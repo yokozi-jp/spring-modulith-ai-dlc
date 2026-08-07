@@ -68,6 +68,18 @@ Based on the user interview, fill in these components:
 - **compatibility**: Required tools, dependencies (optional, rarely needed)
 - **the rest of the skill :)**
 
+### Project-Specific Placement Rules
+
+In this project, all skills live under `.agents/skills/<skill-name>/` as the single source of truth. After creating or editing a skill there, create relative symlinks so that each harness can discover it:
+
+```bash
+# From project root
+ln -s ../../.agents/skills/<skill-name> .claude/skills/<skill-name>
+ln -s ../../.agents/skills/<skill-name> .kiro/skills/<skill-name>
+```
+
+This keeps one canonical copy in `.agents/skills/` with lightweight symlinks for Claude Code (`.claude/skills/`) and Kiro CLI (`.kiro/skills/`). Always create both symlinks when adding a new skill.
+
 ### Skill Writing Guide
 
 #### Anatomy of a Skill
