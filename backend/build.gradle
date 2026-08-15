@@ -3,6 +3,7 @@ plugins {
 	id 'org.springframework.boot' version '4.1.0'
 	id 'io.spring.dependency-management' version '1.1.7'
 	id 'org.cyclonedx.bom' version '3.4.1'
+	id 'com.diffplug.spotless' version '8.9.0'
 }
 
 group = 'com.example'
@@ -69,4 +70,25 @@ dependencyManagement {
 
 tasks.named('test') {
 	useJUnitPlatform()
+}
+
+/*
+ * Spotless: コードフォーマット
+ * Google Java Format を適用。origin/main からの差分のみチェックする。
+ */
+spotless {
+    ratchetFrom 'origin/main'
+    format 'misc', {
+        target '*.gradle', '.gitattributes', '.gitignore'
+        trimTrailingWhitespace()
+        leadingTabsToSpaces(4)
+        endWithNewline()
+    }
+    java {
+        targetExclude 'src/generated/**'
+        removeUnusedImports()
+        cleanthat()
+        googleJavaFormat()
+        formatAnnotations()
+    }
 }
