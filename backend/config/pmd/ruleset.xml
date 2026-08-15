@@ -1,0 +1,40 @@
+<?xml version="1.0"?>
+<ruleset name="pmd java rules"
+		xmlns="http://pmd.sourceforge.net/ruleset/2.0.0"
+		xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+		xsi:schemaLocation="http://pmd.sourceforge.net/ruleset/2.0.0 https://pmd.sourceforge.io/ruleset_2_0_0.xsd">
+    <description>PMD ruleset for Java</description>
+
+    <rule ref="category/java/bestpractices.xml">
+        <!-- テストでは複数アサーションが自然なため無効化 -->
+        <exclude name="UnitTestContainsTooManyAsserts"/>
+        <!-- SLF4J のプレースホルダーで遅延評価されるためガード不要 -->
+        <exclude name="GuardLogStatement"/>
+    </rule>
+    <rule ref="category/java/codestyle.xml">
+        <!-- Lombok がコンストラクタを生成し、record クラスは暗黙コンストラクタを持つため無効化 -->
+        <exclude name="AtLeastOneConstructor"/>
+        <!-- id 等の短い変数名が頻出するため無効化 -->
+        <exclude name="ShortVariable"/>
+        <!-- 長い変数名は説明的で可読性が高いため無効化 -->
+        <exclude name="LongVariable"/>
+        <!-- ドメインモデル名が短くなることがあるため無効化 -->
+        <exclude name="ShortClassName"/>
+        <!-- ガード節（早期 return/throw）を自然に書くため無効化 -->
+        <exclude name="OnlyOneReturn"/>
+    </rule>
+    <rule ref="category/java/design.xml">
+        <!-- メソッドチェーン・Optional チェーン等、流暢 API では不可避なため無効化 -->
+        <exclude name="LawOfDemeter"/>
+        <!-- CRUD Controller は Command/DTO/Request/Response 等で import が多くなるため無効化 -->
+        <exclude name="ExcessiveImports"/>
+    </rule>
+    <rule ref="category/java/documentation.xml">
+        <!-- Javadoc の行数・行長制限は Google Java Format に委ねるため無効化 -->
+        <exclude name="CommentSize"/>
+    </rule>
+    <rule ref="category/java/errorprone.xml"/>
+    <rule ref="category/java/multithreading.xml"/>
+    <rule ref="category/java/performance.xml"/>
+    <rule ref="category/java/security.xml"/>
+</ruleset>
