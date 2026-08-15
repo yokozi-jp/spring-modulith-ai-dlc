@@ -41,7 +41,7 @@ Spring Modulith を用いたモジュラーモノリスアーキテクチャの�
 | Java (Amazon Corretto) | 25 |
 | Spring Boot | 4.1.0 |
 | Spring Modulith | 2.1.0 |
-| TypeScript | 6.0.x |
+| TypeScript | 7.0.x |
 | VitePlus | latest |
 | pnpm | 10.33.0 |
 | PostgreSQL | 17 |
