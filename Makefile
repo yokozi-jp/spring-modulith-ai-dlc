@@ -1,4 +1,4 @@
-.PHONY: setup be-format be-lint be-sbom
+.PHONY: setup be-format be-lint be-test be-coverage be-sbom
 
 ## 開発環境の初期セットアップ（全スクリプトを順次実行）
 ## 実行後に source ~/.bashrc が必要
@@ -19,6 +19,10 @@ be-format:
 ## バックエンドの静的解析（PMD + SpotBugs + Spotless チェック）
 be-lint:
 	cd backend && ./gradlew spotlessCheck pmdMain spotbugsMain
+
+## バックエンドのテスト実行＆カバレッジ検証
+be-test:
+	cd backend && ./gradlew test
 
 ## バックエンドの SBOM 生成（CycloneDX 形式）
 ## 出力先: backend/build/reports/

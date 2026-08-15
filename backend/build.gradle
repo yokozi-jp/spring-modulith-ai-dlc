@@ -1,82 +1,134 @@
 plugins {
-	id 'java'
-	id 'org.springframework.boot' version '4.1.0'
-	id 'io.spring.dependency-management' version '1.1.7'
-	id 'org.cyclonedx.bom' version '3.4.1'
-	id 'com.diffplug.spotless' version '8.9.0'
-	id 'pmd'
-	id 'com.github.spotbugs' version '6.5.9'
-	id 'net.ltgt.errorprone' version '5.1.0'
+    id 'java'
+    id 'org.springframework.boot' version '4.1.0'
+    id 'io.spring.dependency-management' version '1.1.7'
+    id 'org.cyclonedx.bom' version '3.4.1'
+    id 'jacoco'
+    id 'com.diffplug.spotless' version '8.9.0'
+    id 'pmd'
+    id 'com.github.spotbugs' version '6.5.9'
+    id 'net.ltgt.errorprone' version '5.1.0'
 }
 
 group = 'com.example'
 version = '0.0.1-SNAPSHOT'
 
 java {
-	toolchain {
-		languageVersion = JavaLanguageVersion.of(25)
-	}
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(25)
+    }
 }
 
 repositories {
-	mavenCentral()
+    mavenCentral()
 }
 
 ext {
-	set('springCloudVersion', "2025.1.2")
-	set('springModulithVersion', "2.1.0")
+    set('springCloudVersion', "2025.1.2")
+    set('springModulithVersion', "2.1.0")
 }
 
 dependencies {
-	implementation 'org.springframework.boot:spring-boot-starter-actuator'
-	implementation 'org.springframework.boot:spring-boot-starter-jooq'
-	implementation 'org.springframework.boot:spring-boot-starter-liquibase'
-	implementation 'org.springframework.boot:spring-boot-starter-opentelemetry'
-	implementation 'org.springframework.boot:spring-boot-starter-micrometer-metrics'
-	implementation 'org.springframework.boot:spring-boot-starter-security'
-	implementation 'org.springframework.boot:spring-boot-starter-security-oauth2-client'
-	implementation 'org.springframework.boot:spring-boot-starter-session-data-redis'
-	implementation 'org.springframework.boot:spring-boot-starter-validation'
-	implementation 'org.springframework.boot:spring-boot-starter-webmvc'
-	implementation 'org.springframework.cloud:spring-cloud-starter-circuitbreaker-resilience4j'
-	implementation 'org.springframework.modulith:spring-modulith-observability-api'
-	implementation 'org.springframework.modulith:spring-modulith-starter-core'
-	compileOnly 'org.projectlombok:lombok'
-	developmentOnly 'org.springframework.boot:spring-boot-devtools'
-	runtimeOnly 'org.postgresql:postgresql'
-	runtimeOnly 'org.springframework.modulith:spring-modulith-actuator'
-	runtimeOnly 'org.springframework.modulith:spring-modulith-observability-core'
-	runtimeOnly 'io.micrometer:micrometer-registry-otlp'
-	annotationProcessor 'org.projectlombok:lombok'
-	testImplementation 'org.springframework.boot:spring-boot-starter-actuator-test'
-	testImplementation 'org.springframework.boot:spring-boot-starter-jooq-test'
-	testImplementation 'org.springframework.boot:spring-boot-starter-liquibase-test'
-	testImplementation 'org.springframework.boot:spring-boot-starter-opentelemetry-test'
-	testImplementation 'org.springframework.boot:spring-boot-starter-micrometer-metrics-test'
-	testImplementation 'org.springframework.boot:spring-boot-starter-security-oauth2-client-test'
-	testImplementation 'org.springframework.boot:spring-boot-starter-security-test'
-	testImplementation 'org.springframework.boot:spring-boot-starter-session-data-redis-test'
-	testImplementation 'org.springframework.boot:spring-boot-starter-validation-test'
-	testImplementation 'org.springframework.boot:spring-boot-starter-webmvc-test'
-	testImplementation 'org.springframework.modulith:spring-modulith-starter-test'
-	testCompileOnly 'org.projectlombok:lombok'
-	testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
-	testAnnotationProcessor 'org.projectlombok:lombok'
+    implementation 'org.springframework.boot:spring-boot-starter-actuator'
+    implementation 'org.springframework.boot:spring-boot-starter-jooq'
+    implementation 'org.springframework.boot:spring-boot-starter-liquibase'
+    implementation 'org.springframework.boot:spring-boot-starter-opentelemetry'
+    implementation 'org.springframework.boot:spring-boot-starter-micrometer-metrics'
+    implementation 'org.springframework.boot:spring-boot-starter-security'
+    implementation 'org.springframework.boot:spring-boot-starter-security-oauth2-client'
+    implementation 'org.springframework.boot:spring-boot-starter-session-data-redis'
+    implementation 'org.springframework.boot:spring-boot-starter-validation'
+    implementation 'org.springframework.boot:spring-boot-starter-webmvc'
+    implementation 'org.springframework.cloud:spring-cloud-starter-circuitbreaker-resilience4j'
+    implementation 'org.springframework.modulith:spring-modulith-observability-api'
+    implementation 'org.springframework.modulith:spring-modulith-starter-core'
+    compileOnly 'org.projectlombok:lombok'
+    developmentOnly 'org.springframework.boot:spring-boot-devtools'
+    runtimeOnly 'org.postgresql:postgresql'
+    runtimeOnly 'org.springframework.modulith:spring-modulith-actuator'
+    runtimeOnly 'org.springframework.modulith:spring-modulith-observability-core'
+    runtimeOnly 'io.micrometer:micrometer-registry-otlp'
+    annotationProcessor 'org.projectlombok:lombok'
+    testImplementation 'org.springframework.boot:spring-boot-starter-actuator-test'
+    testImplementation 'org.springframework.boot:spring-boot-starter-jooq-test'
+    testImplementation 'org.springframework.boot:spring-boot-starter-liquibase-test'
+    testImplementation 'org.springframework.boot:spring-boot-starter-opentelemetry-test'
+    testImplementation 'org.springframework.boot:spring-boot-starter-micrometer-metrics-test'
+    testImplementation 'org.springframework.boot:spring-boot-starter-security-oauth2-client-test'
+    testImplementation 'org.springframework.boot:spring-boot-starter-security-test'
+    testImplementation 'org.springframework.boot:spring-boot-starter-session-data-redis-test'
+    testImplementation 'org.springframework.boot:spring-boot-starter-validation-test'
+    testImplementation 'org.springframework.boot:spring-boot-starter-webmvc-test'
+    testImplementation 'org.springframework.modulith:spring-modulith-starter-test'
+    testCompileOnly 'org.projectlombok:lombok'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+    testAnnotationProcessor 'org.projectlombok:lombok'
 
-	// Error Prone + NullAway
+    // Error Prone + NullAway
     errorprone 'com.google.errorprone:error_prone_core:2.50.0'
     errorprone 'com.uber.nullaway:nullaway:0.13.8'
 }
 
 dependencyManagement {
-	imports {
-		mavenBom "org.springframework.modulith:spring-modulith-bom:${springModulithVersion}"
-		mavenBom "org.springframework.cloud:spring-cloud-dependencies:${springCloudVersion}"
-	}
+    imports {
+        mavenBom "org.springframework.modulith:spring-modulith-bom:${springModulithVersion}"
+        mavenBom "org.springframework.cloud:spring-cloud-dependencies:${springCloudVersion}"
+    }
 }
 
+/*
+ * テストとカバレッジ
+ * JUnit Platform で実行し、完了後に JaCoCo でカバレッジレポート（HTML/XML）を生成する。
+ * ブランチカバレッジ 85% を下回るとビルド失敗にする。
+ */
 tasks.named('test') {
-	useJUnitPlatform()
+    useJUnitPlatform()
+    finalizedBy jacocoTestCoverageVerification
+}
+
+jacoco {
+    toolVersion = "0.8.15"
+}
+
+def jacocoExcludes = [
+    '**/DemoApplication.class',
+    '**/SecurityConfig*.class',
+    '**/jooq/**'
+]
+
+jacocoTestReport {
+    dependsOn test
+
+ classDirectories.setFrom(
+        sourceSets.main.output.asFileTree.matching {
+            exclude jacocoExcludes
+        }
+    )
+
+    reports {
+        html.required = true
+        xml.required = true
+    }
+}
+
+jacocoTestCoverageVerification {
+    dependsOn jacocoTestReport
+
+     classDirectories.setFrom(
+        sourceSets.main.output.asFileTree.matching {
+            exclude jacocoExcludes
+        }
+    )
+
+    violationRules {
+        rule {
+            limit {
+                counter = 'BRANCH'
+                value = 'COVEREDRATIO'
+                minimum = 0.85
+            }
+        }
+    }
 }
 
 /*
