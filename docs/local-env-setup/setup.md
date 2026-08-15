@@ -123,7 +123,16 @@ gh repo clone yokozi-jp/spring-modulith-ai-dlc
 cd spring-modulith-ai-dlc
 ```
 
-### 7. セットアップスクリプトの実行
+### 7. Git hooks のセットアップ
+
+```bash
+cd /home/projects/spring-modulith-ai-dlc
+npm install
+```
+
+これにより Husky が有効化され、pre-commit フックが `.git/hooks/` にインストールされます。
+
+### 8. セットアップスクリプトの実行
 
 ```bash
 cd docs/local-env-setup
@@ -137,11 +146,11 @@ source ~/.bashrc
 source ~/.bashrc
 ```
 
-### 8. VSCode 拡張機能のインストール
+### 9. VSCode 拡張機能のインストール
 
 `.vscode/extensions.json` に記載されている推奨拡張機能をインストールしてください。
 
-### 9. 動作確認
+### 10. 動作確認
 
 ```bash
 docker info
