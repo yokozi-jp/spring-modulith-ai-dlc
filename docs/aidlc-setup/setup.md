@@ -14,7 +14,7 @@ git checkout v2
 フレームワークのファイルをプロジェクトにコピーします：
 
 ```bash
-cp -r dist/kiro/aidlc/ ../spring-modulith-ai-dlc/aidlc/
+cp -r dist/kiro/aidlc/ ../spring-modulith-ai-dlc/
 cp -r dist/kiro/.kiro/ ../spring-modulith-ai-dlc/
 cp dist/kiro/AGENTS.md ../spring-modulith-ai-dlc/AGENTS.md
 ```
@@ -32,7 +32,7 @@ git pull
 フレームワークのファイルを上書きコピーします：
 
 ```bash
-cp -r dist/kiro/aidlc/ ../spring-modulith-ai-dlc/aidlc/
+cp -r dist/kiro/aidlc/ ../spring-modulith-ai-dlc/
 cp -r dist/kiro/.kiro/ ../spring-modulith-ai-dlc/
 cp dist/kiro/AGENTS.md ../spring-modulith-ai-dlc/AGENTS.md
 ```
