@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<FindBugsFilter>
+  <!-- DDD 集約/エンティティのコンストラクタでバリデーション例外を投げるのは正当なパターン -->
+  <Match>
+    <Bug pattern="CT_CONSTRUCTOR_THROW" />
+  </Match>
+</FindBugsFilter>

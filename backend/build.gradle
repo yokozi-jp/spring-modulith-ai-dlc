@@ -5,6 +5,7 @@ plugins {
 	id 'org.cyclonedx.bom' version '3.4.1'
 	id 'com.diffplug.spotless' version '8.9.0'
 	id 'pmd'
+	id 'com.github.spotbugs' version '6.5.9'
 }
 
 group = 'com.example'
@@ -103,4 +104,12 @@ pmd {
     consoleOutput = true
     ignoreFailures = false
     ruleSetFiles = files("config/pmd/ruleset.xml")
+}
+
+spotbugs {
+    toolVersion = '4.9.8'
+    ignoreFailures = false
+    showStackTraces = true
+    showProgress = true
+    excludeFilter = file('config/spotbugs/exclusion-filter.xml')
 }
