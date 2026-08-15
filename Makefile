@@ -1,4 +1,4 @@
-.PHONY: setup backend-sbom
+.PHONY: setup be-format be-lint be-sbom
 
 ## 開発環境の初期セットアップ（全スクリプトを順次実行）
 ## 実行後に source ~/.bashrc が必要
@@ -12,7 +12,15 @@ setup:
 		./05-setup-lsp.sh && \
 		./06-setup-bun.sh
 
+## バックエンドのコードフォーマット適用（Spotless）
+be-format:
+	cd backend && ./gradlew spotlessApply
+
+## バックエンドの静的解析（PMD + SpotBugs + Spotless チェック）
+be-lint:
+	cd backend && ./gradlew spotlessCheck pmdMain spotbugsMain
+
 ## バックエンドの SBOM 生成（CycloneDX 形式）
 ## 出力先: backend/build/reports/
-backend-sbom:
+be-sbom:
 	cd backend && ./gradlew cyclonedxBom
