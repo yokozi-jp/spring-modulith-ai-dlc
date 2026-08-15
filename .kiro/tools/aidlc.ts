@@ -176,6 +176,7 @@ export const ROUTES: readonly Route[] = [
       "merge",
       "park",
       "unpark",
+      "unit",
     ],
   },
   {
@@ -301,10 +302,10 @@ export const ROUTES: readonly Route[] = [
     group: "intent",
     kind: "custom",
     classification: "translation",
-    verbs: ["list", "switch", "<name>", "birth"],
+    verbs: ["list", "switch", "<name>", "create"],
     custom: "workspace",
-    human: [{ command: "intent [list|switch|birth]", summary: "list, switch, or create intent context" }],
-    all: ["list [--json]", "switch <name>", "<name>", "birth [args]"],
+    human: [{ command: "intent [list|switch|create]", summary: "list, switch, or create intent context" }],
+    all: ["list [--json]", "switch <name>", "<name>", "create [args]"],
   },
   {
     id: "space",
@@ -330,11 +331,12 @@ export const ROUTES: readonly Route[] = [
     group: "config",
     kind: "custom",
     classification: "translation",
-    verbs: ["set depth", "set test-strategy", "get", "list"],
+    verbs: ["set depth", "set test-strategy", "set review", "get", "list"],
     custom: "config",
     targets: {
       "set depth": "config-change",
       "set test-strategy": "config-change",
+      "set review": "config-change",
       get: "config-get",
       list: "config-list",
     },
@@ -343,7 +345,7 @@ export const ROUTES: readonly Route[] = [
       { command: "config set <key> <value>", summary: "change supported project configuration" },
       { command: "config list", summary: "list supported project configuration" },
     ],
-    all: ["set depth <value>", "set test-strategy <value>", "get <key>", "list"],
+    all: ["set depth <value>", "set test-strategy <value>", "set review <value>", "get <key>", "list"],
   },
   {
     id: "plugin",
@@ -441,16 +443,23 @@ function toolsDir(): string {
   return dispatcherDir();
 }
 
-type AdapterHarness = "codex" | "kiro" | "kiro-ide";
+type AdapterHarness = "codex" | "cursor" | "kiro" | "kiro-ide";
 
 const ADAPTER_HARNESS_LEAF: Record<AdapterHarness, string> = {
   codex: ".codex",
+  cursor: ".cursor",
   kiro: ".kiro",
   "kiro-ide": ".kiro",
 };
 
 function isAdapterHarness(value: string): value is AdapterHarness {
   return Object.hasOwn(ADAPTER_HARNESS_LEAF, value);
+}
+
+function adapterFile(harness: AdapterHarness): string {
+  if (harness === "codex") return "aidlc-codex-adapter.ts";
+  if (harness === "cursor") return "aidlc-cursor-adapter.ts";
+  return "aidlc-kiro-adapter.ts";
 }
 
 function resolveHookPath(
@@ -469,6 +478,7 @@ function resolveHookPath(
         ".claude",
         ".kiro",
         ".codex",
+        ".cursor",
       ].filter((value, index, values): value is string =>
         typeof value === "string" && value.length > 0 && values.indexOf(value) === index
       );
@@ -583,6 +593,11 @@ function handleConfig(route: Route, argv: string[]): Action {
     if (missing) return missing;
     return { type: "delegate", tool: TOOLS.utility, args: ["config-change", "--test-strategy", value, ...argv.slice(4)] };
   }
+  if (key === "review") {
+    const missing = requireValue("config", "set review", value);
+    if (missing) return missing;
+    return { type: "delegate", tool: TOOLS.utility, args: ["config-change", "--review", value, ...argv.slice(4)] };
+  }
   return nounError("config", key ? `set ${key}` : "set");
 }
 
@@ -647,7 +662,7 @@ function handleRouteOnly(route: Route, argv: string[]): Action {
     if (!isAdapterHarness(harness)) return nounError("adapter", harness);
     if (!target) return nounError("adapter", undefined);
     if (!isSafeName(target)) return nounError("adapter", target);
-    const file = harness === "codex" ? "aidlc-codex-adapter.ts" : "aidlc-kiro-adapter.ts";
+    const file = adapterFile(harness);
     return {
       type: "adapter",
       harness,
@@ -800,9 +815,7 @@ export function resolveAction(argv: string[]): Action {
       action.path = resolveHookPath("aidlc-statusline.ts", undefined, absoluteProjectDir);
     } else if (action.type === "adapter") {
       action.projectDir = absoluteProjectDir;
-      const file = action.harness === "codex"
-        ? "aidlc-codex-adapter.ts"
-        : "aidlc-kiro-adapter.ts";
+      const file = adapterFile(action.harness);
       action.path = resolveHookPath(file, action.harness, absoluteProjectDir);
     } else if (action.type === "sensor-script-file") {
       action.projectDir = absoluteProjectDir;
@@ -1021,7 +1034,13 @@ async function runAdapter(action: Extract<Action, { type: "adapter" }>): Promise
     let input = "";
     if (action.harness !== "kiro-ide") {
       input = await readStdin();
-    } else if (action.target === "audit-and-sensors" || action.target === "log-subagent") {
+    } else if (
+      action.target === "audit-and-sensors" ||
+      action.target === "log-subagent" ||
+      action.target === "rebuild-stage-graph" ||
+      action.target === "session-start" ||
+      action.target === "continue-workflow"
+    ) {
       // Mirror the adapter entry point's dual-generation channel contract.
       // IDE 0.12 provides USER_PROMPT and leaves stdin open forever, so consume
       // a non-empty env payload immediately. IDE 1.x leaves USER_PROMPT empty

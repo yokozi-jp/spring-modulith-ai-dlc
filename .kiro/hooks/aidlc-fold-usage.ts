@@ -38,11 +38,12 @@ import { isLifecycleBoundaryCommand } from "./aidlc-state-transition-guard.ts";
 import {
   type FoldMode,
   foldTranscriptIntoLedger,
+  usageTrackingDisabled,
   writeCurrentTranscriptPath,
 } from "../tools/aidlc-usage.ts";
 
 // The Current Stage slug from the state file - a minimal substring match,
-// replicating aidlc-stop.ts's currentStageSlug so byStage keys agree. Returns ""
+// replicating aidlc-continue-workflow.ts's currentStageSlug so byStage keys agree. Returns ""
 // when the field is absent.
 function currentStageSlug(stateContent: string): string {
   const stageMatch = stateContent.match(/Current Stage\*{0,2}:?\s*`?([^\n`]*)`?/);
@@ -61,6 +62,11 @@ function isLifecycleBoundaryToolCall(name: string, input: unknown): boolean {
 async function main(): Promise<void> {
   // TTY guard - no Claude Code JSON is coming on a terminal (tests/debug).
   if (process.stdin.isTTY) process.exit(0);
+
+  // Kill switch - this hook fires around EVERY tool call, so exit before
+  // reading stdin or touching the ledger. AIDLC_DISABLE_USAGE_TRACKING=1
+  // silences the producer entirely (fold, pointers, session-id capture here).
+  if (usageTrackingDisabled()) process.exit(0);
 
   const projectDir = resolveProjectDirFromHook(import.meta.url);
 
@@ -89,7 +95,7 @@ async function main(): Promise<void> {
 
   if (!transcriptPath) process.exit(0);
 
-  // Derive the current stage the same way aidlc-stop.ts does: read the state
+  // Derive the current stage the same way aidlc-continue-workflow.ts does: read the state
   // file directly. Absent state => null so byStage is not polluted.
   let currentStage: string | null = null;
   try {
