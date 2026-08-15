@@ -126,15 +126,8 @@ cd spring-modulith-ai-dlc
 ### 7. セットアップスクリプトの実行
 
 ```bash
-cd docs/local-env-setup
-./01-setup-java.sh
-./02-setup-viteplus.sh
-source ~/.bashrc
-./03-setup-kiro.sh
-export PATH="$HOME/.local/bin:$PATH"
-./04-setup-shell.sh
-./05-setup-lsp.sh
-./06-setup-bun.sh
+cd /home/projects/spring-modulith-ai-dlc
+make setup
 source ~/.bashrc
 ```
 

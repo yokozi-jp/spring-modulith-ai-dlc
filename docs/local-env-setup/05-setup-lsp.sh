@@ -2,6 +2,9 @@
 set -e
 source ./versions.env
 
+# VitePlus の PATH を設定（source ~/.bashrc なしでも動作するように）
+export PATH="$HOME/.vite-plus/bin:$PATH"
+
 # TypeScript 言語サーバー
 vp install -g typescript-language-server typescript
 echo 'export PATH="$HOME/.vite-plus/bin:$PATH"' >> ~/.bashrc
