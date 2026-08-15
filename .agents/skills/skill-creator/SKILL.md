@@ -70,15 +70,14 @@ Based on the user interview, fill in these components:
 
 ### Project-Specific Placement Rules
 
-In this project, all skills live under `.agents/skills/<skill-name>/` as the single source of truth. After creating or editing a skill there, create relative symlinks so that each harness can discover it:
+In this project, all skills live under `.agents/skills/<skill-name>/` as the single source of truth. After creating or editing a skill there, create a relative symlink so that Kiro CLI can discover it:
 
 ```bash
 # From project root
-ln -s ../../.agents/skills/<skill-name> .claude/skills/<skill-name>
 ln -s ../../.agents/skills/<skill-name> .kiro/skills/<skill-name>
 ```
 
-This keeps one canonical copy in `.agents/skills/` with lightweight symlinks for Claude Code (`.claude/skills/`) and Kiro CLI (`.kiro/skills/`). Always create both symlinks when adding a new skill.
+This keeps one canonical copy in `.agents/skills/` with a lightweight symlink for Kiro CLI (`.kiro/skills/`).
 
 ### Skill Writing Guide
 
