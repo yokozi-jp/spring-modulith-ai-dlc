@@ -43,8 +43,8 @@ Spring Modulith を用いたモジュラーモノリスアーキテクチャの�
 | Spring Modulith | 2.1.0 |
 | TypeScript | 7.0.x |
 | VitePlus | latest |
-| pnpm | 10.33.0 |
-| PostgreSQL | 17 |
+| pnpm | 11.21.0 |
+| PostgreSQL | 18 |
 | Redis | 7.x |
 | Bun (AI-DLC ランタイム) | 1.3.14 |
 
