@@ -6,6 +6,7 @@ plugins {
 	id 'com.diffplug.spotless' version '8.9.0'
 	id 'pmd'
 	id 'com.github.spotbugs' version '6.5.9'
+	id 'net.ltgt.errorprone' version '5.1.0'
 }
 
 group = 'com.example'
@@ -61,6 +62,10 @@ dependencies {
 	testCompileOnly 'org.projectlombok:lombok'
 	testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 	testAnnotationProcessor 'org.projectlombok:lombok'
+
+	// Error Prone + NullAway
+    errorprone 'com.google.errorprone:error_prone_core:2.50.0'
+    errorprone 'com.uber.nullaway:nullaway:0.13.8'
 }
 
 dependencyManagement {
@@ -116,4 +121,24 @@ spotbugs {
     showStackTraces = true
     showProgress = true
     excludeFilter = file('config/spotbugs/exclusion-filter.xml')
+}
+
+/*
+ * Error Prone: コンパイル時バグ検出
+ * NullAway による null 安全性チェック（テストコードでは無効）と
+ * 未使用変数・タイムゾーン未指定の検出をエラーに昇格させる。
+ */
+tasks.withType(JavaCompile).configureEach {
+    options.errorprone {
+        error('NullAway')
+        error('UnusedVariable')
+        error('JavaTimeDefaultTimeZone')
+        option('NullAway:AnnotatedPackages', 'com.example.demo')
+        option('NullAway:JSpecifyMode', 'true')
+    }
+    if (name.toLowerCase().contains("test")) {
+        options.errorprone {
+            disable('NullAway')
+        }
+    }
 }
