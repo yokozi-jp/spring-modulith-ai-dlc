@@ -1,6 +1,28 @@
+# 環境変数の設定漏れを検知しやすくするため、デフォルト値は設定しない
 spring:
   application:
     name: demo
+  # ローカル: .env ファイルで環境変数を定義する
+  # STG/本番: ECS タスク定義の environment / secrets で環境変数を注入する
+  config:
+    import: optional:file:.env[.properties]
+  # 仮想スレッドを有効化し Tomcat のスループットを向上
   threads:
     virtual:
       enabled: true
+  # DB
+  datasource:
+    url: ${DB_URL}
+    username: ${DB_USERNAME}
+    password: ${DB_PASSWORD}
+    hikari:
+      schema: ${DB_SCHEMA}
+  # Redis
+  data:
+    redis:
+      host: ${REDIS_HOST}
+      port: ${REDIS_PORT}
+  session:
+    data:
+      redis:
+        namespace: "spring:session:demo"

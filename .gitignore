@@ -26,6 +26,9 @@ replay_pid*
 # Node
 node_modules/
 
+# Environment
+.env
+
 # AI-DLC workspace — per-user cursors and machine-local runtime
 aidlc/active-space
 aidlc/spaces/*/intents/active-intent
