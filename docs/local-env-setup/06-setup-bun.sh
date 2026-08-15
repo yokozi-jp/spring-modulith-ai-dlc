@@ -7,10 +7,4 @@ source "$SCRIPT_DIR/versions.env"
 echo "=== Installing Bun v${BUN_VERSION} ==="
 curl -fsSL https://bun.sh/install | bash -s "bun-v${BUN_VERSION}"
 
-# shellcheck source=/dev/null
-source ~/.bashrc
-
-echo "=== Verifying Bun installation ==="
-bun --version
-
 echo "=== Bun setup complete ==="

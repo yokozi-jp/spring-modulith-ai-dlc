@@ -123,7 +123,22 @@ gh repo clone yokozi-jp/spring-modulith-ai-dlc
 cd spring-modulith-ai-dlc
 ```
 
-### 7. Git hooks のセットアップ
+### 7. セットアップスクリプトの実行
+
+```bash
+cd docs/local-env-setup
+./01-setup-java.sh
+./02-setup-viteplus.sh
+source ~/.bashrc
+./03-setup-kiro.sh
+export PATH="$HOME/.local/bin:$PATH"
+./04-setup-shell.sh
+./05-setup-lsp.sh
+./06-setup-bun.sh
+source ~/.bashrc
+```
+
+### 8. Git hooks のセットアップ
 
 ```bash
 cd /home/projects/spring-modulith-ai-dlc
@@ -132,31 +147,27 @@ npm install
 
 これにより Husky が有効化され、pre-commit フックが `.git/hooks/` にインストールされます。
 
-### 8. セットアップスクリプトの実行
+### 9. VSCode から WSL への接続
 
-```bash
-cd docs/local-env-setup
-./01-setup-java.sh
-./02-setup-viteplus.sh
-source ~/.bashrc
-./03-setup-kiro.sh
-./04-setup-shell.sh
-./05-setup-lsp.sh
-./06-setup-bun.sh
-source ~/.bashrc
-```
+1. Windows 側で VSCode を起動
+2. `F1` キーを押してコマンドパレットを開く
+3. `WSL: Connect to WSL using Distro...` を選択
+4. 手順 1 で作成したインスタンス名を選択
 
-### 9. VSCode 拡張機能のインストール
+VSCode が WSL モードで再起動し、左下のステータスバーに `WSL: <インスタンス名>` と表示されれば接続完了です。
+
+### 10. VSCode 拡張機能のインストール
 
 `.vscode/extensions.json` に記載されている推奨拡張機能をインストールしてください。
 
-### 10. 動作確認
+### 11. 動作確認
 
 ```bash
 docker info
 java -version
 node -v
 gh auth status
+bun --version
 ```
 
 エラーなく各ツールの情報が表示されれば環境構築完了です。
