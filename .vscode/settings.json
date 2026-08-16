@@ -19,10 +19,5 @@
   "editor.codeActionsOnSave": {
     "source.fixAll.oxc": "explicit"
   },
-  "[java]": {
-    "editor.defaultFormatter": "redhat.java"
-  },
   "java.compile.nullAnalysis.mode": "automatic",
-  "java.configuration.updateBuildConfiguration": "automatic",
-  "java.import.gradle.java.home": "/usr/lib/jvm/java-25-amazon-corretto"
 }
