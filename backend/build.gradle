@@ -1,3 +1,16 @@
+/*
+ * Liquibase Gradle プラグインが apply 時に Liquibase 5.x のクラスを参照するため、
+ * buildscript classpath に明示的に追加する（liquibaseRuntime はタスク実行時のみ有効）。
+ */
+buildscript {
+    repositories {
+        mavenCentral()
+    }
+    dependencies {
+        classpath 'org.liquibase:liquibase-core:5.0.3'
+    }
+}
+
 plugins {
     id 'java'
     id 'org.springframework.boot' version '4.1.0'
@@ -8,6 +21,7 @@ plugins {
     id 'pmd'
     id 'com.github.spotbugs' version '6.5.9'
     id 'net.ltgt.errorprone' version '5.1.0'
+    id 'org.liquibase.gradle' version '3.1.0'
 }
 
 group = 'com.example'
@@ -29,42 +43,58 @@ ext {
 }
 
 dependencies {
-    implementation 'org.springframework.boot:spring-boot-starter-actuator'
-    implementation 'org.springframework.boot:spring-boot-starter-jooq'
-    implementation 'org.springframework.boot:spring-boot-starter-liquibase'
-    implementation 'org.springframework.boot:spring-boot-starter-opentelemetry'
-    implementation 'org.springframework.boot:spring-boot-starter-micrometer-metrics'
+
+    // --- Web・API ---
+    implementation 'org.springframework.boot:spring-boot-starter-webmvc'
+    implementation 'org.springframework.boot:spring-boot-starter-validation'
+
+    // --- セキュリティ ---
     implementation 'org.springframework.boot:spring-boot-starter-security'
     implementation 'org.springframework.boot:spring-boot-starter-security-oauth2-client'
     implementation 'org.springframework.boot:spring-boot-starter-session-data-redis'
-    implementation 'org.springframework.boot:spring-boot-starter-validation'
-    implementation 'org.springframework.boot:spring-boot-starter-webmvc'
-    implementation 'org.springframework.cloud:spring-cloud-starter-circuitbreaker-resilience4j'
-    implementation 'org.springframework.modulith:spring-modulith-observability-api'
-    implementation 'org.springframework.modulith:spring-modulith-starter-core'
-    compileOnly 'org.projectlombok:lombok'
-    developmentOnly 'org.springframework.boot:spring-boot-devtools'
+
+    // --- データアクセス ---
+    implementation 'org.springframework.boot:spring-boot-starter-jooq'
+    implementation 'org.springframework.boot:spring-boot-starter-liquibase'
     runtimeOnly 'org.postgresql:postgresql'
+
+    // --- モジュラーモノリス ---
+    implementation 'org.springframework.modulith:spring-modulith-starter-core'
+    implementation 'org.springframework.modulith:spring-modulith-observability-api'
     runtimeOnly 'org.springframework.modulith:spring-modulith-actuator'
     runtimeOnly 'org.springframework.modulith:spring-modulith-observability-core'
+
+    // --- 可観測性・メトリクス ---
+    implementation 'org.springframework.boot:spring-boot-starter-actuator'
+    implementation 'org.springframework.boot:spring-boot-starter-opentelemetry'
+    implementation 'org.springframework.boot:spring-boot-starter-micrometer-metrics'
     runtimeOnly 'io.micrometer:micrometer-registry-otlp'
+
+    // --- 耐障害性 ---
+    implementation 'org.springframework.cloud:spring-cloud-starter-circuitbreaker-resilience4j'
+
+    // --- 開発支援 ---
+    compileOnly 'org.projectlombok:lombok'
     annotationProcessor 'org.projectlombok:lombok'
-    testImplementation 'org.springframework.boot:spring-boot-starter-actuator-test'
+    developmentOnly 'org.springframework.boot:spring-boot-devtools'
+
+    // --- テスト ---
+    testImplementation 'org.springframework.boot:spring-boot-starter-webmvc-test'
+    testImplementation 'org.springframework.boot:spring-boot-starter-validation-test'
+    testImplementation 'org.springframework.boot:spring-boot-starter-security-test'
+    testImplementation 'org.springframework.boot:spring-boot-starter-security-oauth2-client-test'
+    testImplementation 'org.springframework.boot:spring-boot-starter-session-data-redis-test'
     testImplementation 'org.springframework.boot:spring-boot-starter-jooq-test'
     testImplementation 'org.springframework.boot:spring-boot-starter-liquibase-test'
+    testImplementation 'org.springframework.boot:spring-boot-starter-actuator-test'
     testImplementation 'org.springframework.boot:spring-boot-starter-opentelemetry-test'
     testImplementation 'org.springframework.boot:spring-boot-starter-micrometer-metrics-test'
-    testImplementation 'org.springframework.boot:spring-boot-starter-security-oauth2-client-test'
-    testImplementation 'org.springframework.boot:spring-boot-starter-security-test'
-    testImplementation 'org.springframework.boot:spring-boot-starter-session-data-redis-test'
-    testImplementation 'org.springframework.boot:spring-boot-starter-validation-test'
-    testImplementation 'org.springframework.boot:spring-boot-starter-webmvc-test'
     testImplementation 'org.springframework.modulith:spring-modulith-starter-test'
     testCompileOnly 'org.projectlombok:lombok'
-    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
     testAnnotationProcessor 'org.projectlombok:lombok'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 
-    // Error Prone + NullAway
+    // --- 静的解析 (Error Prone + NullAway) ---
     errorprone 'com.google.errorprone:error_prone_core:2.50.0'
     errorprone 'com.uber.nullaway:nullaway:0.13.8'
 }
@@ -99,7 +129,7 @@ def jacocoExcludes = [
 jacocoTestReport {
     dependsOn test
 
- classDirectories.setFrom(
+    classDirectories.setFrom(
         sourceSets.main.output.asFileTree.matching {
             exclude jacocoExcludes
         }
@@ -193,4 +223,33 @@ tasks.withType(JavaCompile).configureEach {
             disable('NullAway')
         }
     }
+}
+
+/*
+ * Liquibase: DBマイグレーション
+ * Gradle タスク（update, rollback 等）から直接実行するための設定。
+ * 接続情報は環境変数から取得し、未設定時はローカル開発用デフォルトを使用する。
+ */
+def liquibaseDbUrl = System.getenv('DB_URL') ?: 'jdbc:postgresql://localhost:5432/demo'
+def liquibaseDbUsername = System.getenv('DB_USERNAME') ?: 'demo'
+def liquibaseDbPassword = System.getenv('DB_PASSWORD') ?: 'demo'
+def liquibaseDbSchema = System.getenv('DB_SCHEMA') ?: 'demo'
+
+liquibase {
+    activities {
+        main {
+            changelogFile 'db/changelog/db.changelog-master.yaml'
+            searchPath 'src/main/resources'
+            url liquibaseDbUrl
+            username liquibaseDbUsername
+            password liquibaseDbPassword
+            defaultSchemaName liquibaseDbSchema
+        }
+    }
+}
+
+dependencies {
+    liquibaseRuntime 'org.liquibase:liquibase-core:5.0.3'
+    liquibaseRuntime 'org.postgresql:postgresql'
+    liquibaseRuntime 'info.picocli:picocli:4.7.7'
 }
