@@ -8,8 +8,6 @@
     <rule ref="category/java/bestpractices.xml">
         <!-- テストでは複数アサーションが自然なため無効化 -->
         <exclude name="UnitTestContainsTooManyAsserts"/>
-        <!-- SLF4J のプレースホルダーで遅延評価されるためガード不要 -->
-        <exclude name="GuardLogStatement"/>
     </rule>
     <rule ref="category/java/codestyle.xml">
         <!-- Lombok がコンストラクタを生成し、record クラスは暗黙コンストラクタを持つため無効化 -->
