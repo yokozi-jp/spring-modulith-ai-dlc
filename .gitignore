@@ -32,7 +32,6 @@ node_modules/
 # AI-DLC workspace — per-user cursors and machine-local runtime
 aidlc/active-space
 aidlc/spaces/*/intents/active-intent
-aidlc/.aidlc-clone-id
-aidlc/.aidlc-sessions/
+aidlc/.aidlc-*
 aidlc/spaces/*/intents/*/runtime-graph.json
 aidlc/spaces/*/intents/*/.aidlc-*
