@@ -1,63 +1,64 @@
 # Project-Level Rules
 
-> プロジェクト固有の特殊化と修正。`org.md` および `team.md` の後に厳密加算的ガイダンスとしてロードされる。
-> より広いポリシーとの矛盾は拒否される。
-> practices-discovery と自己学習ループによって投入される。
+> Project-specific specialisation and corrections. Loaded after `org.md` and
+> `team.md` as strict-additive guidance; contradictions with broader policy
+> are rejected. Populated by practices-discovery and the self-learning loop.
 >
-> 控えめに使うこと。大半のチームはプロジェクトレイヤーを必要としない。
-> この特定のプロジェクトがチームプラクティスを超えた安定的かつ持続的なガイダンスを必要とする場合にのみ使用する
-> （例：パッケージ固有のリリースチェック、レガシーコンポーネント用の追加リグレッションスイートなど）。
+> Use sparingly: most teams don't need a project layer. Reach for it
+> only when this specific project needs stable, durable guidance beyond the
+> team practice (for example, package-specific release checks or an additional
+> regression suite for a legacy component).
 
 ## Way of Working
 
-<!-- プロジェクト固有の特殊化。例： -->
-<!-- このモノレポではパッケージスコープのブランチ名を要求し、 -->
-<!-- チームの通常のマージポリシーに加えてパッケージオーナーのレビューを要求する。 -->
+<!-- Project-specific specialisation. Example: -->
+<!-- This monorepo requires package-scoped branch names and a package owner -->
+<!-- review in addition to the team's normal merge policy. -->
 
 ## Walking Skeleton
 
-<!-- プロジェクト固有の特殊化。例： -->
-<!-- ウォーキングスケルトンは新しいサービス境界だけでなく、 -->
-<!-- レガシーサービスアダプターも演習しなければならない。 -->
+<!-- Project-specific specialisation. Example: -->
+<!-- The walking skeleton must exercise the legacy service adapter as well -->
+<!-- as the new service boundary. -->
 
 ## Testing Posture
 
-<!-- プロジェクト固有の特殊化。 -->
+<!-- Project-specific specialisation. -->
 
 ## Deployment
 
-<!-- プロジェクト固有の特殊化。 -->
+<!-- Project-specific specialisation. -->
 
 ## Code Style
 
-<!-- プロジェクト固有の特殊化。 -->
+<!-- Project-specific specialisation. -->
 
 ## Tech Stack
 
-<!-- このプロジェクトで確定した技術選定。 -->
+<!-- Technology choices locked for this project. -->
 
 ## Decided
 
-<!-- 以前のステージで決定され、再度問うべきでない事項。 -->
-<!-- 形式：DECIDED: [決定内容] (Stage [slug], [日付]) -->
+<!-- Decisions made in earlier stages that should not be re-asked. -->
+<!-- Format: DECIDED: [decision] (Stage [slug], [date]) -->
 
 ## Scope Overrides
 
-<!-- このプロジェクトのカスタムスコープルール。 -->
+<!-- Custom scope rules for this project. -->
 
 ## Forbidden
 
-<!-- practices-discovery の確認ゲートで投入される。 -->
-<!-- 形式：NEVER [振る舞い] (affirmed [日付]) -->
-<!-- 例：NEVER throw exceptions across service layer boundaries (affirmed 2026-05-17) -->
+<!-- Populated by practices-discovery affirmation gate. -->
+<!-- Format: NEVER [behavior] (affirmed [date]) -->
+<!-- Example: NEVER throw exceptions across service layer boundaries (affirmed 2026-05-17) -->
 
 ## Mandated
 
-<!-- practices-discovery の確認ゲートで投入される。 -->
-<!-- 形式：ALWAYS [振る舞い] (affirmed [日付]) -->
-<!-- 例：ALWAYS use Result<T,E> for fallible operations in service layer (affirmed 2026-05-17) -->
+<!-- Populated by practices-discovery affirmation gate. -->
+<!-- Format: ALWAYS [behavior] (affirmed [date]) -->
+<!-- Example: ALWAYS use Result<T,E> for fallible operations in service layer (affirmed 2026-05-17) -->
 
 ## Corrections
 
-<!-- 人間のフィードバックによるプロジェクト固有の修正。 -->
-<!-- 形式：NEVER/ALWAYS [振る舞い] (learned [日付]) -->
+<!-- Project-specific corrections from human feedback. -->
+<!-- Format: NEVER/ALWAYS [behavior] (learned [date]) -->

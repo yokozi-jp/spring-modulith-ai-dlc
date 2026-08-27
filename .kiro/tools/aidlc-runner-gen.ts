@@ -175,7 +175,14 @@ that flag without this skill.
    exactly as the directive describes; do not load the conductor persona by hand,
    the engine delivers it.
 
-2. When the stage's work is done, commit the single-stage record:
+2. Before acting on the directive, read
+   \`${harnessDir()}/aidlc-common/protocols/stage-protocol.md\`. Then read every
+   \`${harnessDir()}/aidlc-common/protocols/stage-protocol-<module>.md\` named by
+   \`directive.protocol_modules\`. Load every listed module before reading the
+   stage body or running its topology; skip only a module already loaded earlier
+   in this session.
+
+3. When the stage's work is done, commit the single-stage record:
 
    \`\`\`bash
    bun ${harnessDir()}/tools/aidlc-orchestrate.ts report --single --stage ${node.slug} --result completed
@@ -192,11 +199,11 @@ that flag without this skill.
 // `intent-create` move (which runs the whole initialization phase — mint the
 // intent + detect the workspace + build state — in one call). This is the
 // init-phase analogue of the per-stage runners: opt-in packaging over a path
-// the engine already names at birth. It drives `intent-create`, NOT
+// the engine already names at creation. It drives `intent-create`, NOT
 // `--stage … --single`, so the stage-runner drift guard (which keys on the
 // `--stage`+`--single` marker) never counts it. There is no user-facing
 // `/aidlc --init` (P4): the workspace shell ships in dist/ and the engine
-// auto-births the first intent — this runner just makes that explicit.
+// auto-creates the first intent - this runner just makes that explicit.
 export function renderInitRunner(): string {
   return `---
 name: ${INIT_RUNNER_DIR}
@@ -204,18 +211,18 @@ generated-by: aidlc-runner-gen
 description: >
   Start an AI-DLC workflow — run the whole Initialization phase (mint the
   intent, detect the workspace, build state) in one step, without typing a
-  stage. The engine normally auto-births the first intent; this is opt-in
+  stage. The engine normally auto-creates the first intent; this is opt-in
   packaging over that move. Pass \`--scope <name>\` to seed the initial scope, or a freeform description of what to build.
 argument-hint: "[--scope <name>] [description]"
 user-invocable: true
 ${nativeRunnerFrontmatter()}\
 ---
 
-# AI-DLC — start a workflow (birth the first intent)
+# AI-DLC - start a workflow (create the first intent)
 
 Start a fresh AI-DLC workflow. The workspace shell ships in \`dist/\` (no setup
-command), and the engine auto-births the first intent when you describe what to
-build — this skill is opt-in packaging over that birth move. Initialization is a
+command), and the engine auto-creates the first intent when you describe what to
+build - this skill is opt-in packaging over that creation move. Initialization is a
 PHASE, not a single stage — it mints the intent, detects the workspace
 (greenfield/brownfield), and builds \`aidlc-state.md\` together, in one
 deterministic call. There is no per-init-stage runner because an init stage has
@@ -223,7 +230,7 @@ no standalone meaning.
 
 ## Steps
 
-1. Birth the intent (run the initialization phase). Parse the user's
+1. Create the intent (run the initialization phase). Parse the user's
    \`$ARGUMENTS\`: forward any recognized flags
    (\`--scope <name>\`/\`--depth <level>\`/\`--test-strategy <level>\`)
    as-is, and pass any freeform description text via \`--arguments "<text>"\`
@@ -237,15 +244,16 @@ no standalone meaning.
    tool then falls back to the scope token):
 
    \`\`\`bash
-   bun ${harnessDir()}/tools/aidlc-utility.ts intent-create --arguments "<description>" --label "<2-3 word essence>"
+   bun ${harnessDir()}/tools/aidlc-utility.ts intent-create --scope <scope> --arguments "<description>" --label "<2-3 word essence>"
    \`\`\`
 
-   Pass \`--scope <name>\` only if the user named one; otherwise omit it and the
-   engine picks the install's default scope. If the user gave neither a scope nor
-   a description, do not run a bare \`intent-create\`: ask what they want to build
-   or which scope to use. When only a scope was supplied, omit \`--arguments\` and
-   \`--label\`. Print the tool's output and stop. This does not advance a stage;
-   run \`/aidlc\` afterwards to continue.
+   Pass the user's \`--scope <name>\` when they named one; otherwise omit
+   \`--scope\` — the tool resolves the implicit default itself
+   (\`AWS_AIDLC_DEFAULT_SCOPE\`, else \`classic\`). If the user gave neither a
+   scope nor a description, do not run a bare \`intent-create\`: ask what they
+   want to build or which scope to use. When only a scope was supplied, omit
+   \`--arguments\` and \`--label\`. Print the tool's output and stop. This does
+   not advance a stage; run \`/aidlc\` afterwards to continue.
 `;
 }
 
@@ -633,7 +641,14 @@ engine owns all routing; the conductor persona arrives on the first directive's
 ## The loop
 
 1. \`directive = bun ${harnessDir()}/tools/aidlc-orchestrate.ts next --scope ${scope} $ARGUMENTS\`
-2. Act on \`directive.kind\` exactly as the orchestrator does (run-stage / ask / print / error / done) — see \`aidlc-common/protocols/stage-protocol.md\`.
+2. Before acting on each directive, read
+   \`${harnessDir()}/aidlc-common/protocols/stage-protocol.md\` once per session,
+   then read every
+   \`${harnessDir()}/aidlc-common/protocols/stage-protocol-<module>.md\` named by
+   \`directive.protocol_modules\`. Load every listed module before acting; skip
+   only a module already loaded earlier in this session. Then act on
+   \`directive.kind\` exactly as the orchestrator does (run-stage / invoke-swarm /
+   ask / print / error / done).
 3. \`bun ${harnessDir()}/tools/aidlc-orchestrate.ts report --stage <directive.stage> --result <outcome> [--user-input "<text>"]\` when the directive names a stage; omit \`--stage\` only for non-stage report round-trips.
 4. Repeat from step 1 until \`directive.kind == done\`.
 
@@ -648,7 +663,7 @@ Before you forward \`$ARGUMENTS\` on step 1, make the SAME recognise-vs-route
 judgment the \`${entrySkill}\` orchestrator makes: does this input **continue** the
 active intent, or does it describe a **genuinely new, unrelated** piece of work?
 This matters most when the active intent is already **complete**: then \`next\`
-correctly returns \`done\` (the engine is read-only and never births alongside a
+correctly returns \`done\` (the engine is read-only and never creates alongside a
 live intent), and the loop above would simply stop. New work is NOT a
 continuation; the escape hatch is \`next --new-intent\`.
 
@@ -656,7 +671,7 @@ continuation; the escape hatch is \`next --new-intent\`.
   names a distinct feature/bug/unit unrelated to the active intent's subject
   (\`bun ${harnessDir()}/tools/aidlc-utility.ts intent --json\` gives its \`slug\` and
   \`status\`). When in doubt, continue: false-positive offers are the main risk.
-- **On genuine new-work, OFFER, never auto-birth.** Surface an
+- **On genuine new-work, OFFER, never auto-create.** Surface an
   \`AskUserQuestion\` showing the active intent and the proposed new one, **including
   the scope you'd give the new intent**. Default that scope to this runner's baked
   \`${scope}\` (the new work is likely the same flavour that made the user reach for

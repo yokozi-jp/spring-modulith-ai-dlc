@@ -75,7 +75,7 @@ export interface StageFrontmatter {
   // validates. `aidlc-graph compile` reads this to emit the compiled grid.
   scopes?: string[];
   // reviewer — agent slug to invoke as a quality gate after the stage body
-  // (stage-protocol.md §12a). Optional; absent when the stage has no review step.
+  // (stage-protocol-reviewer.md §12a). Optional; absent when the stage has no review step.
   reviewer?: string;
   // reviewer_max_iterations — review-cycle cap before escalating to the human.
   // Defaults to 2 when reviewer is present.
@@ -283,6 +283,23 @@ export function validateStageFrontmatter(
     const sa = o.support_agents;
     if (!Array.isArray(sa) || sa.length === 0) {
       errors.push(`mode "${o.mode}" requires a non-empty support_agents`);
+    }
+  }
+  if (
+    o.mode === "pipeline" &&
+    typeof o.lead_agent === "string" &&
+    Array.isArray(o.support_agents)
+  ) {
+    const seen = new Set([o.lead_agent]);
+    for (const agent of o.support_agents) {
+      if (typeof agent !== "string") continue;
+      if (seen.has(agent)) {
+        errors.push(
+          `mode "pipeline" requires unique lead/support chain entries; duplicate agent "${agent}"`,
+        );
+        break;
+      }
+      seen.add(agent);
     }
   }
 

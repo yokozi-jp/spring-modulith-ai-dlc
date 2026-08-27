@@ -1,45 +1,46 @@
 # Team-Level Rules
 
-> このチームの確認済みプラクティスと修正。`org.md` の後に厳密加算的ガイダンスとしてロードされる。
-> より広いポリシーとの矛盾は拒否される。
-> practices-discovery の確認ゲートで投入される。ゲートで編集すること。直接編集はしない。
+> This team's affirmed practices and corrections. Loaded after `org.md` as
+> strict-additive guidance; contradictions with broader policy are rejected.
+> Populated by the practices-discovery affirmation gate. Edit at the gate,
+> not directly.
 
 ## Way of Working
 
-<!-- practices-discovery で確認される。例： -->
-<!-- GitHub Flow でフィーチャーブランチを使用する。ブランチの寿命は最大 3〜5 日。 -->
-<!-- ホットフィックスは main からブランチし、迅速レビューを経て main にマージする。 -->
+<!-- Affirmed during practices-discovery. Example: -->
+<!-- We use GitHub Flow with feature branches. Branches live 3-5 days max. -->
+<!-- Hotfixes branch from main and merge back via expedited review. -->
 
 ## Walking Skeleton
 
-<!-- practices-discovery で確認される。例： -->
-<!-- ウォーキングスケルトンは実行しない。デプロイパイプラインが成熟しており、 -->
-<!-- 現在の成熟度ではスライスのコストが価値を上回る。 -->
+<!-- Affirmed during practices-discovery. Example: -->
+<!-- We don't run a walking skeleton — our deployment pipeline is mature -->
+<!-- and the slice cost outweighs the value at our maturity stage. -->
 
 ## Testing Posture
 
-<!-- practices-discovery で確認される。例： -->
-<!-- BDD を採用する。仕様がシナリオを駆動し、シナリオがコードを駆動する。 -->
-<!-- 各ユニットは /features/ にフィーチャーファイルを同梱してシップする。 -->
+<!-- Affirmed during practices-discovery. Example: -->
+<!-- We use BDD. Specifications drive scenarios; scenarios drive code. -->
+<!-- Each Unit ships with feature files in /features/. -->
 
 ## Deployment
 
-<!-- practices-discovery で確認される。 -->
+<!-- Affirmed during practices-discovery. -->
 
 ## Code Style
 
-<!-- リンターを超えたチーム固有の規約。例： -->
-<!-- - default export より named export を優先する -->
-<!-- - すべての async 関数は Result<T, E> を返す。throw しない -->
+<!-- Team-specific conventions beyond the linter. Example: -->
+<!-- - Prefer named exports over default exports -->
+<!-- - All async functions return Result<T, E>, never throw -->
 
 ## Forbidden
 
-<!-- チーム固有の禁止パターン -->
+<!-- Team-specific forbidden patterns -->
 
 ## Mandated
 
-<!-- チーム固有の必須事項 -->
+<!-- Team-specific mandates -->
 
 ## Corrections
 
-<!-- 自己学習ループがここに追記する。 -->
+<!-- Self-learning loop appends here. -->
