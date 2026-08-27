@@ -1,5 +1,5 @@
 {
-  "chat.defaultAgent": "aidlc",
+  "chat.defaultAgent": "kiro_default",
   "chat.modelDefaults": {
     "claude-opus-4.8": {
       "output_config": {
