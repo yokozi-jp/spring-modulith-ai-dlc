@@ -131,16 +131,43 @@ make setup
 source ~/.bashrc
 ```
 
-### 8. Git hooks のセットアップ
+### 8. Go と betterleaks（シークレットスキャナ）のセットアップ
+
+pre-commit フックでのシークレットスキャンに [betterleaks](https://github.com/betterleaks/betterleaks) を使用します。betterleaks は Go 製のため、先に Go をインストールします。
+
+```bash
+# Go の公式 tarball を取得して /usr/local に展開
+cd /tmp
+curl -fsSLO https://go.dev/dl/go1.27.0.linux-amd64.tar.gz
+sudo rm -rf /usr/local/go && sudo tar -C /usr/local -xzf go1.27.0.linux-amd64.tar.gz
+
+# PATH を通す（~/.bashrc に追記）
+echo 'export PATH=$PATH:/usr/local/go/bin:$HOME/go/bin' >> ~/.bashrc
+source ~/.bashrc
+go version
+```
+
+`go version` で `go1.27.0`（インストールしたバージョン）が表示されれば OK です。
+
+続けて betterleaks をインストールします。
+
+```bash
+go install github.com/betterleaks/betterleaks@latest
+betterleaks version
+```
+
+`$HOME/go/bin` は上記で PATH に追加済みのため、`betterleaks` コマンドがそのまま使えます。
+
+### 9. Git hooks のセットアップ
 
 ```bash
 cd /home/projects/spring-modulith-ai-dlc
 npm install
 ```
 
-これにより Lefthook が有効化されます。
+これにより Lefthook が有効化されます。以降、コミット時に pre-commit フックが実行され、ステージした変更を betterleaks がシークレットスキャンします。
 
-### 9. VSCode から WSL への接続
+### 10. VSCode から WSL への接続
 
 1. Windows 側で VSCode を起動
 2. `F1` キーを押してコマンドパレットを開く
@@ -149,11 +176,11 @@ npm install
 
 VSCode が WSL モードで再起動し、左下のステータスバーに `WSL: <インスタンス名>` と表示されれば接続完了です。
 
-### 10. VSCode 拡張機能のインストール
+### 11. VSCode 拡張機能のインストール
 
 `.vscode/extensions.json` に記載されている推奨拡張機能をインストールしてください。
 
-### 11. 動作確認
+### 12. 動作確認
 
 ```bash
 docker info
@@ -161,6 +188,7 @@ java -version
 node -v
 gh auth status
 bun --version
+betterleaks version
 ```
 
 エラーなく各ツールの情報が表示されれば環境構築完了です。

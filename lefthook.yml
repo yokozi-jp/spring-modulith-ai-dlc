@@ -40,3 +40,27 @@
 #
 #     - script: "hello.go"
 #       runner: go run
+
+# ---------------------------------------------------------------------------
+# 実運用設定
+# ---------------------------------------------------------------------------
+
+pre-commit:
+  parallel: true
+  jobs:
+    # ステージ済みの変更をシークレットスキャン（Betterleaks）
+    # betterleaks が PATH に無い場合は go install 先 ($HOME/go/bin) にフォールバック
+    - name: betterleaks-secret-scan
+      run: |
+        export PATH="$PATH:$HOME/go/bin"
+        betterleaks git --staged --no-banner --redact
+
+pre-push:
+  parallel: true
+  jobs:
+    # push 前にリポジトリ全体（履歴含む）をシークレットスキャン（Betterleaks）
+    # betterleaks が PATH に無い場合は go install 先 ($HOME/go/bin) にフォールバック
+    - name: betterleaks-full-scan
+      run: |
+        export PATH="$PATH:$HOME/go/bin"
+        betterleaks git . --no-banner --redact --git-workers=16

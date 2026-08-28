@@ -47,6 +47,7 @@ Spring Modulith を用いたモジュラーモノリスアーキテクチャの�
 | pnpm                    | 11.21.0    |
 | PostgreSQL              | 18         |
 | Redis                   | 7.x        |
+| Go (betterleaks 実行用) | 1.27.x     |
 | Bun (AI-DLC ランタイム) | 1.3.14     |
 
 その他のパッケージのバージョンは `backend/build.gradle` と `frontend/package.json` を参照してください。

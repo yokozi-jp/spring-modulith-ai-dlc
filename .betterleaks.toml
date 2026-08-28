@@ -1,0 +1,16 @@
+# Betterleaks 設定
+# デフォルトルールセットを継承したうえで、プロジェクト固有の許可設定を追加する。
+# 参照: https://github.com/betterleaks/betterleaks
+
+# 組み込みのデフォルトルールを読み込む。
+[extend]
+useDefault = true
+
+# 誤検知の許可（allowlist）
+# .env.example はダミー値を並べるサンプルファイルであり、実際のシークレットは含まない。
+# そのためファイル全体をスキャン対象から除外する。
+[[allowlists]]
+description = ".env.example はプレースホルダ専用のサンプルファイルのため除外"
+paths = [
+  '''(^|/)\.env\.example$''',
+]
