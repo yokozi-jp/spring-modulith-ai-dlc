@@ -1,4 +1,4 @@
-.PHONY: setup be-format be-lint be-test be-coverage be-sbom scan-secrets scan-secrets-all lint-actions lint-actions-security
+.PHONY: setup be-format be-lint be-test be-coverage be-sbom scan-secrets scan-secrets-all lint-actions lint-actions-security lint-docker
 
 ## 開発環境の初期セットアップ（全スクリプトを順次実行）
 ## 実行後に source ~/.bashrc が必要
@@ -47,3 +47,16 @@ lint-actions:
 lint-actions-security:
 	docker run --rm -v "$$PWD":/repo -w /repo \
 		ghcr.io/zizmorcore/zizmor:latest .github/workflows/
+
+## Dockerfile のベストプラクティス検査（hadolint / Docker 実行）
+## リポジトリ内の全 Dockerfile を対象にする
+lint-docker:
+	@files=$$(git ls-files '**/Dockerfile' '**/Dockerfile.*' '**/*.Dockerfile' 'Dockerfile'); \
+	if [ -z "$$files" ]; then \
+		echo "Dockerfile が見つかりません。"; \
+	else \
+		printf 'linting: %s\n' $$files; \
+		docker run --rm -i -v "$$PWD":/repo -w /repo \
+			hadolint/hadolint:v2.12.0@sha256:30a8fd2e785ab6176eed53f74769e04f125afb2f74a6c52aef7d463583b6d45e \
+			hadolint $$files; \
+	fi

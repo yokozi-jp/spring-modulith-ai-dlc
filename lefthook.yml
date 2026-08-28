@@ -55,6 +55,22 @@ pre-commit:
         export PATH="$PATH:$HOME/go/bin"
         betterleaks git --staged --no-banner --redact
 
+    # ステージ済みの Dockerfile をベストプラクティス検査（hadolint）
+    # docker が無い環境ではスキップ（最終担保は CI に任せる）。
+    - name: hadolint
+      glob:
+        - "**/Dockerfile"
+        - "**/Dockerfile.*"
+        - "**/*.Dockerfile"
+      run: |
+        if ! command -v docker >/dev/null 2>&1; then
+          echo "docker が無いため hadolint をスキップします（CI で検査されます）。" >&2
+          exit 0
+        fi
+        docker run --rm -i -v "$PWD":/repo -w /repo \
+          hadolint/hadolint:v2.12.0@sha256:30a8fd2e785ab6176eed53f74769e04f125afb2f74a6c52aef7d463583b6d45e \
+          hadolint {staged_files}
+
 pre-push:
   parallel: true
   jobs:

@@ -1,0 +1,16 @@
+# hadolint 設定
+# Dockerfile をベストプラクティスに沿って検査する。
+# ルール一覧: https://github.com/hadolint/hadolint#rules
+
+# 警告以上を失敗扱いにする（info と style は通知のみ）。
+failure-threshold: warning
+
+# 信頼するベースイメージのレジストリ。ここに無いレジストリからの FROM は DL3026 で警告。
+trustedRegistries:
+  - docker.io
+  - public.ecr.aws
+  - ghcr.io
+
+# プロジェクトで恒久的に無視するルールがあればここに追加する（現状なし）。
+# ignored:
+#   - DL3008
