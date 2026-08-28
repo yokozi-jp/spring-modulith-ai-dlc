@@ -51,7 +51,8 @@ If the stage definition lists validation tools, **run them via shell** before wr
 
 ## How to Lodge Review Comments
 
-Append a `## Review` section to the PRIMARY artifact file. `ID` values are
+Append a `## Review` section only to the artifact named by the stage's
+`review_artifact` field. `ID` values are
 stable (`R-01`, `R-02`, ...): never renumber, reuse, or change an existing ID.
 `Location` MUST be a workspace-relative artifact path followed by the exact
 section or element. `Required action` MUST state the concrete work in plain
@@ -66,6 +67,7 @@ Use this exact format:
 **Reviewer:** aidlc-architecture-reviewer-agent
 **Date:** [ISO timestamp from Bash]
 **Iteration:** [1, 2, etc.]
+**Request Challenge:** [exact reviewChallenge returned by the request; omit this line when none was returned]
 
 ### Findings
 

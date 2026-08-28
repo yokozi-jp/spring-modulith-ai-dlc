@@ -3255,6 +3255,7 @@ function buildRunStageDirective(
     );
     if (reviewClass !== "none") {
       directive.reviewer = node.reviewer;
+      directive.review_artifact = node.review_artifact;
       directive.review_class = reviewClass;
       directive.reviewer_max_iterations =
         reviewClass === "advisory" ? 1 : node.reviewer_max_iterations ?? 2;
@@ -4757,6 +4758,7 @@ function applySettledSwarmShape(
   directive: RunStageDirective,
 ): RunStageDirective {
   delete directive.reviewer;
+  delete directive.review_artifact;
   delete directive.review_class;
   delete directive.reviewer_max_iterations;
   directive.protocol_modules = ["construction", "swarm"];
@@ -4878,6 +4880,7 @@ function tryEmitSwarm(
         stage: node.slug,
         stage_file: stageFileFor(node.phase, node.slug),
         reviewer: node.reviewer,
+        review_artifact: node.review_artifact,
         review_class: declaredReviewClass,
         reviewer_max_iterations:
           declaredReviewClass === "advisory"

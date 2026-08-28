@@ -66,6 +66,7 @@ Load aidlc-design-agent persona from `agents/aidlc-design-agent.md` and knowledg
 ### Step 3: Create Design Plan with Questions
 
 Create `<record>/inception/application-design/application-design-questions.md` with context-appropriate questions using [Answer]: tag format:
+
 - Component boundary decisions
 - Architectural style preferences (if not already decided)
 - Service communication patterns (sync vs. async, REST vs. gRPC vs. events)
@@ -76,6 +77,7 @@ Create `<record>/inception/application-design/application-design-questions.md` w
 ### Step 4: Collect and Analyze Answers
 
 Collect answers following stage-protocol.md §3 question flow (offer interaction mode choice, collect answers, write back to file).
+
 - MANDATORY ambiguity analysis: scan for vague language, contradictions, missing details
 - Create follow-up questions if ANY ambiguity found
 - Resolve all ambiguities before proceeding
@@ -85,30 +87,35 @@ Collect answers following stage-protocol.md §3 question flow (offer interaction
 Create 5 design artifacts in `<record>/inception/application-design/`:
 
 **components.md:**
+
 - Component names and purposes
 - Component responsibilities (what each component owns)
 - Component interfaces (public API surface)
 - Component boundaries and ownership
 
 **component-methods.md:**
+
 - Method signatures for each component's public interface
 - High-level method purposes (detailed business rules belong in Functional Design)
 - Input/output types
 - Error handling approach per method
 
 **services.md:**
+
 - Service definitions and responsibilities
 - Orchestration patterns (choreography vs. orchestration)
 - Service communication contracts
 - Service lifecycle and scaling characteristics
 
 **component-dependency.md:**
+
 - Dependency matrix (which components depend on which)
 - Communication patterns between components (sync, async, event-driven)
 - Data flow between components
 - Shared resource identification
 
 **decisions.md:**
+
 - Architecture Decision Records (ADRs) for each significant design choice
 - Each ADR includes: Context, Decision, Consequences, Alternatives Considered
 - Trade-off analysis for key decisions
@@ -138,6 +145,7 @@ The engine owns all lifecycle transitions and advancement.
 ### Step 7: Present Completion & Request Approval
 
 Use stage-protocol.md completion template with completion emoji: :building_construction:
+
 - Summary of design artifacts produced
 - Key architectural decisions highlighted
 - Review path: `<record>/inception/application-design/`

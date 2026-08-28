@@ -1,9 +1,11 @@
 import { spawnSync } from "node:child_process";
 import { createHash, randomUUID } from "node:crypto";
-import { accessSync, appendFileSync, closeSync, constants as fsConstants, cpSync, type Dirent, existsSync, fstatSync, linkSync, lstatSync, mkdirSync, openSync, readdirSync, readFileSync, readlinkSync, readSync, realpathSync, renameSync, rmSync, statSync, unlinkSync, writeFileSync } from "node:fs";
+import { accessSync, appendFileSync, chmodSync, closeSync, constants as fsConstants, cpSync, type Dirent, existsSync, fstatSync, linkSync, lstatSync, mkdirSync, openSync, opendirSync, readdirSync, readFileSync, readlinkSync, readSync, realpathSync, renameSync, rmSync, statSync, symlinkSync, unlinkSync, writeFileSync, writeSync } from "node:fs";
 import { hostname, tmpdir } from "node:os";
 import { basename, dirname, isAbsolute, join, relative, resolve as resolvePath, sep, win32 } from "node:path";
 import { fileURLToPath } from "node:url";
+import { TextDecoder } from "node:util";
+import { inflateSync } from "node:zlib";
 import { dlopen, FFIType, type Pointer } from "bun:ffi";
 import {
   resolveHarnessPath,
@@ -44,6 +46,7 @@ export interface StageEntry {
   plugin?: string;
   condition?: string;
   reviewer?: string;
+  review_artifact?: string;
   reviewer_max_iterations?: number;
   review_class?: "adversarial" | "advisory";
   // Summary-confirmation policy for stages using the unified question flow.
@@ -1959,6 +1962,112 @@ export function codekbScopeFingerprint(
   }
 }
 
+function normalizeGenerationPath(path: string): string | null {
+  const portable = path.trim().replaceAll("\\", "/");
+  if (
+    portable === "" ||
+    portable.startsWith("/") ||
+    /^[A-Za-z]:\//.test(portable) ||
+    /[*?[\]]/.test(portable)
+  ) {
+    return null;
+  }
+  const segments = portable.split("/").filter((segment) => segment !== "" && segment !== ".");
+  if (segments.some((segment) => segment === "..")) return null;
+  return segments.length === 0 ? "." : segments.join("/");
+}
+
+function treeGeneration(
+  rootDir: string,
+  paths: string[],
+  excludedPaths: string[] = [],
+): string | null {
+  const normalizedPaths = [...new Set(paths.map(normalizeGenerationPath))];
+  if (normalizedPaths.includes(null) || normalizedPaths.length === 0) return null;
+  const normalizedExcludes = new Set(
+    [".git", ...excludedPaths]
+      .map(normalizeGenerationPath)
+      .filter((path): path is string => path !== null),
+  );
+  const root = resolvePath(rootDir);
+  const seen = new Set<string>();
+  const hash = createHash("sha256");
+  const excluded = (portable: string): boolean =>
+    [...normalizedExcludes].some(
+      (entry) => portable === entry || portable.startsWith(`${entry}/`),
+    );
+
+  const visit = (absPath: string, portable: string): boolean => {
+    if (portable !== "." && excluded(portable)) return true;
+    if (seen.has(portable)) return true;
+    seen.add(portable);
+    let stat: ReturnType<typeof lstatSync>;
+    try {
+      stat = lstatSync(absPath);
+    } catch {
+      return false;
+    }
+    if (stat.isSymbolicLink()) {
+      hash.update(`L\0${portable}\0${readlinkSync(absPath)}\0`, "utf-8");
+      return true;
+    }
+    if (stat.isDirectory()) {
+      hash.update(`D\0${portable}\0`, "utf-8");
+      let names: string[];
+      try {
+        names = readdirSync(absPath).sort();
+      } catch {
+        return false;
+      }
+      for (const name of names) {
+        const childPortable = portable === "." ? name : `${portable}/${name}`;
+        if (!visit(join(absPath, name), childPortable)) return false;
+      }
+      return true;
+    }
+    if (!stat.isFile()) return false;
+    hash.update(`F\0${portable}\0${stat.size}\0`, "utf-8");
+    hash.update(readFileSync(absPath));
+    hash.update("\0", "utf-8");
+    return true;
+  };
+
+  for (const portable of normalizedPaths as string[]) {
+    const absPath = portable === "." ? root : resolvePath(root, ...portable.split("/"));
+    const rel = relative(root, absPath);
+    if (rel.startsWith(`..${sep}`) || rel === ".." || isAbsolute(rel)) return null;
+    hash.update(`S\0${portable}\0`, "utf-8");
+    if (!visit(absPath, portable)) return null;
+  }
+  return hash.digest("hex");
+}
+
+// A generation token for the source paths that informed one CodeKB candidate.
+// Prefer the existing git-aware fingerprint (ignored files excluded); fall back
+// to a byte-exact tree hash so non-git workspaces still receive a real CAS token.
+export function codekbSourceFingerprint(
+  repoDir: string,
+  paths: string[],
+  excludedPaths: string[] = [],
+): string | null {
+  const git = codekbScopeFingerprint(repoDir, paths, excludedPaths);
+  if (git !== null) return `git:${git}`;
+  const tree = treeGeneration(repoDir, paths, excludedPaths);
+  return tree === null ? null : `tree:${tree}`;
+}
+
+// Hash the complete on-disk CodeKB directory, not only its timestamp. This is
+// the compare-and-swap generation for cumulative merges: any concurrent edit to
+// any artifact changes the token and makes a stale publish refuse.
+export function codekbStoreGeneration(storeDir: string): string {
+  if (!existsSync(storeDir)) return "none";
+  const generation = treeGeneration(storeDir, ["./"]);
+  if (generation === null) {
+    throw new Error(`cannot compute CodeKB store generation for ${storeDir}`);
+  }
+  return `sha256:${generation}`;
+}
+
 // True only when the durable CodeKB store for `repo` carries a valid scope
 // block whose recorded fingerprint still matches the current source tree.
 // This is the programmatic form of `codekb-scope-diff`'s CURRENT verdict, used
@@ -2838,7 +2947,18 @@ export function readPlanApprovalViolation(
     planApprovalViolationPath(projectDir),
     "Plan Approval violation",
   );
-  return value?.version === 1 ? value : null;
+  return value?.version === 1 &&
+    Number.isInteger(value.markerRevision) &&
+    value.markerRevision >= 0 &&
+    typeof value.reason === "string" &&
+    value.reason.trim().length > 0 &&
+    typeof value.target === "string" &&
+    (
+      isAbsolute(value.target) ||
+      value.target === "(unresolved write target)"
+    )
+    ? value
+    : null;
 }
 
 export function clearPlanApprovalViolation(projectDir: string): void {
@@ -7878,6 +7998,7 @@ export function producesArtifactUnit(
 }
 
 export type ReviewVerdict = "READY" | "NOT-READY";
+export type ReviewRecoveryCause = "artifact" | "source" | "artifact+source";
 
 export function terminalReviewVerdict(
   verdict: string | null,
@@ -7903,6 +8024,7 @@ export interface PendingReviewProgress {
   iteration: number;
   recovery: boolean;
   suspensionActive: boolean;
+  recoveryCause?: ReviewRecoveryCause | null;
 }
 
 export interface StaleReviewProgress {
@@ -7976,6 +8098,8 @@ export interface ReviewFingerprintStage {
   phase: string;
   for_each?: string;
   reviewer?: string;
+  review_artifact?: string;
+  workspace_requires?: boolean;
   produces?: string[];
   optional_produces?: string[];
   produces_kinds?: Record<string, string[]>;
@@ -7984,17 +8108,19 @@ export interface ReviewFingerprintStage {
 export interface ReviewArtifactEntry {
   logicalPath: string;
   path: string | null;
+  boundary: string;
   required: boolean;
+  reviewAppendixTarget: boolean;
 }
 
-export interface ReviewArtifactSnapshotEntry extends ReviewArtifactEntry {
+export interface ReviewArtifactBytesEntry extends ReviewArtifactEntry {
   state: "file" | "missing" | "not-file";
   bytes?: Buffer;
 }
 
-export interface ReviewArtifactSnapshot {
+export interface ReviewArtifactBytesSnapshot {
   fingerprint: string;
-  entries: ReviewArtifactSnapshotEntry[];
+  entries: ReviewArtifactBytesEntry[];
 }
 
 export function reviewArtifactEntries(
@@ -8007,16 +8133,29 @@ export function reviewArtifactEntries(
     mergedBoltUnits?: ReadonlySet<string>;
   } = {},
 ): ReviewArtifactEntry[] | null {
-  const artifactsForKind = (kind: string | null) => [
-    ...filterProducesByKind(stage.produces_kinds, stage.produces ?? [], kind).map(
-      (name) => ({ name, required: true }),
-    ),
-    ...filterProducesByKind(
+  const artifactsForKind = (kind: string | null) => {
+    const required = filterProducesByKind(
       stage.produces_kinds,
-      stage.optional_produces ?? [],
+      stage.produces ?? [],
       kind,
-    ).map((name) => ({ name, required: false })),
-  ];
+    );
+    return [
+      ...required.map((name) => ({
+        name,
+        required: true,
+        reviewAppendixTarget: name === stage.review_artifact,
+      })),
+      ...filterProducesByKind(
+        stage.produces_kinds,
+        stage.optional_produces ?? [],
+        kind,
+      ).map((name) => ({
+        name,
+        required: false,
+        reviewAppendixTarget: false,
+      })),
+    ];
+  };
   const allArtifacts = artifactsForKind(null);
 
   if (KNOWN_CODEKB_STAGES.has(stage.slug)) {
@@ -8035,14 +8174,18 @@ export function reviewArtifactEntries(
       return allArtifacts.map((artifact) => ({
         logicalPath: `codekb/*/${artifactFilename(artifact.name)}`,
         path: null,
+        boundary: root,
         required: artifact.required,
+        reviewAppendixTarget: artifact.reviewAppendixTarget,
       }));
     }
     return repos.flatMap((repo) =>
       allArtifacts.map((artifact) => ({
         logicalPath: `codekb/${repo}/${artifactFilename(artifact.name)}`,
         path: join(codekbDir(projectDir, repo), artifactFilename(artifact.name)),
+        boundary: root,
         required: artifact.required,
+        reviewAppendixTarget: artifact.reviewAppendixTarget,
       })),
     );
   }
@@ -8053,9 +8196,38 @@ export function reviewArtifactEntries(
     return allArtifacts.map((artifact) => ({
       logicalPath: `${stage.phase}/${stage.slug}/${artifactFilename(artifact.name)}`,
       path: join(record, stage.phase, stage.slug, artifactFilename(artifact.name)),
+      boundary: record,
       required: artifact.required,
+      reviewAppendixTarget: artifact.reviewAppendixTarget,
     }));
   }
+
+  const stageLevelEntries = (): ReviewArtifactEntry[] =>
+    allArtifacts.map((artifact) => ({
+      logicalPath: `${stage.phase}/${stage.slug}/${artifactFilename(artifact.name)}`,
+      path: join(record, stage.phase, stage.slug, artifactFilename(artifact.name)),
+      boundary: record,
+      required: artifact.required,
+      reviewAppendixTarget: artifact.reviewAppendixTarget,
+    }));
+  const stageLevelPresent = allArtifacts.some((artifact) =>
+    existsSync(
+      join(record, stage.phase, stage.slug, artifactFilename(artifact.name)),
+    )
+  );
+  const construction = join(record, "construction");
+  const discoveredUnits = existsSync(construction)
+    ? readdirSync(construction).filter((name) => {
+        try {
+          return (
+            statSync(join(construction, name)).isDirectory() &&
+            existsSync(join(construction, name, stage.slug))
+          );
+        } catch {
+          return false;
+        }
+      })
+    : [];
 
   let stateContent = options.stateContent;
   if (stateContent === undefined) {
@@ -8071,13 +8243,10 @@ export function reviewArtifactEntries(
     usesStageLevelPerUnitArtifacts(
       getField(stateContent, "Scope"),
       stateContent,
-    )
+    ) &&
+    (stageLevelPresent || discoveredUnits.length === 0)
   ) {
-    return allArtifacts.map((artifact) => ({
-      logicalPath: `${stage.phase}/${stage.slug}/${artifactFilename(artifact.name)}`,
-      path: join(record, stage.phase, stage.slug, artifactFilename(artifact.name)),
-      required: artifact.required,
-    }));
+    return stageLevelEntries();
   }
 
   let units: string[];
@@ -8091,50 +8260,476 @@ export function reviewArtifactEntries(
   } else if (resolution.state === "ok") {
     units = resolution.units;
     unitKinds = resolution.unitKinds ?? new Map();
-  } else if (resolution.state === "none") {
+  } else {
     if (
       options.mergedBoltUnits !== undefined &&
       options.mergedBoltUnits.size > 0
     ) {
       units = [...options.mergedBoltUnits].sort();
     } else {
-      return allArtifacts.map((artifact) => ({
-        logicalPath: `construction/${stage.slug}/${artifactFilename(artifact.name)}`,
-        path: join(
-          record,
-          "construction",
-          stage.slug,
-          artifactFilename(artifact.name),
-        ),
-        required: artifact.required,
-      }));
+      if (stageLevelPresent) return stageLevelEntries();
+      units = discoveredUnits;
     }
-  } else {
-    const construction = join(record, "construction");
-    units = existsSync(construction)
-      ? readdirSync(construction).filter((name) => {
-          try {
-            return statSync(join(construction, name)).isDirectory();
-          } catch {
-            return false;
-          }
-        })
-      : [];
   }
   if (units.length === 0) {
     return allArtifacts.map((artifact) => ({
       logicalPath: `construction/*/${stage.slug}/${artifactFilename(artifact.name)}`,
       path: null,
+      boundary: record,
       required: artifact.required,
+      reviewAppendixTarget: artifact.reviewAppendixTarget,
     }));
   }
   return units.flatMap((name) =>
     artifactsForKind(unitKinds.get(name) ?? null).map((artifact) => ({
       logicalPath: `construction/${name}/${stage.slug}/${artifactFilename(artifact.name)}`,
       path: join(record, "construction", name, stage.slug, artifactFilename(artifact.name)),
+      boundary: record,
       required: artifact.required,
+      reviewAppendixTarget: artifact.reviewAppendixTarget,
     })),
   );
+}
+
+type StableArtifactStat = {
+  dev: bigint;
+  ino: bigint;
+  mode: bigint;
+  nlink: bigint;
+  size: bigint;
+  mtimeNs: bigint;
+  ctimeNs: bigint;
+  isFile(): boolean;
+};
+
+type ReviewArtifactContent =
+  | (ReviewArtifactEntry & { state: "missing" })
+  | (ReviewArtifactEntry & {
+      state: "not-file";
+      identity: StableArtifactStat;
+    })
+  | (ReviewArtifactEntry & {
+      state: "file";
+      body: Buffer;
+      identity: StableArtifactStat;
+      fd: number;
+    });
+
+function artifactFdStat(fd: number): StableArtifactStat {
+  return fstatSync(fd, { bigint: true }) as unknown as StableArtifactStat;
+}
+
+function sameArtifactIdentity(
+  left: StableArtifactStat,
+  right: StableArtifactStat,
+): boolean {
+  return (
+    left.dev === right.dev &&
+    left.ino === right.ino &&
+    left.mode === right.mode &&
+    left.nlink === right.nlink &&
+    left.size === right.size &&
+    left.mtimeNs === right.mtimeNs &&
+    left.ctimeNs === right.ctimeNs
+  );
+}
+
+function pathContainedBy(root: string, candidate: string): boolean {
+  const rel = relative(root, candidate);
+  return rel === "" || (
+    rel !== ".." &&
+    !rel.startsWith(`..${sep}`) &&
+    !isAbsolute(rel)
+  );
+}
+
+function inspectArtifactPath(
+  boundary: string,
+  path: string,
+): { state: "missing" } | { state: "present"; boundaryReal: string } | null {
+  const lexicalBoundary = resolvePath(boundary);
+  const lexicalPath = resolvePath(path);
+  if (!pathContainedBy(lexicalBoundary, lexicalPath)) return null;
+
+  let boundaryReal: string;
+  try {
+    boundaryReal = realpathSync(lexicalBoundary);
+  } catch {
+    return null;
+  }
+
+  const rel = relative(lexicalBoundary, lexicalPath);
+  let cursor = lexicalBoundary;
+  for (const segment of rel.split(sep).filter(Boolean)) {
+    cursor = join(cursor, segment);
+    try {
+      if (lstatSync(cursor).isSymbolicLink()) return null;
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === "ENOENT") {
+        return { state: "missing" };
+      }
+      return null;
+    }
+  }
+  return { state: "present", boundaryReal };
+}
+
+function readStableReviewArtifacts(
+  entries: ReviewArtifactEntry[],
+  observer?: (event: {
+    phase: "after-read";
+    logicalPath: string;
+    path: string;
+  }) => void,
+): ReviewArtifactContent[] | null {
+  const contents: ReviewArtifactContent[] = [];
+  const opened: number[] = [];
+  try {
+    for (const entry of [...entries].sort((a, b) =>
+      a.logicalPath.localeCompare(b.logicalPath),
+    )) {
+      if (entry.path === null) {
+        contents.push({ ...entry, state: "missing" });
+        continue;
+      }
+
+      const inspected = inspectArtifactPath(entry.boundary, entry.path);
+      if (inspected === null) return null;
+      if (inspected.state === "missing") {
+        contents.push({ ...entry, state: "missing" });
+        continue;
+      }
+      const before = lstatSync(entry.path, {
+        bigint: true,
+      }) as unknown as StableArtifactStat;
+      if (!before.isFile()) {
+        contents.push({ ...entry, state: "not-file", identity: before });
+        continue;
+      }
+      if (before.nlink !== 1n) return null;
+
+      const noFollow =
+        typeof fsConstants.O_NOFOLLOW === "number"
+          ? fsConstants.O_NOFOLLOW
+          : 0;
+      const nonBlock =
+        typeof fsConstants.O_NONBLOCK === "number"
+          ? fsConstants.O_NONBLOCK
+          : 0;
+      const fd = openSync(
+        entry.path,
+        fsConstants.O_RDONLY | noFollow | nonBlock,
+      );
+      opened.push(fd);
+      const openedIdentity = artifactFdStat(fd);
+      if (
+        !openedIdentity.isFile() ||
+        openedIdentity.nlink !== 1n ||
+        !sameArtifactIdentity(before, openedIdentity)
+      ) return null;
+      const openedReal = realpathSync(entry.path);
+      if (!pathContainedBy(inspected.boundaryReal, openedReal)) return null;
+      const body = readFileSync(fd);
+      const afterReadIdentity = artifactFdStat(fd);
+      if (!sameArtifactIdentity(openedIdentity, afterReadIdentity)) return null;
+      contents.push({
+        ...entry,
+        state: "file",
+        body,
+        identity: openedIdentity,
+        fd,
+      });
+      observer?.({
+        phase: "after-read",
+        logicalPath: entry.logicalPath,
+        path: entry.path,
+      });
+    }
+
+    for (const entry of contents) {
+      if (entry.path === null) continue;
+      if (entry.state === "missing") {
+        if (inspectArtifactPath(entry.boundary, entry.path)?.state !== "missing") {
+          return null;
+        }
+        continue;
+      }
+      const inspected = inspectArtifactPath(entry.boundary, entry.path);
+      if (inspected?.state !== "present") return null;
+      const currentPath = lstatSync(entry.path, {
+        bigint: true,
+      }) as unknown as StableArtifactStat;
+      if (!sameArtifactIdentity(entry.identity, currentPath)) return null;
+      if (
+        !pathContainedBy(inspected.boundaryReal, realpathSync(entry.path))
+      ) return null;
+      if (
+        entry.state === "file" &&
+        !sameArtifactIdentity(entry.identity, artifactFdStat(entry.fd))
+      ) {
+        return null;
+      }
+    }
+    return contents;
+  } catch {
+    return null;
+  } finally {
+    for (const fd of opened) {
+      try {
+        closeSync(fd);
+      } catch {
+        // The snapshot has already failed closed if a descriptor is unusable.
+      }
+    }
+  }
+}
+
+function reviewArtifactContentsFingerprint(
+  contents: ReviewArtifactContent[],
+  options: {
+    requireRequiredArtifacts?: boolean;
+    appendixArtifact?: string;
+    appendixOffset?: number;
+  } = {},
+): string | null {
+  const manifest: Array<[string, string]> = [];
+  let matchedAppendix = options.appendixArtifact === undefined;
+  for (const entry of contents) {
+    if (entry.state === "missing") {
+      if (entry.required && options.requireRequiredArtifacts === true) return null;
+      manifest.push([entry.logicalPath, "missing"]);
+      continue;
+    }
+    if (entry.state === "not-file") {
+      if (entry.required && options.requireRequiredArtifacts === true) return null;
+      manifest.push([entry.logicalPath, "not-file"]);
+      continue;
+    }
+
+    let fingerprintedBody = entry.body;
+    if (entry.logicalPath === options.appendixArtifact) {
+      if (
+        !entry.reviewAppendixTarget ||
+        options.appendixOffset === undefined ||
+        options.appendixOffset < 0 ||
+        options.appendixOffset > entry.body.length
+      ) {
+        return null;
+      }
+      fingerprintedBody = entry.body.subarray(0, options.appendixOffset);
+      matchedAppendix = true;
+    }
+    const digest = createHash("sha256").update(fingerprintedBody).digest("hex");
+    manifest.push([entry.logicalPath, `sha256:${digest}`]);
+  }
+  if (!matchedAppendix) return null;
+  return `sha256:${createHash("sha256").update(JSON.stringify(manifest)).digest("hex")}`;
+}
+
+export interface ReviewArtifactSnapshot {
+  fingerprint: string;
+  requestFingerprint: string;
+  appendixArtifact: string;
+  appendixOffset: number;
+  appendix: Buffer;
+}
+
+/**
+ * Exclude permitted blank separator lines from the reviewer-owned evidence.
+ * This keeps the stale-appendix binding anchored at the canonical
+ * `## Review` heading instead of letting an extra blank line shift old
+ * authority past the request-time prefix check.
+ */
+export function reviewAppendixEvidenceBytes(appendix: Buffer): Buffer {
+  let offset = 0;
+  while (offset < appendix.length) {
+    const lineStart = offset;
+    while (appendix[offset] === 0x20 || appendix[offset] === 0x09) offset++;
+    if (appendix[offset] === 0x0d) {
+      offset++;
+      if (appendix[offset] === 0x0a) offset++;
+      continue;
+    }
+    if (appendix[offset] === 0x0a) {
+      offset++;
+      continue;
+    }
+    return appendix.subarray(lineStart);
+  }
+  return appendix.subarray(offset);
+}
+
+/**
+ * Canonical audit binding for the reviewer evidence after an appendix offset.
+ * `none` pins the verified absence of any pre-request appendix; a sha256
+ * digest pins the exact section that already existed when REVIEW_REQUESTED
+ * was recorded. Its recorded byte length lets completion reject both an
+ * unchanged section and one that merely extends those same pre-request bytes,
+ * so a `## Review` section that predates the request (for example one
+ * surviving an attempt reset) cannot be replayed as fresh reviewer evidence.
+ */
+export function reviewAppendixDigest(appendix: Buffer): string {
+  const evidence = reviewAppendixEvidenceBytes(appendix);
+  return evidence.length === 0
+    ? "none"
+    : `sha256:${createHash("sha256").update(evidence).digest("hex")}`;
+}
+
+function existingReviewAppendixOffset(body: Buffer): number | null {
+  let text: string;
+  try {
+    text = new TextDecoder("utf-8", { fatal: true }).decode(body);
+  } catch {
+    return null;
+  }
+  const lineStarts = [0];
+  for (let offset = 0; offset < text.length; offset++) {
+    if (text[offset] === "\r") {
+      if (text[offset + 1] === "\n") offset++;
+      lineStarts.push(offset + 1);
+    } else if (text[offset] === "\n") {
+      lineStarts.push(offset + 1);
+    }
+  }
+
+  const candidates: Array<{ start: number; end: number }> = [];
+  for (let line = 0; line < lineStarts.length; line++) {
+    const start = lineStarts[line];
+    const lineEnd = lineStarts[line + 1] ?? text.length;
+    const rawLine = text
+      .slice(start, lineEnd)
+      .replace(/(?:\r\n|\n|\r)$/, "");
+    if (/^## Review[ \t]*$/.test(rawLine)) {
+      candidates.push({ start, end: start + rawLine.length });
+    }
+  }
+  if (candidates.length === 0 || typeof Bun.markdown?.render !== "function") {
+    return null;
+  }
+
+  let marker = "AIDLCREVIEWAPPENDIXBOUNDARY";
+  while (text.includes(marker)) marker += "X";
+  let marked = text;
+  for (let index = candidates.length - 1; index >= 0; index--) {
+    const candidate = candidates[index];
+    const rawLine = marked.slice(candidate.start, candidate.end);
+    marked =
+      marked.slice(0, candidate.start) +
+      `## ${marker}${index}${rawLine.slice("## Review".length)}` +
+      marked.slice(candidate.end);
+  }
+
+  let sawRenderedH1H2 = false;
+  let terminalCandidate: number | null = null;
+  try {
+    Bun.markdown.render(marked, {
+      heading: (children, { level }) => {
+        if (level <= 2) {
+          sawRenderedH1H2 = true;
+          const match =
+            level === 2
+              ? new RegExp(`^${marker}([0-9]+)$`).exec(children)
+              : null;
+          terminalCandidate = match ? Number(match[1]) : null;
+        }
+        return "";
+      },
+      html: (children) => {
+        if (renderedHtmlCarriesH1H2(children)) {
+          sawRenderedH1H2 = true;
+          terminalCandidate = null;
+        }
+        return "";
+      },
+    });
+  } catch {
+    return null;
+  }
+  if (!sawRenderedH1H2 || terminalCandidate === null) return null;
+
+  const headingStart = candidates[terminalCandidate]?.start;
+  if (headingStart === undefined) return null;
+
+  const prefix = text.slice(0, headingStart);
+  const trailing = /\s+$/.exec(prefix);
+  if (!trailing) return Buffer.byteLength(prefix, "utf-8");
+  const contentEnd = prefix.length - trailing[0].length;
+  const retainedLineEnd = /^[ \t]*(?:\r\n|\n|\r)/.exec(
+    prefix.slice(contentEnd),
+  );
+  const offset =
+    contentEnd + (retainedLineEnd?.[0].length ?? 0);
+  return Buffer.byteLength(text.slice(0, offset), "utf-8");
+}
+
+/**
+ * Snapshot the exact review input and the explicit review_artifact byte
+ * boundary after which the reviewer may append `## Review`.
+ */
+export function reviewArtifactSnapshot(
+  projectDir: string,
+  stage: ReviewFingerprintStage,
+  unit?: string,
+  options: {
+    requireRequiredArtifacts?: boolean;
+    boltDag?: BoltDagResolution;
+    mergedBoltUnits?: ReadonlySet<string>;
+    appendixBinding?: {
+      artifact: string;
+      offset: number;
+    };
+    snapshotObserver?: (event: {
+      phase: "after-read";
+      logicalPath: string;
+      path: string;
+    }) => void;
+  } = {},
+): ReviewArtifactSnapshot | null {
+  let entries: ReviewArtifactEntry[] | null;
+  try {
+    entries = reviewArtifactEntries(projectDir, stage, unit, {
+      boltDag: options.boltDag,
+      mergedBoltUnits: options.mergedBoltUnits,
+    });
+  } catch {
+    return null;
+  }
+  if (entries === null) return null;
+  const contents = readStableReviewArtifacts(entries, options.snapshotObserver);
+  if (contents === null) return null;
+  const fingerprint = reviewArtifactContentsFingerprint(contents, options);
+  if (fingerprint === null) return null;
+
+  const target = contents
+    .filter((entry) => entry.reviewAppendixTarget)
+    .sort((a, b) => a.logicalPath.localeCompare(b.logicalPath))[0];
+  if (target?.state !== "file") return null;
+
+  const binding = options.appendixBinding ?? {
+    artifact: target.logicalPath,
+    offset: existingReviewAppendixOffset(target.body) ?? target.body.length,
+  };
+  if (
+    binding.artifact !== target.logicalPath ||
+    !Number.isSafeInteger(binding.offset) ||
+    binding.offset < 0 ||
+    binding.offset > target.body.length
+  ) {
+    return null;
+  }
+  const requestFingerprint = reviewArtifactContentsFingerprint(contents, {
+    ...options,
+    appendixArtifact: binding.artifact,
+    appendixOffset: binding.offset,
+  });
+  if (requestFingerprint === null) return null;
+  return {
+    fingerprint,
+    requestFingerprint,
+    appendixArtifact: binding.artifact,
+    appendixOffset: binding.offset,
+    appendix: target.body.subarray(binding.offset),
+  };
 }
 
 /**
@@ -8143,7 +8738,440 @@ export function reviewArtifactEntries(
  * missing declared artifacts are explicit manifest entries, so creating one
  * after review also invalidates the receipt.
  */
-export function reviewArtifactSnapshot(
+export function reviewArtifactFingerprint(
+  projectDir: string,
+  stage: ReviewFingerprintStage,
+  unit?: string,
+  options: {
+    requireRequiredArtifacts?: boolean;
+    boltDag?: BoltDagResolution;
+    stateContent?: string | null;
+    mergedBoltUnits?: ReadonlySet<string>;
+  } = {},
+): string | null {
+  let entries: ReviewArtifactEntry[] | null;
+  try {
+    entries = reviewArtifactEntries(projectDir, stage, unit, {
+      boltDag: options.boltDag,
+      stateContent: options.stateContent,
+      mergedBoltUnits: options.mergedBoltUnits,
+    });
+  } catch {
+    return null;
+  }
+  if (entries === null) return null;
+  const contents = readStableReviewArtifacts(entries);
+  if (contents === null) return null;
+  return reviewArtifactContentsFingerprint(contents, options);
+}
+
+export function validateReviewAppendix(
+  appendix: Buffer,
+  expected: {
+    verdict: ReviewVerdict;
+    reviewer: string;
+    iteration: number;
+    reviewChallenge: string | null;
+  },
+): { valid: true } | { valid: false; reason: string } {
+  let text: string;
+  try {
+    text = new TextDecoder("utf-8", { fatal: true }).decode(appendix);
+  } catch {
+    return { valid: false, reason: "the reviewer appendix is not valid UTF-8" };
+  }
+  const normalized = text.replace(/\r\n?/g, "\n");
+  const opening = /^(?:[ \t]*\n)*## Review[ \t]*\n/.exec(normalized);
+  if (!opening) {
+    return {
+      valid: false,
+      reason:
+        "the appended bytes must begin with only blank lines followed by an exact `## Review` heading",
+    };
+  }
+  const section = normalized.slice(opening[0].length);
+  const authority = renderReviewMarkdownAuthority(section);
+  if (authority === null) {
+    return {
+      valid: false,
+      reason: "the reviewer appendix could not be parsed as Markdown",
+    };
+  }
+  if (authority.markdownH1H2) {
+    return {
+      valid: false,
+      reason:
+        "the reviewer appendix must be terminal and contain no later rendered H1 or H2 heading",
+    };
+  }
+  if (authority.htmlH1H2) {
+    return {
+      valid: false,
+      reason:
+        "the reviewer appendix must be terminal and contain no rendered HTML H1 or H2 heading",
+    };
+  }
+
+  if (
+    authority.verdicts.length !== 1 ||
+    authority.verdicts[0] !== expected.verdict
+  ) {
+    return {
+      valid: false,
+      reason:
+        "the reviewer appendix must contain exactly one canonical verdict line matching --verdict",
+    };
+  }
+  if (
+    authority.reviewers.length !== 1 ||
+    authority.reviewers[0] !== expected.reviewer
+  ) {
+    return {
+      valid: false,
+      reason:
+        "the reviewer appendix must contain exactly one Reviewer line matching the requested reviewer",
+    };
+  }
+  if (
+    authority.iterations.length !== 1 ||
+    authority.iterations[0] !== String(expected.iteration)
+  ) {
+    return {
+      valid: false,
+      reason:
+        "the reviewer appendix must contain exactly one Iteration line matching the request",
+    };
+  }
+  if (
+    expected.reviewChallenge === null
+      ? authority.requestChallenges.length !== 0
+      : authority.requestChallenges.length !== 1 ||
+        authority.requestChallenges[0] !== expected.reviewChallenge
+  ) {
+    return {
+      valid: false,
+      reason:
+        expected.reviewChallenge === null
+          ? "the reviewer appendix must omit Request Challenge when the request did not issue one"
+          : "the reviewer appendix must contain exactly one Request Challenge line matching the request",
+    };
+  }
+  return { valid: true };
+}
+
+type RenderedReviewAuthority = {
+  markdownH1H2: boolean;
+  htmlH1H2: boolean;
+  verdicts: string[];
+  reviewers: string[];
+  iterations: string[];
+  requestChallenges: string[];
+};
+
+const REVIEW_MARK_OPEN = "\u0001";
+const REVIEW_MARK_CLOSE = "\u0002";
+const REVIEW_NON_AUTHORITY = "\u0003";
+
+function renderedReviewFields(rendered: string, label: string): string[] {
+  const pattern = new RegExp(
+    `^${REVIEW_MARK_OPEN}${label}:${REVIEW_MARK_CLOSE}[ \\t]+(.+?)[ \\t]*$`,
+    "gm",
+  );
+  return [...rendered.matchAll(pattern)].map((match) => match[1]);
+}
+
+function renderedHtmlCarriesH1H2(html: string): boolean {
+  const visible = html
+    .replace(/<!--[\s\S]*?(?:-->|$)/g, "")
+    .replace(
+      /<(script|style|textarea|title|xmp|iframe|noembed|noframes|plaintext|template)\b[\s\S]*?(?:<\/\1\s*>|$)/gi,
+      "",
+    );
+  return /<h[12](?=[\s/>]|$)/i.test(visible);
+}
+
+function escapeReviewRendererText(text: string): string {
+  let escaped = "";
+  for (const character of text) {
+    const code = character.charCodeAt(0);
+    escaped +=
+      code >= 1 && code <= 3
+        ? `\\u${code.toString(16).padStart(4, "0")}`
+        : character;
+  }
+  return escaped;
+}
+
+function renderReviewMarkdownAuthority(
+  section: string,
+): RenderedReviewAuthority | null {
+  if (typeof Bun.markdown?.render !== "function") return null;
+  let markdownH1H2 = false;
+  let htmlH1H2 = false;
+  let rendered: string;
+  try {
+    rendered = Bun.markdown.render(section, {
+      heading: (_children, { level }) => {
+        if (level <= 2) markdownH1H2 = true;
+        return `${REVIEW_NON_AUTHORITY}\n`;
+      },
+      html: (children) => {
+        if (renderedHtmlCarriesH1H2(children)) htmlH1H2 = true;
+        return children.endsWith("\n")
+          ? `${REVIEW_NON_AUTHORITY}\n`
+          : REVIEW_NON_AUTHORITY;
+      },
+      code: () => `${REVIEW_NON_AUTHORITY}\n`,
+      codespan: () => REVIEW_NON_AUTHORITY,
+      text: escapeReviewRendererText,
+      strong: (children) =>
+        `${REVIEW_MARK_OPEN}${children}${REVIEW_MARK_CLOSE}`,
+      paragraph: (children) => `${children}\n`,
+      blockquote: () => "",
+      list: () => "",
+      table: () => "",
+      emphasis: (children) =>
+        `${REVIEW_NON_AUTHORITY}${children}${REVIEW_NON_AUTHORITY}`,
+      strikethrough: (children) =>
+        `${REVIEW_NON_AUTHORITY}${children}${REVIEW_NON_AUTHORITY}`,
+      link: (children) =>
+        `${REVIEW_NON_AUTHORITY}${children}${REVIEW_NON_AUTHORITY}`,
+      image: () => REVIEW_NON_AUTHORITY,
+      hr: () => `${REVIEW_NON_AUTHORITY}\n`,
+    });
+  } catch {
+    return null;
+  }
+  return {
+    markdownH1H2,
+    htmlH1H2,
+    verdicts: renderedReviewFields(rendered, "Verdict"),
+    reviewers: renderedReviewFields(rendered, "Reviewer"),
+    iterations: renderedReviewFields(rendered, "Iteration"),
+    requestChallenges: renderedReviewFields(rendered, "Request Challenge"),
+  };
+}
+
+const REVIEW_FINGERPRINT_RE = /^sha256:[0-9a-f]{64}$/;
+const REVIEW_APPENDIX_DIGEST_RE = /^(?:none|sha256:[0-9a-f]{64})$/;
+const REVIEW_CHALLENGE_RE = /^review:[0-9a-f]{32}$/;
+const SOURCE_FINGERPRINT_RE = /^(?:[0-9a-f]{40}|[0-9a-f]{64}|unbindable)$/;
+const UNIT_SOURCE_FINGERPRINT_RE = /^(?:sha256:[0-9a-f]{64}|unbindable)$/;
+
+export interface ReviewRequestBinding {
+  artifactFingerprint: string;
+  appendixArtifact: string | null;
+  appendixOffset: number | null;
+  priorAppendixDigest: string | null;
+  priorAppendixLength: number | null;
+  reviewChallenge: string | null;
+  sourceFingerprint: string | null;
+  unitSourceFingerprint: string | null;
+  recoveryCause: ReviewRecoveryCause | null;
+}
+
+export function reviewRequestBindingFromBlock(
+  block: string,
+): ReviewRequestBinding | null {
+  const artifactFingerprint = auditBlockField(block, "Artifact Fingerprint");
+  if (
+    artifactFingerprint === null ||
+    !REVIEW_FINGERPRINT_RE.test(artifactFingerprint)
+  ) {
+    return null;
+  }
+  const appendixArtifact = auditBlockField(
+    block,
+    "Review Appendix Artifact",
+  );
+  const rawOffset = auditBlockField(block, "Review Appendix Offset");
+  if ((appendixArtifact === null) !== (rawOffset === null)) return null;
+  let appendixOffset: number | null = null;
+  if (rawOffset !== null) {
+    if (!/^[0-9]+$/.test(rawOffset)) return null;
+    appendixOffset = Number(rawOffset);
+    if (!Number.isSafeInteger(appendixOffset)) return null;
+  }
+  const priorAppendixDigest = auditBlockField(
+    block,
+    "Review Appendix Prior Digest",
+  );
+  if (
+    priorAppendixDigest !== null &&
+    (appendixArtifact === null ||
+      !REVIEW_APPENDIX_DIGEST_RE.test(priorAppendixDigest))
+  ) {
+    return null;
+  }
+  const rawPriorAppendixLength = auditBlockField(
+    block,
+    "Review Appendix Prior Length",
+  );
+  let priorAppendixLength: number | null = null;
+  if (rawPriorAppendixLength !== null) {
+    if (!/^[0-9]+$/.test(rawPriorAppendixLength)) return null;
+    priorAppendixLength = Number(rawPriorAppendixLength);
+    if (!Number.isSafeInteger(priorAppendixLength)) return null;
+    if (
+      appendixArtifact === null ||
+      priorAppendixDigest === null ||
+      (priorAppendixDigest === "none") !== (priorAppendixLength === 0)
+    ) {
+      return null;
+    }
+  }
+  const reviewChallenge = auditBlockField(block, "Review Challenge");
+  if (
+    reviewChallenge !== null &&
+    (!REVIEW_CHALLENGE_RE.test(reviewChallenge) ||
+      priorAppendixLength === null ||
+      priorAppendixLength === 0)
+  ) {
+    return null;
+  }
+  const sourceFingerprint = auditBlockField(block, "Source Fingerprint");
+  if (
+    sourceFingerprint !== null &&
+    !SOURCE_FINGERPRINT_RE.test(sourceFingerprint)
+  ) {
+    return null;
+  }
+  const unitSourceFingerprint = auditBlockField(
+    block,
+    "Unit Source Fingerprint",
+  );
+  if (
+    unitSourceFingerprint !== null &&
+    !UNIT_SOURCE_FINGERPRINT_RE.test(unitSourceFingerprint)
+  ) {
+    return null;
+  }
+  const rawRecoveryCause = auditBlockField(block, "Recovery Cause");
+  const recoveryCause =
+    rawRecoveryCause === "artifact" ||
+      rawRecoveryCause === "source" ||
+      rawRecoveryCause === "artifact+source"
+      ? rawRecoveryCause
+      : null;
+  if (rawRecoveryCause !== null && recoveryCause === null) return null;
+  return {
+    artifactFingerprint,
+    appendixArtifact,
+    appendixOffset,
+    priorAppendixDigest,
+    priorAppendixLength,
+    reviewChallenge,
+    sourceFingerprint,
+    unitSourceFingerprint,
+    recoveryCause,
+  };
+}
+
+export function reviewCompletionMatchesRequest(
+  request: ReviewRequestBinding,
+  completionBlock: string,
+): boolean {
+  const verdict = auditBlockField(completionBlock, "Verdict");
+  if (verdict !== "READY" && verdict !== "NOT-READY") return false;
+  const recordedFingerprint = auditBlockField(
+    completionBlock,
+    "Artifact Fingerprint",
+  );
+  if (
+    recordedFingerprint === null ||
+    !REVIEW_FINGERPRINT_RE.test(recordedFingerprint)
+  ) {
+    return false;
+  }
+  const completedRequestFingerprint =
+    auditBlockField(completionBlock, "Request Fingerprint") ??
+    recordedFingerprint;
+  if (completedRequestFingerprint !== request.artifactFingerprint) return false;
+
+  const completionAppendixArtifact = auditBlockField(
+    completionBlock,
+    "Review Appendix Artifact",
+  );
+  const completionAppendixOffset = auditBlockField(
+    completionBlock,
+    "Review Appendix Offset",
+  );
+  if (
+    completionAppendixArtifact !== request.appendixArtifact ||
+    (completionAppendixOffset === null
+      ? request.appendixOffset !== null
+      : !/^[0-9]+$/.test(completionAppendixOffset) ||
+        Number(completionAppendixOffset) !== request.appendixOffset)
+  ) {
+    return false;
+  }
+
+  if (
+    request.priorAppendixDigest !== null &&
+    auditBlockField(completionBlock, "Review Appendix Prior Digest") !==
+      request.priorAppendixDigest
+  ) {
+    return false;
+  }
+  if (
+    request.priorAppendixDigest !== null &&
+    request.priorAppendixLength === null
+  ) {
+    return false;
+  }
+  if (request.priorAppendixLength !== null) {
+    const completionPriorLength = auditBlockField(
+      completionBlock,
+      "Review Appendix Prior Length",
+    );
+    if (
+      completionPriorLength === null ||
+      !/^[0-9]+$/.test(completionPriorLength) ||
+      Number(completionPriorLength) !== request.priorAppendixLength
+    ) {
+      return false;
+    }
+  }
+  if (
+    auditBlockField(completionBlock, "Review Challenge") !==
+    request.reviewChallenge
+  ) {
+    return false;
+  }
+
+  if (request.sourceFingerprint !== null) {
+    const requestSource = auditBlockField(
+      completionBlock,
+      "Request Source Fingerprint",
+    );
+    const completedSource = auditBlockField(
+      completionBlock,
+      "Source Fingerprint",
+    );
+    if (
+      requestSource !== request.sourceFingerprint ||
+      completedSource !== request.sourceFingerprint
+    ) {
+      return false;
+    }
+  }
+  if (
+    request.unitSourceFingerprint !== null &&
+    auditBlockField(completionBlock, "Unit Source Fingerprint") !==
+      request.unitSourceFingerprint
+  ) {
+    return false;
+  }
+  return true;
+}
+
+/**
+ * Byte-capture snapshot of the declared artifact set, sharing the sorted
+ * logical-path manifest fingerprint scheme review receipts record. Swarm
+ * finalize reads converged Bolt worktree records through it and merges the
+ * exact reviewed bytes into main.
+ */
+export function reviewArtifactBytesSnapshot(
   projectDir: string,
   stage: ReviewFingerprintStage,
   unit?: string,
@@ -8154,7 +9182,7 @@ export function reviewArtifactSnapshot(
     captureBytes?: boolean;
     mergedBoltUnits?: ReadonlySet<string>;
   } = {},
-): ReviewArtifactSnapshot | null {
+): ReviewArtifactBytesSnapshot | null {
   let entries: ReviewArtifactEntry[] | null;
   try {
     entries = reviewArtifactEntries(projectDir, stage, unit, {
@@ -8168,7 +9196,7 @@ export function reviewArtifactSnapshot(
   if (entries === null) return null;
 
   const manifest: Array<[string, string]> = [];
-  const snapshot: ReviewArtifactSnapshotEntry[] = [];
+  const snapshot: ReviewArtifactBytesEntry[] = [];
   let anchorReal: string;
   try {
     anchorReal = realpathSync(projectDir);
@@ -8236,19 +9264,6 @@ function swarmConvergenceSourceKind(block: string): SwarmConvergenceSourceKind {
   return "invalid";
 }
 
-export function reviewArtifactFingerprint(
-  projectDir: string,
-  stage: ReviewFingerprintStage,
-  unit?: string,
-  options: {
-    requireRequiredArtifacts?: boolean;
-    boltDag?: BoltDagResolution;
-    stateContent?: string | null;
-    mergedBoltUnits?: ReadonlySet<string>;
-  } = {},
-): string | null {
-  return reviewArtifactSnapshot(projectDir, stage, unit, options)?.fingerprint ?? null;
-}
 
 // Collect the fresh terminal review receipts for a stage from the audit
 // ledger. Builds ONE position-tiebroken event stream (the same interleave
@@ -8688,6 +9703,7 @@ export function freshReviewReceipts(
     phase: string;
     for_each?: string;
     reviewer?: string;
+    review_artifact?: string;
     reviewer_max_iterations?: number;
     review_class?: "adversarial" | "advisory";
     workspace_requires?: boolean;
@@ -8829,7 +9845,7 @@ export function freshReviewReceipts(
       unit: string | undefined;
       iteration: number;
       recovery: boolean;
-      fingerprint: string | null;
+      binding: ReviewRequestBinding | null;
       timestamp: string;
       shard: string;
       suspensionActive: boolean;
@@ -9036,6 +10052,8 @@ export function freshReviewReceipts(
         !sessionBoundaryOnlyTie &&
         teamOwnership
       ) continue;
+      const binding = reviewRequestBindingFromBlock(e.block);
+      if (binding === null) continue;
       const previous = pendingRequests.get(requestKey);
       const recovery =
         previous?.recovery === true ||
@@ -9045,15 +10063,13 @@ export function freshReviewReceipts(
         unit,
         iteration,
         recovery,
-        fingerprint: auditBlockField(e.block, "Artifact Fingerprint"),
+        binding,
         timestamp: e.timestamp,
         shard: e.shard,
         suspensionActive:
           recovery &&
           !sessionBoundaryOnlyTie &&
-          /^sha256:[0-9a-f]{64}$/.test(
-            auditBlockField(e.block, "Artifact Fingerprint") ?? "",
-          ),
+          /^sha256:[0-9a-f]{64}$/.test(binding.artifactFingerprint),
       });
       continue;
     }
@@ -9067,16 +10083,14 @@ export function freshReviewReceipts(
     if (
       !request ||
       (request.timestamp === e.timestamp && request.shard !== e.shard) ||
-      !pendingRequests.delete(requestKey)
-    ) continue;
+      !request.binding ||
+      !reviewCompletionMatchesRequest(request.binding, e.block)
+    ) {
+      continue;
+    }
+    pendingRequests.delete(requestKey);
     const recordedFingerprint = auditBlockField(e.block, "Artifact Fingerprint");
-    const requestedFingerprint = request.fingerprint;
-    const artifactFingerprintUsable =
-      requestedFingerprint !== null &&
-      /^sha256:[0-9a-f]{64}$/.test(requestedFingerprint) &&
-      recordedFingerprint !== null &&
-      /^sha256:[0-9a-f]{64}$/.test(recordedFingerprint) &&
-      recordedFingerprint === requestedFingerprint;
+    const artifactFingerprintUsable = recordedFingerprint !== null;
     const currentFingerprint = reviewArtifactFingerprint(
       projectDir,
       stage,
@@ -9090,7 +10104,7 @@ export function freshReviewReceipts(
     const fingerprintUsable =
       artifactFingerprintUsable && currentFingerprint !== null;
     const fingerprintMatches =
-      fingerprintUsable && requestedFingerprint === currentFingerprint;
+      fingerprintUsable && recordedFingerprint === currentFingerprint;
     const terminalVerdict = request.recovery
       ? verdict
       : terminalReviewVerdict(
@@ -9122,12 +10136,14 @@ export function freshReviewReceipts(
             iteration,
             recovery: request.recovery,
             suspensionActive: false,
+            recoveryCause: request.binding?.recoveryCause ?? null,
           }
         : {
             state: "outstanding",
             iteration: iteration + 1,
             recovery: request.recovery,
             suspensionActive: false,
+            recoveryCause: request.binding?.recoveryCause ?? null,
           };
       if (unit) {
         unitVerdicts.delete(unit);
@@ -9191,6 +10207,7 @@ export function freshReviewReceipts(
       iteration: request.iteration,
       recovery: request.recovery,
       suspensionActive: request.suspensionActive,
+      recoveryCause: request.binding?.recoveryCause ?? null,
     };
     if (request.unit) {
       if (!request.recovery) unitVerdicts.delete(request.unit);
@@ -9476,20 +10493,24 @@ export function repoDir(projectDir: string, repoName: string): string {
 // bound to the SOURCE STATE the reviewer actually inspected: workspace writes
 // deliberately emit no audit events (aidlc-audit-logger.ts excludes them), so
 // without a binding a post-review source edit leaves the receipt satisfying the
-// completion guard for code nobody re-reviewed. The binding is a git-native
-// content fingerprint: per repo, a `git write-tree` over a TEMPORARY index
-// seeded from HEAD with `git add -A` applied — the exact tracked + untracked
-// (gitignore-respecting) content state, computed without touching the real
-// index or worktree. Reverting an edit restores the original fingerprint
+// completion guard for code nobody re-reviewed. The binding is one canonical,
+// bounded filesystem identity, independent of repository metadata and Git
+// executable availability. It makes supported non-Git and missing-Git
+// workspaces bindable, includes ignored application bytes, and excludes only
+// explicit framework/dependency/cache and generated-output boundaries.
+// Reverting an edit restores the original fingerprint
 // (content-addressed), so an undone change does not strand a receipt.
 //
 // Multi-repo: the intent's recorded repo set (intentRepos), each resolved via
 // repoDir(); no recorded repos = the legacy single-repo default (projectDir).
-// An unchanged no-Git greenfield whose only paths are the excluded AIDLC shell
-// binds to the canonical empty listing. Returns null when any application path
-// exists without Git, or when any recorded repo is not a usable checkout. New
-// receipts record null explicitly as `unbindable` and completion fails closed;
-// only a legacy receipt with no fingerprint field keeps the migration fail-open.
+// The workspace roof is a separate source boundary: top-level files such as
+// compose manifests remain covered, while top-level directories stay outside
+// unless .aidlc-source-paths.json explicitly re-includes one. That stable
+// partition prevents unrelated siblings from entering when their `.git`
+// metadata disappears. Missing registered repos carry a stable marker and
+// change the identity when they appear. Null now means the bounded scan itself
+// was unreadable, unstable, over budget, or misconfigured, not merely that Git
+// or a repository is absent.
 
 // The record tree and the CLI/IDE workspace shell are anchored at the top level
 // of the dir that CARRIES the shell: the workspace roof, or a Bolt worktree
@@ -9497,9 +10518,10 @@ export function repoDir(projectDir: string, repoName: string): string {
 // SIBLING of the repo dirs (resolveConstructionRepo / repoDir) and
 // `.aidlc/worktrees/` (worktreePath) hangs off the roof - neither is ever
 // legitimately inside a fingerprinted repo or submodule, where a directory of
-// those names is application source (#646 review). The trailing slash keeps the
-// pathspec a directory match, so a root FILE named `aidlc` stays in the walk.
-const AIDLC_SHELL_DIR_NAMES = ["aidlc/", ".aidlc/"];
+// those names is application source (#646 review). Files with these names stay
+// source; the walker and Git snapshot shape exclude only directory/symlink
+// entries at the shell-carrying root.
+const AIDLC_SHELL_PATHS = ["aidlc", ".aidlc"];
 
 // The sensor-cache exclusion remains depth-tolerant for legacy and worktree
 // paths. Before 2.6.94, the type-check sensor anchored
@@ -9595,7 +10617,9 @@ function sourceGitExclusionPathspecs(
     }
   }
   return [
-    ...(carriesWorkspaceShell ? AIDLC_SHELL_DIR_NAMES : []),
+    ...(carriesWorkspaceShell
+      ? AIDLC_SHELL_PATHS.map((path) => `${path}/`)
+      : []),
     ...exactPaths.map((path) => `:(top)${path}`),
     ...AIDLC_SENSOR_CACHE_GLOBS,
   ];
@@ -9613,13 +10637,59 @@ export function workspaceSourceExclusionPathspecs(
       );
 }
 
-// Git runs a configured `clean` filter as content enters the index, so the tree
-// written below hashes the FILTERED bytes - not the bytes sitting in the
-// worktree. A lossy filter therefore maps two different worktrees onto one
-// fingerprint (#646 review, reproduced: two `app.ts` contents, one tree), and
-// the stage executes against the bytes the reviewer read, so those are what the
-// receipt has to bind. Fold a raw (`--no-filters`) hash of exactly the paths a
-// clean driver touches into the fingerprint.
+// Dependency and machine-local cache trees are never application source. These
+// names are excluded at every depth in both Git and filesystem modes so a
+// missing Git executable cannot turn a normal dependency install into a
+// multi-gigabyte freshness walk.
+const SOURCE_FINGERPRINT_HARD_EXCLUDED_NAMES = [
+  ".cache",
+  ".git",
+  ".gradle",
+  ".mypy_cache",
+  ".next",
+  ".nuxt",
+  ".pytest_cache",
+  ".ruff_cache",
+  ".tox",
+  ".venv",
+  "node_modules",
+  "venv",
+] as const;
+const SOURCE_FINGERPRINT_HARD_EXCLUDED_DIRS = new Set<string>(
+  SOURCE_FINGERPRINT_HARD_EXCLUDED_NAMES,
+);
+const SOURCE_FINGERPRINT_HARD_EXCLUDED_GLOBS =
+  SOURCE_FINGERPRINT_HARD_EXCLUDED_NAMES.map(
+    (name) => `:(glob)**/${name}/**`,
+  );
+
+// These names commonly hold generated output, but can also hold real source.
+// They are always outside the default identity so repository/Git availability
+// cannot change the boundary. Real source beneath them must be named explicitly
+// in .aidlc-source-paths.json; registered paths are content-bound regardless of
+// extension or binary/text encoding.
+const SOURCE_FINGERPRINT_CONDITIONAL_NAMES = [
+  "build",
+  "coverage",
+  "dist",
+  "logs",
+  "target",
+  "tmp",
+] as const;
+const SOURCE_FINGERPRINT_CONDITIONAL_DIRS = new Set<string>(
+  SOURCE_FINGERPRINT_CONDITIONAL_NAMES,
+);
+const SOURCE_FINGERPRINT_CONDITIONAL_GLOBS =
+  SOURCE_FINGERPRINT_CONDITIONAL_NAMES.map(
+    (name) => `:(glob)**/${name}/**`,
+  );
+const SOURCE_FINGERPRINT_REGISTRY = ".aidlc-source-paths.json";
+
+// Git runs a configured `clean` filter as content enters a swarm snapshot index.
+// The canonical fingerprint already hashes the raw filesystem bytes, so the
+// immutable Source Commit must replace filtered index blobs with those same raw
+// bytes. A lossy filter must not make the later merge differ from the source the
+// reviewer inspected.
 //
 // Scoped by attribute AND configured driver, because both are required for a
 // filter to run at all: a `.gitattributes` naming `filter=tidy` is inert unless
@@ -9746,6 +10816,7 @@ function cleanFilteredRawLines(
 export function filteredRawIndexEntries(
   repoDir: string,
   indexFile: string,
+  includedRegularPaths: ReadonlySet<string>,
 ): { path: string; sha: string }[] | null {
   const env = { ...process.env, GIT_INDEX_FILE: indexFile };
   const listed = spawnSync("git", ["-C", repoDir, "ls-files", "-s", "-z"], {
@@ -9763,124 +10834,362 @@ export function filteredRawIndexEntries(
     // Leave symlinks (and gitlinks) exactly as `git add -A` staged them.
     if (tab === -1 || !/^100(?:644|755) /.test(record)) continue;
     const path = record.slice(tab + 1);
-    if (path) paths.push(path);
+    if (path && includedRegularPaths.has(path)) paths.push(path);
   }
   return cleanFilteredRawLines(repoDir, env, paths)?.entries ?? null;
 }
 
+const GIT_OBJECT_ID_RE = /^(?:[0-9a-f]{40}|[0-9a-f]{64})$/;
+const GIT_OBJECT_ID_CASE_INSENSITIVE_RE =
+  /^(?:[0-9a-fA-F]{40}|[0-9a-fA-F]{64})$/;
+
+function normalizeGitObjectId(value: string): string | null {
+  return GIT_OBJECT_ID_CASE_INSENSITIVE_RE.test(value)
+    ? value.toLowerCase()
+    : null;
+}
+
 function sourceListingEntry(mode: string, oid: string): string | null {
-  if (!/^\d{6}$/.test(mode) || !/^[0-9a-f]{40,64}$/.test(oid)) return null;
+  if (!/^\d{6}$/.test(mode) || !GIT_OBJECT_ID_RE.test(oid)) return null;
   return `${mode} ${oid}`;
 }
 
-function replaceSourceListingEntryOid(entry: string | undefined, oid: string): string | null {
-  const parsed = entry ? /^(\d{6}) [0-9a-f]{40,64}$/.exec(entry) : null;
-  return parsed === null ? null : sourceListingEntry(parsed[1], oid);
+export type WorkspaceSourceListing = Map<string, string>;
+
+export interface WorkspaceSourceState {
+  fingerprint: string;
+  listing: WorkspaceSourceListing;
+}
+
+function prefixedSourceListing(
+  listing: ReadonlyMap<string, string>,
+  repo = "",
+): WorkspaceSourceListing {
+  return new Map(
+    [...listing].map(([path, entry]) => [`${repo}\0${path}`, entry]),
+  );
+}
+
+interface GitTreeLeafEntry {
+  mode: "100644" | "100755" | "120000" | "160000";
+  oid: string;
+  path: string;
+}
+
+interface SyncBufferedReader {
+  buffer: Buffer;
+  end: number;
+  fd: number;
+  offset: number;
+  position: number;
+}
+
+function refillSyncBufferedReader(reader: SyncBufferedReader): boolean {
+  const count = readSync(
+    reader.fd,
+    reader.buffer,
+    0,
+    reader.buffer.length,
+    reader.position,
+  );
+  reader.offset = 0;
+  reader.end = count;
+  reader.position += count;
+  return count > 0;
+}
+
+function readSyncBufferedLine(
+  reader: SyncBufferedReader,
+  maxBytes: number,
+): Buffer | null {
+  const chunks: Buffer[] = [];
+  let total = 0;
+  while (true) {
+    if (
+      reader.offset >= reader.end &&
+      !refillSyncBufferedReader(reader)
+    ) {
+      return null;
+    }
+    const newline = reader.buffer.indexOf(0x0a, reader.offset);
+    if (newline !== -1 && newline < reader.end) {
+      const chunk = reader.buffer.subarray(reader.offset, newline);
+      chunks.push(chunk);
+      total += chunk.length;
+      reader.offset = newline + 1;
+      if (total > maxBytes) return null;
+      return chunks.length === 1
+        ? Buffer.from(chunks[0])
+        : Buffer.concat(chunks, total);
+    }
+    const chunk = reader.buffer.subarray(reader.offset, reader.end);
+    chunks.push(chunk);
+    total += chunk.length;
+    reader.offset = reader.end;
+    if (total > maxBytes) return null;
+  }
+}
+
+function copySyncBufferedBytes(
+  reader: SyncBufferedReader,
+  size: number,
+  outputFd: number,
+): boolean {
+  let remaining = size;
+  while (remaining > 0) {
+    if (
+      reader.offset >= reader.end &&
+      !refillSyncBufferedReader(reader)
+    ) {
+      return false;
+    }
+    const count = Math.min(remaining, reader.end - reader.offset);
+    if (
+      writeSync(
+        outputFd,
+        reader.buffer,
+        reader.offset,
+        count,
+      ) !== count
+    ) {
+      return false;
+    }
+    reader.offset += count;
+    remaining -= count;
+  }
+  if (
+    reader.offset >= reader.end &&
+    !refillSyncBufferedReader(reader)
+  ) {
+    return false;
+  }
+  if (reader.buffer[reader.offset] !== 0x0a) return false;
+  reader.offset += 1;
+  return true;
+}
+
+function readSyncBufferedBytes(
+  reader: SyncBufferedReader,
+  size: number,
+  maxBytes: number,
+): Buffer | null {
+  if (size > maxBytes) return null;
+  const bytes = Buffer.alloc(size);
+  let offset = 0;
+  while (offset < size) {
+    if (
+      reader.offset >= reader.end &&
+      !refillSyncBufferedReader(reader)
+    ) {
+      return null;
+    }
+    const count = Math.min(size - offset, reader.end - reader.offset);
+    reader.buffer.copy(bytes, offset, reader.offset, reader.offset + count);
+    reader.offset += count;
+    offset += count;
+  }
+  if (
+    reader.offset >= reader.end &&
+    !refillSyncBufferedReader(reader)
+  ) {
+    return null;
+  }
+  if (reader.buffer[reader.offset] !== 0x0a) return null;
+  reader.offset += 1;
+  return bytes;
+}
+
+function gitTreeLeafEntries(
+  repoDir: string,
+  commit: string,
+): GitTreeLeafEntry[] | null {
+  const objectType = spawnSync(
+    "git",
+    ["-C", repoDir, "cat-file", "-t", commit],
+    { encoding: "utf-8", maxBuffer: 1024 * 1024 },
+  );
+  if (objectType.status !== 0 || objectType.stdout.trim() !== "commit") {
+    return null;
+  }
+  const listed = spawnSync(
+    "git",
+    ["-C", repoDir, "ls-tree", "-r", "-z", "--full-tree", commit],
+    { maxBuffer: 512 * 1024 * 1024 },
+  );
+  if (listed.status !== 0 || !Buffer.isBuffer(listed.stdout)) return null;
+  const maxEntries = sourceIdentityBudget(
+    "AIDLC_TEST_SOURCE_MAX_ENTRIES",
+    250_000,
+  );
+  const entries: GitTreeLeafEntry[] = [];
+  const seen = new Set<string>();
+  let offset = 0;
+  while (offset < listed.stdout.length) {
+    const nul = listed.stdout.indexOf(0, offset);
+    if (nul === -1) return null;
+    if (nul === offset) {
+      offset += 1;
+      continue;
+    }
+    const record = listed.stdout.subarray(offset, nul);
+    offset = nul + 1;
+    const tab = record.indexOf(0x09);
+    if (tab === -1) return null;
+    const header = record.subarray(0, tab).toString("ascii");
+    const match =
+      /^(100644|100755|120000|160000) (blob|commit) ([0-9a-fA-F]{40}|[0-9a-fA-F]{64})$/
+        .exec(header);
+    if (match === null) return null;
+    const mode = match[1] as GitTreeLeafEntry["mode"];
+    if (
+      (mode === "160000" && match[2] !== "commit") ||
+      (mode !== "160000" && match[2] !== "blob")
+    ) {
+      return null;
+    }
+    const pathBytes = record.subarray(tab + 1);
+    const path = pathBytes.toString("utf-8");
+    if (
+      path.length === 0 ||
+      !Buffer.from(path, "utf-8").equals(pathBytes) ||
+      isAbsolute(path) ||
+      /^[A-Za-z]:\//.test(path) ||
+      path.startsWith("//") ||
+      path
+        .split("/")
+        .some((part) => part.length === 0 || part === "." || part === "..") ||
+      seen.has(path)
+    ) {
+      return null;
+    }
+    const oid = normalizeGitObjectId(match[3]);
+    if (oid === null) return null;
+    seen.add(path);
+    entries.push({ mode, oid, path });
+    if (entries.length > maxEntries) return null;
+  }
+  return entries;
+}
+
+function materializeRawGitTree(
+  repoDir: string,
+  root: string,
+  entries: readonly GitTreeLeafEntry[],
+): boolean {
+  const blobs = entries.filter((entry) => entry.mode !== "160000");
+  const batchPath = join(dirname(root), "cat-file.batch");
+  let batchFd: number | undefined;
+  try {
+    batchFd = openSync(batchPath, "w+");
+    const batch = spawnSync(
+      "git",
+      ["-C", repoDir, "cat-file", "--batch"],
+      {
+        input: Buffer.from(
+          blobs.map((entry) => entry.oid).join("\n") +
+            (blobs.length > 0 ? "\n" : ""),
+        ),
+        stdio: ["pipe", batchFd, "pipe"],
+        encoding: "utf-8",
+        maxBuffer: 16 * 1024 * 1024,
+      },
+    );
+    if (batch.status !== 0) return false;
+    const reader: SyncBufferedReader = {
+      buffer: Buffer.allocUnsafe(64 * 1024),
+      end: 0,
+      fd: batchFd,
+      offset: 0,
+      position: 0,
+    };
+    for (const entry of blobs) {
+      const header = readSyncBufferedLine(reader, 8192);
+      if (header === null) return false;
+      const parsed =
+        /^([0-9a-fA-F]{40}|[0-9a-fA-F]{64}) blob ([0-9]+)$/
+          .exec(header.toString("ascii"));
+      const size =
+        parsed === null || parsed[2].length > 16
+          ? Number.NaN
+          : Number(parsed[2]);
+      if (
+        parsed === null ||
+        normalizeGitObjectId(parsed[1]) !== entry.oid ||
+        !Number.isSafeInteger(size) ||
+        size < 0 ||
+        size > 4 * 1024 * 1024 * 1024
+      ) {
+        return false;
+      }
+      const target = join(root, entry.path);
+      mkdirSync(dirname(target), { recursive: true });
+      if (entry.mode === "120000") {
+        const linkBytes = readSyncBufferedBytes(reader, size, 64 * 1024);
+        if (linkBytes === null) return false;
+        const linkText = linkBytes.toString("utf-8");
+        if (!Buffer.from(linkText, "utf-8").equals(linkBytes)) return false;
+        symlinkSync(linkText, target);
+        continue;
+      }
+      let outputFd: number | undefined;
+      try {
+        outputFd = openSync(
+          target,
+          "wx",
+          entry.mode === "100755" ? 0o755 : 0o644,
+        );
+        if (!copySyncBufferedBytes(reader, size, outputFd)) return false;
+      } finally {
+        if (outputFd !== undefined) closeSync(outputFd);
+      }
+      chmodSync(target, entry.mode === "100755" ? 0o755 : 0o644);
+    }
+    for (const entry of entries) {
+      if (entry.mode !== "160000") continue;
+      mkdirSync(join(root, entry.path), { recursive: true });
+    }
+    return true;
+  } catch {
+    return false;
+  } finally {
+    if (batchFd !== undefined) closeSync(batchFd);
+  }
 }
 
 /**
- * Reconstruct the exact checked-out source listing for an immutable commit
- * without registering a Git worktree or touching the caller's index/worktree.
- * A temporary index is seeded from the commit and checkout-index populates an
- * ordinary directory, so clean/process/ident raw-byte folding sees the same
- * files and repository-local configuration as a real worktree checkout.
- * `carriesWorkspaceShell` is required for the same reason as gitTreeSourceState:
- * sibling repositories keep top-level aidlc/ and .aidlc/ as application source.
+ * Reconstruct a source listing from immutable tree/blob bytes without
+ * registering a Git worktree or touching the caller's index/worktree. Raw
+ * materialization deliberately avoids checkout filters, EOL conversion, and
+ * working-tree encodings. The opt-in live-target mode is used only for the
+ * one-time worktree base snapshot.
  */
 export function gitCommitSourceListing(
   repoDir: string,
   commit: string,
   carriesWorkspaceShell: boolean,
+  followExternalTargets = false,
 ): WorkspaceSourceListing | null {
-  if (!isGitRepoDir(repoDir) || !/^[0-9a-f]{40,64}$/.test(commit)) return null;
+  if (!isGitRepoDir(repoDir) || !GIT_OBJECT_ID_RE.test(commit)) return null;
   const root = join(tmpdir(), `aidlc-commit-listing-${process.pid}-${randomUUID().slice(0, 8)}`);
-  const indexFile = join(root, "index");
   const checkoutDir = join(root, "checkout");
-  const env = { ...process.env, GIT_INDEX_FILE: indexFile };
   try {
     mkdirSync(checkoutDir, { recursive: true });
-    const readTree = spawnSync("git", ["-C", repoDir, "read-tree", commit], {
-      env,
-      encoding: "utf-8",
-      maxBuffer: 512 * 1024 * 1024,
-    });
-    if (readTree.status !== 0) return null;
-    const checkout = spawnSync(
-      "git",
-      ["-C", repoDir, "checkout-index", "-a", "-f", `--prefix=${checkoutDir}${sep}`],
-      { env, encoding: "utf-8", maxBuffer: 512 * 1024 * 1024 },
+    const entries = gitTreeLeafEntries(repoDir, commit);
+    if (entries === null) return null;
+    if (!materializeRawGitTree(repoDir, checkoutDir, entries)) return null;
+    const source = filesystemSourceIdentity(
+      checkoutDir,
+      carriesWorkspaceShell,
+      new Set(),
+      followExternalTargets ? "follow" : "tree-only",
+      false,
     );
-    if (checkout.status !== 0) return null;
-
-    const shellPatterns =
-      sourceGitExclusionPathspecs(carriesWorkspaceShell, repoDir);
-    const excluded = spawnSync(
-      "git",
-      [
-        "-C",
-        repoDir,
-        "rm",
-        "-r",
-        "-q",
-        "-f",
-        "--cached",
-        "--ignore-unmatch",
-        "--",
-        ...shellPatterns,
-      ],
-      { env, encoding: "utf-8", maxBuffer: 512 * 1024 * 1024 },
-    );
-    if (excluded.status !== 0) return null;
-
-    const listed = spawnSync("git", ["-C", repoDir, "ls-files", "-s", "-z"], {
-      env,
-      encoding: "utf-8",
-      maxBuffer: 512 * 1024 * 1024,
-    });
-    if (listed.status !== 0) return null;
-    const listing: WorkspaceSourceListing = new Map();
-    const regularPaths: string[] = [];
-    for (const record of listed.stdout.split("\0")) {
-      if (!record) continue;
-      const tab = record.indexOf("\t");
-      if (tab === -1) return null;
-      const match = /^(\d{6}) ([0-9a-f]{40,64}) \d+$/.exec(record.slice(0, tab));
-      const path = record.slice(tab + 1);
-      if (match === null || !path) return null;
-      const entry = sourceListingEntry(match[1], match[2]);
-      if (entry === null) return null;
-      listing.set(`\0${path}`, entry);
-      if (match[1] === "100644" || match[1] === "100755") regularPaths.push(path);
-    }
-
-    // Query attributes/config through the owning repository while pointing Git
-    // at the ordinary reconstructed checkout. The worktree bytes hashed here
-    // therefore match a real checkout without registering one.
-    const gitDir = spawnSync("git", ["-C", repoDir, "rev-parse", "--absolute-git-dir"], {
-      encoding: "utf-8",
-      maxBuffer: 512 * 1024 * 1024,
-    });
-    if (gitDir.status !== 0 || !gitDir.stdout.trim()) return null;
-    const checkoutEnv = {
-      ...env,
-      GIT_DIR: gitDir.stdout.trim(),
-      GIT_WORK_TREE: checkoutDir,
-    };
-    const raw = cleanFilteredRawLines(checkoutDir, checkoutEnv, regularPaths);
-    if (raw === null) return null;
-    for (const entry of raw.entries) {
-      const key = `\0${entry.path}`;
-      const replacement = replaceSourceListingEntryOid(listing.get(key), entry.sha);
-      if (replacement === null) return null;
-      listing.set(key, replacement);
-    }
-    return listing;
+    if (source === null) return null;
+    return prefixedSourceListing(source.listing);
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
 }
-
-export type WorkspaceSourceListing = Map<string, string>;
 
 /**
  * New listings bind mode/type plus OID. Three-column snapshots from the
@@ -9893,170 +11202,159 @@ export function sourceListingEntriesEqual(
 ): boolean {
   if (left === right) return true;
   if (left === undefined || right === undefined) return false;
-  const leftModern = /^\d{6} ([0-9a-f]{40,64})$/.exec(left);
-  const rightModern = /^\d{6} ([0-9a-f]{40,64})$/.exec(right);
+  const leftModern =
+    /^\d{6} ((?:[0-9a-f]{40}|[0-9a-f]{64}))$/.exec(left);
+  const rightModern =
+    /^\d{6} ((?:[0-9a-f]{40}|[0-9a-f]{64}))$/.exec(right);
   if (leftModern !== null && rightModern !== null) return false;
-  const leftOid = leftModern?.[1] ?? (/^[0-9a-f]{40,64}$/.test(left) ? left : null);
+  const leftOid = leftModern?.[1] ?? (GIT_OBJECT_ID_RE.test(left) ? left : null);
   const rightOid =
-    rightModern?.[1] ?? (/^[0-9a-f]{40,64}$/.test(right) ? right : null);
+    rightModern?.[1] ?? (GIT_OBJECT_ID_RE.test(right) ? right : null);
   return leftOid !== null && leftOid === rightOid;
 }
 
-export interface WorkspaceSourceState {
-  fingerprint: string;
-  listing: WorkspaceSourceListing;
+function sourceSnapshotPathBatches(
+  repoDir: string,
+  paths: string[],
+): string[][] | null {
+  // CreateProcess accepts at most 32,767 UTF-16 command-line code units.
+  // Reserve ample room for the executable, `-C <repo> add -f -A --`, quoting,
+  // and Bun/Node launcher behavior. The 256-path cap also bounds POSIX argv.
+  const maxEstimatedUnits = 20_000;
+  const maxPaths = 256;
+  const baseUnits = 512 + repoDir.length * 2;
+  const batches: string[][] = [];
+  let batch: string[] = [];
+  let units = baseUnits;
+  for (const path of paths) {
+    // Windows quoting can double backslashes before a quote. Doubling every
+    // code unit is deliberately conservative and keeps one path independently
+    // bounded before it reaches spawnSync.
+    const pathUnits = path.length * 2 + 4;
+    if (baseUnits + pathUnits > maxEstimatedUnits) return null;
+    if (
+      batch.length > 0 &&
+      (batch.length >= maxPaths || units + pathUnits > maxEstimatedUnits)
+    ) {
+      batches.push(batch);
+      batch = [];
+      units = baseUnits;
+    }
+    batch.push(path);
+    units += pathUnits;
+  }
+  if (batch.length > 0) batches.push(batch);
+  return batches;
 }
 
-function emptyNoGitWorkspaceSourceState(
-  projectDir: string,
-): WorkspaceSourceState | null {
-  let entries: Dirent[];
-  try {
-    entries = readdirSync(projectDir, { withFileTypes: true });
-  } catch {
-    return null;
-  }
-  for (const entry of entries) {
-    const path = `${entry.name}${entry.isDirectory() ? "/" : ""}`;
-    if (!sourcePathIsExcluded(path, true)) return null;
-  }
-  const serialized = serializeSourceListing(new Map());
-  return {
-    fingerprint: sourceListingSha256(serialized),
-    listing: new Map(),
-  };
+// Shape a caller-owned temporary index to the same source boundary used by the
+// fingerprint. The caller seeds and overlays the index first; this helper then
+// restores framework/dependency/cache/generated paths to HEAD and force-adds
+// ignored source candidates plus every explicitly registered path (including
+// binary source). Swarm uses the same helper before writing its immutable
+// Source Commit.
+export interface SourceSnapshotIndexShape {
+  externalSymlinkPaths: string[];
+  includedRegularPaths: Set<string>;
 }
 
-interface GitTreeSourceState extends WorkspaceSourceState {}
-
-// `carriesWorkspaceShell` is REQUIRED, never defaulted: a new call site must
-// decide, so the shell exclusion cannot leak into a derived dir by omission.
-// The fingerprint and per-path listing deliberately come from this SAME temp
-// index pass. A caller that needs both must use workspaceSourceState(), rather
-// than independently invoking the compatibility fingerprint/listing wrappers.
-function gitTreeSourceState(repoDir: string, carriesWorkspaceShell: boolean): GitTreeSourceState | null {
-  if (!isGitRepoDir(repoDir)) return null;
-  const idx = join(
-    tmpdir(),
-    `aidlc-src-fp-${process.pid}-${randomUUID().slice(0, 8)}`,
+export function shapeSourceSnapshotIndex(
+  repoDir: string,
+  indexFile: string,
+  carriesWorkspaceShell: boolean,
+): SourceSnapshotIndexShape | null {
+  const hasWorktreeContext = existsSync(
+    join(repoDir, ".aidlc", "worktree-meta.json"),
   );
-  const env = { ...process.env, GIT_INDEX_FILE: idx };
-  try {
-    // Seed from HEAD so deletions of tracked files change the tree. An unborn
-    // HEAD (fresh init) fails read-tree; the empty temp index is then correct.
-    spawnSync("git", ["-C", repoDir, "read-tree", "HEAD"], { env, encoding: "utf-8" });
-    const add = spawnSync("git", ["-C", repoDir, "add", "-A"], { env, encoding: "utf-8" });
-    if (add.status !== 0) return null;
-    // Drop the aidlc workspace family from the fingerprint and listing. The
-    // root shell names apply only where the workspace shell lives; the sensor
-    // cache glob remains depth-tolerant exactly as documented above.
-    const excluded = sourceGitExclusionPathspecs(
-      carriesWorkspaceShell,
+  const worktreeContext = hasWorktreeContext
+    ? worktreeSourceExclusionContext(repoDir)
+    : null;
+  if (hasWorktreeContext && worktreeContext === null) return null;
+  const effectiveCarriesWorkspaceShell =
+    worktreeContext?.carriesWorkspaceShell ?? carriesWorkspaceShell;
+  const sourceIdentity = filesystemSourceIdentity(
+    repoDir,
+    effectiveCarriesWorkspaceShell,
+  );
+  if (sourceIdentity === null) return null;
+  const harnessShellDirs = new Set(sourceIdentity.harnessShellDirs);
+  const env = { ...process.env, GIT_INDEX_FILE: indexFile };
+  const staticExcluded = [
+    ...sourceGitExclusionPathspecs(
+      effectiveCarriesWorkspaceShell,
       repoDir,
+    ),
+    ...[...harnessShellDirs].sort().map((path) => `${path}/`),
+    ...SOURCE_FINGERPRINT_HARD_EXCLUDED_GLOBS,
+    ...SOURCE_FINGERPRINT_CONDITIONAL_GLOBS,
+  ];
+  if (staticExcluded.length > 0) {
+    const restored = spawnSync(
+      "git",
+      [
+        "-C",
+        repoDir,
+        "reset",
+        "-q",
+        "HEAD",
+        "--",
+        ...staticExcluded,
+      ],
+      { env, encoding: "utf-8" },
     );
-    if (excluded.length > 0) {
-      const removed = spawnSync(
-        "git",
-        [
-          "-C",
-          repoDir,
-          "rm",
-          "-r",
-          "-q",
-          "-f",
-          "--cached",
-          "--ignore-unmatch",
-          "--",
-          ...excluded,
-        ],
-        { env, encoding: "utf-8" },
-      );
-      if (removed.status !== 0) return null;
-    }
-    const wt = spawnSync("git", ["-C", repoDir, "write-tree"], { env, encoding: "utf-8" });
-    if (wt.status !== 0) return null;
-    const treeSha = wt.stdout.trim();
-    if (treeSha.length === 0) return null;
-
-    // One NUL-terminated index enumeration supplies all three consumers:
-    // ordinary per-path oids, initialized-submodule recursion, and the clean-
-    // filter raw-byte scan. Keeping this walk shared preserves Git path bytes
-    // (including tabs/newlines/non-ASCII) and avoids a second index traversal.
-    const lsFiles = spawnSync("git", ["-C", repoDir, "ls-files", "-s", "-z"], {
-      env,
-      encoding: "utf-8",
-      maxBuffer: 512 * 1024 * 1024,
-    });
-    if (lsFiles.status !== 0) return null;
-
-    const listing: WorkspaceSourceListing = new Map();
-    const submodules: string[] = [];
-    const blobPaths: string[] = [];
-    for (const record of lsFiles.stdout.split("\0")) {
-      if (record.length === 0) continue;
-      const tabIdx = record.indexOf("\t");
-      if (tabIdx === -1) return null;
-      const metadata = record.slice(0, tabIdx);
-      const entryPath = record.slice(tabIdx + 1);
-      const parsed = /^(\d{6}) ([0-9a-f]{40,64}) (\d+)$/.exec(metadata);
-      if (parsed === null || entryPath.length === 0) return null;
-      const mode = parsed[1];
-      const oid = parsed[2];
-      const entry = sourceListingEntry(mode, oid);
-      if (entry === null) return null;
-      listing.set(entryPath, entry);
-      if (mode === "160000") {
-        submodules.push(entryPath);
-      } else if (mode === "100644" || mode === "100755") {
-        // Attribute filters apply only to regular blobs, never symlinks/gitlinks.
-        blobPaths.push(entryPath);
-      }
-    }
-
-    const subLines: string[] = [];
-    for (const entryPath of submodules) {
-      const subDir = join(repoDir, entryPath);
-      // An uninitialized submodule has no materialized source beyond its gitlink.
-      if (!isGitRepoDir(subDir)) continue;
-      // A submodule's own `aidlc/` is application source, not the parent shell.
-      const subState = gitTreeSourceState(subDir, false);
-      if (subState === null) return null;
-      subLines.push(`${entryPath}=${subState.fingerprint}`);
-      for (const [path, oid] of subState.listing) {
-        listing.set(`${entryPath}/${path}`, oid);
-      }
-    }
-
-    const raw = cleanFilteredRawLines(repoDir, env, blobPaths);
-    if (raw === null) return null;
-    // A lossy clean/process/ident transform must not hide the worktree bytes.
-    // Replace the indexed oid for each affected path with its raw no-filter oid
-    // while retaining the index mode/type in the canonical listing.
-    for (const entry of raw.entries) {
-      const replacement = replaceSourceListingEntryOid(
-        listing.get(entry.path),
-        entry.sha,
-      );
-      if (replacement === null) return null;
-      listing.set(entry.path, replacement);
-    }
-
-    const rawLines = raw.lines;
-    let fingerprint = treeSha;
-    // Preserve the pre-listing fingerprint VALUE byte-for-byte: the common case
-    // remains the bare tree oid; only initialized submodules/raw-filter paths
-    // fold into the existing sha256 composite, with the same sorted line form.
-    if (subLines.length > 0 || rawLines.length > 0) {
-      subLines.sort();
-      rawLines.sort();
-      fingerprint = createHash("sha256")
-        .update([treeSha, ...subLines, ...rawLines].join("\n"))
-        .digest("hex");
-    }
-    return { fingerprint, listing };
-  } finally {
-    rmSync(idx, { force: true });
+    if (restored.status !== 0) return null;
   }
+  const symlinkBatches = sourceSnapshotPathBatches(
+    repoDir,
+    sourceIdentity.excludedSymlinkPathspecs,
+  );
+  if (symlinkBatches === null) return null;
+  for (const batch of symlinkBatches) {
+    const restored = spawnSync(
+      "git",
+      ["-C", repoDir, "reset", "-q", "HEAD", "--", ...batch],
+      { env, encoding: "utf-8", maxBuffer: 512 * 1024 * 1024 },
+    );
+    if (restored.status !== 0) return null;
+  }
+
+  const forcePaths = new Set(sourceIdentity.snapshotPaths);
+  for (const path of sourceIdentity.registeredSnapshotPaths) {
+    if (existsSync(join(repoDir, path))) {
+      forcePaths.add(path);
+      continue;
+    }
+    const tracked = spawnSync(
+      "git",
+      ["-C", repoDir, "ls-tree", "-r", "-z", "--name-only", "HEAD", "--", path],
+      { encoding: "utf-8", maxBuffer: 512 * 1024 * 1024 },
+    );
+    if (tracked.status !== 0) return null;
+    if (tracked.stdout.length > 0) forcePaths.add(path);
+  }
+  const sortedForcePaths = [...forcePaths].sort();
+  const forceBatches = sourceSnapshotPathBatches(repoDir, sortedForcePaths);
+  if (forceBatches === null) return null;
+  for (const batch of forceBatches) {
+    const restored = spawnSync(
+      "git",
+      [
+        "-C",
+        repoDir,
+        "add",
+        "-f",
+        "-A",
+        "--",
+        ...batch,
+      ],
+      { env, encoding: "utf-8", maxBuffer: 512 * 1024 * 1024 },
+    );
+    if (restored.status !== 0) return null;
+  }
+  return {
+    externalSymlinkPaths: sourceIdentity.externalSymlinkPaths,
+    includedRegularPaths: new Set(sourceIdentity.includedRegularPaths),
+  };
 }
 
 // Recorded in place of a fingerprint when one cannot be computed, so a receipt
@@ -10064,8 +11362,1679 @@ function gitTreeSourceState(repoDir: string, carriesWorkspaceShell: boolean): Gi
 // pre-#629 receipt that carries no field at all (#646 review).
 export const UNBINDABLE_FINGERPRINT = "unbindable";
 
+function sourceIdentityBudget(name: string, fallback: number): number {
+  const raw = process.env[name];
+  if (raw && /^[1-9][0-9]*$/.test(raw)) return Number(raw);
+  return fallback;
+}
+
+function isSourceHarnessShellDir(root: string, name: string): boolean {
+  if (!isHarnessDirName(name)) return false;
+  try {
+    const manifestPath = join(root, name, "tools", "data", "harness.json");
+    const stat = lstatSync(manifestPath);
+    if (!stat.isFile() || stat.size > 64 * 1024) return false;
+    const parsed = JSON.parse(readFileSync(manifestPath, "utf-8")) as {
+      name?: unknown;
+    };
+    return typeof parsed.name === "string" && parsed.name.trim().length > 0;
+  } catch {
+    return false;
+  }
+}
+
+function sourceHarnessShellDirs(root: string): Set<string> | null {
+  const dirs = new Set<string>();
+  const maxEntries = sourceIdentityBudget(
+    "AIDLC_TEST_SOURCE_MAX_ENTRIES",
+    250_000,
+  );
+  let handle: ReturnType<typeof opendirSync> | undefined;
+  try {
+    handle = opendirSync(root);
+    let entriesSeen = 0;
+    while (true) {
+      const entry = handle.readSync();
+      if (entry === null) break;
+      entriesSeen += 1;
+      if (entriesSeen > maxEntries) return null;
+      if (
+        (entry.isDirectory() || entry.isSymbolicLink()) &&
+        isSourceHarnessShellDir(root, entry.name)
+      ) {
+        dirs.add(entry.name);
+      }
+    }
+    return dirs;
+  } catch {
+    return null;
+  } finally {
+    if (handle !== undefined) {
+      try {
+        handle.closeSync();
+      } catch {
+        // The bounded scan already fails closed on earlier read errors.
+      }
+    }
+  }
+}
+
+function sourceFingerprintRegistryPaths(
+  root: string,
+  carriesWorkspaceShell: boolean,
+  suppliedHarnessShellDirs?: ReadonlySet<string>,
+): Set<string> | null {
+  const harnessShellDirs = suppliedHarnessShellDirs ??
+    (
+      carriesWorkspaceShell
+        ? sourceHarnessShellDirs(root)
+        : new Set<string>()
+    );
+  if (harnessShellDirs === null) return null;
+  const registryPath = join(root, SOURCE_FINGERPRINT_REGISTRY);
+  let registryLinkStat: ReturnType<typeof lstatSync>;
+  try {
+    registryLinkStat = lstatSync(registryPath);
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") return new Set();
+    return null;
+  }
+  try {
+    if (
+      registryLinkStat.isSymbolicLink() ||
+      !registryLinkStat.isFile() ||
+      registryLinkStat.size > 1024 * 1024
+    ) return null;
+    const parsed = JSON.parse(readFileSync(registryPath, "utf-8")) as {
+      version?: unknown;
+      paths?: unknown;
+    };
+    if (
+      parsed.version !== 1 ||
+      !Array.isArray(parsed.paths) ||
+      parsed.paths.length > 10_000 ||
+      parsed.paths.some((path) => typeof path !== "string")
+    ) {
+      return null;
+    }
+    const paths = new Set<string>();
+    for (const raw of parsed.paths) {
+      const path = String(raw)
+        .replace(/\\/g, "/")
+        .replace(/^\.\/+/, "")
+        .replace(/\/+$/, "");
+      if (
+        path.length === 0 ||
+        path.length > 4096 ||
+        path === "." ||
+        path.includes("\0") ||
+        isAbsolute(path) ||
+        /^[A-Za-z]:\//.test(path) ||
+        path.startsWith("//") ||
+        path
+          .split("/")
+          .some((part) => part.length === 0 || part === "." || part === "..")
+      ) {
+        return null;
+      }
+      const parts = path.split("/");
+      if (
+        (
+          carriesWorkspaceShell &&
+          (
+            parts[0] === "aidlc" ||
+            parts[0] === ".aidlc" ||
+            (KNOWN_HARNESS_DIRS as readonly string[]).includes(parts[0]) ||
+            harnessShellDirs.has(parts[0])
+          )
+        ) ||
+        parts.some((part) => SOURCE_FINGERPRINT_HARD_EXCLUDED_DIRS.has(part)) ||
+        isAidlcSensorCachePath(path)
+      ) {
+        return null;
+      }
+      paths.add(path);
+    }
+    return paths;
+  } catch {
+    return null;
+  }
+}
+
+function sourcePathPhysicallyExcluded(
+  path: string,
+  carriesWorkspaceShell: boolean,
+  harnessShellDirs: ReadonlySet<string>,
+): boolean {
+  const parts = path.split("/");
+  return (
+    (
+      carriesWorkspaceShell &&
+      (
+        parts[0] === "aidlc" ||
+        parts[0] === ".aidlc" ||
+        (KNOWN_HARNESS_DIRS as readonly string[]).includes(parts[0]) ||
+        harnessShellDirs.has(parts[0])
+      )
+    ) ||
+    parts.some((part) => SOURCE_FINGERPRINT_HARD_EXCLUDED_DIRS.has(part)) ||
+    isAidlcSensorCachePath(path)
+  );
+}
+
+function pathIsWithinRoot(root: string, target: string): boolean {
+  const rel = relative(root, target);
+  return (
+    rel === "" ||
+    (
+      !isAbsolute(rel) &&
+      rel !== ".." &&
+      !rel.startsWith(`..${sep}`)
+    )
+  );
+}
+
+interface SourceSymlinkResolution {
+  externalHop: boolean;
+  target: string | null;
+}
+
+function resolveSourceSymlinkTarget(
+  rootReal: string,
+  linkPath: string,
+  stopOnExternalHop = false,
+): SourceSymlinkResolution | null {
+  let current = linkPath;
+  let externalHop = false;
+  const visited = new Set<string>();
+  for (let hop = 0; hop < 40; hop++) {
+    const key = resolvePath(current);
+    if (visited.has(key)) return null;
+    visited.add(key);
+
+    let currentDir: string;
+    try {
+      currentDir = realpathSync(dirname(current));
+    } catch {
+      return null;
+    }
+    if (!pathIsWithinRoot(rootReal, currentDir)) {
+      externalHop = true;
+      if (stopOnExternalHop) return { externalHop, target: null };
+    }
+    let linkText: string;
+    try {
+      linkText = readlinkSync(current);
+    } catch {
+      return null;
+    }
+    const next = isAbsolute(linkText)
+      ? resolvePath(linkText)
+      : resolvePath(currentDir, linkText);
+    if (!pathIsWithinRoot(rootReal, next)) {
+      externalHop = true;
+      if (stopOnExternalHop) return { externalHop, target: null };
+    }
+
+    let stat: ReturnType<typeof lstatSync>;
+    try {
+      stat = lstatSync(next);
+    } catch {
+      return { externalHop, target: null };
+    }
+    if (stat.isSymbolicLink()) {
+      current = next;
+      continue;
+    }
+    let target: string;
+    try {
+      target = realpathSync(next);
+    } catch {
+      return { externalHop, target: null };
+    }
+    if (!pathIsWithinRoot(rootReal, target)) externalHop = true;
+    return { externalHop, target };
+  }
+  return null;
+}
+
+interface RegisteredPhysicalSourceResolution {
+  externalHop: boolean;
+  path: string | null;
+}
+
+function registeredPhysicalSourcePath(
+  rootReal: string,
+  logicalPath: string,
+  stopOnExternalHop: boolean,
+): RegisteredPhysicalSourceResolution | null {
+  const parts = logicalPath.split("/");
+  let current = rootReal;
+  let externalHop = false;
+  for (let index = 0; index < parts.length; index++) {
+    const candidate = join(current, parts[index]);
+    let stat: ReturnType<typeof lstatSync>;
+    try {
+      stat = lstatSync(candidate);
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== "ENOENT") return null;
+      const unresolved = join(current, ...parts.slice(index));
+      return {
+        externalHop:
+          externalHop || !pathIsWithinRoot(rootReal, unresolved),
+        path: unresolved,
+      };
+    }
+    if (stat.isSymbolicLink()) {
+      const resolution = resolveSourceSymlinkTarget(
+        rootReal,
+        candidate,
+        stopOnExternalHop,
+      );
+      if (resolution === null) return null;
+      externalHop = externalHop || resolution.externalHop;
+      if (resolution.target === null) {
+        return { externalHop, path: null };
+      }
+      current = resolution.target;
+    } else {
+      current = candidate;
+    }
+    if (!pathIsWithinRoot(rootReal, current)) externalHop = true;
+  }
+  return { externalHop, path: current };
+}
+
+function isAidlcSensorCachePath(path: string): boolean {
+  const parts = path.split("/");
+  for (let i = 0; i + 4 < parts.length; i++) {
+    if (
+      parts[i] === "aidlc" &&
+      parts[i + 1] === "spaces" &&
+      parts[i + 3] === "intents" &&
+      parts.slice(i + 4).includes(".aidlc-sensors")
+    ) {
+      return true;
+    }
+  }
+  return false;
+}
+
+function stableFileSha256(path: string): string | null {
+  let fd: number | undefined;
+  try {
+    fd = openSync(path, "r");
+    const before = fstatSync(fd);
+    if (!before.isFile()) return null;
+    const hash = createHash("sha256");
+    const buffer = Buffer.allocUnsafe(64 * 1024);
+    let position = 0;
+    while (true) {
+      const count = readSync(fd, buffer, 0, buffer.length, position);
+      if (count === 0) break;
+      hash.update(buffer.subarray(0, count));
+      position += count;
+    }
+    const after = fstatSync(fd);
+    if (
+      before.size !== after.size ||
+      before.mtimeMs !== after.mtimeMs ||
+      before.ctimeMs !== after.ctimeMs ||
+      position !== after.size
+    ) {
+      return null;
+    }
+    return hash.digest("hex");
+  } catch {
+    return null;
+  } finally {
+    if (fd !== undefined) {
+      try {
+        closeSync(fd);
+      } catch {
+        // The fingerprint already fails closed on any earlier read error.
+      }
+    }
+  }
+}
+
+interface FilesystemSourceIdentity {
+  embeddedGitPaths: string[];
+  excludedSymlinkPathspecs: string[];
+  externalSymlinkPaths: string[];
+  fingerprint: string;
+  harnessShellDirs: string[];
+  includedRegularPaths: string[];
+  listing: WorkspaceSourceListing;
+  registeredSnapshotPaths: string[];
+  snapshotPaths: string[];
+}
+
+type SourceSymlinkTargetMode = "follow" | "tree-only";
+
+function boundedGitMetadataText(path: string, maxBytes: number): string | null {
+  let fd: number | undefined;
+  try {
+    const pathStat = lstatSync(path);
+    if (!pathStat.isFile() || pathStat.size > maxBytes) return null;
+    fd = openSync(path, "r");
+    const before = fstatSync(fd);
+    if (!before.isFile() || before.size > maxBytes) return null;
+    const bytes = Buffer.alloc(before.size);
+    let offset = 0;
+    while (offset < bytes.length) {
+      const count = readSync(
+        fd,
+        bytes,
+        offset,
+        bytes.length - offset,
+        offset,
+      );
+      if (count === 0) return null;
+      offset += count;
+    }
+    const after = fstatSync(fd);
+    if (
+      before.size !== after.size ||
+      before.mtimeMs !== after.mtimeMs ||
+      before.ctimeMs !== after.ctimeMs
+    ) {
+      return null;
+    }
+    return bytes.toString("utf-8");
+  } catch {
+    return null;
+  } finally {
+    if (fd !== undefined) {
+      try {
+        closeSync(fd);
+      } catch {
+        // The metadata read already fails closed on any earlier error.
+      }
+    }
+  }
+}
+
+function singleGitMetadataLine(raw: string): string | null {
+  const line = raw.replace(/\r?\n$/, "");
+  if (line.length === 0 || line.includes("\n") || line.includes("\r")) {
+    return null;
+  }
+  return line;
+}
+
+function gitMetadataDirectory(worktreeDir: string): string | null {
+  const marker = join(worktreeDir, ".git");
+  try {
+    const markerStat = lstatSync(marker);
+    if (markerStat.isDirectory()) return realpathSync(marker);
+    if (!markerStat.isFile()) return null;
+  } catch {
+    return null;
+  }
+  const pointerRaw = boundedGitMetadataText(marker, 8192);
+  const pointerLine =
+    pointerRaw === null ? null : singleGitMetadataLine(pointerRaw);
+  if (pointerLine === null || !pointerLine.startsWith("gitdir: ")) {
+    return null;
+  }
+  const pointer = pointerLine.slice("gitdir: ".length);
+  if (pointer.length === 0 || pointer.includes("\0")) return null;
+  const target = isAbsolute(pointer)
+    ? pointer
+    : resolvePath(worktreeDir, pointer);
+  try {
+    if (!lstatSync(target).isDirectory()) return null;
+    return realpathSync(target);
+  } catch {
+    return null;
+  }
+}
+
+function gitCommonDirectory(gitDir: string): string | null {
+  const marker = join(gitDir, "commondir");
+  try {
+    if (!lstatSync(marker).isFile()) return null;
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") return gitDir;
+    return null;
+  }
+  const pointerRaw = boundedGitMetadataText(marker, 8192);
+  const pointerLine =
+    pointerRaw === null ? null : singleGitMetadataLine(pointerRaw);
+  if (
+    pointerLine === null ||
+    pointerLine.length === 0 ||
+    pointerLine.includes("\0")
+  ) {
+    return null;
+  }
+  const target = isAbsolute(pointerLine)
+    ? pointerLine
+    : resolvePath(gitDir, pointerLine);
+  try {
+    if (!lstatSync(target).isDirectory()) return null;
+    return realpathSync(target);
+  } catch {
+    return null;
+  }
+}
+
+type GitObjectType = "commit" | "other";
+
+function gitObjectDirectories(
+  _gitDir: string,
+  commonDir: string,
+): string[] | null {
+  const queue = [join(commonDir, "objects")];
+  const directories: string[] = [];
+  const seen = new Set<string>();
+  while (queue.length > 0) {
+    if (directories.length >= 64) return null;
+    const candidate = queue.shift()!;
+    let objectDir: string;
+    try {
+      if (!lstatSync(candidate).isDirectory()) return null;
+      objectDir = realpathSync(candidate);
+    } catch {
+      return null;
+    }
+    if (seen.has(objectDir)) continue;
+    seen.add(objectDir);
+    directories.push(objectDir);
+
+    const alternatesPath = join(objectDir, "info", "alternates");
+    try {
+      const alternatesStat = lstatSync(alternatesPath);
+      if (!alternatesStat.isFile()) return null;
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === "ENOENT") continue;
+      return null;
+    }
+    const alternates = boundedGitMetadataText(
+      alternatesPath,
+      1024 * 1024,
+    );
+    if (alternates === null) return null;
+    const lines = alternates.split(/\r?\n/).filter(Boolean);
+    if (lines.length > 64) return null;
+    for (const line of lines) {
+      if (
+        line.length > 4096 ||
+        line.includes("\0") ||
+        line.startsWith("#")
+      ) {
+        return null;
+      }
+      queue.push(
+        isAbsolute(line) ? resolvePath(line) : resolvePath(objectDir, line),
+      );
+    }
+  }
+  return directories;
+}
+
+function looseGitObjectType(
+  objectDir: string,
+  oid: string,
+): GitObjectType | null {
+  const path = join(objectDir, oid.slice(0, 2), oid.slice(2));
+  let compressed: Buffer;
+  try {
+    const stat = lstatSync(path);
+    if (!stat.isFile() || stat.size > 16 * 1024 * 1024) return null;
+    compressed = readFileSync(path);
+  } catch {
+    return null;
+  }
+  let inflated: Buffer;
+  try {
+    inflated = inflateSync(compressed, {
+      maxOutputLength: 64 * 1024 * 1024,
+    });
+  } catch {
+    return null;
+  }
+  const separator = inflated.indexOf(0);
+  if (separator <= 0 || separator > 128) return null;
+  const header = inflated.subarray(0, separator).toString("ascii");
+  const match = /^(commit|tree|blob|tag) ([0-9]+)$/.exec(header);
+  if (match === null) return null;
+  const declaredSize = Number(match[2]);
+  if (
+    !Number.isSafeInteger(declaredSize) ||
+    declaredSize !== inflated.length - separator - 1
+  ) {
+    return null;
+  }
+  return match[1] === "commit" ? "commit" : "other";
+}
+
+interface PackedGitObjectLocation {
+  offset: number;
+  packPath: string;
+}
+
+function packedGitObjectLocation(
+  objectDir: string,
+  oid: string,
+): PackedGitObjectLocation | null {
+  const packDir = join(objectDir, "pack");
+  let indexes: string[];
+  try {
+    indexes = readdirSync(packDir)
+      .filter((name) => /^pack-[0-9a-f]+\.idx$/.test(name))
+      .sort();
+  } catch {
+    return null;
+  }
+  if (indexes.length > 256) return null;
+  const oidBytes = Buffer.from(oid, "hex");
+  let totalIndexBytes = 0;
+  for (const indexName of indexes) {
+    const indexPath = join(packDir, indexName);
+    let index: Buffer;
+    try {
+      const stat = lstatSync(indexPath);
+      if (!stat.isFile() || stat.size > 128 * 1024 * 1024) return null;
+      totalIndexBytes += stat.size;
+      if (totalIndexBytes > 256 * 1024 * 1024) return null;
+      index = readFileSync(indexPath);
+    } catch {
+      return null;
+    }
+    if (index.length < 1024) {
+      return null;
+    }
+    const versionTwo = index.readUInt32BE(0) === 0xff744f63;
+    if (!versionTwo) {
+      const count = index.readUInt32BE(255 * 4);
+      const table = 256 * 4;
+      const entrySize = 4 + oidBytes.length;
+      if (
+        table + count * entrySize + oidBytes.length * 2 > index.length
+      ) {
+        return null;
+      }
+      let low = 0;
+      let high = count;
+      while (low < high) {
+        const mid = Math.floor((low + high) / 2);
+        const start = table + mid * entrySize + 4;
+        const comparison = Buffer.compare(
+          index.subarray(start, start + oidBytes.length),
+          oidBytes,
+        );
+        if (comparison < 0) low = mid + 1;
+        else high = mid;
+      }
+      if (low >= count) continue;
+      const entry = table + low * entrySize;
+      if (
+        !index
+          .subarray(entry + 4, entry + 4 + oidBytes.length)
+          .equals(oidBytes)
+      ) {
+        continue;
+      }
+      const packPath = join(
+        packDir,
+        `${indexName.slice(0, -".idx".length)}.pack`,
+      );
+      try {
+        if (!lstatSync(packPath).isFile()) return null;
+      } catch {
+        return null;
+      }
+      return { offset: index.readUInt32BE(entry), packPath };
+    }
+    if (index.length < 1032 || index.readUInt32BE(4) !== 2) return null;
+    const count = index.readUInt32BE(8 + 255 * 4);
+    const oidTable = 8 + 256 * 4;
+    const crcTable = oidTable + count * oidBytes.length;
+    const offsetTable = crcTable + count * 4;
+    if (
+      !Number.isSafeInteger(offsetTable) ||
+      offsetTable + count * 4 > index.length
+    ) {
+      return null;
+    }
+    let low = 0;
+    let high = count;
+    while (low < high) {
+      const mid = Math.floor((low + high) / 2);
+      const start = oidTable + mid * oidBytes.length;
+      const comparison = Buffer.compare(
+        index.subarray(start, start + oidBytes.length),
+        oidBytes,
+      );
+      if (comparison < 0) low = mid + 1;
+      else high = mid;
+    }
+    if (low >= count) continue;
+    const foundStart = oidTable + low * oidBytes.length;
+    if (
+      !index
+        .subarray(foundStart, foundStart + oidBytes.length)
+        .equals(oidBytes)
+    ) {
+      continue;
+    }
+    const rawOffset = index.readUInt32BE(offsetTable + low * 4);
+    let offset: number;
+    if ((rawOffset & 0x80000000) === 0) {
+      offset = rawOffset;
+    } else {
+      const largeOffset =
+        offsetTable + count * 4 + (rawOffset & 0x7fffffff) * 8;
+      if (largeOffset + 8 > index.length) return null;
+      const value = index.readBigUInt64BE(largeOffset);
+      if (value > BigInt(Number.MAX_SAFE_INTEGER)) return null;
+      offset = Number(value);
+    }
+    const packPath = join(
+      packDir,
+      `${indexName.slice(0, -".idx".length)}.pack`,
+    );
+    try {
+      if (!lstatSync(packPath).isFile()) return null;
+    } catch {
+      return null;
+    }
+    return { offset, packPath };
+  }
+  return null;
+}
+
+function packedGitObjectType(
+  location: PackedGitObjectLocation,
+  objectDirs: readonly string[],
+  oidLength: number,
+  seen: Set<string>,
+  depth: number,
+): GitObjectType | null {
+  if (depth > 64) return null;
+  const visitKey = `${location.packPath}\0${location.offset}`;
+  if (seen.has(visitKey)) return null;
+  seen.add(visitKey);
+
+  let fd: number | undefined;
+  try {
+    fd = openSync(location.packPath, "r");
+    const stat = fstatSync(fd);
+    if (
+      !stat.isFile() ||
+      location.offset < 12 ||
+      location.offset >= stat.size
+    ) {
+      return null;
+    }
+    const packHeader = Buffer.alloc(12);
+    if (readSync(fd, packHeader, 0, 12, 0) !== 12) return null;
+    if (
+      packHeader.subarray(0, 4).toString("ascii") !== "PACK" ||
+      ![2, 3].includes(packHeader.readUInt32BE(4))
+    ) {
+      return null;
+    }
+    const available = Math.min(96, stat.size - location.offset);
+    const header = Buffer.alloc(available);
+    if (
+      readSync(
+        fd,
+        header,
+        0,
+        available,
+        location.offset,
+      ) !== available
+    ) {
+      return null;
+    }
+    let cursor = 0;
+    let byte = header[cursor++];
+    const packedType = (byte >> 4) & 0x07;
+    while ((byte & 0x80) !== 0) {
+      if (cursor >= header.length) return null;
+      byte = header[cursor++];
+    }
+    if (packedType === 1) return "commit";
+    if ([2, 3, 4].includes(packedType)) return "other";
+    if (packedType === 6) {
+      if (cursor >= header.length) return null;
+      let offsetByte = header[cursor++];
+      let distance = offsetByte & 0x7f;
+      while ((offsetByte & 0x80) !== 0) {
+        if (cursor >= header.length) return null;
+        offsetByte = header[cursor++];
+        distance = ((distance + 1) * 128) + (offsetByte & 0x7f);
+        if (!Number.isSafeInteger(distance)) return null;
+      }
+      const baseOffset = location.offset - distance;
+      if (baseOffset < 12) return null;
+      return packedGitObjectType(
+        { offset: baseOffset, packPath: location.packPath },
+        objectDirs,
+        oidLength,
+        seen,
+        depth + 1,
+      );
+    }
+    if (packedType === 7) {
+      if (cursor + oidLength > header.length) return null;
+      const baseOid = header
+        .subarray(cursor, cursor + oidLength)
+        .toString("hex");
+      return gitObjectTypeByOid(
+        objectDirs,
+        baseOid,
+        seen,
+        depth + 1,
+      );
+    }
+    return null;
+  } catch {
+    return null;
+  } finally {
+    if (fd !== undefined) {
+      try {
+        closeSync(fd);
+      } catch {
+        // The object proof already fails closed on any earlier read error.
+      }
+    }
+  }
+}
+
+function gitObjectTypeByOid(
+  objectDirs: readonly string[],
+  oid: string,
+  seen: Set<string>,
+  depth = 0,
+): GitObjectType | null {
+  if (depth > 64 || !GIT_OBJECT_ID_RE.test(oid)) return null;
+  const oidKey = `oid\0${oid}`;
+  if (seen.has(oidKey)) return null;
+  seen.add(oidKey);
+  for (const objectDir of objectDirs) {
+    const loosePath = join(objectDir, oid.slice(0, 2), oid.slice(2));
+    if (existsSync(loosePath)) {
+      return looseGitObjectType(objectDir, oid);
+    }
+  }
+  for (const objectDir of objectDirs) {
+    const packed = packedGitObjectLocation(objectDir, oid);
+    if (packed === null) continue;
+    return packedGitObjectType(
+      packed,
+      objectDirs,
+      oid.length / 2,
+      seen,
+      depth + 1,
+    );
+  }
+  return null;
+}
+
+function validGitRefName(ref: string): boolean {
+  const forbiddenCharacter = [...ref].some((character) => {
+    const code = character.charCodeAt(0);
+    return (
+      code <= 0x20 ||
+      code === 0x7f ||
+      "~^:?*[\\]".includes(character)
+    );
+  });
+  if (
+    !ref.startsWith("refs/") ||
+    ref.endsWith("/") ||
+    ref.includes("//") ||
+    ref.includes("..") ||
+    ref.includes("@{") ||
+    forbiddenCharacter
+  ) {
+    return false;
+  }
+  return ref
+    .split("/")
+    .every((part) =>
+      part.length > 0 &&
+      part !== "." &&
+      part !== ".." &&
+      !part.startsWith(".") &&
+      !part.endsWith(".") &&
+      !part.endsWith(".lock")
+    );
+}
+
+function gitRepositoryObjectIdLength(commonDir: string): 40 | 64 | null {
+  const raw = boundedGitMetadataText(join(commonDir, "config"), 1024 * 1024);
+  if (raw === null) return null;
+  let section = "";
+  let hasSubsection = false;
+  let repositoryFormatVersion = 0;
+  let repositoryFormatVersionSet = false;
+  let objectFormat: 40 | 64 = 40;
+  let explicitlySet = false;
+  let sawExtension = false;
+  const supportedExtensions = new Set([
+    "compatobjectformat",
+    "noop",
+    "objectformat",
+    "partialclone",
+    "preciousobjects",
+    "relativeworktrees",
+    "refstorage",
+    "worktreeconfig",
+  ]);
+  for (const rawLine of raw.split(/\r?\n/)) {
+    const line = rawLine.trim();
+    if (line.length === 0 || line.startsWith("#") || line.startsWith(";")) {
+      continue;
+    }
+    const sectionMatch =
+      /^\[\s*([A-Za-z0-9.-]+)(?:\s+"(?:[^"\\]|\\.)*")?\s*\]$/.exec(line);
+    if (sectionMatch !== null) {
+      section = sectionMatch[1].toLowerCase();
+      hasSubsection = /\s+"/.test(line);
+      continue;
+    }
+    if (hasSubsection || (section !== "core" && section !== "extensions")) {
+      continue;
+    }
+    const keyValue = /^([A-Za-z][A-Za-z0-9-]*)\s*=\s*(.*?)\s*$/.exec(line);
+    if (keyValue === null) return null;
+    const key = keyValue[1].toLowerCase();
+    const value = keyValue[2].replace(/^"(.*)"$/, "$1").toLowerCase();
+    if (section === "core") {
+      if (key !== "repositoryformatversion") continue;
+      if (!/^[0-9]+$/.test(value)) return null;
+      const parsed = Number(value);
+      if (
+        !Number.isSafeInteger(parsed) ||
+        ![0, 1].includes(parsed) ||
+        (repositoryFormatVersionSet && parsed !== repositoryFormatVersion)
+      ) {
+        return null;
+      }
+      repositoryFormatVersion = parsed;
+      repositoryFormatVersionSet = true;
+      continue;
+    }
+    sawExtension = true;
+    if (!supportedExtensions.has(key)) return null;
+    if (key === "refstorage" && value !== "files") return null;
+    if (key !== "objectformat") continue;
+    const parsed = value === "sha1" ? 40 : value === "sha256" ? 64 : null;
+    if (parsed === null || (explicitlySet && parsed !== objectFormat)) {
+      return null;
+    }
+    objectFormat = parsed;
+    explicitlySet = true;
+  }
+  if (sawExtension && repositoryFormatVersion !== 1) return null;
+  if (objectFormat === 64 && repositoryFormatVersion !== 1) return null;
+  return objectFormat;
+}
+
+function gitOidFromRef(
+  gitDir: string,
+  commonDir: string,
+  ref: string,
+  seen: Set<string>,
+  depth: number,
+): string | null {
+  if (depth > 8 || !validGitRefName(ref) || seen.has(ref)) return null;
+  seen.add(ref);
+  const looseCandidates = [...new Set([
+    ...(
+      ref.startsWith("refs/bisect/") ||
+        ref.startsWith("refs/worktree/") ||
+        ref.startsWith("refs/rewritten/")
+        ? [join(gitDir, ...ref.split("/"))]
+        : [join(commonDir, ...ref.split("/"))]
+    ),
+  ])];
+  for (const candidate of looseCandidates) {
+    if (!existsSync(candidate)) continue;
+    const raw = boundedGitMetadataText(candidate, 8192);
+    const line = raw === null ? null : singleGitMetadataLine(raw);
+    if (line === null) return null;
+    const oid = normalizeGitObjectId(line);
+    if (oid !== null) return oid;
+    if (!line.startsWith("ref: ")) return null;
+    return gitOidFromRef(
+      gitDir,
+      commonDir,
+      line.slice("ref: ".length),
+      seen,
+      depth + 1,
+    );
+  }
+
+  const packedPath = join(commonDir, "packed-refs");
+  if (!existsSync(packedPath)) return null;
+  const packed = boundedGitMetadataText(packedPath, 16 * 1024 * 1024);
+  if (packed === null) return null;
+  for (const line of packed.split(/\r?\n/)) {
+    if (line.length === 0 || line.startsWith("#") || line.startsWith("^")) {
+      continue;
+    }
+    const separator = line.indexOf(" ");
+    if (separator === -1 || line.slice(separator + 1) !== ref) continue;
+    const oid = line.slice(0, separator);
+    return normalizeGitObjectId(oid);
+  }
+  return null;
+}
+
+function gitHeadOid(worktreeDir: string): string | null {
+  const gitDir = gitMetadataDirectory(worktreeDir);
+  if (gitDir === null) return null;
+  const commonDir = gitCommonDirectory(gitDir);
+  if (commonDir === null) return null;
+  const objectIdLength = gitRepositoryObjectIdLength(commonDir);
+  if (objectIdLength === null) return null;
+  const raw = boundedGitMetadataText(join(gitDir, "HEAD"), 8192);
+  const line = raw === null ? null : singleGitMetadataLine(raw);
+  if (line === null) return null;
+  const detached = normalizeGitObjectId(line);
+  const oid = detached ?? (
+    line.startsWith("ref: ")
+      ? gitOidFromRef(
+          gitDir,
+          commonDir,
+          line.slice("ref: ".length),
+          new Set(),
+          0,
+        )
+      : null
+  );
+  if (oid === null || oid.length !== objectIdLength) return null;
+  const objectDirs = gitObjectDirectories(gitDir, commonDir);
+  if (objectDirs === null) return null;
+  return gitObjectTypeByOid(objectDirs, oid, new Set()) === "commit"
+    ? oid
+    : null;
+}
+
+function filesystemSourceIdentity(
+  root: string,
+  carriesWorkspaceShell: boolean,
+  excludedTopLevel: ReadonlySet<string> = new Set(),
+  symlinkTargetMode: SourceSymlinkTargetMode = "follow",
+  useWorktreeContext = true,
+): FilesystemSourceIdentity | null {
+  const maxEntries = sourceIdentityBudget(
+    "AIDLC_TEST_SOURCE_MAX_ENTRIES",
+    250_000,
+  );
+  const maxDirectories = sourceIdentityBudget(
+    "AIDLC_TEST_SOURCE_MAX_DIRECTORIES",
+    100_000,
+  );
+  const maxSymlinks = sourceIdentityBudget(
+    "AIDLC_TEST_SOURCE_MAX_SYMLINKS",
+    100_000,
+  );
+  const maxFiles = 250_000;
+  const maxBytes = 4 * 1024 * 1024 * 1024;
+  const sourceOnlyMaxFiles = 10_000;
+  const sourceOnlyMaxBytes = 64 * 1024 * 1024;
+  const sourceExtension =
+    /\.(?:astro|c|cc|cmake|cpp|cs|css|dart|erl|ex|exs|go|gql|graphql|h|hcl|hpp|hrl|html|java|js|jsx|json|kt|kts|lua|m|mm|php|proto|ps1|psd1|psm1|py|r|rb|rs|scala|sh|sol|sql|svelte|swift|tf|tfvars|toml|ts|tsx|vue|xml|ya?ml|zig)$/i;
+  const sourceBasename =
+    /^(?:BUILD|CMakeLists\.txt|Dockerfile(?:\..+)?|Gemfile|Justfile|Makefile|Procfile|Tiltfile|WORKSPACE)$/i;
+  const lines: string[] = [];
+  const embeddedGitPaths = new Set<string>();
+  const excludedSymlinkPathspecs = new Set<string>();
+  const externalSymlinkPaths = new Set<string>();
+  const includedRegularPaths = new Set<string>();
+  const listing: WorkspaceSourceListing = new Map();
+  const registeredSnapshotPaths = new Set<string>();
+  const snapshotPaths = new Set<string>();
+  const visited = new Map<string, boolean>();
+  const active = new Set<string>();
+  let entriesSeen = 0;
+  let directoriesSeen = 0;
+  let symlinksSeen = 0;
+  let totalFiles = 0;
+  let totalBytes = 0;
+  let sourceOnlyFiles = 0;
+  let sourceOnlyBytes = 0;
+  let rootReal: string;
+  try {
+    rootReal = realpathSync(root);
+  } catch {
+    return null;
+  }
+  const hasWorktreeContext =
+    useWorktreeContext &&
+    existsSync(join(rootReal, ".aidlc", "worktree-meta.json"));
+  const worktreeContext = hasWorktreeContext
+    ? worktreeSourceExclusionContext(rootReal)
+    : null;
+  if (hasWorktreeContext && worktreeContext === null) {
+    return null;
+  }
+  const harnessShellDirs = carriesWorkspaceShell
+    ? sourceHarnessShellDirs(rootReal)
+    : new Set<string>();
+  if (harnessShellDirs === null) return null;
+  const exactExcludedPaths =
+    worktreeContext !== null && !worktreeContext.carriesWorkspaceShell
+      ? worktreeContext.exactPaths
+      : [];
+  const exactPathExcluded = (path: string): boolean => {
+    const normalizedPath = path.replace(/\/+$/, "");
+    return exactExcludedPaths.some((excluded) => {
+      const normalizedExcluded = excluded.replace(/\/+$/, "");
+      return normalizedPath === normalizedExcluded ||
+        (
+          excluded.endsWith("/") &&
+          normalizedPath.startsWith(`${normalizedExcluded}/`)
+        );
+    });
+  };
+  const registeredSources = sourceFingerprintRegistryPaths(
+    rootReal,
+    carriesWorkspaceShell,
+    harnessShellDirs,
+  );
+  if (registeredSources === null) return null;
+  const effectiveRegisteredSources = new Set(registeredSources);
+  for (const logicalPath of registeredSources) {
+    if (exactPathExcluded(logicalPath)) return null;
+    const physical = registeredPhysicalSourcePath(
+      rootReal,
+      logicalPath,
+      symlinkTargetMode === "tree-only",
+    );
+    if (physical === null) return null;
+    if (
+      physical.externalHop &&
+      symlinkTargetMode === "tree-only"
+    ) {
+      continue;
+    }
+    if (physical.path === null) return null;
+    const physicalPath = physical.path;
+    const physicalInside = pathIsWithinRoot(rootReal, physicalPath);
+    if (physical.externalHop && physicalInside) return null;
+    if (!physicalInside) continue;
+    const physicalRel = relative(rootReal, physicalPath);
+    if (physicalRel !== "") {
+      const physicalPosix = physicalRel.split(sep).join("/");
+      if (
+        sourcePathPhysicallyExcluded(
+          physicalPosix,
+          carriesWorkspaceShell,
+          harnessShellDirs,
+        )
+      ) {
+        return null;
+      }
+      registeredSnapshotPaths.add(physicalPosix);
+      effectiveRegisteredSources.add(physicalPosix);
+    }
+  }
+  const registeredList = [...effectiveRegisteredSources].sort();
+  const registeredPathIncludes = (rel: string): boolean => {
+    if (effectiveRegisteredSources.has(rel)) return true;
+    let slash = rel.lastIndexOf("/");
+    while (slash !== -1) {
+      if (effectiveRegisteredSources.has(rel.slice(0, slash))) return true;
+      slash = rel.lastIndexOf("/", slash - 1);
+    }
+    return false;
+  };
+  const registeredDescendantExists = (rel: string): boolean => {
+    const prefix = `${rel}/`;
+    let low = 0;
+    let high = registeredList.length;
+    while (low < high) {
+      const mid = Math.floor((low + high) / 2);
+      if (registeredList[mid] < prefix) low = mid + 1;
+      else high = mid;
+    }
+    return registeredList[low]?.startsWith(prefix) ?? false;
+  };
+  const registeredPathRelevant = (rel: string): boolean =>
+    registeredPathIncludes(rel) || registeredDescendantExists(rel);
+  const textLike = (path: string, size: number): boolean => {
+    if (size === 0) return true;
+    let fd: number | undefined;
+    try {
+      fd = openSync(path, "r");
+      const sample = Buffer.alloc(Math.min(size, 8192));
+      const count = readSync(fd, sample, 0, sample.byteLength, 0);
+      return !sample.subarray(0, count).includes(0);
+    } catch {
+      return false;
+    } finally {
+      if (fd !== undefined) {
+        try {
+          closeSync(fd);
+        } catch {
+          // The later full read remains fail-closed.
+        }
+      }
+    }
+  };
+  const hasShebang = (path: string, size: number): boolean => {
+    if (size < 2) return false;
+    let fd: number | undefined;
+    try {
+      fd = openSync(path, "r");
+      const sample = Buffer.alloc(2);
+      return readSync(fd, sample, 0, 2, 0) === 2 &&
+        sample[0] === 0x23 &&
+        sample[1] === 0x21;
+    } catch {
+      return false;
+    } finally {
+      if (fd !== undefined) {
+        try {
+          closeSync(fd);
+        } catch {
+          // The later full read remains fail-closed.
+        }
+      }
+    }
+  };
+  const snapshotCandidate = (
+    path: string,
+    rel: string,
+    name: string,
+    size: number,
+  ): boolean =>
+    registeredPathIncludes(rel) ||
+    sourceExtension.test(name) ||
+    sourceBasename.test(name) ||
+    hasShebang(path, size);
+  const recordFile = (
+    path: string,
+    rel: string,
+    size: number,
+    executable: boolean,
+    sourceOnly: boolean,
+    listingPath = rel,
+  ): boolean => {
+    totalFiles += 1;
+    totalBytes += size;
+    if (totalFiles > maxFiles || totalBytes > maxBytes) return false;
+    if (sourceOnly) {
+      sourceOnlyFiles += 1;
+      sourceOnlyBytes += size;
+      if (
+        sourceOnlyFiles > sourceOnlyMaxFiles ||
+        sourceOnlyBytes > sourceOnlyMaxBytes
+      ) {
+        return false;
+      }
+    }
+    const sha = stableFileSha256(path);
+    if (sha === null) return false;
+    lines.push(`file:${rel}:${executable ? "x" : "-"}=${sha}`);
+    const entry = sourceListingEntry(executable ? "100755" : "100644", sha);
+    if (entry === null) return false;
+    listing.set(listingPath, entry);
+    return true;
+  };
+  const walk = (
+    dir: string,
+    rel = "",
+    sourceOnly = false,
+    registeredOnly = false,
+    snapshotEligible = true,
+    registryRel = rel,
+    snapshotRel = rel,
+    listingRel = rel,
+  ): boolean => {
+    let real: string;
+    try {
+      real = realpathSync(dir);
+    } catch {
+      return false;
+    }
+    if (active.has(real)) return true;
+    const identityMode = registeredOnly
+      ? `registered:${registryRel}`
+      : sourceOnly
+        ? "source-only"
+        : "full";
+    const visitKey = `${real}\0${identityMode}`;
+    const priorSnapshotEligibility = visited.get(visitKey);
+    if (
+      priorSnapshotEligibility === true ||
+      (priorSnapshotEligibility === false && !snapshotEligible)
+    ) {
+      return true;
+    }
+    const recordIdentity = priorSnapshotEligibility === undefined;
+    visited.set(
+      visitKey,
+      (priorSnapshotEligibility ?? false) || snapshotEligible,
+    );
+    active.add(real);
+    try {
+      directoriesSeen += 1;
+      if (directoriesSeen > maxDirectories) return false;
+      const entries: import("node:fs").Dirent[] = [];
+      let handle: ReturnType<typeof opendirSync> | undefined;
+      try {
+        handle = opendirSync(dir);
+        while (true) {
+          const entry = handle.readSync();
+          if (entry === null) break;
+          entriesSeen += 1;
+          if (entriesSeen > maxEntries) return false;
+          entries.push(entry);
+        }
+      } catch {
+        return false;
+      } finally {
+        if (handle !== undefined) {
+          try {
+            handle.closeSync();
+          } catch {
+            // The read path already fails closed.
+          }
+        }
+      }
+      entries.sort((a, b) =>
+        a.name < b.name ? -1 : a.name > b.name ? 1 : 0
+      );
+      for (const entry of entries) {
+        const childRel = rel ? `${rel}/${entry.name}` : entry.name;
+        const childRegistryRel = registryRel
+          ? `${registryRel}/${entry.name}`
+          : entry.name;
+        const childSnapshotRel = snapshotRel
+          ? `${snapshotRel}/${entry.name}`
+          : entry.name;
+        const childListingRel = listingRel
+          ? `${listingRel}/${entry.name}`
+          : entry.name;
+        if (entry.isSymbolicLink()) {
+          symlinksSeen += 1;
+          if (symlinksSeen > maxSymlinks) return false;
+        }
+        if (
+          registeredOnly &&
+          !registeredPathRelevant(childRegistryRel)
+        ) {
+          continue;
+        }
+        if (exactPathExcluded(childRel)) continue;
+        if (
+          rel === "" &&
+          excludedTopLevel.has(entry.name) &&
+          !registeredPathRelevant(childRegistryRel)
+        ) {
+          continue;
+        }
+        if (entry.name === ".git") {
+          if (entry.isSymbolicLink()) {
+            excludedSymlinkPathspecs.add(`:(top,literal)${childSnapshotRel}`);
+          }
+          continue;
+        }
+        if (
+          (entry.isDirectory() || entry.isSymbolicLink()) &&
+          SOURCE_FINGERPRINT_HARD_EXCLUDED_DIRS.has(entry.name)
+        ) {
+          if (entry.isSymbolicLink()) {
+            excludedSymlinkPathspecs.add(`:(top,literal)${childSnapshotRel}`);
+          }
+          continue;
+        }
+        if (
+          rel === "" &&
+          carriesWorkspaceShell &&
+          (entry.isDirectory() || entry.isSymbolicLink()) &&
+          (
+            entry.name === "aidlc" ||
+            entry.name === ".aidlc" ||
+            harnessShellDirs.has(entry.name)
+          )
+        ) {
+          if (entry.isSymbolicLink()) {
+            excludedSymlinkPathspecs.add(`:(top,literal)${childSnapshotRel}`);
+          }
+          continue;
+        }
+        if (
+          (entry.isDirectory() || entry.isSymbolicLink()) &&
+          isAidlcSensorCachePath(childRel)
+        ) {
+          if (entry.isSymbolicLink()) {
+            excludedSymlinkPathspecs.add(`:(top,literal)${childSnapshotRel}`);
+          }
+          continue;
+        }
+        const conditionalBoundary =
+          (entry.isDirectory() || entry.isSymbolicLink()) &&
+          SOURCE_FINGERPRINT_CONDITIONAL_DIRS.has(entry.name);
+        if (
+          conditionalBoundary &&
+          !registeredPathRelevant(childRegistryRel)
+        ) {
+          if (entry.isSymbolicLink()) {
+            excludedSymlinkPathspecs.add(`:(top,literal)${childSnapshotRel}`);
+          }
+          continue;
+        }
+        const childRegisteredOnly =
+          registeredOnly || conditionalBoundary;
+        const child = join(dir, entry.name);
+        let stat: ReturnType<typeof lstatSync>;
+        try {
+          stat = lstatSync(child);
+        } catch {
+          return false;
+        }
+        if (stat.isSymbolicLink()) {
+          let linkText: string;
+          try {
+            linkText = readlinkSync(child);
+          } catch {
+            return false;
+          }
+          if (recordIdentity) lines.push(`link:${childRel}=${linkText}`);
+          if (recordIdentity) {
+            const linkSha = createHash("sha256")
+              .update(linkText, "utf-8")
+              .digest("hex");
+            const linkEntry = sourceListingEntry("120000", linkSha);
+            if (linkEntry === null) return false;
+            listing.set(childListingRel, linkEntry);
+          }
+          if (snapshotEligible) snapshotPaths.add(childSnapshotRel);
+          if (symlinkTargetMode === "tree-only") continue;
+          const resolution = resolveSourceSymlinkTarget(rootReal, child);
+          if (resolution === null) return false;
+          if (resolution.externalHop) {
+            externalSymlinkPaths.add(childSnapshotRel);
+          }
+          if (resolution.target === null) {
+            if (recordIdentity) {
+              lines.push(`link-target:${childRel}=missing`);
+              const missingEntry = sourceListingEntry(
+                "000000",
+                createHash("sha256").update("missing").digest("hex"),
+              );
+              if (missingEntry === null) return false;
+              listing.set(`${childListingRel}@target`, missingEntry);
+            }
+            continue;
+          }
+          const target = resolution.target;
+          const targetRelNative = relative(rootReal, target);
+          const internal = pathIsWithinRoot(rootReal, target);
+          let targetStat: ReturnType<typeof statSync>;
+          try {
+            targetStat = statSync(target);
+          } catch {
+            return false;
+          }
+          if (targetStat.isFile()) {
+            if (
+              childRegisteredOnly &&
+              !registeredPathIncludes(childRegistryRel)
+            ) {
+              continue;
+            }
+            if (
+              sourceOnly &&
+              !childRegisteredOnly &&
+              !sourceExtension.test(entry.name) &&
+              !sourceBasename.test(entry.name) &&
+              !textLike(target, targetStat.size)
+            ) {
+              continue;
+            }
+            const targetListingRel = internal
+              ? targetRelNative.split(sep).join("/")
+              : `${childListingRel}@target`;
+            if (
+              recordIdentity &&
+              !recordFile(
+                target,
+                `${childRel}@target`,
+                targetStat.size,
+                (targetStat.mode & 0o111) !== 0,
+                sourceOnly,
+                targetListingRel,
+              )
+            ) {
+              return false;
+            }
+          } else if (targetStat.isDirectory()) {
+            const targetSnapshotRel = internal
+              ? targetRelNative.split(sep).join("/")
+              : childSnapshotRel;
+            const targetSnapshotEligible =
+              snapshotEligible &&
+              internal &&
+              !existsSync(join(target, ".git"));
+            const targetListingRel = internal
+              ? targetSnapshotRel
+              : `${childListingRel}@target`;
+            if (
+              !walk(
+                target,
+                `${childRel}@target`,
+                sourceOnly || !internal,
+                childRegisteredOnly,
+                targetSnapshotEligible,
+                childRegistryRel,
+                targetSnapshotRel,
+                targetListingRel,
+              )
+            ) {
+              return false;
+            }
+          } else if (recordIdentity) {
+            const special = `special:${targetStat.mode}`;
+            lines.push(`link-target:${childRel}=${special}`);
+            const specialEntry = sourceListingEntry(
+              "000000",
+              createHash("sha256").update(special).digest("hex"),
+            );
+            if (specialEntry === null) return false;
+            listing.set(`${childListingRel}@target`, specialEntry);
+          }
+          continue;
+        }
+        if (stat.isDirectory()) {
+          if (conditionalBoundary) {
+            if (
+              !walk(
+                child,
+                childRel,
+                false,
+                true,
+                snapshotEligible,
+                childRegistryRel,
+                childSnapshotRel,
+                childListingRel,
+              )
+            ) {
+              return false;
+            }
+            continue;
+        }
+        const nestedGitRepo = existsSync(join(child, ".git"));
+        if (nestedGitRepo && snapshotEligible) {
+          embeddedGitPaths.add(childSnapshotRel);
+          snapshotPaths.add(childSnapshotRel);
+          const oid = gitHeadOid(child);
+          if (oid === null) return false;
+          const gitlinkEntry = sourceListingEntry("160000", oid);
+          if (gitlinkEntry === null) return false;
+          listing.set(childListingRel, gitlinkEntry);
+        }
+        if (
+          !walk(
+              child,
+              childRel,
+              sourceOnly,
+              registeredOnly,
+              snapshotEligible && !nestedGitRepo,
+              childRegistryRel,
+              childSnapshotRel,
+              childListingRel,
+            )
+          ) {
+            return false;
+          }
+          continue;
+        }
+        if (stat.isFile()) {
+          if (
+            sourceOnly &&
+            !childRegisteredOnly &&
+            !sourceExtension.test(entry.name) &&
+            !sourceBasename.test(entry.name) &&
+            !textLike(child, stat.size)
+          ) {
+            continue;
+          }
+          if (
+            childRegisteredOnly &&
+            !registeredPathIncludes(childRegistryRel)
+          ) {
+            continue;
+          }
+          if (snapshotEligible) {
+            includedRegularPaths.add(childSnapshotRel);
+          }
+          if (
+            recordIdentity &&
+            !recordFile(
+              child,
+              childRel,
+              stat.size,
+              (stat.mode & 0o111) !== 0,
+              sourceOnly,
+              childListingRel,
+            )
+          ) {
+            return false;
+          }
+          if (
+            snapshotEligible &&
+            snapshotCandidate(
+              child,
+              childRegistryRel,
+              entry.name,
+              stat.size,
+            )
+          ) {
+            snapshotPaths.add(childSnapshotRel);
+          }
+          continue;
+        }
+        if (recordIdentity) {
+          const special = `special:${stat.mode}`;
+          lines.push(`${special}:${childRel}`);
+          const specialEntry = sourceListingEntry(
+            "000000",
+            createHash("sha256").update(special).digest("hex"),
+          );
+          if (specialEntry === null) return false;
+          listing.set(childListingRel, specialEntry);
+        }
+      }
+      return true;
+    } finally {
+      active.delete(real);
+    }
+  };
+  if (!walk(rootReal)) return null;
+  return {
+    embeddedGitPaths: [...embeddedGitPaths].sort(),
+    excludedSymlinkPathspecs: [...excludedSymlinkPathspecs].sort(),
+    externalSymlinkPaths: [...externalSymlinkPaths].sort(),
+    fingerprint: createHash("sha256")
+      .update(["aidlc-filesystem-source-v2", ...lines].join("\n"))
+      .digest("hex"),
+    harnessShellDirs: [...harnessShellDirs].sort(),
+    includedRegularPaths: [...includedRegularPaths].sort(),
+    listing,
+    registeredSnapshotPaths: [...registeredSnapshotPaths].sort(),
+    snapshotPaths: [...snapshotPaths].sort(),
+  };
+}
+
+function multiRepoRoofExcludedTopLevel(
+  projectDir: string,
+  repos: readonly string[],
+): Set<string> | null {
+  const excluded = new Set(repos);
+  const maxEntries = sourceIdentityBudget(
+    "AIDLC_TEST_SOURCE_MAX_ENTRIES",
+    250_000,
+  );
+  let handle: ReturnType<typeof opendirSync> | undefined;
+  try {
+    handle = opendirSync(projectDir);
+    let entriesSeen = 0;
+    while (true) {
+      const entry = handle.readSync();
+      if (entry === null) break;
+      entriesSeen += 1;
+      if (entriesSeen > maxEntries) return null;
+      if (entry.isDirectory()) {
+        excluded.add(entry.name);
+        continue;
+      }
+      if (!entry.isSymbolicLink()) continue;
+      try {
+        if (statSync(join(projectDir, entry.name)).isDirectory()) {
+          excluded.add(entry.name);
+        }
+      } catch {
+        // A broken roof symlink is fingerprinted as a roof file unless the
+        // source registry or another explicit boundary says otherwise.
+      }
+    }
+  } catch {
+    return null;
+  } finally {
+    if (handle !== undefined) {
+      try {
+        handle.closeSync();
+      } catch {
+        // The bounded read path already fails closed.
+      }
+    }
+  }
+  return excluded;
+}
+
+export function workspaceSourceSnapshotPaths(
+  projectDir: string,
+  carriesWorkspaceShell = false,
+): string[] | null {
+  return (
+    filesystemSourceIdentity(projectDir, carriesWorkspaceShell)
+      ?.snapshotPaths ?? null
+  );
+}
+
+export function workspaceSourceEmbeddedGitPaths(
+  projectDir: string,
+  carriesWorkspaceShell = false,
+): string[] | null {
+  return (
+    filesystemSourceIdentity(projectDir, carriesWorkspaceShell)
+      ?.embeddedGitPaths ?? null
+  );
+}
+
 // Compute the opaque #629 source fingerprint and the #662 canonical per-path
-// listing in one temporary-index pass per repo. Keys are `<repo>\0<path>`;
+// listing in the same bounded filesystem pass. Keys are `<repo>\0<path>`;
 // single-repo/Bolt worktrees use an empty repo component.
 export function workspaceSourceState(
   projectDir: string,
@@ -10074,34 +13043,59 @@ export function workspaceSourceState(
 ): WorkspaceSourceState | null {
   const repos = intentRepos(projectDir, intent, space);
   if (repos.length === 0) {
-    if (!isGitRepoDir(projectDir)) {
-      return emptyNoGitWorkspaceSourceState(projectDir);
-    }
-    const context = worktreeSourceExclusionContext(projectDir);
-    if (context === null) return null;
-    const state = gitTreeSourceState(
-      projectDir,
-      context.carriesWorkspaceShell,
+    const hasWorktreeContext = existsSync(
+      join(projectDir, ".aidlc", "worktree-meta.json"),
     );
-    if (state === null) return null;
+    const worktreeContext = hasWorktreeContext
+      ? worktreeSourceExclusionContext(projectDir)
+      : null;
+    if (hasWorktreeContext && worktreeContext === null) return null;
+    const source = filesystemSourceIdentity(
+      projectDir,
+      worktreeContext?.carriesWorkspaceShell ?? true,
+    );
+    if (source === null) return null;
     return {
-      fingerprint: state.fingerprint,
-      listing: new Map([...state.listing].map(([path, oid]) => [`\0${path}`, oid])),
+      fingerprint: createHash("sha256")
+        .update(
+          [
+            "aidlc-workspace-source-v2",
+            `filesystem=${source.fingerprint}`,
+          ].join("\n"),
+        )
+        .digest("hex"),
+      listing: prefixedSourceListing(source.listing),
     };
   }
-
   const lines: string[] = [];
   const listing: WorkspaceSourceListing = new Map();
+  const roofExcluded = multiRepoRoofExcludedTopLevel(projectDir, repos);
+  if (roofExcluded === null) return null;
+  const roof = filesystemSourceIdentity(projectDir, true, roofExcluded);
+  if (roof === null) return null;
+  lines.push(`roof=filesystem:${roof.fingerprint}`);
+  for (const [key, entry] of prefixedSourceListing(roof.listing)) {
+    listing.set(key, entry);
+  }
   for (const name of [...repos].sort()) {
     // A sibling repo is a child of the roof; the shell is its SIBLING, never
     // nested inside it, so nothing there belongs to the framework.
-    const state = gitTreeSourceState(repoDir(projectDir, name), false);
-    if (state === null) return null;
-    lines.push(`${name}=${state.fingerprint}`);
-    for (const [path, oid] of state.listing) listing.set(`${name}\0${path}`, oid);
+    const dir = repoDir(projectDir, name);
+    if (!existsSync(dir)) {
+      lines.push(`${name}=missing`);
+      continue;
+    }
+    const source = filesystemSourceIdentity(dir, false);
+    if (source === null) return null;
+    lines.push(`${name}=filesystem:${source.fingerprint}`);
+    for (const [key, entry] of prefixedSourceListing(source.listing, name)) {
+      listing.set(key, entry);
+    }
   }
   return {
-    fingerprint: createHash("sha256").update(lines.join("\n")).digest("hex"),
+    fingerprint: createHash("sha256")
+      .update(["aidlc-workspace-source-v2", ...lines].join("\n"))
+      .digest("hex"),
     listing,
   };
 }
@@ -10203,8 +13197,9 @@ export function serializeSourceListing(listing: ReadonlyMap<string, string>): st
   for (const [key, entry] of listing) {
     const parsed = splitSourcePathKey(key);
     if (parsed === null) throw new Error("Invalid canonical source-listing path key");
-    const modern = /^(\d{6}) ([0-9a-f]{40,64})$/.exec(entry);
-    const legacy = /^[0-9a-f]{40,64}$/.test(entry);
+    const modern =
+      /^(\d{6}) ((?:[0-9a-f]{40}|[0-9a-f]{64}))$/.exec(entry);
+    const legacy = GIT_OBJECT_ID_RE.test(entry);
     if (modern === null && !legacy) {
       throw new Error(`Invalid source-listing entry for ${JSON.stringify(parsed.path)}`);
     }
@@ -10235,7 +13230,7 @@ export function parseSourceListing(serialized: string): WorkspaceSourceListing |
       path.length === 0 ||
       (repo.length > 0 && !isValidRepoName(repo)) ||
       (mode !== null && !/^\d{6}$/.test(mode)) ||
-      !/^[0-9a-f]{40,64}$/.test(oid)
+      !GIT_OBJECT_ID_RE.test(oid)
     ) return null;
     const key = sourcePathKey(repo, path);
     if (listing.has(key)) return null;
@@ -10270,9 +13265,19 @@ function sourcePathIsExcluded(
   projectDir?: string,
 ): boolean {
   const withoutTrailingSlash = path.replace(/\/+$/, "");
+  const segments = withoutTrailingSlash.split("/");
   if (
     carriesWorkspaceShell &&
-    (path === "aidlc/" || path === ".aidlc/" || path.startsWith("aidlc/") || path.startsWith(".aidlc/"))
+    (
+      path === "aidlc/" ||
+      path === ".aidlc/" ||
+      path.startsWith("aidlc/") ||
+      path.startsWith(".aidlc/") ||
+      (
+        projectDir !== undefined &&
+        isSourceHarnessShellDir(projectDir, segments[0])
+      )
+    )
   ) return true;
 
   if (!carriesWorkspaceShell && projectDir !== undefined) {
@@ -10291,7 +13296,6 @@ function sourcePathIsExcluded(
     }
   }
 
-  const segments = withoutTrailingSlash.split("/");
   for (let i = 0; i + 4 < segments.length; i++) {
     if (segments[i] !== "aidlc" || segments[i + 1] !== "spaces" || segments[i + 3] !== "intents") continue;
     if (segments[i + 2].length === 0) continue;
@@ -10422,11 +13426,69 @@ function symlinkedParentComponent(
   return null;
 }
 
+function sourcePathIsRegistered(
+  sourceRepoDir: string,
+  carriesWorkspaceShell: boolean,
+  path: string,
+): boolean {
+  const harnessShellDirs = carriesWorkspaceShell
+    ? sourceHarnessShellDirs(sourceRepoDir)
+    : new Set<string>();
+  if (harnessShellDirs === null) return false;
+  const registered = sourceFingerprintRegistryPaths(
+    sourceRepoDir,
+    carriesWorkspaceShell,
+    harnessShellDirs,
+  );
+  if (registered === null) return false;
+  const effective = new Set(registered);
+  let rootReal: string;
+  try {
+    rootReal = realpathSync(sourceRepoDir);
+  } catch {
+    return false;
+  }
+  for (const logicalPath of registered) {
+    const physical = registeredPhysicalSourcePath(
+      rootReal,
+      logicalPath,
+      false,
+    );
+    if (physical === null || physical.path === null) return false;
+    const physicalPath = physical.path;
+    const physicalInside = pathIsWithinRoot(rootReal, physicalPath);
+    if (physical.externalHop && physicalInside) return false;
+    if (!physicalInside) continue;
+    const physicalRel = relative(rootReal, physicalPath)
+      .split(sep)
+      .join("/");
+    if (
+      physicalRel.length > 0 &&
+      !sourcePathPhysicallyExcluded(
+        physicalRel,
+        carriesWorkspaceShell,
+        harnessShellDirs,
+      )
+    ) {
+      effective.add(physicalRel);
+    }
+  }
+  const normalized = path.replace(/\/+$/, "");
+  if (effective.has(normalized)) return true;
+  let slash = normalized.lastIndexOf("/");
+  while (slash !== -1) {
+    if (effective.has(normalized.slice(0, slash))) return true;
+    slash = normalized.lastIndexOf("/", slash - 1);
+  }
+  return false;
+}
+
 function ignoredSourceClaimReason(
   sourceRepoDir: string,
   path: string,
   prefix: boolean,
   pathModeIndexes: GitPathModeIndexCache,
+  carriesWorkspaceShell: boolean,
 ): string | null {
   if (!isGitRepoDir(sourceRepoDir)) return null;
   const literalPath = path.replace(/\/+$/, "");
@@ -10497,6 +13559,15 @@ function ignoredSourceClaimReason(
     { encoding: "utf-8", maxBuffer: 512 * 1024 * 1024 },
   );
   if (ignored.status === 0) {
+    if (
+      sourcePathIsRegistered(
+        sourceRepoDir,
+        carriesWorkspaceShell,
+        literalPath,
+      )
+    ) {
+      return null;
+    }
     if (!prefix && headTracked && !currentIsDirectory) return null;
     return `${JSON.stringify(path)} is ignored by Git and cannot be source-review evidence`;
   }
@@ -10702,6 +13773,14 @@ function symlinkClaimTargetReason(
       }
       const repoRelative = resolvedRelative.replaceAll("\\", "/");
       if (
+        !prefix &&
+        link === claimPath.replace(/\/+$/, "") &&
+        stat.isDirectory()
+      ) {
+        targetDisplay = "";
+        break;
+      }
+      if (
         sourcePathIsExcluded(
           repoRelative,
           carriesWorkspaceShell,
@@ -10715,6 +13794,7 @@ function symlinkClaimTargetReason(
         repoRelative,
         false,
         pathModeIndexes,
+        carriesWorkspaceShell,
       );
       if (ignored !== null) {
         const targetReason = prefix && stat.isDirectory()
@@ -10845,6 +13925,7 @@ export function readUnitSourceManifest(
       normalized.path,
       normalized.prefix,
       pathModeIndexes,
+      carriesWorkspaceShell,
     );
     if (ignoredReason !== null) {
       return { ok: false, reason: `writes[${index}].path: ${ignoredReason}` };
@@ -18531,6 +21612,7 @@ export function emitStageFrontmatter(obj: Record<string, unknown>): string {
     "mode",
     "summary_confirmation",
     "reviewer",
+    "review_artifact",
     "reviewer_max_iterations",
     "review_class",
     "for_each",
