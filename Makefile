@@ -1,4 +1,4 @@
-.PHONY: setup be-format be-lint be-test be-coverage be-sbom scan-secrets scan-secrets-all lint-actions lint-actions-security lint-docker
+.PHONY: setup be-format be-lint be-test be-coverage be-sbom scan-secrets scan-secrets-all lint-actions lint-actions-security lint-docker lint-docker-check lint-compose
 
 ## 開発環境の初期セットアップ（全スクリプトを順次実行）
 ## 実行後に source ~/.bashrc が必要
@@ -59,4 +59,30 @@ lint-docker:
 		docker run --rm -i -v "$$PWD":/repo -w /repo \
 			hadolint/hadolint:v2.12.0@sha256:30a8fd2e785ab6176eed53f74769e04f125afb2f74a6c52aef7d463583b6d45e \
 			hadolint $$files; \
+	fi
+
+## Dockerfile の Docker 公式ベストプラクティスチェック（docker build --check）
+## ビルドはせず --check のみ。リポジトリ内の全 Dockerfile を対象にする
+lint-docker-check:
+	@files=$$(git ls-files '**/Dockerfile' '**/Dockerfile.*' '**/*.Dockerfile' 'Dockerfile'); \
+	if [ -z "$$files" ]; then \
+		echo "Dockerfile が見つかりません。"; \
+	else \
+		for f in $$files; do \
+			echo "checking: $$f"; \
+			docker build --check -f "$$f" "$$(dirname "$$f")" || exit 1; \
+		done; \
+	fi
+
+## Compose ファイルの構文・参照・変数展開を検証（docker compose config）
+## リポジトリ内の全 Compose ファイルを対象にする
+lint-compose:
+	@files=$$(git ls-files '**/compose.yml' '**/compose.yaml' '**/docker-compose.yml' '**/docker-compose.yaml' 'compose.yml' 'compose.yaml' 'docker-compose.yml' 'docker-compose.yaml'); \
+	if [ -z "$$files" ]; then \
+		echo "Compose ファイルが見つかりません。"; \
+	else \
+		for f in $$files; do \
+			echo "validating: $$f"; \
+			docker compose -f "$$f" config --quiet || exit 1; \
+		done; \
 	fi

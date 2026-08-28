@@ -71,6 +71,39 @@ pre-commit:
           hadolint/hadolint:v2.12.0@sha256:30a8fd2e785ab6176eed53f74769e04f125afb2f74a6c52aef7d463583b6d45e \
           hadolint {staged_files}
 
+    # ステージ済みの Dockerfile を Docker 公式チェック（BuildKit のベストプラクティス）
+    # ビルドはせず --check のみ。docker が無い環境ではスキップ。
+    - name: docker-build-check
+      glob:
+        - "**/Dockerfile"
+        - "**/Dockerfile.*"
+        - "**/*.Dockerfile"
+      run: |
+        if ! command -v docker >/dev/null 2>&1; then
+          echo "docker が無いため docker build --check をスキップします（CI で検査されます）。" >&2
+          exit 0
+        fi
+        for dockerfile in {staged_files}; do
+          echo "checking: $dockerfile"
+          docker build --check -f "$dockerfile" "$(dirname "$dockerfile")" || exit 1
+        done
+
+    # ステージ済みの Compose ファイルの構文・参照・変数展開を検証
+    # docker が無い環境ではスキップ。
+    - name: compose-config
+      glob:
+        - "**/compose.{yml,yaml}"
+        - "**/docker-compose.{yml,yaml}"
+      run: |
+        if ! command -v docker >/dev/null 2>&1; then
+          echo "docker が無いため docker compose config をスキップします（CI で検査されます）。" >&2
+          exit 0
+        fi
+        for composefile in {staged_files}; do
+          echo "validating: $composefile"
+          docker compose -f "$composefile" config --quiet || exit 1
+        done
+
 pre-push:
   parallel: true
   jobs:

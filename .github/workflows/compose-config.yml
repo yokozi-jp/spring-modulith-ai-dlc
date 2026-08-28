@@ -1,0 +1,50 @@
+name: Validate Compose files 🐳
+
+on:
+  push:
+    branches: ["main"]
+    paths:
+      - "**/compose.yml"
+      - "**/compose.yaml"
+      - "**/docker-compose.yml"
+      - "**/docker-compose.yaml"
+  pull_request:
+    branches: ["**"]
+    paths:
+      - "**/compose.yml"
+      - "**/compose.yaml"
+      - "**/docker-compose.yml"
+      - "**/docker-compose.yaml"
+
+permissions:
+  contents: read
+
+jobs:
+  compose-config:
+    name: Run docker compose config 🐳
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      # Compose ファイルの構文・参照・変数展開を検証（起動はしない）。
+      - name: docker compose config
+        run: |
+          mapfile -t composefiles < <(git ls-files -z \
+            '**/compose.yml' '**/compose.yaml' \
+            '**/docker-compose.yml' '**/docker-compose.yaml' \
+            'compose.yml' 'compose.yaml' \
+            'docker-compose.yml' 'docker-compose.yaml' \
+            | tr '\0' '\n')
+          if [ "${#composefiles[@]}" -eq 0 ]; then
+            echo "Compose ファイルが見つからないため検証をスキップします。"
+            exit 0
+          fi
+          status=0
+          for composefile in "${composefiles[@]}"; do
+            echo "validating: $composefile"
+            docker compose -f "$composefile" config --quiet || status=1
+          done
+          exit "$status"

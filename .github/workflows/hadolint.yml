@@ -43,3 +43,29 @@ jobs:
           docker run --rm -i -v "$PWD":/repo -w /repo \
             hadolint/hadolint:v2.12.0@sha256:30a8fd2e785ab6176eed53f74769e04f125afb2f74a6c52aef7d463583b6d45e \
             hadolint "${dockerfiles[@]}"
+
+  docker-build-check:
+    name: Run docker build --check 🐳
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      # Docker 公式のベストプラクティスチェック（ビルドはしない）。
+      - name: docker build --check
+        run: |
+          mapfile -t dockerfiles < <(git ls-files -z \
+            '**/Dockerfile' '**/Dockerfile.*' '**/*.Dockerfile' 'Dockerfile' \
+            | tr '\0' '\n')
+          if [ "${#dockerfiles[@]}" -eq 0 ]; then
+            echo "Dockerfile が見つからないため docker build --check をスキップします。"
+            exit 0
+          fi
+          status=0
+          for dockerfile in "${dockerfiles[@]}"; do
+            echo "checking: $dockerfile"
+            docker build --check -f "$dockerfile" "$(dirname "$dockerfile")" || status=1
+          done
+          exit "$status"
