@@ -9,8 +9,14 @@ updates:
     directory: "/backend"
     schedule:
       interval: "weekly"
+    # 新しいリリースを取り込むまで最低 7 日待つ（リリース直後の不正パッケージ対策）
+    cooldown:
+      default-days: 7
 
   - package-ecosystem: "npm"
     directory: "/frontend"
     schedule:
       interval: "weekly"
+    # 新しいリリースを取り込むまで最低 7 日待つ（リリース直後の不正パッケージ対策）
+    cooldown:
+      default-days: 7
