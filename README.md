@@ -66,8 +66,11 @@ Spring Modulith を用いたモジュラーモノリスアーキテクチャの�
 │   ├── local-env-setup/  # 開発環境構築手順・スクリプト
 │   └── aidlc-setup/      # AI-DLC セットアップ手順
 ├── aidlc/            # AI-DLC ワークスペース（自動生成）
+├── .github/          # GitHub 設定
+│   └── workflows/    # GitHub Actions（betterleaks シークレットスキャン等）
 ├── .kiro/            # Kiro 設定
 ├── .vscode/          # VSCode 設定
+├── .betterleaks.toml # betterleaks（シークレットスキャナ）設定
 ├── lefthook.yml      # Git フック定義（Lefthook）
 └── Makefile          # 開発コマンド定義
 ```
