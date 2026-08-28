@@ -64,3 +64,31 @@ pre-push:
       run: |
         export PATH="$PATH:$HOME/go/bin"
         betterleaks git . --no-banner --redact --git-workers=16
+
+    # GitHub Actions ワークフローに変更がある push のときだけ Lint（actionlint）
+    # glob を効かせるため run 内で {push_files} を参照する。
+    # docker が無い環境ではスキップ（最終担保は CI に任せる）。
+    - name: actionlint
+      glob: ".github/workflows/*.{yml,yaml}"
+      run: |
+        echo "{push_files}" >/dev/null
+        if ! command -v docker >/dev/null 2>&1; then
+          echo "docker が無いため actionlint をスキップします（CI で検査されます）。" >&2
+          exit 0
+        fi
+        docker run --rm -v "$PWD":/repo -w /repo \
+          rhysd/actionlint:1.7.12@sha256:9d36088643581e728c969f35141f88139fec77280b2be23c1f66f8e40e1025e7 \
+          -color
+
+    # GitHub Actions ワークフローに変更がある push のときだけセキュリティ解析（zizmor）
+    # docker が無い環境ではスキップ（最終担保は CI に任せる）。
+    - name: zizmor
+      glob: ".github/workflows/*.{yml,yaml}"
+      run: |
+        echo "{push_files}" >/dev/null
+        if ! command -v docker >/dev/null 2>&1; then
+          echo "docker が無いため zizmor をスキップします（CI で検査されます）。" >&2
+          exit 0
+        fi
+        docker run --rm -v "$PWD":/repo -w /repo \
+          ghcr.io/zizmorcore/zizmor:latest .github/workflows/
