@@ -67,6 +67,7 @@ Spring Modulith を用いたモジュラーモノリスアーキテクチャの�
 ├── aidlc/            # AI-DLC ワークスペース（自動生成）
 ├── .kiro/            # Kiro 設定
 ├── .vscode/          # VSCode 設定
+├── lefthook.yml      # Git フック定義（Lefthook）
 └── Makefile          # 開発コマンド定義
 ```
 
