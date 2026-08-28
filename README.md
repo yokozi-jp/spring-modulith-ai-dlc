@@ -29,7 +29,8 @@
 3. [ディレクトリ構成](#ディレクトリ構成)
 4. [開発環境構築](#開発環境構築)
 5. [開発コマンド](#開発コマンド)
-6. [トラブルシューティング](#トラブルシューティング)
+6. [Lint・テスト](#lintテスト)
+7. [トラブルシューティング](#トラブルシューティング)
 
 ## プロジェクトについて
 
@@ -59,7 +60,7 @@ Spring Modulith を用いたモジュラーモノリスアーキテクチャの�
 ```
 .
 ├── backend/          # Spring Boot アプリケーション
-├── frontend/         # VitePlus + TypeScript フロントエンド
+├── frontend/         # VitePlus + TypeScript フロントエンド（pnpm）
 ├── docker/           # Docker 関連ファイル
 ├── infrastructure/   # インフラ定義
 ├── docs/             # ドキュメント
@@ -67,11 +68,15 @@ Spring Modulith を用いたモジュラーモノリスアーキテクチャの�
 │   └── aidlc-setup/      # AI-DLC セットアップ手順
 ├── aidlc/            # AI-DLC ワークスペース（自動生成）
 ├── .github/          # GitHub 設定
-│   └── workflows/    # GitHub Actions（betterleaks シークレットスキャン等）
+│   ├── workflows/    # GitHub Actions（Lint・シークレットスキャン等）
+│   └── dependabot.yml # 依存関係の自動更新設定
 ├── .kiro/            # Kiro 設定
 ├── .vscode/          # VSCode 設定
 ├── .betterleaks.toml # betterleaks（シークレットスキャナ）設定
+├── .hadolint.yaml    # hadolint（Dockerfile リンタ）設定
+├── .env.example      # 環境変数のサンプル
 ├── lefthook.yml      # Git フック定義（Lefthook）
+├── package.json      # Lefthook 導入用（ルート）
 └── Makefile          # 開発コマンド定義
 ```
 
@@ -94,6 +99,54 @@ Spring Modulith を用いたモジュラーモノリスアーキテクチャの�
 ```bash
 make <ターゲット名>
 ```
+
+<p align="right">(<a href="#top">トップへ</a>)</p>
+
+## Lint・テスト
+
+各種チェックは [`Makefile`](Makefile) のターゲットとして実行できます（`make <ターゲット名>`）。
+Docker を使うターゲット（actionlint / zizmor / hadolint / docker build --check / compose）は、Docker が無い環境ではスキップされます。
+
+### バックエンド（Gradle）
+
+| ターゲット       | 内容                                           |
+| ---------------- | ---------------------------------------------- |
+| `make be-format` | コードフォーマット適用（Spotless）             |
+| `make be-lint`   | 静的解析（PMD + SpotBugs + Spotless チェック） |
+| `make be-test`   | テスト実行＆カバレッジ検証                     |
+| `make be-sbom`   | SBOM 生成（CycloneDX 形式）                    |
+
+### シークレットスキャン（betterleaks）
+
+| ターゲット              | 内容                                                  |
+| ----------------------- | ----------------------------------------------------- |
+| `make scan-secrets`     | ステージ済みの変更をスキャン（pre-commit 相当）       |
+| `make scan-secrets-all` | リポジトリ全体（履歴含む）をスキャン（pre-push 相当） |
+
+### GitHub Actions ワークフロー
+
+| ターゲット                   | 内容                                     |
+| ---------------------------- | ---------------------------------------- |
+| `make lint-actions`          | ワークフローの Lint（actionlint）        |
+| `make lint-actions-security` | ワークフローのセキュリティ解析（zizmor） |
+
+### Docker / Compose
+
+| ターゲット               | 内容                                                                  |
+| ------------------------ | --------------------------------------------------------------------- |
+| `make lint-docker`       | Dockerfile のベストプラクティス検査（hadolint）                       |
+| `make lint-docker-check` | Dockerfile の Docker 公式チェック（docker build --check）             |
+| `make lint-compose`      | Compose ファイルの構文・参照・変数展開の検証（docker compose config） |
+
+### 自動実行（Git フック / CI）
+
+- **Git フック（Lefthook, [`lefthook.yml`](lefthook.yml)）**
+  - pre-commit: betterleaks（ステージ済み）、hadolint / docker build --check（Dockerfile 変更時）、compose config（Compose 変更時）
+  - pre-push: betterleaks（全履歴）、actionlint / zizmor（ワークフロー変更時）
+- **CI（GitHub Actions, [`.github/workflows/`](.github/workflows/)）**
+  - `betterleaks.yml`（シークレットスキャン）、`actionlint.yml` / `zizmor.yml`（ワークフロー）、`hadolint.yml`（Dockerfile + docker build --check）、`compose-config.yml`（Compose）
+
+<p align="right">(<a href="#top">トップへ</a>)</p>
 
 ## トラブルシューティング
 
