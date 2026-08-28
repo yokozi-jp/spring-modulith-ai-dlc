@@ -138,7 +138,7 @@ cd /home/projects/spring-modulith-ai-dlc
 npm install
 ```
 
-これにより Husky が有効化され、pre-commit フックが `.git/hooks/` にインストールされます。
+これにより Lefthook が有効化されます。
 
 ### 9. VSCode から WSL への接続
 

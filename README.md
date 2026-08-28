@@ -37,17 +37,17 @@ Spring Modulith を用いたモジュラーモノリスアーキテクチャの�
 
 ## 環境
 
-| 言語・フレームワーク | バージョン |
-| --- | --- |
-| Java (Amazon Corretto) | 25 |
-| Spring Boot | 4.1.0 |
-| Spring Modulith | 2.1.0 |
-| TypeScript | 7.0.x |
-| VitePlus | latest |
-| pnpm | 11.21.0 |
-| PostgreSQL | 18 |
-| Redis | 7.x |
-| Bun (AI-DLC ランタイム) | 1.3.14 |
+| 言語・フレームワーク    | バージョン |
+| ----------------------- | ---------- |
+| Java (Amazon Corretto)  | 25         |
+| Spring Boot             | 4.1.1      |
+| Spring Modulith         | 2.1.0      |
+| TypeScript              | 7.0.x      |
+| VitePlus                | latest     |
+| pnpm                    | 11.21.0    |
+| PostgreSQL              | 18         |
+| Redis                   | 7.x        |
+| Bun (AI-DLC ランタイム) | 1.3.14     |
 
 その他のパッケージのバージョンは `backend/build.gradle` と `frontend/package.json` を参照してください。
 
