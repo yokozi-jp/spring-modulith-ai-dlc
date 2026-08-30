@@ -105,7 +105,7 @@ make <ターゲット名>
 ## Lint・テスト
 
 各種チェックは [`Makefile`](Makefile) のターゲットとして実行できます（`make <ターゲット名>`）。
-Docker を使うターゲット（actionlint / zizmor / hadolint / docker build --check / compose）は、Docker が無い環境ではスキップされます。
+Docker を使うターゲット（semgrep / trivy / actionlint / zizmor / hadolint / docker build --check / compose）は、Docker が無い環境ではスキップされます。
 
 ### バックエンド（Gradle）
 
@@ -122,6 +122,25 @@ Docker を使うターゲット（actionlint / zizmor / hadolint / docker build 
 | ----------------------- | ----------------------------------------------------- |
 | `make scan-secrets`     | ステージ済みの変更をスキャン（pre-commit 相当）       |
 | `make scan-secrets-all` | リポジトリ全体（履歴含む）をスキャン（pre-push 相当） |
+
+### 静的解析（Semgrep）
+
+Semgrep OSS（コミュニティエディション）で静的解析を行います（`.kiro` / `aidlc` は対象外）。
+
+| ターゲット           | 内容                                                     |
+| -------------------- | -------------------------------------------------------- |
+| `make lint-semgrep`  | 静的解析（Semgrep OSS / Docker 実行、検出があれば失敗）  |
+
+### 脆弱性スキャン（Trivy）
+
+依存関係の脆弱性を Trivy でスキャンします。backend は CycloneDX SBOM 経由、frontend は依存を解決してからスキャンします。
+
+| ターゲット                  | 内容                                                          |
+| --------------------------- | ------------------------------------------------------------- |
+| `make scan-vulns`           | backend + frontend の脆弱性スキャン（Trivy / Docker 実行）    |
+| `make scan-vulns-backend`   | backend（Gradle）の脆弱性スキャン（SBOM 経由）                |
+| `make scan-vulns-frontend`  | frontend（pnpm）の脆弱性スキャン（依存解決後）                |
+
 
 ### GitHub Actions ワークフロー
 
@@ -144,7 +163,8 @@ Docker を使うターゲット（actionlint / zizmor / hadolint / docker build 
   - pre-commit: betterleaks（ステージ済み）、hadolint / docker build --check（Dockerfile 変更時）、compose config（Compose 変更時）
   - pre-push: betterleaks（全履歴）、actionlint / zizmor（ワークフロー変更時）
 - **CI（GitHub Actions, [`.github/workflows/`](.github/workflows/)）**
-  - `betterleaks.yml`（シークレットスキャン）、`actionlint.yml` / `zizmor.yml`（ワークフロー）、`hadolint.yml`（Dockerfile + docker build --check）、`compose-config.yml`（Compose）
+  - `betterleaks.yml`（シークレットスキャン）、`semgrep.yml`（静的解析 / SARIF アップロード）、`trivy.yml`（脆弱性スキャン / SARIF アップロード）、`actionlint.yml` / `zizmor.yml`（ワークフロー）、`hadolint.yml`（Dockerfile + docker build --check）、`compose-config.yml`（Compose）
+  - `semgrep.yml` / `trivy.yml` の検出結果は GitHub Code Scanning（Security タブ）に SARIF 形式でアップロードされます。
 
 <p align="right">(<a href="#top">トップへ</a>)</p>
 
