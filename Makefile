@@ -10,7 +10,8 @@ setup:
 		export PATH="$$HOME/.local/bin:$$PATH" && \
 		./04-setup-shell.sh && \
 		./05-setup-lsp.sh && \
-		./06-setup-bun.sh
+		./06-setup-bun.sh && \
+		./07-setup-go-betterleaks.sh
 
 ## バックエンドのコードフォーマット適用（Spotless）
 be-format:
