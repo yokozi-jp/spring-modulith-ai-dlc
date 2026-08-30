@@ -1,0 +1,104 @@
+name: Vulnerability Scan (Trivy) 🛡️
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+    branches: ["**"]
+
+# SARIF を GitHub Code Scanning にアップロードするため security-events: write が必要。
+permissions:
+  contents: read
+  security-events: write
+
+# Trivy の脆弱性 DB は Trivy 公式のミラーレジストリから取得する。
+env:
+  TRIVY_DB_REPOSITORY: mirror.gcr.io/aquasec/trivy-db:2
+  TRIVY_JAVA_DB_REPOSITORY: mirror.gcr.io/aquasec/trivy-java-db:1
+
+jobs:
+  # フロントエンド（pnpm）の依存脆弱性スキャン。
+  # 依存を実際に解決（node_modules を生成）してからスキャンする。
+  frontend:
+    name: Trivy scan (frontend) 🛡️
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@7088e561eb65bb68695d245aa206f005ef30921d # v4.1.0
+        with:
+          version: "11.21.0"
+
+      - name: Set up Node.js
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
+        with:
+          node-version: "22"
+
+      # ロックファイルどおりに依存を解決する（更新はしない）。
+      - name: Install dependencies
+        working-directory: frontend
+        run: pnpm install --frozen-lockfile
+
+      # 解決済みの依存を対象に脆弱性をスキャンする。
+      # 検出があってもここでは失敗させず、結果は Code Scanning で確認する。
+      - name: Run Trivy filesystem scan
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          scan-type: fs
+          scan-ref: frontend
+          scanners: vuln
+          format: sarif
+          output: trivy-frontend.sarif
+          exit-code: "0"
+          ignore-unfixed: true
+
+      - name: Upload SARIF to code scanning
+        if: always()
+        uses: github/codeql-action/upload-sarif@6f5948dfacef28e207b48d0905cf90c03365536d # v3
+        with:
+          sarif_file: trivy-frontend.sarif
+          category: trivy-frontend
+
+  # バックエンド（Gradle）の依存脆弱性スキャン。
+  # Gradle が解決した正確なバージョンを CycloneDX SBOM に書き出し、それをスキャンする。
+  backend:
+    name: Trivy scan (backend) 🛡️
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up JDK
+        uses: actions/setup-java@c5195efecf7bdfc987ee8bae7a71cb8b11521c00 # v4.7.1
+        with:
+          distribution: corretto
+          java-version: "25"
+
+      # 依存を解決して CycloneDX SBOM を生成する。
+      - name: Generate CycloneDX SBOM
+        working-directory: backend
+        run: ./gradlew cyclonedxBom --no-daemon
+
+      # SBOM を対象に脆弱性をスキャンする。
+      - name: Run Trivy SBOM scan
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          scan-type: sbom
+          scan-ref: backend/build/reports/cyclonedx/application.cdx.json
+          format: sarif
+          output: trivy-backend.sarif
+          exit-code: "0"
+          ignore-unfixed: true
+
+      - name: Upload SARIF to code scanning
+        if: always()
+        uses: github/codeql-action/upload-sarif@6f5948dfacef28e207b48d0905cf90c03365536d # v3
+        with:
+          sarif_file: trivy-backend.sarif
+          category: trivy-backend

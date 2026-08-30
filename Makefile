@@ -1,4 +1,4 @@
-.PHONY: setup be-format be-lint be-test be-coverage be-sbom scan-secrets scan-secrets-all lint-actions lint-actions-security lint-docker lint-docker-check lint-compose lint-semgrep
+.PHONY: setup be-format be-lint be-test be-coverage be-sbom scan-secrets scan-secrets-all lint-actions lint-actions-security lint-docker lint-docker-check lint-compose lint-semgrep scan-vulns scan-vulns-backend scan-vulns-frontend
 
 ## 開発環境の初期セットアップ（全スクリプトを順次実行）
 ## 実行後に source ~/.bashrc が必要
@@ -104,3 +104,29 @@ lint-semgrep:
 			--error \
 			--metrics off \
 			--disable-version-check
+
+## 依存関係の脆弱性スキャン（Trivy / Docker 実行）
+## CI と同じ対象・設定でローカル実行する。修正済みの脆弱性は除外する。
+## backend は CycloneDX SBOM を、frontend は解決済みの依存をスキャンする。
+scan-vulns: scan-vulns-backend scan-vulns-frontend
+
+## backend（Gradle）の脆弱性スキャン（SBOM 経由）
+scan-vulns-backend:
+	cd backend && ./gradlew cyclonedxBom
+	docker run --rm -v "$$PWD/backend":/src -w /src \
+		-e TRIVY_DB_REPOSITORY=mirror.gcr.io/aquasec/trivy-db:2 \
+		-e TRIVY_JAVA_DB_REPOSITORY=mirror.gcr.io/aquasec/trivy-java-db:1 \
+		aquasec/trivy:0.74.0@sha256:62b1e65e8869bc4b4c6aa4fa2b21595256c7c2f6018a9d9ad61caf87187c1969 \
+		sbom build/reports/cyclonedx/application.cdx.json \
+			--ignore-unfixed
+
+## frontend（pnpm）の脆弱性スキャン（依存を解決してから）
+scan-vulns-frontend:
+	cd frontend && pnpm install --frozen-lockfile
+	docker run --rm -v "$$PWD/frontend":/src -w /src \
+		-e TRIVY_DB_REPOSITORY=mirror.gcr.io/aquasec/trivy-db:2 \
+		-e TRIVY_JAVA_DB_REPOSITORY=mirror.gcr.io/aquasec/trivy-java-db:1 \
+		aquasec/trivy:0.74.0@sha256:62b1e65e8869bc4b4c6aa4fa2b21595256c7c2f6018a9d9ad61caf87187c1969 \
+		fs . \
+			--scanners vuln \
+			--ignore-unfixed
