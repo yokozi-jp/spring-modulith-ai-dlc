@@ -1,4 +1,4 @@
-.PHONY: setup be-format be-lint be-test be-coverage be-sbom scan-secrets scan-secrets-all lint-actions lint-actions-security lint-docker lint-docker-check lint-compose
+.PHONY: setup be-format be-lint be-test be-coverage be-sbom scan-secrets scan-secrets-all lint-actions lint-actions-security lint-docker lint-docker-check lint-compose lint-semgrep
 
 ## 開発環境の初期セットアップ（全スクリプトを順次実行）
 ## 実行後に source ~/.bashrc が必要
@@ -87,3 +87,20 @@ lint-compose:
 			docker compose -f "$$f" config --quiet || exit 1; \
 		done; \
 	fi
+
+## 静的解析（Semgrep OSS / Docker 実行）
+## CI と同じルール・設定でローカル実行する。コードは外部に送信されない。
+lint-semgrep:
+	docker run --rm -e SEMGREP_SEND_METRICS=off -v "$$PWD":/src -w /src \
+		semgrep/semgrep:1.175.0@sha256:b94b53d02fd4a022f9eac4e2af1380f5c3c4c21400e79d3336bdff1d1db5e796 \
+		semgrep scan \
+			--config p/default \
+			--config p/java \
+			--config p/typescript \
+			--config p/dockerfile \
+			--config p/secrets \
+			--exclude .kiro \
+			--exclude aidlc \
+			--error \
+			--metrics off \
+			--disable-version-check

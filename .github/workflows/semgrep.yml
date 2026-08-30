@@ -1,0 +1,60 @@
+name: Static Analysis (Semgrep) 🔎
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+    branches: ["**"]
+
+# SARIF を GitHub Code Scanning にアップロードするため security-events: write が必要。
+permissions:
+  contents: read
+  security-events: write
+
+jobs:
+  semgrep:
+    name: Run Semgrep 🔎
+    runs-on: ubuntu-latest
+    # メトリクス送信を無効化し、外部への通信を行わない。
+    env:
+      SEMGREP_SEND_METRICS: "off"
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: "3.12"
+
+      # Semgrep OSS（コミュニティエディション）をバージョン固定で導入する。
+      - name: Install Semgrep
+        run: pip install semgrep==1.175.0
+
+      # SARIF を出力する。検出があってもここでは失敗させず、
+      # 結果は Code Scanning（Security タブ）で確認する。
+      # .kiro/ と aidlc/ は AI-DLC フレームワークの領域のため対象外にする。
+      - name: Run semgrep scan
+        run: |
+          semgrep scan \
+            --config p/default \
+            --config p/java \
+            --config p/typescript \
+            --config p/dockerfile \
+            --config p/secrets \
+            --exclude .kiro \
+            --exclude aidlc \
+            --sarif \
+            --output semgrep.sarif \
+            --metrics off \
+            --disable-version-check
+
+      # 検出結果を GitHub Code Scanning にアップロードする。
+      # スキャンが失敗しても、生成済みの SARIF は必ずアップロードする。
+      - name: Upload SARIF to code scanning
+        if: always()
+        uses: github/codeql-action/upload-sarif@6f5948dfacef28e207b48d0905cf90c03365536d # v3
+        with:
+          sarif_file: semgrep.sarif
