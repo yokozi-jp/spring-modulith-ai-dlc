@@ -76,8 +76,11 @@ import {
 } from "../tools/aidlc-lib.ts";
 import { writeTargets } from "./review-freeze-command.ts";
 export {
+  shellCommandAltersExecutableResolution,
+  shellCommandInvocationDetails,
   shellCommandInvocations,
   shellWriteTargets,
+  type ShellInvocationDetails,
   type ShellInvocation,
   writeTargets,
 } from "./review-freeze-command.ts";
