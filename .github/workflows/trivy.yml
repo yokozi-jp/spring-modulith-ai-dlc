@@ -6,10 +6,10 @@ on:
   pull_request:
     branches: ["**"]
 
-# SARIF を GitHub Code Scanning にアップロードするため security-events: write が必要。
+# SARIF を Code Scanning にアップロードする権限はジョブごとに付与する
+# （ワークフロー全体に広く付与しない）。
 permissions:
   contents: read
-  security-events: write
 
 # Trivy の脆弱性 DB は Trivy 公式のミラーレジストリから取得する。
 env:
@@ -22,6 +22,9 @@ jobs:
   frontend:
     name: Trivy scan (frontend) 🛡️
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
     steps:
       - name: Checkout repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -68,6 +71,9 @@ jobs:
   backend:
     name: Trivy scan (backend) 🛡️
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
     steps:
       - name: Checkout repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
