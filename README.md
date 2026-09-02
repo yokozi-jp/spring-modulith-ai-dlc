@@ -160,6 +160,7 @@ Semgrep OSS（コミュニティエディション）で静的解析を行いま
 ### 自動実行（Git フック / CI）
 
 - **Git フック（Lefthook, [`lefthook.yml`](lefthook.yml)）**
+  - commit-msg: commitlint（コミットメッセージを Conventional Commits 規約で検証）
   - pre-commit: betterleaks（ステージ済み）、hadolint / docker build --check（Dockerfile 変更時）、compose config（Compose 変更時）
   - pre-push: betterleaks（全履歴）、actionlint / zizmor（ワークフロー変更時）
 - **CI（GitHub Actions, [`.github/workflows/`](.github/workflows/)）**

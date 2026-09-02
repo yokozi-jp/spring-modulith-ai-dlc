@@ -138,7 +138,7 @@ cd /home/projects/spring-modulith-ai-dlc
 npm install
 ```
 
-これにより Lefthook が有効化されます。以降、コミット時に pre-commit フックが実行され、ステージした変更を betterleaks がシークレットスキャンします。
+これにより Lefthook が有効化されます。
 
 ### 9. VSCode から WSL への接続
 
