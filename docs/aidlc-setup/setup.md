@@ -8,7 +8,6 @@
 cd /home/projects
 gh repo clone awslabs/aidlc-workflows
 cd aidlc-workflows
-git checkout v2
 ```
 
 フレームワークのファイルをプロジェクトにコピーします：
