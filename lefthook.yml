@@ -45,6 +45,12 @@
 # 実運用設定
 # ---------------------------------------------------------------------------
 
+# コミットメッセージを Conventional Commits 規約で検証（commitlint）
+commit-msg:
+  jobs:
+    - name: commitlint
+      run: npx --no-install commitlint --edit {1}
+
 pre-commit:
   parallel: true
   jobs:
