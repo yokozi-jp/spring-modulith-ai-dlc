@@ -60,3 +60,21 @@ spring:
       fail-on-unknown-properties: false
       # null を java プリミティブに代入しようとしたら失敗させる（不正データの早期検知）
       fail-on-null-for-primitives: true
+
+  # グレースフルシャットダウン（Spring Boot 4 ではデフォルトで有効）の待ち時間。
+  # 処理中リクエストの完了を待つ上限。ECS の stopTimeout はこの値より大きくすること。
+  lifecycle:
+    timeout-per-shutdown-phase: 30s
+
+# Actuator: 監視・ヘルスチェック用エンドポイント
+# ローカル・本番（ECS）共通。ECS/ALB のヘルスチェックは /actuator/health/readiness を使う。
+management:
+  endpoints:
+    web:
+      exposure:
+        # 最小公開: health と info のみ web に露出する
+        include: health,info
+  endpoint:
+    health:
+      # 詳細は認可されたリクエストにのみ返す（未認可には UP/DOWN のみ）
+      show-details: when-authorized
