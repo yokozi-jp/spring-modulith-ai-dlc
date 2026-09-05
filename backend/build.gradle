@@ -107,6 +107,16 @@ dependencyManagement {
         mavenBom "org.springframework.modulith:spring-modulith-bom:${springModulithVersion}"
         mavenBom "org.springframework.cloud:spring-cloud-dependencies:${springCloudVersion}"
     }
+    dependencies {
+        // --- 脆弱性対応（推移的依存のバージョン強制） ---
+        // Spring Boot 4.1.1 BOM が引く Tomcat に認証バイパス等の CVE が判明したため上書き。
+        // CVE-2026-65182 / CVE-2026-65905 / CVE-2026-68525 対応。
+        dependency 'org.apache.tomcat.embed:tomcat-embed-core:11.0.25'
+        dependency 'org.apache.tomcat.embed:tomcat-embed-el:11.0.25'
+        dependency 'org.apache.tomcat.embed:tomcat-embed-websocket:11.0.25'
+        // CVE-2026-0636（LDAP インジェクション）対応。
+        dependency 'org.bouncycastle:bcprov-jdk18on:1.84'
+    }
 }
 
 /*
