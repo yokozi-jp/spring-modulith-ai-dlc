@@ -175,7 +175,7 @@ Markdown ファイルの体裁を markdownlint-cli2 で検査します。除外�
   - pre-commit: betterleaks（ステージ済み）、hadolint / docker build --check（Dockerfile 変更時）、compose config（Compose 変更時）、markdownlint（Markdown 変更時）
   - pre-push: betterleaks（全履歴）、actionlint / zizmor（ワークフロー変更時）
 - **CI（GitHub Actions, [`.github/workflows/`](.github/workflows/)）**
-  - `betterleaks.yml`（シークレットスキャン）、`semgrep.yml`（静的解析 / SARIF アップロード）、`trivy.yml`（脆弱性スキャン / SARIF アップロード）、`actionlint.yml` / `zizmor.yml`（ワークフロー）、`hadolint.yml`（Dockerfile + docker build --check）、`compose-config.yml`（Compose）、`markdownlint.yml`（Markdown）
+  - `betterleaks.yml`（シークレットスキャン）、`semgrep.yml`（静的解析 / SARIF アップロード）、`trivy.yml`（脆弱性スキャン / SARIF アップロード）、`actionlint.yml` / `zizmor.yml`（ワークフロー）、`hadolint.yml`（Dockerfile Lint、docker build --check、backend イメージのビルド、起動、ヘルスチェック）、`compose-config.yml`（Compose）、`markdownlint.yml`（Markdown）
   - `semgrep.yml` / `trivy.yml` の検出結果は GitHub Code Scanning（Security タブ）に SARIF 形式でアップロードされます。
 
 <p align="right">(<a href="#top">トップへ</a>)</p>

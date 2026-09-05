@@ -1,0 +1,31 @@
+# ビルドに不要なものはコンテキストへ送らない（転送量削減・秘密混入防止）
+
+# Gradle の生成物・キャッシュ
+.gradle/
+build/
+bin/
+
+# Node.js の依存関係（誤配置や将来のツール導入に備える）
+node_modules/
+
+# Eclipse の生成物（DemoApplication ビルド出力等）
+out/
+
+# バージョン管理・IDE
+.git/
+.gitignore
+.gitattributes
+.idea/
+.vscode/
+.settings/
+.classpath
+.project
+*.iml
+
+# ローカル秘密・環境変数（本番は ECS で注入）
+.env
+.env.*
+!.env.example
+
+# 静的解析レポート等
+**/*.log

@@ -33,6 +33,10 @@ java {
     }
 }
 
+tasks.named('bootJar') {
+    archiveFileName = 'app.jar'
+}
+
 repositories {
     mavenCentral()
 }
