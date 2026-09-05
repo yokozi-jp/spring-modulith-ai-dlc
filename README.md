@@ -78,7 +78,8 @@ Spring Modulith を用いたモジュラーモノリスアーキテクチャの�
 ├── .markdownlint-cli2.yaml # markdownlint-cli2（Markdown リンタ）設定
 ├── .env.example      # 環境変数のサンプル
 ├── lefthook.yml      # Git フック定義（Lefthook）
-├── package.json      # Lefthook 導入用（ルート）
+├── commitlint.config.mjs # commitlint 設定（Conventional Commits 検証）
+├── package.json      # Lefthook・commitlint 導入用（ルート）
 └── Makefile          # 開発コマンド定義
 ```
 
