@@ -1,15 +1,21 @@
-# 環境変数の設定漏れを検知しやすくするため、デフォルト値は設定しない
+# このファイルの方針:
+#   環境変数（DB/Redis など）の参照にはデフォルト値を設定しない。
+#   設定漏れをアプリ起動時に検知しやすくするため（未設定なら起動に失敗させる）。
+
 spring:
   application:
     name: demo
+
   # ローカル: .env ファイルで環境変数を定義する
   # STG/本番: ECS タスク定義の environment / secrets で環境変数を注入する
   config:
     import: optional:file:.env[.properties]
+
   # 仮想スレッドを有効化し Tomcat のスループットを向上
   threads:
     virtual:
       enabled: true
+
   # DB
   datasource:
     url: ${DB_URL}
@@ -17,6 +23,13 @@ spring:
     password: ${DB_PASSWORD}
     hikari:
       schema: ${DB_SCHEMA}
+
+  # Liquibase: DB マイグレーション
+  liquibase:
+    # 管理テーブル・変更セットの適用先スキーマを明示する。
+    # build.gradle の defaultSchemaName と揃え、暗黙依存（Hikari の schema 経由）にしない。
+    default-schema: ${DB_SCHEMA}
+
   # Redis
   data:
     redis:
@@ -25,4 +38,25 @@ spring:
   session:
     data:
       redis:
-        namespace: "spring:session:demo"
+        namespace: ${REDIS_SESSION_NAMESPACE}
+
+  # Jackson（JSON シリアライズ/デシリアライズ）: Spring Boot 4 のデフォルトである Jackson 3 を使う。
+  # 自動構成された JsonMapper をプロパティで調整する（独自 Bean で丸ごと差し替えない）。
+  jackson:
+    # Jackson の日時フォーマット時に使用するコンテキスト TZ を UTC に固定する
+    # 絶対時刻の API モデルには原則 Instant を使用する
+    time-zone: UTC
+    # null のプロパティは出力しない（レスポンスを軽くする）
+    default-property-inclusion: non_null
+    # 日付・時刻関連（Jackson 3 では SerializationFeature でなく DateTimeFeature）
+    datatype:
+      datetime:
+        # 日付・時刻を数値でなく ISO-8601 文字列で出力する（[2025,9,5,...] を防ぐ）
+        write-dates-as-timestamps: false
+        # 期間（Duration）も数値でなく ISO-8601 文字列で出力する
+        write-durations-as-timestamps: false
+    deserialization:
+      # 未知のプロパティが来ても失敗させない（API の後方互換を保ちやすい）
+      fail-on-unknown-properties: false
+      # null を java プリミティブに代入しようとしたら失敗させる（不正データの早期検知）
+      fail-on-null-for-primitives: true
