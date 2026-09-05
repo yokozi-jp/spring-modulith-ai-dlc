@@ -47,6 +47,10 @@ dependencies {
     implementation 'org.springframework.boot:spring-boot-starter-webmvc'
     implementation 'org.springframework.boot:spring-boot-starter-validation'
 
+    // --- API ドキュメント（OpenAPI / Swagger UI）---
+    // springdoc 3.x が Spring Boot 4 系対応（2.x は Boot 3 系）。
+    implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:3.1.0'
+
     // --- セキュリティ ---
     implementation 'org.springframework.boot:spring-boot-starter-security'
     implementation 'org.springframework.boot:spring-boot-starter-security-oauth2-client'
