@@ -126,6 +126,21 @@ pre-push:
         export PATH="$PATH:$HOME/go/bin"
         betterleaks git . --no-banner --redact --git-workers=16
 
+    # backend に変更がある push のときだけ Lint（Spotless + PMD + SpotBugs）
+    # Gradle は重いため pre-commit ではなく pre-push で実行する。
+    - name: be-lint
+      glob: "backend/**/*.{java,gradle}"
+      run: |
+        echo "{push_files}" >/dev/null
+        cd backend && ./gradlew spotlessCheck pmdMain spotbugsMain
+
+    # backend に変更がある push のときだけテスト実行（カバレッジ検証含む）
+    - name: be-test
+      glob: "backend/**/*.{java,gradle}"
+      run: |
+        echo "{push_files}" >/dev/null
+        cd backend && ./gradlew test
+
     # GitHub Actions ワークフローに変更がある push のときだけ Lint（actionlint）
     # glob を効かせるため run 内で {push_files} を参照する。
     # docker が無い環境ではスキップ（最終担保は CI に任せる）。
