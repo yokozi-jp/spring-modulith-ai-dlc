@@ -14,8 +14,8 @@ peerDependencyRules:
     vitest: "*"
 
 # --- サプライチェーン対策（明示設定） ---
-# 公開直後の悪意あるパッケージを避けるため、1日以上経過したバージョンのみ許可する。
-minimumReleaseAge: 1440
+# 公開直後の悪意あるパッケージを避けるため、7日以上経過したバージョンのみ許可する。
+minimumReleaseAge: 10080
 # 信頼レベルが下がった（provenance/署名が失われた等の）バージョンの導入を拒否する。
 trustPolicy: no-downgrade
 # 推移的依存が Git リポジトリや直接 URL などの exotic なソースから取得されることを禁止する。

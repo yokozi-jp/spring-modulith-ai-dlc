@@ -14,15 +14,16 @@ import org.springframework.security.web.SecurityFilterChain;
  * <p>独自の {@link SecurityFilterChain} を定義すると Actuator の ManagementWebSecurityAutoConfiguration
  * が後退し、Actuator を含む全リクエストをこの Chain が制御する。
  *
- * <p>ヘルスチェック用のプローブ（{@code /actuator/health}、liveness/readiness）は ALB/ECS が未認証で叩くため
- * 認証不要にする。{@link EndpointRequest#to} でエンドポイントクラスから解決するため、
- * {@code management.endpoints.web.base-path} を変更してもここを直す必要はない。
+ * <p>ヘルスチェック用のプローブ（{@code /actuator/health}、liveness/readiness）は ALB/ECS が未認証で叩くため 認証不要にする。{@link
+ * EndpointRequest#to} でエンドポイントクラスから解決するため、 {@code management.endpoints.web.base-path}
+ * を変更してもここを直す必要はない。
  */
 @Configuration
 public class SecurityConfig {
 
   /** セキュリティフィルタチェーンを構築する。 */
   @Bean
+  @SuppressWarnings("PMD.SignatureDeclareThrowsException")
   public SecurityFilterChain securityFilterChain(final HttpSecurity http) throws Exception {
     http.authorizeHttpRequests(
             auth ->
