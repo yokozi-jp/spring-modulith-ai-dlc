@@ -21,7 +21,7 @@
 # -----------------------------------------------------------------------------
 # Stage 1: ビルド（JDK + Gradle）
 # -----------------------------------------------------------------------------
-FROM amazoncorretto:25-alpine3.22@sha256:7d93179da1c00e18ac3760c90f4ad1b7fc053cf358a6db29028fa5bb022d3043 AS build
+FROM amazoncorretto:26-alpine3.22@sha256:439fa27baa29f55628c6384cc7c30677ca2ca5de234baf51388995cf0017ab8d AS build
 
 WORKDIR /workspace
 
@@ -49,7 +49,7 @@ RUN java -Djarmode=tools -jar build/libs/app.jar \
 # -----------------------------------------------------------------------------
 # Stage 2: 実行（headless JRE）
 # -----------------------------------------------------------------------------
-FROM amazoncorretto:25-headless@sha256:770e291fe5d1bc20254c49489a6762095fa93937c11fa5e7408c3a3e4e04931e AS runtime
+FROM amazoncorretto:26-headless@sha256:23a497be708eefbaa004f82fc163e059f68b9cae96fdfde42aac68aaeade1b0e AS runtime
 
 WORKDIR /app
 
