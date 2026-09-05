@@ -66,6 +66,23 @@ spring:
   lifecycle:
     timeout-per-shutdown-phase: 30s
 
+# 組み込みサーバ（Tomcat）
+server:
+  # 待ち受けポート。環境ごとに指定する。
+  port: ${SERVER_PORT}
+  # ALB などプロキシ配下で X-Forwarded-* を解釈し、元のスキーム/ホスト/IP を復元する。
+  # ローカルはヘッダが付かないため透過的（全環境共通で可）。
+  forward-headers-strategy: framework
+  servlet:
+    session:
+      cookie:
+        # JavaScript から Cookie を読めなくする（XSS によるセッション窃取対策）
+        http-only: true
+        # HTTPS 経由でのみ Cookie を送る。本番/STG は true、ローカル（HTTP）は false。
+        secure: ${SESSION_COOKIE_SECURE}
+        # クロスサイトでの Cookie 送信を制限する（CSRF 対策）
+        same-site: lax
+
 # Actuator: 監視・ヘルスチェック用エンドポイント
 # ローカル・本番（ECS）共通。ECS/ALB のヘルスチェックは /actuator/health/readiness を使う。
 management:
