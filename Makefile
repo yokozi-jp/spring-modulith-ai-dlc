@@ -1,4 +1,9 @@
-.PHONY: setup be-format be-lint be-test be-coverage be-sbom scan-secrets scan-secrets-all lint-actions lint-actions-security lint-docker lint-docker-check lint-compose lint-md lint-md-fix lint-semgrep scan-vulns scan-vulns-backend scan-vulns-frontend
+DOCKER ?= $(shell command -v docker)
+COMPOSE_ENV_FILE ?= .env
+COMPOSE_FILE ?= docker/compose.yml
+COMPOSE = $(DOCKER) compose --env-file $(COMPOSE_ENV_FILE) -f $(COMPOSE_FILE)
+
+.PHONY: setup be-run be-format be-lint be-test be-coverage be-sbom compose-up compose-up-backend compose-down compose-ps compose-logs compose-reset scan-secrets scan-secrets-all lint-actions lint-actions-security lint-docker lint-docker-check lint-compose lint-md lint-md-fix lint-semgrep scan-vulns scan-vulns-backend scan-vulns-frontend
 
 ## 開発環境の初期セットアップ（全スクリプトを順次実行）
 ## 実行後に source ~/.bashrc が必要
@@ -12,6 +17,10 @@ setup:
 		./05-setup-lsp.sh && \
 		./06-setup-bun.sh && \
 		./07-setup-go-betterleaks.sh
+
+## バックエンドをホスト上で起動（application.yaml がルートの .env を読み込む）
+be-run:
+	cd backend && ./gradlew bootRun
 
 ## バックエンドのコードフォーマット適用（Spotless）
 be-format:
@@ -29,6 +38,30 @@ be-test:
 ## 出力先: backend/build/reports/
 be-sbom:
 	cd backend && ./gradlew cyclonedxBom
+
+## ローカル依存サービスを起動（backend コンテナは起動しない）
+compose-up:
+	$(COMPOSE) up -d --wait
+
+## backend profile を含む全サービスをビルド・起動
+compose-up-backend:
+	$(COMPOSE) --profile backend up -d --build --wait
+
+## Compose サービスを停止（named volume は保持）
+compose-down:
+	$(COMPOSE) --profile backend down
+
+## Compose サービスの状態を表示
+compose-ps:
+	$(COMPOSE) --profile backend ps
+
+## Compose サービスのログを追跡
+compose-logs:
+	$(COMPOSE) --profile backend logs --follow
+
+## Compose サービスと named volume を削除して初期化
+compose-reset:
+	$(COMPOSE) --profile backend down --volumes --remove-orphans
 
 ## ステージ済みの変更をシークレットスキャン（betterleaks / pre-commit 相当）
 scan-secrets:
@@ -84,7 +117,7 @@ lint-compose:
 	else \
 		for f in $$files; do \
 			echo "validating: $$f"; \
-			docker compose -f "$$f" config --quiet || exit 1; \
+			docker compose --env-file .env.example -f "$$f" config --quiet || exit 1; \
 		done; \
 	fi
 

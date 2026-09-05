@@ -1,0 +1,156 @@
+name: spring-modulith-local
+
+services:
+  postgres:
+    image: postgres:18.6-alpine3.23@sha256:697c180dbf244d3ce4a8f4cbc0156cde840af055c1bf8b76aebe422a4822086f
+    environment:
+      POSTGRES_DB: ${DB_NAME:?DB_NAME is required}
+      POSTGRES_USER: ${DB_USERNAME:?DB_USERNAME is required}
+      POSTGRES_PASSWORD_FILE: /run/secrets/db_password
+    ports:
+      - "127.0.0.1:${DB_PORT:?DB_PORT is required}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql
+      # 初回起動時に demo スキーマを作成する（DB_SCHEMA=demo に対応）。
+      - ./initdb:/docker-entrypoint-initdb.d:ro
+    secrets:
+      - db_password
+    healthcheck:
+      test: ["CMD-SHELL", 'pg_isready -U "$${POSTGRES_USER}" -d "$${POSTGRES_DB}"']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    restart: unless-stopped
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.7.0@sha256:0f198be292568439d700cdbfb893e69a6009bb43a94a06a945b1d3d506c76b13
+    # ローカル専用の使い捨て IdP（本番ではCognitoを使う想定）。127.0.0.1 のみに公開し
+    # start-dev で動かすため、管理者資格情報は開発用の admin/admin を直書きする
+    # （機密ではなく、上書きの必要もない）。
+    command: ["start-dev"]
+    environment:
+      KC_BOOTSTRAP_ADMIN_USERNAME: admin
+      KC_BOOTSTRAP_ADMIN_PASSWORD: admin
+      KC_HEALTH_ENABLED: "true"
+      KC_METRICS_ENABLED: "true"
+    ports:
+      - "127.0.0.1:8080:8080"
+    volumes:
+      - keycloak_data:/opt/keycloak/data
+    healthcheck:
+      test:
+        - CMD
+        - /bin/bash
+        - -ec
+        - >-
+          exec 3<>/dev/tcp/127.0.0.1/9000;
+          printf 'GET /health/ready HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n' >&3;
+          grep -q '200 OK' <&3
+      interval: 10s
+      timeout: 5s
+      retries: 18
+      start_period: 30s
+    restart: unless-stopped
+
+  redis:
+    image: redis:8.10.1-alpine3.23@sha256:becdda6c7f4b3fb42e42fd7f120bbf5c54c4caaaf16f26da24e4563d2c1f0576
+    command: ["redis-server", "--appendonly", "yes"]
+    ports:
+      - "127.0.0.1:${REDIS_PORT:?REDIS_PORT is required}:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 5s
+    restart: unless-stopped
+
+  otel-lgtm:
+    image: grafana/otel-lgtm:0.29.0@sha256:6e14b923e0130b8b294ca5bcc7c94d54e899d150817e6c3ed82d9b665afe5499
+    entrypoint:
+      - /bin/bash
+      - -ec
+      - |
+        export GF_SECURITY_ADMIN_PASSWORD="$$(cat /run/secrets/grafana_admin_password)"
+        exec /otel-lgtm/run-all.sh
+    environment:
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:?GRAFANA_ADMIN_USER is required}
+    ports:
+      - "127.0.0.1:${GRAFANA_HOST_PORT:?GRAFANA_HOST_PORT is required}:3000"
+      # backend は全シグナルを OTLP/HTTP(4318)へ送るため、gRPC(4317)は公開しない。
+      - "127.0.0.1:${OTEL_HTTP_PORT:?OTEL_HTTP_PORT is required}:4318"
+    volumes:
+      - otel_lgtm_data:/data
+    secrets:
+      - grafana_admin_password
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "--silent", "http://localhost:3000/api/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 18
+      start_period: 30s
+    restart: unless-stopped
+
+  backend:
+    profiles: ["backend"]
+    image: spring-modulith-backend:local
+    build:
+      context: ../backend
+      dockerfile: Dockerfile
+    entrypoint:
+      - /bin/bash
+      - -ec
+      - |
+        export DB_PASSWORD="$$(cat /run/secrets/db_password)"
+        exec java -jar app.jar
+    environment:
+      SERVER_PORT: "8080"
+      # .env の DB_HOST/DB_PORT・OTEL_HOST はホスト起動用なので、
+      # container 間通信では service 名と内部ポートへ置き換える。
+      DB_HOST: postgres
+      DB_PORT: "5432"
+      DB_NAME: ${DB_NAME:?DB_NAME is required}
+      DB_USERNAME: ${DB_USERNAME:?DB_USERNAME is required}
+      DB_SCHEMA: ${DB_SCHEMA:?DB_SCHEMA is required}
+      REDIS_HOST: redis
+      REDIS_PORT: "6379"
+      REDIS_SESSION_NAMESPACE: ${REDIS_SESSION_NAMESPACE:?REDIS_SESSION_NAMESPACE is required}
+      SESSION_COOKIE_SECURE: ${SESSION_COOKIE_SECURE:?SESSION_COOKIE_SECURE is required}
+      SPRINGDOC_ENABLED: ${SPRINGDOC_ENABLED:?SPRINGDOC_ENABLED is required}
+      OTEL_HOST: otel-lgtm
+      OTEL_HTTP_PORT: "4318"
+      MANAGEMENT_TRACING_SAMPLING_PROBABILITY: ${MANAGEMENT_TRACING_SAMPLING_PROBABILITY:?MANAGEMENT_TRACING_SAMPLING_PROBABILITY is required}
+      OTEL_SERVICE_NAME: ${OTEL_SERVICE_NAME:?OTEL_SERVICE_NAME is required}
+    ports:
+      - "127.0.0.1:${SERVER_PORT:?SERVER_PORT is required}:8080"
+    secrets:
+      - db_password
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      otel-lgtm:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "--silent", "http://localhost:8080/actuator/health/readiness"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+  keycloak_data:
+  redis_data:
+  otel_lgtm_data:
+
+secrets:
+  db_password:
+    environment: DB_PASSWORD
+  grafana_admin_password:
+    environment: GRAFANA_ADMIN_PASSWORD

@@ -39,7 +39,7 @@ updates:
     cooldown:
       default-days: 7
 
-  # ローカル開発用 compose のイメージ（postgres / redis）のバージョン更新。
+  # ローカル開発用 Compose のイメージを更新する。
   - package-ecosystem: "docker-compose"
     directory: "/docker"
     schedule:

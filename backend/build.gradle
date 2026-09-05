@@ -75,7 +75,6 @@ dependencies {
     implementation 'org.springframework.boot:spring-boot-starter-actuator'
     implementation 'org.springframework.boot:spring-boot-starter-opentelemetry'
     implementation 'org.springframework.boot:spring-boot-starter-micrometer-metrics'
-    runtimeOnly 'io.micrometer:micrometer-registry-otlp'
 
     // --- 耐障害性 ---
     implementation 'org.springframework.cloud:spring-cloud-starter-circuitbreaker-resilience4j'
@@ -246,7 +245,10 @@ tasks.withType(JavaCompile).configureEach {
  * Gradle タスク（update, rollback 等）から直接実行するための設定。
  * 接続情報は環境変数から取得し、未設定時はローカル開発用デフォルトを使用する。
  */
-def liquibaseDbUrl = System.getenv('DB_URL') ?: 'jdbc:postgresql://localhost:5432/demo'
+def liquibaseDbHost = System.getenv('DB_HOST') ?: 'localhost'
+def liquibaseDbPort = System.getenv('DB_PORT') ?: '5432'
+def liquibaseDbName = System.getenv('DB_NAME') ?: 'demo'
+def liquibaseDbUrl = System.getenv('DB_URL') ?: "jdbc:postgresql://${liquibaseDbHost}:${liquibaseDbPort}/${liquibaseDbName}"
 def liquibaseDbUsername = System.getenv('DB_USERNAME') ?: 'demo'
 def liquibaseDbPassword = System.getenv('DB_PASSWORD') ?: 'demo'
 def liquibaseDbSchema = System.getenv('DB_SCHEMA') ?: 'demo'

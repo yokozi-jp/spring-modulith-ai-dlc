@@ -14,3 +14,15 @@ description = ".env.example はプレースホルダ専用のサンプルファ�
 paths = [
   '''(^|/)\.env\.example$''',
 ]
+
+# Compose の secret 読み込みは実値ではなく /run/secrets からの読み出しであり、
+# ローカル専用 Keycloak の admin/admin は使い捨ての開発用資格情報のため除外する。
+[[allowlists]]
+description = "docker/compose.yml の Compose secret 読み出しとローカル専用 Keycloak 開発用資格情報を除外"
+paths = [
+  '''(^|/)docker/compose\.yml$''',
+]
+regexes = [
+  '''\$\$\(cat /run/secrets/[a-z_]+\)''',
+  '''KC_BOOTSTRAP_ADMIN_PASSWORD:\s*admin''',
+]

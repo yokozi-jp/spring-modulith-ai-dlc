@@ -6,10 +6,11 @@ spring:
   application:
     name: demo
 
-  # ローカル: .env ファイルで環境変数を定義する
-  # STG/本番: ECS タスク定義の environment / secrets で環境変数を注入する
+  # ローカル: リポジトリルートの .env で環境変数を定義する。
+  #   make be-run は backend/ を作業ディレクトリに起動するため、参照先は ../.env。
+  # STG/本番: ECS タスク定義の environment / secrets で環境変数を注入する（.env は無いので optional）。
   config:
-    import: optional:file:.env[.properties]
+    import: optional:file:../.env[.properties]
 
   # 仮想スレッドを有効化し Tomcat のスループットを向上
   threads:
@@ -18,7 +19,9 @@ spring:
 
   # DB
   datasource:
-    url: ${DB_URL}
+    # ホスト起動では localhost、Compose の backend profile では postgres サービスを指す。
+    # URL 全体でなく部品（DB_HOST/DB_PORT/DB_NAME）から組み立て、公開ポートと二重管理しない。
+    url: jdbc:postgresql://${DB_HOST}:${DB_PORT}/${DB_NAME}
     username: ${DB_USERNAME}
     password: ${DB_PASSWORD}
     hikari:
@@ -95,6 +98,26 @@ management:
     health:
       # 詳細は認可されたリクエストにのみ返す（未認可には UP/DOWN のみ）
       show-details: when-authorized
+  # OpenTelemetry の出力先（spring-boot-starter-opentelemetry）。
+  # メトリクスは Micrometer の OTLP レジストリ（management.otlp.metrics）、
+  # トレース・ログは OpenTelemetry SDK（management.opentelemetry.*）が別プロパティ体系で担う。
+  # いずれも OTEL_HOST/OTEL_HTTP_PORT から OTLP/HTTP の URL を組み立てる。
+  otlp:
+    metrics:
+      export:
+        url: http://${OTEL_HOST}:${OTEL_HTTP_PORT}/v1/metrics
+  opentelemetry:
+    tracing:
+      export:
+        otlp:
+          endpoint: http://${OTEL_HOST}:${OTEL_HTTP_PORT}/v1/traces
+    logging:
+      export:
+        otlp:
+          endpoint: http://${OTEL_HOST}:${OTEL_HTTP_PORT}/v1/logs
+  tracing:
+    sampling:
+      probability: ${MANAGEMENT_TRACING_SAMPLING_PROBABILITY}
 
 # API ドキュメント（springdoc-openapi / Swagger UI）
 # 有効/無効は環境変数で切り替える。本番は false、ローカル/STG は必要に応じて true。

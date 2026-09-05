@@ -45,6 +45,6 @@ jobs:
           status=0
           for composefile in "${composefiles[@]}"; do
             echo "validating: $composefile"
-            docker compose -f "$composefile" config --quiet || status=1
+            docker compose --env-file "$GITHUB_WORKSPACE/.env.example" -f "$composefile" config --quiet || status=1
           done
           exit "$status"

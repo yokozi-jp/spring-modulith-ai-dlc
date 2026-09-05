@@ -107,7 +107,7 @@ pre-commit:
         fi
         for composefile in {staged_files}; do
           echo "validating: $composefile"
-          docker compose -f "$composefile" config --quiet || exit 1
+          docker compose --env-file .env.example -f "$composefile" config --quiet || exit 1
         done
 
     # ステージ済みの Markdown を Lint（markdownlint-cli2）

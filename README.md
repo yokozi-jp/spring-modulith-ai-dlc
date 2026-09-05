@@ -103,6 +103,43 @@ Spring Modulith を用いたモジュラーモノリスアーキテクチャの�
 make <ターゲット名>
 ```
 
+### Docker Compose
+
+ルートのサンプルを `.env` へコピーし、パスワードを変更します。
+
+```bash
+cp .env.example .env
+```
+
+通常は PostgreSQL、Keycloak、Redis、Grafana OpenTelemetry LGTM だけを起動します。
+
+```bash
+make compose-up
+```
+
+バックエンドはルートの `.env` を読み込み、ホスト上で起動します。
+
+```bash
+make be-run
+```
+
+バックエンドは <http://localhost:18080>、Keycloak は <http://localhost:8080>、Grafana は <http://localhost:3000> で公開されます。
+
+バックエンドもコンテナで確認するときだけ `backend` profile を有効にします。
+
+```bash
+make compose-up-backend
+```
+
+サービスの状態確認と停止には次のターゲットを使用します。
+
+```bash
+make compose-ps
+make compose-down
+```
+
+データも削除して初期化する場合だけ `make compose-reset` を使用します。
+
 <p align="right">(<a href="#top">トップへ</a>)</p>
 
 ## Lint・テスト
