@@ -1,0 +1,7 @@
+# Liquibase マスターチェンジログ。
+# 各マイグレーションは changesets/ 配下に作成し、includeAll で一括取り込む。
+# ファイル名は連番プレフィックス（001-, 002-, ...）を付け、実行順を保証する。
+databaseChangeLog:
+  - includeAll:
+      path: changesets
+      relativeToChangelogFile: true
