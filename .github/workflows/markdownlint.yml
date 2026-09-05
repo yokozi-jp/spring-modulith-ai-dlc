@@ -1,0 +1,34 @@
+name: Lint Markdown (markdownlint-cli2) 📝
+
+on:
+  push:
+    branches: ["main"]
+    paths:
+      - "**/*.md"
+      - ".markdownlint-cli2.yaml"
+  pull_request:
+    branches: ["**"]
+    paths:
+      - "**/*.md"
+      - ".markdownlint-cli2.yaml"
+
+permissions:
+  contents: read
+
+jobs:
+  markdownlint:
+    name: Run markdownlint-cli2 📝
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      # 除外設定は .markdownlint-cli2.yaml の ignores に従う（.kiro 配下は steering のみ対象）。
+      # ローカル（make lint-md / lefthook）と同じ v0.23.2 のイメージを digest で固定する。
+      - name: Run markdownlint-cli2
+        run: |
+          docker run --rm -v "$PWD":/workdir -w /workdir \
+            davidanson/markdownlint-cli2:v0.23.2@sha256:839558fd0d36c46da0e01ea84fd1d20a2822b5a8a60c16dc9708f0bb7c9e903b \
+            "**/*.md"
