@@ -51,6 +51,7 @@ practices-discovery and recorded in `team.md` under this heading with explicit
 independently from coverage, tooling, and scope notes.
 
 When no posture has been affirmed, our default per scope is:
+
 - **Methodology**: test-after
 - **Ordering**: implement each applicable testable layer, then write and run
   that layer's tests.
@@ -86,6 +87,7 @@ auto-deploys); that's a team decision, not a framework default.
 ## Code Style
 
 We defer to project-level configurations:
+
 - Formatter: Prettier (JS/TS), Black (Python), `gofmt` (Go), or
   language-default. Configured in repo root (`.prettierrc`,
   `pyproject.toml`, etc.).

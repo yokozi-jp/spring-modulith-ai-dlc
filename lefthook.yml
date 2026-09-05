@@ -110,6 +110,12 @@ pre-commit:
           docker compose -f "$composefile" config --quiet || exit 1
         done
 
+    # ステージ済みの Markdown を Lint（markdownlint-cli2）
+    # 除外設定は .markdownlint-cli2.yaml の ignores に従う。
+    - name: markdownlint
+      glob: "*.md"
+      run: npx --yes markdownlint-cli2 {staged_files}
+
 pre-push:
   parallel: true
   jobs:

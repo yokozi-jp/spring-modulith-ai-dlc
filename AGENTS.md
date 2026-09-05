@@ -55,6 +55,7 @@ AI-DLC is open-world. Plugins under `plugins/<name>/` contribute additional stag
 ## Documentation
 
 For full documentation, see `docs/guide/` (User Guide), `docs/harness-engineering/` (Harness Engineer Guide), and `docs/reference/` (Developer Reference); start at `docs/README.md`. The Kiro-specific guide (install, what differs, the live journey test) is `docs/guide/harnesses/kiro-cli.md`.
+
 ## What's different on this harness
 
 This is the same AI-DLC core that ships to every harness: the same ordered steps, the same approval gates, and the same written record of what was decided, rendered onto Kiro CLI. On Kiro:
@@ -69,9 +70,11 @@ This is the same AI-DLC core that ships to every harness: the same ordered steps
 ## Session Resumption
 
 On startup, resolve the active intent (the `aidlc/spaces/<active-space>/intents/active-intent` cursor) and check for its `<record>/aidlc-state.md`. If found, load prior context and offer to resume from last checkpoint. (A brand-new project has no work recorded yet; the first `/aidlc` creates that record for you.)
+
 ## Git Integration
 
 Commit the `aidlc/` workspace tree — the record (state, the per-clone audit shards under `<record>/audit/`, `intents.json`), memory, codekb, and knowledge are all version-controlled. The shipped `.gitignore` excludes the per-user cursors and machine-local runtime (these may be per-clone or contain sensitive data):
+
 - `aidlc/active-space` and `aidlc/spaces/*/intents/active-intent` (per-user cursors)
 - `aidlc/.aidlc-clone-id` (per-clone audit-shard token) and `aidlc/.aidlc-sessions/`
 - `aidlc/spaces/*/intents/.aidlc-*` (pre-intent hooks-health scratch)

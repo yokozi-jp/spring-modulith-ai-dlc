@@ -1,0 +1,41 @@
+# markdownlint-cli2 の設定
+# https://github.com/DavidAnson/markdownlint-cli2
+# 実行: npx markdownlint-cli2 "**/*.md"
+# 自動修正: npx markdownlint-cli2 --fix "**/*.md"
+
+config:
+  # ============================================================
+  # 恒久的に無効化（本プロジェクトの文書スタイルと衝突するため）
+  # ============================================================
+
+  # 行の長さ（長い URL・表・コード例・ASCII 図があるため）
+  MD013: false
+
+  # 重複する見出し（プラットフォーム別ガイドで同じ節名が繰り返されるため）
+  MD024: false
+
+  # インライン HTML（README のスクリーンショットやバッジで <img> を使うため）
+  MD033: false
+
+  # ============================================================
+  # スタイル設定
+  # ============================================================
+
+  # 表はパイプを縦にそろえる整形済みスタイルを強制する
+  MD060:
+    style: "aligned"
+
+ignores:
+  - "**/node_modules/**"
+  - "**/build/**"
+  - ".agents/**"
+  # .kiro 配下は steering だけ lint 対象にし、それ以外のディレクトリは除外する
+  - ".kiro/agents/**"
+  - ".kiro/aidlc-common/**"
+  - ".kiro/hooks/**"
+  - ".kiro/knowledge/**"
+  - ".kiro/scopes/**"
+  - ".kiro/sensors/**"
+  - ".kiro/settings/**"
+  - ".kiro/skills/**"
+  - ".kiro/tools/**"

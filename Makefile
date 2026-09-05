@@ -1,4 +1,4 @@
-.PHONY: setup be-format be-lint be-test be-coverage be-sbom scan-secrets scan-secrets-all lint-actions lint-actions-security lint-docker lint-docker-check lint-compose lint-semgrep scan-vulns scan-vulns-backend scan-vulns-frontend
+.PHONY: setup be-format be-lint be-test be-coverage be-sbom scan-secrets scan-secrets-all lint-actions lint-actions-security lint-docker lint-docker-check lint-compose lint-md lint-md-fix lint-semgrep scan-vulns scan-vulns-backend scan-vulns-frontend
 
 ## 開発環境の初期セットアップ（全スクリプトを順次実行）
 ## 実行後に source ~/.bashrc が必要
@@ -87,6 +87,16 @@ lint-compose:
 			docker compose -f "$$f" config --quiet || exit 1; \
 		done; \
 	fi
+
+## Markdown の Lint（markdownlint-cli2）
+## 除外設定は .markdownlint-cli2.yaml の ignores に従う。
+lint-md:
+	npx --yes markdownlint-cli2 "**/*.md"
+
+## Markdown の Lint 自動修正（markdownlint-cli2 --fix）
+## 安全に直せる項目のみ修正する。除外設定は .markdownlint-cli2.yaml に従う。
+lint-md-fix:
+	npx --yes markdownlint-cli2 --fix "**/*.md"
 
 ## 静的解析（Semgrep OSS / Docker 実行）
 ## CI と同じルール・設定でローカル実行する。コードは外部に送信されない。

@@ -1,3 +1,4 @@
+<!-- markdownlint-disable-next-line MD041 -->
 <div id="top"></div>
 
 # spring-modulith-ai-dlc
@@ -6,20 +7,20 @@
 
 <p style="display: inline">
   <!-- バックエンド -->
-  <img src="https://img.shields.io/badge/-Java%2025-007396.svg?logo=openjdk&style=for-the-badge">
-  <img src="https://img.shields.io/badge/-Spring%20Boot%204.1-6DB33F.svg?logo=spring-boot&style=for-the-badge">
-  <img src="https://img.shields.io/badge/-Spring%20Modulith-6DB33F.svg?logo=spring&style=for-the-badge">
+  <img alt="Java 25" src="https://img.shields.io/badge/-Java%2025-007396.svg?logo=openjdk&style=for-the-badge">
+  <img alt="Spring Boot 4.1" src="https://img.shields.io/badge/-Spring%20Boot%204.1-6DB33F.svg?logo=spring-boot&style=for-the-badge">
+  <img alt="Spring Modulith" src="https://img.shields.io/badge/-Spring%20Modulith-6DB33F.svg?logo=spring&style=for-the-badge">
   <!-- フロントエンド -->
-  <img src="https://img.shields.io/badge/-TypeScript-3178C6.svg?logo=typescript&style=for-the-badge&logoColor=white">
-  <img src="https://img.shields.io/badge/-VitePlus-646CFF.svg?logo=vite&style=for-the-badge&logoColor=white">
-  <img src="https://img.shields.io/badge/-pnpm-F69220.svg?logo=pnpm&style=for-the-badge&logoColor=white">
+  <img alt="TypeScript" src="https://img.shields.io/badge/-TypeScript-3178C6.svg?logo=typescript&style=for-the-badge&logoColor=white">
+  <img alt="VitePlus" src="https://img.shields.io/badge/-VitePlus-646CFF.svg?logo=vite&style=for-the-badge&logoColor=white">
+  <img alt="pnpm" src="https://img.shields.io/badge/-pnpm-F69220.svg?logo=pnpm&style=for-the-badge&logoColor=white">
   <!-- ミドルウェア -->
-  <img src="https://img.shields.io/badge/-PostgreSQL-4169E1.svg?logo=postgresql&style=for-the-badge&logoColor=white">
-  <img src="https://img.shields.io/badge/-Redis-DC382D.svg?logo=redis&style=for-the-badge&logoColor=white">
+  <img alt="PostgreSQL" src="https://img.shields.io/badge/-PostgreSQL-4169E1.svg?logo=postgresql&style=for-the-badge&logoColor=white">
+  <img alt="Redis" src="https://img.shields.io/badge/-Redis-DC382D.svg?logo=redis&style=for-the-badge&logoColor=white">
   <!-- インフラ -->
-  <img src="https://img.shields.io/badge/-Docker-1488C6.svg?logo=docker&style=for-the-badge">
-  <img src="https://img.shields.io/badge/-Amazon%20AWS-232F3E.svg?logo=amazon-aws&style=for-the-badge">
-  <img src="https://img.shields.io/badge/-GitHub%20Actions-2088FF.svg?logo=github-actions&style=for-the-badge&logoColor=white">
+  <img alt="Docker" src="https://img.shields.io/badge/-Docker-1488C6.svg?logo=docker&style=for-the-badge">
+  <img alt="Amazon AWS" src="https://img.shields.io/badge/-Amazon%20AWS-232F3E.svg?logo=amazon-aws&style=for-the-badge">
+  <img alt="GitHub Actions" src="https://img.shields.io/badge/-GitHub%20Actions-2088FF.svg?logo=github-actions&style=for-the-badge&logoColor=white">
 </p>
 
 ## 目次
@@ -57,7 +58,7 @@ Spring Modulith を用いたモジュラーモノリスアーキテクチャの�
 
 ## ディレクトリ構成
 
-```
+```text
 .
 ├── backend/          # Spring Boot アプリケーション
 ├── frontend/         # VitePlus + TypeScript フロントエンド（pnpm）
@@ -74,6 +75,7 @@ Spring Modulith を用いたモジュラーモノリスアーキテクチャの�
 ├── .vscode/          # VSCode 設定
 ├── .betterleaks.toml # betterleaks（シークレットスキャナ）設定
 ├── .hadolint.yaml    # hadolint（Dockerfile リンタ）設定
+├── .markdownlint-cli2.yaml # markdownlint-cli2（Markdown リンタ）設定
 ├── .env.example      # 環境変数のサンプル
 ├── lefthook.yml      # Git フック定義（Lefthook）
 ├── package.json      # Lefthook 導入用（ルート）
@@ -141,7 +143,6 @@ Semgrep OSS（コミュニティエディション）で静的解析を行いま
 | `make scan-vulns-backend`   | backend（Gradle）の脆弱性スキャン（SBOM 経由）                |
 | `make scan-vulns-frontend`  | frontend（pnpm）の脆弱性スキャン（依存解決後）                |
 
-
 ### GitHub Actions ワークフロー
 
 | ターゲット                   | 内容                                     |
@@ -157,11 +158,20 @@ Semgrep OSS（コミュニティエディション）で静的解析を行いま
 | `make lint-docker-check` | Dockerfile の Docker 公式チェック（docker build --check）             |
 | `make lint-compose`      | Compose ファイルの構文・参照・変数展開の検証（docker compose config） |
 
+### Markdown Lint（markdownlint-cli2）
+
+Markdown ファイルの体裁を markdownlint-cli2 で検査します。除外設定は `.markdownlint-cli2.yaml` の `ignores` に従います（`.kiro` 配下は steering のみ対象）。
+
+| ターゲット                | 内容                                             |
+| ------------------------- | ------------------------------------------------ |
+| `make lint-md`            | Markdown の Lint（検出があれば失敗）             |
+| `make lint-md-fix`        | Markdown の Lint 自動修正（安全に直せる項目のみ）|
+
 ### 自動実行（Git フック / CI）
 
 - **Git フック（Lefthook, [`lefthook.yml`](lefthook.yml)）**
   - commit-msg: commitlint（コミットメッセージを Conventional Commits 規約で検証）
-  - pre-commit: betterleaks（ステージ済み）、hadolint / docker build --check（Dockerfile 変更時）、compose config（Compose 変更時）
+  - pre-commit: betterleaks（ステージ済み）、hadolint / docker build --check（Dockerfile 変更時）、compose config（Compose 変更時）、markdownlint（Markdown 変更時）
   - pre-push: betterleaks（全履歴）、actionlint / zizmor（ワークフロー変更時）
 - **CI（GitHub Actions, [`.github/workflows/`](.github/workflows/)）**
   - `betterleaks.yml`（シークレットスキャン）、`semgrep.yml`（静的解析 / SARIF アップロード）、`trivy.yml`（脆弱性スキャン / SARIF アップロード）、`actionlint.yml` / `zizmor.yml`（ワークフロー）、`hadolint.yml`（Dockerfile + docker build --check）、`compose-config.yml`（Compose）

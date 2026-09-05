@@ -100,7 +100,7 @@ gh auth login
 
 以下のように選択してください：
 
-```
+```text
 ? Where do you use GitHub? GitHub.com
 ? What is your preferred protocol for Git operations on this host? HTTPS
 ? Authenticate Git with your GitHub credentials? Yes
