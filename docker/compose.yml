@@ -69,7 +69,7 @@ services:
     restart: unless-stopped
 
   otel-lgtm:
-    image: grafana/otel-lgtm:0.29.0@sha256:6e14b923e0130b8b294ca5bcc7c94d54e899d150817e6c3ed82d9b665afe5499
+    image: grafana/otel-lgtm:0.32.1@sha256:7fd8eaad6bb64897ad5f644c8e15ee67c3204c97168f4bdba122adbf8f60e3c4
     entrypoint:
       - /bin/bash
       - -ec
