@@ -38,6 +38,12 @@ updates:
     # 新しいリリースを取り込むまで最低 7 日待つ（リリース直後の不正パッケージ対策）
     cooldown:
       default-days: 7
+    ignore:
+      # Java は LTS の Corretto 25 に固定する。26 以降は非 LTS のため、
+      # メジャー更新（25 → 26 等）は無視し、25 系のマイナー/パッチ更新のみ受け取る。
+      # 次の LTS へ上げるときはこの ignore を外して意図的に対応する。
+      - dependency-name: "amazoncorretto"
+        update-types: ["version-update:semver-major"]
 
   # ローカル開発用 Compose のイメージを更新する。
   - package-ecosystem: "docker-compose"

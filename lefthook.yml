@@ -99,6 +99,7 @@ pre-commit:
     - name: compose-config
       glob:
         - "**/compose.{yml,yaml}"
+        - "**/compose-test.{yml,yaml}"
         - "**/docker-compose.{yml,yaml}"
       run: |
         if ! command -v docker >/dev/null 2>&1; then
@@ -135,11 +136,18 @@ pre-push:
         cd backend && ./gradlew spotlessCheck pmdMain spotbugsMain
 
     # backend に変更がある push のときだけテスト実行（カバレッジ検証含む）
+    # 開発用 .env / 開発 DB には触れず、隔離したテスト用スタック（compose-test の
+    # PostgreSQL 5433 / Redis 6380）と test.env を使う make test で実行する。
+    # docker が無い環境ではスキップ（最終担保は CI に任せる）。
     - name: be-test
       glob: "backend/**/*.{java,gradle}"
       run: |
         echo "{push_files}" >/dev/null
-        cd backend && ./gradlew test
+        if ! command -v docker >/dev/null 2>&1; then
+          echo "docker が無いため make test をスキップします（CI で検査されます）。" >&2
+          exit 0
+        fi
+        make test
 
     # GitHub Actions ワークフローに変更がある push のときだけ Lint（actionlint）
     # glob を効かせるため run 内で {push_files} を参照する。

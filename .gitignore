@@ -33,5 +33,7 @@ node_modules/
 aidlc/active-space
 aidlc/spaces/*/intents/active-intent
 aidlc/.aidlc-*
+aidlc/spaces/*/intents/.aidlc-*
+**/aidlc/spaces/*/intents/**/.aidlc-sensors/
 aidlc/spaces/*/intents/*/runtime-graph.json
 aidlc/spaces/*/intents/*/.aidlc-*

@@ -3,7 +3,12 @@ COMPOSE_ENV_FILE ?= .env
 COMPOSE_FILE ?= docker/compose.yml
 COMPOSE = $(DOCKER) compose --env-file $(COMPOSE_ENV_FILE) -f $(COMPOSE_FILE)
 
-.PHONY: setup be-run be-format be-lint be-test be-coverage be-sbom compose-up compose-up-backend compose-down compose-ps compose-logs compose-reset scan-secrets scan-secrets-all lint-actions lint-actions-security lint-docker lint-docker-check lint-compose lint-md lint-md-fix lint-semgrep scan-vulns scan-vulns-backend scan-vulns-frontend
+# テスト専用の依存スタック（PostgreSQL + Redis）。開発用とポート/プロジェクトを分ける。
+TEST_ENV_FILE ?= test.env
+TEST_COMPOSE_FILE ?= docker/compose-test.yml
+TEST_COMPOSE = $(DOCKER) compose -f $(TEST_COMPOSE_FILE)
+
+.PHONY: setup be-run be-format be-lint be-test test test-deps-up test-deps-down be-coverage be-sbom compose-up compose-up-backend compose-down compose-ps compose-logs compose-reset scan-secrets scan-secrets-all lint-actions lint-actions-security lint-docker lint-docker-check lint-compose lint-md lint-md-fix lint-semgrep scan-vulns scan-vulns-backend scan-vulns-frontend
 
 ## 開発環境の初期セットアップ（全スクリプトを順次実行）
 ## 実行後に source ~/.bashrc が必要
@@ -30,9 +35,34 @@ be-format:
 be-lint:
 	cd backend && ./gradlew spotlessCheck pmdMain spotbugsMain
 
-## バックエンドのテスト実行＆カバレッジ検証
+## バックエンドのテスト実行（依存が起動済みの前提。フック/CI・test ターゲットの部品）。
+## 開発用ルート .env ではなく test.env を読み、DB/Redis も隔離した 5433/6380 を指す。
 be-test:
-	cd backend && ./gradlew test
+	cd backend && SPRING_CONFIG_IMPORT="optional:file:../$(TEST_ENV_FILE)[.properties]" ./gradlew test
+
+## テスト専用の依存スタック（PostgreSQL 5433 / Redis 6380）を起動
+test-deps-up:
+	$(TEST_COMPOSE) up -d --wait
+
+## テスト専用の依存スタックを停止しボリュームごと削除（使い捨て）
+test-deps-down:
+	$(TEST_COMPOSE) down --volumes --remove-orphans
+
+## 隔離した依存を起動してテストを実行し、終了後に必ず後片付けする（ワンショット）。
+## test.env で 5433/6380 を使うため、開発用スタック（5432/6379）や make be-run と衝突しない。
+test:
+	@set -eu; \
+	cleanup() { \
+		status=$$?; \
+		trap - EXIT; \
+		cleanup_status=0; \
+		$(TEST_COMPOSE) down --volumes --remove-orphans || cleanup_status=$$?; \
+		if [ "$$status" -ne 0 ]; then exit "$$status"; fi; \
+		exit "$$cleanup_status"; \
+	}; \
+	trap cleanup EXIT; \
+	$(TEST_COMPOSE) up -d --wait; \
+	$(MAKE) be-test
 
 ## バックエンドの SBOM 生成（CycloneDX 形式）
 ## 出力先: backend/build/reports/
@@ -111,7 +141,7 @@ lint-docker-check:
 ## Compose ファイルの構文・参照・変数展開を検証（docker compose config）
 ## リポジトリ内の全 Compose ファイルを対象にする
 lint-compose:
-	@files=$$(git ls-files '**/compose.yml' '**/compose.yaml' '**/docker-compose.yml' '**/docker-compose.yaml' 'compose.yml' 'compose.yaml' 'docker-compose.yml' 'docker-compose.yaml'); \
+	@files=$$(git ls-files '**/compose.yml' '**/compose.yaml' '**/compose-test.yml' '**/compose-test.yaml' '**/docker-compose.yml' '**/docker-compose.yaml' 'compose.yml' 'compose.yaml' 'compose-test.yml' 'compose-test.yaml' 'docker-compose.yml' 'docker-compose.yaml'); \
 	if [ -z "$$files" ]; then \
 		echo "Compose ファイルが見つかりません。"; \
 	else \

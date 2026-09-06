@@ -6,15 +6,21 @@ on:
     paths:
       - "**/compose.yml"
       - "**/compose.yaml"
+      - "**/compose-test.yml"
+      - "**/compose-test.yaml"
       - "**/docker-compose.yml"
       - "**/docker-compose.yaml"
+      - ".github/workflows/compose-config.yml"
   pull_request:
     branches: ["**"]
     paths:
       - "**/compose.yml"
       - "**/compose.yaml"
+      - "**/compose-test.yml"
+      - "**/compose-test.yaml"
       - "**/docker-compose.yml"
       - "**/docker-compose.yaml"
+      - ".github/workflows/compose-config.yml"
 
 permissions:
   contents: read
@@ -34,8 +40,10 @@ jobs:
         run: |
           mapfile -t composefiles < <(git ls-files -z \
             '**/compose.yml' '**/compose.yaml' \
+            '**/compose-test.yml' '**/compose-test.yaml' \
             '**/docker-compose.yml' '**/docker-compose.yaml' \
             'compose.yml' 'compose.yaml' \
+            'compose-test.yml' 'compose-test.yaml' \
             'docker-compose.yml' 'docker-compose.yaml' \
             | tr '\0' '\n')
           if [ "${#composefiles[@]}" -eq 0 ]; then

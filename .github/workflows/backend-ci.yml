@@ -5,10 +5,18 @@ on:
     branches: ["main"]
     paths:
       - "backend/**"
+      - "docker/compose-test.yml"
+      - "docker/initdb/**"
+      - "test.env"
+      - ".github/workflows/backend-ci.yml"
   pull_request:
     branches: ["**"]
     paths:
       - "backend/**"
+      - "docker/compose-test.yml"
+      - "docker/initdb/**"
+      - "test.env"
+      - ".github/workflows/backend-ci.yml"
 
 permissions:
   contents: read
@@ -59,9 +67,22 @@ jobs:
         with:
           cache-provider: basic
 
+      # ローカルの make test と同じ隔離スタック（PostgreSQL 5433 / Redis 6380）を使う。
+      # docker/compose-test.yml と test.env を共用し、ローカルと CI の乖離を防ぐ。
+      - name: Start test dependencies
+        run: docker compose -f docker/compose-test.yml up -d --wait
+
       - name: Run tests
         working-directory: backend
+        env:
+          # application.yaml は全プレースホルダにデフォルトを持たないため、
+          # test.env（非機密ダミー）を Spring 設定として読み込ませる。
+          SPRING_CONFIG_IMPORT: "optional:file:../test.env[.properties]"
         run: ./gradlew test
+
+      - name: Stop test dependencies
+        if: always()
+        run: docker compose -f docker/compose-test.yml down --volumes --remove-orphans
 
       - name: Upload JaCoCo report
         if: always()

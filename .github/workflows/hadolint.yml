@@ -5,12 +5,18 @@ on:
     branches: ["main"]
     paths:
       - "backend/**"
+      - "docker/compose-test.yml"
+      - "docker/initdb/**"
+      - "test.env"
       - ".hadolint.yaml"
       - ".github/workflows/hadolint.yml"
   pull_request:
     branches: ["**"]
     paths:
       - "backend/**"
+      - "docker/compose-test.yml"
+      - "docker/initdb/**"
+      - "test.env"
       - ".hadolint.yaml"
       - ".github/workflows/hadolint.yml"
 
@@ -72,29 +78,6 @@ jobs:
     name: Build and test backend image 🐳
     needs: [hadolint, docker-build-check]
     runs-on: ubuntu-latest
-    services:
-      postgres:
-        image: postgres:18.6-alpine3.23@sha256:697c180dbf244d3ce4a8f4cbc0156cde840af055c1bf8b76aebe422a4822086f
-        env:
-          POSTGRES_DB: demo
-          POSTGRES_USER: demo
-          POSTGRES_PASSWORD: demo
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd "pg_isready -U demo -d demo"
-          --health-interval 5s
-          --health-timeout 5s
-          --health-retries 10
-      redis:
-        image: redis:8.10.1-alpine3.23@sha256:becdda6c7f4b3fb42e42fd7f120bbf5c54c4caaaf16f26da24e4563d2c1f0576
-        ports:
-          - 6379:6379
-        options: >-
-          --health-cmd "redis-cli ping"
-          --health-interval 5s
-          --health-timeout 3s
-          --health-retries 10
     steps:
       - name: Checkout repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -104,19 +87,16 @@ jobs:
       - name: Build backend image
         run: docker build --tag spring-modulith-backend:ci backend
 
-      # CI の postgres サービスには initdb を差し込めないため、backend 起動前に demo スキーマを作る。
-      - name: Create application schema
-        run: |
-          docker run --rm --network host \
-            --env PGPASSWORD=demo \
-            postgres:18.6-alpine3.23@sha256:697c180dbf244d3ce4a8f4cbc0156cde840af055c1bf8b76aebe422a4822086f \
-            psql -h 127.0.0.1 -U demo -d demo \
-            -c "CREATE SCHEMA IF NOT EXISTS demo AUTHORIZATION demo;"
+      # テスト用の依存スタック（PostgreSQL 5433 / Redis 6380）を起動する。
+      # backend-ci.yml のテストや make test と同じ docker/compose-test.yml・test.env を共用し、
+      # スキーマ作成は compose-test の initdb が担うため、ここでの手動作成は不要。
+      - name: Start test dependencies
+        run: docker compose -f docker/compose-test.yml up -d --wait
 
       - name: Start backend container
         run: |
           docker run --detach --name backend-smoke --network host \
-            --env-file .github/backend-smoke.env \
+            --env-file test.env \
             spring-modulith-backend:ci
 
       - name: Wait for healthy backend
@@ -147,3 +127,7 @@ jobs:
       - name: Remove backend container
         if: always()
         run: docker rm --force backend-smoke || true
+
+      - name: Stop test dependencies
+        if: always()
+        run: docker compose -f docker/compose-test.yml down --volumes --remove-orphans
