@@ -43,7 +43,7 @@ repositories {
 
 ext {
     set('springCloudVersion', "2025.1.2")
-    set('springModulithVersion', "2.1.0")
+    set('springModulithVersion', "2.1.1")
 }
 
 dependencies {
@@ -67,9 +67,8 @@ dependencies {
 
     // --- モジュラーモノリス ---
     implementation 'org.springframework.modulith:spring-modulith-starter-core'
-    implementation 'org.springframework.modulith:spring-modulith-observability-api'
-    runtimeOnly 'org.springframework.modulith:spring-modulith-actuator'
-    runtimeOnly 'org.springframework.modulith:spring-modulith-observability-core'
+    implementation 'org.springframework.modulith:spring-modulith-starter-jdbc'
+    implementation 'org.springframework.modulith:spring-modulith-starter-insight'
 
     // --- 可観測性・メトリクス ---
     implementation 'org.springframework.boot:spring-boot-starter-actuator'

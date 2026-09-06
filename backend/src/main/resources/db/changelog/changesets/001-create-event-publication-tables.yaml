@@ -1,0 +1,123 @@
+databaseChangeLog:
+  - changeSet:
+      id: 001-create-event-publication-tables
+      author: spring-modulith-ai-dlc
+      preConditions:
+        - dbms:
+            type: postgresql
+      changes:
+        - createTable:
+            tableName: event_publication
+            columns:
+              - column:
+                  name: id
+                  type: UUID
+                  constraints:
+                    nullable: false
+                    primaryKey: true
+                    primaryKeyName: event_publication_pkey
+              - column:
+                  name: listener_id
+                  type: TEXT
+                  constraints:
+                    nullable: false
+              - column:
+                  name: event_type
+                  type: TEXT
+                  constraints:
+                    nullable: false
+              - column:
+                  name: serialized_event
+                  type: TEXT
+                  constraints:
+                    nullable: false
+              - column:
+                  name: publication_date
+                  type: TIMESTAMP WITH TIME ZONE
+                  constraints:
+                    nullable: false
+              - column:
+                  name: completion_date
+                  type: TIMESTAMP WITH TIME ZONE
+              - column:
+                  name: status
+                  type: TEXT
+              - column:
+                  name: completion_attempts
+                  type: INT
+              - column:
+                  name: last_resubmission_date
+                  type: TIMESTAMP WITH TIME ZONE
+        - createIndex:
+            indexName: event_publication_serialized_event_hash_idx
+            tableName: event_publication
+            using: hash
+            columns:
+              - column:
+                  name: serialized_event
+        - createIndex:
+            indexName: event_publication_by_completion_date_idx
+            tableName: event_publication
+            columns:
+              - column:
+                  name: completion_date
+        - createTable:
+            tableName: event_publication_archive
+            columns:
+              - column:
+                  name: id
+                  type: UUID
+                  constraints:
+                    nullable: false
+                    primaryKey: true
+                    primaryKeyName: event_publication_archive_pkey
+              - column:
+                  name: listener_id
+                  type: TEXT
+                  constraints:
+                    nullable: false
+              - column:
+                  name: event_type
+                  type: TEXT
+                  constraints:
+                    nullable: false
+              - column:
+                  name: serialized_event
+                  type: TEXT
+                  constraints:
+                    nullable: false
+              - column:
+                  name: publication_date
+                  type: TIMESTAMP WITH TIME ZONE
+                  constraints:
+                    nullable: false
+              - column:
+                  name: completion_date
+                  type: TIMESTAMP WITH TIME ZONE
+              - column:
+                  name: status
+                  type: TEXT
+              - column:
+                  name: completion_attempts
+                  type: INT
+              - column:
+                  name: last_resubmission_date
+                  type: TIMESTAMP WITH TIME ZONE
+        - createIndex:
+            indexName: event_publication_archive_serialized_event_hash_idx
+            tableName: event_publication_archive
+            using: hash
+            columns:
+              - column:
+                  name: serialized_event
+        - createIndex:
+            indexName: event_publication_archive_by_completion_date_idx
+            tableName: event_publication_archive
+            columns:
+              - column:
+                  name: completion_date
+      rollback:
+        - dropTable:
+            tableName: event_publication_archive
+        - dropTable:
+            tableName: event_publication

@@ -64,6 +64,26 @@ spring:
       # null を java プリミティブに代入しようとしたら失敗させる（不正データの早期検知）
       fail-on-null-for-primitives: true
 
+  # Spring Modulith
+  modulith:
+    # 起動時にモジュール間の依存違反を検証し、違反があれば起動を失敗させる。
+    runtime:
+      verification-enabled: true
+    events:
+      # 完了したイベント出版レコードをアーカイブへ移し、調査可能な履歴を保持する。
+      completion-mode: archive
+      jdbc:
+        # Hikari と Liquibase が使用するスキーマに揃える。
+        schema: ${DB_SCHEMA}
+        # テーブル作成は Liquibase に一本化する。
+        schema-initialization:
+          enabled: false
+      # 外部ブローカーへのイベント配信を導入するまで無効にする。
+      externalization:
+        enabled: false
+      # 複数インスタンスでの競合を避けるため、起動時には自動再配信しない。
+      republish-outstanding-events-on-restart: false
+
   # グレースフルシャットダウン（Spring Boot 4 ではデフォルトで有効）の待ち時間。
   # 処理中リクエストの完了を待つ上限。ECS の stopTimeout はこの値より大きくすること。
   lifecycle:
