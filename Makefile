@@ -19,9 +19,8 @@ setup:
 		./03-setup-kiro.sh && \
 		export PATH="$$HOME/.local/bin:$$PATH" && \
 		./04-setup-shell.sh && \
-		./05-setup-lsp.sh && \
-		./06-setup-bun.sh && \
-		./07-setup-go-betterleaks.sh
+		./05-setup-bun.sh && \
+		./06-setup-go-betterleaks.sh
 
 ## バックエンドをホスト上で起動（application.yaml がルートの .env を読み込む）
 be-run:
