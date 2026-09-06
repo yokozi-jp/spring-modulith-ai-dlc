@@ -60,27 +60,33 @@ Spring Modulith を用いたモジュラーモノリスアーキテクチャの�
 
 ```text
 .
-├── backend/          # Spring Boot アプリケーション
-├── frontend/         # VitePlus + TypeScript フロントエンド（pnpm）
-├── docker/           # Docker 関連ファイル
-├── infrastructure/   # インフラ定義
-├── docs/             # ドキュメント
-│   ├── local-env-setup/  # 開発環境構築手順・スクリプト
-│   └── aidlc-setup/      # AI-DLC セットアップ手順
-├── aidlc/            # AI-DLC ワークスペース（自動生成）
+├── .agents/          # スキル定義（.agents/skills）
 ├── .github/          # GitHub 設定
 │   ├── workflows/    # GitHub Actions（Lint・シークレットスキャン等）
 │   └── dependabot.yml # 依存関係の自動更新設定
 ├── .kiro/            # Kiro 設定
 ├── .vscode/          # VSCode 設定
+├── aidlc/            # AI-DLC ワークスペース（自動生成）
+├── backend/          # Spring Boot アプリケーション
+├── docker/           # Docker 関連ファイル
+├── docs/             # ドキュメント
+│   ├── aidlc-setup/      # AI-DLC セットアップ手順
+│   └── local-env-setup/  # 開発環境構築手順・スクリプト
+├── frontend/         # VitePlus + TypeScript フロントエンド（pnpm）
+├── infrastructure/   # インフラ定義
 ├── .betterleaks.toml # betterleaks（シークレットスキャナ）設定
+├── .env.example      # 環境変数のサンプル
+├── .env.test         # テスト用の環境変数（非機密ダミー）
+├── .gitignore        # Git 追跡除外設定
 ├── .hadolint.yaml    # hadolint（Dockerfile リンタ）設定
 ├── .markdownlint-cli2.yaml # markdownlint-cli2（Markdown リンタ）設定
-├── .env.example      # 環境変数のサンプル
-├── lefthook.yml      # Git フック定義（Lefthook）
+├── AGENTS.md         # AI-DLC / エージェント向けプロジェクト説明
 ├── commitlint.config.mjs # commitlint 設定（Conventional Commits 検証）
+├── lefthook.yml      # Git フック定義（Lefthook）
+├── LICENSE           # ライセンス
+├── Makefile          # 開発コマンド定義
 ├── package.json      # Lefthook・commitlint 導入用（ルート）
-└── Makefile          # 開発コマンド定義
+└── skills-lock.json  # スキルのバージョン固定（lock）
 ```
 
 <p align="right">(<a href="#top">トップへ</a>)</p>
