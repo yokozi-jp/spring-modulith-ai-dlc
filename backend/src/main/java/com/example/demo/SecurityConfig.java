@@ -39,6 +39,8 @@ public class SecurityConfig {
                     // 上記以外はすべて認証必須
                     .anyRequest()
                     .authenticated())
+        // SPA が XSRF-TOKEN Cookie を読み、更新系リクエストの X-XSRF-TOKEN Header で送り返す。
+        .csrf(csrf -> csrf.spa())
         // TODO 認証方式は暫定。OAuth2 ログイン（client 登録）を実装する段で置き換える。
         .httpBasic(Customizer.withDefaults());
     return http.build();

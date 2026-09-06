@@ -37,6 +37,9 @@ be-lint:
 ## バックエンドのテスト実行（依存が起動済みの前提。フック/CI・test ターゲットの部品）。
 ## 開発用ルート .env ではなく .env.test を読み、DB/Redis も隔離した 5433/6380 を指す。
 be-test:
+	set -a; \
+	. ./$(TEST_ENV_FILE); \
+	set +a; \
 	cd backend && SPRING_CONFIG_IMPORT="optional:file:../$(TEST_ENV_FILE)[.properties]" ./gradlew test
 
 ## テスト専用の依存スタック（PostgreSQL 5433 / Redis 6380）を起動

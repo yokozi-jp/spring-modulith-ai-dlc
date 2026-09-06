@@ -10,6 +10,8 @@
         <exclude name="UnitTestContainsTooManyAsserts"/>
     </rule>
     <rule ref="category/java/codestyle.xml">
+        <!-- ラムダ式とメソッド参照を意図に応じて選択できるようにする -->
+        <exclude name="LambdaCanBeMethodReference"/>
         <!-- Lombok がコンストラクタを生成し、record クラスは暗黙コンストラクタを持つため無効化 -->
         <exclude name="AtLeastOneConstructor"/>
         <!-- id 等の短い変数名が頻出するため無効化 -->
