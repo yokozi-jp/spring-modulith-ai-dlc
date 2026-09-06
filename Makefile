@@ -8,7 +8,7 @@ TEST_ENV_FILE ?= .env.test
 TEST_COMPOSE_FILE ?= docker/compose-test.yml
 TEST_COMPOSE = $(DOCKER) compose -f $(TEST_COMPOSE_FILE)
 
-.PHONY: setup be-run be-format be-lint be-test test test-deps-up test-deps-down be-coverage be-sbom compose-up compose-up-backend compose-down compose-ps compose-logs compose-reset scan-secrets scan-secrets-all lint-actions lint-actions-security lint-docker lint-docker-check lint-compose lint-md lint-md-fix lint-semgrep scan-vulns scan-vulns-backend scan-vulns-frontend
+.PHONY: setup be-run be-format be-lint be-test test test-deps-up test-deps-down be-coverage be-sbom compose-up compose-up-backend compose-down compose-ps compose-logs keycloak-logs keycloak-reimport oidc-check compose-reset scan-secrets scan-secrets-all lint-actions lint-actions-security lint-docker lint-docker-check lint-compose lint-md lint-md-fix lint-semgrep scan-vulns scan-vulns-backend scan-vulns-frontend
 
 ## 開発環境の初期セットアップ（全スクリプトを順次実行）
 ## 実行後に source ~/.bashrc が必要
@@ -90,6 +90,39 @@ compose-ps:
 ## Compose サービスのログを追跡
 compose-logs:
 	$(COMPOSE) --profile backend logs --follow
+
+## Keycloak のログだけを追跡
+keycloak-logs:
+	$(COMPOSE) logs --follow keycloak
+
+## Keycloak のローカルデータだけを削除し、realm.json を再投入して起動
+## PostgreSQL、Redis、Grafana の named volume は保持する。
+keycloak-reimport:
+	@set -eu; \
+	$(COMPOSE) create keycloak >/dev/null; \
+	container_id=$$($(COMPOSE) ps -aq keycloak); \
+	volume=$$($(DOCKER) inspect --format '{{range .Mounts}}{{if eq .Destination "/opt/keycloak/data"}}{{.Name}}{{end}}{{end}}' "$$container_id"); \
+	if [ -z "$$volume" ]; then \
+		echo "Keycloak data volume を特定できませんでした。" >&2; \
+		exit 1; \
+	fi; \
+	$(COMPOSE) rm --stop --force keycloak; \
+	$(DOCKER) volume rm "$$volume"; \
+	$(COMPOSE) up -d --wait keycloak; \
+	echo "Keycloak realm を再投入しました。"
+
+## Keycloak の OIDC discovery と PKCE S256 対応を確認
+## Keycloak が起動済みであること。
+oidc-check:
+	@$(COMPOSE) exec -T keycloak /bin/bash -ec '\
+		exec 3<>/dev/tcp/127.0.0.1/8080; \
+		printf "GET /realms/spring-modulith/.well-known/openid-configuration HTTP/1.1\r\nHost: localhost:8080\r\nConnection: close\r\n\r\n" >&3; \
+		response="$$(cat <&3)"; \
+		printf "%s" "$$response" | grep -q "200 OK"; \
+		printf "%s" "$$response" | grep -q "\"issuer\":\"http://localhost:8080/realms/spring-modulith\""; \
+		printf "%s" "$$response" | grep -q "\"S256\""'
+	@echo "OIDC discovery と PKCE S256 を確認しました。"
+	@echo "Login URL: http://localhost:18080/oauth2/authorization/web"
 
 ## Compose サービスと named volume を削除して初期化
 compose-reset:

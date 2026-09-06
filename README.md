@@ -144,7 +144,27 @@ make compose-ps
 make compose-down
 ```
 
-データも削除して初期化する場合だけ `make compose-reset` を使用します。
+Keycloak の OIDC discovery、issuer、PKCE S256 対応を確認します。
+
+```bash
+make oidc-check
+```
+
+Keycloak のログだけを追跡する場合は次のターゲットを使用します。
+
+```bash
+make keycloak-logs
+```
+
+`realm.json` を変更した場合、既存 realm は起動時インポートで上書きされません。
+Keycloak のローカルデータだけを削除して realm を再投入するには、次のターゲットを使用します。
+
+```bash
+make keycloak-reimport
+```
+
+`make keycloak-reimport` は PostgreSQL、Redis、Grafana のデータを保持します。
+全サービスのデータも削除して初期化する場合だけ `make compose-reset` を使用します。
 
 <p align="right">(<a href="#top">トップへ</a>)</p>
 

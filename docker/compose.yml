@@ -28,7 +28,7 @@ services:
     # ローカル専用の使い捨て IdP（本番ではCognitoを使う想定）。127.0.0.1 のみに公開し
     # start-dev で動かすため、管理者資格情報は開発用の admin/admin を直書きする
     # （機密ではなく、上書きの必要もない）。
-    command: ["start-dev"]
+    command: ["start-dev", "--import-realm"]
     environment:
       KC_BOOTSTRAP_ADMIN_USERNAME: admin
       KC_BOOTSTRAP_ADMIN_PASSWORD: admin
@@ -38,6 +38,8 @@ services:
       - "127.0.0.1:8080:8080"
     volumes:
       - keycloak_data:/opt/keycloak/data
+      # realm が存在しない初回起動時だけ、ローカル用 client・role・user を投入する。
+      - ./keycloak:/opt/keycloak/data/import:ro
     healthcheck:
       test:
         - CMD
@@ -119,6 +121,10 @@ services:
       REDIS_PORT: "6379"
       REDIS_SESSION_NAMESPACE: ${REDIS_SESSION_NAMESPACE:?REDIS_SESSION_NAMESPACE is required}
       SESSION_COOKIE_SECURE: ${SESSION_COOKIE_SECURE:?SESSION_COOKIE_SECURE is required}
+      OIDC_CLIENT_ID: ${OIDC_CLIENT_ID:?OIDC_CLIENT_ID is required}
+      OIDC_CLIENT_SECRET: ${OIDC_CLIENT_SECRET:?OIDC_CLIENT_SECRET is required}
+      # コンテナから issuer metadata を取得するため Compose の service 名を使う。
+      OIDC_ISSUER_URI: http://keycloak:8080/realms/spring-modulith
       SPRINGDOC_ENABLED: ${SPRINGDOC_ENABLED:?SPRINGDOC_ENABLED is required}
       OTEL_HOST: otel-lgtm
       OTEL_HTTP_PORT: "4318"
@@ -130,6 +136,8 @@ services:
       - db_password
     depends_on:
       postgres:
+        condition: service_healthy
+      keycloak:
         condition: service_healthy
       redis:
         condition: service_healthy

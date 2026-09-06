@@ -43,6 +43,27 @@ spring:
       redis:
         namespace: ${REDIS_SESSION_NAMESPACE}
 
+  # OIDC Client: Authorization Code Flow を使用するサーバーサイド Web クライアント。
+  # PKCE は SecurityConfig で認可リクエストごとに S256 の challenge を付与する。
+  security:
+    oauth2:
+      client:
+        registration:
+          web:
+            provider: oidc
+            client-id: ${OIDC_CLIENT_ID}
+            client-secret: ${OIDC_CLIENT_SECRET}
+            client-authentication-method: client_secret_basic
+            authorization-grant-type: authorization_code
+            redirect-uri: "{baseUrl}/login/oauth2/code/{registrationId}"
+            scope:
+              - openid
+              - profile
+              - email
+        provider:
+          oidc:
+            issuer-uri: ${OIDC_ISSUER_URI}
+
   # Jackson（JSON シリアライズ/デシリアライズ）: Spring Boot 4 のデフォルトである Jackson 3 を使う。
   # 自動構成された JsonMapper をプロパティで調整する（独自 Bean で丸ごと差し替えない）。
   jackson:
@@ -98,7 +119,11 @@ server:
   forward-headers-strategy: framework
   servlet:
     session:
+      # URL rewriting を無効化し、セッション ID は Cookie だけで送受信する。
+      tracking-modes: cookie
       cookie:
+        # アプリケーションが管理するセッション Cookie であることを明示する。
+        name: APP_SESSION
         # JavaScript から Cookie を読めなくする（XSS によるセッション窃取対策）
         http-only: true
         # HTTPS 経由でのみ Cookie を送る。本番/STG は true、ローカル（HTTP）は false。
