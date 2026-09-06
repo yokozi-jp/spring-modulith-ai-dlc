@@ -17,6 +17,8 @@
   <!-- ミドルウェア -->
   <img alt="PostgreSQL" src="https://img.shields.io/badge/-PostgreSQL-4169E1.svg?logo=postgresql&style=for-the-badge&logoColor=white">
   <img alt="Redis" src="https://img.shields.io/badge/-Redis-DC382D.svg?logo=redis&style=for-the-badge&logoColor=white">
+  <img alt="Keycloak" src="https://img.shields.io/badge/-Keycloak-4D4D4D.svg?logo=keycloak&style=for-the-badge&logoColor=white">
+  <img alt="Grafana OpenTelemetry LGTM" src="https://img.shields.io/badge/-Grafana%20OTel%20LGTM-F46800.svg?logo=grafana&style=for-the-badge&logoColor=white">
   <!-- インフラ -->
   <img alt="Docker" src="https://img.shields.io/badge/-Docker-1488C6.svg?logo=docker&style=for-the-badge">
   <img alt="Amazon AWS" src="https://img.shields.io/badge/-Amazon%20AWS-232F3E.svg?logo=amazon-aws&style=for-the-badge">
@@ -39,18 +41,20 @@ Spring Modulith を用いたモジュラーモノリスアーキテクチャの�
 
 ## 環境
 
-| 言語・フレームワーク    | バージョン |
-| ----------------------- | ---------- |
-| Java (Amazon Corretto)  | 25         |
-| Spring Boot             | 4.1.1      |
-| Spring Modulith         | 2.1.0      |
-| TypeScript              | 7.0.x      |
-| VitePlus                | latest     |
-| pnpm                    | 11.21.0    |
-| PostgreSQL              | 18         |
-| Redis                   | 7.x        |
-| Go (betterleaks 実行用) | 1.27.x     |
-| Bun (AI-DLC ランタイム) | 1.3.14     |
+| 言語・フレームワーク       | バージョン |
+| -------------------------- | ---------- |
+| Java (Amazon Corretto)     | 25         |
+| Spring Boot                | 4.1.1      |
+| Spring Modulith            | 2.1.0      |
+| TypeScript                 | 7.0.x      |
+| VitePlus                   | latest     |
+| pnpm                       | 11.21.0    |
+| PostgreSQL                 | 18         |
+| Redis                      | 7.x        |
+| Keycloak                   | 26.7.3     |
+| Grafana OpenTelemetry LGTM | 0.32.1     |
+| Go (betterleaks 実行用)    | 1.27.x     |
+| Bun (AI-DLC ランタイム)    | 1.3.14     |
 
 その他のパッケージのバージョンは `backend/build.gradle` と `frontend/package.json` を参照してください。
 
@@ -69,6 +73,8 @@ Spring Modulith を用いたモジュラーモノリスアーキテクチャの�
 ├── aidlc/            # AI-DLC ワークスペース（自動生成）
 ├── backend/          # Spring Boot アプリケーション
 ├── docker/           # Docker 関連ファイル
+│   ├── initdb/       # PostgreSQL 初期化スクリプト（スキーマ作成）
+│   └── keycloak/     # Keycloak realm 定義（起動時インポート）
 ├── docs/             # ドキュメント
 │   ├── aidlc-setup/      # AI-DLC セットアップ手順
 │   └── local-env-setup/  # 開発環境構築手順・スクリプト
