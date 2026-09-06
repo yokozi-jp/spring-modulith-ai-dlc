@@ -7,7 +7,7 @@ on:
       - "backend/**"
       - "docker/compose-test.yml"
       - "docker/initdb/**"
-      - "test.env"
+      - ".env.test"
       - ".github/workflows/backend-ci.yml"
   pull_request:
     branches: ["**"]
@@ -15,7 +15,7 @@ on:
       - "backend/**"
       - "docker/compose-test.yml"
       - "docker/initdb/**"
-      - "test.env"
+      - ".env.test"
       - ".github/workflows/backend-ci.yml"
 
 permissions:
@@ -30,6 +30,9 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+          # Spotless の ratchetFrom 'origin/main' が差分計算に origin/main を必要とするため、
+          # 全履歴・全ブランチを取得してリモート追跡参照 origin/main を解決可能にする。
+          fetch-depth: 0
 
       - name: Set up JDK
         uses: actions/setup-java@dd06d9cba3e5552c54d9f8ea23572deb30010f7c # v6.0.0
@@ -68,7 +71,7 @@ jobs:
           cache-provider: basic
 
       # ローカルの make test と同じ隔離スタック（PostgreSQL 5433 / Redis 6380）を使う。
-      # docker/compose-test.yml と test.env を共用し、ローカルと CI の乖離を防ぐ。
+      # docker/compose-test.yml と .env.test を共用し、ローカルと CI の乖離を防ぐ。
       - name: Start test dependencies
         run: docker compose -f docker/compose-test.yml up -d --wait
 
@@ -76,8 +79,8 @@ jobs:
         working-directory: backend
         env:
           # application.yaml は全プレースホルダにデフォルトを持たないため、
-          # test.env（非機密ダミー）を Spring 設定として読み込ませる。
-          SPRING_CONFIG_IMPORT: "optional:file:../test.env[.properties]"
+          # .env.test（非機密ダミー）を Spring 設定として読み込ませる。
+          SPRING_CONFIG_IMPORT: "optional:file:../.env.test[.properties]"
         run: ./gradlew test
 
       - name: Stop test dependencies

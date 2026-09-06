@@ -4,7 +4,7 @@ COMPOSE_FILE ?= docker/compose.yml
 COMPOSE = $(DOCKER) compose --env-file $(COMPOSE_ENV_FILE) -f $(COMPOSE_FILE)
 
 # テスト専用の依存スタック（PostgreSQL + Redis）。開発用とポート/プロジェクトを分ける。
-TEST_ENV_FILE ?= test.env
+TEST_ENV_FILE ?= .env.test
 TEST_COMPOSE_FILE ?= docker/compose-test.yml
 TEST_COMPOSE = $(DOCKER) compose -f $(TEST_COMPOSE_FILE)
 
@@ -36,7 +36,7 @@ be-lint:
 	cd backend && ./gradlew spotlessCheck pmdMain spotbugsMain
 
 ## バックエンドのテスト実行（依存が起動済みの前提。フック/CI・test ターゲットの部品）。
-## 開発用ルート .env ではなく test.env を読み、DB/Redis も隔離した 5433/6380 を指す。
+## 開発用ルート .env ではなく .env.test を読み、DB/Redis も隔離した 5433/6380 を指す。
 be-test:
 	cd backend && SPRING_CONFIG_IMPORT="optional:file:../$(TEST_ENV_FILE)[.properties]" ./gradlew test
 
@@ -49,7 +49,7 @@ test-deps-down:
 	$(TEST_COMPOSE) down --volumes --remove-orphans
 
 ## 隔離した依存を起動してテストを実行し、終了後に必ず後片付けする（ワンショット）。
-## test.env で 5433/6380 を使うため、開発用スタック（5432/6379）や make be-run と衝突しない。
+## .env.test で 5433/6380 を使うため、開発用スタック（5432/6379）や make be-run と衝突しない。
 test:
 	@set -eu; \
 	cleanup() { \

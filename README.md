@@ -154,11 +154,11 @@ Docker を使うターゲット（semgrep / trivy / actionlint / zizmor / hadoli
 | `make be-format` | コードフォーマット適用（Spotless）                           |
 | `make be-lint`   | 静的解析（PMD + SpotBugs + Spotless チェック）               |
 | `make test`      | 隔離した依存を起動してテストを実行し、終了後に片付ける       |
-| `make be-test`   | テスト実行のみ（test.env 使用・依存起動済み前提。CI/部品用） |
+| `make be-test`   | テスト実行のみ（.env.test 使用・依存起動済み前提。CI/部品用）|
 | `make be-sbom`   | SBOM 生成（CycloneDX 形式）                                  |
 
 `make test` はテスト専用スタック（`docker/compose-test.yml` の PostgreSQL 5433 / Redis 6380）を
-`test.env` で起動し、終了後にボリュームごと片付けます。
+`.env.test` で起動し、終了後にボリュームごと片付けます。
 開発用スタック（`make compose-up` の 5432 / 6379）とポートを分けているため、`make be-run` で
 バックエンドをホスト起動したまま `make test` を並行実行できます。
 

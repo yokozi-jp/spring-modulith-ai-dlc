@@ -27,7 +27,8 @@ replay_pid*
 node_modules/
 
 # Environment
-.env
+# 実値を持つルート .env のみ無視する（.env.test は非機密ダミーのため追跡する）。
+/.env
 
 # AI-DLC workspace — per-user cursors and machine-local runtime
 aidlc/active-space

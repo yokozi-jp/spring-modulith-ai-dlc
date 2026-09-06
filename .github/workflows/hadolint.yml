@@ -7,7 +7,7 @@ on:
       - "backend/**"
       - "docker/compose-test.yml"
       - "docker/initdb/**"
-      - "test.env"
+      - ".env.test"
       - ".hadolint.yaml"
       - ".github/workflows/hadolint.yml"
   pull_request:
@@ -16,7 +16,7 @@ on:
       - "backend/**"
       - "docker/compose-test.yml"
       - "docker/initdb/**"
-      - "test.env"
+      - ".env.test"
       - ".hadolint.yaml"
       - ".github/workflows/hadolint.yml"
 
@@ -88,7 +88,7 @@ jobs:
         run: docker build --tag spring-modulith-backend:ci backend
 
       # テスト用の依存スタック（PostgreSQL 5433 / Redis 6380）を起動する。
-      # backend-ci.yml のテストや make test と同じ docker/compose-test.yml・test.env を共用し、
+      # backend-ci.yml のテストや make test と同じ docker/compose-test.yml・.env.test を共用し、
       # スキーマ作成は compose-test の initdb が担うため、ここでの手動作成は不要。
       - name: Start test dependencies
         run: docker compose -f docker/compose-test.yml up -d --wait
@@ -96,7 +96,7 @@ jobs:
       - name: Start backend container
         run: |
           docker run --detach --name backend-smoke --network host \
-            --env-file test.env \
+            --env-file .env.test \
             spring-modulith-backend:ci
 
       - name: Wait for healthy backend

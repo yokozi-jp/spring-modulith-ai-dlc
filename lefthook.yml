@@ -137,7 +137,7 @@ pre-push:
 
     # backend に変更がある push のときだけテスト実行（カバレッジ検証含む）
     # 開発用 .env / 開発 DB には触れず、隔離したテスト用スタック（compose-test の
-    # PostgreSQL 5433 / Redis 6380）と test.env を使う make test で実行する。
+    # PostgreSQL 5433 / Redis 6380）と .env.test を使う make test で実行する。
     # docker が無い環境ではスキップ（最終担保は CI に任せる）。
     - name: be-test
       glob: "backend/**/*.{java,gradle}"

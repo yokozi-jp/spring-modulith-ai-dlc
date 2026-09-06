@@ -5,7 +5,7 @@
 #   - 名前付きボリュームを持たず使い捨て（down -v で毎回クリーン）。テストは常にまっさらな DB で走らせる。
 #   - テストに不要な Keycloak / OTEL LGTM は含めない。
 #   - 開発用 compose と違い必須変数（${...:?}）や secret には依存せず、値を直書きして自己完結させる
-#     （機密ではない demo/demo の使い捨て。接続情報は test.env が Gradle 側へ渡す）。
+#     （機密ではない demo/demo の使い捨て。接続情報は .env.test が Gradle 側へ渡す）。
 name: spring-modulith-test
 
 services:
