@@ -118,7 +118,7 @@ dependencyManagement {
         dependency 'org.apache.tomcat.embed:tomcat-embed-el:11.0.25'
         dependency 'org.apache.tomcat.embed:tomcat-embed-websocket:11.0.25'
         // CVE-2026-0636（LDAP インジェクション）対応。
-        dependency 'org.bouncycastle:bcprov-jdk18on:1.84'
+        dependency 'org.bouncycastle:bcprov-jdk18on:1.85.2'
     }
 }
 
