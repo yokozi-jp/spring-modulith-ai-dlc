@@ -1,0 +1,8 @@
+# Snyk (https://snyk.io) policy file
+# AI-DLC のフレームワークコード（.kiro / aidlc）はプロダクションコードではないため
+# Snyk Code / Snyk Secrets のスキャン対象から除外する。
+# Semgrep（Makefile の lint-semgrep）の --exclude .kiro --exclude aidlc と方針を揃える。
+exclude:
+  global:
+    - .kiro/**
+    - aidlc/**
