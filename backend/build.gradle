@@ -100,6 +100,8 @@ dependencies {
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 
     // --- 静的解析 (Error Prone + NullAway) ---
+    // JSpecify: @NullMarked 等の null 安全性アノテーション（NullAway の JSpecifyMode で参照）
+    implementation 'org.jspecify:jspecify:1.0.0'
     errorprone 'com.google.errorprone:error_prone_core:2.50.0'
     errorprone 'com.uber.nullaway:nullaway:0.14.1'
 }
@@ -223,18 +225,30 @@ spotbugs {
  * Error Prone: コンパイル時バグ検出
  * NullAway による null 安全性チェック（テストコードでは無効）と
  * 未使用変数・タイムゾーン未指定の検出をエラーに昇格させる。
+ *
+ * null 安全性は JSpecify 標準に準拠する。
+ * - NullAway:OnlyNullMarked=true で、@NullMarked が付いたコードだけを検査対象にする
+ *   （AnnotatedPackages とは排他。パッケージ前方一致ではなく @NullMarked 起点に統一し、
+ *   IDE・他ツールとの解釈を一致させる）。
+ * - @NullMarked は各パッケージの package-info.java に付与する。
+ * - RequireExplicitNullMarking:ERROR で @NullMarked/@NullUnmarked の付け忘れ
+ *   （= 黙って @NullUnmarked 扱いになり無検査化する事故）をビルドで検出する。
  */
 tasks.withType(JavaCompile).configureEach {
     options.errorprone {
         error('NullAway')
+        error('RequireExplicitNullMarking')
         error('UnusedVariable')
         error('JavaTimeDefaultTimeZone')
-        option('NullAway:AnnotatedPackages', 'com.example.demo')
+        option('NullAway:OnlyNullMarked', 'true')
         option('NullAway:JSpecifyMode', 'true')
     }
     if (name.toLowerCase().contains("test")) {
         options.errorprone {
+            // テストコードには null 契約を強制しない。
+            // RequireExplicitNullMarking は NullAway とは別チェッカーのため個別に無効化する。
             disable('NullAway')
+            disable('RequireExplicitNullMarking')
         }
     }
 }
