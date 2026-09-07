@@ -86,6 +86,7 @@ Spring Modulith を用いたモジュラーモノリスアーキテクチャの�
 ├── .gitignore        # Git 追跡除外設定
 ├── .hadolint.yaml    # hadolint（Dockerfile リンタ）設定
 ├── .markdownlint-cli2.yaml # markdownlint-cli2（Markdown リンタ）設定
+├── .snyk             # Snyk のスキャン除外ポリシー（プロダクションコード以外を除外）
 ├── AGENTS.md         # AI-DLC / エージェント向けプロジェクト説明
 ├── commitlint.config.mjs # commitlint 設定（Conventional Commits 検証）
 ├── lefthook.yml      # Git フック定義（Lefthook）
@@ -208,6 +209,11 @@ Semgrep OSS（コミュニティエディション）で静的解析を行いま
 | ターゲット           | 内容                                                     |
 | -------------------- | -------------------------------------------------------- |
 | `make lint-semgrep`  | 静的解析（Semgrep OSS / Docker 実行、検出があれば失敗）  |
+
+### 静的解析・脆弱性スキャン（Snyk・任意）
+
+Snyk は任意導入です。利用にはアカウント作成が必要で、本プロジェクトは free プランで運用しています。
+`.snyk` にスキャン除外ポリシーを定義し、`.kiro` / `aidlc` / `.agents`（いずれも AI-DLC のフレームワークコードでプロダクションコードではない）を対象から除外しています。
 
 ### 脆弱性スキャン（Trivy）
 
