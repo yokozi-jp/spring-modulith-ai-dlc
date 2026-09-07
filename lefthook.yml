@@ -133,7 +133,7 @@ pre-push:
       glob: "backend/**/*.{java,gradle}"
       run: |
         echo "{push_files}" >/dev/null
-        cd backend && ./gradlew spotlessCheck pmdMain spotbugsMain
+        cd backend && ./gradlew spotlessCheck pmdMain pmdTest spotbugsMain spotbugsTest
 
     # backend に変更がある push のときだけテスト実行（カバレッジ検証含む）
     # 開発用 .env / 開発 DB には触れず、隔離したテスト用スタック（compose-test の

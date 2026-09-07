@@ -30,9 +30,9 @@ be-run:
 be-format:
 	cd backend && ./gradlew spotlessApply
 
-## バックエンドの静的解析（PMD + SpotBugs + Spotless チェック）
+## バックエンドの静的解析（PMD + SpotBugs + Spotless チェック。main/test 両方）
 be-lint:
-	cd backend && ./gradlew spotlessCheck pmdMain spotbugsMain
+	cd backend && ./gradlew spotlessCheck pmdMain pmdTest spotbugsMain spotbugsTest
 
 ## バックエンドのテスト実行（依存が起動済みの前提。フック/CI・test ターゲットの部品）。
 ## 開発用ルート .env ではなく .env.test を読み、DB/Redis も隔離した 5433/6380 を指す。

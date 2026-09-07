@@ -11,6 +11,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.context.TestConfiguration;
+import org.springframework.context.ApplicationContext;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -21,67 +22,87 @@ import org.springframework.security.oauth2.client.registration.InMemoryClientReg
 import org.springframework.security.oauth2.client.web.OAuth2AuthorizationRequestResolver;
 import org.springframework.security.oauth2.core.AuthorizationGrantType;
 import org.springframework.security.oauth2.core.ClientAuthenticationMethod;
+import org.springframework.security.oauth2.core.endpoint.OAuth2AuthorizationRequest;
 import org.springframework.security.oauth2.core.endpoint.PkceParameterNames;
 
+/** アプリケーション起動時の日時・DB・OIDC(PKCE) 設定が規約どおりであることを検証する統合テスト。 */
 @SpringBootTest
 @Import(DemoApplicationTests.OidcTestConfiguration.class)
 class DemoApplicationTests {
 
+  /** UTC 固定を検証する対象のアプリケーション {@code Clock}。 */
   @Autowired private Clock clock;
 
+  /** DB セッションのタイムゾーンと {@code timestamptz} 往復を検証するための {@code JdbcTemplate}。 */
   @Autowired private JdbcTemplate jdbcTemplate;
 
+  /** PKCE パラメータを検証する対象の認可リクエストリゾルバ。 */
   @Autowired private OAuth2AuthorizationRequestResolver authorizationRequestResolver;
 
+  /** 起動確認の対象となる {@code ApplicationContext}。 */
+  @Autowired private ApplicationContext applicationContext;
+
   @Test
-  void contextLoads() {}
+  void contextLoads() {
+    assertNotNull(applicationContext, "ApplicationContext が起動できること");
+  }
 
   @Test
   void applicationClockUsesUtc() {
-    assertEquals(ZoneOffset.UTC, clock.getZone());
+    assertEquals(ZoneOffset.UTC, clock.getZone(), "アプリケーション Clock は UTC 固定であること");
   }
 
   @Test
   void databaseSessionUsesUtc() {
-    assertEquals("UTC", jdbcTemplate.queryForObject("SHOW TIME ZONE", String.class));
+    assertEquals(
+        "UTC",
+        jdbcTemplate.queryForObject("SHOW TIME ZONE", String.class),
+        "DB セッションのタイムゾーンは UTC であること");
   }
 
   @Test
   void instantRoundTripsThroughTimestampWithTimeZone() {
-    final var expected = Instant.parse("2026-09-07T06:18:42.567123Z");
+    final Instant expected = Instant.parse("2026-09-07T06:18:42.567123Z");
     final OffsetDateTime actual =
         jdbcTemplate.queryForObject(
             "SELECT CAST(? AS TIMESTAMP WITH TIME ZONE)",
             OffsetDateTime.class,
             expected.atOffset(ZoneOffset.UTC));
 
-    assertNotNull(actual);
-    assertEquals(expected, actual.toInstant());
+    assertNotNull(actual, "timestamptz へキャストした結果が取得できること");
+    assertEquals(expected, actual.toInstant(), "timestamptz 往復で Instant が保存されること");
   }
 
   @Test
   void authorizationRequestUsesPkceS256() {
-    final var request = new MockHttpServletRequest("GET", "/oauth2/authorization/web");
+    final MockHttpServletRequest request =
+        new MockHttpServletRequest("GET", "/oauth2/authorization/web");
     request.setServletPath("/oauth2/authorization/web");
 
-    final var authorizationRequest = authorizationRequestResolver.resolve(request);
+    final OAuth2AuthorizationRequest authorizationRequest =
+        authorizationRequestResolver.resolve(request);
 
-    assertNotNull(authorizationRequest);
+    assertNotNull(authorizationRequest, "認可リクエストが解決されること");
     assertNotNull(
-        authorizationRequest.getAdditionalParameters().get(PkceParameterNames.CODE_CHALLENGE));
+        authorizationRequest.getAdditionalParameters().get(PkceParameterNames.CODE_CHALLENGE),
+        "PKCE の code_challenge が付与されること");
     assertEquals(
         "S256",
         authorizationRequest
             .getAdditionalParameters()
-            .get(PkceParameterNames.CODE_CHALLENGE_METHOD));
-    assertNotNull(authorizationRequest.getAttributes().get(PkceParameterNames.CODE_VERIFIER));
+            .get(PkceParameterNames.CODE_CHALLENGE_METHOD),
+        "PKCE の code_challenge_method が S256 であること");
+    assertNotNull(
+        authorizationRequest.getAttributes().get(PkceParameterNames.CODE_VERIFIER),
+        "PKCE の code_verifier が保持されること");
   }
 
+  /** OIDC クライアント登録をテスト用のダミー発行者で差し替える構成。 */
   @TestConfiguration(proxyBeanMethods = false)
-  static class OidcTestConfiguration {
+  /* package */ static class OidcTestConfiguration {
 
     @Bean
-    ClientRegistrationRepository clientRegistrationRepository() {
+    /* package */ ClientRegistrationRepository clientRegistrationRepository() {
       final ClientRegistration registration =
           ClientRegistration.withRegistrationId("web")
               .clientId("test-web-client")

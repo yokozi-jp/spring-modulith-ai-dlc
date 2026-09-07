@@ -22,6 +22,8 @@
         <exclude name="ShortClassName"/>
         <!-- ガード節（早期 return/throw）を自然に書くため無効化 -->
         <exclude name="OnlyOneReturn"/>
+        <!-- ArchUnit の @ArchTest フィールドはルール説明として命名するため、定数命名規則（UPPER_SNAKE）と衝突する。無効化 -->
+        <exclude name="FieldNamingConventions"/>
     </rule>
     <rule ref="category/java/design.xml">
         <!-- メソッドチェーン・Optional チェーン等、流暢 API では不可避なため無効化 -->

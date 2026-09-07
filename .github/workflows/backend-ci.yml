@@ -48,7 +48,7 @@ jobs:
 
       - name: Run Spotless, PMD, SpotBugs
         working-directory: backend
-        run: ./gradlew spotlessCheck pmdMain spotbugsMain
+        run: ./gradlew spotlessCheck pmdMain pmdTest spotbugsMain spotbugsTest
 
   test:
     name: Test & Coverage ☕
