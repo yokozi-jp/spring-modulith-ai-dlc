@@ -137,31 +137,38 @@ management:
   endpoints:
     web:
       exposure:
-        # 最小公開: health と info のみ web に露出する
-        include: health,info
+        # OTLP は push 方式なので、Web には health だけを露出する。
+        include: health
   endpoint:
     health:
-      # 詳細は認可されたリクエストにのみ返す（未認可には UP/DOWN のみ）
-      show-details: when-authorized
+      # 認証状態にかかわらず、DB や Redis などのコンポーネント詳細を公開しない。
+      show-details: never
+      # ECS と通常の Docker でも liveness/readiness の health group を有効にする。
+      probes:
+        enabled: true
   # OpenTelemetry の出力先（spring-boot-starter-opentelemetry）。
   # メトリクスは Micrometer の OTLP レジストリ（management.otlp.metrics）、
   # トレース・ログは OpenTelemetry SDK（management.opentelemetry.*）が別プロパティ体系で担う。
-  # いずれも OTEL_HOST/OTEL_HTTP_PORT から OTLP/HTTP の URL を組み立てる。
+  # 3 シグナルとも標準環境変数 OTEL_EXPORTER_OTLP_ENDPOINT の OTLP/HTTP URL を基点にする。
   otlp:
     metrics:
       export:
-        url: http://${OTEL_HOST}:${OTEL_HTTP_PORT}/v1/metrics
+        url: ${OTEL_EXPORTER_OTLP_ENDPOINT}/v1/metrics
   opentelemetry:
+    resource-attributes:
+      service.name: ${OTEL_SERVICE_NAME}
+      deployment.environment.name: ${OTEL_DEPLOYMENT_ENVIRONMENT_NAME}
     tracing:
       export:
         otlp:
-          endpoint: http://${OTEL_HOST}:${OTEL_HTTP_PORT}/v1/traces
+          endpoint: ${OTEL_EXPORTER_OTLP_ENDPOINT}/v1/traces
     logging:
       export:
         otlp:
-          endpoint: http://${OTEL_HOST}:${OTEL_HTTP_PORT}/v1/logs
+          endpoint: ${OTEL_EXPORTER_OTLP_ENDPOINT}/v1/logs
   tracing:
     sampling:
+      # ローカルは 1.0、本番はトラフィック量と保存コストに応じて引き下げる。
       probability: ${MANAGEMENT_TRACING_SAMPLING_PROBABILITY}
 
 # API ドキュメント（springdoc-openapi / Swagger UI）

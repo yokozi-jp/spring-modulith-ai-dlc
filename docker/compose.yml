@@ -110,7 +110,7 @@ services:
         exec java -jar app.jar
     environment:
       SERVER_PORT: "8080"
-      # .env の DB_HOST/DB_PORT・OTEL_HOST はホスト起動用なので、
+      # .env の DB_HOST/DB_PORT・OTLP endpoint はホスト起動用なので、
       # container 間通信では service 名と内部ポートへ置き換える。
       DB_HOST: postgres
       DB_PORT: "5432"
@@ -126,10 +126,10 @@ services:
       # コンテナから issuer metadata を取得するため Compose の service 名を使う。
       OIDC_ISSUER_URI: http://keycloak:8080/realms/spring-modulith
       SPRINGDOC_ENABLED: ${SPRINGDOC_ENABLED:?SPRINGDOC_ENABLED is required}
-      OTEL_HOST: otel-lgtm
-      OTEL_HTTP_PORT: "4318"
-      MANAGEMENT_TRACING_SAMPLING_PROBABILITY: ${MANAGEMENT_TRACING_SAMPLING_PROBABILITY:?MANAGEMENT_TRACING_SAMPLING_PROBABILITY is required}
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-lgtm:4318
       OTEL_SERVICE_NAME: ${OTEL_SERVICE_NAME:?OTEL_SERVICE_NAME is required}
+      OTEL_DEPLOYMENT_ENVIRONMENT_NAME: ${OTEL_DEPLOYMENT_ENVIRONMENT_NAME:?OTEL_DEPLOYMENT_ENVIRONMENT_NAME is required}
+      MANAGEMENT_TRACING_SAMPLING_PROBABILITY: ${MANAGEMENT_TRACING_SAMPLING_PROBABILITY:?MANAGEMENT_TRACING_SAMPLING_PROBABILITY is required}
     ports:
       - "127.0.0.1:${SERVER_PORT:?SERVER_PORT is required}:8080"
     secrets:
