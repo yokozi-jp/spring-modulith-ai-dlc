@@ -156,8 +156,8 @@ management:
         url: ${OTEL_EXPORTER_OTLP_ENDPOINT}/v1/metrics
   opentelemetry:
     resource-attributes:
-      service.name: ${OTEL_SERVICE_NAME}
-      deployment.environment.name: ${OTEL_DEPLOYMENT_ENVIRONMENT_NAME}
+      "[service.name]": ${OTEL_SERVICE_NAME}
+      "[deployment.environment.name]": ${OTEL_DEPLOYMENT_ENVIRONMENT_NAME}
     tracing:
       export:
         otlp:
