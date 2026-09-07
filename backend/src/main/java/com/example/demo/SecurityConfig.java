@@ -46,6 +46,7 @@ public class SecurityConfig {
       throws Exception {
     final OidcClientInitiatedLogoutSuccessHandler logoutSuccessHandler =
         new OidcClientInitiatedLogoutSuccessHandler(clientRegistrationRepository);
+    // TODO: ログアウト後画面の URL が確定したら、IdP の許可済み URI とともに変更する。
     logoutSuccessHandler.setPostLogoutRedirectUri("{baseUrl}/actuator/health");
 
     http.authorizeHttpRequests(
