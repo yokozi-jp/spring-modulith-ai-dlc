@@ -7,6 +7,7 @@ on:
       - "backend/**"
       - "docker/compose-test.yml"
       - "docker/initdb/**"
+      - "docker/keycloak/**"
       - ".env.test"
       - ".hadolint.yaml"
       - ".github/workflows/hadolint.yml"
@@ -16,6 +17,7 @@ on:
       - "backend/**"
       - "docker/compose-test.yml"
       - "docker/initdb/**"
+      - "docker/keycloak/**"
       - ".env.test"
       - ".hadolint.yaml"
       - ".github/workflows/hadolint.yml"
@@ -87,11 +89,11 @@ jobs:
       - name: Build backend image
         run: docker build --tag spring-modulith-backend:ci backend
 
-      # テスト用の依存スタック（PostgreSQL 5433 / Redis 6380）を起動する。
-      # backend-ci.yml のテストや make test と同じ docker/compose-test.yml・.env.test を共用し、
+      # 通常テスト用の PostgreSQL / Redis に加え、backend-smoke profile の Keycloak を起動する。
+      # backend-ci.yml と make test は profile を有効にしないため、Keycloak の起動コストを負わない。
       # スキーマ作成は compose-test の initdb が担うため、ここでの手動作成は不要。
-      - name: Start test dependencies
-        run: docker compose -f docker/compose-test.yml up -d --wait
+      - name: Start backend smoke dependencies
+        run: docker compose -f docker/compose-test.yml --profile backend-smoke up -d --wait
 
       - name: Start backend container
         run: |
@@ -118,7 +120,7 @@ jobs:
           exit 1
 
       - name: Verify readiness response
-        run: curl --fail --silent --show-error http://127.0.0.1:8080/actuator/health/readiness
+        run: docker exec backend-smoke curl --fail --silent --show-error http://127.0.0.1:8080/actuator/health/readiness
 
       - name: Show backend logs on failure
         if: failure()
@@ -128,6 +130,6 @@ jobs:
         if: always()
         run: docker rm --force backend-smoke || true
 
-      - name: Stop test dependencies
+      - name: Stop backend smoke dependencies
         if: always()
-        run: docker compose -f docker/compose-test.yml down --volumes --remove-orphans
+        run: docker compose -f docker/compose-test.yml --profile backend-smoke down --volumes --remove-orphans
