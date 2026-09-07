@@ -37,6 +37,11 @@ tasks.named('bootJar') {
     archiveFileName = 'app.jar'
 }
 
+tasks.named('bootRun') {
+    // ホスト起動でもコンテナと同じJVMデフォルトタイムゾーンを使う。
+    jvmArgs('-Duser.timezone=UTC')
+}
+
 repositories {
     mavenCentral()
 }
@@ -130,6 +135,7 @@ dependencyManagement {
  */
 tasks.named('test') {
     useJUnitPlatform()
+    systemProperty 'user.timezone', 'UTC'
     finalizedBy jacocoTestCoverageVerification
 }
 
@@ -240,6 +246,7 @@ tasks.withType(JavaCompile).configureEach {
         error('RequireExplicitNullMarking')
         error('UnusedVariable')
         error('JavaTimeDefaultTimeZone')
+        error('JavaUtilDate')
         option('NullAway:OnlyNullMarked', 'true')
         option('NullAway:JSpecifyMode', 'true')
     }

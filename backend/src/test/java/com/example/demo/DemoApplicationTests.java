@@ -3,12 +3,17 @@ package com.example.demo;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 
+import java.time.Clock;
+import java.time.Instant;
+import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.security.oauth2.client.registration.ClientRegistration;
 import org.springframework.security.oauth2.client.registration.ClientRegistrationRepository;
@@ -22,10 +27,37 @@ import org.springframework.security.oauth2.core.endpoint.PkceParameterNames;
 @Import(DemoApplicationTests.OidcTestConfiguration.class)
 class DemoApplicationTests {
 
+  @Autowired private Clock clock;
+
+  @Autowired private JdbcTemplate jdbcTemplate;
+
   @Autowired private OAuth2AuthorizationRequestResolver authorizationRequestResolver;
 
   @Test
   void contextLoads() {}
+
+  @Test
+  void applicationClockUsesUtc() {
+    assertEquals(ZoneOffset.UTC, clock.getZone());
+  }
+
+  @Test
+  void databaseSessionUsesUtc() {
+    assertEquals("UTC", jdbcTemplate.queryForObject("SHOW TIME ZONE", String.class));
+  }
+
+  @Test
+  void instantRoundTripsThroughTimestampWithTimeZone() {
+    final var expected = Instant.parse("2026-09-07T06:18:42.567123Z");
+    final OffsetDateTime actual =
+        jdbcTemplate.queryForObject(
+            "SELECT CAST(? AS TIMESTAMP WITH TIME ZONE)",
+            OffsetDateTime.class,
+            expected.atOffset(ZoneOffset.UTC));
+
+    assertNotNull(actual);
+    assertEquals(expected, actual.toInstant());
+  }
 
   @Test
   void authorizationRequestUsesPkceS256() {

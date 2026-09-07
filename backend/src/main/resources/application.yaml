@@ -26,6 +26,8 @@ spring:
     password: ${DB_PASSWORD}
     hikari:
       schema: ${DB_SCHEMA}
+      # 新しい物理接続ごとにDBセッションの日時解釈と表示をUTCへ固定する。
+      connection-init-sql: SET TIME ZONE 'UTC'
 
   # Liquibase: DB マイグレーション
   liquibase:

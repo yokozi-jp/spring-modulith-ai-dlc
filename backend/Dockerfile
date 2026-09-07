@@ -73,7 +73,7 @@ EXPOSE 8080
 # コンテナ環境向けの JVM オプション（コンテナのメモリ制限を尊重）。
 # JAVA_TOOL_OPTIONS は JVM が起動時に自動で読むため、shell 経由の変数展開が不要になり
 # ENTRYPOINT を純粋な exec 形式に保てる。運用時は ECS 側で上書きできる。
-ENV JAVA_TOOL_OPTIONS="-XX:MaxRAMPercentage=75.0"
+ENV JAVA_TOOL_OPTIONS="-XX:MaxRAMPercentage=75.0 -Duser.timezone=UTC"
 
 # Actuator の readiness を検査し、プロセス生存だけでなく応答可能性を確認する。
 HEALTHCHECK --interval=10s --timeout=5s --start-period=30s --retries=10 \

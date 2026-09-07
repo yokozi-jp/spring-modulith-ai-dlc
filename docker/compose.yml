@@ -3,6 +3,7 @@ name: spring-modulith-local
 services:
   postgres:
     image: postgres:18.6-alpine3.23@sha256:697c180dbf244d3ce4a8f4cbc0156cde840af055c1bf8b76aebe422a4822086f
+    command: ["postgres", "-c", "timezone=UTC", "-c", "log_timezone=UTC"]
     environment:
       POSTGRES_DB: ${DB_NAME:?DB_NAME is required}
       POSTGRES_USER: ${DB_USERNAME:?DB_USERNAME is required}
@@ -30,6 +31,7 @@ services:
     # （機密ではなく、上書きの必要もない）。
     command: ["start-dev", "--import-realm"]
     environment:
+      TZ: UTC
       KC_BOOTSTRAP_ADMIN_USERNAME: admin
       KC_BOOTSTRAP_ADMIN_PASSWORD: admin
       KC_HEALTH_ENABLED: "true"
@@ -58,6 +60,8 @@ services:
   redis:
     image: redis:8.10.1-alpine3.23@sha256:becdda6c7f4b3fb42e42fd7f120bbf5c54c4caaaf16f26da24e4563d2c1f0576
     command: ["redis-server", "--appendonly", "yes"]
+    environment:
+      TZ: UTC
     ports:
       - "127.0.0.1:${REDIS_PORT:?REDIS_PORT is required}:6379"
     volumes:
@@ -79,6 +83,7 @@ services:
         export GF_SECURITY_ADMIN_PASSWORD="$$(cat /run/secrets/grafana_admin_password)"
         exec /otel-lgtm/run-all.sh
     environment:
+      TZ: UTC
       GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:?GRAFANA_ADMIN_USER is required}
     ports:
       - "127.0.0.1:${GRAFANA_HOST_PORT:?GRAFANA_HOST_PORT is required}:3000"
