@@ -94,3 +94,13 @@ jobs:
           name: jacoco-report
           path: backend/build/reports/jacoco/
           retention-days: 14
+
+      # ArchitectureMetricsReportTest が生成する package by feature 単位の
+      # アーキテクチャ指標レポート。合否判定ではなく推移の可視化に使う。
+      - name: Upload architecture metrics report
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: architecture-metrics
+          path: backend/build/reports/architecture-metrics/
+          retention-days: 14
