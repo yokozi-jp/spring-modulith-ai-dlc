@@ -9,8 +9,6 @@ import com.tngtech.archunit.core.domain.JavaClass;
 import com.tngtech.archunit.core.domain.JavaClasses;
 import com.tngtech.archunit.core.domain.JavaMethodCall;
 import com.tngtech.archunit.core.importer.ClassFileImporter;
-import com.tngtech.archunit.core.importer.ImportOption;
-import com.tngtech.archunit.core.importer.Location;
 import com.tngtech.archunit.junit.AnalyzeClasses;
 import com.tngtech.archunit.junit.ArchTest;
 import com.tngtech.archunit.lang.ArchCondition;
@@ -37,9 +35,7 @@ import org.junit.jupiter.api.Test;
  * ProductionCodeOnly} で対象外にする。テストは規約に従い {@code Clock.fixed(...)} と {@code Instant.parse(...)}
  * を使う前提で、{@code now()} の既定タイムゾーン依存は Error Prone が全 JavaCompile で検出する。
  */
-@AnalyzeClasses(
-    packages = "com.example.demo",
-    importOptions = DateTimeConventionsArchTest.ProductionCodeOnly.class)
+@AnalyzeClasses(packagesOf = DemoApplication.class, importOptions = ProductionCodeOnly.class)
 class DateTimeConventionsArchTest {
 
   /** 唯一システム {@code Clock} の生成を許す {@code @Bean} メソッドの完全修飾名。 */
@@ -188,25 +184,6 @@ class DateTimeConventionsArchTest {
         && Clock.class.getName().equals(call.getTargetOwner().getFullName())
         && "systemUTC".equals(call.getTarget().getName())
         && call.getTarget().getRawParameterTypes().isEmpty();
-  }
-
-  /**
-   * プロダクションコードだけを解析対象にする {@link ImportOption}。テストと生成コード（jOOQ など）は規約の対象外にする。
-   *
-   * <p>{@code @AnalyzeClasses} は {@link ImportOption} の型を受け取り、引数なしコンストラクタで生成する。将来生成物が入っても誤検知しないよう
-   * 場所（ロケーション）で除外する。
-   */
-  /* package */ static final class ProductionCodeOnly implements ImportOption {
-
-    /** テストのロケーションを除外する ArchUnit 標準の {@link ImportOption}。 */
-    private static final ImportOption DO_NOT_INCLUDE_TESTS = new ImportOption.DoNotIncludeTests();
-
-    @Override
-    public boolean includes(final Location location) {
-      return DO_NOT_INCLUDE_TESTS.includes(location)
-          && !location.contains("/jooq/")
-          && !location.contains("/generated/");
-    }
   }
 
   /** ArchUnit の拒否経路を検証するため、禁止対象の呼び出しを意図的に含めたフィクスチャ。 */
