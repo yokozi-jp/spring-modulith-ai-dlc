@@ -12,10 +12,10 @@ description: バックエンド（Spring Boot 4 / Spring Modulith / jOOQ / Postg
 
 基準となる実装は次を参照する。
 
-- ロールバック隔離のスライス：#[[file:backend/src/test/java/com/example/demo/support/DatabaseTest.java]]
-- コミット＋自動後始末：#[[file:backend/src/test/java/com/example/demo/support/CommittedDatabaseTest.java]]
-- 後始末拡張：#[[file:backend/src/test/java/com/example/demo/support/TruncateGeneratedTablesExtension.java]]
-- 共有テスト構成：#[[file:backend/src/test/java/com/example/demo/support/SharedTestConfiguration.java]]
+- ロールバック隔離のスライス：#[[file:backend/src/test/java/com/example/demo/testkit/DatabaseTest.java]]
+- コミット＋自動後始末：#[[file:backend/src/test/java/com/example/demo/testkit/CommittedDatabaseTest.java]]
+- 後始末拡張：#[[file:backend/src/test/java/com/example/demo/testkit/TruncateGeneratedTablesExtension.java]]
+- 共有テスト構成：#[[file:backend/src/test/java/com/example/demo/testkit/SharedTestConfiguration.java]]
 - ArchUnit の解析対象限定：#[[file:backend/src/test/java/com/example/demo/architecture/ProductionCodeOnly.java]]
 - 静的解析ルール：#[[file:backend/config/pmd/ruleset.xml]]
 - テスト用環境変数：#[[file:.env.test]]
@@ -116,7 +116,7 @@ class SomethingTest {
 Spring はテスト構成（アノテーションと `@Import` の組）ごとにコンテキストをキャッシュして再利用する。
 本数が増えてもコンテキストの再ロードを増やさないため、次を守る。
 
-- フルの `@SpringBootTest` は、共有の `@TestConfiguration`（#[[file:backend/src/test/java/com/example/demo/support/SharedTestConfiguration.java]]）を `@Import` して構成を揃える。テストごとに個別の `@Import` や `@MockBean` を足して構成をばらけさせない。
+- フルの `@SpringBootTest` は、共有の `@TestConfiguration`（#[[file:backend/src/test/java/com/example/demo/testkit/SharedTestConfiguration.java]]）を `@Import` して構成を揃える。テストごとに個別の `@Import` や `@MockBean` を足して構成をばらけさせない。
 - OIDC クライアント登録など、複数のテストで共通して要る差し替えは共有構成に集約する。
 
 ## コード規約

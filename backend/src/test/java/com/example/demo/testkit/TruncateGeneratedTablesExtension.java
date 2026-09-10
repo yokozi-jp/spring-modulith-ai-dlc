@@ -1,4 +1,4 @@
-package com.example.demo.support;
+package com.example.demo.testkit;
 
 import com.example.demo.jooq.DefaultSchema;
 import org.jooq.DSLContext;

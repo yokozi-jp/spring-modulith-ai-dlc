@@ -3,7 +3,7 @@ package com.example.demo;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 
-import com.example.demo.support.SharedTestConfiguration;
+import com.example.demo.testkit.SharedTestConfiguration;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.OffsetDateTime;

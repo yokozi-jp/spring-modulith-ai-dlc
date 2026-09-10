@@ -1,4 +1,4 @@
-package com.example.demo.support;
+package com.example.demo.testkit;
 
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Bean;

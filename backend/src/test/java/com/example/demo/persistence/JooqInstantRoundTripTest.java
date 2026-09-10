@@ -3,7 +3,7 @@ package com.example.demo.persistence;
 import static com.example.demo.jooq.tables.EventPublication.EVENT_PUBLICATION;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
-import com.example.demo.support.CommittedDatabaseTest;
+import com.example.demo.testkit.CommittedDatabaseTest;
 import java.time.Instant;
 import java.util.UUID;
 import org.jooq.DSLContext;
