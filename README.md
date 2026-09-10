@@ -192,9 +192,9 @@ Docker を使うターゲット（semgrep / trivy / actionlint / zizmor / hadoli
 | --------------------------- | -------------------------------------------------------------- |
 | `make be-format`            | コードフォーマット適用（Spotless）                             |
 | `make be-lint`              | 静的解析（PMD + SpotBugs + Spotless チェック）                 |
-| `make be-migrate`           | 現在の宣言的スキーマタグまでマイグレーション                   |
+| `make be-migrate`           | 現在のスキーマタグまでマイグレーション                         |
 | `make be-release-migrate`   | 本番向けマイグレーション（実行時のタグ入力は不要）             |
-| `make be-schema-tag-check`  | 現在の宣言的スキーマタグがDBに存在することを確認               |
+| `make be-schema-tag-check`  | 現在のスキーマタグがDBに存在することを確認                     |
 | `make be-verify-migrations` | 使い捨てDBで適用、rollback、再適用、タグを検証                 |
 | `make be-rollback-check`    | 切り戻し対象タグの存在を確認                                   |
 | `make be-rollback-preview`  | 指定タグまでの切り戻しSQLを生成（DB変更なし）                  |

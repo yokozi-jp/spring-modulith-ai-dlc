@@ -8,7 +8,17 @@ TEST_ENV_FILE ?= .env.test
 TEST_COMPOSE_FILE ?= docker/compose-test.yml
 TEST_COMPOSE = $(DOCKER) compose -f $(TEST_COMPOSE_FILE)
 
-.PHONY: setup be-run be-migrate be-release-migrate be-schema-tag-check be-verify-migrations be-rollback-check be-rollback-preview be-rollback be-generate-jooq be-refresh-jooq be-format be-lint be-test test test-deps-up test-deps-down be-coverage be-sbom compose-up compose-up-backend compose-down compose-ps compose-logs keycloak-logs keycloak-reimport oidc-check compose-reset scan-secrets scan-secrets-all lint-actions lint-actions-security lint-docker lint-docker-check lint-compose lint-md lint-md-fix lint-semgrep scan-vulns scan-vulns-backend scan-vulns-frontend
+.PHONY: help setup be-run be-migrate be-migrate-dev be-release-migrate be-schema-tag-check be-verify-migrations be-rollback-check be-rollback-preview be-rollback be-generate-jooq be-refresh-jooq be-format be-lint be-test be-test-dev test test-dev test-deps-up test-deps-down be-coverage be-sbom compose-up compose-up-backend compose-down compose-ps compose-logs keycloak-logs keycloak-reimport oidc-check compose-reset scan-secrets scan-secrets-all lint-actions lint-actions-security lint-docker lint-docker-check lint-compose lint-md lint-md-fix lint-semgrep scan-vulns scan-vulns-backend scan-vulns-frontend
+
+# 引数なしの make はヘルプを表示する（setup を誤って実行しないため）。
+.DEFAULT_GOAL := help
+
+## 各ターゲットの一覧と説明を表示（引数なしの make でも表示）
+help:
+	@awk 'BEGIN { FS = ":" } \
+		/^## / { if (doc == "") doc = substr($$0, 4); next } \
+		/^[a-zA-Z0-9][a-zA-Z0-9_-]*:/ { if (doc != "") { printf "  \033[36m%-22s\033[0m %s\n", $$1, doc; doc = "" } next } \
+		{ doc = "" }' $(MAKEFILE_LIST)
 
 ## 開発環境の初期セットアップ（全スクリプトを順次実行）
 ## 実行後に source ~/.bashrc が必要
@@ -34,6 +44,14 @@ be-migrate:
 	set +a; \
 	cd backend && ./gradlew migrateDatabase
 
+## 作りかけを含む全changesetを開発DBへ適用（Liquibase update。タグ規則なし・タグ確定前の開発用）。
+## リリース手前の「現在タグまで」確定適用は be-migrate を使う。
+be-migrate-dev:
+	set -a; \
+	. ./$(COMPOSE_ENV_FILE); \
+	set +a; \
+	cd backend && ./gradlew update
+
 ## 本番向けマイグレーションとrollbackはローカル.envを読まず、CI/CDが注入した専用資格情報だけを使う。
 .PHONY: _require-migration-env
 _require-migration-env:
@@ -46,7 +64,7 @@ _require-migration-env:
 be-release-migrate: _require-migration-env
 	cd backend && ./gradlew migrateDatabase
 
-## 現在の宣言的スキーマタグが対象DBへ適用済みであることを確認
+## 現在のスキーマタグが対象DBへ適用済みであることを確認
 ## ローカルでは.envを読み、本番では注入済みのMIGRATION_DB_*をそのまま使う。
 be-schema-tag-check:
 	@set -eu; \
@@ -123,6 +141,14 @@ be-test:
 	set +a; \
 	cd backend && SPRING_CONFIG_IMPORT="optional:file:../$(TEST_ENV_FILE)[.properties]" ./gradlew migrateDatabase test
 
+## 作りかけを含む全changesetをテストDBへ適用してからテスト（依存起動済み前提。test-dev の部品）。
+## be-test はタグ確定後の確定適用（migrateDatabase）、be-test-dev は開発中の全適用（update）で回す。
+be-test-dev:
+	set -a; \
+	. ./$(TEST_ENV_FILE); \
+	set +a; \
+	cd backend && SPRING_CONFIG_IMPORT="optional:file:../$(TEST_ENV_FILE)[.properties]" ./gradlew update test
+
 ## テスト専用の依存スタック（PostgreSQL 5433 / Redis 6380）を起動
 test-deps-up:
 	$(TEST_COMPOSE) up -d --wait
@@ -147,6 +173,23 @@ test:
 	$(TEST_COMPOSE) up -d --wait; \
 	$(MAKE) be-verify-migrations; \
 	$(MAKE) be-test
+
+## 隔離した依存を起動し、作りかけ含む全changesetを適用してテスト、終了後に必ず後片付け（ワンショット・開発用）。
+## make test はタグ確定後の確定適用＋rollback検証、make test-dev はタグ確定前の全適用でテストだけ回す。
+## rollback検証も要るときは make be-verify-migrations を併用する（タグ未確定でも動く）。
+test-dev:
+	@set -eu; \
+	cleanup() { \
+		status=$$?; \
+		trap - EXIT; \
+		cleanup_status=0; \
+		$(TEST_COMPOSE) down --volumes --remove-orphans || cleanup_status=$$?; \
+		if [ "$$status" -ne 0 ]; then exit "$$status"; fi; \
+		exit "$$cleanup_status"; \
+	}; \
+	trap cleanup EXIT; \
+	$(TEST_COMPOSE) up -d --wait; \
+	$(MAKE) be-test-dev
 
 ## バックエンドの SBOM 生成（CycloneDX 形式）
 ## 出力先: backend/build/reports/

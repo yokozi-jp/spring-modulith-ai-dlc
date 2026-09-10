@@ -8,9 +8,44 @@
 スキーマ変更はアプリケーションのデプロイ前に、独立したジョブまたは作業者がGradleタスクを明示して適用します。
 通常の`compileJava`、`test`、`bootJar`はLiquibaseとjOOQコード生成を起動せず、DBにも接続しません。
 
-## 宣言的スキーマタグ
+## コマンドの影響範囲（クイックリファレンス）
 
-DBの復旧点は、命令的な`tag`コマンドではなく、changelog内の`tagDatabase` changesetで管理します。
+どのコマンドを、どういうときに叩けばよいか迷ったときの早見表です。
+判断の軸は「そのコマンドがDBに何をするか（影響範囲）」です。
+
+`-check`と`-preview`は必ず安全です。
+`be-migrate`系は前へ進めるだけで、既存の状態を戻しません。
+`be-verify-migrations`と`make test`は使い捨てDB専用で、開発DBや本番DBには触れません。
+破壊的なのは`be-rollback`だけで、それも`CONFIRM_ROLLBACK=yes`がなければDBへ接続せず失敗します。
+
+| コマンド                                                      | 何をするか                                                          | 影響範囲                         | 使うタイミング                          |
+| ------------------------------------------------------------- | ------------------------------------------------------------------- | -------------------------------- | --------------------------------------- |
+| `make be-schema-tag-check`                                    | 現在のスキーマタグがDBにあるか照会                                  | 読み取りのみ・安全               | 対象DBの状態を確認したいとき            |
+| `make be-rollback-check DB_ROLLBACK_TAG=<tag>`                | 切り戻し対象タグの存在を確認                                        | 読み取りのみ・安全               | 切り戻し前の下調べ                      |
+| `make be-rollback-preview DB_ROLLBACK_TAG=<tag>`              | 切り戻しSQLを生成（`build/reports/liquibase/rollback-preview.sql`） | DB変更なし・安全                 | 切り戻しの内容を実行前に確認            |
+| `make be-generate-jooq`                                       | 現在のDBスキーマからjOOQコードを生成                                | DB変更なし（生成ソースを更新）   | スキーマは変えずにコードだけ再生成      |
+| `make be-migrate`                                             | 現在のスキーマタグまで前進適用し、タグを確認                        | 追記のみ（前進）                 | 初回起動前・changeset追加後（ローカル） |
+| `make be-refresh-jooq`                                        | 前進適用してからjOOQコードを生成                                    | 追記のみ（前進）                 | changeset追加後にまとめて実行           |
+| `make be-verify-migrations`                                   | 使い捨てDBで適用・rollback・再適用・タグ確認                        | 隔離DB専用・安全                 | changeset追加後の検証・CI               |
+| `make test`                                                   | 隔離スタックで上記検証を通してからテスト                            | 隔離DB専用・安全                 | 変更のローカル総合確認                  |
+| `make be-release-migrate`                                     | 本番の前進適用（`MIGRATION_DB_*`必須）                              | 追記のみ（前進・本番）           | デプロイパイプラインから                |
+| `make be-rollback DB_ROLLBACK_TAG=<tag> CONFIRM_ROLLBACK=yes` | 指定タグより後のchangesetを切り戻す                                 | **破壊的（データ損失の可能性）** | preview・バックアップ・影響確認の後だけ |
+
+「安全」は、対象DBのスキーマとデータを変えないことを指します（`be-generate-jooq`はリポジトリの生成ソースを書き換えます）。
+「前進」は、未適用のchangesetを新しく適用するだけで、適用済みの変更は戻さないことを指します。
+
+各Makeターゲットの本体は、`backend`ディレクトリのGradleタスクを呼び出します。
+`make help`で各ターゲットの一行説明を一覧表示できます。
+
+## スキーマタグ
+
+**スキーマタグ**は、DBスキーマのある状態に付けた名前です。
+デプロイやマイグレーションの区切りとなる、復旧の目印として使います。
+
+このタグは、稼働中のDBへ`tag`コマンドを手で打って付けるのではなく、changelogファイルの中に`tagDatabase` changesetとして書いておきます。
+changelogはGitでコードと一緒に版管理されるので、タグもコードと同じ履歴で追えます。
+稼働DBの状態に手を入れて付けるのではなく、ファイルに書いて管理する方式なので、これを宣言的と呼びます（対義語は、コマンドを打って付ける命令的な方式です）。
+
 現在のスキーマタグは`backend/gradle.properties`の`databaseSchemaTag`に記録し、`migrateDatabase`が同じタグを`updateToTag`へ自動的に渡します。
 実行時に`DB_TAG`を入力する必要はありません。
 
@@ -106,10 +141,10 @@ PostgreSQLの`TIMESTAMP WITH TIME ZONE`と`TIMESTAMPTZ`は、forced typeによ�
 ```
 
 - `migrateDatabase`：`databaseSchemaTag`まで`updateToTag`を実行し、そのタグの存在を確認します。
-- `checkCurrentSchemaTag`：現在の宣言的スキーマタグが対象DBに存在することを確認します。
+- `checkCurrentSchemaTag`：現在のスキーマタグが対象DBに存在することを確認します。
 - `verifyDatabaseMigrations`：使い捨てDBで全changesetの適用、rollback、再適用、現在タグの存在確認を実行します。
 - `jooqCodegen`：現在のDBスキーマを読み取り、コード生成だけを実行します。
-- `migrateAndGenerateJooq`：現在の宣言的スキーマタグまで適用してから`jooqCodegen`を実行します。
+- `migrateAndGenerateJooq`：現在のスキーマタグまで適用してから`jooqCodegen`を実行します。
 
 `verifyDatabaseMigrations`は適用済みchangesetを実際に戻すため、使い捨てDB専用です。
 開発DBと本番DBでは実行しません。
@@ -165,7 +200,7 @@ changeset追加時のコード生成とレビューを開発またはCIで完了
 
 バックエンドCIは使い捨てPostgreSQLに対して`verifyDatabaseMigrations`を実行します。
 Liquibaseの`updateTestingRollback`によって、全changesetを適用し、同じchangesetを戻し、再び適用します。
-その後に`assertSchemaTagExists`で現在の宣言的スキーマタグを確認し、通常のマイグレーションとバックエンドテストを実行します。
+その後に`assertSchemaTagExists`で現在のスキーマタグを確認し、通常のマイグレーションとバックエンドテストを実行します。
 
 この検証により、rollback定義の不足とタグchangesetの追加漏れをPull Requestで検出します。
 本番DBのデータ復元可能性までは保証しません。
