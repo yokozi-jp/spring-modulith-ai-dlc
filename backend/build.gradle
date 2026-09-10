@@ -79,7 +79,7 @@ dependencies {
     implementation 'org.springframework.boot:spring-boot-starter-actuator'
     implementation 'org.springframework.boot:spring-boot-starter-opentelemetry'
     // Spring Boot 4.1.1 が管理する OpenTelemetry 1.62.0 と整合するバージョン。
-    implementation 'io.opentelemetry.instrumentation:opentelemetry-logback-appender-1.0:2.28.1-alpha'
+    implementation 'io.opentelemetry.instrumentation:opentelemetry-logback-appender-1.0:2.31.1-alpha'
 
     // --- 耐障害性 ---
     implementation 'org.springframework.cloud:spring-cloud-starter-circuitbreaker-resilience4j'
