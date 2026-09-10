@@ -103,7 +103,7 @@ dependencies {
     // ArchUnit の JUnit 5 連携（@AnalyzeClasses / @ArchTest）。
     // コア（com.tngtech.archunit:archunit）は spring-modulith-starter-test 経由で 1.4.2 が入るため、
     // JUnit 5 エンジンも同じ 1.4.2 に揃える。
-    testImplementation 'com.tngtech.archunit:archunit-junit5:1.4.2'
+    testImplementation 'com.tngtech.archunit:archunit-junit5:1.5.0'
     testCompileOnly 'org.projectlombok:lombok'
     testAnnotationProcessor 'org.projectlombok:lombok'
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
