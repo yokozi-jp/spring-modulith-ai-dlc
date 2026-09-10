@@ -110,7 +110,7 @@ dependencies {
 
     // --- 静的解析 (Error Prone + NullAway) ---
     // JSpecify: @NullMarked 等の null 安全性アノテーション（NullAway の JSpecifyMode で参照）
-    implementation 'org.jspecify:jspecify:1.0.0'
+    implementation 'org.jspecify:jspecify:1.0.1'
     errorprone 'com.google.errorprone:error_prone_core:2.50.0'
     errorprone 'com.uber.nullaway:nullaway:0.14.1'
 }
