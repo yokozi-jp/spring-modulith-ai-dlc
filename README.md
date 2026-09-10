@@ -33,7 +33,8 @@
 4. [開発環境構築](#開発環境構築)
 5. [開発コマンド](#開発コマンド)
 6. [Lint・テスト](#lintテスト)
-7. [トラブルシューティング](#トラブルシューティング)
+7. [設計判断の記録（ADR）](#設計判断の記録adr)
+8. [トラブルシューティング](#トラブルシューティング)
 
 ## プロジェクトについて
 
@@ -76,6 +77,7 @@ Spring Modulith を用いたモジュラーモノリスアーキテクチャの�
 │   ├── initdb/       # PostgreSQL 初期化スクリプト（スキーマ作成）
 │   └── keycloak/     # Keycloak realm 定義（起動時インポート）
 ├── docs/             # ドキュメント
+│   ├── adr/              # Architecture Decision Records（設計判断の記録）
 │   ├── aidlc-setup/      # AI-DLC セットアップ手順
 │   └── local-env-setup/  # 開発環境構築手順・スクリプト
 ├── frontend/         # VitePlus + TypeScript フロントエンド（pnpm）
@@ -294,6 +296,20 @@ Markdown ファイルの体裁を markdownlint-cli2 で検査します。除外�
 - **CI（GitHub Actions, [`.github/workflows/`](.github/workflows/)）**
   - `backend-ci.yml`（backend の Lint（Spotless + PMD + SpotBugs）とテスト・カバレッジ）、`betterleaks.yml`（シークレットスキャン）、`semgrep.yml`（静的解析 / SARIF アップロード）、`trivy.yml`（脆弱性スキャン / SARIF アップロード）、`actionlint.yml` / `zizmor.yml`（ワークフロー）、`hadolint.yml`（Dockerfile Lint、docker build --check、backend イメージのビルド・起動・ヘルスチェック）、`compose-config.yml`（Compose）、`markdownlint.yml`（Markdown）
   - `semgrep.yml` / `trivy.yml` の検出結果は GitHub Code Scanning（Security タブ）に SARIF 形式でアップロードされます。
+
+<p align="right">(<a href="#top">トップへ</a>)</p>
+
+## 設計判断の記録（ADR）
+
+重要な設計・アーキテクチャ上の判断は、Architecture Decision Record（ADR）として [`docs/adr/`](docs/adr/) に残します。
+
+- 規約は [`.kiro/steering/adr-decision-record.md`](.kiro/steering/adr-decision-record.md) に定義しています（ADR を作る/作らない基準、記録先、ライフサイクル）。
+- 書式は AI-DLC 同梱テンプレート（`.kiro/knowledge/aidlc-architect-agent/adr-template.md`）に準拠します。
+- ADR の一覧は [`docs/adr/index.md`](docs/adr/index.md) を参照してください。
+- インテント固有の設計判断は、AI-DLC が inception 実行時に各インテントの record dir（`<record>/inception/domain-design/decisions.md`）へ生成します。`docs/adr/` はワークフロー外・横断の判断を残す場所です。
+
+push 前には `make adr-check` が pre-push で走り、判断が絡む変更（依存・セキュリティ・DB・インフラ・ワークフロー、およびフロントエンド全体）に `docs/adr/` の更新が伴わないとき注意喚起します。
+既定は非ブロッキングで、該当しない場合は `ADR_ACK=1 git push` で抑制できます。
 
 <p align="right">(<a href="#top">トップへ</a>)</p>
 
