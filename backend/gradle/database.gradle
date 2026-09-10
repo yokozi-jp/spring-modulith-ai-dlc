@@ -161,6 +161,23 @@ def configureLiquibaseDatabaseTask = { task, String operation ->
     }
 }
 
+// Liquibase Gradle plugin 3.1.0 は ArgumentBuilder の静的フィールド（allGlobalArguments 等）を
+// apply（構成）フェーズで初期化し、実行フェーズで参照する。構成キャッシュを再利用すると構成フェーズが
+// スキップされ、静的フィールドが null のまま ArgumentBuilder.groovy:127 で NPE になる
+// （新しいデーモンがキャッシュを復元したときに顕在化する）。
+// 対策として全 LiquibaseTask を構成キャッシュ非対応と宣言し、これらを含むビルドでは毎回構成フェーズを
+// 走らせて静的フィールドを初期化させる。Liquibase を起動しないビルドでは構成キャッシュは有効なまま。
+// apply from の適用スクリプトは plugins{} で読み込んだプラグインのクラスをコンパイル時に解決できないため、
+// 型を import せず、装飾後のクラス名（org.liquibase.gradle.LiquibaseTask_Decorated）を接頭辞で判定する。
+// 上流（PR #176 以降）で再利用パスが修正されたら、このブロックを削除する。
+tasks.configureEach { task ->
+    if (task.class.name.startsWith('org.liquibase.gradle.LiquibaseTask')) {
+        task.notCompatibleWithConfigurationCache(
+            'liquibase-gradle 3.1.0 は ArgumentBuilder の静的状態を apply フェーズで初期化するため、'
+                + '構成キャッシュ再利用時に ArgumentBuilder.groovy:127 で NPE になる。上流修正後に解除する。')
+    }
+}
+
 tasks.named('update') {
     configureLiquibaseDatabaseTask(delegate, 'Liquibaseマイグレーション')
     description = 'changelogの未適用changesetをすべて適用します（検証用途）。'
