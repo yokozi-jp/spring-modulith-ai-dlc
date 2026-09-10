@@ -120,6 +120,12 @@ pre-commit:
 pre-push:
   parallel: true
   jobs:
+    # push 前に、判断が絡む変更へ ADR が伴うかを確認（ナッジ）
+    # 既定は非ブロッキング（気づかせるだけ）。ADR_STRICT=1 でブロック、ADR_ACK=1 で抑制。
+    # ローカルと同じ判定を make adr-check に集約している。
+    - name: adr-check
+      run: make adr-check
+
     # push 前にリポジトリ全体（履歴含む）をシークレットスキャン（Betterleaks）
     # betterleaks が PATH に無い場合は go install 先 ($HOME/go/bin) にフォールバック
     - name: betterleaks-full-scan

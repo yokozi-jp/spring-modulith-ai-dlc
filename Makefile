@@ -8,7 +8,7 @@ TEST_ENV_FILE ?= .env.test
 TEST_COMPOSE_FILE ?= docker/compose-test.yml
 TEST_COMPOSE = $(DOCKER) compose -f $(TEST_COMPOSE_FILE)
 
-.PHONY: help setup be-run be-migrate be-migrate-dev be-release-migrate be-schema-tag-check be-verify-migrations be-rollback-check be-rollback-preview be-rollback be-generate-jooq be-refresh-jooq be-format be-lint be-test be-test-dev test test-dev test-deps-up test-deps-down be-coverage be-sbom compose-up compose-up-backend compose-down compose-ps compose-logs keycloak-logs keycloak-reimport oidc-check compose-reset scan-secrets scan-secrets-all lint-actions lint-actions-security lint-docker lint-docker-check lint-compose lint-md lint-md-fix lint-semgrep scan-vulns scan-vulns-backend scan-vulns-frontend
+.PHONY: help dev check verify e2e adr-check setup be-run be-migrate be-migrate-dev be-release-migrate be-schema-tag-check be-verify-migrations be-rollback-check be-rollback-preview be-rollback be-generate-jooq be-refresh-jooq be-format be-lint be-test be-test-dev test test-dev test-deps-up test-deps-down be-coverage be-sbom compose-up compose-up-backend compose-down compose-ps compose-logs keycloak-logs keycloak-reimport oidc-check compose-reset scan-secrets scan-secrets-all lint-actions lint-actions-security lint-docker lint-docker-check lint-compose lint-md lint-md-fix lint-semgrep scan-vulns scan-vulns-backend scan-vulns-frontend
 
 # 引数なしの make はヘルプを表示する（setup を誤って実行しないため）。
 .DEFAULT_GOAL := help
@@ -16,10 +16,60 @@ TEST_COMPOSE = $(DOCKER) compose -f $(TEST_COMPOSE_FILE)
 ## 各ターゲットの一覧と説明を表示（引数なしの make でも表示）
 help:
 	@awk 'BEGIN { FS = ":" } \
+		/^##@ / { printf "\n\033[1m%s\033[0m\n", substr($$0, 5); next } \
 		/^## / { if (doc == "") doc = substr($$0, 4); next } \
-		/^[a-zA-Z0-9][a-zA-Z0-9_-]*:/ { if (doc != "") { printf "  \033[36m%-22s\033[0m %s\n", $$1, doc; doc = "" } next } \
+		/^[a-zA-Z0-9][a-zA-Z0-9_-]*:/ { if (doc != "") { printf "  \033[36m%-24s\033[0m %s\n", $$1, doc; doc = "" } next } \
 		{ doc = "" }' $(MAKEFILE_LIST)
 
+##@ Workflow（日々の入口）
+
+## 依存を起動してバックエンドを起動（日々の入口。初回・changeset追加後は先に be-migrate）
+dev: compose-up
+	@echo "依存を起動しました。初回・changeset追加後は make be-migrate を実行してください。"
+	$(MAKE) be-run
+
+## 素早いローカル確認（バックエンドの静的解析）。こまめに回す。
+check: be-lint
+
+## push 前の総合ゲート（静的解析＋隔離テスト）。CI と同じ内容。
+verify: be-lint test
+
+## E2E（未整備）。docs/e2e-testing-strategy.md の方針に沿って構築予定。
+e2e:
+	@echo "E2E はまだ整備されていません。docs/e2e-testing-strategy.md を参照してください。"
+	@echo "整備後は「フルスタック起動→シード→playwright test」をこのターゲットに束ねます。"
+
+##@ ADR
+## 判断が絡む変更に ADR が伴うかを確認（push 前のナッジ）
+## ADR_DIFF_BASE で比較起点を変更（既定 origin/main）。ADR_ACK=1 で抑制、ADR_STRICT=1 でブロック。
+adr-check:
+	@set -eu; \
+	base="$${ADR_DIFF_BASE:-origin/main}"; \
+	if ! git rev-parse --verify --quiet "$$base" >/dev/null; then \
+		echo "ADR check: 比較起点 $$base が無いためスキップします。" >&2; \
+		exit 0; \
+	fi; \
+	changed="$$(git diff --name-only "$$base"...HEAD)"; \
+	if [ -z "$$changed" ]; then exit 0; fi; \
+	sig="$$(printf '%s\n' "$$changed" | grep -E '^(frontend/|backend/build\.gradle|backend/buildSrc/|backend/gradle/[^/]+\.gradle|backend/src/main/resources/application(-[^/]+)?\.yaml|backend/src/main/resources/db/changelog/|backend/src/main/java/com/example/demo/SecurityConfig\.java|docker/|infrastructure/|\.github/workflows/)' || true)"; \
+	if [ -z "$$sig" ]; then exit 0; fi; \
+	adr="$$(printf '%s\n' "$$changed" | grep -E '^docs/adr/ADR-[0-9]+.*\.md$$' || true)"; \
+	if [ -n "$$adr" ]; then exit 0; fi; \
+	if [ "$${ADR_ACK:-}" = "1" ]; then \
+		echo "ADR check: ADR_ACK=1 のため警告を抑制しました。" >&2; \
+		exit 0; \
+	fi; \
+	echo "" >&2; \
+	echo "⚠ ADR 未追加の可能性: 判断が絡む変更が含まれますが docs/adr/ の更新がありません。" >&2; \
+	echo "  対象の変更:" >&2; \
+	printf '    - %s\n' $$sig >&2; \
+	echo "  重要な設計判断なら docs/adr/ に ADR を追加してください（規約: .kiro/steering/adr-decision-record.md）。" >&2; \
+	echo "  該当しない場合は ADR_ACK=1 を付けて再実行できます（例: ADR_ACK=1 git push）。" >&2; \
+	echo "" >&2; \
+	if [ "$${ADR_STRICT:-}" = "1" ]; then exit 1; fi; \
+	exit 0
+
+##@ Setup
 ## 開発環境の初期セットアップ（全スクリプトを順次実行）
 ## 実行後に source ~/.bashrc が必要
 setup:
@@ -32,11 +82,13 @@ setup:
 		./05-setup-bun.sh && \
 		./06-setup-go-betterleaks.sh
 
+##@ Backend（実行）
 ## バックエンドをホスト上で起動（application.yaml がルートの .env を読み込む）
 ## DBマイグレーションは実行しないため、初回やchangeset追加後は先に be-migrate を実行する。
 be-run:
 	cd backend && ./gradlew bootRun
 
+##@ Database（マイグレーション & jOOQ）
 ## changelogをgradle.propertiesの現在スキーマタグまで明示的に適用し、タグの存在も確認する。
 be-migrate:
 	set -a; \
@@ -125,6 +177,7 @@ be-refresh-jooq:
 	set +a; \
 	cd backend && ./gradlew migrateAndGenerateJooq
 
+##@ Backend（フォーマット・静的解析・テスト）
 ## バックエンドのコードフォーマット適用（Spotless）
 be-format:
 	cd backend && ./gradlew spotlessApply
@@ -196,6 +249,7 @@ test-dev:
 be-sbom:
 	cd backend && ./gradlew cyclonedxBom
 
+##@ Compose & サービス
 ## ローカル依存サービスを起動（backend コンテナは起動しない）
 compose-up:
 	$(COMPOSE) up -d --wait
@@ -253,6 +307,7 @@ oidc-check:
 compose-reset:
 	$(COMPOSE) --profile backend down --volumes --remove-orphans
 
+##@ Security（シークレットスキャン）
 ## ステージ済みの変更をシークレットスキャン（betterleaks / pre-commit 相当）
 scan-secrets:
 	PATH="$$PATH:$$HOME/go/bin" betterleaks git --staged --no-banner --redact
@@ -261,6 +316,7 @@ scan-secrets:
 scan-secrets-all:
 	PATH="$$PATH:$$HOME/go/bin" betterleaks git . --no-banner --redact --git-workers=16
 
+##@ Lint & Format（リポジトリ全体）
 ## GitHub Actions ワークフローの Lint（actionlint / Docker 実行）
 lint-actions:
 	docker run --rm -v "$$PWD":/repo -w /repo \
@@ -338,6 +394,7 @@ lint-semgrep:
 			--metrics off \
 			--disable-version-check
 
+##@ Security（脆弱性スキャン）
 ## 依存関係の脆弱性スキャン（Trivy / Docker 実行）
 ## CI と同じ対象・設定でローカル実行する。修正済みの脆弱性は除外する。
 ## backend は CycloneDX SBOM を、frontend は解決済みの依存をスキャンする。
