@@ -8,7 +8,7 @@ TEST_ENV_FILE ?= .env.test
 TEST_COMPOSE_FILE ?= docker/compose-test.yml
 TEST_COMPOSE = $(DOCKER) compose -f $(TEST_COMPOSE_FILE)
 
-.PHONY: setup be-run be-format be-lint be-test test test-deps-up test-deps-down be-coverage be-sbom compose-up compose-up-backend compose-down compose-ps compose-logs keycloak-logs keycloak-reimport oidc-check compose-reset scan-secrets scan-secrets-all lint-actions lint-actions-security lint-docker lint-docker-check lint-compose lint-md lint-md-fix lint-semgrep scan-vulns scan-vulns-backend scan-vulns-frontend
+.PHONY: setup be-run be-migrate be-release-migrate be-schema-tag-check be-verify-migrations be-rollback-check be-rollback-preview be-rollback be-generate-jooq be-refresh-jooq be-format be-lint be-test test test-deps-up test-deps-down be-coverage be-sbom compose-up compose-up-backend compose-down compose-ps compose-logs keycloak-logs keycloak-reimport oidc-check compose-reset scan-secrets scan-secrets-all lint-actions lint-actions-security lint-docker lint-docker-check lint-compose lint-md lint-md-fix lint-semgrep scan-vulns scan-vulns-backend scan-vulns-frontend
 
 ## 開発環境の初期セットアップ（全スクリプトを順次実行）
 ## 実行後に source ~/.bashrc が必要
@@ -23,8 +23,89 @@ setup:
 		./06-setup-go-betterleaks.sh
 
 ## バックエンドをホスト上で起動（application.yaml がルートの .env を読み込む）
+## DBマイグレーションは実行しないため、初回やchangeset追加後は先に be-migrate を実行する。
 be-run:
 	cd backend && ./gradlew bootRun
+
+## changelogをgradle.propertiesの現在スキーマタグまで明示的に適用し、タグの存在も確認する。
+be-migrate:
+	set -a; \
+	. ./$(COMPOSE_ENV_FILE); \
+	set +a; \
+	cd backend && ./gradlew migrateDatabase
+
+## 本番向けマイグレーションとrollbackはローカル.envを読まず、CI/CDが注入した専用資格情報だけを使う。
+.PHONY: _require-migration-env
+_require-migration-env:
+	@test -n "$${MIGRATION_DB_URL:-}" || { echo "MIGRATION_DB_URLを指定してください。" >&2; exit 1; }
+	@test -n "$${MIGRATION_DB_USERNAME:-}" || { echo "MIGRATION_DB_USERNAMEを指定してください。" >&2; exit 1; }
+	@test -n "$${MIGRATION_DB_PASSWORD:-}" || { echo "MIGRATION_DB_PASSWORDを指定してください。" >&2; exit 1; }
+	@test -n "$${MIGRATION_DB_SCHEMA:-}" || { echo "MIGRATION_DB_SCHEMAを指定してください。" >&2; exit 1; }
+
+## 本番向けマイグレーション。タグ名はGit管理し、実行時入力を不要にする。
+be-release-migrate: _require-migration-env
+	cd backend && ./gradlew migrateDatabase
+
+## 現在の宣言的スキーマタグが対象DBへ適用済みであることを確認
+## ローカルでは.envを読み、本番では注入済みのMIGRATION_DB_*をそのまま使う。
+be-schema-tag-check:
+	@set -eu; \
+	if [ -f "./$(COMPOSE_ENV_FILE)" ]; then \
+		set -a; \
+		. "./$(COMPOSE_ENV_FILE)"; \
+		set +a; \
+	fi; \
+	cd backend && ./gradlew checkCurrentSchemaTag
+
+## 使い捨てテストDBで全changesetのupdate、rollback、再updateと現在タグを検証
+be-verify-migrations:
+	set -a; \
+	. ./$(TEST_ENV_FILE); \
+	set +a; \
+	cd backend && ./gradlew verifyDatabaseMigrations
+
+## 切り戻し対象タグが存在するか確認
+be-rollback-check: _require-migration-env
+	@set -eu; \
+	if [ -z "$(DB_ROLLBACK_TAG)" ]; then echo "DB_ROLLBACK_TAGを指定してください。" >&2; exit 1; fi; \
+	cd backend && ./gradlew checkRollbackTag -PliquibaseTag="$(DB_ROLLBACK_TAG)"
+
+## DBを変更せず、指定タグまでの切り戻しSQLを生成
+## 出力先: backend/build/reports/liquibase/rollback-preview.sql
+be-rollback-preview: _require-migration-env
+	@set -eu; \
+	if [ -z "$(DB_ROLLBACK_TAG)" ]; then echo "DB_ROLLBACK_TAGを指定してください。" >&2; exit 1; fi; \
+	mkdir -p backend/build/reports/liquibase; \
+	cd backend && ./gradlew previewDatabaseRollback \
+		-PliquibaseTag="$(DB_ROLLBACK_TAG)" \
+		-PliquibaseOutputFile=build/reports/liquibase/rollback-preview.sql
+
+## 指定タグより後のchangesetを切り戻す
+## rollback preview、DBバックアップ、影響確認後にCONFIRM_ROLLBACK=yesを指定する。
+be-rollback: _require-migration-env
+	@set -eu; \
+	if [ -z "$(DB_ROLLBACK_TAG)" ]; then echo "DB_ROLLBACK_TAGを指定してください。" >&2; exit 1; fi; \
+	if [ "$(CONFIRM_ROLLBACK)" != "yes" ]; then \
+		echo "切り戻すにはrollback previewとバックアップを確認し、CONFIRM_ROLLBACK=yesを指定してください。" >&2; \
+		exit 1; \
+	fi; \
+	cd backend && ./gradlew rollbackDatabase \
+		-PliquibaseTag="$(DB_ROLLBACK_TAG)" \
+		-PconfirmRollback=true
+
+## 現在のDBスキーマからjOOQソースを生成（マイグレーションは実行しない）
+be-generate-jooq:
+	set -a; \
+	. ./$(COMPOSE_ENV_FILE); \
+	set +a; \
+	cd backend && ./gradlew jooqCodegen
+
+## Liquibase適用後の最新DBからjOOQソースを生成
+be-refresh-jooq:
+	set -a; \
+	. ./$(COMPOSE_ENV_FILE); \
+	set +a; \
+	cd backend && ./gradlew migrateAndGenerateJooq
 
 ## バックエンドのコードフォーマット適用（Spotless）
 be-format:
@@ -35,12 +116,12 @@ be-lint:
 	cd backend && ./gradlew spotlessCheck pmdMain pmdTest spotbugsMain spotbugsTest
 
 ## バックエンドのテスト実行（依存が起動済みの前提。フック/CI・test ターゲットの部品）。
-## 開発用ルート .env ではなく .env.test を読み、DB/Redis も隔離した 5433/6380 を指す。
+## 開発用ルート .env ではなく .env.test を読み、テスト前にLiquibaseを明示実行する。
 be-test:
 	set -a; \
 	. ./$(TEST_ENV_FILE); \
 	set +a; \
-	cd backend && SPRING_CONFIG_IMPORT="optional:file:../$(TEST_ENV_FILE)[.properties]" ./gradlew test
+	cd backend && SPRING_CONFIG_IMPORT="optional:file:../$(TEST_ENV_FILE)[.properties]" ./gradlew migrateDatabase test
 
 ## テスト専用の依存スタック（PostgreSQL 5433 / Redis 6380）を起動
 test-deps-up:
@@ -64,6 +145,7 @@ test:
 	}; \
 	trap cleanup EXIT; \
 	$(TEST_COMPOSE) up -d --wait; \
+	$(MAKE) be-verify-migrations; \
 	$(MAKE) be-test
 
 ## バックエンドの SBOM 生成（CycloneDX 形式）

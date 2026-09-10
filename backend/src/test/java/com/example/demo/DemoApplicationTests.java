@@ -1,5 +1,6 @@
 package com.example.demo;
 
+import static com.example.demo.jooq.tables.EventPublication.EVENT_PUBLICATION;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 
@@ -7,6 +8,8 @@ import java.time.Clock;
 import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
+import java.util.UUID;
+import org.jooq.DSLContext;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -35,6 +38,9 @@ class DemoApplicationTests {
 
   /** DB セッションのタイムゾーンと {@code timestamptz} 往復を検証するための {@code JdbcTemplate}。 */
   @Autowired private JdbcTemplate jdbcTemplate;
+
+  /** 生成コードの日時型とPostgreSQL間の往復を検証するためのjOOQコンテキスト。 */
+  @Autowired private DSLContext dslContext;
 
   /** PKCE パラメータを検証する対象の認可リクエストリゾルバ。 */
   @Autowired private OAuth2AuthorizationRequestResolver authorizationRequestResolver;
@@ -71,6 +77,41 @@ class DemoApplicationTests {
 
     assertNotNull(actual, "timestamptz へキャストした結果が取得できること");
     assertEquals(expected, actual.toInstant(), "timestamptz 往復で Instant が保存されること");
+  }
+
+  @Test
+  void generatedJooqInstantRoundTripsThroughTimestampWithTimeZone() {
+    final UUID publicationId = UUID.fromString("99999999-9999-9999-9999-999999999999");
+    final Instant expected = Instant.parse("2026-09-09T07:44:32.364123Z");
+
+    try {
+      assertEquals(
+          1,
+          dslContext
+              .insertInto(EVENT_PUBLICATION)
+              .set(EVENT_PUBLICATION.ID, publicationId)
+              .set(EVENT_PUBLICATION.LISTENER_ID, "jooq-instant-test")
+              .set(EVENT_PUBLICATION.EVENT_TYPE, "test.event")
+              .set(EVENT_PUBLICATION.SERIALIZED_EVENT, "{}")
+              .set(EVENT_PUBLICATION.PUBLICATION_DATE, expected)
+              .execute(),
+          "生成jOOQフィールドへInstantを保存できること");
+
+      final Instant actual =
+          dslContext
+              .select(EVENT_PUBLICATION.PUBLICATION_DATE)
+              .from(EVENT_PUBLICATION)
+              .where(EVENT_PUBLICATION.ID.eq(publicationId))
+              .fetchOptional(EVENT_PUBLICATION.PUBLICATION_DATE)
+              .orElseThrow();
+
+      assertEquals(expected, actual, "生成jOOQフィールドがInstantを維持すること");
+    } finally {
+      dslContext
+          .deleteFrom(EVENT_PUBLICATION)
+          .where(EVENT_PUBLICATION.ID.eq(publicationId))
+          .execute();
+    }
   }
 
   @Test

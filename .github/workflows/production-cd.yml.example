@@ -1,0 +1,376 @@
+# # 本番CDワークフローひな型
+# #
+# # このファイルは設計メモを兼ねた無効なひな型であり、GitHub Actionsから実行されません。
+# # 拡張子を`.yml.example`にしている理由は、全行コメントの空ワークフローをGitHubへ認識させないためです。
+# # 本番インフラが確定したらプレースホルダーを置換し、先頭のコメント記号を外して`production-cd.yml`へ改名します。
+# # 説明行はコメントとして残し、YAML構造を表す行だけを有効化します。
+# #
+# # 現時点の仮定
+# #
+# # バックエンドはECRへ保存したコンテナイメージをECSサービスへデプロイします。
+# # ALBは`/actuator/health/readiness`をECSタスクのreadiness確認に使います。
+# # PostgreSQLはRDSを使い、アプリケーション用ロールとLiquibase用ロールを分けます。
+# # AWS構成はまだ`infrastructure/`へ定義されていないため、実際のサービス名と配置方式が決まった時点でこの仮定を見直します。
+# #
+# # 有効化前に完了させること
+# #
+# # 1. `infrastructure/`へECR、ECS、ALB、RDS、CloudWatch、Secrets ManagerをIaCで定義します。
+# # 2. ECRはタグを上書きできない設定にし、push時の脆弱性スキャンとイメージ署名を有効にします。
+# # 3. CIは一度だけイメージをビルドし、SBOMとprovenanceを付けてECRへpushし、digestをリリース候補として保存します。
+# # 4. 本番CDはソースからイメージを再ビルドせず、CIが検証した同じdigestを昇格させます。
+# # 5. GitHub Environmentの`production`を作り、必須レビュー担当者とデプロイ可能なブランチまたはタグを設定します。
+# # 6. GitHub OIDC用IAMロールの信頼ポリシーを、このリポジトリ、production Environment、許可したrefへ限定します。
+# # 7. IAMロールにはECR参照、ECS更新、対象シークレット参照、バックアップ確認、CloudWatch参照の最小権限だけを付与します。
+# # 8. ECSサービスへdeployment circuit breakerとCloudWatch alarm連動の自動ロールバックを設定します。
+# # 9. RDSの自動バックアップとPoint-in-Time Recoveryを有効にし、復元訓練を完了させます。
+# # 10. changesetはexpand-and-contractを守り、旧アプリケーションと新アプリケーションの併存中も後方互換にします。
+# # 11. `checkCurrentSchemaTag`と`checkRollbackTag`がタグ不在時に失敗するよう、DBを直接照会する検証へ修正します。
+# # 12. `be-release-migrate`と本番rollbackターゲットからローカル`.env`への必須依存を外します。
+# # 13. 使用する全GitHub Actionをリリースタグではなく検証済みcommit SHAへ固定します。
+# # 14. 有効化したワークフローへactionlint、zizmor、レビュー、ステージング実行を通します。
+# #
+# # GitHub Environmentの変数
+# #
+# # `AWS_REGION`には本番リソースを配置したAWSリージョンを設定します。
+# # `PRODUCTION_DEPLOY_ROLE_ARN`にはGitHub OIDCから引き受けるIAMロールARNを設定します。
+# # `ECR_REGISTRY`にはAWSアカウント別のECRレジストリを設定します。
+# # `ECR_REPOSITORY`にはバックエンドイメージのECRリポジトリ名を設定します。
+# # `ECS_CLUSTER`、`ECS_SERVICE`、`ECS_CONTAINER_NAME`には本番ECSの識別子を設定します。
+# # `ECS_TASK_DEFINITION_PATH`にはIaCが生成または管理するタスク定義JSONのパスを設定します。
+# # `MIGRATION_SECRET_ID`にはLiquibase専用資格情報を格納したSecrets ManagerのシークレットIDを設定します。
+# # `PRODUCTION_BASE_URL`にはALBまたはCloudFront経由の本番URLを設定します。
+# # `DEPLOYMENT_ALARM_NAMES`にはデプロイ判定へ使うCloudWatch Alarm名をカンマ区切りで設定します。
+# #
+# # Secrets Managerの`MIGRATION_SECRET_ID`は次のJSONキーを持たせます。
+# #
+# # `MIGRATION_DB_URL`はRDS Writerへ直接接続するJDBC URLです。
+# # `MIGRATION_DB_USERNAME`はDDL権限を持つLiquibase専用ユーザーです。
+# # `MIGRATION_DB_PASSWORD`はLiquibase専用ユーザーのパスワードです。
+# # `MIGRATION_DB_SCHEMA`はアプリケーションと共用するスキーマ名です。
+# #
+# # アプリケーション用DB資格情報、OIDCクライアントシークレット、Redis資格情報はGitHubへ渡しません。
+# # これらはECSタスク定義の`secrets`からSecrets ManagerまたはSSM Parameter Storeを直接参照します。
+# #
+# name: Production CD 🚀
+#
+# on:
+#   workflow_dispatch:
+#     inputs:
+#       image_digest:
+#         description: "CIがECRへpushして検証したsha256 digest"
+#         required: true
+#         type: string
+#       confirmation:
+#         description: "誤操作防止のためproductionと入力"
+#         required: true
+#         type: string
+#
+# # 本番デプロイを同時に二つ走らせると、マイグレーションとECS更新の対応関係が崩れます。
+# # 実行中の本番デプロイを途中キャンセルすると状態判定が難しくなるため、後続実行は待機させます。
+# concurrency:
+#   group: production-cd
+#   cancel-in-progress: false
+#
+# # ワークフロー全体では権限を付けず、ジョブへ必要な権限だけを指定します。
+# permissions: {}
+#
+# env:
+#   AWS_REGION: ${{ vars.AWS_REGION }}
+#   ECR_REGISTRY: ${{ vars.ECR_REGISTRY }}
+#   ECR_REPOSITORY: ${{ vars.ECR_REPOSITORY }}
+#   ECS_CLUSTER: ${{ vars.ECS_CLUSTER }}
+#   ECS_SERVICE: ${{ vars.ECS_SERVICE }}
+#   ECS_CONTAINER_NAME: ${{ vars.ECS_CONTAINER_NAME }}
+#
+# jobs:
+#   release:
+#     name: Approve, migrate, deploy, and verify production
+#     runs-on: ubuntu-latest
+#     timeout-minutes: 60
+#
+#     # production Environmentの必須レビューを、このジョブがAWSへ接続する前に通します。
+#     # 承認画面には対象commit、イメージdigest、変更内容、監視担当者を確認できる情報を提示します。
+#     environment:
+#       name: production
+#       url: ${{ vars.PRODUCTION_BASE_URL }}
+#
+#     permissions:
+#       contents: read
+#       id-token: write
+#       actions: read
+#
+#     steps:
+#       # デプロイ対象のchangeset、databaseSchemaTag、タスク定義を承認したcommitへ固定します。
+#       # persist-credentialsを無効にし、ジョブ内の後続処理へGitHub資格情報を残しません。
+#       - name: Checkout approved release commit
+#         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+#         with:
+#           ref: ${{ github.sha }}
+#           persist-credentials: false
+#
+#       # workflow_dispatchは任意のrefから実行できるため、本番へ許可するrefをジョブ内でも検証します。
+#       # Environmentのdeployment branchesも設定し、GitHub設定とワークフローの二箇所で誤操作を防ぎます。
+#       - name: Validate release request
+#         env:
+#           IMAGE_DIGEST: ${{ inputs.image_digest }}
+#           CONFIRMATION: ${{ inputs.confirmation }}
+#         run: |
+#           set -euo pipefail
+#           test "$CONFIRMATION" = "production"
+#           [[ "$IMAGE_DIGEST" =~ ^sha256:[0-9a-f]{64}$ ]]
+#           case "$GITHUB_REF" in
+#             refs/heads/main|refs/tags/v*) ;;
+#             *) echo "本番へ許可されていないrefです: $GITHUB_REF" >&2; exit 1 ;;
+#           esac
+#
+#       # 長期AWSアクセスキーをGitHub Secretsへ保存せず、ジョブごとの短期資格情報をOIDCで取得します。
+#       # IAM信頼ポリシー側でもrepository、ref、environmentのsubjectを制限します。
+#       - name: Configure AWS credentials with GitHub OIDC
+#         uses: aws-actions/configure-aws-credentials@<PINNED_COMMIT_SHA>
+#         with:
+#           role-to-assume: ${{ vars.PRODUCTION_DEPLOY_ROLE_ARN }}
+#           role-session-name: gha-production-${{ github.run_id }}
+#           aws-region: ${{ env.AWS_REGION }}
+#
+#       # タグは後から別イメージを指せるため、デプロイ対象をdigestで固定します。
+#       # ECRにdigestが存在し、スキャンが完了し、Critical脆弱性が許容基準以下であることを確認します。
+#       # Inspector Enhanced Scanningを使う場合は、実際の検出結果APIに合わせてコマンドを置き換えます。
+#       - name: Verify immutable image and vulnerability gate
+#         id: image
+#         env:
+#           IMAGE_DIGEST: ${{ inputs.image_digest }}
+#         run: |
+#           set -euo pipefail
+#           aws ecr describe-images \
+#             --repository-name "$ECR_REPOSITORY" \
+#             --image-ids imageDigest="$IMAGE_DIGEST" \
+#             --query 'imageDetails[0].imageDigest' \
+#             --output text | grep -Fx "$IMAGE_DIGEST"
+#           # JMESPathの`0`はAWS CLI側の数値リテラルであり、シェルのコマンド置換ではありません。
+#           # shellcheck disable=SC2016
+#           critical_count="$(aws ecr describe-image-scan-findings \
+#             --repository-name "$ECR_REPOSITORY" \
+#             --image-id imageDigest="$IMAGE_DIGEST" \
+#             --query 'imageScanFindings.findingSeverityCounts.CRITICAL || `0`' \
+#             --output text)"
+#           test "$critical_count" = "0"
+#           image_uri="$ECR_REGISTRY/$ECR_REPOSITORY@$IMAGE_DIGEST"
+#           echo "image_uri=$image_uri" >> "$GITHUB_OUTPUT"
+#
+#       # digestの存在だけでは、そのイメージがこのcommitのCI成果物であることを証明できません。
+#       # 採用する署名方式に合わせ、署名、provenance、SBOM、source commitの対応をここで検証します。
+#       # cosign、AWS Signer、GitHub artifact attestationsのいずれを使う場合も検証ツールをSHAまたはdigestで固定します。
+#       - name: Verify image signature and provenance
+#         env:
+#           IMAGE_URI: ${{ steps.image.outputs.image_uri }}
+#           EXPECTED_COMMIT: ${{ github.sha }}
+#         run: |
+#           set -euo pipefail
+#           echo "TODO: $IMAGE_URI の署名とprovenanceが $EXPECTED_COMMIT を指すことを検証する"
+#           exit 1
+#
+#       # マイグレーションとアプリケーションが参照するソースを同じcommitへ固定します。
+#       # JavaとGradle ActionもCIと同じバージョンおよび固定SHAを使います。
+#       - name: Set up JDK
+#         uses: actions/setup-java@dd06d9cba3e5552c54d9f8ea23572deb30010f7c
+#         with:
+#           distribution: corretto
+#           java-version: "25"
+#
+#       - name: Setup Gradle
+#         uses: gradle/actions/setup-gradle@9c971963bec38e04b3d30dcc455b5382be2fdbfb
+#         with:
+#           cache-provider: basic
+#
+#       # 失敗時にアプリケーションだけを直前のタスク定義へ戻せるよう、更新前の状態を保存します。
+#       # 現在のイメージdigestとDBスキーマタグもデプロイ記録へ残します。
+#       - name: Capture current production state
+#         id: previous
+#         run: |
+#           set -euo pipefail
+#           previous_task_definition="$(aws ecs describe-services \
+#             --cluster "$ECS_CLUSTER" \
+#             --services "$ECS_SERVICE" \
+#             --query 'services[0].taskDefinition' \
+#             --output text)"
+#           test -n "$previous_task_definition"
+#           echo "task_definition=$previous_task_definition" >> "$GITHUB_OUTPUT"
+#
+#       # DB変更前に、PITRが有効で直近の復旧点が存在することを確認します。
+#       # 破壊的変更を別リリースで行う場合は、承認済みの手動スナップショット作成と復元確認も追加します。
+#       # スナップショット作成APIの成功だけでは復元可能性を保証しないため、定期的な復元訓練が必要です。
+#       - name: Verify database recovery point
+#         run: |
+#           set -euo pipefail
+#           echo "TODO: AWS BackupまたはRDS APIでPITRと直近の復旧点を確認する"
+#           exit 1
+#
+#       # Liquibase専用資格情報だけをSecrets Managerから取得します。
+#       # 値をログへ出さず、add-mask後にこのジョブの環境変数へ渡します。
+#       # アプリケーション用DB資格情報はDDL権限を持たないため、マイグレーションへ流用しません。
+#       - name: Load migration credentials from Secrets Manager
+#         env:
+#           MIGRATION_SECRET_ID: ${{ vars.MIGRATION_SECRET_ID }}
+#         run: |
+#           set -euo pipefail
+#           secret_json="$(aws secretsmanager get-secret-value \
+#             --secret-id "$MIGRATION_SECRET_ID" \
+#             --query SecretString \
+#             --output text)"
+#           for key in MIGRATION_DB_URL MIGRATION_DB_USERNAME MIGRATION_DB_PASSWORD MIGRATION_DB_SCHEMA; do
+#             value="$(jq -er --arg key "$key" '.[$key]' <<<"$secret_json")"
+#             echo "::add-mask::$value"
+#             echo "$key=$value" >> "$GITHUB_ENV"
+#           done
+#           unset secret_json value
+#
+#       # databaseSchemaTagはリポジトリに固定し、workflow_dispatchの入力や作業者の記憶から選びません。
+#       # マイグレーション前に宣言タグがchangelog末尾へ一度だけ存在することを検査します。
+#       - name: Read release schema tag
+#         id: schema
+#         run: |
+#           set -euo pipefail
+#           schema_tag="$(sed -n 's/^databaseSchemaTag=//p' backend/gradle.properties)"
+#           test -n "$schema_tag"
+#           echo "tag=$schema_tag" >> "$GITHUB_OUTPUT"
+#
+#       # 本番では`make be-release-migrate`だけを実行し、`update`を直接呼びません。
+#       # `updateToTag`でリポジトリに固定されたタグまで適用し、未承認の後続changesetを取り込みません。
+#       # この処理はGitHub concurrencyとLiquibase lockにより単一実行にします。
+#       - name: Apply approved database migrations
+#         id: migrate
+#         run: |
+#           set -euo pipefail
+#           make be-release-migrate
+#           echo "completed=true" >> "$GITHUB_OUTPUT"
+#
+#       # タグ確認は、DATABASECHANGELOGを直接照会してタグ不在時に非0終了する実装を使います。
+#       # Liquibase標準のtagExistsはタグ不在でも終了コード0になるため、リリースゲートへ単独では使いません。
+#       - name: Verify deployed schema tag
+#         run: make be-schema-tag-check
+#
+#       # jOOQ生成コードはchangesetと同じcommitでGit管理されています。
+#       # 本番DBからのjOOQ生成は成果物を稼働DBへ依存させ、不要なメタデータ参照権限を持ち込むため実行しません。
+#       # `jooqCodegen`と`migrateAndGenerateJooq`は開発またはCIの使い捨てDBだけで実行します。
+#
+#       # タスク定義はIaC管理下のJSONを基準にし、アプリケーションの秘密値を直接埋め込みません。
+#       # イメージだけを検証済みdigestへ差し替え、ECSタスクのsecrets参照は維持します。
+#       - name: Render ECS task definition with image digest
+#         id: render
+#         uses: aws-actions/amazon-ecs-render-task-definition@<PINNED_COMMIT_SHA>
+#         with:
+#           task-definition: ${{ vars.ECS_TASK_DEFINITION_PATH }}
+#           container-name: ${{ env.ECS_CONTAINER_NAME }}
+#           image: ${{ steps.image.outputs.image_uri }}
+#
+#       # rolling、blue/green、canaryのどれを採用するかはインフラ設計で確定させます。
+#       # rollingを使う場合もminimumHealthyPercent、maximumPercent、circuit breaker、alarmをIaCで明示します。
+#       # deploy Actionは新タスクの安定化まで待機し、起動要求を出しただけで成功扱いにしません。
+#       - name: Deploy ECS service
+#         id: deploy
+#         uses: aws-actions/amazon-ecs-deploy-task-definition@<PINNED_COMMIT_SHA>
+#         with:
+#           task-definition: ${{ steps.render.outputs.task-definition }}
+#           cluster: ${{ env.ECS_CLUSTER }}
+#           service: ${{ env.ECS_SERVICE }}
+#           wait-for-service-stability: true
+#
+#       # ALB経由でreadinessを確認し、利用者と同じネットワーク経路を通します。
+#       # 200応答だけでなく、レスポンス本文のstatusも確認します。
+#       - name: Run public readiness smoke test
+#         env:
+#           BASE_URL: ${{ vars.PRODUCTION_BASE_URL }}
+#         run: |
+#           set -euo pipefail
+#           response="$(curl --fail --silent --show-error \
+#             --retry 6 --retry-all-errors --retry-delay 5 \
+#             "$BASE_URL/actuator/health/readiness")"
+#           jq -e '.status == "UP"' <<<"$response"
+#
+#       # readinessだけでは認証、DB、Redisを使う主要機能の回帰を検出できません。
+#       # 本番向けの読み取り中心の合成トランザクションを用意し、テストデータと監査ログを識別可能にします。
+#       # 認証トークンを使う場合は専用の低権限アカウントをSecrets Managerで管理し、ログへ出しません。
+#       - name: Run authenticated critical-path smoke test
+#         env:
+#           BASE_URL: ${{ vars.PRODUCTION_BASE_URL }}
+#         run: |
+#           set -euo pipefail
+#           echo "TODO: 本番向け合成トランザクションを実行する"
+#           exit 1
+#
+#       # デプロイ直後だけ正常でも、エラー率やレイテンシが数分後に悪化する場合があります。
+#       # 一定時間CloudWatch Alarmを監視し、ALARMまたはINSUFFICIENT_DATAを成功扱いにしません。
+#       - name: Observe production alarms
+#         env:
+#           ALARM_NAMES: ${{ vars.DEPLOYMENT_ALARM_NAMES }}
+#         run: |
+#           set -euo pipefail
+#           echo "TODO: 指定時間、ECS、ALB、RDS、アプリケーションのAlarmがOKであることを確認する"
+#           exit 1
+#
+#       # デプロイ後のcommit、イメージdigest、DBタグ、ECSタスク定義を一組の履歴として残します。
+#       # DB切り戻しが必要な場合は、作業者の推測ではなくこの履歴から対象タグを選びます。
+#       - name: Write deployment summary
+#         if: success()
+#         env:
+#           IMAGE_DIGEST: ${{ inputs.image_digest }}
+#           SCHEMA_TAG: ${{ steps.schema.outputs.tag }}
+#           PREVIOUS_TASK_DEFINITION: ${{ steps.previous.outputs.task_definition }}
+#           NEW_TASK_DEFINITION: ${{ steps.deploy.outputs.task-definition-arn }}
+#         run: |
+#           {
+#             echo "## Production deployment"
+#             echo "- Commit: $GITHUB_SHA"
+#             echo "- Image digest: $IMAGE_DIGEST"
+#             echo "- Schema tag: $SCHEMA_TAG"
+#             echo "- Previous task definition: $PREVIOUS_TASK_DEFINITION"
+#             echo "- New task definition: $NEW_TASK_DEFINITION"
+#           } >> "$GITHUB_STEP_SUMMARY"
+#
+#       # ECS更新後のスモークまたは監視が失敗した場合は、アプリケーションだけを直前のタスク定義へ戻します。
+#       # マイグレーションが後方互換なら、新しいスキーマを残したまま旧アプリケーションを動かせます。
+#       # この切り戻しを成立させるため、expand-and-contractをデプロイ規約にします。
+#       - name: Roll back application task definition on failure
+#         if: failure() && steps.previous.outputs.task_definition != ''
+#         env:
+#           PREVIOUS_TASK_DEFINITION: ${{ steps.previous.outputs.task_definition }}
+#         run: |
+#           set -euo pipefail
+#           aws ecs update-service \
+#             --cluster "$ECS_CLUSTER" \
+#             --service "$ECS_SERVICE" \
+#             --task-definition "$PREVIOUS_TASK_DEFINITION"
+#           aws ecs wait services-stable \
+#             --cluster "$ECS_CLUSTER" \
+#             --services "$ECS_SERVICE"
+#
+#       # DBの自動rollbackは行いません。
+#       # DROPやデータ変換を自動で戻すと、デプロイ後に書き込まれたデータを失う可能性があります。
+#       # DB切り戻しは書き込み停止、復旧点確認、rollback SQLレビュー、専用Environment承認を持つ別ワークフローで実行します。
+#       # アプリケーション切り戻し後も互換性が保てない場合は、インシデント対応へ移行して手動判断します。
+#       - name: Report database rollback policy on failure
+#         if: failure() && steps.migrate.outputs.completed == 'true'
+#         run: |
+#           {
+#             echo "## Database rollback"
+#             echo "DBは自動で切り戻していません。"
+#             echo "書き込み停止と復旧点を確認し、承認済みのDB切り戻し手順を使用してください。"
+#           } >> "$GITHUB_STEP_SUMMARY"
+#
+#       # 失敗調査に必要なECSイベントとCloudWatch Logsへのリンクを残します。
+#       # ログ本文を無制限にartifact化すると秘密値や個人情報を持ち出すため、収集範囲と保持期間を決めます。
+#       - name: Collect deployment diagnostics
+#         if: failure()
+#         run: |
+#           set -euo pipefail
+#           aws ecs describe-services \
+#             --cluster "$ECS_CLUSTER" \
+#             --services "$ECS_SERVICE" \
+#             --query 'services[0].events[0:10]'
+#
+#       # 成否を運用チャネルとインシデント管理へ通知します。
+#       # GitHubの実行URL、commit、digest、schema tagを含め、シークレットや接続文字列は含めません。
+#       - name: Notify deployment result
+#         if: always()
+#         run: |
+#           echo "TODO: 承認済みの通知先へデプロイ結果を送る"

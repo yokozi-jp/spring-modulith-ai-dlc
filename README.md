@@ -45,7 +45,7 @@ Spring Modulith を用いたモジュラーモノリスアーキテクチャの�
 | -------------------------- | ---------- |
 | Java (Amazon Corretto)     | 25         |
 | Spring Boot                | 4.1.1      |
-| Spring Modulith            | 2.1.0      |
+| Spring Modulith            | 2.1.1      |
 | TypeScript                 | 7.0.x      |
 | VitePlus                   | latest     |
 | pnpm                       | 11.21.0    |
@@ -130,6 +130,12 @@ cp .env.example .env
 make compose-up
 ```
 
+バックエンドの初回起動前とchangeset追加後に、マイグレーションを明示実行します。
+
+```bash
+make be-migrate
+```
+
 バックエンドはルートの `.env` を読み込み、ホスト上で起動します。
 
 ```bash
@@ -182,13 +188,30 @@ Docker を使うターゲット（semgrep / trivy / actionlint / zizmor / hadoli
 
 ### バックエンド（Gradle）
 
-| ターゲット       | 内容                                                         |
-| ---------------- | ------------------------------------------------------------ |
-| `make be-format` | コードフォーマット適用（Spotless）                           |
-| `make be-lint`   | 静的解析（PMD + SpotBugs + Spotless チェック）               |
-| `make test`      | 隔離した依存を起動してテストを実行し、終了後に片付ける       |
-| `make be-test`   | テスト実行のみ（.env.test 使用・依存起動済み前提。CI/部品用）|
-| `make be-sbom`   | SBOM 生成（CycloneDX 形式）                                  |
+| ターゲット                  | 内容                                                           |
+| --------------------------- | -------------------------------------------------------------- |
+| `make be-format`            | コードフォーマット適用（Spotless）                             |
+| `make be-lint`              | 静的解析（PMD + SpotBugs + Spotless チェック）                 |
+| `make be-migrate`           | 現在の宣言的スキーマタグまでマイグレーション                   |
+| `make be-release-migrate`   | 本番向けマイグレーション（実行時のタグ入力は不要）             |
+| `make be-schema-tag-check`  | 現在の宣言的スキーマタグがDBに存在することを確認               |
+| `make be-verify-migrations` | 使い捨てDBで適用、rollback、再適用、タグを検証                 |
+| `make be-rollback-check`    | 切り戻し対象タグの存在を確認                                   |
+| `make be-rollback-preview`  | 指定タグまでの切り戻しSQLを生成（DB変更なし）                  |
+| `make be-rollback`          | 明示確認付きで指定タグまで切り戻し                             |
+| `make be-generate-jooq`     | 現在のDBからjOOQコードを生成                                   |
+| `make be-refresh-jooq`      | マイグレーション後の最新DBからjOOQコードを生成                 |
+| `make test`                 | 隔離DBでrollback検証後にテストして片付ける                     |
+| `make be-test`              | 明示マイグレーションとテストを実行（依存起動済みのCI部品用）   |
+| `make be-sbom`              | SBOM生成（CycloneDX形式）                                      |
+
+アプリケーション起動時のLiquibase自動実行は無効です。
+jOOQコード生成には公式`org.jooq.jooq-codegen-gradle`プラグイン3.21.7を使用し、PostgreSQLの絶対時刻を`Instant`へマッピングします。
+生成コードはchangesetと同じ変更としてGit管理し、本番のDBマイグレーションとアプリケーションデプロイではjOOQコード生成を実行しません。
+DBスキーマタグはchangelog内の`tagDatabase` changesetで管理し、現在タグは`backend/gradle.properties`から自動選択します。
+ローカルの初回起動時とchangeset追加後は`make be-migrate`を実行してください。
+本番ではタグを手入力せず、`make be-release-migrate`でリポジトリに固定されたスキーマタグまで適用します。
+changesetとjOOQ生成コードを更新する手順、本番の資格情報、デプロイ順序、DB切り戻しは[DBマイグレーションとjOOQコード生成](docs/database-migrations.md)を参照してください。
 
 `make test` はテスト専用スタック（`docker/compose-test.yml` の PostgreSQL 5433 / Redis 6380）を
 `.env.test` で起動し、終了後にボリュームごと片付けます。
@@ -206,9 +229,9 @@ Docker を使うターゲット（semgrep / trivy / actionlint / zizmor / hadoli
 
 Semgrep OSS（コミュニティエディション）で静的解析を行います（`.kiro` / `aidlc` は対象外）。
 
-| ターゲット           | 内容                                                     |
-| -------------------- | -------------------------------------------------------- |
-| `make lint-semgrep`  | 静的解析（Semgrep OSS / Docker 実行、検出があれば失敗）  |
+| ターゲット          | 内容                                                    |
+| ------------------- | ------------------------------------------------------- |
+| `make lint-semgrep` | 静的解析（Semgrep OSS / Docker 実行、検出があれば失敗） |
 
 ### 静的解析・脆弱性スキャン（Snyk・任意）
 
@@ -219,11 +242,11 @@ Snyk は任意導入です。利用にはアカウント作成が必要で、本
 
 依存関係の脆弱性を Trivy でスキャンします。backend は CycloneDX SBOM 経由、frontend は依存を解決してからスキャンします。
 
-| ターゲット                  | 内容                                                          |
-| --------------------------- | ------------------------------------------------------------- |
-| `make scan-vulns`           | backend + frontend の脆弱性スキャン（Trivy / Docker 実行）    |
-| `make scan-vulns-backend`   | backend（Gradle）の脆弱性スキャン（SBOM 経由）                |
-| `make scan-vulns-frontend`  | frontend（pnpm）の脆弱性スキャン（依存解決後）                |
+| ターゲット                 | 内容                                                       |
+| -------------------------- | ---------------------------------------------------------- |
+| `make scan-vulns`          | backend + frontend の脆弱性スキャン（Trivy / Docker 実行） |
+| `make scan-vulns-backend`  | backend（Gradle）の脆弱性スキャン（SBOM 経由）             |
+| `make scan-vulns-frontend` | frontend（pnpm）の脆弱性スキャン（依存解決後）             |
 
 ### GitHub Actions ワークフロー
 
@@ -244,10 +267,10 @@ Snyk は任意導入です。利用にはアカウント作成が必要で、本
 
 Markdown ファイルの体裁を markdownlint-cli2 で検査します。除外設定は `.markdownlint-cli2.yaml` の `ignores` に従います（`.kiro` 配下は steering のみ対象）。
 
-| ターゲット                | 内容                                             |
-| ------------------------- | ------------------------------------------------ |
-| `make lint-md`            | Markdown の Lint（検出があれば失敗）             |
-| `make lint-md-fix`        | Markdown の Lint 自動修正（安全に直せる項目のみ）|
+| ターゲット         | 内容                                              |
+| ------------------ | ------------------------------------------------- |
+| `make lint-md`     | Markdown の Lint（検出があれば失敗）              |
+| `make lint-md-fix` | Markdown の Lint 自動修正（安全に直せる項目のみ） |
 
 ### 自動実行（Git フック / CI）
 

@@ -28,3 +28,15 @@ regexes = [
   '''\$\$\(cat /run/secrets/[a-z_]+\)''',
   '''KC_BOOTSTRAP_ADMIN_PASSWORD:\s*admin''',
 ]
+
+# backend/build.gradle の Liquibase / jOOQ 設定は、パスワードを環境変数由来の変数へ束ねて
+# 参照するだけで実値を直書きしない。password に変数名（英字識別子）を代入する行だけを除外し、
+# 引用符付きリテラルの直書きは引き続き検出できるようにする。
+[[allowlists]]
+description = "backend/build.gradle の Liquibase / jOOQ 設定で password に変数参照を代入する行を除外（リテラル直書きは検出対象のまま）"
+paths = [
+  '''(^|/)backend/build\.gradle$''',
+]
+regexes = [
+  '''password\s*=?\s*[a-zA-Z_][a-zA-Z0-9_]*$''',
+]

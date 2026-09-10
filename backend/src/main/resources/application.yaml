@@ -29,11 +29,10 @@ spring:
       # 新しい物理接続ごとにDBセッションの日時解釈と表示をUTCへ固定する。
       connection-init-sql: SET TIME ZONE 'UTC'
 
-  # Liquibase: DB マイグレーション
+  # Liquibase: アプリケーション起動からDBマイグレーションを分離する。
+  # 変更はデプロイ前に ./gradlew migrateDatabase などの明示コマンドで適用する。
   liquibase:
-    # 管理テーブル・変更セットの適用先スキーマを明示する。
-    # build.gradle の defaultSchemaName と揃え、暗黙依存（Hikari の schema 経由）にしない。
-    default-schema: ${DB_SCHEMA}
+    enabled: false
 
   # Redis
   data:
