@@ -1,3 +1,14 @@
+# 厳格な既定（規約: .kiro/steering/makefile-best-practices.md）。
+# レシピ全体を単一シェル（.ONESHELL）の bash strict mode で実行し、失敗時は生成途中のターゲットを削除する。
+# .ONESHELL のため、複数行レシピは行をまたいで状態を共有する。ディレクトリ移動はサブシェルに閉じ込め、
+# 2 行目以降の行頭に @/-/+ を置かない（1 行目の接頭辞だけがレシピ全体に適用される）。
+SHELL := bash
+.ONESHELL:
+.SHELLFLAGS := -eu -o pipefail -c
+.DELETE_ON_ERROR:
+MAKEFLAGS += --warn-undefined-variables
+MAKEFLAGS += --no-builtin-rules
+
 DOCKER ?= $(shell command -v docker)
 COMPOSE_ENV_FILE ?= .env
 COMPOSE_FILE ?= docker/compose.yml
@@ -8,7 +19,13 @@ TEST_ENV_FILE ?= .env.test
 TEST_COMPOSE_FILE ?= docker/compose-test.yml
 TEST_COMPOSE = $(DOCKER) compose -f $(TEST_COMPOSE_FILE)
 
-.PHONY: help dev check verify e2e adr-check setup be-run be-migrate be-migrate-dev be-release-migrate be-schema-tag-check be-verify-migrations be-rollback-check be-rollback-preview be-rollback be-generate-jooq be-refresh-jooq be-format be-lint be-test be-test-dev test test-dev test-deps-up test-deps-down be-coverage be-sbom compose-up compose-up-backend compose-down compose-ps compose-logs keycloak-logs keycloak-reimport oidc-check compose-reset scan-secrets scan-secrets-all lint-actions lint-actions-security lint-docker lint-docker-check lint-compose lint-md lint-md-fix lint-semgrep scan-vulns scan-vulns-backend scan-vulns-frontend
+# コマンドラインから渡す変数（未指定時は空）。
+# 明示的に空を定義し、--warn-undefined-variables の警告を避ける。
+DB_ROLLBACK_TAG ?=
+CONFIRM_ROLLBACK ?=
+CONFIRM_RESET ?=
+
+.PHONY: help dev check verify e2e adr-check setup be-run be-migrate be-migrate-dev be-release-migrate be-schema-tag-check be-verify-migrations be-rollback-check be-rollback-preview be-rollback be-generate-jooq be-refresh-jooq be-format be-lint be-test be-test-dev test test-dev test-deps-up test-deps-down be-sbom compose-up compose-up-backend compose-down compose-ps compose-logs keycloak-logs keycloak-reimport oidc-check compose-reset scan-secrets scan-secrets-all lint-actions lint-actions-security lint-docker lint-docker-check lint-compose lint-md lint-md-fix lint-semgrep scan-vulns scan-vulns-backend scan-vulns-frontend
 
 # 引数なしの make はヘルプを表示する（setup を誤って実行しないため）。
 .DEFAULT_GOAL := help
@@ -37,7 +54,7 @@ verify: be-lint test
 ## E2E（未整備）。docs/e2e-testing-strategy.md の方針に沿って構築予定。
 e2e:
 	@echo "E2E はまだ整備されていません。docs/e2e-testing-strategy.md を参照してください。"
-	@echo "整備後は「フルスタック起動→シード→playwright test」をこのターゲットに束ねます。"
+	echo "整備後は「フルスタック起動→シード→playwright test」をこのターゲットに束ねます。"
 
 ##@ ADR
 ## 判断が絡む変更に ADR が伴うかを確認（push 前のナッジ）
@@ -108,9 +125,9 @@ be-migrate-dev:
 .PHONY: _require-migration-env
 _require-migration-env:
 	@test -n "$${MIGRATION_DB_URL:-}" || { echo "MIGRATION_DB_URLを指定してください。" >&2; exit 1; }
-	@test -n "$${MIGRATION_DB_USERNAME:-}" || { echo "MIGRATION_DB_USERNAMEを指定してください。" >&2; exit 1; }
-	@test -n "$${MIGRATION_DB_PASSWORD:-}" || { echo "MIGRATION_DB_PASSWORDを指定してください。" >&2; exit 1; }
-	@test -n "$${MIGRATION_DB_SCHEMA:-}" || { echo "MIGRATION_DB_SCHEMAを指定してください。" >&2; exit 1; }
+	test -n "$${MIGRATION_DB_USERNAME:-}" || { echo "MIGRATION_DB_USERNAMEを指定してください。" >&2; exit 1; }
+	test -n "$${MIGRATION_DB_PASSWORD:-}" || { echo "MIGRATION_DB_PASSWORDを指定してください。" >&2; exit 1; }
+	test -n "$${MIGRATION_DB_SCHEMA:-}" || { echo "MIGRATION_DB_SCHEMAを指定してください。" >&2; exit 1; }
 
 ## 本番向けマイグレーション。タグ名はGit管理し、実行時入力を不要にする。
 be-release-migrate: _require-migration-env
@@ -300,11 +317,17 @@ oidc-check:
 		printf "%s" "$$response" | grep -q "200 OK"; \
 		printf "%s" "$$response" | grep -q "\"issuer\":\"http://localhost:8080/realms/spring-modulith\""; \
 		printf "%s" "$$response" | grep -q "\"S256\""'
-	@echo "OIDC discovery と PKCE S256 を確認しました。"
-	@echo "Login URL: http://localhost:18080/oauth2/authorization/web"
+	echo "OIDC discovery と PKCE S256 を確認しました。"
+	echo "Login URL: http://localhost:18080/oauth2/authorization/web"
 
-## Compose サービスと named volume を削除して初期化
+## Compose サービスと named volume を削除して初期化（全サービスのデータを削除）
+## 破壊的操作のため CONFIRM_RESET=yes を要求する（例: make compose-reset CONFIRM_RESET=yes）。
 compose-reset:
+	@set -eu; \
+	if [ "$(CONFIRM_RESET)" != "yes" ]; then \
+		echo "全サービスのデータを削除して初期化します。実行するには CONFIRM_RESET=yes を指定してください（例: make compose-reset CONFIRM_RESET=yes）。" >&2; \
+		exit 1; \
+	fi
 	$(COMPOSE) --profile backend down --volumes --remove-orphans
 
 ##@ Security（シークレットスキャン）
@@ -326,7 +349,7 @@ lint-actions:
 ## GitHub Actions ワークフローのセキュリティ解析（zizmor / Docker 実行）
 lint-actions-security:
 	docker run --rm -v "$$PWD":/repo -w /repo \
-		ghcr.io/zizmorcore/zizmor:latest .github/workflows/
+		ghcr.io/zizmorcore/zizmor:1.29.0@sha256:863026d54f91271b10b60b67ad8054cb37120167e162482597db102b3026a284 .github/workflows/
 
 ## Dockerfile のベストプラクティス検査（hadolint / Docker 実行）
 ## リポジトリ内の全 Dockerfile を対象にする
@@ -402,7 +425,7 @@ scan-vulns: scan-vulns-backend scan-vulns-frontend
 
 ## backend（Gradle）の脆弱性スキャン（SBOM 経由）
 scan-vulns-backend:
-	cd backend && ./gradlew cyclonedxBom
+	( cd backend && ./gradlew cyclonedxBom )
 	docker run --rm -v "$$PWD/backend":/src -w /src \
 		-e TRIVY_DB_REPOSITORY=mirror.gcr.io/aquasec/trivy-db:2 \
 		-e TRIVY_JAVA_DB_REPOSITORY=mirror.gcr.io/aquasec/trivy-java-db:1 \
@@ -412,7 +435,7 @@ scan-vulns-backend:
 
 ## frontend（pnpm）の脆弱性スキャン（依存を解決してから）
 scan-vulns-frontend:
-	cd frontend && pnpm install --frozen-lockfile
+	( cd frontend && pnpm install --frozen-lockfile )
 	docker run --rm -v "$$PWD/frontend":/src -w /src \
 		-e TRIVY_DB_REPOSITORY=mirror.gcr.io/aquasec/trivy-db:2 \
 		-e TRIVY_JAVA_DB_REPOSITORY=mirror.gcr.io/aquasec/trivy-java-db:1 \

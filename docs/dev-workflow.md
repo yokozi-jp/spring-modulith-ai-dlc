@@ -8,7 +8,7 @@
 
 - **`make dev`**：依存サービスを起動してバックエンドを起動する。日々の開発の入口。
 - **`make check`**：素早いローカル確認（バックエンドの静的解析）。こまめに回す。
-- **`make verify`**：push 前の総合ゲート（静的解析＋隔離テスト）。CI と同じ内容。
+- **`make verify`**：push 前の総合ゲート（静的解析と、使い捨てDBでのマイグレーション検証とテスト）。CI と同じ内容。
 - **`make e2e`**：E2E（未整備。`docs/e2e-testing-strategy.md` に沿って構築予定）。
 
 これ以外の細かいターゲットは、上記や CI・Git フックから呼ばれる**部品**である。
@@ -54,7 +54,7 @@ changeset と jOOQ 生成コードは同じ変更として Git 管理する。
 ### push する前
 
 ```bash
-make verify                # be-lint + 隔離テスト（CI と同じ）
+make verify                # be-lint + 使い捨てDBでのマイグレーション検証とテスト（CI と同じ）
 ```
 
 `make verify` は `.env.test` の隔離スタック（PostgreSQL 5433 / Redis 6380）を
@@ -77,12 +77,40 @@ make e2e                   # フルスタック起動→シード→playwright t
 
 現時点では未整備。方針は `docs/e2e-testing-strategy.md` を参照。
 
-### サービスの停止・初期化
+### Docker Compose とサービスの操作
+
+依存サービス（PostgreSQL / Keycloak / Redis / Grafana）は Docker Compose で起動する。
+通常はこれらだけを起動し、バックエンドは `make be-run`（`make dev` の一部）でホスト上に立てる。
+`.env` はルートの `.env.example` をコピーして用意し、パスワードを変更しておく。
+
+```bash
+make compose-ps            # サービスの状態を確認
+make compose-up-backend    # backend profile も有効にしてコンテナで起動
+```
+
+Keycloak の OIDC discovery、issuer、PKCE S256 対応を確認する。ログの追跡も同様。
+
+```bash
+make oidc-check
+make keycloak-logs
+```
+
+`realm.json` を変更しても、既存 realm は起動時インポートで上書きされない。
+Keycloak のローカルデータだけを削除して realm を再投入するには `make keycloak-reimport` を使う。
+これは PostgreSQL、Redis、Grafana のデータを保持する。
+
+```bash
+make keycloak-reimport
+```
+
+停止と初期化は次のとおり。
 
 ```bash
 make compose-down          # 停止（named volume は保持）
-make compose-reset         # volume ごと削除して初期化（データは失われる）
+make compose-reset CONFIRM_RESET=yes   # 全サービスの volume ごと削除して初期化（データは失われる）
 ```
+
+`compose-reset` は全サービスのデータを削除するため、確認変数 `CONFIRM_RESET=yes` を指定しないと実行されない。
 
 ## ローカル・CI・フックの一致
 
