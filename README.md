@@ -33,11 +33,22 @@
 4. [開発環境構築](#開発環境構築)
 5. [開発コマンド](#開発コマンド)
 6. [Lint・テスト](#lintテスト)
-7. [トラブルシューティング](#トラブルシューティング)
+7. [設計判断の記録（ADR）](#設計判断の記録adr)
 
 ## プロジェクトについて
 
-Spring Modulith を用いたモジュラーモノリスアーキテクチャのサンプルプロジェクト。
+**Spring Modulith** を用いた**モジュラーモノリス**の土台となるプロジェクトです。
+単一のデプロイ単位の内側を業務モジュールへ分割し、モジュール間の境界と依存を Spring Modulith で検証しながら開発することを狙いとしています。
+開発は [AI-DLC（AI-Driven Development Life Cycle）](https://github.com/awslabs/aidlc-workflows)に沿って進めます。
+
+現時点で整備済みなのは、業務モジュールを載せる前の基盤部分です。
+
+- **認証と認可**：Keycloak を認可サーバとした OIDC（OAuth2 Client）と、Redis による分散セッション
+- **データアクセス**：Liquibase によるDBマイグレーションと、スキーマから生成する jOOQ コード
+- **可観測性**：OpenTelemetry による計装と、Grafana OpenTelemetry LGTM への集約
+- **品質ゲート**：静的解析、シークレットと脆弱性のスキャン、使い捨てDBでのテストを Git フックと CI で強制
+
+業務ドメインのモジュールはこれから追加していきます。
 
 ## 環境
 
@@ -45,7 +56,7 @@ Spring Modulith を用いたモジュラーモノリスアーキテクチャの�
 | -------------------------- | ---------- |
 | Java (Amazon Corretto)     | 25         |
 | Spring Boot                | 4.1.1      |
-| Spring Modulith            | 2.1.0      |
+| Spring Modulith            | 2.1.1      |
 | TypeScript                 | 7.0.x      |
 | VitePlus                   | latest     |
 | pnpm                       | 11.21.0    |
@@ -76,6 +87,7 @@ Spring Modulith を用いたモジュラーモノリスアーキテクチャの�
 │   ├── initdb/       # PostgreSQL 初期化スクリプト（スキーマ作成）
 │   └── keycloak/     # Keycloak realm 定義（起動時インポート）
 ├── docs/             # ドキュメント
+│   ├── adr/              # Architecture Decision Records（設計判断の記録）
 │   ├── aidlc-setup/      # AI-DLC セットアップ手順
 │   └── local-env-setup/  # 開発環境構築手順・スクリプト
 ├── frontend/         # VitePlus + TypeScript フロントエンド（pnpm）
@@ -104,7 +116,8 @@ Spring Modulith を用いたモジュラーモノリスアーキテクチャの�
 
 ### AI-DLC のセットアップ
 
-[AI-DLC セットアップ](docs/aidlc-setup/setup.md) を参照してください。
+- 導入手順は [AI-DLC セットアップ](docs/aidlc-setup/setup.md) を参照してください。
+- 使い方は [AI-DLC の公式ドキュメント](https://github.com/awslabs/aidlc-workflows/tree/main/docs) を参照してください。
 
 <p align="right">(<a href="#top">トップへ</a>)</p>
 
@@ -116,153 +129,50 @@ Spring Modulith を用いたモジュラーモノリスアーキテクチャの�
 make <ターゲット名>
 ```
 
-### Docker Compose
+引数なしの `make`（または `make help`）で、カテゴリ別のターゲット一覧を表示します。
 
-ルートのサンプルを `.env` へコピーし、パスワードを変更します。
+### Quick Start
 
-```bash
-cp .env.example .env
-```
-
-通常は PostgreSQL、Keycloak、Redis、Grafana OpenTelemetry LGTM だけを起動します。
+初回は次の順で環境を立ち上げます。
 
 ```bash
-make compose-up
-```
-
-バックエンドはルートの `.env` を読み込み、ホスト上で起動します。
-
-```bash
-make be-run
+cp .env.example .env       # 環境変数を用意し、パスワードを変更する
+make compose-up            # PostgreSQL / Keycloak / Redis / Grafana を起動
+make be-migrate            # 初回はマイグレーションを明示実行する
+make dev                   # 依存起動＋バックエンドを起動
 ```
 
 バックエンドは <http://localhost:18080>、Keycloak は <http://localhost:8080>、Grafana は <http://localhost:3000> で公開されます。
 
-バックエンドもコンテナで確認するときだけ `backend` profile を有効にします。
+日々の開発で使う入口タスクは次の三つです。
 
-```bash
-make compose-up-backend
-```
+- **`make dev`**：依存サービスを起動してバックエンドを起動（日々の開発の入口）。
+- **`make check`**：素早いローカル確認（バックエンドの静的解析）。
+- **`make verify`**：push 前の総合ゲート（静的解析と、使い捨てDBでのマイグレーション検証とテスト。CI と同じ内容）。
 
-サービスの状態確認と停止には次のターゲットを使用します。
-
-```bash
-make compose-ps
-make compose-down
-```
-
-Keycloak の OIDC discovery、issuer、PKCE S256 対応を確認します。
-
-```bash
-make oidc-check
-```
-
-Keycloak のログだけを追跡する場合は次のターゲットを使用します。
-
-```bash
-make keycloak-logs
-```
-
-`realm.json` を変更した場合、既存 realm は起動時インポートで上書きされません。
-Keycloak のローカルデータだけを削除して realm を再投入するには、次のターゲットを使用します。
-
-```bash
-make keycloak-reimport
-```
-
-`make keycloak-reimport` は PostgreSQL、Redis、Grafana のデータを保持します。
-全サービスのデータも削除して初期化する場合だけ `make compose-reset` を使用します。
+Docker Compose の操作（サービスの起動、停止、状態確認、Keycloak の realm 再投入）や、「いつ、どのコマンドを、どの順で使うか」のシナリオ別の手順は [開発ワークフロー](docs/dev-workflow.md) を参照してください。
 
 <p align="right">(<a href="#top">トップへ</a>)</p>
 
 ## Lint・テスト
 
-各種チェックは [`Makefile`](Makefile) のターゲットとして実行できます（`make <ターゲット名>`）。
-Docker を使うターゲット（semgrep / trivy / actionlint / zizmor / hadolint / docker build --check / compose）は、Docker が無い環境ではスキップされます。
+静的解析、シークレットと脆弱性のスキャン、テストは、いずれも [`Makefile`](Makefile) のターゲットとして実行できます（`make <ターゲット名>`）。
+日常的には push 前に `make verify`（静的解析と、使い捨てDBでのマイグレーション検証とテスト、CI と同じ内容）を回せば足ります。
 
-### バックエンド（Gradle）
-
-| ターゲット       | 内容                                                         |
-| ---------------- | ------------------------------------------------------------ |
-| `make be-format` | コードフォーマット適用（Spotless）                           |
-| `make be-lint`   | 静的解析（PMD + SpotBugs + Spotless チェック）               |
-| `make test`      | 隔離した依存を起動してテストを実行し、終了後に片付ける       |
-| `make be-test`   | テスト実行のみ（.env.test 使用・依存起動済み前提。CI/部品用）|
-| `make be-sbom`   | SBOM 生成（CycloneDX 形式）                                  |
-
-`make test` はテスト専用スタック（`docker/compose-test.yml` の PostgreSQL 5433 / Redis 6380）を
-`.env.test` で起動し、終了後にボリュームごと片付けます。
-開発用スタック（`make compose-up` の 5432 / 6379）とポートを分けているため、`make be-run` で
-バックエンドをホスト起動したまま `make test` を並行実行できます。
-
-### シークレットスキャン（betterleaks）
-
-| ターゲット              | 内容                                                  |
-| ----------------------- | ----------------------------------------------------- |
-| `make scan-secrets`     | ステージ済みの変更をスキャン（pre-commit 相当）       |
-| `make scan-secrets-all` | リポジトリ全体（履歴含む）をスキャン（pre-push 相当） |
-
-### 静的解析（Semgrep）
-
-Semgrep OSS（コミュニティエディション）で静的解析を行います（`.kiro` / `aidlc` は対象外）。
-
-| ターゲット           | 内容                                                     |
-| -------------------- | -------------------------------------------------------- |
-| `make lint-semgrep`  | 静的解析（Semgrep OSS / Docker 実行、検出があれば失敗）  |
-
-### 静的解析・脆弱性スキャン（Snyk・任意）
-
-Snyk は任意導入です。利用にはアカウント作成が必要で、本プロジェクトは free プランで運用しています。
-`.snyk` にスキャン除外ポリシーを定義し、`.kiro` / `aidlc` / `.agents`（いずれも AI-DLC のフレームワークコードでプロダクションコードではない）を対象から除外しています。
-
-### 脆弱性スキャン（Trivy）
-
-依存関係の脆弱性を Trivy でスキャンします。backend は CycloneDX SBOM 経由、frontend は依存を解決してからスキャンします。
-
-| ターゲット                  | 内容                                                          |
-| --------------------------- | ------------------------------------------------------------- |
-| `make scan-vulns`           | backend + frontend の脆弱性スキャン（Trivy / Docker 実行）    |
-| `make scan-vulns-backend`   | backend（Gradle）の脆弱性スキャン（SBOM 経由）                |
-| `make scan-vulns-frontend`  | frontend（pnpm）の脆弱性スキャン（依存解決後）                |
-
-### GitHub Actions ワークフロー
-
-| ターゲット                   | 内容                                     |
-| ---------------------------- | ---------------------------------------- |
-| `make lint-actions`          | ワークフローの Lint（actionlint）        |
-| `make lint-actions-security` | ワークフローのセキュリティ解析（zizmor） |
-
-### Docker / Compose
-
-| ターゲット               | 内容                                                                  |
-| ------------------------ | --------------------------------------------------------------------- |
-| `make lint-docker`       | Dockerfile のベストプラクティス検査（hadolint）                       |
-| `make lint-docker-check` | Dockerfile の Docker 公式チェック（docker build --check）             |
-| `make lint-compose`      | Compose ファイルの構文・参照・変数展開の検証（docker compose config） |
-
-### Markdown Lint（markdownlint-cli2）
-
-Markdown ファイルの体裁を markdownlint-cli2 で検査します。除外設定は `.markdownlint-cli2.yaml` の `ignores` に従います（`.kiro` 配下は steering のみ対象）。
-
-| ターゲット                | 内容                                             |
-| ------------------------- | ------------------------------------------------ |
-| `make lint-md`            | Markdown の Lint（検出があれば失敗）             |
-| `make lint-md-fix`        | Markdown の Lint 自動修正（安全に直せる項目のみ）|
-
-### 自動実行（Git フック / CI）
-
-- **Git フック（Lefthook, [`lefthook.yml`](lefthook.yml)）**
-  - commit-msg: commitlint（コミットメッセージを Conventional Commits 規約で検証）
-  - pre-commit: betterleaks（ステージ済み）、hadolint / docker build --check（Dockerfile 変更時）、compose config（Compose 変更時）、markdownlint（Markdown 変更時）
-  - pre-push: betterleaks（全履歴）、be-lint（Spotless + PMD + SpotBugs）/ be-test（`make test`）（backend 変更時）、actionlint / zizmor（ワークフロー変更時）
-- **CI（GitHub Actions, [`.github/workflows/`](.github/workflows/)）**
-  - `backend-ci.yml`（backend の Lint（Spotless + PMD + SpotBugs）とテスト・カバレッジ）、`betterleaks.yml`（シークレットスキャン）、`semgrep.yml`（静的解析 / SARIF アップロード）、`trivy.yml`（脆弱性スキャン / SARIF アップロード）、`actionlint.yml` / `zizmor.yml`（ワークフロー）、`hadolint.yml`（Dockerfile Lint、docker build --check、backend イメージのビルド・起動・ヘルスチェック）、`compose-config.yml`（Compose）、`markdownlint.yml`（Markdown）
-  - `semgrep.yml` / `trivy.yml` の検出結果は GitHub Code Scanning（Security タブ）に SARIF 形式でアップロードされます。
+各ターゲットの一覧と内容、Git フックと CI での自動実行の対応は [Lint・テストのリファレンス](docs/lint-and-test.md) にまとめています。
 
 <p align="right">(<a href="#top">トップへ</a>)</p>
 
-## トラブルシューティング
+## 設計判断の記録（ADR）
 
-（随時追記）
+重要な設計・アーキテクチャ上の判断は、Architecture Decision Record（ADR）として [`docs/adr/`](docs/adr/) に残します。
+
+- 規約は [`.kiro/steering/adr-decision-record.md`](.kiro/steering/adr-decision-record.md) に定義しています（ADR を作る/作らない基準、記録先、ライフサイクル）。
+- 書式は AI-DLC 同梱テンプレート（`.kiro/knowledge/aidlc-architect-agent/adr-template.md`）に準拠します。
+- ADR の一覧は [`docs/adr/index.md`](docs/adr/index.md) を参照してください。
+- インテント固有の設計判断は、AI-DLC が inception 実行時に各インテントの record dir（`<record>/inception/domain-design/decisions.md`）へ生成します。`docs/adr/` はワークフロー外・横断の判断を残す場所です。
+
+push 前には `make adr-check` が pre-push で走り、判断が絡む変更（依存・セキュリティ・DB・インフラ・ワークフロー、およびフロントエンド全体）に `docs/adr/` の更新が伴わないとき注意喚起します。
+既定は非ブロッキングで、該当しない場合は `ADR_ACK=1 git push` で抑制できます。
 
 <p align="right">(<a href="#top">トップへ</a>)</p>

@@ -1,5 +1,6 @@
-package com.example.demo;
+package com.example.demo.architecture;
 
+import com.example.demo.DemoApplication;
 import org.junit.jupiter.api.Test;
 import org.springframework.modulith.core.ApplicationModules;
 

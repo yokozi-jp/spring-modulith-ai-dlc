@@ -8,6 +8,7 @@ on:
       - "docker/compose-test.yml"
       - "docker/initdb/**"
       - ".env.test"
+      - "Makefile"
       - ".github/workflows/backend-ci.yml"
   pull_request:
     branches: ["**"]
@@ -16,6 +17,7 @@ on:
       - "docker/compose-test.yml"
       - "docker/initdb/**"
       - ".env.test"
+      - "Makefile"
       - ".github/workflows/backend-ci.yml"
 
 permissions:
@@ -75,13 +77,11 @@ jobs:
       - name: Start test dependencies
         run: docker compose -f docker/compose-test.yml up -d --wait
 
-      - name: Run tests
-        working-directory: backend
-        env:
-          # application.yaml は全プレースホルダにデフォルトを持たないため、
-          # .env.test（非機密ダミー）を Spring 設定として読み込ませる。
-          SPRING_CONFIG_IMPORT: "optional:file:../.env.test[.properties]"
-        run: ./gradlew test
+      - name: Verify migrations, rollback, reapply, and schema tag
+        run: make be-verify-migrations
+
+      - name: Migrate test database and run tests
+        run: make be-test
 
       - name: Stop test dependencies
         if: always()

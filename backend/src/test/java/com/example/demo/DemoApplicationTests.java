@@ -3,6 +3,7 @@ package com.example.demo;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 
+import com.example.demo.testkit.SharedTestConfiguration;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.OffsetDateTime;
@@ -10,24 +11,17 @@ import java.time.ZoneOffset;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.ApplicationContext;
-import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.mock.web.MockHttpServletRequest;
-import org.springframework.security.oauth2.client.registration.ClientRegistration;
-import org.springframework.security.oauth2.client.registration.ClientRegistrationRepository;
-import org.springframework.security.oauth2.client.registration.InMemoryClientRegistrationRepository;
 import org.springframework.security.oauth2.client.web.OAuth2AuthorizationRequestResolver;
-import org.springframework.security.oauth2.core.AuthorizationGrantType;
-import org.springframework.security.oauth2.core.ClientAuthenticationMethod;
 import org.springframework.security.oauth2.core.endpoint.OAuth2AuthorizationRequest;
 import org.springframework.security.oauth2.core.endpoint.PkceParameterNames;
 
 /** アプリケーション起動時の日時・DB・OIDC(PKCE) 設定が規約どおりであることを検証する統合テスト。 */
 @SpringBootTest
-@Import(DemoApplicationTests.OidcTestConfiguration.class)
+@Import(SharedTestConfiguration.class)
 class DemoApplicationTests {
 
   /** UTC 固定を検証する対象のアプリケーション {@code Clock}。 */
@@ -95,30 +89,5 @@ class DemoApplicationTests {
     assertNotNull(
         authorizationRequest.getAttributes().get(PkceParameterNames.CODE_VERIFIER),
         "PKCE の code_verifier が保持されること");
-  }
-
-  /** OIDC クライアント登録をテスト用のダミー発行者で差し替える構成。 */
-  @TestConfiguration(proxyBeanMethods = false)
-  /* package */ static class OidcTestConfiguration {
-
-    @Bean
-    /* package */ ClientRegistrationRepository clientRegistrationRepository() {
-      final ClientRegistration registration =
-          ClientRegistration.withRegistrationId("web")
-              .clientId("test-web-client")
-              .clientSecret("test-web-client-secret")
-              .clientAuthenticationMethod(ClientAuthenticationMethod.CLIENT_SECRET_BASIC)
-              .authorizationGrantType(AuthorizationGrantType.AUTHORIZATION_CODE)
-              .redirectUri("{baseUrl}/login/oauth2/code/{registrationId}")
-              .scope("openid", "profile", "email")
-              .authorizationUri("https://issuer.example.test/oauth2/authorize")
-              .tokenUri("https://issuer.example.test/oauth2/token")
-              .jwkSetUri("https://issuer.example.test/oauth2/jwks")
-              .userInfoUri("https://issuer.example.test/oauth2/userinfo")
-              .userNameAttributeName("sub")
-              .clientName("Test Web Client")
-              .build();
-      return new InMemoryClientRegistrationRepository(registration);
-    }
   }
 }

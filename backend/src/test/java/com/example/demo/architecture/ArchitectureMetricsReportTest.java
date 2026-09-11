@@ -1,7 +1,8 @@
-package com.example.demo;
+package com.example.demo.architecture;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.example.demo.DemoApplication;
 import com.google.errorprone.annotations.FormatMethod;
 import com.google.errorprone.annotations.FormatString;
 import com.tngtech.archunit.core.domain.JavaClass;

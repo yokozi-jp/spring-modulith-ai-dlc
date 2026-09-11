@@ -12,6 +12,14 @@ updates:
     # 新しいリリースを取り込むまで最低 7 日待つ（リリース直後の不正パッケージ対策）
     cooldown:
       default-days: 7
+    ignore:
+      # opentelemetry-logback-appender-1.0 は Spring Boot が管理する OpenTelemetry
+      # コア（現状 1.62.0）と歩調を合わせる必要がある。Boot の管理コアより先行して
+      # 上げると、instrumentation-api が新しい SDK 前提のままコアが 1.62.0 に固定され、
+      # ランタイムで API 不整合（NoSuchMethodError / NoClassDefFoundError）を起こす。
+      # そのため Dependabot の自動更新は無視し、Boot の管理 OTel コアが上がったときに
+      # 対応するバージョンへ手動で同時に上げる。
+      - dependency-name: "io.opentelemetry.instrumentation:opentelemetry-logback-appender-1.0"
 
   - package-ecosystem: "npm"
     directory: "/frontend"
