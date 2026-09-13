@@ -182,6 +182,12 @@
 #         with:
 #           cache-provider: basic
 #
+#       - name: Set up Task
+#         uses: go-task/setup-task@a00fbb05ce67b35648be3c78cbc9fd85354c757e
+#         with:
+#           version: "3.53.1"
+#           checksum: a54a408f6861ff921f6e87774180db31bacd8c1e7c944ca696db9fea49a82fc7
+#
 #       # 失敗時にアプリケーションだけを直前のタスク定義へ戻せるよう、更新前の状態を保存します。
 #       # 現在のイメージdigestとDBスキーマタグもデプロイ記録へ残します。
 #       - name: Capture current production state
@@ -234,20 +240,20 @@
 #           test -n "$schema_tag"
 #           echo "tag=$schema_tag" >> "$GITHUB_OUTPUT"
 #
-#       # 本番では`make be-release-migrate`だけを実行し、`update`を直接呼びません。
+#       # 本番では`task be-release-migrate`だけを実行し、`update`を直接呼びません。
 #       # `updateToTag`でリポジトリに固定されたタグまで適用し、未承認の後続changesetを取り込みません。
 #       # この処理はGitHub concurrencyとLiquibase lockにより単一実行にします。
 #       - name: Apply approved database migrations
 #         id: migrate
 #         run: |
 #           set -euo pipefail
-#           make be-release-migrate
+#           task be-release-migrate
 #           echo "completed=true" >> "$GITHUB_OUTPUT"
 #
 #       # タグ確認は、DATABASECHANGELOGを直接照会してタグ不在時に非0終了する実装を使います。
 #       # Liquibase標準のtagExistsはタグ不在でも終了コード0になるため、リリースゲートへ単独では使いません。
 #       - name: Verify deployed schema tag
-#         run: make be-schema-tag-check
+#         run: task be-schema-tag-check
 #
 #       # jOOQ生成コードはchangesetと同じcommitでGit管理されています。
 #       # 本番DBからのjOOQ生成は成果物を稼働DBへ依存させ、不要なメタデータ参照権限を持ち込むため実行しません。

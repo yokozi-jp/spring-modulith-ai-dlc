@@ -1,0 +1,538 @@
+version: "3"
+
+set: [errexit, nounset, pipefail]
+
+vars:
+  DOCKER: '{{.DOCKER | default "docker"}}'
+  COMPOSE_ENV_FILE: '{{.COMPOSE_ENV_FILE | default ".env"}}'
+  COMPOSE_FILE: '{{.COMPOSE_FILE | default "docker/compose.yml"}}'
+  TEST_ENV_FILE: '{{.TEST_ENV_FILE | default ".env.test"}}'
+  TEST_COMPOSE_FILE: '{{.TEST_COMPOSE_FILE | default "docker/compose-test.yml"}}'
+  DB_ROLLBACK_TAG: '{{.DB_ROLLBACK_TAG | default ""}}'
+  CONFIRM_ROLLBACK: '{{.CONFIRM_ROLLBACK | default ""}}'
+  CONFIRM_RESET: '{{.CONFIRM_RESET | default ""}}'
+
+# 引数なしのtaskは安全なタスク一覧だけを表示する。
+tasks:
+  default:
+    silent: true
+    cmds:
+      - task --list
+
+  help:
+    desc: 各タスクの一覧と説明を表示
+    silent: true
+    cmds:
+      - task --list
+
+  # Workflow
+  dev:
+    desc: 依存を起動してバックエンドを起動
+    cmds:
+      - task: compose-up
+      - echo "依存を起動しました。初回またはchangeset追加後は task be-migrate を実行してください。"
+      - task: be-run
+
+  check:
+    desc: バックエンドの静的解析で素早く確認
+    cmds:
+      - task: be-lint
+
+  verify:
+    desc: push前の静的解析と隔離テストを実行
+    cmds:
+      - task: be-lint
+      - task: test
+
+  e2e:
+    desc: E2Eの未整備を案内
+    cmds:
+      - echo "E2E はまだ整備されていません。docs/e2e-testing-strategy.md を参照してください。"
+      - echo "整備後はフルスタック起動、シード、playwright testをこのタスクに束ねます。"
+
+  # ADR
+  adr-check:
+    desc: 判断が絡む変更にADRが伴うかを確認
+    silent: true
+    cmds:
+      - |
+        base="${ADR_DIFF_BASE:-origin/main}"
+        if ! git rev-parse --verify --quiet "$base" >/dev/null; then
+          echo "ADR check: 比較起点 $base が無いためスキップします。" >&2
+          exit 0
+        fi
+        changed="$(git diff --name-only "$base"...HEAD)"
+        if [ -z "$changed" ]; then exit 0; fi
+        sig="$(printf '%s\n' "$changed" | grep -E '^(frontend/|backend/build\.gradle|backend/buildSrc/|backend/gradle/[^/]+\.gradle|backend/src/main/resources/application(-[^/]+)?\.yaml|backend/src/main/resources/db/changelog/|backend/src/main/java/com/example/demo/SecurityConfig\.java|docker/|infrastructure/|\.github/workflows/)' || true)"
+        if [ -z "$sig" ]; then exit 0; fi
+        adr="$(printf '%s\n' "$changed" | grep -E '^docs/adr/ADR-[0-9]+.*\.md$' || true)"
+        if [ -n "$adr" ]; then exit 0; fi
+        if [ "${ADR_ACK:-}" = "1" ]; then
+          echo "ADR check: ADR_ACK=1 のため警告を抑制しました。" >&2
+          exit 0
+        fi
+        echo "" >&2
+        echo "⚠ ADR 未追加の可能性: 判断が絡む変更が含まれますが docs/adr/ の更新がありません。" >&2
+        echo "  対象の変更:" >&2
+        printf '    - %s\n' $sig >&2
+        echo "  重要な設計判断なら docs/adr/ に ADR を追加してください（規約: .kiro/steering/adr-decision-record.md）。" >&2
+        echo "  該当しない場合は ADR_ACK=1 を付けて再実行できます（例: ADR_ACK=1 git push）。" >&2
+        echo "" >&2
+        if [ "${ADR_STRICT:-}" = "1" ]; then exit 1; fi
+
+  # Setup
+  setup:
+    desc: 開発環境のセットアップスクリプトを順次実行
+    dir: docs/local-env-setup
+    cmds:
+      - |
+        ./00-setup-task.sh
+        ./01-setup-java.sh
+        ./02-setup-viteplus.sh
+        ./03-setup-kiro.sh
+        export PATH="$HOME/.local/bin:$PATH"
+        ./04-setup-shell.sh
+        ./05-setup-bun.sh
+        ./06-setup-go-betterleaks.sh
+
+  # Backend
+  be-run:
+    desc: バックエンドをホスト上で起動
+    dir: backend
+    cmds:
+      - ./gradlew bootRun
+
+  # Database
+  be-migrate:
+    desc: 現在のスキーマタグまでマイグレーション
+    dir: backend
+    cmds:
+      - |
+        set -a
+        . "../{{.COMPOSE_ENV_FILE}}"
+        set +a
+        ./gradlew migrateDatabase
+
+  be-migrate-dev:
+    desc: 作りかけを含む全changesetを開発DBへ適用
+    dir: backend
+    cmds:
+      - |
+        set -a
+        . "../{{.COMPOSE_ENV_FILE}}"
+        set +a
+        ./gradlew update
+
+  _require-migration-env:
+    internal: true
+    preconditions:
+      - sh: 'test -n "${DB_URL:-}" || { test -n "${DB_HOST:-}" && test -n "${DB_PORT:-}" && test -n "${DB_NAME:-}"; }'
+        msg: DB_URL、またはDB_HOST、DB_PORT、DB_NAMEを指定してください。
+      - sh: 'test -n "${DB_SCHEMA:-}"'
+        msg: DB_SCHEMAを指定してください。
+      - sh: 'test -n "${MIGRATION_DB_USERNAME:-}"'
+        msg: MIGRATION_DB_USERNAMEを指定してください。
+      - sh: 'test -n "${MIGRATION_DB_PASSWORD:-}"'
+        msg: MIGRATION_DB_PASSWORDを指定してください。
+
+  be-release-migrate:
+    desc: 本番向けに現在のスキーマタグまでマイグレーション
+    cmds:
+      - task: _require-migration-env
+      - task: _be-release-migrate
+
+  _be-release-migrate:
+    internal: true
+    dir: backend
+    cmds:
+      - ./gradlew migrateDatabase
+
+  be-schema-tag-check:
+    desc: 現在のスキーマタグが対象DBへ適用済みか確認
+    silent: true
+    cmds:
+      - |
+        if [ -f "./{{.COMPOSE_ENV_FILE}}" ]; then
+          set -a
+          . "./{{.COMPOSE_ENV_FILE}}"
+          set +a
+        fi
+        cd backend
+        ./gradlew checkCurrentSchemaTag
+
+  be-verify-migrations:
+    desc: 使い捨てDBでマイグレーションとrollbackを検証
+    dir: backend
+    cmds:
+      - |
+        set -a
+        . "../{{.TEST_ENV_FILE}}"
+        set +a
+        ./gradlew verifyDatabaseMigrations
+
+  be-rollback-check:
+    desc: 切り戻し対象タグが存在するか確認
+    env:
+      DB_ROLLBACK_TAG: '{{.DB_ROLLBACK_TAG}}'
+    cmds:
+      - task: _require-migration-env
+      - |
+        if [ -z "$DB_ROLLBACK_TAG" ]; then
+          echo "DB_ROLLBACK_TAGを指定してください。" >&2
+          exit 1
+        fi
+        cd backend
+        ./gradlew checkRollbackTag -PliquibaseTag="$DB_ROLLBACK_TAG"
+
+  be-rollback-preview:
+    desc: DBを変更せず指定タグまでの切り戻しSQLを生成
+    env:
+      DB_ROLLBACK_TAG: '{{.DB_ROLLBACK_TAG}}'
+    cmds:
+      - task: _require-migration-env
+      - |
+        if [ -z "$DB_ROLLBACK_TAG" ]; then
+          echo "DB_ROLLBACK_TAGを指定してください。" >&2
+          exit 1
+        fi
+        mkdir -p backend/build/reports/liquibase
+        cd backend
+        ./gradlew previewDatabaseRollback \
+          -PliquibaseTag="$DB_ROLLBACK_TAG" \
+          -PliquibaseOutputFile=build/reports/liquibase/rollback-preview.sql
+
+  be-rollback:
+    desc: 明示確認付きで指定タグより後のchangesetを切り戻し
+    env:
+      DB_ROLLBACK_TAG: '{{.DB_ROLLBACK_TAG}}'
+      CONFIRM_ROLLBACK: '{{.CONFIRM_ROLLBACK}}'
+    cmds:
+      - task: _require-migration-env
+      - |
+        if [ -z "$DB_ROLLBACK_TAG" ]; then
+          echo "DB_ROLLBACK_TAGを指定してください。" >&2
+          exit 1
+        fi
+        if [ "$CONFIRM_ROLLBACK" != "yes" ]; then
+          echo "切り戻すにはrollback previewとバックアップを確認し、CONFIRM_ROLLBACK=yesを指定してください。" >&2
+          exit 1
+        fi
+        cd backend
+        ./gradlew rollbackDatabase \
+          -PliquibaseTag="$DB_ROLLBACK_TAG" \
+          -PconfirmRollback=true
+
+  be-generate-jooq:
+    desc: 現在のDBスキーマからjOOQソースを生成
+    dir: backend
+    cmds:
+      - |
+        set -a
+        . "../{{.COMPOSE_ENV_FILE}}"
+        set +a
+        ./gradlew jooqCodegen
+
+  be-refresh-jooq:
+    desc: マイグレーション後の最新DBからjOOQソースを生成
+    dir: backend
+    cmds:
+      - |
+        set -a
+        . "../{{.COMPOSE_ENV_FILE}}"
+        set +a
+        ./gradlew migrateAndGenerateJooq
+
+  # Backend quality
+  be-format:
+    desc: バックエンドのコードフォーマットを適用
+    dir: backend
+    cmds:
+      - ./gradlew spotlessApply
+
+  be-lint:
+    desc: バックエンドの静的解析を実行
+    dir: backend
+    cmds:
+      - ./gradlew spotlessCheck pmdMain pmdTest spotbugsMain spotbugsTest
+
+  be-test:
+    desc: 依存起動済みのテストDBでマイグレーションとテストを実行
+    dir: backend
+    cmds:
+      - |
+        set -a
+        . "../{{.TEST_ENV_FILE}}"
+        set +a
+        SPRING_CONFIG_IMPORT="optional:file:../{{.TEST_ENV_FILE}}[.properties]" ./gradlew migrateDatabase test
+
+  be-test-dev:
+    desc: 作りかけを含むchangesetを適用してテスト
+    dir: backend
+    cmds:
+      - |
+        set -a
+        . "../{{.TEST_ENV_FILE}}"
+        set +a
+        SPRING_CONFIG_IMPORT="optional:file:../{{.TEST_ENV_FILE}}[.properties]" ./gradlew update test
+
+  test-deps-up:
+    desc: テスト専用の依存スタックを起動
+    cmds:
+      - '{{.DOCKER}} compose -f "{{.TEST_COMPOSE_FILE}}" up -d --wait'
+
+  test-deps-down:
+    desc: テスト専用の依存スタックをボリュームごと停止
+    cmds:
+      - '{{.DOCKER}} compose -f "{{.TEST_COMPOSE_FILE}}" down --volumes --remove-orphans'
+
+  test:
+    desc: 隔離依存を起動してマイグレーション検証とテスト後に片付け
+    silent: true
+    cmds:
+      - |
+        cleanup() {
+          status=$?
+          trap - EXIT
+          cleanup_status=0
+          {{.DOCKER}} compose -f "{{.TEST_COMPOSE_FILE}}" down --volumes --remove-orphans || cleanup_status=$?
+          if [ "$status" -ne 0 ]; then exit "$status"; fi
+          exit "$cleanup_status"
+        }
+        trap cleanup EXIT
+        {{.DOCKER}} compose -f "{{.TEST_COMPOSE_FILE}}" up -d --wait
+        task be-verify-migrations TEST_ENV_FILE="{{.TEST_ENV_FILE}}"
+        task be-test TEST_ENV_FILE="{{.TEST_ENV_FILE}}"
+
+  test-dev:
+    desc: 隔離依存を起動して作りかけを含むテスト後に片付け
+    silent: true
+    cmds:
+      - |
+        cleanup() {
+          status=$?
+          trap - EXIT
+          cleanup_status=0
+          {{.DOCKER}} compose -f "{{.TEST_COMPOSE_FILE}}" down --volumes --remove-orphans || cleanup_status=$?
+          if [ "$status" -ne 0 ]; then exit "$status"; fi
+          exit "$cleanup_status"
+        }
+        trap cleanup EXIT
+        {{.DOCKER}} compose -f "{{.TEST_COMPOSE_FILE}}" up -d --wait
+        task be-test-dev TEST_ENV_FILE="{{.TEST_ENV_FILE}}"
+
+  be-sbom:
+    desc: バックエンドのCycloneDX SBOMを生成
+    dir: backend
+    cmds:
+      - ./gradlew cyclonedxBom
+
+  # Compose and services
+  compose-up:
+    desc: ローカル依存サービスを起動
+    cmds:
+      - '{{.DOCKER}} compose --env-file "{{.COMPOSE_ENV_FILE}}" -f "{{.COMPOSE_FILE}}" up -d --wait'
+
+  compose-up-backend:
+    desc: backendを含む全サービスをビルドして起動
+    cmds:
+      - '{{.DOCKER}} compose --env-file "{{.COMPOSE_ENV_FILE}}" -f "{{.COMPOSE_FILE}}" --profile backend up -d --build --wait'
+
+  compose-down:
+    desc: Composeサービスをnamed volumeを保持して停止
+    cmds:
+      - '{{.DOCKER}} compose --env-file "{{.COMPOSE_ENV_FILE}}" -f "{{.COMPOSE_FILE}}" --profile backend down'
+
+  compose-ps:
+    desc: Composeサービスの状態を表示
+    cmds:
+      - '{{.DOCKER}} compose --env-file "{{.COMPOSE_ENV_FILE}}" -f "{{.COMPOSE_FILE}}" --profile backend ps'
+
+  compose-logs:
+    desc: Composeサービスのログを追跡
+    cmds:
+      - '{{.DOCKER}} compose --env-file "{{.COMPOSE_ENV_FILE}}" -f "{{.COMPOSE_FILE}}" --profile backend logs --follow'
+
+  keycloak-logs:
+    desc: Keycloakのログを追跡
+    cmds:
+      - '{{.DOCKER}} compose --env-file "{{.COMPOSE_ENV_FILE}}" -f "{{.COMPOSE_FILE}}" logs --follow keycloak'
+
+  keycloak-reimport:
+    desc: Keycloakデータだけを削除してrealmを再投入
+    silent: true
+    cmds:
+      - |
+        {{.DOCKER}} compose --env-file "{{.COMPOSE_ENV_FILE}}" -f "{{.COMPOSE_FILE}}" create keycloak >/dev/null
+        container_id="$({{.DOCKER}} compose --env-file "{{.COMPOSE_ENV_FILE}}" -f "{{.COMPOSE_FILE}}" ps -aq keycloak)"
+        volume="$({{.DOCKER}} inspect "$container_id" | jq -r '.[0].Mounts | map(select(.Destination == "/opt/keycloak/data") | .Name) | first // empty')"
+        if [ -z "$volume" ]; then
+          echo "Keycloak data volume を特定できませんでした。" >&2
+          exit 1
+        fi
+        {{.DOCKER}} compose --env-file "{{.COMPOSE_ENV_FILE}}" -f "{{.COMPOSE_FILE}}" rm --stop --force keycloak
+        {{.DOCKER}} volume rm "$volume"
+        {{.DOCKER}} compose --env-file "{{.COMPOSE_ENV_FILE}}" -f "{{.COMPOSE_FILE}}" up -d --wait keycloak
+        echo "Keycloak realm を再投入しました。"
+
+  oidc-check:
+    desc: KeycloakのOIDC discoveryとPKCE S256対応を確認
+    cmds:
+      - |
+        {{.DOCKER}} compose --env-file "{{.COMPOSE_ENV_FILE}}" -f "{{.COMPOSE_FILE}}" exec -T keycloak /bin/bash -ec '
+          exec 3<>/dev/tcp/127.0.0.1/8080
+          printf "GET /realms/spring-modulith/.well-known/openid-configuration HTTP/1.1\r\nHost: localhost:8080\r\nConnection: close\r\n\r\n" >&3
+          response="$(cat <&3)"
+          printf "%s" "$response" | grep -q "200 OK"
+          printf "%s" "$response" | grep -q "\"issuer\":\"http://localhost:8080/realms/spring-modulith\""
+          printf "%s" "$response" | grep -q "\"S256\""'
+        echo "OIDC discovery と PKCE S256 を確認しました。"
+        echo "Login URL: http://localhost:18080/oauth2/authorization/web"
+
+  compose-reset:
+    desc: 明示確認付きでComposeサービスと全データを削除
+    env:
+      CONFIRM_RESET: '{{.CONFIRM_RESET}}'
+    cmds:
+      - |
+        if [ "$CONFIRM_RESET" != "yes" ]; then
+          echo "全サービスのデータを削除して初期化します。実行するには CONFIRM_RESET=yes を指定してください（例: task compose-reset CONFIRM_RESET=yes）。" >&2
+          exit 1
+        fi
+      - '{{.DOCKER}} compose --env-file "{{.COMPOSE_ENV_FILE}}" -f "{{.COMPOSE_FILE}}" --profile backend down --volumes --remove-orphans'
+
+  # Security
+  scan-secrets:
+    desc: ステージ済みの変更をbetterleaksでスキャン
+    cmds:
+      - PATH="$PATH:$HOME/go/bin" betterleaks git --staged --no-banner --redact
+
+  scan-secrets-all:
+    desc: リポジトリ全体と履歴をbetterleaksでスキャン
+    cmds:
+      - PATH="$PATH:$HOME/go/bin" betterleaks git . --no-banner --redact --git-workers=16
+
+  # Lint and format
+  lint-actions:
+    desc: GitHub Actionsワークフローをactionlintで検査
+    cmds:
+      - |
+        docker run --rm -v "$PWD":/repo -w /repo \
+          rhysd/actionlint:1.7.12@sha256:9d36088643581e728c969f35141f88139fec77280b2be23c1f66f8e40e1025e7 \
+          -color
+
+  lint-actions-security:
+    desc: GitHub Actionsワークフローをzizmorで検査
+    cmds:
+      - |
+        docker run --rm -v "$PWD":/repo -w /repo \
+          ghcr.io/zizmorcore/zizmor:1.29.0@sha256:863026d54f91271b10b60b67ad8054cb37120167e162482597db102b3026a284 .github/workflows/
+
+  lint-docker:
+    desc: 全Dockerfileをhadolintで検査
+    cmds:
+      - |
+        files="$(git ls-files '**/Dockerfile' '**/Dockerfile.*' '**/*.Dockerfile' 'Dockerfile')"
+        if [ -z "$files" ]; then
+          echo "Dockerfile が見つかりません。"
+        else
+          printf 'linting: %s\n' $files
+          docker run --rm -i -v "$PWD":/repo -w /repo \
+            hadolint/hadolint:v2.12.0@sha256:30a8fd2e785ab6176eed53f74769e04f125afb2f74a6c52aef7d463583b6d45e \
+            hadolint $files
+        fi
+
+  lint-docker-check:
+    desc: 全Dockerfileをdocker build --checkで検査
+    cmds:
+      - |
+        files="$(git ls-files '**/Dockerfile' '**/Dockerfile.*' '**/*.Dockerfile' 'Dockerfile')"
+        if [ -z "$files" ]; then
+          echo "Dockerfile が見つかりません。"
+        else
+          for file in $files; do
+            echo "checking: $file"
+            docker build --check -f "$file" "$(dirname "$file")"
+          done
+        fi
+
+  lint-compose:
+    desc: 全Composeファイルの構文と変数展開を検証
+    cmds:
+      - |
+        files="$(git ls-files '**/compose.yml' '**/compose.yaml' '**/compose-test.yml' '**/compose-test.yaml' '**/docker-compose.yml' '**/docker-compose.yaml' 'compose.yml' 'compose.yaml' 'compose-test.yml' 'compose-test.yaml' 'docker-compose.yml' 'docker-compose.yaml')"
+        if [ -z "$files" ]; then
+          echo "Compose ファイルが見つかりません。"
+        else
+          for file in $files; do
+            echo "validating: $file"
+            docker compose --env-file .env.example -f "$file" config --quiet
+          done
+        fi
+
+  lint-md:
+    desc: Markdownをmarkdownlint-cli2で検査
+    cmds:
+      - npx --yes markdownlint-cli2 "**/*.md"
+
+  lint-md-fix:
+    desc: Markdownlintで安全に修正できる問題を修正
+    cmds:
+      - npx --yes markdownlint-cli2 --fix "**/*.md"
+
+  lint-taskfile:
+    desc: TaskfileをTask本体で解析しYAML構文とスキーマ構造を検証
+    silent: true
+    cmds:
+      - |
+        task --list-all >/dev/null
+        echo "Taskfile OK: YAML構文とスキーマ構造の解析に成功しました。"
+
+  lint-semgrep:
+    desc: Semgrep OSSで静的解析
+    cmds:
+      - |
+        docker run --rm -e SEMGREP_SEND_METRICS=off -v "$PWD":/src -w /src \
+          semgrep/semgrep:1.175.0@sha256:b94b53d02fd4a022f9eac4e2af1380f5c3c4c21400e79d3336bdff1d1db5e796 \
+          semgrep scan \
+            --config p/default \
+            --config p/java \
+            --config p/typescript \
+            --config p/dockerfile \
+            --config p/secrets \
+            --exclude .kiro \
+            --exclude aidlc \
+            --error \
+            --metrics off \
+            --disable-version-check
+
+  # Vulnerability scanning
+  scan-vulns:
+    desc: backendとfrontendの依存関係脆弱性を検査
+    cmds:
+      - task: scan-vulns-backend
+      - task: scan-vulns-frontend
+
+  scan-vulns-backend:
+    desc: backendのCycloneDX SBOMをTrivyで検査
+    cmds:
+      - |
+        (cd backend && ./gradlew cyclonedxBom)
+        docker run --rm -v "$PWD/backend":/src -w /src \
+          -e TRIVY_DB_REPOSITORY=mirror.gcr.io/aquasec/trivy-db:2 \
+          -e TRIVY_JAVA_DB_REPOSITORY=mirror.gcr.io/aquasec/trivy-java-db:1 \
+          aquasec/trivy:0.74.0@sha256:62b1e65e8869bc4b4c6aa4fa2b21595256c7c2f6018a9d9ad61caf87187c1969 \
+          sbom build/reports/cyclonedx/application.cdx.json \
+            --ignore-unfixed
+
+  scan-vulns-frontend:
+    desc: frontendの解決済み依存関係をTrivyで検査
+    cmds:
+      - |
+        (cd frontend && pnpm install --frozen-lockfile)
+        docker run --rm -v "$PWD/frontend":/src -w /src \
+          -e TRIVY_DB_REPOSITORY=mirror.gcr.io/aquasec/trivy-db:2 \
+          -e TRIVY_JAVA_DB_REPOSITORY=mirror.gcr.io/aquasec/trivy-java-db:1 \
+          aquasec/trivy:0.74.0@sha256:62b1e65e8869bc4b4c6aa4fa2b21595256c7c2f6018a9d9ad61caf87187c1969 \
+          fs . \
+            --scanners vuln \
+            --ignore-unfixed

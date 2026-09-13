@@ -7,7 +7,7 @@ spring:
     name: demo
 
   # ローカル: リポジトリルートの .env で環境変数を定義する。
-  #   make be-run は backend/ を作業ディレクトリに起動するため、参照先は ../.env。
+  #   task be-run は backend/ を作業ディレクトリに起動するため、参照先は ../.env。
   # STG/本番: ECS タスク定義の environment / secrets で環境変数を注入する（.env は無いので optional）。
   config:
     import: optional:file:../.env[.properties]
