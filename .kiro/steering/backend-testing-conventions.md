@@ -14,7 +14,7 @@ description: バックエンド（Spring Boot 4 / Spring Modulith / jOOQ / Postg
 
 - ロールバック隔離のスライス：#[[file:backend/src/test/java/com/example/demo/testkit/DatabaseTest.java]]
 - コミット＋自動後始末：#[[file:backend/src/test/java/com/example/demo/testkit/CommittedDatabaseTest.java]]
-- 後始末拡張：#[[file:backend/src/test/java/com/example/demo/testkit/TruncateGeneratedTablesExtension.java]]
+- 後始末拡張：#[[file:backend/src/test/java/com/example/demo/testkit/CleanGeneratedTablesExtension.java]]
 - 共有テスト構成：#[[file:backend/src/test/java/com/example/demo/testkit/SharedTestConfiguration.java]]
 - ArchUnit の解析対象限定：#[[file:backend/src/test/java/com/example/demo/architecture/ProductionCodeOnly.java]]
 - 静的解析ルール：#[[file:backend/config/pmd/ruleset.xml]]
@@ -48,7 +48,7 @@ description: バックエンド（Spring Boot 4 / Spring Modulith / jOOQ / Postg
 DBに書き込むテストは、次の二択で書く。**手書きの `try/finally` による後始末を新しく書かない**。
 
 - 既定は `@DatabaseTest`。`@JooqTest` が各テスト後にロールバックするので、書いた行は自動で消える。
-- コミットが必要なときだけ `@CommittedDatabaseTest`。`TruncateGeneratedTablesExtension` が各テスト後に、jOOQ が生成したアプリケーションテーブルだけを `TRUNCATE` する。Liquibase 管理テーブルは codegen で除外済みなので触らない。
+- コミットが必要なときだけ `@CommittedDatabaseTest`。`CleanGeneratedTablesExtension` が各テスト後に、jOOQ が生成したアプリケーションテーブルの行だけを `DELETE` する。Liquibase 管理テーブルは codegen で除外済みなので触らない。後始末は本番と同じ DML 限定のアプリロールで動くため、`TRUNCATE` ではなく `DELETE` を使う（アプリロールは `CREATE`/`ALTER`/`DROP`/`TRUNCATE` を持たない。ADR-009）。
 
 ```java
 // 良い例：ふつうの「書いて読む」テストはロールバックに任せる

@@ -43,10 +43,10 @@
 # #
 # # Secrets Managerの`MIGRATION_SECRET_ID`は次のJSONキーを持たせます。
 # #
-# # `MIGRATION_DB_URL`はRDS Writerへ直接接続するJDBC URLです。
+# # `DB_URL`はRDS Writerへ直接接続するJDBC URLです（マイグレーションとアプリで共通の接続先）。
+# # `DB_SCHEMA`はアプリケーションと共用するスキーマ名です。
 # # `MIGRATION_DB_USERNAME`はDDL権限を持つLiquibase専用ユーザーです。
 # # `MIGRATION_DB_PASSWORD`はLiquibase専用ユーザーのパスワードです。
-# # `MIGRATION_DB_SCHEMA`はアプリケーションと共用するスキーマ名です。
 # #
 # # アプリケーション用DB資格情報、OIDCクライアントシークレット、Redis資格情報はGitHubへ渡しません。
 # # これらはECSタスク定義の`secrets`からSecrets ManagerまたはSSM Parameter Storeを直接参照します。
@@ -217,7 +217,7 @@
 #             --secret-id "$MIGRATION_SECRET_ID" \
 #             --query SecretString \
 #             --output text)"
-#           for key in MIGRATION_DB_URL MIGRATION_DB_USERNAME MIGRATION_DB_PASSWORD MIGRATION_DB_SCHEMA; do
+#           for key in DB_URL DB_SCHEMA MIGRATION_DB_USERNAME MIGRATION_DB_PASSWORD; do
 #             value="$(jq -er --arg key "$key" '.[$key]' <<<"$secret_json")"
 #             echo "::add-mask::$value"
 #             echo "$key=$value" >> "$GITHUB_ENV"

@@ -12,7 +12,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 
 /**
  * 生成 jOOQ フィールドの {@code Instant} が {@code timestamptz} 往復で精度を保つことを、実際に
- * コミットして検証する。読み戻しは別トランザクションで確定値を読むため、保存往復の忠実な検証になる。 後始末は {@link TruncateGeneratedTablesExtension}
+ * コミットして検証する。読み戻しは別トランザクションで確定値を読むため、保存往復の忠実な検証になる。 後始末は {@link CleanGeneratedTablesExtension}
  * に委ねる。
  */
 @CommittedDatabaseTest

@@ -9,31 +9,29 @@
  * migrateDatabase と jooqCodegen は個別に実行でき、migrateAndGenerateJooq を明示した場合だけ
  * Liquibase updateの完了後に最新スキーマからjOOQコードを生成する。
  *
- * 本番ではMIGRATION_DB_*とCODEGEN_DB_*を専用資格情報として注入できる。
- * ローカルでは既存のDB_*へフォールバックするが、ユーザー名とパスワードに既定値は持たせない。
+ * 接続先（DB_HOST/DB_PORT/DB_NAME、スキーマはDB_SCHEMA）はアプリケーションと共有し、役割差は
+ * 資格情報だけにする。マイグレーションとjOOQコード生成はMIGRATION_DB_USERNAME/MIGRATION_DB_PASSWORD
+ * で接続する。フォールバックは持たず全環境でこの二つを明示するため、ローカルとステージング・本番で
+ * 接続の解決経路が一致する（本番ではコード生成を実行せず、ローカルとCIでのみ生成する）。
  */
 def databaseHost = System.getenv('DB_HOST') ?: 'localhost'
 def databasePort = System.getenv('DB_PORT') ?: '5432'
 def databaseName = System.getenv('DB_NAME') ?: 'demo'
-def defaultDatabaseUrl = System.getenv('DB_URL') ?: "jdbc:postgresql://${databaseHost}:${databasePort}/${databaseName}"
-def defaultDatabaseSchema = System.getenv('DB_SCHEMA') ?: 'demo'
+def databaseUrl = System.getenv('DB_URL') ?: "jdbc:postgresql://${databaseHost}:${databasePort}/${databaseName}"
+def databaseSchema = System.getenv('DB_SCHEMA') ?: 'demo'
 
-def migrationDatabaseUrl = System.getenv('MIGRATION_DB_URL') ?: defaultDatabaseUrl
-def migrationDatabaseUsername = System.getenv('MIGRATION_DB_USERNAME') ?: System.getenv('DB_USERNAME') ?: ''
-def migrationDatabasePassword = System.getenv('MIGRATION_DB_PASSWORD') ?: System.getenv('DB_PASSWORD') ?: ''
-def migrationDatabaseSchema = System.getenv('MIGRATION_DB_SCHEMA') ?: defaultDatabaseSchema
-
-def codegenDatabaseUrl = System.getenv('CODEGEN_DB_URL') ?: migrationDatabaseUrl
-def codegenDatabaseUsername = System.getenv('CODEGEN_DB_USERNAME') ?: migrationDatabaseUsername
-def codegenDatabasePassword = System.getenv('CODEGEN_DB_PASSWORD') ?: migrationDatabasePassword
-def codegenDatabaseSchema = System.getenv('CODEGEN_DB_SCHEMA') ?: migrationDatabaseSchema
+// 接続先とスキーマはアプリケーションと共有し、役割差は資格情報だけにする。
+// フォールバックは持たず、全環境でMIGRATION_DB_USERNAME/MIGRATION_DB_PASSWORDを明示する。
+def migrationDatabaseUrl = databaseUrl
+def migrationDatabaseUsername = System.getenv('MIGRATION_DB_USERNAME') ?: ''
+def migrationDatabasePassword = System.getenv('MIGRATION_DB_PASSWORD') ?: ''
+def migrationDatabaseSchema = databaseSchema
 
 def requireDatabaseCredentials = { String operation, String username, String password ->
     if (username.isBlank() || password.isBlank()) {
         throw new IllegalArgumentException(
             "${operation}にはDB資格情報が必要です。" +
-            'MIGRATION_DB_USERNAME/MIGRATION_DB_PASSWORD、CODEGEN_DB_USERNAME/CODEGEN_DB_PASSWORD、' +
-            'またはDB_USERNAME/DB_PASSWORDを環境変数で指定してください。'
+            'MIGRATION_DB_USERNAMEとMIGRATION_DB_PASSWORDを環境変数で指定してください。'
         )
     }
 }
@@ -102,15 +100,15 @@ jooq {
     configuration {
         jdbc {
             driver = 'org.postgresql.Driver'
-            url = codegenDatabaseUrl
-            user = codegenDatabaseUsername
-            password = codegenDatabasePassword
+            url = migrationDatabaseUrl
+            user = migrationDatabaseUsername
+            password = migrationDatabasePassword
         }
         generator {
             name = 'org.jooq.codegen.JavaGenerator'
             database {
                 name = 'org.jooq.meta.postgres.PostgresDatabase'
-                inputSchema = codegenDatabaseSchema
+                inputSchema = migrationDatabaseSchema
                 includes = '.*'
                 excludes = '(?i:DATABASECHANGELOG|DATABASECHANGELOGLOCK)'
                 outputSchemaToDefault = true
@@ -318,7 +316,7 @@ tasks.named('jooqCodegen') {
     description = '現在のDBスキーマからjOOQソースを生成します（マイグレーションは実行しません）。'
     mustRunAfter migrateDatabase, tasks.named('updateToTag'), assertSchemaTagExists
     doFirst {
-        requireDatabaseCredentials('jOOQコード生成', codegenDatabaseUsername, codegenDatabasePassword)
+        requireDatabaseCredentials('jOOQコード生成', migrationDatabaseUsername, migrationDatabasePassword)
     }
 }
 

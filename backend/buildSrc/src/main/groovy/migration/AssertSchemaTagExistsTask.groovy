@@ -67,7 +67,7 @@ abstract class AssertSchemaTagExistsTask extends DefaultTask {
             connectionProperties.setProperty('password', password.get())
             connection = driver.connect(jdbcUrl.get(), connectionProperties)
             if (connection == null) {
-                throw new GradleException('PostgreSQL JDBCドライバがMIGRATION_DB_URLを処理できません。')
+                throw new GradleException('PostgreSQL JDBCドライバがマイグレーション接続URLを処理できません。')
             }
             connection.setReadOnly(true)
             connection.setSchema(schemaName)

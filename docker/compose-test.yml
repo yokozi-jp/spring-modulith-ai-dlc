@@ -15,8 +15,13 @@ services:
     command: ["postgres", "-c", "timezone=UTC", "-c", "log_timezone=UTC"]
     environment:
       POSTGRES_DB: demo
-      POSTGRES_USER: demo
+      # ブートストラップは DDL・スキーマ所有のマイグレーションロール（.env.test の MIGRATION_DB_*）。
+      POSTGRES_USER: demo_migration
       POSTGRES_PASSWORD: demo
+      # initdb が作成する DML 限定のアプリロール（.env.test の DB_USERNAME/DB_PASSWORD）。
+      DB_USERNAME: demo
+      DB_PASSWORD: demo
+      DB_SCHEMA: demo
     ports:
       - "127.0.0.1:5433:5432"
     volumes:

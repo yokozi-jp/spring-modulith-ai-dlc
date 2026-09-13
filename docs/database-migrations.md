@@ -160,35 +160,37 @@ Liquibaseプラグインの`update`はchangelog内の未適用changesetをすべ
 接続変数の区分は、同じ環境内に別々の物理DBを用意するためのものではありません。
 開発、CI、ステージング、本番のDBは環境ごとに分離しますが、ステージングまたは本番のアプリケーションとLiquibaseは、通常は同じデータベースとスキーマへ異なる権限で接続します。
 
-- **アプリケーション接続**：`DB_HOST`、`DB_PORT`、`DB_NAME`、`DB_USERNAME`、`DB_PASSWORD`、`DB_SCHEMA`を使います。
-  Spring Bootはこれらの値からJDBC URLを組み立てます。
-- **Liquibase接続**：`MIGRATION_DB_URL`、`MIGRATION_DB_USERNAME`、`MIGRATION_DB_PASSWORD`、`MIGRATION_DB_SCHEMA`を使います。
+接続先（ホスト・ポート・DB名・スキーマ）はアプリケーションとマイグレーションで共有し、役割ごとに変わるのは資格情報だけです。
+
+- **共通の接続先**：`DB_HOST`、`DB_PORT`、`DB_NAME`、`DB_SCHEMA`を使います。
+  アプリケーション、Liquibase、jOOQ生成のいずれもこの接続先へ接続します。
+  接続先を一箇所に集約し、URLとホスト・ポートの二重管理を避けます。
+- **アプリケーション接続の資格情報**：`DB_USERNAME`、`DB_PASSWORD`を使います。
+  Spring Bootは共通の接続先とこの資格情報からJDBC URLを組み立てます。
+- **マイグレーション接続の資格情報**：`MIGRATION_DB_USERNAME`、`MIGRATION_DB_PASSWORD`を使います。
+  Liquibaseとその接続を共用するjOOQ生成が使います。接続先は共通の`DB_*`から組み立て、資格情報だけを差し替えます。
   ステージングと本番では、DDL権限を持つマイグレーション専用アカウントを指定します。
-- **jOOQ生成接続**：`CODEGEN_DB_URL`、`CODEGEN_DB_USERNAME`、`CODEGEN_DB_PASSWORD`、`CODEGEN_DB_SCHEMA`を使います。
-  CIでコード生成する場合は、changesetから再現した使い捨てDBを指定します。
+  jOOQコード生成はローカルとCIでのみ実行し、本番では実行しないため、生成専用の資格情報は設けません。
 - **Gradle用URLの上書き**：`DB_URL`はGradleの共通接続先を上書きします。
   Spring Bootのデータソースは`DB_URL`を参照せず、`DB_HOST`、`DB_PORT`、`DB_NAME`からURLを組み立てます。
 
-Gradleタスクのフォールバック順は次のとおりです。
-
-```text
-MIGRATION_DB_* -> DB_*
-CODEGEN_DB_*   -> MIGRATION_DB_* -> DB_*
-```
-
-このフォールバックは、ローカルと使い捨てのCI環境で一つのDBと資格情報を共用するために使います。
-ステージングと本番ではフォールバックに依存せず、アプリケーション用の`DB_*`とマイグレーション用の`MIGRATION_DB_*`を個別に注入します。
-`be-release-migrate`とDB切り戻し用Makeターゲットはローカルの`.env`を読み込まず、四つの`MIGRATION_DB_*`がすべて注入されていなければGradle実行前に失敗します。
+資格情報にフォールバックはありません。
+マイグレーションとjOOQ生成を実行するときは、`MIGRATION_DB_USERNAME`と`MIGRATION_DB_PASSWORD`を全環境で明示します。
+これにより、ローカルからテスト、ステージング、本番まで、接続の解決経路と権限モデルが一致し、環境ごとに異なる分岐を通りません。
+ローカルとテストも二ロールで動かします。
+`docker/compose.yml`と`docker/compose-test.yml`では、DDL権限を持つマイグレーション用ロールがPostgreSQLのブートストラップユーザー兼スキーマ所有者になり、DML限定のアプリケーション用ロールを`docker/initdb`が初回起動時に作成します。
+既存のDBボリュームには初期化スクリプトが再実行されないため、単一ロールから二ロールへ切り替えるときは`make compose-reset`で作り直します。
+ステージングと本番でも、アプリケーション用の`DB_USERNAME`/`DB_PASSWORD`とマイグレーション用の`MIGRATION_DB_USERNAME`/`MIGRATION_DB_PASSWORD`を個別に注入します。
+`be-release-migrate`とDB切り戻し用Makeターゲットはローカルの`.env`を読み込まず、共通の接続先（`DB_URL`、または`DB_HOST`/`DB_PORT`/`DB_NAME`）と`DB_SCHEMA`、`MIGRATION_DB_USERNAME`、`MIGRATION_DB_PASSWORD`が注入されていなければGradle実行前に失敗します。
 アプリケーション用アカウントには業務処理に必要なDML権限を与え、`CREATE`、`ALTER`、`DROP`を与えません。
 Liquibase用アカウントには、DDL、Liquibase管理テーブルの更新、データ移行changesetに必要なDMLの権限を与えます。
 
-| 環境         | アプリケーション             | Liquibase                   | jOOQ生成                                            |
-| ------------ | ---------------------------- | --------------------------- | --------------------------------------------------- |
-| ローカル     | `DB_*`                       | `DB_*`へフォールバック      | `DB_*`へフォールバック                              |
-| CIテスト     | `DB_*`                       | 同じ使い捨てDB              | 必要な場合だけ同じ使い捨てDB                        |
-| ステージング | `DB_*`                       | 専用の`MIGRATION_DB_*`      | 実行しない                                          |
-| 本番         | `DB_*`                       | 専用の`MIGRATION_DB_*`      | 実行しない                                          |
-| コード生成CI | アプリケーションを起動しない | 使い捨てDBへchangesetを適用 | `CODEGEN_DB_*`またはLiquibase接続へのフォールバック |
+| 環境         | 接続先       | アプリケーションロール（DML） | マイグレーションロール（DDL・所有）  | jOOQ生成           |
+| ------------ | ------------ | ----------------------------- | ------------------------------------ | ------------------ |
+| ローカル     | 共通の`DB_*` | `demo`（initdbが作成）        | `demo_migration`（ブートストラップ） | 同じ接続で生成     |
+| CIテスト     | 共通の`DB_*` | `demo`（initdbが作成）        | `demo_migration`（ブートストラップ） | 必要な場合だけ生成 |
+| ステージング | 共通の`DB_*` | 専用アカウント                | 専用アカウント                       | 実行しない         |
+| 本番         | 共通の`DB_*` | 専用アカウント                | 専用アカウント                       | 実行しない         |
 
 本番のDBマイグレーションジョブとアプリケーションデプロイでは、`jooqCodegen`と`migrateAndGenerateJooq`を実行しません。
 生成コードはchangesetと同じ変更として`backend/src/generated/jooq`へコミットし、リリースビルドはそのコミット済みソースをコンパイルします。

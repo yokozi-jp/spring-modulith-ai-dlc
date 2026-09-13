@@ -42,3 +42,14 @@ paths = [
 regexes = [
   '''password\s*=?\s*[a-zA-Z_][a-zA-Z0-9_]*$''',
 ]
+
+# docker/initdb/02-create-app-role.sh は psql 変数（:'app_password'）でパスワードを受け渡すだけで、
+# 実値を直書きしない。psql 変数参照の行だけを除外し、引用符付きリテラルの直書きは検出対象のまま。
+[[allowlists]]
+description = "docker/initdb/02-create-app-role.sh の psql 変数によるパスワード受け渡し（:'app_password'）を除外（リテラル直書きは検出対象のまま）"
+paths = [
+  '''(^|/)docker/initdb/02-create-app-role\.sh$''',
+]
+regexes = [
+  '''PASSWORD :'[a-zA-Z_][a-zA-Z0-9_]*';''',
+]

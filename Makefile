@@ -122,12 +122,14 @@ be-migrate-dev:
 	cd backend && ./gradlew update
 
 ## 本番向けマイグレーションとrollbackはローカル.envを読まず、CI/CDが注入した専用資格情報だけを使う。
+## 接続先はアプリと共有する DB_HOST/DB_PORT/DB_NAME（または DB_URL）と DB_SCHEMA、
+## 役割差は MIGRATION_DB_USERNAME/MIGRATION_DB_PASSWORD で表す（フォールバックなし）。
 .PHONY: _require-migration-env
 _require-migration-env:
-	@test -n "$${MIGRATION_DB_URL:-}" || { echo "MIGRATION_DB_URLを指定してください。" >&2; exit 1; }
+	@test -n "$${DB_URL:-}" || { test -n "$${DB_HOST:-}" && test -n "$${DB_PORT:-}" && test -n "$${DB_NAME:-}"; } || { echo "DB_URL、またはDB_HOST/DB_PORT/DB_NAMEを指定してください。" >&2; exit 1; }
+	test -n "$${DB_SCHEMA:-}" || { echo "DB_SCHEMAを指定してください。" >&2; exit 1; }
 	test -n "$${MIGRATION_DB_USERNAME:-}" || { echo "MIGRATION_DB_USERNAMEを指定してください。" >&2; exit 1; }
 	test -n "$${MIGRATION_DB_PASSWORD:-}" || { echo "MIGRATION_DB_PASSWORDを指定してください。" >&2; exit 1; }
-	test -n "$${MIGRATION_DB_SCHEMA:-}" || { echo "MIGRATION_DB_SCHEMAを指定してください。" >&2; exit 1; }
 
 ## 本番向けマイグレーション。タグ名はGit管理し、実行時入力を不要にする。
 be-release-migrate: _require-migration-env

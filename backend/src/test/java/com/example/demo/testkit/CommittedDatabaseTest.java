@@ -14,7 +14,7 @@ import org.springframework.context.annotation.Import;
  * <p>テストトランザクションを張らない（{@code @Transactional} を付けない）ため、各文はそのまま コミットされ、timestamptz
  * 往復のように「実際に保存して読み戻す」忠実さを検証できる。
  *
- * <p>後始末は {@link TruncateGeneratedTablesExtension} が各テスト後に自動で行うので、テストごとの 手動 cleanup は不要。
+ * <p>後始末は {@link CleanGeneratedTablesExtension} が各テスト後に自動で行うので、テストごとの 手動 cleanup は不要。
  *
  * <p>単に副作用を捨てたいだけの大多数のDBテストは、より軽くロールバックで隔離される {@link DatabaseTest} を使う。
  */
@@ -22,5 +22,5 @@ import org.springframework.context.annotation.Import;
 @Retention(RetentionPolicy.RUNTIME)
 @SpringBootTest
 @Import(SharedTestConfiguration.class)
-@ExtendWith(TruncateGeneratedTablesExtension.class)
+@ExtendWith(CleanGeneratedTablesExtension.class)
 public @interface CommittedDatabaseTest {}
