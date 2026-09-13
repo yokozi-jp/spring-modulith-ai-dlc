@@ -17,15 +17,6 @@ Security / Lint）ごとに一覧を表示する。
 
 ## シナリオ別の手順
 
-### 初回セットアップ
-
-```bash
-make setup                 # 言語・ツールの導入（実行後に source ~/.bashrc）
-cp .env.example .env       # 環境変数を用意し、パスワードを変更する
-make compose-up            # PostgreSQL / Keycloak / Redis / Grafana を起動
-make be-migrate            # 初回はマイグレーションを明示実行する
-```
-
 ### 日々の開発ループ
 
 ```bash
@@ -68,14 +59,6 @@ push 時には `make adr-check` が pre-push で走り、判断が絡む変更�
 既定は非ブロッキングのナッジで、該当しなければ `ADR_ACK=1 git push` で抑制できる。
 フロントエンドは構築初期のため全体を対象にしている。安定したら
 `frontend/package.json` や設定ファイルなど判断が出やすい箇所へ絞ってよい。
-
-### E2E を回すとき（整備後）
-
-```bash
-make e2e                   # フルスタック起動→シード→playwright test（予定）
-```
-
-現時点では未整備。方針は `docs/e2e-testing-strategy.md` を参照。
 
 ### Docker Compose とサービスの操作
 
