@@ -10,8 +10,8 @@ import org.springframework.test.context.junit.jupiter.SpringExtension;
 /**
  * 各テストの後に、jOOQ が生成したアプリケーションテーブルの行をすべて {@code DELETE} する JUnit 拡張。
  *
- * <p>後始末はアプリケーションと同じ DML 限定ロールで実行するため、{@code TRUNCATE} ではなく {@code DELETE}
- * を使う。本番のアプリケーションロールは {@code CREATE}/{@code ALTER}/{@code DROP} も {@code TRUNCATE}
+ * <p>後始末はアプリケーションと同じ DML 限定ロールで実行するため、{@code TRUNCATE} ではなく {@code DELETE} を使う。本番のアプリケーションロールは
+ * {@code CREATE}/{@code ALTER}/{@code DROP} も {@code TRUNCATE}
  * も持たない（ADR-009）。後始末が本番で実行できない権限に依存しないようにし、テストと本番の権限を揃える。
  *
  * <p>生成対象は Liquibase 管理テーブル（{@code DATABASECHANGELOG} など）を codegen で除外済みなので、
