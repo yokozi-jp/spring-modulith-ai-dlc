@@ -51,12 +51,12 @@ ADR-005 は Liquibase をアプリケーション起動から分離し、アプ�
 
 - ローカルとテストの DB も二ロールを用意するため、`docker/initdb` にアプリケーションロール作成を追加し、Compose のブートストラップロールとシークレット配線を変える。
 - マイグレーションや jOOQ 生成を回す環境では、`MIGRATION_DB_USERNAME`/`MIGRATION_DB_PASSWORD` を必ず設定する。フォールバックによる省略ができない。
-- 既存のローカル DB ボリュームには初期化スクリプトが再実行されないため、二ロールへ切り替えるときは `make compose-reset` で作り直す。
+- 既存のローカル DB ボリュームには初期化スクリプトが再実行されないため、二ロールへ切り替えるときは `task compose-reset` で作り直す。
 
 ### Neutral
 
 - アプリケーション用ロールに与える DML の範囲（`SELECT`/`INSERT`/`UPDATE`/`DELETE` とシーケンス使用、将来テーブルへの既定権限）を初期化スクリプトで定義する。テストがこの範囲で動くことを前提にする。
-- `be-release-migrate` と切り戻し系ターゲットの必須環境変数は、接続先（`DB_URL` または `DB_HOST`/`DB_PORT`/`DB_NAME`）と `DB_SCHEMA`、`MIGRATION_DB_USERNAME`、`MIGRATION_DB_PASSWORD` になる。
+- `be-release-migrate` と切り戻し系タスクの必須環境変数は、接続先（`DB_URL` または `DB_HOST`/`DB_PORT`/`DB_NAME`）と `DB_SCHEMA`、`MIGRATION_DB_USERNAME`、`MIGRATION_DB_PASSWORD` になる。
 
 ## Alternatives Considered
 

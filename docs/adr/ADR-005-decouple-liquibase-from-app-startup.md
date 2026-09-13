@@ -22,10 +22,10 @@ Accepted
 Liquibase の起動時自動実行を無効化し（`spring.liquibase.enabled: false`）、
 マイグレーションをデプロイ前の明示コマンドで適用する。
 
-- ローカル・CI は `make be-migrate`（`./gradlew migrateDatabase`）で適用する。
-- スキーマタグを Git 管理し、本番は `make be-release-migrate` で固定タグまで適用する。
+- ローカル・CI は `task be-migrate`（`./gradlew migrateDatabase`）で適用する。
+- スキーマタグを Git 管理し、本番は `task be-release-migrate` で固定タグまで適用する。
 - 使い捨て DB で update → rollback → 再 update とタグを検証する
-  （`make be-verify-migrations`）。
+  （`task be-verify-migrations`）。
 - 本番は expand-and-contract を守り、旧・新アプリの併存中も後方互換にする。
 
 ## Consequences
@@ -63,4 +63,4 @@ Liquibase の起動時自動実行を無効化し（`spring.liquibase.enabled: f
 
 - `backend/src/main/resources/application.yaml`（`spring.liquibase.enabled: false`）
 - [`docs/database-migrations.md`](../database-migrations.md)
-- `Makefile`（`be-migrate` / `be-release-migrate` / `be-verify-migrations`）
+- `Taskfile.yml`（`be-migrate` / `be-release-migrate` / `be-verify-migrations`）

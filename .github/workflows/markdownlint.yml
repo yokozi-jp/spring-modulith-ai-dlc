@@ -26,7 +26,7 @@ jobs:
           persist-credentials: false
 
       # 除外設定は .markdownlint-cli2.yaml の ignores に従う（.kiro 配下は steering のみ対象）。
-      # ローカル（make lint-md / lefthook）と同じ v0.23.2 のイメージを digest で固定する。
+      # ローカル（task lint-md / lefthook）と同じ v0.23.2 のイメージを digest で固定する。
       - name: Run markdownlint-cli2
         run: |
           docker run --rm -v "$PWD":/workdir -w /workdir \

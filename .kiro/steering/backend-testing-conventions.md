@@ -27,7 +27,7 @@ description: バックエンド（Spring Boot 4 / Spring Modulith / jOOQ / Postg
 - **最小のスライスを選ぶ**。必要な範囲だけを起動するテストほど速く、壊れにくい。フルの `@SpringBootTest` を既定にしない。
 - テストは UTC の JVM で一度だけ走らせる（`build.gradle` の `test` が `-Duser.timezone=UTC` を渡す）。ローカルタイムゾーンに依存する検証を書かない。
 - DBテストは使い捨てスタック（`docker/compose-test.yml` の PostgreSQL 5433 / Redis 6380、`.env.test`）に対して実行する。開発用スタック（5432/6379）や本番DBには向けない。
-- 静的解析（PMD・SpotBugs・Spotless）はテストコードにも適用される。書いたら `make be-lint` で確認する。
+- 静的解析（PMD・SpotBugs・Spotless）はテストコードにも適用される。書いたら `task be-lint` で確認する。
 
 ## テストの選び方
 
@@ -41,7 +41,7 @@ description: バックエンド（Spring Boot 4 / Spring Modulith / jOOQ / Postg
 - **横断的な起動確認・配線**：フルの `@SpringBootTest`。共有構成を使ってコンテキストを1つに揃える（後述）。
 
 `@DatabaseTest` と `@CommittedDatabaseTest` は移行済みのテストDBを前提にする。
-ローカルでは `make test`（確定版）または `make test-dev`（作りかけ含む）が、DBの起動・マイグレーション・後片付けまで面倒を見る。
+ローカルでは `task test`（確定版）または `task test-dev`（作りかけ含む）が、DBの起動・マイグレーション・後片付けまで面倒を見る。
 
 ## DBテストの隔離と後始末
 
@@ -123,7 +123,7 @@ Spring はテスト構成（アノテーションと `@Import` の組）ごと�
 
 静的解析（#[[file:backend/config/pmd/ruleset.xml]]、SpotBugs、Spotless の Google Java Format）に通る形で書く。
 
-- フォーマットは Google Java Format に従う。`make be-format` で整形し、`make be-lint` で確認する。
+- フォーマットは Google Java Format に従う。`task be-format` で整形し、`task be-lint` で確認する。
 - **クラス・フィールドには Javadoc を付ける**（PMD `CommentRequired`）。`@Test` メソッドはパッケージプライベートにするので Javadoc は不要。
 - テストクラス・テストメソッド・ネスト型はパッケージプライベートにする（`public` を付けない。JUnit 5 は package-private を実行する）。既存コードは意図を示すため `/* package */` の目印を添えている。
 - アサーションには失敗時メッセージを添える。原因が一目で分かるようにする。
@@ -138,10 +138,10 @@ Spring はテスト構成（アノテーションと `@Import` の組）ごと�
 
 ## 実行
 
-- ローカルの総合確認（確定版）：`make test`。使い捨てスタックを起動し、マイグレーション検証とテストを通してから後片付けする。
-- 作りかけ changeset を含めて回す：`make test-dev`。全 changeset を適用してからテストする。
-- マイグレーションの rollback 検証だけ：`make be-verify-migrations`。
-- 依存が起動済みの環境（CI 部品）：`make be-test` / `make be-test-dev`。
+- ローカルの総合確認（確定版）：`task test`。使い捨てスタックを起動し、マイグレーション検証とテストを通してから後片付けする。
+- 作りかけ changeset を含めて回す：`task test-dev`。全 changeset を適用してからテストする。
+- マイグレーションの rollback 検証だけ：`task be-verify-migrations`。
+- 依存が起動済みの環境（CI 部品）：`task be-test` / `task be-test-dev`。
 
 ## 避けるべきアンチパターン
 

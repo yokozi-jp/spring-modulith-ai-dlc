@@ -15,27 +15,27 @@
 
 `-check`と`-preview`は必ず安全です。
 `be-migrate`系は前へ進めるだけで、既存の状態を戻しません。
-`be-verify-migrations`と`make test`は使い捨てDB専用で、開発DBや本番DBには触れません。
+`be-verify-migrations`と`task test`は使い捨てDB専用で、開発DBや本番DBには触れません。
 破壊的なのは`be-rollback`だけで、それも`CONFIRM_ROLLBACK=yes`がなければDBへ接続せず失敗します。
 
 | コマンド                                                      | 何をするか                                                          | 影響範囲                         | 使うタイミング                          |
 | ------------------------------------------------------------- | ------------------------------------------------------------------- | -------------------------------- | --------------------------------------- |
-| `make be-schema-tag-check`                                    | 現在のスキーマタグがDBにあるか照会                                  | 読み取りのみ・安全               | 対象DBの状態を確認したいとき            |
-| `make be-rollback-check DB_ROLLBACK_TAG=<tag>`                | 切り戻し対象タグの存在を確認                                        | 読み取りのみ・安全               | 切り戻し前の下調べ                      |
-| `make be-rollback-preview DB_ROLLBACK_TAG=<tag>`              | 切り戻しSQLを生成（`build/reports/liquibase/rollback-preview.sql`） | DB変更なし・安全                 | 切り戻しの内容を実行前に確認            |
-| `make be-generate-jooq`                                       | 現在のDBスキーマからjOOQコードを生成                                | DB変更なし（生成ソースを更新）   | スキーマは変えずにコードだけ再生成      |
-| `make be-migrate`                                             | 現在のスキーマタグまで前進適用し、タグを確認                        | 追記のみ（前進）                 | 初回起動前・changeset追加後（ローカル） |
-| `make be-refresh-jooq`                                        | 前進適用してからjOOQコードを生成                                    | 追記のみ（前進）                 | changeset追加後にまとめて実行           |
-| `make be-verify-migrations`                                   | 使い捨てDBで適用・rollback・再適用・タグ確認                        | 隔離DB専用・安全                 | changeset追加後の検証・CI               |
-| `make test`                                                   | 隔離スタックで上記検証を通してからテスト                            | 隔離DB専用・安全                 | 変更のローカル総合確認                  |
-| `make be-release-migrate`                                     | 本番の前進適用（`MIGRATION_DB_*`必須）                              | 追記のみ（前進・本番）           | デプロイパイプラインから                |
-| `make be-rollback DB_ROLLBACK_TAG=<tag> CONFIRM_ROLLBACK=yes` | 指定タグより後のchangesetを切り戻す                                 | **破壊的（データ損失の可能性）** | preview・バックアップ・影響確認の後だけ |
+| `task be-schema-tag-check`                                    | 現在のスキーマタグがDBにあるか照会                                  | 読み取りのみ・安全               | 対象DBの状態を確認したいとき            |
+| `task be-rollback-check DB_ROLLBACK_TAG=<tag>`                | 切り戻し対象タグの存在を確認                                        | 読み取りのみ・安全               | 切り戻し前の下調べ                      |
+| `task be-rollback-preview DB_ROLLBACK_TAG=<tag>`              | 切り戻しSQLを生成（`build/reports/liquibase/rollback-preview.sql`） | DB変更なし・安全                 | 切り戻しの内容を実行前に確認            |
+| `task be-generate-jooq`                                       | 現在のDBスキーマからjOOQコードを生成                                | DB変更なし（生成ソースを更新）   | スキーマは変えずにコードだけ再生成      |
+| `task be-migrate`                                             | 現在のスキーマタグまで前進適用し、タグを確認                        | 追記のみ（前進）                 | 初回起動前・changeset追加後（ローカル） |
+| `task be-refresh-jooq`                                        | 前進適用してからjOOQコードを生成                                    | 追記のみ（前進）                 | changeset追加後にまとめて実行           |
+| `task be-verify-migrations`                                   | 使い捨てDBで適用・rollback・再適用・タグ確認                        | 隔離DB専用・安全                 | changeset追加後の検証・CI               |
+| `task test`                                                   | 隔離スタックで上記検証を通してからテスト                            | 隔離DB専用・安全                 | 変更のローカル総合確認                  |
+| `task be-release-migrate`                                     | 本番の前進適用（`MIGRATION_DB_*`必須）                              | 追記のみ（前進・本番）           | デプロイパイプラインから                |
+| `task be-rollback DB_ROLLBACK_TAG=<tag> CONFIRM_ROLLBACK=yes` | 指定タグより後のchangesetを切り戻す                                 | **破壊的（データ損失の可能性）** | preview・バックアップ・影響確認の後だけ |
 
 「安全」は、対象DBのスキーマとデータを変えないことを指します（`be-generate-jooq`はリポジトリの生成ソースを書き換えます）。
 「前進」は、未適用のchangesetを新しく適用するだけで、適用済みの変更は戻さないことを指します。
 
-各Makeターゲットの本体は、`backend`ディレクトリのGradleタスクを呼び出します。
-`make help`で各ターゲットの一行説明を一覧表示できます。
+各Taskfileのタスクの本体は、`backend`ディレクトリのGradleタスクを呼び出します。
+`task help`で各タスクの一行説明を一覧表示できます。
 
 ## スキーマタグ
 
@@ -88,8 +88,8 @@ DB変更のないアプリケーションリリースでは、新しいDBスキ�
 PostgreSQLを起動し、ルートの`.env`に接続情報を設定してから現在のスキーマタグまで適用します。
 
 ```bash
-make compose-up
-make be-migrate
+task compose-up
+task be-migrate
 ```
 
 `be-migrate`は`updateToTag`と`assertSchemaTagExists`を順序実行します。
@@ -98,22 +98,22 @@ changelogに現在タグより後のchangesetが存在しても、自動的に�
 changesetを追加した後は、使い捨てDBでrollback可能性を検証します。
 
 ```bash
-make test
+task test
 ```
 
-`make test`は隔離したPostgreSQLを起動し、全changesetの適用、rollback、再適用、現在タグの存在確認を実行してからバックエンドテストを開始します。
+`task test`は隔離したPostgreSQLを起動し、全changesetの適用、rollback、再適用、現在タグの存在確認を実行してからバックエンドテストを開始します。
 終了後はテスト用ボリュームを削除します。
 
 マイグレーションを適用して最新スキーマのjOOQソースを生成する場合は、次のコマンドを使います。
 
 ```bash
-make be-refresh-jooq
+task be-refresh-jooq
 ```
 
 現在のDBを変更せず、コード生成だけを再実行する場合は次のコマンドを使います。
 
 ```bash
-make be-generate-jooq
+task be-generate-jooq
 ```
 
 生成先は`backend/src/generated/jooq`です。
@@ -179,9 +179,9 @@ Liquibaseプラグインの`update`はchangelog内の未適用changesetをすべ
 これにより、ローカルからテスト、ステージング、本番まで、接続の解決経路と権限モデルが一致し、環境ごとに異なる分岐を通りません。
 ローカルとテストも二ロールで動かします。
 `docker/compose.yml`と`docker/compose-test.yml`では、DDL権限を持つマイグレーション用ロールがPostgreSQLのブートストラップユーザー兼スキーマ所有者になり、DML限定のアプリケーション用ロールを`docker/initdb`が初回起動時に作成します。
-既存のDBボリュームには初期化スクリプトが再実行されないため、単一ロールから二ロールへ切り替えるときは`make compose-reset`で作り直します。
+既存のDBボリュームには初期化スクリプトが再実行されないため、単一ロールから二ロールへ切り替えるときは`task compose-reset`で作り直します。
 ステージングと本番でも、アプリケーション用の`DB_USERNAME`/`DB_PASSWORD`とマイグレーション用の`MIGRATION_DB_USERNAME`/`MIGRATION_DB_PASSWORD`を個別に注入します。
-`be-release-migrate`とDB切り戻し用Makeターゲットはローカルの`.env`を読み込まず、共通の接続先（`DB_URL`、または`DB_HOST`/`DB_PORT`/`DB_NAME`）と`DB_SCHEMA`、`MIGRATION_DB_USERNAME`、`MIGRATION_DB_PASSWORD`が注入されていなければGradle実行前に失敗します。
+`be-release-migrate`とDB切り戻し用Taskfileのタスクはローカルの`.env`を読み込まず、共通の接続先（`DB_URL`、または`DB_HOST`/`DB_PORT`/`DB_NAME`）と`DB_SCHEMA`、`MIGRATION_DB_USERNAME`、`MIGRATION_DB_PASSWORD`が注入されていなければGradle実行前に失敗します。
 アプリケーション用アカウントには業務処理に必要なDML権限を与え、`CREATE`、`ALTER`、`DROP`を与えません。
 Liquibase用アカウントには、DDL、Liquibase管理テーブルの更新、データ移行changesetに必要なDMLの権限を与えます。
 
@@ -195,7 +195,7 @@ Liquibase用アカウントには、DDL、Liquibase管理テーブルの更新�
 本番のDBマイグレーションジョブとアプリケーションデプロイでは、`jooqCodegen`と`migrateAndGenerateJooq`を実行しません。
 生成コードはchangesetと同じ変更として`backend/src/generated/jooq`へコミットし、リリースビルドはそのコミット済みソースをコンパイルします。
 本番でコード生成すると、リリース成果物が稼働DBの状態へ依存し、コード生成用のメタデータ参照権限も本番へ持ち込むことになります。
-changeset追加時のコード生成とレビューを開発またはCIで完了させ、本番では`make be-release-migrate`によるマイグレーションと、コミット済み生成コードを含むアプリケーションのデプロイだけを実行します。
+changeset追加時のコード生成とレビューを開発またはCIで完了させ、本番では`task be-release-migrate`によるマイグレーションと、コミット済み生成コードを含むアプリケーションのデプロイだけを実行します。
 稼働DBの資格情報を開発端末へ配布してコード生成する運用も行いません。
 
 ## CIでの検証
@@ -213,12 +213,12 @@ Liquibaseの`updateTestingRollback`によって、全changesetを適用し、同
 
 1. CIが使い捨てDBでマイグレーションとrollback再適用を検証します。
 2. リリース対象のchangeset、バックアップ、復旧手順を承認します。
-3. 単一のマイグレーションジョブが`make be-release-migrate`を実行します。
+3. 単一のマイグレーションジョブが`task be-release-migrate`を実行します。
 4. `updateToTag`と`assertSchemaTagExists`が成功した場合だけアプリケーションをデプロイします。
 5. デプロイ履歴へアプリケーション識別子とDBスキーマタグを記録します。
 
 ```bash
-make be-release-migrate
+task be-release-migrate
 ```
 
 本番でタグ名を手入力しません。
@@ -233,14 +233,14 @@ DB切り戻しは指定タグより後に適用されたchangesetを新しい順
 テーブルや列を再作成できるrollbackでも、削除済みデータの復元は保証されません。
 
 本番の切り戻し対象タグは作業者が記憶や推測で選ばず、直前に成功したデプロイ履歴からパイプラインが取得します。
-現時点では本番デプロイワークフローがないため、Makeターゲットへ`DB_ROLLBACK_TAG`として明示します。
+現時点では本番デプロイワークフローがないため、Taskfileのタスクへ`DB_ROLLBACK_TAG`として明示します。
 
 切り戻し前にアプリケーションの書き込みを停止し、対象DBのバックアップと復元手順を確認します。
 その後、タグの存在とLiquibaseが生成するSQLを確認します。
 
 ```bash
-make be-rollback-check DB_ROLLBACK_TAG=schema-v1
-make be-rollback-preview DB_ROLLBACK_TAG=schema-v1
+task be-rollback-check DB_ROLLBACK_TAG=schema-v1
+task be-rollback-preview DB_ROLLBACK_TAG=schema-v1
 ```
 
 プレビューSQLは`backend/build/reports/liquibase/rollback-preview.sql`へ出力されます。
@@ -249,12 +249,12 @@ SQLの対象オブジェクト、データ損失、ロック時間、切り戻�
 確認後に限り、明示確認を付けて切り戻します。
 
 ```bash
-make be-rollback \
+task be-rollback \
   DB_ROLLBACK_TAG=schema-v1 \
   CONFIRM_ROLLBACK=yes
 ```
 
-`DB_ROLLBACK_TAG`と`CONFIRM_ROLLBACK=yes`がなければMakeターゲットはDBへ接続せず失敗します。
+`DB_ROLLBACK_TAG`と`CONFIRM_ROLLBACK=yes`がなければTaskfileのタスクはDBへ接続せず失敗します。
 Gradleを直接使う場合も、`-PliquibaseTag=<tag>`と`-PconfirmRollback=true`が必要です。
 
 ```bash

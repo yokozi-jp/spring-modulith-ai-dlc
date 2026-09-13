@@ -8,7 +8,7 @@ on:
       - "docker/compose-test.yml"
       - "docker/initdb/**"
       - ".env.test"
-      - "Makefile"
+      - "Taskfile.yml"
       - ".github/workflows/backend-ci.yml"
   pull_request:
     branches: ["**"]
@@ -17,7 +17,7 @@ on:
       - "docker/compose-test.yml"
       - "docker/initdb/**"
       - ".env.test"
-      - "Makefile"
+      - "Taskfile.yml"
       - ".github/workflows/backend-ci.yml"
 
 permissions:
@@ -72,16 +72,22 @@ jobs:
         with:
           cache-provider: basic
 
-      # ローカルの make test と同じ隔離スタック（PostgreSQL 5433 / Redis 6380）を使う。
+      - name: Set up Task
+        uses: go-task/setup-task@a00fbb05ce67b35648be3c78cbc9fd85354c757e # v2
+        with:
+          version: "3.53.1"
+          checksum: a54a408f6861ff921f6e87774180db31bacd8c1e7c944ca696db9fea49a82fc7
+
+      # ローカルの task test と同じ隔離スタック（PostgreSQL 5433 / Redis 6380）を使う。
       # docker/compose-test.yml と .env.test を共用し、ローカルと CI の乖離を防ぐ。
       - name: Start test dependencies
         run: docker compose -f docker/compose-test.yml up -d --wait
 
       - name: Verify migrations, rollback, reapply, and schema tag
-        run: make be-verify-migrations
+        run: task be-verify-migrations
 
       - name: Migrate test database and run tests
-        run: make be-test
+        run: task be-test
 
       - name: Stop test dependencies
         if: always()

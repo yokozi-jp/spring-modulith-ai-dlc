@@ -90,7 +90,7 @@ jobs:
         run: docker build --tag spring-modulith-backend:ci backend
 
       # 通常テスト用の PostgreSQL / Redis に加え、backend-smoke profile の Keycloak を起動する。
-      # backend-ci.yml と make test は profile を有効にしないため、Keycloak の起動コストを負わない。
+      # backend-ci.yml と task test は profile を有効にしないため、Keycloak の起動コストを負わない。
       # スキーマ作成は compose-test の initdb が担うため、ここでの手動作成は不要。
       - name: Start backend smoke dependencies
         run: docker compose -f docker/compose-test.yml --profile backend-smoke up -d --wait

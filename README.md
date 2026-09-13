@@ -66,6 +66,7 @@
 | Grafana OpenTelemetry LGTM | 0.32.1     |
 | Go (betterleaks 実行用)    | 1.27.x     |
 | Bun (AI-DLC ランタイム)    | 1.3.14     |
+| Task                       | 3.53.1     |
 
 その他のパッケージのバージョンは `backend/build.gradle` と `frontend/package.json` を参照してください。
 
@@ -103,7 +104,7 @@
 ├── commitlint.config.mjs # commitlint 設定（Conventional Commits 検証）
 ├── lefthook.yml      # Git フック定義（Lefthook）
 ├── LICENSE           # ライセンス
-├── Makefile          # 開発コマンド定義
+├── Taskfile.yml          # 開発コマンド定義
 ├── package.json      # Lefthook・commitlint 導入用（ルート）
 └── skills-lock.json  # スキルのバージョン固定（lock）
 ```
@@ -123,13 +124,13 @@
 
 ## 開発コマンド
 
-ビルド、テスト、SBOM 生成などの各種コマンドは [`Makefile`](Makefile) にまとめています。
+ビルド、テスト、SBOM 生成などの各種コマンドは [`Taskfile.yml`](Taskfile.yml) にまとめています。
 
 ```bash
-make <ターゲット名>
+task <タスク名>
 ```
 
-引数なしの `make`（または `make help`）で、カテゴリ別のターゲット一覧を表示します。
+引数なしの`task`、`task help`、または`task --list`で、公開タスクの一覧を表示します。
 
 ### Quick Start
 
@@ -137,18 +138,18 @@ make <ターゲット名>
 
 ```bash
 cp .env.example .env       # 環境変数を用意し、パスワードを変更する
-make compose-up            # PostgreSQL / Keycloak / Redis / Grafana を起動
-make be-migrate            # 初回はマイグレーションを明示実行する
-make dev                   # 依存起動＋バックエンドを起動
+task compose-up            # PostgreSQL / Keycloak / Redis / Grafana を起動
+task be-migrate            # 初回はマイグレーションを明示実行する
+task dev                   # 依存起動＋バックエンドを起動
 ```
 
 バックエンドは <http://localhost:18080>、Keycloak は <http://localhost:8080>、Grafana は <http://localhost:3000> で公開されます。
 
 日々の開発で使う入口タスクは次の三つです。
 
-- **`make dev`**：依存サービスを起動してバックエンドを起動（日々の開発の入口）。
-- **`make check`**：素早いローカル確認（バックエンドの静的解析）。
-- **`make verify`**：push 前の総合ゲート（静的解析と、使い捨てDBでのマイグレーション検証とテスト。CI と同じ内容）。
+- **`task dev`**：依存サービスを起動してバックエンドを起動（日々の開発の入口）。
+- **`task check`**：素早いローカル確認（バックエンドの静的解析）。
+- **`task verify`**：push 前の総合ゲート（静的解析と、使い捨てDBでのマイグレーション検証とテスト。CI と同じ内容）。
 
 Docker Compose の操作（サービスの起動、停止、状態確認、Keycloak の realm 再投入）や、「いつ、どのコマンドを、どの順で使うか」のシナリオ別の手順は [開発ワークフロー](docs/dev-workflow.md) を参照してください。
 
@@ -156,10 +157,10 @@ Docker Compose の操作（サービスの起動、停止、状態確認、Keycl
 
 ## Lint・テスト
 
-静的解析、シークレットと脆弱性のスキャン、テストは、いずれも [`Makefile`](Makefile) のターゲットとして実行できます（`make <ターゲット名>`）。
-日常的には push 前に `make verify`（静的解析と、使い捨てDBでのマイグレーション検証とテスト、CI と同じ内容）を回せば足ります。
+静的解析、シークレットと脆弱性のスキャン、テストは、いずれも [`Taskfile.yml`](Taskfile.yml) のタスクとして実行できます（`task <タスク名>`）。
+日常的には push 前に `task verify`（静的解析と、使い捨てDBでのマイグレーション検証とテスト、CI と同じ内容）を回せば足ります。
 
-各ターゲットの一覧と内容、Git フックと CI での自動実行の対応は [Lint・テストのリファレンス](docs/lint-and-test.md) にまとめています。
+各タスクの一覧と内容、Git フックと CI での自動実行の対応は [Lint・テストのリファレンス](docs/lint-and-test.md) にまとめています。
 
 <p align="right">(<a href="#top">トップへ</a>)</p>
 
@@ -172,7 +173,7 @@ Docker Compose の操作（サービスの起動、停止、状態確認、Keycl
 - ADR の一覧は [`docs/adr/index.md`](docs/adr/index.md) を参照してください。
 - インテント固有の設計判断は、AI-DLC が inception 実行時に各インテントの record dir（`<record>/inception/domain-design/decisions.md`）へ生成します。`docs/adr/` はワークフロー外・横断の判断を残す場所です。
 
-push 前には `make adr-check` が pre-push で走り、判断が絡む変更（依存・セキュリティ・DB・インフラ・ワークフロー、およびフロントエンド全体）に `docs/adr/` の更新が伴わないとき注意喚起します。
+push 前には `task adr-check` が pre-push で走り、判断が絡む変更（依存・セキュリティ・DB・インフラ・ワークフロー、およびフロントエンド全体）に `docs/adr/` の更新が伴わないとき注意喚起します。
 既定は非ブロッキングで、該当しない場合は `ADR_ACK=1 git push` で抑制できます。
 
 <p align="right">(<a href="#top">トップへ</a>)</p>

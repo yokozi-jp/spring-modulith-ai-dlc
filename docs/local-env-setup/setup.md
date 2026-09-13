@@ -66,7 +66,7 @@ sudo chmod -R 755 /home/projects
 
 # 基本パッケージインストール
 sudo apt update && sudo apt upgrade -y
-sudo apt install -y curl git wget unzip jq vim tree gnupg2 software-properties-common make
+sudo apt install -y curl git wget unzip jq vim tree gnupg2 software-properties-common
 
 # Git基本設定（⚠️ 以下2行は自分の名前・メールアドレスに書き換えてから実行してください）
 # git config --global user.name "Your Name"
@@ -125,9 +125,13 @@ cd spring-modulith-ai-dlc
 
 ### 7. セットアップスクリプトの実行
 
+最初にTaskを独立したスクリプトで導入し、その後のセットアップを`task setup`で実行します。
+
 ```bash
 cd /home/projects/spring-modulith-ai-dlc
-make setup
+./docs/local-env-setup/00-setup-task.sh
+export PATH="$HOME/.local/bin:$PATH"
+task setup
 source ~/.bashrc
 ```
 
@@ -161,6 +165,7 @@ java -version
 node -v
 gh auth status
 bun --version
+task --version
 go version
 betterleaks version
 ```
