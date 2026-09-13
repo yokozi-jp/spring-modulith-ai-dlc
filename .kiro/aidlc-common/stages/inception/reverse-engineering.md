@@ -57,7 +57,7 @@ Read `<record>/aidlc-state.md` to confirm:
 - Project type is brownfield
 
 If the project is not brownfield, run
-`bun .kiro/tools/aidlc-orchestrate.ts report --stage reverse-engineering --result skipped --reason "<reason>"`.
+`aidlc engine orchestrate report --stage reverse-engineering --result skipped --reason "<reason>"`.
 The engine records the skip and advances to the next in-scope stage.
 
 #### Resolve the intent's repo set (multi-repo)
@@ -95,7 +95,7 @@ accumulates across intents. For every repo in the resolved set, run the
 read-only check:
 
 ```
-bun .kiro/tools/aidlc-utility.ts codekb-scope-diff --repo <repo>
+aidlc engine workspace codekb-scope-diff --repo <repo>
 ```
 
 - **NO_STORE** - first scan for this repo. Proceed to Step 2; no question.
@@ -148,7 +148,7 @@ Immediately after each human reuse decision, record that repo's
 current-attempt exemption:
 
 ```
-bun .kiro/tools/aidlc-state.ts reuse-artifact reverse-engineering --decision keep --artifacts "<codekb-path output>" [--repo <repo>] [--single]
+aidlc engine state reuse-artifact reverse-engineering --decision keep --artifacts "<codekb-path output>" [--repo <repo>] [--single]
 ```
 
 Use one row per reused registered repo. For an unrecorded single-repo workspace,
@@ -162,7 +162,7 @@ Immediately before Step 2, take one compare-and-swap snapshot for every repo
 selected for scanning:
 
 ```
-bun .kiro/tools/aidlc-utility.ts codekb-snapshot --repo <repo> --paths <source paths> --json
+aidlc engine workspace codekb-snapshot --repo <repo> --paths <source paths> --json
 ```
 
 Choose `<source paths>` as follows:
@@ -185,7 +185,7 @@ Only after every repository decision has been resolved:
 
 - If every repo is reused on an ordinary workflow run, report the stage as
   skipped exactly once:
-  `bun .kiro/tools/aidlc-orchestrate.ts report --stage reverse-engineering --result skipped --reason "codekb reuse: all resolved stores CURRENT, human chose reuse"`.
+  `aidlc engine orchestrate report --stage reverse-engineering --result skipped --reason "codekb reuse: all resolved stores CURRENT, human chose reuse"`.
 - If every repo is reused on an isolated run (`directive.single === true`), do
   NOT call the main-workflow skipped report. Return the reused-repositories
   summary to the orchestrator's isolated stage-runner branch; the single-run
@@ -242,7 +242,7 @@ contains `## Developer Code Scan Results`, `### Scan Coverage`, and
 `## Handoff Summary`. Then mint link 1 before dispatching the architect:
 
 ```
-bun .kiro/tools/aidlc-log.ts link --stage reverse-engineering --link aidlc-developer-agent --artifact "<developer scan handoff path>" [--repo <repo>] [--single]
+aidlc engine log link --stage reverse-engineering --link aidlc-developer-agent --artifact "<developer scan handoff path>" [--repo <repo>] [--single]
 ```
 
 The logger requires the handoff to have been written in the current stage
@@ -305,7 +305,7 @@ For the block's `fingerprint:` line, run the mint command with the final
 its output verbatim:
 
    ```
-   bun .kiro/tools/aidlc-utility.ts codekb-scope-diff --repo <repo> --mint --paths <analyzed paths>
+   aidlc engine workspace codekb-scope-diff --repo <repo> --mint --paths <analyzed paths>
    ```
 
 At Minimal depth, all nine artifacts and every required section above still
@@ -318,7 +318,7 @@ is the methodology's existing depth contract, not an output-length cap.
 yourself.** Run the read-only tool
 
 ```
-bun .kiro/tools/aidlc-utility.ts codekb-path --repo <repo>
+aidlc engine workspace codekb --repo <repo>
 ```
 
 (omit `--repo` only for an unrecorded project-root repo; pass it for every
@@ -335,7 +335,7 @@ repo; NOT the timestamp filename - record-dir placement checks key on the
 artifact stems) and run
 
 ```
-bun .kiro/tools/aidlc-utility.ts codekb-scope-diff --repo <repo> --compare <record>/inception/reverse-engineering/scope-draft-<repo>.md
+aidlc engine workspace codekb-scope-diff --repo <repo> --compare <record>/inception/reverse-engineering/scope-draft-<repo>.md
 ```
 
 Keep the output keyed by `<repo>` for Step 5's completion summary. This is the
@@ -350,7 +350,7 @@ Publish the complete candidate through the compare-and-swap utility, using the
 exact snapshot values captured immediately before Step 2:
 
 ```
-bun .kiro/tools/aidlc-utility.ts codekb-publish \
+aidlc engine workspace codekb-publish \
   --repo <repo> \
   --staged <record>/.aidlc-codekb-stage-<repo>/ \
   --paths <snapshot paths> \
@@ -385,7 +385,7 @@ After the architect return has been read and all 9 artifacts for that repo are
 present, mint the final-link receipt:
 
 ```
-bun .kiro/tools/aidlc-log.ts link --stage reverse-engineering --link aidlc-architect-agent [--repo <repo>] [--single]
+aidlc engine log link --stage reverse-engineering --link aidlc-architect-agent [--repo <repo>] [--single]
 ```
 
 Do not report completion until every selected repo's chain has both receipts.
@@ -394,7 +394,7 @@ Do not report completion until every selected repo's chain has both receipts.
 
 After every selected repo scan has completed, hand completion to
 `stage-protocol.md` exactly once via
-`bun .kiro/tools/aidlc-orchestrate.ts report --stage reverse-engineering --result <outcome>`.
+`aidlc engine orchestrate report --stage reverse-engineering --result <outcome>`.
 That `report` call owns every lifecycle transition and advancement; never perform one in prose, and never narrate this bookkeeping to the user.
 
 ### Step 5: Present Completion & Request Approval

@@ -22,7 +22,7 @@ that flag without this skill.
 1. Ask the engine for the single-stage directive:
 
    ```bash
-   bun .kiro/tools/aidlc-orchestrate.ts next --stage build-and-test --single
+   aidlc engine orchestrate next --stage build-and-test --single
    ```
 
    The engine emits one `run-stage` directive for `build-and-test` (carrying the
@@ -41,7 +41,7 @@ that flag without this skill.
 3. When the stage's work is done, commit the single-stage record:
 
    ```bash
-   bun .kiro/tools/aidlc-orchestrate.ts report --single --stage build-and-test --result completed
+   aidlc engine orchestrate report --single --stage build-and-test --result completed
    ```
 
    This records a STAGE_STARTED / STAGE_COMPLETED pair under a synthetic workflow

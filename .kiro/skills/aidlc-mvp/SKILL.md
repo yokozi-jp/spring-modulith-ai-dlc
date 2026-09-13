@@ -19,7 +19,7 @@ engine owns all routing; the conductor persona arrives on the first directive's
 
 ## The loop
 
-1. `directive = bun .kiro/tools/aidlc-orchestrate.ts next --scope mvp $ARGUMENTS`
+1. `directive = aidlc engine orchestrate next --scope mvp $ARGUMENTS`
 2. Before acting on each directive, read
    `.kiro/aidlc-common/protocols/stage-protocol.md` once per session,
    then read every
@@ -28,7 +28,7 @@ engine owns all routing; the conductor persona arrives on the first directive's
    only a module already loaded earlier in this session. Then act on
    `directive.kind` exactly as the orchestrator does (run-stage / invoke-swarm /
    ask / print / error / done).
-3. `bun .kiro/tools/aidlc-orchestrate.ts report --stage <directive.stage> --result <outcome> [--user-input "<text>"]` when the directive names a stage; omit `--stage` only for non-stage report round-trips.
+3. `aidlc engine orchestrate report --stage <directive.stage> --result <outcome> [--user-input "<text>"]` when the directive names a stage; omit `--stage` only for non-stage report round-trips.
 4. Repeat from step 1 until `directive.kind == done`.
 
 Pass `$ARGUMENTS` through verbatim after `--scope mvp`; the engine parses
@@ -48,7 +48,7 @@ continuation; the escape hatch is `next --new-intent`.
 
 - **Default to CONTINUATION.** Treat the input as new-work ONLY when it clearly
   names a distinct feature/bug/unit unrelated to the active intent's subject
-  (`bun .kiro/tools/aidlc-utility.ts intent --json` gives its `slug` and
+  (`aidlc engine intent list --json` gives its `slug` and
   `status`). When in doubt, continue: false-positive offers are the main risk.
 - **On genuine new-work, OFFER, never auto-create.** Surface an
   `AskUserQuestion` showing the active intent and the proposed new one, **including
@@ -62,7 +62,7 @@ continuation; the escape hatch is `next --new-intent`.
   new-work text:
 
   ```bash
-  bun .kiro/tools/aidlc-orchestrate.ts next --new-intent --scope <the confirmed scope> "<the new-work description>"
+  aidlc engine orchestrate next --new-intent --scope <the confirmed scope> "<the new-work description>"
   ```
 
   The engine returns a `print` directive naming the `intent-create` command

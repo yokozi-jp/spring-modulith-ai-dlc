@@ -158,7 +158,7 @@ stage before Construction begins.
 ### Step 6: Completion Handoff
 
 Hand completion to `stage-protocol.md` via
-`bun .kiro/tools/aidlc-orchestrate.ts report --stage delivery-planning --result <outcome>`.
+`aidlc engine orchestrate report --stage delivery-planning --result <outcome>`.
 That `report` call owns every lifecycle transition and advancement; never perform one in prose, and never narrate this bookkeeping to the user.
 
 **Construction iteration.** Classify how the approved `bolt-plan.md` wants the
@@ -169,7 +169,7 @@ building one unit completely before the next unit begins — the first working
 code lands after one unit's design, honoring a skeleton-first sequence; a plan
 that reasons stage-by-stage across all units does not. Only when the plan calls
 for the unit-first order, record it:
-`bun .kiro/tools/aidlc-state.ts set-construction-iteration unit-major`.
+`aidlc engine state set-construction-iteration unit-major`.
 The default is `stage-major` (each design stage runs for every unit, then the
 next stage, with code-generation last), needs no write, and is byte-identical
 to prior behaviour. Under `unit-major` the same per-stage gates still fire, but
@@ -188,9 +188,9 @@ builds.
 The several-teams choice requires the unit-first order above. If the plan is not
 already unit-major, explain that prerequisite and confirm switching before
 recording:
-`bun .kiro/tools/aidlc-state.ts set-construction-iteration unit-major`,
+`aidlc engine state set-construction-iteration unit-major`,
 then
-`bun .kiro/tools/aidlc-state.ts set-unit-ownership team`. Team ownership
+`aidlc engine state set-unit-ownership team`. Team ownership
 requires the workspace root itself to be the source Git repository; intents with
 recorded sibling repos must remain solo.
 For the one-session choice, leave the field absent (the byte-identical default)
@@ -204,7 +204,7 @@ or record `set-unit-ownership solo`.
 > after the unit's design and code are complete."
 
 Record the answer with
-`bun .kiro/tools/aidlc-state.ts set-unit-gate-rhythm per-stage` or
+`aidlc engine state set-unit-gate-rhythm per-stage` or
 `... unit-end`. If the field is absent under team ownership, `per-stage` is the
 default. These names are tool vocabulary; present the plain-language choices,
 not the field or enum names.
