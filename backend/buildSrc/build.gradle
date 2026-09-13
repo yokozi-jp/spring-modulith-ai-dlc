@@ -1,0 +1,17 @@
+/*
+ * buildSrc: build ロジックの型付き実装を置く。
+ * ここでコンパイルしたクラスは、ルートの build.gradle と apply from で読み込む
+ * gradle/*.gradle の双方から参照できる。
+ *
+ * 依存は Gradle 同梱の API と Groovy だけに閉じる（外部ダウンロードを増やさない）。
+ * PostgreSQL ドライバは実行時に jooqCodegen 構成から URLClassLoader 経由で読むため、
+ * buildSrc のコンパイル依存には含めない。
+ */
+plugins {
+    id 'groovy'
+}
+
+dependencies {
+    implementation gradleApi()
+    implementation localGroovy()
+}

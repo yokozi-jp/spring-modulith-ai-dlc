@@ -1,4 +1,4 @@
-package com.example.demo;
+package com.example.demo.architecture;
 
 import com.tngtech.archunit.core.importer.ImportOption;
 import com.tngtech.archunit.core.importer.Location;

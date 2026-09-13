@@ -1,7 +1,8 @@
-package com.example.demo;
+package com.example.demo.architecture;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.example.demo.DemoApplication;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;

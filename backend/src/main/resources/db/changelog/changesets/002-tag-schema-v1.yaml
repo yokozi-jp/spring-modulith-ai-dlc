@@ -1,0 +1,7 @@
+databaseChangeLog:
+  - changeSet:
+      id: 002-tag-schema-v1
+      author: spring-modulith-ai-dlc
+      changes:
+        - tagDatabase:
+            tag: schema-v1

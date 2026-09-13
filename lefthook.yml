@@ -120,6 +120,12 @@ pre-commit:
 pre-push:
   parallel: true
   jobs:
+    # push 前に、判断が絡む変更へ ADR が伴うかを確認（ナッジ）
+    # 既定は非ブロッキング（気づかせるだけ）。ADR_STRICT=1 でブロック、ADR_ACK=1 で抑制。
+    # ローカルと同じ判定を make adr-check に集約している。
+    - name: adr-check
+      run: make adr-check
+
     # push 前にリポジトリ全体（履歴含む）をシークレットスキャン（Betterleaks）
     # betterleaks が PATH に無い場合は go install 先 ($HOME/go/bin) にフォールバック
     - name: betterleaks-full-scan
@@ -148,6 +154,26 @@ pre-push:
           exit 0
         fi
         make test
+
+    # Dockerfile または backend のビルド/ソースに変更がある push のときだけ、イメージの build ステージを
+    # 実ビルドする。docker build --check や作業ツリーでの Gradle 実行では踏めない「縮小コンテキスト特有」の
+    # 失敗（buildSrc 未コピーでスクリプト評価が壊れる等）を push 前に捕まえるのが目的。
+    # runtime ステージは COPY のみで得るものが薄いため --target build に絞る。
+    # docker が無い環境ではスキップ（最終担保は CI に任せる）。
+    - name: be-image-build
+      glob:
+        - "backend/Dockerfile"
+        - "backend/.dockerignore"
+        - "backend/**/*.{java,gradle}"
+        - "backend/gradle.properties"
+        - "backend/gradlew"
+      run: |
+        echo "{push_files}" >/dev/null
+        if ! command -v docker >/dev/null 2>&1; then
+          echo "docker が無いため docker build --target build をスキップします（CI で検査されます）。" >&2
+          exit 0
+        fi
+        docker build --target build --tag spring-modulith-backend:prepush-check backend
 
     # GitHub Actions ワークフローに変更がある push のときだけ Lint（actionlint）
     # glob を効かせるため run 内で {push_files} を参照する。

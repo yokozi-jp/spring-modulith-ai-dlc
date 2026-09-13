@@ -6,15 +6,21 @@ services:
     command: ["postgres", "-c", "timezone=UTC", "-c", "log_timezone=UTC"]
     environment:
       POSTGRES_DB: ${DB_NAME:?DB_NAME is required}
-      POSTGRES_USER: ${DB_USERNAME:?DB_USERNAME is required}
-      POSTGRES_PASSWORD_FILE: /run/secrets/db_password
+      # ブートストラップは DDL とスキーマ所有を持つマイグレーション用ロール。
+      POSTGRES_USER: ${MIGRATION_DB_USERNAME:?MIGRATION_DB_USERNAME is required}
+      POSTGRES_PASSWORD_FILE: /run/secrets/migration_db_password
+      # initdb が作成する DML 限定のアプリロール（アプリはこの資格情報で接続する）。
+      DB_USERNAME: ${DB_USERNAME:?DB_USERNAME is required}
+      DB_PASSWORD_FILE: /run/secrets/db_password
+      DB_SCHEMA: ${DB_SCHEMA:?DB_SCHEMA is required}
     ports:
       - "127.0.0.1:${DB_PORT:?DB_PORT is required}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql
-      # 初回起動時に demo スキーマを作成する（DB_SCHEMA=demo に対応）。
+      # 初回起動時に demo スキーマ（マイグレーションロール所有）と DML 限定のアプリロールを作成する。
       - ./initdb:/docker-entrypoint-initdb.d:ro
     secrets:
+      - migration_db_password
       - db_password
     healthcheck:
       test: ["CMD-SHELL", 'pg_isready -U "$${POSTGRES_USER}" -d "$${POSTGRES_DB}"']
@@ -163,6 +169,8 @@ volumes:
   otel_lgtm_data:
 
 secrets:
+  migration_db_password:
+    environment: MIGRATION_DB_PASSWORD
   db_password:
     environment: DB_PASSWORD
   grafana_admin_password:

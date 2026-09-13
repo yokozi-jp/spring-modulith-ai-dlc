@@ -22,6 +22,7 @@ plugins {
     id 'com.github.spotbugs' version '6.5.11'
     id 'net.ltgt.errorprone' version '5.1.1'
     id 'org.liquibase.gradle' version '3.1.0'
+    id 'org.jooq.jooq-codegen-gradle' version '3.21.7'
 }
 
 group = 'com.example'
@@ -67,8 +68,8 @@ dependencies {
 
     // --- データアクセス ---
     implementation 'org.springframework.boot:spring-boot-starter-jooq'
-    implementation 'org.springframework.boot:spring-boot-starter-liquibase'
     runtimeOnly 'org.postgresql:postgresql'
+    jooqCodegen 'org.postgresql:postgresql'
 
     // --- モジュラーモノリス ---
     implementation 'org.springframework.modulith:spring-modulith-starter-core'
@@ -96,7 +97,6 @@ dependencies {
     testImplementation 'org.springframework.boot:spring-boot-starter-security-oauth2-client-test'
     testImplementation 'org.springframework.boot:spring-boot-starter-session-data-redis-test'
     testImplementation 'org.springframework.boot:spring-boot-starter-jooq-test'
-    testImplementation 'org.springframework.boot:spring-boot-starter-liquibase-test'
     testImplementation 'org.springframework.boot:spring-boot-starter-actuator-test'
     testImplementation 'org.springframework.boot:spring-boot-starter-opentelemetry-test'
     testImplementation 'org.springframework.modulith:spring-modulith-starter-test'
@@ -231,6 +231,17 @@ spotbugs {
     excludeFilter = file('config/spotbugs/exclusion-filter.xml')
 }
 
+// jOOQ生成コードは生成器の責任範囲なので、手書きコード向けの静的解析から除外する。
+tasks.named('pmdMain') {
+    exclude '**/jooq/**'
+}
+
+tasks.named('spotbugsMain') {
+    classes = files(sourceSets.main.output.classesDirs.asFileTree.matching {
+        exclude '**/jooq/**'
+    })
+}
+
 /*
  * Error Prone: コンパイル時バグ検出
  * NullAway による null 安全性チェック（テストコードでは無効）と
@@ -265,33 +276,8 @@ tasks.withType(JavaCompile).configureEach {
 }
 
 /*
- * Liquibase: DBマイグレーション
- * Gradle タスク（update, rollback 等）から直接実行するための設定。
- * 接続情報は環境変数から取得し、未設定時はローカル開発用デフォルトを使用する。
+ * DBマイグレーションとjOOQコード生成のワークフロー定義は gradle/database.gradle に分離している。
+ * build.gradle はアプリのビルド定義（依存・品質ツール）に集中させ、DB運用の
+ * タスク群（マイグレーション・切り戻し・コード生成）はそちらへ切り出している。
  */
-def liquibaseDbHost = System.getenv('DB_HOST') ?: 'localhost'
-def liquibaseDbPort = System.getenv('DB_PORT') ?: '5432'
-def liquibaseDbName = System.getenv('DB_NAME') ?: 'demo'
-def liquibaseDbUrl = System.getenv('DB_URL') ?: "jdbc:postgresql://${liquibaseDbHost}:${liquibaseDbPort}/${liquibaseDbName}"
-def liquibaseDbUsername = System.getenv('DB_USERNAME') ?: 'demo'
-def liquibaseDbPassword = System.getenv('DB_PASSWORD') ?: 'demo'
-def liquibaseDbSchema = System.getenv('DB_SCHEMA') ?: 'demo'
-
-liquibase {
-    activities {
-        main {
-            changelogFile 'db/changelog/db.changelog-master.yaml'
-            searchPath 'src/main/resources'
-            url liquibaseDbUrl
-            username liquibaseDbUsername
-            password liquibaseDbPassword
-            defaultSchemaName liquibaseDbSchema
-        }
-    }
-}
-
-dependencies {
-    liquibaseRuntime 'org.liquibase:liquibase-core:5.0.4'
-    liquibaseRuntime 'org.postgresql:postgresql'
-    liquibaseRuntime 'info.picocli:picocli:4.7.7'
-}
+apply from: "$rootDir/gradle/database.gradle"

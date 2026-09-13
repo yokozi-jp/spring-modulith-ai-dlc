@@ -28,6 +28,9 @@ WORKDIR /workspace
 # 変更頻度の低い Gradle ラッパーとビルド定義を先にコピーする。
 COPY gradlew settings.gradle build.gradle gradle.properties ./
 COPY gradle ./gradle
+# buildSrc（型付きタスク等のビルドロジック）は build.gradle / gradle/*.gradle から
+# 参照されるため、Gradle 実行前にコピーする。無いとスクリプト評価時に解決できず失敗する。
+COPY buildSrc ./buildSrc
 
 # ソースより先に主な依存関係を解決し、ビルド時のダウンロードを抑える。
 # 一回限りのタスクグラフなので Configuration Cache は生成しない。
