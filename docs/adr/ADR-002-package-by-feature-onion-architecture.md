@@ -27,7 +27,8 @@ Accepted
 - モジュールルートには他モジュールへ公開する契約だけを置く。
 - 内部は `domain` / `application` / `presentation` / `infrastructure` に分ける。
 - 外周命名は Hexagonal の `adapter.in/out` ではなく、
-  Onion / Clean で一般的な `presentation` と `infrastructure` を使う。
+  Onion / Clean で一般的な `presentation` と `infrastructure` を使う
+  （選定理由は Alternatives Considered の Alternative 2 を参照）。
 - 依存は内向き（presentation / infrastructure → application → domain）に限定し、
   業務モジュール実装後に `Architectures.onionArchitecture()` で強制する。
 
@@ -58,12 +59,40 @@ Accepted
 - Pros：小規模では素直。
 - Cons：機能をまたぐ依存が生まれ、Modulith の機能モジュール分割と衝突する。
 
-### Alternative 2: Hexagonal の adapter.in / adapter.out 命名
+### Alternative 2: Hexagonal（Ports and Adapters）
 
-- 説明：Ports and Adapters の命名を使う。
-- Pros：入出力の対称性が明確。
-- Cons：Web API 主入口の本プロジェクトでは Onion 命名のほうが通りが良く、
-  presentation を独立させたい意図と合う。
+- 説明：核を Port（インターフェース）で囲み、外部との接続を Adapter に閉じる。
+  最上位の分割を interaction point（外部がどう核に接続するか）で定義し、
+  外周は `adapter.in`（primary/driver）と `adapter.out`（secondary/driven）に分ける。
+
+Hexagonal と Onion は、業務ロジックを外部から切り離すという目標も、依存を核へ向ける方針も、
+テスト容易性も共有する。
+両者は排他ではなく、力点の違いである。
+Hexagonal は核の分離と外部統合の交換可能性に、Onion は同心層による責務分割とドメイン中心性に力点を置く[^origin]。
+本プロジェクトでは、後者の力点が要件に合う。
+
+- Pros：primary/secondary の対称性が明確で、Adapter を差し替えれば核を変えずに
+  外部ツール（REST から gRPC、SQL から NoSQL など）を交換できる。
+  外部統合が多いシステムやマイクロサービスに向く。
+- Cons：本プロジェクトは Modulith の単一モノリスで、主入口は Web API に定まっており、
+  DB や外部ツールを頻繁に差し替える要件がない。
+  Hexagonal の交換可能性が解く問題（多数の外部統合、Adapter の頻繁な差し替え）は本プロジェクトには生じにくく、
+  対称な `adapter.in/out` は入口の非対称な実態（Web API 主入口）を隠す。
+  Onion は責務で層を切るため、入口を `presentation` として独立させたい意図とも噛み合う。
+  また Onion は複雑なドメインを持つエンタープライズモノリスと DDD に向くとされ[^whenonion]、
+  DDD 戦術パターンを志向する本プロジェクトの性質に一致する。
+
+なお Hexagonal の secondary port/adapter が与える「外部ツールの交換可能性」は、
+Onion でも Infrastructure が内側インターフェースを実装する形で（層としては弱いながら）得られる。
+本プロジェクトが必要とするのはこの範囲であり、Hexagonal 固有の対称構造までは要らない。
+
+[^origin]: Onion は Jeffrey Palermo が 2008 年に、Hexagonal は Alistair Cockburn が 2005 年に提唱した。
+  対比の整理は次を参照した。
+  [Onion Architecture vs Hexagonal Architecture](https://www.codegenes.net/blog/onion-architecture-compared-to-hexagonal/)。
+  内容は要約であり、ライセンス上の制約に配慮して言い換えた。
+
+[^whenonion]: 前掲記事の "When to Use Onion Architecture"（複雑なドメイン、DDD、大規模モノリス）と
+  "When to Use Hexagonal Architecture"（多数の外部統合、頻繁な Adapter 差し替え、マイクロサービス）の対比による。
 
 ### Alternative 3: jMolecules の Onion 規則
 
@@ -76,3 +105,4 @@ Accepted
 
 - [`docs/architecture/package-by-feature-onion-handoff.md`](../architecture/package-by-feature-onion-handoff.md)
 - [`docs/architecture/archunit-additional-rules.md`](../architecture/archunit-additional-rules.md)
+- [Onion Architecture vs Hexagonal Architecture](https://www.codegenes.net/blog/onion-architecture-compared-to-hexagonal/)

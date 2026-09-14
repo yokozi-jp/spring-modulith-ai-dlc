@@ -39,4 +39,49 @@
     <rule ref="category/java/multithreading.xml"/>
     <rule ref="category/java/performance.xml"/>
     <rule ref="category/java/security.xml"/>
+
+    <rule name="UseLombokSlf4j"
+          language="java"
+          message="Logger を手書きせず Lombok の @Slf4j を使用する。"
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule">
+        <description>
+            SLF4J Logger の生成を @Slf4j に統一し、Logger フィールドと LoggerFactory の直接利用を禁止する。
+        </description>
+        <priority>3</priority>
+        <properties>
+            <property name="xpath">
+                <value><![CDATA[
+                    //ClassType[
+                        pmd-java:typeIs('org.slf4j.Logger')
+                        or pmd-java:typeIs('org.slf4j.LoggerFactory')
+                    ]
+                    |
+                    //ImportDeclaration[
+                        @Static = true()
+                        and starts-with(@ImportedName, 'org.slf4j.LoggerFactory.')
+                    ]
+                ]]></value>
+            </property>
+        </properties>
+    </rule>
+
+    <rule name="DoNotUseLombokDataOrSetter"
+          language="java"
+          message="Lombok の @Data と @Setter は使用せず、record または意図を表す状態変更メソッドを使う。"
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule">
+        <description>
+            @Data と @Setter が生成する一括の状態変更を禁止し、Domain Model の不変条件とデータキャリアの不変性を保つ。
+        </description>
+        <priority>2</priority>
+        <properties>
+            <property name="xpath">
+                <value><![CDATA[
+                    //Annotation[
+                        pmd-java:typeIs('lombok.Data')
+                        or pmd-java:typeIs('lombok.Setter')
+                    ]
+                ]]></value>
+            </property>
+        </properties>
+    </rule>
 </ruleset>
