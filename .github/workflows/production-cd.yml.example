@@ -44,7 +44,7 @@
 # # Secrets Managerの`MIGRATION_SECRET_ID`は次のJSONキーを持たせます。
 # #
 # # `DB_URL`はRDS Writerへ直接接続するJDBC URLです（マイグレーションとアプリで共通の接続先）。
-# # `DB_SCHEMA`はアプリケーションと共用するスキーマ名です。
+# # `DB_USERNAME`は001 changesetがGRANT対象にするアプリケーションロール名です（名前だけで、パスワードは渡しません）。
 # # `MIGRATION_DB_USERNAME`はDDL権限を持つLiquibase専用ユーザーです。
 # # `MIGRATION_DB_PASSWORD`はLiquibase専用ユーザーのパスワードです。
 # #
@@ -223,7 +223,7 @@
 #             --secret-id "$MIGRATION_SECRET_ID" \
 #             --query SecretString \
 #             --output text)"
-#           for key in DB_URL DB_SCHEMA MIGRATION_DB_USERNAME MIGRATION_DB_PASSWORD; do
+#           for key in DB_URL DB_USERNAME MIGRATION_DB_USERNAME MIGRATION_DB_PASSWORD; do
 #             value="$(jq -er --arg key "$key" '.[$key]' <<<"$secret_json")"
 #             echo "::add-mask::$value"
 #             echo "$key=$value" >> "$GITHUB_ENV"
@@ -243,6 +243,8 @@
 #       # 本番では`task be-release-migrate`だけを実行し、`update`を直接呼びません。
 #       # `updateToTag`でリポジトリに固定されたタグまで適用し、未承認の後続changesetを取り込みません。
 #       # この処理はGitHub concurrencyとLiquibase lockにより単一実行にします。
+#       # 001 changesetはアプリケーションロール（`DB_USERNAME`）へGRANTするため、初回マイグレーション前に
+#       # そのロールをRDS側（IaC）で作成しておきます。未作成だとGRANTで失敗します。
 #       - name: Apply approved database migrations
 #         id: migrate
 #         run: |

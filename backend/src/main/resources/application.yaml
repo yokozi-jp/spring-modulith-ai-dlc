@@ -25,14 +25,13 @@ spring:
     username: ${DB_USERNAME}
     password: ${DB_PASSWORD}
     hikari:
-      schema: ${DB_SCHEMA}
+      # モジュールスキーマ名は環境差を持たないアーキテクチャ上の固定値。
+      schema: modulith
       # 新しい物理接続ごとにDBセッションの日時解釈と表示をUTCへ固定する。
       connection-init-sql: SET TIME ZONE 'UTC'
 
-  # Liquibase: アプリケーション起動からDBマイグレーションを分離する。
-  # 変更はデプロイ前に ./gradlew migrateDatabase などの明示コマンドで適用する。
-  liquibase:
-    enabled: false
+  # DBマイグレーションはアプリ起動から分離済み（spring-boot-starter-liquibase を依存に持たず、
+  # 起動時の自動実行は起こらない）。変更は ./gradlew migrateDatabase などの明示コマンドで適用する。
 
   # Redis
   data:
@@ -95,8 +94,8 @@ spring:
       # 完了したイベント出版レコードをアーカイブへ移し、調査可能な履歴を保持する。
       completion-mode: archive
       jdbc:
-        # Hikari と Liquibase が使用するスキーマに揃える。
-        schema: ${DB_SCHEMA}
+        # Spring Modulith が所有する共有インフラを業務モジュールのスキーマから分離する。
+        schema: modulith
         # テーブル作成は Liquibase に一本化する。
         schema-initialization:
           enabled: false

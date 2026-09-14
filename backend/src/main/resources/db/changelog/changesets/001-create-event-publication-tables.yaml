@@ -6,8 +6,13 @@ databaseChangeLog:
         - dbms:
             type: postgresql
       changes:
+        - sql:
+            sql: CREATE SCHEMA modulith AUTHORIZATION CURRENT_USER;
+        - sql:
+            sql: GRANT USAGE ON SCHEMA modulith TO "${appDatabaseUsername}";
         - createTable:
             tableName: event_publication
+            schemaName: modulith
             columns:
               - column:
                   name: id
@@ -51,6 +56,7 @@ databaseChangeLog:
         - createIndex:
             indexName: event_publication_serialized_event_hash_idx
             tableName: event_publication
+            schemaName: modulith
             using: hash
             columns:
               - column:
@@ -58,11 +64,13 @@ databaseChangeLog:
         - createIndex:
             indexName: event_publication_by_completion_date_idx
             tableName: event_publication
+            schemaName: modulith
             columns:
               - column:
                   name: completion_date
         - createTable:
             tableName: event_publication_archive
+            schemaName: modulith
             columns:
               - column:
                   name: id
@@ -106,6 +114,7 @@ databaseChangeLog:
         - createIndex:
             indexName: event_publication_archive_serialized_event_hash_idx
             tableName: event_publication_archive
+            schemaName: modulith
             using: hash
             columns:
               - column:
@@ -113,11 +122,18 @@ databaseChangeLog:
         - createIndex:
             indexName: event_publication_archive_by_completion_date_idx
             tableName: event_publication_archive
+            schemaName: modulith
             columns:
               - column:
                   name: completion_date
+        - sql:
+            sql: GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE modulith.event_publication, modulith.event_publication_archive TO "${appDatabaseUsername}";
       rollback:
         - dropTable:
             tableName: event_publication_archive
+            schemaName: modulith
         - dropTable:
             tableName: event_publication
+            schemaName: modulith
+        - sql:
+            sql: DROP SCHEMA modulith;

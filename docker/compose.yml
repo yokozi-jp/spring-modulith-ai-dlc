@@ -12,12 +12,11 @@ services:
       # initdb が作成する DML 限定のアプリロール（アプリはこの資格情報で接続する）。
       DB_USERNAME: ${DB_USERNAME:?DB_USERNAME is required}
       DB_PASSWORD_FILE: /run/secrets/db_password
-      DB_SCHEMA: ${DB_SCHEMA:?DB_SCHEMA is required}
     ports:
       - "127.0.0.1:${DB_PORT:?DB_PORT is required}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql
-      # 初回起動時に demo スキーマ（マイグレーションロール所有）と DML 限定のアプリロールを作成する。
+      # Liquibase管理専用スキーマとアプリロールだけを作る。モジュールスキーマはchangesetが作成する。
       - ./initdb:/docker-entrypoint-initdb.d:ro
     secrets:
       - migration_db_password
@@ -127,7 +126,6 @@ services:
       DB_PORT: "5432"
       DB_NAME: ${DB_NAME:?DB_NAME is required}
       DB_USERNAME: ${DB_USERNAME:?DB_USERNAME is required}
-      DB_SCHEMA: ${DB_SCHEMA:?DB_SCHEMA is required}
       REDIS_HOST: redis
       REDIS_PORT: "6379"
       REDIS_SESSION_NAMESPACE: ${REDIS_SESSION_NAMESPACE:?REDIS_SESSION_NAMESPACE is required}

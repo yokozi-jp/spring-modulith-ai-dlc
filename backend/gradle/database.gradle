@@ -9,29 +9,36 @@
  * migrateDatabase と jooqCodegen は個別に実行でき、migrateAndGenerateJooq を明示した場合だけ
  * Liquibase updateの完了後に最新スキーマからjOOQコードを生成する。
  *
- * 接続先（DB_HOST/DB_PORT/DB_NAME、スキーマはDB_SCHEMA）はアプリケーションと共有し、役割差は
- * 資格情報だけにする。マイグレーションとjOOQコード生成はMIGRATION_DB_USERNAME/MIGRATION_DB_PASSWORD
- * で接続する。フォールバックは持たず全環境でこの二つを明示するため、ローカルとステージング・本番で
- * 接続の解決経路が一致する（本番ではコード生成を実行せず、ローカルとCIでのみ生成する）。
+ * 接続先（DB_HOST/DB_PORT/DB_NAME）はアプリケーションと共有する。
+ * Liquibase管理スキーマとjOOQ生成対象は、環境差を持たないアーキテクチャ上の固定値として管理する。
+ * マイグレーションとjOOQコード生成はMIGRATION_DB_USERNAME/MIGRATION_DB_PASSWORDで接続する。
  */
 def databaseHost = System.getenv('DB_HOST') ?: 'localhost'
 def databasePort = System.getenv('DB_PORT') ?: '5432'
 def databaseName = System.getenv('DB_NAME') ?: 'demo'
 def databaseUrl = System.getenv('DB_URL') ?: "jdbc:postgresql://${databaseHost}:${databasePort}/${databaseName}"
-def databaseSchema = System.getenv('DB_SCHEMA') ?: 'demo'
+def appDatabaseUsername = System.getenv('DB_USERNAME') ?: ''
+def migrationDatabaseSchema = 'liquibase'
+def databaseSchemas = ['modulith']
 
-// 接続先とスキーマはアプリケーションと共有し、役割差は資格情報だけにする。
-// フォールバックは持たず、全環境でMIGRATION_DB_USERNAME/MIGRATION_DB_PASSWORDを明示する。
+// 接続先はアプリケーションと共有し、役割差は資格情報だけにする。
 def migrationDatabaseUrl = databaseUrl
 def migrationDatabaseUsername = System.getenv('MIGRATION_DB_USERNAME') ?: ''
 def migrationDatabasePassword = System.getenv('MIGRATION_DB_PASSWORD') ?: ''
-def migrationDatabaseSchema = databaseSchema
 
 def requireDatabaseCredentials = { String operation, String username, String password ->
     if (username.isBlank() || password.isBlank()) {
         throw new IllegalArgumentException(
             "${operation}にはDB資格情報が必要です。" +
             'MIGRATION_DB_USERNAMEとMIGRATION_DB_PASSWORDを環境変数で指定してください。'
+        )
+    }
+}
+
+def requireApplicationDatabaseUsername = { String operation ->
+    if (!(appDatabaseUsername ==~ /[A-Za-z_][A-Za-z0-9_]{0,62}/)) {
+        throw new IllegalArgumentException(
+            "${operation}には英数字とアンダースコアからなるDB_USERNAMEが必要です。"
         )
     }
 }
@@ -90,6 +97,8 @@ liquibase {
             username migrationDatabaseUsername
             password migrationDatabasePassword
             defaultSchemaName migrationDatabaseSchema
+            liquibaseSchemaName migrationDatabaseSchema
+            changelogParameters([appDatabaseUsername: appDatabaseUsername])
         }
     }
     runList = 'main'
@@ -108,10 +117,15 @@ jooq {
             name = 'org.jooq.codegen.JavaGenerator'
             database {
                 name = 'org.jooq.meta.postgres.PostgresDatabase'
-                inputSchema = migrationDatabaseSchema
                 includes = '.*'
                 excludes = '(?i:DATABASECHANGELOG|DATABASECHANGELOGLOCK)'
-                outputSchemaToDefault = true
+                schemata {
+                    databaseSchemas.each { configuredSchema ->
+                        schema {
+                            inputSchema = configuredSchema
+                        }
+                    }
+                }
                 forcedTypes {
                     forcedType {
                         // PostgreSQLのtimestamptzを絶対時刻として扱い、アプリケーション型をInstantへ統一する。
@@ -156,6 +170,7 @@ def configureLiquibaseDatabaseTask = { task, String operation ->
     task.group = 'database migration'
     task.doFirst {
         requireDatabaseCredentials(operation, migrationDatabaseUsername, migrationDatabasePassword)
+        requireApplicationDatabaseUsername(operation)
     }
 }
 
