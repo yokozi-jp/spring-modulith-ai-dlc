@@ -275,6 +275,16 @@ tasks:
         set +a
         SPRING_CONFIG_IMPORT="optional:file:../{{.TEST_ENV_FILE}}[.properties]" ./gradlew update test
 
+  be-mutation-test:
+    desc: 依存起動済みのテストDBでPITミューテーションテストを実行
+    dir: backend
+    cmds:
+      - |
+        set -a
+        . "../{{.TEST_ENV_FILE}}"
+        set +a
+        SPRING_CONFIG_IMPORT="optional:file:../{{.TEST_ENV_FILE}}[.properties]" ./gradlew migrateDatabase pitest
+
   test-deps-up:
     desc: テスト専用の依存スタックを起動
     cmds:
@@ -319,6 +329,24 @@ tasks:
         trap cleanup EXIT
         {{.DOCKER}} compose -f "{{.TEST_COMPOSE_FILE}}" up -d --wait
         task be-test-dev TEST_ENV_FILE="{{.TEST_ENV_FILE}}"
+
+  mutation-test:
+    desc: 隔離依存を使ってバックエンドのPITミューテーションテストを実行
+    silent: true
+    cmds:
+      - |
+        cleanup() {
+          status=$?
+          trap - EXIT
+          cleanup_status=0
+          {{.DOCKER}} compose -f "{{.TEST_COMPOSE_FILE}}" down --volumes --remove-orphans || cleanup_status=$?
+          if [ "$status" -ne 0 ]; then exit "$status"; fi
+          exit "$cleanup_status"
+        }
+        trap cleanup EXIT
+        {{.DOCKER}} compose -f "{{.TEST_COMPOSE_FILE}}" up -d --wait
+        task be-verify-migrations TEST_ENV_FILE="{{.TEST_ENV_FILE}}"
+        task be-mutation-test TEST_ENV_FILE="{{.TEST_ENV_FILE}}"
 
   be-sbom:
     desc: バックエンドのCycloneDX SBOMを生成

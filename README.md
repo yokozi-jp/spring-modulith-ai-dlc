@@ -159,6 +159,8 @@ Docker Compose の操作（サービスの起動、停止、状態確認、Keycl
 
 静的解析、シークレットと脆弱性のスキャン、テストは、いずれも [`Taskfile.yml`](Taskfile.yml) のタスクとして実行できます（`task <タスク名>`）。
 日常的には push 前に `task verify`（静的解析と、使い捨てDBでのマイグレーション検証とテスト、CI と同じ内容）を回せば足ります。
+入力範囲が広い契約にはQuickTheoriesによるプロパティベーステストを使い、通常のテストと一緒に実行します。
+テストの検出力を確認するときは`task mutation-test`でPITを明示実行しますが、実行コストが高いため`task verify`には含めません。
 
 各タスクの一覧と内容、Git フックと CI での自動実行の対応は [Lint・テストのリファレンス](docs/lint-and-test.md) にまとめています。
 

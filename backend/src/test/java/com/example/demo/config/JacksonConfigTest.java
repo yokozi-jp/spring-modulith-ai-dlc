@@ -1,9 +1,12 @@
 package com.example.demo.config;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.quicktheories.QuickTheory.qt;
+import static org.quicktheories.generators.SourceDSL.longs;
 
 import java.time.Duration;
 import java.time.Instant;
+import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.json.JsonTest;
@@ -24,6 +27,27 @@ class JacksonConfigTest {
     final Instant value = Instant.parse("2025-09-05T16:00:00Z");
     final String json = jsonMapper.writeValueAsString(new HasInstant(value));
     assertThat(json).isEqualTo("{\"when\":\"2025-09-05T16:00:00Z\"}");
+  }
+
+  @Test
+  void instantsRoundTripAtMicrosecondPrecision() {
+    qt().withExamples(1_000)
+        .forAll(longs().between(-2_208_988_800_000_000L, 4_133_980_800_000_000L))
+        .checkAssert(
+            epochMicros -> {
+              final long microsPerSecond = TimeUnit.SECONDS.toMicros(1);
+              final Instant expected =
+                  Instant.ofEpochSecond(
+                      Math.floorDiv(epochMicros, microsPerSecond),
+                      TimeUnit.MICROSECONDS.toNanos(Math.floorMod(epochMicros, microsPerSecond)));
+              final String json = jsonMapper.writeValueAsString(new HasInstant(expected));
+              final HasInstant actual = jsonMapper.readValue(json, HasInstant.class);
+
+              assertThat(json)
+                  .as("InstantはUTCのRFC 3339文字列として直列化されること")
+                  .isEqualTo("{\"when\":\"" + expected + "\"}");
+              assertThat(actual.when()).as("マイクロ秒精度のInstantがJSON往復で変化しないこと").isEqualTo(expected);
+            });
   }
 
   @Test
