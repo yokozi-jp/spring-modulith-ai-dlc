@@ -89,7 +89,6 @@
 │   └── keycloak/     # Keycloak realm 定義（起動時インポート）
 ├── docs/             # ドキュメント
 │   ├── adr/              # Architecture Decision Records（設計判断の記録）
-│   ├── aidlc-setup/      # AI-DLC セットアップ手順
 │   └── local-env-setup/  # 開発環境構築手順・スクリプト
 ├── frontend/         # VitePlus + TypeScript フロントエンド（pnpm）
 ├── infrastructure/   # インフラ定義
@@ -117,8 +116,7 @@
 
 ### AI-DLC のセットアップ
 
-- 導入手順は [AI-DLC セットアップ](docs/aidlc-setup/setup.md) を参照してください。
-- 使い方は [AI-DLC の公式ドキュメント](https://github.com/awslabs/aidlc-workflows/tree/main/docs) を参照してください。
+- 使い方・更新手順は [AI-DLC の公式ドキュメント](https://github.com/awslabs/aidlc-workflows/tree/main/docs) を参照してください。
 
 <p align="right">(<a href="#top">トップへ</a>)</p>
 
