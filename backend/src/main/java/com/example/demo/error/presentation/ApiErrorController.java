@@ -19,6 +19,9 @@ import org.springframework.web.bind.annotation.RestController;
 public class ApiErrorController implements ErrorController {
 
   /** 転送元の HTTP status を保ち、内部例外を公開せずにエラーを返す。 */
+  // /error はコンテナが元リクエストの method のまま転送する dispatch 先で、状態変更のない読み取り専用のため
+  // method を絞らない（Spring の BasicErrorController も同様）。CSRF の懸念はない。
+  // nosemgrep: java.spring.security.unrestricted-request-mapping.unrestricted-request-mapping
   @RequestMapping(
       path = "${spring.web.error.path:${error.path:/error}}",
       produces = MediaType.APPLICATION_PROBLEM_JSON_VALUE)
