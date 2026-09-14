@@ -2,7 +2,7 @@
 
 ## Status
 
-Proposed
+Superseded by [ADR-011](./ADR-011-use-module-owned-database-schemas.md)
 
 ## Date
 

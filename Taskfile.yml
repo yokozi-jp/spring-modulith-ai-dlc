@@ -128,8 +128,8 @@ tasks:
     preconditions:
       - sh: 'test -n "${DB_URL:-}" || { test -n "${DB_HOST:-}" && test -n "${DB_PORT:-}" && test -n "${DB_NAME:-}"; }'
         msg: DB_URL、またはDB_HOST、DB_PORT、DB_NAMEを指定してください。
-      - sh: 'test -n "${DB_SCHEMA:-}"'
-        msg: DB_SCHEMAを指定してください。
+      - sh: 'test -n "${DB_USERNAME:-}"'
+        msg: DB_USERNAMEを指定してください。
       - sh: 'test -n "${MIGRATION_DB_USERNAME:-}"'
         msg: MIGRATION_DB_USERNAMEを指定してください。
       - sh: 'test -n "${MIGRATION_DB_PASSWORD:-}"'

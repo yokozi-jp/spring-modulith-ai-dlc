@@ -3,7 +3,7 @@
 ## 実行モデル
 
 アプリケーションは起動時にLiquibaseを実行しません。
-`spring.liquibase.enabled=false`を共通設定に置き、LiquibaseのSpring Boot依存も実行時クラスパスから除外しています。
+`spring-boot-starter-liquibase`を実行時クラスパスから除外しているため、Spring Bootの自動構成（`LiquibaseAutoConfiguration`）が読み込まれず、起動時マイグレーションは起こりません。
 
 スキーマ変更はアプリケーションのデプロイ前に、独立したジョブまたは作業者がGradleタスクを明示して適用します。
 通常の`compileJava`、`test`、`bootJar`はLiquibaseとjOOQコード生成を起動せず、DBにも接続しません。
@@ -158,13 +158,18 @@ Liquibaseプラグインの`update`はchangelog内の未適用changesetをすべ
 ユーザー名とパスワードが未設定のままDB操作タスクを実行すると、タスクは接続前に失敗します。
 
 接続変数の区分は、同じ環境内に別々の物理DBを用意するためのものではありません。
-開発、CI、ステージング、本番のDBは環境ごとに分離しますが、ステージングまたは本番のアプリケーションとLiquibaseは、通常は同じデータベースとスキーマへ異なる権限で接続します。
+開発、CI、ステージング、本番のDBは環境ごとに分離しますが、同じ環境のアプリケーションとLiquibaseは同じデータベースへ異なる権限で接続します。
 
-接続先（ホスト・ポート・DB名・スキーマ）はアプリケーションとマイグレーションで共有し、役割ごとに変わるのは資格情報だけです。
+接続先（ホスト、ポート、DB名）はアプリケーションとマイグレーションで共有し、役割ごとに変わるのは資格情報だけです。
+スキーマ名は環境差を持たないため、ビルド設定とchangesetで固定します。
 
-- **共通の接続先**：`DB_HOST`、`DB_PORT`、`DB_NAME`、`DB_SCHEMA`を使います。
-  アプリケーション、Liquibase、jOOQ生成のいずれもこの接続先へ接続します。
-  接続先を一箇所に集約し、URLとホスト・ポートの二重管理を避けます。
+- **共通の接続先**：`DB_HOST`、`DB_PORT`、`DB_NAME`を使います。
+  アプリケーション、Liquibase、jOOQ生成のいずれもこのDBへ接続します。
+- **Liquibase管理スキーマ**：`liquibase`に固定します。
+  Liquibaseがchangesetより先に管理テーブルを作るため、DB初期化はこのスキーマだけを事前作成します。
+- **モジュール所有スキーマ**：Liquibase changesetで作成します。
+  現在はSpring Modulith共有テーブル用の`modulith`だけです。
+  jOOQの生成対象は`backend/gradle/database.gradle`の一覧で管理します。
 - **アプリケーション接続の資格情報**：`DB_USERNAME`、`DB_PASSWORD`を使います。
   Spring Bootは共通の接続先とこの資格情報からJDBC URLを組み立てます。
 - **マイグレーション接続の資格情報**：`MIGRATION_DB_USERNAME`、`MIGRATION_DB_PASSWORD`を使います。
@@ -178,10 +183,14 @@ Liquibaseプラグインの`update`はchangelog内の未適用changesetをすべ
 マイグレーションとjOOQ生成を実行するときは、`MIGRATION_DB_USERNAME`と`MIGRATION_DB_PASSWORD`を全環境で明示します。
 これにより、ローカルからテスト、ステージング、本番まで、接続の解決経路と権限モデルが一致し、環境ごとに異なる分岐を通りません。
 ローカルとテストも二ロールで動かします。
-`docker/compose.yml`と`docker/compose-test.yml`では、DDL権限を持つマイグレーション用ロールがPostgreSQLのブートストラップユーザー兼スキーマ所有者になり、DML限定のアプリケーション用ロールを`docker/initdb`が初回起動時に作成します。
-既存のDBボリュームには初期化スクリプトが再実行されないため、単一ロールから二ロールへ切り替えるときは`task compose-reset`で作り直します。
-ステージングと本番でも、アプリケーション用の`DB_USERNAME`/`DB_PASSWORD`とマイグレーション用の`MIGRATION_DB_USERNAME`/`MIGRATION_DB_PASSWORD`を個別に注入します。
-`be-release-migrate`とDB切り戻し用Taskfileのタスクはローカルの`.env`を読み込まず、共通の接続先（`DB_URL`、または`DB_HOST`/`DB_PORT`/`DB_NAME`）と`DB_SCHEMA`、`MIGRATION_DB_USERNAME`、`MIGRATION_DB_PASSWORD`が注入されていなければGradle実行前に失敗します。
+`docker/compose.yml`と`docker/compose-test.yml`では、DDL権限を持つマイグレーション用ロールがPostgreSQLのブートストラップユーザーになり、`liquibase`スキーマとDML限定のアプリケーション用ロールを`docker/initdb`が初回起動時に作成します。
+001 changesetは`modulith`スキーマを作成し、そのUSAGEとイベント出版テーブルだけのDML権限を`DB_USERNAME`へ付与します。
+Liquibase管理スキーマと管理テーブルへのアプリ権限は付与しません。
+001 changesetを初期状態から書き換えたため、既存DBは移行せず`task compose-reset CONFIRM_RESET=yes`で作り直します。
+ステージングと本番も既存DBを再利用せず、`liquibase`スキーマだけをマイグレーション用ロールの所有で作ってから初回マイグレーションを実行します。
+001 changesetがアプリケーションロール（`DB_USERNAME`）へGRANTするため、ステージングと本番では、そのロールを初回マイグレーションより前にRDS側で作成しておきます。
+`docker/initdb`のような自動作成経路がないため、未作成のままマイグレーションを実行するとGRANTで失敗します。
+`be-release-migrate`とDB切り戻し用Taskfileのタスクはローカルの`.env`を読み込まず、共通の接続先（`DB_URL`、または`DB_HOST`/`DB_PORT`/`DB_NAME`）と権限付与先の`DB_USERNAME`、`MIGRATION_DB_USERNAME`、`MIGRATION_DB_PASSWORD`が注入されていなければGradle実行前に失敗します。
 アプリケーション用アカウントには業務処理に必要なDML権限を与え、`CREATE`、`ALTER`、`DROP`を与えません。
 Liquibase用アカウントには、DDL、Liquibase管理テーブルの更新、データ移行changesetに必要なDMLの権限を与えます。
 

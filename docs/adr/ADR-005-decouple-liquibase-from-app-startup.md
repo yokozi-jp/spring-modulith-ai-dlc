@@ -19,8 +19,10 @@ Accepted
 
 ## Decision
 
-Liquibase の起動時自動実行を無効化し（`spring.liquibase.enabled: false`）、
-マイグレーションをデプロイ前の明示コマンドで適用する。
+Liquibase の起動時自動実行を無効化し、マイグレーションをデプロイ前の明示コマンドで適用する。
+無効化は、アプリケーションの実行時クラスパスから `spring-boot-starter-liquibase` を外すことで行う。
+自動構成（`LiquibaseAutoConfiguration`）が読み込まれないため、起動時マイグレーションは起こらない。
+（当初は `spring.liquibase.enabled: false` も併用していたが、スターターを外した時点で無効となり、Spring Boot 4 では未知プロパティ扱いになるため削除した。）
 
 - ローカル・CI は `task be-migrate`（`./gradlew migrateDatabase`）で適用する。
 - スキーマタグを Git 管理し、本番は `task be-release-migrate` で固定タグまで適用する。
@@ -61,6 +63,6 @@ Liquibase の起動時自動実行を無効化し（`spring.liquibase.enabled: f
 
 ## References
 
-- `backend/src/main/resources/application.yaml`（`spring.liquibase.enabled: false`）
+- `backend/build.gradle`（`spring-boot-starter-liquibase` を実行時依存に持たず、Liquibase は Gradle プラグインと `liquibaseRuntime` のみ）
 - [`docs/database-migrations.md`](../database-migrations.md)
 - `Taskfile.yml`（`be-migrate` / `be-release-migrate` / `be-verify-migrations`）

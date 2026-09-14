@@ -22,8 +22,9 @@ Alternatives Considered / References の構成）。
 - **ADR-006**：絶対時刻を UTC / Instant / timestamptz に統一する（Accepted, 2026-09-11）
 - **ADR-007**：セッションベース認証と OIDC Authorization Code + PKCE（Accepted, 2026-09-11）
 - **ADR-008**：application.yaml を単一にし設定を外部注入する（Accepted, 2026-09-11）
-- **ADR-009**：DB 接続を単一アカウントから二つの役割へ分ける（Proposed, 2026-09-13）
+- **ADR-009**：DB 接続を単一アカウントから二つの役割へ分ける（Superseded by ADR-011, 2026-09-13）
 - **ADR-010**：プロジェクトのタスクランナーにTaskを採用する（Proposed, 2026-09-13）
+- **ADR-011**：モジュール所有のデータベーススキーマを使う（Proposed, 2026-09-14）
 
 ## 運用
 
