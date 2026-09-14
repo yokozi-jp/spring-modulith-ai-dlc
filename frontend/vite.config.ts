@@ -31,6 +31,9 @@ export default defineConfig(({ mode }) => ({
     },
     proxy: {
       "^/(api|oauth2|login|logout|error|actuator|v3/api-docs|swagger-ui)(/|$)": {
+        // 開発専用の転送先。本番はCloudFront等が振り分けるためこのproxyは効かない。
+        // ポートは開発バックエンド（.env の SERVER_PORT）と一致させる。両者は独立に定義され追従しない。
+        // TODO: 開発者ごとにポートが変わるなら loadEnv で SERVER_PORT を読み単一ソース化する。
         target: "http://localhost:18080",
         changeOrigin: false,
       },
