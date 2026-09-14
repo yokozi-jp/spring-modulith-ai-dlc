@@ -7,6 +7,7 @@ import com.example.demo.testkit.DatabaseTest;
 import java.time.Instant;
 import java.util.UUID;
 import org.jooq.DSLContext;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 
@@ -23,6 +24,7 @@ class JooqGeneratedMappingTest {
   @Autowired private DSLContext dslContext;
 
   @Test
+  @DisplayName("生成カラムへ insert した値を読み戻せる")
   void insertsAndReadsBackGeneratedColumns() {
     final UUID publicationId = UUID.fromString("11111111-1111-1111-1111-111111111111");
 

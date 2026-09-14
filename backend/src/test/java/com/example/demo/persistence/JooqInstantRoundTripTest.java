@@ -7,6 +7,7 @@ import com.example.demo.testkit.CommittedDatabaseTest;
 import java.time.Instant;
 import java.util.UUID;
 import org.jooq.DSLContext;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 
@@ -22,6 +23,7 @@ class JooqInstantRoundTripTest {
   @Autowired private DSLContext dslContext;
 
   @Test
+  @DisplayName("生成 jOOQ の Instant が timestamptz 往復で精度を保つ")
   void generatedJooqInstantRoundTripsThroughTimestampWithTimeZone() {
     final UUID publicationId = UUID.fromString("99999999-9999-9999-9999-999999999999");
     final Instant expected = Instant.parse("2026-09-09T07:44:32.364123Z");

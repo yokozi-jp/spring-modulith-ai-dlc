@@ -12,6 +12,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import org.jspecify.annotations.Nullable;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -32,6 +33,7 @@ class OpenApiContractTest {
   @Autowired private MockMvc mockMvc;
 
   @Test
+  @DisplayName("生成 OpenAPI は 3.1 で RFC 9457 共通 components を含む")
   void openApiDocumentContainsProblemDetailsComponents() throws Exception {
     final MvcResult result =
         mockMvc

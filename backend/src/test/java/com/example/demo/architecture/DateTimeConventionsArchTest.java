@@ -23,6 +23,7 @@ import java.util.GregorianCalendar;
 import java.util.List;
 import java.util.Set;
 import java.util.TimeZone;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -80,6 +81,7 @@ class DateTimeConventionsArchTest {
 
   /** システム {@code Clock} は {@code com.example.demo.DemoApplication.clock()} だけで生成する。 */
   @Test
+  @DisplayName("システム Clock 生成を DemoApplication.clock() 以外で拒否する")
   // JavaClasses は ArchUnit の import 結果を表す公開 API 型であり、インタフェースへ置き換えられない。
   @SuppressWarnings("PMD.LooseCoupling")
   void systemClockFactoriesAreRejectedOutsideDemoApplicationClockBeanMethod() {

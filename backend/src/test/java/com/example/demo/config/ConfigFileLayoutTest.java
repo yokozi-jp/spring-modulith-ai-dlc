@@ -9,6 +9,7 @@ import java.nio.file.Path;
 import java.util.List;
 import java.util.regex.Pattern;
 import java.util.stream.Stream;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -43,6 +44,7 @@ class ConfigFileLayoutTest {
   private static final Path TEST_RESOURCES = Path.of("src", "test", "resources");
 
   @Test
+  @DisplayName("main には application.yaml だけを許可する")
   void mainResourcesContainOnlyTheSingleAllowedApplicationConfig() {
     final List<String> disallowed =
         applicationConfigFilesUnder(MAIN_RESOURCES).stream()
@@ -59,6 +61,7 @@ class ConfigFileLayoutTest {
   }
 
   @Test
+  @DisplayName("test には application 系設定ファイルを置かせない")
   void testResourcesContainNoApplicationConfig() {
     final List<String> disallowed =
         applicationConfigFilesUnder(TEST_RESOURCES).stream().map(path -> path.toString()).toList();

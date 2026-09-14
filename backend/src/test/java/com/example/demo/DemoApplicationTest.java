@@ -8,6 +8,7 @@ import java.time.Clock;
 import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -22,7 +23,7 @@ import org.springframework.security.oauth2.core.endpoint.PkceParameterNames;
 /** アプリケーション起動時の日時・DB・OIDC(PKCE) 設定が規約どおりであることを検証する統合テスト。 */
 @SpringBootTest
 @Import(SharedTestConfiguration.class)
-class DemoApplicationTests {
+class DemoApplicationTest {
 
   /** UTC 固定を検証する対象のアプリケーション {@code Clock}。 */
   @Autowired private Clock clock;
@@ -37,16 +38,19 @@ class DemoApplicationTests {
   @Autowired private ApplicationContext applicationContext;
 
   @Test
+  @DisplayName("ApplicationContext が起動する")
   void contextLoads() {
     assertNotNull(applicationContext, "ApplicationContext が起動できること");
   }
 
   @Test
+  @DisplayName("アプリケーション Clock は UTC 固定である")
   void applicationClockUsesUtc() {
     assertEquals(ZoneOffset.UTC, clock.getZone(), "アプリケーション Clock は UTC 固定であること");
   }
 
   @Test
+  @DisplayName("DB セッションのタイムゾーンは UTC である")
   void databaseSessionUsesUtc() {
     assertEquals(
         "UTC",
@@ -55,6 +59,7 @@ class DemoApplicationTests {
   }
 
   @Test
+  @DisplayName("Instant が timestamptz 往復で保存される")
   void instantRoundTripsThroughTimestampWithTimeZone() {
     final Instant expected = Instant.parse("2026-09-07T06:18:42.567123Z");
     final OffsetDateTime actual =
@@ -68,6 +73,7 @@ class DemoApplicationTests {
   }
 
   @Test
+  @DisplayName("認可リクエストが PKCE (S256) を使う")
   void authorizationRequestUsesPkceS256() {
     final MockHttpServletRequest request =
         new MockHttpServletRequest("GET", "/oauth2/authorization/web");

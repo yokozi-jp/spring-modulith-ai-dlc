@@ -10,6 +10,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.example.demo.testkit.SharedTestConfiguration;
 import jakarta.servlet.RequestDispatcher;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -33,6 +34,7 @@ class ApiContractTest {
   @Autowired private MockMvc mockMvc;
 
   @Test
+  @DisplayName("未認証の /api リクエストは 401 Problem Details を返す")
   void unauthenticatedApiRequestReturnsProblemDetails() throws Exception {
     mockMvc
         .perform(get("/api/missing"))
@@ -44,6 +46,7 @@ class ApiContractTest {
   }
 
   @Test
+  @DisplayName("CSRF トークン欠如の更新リクエストは 403 Problem Details を返す")
   void csrfFailureReturnsProblemDetails() throws Exception {
     mockMvc
         .perform(post("/api/missing").with(user("test-user")))
@@ -55,6 +58,7 @@ class ApiContractTest {
   }
 
   @Test
+  @DisplayName("認証済みで存在しない /api リソースは 404 Problem Details を返す")
   void missingAuthenticatedApiResourceUsesMvcProblemDetails() throws Exception {
     mockMvc
         .perform(get("/api/missing").with(user("test-user")))
@@ -66,6 +70,7 @@ class ApiContractTest {
   }
 
   @Test
+  @DisplayName("/error は実装詳細を含まない Problem Details を返す")
   void errorEndpointReturnsProblemDetailsWithoutImplementationDetails() throws Exception {
     mockMvc
         .perform(
@@ -87,6 +92,7 @@ class ApiContractTest {
   }
 
   @Test
+  @DisplayName("別オリジンのブラウザクライアントを許可しない")
   void crossOriginBrowserClientIsNotAllowed() throws Exception {
     mockMvc
         .perform(get("/api/missing").header("Origin", "https://client.example"))
@@ -95,6 +101,7 @@ class ApiContractTest {
   }
 
   @Test
+  @DisplayName("ブラウザ向けセキュリティヘッダを明示的に返す")
   void browserSecurityHeadersAreExplicit() throws Exception {
     mockMvc
         .perform(get("/error").secure(true))
