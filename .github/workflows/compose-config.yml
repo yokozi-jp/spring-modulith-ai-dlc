@@ -22,6 +22,10 @@ on:
       - "**/docker-compose.yaml"
       - ".github/workflows/compose-config.yml"
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 permissions:
   contents: read
 

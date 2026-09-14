@@ -6,6 +6,10 @@ on:
   pull_request:
     branches: ["**"]
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 # SARIF を Code Scanning にアップロードする権限はジョブごとに付与する
 # （ワークフロー全体に広く付与しない）。
 permissions:

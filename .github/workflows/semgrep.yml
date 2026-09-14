@@ -6,6 +6,10 @@ on:
   pull_request:
     branches: ["**"]
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 # SARIF を GitHub Code Scanning にアップロードするため security-events: write が必要。
 permissions:
   contents: read
