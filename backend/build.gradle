@@ -152,6 +152,19 @@ tasks.named('test') {
     finalizedBy jacocoTestCoverageVerification
 }
 
+tasks.register('exportOpenApi', Test) {
+    group = 'verification'
+    description = 'OpenAPI契約テストを実行し、Spectral用のJSONを生成する'
+    testClassesDirs = sourceSets.test.output.classesDirs
+    classpath = sourceSets.test.runtimeClasspath
+    useJUnitPlatform()
+    systemProperty 'user.timezone', 'UTC'
+    systemProperty 'openapi.output', layout.buildDirectory.file('openapi/openapi.json').get().asFile.absolutePath
+    filter {
+        includeTestsMatching 'com.example.demo.OpenApiContractTest'
+    }
+}
+
 jacoco {
     toolVersion = "0.8.15"
 }

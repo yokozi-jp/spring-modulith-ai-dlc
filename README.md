@@ -139,15 +139,18 @@ cp .env.example .env       # 環境変数を用意し、パスワードを変更
 task compose-up            # PostgreSQL / Keycloak / Redis / Grafana を起動
 task be-migrate            # 初回はマイグレーションを明示実行する
 task dev                   # 依存起動＋バックエンドを起動
+# 別のターミナルで
+cd frontend && vp dev      # SPAを起動し、APIとOIDCを同一オリジンでproxy
 ```
 
+ブラウザは <http://localhost:5173> を開きます。
 バックエンドは <http://localhost:18080>、Keycloak は <http://localhost:8080>、Grafana は <http://localhost:3000> で公開されます。
 
 日々の開発で使う入口タスクは次の三つです。
 
 - **`task dev`**：依存サービスを起動してバックエンドを起動（日々の開発の入口）。
 - **`task check`**：素早いローカル確認（バックエンドの静的解析）。
-- **`task verify`**：push 前の総合ゲート（静的解析と、使い捨てDBでのマイグレーション検証とテスト。CI と同じ内容）。
+- **`task verify`**：push 前の総合ゲート（静的解析、OpenAPI 契約検査と、使い捨てDBでのマイグレーション検証とテスト。CI と同じ内容）。
 
 Docker Compose の操作（サービスの起動、停止、状態確認、Keycloak の realm 再投入）や、「いつ、どのコマンドを、どの順で使うか」のシナリオ別の手順は [開発ワークフロー](docs/dev-workflow.md) を参照してください。
 
@@ -156,7 +159,7 @@ Docker Compose の操作（サービスの起動、停止、状態確認、Keycl
 ## Lint・テスト
 
 静的解析、シークレットと脆弱性のスキャン、テストは、いずれも [`Taskfile.yml`](Taskfile.yml) のタスクとして実行できます（`task <タスク名>`）。
-日常的には push 前に `task verify`（静的解析と、使い捨てDBでのマイグレーション検証とテスト、CI と同じ内容）を回せば足ります。
+日常的には push 前に `task verify`（静的解析、OpenAPI 契約検査と、使い捨てDBでのマイグレーション検証とテスト、CI と同じ内容）を回せば足ります。
 入力範囲が広い契約にはQuickTheoriesによるプロパティベーステストを使い、通常のテストと一緒に実行します。
 テストの検出力を確認するときは`task mutation-test`でPITを明示実行しますが、実行コストが高いため`task verify`には含めません。
 

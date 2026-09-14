@@ -6,6 +6,7 @@ on:
     branches: ["main"]
     paths:
       - "backend/**"
+      - ".spectral.yaml"
       - "docker/compose-test.yml"
       - "docker/initdb/**"
       - ".env.test"
@@ -15,6 +16,7 @@ on:
     branches: ["**"]
     paths:
       - "backend/**"
+      - ".spectral.yaml"
       - "docker/compose-test.yml"
       - "docker/initdb/**"
       - ".env.test"
@@ -89,6 +91,9 @@ jobs:
 
       - name: Migrate test database and run tests
         run: task be-test
+
+      - name: Generate and lint OpenAPI contract
+        run: task be-openapi-lint
 
       - name: Stop test dependencies
         if: always()

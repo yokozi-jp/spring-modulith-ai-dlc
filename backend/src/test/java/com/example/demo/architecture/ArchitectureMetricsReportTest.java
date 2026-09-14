@@ -22,6 +22,7 @@ import java.util.Locale;
 import java.util.Objects;
 import java.util.Set;
 import java.util.TreeSet;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 /** Package by feature の機能パッケージ単位でアーキテクチャ指標を出力する。 */
@@ -38,6 +39,7 @@ class ArchitectureMetricsReportTest {
 
   /** Lakos、コンポーネント依存、可視性の各指標を計算してレポートへ保存する。 */
   @Test
+  @DisplayName("アーキテクチャ指標レポートを生成する")
   // JavaClasses と MetricsComponents は ArchitectureMetrics の公開 API 型であり、インタフェースへ置き換えられない。
   @SuppressWarnings("PMD.LooseCoupling")
   void writesArchitectureMetricsReport() throws IOException {

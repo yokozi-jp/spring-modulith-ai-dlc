@@ -7,6 +7,7 @@ import static org.quicktheories.generators.SourceDSL.longs;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.concurrent.TimeUnit;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.json.JsonTest;
@@ -23,6 +24,7 @@ class JacksonConfigTest {
   @Autowired private JsonMapper jsonMapper;
 
   @Test
+  @DisplayName("Instant を UTC の ISO 8601 文字列として直列化する")
   void instantsAreWrittenAsUtcIso8601Strings() {
     final Instant value = Instant.parse("2025-09-05T16:00:00Z");
     final String json = jsonMapper.writeValueAsString(new HasInstant(value));
@@ -30,6 +32,7 @@ class JacksonConfigTest {
   }
 
   @Test
+  @DisplayName("Instant はマイクロ秒精度で JSON 往復しても変化しない")
   void instantsRoundTripAtMicrosecondPrecision() {
     qt().withExamples(1_000)
         .forAll(longs().between(-2_208_988_800_000_000L, 4_133_980_800_000_000L))
@@ -51,18 +54,21 @@ class JacksonConfigTest {
   }
 
   @Test
+  @DisplayName("Duration を ISO 8601 文字列として直列化する")
   void durationsAreWrittenAsIso8601String() {
     final String json = jsonMapper.writeValueAsString(new HasDuration(Duration.ofHours(1)));
     assertThat(json).contains("PT1H");
   }
 
   @Test
+  @DisplayName("null プロパティを JSON 出力から除外する")
   void nullPropertiesAreExcluded() {
     final String json = jsonMapper.writeValueAsString(new HasNullable("x", null));
     assertThat(json).contains("present").doesNotContain("missing");
   }
 
   @Test
+  @DisplayName("未知のプロパティを無視して読み込む")
   void unknownPropertiesAreIgnored() {
     // fail-on-unknown-properties: false なので例外にならない
     final HasName parsed = jsonMapper.readValue("{\"name\":\"a\",\"unknown\":1}", HasName.class);

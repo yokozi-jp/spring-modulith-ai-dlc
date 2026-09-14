@@ -16,7 +16,9 @@ description: バックエンド（Spring Boot 4 / Spring Modulith / jOOQ / Postg
 - コミット＋自動後始末：#[[file:backend/src/test/java/com/example/demo/testkit/CommittedDatabaseTest.java]]
 - 後始末拡張：#[[file:backend/src/test/java/com/example/demo/testkit/CleanGeneratedTablesExtension.java]]
 - 共有テスト構成：#[[file:backend/src/test/java/com/example/demo/testkit/SharedTestConfiguration.java]]
-- ArchUnit の解析対象限定：#[[file:backend/src/test/java/com/example/demo/architecture/ProductionCodeOnly.java]]
+- ArchUnit の解析対象限定（プロダクション）：#[[file:backend/src/test/java/com/example/demo/architecture/ProductionCodeOnly.java]]
+- ArchUnit の解析対象限定（テスト）：#[[file:backend/src/test/java/com/example/demo/architecture/TestCodeOnly.java]]
+- テスト規約の ArchUnit 強制：#[[file:backend/src/test/java/com/example/demo/architecture/TestConventionsArchTest.java]]
 - 共通の静的解析ルール：#[[file:backend/config/pmd/ruleset.xml]]
 - テスト固有の静的解析ルール：#[[file:backend/config/pmd/test-ruleset.xml]]
 - テスト用環境変数：#[[file:.env.test]]
@@ -169,16 +171,25 @@ Spring はテスト構成（アノテーションと `@Import` の組）ごと�
 
 - フォーマットは Google Java Format に従う。`task be-format` で整形し、`task be-lint` で確認する。
 - **クラス・フィールドには Javadoc を付ける**（PMD `CommentRequired`）。`@Test` メソッドはパッケージプライベートにするので Javadoc は不要。
+- **すべての `@Test` メソッドに `@DisplayName` で検証意図を明記する**。コメントや Javadoc はバイトコードに残らず ArchUnit で強制できないが、`@DisplayName` は実行時に残りレポートにも出るため、意図の記述はこちらに寄せる。強制は `TestConventionsArchTest` が担う。
 - テストクラス・テストメソッド・ネスト型はパッケージプライベートにする（`public` を付けない。JUnit 5 は package-private を実行する）。既存コードは意図を示すため `/* package */` の目印を添えている。
 - JUnit のアサーションには失敗時メッセージを添える。メッセージは期待値を言い換えず、失敗対象と入力を補う。
 - アサーションは JUnit の `Assertions` と AssertJ のどちらでもよいが、1つのテストクラス内では揃える。
-- テストクラス名は `...Test` を接尾辞にする。合成アノテーションや拡張などテストでない補助クラスには付けない。
+- テストクラス名は `...Test`（単数）を接尾辞にする。`...Tests`（複数）にしない。合成アノテーションや拡張などテストでない補助クラスには付けない。
 - 複数アサーションは許容される（PMD `UnitTestContainsTooManyAsserts` は無効化済み）。1テストで1つの振る舞いを検証する範囲にとどめる。
 
 ## ArchUnit
 
 - ArchUnit は手書きのプロダクションコードだけを解析する。生成コード（`jooq` / `generated`）とテストコードは `ProductionCodeOnly` で除外する（#[[file:backend/src/test/java/com/example/demo/architecture/ProductionCodeOnly.java]]）。
 - `@ArchTest` フィールドはルールの説明として命名するため、定数命名規則（UPPER_SNAKE）とは別扱いにしている（PMD `FieldNamingConventions` は無効化済み）。
+- テストコード自身の規約は `TestCodeOnly`（`ProductionCodeOnly` の対）で対象を反転し、`TestConventionsArchTest` で強制する（#[[file:backend/src/test/java/com/example/demo/architecture/TestConventionsArchTest.java]]）。コメントや Javadoc はバイトコードに残らず ArchUnit では検査できないため、この規約のうち機械判定できる項目だけを扱う。強制する項目は次のとおり。
+  - すべての `@Test` メソッドに `@DisplayName` があること。
+  - `@Test` メソッドと、それを含むクラスが `public` でないこと。
+  - `@Test` を含むクラス名が `Test` で終わること。
+  - 直接 `@SpringBootTest` を付けたクラスが `@Import(SharedTestConfiguration.class)` を持つこと（合成アノテーション経由でもよい）。
+  - `assertTimeoutPreemptively` を呼ばないこと。
+  - テストコードでレガシー日時型を使わないこと（禁止型を参照する `architecture` パッケージ自身は除外）。
+  - `@Disabled` に理由（`value`）があること。
 
 ## 実行
 
@@ -199,3 +210,4 @@ Spring はテスト構成（アノテーションと `@Import` の組）ごと�
 - Spring Modulith の `event_publication` へ手で行を入れて、イベント挙動やイベントと無関係な検証を行う。
 - ローカルタイムゾーンや引数なし `now()`、ナノ秒精度に依存する。
 - クラス・フィールドの Javadoc を省く（PMD で失敗する）。
+- `@Test` に `@DisplayName` を付けず、検証意図を名前だけに委ねる（`TestConventionsArchTest` で失敗する）。

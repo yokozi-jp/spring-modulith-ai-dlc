@@ -255,6 +255,19 @@ tasks:
     cmds:
       - ./gradlew spotlessCheck pmdMain pmdTest spotbugsMain spotbugsTest
 
+  be-openapi-lint:
+    desc: 依存起動済みのテストDBでOpenAPI 3.1契約を生成しSpectralで検査
+    dir: backend
+    cmds:
+      - |
+        set -a
+        . "../{{.TEST_ENV_FILE}}"
+        set +a
+        SPRING_CONFIG_IMPORT="optional:file:../{{.TEST_ENV_FILE}}[.properties]" ./gradlew exportOpenApi
+        {{.DOCKER}} run --rm -v "$PWD/..:/repo" -w /repo \
+          stoplight/spectral:6.16.3@sha256:a07aa4455367b9501b574423b684ab0ef3ee42556089013583318ec015249050 \
+          lint backend/build/openapi/openapi.json --ruleset .spectral.yaml
+
   be-test:
     desc: 依存起動済みのテストDBでマイグレーションとテストを実行
     dir: backend
@@ -312,6 +325,7 @@ tasks:
         {{.DOCKER}} compose -f "{{.TEST_COMPOSE_FILE}}" up -d --wait
         task be-verify-migrations TEST_ENV_FILE="{{.TEST_ENV_FILE}}"
         task be-test TEST_ENV_FILE="{{.TEST_ENV_FILE}}"
+        task be-openapi-lint TEST_ENV_FILE="{{.TEST_ENV_FILE}}"
 
   test-dev:
     desc: 隔離依存を起動して作りかけを含むテスト後に片付け

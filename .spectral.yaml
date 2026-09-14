@@ -1,0 +1,58 @@
+extends:
+  - spectral:oas
+
+rules:
+  openapi-version-3-1:
+    description: OpenAPI 3.1 を使用する。
+    severity: error
+    given: "$"
+    then:
+      field: openapi
+      function: pattern
+      functionOptions:
+        match: "^3\\.1\\."
+
+  common-problem-detail-schema:
+    description: RFC 9457 の共通 schema を定義する。
+    severity: error
+    given: "$.components.schemas"
+    then:
+      field: ProblemDetail
+      function: truthy
+
+  problem-detail-required-fields:
+    description: Problem Details の契約フィールドを必須にする。
+    severity: error
+    given: "$.components.schemas.ProblemDetail.required"
+    then:
+      function: schema
+      functionOptions:
+        schema:
+          type: array
+          allOf:
+            - contains:
+                const: type
+            - contains:
+                const: title
+            - contains:
+                const: status
+
+  common-problem-responses:
+    description: 認証、認可、サーバーエラーの共通 response を定義する。
+    severity: error
+    given: "$.components.responses"
+    then:
+      - field: UnauthorizedProblem
+        function: truthy
+      - field: ForbiddenProblem
+        function: truthy
+      - field: InternalServerErrorProblem
+        function: truthy
+
+  operation-operationId: error
+  operation-success-response: error
+  operation-tags: error
+  info-contact: off
+  oas3-api-servers: off
+  # 共通 response は各 API 操作を追加する前から契約として保持する。
+  oas3-unused-component: off

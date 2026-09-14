@@ -1,6 +1,7 @@
 package com.example.demo.architecture;
 
 import com.example.demo.DemoApplication;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.modulith.core.ApplicationModules;
 
@@ -9,6 +10,7 @@ class ApplicationModuleArchitectureTest {
 
   /** モジュール間の循環、内部パッケージ参照、明示した許可依存への違反がないことを検証する。 */
   @Test
+  @DisplayName("アプリケーションモジュールの境界を検証する")
   void verifiesApplicationModuleStructure() {
     ApplicationModules.of(DemoApplication.class).verify();
   }
