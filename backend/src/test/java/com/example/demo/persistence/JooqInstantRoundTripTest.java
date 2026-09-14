@@ -44,7 +44,10 @@ class JooqInstantRoundTripTest {
             .from(EVENT_PUBLICATION)
             .where(EVENT_PUBLICATION.ID.eq(publicationId))
             .fetchOptional(EVENT_PUBLICATION.PUBLICATION_DATE)
-            .orElseThrow();
+            .orElseThrow(
+                () ->
+                    new AssertionError(
+                        "event_publication が見つからない: publicationId=" + publicationId));
 
     assertEquals(expected, actual, "生成jOOQフィールドがInstantを維持すること");
   }

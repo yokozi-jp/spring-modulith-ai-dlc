@@ -53,17 +53,22 @@ class PackageByFeatureOnionArchitectureTest {
           .allowEmptyShould(true)
           .because("機能ルートには他モジュールへ公開する自己完結した契約だけを置き、内部型を露出させない。");
 
-  /** jOOQ API と生成型を各機能の Persistence Adapter に閉じ込める。 */
+  /** DB 技術 API を各機能の Persistence Adapter に閉じ込める。 */
   @ArchTest
-  /* package */ static final ArchRule jooqIsOnlyUsedByPersistenceAdapters =
+  /* package */ static final ArchRule databaseTechnologyApisAreOnlyUsedByPersistenceAdapters =
       noClasses()
           .that()
           .resideOutsideOfPackage("..infrastructure.persistence..")
           .should()
           .dependOnClassesThat()
-          .resideInAnyPackage("org.jooq..", "com.example.demo.jooq..")
+          .resideInAnyPackage(
+              "org.jooq..",
+              "com.example.demo.jooq..",
+              "java.sql..",
+              "javax.sql..",
+              "org.springframework.jdbc..")
           .because(
-              "jOOQ の DSLContext と生成型は Persistence Adapter 内で Domain 型へ変換し、"
+              "jOOQ、JDBC、生成型は Persistence Adapter 内で Domain 型へ変換し、"
                   + "公開契約、Application、Domain、Presentation へ漏らさない。");
 
   /** Domain を Spring、jOOQ、JPA、Jackson から独立させる。 */

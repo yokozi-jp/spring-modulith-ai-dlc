@@ -143,6 +143,12 @@ dependencyManagement {
 tasks.named('test') {
     useJUnitPlatform()
     systemProperty 'user.timezone', 'UTC'
+    testLogging {
+        events 'failed'
+        exceptionFormat = 'full'
+        showCauses = true
+        showStackTraces = true
+    }
     finalizedBy jacocoTestCoverageVerification
 }
 
@@ -261,6 +267,11 @@ spotbugs {
 // jOOQ生成コードは生成器の責任範囲なので、手書きコード向けの静的解析から除外する。
 tasks.named('pmdMain') {
     exclude '**/jooq/**'
+}
+
+// テスト固有の診断性と待機方法は、プロダクションコード向け規則と分けて検査する。
+tasks.named('pmdTest') {
+    ruleSetFiles = files("config/pmd/ruleset.xml", "config/pmd/test-ruleset.xml")
 }
 
 tasks.named('spotbugsMain') {

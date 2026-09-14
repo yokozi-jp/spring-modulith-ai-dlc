@@ -1,8 +1,8 @@
 ---
 inclusion: fileMatch
-fileMatchPattern: ["backend/src/test/**/*.java", "backend/src/test/**/*.gradle"]
+fileMatchPattern: ["backend/src/test/**/*.java", "backend/build.gradle", ".github/workflows/backend-ci.yml"]
 name: backend-testing-conventions
-description: バックエンド（Spring Boot 4 / Spring Modulith / jOOQ / PostgreSQL）のテストコード規約。テストスライスと @SpringBootTest の使い分け、DBテストの隔離方式（@DatabaseTest のロールバックと @CommittedDatabaseTest のコミット＋自動 TRUNCATE）、@Transactional の可否と理由、Spring Modulith のイベントテスト作法、日時の固定と検証、コンテキストキャッシュ、静的解析（PMD CommentRequired・Spotless）に沿ったコード規約、実行コマンドを定める。backend のテストを書く・直すときに使用する。
+description: バックエンド（Spring Boot 4 / Spring Modulith / jOOQ / PostgreSQL）のテストコード規約。テストスライスと @SpringBootTest の使い分け、DBテストの隔離方式（@DatabaseTest のロールバックと @CommittedDatabaseTest のコミット＋自動 DELETE）、失敗時の診断情報、非同期待機、日時の固定、コンテキストキャッシュ、静的解析に沿ったコード規約、実行コマンドを定める。backend のテスト、テスト用ビルド設定、CI を書く・直すときに使用する。
 ---
 
 # バックエンドのテストコード規約
@@ -17,7 +17,8 @@ description: バックエンド（Spring Boot 4 / Spring Modulith / jOOQ / Postg
 - 後始末拡張：#[[file:backend/src/test/java/com/example/demo/testkit/CleanGeneratedTablesExtension.java]]
 - 共有テスト構成：#[[file:backend/src/test/java/com/example/demo/testkit/SharedTestConfiguration.java]]
 - ArchUnit の解析対象限定：#[[file:backend/src/test/java/com/example/demo/architecture/ProductionCodeOnly.java]]
-- 静的解析ルール：#[[file:backend/config/pmd/ruleset.xml]]
+- 共通の静的解析ルール：#[[file:backend/config/pmd/ruleset.xml]]
+- テスト固有の静的解析ルール：#[[file:backend/config/pmd/test-ruleset.xml]]
 - テスト用環境変数：#[[file:.env.test]]
 - 日時の規約：#[[file:.kiro/steering/datetime-timezone-conventions.md]]
 
@@ -43,12 +44,55 @@ description: バックエンド（Spring Boot 4 / Spring Modulith / jOOQ / Postg
 `@DatabaseTest` と `@CommittedDatabaseTest` は移行済みのテストDBを前提にする。
 ローカルでは `task test`（確定版）または `task test-dev`（作りかけ含む）が、DBの起動・マイグレーション・後片付けまで面倒を見る。
 
+## 失敗時の診断情報
+
+失敗ログだけで失敗対象と再現条件を特定できるようにする。
+ログには、該当する範囲で対象、入力、expected と actual、再現情報を残す。
+対象にはレコードID、ファイルパス、リクエスト、イベントキーなどが該当し、再現情報には乱数seed、期限、最後に観測した状態などが該当する。
+
+- JUnit の等価比較では expected と actual の引数を維持し、メッセージには対象と入力を補う。
+- AssertJ は標準の差分を維持できる `as(...)` を使って対象と入力を補う。`withFailMessage(...)` は標準の差分を上書きするため、置き換える理由がある場合に限る。
+- テスト内で `Optional` が空なら、引数なしの `orElseThrow()` を使わず、対象と検索条件を持つ `AssertionError` などを送出する。
+- プロパティベーステストでは、縮小された反例と再現に必要なseedを失敗ログから取得できるようにする。
+- 修正方法をメッセージへ書くのは、アーキテクチャ規則や禁止APIのように修正方針が一つに決まる場合に限る。振る舞いテストでは実装方法を固定せず、契約と診断情報を示す。
+
+```java
+assertEquals(
+    expected,
+    actual,
+    () -> "publicationId=" + publicationId + ", column=publication_date");
+```
+
+```java
+assertThat(actual)
+    .as("publicationId=%s の保存往復", publicationId)
+    .isEqualTo(expected);
+```
+
+```java
+final Instant actual =
+    result.orElseThrow(
+        () ->
+            new AssertionError(
+                "event_publication が見つからない: publicationId=" + publicationId));
+```
+
+## 非同期待機
+
+固定時間を待つ `Thread.sleep()` は、処理が早く終わっても待機し、遅い環境では不足してテストを不安定にするため使わない。
+イベントの発行と購読は Spring Modulith の `Scenario` で条件を待つ。
+それ以外の非同期処理では、対象APIが提供する期限付きの条件待機か、JUnit の非プリエンプティブな `assertTimeout` を使う。
+タイムアウト時には対象ID、期待条件、期限、最後に観測した状態を出す。
+
+`assertTimeoutPreemptively` は別スレッドで処理を実行するため、トランザクション、セキュリティコンテキスト、ログのコンテキストが本番経路と変わり得る。
+このため既定にはしない。
+
 ## DBテストの隔離と後始末
 
 DBに書き込むテストは、次の二択で書く。**手書きの `try/finally` による後始末を新しく書かない**。
 
 - 既定は `@DatabaseTest`。`@JooqTest` が各テスト後にロールバックするので、書いた行は自動で消える。
-- コミットが必要なときだけ `@CommittedDatabaseTest`。`CleanGeneratedTablesExtension` が各テスト後に、jOOQ が生成したアプリケーションテーブルの行だけを `DELETE` する。Liquibase 管理テーブルは codegen で除外済みなので触らない。後始末は本番と同じ DML 限定のアプリロールで動くため、`TRUNCATE` ではなく `DELETE` を使う（アプリロールは `CREATE`/`ALTER`/`DROP`/`TRUNCATE` を持たない。ADR-009）。
+- コミットが必要なときだけ `@CommittedDatabaseTest`。`CleanGeneratedTablesExtension` が各テスト後に、jOOQ が生成したアプリケーションテーブルの行だけを `DELETE` する。Liquibase 管理テーブルは codegen で除外済みなので触らない。後始末は本番と同じ DML 限定のアプリロールで動くため、`TRUNCATE` ではなく `DELETE` を使う（アプリロールは `CREATE`/`ALTER`/`DROP`/`TRUNCATE` を持たない。ADR-011）。
 
 ```java
 // 良い例：ふつうの「書いて読む」テストはロールバックに任せる
@@ -108,7 +152,7 @@ class SomethingTest {
 
 - 現在時刻を使うクラスには `Clock.fixed(...)` を渡す。引数なしの `now()` に依存しない。
 - JSON の絶対時刻は `Z` 付き文字列との完全一致で検証する。
-- テストデータの `Instant` は、DBとAPIが保持する精度（PostgreSQL はマイクロ秒）に合わせ、ナノ秒に依存させない。ナノ秒を含めると保存往復や文字列一致が丸めで失敗する。
+- テストデータの `Instant` は、DBとAPIが保持する精度（PostgreSQL はマイクロ秒）に合わせ、ナノ秒に依存させない。ナノ秒を含めると、保存往復や文字列一致が丸めで失敗する。
 - DB統合テストでは `SHOW TIME ZONE` が `UTC` であることと、`timestamptz` の保存往復を検証する。
 
 ## コンテキストキャッシュ
@@ -121,12 +165,12 @@ Spring はテスト構成（アノテーションと `@Import` の組）ごと�
 
 ## コード規約
 
-静的解析（#[[file:backend/config/pmd/ruleset.xml]]、SpotBugs、Spotless の Google Java Format）に通る形で書く。
+静的解析（#[[file:backend/config/pmd/ruleset.xml]]、#[[file:backend/config/pmd/test-ruleset.xml]]、SpotBugs、Spotless の Google Java Format）に通る形で書く。
 
 - フォーマットは Google Java Format に従う。`task be-format` で整形し、`task be-lint` で確認する。
 - **クラス・フィールドには Javadoc を付ける**（PMD `CommentRequired`）。`@Test` メソッドはパッケージプライベートにするので Javadoc は不要。
 - テストクラス・テストメソッド・ネスト型はパッケージプライベートにする（`public` を付けない。JUnit 5 は package-private を実行する）。既存コードは意図を示すため `/* package */` の目印を添えている。
-- アサーションには失敗時メッセージを添える。原因が一目で分かるようにする。
+- JUnit のアサーションには失敗時メッセージを添える。メッセージは期待値を言い換えず、失敗対象と入力を補う。
 - アサーションは JUnit の `Assertions` と AssertJ のどちらでもよいが、1つのテストクラス内では揃える。
 - テストクラス名は `...Test` を接尾辞にする。合成アノテーションや拡張などテストでない補助クラスには付けない。
 - 複数アサーションは許容される（PMD `UnitTestContainsTooManyAsserts` は無効化済み）。1テストで1つの振る舞いを検証する範囲にとどめる。
@@ -142,12 +186,16 @@ Spring はテスト構成（アノテーションと `@Import` の組）ごと�
 - 作りかけ changeset を含めて回す：`task test-dev`。全 changeset を適用してからテストする。
 - マイグレーションの rollback 検証だけ：`task be-verify-migrations`。
 - 依存が起動済みの環境（CI 部品）：`task be-test` / `task be-test-dev`。
+- Gradle は失敗したテストの例外、cause、スタックトレースを省略せずターミナルへ出す。
+- CI は失敗時に JUnit XML と HTML レポートを `backend-test-results` artifact として保存する。
 
 ## 避けるべきアンチパターン
 
 - 何でも `@SpringBootTest` で書く。起動が遅く、構成がばらけてコンテキストキャッシュが効かない。
 - コミット時挙動を検証するテストに `@Transactional` のロールバックを被せる。after-commit や制約が素通りし、誤検知になる。
-- 各DBテストに手書きの `try/finally` 後始末を書く。`@DatabaseTest`（ロールバック）か `@CommittedDatabaseTest`（自動 `TRUNCATE`）に任せる。
+- 各DBテストに手書きの `try/finally` 後始末を書く。`@DatabaseTest`（ロールバック）か `@CommittedDatabaseTest`（自動 `DELETE`）に任せる。
+- テスト内で引数なしの `Optional.orElseThrow()` を使い、失敗対象と検索条件を失う。
+- `Thread.sleep()` で固定時間を待ち、実行時間と成否を実行環境の速度へ依存させる。
 - Spring Modulith の `event_publication` へ手で行を入れて、イベント挙動やイベントと無関係な検証を行う。
 - ローカルタイムゾーンや引数なし `now()`、ナノ秒精度に依存する。
 - クラス・フィールドの Javadoc を省く（PMD で失敗する）。

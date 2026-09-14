@@ -1,0 +1,46 @@
+<?xml version="1.0"?>
+<ruleset name="pmd java test rules"
+         xmlns="http://pmd.sourceforge.net/ruleset/2.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://pmd.sourceforge.net/ruleset/2.0.0 https://pmd.sourceforge.io/ruleset_2_0_0.xsd">
+    <description>PMD ruleset for Java test code</description>
+
+    <rule name="UseComposedDatabaseTestAnnotation"
+          language="java"
+          message="@JooqTest を直接付けず、@DatabaseTest または @CommittedDatabaseTest を使用する。"
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule">
+        <description>
+            実行テストへの @JooqTest 直付けを禁止し、DBテストの構成と隔離方法を合成アノテーションへ集約する。
+        </description>
+        <priority>2</priority>
+        <properties>
+            <property name="xpath">
+                <value><![CDATA[
+                    //Annotation[
+                        pmd-java:typeIs('org.springframework.boot.jooq.test.autoconfigure.JooqTest')
+                        and not(ancestor::AnnotationTypeDeclaration)
+                    ]
+                ]]></value>
+            </property>
+        </properties>
+    </rule>
+
+    <rule name="RequireDiagnosticOptionalFailure"
+          language="java"
+          message="引数なしの Optional.orElseThrow() を使わず、失敗対象と検索条件を例外メッセージへ含める。"
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule">
+        <description>
+            Optional が空だった場合に対象IDや検索条件を残し、失敗ログだけで対象を特定できるようにする。
+        </description>
+        <priority>2</priority>
+        <properties>
+            <property name="xpath">
+                <value><![CDATA[
+                    //MethodCall[
+                        pmd-java:matchesSig('java.util.Optional#orElseThrow()')
+                    ]
+                ]]></value>
+            </property>
+        </properties>
+    </rule>
+</ruleset>

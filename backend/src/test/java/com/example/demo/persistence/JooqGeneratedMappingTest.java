@@ -41,7 +41,10 @@ class JooqGeneratedMappingTest {
             .from(EVENT_PUBLICATION)
             .where(EVENT_PUBLICATION.ID.eq(publicationId))
             .fetchOptional(EVENT_PUBLICATION.LISTENER_ID)
-            .orElseThrow();
+            .orElseThrow(
+                () ->
+                    new AssertionError(
+                        "event_publication が見つからない: publicationId=" + publicationId));
 
     assertEquals("jooq-mapping-test", listenerId, "生成カラムへ書いた値が読み戻せること");
   }
