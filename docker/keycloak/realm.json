@@ -34,17 +34,19 @@
       "directAccessGrantsEnabled": false,
       "serviceAccountsEnabled": false,
       "redirectUris": [
+        "http://localhost:5173/login/oauth2/code/web",
         "http://localhost:18080/login/oauth2/code/web"
       ],
       "webOrigins": [
+        "http://localhost:5173",
         "http://localhost:18080"
       ],
-      "baseUrl": "http://localhost:18080",
-      "adminUrl": "http://localhost:18080",
+      "baseUrl": "http://localhost:5173",
+      "adminUrl": "http://localhost:5173",
       "frontchannelLogout": true,
       "attributes": {
         "pkce.code.challenge.method": "S256",
-        "post.logout.redirect.uris": "http://localhost:18080/actuator/health"
+        "post.logout.redirect.uris": "http://localhost:5173/actuator/health##http://localhost:18080/actuator/health"
       }
     }
   ],

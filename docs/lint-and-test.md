@@ -12,6 +12,7 @@ Docker を使うタスク（semgrep / trivy / actionlint / zizmor / hadolint / d
 | --------------------------- | -------------------------------------------------------------- |
 | `task be-format`            | コードフォーマット適用（Spotless）                             |
 | `task be-lint`              | 静的解析（PMD + SpotBugs + Spotless チェック）                 |
+| `task be-openapi-lint`      | 生成したOpenAPI 3.1契約をSpectralで検査（依存起動済み）        |
 | `task be-migrate`           | 現在のスキーマタグまでマイグレーション                         |
 | `task be-release-migrate`   | 本番向けマイグレーション（実行時のタグ入力は不要）             |
 | `task be-schema-tag-check`  | 現在のスキーマタグがDBに存在することを確認                     |
@@ -36,7 +37,7 @@ DBスキーマタグはchangelog内の`tagDatabase` changesetで管理し、現�
 changesetとjOOQ生成コードを更新する手順、本番の資格情報、デプロイ順序、DB切り戻しは[DBマイグレーションとjOOQコード生成](database-migrations.md)を参照してください。
 
 `task test` はテスト専用スタック（`docker/compose-test.yml` の PostgreSQL 5433 / Redis 6380）を
-`.env.test` で起動し、終了後にボリュームごと片付けます。
+`.env.test` で起動し、マイグレーション、テスト、生成したOpenAPI 3.1契約のSpectral検査を実行してから、ボリュームごと片付けます。
 開発用スタック（`task compose-up` の 5432 / 6379）とポートを分けているため、`task be-run` で
 バックエンドをホスト起動したまま `task test` を並行実行できます。
 

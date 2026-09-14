@@ -12,6 +12,11 @@ spring:
   config:
     import: optional:file:../.env[.properties]
 
+  # Spring MVC の標準例外を RFC 9457 Problem Details で返す。
+  mvc:
+    problemdetails:
+      enabled: true
+
   # 仮想スレッドを有効化し Tomcat のスループットを向上
   threads:
     virtual:
@@ -176,5 +181,7 @@ management:
 springdoc:
   api-docs:
     enabled: ${SPRINGDOC_ENABLED}
+    # Spectralとクライアント生成が解釈する契約版を明示する。
+    version: openapi-3-1
   swagger-ui:
     enabled: ${SPRINGDOC_ENABLED}

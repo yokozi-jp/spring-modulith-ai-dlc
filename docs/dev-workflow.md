@@ -8,7 +8,7 @@
 
 - **`task dev`**：依存サービスを起動してバックエンドを起動する。日々の開発の入口。
 - **`task check`**：素早いローカル確認（バックエンドの静的解析）。こまめに回す。
-- **`task verify`**：push 前の総合ゲート（静的解析と、使い捨てDBでのマイグレーション検証とテスト）。CI と同じ内容。
+- **`task verify`**：push 前の総合ゲート（静的解析、OpenAPI 契約検査と、使い捨てDBでのマイグレーション検証とテスト）。CI と同じ内容。
 - **`task e2e`**：E2E（未整備。`docs/e2e-testing-strategy.md` に沿って構築予定）。
 
 これ以外の細かいタスクは、上記やCI、Gitフックから呼ばれる**部品**である。
@@ -20,12 +20,15 @@
 
 ```bash
 task dev                   # 依存起動＋バックエンド起動
+# 別のターミナルで
+cd frontend && vp dev      # SPAを起動し、APIとOIDC関連パスを同一オリジンでproxy
 # コードを変更する
 task check                 # 静的解析で素早く確認（こまめに）
 ```
 
+ブラウザは <http://localhost:5173> を開き、Vite proxy 経由でバックエンドを利用する。
 バックエンドは <http://localhost:18080>、Keycloak は <http://localhost:8080>、
-Grafana は <http://localhost:3000>。
+Grafana は <http://localhost:3000> で待ち受ける。
 
 ### マイグレーションを追加するとき
 
