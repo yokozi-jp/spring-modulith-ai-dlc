@@ -23,6 +23,7 @@ plugins {
     id 'net.ltgt.errorprone' version '5.1.1'
     id 'org.liquibase.gradle' version '3.1.0'
     id 'org.jooq.jooq-codegen-gradle' version '3.21.8'
+    id 'info.solidsoft.pitest' version '1.19.0'
 }
 
 group = 'com.example'
@@ -100,6 +101,8 @@ dependencies {
     testImplementation 'org.springframework.boot:spring-boot-starter-actuator-test'
     testImplementation 'org.springframework.boot:spring-boot-starter-opentelemetry-test'
     testImplementation 'org.springframework.modulith:spring-modulith-starter-test'
+    // JUnit Jupiter テスト内でプロパティ生成と反例の縮小を行う。
+    testImplementation 'org.quicktheories:quicktheories:0.26'
     // ArchUnit の JUnit 5 連携（@AnalyzeClasses / @ArchTest）。
     // コア（com.tngtech.archunit:archunit）は spring-modulith-starter-test 経由で 1.4.2 が入るため、
     // JUnit 5 エンジンも同じ 1.4.2 に揃える。
@@ -185,6 +188,30 @@ jacocoTestCoverageVerification {
             }
         }
     }
+}
+
+/*
+ * PIT: 手書きプロダクションコードに変異を加え、既存テストの検出力を測る。
+ * 高コストなので通常の test/verify から分離し、task mutation-test から明示実行する。
+ * 導入時点では業務ロジックがないため、スコア閾値は基準値を取得してから設定する。
+ */
+pitest {
+    pitestVersion = '1.22.1'
+    junit5PluginVersion = '1.2.2'
+    // Spring Boot BOM がJUnit 6に揃えるlauncherを使い、プラグインの推測による1.x混入を防ぐ。
+    addJUnitPlatformLauncher = false
+    targetClasses = ['com.example.demo.*']
+    // Springの配線はコンテキストキャッシュで誤検知しやすいため、業務ロジックだけを測る。
+    excludedClasses = [
+        'com.example.demo.DemoApplication',
+        'com.example.demo.OpenTelemetryAppenderInitializer',
+        'com.example.demo.SecurityConfig',
+        'com.example.demo.jooq.*'
+    ]
+    failWhenNoMutations = false
+    outputFormats = ['HTML', 'XML']
+    timestampedReports = false
+    jvmArgs = ['-Duser.timezone=UTC']
 }
 
 /*

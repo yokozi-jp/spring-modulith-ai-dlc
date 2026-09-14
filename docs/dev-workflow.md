@@ -52,6 +52,16 @@ task verify                # be-lint + 使い捨てDBでのマイグレーショ
 開発用スタック（5432 / 6379）とポートが分かれているため、`task dev` で
 バックエンドを起動したまま並行実行できる。
 
+### ミューテーションテストを実行するとき
+
+```bash
+task mutation-test
+```
+
+`task mutation-test`は使い捨てのテスト用依存を起動し、マイグレーション検証後にPITを実行して片付ける。
+PITは通常テストより実行コストが高いため、`task verify`とpull requestの必須CIには含めない。
+結果は、変異対象が存在するときに`backend/build/reports/pitest/`へ出力される。
+
 push 時には `task adr-check` が pre-push で走り、判断が絡む変更（依存・
 セキュリティ・DB・インフラ・ワークフロー、およびフロントエンド全体）に
 `docs/adr/` の更新が伴わないとき警告する。
@@ -113,5 +123,5 @@ task compose-reset CONFIRM_RESET=yes   # 全サービスの volume ごと削除�
 - `task verify` → `be-lint` ＋ `test`（`test` は隔離スタック起動＋
   `be-verify-migrations` ＋ `be-test` ＋ 後片付け）
 
-部品タスク（`be-test`、`test-deps-up` など）は通常直接打たず、
+部品タスク（`be-test`、`be-mutation-test`、`test-deps-up` など）は通常直接打たず、
 入口タスクや CI から呼ばれる。

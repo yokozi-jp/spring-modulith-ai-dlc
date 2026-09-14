@@ -1,6 +1,7 @@
 name: Backend CI (Gradle) ☕
 
 on:
+  workflow_dispatch:
   push:
     branches: ["main"]
     paths:
@@ -109,4 +110,43 @@ jobs:
         with:
           name: architecture-metrics
           path: backend/build/reports/architecture-metrics/
+          retention-days: 14
+
+
+  mutation:
+    if: github.event_name == 'workflow_dispatch'
+    name: Mutation Testing ☕
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up JDK
+        uses: actions/setup-java@dd06d9cba3e5552c54d9f8ea23572deb30010f7c # v6.0.0
+        with:
+          distribution: corretto
+          java-version: "25"
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@9c971963bec38e04b3d30dcc455b5382be2fdbfb # v6.3.0
+        with:
+          cache-provider: basic
+
+      - name: Set up Task
+        uses: go-task/setup-task@a00fbb05ce67b35648be3c78cbc9fd85354c757e # v2
+        with:
+          version: "3.53.1"
+          checksum: a54a408f6861ff921f6e87774180db31bacd8c1e7c944ca696db9fea49a82fc7
+
+      - name: Run mutation tests
+        run: task mutation-test
+
+      - name: Upload PIT report
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: pitest-report
+          path: backend/build/reports/pitest/
           retention-days: 14

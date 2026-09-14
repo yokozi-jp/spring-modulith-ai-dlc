@@ -22,7 +22,9 @@ Docker を使うタスク（semgrep / trivy / actionlint / zizmor / hadolint / d
 | `task be-generate-jooq`     | 現在のDBからjOOQコードを生成                                   |
 | `task be-refresh-jooq`      | マイグレーション後の最新DBからjOOQコードを生成                 |
 | `task test`                 | 隔離DBでrollback検証後にテストして片付ける                     |
+| `task mutation-test`        | 隔離DBでPITミューテーションテストを実行して片付ける            |
 | `task be-test`              | 明示マイグレーションとテストを実行（依存起動済みのCI部品用）   |
+| `task be-mutation-test`     | PITを実行（依存起動済みのCI部品用）                            |
 | `task be-sbom`              | SBOM生成（CycloneDX形式）                                      |
 
 アプリケーション起動時のLiquibase自動実行は無効です。
@@ -37,6 +39,27 @@ changesetとjOOQ生成コードを更新する手順、本番の資格情報、�
 `.env.test` で起動し、終了後にボリュームごと片付けます。
 開発用スタック（`task compose-up` の 5432 / 6379）とポートを分けているため、`task be-run` で
 バックエンドをホスト起動したまま `task test` を並行実行できます。
+
+### プロパティベーステストとミューテーションテスト
+
+プロパティベーステストはQuickTheories 0.26をJUnit Jupiterのテストメソッド内で使います。
+固定例の代わりに無作為な値を並べるのではなく、往復則、冪等性、順序不変性、境界保存など、対象コードが満たす不変条件を検証します。
+通常の`task test`で具体例テストと一緒に実行され、失敗時にはseedと縮小された反例が出力されます。
+
+PIT 1.22.1は手書き業務コードへ変異を加え、既存テストが変化を検出できるかを測ります。
+jOOQ生成コード、起動クラス、Springの設定と外部ライブラリを接続する配線クラスは対象外です。
+業務コードがまだ存在しない現状では、変異対象がない実行を正常終了させます。
+実行コストが高いため通常の`task verify`には含めず、次のコマンドで明示実行します。
+
+```bash
+task mutation-test
+```
+
+このタスクはテスト専用のPostgreSQLとRedisを起動し、マイグレーション検証後にPITを実行してから片付けます。
+変異対象が存在するとき、HTMLとXMLのレポートは`backend/build/reports/pitest/`へ出力されます。
+導入時点では業務ロジックがないためスコア閾値を設けず、業務モジュール追加後に実測した基準値から設定します。
+GitHub Actionsでは`Backend CI (Gradle)`を手動実行したときだけミューテーションテストを実行し、レポートを成果物として保存します。
+判断の理由と採用候補の比較は[ADR-012](adr/ADR-012-adopt-property-based-and-mutation-testing.md)を参照してください。
 
 ## シークレットスキャン（betterleaks）
 
