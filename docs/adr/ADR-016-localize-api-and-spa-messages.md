@@ -25,12 +25,17 @@ API クライアントは RFC 9457 の `type` で問題種別を判定する契�
 ヘッダがない場合と対応言語がない場合は日本語を選ぶ。
 URL parameter、Cookie、server の既定 locale では言語を切り替えない。
 
+MVC dispatch 内では `AcceptHeaderLocaleResolver` が locale を解決する。
+Spring Security の `AuthenticationEntryPoint` と `AccessDeniedHandler` は `DispatcherServlet` より前に動くため、この経路では同じ対応言語と既定言語を持つ `LocaleSupport` が request header を直接解決する。
+二経路は実行位置だけが異なり、対応言語と fallback 規則を共有する。
+
 バックエンドの文言は Spring Boot が自動構成する `MessageSource` へ置く。
 基底 bundle を英語、`messages_ja.properties` を日本語とし、system locale への fallback を無効にする。
 Bean Validation の業務向け制約は `{validation.required}` のような key を指定し、入力値をメッセージへ埋め込まない。
 
 Problem Details の `type`、`status` と拡張フィールド名はロケールで変えない。
-一般的な HTTP エラーの `title` と、人が読む `detail`、検証エラーの説明だけを翻訳する。
+一般的な `about:blank` の HTTP エラーは `title` だけを翻訳し、framework が生成した `detail` は公開しない。
+業務固有の安全な `detail` と検証エラーの説明は翻訳する。
 クライアントは引き続き `type` で分岐し、翻訳文を分岐条件にしない。
 応答には選択した locale の `Content-Language` と `Vary: Accept-Language` を付ける。
 

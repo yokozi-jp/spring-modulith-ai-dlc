@@ -43,7 +43,11 @@ final class ApiProblemDetails {
   /** 標準 type と、人が読む title を API の契約へ正規化する。 */
   /* package */ void normalize(
       final ProblemDetail problem, final HttpStatusCode status, final Locale locale) {
-    problem.setType(Objects.requireNonNullElse(problem.getType(), ABOUT_BLANK));
+    final URI type = Objects.requireNonNullElse(problem.getType(), ABOUT_BLANK);
+    problem.setType(type);
+    if (ABOUT_BLANK.equals(type)) {
+      problem.setDetail(null);
+    }
     final String defaultTitle =
         status instanceof HttpStatus httpStatus ? httpStatus.getReasonPhrase() : status.toString();
     problem.setTitle(

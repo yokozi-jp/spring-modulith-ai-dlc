@@ -37,6 +37,8 @@ JSON API は `/api` 配下へ置き、次の契約を適用する。
 - `type`、`title`、`status`、`detail`、`instance` は RFC 9457 の意味を変えない。
 - クライアントは `type` を問題種別の識別子として使い、`detail` を分岐条件に使わない。
 - 一般的な HTTP エラーには `about:blank` を使う。
+- `about:blank` の Problem Details では、Spring MVC が例外から生成した `detail` を公開せず、`type`、ローカライズした `title`、`status` だけを返す。
+- 業務固有の problem type では、入力値と実装詳細を含まないことを確認して明示的に作成した `detail` だけを返す。
 - 業務固有の問題を初めて公開するときは、管理下にある安定した HTTPS URI を `type` に使い、その URI で意味、HTTP status、対処方法を文書化する。
 - `status` は実際の HTTP status と必ず一致させる。
 - `detail`、検証エラー、ログ相関情報にスタックトレース、SQL、秘密情報、存在確認に使える認可情報を含めない。
