@@ -116,6 +116,14 @@ Markdown ファイルの体裁を markdownlint-cli2 で検査します。除外�
 | `task lint-md`     | Markdown の Lint（検出があれば失敗）              |
 | `task lint-md-fix` | Markdown の Lint 自動修正（安全に直せる項目のみ） |
 
+## リリース設定
+
+release-pleaseの設定と版ファイルの一致を検証する。
+
+| 実行タスク           | 内容                                                                    |
+| -------------------- | ----------------------------------------------------------------------- |
+| `task release-check` | manifest、`version.txt`、Gradle版、release-please設定の一致を検証する   |
+
 ## Taskfile Lint（Task 本体）
 
 `Taskfile.yml` を Task 本体で解析し、YAML 構文とスキーマ構造（未知のキー、型の誤り、不正な構造）を検証します。
@@ -133,5 +141,5 @@ Task 専用の公式リンタは存在しないため、Task 自身がファイ�
   - pre-commit: betterleaks（ステージ済み）、hadolint / docker build --check（Dockerfile 変更時）、compose config（Compose 変更時）、markdownlint（Markdown 変更時）
   - pre-push: betterleaks（全履歴）、be-lint（Spotless + PMD + SpotBugs）/ be-test（`task test`）（backend 変更時）、actionlint / zizmor（ワークフロー変更時）
 - **CI（GitHub Actions, [`.github/workflows/`](../.github/workflows/)）**
-  - `backend-ci.yml`（backend の Lint（Spotless + PMD + SpotBugs）とテスト・カバレッジ）、`betterleaks.yml`（シークレットスキャン）、`semgrep.yml`（静的解析 / SARIF アップロード）、`trivy.yml`（脆弱性スキャン / SARIF アップロード）、`actionlint.yml` / `zizmor.yml`（ワークフロー）、`hadolint.yml`（Dockerfile Lint、docker build --check、backend イメージのビルド・起動・ヘルスチェック）、`compose-config.yml`（Compose）、`markdownlint.yml`（Markdown）
+  - `backend-ci.yml`（backend の Lint（Spotless + PMD + SpotBugs）とテスト・カバレッジ）、`conventional-commits.yml`（Pull Requestタイトルのcommitlint）、`betterleaks.yml`（シークレットスキャン）、`semgrep.yml`（静的解析 / SARIF アップロード）、`trivy.yml`（脆弱性スキャン / SARIF アップロード）、`actionlint.yml` / `zizmor.yml`（ワークフロー）、`hadolint.yml`（Dockerfile Lint、docker build --check、backend イメージのビルド・起動・ヘルスチェック）、`compose-config.yml`（Compose）、`markdownlint.yml`（Markdown）、`release-please.yml`（リリース設定検証とRelease Pull Request作成）
   - `semgrep.yml` / `trivy.yml` の検出結果は GitHub Code Scanning（Security タブ）に SARIF 形式でアップロードされます。

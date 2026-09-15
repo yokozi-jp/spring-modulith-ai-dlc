@@ -1,0 +1,40 @@
+name: 機能提案
+description: 新しい機能または改善を提案する
+title: "feat: "
+labels:
+  - enhancement
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: 解決したい問題
+      description: 実装案ではなく、利用者または運用者が困っている状況を記載してください。
+    validations:
+      required: true
+  - type: textarea
+    id: outcome
+    attributes:
+      label: 期待する結果
+      description: 完了を判断できる条件を記載してください。
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: 提案する変更
+      description: 必要と考える変更を記載してください。
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: 既存機能と代替案
+      description: 既存の機能、標準機能、運用変更で代替できない理由を記載してください。
+  - type: textarea
+    id: validation
+    attributes:
+      label: 検証方法
+      description: 受け入れ確認、テスト、運用確認の案を記載してください。
+  - type: textarea
+    id: blockers
+    attributes:
+      label: 依存事項とブロッカー
+      description: 他の変更、外部サービス、意思決定、期限への依存を記載してください。

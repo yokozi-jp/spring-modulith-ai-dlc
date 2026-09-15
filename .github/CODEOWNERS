@@ -1,0 +1,19 @@
+# 既定の所有者
+* @yokozi-jp
+
+# バックエンド
+/backend/ @yokozi-jp
+
+# フロントエンド
+/frontend/ @yokozi-jp
+
+# ローカル基盤と本番インフラ
+/docker/ @yokozi-jp
+/infrastructure/ @yokozi-jp
+
+# Kiro設定とAI-DLCワークスペース
+/.kiro/ @yokozi-jp
+/aidlc/ @yokozi-jp
+
+# GitHub上のリポジトリ運用
+/.github/ @yokozi-jp

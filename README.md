@@ -180,3 +180,19 @@ push 前には `task adr-check` が pre-push で走り、判断が絡む変更�
 既定は非ブロッキングで、該当しない場合は `ADR_ACK=1 git push` で抑制できます。
 
 <p align="right">(<a href="#top">トップへ</a>)</p>
+
+## コントリビューションとリリース
+
+変更手順、ブランチ運用、コミット規約は [`CONTRIBUTING.md`](CONTRIBUTING.md) を参照してください。
+
+`main` の保護設定は [`docs/branch-protection.md`](docs/branch-protection.md)、版採番、CHANGELOG、タグの作成手順は [`docs/release-management.md`](docs/release-management.md) に定義しています。
+
+リリース設定と版ファイルの一致は次のコマンドで確認できます。
+
+```bash
+task release-check
+```
+
+脆弱性の非公開報告方法は [`SECURITY.md`](SECURITY.md) を参照してください。
+
+<p align="right">(<a href="#top">トップへ</a>)</p>
