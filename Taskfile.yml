@@ -44,6 +44,59 @@ tasks:
       - task: be-lint
       - task: test
 
+  # Release
+  release-check:
+    desc: release-please設定と版ファイルの一致を検証
+    silent: true
+    cmds:
+      - |
+        node --input-type=module <<'NODE'
+        import { readFileSync } from "node:fs";
+
+        const config = JSON.parse(readFileSync("release-please-config.json", "utf8"));
+        const manifest = JSON.parse(readFileSync(".release-please-manifest.json", "utf8"));
+        const packageConfig = config.packages?.["."];
+        const manifestVersion = manifest["."];
+        const versionFile = readFileSync("version.txt", "utf8").trim();
+        const buildFile = readFileSync("backend/build.gradle", "utf8");
+        const buildVersion = buildFile.match(
+          /^version = '([^']+)' \/\/ x-release-please-version$/m,
+        )?.[1];
+        const semver = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/;
+        const updatesBuild = packageConfig?.["extra-files"]?.some(
+          ({ type, path }) => type === "generic" && path === "backend/build.gradle",
+        );
+
+        if (packageConfig?.["release-type"] !== "simple") {
+          throw new Error('packages["."].release-type must be "simple"');
+        }
+        if (packageConfig?.["version-file"] !== "version.txt") {
+          throw new Error('packages["."].version-file must be "version.txt"');
+        }
+        if (packageConfig?.["include-component-in-tag"] !== false) {
+          throw new Error("release tags must use v<version> without a component prefix");
+        }
+        if (!updatesBuild) {
+          throw new Error("backend/build.gradle must be a generic extra-file");
+        }
+        if (!semver.test(manifestVersion ?? "")) {
+          throw new Error("manifest root version must be a stable semantic version");
+        }
+        if (manifestVersion !== versionFile || manifestVersion !== buildVersion) {
+          throw new Error(
+            `version mismatch: manifest=${manifestVersion}, version.txt=${versionFile}, build.gradle=${buildVersion}`,
+          );
+        }
+        if (
+          config["bootstrap-sha"] !== undefined &&
+          !/^[0-9a-f]{40}$/.test(config["bootstrap-sha"])
+        ) {
+          throw new Error("bootstrap-sha must be a full 40-character commit SHA");
+        }
+
+        console.log(`Release configuration OK: v${manifestVersion}`);
+        NODE
+
   e2e:
     desc: E2Eの未整備を案内
     cmds:

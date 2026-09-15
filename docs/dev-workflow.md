@@ -72,6 +72,18 @@ push 時には `task adr-check` が pre-push で走り、判断が絡む変更�
 フロントエンドは構築初期のため全体を対象にしている。安定したら
 `frontend/package.json` や設定ファイルなど判断が出やすい箇所へ絞ってよい。
 
+### リリース設定を変更するとき
+
+```bash
+task release-check
+```
+
+`task release-check`はrelease-pleaseの設定、manifest、`version.txt`、Gradleの版番号が一致することを検証する。
+
+通常の変更では版ファイルと`CHANGELOG.md`を直接変更せず、Release Pull Requestに更新を任せる。
+
+詳しい手順とGitHub secretの設定は`docs/release-management.md`を参照する。
+
 ### Docker Compose とサービスの操作
 
 依存サービス（PostgreSQL / Keycloak / Redis / Grafana）は Docker Compose で起動する。

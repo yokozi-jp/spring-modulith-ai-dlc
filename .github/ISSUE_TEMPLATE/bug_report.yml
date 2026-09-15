@@ -1,0 +1,58 @@
+name: 不具合報告
+description: 再現可能な不具合を報告する
+title: "fix: "
+labels:
+  - bug
+body:
+  - type: markdown
+    attributes:
+      value: |
+        セキュリティ上の問題は公開 Issue に書かず、Security Advisory から非公開で報告してください。
+  - type: textarea
+    id: summary
+    attributes:
+      label: 症状
+      description: 何が起きているかを記載してください。
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: 再現手順
+      description: 最小の再現手順、入力、発生頻度を記載してください。
+      placeholder: |
+        1. ...
+        2. ...
+        3. ...
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: 期待する結果
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: 実際の結果と診断情報
+      description: エラー、ログ、スクリーンショットを機密情報を除いて記載してください。
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: 実行環境
+      description: OS、ブラウザ、Java、コンテナ、対象commitなど、再現に必要な情報を記載してください。
+    validations:
+      required: true
+  - type: textarea
+    id: validation
+    attributes:
+      label: 確認済みの内容
+      description: 実行したテスト、回避策、発生しない条件を記載してください。
+  - type: textarea
+    id: blockers
+    attributes:
+      label: 影響とブロッカー
+      description: 利用者への影響、作業を止めている事項、期限があれば記載してください。

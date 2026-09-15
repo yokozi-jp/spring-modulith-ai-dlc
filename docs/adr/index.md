@@ -30,6 +30,8 @@ Alternatives Considered / References の構成）。
 - **ADR-014**：SPA とバックエンドを同一オリジンで公開する（Accepted, 2026-09-14）
 - **ADR-015**：可観測性データを構造化し保護する（Proposed, 2026-09-15）
 - **ADR-016**：API と SPA のメッセージをローカライズする（Proposed, 2026-09-15）
+- **ADR-017**：トランクベース開発とリポジトリ保護を採用する（Proposed, 2026-09-15）
+- **ADR-018**：release-please でセマンティックリリースを自動化する（Proposed, 2026-09-15）
 
 ## 運用
 

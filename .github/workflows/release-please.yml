@@ -1,0 +1,62 @@
+name: Release Please
+
+on:
+  workflow_dispatch:
+  push:
+    branches: ["main"]
+  pull_request:
+    branches: ["main"]
+    paths:
+      - ".github/workflows/release-please.yml"
+      - ".release-please-manifest.json"
+      - "release-please-config.json"
+      - "version.txt"
+      - "backend/build.gradle"
+      - "Taskfile.yml"
+
+concurrency:
+  group: release-please-main
+  cancel-in-progress: false
+
+permissions: {}
+
+jobs:
+  validate:
+    if: github.event_name == 'pull_request'
+    name: Validate release configuration
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Task
+        uses: go-task/setup-task@a00fbb05ce67b35648be3c78cbc9fd85354c757e # v2
+        with:
+          version: "3.53.1"
+          checksum: a54a408f6861ff921f6e87774180db31bacd8c1e7c944ca696db9fea49a82fc7
+
+      - name: Validate release configuration and versions
+        run: task release-check
+
+  release:
+    if: github.event_name != 'pull_request'
+    name: Create or update Release Pull Request
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+      issues: write
+      pull-requests: write
+    steps:
+      - name: Run release-please
+        id: release
+        uses: googleapis/release-please-action@5c625bfb5d1ff62eadeeb3772007f7f66fdcf071 # v4.4.1
+        with:
+          token: ${{ secrets.RELEASE_PLEASE_TOKEN }}
+          target-branch: main
+          config-file: release-please-config.json
+          manifest-file: .release-please-manifest.json
