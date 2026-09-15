@@ -126,11 +126,22 @@
 #       # 長期AWSアクセスキーをGitHub Secretsへ保存せず、ジョブごとの短期資格情報をOIDCで取得します。
 #       # IAM信頼ポリシー側でもrepository、ref、environmentのsubjectを制限します。
 #       - name: Configure AWS credentials with GitHub OIDC
-#         uses: aws-actions/configure-aws-credentials@<PINNED_COMMIT_SHA>
+#         uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
 #         with:
 #           role-to-assume: ${{ vars.PRODUCTION_DEPLOY_ROLE_ARN }}
 #           role-session-name: gha-production-${{ github.run_id }}
 #           aws-region: ${{ env.AWS_REGION }}
+#
+#       # Cosign と gh attestation が ECR の署名および attestation を取得できるよう、Docker credential を設定します。
+#       - name: Log in to Amazon ECR
+#         uses: aws-actions/amazon-ecr-login@aded0d722166a37980e030aa969dda0bfe6b6947 # v2.1.7
+#         with:
+#           mask-password: true
+#
+#       - name: Install Cosign
+#         uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
+#         with:
+#           cosign-release: v3.1.3
 #
 #       # タグは後から別イメージを指せるため、デプロイ対象をdigestで固定します。
 #       # ECRにdigestが存在し、スキャンが完了し、Critical脆弱性が許容基準以下であることを確認します。
@@ -158,16 +169,24 @@
 #           echo "image_uri=$image_uri" >> "$GITHUB_OUTPUT"
 #
 #       # digestの存在だけでは、そのイメージがこのcommitのCI成果物であることを証明できません。
-#       # 採用する署名方式に合わせ、署名、provenance、SBOM、source commitの対応をここで検証します。
-#       # cosign、AWS Signer、GitHub artifact attestationsのいずれを使う場合も検証ツールをSHAまたはdigestで固定します。
+#       # Cosign署名のworkflow identityと、SLSA provenanceのsource commitを個別に検証します。
 #       - name: Verify image signature and provenance
 #         env:
+#           GH_TOKEN: ${{ github.token }}
 #           IMAGE_URI: ${{ steps.image.outputs.image_uri }}
 #           EXPECTED_COMMIT: ${{ github.sha }}
 #         run: |
 #           set -euo pipefail
-#           echo "TODO: $IMAGE_URI の署名とprovenanceが $EXPECTED_COMMIT を指すことを検証する"
-#           exit 1
+#           certificate_identity_regex="^https://github.com/${GITHUB_REPOSITORY}/\\.github/workflows/container-publish\\.yml@refs/(heads/main|tags/v[^/]+)$"
+#           cosign verify \
+#             --certificate-identity-regexp "$certificate_identity_regex" \
+#             --certificate-oidc-issuer "https://token.actions.githubusercontent.com" \
+#             "$IMAGE_URI"
+#           gh attestation verify "oci://$IMAGE_URI" \
+#             --repo "$GITHUB_REPOSITORY" \
+#             --signer-workflow "$GITHUB_REPOSITORY/.github/workflows/container-publish.yml" \
+#             --source-digest "$EXPECTED_COMMIT" \
+#             --bundle-from-oci
 #
 #       # マイグレーションとアプリケーションが参照するソースを同じcommitへ固定します。
 #       # JavaとGradle ActionもCIと同じバージョンおよび固定SHAを使います。
