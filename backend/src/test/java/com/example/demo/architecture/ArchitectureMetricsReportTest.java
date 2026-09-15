@@ -37,6 +37,12 @@ class ArchitectureMetricsReportTest {
   /** アーキテクチャ指標レポートの出力先。 */
   private static final Path REPORT_PATH = REPORT_DIRECTORY.resolve("architecture-metrics.txt");
 
+  /** 均衡二分木を基準とした正規化累積コンポーネント依存の上限。 */
+  private static final double MAX_NORMALIZED_CUMULATIVE_COMPONENT_DEPENDENCY = 1.0D;
+
+  /** 現在の外部可視型数 7、全型数 13 を基準とする global relative visibility の上限。 */
+  private static final double MAX_GLOBAL_RELATIVE_VISIBILITY = 7.0D / 13.0D;
+
   /** Lakos、コンポーネント依存、可視性の各指標を計算してレポートへ保存する。 */
   @Test
   @DisplayName("アーキテクチャ指標レポートを生成する")
@@ -70,6 +76,13 @@ class ArchitectureMetricsReportTest {
 
     assertThat(Files.readString(REPORT_PATH, StandardCharsets.UTF_8))
         .contains("Architecture Metrics", "component=bootstrap", "CCD=", "GRV=");
+    assertThat(lakosMetrics.getNormalizedCumulativeComponentDependency())
+        .as("NCCD は均衡二分木を基準とする上限 %s 以下", MAX_NORMALIZED_CUMULATIVE_COMPONENT_DEPENDENCY)
+        .isLessThanOrEqualTo(MAX_NORMALIZED_CUMULATIVE_COMPONENT_DEPENDENCY);
+    // ponytail: GRV は component 間の増減を相殺できる。必要になったら module ごとの公開 API 規則へ置き換える。
+    assertThat(visibilityMetrics.getGlobalRelativeVisibility())
+        .as("GRV は現在の公開面積比 %s 以下", MAX_GLOBAL_RELATIVE_VISIBILITY)
+        .isLessThanOrEqualTo(MAX_GLOBAL_RELATIVE_VISIBILITY);
   }
 
   private static String componentIdentifier(final JavaClass javaClass) {

@@ -3,6 +3,8 @@
 
 # spring-modulith-ai-dlc
 
+[![OpenSSF Scorecard](https://api.securityscorecards.dev/projects/github.com/yokozi-jp/spring-modulith-ai-dlc/badge)](https://securityscorecards.dev/viewer/?uri=github.com/yokozi-jp/spring-modulith-ai-dlc)
+
 ## 使用技術一覧
 
 <p style="display: inline">

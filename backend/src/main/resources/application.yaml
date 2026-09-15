@@ -35,7 +35,9 @@ spring:
     problemdetails:
       enabled: true
 
-  # 仮想スレッドを有効化し Tomcat のスループットを向上
+  # 仮想スレッドを有効化し、待機中のリクエストが占有するプラットフォームスレッドを減らす。
+  # Java 25 では synchronized による pinning は JEP 491 で解消済み。
+  # native 呼び出しなどの残る pinning は、外部連携追加時の JFR 負荷スモークで確認する。
   threads:
     virtual:
       enabled: true
@@ -48,6 +50,11 @@ spring:
     username: ${DB_USERNAME}
     password: ${DB_PASSWORD}
     hikari:
+      # DB の接続予算から環境ごとに算出する。仮想スレッド数からは決めない。
+      maximum-pool-size: ${DB_POOL_MAXIMUM_SIZE}
+      # pool 枯渇時にリクエストを無期限に待たせず、上位の時間予算内で失敗させる。
+      connection-timeout: ${DB_POOL_CONNECTION_TIMEOUT_MS}
+      # minimum-idle は未指定とし、HikariCP の固定サイズ pool の既定動作を使う。
       # モジュールスキーマ名は環境差を持たないアーキテクチャ上の固定値。
       schema: modulith
       # 新しい物理接続ごとにDBセッションの日時解釈と表示をUTCへ固定する。
@@ -132,6 +139,35 @@ spring:
   # 処理中リクエストの完了を待つ上限。ECS の stopTimeout はこの値より大きくすること。
   lifecycle:
     timeout-per-shutdown-phase: 30s
+
+# 外部 client は依存先ごとに名前付き instance を定義し、client adapter の境界で適用する。
+# 現在の PostgreSQL、Redis、OIDC 通信へは自動適用されない。
+resilience4j:
+  circuitbreaker:
+    configs:
+      default:
+        sliding-window-type: count_based
+        sliding-window-size: 20
+        minimum-number-of-calls: 10
+        failure-rate-threshold: 50
+        wait-duration-in-open-state: 30s
+        permitted-number-of-calls-in-half-open-state: 5
+  retry:
+    configs:
+      # 非冪等処理を重複実行しないよう、明示しない retry は無効にする。
+      default:
+        max-attempts: 1
+      # GET などの冪等な操作だけ、名前付き instance から base-config として継承する。
+      idempotent:
+        max-attempts: 3
+        wait-duration: 200ms
+        enable-exponential-backoff: true
+        exponential-backoff-multiplier: 2
+  timelimiter:
+    configs:
+      default:
+        timeout-duration: 2s
+        cancel-running-future: true
 
 # 組み込みサーバ（Tomcat）
 server:

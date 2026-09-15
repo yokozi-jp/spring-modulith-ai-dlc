@@ -32,6 +32,8 @@ Alternatives Considered / References の構成）。
 - **ADR-016**：API と SPA のメッセージをローカライズする（Proposed, 2026-09-15）
 - **ADR-017**：トランクベース開発とリポジトリ保護を採用する（Proposed, 2026-09-15）
 - **ADR-018**：release-please でセマンティックリリースを自動化する（Proposed, 2026-09-15）
+- **ADR-019**：外部連携の耐障害性と容量制御を標準化する（Proposed, 2026-09-15）
+- **ADR-020**：コンテナイメージを署名し provenance を検証する（Proposed, 2026-09-15）
 
 ## 運用
 
