@@ -45,7 +45,7 @@
 
 - **認証と認可**：Keycloak を認可サーバとした OIDC（OAuth2 Client）と、Redis による分散セッション
 - **データアクセス**：Liquibase によるDBマイグレーションと、スキーマから生成する jOOQ コード
-- **可観測性**：OpenTelemetry による計装と、Grafana OpenTelemetry LGTM への集約
+- **可観測性**：OpenTelemetry による計装と、Grafana OpenTelemetry LGTM への集約（ログ相関、PII、保持は[可観測性の運用](docs/observability-operations.md)を参照）
 - **品質ゲート**：静的解析、シークレットと脆弱性のスキャン、使い捨てDBでのテストを Git フックと CI で強制
 
 業務ドメインのモジュールはこれから追加していきます。

@@ -2,6 +2,17 @@
 #   環境変数（DB/Redis など）の参照にはデフォルト値を設定しない。
 #   設定漏れをアプリ起動時に検知しやすくするため（未設定なら起動に失敗させる）。
 
+# コンソールは収集基盤やコンテナランタイムが解釈できる ECS JSON で出力する。
+# traceId / spanId は Micrometer Tracing が設定する MDC から追加される。
+logging:
+  structured:
+    format:
+      console: ecs
+    ecs:
+      service:
+        name: ${OTEL_SERVICE_NAME}
+        environment: ${OTEL_DEPLOYMENT_ENVIRONMENT_NAME}
+
 spring:
   application:
     name: demo
@@ -11,6 +22,13 @@ spring:
   # STG/本番: ECS タスク定義の environment / secrets で環境変数を注入する（.env は無いので optional）。
   config:
     import: optional:file:../.env[.properties]
+
+  # API と Bean Validation の文言を ResourceBundle から解決する。
+  # 実行ホストの locale へ fallback させず、Accept-Language と既定の日本語だけで決定する。
+  messages:
+    basename: messages
+    encoding: UTF-8
+    fallback-to-system-locale: false
 
   # Spring MVC の標準例外を RFC 9457 Problem Details で返す。
   mvc:

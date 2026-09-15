@@ -16,10 +16,11 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.context.annotation.Import;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 
-/** API の Problem Details とブラウザ向けセキュリティヘッダを HTTP レベルで検証する。 */
+/** API の Problem Details、locale、ブラウザ向けセキュリティヘッダを HTTP レベルで検証する。 */
 @SuppressWarnings({
   "PMD.AvoidDuplicateLiterals",
   "PMD.TooManyStaticImports",
@@ -34,47 +35,60 @@ class ApiContractTest {
   @Autowired private MockMvc mockMvc;
 
   @Test
-  @DisplayName("未認証の /api リクエストは 401 Problem Details を返す")
-  void unauthenticatedApiRequestReturnsProblemDetails() throws Exception {
+  @DisplayName("言語未指定の未認証 API は日本語の 401 Problem Details を返す")
+  void unauthenticatedApiRequestReturnsDefaultLocaleProblemDetails() throws Exception {
     mockMvc
         .perform(get("/api/missing"))
         .andExpect(status().isUnauthorized())
         .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
+        .andExpect(header().string(HttpHeaders.CONTENT_LANGUAGE, "ja"))
+        .andExpect(header().string(HttpHeaders.VARY, HttpHeaders.ACCEPT_LANGUAGE))
         .andExpect(jsonPath("$.type").value("about:blank"))
-        .andExpect(jsonPath("$.title").value("Unauthorized"))
+        .andExpect(jsonPath("$.title").value("認証が必要です"))
         .andExpect(jsonPath("$.status").value(401));
   }
 
   @Test
-  @DisplayName("CSRF トークン欠如の更新リクエストは 403 Problem Details を返す")
-  void csrfFailureReturnsProblemDetails() throws Exception {
+  @DisplayName("地域付き英語を指定した CSRF エラーは英語の 403 Problem Details を返す")
+  void csrfFailureReturnsEnglishProblemDetails() throws Exception {
     mockMvc
-        .perform(post("/api/missing").with(user("test-user")))
+        .perform(
+            post("/api/missing")
+                .with(user("test-user"))
+                .header(HttpHeaders.ACCEPT_LANGUAGE, "en-US"))
         .andExpect(status().isForbidden())
         .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
+        .andExpect(header().string(HttpHeaders.CONTENT_LANGUAGE, "en"))
+        .andExpect(header().string(HttpHeaders.VARY, HttpHeaders.ACCEPT_LANGUAGE))
         .andExpect(jsonPath("$.type").value("about:blank"))
         .andExpect(jsonPath("$.title").value("Forbidden"))
         .andExpect(jsonPath("$.status").value(403));
   }
 
   @Test
-  @DisplayName("認証済みで存在しない /api リソースは 404 Problem Details を返す")
-  void missingAuthenticatedApiResourceUsesMvcProblemDetails() throws Exception {
+  @DisplayName("品質値付き Accept-Language から対応言語を選ぶ")
+  void missingAuthenticatedApiResourceUsesPreferredSupportedLocale() throws Exception {
     mockMvc
-        .perform(get("/api/missing").with(user("test-user")))
+        .perform(
+            get("/api/missing")
+                .with(user("test-user"))
+                .header(HttpHeaders.ACCEPT_LANGUAGE, "fr-FR, en;q=0.9"))
         .andExpect(status().isNotFound())
         .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
+        .andExpect(header().string(HttpHeaders.CONTENT_LANGUAGE, "en"))
+        .andExpect(header().string(HttpHeaders.VARY, HttpHeaders.ACCEPT_LANGUAGE))
         .andExpect(jsonPath("$.type").value("about:blank"))
         .andExpect(jsonPath("$.title").value("Not Found"))
         .andExpect(jsonPath("$.status").value(404));
   }
 
   @Test
-  @DisplayName("/error は実装詳細を含まない Problem Details を返す")
-  void errorEndpointReturnsProblemDetailsWithoutImplementationDetails() throws Exception {
+  @DisplayName("/error は日本語でも実装詳細を含まない Problem Details を返す")
+  void errorEndpointReturnsLocalizedProblemDetailsWithoutImplementationDetails() throws Exception {
     mockMvc
         .perform(
             get("/error")
+                .header(HttpHeaders.ACCEPT_LANGUAGE, "ja-JP")
                 .requestAttr(
                     RequestDispatcher.ERROR_STATUS_CODE,
                     org.springframework.http.HttpStatus.INTERNAL_SERVER_ERROR.value())
@@ -83,8 +97,10 @@ class ApiContractTest {
                     new IllegalStateException("sensitive implementation detail")))
         .andExpect(status().isInternalServerError())
         .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
+        .andExpect(header().string(HttpHeaders.CONTENT_LANGUAGE, "ja"))
+        .andExpect(header().string(HttpHeaders.VARY, HttpHeaders.ACCEPT_LANGUAGE))
         .andExpect(jsonPath("$.type").value("about:blank"))
-        .andExpect(jsonPath("$.title").value("Internal Server Error"))
+        .andExpect(jsonPath("$.title").value("サーバー内部エラー"))
         .andExpect(jsonPath("$.status").value(500))
         .andExpect(jsonPath("$.detail").doesNotExist())
         .andExpect(jsonPath("$.exception").doesNotExist())
