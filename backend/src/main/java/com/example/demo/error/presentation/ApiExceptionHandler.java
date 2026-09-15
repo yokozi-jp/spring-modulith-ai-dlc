@@ -1,5 +1,8 @@
 package com.example.demo.error.presentation;
 
+import com.example.demo.LocaleSupport;
+import jakarta.servlet.http.HttpServletRequest;
+import java.util.Locale;
 import java.util.Objects;
 import java.util.Optional;
 import lombok.extern.slf4j.Slf4j;
@@ -7,13 +10,13 @@ import org.jspecify.annotations.Nullable;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpStatusCode;
-import org.springframework.http.MediaType;
 import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.AuthenticationException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.context.request.ServletWebRequest;
 import org.springframework.web.context.request.WebRequest;
 import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExceptionHandler;
 
@@ -21,6 +24,15 @@ import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExcep
 @Slf4j
 @RestControllerAdvice
 public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
+
+  /** Problem Details の共通フィールドを生成する。 */
+  private final ApiProblemDetails problemDetails;
+
+  /** Problem Details の共通処理を受け取る。 */
+  public ApiExceptionHandler(final ApiProblemDetails problemDetails) {
+    super();
+    this.problemDetails = problemDetails;
+  }
 
   /** 未認証の API リクエストを 401 Problem Details へ変換する。 */
   @ExceptionHandler(AuthenticationException.class)
@@ -30,7 +42,7 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
         handleExceptionInternal(
             exception,
             ApiProblemDetails.forStatus(HttpStatus.UNAUTHORIZED),
-            problemHeaders(),
+            new HttpHeaders(),
             HttpStatus.UNAUTHORIZED,
             request));
   }
@@ -43,7 +55,7 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
         handleExceptionInternal(
             exception,
             ApiProblemDetails.forStatus(HttpStatus.FORBIDDEN),
-            problemHeaders(),
+            new HttpHeaders(),
             HttpStatus.FORBIDDEN,
             request));
   }
@@ -52,12 +64,15 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
   @ExceptionHandler(Exception.class)
   /* package */ ResponseEntity<Object> handleUnexpectedException(
       final Exception exception, final WebRequest request) {
-    log.error("Unhandled API exception", exception);
+    log.atError()
+        .addKeyValue("exception.type", exception.getClass().getName())
+        .addKeyValue("exception.stacktrace", ExceptionLogSanitizer.stackTrace(exception))
+        .log("Unhandled API exception");
     return Objects.requireNonNull(
         handleExceptionInternal(
             exception,
             ApiProblemDetails.forStatus(HttpStatus.INTERNAL_SERVER_ERROR),
-            problemHeaders(),
+            new HttpHeaders(),
             HttpStatus.INTERNAL_SERVER_ERROR,
             request));
   }
@@ -68,16 +83,20 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
       final HttpHeaders headers,
       final HttpStatusCode status,
       final WebRequest request) {
+    final Locale locale = resolveLocale(request);
     Optional.ofNullable(body)
         .filter(ProblemDetail.class::isInstance)
         .map(ProblemDetail.class::cast)
-        .ifPresent(ApiProblemDetails::normalize);
-    return super.createResponseEntity(body, headers, status, request);
+        .ifPresent(problem -> problemDetails.normalize(problem, status, locale));
+    return super.createResponseEntity(
+        body, ApiProblemDetails.responseHeaders(headers, locale), status, request);
   }
 
-  private static HttpHeaders problemHeaders() {
-    final HttpHeaders headers = new HttpHeaders();
-    headers.setContentType(MediaType.APPLICATION_PROBLEM_JSON);
-    return headers;
+  private static Locale resolveLocale(final WebRequest request) {
+    if (request instanceof ServletWebRequest servletWebRequest) {
+      final HttpServletRequest servletRequest = servletWebRequest.getRequest();
+      return LocaleSupport.resolve(servletRequest);
+    }
+    return LocaleSupport.defaultLocale();
   }
 }

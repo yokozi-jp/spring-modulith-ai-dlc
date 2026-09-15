@@ -28,6 +28,8 @@ Alternatives Considered / References の構成）。
 - **ADR-012**：プロパティベーステストとミューテーションテストを採用する（Proposed, 2026-09-14）
 - **ADR-013**：HTTP API 契約を標準化する（Accepted, 2026-09-14）
 - **ADR-014**：SPA とバックエンドを同一オリジンで公開する（Accepted, 2026-09-14）
+- **ADR-015**：可観測性データを構造化し保護する（Proposed, 2026-09-15）
+- **ADR-016**：API と SPA のメッセージをローカライズする（Proposed, 2026-09-15）
 
 ## 運用
 
