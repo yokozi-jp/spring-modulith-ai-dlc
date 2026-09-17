@@ -30,7 +30,7 @@ services:
     restart: unless-stopped
 
   keycloak:
-    image: quay.io/keycloak/keycloak:26.7.3@sha256:ff4257d0d64efbe99ed1ddfaf07765cc3c36dc7518bf8324d41961327f441c54
+    image: quay.io/keycloak/keycloak:26.7.4@sha256:82a77884f3af238beab1e7afd63b5f530e1b5c0590bd7aa60b40a40463e29b2c
     # ローカル専用の使い捨て IdP（本番ではCognitoを使う想定）。127.0.0.1 のみに公開し
     # start-dev で動かすため、管理者資格情報は開発用の admin/admin を直書きする
     # （機密ではなく、上書きの必要もない）。
