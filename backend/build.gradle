@@ -60,7 +60,7 @@ dependencies {
 
     // --- API ドキュメント（OpenAPI / Swagger UI）---
     // springdoc 3.x が Spring Boot 4 系対応（2.x は Boot 3 系）。
-    implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:3.1.0'
+    implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:3.1.1'
 
     // --- セキュリティ ---
     implementation 'org.springframework.boot:spring-boot-starter-security'
