@@ -12,6 +12,13 @@ updates:
     # 新しいリリースを取り込むまで最低 7 日待つ（リリース直後の不正パッケージ対策）
     cooldown:
       default-days: 7
+    # patch と minor は 1 PR にまとめる。major は破壊的変更の可能性があるため
+    # グループから外し、従来どおり個別 PR で人が判断する。
+    groups:
+      minor-and-patch:
+        update-types:
+          - "minor"
+          - "patch"
     ignore:
       # opentelemetry-logback-appender-1.0 は Spring Boot が管理する OpenTelemetry
       # コア（現状 1.62.0）と歩調を合わせる必要がある。Boot の管理コアより先行して
@@ -28,6 +35,12 @@ updates:
     # 新しいリリースを取り込むまで最低 7 日待つ（リリース直後の不正パッケージ対策）
     cooldown:
       default-days: 7
+    # patch と minor は 1 PR にまとめる。major は個別 PR で人が判断する。
+    groups:
+      minor-and-patch:
+        update-types:
+          - "minor"
+          - "patch"
 
   # GitHub Actions のワークフローで使うアクションのバージョン更新。
   - package-ecosystem: "github-actions"
@@ -37,6 +50,12 @@ updates:
     # 新しいリリースを取り込むまで最低 7 日待つ（リリース直後の不正パッケージ対策）
     cooldown:
       default-days: 7
+    # patch と minor は 1 PR にまとめる。major は個別 PR で人が判断する。
+    groups:
+      minor-and-patch:
+        update-types:
+          - "minor"
+          - "patch"
 
   # Dockerfile の FROM イメージのバージョン更新（backend/Dockerfile）。
   - package-ecosystem: "docker"
@@ -46,6 +65,13 @@ updates:
     # 新しいリリースを取り込むまで最低 7 日待つ（リリース直後の不正パッケージ対策）
     cooldown:
       default-days: 7
+    # patch と minor は 1 PR にまとめる。amazoncorretto の major は下の ignore で
+    # 除外済みだが、他イメージの major も個別 PR で人が判断する。
+    groups:
+      minor-and-patch:
+        update-types:
+          - "minor"
+          - "patch"
     ignore:
       # Java は LTS の Corretto 25 に固定する。26 以降は非 LTS のため、
       # メジャー更新（25 → 26 等）は無視し、25 系のマイナー/パッチ更新のみ受け取る。
@@ -61,3 +87,9 @@ updates:
     # 新しいリリースを取り込むまで最低 7 日待つ（リリース直後の不正パッケージ対策）
     cooldown:
       default-days: 7
+    # patch と minor は 1 PR にまとめる。major は個別 PR で人が判断する。
+    groups:
+      minor-and-patch:
+        update-types:
+          - "minor"
+          - "patch"
