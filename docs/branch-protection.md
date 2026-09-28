@@ -38,7 +38,7 @@ Pull Request の作成者は自分の変更を承認できないため、コー�
 
 ## 常時必須にするステータスチェック
 
-次のジョブはすべての Pull Request で起動するため、ruleset の required status checks に正確な名前で登録する。
+次のジョブはすべての Pull Request で check run を報告するため、ruleset の required status checks に正確な名前で登録する。
 
 - `Run betterleaks 🔐`
 - `Run Semgrep 🔎`
@@ -46,6 +46,21 @@ Pull Request の作成者は自分の変更を承認できないため、コー�
 - `Trivy scan (backend) 🛡️`
 - `Run zizmor 🌈`
 - `Validate PR title`
+- `Detect backend changes`
+- `Detect docker changes`
+- `Lint (Spotless + PMD + SpotBugs) ☕`
+- `Test & Coverage ☕`
+- `Run hadolint 🐳`
+- `Run docker build --check 🐳`
+- `Build and test backend image 🐳`
+
+backend と Docker の workflow は Pull Request ごとに変更対象を検出する。
+
+関連パスを変更していない場合、重い検査ジョブはジョブ単位で `skipped` を報告し、GitHub は required status check を満たしたものとして扱う。
+
+変更検知ジョブ、hadolint、`docker build --check` も必須にする。
+
+検知ジョブやイメージビルドの前段が失敗した場合、後続ジョブが `skipped` になっても前段の失敗によってマージを止めるためである。
 
 Semgrep と Trivy は現在、検出結果を SARIF へ送ってもジョブ自体を失敗させない。
 
@@ -55,19 +70,23 @@ Security タブの未解決結果はレビュー時に確認し、受容する�
 
 ## 変更対象に応じて必須となるチェック
 
-次のジョブは path filter を持つため、該当ファイルを変更した Pull Request で実行結果を確認する。
+次のジョブは workflow レベルの path filter を持つため、該当ファイルを変更した Pull Request で実行結果を確認する。
 
-- backend：`Lint (Spotless + PMD + SpotBugs) ☕`、`Test & Coverage ☕`
 - GitHub Actions：`actionlint`
 - Markdown：`Run markdownlint-cli2 📝`
 - Compose：`Run docker compose config 🐳`
-- Docker：`Run hadolint 🐳`、`Run docker build --check 🐳`、`Build and test backend image 🐳`
 
 path filter によって workflow 自体が作られない Pull Request では、これらの check run も存在しない。
 
 そのまま全 Pull Request の required status checks に登録すると、対象外の変更が待機状態のまま merge できなくなるため、常時必須の一覧には加えない。
 
-将来これらを ruleset で常時必須にする場合は、変更対象外でも成功または neutral を返す集約ジョブへ先に変更する。
+## 条件付きチェックを必須化する順序
+
+Pull Request #67 を `main` へマージし、backend と Docker の workflow がすべての Pull Request で check run を報告できる状態にする。
+
+その後、変更検知二件、backend CI 二件、Docker CI 三件を ruleset へ追加する。
+
+先に ruleset を更新すると、パスフィルタが残る古い `main` を基準にした Pull Request で check run が生成されず、必須チェックが "Expected" のまま残る可能性がある。
 
 ## その他の推奨設定
 
