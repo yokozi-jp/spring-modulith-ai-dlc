@@ -52,7 +52,7 @@ RUN java -Djarmode=tools -jar build/libs/app.jar \
 # -----------------------------------------------------------------------------
 # Stage 2: 実行（headless JRE）
 # -----------------------------------------------------------------------------
-FROM amazoncorretto:25-headless@sha256:770e291fe5d1bc20254c49489a6762095fa93937c11fa5e7408c3a3e4e04931e AS runtime
+FROM amazoncorretto:25-headless@sha256:03135c74260b73f04b55ee8f6fa7e8e4415348b43479ebfa4125ac6443ec9e71 AS runtime
 
 WORKDIR /app
 
