@@ -43,6 +43,7 @@ jobs:
 
       - name: Detect changed paths
         id: filter
+        shell: bash
         env:
           EVENT_NAME: ${{ github.event_name }}
           BASE_REF: ${{ github.event.pull_request.base.ref }}
@@ -51,10 +52,16 @@ jobs:
             echo "backend=true" >> "$GITHUB_OUTPUT"
             exit 0
           fi
-          git fetch --no-tags --depth=1 origin "$BASE_REF"
+          # fetch-depth: 0 で取得済みの base と比較する。差分取得に失敗した場合は
+          # CI を実行する側へ倒し、検出失敗をテストのスキップとして扱わない。
+          if ! changed_files="$(git diff --name-only "origin/${BASE_REF}...HEAD")"; then
+            echo "差分取得に失敗したためバックエンド CI を実行します。" >&2
+            echo "backend=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
           # backend-ci.yml の push パスフィルタと同じ集合で判定する。
-          if git diff --name-only "origin/${BASE_REF}...HEAD" \
-            | grep -Eq '^(backend/|docker/initdb/|\.spectral\.yaml$|docker/compose-test\.yml$|\.env\.test$|Taskfile\.yml$|\.github/workflows/backend-ci\.yml$)'; then
+          if grep -Eq '^(backend/|docker/initdb/|\.spectral\.yaml$|docker/compose-test\.yml$|\.env\.test$|Taskfile\.yml$|\.github/workflows/backend-ci\.yml$)' \
+            <<< "$changed_files"; then
             echo "backend=true" >> "$GITHUB_OUTPUT"
           else
             echo "backend=false" >> "$GITHUB_OUTPUT"

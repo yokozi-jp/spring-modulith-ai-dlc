@@ -28,13 +28,13 @@ Dependabot は既定で、更新可能な依存ごとに個別の Pull Request �
 
 グループ化は gradle、npm、github-actions、docker、docker-compose の五エコシステムすべてに適用する。既存の cooldown、OpenTelemetry の pin、amazoncorretto の major 無視は変更しない。
 
-加えて、patch と minor の Dependabot Pull Request に auto-merge を設定する。GitHub Actions ワークフロー（`dependabot-auto-merge.yml`）が、Dependabot が作成した Pull Request のうち `dependabot/fetch-metadata` の `update-type` が `version-update:semver-major` でないものに `gh pr merge --squash --auto` を実行し、必須チェックがすべて通った時点で GitHub に squash マージさせる。`fetch-metadata` の `update-type` はその Pull Request が行う最も高い semver 変更を返すため、グループ Pull Request に major が一つでも混じれば major と判定され、auto-merge の対象から外れる。major はグループ外の個別 Pull Request として出るため、いずれの経路でも major は人が判断する。
+加えて、patch と minor の Dependabot Pull Request に auto-merge を設定する。GitHub Actions ワークフロー（`dependabot-auto-merge.yml`）が、Dependabot が作成した Pull Request のうち `dependabot/fetch-metadata` の `update-type` が `version-update:semver-patch` または `version-update:semver-minor` のものに限って `gh pr merge --squash --auto` を実行し、必須チェックがすべて通った時点で GitHub に squash マージさせる。`fetch-metadata` が更新種別を判定できない場合や、タグを変えずダイジェストだけを更新する場合は auto-merge せず、人が判断する。major もグループ外の個別 Pull Request として出るため、人が判断する。
 
 リポジトリ設定で auto-merge を許可する（`allow_auto_merge: true`）。この設定は可逆で、無効化すればワークフローの `--auto` は失敗するだけで既存 Pull Request の状態は変わらない。
 
-auto-merge は必須チェックが通った時点でマージするため、必須チェックの集合が auto-merge の安全性を決める。従来の必須チェックはセキュリティスキャン（betterleaks、Semgrep、Trivy、zizmor）と PR タイトル検証だけで、バックエンドの動作を検証する Test & Coverage、静的解析、イメージビルドは含まれていなかった。そこで、`Test & Coverage ☕`、`Lint (Spotless + PMD + SpotBugs) ☕`、`Build and test backend image 🐳` を必須チェックに追加し、テストが拾う退行が無人でマージされる穴を塞ぐ。
+auto-merge は必須チェックが通った時点でマージするため、必須チェックの集合が auto-merge の安全性を決める。現在の ruleset が要求するのは、セキュリティスキャン（betterleaks、Semgrep、Trivy、zizmor）と PR タイトル検証の六件である。Pull Request #67 を `main` へマージして条件付きチェックを常に報告できる workflow を先に反映した後、`Detect backend changes`、`Detect docker changes`、`Test & Coverage ☕`、`Lint (Spotless + PMD + SpotBugs) ☕`、`Build and test backend image 🐳` の五件を ruleset の必須チェックへ追加する。変更検知自体も必須にすることで、検知ジョブが失敗して後続の重いジョブが `skipped` になった場合に、失敗を素通りさせない。
 
-これらのバックエンド CI ジョブは backend 関連パスを触る Pull Request でのみ実行する重いジョブである。ジョブを走らせる workflow を Pull Request のパスフィルタでスキップすると、GitHub は check run を生成せず、必須チェックが "Expected" のまま Pull Request が恒久的にマージ不能になる。これを避けるため、Pull Request では workflow のパスフィルタを外して常に起動し、workflow 内の変更検知ジョブ（base との `git diff`）が backend 変更の有無を出力し、各重いジョブを `if` 条件で実行する。ジョブレベルの `if` でスキップされたジョブは `skipped` の結論を持つ check run を生成し、GitHub のブランチ保護はこれを success と同様に満たされたものとして扱う。`main` への push では従来どおりパスフィルタで無関係な実行を抑える。
+これらのバックエンド CI ジョブは backend 関連パスを触る Pull Request でのみ実行する重いジョブである。ジョブを走らせる workflow を Pull Request のパスフィルタでスキップすると、GitHub は check run を生成せず、必須チェックが "Expected" のまま Pull Request が恒久的にマージ不能になる。これを避けるため、Pull Request では workflow のパスフィルタを外して常に起動し、workflow 内の変更検知ジョブが `fetch-depth: 0` で取得済みの base と `HEAD` の差分を判定して、各重いジョブを `if` 条件で実行する。差分取得に失敗した場合は backend または docker の変更ありとして重いジョブを実行し、安全側へ倒す。ジョブレベルの `if` でスキップされたジョブは `skipped` の結論を持つ check run を生成し、GitHub のブランチ保護はこれを success と同様に満たされたものとして扱う。`main` への push では従来どおりパスフィルタで無関係な実行を抑える。
 
 ## Consequences
 
@@ -44,19 +44,21 @@ auto-merge は必須チェックが通った時点でマージするため、必
 - 関連する依存の minor/patch を一件のまとめた変更として確認でき、レビューと必須チェックの重複実行が減る。
 - major 更新は個別のまま残るため、破壊的変更を見落とさずに判断できる。
 - patch/minor のマージ操作が無人化され、必須チェック通過後の手作業が消える。
-- backend の Test & Coverage・静的解析・イメージビルドが必須チェックになり、テストが拾う退行は auto-merge でも人手マージでも `main` に入る前に止まる。
+- backend の Test & Coverage、静的解析、イメージビルドが必須チェックになり、テストが拾う退行は auto-merge でも人手マージでも `main` に入る前に止まる。
 
 ### Negative
 
 - 一件の Pull Request に複数の依存更新が混ざるため、どの更新が特定の問題を招いたかの切り分けは、個別 Pull Request のときより手間が増える。
 - グループ内のいずれか一つの更新が必須チェックを落とすと、その Pull Request 全体がマージできず、健全な更新の取り込みも足止めされる。
-- auto-merge は必須チェックが緑なら人の確認なしにマージする。この退行検知の穴を塞ぐため Test & Coverage・静的解析・イメージビルドを必須チェックに加えたが、必須チェックが検証しない性質（実行時の性能劣化、テストが網羅しない経路の挙動など）は依然として無人で `main` に入りうる。
+- auto-merge は必須チェックが緑なら人の確認なしにマージする。この退行検知の穴を塞ぐため Test & Coverage、静的解析、イメージビルドを必須チェックに加えるが、必須チェックが検証しない性質（実行時の性能劣化、テストが網羅しない経路の挙動など）は依然として無人で `main` に入りうる。
 - サプライチェーン経由の悪性更新を人の確認なしに取り込む窓が開く。cooldown（7 日）とセキュリティスキャン必須で窓は狭いが、スキャナが検知できない変更は通りうる。
 - backend 非依存の Pull Request では必須のバックエンド CI が `skipped` になり success 扱いとなる。変更検知の `git diff` パターンが実際の依存範囲より狭いと、本来テストすべき変更を skip したまま通す誤りが起こりうるため、パターンは push 側のパスフィルタと同一集合に保つ。
+- `GITHUB_TOKEN` が直接起こした push は後続の GitHub Actions workflow を起動しない。`gh pr merge --auto` は native auto-merge を有効化して後から GitHub がマージするため、この制限がマージ時の push にも適用されるかは公式文書だけでは確定できない。初回の自動マージで `main` の push workflow を実測し、起動しない場合は release-please が次の `main` push まで遅延することを受け入れるか、GitHub App installation token へ切り替える。
 
 ### Neutral
 
-- この変更は `main` にマージされて初めて有効になる。反映後の weekly 実行、または手動の "Check for updates" で、既存の個別 Pull Request がグループ Pull Request へ再編成され、古い個別 Pull Request は Dependabot が自動でクローズする。
+- `minor-and-patch` のグループ設定は `main` に反映済みである。auto-merge と条件付き必須チェックの workflow は Pull Request #67 のマージで有効になる。
+- Pull Request #67 のマージ後に ruleset を更新するまで、変更検知二件とバックエンド CI 三件は必須チェックではない。先に ruleset を更新すると、パスフィルタが残る古い `main` を基準にした Pull Request で check run が生成されず、"Expected" のままマージ不能になりうるため、この順序を守る。
 - グループ化しても厳格モードの out-of-date 判定自体は消えない。本数を減らして緩和するだけであり、更新の連鎖を完全に無くすにはマージキュー等の別の手段が要る（この決定の対象外）。
 - auto-merge を設定しても、厳格モード下では out-of-date になった Pull Request のブランチは自動更新されない。base が進むと auto-merge は発火せず滞留しうる。滞留の解消（ブランチ自動更新やマージキュー）はこの決定の対象外とする。
 
@@ -91,4 +93,5 @@ auto-merge は必須チェックが通った時点でマージするため、必
 - [`.github/workflows/backend-ci.yml`](../../.github/workflows/backend-ci.yml)
 - [`.github/workflows/hadolint.yml`](../../.github/workflows/hadolint.yml)
 - [GitHub Docs: Troubleshooting required status checks（skipped は success 扱い）](https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/managing-protected-branches/troubleshooting-required-status-checks)
+- [GitHub Docs: Triggering a workflow（`GITHUB_TOKEN` による再帰実行の抑止）](https://docs.github.com/en/actions/using-workflows/triggering-a-workflow)
 - [dependabot/fetch-metadata](https://github.com/dependabot/fetch-metadata)

@@ -29,10 +29,12 @@ jobs:
         id: meta
         uses: dependabot/fetch-metadata@25dd0e34f4fe68f24cc83900b1fe3fe149efef98 # v3.1.0
 
-      # patch と minor だけを auto-merge の対象にする。major は除外し、
-      # グループ更新（複数依存をまとめた PR）は最上位の更新種別で判定する。
+      # patch と minor だけを許可リストで auto-merge の対象にする。
+      # 判定不能なバージョンやダイジェストのみの更新は人の判断に回す。
       - name: Enable auto-merge for patch/minor
-        if: steps.meta.outputs.update-type != 'version-update:semver-major'
+        if: >-
+          steps.meta.outputs.update-type == 'version-update:semver-patch' ||
+          steps.meta.outputs.update-type == 'version-update:semver-minor'
         env:
           PR_URL: ${{ github.event.pull_request.html_url }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
