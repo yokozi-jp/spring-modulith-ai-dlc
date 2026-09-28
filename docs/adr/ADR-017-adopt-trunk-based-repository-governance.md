@@ -16,6 +16,8 @@ Proposed
 
 `main` への直接 push を許すと、レビューと既存の CI を通らない変更を防げない。
 
+リポジトリのセキュリティ状態を集約スコアで評価しても、個別の変更に含まれる問題を理由としてマージを止めることはできない。秘密情報、コード、依存関係、GitHub Actions は、それぞれの問題を直接検出する検査で保護する必要がある。
+
 CODEOWNERS に利用できることをリポジトリから確認できた所有者は `@yokozi-jp` だけであり、未作成のチームを所有者として指定するとレビュー要求が機能しない。
 
 ## Decision
@@ -25,6 +27,8 @@ CODEOWNERS に利用できることをリポジトリから確認できた所有
 変更は最新の `main` から作った短命な作業ブランチで行い、Pull Request を経て squash merge する。
 
 GitHub ruleset で `main` への直接 push、force push、削除を禁止し、一件以上の承認、コード所有者の承認、会話の解決、必須チェックの成功、linear history を要求する。
+
+セキュリティは、betterleaks、Semgrep、Trivy、zizmor、CodeQL のように対象の問題を直接検出する検査で担保する。外部サービスによるリポジトリの集約スコアは定期実行せず、README に公開スコアのバッジを表示しない。
 
 Pull Request のタイトルを squash commit の Conventional Commit メッセージとして扱う。
 
@@ -39,6 +43,7 @@ CODEOWNERS は backend、frontend、docker と infrastructure、`.kiro` と `aid
 ### Positive
 
 - すべての変更がレビューと CI を通り、`main` を常に統合可能な状態へ保ちやすくなる。
+- セキュリティ上の問題を対象別の検査で直接検出し、外部の集約スコアやバッジの可用性へ依存しない。
 - ファイル境界ごとのレビュー責任が CODEOWNERS から判別できる。
 - Pull Request のテンプレートによって変更内容、検証結果、ブロッカーをリリース前に確認できる。
 - 脆弱性の詳細を公開せずに報告できる。
@@ -48,6 +53,7 @@ CODEOWNERS は backend、frontend、docker と infrastructure、`.kiro` と `aid
 - GitHub ruleset と Private Vulnerability Reporting は、リポジトリ管理者が GitHub 側でも有効化する必要がある。
 - 所有者が一名の間は領域別ルールを分けても職務分離にならず、その所有者が不在だとレビューが止まる。
 - squash merge では作業ブランチ上の個々のコミット履歴が `main` に残らない。
+- リポジトリ運用を横断して採点する外部サービスを使わないため、集約評価の推移と公開バッジは得られない。
 
 ### Neutral
 
@@ -55,6 +61,12 @@ CODEOWNERS は backend、frontend、docker と infrastructure、`.kiro` と `aid
 - パス条件付きの CI は変更が該当するときだけ実行されるため、ruleset の常時必須チェックと条件付き品質ゲートを分けて管理する。
 
 ## Alternatives Considered
+
+### OpenSSF Scorecard を定期実行して公開する
+
+- **Description**：`main` への push と週次スケジュールでリポジトリを採点し、SARIF と公開バッジを生成する。
+- **Pros**：リポジトリ運用上の弱点を横断的に確認でき、外部の閲覧者にも評価を示せる。
+- **Cons**：個別の変更を理由としてマージを止める品質ゲートにはならず、定期 workflow、書き込み権限、外部公開を保守する必要がある。
 
 ### Git Flow
 
