@@ -34,7 +34,7 @@ Alternatives Considered / References の構成）。
 - **ADR-018**：release-please でセマンティックリリースを自動化する（Proposed, 2026-09-15）
 - **ADR-019**：外部連携の耐障害性と容量制御を標準化する（Proposed, 2026-09-15）
 - **ADR-020**：コンテナイメージを署名し provenance を検証する（Proposed, 2026-09-15）
-- **ADR-021**：Dependabot の minor/patch 更新をグループ化する（Proposed, 2026-09-29）
+- **ADR-021**：Dependabot の minor/patch 更新をグループ化し auto-merge する（Proposed, 2026-09-29）
 
 ## 運用
 
