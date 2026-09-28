@@ -32,6 +32,10 @@ Dependabot は既定で、更新可能な依存ごとに個別の Pull Request �
 
 リポジトリ設定で auto-merge を許可する（`allow_auto_merge: true`）。この設定は可逆で、無効化すればワークフローの `--auto` は失敗するだけで既存 Pull Request の状態は変わらない。
 
+auto-merge は必須チェックが通った時点でマージするため、必須チェックの集合が auto-merge の安全性を決める。従来の必須チェックはセキュリティスキャン（betterleaks、Semgrep、Trivy、zizmor）と PR タイトル検証だけで、バックエンドの動作を検証する Test & Coverage、静的解析、イメージビルドは含まれていなかった。そこで、`Test & Coverage ☕`、`Lint (Spotless + PMD + SpotBugs) ☕`、`Build and test backend image 🐳` を必須チェックに追加し、テストが拾う退行が無人でマージされる穴を塞ぐ。
+
+これらのバックエンド CI ジョブは backend 関連パスを触る Pull Request でのみ実行する重いジョブである。ジョブを走らせる workflow を Pull Request のパスフィルタでスキップすると、GitHub は check run を生成せず、必須チェックが "Expected" のまま Pull Request が恒久的にマージ不能になる。これを避けるため、Pull Request では workflow のパスフィルタを外して常に起動し、workflow 内の変更検知ジョブ（base との `git diff`）が backend 変更の有無を出力し、各重いジョブを `if` 条件で実行する。ジョブレベルの `if` でスキップされたジョブは `skipped` の結論を持つ check run を生成し、GitHub のブランチ保護はこれを success と同様に満たされたものとして扱う。`main` への push では従来どおりパスフィルタで無関係な実行を抑える。
+
 ## Consequences
 
 ### Positive
@@ -40,13 +44,15 @@ Dependabot は既定で、更新可能な依存ごとに個別の Pull Request �
 - 関連する依存の minor/patch を一件のまとめた変更として確認でき、レビューと必須チェックの重複実行が減る。
 - major 更新は個別のまま残るため、破壊的変更を見落とさずに判断できる。
 - patch/minor のマージ操作が無人化され、必須チェック通過後の手作業が消える。
+- backend の Test & Coverage・静的解析・イメージビルドが必須チェックになり、テストが拾う退行は auto-merge でも人手マージでも `main` に入る前に止まる。
 
 ### Negative
 
 - 一件の Pull Request に複数の依存更新が混ざるため、どの更新が特定の問題を招いたかの切り分けは、個別 Pull Request のときより手間が増える。
 - グループ内のいずれか一つの更新が必須チェックを落とすと、その Pull Request 全体がマージできず、健全な更新の取り込みも足止めされる。
-- auto-merge は必須チェックが緑なら人の確認なしにマージする。現在の必須チェックはセキュリティスキャン（betterleaks、Semgrep、Trivy、zizmor）と PR タイトル検証であり、バックエンドの Test & Coverage やイメージビルドは必須チェックに含まれていない。したがって、テストが拾う種類の退行を無人で `main` に入れる穴が残る。テストを必須チェックへ加えるかは別途の判断とする。
+- auto-merge は必須チェックが緑なら人の確認なしにマージする。この退行検知の穴を塞ぐため Test & Coverage・静的解析・イメージビルドを必須チェックに加えたが、必須チェックが検証しない性質（実行時の性能劣化、テストが網羅しない経路の挙動など）は依然として無人で `main` に入りうる。
 - サプライチェーン経由の悪性更新を人の確認なしに取り込む窓が開く。cooldown（7 日）とセキュリティスキャン必須で窓は狭いが、スキャナが検知できない変更は通りうる。
+- backend 非依存の Pull Request では必須のバックエンド CI が `skipped` になり success 扱いとなる。変更検知の `git diff` パターンが実際の依存範囲より狭いと、本来テストすべき変更を skip したまま通す誤りが起こりうるため、パターンは push 側のパスフィルタと同一集合に保つ。
 
 ### Neutral
 
@@ -82,4 +88,7 @@ Dependabot は既定で、更新可能な依存ごとに個別の Pull Request �
 - [ADR-017: トランクベース開発とリポジトリ保護を採用する](./ADR-017-adopt-trunk-based-repository-governance.md)
 - [`.github/dependabot.yml`](../../.github/dependabot.yml)
 - [`.github/workflows/dependabot-auto-merge.yml`](../../.github/workflows/dependabot-auto-merge.yml)
+- [`.github/workflows/backend-ci.yml`](../../.github/workflows/backend-ci.yml)
+- [`.github/workflows/hadolint.yml`](../../.github/workflows/hadolint.yml)
+- [GitHub Docs: Troubleshooting required status checks（skipped は success 扱い）](https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/managing-protected-branches/troubleshooting-required-status-checks)
 - [dependabot/fetch-metadata](https://github.com/dependabot/fetch-metadata)
