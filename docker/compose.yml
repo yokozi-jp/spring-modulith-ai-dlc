@@ -2,7 +2,7 @@ name: spring-modulith-local
 
 services:
   postgres:
-    image: postgres:18.6-alpine3.23@sha256:697c180dbf244d3ce4a8f4cbc0156cde840af055c1bf8b76aebe422a4822086f
+    image: postgres:18.6-alpine3.23@sha256:885cf05d376c7cf27afef02073e6bdac3841252537f16e244fd1c1e6a7c99fb1
     command: ["postgres", "-c", "timezone=UTC", "-c", "log_timezone=UTC"]
     environment:
       POSTGRES_DB: ${DB_NAME:?DB_NAME is required}
@@ -63,7 +63,7 @@ services:
     restart: unless-stopped
 
   redis:
-    image: redis:8.10.1-alpine3.23@sha256:becdda6c7f4b3fb42e42fd7f120bbf5c54c4caaaf16f26da24e4563d2c1f0576
+    image: redis:8.10.1-alpine3.23@sha256:ef216d85ec44f4fdf7c0e6df2d1757a4734ed32fbb278cabd3181b5a27353b79
     command: ["redis-server", "--appendonly", "yes"]
     environment:
       TZ: UTC
@@ -80,7 +80,7 @@ services:
     restart: unless-stopped
 
   otel-lgtm:
-    image: grafana/otel-lgtm:0.33.0@sha256:475319e883b66594d1a2f22ef168c2459802bb94548e6f25d9782bd5f5c19a3a
+    image: grafana/otel-lgtm:0.33.1@sha256:d6c52678ab5b7144f27ae569fd778608121c0f4a10eb411983750a0d67c1fbe3
     entrypoint:
       - /bin/bash
       - -ec

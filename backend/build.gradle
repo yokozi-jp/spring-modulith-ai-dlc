@@ -60,7 +60,7 @@ dependencies {
 
     // --- API ドキュメント（OpenAPI / Swagger UI）---
     // springdoc 3.x が Spring Boot 4 系対応（2.x は Boot 3 系）。
-    implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:3.1.0'
+    implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:3.1.1'
 
     // --- セキュリティ ---
     implementation 'org.springframework.boot:spring-boot-starter-security'
@@ -127,11 +127,11 @@ dependencyManagement {
         // --- 脆弱性対応（推移的依存のバージョン強制） ---
         // Spring Boot 4.1.1 BOM が引く Tomcat に認証バイパス等の CVE が判明したため上書き。
         // CVE-2026-65182 / CVE-2026-65905 / CVE-2026-68525 対応。
-        dependency 'org.apache.tomcat.embed:tomcat-embed-core:11.0.25'
-        dependency 'org.apache.tomcat.embed:tomcat-embed-el:11.0.25'
-        dependency 'org.apache.tomcat.embed:tomcat-embed-websocket:11.0.25'
+        dependency 'org.apache.tomcat.embed:tomcat-embed-core:11.0.26'
+        dependency 'org.apache.tomcat.embed:tomcat-embed-el:11.0.26'
+        dependency 'org.apache.tomcat.embed:tomcat-embed-websocket:11.0.26'
         // CVE-2026-0636（LDAP インジェクション）対応。
-        dependency 'org.bouncycastle:bcprov-jdk18on:1.85.2'
+        dependency 'org.bouncycastle:bcprov-jdk18on:1.86'
     }
 }
 
