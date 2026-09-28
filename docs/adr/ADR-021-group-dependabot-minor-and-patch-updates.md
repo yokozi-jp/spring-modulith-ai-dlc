@@ -1,4 +1,4 @@
-# ADR-021: Dependabot の minor/patch 更新をグループ化する
+# ADR-021: Dependabot の minor/patch 更新をグループ化し auto-merge する
 
 ## Status
 
@@ -28,7 +28,9 @@ Dependabot は既定で、更新可能な依存ごとに個別の Pull Request �
 
 グループ化は gradle、npm、github-actions、docker、docker-compose の五エコシステムすべてに適用する。既存の cooldown、OpenTelemetry の pin、amazoncorretto の major 無視は変更しない。
 
-自動マージ（auto-merge）は、この決定では採用しない。グループ化で Pull Request の本数を減らすことのみを対象とし、マージ自体は引き続き人が実行する。
+加えて、patch と minor の Dependabot Pull Request に auto-merge を設定する。GitHub Actions ワークフロー（`dependabot-auto-merge.yml`）が、Dependabot が作成した Pull Request のうち `dependabot/fetch-metadata` の `update-type` が `version-update:semver-major` でないものに `gh pr merge --squash --auto` を実行し、必須チェックがすべて通った時点で GitHub に squash マージさせる。`fetch-metadata` の `update-type` はその Pull Request が行う最も高い semver 変更を返すため、グループ Pull Request に major が一つでも混じれば major と判定され、auto-merge の対象から外れる。major はグループ外の個別 Pull Request として出るため、いずれの経路でも major は人が判断する。
+
+リポジトリ設定で auto-merge を許可する（`allow_auto_merge: true`）。この設定は可逆で、無効化すればワークフローの `--auto` は失敗するだけで既存 Pull Request の状態は変わらない。
 
 ## Consequences
 
@@ -37,16 +39,20 @@ Dependabot は既定で、更新可能な依存ごとに個別の Pull Request �
 - 毎週開く Dependabot Pull Request の本数が減り、厳格モード下の rebase cascade でさばく対象が減る。
 - 関連する依存の minor/patch を一件のまとめた変更として確認でき、レビューと必須チェックの重複実行が減る。
 - major 更新は個別のまま残るため、破壊的変更を見落とさずに判断できる。
+- patch/minor のマージ操作が無人化され、必須チェック通過後の手作業が消える。
 
 ### Negative
 
 - 一件の Pull Request に複数の依存更新が混ざるため、どの更新が特定の問題を招いたかの切り分けは、個別 Pull Request のときより手間が増える。
 - グループ内のいずれか一つの更新が必須チェックを落とすと、その Pull Request 全体がマージできず、健全な更新の取り込みも足止めされる。
+- auto-merge は必須チェックが緑なら人の確認なしにマージする。現在の必須チェックはセキュリティスキャン（betterleaks、Semgrep、Trivy、zizmor）と PR タイトル検証であり、バックエンドの Test & Coverage やイメージビルドは必須チェックに含まれていない。したがって、テストが拾う種類の退行を無人で `main` に入れる穴が残る。テストを必須チェックへ加えるかは別途の判断とする。
+- サプライチェーン経由の悪性更新を人の確認なしに取り込む窓が開く。cooldown（7 日）とセキュリティスキャン必須で窓は狭いが、スキャナが検知できない変更は通りうる。
 
 ### Neutral
 
 - この変更は `main` にマージされて初めて有効になる。反映後の weekly 実行、または手動の "Check for updates" で、既存の個別 Pull Request がグループ Pull Request へ再編成され、古い個別 Pull Request は Dependabot が自動でクローズする。
 - グループ化しても厳格モードの out-of-date 判定自体は消えない。本数を減らして緩和するだけであり、更新の連鎖を完全に無くすにはマージキュー等の別の手段が要る（この決定の対象外）。
+- auto-merge を設定しても、厳格モード下では out-of-date になった Pull Request のブランチは自動更新されない。base が進むと auto-merge は発火せず滞留しうる。滞留の解消（ブランチ自動更新やマージキュー）はこの決定の対象外とする。
 
 ## Alternatives Considered
 
@@ -56,11 +62,11 @@ Dependabot は既定で、更新可能な依存ごとに個別の Pull Request �
 - **Pros**：更新の強制がなくなり、rebase cascade が消える。
 - **Cons**：古い `main` に対して通った必須チェックのままマージでき、承認からマージまでに `main` が動いた組み合わせを誰も検証しない。ADR-017 のトランクベースと linear history の意図に反する。
 
-### auto-merge を導入する
+### auto-merge を major にも適用する
 
-- **Description**：minor/patch の Dependabot Pull Request を、必須チェック通過後に自動で squash マージする。
-- **Pros**：マージの手作業自体がなくなる。
-- **Cons**：必須チェックが拾えない退行を無人で `main` に入れる経路になる。厳格モード下では out-of-date になった Pull Request のブランチを自動更新しないため、滞留が残りうる。今回は本数削減を先行させ、採否は別途判断する。
+- **Description**：major を含むすべての Dependabot 更新を auto-merge の対象にする。
+- **Pros**：マージの手作業が完全になくなる。
+- **Cons**：major は破壊的変更を含みうるため、無人でのマージはリスクが高い。patch/minor のみを auto-merge の対象とし、major は人が判断する（採用した Decision のとおり）。
 
 ### マージキュー（merge queue）を導入する
 
@@ -75,3 +81,5 @@ Dependabot は既定で、更新可能な依存ごとに個別の Pull Request �
 - [GitHub Blog: Tame Dependabot — group your updates, slow the cadence, keep security fast](https://github.blog/security/supply-chain-security/tame-dependabot-group-your-updates-slow-the-cadence-keep-security-fast/)
 - [ADR-017: トランクベース開発とリポジトリ保護を採用する](./ADR-017-adopt-trunk-based-repository-governance.md)
 - [`.github/dependabot.yml`](../../.github/dependabot.yml)
+- [`.github/workflows/dependabot-auto-merge.yml`](../../.github/workflows/dependabot-auto-merge.yml)
+- [dependabot/fetch-metadata](https://github.com/dependabot/fetch-metadata)
