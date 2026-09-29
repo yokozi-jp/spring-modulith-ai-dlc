@@ -46,6 +46,8 @@ Pull Request の作成者は自分の変更を承認できないため、コー�
 - `Trivy scan (backend) 🛡️`
 - `Run zizmor 🌈`
 - `Validate PR title`
+- `Detect frontend changes`
+- `Verify frontend`
 - `Detect backend changes`
 - `Detect docker changes`
 - `Lint (Spotless + PMD + SpotBugs) ☕`
@@ -54,7 +56,7 @@ Pull Request の作成者は自分の変更を承認できないため、コー�
 - `Run docker build --check 🐳`
 - `Build and test backend image 🐳`
 
-backend と Docker の workflow は Pull Request ごとに変更対象を検出する。
+Frontend、backend、Docker の workflow は Pull Request ごとに変更対象を検出する。
 
 関連パスを変更していない場合、重い検査ジョブはジョブ単位で `skipped` を報告し、GitHub は required status check を満たしたものとして扱う。
 
@@ -87,6 +89,8 @@ Pull Request #67 を `main` へマージし、backend と Docker の workflow �
 その後、変更検知二件、backend CI 二件、Docker CI 三件を ruleset へ追加する。
 
 先に ruleset を更新すると、パスフィルタが残る古い `main` を基準にした Pull Request で check run が生成されず、必須チェックが "Expected" のまま残る可能性がある。
+
+Frontend CIはPull Request #70で `Detect frontend changes` と `Verify frontend` の成功を確認してから、両方をrulesetへ追加する。
 
 ## その他の推奨設定
 
