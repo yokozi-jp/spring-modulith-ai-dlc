@@ -2,6 +2,7 @@
 
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { QueryClient } from "@tanstack/react-query";
 import { createMemoryHistory, createRouter, RouterProvider } from "@tanstack/react-router";
 import { afterEach, describe, expect, it, vi } from "vite-plus/test";
 import { routeTree } from "../routeTree.gen";
@@ -21,6 +22,7 @@ describe("home route", () => {
     const router = createRouter({
       history: createMemoryHistory({ initialEntries: ["/"] }),
       routeTree,
+      context: { queryClient: new QueryClient() },
     });
     const user = userEvent.setup();
 

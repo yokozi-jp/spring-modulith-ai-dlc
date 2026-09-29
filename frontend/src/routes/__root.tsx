@@ -1,3 +1,5 @@
-import { createRootRoute } from "@tanstack/react-router";
+import type { QueryClient } from "@tanstack/react-query";
+import { createRootRouteWithContext } from "@tanstack/react-router";
 
-export const Route = createRootRoute();
+// loaderから queryClient.ensureQueryData などを呼べるよう、ルーターのcontextで受け渡す。
+export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()();
