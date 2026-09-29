@@ -1,3 +1,5 @@
+import { tanstackRouter } from "@tanstack/router-plugin/vite";
+import react from "@vitejs/plugin-react";
 import { defineConfig } from "vite-plus";
 
 const contentSecurityPolicy =
@@ -12,8 +14,10 @@ const securityHeaders = {
 };
 
 export default defineConfig(({ mode }) => ({
-  fmt: {},
+  plugins: [tanstackRouter({ target: "react" }), react()],
+  fmt: { ignorePatterns: ["src/routeTree.gen.ts"] },
   lint: {
+    ignorePatterns: ["src/routeTree.gen.ts"],
     jsPlugins: [{ name: "vite-plus", specifier: "vite-plus/oxlint-plugin" }],
     rules: { "vite-plus/prefer-vite-plus-imports": "error" },
     options: { typeAware: true, typeCheck: true },

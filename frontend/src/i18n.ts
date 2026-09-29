@@ -21,7 +21,7 @@ const catalog: Record<Locale, Messages> = {
   ja: {
     title: "デモアプリケーション",
     heading: "はじめる",
-    intro: "src/main.ts を編集して保存すると、HMR の動作を確認できます。",
+    intro: "src/routes/index.tsx を編集して保存すると、HMR の動作を確認できます。",
     documentationHeading: "ドキュメント",
     documentationLead: "開発に必要な情報を確認できます。",
     exploreVite: "Vite を調べる",
@@ -33,7 +33,7 @@ const catalog: Record<Locale, Messages> = {
   en: {
     title: "Demo application",
     heading: "Get started",
-    intro: "Edit src/main.ts and save to test HMR.",
+    intro: "Edit src/routes/index.tsx and save to test HMR.",
     documentationHeading: "Documentation",
     documentationLead: "Find the information needed for development.",
     exploreVite: "Explore Vite",
