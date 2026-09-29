@@ -16,9 +16,8 @@ const securityHeaders = {
 
 export default defineConfig(({ mode }) => ({
   plugins: [tanstackRouter({ target: "react" }), react({ compiler: true }), tailwindcss()],
-  resolve: {
-    alias: { "@": new URL("./src", import.meta.url).pathname },
-  },
+  // エイリアスの正本は tsconfig.json の paths とする。
+  resolve: { tsconfigPaths: true },
   test: {
     coverage: {
       provider: "v8",
