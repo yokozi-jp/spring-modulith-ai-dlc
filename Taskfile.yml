@@ -165,7 +165,7 @@ tasks:
     desc: React固有の問題をReact Doctorで診断
     dir: frontend
     cmds:
-      - vp exec react-doctor . --yes --no-supply-chain --no-telemetry --blocking error --no-color --max-duration 300
+      - timeout 300s vp exec react-doctor . --yes --no-supply-chain --no-telemetry --blocking error --no-color
 
   fe-coverage:
     desc: フロントエンドの全体branch coverage 85%を検証

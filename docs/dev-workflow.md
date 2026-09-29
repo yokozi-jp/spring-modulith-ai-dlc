@@ -139,7 +139,7 @@ task compose-reset CONFIRM_RESET=yes   # 全サービスの volume ごと削除�
 - `task check` → `be-lint`
 - `task fe-verify` → `fe-check` ＋ `fe-doctor` ＋ `fe-test-build`
 - `task fe-check` → `vp check`
-- `task fe-doctor` → `react-doctor`（外部通信なし）
+- `task fe-doctor` → `react-doctor`（外部通信なし、5分超過で失敗）
 - `task fe-coverage` → VitestのV8 coverageで全体branch 85%を検証
 - `task fe-test-build` → coverage付き `vp test` ＋ `vp run build`
 - `task verify` → `be-lint` ＋ `test`（`test` は隔離スタック起動＋

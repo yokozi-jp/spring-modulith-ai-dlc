@@ -6,6 +6,12 @@ import { defineConfig } from "vite-plus";
 const contentSecurityPolicy =
   "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; form-action 'self'; script-src 'self'; style-src 'self'; style-src-elem 'self' 'unsafe-inline'; style-src-attr 'none'; img-src 'self' data:; font-src 'self'; connect-src 'self'";
 
+// ponytail: 開発では起動単位でnonceを固定する。本番へ適用するなら配信層でリクエスト単位に生成する。
+const developmentCspNonce = crypto.randomUUID().replaceAll("-", "");
+const developmentContentSecurityPolicy = contentSecurityPolicy
+  .replace("script-src 'self'", `script-src 'self' 'nonce-${developmentCspNonce}'`)
+  .replace("connect-src 'self'", "connect-src 'self' ws://localhost:*");
+
 const securityHeaders = {
   "Content-Security-Policy": contentSecurityPolicy,
   "Referrer-Policy": "strict-origin-when-cross-origin",
@@ -21,10 +27,12 @@ const restrictedHtmlProperties = [
   "createContextualFragment",
   "setHTMLUnsafe",
   "parseHTMLUnsafe",
+  "DOMParser",
   "srcdoc",
 ].map((property) => ({ property, message: "Use React children or textContent instead." }));
 
 export default defineConfig(({ mode }) => ({
+  ...(mode === "development" ? { html: { cspNonce: developmentCspNonce } } : {}),
   plugins: [tanstackRouter({ target: "react" }), react({ compiler: true }), tailwindcss()],
   // エイリアスの正本は tsconfig.json の paths とする。
   resolve: { tsconfigPaths: true },
@@ -95,14 +103,9 @@ export default defineConfig(({ mode }) => ({
   server: {
     headers: {
       ...securityHeaders,
-      // ViteのWebSocketだけをローカル開発で追加許可する。
+      // ViteのWebSocketとReact Refreshのinline scriptだけをローカル開発で追加許可する。
       "Content-Security-Policy":
-        mode === "development"
-          ? contentSecurityPolicy.replace(
-              "connect-src 'self'",
-              "connect-src 'self' ws://localhost:*",
-            )
-          : contentSecurityPolicy,
+        mode === "development" ? developmentContentSecurityPolicy : contentSecurityPolicy,
     },
     proxy: {
       "^/(api|oauth2|login|logout|error|actuator|v3/api-docs|swagger-ui)(/|$)": {

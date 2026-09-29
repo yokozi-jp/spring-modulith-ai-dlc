@@ -17,7 +17,7 @@ S3などから静的SPAを配信する構成では、requestごとのnonceをHTM
 `CSPProvider disableStyleElements` で生成を止める方法はstrict CSPを維持できるが、Base UIが生成していたCSSをapplication側で複製し、dependency更新時に同期する必要がある。
 CSP hashも静的配信に利用できるが、Base UIがCSSの内容や空白を変えるたびに配信設定との同期が必要になる。
 
-本プロジェクトは保守性と設定の単純さを優先しながら、任意HTMLとinline scriptの実行経路は引き続き遮断する。
+本番配信では保守性と設定の単純さを優先しながら、任意HTMLとinline scriptの実行経路は引き続き遮断する。
 CSP Level 3はstyle要素とstyle属性を `style-src-elem` と `style-src-attr` で分離できる。
 Frontendのformat、lint、型検査はVite+の `vp check` へ統一しており、別の静的解析製品を任意HTML禁止の必須経路にすると設定と実行環境が増える。
 
@@ -25,10 +25,14 @@ Frontendのformat、lint、型検査はVite+の `vp check` へ統一しており
 
 SPAのCSPは `style-src 'self'` を非対応browser向けfallbackとして維持し、`style-src-elem 'self' 'unsafe-inline'` でinline `<style>` 要素を許可する。
 HTMLとして解釈されるstyle属性は `style-src-attr 'none'` で拒否する。
-`script-src 'self'` は維持し、inline scriptと `unsafe-eval` は許可しない。
+本番配信では `script-src 'self'` を維持し、inline scriptと `unsafe-eval` は許可しない。
+
+ローカル開発ではReact Refreshのinline scriptだけを許可するため、開発サーバーの起動単位でnonceを生成する。
+ViteのHTML変換とCSP headerへ同じnonceを設定し、`script-src` にそのnonceを追加する。
+このnonceは本番buildとpreviewへ設定しない。
 
 Base UIには必要なstyle要素を生成させるため、application rootで `CSPProvider disableStyleElements` を使わない。
-Base UIが生成するCSSをapplicationへ複製せず、CSP hashやnonceも導入しない。
+Base UIが生成するCSSをapplicationへ複製せず、CSP hashや本番配信用のnonceも導入しない。
 
 任意HTMLを直接描画する `dangerouslySetInnerHTML` はOxlintの `react/no-danger` で禁止する。
 `innerHTML`、`outerHTML`、`insertAdjacentHTML`、`document.write`、`document.writeln`、`createContextualFragment`、`DOMParser`、`parseHTMLUnsafe`、`setHTMLUnsafe`、iframeのDOM `srcdoc` はOxlintの `no-restricted-properties` と `no-restricted-globals` で禁止する。

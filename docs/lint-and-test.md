@@ -10,7 +10,7 @@ Docker を使うタスク（semgrep / trivy / actionlint / zizmor / hadolint / d
 
 - **`task fe-format`**：OxfmtでFrontendを整形する。
 - **`task fe-check`**：format、Oxlint（Tailwindとshadcn規則を含む）、TypeScript型を非破壊で検査する。
-- **`task fe-doctor`**：React固有の問題をReact Doctorで診断する。
+- **`task fe-doctor`**：React固有の問題をReact Doctorで診断し、5分以内に完了しなければ失敗する。
 - **`task fe-coverage`**：VitestのV8 providerで全体branch coverage 85%を検証する。
 - **`task fe-test-build`**：coverage付きテストと本番ビルドを実行する。
 - **`task fe-verify`**：上記の検査、診断、テスト、ビルドを順番に実行する。
@@ -31,6 +31,7 @@ MSW serverは最初のAPIテストを追加する変更で設定します。
 Oxlintのbuilt-in pluginは既定の `unicorn`、`typescript`、`oxc` を維持したうえで `react` を追加します。
 Oxlintの `react/no-danger` は `dangerouslySetInnerHTML` を禁止します。
 `no-restricted-properties` と `no-restricted-globals` はHTMLを解釈するDOM APIを禁止し、repository-localの `local-security/no-jsx-srcdoc` はiframeのJSX `srcDoc` を禁止します。
+HTML sinkの組み込み規則は、qualified accessを実際の `vp lint` へ渡す統合テストで検証します。
 ローカルruleはOxlintのESLint互換JavaScript plugin APIで実装し、Vitestの陽性例と陰性例で検証します。
 任意HTML禁止は `vp check` へ集約し、SemgrepやESLintへ同じ規則を重複定義しません。
 文字列はReact childrenまたは `textContent` として描画し、HTML描画が業務要件になった場合は個別にlintを抑制せず、sanitizerと単一の描画境界を設計します。

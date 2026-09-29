@@ -63,7 +63,9 @@ pre-commit:
 
     # frontend にステージ済み変更があるとき、作業ツリーを書き換えずformat、lint、型を検査する。
     - name: frontend-check
-      glob: "frontend/**"
+      glob:
+        - "frontend/**"
+        - "Taskfile.yml"
       run: |
         echo "{staged_files}" >/dev/null
         task fe-check
@@ -144,7 +146,9 @@ pre-push:
     # frontend に変更があるpushのとき、React固有の問題を診断する。
     # 外部へのコード送信と依存情報照会を避けるため、telemetryとsupply-chain scanは無効化する。
     - name: frontend-doctor
-      glob: "frontend/**"
+      glob:
+        - "frontend/**"
+        - "Taskfile.yml"
       run: |
         echo "{push_files}" >/dev/null
         task fe-doctor
@@ -152,7 +156,9 @@ pre-push:
 
     # frontend に変更があるpushのとき、テストと本番ビルドを実行する。
     - name: frontend-test-build
-      glob: "frontend/**"
+      glob:
+        - "frontend/**"
+        - "Taskfile.yml"
       run: |
         echo "{push_files}" >/dev/null
         task fe-test-build
