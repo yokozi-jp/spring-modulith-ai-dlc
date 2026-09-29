@@ -35,6 +35,16 @@ Alternatives Considered / References の構成）。
 - **ADR-019**：外部連携の耐障害性と容量制御を標準化する（Proposed, 2026-09-15）
 - **ADR-020**：コンテナイメージを署名し provenance を検証する（Proposed, 2026-09-15）
 - **ADR-021**：Dependabot の minor/patch 更新をグループ化し auto-merge する（Proposed, 2026-09-29）
+- **ADR-022**：semver 6.3.1 を pnpm trust policy の例外にする（Proposed, 2026-09-29）
+- **ADR-023**：TanStack Form と Zod を採用する（Proposed, 2026-09-29）
+- **ADR-024**：Frontend API client生成にOrvalを採用する（Proposed, 2026-09-29）
+- **ADR-025**：shadcn/uiのBase UI版とTailwind CSSを採用する（Proposed, 2026-09-29）
+- **ADR-026**：OXCでReact Compilerを有効化する（Proposed, 2026-09-29）
+- **ADR-027**：Frontendのテスト基盤を標準化する（Proposed, 2026-09-29）
+- **ADR-028**：TanStack Tableを採用する（Proposed, 2026-09-29）
+- **ADR-029**：Frontend開発依存の既知脆弱性をoverrideと期限付きignoreで扱う（Proposed, 2026-09-29）
+- **ADR-030**：Base UIのインラインstyle要素を限定して許可する（Proposed, 2026-09-29）
+- **ADR-031**：Frontendの型検査を厳格化し、tsconfigを正本にする（Proposed, 2026-09-30）
 
 ## 運用
 

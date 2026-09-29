@@ -30,14 +30,18 @@ task dev
 - **`task lint-actions-security`**：GitHub Actions を zizmor で検査する。
 - **`task release-check`**：release-please の設定と版ファイルの一致を検査する。
 
-frontend を変更した場合は `frontend/` で Vite+ の検査も実行する。
+frontend の依存を取得するときは `frontend/` で `vp install` を実行する。
+日常の整形と検証にはルートからTaskを使う。
 
 ```bash
-cd frontend
-vp install
-vp check
-vp test
+task fe-format
+task fe-verify
 ```
+
+coverageを確認するときは `task fe-coverage` を実行する。
+バックエンドと同じく、手書きproduction code全体のbranch coverage 85%をCIで強制する。
+
+LefthookはFrontend変更を検出すると、pre-commitで `task fe-check`、pre-pushで `task fe-doctor` と `task fe-test-build` を実行する。
 
 詳しい起動手順は [`README.md`](README.md)、検証内容は [`docs/lint-and-test.md`](docs/lint-and-test.md) を参照する。
 

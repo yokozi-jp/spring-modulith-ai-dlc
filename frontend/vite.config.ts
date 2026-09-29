@@ -1,7 +1,16 @@
+import { tanstackRouter } from "@tanstack/router-plugin/vite";
+import tailwindcss from "@tailwindcss/vite";
+import react from "@vitejs/plugin-react";
 import { defineConfig } from "vite-plus";
 
 const contentSecurityPolicy =
-  "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; form-action 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; font-src 'self'; connect-src 'self'";
+  "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; form-action 'self'; script-src 'self'; style-src 'self'; style-src-elem 'self' 'unsafe-inline'; style-src-attr 'none'; img-src 'self' data:; font-src 'self'; connect-src 'self'";
+
+// ponytail: 開発では起動単位でnonceを固定する。本番へ適用するなら配信層でリクエスト単位に生成する。
+const developmentCspNonce = crypto.randomUUID().replaceAll("-", "");
+const developmentContentSecurityPolicy = contentSecurityPolicy
+  .replace("script-src 'self'", `script-src 'self' 'nonce-${developmentCspNonce}'`)
+  .replace("connect-src 'self'", "connect-src 'self' ws://localhost:*");
 
 const securityHeaders = {
   "Content-Security-Policy": contentSecurityPolicy,
@@ -11,23 +20,92 @@ const securityHeaders = {
   "X-Frame-Options": "DENY",
 };
 
+const restrictedHtmlProperties = [
+  "innerHTML",
+  "outerHTML",
+  "insertAdjacentHTML",
+  "createContextualFragment",
+  "setHTMLUnsafe",
+  "parseHTMLUnsafe",
+  "DOMParser",
+  "srcdoc",
+].map((property) => ({ property, message: "Use React children or textContent instead." }));
+
 export default defineConfig(({ mode }) => ({
-  fmt: {},
+  ...(mode === "development" ? { html: { cspNonce: developmentCspNonce } } : {}),
+  plugins: [tanstackRouter({ target: "react" }), react({ compiler: true }), tailwindcss()],
+  // エイリアスの正本は tsconfig.json の paths とする。
+  resolve: { tsconfigPaths: true },
+  test: {
+    coverage: {
+      provider: "v8",
+      include: ["src/**/*.{ts,tsx}"],
+      exclude: [
+        "src/**/*.{test,spec}.{ts,tsx}",
+        "src/**/*.d.ts",
+        "src/main.tsx",
+        "src/routeTree.gen.ts",
+      ],
+      thresholds: { branches: 85 },
+    },
+  },
+  fmt: { ignorePatterns: ["src/routeTree.gen.ts"] },
   lint: {
-    jsPlugins: [{ name: "vite-plus", specifier: "vite-plus/oxlint-plugin" }],
-    rules: { "vite-plus/prefer-vite-plus-imports": "error" },
+    ignorePatterns: ["src/routeTree.gen.ts"],
+    plugins: ["unicorn", "typescript", "oxc", "react"],
+    jsPlugins: [
+      { name: "vite-plus", specifier: "vite-plus/oxlint-plugin" },
+      { name: "local-security", specifier: "./lint/local-security.js" },
+      { name: "shadcn", specifier: "@shadcn/lint" },
+      { name: "better-tailwindcss", specifier: "eslint-plugin-better-tailwindcss" },
+    ],
+    rules: {
+      "vite-plus/prefer-vite-plus-imports": "error",
+      "react/no-danger": "error",
+      "no-restricted-globals": [
+        "error",
+        { name: "DOMParser", message: "Do not parse arbitrary HTML." },
+      ],
+      "no-restricted-properties": [
+        "error",
+        ...restrictedHtmlProperties,
+        { object: "document", property: "write", message: "Do not write HTML directly." },
+        { object: "document", property: "writeln", message: "Do not write HTML directly." },
+      ],
+      "local-security/no-jsx-srcdoc": "error",
+      "shadcn/no-restyle": ["error", { allow: ["layout"] }],
+      "shadcn/no-raw-colors": "error",
+      "shadcn/no-arbitrary-values": ["error", { allow: ["layout"] }],
+      "shadcn/no-inline-styles": "error",
+      "shadcn/require-static-classes": "error",
+      "shadcn/no-unknown-classes": "error",
+      "better-tailwindcss/enforce-consistent-class-order": "error",
+      "better-tailwindcss/no-deprecated-classes": "error",
+      "better-tailwindcss/no-duplicate-classes": "error",
+      "better-tailwindcss/no-unnecessary-whitespace": "error",
+      "better-tailwindcss/no-conflicting-classes": "error",
+    },
+    settings: {
+      "better-tailwindcss": { entryPoint: "src/style.css" },
+    },
+    overrides: [
+      {
+        files: ["src/components/ui/**"],
+        rules: {
+          "shadcn/no-restyle": "off",
+          "shadcn/no-arbitrary-values": "off",
+          "shadcn/require-static-classes": "off",
+        },
+      },
+    ],
     options: { typeAware: true, typeCheck: true },
   },
   server: {
     headers: {
       ...securityHeaders,
-      // ViteのCSS HMRとWebSocketだけをローカル開発で追加許可する。
+      // ViteのWebSocketとReact Refreshのinline scriptだけをローカル開発で追加許可する。
       "Content-Security-Policy":
-        mode === "development"
-          ? contentSecurityPolicy
-              .replace("style-src 'self'", "style-src 'self' 'unsafe-inline'")
-              .replace("connect-src 'self'", "connect-src 'self' ws://localhost:*")
-          : contentSecurityPolicy,
+        mode === "development" ? developmentContentSecurityPolicy : contentSecurityPolicy,
     },
     proxy: {
       "^/(api|oauth2|login|logout|error|actuator|v3/api-docs|swagger-ui)(/|$)": {
