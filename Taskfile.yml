@@ -148,6 +148,45 @@ tasks:
         ./05-setup-bun.sh
         ./06-setup-go-betterleaks.sh
 
+  # Frontend
+  fe-format:
+    desc: フロントエンドをOxfmtで整形
+    dir: frontend
+    cmds:
+      - vp fmt
+
+  fe-check:
+    desc: フロントエンドのformat、Oxlint（Tailwindとshadcn規則を含む）、型を検査
+    dir: frontend
+    cmds:
+      - vp check
+
+  fe-doctor:
+    desc: React固有の問題をReact Doctorで診断
+    dir: frontend
+    cmds:
+      - vp exec react-doctor . --yes --no-supply-chain --no-telemetry --blocking error --no-color --max-duration 300
+
+  fe-coverage:
+    desc: フロントエンドの全体branch coverage 85%を検証
+    dir: frontend
+    cmds:
+      - vp test run --coverage
+
+  fe-test-build:
+    desc: フロントエンドの85% branch coverage、テスト、本番ビルドを実行
+    dir: frontend
+    cmds:
+      - vp test run --coverage
+      - vp run build
+
+  fe-verify:
+    desc: フロントエンドの静的解析、React診断、テスト、ビルドを実行
+    cmds:
+      - task: fe-check
+      - task: fe-doctor
+      - task: fe-test-build
+
   # Backend
   be-run:
     desc: バックエンドをホスト上で起動

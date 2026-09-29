@@ -146,11 +146,12 @@ cd frontend && vp dev      # SPAを起動し、APIとOIDCを同一オリジン�
 ブラウザは <http://localhost:5173> を開きます。
 バックエンドは <http://localhost:18080>、Keycloak は <http://localhost:8080>、Grafana は <http://localhost:3000> で公開されます。
 
-日々の開発で使う入口タスクは次の三つです。
+日々の開発で使う入口タスクは次の四つです。
 
 - **`task dev`**：依存サービスを起動してバックエンドを起動（日々の開発の入口）。
 - **`task check`**：素早いローカル確認（バックエンドの静的解析）。
-- **`task verify`**：push 前の総合ゲート（静的解析、OpenAPI 契約検査と、使い捨てDBでのマイグレーション検証とテスト。CI と同じ内容）。
+- **`task fe-verify`**：フロントエンドの静的解析、React診断、テスト、本番ビルド。
+- **`task verify`**：push 前のバックエンド総合ゲート（静的解析、OpenAPI 契約検査と、使い捨てDBでのマイグレーション検証とテスト。CI と同じ内容）。
 
 Docker Compose の操作（サービスの起動、停止、状態確認、Keycloak の realm 再投入）や、「いつ、どのコマンドを、どの順で使うか」のシナリオ別の手順は [開発ワークフロー](docs/dev-workflow.md) を参照してください。
 
@@ -159,7 +160,13 @@ Docker Compose の操作（サービスの起動、停止、状態確認、Keycl
 ## Lint・テスト
 
 静的解析、シークレットと脆弱性のスキャン、テストは、いずれも [`Taskfile.yml`](Taskfile.yml) のタスクとして実行できます（`task <タスク名>`）。
-日常的には push 前に `task verify`（静的解析、OpenAPI 契約検査と、使い捨てDBでのマイグレーション検証とテスト、CI と同じ内容）を回せば足ります。
+フロントエンドの手動整形には `task fe-format` を使い、変更中の確認には `task fe-check` を使います。
+`task fe-check` はOxlintから `@shadcn/lint` と `eslint-plugin-better-tailwindcss` も実行し、Tailwind CSSと共有UI componentのdesign-system規則を検査します。
+フロントエンド変更時は `task fe-verify` で静的解析、React診断、テスト、本番ビルドを実行します。
+LefthookはFrontend変更を検出すると、pre-commitで `task fe-check`、pre-pushで `task fe-doctor` と `task fe-test-build` を実行します。
+Frontend CIもPull Requestと `main` へのpushで同じ `task fe-verify` を実行し、全体branch coverage 85%を強制します。
+coverageレポートは `task fe-coverage` で確認でき、CIでは14日間artifactとして保存します。
+バックエンド変更時は push 前に `task verify`（静的解析、OpenAPI 契約検査と、使い捨てDBでのマイグレーション検証とテスト、CI と同じ内容）を実行します。
 入力範囲が広い契約にはQuickTheoriesによるプロパティベーステストを使い、通常のテストと一緒に実行します。
 テストの検出力を確認するときは`task mutation-test`でPITを明示実行しますが、実行コストが高いため`task verify`には含めません。
 

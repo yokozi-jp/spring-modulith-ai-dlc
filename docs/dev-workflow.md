@@ -8,7 +8,8 @@
 
 - **`task dev`**：依存サービスを起動してバックエンドを起動する。日々の開発の入口。
 - **`task check`**：素早いローカル確認（バックエンドの静的解析）。こまめに回す。
-- **`task verify`**：push 前の総合ゲート（静的解析、OpenAPI 契約検査と、使い捨てDBでのマイグレーション検証とテスト）。CI と同じ内容。
+- **`task fe-verify`**：フロントエンドの静的解析、React診断、テスト、本番ビルドを実行する。
+- **`task verify`**：push 前のバックエンド総合ゲート（静的解析、OpenAPI 契約検査と、使い捨てDBでのマイグレーション検証とテスト）。CI と同じ内容。
 - **`task e2e`**：E2E（未整備。`docs/e2e-testing-strategy.md` に沿って構築予定）。
 
 これ以外の細かいタスクは、上記やCI、Gitフックから呼ばれる**部品**である。
@@ -47,9 +48,11 @@ changeset と jOOQ 生成コードは同じ変更として Git 管理する。
 ### push する前
 
 ```bash
+task fe-verify             # フロントエンドの静的解析、React診断、テスト、本番ビルド
 task verify                # be-lint + 使い捨てDBでのマイグレーション検証とテスト（CI と同じ）
 ```
 
+`task fe-verify` は `fe-check`、`fe-doctor`、`fe-test-build` を順に実行する。
 `task verify` は `.env.test` の隔離スタック（PostgreSQL 5433 / Redis 6380）を
 起動し、マイグレーション検証とテストを実行して後片付けまで行う。
 開発用スタック（5432 / 6379）とポートが分かれているため、`task dev` で
@@ -124,19 +127,23 @@ task compose-reset CONFIRM_RESET=yes   # 全サービスの volume ごと削除�
 同じTaskfileのタスクを、ローカル、CI、Gitフック（Lefthook）が共用している。
 これにより「ローカルでは通ったが CI で落ちる」乖離を防ぐ。
 
-- pre-commit：betterleaks、hadolint、compose config、markdownlint（変更種別に応じて）。
-- pre-push：betterleaks（全履歴）、backend 変更時は be-lint / be-test、
-  判断が絡む変更に ADR が伴うかの確認（`task adr-check`。既定は非ブロッキングのナッジ）。
-- CI：`backend-ci.yml` が `task be-verify-migrations` と `task be-test` を実行。
+- pre-commit：betterleaks、Frontendのformat、lint、型検査、hadolint、compose config、markdownlint（変更種別に応じて）。
+- pre-push：betterleaks（全履歴）、FrontendのReact診断、テストと本番ビルド、backend 変更時は be-lint / be-test、判断が絡む変更に ADR が伴うかの確認（`task adr-check`。既定は非ブロッキングのナッジ）。
+- CI：`frontend-ci.yml` が `task fe-verify`、`backend-ci.yml` が `task be-verify-migrations` と `task be-test` を実行。
 
-したがって、ローカルで `task verify` が通れば CI もほぼ通る。
+したがって、Frontend変更では `task fe-verify`、backend変更では `task verify` を事前に実行する。
 
 ## 入口タスクと部品の関係
 
 - `task dev` → `compose-up` ＋ `be-run`
 - `task check` → `be-lint`
+- `task fe-verify` → `fe-check` ＋ `fe-doctor` ＋ `fe-test-build`
+- `task fe-check` → `vp check`
+- `task fe-doctor` → `react-doctor`（外部通信なし）
+- `task fe-coverage` → VitestのV8 coverageで全体branch 85%を検証
+- `task fe-test-build` → coverage付き `vp test` ＋ `vp run build`
 - `task verify` → `be-lint` ＋ `test`（`test` は隔離スタック起動＋
   `be-verify-migrations` ＋ `be-test` ＋ 後片付け）
 
-部品タスク（`be-test`、`be-mutation-test`、`test-deps-up` など）は通常直接打たず、
-入口タスクや CI から呼ばれる。
+部品タスク（`fe-check`、`fe-test-build`、`be-test`、`be-mutation-test`、`test-deps-up` など）は通常直接打たず、
+入口タスクや CI、Gitフックから呼ばれる。

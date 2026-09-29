@@ -6,6 +6,38 @@
 
 Docker を使うタスク（semgrep / trivy / actionlint / zizmor / hadolint / docker build --check / compose）は、Docker が無い環境ではスキップされます。
 
+## フロントエンド（Vite+）
+
+- **`task fe-format`**：OxfmtでFrontendを整形する。
+- **`task fe-check`**：format、Oxlint（Tailwindとshadcn規則を含む）、TypeScript型を非破壊で検査する。
+- **`task fe-doctor`**：React固有の問題をReact Doctorで診断する。
+- **`task fe-coverage`**：VitestのV8 providerで全体branch coverage 85%を検証する。
+- **`task fe-test-build`**：coverage付きテストと本番ビルドを実行する。
+- **`task fe-verify`**：上記の検査、診断、テスト、ビルドを順番に実行する。
+
+`task fe-format` はファイルを書き換えます。
+pre-commitは部分的にステージした変更を壊さないよう、自動修正ではなく `task fe-check` だけを実行します。
+pre-pushはFrontend変更がある場合に `task fe-doctor` と `task fe-test-build` を実行します。
+React Doctorは外部へのコード送信と依存情報照会を避けるため、telemetryとsupply-chain scanを無効にして実行します。
+個別のVite+処理が必要な場合は、`frontend/` で対応する `vp` コマンドを直接実行します。
+component testにはTesting Library React、user-event、jsdomを使います。
+API境界のmockにはMSW、coverage計測にはVitestと同じversionのV8 providerを使います。
+coverageは起動処理と生成route treeを除く手書きproduction code全体を対象にし、branch coverage 85%をCIで強制します。
+Frontend CIはcoverageレポートを14日間artifactとして保存します。
+MSW serverは最初のAPIテストを追加する変更で設定します。
+
+`@shadcn/lint` はVite+内蔵のOxlint pluginとして登録し、`vp lint` と `vp check` から実行します。
+`no-restyle`、`no-raw-colors`、`no-arbitrary-values`、`no-inline-styles`、`require-static-classes`、`no-unknown-classes` をerrorとして有効化しています。
+`src/components/ui/**` はcomponent自身が見た目と構造を定義するため、公式の段階導入方針に従って `no-restyle`、`no-arbitrary-values`、`require-static-classes` を無効化し、残る規則は適用します。
+設定は `frontend/vite.config.ts` に集約し、別のOxlint設定や重複するlint taskを追加しません。
+導入判断とruleの仕様は[@shadcn/lint公式リポジトリ](https://github.com/shadcn-ui/lint)を参照してください。
+
+`eslint-plugin-better-tailwindcss` も同じOxlintへ登録し、class順序、非推奨class、重複class、不要な空白、競合classをerrorとして検査します。
+`no-unknown-classes` と `no-concatenated-classes` は `@shadcn/lint` の規則と重複するため有効化しません。
+`enforce-canonical-classes` はTailwind解析workerのtimeoutが再現し、`enforce-consistent-line-wrapping` はOxfmtとの間で同じ字下げ差分が再発するため有効化しません。
+Tailwind CSS v4のentry pointは `frontend/vite.config.ts` で `src/style.css` に固定しています。
+規則の仕様は[eslint-plugin-better-tailwindcss公式リポジトリ](https://github.com/schoero/eslint-plugin-better-tailwindcss)を参照してください。
+
 ## バックエンド（Gradle）
 
 | 実行タスク                  | 内容                                                           |
@@ -138,8 +170,8 @@ Task 専用の公式リンタは存在しないため、Task 自身がファイ�
 
 - **Git フック（Lefthook, [`lefthook.yml`](../lefthook.yml)）**
   - commit-msg: commitlint（コミットメッセージを Conventional Commits 規約で検証）
-  - pre-commit: betterleaks（ステージ済み）、hadolint / docker build --check（Dockerfile 変更時）、compose config（Compose 変更時）、markdownlint（Markdown 変更時）
-  - pre-push: betterleaks（全履歴）、be-lint（Spotless + PMD + SpotBugs）/ be-test（`task test`）（backend 変更時）、actionlint / zizmor（ワークフロー変更時）
+  - pre-commit: betterleaks（ステージ済み）、Frontendのformat、lint、型検査、hadolint / docker build --check（Dockerfile 変更時）、compose config（Compose 変更時）、markdownlint（Markdown 変更時）
+  - pre-push: betterleaks（全履歴）、FrontendのReact診断、テスト、本番ビルド、be-lint（Spotless + PMD + SpotBugs）/ be-test（`task test`）（backend 変更時）、actionlint / zizmor（ワークフロー変更時）
 - **CI（GitHub Actions, [`.github/workflows/`](../.github/workflows/)）**
-  - `backend-ci.yml`（backend の Lint（Spotless + PMD + SpotBugs）とテスト・カバレッジ）、`conventional-commits.yml`（Pull Requestタイトルのcommitlint）、`betterleaks.yml`（シークレットスキャン）、`semgrep.yml`（静的解析 / SARIF アップロード）、`trivy.yml`（脆弱性スキャン / SARIF アップロード）、`actionlint.yml` / `zizmor.yml`（ワークフロー）、`hadolint.yml`（Dockerfile Lint、docker build --check、backend イメージのビルド・起動・ヘルスチェック）、`compose-config.yml`（Compose）、`markdownlint.yml`（Markdown）、`release-please.yml`（リリース設定検証とRelease Pull Request作成）
+  - `frontend-ci.yml`（Frontendのformat、lint、型検査、React Doctor、全体branch coverage 85%、React Compilerを有効にした本番ビルド）、`backend-ci.yml`（backend の Lint（Spotless + PMD + SpotBugs）とテスト・カバレッジ）、`conventional-commits.yml`（Pull Requestタイトルのcommitlint）、`betterleaks.yml`（シークレットスキャン）、`semgrep.yml`（静的解析 / SARIF アップロード）、`trivy.yml`（脆弱性スキャン / SARIF アップロード）、`actionlint.yml` / `zizmor.yml`（ワークフロー）、`hadolint.yml`（Dockerfile Lint、docker build --check、backend イメージのビルド・起動・ヘルスチェック）、`compose-config.yml`（Compose）、`markdownlint.yml`（Markdown）、`release-please.yml`（リリース設定検証とRelease Pull Request作成）
   - `semgrep.yml` / `trivy.yml` の検出結果は GitHub Code Scanning（Security タブ）に SARIF 形式でアップロードされます。

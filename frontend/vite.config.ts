@@ -1,4 +1,5 @@
 import { tanstackRouter } from "@tanstack/router-plugin/vite";
+import tailwindcss from "@tailwindcss/vite";
 import react from "@vitejs/plugin-react";
 import { defineConfig } from "vite-plus";
 
@@ -14,12 +15,58 @@ const securityHeaders = {
 };
 
 export default defineConfig(({ mode }) => ({
-  plugins: [tanstackRouter({ target: "react" }), react()],
+  plugins: [tanstackRouter({ target: "react" }), react({ compiler: true }), tailwindcss()],
+  resolve: {
+    alias: { "@": new URL("./src", import.meta.url).pathname },
+  },
+  test: {
+    coverage: {
+      provider: "v8",
+      include: ["src/**/*.{ts,tsx}"],
+      exclude: [
+        "src/**/*.{test,spec}.{ts,tsx}",
+        "src/**/*.d.ts",
+        "src/main.tsx",
+        "src/routeTree.gen.ts",
+      ],
+      thresholds: { branches: 85 },
+    },
+  },
   fmt: { ignorePatterns: ["src/routeTree.gen.ts"] },
   lint: {
     ignorePatterns: ["src/routeTree.gen.ts"],
-    jsPlugins: [{ name: "vite-plus", specifier: "vite-plus/oxlint-plugin" }],
-    rules: { "vite-plus/prefer-vite-plus-imports": "error" },
+    jsPlugins: [
+      { name: "vite-plus", specifier: "vite-plus/oxlint-plugin" },
+      { name: "shadcn", specifier: "@shadcn/lint" },
+      { name: "better-tailwindcss", specifier: "eslint-plugin-better-tailwindcss" },
+    ],
+    rules: {
+      "vite-plus/prefer-vite-plus-imports": "error",
+      "shadcn/no-restyle": ["error", { allow: ["layout"] }],
+      "shadcn/no-raw-colors": "error",
+      "shadcn/no-arbitrary-values": ["error", { allow: ["layout"] }],
+      "shadcn/no-inline-styles": "error",
+      "shadcn/require-static-classes": "error",
+      "shadcn/no-unknown-classes": "error",
+      "better-tailwindcss/enforce-consistent-class-order": "error",
+      "better-tailwindcss/no-deprecated-classes": "error",
+      "better-tailwindcss/no-duplicate-classes": "error",
+      "better-tailwindcss/no-unnecessary-whitespace": "error",
+      "better-tailwindcss/no-conflicting-classes": "error",
+    },
+    settings: {
+      "better-tailwindcss": { entryPoint: "src/style.css" },
+    },
+    overrides: [
+      {
+        files: ["src/components/ui/**"],
+        rules: {
+          "shadcn/no-restyle": "off",
+          "shadcn/no-arbitrary-values": "off",
+          "shadcn/require-static-classes": "off",
+        },
+      },
+    ],
     options: { typeAware: true, typeCheck: true },
   },
   server: {

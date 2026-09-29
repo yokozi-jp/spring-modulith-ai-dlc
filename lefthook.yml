@@ -61,6 +61,14 @@ pre-commit:
         export PATH="$PATH:$HOME/go/bin"
         betterleaks git --staged --no-banner --redact
 
+    # frontend にステージ済み変更があるとき、作業ツリーを書き換えずformat、lint、型を検査する。
+    - name: frontend-check
+      glob: "frontend/**"
+      run: |
+        echo "{staged_files}" >/dev/null
+        task fe-check
+      fail_text: "Frontendの静的検査に失敗しました。task fe-checkで再実行してください。"
+
     # ステージ済みの Dockerfile をベストプラクティス検査（hadolint）
     # docker が無い環境ではスキップ（最終担保は CI に任せる）。
     - name: hadolint
@@ -132,6 +140,23 @@ pre-push:
       run: |
         export PATH="$PATH:$HOME/go/bin"
         betterleaks git . --no-banner --redact --git-workers=16
+
+    # frontend に変更があるpushのとき、React固有の問題を診断する。
+    # 外部へのコード送信と依存情報照会を避けるため、telemetryとsupply-chain scanは無効化する。
+    - name: frontend-doctor
+      glob: "frontend/**"
+      run: |
+        echo "{push_files}" >/dev/null
+        task fe-doctor
+      fail_text: "React Doctorの診断に失敗しました。task fe-doctorで再実行してください。"
+
+    # frontend に変更があるpushのとき、テストと本番ビルドを実行する。
+    - name: frontend-test-build
+      glob: "frontend/**"
+      run: |
+        echo "{push_files}" >/dev/null
+        task fe-test-build
+      fail_text: "Frontendのテストまたはビルドに失敗しました。task fe-test-buildで再実行してください。"
 
     # backend に変更がある push のときだけ Lint（Spotless + PMD + SpotBugs）
     # Gradle は重いため pre-commit ではなく pre-push で実行する。
