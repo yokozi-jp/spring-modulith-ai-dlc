@@ -5,6 +5,9 @@ catalog:
 overrides:
   vite: "catalog:"
   vitest: "catalog:"
+  # Orval経由の@scalar/json-magicが脆弱なundici（7.24.4、7.29.0）を固定するため、修正版へ引き上げる。
+  # ponytail: 上流が7.29.1以上を要求したら削除する。
+  "undici@<7.29.1": 7.29.1
 peerDependencyRules:
   allowAny:
     - vite

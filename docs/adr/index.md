@@ -42,6 +42,7 @@ Alternatives Considered / References の構成）。
 - **ADR-026**：OXCでReact Compilerを有効化する（Proposed, 2026-09-29）
 - **ADR-027**：Frontendのテスト基盤を標準化する（Proposed, 2026-09-29）
 - **ADR-028**：TanStack Tableを採用する（Proposed, 2026-09-29）
+- **ADR-029**：Frontend開発依存の既知脆弱性をoverrideと期限付きignoreで扱う（Proposed, 2026-09-29）
 
 ## 運用
 
