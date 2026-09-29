@@ -47,15 +47,16 @@ Spring Boot が SPA も配信する場合は Spring Security が配信点とな�
 同じヘッダを複数層から重複して付けない。
 
 ```text
-Content-Security-Policy: default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; form-action 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; font-src 'self'; connect-src 'self'
+Content-Security-Policy: default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; form-action 'self'; script-src 'self'; style-src 'self'; style-src-elem 'self' 'unsafe-inline'; style-src-attr 'none'; img-src 'self' data:; font-src 'self'; connect-src 'self'
 Referrer-Policy: strict-origin-when-cross-origin
 Permissions-Policy: camera=(), microphone=(), geolocation=(), payment=(), usb=()
 X-Content-Type-Options: nosniff
 X-Frame-Options: DENY
 ```
 
-CSP ではインライン script と `unsafe-eval` を許可しない。
-外部接続、Web Worker、画像 CDN などが実際に必要になった場合だけ、該当 directive へ個別に追加する。
+CSPではinline scriptと `unsafe-eval` を許可しない。
+Base UIのstyle要素に限らないinline style要素の許可と、任意HTML sinkを静的解析で遮断する代替防御はADR-030で定める。
+外部接続、Web Worker、画像CDNなどが実際に必要になった場合だけ、該当directiveへ個別に追加する。
 Swagger UI は業務 SPA ではなく、既定の CSP と両立しない可能性があるため、本番では無効のまま維持し、開発環境でも SPA の CSP を緩める理由にしない。
 
 HSTS は HTTPS の最終応答を返す配信点で `max-age=31536000` を設定する。

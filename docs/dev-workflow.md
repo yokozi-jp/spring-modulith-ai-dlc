@@ -129,7 +129,7 @@ task compose-reset CONFIRM_RESET=yes   # 全サービスの volume ごと削除�
 
 - pre-commit：betterleaks、Frontendのformat、lint、型検査、hadolint、compose config、markdownlint（変更種別に応じて）。
 - pre-push：betterleaks（全履歴）、FrontendのReact診断、テストと本番ビルド、backend 変更時は be-lint / be-test、判断が絡む変更に ADR が伴うかの確認（`task adr-check`。既定は非ブロッキングのナッジ）。
-- CI：`frontend-ci.yml` が `task fe-verify`、`backend-ci.yml` が `task be-verify-migrations` と `task be-test` を実行。
+- CI：`frontend-ci.yml` が `task fe-verify`、`backend-ci.yml` が `task be-verify-migrations` と `task be-test` を実行し、`semgrep.yml` がrepository固有の任意HTML禁止規則をblocking検査する。
 
 したがって、Frontend変更では `task fe-verify`、backend変更では `task verify` を事前に実行する。
 

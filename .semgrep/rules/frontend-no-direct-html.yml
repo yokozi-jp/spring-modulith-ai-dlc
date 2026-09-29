@@ -1,0 +1,22 @@
+rules:
+  - id: frontend-no-direct-html
+    message: Use React children or textContent instead of interpreting a string as HTML.
+    severity: ERROR
+    languages: [typescript]
+    paths:
+      include:
+        - /frontend/src/**
+    pattern-either:
+      - pattern: $ELEMENT.innerHTML = $VALUE
+      - pattern: $ELEMENT.outerHTML = $VALUE
+      - pattern: $ELEMENT.insertAdjacentHTML(...)
+      - pattern: document.write(...)
+      - pattern: document.writeln(...)
+      - pattern: window.document.write(...)
+      - pattern: window.document.writeln(...)
+      - pattern: $RANGE.createContextualFragment(...)
+      - pattern: new DOMParser(...)
+      - pattern: Document.parseHTMLUnsafe(...)
+      - pattern: $ELEMENT.setHTMLUnsafe(...)
+      - pattern: $ELEMENT.srcdoc = $VALUE
+      - pattern: <$ELEMENT ... srcDoc={$VALUE} ... />

@@ -17,12 +17,12 @@ FrontendはReact 19とTanStack Routerを採用しているが、共有UI compone
 完成済みのthemeを持つcomponent libraryをそのまま採用すると、application固有のdesign tokenへ合わせるためにlibraryのtheme APIと上書き規則へ依存する。
 
 shadcn/uiはnpm packageから完成済みcomponentをimportする方式ではなく、component sourceをrepositoryへ配置してapplication側で所有するcode distribution方式である。
-shadcn/uiのBase UI版は、unstyledでアクセシビリティを重視するBase UIを対話primitiveに使い、Tailwind CSSで見た目を構成する。
+shadcn/uiのBase UI版は、unstyledでaccessibilityを重視するBase UIを対話primitiveに使い、Tailwind CSSで見た目を構成する。
 Tailwind CSS v4はVite pluginでbuild時に静的CSSを生成できる。
 
-ADR-014は本番SPAへ `script-src 'self'` と `style-src 'self'` のContent Security Policyを要求し、inline scriptとinline style elementを許可していない。
-Base UIの一部componentはscrollbar制御などのためにinline style elementを生成するため、既定のままでは本番CSPに拒否される可能性がある。
-Base UIは `CSPProvider` によって、配下のcomponentが生成するstyle elementを無効化できる。
+Base UIの一部componentは、native scrollbarの抑止などのためにinline `<style>` 要素を生成する。
+静的配信でこれらを止めてCSSを複製すると、Base UI更新時の同期がapplication側の保守負担になる。
+ADR-030は、style要素とstyle属性をCSPで分離し、Base UIのstyle要素を許可する代わりに任意HTML sinkを静的解析で禁止する判断を記録する。
 
 ADR-023はform状態にTanStack Form、runtime入力検証にZodを使う判断を記録している。
 shadcn/uiのTanStack Form例もZodを使い、ADR-024で採用するOrvalはOpenAPIからZod schemaを生成できる。
@@ -38,14 +38,13 @@ featureとrouteはBase UIを直接importせず、`components/ui` の公開compon
 Tailwind CSSと別のstyling systemをcomponent単位で併用しない。
 既存の初期画面用CSSは、共有UI componentを導入する変更でTailwind CSSへ置き換える。
 
-application rootを `CSPProvider` の `disableStyleElements` 設定で囲み、Base UIによるinline style elementの生成を無効化する。
-不足する見た目は静的stylesheetへ定義し、ADR-014の `style-src 'self'` を緩和しない。
-inline scriptを必要とするBase UI機能は先行して有効化しない。
-その機能が必要になった場合は、配信点でrequestごとのnonceを生成してCSP headerとapplicationへ同じ値を渡す設計を別途行う。
+ADR-030に従い、Base UIが生成するinline `<style>` 要素はCSPの `style-src-elem` で許可する。
+`CSPProvider disableStyleElements`、Base UI内部CSSの複製、CSP hash、nonceは使わない。
+HTMLとして解釈されるstyle属性は `style-src-attr 'none'` で拒否し、inline scriptと `unsafe-eval` は許可しない。
 
 form状態と入力検証には、ADR-023どおりTanStack FormとZodを使う。
 shadcn/uiの利用例だけを理由にReact Hook Formを追加せず、ValibotとZodを併用しない。
-依存は検証したexact versionへ固定する。
+dependencyは検証したexact versionへ固定する。
 
 ## Consequences
 
@@ -53,7 +52,7 @@ shadcn/uiの利用例だけを理由にReact Hook Formを追加せず、Valibot�
 
 - DialogやSelectなどの対話componentで、Base UIのkeyboard操作、focus管理、ARIA対応を利用できる。
 - component sourceをrepository内で確認し、applicationの要件に合わせて変更できる。
-- Tailwind CSSが生成する静的CSSを使い、ADR-014のstrict CSPを維持できる。
+- Base UIが必要とするstyle要素を自己完結して提供し、application側で内部CSSを同期しなくてよい。
 - semantic tokenを通じて、共有componentと業務画面の見た目を統一できる。
 - TanStack Form、shadcn/uiの公開例、Orvalの生成schemaでZodを共通利用できる。
 
@@ -61,7 +60,7 @@ shadcn/uiの利用例だけを理由にReact Hook Formを追加せず、Valibot�
 
 - 取り込んだshadcn/ui componentのsourceと上流変更をapplication側で保守する必要がある。
 - utility classがcomponent markupへ現れるため、class構成とsemantic tokenのreview規約が必要になる。
-- `disableStyleElements` の影響を受けるBase UI componentでは、scrollbarなどのstyleを静的CSSで補う必要がある。
+- CSPは任意のinline style要素を拒否できず、CSS injectionによる画面改変の防御が弱くなる。
 - component libraryを更新するとき、型検査だけでなくkeyboard操作、focus、CSP下の動作を回帰検証する必要がある。
 
 ### Neutral
@@ -102,6 +101,7 @@ shadcn/uiの利用例だけを理由にReact Hook Formを追加せず、Valibot�
 - [ADR-014: SPAとバックエンドを同一オリジンで公開する](./ADR-014-use-same-origin-spa-security-boundary.md)
 - [ADR-023: TanStack FormとZodを採用する](./ADR-023-adopt-tanstack-form-and-zod.md)
 - [ADR-024: Frontend API client生成にOrvalを採用する](./ADR-024-adopt-orval-for-frontend-api-client.md)
+- [ADR-030: Base UIのインラインstyle要素を限定して許可する](./ADR-030-allow-base-ui-inline-style-elements.md)
 - [shadcn/ui: Introduction](https://ui.shadcn.com/docs)
 - [shadcn/ui: Base UI as the Default](https://ui.shadcn.com/docs/changelog/2026-07-base-ui-default)
 - [Base UI: About](https://base-ui.com/react/overview/about)
