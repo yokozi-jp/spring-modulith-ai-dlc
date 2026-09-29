@@ -161,8 +161,8 @@ Docker Compose の操作（サービスの起動、停止、状態確認、Keycl
 
 静的解析、シークレットと脆弱性のスキャン、テストは、いずれも [`Taskfile.yml`](Taskfile.yml) のタスクとして実行できます（`task <タスク名>`）。
 フロントエンドの手動整形には `task fe-format` を使い、変更中の確認には `task fe-check` を使います。
-`task fe-check` はOxlintから `@shadcn/lint` と `eslint-plugin-better-tailwindcss` も実行し、Tailwind CSSと共有UI componentのdesign-system規則に加えて、`dangerouslySetInnerHTML` による任意HTML描画を検査します。
-生のDOM APIへHTML文字列を渡す処理は、repository固有のSemgrep規則を `task lint-semgrep` とCIでblocking検査します。
+`task fe-check` はOxlintからrepository-localのsecurity rule、`@shadcn/lint`、`eslint-plugin-better-tailwindcss` も実行します。
+Tailwind CSSと共有UI componentのdesign-system規則に加え、`dangerouslySetInnerHTML` と生のDOM HTML APIによる任意HTML描画をblocking検査します。
 フロントエンド変更時は `task fe-verify` で静的解析、React診断、テスト、本番ビルドを実行します。
 LefthookはFrontend変更を検出すると、pre-commitで `task fe-check`、pre-pushで `task fe-doctor` と `task fe-test-build` を実行します。
 Frontend CIもPull Requestと `main` へのpushで同じ `task fe-verify` を実行し、全体branch coverage 85%を強制します。

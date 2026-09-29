@@ -37,18 +37,9 @@ jobs:
       - name: Install Semgrep
         run: pip install semgrep==1.175.0
 
-      # Repository固有の禁止規則は検出時にCIを失敗させる。
-      - name: Enforce repository security rules
-        run: |
-          semgrep --test --config .semgrep/rules .semgrep/tests
-          semgrep scan \
-            --config .semgrep/rules \
-            --error \
-            --metrics off \
-            --disable-version-check
-
-      # コミュニティ規則はSARIFへ出力し、結果をSecurityタブで確認する。
-      # .kiro/ と aidlc/ はAI-DLCフレームワークの領域のため対象外にする。
+      # SARIF を出力する。検出があってもここでは失敗させず、
+      # 結果は Code Scanning（Security タブ）で確認する。
+      # .kiro/ と aidlc/ は AI-DLC フレームワークの領域のため対象外にする。
       - name: Run semgrep scan
         run: |
           semgrep scan \
@@ -59,7 +50,6 @@ jobs:
             --config p/secrets \
             --exclude .kiro \
             --exclude aidlc \
-            --exclude .semgrep/tests \
             --sarif \
             --output semgrep.sarif \
             --metrics off \

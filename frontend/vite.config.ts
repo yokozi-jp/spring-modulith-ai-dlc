@@ -14,6 +14,16 @@ const securityHeaders = {
   "X-Frame-Options": "DENY",
 };
 
+const restrictedHtmlProperties = [
+  "innerHTML",
+  "outerHTML",
+  "insertAdjacentHTML",
+  "createContextualFragment",
+  "setHTMLUnsafe",
+  "parseHTMLUnsafe",
+  "srcdoc",
+].map((property) => ({ property, message: "Use React children or textContent instead." }));
+
 export default defineConfig(({ mode }) => ({
   plugins: [tanstackRouter({ target: "react" }), react({ compiler: true }), tailwindcss()],
   // エイリアスの正本は tsconfig.json の paths とする。
@@ -34,14 +44,27 @@ export default defineConfig(({ mode }) => ({
   fmt: { ignorePatterns: ["src/routeTree.gen.ts"] },
   lint: {
     ignorePatterns: ["src/routeTree.gen.ts"],
+    plugins: ["unicorn", "typescript", "oxc", "react"],
     jsPlugins: [
       { name: "vite-plus", specifier: "vite-plus/oxlint-plugin" },
+      { name: "local-security", specifier: "./lint/local-security.js" },
       { name: "shadcn", specifier: "@shadcn/lint" },
       { name: "better-tailwindcss", specifier: "eslint-plugin-better-tailwindcss" },
     ],
     rules: {
       "vite-plus/prefer-vite-plus-imports": "error",
       "react/no-danger": "error",
+      "no-restricted-globals": [
+        "error",
+        { name: "DOMParser", message: "Do not parse arbitrary HTML." },
+      ],
+      "no-restricted-properties": [
+        "error",
+        ...restrictedHtmlProperties,
+        { object: "document", property: "write", message: "Do not write HTML directly." },
+        { object: "document", property: "writeln", message: "Do not write HTML directly." },
+      ],
+      "local-security/no-jsx-srcdoc": "error",
       "shadcn/no-restyle": ["error", { allow: ["layout"] }],
       "shadcn/no-raw-colors": "error",
       "shadcn/no-arbitrary-values": ["error", { allow: ["layout"] }],

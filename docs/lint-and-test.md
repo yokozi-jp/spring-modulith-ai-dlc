@@ -28,7 +28,11 @@ MSW serverは最初のAPIテストを追加する変更で設定します。
 
 `@shadcn/lint` はVite+内蔵のOxlint pluginとして登録し、`vp lint` と `vp check` から実行します。
 `no-restyle`、`no-raw-colors`、`no-arbitrary-values`、`no-inline-styles`、`require-static-classes`、`no-unknown-classes` をerrorとして有効化しています。
-Oxlintの `react/no-danger` もerrorとして有効化し、Reactの `dangerouslySetInnerHTML` による任意HTML描画を禁止します。
+Oxlintのbuilt-in pluginは既定の `unicorn`、`typescript`、`oxc` を維持したうえで `react` を追加します。
+Oxlintの `react/no-danger` は `dangerouslySetInnerHTML` を禁止します。
+`no-restricted-properties` と `no-restricted-globals` はHTMLを解釈するDOM APIを禁止し、repository-localの `local-security/no-jsx-srcdoc` はiframeのJSX `srcDoc` を禁止します。
+ローカルruleはOxlintのESLint互換JavaScript plugin APIで実装し、Vitestの陽性例と陰性例で検証します。
+任意HTML禁止は `vp check` へ集約し、SemgrepやESLintへ同じ規則を重複定義しません。
 文字列はReact childrenまたは `textContent` として描画し、HTML描画が業務要件になった場合は個別にlintを抑制せず、sanitizerと単一の描画境界を設計します。
 `src/components/ui/**` はcomponent自身が見た目と構造を定義するため、公式の段階導入方針に従って `no-restyle`、`no-arbitrary-values`、`require-static-classes` を無効化し、残る規則は適用します。
 設定は `frontend/vite.config.ts` に集約し、別のOxlint設定や重複するlint taskを追加しません。
@@ -106,14 +110,11 @@ GitHub Actionsでは`Backend CI (Gradle)`を手動実行したときだけミュ
 ## 静的解析（Semgrep）
 
 Semgrep OSS（コミュニティエディション）で静的解析を行います（`.kiro` / `aidlc` は対象外）。
-repository固有の規則は `frontend/src` における `innerHTML`、`outerHTML`、`insertAdjacentHTML`、`document.write`、`document.writeln`、`createContextualFragment`、`DOMParser`、`parseHTMLUnsafe`、`setHTMLUnsafe`、iframeの `srcDoc` を禁止します。
-規則の検出例と安全な `textContent` の非検出例は `semgrep --test` で検証します。
-ローカルの `task lint-semgrep` はrepository固有規則とcommunity規則の検出で失敗します。
-CIはrepository固有規則をblockingにし、community規則は従来どおりSARIFへ出力します。
+任意HTML禁止はFrontendのOxlintで強制し、Semgrepには同じrepository固有規則を定義しません。
 
-| 実行タスク          | 内容                                                               |
-| ------------------- | ------------------------------------------------------------------ |
-| `task lint-semgrep` | 静的解析（Semgrep OSS / Docker実行、規則テストまたは検出で失敗）   |
+| 実行タスク          | 内容                                                    |
+| ------------------- | ------------------------------------------------------- |
+| `task lint-semgrep` | 静的解析（Semgrep OSS / Docker 実行、検出があれば失敗） |
 
 ## 静的解析・脆弱性スキャン（Snyk・任意）
 
@@ -182,4 +183,3 @@ Task 専用の公式リンタは存在しないため、Task 自身がファイ�
 - **CI（GitHub Actions, [`.github/workflows/`](../.github/workflows/)）**
   - `frontend-ci.yml`（Frontendのformat、lint、型検査、React Doctor、全体branch coverage 85%、React Compilerを有効にした本番ビルド）、`backend-ci.yml`（backend の Lint（Spotless + PMD + SpotBugs）とテスト・カバレッジ）、`conventional-commits.yml`（Pull Requestタイトルのcommitlint）、`betterleaks.yml`（シークレットスキャン）、`semgrep.yml`（静的解析 / SARIF アップロード）、`trivy.yml`（脆弱性スキャン / SARIF アップロード）、`actionlint.yml` / `zizmor.yml`（ワークフロー）、`hadolint.yml`（Dockerfile Lint、docker build --check、backend イメージのビルド・起動・ヘルスチェック）、`compose-config.yml`（Compose）、`markdownlint.yml`（Markdown）、`release-please.yml`（リリース設定検証とRelease Pull Request作成）
   - `semgrep.yml` / `trivy.yml` の検出結果は GitHub Code Scanning（Security タブ）に SARIF 形式でアップロードされます。
-  - `semgrep.yml` はrepository固有の任意HTML禁止規則をblocking検査し、community規則の検出はadvisoryとして扱います。

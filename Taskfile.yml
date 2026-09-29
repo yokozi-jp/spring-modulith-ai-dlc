@@ -627,11 +627,7 @@ tasks:
       - |
         docker run --rm -e SEMGREP_SEND_METRICS=off -v "$PWD":/src -w /src \
           semgrep/semgrep:1.175.0@sha256:b94b53d02fd4a022f9eac4e2af1380f5c3c4c21400e79d3336bdff1d1db5e796 \
-          semgrep --test --config .semgrep/rules .semgrep/tests
-        docker run --rm -e SEMGREP_SEND_METRICS=off -v "$PWD":/src -w /src \
-          semgrep/semgrep:1.175.0@sha256:b94b53d02fd4a022f9eac4e2af1380f5c3c4c21400e79d3336bdff1d1db5e796 \
           semgrep scan \
-            --config .semgrep/rules \
             --config p/default \
             --config p/java \
             --config p/typescript \
@@ -639,7 +635,6 @@ tasks:
             --config p/secrets \
             --exclude .kiro \
             --exclude aidlc \
-            --exclude .semgrep/tests \
             --error \
             --metrics off \
             --disable-version-check
