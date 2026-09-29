@@ -6,12 +6,5 @@
   },
   "scripts": {
     "prepare": "lefthook install"
-  },
-  "devEngines": {
-    "packageManager": {
-      "name": "npm",
-      "version": "12.1.0",
-      "onFail": "download"
-    }
   }
 }
