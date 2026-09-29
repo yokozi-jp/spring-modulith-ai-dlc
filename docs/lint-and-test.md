@@ -10,7 +10,7 @@ Docker を使うタスク（semgrep / trivy / actionlint / zizmor / hadolint / d
 
 - **`task fe-format`**：OxfmtでFrontendを整形する。
 - **`task fe-check`**：format、Oxlint（Tailwindとshadcn規則を含む）、TypeScript型を非破壊で検査する。
-- **`task fe-doctor`**：React固有の問題をReact Doctorで診断し、5分以内に完了しなければ失敗する。
+- **`task fe-doctor`**：React固有のwarningとerrorをReact Doctorで検出し、いずれかの検出または5分超過で失敗する。
 - **`task fe-coverage`**：VitestのV8 providerで全体branch coverage 85%を検証する。
 - **`task fe-test-build`**：coverage付きテストと本番ビルドを実行する。
 - **`task fe-verify`**：上記の検査、診断、テスト、ビルドを順番に実行する。

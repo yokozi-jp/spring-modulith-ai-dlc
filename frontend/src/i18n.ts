@@ -16,6 +16,8 @@ type Messages = {
 };
 
 const defaultLocale: Locale = "ja";
+const jaNumberFormat = new Intl.NumberFormat("ja");
+const enNumberFormat = new Intl.NumberFormat("en");
 
 const catalog: Record<Locale, Messages> = {
   ja: {
@@ -28,7 +30,7 @@ const catalog: Record<Locale, Messages> = {
     learnTypeScript: "TypeScript を学ぶ",
     communityHeading: "コミュニティ",
     communityLead: "Vite コミュニティに参加できます。",
-    count: (value) => `カウント：${new Intl.NumberFormat("ja").format(value)}`,
+    count: (value) => `カウント：${jaNumberFormat.format(value)}`,
   },
   en: {
     title: "Demo application",
@@ -40,7 +42,7 @@ const catalog: Record<Locale, Messages> = {
     learnTypeScript: "Learn TypeScript",
     communityHeading: "Community",
     communityLead: "Join the Vite community.",
-    count: (value) => `Count: ${new Intl.NumberFormat("en").format(value)}`,
+    count: (value) => `Count: ${enNumberFormat.format(value)}`,
   },
 };
 

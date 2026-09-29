@@ -165,6 +165,7 @@ Docker Compose の操作（サービスの起動、停止、状態確認、Keycl
 Tailwind CSSと共有UI componentのdesign-system規則に加え、`dangerouslySetInnerHTML` と生のDOM HTML APIによる任意HTML描画をblocking検査します。
 フロントエンド変更時は `task fe-verify` で静的解析、React診断、テスト、本番ビルドを実行します。
 React診断が5分以内に完了しない場合は、不完全な結果を成功扱いせず検査を失敗させます。
+React Doctorのwarningとerrorはどちらもblockingとし、pre-pushとFrontend CIを停止します。
 LefthookはFrontend変更を検出すると、pre-commitで `task fe-check`、pre-pushで `task fe-doctor` と `task fe-test-build` を実行します。
 Frontend CIもPull Requestと `main` へのpushで同じ `task fe-verify` を実行し、全体branch coverage 85%を強制します。
 coverageレポートは `task fe-coverage` で確認でき、CIでは14日間artifactとして保存します。

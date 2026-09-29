@@ -162,10 +162,10 @@ tasks:
       - vp check
 
   fe-doctor:
-    desc: React固有の問題をReact Doctorで診断
+    desc: React固有のwarningとerrorをReact Doctorで検出
     dir: frontend
     cmds:
-      - timeout 300s vp exec react-doctor . --yes --no-supply-chain --no-telemetry --blocking error --no-color
+      - timeout 300s vp exec react-doctor . --yes --no-supply-chain --no-telemetry --blocking warning --no-color
 
   fe-coverage:
     desc: フロントエンドの全体branch coverage 85%を検証
