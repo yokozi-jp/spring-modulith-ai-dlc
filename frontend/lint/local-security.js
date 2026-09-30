@@ -15,7 +15,9 @@ export const noJsxSrcDoc = {
   },
 };
 
-export default {
+const localSecurity = {
   meta: { name: "local-security" },
   rules: { "no-jsx-srcdoc": noJsxSrcDoc },
 };
+
+export default localSecurity;

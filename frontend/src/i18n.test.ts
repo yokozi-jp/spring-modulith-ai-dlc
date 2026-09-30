@@ -20,6 +20,6 @@ describe("resolveMessages", () => {
     const { locale, messages } = resolveMessages(["en-GB"]);
 
     expect(locale).toBe("en");
-    expect(messages.count(1_234)).toBe("Count: 1,234");
+    expect(messages.count(1234)).toBe("Count: 1,234");
   });
 });

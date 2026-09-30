@@ -6,11 +6,11 @@ const proxyPath = "^/(api|oauth2|login|logout|error|actuator|v3/api-docs|swagger
 const createDevelopmentServer = () =>
   createServer({ mode: "development", server: { middlewareMode: true } });
 
-afterEach(() => {
-  vi.unstubAllEnvs();
-});
-
 describe("Vite configuration", () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
   it("pins the development origin and uses SERVER_PORT for the proxy", async () => {
     vi.stubEnv("SERVER_PORT", "19090");
     const server = await createDevelopmentServer();
@@ -18,8 +18,10 @@ describe("Vite configuration", () => {
     try {
       expect(server.config.server.port).toBe(5173);
       expect(server.config.server.strictPort).toBe(true);
-      const proxy = server.config.server.proxy;
-      if (!proxy) throw new Error("Development proxy not configured");
+      const { proxy } = server.config.server;
+      if (!proxy) {
+        throw new Error("Development proxy not configured");
+      }
       expect(proxy[proxyPath]).toMatchObject({
         target: "http://localhost:19090",
         changeOrigin: false,
@@ -34,8 +36,10 @@ describe("Vite configuration", () => {
 
     try {
       const nonce = server.config.html?.cspNonce;
-      if (!nonce) throw new Error("Development CSP nonce not configured");
-      expect(nonce).toMatch(/^[0-9a-f]{32}$/);
+      if (typeof nonce !== "string" || nonce === "") {
+        throw new Error("Development CSP nonce not configured");
+      }
+      expect(nonce).toMatch(/^[0-9a-f]{32}$/u);
       expect(server.config.server.headers?.["Content-Security-Policy"]).toContain(
         `script-src 'self' 'nonce-${nonce}'`,
       );

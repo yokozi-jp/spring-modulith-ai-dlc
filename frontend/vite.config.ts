@@ -39,7 +39,7 @@ export default defineConfig(({ mode }) => {
   const serverPortValue = loadEnv(mode, "..", "SERVER_PORT").SERVER_PORT ?? "18080";
   const serverPort = Number(serverPortValue);
   if (
-    !/^\d+$/.test(serverPortValue) ||
+    !/^\d+$/u.test(serverPortValue) ||
     !Number.isInteger(serverPort) ||
     serverPort < 1 ||
     serverPort > 65_535
@@ -68,7 +68,25 @@ export default defineConfig(({ mode }) => {
     fmt: { ignorePatterns: generatedFiles },
     lint: {
       ignorePatterns: generatedFiles,
-      plugins: ["unicorn", "typescript", "oxc", "react"],
+      categories: {
+        correctness: "error",
+        suspicious: "error",
+        pedantic: "error",
+        perf: "error",
+        style: "error",
+        restriction: "error",
+      },
+      plugins: [
+        "eslint",
+        "unicorn",
+        "typescript",
+        "oxc",
+        "react",
+        "import",
+        "vitest",
+        "jsx-a11y",
+        "promise",
+      ],
       jsPlugins: [
         { name: "vite-plus", specifier: "vite-plus/oxlint-plugin" },
         { name: "local-security", specifier: "./lint/local-security.js" },
@@ -76,6 +94,48 @@ export default defineConfig(({ mode }) => {
         { name: "better-tailwindcss", specifier: "eslint-plugin-better-tailwindcss" },
       ],
       rules: {
+        // automatic JSX runtime、Vite設定、TanStack Routerの規約と両立しない規則。
+        "react/react-in-jsx-scope": "off",
+        "react/forbid-component-props": "off",
+        "react/jsx-filename-extension": ["error", { extensions: [".jsx", ".tsx"] }],
+        "react/jsx-max-depth": "off",
+        "react/jsx-props-no-spreading": "off",
+        "import/no-default-export": "off",
+        "import/no-named-export": "off",
+        "import/prefer-default-export": "off",
+        "import/exports-last": "off",
+        "import/group-exports": "off",
+        "import/no-unassigned-import": ["error", { allow: ["**/*.css"] }],
+        // modern TypeScriptとReactで一般的な構文を一律禁止するrestriction規則。
+        "oxc/no-async-await": "off",
+        "oxc/no-optional-chaining": "off",
+        "oxc/no-rest-spread-properties": "off",
+        "typescript/explicit-function-return-type": "off",
+        "typescript/explicit-module-boundary-types": "off",
+        "typescript/prefer-readonly-parameter-types": "off",
+        "typescript/promise-function-async": "off",
+        // Oxfmtや型推論と役割が重複するか、可読性を下げる一律のstyle規則。
+        "capitalized-comments": "off",
+        "func-style": "off",
+        "max-lines-per-function": "off",
+        "no-duplicate-imports": ["error", { allowSeparateTypeImports: true }],
+        "no-magic-numbers": "off",
+        "no-ternary": "off",
+        "one-var": "off",
+        "sort-imports": "off",
+        "sort-keys": "off",
+        // Vitestの標準APIと競合するか、相互に矛盾するtest style規則。
+        "vitest/no-conditional-in-test": "off",
+        "vitest/no-hooks": "off",
+        "vitest/no-importing-vitest-globals": "off",
+        "vitest/prefer-called-times": "off",
+        "vitest/prefer-describe-function-title": "off",
+        "vitest/prefer-expect-assertions": "off",
+        "vitest/prefer-lowercase-title": "off",
+        "vitest/prefer-strict-boolean-matchers": "off",
+        "vitest/prefer-to-be-truthy": "off",
+        "vitest/require-hook": "off",
+        "vitest/require-test-timeout": "off",
         "vite-plus/prefer-vite-plus-imports": "error",
         "react/no-danger": "error",
         "no-restricted-globals": [
@@ -106,6 +166,16 @@ export default defineConfig(({ mode }) => {
       },
       overrides: [
         {
+          files: ["lint/**"],
+          rules: {
+            "import/no-nodejs-modules": "off",
+            "new-cap": "off",
+            "typescript/no-unsafe-assignment": "off",
+            "typescript/no-unsafe-call": "off",
+            "typescript/no-unsafe-member-access": "off",
+          },
+        },
+        {
           files: ["src/components/ui/**"],
           rules: {
             "shadcn/no-restyle": "off",
@@ -113,8 +183,25 @@ export default defineConfig(({ mode }) => {
             "shadcn/require-static-classes": "off",
           },
         },
+        {
+          files: ["src/routes/**"],
+          rules: {
+            "react/only-export-components": "off",
+          },
+        },
+        {
+          files: ["**/*.{test,spec}.{ts,tsx,js,jsx}"],
+          rules: {
+            "react/jsx-no-literals": "off",
+          },
+        },
       ],
-      options: { typeAware: true, typeCheck: true },
+      options: {
+        denyWarnings: true,
+        reportUnusedDisableDirectives: "error",
+        typeAware: true,
+        typeCheck: true,
+      },
     },
     server: {
       // Keycloakのredirect URIと同じoriginを維持し、競合時は別ポートへ移動せず失敗させる。
