@@ -1,7 +1,8 @@
 ---
-inclusion: always
-name: datetime-timezone-conventions
-description: 日時を扱うときの基本規約。バックエンドの絶対時刻をUTCへ統一し、フロントエンドで表示用タイムゾーンへ変換する方針を定める。日時の保存、API、表示、テストを変更するときに使用する。
+type: Convention
+title: 日時とタイムゾーンの規約
+description: 絶対時刻を UTC の Instant と timestamptz に統一し、表示用タイムゾーンへの変換をフロントエンドで行う規約。日時の保存、API、表示、テスト、DST の扱い、精度、自動強制を定める。
+tags: [convention, datetime, backend, frontend, database]
 ---
 
 # 日時とタイムゾーンの規約
@@ -11,6 +12,8 @@ description: 日時を扱うときの基本規約。バックエンドの絶対�
 バックエンドの実行環境、絶対時刻、DBセッション、ログはUTCへ統一する。
 APIは絶対時刻をUTCで返し、フロントエンドが画面の要件に応じたタイムゾーンへ変換して表示する。
 表示用タイムゾーンをバックエンドの保存形式へ混ぜない。
+
+この方針は [ADR-006](../adr/ADR-006-utc-instant-absolute-time-policy.md) で決定している。
 
 ## バックエンド
 
@@ -27,10 +30,10 @@ APIは絶対時刻をUTCで返し、フロントエンドが画面の要件に�
 
 基準となる設定は次を参照する。
 
-- Spring Boot：#[[file:backend/src/main/resources/application.yaml]]
-- JVM：#[[file:backend/Dockerfile]]
-- PostgreSQL：#[[file:docker/compose.yml]]
-- DBマイグレーション：#[[file:backend/src/main/resources/db/changelog/changesets/001-create-event-publication-tables.yaml]]
+- Spring Boot：[application.yaml](../../backend/src/main/resources/application.yaml)
+- JVM：[Dockerfile](../../backend/Dockerfile)
+- PostgreSQL：[compose.yml](../../docker/compose.yml)
+- DBマイグレーション：[001-create-event-publication-tables.yaml](../../backend/src/main/resources/db/changelog/changesets/001-create-event-publication-tables.yaml)
 
 ## フロントエンド
 

@@ -6,12 +6,14 @@ on:
     paths:
       - "docs/**/*.md"
       - "docs/.iwe/**"
+      - ".kiro/steering/**"
       - "Taskfile.yml"
   pull_request:
     branches: ["**"]
     paths:
       - "docs/**/*.md"
       - "docs/.iwe/**"
+      - ".kiro/steering/**"
       - "Taskfile.yml"
 
 concurrency:

@@ -53,7 +53,7 @@ task be-verify-migrations  # 使い捨てDBで update→rollback→再update と
 ```
 
 changeset と jOOQ 生成コードは同じ変更として Git 管理する。
-詳細は `docs/database-migrations.md` を参照。
+詳細は [jOOQコード生成と日時型](database/jooq-codegen.md) を参照。
 
 ### push する前
 
@@ -137,7 +137,7 @@ task compose-reset CONFIRM_RESET=yes   # 全サービスの volume ごと削除�
 同じTaskfileのタスクを、ローカル、CI、Gitフック（Lefthook）が共用している。
 これにより「ローカルでは通ったが CI で落ちる」乖離を防ぐ。
 
-- pre-commit：betterleaks、Frontendのformat、lint、型検査、hadolint、compose config、markdownlint、okf-check（`docs/` 変更時）（変更種別に応じて）。
+- pre-commit：betterleaks、Frontendのformat、lint、型検査、hadolint、compose config、markdownlint、okf-check（`docs/` か `.kiro/steering/` の変更時）（変更種別に応じて）。
 - pre-push：betterleaks（全履歴）、FrontendのReact診断、テストと本番ビルド、backend 変更時は be-lint / be-test、判断が絡む変更に ADR が伴うかの確認（`task adr-check`、既定は非ブロッキングのナッジ）。
 - CI：`frontend-ci.yml` が `task fe-verify`、`backend-ci.yml` が `task be-verify-migrations` と `task be-test` を実行。
 

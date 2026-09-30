@@ -67,5 +67,5 @@ Liquibase の起動時自動実行を無効化し、マイグレーションを�
 ## References
 
 - `backend/build.gradle`（`spring-boot-starter-liquibase` を実行時依存に持たず、Liquibase は Gradle プラグインと `liquibaseRuntime` のみ）
-- [docs/database-migrations.md](../database-migrations.md)
+- [DBマイグレーションの実行モデルとスキーマタグ](../database/migrations.md)
 - `Taskfile.yml`（`be-migrate` / `be-release-migrate` / `be-verify-migrations`）

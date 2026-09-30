@@ -67,6 +67,6 @@ Accepted
 
 ## References
 
-- [../../.kiro/steering/datetime-timezone-conventions.md](../../.kiro/steering/datetime-timezone-conventions.md)
+- [日時とタイムゾーンの規約](../datetime/timezone-conventions.md)
 - `backend/src/test/java/com/example/demo/architecture/DateTimeConventionsArchTest.java`
 - `backend/build.gradle`（Error Prone 設定）

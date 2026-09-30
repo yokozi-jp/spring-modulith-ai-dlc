@@ -1,15 +1,19 @@
 ---
-inclusion: fileMatch
-fileMatchPattern: ["**/Taskfile.yml", "**/Taskfile.yaml", "**/taskfile.yml", "**/taskfile.yaml"]
-name: taskfile-best-practices
-description: ルートのTaskfileを新規作成または編集するときの規約。厳格なシェル設定、タスクの公開範囲と説明、変数上書き、環境ファイルの分離、順次実行、後片付け、破壊操作の確認、外部ツールのバージョン固定、CIとフックとの一致、文書同期を定める。
+type: Convention
+title: Taskfile の書き方
+description: ルートの Taskfile のシェル設定、公開タスクと説明、変数上書き、環境ファイルの分離、実行順序、後片付け、破壊操作の確認、外部ツールの固定、CI とフックとの一致、文書同期を定める規約。Taskfile.yml を書く、または直すときに読む。
+tags: [convention, tooling, taskfile, ci]
 ---
 
 # Taskfileの書き方
 
+`set: [errexit, nounset, pipefail]` を維持し、順序が要る処理は `deps` ではなく `cmds` で順に呼ぶ。
+環境ファイルはタスクごとに分離し、破壊操作は明示確認変数がなければ失敗させる。
+CI と Lefthook は同じタスクを呼び、公開タスクを変えたら関連文書を同じ変更で更新する。
+
 このプロジェクトは、開発コマンドの共通入口としてTaskを使う。
 実行するTaskのバージョンは`docs/local-env-setup/versions.env`へ固定する。
-基準となる定義は#[[file:Taskfile.yml]]を参照する。
+基準となる定義は[Taskfile.yml](../../Taskfile.yml)を参照する。
 
 ## スキーマとシェル設定
 
@@ -106,11 +110,11 @@ Taskfileを変更したら、CIのpaths条件に`Taskfile.yml`が含まれてい
 
 公開タスクの追加、削除、改名、挙動変更では、次の文書を同じ変更で更新する。
 
-- #[[file:README.md]]の「開発コマンド」と「Lint・テスト」
-- #[[file:docs/dev-workflow.md]]
-- #[[file:docs/lint-and-test.md]]
-- DB操作を変えた場合は#[[file:docs/database-migrations.md]]
-- 導入バージョンを変えた場合は#[[file:docs/local-env-setup/versions.env]]とCI
+- [README.md](../../README.md)の「開発コマンド」と「Lint・テスト」
+- `docs/dev-workflow.md`
+- `docs/lint-and-test.md`
+- DB操作を変えた場合は`docs/database/migrations.md`
+- 導入バージョンを変えた場合は`docs/local-env-setup/versions.env`とCI
 
 変更後は`task --list`、対象タスク、`task lint-md`を実行する。
 順序、環境分離、確認ゲート、後片付けに触れた場合は、その失敗経路も検証する。

@@ -1,13 +1,17 @@
 ---
-inclusion: fileMatch
-fileMatchPattern: "**/{Dockerfile,Dockerfile.*,*.Dockerfile,*.dockerfile}"
-name: dockerfile-best-practices
-description: Dockerfile を新規作成・編集するときのベストプラクティスとアンチパターン。ベースイメージの選び方、マルチステージビルド、タグと digest の固定、.dockerignore、レイヤーキャッシュ順序、パッケージ導入、非 root 実行、Secrets、COPY/ADD、ENTRYPOINT/CMD、WORKDIR、1 コンテナ 1 concern、検証手段を定める。Docker 公式のビルドベストプラクティスに準拠する。Dockerfile を書く・直すときに使用する。
+type: Convention
+title: Dockerfile の作り方
+description: Dockerfile のベースイメージ、マルチステージビルド、タグと digest の固定、.dockerignore、レイヤー順序、非 root 実行、Secrets、ENTRYPOINT と CMD、検証手段を定める規約。Dockerfile や .dockerignore を書く、または直すときに読む。
+tags: [convention, container, docker, dockerfile]
 ---
 
 # Dockerfile の作り方
 
-Dockerfile を作成・編集するときは、以下に従う。
+小さく信頼できるベースイメージをタグと digest で固定し、マルチステージビルドで実行に必要なものだけを残す。
+依存の解決をソースの `COPY` より前に置き、非 root で exec 形式の `ENTRYPOINT` から起動する。
+秘密はイメージに焼き込まず、hadolint と `docker build --check` で検証する。
+
+Dockerfile を作成、編集するときは、以下に従う。
 すべて Docker 公式のビルドベストプラクティスに基づく（末尾の出典を参照）。
 
 ## ベースイメージ
@@ -68,7 +72,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 - サービスが特権なしで動くなら `USER` で非 root ユーザーに切り替える。
 - ユーザーとグループを作ってから `USER` を指定する。再現性が要るなら UID/GID を明示する。
-- `sudo` の導入・使用は避ける。TTY やシグナル転送の挙動が読めない。
+- `sudo` の導入と使用は避ける。TTY やシグナル転送の挙動が読めない。
 
 アンチパターン：常時 root で実行する。
 
@@ -113,14 +117,14 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 ## 検証
 
 - Dockerfile は hadolint で lint し、`docker build --check` で公式チェックにかける。
-- CI でイメージをビルド・テストする。base image の更新は Docker Scout や Dependabot で追う。
+- CI でイメージをビルドしてテストする。base image の更新は Docker Scout や Dependabot で追う。
 
 ## アンチパターンまとめ
 
-- 出所不明・巨大な汎用 OS をベースにする。
+- 出所不明のイメージや巨大な汎用 OS をベースにする。
 - ビルドツールを本番イメージに残す。
 - `FROM xxx:latest` に全面依存する。
-- コンテキストに `.git`・`node_modules`・secrets を送る。
+- コンテキストに `.git`、`node_modules`、secrets を送る。
 - 冒頭で `COPY . .` する。
 - 不要なパッケージや推奨パッケージまで入れる。
 - `apt update` と `apt install` を別 `RUN` に分ける。

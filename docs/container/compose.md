@@ -1,13 +1,17 @@
 ---
-inclusion: fileMatch
-fileMatchPattern: "**/{compose,docker-compose}*.{yml,yaml}"
-name: compose-best-practices
-description: Docker Compose ファイル（compose.yaml / docker-compose.yml）を新規作成・編集するときのベストプラクティスとアンチパターン。サービス分離、イメージのタグと digest 固定、起動順序（depends_on と healthcheck condition）、restart ポリシー、環境変数と Secrets、volumes、ports、networks、profiles、build、検証手段を定める。Docker 公式の Compose ドキュメントに準拠する。Compose ファイルを書く・直すときに使用する。
+type: Convention
+title: Compose の作り方
+description: Docker Compose ファイルのサービス分離、イメージの固定、起動順序と healthcheck、restart、環境変数と Secrets、volumes、ports、networks、profiles、build、検証手段を定める規約。compose.yaml や docker-compose.yml を書く、または直すときに読む。
+tags: [convention, container, docker, compose]
 ---
 
 # Compose の作り方
 
-Compose ファイルを作成・編集するときは、以下に従う。
+サービスは関心事ごとに分け、イメージをタグと digest で固定する。
+依存先には healthcheck を定義して `condition: service_healthy` で待ち、機密は `secrets` で渡す。
+公開するポートは必要最小限にし、変更後は `docker compose config` で検証する。
+
+Compose ファイルを作成、編集するときは、以下に従う。
 すべて Docker 公式の Compose ドキュメントに基づく（末尾の出典を参照）。
 
 ## サービス分離（1 コンテナ 1 concern）
@@ -41,7 +45,7 @@ depends_on:
 
 ## healthcheck
 
-- 各サービスに `healthcheck` を定義し、`interval`・`timeout`・`retries` を設定する。
+- 各サービスに `healthcheck` を定義し、`interval`、`timeout`、`retries` を設定する。
 - DB なら `pg_isready`、Redis なら `redis-cli ping` のように、実際に応答できるかを見るコマンドにする。
 
 ## restart ポリシー
@@ -52,7 +56,7 @@ depends_on:
 
 - 機密情報は環境変数に直書きせず、`secrets` を使う。
 - 環境変数の優先順位（`.env`、shell、`environment`、CLI）を理解して使う。
-- 環境ごと（development・testing・production）に `.env` ファイルを分ける。`.env` はコミットしない。
+- 環境ごと（development、testing、production）に `.env` ファイルを分ける。`.env` はコミットしない。
 - 変数展開（interpolation）の挙動を理解する。一時的な上書きは CLI（`-e` や `docker compose run -e`）で行う。
 
 アンチパターン：パスワードや API キーを `environment:` に平文で書き、リポジトリにコミットする。
@@ -70,7 +74,7 @@ depends_on:
 - 必要なポートだけ公開する。外部に晒したくないサービスは `ports` を張らず、ネットワーク内通信だけにする。
 - ローカル限定で使うなら `127.0.0.1:5432:5432` のようにループバックへバインドする。
 
-アンチパターン：内部依存（DB・キャッシュ）のポートまで無条件に `0.0.0.0` へ公開する。
+アンチパターン：内部依存（DB やキャッシュ）のポートまで無条件に `0.0.0.0` へ公開する。
 
 ## networks
 
@@ -94,14 +98,14 @@ services:
 
 ## 検証
 
-- 変更したら `docker compose config` で構文・参照・変数展開を検証する。
+- 変更したら `docker compose config` で構文、参照、変数展開を検証する。
 - CI で `docker compose config` を回し、壊れた Compose をマージしない。
 
 ## アンチパターンまとめ
 
 - 1 service に複数の関心事を詰め込む。
 - サービス間通信に `localhost` を使う。
-- タグなし・`:latest` のイメージを使う。
+- タグなしや `:latest` のイメージを使う。
 - `depends_on` だけで相手が使えると仮定する。
 - healthcheck を定義しない。
 - 機密を `environment:` に平文で置き、`.env` をコミットする。

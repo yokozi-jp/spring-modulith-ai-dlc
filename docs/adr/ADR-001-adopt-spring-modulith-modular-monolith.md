@@ -72,6 +72,5 @@ Spring Modulith を用いたモジュラーモノリスを採用する。
 
 ## References
 
-- [docs/architecture/package-by-feature-onion-handoff.md](../architecture/package-by-feature-onion-handoff.md)
 - `backend/src/main/resources/application.yaml`（`spring.modulith.*`）
 - `backend/src/test/java/com/example/demo/architecture/ApplicationModuleArchitectureTest.java`

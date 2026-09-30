@@ -94,6 +94,4 @@ Hexagonal は核の分離と外部統合の交換可能性に、Onion は同心�
 
 ## References
 
-- [docs/architecture/package-by-feature-onion-handoff.md](../architecture/package-by-feature-onion-handoff.md)
-- [docs/architecture/archunit-additional-rules.md](../architecture/archunit-additional-rules.md)
 - [Onion Architecture vs Hexagonal Architecture](https://www.codegenes.net/blog/onion-architecture-compared-to-hexagonal/)

@@ -28,7 +28,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Import;
 
 /**
- * バックエンドのテストコード規約（.kiro/steering/backend-testing-conventions.md）を静的に強制する。
+ * バックエンドのテストコード規約（docs/backend/testing-code-style.md）を静的に強制する。
  *
  * <p>コメントや Javadoc はバイトコードに残らないため ArchUnit では検査できない。テストの意図は、実行時に保持され レポートにも出る {@link DisplayName}
  * で明記させ、その存在をここで強制する。あわせて、可視性・命名・共有構成の {@code @Import}・禁止 API・レガシー日時型・{@code @Disabled}

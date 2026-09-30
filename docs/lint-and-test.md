@@ -96,7 +96,7 @@ jOOQコード生成には公式`org.jooq.jooq-codegen-gradle`プラグイン3.21
 DBスキーマタグはchangelog内の`tagDatabase` changesetで管理し、現在タグは`backend/gradle.properties`から自動選択します。
 ローカルの初回起動時とchangeset追加後は`task be-migrate`を実行してください。
 本番ではタグを手入力せず、`task be-release-migrate`でリポジトリに固定されたスキーマタグまで適用します。
-changesetとjOOQ生成コードを更新する手順、本番の資格情報、デプロイ順序、DB切り戻しは[DBマイグレーションとjOOQコード生成](database-migrations.md)を参照してください。
+changesetとjOOQ生成コードを更新する手順、本番の資格情報、デプロイ順序、DB切り戻しは[データベースの文書一覧](database/index.md)から該当する文書を参照してください。
 
 `task test` はテスト専用スタック（`docker/compose-test.yml` の PostgreSQL 5433 / Redis 6380）を `.env.test` で起動し、マイグレーション、テスト、生成したOpenAPI 3.1契約のSpectral検査を実行してから、ボリュームごと片付けます。
 開発用スタック（`task compose-up` の 5432 / 6379）とポートを分けているため、`task be-run` でバックエンドをホスト起動したまま `task test` を並行実行できます。
@@ -187,11 +187,15 @@ Markdown ファイルの体裁を markdownlint-cli2 で検査します。
 各概念ドキュメントのフロントマター（`type` / `title` / `description` / `tags`）と予約ファイル（`index.md`）の形状を `iwe schema validate` で検査し、どこからも参照されない孤立ドキュメントを `iwe stats` で検出します。
 検証は `docs/.iwe/schemas/` のスキーマに従います。
 
-| 実行タスク       | 内容                                                              |
-| ---------------- | ----------------------------------------------------------------- |
-| `task okf-check` | OKF 適合（フロントマター・予約ファイル）と孤立ドキュメントを検証  |
+同じタスクで、steering（`.kiro/steering/`）と docs の境界も検査します（[ADR-038](adr/ADR-038-route-steering-to-docs-knowledge.md)）。
+docs から `.kiro/` 配下へのリンク、steering の `#[[file:docs/...]]`、steering が指す存在しない docs パスは失敗にします。
+docs の文書が 200 行、steering が 1 ファイル 150 行、合計 500 行を超えた場合は警告だけを出します。
 
-iwe が無い環境ではスキップします（最終担保は CI）。
+| 実行タスク       | 内容                                                                                |
+| ---------------- | ----------------------------------------------------------------------------------- |
+| `task okf-check` | OKF 適合（フロントマター・予約ファイル）、孤立ドキュメント、steering との境界を検証 |
+
+iwe が無い環境では OKF 適合と孤立の検査だけをスキップします（最終担保は CI）。
 iwe の導入は [開発環境構築](local-env-setup/setup.md) を参照してください。
 
 ## リリース設定
@@ -217,8 +221,8 @@ Task 専用の公式リンタは存在しないため、Task 自身がファイ�
 
 - **Git フック（Lefthook, [`lefthook.yml`](../lefthook.yml)）**
   - commit-msg: commitlint（コミットメッセージを Conventional Commits 規約で検証）
-  - pre-commit: betterleaks（ステージ済み）、Frontendのformat、lint、型検査、hadolint / docker build --check（Dockerfile 変更時）、compose config（Compose 変更時）、markdownlint（Markdown 変更時）、okf-check（`docs/` 変更時）
+  - pre-commit: betterleaks（ステージ済み）、Frontendのformat、lint、型検査、hadolint / docker build --check（Dockerfile 変更時）、compose config（Compose 変更時）、markdownlint（Markdown 変更時）、okf-check（`docs/` か `.kiro/steering/` の変更時）
   - pre-push: betterleaks（全履歴）、FrontendのReact診断、テスト、本番ビルド、be-lint（Spotless + PMD + SpotBugs）/ be-test（`task test`）（backend 変更時）、actionlint / zizmor（ワークフロー変更時）
 - **CI（GitHub Actions, [`.github/workflows/`](../.github/workflows/)）**
-  - `frontend-ci.yml`（Frontendのformat、lint、Knip、型検査、React Doctor、全体branch coverage 85%、React Compilerを有効にした本番ビルド）、`backend-ci.yml`（backend の Lint（Spotless + PMD + SpotBugs）とテスト・カバレッジ）、`conventional-commits.yml`（Pull Requestタイトルのcommitlint）、`betterleaks.yml`（シークレットスキャン）、`static-analysis.yml`（Semgrepの静的解析とSARIFアップロード、jscpdの重複コード検査）、`trivy.yml`（脆弱性スキャン / SARIF アップロード）、`actionlint.yml` / `zizmor.yml`（ワークフロー）、`hadolint.yml`（Dockerfile Lint、docker build --check、backend イメージのビルド・起動・ヘルスチェック）、`compose-config.yml`（Compose）、`markdownlint.yml`（Markdown）、`okf-validate.yml`（`docs/` の OKF バンドル検証）、`release-please.yml`（リリース設定検証とRelease Pull Request作成）
+  - `frontend-ci.yml`（Frontendのformat、lint、Knip、型検査、React Doctor、全体branch coverage 85%、React Compilerを有効にした本番ビルド）、`backend-ci.yml`（backend の Lint（Spotless + PMD + SpotBugs）とテスト・カバレッジ）、`conventional-commits.yml`（Pull Requestタイトルのcommitlint）、`betterleaks.yml`（シークレットスキャン）、`static-analysis.yml`（Semgrepの静的解析とSARIFアップロード、jscpdの重複コード検査）、`trivy.yml`（脆弱性スキャン / SARIF アップロード）、`actionlint.yml` / `zizmor.yml`（ワークフロー）、`hadolint.yml`（Dockerfile Lint、docker build --check、backend イメージのビルド・起動・ヘルスチェック）、`compose-config.yml`（Compose）、`markdownlint.yml`（Markdown）、`okf-validate.yml`（`docs/` の OKF バンドル検証と steering との境界検査）、`release-please.yml`（リリース設定検証とRelease Pull Request作成）
   - `static-analysis.yml` / `trivy.yml` の検出結果は GitHub Code Scanning（Security タブ）に SARIF 形式でアップロードされます。

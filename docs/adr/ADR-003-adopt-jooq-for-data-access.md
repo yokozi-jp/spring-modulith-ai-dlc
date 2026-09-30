@@ -72,5 +72,5 @@ ORM の暗黙のフェッチや N+1、マッピングの不透明さを避け、
 ## References
 
 - `backend/build.gradle`（`spring-boot-starter-jooq`、`jooq-codegen-gradle`）
-- [../../.kiro/steering/datetime-timezone-conventions.md](../../.kiro/steering/datetime-timezone-conventions.md)
+- [日時とタイムゾーンの規約](../datetime/timezone-conventions.md)
 - [ADR-004-commit-jooq-generated-code.md](ADR-004-commit-jooq-generated-code.md)

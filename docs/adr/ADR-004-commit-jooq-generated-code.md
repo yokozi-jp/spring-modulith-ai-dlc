@@ -64,5 +64,5 @@ jOOQ 生成コードを Git 管理し、changeset と同じ変更としてコミ
 ## References
 
 - `backend/gradle/database.gradle`
-- [docs/database-migrations.md](../database-migrations.md)
+- [jOOQコード生成と日時型](../database/jooq-codegen.md)
 - [ADR-003-adopt-jooq-for-data-access.md](ADR-003-adopt-jooq-for-data-access.md)

@@ -1,34 +1,18 @@
 ---
 type: Reference
 title: ADR テンプレート
-description: このリポジトリの ADR が従う書式・採番・ライフサイクルのテンプレート。
+description: このリポジトリの ADR が従う書式のテンプレートと書き方の指針。
 tags: [adr, reference, template]
 ---
 
 # ADR テンプレート
 
 このリポジトリの Architecture Decision Record（ADR）は、以下の書式に従う。
-運用ルールは [ADR の運用ルール](conventions.md) を参照する。
-
-## ADR を作る基準
-
-次のいずれかに当てはまる判断を ADR にする。
-
-- 実装後に戻しにくい（DB、API 契約、フレームワーク、言語、認証方式など）。
-- 複数のモジュールやチームに影響する。
-- コスト、性能、セキュリティに大きく影響する。
-- 議論や異論があった（合意形成の理由を残す価値がある）。
-- 過去のアーキテクチャ方針を変更する。
-
-次のものは ADR にしない。
-
-- 変数名やコード整形などの日常的な実装選択。
-- 自明に可逆な決定。
-- すでにチーム規約や steering に文書化されている標準。
+ADR を作る基準、採番とファイル名、ライフサイクルは [ADR の運用ルール](conventions.md) に定める。
 
 ## 書式
 
-見出し構成は Status / Date / Context / Decision / Consequences（Positive・Negative・Neutral）/ Alternatives Considered / References とする。
+見出し構成は Status / Date / Context / Decision / Consequences（Positive、Negative、Neutral）/ Alternatives Considered / References とする。
 frontmatter に `type: Architecture Decision Record`、`title`、`description`、`tags` を置く。
 
 ```markdown
@@ -85,18 +69,6 @@ YYYY-MM-DD
 
 - 関連する RFC、設計文書、ベンチマーク結果、議論へのリンク。
 ```
-
-## 採番とファイル名
-
-- 番号は連番（ADR-001, ADR-002, …）で、廃止しても再利用しない。
-- ファイル名は `ADR-NNN-<kebab-case-title>.md` とする。
-- 追加したら [ADR インデックス](index.md) に 1 行加える。
-
-## ライフサイクル
-
-- 状態は Proposed、Accepted、Deprecated、Superseded で管理する。
-- 決定は実装前に Proposed として起こし、Pull Request でコードと一緒にレビューする。
-- 置き換えるときは、新旧の ADR を `Superseded by ADR-NNN` で相互リンクする。
 
 ## 書き方の指針
 

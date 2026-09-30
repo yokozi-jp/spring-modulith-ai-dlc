@@ -128,17 +128,18 @@ tasks:
         echo "⚠ ADR 未追加の可能性: 判断が絡む変更が含まれますが docs/adr/ の更新がありません。" >&2
         echo "  対象の変更:" >&2
         printf '    - %s\n' $sig >&2
-        echo "  重要な設計判断なら docs/adr/ に ADR を追加してください（規約: .kiro/steering/adr-decision-record.md）。" >&2
+        echo "  重要な設計判断なら docs/adr/ に ADR を追加してください（規約: docs/adr/conventions.md）。" >&2
         echo "  該当しない場合は ADR_ACK=1 を付けて再実行できます（例: ADR_ACK=1 git push）。" >&2
         echo "" >&2
         if [ "${ADR_STRICT:-}" = "1" ]; then exit 1; fi
 
   # OKF（docs/ を Open Knowledge Format v0.2 バンドルとして検証）
   okf-check:
-    desc: docs/ の OKF 適合と孤立ドキュメントを検証
+    desc: docs/ の OKF 適合、孤立ドキュメント、steering との境界を検証
     silent: true
     dir: docs
     cmds:
+      - task: docs-boundary-check
       - |
         if ! command -v iwe >/dev/null 2>&1; then
           echo "OKF check: iwe が無いためスキップします（CI で検査されます）。" >&2
@@ -158,6 +159,44 @@ tasks:
           iwe stats -f json | jq -r '.orphans[] | "    - " + .' >&2
           exit 1
         fi
+
+  # steering → docs の一方向依存と文書の大きさを検査する（ADR-038）。
+  # 依存方向とパスの実在は失敗、行数の目安超過は警告にとどめる。
+  docs-boundary-check:
+    internal: true
+    silent: true
+    cmds:
+      - |
+        fail=0
+        if grep -rnE '\]\([^)]*\.kiro/' --include='*.md' docs >&2; then
+          echo "✗ docs/ から .kiro/ 配下へリンクしています。依存は steering → docs の一方向にしてください。" >&2
+          fail=1
+        fi
+        if grep -nE '#\[\[file:docs/' .kiro/steering/*.md >&2; then
+          echo "✗ steering が #[[file:docs/...]] で docs を展開しています。パスを文字列で書いてください。" >&2
+          fail=1
+        fi
+        # ponytail: steering は常に .kiro/steering/ 直下にあるため、先頭の ../ を落としてリポジトリルート相対として解決する。
+        missing="$(grep -oE '(^|[^A-Za-z0-9_./-])(\.\./)*docs/[A-Za-z0-9_./-]*' .kiro/steering/*.md \
+          | sed -E 's#^([^:]*):[^d.]*(\.\./)*#\1:#; s#\.+$##' | sort -u \
+          | while IFS=: read -r file path; do [ -e "$path" ] || echo "    - $file: $path"; done)"
+        if [ -n "$missing" ]; then
+          echo "✗ steering が存在しない docs/ のパスを指しています。" >&2
+          echo "$missing" >&2
+          fail=1
+        fi
+        for f in $(find docs -name '*.md' -not -path '*/node_modules/*'); do
+          n="$(wc -l < "$f")"
+          if [ "$n" -gt 200 ]; then echo "⚠ $f は $n 行です（目安 200 行以内）。" >&2; fi
+        done
+        total=0
+        for f in .kiro/steering/*.md; do
+          n="$(wc -l < "$f")"
+          total=$((total + n))
+          if [ "$n" -gt 150 ]; then echo "⚠ $f は $n 行です（目安 150 行以内）。" >&2; fi
+        done
+        if [ "$total" -gt 500 ]; then echo "⚠ steering の合計は $total 行です（目安 500 行以内）。" >&2; fi
+        exit "$fail"
 
 
   # Setup

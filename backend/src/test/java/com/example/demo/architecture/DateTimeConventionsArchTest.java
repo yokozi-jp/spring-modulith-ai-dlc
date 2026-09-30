@@ -27,7 +27,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 /**
- * 日時とタイムゾーンの規約（.kiro/steering/datetime-timezone-conventions.md）をプロダクションコードへ静的に強制する。
+ * 日時とタイムゾーンの規約（docs/datetime/timezone-conventions.md）をプロダクションコードへ静的に強制する。
  *
  * <p>Error Prone の {@code JavaTimeDefaultTimeZone} が既定タイムゾーン依存の {@code now()} をコンパイル時に弾くのを補完し、
  * ArchUnit ではレガシー日時型の遮断と、注入した {@code Clock} を迂回する時刻取得およびシステム {@code Clock} 生成の遮断を担う。

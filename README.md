@@ -193,8 +193,8 @@ Docker Compose の操作（サービスの起動、停止、状態確認、Keycl
 
 ### ドキュメント
 
-- `docs/` を編集したときは `task okf-check` で Open Knowledge Format v0.2 バンドルの適合（フロントマターと予約ファイル）と孤立ドキュメントを検査します。
-- Lefthook は `docs/` 変更を検出すると pre-commit で同じ検査を実行します。
+- `docs/` か `.kiro/steering/` を編集したときは `task okf-check` で Open Knowledge Format v0.2 バンドルの適合（フロントマターと予約ファイル）、孤立ドキュメント、steering と docs の境界を検査します。
+- Lefthook は `docs/` か `.kiro/steering/` の変更を検出すると pre-commit で同じ検査を実行します。
 
 <p align="right">(<a href="#top">トップへ</a>)</p>
 
@@ -202,7 +202,7 @@ Docker Compose の操作（サービスの起動、停止、状態確認、Keycl
 
 重要な設計とアーキテクチャ上の判断は、Architecture Decision Record（ADR）として [`docs/adr/`](docs/adr/) に残します。
 
-- 規約は [`.kiro/steering/adr-decision-record.md`](.kiro/steering/adr-decision-record.md) に定義しています（ADR を作る/作らない基準、記録先、ライフサイクル）。
+- 運用ルールの正文は [`docs/adr/conventions.md`](docs/adr/conventions.md) です（ADR を作る基準と作らないもの、記録先、採番、ライフサイクル）。
 - 書式は [`docs/adr/adr-template.md`](docs/adr/adr-template.md) に準拠します。
 - ADR の一覧は [`docs/adr/index.md`](docs/adr/index.md) を参照してください。
   `docs/adr/` はワークフロー外と横断の判断を残す場所です。
@@ -221,8 +221,11 @@ push 前には `task adr-check` が pre-push で走り、判断が絡む変更�
 - iwe は Markdown をナレッジグラフとして扱う CLI、LSP サーバー、MCP サーバーです。
   導入は [開発環境構築](docs/local-env-setup/setup.md) を参照してください。
 - OKF 適合（フロントマターと予約ファイルの形状）と孤立ドキュメントは `task okf-check` で検証し、Git フック（pre-commit）と CI（`okf-validate.yml`）で強制します。
+  同じタスクが、docs から `.kiro/` へのリンクの禁止、steering が指す docs パスの実在、文書の行数の目安も検査します。
 - 検証スキーマは `docs/.iwe/schemas/` に置き、`docs/index.md` を目次の起点としています。
-- AI エージェント向けの作成規約は [`.kiro/steering/documentation-authoring.md`](.kiro/steering/documentation-authoring.md)、この構成を採用した判断は [ADR-036](docs/adr/ADR-036-adopt-okf-for-docs-knowledge-bundle.md) に記録しています。
+  各領域の `docs/<領域>/index.md` は、どの文書をいつ読むかを示す入口です。
+- AI エージェント向けの作成規約は [`.kiro/steering/documentation-authoring.md`](.kiro/steering/documentation-authoring.md)、docs の読み方は [`.kiro/steering/docs-navigation.md`](.kiro/steering/docs-navigation.md) にあります。
+  この構成を採用した判断は [ADR-036](docs/adr/ADR-036-adopt-okf-for-docs-knowledge-bundle.md) と [ADR-038](docs/adr/ADR-038-route-steering-to-docs-knowledge.md) に記録しています。
 
 <p align="right">(<a href="#top">トップへ</a>)</p>
 
