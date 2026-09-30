@@ -1,0 +1,16 @@
+{
+  "version": "v1",
+  "hooks": [
+    {
+      "name": "block-iwe-normalize",
+      "trigger": "PreToolUse",
+      "description": "Blocks `iwe normalize` on both the CLI path (execute_bash/shell command string) and the MCP path (the iwe server's normalize tool). Fail-open; bypass with IWE_ALLOW_NORMALIZE=1.",
+      "matcher": "execute_bash|shell|bash|iwe.*normalize|normalize.*iwe",
+      "action": {
+        "type": "command",
+        "command": "bash .kiro/hooks/block-iwe-normalize.sh"
+      }
+    }
+  ]
+}
+
