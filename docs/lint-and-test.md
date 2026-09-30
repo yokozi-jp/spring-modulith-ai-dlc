@@ -189,7 +189,7 @@ Markdown ファイルの体裁を markdownlint-cli2 で検査します。
 
 同じタスクで、steering（`.kiro/steering/`）と docs の境界も検査します（[ADR-038](adr/ADR-038-route-steering-to-docs-knowledge.md)）。
 docs から `.kiro/` 配下へのリンク、steering の `#[[file:docs/...]]`、steering が指す存在しない docs パスは失敗にします。
-docs の文書が 200 行、steering が 1 ファイル 150 行、合計 500 行を超えた場合は警告だけを出します。
+docs の文書が 250 行、steering が 1 ファイル 150 行、合計 500 行を超えた場合は警告だけを出します。
 
 | 実行タスク       | 内容                                                                                |
 | ---------------- | ----------------------------------------------------------------------------------- |

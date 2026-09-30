@@ -187,7 +187,7 @@ tasks:
         fi
         for f in $(find docs -name '*.md' -not -path '*/node_modules/*'); do
           n="$(wc -l < "$f")"
-          if [ "$n" -gt 200 ]; then echo "⚠ $f は $n 行です（目安 200 行以内）。" >&2; fi
+          if [ "$n" -gt 250 ]; then echo "⚠ $f は $n 行です（目安 250 行以内）。" >&2; fi
         done
         total=0
         for f in .kiro/steering/*.md; do
