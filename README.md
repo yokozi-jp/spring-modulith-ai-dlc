@@ -40,7 +40,6 @@
 
 **Spring Modulith** を用いた**モジュラーモノリス**の土台となるプロジェクトです。
 単一のデプロイ単位の内側を業務モジュールへ分割し、モジュール間の境界と依存を Spring Modulith で検証しながら開発することを狙いとしています。
-開発は [AI-DLC（AI-Driven Development Life Cycle）](https://github.com/awslabs/aidlc-workflows)に沿って進めます。
 
 現時点で整備済みなのは、業務モジュールを載せる前の基盤部分です。
 
@@ -67,7 +66,6 @@
 | Keycloak                   | 26.7.3     |
 | Grafana OpenTelemetry LGTM | 0.32.1     |
 | Go (betterleaks 実行用)    | 1.27.x     |
-| Bun (AI-DLC ランタイム)    | 1.3.14     |
 | Task                       | 3.53.1     |
 
 その他のパッケージのバージョンは `backend/build.gradle` と `frontend/package.json` を参照してください。
@@ -84,7 +82,6 @@
 │   └── dependabot.yml # 依存関係の自動更新設定
 ├── .kiro/            # Kiro 設定
 ├── .vscode/          # VSCode 設定
-├── aidlc/            # AI-DLC ワークスペース（自動生成）
 ├── backend/          # Spring Boot アプリケーション
 ├── docker/           # Docker 関連ファイル
 │   ├── initdb/       # PostgreSQL 初期化スクリプト（スキーマ作成）
@@ -101,7 +98,7 @@
 ├── .hadolint.yaml    # hadolint（Dockerfile リンタ）設定
 ├── .markdownlint-cli2.yaml # markdownlint-cli2（Markdown リンタ）設定
 ├── .snyk             # Snyk のスキャン除外ポリシー（プロダクションコード以外を除外）
-├── AGENTS.md         # AI-DLC / エージェント向けプロジェクト説明
+├── AGENTS.md         # エージェント向けプロジェクト説明
 ├── commitlint.config.mjs # commitlint 設定（Conventional Commits 検証）
 ├── lefthook.yml      # Git フック定義（Lefthook）
 ├── LICENSE           # ライセンス
@@ -115,10 +112,6 @@
 ## 開発環境構築
 
 [開発環境構築ガイド](docs/local-env-setup/setup.md) を参照してください。
-
-### AI-DLC のセットアップ
-
-- 使い方・更新手順は [AI-DLC の公式ドキュメント](https://github.com/awslabs/aidlc-workflows/tree/main/docs) を参照してください。
 
 <p align="right">(<a href="#top">トップへ</a>)</p>
 
@@ -189,9 +182,8 @@ Lefthook は `docs/` 変更を検出すると pre-commit で同じ検査を実�
 重要な設計・アーキテクチャ上の判断は、Architecture Decision Record（ADR）として [`docs/adr/`](docs/adr/) に残します。
 
 - 規約は [`.kiro/steering/adr-decision-record.md`](.kiro/steering/adr-decision-record.md) に定義しています（ADR を作る/作らない基準、記録先、ライフサイクル）。
-- 書式は AI-DLC 同梱テンプレート（`.kiro/knowledge/aidlc-architect-agent/adr-template.md`）に準拠します。
+- 書式は [`docs/adr/adr-template.md`](docs/adr/adr-template.md) に準拠します。
 - ADR の一覧は [`docs/adr/index.md`](docs/adr/index.md) を参照してください。
-- インテント固有の設計判断は、AI-DLC が inception 実行時に各インテントの record dir（`<record>/inception/domain-design/decisions.md`）へ生成します。
   `docs/adr/` はワークフロー外・横断の判断を残す場所です。
 
 push 前には `task adr-check` が pre-push で走り、判断が絡む変更（依存・セキュリティ・DB・インフラ・ワークフロー、およびフロントエンド全体）に `docs/adr/` の更新が伴わないとき注意喚起します。

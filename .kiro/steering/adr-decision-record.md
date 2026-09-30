@@ -1,7 +1,7 @@
 ---
 inclusion: always
 name: adr-decision-record
-description: 重要な設計・アーキテクチャ上の判断を下したときに Architecture Decision Record（ADR）を残す規約。ADR を作る/作らない基準、記録先（横断的な判断は docs/adr、インテント固有は AI-DLC の record dir）、書式（AI-DLC 同梱テンプレートに準拠）、採番、ライフサイクル、運用手順を定める。技術選定・境界設計・API 契約・認証方式・データ方針など、後戻りしにくい判断や議論のあった判断をするとき、またその判断を提案・実装するときに使用する。
+description: 重要な設計・アーキテクチャ上の判断を下したときに Architecture Decision Record（ADR）を残す規約。ADR を作る/作らない基準、記録先（docs/adr）、書式（docs/adr/adr-template.md に準拠）、採番、ライフサイクル、運用手順を定める。技術選定・境界設計・API 契約・認証方式・データ方針など、後戻りしにくい判断や議論のあった判断をするとき、またその判断を提案・実装するときに使用する。
 ---
 
 # 判断があったら ADR を残す
@@ -28,20 +28,12 @@ description: 重要な設計・アーキテクチャ上の判断を下したと�
 
 ## 記録先
 
-判断のスコープで置き場所を分ける。
-
-- **プロジェクト横断・ワークフロー外の判断**は `docs/adr/` に追加する。
-  技術選定、全体のアーキテクチャ、時刻や認証の方針などが該当する。
-- **インテント固有の設計判断**は AI-DLC が inception 実行時に
-  `<record>/inception/domain-design/decisions.md` へ生成する。
-  これはそのまま AI-DLC に任せ、`docs/adr/` へ二重に書かない。
-- インテント固有の ADR のうち、後からプロジェクト横断で効くと判明したものだけを、
-  `docs/adr/` へ昇格（採番し直して記録）する。昇格は手動のキュレーションとする。
+プロジェクト横断・ワークフロー外の判断を `docs/adr/` に追加する。
+技術選定、全体のアーキテクチャ、時刻や認証の方針などが該当する。
 
 ## 書式
 
-書式は AI-DLC 同梱の
-`.kiro/knowledge/aidlc-architect-agent/adr-template.md` に準拠する。
+書式は `docs/adr/adr-template.md` に準拠する。
 新しいテンプレートを作らない。
 
 - 見出し構成：Status / Date / Context / Decision / Consequences

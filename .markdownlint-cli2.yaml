@@ -45,11 +45,6 @@ ignores:
   - "CHANGELOG.md"
   # .kiro 配下は steering だけ lint 対象にし、それ以外のディレクトリは除外する
   - ".kiro/agents/**"
-  - ".kiro/aidlc-common/**"
   - ".kiro/hooks/**"
-  - ".kiro/knowledge/**"
-  - ".kiro/scopes/**"
-  - ".kiro/sensors/**"
   - ".kiro/settings/**"
   - ".kiro/skills/**"
-  - ".kiro/tools/**"

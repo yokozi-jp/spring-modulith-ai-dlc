@@ -165,7 +165,7 @@ VSCode が WSL モードで再起動し、左下のステータスバーに `WSL
 [iwe](https://github.com/iwe-org/iwe) は markdown ベースのナレッジ管理ツールです（CLI、LSP サーバー、MCP サーバー）。
 このプロジェクトでは `docs/` 配下のドキュメント（ADR など）を対象に、リンク補完、バックリンク、定義ジャンプや AI エージェント連携に使い、`task okf-check` で OKF バンドルの適合を検証します。
 
-iwe は手順 7 の `task setup`（`07-setup-iwe.sh`）で導入済みです。
+iwe は `task setup`（`06-setup-iwe.sh`）で導入済みです。
 バージョンは `versions.env` の `IWE_VERSION` に固定し、チームで揃えます。
 
 `iwe`（CLI）、`iwes`（LSP サーバー）、`iwec`（MCP サーバー）の 3 コマンドが入ります。
@@ -174,7 +174,7 @@ iwe は手順 7 の `task setup`（`07-setup-iwe.sh`）で導入済みです。
 クローンした時点で使える状態なので、`iwe init` を実行する必要はありません。
 
 > **なぜ `docs/` を対象にするのか**: iwe は人が育てる markdown のナレッジグラフを扱うツールです。
-> `.kiro/` や `aidlc/` 配下の markdown は AI-DLC フレームワークが管理する生成物なので対象にせず、 リポジトリルートではなく `docs/` に絞ります。
+> `.kiro/` 配下の markdown は Kiro の設定・生成物なので対象にせず、 リポジトリルートではなく `docs/` に絞ります。
 
 エディタ連携（LSP）と AI エージェント連携（MCP）は設定済みで、追加作業は要りません。
 
@@ -194,7 +194,6 @@ docker info
 java -version
 node -v
 gh auth status
-bun --version
 task --version
 go version
 betterleaks version

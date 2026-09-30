@@ -37,3 +37,4 @@
 - [ADR-034: Frontend ランタイムを固定し Oxlint 全カテゴリを強制する](ADR-034-pin-frontend-runtime-and-enforce-oxlint-categories.md)（Proposed, 2026-09-30）
 - [ADR-035: jscpd と Knip を品質ゲートに採用する](ADR-035-adopt-jscpd-and-knip-quality-gates.md)（Proposed, 2026-10-01）
 - [ADR-036: docs/ を OKF v0.2 バンドルとして構成する](ADR-036-adopt-okf-for-docs-knowledge-bundle.md)（Proposed, 2026-09-30）
+- [ADR-037: AI-DLC フレームワークの利用をやめる](ADR-037-remove-aidlc-framework.md)（Proposed, 2026-09-30）

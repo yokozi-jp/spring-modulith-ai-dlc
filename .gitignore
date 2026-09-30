@@ -2,7 +2,6 @@
 # 実値を持つルート .env のみ無視する（.env.test は非機密ダミーのため追跡する）。
 /.env
 
-# BEGIN AI-DLC:gitignore
 # Logs
 logs
 *.log

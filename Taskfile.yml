@@ -172,9 +172,8 @@ tasks:
         ./03-setup-kiro.sh
         export PATH="$HOME/.local/bin:$PATH"
         ./04-setup-shell.sh
-        ./05-setup-bun.sh
-        ./06-setup-go-betterleaks.sh
-        ./07-setup-iwe.sh
+        ./05-setup-go-betterleaks.sh
+        ./06-setup-iwe.sh
 
   # Frontend
   fe-format:
@@ -675,7 +674,6 @@ tasks:
             --config p/dockerfile \
             --config p/secrets \
             --exclude .kiro \
-            --exclude aidlc \
             --error \
             --metrics off \
             --disable-version-check
