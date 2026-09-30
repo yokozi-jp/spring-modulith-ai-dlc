@@ -1,7 +1,8 @@
-import { Button } from "@/components/ui/button";
-import { resolveMessages } from "@/i18n.ts";
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
+
+import { Button } from "@/components/ui/button";
+import { resolveMessages } from "@/i18n.ts";
 
 function HomePage() {
   const [count, setCount] = useState(0);

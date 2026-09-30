@@ -1,5 +1,5 @@
-import { tanstackRouter } from "@tanstack/router-plugin/vite";
 import tailwindcss from "@tailwindcss/vite";
+import { tanstackRouter } from "@tanstack/router-plugin/vite";
 import react from "@vitejs/plugin-react";
 import { defineConfig, loadEnv } from "vite-plus";
 
@@ -65,7 +65,7 @@ export default defineConfig(({ mode }) => {
         thresholds: { branches: 85 },
       },
     },
-    fmt: { ignorePatterns: generatedFiles },
+    fmt: { ignorePatterns: generatedFiles, sortImports: true },
     lint: {
       ignorePatterns: generatedFiles,
       categories: {
