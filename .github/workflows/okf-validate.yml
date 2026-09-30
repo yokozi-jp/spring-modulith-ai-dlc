@@ -44,8 +44,10 @@ jobs:
 
       # docs/ を OKF v0.2 バンドルとして検証する（適合と孤立ドキュメント）。
       # 開発環境構築手順と同じ版に固定し、ローカルの lefthook と同じ task okf-check を呼ぶ。
+      # iwe はグローバル CLI ツールで pnpm workspace の lockfile 管理にそぐわないため、
+      # バージョンを versions.env と揃えて固定し、adhoc-packages 監査を抑制する。
       - name: Install iwe
-        run: npm install -g @iwe-org/iwe@0.24.2
+        run: npm install -g @iwe-org/iwe@0.24.2 # zizmor: ignore[adhoc-packages]
 
       - name: Validate OKF conformance
         run: task okf-check
