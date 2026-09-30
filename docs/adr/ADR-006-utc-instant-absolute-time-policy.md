@@ -19,11 +19,13 @@ Accepted
 
 本 ADR は、既に実装済みの決定を遡って記録した（backfill）。
 
-日時の扱いは、保存・API・表示・テストで解釈がずれると、 再現困難なバグや、環境依存の挙動を生む。 バックエンドの実行環境・DB セッション・ログ・API 表現で、 絶対時刻の解釈を一意に固定したい。
+日時の扱いは、保存・API・表示・テストで解釈がずれると、 再現困難なバグや、環境依存の挙動を生む。
+バックエンドの実行環境・DB セッション・ログ・API 表現で、 絶対時刻の解釈を一意に固定したい。
 
 ## Decision
 
-絶対時刻を UTC に統一し、Java では `Instant`、PostgreSQL では `TIMESTAMP WITH TIME ZONE` を使う。表示用タイムゾーンへの変換はフロントエンドが担う。
+絶対時刻を UTC に統一し、Java では `Instant`、PostgreSQL では `TIMESTAMP WITH TIME ZONE` を使う。
+表示用タイムゾーンへの変換はフロントエンドが担う。
 
 - 現在時刻は `Clock` をコンストラクタ注入し、`now(Clock)` で取得する。
 - システム `Clock` の生成は `DemoApplication.clock()`（`Clock.systemUTC()`）だけに限定する。

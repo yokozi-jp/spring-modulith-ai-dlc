@@ -17,23 +17,37 @@ Proposed
 
 ## Context
 
-バックエンドはSpring Bootとspringdoc-openapiを使い、実行中のControllerからOpenAPI 3.1契約を生成する。 ADR-013はこのcode-first契約をSpectralと契約テストで検査する方針を定めている。 現在の契約には共通のProblem Details schemaとresponseがあるが、業務APIの `paths` はまだない。
+バックエンドはSpring Bootとspringdoc-openapiを使い、実行中のControllerからOpenAPI 3.1契約を生成する。
+ADR-013はこのcode-first契約をSpectralと契約テストで検査する方針を定めている。
+現在の契約には共通のProblem Details schemaとresponseがあるが、業務APIの `paths` はまだない。
 
-FrontendはReact、TanStack Router、TanStack Query、TanStack Form、Zodを採用している。 Spring BootのAPIを手書きのFetch関数から呼ぶと、URL、request、responseのTypeScript型をOpenAPIと別に保守することになる。 両者がずれると、コンパイルが成功しても実行時のrequestまたはresponseが契約と一致しない可能性がある。
+FrontendはReact、TanStack Router、TanStack Query、TanStack Form、Zodを採用している。
+Spring BootのAPIを手書きのFetch関数から呼ぶと、URL、request、responseのTypeScript型をOpenAPIと別に保守することになる。
+両者がずれると、コンパイルが成功しても実行時のrequestまたはresponseが契約と一致しない可能性がある。
 
-OrvalはOpenAPIからFetch関数、TypeScript型、TanStack Query hooks、Zod schemaを生成できる。 一方、up-fetchはnative Fetchを拡張し、base URL、timeout、retry、response parsing、Standard Schema検証などを提供するが、OpenAPIからclientやschemaを生成しない。 両方を最初から重ねると、request生成とtransport設定の境界を追加で設計する必要がある。
+OrvalはOpenAPIからFetch関数、TypeScript型、TanStack Query hooks、Zod schemaを生成できる。
+一方、up-fetchはnative Fetchを拡張し、base URL、timeout、retry、response parsing、Standard Schema検証などを提供するが、OpenAPIからclientやschemaを生成しない。
+両方を最初から重ねると、request生成とtransport設定の境界を追加で設計する必要がある。
 
-ZodはStandard Schema v1に対応し、TanStack Formの入力検証へ直接利用できる。 Orvalの組み込みruntime validationも生成したZod schemaを利用できるため、フォームとAPI生成のschema libraryを一つに揃えられる。
+ZodはStandard Schema v1に対応し、TanStack Formの入力検証へ直接利用できる。
+Orvalの組み込みruntime validationも生成したZod schemaを利用できるため、フォームとAPI生成のschema libraryを一つに揃えられる。
 
 ## Decision
 
-Frontend API client generatorにOrvalを採用し、開発依存のバージョンを固定する。 Orvalの推移依存 `esbuild` のinstall scriptは許可せず、pnpmの `allowBuilds` で明示的に無効化する。 最初の業務APIを追加するとき、Spring Bootが生成してSpectral検査を通したOpenAPI 3.1契約を入力にし、native Fetchを使うTanStack Query client、TypeScript型、Zod schemaを生成する。
+Frontend API client generatorにOrvalを採用し、開発依存のバージョンを固定する。
+Orvalの推移依存 `esbuild` のinstall scriptは許可せず、pnpmの `allowBuilds` で明示的に無効化する。
+最初の業務APIを追加するとき、Spring Bootが生成してSpectral検査を通したOpenAPI 3.1契約を入力にし、native Fetchを使うTanStack Query client、TypeScript型、Zod schemaを生成する。
 
-初期構成ではup-fetchを追加せず、Orvalの組み込みFetch clientを使う。 認証は同一オリジンのセッションCookieを前提とし、生成clientへ不要なtoken管理を追加しない。 Problem Details、CSRF、timeoutなどの共通処理が組み込みFetchだけでは表現できないと確認した場合に限り、Orval custom mutatorを追加する。 その時点でも、up-fetchを使うか小さなnative Fetch wrapperで足りるかを要件から選ぶ。
+初期構成ではup-fetchを追加せず、Orvalの組み込みFetch clientを使う。
+認証は同一オリジンのセッションCookieを前提とし、生成clientへ不要なtoken管理を追加しない。
+Problem Details、CSRF、timeoutなどの共通処理が組み込みFetchだけでは表現できないと確認した場合に限り、Orval custom mutatorを追加する。
+その時点でも、up-fetchを使うか小さなnative Fetch wrapperで足りるかを要件から選ぶ。
 
-フォーム入力と手書きのruntime境界にもZodを使う。 API responseのruntime validationが必要な境界では、OpenAPIと同じ定義からOrvalが生成したZod schemaを使い、schemaを手書きで重複させない。
+フォーム入力と手書きのruntime境界にもZodを使う。
+API responseのruntime validationが必要な境界では、OpenAPIと同じ定義からOrvalが生成したZod schemaを使い、schemaを手書きで重複させない。
 
-現在は業務APIの `paths` とGit管理するOpenAPI snapshotがないため、Orval設定と空の生成ディレクトリは追加しない。 最初の業務APIと同じ変更で、契約snapshot、生成Task、drift検査、生成物のGit管理方針を追加する。
+現在は業務APIの `paths` とGit管理するOpenAPI snapshotがないため、Orval設定と空の生成ディレクトリは追加しない。
+最初の業務APIと同じ変更で、契約snapshot、生成Task、drift検査、生成物のGit管理方針を追加する。
 
 ## Consequences
 
@@ -54,7 +68,8 @@ Frontend API client generatorにOrvalを採用し、開発依存のバージョ�
 ### Neutral
 
 - Orvalは開発時のcode generatorであり、生成されたFetch clientと必要なZod schemaがブラウザで動く。
-- up-fetchを恒久的に禁止しない。 共通transport要件が生じた時点でcustom mutatorの実装候補として再評価する。
+- up-fetchを恒久的に禁止しない。
+  共通transport要件が生じた時点でcustom mutatorの実装候補として再評価する。
 - Orvalでのclient生成開始まではHTTP clientを先行実装しない。
 
 ## Alternatives Considered

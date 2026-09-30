@@ -19,9 +19,11 @@ Accepted
 
 本 ADR は、既に実装済みの決定を遡って記録した（backfill）。
 
-環境（ローカル / STG / 本番）ごとに設定値は変わる。 Spring Boot は `application-<profile>.yaml` によるプロファイル分割を標準で提供する。
+環境（ローカル / STG / 本番）ごとに設定値は変わる。
+Spring Boot は `application-<profile>.yaml` によるプロファイル分割を標準で提供する。
 
-一方で、DB パスワードや OIDC クライアントシークレットなどの秘密情報は リポジトリ内の YAML には書けない。 したがって、いずれにせよ秘密情報は外部から注入する必要がある。
+一方で、DB パスワードや OIDC クライアントシークレットなどの秘密情報は リポジトリ内の YAML には書けない。
+したがって、いずれにせよ秘密情報は外部から注入する必要がある。
 
 秘密を外部注入する仕組みが必須である以上、環境ごとに YAML を分けると、 「YAML に書く設定」と「外部注入する設定」の二系統を環境の数だけ管理することになり、 どこで何が上書きされるかが追いにくくなる。
 
@@ -29,7 +31,8 @@ Accepted
 
 `application.yaml` を単一に保ち、環境ごとに変わる値と秘密情報は すべて外部から注入する。
 
-- 環境変数を参照し、`application.yaml` にデフォルト値を置かない。 未設定なら起動時に失敗させ、設定漏れを早期に検知する。
+- 環境変数を参照し、`application.yaml` にデフォルト値を置かない。
+  未設定なら起動時に失敗させ、設定漏れを早期に検知する。
 - ローカルはリポジトリルートの `.env` で環境変数を与える （`spring.config.import: optional:file:../.env[.properties]`）。
 - STG / 本番は ECS タスク定義の `environment` / `secrets` から、 SSM Parameter Store または Secrets Manager の値を注入する。
 - CI / CD は GitHub Actions の変数・シークレットから注入する。

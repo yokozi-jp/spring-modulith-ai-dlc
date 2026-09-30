@@ -180,7 +180,8 @@ Liquibaseプラグインの`update`はchangelog内の未適用changesetをすべ
 - **アプリケーション接続の資格情報**：`DB_USERNAME`、`DB_PASSWORD`を使います。
   Spring Bootは共通の接続先とこの資格情報からJDBC URLを組み立てます。
 - **マイグレーション接続の資格情報**：`MIGRATION_DB_USERNAME`、`MIGRATION_DB_PASSWORD`を使います。
-  Liquibaseとその接続を共用するjOOQ生成が使います。接続先は共通の`DB_*`から組み立て、資格情報だけを差し替えます。
+  Liquibaseとその接続を共用するjOOQ生成が使います。
+  接続先は共通の`DB_*`から組み立て、資格情報だけを差し替えます。
   ステージングと本番では、DDL権限を持つマイグレーション専用アカウントを指定します。
   jOOQコード生成はローカルとCIでのみ実行し、本番では実行しないため、生成専用の資格情報は設けません。
 - **Gradle用URLの上書き**：`DB_URL`はGradleの共通接続先を上書きします。
