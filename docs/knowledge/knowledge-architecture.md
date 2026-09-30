@@ -25,7 +25,7 @@ steering に書いた知識は iwe の検索とリンク検査の対象になら
 
 - docs から `.kiro/` 配下へリンクしない。
 - steering から docs を指すときは、パスを文字列（`docs/backend/index.md` など）で書く。
-- steering で `#[[file:docs/...]]` を使わない。Kiro CLI はすべての steering を常時読み込むため、展開された docs が毎回コンテキストに入る可能性がある。
+- steering で `#[[file:docs/...]]` を使わない。展開した docs は、その steering が読み込まれるたびに全文がコンテキストに入る。
 - steering からソースコードや設定ファイルを `#[[file:...]]` で参照するのはよい。
 
 ## 読む流れ
