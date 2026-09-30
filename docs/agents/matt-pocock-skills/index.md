@@ -1,5 +1,6 @@
 # Matt Pocock スキル日本語リファレンス
 
+- [Matt Pocock スキル運用](workflow.md)：Matt Pocock のスキルを使う前に、このプロジェクトでの利用順序、例外時の入口、取得元と更新方法を確かめるとき
 - [ask-matt](ask-matt.md)：現在の状況に合うスキルまたはフローを選ぶとき
 - [code-review](code-review.md)：差分をコーディング規約と仕様の二軸でレビューするとき
 - [codebase-design](codebase-design.md)：深いモジュールとテスト可能な継ぎ目を設計するとき

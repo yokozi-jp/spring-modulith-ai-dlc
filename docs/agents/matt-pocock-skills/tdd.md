@@ -7,7 +7,7 @@ tags: [reference, agent-skills, matt-pocock]
 # 振る舞いをテスト駆動で実装する TDD リファレンス
 
 この文書は実行用の `SKILL.md` ではなく、固定した上流版の日本語リファレンスである。
-プロジェクトでの運用は [Matt Pocock スキル運用](../../matt-pocock-skills.md) を優先する。
+プロジェクトでの運用は [Matt Pocock スキル運用](workflow.md) を優先する。
 
 ## 保守できるテストの概要
 

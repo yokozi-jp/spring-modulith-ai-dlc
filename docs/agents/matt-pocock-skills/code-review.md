@@ -7,7 +7,7 @@ tags: [reference, agent-skills, matt-pocock]
 # 規約と仕様を分離して確認する code-review リファレンス
 
 この文書は実行用の `SKILL.md` ではなく、固定した上流版の日本語リファレンスである。
-プロジェクトでの運用は [Matt Pocock スキル運用](../../matt-pocock-skills.md) を優先する。
+プロジェクトでの運用は [Matt Pocock スキル運用](workflow.md) を優先する。
 
 ## 二軸レビューの概要
 

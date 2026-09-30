@@ -26,14 +26,14 @@ Proposed
 
 ## Decision
 
-Matt Pocock の開発フローを採用し、[Matt Pocock スキル運用 Runbook](../matt-pocock-skills.md) に利用順序、例外時の入口、コンテキストの切り方を記録する。
+Matt Pocock の開発フローを採用し、[Matt Pocock スキル運用 Runbook](../agents/matt-pocock-skills/workflow.md) に利用順序、例外時の入口、コンテキストの切り方を記録する。
 
 利用者が提示した説明に登場するスキルと、その直接依存である `grilling` と `codebase-design` をワークスペースへ導入する。
 上流は `mattpocock/skills` のコミット `d81f3a183412e71a5b1e84ca21bc1a35eea03a60` に固定する。
 取得には `skills` CLI 1.7.0 を使い、実体を `.agents/skills/`、Kiro の検出用リンクを `.kiro/skills/`、内容ハッシュを `skills-lock.json` に置く。
 
 上流の `SKILL.md` と同梱リソースは、更新差分を追跡できるよう無変更で保持する。
-`docs/matt-pocock-skills.md` をプロジェクト固有の利用方法の正文とし、上流スキルとプロジェクト規約が競合した場合は docs の規約と ADR を優先する。
+`docs/agents/matt-pocock-skills/workflow.md` をプロジェクト固有の利用方法の正文とし、上流スキルとプロジェクト規約が競合した場合は docs の規約と ADR を優先する。
 特に ADR の書式と作成条件は `docs/adr/conventions.md`、docs の作成方法は `docs/writing/` と documentation authoring の規約に従う。
 
 更新は固定コミットを明示的に変更する Pull Request で行う。
@@ -81,7 +81,7 @@ Matt Pocock の開発フローを採用し、[Matt Pocock スキル運用 Runboo
 
 ## References
 
-- [Matt Pocock スキル運用 Runbook](../matt-pocock-skills.md)
+- [Matt Pocock スキル運用 Runbook](../agents/matt-pocock-skills/workflow.md)
 - [ADR-037: AI-DLC フレームワークの利用をやめる](ADR-037-remove-aidlc-framework.md)
 - [ADR-038: steering をナビゲーションに限定し、規約の正文を docs/ に置く](ADR-038-route-steering-to-docs-knowledge.md)
 - [Matt Pocock skills](https://github.com/mattpocock/skills/tree/d81f3a183412e71a5b1e84ca21bc1a35eea03a60)

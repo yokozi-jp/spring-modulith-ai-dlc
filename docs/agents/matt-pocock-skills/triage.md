@@ -8,7 +8,7 @@ tags: [reference, agent-skills, matt-pocock]
 # Issueと外部PRをtriage状態へ整理する手順
 
 この文書は実行用の`SKILL.md`ではなく、固定した上流版の日本語リファレンスである。
-プロジェクトでの運用は[Matt Pocock スキル運用](../../matt-pocock-skills.md)を優先する。
+プロジェクトでの運用は[Matt Pocock スキル運用](workflow.md)を優先する。
 
 ## 概要
 

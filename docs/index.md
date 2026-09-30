@@ -12,8 +12,7 @@ okf_version: '0.2'
 - [開発ツール](tooling/index.md)：Taskfile、Git フック、CI、Lint とテストのタスクを扱うとき
 - [文章](writing/index.md)：日本語の docs、ADR、記事を書く、または推敲するとき
 - [ナレッジ管理](knowledge/index.md)：docs や steering を追加、分割、移動するとき、知識をどこに書くか迷ったとき
-- [Matt Pocock スキル運用](matt-pocock-skills.md)：Matt Pocock のスキルを使って要求整理、仕様化、実装、レビューを進めるとき
-- [エージェント設定](agents/index.md)：Agent skillsのIssue tracker、triageラベル、ドメイン文書の設定を確認、変更するとき
+- [エージェント設定](agents/index.md)：Agent skillsのIssue tracker、triageラベル、ドメイン文書の設定を確認、変更するとき、Matt Pocock のスキルを使うとき
 - [Architecture Decision Records](adr/index.md)：設計上の判断をする前に既存の決定を確かめるとき、ADR を起こすとき
 - [開発環境構築](local-env-setup/setup.md)：WSL、Java、Kiro、iwe などの開発環境を用意するとき
 - [main ブランチの保護設定](branch-protection.md)：ブランチ保護、必須チェック、CODEOWNERS を設定、変更するとき

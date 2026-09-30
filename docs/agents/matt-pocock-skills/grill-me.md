@@ -7,7 +7,7 @@ tags: [reference, agent-skills, matt-pocock]
 # Grill Me の対話開始リファレンス
 
 この文書は実行用の `SKILL.md` ではなく、固定した上流版の日本語リファレンスである。
-プロジェクトでの運用は [Matt Pocock スキル運用](../../matt-pocock-skills.md) を優先する。
+プロジェクトでの運用は [Matt Pocock スキル運用](workflow.md) を優先する。
 
 ## 概要
 

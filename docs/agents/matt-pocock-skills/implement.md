@@ -7,7 +7,7 @@ tags: [reference, agent-skills, matt-pocock]
 # 仕様またはチケットを実装する implement リファレンス
 
 この文書は実行用の `SKILL.md` ではなく、固定した上流版の日本語リファレンスである。
-プロジェクトでの運用は [Matt Pocock スキル運用](../../matt-pocock-skills.md) を優先する。
+プロジェクトでの運用は [Matt Pocock スキル運用](workflow.md) を優先する。
 
 ## 仕様に基づく実装の概要
 
