@@ -28,7 +28,11 @@ MSW serverは最初のAPIテストを追加する変更で設定します。
 
 `@shadcn/lint` はVite+内蔵のOxlint pluginとして登録し、`vp lint` と `vp check` から実行します。
 `no-restyle`、`no-raw-colors`、`no-arbitrary-values`、`no-inline-styles`、`require-static-classes`、`no-unknown-classes` をerrorとして有効化しています。
-Oxlintのbuilt-in pluginは既定の `unicorn`、`typescript`、`oxc` を維持したうえで `react` を追加します。
+Oxlintのbuilt-in pluginは `eslint`、`unicorn`、`typescript`、`oxc`、`react`、`import`、`vitest`、`jsx-a11y`、`promise` を有効化します。
+`correctness`、`suspicious`、`pedantic`、`perf`、`style`、`restriction` の安定カテゴリはすべてerrorとし、開発中の `nursery` は有効化しません。
+warningも `denyWarnings` でblockingにし、不要になったdisable directiveはerrorとして検出します。
+全カテゴリには相互に矛盾する規則やframeworkの標準構文を禁止する規則も含まれるため、automatic JSX runtime、Viteのdefault export、TanStack Routerのnamed export、CSSの副作用import、Vitestのhookなどに限って個別規則を無効化または調整します。
+カテゴリ全体をwarningへ戻したり、ファイル単位でLintを無効化したりしません。
 Oxlintの `react/no-danger` は `dangerouslySetInnerHTML` を禁止します。
 `no-restricted-properties` と `no-restricted-globals` はHTMLを解釈するDOM APIを禁止し、repository-localの `local-security/no-jsx-srcdoc` はiframeのJSX `srcDoc` を禁止します。
 HTML sinkの組み込み規則は、qualified accessを実際の `vp lint` へ渡す統合テストで検証します。

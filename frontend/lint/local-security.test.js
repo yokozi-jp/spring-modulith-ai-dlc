@@ -1,7 +1,7 @@
 import { spawnSync } from "node:child_process";
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it, vi } from "vite-plus/test";
 import { noJsxSrcDoc } from "./local-security.js";
@@ -27,8 +27,8 @@ describe("local-security/no-jsx-srcdoc", () => {
 
 describe("HTML sink restrictions", () => {
   it("rejects qualified DOMParser access through the project lint config", () => {
-    const directory = mkdtempSync(join(tmpdir(), "frontend-security-lint-"));
-    const fixture = join(directory, "qualified-dom-parser.ts");
+    const directory = mkdtempSync(path.join(tmpdir(), "frontend-security-lint-"));
+    const fixture = path.join(directory, "qualified-dom-parser.ts");
 
     try {
       writeFileSync(

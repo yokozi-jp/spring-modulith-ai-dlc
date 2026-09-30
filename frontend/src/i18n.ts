@@ -2,7 +2,7 @@ export const supportedLocales = ["ja", "en"] as const;
 
 export type Locale = (typeof supportedLocales)[number];
 
-type Messages = {
+interface Messages {
   title: string;
   heading: string;
   intro: string;
@@ -12,8 +12,11 @@ type Messages = {
   learnTypeScript: string;
   communityHeading: string;
   communityLead: string;
+  stack: string;
+  github: string;
+  discord: string;
   count: (value: number) => string;
-};
+}
 
 const defaultLocale: Locale = "ja";
 const jaNumberFormat = new Intl.NumberFormat("ja");
@@ -30,6 +33,9 @@ const catalog: Record<Locale, Messages> = {
     learnTypeScript: "TypeScript を学ぶ",
     communityHeading: "コミュニティ",
     communityLead: "Vite コミュニティに参加できます。",
+    stack: "React 19、TanStack、Base UI",
+    github: "GitHub",
+    discord: "Discord",
     count: (value) => `カウント：${jaNumberFormat.format(value)}`,
   },
   en: {
@@ -42,6 +48,9 @@ const catalog: Record<Locale, Messages> = {
     learnTypeScript: "Learn TypeScript",
     communityHeading: "Community",
     communityLead: "Join the Vite community.",
+    stack: "React 19 · TanStack · Base UI",
+    github: "GitHub",
+    discord: "Discord",
     count: (value) => `Count: ${enNumberFormat.format(value)}`,
   },
 };
@@ -49,7 +58,7 @@ const catalog: Record<Locale, Messages> = {
 export function resolveLocale(preferredLocales: readonly string[]): Locale {
   for (const preferredLocale of preferredLocales) {
     try {
-      const language = new Intl.Locale(preferredLocale).language;
+      const { language } = new Intl.Locale(preferredLocale);
       if (language === "ja" || language === "en") {
         return language;
       }

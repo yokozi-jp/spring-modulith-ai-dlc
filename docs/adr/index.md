@@ -45,6 +45,9 @@ Alternatives Considered / References の構成）。
 - **ADR-029**：Frontend開発依存の既知脆弱性をoverrideと期限付きignoreで扱う（Proposed, 2026-09-29）
 - **ADR-030**：Base UIのインラインstyle要素を限定して許可する（Proposed, 2026-09-29）
 - **ADR-031**：Frontendの型検査を厳格化し、tsconfigを正本にする（Proposed, 2026-09-30）
+- **ADR-032**：Frontendを業務機能単位で構成する（Proposed, 2026-09-30）
+- **ADR-033**：Vite 開発オリジンを固定し proxy ポートを単一ソース化する（Proposed, 2026-09-30）
+- **ADR-034**：Frontend ランタイムを固定し Oxlint 全カテゴリを強制する（Proposed, 2026-09-30）
 
 ## 運用
 

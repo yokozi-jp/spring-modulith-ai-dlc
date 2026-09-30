@@ -1,9 +1,7 @@
 import { Button } from "@/components/ui/button";
+import { resolveMessages } from "@/i18n.ts";
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { resolveMessages } from "../i18n.ts";
-
-export const Route = createFileRoute("/")({ component: HomePage });
 
 function HomePage() {
   const [count, setCount] = useState(0);
@@ -19,7 +17,7 @@ function HomePage() {
       <div className="mx-auto flex w-full max-w-4xl flex-col gap-12">
         <section className="flex flex-col items-start gap-6" aria-labelledby="page-heading">
           <div className="rounded-full border bg-muted px-3 py-1 text-sm text-muted-foreground">
-            React 19 · TanStack · Base UI
+            {messages.stack}
           </div>
           <div className="max-w-2xl space-y-3">
             <h1 id="page-heading" className="text-4xl font-semibold tracking-tight sm:text-5xl">
@@ -27,7 +25,13 @@ function HomePage() {
             </h1>
             <p className="text-lg leading-8 text-muted-foreground">{messages.intro}</p>
           </div>
-          <Button type="button" size="lg" onClick={() => setCount((value) => value + 1)}>
+          <Button
+            type="button"
+            size="lg"
+            onClick={() => {
+              setCount((value) => value + 1);
+            }}
+          >
             {messages.count(count)}
           </Button>
         </section>
@@ -73,7 +77,7 @@ function HomePage() {
                   target="_blank"
                   rel="noopener noreferrer"
                 >
-                  GitHub
+                  {messages.github}
                 </a>
               </li>
               <li>
@@ -83,7 +87,7 @@ function HomePage() {
                   target="_blank"
                   rel="noopener noreferrer"
                 >
-                  Discord
+                  {messages.discord}
                 </a>
               </li>
             </ul>
@@ -93,3 +97,5 @@ function HomePage() {
     </main>
   );
 }
+
+export const Route = createFileRoute("/")({ component: HomePage });
