@@ -27,6 +27,7 @@ steering は入口の案内だけを持ち、規約の本文を持たない（[A
 | 開発ツール（Taskfile、フック、CI、Lint）         | `docs/tooling/index.md`    |
 | 文章（日本語の技術文書）                         | `docs/writing/index.md`    |
 | ナレッジ管理（docs と steering の役割分担）      | `docs/knowledge/index.md`  |
+| エージェント設定                                 | `docs/agents/index.md`     |
 | 設計判断（ADR）                                  | `docs/adr/index.md`        |
 | 上記以外、どこか分からないとき                   | `docs/index.md`            |
 

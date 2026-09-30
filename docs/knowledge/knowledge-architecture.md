@@ -8,7 +8,7 @@ tags: [convention, documentation, steering, okf, knowledge-management]
 # steering、docs、iwe の役割分担
 
 知識は3層に分け、依存は steering から docs への一方向にする。
-規約の正文は docs に置き、steering は「いつ、どの docs を読むか」だけを持つ。
+規約の正文は docs に置き、steering は「いつ、どの docs を読むか」だけを持つ。ただし、エージェント設定ではルートの `AGENTS.md` が steering を兼ねる。
 docs は領域ごとのフォルダに分け、各フォルダの index.md を入口にする。
 この分担は [ADR-038](../adr/ADR-038-route-steering-to-docs-knowledge.md) で決定している。
 
@@ -32,7 +32,7 @@ steering に書いた知識は iwe の検索とリンク検査の対象になら
 
 エージェントは次の順で docs を読む。
 
-1. steering で、作業する領域と読むべき index.md を決める。
+1. steering（エージェント設定ではルートの `AGENTS.md`）で、作業する領域と読むべき index.md を決める。
 2. 領域の index.md で、「いつ読むか」が作業に該当する行の文書を選ぶ。
 3. 必要なら iwe（`iwe_retrieve`、`iwe_find`）でリンクをたどり、関連する文書だけを読む。
 
@@ -52,6 +52,7 @@ docs は領域ごとのフォルダ（`docs/backend/`、`docs/database/` など�
 `docs/index.md` は、各領域の index.md へ「いつ読むか」を添えてリンクする。
 領域に属さない単独の文書（リリース管理など）も、`docs/index.md` から同じ形式でリンクする。
 `docs/knowledge/` の領域では、常時読み込みの steering `docs-navigation` が領域の steering を兼ねる。
+`docs/agents/` の領域では、ルートの `AGENTS.md` が領域の steering を兼ねる。
 
 ## index.md の形式
 
@@ -117,6 +118,6 @@ ADR の運用は [ADR の運用ルール](../adr/conventions.md) に従う。
 
 1. `docs/<領域>/` を作り、最初の文書と index.md を置く。
 2. `docs/index.md` に、領域の index.md へのリンクを「いつ読むか」付きで1行加える。
-3. `.kiro/steering/<領域>.md` を作り、その領域のファイルに `fileMatch` させる。
+3. `.kiro/steering/<領域>.md` を作り、その領域のファイルに `fileMatch` させる。ルートの `AGENTS.md` が領域の steering を兼ねる場合は省く。
 4. steering `docs-navigation` の「領域ごとの入口」の表に1行加える。
 5. `task okf-check` を実行する。

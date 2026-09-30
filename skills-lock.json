@@ -38,6 +38,7 @@
     },
     "git-commit": {
       "source": "github/awesome-copilot",
+      "ref": "e24be77e6f203409cf99ab7d5a67e1540cb386d3",
       "sourceType": "github",
       "skillPath": "skills/git-commit/SKILL.md",
       "computedHash": "2607fc60629b82b257136dd2a7a373f0a4466c0b49df7746d845d59313c99b21"
@@ -107,8 +108,10 @@
     },
     "skill-creator": {
       "source": "anthropics/skills",
+      "ref": "b0cbd3df1533b396d281a6886d5132f623393a9c",
       "sourceType": "github",
       "skillPath": "skills/skill-creator/SKILL.md",
+      "note": "Locally modified: added project-specific placement rules. ref pins the upstream base commit; computedHash reflects the local content.",
       "computedHash": "5ea13a6d9f0d4bb694405d79acd00cadec0d21bb138c4dd10fcf3c500cb835c2"
     },
     "tdd": {
@@ -148,6 +151,7 @@
     },
     "using-git-worktrees": {
       "source": "obra/superpowers",
+      "ref": "bc868020bbcec32bbaf9d6b51fa0538dba0b487f",
       "sourceType": "github",
       "skillPath": "skills/using-git-worktrees/SKILL.md",
       "computedHash": "48c8a1040e378e0cb7208107294e3afa9067b9370c3f33b49a443eb6b7528b0d"
