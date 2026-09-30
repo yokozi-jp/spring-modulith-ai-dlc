@@ -80,8 +80,9 @@ describe("Vite configuration", { timeout: 60_000 }, () => {
   it.each(["invalid", "0x10", "65536"])("rejects invalid SERVER_PORT %s", async (value) => {
     vi.stubEnv("SERVER_PORT", value);
 
-    await expect(createDevelopmentServer()).rejects.toThrow(
-      `SERVER_PORT must be an integer between 1 and 65535: ${value}`,
-    );
+    // 設定の読み込み失敗を期待するテストなので、Vite が出す "failed to load config" のログを抑える。
+    await expect(
+      createServer({ mode: "development", logLevel: "silent", server: { middlewareMode: true } }),
+    ).rejects.toThrow(`SERVER_PORT must be an integer between 1 and 65535: ${value}`);
   });
 });
