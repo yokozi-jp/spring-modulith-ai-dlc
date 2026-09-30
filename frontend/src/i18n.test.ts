@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vite-plus/test";
+
 import { resolveLocale, resolveMessages } from "./i18n.ts";
 
 describe("resolveLocale", () => {

@@ -1,11 +1,12 @@
 /* @vitest-environment jsdom */
 
-import { routeTree } from "@/routeTree.gen";
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
-import userEvent from "@testing-library/user-event";
 import { QueryClient } from "@tanstack/react-query";
 import { createMemoryHistory, createRouter, RouterProvider } from "@tanstack/react-router";
+import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vite-plus/test";
+
+import { routeTree } from "@/routeTree.gen";
 
 describe("home route", () => {
   afterEach(() => {

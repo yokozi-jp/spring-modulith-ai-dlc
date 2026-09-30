@@ -3,7 +3,9 @@ import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+
 import { describe, expect, it, vi } from "vite-plus/test";
+
 import { noJsxSrcDoc } from "./local-security.js";
 
 function checkAttribute(name) {
