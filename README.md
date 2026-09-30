@@ -78,19 +78,39 @@
 .
 ├── .agents/          # スキル定義（.agents/skills）
 ├── .github/          # GitHub 設定
-│   ├── workflows/    # GitHub Actions（Lint・シークレットスキャン等）
-│   └── dependabot.yml # 依存関係の自動更新設定
+│   ├── ISSUE_TEMPLATE/   # Issue テンプレート
+│   ├── workflows/        # GitHub Actions（Lint・シークレットスキャン等）
+│   ├── CODEOWNERS        # レビュー担当者の自動割り当て
+│   ├── PULL_REQUEST_TEMPLATE.md # Pull Request テンプレート
+│   └── dependabot.yml    # 依存関係の自動更新設定
 ├── .kiro/            # Kiro 設定
+│   ├── hooks/            # エージェントのフック
+│   ├── settings/         # Kiro CLI と MCP サーバーの設定
+│   ├── skills/           # .agents/skills へのシンボリックリンク（Kiro の検出用）
+│   └── steering/         # steering（docs への案内）
 ├── .vscode/          # VSCode 設定
 ├── backend/          # Spring Boot アプリケーション
 ├── docker/           # Docker 関連ファイル
-│   ├── initdb/       # PostgreSQL 初期化スクリプト（スキーマ作成）
-│   └── keycloak/     # Keycloak realm 定義（起動時インポート）
-├── docs/             # ドキュメント
+│   ├── initdb/           # PostgreSQL 初期化スクリプト（スキーマ作成）
+│   ├── keycloak/         # Keycloak realm 定義（起動時インポート）
+│   ├── compose.yml       # 開発用スタック
+│   └── compose-test.yml  # テスト用の隔離スタック
+├── docs/             # ドキュメント（iwe / OKF のナレッジグラフ）
+│   ├── .iwe/             # iwe の設定と OKF スキーマ
 │   ├── adr/              # Architecture Decision Records（設計判断の記録）
-│   └── local-env-setup/  # 開発環境構築手順・スクリプト
+│   ├── agents/           # エージェントスキル用の設定（Issue tracker、Triage ラベル、ドメイン文書）
+│   ├── backend/          # バックエンドの規約（アーキテクチャ、テスト）
+│   ├── container/        # コンテナ（Dockerfile、Compose）の規約
+│   ├── database/         # データベース（マイグレーション、jOOQ、接続）の規約
+│   ├── datetime/         # 日時とタイムゾーンの規約
+│   ├── frontend/         # フロントエンドの規約
+│   ├── knowledge/        # ナレッジ管理（docs と steering の役割分担）
+│   ├── local-env-setup/  # 開発環境構築手順・スクリプト
+│   ├── tooling/          # 開発ツール（Taskfile、フック、CI、Lint）の規約
+│   ├── writing/          # 日本語の技術文書の書き方
+│   └── index.md          # docs の入口
 ├── frontend/         # VitePlus + TypeScript フロントエンド（pnpm）
-├── infrastructure/   # インフラ定義
+├── infrastructure/   # インフラ定義（未整備）
 ├── .betterleaks.toml # betterleaks（シークレットスキャナ）設定
 ├── .editorconfig     # エディタ共通設定
 ├── .env.example      # 環境変数のサンプル
@@ -102,6 +122,7 @@
 ├── .release-please-manifest.json # release-please が追跡する直近の版
 ├── .snyk             # Snyk のスキャン除外ポリシー（プロダクションコード以外を除外）
 ├── .spectral.yaml    # Spectral（OpenAPI 契約リンタ）設定
+├── AGENTS.md         # エージェント共通の設定（スキルが参照する docs の案内）
 ├── CHANGELOG.md      # リリースノート（release-please が生成）
 ├── CONTRIBUTING.md   # 変更手順、ブランチ運用、コミット規約
 ├── LICENSE           # ライセンス
