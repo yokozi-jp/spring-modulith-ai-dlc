@@ -48,5 +48,7 @@ describe("HTML sink restrictions", () => {
     } finally {
       rmSync(directory, { recursive: true, force: true });
     }
-  }, 15_000);
+    // vp lint をプロセスとして起動しプロジェクトの設定と plugin を読み込むため、所要時間は CPU の空きに比例する。
+    // pre-push の並列実行では 15 秒を超えたので、ハング検出として十分な 60 秒にする。
+  }, 60_000);
 });
