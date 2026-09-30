@@ -1,0 +1,7 @@
+{
+  "telemetry.enabled": false,
+  "chat.defaultModel": "auto",
+  "chat.defaultAgent": "default",
+  "chat.ui": "tui",
+  "chat.agentEngine": "v3"
+}
