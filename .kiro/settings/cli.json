@@ -1,10 +1,7 @@
 {
-  "chat.defaultAgent": "kiro_default",
-  "chat.modelDefaults": {
-    "claude-opus-4.8": {
-      "output_config": {
-        "effort": "high"
-      }
-    }
-  }
+  "telemetry.enabled": false,
+  "chat.defaultModel": "auto",
+  "chat.defaultAgent": "default",
+  "chat.ui": "tui",
+  "chat.agentEngine": "v3"
 }

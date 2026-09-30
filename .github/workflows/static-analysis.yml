@@ -41,7 +41,7 @@ jobs:
 
       # SARIF を出力する。検出があってもここでは失敗させず、
       # 結果は Code Scanning（Security タブ）で確認する。
-      # .kiro/ と aidlc/ は AI-DLC フレームワークの領域のため対象外にする。
+      # .kiro/ は Kiro 設定・ツールの領域のため対象外にする。
       - name: Run semgrep scan
         run: |
           semgrep scan \
@@ -51,7 +51,6 @@ jobs:
             --config p/dockerfile \
             --config p/secrets \
             --exclude .kiro \
-            --exclude aidlc \
             --sarif \
             --output semgrep.sarif \
             --metrics off \

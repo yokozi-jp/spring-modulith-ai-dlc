@@ -11,9 +11,8 @@
 /docker/ @yokozi-jp
 /infrastructure/ @yokozi-jp
 
-# Kiro設定とAI-DLCワークスペース
+# Kiro設定
 /.kiro/ @yokozi-jp
-/aidlc/ @yokozi-jp
 
 # GitHub上のリポジトリ運用
 /.github/ @yokozi-jp
