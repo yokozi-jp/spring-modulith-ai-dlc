@@ -153,11 +153,40 @@ npm install
 
 VSCode が WSL モードで再起動し、左下のステータスバーに `WSL: <インスタンス名>` と表示されれば接続完了です。
 
-### 10. VSCode 拡張機能のインストール
+### 10. iwe のインストール
+
+[iwe](https://github.com/iwe-org/iwe) は markdown ベースのナレッジ管理ツールです（CLI、LSP サーバー、MCP サーバー）。
+このプロジェクトでは `docs/` 配下のドキュメント（ADR など）を対象に、リンク補完・バックリンク・定義ジャンプや AI エージェント連携に使います。
+チームでバージョンを揃えるため、グローバルインストールでバージョンを固定します。
+
+```bash
+npm install -g @iwe-org/iwe@0.24.2
+iwe --version
+```
+
+`iwe`（CLI）、`iwes`（LSP サーバー）、`iwec`（MCP サーバー）の 3 コマンドが入ります。
+
+`docs/` のワークスペースを初期化します（初回のみ）。
+
+```bash
+cd /home/projects/spring-modulith-ai-dlc/docs
+iwe init
+```
+
+> **なぜ `docs/` を対象にするのか**: iwe は人が育てる markdown のナレッジグラフを扱うツールです。
+> `.kiro/` や `aidlc/` 配下の markdown は AI-DLC フレームワークが管理する生成物なので対象にせず、
+> リポジトリルートではなく `docs/` に絞ります。
+
+エディタ連携（LSP）と AI エージェント連携（MCP）は設定済みで、追加作業は要りません。
+
+- **エディタ連携（LSP）**: 手順 11 の推奨拡張に含まれる `iwe.iwe` 拡張が、ここでグローバルインストールした `iwes` を LSP サーバーとして利用します。定義ジャンプ、バックリンク、リンク補完などが markdown で使えます（詳細は [VS Code 向けドキュメント](https://iwe.md/docs/editors/vscode/)）。
+- **AI エージェント連携（MCP）**: MCP サーバー `iwec` の設定は `.kiro/settings/mcp.json` にコミット済みです（作業ディレクトリを `docs/` に固定して起動）。Kiro を再起動すれば利用できます。
+
+### 11. VSCode 拡張機能のインストール
 
 `.vscode/extensions.json` に記載されている推奨拡張機能をインストールしてください。
 
-### 11. 動作確認
+### 12. 動作確認
 
 ```bash
 docker info
@@ -168,6 +197,7 @@ bun --version
 task --version
 go version
 betterleaks version
+iwe --version
 ```
 
 エラーなく各ツールの情報が表示されれば環境構築完了です。

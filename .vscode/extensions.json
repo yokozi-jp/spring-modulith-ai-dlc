@@ -4,6 +4,7 @@
     "vscjava.vscode-java-pack",
     "vmware.vscode-spring-boot",
     "mermaidchart.vscode-mermaid-chart",
-    "redhat.vscode-yaml"
+    "redhat.vscode-yaml",
+    "iwe.iwe"
   ]
 }
