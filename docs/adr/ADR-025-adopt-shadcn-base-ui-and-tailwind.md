@@ -1,5 +1,5 @@
 ---
-type: Architecture Decision Record
+type: ADR
 title: 'ADR-025: shadcn/uiのBase UI版とTailwind CSSを採用する'
 description: アクセシビリティと所有可能な component のため、shadcn/ui の Base UI 版と Tailwind CSS を採用する決定。
 tags: [adr, frontend, ui, tailwind]

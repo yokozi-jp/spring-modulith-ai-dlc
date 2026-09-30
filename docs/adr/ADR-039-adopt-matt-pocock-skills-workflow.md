@@ -1,5 +1,5 @@
 ---
-type: Architecture Decision Record
+type: ADR
 title: 'ADR-039: Matt Pocock のスキルフローを導入する'
 description: Matt Pocock の開発フローで使うスキルを固定リビジョンから導入し、プロジェクト固有の使い方を Runbook へ記録する決定。
 tags: [adr, workflow, agent-skills, matt-pocock]

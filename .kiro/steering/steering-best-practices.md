@@ -17,5 +17,5 @@ steering の書き方の正文は docs にあり、この steering は読む文�
 
 ## 読む docs
 
-- フロントマター、inclusion モード、ファイル参照、カスタムエージェントの設定を確認するとき：`docs/knowledge/steering-authoring.md`
-- steering と docs に何を書き分けるか、行数の目安、依存方向を確認するとき：`docs/knowledge/knowledge-architecture.md`
+- フロントマター、inclusion モード、行数、本文、ファイル参照、カスタムエージェントの設定を確認するとき：`docs/knowledge/steering-authoring.md`
+- steering と docs に何を書き分けるか、依存方向を確認するとき：`docs/knowledge/knowledge-architecture.md`

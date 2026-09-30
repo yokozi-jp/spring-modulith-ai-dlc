@@ -1,8 +1,8 @@
 ---
-type: Guide
+type: Runbook
 title: 開発ワークフロー
-description: 日常の開発で、いつどの Task コマンドをどの順で使うかをシナリオ別に示すガイド。
-tags: [guide, workflow, task-runner]
+description: 日常の開発で、いつどの Task コマンドをどの順で使うかをシナリオ別に示す手順書。
+tags: [runbook, workflow, task-runner]
 ---
 
 # 開発ワークフロー

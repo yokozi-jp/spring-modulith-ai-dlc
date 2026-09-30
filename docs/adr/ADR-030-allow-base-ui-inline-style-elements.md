@@ -1,5 +1,5 @@
 ---
-type: Architecture Decision Record
+type: ADR
 title: 'ADR-030: Base UIのインラインstyle要素を限定して許可する'
 description: 静的配信で保守性を保ちつつ script 実行を遮断するため、Base UI のインライン style 要素を限定して許可する決定。
 tags: [adr, frontend, security, csp]

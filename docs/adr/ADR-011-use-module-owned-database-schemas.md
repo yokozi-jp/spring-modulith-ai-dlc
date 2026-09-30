@@ -1,5 +1,5 @@
 ---
-type: Architecture Decision Record
+type: ADR
 title: 'ADR-011: モジュール所有のデータベーススキーマを使う'
 description: モジュールごとのテーブル所有境界を DB 上で識別するため、モジュール所有のスキーマを使う決定。
 tags: [adr, database, spring-modulith, schema]

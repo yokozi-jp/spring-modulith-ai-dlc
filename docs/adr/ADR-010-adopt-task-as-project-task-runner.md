@@ -1,5 +1,5 @@
 ---
-type: Architecture Decision Record
+type: ADR
 title: 'ADR-010: プロジェクトのタスクランナーにTaskを採用する'
 description: Make 固有の設定負担を避け YAML で保守しやすくするため、タスクランナーに Task を採用する決定。
 tags: [adr, tooling, task-runner]

@@ -1,8 +1,8 @@
 ---
-type: Guide
+type: Reference
 title: 'Lint・テストのリファレンス'
 description: 静的解析・スキャン・テストの各 Task と、Git フックおよび CI での自動実行の対応をまとめたリファレンス。
-tags: [guide, testing, lint, ci]
+tags: [reference, testing, lint, ci]
 ---
 
 # Lint・テストのリファレンス

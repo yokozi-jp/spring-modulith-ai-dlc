@@ -13,11 +13,11 @@ ADR を作る基準、採番とファイル名、ライフサイクルは [ADR �
 ## 書式
 
 見出し構成は Status / Date / Context / Decision / Consequences（Positive、Negative、Neutral）/ Alternatives Considered / References とする。
-frontmatter に `type: Architecture Decision Record`、`title`、`description`、`tags` を置く。
+frontmatter に `type: ADR`、`title`、`description`、`tags` を置く。
 
 ```markdown
 ---
-type: Architecture Decision Record
+type: ADR
 title: 'ADR-NNN: 短く内容を特定する題'
 description: この判断を一文で要約する。
 tags: [adr, ...]

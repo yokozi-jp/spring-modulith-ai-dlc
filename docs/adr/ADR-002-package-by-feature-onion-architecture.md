@@ -1,5 +1,5 @@
 ---
-type: Architecture Decision Record
+type: ADR
 title: 'ADR-002: package by feature とオニオンアーキテクチャ'
 description: 機能単位のパッケージ分割とオニオンアーキテクチャで、ドメインを技術詳細から独立させ依存を内向きに保つ決定。
 tags: [adr, architecture, onion-architecture, package-by-feature]

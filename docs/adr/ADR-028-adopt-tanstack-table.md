@@ -1,5 +1,5 @@
 ---
-type: Architecture Decision Record
+type: ADR
 title: 'ADR-028: TanStack Tableを採用する'
 description: table state と row model の重複実装を避けるため、headless な TanStack Table を採用する決定。
 tags: [adr, frontend, ui, table]

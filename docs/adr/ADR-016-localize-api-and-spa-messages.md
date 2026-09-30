@@ -1,5 +1,5 @@
 ---
-type: Architecture Decision Record
+type: ADR
 title: 'ADR-016: API と SPA のメッセージをローカライズする'
 description: 機械判定と言語選択を分離するため、API と SPA のメッセージを日本語と英語でローカライズする決定。
 tags: [adr, i18n, api, frontend]

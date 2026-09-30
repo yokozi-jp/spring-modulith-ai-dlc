@@ -1,8 +1,8 @@
 ---
-type: Operations
+type: Runbook
 title: リリース管理
 description: リポジトリ全体を単一リリース単位として扱うリリース管理の運用。
-tags: [operations, release, versioning]
+tags: [runbook, operations, release, versioning]
 ---
 
 # リリース管理

@@ -1,5 +1,5 @@
 ---
-type: Architecture Decision Record
+type: ADR
 title: 'ADR-027: Frontendのテスト基盤を標準化する'
 description: 利用者操作と API 境界を実装に近く検証するため、Frontend のテスト基盤を標準化する決定。
 tags: [adr, frontend, testing]

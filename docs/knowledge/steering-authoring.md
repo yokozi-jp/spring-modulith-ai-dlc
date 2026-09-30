@@ -1,7 +1,7 @@
 ---
 type: Convention
 title: steering の書き方
-description: Kiro の steering ファイル（.kiro/steering/ 配下の .md）を作成、編集するときの配置、フロントマター、inclusion モード、粒度と命名、本文、ファイル参照、機密情報、カスタムエージェント、保守を定める規約。steering ファイルを書く、または直す前に読む。
+description: Kiro の steering ファイル（.kiro/steering/ 配下の .md）を作成、編集するときの配置、フロントマター、inclusion モード、粒度、行数、命名、本文、ファイル参照、機密情報、カスタムエージェント、保守を定める規約。steering ファイルを書く、または直す前に読む。
 tags: [convention, steering, kiro]
 ---
 
@@ -9,7 +9,7 @@ tags: [convention, steering, kiro]
 
 steering はワークスペースの `.kiro/steering/` にだけ置き、フロントマターで inclusion モードを指定する。
 本文は読む docs の案内、行動指針、全タスクで守る短いルールだけにし、規約の本文と理由は docs と ADR に置く。
-steering に何を書くか、行数の目安、docs との依存方向は [steering、docs、iwe の役割分担](knowledge-architecture.md) に従う。
+steering と docs の役割および依存方向は [steering、docs、iwe の役割分担](knowledge-architecture.md) に従う。
 
 ## 配置とスコープ
 
@@ -61,6 +61,8 @@ inclusion モードは CLI でも効く前提で設計する。
 
 - 1つのファイルには1つの領域だけを置く。API 設計、テスト、デプロイ手順を混ぜない。
 - ファイル名は領域が分かる具体的な名前にする（`backend.md`、`database.md` など）。
+- 1ファイル150行、全 steering の合計500行以内を目安にする。
+- 領域の steering は30行程度にとどめる。
 
 ## 本文の書き方
 
@@ -101,7 +103,7 @@ steering はコードベースの一部としてリポジトリで管理され�
 ## 保守
 
 - アーキテクチャや開発フローを変えたら、steering の案内が docs の現状と合っているかを見直す。
-- 再編後は、steering が指す docs のパスとファイル参照が実在するかを確認する。`task okf-check` が docs のパスの実在を検査する。
+- 再編後は、steering が指す docs のパスとファイル参照が実在するか確認する。`task okf-check` が docs のパスの実在を検査する。
 - steering の変更はコードの変更と同じくレビューを通す。
 
 ## 出典

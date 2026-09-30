@@ -1,5 +1,5 @@
 ---
-type: Architecture Decision Record
+type: ADR
 title: 'ADR-035: jscpd と Knip を品質ゲートに採用する'
 description: 重複コードと未使用コードを Pull Request ごとに検出するため、jscpd と Knip を品質ゲートに採用する決定。
 tags: [adr, quality, ci, lint]

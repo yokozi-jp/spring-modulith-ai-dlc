@@ -1,5 +1,5 @@
 ---
-type: Architecture Decision Record
+type: ADR
 title: 'ADR-029: Frontend開発依存の既知脆弱性をoverrideと期限付きignoreで扱う'
 description: 修正版のない推移的脆弱性を管理するため、override と期限付き ignore で Frontend 開発依存を扱う決定。
 tags: [adr, frontend, security, dependencies]

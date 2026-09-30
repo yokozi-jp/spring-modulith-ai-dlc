@@ -1,5 +1,5 @@
 ---
-type: Architecture Decision Record
+type: ADR
 title: 'ADR-014: SPA とバックエンドを同一オリジンで公開する'
 description: CORS と Cookie 設定の複雑さを避けるため、SPA とバックエンドを同一オリジンで公開する決定。
 tags: [adr, security, spa, frontend]

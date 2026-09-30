@@ -1,8 +1,8 @@
 ---
-type: Operations
+type: Convention
 title: main ブランチの保護設定
 description: 既定ブランチ main を対象にした GitHub branch ruleset の保護設定。
-tags: [operations, governance, git, github]
+tags: [convention, operations, governance, git, github]
 ---
 
 # main ブランチの保護設定

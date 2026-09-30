@@ -1,8 +1,8 @@
 ---
-type: Operations
+type: Convention
 title: 可観測性の運用
 description: OpenTelemetry によるログ・トレース・メトリクスの送信と、ローカルおよび本番の可観測性運用。
-tags: [operations, observability, opentelemetry]
+tags: [convention, operations, observability, opentelemetry]
 ---
 
 # 可観測性の運用

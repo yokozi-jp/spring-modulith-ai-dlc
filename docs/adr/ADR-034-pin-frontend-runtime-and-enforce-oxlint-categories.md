@@ -1,5 +1,5 @@
 ---
-type: Architecture Decision Record
+type: ADR
 title: 'ADR-034: Frontend ランタイムを固定し Oxlint 全カテゴリを強制する'
 description: ローカルと CI の実行差をなくすため、Frontend ランタイムを固定し Oxlint 全カテゴリを強制する決定。
 tags: [adr, frontend, tooling, lint]

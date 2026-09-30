@@ -1,5 +1,5 @@
 ---
-type: Architecture Decision Record
+type: ADR
 title: 'ADR-032: Frontendを業務機能単位で構成する'
 description: API の所有機能と画面コードの対応を追いやすくするため、Frontend を業務機能単位で構成する決定。
 tags: [adr, frontend, architecture]

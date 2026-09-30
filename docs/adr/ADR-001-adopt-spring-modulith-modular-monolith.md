@@ -1,5 +1,5 @@
 ---
-type: Architecture Decision Record
+type: ADR
 title: 'ADR-001: Spring Modulith によるモジュラーモノリス'
 description: 単一デプロイの軽さを保ちながら機能境界を強制するため、Spring Modulith でモジュラーモノリスを採用する決定。
 tags: [adr, architecture, spring-modulith, modular-monolith]

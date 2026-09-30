@@ -1,5 +1,5 @@
 ---
-type: Architecture Decision Record
+type: ADR
 title: 'ADR-021: Dependabot の minor/patch 更新をグループ化し auto-merge する'
 description: 厳格モードでの Pull Request 滞留を抑えるため、Dependabot の minor/patch 更新をグループ化し auto-merge する決定。
 tags: [adr, dependabot, ci, automation]

@@ -44,6 +44,7 @@ index.md の各行には「いつ読むか」が書いてある。
 
 ## docs や steering を更新するとき
 
-docs や steering を追加、分割、移動する前に `docs/knowledge/knowledge-architecture.md` を読む。
-どの層に何を書くか、index.md の形式、文書の大きさ、新しい領域の追加手順はそこにある。
-更新したら `task okf-check` を実行する。
+- 知識をどの層へ置くか、依存方向や領域の入口を決める前に、`docs/knowledge/knowledge-architecture.md` を読む。
+- docs を新規作成、編集、移動、分割する、または新しい領域を追加する前に、`docs/knowledge/documentation-authoring.md` を読む。
+- steering を作成、編集する前に、`docs/knowledge/steering-authoring.md` を読む。
+- 更新後は `task okf-check` を実行する。

@@ -1,5 +1,5 @@
 ---
-type: Architecture Decision Record
+type: ADR
 title: 'ADR-038: steering をナビゲーションに限定し、規約の正文を docs/ に置く'
 description: steering をエージェント向けのナビゲーションに限定し、規約の正文を docs/ に集約して、steering から docs/ への一方向の依存とする決定。
 tags: [adr, documentation, okf, steering, knowledge-management]
@@ -52,7 +52,7 @@ index が該当しない場合は `iwe_find` で全文検索し、それでも�
 - 各領域の `index.md` は目次とルーターを兼ね、各行に「いつ読むか」を書く。どの index からもリンクされない文書を残さない。
 - 規約文書には現行ルールと検査方法を書き、理由は ADR へリンクする。ADR が Accepted または Superseded になったら、対応する規約文書を更新する。
 - 各文書の冒頭にルールの要約を置き、詳細はその後に書く。
-- frontmatter の `type` を固定の語彙（`Convention`、`Architecture`、`Runbook`、`Reference`、`Domain`、`Architecture Decision Record`）で付け、`iwe_find` の絞り込みに使う。
+- frontmatter の `type` を固定の語彙（`Convention`、`Architecture`、`Runbook`、`Reference`、`Domain`、`ADR`）で付け、`iwe_find` の絞り込みに使う。
 - エージェントが繰り返す手順は docs の Runbook を正本とし、skill は Runbook を指すだけにする。
 - 依存方向、steering から docs へのパスの実在、行数の目安は `task okf-check` で検査する。依存方向とパスの実在は失敗とし、行数は警告とする。
 

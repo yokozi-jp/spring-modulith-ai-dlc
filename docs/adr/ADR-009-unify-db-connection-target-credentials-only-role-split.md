@@ -1,5 +1,5 @@
 ---
-type: Architecture Decision Record
+type: ADR
 title: 'ADR-009: DB 接続を単一アカウントから二つの役割へ分ける'
 description: 最小権限を全環境で実現するため、DB 接続をアプリケーション用とマイグレーション用の役割へ分ける決定。
 tags: [adr, database, security, migration]

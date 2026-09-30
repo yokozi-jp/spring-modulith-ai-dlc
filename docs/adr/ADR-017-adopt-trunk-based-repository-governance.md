@@ -1,5 +1,5 @@
 ---
-type: Architecture Decision Record
+type: ADR
 title: 'ADR-017: トランクベース開発とリポジトリ保護を採用する'
 description: 統合時の差分と検証量を抑えるため、トランクベース開発とブランチ保護を採用する決定。
 tags: [adr, governance, git, ci]

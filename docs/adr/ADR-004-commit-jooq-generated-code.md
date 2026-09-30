@@ -1,5 +1,5 @@
 ---
-type: Architecture Decision Record
+type: ADR
 title: 'ADR-004: jOOQ 生成コードを Git 管理する'
 description: ビルドを稼働 DB から切り離し変更履歴を追えるよう、jOOQ 生成コードを Git 管理する決定。
 tags: [adr, backend, jooq, build]

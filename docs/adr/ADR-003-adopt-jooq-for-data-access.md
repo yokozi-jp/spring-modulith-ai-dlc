@@ -1,5 +1,5 @@
 ---
-type: Architecture Decision Record
+type: ADR
 title: 'ADR-003: データアクセスに jOOQ を採用'
 description: 発行される SQL を明示制御し PostgreSQL 方言を活かすため、データアクセスに jOOQ を採用する決定。
 tags: [adr, backend, database, jooq]

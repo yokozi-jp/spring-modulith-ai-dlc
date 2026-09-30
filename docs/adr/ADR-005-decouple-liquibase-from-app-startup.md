@@ -1,5 +1,5 @@
 ---
-type: Architecture Decision Record
+type: ADR
 title: 'ADR-005: Liquibase をアプリケーション起動から分離する'
 description: 起動時マイグレーションの競合を避け、スキーマ変更をデプロイと独立させるため Liquibase を起動から分離する決定。
 tags: [adr, database, liquibase, migration]
