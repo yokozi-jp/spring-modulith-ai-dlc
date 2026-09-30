@@ -176,6 +176,7 @@ coverageレポートは `task fe-coverage` で確認でき、CIでは14日間art
 バックエンド変更時は push 前に `task verify`（静的解析、OpenAPI 契約検査と、使い捨てDBでのマイグレーション検証とテスト、CI と同じ内容）を実行します。
 入力範囲が広い契約にはQuickTheoriesによるプロパティベーステストを使い、通常のテストと一緒に実行します。
 テストの検出力を確認するときは`task mutation-test`でPITを明示実行しますが、実行コストが高いため`task verify`には含めません。
+`docs/` を編集したときは `task okf-check` で Open Knowledge Format v0.2 バンドルの適合（フロントマターと予約ファイル）と孤立ドキュメントを検査します。Lefthook は `docs/` 変更を検出すると pre-commit で同じ検査を実行します。
 
 各タスクの一覧と内容、Git フックと CI での自動実行の対応は [Lint・テストのリファレンス](docs/lint-and-test.md) にまとめています。
 

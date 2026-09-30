@@ -1,3 +1,10 @@
+---
+type: Architecture Decision Record
+title: 'ADR-014: SPA とバックエンドを同一オリジンで公開する'
+description: CORS と Cookie 設定の複雑さを避けるため、SPA とバックエンドを同一オリジンで公開する決定。
+tags: [adr, security, spa, frontend]
+---
+
 # ADR-014: SPA とバックエンドを同一オリジンで公開する
 
 ## Status
@@ -10,30 +17,21 @@ Accepted
 
 ## Context
 
-認証は OIDC Authorization Code Flow とサーバ側セッションを使い、ブラウザは `APP_SESSION` Cookie と CSRF token をバックエンドへ送る。
-この構成はアクセストークンを SPA に渡さない一方、SPA と API を別オリジンにすると credentialed CORS、Cookie 属性、preflight、OIDC redirect URI の設定が増える。
+認証は OIDC Authorization Code Flow とサーバ側セッションを使い、ブラウザは `APP_SESSION` Cookie と CSRF token をバックエンドへ送る。 この構成はアクセストークンを SPA に渡さない一方、SPA と API を別オリジンにすると credentialed CORS、Cookie 属性、preflight、OIDC redirect URI の設定が増える。
 
-現在の Vite 開発サーバーには proxy がなく、本番の SPA 配信先とリバースプロキシも決まっていない。
-CORS は未設定なので、Vite とバックエンドを別ポートのままブラウザから直接接続する構成は動作しない。
+現在の Vite 開発サーバーには proxy がなく、本番の SPA 配信先とリバースプロキシも決まっていない。 CORS は未設定なので、Vite とバックエンドを別ポートのままブラウザから直接接続する構成は動作しない。
 
-Spring Security は HSTS、`X-Content-Type-Options`、`X-Frame-Options` などを既定で付けるが、CSP、Referrer-Policy、Permissions-Policy はアプリケーション固有の値を決められないため既定では付けない。
-CSP は HTML 文書が読み込めるスクリプトなどを制約するものであり、JSON API 応答へ一律に付けても、別の配信元から提供する SPA は保護できない。
-セキュリティヘッダは最終的にブラウザへ HTML を返す配信点で保証する必要がある。
+Spring Security は HSTS、`X-Content-Type-Options`、`X-Frame-Options` などを既定で付けるが、CSP、Referrer-Policy、Permissions-Policy はアプリケーション固有の値を決められないため既定では付けない。 CSP は HTML 文書が読み込めるスクリプトなどを制約するものであり、JSON API 応答へ一律に付けても、別の配信元から提供する SPA は保護できない。 セキュリティヘッダは最終的にブラウザへ HTML を返す配信点で保証する必要がある。
 
 ## Decision
 
-本番では、SPA、API、OIDC の開始 URL と callback、logout を一つの HTTPS origin で公開する。
-入口のリバースプロキシまたは CDN はパスで SPA と Spring Boot へ振り分ける。
-API は `/api/**`、認証関連は `/oauth2/**`、`/login/**`、`/logout`、エラーは `/error` とする。
+本番では、SPA、API、OIDC の開始 URL と callback、logout を一つの HTTPS origin で公開する。 入口のリバースプロキシまたは CDN はパスで SPA と Spring Boot へ振り分ける。 API は `/api/**`、認証関連は `/oauth2/**`、`/login/**`、`/logout`、エラーは `/error` とする。
 
-ローカル開発でも、ブラウザは Vite の一つの origin だけへ接続し、Vite proxy が API と認証関連パスをバックエンドへ転送する。
-OIDC の redirect URI と post logout URI は、ブラウザから見えるこの origin に揃える。
+ローカル開発でも、ブラウザは Vite の一つの origin だけへ接続し、Vite proxy が API と認証関連パスをバックエンドへ転送する。 OIDC の redirect URI と post logout URI は、ブラウザから見えるこの origin に揃える。
 
-同一オリジンを維持する間は CORS を有効にしない。
-「未設定だから動いている」のではなく、cross-origin browser client を許可しないことを契約テストで確認する。
+同一オリジンを維持する間は CORS を有効にしない。 「未設定だから動いている」のではなく、cross-origin browser client を許可しないことを契約テストで確認する。
 
-将来、別オリジンのブラウザクライアントが必要になった場合は本 ADR を再評価する。
-その場合は Spring Security より前に CORS を処理し、次を満たす `CorsConfigurationSource` を単一箇所に定義する。
+将来、別オリジンのブラウザクライアントが必要になった場合は本 ADR を再評価する。 その場合は Spring Security より前に CORS を処理し、次を満たす `CorsConfigurationSource` を単一箇所に定義する。
 
 - 設定から読み込んだ完全一致の HTTPS origin だけを許可する。
 - credential を許可するときに `*` origin を使わない。
@@ -42,11 +40,9 @@ OIDC の redirect URI と post logout URI は、ブラウザから見えるこ�
 - CSRF 保護を無効にせず、`X-XSRF-TOKEN` を許可する。
 - preflight、許可 origin、不許可 origin、credential 付き要求を契約テストで固定する。
 
-最終的な SPA の HTML 応答には、配信点で次のヘッダを付ける。
-Spring Boot が SPA も配信する場合は Spring Security が配信点となり、CDN またはリバースプロキシが配信する場合はその層が正本となる。
-同じヘッダを複数層から重複して付けない。
+最終的な SPA の HTML 応答には、配信点で次のヘッダを付ける。 Spring Boot が SPA も配信する場合は Spring Security が配信点となり、CDN またはリバースプロキシが配信する場合はその層が正本となる。 同じヘッダを複数層から重複して付けない。
 
-```text
+``` text
 Content-Security-Policy: default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; form-action 'self'; script-src 'self'; style-src 'self'; style-src-elem 'self' 'unsafe-inline'; style-src-attr 'none'; img-src 'self' data:; font-src 'self'; connect-src 'self'
 Referrer-Policy: strict-origin-when-cross-origin
 Permissions-Policy: camera=(), microphone=(), geolocation=(), payment=(), usb=()
@@ -54,18 +50,11 @@ X-Content-Type-Options: nosniff
 X-Frame-Options: DENY
 ```
 
-CSPではinline scriptと `unsafe-eval` を許可しない。
-Base UIのstyle要素に限らないinline style要素の許可と、任意HTML sinkを静的解析で遮断する代替防御はADR-030で定める。
-外部接続、Web Worker、画像CDNなどが実際に必要になった場合だけ、該当directiveへ個別に追加する。
-Swagger UI は業務 SPA ではなく、既定の CSP と両立しない可能性があるため、本番では無効のまま維持し、開発環境でも SPA の CSP を緩める理由にしない。
+CSPではinline scriptと `unsafe-eval` を許可しない。 Base UIのstyle要素に限らないinline style要素の許可と、任意HTML sinkを静的解析で遮断する代替防御はADR-030で定める。 外部接続、Web Worker、画像CDNなどが実際に必要になった場合だけ、該当directiveへ個別に追加する。 Swagger UI は業務 SPA ではなく、既定の CSP と両立しない可能性があるため、本番では無効のまま維持し、開発環境でも SPA の CSP を緩める理由にしない。
 
-HSTS は HTTPS の最終応答を返す配信点で `max-age=31536000` を設定する。
-`includeSubDomains` は対象ドメインの全 subdomain が HTTPS 化されたことを確認してから有効にし、`preload` は運用上の取り消しコストを評価した別判断とする。
+HSTS は HTTPS の最終応答を返す配信点で `max-age=31536000` を設定する。 `includeSubDomains` は対象ドメインの全 subdomain が HTTPS 化されたことを確認してから有効にし、`preload` は運用上の取り消しコストを評価した別判断とする。
 
-Spring Security の既定ヘッダは無効化しない。
-バックエンドが直接返す API 応答では、少なくとも `nosniff`、`X-Frame-Options: DENY`、Referrer-Policy、Permissions-Policy と、HTTPS 時の HSTS を MockMvc で検証する。
-CSP は SPA の HTML 応答で検証し、JSON API に存在することは要求しない。
-本番では入口を経由した smoke test でも最終ヘッダを検証する。
+Spring Security の既定ヘッダは無効化しない。 バックエンドが直接返す API 応答では、少なくとも `nosniff`、`X-Frame-Options: DENY`、Referrer-Policy、Permissions-Policy と、HTTPS 時の HSTS を MockMvc で検証する。 CSP は SPA の HTML 応答で検証し、JSON API に存在することは要求しない。 本番では入口を経由した smoke test でも最終ヘッダを検証する。
 
 ## Consequences
 
@@ -119,7 +108,7 @@ CSP は SPA の HTML 応答で検証し、JSON API に存在することは要�
 - [Spring Security 7.1: Security HTTP Response Headers](https://docs.spring.io/spring-security/reference/7.1/servlet/exploits/headers.html)
 - [Spring Security 7.1: CORS](https://docs.spring.io/spring-security/reference/7.1/servlet/integrations/cors.html)
 - [OWASP HTTP Headers Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/HTTP_Headers_Cheat_Sheet.html)
-- [`ADR-007`](./ADR-007-session-based-auth-with-oidc-pkce.md)
+- [ADR-007](ADR-007-session-based-auth-with-oidc-pkce.md)
 - `backend/src/main/java/com/example/demo/SecurityConfig.java`
 - `frontend/vite.config.ts`
 - `docker/keycloak/realm.json`

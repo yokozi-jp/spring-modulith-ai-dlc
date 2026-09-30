@@ -1,8 +1,15 @@
+---
+type: Architecture Decision Record
+title: 'ADR-009: DB 接続を単一アカウントから二つの役割へ分ける'
+description: 最小権限を全環境で実現するため、DB 接続をアプリケーション用とマイグレーション用の役割へ分ける決定。
+tags: [adr, database, security, migration]
+---
+
 # ADR-009: DB 接続を単一アカウントから二つの役割へ分ける
 
 ## Status
 
-Superseded by [ADR-011](./ADR-011-use-module-owned-database-schemas.md)
+Superseded by [ADR-011](ADR-011-use-module-owned-database-schemas.md)
 
 ## Date
 
@@ -10,26 +17,17 @@ Superseded by [ADR-011](./ADR-011-use-module-owned-database-schemas.md)
 
 ## Context
 
-DB マイグレーションと jOOQ コード生成の接続は、これまでアプリケーションと同じ一つのアカウントで行っていた。
-ローカルとテストでは、この単一アカウントがアプリケーションの実行もスキーマ変更も兼ねていた。
+DB マイグレーションと jOOQ コード生成の接続は、これまでアプリケーションと同じ一つのアカウントで行っていた。 ローカルとテストでは、この単一アカウントがアプリケーションの実行もスキーマ変更も兼ねていた。
 
-ADR-005 は Liquibase をアプリケーション起動から分離し、アプリケーション用ロールとマイグレーション用ロールを分ける方針を neutral な帰結として挙げていた。
-しかし実装は、その二役を一つのアカウントに束ねたままだった。
-アプリケーションが `CREATE`/`ALTER`/`DROP` を持つアカウントで動くのは、最小権限に反する。
+ADR-005 は Liquibase をアプリケーション起動から分離し、アプリケーション用ロールとマイグレーション用ロールを分ける方針を neutral な帰結として挙げていた。 しかし実装は、その二役を一つのアカウントに束ねたままだった。 アプリケーションが `CREATE`/`ALTER`/`DROP` を持つアカウントで動くのは、最小権限に反する。
 
-もう一つの弱点は、権限モデルが環境ごとに分かれていたことだった。
-ローカルとテストは単一アカウントで動き、マイグレーション専用アカウントはステージングと本番だけで用意する想定だった。
-二役の分離が本番でしか実現されず、手元で再現・検証されなかった。
+もう一つの弱点は、権限モデルが環境ごとに分かれていたことだった。 ローカルとテストは単一アカウントで動き、マイグレーション専用アカウントはステージングと本番だけで用意する想定だった。 二役の分離が本番でしか実現されず、手元で再現・検証されなかった。
 
-接続変数の区分は、同じ環境内に別々の物理 DB を用意するためのものではない。
-ステージングと本番でも、アプリケーションと Liquibase は同じ DB とスキーマへ異なる権限で接続する。
-環境ごとに変わるのは接続先ではなく、役割ごとの資格情報である。
+接続変数の区分は、同じ環境内に別々の物理 DB を用意するためのものではない。 ステージングと本番でも、アプリケーションと Liquibase は同じ DB とスキーマへ異なる権限で接続する。 環境ごとに変わるのは接続先ではなく、役割ごとの資格情報である。
 
 ## Decision
 
-接続を単一アカウント（1 系統）から、役割の異なる二つのアカウント（2 系統）へ分ける。
-接続先はアプリケーションとマイグレーションで共有し、役割差は資格情報だけで表す。
-この二役モデルを、ローカル、テスト、ステージング、本番のすべてで統一して適用する。
+接続を単一アカウント（1 系統）から、役割の異なる二つのアカウント（2 系統）へ分ける。 接続先はアプリケーションとマイグレーションで共有し、役割差は資格情報だけで表す。 この二役モデルを、ローカル、テスト、ステージング、本番のすべてで統一して適用する。
 
 - 接続先は `DB_HOST`、`DB_PORT`、`DB_NAME`、`DB_SCHEMA` に一本化する。マイグレーションと jOOQ 生成の URL もこの部品から組み立てる。
 - 役割は二つに分ける。アプリケーション用ロールは `DB_USERNAME`/`DB_PASSWORD` で接続し、DML だけを持つ。マイグレーション用ロールは `MIGRATION_DB_USERNAME`/`MIGRATION_DB_PASSWORD` で接続し、DDL とスキーマ所有を持つ。
@@ -74,9 +72,9 @@ ADR-005 は Liquibase をアプリケーション起動から分離し、アプ�
 
 ## References
 
-- [ADR-004](./ADR-004-commit-jooq-generated-code.md)（jOOQ 生成コードを Git 管理し、本番で生成しない）
-- [ADR-005](./ADR-005-decouple-liquibase-from-app-startup.md)（Liquibase の分離、ロール分離の方針）
-- [`docs/database-migrations.md`](../database-migrations.md)
+- [ADR-004](ADR-004-commit-jooq-generated-code.md)（jOOQ 生成コードを Git 管理し、本番で生成しない）
+- [ADR-005](ADR-005-decouple-liquibase-from-app-startup.md)（Liquibase の分離、ロール分離の方針）
+- [docs/database-migrations.md](../database-migrations.md)
 - `backend/gradle/database.gradle`（接続先の組み立てと資格情報チェック）
 - `docker/initdb/`（スキーマ所有のマイグレーションロールと DML 限定のアプリロール）
 - `docker/compose.yml` / `docker/compose-test.yml`

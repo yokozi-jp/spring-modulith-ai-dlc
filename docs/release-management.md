@@ -1,3 +1,10 @@
+---
+type: Operations
+title: リリース管理
+description: リポジトリ全体を単一リリース単位として扱うリリース管理の運用。
+tags: [operations, release, versioning]
+---
+
 # リリース管理
 
 ## 管理対象
@@ -15,7 +22,7 @@ frontend は private package であり、独立したタグと版系列を持た
 
 版情報の一致は次のコマンドで確認する。
 
-```bash
+``` bash
 task release-check
 ```
 
@@ -73,7 +80,7 @@ Release Pull Request では次版、CHANGELOG、版ファイルの一致、通�
 
 自動計算と異なる版が必要な場合は、理由を記録した Conventional Commit の footer に `Release-As:` を指定する。
 
-```text
+``` text
 chore(release): align initial public version
 
 Release-As: 1.0.0

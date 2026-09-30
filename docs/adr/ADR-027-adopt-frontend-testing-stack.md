@@ -1,3 +1,10 @@
+---
+type: Architecture Decision Record
+title: 'ADR-027: Frontendのテスト基盤を標準化する'
+description: 利用者操作と API 境界を実装に近く検証するため、Frontend のテスト基盤を標準化する決定。
+tags: [adr, frontend, testing]
+---
+
 # ADR-027: Frontendのテスト基盤を標準化する
 
 ## Status
@@ -10,31 +17,21 @@ Proposed
 
 ## Context
 
-FrontendはVite+経由のVitestで純粋関数とReactのserver renderingを検証している。
-現在のテストはNode環境で動き、componentをDOMへmountした利用者操作、API境界、coverageを扱う直接依存を持たない。
+FrontendはVite+経由のVitestで純粋関数とReactのserver renderingを検証している。 現在のテストはNode環境で動き、componentをDOMへmountした利用者操作、API境界、coverageを扱う直接依存を持たない。
 
-React、Base UI、TanStack Router、TanStack Query、TanStack Formを使う画面では、roleやlabelを基準にcomponentを操作し、click、keyboard入力、focus、非同期状態を検証する必要がある。
-Node環境だけでは `window` と `document` がないため、通常のcomponent testにはDOM実装も必要になる。
+React、Base UI、TanStack Router、TanStack Query、TanStack Formを使う画面では、roleやlabelを基準にcomponentを操作し、click、keyboard入力、focus、非同期状態を検証する必要がある。 Node環境だけでは `window` と `document` がないため、通常のcomponent testにはDOM実装も必要になる。
 
-Spring Boot APIのclientはOrvalで生成する方針である。
-APIを使うcomponent testでは、生成関数そのものをmockするよりHTTP境界をmockした方が、requestとresponseの扱いを実装に近い経路で検証できる。
+Spring Boot APIのclientはOrvalで生成する方針である。 APIを使うcomponent testでは、生成関数そのものをmockするよりHTTP境界をmockした方が、requestとresponseの扱いを実装に近い経路で検証できる。
 
 ## Decision
 
-テストrunnerとassertionにはVite+同梱のVitestを使い続け、Vitestを重複して直接追加しない。
-React component testにTesting Library React、Testing Library DOM、user-event、jsdomを使う。
+テストrunnerとassertionにはVite+同梱のVitestを使い続け、Vitestを重複して直接追加しない。 React component testにTesting Library React、Testing Library DOM、user-event、jsdomを使う。
 
-DOMを必要とするテストだけをjsdom環境で実行し、純粋関数とserver renderingのテストはNode環境を維持する。
-実ブラウザのlayout、focus、portal、pointer操作が必要になった場合はVitest Browser ModeまたはPlaywrightを別途判断する。
+DOMを必要とするテストだけをjsdom環境で実行し、純粋関数とserver renderingのテストはNode環境を維持する。 実ブラウザのlayout、focus、portal、pointer操作が必要になった場合はVitest Browser ModeまたはPlaywrightを別途判断する。
 
-API component testにはMSWを使う。
-MSWのpostinstall scriptは実行機能に不要なため、pnpmの `allowBuilds` で無効化する。
-最初のAPIテストでserver lifecycleと未処理requestを失敗させる設定を追加し、Orvalが生成するhandlerを利用できる場合は手書きhandlerとの重複を避ける。
+API component testにはMSWを使う。 MSWのpostinstall scriptは実行機能に不要なため、pnpmの `allowBuilds` で無効化する。 最初のAPIテストでserver lifecycleと未処理requestを失敗させる設定を追加し、Orvalが生成するhandlerを利用できる場合は手書きhandlerとの重複を避ける。
 
-coverage providerにはVitestと同じ版の `@vitest/coverage-v8` を使う。
-起動処理の `src/main.tsx`、test、型宣言、自動生成された `src/routeTree.gen.ts` を除く手書きproduction source全体を対象にする。
-バックエンドのJaCoCo基準と同じ意味に揃え、ファイル単位ではなく全体のbranch coverage 85%をローカルとCIで強制する。
-最初のOrval生成先を確定したときは、その生成ディレクトリだけをcoverage対象から除外する。
+coverage providerにはVitestと同じ版の `@vitest/coverage-v8` を使う。 起動処理の `src/main.tsx`、test、型宣言、自動生成された `src/routeTree.gen.ts` を除く手書きproduction source全体を対象にする。 バックエンドのJaCoCo基準と同じ意味に揃え、ファイル単位ではなく全体のbranch coverage 85%をローカルとCIで強制する。 最初のOrval生成先を確定したときは、その生成ディレクトリだけをcoverage対象から除外する。
 
 ## Consequences
 
@@ -84,4 +81,4 @@ coverage providerにはVitestと同じ版の `@vitest/coverage-v8` を使う。
 - [Vitest: Test environment](https://vitest.dev/guide/environment.html)
 - [Vitest: Coverage](https://vitest.dev/guide/coverage.html)
 - [MSW](https://mswjs.io/docs/)
-- [ADR-024: Frontend API client生成にOrvalを採用する](./ADR-024-adopt-orval-for-frontend-api-client.md)
+- [ADR-024: Frontend API client生成にOrvalを採用する](ADR-024-adopt-orval-for-frontend-api-client.md)

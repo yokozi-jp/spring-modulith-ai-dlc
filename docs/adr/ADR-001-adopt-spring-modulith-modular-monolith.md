@@ -1,3 +1,10 @@
+---
+type: Architecture Decision Record
+title: 'ADR-001: Spring Modulith によるモジュラーモノリス'
+description: 単一デプロイの軽さを保ちながら機能境界を強制するため、Spring Modulith でモジュラーモノリスを採用する決定。
+tags: [adr, architecture, spring-modulith, modular-monolith]
+---
+
 # ADR-001: Spring Modulith によるモジュラーモノリス
 
 ## Status
@@ -12,23 +19,16 @@ Accepted
 
 本 ADR は、既に実装済みの決定を遡って記録した（backfill）。
 
-初期段階のプロダクトで、単一デプロイの運用の軽さを保ちつつ、
-機能間の境界を明確にし、将来のサービス分割余地も残したい。
-マイクロサービスは分散トランザクション、ネットワーク境界、
-運用基盤の複雑さを初期から抱える。
-素のモノリスはパッケージ境界が時間とともに腐敗し、
-どの機能がどこに依存しているかを静的に保証できない。
+初期段階のプロダクトで、単一デプロイの運用の軽さを保ちつつ、 機能間の境界を明確にし、将来のサービス分割余地も残したい。 マイクロサービスは分散トランザクション、ネットワーク境界、 運用基盤の複雑さを初期から抱える。 素のモノリスはパッケージ境界が時間とともに腐敗し、 どの機能がどこに依存しているかを静的に保証できない。
 
 ## Decision
 
 Spring Modulith を用いたモジュラーモノリスを採用する。
 
 - `com.example.demo` の直接サブパッケージをアプリケーションモジュールとする。
-- 起動時に `spring.modulith.runtime.verification-enabled` を有効化し、
-  モジュール間の依存違反があれば起動を失敗させる。
+- 起動時に `spring.modulith.runtime.verification-enabled` を有効化し、 モジュール間の依存違反があれば起動を失敗させる。
 - モジュール間の連携は、公開 API とアプリケーションイベントに限定する。
-- イベント出版はレジストリ（jdbc、`completion-mode: archive`）で追跡し、
-  外部ブローカーへの externalization は当面無効にする。
+- イベント出版はレジストリ（jdbc、`completion-mode: archive`）で追跡し、 外部ブローカーへの externalization は当面無効にする。
 
 ## Consequences
 
@@ -70,6 +70,6 @@ Spring Modulith を用いたモジュラーモノリスを採用する。
 
 ## References
 
-- [`docs/architecture/package-by-feature-onion-handoff.md`](../architecture/package-by-feature-onion-handoff.md)
+- [docs/architecture/package-by-feature-onion-handoff.md](../architecture/package-by-feature-onion-handoff.md)
 - `backend/src/main/resources/application.yaml`（`spring.modulith.*`）
 - `backend/src/test/java/com/example/demo/architecture/ApplicationModuleArchitectureTest.java`

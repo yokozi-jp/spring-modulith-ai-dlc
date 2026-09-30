@@ -1,3 +1,10 @@
+---
+type: Operations
+title: main ブランチの保護設定
+description: 既定ブランチ main を対象にした GitHub branch ruleset の保護設定。
+tags: [operations, governance, git, github]
+---
+
 # main ブランチの保護設定
 
 ## 適用方法
@@ -102,4 +109,4 @@ GitHub の General、Pull Requests で次を設定する。
 
 Private Vulnerability Reporting は Security、Code security and analysis で有効にする。
 
-リリース自動化に必要な secret と権限は [`release-management.md`](release-management.md) に記載する。
+リリース自動化に必要な secret と権限は [release-management.md](release-management.md) に記載する。

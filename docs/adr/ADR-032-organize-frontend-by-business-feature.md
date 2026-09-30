@@ -1,3 +1,10 @@
+---
+type: Architecture Decision Record
+title: 'ADR-032: Frontendを業務機能単位で構成する'
+description: API の所有機能と画面コードの対応を追いやすくするため、Frontend を業務機能単位で構成する決定。
+tags: [adr, frontend, architecture]
+---
+
 # ADR-032: Frontendを業務機能単位で構成する
 
 ## Status
@@ -10,28 +17,19 @@ Proposed
 
 ## Context
 
-FrontendはReact 19、TanStack Router、TanStack Queryを採用しているが、現在の画面は一つであり、業務APIもまだ存在しない。
-この段階で大規模な階層や空ディレクトリを作ると、実在しない依存関係を先に固定することになる。
+FrontendはReact 19、TanStack Router、TanStack Queryを採用しているが、現在の画面は一つであり、業務APIもまだ存在しない。 この段階で大規模な階層や空ディレクトリを作ると、実在しない依存関係を先に固定することになる。
 
-一方、バックエンドはADR-002により、業務機能を最上位のパッケージ境界とし、その内部へオニオンアーキテクチャを適用する。
-Frontendも業務能力を単位に凝集させれば、APIの所有機能と画面コードの対応を追いやすい。
-ただし、バックエンドの `domain`、`application`、`presentation`、`infrastructure` はサーバー内部の依存制御であり、利用者の画面と同じ分割ではない。
+一方、バックエンドはADR-002により、業務機能を最上位のパッケージ境界とし、その内部へオニオンアーキテクチャを適用する。 Frontendも業務能力を単位に凝集させれば、APIの所有機能と画面コードの対応を追いやすい。 ただし、バックエンドの `domain`、`application`、`presentation`、`infrastructure` はサーバー内部の依存制御であり、利用者の画面と同じ分割ではない。
 
-また、ADR-024は最初の業務APIからOrvalでnative FetchのTanStack Query clientを生成する方針を定めている。
-OrvalはOpenAPI tag単位の分割、query options、query hooks、schema、MSW handlerを生成できる。
-生成先は再生成時のclean対象になり得るため、手書きコードと同じディレクトリへ混在させるわけにはいかない。
+また、ADR-024は最初の業務APIからOrvalでnative FetchのTanStack Query clientを生成する方針を定めている。 OrvalはOpenAPI tag単位の分割、query options、query hooks、schema、MSW handlerを生成できる。 生成先は再生成時のclean対象になり得るため、手書きコードと同じディレクトリへ混在させるわけにはいかない。
 
-React HooksはstatefulなUI logicを関数componentから利用する標準機構である。
-しかし、custom Hookはディレクトリ分割の単位ではなく、具体的なstateful logicを再利用する単位である。
-すべての処理をHookへ変換すると、純粋関数とReactのrendering lifecycleに属する処理の区別が崩れる。
+React HooksはstatefulなUI logicを関数componentから利用する標準機構である。 しかし、custom Hookはディレクトリ分割の単位ではなく、具体的なstateful logicを再利用する単位である。 すべての処理をHookへ変換すると、純粋関数とReactのrendering lifecycleに属する処理の区別が崩れる。
 
 ## Decision
 
-Frontendは、業務機能を最上位の変更単位にする軽量なfeature-first構成を採用する。
-既存の小さな構成は維持し、最初の業務画面または業務APIを実装するときに必要なディレクトリだけを追加する。
-目標とする構成は次のとおりである。
+Frontendは、業務機能を最上位の変更単位にする軽量なfeature-first構成を採用する。 既存の小さな構成は維持し、最初の業務画面または業務APIを実装するときに必要なディレクトリだけを追加する。 目標とする構成は次のとおりである。
 
-```text
+``` text
 frontend/src/
 ├── main.tsx
 ├── routes/
@@ -54,33 +52,17 @@ frontend/src/
 └── i18n.ts
 ```
 
-`features/<business-feature>` は利用者に提供する業務能力を表す。
-対応するバックエンド業務モジュールがある場合は同じ業務語彙を使うが、サーバー専用モジュールにはFrontend featureを作らない。
-一つの利用者操作が複数のバックエンドモジュールを使う場合は、画面側の凝集を優先して一つのFrontend featureから複数のAPIを組み合わせる。
+`features/<business-feature>` は利用者に提供する業務能力を表す。 対応するバックエンド業務モジュールがある場合は同じ業務語彙を使うが、サーバー専用モジュールにはFrontend featureを作らない。 一つの利用者操作が複数のバックエンドモジュールを使う場合は、画面側の凝集を優先して一つのFrontend featureから複数のAPIを組み合わせる。
 
-`routes` はURL、path parameter、search parameter、loader、画面componentの接続を担当する。
-初期描画に必要なserver stateはroute loaderからTanStack Queryへpreloadし、route fileへ画面実装を蓄積しない。
-単一endpointのquery optionsで足りる場合はOrval生成物を直接使い、複数queryの合成や業務上の既定値が必要な場合だけfeature内に手書きのquery定義を置く。
+`routes` はURL、path parameter、search parameter、loader、画面componentの接続を担当する。 初期描画に必要なserver stateはroute loaderからTanStack Queryへpreloadし、route fileへ画面実装を蓄積しない。 単一endpointのquery optionsで足りる場合はOrval生成物を直接使い、複数queryの合成や業務上の既定値が必要な場合だけfeature内に手書きのquery定義を置く。
 
-feature内部にはpage、feature固有component、custom Hook、form schemaなど、実際に必要なものだけを置く。
-テストは対象ファイルの隣へ置き、種類別のトップレベル `tests` へ分離しない。
-featureに依存しないUI primitiveは `components/ui` に置き、小さな純粋関数は `lib` に置く。
-共有候補を最初から共通化せず、複数featureで同じ責務が確認できた時点で移す。
+feature内部にはpage、feature固有component、custom Hook、form schemaなど、実際に必要なものだけを置く。 テストは対象ファイルの隣へ置き、種類別のトップレベル `tests` へ分離しない。 featureに依存しないUI primitiveは `components/ui` に置き、小さな純粋関数は `lib` に置く。 共有候補を最初から共通化せず、複数featureで同じ責務が確認できた時点で移す。
 
-依存は `routes` から `features` へ、`features` から `api/generated`、`components/ui`、`lib` へ向ける。
-共有ディレクトリからfeatureへ依存させず、別featureの内部ファイルを直接importしない。
-複数featureをまたぐ画面の合成はrouteで行い、再利用可能な公開境界が実在するまではfeature barrelを作らない。
+依存は `routes` から `features` へ、`features` から `api/generated`、`components/ui`、`lib` へ向ける。 共有ディレクトリからfeatureへ依存させず、別featureの内部ファイルを直接importしない。 複数featureをまたぐ画面の合成はrouteで行い、再利用可能な公開境界が実在するまではfeature barrelを作らない。
 
-React componentはfunction componentとHooksで実装する。
-local UI stateにはReactの組み込みHook、server stateにはTanStack Query、URL stateにはTanStack Router、form stateにはTanStack Formを使う。
-custom Hookは、再利用するstateful logicまたは外部systemとの同期を、具体的な用途名で表せる場合にfeature内へ置く。
-純粋な変換は通常の関数にし、生成Hookをそのまま転送するだけのwrapper Hookやトップレベル `hooks` ディレクトリは作らない。
+React componentはfunction componentとHooksで実装する。 local UI stateにはReactの組み込みHook、server stateにはTanStack Query、URL stateにはTanStack Router、form stateにはTanStack Formを使う。 custom Hookは、再利用するstateful logicまたは外部systemとの同期を、具体的な用途名で表せる場合にfeature内へ置く。 純粋な変換は通常の関数にし、生成Hookをそのまま転送するだけのwrapper Hookやトップレベル `hooks` ディレクトリは作らない。
 
-Orvalは最初の業務APIを追加する変更で設定する。
-生成clientには `client: 'react-query'`、`httpClient: 'fetch'`、`mode: 'tags-split'` を使い、schemaもtag単位に分割する。
-OpenAPI operationには所有する業務機能のtagを一つ付け、安定した `operationId` を与える。
-Orvalが所有するclient、model、mockの生成先を `api/generated` の専用サブディレクトリへ限定し、手書きのmutator、MSW lifecycle、fixtureを生成先へ置かない。
-共通transport要件が確認できるまではcustom mutatorを追加しない。
+Orvalは最初の業務APIを追加する変更で設定する。 生成clientには `client: 'react-query'`、`httpClient: 'fetch'`、`mode: 'tags-split'` を使い、schemaもtag単位に分割する。 OpenAPI operationには所有する業務機能のtagを一つ付け、安定した `operationId` を与える。 Orvalが所有するclient、model、mockの生成先を `api/generated` の専用サブディレクトリへ限定し、手書きのmutator、MSW lifecycle、fixtureを生成先へ置かない。 共通transport要件が確認できるまではcustom mutatorを追加しない。
 
 ## Consequences
 
@@ -132,9 +114,9 @@ Orvalが所有するclient、model、mockの生成先を `api/generated` の専�
 
 ## References
 
-- [ADR-002: package by feature とオニオンアーキテクチャ](./ADR-002-package-by-feature-onion-architecture.md)
-- [ADR-024: Frontend API client生成にOrvalを採用する](./ADR-024-adopt-orval-for-frontend-api-client.md)
-- [ADR-027: Frontendのテスト基盤を標準化する](./ADR-027-adopt-frontend-testing-stack.md)
+- [ADR-002: package by feature とオニオンアーキテクチャ](ADR-002-package-by-feature-onion-architecture.md)
+- [ADR-024: Frontend API client生成にOrvalを採用する](ADR-024-adopt-orval-for-frontend-api-client.md)
+- [ADR-027: Frontendのテスト基盤を標準化する](ADR-027-adopt-frontend-testing-stack.md)
 - [React: Reusing Logic with Custom Hooks](https://react.dev/learn/reusing-logic-with-custom-hooks)
 - [React: Rules of Hooks](https://react.dev/reference/rules/rules-of-hooks)
 - [Orval: React Query](https://orval.dev/docs/guides/react-query/)

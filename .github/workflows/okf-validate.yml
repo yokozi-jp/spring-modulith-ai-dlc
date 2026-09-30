@@ -1,0 +1,51 @@
+name: Validate OKF bundle (iwe) 📚
+
+on:
+  push:
+    branches: ["main"]
+    paths:
+      - "docs/**/*.md"
+      - "docs/.iwe/**"
+      - "Taskfile.yml"
+  pull_request:
+    branches: ["**"]
+    paths:
+      - "docs/**/*.md"
+      - "docs/.iwe/**"
+      - "Taskfile.yml"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  okf-validate:
+    name: Run task okf-check 📚
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: "22"
+
+      - name: Set up Task
+        uses: go-task/setup-task@a00fbb05ce67b35648be3c78cbc9fd85354c757e # v2
+        with:
+          version: "3.53.1"
+          checksum: a54a408f6861ff921f6e87774180db31bacd8c1e7c944ca696db9fea49a82fc7
+
+      # docs/ を OKF v0.2 バンドルとして検証する（適合と孤立ドキュメント）。
+      # 開発環境構築手順と同じ版に固定し、ローカルの lefthook と同じ task okf-check を呼ぶ。
+      - name: Install iwe
+        run: npm install -g @iwe-org/iwe@0.24.2
+
+      - name: Validate OKF conformance
+        run: task okf-check

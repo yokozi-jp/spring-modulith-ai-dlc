@@ -1,3 +1,10 @@
+---
+type: Architecture
+title: バックエンドアーキテクチャ
+description: Package by feature とオニオンアーキテクチャによるバックエンドの構造と依存方向を説明する。
+tags: [architecture, backend, spring-modulith]
+---
+
 # バックエンドアーキテクチャ
 
 ## 方針
@@ -16,7 +23,7 @@ Spring Modulith は `com.example.demo` の直接サブパッケージをアプ�
 
 機能モジュールは、必要な役割が生じたパッケージだけを作る。
 
-```text
+``` text
 backend/src/main/java/com/example/demo/
 ├── DemoApplication.java
 ├── SecurityConfig.java
@@ -150,7 +157,7 @@ Presentation、Persistence、Messaging、外部 Client は別々の Adapter と�
 
 許可する主要な依存方向は次のとおりである。
 
-```text
+``` text
 presentation ─┐
 persistence ──┤
 messaging ────┼─> application ─> domain.service ─> domain.model
@@ -195,7 +202,7 @@ Domain Model の状態は setter で公開せず、業務上の操作と不変�
 
 パッケージ構成と依存方向は、次のテストで自動検証する。
 
-```text
+``` text
 backend/src/test/java/com/example/demo/architecture/
 ├── ApplicationModuleArchitectureTest.java
 ├── GeneralCodingRulesArchTest.java
@@ -258,7 +265,7 @@ ArchUnit は `ProductionCodeOnly` を通して手書きのプロダクション�
 
 アーキテクチャテストは次のコマンドで実行できる。
 
-```bash
+``` bash
 cd backend
 ./gradlew test \
   --tests com.example.demo.architecture.ApplicationModuleArchitectureTest \
@@ -268,7 +275,7 @@ cd backend
 
 静的解析はワークスペースルートで次のコマンドを実行する。
 
-```bash
+``` bash
 task be-lint
 ```
 

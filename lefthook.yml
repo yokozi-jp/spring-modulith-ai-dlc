@@ -127,6 +127,17 @@ pre-commit:
       glob: "*.md"
       run: npx --yes markdownlint-cli2 {staged_files}
 
+    # docs/ にステージ済み変更があるとき、OKF v0.2 バンドルの適合と孤立を検証（task okf-check）
+    # iwe が無い環境はタスク側でスキップ（最終担保は CI の okf-validate に任せる）。
+    - name: okf-check
+      glob:
+        - "docs/**/*.md"
+        - "docs/.iwe/**"
+      run: |
+        echo "{staged_files}" >/dev/null
+        task okf-check
+      fail_text: "OKF バンドルの検証に失敗しました。task okf-check で再実行してください。"
+
 pre-push:
   parallel: true
   jobs:

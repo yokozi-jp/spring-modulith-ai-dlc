@@ -1,3 +1,10 @@
+---
+type: Architecture Decision Record
+title: 'ADR-017: トランクベース開発とリポジトリ保護を採用する'
+description: 統合時の差分と検証量を抑えるため、トランクベース開発とブランチ保護を採用する決定。
+tags: [adr, governance, git, ci]
+---
+
 # ADR-017: トランクベース開発とリポジトリ保護を採用する
 
 ## Status
@@ -91,5 +98,5 @@ CODEOWNERS は backend、frontend、docker と infrastructure、`.kiro` と `aid
 - [GitHub Docs: About rulesets](https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/managing-rulesets/about-rulesets)
 - [GitHub Docs: About code owners](https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-code-owners)
 - [GitHub Docs: Configuring private vulnerability reporting](https://docs.github.com/en/code-security/security-advisories/working-with-repository-security-advisories/configuring-private-vulnerability-reporting-for-a-repository)
-- [`CONTRIBUTING.md`](../../CONTRIBUTING.md)
+- [CONTRIBUTING.md](../../CONTRIBUTING.md)
 - [ブランチ保護設定](../branch-protection.md)

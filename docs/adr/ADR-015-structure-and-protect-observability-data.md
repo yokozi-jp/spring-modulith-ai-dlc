@@ -1,3 +1,10 @@
+---
+type: Architecture Decision Record
+title: 'ADR-015: 可観測性データを構造化し保護する'
+description: ログとトレースの結合と秘密情報の保護のため、可観測性データを構造化し保護する決定。
+tags: [adr, observability, logging, security]
+---
+
 # ADR-015: 可観測性データを構造化し保護する
 
 ## Status
@@ -10,25 +17,17 @@ Proposed
 
 ## Context
 
-バックエンドは OpenTelemetry でログ、トレース、メトリクスを送信するが、コンソールログは非構造化であり、ログとトレースを結ぶフィールドの契約がない。
-アプリケーション固有のログは未処理例外の一箇所だけだが、例外メッセージと通常の stack trace の先頭行には利用者入力、メールアドレス、SQL、秘密情報が混入し得る。
-一方、stack frame まで捨てると、例外が発生した class、method、ファイル、行番号をログから調査できない。
+バックエンドは OpenTelemetry でログ、トレース、メトリクスを送信するが、コンソールログは非構造化であり、ログとトレースを結ぶフィールドの契約がない。 アプリケーション固有のログは未処理例外の一箇所だけだが、例外メッセージと通常の stack trace の先頭行には利用者入力、メールアドレス、SQL、秘密情報が混入し得る。 一方、stack frame まで捨てると、例外が発生した class、method、ファイル、行番号をログから調査できない。
 
-ローカル開発では Grafana OpenTelemetry LGTM を使う一方、本番の収集基盤、アクセス制御、削除機能はまだ実装していない。
-保持期間をアプリケーションコードだけに書いても保存先では強制できないため、保存先を導入するときの受け入れ条件まで定める必要がある。
+ローカル開発では Grafana OpenTelemetry LGTM を使う一方、本番の収集基盤、アクセス制御、削除機能はまだ実装していない。 保持期間をアプリケーションコードだけに書いても保存先では強制できないため、保存先を導入するときの受け入れ条件まで定める必要がある。
 
 ## Decision
 
-バックエンドのコンソールログには Spring Boot 標準の Elastic Common Schema（ECS）JSON 形式を使う。
-独自の JSON encoder は追加しない。
-OpenTelemetry へ送るログは、既存 appender が生成する型付き LogRecord を維持する。
+バックエンドのコンソールログには Spring Boot 標準の Elastic Common Schema（ECS）JSON 形式を使う。 独自の JSON encoder は追加しない。 OpenTelemetry へ送るログは、既存 appender が生成する型付き LogRecord を維持する。
 
-ログとトレースの相関には、Micrometer Tracing が MDC へ設定する trace ID と span ID を使う。
-コンソールでは Spring Boot 標準 MDC の `traceId` と `spanId`、OTLP では LogRecord の TraceId と SpanId を正本とし、独自 request ID を重ねない。
-アクティブな span がないログでは、これらのフィールドを要求しない。
+ログとトレースの相関には、Micrometer Tracing が MDC へ設定する trace ID と span ID を使う。 コンソールでは Spring Boot 標準 MDC の `traceId` と `spanId`、OTLP では LogRecord の TraceId と SpanId を正本とし、独自 request ID を重ねない。 アクティブな span がないログでは、これらのフィールドを要求しない。
 
-アプリケーションログは静的な event message と許可した構造化属性だけを出す。
-次の値はログへ出さない。
+アプリケーションログは静的な event message と許可した構造化属性だけを出す。 次の値はログへ出さない。
 
 - Authorization、Cookie、session ID、token、password、secret
 - request body、response body、フォーム入力、DOM text
@@ -36,23 +35,13 @@ OpenTelemetry へ送るログは、既存 appender が生成する型付き LogR
 - query string と URL fragment
 - 例外メッセージ、SQL、認可判断で存在確認に使える値
 
-未処理例外には OpenTelemetry semantic conventions の `exception.type` と `exception.stacktrace` を使う。
-`exception.stacktrace` は root、cause、suppressed exception の型と `StackTraceElement` だけから構成し、各例外の message を含めない。
-循環する例外参照は有限の表現に変換する。
-例外オブジェクトそのものは logger へ渡さない。
+未処理例外には OpenTelemetry semantic conventions の `exception.type` と `exception.stacktrace` を使う。 `exception.stacktrace` は root、cause、suppressed exception の型と `StackTraceElement` だけから構成し、各例外の message を含めない。 循環する例外参照は有限の表現に変換する。 例外オブジェクトそのものは logger へ渡さない。
 
-OpenTelemetry appender が SLF4J key-value から OTLP 属性へ転送できる名前は、`exception.type` と `exception.stacktrace` の allowlist で制限する。
-全 key-value の capture は有効にしない。
-内部 ID を記録する場合は、業務上必要な非公開 ID に限定し、表示名を併記しない。
-値を追加する変更では allowlist をレビューし、自由入力を正規表現だけでマスクする方式へ依存しない。
+OpenTelemetry appender が SLF4J key-value から OTLP 属性へ転送できる名前は、`exception.type` と `exception.stacktrace` の allowlist で制限する。 全 key-value の capture は有効にしない。 内部 ID を記録する場合は、業務上必要な非公開 ID に限定し、表示名を併記しない。 値を追加する変更では allowlist をレビューし、自由入力を正規表現だけでマスクする方式へ依存しない。
 
-ローカル LGTM のデータは開発用の一時データとし、本番データを投入しない。
-本番の保存先を導入する際は、collector または保存先で denylist を第二防御として適用し、通常のアプリケーションログを 30 日で自動削除する。
-セキュリティ監査ログが必要になった場合は、通常ログと別のデータセット、権限、保持期間をその要件の ADR で決める。
+ローカル LGTM のデータは開発用の一時データとし、本番データを投入しない。 本番の保存先を導入する際は、collector または保存先で denylist を第二防御として適用し、通常のアプリケーションログを 30 日で自動削除する。 セキュリティ監査ログが必要になった場合は、通常ログと別のデータセット、権限、保持期間をその要件の ADR で決める。
 
-可観測性データの閲覧権限は運用担当者と障害対応者に限定し、閲覧を監査する。
-PII または秘密情報の混入を検知した場合は、該当ログの生成を止め、保存先から削除し、秘密ならローテーションし、インシデントとして記録する。
-本番保存先は、保持期限による削除と対象期間または対象 stream の緊急削除を検証できなければリリースしない。
+可観測性データの閲覧権限は運用担当者と障害対応者に限定し、閲覧を監査する。 PII または秘密情報の混入を検知した場合は、該当ログの生成を止め、保存先から削除し、秘密ならローテーションし、インシデントとして記録する。 本番保存先は、保持期限による削除と対象期間または対象 stream の緊急削除を検証できなければリリースしない。
 
 ## Consequences
 
@@ -110,5 +99,5 @@ PII または秘密情報の混入を検知した場合は、該当ログの生�
 - [OpenTelemetry: Exceptions in Logs](https://opentelemetry.io/docs/specs/semconv/exceptions/exceptions-logs/)
 - [OpenTelemetry Logback Appender](https://github.com/open-telemetry/opentelemetry-java-instrumentation/tree/main/instrumentation/logback/logback-appender-1.0/library)
 - [OWASP Logging Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Logging_Cheat_Sheet.html)
-- [`ADR-013`](./ADR-013-standardize-http-api-contracts.md)
+- [ADR-013](ADR-013-standardize-http-api-contracts.md)
 - `backend/src/main/resources/logback-spring.xml`

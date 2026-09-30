@@ -1,3 +1,10 @@
+---
+type: Architecture
+title: 'DBマイグレーションとjOOQコード生成'
+description: Liquibase による起動から分離したマイグレーションと jOOQ コード生成の仕組みを説明する。
+tags: [architecture, database, liquibase, jooq]
+---
+
 # DBマイグレーションとjOOQコード生成
 
 ## 実行モデル

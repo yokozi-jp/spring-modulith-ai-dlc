@@ -1,59 +1,39 @@
 # Architecture Decision Records
 
-このディレクトリは、ワークフローの外で既に確定している重要な設計判断を記録する。
-書式は AI-DLC 同梱の
-[`adr-template.md`](../../.kiro/knowledge/aidlc-architect-agent/adr-template.md)
-に揃える（`ADR-NNN`、Status / Date / Context / Decision / Consequences /
-Alternatives Considered / References の構成）。
-
-インテント単位の設計判断は AI-DLC が inception 実行時に
-`<record>/inception/domain-design/decisions.md` へ生成する。
-このディレクトリは、それより前・外で下された横断的な決定を残す場所である。
-
-以下の ADR は、実装済みの決定を遡って記録した（backfill）。
-
-## 一覧
-
-- **ADR-001**：Spring Modulith によるモジュラーモノリス（Accepted, 2026-09-11）
-- **ADR-002**：package by feature とオニオンアーキテクチャ（Accepted, 2026-09-11）
-- **ADR-003**：データアクセスに jOOQ を採用（Accepted, 2026-09-11）
-- **ADR-004**：jOOQ 生成コードを Git 管理する（Accepted, 2026-09-11）
-- **ADR-005**：Liquibase をアプリケーション起動から分離する（Accepted, 2026-09-11）
-- **ADR-006**：絶対時刻を UTC / Instant / timestamptz に統一する（Accepted, 2026-09-11）
-- **ADR-007**：セッションベース認証と OIDC Authorization Code + PKCE（Accepted, 2026-09-11）
-- **ADR-008**：application.yaml を単一にし設定を外部注入する（Accepted, 2026-09-11）
-- **ADR-009**：DB 接続を単一アカウントから二つの役割へ分ける（Superseded by ADR-011, 2026-09-13）
-- **ADR-010**：プロジェクトのタスクランナーにTaskを採用する（Proposed, 2026-09-13）
-- **ADR-011**：モジュール所有のデータベーススキーマを使う（Proposed, 2026-09-14）
-- **ADR-012**：プロパティベーステストとミューテーションテストを採用する（Proposed, 2026-09-14）
-- **ADR-013**：HTTP API 契約を標準化する（Accepted, 2026-09-14）
-- **ADR-014**：SPA とバックエンドを同一オリジンで公開する（Accepted, 2026-09-14）
-- **ADR-015**：可観測性データを構造化し保護する（Proposed, 2026-09-15）
-- **ADR-016**：API と SPA のメッセージをローカライズする（Proposed, 2026-09-15）
-- **ADR-017**：トランクベース開発とリポジトリ保護を採用する（Proposed, 2026-09-15）
-- **ADR-018**：release-please でセマンティックリリースを自動化する（Proposed, 2026-09-15）
-- **ADR-019**：外部連携の耐障害性と容量制御を標準化する（Proposed, 2026-09-15）
-- **ADR-020**：コンテナイメージを署名し provenance を検証する（Proposed, 2026-09-15）
-- **ADR-021**：Dependabot の minor/patch 更新をグループ化し auto-merge する（Proposed, 2026-09-29）
-- **ADR-022**：semver 6.3.1 を pnpm trust policy の例外にする（Proposed, 2026-09-29）
-- **ADR-023**：TanStack Form と Zod を採用する（Proposed, 2026-09-29）
-- **ADR-024**：Frontend API client生成にOrvalを採用する（Proposed, 2026-09-29）
-- **ADR-025**：shadcn/uiのBase UI版とTailwind CSSを採用する（Proposed, 2026-09-29）
-- **ADR-026**：OXCでReact Compilerを有効化する（Proposed, 2026-09-29）
-- **ADR-027**：Frontendのテスト基盤を標準化する（Proposed, 2026-09-29）
-- **ADR-028**：TanStack Tableを採用する（Proposed, 2026-09-29）
-- **ADR-029**：Frontend開発依存の既知脆弱性をoverrideと期限付きignoreで扱う（Proposed, 2026-09-29）
-- **ADR-030**：Base UIのインラインstyle要素を限定して許可する（Proposed, 2026-09-29）
-- **ADR-031**：Frontendの型検査を厳格化し、tsconfigを正本にする（Proposed, 2026-09-30）
-- **ADR-032**：Frontendを業務機能単位で構成する（Proposed, 2026-09-30）
-- **ADR-033**：Vite 開発オリジンを固定し proxy ポートを単一ソース化する（Proposed, 2026-09-30）
-- **ADR-034**：Frontend ランタイムを固定し Oxlint 全カテゴリを強制する（Proposed, 2026-09-30）
-- **ADR-035**：jscpd と Knip を品質ゲートに採用する（Proposed, 2026-10-01）
-
-## 運用
-
-- 番号は連番で、廃止しても再利用しない。
-- ファイル名は `ADR-NNN-<kebab-case-title>.md`。
-- 状態は Proposed / Accepted / Deprecated / Superseded で管理し、
-  置き換えは `Superseded by ADR-NNN` で相互リンクする。
-- 新しい決定は実装前に Proposed として起こし、PR でレビューする。
+- [ADR の運用ルール](conventions.md)
+- [ADR-001: Spring Modulith によるモジュラーモノリス](ADR-001-adopt-spring-modulith-modular-monolith.md)（Accepted, 2026-09-11）
+- [ADR-002: package by feature とオニオンアーキテクチャ](ADR-002-package-by-feature-onion-architecture.md)（Accepted, 2026-09-11）
+- [ADR-003: データアクセスに jOOQ を採用](ADR-003-adopt-jooq-for-data-access.md)（Accepted, 2026-09-11）
+- [ADR-004: jOOQ 生成コードを Git 管理する](ADR-004-commit-jooq-generated-code.md)（Accepted, 2026-09-11）
+- [ADR-005: Liquibase をアプリケーション起動から分離する](ADR-005-decouple-liquibase-from-app-startup.md)（Accepted, 2026-09-11）
+- [ADR-006: 絶対時刻を UTC / Instant / timestamptz に統一する](ADR-006-utc-instant-absolute-time-policy.md)（Accepted, 2026-09-11）
+- [ADR-007: セッションベース認証と OIDC Authorization Code + PKCE](ADR-007-session-based-auth-with-oidc-pkce.md)（Accepted, 2026-09-11）
+- [ADR-008: application.yaml を単一にし設定を外部注入する](ADR-008-single-application-yaml-external-config.md)（Accepted, 2026-09-11）
+- [ADR-009: DB 接続を単一アカウントから二つの役割へ分ける](ADR-009-unify-db-connection-target-credentials-only-role-split.md)（Superseded by ADR-011, 2026-09-13）
+- [ADR-010: プロジェクトのタスクランナーに Task を採用する](ADR-010-adopt-task-as-project-task-runner.md)（Proposed, 2026-09-13）
+- [ADR-011: モジュール所有のデータベーススキーマを使う](ADR-011-use-module-owned-database-schemas.md)（Proposed, 2026-09-14）
+- [ADR-012: プロパティベーステストとミューテーションテストを採用する](ADR-012-adopt-property-based-and-mutation-testing.md)（Proposed, 2026-09-14）
+- [ADR-013: HTTP API 契約を標準化する](ADR-013-standardize-http-api-contracts.md)（Accepted, 2026-09-14）
+- [ADR-014: SPA とバックエンドを同一オリジンで公開する](ADR-014-use-same-origin-spa-security-boundary.md)（Accepted, 2026-09-14）
+- [ADR-015: 可観測性データを構造化し保護する](ADR-015-structure-and-protect-observability-data.md)（Proposed, 2026-09-15）
+- [ADR-016: API と SPA のメッセージをローカライズする](ADR-016-localize-api-and-spa-messages.md)（Proposed, 2026-09-15）
+- [ADR-017: トランクベース開発とリポジトリ保護を採用する](ADR-017-adopt-trunk-based-repository-governance.md)（Proposed, 2026-09-15）
+- [ADR-018: release-please でセマンティックリリースを自動化する](ADR-018-automate-semantic-releases.md)（Proposed, 2026-09-15）
+- [ADR-019: 外部連携の耐障害性と容量制御を標準化する](ADR-019-define-resilience-and-capacity-guardrails.md)（Proposed, 2026-09-15）
+- [ADR-020: コンテナイメージを署名し provenance を検証する](ADR-020-sign-and-attest-container-images.md)（Proposed, 2026-09-15）
+- [ADR-021: Dependabot の minor/patch 更新をグループ化し auto-merge する](ADR-021-group-dependabot-minor-and-patch-updates.md)（Proposed, 2026-09-29）
+- [ADR-022: semver 6.3.1 を pnpm trust policy の例外にする](ADR-022-exclude-semver-from-pnpm-trust-policy.md)（Proposed, 2026-09-29）
+- [ADR-023: TanStack Form と Zod を採用する](ADR-023-adopt-tanstack-form-and-zod.md)（Proposed, 2026-09-29）
+- [ADR-024: Frontend API client 生成に Orval を採用する](ADR-024-adopt-orval-for-frontend-api-client.md)（Proposed, 2026-09-29）
+- [ADR-025: shadcn/ui の Base UI 版と Tailwind CSS を採用する](ADR-025-adopt-shadcn-base-ui-and-tailwind.md)（Proposed, 2026-09-29）
+- [ADR-026: OXC で React Compiler を有効化する](ADR-026-enable-react-compiler-with-oxc.md)（Proposed, 2026-09-29）
+- [ADR-027: Frontend のテスト基盤を標準化する](ADR-027-adopt-frontend-testing-stack.md)（Proposed, 2026-09-29）
+- [ADR-028: TanStack Table を採用する](ADR-028-adopt-tanstack-table.md)（Proposed, 2026-09-29）
+- [ADR-029: Frontend 開発依存の既知脆弱性を override と期限付き ignore で扱う](ADR-029-handle-frontend-dev-dependency-vulnerabilities.md)（Proposed, 2026-09-29）
+- [ADR-030: Base UI のインライン style 要素を限定して許可する](ADR-030-allow-base-ui-inline-style-elements.md)（Proposed, 2026-09-29）
+- [ADR-031: Frontend の型検査を厳格化し、tsconfig を正本にする](ADR-031-tighten-frontend-typescript-checks.md)（Proposed, 2026-09-30）
+- [ADR-032: Frontend を業務機能単位で構成する](ADR-032-organize-frontend-by-business-feature.md)（Proposed, 2026-09-30）
+- [ADR-033: Vite 開発オリジンを固定し proxy ポートを単一ソース化する](ADR-033-pin-vite-dev-origin-and-source-proxy-port.md)（Proposed, 2026-09-30）
+- [ADR-034: Frontend ランタイムを固定し Oxlint 全カテゴリを強制する](ADR-034-pin-frontend-runtime-and-enforce-oxlint-categories.md)（Proposed, 2026-09-30）
+- [ADR-035: jscpd と Knip を品質ゲートに採用する](ADR-035-adopt-jscpd-and-knip-quality-gates.md)（Proposed, 2026-10-01）
+- [ADR-036: docs/ を OKF v0.2 バンドルとして構成する](ADR-036-adopt-okf-for-docs-knowledge-bundle.md)（Proposed, 2026-09-30）

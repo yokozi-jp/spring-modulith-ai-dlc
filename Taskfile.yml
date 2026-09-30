@@ -133,6 +133,28 @@ tasks:
         echo "" >&2
         if [ "${ADR_STRICT:-}" = "1" ]; then exit 1; fi
 
+  # OKF（docs/ を Open Knowledge Format v0.2 バンドルとして検証）
+  okf-check:
+    desc: docs/ の OKF 適合と孤立ドキュメントを検証
+    silent: true
+    dir: docs
+    cmds:
+      - |
+        if ! command -v iwe >/dev/null 2>&1; then
+          echo "OKF check: iwe が無いためスキップします（CI で検査されます）。" >&2
+          exit 0
+        fi
+        iwe schema validate
+        orphans="$(iwe stats -f json | python3 -c 'import sys,json; print(len(json.load(sys.stdin).get("orphans", [])))')"
+        if [ "$orphans" != "0" ]; then
+          echo "" >&2
+          echo "⚠ 孤立ドキュメントが $orphans 件あります（どこからも参照されていません）。" >&2
+          echo "  index.md などの目次からリンクして、グラフに接続してください。" >&2
+          iwe stats -f json | python3 -c 'import sys,json; [print("    - "+o) for o in json.load(sys.stdin).get("orphans", [])]' >&2
+          exit 1
+        fi
+
+
   # Setup
   setup:
     desc: 開発環境のセットアップスクリプトを順次実行
@@ -147,6 +169,7 @@ tasks:
         ./04-setup-shell.sh
         ./05-setup-bun.sh
         ./06-setup-go-betterleaks.sh
+        ./07-setup-iwe.sh
 
   # Frontend
   fe-format:

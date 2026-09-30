@@ -1,3 +1,10 @@
+---
+type: Architecture Decision Record
+title: 'ADR-007: セッションベース認証と OIDC Authorization Code + PKCE'
+description: トークン窃取と失効の難しさを避けるため、サーバ側セッションと OIDC Authorization Code + PKCE で認証する決定。
+tags: [adr, security, auth, oidc]
+---
+
 # ADR-007: セッションベース認証と OIDC Authorization Code + PKCE
 
 ## Status
@@ -12,14 +19,11 @@ Accepted
 
 本 ADR は、既に実装済みの決定を遡って記録した（backfill）。
 
-ブラウザ向けの Web アプリケーションで、認証を IdP（Keycloak）へ委譲しつつ、
-XSS によるトークン窃取やトークン失効の難しさを避けたい。
-SPA が保持する stateless な JWT は、失効・ローテーション・保管場所の問題を伴う。
+ブラウザ向けの Web アプリケーションで、認証を IdP（Keycloak）へ委譲しつつ、 XSS によるトークン窃取やトークン失効の難しさを避けたい。 SPA が保持する stateless な JWT は、失効・ローテーション・保管場所の問題を伴う。
 
 ## Decision
 
-サーバサイド Web クライアントとして OIDC Authorization Code Flow + PKCE（S256）を採用し、
-認証状態はサーバ側セッション（Spring Session + Redis）で保持する。
+サーバサイド Web クライアントとして OIDC Authorization Code Flow + PKCE（S256）を採用し、 認証状態はサーバ側セッション（Spring Session + Redis）で保持する。
 
 - 認可リクエストごとに PKCE の challenge（S256）を付与する。
 - セッション ID は Cookie（`APP_SESSION`、`http-only` / `secure` / `SameSite=Lax`）でのみ送受信する。
@@ -57,8 +61,7 @@ SPA が保持する stateless な JWT は、失効・ローテーション・保
 
 - 説明：BFF がトークンを保持し、ブラウザには独自セッションを渡す。
 - Pros：本 ADR と方向性は近い。
-- Cons：本プロジェクトは Spring Security の OAuth2 Client + Session で同等を得られ、
-  追加コンポーネントを持たない構成を選好。
+- Cons：本プロジェクトは Spring Security の OAuth2 Client + Session で同等を得られ、 追加コンポーネントを持たない構成を選好。
 
 ## References
 

@@ -1,3 +1,10 @@
+---
+type: Architecture
+title: フロントエンドアーキテクチャ
+description: 業務能力を最上位の変更単位にする軽量な Package by feature によるフロントエンドの構造を説明する。
+tags: [architecture, frontend, react]
+---
+
 # フロントエンドアーキテクチャ
 
 ## 方針
@@ -18,7 +25,7 @@ OpenAPIからOrvalでnative FetchのTanStack Query clientを生成し、手書�
 
 現在の `src` は、アプリケーションの起動、ルーティング、共通UI、国際化、小さなutilityだけを持つ。
 
-```text
+``` text
 frontend/src/
 ├── main.tsx
 ├── style.css
@@ -48,7 +55,7 @@ frontend/src/
 
 最初の業務機能を追加した後は、必要な範囲で次の構成へ拡張する。
 
-```text
+``` text
 frontend/src/
 ├── main.tsx
 ├── style.css
@@ -134,7 +141,7 @@ Orvalは、最初の業務APIとGit管理するOpenAPI snapshotを追加する�
 
 初期設定ではTanStack Query client、native Fetch、tag単位の分割を使う。
 
-```typescript
+``` typescript
 import { defineConfig } from "orval";
 
 export default defineConfig({
@@ -249,7 +256,7 @@ APIから受け取る絶対時刻はRFC 3339のUTC表現として受け取り、
 
 表示には `Intl.DateTimeFormat` を使い、画面要件で地域が決まる場合はIANA time zoneを明示する。
 
-```typescript
+``` typescript
 const occurredAt = new Date(response.occurredAt);
 
 const label = new Intl.DateTimeFormat("ja-JP", {
@@ -269,7 +276,7 @@ const label = new Intl.DateTimeFormat("ja-JP", {
 
 許可する主要な依存方向は次のとおりである。
 
-```text
+``` text
 main.tsx -> routeTree.gen.ts -> routes
                                   |
                                   +-> features
@@ -324,13 +331,13 @@ TanStack Router pluginが生成する `routeTree.gen.ts` とOrval生成物は、
 
 フロントエンド全体の型検査、lint、test、buildは、ワークスペースルートで次のコマンドから実行する。
 
-```bash
+``` bash
 task fe-verify
 ```
 
 変更範囲を短時間で確認するときは、次のcommandを使う。
 
-```bash
+``` bash
 task fe-check
 ```
 

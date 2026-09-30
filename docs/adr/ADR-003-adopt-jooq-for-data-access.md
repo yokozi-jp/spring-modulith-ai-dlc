@@ -1,3 +1,10 @@
+---
+type: Architecture Decision Record
+title: 'ADR-003: データアクセスに jOOQ を採用'
+description: 発行される SQL を明示制御し PostgreSQL 方言を活かすため、データアクセスに jOOQ を採用する決定。
+tags: [adr, backend, database, jooq]
+---
+
 # ADR-003: データアクセスに jOOQ を採用
 
 ## Status
@@ -12,10 +19,7 @@ Accepted
 
 本 ADR は、既に実装済みの決定を遡って記録した（backfill）。
 
-型安全な SQL と、PostgreSQL 固有の機能・方言をそのまま活かせるデータアクセスがほしい。
-ORM の暗黙のフェッチや N+1、マッピングの不透明さを避け、
-発行される SQL を明示的に制御したい。
-また、日時規約（絶対時刻は `Instant`）へ素直にマッピングできることが要る。
+型安全な SQL と、PostgreSQL 固有の機能・方言をそのまま活かせるデータアクセスがほしい。 ORM の暗黙のフェッチや N+1、マッピングの不透明さを避け、 発行される SQL を明示的に制御したい。 また、日時規約（絶対時刻は `Instant`）へ素直にマッピングできることが要る。
 
 ## Decision
 
@@ -65,5 +69,5 @@ ORM の暗黙のフェッチや N+1、マッピングの不透明さを避け、
 ## References
 
 - `backend/build.gradle`（`spring-boot-starter-jooq`、`jooq-codegen-gradle`）
-- [`../../.kiro/steering/datetime-timezone-conventions.md`](../../.kiro/steering/datetime-timezone-conventions.md)
-- [`ADR-004-commit-jooq-generated-code.md`](ADR-004-commit-jooq-generated-code.md)
+- [../../.kiro/steering/datetime-timezone-conventions.md](../../.kiro/steering/datetime-timezone-conventions.md)
+- [ADR-004-commit-jooq-generated-code.md](ADR-004-commit-jooq-generated-code.md)

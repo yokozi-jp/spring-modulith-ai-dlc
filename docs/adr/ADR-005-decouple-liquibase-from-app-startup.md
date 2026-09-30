@@ -1,3 +1,10 @@
+---
+type: Architecture Decision Record
+title: 'ADR-005: Liquibase をアプリケーション起動から分離する'
+description: 起動時マイグレーションの競合を避け、スキーマ変更をデプロイと独立させるため Liquibase を起動から分離する決定。
+tags: [adr, database, liquibase, migration]
+---
+
 # ADR-005: Liquibase をアプリケーション起動から分離する
 
 ## Status
@@ -12,22 +19,15 @@ Accepted
 
 本 ADR は、既に実装済みの決定を遡って記録した（backfill）。
 
-アプリケーション起動時に自動でマイグレーションを走らせると、
-複数インスタンスの同時起動で競合し、デプロイとスキーマ変更のタイミングを制御できない。
-本番では、後方互換なスキーマ変更（expand-and-contract）を、
-アプリケーションデプロイと独立した明示的な手順で適用したい。
+アプリケーション起動時に自動でマイグレーションを走らせると、 複数インスタンスの同時起動で競合し、デプロイとスキーマ変更のタイミングを制御できない。 本番では、後方互換なスキーマ変更（expand-and-contract）を、 アプリケーションデプロイと独立した明示的な手順で適用したい。
 
 ## Decision
 
-Liquibase の起動時自動実行を無効化し、マイグレーションをデプロイ前の明示コマンドで適用する。
-無効化は、アプリケーションの実行時クラスパスから `spring-boot-starter-liquibase` を外すことで行う。
-自動構成（`LiquibaseAutoConfiguration`）が読み込まれないため、起動時マイグレーションは起こらない。
-（当初は `spring.liquibase.enabled: false` も併用していたが、スターターを外した時点で無効となり、Spring Boot 4 では未知プロパティ扱いになるため削除した。）
+Liquibase の起動時自動実行を無効化し、マイグレーションをデプロイ前の明示コマンドで適用する。 無効化は、アプリケーションの実行時クラスパスから `spring-boot-starter-liquibase` を外すことで行う。 自動構成（`LiquibaseAutoConfiguration`）が読み込まれないため、起動時マイグレーションは起こらない。 （当初は `spring.liquibase.enabled: false` も併用していたが、スターターを外した時点で無効となり、Spring Boot 4 では未知プロパティ扱いになるため削除した。）
 
 - ローカル・CI は `task be-migrate`（`./gradlew migrateDatabase`）で適用する。
 - スキーマタグを Git 管理し、本番は `task be-release-migrate` で固定タグまで適用する。
-- 使い捨て DB で update → rollback → 再 update とタグを検証する
-  （`task be-verify-migrations`）。
+- 使い捨て DB で update → rollback → 再 update とタグを検証する （`task be-verify-migrations`）。
 - 本番は expand-and-contract を守り、旧・新アプリの併存中も後方互換にする。
 
 ## Consequences
@@ -64,5 +64,5 @@ Liquibase の起動時自動実行を無効化し、マイグレーションを�
 ## References
 
 - `backend/build.gradle`（`spring-boot-starter-liquibase` を実行時依存に持たず、Liquibase は Gradle プラグインと `liquibaseRuntime` のみ）
-- [`docs/database-migrations.md`](../database-migrations.md)
+- [docs/database-migrations.md](../database-migrations.md)
 - `Taskfile.yml`（`be-migrate` / `be-release-migrate` / `be-verify-migrations`）
