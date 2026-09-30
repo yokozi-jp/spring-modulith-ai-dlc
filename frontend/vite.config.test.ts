@@ -65,7 +65,12 @@ describe("Vite configuration", () => {
 
     expect(config.html?.cspNonce).toBeUndefined();
     expect(contentSecurityPolicy).not.toContain("'nonce-");
-    expect(contentSecurityPolicy).not.toContain("ws://");
+    // 本番の connect-src は自オリジンのみで、開発用の WebSocket 許可などへ拡張しない。
+    const connectSrc = contentSecurityPolicy
+      .split(";")
+      .map((directive) => directive.trim())
+      .find((directive) => directive.startsWith("connect-src"));
+    expect(connectSrc).toBe("connect-src 'self'");
     expect(config.preview.headers?.["Content-Security-Policy"]).toBe(contentSecurityPolicy);
   });
 
