@@ -58,7 +58,8 @@
 | Spring Boot                | 4.1.1      |
 | Spring Modulith            | 2.1.1      |
 | TypeScript                 | 7.0.x      |
-| VitePlus                   | latest     |
+| Node.js                    | 24.21.0    |
+| VitePlus                   | 0.3.3      |
 | pnpm                       | 11.21.0    |
 | PostgreSQL                 | 18         |
 | Redis                      | 7.x        |
