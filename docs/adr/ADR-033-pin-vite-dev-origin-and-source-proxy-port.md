@@ -80,5 +80,5 @@ proxy の `changeOrigin` は `false` を維持し、フロントエンド側の 
 - [Vite: Server Options](https://vite.dev/config/server-options)
 - [Vite: Shared Options（`loadEnv`）](https://vite.dev/config/shared-options)
 - `frontend/vite.config.ts`
-- `frontend/vite.config.test.ts`
+- `frontend/vite-config.test.ts`
 - `docker/keycloak/realm.json`
