@@ -9,7 +9,7 @@ tags: [adr, documentation, okf, steering, knowledge-management]
 
 ## Status
 
-Proposed
+Accepted
 
 ## Date
 
