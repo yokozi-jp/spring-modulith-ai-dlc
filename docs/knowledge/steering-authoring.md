@@ -41,6 +41,8 @@ description: バックエンドのコード、テスト、ビルド設定を追�
 ```
 
 `fileMatchPattern` に複数のパターンを指定するときは配列で書く。
+`task okf-check`で検査できるよう、`inclusion`、`name`、`description`は1行のplain scalarまたはquoted scalarで書き、ブロックスカラーと行末コメントを使わない。
+`fileMatchPattern`は1行の文字列、inline配列、文字列だけを持つblock配列のいずれかで書く。
 
 `name` と `description` は、公式には `auto` で必須である。
 このプロジェクトでは、`fileMatch` と `auto` の両方に付ける。
@@ -103,7 +105,8 @@ steering はコードベースの一部としてリポジトリで管理され�
 ## 保守
 
 - アーキテクチャや開発フローを変えたら、steering の案内が docs の現状と合っているかを見直す。
-- 再編後は、steering が指す docs のパスとファイル参照が実在するか確認する。`task okf-check` が docs のパスの実在を検査する。
+- 再編後は、steeringが指すdocsのパスとファイル参照が実在するか確認する。
+- `task okf-check`はdocsパスの実在に加え、`inclusion`の許容値と、`fileMatch`または`auto`に必要なfrontmatter項目を検査する。
 - steering の変更はコードの変更と同じくレビューを通す。
 
 ## 出典

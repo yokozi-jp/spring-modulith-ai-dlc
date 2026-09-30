@@ -83,6 +83,7 @@ Security タブの未解決結果はレビュー時に確認し、受容する�
 
 - GitHub Actions：`actionlint`
 - Markdown：`Run markdownlint-cli2 📝`
+- docs、steering、OKF設定、Taskfile：`Run task okf-check 📚`
 - Compose：`Run docker compose config 🐳`
 
 path filter によって workflow 自体が作られない Pull Request では、これらの check run も存在しない。

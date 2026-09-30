@@ -183,20 +183,26 @@ Markdown ファイルの体裁を markdownlint-cli2 で検査します。
 
 ## OKF バンドル検証（iwe）
 
-`docs/` を [Open Knowledge Format](https://github.com/GoogleCloudPlatform/open-knowledge-format) v0.2 バンドルとして検証します。
-各概念ドキュメントのフロントマター（`type` / `title` / `description` / `tags`）と予約ファイル（`index.md`）の形状を `iwe schema validate` で検査し、どこからも参照されない孤立ドキュメントを `iwe stats` で検出します。
-検証は `docs/.iwe/schemas/` のスキーマに従います。
+`docs/`を[Open Knowledge Format](https://github.com/GoogleCloudPlatform/open-knowledge-format) v0.2バンドルとして検証します。
+各概念ドキュメントのfrontmatterと予約ファイルの形状を`iwe schema validate`で検査します。
+この検査は`type`の値と必須項目を確認しますが、`type`と本文の責務が一致するかは判定しません。
+`iwe stats`では、docs内部のリンク切れと、どこからも参照されない孤立ドキュメントを検出します。
+docs外のリポジトリファイルへの参照は、iweが未解決として報告しても内部リンク切れの失敗対象にはしません。
 
-同じタスクで、steering（`.kiro/steering/`）と docs の境界も検査します（[ADR-038](adr/ADR-038-route-steering-to-docs-knowledge.md)）。
-docs から `.kiro/` 配下へのリンク、steering の `#[[file:docs/...]]`、steering が指す存在しない docs パスは失敗にします。
-docs の文書が 250 行、steering が 1 ファイル 150 行、合計 500 行を超えた場合は警告だけを出します。
+同じタスクで、steeringとdocsの境界も検査します（[ADR-038](adr/ADR-038-route-steering-to-docs-knowledge.md)）。
+docsから`.kiro/`配下へのリンク、steeringの`#[[file:docs/...]]`、steeringが指す存在しないdocsパスは失敗にします。
+steeringの`inclusion`を検査し、`fileMatch`には`fileMatchPattern`、`name`、`description`を、`auto`には`name`と`description`を要求します。
+docsの非index文書が250行を超えた場合は、1ファイル1責務を見直す合図として警告します。
+行数だけでは失敗にせず、250行以下の責務混在はレビューで確認します。
+steeringは1ファイル150行、合計500行を超えた場合に警告します。
 
-| 実行タスク       | 内容                                                                                |
-| ---------------- | ----------------------------------------------------------------------------------- |
-| `task okf-check` | OKF 適合（フロントマター・予約ファイル）、孤立ドキュメント、steering との境界を検証 |
+`Taskfile.yml`が変わった場合は、README、`docs/dev-workflow.md`、この文書が同じ差分に含まれるかを警告します。
+公開タスクの変更だけが文書同期の対象であり、内部実装だけの変更では警告を確認して対応不要と判断できます。
 
-iwe が無い環境では OKF 適合と孤立の検査だけをスキップします（最終担保は CI）。
-iwe の導入は [開発環境構築](local-env-setup/setup.md) を参照してください。
+- **`task okf-check`**：OKF適合、内部リンク、孤立ドキュメント、文書責務の見直し合図、steeringのfrontmatterと境界、Taskfileの文書同期候補を検査します。
+
+iweが無い環境ではOKF適合、内部リンク、孤立の検査だけをスキップします（最終担保はCI）。
+iweの導入は[開発環境構築](local-env-setup/setup.md)を参照してください。
 
 ## リリース設定
 
@@ -221,8 +227,8 @@ Task 専用の公式リンタは存在しないため、Task 自身がファイ�
 
 - **Git フック（Lefthook, [`lefthook.yml`](../lefthook.yml)）**
   - commit-msg: commitlint（コミットメッセージを Conventional Commits 規約で検証）
-  - pre-commit: betterleaks（ステージ済み）、Frontendのformat、lint、型検査、hadolint / docker build --check（Dockerfile 変更時）、compose config（Compose 変更時）、markdownlint（Markdown 変更時）、okf-check（`docs/` か `.kiro/steering/` の変更時）
+  - pre-commit: betterleaks（ステージ済み）、Frontendのformat、lint、型検査、hadolint / docker build --check（Dockerfile変更時）、compose config（Compose変更時）、markdownlint（Markdown変更時）、okf-check（`docs/`、`.kiro/steering/`、`Taskfile.yml`の変更時）
   - pre-push: betterleaks（全履歴）、FrontendのReact診断、テスト、本番ビルド、be-lint（Spotless + PMD + SpotBugs）/ be-test（`task test`）（backend 変更時）、actionlint / zizmor（ワークフロー変更時）
 - **CI（GitHub Actions, [`.github/workflows/`](../.github/workflows/)）**
-  - `frontend-ci.yml`（Frontendのformat、lint、Knip、型検査、React Doctor、全体branch coverage 85%、React Compilerを有効にした本番ビルド）、`backend-ci.yml`（backend の Lint（Spotless + PMD + SpotBugs）とテスト・カバレッジ）、`conventional-commits.yml`（Pull Requestタイトルのcommitlint）、`betterleaks.yml`（シークレットスキャン）、`static-analysis.yml`（Semgrepの静的解析とSARIFアップロード、jscpdの重複コード検査）、`trivy.yml`（脆弱性スキャン / SARIF アップロード）、`actionlint.yml` / `zizmor.yml`（ワークフロー）、`hadolint.yml`（Dockerfile Lint、docker build --check、backend イメージのビルド・起動・ヘルスチェック）、`compose-config.yml`（Compose）、`markdownlint.yml`（Markdown）、`okf-validate.yml`（`docs/` の OKF バンドル検証と steering との境界検査）、`release-please.yml`（リリース設定検証とRelease Pull Request作成）
+  - `frontend-ci.yml`（Frontendのformat、lint、Knip、型検査、React Doctor、全体branch coverage 85%、React Compilerを有効にした本番ビルド）、`backend-ci.yml`（backend の Lint（Spotless + PMD + SpotBugs）とテスト・カバレッジ）、`conventional-commits.yml`（Pull Requestタイトルのcommitlint）、`betterleaks.yml`（シークレットスキャン）、`static-analysis.yml`（Semgrepの静的解析とSARIFアップロード、jscpdの重複コード検査）、`trivy.yml`（脆弱性スキャン / SARIF アップロード）、`actionlint.yml` / `zizmor.yml`（ワークフロー）、`hadolint.yml`（Dockerfile Lint、docker build --check、backend イメージのビルド・起動・ヘルスチェック）、`compose-config.yml`（Compose）、`markdownlint.yml`（Markdown）、`okf-validate.yml`（OKF適合、docs内部リンク、孤立ドキュメント、steering境界、Taskfile文書同期候補）、`release-please.yml`（リリース設定検証とRelease Pull Request作成）
   - `static-analysis.yml` / `trivy.yml` の検出結果は GitHub Code Scanning（Security タブ）に SARIF 形式でアップロードされます。

@@ -133,12 +133,37 @@ tasks:
         echo "" >&2
         if [ "${ADR_STRICT:-}" = "1" ]; then exit 1; fi
 
+  # docs と Taskfile の同期候補を警告する。
+  lint-docs-sync:
+    internal: true
+    silent: true
+    cmds:
+      - |
+        base="${DOCS_DIFF_BASE:-origin/main}"
+        if ! git rev-parse --verify --quiet "$base" >/dev/null; then
+          echo "Docs sync check: 比較起点 $base が無いためスキップします。" >&2
+          exit 0
+        fi
+        changed="$({ git diff --name-only "$base"...HEAD; git diff --name-only; git diff --cached --name-only; } | sort -u)"
+        if ! printf '%s\n' "$changed" | grep -qx 'Taskfile.yml'; then exit 0; fi
+        missing=""
+        for doc in README.md docs/dev-workflow.md docs/lint-and-test.md; do
+          if ! printf '%s\n' "$changed" | grep -qx "$doc"; then missing="${missing}    - ${doc}\n"; fi
+        done
+        if [ -z "$missing" ]; then exit 0; fi
+        echo "" >&2
+        echo "⚠ Taskfile.yml が変更されています。公開タスクの変更なら次の文書も同じ変更で更新してください。" >&2
+        printf '%b' "$missing" >&2
+        echo "  内部実装だけの変更なら対応は不要です（規約: docs/tooling/taskfile.md）。" >&2
+        echo "" >&2
+
   # OKF（docs/ を Open Knowledge Format v0.2 バンドルとして検証）
   okf-check:
-    desc: docs/ の OKF 適合、孤立ドキュメント、steering との境界を検証
+    desc: docs の OKF 適合、内部リンク、孤立ドキュメント、責務混在の見直し合図、steering との境界を検証
     silent: true
     dir: docs
     cmds:
+      - task: lint-docs-sync
       - task: docs-boundary-check
       - |
         if ! command -v iwe >/dev/null 2>&1; then
@@ -146,22 +171,30 @@ tasks:
           exit 0
         fi
         if ! command -v jq >/dev/null 2>&1; then
-          echo "OKF check: jq が無いため孤立検査をスキップします（CI で検査されます）。" >&2
+          echo "OKF check: jq が無いためリンクと孤立の検査をスキップします（CI で検査されます）。" >&2
           iwe schema validate
           exit 0
         fi
         iwe schema validate
-        orphans="$(iwe stats -f json | jq '.orphans | length')"
+        stats="$(iwe stats -f json)"
+        broken="$(printf '%s' "$stats" | jq '[.brokenLinks[]? | select((.targetKey | startswith("../")) | not)] | length')"
+        if [ "$broken" != "0" ]; then
+          echo "" >&2
+          echo "✗ docs/ 内のリンク切れが $broken 件あります。" >&2
+          printf '%s' "$stats" | jq -r '.brokenLinks[]? | select((.targetKey | startswith("../")) | not) | "    - " + .sourceKey + " -> " + .targetKey' >&2
+          exit 1
+        fi
+        orphans="$(printf '%s' "$stats" | jq '.orphans | length')"
         if [ "$orphans" != "0" ]; then
           echo "" >&2
           echo "⚠ 孤立ドキュメントが $orphans 件あります（どこからも参照されていません）。" >&2
           echo "  index.md などの目次からリンクして、グラフに接続してください。" >&2
-          iwe stats -f json | jq -r '.orphans[] | "    - " + .' >&2
+          printf '%s' "$stats" | jq -r '.orphans[] | "    - " + .' >&2
           exit 1
         fi
 
-  # steering → docs の一方向依存と文書の大きさを検査する（ADR-038）。
-  # 依存方向とパスの実在は失敗、行数の目安超過は警告にとどめる。
+  # steering → docs の一方向依存、frontmatter、文書責務の見直し合図を検査する（ADR-038）。
+  # 依存方向、frontmatter、パスの実在は失敗、docs の250行超とsteeringの行数超過は警告にとどめる。
   docs-boundary-check:
     internal: true
     silent: true
@@ -185,9 +218,73 @@ tasks:
           echo "$missing" >&2
           fail=1
         fi
-        for f in $(find docs -name '*.md' -not -path '*/node_modules/*'); do
+        if ! node --input-type=module <<'NODE'
+        import { readdirSync, readFileSync } from "node:fs";
+
+        const allowed = new Set(["always", "fileMatch", "manual", "auto"]);
+        const errors = [];
+        for (const file of readdirSync(".kiro/steering").filter((name) => name.endsWith(".md")).sort()) {
+          const path = `.kiro/steering/${file}`;
+          const lines = readFileSync(path, "utf8").replaceAll("\r\n", "\n").split("\n");
+          if (lines[0] !== "---") continue;
+          const end = lines.indexOf("---", 1);
+          if (end < 0) {
+            errors.push(`${path}: frontmatter の終端 --- がありません`);
+            continue;
+          }
+          const frontmatter = lines.slice(1, end);
+          const entry = (name) => {
+            const index = frontmatter.findIndex((candidate) => candidate.startsWith(`${name}:`));
+            return index < 0 ? undefined : {
+              index,
+              raw: frontmatter[index].slice(frontmatter[index].indexOf(":") + 1).trim(),
+            };
+          };
+          const scalar = (item) => item?.raw.replace(/^(['"])(.*)\1$/, "$2");
+          const quotedString = (raw) => /^(['"]).+\1$/.test(raw ?? "");
+          const plainString = (raw) => Boolean(raw)
+            && !/^[#\[{>|!&*]/.test(raw)
+            && !/\s+#/.test(raw)
+            && !/^(null|~|true|false|[-+]?\d+(\.\d+)?)$/i.test(raw);
+          const stringValue = (raw) => quotedString(raw) || plainString(raw);
+          const inclusionItem = entry("inclusion");
+          const inclusion = scalar(inclusionItem) ?? "always";
+          if ((inclusionItem && !stringValue(inclusionItem.raw)) || !allowed.has(inclusion)) {
+            errors.push(`${path}: inclusion が不正です: ${inclusion || "(empty)"}`);
+            continue;
+          }
+          const required = inclusion === "fileMatch"
+            ? ["fileMatchPattern", "name", "description"]
+            : inclusion === "auto" ? ["name", "description"] : [];
+          for (const name of required) {
+            const item = entry(name);
+            const rest = item ? frontmatter.slice(item.index + 1) : [];
+            const nextKey = rest.findIndex((line) => /^[A-Za-z][A-Za-z0-9_-]*:/.test(line));
+            const nested = nextKey < 0 ? rest : rest.slice(0, nextKey);
+            const blockValues = nested
+              .filter((line) => /^\s+-\s+\S/.test(line))
+              .map((line) => line.replace(/^\s+-\s+/, "").trim());
+            const inlineList = /^\[.*\]$/.test(item?.raw ?? "")
+              && item.raw.slice(1, -1).trim().length > 0;
+            const valid = name === "fileMatchPattern"
+              ? stringValue(item?.raw)
+                || inlineList
+                || (blockValues.length > 0 && blockValues.every(stringValue))
+              : stringValue(item?.raw);
+            if (!valid) errors.push(`${path}: ${inclusion} には文字列の ${name} が必要です`);
+          }
+        }
+        if (errors.length > 0) {
+          console.error(`✗ steering の frontmatter が不正です。\n${errors.map((error) => `    - ${error}`).join("\n")}`);
+          process.exitCode = 1;
+        }
+        NODE
+        then
+          fail=1
+        fi
+        for f in $(find docs -name '*.md' ! -name 'index.md' -not -path '*/node_modules/*'); do
           n="$(wc -l < "$f")"
-          if [ "$n" -gt 250 ]; then echo "⚠ $f は $n 行です（目安 250 行以内）。" >&2; fi
+          if [ "$n" -gt 250 ]; then echo "⚠ $f は $n 行です（250行超）。行数だけで分割せず、1ファイル1責務とtypeと本文の一致を見直してください。" >&2; fi
         done
         total=0
         for f in .kiro/steering/*.md; do

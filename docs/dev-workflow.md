@@ -137,9 +137,11 @@ task compose-reset CONFIRM_RESET=yes   # 全サービスの volume ごと削除�
 同じTaskfileのタスクを、ローカル、CI、Gitフック（Lefthook）が共用している。
 これにより「ローカルでは通ったが CI で落ちる」乖離を防ぐ。
 
-- pre-commit：betterleaks、Frontendのformat、lint、型検査、hadolint、compose config、markdownlint、okf-check（`docs/` か `.kiro/steering/` の変更時）（変更種別に応じて）。
+- pre-commit：betterleaks、Frontendのformat、lint、型検査、hadolint、compose config、markdownlint、okf-check（`docs/`、`.kiro/steering/`、`Taskfile.yml`の変更時）（変更種別に応じて）。
+  `task okf-check`はOKF適合、docs内部リンク、孤立ドキュメント、steeringのfrontmatterと境界を検査し、非index文書の250行超を責務混在の見直し合図として警告する。
+  Taskfileと利用文書の同期候補も警告する。
 - pre-push：betterleaks（全履歴）、FrontendのReact診断、テストと本番ビルド、backend 変更時は be-lint / be-test、判断が絡む変更に ADR が伴うかの確認（`task adr-check`、既定は非ブロッキングのナッジ）。
-- CI：`frontend-ci.yml` が `task fe-verify`、`backend-ci.yml` が `task be-verify-migrations` と `task be-test` を実行。
+- CI：`frontend-ci.yml` が `task fe-verify`、`backend-ci.yml` が `task be-verify-migrations` と `task be-test`、`okf-validate.yml`が`task okf-check`を実行。
 
 したがって、Frontend変更では `task fe-verify`、backend変更では `task verify` を事前に実行する。
 

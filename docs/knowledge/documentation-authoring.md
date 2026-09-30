@@ -1,7 +1,7 @@
 ---
 type: Convention
 title: docs文書の作成と変更
-description: docs配下のMarkdownを作成、編集、移動、分割するときの手段、配置、index、frontmatter、キー、検査、新しい領域の追加を定める規約。docsの文書へ変更を加える前に読む。
+description: docs配下のMarkdownを1ファイル1責務で作成、編集、移動、分割するときの責務、手段、配置、index、frontmatter、キー、検査、新しい領域の追加を定める規約。docsの文書へ変更を加える前に読む。
 tags: [convention, documentation, iwe, okf]
 ---
 
@@ -42,7 +42,7 @@ Kiroでは`iwe_create`にキーと本文を渡して作成する。
 
 知識をsteering、docs、iweのどこへ置くかは[steering、docs、iweの役割分担](knowledge-architecture.md)に従う。
 docsは`docs/backend/`や`docs/database/`のように領域ごとのフォルダへ分ける。
-各領域には、その領域の全文書へのリンクを持つ`docs/<領域>/index.md`と、1テーマ1ファイルの文書を置く。
+各領域には、その領域の全文書へのリンクを持つ`docs/<領域>/index.md`と、1責務1ファイルの文書を置く。
 
 通常の領域には、対象ファイルから領域の`index.md`へ案内する`.kiro/steering/<領域>.md`も置く。
 `docs/knowledge/`では`docs-navigation`が、`docs/agents/`ではルートの`AGENTS.md`が領域のsteeringを兼ねるため、領域専用のsteeringを作らない。
@@ -67,7 +67,10 @@ H1の見出しと、次の形式の箇条書きだけを書く。
 
 ## 文書の構造
 
-1テーマ1ファイルにし、250行以内を目安にする。
+1ファイル1責務を主原則とし、「この文書を読めば何が決まるか」を一つの問いで言える単位にする。
+frontmatterの`type`と本文を照合し、異なるtypeの責務を一つの文書へ混ぜない。
+250行は責務混在を見直す合図とする。
+250行を超えても責務が一つなら維持し、250行以下でも責務が混在すれば既存文書への移動または分割を検討する。
 冒頭にルールの要約を1行から4行で置き、詳細はその後に書く。
 規約文書には現行ルールと検査方法を書き、理由はADRへリンクする。
 理由を規約文書へ重複して書かない。
@@ -82,7 +85,7 @@ ADRの作成条件、採番、書式、ライフサイクルは[ADRの運用ル�
 
 `index.md`以外の文書には、`type`、`title`、`description`、`tags`を置く。
 `description`には、何を定める文書かと、いつ読むかを書く。
-`type`は次の語彙から選ぶ。
+`type`は本文の主責務に一致させ、次の語彙から選ぶ。
 
 - **Convention**：守るべき規約。
 - **Architecture**：構造と依存の説明。
@@ -136,6 +139,6 @@ Kiro CLI用の`.kiro/hooks/block-iwe-normalize.json`と判定本体の`.kiro/hoo
 
 ## 検証
 
-変更後は`task okf-check`を実行し、OKF形式、リンク切れ、孤立文書、steeringからdocsへの参照を確認する。
+変更後は`task okf-check`を実行し、OKF形式、docs内部のリンク切れ、孤立文書、steeringのfrontmatterとdocsへの参照を確認する。
 Markdownの変更では、リポジトリで設定されたMarkdown lintも実行する。
 検査コマンドと検査範囲は[Lint・テストのリファレンス](../lint-and-test.md)を参照する。
