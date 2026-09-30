@@ -17,17 +17,25 @@ Proposed
 
 ## Context
 
-Frontend は TanStack Router の Vite plugin を使い、ファイル構成から型付きルートツリーを生成する。 `@tanstack/router-plugin@1.168.40` は `@babel/core@7.29.7` を介して `semver@6.3.1` を必要とする。 この `semver` は Babel がバージョン制約を解析し、Babel本体とpluginの互換性を検証するためのビルド時依存であり、ブラウザ向けの実行時バンドルには含まれない。
+Frontend は TanStack Router の Vite plugin を使い、ファイル構成から型付きルートツリーを生成する。
+`@tanstack/router-plugin@1.168.40` は `@babel/core@7.29.7` を介して `semver@6.3.1` を必要とする。
+この `semver` は Babel がバージョン制約を解析し、Babel本体とpluginの互換性を検証するためのビルド時依存であり、ブラウザ向けの実行時バンドルには含まれない。
 
-Frontend の pnpm workspace は `trustPolicy: no-downgrade` を設定している。 このポリシーは、公開日時が前のリリースに存在した信頼証拠より弱いリリースを拒否する。 `semver@6.3.1` には npm provenance がないため、pnpm 11.21.0 は `ERR_PNPM_TRUST_DOWNGRADE` で導入を止める。
+Frontend の pnpm workspace は `trustPolicy: no-downgrade` を設定している。
+このポリシーは、公開日時が前のリリースに存在した信頼証拠より弱いリリースを拒否する。
+`semver@6.3.1` には npm provenance がないため、pnpm 11.21.0 は `ERR_PNPM_TRUST_DOWNGRADE` で導入を止める。
 
-`semver@6.3.1` は2023年7月10日に公開され、npmの `node-semver` リポジトリを公開元としており、registry が配布するtarballのintegrityとshasumは確認できる。 しかし、integrityは取得内容の一致を検証するだけで、公開主体をprovenanceによって証明しない。 TanStack Router plugin の対応バージョンを下げても Babel が同じsemver範囲を要求するため、この依存経路は残る。
+`semver@6.3.1` は2023年7月10日に公開され、npmの `node-semver` リポジトリを公開元としており、registry が配布するtarballのintegrityとshasumは確認できる。
+しかし、integrityは取得内容の一致を検証するだけで、公開主体をprovenanceによって証明しない。
+TanStack Router plugin の対応バージョンを下げても Babel が同じsemver範囲を要求するため、この依存経路は残る。
 
 ## Decision
 
-`frontend/pnpm-workspace.yaml` の `trustPolicyExclude` に `semver@6.3.1` を追加する。 例外はpackage名とversionの完全一致に限定し、`trustPolicy: no-downgrade`、7日間の `minimumReleaseAge`、`blockExoticSubdeps` は維持する。
+`frontend/pnpm-workspace.yaml` の `trustPolicyExclude` に `semver@6.3.1` を追加する。
+例外はpackage名とversionの完全一致に限定し、`trustPolicy: no-downgrade`、7日間の `minimumReleaseAge`、`blockExoticSubdeps` は維持する。
 
-`semver` のバージョンを範囲指定で例外化せず、別バージョンへ自動的に例外が広がらないようにする。 BabelまたはTanStack Router pluginがこの依存を解消した時点で、lockfileに `semver@6.3.1` が残っていないことを確認して例外を削除する。
+`semver` のバージョンを範囲指定で例外化せず、別バージョンへ自動的に例外が広がらないようにする。
+BabelまたはTanStack Router pluginがこの依存を解消した時点で、lockfileに `semver@6.3.1` が残っていないことを確認して例外を削除する。
 
 ## Consequences
 

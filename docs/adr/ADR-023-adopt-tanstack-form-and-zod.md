@@ -17,17 +17,25 @@ Proposed
 
 ## Context
 
-Frontend は React 19 と TanStack Router を採用しているが、フォーム状態と入力検証を扱う共通ライブラリを持っていない。 現在の画面に業務フォームはなく、標準化する対象は今後追加するフォームである。
+Frontend は React 19 と TanStack Router を採用しているが、フォーム状態と入力検証を扱う共通ライブラリを持っていない。
+現在の画面に業務フォームはなく、標準化する対象は今後追加するフォームである。
 
-フォームでは入力値、送信状態、項目単位のエラーを型安全に管理する必要がある。 入力検証はTypeScriptの型だけでは実行時に働かないため、ブラウザで実行できるschemaが必要になる。 フォームライブラリと検証ライブラリを独自adapterで接続すると、そのadapterの保守と型の不一致を追加で引き受けることになる。
+フォームでは入力値、送信状態、項目単位のエラーを型安全に管理する必要がある。
+入力検証はTypeScriptの型だけでは実行時に働かないため、ブラウザで実行できるschemaが必要になる。
+フォームライブラリと検証ライブラリを独自adapterで接続すると、そのadapterの保守と型の不一致を追加で引き受けることになる。
 
-TanStack Form 1.x は Standard Schema v1 を実装するschemaをvalidatorとして受け取る。 Zod 4.x も Standard Schema v1 に対応しているため、専用adapterを追加せず連携できる。 OrvalはOpenAPIからZod schemaを生成し、Fetch clientのruntime response validationに利用できる。 フォームとAPI生成でZodへ揃えれば、schema記法、エラー型、依存更新を一系統にできる。
+TanStack Form 1.x は Standard Schema v1 を実装するschemaをvalidatorとして受け取る。
+Zod 4.x も Standard Schema v1 に対応しているため、専用adapterを追加せず連携できる。
+OrvalはOpenAPIからZod schemaを生成し、Fetch clientのruntime response validationに利用できる。
+フォームとAPI生成でZodへ揃えれば、schema記法、エラー型、依存更新を一系統にできる。
 
 ## Decision
 
-Reactのフォーム状態管理に `@tanstack/react-form` 1.xを使い、実行時入力検証にZod 4.xを使う。 依存バージョンは `frontend/package.json` へ固定し、TanStack FormのvalidatorへZod schemaをStandard Schemaとして直接渡す。
+Reactのフォーム状態管理に `@tanstack/react-form` 1.xを使い、実行時入力検証にZod 4.xを使う。
+依存バージョンは `frontend/package.json` へ固定し、TanStack FormのvalidatorへZod schemaをStandard Schemaとして直接渡す。
 
-OrvalでAPI clientを生成するときもZod schemaを生成し、runtime response validationが必要な境界で利用する。 共通field componentやschema wrapperは先行して作らず、最初の業務フォームで重複が確認できた場合に限り共有部品を抽出する。
+OrvalでAPI clientを生成するときもZod schemaを生成し、runtime response validationが必要な境界で利用する。
+共通field componentやschema wrapperは先行して作らず、最初の業務フォームで重複が確認できた場合に限り共有部品を抽出する。
 
 ## Consequences
 

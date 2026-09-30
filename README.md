@@ -177,7 +177,8 @@ coverageレポートは `task fe-coverage` で確認でき、CIでは14日間art
 バックエンド変更時は push 前に `task verify`（静的解析、OpenAPI 契約検査と、使い捨てDBでのマイグレーション検証とテスト、CI と同じ内容）を実行します。
 入力範囲が広い契約にはQuickTheoriesによるプロパティベーステストを使い、通常のテストと一緒に実行します。
 テストの検出力を確認するときは`task mutation-test`でPITを明示実行しますが、実行コストが高いため`task verify`には含めません。
-`docs/` を編集したときは `task okf-check` で Open Knowledge Format v0.2 バンドルの適合（フロントマターと予約ファイル）と孤立ドキュメントを検査します。Lefthook は `docs/` 変更を検出すると pre-commit で同じ検査を実行します。
+`docs/` を編集したときは `task okf-check` で Open Knowledge Format v0.2 バンドルの適合（フロントマターと予約ファイル）と孤立ドキュメントを検査します。
+Lefthook は `docs/` 変更を検出すると pre-commit で同じ検査を実行します。
 
 各タスクの一覧と内容、Git フックと CI での自動実行の対応は [Lint・テストのリファレンス](docs/lint-and-test.md) にまとめています。
 
@@ -190,7 +191,8 @@ coverageレポートは `task fe-coverage` で確認でき、CIでは14日間art
 - 規約は [`.kiro/steering/adr-decision-record.md`](.kiro/steering/adr-decision-record.md) に定義しています（ADR を作る/作らない基準、記録先、ライフサイクル）。
 - 書式は AI-DLC 同梱テンプレート（`.kiro/knowledge/aidlc-architect-agent/adr-template.md`）に準拠します。
 - ADR の一覧は [`docs/adr/index.md`](docs/adr/index.md) を参照してください。
-- インテント固有の設計判断は、AI-DLC が inception 実行時に各インテントの record dir（`<record>/inception/domain-design/decisions.md`）へ生成します。`docs/adr/` はワークフロー外・横断の判断を残す場所です。
+- インテント固有の設計判断は、AI-DLC が inception 実行時に各インテントの record dir（`<record>/inception/domain-design/decisions.md`）へ生成します。
+  `docs/adr/` はワークフロー外・横断の判断を残す場所です。
 
 push 前には `task adr-check` が pre-push で走り、判断が絡む変更（依存・セキュリティ・DB・インフラ・ワークフロー、およびフロントエンド全体）に `docs/adr/` の更新が伴わないとき注意喚起します。
 既定は非ブロッキングで、該当しない場合は `ADR_ACK=1 git push` で抑制できます。
@@ -203,7 +205,8 @@ push 前には `task adr-check` が pre-push で走り、判断が絡む変更�
 各ドキュメントはフロントマターに `type`、`title`、`description`、`tags` を持ち、相互リンクでナレッジグラフを形成します。
 これにより、ドキュメントの種別や関係を機械的に検索、検証でき、AI エージェントからも構造化された知識として参照できます。
 
-- iwe は Markdown をナレッジグラフとして扱う CLI、LSP サーバー、MCP サーバーです。導入は [開発環境構築](docs/local-env-setup/setup.md) を参照してください。
+- iwe は Markdown をナレッジグラフとして扱う CLI、LSP サーバー、MCP サーバーです。
+  導入は [開発環境構築](docs/local-env-setup/setup.md) を参照してください。
 - OKF 適合（フロントマターと予約ファイルの形状）と孤立ドキュメントは `task okf-check` で検証し、Git フック（pre-commit）と CI（`okf-validate.yml`）で強制します。
 - 検証スキーマは `docs/.iwe/schemas/` に置き、`docs/index.md` を目次の起点としています。
 - AI エージェント向けの作成規約は [`.kiro/steering/documentation-authoring.md`](.kiro/steering/documentation-authoring.md)、この構成を採用した判断は [ADR-036](docs/adr/ADR-036-adopt-okf-for-docs-knowledge-bundle.md) に記録しています。

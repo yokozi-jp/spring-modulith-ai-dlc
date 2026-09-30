@@ -7,18 +7,24 @@ tags: [guide, workflow, task-runner]
 
 # 開発ワークフロー
 
-`task`の公開タスクは多いが、日常的に打つのは少数の**入口タスク**で足りる。 このドキュメントは「いつ、どのコマンドを、どの順で使うか」をシナリオ別に示す地図である。 公開タスクの一覧と説明は`task`（引数なし）、`task help`、または`task --list`で確認できる。
+`task`の公開タスクは多いが、日常的に打つのは少数の**入口タスク**で足りる。
+このドキュメントは「いつ、どのコマンドを、どの順で使うか」をシナリオ別に示す地図である。
+公開タスクの一覧と説明は`task`（引数なし）、`task help`、または`task --list`で確認できる。
 
 ## 入口タスク（まずこれだけ覚える）
 
-- **`task dev`**：依存サービスを起動してバックエンドを起動する。日々の開発の入口。
-- **`task check`**：素早いローカル確認（バックエンドの静的解析）。こまめに回す。
+- **`task dev`**：依存サービスを起動してバックエンドを起動する。
+  日々の開発の入口。
+- **`task check`**：素早いローカル確認（バックエンドの静的解析）。
+  こまめに回す。
 - **`task fe-verify`**：フロントエンドの静的解析、未使用コード検査、React診断、テスト、本番ビルドを実行する。
 - **`task lint-duplicates`**：フロントエンドとバックエンドの手書きコードの重複を検査する。
-- **`task verify`**：push 前のバックエンド総合ゲート（静的解析、OpenAPI 契約検査と、使い捨てDBでのマイグレーション検証とテスト）。CI と同じ内容。
+- **`task verify`**：push 前のバックエンド総合ゲート（静的解析、OpenAPI 契約検査と、使い捨てDBでのマイグレーション検証とテスト）。
+  CI と同じ内容。
 - **`task e2e`**：E2E（未整備。`docs/e2e-testing-strategy.md` に沿って構築予定）。
 
-これ以外の細かいタスクは、上記やCI、Gitフックから呼ばれる**部品**である。 `task help`は公開タスクの名前と説明を一覧表示する。
+これ以外の細かいタスクは、上記やCI、Gitフックから呼ばれる**部品**である。
+`task help`は公開タスクの名前と説明を一覧表示する。
 
 ## シナリオ別の手順
 
@@ -32,7 +38,8 @@ cd frontend && vp dev      # SPAを起動し、APIとOIDC関連パスを同一�
 task check                 # 静的解析で素早く確認（こまめに）
 ```
 
-ブラウザは <http://localhost:5173> を開き、Vite proxy 経由でバックエンドを利用する。 バックエンドは <http://localhost:18080>、Keycloak は <http://localhost:8080>、 Grafana は <http://localhost:3000> で待ち受ける。
+ブラウザは <http://localhost:5173> を開き、Vite proxy 経由でバックエンドを利用する。
+バックエンドは <http://localhost:18080>、Keycloak は <http://localhost:8080>、 Grafana は <http://localhost:3000> で待ち受ける。
 
 ### マイグレーションを追加するとき
 
@@ -45,7 +52,8 @@ task be-refresh-jooq       # 最新スキーマから jOOQ 生成コードを更
 task be-verify-migrations  # 使い捨てDBで update→rollback→再update とタグを検証
 ```
 
-changeset と jOOQ 生成コードは同じ変更として Git 管理する。 詳細は `docs/database-migrations.md` を参照。
+changeset と jOOQ 生成コードは同じ変更として Git 管理する。
+詳細は `docs/database-migrations.md` を参照。
 
 ### push する前
 
@@ -55,7 +63,11 @@ task lint-duplicates       # フロントエンドとバックエンドの手書
 task verify                # be-lint + 使い捨てDBでのマイグレーション検証とテスト（CI と同じ）
 ```
 
-`task fe-verify` は `fe-check`、`fe-knip`、`fe-doctor`、`fe-test-build` を順に実行する。 `task lint-duplicates` はTanStack RouterとjOOQの生成コードを除外し、既存の重複行率3.19%を通す3.2%を上限とする。 既存cloneを解消した変更では、`.jscpd.json` の閾値も下げる。 `task verify` は `.env.test` の隔離スタック（PostgreSQL 5433 / Redis 6380）を 起動し、マイグレーション検証とテストを実行して後片付けまで行う。 開発用スタック（5432 / 6379）とポートが分かれているため、`task dev` で バックエンドを起動したまま並行実行できる。
+`task fe-verify` は `fe-check`、`fe-knip`、`fe-doctor`、`fe-test-build` を順に実行する。
+`task lint-duplicates` はTanStack RouterとjOOQの生成コードを除外し、既存の重複行率3.19%を通す3.2%を上限とする。
+既存cloneを解消した変更では、`.jscpd.json` の閾値も下げる。
+`task verify` は `.env.test` の隔離スタック（PostgreSQL 5433 / Redis 6380）を 起動し、マイグレーション検証とテストを実行して後片付けまで行う。
+開発用スタック（5432 / 6379）とポートが分かれているため、`task dev` で バックエンドを起動したまま並行実行できる。
 
 ### ミューテーションテストを実行するとき
 
@@ -63,9 +75,14 @@ task verify                # be-lint + 使い捨てDBでのマイグレーショ
 task mutation-test
 ```
 
-`task mutation-test`は使い捨てのテスト用依存を起動し、マイグレーション検証後にPITを実行して片付ける。 PITは通常テストより実行コストが高いため、`task verify`とpull requestの必須CIには含めない。 結果は、変異対象が存在するときに`backend/build/reports/pitest/`へ出力される。
+`task mutation-test`は使い捨てのテスト用依存を起動し、マイグレーション検証後にPITを実行して片付ける。
+PITは通常テストより実行コストが高いため、`task verify`とpull requestの必須CIには含めない。
+結果は、変異対象が存在するときに`backend/build/reports/pitest/`へ出力される。
 
-push 時には `task adr-check` が pre-push で走り、判断が絡む変更（依存・ セキュリティ・DB・インフラ・ワークフロー、およびフロントエンド全体）に `docs/adr/` の更新が伴わないとき警告する。 既定は非ブロッキングのナッジで、該当しなければ `ADR_ACK=1 git push` で抑制できる。 フロントエンドは構築初期のため全体を対象にしている。安定したら `frontend/package.json` や設定ファイルなど判断が出やすい箇所へ絞ってよい。
+push 時には `task adr-check` が pre-push で走り、判断が絡む変更（依存・ セキュリティ・DB・インフラ・ワークフロー、およびフロントエンド全体）に `docs/adr/` の更新が伴わないとき警告する。
+既定は非ブロッキングのナッジで、該当しなければ `ADR_ACK=1 git push` で抑制できる。
+フロントエンドは構築初期のため全体を対象にしている。
+安定したら `frontend/package.json` や設定ファイルなど判断が出やすい箇所へ絞ってよい。
 
 ### リリース設定を変更するとき
 
@@ -81,21 +98,26 @@ task release-check
 
 ### Docker Compose とサービスの操作
 
-依存サービス（PostgreSQL / Keycloak / Redis / Grafana）は Docker Compose で起動する。 通常はこれらだけを起動し、バックエンドは `task be-run`（`task dev` の一部）でホスト上に立てる。 `.env` はルートの `.env.example` をコピーして用意し、パスワードを変更しておく。
+依存サービス（PostgreSQL / Keycloak / Redis / Grafana）は Docker Compose で起動する。
+通常はこれらだけを起動し、バックエンドは `task be-run`（`task dev` の一部）でホスト上に立てる。
+`.env` はルートの `.env.example` をコピーして用意し、パスワードを変更しておく。
 
 ``` bash
 task compose-ps            # サービスの状態を確認
 task compose-up-backend    # backend profile も有効にしてコンテナで起動
 ```
 
-Keycloak の OIDC discovery、issuer、PKCE S256 対応を確認する。ログの追跡も同様。
+Keycloak の OIDC discovery、issuer、PKCE S256 対応を確認する。
+ログの追跡も同様。
 
 ``` bash
 task oidc-check
 task keycloak-logs
 ```
 
-`realm.json` を変更しても、既存 realm は起動時インポートで上書きされない。 Keycloak のローカルデータだけを削除して realm を再投入するには `task keycloak-reimport` を使う。 これは PostgreSQL、Redis、Grafana のデータを保持する。
+`realm.json` を変更しても、既存 realm は起動時インポートで上書きされない。
+Keycloak のローカルデータだけを削除して realm を再投入するには `task keycloak-reimport` を使う。
+これは PostgreSQL、Redis、Grafana のデータを保持する。
 
 ``` bash
 task keycloak-reimport
@@ -112,7 +134,8 @@ task compose-reset CONFIRM_RESET=yes   # 全サービスの volume ごと削除�
 
 ## ローカル・CI・フックの一致
 
-同じTaskfileのタスクを、ローカル、CI、Gitフック（Lefthook）が共用している。 これにより「ローカルでは通ったが CI で落ちる」乖離を防ぐ。
+同じTaskfileのタスクを、ローカル、CI、Gitフック（Lefthook）が共用している。
+これにより「ローカルでは通ったが CI で落ちる」乖離を防ぐ。
 
 - pre-commit：betterleaks、Frontendのformat、lint、型検査、hadolint、compose config、markdownlint、okf-check（`docs/` 変更時）（変更種別に応じて）。
 - pre-push：betterleaks（全履歴）、FrontendのReact診断、テストと本番ビルド、backend 変更時は be-lint / be-test、判断が絡む変更に ADR が伴うかの確認（`task adr-check`。既定は非ブロッキングのナッジ）。
