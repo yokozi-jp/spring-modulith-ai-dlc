@@ -92,19 +92,29 @@
 ├── frontend/         # VitePlus + TypeScript フロントエンド（pnpm）
 ├── infrastructure/   # インフラ定義
 ├── .betterleaks.toml # betterleaks（シークレットスキャナ）設定
+├── .editorconfig     # エディタ共通設定
 ├── .env.example      # 環境変数のサンプル
 ├── .env.test         # テスト用の環境変数（非機密ダミー）
 ├── .gitignore        # Git 追跡除外設定
 ├── .hadolint.yaml    # hadolint（Dockerfile リンタ）設定
+├── .jscpd.json       # jscpd（重複コード検査）設定
 ├── .markdownlint-cli2.yaml # markdownlint-cli2（Markdown リンタ）設定
+├── .release-please-manifest.json # release-please が追跡する直近の版
 ├── .snyk             # Snyk のスキャン除外ポリシー（プロダクションコード以外を除外）
-├── AGENTS.md         # エージェント向けプロジェクト説明
+├── .spectral.yaml    # Spectral（OpenAPI 契約リンタ）設定
+├── CHANGELOG.md      # リリースノート（release-please が生成）
+├── CONTRIBUTING.md   # 変更手順、ブランチ運用、コミット規約
+├── LICENSE           # ライセンス
+├── README.md         # プロジェクト概要（このファイル）
+├── SECURITY.md       # 脆弱性の非公開報告方法
+├── Taskfile.yml      # 開発コマンド定義
 ├── commitlint.config.mjs # commitlint 設定（Conventional Commits 検証）
 ├── lefthook.yml      # Git フック定義（Lefthook）
-├── LICENSE           # ライセンス
-├── Taskfile.yml          # 開発コマンド定義
 ├── package.json      # Lefthook・commitlint 導入用（ルート）
-└── skills-lock.json  # スキルのバージョン固定（lock）
+├── package-lock.json # ルート npm 依存の lockfile
+├── release-please-config.json # release-please の設定
+├── skills-lock.json  # スキルのバージョン固定（lock）
+└── version.txt       # simple strategy が使う主版ファイル
 ```
 
 <p align="right">(<a href="#top">トップへ</a>)</p>
@@ -147,7 +157,7 @@ cd frontend && vp dev      # SPAを起動し、APIとOIDCを同一オリジン�
 - **`task check`**：素早いローカル確認（バックエンドの静的解析）。
 - **`task fe-verify`**：フロントエンドの静的解析、未使用コード検査、React診断、テスト、本番ビルド。
 - **`task lint-duplicates`**：フロントエンドとバックエンドの手書きコードの重複検査。
-- **`task verify`**：push 前のバックエンド総合ゲート（静的解析、OpenAPI 契約検査と、使い捨てDBでのマイグレーション検証とテスト。CI と同じ内容）。
+- **`task verify`**：push 前のバックエンド総合ゲート（静的解析、OpenAPI 契約検査と、使い捨てDBでのマイグレーション検証とテスト、CI と同じ内容）。
 
 Docker Compose の操作（サービスの起動、停止、状態確認、Keycloak の realm 再投入）や、「いつ、どのコマンドを、どの順で使うか」のシナリオ別の手順は [開発ワークフロー](docs/dev-workflow.md) を参照してください。
 
@@ -156,37 +166,48 @@ Docker Compose の操作（サービスの起動、停止、状態確認、Keycl
 ## Lint・テスト
 
 静的解析、シークレットと脆弱性のスキャン、テストは、いずれも [`Taskfile.yml`](Taskfile.yml) のタスクとして実行できます（`task <タスク名>`）。
-フロントエンドの手動整形には `task fe-format` を使い、変更中の確認には `task fe-check` を使います。
-`task fe-check` はOxlintからrepository-localのsecurity rule、`@shadcn/lint`、`eslint-plugin-better-tailwindcss` も実行します。
-Tailwind CSSと共有UI componentのdesign-system規則に加え、`dangerouslySetInnerHTML` と生のDOM HTML APIによる任意HTML描画をblocking検査します。
-フロントエンド変更時は `task fe-verify` で静的解析、Knipによる未使用コード検査、React診断、テスト、本番ビルドを実行します。
-React診断が5分以内に完了しない場合は、不完全な結果を成功扱いせず検査を失敗させます。
-React Doctorのwarningとerrorはどちらもblockingとし、pre-pushとFrontend CIを停止します。
-LefthookはFrontend変更を検出すると、pre-commitで `task fe-check`、pre-pushで `task fe-doctor` と `task fe-test-build` を実行します。
-Frontend CIもPull Requestと `main` へのpushで同じ `task fe-verify` を実行し、Knipと全体branch coverage 85%を強制します。
-`task lint-duplicates` はTanStack RouterとjOOQの生成コードを除いたFrontendとBackendの手書きソースをjscpdで検査します。
-既存の重複行率3.19%を基準に3.2%を上限とし、既存cloneの解消に合わせて閾値を下げます。
-coverageレポートは `task fe-coverage` で確認でき、CIでは14日間artifactとして保存します。
-バックエンド変更時は push 前に `task verify`（静的解析、OpenAPI 契約検査と、使い捨てDBでのマイグレーション検証とテスト、CI と同じ内容）を実行します。
-入力範囲が広い契約にはQuickTheoriesによるプロパティベーステストを使い、通常のテストと一緒に実行します。
-テストの検出力を確認するときは`task mutation-test`でPITを明示実行しますが、実行コストが高いため`task verify`には含めません。
-`docs/` を編集したときは `task okf-check` で Open Knowledge Format v0.2 バンドルの適合（フロントマターと予約ファイル）と孤立ドキュメントを検査します。
-Lefthook は `docs/` 変更を検出すると pre-commit で同じ検査を実行します。
-
 各タスクの一覧と内容、Git フックと CI での自動実行の対応は [Lint・テストのリファレンス](docs/lint-and-test.md) にまとめています。
+
+### フロントエンド
+
+- 手動整形には `task fe-format` を使い、変更中の確認には `task fe-check` を使います。
+- `task fe-check` はOxlintからrepository-localのsecurity rule、`@shadcn/lint`、`eslint-plugin-better-tailwindcss` も実行します。
+- Tailwind CSSと共有UI componentのdesign-system規則に加え、`dangerouslySetInnerHTML` と生のDOM HTML APIによる任意HTML描画をblocking検査します。
+- フロントエンド変更時は `task fe-verify` で静的解析、Knipによる未使用コード検査、React診断、テスト、本番ビルドを実行します。
+- React診断が5分以内に完了しない場合は、不完全な結果を成功扱いせず検査を失敗させます。
+- React Doctorのwarningとerrorはどちらもblockingとし、pre-pushとFrontend CIを停止します。
+- LefthookはFrontend変更を検出すると、pre-commitで `task fe-check`、pre-pushで `task fe-doctor` と `task fe-test-build` を実行します。
+- Frontend CIもPull Requestと `main` へのpushで同じ `task fe-verify` を実行し、Knipと全体branch coverage 85%を強制します。
+- coverageレポートは `task fe-coverage` で確認でき、CIでは14日間artifactとして保存します。
+
+### 重複コード検査
+
+- `task lint-duplicates` はTanStack RouterとjOOQの生成コードを除いたFrontendとBackendの手書きソースをjscpdで検査します。
+- 既存の重複行率3.19%を基準に3.2%を上限とし、既存cloneの解消に合わせて閾値を下げます。
+
+### バックエンド
+
+- バックエンド変更時は push 前に `task verify`（静的解析、OpenAPI 契約検査と、使い捨てDBでのマイグレーション検証とテスト、CI と同じ内容）を実行します。
+- 入力範囲が広い契約にはQuickTheoriesによるプロパティベーステストを使い、通常のテストと一緒に実行します。
+- テストの検出力を確認するときは `task mutation-test` でPITを明示実行しますが、実行コストが高いため `task verify` には含めません。
+
+### ドキュメント
+
+- `docs/` を編集したときは `task okf-check` で Open Knowledge Format v0.2 バンドルの適合（フロントマターと予約ファイル）と孤立ドキュメントを検査します。
+- Lefthook は `docs/` 変更を検出すると pre-commit で同じ検査を実行します。
 
 <p align="right">(<a href="#top">トップへ</a>)</p>
 
 ## 設計判断の記録（ADR）
 
-重要な設計・アーキテクチャ上の判断は、Architecture Decision Record（ADR）として [`docs/adr/`](docs/adr/) に残します。
+重要な設計とアーキテクチャ上の判断は、Architecture Decision Record（ADR）として [`docs/adr/`](docs/adr/) に残します。
 
 - 規約は [`.kiro/steering/adr-decision-record.md`](.kiro/steering/adr-decision-record.md) に定義しています（ADR を作る/作らない基準、記録先、ライフサイクル）。
 - 書式は [`docs/adr/adr-template.md`](docs/adr/adr-template.md) に準拠します。
 - ADR の一覧は [`docs/adr/index.md`](docs/adr/index.md) を参照してください。
-  `docs/adr/` はワークフロー外・横断の判断を残す場所です。
+  `docs/adr/` はワークフロー外と横断の判断を残す場所です。
 
-push 前には `task adr-check` が pre-push で走り、判断が絡む変更（依存・セキュリティ・DB・インフラ・ワークフロー、およびフロントエンド全体）に `docs/adr/` の更新が伴わないとき注意喚起します。
+push 前には `task adr-check` が pre-push で走り、判断が絡む変更（依存、セキュリティ、DB、インフラ、ワークフロー、およびフロントエンド全体）に `docs/adr/` の更新が伴わないとき注意喚起します。
 既定は非ブロッキングで、該当しない場合は `ADR_ACK=1 git push` で抑制できます。
 
 <p align="right">(<a href="#top">トップへ</a>)</p>

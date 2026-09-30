@@ -98,10 +98,8 @@ DBスキーマタグはchangelog内の`tagDatabase` changesetで管理し、現�
 本番ではタグを手入力せず、`task be-release-migrate`でリポジトリに固定されたスキーマタグまで適用します。
 changesetとjOOQ生成コードを更新する手順、本番の資格情報、デプロイ順序、DB切り戻しは[DBマイグレーションとjOOQコード生成](database-migrations.md)を参照してください。
 
-`task test` はテスト専用スタック（`docker/compose-test.yml` の PostgreSQL 5433 / Redis 6380）を
-`.env.test` で起動し、マイグレーション、テスト、生成したOpenAPI 3.1契約のSpectral検査を実行してから、ボリュームごと片付けます。
-開発用スタック（`task compose-up` の 5432 / 6379）とポートを分けているため、`task be-run` で
-バックエンドをホスト起動したまま `task test` を並行実行できます。
+`task test` はテスト専用スタック（`docker/compose-test.yml` の PostgreSQL 5433 / Redis 6380）を `.env.test` で起動し、マイグレーション、テスト、生成したOpenAPI 3.1契約のSpectral検査を実行してから、ボリュームごと片付けます。
+開発用スタック（`task compose-up` の 5432 / 6379）とポートを分けているため、`task be-run` でバックエンドをホスト起動したまま `task test` を並行実行できます。
 
 ### プロパティベーステストとミューテーションテスト
 
@@ -144,7 +142,7 @@ Semgrep OSS（コミュニティエディション）で静的解析を行いま
 
 Snyk は任意導入です。
 利用にはアカウント作成が必要で、本プロジェクトは free プランで運用しています。
-`.snyk` にスキャン除外ポリシーを定義し、`.kiro` / `.agents`（いずれもツール・エージェント関連コードでプロダクションコードではない）を対象から除外しています。
+`.snyk` にスキャン除外ポリシーを定義し、`.kiro` / `.agents`（いずれもツールやエージェント関連のコードでプロダクションコードではない）を対象から除外しています。
 `frontend/.snyk` には、修正版のない開発依存の脆弱性を、依存経路と期限を限定してignoreする設定を置いています（ADR-029）。
 
 ## 脆弱性スキャン（Trivy）
