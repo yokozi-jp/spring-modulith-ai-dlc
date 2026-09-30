@@ -1,0 +1,7 @@
+{
+  "minTokens": 50,
+  "minLines": 5,
+  "ignore": ["**/routeTree.gen.ts"],
+  "reporters": ["console"],
+  "threshold": 3.2
+}

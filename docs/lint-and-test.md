@@ -10,6 +10,7 @@ Docker を使うタスク（semgrep / trivy / actionlint / zizmor / hadolint / d
 
 - **`task fe-format`**：OxfmtでFrontendを整形する。
 - **`task fe-check`**：format、Oxlint（Tailwindとshadcn規則を含む）、TypeScript型を非破壊で検査する。
+- **`task fe-knip`**：Knipで未参照ファイル、未使用export、未使用依存を検査する。
 - **`task fe-doctor`**：React固有のwarningとerrorをReact Doctorで検出し、いずれかの検出または5分超過で失敗する。
 - **`task fe-coverage`**：VitestのV8 providerで全体branch coverage 85%を検証する。
 - **`task fe-test-build`**：coverage付きテストと本番ビルドを実行する。
@@ -48,6 +49,17 @@ HTML sinkの組み込み規則は、qualified accessを実際の `vp lint` へ�
 `enforce-canonical-classes` はTailwind解析workerのtimeoutが再現し、`enforce-consistent-line-wrapping` はOxfmtとの間で同じ字下げ差分が再発するため有効化しません。
 Tailwind CSS v4のentry pointは `frontend/vite.config.ts` で `src/style.css` に固定しています。
 規則の仕様は[eslint-plugin-better-tailwindcss公式リポジトリ](https://github.com/schoero/eslint-plugin-better-tailwindcss)を参照してください。
+
+Knipの設定は `frontend/knip.json` に置きます。
+業務画面やAPIテストより先に採用したTanStack Form、TanStack Table、Lucide、MSW、Orval、Zodは、対応するADRの実装が始まるまで未使用依存の検査対象から個別に除外します。
+各依存を使い始めた変更で、対応する除外も削除します。
+
+## 重複コード検査（jscpd）
+
+`task lint-duplicates` はFrontendとBackendの手書きソースを一回で検査します。
+TanStack Routerの `routeTree.gen.ts` と、入力範囲外にあるjOOQ生成コードは検査しません。
+導入時の重複行率3.19%を通すため、`.jscpd.json` の上限は3.2%です。
+既存cloneを解消した変更では閾値も下げ、新しい重複で上限を超えた場合はローカルとCIを失敗させます。
 
 ## バックエンド（Gradle）
 
@@ -186,5 +198,5 @@ Task 専用の公式リンタは存在しないため、Task 自身がファイ�
   - pre-commit: betterleaks（ステージ済み）、Frontendのformat、lint、型検査、hadolint / docker build --check（Dockerfile 変更時）、compose config（Compose 変更時）、markdownlint（Markdown 変更時）
   - pre-push: betterleaks（全履歴）、FrontendのReact診断、テスト、本番ビルド、be-lint（Spotless + PMD + SpotBugs）/ be-test（`task test`）（backend 変更時）、actionlint / zizmor（ワークフロー変更時）
 - **CI（GitHub Actions, [`.github/workflows/`](../.github/workflows/)）**
-  - `frontend-ci.yml`（Frontendのformat、lint、型検査、React Doctor、全体branch coverage 85%、React Compilerを有効にした本番ビルド）、`backend-ci.yml`（backend の Lint（Spotless + PMD + SpotBugs）とテスト・カバレッジ）、`conventional-commits.yml`（Pull Requestタイトルのcommitlint）、`betterleaks.yml`（シークレットスキャン）、`semgrep.yml`（静的解析 / SARIF アップロード）、`trivy.yml`（脆弱性スキャン / SARIF アップロード）、`actionlint.yml` / `zizmor.yml`（ワークフロー）、`hadolint.yml`（Dockerfile Lint、docker build --check、backend イメージのビルド・起動・ヘルスチェック）、`compose-config.yml`（Compose）、`markdownlint.yml`（Markdown）、`release-please.yml`（リリース設定検証とRelease Pull Request作成）
-  - `semgrep.yml` / `trivy.yml` の検出結果は GitHub Code Scanning（Security タブ）に SARIF 形式でアップロードされます。
+  - `frontend-ci.yml`（Frontendのformat、lint、Knip、型検査、React Doctor、全体branch coverage 85%、React Compilerを有効にした本番ビルド）、`backend-ci.yml`（backend の Lint（Spotless + PMD + SpotBugs）とテスト・カバレッジ）、`conventional-commits.yml`（Pull Requestタイトルのcommitlint）、`betterleaks.yml`（シークレットスキャン）、`static-analysis.yml`（Semgrepの静的解析とSARIFアップロード、jscpdの重複コード検査）、`trivy.yml`（脆弱性スキャン / SARIF アップロード）、`actionlint.yml` / `zizmor.yml`（ワークフロー）、`hadolint.yml`（Dockerfile Lint、docker build --check、backend イメージのビルド・起動・ヘルスチェック）、`compose-config.yml`（Compose）、`markdownlint.yml`（Markdown）、`release-please.yml`（リリース設定検証とRelease Pull Request作成）
+  - `static-analysis.yml` / `trivy.yml` の検出結果は GitHub Code Scanning（Security タブ）に SARIF 形式でアップロードされます。

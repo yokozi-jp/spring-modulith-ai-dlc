@@ -165,7 +165,13 @@ tasks:
     desc: React固有のwarningとerrorをReact Doctorで検出
     dir: frontend
     cmds:
-      - timeout 300s vp exec react-doctor . --yes --no-supply-chain --no-telemetry --blocking warning --no-color
+      - timeout 300s vp run react-doctor
+
+  fe-knip:
+    desc: フロントエンドの未参照ファイル、未使用export、未使用依存をKnipで検査
+    dir: frontend
+    cmds:
+      - vp run knip
 
   fe-coverage:
     desc: フロントエンドの全体branch coverage 85%を検証
@@ -181,11 +187,18 @@ tasks:
       - vp run build
 
   fe-verify:
-    desc: フロントエンドの静的解析、React診断、テスト、ビルドを実行
+    desc: フロントエンドの静的解析、未使用コード検査、React診断、テスト、ビルドを実行
     cmds:
       - task: fe-check
+      - task: fe-knip
       - task: fe-doctor
       - task: fe-test-build
+
+  lint-duplicates:
+    desc: フロントエンドとバックエンドの手書きコードの重複をjscpdで検査
+    cmds:
+      # ponytail: 導入時の重複率3.19%を3.2%で固定し、既存cloneの解消に合わせて閾値を下げる。
+      - npm exec -- jscpd frontend/src frontend/lint frontend/vite.config.ts frontend/vite-config.test.ts backend/src/main/java backend/src/test/java
 
   # Backend
   be-run:
