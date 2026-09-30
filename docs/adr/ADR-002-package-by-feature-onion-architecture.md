@@ -17,20 +17,20 @@ Accepted
 
 ## Context
 
-本 ADR は、既に実装済み・確定済みの方針を遡って記録した（backfill）。
+本 ADR は、既に実装し確定した方針を遡って記録した（backfill）。
 
-モジュール内部の構造を定めないと、technical layer 単位 （controller / service / repository を横断パッケージに集約する構成）に流れ、 機能をまたぐ依存が生まれやすい。
-ドメインを技術詳細（Web、DB、外部 API）から独立させ、 依存を内向きに保ちたい。
+モジュール内部の構造を定めないと、technical layer 単位（controller / service / repository を横断パッケージに集約する構成）に流れ、機能をまたぐ依存が生まれやすい。
+ドメインを技術詳細（Web、DB、外部 API）から独立させ、依存を内向きに保ちたい。
 
 ## Decision
 
-最上位の分割に package by feature を用い、各機能パッケージの内部に オニオンアーキテクチャを適用する。
+最上位の分割に package by feature を用い、各機能パッケージの内部にオニオンアーキテクチャを適用する。
 
 - 機能モジュールは `com.example.demo.<feature>`。
 - モジュールルートには他モジュールへ公開する契約だけを置く。
 - 内部は `domain` / `application` / `presentation` / `infrastructure` に分ける。
-- 外周命名は Hexagonal の `adapter.in/out` ではなく、 Onion / Clean で一般的な `presentation` と `infrastructure` を使う （選定理由は Alternatives Considered の Alternative 2 を参照）。
-- 依存は内向き（presentation / infrastructure → application → domain）に限定し、 業務モジュール実装後に `Architectures.onionArchitecture()` で強制する。
+- 外周命名は Hexagonal の `adapter.in/out` ではなく、Onion / Clean で一般的な `presentation` と `infrastructure` を使う（選定理由は Alternatives Considered の Alternative 2 を参照）。
+- 依存は内向き（presentation / infrastructure → application → domain）に限定し、業務モジュール実装後に `Architectures.onionArchitecture()` で強制する。
 
 ## Consequences
 
@@ -47,7 +47,7 @@ Accepted
 
 ### Neutral
 
-- Persistence / Messaging / 外部 Client は別 Adapter として登録し、 外周同士の直接依存を禁止する。
+- Persistence / Messaging / 外部 Client は別 Adapter として登録し、外周同士の直接依存を禁止する。
 - 空パッケージは先に作らず、役割を持つ型が生じた時点で追加する。
 
 ## Alternatives Considered
@@ -61,21 +61,21 @@ Accepted
 ### Alternative 2: Hexagonal（Ports and Adapters）
 
 - 説明：核を Port（インターフェース）で囲み、外部との接続を Adapter に閉じる。
-  最上位の分割を interaction point（外部がどう核に接続するか）で定義し、 外周は `adapter.in`（primary/driver）と `adapter.out`（secondary/driven）に分ける。
+  最上位の分割を interaction point（外部がどう核に接続するか）で定義し、外周は `adapter.in`（primary/driver）と `adapter.out`（secondary/driven）に分ける。
 
-Hexagonal と Onion は、業務ロジックを外部から切り離すという目標も、依存を核へ向ける方針も、 テスト容易性も共有する。
+Hexagonal と Onion は、業務ロジックを外部から切り離すという目標も、依存を核へ向ける方針も、テスト容易性も共有する。
 両者は排他ではなく、力点の違いである。
 Hexagonal は核の分離と外部統合の交換可能性に、Onion は同心層による責務分割とドメイン中心性に力点を置く[^origin]。
 本プロジェクトでは、後者の力点が要件に合う。
 
-- Pros：primary/secondary の対称性が明確で、Adapter を差し替えれば核を変えずに 外部ツール（REST から gRPC、SQL から NoSQL など）を交換できる。
+- Pros：primary/secondary の対称性が明確で、Adapter を差し替えれば核を変えずに外部ツール（REST から gRPC、SQL から NoSQL など）を交換できる。
   外部統合が多いシステムやマイクロサービスに向く。
-- Cons：本プロジェクトは Modulith の単一モノリスで、主入口は Web API に定まっており、 DB や外部ツールを頻繁に差し替える要件がない。
-  Hexagonal の交換可能性が解く問題（多数の外部統合、Adapter の頻繁な差し替え）は本プロジェクトには生じにくく、 対称な `adapter.in/out` は入口の非対称な実態（Web API 主入口）を隠す。
+- Cons：本プロジェクトは Modulith の単一モノリスで、主入口は Web API に定まっており、DB や外部ツールを頻繁に差し替える要件がない。
+  Hexagonal の交換可能性が解く問題（多数の外部統合、Adapter の頻繁な差し替え）は本プロジェクトには生じにくく、対称な `adapter.in/out` は入口の非対称な実態（Web API 主入口）を隠す。
   Onion は責務で層を切るため、入口を `presentation` として独立させたい意図とも噛み合う。
-  また Onion は複雑なドメインを持つエンタープライズモノリスと DDD に向くとされ[^whenonion]、 DDD 戦術パターンを志向する本プロジェクトの性質に一致する。
+  また Onion は複雑なドメインを持つエンタープライズモノリスと DDD に向くとされ[^whenonion]、DDD 戦術パターンを志向する本プロジェクトの性質に一致する。
 
-なお Hexagonal の secondary port/adapter が与える「外部ツールの交換可能性」は、 Onion でも Infrastructure が内側インターフェースを実装する形で（層としては弱いながら）得られる。
+なお Hexagonal の secondary port/adapter が与える「外部ツールの交換可能性」は、Onion でも Infrastructure が内側インターフェースを実装する形で（層としては弱いながら）得られる。
 本プロジェクトが必要とするのはこの範囲であり、Hexagonal 固有の対称構造までは要らない。
 
 [^origin]: Onion は Jeffrey Palermo が 2008 年に、Hexagonal は Alistair Cockburn が 2005 年に提唱した。

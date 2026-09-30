@@ -19,12 +19,12 @@ Accepted
 
 本 ADR は、既に実装済みの決定を遡って記録した（backfill）。
 
-ブラウザ向けの Web アプリケーションで、認証を IdP（Keycloak）へ委譲しつつ、 XSS によるトークン窃取やトークン失効の難しさを避けたい。
-SPA が保持する stateless な JWT は、失効・ローテーション・保管場所の問題を伴う。
+ブラウザ向けの Web アプリケーションで、認証を IdP（Keycloak）へ委譲しつつ、XSS によるトークン窃取やトークン失効の難しさを避けたい。
+SPA が保持する stateless な JWT は、失効、ローテーション、保管場所の問題を伴う。
 
 ## Decision
 
-サーバサイド Web クライアントとして OIDC Authorization Code Flow + PKCE（S256）を採用し、 認証状態はサーバ側セッション（Spring Session + Redis）で保持する。
+サーバサイド Web クライアントとして OIDC Authorization Code Flow + PKCE（S256）を採用し、認証状態はサーバ側セッション（Spring Session + Redis）で保持する。
 
 - 認可リクエストごとに PKCE の challenge（S256）を付与する。
 - セッション ID は Cookie（`APP_SESSION`、`http-only` / `secure` / `SameSite=Lax`）でのみ送受信する。
@@ -37,7 +37,7 @@ SPA が保持する stateless な JWT は、失効・ローテーション・保
 ### Positive
 
 - アクセストークンをブラウザに保持せず、XSS によるトークン窃取面を減らせる。
-- 失効・無効化がサーバ側セッションの破棄で完結する。
+- 失効と無効化がサーバ側セッションの破棄で完結する。
 - 複数インスタンスでセッションを共有できる（Redis）。
 
 ### Negative
@@ -48,7 +48,7 @@ SPA が保持する stateless な JWT は、失効・ローテーション・保
 ### Neutral
 
 - セッション Cookie の `secure` は環境で切り替える（本番 / STG は true、ローカルは false）。
-- ALB 配下では `X-Forwarded-*` を解釈してスキーム・ホストを復元する。
+- ALB 配下では `X-Forwarded-*` を解釈してスキームとホストを復元する。
 
 ## Alternatives Considered
 
@@ -56,13 +56,13 @@ SPA が保持する stateless な JWT は、失効・ローテーション・保
 
 - 説明：アクセストークンをブラウザで保持し API へ付与する。
 - Pros：サーバがセッションを持たずスケールしやすい。
-- Cons：XSS による窃取、失効・ローテーションの難しさ、保管場所の問題。
+- Cons：XSS による窃取、失効やローテーションの難しさ、保管場所の問題。
 
 ### Alternative 2: BFF でトークンを保持しつつ独自セッション
 
 - 説明：BFF がトークンを保持し、ブラウザには独自セッションを渡す。
 - Pros：本 ADR と方向性は近い。
-- Cons：本プロジェクトは Spring Security の OAuth2 Client + Session で同等を得られ、 追加コンポーネントを持たない構成を選好。
+- Cons：本プロジェクトは Spring Security の OAuth2 Client + Session で同等を得られ、追加コンポーネントを持たない構成を選好。
 
 ## References
 

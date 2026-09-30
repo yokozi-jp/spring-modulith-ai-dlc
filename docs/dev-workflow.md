@@ -21,7 +21,7 @@ tags: [guide, workflow, task-runner]
 - **`task lint-duplicates`**：フロントエンドとバックエンドの手書きコードの重複を検査する。
 - **`task verify`**：push 前のバックエンド総合ゲート（静的解析、OpenAPI 契約検査と、使い捨てDBでのマイグレーション検証とテスト）。
   CI と同じ内容。
-- **`task e2e`**：E2E（未整備。`docs/e2e-testing-strategy.md` に沿って構築予定）。
+- **`task e2e`**：E2E（未整備、`docs/e2e-testing-strategy.md` に沿って構築予定）。
 
 これ以外の細かいタスクは、上記やCI、Gitフックから呼ばれる**部品**である。
 `task help`は公開タスクの名前と説明を一覧表示する。
@@ -39,7 +39,7 @@ task check                 # 静的解析で素早く確認（こまめに）
 ```
 
 ブラウザは <http://localhost:5173> を開き、Vite proxy 経由でバックエンドを利用する。
-バックエンドは <http://localhost:18080>、Keycloak は <http://localhost:8080>、 Grafana は <http://localhost:3000> で待ち受ける。
+バックエンドは <http://localhost:18080>、Keycloak は <http://localhost:8080>、Grafana は <http://localhost:3000> で待ち受ける。
 
 ### マイグレーションを追加するとき
 
@@ -66,8 +66,8 @@ task verify                # be-lint + 使い捨てDBでのマイグレーショ
 `task fe-verify` は `fe-check`、`fe-knip`、`fe-doctor`、`fe-test-build` を順に実行する。
 `task lint-duplicates` はTanStack RouterとjOOQの生成コードを除外し、既存の重複行率3.19%を通す3.2%を上限とする。
 既存cloneを解消した変更では、`.jscpd.json` の閾値も下げる。
-`task verify` は `.env.test` の隔離スタック（PostgreSQL 5433 / Redis 6380）を 起動し、マイグレーション検証とテストを実行して後片付けまで行う。
-開発用スタック（5432 / 6379）とポートが分かれているため、`task dev` で バックエンドを起動したまま並行実行できる。
+`task verify` は `.env.test` の隔離スタック（PostgreSQL 5433 / Redis 6380）を起動し、マイグレーション検証とテストを実行して後片付けまで行う。
+開発用スタック（5432 / 6379）とポートが分かれているため、`task dev` でバックエンドを起動したまま並行実行できる。
 
 ### ミューテーションテストを実行するとき
 
@@ -79,7 +79,7 @@ task mutation-test
 PITは通常テストより実行コストが高いため、`task verify`とpull requestの必須CIには含めない。
 結果は、変異対象が存在するときに`backend/build/reports/pitest/`へ出力される。
 
-push 時には `task adr-check` が pre-push で走り、判断が絡む変更（依存・ セキュリティ・DB・インフラ・ワークフロー、およびフロントエンド全体）に `docs/adr/` の更新が伴わないとき警告する。
+push 時には `task adr-check` が pre-push で走り、判断が絡む変更（依存、セキュリティ、DB、インフラ、ワークフロー、およびフロントエンド全体）に `docs/adr/` の更新が伴わないとき警告する。
 既定は非ブロッキングのナッジで、該当しなければ `ADR_ACK=1 git push` で抑制できる。
 フロントエンドは構築初期のため全体を対象にしている。
 安定したら `frontend/package.json` や設定ファイルなど判断が出やすい箇所へ絞ってよい。
@@ -138,7 +138,7 @@ task compose-reset CONFIRM_RESET=yes   # 全サービスの volume ごと削除�
 これにより「ローカルでは通ったが CI で落ちる」乖離を防ぐ。
 
 - pre-commit：betterleaks、Frontendのformat、lint、型検査、hadolint、compose config、markdownlint、okf-check（`docs/` 変更時）（変更種別に応じて）。
-- pre-push：betterleaks（全履歴）、FrontendのReact診断、テストと本番ビルド、backend 変更時は be-lint / be-test、判断が絡む変更に ADR が伴うかの確認（`task adr-check`。既定は非ブロッキングのナッジ）。
+- pre-push：betterleaks（全履歴）、FrontendのReact診断、テストと本番ビルド、backend 変更時は be-lint / be-test、判断が絡む変更に ADR が伴うかの確認（`task adr-check`、既定は非ブロッキングのナッジ）。
 - CI：`frontend-ci.yml` が `task fe-verify`、`backend-ci.yml` が `task be-verify-migrations` と `task be-test` を実行。
 
 したがって、Frontend変更では `task fe-verify`、backend変更では `task verify` を事前に実行する。
@@ -154,4 +154,4 @@ task compose-reset CONFIRM_RESET=yes   # 全サービスの volume ごと削除�
 - `task fe-test-build` → coverage付き `vp test` ＋ `vp run build`
 - `task verify` → `be-lint` ＋ `test`（`test` は隔離スタック起動＋ `be-verify-migrations` ＋ `be-test` ＋ 後片付け）
 
-部品タスク（`fe-check`、`fe-test-build`、`be-test`、`be-mutation-test`、`test-deps-up` など）は通常直接打たず、 入口タスクや CI、Gitフックから呼ばれる。
+部品タスク（`fe-check`、`fe-test-build`、`be-test`、`be-mutation-test`、`test-deps-up` など）は通常直接打たず、入口タスクや CI、Gitフックから呼ばれる。
