@@ -1,3 +1,10 @@
+---
+type: Architecture Decision Record
+title: 'ADR-021: Dependabot の minor/patch 更新をグループ化し auto-merge する'
+description: 厳格モードでの Pull Request 滞留を抑えるため、Dependabot の minor/patch 更新をグループ化し auto-merge する決定。
+tags: [adr, dependabot, ci, automation]
+---
+
 # ADR-021: Dependabot の minor/patch 更新をグループ化し auto-merge する
 
 ## Status
@@ -87,11 +94,11 @@ auto-merge は必須チェックが通った時点でマージするため、必
 - [GitHub Docs: Optimizing the creation of pull requests for Dependabot version updates](https://docs.github.com/en/code-security/dependabot/dependabot-version-updates/optimizing-pr-creation-version-updates)
 - [GitHub Docs: Configuration options for the dependabot.yml file](https://docs.github.com/en/code-security/dependabot/dependabot-version-updates/configuration-options-for-the-dependabot.yml-file)
 - [GitHub Blog: Tame Dependabot — group your updates, slow the cadence, keep security fast](https://github.blog/security/supply-chain-security/tame-dependabot-group-your-updates-slow-the-cadence-keep-security-fast/)
-- [ADR-017: トランクベース開発とリポジトリ保護を採用する](./ADR-017-adopt-trunk-based-repository-governance.md)
-- [`.github/dependabot.yml`](../../.github/dependabot.yml)
-- [`.github/workflows/dependabot-auto-merge.yml`](../../.github/workflows/dependabot-auto-merge.yml)
-- [`.github/workflows/backend-ci.yml`](../../.github/workflows/backend-ci.yml)
-- [`.github/workflows/hadolint.yml`](../../.github/workflows/hadolint.yml)
+- [ADR-017: トランクベース開発とリポジトリ保護を採用する](ADR-017-adopt-trunk-based-repository-governance.md)
+- [.github/dependabot.yml](../../.github/dependabot.yml)
+- [.github/workflows/dependabot-auto-merge.yml](../../.github/workflows/dependabot-auto-merge.yml)
+- [.github/workflows/backend-ci.yml](../../.github/workflows/backend-ci.yml)
+- [.github/workflows/hadolint.yml](../../.github/workflows/hadolint.yml)
 - [GitHub Docs: Troubleshooting required status checks（skipped は success 扱い）](https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/managing-protected-branches/troubleshooting-required-status-checks)
 - [GitHub Docs: Triggering a workflow（`GITHUB_TOKEN` による再帰実行の抑止）](https://docs.github.com/en/actions/using-workflows/triggering-a-workflow)
 - [dependabot/fetch-metadata](https://github.com/dependabot/fetch-metadata)

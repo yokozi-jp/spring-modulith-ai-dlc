@@ -1,3 +1,10 @@
+---
+type: Architecture Decision Record
+title: 'ADR-010: プロジェクトのタスクランナーにTaskを採用する'
+description: Make 固有の設定負担を避け YAML で保守しやすくするため、タスクランナーに Task を採用する決定。
+tags: [adr, tooling, task-runner]
+---
+
 # ADR-010: プロジェクトのタスクランナーにTaskを採用する
 
 ## Status
@@ -10,12 +17,9 @@ Proposed
 
 ## Context
 
-開発コマンド、DBマイグレーション、テスト、Lint、セキュリティ検査は、ルートの`Makefile`を共通の入口としている。
-GNU Makeはファイル生成の依存関係を扱うビルドツールであり、このプロジェクトではすべてのターゲットを`.PHONY`として宣言し、タスクランナーとして利用している。
-そのため、厳格なシェル設定、暗黙ルールの無効化、セルフドキュメント用の`awk`、シェル変数の二重エスケープなど、タスクの処理とは直接関係しないMake固有の設定が必要になっている。
+開発コマンド、DBマイグレーション、テスト、Lint、セキュリティ検査は、ルートの`Makefile`を共通の入口としている。 GNU Makeはファイル生成の依存関係を扱うビルドツールであり、このプロジェクトではすべてのターゲットを`.PHONY`として宣言し、タスクランナーとして利用している。 そのため、厳格なシェル設定、暗黙ルールの無効化、セルフドキュメント用の`awk`、シェル変数の二重エスケープなど、タスクの処理とは直接関係しないMake固有の設定が必要になっている。
 
-開発環境はWSL上のLinuxを基準とするが、タスク定義にはYAMLで説明、作業ディレクトリ、環境ファイル、内部タスク、前提条件を明示できる方が保守しやすい。
-ローカル、Gitフック、CIが同じタスクを呼ぶ構造と、既存のタスク名および安全策は維持する必要がある。
+開発環境はWSL上のLinuxを基準とするが、タスク定義にはYAMLで説明、作業ディレクトリ、環境ファイル、内部タスク、前提条件を明示できる方が保守しやすい。 ローカル、Gitフック、CIが同じタスクを呼ぶ構造と、既存のタスク名および安全策は維持する必要がある。
 
 ## Decision
 
@@ -76,5 +80,5 @@ GNU Makeはファイル生成の依存関係を扱うビルドツールであり
 - [Task Installation](https://taskfile.dev/docs/installation)
 - [Task Guide](https://taskfile.dev/docs/guide)
 - [Taskfile Schema](https://taskfile.dev/docs/reference/schema)
-- [`docs/dev-workflow.md`](../dev-workflow.md)
-- [`docs/lint-and-test.md`](../lint-and-test.md)
+- [docs/dev-workflow.md](../dev-workflow.md)
+- [docs/lint-and-test.md](../lint-and-test.md)

@@ -30,6 +30,12 @@ config:
   MD060:
     style: "aligned"
 
+  # OKF v0.2 バンドルの概念ドキュメントはフロントマターに title を持つ。
+  # front_matter_title を空にして、フロントマターの title を H1 と数えないようにし、
+  # 本文の見出しと二重の H1 になる MD025 違反を防ぐ。
+  MD025:
+    front_matter_title: ""
+
 ignores:
   - "**/node_modules/**"
   - "**/build/**"

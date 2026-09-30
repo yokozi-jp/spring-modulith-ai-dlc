@@ -1,3 +1,10 @@
+---
+type: Architecture Decision Record
+title: 'ADR-034: Frontend ランタイムを固定し Oxlint 全カテゴリを強制する'
+description: ローカルと CI の実行差をなくすため、Frontend ランタイムを固定し Oxlint 全カテゴリを強制する決定。
+tags: [adr, frontend, tooling, lint]
+---
+
 # ADR-034: Frontend ランタイムを固定し Oxlint 全カテゴリを強制する
 
 ## Status
@@ -10,32 +17,17 @@ Proposed
 
 ## Context
 
-Frontend は Vite+ をツールチェーンの単一入口とし、Node.js は Vite+ が管理する。
-これまで Node.js の版はプロジェクトに明示されておらず、Vite+ はローカルで LTS を選び、Frontend CI は `actions/setup-node` にメジャー版 `22` だけを渡していた。
-ローカルと CI で解決される Node.js の版が食い違い、片方でだけ再現する不具合を招きうる。
-Vite+ とその Vite 互換コアも、`pnpm-workspace.yaml` の catalog でキャレット範囲（`^0.3.3`）を指定していた。
+Frontend は Vite+ をツールチェーンの単一入口とし、Node.js は Vite+ が管理する。 これまで Node.js の版はプロジェクトに明示されておらず、Vite+ はローカルで LTS を選び、Frontend CI は `actions/setup-node` にメジャー版 `22` だけを渡していた。 ローカルと CI で解決される Node.js の版が食い違い、片方でだけ再現する不具合を招きうる。 Vite+ とその Vite 互換コアも、`pnpm-workspace.yaml` の catalog でキャレット範囲（`^0.3.3`）を指定していた。
 
-Lint は `vp check` へ集約し、型認識 Lint と型検査、React、Tailwind、shadcn、任意 HTML sink の禁止まで有効化していた。
-一方で Oxlint のカテゴリは明示しておらず、既定では correctness 系の多くが警告のままで、警告だけでは `vp check` が失敗しなかった。
-検出力を上げるため、Oxlint の安定カテゴリをすべてエラーへ引き上げたい。
-ただし、全カテゴリを有効にすると、named export 禁止と default export 禁止のように同時に満たせない規則や、automatic JSX runtime で不要になる規則、Vite や TanStack Router や Vitest の標準構文を禁じる規則が含まれる。
+Lint は `vp check` へ集約し、型認識 Lint と型検査、React、Tailwind、shadcn、任意 HTML sink の禁止まで有効化していた。 一方で Oxlint のカテゴリは明示しておらず、既定では correctness 系の多くが警告のままで、警告だけでは `vp check` が失敗しなかった。 検出力を上げるため、Oxlint の安定カテゴリをすべてエラーへ引き上げたい。 ただし、全カテゴリを有効にすると、named export 禁止と default export 禁止のように同時に満たせない規則や、automatic JSX runtime で不要になる規則、Vite や TanStack Router や Vitest の標準構文を禁じる規則が含まれる。
 
 ## Decision
 
-Node.js の版を `frontend/.node-version`（`24.21.0`）で固定し、これを正本とする。
-Vite+ は `.node-version` を最優先で解決し、Frontend CI も `node-version-file: frontend/.node-version` で同じ値を参照する。
-Vite+ と Vite 互換コアは catalog で完全固定（`0.3.3`）し、更新は明示的な依存更新の PR で行う。
+Node.js の版を `frontend/.node-version`（`24.21.0`）で固定し、これを正本とする。 Vite+ は `.node-version` を最優先で解決し、Frontend CI も `node-version-file: frontend/.node-version` で同じ値を参照する。 Vite+ と Vite 互換コアは catalog で完全固定（`0.3.3`）し、更新は明示的な依存更新の PR で行う。
 
-Oxlint の `correctness`、`suspicious`、`pedantic`、`perf`、`style`、`restriction` をすべてエラーにする。
-開発中の `nursery` は有効化しない。
-組み込みプラグインは eslint core に加えて `unicorn`、`typescript`、`oxc`、`react`、`import`、`vitest`、`jsx-a11y`、`promise` を有効にする。
-`denyWarnings` で警告も CI を止め、`reportUnusedDisableDirectives` で不要になった抑制コメントをエラーとして検出する。
-`typeAware` と `typeCheck` は維持する。
+Oxlint の `correctness`、`suspicious`、`pedantic`、`perf`、`style`、`restriction` をすべてエラーにする。 開発中の `nursery` は有効化しない。 組み込みプラグインは eslint core に加えて `unicorn`、`typescript`、`oxc`、`react`、`import`、`vitest`、`jsx-a11y`、`promise` を有効にする。 `denyWarnings` で警告も CI を止め、`reportUnusedDisableDirectives` で不要になった抑制コメントをエラーとして検出する。 `typeAware` と `typeCheck` は維持する。
 
-カテゴリ全体を維持したうえで、次のものに限って個別規則を無効化または調整する。
-相互に矛盾する規則（named/default export の強制など）、automatic JSX runtime で不要な規則、Vite の default export や TanStack Router の named export や CSS の副作用 import、React の `className` と props spread、modern な async / optional chaining / rest、Vitest の hook や import に関する標準構文、Oxfmt や型推論と役割が重複する整形系規則である。
-ファイル単位で Lint を無効化したり、カテゴリ全体を警告へ戻したりしない。
-範囲を限定する調整は、Node 側 Lint ツール（`lint/**`）、shadcn 由来コンポーネント（`src/components/ui/**`）、ルートモジュール（`src/routes/**`）、テストファイルの override で行う。
+カテゴリ全体を維持したうえで、次のものに限って個別規則を無効化または調整する。 相互に矛盾する規則（named/default export の強制など）、automatic JSX runtime で不要な規則、Vite の default export や TanStack Router の named export や CSS の副作用 import、React の `className` と props spread、modern な async / optional chaining / rest、Vitest の hook や import に関する標準構文、Oxfmt や型推論と役割が重複する整形系規則である。 ファイル単位で Lint を無効化したり、カテゴリ全体を警告へ戻したりしない。 範囲を限定する調整は、Node 側 Lint ツール（`lint/**`）、shadcn 由来コンポーネント（`src/components/ui/**`）、ルートモジュール（`src/routes/**`）、テストファイルの override で行う。
 
 ## Consequences
 
@@ -80,7 +72,7 @@ Oxlint の `correctness`、`suspicious`、`pedantic`、`perf`、`style`、`restr
 
 ## References
 
-- [ADR-031: Frontend の型検査を厳格化し、tsconfig を正本にする](./ADR-031-tighten-frontend-typescript-checks.md)
+- [ADR-031: Frontend の型検査を厳格化し、tsconfig を正本にする](ADR-031-tighten-frontend-typescript-checks.md)
 - [Oxlint: Built-in plugins](https://oxc.rs/docs/guide/usage/linter/plugins.html)
 - [Oxlint: CLI reference（カテゴリ）](https://oxc.rs/docs/guide/usage/linter/cli.html)
 - [Oxlint: Config file reference（`options`）](https://oxc.rs/docs/guide/usage/linter/config-file-reference.html)

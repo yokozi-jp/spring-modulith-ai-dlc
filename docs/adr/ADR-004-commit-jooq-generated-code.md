@@ -1,3 +1,10 @@
+---
+type: Architecture Decision Record
+title: 'ADR-004: jOOQ 生成コードを Git 管理する'
+description: ビルドを稼働 DB から切り離し変更履歴を追えるよう、jOOQ 生成コードを Git 管理する決定。
+tags: [adr, backend, jooq, build]
+---
+
 # ADR-004: jOOQ 生成コードを Git 管理する
 
 ## Status
@@ -12,9 +19,7 @@ Accepted
 
 本 ADR は、既に実装済みの決定を遡って記録した（backfill）。
 
-jOOQ の生成コードをビルド時に毎回生成する方式は、
-ビルドが稼働 DB へ依存し、CI・本番デプロイで DB 接続とスキーマ整合を要求する。
-生成物とスキーマ変更の対応関係を、レビューと履歴で追える形にしたい。
+jOOQ の生成コードをビルド時に毎回生成する方式は、 ビルドが稼働 DB へ依存し、CI・本番デプロイで DB 接続とスキーマ整合を要求する。 生成物とスキーマ変更の対応関係を、レビューと履歴で追える形にしたい。
 
 ## Decision
 
@@ -58,5 +63,5 @@ jOOQ 生成コードを Git 管理し、changeset と同じ変更としてコミ
 ## References
 
 - `backend/gradle/database.gradle`
-- [`docs/database-migrations.md`](../database-migrations.md)
-- [`ADR-003-adopt-jooq-for-data-access.md`](ADR-003-adopt-jooq-for-data-access.md)
+- [docs/database-migrations.md](../database-migrations.md)
+- [ADR-003-adopt-jooq-for-data-access.md](ADR-003-adopt-jooq-for-data-access.md)

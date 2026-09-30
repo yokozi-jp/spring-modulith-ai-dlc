@@ -1,3 +1,10 @@
+---
+type: Architecture Decision Record
+title: 'ADR-019: 外部連携の耐障害性と容量制御を標準化する'
+description: retry の乗算による障害増幅を避けるため、外部連携の耐障害性と容量制御を標準化する決定。
+tags: [adr, resilience, backend, reliability]
+---
+
 # ADR-019: 外部連携の耐障害性と容量制御を標準化する
 
 ## Status
@@ -12,19 +19,15 @@ Proposed
 
 バックエンドは Resilience4j と仮想スレッドを導入済みだが、外部連携に適用する timeout、retry、circuit breaker の共通値を定めていない。
 
-現時点ではアプリケーションが所有する外部 HTTP クライアントがなく、PostgreSQL、Redis、OIDC の通信は各 Spring starter が管理している。
-Resilience4j の設定を追加しても、これらの通信には自動適用されない。
+現時点ではアプリケーションが所有する外部 HTTP クライアントがなく、PostgreSQL、Redis、OIDC の通信は各 Spring starter が管理している。 Resilience4j の設定を追加しても、これらの通信には自動適用されない。
 
-retry をすべての呼び出しへ一律に適用すると、非冪等な更新や認証処理を重複実行する可能性がある。
-HTTP クライアントと Resilience4j と上位の呼び出し元が別々に retry すると、試行回数が乗算されて依存先の障害を増幅する。
+retry をすべての呼び出しへ一律に適用すると、非冪等な更新や認証処理を重複実行する可能性がある。 HTTP クライアントと Resilience4j と上位の呼び出し元が別々に retry すると、試行回数が乗算されて依存先の障害を増幅する。
 
-仮想スレッドは待機中の Java スレッドのコストを下げるが、PostgreSQL の接続数は増やさない。
-したがって、HikariCP の pool が DB 処理の backpressure と接続予算を担う。
+仮想スレッドは待機中の Java スレッドのコストを下げるが、PostgreSQL の接続数は増やさない。 したがって、HikariCP の pool が DB 処理の backpressure と接続予算を担う。
 
-JDK 25 では JEP 491 により、通常の `synchronized` メソッドとブロックで待機する仮想スレッドは carrier thread を解放できる。
-一方、native frame などによる pinning と、制限のない外部資源への同時実行は別の問題として残る。
+JDK 25 では JEP 491 により、通常の `synchronized` メソッドとブロックで待機する仮想スレッドは carrier thread を解放できる。 一方、native frame などによる pinning と、制限のない外部資源への同時実行は別の問題として残る。
 
-この判断は、外部 client を infrastructure adapter に置く [ADR-002](./ADR-002-package-by-feature-onion-architecture.md) と、環境差のある値を外部注入する [ADR-008](./ADR-008-single-application-yaml-external-config.md) に従う。
+この判断は、外部 client を infrastructure adapter に置く [ADR-002](ADR-002-package-by-feature-onion-architecture.md) と、環境差のある値を外部注入する [ADR-008](ADR-008-single-application-yaml-external-config.md) に従う。
 
 ## Decision
 
@@ -43,13 +46,11 @@ JDK 25 では JEP 491 により、通常の `synchronized` メソッドとブロ
 
 circuit breaker の既定値を、count based window 20 回、評価開始 10 回、failure rate 50 パーセント、open 30 秒、half-open 5 回とする。
 
-外部連携を追加するときは、依存先の SLO と上位処理の時間予算から値を見直し、名前付き instance の設定と境界テストを同じ変更に含める。
-既定値をそのまま採用した場合も、その根拠を client adapter の文書へ残す。
+外部連携を追加するときは、依存先の SLO と上位処理の時間予算から値を見直し、名前付き instance の設定と境界テストを同じ変更に含める。 既定値をそのまま採用した場合も、その根拠を client adapter の文書へ残す。
 
-HikariCP の `maximum-pool-size` は、PostgreSQL がアプリケーションへ割り当てた接続数から算出して環境変数で注入する。
-次の不等式を全環境で満たす。
+HikariCP の `maximum-pool-size` は、PostgreSQL がアプリケーションへ割り当てた接続数から算出して環境変数で注入する。 次の不等式を全環境で満たす。
 
-```text
+``` text
 maximum-pool-size × 最大アプリケーションタスク数
 + マイグレーション接続
 + 監視と運用の接続
@@ -57,13 +58,9 @@ maximum-pool-size × 最大アプリケーションタスク数
 <= PostgreSQL max_connections
 ```
 
-ローカル開発の開始値は 10、テストは 4 とし、接続取得の待機上限は 5 秒とする。
-`minimum-idle` は明示せず、HikariCP の固定サイズ pool の既定動作を使う。
-本番値は負荷試験と RDS の接続予算で決め、ローカル値を流用しない。
+ローカル開発の開始値は 10、テストは 4 とし、接続取得の待機上限は 5 秒とする。 `minimum-idle` は明示せず、HikariCP の固定サイズ pool の既定動作を使う。 本番値は負荷試験と RDS の接続予算で決め、ローカル値を流用しない。
 
-仮想スレッドは有効のまま維持する。
-`synchronized` を pinning 回避だけを理由に `ReentrantLock` へ置き換えない。
-外部 client または native library を追加したときは、JFR を有効にした負荷スモークで pinning と HikariCP の接続待ち時間を確認する。
+仮想スレッドは有効のまま維持する。 `synchronized` を pinning 回避だけを理由に `ReentrantLock` へ置き換えない。 外部 client または native library を追加したときは、JFR を有効にした負荷スモークで pinning と HikariCP の接続待ち時間を確認する。
 
 ## Consequences
 
@@ -111,4 +108,4 @@ maximum-pool-size × 最大アプリケーションタスク数
 - [Resilience4j documentation](https://resilience4j.readme.io/docs/getting-started-3)
 - [HikariCP: About Pool Sizing](https://github.com/brettwooldridge/HikariCP/wiki/About-Pool-Sizing)
 - [OpenJDK JEP 491: Synchronize Virtual Threads without Pinning](https://openjdk.org/jeps/491)
-- [`backend/src/main/resources/application.yaml`](../../backend/src/main/resources/application.yaml)
+- [backend/src/main/resources/application.yaml](../../backend/src/main/resources/application.yaml)

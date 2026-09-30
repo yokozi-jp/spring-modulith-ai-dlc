@@ -1,3 +1,10 @@
+---
+type: Guide
+title: 'Lint・テストのリファレンス'
+description: 静的解析・スキャン・テストの各 Task と、Git フックおよび CI での自動実行の対応をまとめたリファレンス。
+tags: [guide, testing, lint, ci]
+---
+
 # Lint・テストのリファレンス
 
 静的解析、シークレットと脆弱性のスキャン、テストは、いずれも [`Taskfile.yml`](../Taskfile.yml) のタスクとして実行できます（`task <タスク名>`）。
@@ -173,6 +180,18 @@ Markdown ファイルの体裁を markdownlint-cli2 で検査します。除外�
 | `task lint-md`     | Markdown の Lint（検出があれば失敗）              |
 | `task lint-md-fix` | Markdown の Lint 自動修正（安全に直せる項目のみ） |
 
+## OKF バンドル検証（iwe）
+
+`docs/` を [Open Knowledge Format](https://github.com/GoogleCloudPlatform/open-knowledge-format) v0.2 バンドルとして検証します。
+各概念ドキュメントのフロントマター（`type` / `title` / `description` / `tags`）と予約ファイル（`index.md`）の形状を `iwe schema validate` で検査し、どこからも参照されない孤立ドキュメントを `iwe stats` で検出します。
+検証は `docs/.iwe/schemas/` のスキーマに従います。
+
+| 実行タスク       | 内容                                                              |
+| ---------------- | ----------------------------------------------------------------- |
+| `task okf-check` | OKF 適合（フロントマター・予約ファイル）と孤立ドキュメントを検証  |
+
+iwe が無い環境ではスキップします（最終担保は CI）。iwe の導入は [開発環境構築](local-env-setup/setup.md) を参照してください。
+
 ## リリース設定
 
 release-pleaseの設定と版ファイルの一致を検証する。
@@ -195,8 +214,8 @@ Task 専用の公式リンタは存在しないため、Task 自身がファイ�
 
 - **Git フック（Lefthook, [`lefthook.yml`](../lefthook.yml)）**
   - commit-msg: commitlint（コミットメッセージを Conventional Commits 規約で検証）
-  - pre-commit: betterleaks（ステージ済み）、Frontendのformat、lint、型検査、hadolint / docker build --check（Dockerfile 変更時）、compose config（Compose 変更時）、markdownlint（Markdown 変更時）
+  - pre-commit: betterleaks（ステージ済み）、Frontendのformat、lint、型検査、hadolint / docker build --check（Dockerfile 変更時）、compose config（Compose 変更時）、markdownlint（Markdown 変更時）、okf-check（`docs/` 変更時）
   - pre-push: betterleaks（全履歴）、FrontendのReact診断、テスト、本番ビルド、be-lint（Spotless + PMD + SpotBugs）/ be-test（`task test`）（backend 変更時）、actionlint / zizmor（ワークフロー変更時）
 - **CI（GitHub Actions, [`.github/workflows/`](../.github/workflows/)）**
-  - `frontend-ci.yml`（Frontendのformat、lint、Knip、型検査、React Doctor、全体branch coverage 85%、React Compilerを有効にした本番ビルド）、`backend-ci.yml`（backend の Lint（Spotless + PMD + SpotBugs）とテスト・カバレッジ）、`conventional-commits.yml`（Pull Requestタイトルのcommitlint）、`betterleaks.yml`（シークレットスキャン）、`static-analysis.yml`（Semgrepの静的解析とSARIFアップロード、jscpdの重複コード検査）、`trivy.yml`（脆弱性スキャン / SARIF アップロード）、`actionlint.yml` / `zizmor.yml`（ワークフロー）、`hadolint.yml`（Dockerfile Lint、docker build --check、backend イメージのビルド・起動・ヘルスチェック）、`compose-config.yml`（Compose）、`markdownlint.yml`（Markdown）、`release-please.yml`（リリース設定検証とRelease Pull Request作成）
+  - `frontend-ci.yml`（Frontendのformat、lint、Knip、型検査、React Doctor、全体branch coverage 85%、React Compilerを有効にした本番ビルド）、`backend-ci.yml`（backend の Lint（Spotless + PMD + SpotBugs）とテスト・カバレッジ）、`conventional-commits.yml`（Pull Requestタイトルのcommitlint）、`betterleaks.yml`（シークレットスキャン）、`static-analysis.yml`（Semgrepの静的解析とSARIFアップロード、jscpdの重複コード検査）、`trivy.yml`（脆弱性スキャン / SARIF アップロード）、`actionlint.yml` / `zizmor.yml`（ワークフロー）、`hadolint.yml`（Dockerfile Lint、docker build --check、backend イメージのビルド・起動・ヘルスチェック）、`compose-config.yml`（Compose）、`markdownlint.yml`（Markdown）、`okf-validate.yml`（`docs/` の OKF バンドル検証）、`release-please.yml`（リリース設定検証とRelease Pull Request作成）
   - `static-analysis.yml` / `trivy.yml` の検出結果は GitHub Code Scanning（Security タブ）に SARIF 形式でアップロードされます。

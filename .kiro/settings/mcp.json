@@ -29,6 +29,11 @@
       "command": "uvx",
       "args": ["awslabs.aws-serverless-mcp-server@latest"],
       "disabled": true
+    },
+    "iwe": {
+      "command": "bash",
+      "args": ["-c", "cd \"$(git rev-parse --show-toplevel)/docs\" && exec iwec"],
+      "disabled": false
     }
   }
 }

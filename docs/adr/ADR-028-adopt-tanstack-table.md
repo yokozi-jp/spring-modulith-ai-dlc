@@ -1,3 +1,10 @@
+---
+type: Architecture Decision Record
+title: 'ADR-028: TanStack Tableを採用する'
+description: table state と row model の重複実装を避けるため、headless な TanStack Table を採用する決定。
+tags: [adr, frontend, ui, table]
+---
+
 # ADR-028: TanStack Tableを採用する
 
 ## Status
@@ -10,25 +17,19 @@ Proposed
 
 ## Context
 
-FrontendはReact 19、TanStack Router、TanStack Query、TanStack Formを採用している。
-今後の一覧画面では、sorting、filtering、pagination、row selection、column visibilityなどのtable stateを扱う可能性がある。
+FrontendはReact 19、TanStack Router、TanStack Query、TanStack Formを採用している。 今後の一覧画面では、sorting、filtering、pagination、row selection、column visibilityなどのtable stateを扱う可能性がある。
 
-単純な読み取り専用表はnative `<table>` だけで実装できる。
-一方、複数のtable stateを画面ごとに手書きすると、state更新、列定義、row modelの実装が重複する。
+単純な読み取り専用表はnative `<table>` だけで実装できる。 一方、複数のtable stateを画面ごとに手書きすると、state更新、列定義、row modelの実装が重複する。
 
-TanStack TableはUIを描画しないheadless libraryであり、table stateとrow modelを提供する。
-描画とアクセシビリティはnative table要素と、このプロジェクトのshadcnおよびTailwind CSSで管理できる。
+TanStack TableはUIを描画しないheadless libraryであり、table stateとrow modelを提供する。 描画とアクセシビリティはnative table要素と、このプロジェクトのshadcnおよびTailwind CSSで管理できる。
 
 ## Decision
 
-Reactのtable state管理に `@tanstack/react-table` 9.xを使う。
-依存versionは `frontend/package.json` へ固定する。
+Reactのtable state管理に `@tanstack/react-table` 9.xを使う。 依存versionは `frontend/package.json` へ固定する。
 
-TanStack Table専用の共通wrapperやData Grid componentは先行して作らない。
-最初の一覧画面で必要なcolumn definitionとrow modelだけを構成し、単純な表ではnative `<table>` を直接使う。
+TanStack Table専用の共通wrapperやData Grid componentは先行して作らない。 最初の一覧画面で必要なcolumn definitionとrow modelだけを構成し、単純な表ではnative `<table>` を直接使う。
 
-大量データのsorting、filtering、paginationはSpring Boot APIの責務とし、Frontendへ全件を取得して処理しない。
-小規模な表示データに限り、TanStack Tableのclient-side row modelを使う。
+大量データのsorting、filtering、paginationはSpring Boot APIの責務とし、Frontendへ全件を取得して処理しない。 小規模な表示データに限り、TanStack Tableのclient-side row modelを使う。
 
 ## Consequences
 
@@ -66,4 +67,4 @@ TanStack Table専用の共通wrapperやData Grid componentは先行して作ら�
 ## References
 
 - [TanStack Table](https://tanstack.com/table/latest)
-- [`frontend/package.json`](../../frontend/package.json)
+- [frontend/package.json](../../frontend/package.json)

@@ -1,3 +1,10 @@
+---
+type: Architecture Decision Record
+title: 'ADR-033: Vite 開発オリジンを固定し proxy ポートを単一ソース化する'
+description: Vite のポート自動移動による OIDC redirect 不一致を防ぐため、開発オリジンを固定し proxy ポートを単一ソース化する決定。
+tags: [adr, frontend, vite, auth]
+---
+
 # ADR-033: Vite 開発オリジンを固定し proxy ポートを単一ソース化する
 
 ## Status
@@ -10,26 +17,17 @@ Proposed
 
 ## Context
 
-ADR-014 は、SPA、API、OIDC の開始 URL と callback、logout を単一オリジンで公開し、ローカル開発でもブラウザは Vite の一つのオリジンだけへ接続する方針を定めた。
-ローカルの Keycloak realm は、redirect URI、web origin、baseUrl、logout 後 URI をすべて `http://localhost:5173` に固定している。
-バックエンドの OAuth2 Client は redirect URI を `{baseUrl}/login/oauth2/code/{registrationId}` として、ブラウザから見えるオリジンから組み立てる。
+ADR-014 は、SPA、API、OIDC の開始 URL と callback、logout を単一オリジンで公開し、ローカル開発でもブラウザは Vite の一つのオリジンだけへ接続する方針を定めた。 ローカルの Keycloak realm は、redirect URI、web origin、baseUrl、logout 後 URI をすべて `http://localhost:5173` に固定している。 バックエンドの OAuth2 Client は redirect URI を `{baseUrl}/login/oauth2/code/{registrationId}` として、ブラウザから見えるオリジンから組み立てる。
 
-しかし、Vite 開発サーバーはポートを明示しない場合、5173 が使用中だと次の空きポートへ自動的に移動する。
-移動すると、ブラウザのオリジンが Keycloak の登録値と食い違い、認証フローが redirect URI 不一致で失敗する。
+しかし、Vite 開発サーバーはポートを明示しない場合、5173 が使用中だと次の空きポートへ自動的に移動する。 移動すると、ブラウザのオリジンが Keycloak の登録値と食い違い、認証フローが redirect URI 不一致で失敗する。
 
-proxy の転送先ポートも、`vite.config.ts` に `18080` を直書きしていた。
-一方、開発バックエンドの待受ポートはリポジトリルートの `.env` の `SERVER_PORT` が正本であり、両者は独立に定義されて追従しなかった。
-このルート `.env` は OIDC クライアントシークレットや DB パスワードなどの秘密情報も含む。
+proxy の転送先ポートも、`vite.config.ts` に `18080` を直書きしていた。 一方、開発バックエンドの待受ポートはリポジトリルートの `.env` の `SERVER_PORT` が正本であり、両者は独立に定義されて追従しなかった。 このルート `.env` は OIDC クライアントシークレットや DB パスワードなどの秘密情報も含む。
 
 ## Decision
 
-Vite 開発サーバーのポートを `5173` に固定し、`server.strictPort: true` を設定する。
-5173 が使用中のときは別ポートへ移らず起動を失敗させ、Keycloak の redirect URI と同じオリジンを保証する。
+Vite 開発サーバーのポートを `5173` に固定し、`server.strictPort: true` を設定する。 5173 が使用中のときは別ポートへ移らず起動を失敗させ、Keycloak の redirect URI と同じオリジンを保証する。
 
-proxy の転送先ポートは、`loadEnv(mode, "..", "SERVER_PORT")` でルート `.env` の `SERVER_PORT` だけを読み込んで組み立てる。
-プレフィックスを `SERVER_PORT` に限定し、同じファイルの秘密情報をクライアントバンドルへ露出させない。
-値は 10 進整数かつ 1 から 65535 の範囲を設定読込時に検証し、範囲外や非数値は起動を失敗させる。
-`.env` が無い CI などでは、現行の標準値 `18080` へフォールバックする。
+proxy の転送先ポートは、`loadEnv(mode, "..", "SERVER_PORT")` でルート `.env` の `SERVER_PORT` だけを読み込んで組み立てる。 プレフィックスを `SERVER_PORT` に限定し、同じファイルの秘密情報をクライアントバンドルへ露出させない。 値は 10 進整数かつ 1 から 65535 の範囲を設定読込時に検証し、範囲外や非数値は起動を失敗させる。 `.env` が無い CI などでは、現行の標準値 `18080` へフォールバックする。
 
 proxy の `changeOrigin` は `false` を維持し、フロントエンド側の Host をバックエンドへ渡して `{baseUrl}` を開発オリジンに揃える。
 
@@ -76,7 +74,7 @@ proxy の `changeOrigin` は `false` を維持し、フロントエンド側の 
 
 ## References
 
-- [ADR-014: SPA とバックエンドを同一オリジンで公開する](./ADR-014-use-same-origin-spa-security-boundary.md)
+- [ADR-014: SPA とバックエンドを同一オリジンで公開する](ADR-014-use-same-origin-spa-security-boundary.md)
 - [Vite: Server Options](https://vite.dev/config/server-options)
 - [Vite: Shared Options（`loadEnv`）](https://vite.dev/config/shared-options)
 - `frontend/vite.config.ts`
