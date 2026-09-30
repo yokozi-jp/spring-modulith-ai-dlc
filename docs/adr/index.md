@@ -39,3 +39,4 @@
 - [ADR-036: docs/ を OKF v0.2 バンドルとして構成する](ADR-036-adopt-okf-for-docs-knowledge-bundle.md)（Proposed, 2026-09-30）
 - [ADR-037: AI-DLC フレームワークの利用をやめる](ADR-037-remove-aidlc-framework.md)（Proposed, 2026-09-30）
 - [ADR-038: steering をナビゲーションに限定し、規約の正文を docs/ に置く](ADR-038-route-steering-to-docs-knowledge.md)（Proposed, 2026-09-30）
+- [ADR-039: Matt Pocock のスキルフローを導入する](ADR-039-adopt-matt-pocock-skills-workflow.md)（Proposed, 2026-09-30）
