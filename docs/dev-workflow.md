@@ -8,7 +8,8 @@
 
 - **`task dev`**：依存サービスを起動してバックエンドを起動する。日々の開発の入口。
 - **`task check`**：素早いローカル確認（バックエンドの静的解析）。こまめに回す。
-- **`task fe-verify`**：フロントエンドの静的解析、React診断、テスト、本番ビルドを実行する。
+- **`task fe-verify`**：フロントエンドの静的解析、未使用コード検査、React診断、テスト、本番ビルドを実行する。
+- **`task lint-duplicates`**：フロントエンドとバックエンドの手書きコードの重複を検査する。
 - **`task verify`**：push 前のバックエンド総合ゲート（静的解析、OpenAPI 契約検査と、使い捨てDBでのマイグレーション検証とテスト）。CI と同じ内容。
 - **`task e2e`**：E2E（未整備。`docs/e2e-testing-strategy.md` に沿って構築予定）。
 
@@ -48,11 +49,14 @@ changeset と jOOQ 生成コードは同じ変更として Git 管理する。
 ### push する前
 
 ```bash
-task fe-verify             # フロントエンドの静的解析、React診断、テスト、本番ビルド
+task fe-verify             # フロントエンドの静的解析、未使用コード検査、React診断、テスト、本番ビルド
+task lint-duplicates       # フロントエンドとバックエンドの手書きコードの重複検査
 task verify                # be-lint + 使い捨てDBでのマイグレーション検証とテスト（CI と同じ）
 ```
 
-`task fe-verify` は `fe-check`、`fe-doctor`、`fe-test-build` を順に実行する。
+`task fe-verify` は `fe-check`、`fe-knip`、`fe-doctor`、`fe-test-build` を順に実行する。
+`task lint-duplicates` はTanStack RouterとjOOQの生成コードを除外し、既存の重複行率3.19%を通す3.2%を上限とする。
+既存cloneを解消した変更では、`.jscpd.json` の閾値も下げる。
 `task verify` は `.env.test` の隔離スタック（PostgreSQL 5433 / Redis 6380）を
 起動し、マイグレーション検証とテストを実行して後片付けまで行う。
 開発用スタック（5432 / 6379）とポートが分かれているため、`task dev` で

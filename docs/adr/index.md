@@ -48,6 +48,7 @@ Alternatives Considered / References の構成）。
 - **ADR-032**：Frontendを業務機能単位で構成する（Proposed, 2026-09-30）
 - **ADR-033**：Vite 開発オリジンを固定し proxy ポートを単一ソース化する（Proposed, 2026-09-30）
 - **ADR-034**：Frontend ランタイムを固定し Oxlint 全カテゴリを強制する（Proposed, 2026-09-30）
+- **ADR-035**：jscpd と Knip を品質ゲートに採用する（Proposed, 2026-10-01）
 
 ## 運用
 
