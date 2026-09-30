@@ -144,13 +144,18 @@ tasks:
           echo "OKF check: iwe が無いためスキップします（CI で検査されます）。" >&2
           exit 0
         fi
+        if ! command -v jq >/dev/null 2>&1; then
+          echo "OKF check: jq が無いため孤立検査をスキップします（CI で検査されます）。" >&2
+          iwe schema validate
+          exit 0
+        fi
         iwe schema validate
-        orphans="$(iwe stats -f json | python3 -c 'import sys,json; print(len(json.load(sys.stdin).get("orphans", [])))')"
+        orphans="$(iwe stats -f json | jq '.orphans | length')"
         if [ "$orphans" != "0" ]; then
           echo "" >&2
           echo "⚠ 孤立ドキュメントが $orphans 件あります（どこからも参照されていません）。" >&2
           echo "  index.md などの目次からリンクして、グラフに接続してください。" >&2
-          iwe stats -f json | python3 -c 'import sys,json; [print("    - "+o) for o in json.load(sys.stdin).get("orphans", [])]' >&2
+          iwe stats -f json | jq -r '.orphans[] | "    - " + .' >&2
           exit 1
         fi
 
