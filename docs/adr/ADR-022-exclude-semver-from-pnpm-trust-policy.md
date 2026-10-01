@@ -1,5 +1,5 @@
 ---
-type: Architecture Decision Record
+type: ADR
 title: 'ADR-022: semver 6.3.1 を pnpm trust policy の例外にする'
 description: Babel 経由の避けられない依存を通すため、semver 6.3.1 を pnpm trust policy の例外にする決定。
 tags: [adr, frontend, supply-chain, pnpm]

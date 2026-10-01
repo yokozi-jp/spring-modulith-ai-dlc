@@ -1,5 +1,5 @@
 ---
-type: Architecture Decision Record
+type: ADR
 title: 'ADR-008: application.yaml を単一にし、設定を外部から注入する'
 description: 秘密情報を外部注入する前提で設定の二系統管理を避けるため、application.yaml を単一にする決定。
 tags: [adr, config, spring-boot]

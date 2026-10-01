@@ -1,5 +1,5 @@
 ---
-type: Architecture Decision Record
+type: ADR
 title: 'ADR-009: DB 接続を単一アカウントから二つの役割へ分ける'
 description: 最小権限を全環境で実現するため、DB 接続をアプリケーション用とマイグレーション用の役割へ分ける決定。
 tags: [adr, database, security, migration]
@@ -95,7 +95,7 @@ ADR-005 は Liquibase をアプリケーション起動から分離し、アプ�
 
 - [ADR-004](ADR-004-commit-jooq-generated-code.md)（jOOQ 生成コードを Git 管理し、本番で生成しない）
 - [ADR-005](ADR-005-decouple-liquibase-from-app-startup.md)（Liquibase の分離、ロール分離の方針）
-- [docs/database-migrations.md](../database-migrations.md)
+- [DB接続情報とロール分離](../database/connections.md)
 - `backend/gradle/database.gradle`（接続先の組み立てと資格情報チェック）
 - `docker/initdb/`（スキーマ所有のマイグレーションロールと DML 限定のアプリロール）
 - `docker/compose.yml` / `docker/compose-test.yml`

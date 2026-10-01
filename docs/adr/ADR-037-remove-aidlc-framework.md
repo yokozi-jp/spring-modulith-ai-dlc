@@ -1,5 +1,5 @@
 ---
-type: Architecture Decision Record
+type: ADR
 title: 'ADR-037: AI-DLC フレームワークの利用をやめる'
 description: AI-DLC フレームワークへの依存を撤去し、ADR 書式・運用をリポジトリ内に自立させる決定。
 tags: [adr, governance, workflow, documentation]

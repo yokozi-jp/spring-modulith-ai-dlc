@@ -1,5 +1,5 @@
 ---
-type: Architecture Decision Record
+type: ADR
 title: 'ADR-019: 外部連携の耐障害性と容量制御を標準化する'
 description: retry の乗算による障害増幅を避けるため、外部連携の耐障害性と容量制御を標準化する決定。
 tags: [adr, resilience, backend, reliability]

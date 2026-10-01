@@ -1,5 +1,5 @@
 ---
-type: Architecture Decision Record
+type: ADR
 title: 'ADR-005: Liquibase をアプリケーション起動から分離する'
 description: 起動時マイグレーションの競合を避け、スキーマ変更をデプロイと独立させるため Liquibase を起動から分離する決定。
 tags: [adr, database, liquibase, migration]
@@ -67,5 +67,5 @@ Liquibase の起動時自動実行を無効化し、マイグレーションを�
 ## References
 
 - `backend/build.gradle`（`spring-boot-starter-liquibase` を実行時依存に持たず、Liquibase は Gradle プラグインと `liquibaseRuntime` のみ）
-- [docs/database-migrations.md](../database-migrations.md)
+- [DBマイグレーションの実行モデルとスキーマタグ](../database/migrations.md)
 - `Taskfile.yml`（`be-migrate` / `be-release-migrate` / `be-verify-migrations`）

@@ -1,5 +1,5 @@
 ---
-type: Architecture Decision Record
+type: ADR
 title: 'ADR-036: docs/ を OKF v0.2 バンドルとして構成する'
 description: ドキュメントの鮮度と出所を機械判定できるようにするため、docs/ を OKF v0.2 バンドルとして構成する決定。
 tags: [adr, documentation, okf, knowledge-management]

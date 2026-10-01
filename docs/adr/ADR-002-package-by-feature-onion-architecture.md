@@ -1,5 +1,5 @@
 ---
-type: Architecture Decision Record
+type: ADR
 title: 'ADR-002: package by feature とオニオンアーキテクチャ'
 description: 機能単位のパッケージ分割とオニオンアーキテクチャで、ドメインを技術詳細から独立させ依存を内向きに保つ決定。
 tags: [adr, architecture, onion-architecture, package-by-feature]
@@ -94,6 +94,4 @@ Hexagonal は核の分離と外部統合の交換可能性に、Onion は同心�
 
 ## References
 
-- [docs/architecture/package-by-feature-onion-handoff.md](../architecture/package-by-feature-onion-handoff.md)
-- [docs/architecture/archunit-additional-rules.md](../architecture/archunit-additional-rules.md)
 - [Onion Architecture vs Hexagonal Architecture](https://www.codegenes.net/blog/onion-architecture-compared-to-hexagonal/)

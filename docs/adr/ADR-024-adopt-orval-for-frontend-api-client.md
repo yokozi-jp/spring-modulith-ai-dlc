@@ -1,5 +1,5 @@
 ---
-type: Architecture Decision Record
+type: ADR
 title: 'ADR-024: Frontend API client生成にOrvalを採用する'
 description: OpenAPI と型のずれを防ぐため、Frontend API client 生成に Orval を採用する決定。
 tags: [adr, frontend, api, openapi]

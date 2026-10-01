@@ -1,5 +1,5 @@
 ---
-type: Architecture Decision Record
+type: ADR
 title: 'ADR-003: データアクセスに jOOQ を採用'
 description: 発行される SQL を明示制御し PostgreSQL 方言を活かすため、データアクセスに jOOQ を採用する決定。
 tags: [adr, backend, database, jooq]
@@ -72,5 +72,5 @@ ORM の暗黙のフェッチや N+1、マッピングの不透明さを避け、
 ## References
 
 - `backend/build.gradle`（`spring-boot-starter-jooq`、`jooq-codegen-gradle`）
-- [../../.kiro/steering/datetime-timezone-conventions.md](../../.kiro/steering/datetime-timezone-conventions.md)
+- [日時とタイムゾーンの規約](../datetime/timezone-conventions.md)
 - [ADR-004-commit-jooq-generated-code.md](ADR-004-commit-jooq-generated-code.md)

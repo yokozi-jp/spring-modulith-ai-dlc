@@ -1,5 +1,5 @@
 ---
-type: Architecture Decision Record
+type: ADR
 title: 'ADR-020: コンテナイメージを署名し provenance を検証する'
 description: イメージの出所を証明するため、コンテナイメージを署名し provenance を検証する決定。
 tags: [adr, security, supply-chain, container]

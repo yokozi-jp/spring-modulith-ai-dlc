@@ -1,5 +1,5 @@
 ---
-type: Architecture Decision Record
+type: ADR
 title: 'ADR-013: HTTP API 契約を標準化する'
 description: 公開後の破壊的変更を避けるため、エラー・一覧・互換性・OpenAPI の HTTP API 契約を標準化する決定。
 tags: [adr, backend, api, openapi]

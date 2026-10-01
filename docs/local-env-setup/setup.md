@@ -1,8 +1,8 @@
 ---
-type: Guide
+type: Runbook
 title: 開発環境構築
 description: WSL2 と Docker Desktop を前提にしたローカル開発環境の構築手順。
-tags: [guide, setup, wsl, docker]
+tags: [runbook, setup, wsl, docker]
 ---
 
 # 開発環境構築

@@ -1,5 +1,5 @@
 ---
-type: Architecture Decision Record
+type: ADR
 title: 'ADR-012: プロパティベーステストとミューテーションテストを採用する'
 description: 入力空間の境界とテスト検出力を測るため、プロパティベーステストとミューテーションテストを採用する決定。
 tags: [adr, testing, quality]

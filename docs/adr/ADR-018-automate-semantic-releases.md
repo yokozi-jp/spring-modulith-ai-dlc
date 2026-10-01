@@ -1,5 +1,5 @@
 ---
-type: Architecture Decision Record
+type: ADR
 title: 'ADR-018: release-please でセマンティックリリースを自動化する'
 description: 版番号とリリースノートの手作業のずれを避けるため、release-please でセマンティックリリースを自動化する決定。
 tags: [adr, release, ci, automation]

@@ -1,5 +1,5 @@
 ---
-type: Architecture Decision Record
+type: ADR
 title: 'ADR-035: jscpd と Knip を品質ゲートに採用する'
 description: 重複コードと未使用コードを Pull Request ごとに検出するため、jscpd と Knip を品質ゲートに採用する決定。
 tags: [adr, quality, ci, lint]
@@ -85,7 +85,7 @@ jscpd は既存のリポジトリ横断静的解析 workflow で実行し、Knip
 
 - [jscpd](https://github.com/kucherenko/jscpd)
 - [Knip](https://knip.dev/)
-- [ADR-010: プロジェクトのタスクランナーにTaskを採用する](ADR-010-adopt-taskfile.md)
+- [ADR-010: プロジェクトのタスクランナーにTaskを採用する](ADR-010-adopt-task-as-project-task-runner.md)
 - [ADR-031: Frontend の型検査を厳格化し、tsconfig を正本にする](ADR-031-tighten-frontend-typescript-checks.md)
 - `Taskfile.yml`
 - `.github/workflows/static-analysis.yml`

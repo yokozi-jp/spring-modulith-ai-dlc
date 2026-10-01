@@ -1,5 +1,5 @@
 ---
-type: Architecture Decision Record
+type: ADR
 title: 'ADR-031: Frontendの型検査を厳格化し、tsconfigを正本にする'
 description: エディタと CI の型検査の食い違いを防ぐため、Frontend の型検査を厳格化し tsconfig を正本にする決定。
 tags: [adr, frontend, typescript, quality]

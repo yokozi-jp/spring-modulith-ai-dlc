@@ -1,5 +1,5 @@
 ---
-type: Architecture Decision Record
+type: ADR
 title: 'ADR-007: セッションベース認証と OIDC Authorization Code + PKCE'
 description: トークン窃取と失効の難しさを避けるため、サーバ側セッションと OIDC Authorization Code + PKCE で認証する決定。
 tags: [adr, security, auth, oidc]

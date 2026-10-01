@@ -1,5 +1,5 @@
 ---
-type: Architecture Decision Record
+type: ADR
 title: 'ADR-026: OXCでReact Compilerを有効化する'
 description: 手動 memoization の判断を不要にするため、OXC で React Compiler を有効化する決定。
 tags: [adr, frontend, react, build]

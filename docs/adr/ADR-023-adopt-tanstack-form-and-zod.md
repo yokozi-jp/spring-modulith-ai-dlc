@@ -1,5 +1,5 @@
 ---
-type: Architecture Decision Record
+type: ADR
 title: 'ADR-023: TanStack Form と Zod を採用する'
 description: フォームと API 生成の schema を一系統に揃えるため、TanStack Form と Zod を採用する決定。
 tags: [adr, frontend, form, validation]

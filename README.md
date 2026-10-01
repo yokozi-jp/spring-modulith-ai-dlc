@@ -3,28 +3,6 @@
 
 # spring-modulith-ai-dlc
 
-## 使用技術一覧
-
-<p style="display: inline">
-  <!-- バックエンド -->
-  <img alt="Java 25" src="https://img.shields.io/badge/-Java%2025-007396.svg?logo=openjdk&style=for-the-badge">
-  <img alt="Spring Boot 4.1" src="https://img.shields.io/badge/-Spring%20Boot%204.1-6DB33F.svg?logo=spring-boot&style=for-the-badge">
-  <img alt="Spring Modulith" src="https://img.shields.io/badge/-Spring%20Modulith-6DB33F.svg?logo=spring&style=for-the-badge">
-  <!-- フロントエンド -->
-  <img alt="TypeScript" src="https://img.shields.io/badge/-TypeScript-3178C6.svg?logo=typescript&style=for-the-badge&logoColor=white">
-  <img alt="VitePlus" src="https://img.shields.io/badge/-VitePlus-646CFF.svg?logo=vite&style=for-the-badge&logoColor=white">
-  <img alt="pnpm" src="https://img.shields.io/badge/-pnpm-F69220.svg?logo=pnpm&style=for-the-badge&logoColor=white">
-  <!-- ミドルウェア -->
-  <img alt="PostgreSQL" src="https://img.shields.io/badge/-PostgreSQL-4169E1.svg?logo=postgresql&style=for-the-badge&logoColor=white">
-  <img alt="Redis" src="https://img.shields.io/badge/-Redis-DC382D.svg?logo=redis&style=for-the-badge&logoColor=white">
-  <img alt="Keycloak" src="https://img.shields.io/badge/-Keycloak-4D4D4D.svg?logo=keycloak&style=for-the-badge&logoColor=white">
-  <img alt="Grafana OpenTelemetry LGTM" src="https://img.shields.io/badge/-Grafana%20OTel%20LGTM-F46800.svg?logo=grafana&style=for-the-badge&logoColor=white">
-  <!-- インフラ -->
-  <img alt="Docker" src="https://img.shields.io/badge/-Docker-1488C6.svg?logo=docker&style=for-the-badge">
-  <img alt="Amazon AWS" src="https://img.shields.io/badge/-Amazon%20AWS-232F3E.svg?logo=amazon-aws&style=for-the-badge">
-  <img alt="GitHub Actions" src="https://img.shields.io/badge/-GitHub%20Actions-2088FF.svg?logo=github-actions&style=for-the-badge&logoColor=white">
-</p>
-
 ## 目次
 
 1. [プロジェクトについて](#プロジェクトについて)
@@ -45,7 +23,7 @@
 
 - **認証と認可**：Keycloak を認可サーバとした OIDC（OAuth2 Client）と、Redis による分散セッション
 - **データアクセス**：Liquibase によるDBマイグレーションと、スキーマから生成する jOOQ コード
-- **可観測性**：OpenTelemetry による計装と、Grafana OpenTelemetry LGTM への集約（ログ相関、PII、保持は[可観測性の運用](docs/observability-operations.md)を参照）
+- **可観測性**：OpenTelemetry による計装と、Grafana OpenTelemetry LGTM への集約（ログ相関、PII、保持は[可観測性データの規約](docs/observability-conventions.md)を参照）
 - **品質ゲート**：静的解析、シークレットと脆弱性のスキャン、使い捨てDBでのテストを Git フックと CI で強制
 
 業務ドメインのモジュールはこれから追加していきます。
@@ -78,19 +56,39 @@
 .
 ├── .agents/          # スキル定義（.agents/skills）
 ├── .github/          # GitHub 設定
-│   ├── workflows/    # GitHub Actions（Lint・シークレットスキャン等）
-│   └── dependabot.yml # 依存関係の自動更新設定
+│   ├── ISSUE_TEMPLATE/   # Issue テンプレート
+│   ├── workflows/        # GitHub Actions（Lint・シークレットスキャン等）
+│   ├── CODEOWNERS        # レビュー担当者の自動割り当て
+│   ├── PULL_REQUEST_TEMPLATE.md # Pull Request テンプレート
+│   └── dependabot.yml    # 依存関係の自動更新設定
 ├── .kiro/            # Kiro 設定
+│   ├── hooks/            # エージェントのフック
+│   ├── settings/         # Kiro CLI と MCP サーバーの設定
+│   ├── skills/           # .agents/skills へのシンボリックリンク（Kiro の検出用）
+│   └── steering/         # steering（docs への案内）
 ├── .vscode/          # VSCode 設定
 ├── backend/          # Spring Boot アプリケーション
 ├── docker/           # Docker 関連ファイル
-│   ├── initdb/       # PostgreSQL 初期化スクリプト（スキーマ作成）
-│   └── keycloak/     # Keycloak realm 定義（起動時インポート）
-├── docs/             # ドキュメント
+│   ├── initdb/           # PostgreSQL 初期化スクリプト（スキーマ作成）
+│   ├── keycloak/         # Keycloak realm 定義（起動時インポート）
+│   ├── compose.yml       # 開発用スタック
+│   └── compose-test.yml  # テスト用の隔離スタック
+├── docs/             # ドキュメント（iwe / OKF のナレッジグラフ）
+│   ├── .iwe/             # iwe の設定と OKF スキーマ
 │   ├── adr/              # Architecture Decision Records（設計判断の記録）
-│   └── local-env-setup/  # 開発環境構築手順・スクリプト
+│   ├── agents/           # エージェントスキル用の設定（Issue tracker、Triage ラベル、ドメイン文書）
+│   ├── backend/          # バックエンドの規約（アーキテクチャ、テスト）
+│   ├── container/        # コンテナ（Dockerfile、Compose）の規約
+│   ├── database/         # データベース（マイグレーション、jOOQ、接続）の規約
+│   ├── datetime/         # 日時とタイムゾーンの規約
+│   ├── frontend/         # フロントエンドの規約
+│   ├── knowledge/        # ナレッジ管理（docs と steering の役割分担）
+│   ├── local-env-setup/  # 開発環境構築手順・スクリプト
+│   ├── tooling/          # 開発ツール（Taskfile、フック、CI、Lint）の規約
+│   ├── writing/          # 日本語の技術文書の書き方
+│   └── index.md          # docs の入口
 ├── frontend/         # VitePlus + TypeScript フロントエンド（pnpm）
-├── infrastructure/   # インフラ定義
+├── infrastructure/   # インフラ定義（未整備）
 ├── .betterleaks.toml # betterleaks（シークレットスキャナ）設定
 ├── .editorconfig     # エディタ共通設定
 ├── .env.example      # 環境変数のサンプル
@@ -102,6 +100,7 @@
 ├── .release-please-manifest.json # release-please が追跡する直近の版
 ├── .snyk             # Snyk のスキャン除外ポリシー（プロダクションコード以外を除外）
 ├── .spectral.yaml    # Spectral（OpenAPI 契約リンタ）設定
+├── AGENTS.md         # エージェント共通の設定（スキルが参照する docs の案内）
 ├── CHANGELOG.md      # リリースノート（release-please が生成）
 ├── CONTRIBUTING.md   # 変更手順、ブランチ運用、コミット規約
 ├── LICENSE           # ライセンス
@@ -193,8 +192,10 @@ Docker Compose の操作（サービスの起動、停止、状態確認、Keycl
 
 ### ドキュメント
 
-- `docs/` を編集したときは `task okf-check` で Open Knowledge Format v0.2 バンドルの適合（フロントマターと予約ファイル）と孤立ドキュメントを検査します。
-- Lefthook は `docs/` 変更を検出すると pre-commit で同じ検査を実行します。
+- `docs/`、`.kiro/steering/`、`Taskfile.yml`を編集したときは`task okf-check`を実行します。
+  このタスクはOpen Knowledge Format v0.2バンドルの適合、docs内部のリンク切れ、孤立ドキュメント、steeringのfrontmatterとdocsとの境界を検査し、非index文書の250行超を責務混在の見直し合図として警告します。
+  Taskfileと利用文書の同期候補も警告します。
+- Lefthookは対象ファイルの変更を検出すると、pre-commitで同じ検査を実行します。
 
 <p align="right">(<a href="#top">トップへ</a>)</p>
 
@@ -202,7 +203,7 @@ Docker Compose の操作（サービスの起動、停止、状態確認、Keycl
 
 重要な設計とアーキテクチャ上の判断は、Architecture Decision Record（ADR）として [`docs/adr/`](docs/adr/) に残します。
 
-- 規約は [`.kiro/steering/adr-decision-record.md`](.kiro/steering/adr-decision-record.md) に定義しています（ADR を作る/作らない基準、記録先、ライフサイクル）。
+- 運用ルールの正文は [`docs/adr/conventions.md`](docs/adr/conventions.md) です（ADR を作る基準と作らないもの、記録先、採番、ライフサイクル）。
 - 書式は [`docs/adr/adr-template.md`](docs/adr/adr-template.md) に準拠します。
 - ADR の一覧は [`docs/adr/index.md`](docs/adr/index.md) を参照してください。
   `docs/adr/` はワークフロー外と横断の判断を残す場所です。
@@ -220,9 +221,12 @@ push 前には `task adr-check` が pre-push で走り、判断が絡む変更�
 
 - iwe は Markdown をナレッジグラフとして扱う CLI、LSP サーバー、MCP サーバーです。
   導入は [開発環境構築](docs/local-env-setup/setup.md) を参照してください。
-- OKF 適合（フロントマターと予約ファイルの形状）と孤立ドキュメントは `task okf-check` で検証し、Git フック（pre-commit）と CI（`okf-validate.yml`）で強制します。
+- OKF適合、docs内部のリンク切れ、孤立ドキュメント、steeringのfrontmatterとdocsとの境界は`task okf-check`で検証し、非index文書の250行超は責務混在の見直し合図として警告します。
+  同じタスクは、Taskfileの公開タスクを変更した場合にREADMEと関連docsの同期候補も警告します。
 - 検証スキーマは `docs/.iwe/schemas/` に置き、`docs/index.md` を目次の起点としています。
-- AI エージェント向けの作成規約は [`.kiro/steering/documentation-authoring.md`](.kiro/steering/documentation-authoring.md)、この構成を採用した判断は [ADR-036](docs/adr/ADR-036-adopt-okf-for-docs-knowledge-bundle.md) に記録しています。
+  各領域の `docs/<領域>/index.md` は、どの文書をいつ読むかを示す入口です。
+- AI エージェント向けの作成規約は [`.kiro/steering/documentation-authoring.md`](.kiro/steering/documentation-authoring.md)、docs の読み方は [`.kiro/steering/docs-navigation.md`](.kiro/steering/docs-navigation.md) にあります。
+  この構成を採用した判断は [ADR-036](docs/adr/ADR-036-adopt-okf-for-docs-knowledge-bundle.md) と [ADR-038](docs/adr/ADR-038-route-steering-to-docs-knowledge.md) に記録しています。
 
 <p align="right">(<a href="#top">トップへ</a>)</p>
 

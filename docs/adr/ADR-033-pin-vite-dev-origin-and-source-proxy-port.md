@@ -1,5 +1,5 @@
 ---
-type: Architecture Decision Record
+type: ADR
 title: 'ADR-033: Vite 開発オリジンを固定し proxy ポートを単一ソース化する'
 description: Vite のポート自動移動による OIDC redirect 不一致を防ぐため、開発オリジンを固定し proxy ポートを単一ソース化する決定。
 tags: [adr, frontend, vite, auth]

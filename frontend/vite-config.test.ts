@@ -6,7 +6,10 @@ const proxyPath = "^/(api|oauth2|login|logout|error|actuator|v3/api-docs|swagger
 const createDevelopmentServer = () =>
   createServer({ mode: "development", server: { middlewareMode: true } });
 
-describe("Vite configuration", () => {
+// 実際に Vite の設定を読み込み開発サーバーを生成するため、所要時間は CPU の空きに比例する。
+// pre-push では backend のテストやイメージビルドと並列に走るので、既定の 5 秒では足りないことがある。
+// ponytail: タイムアウトは性能の検証ではなくハング検出のためなので、負荷時の実測（5 秒超）に余裕を持たせた 60 秒にする。
+describe("Vite configuration", { timeout: 60_000 }, () => {
   afterEach(() => {
     vi.unstubAllEnvs();
   });
@@ -77,8 +80,9 @@ describe("Vite configuration", () => {
   it.each(["invalid", "0x10", "65536"])("rejects invalid SERVER_PORT %s", async (value) => {
     vi.stubEnv("SERVER_PORT", value);
 
-    await expect(createDevelopmentServer()).rejects.toThrow(
-      `SERVER_PORT must be an integer between 1 and 65535: ${value}`,
-    );
+    // 設定の読み込み失敗を期待するテストなので、Vite が出す "failed to load config" のログを抑える。
+    await expect(
+      createServer({ mode: "development", logLevel: "silent", server: { middlewareMode: true } }),
+    ).rejects.toThrow(`SERVER_PORT must be an integer between 1 and 65535: ${value}`);
   });
 });

@@ -4,13 +4,18 @@ okf_version: '0.2'
 
 # ドキュメント
 
-- [Architecture Decision Records](adr/index.md)
-- [バックエンドアーキテクチャ](backend-architecture.md)
-- [フロントエンドアーキテクチャ](frontend-architecture.md)
-- [DBマイグレーションとjOOQコード生成](database-migrations.md)
-- [開発環境構築](local-env-setup/setup.md)
-- [開発ワークフロー](dev-workflow.md)
-- [Lint・テストのリファレンス](lint-and-test.md)
-- [main ブランチの保護設定](branch-protection.md)
-- [可観測性の運用](observability-operations.md)
-- [リリース管理](release-management.md)
+- [バックエンド](backend/index.md)：`backend/` のコード、アーキテクチャ、テストを扱うとき
+- [フロントエンド](frontend/index.md)：`frontend/` のコード、ルーティング、状態、API client、UI、テストを扱うとき
+- [データベース](database/index.md)：マイグレーション、jOOQ コード生成、DB 接続、DB のデプロイと切り戻しを扱うとき
+- [日時](datetime/index.md)：日時の保存、API の日時表現、表示、日時のテストを扱うとき
+- [コンテナ](container/index.md)：Dockerfile、.dockerignore、Compose ファイルを書く、または直すとき
+- [開発ツール](tooling/index.md)：Taskfile、Git フック、CI、Lint とテストのタスクを扱うとき
+- [文章](writing/index.md)：日本語の docs、ADR、記事を書く、または推敲するとき
+- [ナレッジ管理](knowledge/index.md)：docs や steering を追加、分割、移動するとき、知識をどこに書くか迷ったとき
+- [エージェント設定](agents/index.md)：Agent skillsのIssue tracker、triageラベル、ドメイン文書の設定を確認、変更するとき、Matt Pocock のスキルを使うとき
+- [Architecture Decision Records](adr/index.md)：設計上の判断をする前に既存の決定を確かめるとき、ADR を起こすとき
+- [開発環境構築](local-env-setup/setup.md)：WSL、Java、Kiro、iwe などの開発環境を用意するとき
+- [main ブランチの保護設定](branch-protection.md)：ブランチ保護、必須チェック、CODEOWNERS を設定、変更するとき
+- [可観測性データの規約](observability-conventions.md)：ログの記録と相関、PII と秘密情報の禁止、保持、アクセス、本番の受け入れ条件を確認するとき
+- [可観測性データ混入対応](observability-data-contamination.md)：可観測性データから PII または秘密情報を検知し、生成停止、削除、確認、記録を行うとき
+- [リリース管理](release-management.md)：release-please による版の決まり方、リリース手順、障害時の確認を扱うとき

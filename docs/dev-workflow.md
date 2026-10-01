@@ -1,157 +1,107 @@
 ---
-type: Guide
+type: Runbook
 title: 開発ワークフロー
-description: 日常の開発で、いつどの Task コマンドをどの順で使うかをシナリオ別に示すガイド。
-tags: [guide, workflow, task-runner]
+description: 日常の開発で入口となるTaskを、作業場面ごとの実行順で示す手順書。
+tags: [runbook, workflow, task-runner]
 ---
 
 # 開発ワークフロー
 
-`task`の公開タスクは多いが、日常的に打つのは少数の**入口タスク**で足りる。
-このドキュメントは「いつ、どのコマンドを、どの順で使うか」をシナリオ別に示す地図である。
-公開タスクの一覧と説明は`task`（引数なし）、`task help`、または`task --list`で確認できる。
+場面に合う節の入口Taskを上から順に実行する。
+個々の検査Taskの仕様は[Lintとテストのリファレンス](lint-and-test.md)、DBコマンドの影響範囲は[DB操作コマンドのリファレンス](database/commands.md)を参照する。
 
-## 入口タスク（まずこれだけ覚える）
+## バックエンドを開発するとき
 
-- **`task dev`**：依存サービスを起動してバックエンドを起動する。
-  日々の開発の入口。
-- **`task check`**：素早いローカル確認（バックエンドの静的解析）。
-  こまめに回す。
-- **`task fe-verify`**：フロントエンドの静的解析、未使用コード検査、React診断、テスト、本番ビルドを実行する。
-- **`task lint-duplicates`**：フロントエンドとバックエンドの手書きコードの重複を検査する。
-- **`task verify`**：push 前のバックエンド総合ゲート（静的解析、OpenAPI 契約検査と、使い捨てDBでのマイグレーション検証とテスト）。
-  CI と同じ内容。
-- **`task e2e`**：E2E（未整備、`docs/e2e-testing-strategy.md` に沿って構築予定）。
-
-これ以外の細かいタスクは、上記やCI、Gitフックから呼ばれる**部品**である。
-`task help`は公開タスクの名前と説明を一覧表示する。
-
-## シナリオ別の手順
-
-### 日々の開発ループ
-
-``` bash
-task dev                   # 依存起動＋バックエンド起動
-# 別のターミナルで
-cd frontend && vp dev      # SPAを起動し、APIとOIDC関連パスを同一オリジンでproxy
+```bash
+task dev
 # コードを変更する
-task check                 # 静的解析で素早く確認（こまめに）
+task check
 ```
 
-ブラウザは <http://localhost:5173> を開き、Vite proxy 経由でバックエンドを利用する。
-バックエンドは <http://localhost:18080>、Keycloak は <http://localhost:8080>、Grafana は <http://localhost:3000> で待ち受ける。
+## フロントエンドを開発するとき
 
-### マイグレーションを追加するとき
-
-``` bash
-# 1. changeset を追加する（backend/src/main/resources/db/changelog/changesets/）
-task be-migrate            # 現在のスキーマタグまで適用（タグ確定後）
-# または開発中は
-task be-migrate-dev        # 作りかけを含む全 changeset を適用
-task be-refresh-jooq       # 最新スキーマから jOOQ 生成コードを更新
-task be-verify-migrations  # 使い捨てDBで update→rollback→再update とタグを検証
+```bash
+cd frontend && vp dev
+# コードを変更する
+cd .. && task fe-check
 ```
 
-changeset と jOOQ 生成コードは同じ変更として Git 管理する。
-詳細は `docs/database-migrations.md` を参照。
+## ローカルDBを初めて用意するとき
 
-### push する前
-
-``` bash
-task fe-verify             # フロントエンドの静的解析、未使用コード検査、React診断、テスト、本番ビルド
-task lint-duplicates       # フロントエンドとバックエンドの手書きコードの重複検査
-task verify                # be-lint + 使い捨てDBでのマイグレーション検証とテスト（CI と同じ）
+```bash
+task compose-up
+task be-migrate
 ```
 
-`task fe-verify` は `fe-check`、`fe-knip`、`fe-doctor`、`fe-test-build` を順に実行する。
-`task lint-duplicates` はTanStack RouterとjOOQの生成コードを除外し、既存の重複行率3.19%を通す3.2%を上限とする。
-既存cloneを解消した変更では、`.jscpd.json` の閾値も下げる。
-`task verify` は `.env.test` の隔離スタック（PostgreSQL 5433 / Redis 6380）を起動し、マイグレーション検証とテストを実行して後片付けまで行う。
-開発用スタック（5432 / 6379）とポートが分かれているため、`task dev` でバックエンドを起動したまま並行実行できる。
+## changesetを追加するとき
 
-### ミューテーションテストを実行するとき
+作りかけのchangesetを確認する間は次の順で実行する。
 
-``` bash
+```bash
+task be-migrate-dev
+task be-generate-jooq
+task test-dev
+```
+
+スキーマタグを確定した後は次の順で実行する。
+
+```bash
+task be-refresh-jooq
+task be-verify-migrations
+task test
+```
+
+生成物の管理は[jOOQコード生成物の管理](database/jooq-codegen.md)を参照する。
+
+## pushする前
+
+変更した領域の入口Taskを実行し、最後に重複検査を実行する。
+
+```bash
+task fe-verify
+task verify
+task lint-duplicates
+```
+
+フロントエンドだけ、またはバックエンドだけを変更した場合は、変更していない領域のTaskを省く。
+
+## ミューテーションテストを実行するとき
+
+```bash
 task mutation-test
 ```
 
-`task mutation-test`は使い捨てのテスト用依存を起動し、マイグレーション検証後にPITを実行して片付ける。
-PITは通常テストより実行コストが高いため、`task verify`とpull requestの必須CIには含めない。
-結果は、変異対象が存在するときに`backend/build/reports/pitest/`へ出力される。
+## docsを変更するとき
 
-push 時には `task adr-check` が pre-push で走り、判断が絡む変更（依存、セキュリティ、DB、インフラ、ワークフロー、およびフロントエンド全体）に `docs/adr/` の更新が伴わないとき警告する。
-既定は非ブロッキングのナッジで、該当しなければ `ADR_ACK=1 git push` で抑制できる。
-フロントエンドは構築初期のため全体を対象にしている。
-安定したら `frontend/package.json` や設定ファイルなど判断が出やすい箇所へ絞ってよい。
+```bash
+task lint-md
+task okf-check
+```
 
-### リリース設定を変更するとき
+## リリース設定を変更するとき
 
-``` bash
+```bash
 task release-check
 ```
 
-`task release-check`はrelease-pleaseの設定、manifest、`version.txt`、Gradleの版番号が一致することを検証する。
+## ローカルサービスを確認するとき
 
-通常の変更では版ファイルと`CHANGELOG.md`を直接変更せず、Release Pull Requestに更新を任せる。
-
-詳しい手順とGitHub secretの設定は`docs/release-management.md`を参照する。
-
-### Docker Compose とサービスの操作
-
-依存サービス（PostgreSQL / Keycloak / Redis / Grafana）は Docker Compose で起動する。
-通常はこれらだけを起動し、バックエンドは `task be-run`（`task dev` の一部）でホスト上に立てる。
-`.env` はルートの `.env.example` をコピーして用意し、パスワードを変更しておく。
-
-``` bash
-task compose-ps            # サービスの状態を確認
-task compose-up-backend    # backend profile も有効にしてコンテナで起動
-```
-
-Keycloak の OIDC discovery、issuer、PKCE S256 対応を確認する。
-ログの追跡も同様。
-
-``` bash
+```bash
+task compose-ps
 task oidc-check
 task keycloak-logs
 ```
 
-`realm.json` を変更しても、既存 realm は起動時インポートで上書きされない。
-Keycloak のローカルデータだけを削除して realm を再投入するには `task keycloak-reimport` を使う。
-これは PostgreSQL、Redis、Grafana のデータを保持する。
+## ローカルサービスを停止するとき
 
-``` bash
-task keycloak-reimport
+```bash
+task compose-down
 ```
 
-停止と初期化は次のとおり。
+全サービスのローカルデータを破棄して初期化するときだけ、確認値を指定する。
 
-``` bash
-task compose-down          # 停止（named volume は保持）
-task compose-reset CONFIRM_RESET=yes   # 全サービスの volume ごと削除して初期化（データは失われる）
+```bash
+task compose-reset CONFIRM_RESET=yes
 ```
 
-`compose-reset` は全サービスのデータを削除するため、確認変数 `CONFIRM_RESET=yes` を指定しないと実行されない。
-
-## ローカル・CI・フックの一致
-
-同じTaskfileのタスクを、ローカル、CI、Gitフック（Lefthook）が共用している。
-これにより「ローカルでは通ったが CI で落ちる」乖離を防ぐ。
-
-- pre-commit：betterleaks、Frontendのformat、lint、型検査、hadolint、compose config、markdownlint、okf-check（`docs/` 変更時）（変更種別に応じて）。
-- pre-push：betterleaks（全履歴）、FrontendのReact診断、テストと本番ビルド、backend 変更時は be-lint / be-test、判断が絡む変更に ADR が伴うかの確認（`task adr-check`、既定は非ブロッキングのナッジ）。
-- CI：`frontend-ci.yml` が `task fe-verify`、`backend-ci.yml` が `task be-verify-migrations` と `task be-test` を実行。
-
-したがって、Frontend変更では `task fe-verify`、backend変更では `task verify` を事前に実行する。
-
-## 入口タスクと部品の関係
-
-- `task dev` → `compose-up` ＋ `be-run`
-- `task check` → `be-lint`
-- `task fe-verify` → `fe-check` ＋ `fe-doctor` ＋ `fe-test-build`
-- `task fe-check` → `vp check`
-- `task fe-doctor` → `react-doctor`（外部通信なし、warning以上または5分超過で失敗）
-- `task fe-coverage` → VitestのV8 coverageで全体branch 85%を検証
-- `task fe-test-build` → coverage付き `vp test` ＋ `vp run build`
-- `task verify` → `be-lint` ＋ `test`（`test` は隔離スタック起動＋ `be-verify-migrations` ＋ `be-test` ＋ 後片付け）
-
-部品タスク（`fe-check`、`fe-test-build`、`be-test`、`be-mutation-test`、`test-deps-up` など）は通常直接打たず、入口タスクや CI、Gitフックから呼ばれる。
+DBの本番適用と切り戻しは[DBのデプロイと切り戻し](database/runbook-deploy-and-rollback.md)を参照する。

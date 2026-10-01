@@ -2,7 +2,7 @@
 # block-iwe-normalize.sh — PreToolUse guard that refuses `iwe normalize`.
 #
 # `iwe normalize` rewrites every document under docs/ mechanically; the
-# documentation-authoring steering forbids it outside a committed,
+# `docs/knowledge/documentation-authoring.md` convention forbids it outside a committed,
 # opt-in run. This hook is that rule's deterministic twin: it detects the
 # two ways normalize can be invoked and refuses both.
 #
@@ -44,7 +44,7 @@ if command -v jq >/dev/null 2>&1; then
 fi
 
 refuse() {
-  echo "block-iwe-normalize: refused. \`iwe normalize\` rewrites every document under docs/ and is blocked by the documentation-authoring steering. Commit docs/ first, then relaunch Kiro with IWE_ALLOW_NORMALIZE=1 to run it deliberately." 1>&2
+  echo "block-iwe-normalize: refused. \`iwe normalize\` rewrites every document under docs/ and is blocked by the \`docs/knowledge/documentation-authoring.md\` convention. Commit docs/ first, then relaunch Kiro with IWE_ALLOW_NORMALIZE=1 to run it deliberately." 1>&2
   exit 2
 }
 

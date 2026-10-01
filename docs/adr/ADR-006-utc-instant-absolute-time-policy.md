@@ -1,5 +1,5 @@
 ---
-type: Architecture Decision Record
+type: ADR
 title: 'ADR-006: 絶対時刻を UTC / Instant / timestamptz に統一する'
 description: 保存・API・表示・テストで絶対時刻の解釈を一意に固定するため、UTC / Instant / timestamptz に統一する決定。
 tags: [adr, datetime, timezone, backend]
@@ -67,6 +67,6 @@ Accepted
 
 ## References
 
-- [../../.kiro/steering/datetime-timezone-conventions.md](../../.kiro/steering/datetime-timezone-conventions.md)
+- [日時とタイムゾーンの規約](../datetime/timezone-conventions.md)
 - `backend/src/test/java/com/example/demo/architecture/DateTimeConventionsArchTest.java`
 - `backend/build.gradle`（Error Prone 設定）
