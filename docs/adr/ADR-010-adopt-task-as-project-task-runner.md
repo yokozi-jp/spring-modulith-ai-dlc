@@ -83,5 +83,5 @@ GNU Makeはファイル生成の依存関係を扱うビルドツールであり
 - [Task Installation](https://taskfile.dev/docs/installation)
 - [Task Guide](https://taskfile.dev/docs/guide)
 - [Taskfile Schema](https://taskfile.dev/docs/reference/schema)
-- [docs/dev-workflow.md](../dev-workflow.md)
-- [docs/lint-and-test.md](../lint-and-test.md)
+- [docs/tooling/dev-workflow.md](../tooling/dev-workflow.md)
+- [docs/tooling/lint-and-test.md](../tooling/lint-and-test.md)

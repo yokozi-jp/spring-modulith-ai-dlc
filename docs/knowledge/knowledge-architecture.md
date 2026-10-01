@@ -57,4 +57,4 @@ docs は領域ごとのフォルダ（`docs/backend/`、`docs/database/` など�
 docs の作成、編集、移動、index.md の形式、新しい領域の追加は [docs 文書の作成と変更](documentation-authoring.md) に従う。
 steering の作成、編集、行数、inclusion モードは [steering の書き方](steering-authoring.md) に従う。
 ADR の運用は [ADR の運用ルール](../adr/conventions.md) に従う。
-検査コマンドと検査範囲は [Lint・テストのリファレンス](../lint-and-test.md) を参照する。
+検査コマンドと検査範囲は [Lint・テストのリファレンス](../tooling/lint-and-test.md) を参照する。

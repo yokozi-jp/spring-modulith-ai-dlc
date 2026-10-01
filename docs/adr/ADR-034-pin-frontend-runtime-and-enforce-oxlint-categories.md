@@ -63,7 +63,7 @@ Oxlint の `correctness`、`suspicious`、`pedantic`、`perf`、`style`、`restr
 
 - eslint core は Vite+ が常に有効化するため、`plugins` の正規化表示には現れない。
 - 型なしの ESLint 互換 JS プラグイン API はアルファであり、`lint/**` の型安全規則は当該ディレクトリに限って無効化している。
-- Lint 設定と例外の一覧は `docs/lint-and-test.md` に記述し、実装と一致させる。
+- Lint 設定と例外の一覧は `docs/tooling/lint-and-test.md` に記述し、実装と一致させる。
 
 ## Alternatives Considered
 
@@ -98,4 +98,4 @@ Oxlint の `correctness`、`suspicious`、`pedantic`、`perf`、`style`、`restr
 - `frontend/vite.config.ts`
 - `frontend/.node-version`
 - `.github/workflows/frontend-ci.yml`
-- `docs/lint-and-test.md`
+- `docs/tooling/lint-and-test.md`

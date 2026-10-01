@@ -111,12 +111,12 @@ Taskfileを変更したら、CIのpaths条件に`Taskfile.yml`が含まれてい
 公開タスクの追加、削除、改名、挙動変更では、次の文書を同じ変更で更新する。
 
 - [README.md](../../README.md)の「開発コマンド」と「Lint・テスト」
-- `docs/dev-workflow.md`
-- `docs/lint-and-test.md`
+- `docs/tooling/dev-workflow.md`
+- `docs/tooling/lint-and-test.md`
 - DB操作を変えた場合は`docs/database/migrations.md`
 - 導入バージョンを変えた場合は`docs/local-env-setup/versions.env`とCI
 
-`task okf-check`は`Taskfile.yml`の変更を検出すると、README、`docs/dev-workflow.md`、`docs/lint-and-test.md`が同じ差分に含まれるかを警告する。
+`task okf-check`は`Taskfile.yml`の変更を検出すると、README、`docs/tooling/dev-workflow.md`、`docs/tooling/lint-and-test.md`が同じ差分に含まれるかを警告する。
 内部タスクや実装だけの変更では文書更新を要求しないため、警告を確認して対応不要と判断してよい。
 
 変更後は`task --list`、対象タスク、`task lint-md`を実行する。

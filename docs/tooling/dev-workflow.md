@@ -8,7 +8,7 @@ tags: [runbook, workflow, task-runner]
 # 開発ワークフロー
 
 場面に合う節の入口Taskを上から順に実行する。
-個々の検査Taskの仕様は[Lintとテストのリファレンス](lint-and-test.md)、DBコマンドの影響範囲は[DB操作コマンドのリファレンス](database/commands.md)を参照する。
+個々の検査Taskの仕様は[Lintとテストのリファレンス](lint-and-test.md)、DBコマンドの影響範囲は[DB操作コマンドのリファレンス](../database/commands.md)を参照する。
 
 ## バックエンドを開発するとき
 
@@ -51,7 +51,7 @@ task be-verify-migrations
 task test
 ```
 
-生成物の管理は[jOOQコード生成物の管理](database/jooq-codegen.md)を参照する。
+生成物の管理は[jOOQコード生成物の管理](../database/jooq-codegen.md)を参照する。
 
 ## pushする前
 
@@ -104,4 +104,4 @@ task compose-down
 task compose-reset CONFIRM_RESET=yes
 ```
 
-DBの本番適用と切り戻しは[DBのデプロイと切り戻し](database/runbook-deploy-and-rollback.md)を参照する。
+DBの本番適用と切り戻しは[DBのデプロイと切り戻し](../database/runbook-deploy-and-rollback.md)を参照する。

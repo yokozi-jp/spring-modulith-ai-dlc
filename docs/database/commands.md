@@ -38,7 +38,7 @@ tags: [reference, database, liquibase, jooq, taskfile, gradle]
 - **`task be-rollback DB_ROLLBACK_TAG=<tag> CONFIRM_ROLLBACK=yes`**：指定タグより後のchangesetを切り戻す。
   対象DBのスキーマまたはデータを失う可能性がある。
 
-場面ごとのローカル実行順は[開発ワークフロー](../dev-workflow.md)を参照する。
+場面ごとのローカル実行順は[開発ワークフロー](../tooling/dev-workflow.md)を参照する。
 本番の前進適用と切り戻し手順は[DBのデプロイと切り戻し](runbook-deploy-and-rollback.md)を参照する。
 生成コードの扱いは[jOOQコード生成物の管理](jooq-codegen.md)を参照する。
 

@@ -7,7 +7,7 @@ tags: [reference, testing, lint, ci]
 
 # Lintとテストのリファレンス
 
-検査は[`Taskfile.yml`](../Taskfile.yml)の公開Taskから実行する。
+検査は[`Taskfile.yml`](../../Taskfile.yml)の公開Taskから実行する。
 場面ごとの実行順は[開発ワークフロー](dev-workflow.md)を参照する。
 Dockerを使うTaskは、Dockerがないローカル環境ではスキップし、CIで検査する。
 
@@ -43,7 +43,7 @@ Dockerを使うTaskは、Dockerがないローカル環境ではスキップし�
 
 `task test`と`task mutation-test`は、`docker/compose-test.yml`のPostgreSQL 5433とRedis 6380を`.env.test`で起動する。
 PITのHTMLとXMLのレポートは、変異対象がある場合に`backend/build/reports/pitest/`へ出力する。
-プロパティベーステストとミューテーションテストの採用理由は[ADR-012](adr/ADR-012-adopt-property-based-and-mutation-testing.md)を参照する。
+プロパティベーステストとミューテーションテストの採用理由は[ADR-012](../adr/ADR-012-adopt-property-based-and-mutation-testing.md)を参照する。
 
 ## リポジトリ全体
 
@@ -67,8 +67,8 @@ PITのHTMLとXMLのレポートは、変異対象がある場合に`backend/buil
 - **`task lint-taskfile`**：Task本体でTaskfileのYAML構文とスキーマ構造を検証する。
 - **`task adr-check`**：判断が絡む変更にADRが伴うかを確認する。
 
-Knipとjscpdの採用理由は[ADR-035](adr/ADR-035-adopt-jscpd-and-knip-quality-gates.md)を参照する。
-OKF検査の採用理由は[ADR-036](adr/ADR-036-adopt-okf-for-docs-knowledge-bundle.md)と[ADR-038](adr/ADR-038-route-steering-to-docs-knowledge.md)を参照する。
+Knipとjscpdの採用理由は[ADR-035](../adr/ADR-035-adopt-jscpd-and-knip-quality-gates.md)を参照する。
+OKF検査の採用理由は[ADR-036](../adr/ADR-036-adopt-okf-for-docs-knowledge-bundle.md)と[ADR-038](../adr/ADR-038-route-steering-to-docs-knowledge.md)を参照する。
 
 ## Gitフック対応
 
@@ -85,7 +85,7 @@ OKF検査の採用理由は[ADR-036](adr/ADR-036-adopt-okf-for-docs-knowledge-bu
 - **pre-push（バックエンドまたはDockerfileの変更）**：バックエンドイメージのbuild stageをビルドする。
 - **pre-push（GitHub Actionsワークフローの変更）**：`lint-actions`相当と`lint-actions-security`相当を実行する。
 
-Gitフックの条件とコマンドは[`lefthook.yml`](../lefthook.yml)を正とする。
+Gitフックの条件とコマンドは[`lefthook.yml`](../../lefthook.yml)を正とする。
 
 ## CI対応
 
@@ -102,4 +102,4 @@ Gitフックの条件とコマンドは[`lefthook.yml`](../lefthook.yml)を正�
 - **`okf-validate.yml`**：`okf-check`を実行する。
 - **`release-please.yml`**：`release-check`を実行する。
 
-各ワークフローの実装は[`.github/workflows/`](../.github/workflows/)を正とする。
+各ワークフローの実装は[`.github/workflows/`](../../.github/workflows/)を正とする。

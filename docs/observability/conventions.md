@@ -9,7 +9,7 @@ tags: [convention, observability, opentelemetry, security]
 
 バックエンドはログ、トレース、メトリクスを OpenTelemetry で送信する。
 可観測性データには許可した値だけを記録し、保持とアクセスを制限する。
-設計判断は [ADR-015](adr/ADR-015-structure-and-protect-observability-data.md) に記録している。
+設計判断は [ADR-015](../adr/ADR-015-structure-and-protect-observability-data.md) に記録している。
 
 ## 記録
 
@@ -58,7 +58,17 @@ OpenTelemetry appender が SLF4J key-value から転送する名前も `exceptio
 
 本番 collector または保存先にも denylist を置くが、これは第二防御であり、アプリケーションから禁止値を送ってよい理由にはならない。
 自由入力を正規表現だけでマスクする方式は、表記ゆれによる漏えいを防げないため採用しない。
-PII または秘密情報の混入を検知した場合は、[可観測性データ混入対応](observability-data-contamination.md)に従う。
+PII または秘密情報の混入を検知した場合は、[可観測性データ混入対応](runbook-data-contamination.md)に従う。
+
+## 本番の保存先
+
+本番の可観測性データは CloudWatch だけに保存する（[ADR-043](../adr/ADR-043-send-production-telemetry-to-cloudwatch-via-adot.md)）。
+
+- アプリケーションは OTLP を Fargate タスクのサイドカーの ADOT Collector へ送る。Collector はログを CloudWatch Logs、トレースを X-Ray、メトリクスを CloudWatch へ送る。
+- Collector の processor で、[PII と秘密情報](#pii-と秘密情報)の禁止値に当たる属性を保存前に削除する。
+- アプリケーションのロググループに CloudWatch Logs のデータ保護ポリシーを設定する。
+- 標準出力は WARN 以上だけを別のロググループへ送り、起動時と Collector の障害時の調査に使う。
+- ロググループの分け方は [CloudWatch Logsのロググループ](../aws/cloudwatch-logs.md) に従う。
 
 ## 保持とアクセス
 

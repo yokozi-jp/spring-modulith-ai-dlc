@@ -103,4 +103,4 @@ Release Pull Request が作られない場合は、workflow の実行結果、to
 - [release-please の manifest mode](https://github.com/googleapis/release-please/blob/main/docs/manifest-releaser.md)
 - [release-please-action](https://github.com/googleapis/release-please-action)
 - [GitHub Actions の `GITHUB_TOKEN`](https://docs.github.com/en/actions/concepts/security/github_token)
-- [ADR-018](adr/ADR-018-automate-semantic-releases.md)
+- [ADR-018](../adr/ADR-018-automate-semantic-releases.md)
