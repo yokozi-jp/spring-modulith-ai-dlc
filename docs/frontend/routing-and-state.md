@@ -58,8 +58,10 @@ React Compilerを有効にしているため、参照同一性が契約になる
 
 - [フロントエンドアーキテクチャ](architecture.md)
 - [OrvalとAPI境界](api-client-orval.md)
+- [フロントエンドのテストと検証](testing.md)
 - [ADR-023: TanStack Form と Zod を採用する](../adr/ADR-023-adopt-tanstack-form-and-zod.md)
 - [ADR-026: OXCでReact Compilerを有効化する](../adr/ADR-026-enable-react-compiler-with-oxc.md)
+- [ADR-032: Frontendを業務機能単位で構成する](../adr/ADR-032-organize-frontend-by-business-feature.md)
 - [React: Reusing Logic with Custom Hooks](https://react.dev/learn/reusing-logic-with-custom-hooks)
 - [React: Rules of Hooks](https://react.dev/reference/rules/rules-of-hooks)
 - [TanStack Router: External Data Loading](https://tanstack.com/router/latest/docs/framework/react/guide/external-data-loading)

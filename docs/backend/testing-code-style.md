@@ -1,34 +1,72 @@
 ---
 type: Convention
 title: バックエンドのテストコードの書き方
-description: バックエンドのテストコードが静的解析（PMD、SpotBugs、Spotless）と ArchUnit の TestConventionsArchTest に通るための書き方（Javadoc、@DisplayName、可視性、命名、アサーション）と、ArchUnit の解析対象の限定を定める。
-tags: [convention, backend, testing, archunit, static-analysis]
+description: バックエンドテストの命名、可視性、アサーション、Springコンテキスト、失敗診断、非同期待機の書き方を定め、テストコードを書く、または直すときに読む規約。
+tags: [convention, backend, testing, spring]
 ---
 
 # バックエンドのテストコードの書き方
 
-## コード規約
+テストは失敗対象と再現条件がレポートから分かるように書き、共有するSpringコンテキストを増やさない。
+非同期処理は固定時間ではなく、期限付きの条件待機で検証する。
 
-静的解析（[ruleset.xml](../../backend/config/pmd/ruleset.xml)、[test-ruleset.xml](../../backend/config/pmd/test-ruleset.xml)、SpotBugs、Spotless の Google Java Format）に通る形で書く。
+## 基本の書き方
 
-- フォーマットは Google Java Format に従う。`task be-format` で整形し、`task be-lint` で確認する。
-- クラスとフィールドには Javadoc を付ける（PMD `CommentRequired`）。`@Test` メソッドはパッケージプライベートにするので Javadoc は不要。
-- すべての `@Test` メソッドに `@DisplayName` で検証意図を明記する。コメントや Javadoc はバイトコードに残らず ArchUnit で強制できないが、`@DisplayName` は実行時に残りレポートにも出るため、意図の記述はこちらに寄せる。
-- テストクラス、テストメソッド、ネスト型はパッケージプライベートにする（`public` を付けない。JUnit 5 は package-private を実行する）。既存コードは意図を示すため `/* package */` の目印を添えている。
-- JUnit のアサーションには失敗時メッセージを添える。メッセージは期待値を言い換えず、失敗対象と入力を補う（[失敗時の診断情報](testing-strategy.md)）。
-- アサーションは JUnit の `Assertions` と AssertJ のどちらでもよいが、1つのテストクラス内では揃える。
-- テストクラス名は `...Test`（単数）を接尾辞にする。`...Tests`（複数）にしない。合成アノテーションや拡張などテストでない補助クラスには付けない。
-- 複数アサーションは許容される（PMD `UnitTestContainsTooManyAsserts` は無効化済み）。1テストで1つの振る舞いを検証する範囲にとどめる。
+- Google Java Formatに従い、`task be-format`で整形する。
+- クラスとフィールドにはJavadocを付ける。
+- `@Test`メソッドには`@DisplayName`で検証意図を書く。
+- テストクラス、テストメソッド、ネスト型はパッケージプライベートにする。
+- テストクラス名は単数形の`...Test`で終える。
+- `@Disabled`には停止理由を指定する。
+- JUnit AssertionsとAssertJのどちらを使ってもよいが、一つのテストクラス内では揃える。
+- 一つのテストでは一つの振る舞いを検証し、その範囲で複数のアサーションを使ってよい。
 
-## ArchUnit
+## Springコンテキスト
 
-- ArchUnit は手書きのプロダクションコードだけを解析する。生成コード（`jooq` / `generated`）とテストコードは [ProductionCodeOnly](../../backend/src/test/java/com/example/demo/architecture/ProductionCodeOnly.java) で除外する。
-- `@ArchTest` フィールドはルールの説明として命名するため、定数命名規則（UPPER_SNAKE）とは別扱いにしている（PMD `FieldNamingConventions` は無効化済み）。
-- テストコード自身の規約は [TestCodeOnly](../../backend/src/test/java/com/example/demo/architecture/TestCodeOnly.java)（`ProductionCodeOnly` の対）で対象を反転し、[TestConventionsArchTest](../../backend/src/test/java/com/example/demo/architecture/TestConventionsArchTest.java) で強制する。コメントや Javadoc は ArchUnit では検査できないため、機械判定できる次の項目だけを扱う。
-  - すべての `@Test` メソッドに `@DisplayName` があること。
-  - `@Test` メソッドと、それを含むクラスが `public` でないこと。
-  - `@Test` を含むクラス名が `Test` で終わること。
-  - 直接 `@SpringBootTest` を付けたクラスが `@Import(SharedTestConfiguration.class)` を持つこと（合成アノテーション経由でもよい）。
-  - `assertTimeoutPreemptively` を呼ばないこと。
-  - テストコードでレガシー日時型を使わないこと（禁止型を参照する `architecture` パッケージ自身は除外）。
-  - `@Disabled` に理由（`value`）があること。
+フルの`@SpringBootTest`は、[SharedTestConfiguration](../../backend/src/test/java/com/example/demo/testkit/SharedTestConfiguration.java)を`@Import`するか、それを内蔵する合成アノテーションを使う。
+テストごとの`@Import`や`@MockBean`で共有構成を分岐させない。
+OIDCクライアント登録など複数のテストで使う差し替えは、共有構成へ集約する。
+
+## 失敗時の診断情報
+
+失敗メッセージには、該当する対象、入力、expected、actual、再現情報を残す。
+対象にはレコードID、ファイルパス、リクエスト、イベントキーなどを指定する。
+再現情報には乱数seed、期限、最後に観測した状態などを指定する。
+
+- JUnitの等価比較ではexpectedとactualの引数を維持し、メッセージで対象と入力を補う。
+- AssertJでは標準の差分を維持する`as(...)`を使い、標準の差分を置き換える必要がある場合だけ`withFailMessage(...)`を使う。
+- `Optional`が空の場合は、対象と検索条件を持つ`AssertionError`などを送出する。
+- プロパティベーステストでは、縮小された反例とseedを失敗ログから取得できるようにする。
+- 修正方法をメッセージへ書くのは、修正方針が一つに決まるアーキテクチャ規則や禁止APIに限る。
+
+```java
+assertEquals(
+    expected,
+    actual,
+    () -> "publicationId=" + publicationId + ", column=publication_date");
+```
+
+```java
+assertThat(actual)
+    .as("publicationId=%s の保存往復", publicationId)
+    .isEqualTo(expected);
+```
+
+```java
+final Instant actual =
+    result.orElseThrow(
+        () ->
+            new AssertionError(
+                "event_publication が見つからない: publicationId=" + publicationId));
+```
+
+## 非同期待機
+
+固定時間を待つ`Thread.sleep()`を使わない。
+イベントの発行と購読はSpring Modulithの`Scenario`で条件を待つ。
+それ以外の非同期処理は、対象APIの期限付き条件待機か、JUnitの非プリエンプティブな`assertTimeout`を使う。
+タイムアウト時には、対象ID、期待条件、期限、最後に観測した状態を出す。
+`assertTimeoutPreemptively`は使わない。
+
+機械的に判定できる規約と検査実装は[バックエンドのアーキテクチャテスト](architecture-tests.md)を参照する。
+変更後は`task be-format`と`task be-lint`を実行する。

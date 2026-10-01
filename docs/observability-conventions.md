@@ -1,20 +1,33 @@
 ---
 type: Convention
-title: 可観測性の運用
-description: OpenTelemetry によるログ・トレース・メトリクスの送信と、ローカルおよび本番の可観測性運用。
-tags: [convention, operations, observability, opentelemetry]
+title: 可観測性データの規約
+description: OpenTelemetry へ記録するデータ、ログとトレースの相関、PII と秘密情報の禁止、保持、アクセス、本番の受け入れ条件を定め、可観測性データの実装または本番収集基盤を変更するときに読む規約。
+tags: [convention, observability, opentelemetry, security]
 ---
 
-# 可観測性の運用
+# 可観測性データの規約
 
 バックエンドはログ、トレース、メトリクスを OpenTelemetry で送信する。
-ローカルでは Grafana OpenTelemetry LGTM を確認用に使い、本番の保存先として扱わない。
+可観測性データには許可した値だけを記録し、保持とアクセスを制限する。
 設計判断は [ADR-015](adr/ADR-015-structure-and-protect-observability-data.md) に記録している。
 
-## ログとトレースの相関
+## 記録
 
 コンソールログは一行一 JSON の Elastic Common Schema（ECS）で出力する。
 OpenTelemetry appender は同じ Logback event を OTLP の LogRecord として送る。
+
+アプリケーションログの message は検索可能な静的 event 名にし、変動する値は SLF4J の key-value 属性へ置く。
+属性名には OpenTelemetry の semantic conventions が定義する名前を優先する。
+
+予期しない 5xx 例外は `ERROR` とし、`exception.type`、`exception.stacktrace`、trace ID、span ID を記録する。
+`exception.stacktrace` は root、cause、suppressed exception の class 名、method 名、ファイル名、行番号から作る。
+例外メッセージは含めない。
+循環する cause または suppressed exception は、型を持つ有限の循環参照表現へ変換する。
+
+予期した 4xx は Problem Details と HTTP status で処理し、同じ失敗を stack trace 付き `ERROR` として重複記録しない。
+プロセス停止につながる構成不備などは、起動処理を担当する logger の severity と終了結果で区別する。
+
+## ログとトレースの相関
 
 アクティブな span 内のログには次の相関情報が付く。
 
@@ -24,19 +37,6 @@ OpenTelemetry appender は同じ Logback event を OTLP の LogRecord として�
 独自の request ID は追加しない。
 Grafana では trace ID を使ってログとトレースを相互に検索する。
 起動時やバッチの span 外で発生したログには相関情報がないため、空文字の ID を補わない。
-
-アプリケーションログの message は検索可能な静的 event 名にし、変動する値は SLF4J の key-value 属性へ置く。
-属性名には OpenTelemetry の semantic conventions が定義する名前を優先する。
-
-## 例外の診断情報
-
-予期しない 5xx 例外は `ERROR` とし、`exception.type`、`exception.stacktrace`、trace ID、span ID を記録する。
-`exception.stacktrace` は root、cause、suppressed exception の class 名、method 名、ファイル名、行番号から作る。
-例外メッセージは含めない。
-循環する cause または suppressed exception は、型を持つ有限の循環参照表現へ変換する。
-
-予期した 4xx は Problem Details と HTTP status で処理し、同じ失敗を stack trace 付き `ERROR` として重複記録しない。
-プロセス停止につながる構成不備などは、起動処理を担当する logger の severity と終了結果で区別する。
 
 ## PII と秘密情報
 
@@ -58,17 +58,18 @@ OpenTelemetry appender が SLF4J key-value から転送する名前も `exceptio
 
 本番 collector または保存先にも denylist を置くが、これは第二防御であり、アプリケーションから禁止値を送ってよい理由にはならない。
 自由入力を正規表現だけでマスクする方式は、表記ゆれによる漏えいを防げないため採用しない。
+PII または秘密情報の混入を検知した場合は、[可観測性データ混入対応](observability-data-contamination.md)に従う。
 
 ## 保持とアクセス
 
 通常のアプリケーションログは本番保存先で 30 日後に自動削除する。
 閲覧権限は運用担当者と障害対応者に限定し、閲覧操作を監査する。
 セキュリティ監査ログが必要になった場合は、通常ログと別のデータセット、権限、保持期間を定める。
+ローカル LGTM は開発用の一時データに限定し、本番データを投入しない。
 
-ローカル LGTM の named volume には本番データを入れない。
-ローカルデータが不要になった場合は、他サービスのデータも削除されることを確認したうえで、既存の `task compose-reset CONFIRM_RESET=yes` を使う。
+## 本番の受け入れ条件
 
-本番の収集基盤をリリースする前に、次を実環境で確認する。
+本番の収集基盤は、次の条件を実環境で確認できるまでリリースしない。
 
 1. 30 日の retention が保存先で強制される。
 2. 対象期間または対象 stream を緊急削除できる。
@@ -76,9 +77,3 @@ OpenTelemetry appender が SLF4J key-value から転送する名前も `exceptio
 4. trace ID からログを、ログから trace を検索できる。
 5. token、Cookie、メールアドレスを含む検査用 event が保存前に拒否または除去される。
 6. `exception.type` と `exception.stacktrace` が OTLP 属性として検索できる。
-
-## 混入時の対応
-
-PII または秘密情報を検知した場合は、該当ログの生成を止め、保存先の対象データを削除する。
-秘密情報なら同時にローテーションし、アクセス履歴を確認する。
-対象期間、データ種別、削除結果、再発防止をインシデント記録へ残す。

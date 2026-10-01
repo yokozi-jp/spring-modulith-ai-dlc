@@ -51,7 +51,7 @@ frontend/src/
 
 `main.tsx` はcomposition rootであり、TanStack Queryの `QueryClient` とTanStack Routerを生成してProviderを接続する。
 
-`routeTree.gen.ts` はTanStack Router pluginの生成物なので、手で編集しない。
+`routeTree.gen.ts` はTanStack Router pluginの生成物なので、生成元のroute fileを変更して再生成し、生成物を手で編集しない。
 
 現在は業務画面と業務APIがないため、`features`、`api`、global storeは存在しない。
 
@@ -170,6 +170,7 @@ feature間の内部importと循環依存を作らない。
 
 - [フロントエンドのルーティングと状態管理](routing-and-state.md)
 - [OrvalとAPI境界](api-client-orval.md)
-- [フロントエンドのUI、スタイル、国際化](ui-and-i18n.md)
+- [フロントエンドのUIとスタイル](ui-and-style.md)
+- [フロントエンドの国際化](i18n.md)
 - [フロントエンドのテストと検証](testing.md)
 - [ADR-032: Frontendを業務機能単位で構成する](../adr/ADR-032-organize-frontend-by-business-feature.md)

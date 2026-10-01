@@ -1,15 +1,16 @@
 ---
-type: Architecture
-title: 'DBマイグレーションの実行モデルとスキーマタグ'
-description: Liquibase をアプリケーション起動から分離して実行する仕組み、宣言的なスキーマタグ、CIでのrollback検証を説明する。changesetやスキーマタグを追加するとき、マイグレーションの実行経路を変えるときに読む。
-tags: [architecture, database, liquibase]
+type: Convention
+title: DBマイグレーション規約
+description: Liquibase changesetとスキーマタグの追加規約、マイグレーションの実行経路、CIでのrollback検証を定め、changesetやスキーマタグを追加する、または実行経路や検査方法を変更するときに読む。
+tags: [convention, database, liquibase, migration]
 ---
 
-# DBマイグレーションの実行モデルとスキーマタグ
+# DBマイグレーション規約
 
 アプリケーションは起動時にLiquibaseを実行せず、スキーマ変更はデプロイ前にGradleタスクで明示的に適用します。
 スキーマタグはchangelogに`tagDatabase` changesetとして書き、現在のタグを`backend/gradle.properties`の`databaseSchemaTag`に記録します。
 CIは使い捨てDBで適用、rollback、再適用を検証します。
+この実行モデルと検証を採用した理由は[ADR-005](../adr/ADR-005-decouple-liquibase-from-app-startup.md)を参照してください。
 
 ## 実行モデル
 
@@ -30,41 +31,17 @@ changelogはGitでコードと一緒に版管理されるので、タグもコ�
 稼働DBの状態に手を入れて付けるのではなく、ファイルに書いて管理する方式なので、これを宣言的と呼びます（対義語は、コマンドを打って付ける命令的な方式です）。
 
 現在のスキーマタグは`backend/gradle.properties`の`databaseSchemaTag`に記録し、`migrateDatabase`が同じタグを`updateToTag`へ自動的に渡します。
-実行時に`DB_TAG`を入力する必要はありません。
-
-現在のタグは`schema-v1`です。
-
-```yaml
-databaseChangeLog:
-  - changeSet:
-      id: 002-tag-schema-v1
-      author: spring-modulith-ai-dlc
-      changes:
-        - tagDatabase:
-            tag: schema-v1
-```
 
 次のスキーマ版を追加するときは、スキーマ変更と独立したタグchangesetを連番順に追加します。
 `tagDatabase`は他のChange Typeと同じchangesetへ入れません。
-
-```text
-003-add-example-column.yaml
-004-tag-schema-v2.yaml
-```
-
-タグchangesetの追加と同じ変更で、`backend/gradle.properties`を次のように更新します。
+タグchangesetの追加と同じ変更で、`backend/gradle.properties`の`databaseSchemaTag`を更新します。
 `validateCurrentSchemaTag`は、このタグが連番changelogの末尾に一度だけ宣言されていることをDB接続前に検証します。
-
-```properties
-databaseSchemaTag=schema-v2
-```
 
 DBスキーマタグはDB変更の復旧点であり、アプリケーションのリリース番号ではありません。
 DB変更のないアプリケーションリリースでは、新しいDBスキーマタグを作りません。
 アプリケーションリリースはGitタグまたはコンテナイメージdigestで識別し、デプロイ履歴へ使用したDBスキーマタグを記録します。
 
 命令的なGradleの`tag`タスクは誤操作を防ぐため失敗します。
-過去の`migrateAndTagDatabase`、`tagDatabase`集約タスク、`DB_TAG`入力は廃止しました。
 
 ## CIでの検証
 

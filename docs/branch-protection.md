@@ -90,16 +90,6 @@ path filter によって workflow 自体が作られない Pull Request では�
 
 そのまま全 Pull Request の required status checks に登録すると、対象外の変更が待機状態のまま merge できなくなるため、常時必須の一覧には加えない。
 
-## 条件付きチェックを必須化する順序
-
-Pull Request #67 を `main` へマージし、backend と Docker の workflow がすべての Pull Request で check run を報告できる状態にする。
-
-その後、変更検知二件、backend CI 二件、Docker CI 三件を ruleset へ追加する。
-
-先に ruleset を更新すると、パスフィルタが残る古い `main` を基準にした Pull Request で check run が生成されず、必須チェックが "Expected" のまま残る可能性がある。
-
-Frontend CIはPull Request #70で `Detect frontend changes` と `Verify frontend` の成功を確認してから、両方をrulesetへ追加する。
-
 ## その他の推奨設定
 
 GitHub の General、Pull Requests で次を設定する。

@@ -112,6 +112,8 @@ PII または秘密情報の混入を検知した場合は、該当ログの生�
 
 ## References
 
+- [可観測性データの規約](../observability-conventions.md)
+- [可観測性データ混入対応](../observability-data-contamination.md)
 - [Spring Boot: Structured Logging](https://docs.spring.io/spring-boot/reference/features/logging.html#features.logging.structured)
 - [Spring Boot: Logging Correlation IDs](https://docs.spring.io/spring-boot/reference/actuator/tracing.html#actuator.micrometer-tracing.tracer-implementations.logging-correlation-ids)
 - [OpenTelemetry: Exceptions in Logs](https://opentelemetry.io/docs/specs/semconv/exceptions/exceptions-logs/)

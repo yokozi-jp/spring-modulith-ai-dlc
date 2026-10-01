@@ -16,5 +16,6 @@ okf_version: '0.2'
 - [Architecture Decision Records](adr/index.md)：設計上の判断をする前に既存の決定を確かめるとき、ADR を起こすとき
 - [開発環境構築](local-env-setup/setup.md)：WSL、Java、Kiro、iwe などの開発環境を用意するとき
 - [main ブランチの保護設定](branch-protection.md)：ブランチ保護、必須チェック、CODEOWNERS を設定、変更するとき
-- [可観測性の運用](observability-operations.md)：ログとトレースの相関、例外の診断情報、PII の扱いを確認するとき
+- [可観測性データの規約](observability-conventions.md)：ログの記録と相関、PII と秘密情報の禁止、保持、アクセス、本番の受け入れ条件を確認するとき
+- [可観測性データ混入対応](observability-data-contamination.md)：可観測性データから PII または秘密情報を検知し、生成停止、削除、確認、記録を行うとき
 - [リリース管理](release-management.md)：release-please による版の決まり方、リリース手順、障害時の確認を扱うとき

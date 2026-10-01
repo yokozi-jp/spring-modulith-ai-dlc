@@ -22,7 +22,8 @@ description: frontend/ 配下の React と TypeScript のコード、route、API
 - ディレクトリ構成、業務機能の境界、依存方向、共有コードを決める：`docs/frontend/architecture.md`
 - route、loader、状態の置き場所、custom Hook を扱う：`docs/frontend/routing-and-state.md`
 - 業務 API の追加、Orval の設定、OpenAPI の tag と operationId を扱う：`docs/frontend/api-client-orval.md`
-- component、style、表示文言、日時の表示を扱う：`docs/frontend/ui-and-i18n.md`
+- component、style、アクセシビリティを扱う：`docs/frontend/ui-and-style.md`
+- 表示文言、locale、数値表示を扱う：`docs/frontend/i18n.md`
 - テストを書く、生成物を更新する、検証コマンドを選ぶ：`docs/frontend/testing.md`
 - 新しい画面や業務機能を追加する：`docs/frontend/runbook-add-feature.md`
 - 絶対時刻の解析と表示：`docs/datetime/index.md`

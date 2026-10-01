@@ -1,106 +1,57 @@
 ---
 type: Reference
-title: 'DB操作コマンドの早見表'
-description: DBを操作するTaskfileとGradleのタスクごとに、DBへの影響範囲と使うタイミングを示す。どのコマンドを叩くか迷ったとき、ローカルでスキーマを適用しjOOQを再生成するときに読む。
+title: DB操作コマンドのリファレンス
+description: DBを操作するTaskとGradleタスクの動作、影響範囲、必要な確認値を示し、実行するDBコマンドを選ぶときに読むリファレンス。
 tags: [reference, database, liquibase, jooq, taskfile, gradle]
 ---
 
-# DB操作コマンドの早見表
+# DB操作コマンドのリファレンス
 
-`-check`と`-preview`は安全で、`be-migrate`系は前進適用だけを行います。
-`be-verify-migrations`と`task test`は使い捨てDB専用です。
-破壊的なのは`be-rollback`だけで、`CONFIRM_ROLLBACK=yes`がなければDBへ接続しません。
+`-check`と`-preview`はDBを変更せず、`be-migrate`系は前進適用する。
+`be-verify-migrations`、`task test`、`task test-dev`は使い捨てDBだけを使う。
+`be-rollback`は`CONFIRM_ROLLBACK=yes`がなければDBへ接続しない。
 
-## コマンドの影響範囲（クイックリファレンス）
+## Task
 
-どのコマンドを、どういうときに叩けばよいか迷ったときの早見表です。
-判断の軸は「そのコマンドがDBに何をするか（影響範囲）」です。
+- **`task be-schema-tag-check`**：現在のスキーマタグがDBにあるか照会する。
+  DBの読み取りだけを行う。
+- **`task be-rollback-check DB_ROLLBACK_TAG=<tag>`**：切り戻し対象タグの存在を確認する。
+  DBの読み取りだけを行う。
+- **`task be-rollback-preview DB_ROLLBACK_TAG=<tag>`**：切り戻しSQLを`build/reports/liquibase/rollback-preview.sql`へ生成する。
+  DBを変更せず、ファイルを生成する。
+- **`task be-generate-jooq`**：現在のDBスキーマからjOOQコードを生成する。
+  DBを読み取り、生成ソースを更新する。
+- **`task be-migrate`**：現在のスキーマタグまでchangesetを前進適用し、タグを確認する。
+  対象DBへchangesetを適用する。
+- **`task be-migrate-dev`**：作りかけを含む全changesetを前進適用する。
+  開発DBへchangesetを適用する。
+- **`task be-refresh-jooq`**：現在のスキーマタグまで前進適用してjOOQコードを生成する。
+  対象DBへchangesetを適用し、生成ソースを更新する。
+- **`task be-verify-migrations`**：changesetの適用、rollback、再適用、現在タグを検証する。
+  使い捨てDBだけを変更する。
+- **`task test`**：隔離スタックで確定済みマイグレーションを検証してからバックエンドテストを実行する。
+  使い捨てDBだけを変更し、終了時に削除する。
+- **`task test-dev`**：隔離スタックで作りかけを含むchangesetを適用してバックエンドテストを実行する。
+  使い捨てDBだけを変更し、終了時に削除する。
+- **`task be-release-migrate`**：リポジトリの現在タグまで本番向けに前進適用する。
+  `MIGRATION_DB_*`が示すDBへchangesetを適用する。
+- **`task be-rollback DB_ROLLBACK_TAG=<tag> CONFIRM_ROLLBACK=yes`**：指定タグより後のchangesetを切り戻す。
+  対象DBのスキーマまたはデータを失う可能性がある。
 
-`-check`と`-preview`は必ず安全です。
-`be-migrate`系は前へ進めるだけで、既存の状態を戻しません。
-`be-verify-migrations`と`task test`は使い捨てDB専用で、開発DBや本番DBには触れません。
-破壊的なのは`be-rollback`だけで、それも`CONFIRM_ROLLBACK=yes`がなければDBへ接続せず失敗します。
-
-| コマンド                                                      | 何をするか                                                          | 影響範囲                         | 使うタイミング                          |
-| ------------------------------------------------------------- | ------------------------------------------------------------------- | -------------------------------- | --------------------------------------- |
-| `task be-schema-tag-check`                                    | 現在のスキーマタグがDBにあるか照会                                  | 読み取りのみ、安全               | 対象DBの状態を確認したいとき            |
-| `task be-rollback-check DB_ROLLBACK_TAG=<tag>`                | 切り戻し対象タグの存在を確認                                        | 読み取りのみ、安全               | 切り戻し前の下調べ                      |
-| `task be-rollback-preview DB_ROLLBACK_TAG=<tag>`              | 切り戻しSQLを生成（`build/reports/liquibase/rollback-preview.sql`） | DB変更なし、安全                 | 切り戻しの内容を実行前に確認            |
-| `task be-generate-jooq`                                       | 現在のDBスキーマからjOOQコードを生成                                | DB変更なし（生成ソースを更新）   | スキーマは変えずにコードだけ再生成      |
-| `task be-migrate`                                             | 現在のスキーマタグまで前進適用し、タグを確認                        | 追記のみ（前進）                 | 初回起動前、changeset追加後（ローカル） |
-| `task be-refresh-jooq`                                        | 前進適用してからjOOQコードを生成                                    | 追記のみ（前進）                 | changeset追加後にまとめて実行           |
-| `task be-verify-migrations`                                   | 使い捨てDBで適用、rollback、再適用、タグ確認                        | 隔離DB専用、安全                 | changeset追加後の検証、CI               |
-| `task test`                                                   | 隔離スタックで上記検証を通してからテスト                            | 隔離DB専用、安全                 | 変更のローカル総合確認                  |
-| `task be-release-migrate`                                     | 本番の前進適用（`MIGRATION_DB_*`必須）                              | 追記のみ（前進、本番）           | デプロイパイプラインから                |
-| `task be-rollback DB_ROLLBACK_TAG=<tag> CONFIRM_ROLLBACK=yes` | 指定タグより後のchangesetを切り戻す                                 | **破壊的（データ損失の可能性）** | preview、バックアップ、影響確認の後だけ |
-
-「安全」は、対象DBのスキーマとデータを変えないことを指します（`be-generate-jooq`はリポジトリの生成ソースを書き換えます）。
-「前進」は、未適用のchangesetを新しく適用するだけで、適用済みの変更は戻さないことを指します。
-
-各Taskfileのタスクの本体は、`backend`ディレクトリのGradleタスクを呼び出します。
-`task help`で各タスクの一行説明を一覧表示できます。
-本番の前進適用と切り戻しの手順は[DBのデプロイと切り戻し](runbook-deploy-and-rollback.md)にあります。
-
-## ローカル開発
-
-PostgreSQLを起動し、ルートの`.env`に接続情報を設定してから現在のスキーマタグまで適用します。
-
-```bash
-task compose-up
-task be-migrate
-```
-
-`be-migrate`は`updateToTag`と`assertSchemaTagExists`を順序実行します。
-changelogに現在タグより後のchangesetが存在しても、自動的には適用しません。
-
-changesetを追加した後は、使い捨てDBでrollback可能性を検証します。
-
-```bash
-task test
-```
-
-`task test`は隔離したPostgreSQLを起動し、全changesetの適用、rollback、再適用、現在タグの存在確認を実行してからバックエンドテストを開始します。
-終了後はテスト用ボリュームを削除します。
-
-マイグレーションを適用して最新スキーマのjOOQソースを生成する場合は、次のコマンドを使います。
-
-```bash
-task be-refresh-jooq
-```
-
-現在のDBを変更せず、コード生成だけを再実行する場合は次のコマンドを使います。
-
-```bash
-task be-generate-jooq
-```
-
-生成先は`backend/src/generated/jooq`です。
-生成コードはchangesetと同じ変更に含め、リリースビルドが稼働DBへ接続しなくても再現できる状態を保ちます。
+場面ごとのローカル実行順は[開発ワークフロー](../dev-workflow.md)を参照する。
+本番の前進適用と切り戻し手順は[DBのデプロイと切り戻し](runbook-deploy-and-rollback.md)を参照する。
+生成コードの扱いは[jOOQコード生成物の管理](jooq-codegen.md)を参照する。
 
 ## Gradleタスク
 
-`backend`ディレクトリでは次のタスクを直接実行できます。
+`backend`ディレクトリでは次のタスクを直接実行できる。
 
-```bash
-./gradlew migrateDatabase
-./gradlew checkCurrentSchemaTag
-./gradlew verifyDatabaseMigrations
-./gradlew jooqCodegen
-./gradlew migrateAndGenerateJooq
-```
+- **`./gradlew migrateDatabase`**：`databaseSchemaTag`までchangesetを前進適用し、タグを確認する。
+- **`./gradlew update`**：作りかけを含む全changesetを前進適用する。
+- **`./gradlew checkCurrentSchemaTag`**：現在のスキーマタグが対象DBにあるか確認する。
+- **`./gradlew verifyDatabaseMigrations`**：使い捨てDBで全changesetの適用、rollback、再適用、現在タグを検証する。
+- **`./gradlew jooqCodegen`**：現在のDBスキーマを読み取り、コード生成だけを実行する。
+- **`./gradlew migrateAndGenerateJooq`**：現在のスキーマタグまで前進適用してからjOOQコードを生成する。
 
-- `migrateDatabase`：`databaseSchemaTag`まで`updateToTag`を実行し、そのタグの存在を確認します。
-- `checkCurrentSchemaTag`：現在のスキーマタグが対象DBに存在することを確認します。
-- `verifyDatabaseMigrations`：使い捨てDBで全changesetの適用、rollback、再適用、現在タグの存在確認を実行します。
-- `jooqCodegen`：現在のDBスキーマを読み取り、コード生成だけを実行します。
-- `migrateAndGenerateJooq`：現在のスキーマタグまで適用してから`jooqCodegen`を実行します。
-
-`verifyDatabaseMigrations`は適用済みchangesetを実際に戻すため、使い捨てDB専用です。
-開発DBと本番DBでは実行しません。
-
-Liquibaseプラグインの`update`はchangelog内の未適用changesetをすべて適用します。
-現在タグより後の開発中changesetも対象になるため、本番のマイグレーション入口には使用しません。
-
-## 参照資料
-
-- Liquibase Gradle Plugin Usage: <https://github.com/liquibase/liquibase-gradle-plugin/blob/main/doc/usage.md>
+`verifyDatabaseMigrations`は使い捨てDBだけで実行する。
+Liquibaseプラグインの`update`は現在タグより後のchangesetも適用するため、本番マイグレーションの入口に使わない。

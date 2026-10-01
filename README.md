@@ -3,28 +3,6 @@
 
 # spring-modulith-ai-dlc
 
-## 使用技術一覧
-
-<p style="display: inline">
-  <!-- バックエンド -->
-  <img alt="Java 25" src="https://img.shields.io/badge/-Java%2025-007396.svg?logo=openjdk&style=for-the-badge">
-  <img alt="Spring Boot 4.1" src="https://img.shields.io/badge/-Spring%20Boot%204.1-6DB33F.svg?logo=spring-boot&style=for-the-badge">
-  <img alt="Spring Modulith" src="https://img.shields.io/badge/-Spring%20Modulith-6DB33F.svg?logo=spring&style=for-the-badge">
-  <!-- フロントエンド -->
-  <img alt="TypeScript" src="https://img.shields.io/badge/-TypeScript-3178C6.svg?logo=typescript&style=for-the-badge&logoColor=white">
-  <img alt="VitePlus" src="https://img.shields.io/badge/-VitePlus-646CFF.svg?logo=vite&style=for-the-badge&logoColor=white">
-  <img alt="pnpm" src="https://img.shields.io/badge/-pnpm-F69220.svg?logo=pnpm&style=for-the-badge&logoColor=white">
-  <!-- ミドルウェア -->
-  <img alt="PostgreSQL" src="https://img.shields.io/badge/-PostgreSQL-4169E1.svg?logo=postgresql&style=for-the-badge&logoColor=white">
-  <img alt="Redis" src="https://img.shields.io/badge/-Redis-DC382D.svg?logo=redis&style=for-the-badge&logoColor=white">
-  <img alt="Keycloak" src="https://img.shields.io/badge/-Keycloak-4D4D4D.svg?logo=keycloak&style=for-the-badge&logoColor=white">
-  <img alt="Grafana OpenTelemetry LGTM" src="https://img.shields.io/badge/-Grafana%20OTel%20LGTM-F46800.svg?logo=grafana&style=for-the-badge&logoColor=white">
-  <!-- インフラ -->
-  <img alt="Docker" src="https://img.shields.io/badge/-Docker-1488C6.svg?logo=docker&style=for-the-badge">
-  <img alt="Amazon AWS" src="https://img.shields.io/badge/-Amazon%20AWS-232F3E.svg?logo=amazon-aws&style=for-the-badge">
-  <img alt="GitHub Actions" src="https://img.shields.io/badge/-GitHub%20Actions-2088FF.svg?logo=github-actions&style=for-the-badge&logoColor=white">
-</p>
-
 ## 目次
 
 1. [プロジェクトについて](#プロジェクトについて)
@@ -45,7 +23,7 @@
 
 - **認証と認可**：Keycloak を認可サーバとした OIDC（OAuth2 Client）と、Redis による分散セッション
 - **データアクセス**：Liquibase によるDBマイグレーションと、スキーマから生成する jOOQ コード
-- **可観測性**：OpenTelemetry による計装と、Grafana OpenTelemetry LGTM への集約（ログ相関、PII、保持は[可観測性の運用](docs/observability-operations.md)を参照）
+- **可観測性**：OpenTelemetry による計装と、Grafana OpenTelemetry LGTM への集約（ログ相関、PII、保持は[可観測性データの規約](docs/observability-conventions.md)を参照）
 - **品質ゲート**：静的解析、シークレットと脆弱性のスキャン、使い捨てDBでのテストを Git フックと CI で強制
 
 業務ドメインのモジュールはこれから追加していきます。

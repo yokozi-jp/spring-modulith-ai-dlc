@@ -1,72 +1,95 @@
 ---
 type: Reference
 title: バックエンドのアーキテクチャテスト
-description: パッケージ構成、依存方向、配置規則、Java 実装規約を検証する ArchUnit、Spring Modulith、PMD の検査内容を示す。アーキテクチャテストや PMD が失敗したとき、検査規則を追加や変更するときに読む。
+description: Spring Modulith、ArchUnit、PMD、Error Proneでバックエンド規約を検査する実装と解析対象を示し、規約違反の検出方法または解析対象を確認するときに読むリファレンス。
 tags: [reference, backend, testing, archunit, spring-modulith]
 ---
 
 # バックエンドのアーキテクチャテスト
 
-モジュール間の依存は Spring Modulith の `ApplicationModules.verify()` で、機能モジュール内部の依存と配置は ArchUnit で検証する。
-バイトコードに残らない Lombok の注釈と Logger の書き方は PMD で検証する。
-実行コマンドは [機能追加時の確認](runbook-add-feature.md) に示す。
+Spring ModulithとArchUnitはモジュール境界、依存方向、配置、禁止API、テスト規約を検査する。
+PMDとError Proneはソースまたはコンパイル時に判定する規約を検査する。
 
-## テストクラス
+## 検査クラス
 
-パッケージ構成と依存方向は、次のテストで自動検証する。
-
-``` text
+```text
 backend/src/test/java/com/example/demo/architecture/
 ├── ApplicationModuleArchitectureTest.java
+├── DateTimeConventionsArchTest.java
 ├── GeneralCodingRulesArchTest.java
-└── PackageByFeatureOnionArchitectureTest.java
+├── PackageByFeatureOnionArchitectureTest.java
+├── ProxyRulesArchTest.java
+└── TestConventionsArchTest.java
 ```
 
-`ApplicationModuleArchitectureTest` は Spring Modulith の `ApplicationModules.verify()` を使い、モジュール間の循環、内部パッケージ参照、明示した許可依存への違反を検出する。
+## モジュールとパッケージ
 
-`GeneralCodingRulesArchTest` は標準ストリーム、`java.util.logging`、ロギング実装 API、`@Autowired` によるメソッドインジェクションなど、プロダクションコード全体の規則を検証する。
+`ApplicationModuleArchitectureTest`はSpring Modulithの`ApplicationModules.verify()`を使い、モジュール間の循環、内部パッケージ参照、許可されていない依存を検出する。
+モジュール構造の決定は[ADR-001](../adr/ADR-001-adopt-spring-modulith-modular-monolith.md)を参照する。
 
-`PackageByFeatureOnionArchitectureTest` は ArchUnit の `Architectures.onionArchitecture()` を使い、機能モジュール内部の依存を検証する。
+`PackageByFeatureOnionArchitectureTest`はArchUnitの`Architectures.onionArchitecture()`と追加規則で、次の内容を検査する。
 
-## オニオン規則
+- Domain Modelは`com.example.demo.*.domain.model..`に置く。
+- Domain Serviceは`com.example.demo.*.domain.service..`に置く。
+- Application Serviceは`com.example.demo.*`または`com.example.demo.*.application..`に置く。
+- Presentation Adapterは`com.example.demo.*.presentation..`に置く。
+- Persistence Adapterは`com.example.demo.*.infrastructure.persistence..`に置く。
+- Messaging Adapterは`com.example.demo.*.infrastructure.messaging..`に置く。
+- 外部Client Adapterは`com.example.demo.*.infrastructure.client..`に置く。
+- jOOQ APIと生成型は`infrastructure.persistence`だけで使う。
+- 機能ルートの公開契約は内部パッケージの型へ依存しない。
+- DomainはSpring、jOOQ、JPA、Jacksonに依存しない。
+- `@Controller`と`@RestController`を付けた型は`presentation`に置く。
+- `@Service`を付けた型は`application`に置く。
+- `@Repository`を付けた型は`infrastructure.persistence`に置く。
+- クラス単位の`@Transactional`を禁止する。
+- `@Transactional`メソッドは`application`のpublicメソッドに限定する。
 
-オニオン規則は次のパッケージを識別する。
+ベースパッケージ直下の起動クラスと全体設定は、オニオン規則の所属検査から除外する。
+パッケージ構造の決定は[ADR-002](../adr/ADR-002-package-by-feature-onion-architecture.md)を参照する。
 
-- **Domain Model**：`com.example.demo.*.domain.model..`
-- **Domain Service**：`com.example.demo.*.domain.service..`
-- **Application Service**：`com.example.demo.*` と `com.example.demo.*.application..`
-- **Presentation Adapter**：`com.example.demo.*.presentation..`
-- **Persistence Adapter**：`com.example.demo.*.infrastructure.persistence..`
-- **Messaging Adapter**：`com.example.demo.*.infrastructure.messaging..`
-- **外部 Client Adapter**：`com.example.demo.*.infrastructure.client..`
+## 共通実装とプロキシ
 
-空の層は許可するが、機能モジュールに追加したクラスが定義済みの層または Adapter のどれにも属さない場合は失敗させる。
+`GeneralCodingRulesArchTest`は、標準ストリーム、`java.util.logging`、ロギング実装API、`@Autowired`によるメソッドインジェクションなどの禁止規則を検査する。
 
-ベースパッケージ直下の起動クラスと全体設定だけは、オニオン規則の所属検査から除外する。
+`ProxyRulesArchTest`は、次のアノテーションを付けたメソッドへの同一クラス内の直接呼び出しを検査する。
 
-## 配置規則
+- Springの`@Transactional`、`@Async`、`@Cacheable`、`@CachePut`、`@CacheEvict`。
+- Spring Securityの`@PreAuthorize`、`@PostAuthorize`、`@PreFilter`、`@PostFilter`、`@Secured`。
+- Resilience4jの`@CircuitBreaker`、`@Retry`、`@RateLimiter`、`@Bulkhead`、`@TimeLimiter`。
 
-同じテストは、オニオン規則だけでは表せない次の配置規則も検証する。
+## 日時
 
-- jOOQ API と生成型は `infrastructure.persistence` だけで利用する。
-- 機能ルートの公開契約は `domain`、`application`、`presentation`、`infrastructure` の内部型へ依存しない。
-- Domain は Spring、jOOQ、JPA、Jackson に依存しない。
-- `@Controller` と `@RestController` を付けた型は `presentation` に置く。
-- `@Service` を付けた型は `application` に置く。
-- `@Repository` を付けた型は `infrastructure.persistence` に置く。
-- クラス単位の `@Transactional` は使用しない。
-- `@Transactional` を付けるメソッドは `application` の public メソッドに限定する。
+`DateTimeConventionsArchTest`は、レガシー日時型、引数なしの`now()`、`System.currentTimeMillis()`、`ZoneId.systemDefault()`、許可点以外でのシステム`Clock`生成を検査する。
+システム`Clock`の生成は`DemoApplication.clock()`だけを許可する。
+日時規約の決定は[ADR-006](../adr/ADR-006-utc-instant-absolute-time-policy.md)を参照する。
 
-## PMD とその他の規則
+Error ProneはすべてのJavaコンパイルで`JavaTimeDefaultTimeZone`と`JavaUtilDate`をerrorとして検査する。
 
-Lombok の `@Data` と `@Setter` はコンパイル後のバイトコードに残らないため、ArchUnit ではなくソースを解析する PMD で禁止する。
+## テストコード
 
-同じ PMD 規則で、手書きの Logger フィールド、`LoggerFactory` の直接参照、`getLogger` の static import を禁止し、`@Slf4j` の使用へ統一する。
+`TestConventionsArchTest`は[TestCodeOnly](../../backend/src/test/java/com/example/demo/architecture/TestCodeOnly.java)で手書きのテストコードを選び、次の内容を検査する。
 
-`@Autowired` を付けた通常メソッドは禁止し、依存注入にはコンストラクタを使う。
+- `@Test`メソッドに`@DisplayName`がある。
+- `@Test`メソッドとテストクラスがpublicではない。
+- `@Test`を持つクラス名が`Test`で終わる。
+- `@SpringBootTest`を直接付けたクラスが`SharedTestConfiguration`を`@Import`する。
+- `assertTimeoutPreemptively`を呼ばない。
+- テストコードでレガシー日時型を使わない。
+- クラスまたはメソッドの`@Disabled`に理由がある。
 
-## 解析対象
+コメントとJavadocはバイトコードに残らないため、ArchUnitの検査対象ではない。
+テストコードの現行規約は[バックエンドのテストコードの書き方](testing-code-style.md)を参照する。
 
-ArchUnit は `ProductionCodeOnly` を通して手書きのプロダクションコードだけを解析し、テストコードと生成コードを解析対象から除外する。
+## PMD
 
-生成コード自体を除外しても、手書きコードから jOOQ API や生成型への依存は検査する。
+PMDはmainとtestに別のrulesetを適用し、Lombokの`@Data`と`@Setter`、手書きのLoggerフィールド、`LoggerFactory`の直接参照、`getLogger`のstatic import、`@Autowired`を付けた通常メソッドなどを検査する。
+PMDの設定は[`ruleset.xml`](../../backend/config/pmd/ruleset.xml)と[`test-ruleset.xml`](../../backend/config/pmd/test-ruleset.xml)を正とする。
+
+## 解析対象と実行
+
+プロダクションコード向けArchUnit検査は[ProductionCodeOnly](../../backend/src/test/java/com/example/demo/architecture/ProductionCodeOnly.java)で手書きコードだけを選び、生成コードとテストコードを除外する。
+生成コードを除外しても、手書きコードからjOOQ APIや生成型への依存は検査する。
+
+静的解析は`task be-lint`で、ArchUnitとSpring Modulithの検査は`task test`で実行する。
+機能追加後の実行順は[バックエンドの機能追加時の確認](runbook-add-feature.md)を参照する。
