@@ -147,7 +147,7 @@ tasks:
         changed="$({ git diff --name-only "$base"...HEAD; git diff --name-only; git diff --cached --name-only; } | sort -u)"
         if ! printf '%s\n' "$changed" | grep -qx 'Taskfile.yml'; then exit 0; fi
         missing=""
-        for doc in README.md docs/dev-workflow.md docs/lint-and-test.md; do
+        for doc in README.md docs/tooling/dev-workflow.md docs/tooling/lint-and-test.md; do
           if ! printf '%s\n' "$changed" | grep -qx "$doc"; then missing="${missing}    - ${doc}\n"; fi
         done
         if [ -z "$missing" ]; then exit 0; fi

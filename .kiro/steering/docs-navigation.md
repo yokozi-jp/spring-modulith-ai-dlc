@@ -17,19 +17,29 @@ steering は入口の案内だけを持ち、規約の本文を持たない（[A
 
 ## 領域ごとの入口
 
-| 領域                                             | 入口                       |
-| ------------------------------------------------ | -------------------------- |
-| バックエンド（アーキテクチャ、テスト）           | `docs/backend/index.md`    |
-| フロントエンド                                   | `docs/frontend/index.md`   |
-| データベース（マイグレーション、jOOQ、接続）     | `docs/database/index.md`   |
-| 日時とタイムゾーン                               | `docs/datetime/index.md`   |
-| コンテナ（Dockerfile、Compose）                  | `docs/container/index.md`  |
-| 開発ツール（Taskfile、フック、CI、Lint）         | `docs/tooling/index.md`    |
-| 文章（日本語の技術文書）                         | `docs/writing/index.md`    |
-| ナレッジ管理（docs と steering の役割分担）      | `docs/knowledge/index.md`  |
-| エージェント設定                                 | `docs/agents/index.md`     |
-| 設計判断（ADR）                                  | `docs/adr/index.md`        |
-| 上記以外、どこか分からないとき                   | `docs/index.md`            |
+| 領域                                                          | 入口                             |
+| ------------------------------------------------------------- | -------------------------------- |
+| バックエンド（アーキテクチャ、テスト）                        | `docs/backend/index.md`          |
+| フロントエンド                                                | `docs/frontend/index.md`         |
+| データベース（マイグレーション、jOOQ、接続、PostgreSQL 設計） | `docs/database/index.md`         |
+| Web API（HTTP API の設計と契約）                              | `docs/web-api/index.md`          |
+| システム連携と非同期処理                                      | `docs/integration/index.md`      |
+| 可観測性とログ                                                | `docs/observability/index.md`    |
+| 日時とタイムゾーン                                            | `docs/datetime/index.md`         |
+| コンテナ（Dockerfile、Compose）                               | `docs/container/index.md`        |
+| AWS                                                           | `docs/aws/index.md`              |
+| 開発ツール（Taskfile、フック、CI、Lint）                      | `docs/tooling/index.md`          |
+| リポジトリ運用（ブランチ保護、リリース）                      | `docs/repository/index.md`       |
+| 文章（日本語の技術文書、メッセージ、設計書）                  | `docs/writing/index.md`          |
+| アーキテクチャ原則                                            | `docs/principles/index.md`       |
+| 非機能要件                                                    | `docs/nfr/index.md`              |
+| 性能テスト                                                    | `docs/performance-test/index.md` |
+| 帳票                                                          | `docs/report/index.md`           |
+| コードレビュー、Pull Request                                  | `docs/code-review/index.md`      |
+| ナレッジ管理（docs と steering の役割分担）                   | `docs/knowledge/index.md`        |
+| エージェント設定                                              | `docs/agents/index.md`           |
+| 設計判断（ADR）                                               | `docs/adr/index.md`              |
+| 上記以外、どこか分からないとき                                | `docs/index.md`                  |
 
 領域ごとの steering（`backend.md` など）は、ケースごとに読む文書を示す。
 index.md の各行には「いつ読むか」が書いてある。

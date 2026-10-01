@@ -19,5 +19,5 @@ description: Taskfile.yml、lefthook.yml、GitHub Actions のワークフロー�
 ## どの docs を読むか
 
 - Taskfile.yml のタスクを書く、または直すとき：`docs/tooling/taskfile.md`
-- 日常の開発手順とタスクの使い方を確認するとき：`docs/dev-workflow.md`
-- Lint、スキャン、テストと、フックや CI での実行の対応を確認するとき：`docs/lint-and-test.md`
+- 日常の開発手順とタスクの使い方を確認するとき：`docs/tooling/dev-workflow.md`
+- Lint、スキャン、テストと、フックや CI での実行の対応を確認するとき：`docs/tooling/lint-and-test.md`

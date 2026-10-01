@@ -72,7 +72,7 @@ API responseをruntimeで検証する必要がある境界では、OpenAPIから
 
 ## 検査
 
-実行するTaskと検査範囲は[Lintとテストのリファレンス](../lint-and-test.md#フロントエンド)を参照する。
+実行するTaskと検査範囲は[Lintとテストのリファレンス](../tooling/lint-and-test.md#フロントエンド)を参照する。
 
 ## 関連資料
 

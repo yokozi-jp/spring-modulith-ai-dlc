@@ -8,8 +8,8 @@ tags: [runbook, observability, security, incident-response]
 # 可観測性データ混入対応
 
 可観測性データから PII または秘密情報を検知した場合は、生成停止から記録までを順に実施する。
-禁止する値と保存先の要件は[可観測性データの規約](observability-conventions.md)に従う。
-この手順の根拠は [ADR-015](adr/ADR-015-structure-and-protect-observability-data.md) に記録している。
+禁止する値と保存先の要件は[可観測性データの規約](conventions.md)に従う。
+この手順の根拠は [ADR-015](../adr/ADR-015-structure-and-protect-observability-data.md) に記録している。
 
 ## 対応手順
 

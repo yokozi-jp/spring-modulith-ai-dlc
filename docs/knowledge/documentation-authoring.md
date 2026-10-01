@@ -141,4 +141,4 @@ Kiro CLI用の`.kiro/hooks/block-iwe-normalize.json`と判定本体の`.kiro/hoo
 
 変更後は`task okf-check`を実行し、OKF形式、docs内部のリンク切れ、孤立文書、steeringのfrontmatterとdocsへの参照を確認する。
 Markdownの変更では、リポジトリで設定されたMarkdown lintも実行する。
-検査コマンドと検査範囲は[Lint・テストのリファレンス](../lint-and-test.md)を参照する。
+検査コマンドと検査範囲は[Lint・テストのリファレンス](../tooling/lint-and-test.md)を参照する。

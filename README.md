@@ -23,7 +23,7 @@
 
 - **認証と認可**：Keycloak を認可サーバとした OIDC（OAuth2 Client）と、Redis による分散セッション
 - **データアクセス**：Liquibase によるDBマイグレーションと、スキーマから生成する jOOQ コード
-- **可観測性**：OpenTelemetry による計装と、Grafana OpenTelemetry LGTM への集約（ログ相関、PII、保持は[可観測性データの規約](docs/observability-conventions.md)を参照）
+- **可観測性**：OpenTelemetry による計装と、Grafana OpenTelemetry LGTM への集約（ログ相関、PII、保持は[可観測性データの規約](docs/observability/conventions.md)を参照）
 - **品質ゲート**：静的解析、シークレットと脆弱性のスキャン、使い捨てDBでのテストを Git フックと CI で強制
 
 業務ドメインのモジュールはこれから追加していきます。
@@ -158,14 +158,14 @@ cd frontend && vp dev      # SPAを起動し、APIとOIDCを同一オリジン�
 - **`task lint-duplicates`**：フロントエンドとバックエンドの手書きコードの重複検査。
 - **`task verify`**：push 前のバックエンド総合ゲート（静的解析、OpenAPI 契約検査と、使い捨てDBでのマイグレーション検証とテスト、CI と同じ内容）。
 
-Docker Compose の操作（サービスの起動、停止、状態確認、Keycloak の realm 再投入）や、「いつ、どのコマンドを、どの順で使うか」のシナリオ別の手順は [開発ワークフロー](docs/dev-workflow.md) を参照してください。
+Docker Compose の操作（サービスの起動、停止、状態確認、Keycloak の realm 再投入）や、「いつ、どのコマンドを、どの順で使うか」のシナリオ別の手順は [開発ワークフロー](docs/tooling/dev-workflow.md) を参照してください。
 
 <p align="right">(<a href="#top">トップへ</a>)</p>
 
 ## Lint・テスト
 
 静的解析、シークレットと脆弱性のスキャン、テストは、いずれも [`Taskfile.yml`](Taskfile.yml) のタスクとして実行できます（`task <タスク名>`）。
-各タスクの一覧と内容、Git フックと CI での自動実行の対応は [Lint・テストのリファレンス](docs/lint-and-test.md) にまとめています。
+各タスクの一覧と内容、Git フックと CI での自動実行の対応は [Lint・テストのリファレンス](docs/tooling/lint-and-test.md) にまとめています。
 
 ### フロントエンド
 
@@ -234,7 +234,7 @@ push 前には `task adr-check` が pre-push で走り、判断が絡む変更�
 
 変更手順、ブランチ運用、コミット規約は [`CONTRIBUTING.md`](CONTRIBUTING.md) を参照してください。
 
-`main` の保護設定は [`docs/branch-protection.md`](docs/branch-protection.md)、版採番、CHANGELOG、タグの作成手順は [`docs/release-management.md`](docs/release-management.md) に定義しています。
+`main` の保護設定は [`docs/repository/branch-protection.md`](docs/repository/branch-protection.md)、版採番、CHANGELOG、タグの作成手順は [`docs/repository/release-management.md`](docs/repository/release-management.md) に定義しています。
 
 リリース設定と版ファイルの一致は次のコマンドで確認できます。
 

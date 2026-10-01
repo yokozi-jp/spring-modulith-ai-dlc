@@ -101,4 +101,4 @@ CODEOWNERS は backend、frontend、docker と infrastructure、`.kiro` と `aid
 - [GitHub Docs: About code owners](https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-code-owners)
 - [GitHub Docs: Configuring private vulnerability reporting](https://docs.github.com/en/code-security/security-advisories/working-with-repository-security-advisories/configuring-private-vulnerability-reporting-for-a-repository)
 - [CONTRIBUTING.md](../../CONTRIBUTING.md)
-- [ブランチ保護設定](../branch-protection.md)
+- [ブランチ保護設定](../repository/branch-protection.md)

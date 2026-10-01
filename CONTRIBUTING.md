@@ -43,7 +43,7 @@ coverageを確認するときは `task fe-coverage` を実行する。
 
 LefthookはFrontend変更を検出すると、pre-commitで `task fe-check`、pre-pushで `task fe-doctor` と `task fe-test-build` を実行する。
 
-詳しい起動手順は [`README.md`](README.md)、検証内容は [`docs/lint-and-test.md`](docs/lint-and-test.md) を参照する。
+詳しい起動手順は [`README.md`](README.md)、検証内容は [`docs/tooling/lint-and-test.md`](docs/tooling/lint-and-test.md) を参照する。
 
 ## ブランチ運用
 
@@ -62,7 +62,7 @@ chore/<short-description>
 
 Pull Request は squash merge し、そのタイトルを `main` に残る Conventional Commit メッセージとして扱う。
 
-GitHub 側の設定値と必須チェックは [`docs/branch-protection.md`](docs/branch-protection.md) に定義する。
+GitHub 側の設定値と必須チェックは [`docs/repository/branch-protection.md`](docs/repository/branch-protection.md) に定義する。
 
 ## コミット規約
 

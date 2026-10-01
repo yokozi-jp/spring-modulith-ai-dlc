@@ -23,3 +23,4 @@ description: Liquibase の changeset やスキーマタグ、jOOQ 生成コー�
 - jOOQ コードを再生成する、日時型を確認する：`docs/database/jooq-codegen.md`
 - 接続の環境変数や DB ロールを変える：`docs/database/connections.md`
 - 本番マイグレーションや DB 切り戻しを扱う：`docs/database/runbook-deploy-and-rollback.md`
+- テーブル、カラム、型、制約、インデックスを設計する：`docs/database/index.md` の `postgresql-` で始まる文書
