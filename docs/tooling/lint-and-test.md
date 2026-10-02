@@ -60,6 +60,7 @@ PITのHTMLとXMLのレポートは、変異対象がある場合に`backend/buil
 - **`task lint-docker`**：Dockerfileをhadolintで検査する。
 - **`task lint-docker-check`**：Dockerfileを`docker build --check`で検査する。
 - **`task lint-compose`**：Composeファイルの構文、参照、変数展開を検証する。
+- **`task otel-collector-check`**：許可していない属性を含むOTLPのログをCollectorに流し、その属性が除かれ、許可した属性が残ることを確かめる。
 - **`task lint-md`**：`.markdownlint-cli2.yaml`の除外設定に従いMarkdownを検査する。
 - **`task lint-md-fix`**：markdownlint-cli2で安全に修正できるMarkdownの問題を修正する。
 - **`task okf-check`**：OKF適合、内部リンク、孤立文書、文書責務の見直し合図、steering境界、Taskfile文書同期候補を検査する。
@@ -98,6 +99,7 @@ Gitフックの条件とコマンドは[`lefthook.yml`](../../lefthook.yml)を�
 - **`zizmor.yml`**：`lint-actions-security`相当を実行する。
 - **`hadolint.yml`**：`lint-docker`相当、`lint-docker-check`相当、バックエンドイメージのビルドと起動確認を実行する。
 - **`compose-config.yml`**：`lint-compose`相当を実行する。
+- **`otel-collector.yml`**：`otel-collector-check`を実行する。
 - **`markdownlint.yml`**：`lint-md`相当を実行する。
 - **`okf-validate.yml`**：`okf-check`を実行する。
 - **`release-please.yml`**：`release-check`を実行する。

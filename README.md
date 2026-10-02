@@ -23,7 +23,7 @@
 
 - **認証と認可**：Keycloak を認可サーバとした OIDC（OAuth2 Client）と、Redis による分散セッション
 - **データアクセス**：Liquibase によるDBマイグレーションと、スキーマから生成する jOOQ コード
-- **可観測性**：OpenTelemetry による計装と、Grafana OpenTelemetry LGTM への集約（ログ相関、PII、保持は[可観測性データの規約](docs/observability/conventions.md)を参照）
+- **可観測性**：OpenTelemetry による計装と、OpenTelemetry Collector でログの属性を絞ってからの Grafana OpenTelemetry LGTM への集約（ログ相関、PII、保持は[可観測性データの規約](docs/observability/conventions.md)を参照）
 - **品質ゲート**：静的解析、シークレットと脆弱性のスキャン、使い捨てDBでのテストを Git フックと CI で強制
 
 業務ドメインのモジュールはこれから追加していきます。
@@ -43,6 +43,7 @@
 | Redis                      | 7.x        |
 | Keycloak                   | 26.7.3     |
 | Grafana OpenTelemetry LGTM | 0.32.1     |
+| OpenTelemetry Collector    | 0.161.0    |
 | Go (betterleaks 実行用)    | 1.27.x     |
 | Task                       | 3.53.1     |
 
@@ -71,6 +72,7 @@
 ├── docker/           # Docker 関連ファイル
 │   ├── initdb/           # PostgreSQL 初期化スクリプト（スキーマ作成）
 │   ├── keycloak/         # Keycloak realm 定義（起動時インポート）
+│   ├── otel-collector/   # OpenTelemetry Collector の設定（ローカルと本番で共有）と検査データ
 │   ├── compose.yml       # 開発用スタック
 │   └── compose-test.yml  # テスト用の隔離スタック
 ├── docs/             # ドキュメント（iwe / OKF のナレッジグラフ）
@@ -140,7 +142,7 @@ task <タスク名>
 
 ```bash
 cp .env.example .env       # 環境変数を用意し、パスワードを変更する
-task compose-up            # PostgreSQL / Keycloak / Redis / Grafana を起動
+task compose-up            # PostgreSQL / Keycloak / Redis / Collector / Grafana を起動
 task be-migrate            # 初回はマイグレーションを明示実行する
 task dev                   # 依存起動＋バックエンドを起動
 # 別のターミナルで
@@ -189,6 +191,12 @@ Docker Compose の操作（サービスの起動、停止、状態確認、Keycl
 - バックエンド変更時は push 前に `task verify`（静的解析、OpenAPI 契約検査と、使い捨てDBでのマイグレーション検証とテスト、CI と同じ内容）を実行します。
 - 入力範囲が広い契約にはQuickTheoriesによるプロパティベーステストを使い、通常のテストと一緒に実行します。
 - テストの検出力を確認するときは `task mutation-test` でPITを明示実行しますが、実行コストが高いため `task verify` には含めません。
+
+### 可観測性
+
+- `docker/otel-collector/config.yaml` を変更したときは `task otel-collector-check` を実行します。
+  このタスクは許可していない属性を含むOTLPのログをCollectorに流し、その属性が除かれ、許可した属性が残ることを確かめます。
+- CIも同じタスクを、Collectorの設定、Composeファイル、Taskfileの変更時に実行します。
 
 ### ドキュメント
 

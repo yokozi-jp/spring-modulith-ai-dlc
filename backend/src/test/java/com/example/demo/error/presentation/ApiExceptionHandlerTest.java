@@ -1,7 +1,6 @@
 package com.example.demo.error.presentation;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.Locale;
@@ -16,39 +15,37 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.web.context.request.ServletWebRequest;
 
-/** 未処理例外ログが PII を除外し、診断用 stack frame を保持することを検証する。 */
+/** 未処理例外を汎用の 500 応答へ変換し、調査用の例外の詳細をログへ残すことを検証する。 */
 @ExtendWith(OutputCaptureExtension.class)
 class ApiExceptionHandlerTest {
 
   @Test
-  @DisplayName("未処理例外ログはメッセージを除外し stack frame と cause の型を残す")
-  void unexpectedExceptionLogKeepsSanitizedStackTrace(final CapturedOutput output) {
+  @DisplayName("未処理例外は 500 を返し、ログに例外の型、発生行、cause を残す")
+  void unexpectedExceptionIsLoggedWithStackTrace(final CapturedOutput output) {
     final StaticMessageSource messages = new StaticMessageSource();
     messages.addMessage("problem.title.500", Locale.JAPANESE, "サーバー内部エラー");
     final ApiExceptionHandler handler = new ApiExceptionHandler(new ApiProblemDetails(messages));
-    final MockHttpServletRequest request = new MockHttpServletRequest();
-    final String sensitiveMessage = "person@example.com token=secret";
-    final String sensitiveCauseMessage = "account=customer@example.com";
-    final IllegalArgumentException cause = new IllegalArgumentException(sensitiveCauseMessage);
+    final IllegalArgumentException cause = new IllegalArgumentException("invalid order state");
     cause.setStackTrace(
         new StackTraceElement[] {
           new StackTraceElement(
               "com.example.demo.OrderRepository", "save", "OrderRepository.java", 57)
         });
-    final IllegalStateException exception = new IllegalStateException(sensitiveMessage, cause);
+    final IllegalStateException exception = new IllegalStateException("order failed", cause);
     exception.setStackTrace(
         new StackTraceElement[] {
           new StackTraceElement("com.example.demo.OrderService", "create", "OrderService.java", 84)
         });
 
     final ResponseEntity<Object> response =
-        handler.handleUnexpectedException(exception, new ServletWebRequest(request));
+        handler.handleUnexpectedException(
+            exception, new ServletWebRequest(new MockHttpServletRequest()));
 
     assertEquals(HttpStatus.INTERNAL_SERVER_ERROR, response.getStatusCode(), "HTTP status");
-    assertTrue(output.getAll().contains("OrderService.java:84"), "ログに例外発生行が含まれること");
-    assertTrue(
-        output.getAll().contains(IllegalArgumentException.class.getName()), "ログに cause の型が含まれること");
-    assertFalse(output.getAll().contains(sensitiveMessage), "ログに例外メッセージが含まれないこと");
-    assertFalse(output.getAll().contains(sensitiveCauseMessage), "ログに cause のメッセージが含まれないこと");
+    final String log = output.getAll();
+    assertTrue(log.contains("Unhandled API exception"), () -> "event 名が残ること: " + log);
+    assertTrue(log.contains(IllegalStateException.class.getName()), () -> "例外の型が残ること: " + log);
+    assertTrue(log.contains("OrderService.java:84"), () -> "例外の発生行が残ること: " + log);
+    assertTrue(log.contains("OrderRepository.java:57"), () -> "cause の発生行が残ること: " + log);
   }
 }

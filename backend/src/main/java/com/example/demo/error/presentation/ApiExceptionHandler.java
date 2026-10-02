@@ -64,10 +64,7 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
   @ExceptionHandler(Exception.class)
   /* package */ ResponseEntity<Object> handleUnexpectedException(
       final Exception exception, final WebRequest request) {
-    log.atError()
-        .addKeyValue("exception.type", exception.getClass().getName())
-        .addKeyValue("exception.stacktrace", ExceptionLogSanitizer.stackTrace(exception))
-        .log("Unhandled API exception");
+    log.atError().setCause(exception).log("Unhandled API exception");
     return Objects.requireNonNull(
         handleExceptionInternal(
             exception,

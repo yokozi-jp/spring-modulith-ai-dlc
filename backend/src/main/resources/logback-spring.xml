@@ -3,10 +3,11 @@
     <include resource="org/springframework/boot/logging/logback/defaults.xml"/>
     <include resource="org/springframework/boot/logging/logback/structured-console-appender.xml"/>
 
+    <!-- SLF4J の key-value はすべて OTLP 属性へ送り、allowlist は Collector で適用する（ADR-015）。 -->
     <appender
         name="OTEL"
         class="io.opentelemetry.instrumentation.logback.appender.v1_0.OpenTelemetryAppender">
-        <keyValuePairAttributesIncluded>exception.type,exception.stacktrace</keyValuePairAttributesIncluded>
+        <captureKeyValuePairAttributes>true</captureKeyValuePairAttributes>
     </appender>
 
     <root level="INFO">

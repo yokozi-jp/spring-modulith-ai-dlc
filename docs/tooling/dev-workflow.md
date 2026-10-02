@@ -84,6 +84,14 @@ task okf-check
 task release-check
 ```
 
+## Collectorの設定を変更するとき
+
+```bash
+task otel-collector-check
+```
+
+ログ属性の allowlist は[可観測性データの規約](../observability/conventions.md)を参照する。
+
 ## ローカルサービスを確認するとき
 
 ```bash
