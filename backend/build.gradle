@@ -123,12 +123,12 @@ dependencyManagement {
         mavenBom "org.springframework.modulith:spring-modulith-bom:${springModulithVersion}"
         mavenBom "org.springframework.cloud:spring-cloud-dependencies:${springCloudVersion}"
         // --- 脆弱性対応（Jackson BOM の推移的バージョン上書き） ---
-        // jackson-databind の CVE-2026-68497 / CVE-2026-83557 / CVE-2026-19032 対応。
+        // jackson-databind の CVE-2026-91776 / CVE-2026-91777 対応。
         // databind 単体ではなく BOM を上げ、core など同系列の版ずれを避ける。
-        // Jackson 2.x 系（Spring Boot BOM 由来の 2.21.5）を 2.21.6 へ。
-        mavenBom "com.fasterxml.jackson:jackson-bom:2.21.6"
-        // Jackson 3.x 系（Spring Boot 4 / Modulith 由来の 3.1.5）を 3.1.6 へ。
-        mavenBom "tools.jackson:jackson-bom:3.1.6"
+        // Jackson 2.x 系（Spring Boot BOM 由来）を 2.21.7 へ。
+        mavenBom "com.fasterxml.jackson:jackson-bom:2.21.7"
+        // Jackson 3.x 系（Spring Boot 4 / Modulith 由来）を 3.1.7 へ。
+        mavenBom "tools.jackson:jackson-bom:3.1.7"
     }
     dependencies {
         // --- 脆弱性対応（推移的依存のバージョン強制） ---
