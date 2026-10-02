@@ -1,0 +1,15 @@
+{
+  "title": "Demo application",
+  "heading": "Get started",
+  "intro": "Edit src/routes/index.tsx and save to test HMR.",
+  "documentationHeading": "Documentation",
+  "documentationLead": "Find the information needed for development.",
+  "exploreVite": "Explore Vite",
+  "learnTypeScript": "Learn TypeScript",
+  "communityHeading": "Community",
+  "communityLead": "Join the Vite community.",
+  "stack": "React 19 · TanStack · Base UI",
+  "github": "GitHub",
+  "discord": "Discord",
+  "count": "Count: {{count, number}}"
+}

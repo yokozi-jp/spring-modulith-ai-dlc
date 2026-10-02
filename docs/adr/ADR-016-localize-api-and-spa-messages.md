@@ -46,10 +46,16 @@ Problem Details の `type`、`status` と拡張フィールド名はロケール
 クライアントは引き続き `type` で分岐し、翻訳文を分岐条件にしない。
 応答には選択した locale の `Content-Language` と `Vary: Accept-Language` を付ける。
 
-SPA は新しい依存を追加せず、TypeScript の型付き message catalog と `Intl` を使う。
+SPA は React の i18n で最も広く使われている i18next と react-i18next を使う。
+文言は言語ごとの JSON resource に置き、既定言語の resource から message key と interpolation の型を導く。
 `navigator.languages` を優先順に解決し、language subtag が `ja` または `en` に一致しなければ日本語へ fallback する。
+i18next の `supportedLngs` による解決は完全一致する候補を優先順より先に選ぶため、言語の解決は自前の関数で行い、結果を i18next の `lng` へ渡す。
+同じ理由で、Cookie や localStorage を読み書きする `i18next-browser-languagedetector` は使わない。
+i18next の global instance は使わず、`createInstance` で作った instance を `I18nextProvider` で渡す。
+起動処理と component test が同じ instance を明示的に受け渡せ、初期化のための副作用 import が不要になるためである。
 選択結果を `document.documentElement.lang` と画面 title に反映する。
-日時、数値、複数形は翻訳済みの固定文字列へ変換せず、表示境界で `Intl.DateTimeFormat`、`Intl.NumberFormat`、必要なら `Intl.PluralRules` を使う。
+数値と複数形は翻訳済みの固定文字列へ変換せず、i18next の formatting と plural を使う（どちらも内部で `Intl.NumberFormat` と `Intl.PluralRules` を使う）。
+日時は表示境界で `Intl.DateTimeFormat` を使う。
 
 ブラウザ設定を使う間は、API request の `Accept-Language` を JavaScript で上書きしない。
 将来、アプリ内の言語選択を追加する場合は、その選択を SPA と API の双方へ同じ規則で反映する。
@@ -64,13 +70,15 @@ SPA が Problem Details を扱う際は、既知の `type` をローカル messa
 
 - API と SPA が同じ二言語と fallback 規則を使える。
 - Problem Details の機械判定を安定させたまま、人が読む文章を翻訳できる。
-- 追加ライブラリなしで現在の文言量に対応できる。
+- SPA の文言を JSON resource に置くため、翻訳管理サービスや抽出ツールなど i18next の周辺ツールをそのまま使える。
+- 複数形、interpolation、namespace による分割、遅延ロードへ、移行せずに拡張できる。
 - `Content-Language` と `Vary` により、client と HTTP cache が応答言語を区別できる。
 
 ### Negative
 
-- message key と各言語の catalog を同じ変更で更新する必要がある。
-- SPA の catalog は ICU MessageFormat を持たず、複雑な文法や翻訳管理が必要になれば移行が必要になる。
+- message key と各言語の resource を同じ変更で更新する必要がある。
+- 型検査は英語の resource に不足する key を検出するが、余分な key は検出しない。
+- SPA に i18next と react-i18next の依存と bundle サイズが加わる。
 - 既定言語を日本語にするため、`Accept-Language` を送らない既存テストと client の表示文言が変わる。
 
 ### Neutral
@@ -87,17 +95,23 @@ SPA が Problem Details を扱う際は、既知の `type` をローカル messa
 - Pros：バックエンドの bundle と locale 解決が不要になる。
 - Cons：直接表示する検証文言と API エラーが画面言語と一致せず、client 側で全エラーを再定義する必要がある。
 
-### Alternative 2: i18n ライブラリを導入する
+### Alternative 2: 型付き object と `Intl` だけで SPA を翻訳する
 
-- Description：SPA に ICU MessageFormat と動的 catalog 読み込みを持つライブラリを追加する。
-- Pros：複雑な複数形、翻訳管理、遅延ロードへ拡張しやすい。
-- Cons：現在は静的な二言語と少数文言だけであり、標準 `Intl` と型付き object で足りる。
+- Description：依存を追加せず、TypeScript の型付き object を message catalog にし、数値は `Intl.NumberFormat` で整形する。
+- Pros：依存と bundle サイズが増えず、静的な二言語と少数の文言なら足りる。
+- Cons：複数形、interpolation、翻訳管理の仕組みを自前で作る必要があり、翻訳ツールと resource の形式を共有できない。
 
 ### Alternative 3: 翻訳済み `detail` でエラーを分類する
 
 - Description：SPA が Problem Details の文章を比較して画面を分岐する。
 - Pros：追加の problem type を定義せずに実装できる。
 - Cons：翻訳と文言修正が client の制御フローを壊し、ADR-013 の契約にも反する。
+
+### Alternative 4: react-intl（FormatJS）を使う
+
+- Description：ICU MessageFormat を標準とする react-intl を使う。
+- Pros：ICU MessageFormat をそのまま書け、翻訳管理サービスとの互換性が高い。
+- Cons：React での採用例と周辺ツールは i18next より少ない。i18next も plugin で ICU MessageFormat を使えるため、ICU が必要になった時点で移行せずに対応できる。
 
 ## References
 
@@ -106,6 +120,9 @@ SPA が Problem Details を扱う際は、既知の `type` をローカル messa
 - [RFC 9457: Problem Details for HTTP APIs](https://datatracker.ietf.org/doc/html/rfc9457)
 - [Spring Framework: `AcceptHeaderLocaleResolver`](https://docs.spring.io/spring-framework/docs/current/javadoc-api/org/springframework/web/servlet/i18n/AcceptHeaderLocaleResolver.html)
 - [MDN: `Intl`](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Intl)
+- [i18next: TypeScript](https://www.i18next.com/overview/typescript)
+- [i18next: Formatting](https://www.i18next.com/translation-function/formatting)
+- [react-i18next](https://react.i18next.com/)
 - [ADR-013](ADR-013-standardize-http-api-contracts.md)
 - `backend/src/main/resources/application.yaml`
-- `frontend/src/main.ts`
+- `frontend/src/i18n/index.ts`

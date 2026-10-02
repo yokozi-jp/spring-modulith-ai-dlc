@@ -33,8 +33,14 @@ OpenAPIからOrvalでnative FetchのTanStack Query clientを生成し、手書�
 frontend/src/
 ├── main.tsx
 ├── style.css
-├── i18n.ts
-├── i18n.test.ts
+├── i18n/
+│   ├── index.ts
+│   ├── i18next.d.ts
+│   ├── resolve-locale.ts
+│   ├── resolve-locale.test.ts
+│   └── locales/
+│       ├── ja.json
+│       └── en.json
 ├── routeTree.gen.ts
 ├── routes/
 │   ├── __root.tsx
@@ -63,7 +69,7 @@ frontend/src/
 frontend/src/
 ├── main.tsx
 ├── style.css
-├── i18n.ts
+├── i18n/
 ├── routeTree.gen.ts
 │
 ├── routes/
@@ -125,7 +131,7 @@ feature名には業務で使う名詞を使い、`management`、`common`、`misc
 
 複数featureから使うという理由だけで、トップレベルに汎用的な `shared` ディレクトリを作らない。
 
-現在は共有物の責務を `components/ui`、`lib`、`api/generated`、`i18n.ts` で直接表せるため、`shared` を加えても階層が一つ増えるだけである。
+現在は共有物の責務を `components/ui`、`lib`、`api/generated`、`i18n` で直接表せるため、`shared` を加えても階層が一つ増えるだけである。
 
 共有候補は、二つ以上のfeatureで同じ責務が確認でき、特定featureの業務語彙へ属さず、featureへ逆依存しない場合にだけ移動する。
 
