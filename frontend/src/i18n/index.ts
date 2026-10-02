@@ -11,7 +11,8 @@ i18n.on("languageChanged", (language) => {
   document.documentElement.lang = language;
 });
 
-// resources を同梱するため、init は同期的に完了する。
+// top-level await により、この module を import する側は init の完了後に評価される。
+// resources を同梱するため、init 自体も同期的に完了する。
 await i18n.init({
   resources: {
     ja: { translation: ja },
