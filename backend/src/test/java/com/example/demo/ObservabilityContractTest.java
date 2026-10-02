@@ -63,6 +63,8 @@ class ObservabilityContractTest {
 
   @Test
   @DisplayName("SLF4J の key-value は OTLP の LogRecord 属性になる")
+  // appender が key-value を属性にすることだけを確かめる。order.id は Collector の allowlist にないため、
+  // 実際の出口では除かれる（docs/observability/conventions.md）。
   void keyValuePairsBecomeLogRecordAttributes() {
     final String event = "observability key-value contract";
 

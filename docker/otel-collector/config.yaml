@@ -12,8 +12,6 @@ receivers:
 
 processors:
   transform/log_attributes:
-    # 文の評価に失敗したデータは捨てる（絞り込む前のデータを送らない）。
-    error_mode: propagate
     log_statements:
       # ログ属性の allowlist。属性を足すときは docs/observability/conventions.md と同じ変更で直す。
       - keep_keys(log.attributes, ["exception.type", "exception.message", "exception.stacktrace"])
