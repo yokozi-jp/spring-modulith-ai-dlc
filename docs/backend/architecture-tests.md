@@ -72,7 +72,7 @@ Error ProneはすべてのJavaコンパイルで`JavaTimeDefaultTimeZone`と`Jav
 `JooqCommonColumnsArchTest`は、jOOQの生成クラスの`CREATED_*`、`UPDATED_*`、`PATCHED_*`フィールドを参照するクラスが、`com.example.demo.shared.infrastructure.persistence`の外にないことを検査する。
 楽観的ロックで各モジュールが参照する`LOCK_NO`は対象外にする。
 生成したRecordのgetterは検査しない。
-共通カラムの扱いは[PostgreSQLの共通カラム](../database/postgresql-common-columns.md)、sharedモジュールの決定は[ADR-044](../adr/ADR-044-add-shared-module-for-jooq-common-code.md)を参照する。
+共通カラムの扱いは[PostgreSQLの共通カラム](../database/postgresql-common-columns.md)、sharedモジュールの決定は[ADR-046](../adr/ADR-046-add-shared-module-for-jooq-common-code.md)を参照する。
 
 ## テストコード
 

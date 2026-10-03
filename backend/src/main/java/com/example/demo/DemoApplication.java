@@ -9,7 +9,7 @@ import org.springframework.modulith.Modulithic;
 
 /** Spring Boot アプリケーションのエントリポイント。 */
 @SpringBootApplication
-// 共通処理の shared モジュールを、モジュール単位の統合テストでも常に起動する（ADR-044）。
+// 共通処理の shared モジュールを、モジュール単位の統合テストでも常に起動する（ADR-046）。
 @Modulithic(sharedModules = "shared")
 public class DemoApplication {
 
