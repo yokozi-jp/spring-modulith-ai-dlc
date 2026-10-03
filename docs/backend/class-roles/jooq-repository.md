@@ -78,6 +78,8 @@ jOOQ の Repository は業務規則を持たない。
   4. 更新件数を `optimisticLock.requireUpdated(updated, ORDERS, byId, OrderConflictException::new)` に渡す。
      0 件のとき、行がなければ `NoSuchElementException` が、行があれば `<Aggregate>ConflictException` が投げられる。
   5. 子の行は集約ルートの後で更新し、主キー以外の業務の列と `forUpdate` の値を書く。
+     子の行は主キーの順に更新する（[PostgreSQL の排他制御](../../database/postgresql-concurrency-control.md)）。
+     集約が持つ子の Entity のリストは `multiset` の `orderBy` の順に並ぶため、その順に UPDATE を `dsl.batch` に加える。
 - jOOQ の `executeWithOptimisticLocking` と `recordVersionFields` を使わない。
   これらは `UpdatableRecord.store()` でしか働かず、この役割は UPDATE を DSL で書く（[PostgreSQL の排他制御](../../database/postgresql-concurrency-control.md)）。
 - 子の Entity の行は、`add` では行ごとの INSERT を、`update` では行ごとの UPDATE を、`dsl.batch` 一つで実行する。
@@ -320,7 +322,7 @@ public long countUnshippedByCustomer(final CustomerId customerId) {
 - [ ] `multiset` の副問い合わせに、子を識別する列の `orderBy` を付ける（`orderBy(ORDER_LINES.LINE_NUMBER)`）。［自分で点検］
 - [ ] 集約ルートの `LOCK_NO` を選び、`restore` の `lockNo` に渡す。［自分で点検］
 - [ ] `add` は `set(列, 値)` で業務の全列を書き、子の行を行ごとの INSERT の `dsl.batch` 一つで書く。［自分で点検］
-- [ ] `update` は、集約ルートを先に `LOCK_NO.eq(order.lockNo())` の条件で UPDATE して更新件数を `optimisticLock.requireUpdated` に渡し、その後で子の行を UPDATE する。［自分で点検］
+- [ ] `update` は、集約ルートを先に `LOCK_NO.eq(order.lockNo())` の条件で UPDATE して更新件数を `optimisticLock.requireUpdated` に渡し、その後で子の行を主キーの順に UPDATE する。［自分で点検］
 - [ ] 集約ルートの UPDATE の `CannotAcquireLockException` を、原因に付けた `<Aggregate>ConflictException` にする。［自分で点検］
 - [ ] jOOQ の `executeWithOptimisticLocking` と `recordVersionFields` を使わない。［自分で点検］
 - [ ] `add` と `update` で、UPSERT（`INSERT ... ON CONFLICT`）を使わない。［自分で点検］

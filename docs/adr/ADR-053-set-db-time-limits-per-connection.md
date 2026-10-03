@@ -25,7 +25,7 @@ Proposed
 接続を持ち続ける要求があると、他の要求は接続を待って失敗する。
 ADR-019 の Neutral は PostgreSQL の通信を各 starter の timeout に任せているが、PostgreSQL の `lock_timeout`、`statement_timeout`、`idle_in_transaction_session_timeout` の既定値は 0（無効）である（[PostgreSQL, Client Connection Defaults](https://www.postgresql.org/docs/18/runtime-config-client.html)）。
 
-PostgreSQL の文書は、この三つを `postgresql.conf` で設定するとすべてのセッションに効くため勧めていない。
+PostgreSQL の文書は、`statement_timeout` と `lock_timeout` を `postgresql.conf` で設定するとすべてのセッションに効くため勧めていない。
 アプリの接続では、HikariCP の `connection-init-sql` が新しい物理接続ごとに `SET TIME ZONE 'UTC'` をすでに実行している（[ADR-006](ADR-006-utc-instant-absolute-time-policy.md)）。
 `connectionInitSql` は接続を pool に加える前に実行され、失敗すると接続の失敗として扱われる（[HikariCP, Configuration](https://github.com/brettwooldridge/HikariCP#infrequently-used)）。
 
@@ -94,7 +94,7 @@ ADR-052 の方式では、行のロックは決済を呼んだ後の `update` �
 - **Description**：DB クラスタの設定で三つの上限を決める。
 - **Pros**：アプリの設定を変えずに、すべての接続に効く。
 - **Cons**：マイグレーション、運用、監視の接続にも効き、長い DDL やバッチが止まる。
-  PostgreSQL の文書も勧めていない。
+  PostgreSQL の文書も、`statement_timeout` と `lock_timeout` をこの方法で設定することを勧めていない。
 
 ### 選択肢2: ALTER ROLE ... SET でアプリのロールに設定する
 
