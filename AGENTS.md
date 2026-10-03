@@ -18,3 +18,10 @@ Triageでは5種類の標準ラベルを使う。詳細は `docs/agents/triage-l
 ### Domain docs
 
 ドメイン文書はsingle-context構成で管理する。詳細は `docs/agents/domain.md` を参照する。
+
+## Git
+
+### Commit messages
+
+コミットする前に `docs/repository/commit-messages.md` を読む。
+subjectは小文字始まりにし、末尾にピリオドを置かない。検査の正本は `commitlint.config.mjs` である。

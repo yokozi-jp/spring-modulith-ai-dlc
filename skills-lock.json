@@ -36,13 +36,6 @@
       "skillPath": "skills/engineering/domain-modeling/SKILL.md",
       "computedHash": "b3eb40152b81f0c98fd2095a023c019452dbdce56f7540cc67fece2972db8369"
     },
-    "git-commit": {
-      "source": "github/awesome-copilot",
-      "ref": "e24be77e6f203409cf99ab7d5a67e1540cb386d3",
-      "sourceType": "github",
-      "skillPath": "skills/git-commit/SKILL.md",
-      "computedHash": "2607fc60629b82b257136dd2a7a373f0a4466c0b49df7746d845d59313c99b21"
-    },
     "grill-me": {
       "source": "mattpocock/skills",
       "ref": "d81f3a183412e71a5b1e84ca21bc1a35eea03a60",
