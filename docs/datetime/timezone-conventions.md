@@ -152,8 +152,13 @@ Javaの`LocalDateTime.atZone()`は、gapでは時刻を後ろへずらし、over
 - JVMのタイムゾーンは`-Duser.timezone=UTC`を`test`タスク、`bootRun`、コンテナの`JAVA_TOOL_OPTIONS`で固定する。
 - Jacksonの`Z`付き絶対時刻表現、DBセッションのUTC固定、`Instant`の保存往復は、契約テストと統合テストで検証する。
 
-型の使い分けは、その値が絶対時刻かどうかという意味の判断を伴うため機械判定しない。
+型の選択そのものは、その値が絶対時刻かどうかという意味の判断を伴うため機械判定しない。
 `timestamptz`と`timestamp`、`Instant`と`LocalDateTime`および`ZoneId`の選択はレビューで確認する。
+
+一方、カラム名と型の矛盾は機械検査で検出する。
+`_at`で終わるカラムが`timestamptz`でない場合と、`_date`で終わるカラムが`date`でない場合が対象である。
+接尾辞の意味は[PostgreSQLの命名規約](../database/postgresql-naming.md)に従う。
+この方針の理由は[ADR-049](../adr/ADR-049-detect-column-name-and-type-mismatches.md)を参照する。
 
 ## 出典
 
