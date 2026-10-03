@@ -1,0 +1,10 @@
+databaseChangeLog:
+  - changeSet:
+      id: "002-create-item-status"
+      author: system
+      changes:
+        - sql:
+            sql: "CREATE TYPE item.item_status AS ENUM ('active');"
+      rollback:
+        - sql:
+            sql: "DROP TYPE item.item_status;"
