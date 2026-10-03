@@ -290,12 +290,20 @@ tasks.named('pmdMain') {
 }
 
 // テスト固有の診断性と待機方法は、プロダクションコード向け規則と分けて検査する。
+// 生成コードを模すテスト用のjOOQテーブルも、生成コードと同じく除外する。
 tasks.named('pmdTest') {
     ruleSetFiles = files("config/pmd/ruleset.xml", "config/pmd/test-ruleset.xml")
+    exclude '**/jooq/**'
 }
 
 tasks.named('spotbugsMain') {
     classes = files(sourceSets.main.output.classesDirs.asFileTree.matching {
+        exclude '**/jooq/**'
+    })
+}
+
+tasks.named('spotbugsTest') {
+    classes = files(sourceSets.test.output.classesDirs.asFileTree.matching {
         exclude '**/jooq/**'
     })
 }
