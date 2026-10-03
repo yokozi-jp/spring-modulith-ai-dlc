@@ -60,9 +60,108 @@ rules:
       functionOptions:
         match: "^[a-z]+(?:[A-Z][a-z]+)+$"
 
+  # 説明と example は Javadoc と @Schema(example) から生成する（ADR-052）。
+  # $ref の値そのものを見るルールには resolved: false を付ける。
+  schema-property-description:
+    description: スキーマのプロパティに説明を書く（record の Javadoc の @param）。
+    severity: error
+    resolved: false
+    given: "$.components.schemas[*].properties[*]"
+    then:
+      - field: description
+        function: truthy
+      - field: description
+        function: pattern
+        functionOptions:
+          match: "\\S"
+
+  # ponytail: components.schemas 直下の property だけを見る。inline schema、allOf、items は対象外。
+  schema-property-example:
+    description: enum、boolean、$ref、object、array 以外のプロパティに example を書く。
+    severity: error
+    resolved: false
+    given: "$.components.schemas[?(@property != 'ProblemDetail')].properties[*]"
+    then:
+      function: schema
+      functionOptions:
+        schema:
+          if:
+            not:
+              anyOf:
+                - required: [enum]
+                - required: [$ref]
+                - properties:
+                    type:
+                      enum: [boolean, object, array]
+                - properties:
+                    type:
+                      type: array
+                      contains:
+                        enum: [boolean, object, array]
+          then:
+            anyOf:
+              - required: [example]
+              - required: [examples]
+
+  tag-name-format:
+    description: tag は業務機能のパッケージ名を英小文字の kebab-case にし、Controller の名前を使わない。
+    severity: error
+    given: "$.paths[*][get,put,post,delete,options,head,patch,trace].tags[*]"
+    then:
+      function: pattern
+      functionOptions:
+        match: "^[a-z]+(?:-[a-z]+)*$"
+        notMatch: "-controller$"
+
+  error-response-problem-detail:
+    description: 4xx と 5xx の応答は共通の Problem response か ProblemDetail の schema を参照する。
+    severity: error
+    resolved: false
+    given: "$.paths[*][get,put,post,delete,options,head,patch,trace].responses[?(@property.match(/^[45][0-9][0-9]$/))]"
+    then:
+      function: schema
+      functionOptions:
+        schema:
+          anyOf:
+            - required: [$ref]
+              properties:
+                $ref:
+                  pattern: "^#/components/responses/[A-Za-z]+Problem$"
+            - required: [content]
+              properties:
+                content:
+                  required: [application/problem+json]
+                  properties:
+                    application/problem+json:
+                      required: [schema]
+                      properties:
+                        schema:
+                          required: [$ref]
+                          properties:
+                            $ref:
+                              const: "#/components/schemas/ProblemDetail"
+
+  problem-response-content:
+    description: 共通の Problem response は application/problem+json で ProblemDetail を返す。
+    severity: error
+    resolved: false
+    given: "$.components.responses[?(@property.match(/Problem$/))].content"
+    then:
+      - field: application/problem+json
+        function: truthy
+      - field: "application/problem+json.schema.$ref"
+        function: pattern
+        functionOptions:
+          match: "^#/components/schemas/ProblemDetail$"
+
   operation-operationId: error
   operation-success-response: error
   operation-tags: error
+  operation-description: error
+  oas3-parameter-description: error
+  tag-description: error
+  operation-singular-tag: error
+  operation-tag-defined: error
   info-contact: off
   oas3-api-servers: off
   # 共通 response は各 API 操作を追加する前から契約として保持する。

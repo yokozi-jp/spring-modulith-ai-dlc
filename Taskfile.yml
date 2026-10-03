@@ -642,6 +642,61 @@ tasks:
     cmds:
       - ./gradlew cyclonedxBom
 
+  # API contract（ADR-051）
+  api-lint:
+    desc: コミット済みのOpenAPI契約をSpectralで検査（DB不要）
+    cmds:
+      - |
+        {{.DOCKER}} run --rm -v "$PWD:/repo" -w /repo \
+          stoplight/spectral:6.16.3@sha256:a07aa4455367b9501b574423b684ab0ef3ee42556089013583318ec015249050 \
+          lint openapi/openapi.yaml --ruleset .spectral.yaml
+
+  # 違反例は、違反ごとの「ルール名|JSON パス」が stylish 出力の同じ行に出ることを確かめる。
+  # text 形式は JSON パスを出さないため、既定の stylish 形式を使う。
+  api-lint-rules-test:
+    desc: SpectralのルールをOpenAPIのfixture（合格例と違反例）で検査
+    silent: true
+    cmds:
+      - |
+        spectral() {
+          {{.DOCKER}} run --rm -v "$PWD:/repo" -w /repo \
+            stoplight/spectral:6.16.3@sha256:a07aa4455367b9501b574423b684ab0ef3ee42556089013583318ec015249050 \
+            lint "$@" --ruleset .spectral.yaml
+        }
+        spectral openapi/spectral-fixtures/valid.yaml
+        status=0
+        output="$(spectral openapi/spectral-fixtures/invalid.yaml)" || status=$?
+        if [ "$status" -eq 0 ]; then
+          printf '%s\n' "$output"
+          echo "違反例 invalid.yaml が Spectral の検査を通りました。" >&2
+          exit 1
+        fi
+        missing=0
+        while IFS='|' read -r rule path; do
+          if ! printf '%s\n' "$output" | grep -F -- " $rule " | grep -qF -- " $path"; then
+            echo "検出されなかった違反: $rule|$path" >&2
+            missing=1
+          fi
+        done <<'EOF'
+        operation-description|paths./api/sample-orders.post
+        oas3-parameter-description|paths./api/sample-orders/{sampleOrderId}.get.parameters[0]
+        tag-description|tags[3]
+        operation-singular-tag|paths./api/sample-orders.get.tags
+        tag-name-format|paths./api/sample-orders.get.tags[1]
+        tag-name-format|paths./api/orders.get.tags[0]
+        operation-tag-defined|paths./api/sample-payments.get.tags[0]
+        schema-property-description|components.schemas.SampleOrderRequest.properties.giftWrap
+        schema-property-example|components.schemas.SampleOrderRequest.properties.customerId
+        schema-property-example|components.schemas.SampleOrderRequest.properties.quantity
+        error-response-problem-detail|paths./api/sample-orders/{sampleOrderId}.get.responses[404]
+        problem-response-content|components.responses.NotFoundProblem.content
+        EOF
+        if [ "$missing" -ne 0 ]; then
+          printf '%s\n' "$output"
+          exit 1
+        fi
+        echo "Spectral のルールは合格例を通し、違反例の全件を検出しました。"
+
   # Compose and services
   compose-up:
     desc: ローカル依存サービスを起動

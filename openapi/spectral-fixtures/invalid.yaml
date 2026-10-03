@@ -1,0 +1,175 @@
+# .spectral.yaml の違反例。各ルールの違反を一つずつ含み、それ以外は合格例と同じ形にする。
+# task api-lint-rules-test が、違反ごとのルール名と JSON パスの組を出力から探す。
+openapi: 3.1.0
+info:
+  title: Demo API
+  description: Demo アプリケーションの HTTP API
+  version: 0.1.0
+tags:
+  - name: sample-order
+    description: サンプル注文の API
+  # operation-singular-tag と tag-name-format（-controller で終わる）
+  - name: order-controller
+    description: 注文の Controller
+  # tag-name-format（kebab-case でない）
+  - name: Orders
+    description: 注文の API
+  # tag-description
+  - name: sample-invoice
+paths:
+  /api/sample-orders:
+    get:
+      # operation-singular-tag
+      tags:
+        - sample-order
+        - order-controller
+      summary: サンプル注文を一覧する。
+      description: サンプル注文を一覧する。<p>新しい順に返す。
+      operationId: listSampleOrders
+      responses:
+        "200":
+          description: サンプル注文の一覧
+    post:
+      tags:
+        - sample-order
+      summary: サンプル注文を受け付ける。
+      # operation-description（description がない）
+      operationId: placeSampleOrder
+      requestBody:
+        description: 受け付けるサンプル注文
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SampleOrderRequest"
+        required: true
+      responses:
+        "201":
+          description: サンプル注文を受け付けた
+  /api/sample-orders/{sampleOrderId}:
+    get:
+      tags:
+        - sample-order
+      summary: サンプル注文を 1 件取得する。
+      description: サンプル注文を 1 件取得する。<p>取り消し済みの注文も返す。
+      operationId: findSampleOrderById
+      parameters:
+        # oas3-parameter-description
+        - name: sampleOrderId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: サンプル注文
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SampleOrderResponse"
+        # error-response-problem-detail（application/problem+json でない）
+        "404":
+          description: サンプル注文が存在しない
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+  /api/orders:
+    get:
+      tags:
+        - Orders
+      summary: 注文を一覧する。
+      description: 注文を一覧する。<p>新しい順に返す。
+      operationId: listOrders
+      responses:
+        "200":
+          description: 注文の一覧
+  /api/sample-payments:
+    get:
+      # operation-tag-defined
+      tags:
+        - sample-payment
+      summary: サンプル支払いを一覧する。
+      description: サンプル支払いを一覧する。<p>新しい順に返す。
+      operationId: listSamplePayments
+      responses:
+        "200":
+          description: サンプル支払いの一覧
+components:
+  schemas:
+    ProblemDetail:
+      type: object
+      description: RFC 9457 の Problem Details
+      properties:
+        type:
+          type: string
+          format: uri
+          description: Problem type の安定した識別 URI
+          example: about:blank
+        title:
+          type: string
+          description: Problem type の短い説明
+        status:
+          type: integer
+          format: int32
+          description: 実際の HTTP status code
+      required:
+        - type
+        - title
+        - status
+    SampleOrderRequest:
+      type: object
+      description: サンプル注文の受け付けの要求
+      properties:
+        # schema-property-example（文字列）
+        customerId:
+          type: string
+          description: 顧客の ID
+        # schema-property-example（3.1 の nullable）
+        quantity:
+          type:
+            - integer
+            - "null"
+          format: int32
+          description: 数量
+        # schema-property-description
+        giftWrap:
+          type: boolean
+      required:
+        - customerId
+        - giftWrap
+    SampleOrderResponse:
+      type: object
+      description: サンプル注文
+      properties:
+        sampleOrderId:
+          type: string
+          description: サンプル注文の ID
+          example: SO-0001
+      required:
+        - sampleOrderId
+  responses:
+    UnauthorizedProblem:
+      description: 認証されていない
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/ProblemDetail"
+    ForbiddenProblem:
+      description: 操作の権限がない
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/ProblemDetail"
+    # problem-response-content（ProblemDetail を参照しない）
+    NotFoundProblem:
+      description: 対象のリソースが存在しない
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/SampleOrderResponse"
+    InternalServerErrorProblem:
+      description: サーバーの内部エラー
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/ProblemDetail"

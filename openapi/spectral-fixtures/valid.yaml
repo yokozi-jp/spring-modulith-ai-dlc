@@ -1,0 +1,209 @@
+# .spectral.yaml の合格例。task api-lint-rules-test が 0 件の error を期待する。
+# springdoc が出力する形にそろえる（ADR-052）。
+openapi: 3.1.0
+info:
+  title: Demo API
+  description: Demo アプリケーションの HTTP API
+  version: 0.1.0
+tags:
+  - name: sample-order
+    description: サンプル注文の API
+paths:
+  /api/sample-orders:
+    post:
+      tags:
+        - sample-order
+      summary: サンプル注文を受け付ける。
+      description: サンプル注文を受け付ける。<p>在庫は引き当てない。
+      operationId: placeSampleOrder
+      requestBody:
+        description: 受け付けるサンプル注文
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SampleOrderRequest"
+        required: true
+      responses:
+        "201":
+          description: サンプル注文を受け付けた
+        "400":
+          $ref: "#/components/responses/BadRequestProblem"
+        "401":
+          $ref: "#/components/responses/UnauthorizedProblem"
+        "403":
+          $ref: "#/components/responses/ForbiddenProblem"
+        "422":
+          $ref: "#/components/responses/UnprocessableContentProblem"
+        "500":
+          $ref: "#/components/responses/InternalServerErrorProblem"
+  /api/sample-orders/{sampleOrderId}:
+    get:
+      tags:
+        - sample-order
+      summary: サンプル注文を 1 件取得する。
+      description: サンプル注文を 1 件取得する。<p>取り消し済みの注文も返す。
+      operationId: findSampleOrderById
+      parameters:
+        - name: sampleOrderId
+          in: path
+          description: サンプル注文の ID
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: サンプル注文
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SampleOrderResponse"
+        "400":
+          $ref: "#/components/responses/BadRequestProblem"
+        "401":
+          $ref: "#/components/responses/UnauthorizedProblem"
+        "403":
+          $ref: "#/components/responses/ForbiddenProblem"
+        "404":
+          description: サンプル注文が存在しない
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "500":
+          $ref: "#/components/responses/InternalServerErrorProblem"
+components:
+  schemas:
+    ProblemDetail:
+      type: object
+      description: RFC 9457 の Problem Details
+      properties:
+        type:
+          type: string
+          format: uri
+          description: Problem type の安定した識別 URI
+          example: about:blank
+        title:
+          type: string
+          description: Problem type の短い説明
+        status:
+          type: integer
+          format: int32
+          description: 実際の HTTP status code
+        detail:
+          type: string
+          description: この失敗に固有の、人が読むための説明
+        instance:
+          type: string
+          format: uri-reference
+          description: 失敗発生を識別する URI
+      required:
+        - type
+        - title
+        - status
+    SampleOrderRequest:
+      type: object
+      description: サンプル注文の受け付けの要求
+      properties:
+        customerId:
+          type: string
+          description: 顧客の ID
+          example: C-0001
+        quantity:
+          type: integer
+          format: int32
+          description: 数量
+          examples:
+            - 2
+        giftWrap:
+          type: boolean
+          description: ギフト包装にするか
+        note:
+          type:
+            - string
+            - "null"
+          description: 備考
+          example: 午前中に届ける
+      required:
+        - customerId
+        - quantity
+        - giftWrap
+    SampleOrderResponse:
+      type: object
+      description: サンプル注文
+      properties:
+        sampleOrderId:
+          type: string
+          description: サンプル注文の ID
+          example: SO-0001
+        status:
+          type: string
+          description: 注文の状態
+          enum:
+            - PLACED
+            - CANCELLED
+        customer:
+          $ref: "#/components/schemas/SampleCustomer"
+          description: 注文した顧客
+        lines:
+          type: array
+          description: 注文の明細
+          items:
+            type: string
+      required:
+        - sampleOrderId
+        - status
+        - customer
+        - lines
+    SampleCustomer:
+      type: object
+      description: サンプル注文の顧客
+      properties:
+        name:
+          type: string
+          description: 顧客の名前
+          example: 山田 太郎
+      required:
+        - name
+  responses:
+    BadRequestProblem:
+      description: 要求の形式または入力値が正しくない
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/ProblemDetail"
+    UnauthorizedProblem:
+      description: 認証されていない
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/ProblemDetail"
+    ForbiddenProblem:
+      description: 操作の権限がない
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/ProblemDetail"
+    NotFoundProblem:
+      description: 対象のリソースが存在しない
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/ProblemDetail"
+    ConflictProblem:
+      description: リソースの現在の状態と競合する
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/ProblemDetail"
+    UnprocessableContentProblem:
+      description: 業務規則に反するため処理できない
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/ProblemDetail"
+    InternalServerErrorProblem:
+      description: サーバーの内部エラー
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/ProblemDetail"
