@@ -14,40 +14,37 @@ class PgmCdAspectTest {
   @Test
   @DisplayName("CommandHandler の handle の中では、モジュール名と CommandHandler を除いた単純名の pgm_cd が束縛される")
   void commandHandlerBindsPgmCd() {
-    final PlaceOrderCommandHandler handler =
-        proxy(new PlaceOrderCommandHandler(proxy(new StockReservedListener())));
-
-    assertThat(handler.handle().getFirst()).isEqualTo("shared.PlaceOrder");
+    assertThat(proxy(new ChargeOrderCommandHandler()).handle()).isEqualTo("shared.ChargeOrder");
   }
 
   @Test
   @DisplayName("Listener の public メソッドの中では、Listener を除いた単純名の pgm_cd が束縛される")
   void listenerBindsPgmCd() {
-    assertThat(proxy(new StockReservedListener()).on()).isEqualTo("shared.StockReserved");
+    final OrderConfirmedListener listener =
+        proxy(new OrderConfirmedListener(proxy(new ChargeOrderCommandHandler())));
+
+    assertThat(listener.on().getFirst()).isEqualTo("shared.OrderConfirmed");
   }
 
   @Test
-  @DisplayName("CommandHandler の中で同期の Listener を呼ぶと、その間は内側の pgm_cd になり、戻ると外側に戻る")
+  @DisplayName("Listener の中で CommandHandler を呼ぶと、その間は内側の pgm_cd になり、戻ると外側に戻る")
   void nestedBindingOverridesOuter() {
-    final PlaceOrderCommandHandler handler =
-        proxy(new PlaceOrderCommandHandler(proxy(new StockReservedListener())));
+    final OrderConfirmedListener listener =
+        proxy(new OrderConfirmedListener(proxy(new ChargeOrderCommandHandler())));
 
-    assertThat(handler.handle())
-        .as("呼ぶ前、Listener の中、戻った後の pgm_cd")
-        .containsExactly("shared.PlaceOrder", "shared.StockReserved", "shared.PlaceOrder");
+    assertThat(listener.on())
+        .as("呼ぶ前、CommandHandler の中、戻った後の pgm_cd")
+        .containsExactly("shared.OrderConfirmed", "shared.ChargeOrder", "shared.OrderConfirmed");
   }
 
   @Test
   @DisplayName("CommandHandler の handle 以外のメソッドと、役割名でないクラスでは pgm_cd を束縛しない")
   void otherMethodsAreNotBound() {
-    final PlaceOrderCommandHandler handler =
-        proxy(new PlaceOrderCommandHandler(new StockReservedListener()));
-
-    assertThatThrownBy(handler::describe)
+    assertThatThrownBy(proxy(new ChargeOrderCommandHandler())::describe)
         .as("CommandHandler の handle 以外")
         .isInstanceOf(IllegalStateException.class)
         .hasMessageContaining("pgm_cd is not bound");
-    assertThatThrownBy(proxy(new PlaceOrderService())::handle)
+    assertThatThrownBy(proxy(new ChargeOrderService())::handle)
         .as("役割名でないクラス")
         .isInstanceOf(IllegalStateException.class)
         .hasMessageContaining("pgm_cd is not bound");
@@ -60,23 +57,14 @@ class PgmCdAspectTest {
     return factory.getProxy();
   }
 
-  /** pointcut の対象になる CommandHandler。束縛された pgm_cd を返す。 */
+  /** pointcut の対象になる CommandHandler。 */
   // CGLIB のプロキシを作れるよう、final にしない。pointcut の対象にするため、メソッドを public にする。
   @SuppressWarnings("PMD.PublicMemberInNonPublicType")
-  /* package */ static class PlaceOrderCommandHandler {
+  /* package */ static class ChargeOrderCommandHandler {
 
-    /** handle の中で同期で呼ぶ Listener。 */
-    private final StockReservedListener listener;
-
-    /* package */ PlaceOrderCommandHandler(final StockReservedListener listener) {
-      this.listener = listener;
-    }
-
-    /** 呼ぶ前、Listener の中、戻った後の pgm_cd を返す。 */
-    public List<String> handle() {
-      final String before = PgmCdAspect.current();
-      final String inner = listener.on();
-      return List.of(before, inner, PgmCdAspect.current());
+    /** 束縛された pgm_cd を返す。 */
+    public String handle() {
+      return PgmCdAspect.current();
     }
 
     /** pointcut の対象にならないメソッド。 */
@@ -85,19 +73,28 @@ class PgmCdAspectTest {
     }
   }
 
-  /** pointcut の対象になる Listener。 */
+  /** pointcut の対象になる Listener。ADR-050 のとおり、on から CommandHandler を一つ呼ぶ。 */
   @SuppressWarnings({"PMD.ShortMethodName", "PMD.PublicMemberInNonPublicType"})
-  /* package */ static class StockReservedListener {
+  /* package */ static class OrderConfirmedListener {
 
-    /** 束縛された pgm_cd を返す。 */
-    public String on() {
-      return PgmCdAspect.current();
+    /** on の中で呼ぶ CommandHandler。 */
+    private final ChargeOrderCommandHandler handler;
+
+    /* package */ OrderConfirmedListener(final ChargeOrderCommandHandler handler) {
+      this.handler = handler;
+    }
+
+    /** 呼ぶ前、CommandHandler の中、戻った後の pgm_cd を返す。 */
+    public List<String> on() {
+      final String before = PgmCdAspect.current();
+      final String inner = handler.handle();
+      return List.of(before, inner, PgmCdAspect.current());
     }
   }
 
   /** 役割名でないため、pointcut の対象にならないクラス。 */
   @SuppressWarnings("PMD.PublicMemberInNonPublicType")
-  /* package */ static class PlaceOrderService {
+  /* package */ static class ChargeOrderService {
 
     /** 束縛された pgm_cd を返す。 */
     public String handle() {

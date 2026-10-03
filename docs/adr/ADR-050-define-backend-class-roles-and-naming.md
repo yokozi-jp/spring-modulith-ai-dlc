@@ -100,7 +100,7 @@ Proposed
 - `add` は、`insertInto` の `set(列, 値)` で業務の全列を書き、`lock_no` を含む共通カラムの値は [ADR-048](ADR-048-add-shared-module-for-jooq-common-code.md) の `shared` の共通処理から受け取る。
 - `update` は、[PostgreSQL の排他制御](../database/postgresql-concurrency-control.md)の楽観的ロックの順序に従う。
   集約ルートの行を `SELECT ... FOR UPDATE NOWAIT` でロックし、行がなければ `NoSuchElementException` を、`lock_no` が集約の `lockNo` と違うか行をロックできなければ `domain.model` の `<Aggregate>ConflictException` を投げる。
-  一致したら、`lock_no` を1加算し、`updated_*` を `shared` の共通処理から受け取って更新する。
+  一致したら、`lock_no` の加算を含む共通カラムの値を `shared` の共通処理から受け取って更新する。
 - Controller が作り、既存の集約の状態を変える Command は、クライアントが参照の応答で受け取った `lockNo` を持つ。
   CommandHandler は、集約を取り出した直後に集約の `lockNo` と比べ、画面から受け取った値とロックした行の値の比較が成り立つようにする。
 - 外部システムのインタフェースの実装は `infrastructure.client` の `<ExternalSystem>Client` とする。

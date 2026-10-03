@@ -42,6 +42,7 @@ jOOQ の共通処理は `com.example.demo.shared.infrastructure.persistence` に
 `shared` には、共通カラムの値を組み立てる共通処理と、NULL を空文字へ変える Converter だけを置き、業務の概念を置かない。
 共通カラムの値には `lock_no` を含め、INSERT では `1`、UPDATE では1加算した値にする。
 `*_pgm_cd` の値の求め方は [ADR-051](ADR-051-bind-pgm-cd-with-scoped-value-and-aspect.md) で決める。
+ADR-051 の `*_pgm_cd` を束縛する Aspect も、共通カラムの値を組み立てる共通処理の一部として `shared` に置く。
 
 楽観的ロックの手順（[PostgreSQL の排他制御](../database/postgresql-concurrency-control.md)）は `shared` に置かない。
 楽観的ロックの方式は、新しい ADR で決め直す。

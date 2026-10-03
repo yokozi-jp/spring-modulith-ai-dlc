@@ -33,7 +33,8 @@ Repository の実装は、どのユースケースから呼ばれたかを引数
 
 - `PgmCdAspect` は、`com.example.demo.<モジュール>..` の `*CommandHandler` の `handle` と、`*Listener` の public メソッドの呼び出しを `@Around` で囲む。
 - 呼び出しの間だけ、`ScopedValue<String>` に `モジュール名.クラスの単純名から CommandHandler か Listener を除いた名前`（`order.PlaceOrder`）を束縛する。
-- 呼び出しが入れ子になったら（CommandHandler の中で同期の Listener が呼ばれたら）、その間は内側の値になり、戻ると外側の値に戻る。
+- 呼び出しが入れ子になったら、その間は内側の値になり、戻ると外側の値に戻る。
+  ADR-050 では `<Event>Listener` の `on` が `<UseCase>CommandHandler` の `handle` を一つだけ呼ぶため、イベントを受けた書き込みの `*_pgm_cd` には、内側の CommandHandler の名前（`order.ChargeOrder`）が入る。
 - `CommonColumns` の `forInsert(Table)` と `forUpdate(Table)` は、束縛された値を `*_pgm_cd` に登録する。
   何も束縛されていなければ `IllegalStateException` を投げ、登録を失敗させる。
 
