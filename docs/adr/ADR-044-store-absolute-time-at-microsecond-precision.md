@@ -43,7 +43,7 @@ API の小数部は `Instant.toString()` の出力に従う。
 
 ### Neutral
 
-- フロントエンドの `Date` はミリ秒までしか保持しないため、画面ではマイクロ秒の差を扱わない。
+- フロントエンドの `Date` はミリ秒までしか保持しないため、フロントエンドは [ADR-047](ADR-047-parse-api-datetimes-with-temporal.md) のとおり `Temporal` で解析する。
 - API の小数部の桁数は値によって 0 桁、3 桁、6 桁に変わる。
 
 ## Alternatives Considered

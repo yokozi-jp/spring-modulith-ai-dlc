@@ -34,7 +34,7 @@ jOOQの楽観的ロックの機能を使わない規則は、[PostgreSQLの排�
 
 ## 共通処理
 
-共通カラムと楽観的ロックは、sharedモジュールの共通処理を使って実装する（[ADR-046](../adr/ADR-046-add-shared-module-for-jooq-common-code.md)）。
+共通カラムと楽観的ロックは、sharedモジュールの共通処理を使って実装する（[ADR-048](../adr/ADR-048-add-shared-module-for-jooq-common-code.md)）。
 
 - **INSERT**：`CommonColumns.forInsert(table, UseCase.class)`が返す共通カラムの値を、`set(...)`で登録する。
 - **UPDATE**：他の処理も更新しうる行は、`OptimisticLock.update(...)`で更新する。`SELECT ... FOR UPDATE NOWAIT`で行をロックしてから`lock_no`を比べ、一致すれば`lock_no`を1加算する。

@@ -19,7 +19,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 /**
- * 生成クラスの共通カラムを参照できる場所を、shared の共通処理だけに限る（ADR-046、docs/database/postgresql-common-columns.md）。
+ * 生成クラスの共通カラムを参照できる場所を、shared の共通処理だけに限る（ADR-048、docs/database/postgresql-common-columns.md）。
  *
  * <p>{@code LOCK_NO} は各モジュールが楽観的ロックで参照するため対象外にする。生成した Record の getter は対象にしない。
  */
@@ -80,7 +80,7 @@ class JooqCommonColumnsArchTest {
                             .matches("(CREATED|UPDATED|PATCHED)_[A-Z0-9_]+")))
         .because(
             "共通カラムは shared の共通処理だけが扱い、業務ロジックと画面で参照しない"
-                + "（ADR-046、postgresql-common-columns.md）。"
+                + "（ADR-048、postgresql-common-columns.md）。"
                 + "INSERT と UPDATE では CommonColumns の forInsert と forUpdate を使う。"
                 + "LOCK_NO は楽観的ロックで参照するため対象外。");
   }

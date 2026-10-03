@@ -131,7 +131,7 @@ client ───────┘
 
 複数の機能で似た処理が必要になっても、共有される概念と安定した境界が明確になるまでは各機能内に置く。
 
-例外として、`com.example.demo.shared` を Spring Modulith の shared モジュールにする（[ADR-046](../adr/ADR-046-add-shared-module-for-jooq-common-code.md)）。
+例外として、`com.example.demo.shared` を Spring Modulith の shared モジュールにする（[ADR-048](../adr/ADR-048-add-shared-module-for-jooq-common-code.md)）。
 shared モジュールには永続化の技術的な共通処理だけを置き、業務の概念を置かない。
 共通処理は `shared.infrastructure.persistence` に置き、`@NamedInterface` で公開する。
 これを使うのは、他のモジュールの `infrastructure.persistence` のアダプターだけとする。

@@ -1,11 +1,11 @@
 ---
 type: ADR
-title: 'ADR-046: jOOQ の共通処理を共有モジュール shared に置く'
+title: 'ADR-048: jOOQ の共通処理を共有モジュール shared に置く'
 description: 共通カラムの値の設定、楽観的ロック、NULL から空文字への変換という jOOQ の共通処理を、Spring Modulith の shared モジュール com.example.demo.shared の infrastructure.persistence に置く決定。
 tags: [adr, backend, spring-modulith, jooq, database]
 ---
 
-# ADR-046: jOOQ の共通処理を共有モジュール shared に置く
+# ADR-048: jOOQ の共通処理を共有モジュール shared に置く
 
 ## Status
 
