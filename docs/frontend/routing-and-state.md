@@ -155,6 +155,8 @@ Hookのファイル名は `use-media-query.ts` のようにHook名をkebab-case�
 
 置き場所は[目標のディレクトリ構成](architecture.md#目標のディレクトリ構成)のとおり、custom Hookがあるfeatureの `hooks/` とする。
 
+custom Hookのテストは[テスト観点の割り当て](test-strategy.md#観点ごとのテスト)に従う。
+
 ## 関連資料
 
 - [フロントエンドアーキテクチャ](architecture.md)
