@@ -101,6 +101,7 @@ Controller は `@Valid @RequestBody` で受け、`toCommand(...)` の結果を C
 
 ```java
 // com.example.demo.order.presentation.web.OrderController（抜粋）
+@Operation(operationId = "placeOrder")
 @PostMapping
 /* package */ ResponseEntity<Void> place(@Valid @RequestBody final PlaceOrderRequest request) {
   final PlaceOrderResult result = placeOrder.handle(request.toCommand());

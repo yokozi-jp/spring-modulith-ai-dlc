@@ -92,6 +92,9 @@ jobs:
       - name: Verify frontend
         run: PATH="$GITHUB_WORKSPACE/frontend/node_modules/.bin:$PATH" task fe-verify
 
+      - name: Check route tree is up to date
+        run: PATH="$GITHUB_WORKSPACE/frontend/node_modules/.bin:$PATH" task fe-route-tree-check
+
       - name: Diagnose React
         run: PATH="$GITHUB_WORKSPACE/frontend/node_modules/.bin:$PATH" task fe-doctor
 

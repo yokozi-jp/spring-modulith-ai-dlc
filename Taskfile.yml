@@ -356,6 +356,13 @@ tasks:
       - task: fe-knip
       - task: fe-test-build
 
+  fe-route-tree-check:
+    desc: ビルドで再生成したrouteTree.gen.tsがコミット済みの内容と一致するか検査
+    dir: frontend
+    cmds:
+      - vp build
+      - git diff --exit-code -- src/routeTree.gen.ts
+
   lint-duplicates:
     desc: フロントエンドとバックエンドの手書きコードの重複をjscpdで検査
     cmds:

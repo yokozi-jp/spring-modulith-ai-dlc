@@ -13,7 +13,7 @@ function HomePage() {
   }, [t]);
 
   return (
-    <main className="min-h-svh bg-background px-6 py-16 text-foreground sm:px-10">
+    <div className="px-6 py-16 sm:px-10">
       <div className="mx-auto flex w-full max-w-4xl flex-col gap-12">
         <section className="flex flex-col items-start gap-6" aria-labelledby="page-heading">
           <div className="rounded-full border bg-muted px-3 py-1 text-sm text-muted-foreground">
@@ -23,7 +23,7 @@ function HomePage() {
             <h1 id="page-heading" className="text-4xl font-semibold tracking-tight sm:text-5xl">
               {t("heading")}
             </h1>
-            <p className="text-lg leading-8 text-muted-foreground">{t("intro")}</p>
+            <p className="text-lg/8 text-muted-foreground">{t("intro")}</p>
           </div>
           <Button
             type="button"
@@ -39,7 +39,7 @@ function HomePage() {
         <div className="grid gap-6 md:grid-cols-2">
           <section className="rounded-xl border bg-card p-6 text-card-foreground shadow-sm">
             <h2 className="text-xl font-semibold">{t("documentationHeading")}</h2>
-            <p className="mt-2 text-sm leading-6 text-muted-foreground">{t("documentationLead")}</p>
+            <p className="mt-2 text-sm/6 text-muted-foreground">{t("documentationLead")}</p>
             <ul className="mt-6 space-y-3">
               <li>
                 <a
@@ -66,7 +66,7 @@ function HomePage() {
 
           <section className="rounded-xl border bg-card p-6 text-card-foreground shadow-sm">
             <h2 className="text-xl font-semibold">{t("communityHeading")}</h2>
-            <p className="mt-2 text-sm leading-6 text-muted-foreground">{t("communityLead")}</p>
+            <p className="mt-2 text-sm/6 text-muted-foreground">{t("communityLead")}</p>
             <ul className="mt-6 space-y-3">
               <li>
                 <a
@@ -92,8 +92,8 @@ function HomePage() {
           </section>
         </div>
       </div>
-    </main>
+    </div>
   );
 }
 
-export const Route = createFileRoute("/")({ component: HomePage });
+export const Route = createFileRoute("/_authenticated/")({ component: HomePage });

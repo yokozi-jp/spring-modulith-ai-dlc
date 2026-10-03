@@ -1,7 +1,7 @@
 ---
 type: Convention
 title: クエリパラメータ
-description: クエリパラメータを使うHTTPメソッド、載せてはいけない値、共通の語彙、キーワード、ソート、複数キー、取得項目の絞り込みの指定方法を定める規約。検索APIや一覧APIのパラメータを設計するときに読む。
+description: クエリパラメータを使うHTTPメソッド、載せてはいけない値、共通の語彙、Controllerでの受け方、キーワード、ソート、複数キー、取得項目の絞り込みの指定方法を定める規約。検索APIや一覧APIのパラメータを設計するときに読む。
 tags: [convention, web-api, http, future-arch-guidelines]
 ---
 
@@ -33,6 +33,11 @@ URLに載せられない値を検索条件にする場合は、[HTTPメソッド
 - **cursor**：次のページの位置。形式と扱いはADR-013に従う。
 
 その他のパラメータには、DBの列が表す概念と同じ語を使い、対応付けの手間を減らす。
+
+## Controllerでの受け方
+
+Controllerはクエリパラメータを`@RequestParam`で項目ごとに受け、検索条件のrecordを作る（[クラスの役割：検索条件](../backend/class-roles/search-criteria.md)）。
+項目ごとに受けると、必須かどうかと既定値が引数ごとにOpenAPIへ出る。
 
 ## 検索キーワード
 

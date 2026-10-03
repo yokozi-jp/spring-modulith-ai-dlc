@@ -1,7 +1,7 @@
 {
   "title": "デモアプリケーション",
   "heading": "はじめる",
-  "intro": "src/routes/index.tsx を編集して保存すると、HMR の動作を確認できます。",
+  "intro": "src/routes/_authenticated/index.tsx を編集して保存すると、HMR の動作を確認できます。",
   "documentationHeading": "ドキュメント",
   "documentationLead": "開発に必要な情報を確認できます。",
   "exploreVite": "Vite を調べる",
@@ -11,5 +11,12 @@
   "stack": "React 19、TanStack、Base UI",
   "github": "GitHub",
   "discord": "Discord",
-  "count": "カウント：{{count, number}}"
+  "count": "カウント：{{count, number}}",
+  "loading": "読み込んでいます…",
+  "errorHeading": "問題が発生しました",
+  "errorDescription": "画面を表示できませんでした。もう一度お試しください。",
+  "retry": "再試行",
+  "notFoundHeading": "ページが見つかりません",
+  "notFoundDescription": "URL が正しいか確認してください。",
+  "backToHome": "ホームへ戻る"
 }

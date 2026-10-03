@@ -1,7 +1,7 @@
 ---
 type: Convention
 title: フロントエンドのルーティングと状態管理
-description: TanStack Router の route file の責務、loader による server state の preload、状態の置き場所、custom Hook を作る条件を定める。route、loader、state、Hook を追加または変更するときに読む。
+description: TanStack Router の route file の責務と形、認証が要る画面の layout、loader による server state の preload、状態表示の分担、状態の置き場所、custom Hook を作る条件を定める。route、loader、state、Hook を追加または変更するときに読む。
 tags: [convention, frontend, routing, state, react]
 ---
 
@@ -24,9 +24,67 @@ route fileはpath、path parameter、search parameter、loader、error境界、�
 
 Orvalが生成したquery optionsだけで要件を表せる場合は、それをloaderとcomponentの両方から利用する。
 
+別のtagの生成query optionsは、他のfeatureから直接使ってよく、変換は使う側の `select` で書く。
+
 複数queryの合成、業務上の既定値、追加のselect処理が必要な場合だけ、feature内の `queries.ts` または用途を表すcustom Hookへ閉じ込める。
 
 routeの近くへテストを置く場合は、TanStack Routerのroute候補に含めないよう、現在の規約どおりファイル名を `-` で始める。
+
+## routeの形
+
+routeはdirectory形式で書く。
+
+一覧、新規、詳細、編集は `index.tsx` と名前付きのrouteで置き、親のlayout routeを作らない。
+
+``` text
+src/routes/
+├── __root.tsx
+└── _authenticated/
+    ├── route.tsx          # beforeLoadとアプリシェル
+    └── orders/
+        ├── index.tsx      # /orders
+        ├── new.tsx        # /orders/new
+        └── $orderId/
+            ├── index.tsx  # /orders/$orderId
+            └── edit.tsx   # /orders/$orderId/edit
+```
+
+`route.tsx` は、子が共有する `beforeLoad`、`loader`、`validateSearch`、layoutがあるときだけ作る。
+
+`_` 接尾辞は、親のlayoutを共有する子のうち一部だけを外す場面に限る。
+
+この形はlintでは制限しない。
+
+URLのpathとparameterの命名は[フロントエンドのURL設計](url-design.md)に従う。
+
+## 認証が要る画面とアプリシェル
+
+認証が要る画面はpathless layoutの `_authenticated` の下に置く。
+
+`_authenticated/route.tsx` に、配下に共通する `beforeLoad`（[画面の認可制御](authorization-ui.md)）とアプリシェルを置く。
+
+layout routeにcomponentを持たせるなら、そのcomponentで `<Outlet />` を描画する。
+
+現在の `_authenticated/route.tsx` は `components/app-shell.tsx` を描画するだけであり、`beforeLoad` は最初の権限APIと同時に足す。
+
+## 状態表示の分担
+
+初期描画のdataはloaderで `ensureQueryData` し、componentは `useSuspenseQuery` で読む。
+
+状態ごとの表示は次のように分担する。
+
+- **Loading**：routerの `defaultPendingComponent`（`components/route-pending.tsx`）が表示する。
+- **Error**：routerの `defaultErrorComponent`（`components/route-error.tsx`）が表示する。
+- **存在しないresource**：loaderで `notFound()` を投げ、routerの `defaultNotFoundComponent`（`components/route-not-found.tsx`）が表示する。
+- **Empty**と**Content**：画面のcomponentが分ける。
+
+既定値は `src/router-defaults.ts` の `routerDefaults` にまとめ、`main.tsx` とrouteのテストが同じobjectを `createRouter` に渡す。
+
+errorの表示はcatalogの文言を使い、`error.message` を画面に出さない。
+
+再試行は、`useQueryErrorResetBoundary` の `reset()` でqueryのerrorを戻してから `router.invalidate()` を呼ぶ。
+
+route固有の `pendingComponent` や `errorComponent` は、`react/no-multi-comp` があるためroute fileとは別のファイルに置く。
 
 ## React Hooksと状態
 
@@ -65,4 +123,6 @@ React Compilerを有効にしているため、参照同一性が契約になる
 - [React: Reusing Logic with Custom Hooks](https://react.dev/learn/reusing-logic-with-custom-hooks)
 - [React: Rules of Hooks](https://react.dev/reference/rules/rules-of-hooks)
 - [TanStack Router: External Data Loading](https://tanstack.com/router/latest/docs/framework/react/guide/external-data-loading)
+- [TanStack Router: Authenticated Routes](https://tanstack.com/router/latest/docs/framework/react/guide/authenticated-routes)
+- [TanStack Router: Not Found Errors](https://tanstack.com/router/latest/docs/framework/react/guide/not-found-errors)
 - [TanStack Query: Prefer the use of queryOptions](https://tanstack.com/query/latest/docs/eslint/prefer-query-options)
