@@ -78,18 +78,22 @@ describe("project lint config on fixtures", () => {
       ).toBe(3);
     });
 
+    it("rejects importing routes and the route tree from a feature", () => {
+      expect(countIn("features/order/route-import.ts", "eslint(no-restricted-imports)")).toBe(2);
+    });
+
     it("allows the own feature and the API client", () => {
       expect(codesIn("features/order/own-feature.ts")).toStrictEqual([]);
     });
   });
 
-  describe("feature to route", () => {
-    it("rejects importing routes and the route tree from a feature", () => {
-      expect(countIn("features/order/route-import.ts", "eslint(no-restricted-imports)")).toBe(2);
+  describe("routes", () => {
+    it("rejects Base UI and test-only modules from a route", () => {
+      expect(countIn("routes/restricted.tsx", "eslint(no-restricted-imports)")).toBe(2);
     });
 
-    it("allows a feature that does not import routes", () => {
-      expect(codesIn("features/order/own-feature.ts")).toStrictEqual([]);
+    it("allows a route to compose a feature", () => {
+      expect(codesIn("routes/orders.tsx")).toStrictEqual([]);
     });
   });
 
@@ -111,6 +115,14 @@ describe("project lint config on fixtures", () => {
 
     it("allows Base UI inside components/ui", () => {
       expect(codesIn("components/ui/primitive.tsx")).toStrictEqual([]);
+    });
+
+    it("keeps the shared layer and test-only bans inside components/ui", () => {
+      expect(countIn("components/ui/shared-layer.tsx", "eslint(no-restricted-imports)")).toBe(2);
+    });
+
+    it("keeps Base UI banned in test files", () => {
+      expect(countIn("features/order/base-ui.test.ts", "eslint(no-restricted-imports)")).toBe(1);
     });
   });
 
