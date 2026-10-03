@@ -224,8 +224,11 @@ public long countUnshippedByCustomer(final CustomerId customerId) {
 - [ ] package-private の class にし、`DSLContext` をコンストラクタで受け取る。［自分で点検］
 - [ ] 列の選択と変換を `select<Aggregate>s()` 一つに置き、列を `convertFrom` で値オブジェクトと enum に変える。［自分で点検］
 - [ ] 子の Entity を `multiset` で集約ルートと同じ SQL で読み、集約を `Records.mapping(Order::restore)` で作る。［自分で点検］
+- [ ] `multiset` の副問い合わせに、子を識別する列の `orderBy` を付ける（`orderBy(ORDER_LINES.LINE_NUMBER)`）。［自分で点検］
 - [ ] 書き込みは `set(列, 値)` で全列を書き、子の行を `valuesOfRows` の INSERT 一つで書く。［自分で点検］
-- [ ] 変換で `Order.place`、業務規則、既定値、リフレクションの対応づけ、Mapper のクラスを使わない。［自分で点検］
+- [ ] 変換で `Order.place`、業務規則、既定値、Mapper のクラスを使わない。［自分で点検］
+- [ ] `into(Class)`、`fetchInto(Class)` のように `Class` を受け取る jOOQ の対応づけを呼ばない。［ArchUnit で検査：ClassRoleArchTest.jooqReflectionMappingIsNotUsed］
+- [ ] MapStruct、ModelMapper、Dozer、`DefaultRecordMapper` に依存しない。［ArchUnit で検査：ClassRoleArchTest.mappingLibrariesAreNotUsed］
 - [ ] クラス、フィールド、コンストラクタに Javadoc を書く。［自分で点検］
 - [ ] `@DatabaseTest` で保存と読み戻しを確かめる。［自分で点検］
 - [ ] `infrastructure.persistence` のパッケージに `@NullMarked` の `package-info.java` を置く。［Error Prone で検査：RequireExplicitNullMarking］

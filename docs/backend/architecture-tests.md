@@ -65,6 +65,9 @@ backend/src/test/java/com/example/demo/architecture/
 - `listenersExposeOnlyOnAndCallOneCommandHandler`：`*Listener`のpublicメソッドは`@ApplicationModuleListener`を付けた`void on(...)`一つだけにし、呼ぶ`*CommandHandler`はちょうど一つにする。
 - `requestsAndResponsesArePresentationWebRecords`：`*Request`と`*Response`は`presentation.web`のrecordにする。
 - `queryServicesImplementModuleQueries`：`*QueryService`は`application`に置いて自モジュールのルートの`*Queries`を実装し、すべてのpublicメソッドに`@Transactional(readOnly = true)`を付ける。
+- `mappingLibrariesAreNotUsed`：MapStruct、ModelMapper、Dozerのパッケージと、jOOQの`DefaultRecordMapper`に依存しない。
+- `jooqReflectionMappingIsNotUsed`：jOOQの`into`と名前が`Into`で終わるメソッドのうち、`Class`を受け取るもの（`into(Class)`、`fetchInto(Class)`、`fetchOneInto(Class)`など）を呼ばない。
+  `convertFrom`、`Records.mapping`、`into(Table)`、`fetch(RecordMapper)`は呼んでよい。
 
 ## 規則を確かめるフィクスチャ
 
@@ -77,6 +80,10 @@ backend/src/test/java/com/example/demo/architecture/
 フィクスチャは`com.example.demo`の外に置く。
 そのため、Springのコンポーネントスキャン、Spring Modulithの`ApplicationModules`、プロダクション向けの`@AnalyzeClasses(packagesOf = DemoApplication.class)`は、フィクスチャを読まない。
 `ArchitectureRuleFixtureTest`は`ClassFileImporter`でフィクスチャを読み込み、ベースパッケージを引数に取る`<規則名>Rule(basePackage)`のファクトリか、規則のフィールドをそのまま使う。
+
+`jooqReflectionMappingIsNotUsed`は、違反フィクスチャの`ReflectiveOrderReader`で禁止するメソッドごとに一行を持ち、それぞれの呼び出しを検出することを確かめる。
+`typeSafeJooqMappingIsAllowed`は、対応づけの二つの規則が`convertFrom`、`Records.mapping`、`into(Table)`、`fetch(RecordMapper)`を誤検出しないことを確かめる。
+MapStruct、ModelMapper、Dozerはテストのクラスパスにないため、`mappingLibrariesAreNotUsed`のフィクスチャは`DefaultRecordMapper`への依存だけで確かめる。
 
 規則を追加するときは、違反フィクスチャのクラスを一つ追加し、`eachRuleDetectsItsViolatingFixture`の行と`rulesFor()`に規則を加える。
 この手順で、新しい規則が違反を検出し、規約どおりのコードを誤検出しないことを確かめる。

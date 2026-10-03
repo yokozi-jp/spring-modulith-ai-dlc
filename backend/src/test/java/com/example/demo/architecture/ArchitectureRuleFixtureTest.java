@@ -8,6 +8,13 @@ import com.tngtech.archunit.core.importer.ClassFileImporter;
 import com.tngtech.archunit.lang.ArchRule;
 import java.util.List;
 import java.util.stream.Stream;
+import org.jooq.DSLContext;
+import org.jooq.Field;
+import org.jooq.Record;
+import org.jooq.Record1;
+import org.jooq.Records;
+import org.jooq.Table;
+import org.jooq.impl.DSL;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -33,6 +40,10 @@ class ArchitectureRuleFixtureTest {
 
   /** 違反フィクスチャのクラス名の接頭辞。 */
   private static final String VIOLATING_PREFIX = VIOLATING + ".";
+
+  /** リフレクションで対応づける違反フィクスチャのクラス名。 */
+  private static final String REFLECTIVE_READER =
+      "order.infrastructure.persistence.ReflectiveOrderReader";
 
   @Test
   @DisplayName("規約どおりのフィクスチャはすべてのクラス役割規則を満たす")
@@ -154,8 +165,66 @@ class ArchitectureRuleFixtureTest {
         row(
             "queryServicesImplementModuleQueries",
             ClassRoleArchTest.queryServicesImplementModuleQueries,
-            "order.application.OrderQueryService"));
+            "order.application.OrderQueryService"),
+        row(
+            "mappingLibrariesAreNotUsed",
+            ClassRoleArchTest.mappingLibrariesAreNotUsed,
+            REFLECTIVE_READER + ".defaultRecordMapper("),
+        reflectionRow("recordInto"),
+        reflectionRow("resultInto"),
+        reflectionRow("fetchInto"),
+        reflectionRow("fetchOneInto"),
+        reflectionRow("fetchOptionalInto"),
+        reflectionRow("fetchSingleInto"));
   }
+
+  /** {@code jooqReflectionMappingIsNotUsed} が、違反フィクスチャの同名のメソッドの呼び出しを検出することを確かめる行を作る。 */
+  private static Arguments reflectionRow(final String method) {
+    return row(
+        "jooqReflectionMappingIsNotUsed: " + method,
+        ClassRoleArchTest.jooqReflectionMappingIsNotUsed,
+        REFLECTIVE_READER + "." + method + "(");
+  }
+
+  @Test
+  @DisplayName("型安全な jOOQ の対応づけは対応づけの禁止規則に検出されない")
+  void typeSafeJooqMappingIsAllowed() {
+    final JavaClasses usage = new ClassFileImporter().importClasses(TypeSafeJooqMapping.class);
+
+    assertThatCode(() -> ClassRoleArchTest.jooqReflectionMappingIsNotUsed.check(usage))
+        .doesNotThrowAnyException();
+    assertThatCode(() -> ClassRoleArchTest.mappingLibrariesAreNotUsed.check(usage))
+        .doesNotThrowAnyException();
+  }
+
+  /**
+   * 対応づけの禁止規則が許す jOOQ の呼び出し（convertFrom、Records.mapping、into(Table)、fetch(RecordMapper)）を持つフィクスチャ。
+   */
+  /* package */ static final class TypeSafeJooqMapping {
+
+    /** 注文のテーブル。 */
+    private static final Table<Record> ORDERS = DSL.table(DSL.name("orders"));
+
+    /** 注文 ID の列。 */
+    private static final Field<String> ORDER_ID = DSL.field(DSL.name("order_id"), String.class);
+
+    private TypeSafeJooqMapping() {}
+
+    /** 型を検査する対応づけで、注文 ID の値オブジェクトを読む。 */
+    /* package */ static List<Object> read(final DSLContext dsl, final Record row) {
+      return List.of(
+          dsl.select(ORDER_ID.convertFrom(OrderNumber::new))
+              .from(ORDERS)
+              .fetch(Records.mapping(OrderNumber::value)),
+          dsl.select(ORDER_ID.convertFrom(OrderNumber.class, OrderNumber::new))
+              .from(ORDERS)
+              .fetch(Record1::value1),
+          row.into(ORDERS));
+    }
+  }
+
+  /** フィクスチャが列を変換する先の値オブジェクト。 */
+  private record OrderNumber(String value) {}
 
   private static Arguments row(
       final String ruleName, final ArchRule rule, final String violatingClass) {
@@ -193,6 +262,8 @@ class ArchitectureRuleFixtureTest {
         ClassRoleArchTest.moduleListenersAreApplicationListeners,
         ClassRoleArchTest.listenersExposeOnlyOnAndCallOneCommandHandler,
         ClassRoleArchTest.requestsAndResponsesArePresentationWebRecordsRule(basePackage),
-        ClassRoleArchTest.queryServicesImplementModuleQueries);
+        ClassRoleArchTest.queryServicesImplementModuleQueries,
+        ClassRoleArchTest.mappingLibrariesAreNotUsed,
+        ClassRoleArchTest.jooqReflectionMappingIsNotUsed);
   }
 }

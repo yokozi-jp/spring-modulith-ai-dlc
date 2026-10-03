@@ -1,7 +1,9 @@
 package com.example.demo.architecture;
 
 import static com.tngtech.archunit.core.domain.JavaClass.Predicates.resideInAPackage;
+import static com.tngtech.archunit.core.domain.JavaClass.Predicates.resideInAnyPackage;
 import static com.tngtech.archunit.core.domain.JavaClass.Predicates.simpleNameEndingWith;
+import static com.tngtech.archunit.core.domain.JavaClass.Predicates.type;
 import static com.tngtech.archunit.lang.conditions.ArchConditions.be;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.classes;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.methods;
@@ -22,6 +24,7 @@ import com.tngtech.archunit.lang.SimpleConditionEvent;
 import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
+import org.jooq.impl.DefaultRecordMapper;
 import org.springframework.modulith.events.ApplicationModuleListener;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -153,6 +156,40 @@ class ClassRoleArchTest {
               "QueryService は <モジュール>.application に置き、"
                   + "同じモジュールのルートにある <Feature>Queries を実装し、"
                   + "public メソッドすべてに @Transactional(readOnly = true) を付ける。");
+
+  /** 列と項目を対応づけるライブラリと jOOQ の {@code DefaultRecordMapper} を使わない。 */
+  @ArchTest
+  /* package */ static final ArchRule mappingLibrariesAreNotUsed =
+      noClasses()
+          .should()
+          .dependOnClassesThat(
+              resideInAnyPackage(
+                      "org.mapstruct..",
+                      "org.modelmapper..",
+                      "com.github.dozermapper..",
+                      "org.dozer..")
+                  .or(type(DefaultRecordMapper.class)))
+          .because(
+              "jOOQ と集約の変換は Jooq<Aggregate>Repository に convertFrom、multiset、Records.mapping で書き、"
+                  + "列の数と型をコンパイルで検査する。");
+
+  /** jOOQ の {@code into(Class)} と {@code *Into(Class)} による、名前のリフレクションでの対応づけを禁止する。 */
+  @ArchTest
+  /* package */ static final ArchRule jooqReflectionMappingIsNotUsed =
+      noClasses()
+          .should()
+          .callMethodWhere(
+              DescribedPredicate.describe(
+                  "jOOQ の into(Class) か *Into(Class)",
+                  (JavaMethodCall call) ->
+                      resideInAnyPackage("org.jooq..", BASE_PACKAGE + ".jooq..")
+                              .test(call.getTargetOwner())
+                          && ("into".equals(call.getName()) || call.getName().endsWith("Into"))
+                          && call.getTarget().getRawParameterTypes().stream()
+                              .anyMatch(parameter -> parameter.isEquivalentTo(Class.class))))
+          .because(
+              "into(Class)、fetchInto(Class)、fetchOneInto(Class) などを、"
+                  + "convertFrom と fetch(Records.mapping(<Aggregate>::restore)) に置き換える。");
 
   /** モジュールルートの型を record、enum、{@code *Queries} interface に限る規則を組み立てる。 */
   /* package */ static ArchRule moduleRootTypesAreRecordsEnumsOrQueriesRule(
