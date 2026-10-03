@@ -29,6 +29,7 @@ tags: [convention, database, postgresql, performance, read-replica, cache, futur
 接続プールの大きさと接続取得の待ち時間は、[ADR-019](../adr/ADR-019-define-resilience-and-capacity-guardrails.md)の接続予算に従う。
 接続の最大寿命は必ず設定し、HikariCPの`max-lifetime`を無効にしない。
 不安定になった接続を定期的に破棄して、自律的に復旧させるためである。
+`max-lifetime`の機械検査は、未設定でHikariCPの既定値が有効なため行わず、接続プールのプロパティを設定するときに要否を決める。
 
 ## スケールの選び方
 
