@@ -1,11 +1,11 @@
 package com.example.demo.shared.infrastructure.persistence;
 
 import static com.example.demo.jooq.tables.FixtureItemTable.FIXTURE_ITEM;
+import static com.example.demo.jooq.tables.FixtureWorkLogTable.FIXTURE_WORK_LOG;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.example.demo.DemoApplication;
-import com.example.demo.jooq.tables.FixtureWorkLogTable;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
@@ -156,24 +156,23 @@ class CommonColumnsTest {
   @Test
   @DisplayName("更新のカラムを省いたワークテーブルの INSERT では、作成のカラムと lock_no だけを登録する")
   void workTableInsertOmitsUpdatedColumns() {
-    final FixtureWorkLogTable workLog = FixtureWorkLogTable.FIXTURE_WORK_LOG;
-
-    final Map<Field<?>, Object> values = commonColumns.forInsert(workLog, CommonColumnsTest.class);
+    final Map<Field<?>, Object> values =
+        commonColumns.forInsert(FIXTURE_WORK_LOG, CommonColumnsTest.class);
 
     assertThat(values.keySet())
         .as("ワークテーブルの共通カラム")
         .containsExactly(
-            workLog.CREATED_AT,
-            workLog.CREATED_BY,
-            workLog.CREATED_PGM_CD,
-            workLog.CREATED_TX_ID,
-            workLog.LOCK_NO);
+            FIXTURE_WORK_LOG.CREATED_AT,
+            FIXTURE_WORK_LOG.CREATED_BY,
+            FIXTURE_WORK_LOG.CREATED_PGM_CD,
+            FIXTURE_WORK_LOG.CREATED_TX_ID,
+            FIXTURE_WORK_LOG.LOCK_NO);
   }
 
   @Test
   @DisplayName("ワークテーブル以外で updated_at がなければ例外にする")
   void nonWorkTableWithoutUpdatedColumnsIsRejected() {
-    final Table<?> renamed = FixtureWorkLogTable.FIXTURE_WORK_LOG.as("t_fixture_log");
+    final Table<?> renamed = FIXTURE_WORK_LOG.as("t_fixture_log");
 
     assertThatThrownBy(() -> commonColumns.forInsert(renamed, CommonColumnsTest.class))
         .isInstanceOf(IllegalArgumentException.class)

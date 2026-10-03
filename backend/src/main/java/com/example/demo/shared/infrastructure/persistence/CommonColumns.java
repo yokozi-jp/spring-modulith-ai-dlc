@@ -32,6 +32,10 @@ import org.springframework.stereotype.Component;
  *   <li>{@code *_pgm_cd}：{@code モジュール名.ユースケースのクラスの単純名}。
  *   <li>{@code *_tx_id}：現在のスパンの trace ID。trace がなければ例外にする。
  * </ul>
+ *
+ * <p>{@link #forInsert} と {@link #forUpdate} は、共通カラムがない、または型が異なる場合に {@link
+ * IllegalArgumentException} を投げる。trace がない場合、または利用者を特定できない認証の場合に {@link IllegalStateException}
+ * を投げる。
  */
 @Component
 public class CommonColumns {
@@ -59,8 +63,6 @@ public class CommonColumns {
    *
    * @param table 登録先のテーブル
    * @param useCase 処理を実行するユースケースのクラス。{@code *_pgm_cd} の値になる
-   * @throws IllegalArgumentException 共通カラムがない、または型が異なる場合
-   * @throws IllegalStateException trace がない場合、または利用者を特定できない認証の場合
    */
   public Map<Field<?>, Object> forInsert(final Table<?> table, final Class<?> useCase) {
     final AuditValues audit = audit(useCase);
@@ -87,8 +89,6 @@ public class CommonColumns {
    *
    * @param table 更新先のテーブル
    * @param useCase 処理を実行するユースケースのクラス。{@code *_pgm_cd} の値になる
-   * @throws IllegalArgumentException 共通カラムがない、または型が異なる場合
-   * @throws IllegalStateException trace がない場合、または利用者を特定できない認証の場合
    */
   public Map<Field<?>, Object> forUpdate(final Table<?> table, final Class<?> useCase) {
     final Field<Long> lockNo = requiredField(table, "lock_no", Long.class);
