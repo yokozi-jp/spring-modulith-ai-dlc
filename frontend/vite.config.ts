@@ -34,6 +34,7 @@ const restrictedHtmlProperties = [
 // override の option は前の指定とマージされず置き換わるため、禁止の一覧を定数に分けて override ごとに組み合わせる。
 const htmlSinkGlobals = [{ name: "DOMParser", message: "Do not parse arbitrary HTML." }];
 const apiMessage = "Use the generated API client in src/api.";
+const mockMessage = "Use MSW, vi.spyOn or vi.stubGlobal instead of module mocks.";
 const networkGlobals = ["fetch", "XMLHttpRequest"].map((name) => ({ name, message: apiMessage }));
 const htmlSinkProperties = [
   ...restrictedHtmlProperties,
@@ -178,6 +179,7 @@ export default defineConfig(({ mode }) => {
         "vitest/require-test-timeout": "off",
         "vite-plus/prefer-vite-plus-imports": "error",
         "react/no-danger": "error",
+        "vitest/no-restricted-vi-methods": ["error", { mock: mockMessage, doMock: mockMessage }],
         "no-restricted-imports": ["error", { patterns: [baseUiImports, testOnlyImports] }],
         "no-restricted-globals": ["error", ...htmlSinkGlobals, ...networkGlobals],
         "no-restricted-properties": ["error", ...htmlSinkProperties, ...networkProperties],
