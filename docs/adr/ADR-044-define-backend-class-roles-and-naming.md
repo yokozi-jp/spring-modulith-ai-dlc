@@ -69,9 +69,11 @@ Proposed
 - Controller は集約ごとに `<Aggregate>Controller` として `presentation.web` に置く。
 - リクエストボディを受けるユースケースごとに `<UseCase>Request` を、参照の結果ごとに `<QueryResult>Response` を、`presentation.web` の record として置く。
 - 作成の成功は 201 と、作成したリソースの URI を示す `Location` で返す。`POST` の対象 URI はコレクションなので、`Location` がないと作成したリソースを示せない（[RFC 9110 15.3.2](https://www.rfc-editor.org/rfc/rfc9110#section-15.3.2)）。Spring では `ResponseEntity.created(URI)` と `ServletUriComponentsBuilder` で組み立てる（[Javadoc: ResponseEntity](https://docs.spring.io/spring-framework/docs/current/javadoc-api/org/springframework/http/ResponseEntity.html)、[Spring, URI Links](https://docs.spring.io/spring-framework/reference/web/webmvc/mvc-uri-building.html)）。
+- Request から Command への変換は Request のインスタンスメソッド `toCommand()` に、ルートの record から Response への変換は Response の static メソッド `from(...)` に置き、`presentation.web` に Mapper クラスを作らない。
 - Presentation は Domain に依存せず、Application の Command、Result、CommandHandler と、ルートの Queries と record だけを使う。
 - Repository の実装は `infrastructure.persistence` の `Jooq<Aggregate>Repository` とし、jOOQ の生成型と Domain の型の変換は `<Aggregate>RecordMapper` に置く。
 - 外部システムのインタフェースの実装は `infrastructure.client` の `<ExternalSystem>Client` とする。
+- Infrastructure は、機能モジュールの型のうち同じモジュールの `domain.model` の型だけを使い、Application、Domain Service、モジュールルートの型に依存しない。
 
 ### モジュール間の連携
 
@@ -149,9 +151,9 @@ Proposed
 
 ### 選択肢7: Domain Event を `domain.model` に置き、`<Event>Publisher` で発行する
 
-- **Description**：集約がイベントを記録し、`<Event>Publisher` クラスが `infrastructure.messaging` から発行する。
-- **Pros**：集約の状態変化とイベントの生成を一か所にまとめられる。
-- **Cons**：モジュール間のイベントは他モジュールが読む公開契約であり、ルートの record にしないと Domain の型が他モジュールへ漏れる。発行は `ApplicationEventPublisher` の一行で済み、ラッパーのクラスは間接層を増やすだけである。発行をトランザクションの内側に置くには、CommandHandler で発行するのが最も単純である。
+- **Description**：Evans の DDD Reference は、ドメインで起きた出来事を Domain Event としてドメインモデルの一部に表すとしている（[Evans, DDD Reference](https://www.domainlanguage.com/wp-content/uploads/2016/05/DDD_Reference_2015-03.pdf)）。Vernon の公開サンプルも、発行のための `DomainEventPublisher` を `domain.model` に置く（[IDDD_Samples, DomainEventPublisher](https://github.com/VaughnVernon/IDDD_Samples/blob/master/iddd_common/src/main/java/com/saasovation/common/domain/model/DomainEventPublisher.java)）。Spring Data では、集約ルートが `AbstractAggregateRoot` を継承するか `@DomainEvents` を付けたメソッドでイベントを記録し、Repository の `save` と `delete` のときに発行される（[Spring Data Commons, Publishing Events from Aggregate Roots](https://docs.spring.io/spring-data/commons/reference/repositories/core-domain-events.html)、[Javadoc: AbstractAggregateRoot](https://docs.spring.io/spring-data/commons/docs/current/api/org/springframework/data/domain/AbstractAggregateRoot.html)）。以前の docs は、これに加えて `<Event>Publisher` クラスが `infrastructure.messaging` から発行する形にしていた。
+- **Pros**：集約の状態変化とイベントの生成を一か所にまとめられ、DDD の正典の形に沿う。
+- **Cons**：モジュール間のイベントは他モジュールが読む公開契約であり、ルートの record にしないと Domain の型が他モジュールへ漏れる。Spring Data の仕組みは Spring Data の Repository の `save` と `delete` でだけ働くため、jOOQ で書く Repository では使えず、集約が Spring Data の型に依存して `domain.model` を Spring から独立させる規則にも反する。Spring Modulith の文書の例も、集約の状態を変えたあとに `@Service` から `ApplicationEventPublisher` でイベントを発行している（[Spring Modulith, Working with Application Events](https://docs.spring.io/spring-modulith/reference/events.html)）。発行は `ApplicationEventPublisher` の一行で済み、ラッパーのクラスは間接層を増やすだけである。発行をトランザクションの内側に置くには、CommandHandler で発行するのが最も単純である。
 
 ### 選択肢8: Listener を `infrastructure.messaging` に置く
 
@@ -164,6 +166,12 @@ Proposed
 - **Description**：データの取得は CommandHandler が行い、Domain Service には取得した値を引数で渡す。
 - **Pros**：Domain Service が純粋な計算になり、テストに Repository の代役が要らない。
 - **Cons**：Evans の DDD Reference も Vernon の公開サンプルも、Domain Service が Repository を使うことを禁じていない（[IDDD_Samples](https://github.com/VaughnVernon/IDDD_Samples)）。「未出荷の注文は3件まで」のように Repository で数えて確かめる規則を Domain Service に置けないと、規則が CommandHandler へ漏れ、ドメインモデル貧血症に近づく（[Fowler, AnemicDomainModel](https://www.martinfowler.com/bliki/AnemicDomainModel.html)）。Application から依存を渡せば集約は Repository に頼らずに済むという指摘（[Vernon, Effective Aggregate Design Part II](https://www.dddcommunity.org/wp-content/uploads/files/pdf_articles/Vernon_2011_2.pdf)）は集約についてのものであり、Domain Service には当てはめない。
+
+### 選択肢10: Response を機能ごとの `<Feature>Response` にする
+
+- **Description**：`presentation.web` の応答を機能ごとの `<Feature>Response`（`OrderResponse`）にし、参照の形ごとに `OrderSummaryResponse` などへ分けてもよいとする。
+- **Pros**：機能ごとの応答のクラスが少なくて済む。
+- **Cons**：「分けてもよい」は、分けるかどうかの判断を作業者に残す条件付きの規則になる。ルートの参照の結果（`OrderDetails`、`OrderSummary`）ごとに `<QueryResult>Response` を一つ作れば、名前と変換元が一つに決まり、`from(...)` の引数の型も一つになる。
 
 ## References
 
@@ -186,6 +194,8 @@ Proposed
 - [Spring Modulith, Fundamentals](https://docs.spring.io/spring-modulith/reference/fundamentals.html)
 - [Spring Modulith, Working with Application Events](https://docs.spring.io/spring-modulith/reference/events.html)
 - [Spring Modulith, Integration Testing Application Modules](https://docs.spring.io/spring-modulith/reference/testing.html)
+- [Spring Data Commons, Publishing Events from Aggregate Roots](https://docs.spring.io/spring-data/commons/reference/repositories/core-domain-events.html)
+- [Spring Data Commons Javadoc, AbstractAggregateRoot](https://docs.spring.io/spring-data/commons/docs/current/api/org/springframework/data/domain/AbstractAggregateRoot.html)
 - [Spring Framework Javadoc, @Service](https://docs.spring.io/spring-framework/docs/current/javadoc-api/org/springframework/stereotype/Service.html)
 - [Spring Framework Javadoc, ResponseEntity](https://docs.spring.io/spring-framework/docs/current/javadoc-api/org/springframework/http/ResponseEntity.html)
 - [Spring Framework, Classpath Scanning and Managed Components](https://docs.spring.io/spring-framework/reference/core/beans/classpath-scanning.html)
@@ -197,6 +207,7 @@ Proposed
 - [Tom Hombergs, buckpal](https://github.com/thombergs/buckpal)
 - [Tom Hombergs, Hexagonal Architecture with Java and Spring](https://reflectoring.io/spring-hexagonal/)
 - [Vaughn Vernon, IDDD_Samples](https://github.com/VaughnVernon/IDDD_Samples)
+- [Vaughn Vernon, IDDD_Samples: DomainEventPublisher](https://github.com/VaughnVernon/IDDD_Samples/blob/master/iddd_common/src/main/java/com/saasovation/common/domain/model/DomainEventPublisher.java)
 - [Oliver Drotbohm, spring-restbucks](https://github.com/odrotbohm/spring-restbucks)
 - [jMolecules](https://github.com/xmolecules/jmolecules)
 - [jMolecules Technology Integrations](https://github.com/xmolecules/jmolecules-integrations)

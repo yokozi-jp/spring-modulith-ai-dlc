@@ -29,8 +29,8 @@ tags: [convention, backend, class-role]
 - `com.example.demo.<feature>.domain.model` に置く。
 - 名前は値を表すユビキタス言語の名詞にする。
   識別子は対象の名前に `Id` を付け（`OrderId`、`CustomerId`、`PaymentId`）、そのほかは `Money`、`Quantity`、`ProductCode` のようにする。
-- 単一の値を持つ record の component は `value` にする（`OrderId(String value)`）。
-  金額のように値の意味を名前で示すときは、その名前にする（`Money(BigDecimal amount)`）。
+- 単一の値を持つ record の component は、金額の `Money` だけを `amount` にし、それ以外はすべて `value` にする。
+  例は `OrderId(String value)`、`ProductCode(String value)`、`Quantity(int value)`、`Money(BigDecimal amount)` である。
 - 固定の値の集合は enum にする（`OrderStatus`、`MembershipRank`）。
 
 ## 必須の記述
@@ -179,7 +179,7 @@ class QuantityTest {
 - [ ] `public record` にし、固定の値の集合は `public enum` にする。［自分で点検］
 - [ ] 不変条件をコンパクトコンストラクタで検査し、`IllegalArgumentException` を投げる。［自分で点検］
 - [ ] 演算は新しい値オブジェクトを返す。［自分で点検］
-- [ ] 識別子の名前は対象の名前に `Id` を付け、単一の値の component は `value` にする。［自分で点検］
+- [ ] 識別子の名前は対象の名前に `Id` を付け、単一の値の component は `Money` だけを `amount`、それ以外を `value` にする。［自分で点検］
 - [ ] Domain の例外を 400、404、422 で返す必要があるなら、実装を止めて利用者に確認した。［自分で点検］
 - [ ] Javadoc を書く。［自分で点検］
 - [ ] 不変条件を QuickTheories のプロパティベーステストで確かめる。［自分で点検］
