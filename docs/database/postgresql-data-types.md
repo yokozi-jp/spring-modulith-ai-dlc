@@ -21,6 +21,8 @@ Spring Modulithのイベント出版テーブルのように、フレームワ�
 - **コード**：`varchar(n)`。商品コードのように値が数字だけでも文字列にする。
 - **区分**：`varchar(n)`とし、NOT NULLにする。値が数字だけでも区分値はコードとして扱う。
 - **絶対時刻**：`timestamptz`。扱いは[日時とタイムゾーンの規約](../datetime/timezone-conventions.md)に従う。
+  期間の検索は開始を含み終了を含まない半開区間（`>= start AND < end`）で書き、`BETWEEN`を使わない。
+  `BETWEEN`は両端を含むため、終了の境界ちょうどの値が隣の期間と二重に数えられる。
 - **日付**：`date`。パーティションキーに使うときはNOT NULLにする。
 - **年月**：`yyyy-MM`形式の`varchar(7)`。パーティションキーに使うときはNOT NULLにする。
 - **数量**：`integer`または`bigint`。連番に対応する数量は`bigint`にする。既定値を0にしない。
@@ -39,8 +41,10 @@ Spring Modulithのイベント出版テーブルのように、フレームワ�
 - **`smallint`**：型の選択肢を減らすため、`integer`か`bigint`を使う。
 - **`real`**：精度が6桁程度しかないため、浮動小数が必要なら`double precision`を使う。
 - **`money`**：桁数と精度を指定した`numeric(p, s)`を使う。
+- **`time with time zone`**：PostgreSQL自身が有用性に疑問があるとしている。時刻だけの値には`time`を使う。
+- **`timestamptz(n)`と`timestamp(n)`の精度指定**：小数部が切り捨てではなく丸めになり、保存した値が未来の時刻になることがある。精度をそろえる処理は保存前にアプリケーションで行う。
 
-`timestamp without time zone`と`time with time zone`は、[日時とタイムゾーンの規約](../datetime/timezone-conventions.md)が定める場合だけ使う。
+`timestamp without time zone`は、[日時とタイムゾーンの規約](../datetime/timezone-conventions.md)が定める場合だけ使う。
 
 ## IDENTITY列
 
@@ -103,3 +107,4 @@ JSONの中の値で検索する必要が出たら、インデックスを張ら�
 
 - フューチャー株式会社「PostgreSQL設計ガイドライン」（[アーキテクチャ設計ガイドライン](https://future-architect.github.io/arch-guidelines/documents/forDB/postgresql_guidelines.html)、commit `e309a6d`）、[CC BY 4.0](https://creativecommons.org/licenses/by/4.0/deed.ja)
 - このリポジトリの規約に合わせて抜粋、再構成、改変している。取り込みの方針は [ADR-040](../adr/ADR-040-import-future-architecture-guidelines.md) に従う。
+- 半開区間、`time with time zone`、精度指定の規則は PostgreSQL Wiki「Don't Do This」（<https://wiki.postgresql.org/wiki/Don't_Do_This>）に基づく。

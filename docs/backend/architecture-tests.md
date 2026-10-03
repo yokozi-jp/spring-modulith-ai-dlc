@@ -62,9 +62,10 @@ backend/src/test/java/com/example/demo/architecture/
 
 ## 日時
 
-`DateTimeConventionsArchTest`は、レガシー日時型、引数なしの`now()`、`System.currentTimeMillis()`、`ZoneId.systemDefault()`、許可点以外でのシステム`Clock`生成を検査する。
+`DateTimeConventionsArchTest`は、レガシー日時型、`Clock`を受け取らない`now(...)`、`Instant`以外の`now(Clock)`、`System.currentTimeMillis()`、`ZoneId.systemDefault()`、許可点以外でのシステム`Clock`生成と`InstantSource.system()`を検査する。
 システム`Clock`の生成は`DemoApplication.clock()`だけを許可する。
-日時規約の決定は[ADR-006](../adr/ADR-006-utc-instant-absolute-time-policy.md)を参照する。
+呼び出しに加えて、`Instant::now`のようなメソッド参照も検査する。
+日時規約の決定は[ADR-006](../adr/ADR-006-utc-instant-absolute-time-policy.md)と[ADR-046](../adr/ADR-046-derive-local-dates-with-configured-business-zone.md)を参照する。
 
 Error ProneはすべてのJavaコンパイルで`JavaTimeDefaultTimeZone`と`JavaUtilDate`をerrorとして検査する。
 
