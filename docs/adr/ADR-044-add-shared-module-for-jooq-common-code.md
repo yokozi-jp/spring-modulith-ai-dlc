@@ -94,6 +94,7 @@ jOOQ の共通処理は `com.example.demo.shared.infrastructure.persistence` に
 - [ADR-002: package by feature とオニオンアーキテクチャ](ADR-002-package-by-feature-onion-architecture.md)
 - [ADR-003: データアクセスに jOOQ を採用](ADR-003-adopt-jooq-for-data-access.md)
 - [バックエンドアーキテクチャ](../backend/architecture.md)
+- [バックエンドのアーキテクチャテスト](../backend/architecture-tests.md)
 - [PostgreSQL の共通カラム](../database/postgresql-common-columns.md)
 - [PostgreSQL の排他制御](../database/postgresql-concurrency-control.md)
 - [Spring Modulith `@Modulithic`](https://docs.spring.io/spring-modulith/docs/current/api/org/springframework/modulith/Modulithic.html)
