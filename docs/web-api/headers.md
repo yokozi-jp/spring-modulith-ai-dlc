@@ -9,7 +9,7 @@ tags: [convention, web-api, http, future-arch-guidelines]
 
 認証情報はCookieまたは`Authorization`ヘッダーで送り、URLと本文に入れない。
 応答には必ず`Content-Type`を付け、`charset`を付けない。
-API応答は既定でキャッシュさせず、共有できる応答だけを個別に判断してキャッシュさせる。
+API応答はキャッシュさせない。
 
 ## リクエストヘッダー
 
@@ -43,10 +43,6 @@ Content-Type: application/json
 API応答は既定でキャッシュさせない。
 業務データは利用者ごとに権限で制御され、共有端末のブラウザやCDNに残すと他の利用者が参照できるためである。
 Spring Securityが既定で付けるキャッシュ抑止のヘッダー（`Cache-Control: no-cache, no-store, max-age=0, must-revalidate`）を無効化しない。
-
-区分値のように利用者間で共有できる応答に限り、APIごとに判断してキャッシュを許可する。
-許可するときは、そのAPIの応答で`Cache-Control`を明示する。
-言語ごとに応答が変わるAPIでは、ADR-016に従い`Vary: Accept-Language`を付ける。
 
 ## Server-Timing
 

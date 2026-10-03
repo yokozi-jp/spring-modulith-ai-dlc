@@ -49,6 +49,7 @@ export default defineConfig({
 ## operationと生成物の扱い
 
 各OpenAPI operationには、所有する業務機能のtagを一つ付け、安定した`operationId`を与える。
+`operationId`の命名は[Web APIの方式とURLの設計](../web-api/api-style.md#operationid)に従う。
 
 Orvalは複数tagがあるoperationを先頭tagへ割り当てるため、一つの所有tagに限定すると生成先が記述順へ依存しない。
 
@@ -60,7 +61,7 @@ Orvalが生成する`models/shared`は複数tagが参照するschemaの生成先
 
 Orvalの`clean`は生成先を削除して再作成できるため、手書きのmutator、MSW server lifecycle、fixtureを`api/generated`に置かない。
 
-MSW handlerをOrvalから生成する場合は生成先だけを`api/generated/mocks`に置き、手書きのserver setupは必要になった時点で`testing/msw`などの生成対象外へ置く。
+MSW handlerをOrvalから生成する場合は生成先だけを`api/generated/mocks`に置き、手書きのserver setupは必要になった時点で`src/testing/msw`などの生成対象外へ置く。
 
 ## transportとruntime検証
 

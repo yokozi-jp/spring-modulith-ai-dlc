@@ -1,7 +1,7 @@
 ---
 type: ADR
 title: 'ADR-034: Frontend ランタイムを固定し Oxlint 全カテゴリを強制する'
-description: ローカルと CI の実行差をなくすため、Frontend ランタイムを固定し Oxlint 全カテゴリを強制する決定。
+description: ローカルと CI の実行差をなくすため、Frontend ランタイムを固定し Oxlint 全カテゴリを強制し、矛盾する規則の調整と import と global の制限の範囲を定める決定。
 tags: [adr, frontend, tooling, lint]
 ---
 
@@ -27,6 +27,11 @@ Lint は `vp check` へ集約し、型認識 Lint と型検査、React、Tailwin
 検出力を上げるため、Oxlint の安定カテゴリをすべてエラーへ引き上げたい。
 ただし、全カテゴリを有効にすると、named export 禁止と default export 禁止のように同時に満たせない規則や、automatic JSX runtime で不要になる規則、Vite や TanStack Router や Vitest の標準構文を禁じる規則が含まれる。
 
+最初の業務 feature を作る前の点検で、全カテゴリの組合せには正しい書き方が一つも通らない箇所が残っていた。
+event handler から `navigate()` や `invalidateQueries()` を呼ぶ書き方は、`void`、async handler、`.catch` を含めて 7 通りすべてが違反になった。
+`undefined` の判定は、`x !== undefined` も `typeof x !== "undefined"` も違反になり、型名と比べる形しか通らなかった。
+また、共有層、route、Base UI、`fetch`、テスト用部品の import を制限する規則がなく、`no-restricted-imports` は有効でも禁止の一覧が空だった。
+
 ## Decision
 
 Node.js の版を `frontend/.node-version`（`24.21.0`）で固定し、これを正本とする。
@@ -41,8 +46,32 @@ Oxlint の `correctness`、`suspicious`、`pedantic`、`perf`、`style`、`restr
 
 カテゴリ全体を維持したうえで、次のものに限って個別規則を無効化または調整する。
 相互に矛盾する規則（named/default export の強制など）、automatic JSX runtime で不要な規則、Vite の default export や TanStack Router の named export や CSS の副作用 import、React の `className` と props spread、modern な async / optional chaining / rest、Vitest の hook や import に関する標準構文、Oxfmt や型推論と役割が重複する整形系規則である。
+加えて、正しい書き方が通らない規則と、表記や export の形に関わる規則を次のように調整する。
+
+- `no-void` を `allowAsStatement: true` にする。
+  event handler から呼ぶ Promise を捨てる書き方が、`void`、async handler、`.catch` を含めてすべて違反になるためである。
+  `void` を付けてよいのは、reject しない Promise（`invalidateQueries`、`refetchQueries`、`refetch`）、内部で失敗を処理した Promise、`onSubmit` が例外を投げない場合の `form.handleSubmit()` に限る。
+  `typescript/no-misused-promises` と `typescript/strict-void-return` は既定のまま残し、async 関数を JSX の event handler に直接渡さない。
+- `no-undefined` を無効にし、`undefined` の比較を `x === undefined` にそろえる。
+  有効なままだと型名と比べる形しか通らないためであり、上書きと shadowing は有効なままの `no-global-assign` と `no-shadow-restricted-names` が防ぐ。
+- `better-tailwindcss/enforce-canonical-classes` を有効にし、class の表記を正規形にそろえる。
+  `enforce-shorthand-classes` は役割が重なるため有効にしない。
+- `src/components/ui/**` の `react/only-export-components` に `allowExportNames: ["buttonVariants"]` を与える。
+  link を button の見た目にする `<Link className={buttonVariants(...)}>` の形で、`buttonVariants` を export する必要があるためである。
+
+`radix`、`no-new-wrappers`、`typescript/consistent-type-definitions`、`import/no-relative-parent-imports` はカテゴリ指定ですでに有効なので、個別に列挙しない。
+
+import と global の静的な制限は、組み込みの `no-restricted-imports`、`no-restricted-globals`、`no-restricted-properties` の override で書く。
+共有層（`src/{api,components,lib,i18n}/**`）から feature と route を、feature（`src/features/**`）から route を、`src/components/ui/**` 以外から `@base-ui/**` を禁じる。
+`src/api/**` 以外では global の `fetch` と `XMLHttpRequest`、`window.fetch`、`globalThis.fetch` を禁じる。
+テストファイルと `src/testing/**` 以外では `msw`、`msw/**`、`@/api/generated/mocks/**`、`@/testing/**`、`@testing-library/**` を禁じる。
+override の option はマージされず後の override で置き換わるため、既存の `DOMParser` と HTML 系 property の禁止を含めて禁止の一覧を `vite.config.ts` の定数に分け、override ごとに組み合わせる。
+組み合わせた結果は、違反例の fixture（`lint/fixtures/**`、通常の Lint から除外）を実際の設定で Lint するテストで確かめる。
+feature 間の import は、動的な規則が要るため jsPlugin の `feature-boundaries/no-cross-feature-import` で禁じる（[ADR-032](ADR-032-organize-frontend-by-business-feature.md)）。
+
 ファイル単位で Lint を無効化したり、カテゴリ全体を警告へ戻したりしない。
-範囲を限定する調整は、Node 側 Lint ツール（`lint/**`）、shadcn 由来コンポーネント（`src/components/ui/**`）、ルートモジュール（`src/routes/**`）、テストファイルの override で行う。
+範囲を限定する調整は、Node 側 Lint ツール（`lint/**`）、共有層（`src/{api,components,lib,i18n}/**`）、feature（`src/features/**`）、shadcn 由来コンポーネント（`src/components/ui/**`）、API client（`src/api/**`）、ルートモジュール（`src/routes/**`）、テストファイルと `src/testing/**` の override で行う。
+例外と調整の一覧、ファイルの範囲ごとに効く制限、Lint を通る書き方は `docs/tooling/lint-and-test.md` に理由とともに書く。
 
 ## Consequences
 
@@ -58,6 +87,8 @@ Oxlint の `correctness`、`suspicious`、`pedantic`、`perf`、`style`、`restr
 - 新しい依存や書き方が、これまで警告だった規則でエラーになり、修正が必要になる場合がある。
 - Oxlint の更新で規則やカテゴリの内容が変わると、例外リストの見直しが必要になる。
 - Node.js の版更新は `.node-version`、CI、Vite+ の三者を揃える手順を伴う。
+- import と global の制限は override の並び順と option の置き換えに依存し、override を並べ替えるときは fixture のテストで組合せを確かめる必要がある。
+- テストファイルの override は層の import 制限も外すため、テストにも層の制限が要るようになったら dependency-cruiser への移行を判断する必要がある。
 
 ### Neutral
 
@@ -95,6 +126,9 @@ Oxlint の `correctness`、`suspicious`、`pedantic`、`perf`、`style`、`restr
 - [Oxlint: CLI reference（カテゴリ）](https://oxc.rs/docs/guide/usage/linter/cli.html)
 - [Oxlint: Config file reference（`options`）](https://oxc.rs/docs/guide/usage/linter/config-file-reference.html)
 - [Vite+: Environment（Node.js 選択）](https://viteplus.dev/guide/env)
+- [Oxlint: Configuring（overrides）](https://oxc.rs/docs/guide/usage/linter/config.html)
+- [ADR-032: Frontendを業務機能単位で構成する](ADR-032-organize-frontend-by-business-feature.md)
+- `frontend/lint/lint-config.test.js`
 - `frontend/vite.config.ts`
 - `frontend/.node-version`
 - `.github/workflows/frontend-ci.yml`

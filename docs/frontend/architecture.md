@@ -1,7 +1,7 @@
 ---
 type: Architecture
 title: フロントエンドアーキテクチャ
-description: 業務能力を最上位の変更単位にする軽量な Package by feature によるフロントエンドの構造を説明する。ディレクトリ構成、業務機能の境界、依存方向、共有コードの置き場所を決めるときに読む。
+description: 業務能力を最上位の変更単位にする軽量な Package by feature によるフロントエンドの構造を説明する。ディレクトリ構成、業務機能の境界と検査、依存方向、共有コードとテストの置き場所を決めるときに読む。
 tags: [architecture, frontend, react]
 ---
 
@@ -9,7 +9,8 @@ tags: [architecture, frontend, react]
 
 業務能力を最上位の変更単位にし、`features/<business-feature>` に画面と利用者操作を置く。
 実在しない責務のために空ディレクトリや共通層を先に作らない。
-feature 間の内部 import と、共通コードから feature への依存を作らない。
+feature から別 feature のファイルを import せず、共通コードから feature へ依存しない。
+この境界は Oxlint の `feature-boundaries/no-cross-feature-import` と `no-restricted-*` の override が検査する。
 
 ## 方針
 
@@ -27,14 +28,17 @@ OpenAPIからOrvalでnative FetchのTanStack Query clientを生成し、手書�
 
 ## 現在の構成
 
-現在の `src` は、アプリケーションの起動、ルーティング、共通UI、国際化、小さなutilityだけを持つ。
+現在の `src` は、アプリケーションの起動、ルーティング、アプリシェル、routerの既定の状態表示、共通UI、国際化、小さなutilityだけを持つ。
 
 ``` text
 frontend/src/
 ├── main.tsx
+├── router-defaults.ts
+├── router-defaults.test.tsx
 ├── style.css
 ├── i18n/
 │   ├── index.ts
+│   ├── index.test.ts
 │   ├── i18next.d.ts
 │   ├── resolve-locale.ts
 │   ├── resolve-locale.test.ts
@@ -44,9 +48,15 @@ frontend/src/
 ├── routeTree.gen.ts
 ├── routes/
 │   ├── __root.tsx
-│   ├── index.tsx
-│   └── -index.test.tsx
+│   └── _authenticated/
+│       ├── route.tsx
+│       ├── index.tsx
+│       └── -index.test.tsx
 ├── components/
+│   ├── app-shell.tsx
+│   ├── route-pending.tsx
+│   ├── route-error.tsx
+│   ├── route-not-found.tsx
 │   └── ui/
 │       ├── button.tsx
 │       └── button.test.tsx
@@ -57,7 +67,12 @@ frontend/src/
 
 `main.tsx` はcomposition rootであり、TanStack Queryの `QueryClient` とTanStack Routerを生成してProviderを接続する。
 
+`router-defaults.ts` はrouterの既定値（pending、error、not foundのcomponentとpreloadの設定）を一つのobjectにまとめ、`main.tsx` とrouteのテストが同じ値でrouterを作る。
+
+`routes/_authenticated/route.tsx` は認証が要る画面のpathless layoutであり、アプリシェルを描画する。
+
 `routeTree.gen.ts` はTanStack Router pluginの生成物なので、生成元のroute fileを変更して再生成し、生成物を手で編集しない。
+再生成の手順と検査は[フロントエンドのテストと検証](testing.md#生成物)にある。
 
 現在は業務画面と業務APIがないため、`features`、`api`、global storeは存在しない。
 
@@ -74,11 +89,13 @@ frontend/src/
 │
 ├── routes/
 │   ├── __root.tsx
-│   └── <route>.tsx
+│   └── _authenticated/
+│       ├── route.tsx
+│       └── <route>/           # 形はルーティングと状態管理の規約に従う
 │
 ├── features/
 │   └── <business-feature>/
-│       ├── <Feature>Page.tsx
+│       ├── <feature>-page.tsx
 │       ├── components/        # feature固有componentがある場合だけ追加
 │       ├── hooks/             # custom Hookがある場合だけ追加
 │       ├── queries.ts         # queryの合成が必要な場合だけ追加
@@ -96,7 +113,11 @@ frontend/src/
 │   └── <custom-mutator>.ts     # 共通transport要件がある場合だけ追加
 │
 ├── components/
+│   ├── app-shell.tsx
+│   ├── route-*.tsx
 │   └── ui/
+│
+├── testing/                   # 最初のMSWテストを書くときに追加
 │
 └── lib/
 ```
@@ -121,17 +142,42 @@ frontend/src/
 
 feature名には業務で使う名詞を使い、`management`、`common`、`misc` のように所属を判断できない名前を避ける。
 
-別featureの内部ファイルは直接importしない。
+featureから別featureのファイルは例外なくimportしない。
 
-二つのfeatureで同じ公開能力が必要になった場合は、所有するfeatureの公開境界を定めるか、業務上独立したfeatureとして切り出す。
+他のfeatureのdataや表示が要るときは、次の形で書く。
 
-安定した公開境界が存在するまでは、feature rootのbarrel fileを作らない。
+- **data**：`api/generated` の生成query optionsを直接使い、変換は使う側の `select` で書く。
+- **区分値の表示名**：catalogのkeyで引く（[componentの命名と設計](component-design.md#区分値の表示)）。
+- **複数featureをまたぐ画面**：routeで合成する。
+- **他のfeatureのcomponentを自分の画面の内側に置く場合**：routeから `children` かslot propで受け取る。
+
+featureの公開ファイル（`public.ts`やfeature rootのbarrel file）は作らない。
+
+この形で書けない場面が実際に出たときに、所有するfeatureの公開境界を定めるか、業務上独立したfeatureとして切り出すかを決める。
+
+## 境界の検査
+
+feature間の境界は、`frontend/lint/feature-boundaries.js` のOxlint JS plugin `feature-boundaries/no-cross-feature-import` が検査する。
+
+この規則は、import元のファイルのfeature名とimport先の `@/features/<name>` を比べ、異なれば直し方（routeで合成する）とともに報告する。
+対象は静的import、`export ... from`、`import()` である。
+`../` によるimportは `import/no-relative-parent-imports` が禁じているため、この規則はaliasだけを見る。
+
+共有層、route、Base UI、`fetch`、テスト用部品のimportの制限は、`no-restricted-imports`、`no-restricted-globals`、`no-restricted-properties` のoverrideで書いている。
+ファイルの範囲ごとに効く制限は[Lintとテストのリファレンス](../tooling/lint-and-test.md#フロントエンドのlint設定)にある。
+
+jsPluginは、動的な境界規則をこの一本だけと想定している。
+アプリやパッケージに分かれたとき、または動的な規則が三本を超えたときは、dependency-cruiserへ移る。
+OxlintのJS plugin APIはalphaである。
 
 ## 共有コード
 
+アプリシェル（header、layout）と、routerの既定のpending、error、not foundの表示は `components/` の直下に置く。
+`components/ui` にはshadcnのprimitiveだけを置く。
+
 複数featureから使うという理由だけで、トップレベルに汎用的な `shared` ディレクトリを作らない。
 
-現在は共有物の責務を `components/ui`、`lib`、`api/generated`、`i18n` で直接表せるため、`shared` を加えても階層が一つ増えるだけである。
+現在は共有物の責務を `components`、`lib`、`api/generated`、`i18n` で直接表せるため、`shared` を加えても階層が一つ増えるだけである。
 
 共有候補は、二つ以上のfeatureで同じ責務が確認でき、特定featureの業務語彙へ属さず、featureへ逆依存しない場合にだけ移動する。
 
@@ -148,9 +194,12 @@ feature名には業務で使う名詞を使い、`management`、`common`、`misc
 許可する主要な依存方向は次のとおりである。
 
 ``` text
-main.tsx -> routeTree.gen.ts -> routes
+main.tsx -> router-defaults.ts -> components
+         -> routeTree.gen.ts -> routes
                                   |
                                   +-> features
+                                  |
+                                  +-> components
                                   |
                                   +-> api/generated
 
@@ -158,19 +207,33 @@ features -> api/generated
          -> components/ui -> lib
          -> lib
          -> i18n
+
+components -> components/ui
+           -> i18n
 ```
 
 `main.tsx` はProviderとRouterの組立てだけを担当し、業務処理を持たない。
 
-`routes` はfeatureとloaderに必要なquery optionsを参照できる。
+`routes` はfeature、アプリシェル、loaderに必要なquery optionsを参照できる。
 
 `features` は生成API、共通UI、utility、国際化を参照できる。
 
-`api/generated`、`components/ui`、`lib`、国際化コードからfeatureを参照しない。
+`api`、`components`、`lib`、`i18n` からfeatureとrouteを参照しない。
 
-feature間の内部importと循環依存を作らない。
+featureからrouteを参照せず、routeの情報は `getRouteApi` で取る。
 
-規模が増えてレビューだけでは違反を検出しにくくなった場合は、実在する違反例を基にimport制約のlint ruleを追加する。
+feature間のimportと循環依存を作らない。
+
+これらの向きは[境界の検査](#境界の検査)に書いたlintが検査する。
+
+## テストの置き場所
+
+テストは対象のコードと同じディレクトリに置く。
+routeの近くのテストは、route候補に含めないようファイル名を `-` で始める。
+
+複数のテストで使う準備のコード（MSWのserver、手書きのhandlerとfixture、共通のrender helper）は `src/testing/` に置く。
+`src/testing/` は最初のMSWテストを書くときに作る。
+`src/testing/` はテスト用部品のimport制限の例外であり、coverageの計測対象から外している。
 
 ## 関連資料
 

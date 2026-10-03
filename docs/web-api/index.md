@@ -1,6 +1,6 @@
 # Web API
 
-- [Web APIの方式とURLの設計](api-style.md)：新しいAPIのエンドポイントやパスを設計するとき、RESTで表しにくい操作を追加するとき
+- [Web APIの方式とURLの設計](api-style.md)：新しいAPIのエンドポイントやパスを設計するとき、operationIdを付けるとき、RESTで表しにくい操作を追加するとき
 - [HTTPメソッドの使い分け](http-methods.md)：エンドポイントにHTTPメソッドを割り当てるとき、更新系の応答や再試行への備えを決めるとき
 - [クエリパラメータ](query-parameters.md)：検索APIや一覧APIのパラメータを設計するとき
 - [APIのリクエストヘッダーとレスポンスヘッダー](headers.md)：APIにヘッダーを追加するとき、応答のキャッシュを許可するか決めるとき
