@@ -57,8 +57,14 @@ spring:
       # minimum-idle は未指定とし、HikariCP の固定サイズ pool の既定動作を使う。
       # モジュールスキーマ名は環境差を持たないアーキテクチャ上の固定値。
       schema: modulith
-      # 新しい物理接続ごとにDBセッションの日時解釈と表示をUTCへ固定する。
-      connection-init-sql: SET TIME ZONE 'UTC'
+      # 新しい物理接続ごとに、DBセッションの日時解釈と表示をUTCへ固定し、
+      # ロック待ち、文の実行、トランザクション中の待機の上限（ミリ秒）を設定する（ADR-053）。
+      # lock_timeout は statement_timeout より短くする。postgresql.conf では設定しない。
+      connection-init-sql: >-
+        SET TIME ZONE 'UTC';
+        SET lock_timeout = ${DB_LOCK_TIMEOUT_MS};
+        SET statement_timeout = ${DB_STATEMENT_TIMEOUT_MS};
+        SET idle_in_transaction_session_timeout = ${DB_IDLE_IN_TRANSACTION_TIMEOUT_MS}
 
   # DBマイグレーションはアプリ起動から分離済み（spring-boot-starter-liquibase を依存に持たず、
   # 起動時の自動実行は起こらない）。変更は ./gradlew migrateDatabase などの明示コマンドで適用する。

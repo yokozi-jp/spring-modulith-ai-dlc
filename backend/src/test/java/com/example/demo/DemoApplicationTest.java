@@ -20,6 +20,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
+import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeoutException;
@@ -38,6 +39,8 @@ import org.springframework.security.oauth2.core.endpoint.OAuth2AuthorizationRequ
 import org.springframework.security.oauth2.core.endpoint.PkceParameterNames;
 
 /** アプリケーション起動時の日時、DB、耐障害性、OIDC 配線を検証する統合テスト。 */
+// 起動時の配線を設定ごとに一つのテストで検証するため、メソッドの数の上限を外す。
+@SuppressWarnings("PMD.TooManyMethods")
 @SpringBootTest
 @Import(SharedTestConfiguration.class)
 class DemoApplicationTest {
@@ -177,6 +180,42 @@ class DemoApplicationTest {
         "UTC",
         jdbcTemplate.queryForObject("SHOW TIME ZONE", String.class),
         "DB セッションのタイムゾーンは UTC であること");
+  }
+
+  @Test
+  @DisplayName("DB セッションの待ち時間の上限は環境変数の値であり、ロック待ちは文の実行より短い")
+  void databaseSessionUsesConfiguredTimeLimits() {
+    final Map<String, String> settings =
+        Map.of(
+            "lock_timeout", "DB_LOCK_TIMEOUT_MS",
+            "statement_timeout", "DB_STATEMENT_TIMEOUT_MS",
+            "idle_in_transaction_session_timeout", "DB_IDLE_IN_TRANSACTION_TIMEOUT_MS");
+    settings.forEach(
+        (name, environmentVariable) -> {
+          final String shown = jdbcTemplate.queryForObject("SHOW " + name, String.class);
+          // SHOW は 1000 を 1s のように単位付きで返すため、interval に変換してミリ秒で比べる。
+          assertEquals(
+              applicationContext.getEnvironment().getRequiredProperty(environmentVariable),
+              jdbcTemplate.queryForObject(
+                  "SELECT (EXTRACT(EPOCH FROM CAST(? AS interval)) * 1000)::bigint::text",
+                  String.class,
+                  shown),
+              () -> "DB セッションの " + name + " (" + shown + ") が " + environmentVariable + " と一致すること");
+        });
+    final long lockTimeout =
+        applicationContext.getEnvironment().getRequiredProperty("DB_LOCK_TIMEOUT_MS", Long.class);
+    final long statementTimeout =
+        applicationContext
+            .getEnvironment()
+            .getRequiredProperty("DB_STATEMENT_TIMEOUT_MS", Long.class);
+
+    assertTrue(
+        lockTimeout < statementTimeout,
+        () ->
+            "lock_timeout は statement_timeout より短いこと: lock_timeout="
+                + lockTimeout
+                + ", statement_timeout="
+                + statementTimeout);
   }
 
   @Test
