@@ -17,7 +17,7 @@ Proposed
 
 ## Context
 
-本番デプロイのワークフロー例（`.github/workflows/production-cd.yml.example`）は、ECR に置いたイメージを ECS サービスへデプロイする構成を仮定しているが、起動タイプは決めていない。
+本番デプロイのワークフロー例（[ADR-045](ADR-045-remove-aws-docs-and-production-cd-example.md) で削除）は、ECR に置いたイメージを ECS サービスへデプロイする構成を仮定しているが、起動タイプは決めていない。
 取り込んだ AWS 設計ガイドラインは、費用とイメージキャッシュによる起動の速さを理由に、運用負荷を許容できれば ECS on EC2 を勧めている。
 一方、ECS on EC2 では、OS のパッチ、AMI の更新、ホストの脆弱性管理、クラスターの容量管理をこのチームが担う。
 このリポジトリにはインフラ専任の運用者がおらず、`infrastructure/` もまだ空である。
@@ -69,5 +69,4 @@ ECS on EC2、EKS、Lambda、App Runner、EC2 への直接のデプロイは使�
 
 ## References
 
-- [AWSの実行基盤とジョブキューの選択](../aws/compute-selection.md)
 - [ADR-020: コンテナイメージを署名し provenance を検証する](ADR-020-sign-and-attest-container-images.md)

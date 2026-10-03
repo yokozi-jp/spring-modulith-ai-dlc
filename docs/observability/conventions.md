@@ -1,7 +1,7 @@
 ---
 type: Convention
 title: 可観測性データの規約
-description: OpenTelemetry へ記録するデータ、例外の記録、ログとトレースの相関、発生源で渡さない値、Collector の allowlist、保持、アクセス、本番の受け入れ条件を定め、可観測性データの実装、Collector の設定、本番収集基盤を変更するときに読む規約。
+description: OpenTelemetry へ記録するデータ、例外の記録、ログとトレースの相関、発生源で渡さない値、Collector の allowlist、本番のロググループ、保持、アクセス、本番の受け入れ条件を定め、可観測性データの実装、Collector の設定、本番収集基盤を変更するときに読む規約。
 tags: [convention, observability, opentelemetry, security]
 ---
 
@@ -10,7 +10,7 @@ tags: [convention, observability, opentelemetry, security]
 バックエンドはログ、トレース、メトリクスを OpenTelemetry で Collector へ送り、コンソールにも ECS JSON を出す。
 例外は logger へ渡して標準どおりに記録し、禁止値はアプリケーションから渡さない。
 ログの属性は Collector の allowlist で絞り、保存先で閲覧の制限と表示時のマスクを行う。
-設計判断は [ADR-015](../adr/ADR-015-structure-and-protect-observability-data.md) と [ADR-043](../adr/ADR-043-send-production-telemetry-to-cloudwatch-via-otel-collector.md) に記録している。
+設計判断は [ADR-015](../adr/ADR-015-structure-and-protect-observability-data.md)、[ADR-043](../adr/ADR-043-send-production-telemetry-to-cloudwatch-via-otel-collector.md)、[ADR-045](../adr/ADR-045-remove-aws-docs-and-production-cd-example.md) に記録している。
 
 ## 記録
 
@@ -94,7 +94,19 @@ Collector の設定（`docker/otel-collector/config.yaml`）は、ローカル�
 - 本番の Collector は `docker/otel-collector/config.yaml` に、exporter と拡張と各 pipeline の exporters だけを定める上書きファイルを重ねる。processors は上書きしない。
 - アプリケーションのロググループ、標準出力のロググループ、`aws/spans` ロググループに CloudWatch Logs のデータ保護ポリシーを設定し、個人データと秘密情報を検知して表示時にマスクする。日本の氏名と電話番号は custom data identifier で補う。
 - 標準出力は WARN 以上だけを別のロググループへ送り、起動時と Collector の障害時の調査に使う。
-- ロググループの分け方は [CloudWatch Logsのロググループ](../aws/cloudwatch-logs.md) に従う。
+
+## 本番のロググループ
+
+本番のアプリケーションのログは、サービスごとに二つのロググループへ保存する。
+ロググループを他のサービスと共有しない理由は [ADR-045](../adr/ADR-045-remove-aws-docs-and-production-cd-example.md) に記録している。
+
+- 一つのサービスに、Collector から OTLP で送るアプリケーションのロググループと、WARN 以上の標準出力のロググループを一つずつ作る。他のサービスと共有しない。
+- この二つ以外に、一つのサービスのログを複数のロググループへ分けない。セキュリティ監査ログと通常のログのように保持期間が異なる場合に限り、分けてよい。
+- 複数のサービスを横断して調べるときは、CloudWatch Logs Insights で複数のロググループを指定して検索する。
+- 二つのロググループの保持期間は、次節の通常のアプリケーションログの保持期間に設定し、無期限のまま残さない。
+- 標準出力のロググループのログストリームはタスクごとに分ける。`awslogs` ドライバーに `awslogs-stream-prefix` を設定すると、ストリーム名にタスク ID が入る。CloudWatch Logs の緊急削除はログストリームかロググループの単位になる（[ADR-043](../adr/ADR-043-send-production-telemetry-to-cloudwatch-via-otel-collector.md)）。
+- アプリケーションのロググループのログストリームの単位は未定である。ストリーム名は Collector が送る `x-aws-log-stream` ヘッダーで決まり、本番の上書きファイルはまだない。上書きファイルを作るときに、タスクごとの値を渡す方法を決める。
+- ロググループのログクラスの選択は、この規約の範囲外とする。
 
 ## 保持とアクセス
 
@@ -115,3 +127,8 @@ Collector の設定（`docker/otel-collector/config.yaml`）は、ローカル�
 5. 許可していない属性を持つ検査用 event が、保存前に属性を除かれる。
 6. メールアドレスを含む例外メッセージが、表示時にマスクされる。
 7. `exception.type`、`exception.message`、`exception.stacktrace` が OTLP 属性として検索できる。
+
+## 出典
+
+- フューチャー株式会社「AWS設計ガイドライン」（[アーキテクチャ設計ガイドライン](https://future-architect.github.io/arch-guidelines/documents/forAWS/aws_guidelines.html)、commit `e309a6d`）、[CC BY 4.0](https://creativecommons.org/licenses/by/4.0/deed.ja)
+- 「本番のロググループ」の節は、この原文をこのリポジトリの規約に合わせて抜粋、再構成、改変している。取り込みの方針は [ADR-040](../adr/ADR-040-import-future-architecture-guidelines.md) に従う。
