@@ -6,7 +6,7 @@
       },
       "scopeLogs": [
         {
-          "scope": { "name": "com.example.demo.error.presentation.ApiExceptionHandler" },
+          "scope": { "name": "com.example.demo.error.presentation.web.ApiExceptionHandler" },
           "logRecords": [
             {
               "timeUnixNano": "1790000000000000000",
