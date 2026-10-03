@@ -106,7 +106,6 @@ Collector の設定（`docker/otel-collector/config.yaml`）は、ローカル�
 - 二つのロググループの保持期間は、次節の通常のアプリケーションログの保持期間に設定し、無期限のまま残さない。
 - 標準出力のロググループのログストリームはタスクごとに分ける。`awslogs` ドライバーに `awslogs-stream-prefix` を設定すると、ストリーム名にタスク ID が入る。CloudWatch Logs の緊急削除はログストリームかロググループの単位になる（[ADR-043](../adr/ADR-043-send-production-telemetry-to-cloudwatch-via-otel-collector.md)）。
 - アプリケーションのロググループのログストリームの単位は未定である。ストリーム名は Collector が送る `x-aws-log-stream` ヘッダーで決まり、本番の上書きファイルはまだない。上書きファイルを作るときに、タスクごとの値を渡す方法を決める。
-- ロググループのログクラスの選択は、この規約の範囲外とする。
 
 ## 保持とアクセス
 
