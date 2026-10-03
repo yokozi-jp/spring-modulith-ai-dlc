@@ -44,3 +44,5 @@
 - [ADR-041: ECS のタスクを Fargate で動かす](ADR-041-run-ecs-tasks-on-fargate.md)（Proposed, 2026-10-01）
 - [ADR-042: 人の利用者の AWS アクセスを IAM Identity Center で管理する](ADR-042-use-iam-identity-center-for-human-access.md)（Proposed, 2026-10-01）
 - [ADR-043: 本番の可観測性データを OpenTelemetry Collector で CloudWatch へ送る](ADR-043-send-production-telemetry-to-cloudwatch-via-otel-collector.md)（Proposed, 2026-10-01）
+- [ADR-044: jOOQ の共通処理を共有モジュール shared に置く](ADR-044-add-shared-module-for-jooq-common-code.md)（Proposed, 2026-10-03）
+- [ADR-045: カラム名と型の矛盾を機械検査する](ADR-045-detect-column-name-and-type-mismatches.md)（Proposed, 2026-10-03）

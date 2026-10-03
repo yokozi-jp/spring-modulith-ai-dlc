@@ -43,8 +43,24 @@ DBの行ロックは、在庫の引き当てのように性能が重要になる
 3. 一致しなければロールバックし、競合を利用者へ返す。
 4. 一致すれば、`lock_no`を1加算して更新する。
 
-UPDATEの条件にバージョンを指定して更新件数で判定する方式は使わない。
-複数のテーブルを更新する場合に、更新件数の確認を漏らしやすいためである。
+先に`SELECT ... FOR UPDATE`でロックしてから比較する順序を守り、UPDATEの条件にバージョンを指定して更新件数で判定する方式は使わない。
+理由は次の3点である。
+
+- 親の行（集約のルート）をロックすれば、同じトランザクションで更新する子テーブルの行も守られる。
+- SELECTの段階で、「行がない」（404）と「他の人が更新した」（409）を区別できる。
+- SELECTには`NOWAIT`を付けられるが、UPDATEには付けられない。
+
+### jOOQの楽観的ロックの機能
+
+jOOQの`Settings`の`executeWithOptimisticLocking`と、コード生成の`recordVersionFields`を使わない。
+理由は次の4点である。
+
+- jOOQはレコードに取得した値と比較するため、画面から受け取った`lock_no`と比較できない。
+- `lock_no`をバージョンのカラムに指定すると、jOOQは`UPDATE ... WHERE lock_no = ?`と更新件数で判定する方式に切り替わる。この方式は上記のとおり使わない。
+- jOOQが発行する`SELECT ... FOR UPDATE`に`NOWAIT`を付けられない。
+- `UpdatableRecord.store()`で更新するときにしか働かない。
+
+jOOQの機能の動作は[jOOQのマニュアル](https://www.jooq.org/doc/latest/manual/sql-execution/crud-with-updatablerecords/optimistic-locking/)を参照する。
 
 ## デッドロックの防止
 
@@ -80,3 +96,4 @@ WHERE item_id = 1 AND stock_count >= 5;
 
 - フューチャー株式会社「PostgreSQL設計ガイドライン」（[アーキテクチャ設計ガイドライン](https://future-architect.github.io/arch-guidelines/documents/forDB/postgresql_guidelines.html)、commit `e309a6d`）、[CC BY 4.0](https://creativecommons.org/licenses/by/4.0/deed.ja)
 - このリポジトリの規約に合わせて抜粋、再構成、改変している。取り込みの方針は [ADR-040](../adr/ADR-040-import-future-architecture-guidelines.md) に従う。
+- 楽観的ロックの手順を守る理由を書き直し、jOOQの楽観的ロックの機能を使わない規則を追加している。

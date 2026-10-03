@@ -58,7 +58,9 @@ CREATE TABLE m_color (
 ## 文字列の既定値
 
 文字列のカラムはNOT NULLにし、既定値を空文字`''`にする。
+文字列の共通カラム（`*_by`、`*_pgm_cd`、`*_tx_id`、`patched_by`）は例外とし、既定値を持たず、`patched_by`はNULLを許す（[PostgreSQLの共通カラム](postgresql-common-columns.md)）。
 NULLを空文字へ変える処理は、カラムごとに書かず、Infrastructure層のデータアクセスで一律に行う。
+共通カラムと`patched_*`は、この変換の対象から除く。
 空文字の比較には`= ''`と`<> ''`を使い、文字列のカラムに`IS NULL`を使わない。
 
 空文字はNULLと異なり、ユニークインデックスで重複として扱われる。
