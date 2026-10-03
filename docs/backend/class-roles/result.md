@@ -62,6 +62,7 @@ public record CancelOrderResult(String orderId) {}
 ```java
 // com.example.demo.order.presentation.web.OrderController（抜粋）
 /** 注文を受け付け、作成した注文の URI を Location に入れて返す。 */
+@Operation(operationId = "placeOrder")
 @PostMapping
 /* package */ ResponseEntity<Void> place(@Valid @RequestBody final PlaceOrderRequest request) {
   final PlaceOrderResult result = placeOrder.handle(request.toCommand());

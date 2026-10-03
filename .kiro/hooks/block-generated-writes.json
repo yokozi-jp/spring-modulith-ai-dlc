@@ -1,0 +1,16 @@
+{
+  "version": "v1",
+  "hooks": [
+    {
+      "name": "block-generated-writes",
+      "trigger": "PreToolUse",
+      "description": "Blocks agent writes to generated frontend files (frontend/src/routeTree.gen.ts, frontend/src/api/generated/**) and points to the regeneration steps. Fail-open.",
+      "matcher": "fs_write|fsWrite|write|str_replace|strReplace|fs_append|fsAppend|delete_file|deleteFile",
+      "action": {
+        "type": "command",
+        "command": "bash .kiro/hooks/block-generated-writes.sh"
+      },
+      "timeout": 5
+    }
+  ]
+}

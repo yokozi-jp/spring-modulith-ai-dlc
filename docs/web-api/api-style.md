@@ -1,13 +1,14 @@
 ---
 type: Convention
 title: Web APIの方式とURLの設計
-description: HTTP APIの方式の選択、名前の表記、リソースのネストとフラット、カスタムメソッド、バッチ操作のURLを定める規約。新しいAPIのエンドポイントやパスを設計するとき、RESTで表しにくい操作を追加するときに読む。
+description: HTTP APIの方式の選択、名前の表記、operationId、リソースのネストとフラット、カスタムメソッド、バッチ操作のURLを定める規約。新しいAPIのエンドポイントやパスを設計するとき、operationIdを付けるとき、RESTで表しにくい操作を追加するときに読む。
 tags: [convention, web-api, rest, future-arch-guidelines]
 ---
 
 # Web APIの方式とURLの設計
 
 HTTP APIはRESTで設計し、パスはkebab-caseの複数形のリソース名で表す。
+operationIdは、状態を変える操作をユースケース名、参照を`list<Resource>`と`find<Resource>ById`の形で明示する。
 子リソースをネストするかは、親との一覧取得、作成、削除の関係で決める。
 HTTPメソッドで表せない操作だけを、パスの末尾に置くPOSTのカスタムメソッドにする。
 
@@ -37,6 +38,26 @@ JSON-RPCは採用しない。
 - **JSONの項目名**：ADR-013が定める`nextCursor`や`traceId`と同じcamelCaseにする。
 
 独自ヘッダーは用途を決めてから追加し、数を必要最小限にする。
+
+## operationId
+
+operationIdは、Orvalが生成する関数名とHook名の元になる。
+各operationに次の形のoperationIdを付ける。
+
+- **状態を変える操作**：Commandと同じ`<UseCase>`をlowerCamelCaseにした名前（`placeOrder`、`confirmOrder`、`cancelOrder`）。
+  作成も`create<Resource>`ではなくユースケース名にする。
+  `<UseCase>`の付け方は[クラスの役割：Command](../backend/class-roles/command.md)に従う。
+- **一覧の取得**：`list<Resource>`（`listOrders`）。
+- **1件の取得**：`find<Resource>ById`（`findOrderById`）。
+
+operationIdはControllerのハンドラメソッドに`@Operation(operationId = "...")`で明示し、springdocにメソッド名から作らせない。
+ハンドラメソッドの名前は操作の動詞（`place`、`details`、`search`）であり（[クラスの役割：Controller](../backend/class-roles/controller.md)）、そのままでは1語のoperationIdになるためである。
+また、springdocはメソッド名が重なると`findById_1`のような接尾辞を付け、生成Hookが`useFindById1`のような名前になる。
+
+名前は小文字の動詞で始まるlowerCamelCaseにし、数字と`_`を含めない。
+略語も先頭の文字だけを大文字にする（`findUrlById`）。
+この形は`.spectral.yaml`の`operation-id-naming`が`task be-openapi-lint`で検査する。
+先頭の動詞の語彙は検査しないため、レビューで確かめる。
 
 ## リソースのネストとフラット
 
