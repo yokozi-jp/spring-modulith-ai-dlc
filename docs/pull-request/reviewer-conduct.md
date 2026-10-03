@@ -2,7 +2,7 @@
 type: Convention
 title: レビュアーの進め方
 description: レビュー依頼への反応、重点的に確認する観点、ローカルでの動作確認の要否、不明点の質問と詳しい人への委譲、指摘が多いレビュイーへのフォローを定める規約。レビューを引き受けるとき、レビューの進め方に迷ったときに読む。
-tags: [convention, code-review, future-arch-guidelines]
+tags: [convention, pull-request, future-arch-guidelines]
 ---
 
 # レビュアーの進め方
@@ -21,13 +21,13 @@ tags: [convention, code-review, future-arch-guidelines]
 
 base branchが`main`以外のPull Requestは、意図した向き先かを最初に確認する。
 レビュイーの経験や担当範囲から見落としやすい観点と影響範囲を、重点的に確認する。
-何を人が確認するかは[レビューで人が確認する範囲](review-scope.md)に従う。
+何を人が確認するかは[レビューで人が確認する範囲](../code-review/review-scope.md)に従う。
 
 ## 動作確認
 
 レビュアーはローカルでの動作確認を必須にしない。
 テストの成否はCIで確認し、品質の担保は[バックエンドのテスト戦略](../backend/testing-strategy.md)と[フロントエンドのテスト戦略](../frontend/test-strategy.md)に従う。
-CIで確認できない点（画面の見た目など）は、レビュイーに[Pull Requestの本文](pull-request-description.md)へエビデンスを貼るよう求める。
+CIで確認できない点（画面の見た目など）は、レビュイーに[Pull Requestテンプレート](../../.github/PULL_REQUEST_TEMPLATE.md)の「CI 以外で確認したこと」へエビデンスを貼るよう求める。
 
 ## 分からない点
 

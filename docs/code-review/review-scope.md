@@ -1,7 +1,7 @@
 ---
 type: Convention
 title: レビューで人が確認する範囲
-description: コードレビューで人が確認する観点と、CIの検査やdocsの規約へ任せる観点の振り分け、レビューで見つけた未記載の方針を規約や検査へ戻す方法、生成コードとPull Requestテンプレートの扱いを定める規約。レビューの観点を決めるとき、同じ指摘を繰り返していると気付いたときに読む。
+description: コードレビューで人が確認する観点と、CIの検査やdocsの規約へ任せる観点の振り分け、レビューで見つけた未記載の方針を規約や検査へ戻す方法、生成コードの扱いを定める規約。レビューの観点を決めるとき、同じ指摘を繰り返していると気付いたときに読む。
 tags: [convention, code-review, ci, future-arch-guidelines]
 ---
 
@@ -21,7 +21,7 @@ tags: [convention, code-review, ci, future-arch-guidelines]
 - **機能要件**：レビュイーとレビュアーの両方が、Issueや仕様を満たしているかを確認する。
 - **文脈に依存し規約にできない**：個別の命名や、類似の実装がない箇所は、レビュアーが個別に確認する。
 
-レビューで照らす規約は`docs/`の各領域の文書であり、入口は[ドキュメント](../index.md)から辿る。
+レビューで照らす規約は`docs/`の各領域の文書であり、観点ごとの文書は[レビュー観点と参照する規約](review-viewpoints.md)から辿る。
 
 ## CIに寄せる指摘
 
@@ -43,13 +43,6 @@ tags: [convention, code-review, ci, future-arch-guidelines]
 
 Gitで管理する生成コード（[jOOQの生成コード](../database/jooq-codegen.md)など）は、`.gitattributes`で`linguist-generated=true`を指定し、Pull Requestの差分で既定では折りたたむ。
 生成コードは生成元（changesetやOpenAPI契約）の変更として確認し、生成物を行ごとに確認しない。
-
-## Pull Requestテンプレートのチェックリスト
-
-[Pull Requestテンプレート](../../.github/PULL_REQUEST_TEMPLATE.md)のチェックリストは、レビュー依頼前のセルフチェックに使う。
-項目は「関連文書も更新したか」のように確認できる具体的な行動にし、必要最小限に保つ。
-CIで検査できる項目はチェックリストへ加えず、検査へ移す。
-確認されなくなった項目は削除する。
 
 ## 出典
 

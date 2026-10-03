@@ -91,7 +91,7 @@ Pull Request のタイトルも同じ形式にし、squash merge 時のメッセ
 
 ## Pull Request
 
-Pull Request テンプレートに変更概要、テスト結果、リリースと運用への影響、ブロッカーを記載する。
+Pull Request の本文は [Pull Request テンプレート](.github/PULL_REQUEST_TEMPLATE.md) の各節を埋める。
 
 レビュー依頼前に、変更範囲に応じた最小の検査を実行する。
 

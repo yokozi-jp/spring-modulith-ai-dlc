@@ -2,7 +2,7 @@
 type: Convention
 title: レビュー依頼からマージまで
 description: Draft Pull Requestの使い方、レビュー依頼前の確認、AssigneesとReviewersの設定、レビューの依頼と再依頼、マージする人と承認後の変更の扱いを定める規約。Pull Requestを作成してからマージするまでの間に読む。
-tags: [convention, code-review, pull-request, github, future-arch-guidelines]
+tags: [convention, pull-request, github, future-arch-guidelines]
 ---
 
 # レビュー依頼からマージまで

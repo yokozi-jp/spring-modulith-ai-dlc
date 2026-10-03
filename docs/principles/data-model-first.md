@@ -19,7 +19,7 @@ tags: [convention, principles, data-modeling, database, future-arch-guidelines]
 
 ## 設計の順序
 
-- 業務テーブルの changeset は、それを使うアプリケーションコードより先にレビューを受ける（[Pull Requestの範囲と分割](../code-review/pull-request-scope.md)）。
+- 業務テーブルの changeset は、それを使うアプリケーションコードより先にレビューを受ける（[Pull Requestの範囲と分割](../pull-request/pull-request-scope.md)）。
 - データモデルに不備が見つかったら、アプリケーションコードでの変換や補正で吸収せず、changeset でテーブルを直す。手順は[DBマイグレーション規約](../database/migrations.md)に従い、稼働中のテーブルは[PostgreSQLのロックを抑えるスキーマ変更](../database/postgresql-online-schema-change.md)に従って変える。
 
 ## 確かめる観点
