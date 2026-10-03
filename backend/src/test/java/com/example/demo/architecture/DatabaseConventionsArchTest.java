@@ -96,8 +96,9 @@ class DatabaseConventionsArchTest {
     return classes()
         .should(notDeclareTransactionIsolation())
         .because(
-            "分離レベルはREAD COMMITTEDに統一する（docs/database/postgresql-concurrency-control.md）。"
-                + "@Transactional から isolation を削除し、競合は SELECT ... FOR UPDATE で防ぐ。");
+            "PostgreSQL では REPEATABLE READ 以上にすると、直列化の失敗によるエラーが積極的に起きるため。"
+                + "直し方：@Transactional から isolation を削除し、業務処理に必要な整合性は SELECT ... FOR UPDATE の行ロックで守る。"
+                + "規約：docs/database/postgresql-concurrency-control.md");
   }
 
   private static ArchRule plainSqlRule() {
@@ -106,8 +107,9 @@ class DatabaseConventionsArchTest {
         .accessTargetWhere(
             JavaAccess.Predicates.target(CanBeAnnotated.Predicates.annotatedWith(PlainSQL.class)))
         .because(
-            "@PlainSQL の付いたjOOQのAPIは文字列のSQLでスキーマとのコンパイル時の照合を失う（docs/database/jooq-usage.md）。"
-                + "テーブルとカラムは生成されたクラスから参照する。");
+            "文字列の SQL では、jOOQ を採用した理由であるスキーマとのコンパイル時の照合を失うため。"
+                + "直し方：@PlainSQL の付いた API の呼び出しを削除し、テーブルとカラムは生成されたクラスから参照する。"
+                + "規約：docs/database/jooq-usage.md、docs/adr/ADR-003-adopt-jooq-for-data-access.md");
   }
 
   private static ArchRule renderSchemaRule() {
@@ -118,8 +120,9 @@ class DatabaseConventionsArchTest {
                 AccessTarget.Predicates.declaredIn(Settings.class)
                     .and(HasName.Predicates.nameMatching("(with|set)RenderSchema"))))
         .because(
-            "SQLはスキーマ名で修飾したままにする（docs/database/jooq-usage.md、ADR-011）。"
-                + "renderSchema は既定の true のまま変えず、呼び出しを削除する。");
+            "search_path による暗黙の振り分けを避け、SQL をスキーマ名で修飾したままにするため。"
+                + "直し方：renderSchema は既定の true のまま変えず、withRenderSchema と setRenderSchema の呼び出しを削除する。"
+                + "規約：docs/database/jooq-usage.md、docs/adr/ADR-011-use-module-owned-database-schemas.md");
   }
 
   private static ArchCondition<JavaClass> notDeclareTransactionIsolation() {
@@ -137,7 +140,7 @@ class DatabaseConventionsArchTest {
                             item,
                             owner.getDescription()
                                 + " の @Transactional が isolation を指定している。"
-                                + "修正方法: isolation を削除する。")));
+                                + "直し方：isolation を削除する。")));
       }
     };
   }
