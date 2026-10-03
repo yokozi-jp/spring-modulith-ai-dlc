@@ -125,4 +125,3 @@ Dependabot の GitHub Actions ecosystem 更新で新しい版を受け取り、S
 - [Sigstore: Keyless signing](https://docs.sigstore.dev/cosign/signing/overview/)
 - [Sigstore: Verifying signatures](https://docs.sigstore.dev/cosign/verifying/verify/)
 - [SLSA specification](https://slsa.dev/spec/v1.0/)
-- [production-cd.yml.example](../../.github/workflows/production-cd.yml.example)

@@ -21,12 +21,14 @@ APIは絶対時刻をUTCで返し、フロントエンドが画面の要件に�
 
 - イベント発生日時、作成日時、更新日時には`Instant`を使う。
 - 現在時刻を使うクラスは`Clock`をコンストラクタ引数で受け取り、`Instant.now(clock)`などの`now(Clock)`オーバーロードを使う。
-- システム時刻を供給する`Clock`は`com.example.demo.DemoApplication.clock()`の`@Bean`メソッドだけで生成し、このメソッドが`Clock.systemUTC()`を返す。
+- システム時刻を供給する`Clock`は`com.example.demo.DemoApplication.clock()`の`@Bean`メソッドだけで生成し、このメソッドが`Clock.tick(Clock.systemUTC(), Duration.ofNanos(1_000))`を返す。
 - JVMには`-Duser.timezone=UTC`を設定する。
 - `ZoneId.systemDefault()`や`LocalDateTime.now()`に業務処理を依存させない。
 - APIの絶対時刻はRFC 3339形式のUTC表現で返し、UTCオフセットには常に`Z`を使う。
   `+09:00`のようなオフセット表記では返さない。
   これはRFC 3339の要件ではなく、RFC 3339では`Z`とオフセットの両方を許容するAPI固有の制約である。
+  RFC 9557（2024年）はRFC 3339を更新し、`Z`を「UTCの時刻は分かるが地域のオフセットは不明」という意味に改めた。
+  表示地域を持たない絶対時刻には、この意味が合う。
 - Jacksonの`spring.jackson.time-zone: UTC`を維持する。
   API日時表現の正しさをJackson設定だけに依存させず、シリアライズ結果を契約テストで検証する。
 - PostgreSQLの絶対時刻には`TIMESTAMP WITH TIME ZONE`を使う。
@@ -50,6 +52,10 @@ APIから受け取ったUTCの日時は`Date`として解析し、`Intl.DateTime
 画面で特定地域の時刻を表示する場合は`timeZone`を明示する。
 利用者のブラウザ設定で表示する場合だけ`timeZone`を省略する。
 表示用に整形した文字列を計算やAPI送信へ再利用しない。
+
+JavaScriptの新しい日時APIであるTemporalは、2026年3月にTC39のStage 4に達した。
+2026年10月時点で、提案リポジトリはSafariでの提供を記載していない。
+この規約は現時点では`Date`を前提にする。
 
 ```typescript
 const occurredAt = new Date(response.occurredAt);
@@ -85,7 +91,10 @@ Javaの`LocalDateTime.atZone()`は、gapでは時刻を後ろへずらし、over
 
 `Instant`、PostgreSQLの`timestamp`と`timestamptz`、JavaScriptの`Date`は、表現できる精度が異なる。
 `Instant`はナノ秒、PostgreSQLはマイクロ秒、`Date`はミリ秒まで保持する。
-`Instant`からPostgreSQL、API、`Date`へ流すと各層で精度が変わるため、DBとAPIが保持する精度を要件として明示し、それを超える精度へ業務処理を依存させない。
+絶対時刻の保持精度はマイクロ秒とし、DB、API、イベントで同じ精度を使う。
+生成時点でそろえるため、システムの`Clock`はマイクロ秒単位のtickで生成する。
+`Date`はミリ秒までしか保持しないため、フロントエンドでマイクロ秒に依存する計算をしない。
+この決定は[ADR-044](../adr/ADR-044-store-absolute-time-at-microsecond-precision.md)で行った。
 
 ## テスト
 
@@ -93,7 +102,7 @@ Javaの`LocalDateTime.atZone()`は、gapでは時刻を後ろへずらし、over
 - 現在時刻を使うテストには`Clock.fixed(...)`を渡す。
 - JSONの絶対時刻は`Z`付き文字列との完全一致で検証する。
 - DB統合テストは`SHOW TIME ZONE`と`Instant`の保存往復を検証する。
-- テストデータの`Instant`は、DBとAPIが保持する精度に合わせ、ナノ秒に依存させない。
+- テストデータの`Instant`は、保持精度のマイクロ秒に合わせ、ナノ秒に依存させない。
   PostgreSQLはマイクロ秒まで保持するため、ナノ秒を含めると保存往復や文字列の完全一致が丸めで失敗する。
 - 地域時刻を扱う機能を追加したときは、対象の`ZoneId`に加え、DSTのgapとoverlapを入力した境界値テストを追加する。
 
@@ -118,8 +127,10 @@ Javaの`LocalDateTime.atZone()`は、gapでは時刻を後ろへずらし、over
 ## 出典
 
 - IETF RFC 3339: <https://datatracker.ietf.org/doc/html/rfc3339>
+- IETF RFC 9557: <https://www.rfc-editor.org/rfc/rfc9557.html>
 - OpenJDK 25, `Instant`: <https://github.com/openjdk/jdk/blob/jdk-25%2B36/src/java.base/share/classes/java/time/Instant.java>
 - Oracle Java SE 25, `LocalDateTime`: <https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/time/LocalDateTime.html>
 - PostgreSQL 18, Date/Time Types: <https://www.postgresql.org/docs/18/datatype-datetime.html>
 - MDN, `Date`: <https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Date>
+- TC39, Temporal proposal: <https://github.com/tc39/proposal-temporal>
 - Spring Boot 4.1.1, Common Application Properties: <https://docs.spring.io/spring-boot/appendix/application-properties/index.html>

@@ -75,4 +75,3 @@ Spring Boot は `application-<profile>.yaml` によるプロファイル分割�
 
 - `backend/src/main/resources/application.yaml`
 - `.env.example`
-- [.github/workflows/production-cd.yml.example](../../.github/workflows/production-cd.yml.example)
