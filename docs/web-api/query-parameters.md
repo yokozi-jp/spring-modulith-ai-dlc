@@ -1,7 +1,7 @@
 ---
 type: Convention
 title: クエリパラメータ
-description: クエリパラメータを使うHTTPメソッド、載せてはいけない値、共通の語彙、POJOでの受け方、キーワード、ソート、複数キー、取得項目の絞り込みの指定方法を定める規約。検索APIや一覧APIのパラメータを設計するときに読む。
+description: クエリパラメータを使うHTTPメソッド、載せてはいけない値、共通の語彙、Controllerでの受け方、キーワード、ソート、複数キー、取得項目の絞り込みの指定方法を定める規約。検索APIや一覧APIのパラメータを設計するときに読む。
 tags: [convention, web-api, http, future-arch-guidelines]
 ---
 
@@ -34,11 +34,10 @@ URLに載せられない値を検索条件にする場合は、[HTTPメソッド
 
 その他のパラメータには、DBの列が表す概念と同じ語を使い、対応付けの手間を減らす。
 
-## POJOで受けるクエリパラメータ
+## Controllerでの受け方
 
-Controllerでクエリパラメータを一つのPOJOにまとめて受けるときは、引数にspringdocの`@ParameterObject`を付ける。
-付けないと、springdocはPOJO全体を一つのパラメータとしてOpenAPIに出し、生成clientが壊れたquery stringを作る。
-POJOの項目名にも、前述の共通の語彙（`limit`、`cursor`など）を使う。
+Controllerはクエリパラメータを`@RequestParam`で項目ごとに受け、検索条件のrecordを作る（[クラスの役割：検索条件](../backend/class-roles/search-criteria.md)）。
+項目ごとに受けると、必須かどうかと既定値が引数ごとにOpenAPIへ出る。
 
 ## 検索キーワード
 
