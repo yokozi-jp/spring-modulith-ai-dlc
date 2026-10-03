@@ -49,6 +49,17 @@ rules:
       - field: InternalServerErrorProblem
         function: truthy
 
+  # ponytail: 形だけを検査し、先頭の動詞の語彙は検査しない。
+  operation-id-naming:
+    description: operationId は小文字の動詞で始まるlowerCamelCaseにし、数字と_を含めない。
+    severity: error
+    given: "$.paths[*][get,put,post,delete,options,head,patch,trace]"
+    then:
+      field: operationId
+      function: pattern
+      functionOptions:
+        match: "^[a-z]+(?:[A-Z][a-z]+)+$"
+
   operation-operationId: error
   operation-success-response: error
   operation-tags: error
