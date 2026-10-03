@@ -128,7 +128,7 @@ Java パッケージを作るときは、`@NullMarked` を宣言する `package-
 - **`<Feature>Queries`**：機能の参照を提供するインタフェース。すべての機能モジュールに作り、自モジュールの Controller と他モジュールがこれを使う。
 - **`<QueryResult>`**：参照の結果を表す record。
 - **`<SearchCriteria>`**：検索条件を表す record。
-- **`<Event>`**：他モジュールへ通知する、過去形の名前のイベントの record。
+- **`<Event>`**：状態の変化を他モジュールと自モジュールの後続の処理へ通知する、過去形の名前のイベントの record。
 
 ルートの型は、`String`、`Instant`、`BigDecimal` などの Java の標準型と、同じルートパッケージの型だけを持つ。
 Domain の型、Command と Result、Spring MVC の Request と Response、jOOQ の生成型は置かない。

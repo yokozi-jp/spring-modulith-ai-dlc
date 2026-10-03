@@ -11,10 +11,10 @@
 - [クラスの役割：外部システムのインタフェース](external-system-interface.md)：決済などの外部システムを呼ぶインタフェースを作るとき
 - [クラスの役割：Domain Service](domain-service.md)：業務規則の置き場所が集約や値オブジェクトに決まらないとき、Domain Service を作るとき
 - [クラスの役割：Command](command.md)：状態を変えるユースケースの入力の record を作るとき、入力の項目を足すとき
-- [クラスの役割：CommandHandler](command-handler.md)：状態を変えるユースケースを作るとき、トランザクション境界とイベントの発行の場所を確かめるとき
+- [クラスの役割：CommandHandler](command-handler.md)：状態を変えるユースケースを作るとき、トランザクション境界とイベントの発行の場所、外部システムを呼ぶ場所を確かめるとき
 - [クラスの役割：Result](result.md)：CommandHandler が返す結果の record を作るとき、作成の応答の Location を作るとき
 - [クラスの役割：QueryService](query-service.md)：参照のインタフェースを実装するとき、参照のメソッドを足すとき
-- [クラスの役割：Listener](listener.md)：他モジュールのイベントを受けて自モジュールの状態を変えるとき
+- [クラスの役割：Listener](listener.md)：他モジュールのイベントを受けて自モジュールの状態を変えるとき、外部システムの呼び出しをイベントで始めるとき
 - [クラスの役割：Controller](controller.md)：HTTP API のエンドポイントを作るとき、ステータスコードと Location を確かめるとき
 - [クラスの役割：Request](request.md)：リクエストボディを受ける操作の入力と形式の検証を作るとき
 - [クラスの役割：Response](response.md)：参照の結果を返す API の応答の record を作るとき、応答の項目を足すとき
