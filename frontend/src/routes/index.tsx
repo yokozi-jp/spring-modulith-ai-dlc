@@ -23,7 +23,7 @@ function HomePage() {
             <h1 id="page-heading" className="text-4xl font-semibold tracking-tight sm:text-5xl">
               {t("heading")}
             </h1>
-            <p className="text-lg leading-8 text-muted-foreground">{t("intro")}</p>
+            <p className="text-lg/8 text-muted-foreground">{t("intro")}</p>
           </div>
           <Button
             type="button"
@@ -39,7 +39,7 @@ function HomePage() {
         <div className="grid gap-6 md:grid-cols-2">
           <section className="rounded-xl border bg-card p-6 text-card-foreground shadow-sm">
             <h2 className="text-xl font-semibold">{t("documentationHeading")}</h2>
-            <p className="mt-2 text-sm leading-6 text-muted-foreground">{t("documentationLead")}</p>
+            <p className="mt-2 text-sm/6 text-muted-foreground">{t("documentationLead")}</p>
             <ul className="mt-6 space-y-3">
               <li>
                 <a
@@ -66,7 +66,7 @@ function HomePage() {
 
           <section className="rounded-xl border bg-card p-6 text-card-foreground shadow-sm">
             <h2 className="text-xl font-semibold">{t("communityHeading")}</h2>
-            <p className="mt-2 text-sm leading-6 text-muted-foreground">{t("communityLead")}</p>
+            <p className="mt-2 text-sm/6 text-muted-foreground">{t("communityLead")}</p>
             <ul className="mt-6 space-y-3">
               <li>
                 <a
