@@ -53,3 +53,4 @@
 - [ADR-050: バックエンドのクラスの役割と命名を定める](ADR-050-define-backend-class-roles-and-naming.md)（Proposed, 2026-10-03）
 - [ADR-051: 共通カラムの pgm_cd を Aspect と ScopedValue で渡す](ADR-051-bind-pgm-cd-with-scoped-value-and-aspect.md)（Proposed, 2026-10-03）
 - [ADR-052: 楽観的ロックの競合を UPDATE の条件の lock_no と更新件数で判定する](ADR-052-detect-optimistic-lock-conflicts-by-update-count.md)（Proposed, 2026-10-03）
+- [ADR-053: DB のロック待ち、文の実行、トランザクション中の待機の上限を接続ごとに設定する](ADR-053-set-db-time-limits-per-connection.md)（Proposed, 2026-10-03）

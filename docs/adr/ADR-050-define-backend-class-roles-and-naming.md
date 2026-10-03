@@ -77,7 +77,7 @@ Proposed
   請求に失敗したイベント出版はレジストリに未完了のまま残り、[非同期処理の失敗時の再試行と回復](../integration/async-failure-recovery.md)の `IncompleteEventPublications` の手順で再投入する。
   自動の再投入は [issue #108](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/108) で扱う。
 - 外部システムを呼ぶ CommandHandler も、`@ApplicationModuleListener` が開くトランザクションの中で外部システムを呼ぶ。
-  ただし、呼んでいる間は行をロックせず（ロックは呼んだ後の `update` で取る）、画面の要求を待たせない。
+  ただし、呼んでいる間は行をロックせず（行のロックは呼んだ後の `update` の UPDATE が取る）、画面の要求を待たせない。
   トランザクションの長さは Client のタイムアウト（[ADR-019](ADR-019-define-resilience-and-capacity-guardrails.md)）で抑え、ロールバックで戻らない請求は上の冪等性で二重にしない。
   このため、`charge` の `retry` は一回のままにし、再試行は再投入に任せる。
 - 参照は機能ごとに一つの `<Feature>QueryService` が担う。QueryService はルートの `<Feature>Queries` を実装し、Repository で集約を読んでルートの record に変換する。参照専用の port は作らず、jOOQ で読み取りモデルへ直接射影しない。public メソッドには `@Transactional(readOnly = true)` を付ける。

@@ -67,7 +67,7 @@ UPDATEも更新する行のロックを取るため、同じ順序に従う。
 
 ## ロック待ち
 
-アプリの接続には`lock_timeout`でロック待ちの上限を設定し、既定の無期限待ちのままにしない（[DB接続情報とロール分離](connections.md)）。
+アプリの接続には`lock_timeout`でロック待ちの上限を設定し、既定の無期限待ちのままにしない（[DB接続情報とロール分離](connections.md)、[ADR-053](../adr/ADR-053-set-db-time-limits-per-connection.md)）。
 上限まで待ってもロックを取れなければ、文はSQLSTATE `55P03`で失敗する。
 楽観的ロックのUPDATEがこの失敗になったら、競合として扱う。
 
@@ -101,3 +101,4 @@ WHERE item_id = 1 AND stock_count >= 5;
 - このリポジトリの規約に合わせて抜粋、再構成、改変している。取り込みの方針は [ADR-040](../adr/ADR-040-import-future-architecture-guidelines.md) に従う。
 - 楽観的ロックの方式を、先にロックしてから比較する原典の方式から、UPDATEの条件と更新件数で判定する方式に変えている（[ADR-052](../adr/ADR-052-detect-optimistic-lock-conflicts-by-update-count.md)）。
   jOOQの楽観的ロックの機能を使わない規則を追加している。
+- ロック待ちの上限を、アプリの接続ごとに`lock_timeout`で設定する規則を追加している（[ADR-053](../adr/ADR-053-set-db-time-limits-per-connection.md)）。

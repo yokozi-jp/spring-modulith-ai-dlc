@@ -66,7 +66,7 @@ PostgreSQL の READ COMMITTED では、UPDATE は対象の行のロックを取�
   成功する更新は UPDATE だけで済む。
 - 集約ごとの `lockOrder` がなくなり、件数の判定が `requireUpdated` の一か所になる。
   判定の書き忘れは、Repository の規約のチェックリストと、競合と行がないことを確かめる Repository のテストで見つける。
-- `NOWAIT` の代わりに `lock_timeout` がロック待ちの上限になる。
+- `NOWAIT` の代わりに `lock_timeout` がロック待ちの上限になる（[ADR-053](ADR-053-set-db-time-limits-per-connection.md)）。
 
 ### Negative
 
@@ -121,6 +121,7 @@ PostgreSQL の READ COMMITTED では、UPDATE は対象の行のロックを取�
 - [ADR-040: Future のアーキテクチャ設計ガイドラインを書き直して docs に取り込む](ADR-040-import-future-architecture-guidelines.md)
 - [ADR-048: jOOQ の共通処理を共有モジュール shared に置く](ADR-048-add-shared-module-for-jooq-common-code.md)
 - [ADR-050: バックエンドのクラスの役割と命名を定める](ADR-050-define-backend-class-roles-and-naming.md)
+- [ADR-053: DB のロック待ち、文の実行、トランザクション中の待機の上限を接続ごとに設定する](ADR-053-set-db-time-limits-per-connection.md)
 - [PostgreSQL の排他制御](../database/postgresql-concurrency-control.md)
 - [クラスの役割：jOOQ の Repository](../backend/class-roles/jooq-repository.md)
 - [PostgreSQL, Read Committed Isolation Level](https://www.postgresql.org/docs/current/transaction-iso.html#XACT-READ-COMMITTED)
