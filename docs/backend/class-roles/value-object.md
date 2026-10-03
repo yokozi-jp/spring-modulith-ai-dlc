@@ -10,7 +10,7 @@ tags: [convention, backend, class-role]
 値オブジェクトは、識別子を持たず、値と不変条件を表す型であり、`domain.model` に `public record` として置く。
 不変条件はコンパクトコンストラクタで検査し、満たさない値には `IllegalArgumentException` を投げる。
 固定の値の集合は enum にする。
-役割の決定理由は [ADR-048](../../adr/ADR-048-define-backend-class-roles-and-naming.md) に示す。
+役割の決定理由は [ADR-050](../../adr/ADR-050-define-backend-class-roles-and-naming.md) に示す。
 
 ## 定義
 

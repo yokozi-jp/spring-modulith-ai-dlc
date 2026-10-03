@@ -10,7 +10,7 @@ tags: [convention, backend, class-role]
 `<Feature>QueryService` は、モジュールルートの `<Feature>Queries` を実装するクラスであり、`application` に package-private で置いて `@Service` を付ける。
 public メソッドは `<Feature>Queries` のメソッドだけにし、すべてに `@Transactional(readOnly = true)` を付ける。
 `<Aggregate>Repository` で読んだ集約を、ルートの record に変換して返す。
-役割の決定理由は [ADR-048](../../adr/ADR-048-define-backend-class-roles-and-naming.md) に示す。
+役割の決定理由は [ADR-050](../../adr/ADR-050-define-backend-class-roles-and-naming.md) に示す。
 
 ## 定義
 

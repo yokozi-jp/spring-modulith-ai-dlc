@@ -10,7 +10,7 @@ tags: [convention, backend, class-role]
 `Jooq<Aggregate>Repository` は、`domain.model` の `<Aggregate>Repository` を jOOQ で実装するクラスであり、`infrastructure.persistence` に package-private で置いて `@Repository` を付ける。
 jOOQ と集約の変換もこのクラスに書き、読み取りは `convertFrom`、`multiset`、`Records.mapping` で列の数と型をコンパイルで検査しながら集約にする。
 jOOQ の API と生成型は `infrastructure.persistence` の外に出さない。
-役割の決定理由は [ADR-048](../../adr/ADR-048-define-backend-class-roles-and-naming.md) に示す。
+役割の決定理由は [ADR-050](../../adr/ADR-050-define-backend-class-roles-and-naming.md) に示す。
 
 ## 定義
 
@@ -206,7 +206,7 @@ public long countUnshippedByCustomer(final CustomerId customerId) {
   列や項目の名前を変えたときの誤りが、コンパイルで見つからない。
   集約が `Order.restore` と値オブジェクトの検証を通らず、private のフィールドへ直接書き込まれることがある。
   書き込みの `from(Object)` では、ドメインのフィールド名を変えると、その列だけが例外を出さずに保存されなくなる。
-  理由の詳細は [ADR-048](../../adr/ADR-048-define-backend-class-roles-and-naming.md) の選択肢14に示す。
+  理由の詳細は [ADR-050](../../adr/ADR-050-define-backend-class-roles-and-naming.md) の選択肢14に示す。
 - 変換を別の Mapper のクラスや MapStruct に切り出す。
 - jOOQ のコード生成の `forcedTypes` と `Converter` で、列を Domain の値オブジェクトに対応づける。
   共有の生成パッケージ `com.example.demo.jooq` が、モジュールの Domain の型に依存する。

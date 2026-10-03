@@ -10,7 +10,7 @@ tags: [convention, backend, class-role]
 イベントは、状態の変化を他モジュールへ通知するモジュールルートの record であり、名前は過去形にする。
 発行側の `<UseCase>CommandHandler` が `handle` のトランザクションの中で `ApplicationEventPublisher` を使って発行する。
 受信側のモジュールは、`application` の `<Event>Listener` で受ける。
-役割の決定理由は [ADR-048](../../adr/ADR-048-define-backend-class-roles-and-naming.md) に示す。
+役割の決定理由は [ADR-050](../../adr/ADR-050-define-backend-class-roles-and-naming.md) に示す。
 
 ## 定義
 

@@ -52,7 +52,7 @@ backend/src/test/java/com/example/demo/architecture/
 - `transactionalMethodsArePublicApplicationMethods`：`@Transactional`と、それをメタアノテーションに持つ`@ApplicationModuleListener`を付けたメソッドは、`application`のpublicメソッドに限る。
 
 ベースパッケージ直下の起動クラスと全体設定は、オニオン規則の所属検査から除外する。
-パッケージ構造の決定は[ADR-002](../adr/ADR-002-package-by-feature-onion-architecture.md)を、クラスの役割の決定は[ADR-048](../adr/ADR-048-define-backend-class-roles-and-naming.md)を参照する。
+パッケージ構造の決定は[ADR-002](../adr/ADR-002-package-by-feature-onion-architecture.md)を、クラスの役割の決定は[ADR-050](../adr/ADR-050-define-backend-class-roles-and-naming.md)を参照する。
 
 ## クラスの役割
 
@@ -109,7 +109,7 @@ ArchUnitは規則の説明の後に`, because`とこの文をつなぎ、違反�
 失敗すると、次のように出る。
 
 ```text
-Rule 'no classes should be meta-annotated with @Transactional, because 状態を変えるユースケースの処理の順序とトランザクション境界を一か所で決め、一つのユースケースを Command の受け取りから Result の返却まで一つのトランザクションで進めるため。直し方：クラスの @Transactional を外し、Application の public メソッドへ付け直す。規約：docs/backend/layers.md、docs/backend/class-roles/command-handler.md、docs/adr/ADR-048-define-backend-class-roles-and-naming.md' was violated (1 times):
+Rule 'no classes should be meta-annotated with @Transactional, because 状態を変えるユースケースの処理の順序とトランザクション境界を一か所で決め、一つのユースケースを Command の受け取りから Result の返却まで一つのトランザクションで進めるため。直し方：クラスの @Transactional を外し、Application の public メソッドへ付け直す。規約：docs/backend/layers.md、docs/backend/class-roles/command-handler.md、docs/adr/ADR-050-define-backend-class-roles-and-naming.md' was violated (1 times):
 Class <archfixture.violating.order.application.ShipOrderCommandHandler> is meta-annotated with @Transactional in (ShipOrderCommandHandler.java:0)
 ```
 

@@ -10,7 +10,7 @@ tags: [convention, backend, class-role]
 `<ExternalSystem>` は、決済などの外部システムをドメインの語彙で表すインタフェースであり、`domain.model` に置く。
 引数と戻り値は値オブジェクトにし、HTTP や製品の型を出さない。
 実装は `infrastructure.client` の `<ExternalSystem>Client` が持ち、呼ぶのは `<UseCase>CommandHandler` だけである。
-役割の決定理由は [ADR-048](../../adr/ADR-048-define-backend-class-roles-and-naming.md) に示す。
+役割の決定理由は [ADR-050](../../adr/ADR-050-define-backend-class-roles-and-naming.md) に示す。
 
 ## 定義
 

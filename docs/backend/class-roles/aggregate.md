@@ -10,7 +10,7 @@ tags: [convention, backend, class-role]
 集約は業務上の一貫性を保つ単位であり、集約ルートのクラスが状態と不変条件を持つ。
 `domain.model` に `public final class` として置き、状態は業務の操作を表すメソッドだけで変える。
 許されない状態遷移では `IllegalStateException` を、不正な引数では `IllegalArgumentException` を投げる。
-役割の決定理由は [ADR-048](../../adr/ADR-048-define-backend-class-roles-and-naming.md) に示す。
+役割の決定理由は [ADR-050](../../adr/ADR-050-define-backend-class-roles-and-naming.md) に示す。
 
 ## 定義
 

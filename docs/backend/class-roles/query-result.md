@@ -10,7 +10,7 @@ tags: [convention, backend, class-role]
 参照の結果は、[参照のインタフェース](feature-queries.md)が返すモジュールルートの record である。
 一覧の1行と1件の詳細を別の record にし、内容を表す名前を付ける。
 項目は Java の標準型と同じルートの型だけで表す。
-役割の決定理由は [ADR-048](../../adr/ADR-048-define-backend-class-roles-and-naming.md) に示す。
+役割の決定理由は [ADR-050](../../adr/ADR-050-define-backend-class-roles-and-naming.md) に示す。
 
 ## 定義
 

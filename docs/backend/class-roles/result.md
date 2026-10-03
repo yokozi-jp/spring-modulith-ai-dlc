@@ -10,7 +10,7 @@ tags: [convention, backend, class-role]
 `<UseCase>Result` は、CommandHandler の `handle` が返すユースケースの出力の record であり、`application` に置く。
 CommandHandler ごとに必ず一つ作り、少なくとも状態を変えた集約の ID を持つ。
 Controller は Result の ID から、作成したリソースの `Location` を作る。
-役割の決定理由は [ADR-048](../../adr/ADR-048-define-backend-class-roles-and-naming.md) に示す。
+役割の決定理由は [ADR-050](../../adr/ADR-050-define-backend-class-roles-and-naming.md) に示す。
 
 ## 定義
 

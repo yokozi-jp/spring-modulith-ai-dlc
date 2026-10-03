@@ -10,7 +10,7 @@ tags: [convention, backend, class-role]
 検索条件は、[参照のインタフェース](feature-queries.md)の `search` に渡すモジュールルートの record である。
 名前は機能名に `SearchCriteria` を付け、条件は Java の標準型で表す。
 ページングする一覧では、[ADR-013](../../adr/ADR-013-standardize-http-api-contracts.md) の `cursor` と `limit` を条件に持たせる。
-役割の決定理由は [ADR-048](../../adr/ADR-048-define-backend-class-roles-and-naming.md) に示す。
+役割の決定理由は [ADR-050](../../adr/ADR-050-define-backend-class-roles-and-naming.md) に示す。
 
 ## 定義
 

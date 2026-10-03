@@ -47,7 +47,7 @@ class PackageByFeatureOnionArchitectureTest {
   private static final String ADR_002 = "docs/adr/ADR-002-package-by-feature-onion-architecture.md";
 
   /** クラスの役割を決めた ADR のパス。 */
-  private static final String ADR_048 = "docs/adr/ADR-048-define-backend-class-roles-and-naming.md";
+  private static final String ADR_048 = "docs/adr/ADR-050-define-backend-class-roles-and-naming.md";
 
   /** 層の責務の規約と、クラスの役割を決めた ADR。 */
   private static final String LAYERS_DOCS = "規約：docs/backend/layers.md、" + ADR_048;

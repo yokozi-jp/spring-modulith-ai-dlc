@@ -54,7 +54,7 @@ class ClassRoleArchTest {
   private static final String COMMAND_HANDLER = "CommandHandler";
 
   /** クラスの役割を決めた ADR のパス。 */
-  private static final String ADR_048 = "docs/adr/ADR-048-define-backend-class-roles-and-naming.md";
+  private static final String ADR_048 = "docs/adr/ADR-050-define-backend-class-roles-and-naming.md";
 
   /** jOOQ の Repository の規約のパス。 */
   private static final String JOOQ_REPOSITORY_DOC = "docs/backend/class-roles/jooq-repository.md";

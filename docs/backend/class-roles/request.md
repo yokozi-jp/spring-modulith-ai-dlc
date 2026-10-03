@@ -10,7 +10,7 @@ tags: [convention, backend, class-role]
 `<UseCase>Request` は、リクエストボディを受ける操作の入力を表す record であり、`presentation.web` に置く。
 形式の検証を Bean Validation の制約で書き、`toCommand()` で Command に変換する。
 本文を受けない操作（確定、取消）には作らない。
-役割の決定理由は [ADR-048](../../adr/ADR-048-define-backend-class-roles-and-naming.md) に示す。
+役割の決定理由は [ADR-050](../../adr/ADR-050-define-backend-class-roles-and-naming.md) に示す。
 
 ## 定義
 

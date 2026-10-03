@@ -10,7 +10,7 @@ tags: [convention, backend, class-role]
 Domain Service は、集約にも値オブジェクトにも置けない業務規則を置くクラスであり、`domain.service` に置いて `@Service` を付ける。
 作るのは三つの場合だけであり、まず Entity か値オブジェクトに置けないかを確かめる。
 多くの機能モジュールには Domain Service がない。
-役割の決定理由は [ADR-048](../../adr/ADR-048-define-backend-class-roles-and-naming.md) に示す。
+役割の決定理由は [ADR-050](../../adr/ADR-050-define-backend-class-roles-and-naming.md) に示す。
 
 ## 定義
 
