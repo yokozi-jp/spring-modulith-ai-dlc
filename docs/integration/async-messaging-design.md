@@ -24,7 +24,7 @@ tags: [convention, integration, async, spring-modulith, future-arch-guidelines]
 
 非同期処理は、Spring Modulith のアプリケーションイベントと `@ApplicationModuleListener` で実装する。
 イベントの発行は `modulith` スキーマのイベント出版レジストリに記録され、外部ブローカーへの externalization は無効にしている（[ADR-001](../adr/ADR-001-adopt-spring-modulith-modular-monolith.md)）。
-リスナーの置き場所は[バックエンドの層の責務](../backend/layers.md)の `infrastructure.messaging` に従う。
+リスナーは、イベントを受信する側のモジュールの `application` に `<Event>Listener` として置く（[バックエンドの層の責務](../backend/layers.md)）。
 
 外部ブローカーの導入、製品の選定、externalization の有効化は、後戻りしにくいため ADR を起こして決める。
 製品は運用負担の小さいマネージドサービスを第一候補にする。

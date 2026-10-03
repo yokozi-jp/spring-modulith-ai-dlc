@@ -50,3 +50,4 @@
 - [ADR-047: フロントエンドで API の日時を Temporal で解析する](ADR-047-parse-api-datetimes-with-temporal.md)（Proposed, 2026-10-03）
 - [ADR-048: jOOQ の共通処理を共有モジュール shared に置く](ADR-048-add-shared-module-for-jooq-common-code.md)（Proposed, 2026-10-03）
 - [ADR-049: カラム名と型の矛盾を機械検査する](ADR-049-detect-column-name-and-type-mismatches.md)（Proposed, 2026-10-03）
+- [ADR-050: バックエンドのクラスの役割と命名を定める](ADR-050-define-backend-class-roles-and-naming.md)（Proposed, 2026-10-03）

@@ -16,8 +16,11 @@ tags: [convention, backend, testing, spring]
 - クラスとフィールドにはJavadocを付ける。
 - `@Test`メソッドには`@DisplayName`で検証意図を書く。
 - テストクラス、テストメソッド、ネスト型はパッケージプライベートにする。
+  JUnit 5はpackage-privateのテストも実行するのでpublicは要らず、テストを他のパッケージから使わせないためである。
 - テストクラス名は単数形の`...Test`で終える。
+  合成アノテーションや拡張などテストでない補助クラスには付けず、テストクラスと名前で区別する。
 - `@Disabled`には停止理由を指定する。
+  止めたテストを、なぜ止めたか分からないまま残さないためである。
 - JUnit AssertionsとAssertJのどちらを使ってもよいが、一つのテストクラス内では揃える。
 - 一つのテストでは一つの振る舞いを検証し、その範囲で複数のアサーションを使ってよい。
 
@@ -67,6 +70,7 @@ final Instant actual =
 それ以外の非同期処理は、対象APIの期限付き条件待機か、JUnitの非プリエンプティブな`assertTimeout`を使う。
 タイムアウト時には、対象ID、期待条件、期限、最後に観測した状態を出す。
 `assertTimeoutPreemptively`は使わない。
+`assertTimeoutPreemptively`は別スレッドで処理を実行するため、トランザクション、セキュリティコンテキスト、ログのコンテキストが本番経路と変わり得る。
 
 機械的に判定できる規約と検査実装は[バックエンドのアーキテクチャテスト](architecture-tests.md)を参照する。
 変更後は`task be-format`と`task be-lint`を実行する。
