@@ -20,9 +20,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.web.context.request.ServletWebRequest;
 
-/**
- * 未処理例外を汎用の 500 応答へ変換し、調査用の例外の詳細をログへ残すことと、競合と未検出の例外を 409 と 404 へ変換することを検証する。
- */
+/** 未処理例外を汎用の 500 応答へ変換し、調査用の例外の詳細をログへ残すことと、競合と未検出の例外を 409 と 404 へ変換することを検証する。 */
 @ExtendWith(OutputCaptureExtension.class)
 class ApiExceptionHandlerTest {
 
