@@ -1,4 +1,4 @@
-package com.example.demo.error.presentation;
+package com.example.demo.error.presentation.web;
 
 import java.net.URI;
 import java.util.ArrayList;
