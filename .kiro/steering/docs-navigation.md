@@ -27,7 +27,6 @@ steering は入口の案内だけを持ち、規約の本文を持たない（[A
 | 可観測性とログ                                                | `docs/observability/index.md`    |
 | 日時とタイムゾーン                                            | `docs/datetime/index.md`         |
 | コンテナ（Dockerfile、Compose）                               | `docs/container/index.md`        |
-| AWS                                                           | `docs/aws/index.md`              |
 | 開発ツール（Taskfile、フック、CI、Lint）                      | `docs/tooling/index.md`          |
 | リポジトリ運用（ブランチ保護、リリース）                      | `docs/repository/index.md`       |
 | 文章（日本語の技術文書、メッセージ、設計書）                  | `docs/writing/index.md`          |

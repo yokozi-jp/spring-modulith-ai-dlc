@@ -94,7 +94,6 @@ Collector の設定（`docker/otel-collector/config.yaml`）は、ローカル�
 - 本番の Collector は `docker/otel-collector/config.yaml` に、exporter と拡張と各 pipeline の exporters だけを定める上書きファイルを重ねる。processors は上書きしない。
 - アプリケーションのロググループ、標準出力のロググループ、`aws/spans` ロググループに CloudWatch Logs のデータ保護ポリシーを設定し、個人データと秘密情報を検知して表示時にマスクする。日本の氏名と電話番号は custom data identifier で補う。
 - 標準出力は WARN 以上だけを別のロググループへ送り、起動時と Collector の障害時の調査に使う。
-- ロググループの分け方は [CloudWatch Logsのロググループ](../aws/cloudwatch-logs.md) に従う。
 
 ## 保持とアクセス
 

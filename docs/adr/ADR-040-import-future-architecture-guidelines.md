@@ -11,6 +11,8 @@ tags: [adr, documentation, knowledge-management, future-arch-guidelines]
 
 Proposed
 
+このうち AWS の取り込みは [ADR-045](ADR-045-remove-aws-docs-and-production-cd-example.md) で取り消した。
+
 ## Date
 
 2026-10-01
@@ -26,7 +28,7 @@ Web API、PostgreSQL、非同期処理、システム間連携、ログ、フロ
 原文には、このリポジトリの ADR と矛盾する記述がある。
 たとえば Git ブランチフローは develop ブランチと release ブランチを使い、[ADR-017](ADR-017-adopt-trunk-based-repository-governance.md) のトランクベース開発と両立しない。
 Terraform、DynamoDB、メールのように、このリポジトリで使うと決めていない技術を前提にする原文もある。
-一方、本番デプロイのワークフロー例（`.github/workflows/production-cd.yml.example`）は、ECR、ECS、ALB、RDS などの AWS 構成を仮定している。
+一方、本番デプロイのワークフロー例（[ADR-045](ADR-045-remove-aws-docs-and-production-cd-example.md) で削除）は、ECR、ECS、ALB、RDS などの AWS 構成を仮定している。
 
 ## Decision
 
