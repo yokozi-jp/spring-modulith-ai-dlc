@@ -134,13 +134,8 @@ Class <archfixture.violating.order.application.ShipOrderCommandHandler> is meta-
 - `deprecatedApiShouldNotBeUsed`：`@Deprecated`のAPIを使わない。
 - `oldDateAndTimeClassesShouldNotBeUsed`：`java.util.Date`などの旧日時APIを使わない。
 
-`ProxyRulesArchTest`は、次のアノテーションを付けたメソッドへの同一クラス内の直接呼び出しを検査する。
-
-- Springの`@Transactional`、`@Async`、`@Cacheable`、`@CachePut`、`@CacheEvict`。
-- Spring Securityの`@PreAuthorize`、`@PostAuthorize`、`@PreFilter`、`@PostFilter`、`@Secured`。
-- Resilience4jの`@CircuitBreaker`、`@Retry`、`@RateLimiter`、`@Bulkhead`、`@TimeLimiter`。
-
-これらの規則の理由は[バックエンドのJava実装規約](java-coding.md)に示す。
+`ProxyRulesArchTest`は、プロキシで動くアノテーションを付けたメソッドへの同一クラス内の直接呼び出しを検査する。
+対象のアノテーションの一覧と規則の理由は、[バックエンドのJava実装規約](java-coding.md)の「プロキシで動くアノテーション」に示す。
 
 ## 日時
 

@@ -7,7 +7,7 @@
 
     <rule name="UseComposedDatabaseTestAnnotation"
           language="java"
-          message="テスト用 DB への接続、ロールバック、後始末の構成を一か所にまとめ、テストごとに構成が分かれないようにするため。直し方：@JooqTest を外し、ロールバックするテストには @DatabaseTest、コミットするテストには @CommittedDatabaseTest を付ける。規約：docs/backend/testing-database.md"
+          message="テスト用 DB への接続、ロールバック、後始末の構成を二つの合成アノテーションにまとめ、テストごとに構成が分かれないようにするため。直し方：@JooqTest を外し、ロールバックするテストには @DatabaseTest、コミットするテストには @CommittedDatabaseTest を付ける。規約：docs/backend/testing-database.md"
           class="net.sourceforge.pmd.lang.rule.xpath.XPathRule">
         <description>
             実行テストへの @JooqTest 直付けを禁止し、DBテストの構成と隔離方法を合成アノテーションへ集約する。
