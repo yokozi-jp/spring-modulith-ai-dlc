@@ -79,6 +79,7 @@ public interface OrderQueries {
 ```java
 // com.example.demo.order.presentation.web.OrderController（抜粋）
 /** 注文の詳細を返す。 */
+@Operation(operationId = "findOrderById")
 @GetMapping("/{orderId}")
 /* package */ OrderDetailsResponse details(@PathVariable final String orderId) {
   return orderQueries

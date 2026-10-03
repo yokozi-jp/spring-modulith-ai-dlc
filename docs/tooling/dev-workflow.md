@@ -64,6 +64,7 @@ task lint-duplicates
 ```
 
 フロントエンドだけ、またはバックエンドだけを変更した場合は、変更していない領域のTaskを省く。
+`frontend/src/routes/`を変更した場合は、`task fe-route-tree-check`で`routeTree.gen.ts`の再生成漏れがないことを確かめる。
 React Doctorは実行に時間がかかるためpre-pushでは実行せず、Frontend CIで`task fe-doctor`を実行する。
 ローカルでReact固有の問題を診断するときは、`task fe-doctor`を手動で実行する。
 

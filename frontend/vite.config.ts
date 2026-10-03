@@ -1,7 +1,7 @@
 import tailwindcss from "@tailwindcss/vite";
 import { tanstackRouter } from "@tanstack/router-plugin/vite";
 import react from "@vitejs/plugin-react";
-import { defineConfig, loadEnv } from "vite-plus";
+import { defaultExclude, defineConfig, loadEnv } from "vite-plus";
 
 const contentSecurityPolicy =
   "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; form-action 'self'; script-src 'self'; style-src 'self'; style-src-elem 'self' 'unsafe-inline'; style-src-attr 'none'; img-src 'self' data:; font-src 'self'; connect-src 'self'";
@@ -31,8 +31,40 @@ const restrictedHtmlProperties = [
   "srcdoc",
 ].map((property) => ({ property, message: "Use React children or textContent instead." }));
 
+// override の option は前の指定とマージされず置き換わるため、禁止の一覧を定数に分けて override ごとに組み合わせる。
+const htmlSinkGlobals = [{ name: "DOMParser", message: "Do not parse arbitrary HTML." }];
+const apiMessage = "Use the generated API client in src/api.";
+const networkGlobals = ["fetch", "XMLHttpRequest"].map((name) => ({ name, message: apiMessage }));
+const htmlSinkProperties = [
+  ...restrictedHtmlProperties,
+  { object: "document", property: "write", message: "Do not write HTML directly." },
+  { object: "document", property: "writeln", message: "Do not write HTML directly." },
+];
+const networkProperties = [
+  { object: "window", property: "fetch", message: apiMessage },
+  { object: "globalThis", property: "fetch", message: apiMessage },
+];
+const sharedLayerImports = {
+  group: ["@/features/**", "@/routes/**", "@/routeTree.gen"],
+  message: "Shared code must not depend on features or routes.",
+};
+const featureImports = {
+  group: ["@/routes/**", "@/routeTree.gen"],
+  message: "Use getRouteApi instead of importing a route.",
+};
+const baseUiImports = {
+  group: ["@base-ui/**"],
+  message: "Import UI primitives from @/components/ui (ADR-025).",
+};
+const testOnlyImports = {
+  group: ["msw", "msw/**", "@/api/generated/mocks/**", "@/testing/**", "@testing-library/**"],
+  message: "Use test-only modules only in test files and src/testing.",
+};
+
 // 生成物。整形・静的解析・カバレッジのいずれからも除外する。
 const generatedFiles = ["src/routeTree.gen.ts"];
+// lint 設定のテストが使う、違反を含む fixture。通常の整形、静的解析、テストの収集から外す。
+const lintFixtures = ["lint/fixtures/**"];
 
 export default defineConfig(({ mode }) => {
   // ルートの.envは秘密情報も含むため、proxyに必要な変数だけを読み込む。
@@ -53,6 +85,7 @@ export default defineConfig(({ mode }) => {
     // エイリアスの正本は tsconfig.json の paths とする。
     resolve: { tsconfigPaths: true },
     test: {
+      exclude: [...defaultExclude, ...lintFixtures],
       coverage: {
         provider: "v8",
         include: ["src/**/*.{ts,tsx}"],
@@ -60,14 +93,15 @@ export default defineConfig(({ mode }) => {
           "src/**/*.{test,spec}.{ts,tsx}",
           "src/**/*.d.ts",
           "src/main.tsx",
+          "src/testing/**",
           ...generatedFiles,
         ],
         thresholds: { branches: 85 },
       },
     },
-    fmt: { ignorePatterns: generatedFiles, sortImports: true },
+    fmt: { ignorePatterns: [...generatedFiles, ...lintFixtures], sortImports: true },
     lint: {
-      ignorePatterns: generatedFiles,
+      ignorePatterns: [...generatedFiles, ...lintFixtures],
       categories: {
         correctness: "error",
         suspicious: "error",
@@ -92,6 +126,7 @@ export default defineConfig(({ mode }) => {
         { name: "local-security", specifier: "./lint/local-security.js" },
         { name: "shadcn", specifier: "@shadcn/lint" },
         { name: "better-tailwindcss", specifier: "eslint-plugin-better-tailwindcss" },
+        { name: "feature-boundaries", specifier: "./lint/feature-boundaries.js" },
       ],
       rules: {
         // automatic JSX runtime、Vite設定、TanStack Routerの規約と両立しない規則。
@@ -110,6 +145,9 @@ export default defineConfig(({ mode }) => {
         "oxc/no-async-await": "off",
         "oxc/no-optional-chaining": "off",
         "oxc/no-rest-spread-properties": "off",
+        // event handler で reject しない Promise を捨てる `void` 文と、`x === undefined` の比較は許す。
+        "no-void": ["error", { allowAsStatement: true }],
+        "no-undefined": "off",
         "typescript/explicit-function-return-type": "off",
         "typescript/explicit-module-boundary-types": "off",
         "typescript/prefer-readonly-parameter-types": "off",
@@ -140,17 +178,11 @@ export default defineConfig(({ mode }) => {
         "vitest/require-test-timeout": "off",
         "vite-plus/prefer-vite-plus-imports": "error",
         "react/no-danger": "error",
-        "no-restricted-globals": [
-          "error",
-          { name: "DOMParser", message: "Do not parse arbitrary HTML." },
-        ],
-        "no-restricted-properties": [
-          "error",
-          ...restrictedHtmlProperties,
-          { object: "document", property: "write", message: "Do not write HTML directly." },
-          { object: "document", property: "writeln", message: "Do not write HTML directly." },
-        ],
+        "no-restricted-imports": ["error", { patterns: [baseUiImports, testOnlyImports] }],
+        "no-restricted-globals": ["error", ...htmlSinkGlobals, ...networkGlobals],
+        "no-restricted-properties": ["error", ...htmlSinkProperties, ...networkProperties],
         "local-security/no-jsx-srcdoc": "error",
+        "feature-boundaries/no-cross-feature-import": "error",
         "shadcn/no-restyle": ["error", { allow: ["layout"] }],
         "shadcn/no-raw-colors": "error",
         "shadcn/no-arbitrary-values": ["error", { allow: ["layout"] }],
@@ -162,10 +194,13 @@ export default defineConfig(({ mode }) => {
         "better-tailwindcss/no-duplicate-classes": "error",
         "better-tailwindcss/no-unnecessary-whitespace": "error",
         "better-tailwindcss/no-conflicting-classes": "error",
+        "better-tailwindcss/enforce-canonical-classes": "error",
       },
       settings: {
         "better-tailwindcss": { entryPoint: "src/style.css" },
       },
+      // ponytail: 同じ rule を指定する override は、後に一致したものの option だけが効く。
+      // 正しさは override の並び順と、option が置き換わることに依存する。並べ替えるときは lint/lint-config.test.js で確かめる。
       overrides: [
         {
           files: ["lint/**"],
@@ -178,11 +213,38 @@ export default defineConfig(({ mode }) => {
           },
         },
         {
+          files: ["src/{api,components,lib,i18n}/**"],
+          rules: {
+            "no-restricted-imports": [
+              "error",
+              { patterns: [sharedLayerImports, baseUiImports, testOnlyImports] },
+            ],
+          },
+        },
+        {
+          files: ["src/features/**"],
+          rules: {
+            "no-restricted-imports": [
+              "error",
+              { patterns: [featureImports, baseUiImports, testOnlyImports] },
+            ],
+          },
+        },
+        {
           files: ["src/components/ui/**"],
           rules: {
             "shadcn/no-restyle": "off",
             "shadcn/no-arbitrary-values": "off",
             "shadcn/require-static-classes": "off",
+            "no-restricted-imports": ["error", { patterns: [sharedLayerImports, testOnlyImports] }],
+            "react/only-export-components": "off",
+          },
+        },
+        {
+          files: ["src/api/**"],
+          rules: {
+            "no-restricted-globals": ["error", ...htmlSinkGlobals],
+            "no-restricted-properties": ["error", ...htmlSinkProperties],
           },
         },
         {
@@ -195,6 +257,14 @@ export default defineConfig(({ mode }) => {
           files: ["**/*.{test,spec}.{ts,tsx,js,jsx}"],
           rules: {
             "react/jsx-no-literals": "off",
+          },
+        },
+        // ponytail: option が置き換わるため、テストでは層の import 制限も外れる。
+        // テストにも層の制限が要るようになったら dependency-cruiser へ移る。
+        {
+          files: ["**/*.{test,spec}.{ts,tsx,js,jsx}", "src/testing/**"],
+          rules: {
+            "no-restricted-imports": ["error", { patterns: [baseUiImports] }],
           },
         },
       ],
