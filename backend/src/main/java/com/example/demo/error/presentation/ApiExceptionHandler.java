@@ -1,6 +1,8 @@
 package com.example.demo.error.presentation;
 
 import com.example.demo.LocaleSupport;
+import com.example.demo.error.ResourceConflictException;
+import com.example.demo.error.ResourceNotFoundException;
 import jakarta.servlet.http.HttpServletRequest;
 import java.util.Locale;
 import java.util.Objects;
@@ -57,6 +59,34 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
             ApiProblemDetails.forStatus(HttpStatus.FORBIDDEN),
             new HttpHeaders(),
             HttpStatus.FORBIDDEN,
+            request));
+  }
+
+  /** 他の処理による更新やロックとの競合を 409 Problem Details へ変換する。 */
+  @ExceptionHandler(ResourceConflictException.class)
+  /* package */ ResponseEntity<Object> handleResourceConflictException(
+      final ResourceConflictException exception, final WebRequest request) {
+    log.atInfo().log("API resource conflict");
+    return Objects.requireNonNull(
+        handleExceptionInternal(
+            exception,
+            ApiProblemDetails.forStatus(HttpStatus.CONFLICT),
+            new HttpHeaders(),
+            HttpStatus.CONFLICT,
+            request));
+  }
+
+  /** 対象のリソースが存在しないことを 404 Problem Details へ変換する。 */
+  @ExceptionHandler(ResourceNotFoundException.class)
+  /* package */ ResponseEntity<Object> handleResourceNotFoundException(
+      final ResourceNotFoundException exception, final WebRequest request) {
+    log.atInfo().log("API resource not found");
+    return Objects.requireNonNull(
+        handleExceptionInternal(
+            exception,
+            ApiProblemDetails.forStatus(HttpStatus.NOT_FOUND),
+            new HttpHeaders(),
+            HttpStatus.NOT_FOUND,
             request));
   }
 
