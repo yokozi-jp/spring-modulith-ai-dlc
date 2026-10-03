@@ -194,7 +194,7 @@ class DateTimeConventionsArchTest {
                 + "Instant.now(clock) または clock.millis() を使う。"
                 + "システム Clock を生成できるのは "
                 + CLOCK_BEAN_METHOD
-                + " だけであり、このメソッドが Clock.systemUTC() を返す。"
+                + " だけであり、このメソッドが Clock.systemUTC() をマイクロ秒単位の tick で包んで返す。"
                 + "地域の日付や時刻は ZoneId.systemDefault() や Clock のゾーンに頼らず、"
                 + "LocalDate.ofInstant(Instant.now(clock), zone) のように設定値の ZoneId で求める。");
   }

@@ -13,4 +13,5 @@ description: 日時を扱うすべてのタスクで守る短いルール。詳�
 - 現在時刻は `Clock` をコンストラクタで受け取り、`Instant.now(clock)` で取る。`Clock` を受け取らない `now(...)` や `ZoneId.systemDefault()` を使わない。
 - API は絶対時刻を `Z` 付きの RFC 3339 文字列で返す。
 - 表示用のタイムゾーン変換はフロントエンドの `Temporal.Instant` の `toLocaleString` で行う。
-- テストでは `Clock.fixed(...)` を使い、`Instant` をマイクロ秒精度にそろえる。
+- 絶対時刻はマイクロ秒精度で保持する（`docs/datetime/timezone-conventions.md` の「精度」）。
+- テストでは `Clock.fixed(...)` にマイクロ秒精度の `Instant` を渡す。

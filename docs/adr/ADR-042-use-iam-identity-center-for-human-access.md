@@ -67,6 +67,5 @@ IAM ユーザーを使うと、パスワード、MFA デバイス、アクセス
 
 ## References
 
-- [AWSアカウントの分離と構成](../aws/account-structure.md)
 - [AWS IAM のセキュリティのベストプラクティス](https://docs.aws.amazon.com/IAM/latest/UserGuide/best-practices.html)
 - [IAM Identity Center の委任管理](https://docs.aws.amazon.com/singlesignon/latest/userguide/delegated-admin.html)
