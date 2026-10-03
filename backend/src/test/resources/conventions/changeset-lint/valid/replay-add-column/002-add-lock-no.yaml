@@ -1,0 +1,14 @@
+databaseChangeLog:
+  - changeSet:
+      id: "002-add-lock-no"
+      author: system
+      changes:
+        - addColumn:
+            tableName: m_item
+            schemaName: item
+            columns:
+              - column:
+                  name: lock_no
+                  type: bigint
+                  constraints:
+                    nullable: false

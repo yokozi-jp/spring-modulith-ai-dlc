@@ -9,6 +9,7 @@ tags: [reference, backend, testing, archunit, spring-modulith]
 
 Spring ModulithとArchUnitはモジュール境界、依存方向、配置、禁止API、テスト規約を検査する。
 PMDとError Proneはソースまたはコンパイル時に判定する規約を検査する。
+DBの規約は、changesetの静的検査と`pg_catalog`のスキーマ検査でも検査する。
 ArchUnitとPMDの失敗メッセージは、理由、直し方、規約の文書のパスを示す。
 
 ## 検査クラス
@@ -19,6 +20,7 @@ backend/src/test/java/com/example/demo/architecture/
 ├── ArchitectureRuleFixtureTest.java
 ├── ArchitectureRuleMessageTest.java
 ├── ClassRoleArchTest.java
+├── DatabaseConventionsArchTest.java
 ├── DateTimeConventionsArchTest.java
 ├── GeneralCodingRulesArchTest.java
 ├── PackageByFeatureOnionArchitectureTest.java
@@ -155,6 +157,25 @@ Class <archfixture.violating.order.application.ShipOrderCommandHandler> is meta-
 日時規約の決定は[ADR-006](../adr/ADR-006-utc-instant-absolute-time-policy.md)と[ADR-046](../adr/ADR-046-derive-local-dates-with-configured-business-zone.md)を参照する。
 
 Error ProneはすべてのJavaコンパイルで`JavaTimeDefaultTimeZone`と`JavaUtilDate`をerrorとして検査する。
+
+## DB
+
+`DatabaseConventionsArchTest`は、次の規則を検査する。
+`Jooq<Aggregate>Repository`の作成時の点検は[jOOQのRepository](class-roles/jooq-repository.md)のチェックリストに示す。
+
+- `transactionIsolationIsNotDeclared`：Springの`@Transactional`をクラスまたはメソッドに付けるとき、`isolation`を指定しない。
+- `plainSqlApisAreNotUsed`：`@PlainSQL`の付いたjOOQのAPIを呼び出さず、メソッド参照もしない。
+- `renderSchemaIsNotChanged`：`Settings.withRenderSchema`と`Settings.setRenderSchema`を呼び出さず、メソッド参照もしない。引数の値はバイトコードに残らないため、`withRenderSchema(false)`の禁止を呼び出しの禁止で近似する。
+
+DBの規約のほかの検査は`backend/src/test/java/com/example/demo/persistence/conventions/`に置く。
+
+- `ChangesetLintTest`は、Liquibaseのchangesetを、DBに接続せずに静的に検査する。changesetを順に適用してテーブルの最終形を組み立てる。違反を含むフィクスチャは`backend/src/test/resources/conventions/changeset-lint/`に置く。
+- `SchemaConventionsTest`は、`pg_catalog`の行から違反を判定する関数を、違反を含む行で検証する。
+- `SchemaInspectionTest`は、マイグレーション後のテストDBの`pg_catalog`をアプリロールで読み、同じ関数で検査する。
+
+規約の例外は、理由を付けて`ChangesetLint.ALLOWLIST`と`SchemaConventions.ALLOWLIST`に載せる。
+何も抑止しない項目は違反として報告する。
+changesetの検査は`modulith`スキーマを、スキーマ検査は`modulith`と`liquibase`のスキーマを、業務テーブルの規則から除く。
 
 ## テストコード
 

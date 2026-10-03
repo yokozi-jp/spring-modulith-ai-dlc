@@ -1,0 +1,131 @@
+databaseChangeLog:
+  - changeSet:
+      id: "001-create-m-item"
+      author: system
+      changes:
+        - createTable:
+            tableName: m_item
+            schemaName: item
+            columns:
+              - column:
+                  name: item_id
+                  type: bigint
+                  autoIncrement: true
+                  generationType: ALWAYS
+                  constraints:
+                    primaryKey: true
+                    primaryKeyName: pk_m_item
+              - column:
+                  name: item_code
+                  type: varchar(20)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: is_active
+                  type: boolean
+                  defaultValueBoolean: false
+                  constraints:
+                    nullable: false
+              - column:
+                  name: sale_date
+                  type: date
+                  constraints:
+                    nullable: false
+              - column:
+                  name: ordered_at
+                  type: timestamptz
+                  constraints:
+                    nullable: false
+              - column:
+                  name: created_at
+                  type: timestamptz
+                  constraints:
+                    nullable: false
+              - column:
+                  name: created_by
+                  type: varchar(64)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: created_pgm_cd
+                  type: varchar(64)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: created_tx_id
+                  type: varchar(32)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: updated_at
+                  type: timestamptz
+                  constraints:
+                    nullable: false
+              - column:
+                  name: updated_by
+                  type: varchar(64)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: updated_pgm_cd
+                  type: varchar(64)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: updated_tx_id
+                  type: varchar(32)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: lock_no
+                  type: bigint
+                  constraints:
+                    nullable: false
+              - column:
+                  name: patched_at
+                  type: timestamptz
+              - column:
+                  name: patched_by
+                  type: varchar(64)
+              - column:
+                  name: patched_id
+                  type: integer
+        - createIndex:
+            indexName: uk_m_item
+            tableName: m_item
+            schemaName: item
+            unique: true
+            columns:
+              - column:
+                  name: item_code
+        - createIndex:
+            indexName: uk_2_m_item
+            tableName: m_item
+            schemaName: item
+            unique: true
+            columns:
+              - column:
+                  name: sale_date
+              - column:
+                  name: item_code
+        - createIndex:
+            indexName: idx_1_m_item
+            tableName: m_item
+            schemaName: item
+            columns:
+              - column:
+                  name: sale_date
+        - createIndex:
+            indexName: i2_m_item
+            tableName: m_item
+            schemaName: item
+            columns:
+              - column:
+                  name: ordered_at
+        - createSequence:
+            sequenceName: seq_m_item_1
+            schemaName: item
+        - createView:
+            viewName: v_m_item
+            schemaName: item
+            selectQuery: SELECT item_id, item_code FROM item.m_item
