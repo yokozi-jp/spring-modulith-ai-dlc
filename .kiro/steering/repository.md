@@ -1,6 +1,6 @@
 ---
 inclusion: fileMatch
-fileMatchPattern: [".github/CODEOWNERS", ".github/PULL_REQUEST_TEMPLATE.md", ".github/workflows/release-please.yml", "release-please-config.json", ".release-please-manifest.json", "version.txt", "CHANGELOG.md"]
+fileMatchPattern: [".github/CODEOWNERS", ".github/workflows/release-please.yml", "release-please-config.json", ".release-please-manifest.json", "version.txt", "CHANGELOG.md"]
 name: repository
 description: main のブランチ保護、必須チェック、CODEOWNERS、release-please の設定やリリース手順を確認、変更するときに使う。リポジトリ運用の規約の入口を示す。
 ---

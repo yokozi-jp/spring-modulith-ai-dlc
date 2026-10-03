@@ -20,7 +20,8 @@ okf_version: '0.2'
 - [非機能要件](nfr/index.md)：可用性、耐障害性、災害対策などの非機能要件を定義、合意するとき
 - [性能テスト](performance-test/index.md)：性能テストを計画、実施、分析、報告するとき
 - [帳票](report/index.md)：PDF、Excel、紙の帳票を作るか判断するとき、帳票を設計するとき
-- [コードレビュー](code-review/index.md)：Pull Request を作る、分ける、レビューを依頼する、レビューするとき
+- [コードレビュー](code-review/index.md)：人またはエージェントが変更の内容をレビューして、問題を探すとき
+- [Pull Request](pull-request/index.md)：Pull Request を作る、分ける、本文を書く、レビューを依頼する、レビュアーとしてコメントする、マージするとき
 - [ナレッジ管理](knowledge/index.md)：docs や steering を追加、分割、移動するとき、知識をどこに書くか迷ったとき
 - [エージェント設定](agents/index.md)：Agent skillsのIssue tracker、triageラベル、ドメイン文書の設定を確認、変更するとき、Matt Pocock のスキルを使うとき
 - [Architecture Decision Records](adr/index.md)：設計上の判断をする前に既存の決定を確かめるとき、ADR を起こすとき
