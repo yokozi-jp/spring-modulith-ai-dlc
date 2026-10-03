@@ -48,7 +48,9 @@ jOOQ の Repository は業務規則を持たない。
 `PLACED_AT` の生成型は、[日時とタイムゾーンの規約](../../datetime/timezone-conventions.md)のとおり `Instant` である。
 生成型の扱いは[jOOQコード生成物の管理](../../database/jooq-codegen.md)に従う。
 
-`CommonColumns` と、その `forInsert(テーブル)` と `forUpdate(テーブル)` は、共通カラムの列と値の `Map` を返す `shared.infrastructure.persistence` の共通処理の仮の名前であり、[ADR-048](../../adr/ADR-048-add-shared-module-for-jooq-common-code.md) で `shared` を実装するまで決まらない。
+`CommonColumns` は `shared.infrastructure.persistence` の共通処理であり（[ADR-048](../../adr/ADR-048-add-shared-module-for-jooq-common-code.md)）、`forInsert(テーブル)` と `forUpdate(テーブル)` は `LOCK_NO` を含む共通カラムの列と値の `Map` を返す。
+`forInsert` は `LOCK_NO` を `1` にし、`forUpdate` は `LOCK_NO` を1加算する。
+`*_PGM_CD` の値の求め方は [PostgreSQL の共通カラム](../../database/postgresql-common-columns.md)に従う。
 
 ## 必須の記述
 
@@ -64,7 +66,7 @@ jOOQ の Repository は業務規則を持たない。
 - `select` に並べる列の順は、`Order.restore` と Entity のコンストラクタの引数の順に合わせる。
   集約ルートの `LOCK_NO` も選び、`restore` の `lockNo` に渡す。
 - 集約は `fetchOptional(Records.mapping(Order::restore))` か `fetch(Records.mapping(Order::restore))` で作り、`Order.place` を使わない。
-- `add` は、`insertInto(ORDERS)` の `set(列, 値)` で業務の全列と `LOCK_NO` の `1` を書き、ほかの共通カラムを `set(commonColumns.forInsert(ORDERS))` で書く。
+- `add` は、`insertInto(ORDERS)` の `set(列, 値)` で業務の全列を書き、`LOCK_NO` を含む共通カラムを `set(commonColumns.forInsert(ORDERS))` で書く。
   値オブジェクトと enum は、アクセサ（`value()`、`amount()`、`name()`）で列の値に直す。
 - `update` は、次の順に書く。
   1. `lock<Aggregate>` で、集約ルートの行を `select(ORDERS.LOCK_NO)` の `forUpdate().noWait()` でロックする。
@@ -72,13 +74,13 @@ jOOQ の Repository は業務規則を持たない。
   3. 行をロックできないと、Spring Boot の jOOQ の例外の変換が `CannotAcquireLockException` を投げる。
      これを catch し、原因に付けた `<Aggregate>ConflictException` を投げる。
   4. 読んだ `LOCK_NO` が集約の `lockNo()` と違えば、`<Aggregate>ConflictException` を投げる。
-  5. 集約ルートの行の主キー以外の業務の列を書き、`LOCK_NO` を `ORDERS.LOCK_NO.plus(1L)` にし、ほかの共通カラムを `set(commonColumns.forUpdate(ORDERS))` で書く。
-  6. 子の行も、主キー以外の業務の列を書き、`LOCK_NO` を1加算し、`forUpdate` の値を書く。
+  5. 集約ルートの行の主キー以外の業務の列を書き、`LOCK_NO` の加算を含む共通カラムを `set(commonColumns.forUpdate(ORDERS))` で書く。
+  6. 子の行も、主キー以外の業務の列を書き、`forUpdate` の値を書く。
 - `update` の UPDATE の条件に `LOCK_NO` を入れて更新件数で判定しない。
   jOOQ の `executeWithOptimisticLocking` と `recordVersionFields` も使わない（[PostgreSQL の排他制御](../../database/postgresql-concurrency-control.md)）。
 - 子の Entity の行は、`add` では行ごとの INSERT を、`update` では行ごとの UPDATE を、`dsl.batch` 一つで実行する。
   注文の明細は受付の後に増えも減りもしないため、`update` は明細の行を消さずに UPDATE する。
-- 共通カラムのうち、このクラスが参照するのは `LOCK_NO` だけにし、`CREATED_*`、`UPDATED_*`、`PATCHED_*` の列を参照しない（[ADR-048](../../adr/ADR-048-add-shared-module-for-jooq-common-code.md)）。
+- 共通カラムのうち、このクラスが参照するのは、集約の復元と比較のために読む `LOCK_NO` だけにし、`LOCK_NO` を書かず、`CREATED_*`、`UPDATED_*`、`PATCHED_*` の列を参照しない（[ADR-048](../../adr/ADR-048-add-shared-module-for-jooq-common-code.md)）。
 - `@Transactional` を付けない。
 - クラス、フィールド、コンストラクタに Javadoc を書く。
 - `infrastructure.persistence` のパッケージに `@NullMarked` を宣言する `package-info.java` を置く。
@@ -143,7 +145,6 @@ class JooqOrderRepository implements OrderRepository {
         .set(ORDERS.STATUS, order.status().name())
         .set(ORDERS.DISCOUNT, order.discount().amount())
         .set(ORDERS.PLACED_AT, order.placedAt())
-        .set(ORDERS.LOCK_NO, 1L)
         .set(commonColumns.forInsert(ORDERS))
         .execute();
     dsl.batch(
@@ -156,7 +157,6 @@ class JooqOrderRepository implements OrderRepository {
                             .set(ORDER_LINES.PRODUCT_CODE, line.productCode().value())
                             .set(ORDER_LINES.QUANTITY, line.quantity().value())
                             .set(ORDER_LINES.UNIT_PRICE, line.unitPrice().amount())
-                            .set(ORDER_LINES.LOCK_NO, 1L)
                             .set(commonColumns.forInsert(ORDER_LINES)))
                 .toList())
         .execute();
@@ -170,7 +170,6 @@ class JooqOrderRepository implements OrderRepository {
         .set(ORDERS.STATUS, order.status().name())
         .set(ORDERS.DISCOUNT, order.discount().amount())
         .set(ORDERS.PLACED_AT, order.placedAt())
-        .set(ORDERS.LOCK_NO, ORDERS.LOCK_NO.plus(1L))
         .set(commonColumns.forUpdate(ORDERS))
         .where(ORDERS.ORDER_ID.eq(order.id().value()))
         .execute();
@@ -182,7 +181,6 @@ class JooqOrderRepository implements OrderRepository {
                             .set(ORDER_LINES.PRODUCT_CODE, line.productCode().value())
                             .set(ORDER_LINES.QUANTITY, line.quantity().value())
                             .set(ORDER_LINES.UNIT_PRICE, line.unitPrice().amount())
-                            .set(ORDER_LINES.LOCK_NO, ORDER_LINES.LOCK_NO.plus(1L))
                             .set(commonColumns.forUpdate(ORDER_LINES))
                             .where(ORDER_LINES.ORDER_ID.eq(order.id().value()))
                             .and(ORDER_LINES.LINE_NUMBER.eq(line.lineNumber())))
@@ -327,11 +325,11 @@ public long countUnshippedByCustomer(final CustomerId customerId) {
 - [ ] 子の Entity を `multiset` で集約ルートと同じ SQL で読み、集約を `Records.mapping(Order::restore)` で作る。［自分で点検］
 - [ ] `multiset` の副問い合わせに、子を識別する列の `orderBy` を付ける（`orderBy(ORDER_LINES.LINE_NUMBER)`）。［自分で点検］
 - [ ] 集約ルートの `LOCK_NO` を選び、`restore` の `lockNo` に渡す。［自分で点検］
-- [ ] `add` は `set(列, 値)` で業務の全列と `LOCK_NO` の `1` を書き、子の行を行ごとの INSERT の `dsl.batch` 一つで書く。［自分で点検］
+- [ ] `add` は `set(列, 値)` で業務の全列を書き、子の行を行ごとの INSERT の `dsl.batch` 一つで書く。［自分で点検］
 - [ ] `update` は、集約ルートの行を `forUpdate().noWait()` でロックしてから、行がなければ `NoSuchElementException` を、`LOCK_NO` が集約の `lockNo()` と違うか `CannotAcquireLockException` になったら `<Aggregate>ConflictException` を投げ、その後で UPDATE する。［自分で点検］
-- [ ] `update` は親と子の `LOCK_NO` を1加算し、UPDATE の条件の `LOCK_NO` と更新件数で競合を判定せず、jOOQ の楽観的ロックの機能を使わない。［自分で点検］
+- [ ] `update` は UPDATE の条件の `LOCK_NO` と更新件数で競合を判定せず、jOOQ の楽観的ロックの機能を使わない。［自分で点検］
 - [ ] `add` と `update` で、UPSERT（`INSERT ... ON CONFLICT`）を使わない。［自分で点検］
-- [ ] `LOCK_NO` 以外の共通カラムは `CommonColumns` の `forInsert` と `forUpdate` で書き、`CREATED_*`、`UPDATED_*`、`PATCHED_*` の列を参照しない。［自分で点検］
+- [ ] `LOCK_NO` を含む共通カラムは `CommonColumns` の `forInsert` と `forUpdate` で書き、`LOCK_NO` は読むだけにし、`CREATED_*`、`UPDATED_*`、`PATCHED_*` の列を参照しない。［自分で点検］
 - [ ] Plain SQL と `withRenderSchema(false)` を使わない。［自分で点検］
 - [ ] 変換で `Order.place`、業務規則、既定値、Mapper のクラス、次の ArchUnit の規則が検査しないリフレクションの対応づけを使わない。［自分で点検］
 - [ ] jOOQ の `into`、`intoMap`、`intoGroups`、`fetchMap`、`fetchGroups`、名前が `Into` で終わるメソッドを `Class` を渡して呼ばず、`Record` の `into(Object)` と `from(Object)`、`DSLContext.newRecord(Table, Object)` を呼ばない。［ArchUnit で検査：ClassRoleArchTest.jooqReflectionMappingIsNotUsed］
