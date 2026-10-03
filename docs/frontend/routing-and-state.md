@@ -122,7 +122,8 @@ Effectはrenderの後に動くため、render中やevent handlerで済む処理�
 
 - **propsやstateから計算できる値**：stateとEffectで持たず、render中に計算する。
 - **利用者の操作に応じた処理**：送信や通知は、その操作のevent handlerで行う。
-- **propが変わったときのstateの初期化**：Effectで戻さず、親から `key` を渡してcomponentを作り直す。
+- **propが変わったときのstateの初期化**：Effectで戻さない。
+  stateをすべて戻すときは親から `key` を渡してcomponentを作り直し、一部だけを調整するときはrender中に計算する。
 - **Effectの連鎖**：あるEffectで更新したstateを別のEffectで受けて次のstateを更新せず、event handlerで次のstateをまとめて計算する。
 - **server stateの取得**：[ルーティング](#ルーティング)のとおり、loaderとTanStack Queryで取得する。
 
