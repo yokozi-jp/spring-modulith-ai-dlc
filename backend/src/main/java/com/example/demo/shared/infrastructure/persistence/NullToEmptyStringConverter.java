@@ -7,7 +7,8 @@ import org.jspecify.annotations.Nullable;
  * NOT NULL の文字列カラムで、NULL を空文字 {@code ''} へそろえる jOOQ の Converter。
  *
  * <p>docs/database/postgresql-data-types.md の「文字列の既定値」に従い、NULL から空文字への変換をカラムごとに書かず一律に行う。
- * jOOQ のコード生成の forcedType で NOT NULL の {@code varchar} に当て、文字列の共通カラムと {@code patched_*} には当てない。
+ *
+ * <p>コード生成の forcedType で NOT NULL の {@code varchar} に当て、文字列の共通カラムと {@code patched_*} には当てない。
  */
 public final class NullToEmptyStringConverter extends AbstractConverter<String, String> {
 
@@ -26,6 +27,7 @@ public final class NullToEmptyStringConverter extends AbstractConverter<String, 
 
   /** DB へ書く NULL を空文字にする。 */
   @Override
+  @SuppressWarnings("PMD.ShortMethodName") // jOOQ の Converter が定めるメソッド名のため変えられない。
   public String to(final @Nullable String userObject) {
     return userObject == null ? "" : userObject;
   }

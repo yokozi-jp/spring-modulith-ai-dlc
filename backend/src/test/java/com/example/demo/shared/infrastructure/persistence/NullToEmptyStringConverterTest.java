@@ -3,7 +3,7 @@ package com.example.demo.shared.infrastructure.persistence;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import java.util.ArrayList;
-import java.util.HashMap;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import org.jooq.DSLContext;
@@ -36,6 +36,7 @@ class NullToEmptyStringConverterTest {
   private static final Field<String> RAW_ITEM_NAME =
       DSL.field(DSL.name("s", "t", "item_name"), SQLDataType.VARCHAR(50));
 
+  /** 書き込み先のテーブル。 */
   private static final Table<Record> TABLE = DSL.table(DSL.name("s", "t"));
 
   /** 書き込みで発行された SQL とバインド値。 */
@@ -48,8 +49,9 @@ class NullToEmptyStringConverterTest {
 
     assertThat(converter.from(null)).as("DB からの null").isEmpty();
     assertThat(converter.to(null)).as("DB への null").isEmpty();
-    assertThat(converter.from("abc")).as("DB からの値").isEqualTo("abc");
-    assertThat(converter.to("abc")).as("DB への値").isEqualTo("abc");
+    final String value = "abc";
+    assertThat(converter.from(value)).as("DB からの値").isEqualTo(value);
+    assertThat(converter.to(value)).as("DB への値").isEqualTo(value);
     assertThat(converter.fromType()).as("DB 側の型").isEqualTo(String.class);
     assertThat(converter.toType()).as("アプリケーション側の型").isEqualTo(String.class);
   }
@@ -83,9 +85,8 @@ class NullToEmptyStringConverterTest {
   @Test
   @DisplayName("Map で渡した null を空文字でバインドする")
   void mapSetBindsNullAsEmptyString() {
-    // Map.of は null を受け付けないため、null を値に持てる HashMap を使う。
-    final Map<Field<?>, Object> values = new HashMap<>();
-    values.put(ITEM_NAME, null);
+    // Map.of は null を受け付けないため、null を値に持てる singletonMap を使う。
+    final Map<Field<?>, Object> values = Collections.singletonMap(ITEM_NAME, null);
 
     recordingDsl().update(TABLE).set(values).execute();
 
