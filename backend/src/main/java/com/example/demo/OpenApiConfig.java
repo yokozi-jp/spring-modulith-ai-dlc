@@ -2,6 +2,8 @@ package com.example.demo;
 
 import io.swagger.v3.oas.models.Components;
 import io.swagger.v3.oas.models.OpenAPI;
+import io.swagger.v3.oas.models.Operation;
+import io.swagger.v3.oas.models.PathItem;
 import io.swagger.v3.oas.models.info.Info;
 import io.swagger.v3.oas.models.media.Content;
 import io.swagger.v3.oas.models.media.IntegerSchema;
@@ -10,6 +12,9 @@ import io.swagger.v3.oas.models.media.Schema;
 import io.swagger.v3.oas.models.media.StringSchema;
 import io.swagger.v3.oas.models.responses.ApiResponse;
 import java.util.List;
+import java.util.Map;
+import java.util.function.Consumer;
+import org.springdoc.core.customizers.OpenApiCustomizer;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.MediaType;
@@ -18,25 +23,100 @@ import org.springframework.http.MediaType;
 @Configuration(proxyBeanMethods = false)
 public class OpenApiConfig {
 
+  /**
+   * 契約の版を手で管理する。
+   *
+   * <p>互換な追加で MINOR、破壊的変更で MAJOR を上げ、アプリのリリース版と連動させない（docs/web-api/versioning.md）。
+   */
+  /* package */ static final String CONTRACT_VERSION = "0.1.0";
+
+  /** 共通の Problem response を参照する接頭辞。 */
+  private static final String PROBLEM_RESPONSE_REF = "#/components/responses/";
+
   /** API の基本情報と RFC 9457 共通 components を定義する。 */
   @Bean
   public OpenAPI openApi() {
     final Components components =
         new Components()
             .addSchemas("ProblemDetail", problemDetailSchema())
-            .addResponses("BadRequestProblem", problemResponse("Bad Request"))
-            .addResponses("UnauthorizedProblem", problemResponse("Unauthorized"))
-            .addResponses("ForbiddenProblem", problemResponse("Forbidden"))
-            .addResponses("InternalServerErrorProblem", problemResponse("Internal Server Error"));
+            .addResponses("BadRequestProblem", problemResponse("要求の形式または入力値が正しくない"))
+            .addResponses("UnauthorizedProblem", problemResponse("認証されていない"))
+            .addResponses("ForbiddenProblem", problemResponse("操作の権限がない"))
+            .addResponses("NotFoundProblem", problemResponse("対象のリソースが存在しない"))
+            .addResponses("ConflictProblem", problemResponse("リソースの現在の状態と競合する"))
+            .addResponses("UnprocessableContentProblem", problemResponse("業務規則に反するため処理できない"))
+            .addResponses("InternalServerErrorProblem", problemResponse("サーバーの内部エラー"));
     return new OpenAPI()
         .info(
-            new Info().title("Demo API").description("Demo application HTTP API").version("0.0.1"))
+            new Info()
+                .title("Demo API")
+                .description("Demo アプリケーションの HTTP API")
+                .version(CONTRACT_VERSION))
         .components(components);
   }
 
+  /**
+   * 全 operation に 401、403、500 の共通 response を付け、入力のある operation にだけ 400 を付ける。
+   *
+   * <p>operation ごとに書いた同じ status の response は上書きしない。
+   */
+  @Bean
+  public OpenApiCustomizer commonProblemResponses() {
+    return openApi -> forEachOperation(openApi, OpenApiConfig::addCommonProblemResponses);
+  }
+
+  /**
+   * Javadoc から作った summary の前後の空白を除く。
+   *
+   * <p>springdoc は Javadoc の {@code <p>} の直前までを summary にし、改行と空白を残すため。
+   */
+  @Bean
+  public OpenApiCustomizer trimJavadocSummaries() {
+    return openApi -> forEachOperation(openApi, OpenApiConfig::trimSummary);
+  }
+
+  /** 文書の全 operation に処理を適用する。paths がなければ何もしない。 */
+  private static void forEachOperation(final OpenAPI openApi, final Consumer<Operation> action) {
+    final Map<String, PathItem> paths = openApi.getPaths();
+    if (paths == null) {
+      return;
+    }
+    for (final PathItem pathItem : paths.values()) {
+      pathItem.readOperations().forEach(action);
+    }
+  }
+
+  /** 1 つの operation の summary の前後の空白を除く。 */
+  private static void trimSummary(final Operation operation) {
+    final String summary = operation.getSummary();
+    if (summary != null) {
+      operation.setSummary(summary.strip());
+    }
+  }
+
+  /** 1 つの operation へ共通の Problem response を足す。 */
+  private static void addCommonProblemResponses(final Operation operation) {
+    final Map<String, ApiResponse> responses = operation.getResponses();
+    final boolean hasInput =
+        (operation.getParameters() != null && !operation.getParameters().isEmpty())
+            || operation.getRequestBody() != null;
+    if (hasInput) {
+      responses.putIfAbsent("400", problemRef("BadRequestProblem"));
+    }
+    responses.putIfAbsent("401", problemRef("UnauthorizedProblem"));
+    responses.putIfAbsent("403", problemRef("ForbiddenProblem"));
+    responses.putIfAbsent("500", problemRef("InternalServerErrorProblem"));
+  }
+
+  /** components の共通 Problem response を参照する response を作る。 */
+  private static ApiResponse problemRef(final String name) {
+    return new ApiResponse().$ref(PROBLEM_RESPONSE_REF + name);
+  }
+
+  /** RFC 9457 の Problem Details の schema を作る。 */
   private static Schema<?> problemDetailSchema() {
     final ObjectSchema schema = new ObjectSchema();
-    schema.setDescription("RFC 9457 Problem Details");
+    schema.setDescription("RFC 9457 の Problem Details");
     schema.setRequired(List.of("type", "title", "status"));
     schema.addProperty(
         "type",
@@ -53,6 +133,7 @@ public class OpenApiConfig {
     return schema;
   }
 
+  /** application/problem+json で ProblemDetail を返す response を作る。 */
   private static ApiResponse problemResponse(final String description) {
     final io.swagger.v3.oas.models.media.MediaType mediaType =
         new io.swagger.v3.oas.models.media.MediaType()

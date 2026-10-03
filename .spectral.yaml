@@ -38,13 +38,21 @@ rules:
                 const: status
 
   common-problem-responses:
-    description: 認証、認可、サーバーエラーの共通 response を定義する。
+    description: 入力誤り、認証、認可、不在、競合、業務規則違反、サーバーエラーの共通 response を定義する。
     severity: error
     given: "$.components.responses"
     then:
+      - field: BadRequestProblem
+        function: truthy
       - field: UnauthorizedProblem
         function: truthy
       - field: ForbiddenProblem
+        function: truthy
+      - field: NotFoundProblem
+        function: truthy
+      - field: ConflictProblem
+        function: truthy
+      - field: UnprocessableContentProblem
         function: truthy
       - field: InternalServerErrorProblem
         function: truthy

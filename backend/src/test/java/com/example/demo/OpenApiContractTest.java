@@ -1,6 +1,7 @@
 package com.example.demo;
 
 import static org.hamcrest.Matchers.startsWith;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -20,10 +21,19 @@ import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
-import org.springframework.test.web.servlet.MvcResult;
+import org.springframework.test.web.servlet.ResultMatcher;
 
-/** 生成された OpenAPI 文書の版と共通 RFC 9457 components を検証する。 */
-@SuppressWarnings({"PMD.TooManyStaticImports", "PMD.UnitTestShouldIncludeAssert"})
+/**
+ * 生成された OpenAPI 文書の版と共通 RFC 9457 components を検証する。
+ *
+ * <p>{@code openapi.output} が指定されたときは、springdoc の YAML endpoint の出力をそのパスへ書き出す（exportOpenApi）。
+ */
+// MockMvc.perform が Exception を宣言するため、補助メソッドも Exception を宣言する。
+@SuppressWarnings({
+  "PMD.SignatureDeclareThrowsException",
+  "PMD.TooManyStaticImports",
+  "PMD.UnitTestShouldIncludeAssert"
+})
 @SpringBootTest
 @AutoConfigureMockMvc
 @Import(SharedTestConfiguration.class)
@@ -33,35 +43,50 @@ class OpenApiContractTest {
   @Autowired private MockMvc mockMvc;
 
   @Test
-  @DisplayName("生成 OpenAPI は 3.1 で RFC 9457 共通 components を含む")
+  @DisplayName("生成 OpenAPI は 3.1 で契約の版と RFC 9457 共通 components を含む")
   void openApiDocumentContainsProblemDetailsComponents() throws Exception {
-    final MvcResult result =
-        mockMvc
-            .perform(get("/v3/api-docs"))
-            .andExpect(status().isOk())
-            .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
-            .andExpect(jsonPath("$.openapi").value(startsWith("3.1.")))
-            .andExpect(jsonPath("$.components.schemas.ProblemDetail.type").value("object"))
-            .andExpect(jsonPath("$.components.schemas.ProblemDetail.required.length()").value(3))
-            .andExpect(
-                jsonPath(
-                        "$.components.responses.UnauthorizedProblem.content['application/problem+json']")
-                    .exists())
-            .andExpect(
-                jsonPath(
-                        "$.components.responses.ForbiddenProblem.content['application/problem+json']")
-                    .exists())
-            .andReturn();
+    mockMvc
+        .perform(get("/v3/api-docs"))
+        .andExpect(status().isOk())
+        .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
+        .andExpect(jsonPath("$.openapi").value(startsWith("3.1.")))
+        .andExpect(jsonPath("$.info.version").value(OpenApiConfig.CONTRACT_VERSION))
+        .andExpect(jsonPath("$.components.schemas.ProblemDetail.type").value("object"))
+        .andExpect(jsonPath("$.components.schemas.ProblemDetail.required.length()").value(3))
+        .andExpect(problemResponseExists("BadRequestProblem"))
+        .andExpect(problemResponseExists("UnauthorizedProblem"))
+        .andExpect(problemResponseExists("ForbiddenProblem"))
+        .andExpect(problemResponseExists("NotFoundProblem"))
+        .andExpect(problemResponseExists("ConflictProblem"))
+        .andExpect(problemResponseExists("UnprocessableContentProblem"))
+        .andExpect(problemResponseExists("InternalServerErrorProblem"));
 
-    exportWhenRequested(result.getResponse().getContentAsString(StandardCharsets.UTF_8));
+    exportWhenRequested();
   }
 
-  private static void exportWhenRequested(final String openApiDocument) throws IOException {
+  private static ResultMatcher problemResponseExists(final String name) {
+    return jsonPath("$.components.responses." + name + ".content['application/problem+json']")
+        .exists();
+  }
+
+  private void exportWhenRequested() throws Exception {
     final @Nullable String output = System.getProperty("openapi.output");
     if (output == null) {
       return;
     }
-    final Path outputPath = Path.of(output).toAbsolutePath();
+    // SecurityConfig は /v3/api-docs.yaml を公開しないため、認証済みの利用者として取得する。
+    final String yaml =
+        mockMvc
+            .perform(get("/v3/api-docs.yaml").with(user("openapi-export")))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString(StandardCharsets.UTF_8);
+    write(Path.of(output).toAbsolutePath(), yaml);
+  }
+
+  private static void write(final Path outputPath, final String openApiDocument)
+      throws IOException {
     final @Nullable Path parent = outputPath.getParent();
     if (parent != null) {
       Files.createDirectories(parent);
