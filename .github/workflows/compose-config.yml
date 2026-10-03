@@ -10,6 +10,7 @@ on:
       - "**/compose-test.yaml"
       - "**/docker-compose.yml"
       - "**/docker-compose.yaml"
+      - ".env.example"
       - ".github/workflows/compose-config.yml"
   pull_request:
     branches: ["**"]
@@ -20,6 +21,7 @@ on:
       - "**/compose-test.yaml"
       - "**/docker-compose.yml"
       - "**/docker-compose.yaml"
+      - ".env.example"
       - ".github/workflows/compose-config.yml"
 
 concurrency:

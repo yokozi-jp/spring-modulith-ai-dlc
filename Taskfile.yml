@@ -738,14 +738,19 @@ tasks:
           if grep -qF 'resourceLogs' "$out/telemetry.json" 2>/dev/null; then break; fi
           sleep 1
         done
-        failed=0
-        for allowed in 'java.lang.IllegalStateException' 'order failed' 'OrderService.java:84'; do
-          grep -qF "$allowed" "$out/telemetry.json" || { echo "残すべき値がありません: $allowed" >&2; failed=1; }
-        done
-        for forbidden in 'user.email' 'person@example.com' 'authorization' 'secret-token'; do
-          if grep -qF "$forbidden" "$out/telemetry.json"; then echo "許可していない属性が残っています: $forbidden" >&2; failed=1; fi
-        done
-        if [ "$failed" -ne 0 ]; then exit 1; fi
+        if ! jq -e '
+          def value($key): first(.attributes[]? | select(.key == $key) | .value.stringValue);
+          any(
+            .resourceLogs[]?.scopeLogs[]?.logRecords[]?;
+            ([.attributes[]?.key] | sort) == ["exception.message", "exception.stacktrace", "exception.type"]
+              and value("exception.type") == "java.lang.IllegalStateException"
+              and value("exception.message") == "order failed"
+              and (value("exception.stacktrace") | contains("OrderService.java:84"))
+          )
+        ' "$out/telemetry.json" >/dev/null; then
+          echo "ログ属性が allowlist または期待値と一致しません。" >&2
+          exit 1
+        fi
         echo "Collector OK: 許可した属性だけを残しました。"
 
   compose-reset:
