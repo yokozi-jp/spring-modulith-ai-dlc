@@ -237,7 +237,6 @@ export default defineConfig(({ mode }) => {
             "shadcn/no-arbitrary-values": "off",
             "shadcn/require-static-classes": "off",
             "no-restricted-imports": ["error", { patterns: [sharedLayerImports, testOnlyImports] }],
-            "react/only-export-components": ["error", { allowExportNames: ["buttonVariants"] }],
           },
         },
         {

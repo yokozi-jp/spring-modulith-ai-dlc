@@ -29,6 +29,7 @@ Base UIが提供するkeyboard操作、focus管理、ARIA属性を維持し、�
 ## UIの書き方
 
 - **buttonの見た目のlink**：`<Link className={buttonVariants(...)}>` で書く。
+  `buttonVariants` は `components/ui/button-variants.ts` に置き、component だけを export する `button.tsx` と分ける。
   `Button` の `render` にlinkを渡すと、Base UIがroleを `button` に上書きするため使わない。
   `<Link><Button /></Link>` のような入れ子も作らない。
 - **空状態、確認dialog、skeleton**：shadcnの `Empty`、`AlertDialog`、`Skeleton` を、最初に使う時点でregistryから `components/ui` へ追加する。

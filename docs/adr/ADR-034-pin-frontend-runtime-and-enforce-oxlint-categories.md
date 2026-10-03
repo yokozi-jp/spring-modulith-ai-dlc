@@ -56,8 +56,6 @@ Oxlint の `correctness`、`suspicious`、`pedantic`、`perf`、`style`、`restr
   有効なままだと型名と比べる形しか通らないためであり、上書きと shadowing は有効なままの `no-global-assign` と `no-shadow-restricted-names` が防ぐ。
 - `better-tailwindcss/enforce-canonical-classes` を有効にし、class の表記を正規形にそろえる。
   `enforce-shorthand-classes` は役割が重なるため有効にしない。
-- `src/components/ui/**` の `react/only-export-components` に `allowExportNames: ["buttonVariants"]` を与える。
-  link を button の見た目にする `<Link className={buttonVariants(...)}>` の形で、`buttonVariants` を export する必要があるためである。
 
 `radix`、`no-new-wrappers`、`typescript/consistent-type-definitions`、`import/no-relative-parent-imports` はカテゴリ指定ですでに有効なので、個別に列挙しない。
 

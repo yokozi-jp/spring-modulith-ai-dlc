@@ -66,8 +66,6 @@ Oxlintの設定の正本は[`frontend/vite.config.ts`](../../frontend/vite.confi
 - **`lint/**`**：`import/no-nodejs-modules`、`new-cap`、`typescript/no-unsafe-assignment`、`typescript/no-unsafe-call`、`typescript/no-unsafe-member-access`をoffにする。
   Node側のLintツールであり、OxlintのJS plugin APIに型が無いためである。
 - **`src/components/ui/**`**：shadcnの生成物の書き方に合わせて`shadcn/no-restyle`、`shadcn/no-arbitrary-values`、`shadcn/require-static-classes`をoffにする。
-  `react/only-export-components`には`allowExportNames: ["buttonVariants"]`を与え、linkをbuttonの見た目にする`buttonVariants`をexportできるようにする。
-  React DoctorはこのoptionをOxlintの設定から読まないため、`button.tsx`の`export`の行に`react-doctor-disable-next-line react-doctor/only-export-components`を付けて同じ例外を与える。
 - **`src/routes/**`**：`react/only-export-components`をoffにする。
   TanStack Routerのroute fileは`Route`をexportするためである。
 - **テストファイル**：`react/jsx-no-literals`をoffにし、テストの中の固定文言をcatalogに通さずに書けるようにする。
