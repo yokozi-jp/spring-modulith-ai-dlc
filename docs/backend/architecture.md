@@ -83,6 +83,31 @@ backend/src/main/java/com/example/demo/
 
 `<Event>Listener` は、イベントを受信する側のモジュールの `application` に置く。
 
+各役割の定義、必須の記述、例、作成時のチェックリストは、次の文書に示す。
+役割の一覧は [クラスの役割](class-roles/index.md) にある。
+
+- **`<Feature>Queries`**：[参照のインタフェース](class-roles/feature-queries.md)
+- **`<QueryResult>`**：[参照の結果](class-roles/query-result.md)
+- **`<SearchCriteria>`**：[検索条件](class-roles/search-criteria.md)
+- **`<Event>`**：[イベント](class-roles/event.md)
+- **`<Aggregate>`**：[集約](class-roles/aggregate.md)
+- **`<Entity>`**：[Entity](class-roles/entity.md)
+- **`<ValueObject>`**：[値オブジェクト](class-roles/value-object.md)
+- **`<Aggregate>Repository`**：[Repository](class-roles/repository.md)
+- **`<ExternalSystem>`**：[外部システムのインタフェース](class-roles/external-system-interface.md)
+- **`<DomainService>`**：[Domain Service](class-roles/domain-service.md)
+- **`<UseCase>Command`**：[Command](class-roles/command.md)
+- **`<UseCase>CommandHandler`**：[CommandHandler](class-roles/command-handler.md)
+- **`<UseCase>Result`**：[Result](class-roles/result.md)
+- **`<Feature>QueryService`**：[QueryService](class-roles/query-service.md)
+- **`<Event>Listener`**：[Listener](class-roles/listener.md)
+- **`<Aggregate>Controller`**：[Controller](class-roles/controller.md)
+- **`<UseCase>Request`**：[Request](class-roles/request.md)
+- **`<QueryResult>Response`**：[Response](class-roles/response.md)
+- **`Jooq<Aggregate>Repository`**：[jOOQ の Repository](class-roles/jooq-repository.md)
+- **`<Aggregate>RecordMapper`**：[RecordMapper](class-roles/record-mapper.md)
+- **`<ExternalSystem>Client`**：[外部システムの Client](class-roles/external-client.md)
+
 空のパッケージは、そのパッケージの最初のクラスより先に作らない。
 
 Java パッケージを作るときは、`@NullMarked` を宣言する `package-info.java` も作る。

@@ -18,17 +18,17 @@ tags: [architecture, backend, onion-architecture]
 
 `domain.model` には次の型を置く。
 
-- **集約**：業務上の一貫性の単位。状態は業務の操作を表すメソッドで変更する。
-- **Entity**：集約の中で識別子を持つ型。
-- **値オブジェクト**：識別子を持たず、値と不変条件を表す record または enum。
-- **`<Aggregate>Repository`**：集約を保存し、取り出すインタフェース。
-- **`<ExternalSystem>`**：決済などの外部システムを、ドメインの語彙で表すインタフェース。
+- **[集約](class-roles/aggregate.md)**：業務上の一貫性の単位。状態は業務の操作を表すメソッドで変更する。
+- **[Entity](class-roles/entity.md)**：集約の中で識別子を持つ型。
+- **[値オブジェクト](class-roles/value-object.md)**：識別子を持たず、値と不変条件を表す record または enum。
+- **[`<Aggregate>Repository`](class-roles/repository.md)**：集約を保存し、取り出すインタフェース。
+- **[`<ExternalSystem>`](class-roles/external-system-interface.md)**：決済などの外部システムを、ドメインの語彙で表すインタフェース。
 
 `domain.model` は Spring、jOOQ、JPA、Jackson に依存させない。
 Domain Model を API の Request と Response や、永続化の Record として兼用しない。
 
 業務規則は、まず値オブジェクトか Entity に置く。
-`domain.service` の **Domain Service** は、次の三つの規則だけを置く。
+`domain.service` の **[Domain Service](class-roles/domain-service.md)** は、次の三つの規則だけを置く。
 
 - 複数の集約にまたがる規則。
 - どの集約にも自然に属さない計算。
@@ -43,11 +43,11 @@ Domain Service は Repository を使ってよく、イベントの発行、外�
 ユースケースの進行を担当する内側の領域を **Application** とする。
 `application` の `@Service` は、次の三つの役割のどれかにする。
 
-- **`<UseCase>CommandHandler`**：状態を変えるユースケースを一つ実行する。`<UseCase>Command` を受け取り、集約と Domain Service を組み合わせ、Repository で保存し、`<UseCase>Result` を返す。イベントは `ApplicationEventPublisher` で発行する。
-- **`<Feature>QueryService`**：モジュールルートの `<Feature>Queries` を実装し、Repository で読んだ集約をルートの record に変換する。
-- **`<Event>Listener`**：他モジュールのイベントを受信し、自モジュールの CommandHandler をちょうど一つ呼ぶ。
+- **[`<UseCase>CommandHandler`](class-roles/command-handler.md)**：状態を変えるユースケースを一つ実行する。`<UseCase>Command` を受け取り、集約と Domain Service を組み合わせ、Repository で保存し、`<UseCase>Result` を返す。イベントは `ApplicationEventPublisher` で発行する。
+- **[`<Feature>QueryService`](class-roles/query-service.md)**：モジュールルートの [`<Feature>Queries`](class-roles/feature-queries.md) を実装し、Repository で読んだ集約をルートの record（[参照の結果](class-roles/query-result.md)）に変換する。
+- **[`<Event>Listener`](class-roles/listener.md)**：他モジュールの[イベント](class-roles/event.md)を受信し、自モジュールの CommandHandler をちょうど一つ呼ぶ。
 
-`<UseCase>Command` と `<UseCase>Result` は、Java の標準型だけを持つ record として `application` に置く。
+[`<UseCase>Command`](class-roles/command.md) と [`<UseCase>Result`](class-roles/result.md) は、Java の標準型だけを持つ record として `application` に置く。
 
 CommandHandler は別の CommandHandler を呼ばない。
 
@@ -67,9 +67,9 @@ HTTP からの入力と出力を扱う外側の領域を **Presentation** とす
 
 `presentation.web` には次の型を置く。
 
-- **`<Aggregate>Controller`**：集約ごとの Spring MVC の Controller。Request を Command に変換して CommandHandler を呼び、参照は `<Feature>Queries` を呼ぶ。
-- **`<UseCase>Request`**：リクエストボディを受けるユースケースの入力の record。`toCommand()` で Command に変換する。
-- **`<QueryResult>Response`**：参照の結果の応答の record。`from(...)` でルートの record から作る。
+- **[`<Aggregate>Controller`](class-roles/controller.md)**：集約ごとの Spring MVC の Controller。Request を Command に変換して CommandHandler を呼び、参照は `<Feature>Queries` を呼ぶ。
+- **[`<UseCase>Request`](class-roles/request.md)**：リクエストボディを受けるユースケースの入力の record。`toCommand()` で Command に変換する。
+- **[`<QueryResult>Response`](class-roles/response.md)**：参照の結果の応答の record。`from(...)` でルートの record から作る。
 
 Presentation は Domain と Infrastructure に依存させない。
 
@@ -77,7 +77,7 @@ Presentation は Domain と Infrastructure に依存させない。
 
 DB と外部システムとの接続を扱う外側の領域を **Infrastructure** とする。
 
-- **`infrastructure.persistence`**：`<Aggregate>Repository` を jOOQ で実装する `Jooq<Aggregate>Repository` と、jOOQ の生成型と Domain の型を変換する `<Aggregate>RecordMapper` を置く。
-- **`infrastructure.client`**：`<ExternalSystem>` を実装する `<ExternalSystem>Client` を置く。
+- **`infrastructure.persistence`**：`<Aggregate>Repository` を jOOQ で実装する [`Jooq<Aggregate>Repository`](class-roles/jooq-repository.md) と、jOOQ の生成型と Domain の型を変換する [`<Aggregate>RecordMapper`](class-roles/record-mapper.md) を置く。
+- **`infrastructure.client`**：`<ExternalSystem>` を実装する [`<ExternalSystem>Client`](class-roles/external-client.md) を置く。
 
 Persistence、外部 Client、Presentation は別々の Adapter として扱い、互いに依存させない。
