@@ -6,11 +6,13 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.example.demo.DemoApplication;
+import com.tngtech.archunit.core.domain.AccessTarget;
 import com.tngtech.archunit.core.domain.JavaAccess;
 import com.tngtech.archunit.core.domain.JavaAnnotation;
 import com.tngtech.archunit.core.domain.JavaClass;
 import com.tngtech.archunit.core.domain.JavaClasses;
 import com.tngtech.archunit.core.domain.properties.CanBeAnnotated;
+import com.tngtech.archunit.core.domain.properties.HasName;
 import com.tngtech.archunit.core.importer.ClassFileImporter;
 import com.tngtech.archunit.junit.AnalyzeClasses;
 import com.tngtech.archunit.junit.ArchTest;
@@ -52,7 +54,7 @@ class DatabaseConventionsArchTest {
   @ArchTest /* package */ static final ArchRule plainSqlApisAreNotUsed = plainSqlRule();
 
   /**
-   * {@code Settings.withRenderSchema} と {@code setRenderSchema} を呼ばない。
+   * {@code Settings.withRenderSchema} と {@code setRenderSchema} を呼ばず、メソッド参照もしない。
    *
    * <p>バイトコードには引数の値が残らず、{@code false} だけを検出できない。既定値が {@code true} なので、呼び出しそのものを禁止する。
    */
@@ -64,7 +66,7 @@ class DatabaseConventionsArchTest {
   @SuppressWarnings("PMD.LooseCoupling")
   void databaseConventionBypassesAreRejected() {
     // フィクスチャを実際に呼び出してIDEにも使用済みと認識させる。拒否判定は続くArchUnitの検査が担う。
-    assertThat(DatabaseConventionBypass.useForbiddenApis()).hasSize(3);
+    assertThat(DatabaseConventionBypass.useForbiddenApis()).hasSize(4);
 
     final JavaClasses bypassClass =
         new ClassFileImporter().importClasses(DatabaseConventionBypass.class);
@@ -85,7 +87,9 @@ class DatabaseConventionsArchTest {
         .as("スキーマ名の出力の無効化")
         .isInstanceOf(AssertionError.class)
         .hasMessageContaining(
-            "calls method <org.jooq.conf.Settings.withRenderSchema(java.lang.Boolean)>");
+            "calls method <org.jooq.conf.Settings.withRenderSchema(java.lang.Boolean)>")
+        .hasMessageContaining(
+            "references method <org.jooq.conf.Settings.withRenderSchema(java.lang.Boolean)>");
   }
 
   private static ArchRule isolationRule() {
@@ -109,9 +113,10 @@ class DatabaseConventionsArchTest {
   private static ArchRule renderSchemaRule() {
     return noClasses()
         .should()
-        .callMethod(Settings.class, "withRenderSchema", Boolean.class)
-        .orShould()
-        .callMethod(Settings.class, "setRenderSchema", Boolean.class)
+        .accessTargetWhere(
+            JavaAccess.Predicates.target(
+                AccessTarget.Predicates.declaredIn(Settings.class)
+                    .and(HasName.Predicates.nameMatching("(with|set)RenderSchema"))))
         .because(
             "SQLはスキーマ名で修飾したままにする（docs/database/jooq-usage.md、ADR-011）。"
                 + "renderSchema は既定の true のまま変えず、呼び出しを削除する。");
@@ -152,10 +157,12 @@ class DatabaseConventionsArchTest {
     private static List<Object> useForbiddenApis() {
       // メソッド参照もPlain SQLのAPIの利用として検出する。
       final Function<String, Field<Object>> plainSqlField = DSL::field;
+      final Function<Boolean, Settings> renderSchema = new Settings()::withRenderSchema;
       return List.of(
           new DatabaseConventionBypass().repeatableRead(),
           plainSqlField.apply("x"),
-          new Settings().withRenderSchema(false));
+          new Settings().withRenderSchema(false),
+          renderSchema.apply(false));
     }
 
     // 分離レベルを指定した @Transactional は禁止する。
