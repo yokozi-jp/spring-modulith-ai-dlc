@@ -1,7 +1,7 @@
 ---
 type: Reference
 title: バックエンドのアーキテクチャテスト
-description: Spring Modulith、ArchUnit、PMD、Error Proneでバックエンド規約を検査する実装、規則名、規則を確かめるフィクスチャ、解析対象を示し、規約違反の検出方法を確認するとき、ArchUnitの規則を追加するときに読むリファレンス。
+description: Spring Modulith、ArchUnit、PMD、Error Proneでバックエンド規約を検査する実装、規則名、規則を確かめるフィクスチャ、失敗メッセージの形、解析対象を示し、規約違反の検出方法を確認するとき、ArchUnitの規則を追加するとき、検査の失敗を直すときに読むリファレンス。
 tags: [reference, backend, testing, archunit, spring-modulith]
 ---
 
@@ -9,6 +9,7 @@ tags: [reference, backend, testing, archunit, spring-modulith]
 
 Spring ModulithとArchUnitはモジュール境界、依存方向、配置、禁止API、テスト規約を検査する。
 PMDとError Proneはソースまたはコンパイル時に判定する規約を検査する。
+ArchUnitとPMDの失敗メッセージは、理由、直し方、規約の文書のパスを示す。
 
 ## 検査クラス
 
@@ -16,6 +17,7 @@ PMDとError Proneはソースまたはコンパイル時に判定する規約を
 backend/src/test/java/com/example/demo/architecture/
 ├── ApplicationModuleArchitectureTest.java
 ├── ArchitectureRuleFixtureTest.java
+├── ArchitectureRuleMessageTest.java
 ├── ClassRoleArchTest.java
 ├── DateTimeConventionsArchTest.java
 ├── GeneralCodingRulesArchTest.java
@@ -90,9 +92,48 @@ MapStruct、ModelMapper、Dozerはテストのクラスパスにないため、`
 規則を追加するときは、違反フィクスチャのクラスを一つ追加し、`eachRuleDetectsItsViolatingFixture`の行と`rulesFor()`に規則を加える。
 この手順で、新しい規則が違反を検出し、規約どおりのコードを誤検出しないことを確かめる。
 
+## ArchUnitの規則のbecause
+
+ArchUnitの規則には、`.because(...)`で次の形の文を付ける。
+ArchUnitは規則の説明の後に`, because`とこの文をつなぎ、違反した箇所と一緒に出す。
+
+```text
+<なぜそうあるべきか>。直し方：<具体的な修正>。規約：<リポジトリのルートからのdocs/のパス>
+```
+
+- 理由には、docsかADRに書いてある内容だけを書く。
+- 「規約：」には規則を定める最も具体的な文書を書き、必要ならADRを「、」で区切って続ける。
+- ArchUnitが生成する規則の説明は、`.as(...)`で置き換えない。
+- ArchUnitの標準の規則が英語のbecauseを持つときも、その後ろに`.because(...)`でこの形の文を足す。
+
+失敗すると、次のように出る。
+
+```text
+Rule 'no classes should be meta-annotated with @Transactional, because トランザクション境界を CommandHandler の handle、QueryService の public メソッド、Listener の on に集めるため。直し方：クラスの @Transactional を外し、Application の public メソッドへ付け直す。規約：docs/backend/layers.md、docs/adr/ADR-048-define-backend-class-roles-and-naming.md' was violated (1 times):
+Class <archfixture.violating.order.application.ShipOrderCommandHandler> is meta-annotated with @Transactional in (ShipOrderCommandHandler.java:0)
+```
+
+`ArchitectureRuleMessageTest`は、`architecture`パッケージで`@ArchTest`を付けた`ArchRule`のフィールドをすべて集め、最後のbecauseがこの形であることと、「規約：」の各パスがリポジトリにあることを確かめる。
+`@ArchTest`のメソッドと`ArchTests`のフィールドはbecauseを読めないため、このテストが拒否する。
+新しい規則にこの形のbecauseがないと、`task test`が失敗する。
+
+理由をdocsにもADRにも書いていない規則は、`ArchitectureRuleMessageTest`の`PENDING_RATIONALE`に`<クラス名>.<フィールド名>`で載せ、becauseを「直し方：」から始める。
+理由をdocsかADRに書いたら、`PENDING_RATIONALE`から外してbecauseに理由を足す。
+
 ## 共通実装とプロキシ
 
-`GeneralCodingRulesArchTest`は、標準ストリーム、`java.util.logging`、ロギング実装API、`@Autowired`によるメソッドインジェクションなどの禁止規則を検査する。
+`GeneralCodingRulesArchTest`は、次の規則を検査する。
+
+- `noClassesShouldAccessStandardStreams`：`System.out`、`System.err`、`printStackTrace()`を使わない。
+- `noClassesShouldThrowGenericExceptions`：`Throwable`、`Exception`、`RuntimeException`、`Error`を投げない。
+- `noClassesShouldUseJavaUtilLogging`：`java.util.logging`を使わない。
+- `featureCodeUsesOnlySlf4jFacade`：ベースパッケージ直下以外のクラスは、Logback、Log4j、Apache Commons LoggingのAPIに依存しない。
+- `noClassesShouldUseJodaTime`：Joda-Timeを使わない。
+- `noClassesShouldUseFieldInjection`：フィールドに`@Autowired`などの注入アノテーションを付けない。
+- `autowiredMethodsAreNotUsed`：メソッドに`@Autowired`を付けない。
+- `assertionsShouldHaveDetailMessage`：`assert`文と`new AssertionError()`に失敗の詳細を書く。
+- `deprecatedApiShouldNotBeUsed`：`@Deprecated`のAPIを使わない。
+- `oldDateAndTimeClassesShouldNotBeUsed`：`java.util.Date`などの旧日時APIを使わない。
 
 `ProxyRulesArchTest`は、次のアノテーションを付けたメソッドへの同一クラス内の直接呼び出しを検査する。
 
@@ -128,6 +169,19 @@ Error ProneはすべてのJavaコンパイルで`JavaTimeDefaultTimeZone`と`Jav
 
 PMDはmainとtestに別のrulesetを適用し、Lombokの`@Data`と`@Setter`、手書きのLoggerフィールド、`LoggerFactory`の直接参照、`getLogger`のstatic import、`@Autowired`を付けた通常メソッドなどを検査する。
 PMDの設定は[`ruleset.xml`](../../backend/config/pmd/ruleset.xml)と[`test-ruleset.xml`](../../backend/config/pmd/test-ruleset.xml)を正とする。
+カスタム規則の`message`は、ArchUnitのbecauseと同じ「理由。直し方：…。規約：…」の形にする。
+
+## 失敗したときの読み方と直し方
+
+Spring Modulith、Error Prone、NullAway、SpotBugs、Spotlessの失敗の文は変えられないため、次の表で読む。
+
+| ツール          | 典型的な失敗の文                                                                                     | 意味                                                                                          | 直し方                                                              | 文書                                                            |
+| --------------- | ---------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------- | ------------------------------------------------------------------- | --------------------------------------------------------------- |
+| Spring Modulith | `Module 'order' depends on non-exposed type ... within module 'inventory'!`                          | 他モジュールの内部パッケージの型を使っている                                                  | 相手のルートの`<Feature>Queries`かイベントで連携する                | [バックエンドアーキテクチャ](architecture.md)                   |
+| Error Prone     | `error: [JavaTimeDefaultTimeZone] LocalDate.now() is not allowed ...`                                | 角括弧の中がチェック名で、`(see https://errorprone.info/bugpattern/<チェック名>)`に説明がある | 日時のチェックは、注入した`Clock`と設定値の`ZoneId`で求める形に直す | [日時とタイムゾーンの規約](../datetime/timezone-conventions.md) |
+| NullAway        | `error: [NullAway] dereferenced expression 's' is @Nullable`                                         | `@NullMarked`のコードで、`@Nullable`の値をnullを確かめずに使った                              | nullを確かめてから使うか、値を必ず渡して`@Nullable`を外す           | [バックエンドアーキテクチャ](architecture.md)                   |
+| SpotBugs        | `Verification failed: SpotBugs ended with exit code 1. See the report at: ...`                       | バイトコードからバグのパターンを検出した                                                      | レポートのバグのパターンの説明と行を見て直す                        | [Lintとテストのリファレンス](../tooling/lint-and-test.md)       |
+| Spotless        | `The following files had format violations:`、`Run './gradlew spotlessApply' to fix all violations.` | Google Java Formatの形と違う                                                                  | `task be-format`を実行する                                          | [Lintとテストのリファレンス](../tooling/lint-and-test.md)       |
 
 ## 解析対象と実行
 

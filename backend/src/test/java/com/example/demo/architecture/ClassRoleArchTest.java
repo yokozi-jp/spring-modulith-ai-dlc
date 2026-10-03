@@ -53,6 +53,12 @@ class ClassRoleArchTest {
   /** CommandHandler の名前の接尾辞。 */
   private static final String COMMAND_HANDLER = "CommandHandler";
 
+  /** クラスの役割を決めた ADR のパス。 */
+  private static final String ADR_048 = "docs/adr/ADR-048-define-backend-class-roles-and-naming.md";
+
+  /** jOOQ の Repository の規約のパス。 */
+  private static final String JOOQ_REPOSITORY_DOC = "docs/backend/class-roles/jooq-repository.md";
+
   /** モジュールルートには record、enum、{@code *Queries} interface だけを置く。 */
   @ArchTest
   /* package */ static final ArchRule moduleRootTypesAreRecordsEnumsOrQueries =
@@ -74,8 +80,11 @@ class ClassRoleArchTest {
           .haveSimpleNameEndingWith("Listener")
           .allowEmptyShould(true)
           .because(
-              "状態を変えるユースケースは <UseCase>CommandHandler、"
-                  + "読み取りは <Feature>QueryService、イベントの受信は <Event>Listener と命名する。");
+              "クラス名の接尾辞だけで、更新、参照、イベントの受信のどれかが分かるようにするため。"
+                  + "直し方：状態を変えるユースケースは <UseCase>CommandHandler、"
+                  + "参照は <Feature>QueryService、イベントの受信は <Event>Listener と命名する。"
+                  + "規約：docs/backend/layers.md、"
+                  + ADR_048);
 
   /**
    * CommandHandler の public メソッドは {@code @Transactional} の {@code handle(<UseCase>Command)} だけにする。
@@ -88,9 +97,13 @@ class ClassRoleArchTest {
           .should(exposeOnlyTransactionalHandle())
           .allowEmptyShould(true)
           .because(
-              "CommandHandler の public メソッドは @Transactional を付けた "
-                  + "<UseCase>Result handle(<UseCase>Command command) の 1 つにする。"
-                  + "別のユースケースは別の CommandHandler に分ける。");
+              "複数のユースケースを一つのクラスに並べると、依存とトランザクション境界がユースケースごとに分かれず、"
+                  + "クラスが大きくなるため。"
+                  + "直し方：public メソッドを @Transactional を付けた "
+                  + "<UseCase>Result handle(<UseCase>Command command) の一つにし、"
+                  + "別のユースケースは別の CommandHandler に分ける。"
+                  + "規約：docs/backend/class-roles/command-handler.md、"
+                  + ADR_048);
 
   /** Command と Result は Application の record にする。 */
   @ArchTest
@@ -108,8 +121,10 @@ class ClassRoleArchTest {
           .haveSimpleNameEndingWith(COMMAND_HANDLER)
           .allowEmptyShould(true)
           .because(
-              "共通の業務規則は Aggregate か Domain Service へ移す。"
-                  + "後続の処理はイベントを発行し、Listener から別の CommandHandler を呼ぶ。");
+              "直し方：共通の業務規則は集約か Domain Service へ移し、"
+                  + "後続の処理はイベントを発行して Listener から別の CommandHandler を呼ぶ。"
+                  + "規約：docs/backend/class-roles/command-handler.md、"
+                  + ADR_048);
 
   /** {@code @ApplicationModuleListener} は Application の {@code <Event>Listener.on} にだけ付ける。 */
   @ArchTest
@@ -126,7 +141,12 @@ class ClassRoleArchTest {
           .beDeclaredInClassesThat()
           .haveSimpleNameEndingWith("Listener")
           .allowEmptyShould(true)
-          .because("イベントの受信は受信側モジュールの application に置く <Event>Listener の on メソッドへ移す。");
+          .because(
+              "@ApplicationModuleListener は新しいトランザクションを開き、受信のメソッドがトランザクション境界になるため、"
+                  + "境界を Application に置く。"
+                  + "直し方：イベントの受信は受信側モジュールの application に置く <Event>Listener の on メソッドへ移す。"
+                  + "規約：docs/backend/class-roles/listener.md、"
+                  + ADR_048);
 
   /** Listener は {@code on} だけを公開し、1 つの CommandHandler だけを呼ぶ。 */
   @ArchTest
@@ -139,8 +159,12 @@ class ClassRoleArchTest {
           .should(exposeOnlyOnAndCallOneCommandHandler())
           .allowEmptyShould(true)
           .because(
-              "Listener の public メソッドは @ApplicationModuleListener を付けた void on(<Event> event) の 1 つにし、"
-                  + "イベントから Command を作って 1 つの CommandHandler の handle を呼ぶ。");
+              "一つの on から複数の CommandHandler を呼ぶと、一つが失敗したときにイベントが再配信され、"
+                  + "成功した処理も繰り返されるため。"
+                  + "直し方：public メソッドを @ApplicationModuleListener を付けた void on(<Event> event) の一つにし、"
+                  + "イベントから Command を作って一つの CommandHandler の handle を呼ぶ。"
+                  + "規約：docs/backend/class-roles/listener.md、"
+                  + ADR_048);
 
   /** Request と Response は {@code presentation.web} の record にする。 */
   @ArchTest
@@ -156,9 +180,12 @@ class ClassRoleArchTest {
           .should(implementModuleQueriesWithReadOnlyTransactions())
           .allowEmptyShould(true)
           .because(
-              "QueryService は <モジュール>.application に置き、"
+              "参照の入口を <Feature>Queries に限り、読み取り専用のトランザクションで参照中の書き込みを DB に拒否させるため。"
+                  + "直し方：QueryService を <モジュール>.application に置き、"
                   + "同じモジュールのルートにある <Feature>Queries を実装し、"
-                  + "public メソッドすべてに @Transactional(readOnly = true) を付ける。");
+                  + "public メソッドすべてに @Transactional(readOnly = true) を付ける。"
+                  + "規約：docs/backend/class-roles/query-service.md、"
+                  + ADR_048);
 
   /** 列と項目を対応づけるライブラリと jOOQ の {@code DefaultRecordMapper} を使わない。 */
   @ArchTest
@@ -174,8 +201,13 @@ class ClassRoleArchTest {
                   .or(type(DefaultRecordMapper.class))
                   .or(type(DefaultRecordUnmapper.class)))
           .because(
-              "jOOQ と集約の変換は Jooq<Aggregate>Repository に convertFrom、multiset、Records.mapping で書き、"
-                  + "列の数と型をコンパイルで検査する。");
+              "jOOQ と集約の変換を Jooq<Aggregate>Repository の select の列に収め、"
+                  + "列と引数の数や型の食い違いをコンパイルで見つけるため。"
+                  + "直し方：変換を Jooq<Aggregate>Repository に convertFrom、multiset、Records.mapping で書く。"
+                  + "規約："
+                  + JOOQ_REPOSITORY_DOC
+                  + "、"
+                  + ADR_048);
 
   /**
    * 名前のリフレクションで対応づける jOOQ のメソッドの名前のうち、{@code Class} を受け取るときだけ禁止するもの（ほかに名前が {@code Into}
@@ -199,8 +231,14 @@ class ClassRoleArchTest {
                       + "Record の into(Object)、from(Object)、DSLContext の newRecord(Table, Object)",
                   ClassRoleArchTest::isJooqReflectionMapping))
           .because(
-              "into(Class)、fetchInto(Class)、fetchMap(Field, Class)、from(Object) などを、"
-                  + "convertFrom、fetch(Records.mapping(<Aggregate>::restore))、set(列, 値) に置き換える。");
+              "名前のリフレクションで対応づけると、列や項目の名前を変えたときの誤りがコンパイルで見つからず、"
+                  + "集約が restore と値オブジェクトの検証を通らないため。"
+                  + "直し方：into(Class)、fetchInto(Class)、fetchMap(Field, Class)、from(Object) などを、"
+                  + "convertFrom、fetch(Records.mapping(<Aggregate>::restore))、set(列, 値) に置き換える。"
+                  + "規約："
+                  + JOOQ_REPOSITORY_DOC
+                  + "、"
+                  + ADR_048);
 
   /** モジュールルートの型を record、enum、{@code *Queries} interface に限る規則を組み立てる。 */
   /* package */ static ArchRule moduleRootTypesAreRecordsEnumsOrQueriesRule(
@@ -221,8 +259,11 @@ class ClassRoleArchTest {
                                 && javaClass.getSimpleName().endsWith("Queries")))))
         .allowEmptyShould(true)
         .because(
-            "モジュールルートには <Feature>Queries、クエリ結果、検索条件、イベントの record と enum だけを置く。"
-                + "Command と CommandHandler は application へ移す。");
+            "モジュールルートは他モジュールへ公開する契約であり、他モジュールの状態は同期で変えずイベントで伝えるため。"
+                + "直し方：ルートには <Feature>Queries と、参照の結果、検索条件、イベントの record と enum だけを置き、"
+                + "Command と CommandHandler は application へ移す。"
+                + "規約：docs/backend/architecture.md、"
+                + ADR_048);
   }
 
   /** {@code *Command} と {@code *Result} を {@code <module>.application} の record に限る規則を組み立てる。 */
@@ -237,7 +278,11 @@ class ClassRoleArchTest {
         .andShould()
         .resideInAPackage(basePackage + ".*.application")
         .allowEmptyShould(true)
-        .because("<UseCase>Command と <UseCase>Result は <モジュール>.application の record にする。");
+        .because(
+            "Command と Result はユースケースの入出力であり、モジュールルートに置いて他モジュールから同期で呼ばせないため。"
+                + "直し方：<UseCase>Command と <UseCase>Result を <モジュール>.application の record にする。"
+                + "規約：docs/backend/class-roles/command.md、docs/backend/class-roles/result.md、"
+                + ADR_048);
   }
 
   /** {@code *Request} と {@code *Response} を {@code presentation.web} の record に限る規則を組み立てる。 */
@@ -253,7 +298,10 @@ class ClassRoleArchTest {
         .resideInAPackage("..presentation.web..")
         .allowEmptyShould(true)
         .because(
-            "<UseCase>Request と <QueryResult>Response は <モジュール>.presentation.web の record にする。");
+            "役割ごとに置き場所と形を一つに決め、同じ役割のクラスが作業者ごとに別の形で作られないようにするため。"
+                + "直し方：<UseCase>Request と <QueryResult>Response を <モジュール>.presentation.web の record にする。"
+                + "規約：docs/backend/class-roles/request.md、docs/backend/class-roles/response.md、"
+                + ADR_048);
   }
 
   private static ArchCondition<JavaClass> exposeOnlyTransactionalHandle() {

@@ -43,6 +43,13 @@ class TestConventionsArchTest {
   /** テスト規約の根拠パッケージ。レガシー日時ルールから除外する ArchUnit 定義自身の置き場所。 */
   private static final String ARCHITECTURE_PACKAGE = "com.example.demo.architecture..";
 
+  /** テストコードの規約のパス。 */
+  private static final String TESTING_CODE_STYLE_DOC = "docs/backend/testing-code-style.md";
+
+  /** {@code @Disabled} の理由の規則の直し方と規約。 */
+  private static final String DISABLED_REASON_FIX =
+      "直し方：@Disabled(\"<停止理由>\") のように value に停止理由を書く。規約：" + TESTING_CODE_STYLE_DOC;
+
   /** すべての {@code @Test} メソッドに {@code @DisplayName} で検証意図を明記させる。 */
   @ArchTest
   /* package */ static final ArchRule testsMustDeclareDisplayName =
@@ -51,7 +58,11 @@ class TestConventionsArchTest {
           .areAnnotatedWith(Test.class)
           .should()
           .beAnnotatedWith(DisplayName.class)
-          .because("各テストの意図を @DisplayName で明示し、レポートから何を検証したか追えるようにする。")
+          .because(
+              "テストの検証意図と失敗対象をレポートから分かるようにするため。"
+                  + "直し方：@Test メソッドに @DisplayName(\"<検証する振る舞い>\") を付ける。"
+                  + "規約："
+                  + TESTING_CODE_STYLE_DOC)
           .allowEmptyShould(true);
 
   /** {@code @Test} メソッドはパッケージプライベートにする（JUnit 5 は public を要求しない）。 */
@@ -62,7 +73,7 @@ class TestConventionsArchTest {
           .areAnnotatedWith(Test.class)
           .should()
           .notBePublic()
-          .because("テストメソッドに public を付けない。JUnit 5 は package-private を実行する。")
+          .because("直し方：@Test メソッドの public を外し、パッケージプライベートにする。規約：" + TESTING_CODE_STYLE_DOC)
           .allowEmptyShould(true);
 
   /** {@code @Test} を持つクラスはパッケージプライベートにする。 */
@@ -73,7 +84,7 @@ class TestConventionsArchTest {
           .containAnyMethodsThat(annotatedWith(Test.class))
           .should()
           .notBePublic()
-          .because("テストクラスに public を付けない。JUnit 5 は package-private を実行する。")
+          .because("直し方：テストクラスの public を外し、パッケージプライベートにする。規約：" + TESTING_CODE_STYLE_DOC)
           .allowEmptyShould(true);
 
   /** {@code @Test} を持つクラス名は {@code Test} で終わらせ、補助クラスと区別する。 */
@@ -84,7 +95,7 @@ class TestConventionsArchTest {
           .containAnyMethodsThat(annotatedWith(Test.class))
           .should()
           .haveSimpleNameEndingWith("Test")
-          .because("テストクラス名は ...Test を接尾辞にし、拡張や合成アノテーションなど非テストと区別する。")
+          .because("直し方：@Test を持つクラスの名前を単数形の <対象>Test に変える。規約：" + TESTING_CODE_STYLE_DOC)
           .allowEmptyShould(true);
 
   /** {@code @SpringBootTest} を直接付けたクラスは共有構成を {@code @Import} してコンテキストキャッシュを効かせる。 */
@@ -95,9 +106,11 @@ class TestConventionsArchTest {
           .areAnnotatedWith(SpringBootTest.class)
           .should(importSharedTestConfiguration())
           .because(
-              "フルの @SpringBootTest は "
-                  + "SharedTestConfiguration を @Import して構成を揃え、テストが増えても"
-                  + "コンテキストの再ロードを増やさない。共有差し替えが要る合成アノテーション自身もこれを内蔵する。")
+              "フルの @SpringBootTest の構成を揃え、共有する Spring コンテキストを増やさないため。"
+                  + "直し方：@Import(SharedTestConfiguration.class) を付けるか、それを内蔵する合成アノテーションを使い、"
+                  + "テストごとの @Import や @MockBean で構成を分岐させない。"
+                  + "規約："
+                  + TESTING_CODE_STYLE_DOC)
           .allowEmptyShould(true);
 
   /** {@code assertTimeoutPreemptively} を禁止する。別スレッド実行で本番経路と文脈が変わるため。 */
@@ -107,9 +120,10 @@ class TestConventionsArchTest {
           .should()
           .callMethodWhere(target(name("assertTimeoutPreemptively")))
           .because(
-              "assertTimeoutPreemptively は別スレッドで処理を実行し、トランザクション・"
-                  + "セキュリティコンテキスト・ログのコンテキストが本番経路と変わり得るため既定にしない。"
-                  + "期限付きの条件待機か、非プリエンプティブな assertTimeout を使う。");
+              "直し方：イベントは Spring Modulith の Scenario で、それ以外は対象 API の期限付き条件待機か、"
+                  + "非プリエンプティブな assertTimeout で待つ。"
+                  + "規約："
+                  + TESTING_CODE_STYLE_DOC);
 
   /** テストコードでもレガシー日時型を禁止する（型を参照する ArchUnit 定義自身がある architecture は除外）。 */
   @ArchTest
@@ -130,8 +144,9 @@ class TestConventionsArchTest {
               java.text.DateFormat.class,
               java.text.SimpleDateFormat.class)
           .because(
-              "テストデータの絶対時刻には Instant、日付だけには LocalDate、時刻だけには LocalTime を使う。"
-                  + "禁止型を参照して規約を強制する architecture パッケージ自身は対象外にする。")
+              "絶対時刻を Instant に統一し、保存、API、ログで時刻の解釈を一つにするため。"
+                  + "直し方：テストデータの絶対時刻には Instant、日付だけには LocalDate、時刻だけには LocalTime を使う。"
+                  + "規約：docs/datetime/timezone-conventions.md、docs/adr/ADR-006-utc-instant-absolute-time-policy.md")
           .allowEmptyShould(true);
 
   /** {@code @Disabled} は無言のスキップを避けるため理由を必須にする（メソッド）。 */
@@ -141,7 +156,7 @@ class TestConventionsArchTest {
           .that()
           .areAnnotatedWith(Disabled.class)
           .should(declareDisabledReason())
-          .because("@Disabled で止めるときは理由を書き、無言のスキップを残さない。")
+          .because(DISABLED_REASON_FIX)
           .allowEmptyShould(true);
 
   /** {@code @Disabled} は無言のスキップを避けるため理由を必須にする（クラス）。 */
@@ -151,7 +166,7 @@ class TestConventionsArchTest {
           .that()
           .areAnnotatedWith(Disabled.class)
           .should(declareDisabledReasonOnClass())
-          .because("@Disabled で止めるときは理由を書き、無言のスキップを残さない。")
+          .because(DISABLED_REASON_FIX)
           .allowEmptyShould(true);
 
   private static ArchCondition<JavaClass> importSharedTestConfiguration() {
@@ -169,7 +184,7 @@ class TestConventionsArchTest {
                   item.getFullName()
                       + " は @SpringBootTest を直接付けているが "
                       + "@Import(SharedTestConfiguration.class) を持たない。"
-                      + "修正方法: 共有構成を @Import するか、それを内蔵する合成アノテーションを使う。"));
+                      + "直し方：共有構成を @Import するか、それを内蔵する合成アノテーションを使う。"));
         }
       }
     };

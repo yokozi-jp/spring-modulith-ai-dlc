@@ -72,7 +72,7 @@ class DateTimeConventionsArchTest {
   /**
    * システム {@code Clock} ファクトリの違反に付く修正方法の文。
    *
-   * <p>{@code because(...)} の共通文は {@code Clock.systemUTC()} などを含むため、拒否テストは違反ごとの修正方法の文で検証する。
+   * <p>{@code because(...)} の共通文はどの違反でも同じ文で出るため、拒否テストは違反ごとの修正方法の文で検証する。
    */
   private static final String FACTORY_REMEDIATION = " は " + CLOCK_BEAN_METHOD + " 以外では使えない";
 
@@ -99,9 +99,12 @@ class DateTimeConventionsArchTest {
               java.text.DateFormat.class,
               java.text.SimpleDateFormat.class)
           .because(
-              "違反した型を用途に応じて置き換える。"
+              "絶対時刻を Instant に統一し、保存、API、ログで時刻の解釈を一つにするため。"
+                  + "直し方：違反した型を用途に応じて置き換える。"
                   + "絶対時刻には Instant、日付だけの値には LocalDate、時刻だけの値には LocalTime、"
-                  + "日時の書式化には DateTimeFormatter を使う。");
+                  + "日時の書式化には DateTimeFormatter を使う。"
+                  + "規約：docs/datetime/timezone-conventions.md、"
+                  + "docs/adr/ADR-006-utc-instant-absolute-time-policy.md");
 
   /** 現在時刻を使うクラスへ {@code Clock} をコンストラクタ注入し、現在時刻を {@code Instant.now(clock)} で取る。 */
   @ArchTest
@@ -201,13 +204,15 @@ class DateTimeConventionsArchTest {
     return classes()
         .should(obtainTimeOnlyThroughInjectedClock())
         .because(
-            "現在時刻を使うクラスは Clock をコンストラクタ引数で受け取り、"
-                + "Instant.now(clock) または clock.millis() を使う。"
-                + "システム Clock を生成できるのは "
+            "システム時計を直接読むとテストの Clock.fixed(...) が効かず、"
+                + "UTC の Clock のゾーンで日付を決めると日本では0時から9時の間に前日になるため。"
+                + "直し方：Clock をコンストラクタ引数で受け取り、Instant.now(clock) または clock.millis() を使う。"
+                + "システム Clock は "
                 + CLOCK_BEAN_METHOD
-                + " だけであり、このメソッドが Clock.systemUTC() をマイクロ秒単位の tick で包んで返す。"
-                + "地域の日付や時刻は ZoneId.systemDefault() や Clock のゾーンに頼らず、"
-                + "LocalDate.ofInstant(Instant.now(clock), zone) のように設定値の ZoneId で求める。");
+                + " だけで生成する。"
+                + "地域の日付や時刻は LocalDate.ofInstant(Instant.now(clock), zone) のように設定値の ZoneId で求める。"
+                + "規約：docs/datetime/timezone-conventions.md、"
+                + "docs/adr/ADR-046-derive-local-dates-with-configured-business-zone.md");
   }
 
   private static ArchCondition<JavaClass> obtainTimeOnlyThroughInjectedClock() {
@@ -220,8 +225,7 @@ class DateTimeConventionsArchTest {
           final String remediation = remediationForForbiddenCall(call);
           if (remediation != null) {
             events.add(
-                SimpleConditionEvent.violated(
-                    item, call.getDescription() + "。修正方法: " + remediation));
+                SimpleConditionEvent.violated(item, call.getDescription() + "。直し方：" + remediation));
           }
         }
       }

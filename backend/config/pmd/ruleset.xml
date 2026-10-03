@@ -42,7 +42,7 @@
 
     <rule name="UseLombokSlf4j"
           language="java"
-          message="Logger を手書きせず Lombok の @Slf4j を使用する。"
+          message="直し方：Logger フィールドと LoggerFactory の呼び出しを消し、クラスに Lombok の @Slf4j を付けて log を使う。規約：docs/backend/java-coding.md"
           class="net.sourceforge.pmd.lang.rule.xpath.XPathRule">
         <description>
             SLF4J Logger の生成を @Slf4j に統一し、Logger フィールドと LoggerFactory の直接利用を禁止する。
@@ -67,7 +67,7 @@
 
     <rule name="DoNotUseLombokDataOrSetter"
           language="java"
-          message="Lombok の @Data と @Setter は使用せず、record または意図を表す状態変更メソッドを使う。"
+          message="setter で状態を書き換えると、不変条件の検査を通らずに状態が変わるため。直し方：データキャリアは record にし、Domain Model の状態は業務の操作を表すメソッドで変える。規約：docs/backend/java-coding.md、docs/backend/class-roles/aggregate.md"
           class="net.sourceforge.pmd.lang.rule.xpath.XPathRule">
         <description>
             @Data と @Setter が生成する一括の状態変更を禁止し、Domain Model の不変条件とデータキャリアの不変性を保つ。
