@@ -1,4 +1,4 @@
-package com.example.demo.error.presentation;
+package com.example.demo.error.presentation.web;
 
 import com.example.demo.LocaleSupport;
 import com.example.demo.error.ResourceConflictException;

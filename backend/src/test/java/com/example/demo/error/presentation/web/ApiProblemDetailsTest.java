@@ -1,4 +1,4 @@
-package com.example.demo.error.presentation;
+package com.example.demo.error.presentation.web;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
