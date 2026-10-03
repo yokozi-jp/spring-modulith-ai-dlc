@@ -132,6 +132,15 @@ jooq {
                         name = 'INSTANT'
                         includeTypes = '(?i:TIMESTAMP WITH TIME ZONE|TIMESTAMPTZ)'
                     }
+                    forcedType {
+                        // NOT NULLの文字列カラムで、NULLを空文字へそろえる（docs/database/postgresql-data-types.md）。
+                        // 既定値を持たない文字列の共通カラムとpatched_*、フレームワークのmodulithスキーマは対象外にする。
+                        userType = 'java.lang.String'
+                        converter = 'com.example.demo.shared.infrastructure.persistence.NullToEmptyStringConverter'
+                        includeTypes = '(?i:character varying|varchar)(\\(\\d+\\))?'
+                        nullability = 'NOT_NULL'
+                        excludeExpression = '(?i:modulith\\..*|(.*\\.)?((created|updated)_(by|pgm_cd|tx_id)|patched_.*))'
+                    }
                 }
             }
             generate {
