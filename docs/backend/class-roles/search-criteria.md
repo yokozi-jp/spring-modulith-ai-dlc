@@ -82,7 +82,8 @@ public List<OrderSummary> search(final OrderSearchCriteria criteria) {
                   order.id().value(),
                   order.status().name(),
                   order.total().amount(),
-                  order.placedAt()))
+                  order.placedAt(),
+                  order.lockNo()))
       .toList();
 }
 ```

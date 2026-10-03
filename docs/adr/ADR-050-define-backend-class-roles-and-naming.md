@@ -48,7 +48,7 @@ Proposed
 
 ### Domain
 
-- `domain.model` には、集約、Entity、値オブジェクト、`<Aggregate>Repository` インタフェース、外部システムのインタフェース（`PaymentGateway`）を置く。DDD とオニオンアーキテクチャに従い、インタフェースをドメインの語彙で `domain.model` に定義し、実装を Infrastructure に置く。ヘキサゴナルアーキテクチャの port は使わず、`application.port` を廃止する。
+- `domain.model` には、集約、Entity、値オブジェクト、`<Aggregate>Repository` インタフェース、更新の競合を表す `<Aggregate>ConflictException`、外部システムのインタフェース（`PaymentGateway`）を置く。DDD とオニオンアーキテクチャに従い、インタフェースをドメインの語彙で `domain.model` に定義し、実装を Infrastructure に置く。ヘキサゴナルアーキテクチャの port は使わず、`application.port` を廃止する。
 - `domain.model` は Spring、jOOQ、JPA、Jackson に依存しない。
 - 業務規則は、まず値オブジェクトか Entity（集約を含む）に置く。Domain Service は、複数の集約にまたがる規則、どの集約にも自然に属さない計算、Repository を使って確かめる規則（「未出荷の注文は3件まで」）の3つの場合に限って作る。
 - Domain Service は `domain.service` に置き、Spring の `@Service` を付ける。`@Service` は Domain に許す唯一の Spring の型であり、ArchUnit の許可リストで検査する。Domain Service は Repository を引数で受け取ってよく、イベント発行、外部呼び出し、ログ出力は行わない。
@@ -70,12 +70,19 @@ Proposed
 - Controller は集約ごとに `<Aggregate>Controller` として `presentation.web` に置く。
 - リクエストボディを受けるユースケースごとに `<UseCase>Request` を、参照の結果ごとに `<QueryResult>Response` を、`presentation.web` の record として置く。
 - 作成の成功は 201 と、作成したリソースの URI を示す `Location` で返す。`POST` の対象 URI はコレクションなので、`Location` がないと作成したリソースを示せない（[RFC 9110 15.3.2](https://www.rfc-editor.org/rfc/rfc9110#section-15.3.2)）。Spring では `ResponseEntity.created(URI)` と `ServletUriComponentsBuilder` で組み立てる（[Javadoc: ResponseEntity](https://docs.spring.io/spring-framework/docs/current/javadoc-api/org/springframework/http/ResponseEntity.html)、[Spring, URI Links](https://docs.spring.io/spring-framework/reference/web/webmvc/mvc-uri-building.html)）。
-- Request から Command への変換は Request のインスタンスメソッド `toCommand()` に、ルートの record から Response への変換は Response の static メソッド `from(...)` に置き、`presentation.web` に Mapper クラスを作らない。
+- Request から Command への変換は Request のインスタンスメソッド `toCommand(...)`（パス変数の値は引数で受け取る）に、ルートの record から Response への変換は Response の static メソッド `from(...)` に置き、`presentation.web` に Mapper クラスを作らない。
 - Presentation は Domain に依存せず、Application の Command、Result、CommandHandler と、ルートの Queries と record だけを使う。
   Command と Result を標準型だけにするのと同じ考え方で、Domain の型を Application の外へ出さず、HTTP API の形と Domain を独立に変えられるようにするためである。
 - Repository の実装は `infrastructure.persistence` の `Jooq<Aggregate>Repository` とし、jOOQ の生成型と Domain の型の変換もこのクラスに書く。変換のための Mapper のクラスは作らない。
 - 読み取りは、`select` に並べた列を `Field.convertFrom` で値オブジェクトと enum に変え、子の Entity を `multiset` の副問い合わせで同じ SQL で読み、`Records.mapping(Order::restore)` で集約にする（[jOOQ, Ad-hoc converters](https://www.jooq.org/doc/latest/manual/sql-execution/fetching/ad-hoc-converter/)、[jOOQ, The MULTISET value constructor](https://www.jooq.org/doc/latest/manual/sql-building/column-expressions/multiset-value-constructor/)）。jOOQ の作者も、一対多の対応づけにこの形を示している（[Stack Overflow, Mapping a one-to-many relationship to a list of records in jOOQ](https://stackoverflow.com/a/71855430/521799)）。列の数や型が `restore` や Entity のコンストラクタの引数と合わないと、コンパイルが失敗する。
-- 書き込みは、`insertInto` の `set(列, 値)` で全列を書く。
+- Repository の書き込みは、新しい集約の `add` と、既存の集約の `update` に分ける。
+  新規と更新を一つの `save` にすると、実装は行の有無で INSERT と UPDATE を選ぶことになり、他の人が消した集約の更新が新しい行の作成になって、「行がない」（404）として返せないためである。
+- `add` は、`insertInto` の `set(列, 値)` で業務の全列と `lock_no` を書き、ほかの共通カラムの値は [ADR-048](ADR-048-add-shared-module-for-jooq-common-code.md) の `shared` の共通処理から受け取る。
+- `update` は、[PostgreSQL の排他制御](../database/postgresql-concurrency-control.md)の楽観的ロックの順序に従う。
+  集約ルートの行を `SELECT ... FOR UPDATE NOWAIT` でロックし、行がなければ `NoSuchElementException` を、`lock_no` が集約の `lockNo` と違うか行をロックできなければ `domain.model` の `<Aggregate>ConflictException` を投げる。
+  一致したら、`lock_no` を1加算し、`updated_*` を `shared` の共通処理から受け取って更新する。
+- Controller が作り、既存の集約の状態を変える Command は、クライアントが参照の応答で受け取った `lockNo` を持つ。
+  CommandHandler は、集約を取り出した直後に集約の `lockNo` と比べ、画面から受け取った値とロックした行の値の比較が成り立つようにする。
 - 外部システムのインタフェースの実装は `infrastructure.client` の `<ExternalSystem>Client` とする。
 - Infrastructure は、機能モジュールの型のうち同じモジュールの `domain.model` の型だけを使い、Application、Domain Service、モジュールルートの型に依存しない。
   オニオン規則は Adapter から内側への依存をすべて許すが、Adapter がユースケースを呼べると Presentation のほかに処理の入口ができ、トランザクション境界が Application の外にも広がるためである。
@@ -85,6 +92,10 @@ Proposed
 - モジュール間の連携は、ルートのイベントの発行と受信、ルートの `<Feature>Queries` による参照の二つに限る。
 - 他モジュールの状態を同期で変更しない。同期の状態変更が必要に見えたら、作業者（AI エージェントを含む）は実装を止めて利用者に確認し、ADR を起こす。
 - CommandHandler は内部パッケージの `application` に置くため、他モジュールから呼ぶと Spring Modulith の `ApplicationModules.verify()` で失敗する。
+- [ADR-048](ADR-048-add-shared-module-for-jooq-common-code.md) の `com.example.demo.shared` は、機能モジュールではない唯一の技術的な共有モジュールである。
+  `shared.infrastructure.persistence` を `@NamedInterface` で公開し、業務の概念を持たず、他のモジュールの `infrastructure.persistence` だけから使う。
+  `shared` は機能モジュールの間の連携の手段ではなく、機能モジュールの間の連携はイベントと `<Feature>Queries` だけのままである。
+  使う場所の制限は、ArchUnit の `sharedModuleIsUsedOnlyByPersistenceAdapters` で検査する。
 
 ### 既存コードと規約の書き方
 
@@ -115,7 +126,7 @@ Proposed
 
 ### Neutral
 
-- 業務例外を HTTP の 400、404、422 に対応づける仕組みは、この ADR では決めない。いまは `@Valid` の失敗が 400、`ResponseStatusException` がそのステータスになり、Domain や CommandHandler が投げる JDK の例外は 500 になる。ユースケースが Domain の例外を 400、404、422 で返す必要が出たら、作業者は利用者に確認し、対応づけを新しい ADR で決める（[ADR-013](ADR-013-standardize-http-api-contracts.md)）。
+- 業務例外を HTTP の 400、404、409、422 に対応づける仕組みは、この ADR では決めない。いまは `@Valid` の失敗が 400、`ResponseStatusException` がそのステータスになり、Domain、CommandHandler、Repository の実装が投げる JDK の例外と `<Aggregate>ConflictException` は 500 になる。ユースケースが Domain の例外を 400、404、409、422 で返す必要が出たら、作業者は利用者に確認し、対応づけを新しい ADR で決める（[ADR-013](ADR-013-standardize-http-api-contracts.md)）。
 - QueryService の `@Transactional(readOnly = true)` は、読み取り専用のトランザクションで参照中の書き込みを DB に拒否させるために付ける。分離レベルは既定の READ COMMITTED のままなので、一つのメソッドの中の複数の SQL が同じスナップショットを見ることまでは保証しない。
 - 参照の性能が Repository 経由で足りなくなったら、読み取りモデルへの直接射影を ADR で決め直す。
 
@@ -256,3 +267,6 @@ Proposed
 - [MapStruct](https://mapstruct.org/)
 - [ADR-002: package by feature とオニオンアーキテクチャ](ADR-002-package-by-feature-onion-architecture.md)
 - [ADR-013: HTTP API 契約を標準化する](ADR-013-standardize-http-api-contracts.md)
+- [ADR-048: jOOQ の共通処理を共有モジュール shared に置く](ADR-048-add-shared-module-for-jooq-common-code.md)
+- [PostgreSQL の排他制御](../database/postgresql-concurrency-control.md)
+- [PostgreSQL の共通カラム](../database/postgresql-common-columns.md)

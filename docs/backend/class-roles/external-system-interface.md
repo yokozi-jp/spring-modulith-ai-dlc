@@ -80,7 +80,7 @@ public record PaymentId(String value) {
 
 ```java
 // com.example.demo.order.application.ConfirmOrderCommandHandler（抜粋）
-/** 代金を請求して注文を確定する。 */
+/** ロック番号を確かめ、代金を請求して注文を確定する。 */
 @Transactional
 public ConfirmOrderResult handle(final ConfirmOrderCommand command) {
   final Order order =
@@ -88,9 +88,10 @@ public ConfirmOrderResult handle(final ConfirmOrderCommand command) {
           .findById(new OrderId(command.orderId()))
           .orElseThrow(
               () -> new NoSuchElementException("order not found: orderId=" + command.orderId()));
+  order.ensureLockNo(command.lockNo());
   paymentGateway.charge(order.id(), order.total());
   order.confirm();
-  orderRepository.save(order);
+  orderRepository.update(order);
   return new ConfirmOrderResult(order.id().value());
 }
 ```

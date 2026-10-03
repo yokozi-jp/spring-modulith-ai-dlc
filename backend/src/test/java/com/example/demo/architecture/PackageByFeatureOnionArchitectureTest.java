@@ -47,10 +47,17 @@ class PackageByFeatureOnionArchitectureTest {
   private static final String ADR_002 = "docs/adr/ADR-002-package-by-feature-onion-architecture.md";
 
   /** クラスの役割を決めた ADR のパス。 */
-  private static final String ADR_048 = "docs/adr/ADR-050-define-backend-class-roles-and-naming.md";
+  private static final String ADR_050 = "docs/adr/ADR-050-define-backend-class-roles-and-naming.md";
+
+  /** shared モジュールを決めた ADR のパス。 */
+  private static final String ADR_048 =
+      "docs/adr/ADR-048-add-shared-module-for-jooq-common-code.md";
+
+  /** Persistence Adapter のパッケージ。 */
+  private static final String PERSISTENCE_PACKAGE = "..infrastructure.persistence..";
 
   /** 層の責務の規約と、クラスの役割を決めた ADR。 */
-  private static final String LAYERS_DOCS = "規約：docs/backend/layers.md、" + ADR_048;
+  private static final String LAYERS_DOCS = "規約：docs/backend/layers.md、" + ADR_050;
 
   /** Repository とその実装を Persistence Adapter に置く規則の理由（jooq-repository.md の定義と ADR-002）。 */
   private static final String PERSISTENCE_ADAPTER_REASON =
@@ -63,7 +70,7 @@ class PackageByFeatureOnionArchitectureTest {
 
   /** トランザクション境界の規約と、クラスの役割を決めた ADR。 */
   private static final String TRANSACTION_DOCS =
-      "規約：docs/backend/layers.md、docs/backend/class-roles/command-handler.md、" + ADR_048;
+      "規約：docs/backend/layers.md、docs/backend/class-roles/command-handler.md、" + ADR_050;
 
   /** 機能ルートを公開契約として扱い、Presentation と各 Infrastructure Adapter から Domain へ依存を向ける。 */
   @ArchTest
@@ -75,6 +82,11 @@ class PackageByFeatureOnionArchitectureTest {
   /* package */ static final ArchRule infrastructureDependsOnlyOnDomainModel =
       infrastructureDependsOnlyOnDomainModelRule(BASE_PACKAGE);
 
+  /** shared モジュールを使うクラスを、他のモジュールの Persistence Adapter に限る。 */
+  @ArchTest
+  /* package */ static final ArchRule sharedModuleIsUsedOnlyByPersistenceAdapters =
+      sharedModuleIsUsedOnlyByPersistenceAdaptersRule(BASE_PACKAGE);
+
   /** 機能ルートの公開契約は、標準型、JSpecify、同じルートパッケージの型だけに依存させる。 */
   @ArchTest
   /* package */ static final ArchRule moduleApiDoesNotExposeInternalTypes =
@@ -85,7 +97,7 @@ class PackageByFeatureOnionArchitectureTest {
   /* package */ static final ArchRule databaseTechnologyApisAreOnlyUsedByPersistenceAdapters =
       noClasses()
           .that()
-          .resideOutsideOfPackage("..infrastructure.persistence..")
+          .resideOutsideOfPackage(PERSISTENCE_PACKAGE)
           .should()
           .dependOnClassesThat()
           .resideInAnyPackage(
@@ -147,7 +159,7 @@ class PackageByFeatureOnionArchitectureTest {
                   + "コンポーネントスキャンで登録する。"
                   + "直し方：domain.service のトップレベルのクラスに @Service を付け、依存はコンストラクタで受け取る。"
                   + "規約：docs/backend/class-roles/domain-service.md、"
-                  + ADR_048);
+                  + ADR_050);
 
   /** Spring の Service を Application と Domain Service に置く。 */
   @ArchTest
@@ -181,7 +193,7 @@ class PackageByFeatureOnionArchitectureTest {
               "HTTP の入力と出力をユースケースの入力と出力に変換する場所を、集約ごとに一つに決めるため。"
                   + "直し方：Controller は <モジュール>.presentation.web へ移し、<Aggregate>Controller と命名する。"
                   + "規約：docs/backend/class-roles/controller.md、"
-                  + ADR_048);
+                  + ADR_050);
 
   /** Spring の Repository を Persistence Adapter に置く。 */
   @ArchTest
@@ -190,14 +202,14 @@ class PackageByFeatureOnionArchitectureTest {
           .that()
           .areAnnotatedWith(Repository.class)
           .should()
-          .resideInAPackage("..infrastructure.persistence..")
+          .resideInAPackage(PERSISTENCE_PACKAGE)
           .allowEmptyShould(true)
           .because(
               PERSISTENCE_ADAPTER_REASON
                   + "直し方：@Repository のクラスは <モジュール>.infrastructure.persistence へ移し、"
                   + "Jooq<Aggregate>Repository にする。"
                   + "規約：docs/backend/class-roles/jooq-repository.md、"
-                  + ADR_048
+                  + ADR_050
                   + "、"
                   + ADR_002);
 
@@ -218,7 +230,7 @@ class PackageByFeatureOnionArchitectureTest {
                   + "Domain の型との変換は Application の CommandHandler か QueryService の中で行う。"
                   + "規約：docs/backend/class-roles/controller.md、docs/backend/class-roles/request.md、"
                   + "docs/backend/class-roles/response.md、"
-                  + ADR_048);
+                  + ADR_050);
 
   /** Domain の interface を Domain の外で実装するクラスは Infrastructure に置く。 */
   @ArchTest
@@ -236,14 +248,14 @@ class PackageByFeatureOnionArchitectureTest {
           .andShould()
           .haveSimpleNameEndingWith("Repository")
           .andShould()
-          .resideInAPackage("..infrastructure.persistence..")
+          .resideInAPackage(PERSISTENCE_PACKAGE)
           .allowEmptyShould(true)
           .because(
               PERSISTENCE_ADAPTER_REASON
                   + "直し方：Repository の実装は infrastructure.persistence へ移し、"
                   + "Jooq<Aggregate>Repository と命名する。"
                   + "規約：docs/backend/class-roles/jooq-repository.md、"
-                  + ADR_048
+                  + ADR_050
                   + "、"
                   + ADR_002);
 
@@ -267,7 +279,7 @@ class PackageByFeatureOnionArchitectureTest {
                   + "直し方：外部システムのインタフェースの実装は infrastructure.client へ移し、"
                   + "<ExternalSystem>Client と命名する。"
                   + "規約：docs/backend/class-roles/external-client.md、"
-                  + ADR_048);
+                  + ADR_050);
 
   /** クラス単位の {@code @Transactional} を、合成アノテーション経由も含めて禁止する。 */
   @ArchTest
@@ -342,6 +354,30 @@ class PackageByFeatureOnionArchitectureTest {
                 + "Application、Domain Service、モジュールルートの型を使う処理は Application の CommandHandler か"
                 + " QueryService へ移す。"
                 + "規約：docs/backend/class-roles/jooq-repository.md、docs/backend/class-roles/external-client.md、"
+                + ADR_050);
+  }
+
+  /**
+   * shared の外で shared の型に依存するクラスを、{@code infrastructure.persistence} に限る規則を組み立てる。
+   *
+   * <p>shared 自身の中の依存は対象にしない。
+   */
+  /* package */ static ArchRule sharedModuleIsUsedOnlyByPersistenceAdaptersRule(
+      final String basePackage) {
+    final String sharedPackage = basePackage + ".shared..";
+    return noClasses()
+        .that()
+        .resideOutsideOfPackages(sharedPackage, PERSISTENCE_PACKAGE)
+        .should()
+        .dependOnClassesThat()
+        .resideInAPackage(sharedPackage)
+        .because(
+            "shared は永続化の技術的な共通処理だけを置くモジュールであり、"
+                + "使う場所を他のモジュールの infrastructure.persistence に限って、"
+                + "業務の処理が共通処理と共通カラムに依存しないようにするため。"
+                + "直し方：shared の型を使う処理を <モジュール>.infrastructure.persistence の "
+                + "Jooq<Aggregate>Repository へ移し、Application と Domain からは Repository を通して使う。"
+                + "規約：docs/backend/architecture.md、"
                 + ADR_048);
   }
 
@@ -357,7 +393,7 @@ class PackageByFeatureOnionArchitectureTest {
                 + "直し方：項目を String、Instant、BigDecimal などの標準型か、"
                 + "同じルートパッケージの record と enum に置き換える。"
                 + "規約：docs/backend/architecture.md、"
-                + ADR_048);
+                + ADR_050);
   }
 
   /** Domain Service の依存先を標準型、JSpecify、Lombok、Domain と {@code @Service} に限る規則を組み立てる。 */
@@ -376,7 +412,7 @@ class PackageByFeatureOnionArchitectureTest {
                 + "直し方：Domain の型と標準型だけで業務規則を書き、"
                 + "イベント発行、外部呼び出し、ログ出力は Application の CommandHandler へ移す。"
                 + "規約：docs/backend/class-roles/domain-service.md、"
-                + ADR_048);
+                + ADR_050);
   }
 
   /** Domain の外で Domain Model の interface を実装するクラスを Infrastructure に置く規則を組み立てる。 */

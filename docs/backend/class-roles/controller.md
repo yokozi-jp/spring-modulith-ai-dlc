@@ -8,7 +8,7 @@ tags: [convention, backend, class-role]
 # クラスの役割：Controller
 
 `<Aggregate>Controller` は、集約ごとの HTTP API を受ける Spring MVC の Controller であり、`presentation.web` に package-private で置く。
-更新は Request かパス変数から Command を作って CommandHandler を呼び、参照は `<Feature>Queries` を呼ぶ。
+更新は Request とパス変数から Command を作って CommandHandler を呼び、参照は `<Feature>Queries` を呼ぶ。
 ステータスコード、`Location`、一覧の包み方は docs/web-api の規約に従う。
 役割の決定理由は [ADR-050](../../adr/ADR-050-define-backend-class-roles-and-naming.md) に示す。
 
@@ -36,22 +36,22 @@ Domain の型を Application の外へ出さず、HTTP API の形と Domain を�
 注文の Controller は、次の HTTP の形にする。
 
 - **`POST /api/orders`**：`PlaceOrderRequest` を受けて注文を受け付け、201 と作成した注文の URI の `Location` を返し、本文を返さない。
-- **`POST /api/orders/{orderId}/confirm`**：パス変数から `ConfirmOrderCommand` を作って確定し、204 を返す。
-- **`POST /api/orders/{orderId}/cancel`**：パス変数から `CancelOrderCommand` を作って取り消し、204 を返す。
-- **`GET /api/orders/{orderId}`**：`OrderQueries.findDetails` の結果を `OrderDetailsResponse` にして 200 で返す。
+- **`POST /api/orders/{orderId}/confirm`**：ロック番号を持つ `ConfirmOrderRequest` を受け、パス変数と合わせて `ConfirmOrderCommand` を作って確定し、204 を返す。
+- **`POST /api/orders/{orderId}/cancel`**：ロック番号を持つ `CancelOrderRequest` を受け、パス変数と合わせて `CancelOrderCommand` を作って取り消し、204 を返す。
+- **`GET /api/orders/{orderId}`**：`OrderQueries.findDetails` の結果を、ロック番号を含む `OrderDetailsResponse` にして 200 で返す。
   注文がなければ `ResponseStatusException(HttpStatus.NOT_FOUND)` で 404 にする。
 - **`GET /api/orders?customerId=…`**：`OrderQueries.search` の結果を `OrderSummaryListResponse` の `items` に入れて 200 で返す。
 
 確定と取消は、[Web APIの方式とURLの設計](../../web-api/api-style.md)の「カスタムメソッド」の形にする。
-作成の応答は[HTTPメソッドの使い分け](../../web-api/http-methods.md)の「作成」に、ステータスコードは[HTTPステータスコードの選択](../../web-api/status-codes.md)に、一覧の形は[レスポンスボディの形式](../../web-api/response-body.md)に従う。
+ロック番号の受け渡しは[更新の競合制御](../../web-api/optimistic-locking.md)に、作成の応答は[HTTPメソッドの使い分け](../../web-api/http-methods.md)の「作成」に、ステータスコードは[HTTPステータスコードの選択](../../web-api/status-codes.md)に、一覧の形は[レスポンスボディの形式](../../web-api/response-body.md)に従う。
 
 ## 必須の記述
 
 - `@RestController` と `@RequestMapping("/api/<resources>")` を付けた package-private の `class` にし、`final` を付けない。
 - 依存は package-private のコンストラクタで受け取る。
 - ハンドラメソッドは、マッピングのアノテーションの次の行に `/* package */` を書いた package-private のメソッドにする。
-- 本文を受ける操作は `@Valid @RequestBody` で Request を受け、`request.toCommand()` で Command にする。
-- パスだけで決まる操作は、`@PathVariable` の値で Command を作る（`new CancelOrderCommand(orderId)`）。
+- 状態を変える操作は `@Valid @RequestBody` で Request を受け、`request.toCommand(...)` で Command にする。
+  パス変数の値は `toCommand` の引数で渡す（`request.toCommand(orderId)`）。
 - 作成は `ServletUriComponentsBuilder.fromCurrentRequest()` で `Location` の URI を作り、`ResponseEntity.created(location).build()` を返す。
 - 本文のない更新は `ResponseEntity.noContent().build()` を返す。
 - 参照は `<Feature>Queries` を呼び、`XxxResponse.from(...)` で応答にする。
@@ -68,7 +68,7 @@ Domain の型を Application の外へ出さず、HTTP API の形と Domain を�
 
 ## 最小の例と典型的な例
 
-最小の例は、パス変数だけで注文を取り消す `OrderController` である。
+最小の例は、パス変数の注文 ID と本文のロック番号で注文を取り消す `OrderController` である。
 
 ```java
 package com.example.demo.order.presentation.web;
@@ -88,8 +88,9 @@ class OrderController {
 
   /** 注文を取り消す。 */
   @PostMapping("/{orderId}/cancel")
-  /* package */ ResponseEntity<Void> cancel(@PathVariable final String orderId) {
-    cancelOrder.handle(new CancelOrderCommand(orderId));
+  /* package */ ResponseEntity<Void> cancel(
+      @PathVariable final String orderId, @Valid @RequestBody final CancelOrderRequest request) {
+    cancelOrder.handle(request.toCommand(orderId));
     return ResponseEntity.noContent().build();
   }
 }
@@ -174,6 +175,8 @@ class OrderControllerTest {
 - 一覧を JSON の配列のまま返す。
 - 作成の応答で 200 と本文を返し、`Location` を返さない。
 - 確定や取消を `PUT /api/orders/{orderId}` の状態の書き換えで表す。
+- 確定や取消で、ロック番号を受けずにパス変数だけで Command を作る。
+  画面が読んだ後に他の人が変えた注文を、気付かずに上書きする。
 - 画面ごとに Controller を作り、同じ集約の API を複数のクラスに分ける。
 
 ## 作成時のチェックリスト
@@ -183,7 +186,8 @@ class OrderControllerTest {
 - [ ] Infrastructure に依存しない。［ArchUnit で検査：PackageByFeatureOnionArchitectureTest.dependenciesPointInward］
 - [ ] `@Transactional` を付けない。［ArchUnit で検査：PackageByFeatureOnionArchitectureTest.transactionalMethodsArePublicApplicationMethods］
 - [ ] 集約ごとに一つ作り、`@RequestMapping("/api/<resources>")` を付けた package-private の class にする。［自分で点検］
-- [ ] 本文を受ける操作は `@Valid` の Request を `toCommand()` で Command にし、パスだけの操作はパス変数で Command を作る。［自分で点検］
+- [ ] 状態を変える操作は `@Valid` の Request を `toCommand(...)` で Command にし、パス変数の値は引数で渡す。［自分で点検］
+- [ ] 既存の集約を変える操作は、ロック番号を本文の Request で受ける。［自分で点検］
 - [ ] 作成は 201 と `Location`、本文のない更新は 204、見つからない参照は 404 を返す。［自分で点検］
 - [ ] 参照は `<Feature>Queries` を呼んで `from(...)` で Response にし、一覧は `items` で包む。［自分で点検］
 - [ ] 例外を catch せず、`ApiExceptionHandler` に任せる。［自分で点検］

@@ -1,7 +1,7 @@
 ---
 type: Architecture
 title: バックエンドアーキテクチャ
-description: Package by feature とオニオンアーキテクチャによるバックエンドの構造を説明する。機能モジュールのパッケージ構成とクラスの役割名、モジュールルートの公開契約、依存方向、モジュール間の連携、ベースパッケージ直下の全体設定を確認するときに読む。
+description: Package by feature とオニオンアーキテクチャによるバックエンドの構造を説明する。機能モジュールのパッケージ構成とクラスの役割名、モジュールルートの公開契約、依存方向、モジュール間の連携、共有モジュール shared の範囲、ベースパッケージ直下の全体設定を確認するときに読む。
 tags: [architecture, backend, spring-modulith]
 ---
 
@@ -37,6 +37,13 @@ backend/src/main/java/com/example/demo/
 ├── WebLocaleConfig.java
 ├── package-info.java
 │
+├── shared/
+│   ├── package-info.java
+│   └── infrastructure/
+│       └── persistence/
+│           ├── package-info.java
+│           └── <jOOQ の共通処理>.java
+│
 └── <feature>/
     ├── package-info.java
     ├── <Feature>Queries.java
@@ -51,6 +58,7 @@ backend/src/main/java/com/example/demo/
     │   │   ├── <Entity>.java
     │   │   ├── <ValueObject>.java
     │   │   ├── <Aggregate>Repository.java
+    │   │   ├── <Aggregate>ConflictException.java
     │   │   └── <ExternalSystem>.java
     │   └── service/
     │       ├── package-info.java
@@ -93,6 +101,7 @@ backend/src/main/java/com/example/demo/
 - **`<Entity>`**：[Entity](class-roles/entity.md)
 - **`<ValueObject>`**：[値オブジェクト](class-roles/value-object.md)
 - **`<Aggregate>Repository`**：[Repository](class-roles/repository.md)
+- **`<Aggregate>ConflictException`**：[集約](class-roles/aggregate.md)
 - **`<ExternalSystem>`**：[外部システムのインタフェース](class-roles/external-system-interface.md)
 - **`<DomainService>`**：[Domain Service](class-roles/domain-service.md)
 - **`<UseCase>Command`**：[Command](class-roles/command.md)
@@ -124,7 +133,22 @@ Java パッケージを作るときは、`@NullMarked` を宣言する `package-
 ルートの型は、`String`、`Instant`、`BigDecimal` などの Java の標準型と、同じルートパッケージの型だけを持つ。
 Domain の型、Command と Result、Spring MVC の Request と Response、jOOQ の生成型は置かない。
 
-モジュールは Spring Modulith の既定の閉じたモジュールとし、`@ApplicationModule` と `@NamedInterface` を付けない。
+機能モジュールは Spring Modulith の既定の閉じたモジュールとし、`@ApplicationModule` と `@NamedInterface` を付けない。
+
+## 共有モジュール shared
+
+`com.example.demo.shared` は、機能モジュールではない唯一の技術的な共有モジュールである。
+`@Modulithic(sharedModules = "shared")` で Spring Modulith の shared モジュールにし、決定は [ADR-048](../adr/ADR-048-add-shared-module-for-jooq-common-code.md) に示す。
+
+- jOOQ の共通処理を `shared.infrastructure.persistence` に置き、このパッケージを `@NamedInterface` で公開する。
+- 業務の概念を置かない。
+  ルートのパッケージには `package-info.java` だけを置く。
+- `shared` を使ってよいのは、他のモジュールの `infrastructure.persistence` だけである。
+
+使う場所の制限は、`PackageByFeatureOnionArchitectureTest` の `sharedModuleIsUsedOnlyByPersistenceAdapters` が検査する。
+
+`shared` は機能モジュールではないため、「モジュール間の連携」の対象にならない。
+機能モジュールの間の連携は、`shared` があってもイベントと `<Feature>Queries` だけにする。
 
 ## 依存方向
 
@@ -143,6 +167,8 @@ infrastructure.client ───────────────────�
 - `application` は `domain.service`、`domain.model`、モジュールルートに依存する。
 - `domain.service` は `domain.model` に依存する。
 - `infrastructure.persistence` と `infrastructure.client` は `domain.model` のインタフェースを実装し、`application`、`domain.service`、モジュールルートに依存しない。
+- `infrastructure.persistence` は `shared.infrastructure.persistence` に依存してよい。
+  ほかの層は `shared` に依存しない。
 - Domain と Application は、Presentation と Infrastructure に依存しない。
 - Presentation、Persistence、外部 Client は相互に依存しない。
 
@@ -170,10 +196,12 @@ CommandHandler は `application` にあるため、他モジュールから呼�
 機能横断の API エラー契約は、`error` モジュールの `presentation.web` に置いている。
 
 複数の機能で似た処理が要るときも、処理は各機能内に置く。
+例外は、「共有モジュール shared」に示す jOOQ の共通処理だけである。
 
 ## 関連資料
 
 - [ADR-002: package by feature とオニオンアーキテクチャ](../adr/ADR-002-package-by-feature-onion-architecture.md)
+- [ADR-048: jOOQ の共通処理を共有モジュール shared に置く](../adr/ADR-048-add-shared-module-for-jooq-common-code.md)
 - [ADR-050: バックエンドのクラスの役割と命名を定める](../adr/ADR-050-define-backend-class-roles-and-naming.md)
 - [バックエンドの層の責務](layers.md)
 - [バックエンドの Java 実装規約](java-coding.md)

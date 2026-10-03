@@ -128,9 +128,10 @@ CommandHandler は `PaymentGateway` に依存し、`PaymentGatewayClient` を知
 
 ```java
 // com.example.demo.order.application.ConfirmOrderCommandHandler（抜粋）
+order.ensureLockNo(command.lockNo());
 paymentGateway.charge(order.id(), order.total());
 order.confirm();
-orderRepository.save(order);
+orderRepository.update(order);
 ```
 
 ## 対応するテスト

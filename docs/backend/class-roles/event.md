@@ -75,7 +75,7 @@ public record OrderPlaced(String orderId, String customerId, Instant placedAt) {
 
 ```java
 // com.example.demo.order.application.PlaceOrderCommandHandler（抜粋）
-orderRepository.save(order);
+orderRepository.add(order);
 events.publishEvent(
     new OrderPlaced(order.id().value(), order.customerId().value(), order.placedAt()));
 return new PlaceOrderResult(order.id().value());

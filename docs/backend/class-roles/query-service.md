@@ -19,7 +19,7 @@ public メソッドは `<Feature>Queries` のメソッドだけにし、すべ�
 自モジュールの Controller と他モジュールは、QueryService ではなく `<Feature>Queries` を使う。
 
 QueryService は状態を変えない。
-Repository の `save` を呼ばず、イベントを発行しない。
+Repository の `add` と `update` を呼ばず、イベントを発行しない。
 
 QueryService は SQL を書く場所でもない。
 jOOQ で画面ごとの射影を読まず、[Repository](repository.md) が返す集約から[参照の結果](query-result.md)を作る。
@@ -95,7 +95,11 @@ class OrderQueryService implements OrderQueries {
 
   private static OrderSummary toSummary(final Order order) {
     return new OrderSummary(
-        order.id().value(), order.status().name(), order.total().amount(), order.placedAt());
+        order.id().value(),
+        order.status().name(),
+        order.total().amount(),
+        order.placedAt(),
+        order.lockNo());
   }
 
   private static OrderDetails toDetails(final Order order) {
@@ -117,7 +121,8 @@ class OrderQueryService implements OrderQueries {
         order.subtotal().amount(),
         order.discount().amount(),
         order.total().amount(),
-        order.placedAt());
+        order.placedAt(),
+        order.lockNo());
   }
 }
 ```
@@ -152,7 +157,7 @@ class OrderQueryServiceTest {
                 new OrderLine(
                     1, new ProductCode("P-1"), new Quantity(2), new Money(new BigDecimal("500")))),
             Instant.parse("2026-10-03T00:00:00Z"));
-    orderRepository.save(order);
+    orderRepository.add(order);
 
     final OrderDetails details =
         orderQueries

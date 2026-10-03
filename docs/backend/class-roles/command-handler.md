@@ -39,7 +39,10 @@ CommandHandler は他モジュールから呼ばれない。
 - 依存は public のコンストラクタで受け取り、`private final` フィールドに持つ。
 - `handle` の中で、Command の標準型の値を値オブジェクトに変換する（`new OrderId(command.orderId())`）。
 - 集約が見つからないときは、`.orElseThrow(() -> new NoSuchElementException("order not found: orderId=" + command.orderId()))` で `NoSuchElementException` を投げる。
-- 状態を変えた集約は、`handle` の中で Repository の `save` で保存する。
+- 新しい集約は Repository の `add` で、状態を変えた既存の集約は `update` で、`handle` の中で保存する。
+- Command がロック番号を持つときは、`findById` の直後、状態を変える操作より前に `order.ensureLockNo(command.lockNo())` を呼ぶ。
+  集約は画面から受け取った値と読んだ値を比べ、Repository の `update` はロックした行の値と集約の値を比べる。
+  この二つで、[PostgreSQL の排他制御](../../database/postgresql-concurrency-control.md)の「ロックしてから、画面から受け取った `lock_no` と比べる」を満たす。
 - イベントは、保存の後に `ApplicationEventPublisher` の `publishEvent` で発行する。
 - 現在時刻は、コンストラクタで受け取った `Clock` から `Instant.now(clock)` で取る。
 - 別の CommandHandler を呼ばない。
@@ -52,8 +55,8 @@ CommandHandler は他モジュールから呼ばれない。
 Command の形式は、Controller の `@Valid` で検証済みである。
 形式の違反は、`ApiExceptionHandler` が継承する `ResponseEntityExceptionHandler` が 400 の Problem Details にするため、CommandHandler に届かない。
 
-Domain が投げる JDK の例外は、いまは HTTP の 500 になる。
-ユースケースがこの例外を 400、404、422 で返す必要があるときは、実装を止めて利用者に確認し、対応づけを新しい ADR で決める。
+Domain が投げる JDK の例外と `<Aggregate>ConflictException` は、いまは HTTP の 500 になる。
+ユースケースがこの例外を 400、404、409、422 で返す必要があるときは、実装を止めて利用者に確認し、対応づけを新しい ADR で決める。
 ステータスコードの使い分けは[HTTPステータスコードの選択](../../web-api/status-codes.md)に、API のエラー契約は [ADR-013](../../adr/ADR-013-standardize-http-api-contracts.md) に従う。
 
 ## 依存してよい型、してはいけない型
@@ -91,7 +94,7 @@ public class CancelOrderCommandHandler {
     this.clock = clock;
   }
 
-  /** 注文を取り消して保存し、取消のイベントを発行する。 */
+  /** ロック番号を確かめて注文を取り消して保存し、取消のイベントを発行する。 */
   @Transactional
   public CancelOrderResult handle(final CancelOrderCommand command) {
     final Order order =
@@ -99,8 +102,9 @@ public class CancelOrderCommandHandler {
             .findById(new OrderId(command.orderId()))
             .orElseThrow(
                 () -> new NoSuchElementException("order not found: orderId=" + command.orderId()));
+    order.ensureLockNo(command.lockNo());
     order.cancel();
-    orderRepository.save(order);
+    orderRepository.update(order);
     events.publishEvent(new OrderCancelled(order.id().value(), Instant.now(clock)));
     return new CancelOrderResult(order.id().value());
   }
@@ -126,7 +130,7 @@ public PlaceOrderResult handle(final PlaceOrderCommand command) {
                   new NoSuchElementException("customer not found: customerId=" + command.customerId()));
   final MembershipRank rank = MembershipRank.valueOf(membership.rank());
   order.applyDiscount(discountPolicy.discountFor(rank, order.subtotal()));
-  orderRepository.save(order);
+  orderRepository.add(order);
   events.publishEvent(
       new OrderPlaced(order.id().value(), order.customerId().value(), order.placedAt()));
   return new PlaceOrderResult(order.id().value());
@@ -162,9 +166,10 @@ private List<OrderLine> toOrderLines(final List<PlaceOrderCommand.Line> commandL
 
 ```java
 // com.example.demo.order.application.ConfirmOrderCommandHandler（抜粋）
+order.ensureLockNo(command.lockNo());
 paymentGateway.charge(order.id(), order.total());
 order.confirm();
-orderRepository.save(order);
+orderRepository.update(order);
 return new ConfirmOrderResult(order.id().value());
 ```
 
@@ -199,11 +204,11 @@ class CancelOrderCommandHandlerTest {
                 new OrderLine(
                     1, new ProductCode("P-1"), new Quantity(1), new Money(new BigDecimal("500")))),
             Instant.parse("2026-10-03T00:00:00Z"));
-    orderRepository.save(order);
+    orderRepository.add(order);
     final String orderId = order.id().value();
 
     scenario
-        .stimulate(() -> cancelOrder.handle(new CancelOrderCommand(orderId)))
+        .stimulate(() -> cancelOrder.handle(new CancelOrderCommand(orderId, order.lockNo())))
         .andWaitForEventOfType(OrderCancelled.class)
         .matchingMappedValue(OrderCancelled::orderId, orderId)
         .toArrive();
@@ -223,6 +228,10 @@ class CancelOrderCommandHandlerTest {
   一つのユースケースを一つのトランザクションで進めるという定義が崩れ、ユースケースが別のユースケースを呼んで連鎖する。
 - クラスに `@Transactional` を付ける、または private メソッドに付ける。
 - `Instant.now()` や `LocalDateTime.now()` で現在時刻を取る。
+- Command のロック番号を確かめずに `update` する。
+  画面が読んだ後に他の人が変えた注文を、気付かずに上書きする。
+- Command のロック番号を、外部システムの呼び出しの後で確かめる。
+  競合して更新しないときも、外部システムへの請求が先に済んでしまう。
 - 他モジュールの CommandHandler を呼ぶ。
   同期の状態変更が必要に見えたら、実装を止めて利用者に確認し、ADR を起こす。
 
@@ -238,9 +247,10 @@ class CancelOrderCommandHandlerTest {
 - [ ] Presentation と Infrastructure に依存しない。［ArchUnit で検査：PackageByFeatureOnionArchitectureTest.dependenciesPointInward］
 - [ ] jOOQ の API と生成型を使わない。［ArchUnit で検査：PackageByFeatureOnionArchitectureTest.databaseTechnologyApisAreOnlyUsedByPersistenceAdapters］
 - [ ] Command の値を `handle` の中で値オブジェクトに変換し、業務規則を集約と Domain Service に任せる。［自分で点検］
-- [ ] 状態を変えた集約を `save` し、イベントを保存の後に `ApplicationEventPublisher` で発行する。［自分で点検］
+- [ ] 新しい集約を `add` で、既存の集約を `update` で保存し、イベントを保存の後に `ApplicationEventPublisher` で発行する。［自分で点検］
+- [ ] Command がロック番号を持つときは、`findById` の直後、状態を変える操作より前に `ensureLockNo(command.lockNo())` を呼ぶ。［自分で点検］
 - [ ] 現在時刻は `Instant.now(clock)` で取る。［自分で点検］
-- [ ] Domain の例外を 400、404、422 で返す必要があるなら、実装を止めて利用者に確認した。［自分で点検］
+- [ ] Domain の例外を 400、404、409、422 で返す必要があるなら、実装を止めて利用者に確認した。［自分で点検］
 - [ ] クラス、フィールド、コンストラクタ、`handle` に Javadoc を書く。［自分で点検］
 - [ ] `@ApplicationModuleTest` と `Scenario` のテストを書く。［自分で点検］
 - [ ] `application` のパッケージに `@NullMarked` の `package-info.java` がある。［Error Prone で検査：RequireExplicitNullMarking］

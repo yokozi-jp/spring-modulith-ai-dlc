@@ -34,6 +34,8 @@ Response は Domain の型を持たない。
 - component は Java の標準型と、自分にネストした record だけにする。
 - 日時は `Instant` にし、`Z` 付きの RFC 3339 の文字列で出す。
 - 区分値（`status`）は、参照の結果の文字列をそのまま入れ、表示名を返さない。
+- 1行と詳細の Response は、参照の結果の `lockNo` を `long lockNo` に持つ。
+  クライアントは、この値を更新の本文で送り返す（[更新の競合制御](../../web-api/optimistic-locking.md)）。
 - 1行と詳細の Response は、`public static <QueryResult>Response from(final <QueryResult> ...)` で作る。
 - 一覧の Response は `items` だけを持ち、Controller が 1行の Response の `from` で作ったリストを渡す。
 - `List` の component は、コンパクトコンストラクタで `List.copyOf` に置き換える。
@@ -60,12 +62,16 @@ import java.time.Instant;
 
 /** 注文の一覧の1行を返す API の本文。 */
 public record OrderSummaryResponse(
-    String orderId, String status, BigDecimal total, Instant placedAt) {
+    String orderId, String status, BigDecimal total, Instant placedAt, long lockNo) {
 
   /** 参照の結果から作る。 */
   public static OrderSummaryResponse from(final OrderSummary summary) {
     return new OrderSummaryResponse(
-        summary.orderId(), summary.status(), summary.total(), summary.placedAt());
+        summary.orderId(),
+        summary.status(),
+        summary.total(),
+        summary.placedAt(),
+        summary.lockNo());
   }
 }
 ```
@@ -95,7 +101,8 @@ public record OrderDetailsResponse(
     BigDecimal subtotal,
     BigDecimal discount,
     BigDecimal total,
-    Instant placedAt) {
+    Instant placedAt,
+    long lockNo) {
 
   /** 明細を変更できないリストとして持つ。 */
   public OrderDetailsResponse {
@@ -112,7 +119,8 @@ public record OrderDetailsResponse(
         details.subtotal(),
         details.discount(),
         details.total(),
-        details.placedAt());
+        details.placedAt(),
+        details.lockNo());
   }
 
   /** 注文の明細の1行。 */
@@ -140,18 +148,23 @@ class OrderSummaryListResponseTest {
   @Autowired private JsonMapper jsonMapper;
 
   @Test
-  @DisplayName("一覧を items に入れ、受付時刻を Z 付きの文字列にする")
+  @DisplayName("一覧を items に入れ、受付時刻を Z 付きの文字列にし、ロック番号を返す")
   void writesItemsWithUtcInstant() {
     final OrderSummaryListResponse response =
         new OrderSummaryListResponse(
             List.of(
                 new OrderSummaryResponse(
-                    "O-1", "PLACED", new BigDecimal("1900"), Instant.parse("2026-10-03T00:00:00Z"))));
+                    "O-1",
+                    "PLACED",
+                    new BigDecimal("1900"),
+                    Instant.parse("2026-10-03T00:00:00Z"),
+                    1L)));
 
     assertThat(jsonMapper.writeValueAsString(response))
         .as("orderId=O-1 の一覧の JSON")
         .startsWith("{\"items\":[")
-        .contains("\"placedAt\":\"2026-10-03T00:00:00Z\"");
+        .contains("\"placedAt\":\"2026-10-03T00:00:00Z\"")
+        .contains("\"lockNo\":1");
   }
 }
 ```
@@ -174,6 +187,7 @@ class OrderSummaryListResponseTest {
 - [ ] 名前を参照の結果の名前に `Response` を付けた形にし、一覧は `items` を持つ `<1行の名前>ListResponse` で包む。［自分で点検］
 - [ ] 1行と詳細は static の `from` でルートの record から作る。［自分で点検］
 - [ ] 日時は `Instant`、区分値は参照の結果の文字列のままにする。［自分で点検］
+- [ ] 1行と詳細の Response に `long lockNo` を持つ。［自分で点検］
 - [ ] `List` の component をコンパクトコンストラクタで `List.copyOf` に置き換える。［自分で点検］
 - [ ] Jackson のアノテーションを付けない。［自分で点検］
 - [ ] record、ネストした record、`from` に Javadoc を書く。［自分で点検］

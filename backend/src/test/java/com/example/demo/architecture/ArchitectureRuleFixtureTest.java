@@ -81,6 +81,11 @@ class ArchitectureRuleFixtureTest {
                 VIOLATING),
             "order.infrastructure.persistence.ExpiredOrderSweeper"),
         row(
+            "sharedModuleIsUsedOnlyByPersistenceAdapters",
+            PackageByFeatureOnionArchitectureTest.sharedModuleIsUsedOnlyByPersistenceAdaptersRule(
+                VIOLATING),
+            "order.application.OrderAuditColumns"),
+        row(
             "moduleApiDoesNotExposeInternalTypes",
             PackageByFeatureOnionArchitectureTest.moduleApiDoesNotExposeInternalTypesRule(
                 VIOLATING),
@@ -258,6 +263,8 @@ class ArchitectureRuleFixtureTest {
     return List.of(
         PackageByFeatureOnionArchitectureTest.dependenciesPointInwardRule(basePackage),
         PackageByFeatureOnionArchitectureTest.infrastructureDependsOnlyOnDomainModelRule(
+            basePackage),
+        PackageByFeatureOnionArchitectureTest.sharedModuleIsUsedOnlyByPersistenceAdaptersRule(
             basePackage),
         PackageByFeatureOnionArchitectureTest.moduleApiDoesNotExposeInternalTypesRule(basePackage),
         PackageByFeatureOnionArchitectureTest

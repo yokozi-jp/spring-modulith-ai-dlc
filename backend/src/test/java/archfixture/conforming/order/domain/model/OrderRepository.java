@@ -15,6 +15,6 @@ public interface OrderRepository {
   /** 顧客の未出荷の注文を数える。 */
   long countUnshippedByCustomer(CustomerId customerId);
 
-  /** 注文を保存する。 */
-  void save(Order order);
+  /** 新しい注文を保存する。 */
+  void add(Order order);
 }

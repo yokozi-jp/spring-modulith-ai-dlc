@@ -54,7 +54,7 @@ class ClassRoleArchTest {
   private static final String COMMAND_HANDLER = "CommandHandler";
 
   /** クラスの役割を決めた ADR のパス。 */
-  private static final String ADR_048 = "docs/adr/ADR-050-define-backend-class-roles-and-naming.md";
+  private static final String ADR_050 = "docs/adr/ADR-050-define-backend-class-roles-and-naming.md";
 
   /** jOOQ の Repository の規約のパス。 */
   private static final String JOOQ_REPOSITORY_DOC = "docs/backend/class-roles/jooq-repository.md";
@@ -84,7 +84,7 @@ class ClassRoleArchTest {
                   + "直し方：状態を変えるユースケースは <UseCase>CommandHandler、"
                   + "参照は <Feature>QueryService、イベントの受信は <Event>Listener と命名する。"
                   + "規約：docs/backend/layers.md、"
-                  + ADR_048);
+                  + ADR_050);
 
   /**
    * CommandHandler の public メソッドは {@code @Transactional} の {@code handle(<UseCase>Command)} だけにする。
@@ -103,7 +103,7 @@ class ClassRoleArchTest {
                   + "<UseCase>Result handle(<UseCase>Command command) の一つにし、"
                   + "別のユースケースは別の CommandHandler に分ける。"
                   + "規約：docs/backend/class-roles/command-handler.md、"
-                  + ADR_048);
+                  + ADR_050);
 
   /** Command と Result は Application の record にする。 */
   @ArchTest
@@ -126,7 +126,7 @@ class ClassRoleArchTest {
                   + "直し方：共通の業務規則は集約か Domain Service へ移し、"
                   + "後続の処理はイベントを発行して Listener から別の CommandHandler を呼ぶ。"
                   + "規約：docs/backend/class-roles/command-handler.md、"
-                  + ADR_048);
+                  + ADR_050);
 
   /** {@code @ApplicationModuleListener} は Application の {@code <Event>Listener.on} にだけ付ける。 */
   @ArchTest
@@ -148,7 +148,7 @@ class ClassRoleArchTest {
                   + "境界を Application に置く。"
                   + "直し方：イベントの受信は受信側モジュールの application に置く <Event>Listener の on メソッドへ移す。"
                   + "規約：docs/backend/class-roles/listener.md、"
-                  + ADR_048);
+                  + ADR_050);
 
   /** Listener は {@code on} だけを公開し、1 つの CommandHandler だけを呼ぶ。 */
   @ArchTest
@@ -166,7 +166,7 @@ class ClassRoleArchTest {
                   + "直し方：public メソッドを @ApplicationModuleListener を付けた void on(<Event> event) の一つにし、"
                   + "イベントから Command を作って一つの CommandHandler の handle を呼ぶ。"
                   + "規約：docs/backend/class-roles/listener.md、"
-                  + ADR_048);
+                  + ADR_050);
 
   /** Request と Response は {@code presentation.web} の record にする。 */
   @ArchTest
@@ -187,7 +187,7 @@ class ClassRoleArchTest {
                   + "同じモジュールのルートにある <Feature>Queries を実装し、"
                   + "public メソッドすべてに @Transactional(readOnly = true) を付ける。"
                   + "規約：docs/backend/class-roles/query-service.md、"
-                  + ADR_048);
+                  + ADR_050);
 
   /** 列と項目を対応づけるライブラリと jOOQ の {@code DefaultRecordMapper} を使わない。 */
   @ArchTest
@@ -209,7 +209,7 @@ class ClassRoleArchTest {
                   + "規約："
                   + JOOQ_REPOSITORY_DOC
                   + "、"
-                  + ADR_048);
+                  + ADR_050);
 
   /**
    * 名前のリフレクションで対応づける jOOQ のメソッドの名前のうち、{@code Class} を受け取るときだけ禁止するもの（ほかに名前が {@code Into}
@@ -240,7 +240,7 @@ class ClassRoleArchTest {
                   + "規約："
                   + JOOQ_REPOSITORY_DOC
                   + "、"
-                  + ADR_048);
+                  + ADR_050);
 
   /** モジュールルートの型を record、enum、{@code *Queries} interface に限る規則を組み立てる。 */
   /* package */ static ArchRule moduleRootTypesAreRecordsEnumsOrQueriesRule(
@@ -265,7 +265,7 @@ class ClassRoleArchTest {
                 + "直し方：ルートには <Feature>Queries と、参照の結果、検索条件、イベントの record と enum だけを置き、"
                 + "Command と CommandHandler は application へ移す。"
                 + "規約：docs/backend/architecture.md、"
-                + ADR_048);
+                + ADR_050);
   }
 
   /** {@code *Command} と {@code *Result} を {@code <module>.application} の record に限る規則を組み立てる。 */
@@ -284,7 +284,7 @@ class ClassRoleArchTest {
             "Command と Result はユースケースの入出力であり、モジュールルートに置いて他モジュールから同期で呼ばせないため。"
                 + "直し方：<UseCase>Command と <UseCase>Result を <モジュール>.application の record にする。"
                 + "規約：docs/backend/class-roles/command.md、docs/backend/class-roles/result.md、"
-                + ADR_048);
+                + ADR_050);
   }
 
   /** {@code *Request} と {@code *Response} を {@code presentation.web} の record に限る規則を組み立てる。 */
@@ -303,7 +303,7 @@ class ClassRoleArchTest {
             "リクエストボディと応答は HTTP の利用者との契約であり、ユースケースの入力や参照の結果とは別に変わるため。"
                 + "直し方：<UseCase>Request と <QueryResult>Response を <モジュール>.presentation.web の record にする。"
                 + "規約：docs/backend/class-roles/request.md、docs/backend/class-roles/response.md、"
-                + ADR_048);
+                + ADR_050);
   }
 
   private static ArchCondition<JavaClass> exposeOnlyTransactionalHandle() {

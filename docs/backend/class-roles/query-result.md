@@ -34,6 +34,8 @@ API の応答の形は Presentation の `<QueryResult>Response` が決めるた�
 - `public record` にし、アノテーションを付けない。
 - component は Java の標準型（`String`、`int`、`BigDecimal`、`Instant`、`List`）と、同じルートの record と enum だけにする。
 - 集約の状態は、Domain の enum ではなく `OrderStatus.name()` の文字列で持つ。
+- 一覧の1行と1件の詳細は、集約の `lockNo()` を `long lockNo` に持つ。
+  クライアントは、この値を更新の本文で送り返す（[更新の競合制御](../../web-api/optimistic-locking.md)）。
 - `List` の component は、コンパクトコンストラクタで `List.copyOf` に置き換える。
   置き換えないと、`task be-lint` の SpotBugs が `EI_EXPOSE_REP` と `EI_EXPOSE_REP2` を報告する。
 - record とネストした record に Javadoc を書く。
@@ -55,7 +57,8 @@ import java.math.BigDecimal;
 import java.time.Instant;
 
 /** 注文の一覧の1行。 */
-public record OrderSummary(String orderId, String status, BigDecimal total, Instant placedAt) {}
+public record OrderSummary(
+    String orderId, String status, BigDecimal total, Instant placedAt, long lockNo) {}
 ```
 
 典型的な例は、明細をネストした record で持つ `OrderDetails` である。
@@ -76,7 +79,8 @@ public record OrderDetails(
     BigDecimal subtotal,
     BigDecimal discount,
     BigDecimal total,
-    Instant placedAt) {
+    Instant placedAt,
+    long lockNo) {
 
   /** 明細を変更できないリストとして持つ。 */
   public OrderDetails {
@@ -112,6 +116,7 @@ ArchUnit が形を検査し、この record を使う側のテストが中身を
 - [ ] 一覧の1行と1件の詳細を別の record にし、内容を表す名前を付ける。［自分で点検］
 - [ ] 結果の一部はネストした record にする。［自分で点検］
 - [ ] 状態は `OrderStatus.name()` の文字列で持つ。［自分で点検］
+- [ ] 一覧の1行と1件の詳細に `long lockNo` を持つ。［自分で点検］
 - [ ] `List` の component をコンパクトコンストラクタで `List.copyOf` に置き換える。［自分で点検］
 - [ ] アノテーションを付けない。［自分で点検］
 - [ ] record とネストした record に Javadoc を書く。［自分で点検］

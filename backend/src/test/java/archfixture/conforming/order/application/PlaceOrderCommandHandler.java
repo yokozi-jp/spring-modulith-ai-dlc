@@ -46,7 +46,7 @@ public class PlaceOrderCommandHandler {
     final CustomerId customerId = new CustomerId(command.customerId());
     orderLimitPolicy.ensureCanPlace(customerId);
     final Order order = Order.place(OrderId.newId(), customerId, Instant.now(clock));
-    orderRepository.save(order);
+    orderRepository.add(order);
     events.publishEvent(new OrderPlaced(order.id().value(), customerId.value(), order.placedAt()));
     return new PlaceOrderResult(order.id().value());
   }
