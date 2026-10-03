@@ -1,0 +1,10 @@
+databaseChangeLog:
+  - changeSet:
+      id: "002-create-fn-one"
+      author: system
+      changes:
+        - createProcedure:
+            path: sql/fn-one.sql
+      rollback:
+        - sql:
+            sql: "DROP FUNCTION item.fn_one();"

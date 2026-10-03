@@ -29,7 +29,7 @@ final class ChangesetTableRules {
   private static final String NAMING_DOC = "docs/database/postgresql-naming.md";
 
   /** テーブル名の種別の接頭辞。 */
-  /* package */ static final Pattern TABLE_PREFIX =
+  private static final Pattern TABLE_PREFIX =
       Pattern.compile("^(m|t|w|wr|ws|s|sd|sw|sm|h|v|mv|fdw|tmp)_[a-z0-9_]+$");
 
   /** 論理削除のカラム名（{@code deleted_flg}、{@code is_deleted}など）。 */

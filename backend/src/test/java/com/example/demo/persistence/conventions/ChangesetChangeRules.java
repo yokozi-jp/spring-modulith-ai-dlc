@@ -39,6 +39,9 @@ final class ChangesetChangeRules {
   private static final List<String> CONSTRAINT_NAME_KEYS =
       List.of("primaryKeyName", "uniqueConstraintName", "foreignKeyName");
 
+  /** ビュー名の種別の接頭辞（ビュー、マテリアライズドビュー、postgres_fdwで公開するビュー）。 */
+  private static final Pattern VIEW_PREFIX = Pattern.compile("^(v|mv|fdw)_[a-z0-9_]+$");
+
   /** 明示的に作るシーケンスの名前。グループはテーブル名。 */
   private static final Pattern SEQUENCE_NAME = Pattern.compile("^seq_([a-z0-9_]+)_\\d+$");
 
@@ -119,15 +122,16 @@ final class ChangesetChangeRules {
       case "createIndex" -> indexName(change, out);
       case "createSequence" -> sequenceName(schema, change.text("sequenceName"), replay, out);
       case "createView" -> {
-        if (!ChangesetTableRules.TABLE_PREFIX.matcher(change.text("viewName")).matches()) {
+        if (!VIEW_PREFIX.matcher(change.text("viewName")).matches()) {
           out.add(
               new ConventionViolation(
                   "N5",
                   schema + "." + change.text("viewName"),
-                  "ビュー名に種別の接頭辞（v_、mv_など）を付ける（" + NAMING_DOC + "）。"));
+                  "ビュー名に種別の接頭辞（v_、mv_、fdw_）を付ける（" + NAMING_DOC + "）。"));
         }
       }
-      case "addUniqueConstraint" -> out.add(unique(ChangesetReplay.qualify(schema, table)));
+      case "addUniqueConstraint" ->
+          out.add(unique(schema, table, change.text("columnNames").replaceAll("\\s", "")));
       default -> {
         // 名前の規則がないChange Typeは判定しない。
       }
@@ -143,7 +147,7 @@ final class ChangesetChangeRules {
         primaryKeyName(schema, table, YamlNodes.text(constraints, "primaryKeyName"), out);
       }
       if (YamlNodes.isTrue(constraints.get("unique"))) {
-        out.add(unique(ChangesetReplay.qualify(schema, table)));
+        out.add(unique(schema, table, YamlNodes.text(column, "name")));
       }
     }
   }
@@ -197,10 +201,12 @@ final class ChangesetChangeRules {
     }
   }
 
-  private static ConventionViolation unique(final String table) {
+  /** K3の違反。許可リストの1項目が1つの制約だけを許すよう、対象に制約のカラム（複数ならカンマ区切り）まで含める。 */
+  private static ConventionViolation unique(
+      final String schema, final String table, final String columns) {
     return new ConventionViolation(
         "K3",
-        table,
+        ChangesetReplay.qualify(schema, table) + "." + columns,
         "一意性はunique: trueを付けたcreateIndexで表し、ユニーク制約を使わない。"
             + "例外は理由を付けて許可リストに載せる（docs/database/postgresql-constraints-and-indexes.md）。");
   }

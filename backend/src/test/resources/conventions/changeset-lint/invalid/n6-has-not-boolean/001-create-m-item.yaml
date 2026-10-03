@@ -21,19 +21,8 @@ databaseChangeLog:
                   constraints:
                     nullable: false
               - column:
-                  name: is_active
-                  type: boolean
-                  defaultValueBoolean: false
-                  constraints:
-                    nullable: false
-              - column:
-                  name: sale_date
-                  type: date
-                  constraints:
-                    nullable: false
-              - column:
-                  name: ordered_at
-                  type: timestamptz
+                  name: has_stock
+                  type: varchar(1)
                   constraints:
                     nullable: false
               - column:
@@ -90,42 +79,3 @@ databaseChangeLog:
               - column:
                   name: patched_id
                   type: integer
-        - createIndex:
-            indexName: uk_m_item
-            tableName: m_item
-            schemaName: item
-            unique: true
-            columns:
-              - column:
-                  name: item_code
-        - createIndex:
-            indexName: uk_2_m_item
-            tableName: m_item
-            schemaName: item
-            unique: true
-            columns:
-              - column:
-                  name: sale_date
-              - column:
-                  name: item_code
-        - createIndex:
-            indexName: idx_1_m_item
-            tableName: m_item
-            schemaName: item
-            columns:
-              - column:
-                  name: sale_date
-        - createIndex:
-            indexName: i2_m_item
-            tableName: m_item
-            schemaName: item
-            columns:
-              - column:
-                  name: ordered_at
-        - createSequence:
-            sequenceName: seq_m_item_1
-            schemaName: item
-        - createView:
-            viewName: v_m_item
-            schemaName: item
-            selectQuery: SELECT item_id, item_code FROM item.m_item

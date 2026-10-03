@@ -125,3 +125,7 @@ databaseChangeLog:
         - createSequence:
             sequenceName: seq_m_item_1
             schemaName: item
+        - createView:
+            viewName: v_m_item
+            schemaName: item
+            selectQuery: SELECT item_id, item_code FROM item.m_item

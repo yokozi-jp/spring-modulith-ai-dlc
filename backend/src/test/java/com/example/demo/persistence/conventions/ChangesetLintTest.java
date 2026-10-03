@@ -43,6 +43,9 @@ class ChangesetLintTest {
   private static final String UNCOMMENT_SQL =
       "002-comment-m-item: COMMENT ON TABLE item.m_item IS NULL;";
 
+  /** createProcedureで作った関数を消すrollbackのSQL。 */
+  private static final String DROP_FUNCTION = "002-create-fn-one: DROP FUNCTION item.fn_one();";
+
   /** 違反のケースの多くが使うテーブル。 */
   private static final String M_ITEM = "item.m_item";
 
@@ -91,6 +94,22 @@ class ChangesetLintTest {
                   "002-create-item-status: DROP TYPE item.item_status;"),
               "M12 002-create-item-status"),
           lintCase(
+              "m12-materialized-view-without-comment",
+              sqlAllowlist(
+                  "002-create-mv-m-item: CREATE MATERIALIZED VIEW item.mv_m_item AS SELECT item_id"
+                      + " FROM item.m_item;",
+                  "002-create-mv-m-item: DROP MATERIALIZED VIEW item.mv_m_item;"),
+              "M12 002-create-mv-m-item"),
+          lintCase(
+              "m17-create-procedure-text",
+              sqlAllowlist(DROP_FUNCTION),
+              "M17 002-create-fn-one: createProcedure CREATE FUNCTION item.fn_one()"
+                  + " RETURNS integer LANGUAGE sql AS 'SELECT 1';"),
+          lintCase(
+              "m17-create-procedure-path",
+              sqlAllowlist(DROP_FUNCTION),
+              "M17 002-create-fn-one: createProcedure sql/fn-one.sql"),
+          lintCase(
               "unused-allowlist-entry",
               sqlAllowlist("999-unused: SELECT 1;"),
               "ALLOWLIST M17 999-unused: SELECT 1;"),
@@ -102,8 +121,8 @@ class ChangesetLintTest {
                   "002-create-idx-1-m-item: DROP INDEX item.idx_1_m_item;"),
               "M7 item.idx_1_m_item"),
           lintCase("m8-add-not-null-on-existing-table", "M8 item.m_item.item_name"),
-          lintCase("k3-add-unique-constraint", "K3 " + M_ITEM),
-          lintCase("k3-column-unique", "K3 " + M_ITEM),
+          lintCase("k3-add-unique-constraint", "K3 item.m_item.item_code"),
+          lintCase("k3-column-unique", "K3 item.m_item.item_name"),
           lintCase("c1-missing-common-column", "C1 item.m_item.patched_id"),
           lintCase("c1-wrong-type", "C1 item.m_item.created_by"),
           lintCase(
@@ -112,16 +131,21 @@ class ChangesetLintTest {
           lintCase("c2-work-table-omits-without-comment", "C2 item.w_item"),
           lintCase("c3-default-on-common-column", "C3 item.m_item.created_at"),
           lintCase("n1-keyword-column", "N1 item.m_item.order"),
+          lintCase("n1-keyword-table", "N1 item.order", "N5 item.order"),
           lintCase("n2-uppercase-identifier", "N2 item.m_item.itemName"),
           lintCase("n3-column-same-as-table", "N3 item.m_item.m_item"),
           lintCase(
               "n4-identifier-too-long",
               "N4 item.m_item.item_description_for_the_identifier_length_limit_check_xxxxxxxxx"),
           lintCase("n5-table-without-prefix", "N5 item.goods_item"),
+          lintCase("n5-view-without-prefix", "N5 item.m_item_summary"),
           lintCase("n6-at-not-timestamptz", "N6 item.m_item.ordered_at"),
           lintCase("n6-date-not-date", "N6 item.m_item.sale_date"),
           lintCase("n6-is-not-boolean", "N6 item.m_item.is_active"),
+          lintCase("n6-has-not-boolean", "N6 item.m_item.has_stock"),
           lintCase("n7-primary-key-name", "N7 item.m_item_pkey"),
+          lintCase("n7-primary-key-name-missing", "N7 " + M_ITEM),
+          lintCase("n7-add-primary-key-name", "N7 item.m_item_pkey"),
           lintCase("n7-index-name", "N7 item.m_item_idx"),
           lintCase("n7-unique-index-name", "N7 item.idx_1_m_item"),
           lintCase("n8-sequence-name", "N8 item.m_item_seq"),
