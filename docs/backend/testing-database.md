@@ -16,6 +16,9 @@ DBテストは、`docker/compose-test.yml`のPostgreSQL 5433とRedis 6380を`.en
 `task test`は確定済みchangesetを、`task test-dev`は作りかけを含む全changesetを適用し、テスト後にボリュームを削除する。
 どちらのテストアノテーションも、マイグレーション済みのテストDBを前提にする。
 
+実行テストに`@JooqTest`を直接付けず、`@DatabaseTest`か`@CommittedDatabaseTest`を使う。
+テスト用DBへの接続、ロールバック、後始末の構成を二つの合成アノテーションにまとめ、テストごとに構成が分かれないようにするためである。
+
 ## ロールバックするテスト
 
 通常の書き込みと読み取りには、[DatabaseTest](../../backend/src/test/java/com/example/demo/testkit/DatabaseTest.java)を使う。

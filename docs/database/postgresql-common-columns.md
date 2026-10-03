@@ -32,7 +32,7 @@ Spring Modulithのイベント出版テーブルのように、フレームワ�
 
 - **`created_at`**：作成日時。
 - **`created_by`**：作成者。利用者の操作では、OIDCのIDトークンの`sub`を登録する。利用者の操作でない処理では、`created_pgm_cd`と同じ値を登録する。
-- **`created_pgm_cd`**：作成した機能やプログラムを一意に識別する値。`モジュール名.ユースケースのクラスの単純名`の形式にする（例：`order.PlaceOrder`）。
+- **`created_pgm_cd`**：作成した機能やプログラムを一意に識別する値。`モジュール名.ユースケースのクラスの単純名`の形式にする（例：`order.PlaceOrderCommandHandler`）。
 - **`created_tx_id`**：作成した処理の呼び出しを識別する値。Micrometer Tracingの現在のスパンのtrace IDを登録する。traceがなければ例外にし、登録を失敗させる。
 - **`updated_at`**、**`updated_by`**、**`updated_pgm_cd`**、**`updated_tx_id`**：更新について、作成と同じ値を登録する。INSERTのときも登録する。
 - **`lock_no`**：楽観的ロックのロック番号。INSERTのときは`1`を登録する。使い方は[PostgreSQLの排他制御](postgresql-concurrency-control.md)に従う。

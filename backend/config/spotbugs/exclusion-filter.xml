@@ -4,4 +4,14 @@
   <Match>
     <Bug pattern="CT_CONSTRUCTOR_THROW" />
   </Match>
+  <!--
+    SpotBugs は add で始まるメソッドを持つ型を変更可能とみなすため、Repository の add(集約) があると、
+    Repository をコンストラクタで受け取るだけのクラスが EI_EXPOSE_REP2 になる。
+    Repository は DI で共有する Bean であり、受け取ったクラスの内部表現ではない。
+    Field の type は正規表現で照合できないため、Repository を持つフィールドの名前（orderRepository）で照合する。
+  -->
+  <Match>
+    <Bug pattern="EI_EXPOSE_REP2" />
+    <Field name="~.*Repository" />
+  </Match>
 </FindBugsFilter>
