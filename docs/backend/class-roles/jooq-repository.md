@@ -332,7 +332,8 @@ public long countUnshippedByCustomer(final CustomerId customerId) {
 - [ ] `update` は親と子の `LOCK_NO` を1加算し、UPDATE の条件の `LOCK_NO` と更新件数で競合を判定せず、jOOQ の楽観的ロックの機能を使わない。［自分で点検］
 - [ ] `add` と `update` で、UPSERT（`INSERT ... ON CONFLICT`）を使わない。［自分で点検］
 - [ ] `LOCK_NO` 以外の共通カラムは `CommonColumns` の `forInsert` と `forUpdate` で書き、`CREATED_*`、`UPDATED_*`、`PATCHED_*` の列を参照しない。［自分で点検］
-- [ ] Plain SQL と `withRenderSchema(false)` を使わない。［自分で点検］
+- [ ] `@PlainSQL` の付いた jOOQ の API を使わない。［ArchUnit で検査：DatabaseConventionsArchTest.plainSqlApisAreNotUsed］
+- [ ] `withRenderSchema(false)` を使わない。［ArchUnit で検査：DatabaseConventionsArchTest.renderSchemaIsNotChanged］
 - [ ] 変換で `Order.place`、業務規則、既定値、Mapper のクラス、次の ArchUnit の規則が検査しないリフレクションの対応づけを使わない。［自分で点検］
 - [ ] jOOQ の `into`、`intoMap`、`intoGroups`、`fetchMap`、`fetchGroups`、名前が `Into` で終わるメソッドを `Class` を渡して呼ばず、`Record` の `into(Object)` と `from(Object)`、`DSLContext.newRecord(Table, Object)` を呼ばない。［ArchUnit で検査：ClassRoleArchTest.jooqReflectionMappingIsNotUsed］
 - [ ] MapStruct、ModelMapper、Dozer、`DefaultRecordMapper`、`DefaultRecordUnmapper` に依存しない。［ArchUnit で検査：ClassRoleArchTest.mappingLibrariesAreNotUsed］

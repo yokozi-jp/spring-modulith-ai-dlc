@@ -160,11 +160,12 @@ Error ProneはすべてのJavaコンパイルで`JavaTimeDefaultTimeZone`と`Jav
 
 ## DB
 
-`DatabaseConventionsArchTest`は、次の内容を検査する。
+`DatabaseConventionsArchTest`は、次の規則を検査する。
+`Jooq<Aggregate>Repository`の作成時の点検は[jOOQのRepository](class-roles/jooq-repository.md)のチェックリストに示す。
 
-- Springの`@Transactional`をクラスまたはメソッドに付けるとき、`isolation`を指定しない。
-- `@PlainSQL`の付いたjOOQのAPIを呼び出さず、メソッド参照もしない。
-- `Settings.withRenderSchema`と`Settings.setRenderSchema`を呼び出さず、メソッド参照もしない。引数の値はバイトコードに残らないため、`withRenderSchema(false)`の禁止を呼び出しの禁止で近似する。
+- `transactionIsolationIsNotDeclared`：Springの`@Transactional`をクラスまたはメソッドに付けるとき、`isolation`を指定しない。
+- `plainSqlApisAreNotUsed`：`@PlainSQL`の付いたjOOQのAPIを呼び出さず、メソッド参照もしない。
+- `renderSchemaIsNotChanged`：`Settings.withRenderSchema`と`Settings.setRenderSchema`を呼び出さず、メソッド参照もしない。引数の値はバイトコードに残らないため、`withRenderSchema(false)`の禁止を呼び出しの禁止で近似する。
 
 DBの規約のほかの検査は`backend/src/test/java/com/example/demo/persistence/conventions/`に置く。
 
