@@ -17,6 +17,7 @@ backend/src/test/java/com/example/demo/architecture/
 ├── ApplicationModuleArchitectureTest.java
 ├── DateTimeConventionsArchTest.java
 ├── GeneralCodingRulesArchTest.java
+├── JooqCommonColumnsArchTest.java
 ├── PackageByFeatureOnionArchitectureTest.java
 ├── ProxyRulesArchTest.java
 └── TestConventionsArchTest.java
@@ -65,6 +66,13 @@ backend/src/test/java/com/example/demo/architecture/
 日時規約の決定は[ADR-006](../adr/ADR-006-utc-instant-absolute-time-policy.md)を参照する。
 
 Error ProneはすべてのJavaコンパイルで`JavaTimeDefaultTimeZone`と`JavaUtilDate`をerrorとして検査する。
+
+## 共通カラム
+
+`JooqCommonColumnsArchTest`は、jOOQの生成クラスの`CREATED_*`、`UPDATED_*`、`PATCHED_*`フィールドを参照するクラスが、`com.example.demo.shared.infrastructure.persistence`の外にないことを検査する。
+楽観的ロックで各モジュールが参照する`LOCK_NO`は対象外にする。
+生成したRecordのgetterは検査しない。
+共通カラムの扱いは[PostgreSQLの共通カラム](../database/postgresql-common-columns.md)、sharedモジュールの決定は[ADR-044](../adr/ADR-044-add-shared-module-for-jooq-common-code.md)を参照する。
 
 ## テストコード
 

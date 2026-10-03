@@ -32,6 +32,17 @@ jOOQの生成コードには適用しない。
 
 jOOQの楽観的ロックの機能を使わない規則は、[PostgreSQLの排他制御](postgresql-concurrency-control.md)に従う。
 
+## 共通処理
+
+共通カラムと楽観的ロックは、sharedモジュールの共通処理を使って実装する（[ADR-044](../adr/ADR-044-add-shared-module-for-jooq-common-code.md)）。
+
+- **INSERT**：`CommonColumns.forInsert(table, UseCase.class)`が返す共通カラムの値を、`set(...)`で登録する。
+- **UPDATE**：他の処理も更新しうる行は、`OptimisticLock.update(...)`で更新する。`SELECT ... FOR UPDATE NOWAIT`で行をロックしてから`lock_no`を比べ、一致すれば`lock_no`を1加算する。
+- **競合と未検出**：`lock_no`の不一致とロックの取得の失敗は409、行がない場合は404の応答になる。
+
+NOT NULLの`varchar`には、コード生成がNULLを空文字へそろえるConverterを当てる。
+文字列の共通カラムと`patched_*`には当てない（[PostgreSQLのデータ型](postgresql-data-types.md)）。
+
 ## 検査
 
 Plain SQLのAPIと`withRenderSchema(false)`の使用は、ArchUnitで検査する。
