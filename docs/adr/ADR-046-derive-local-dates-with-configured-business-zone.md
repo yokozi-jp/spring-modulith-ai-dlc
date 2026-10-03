@@ -54,7 +54,8 @@ YAMLのキーは、使うモジュールの設定の接頭辞に合わせる。
 ### Positive
 
 - UTCの日付を業務日付として使う誤りを、ビルドで検出できる。
-- 現在時刻を取る経路が注入`Clock`だけになり、テストの`Clock.fixed(...)`がすべての時刻取得に効く。
+- `java.time`の`now(...)`で現在時刻を取る経路が注入`Clock`だけになり、テストの`Clock.fixed(...)`がそれらの時刻取得に効く。
+  `java.time.chrono.Chronology.dateNow(...)`は名前が`now`ではないため、この規則では検出しない。
 
 ### Negative
 

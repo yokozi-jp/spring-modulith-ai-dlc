@@ -42,9 +42,9 @@ APIは絶対時刻をUTCで返し、フロントエンドが画面の要件に�
   地域タイムゾーン自体が業務データのときは、IANAタイムゾーンIDを別カラムに保存する。
 - PostgreSQLのアプリケーション接続とログはUTCへ固定する。
   これは主に表示とタイムゾーンなし入力の解釈に効く防御策であり、`TIMESTAMP WITH TIME ZONE`の保存がUTCになること自体はセッション設定に依存しない。
-- アプリケーション接続のセッションタイムゾーンは、`-Duser.timezone=UTC`で決まる。
-  PgJDBCが接続時にJVMの既定タイムゾーンを起動パラメータ`TimeZone`として送り、サーバーの設定値を上書きするためである（[pgjdbc#2927](https://github.com/pgjdbc/pgjdbc/issues/2927)）。
-  HikariCPの`connection-init-sql: SET TIME ZONE 'UTC'`は、新しい物理接続ごとに同じ値を設定し直す。
+- アプリケーション接続のセッションタイムゾーンは、JVMの設定と`connection-init-sql`の2段で決まる。
+  PgJDBCは接続時にJVMの既定タイムゾーン（`-Duser.timezone=UTC`）を起動パラメータ`TimeZone`として送り、サーバーの設定値を上書きする（[pgjdbc#2927](https://github.com/pgjdbc/pgjdbc/issues/2927)）。
+  その後、HikariCPの`connection-init-sql: SET TIME ZONE 'UTC'`が新しい物理接続ごとに実行され、JVMの設定にかかわらず実効値をUTCにする。
 - PostgreSQLサーバーの`timezone`と`log_timezone`のUTC指定は、残しておく防御策である。
   前者はpsqlのように`TimeZone`を送らないクライアントのセッションに効き、後者はサーバーログの時刻に効く（[PostgreSQL 18, Client Connection Defaults](https://www.postgresql.org/docs/18/runtime-config-client.html#GUC-TIMEZONE)）。
   DB統合テストの`SHOW TIME ZONE`は、これらを経た実効値を検証する。
@@ -52,7 +52,7 @@ APIは絶対時刻をUTCで返し、フロントエンドが画面の要件に�
 基準となる設定は次を参照する。
 
 - Spring Boot（Jackson、`connection-init-sql`）：[application.yaml](../../backend/src/main/resources/application.yaml)
-- JVM（`user.timezone`、アプリケーション接続のセッションタイムゾーンを決める）：コンテナは[Dockerfile](../../backend/Dockerfile)、`test`と`bootRun`は[build.gradle](../../backend/build.gradle)
+- JVM（`user.timezone`、PgJDBCが接続時に送るセッションタイムゾーン）：コンテナは[Dockerfile](../../backend/Dockerfile)、`test`と`bootRun`は[build.gradle](../../backend/build.gradle)
 - PostgreSQLサーバー（他のクライアントとログへの防御策）：[compose.yml](../../docker/compose.yml)
 - DBマイグレーション：[001-create-event-publication-tables.yaml](../../backend/src/main/resources/db/changelog/changesets/001-create-event-publication-tables.yaml)
 
