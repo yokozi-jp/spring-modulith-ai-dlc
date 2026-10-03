@@ -23,8 +23,10 @@ payload="$(cat 2>/dev/null || true)"
 [ -n "$payload" ] || exit 0
 command -v jq >/dev/null 2>&1 || exit 0
 
-tool_name="$(printf '%s' "$payload" | jq -r '.tool_name // empty' 2>/dev/null || true)"
-case "${tool_name,,}" in
+# Lowercase with tr, not ${var,,}: macOS ships bash 3.2, where ${var,,} is a
+# syntax error and the hook would fail without blocking.
+tool_name="$(printf '%s' "$payload" | jq -r '.tool_name // empty' 2>/dev/null | tr '[:upper:]' '[:lower:]' || true)"
+case "$tool_name" in
   *write* | *replace* | *append* | *delete* | *edit* | *create*) ;;
   *) exit 0 ;;
 esac
