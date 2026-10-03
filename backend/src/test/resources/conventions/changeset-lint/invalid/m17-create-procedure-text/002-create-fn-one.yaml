@@ -1,0 +1,10 @@
+databaseChangeLog:
+  - changeSet:
+      id: "002-create-fn-one"
+      author: system
+      changes:
+        - createProcedure:
+            procedureText: "CREATE FUNCTION item.fn_one() RETURNS integer LANGUAGE sql AS 'SELECT 1';"
+      rollback:
+        - sql:
+            sql: "DROP FUNCTION item.fn_one();"

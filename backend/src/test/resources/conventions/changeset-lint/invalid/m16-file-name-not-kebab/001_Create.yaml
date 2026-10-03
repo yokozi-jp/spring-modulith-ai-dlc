@@ -1,6 +1,6 @@
 databaseChangeLog:
   - changeSet:
-      id: 002-tag-schema-v1
+      id: "001_Create"
       author: system
       changes:
         - tagDatabase:

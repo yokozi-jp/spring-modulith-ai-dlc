@@ -1,0 +1,29 @@
+databaseChangeLog:
+  - changeSet:
+      id: "001-create-event-log"
+      author: system
+      changes:
+        - createTable:
+            tableName: event_log
+            schemaName: modulith
+            columns:
+              - column:
+                  name: id
+                  type: uuid
+                  constraints:
+                    primaryKey: true
+                    primaryKeyName: event_log_pkey
+              - column:
+                  name: payload
+                  type: text
+        - createIndex:
+            indexName: foo_idx
+            tableName: event_log
+            schemaName: modulith
+            columns:
+              - column:
+                  name: payload
+      rollback:
+        - dropTable:
+            tableName: event_log
+            schemaName: modulith

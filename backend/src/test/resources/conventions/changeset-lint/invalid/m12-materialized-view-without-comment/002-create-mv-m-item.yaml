@@ -1,0 +1,10 @@
+databaseChangeLog:
+  - changeSet:
+      id: "002-create-mv-m-item"
+      author: system
+      changes:
+        - sql:
+            sql: "CREATE MATERIALIZED VIEW item.mv_m_item AS SELECT item_id FROM item.m_item;"
+      rollback:
+        - sql:
+            sql: "DROP MATERIALIZED VIEW item.mv_m_item;"
