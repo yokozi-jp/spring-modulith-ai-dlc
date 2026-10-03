@@ -1,7 +1,7 @@
 ---
 type: Convention
 title: フロントエンドのルーティングと状態管理
-description: TanStack Router の route file の責務と形、認証が要る画面の layout、loader による server state の preload、状態表示の分担、状態の置き場所、custom Hook を作る条件を定める。route、loader、state、Hook を追加または変更するときに読む。
+description: TanStack Router の route file の責務と形、認証が要る画面の layout、loader による server state の preload、状態表示の分担、状態の置き場所、custom Hook を作る条件と名前、Effect の使いどころと検査を定める。route、loader、state、Hook、Effect を追加または変更するときに読む。
 tags: [convention, frontend, routing, state, react]
 ---
 
@@ -10,7 +10,7 @@ tags: [convention, frontend, routing, state, react]
 route file は URL と画面の接続だけを担当し、画面の実装は `features` に置く。
 初期描画に必要な server state は loader から TanStack Query へ preload する。
 状態は意味に対応する既存機構（React Hooks、TanStack Query、TanStack Router、TanStack Form）へ置き、global store を先に追加しない。
-custom Hook は具体的な用途名で表せる再利用または外部 system との同期がある場合だけ作る。
+custom Hook は具体的な用途名で表せる再利用または外部 system との同期がある場合だけ作り、Effect も外部 system との同期だけに使う。
 
 ## ルーティング
 
@@ -112,6 +112,48 @@ Hookはcomponentまたは別のcustom Hookのトップレベルから呼び、�
 
 React Compilerを有効にしているため、参照同一性が契約になる場合や計測で効果を確認した場合を除き、`useMemo` と `useCallback` を先回りして追加しない。
 
+### Effectの使いどころ
+
+Effectは、ブラウザAPI、第三者のwidget、購読など、Reactの外にあるsystemとcomponentを同期するときだけ使う。
+
+Effectはrenderの後に動くため、render中やevent handlerで済む処理をEffectに置くと、余分なrenderと古い値の表示が生じる。
+
+次の処理はEffectに書かない。
+
+- **propsやstateから計算できる値**：stateとEffectで持たず、render中に計算する。
+- **利用者の操作に応じた処理**：送信や通知は、その操作のevent handlerで行う。
+- **propが変わったときのstateの初期化**：Effectで戻さず、親から `key` を渡してcomponentを作り直す。
+- **Effectの連鎖**：あるEffectで更新したstateを別のEffectで受けて次のstateを更新せず、event handlerで次のstateをまとめて計算する。
+- **server stateの取得**：[ルーティング](#ルーティング)のとおり、loaderとTanStack Queryで取得する。
+
+Effectの中で最新のpropsやstateを読むが、その値の変化で同期をやり直さない場合は、依存配列から値を外さず `useEffectEvent` を使う。
+
+### Effectの検査
+
+上の処理の多くは `task fe-check` のOxlintと `task fe-doctor` のReact Doctorが検出し、どちらもCIで失敗する。
+
+- **propsやstateから計算できる値**：Oxlintの `react/no-deriving-state-in-effects` と `react/set-state-in-effect`、React Doctorの `react-doctor/no-derived-state` が検出する。
+- **利用者の操作に応じた処理**：React Doctorの `react-doctor/no-event-handler` が検出し、Effectで親のcallbackを呼ぶ形は `react-doctor/no-prop-callback-in-effect` も検出する。
+- **propが変わったときのstateの初期化**：Oxlintの `react/set-state-in-effect`、React Doctorの `react-doctor/no-reset-all-state-on-prop-change` と `react-doctor/no-adjust-state-on-prop-change` が検出する。
+- **Effectの連鎖**：Oxlintの `react/set-state-in-effect` とReact Doctorの `react-doctor/no-effect-chain` が検出する。
+- **server stateの取得**：`fetch` の直接の呼び出しはOxlintの `no-restricted-globals` が禁止し、React Doctorの `react-doctor/no-fetch-in-effect` も検出する。
+
+生成したAPI client関数をEffectから呼ぶ形はどちらも検出しないため、reviewで確認する。
+
+### Hookの名前とファイル
+
+`use` で始まる名前は、Hookを呼ぶ関数だけに付ける。
+
+Hookを呼ばない関数に `use` を付けると、Rules of Hooksの制約が呼び出し側にかかり、条件分岐の中から呼べなくなるためである。
+
+Hookを呼ぶのに `use` で始まらない関数は、Oxlintの `react/rules-of-hooks` とReact Doctorの `react-doctor/rules-of-hooks` が検出する。
+
+Hookを呼ばない関数に `use` を付ける形はどちらも検出しないため、reviewで確認する。
+
+Hookのファイル名は `use-media-query.ts` のようにHook名をkebab-caseにし、Oxlintの `unicorn/filename-case` が検査する。
+
+置き場所は[目標のディレクトリ構成](architecture.md#目標のディレクトリ構成)のとおり、custom Hookがあるfeatureの `hooks/` とする。
+
 ## 関連資料
 
 - [フロントエンドアーキテクチャ](architecture.md)
@@ -122,6 +164,10 @@ React Compilerを有効にしているため、参照同一性が契約になる
 - [ADR-032: Frontendを業務機能単位で構成する](../adr/ADR-032-organize-frontend-by-business-feature.md)
 - [React: Reusing Logic with Custom Hooks](https://react.dev/learn/reusing-logic-with-custom-hooks)
 - [React: Rules of Hooks](https://react.dev/reference/rules/rules-of-hooks)
+- [React: You Might Not Need an Effect](https://react.dev/learn/you-might-not-need-an-effect)
+- [React: Synchronizing with Effects](https://react.dev/learn/synchronizing-with-effects)
+- [React: Separating Events from Effects](https://react.dev/learn/separating-events-from-effects)
+- [React: useEffectEvent](https://react.dev/reference/react/useEffectEvent)
 - [TanStack Router: External Data Loading](https://tanstack.com/router/latest/docs/framework/react/guide/external-data-loading)
 - [TanStack Router: Authenticated Routes](https://tanstack.com/router/latest/docs/framework/react/guide/authenticated-routes)
 - [TanStack Router: Not Found Errors](https://tanstack.com/router/latest/docs/framework/react/guide/not-found-errors)
