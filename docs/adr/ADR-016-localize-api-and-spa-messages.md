@@ -47,7 +47,7 @@ Problem Details の `type`、`status` と拡張フィールド名はロケール
 応答には選択した locale の `Content-Language` と `Vary: Accept-Language` を付ける。
 
 SPA は React の i18n で最も広く使われている i18next と react-i18next を使う。
-文言は言語ごとの JSON resource に置き、既定言語の resource から message key と interpolation の型を導く。
+文言は言語ごとの JSON resource に置き、既定言語の resource から message key の型を導く。
 `navigator.languages` を優先順に解決し、language subtag が `ja` または `en` に一致しなければ日本語へ fallback する。
 i18next の `supportedLngs` による解決は完全一致する候補を優先順より先に選ぶため、言語の解決は自前の関数で行い、結果を i18next の `lng` へ渡す。
 同じ理由で、Cookie や localStorage を読み書きする `i18next-browser-languagedetector` は使わない。
