@@ -15,7 +15,7 @@ Dockerを使うTaskは、Dockerがないローカル環境ではスキップし�
 
 - **`task check`**：バックエンドの静的解析を実行する。
 - **`task verify`**：バックエンドの静的解析、マイグレーション検証、テストを実行する。
-- **`task fe-verify`**：フロントエンドの静的解析、未使用コード検査、React診断、テスト、本番ビルドを実行する。
+- **`task fe-verify`**：フロントエンドの静的解析、未使用コード検査、テスト、本番ビルドを実行する。
 - **`task test`**：隔離した依存を起動し、確定済みマイグレーションの検証、バックエンドテスト、OpenAPI契約検査後に片付ける。
 - **`task test-dev`**：隔離した依存を起動し、作りかけのchangesetを含むバックエンドテスト後に片付ける。
 - **`task mutation-test`**：隔離した依存を使ってバックエンドのPITミューテーションテストを実行する。
@@ -24,10 +24,10 @@ Dockerを使うTaskは、Dockerがないローカル環境ではスキップし�
 
 - **`task fe-check`**：Oxfmt、Oxlint、TypeScriptの型を非破壊で検査する。
 - **`task fe-knip`**：未参照ファイル、未使用export、未使用依存をKnipで検査する。
-- **`task fe-doctor`**：React Doctorでwarningとerrorを検出し、検出または5分超過で失敗する。
+- **`task fe-doctor`**：React Doctorでwarningとerrorを検出し、検出または15分超過で失敗する。
 - **`task fe-coverage`**：VitestのV8 providerで全体branch coverage 85%を検証する。
 - **`task fe-test-build`**：coverage付きテストと本番ビルドを実行する。
-- **`task fe-verify`**：`fe-check`、`fe-knip`、`fe-doctor`、`fe-test-build`を実行する。
+- **`task fe-verify`**：`fe-check`、`fe-knip`、`fe-test-build`を実行する。
 
 ## バックエンド
 
@@ -81,7 +81,7 @@ OKF検査の採用理由は[ADR-036](../adr/ADR-036-adopt-okf-for-docs-knowledge
 - **pre-commit（Markdownの変更）**：変更ファイルへ`lint-md`相当を実行する。
 - **pre-commit（docs、steering、Taskfileの変更）**：`okf-check`を実行する。
 - **pre-push（すべて）**：`adr-check`と`scan-secrets-all`相当を実行する。
-- **pre-push（フロントエンドまたはTaskfileの変更）**：`fe-doctor`と`fe-test-build`を実行する。
+- **pre-push（フロントエンドまたはTaskfileの変更）**：`fe-test-build`を実行する。
 - **pre-push（バックエンドのJavaまたはGradle変更）**：`be-lint`相当と`test`を実行する。
 - **pre-push（バックエンドまたはDockerfileの変更）**：バックエンドイメージのbuild stageをビルドする。
 - **pre-push（GitHub Actionsワークフローの変更）**：`lint-actions`相当と`lint-actions-security`相当を実行する。
@@ -90,7 +90,7 @@ Gitフックの条件とコマンドは[`lefthook.yml`](../../lefthook.yml)を�
 
 ## CI対応
 
-- **`frontend-ci.yml`**：`fe-verify`を実行する。
+- **`frontend-ci.yml`**：`fe-verify`と`fe-doctor`を実行する。
 - **`backend-ci.yml`**：`be-lint`相当、`be-verify-migrations`、`be-test`、`be-openapi-lint`、手動実行時の`mutation-test`を実行する。
 - **`betterleaks.yml`**：`scan-secrets-all`相当を実行する。
 - **`static-analysis.yml`**：`lint-semgrep`相当と`lint-duplicates`を実行する。

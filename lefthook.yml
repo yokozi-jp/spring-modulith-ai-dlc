@@ -157,17 +157,6 @@ pre-push:
         export PATH="$PATH:$HOME/go/bin"
         betterleaks git . --no-banner --redact --git-workers=16
 
-    # frontend に変更があるpushのとき、React固有の問題を診断する。
-    # 外部へのコード送信と依存情報照会を避けるため、telemetryとsupply-chain scanは無効化する。
-    - name: frontend-doctor
-      glob:
-        - "frontend/**"
-        - "Taskfile.yml"
-      run: |
-        echo "{push_files}" >/dev/null
-        task fe-doctor
-      fail_text: "React Doctorの診断に失敗しました。task fe-doctorで再実行してください。"
-
     # frontend に変更があるpushのとき、テストと本番ビルドを実行する。
     - name: frontend-test-build
       glob:

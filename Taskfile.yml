@@ -328,7 +328,7 @@ tasks:
     desc: React固有のwarningとerrorをReact Doctorで検出
     dir: frontend
     cmds:
-      - timeout 300s vp run react-doctor
+      - timeout 900s vp run react-doctor
 
   fe-knip:
     desc: フロントエンドの未参照ファイル、未使用export、未使用依存をKnipで検査
@@ -350,11 +350,10 @@ tasks:
       - vp run build
 
   fe-verify:
-    desc: フロントエンドの静的解析、未使用コード検査、React診断、テスト、ビルドを実行
+    desc: フロントエンドの静的解析、未使用コード検査、テスト、ビルドを実行
     cmds:
       - task: fe-check
       - task: fe-knip
-      - task: fe-doctor
       - task: fe-test-build
 
   lint-duplicates:

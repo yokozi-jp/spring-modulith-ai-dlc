@@ -117,6 +117,8 @@ export default defineConfig(({ mode }) => {
         // Oxfmtや型推論と役割が重複するか、可読性を下げる一律のstyle規則。
         "capitalized-comments": "off",
         "func-style": "off",
+        // react-i18next の慣用名である翻訳関数 t だけを短い識別子として許可する。
+        "id-length": ["error", { exceptions: ["t"] }],
         "max-lines-per-function": "off",
         "no-duplicate-imports": ["error", { allowSeparateTypeImports: true }],
         "no-magic-numbers": "off",

@@ -64,6 +64,8 @@ task lint-duplicates
 ```
 
 フロントエンドだけ、またはバックエンドだけを変更した場合は、変更していない領域のTaskを省く。
+React Doctorは実行に時間がかかるためpre-pushでは実行せず、Frontend CIで`task fe-doctor`を実行する。
+ローカルでReact固有の問題を診断するときは、`task fe-doctor`を手動で実行する。
 
 ## ミューテーションテストを実行するとき
 

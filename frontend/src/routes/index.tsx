@@ -1,30 +1,29 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 
 import { Button } from "@/components/ui/button";
-import { resolveMessages } from "@/i18n.ts";
 
 function HomePage() {
   const [count, setCount] = useState(0);
-  const { locale, messages } = resolveMessages(navigator.languages);
+  const { t } = useTranslation();
 
   useEffect(() => {
-    document.documentElement.lang = locale;
-    document.title = messages.title;
-  }, [locale, messages.title]);
+    document.title = t("title");
+  }, [t]);
 
   return (
     <main className="min-h-svh bg-background px-6 py-16 text-foreground sm:px-10">
       <div className="mx-auto flex w-full max-w-4xl flex-col gap-12">
         <section className="flex flex-col items-start gap-6" aria-labelledby="page-heading">
           <div className="rounded-full border bg-muted px-3 py-1 text-sm text-muted-foreground">
-            {messages.stack}
+            {t("stack")}
           </div>
           <div className="max-w-2xl space-y-3">
             <h1 id="page-heading" className="text-4xl font-semibold tracking-tight sm:text-5xl">
-              {messages.heading}
+              {t("heading")}
             </h1>
-            <p className="text-lg leading-8 text-muted-foreground">{messages.intro}</p>
+            <p className="text-lg leading-8 text-muted-foreground">{t("intro")}</p>
           </div>
           <Button
             type="button"
@@ -33,16 +32,14 @@ function HomePage() {
               setCount((value) => value + 1);
             }}
           >
-            {messages.count(count)}
+            {t("count", { count })}
           </Button>
         </section>
 
         <div className="grid gap-6 md:grid-cols-2">
           <section className="rounded-xl border bg-card p-6 text-card-foreground shadow-sm">
-            <h2 className="text-xl font-semibold">{messages.documentationHeading}</h2>
-            <p className="mt-2 text-sm leading-6 text-muted-foreground">
-              {messages.documentationLead}
-            </p>
+            <h2 className="text-xl font-semibold">{t("documentationHeading")}</h2>
+            <p className="mt-2 text-sm leading-6 text-muted-foreground">{t("documentationLead")}</p>
             <ul className="mt-6 space-y-3">
               <li>
                 <a
@@ -51,7 +48,7 @@ function HomePage() {
                   target="_blank"
                   rel="noopener noreferrer"
                 >
-                  {messages.exploreVite}
+                  {t("exploreVite")}
                 </a>
               </li>
               <li>
@@ -61,15 +58,15 @@ function HomePage() {
                   target="_blank"
                   rel="noopener noreferrer"
                 >
-                  {messages.learnTypeScript}
+                  {t("learnTypeScript")}
                 </a>
               </li>
             </ul>
           </section>
 
           <section className="rounded-xl border bg-card p-6 text-card-foreground shadow-sm">
-            <h2 className="text-xl font-semibold">{messages.communityHeading}</h2>
-            <p className="mt-2 text-sm leading-6 text-muted-foreground">{messages.communityLead}</p>
+            <h2 className="text-xl font-semibold">{t("communityHeading")}</h2>
+            <p className="mt-2 text-sm leading-6 text-muted-foreground">{t("communityLead")}</p>
             <ul className="mt-6 space-y-3">
               <li>
                 <a
@@ -78,7 +75,7 @@ function HomePage() {
                   target="_blank"
                   rel="noopener noreferrer"
                 >
-                  {messages.github}
+                  {t("github")}
                 </a>
               </li>
               <li>
@@ -88,7 +85,7 @@ function HomePage() {
                   target="_blank"
                   rel="noopener noreferrer"
                 >
-                  {messages.discord}
+                  {t("discord")}
                 </a>
               </li>
             </ul>
