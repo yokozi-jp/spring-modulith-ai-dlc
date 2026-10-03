@@ -70,3 +70,4 @@ Accepted
 - [日時とタイムゾーンの規約](../datetime/timezone-conventions.md)
 - `backend/src/test/java/com/example/demo/architecture/DateTimeConventionsArchTest.java`
 - `backend/build.gradle`（Error Prone 設定）
+- [ADR-044: 絶対時刻の保持精度をマイクロ秒にそろえる](ADR-044-store-absolute-time-at-microsecond-precision.md)

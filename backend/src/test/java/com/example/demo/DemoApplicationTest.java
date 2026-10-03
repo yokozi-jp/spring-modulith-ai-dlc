@@ -163,9 +163,10 @@ class DemoApplicationTest {
   }
 
   @Test
-  @DisplayName("アプリケーション Clock は UTC 固定である")
+  @DisplayName("アプリケーション Clock は UTC 固定でマイクロ秒単位である")
   void applicationClockUsesUtc() {
     assertEquals(ZoneOffset.UTC, clock.getZone(), "アプリケーション Clock は UTC 固定であること");
+    assertEquals(0, clock.instant().getNano() % 1_000, "アプリケーション Clock はマイクロ秒単位の値を返すこと");
   }
 
   @Test
