@@ -191,13 +191,17 @@ class DemoApplicationTest {
             "statement_timeout", "DB_STATEMENT_TIMEOUT_MS",
             "idle_in_transaction_session_timeout", "DB_IDLE_IN_TRANSACTION_TIMEOUT_MS");
     settings.forEach(
-        (name, environmentVariable) ->
-            // SHOW は 1000 を 1s のように単位付きで返すため、同じ値をミリ秒の数値で返す pg_settings を読む。
-            assertEquals(
-                applicationContext.getEnvironment().getRequiredProperty(environmentVariable),
-                jdbcTemplate.queryForObject(
-                    "SELECT setting FROM pg_settings WHERE name = ?", String.class, name),
-                () -> "DB セッションの " + name + " が " + environmentVariable + " と一致すること"));
+        (name, environmentVariable) -> {
+          final String shown = jdbcTemplate.queryForObject("SHOW " + name, String.class);
+          // SHOW は 1000 を 1s のように単位付きで返すため、interval に変換してミリ秒で比べる。
+          assertEquals(
+              applicationContext.getEnvironment().getRequiredProperty(environmentVariable),
+              jdbcTemplate.queryForObject(
+                  "SELECT (EXTRACT(EPOCH FROM CAST(? AS interval)) * 1000)::bigint::text",
+                  String.class,
+                  shown),
+              () -> "DB セッションの " + name + " (" + shown + ") が " + environmentVariable + " と一致すること");
+        });
     final long lockTimeout =
         applicationContext.getEnvironment().getRequiredProperty("DB_LOCK_TIMEOUT_MS", Long.class);
     final long statementTimeout =
