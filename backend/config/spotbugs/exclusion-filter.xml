@@ -4,6 +4,11 @@
   <Match>
     <Bug pattern="CT_CONSTRUCTOR_THROW" />
   </Match>
+  <!-- DSLContext は Spring が共有する jOOQ の Bean であり、注入して保持するのが正当なパターン -->
+  <Match>
+    <Bug pattern="EI_EXPOSE_REP2" />
+    <Field type="org.jooq.DSLContext" />
+  </Match>
   <!--
     SpotBugs は add で始まるメソッドを持つ型を変更可能とみなすため、Repository の add(集約) があると、
     Repository をコンストラクタで受け取るだけのクラスが EI_EXPOSE_REP2 になる。
