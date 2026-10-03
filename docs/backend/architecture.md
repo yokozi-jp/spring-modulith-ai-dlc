@@ -198,11 +198,6 @@ CommandHandler は `application` にあるため、他モジュールから呼�
 複数の機能で似た処理が要るときも、処理は各機能内に置く。
 例外は、「共有モジュール shared」に示す jOOQ の共通処理だけである。
 
-例外として、`com.example.demo.shared` を Spring Modulith の shared モジュールにする（[ADR-048](../adr/ADR-048-add-shared-module-for-jooq-common-code.md)）。
-shared モジュールには永続化の技術的な共通処理だけを置き、業務の概念を置かない。
-共通処理は `shared.infrastructure.persistence` に置き、`@NamedInterface` で公開する。
-これを使うのは、他のモジュールの `infrastructure.persistence` のアダプターだけとする。
-
 ## 関連資料
 
 - [ADR-002: package by feature とオニオンアーキテクチャ](../adr/ADR-002-package-by-feature-onion-architecture.md)

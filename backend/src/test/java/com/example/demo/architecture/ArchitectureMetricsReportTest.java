@@ -37,17 +37,11 @@ class ArchitectureMetricsReportTest {
   /** アーキテクチャ指標レポートの出力先。 */
   private static final Path REPORT_PATH = REPORT_DIRECTORY.resolve("architecture-metrics.txt");
 
-  /**
-   * 正規化累積コンポーネント依存の上限。現在の CCD 6 と、均衡二分木の CCD 5 の比を基準とする。
-   *
-   * <p>理想値ではなく現在の計測値であり、増える変更を検知するための歯止めとする。上限を再び上げるときは、理由を PR に書く。
-   */
-  // ponytail: shared と error の連鎖があるため、機能モジュールを足すと NCCD は 1.0 を超えて増える。
-  // 最初の業務モジュールを追加するときに、モジュールごとの規則か別の正規化へ検査を見直す。
-  private static final double MAX_NORMALIZED_CUMULATIVE_COMPONENT_DEPENDENCY = 6.0D / 5.0D;
+  /** 均衡二分木を基準とした正規化累積コンポーネント依存の上限。 */
+  private static final double MAX_NORMALIZED_CUMULATIVE_COMPONENT_DEPENDENCY = 1.0D;
 
-  /** 現在の外部可視型数 9、全型数 14 を基準とする global relative visibility の上限。 */
-  private static final double MAX_GLOBAL_RELATIVE_VISIBILITY = 9.0D / 14.0D;
+  /** 現在の外部可視型数 7、全型数 12 を基準とする global relative visibility の上限。 */
+  private static final double MAX_GLOBAL_RELATIVE_VISIBILITY = 7.0D / 12.0D;
 
   /** Lakos、コンポーネント依存、可視性の各指標を計算してレポートへ保存する。 */
   @Test
@@ -83,7 +77,7 @@ class ArchitectureMetricsReportTest {
     assertThat(Files.readString(REPORT_PATH, StandardCharsets.UTF_8))
         .contains("Architecture Metrics", "component=bootstrap", "CCD=", "GRV=");
     assertThat(lakosMetrics.getNormalizedCumulativeComponentDependency())
-        .as("NCCD は現在の計測値の上限 %s 以下", MAX_NORMALIZED_CUMULATIVE_COMPONENT_DEPENDENCY)
+        .as("NCCD は均衡二分木を基準とする上限 %s 以下", MAX_NORMALIZED_CUMULATIVE_COMPONENT_DEPENDENCY)
         .isLessThanOrEqualTo(MAX_NORMALIZED_CUMULATIVE_COMPONENT_DEPENDENCY);
     // ponytail: GRV は component 間の増減を相殺できる。必要になったら module ごとの公開 API 規則へ置き換える。
     assertThat(visibilityMetrics.getGlobalRelativeVisibility())
