@@ -24,7 +24,10 @@ import com.tngtech.archunit.lang.SimpleConditionEvent;
 import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
+import org.jooq.DSLContext;
+import org.jooq.Record;
 import org.jooq.impl.DefaultRecordMapper;
+import org.jooq.impl.DefaultRecordUnmapper;
 import org.springframework.modulith.events.ApplicationModuleListener;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -168,28 +171,36 @@ class ClassRoleArchTest {
                       "org.modelmapper..",
                       "com.github.dozermapper..",
                       "org.dozer..")
-                  .or(type(DefaultRecordMapper.class)))
+                  .or(type(DefaultRecordMapper.class))
+                  .or(type(DefaultRecordUnmapper.class)))
           .because(
               "jOOQ と集約の変換は Jooq<Aggregate>Repository に convertFrom、multiset、Records.mapping で書き、"
                   + "列の数と型をコンパイルで検査する。");
 
-  /** jOOQ の {@code into(Class)} と {@code *Into(Class)} による、名前のリフレクションでの対応づけを禁止する。 */
+  /**
+   * 名前のリフレクションで対応づける jOOQ のメソッドの名前のうち、{@code Class} を受け取るときだけ禁止するもの（ほかに名前が {@code Into}
+   * で終わるメソッド）。{@code intoArray}、{@code intoSet}、{@code fetch(Field, Class)} は列の型の変換なので含めない。
+   */
+  private static final Set<String> JOOQ_CLASS_MAPPING_METHODS =
+      Set.of("into", "intoMap", "intoGroups", "fetchMap", "fetchGroups");
+
+  /** 名前のリフレクションで対応づける jOOQ のメソッドのうち、{@code Object} を受け取るときに禁止するもの。 */
+  private static final Set<String> JOOQ_OBJECT_MAPPING_METHODS =
+      Set.of("into", "from", "newRecord");
+
+  /** jOOQ の、名前のリフレクションでの読み書きの対応づけを禁止する。 */
   @ArchTest
   /* package */ static final ArchRule jooqReflectionMappingIsNotUsed =
       noClasses()
           .should()
           .callMethodWhere(
               DescribedPredicate.describe(
-                  "jOOQ の into(Class) か *Into(Class)",
-                  (JavaMethodCall call) ->
-                      resideInAnyPackage("org.jooq..", BASE_PACKAGE + ".jooq..")
-                              .test(call.getTargetOwner())
-                          && ("into".equals(call.getName()) || call.getName().endsWith("Into"))
-                          && call.getTarget().getRawParameterTypes().stream()
-                              .anyMatch(parameter -> parameter.isEquivalentTo(Class.class))))
+                  "jOOQ の into、intoMap、intoGroups、fetchMap、fetchGroups、*Into の Class を受け取る呼び出しか、"
+                      + "Record の into(Object)、from(Object)、DSLContext の newRecord(Table, Object)",
+                  ClassRoleArchTest::isJooqReflectionMapping))
           .because(
-              "into(Class)、fetchInto(Class)、fetchOneInto(Class) などを、"
-                  + "convertFrom と fetch(Records.mapping(<Aggregate>::restore)) に置き換える。");
+              "into(Class)、fetchInto(Class)、fetchMap(Field, Class)、from(Object) などを、"
+                  + "convertFrom、fetch(Records.mapping(<Aggregate>::restore))、set(列, 値) に置き換える。");
 
   /** モジュールルートの型を record、enum、{@code *Queries} interface に限る規則を組み立てる。 */
   /* package */ static ArchRule moduleRootTypesAreRecordsEnumsOrQueriesRule(
@@ -343,6 +354,24 @@ class ClassRoleArchTest {
         .tryGetAnnotationOfType(Transactional.class)
         .map(Transactional::readOnly)
         .orElse(false);
+  }
+
+  /** 呼び出しが、名前のリフレクションで列と項目を対応づける jOOQ のメソッドかを返す。 */
+  private static boolean isJooqReflectionMapping(final JavaMethodCall call) {
+    final JavaClass owner = call.getTargetOwner();
+    if (!resideInAnyPackage("org.jooq..", BASE_PACKAGE + ".jooq..").test(owner)) {
+      return false;
+    }
+    final String name = call.getName();
+    final List<JavaClass> parameters = call.getTarget().getRawParameterTypes();
+    final boolean takesClass =
+        parameters.stream().anyMatch(parameter -> parameter.isEquivalentTo(Class.class));
+    final boolean takesObject =
+        parameters.stream().anyMatch(parameter -> parameter.isEquivalentTo(Object.class));
+    return takesClass && (JOOQ_CLASS_MAPPING_METHODS.contains(name) || name.endsWith("Into"))
+        || takesObject
+            && JOOQ_OBJECT_MAPPING_METHODS.contains(name)
+            && (owner.isAssignableTo(Record.class) || owner.isAssignableTo(DSLContext.class));
   }
 
   /** 合成メソッドとブリッジメソッドを除いた、クラス自身が宣言する public メソッドを返す。 */

@@ -13,6 +13,7 @@ import org.jooq.Field;
 import org.jooq.Record;
 import org.jooq.Record1;
 import org.jooq.Records;
+import org.jooq.Result;
 import org.jooq.Table;
 import org.jooq.impl.DSL;
 import org.junit.jupiter.api.DisplayName;
@@ -170,12 +171,23 @@ class ArchitectureRuleFixtureTest {
             "mappingLibrariesAreNotUsed",
             ClassRoleArchTest.mappingLibrariesAreNotUsed,
             REFLECTIVE_READER + ".defaultRecordMapper("),
+        row(
+            "mappingLibrariesAreNotUsed: DefaultRecordUnmapper",
+            ClassRoleArchTest.mappingLibrariesAreNotUsed,
+            REFLECTIVE_READER + ".defaultRecordUnmapper("),
         reflectionRow("recordInto"),
         reflectionRow("resultInto"),
         reflectionRow("fetchInto"),
         reflectionRow("fetchOneInto"),
         reflectionRow("fetchOptionalInto"),
-        reflectionRow("fetchSingleInto"));
+        reflectionRow("fetchSingleInto"),
+        reflectionRow("intoMap"),
+        reflectionRow("intoGroups"),
+        reflectionRow("fetchMap"),
+        reflectionRow("fetchGroups"),
+        reflectionRow("recordIntoObject"),
+        reflectionRow("recordFrom"),
+        reflectionRow("newRecordFromObject"));
   }
 
   /** {@code jooqReflectionMappingIsNotUsed} が、違反フィクスチャの同名のメソッドの呼び出しを検出することを確かめる行を作る。 */
@@ -198,7 +210,8 @@ class ArchitectureRuleFixtureTest {
   }
 
   /**
-   * 対応づけの禁止規則が許す jOOQ の呼び出し（convertFrom、Records.mapping、into(Table)、fetch(RecordMapper)）を持つフィクスチャ。
+   * 対応づけの禁止規則が許す jOOQ
+   * の呼び出し（convertFrom、Records.mapping、into(Table)、fetch(RecordMapper)、列の型の変換）を持つフィクスチャ。
    */
   /* package */ static final class TypeSafeJooqMapping {
 
@@ -220,6 +233,15 @@ class ArchitectureRuleFixtureTest {
               .from(ORDERS)
               .fetch(Record1::value1),
           row.into(ORDERS));
+    }
+
+    /** 列の型を {@code Class} で変換する呼び出しと、Object を受け取らない {@code newRecord} を使う。 */
+    /* package */ static List<Object> convert(final DSLContext dsl, final Result<Record> rows) {
+      return List.of(
+          rows.intoArray(ORDER_ID, String.class),
+          rows.intoSet(ORDER_ID, String.class),
+          dsl.selectFrom(ORDERS).fetch(ORDER_ID, String.class),
+          dsl.newRecord(ORDERS));
     }
   }
 

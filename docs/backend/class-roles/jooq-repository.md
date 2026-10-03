@@ -202,7 +202,7 @@ public long countUnshippedByCustomer(final CustomerId customerId) {
 - 集約を作るときに `Order.place` を使う。
   保存済みの状態と割引額が、受付の初期値に戻る。
 - 変換の中で、業務規則を判定する、または既定値を補う。
-- `into(Class)`、`fetchInto(Class)`、`DefaultRecordMapper`、ModelMapper、Dozer で、列と項目を名前のリフレクションで対応づける。
+- `into(Class)`、`fetchInto(Class)`、`fetchMap(Field, Class)`、`from(Object)`、`DefaultRecordMapper`、ModelMapper、Dozer で、列と項目を名前のリフレクションで対応づける。
   列や項目の名前を変えたときの誤りが、コンパイルで見つからない。
 - 変換を別の Mapper のクラスや MapStruct に切り出す。
 - jOOQ のコード生成の `forcedTypes` と `Converter` で、列を Domain の値オブジェクトに対応づける。
@@ -226,9 +226,9 @@ public long countUnshippedByCustomer(final CustomerId customerId) {
 - [ ] 子の Entity を `multiset` で集約ルートと同じ SQL で読み、集約を `Records.mapping(Order::restore)` で作る。［自分で点検］
 - [ ] `multiset` の副問い合わせに、子を識別する列の `orderBy` を付ける（`orderBy(ORDER_LINES.LINE_NUMBER)`）。［自分で点検］
 - [ ] 書き込みは `set(列, 値)` で全列を書き、子の行を `valuesOfRows` の INSERT 一つで書く。［自分で点検］
-- [ ] 変換で `Order.place`、業務規則、既定値、Mapper のクラスを使わない。［自分で点検］
-- [ ] `into(Class)`、`fetchInto(Class)` のように `Class` を受け取る jOOQ の対応づけを呼ばない。［ArchUnit で検査：ClassRoleArchTest.jooqReflectionMappingIsNotUsed］
-- [ ] MapStruct、ModelMapper、Dozer、`DefaultRecordMapper` に依存しない。［ArchUnit で検査：ClassRoleArchTest.mappingLibrariesAreNotUsed］
+- [ ] 変換で `Order.place`、業務規則、既定値、Mapper のクラス、次の ArchUnit の規則が検査しないリフレクションの対応づけを使わない。［自分で点検］
+- [ ] jOOQ の `into`、`intoMap`、`intoGroups`、`fetchMap`、`fetchGroups`、名前が `Into` で終わるメソッドを `Class` を渡して呼ばず、`Record` の `into(Object)` と `from(Object)`、`DSLContext.newRecord(Table, Object)` を呼ばない。［ArchUnit で検査：ClassRoleArchTest.jooqReflectionMappingIsNotUsed］
+- [ ] MapStruct、ModelMapper、Dozer、`DefaultRecordMapper`、`DefaultRecordUnmapper` に依存しない。［ArchUnit で検査：ClassRoleArchTest.mappingLibrariesAreNotUsed］
 - [ ] クラス、フィールド、コンストラクタに Javadoc を書く。［自分で点検］
 - [ ] `@DatabaseTest` で保存と読み戻しを確かめる。［自分で点検］
 - [ ] `infrastructure.persistence` のパッケージに `@NullMarked` の `package-info.java` を置く。［Error Prone で検査：RequireExplicitNullMarking］
