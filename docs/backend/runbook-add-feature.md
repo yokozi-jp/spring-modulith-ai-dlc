@@ -21,7 +21,7 @@ tags: [runbook, backend, spring-modulith]
 4. 集約にも値オブジェクトにも置けない業務規則を、`domain.service` の Domain Service に置く。
 5. `application` に、状態を変えるユースケースごとの `<UseCase>Command`、`<UseCase>CommandHandler`、`<UseCase>Result` と、`<Feature>QueryService` を置く。他モジュールのイベントを受けるときは、`<Event>Listener` も置く。
 6. `presentation.web` に `<Aggregate>Controller`、`<UseCase>Request`、`<QueryResult>Response` を置く。
-7. `infrastructure.persistence` に `Jooq<Aggregate>Repository` と `<Aggregate>RecordMapper` を、`infrastructure.client` に `<ExternalSystem>Client` を置く。
+7. `infrastructure.persistence` に `Jooq<Aggregate>Repository` を、`infrastructure.client` に `<ExternalSystem>Client` を置く。
 8. 作成した各 Java パッケージへ `@NullMarked` の `package-info.java` を追加する。
 9. アーキテクチャテストと対象機能のテストを実行する。
 

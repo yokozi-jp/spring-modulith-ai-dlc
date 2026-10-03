@@ -74,8 +74,7 @@ backend/src/main/java/com/example/demo/
     └── infrastructure/
         ├── persistence/
         │   ├── package-info.java
-        │   ├── Jooq<Aggregate>Repository.java
-        │   └── <Aggregate>RecordMapper.java
+        │   └── Jooq<Aggregate>Repository.java
         └── client/
             ├── package-info.java
             └── <ExternalSystem>Client.java
@@ -105,7 +104,6 @@ backend/src/main/java/com/example/demo/
 - **`<UseCase>Request`**：[Request](class-roles/request.md)
 - **`<QueryResult>Response`**：[Response](class-roles/response.md)
 - **`Jooq<Aggregate>Repository`**：[jOOQ の Repository](class-roles/jooq-repository.md)
-- **`<Aggregate>RecordMapper`**：[RecordMapper](class-roles/record-mapper.md)
 - **`<ExternalSystem>Client`**：[外部システムの Client](class-roles/external-client.md)
 
 空のパッケージは、そのパッケージの最初のクラスより先に作らない。

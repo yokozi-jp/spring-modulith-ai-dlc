@@ -93,7 +93,7 @@ public interface OrderRepository {
 // com.example.demo.order.infrastructure.persistence.JooqOrderRepository（宣言だけ）
 @Repository
 class JooqOrderRepository implements OrderRepository {
-  // DSLContext を受け取り、OrderRecordMapper で jOOQ の Record と Order を変換する。
+  // DSLContext を受け取り、jOOQ の列と Order の変換もこのクラスに書く。
 }
 ```
 
@@ -101,7 +101,7 @@ class JooqOrderRepository implements OrderRepository {
 
 インタフェース自体の専用のテストは作らない。
 実装の `JooqOrderRepository` を `@DatabaseTest` で、保存してから読み戻す往復で確かめる。
-Record の変換を担う `OrderRecordMapper` の専用のテストは作らず、この往復で確かめる。
+jOOQ の列と集約の変換も、この往復で確かめる。
 テストは実装と同じ `com.example.demo.order.infrastructure.persistence` パッケージのテストソースに置く。
 
 ```java

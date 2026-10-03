@@ -71,7 +71,9 @@ Proposed
 - 作成の成功は 201 と、作成したリソースの URI を示す `Location` で返す。`POST` の対象 URI はコレクションなので、`Location` がないと作成したリソースを示せない（[RFC 9110 15.3.2](https://www.rfc-editor.org/rfc/rfc9110#section-15.3.2)）。Spring では `ResponseEntity.created(URI)` と `ServletUriComponentsBuilder` で組み立てる（[Javadoc: ResponseEntity](https://docs.spring.io/spring-framework/docs/current/javadoc-api/org/springframework/http/ResponseEntity.html)、[Spring, URI Links](https://docs.spring.io/spring-framework/reference/web/webmvc/mvc-uri-building.html)）。
 - Request から Command への変換は Request のインスタンスメソッド `toCommand()` に、ルートの record から Response への変換は Response の static メソッド `from(...)` に置き、`presentation.web` に Mapper クラスを作らない。
 - Presentation は Domain に依存せず、Application の Command、Result、CommandHandler と、ルートの Queries と record だけを使う。
-- Repository の実装は `infrastructure.persistence` の `Jooq<Aggregate>Repository` とし、jOOQ の生成型と Domain の型の変換は `<Aggregate>RecordMapper` に置く。
+- Repository の実装は `infrastructure.persistence` の `Jooq<Aggregate>Repository` とし、jOOQ の生成型と Domain の型の変換もこのクラスに書く。変換のための Mapper のクラスは作らない。
+- 読み取りは、`select` に並べた列を `Field.convertFrom` で値オブジェクトと enum に変え、子の Entity を `multiset` の副問い合わせで同じ SQL で読み、`Records.mapping(Order::restore)` で集約にする（[jOOQ, Ad-hoc converters](https://www.jooq.org/doc/latest/manual/sql-execution/fetching/ad-hoc-converter/)、[jOOQ, The MULTISET value constructor](https://www.jooq.org/doc/latest/manual/sql-building/column-expressions/multiset-value-constructor/)）。jOOQ の作者も、一対多の対応づけにこの形を示している（[Stack Overflow, Mapping a one-to-many relationship to a list of records in jOOQ](https://stackoverflow.com/a/71855430/521799)）。列の数や型が `restore` や Entity のコンストラクタの引数と合わないと、コンパイルが失敗する。
+- 書き込みは、`insertInto` の `set(列, 値)` で全列を書く。
 - 外部システムのインタフェースの実装は `infrastructure.client` の `<ExternalSystem>Client` とする。
 - Infrastructure は、機能モジュールの型のうち同じモジュールの `domain.model` の型だけを使い、Application、Domain Service、モジュールルートの型に依存しない。
 
@@ -94,6 +96,7 @@ Proposed
 - クラス名の接尾辞（`CommandHandler`、`QueryService`、`Listener`）だけで、更新、参照、イベント受信のどれかが分かる。`Service` の名前の衝突もなくなる。
 - 役割ごとに形が一つなので、AI エージェントが例を写して新しいクラスを作るときに、判断の分岐が残らない。
 - 規則の大半を ArchUnit と Spring Modulith で検査でき、レビューで見る項目が減る。
+- jOOQ と集約の変換では、列の名前の変更と、列と引数の数や型の食い違いがコンパイルで見つかる。変換が Repository の中にあるため、`infrastructure.persistence` に置くクラスは集約ごとに一つで済む。
 - トランザクション境界が Application の `handle`、QueryService の public メソッド、Listener の `on` に集まる。
 - モジュール間で同期の状態変更が起きないため、モジュールごとの統合テスト（`@ApplicationModuleTest`）が成り立つ。
 
@@ -103,6 +106,8 @@ Proposed
 - Command と Result を返す値がなくても作るため、中身の少ない record が増える。
 - 参照も Repository を通すため、一覧や集計で集約全体を読む無駄が出ることがある。画面ごとの最適な SQL は書けない。
 - Domain Service のソースに `import org.springframework.stereotype.Service` が入り、Domain が Spring から完全には独立しない。
+- PostgreSQL には MULTISET がなく、jOOQ は JSON の集約で模倣する。子の行が数千に及ぶ集約では、二つの SQL に分けて読むほうが速いことがある。規約は `multiset` に固定し、作業者は二つの SQL に分ける前に実装を止めて利用者に確認する。
+- `Jooq<Aggregate>Repository` は変換を含むため、Mapper のクラスに分けた場合より長くなる。
 - 他モジュールの状態を同期で変える設計は、ADR を経ない限り選べない。
 
 ### Neutral
@@ -173,6 +178,30 @@ Proposed
 - **Pros**：機能ごとの応答のクラスが少なくて済む。
 - **Cons**：「分けてもよい」は、分けるかどうかの判断を作業者に残す条件付きの規則になる。ルートの参照の結果（`OrderDetails`、`OrderSummary`）ごとに `<QueryResult>Response` を一つ作れば、名前と変換元が一つに決まり、`from(...)` の引数の型も一つになる。
 
+### 選択肢11: jOOQ の Record と集約の変換を専用の Mapper のクラスに分ける
+
+- **Description**：`infrastructure.persistence` に static メソッドだけを持つ集約ごとの Mapper のクラスを置き、`selectFrom` で読んだ `OrdersRecord` の getter から集約を組み立て、集約から `OrdersRecord` を作る。
+- **Pros**：Repository が SQL だけになり、短くなる。
+- **Cons**：子の行を別の SQL で読んで集約ごとに分ける処理は Repository に残り、一つの集約の変換が二つのクラスに分かれる。`convertFrom`、`multiset`、`Records.mapping` を使えば、変換は `select` に並べる列の中に収まり、別のクラスに分ける中身が残らない。役割とクラスが集約ごとに一つずつ増えるだけである。
+
+### 選択肢12: MapStruct で変換する
+
+- **Description**：MapStruct の `@Mapper` インタフェースから、ビルド時に変換のクラスを生成する（[MapStruct](https://mapstruct.org/)）。
+- **Pros**：リフレクションを使わず、生成されたコードで変換する。
+- **Cons**：アノテーションプロセッサがビルドに一つ増える。値オブジェクトへの包み直しや `Order.restore` のようなファクトリメソッドは、結局手書きのメソッドで補う必要がある。Presentation の変換は `toCommand()` と `from(...)` の一行で足り、MapStruct が要る場所がない。
+
+### 選択肢13: jOOQ のコード生成の `forcedTypes` と `Converter` で値オブジェクトに対応づける
+
+- **Description**：コード生成の設定で、`ORDERS.ORDER_ID` などの列を `Converter` で `OrderId` などの値オブジェクトの型にして生成する（[jOOQ, Forced types](https://www.jooq.org/doc/latest/manual/code-generation/codegen-advanced/codegen-config-database/codegen-database-forced-types/)）。
+- **Pros**：生成型の列が最初から値オブジェクトの型になり、クエリごとの `convertFrom` が要らない。
+- **Cons**：共有の生成パッケージ `com.example.demo.jooq` が、各モジュールの内部パッケージ `domain.model` の型に依存し、モジュールの境界をまたぐ。ArchUnit の規則は生成型が Domain に依存しない向きを前提にしており、生成コードを検査対象から外しているため、この依存は規則でも見つからない。
+
+### 選択肢14: リフレクションで列と項目を対応づける
+
+- **Description**：jOOQ の `into(Class)`、`fetchInto(Class)`（内部は `DefaultRecordMapper`）や、ModelMapper、Dozer で、列と項目を名前で自動で対応づける。
+- **Pros**：変換のコードを書かずに済む。
+- **Cons**：列や項目の名前を変えたときの誤りがコンパイルで見つからず、実行時に値が欠けるか例外になる。jOOQ のマニュアルも、`Records.mapping` の形は型を検査し、リフレクションの形は型を強く検査しないと区別している（[jOOQ, Ad-hoc converters](https://www.jooq.org/doc/latest/manual/sql-execution/fetching/ad-hoc-converter/)）。
+
 ## References
 
 - [Eric Evans, Domain-Driven Design Reference](https://www.domainlanguage.com/wp-content/uploads/2016/05/DDD_Reference_2015-03.pdf)
@@ -211,5 +240,10 @@ Proposed
 - [Oliver Drotbohm, spring-restbucks](https://github.com/odrotbohm/spring-restbucks)
 - [jMolecules](https://github.com/xmolecules/jmolecules)
 - [jMolecules Technology Integrations](https://github.com/xmolecules/jmolecules-integrations)
+- [jOOQ, Ad-hoc converters](https://www.jooq.org/doc/latest/manual/sql-execution/fetching/ad-hoc-converter/)
+- [jOOQ, The MULTISET value constructor](https://www.jooq.org/doc/latest/manual/sql-building/column-expressions/multiset-value-constructor/)
+- [jOOQ, Forced types](https://www.jooq.org/doc/latest/manual/code-generation/codegen-advanced/codegen-config-database/codegen-database-forced-types/)
+- [Stack Overflow, Mapping a one-to-many relationship to a list of records in jOOQ（Lukas Eder の回答）](https://stackoverflow.com/a/71855430/521799)
+- [MapStruct](https://mapstruct.org/)
 - [ADR-002: package by feature とオニオンアーキテクチャ](ADR-002-package-by-feature-onion-architecture.md)
 - [ADR-013: HTTP API 契約を標準化する](ADR-013-standardize-http-api-contracts.md)

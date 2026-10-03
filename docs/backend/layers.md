@@ -77,7 +77,7 @@ Presentation は Domain と Infrastructure に依存させない。
 
 DB と外部システムとの接続を扱う外側の領域を **Infrastructure** とする。
 
-- **`infrastructure.persistence`**：`<Aggregate>Repository` を jOOQ で実装する [`Jooq<Aggregate>Repository`](class-roles/jooq-repository.md) と、jOOQ の生成型と Domain の型を変換する [`<Aggregate>RecordMapper`](class-roles/record-mapper.md) を置く。
+- **`infrastructure.persistence`**：`<Aggregate>Repository` を jOOQ で実装し、jOOQ の生成型と Domain の型の変換も持つ [`Jooq<Aggregate>Repository`](class-roles/jooq-repository.md) を置く。
 - **`infrastructure.client`**：`<ExternalSystem>` を実装する [`<ExternalSystem>Client`](class-roles/external-client.md) を置く。
 
 Persistence、外部 Client、Presentation は別々の Adapter として扱い、互いに依存させない。
