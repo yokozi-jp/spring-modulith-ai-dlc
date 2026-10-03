@@ -7,13 +7,13 @@ tags: [convention, aws, observability, logging, future-arch-guidelines]
 
 # CloudWatch Logsのロググループ
 
-アプリケーションのログは、ADOT CollectorからCloudWatch Logsへ送るOTLPのロググループと、WARN以上の標準出力のロググループに分ける。
+アプリケーションのログは、OpenTelemetry CollectorからCloudWatch Logsへ送るOTLPのロググループと、WARN以上の標準出力のロググループに分ける。
 AWSのサービスが出すログは、サービスの種類ごとにロググループを分ける。
 ログの内容、相関、保持期間は可観測性データの規約に従う。
 
 ## 前提
 
-アプリケーションはログ、トレース、メトリクスをOpenTelemetryで送り、本番ではCloudWatchだけに保存する（[ADR-043](../adr/ADR-043-send-production-telemetry-to-cloudwatch-via-adot.md)）。
+アプリケーションはログ、トレース、メトリクスをOpenTelemetryで送り、本番ではCloudWatchだけに保存する（[ADR-043](../adr/ADR-043-send-production-telemetry-to-cloudwatch-via-otel-collector.md)）。
 記録する値、相関、禁止する値、保持とアクセス、本番の受け入れ条件は[可観測性データの規約](../observability/conventions.md)に従う。
 この文書は、CloudWatch Logsのロググループの分け方と設定を定める。
 

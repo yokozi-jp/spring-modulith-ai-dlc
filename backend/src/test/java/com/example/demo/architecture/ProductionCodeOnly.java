@@ -11,8 +11,11 @@ public final class ProductionCodeOnly implements ImportOption {
 
   @Override
   public boolean includes(final Location location) {
-    return DO_NOT_INCLUDE_TESTS.includes(location)
-        && !location.contains("/jooq/")
-        && !location.contains("/generated/");
+    return DO_NOT_INCLUDE_TESTS.includes(location) && isHandwritten(location);
+  }
+
+  /** jOOQ などの生成コードを除いた、手書きのコードの場所かを判定する。 */
+  /* package */ static boolean isHandwritten(final Location location) {
+    return !location.contains("/jooq/") && !location.contains("/generated/");
   }
 }

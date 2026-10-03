@@ -92,8 +92,6 @@ services:
       GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:?GRAFANA_ADMIN_USER is required}
     ports:
       - "127.0.0.1:${GRAFANA_HOST_PORT:?GRAFANA_HOST_PORT is required}:3000"
-      # backend は全シグナルを OTLP/HTTP(4318)へ送るため、gRPC(4317)は公開しない。
-      - "127.0.0.1:${OTEL_HTTP_PORT:?OTEL_HTTP_PORT is required}:4318"
     volumes:
       - otel_lgtm_data:/data
     secrets:
@@ -104,6 +102,25 @@ services:
       timeout: 5s
       retries: 18
       start_period: 30s
+    restart: unless-stopped
+
+  # 可観測性データの唯一の出口。ログの属性を allowlist で絞ってから LGTM へ送る（本番と同じ設定）。
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.161.0@sha256:fd328de2552466ad78385e1b1289c3f2402b1c45f265b252aab1955b42845ac1
+    command: ["--config", "/etc/otelcol-contrib/config.yaml"]
+    environment:
+      # コンテナ間通信とホストからの送信を受けるため、全インターフェースで待ち受ける。
+      OTEL_COLLECTOR_OTLP_HTTP_ENDPOINT: 0.0.0.0:4318
+    ports:
+      # backend は全シグナルを OTLP/HTTP(4318)へ送るため、gRPC(4317)は公開しない。
+      - "127.0.0.1:${OTEL_HTTP_PORT:?OTEL_HTTP_PORT is required}:4318"
+    volumes:
+      - ./otel-collector/config.yaml:/etc/otelcol-contrib/config.yaml:ro
+    # イメージにシェルも HTTP クライアントもないため healthcheck を置けない。
+    # 送信側の OTLP exporter が再送するので、起動直後の取りこぼしは許容する。
+    depends_on:
+      otel-lgtm:
+        condition: service_healthy
     restart: unless-stopped
 
   backend:
@@ -137,7 +154,7 @@ services:
       # コンテナから issuer metadata を取得するため Compose の service 名を使う。
       OIDC_ISSUER_URI: http://keycloak:8080/realms/spring-modulith
       SPRINGDOC_ENABLED: ${SPRINGDOC_ENABLED:?SPRINGDOC_ENABLED is required}
-      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-lgtm:4318
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318
       OTEL_SERVICE_NAME: ${OTEL_SERVICE_NAME:?OTEL_SERVICE_NAME is required}
       OTEL_DEPLOYMENT_ENVIRONMENT_NAME: ${OTEL_DEPLOYMENT_ENVIRONMENT_NAME:?OTEL_DEPLOYMENT_ENVIRONMENT_NAME is required}
       MANAGEMENT_TRACING_SAMPLING_PROBABILITY: ${MANAGEMENT_TRACING_SAMPLING_PROBABILITY:?MANAGEMENT_TRACING_SAMPLING_PROBABILITY is required}
@@ -152,8 +169,8 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
-      otel-lgtm:
-        condition: service_healthy
+      otel-collector:
+        condition: service_started
     healthcheck:
       test: ["CMD", "curl", "--fail", "--silent", "http://localhost:8080/actuator/health/readiness"]
       interval: 10s

@@ -49,7 +49,7 @@ OpenTelemetry semantic conventions に該当する名前がない属性は、業
 特定のクラウド製品や SaaS に固有のキー名をアプリケーションコードで使わない。
 保存先の形式への変換が必要な場合は、collector などの収集基盤で行う。
 
-新しい属性を追加する変更では、OpenTelemetry appender の allowlist を同じ変更でレビューする。
+新しい属性を追加する変更では、Collector の設定（`docker/otel-collector/config.yaml`）の allowlist を同じ変更でレビューする。
 
 ## 利用者向けメッセージとの分離
 

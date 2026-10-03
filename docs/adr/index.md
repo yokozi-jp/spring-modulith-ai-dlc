@@ -43,4 +43,4 @@
 - [ADR-040: Future のアーキテクチャ設計ガイドラインを書き直して docs に取り込む](ADR-040-import-future-architecture-guidelines.md)（Proposed, 2026-10-01）
 - [ADR-041: ECS のタスクを Fargate で動かす](ADR-041-run-ecs-tasks-on-fargate.md)（Proposed, 2026-10-01）
 - [ADR-042: 人の利用者の AWS アクセスを IAM Identity Center で管理する](ADR-042-use-iam-identity-center-for-human-access.md)（Proposed, 2026-10-01）
-- [ADR-043: 本番の可観測性データを ADOT Collector で CloudWatch へ送る](ADR-043-send-production-telemetry-to-cloudwatch-via-adot.md)（Proposed, 2026-10-01）
+- [ADR-043: 本番の可観測性データを OpenTelemetry Collector で CloudWatch へ送る](ADR-043-send-production-telemetry-to-cloudwatch-via-otel-collector.md)（Proposed, 2026-10-01）

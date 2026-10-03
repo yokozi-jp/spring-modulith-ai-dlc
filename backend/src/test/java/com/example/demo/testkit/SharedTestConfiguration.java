@@ -9,12 +9,18 @@ import org.springframework.security.oauth2.core.AuthorizationGrantType;
 import org.springframework.security.oauth2.core.ClientAuthenticationMethod;
 
 /**
- * 複数の {@code @SpringBootTest} が共有する、OIDC クライアント登録をダミー発行者へ差し替える構成。
+ * 複数の {@code @SpringBootTest} が共有する、OIDC クライアント登録の差し替えと OTLP ログの観測を持つ構成。
  *
  * <p>同一の構成を共有することで、Spring のテストコンテキストキャッシュを再利用し、テストが増えても コンテキストの再ロードを増やさない。
  */
 @TestConfiguration(proxyBeanMethods = false)
 public class SharedTestConfiguration {
+
+  /** OTLP へ送る LogRecord を観測する processor。Spring Boot が SDK へ登録する。 */
+  @Bean
+  /* package */ CapturedLogRecords capturedLogRecords() {
+    return new CapturedLogRecords();
+  }
 
   @Bean
   /* package */ ClientRegistrationRepository clientRegistrationRepository() {

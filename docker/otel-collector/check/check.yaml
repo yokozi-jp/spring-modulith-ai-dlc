@@ -1,0 +1,15 @@
+# task otel-collector-check 用の上書き設定。
+# config.yaml の processors はそのまま使い、出口だけをファイルに差し替える。
+
+exporters:
+  file/check:
+    path: /out/telemetry.json
+
+service:
+  pipelines:
+    logs:
+      exporters: [file/check]
+    traces:
+      exporters: [file/check]
+    metrics:
+      exporters: [file/check]

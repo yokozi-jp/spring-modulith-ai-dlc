@@ -697,6 +697,62 @@ tasks:
         echo "OIDC discovery と PKCE S256 を確認しました。"
         echo "Login URL: http://localhost:18080/oauth2/authorization/web"
 
+  otel-collector-check:
+    desc: Collectorの設定が許可したログ属性だけを残すことを確認
+    silent: true
+    cmds:
+      - |
+        # イメージは Compose の定義から取り、Dependabot の更新と揃える。
+        image="$({{.DOCKER}} compose --env-file .env.example -f docker/compose.yml config --format json | jq -r '.services["otel-collector"].image')"
+        out="$(mktemp -d)"
+        chmod 777 "$out"
+        container=""
+        cleanup() {
+          status=$?
+          trap - EXIT
+          if [ -n "$container" ]; then {{.DOCKER}} rm -f "$container" >/dev/null || true; fi
+          rm -rf "$out"
+          exit "$status"
+        }
+        trap cleanup EXIT
+        container="$({{.DOCKER}} run -d -p 127.0.0.1::4318 \
+          -e OTEL_COLLECTOR_OTLP_HTTP_ENDPOINT=0.0.0.0:4318 \
+          -v "$PWD/docker/otel-collector:/etc/otelcol-check:ro" -v "$out:/out" \
+          "$image" --config /etc/otelcol-check/config.yaml --config /etc/otelcol-check/check/check.yaml)"
+        address="$({{.DOCKER}} port "$container" 4318/tcp | head -n 1)"
+        accepted=0
+        for _ in $(seq 1 30); do
+          if curl -fsS -o /dev/null -X POST -H "Content-Type: application/json" 2>/dev/null \
+            --data-binary "@docker/otel-collector/check/logs.json" "http://$address/v1/logs"; then
+            accepted=1
+            break
+          fi
+          sleep 1
+        done
+        if [ "$accepted" -ne 1 ]; then
+          echo "Collector がログを受け付けませんでした。" >&2
+          {{.DOCKER}} logs "$container" >&2
+          exit 1
+        fi
+        for _ in $(seq 1 30); do
+          if grep -qF 'resourceLogs' "$out/telemetry.json" 2>/dev/null; then break; fi
+          sleep 1
+        done
+        if ! jq -e '
+          def value($key): first(.attributes[]? | select(.key == $key) | .value.stringValue);
+          any(
+            .resourceLogs[]?.scopeLogs[]?.logRecords[]?;
+            ([.attributes[]?.key] | sort) == ["exception.message", "exception.stacktrace", "exception.type"]
+              and value("exception.type") == "java.lang.IllegalStateException"
+              and value("exception.message") == "order failed"
+              and (value("exception.stacktrace") | contains("OrderService.java:84"))
+          )
+        ' "$out/telemetry.json" >/dev/null; then
+          echo "ログ属性が allowlist または期待値と一致しません。" >&2
+          exit 1
+        fi
+        echo "Collector OK: 許可した属性だけを残しました。"
+
   compose-reset:
     desc: 明示確認付きでComposeサービスと全データを削除
     env:

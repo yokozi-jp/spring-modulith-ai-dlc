@@ -1,0 +1,35 @@
+# OpenTelemetry Collector の共通設定（ローカルと本番で共有する）。
+# 可観測性データの出口をこの Collector に一本化し、ログの属性を許可したものだけに絞る。
+# 規則の正文は docs/observability/conventions.md、判断は ADR-015 と ADR-043。
+# 本番は exporters と各 pipeline の exporters を別ファイルで上書きし、processors は変えない。
+
+receivers:
+  otlp:
+    protocols:
+      http:
+        # 既定は localhost（Fargate のサイドカー）。Compose はコンテナ間通信のため 0.0.0.0 に上書きする。
+        endpoint: ${env:OTEL_COLLECTOR_OTLP_HTTP_ENDPOINT:-localhost:4318}
+
+processors:
+  transform/log_attributes:
+    log_statements:
+      # ログ属性の allowlist。属性を足すときは docs/observability/conventions.md と同じ変更で直す。
+      - keep_keys(log.attributes, ["exception.type", "exception.message", "exception.stacktrace"])
+
+exporters:
+  # ローカルの Grafana OpenTelemetry LGTM。
+  otlp_http/lgtm:
+    endpoint: http://otel-lgtm:4318
+
+service:
+  pipelines:
+    logs:
+      receivers: [otlp]
+      processors: [transform/log_attributes]
+      exporters: [otlp_http/lgtm]
+    traces:
+      receivers: [otlp]
+      exporters: [otlp_http/lgtm]
+    metrics:
+      receivers: [otlp]
+      exporters: [otlp_http/lgtm]

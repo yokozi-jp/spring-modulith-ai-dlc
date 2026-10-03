@@ -1,0 +1,34 @@
+{
+  "resourceLogs": [
+    {
+      "resource": {
+        "attributes": [{ "key": "service.name", "value": { "stringValue": "demo" } }]
+      },
+      "scopeLogs": [
+        {
+          "scope": { "name": "com.example.demo.error.presentation.ApiExceptionHandler" },
+          "logRecords": [
+            {
+              "timeUnixNano": "1790000000000000000",
+              "severityNumber": 17,
+              "severityText": "ERROR",
+              "body": { "stringValue": "Unhandled API exception" },
+              "attributes": [
+                { "key": "exception.type", "value": { "stringValue": "java.lang.IllegalStateException" } },
+                { "key": "exception.message", "value": { "stringValue": "order failed" } },
+                {
+                  "key": "exception.stacktrace",
+                  "value": {
+                    "stringValue": "java.lang.IllegalStateException: order failed\n\tat com.example.demo.OrderService.create(OrderService.java:84)"
+                  }
+                },
+                { "key": "user.email", "value": { "stringValue": "person@example.com" } },
+                { "key": "http.request.header.authorization", "value": { "stringValue": "Bearer secret-token" } }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
