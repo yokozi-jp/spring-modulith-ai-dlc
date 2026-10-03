@@ -68,8 +68,8 @@ Proposed
   理由は二つある。
   一つ目に、確定の `handle` の中で請求すると、遅い外部の呼び出しの間、トランザクションと DB の接続を保ち、ロックを取った後に呼べば行のロックも保つ。
   二つ目に、ロールバックしても外部の副作用は戻らない。
-  `ensureLockNo` はロックしていない読み取りの値と比べるため、同じ `lockNo` の確定が二つ同時に届くと両方が請求まで進む。
-  後の一方は `update` の `SELECT ... FOR UPDATE NOWAIT` で競合してロールバックするが、請求は残り、顧客に二重に請求する。
+  `ensureLockNo` は画面の値と読んだ値を比べるだけなので、同じ `lockNo` の確定が二つ同時に届くと両方が請求まで進む。
+  後の一方は `update` の UPDATE の条件の `lock_no` で競合してロールバックするが、請求は残り、顧客に二重に請求する。
   イベント出版レジストリは業務データの更新と同じトランザクションでイベントを記録するトランザクションアウトボックスであり（[メッセージングの設計](../integration/async-messaging-design.md)の「DB 更新とメッセージ発行の整合」）、コミットした確定のイベントだけが決済へ渡る。
 - 外部システムを呼ぶ CommandHandler は二層で冪等にする。
   外部システムの操作に冪等性キー（注文 ID）を渡し、集約がすでにその操作を終えていれば（`order.isPaid()`）何もせずに Result を返す。
@@ -98,11 +98,12 @@ Proposed
 - Repository の書き込みは、新しい集約の `add` と、既存の集約の `update` に分ける。
   新規と更新を一つの `save` にすると、実装は行の有無で INSERT と UPDATE を選ぶことになり、他の人が消した集約の更新が新しい行の作成になって、「行がない」（404）として返せないためである。
 - `add` は、`insertInto` の `set(列, 値)` で業務の全列を書き、`lock_no` を含む共通カラムの値は [ADR-048](ADR-048-add-shared-module-for-jooq-common-code.md) の `shared` の共通処理から受け取る。
-- `update` は、[PostgreSQL の排他制御](../database/postgresql-concurrency-control.md)の楽観的ロックの順序に従う。
-  集約ルートの行を `SELECT ... FOR UPDATE NOWAIT` でロックし、行がなければ `NoSuchElementException` を、`lock_no` が集約の `lockNo` と違うか行をロックできなければ `domain.model` の `<Aggregate>ConflictException` を投げる。
-  一致したら、`lock_no` の加算を含む共通カラムの値を `shared` の共通処理から受け取って更新する。
+- `update` は、[PostgreSQL の排他制御](../database/postgresql-concurrency-control.md)の楽観的ロックに従う（[ADR-052](ADR-052-detect-optimistic-lock-conflicts-by-update-count.md)）。
+  集約ルートの行を、`lock_no` が集約の `lockNo` と一致する条件と、`lock_no` の加算を含む共通カラムの値で先に更新し、子の行はその後で更新する。
+  更新件数は `shared` の `OptimisticLock.requireUpdated` が判定し、0 件のとき、行がなければ `NoSuchElementException` を、行があれば `domain.model` の `<Aggregate>ConflictException` を投げる。
+  `lock_timeout` までに行のロックを取れないときも、`<Aggregate>ConflictException` を投げる。
 - Controller が作り、既存の集約の状態を変える Command は、クライアントが参照の応答で受け取った `lockNo` を持つ。
-  CommandHandler は、集約を取り出した直後に集約の `lockNo` と比べ、画面から受け取った値とロックした行の値の比較が成り立つようにする。
+  CommandHandler は、集約を取り出した直後に集約の `lockNo` と比べ、画面から受け取った値と更新の時点の行の値の比較が成り立つようにする。
 - 外部システムのインタフェースの実装は `infrastructure.client` の `<ExternalSystem>Client` とする。
 - Infrastructure は、機能モジュールの型のうち同じモジュールの `domain.model` の型だけを使い、Application、Domain Service、モジュールルートの型に依存しない。
   オニオン規則は Adapter から内側への依存をすべて許すが、Adapter がユースケースを呼べると Presentation のほかに処理の入口ができ、トランザクション境界が Application の外にも広がるためである。
@@ -249,10 +250,10 @@ Proposed
 
 ### 選択肢15: 確定の CommandHandler で、行をロックしてから外部システムを呼ぶ
 
-- **Description**：確定の `handle` の中で、先に集約ルートの行を `SELECT ... FOR UPDATE NOWAIT` でロックして `lockNo` を比べ、その後で `PaymentGateway.charge` を呼んで確定を保存する。
+- **Description**：確定の `handle` の中で、先に集約ルートの行を `lock_no` の条件付きの UPDATE でロックして `lockNo` を比べ、その後で `PaymentGateway.charge` を呼んで確定を保存する。
 - **Pros**：一つのトランザクションで済み、確定の応答で決済の成否を返せる。
   同時の確定は、後の一方がロックで止まり、請求まで進まない。
-- **Cons**：遅い外部の呼び出しの間、行のロックとトランザクションを保ち、その間の同じ注文への要求は `NOWAIT` で競合になる。
+- **Cons**：遅い外部の呼び出しの間、行のロックとトランザクションを保ち、その間の同じ注文への要求は `lock_timeout` まで待って競合になる。
   請求の後にコミットが失敗すると、ロールバックしても請求は残る。
   トランザクションアウトボックスなら、コミットした確定だけが請求へ進む。
 
@@ -303,6 +304,7 @@ Proposed
 - [ADR-013: HTTP API 契約を標準化する](ADR-013-standardize-http-api-contracts.md)
 - [ADR-019: 外部連携の耐障害性と容量制御を標準化する](ADR-019-define-resilience-and-capacity-guardrails.md)
 - [ADR-048: jOOQ の共通処理を共有モジュール shared に置く](ADR-048-add-shared-module-for-jooq-common-code.md)
+- [ADR-052: 楽観的ロックの競合を UPDATE の条件の lock_no と更新件数で判定する](ADR-052-detect-optimistic-lock-conflicts-by-update-count.md)
 - [PostgreSQL の排他制御](../database/postgresql-concurrency-control.md)
 - [PostgreSQL の共通カラム](../database/postgresql-common-columns.md)
 - [メッセージングの設計](../integration/async-messaging-design.md)
