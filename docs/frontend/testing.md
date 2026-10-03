@@ -1,14 +1,14 @@
 ---
 type: Convention
 title: フロントエンドのテストと検証
-description: フロントエンドテストの配置、実行環境、利用者から見える期待、API境界、状態遷移、coverage、生成物の再生成と検査を定める規約であり、テストを書くとき、生成物を更新するときに読む。
+description: フロントエンドテストの配置、実行環境、利用者から見える期待、クエリと待ち方と差し替えてよい境界などの書き方、API境界、状態遷移、coverage、生成物の再生成と検査を定める規約であり、テストを書くとき、生成物を更新するときに読む。
 tags: [convention, frontend, testing]
 ---
 
 # フロントエンドのテストと検証
 
 テストは対象ファイルへ併置し、利用者から見える結果をTesting Libraryとuser-eventで検証する。
-APIを使うcomponent testはMSWでHTTP境界を置き換える。
+APIを使うcomponent testはMSWでHTTP境界を置き換え、`vi.mock`でmoduleを差し替えない。
 画面が提供する状態遷移を検証し、手書きproduction source全体のbranch coverage 85%を維持する。
 
 ## 配置と実行環境
@@ -25,6 +25,19 @@ APIを使うcomponent testはMSWでHTTP境界を置き換える。
 
 componentの内部state、Hookの呼出回数、CSS classだけを主要な期待値にせず、利用者から見える結果を検証する。
 
+## 書き方
+
+- **実行環境の指定**：jsdomを使うテストは、ファイルの先頭に`/* @vitest-environment jsdom */`を書く。
+- **クエリ**：role、label、placeholder、text、display valueの順に選び、`data-testid`は他のクエリで取れない場合だけ使い、`container.querySelector`は使わない。
+- **user-event**：renderの前に`userEvent.setup()`を呼び、返ったinstanceで操作する。
+- **非同期の待ち**：`findBy`か`waitFor`で待ち、`setTimeout`などの固定時間で待たない。
+  `waitFor`のcallbackにはassertionを一つだけ置き、clickなどの副作用を置かない。
+- **差し替えてよい境界**：HTTPはMSW、globalは`vi.spyOn`か`vi.stubGlobal`、時刻はfake timerで置き換え、`vi.mock`と`vi.doMock`でmoduleを差し替えない。
+  `vi.mock`と`vi.doMock`はOxlintの`vitest/no-restricted-vi-methods`が禁止する。
+- **テスト名**：利用者から見える振る舞いを書き、関数名やstate名を書かない。
+- **不安定なテスト**：Vitestの`retry`で隠さず、同じ変更で直すか削除し、`skip`で残さない。
+  `skip`と`only`の残置はOxlintの`vitest/no-disabled-tests`と`vitest/no-focused-tests`が禁止する。
+
 ## API境界
 
 APIを使うcomponent testではOrval生成関数をmodule mockで置き換えず、MSWでHTTP境界を置き換える。
@@ -40,6 +53,11 @@ route loaderとTanStack Queryを組み合わせた画面では、loading、succe
 起動処理、test、型宣言、自動生成されたroute tree、Orval生成物を除く手書きproduction source全体をcoverage対象にする。
 
 branch coverage 85%をファイル単位ではなく全体で維持する。
+
+coverageは検証していないコードを見つけるために使い、数値そのものを目標にしない。
+coverageを上げるためだけのテストは書かない。
+テストで到達しない分岐は、削除するか、利用者から見える振る舞いとして検証する。
+`/* v8 ignore */`は生成物に相当するコードだけに使い、理由をコメントで添える。
 
 生成物そのものではなく、生成物を利用する手書きコードの挙動を検証する。
 
@@ -72,3 +90,9 @@ Frontend CIもこのTaskを実行する。
 - [フロントエンドのルーティングと状態管理](routing-and-state.md)
 - [OrvalとAPI境界](api-client-orval.md)
 - [ADR-027: Frontendのテスト基盤を標準化する](../adr/ADR-027-adopt-frontend-testing-stack.md)
+- [Testing Library: Guiding Principles](https://testing-library.com/docs/guiding-principles)
+- [Testing Library: Queries priority](https://testing-library.com/docs/queries/about#priority)
+- [user-event: Intro](https://testing-library.com/docs/user-event/intro)
+- [Kent C. Dodds: Common mistakes with React Testing Library](https://kentcdodds.com/blog/common-mistakes-with-react-testing-library)
+- [Vitest: Mocking Requests](https://vitest.dev/guide/mocking/requests)
+- [Google Testing Blog: Code Coverage Best Practices](https://testing.googleblog.com/2020/08/code-coverage-best-practices.html)

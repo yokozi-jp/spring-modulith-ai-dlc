@@ -1,7 +1,7 @@
 ---
 type: Convention
 title: テスト観点の割り当て
-description: フロントエンドのテスト観点をunit test、component test、E2E test、手動確認のどれで確かめるかと、E2E testとアクセシビリティの自動検査の対象を定める規約。テスト計画を立てるとき、ある観点をどのテストで書くか決めるときに読む。
+description: フロントエンドのテストの配分、層ごとの道具と環境、テスト観点をunit test、component test、E2E test、手動確認のどれで確かめるか、custom Hookのテスト、E2E testとアクセシビリティの自動検査の対象を定める規約。テスト計画を立てるとき、ある観点をどのテストと道具で書くか決めるときに読む。
 tags: [convention, frontend, testing, accessibility, future-arch-guidelines]
 ---
 
@@ -15,12 +15,34 @@ tags: [convention, frontend, testing, accessibility, future-arch-guidelines]
 **Testing Trophy**：利用者の視点で動作を確かめるcomponent testとintegration testを最も厚くし、実装の詳細に依存するunit testと費用の高いE2E testに偏らないテストの配分。
 
 フロントエンドのテストはTesting Trophyに従う。
-テストの配置、実行環境、MSW、coverageは[フロントエンドのテストと検証](testing.md)に従う。
+Trophyの土台は静的解析であり、Oxlintの全カテゴリ、TypeScriptの型検査、Knip、React Doctorがこれにあたる。
+
+テストの種類ごとの件数の比率は数値で決めない。
+既定はcomponent testとし、unit testは純粋関数だけに書き、E2E testは数本にとどめる。
+
+テストの配置、実行環境、MSW、coverage、書き方は[フロントエンドのテストと検証](testing.md)に従う。
+
+## テストの層と道具
+
+| 層            | 道具                                                | 環境  |
+| ------------- | --------------------------------------------------- | ----- |
+| 純粋関数      | Vitest                                              | Node  |
+| component     | Testing Libraryとuser-event                         | jsdom |
+| custom Hook   | Hookを使うcomponentのテスト                         | jsdom |
+| route         | 実際の`routeTree`、memory history、`routerDefaults` | jsdom |
+| APIを使う画面 | componentの道具に加えてMSW                          | jsdom |
+| E2E           | 未定                                                | 未定  |
+
+E2E testの道具と環境は、[ADR-027](../adr/ADR-027-adopt-frontend-testing-stack.md)のとおり要件が生じた時点で判断する。
 
 ## 観点ごとのテスト
 
 - **業務ロジックとutility関数**：Node環境のunit testで検証する。
 - **custom Hookと状態の内部ロジック**：Hookを使うcomponentを通して、component testで検証する。
+  複数のfeatureが使う共有のHookで、代表となるcomponentが無い場合だけ、`renderHook`で検証する。
+  Hookが同期する外部system（`matchMedia`など）は`vi.stubGlobal`で置き換え、Hook自体をmockしない。
+  Hookごとのテストファイルは必須にしない。
+  Hookを作る条件と名前は[ルーティングと状態管理](routing-and-state.md#react-hooksと状態)に従う。
 - **操作による表示の変化**：component testで検証する。
 - **component間の状態の連携**：component testで検証する。
 - **画面遷移と遷移先の表示**：test用のrouterを使うcomponent testで検証する。
@@ -45,3 +67,5 @@ tags: [convention, frontend, testing, accessibility, future-arch-guidelines]
 
 - フューチャー株式会社「Webフロントエンド設計ガイドライン」（[アーキテクチャ設計ガイドライン](https://future-architect.github.io/arch-guidelines/documents/forWebFrontend/web_frontend_guidelines.html)、commit `e309a6d`）、[CC BY 4.0](https://creativecommons.org/licenses/by/4.0/deed.ja)
 - このリポジトリの規約に合わせて抜粋、再構成、改変している。取り込みの方針は [ADR-040](../adr/ADR-040-import-future-architecture-guidelines.md) に従う。
+- [Kent C. Dodds: The Testing Trophy and Testing Classifications](https://kentcdodds.com/blog/the-testing-trophy-and-testing-classifications)
+- [Testing Library: React Testing Library API](https://testing-library.com/docs/react-testing-library/api)
