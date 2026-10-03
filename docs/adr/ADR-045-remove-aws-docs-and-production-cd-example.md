@@ -1,7 +1,7 @@
 ---
 type: ADR
 title: 'ADR-045: AWS の規約と本番 CD のひな型を削除する'
-description: 古くなった docs/aws の規約、本番 CD のワークフローのひな型、AWS の steering を削除し、AWS の規約は AI 活用を含めて新しい領域として書き直す決定。
+description: 古くなった docs/aws の規約、本番 CD のワークフローのひな型、AWS の steering を削除し、AWS の規約は AI 活用を含めて新しい領域として書き直し、CloudWatch Logs のアプリケーションのロググループの規約は docs/observability へ移す決定。
 tags: [adr, aws, documentation, ci-cd]
 ---
 
@@ -34,6 +34,17 @@ GitHub ホストのランナーから RDS の Writer へ JDBC で直接接続す
 これにより、ADR-040 のうち AWS の取り込みを取り消す。
 ADR-040 のほかの領域の取り込みは変えない。
 
+ただし、`docs/aws/cloudwatch-logs.md` のうち、OpenTelemetry の経路で送るアプリケーションのログのロググループの規約は、[可観測性データの規約](../observability/conventions.md)の「本番のロググループ」の節へ移す。
+この規約は ADR-043 の本番の保存先の設定であり、AWS の規約の書き直しを待たずに必要になるためである。
+ロググループをサービスごとに分け、他のサービスと共有しない理由は次のとおりである。
+
+- サブスクリプションフィルターは、ロググループごとに二つまでしか置けない。
+- 保持期間、メトリクスフィルター、アラーム、アクセス制御、タグはロググループの単位で設定するため、共有するとサービスごとにコストを按分できない。
+- 一つのサービスが大量に出力すると、同じロググループを使う他のサービスの検索に影響する。
+- 機微な情報が混入したときに、削除とアクセス制御の範囲が広がる。
+
+AWS のサービスのロググループ（VPC フローログ、RDS のログ）と監査ログの保管先の規約は、OpenTelemetry の経路ではないため移さない。
+
 AWS の規約は、AI の活用を含め、必要になった時点で新しい領域として ADR-040 と同じ規約に従って書き直す。
 [ADR-041](ADR-041-run-ecs-tasks-on-fargate.md)、[ADR-042](ADR-042-use-iam-identity-center-for-human-access.md)、[ADR-043](ADR-043-send-production-telemetry-to-cloudwatch-via-otel-collector.md) の決定は維持する。
 
@@ -47,12 +58,13 @@ AWS の規約は、AI の活用を含め、必要になった時点で新しい�
 ### Negative
 
 - 新しい文書ができるまで、AWS の規約がない。
-- `docs/observability/conventions.md` が参照していた CloudWatch Logs のロググループの分け方の規約がなくなる。
+- CloudWatch Logs のロググループの規約のうち、AWS のサービスのロググループの分け方はなくなる。アプリケーションのロググループの分け方は[可観測性データの規約](../observability/conventions.md)へ移した。
+- 長期に保管する監査ログを、情報の機密性の分類と取り扱い要件に従って S3 に置くという条件が、分類の文書とともになくなる。ADR-043 は S3 に置くことだけを残しているため、AWS の規約を書き直すときにこの条件を戻す。
 - 本番 CD を作るときは、ひな型なしで設計する。
 
 ### Neutral
 
-- ADR-041、ADR-042、ADR-043 は、削除した文書へのリンクを除いたうえで決定を保つ。
+- ADR-041 と ADR-042 は削除した文書へのリンクを除き、ADR-043 はロググループの規約へのリンクを可観測性データの規約へ付け替えたうえで、決定を保つ。
 - AWS の規約を書き直すときに、ADR-041、ADR-042、ADR-043 を見直すかを判断する。
 
 ## Alternatives Considered
@@ -75,6 +87,8 @@ AWS の規約は、AI の活用を含め、必要になった時点で新しい�
 - [ADR-041: ECS のタスクを Fargate で動かす](ADR-041-run-ecs-tasks-on-fargate.md)
 - [ADR-042: 人の利用者の AWS アクセスを IAM Identity Center で管理する](ADR-042-use-iam-identity-center-for-human-access.md)
 - [ADR-043: 本番の可観測性データを OpenTelemetry Collector で CloudWatch へ送る](ADR-043-send-production-telemetry-to-cloudwatch-via-otel-collector.md)
+- [可観測性データの規約](../observability/conventions.md)
+- [Subscriptions](https://docs.aws.amazon.com/AmazonCloudWatch/latest/DeveloperGuide/Subscriptions.html)
 - [AWS Well-Architected Framework, Security Pillar](https://docs.aws.amazon.com/wellarchitected/latest/security-pillar/welcome.html)
 - [App Runner availability change](https://docs.aws.amazon.com/apprunner/latest/dg/apprunner-availability-change.html)
 - [Immutable subject claims for GitHub Actions OIDC tokens](https://github.blog/changelog/2026-04-23-immutable-subject-claims-for-github-actions-oidc-tokens/)

@@ -129,4 +129,5 @@ upstream の OpenTelemetry Collector（contrib）は transform processor と `si
 - [ADOT Collector の component 一覧](https://github.com/aws-observability/aws-otel-collector/blob/main/pkg/defaultcomponents/defaults.go)
 - [sigv4auth extension](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/v0.161.0/extension/sigv4authextension/README.md)
 - [OpenTelemetry: Collector configuration best practices](https://opentelemetry.io/docs/security/config-best-practices/)
+- [可観測性データの規約](../observability/conventions.md)
 - `docker/otel-collector/config.yaml`

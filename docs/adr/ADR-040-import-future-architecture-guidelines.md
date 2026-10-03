@@ -12,6 +12,7 @@ tags: [adr, documentation, knowledge-management, future-arch-guidelines]
 Proposed
 
 このうち AWS の取り込みは [ADR-045](ADR-045-remove-aws-docs-and-production-cd-example.md) で取り消した。
+ただし、CloudWatch Logs のアプリケーションのロググループの規約は[可観測性データの規約](../observability/conventions.md)へ移した。
 
 ## Date
 
