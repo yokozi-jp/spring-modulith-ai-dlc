@@ -198,9 +198,15 @@ Proposed
 
 ### 選択肢14: リフレクションで列と項目を対応づける
 
-- **Description**：jOOQ の `into(Class)`、`fetchInto(Class)`（内部は `DefaultRecordMapper`）や、ModelMapper、Dozer で、列と項目を名前で自動で対応づける。
+- **Description**：jOOQ の `into(Class)`、`fetchInto(Class)`（内部は `DefaultRecordMapper`）、`Record.from(Object)`、`DSLContext.newRecord(Table, Object)` や、ModelMapper、Dozer で、列と項目を名前で自動で対応づける。
 - **Pros**：変換のコードを書かずに済む。
-- **Cons**：列や項目の名前を変えたときの誤りがコンパイルで見つからず、実行時に値が欠けるか例外になる。jOOQ のマニュアルも、`Records.mapping` の形は型を検査し、リフレクションの形は型を強く検査しないと区別している（[jOOQ, Ad-hoc converters](https://www.jooq.org/doc/latest/manual/sql-execution/fetching/ad-hoc-converter/)）。
+  jOOQ の正式な機能であり、リフレクションの費用もキャッシュで小さい。
+- **Cons**：列や項目の名前を変えたときの誤りがコンパイルで見つからず、実行時に値が欠けるか例外になる。
+  jOOQ のマニュアルも、`Records.mapping` の形は型を検査し、リフレクションの形は型を強く検査しないと区別している（[jOOQ, Ad-hoc converters](https://www.jooq.org/doc/latest/manual/sql-execution/fetching/ad-hoc-converter/)）。
+  集約を作るときに `Order.restore` と値オブジェクトの検証を通らず、合うコンストラクタがなければ private のフィールドへ直接書き込む。
+  書き込みの `from(Object)` と `newRecord(Table, Object)` では、ドメインのフィールド名を変えると、その列だけが例外を出さずに保存されなくなり、データを失う。
+  この方式そのものの欠陥ではなく、集約を `restore` で作ること、変換の書き方を `Records.mapping` の一通りにすること、機械で検査することと両立しないため却下する。
+  集約を通さずに DTO へ直接読む参照系を導入するときは、この判断を見直す。
 
 ## References
 

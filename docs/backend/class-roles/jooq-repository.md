@@ -204,6 +204,9 @@ public long countUnshippedByCustomer(final CustomerId customerId) {
 - 変換の中で、業務規則を判定する、または既定値を補う。
 - `into(Class)`、`fetchInto(Class)`、`fetchMap(Field, Class)`、`from(Object)`、`DefaultRecordMapper`、ModelMapper、Dozer で、列と項目を名前のリフレクションで対応づける。
   列や項目の名前を変えたときの誤りが、コンパイルで見つからない。
+  集約が `Order.restore` と値オブジェクトの検証を通らず、private のフィールドへ直接書き込まれることがある。
+  書き込みの `from(Object)` では、ドメインのフィールド名を変えると、その列だけが例外を出さずに保存されなくなる。
+  理由の詳細は [ADR-048](../../adr/ADR-048-define-backend-class-roles-and-naming.md) の選択肢14に示す。
 - 変換を別の Mapper のクラスや MapStruct に切り出す。
 - jOOQ のコード生成の `forcedTypes` と `Converter` で、列を Domain の値オブジェクトに対応づける。
   共有の生成パッケージ `com.example.demo.jooq` が、モジュールの Domain の型に依存する。
