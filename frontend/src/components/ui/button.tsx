@@ -56,4 +56,6 @@ function Button({
   );
 }
 
+// React Doctor は Oxlint の allowExportNames を読まないため、同じ例外をここで与える（docs/tooling/lint-and-test.md）。
+// react-doctor-disable-next-line react-doctor/only-export-components
 export { Button, buttonVariants };
