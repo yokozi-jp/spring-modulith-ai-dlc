@@ -109,16 +109,15 @@ ArchUnitは規則の説明の後に`, because`とこの文をつなぎ、違反�
 失敗すると、次のように出る。
 
 ```text
-Rule 'no classes should be meta-annotated with @Transactional, because トランザクション境界を CommandHandler の handle、QueryService の public メソッド、Listener の on に集めるため。直し方：クラスの @Transactional を外し、Application の public メソッドへ付け直す。規約：docs/backend/layers.md、docs/adr/ADR-048-define-backend-class-roles-and-naming.md' was violated (1 times):
+Rule 'no classes should be meta-annotated with @Transactional, because 状態を変えるユースケースの処理の順序とトランザクション境界を一か所で決め、一つのユースケースを Command の受け取りから Result の返却まで一つのトランザクションで進めるため。直し方：クラスの @Transactional を外し、Application の public メソッドへ付け直す。規約：docs/backend/layers.md、docs/backend/class-roles/command-handler.md、docs/adr/ADR-048-define-backend-class-roles-and-naming.md' was violated (1 times):
 Class <archfixture.violating.order.application.ShipOrderCommandHandler> is meta-annotated with @Transactional in (ShipOrderCommandHandler.java:0)
 ```
 
 `ArchitectureRuleMessageTest`は、`architecture`パッケージで`@ArchTest`を付けた`ArchRule`のフィールドをすべて集め、最後のbecauseがこの形であることと、「規約：」の各パスがリポジトリにあることを確かめる。
+`ArchitectureRuleMessageTest`は、`ruleset.xml`と`test-ruleset.xml`で`name`を持つカスタム規則の`message`も読み、同じ形であることと「規約：」の各パスがリポジトリにあることを確かめる。
 `@ArchTest`のメソッドと`ArchTests`のフィールドはbecauseを読めないため、このテストが拒否する。
-新しい規則にこの形のbecauseがないと、`task test`が失敗する。
-
-理由をdocsにもADRにも書いていない規則は、`ArchitectureRuleMessageTest`の`PENDING_RATIONALE`に`<クラス名>.<フィールド名>`で載せ、becauseを「直し方：」から始める。
-理由をdocsかADRに書いたら、`PENDING_RATIONALE`から外してbecauseに理由を足す。
+新しい規則にこの形のbecauseかmessageがないと、`task test`が失敗する。
+理由がdocsにもADRにもない規則は、先に理由をdocsかADRに書いてから追加する。
 
 ## 共通実装とプロキシ
 
@@ -140,6 +139,8 @@ Class <archfixture.violating.order.application.ShipOrderCommandHandler> is meta-
 - Springの`@Transactional`、`@Async`、`@Cacheable`、`@CachePut`、`@CacheEvict`。
 - Spring Securityの`@PreAuthorize`、`@PostAuthorize`、`@PreFilter`、`@PostFilter`、`@Secured`。
 - Resilience4jの`@CircuitBreaker`、`@Retry`、`@RateLimiter`、`@Bulkhead`、`@TimeLimiter`。
+
+これらの規則の理由は[バックエンドのJava実装規約](java-coding.md)に示す。
 
 ## 日時
 
@@ -170,18 +171,19 @@ Error ProneはすべてのJavaコンパイルで`JavaTimeDefaultTimeZone`と`Jav
 PMDはmainとtestに別のrulesetを適用し、Lombokの`@Data`と`@Setter`、手書きのLoggerフィールド、`LoggerFactory`の直接参照、`getLogger`のstatic import、`@Autowired`を付けた通常メソッドなどを検査する。
 PMDの設定は[`ruleset.xml`](../../backend/config/pmd/ruleset.xml)と[`test-ruleset.xml`](../../backend/config/pmd/test-ruleset.xml)を正とする。
 カスタム規則の`message`は、ArchUnitのbecauseと同じ「理由。直し方：…。規約：…」の形にする。
+`ArchitectureRuleMessageTest`が、この形と「規約：」のパスの実在を確かめる。
 
 ## 失敗したときの読み方と直し方
 
 Spring Modulith、Error Prone、NullAway、SpotBugs、Spotlessの失敗の文は変えられないため、次の表で読む。
 
-| ツール          | 典型的な失敗の文                                                                                     | 意味                                                                                          | 直し方                                                              | 文書                                                            |
-| --------------- | ---------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------- | ------------------------------------------------------------------- | --------------------------------------------------------------- |
-| Spring Modulith | `Module 'order' depends on non-exposed type ... within module 'inventory'!`                          | 他モジュールの内部パッケージの型を使っている                                                  | 相手のルートの`<Feature>Queries`かイベントで連携する                | [バックエンドアーキテクチャ](architecture.md)                   |
-| Error Prone     | `error: [JavaTimeDefaultTimeZone] LocalDate.now() is not allowed ...`                                | 角括弧の中がチェック名で、`(see https://errorprone.info/bugpattern/<チェック名>)`に説明がある | 日時のチェックは、注入した`Clock`と設定値の`ZoneId`で求める形に直す | [日時とタイムゾーンの規約](../datetime/timezone-conventions.md) |
-| NullAway        | `error: [NullAway] dereferenced expression 's' is @Nullable`                                         | `@NullMarked`のコードで、`@Nullable`の値をnullを確かめずに使った                              | nullを確かめてから使うか、値を必ず渡して`@Nullable`を外す           | [バックエンドアーキテクチャ](architecture.md)                   |
-| SpotBugs        | `Verification failed: SpotBugs ended with exit code 1. See the report at: ...`                       | バイトコードからバグのパターンを検出した                                                      | レポートのバグのパターンの説明と行を見て直す                        | [Lintとテストのリファレンス](../tooling/lint-and-test.md)       |
-| Spotless        | `The following files had format violations:`、`Run './gradlew spotlessApply' to fix all violations.` | Google Java Formatの形と違う                                                                  | `task be-format`を実行する                                          | [Lintとテストのリファレンス](../tooling/lint-and-test.md)       |
+| ツール          | 典型的な失敗の文                                                                                     | 意味                                                                                          | 直し方                                                              | 文書                                                                             |
+| --------------- | ---------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------- | ------------------------------------------------------------------- | -------------------------------------------------------------------------------- |
+| Spring Modulith | `Module 'order' depends on non-exposed type ... within module 'inventory'!`                          | 他モジュールの内部パッケージの型を使っている                                                  | 相手のルートの`<Feature>Queries`かイベントで連携する                | [バックエンドアーキテクチャ](architecture.md)                                    |
+| Error Prone     | `error: [JavaTimeDefaultTimeZone] LocalDate.now() is not allowed ...`                                | 角括弧の中がチェック名で、`(see https://errorprone.info/bugpattern/<チェック名>)`に説明がある | 日時のチェックは、注入した`Clock`と設定値の`ZoneId`で求める形に直す | [日時とタイムゾーンの規約](../datetime/timezone-conventions.md)                  |
+| NullAway        | `error: [NullAway] dereferenced expression 's' is @Nullable`                                         | `@NullMarked`のコードで、`@Nullable`の値をnullを確かめずに使った                              | nullを確かめてから使うか、値を必ず渡して`@Nullable`を外す           | [NullAway, Error Messages](https://github.com/uber/NullAway/wiki/Error-Messages) |
+| SpotBugs        | `Verification failed: SpotBugs ended with exit code 1. See the report at: ...`                       | バイトコードからバグのパターンを検出した                                                      | レポートのバグのパターンの説明と行を見て直す                        | [Lintとテストのリファレンス](../tooling/lint-and-test.md)                        |
+| Spotless        | `The following files had format violations:`、`Run './gradlew spotlessApply' to fix all violations.` | Google Java Formatの形と違う                                                                  | `task be-format`を実行する                                          | [Lintとテストのリファレンス](../tooling/lint-and-test.md)                        |
 
 ## 解析対象と実行
 

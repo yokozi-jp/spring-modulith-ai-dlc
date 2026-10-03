@@ -102,6 +102,7 @@ Controller の MockMvc のテストで、制約に違反する本文が 400 の 
 - マスタの存在や在庫を、DB を読む Bean Validation の独自の制約で確かめる。
 - 確定や取消のように本文のない操作に、空の Request を作る。
 - Request に Domain の型（`Quantity`）を持たせる。
+  Domain の型が Application の外へ出て、HTTP API の形と Domain を独立に変えられなくなる。
 - 変換を Controller の private メソッドや Mapper のクラスに書く。
 - 作成と更新で一つの Request を兼ね、片方で使わない項目を任意にする。
 

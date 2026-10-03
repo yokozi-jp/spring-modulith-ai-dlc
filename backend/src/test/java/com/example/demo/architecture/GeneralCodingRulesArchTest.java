@@ -15,11 +15,12 @@ import org.springframework.beans.factory.annotation.Autowired;
 @AnalyzeClasses(packagesOf = DemoApplication.class, importOptions = ProductionCodeOnly.class)
 class GeneralCodingRulesArchTest {
 
-  /** 汎用の規則の一覧を示す文書。 */
-  private static final String ARCHITECTURE_TESTS_DOC = "規約：docs/backend/architecture-tests.md";
-
-  /** ロギングの規約。 */
+  /** Java の実装規約。 */
   private static final String JAVA_CODING_DOC = "規約：docs/backend/java-coding.md";
+
+  /** ロギングの規約と、ログの属性を決めた ADR のパス。 */
+  private static final String LOGGING_DOCS =
+      "規約：docs/backend/java-coding.md、docs/adr/ADR-015-structure-and-protect-observability-data.md";
 
   /** 日時の規約と ADR のパス。 */
   private static final String DATE_TIME_DOCS =
@@ -38,15 +39,18 @@ class GeneralCodingRulesArchTest {
   @ArchTest
   /* package */ static final ArchRule noClassesShouldThrowGenericExceptions =
       GeneralCodingRules.NO_CLASSES_SHOULD_THROW_GENERIC_EXCEPTIONS.because(
-          "直し方：Throwable、Exception、RuntimeException、Error を投げず、"
+          "呼び出し側と ApiExceptionHandler が例外の型で失敗を区別し、HTTP の応答に対応づけられるようにするため。"
+              + "直し方：Throwable、Exception、RuntimeException、Error を投げず、"
               + "NoSuchElementException や IllegalArgumentException などの具体的な例外を投げる。"
-              + ARCHITECTURE_TESTS_DOC);
+              + "規約：docs/backend/java-coding.md、docs/adr/ADR-013-standardize-http-api-contracts.md");
 
   /** {@code java.util.logging} の使用を禁止し、アプリケーションのロギング実装を統一する。 */
   @ArchTest
   /* package */ static final ArchRule noClassesShouldUseJavaUtilLogging =
       GeneralCodingRules.NO_CLASSES_SHOULD_USE_JAVA_UTIL_LOGGING.because(
-          "直し方：java.util.logging を使わず、クラスに @Slf4j を付けて log で記録する。" + JAVA_CODING_DOC);
+          "ログの書き方を一つにし、SLF4J の key-value を OpenTelemetry へ送るログの属性にするため。"
+              + "直し方：java.util.logging を使わず、クラスに @Slf4j を付けて log で記録する。"
+              + LOGGING_DOCS);
 
   /** 機能コードからロギング実装 API への直接依存を禁止し、SLF4J facade を使用する。 */
   @ArchTest
@@ -63,7 +67,8 @@ class GeneralCodingRulesArchTest {
               "org.apache.commons.logging..")
           .allowEmptyShould(true)
           .because(
-              "直し方：Logback、Log4j、Apache Commons Logging の API を使わず、@Slf4j の SLF4J の log で記録する。"
+              "ロギングの実装を差し替えても、機能コードを変えずに済むようにするため。"
+                  + "直し方：Logback、Log4j、Apache Commons Logging の API を使わず、@Slf4j の SLF4J の log で記録する。"
                   + "実装 API との接続はベースパッケージ直下の設定クラスに置く。"
                   + JAVA_CODING_DOC);
 
@@ -79,9 +84,10 @@ class GeneralCodingRulesArchTest {
   @ArchTest
   /* package */ static final ArchRule noClassesShouldUseFieldInjection =
       GeneralCodingRules.NO_CLASSES_SHOULD_USE_FIELD_INJECTION.because(
-          "直し方：フィールドの @Autowired、@Value などの注入アノテーションを外し、"
+          "依存をコンストラクタに明示して final にし、テストで Spring なしに組み立てられるようにするため。"
+              + "直し方：フィールドの @Autowired、@Value などの注入アノテーションを外し、"
               + "依存を private final フィールドにしてコンストラクタ引数で受け取る。"
-              + ARCHITECTURE_TESTS_DOC);
+              + JAVA_CODING_DOC);
 
   /** {@code @Autowired} を通常メソッドへ付けるメソッドインジェクションを禁止する。 */
   @ArchTest
@@ -90,21 +96,26 @@ class GeneralCodingRulesArchTest {
           .should()
           .beAnnotatedWith(Autowired.class)
           .because(
-              "直し方：メソッドの @Autowired を外し、依存をコンストラクタ引数で受け取る。"
+              "依存をコンストラクタに明示して final にし、テストで Spring なしに組み立てられるようにするため。"
+                  + "直し方：メソッドの @Autowired を外し、依存をコンストラクタ引数で受け取る。"
                   + "コンストラクタが一つなら @Autowired を付けない。"
-                  + ARCHITECTURE_TESTS_DOC);
+                  + JAVA_CODING_DOC);
 
   /** Java の {@code assert} 文に失敗理由のメッセージを必須とする。 */
   @ArchTest
   /* package */ static final ArchRule assertionsShouldHaveDetailMessage =
       GeneralCodingRules.ASSERTIONS_SHOULD_HAVE_DETAIL_MESSAGE.because(
-          "直し方：assert 文を「assert 条件 : \"対象と値\";」の形にし、失敗の詳細を書く。" + ARCHITECTURE_TESTS_DOC);
+          "失敗のログだけで原因と値を特定できるようにするため。"
+              + "直し方：assert 文を「assert 条件 : \"対象と値\";」の形にし、失敗の詳細を書く。"
+              + JAVA_CODING_DOC);
 
   /** 非推奨 API の新規利用を禁止する。 */
   @ArchTest
   /* package */ static final ArchRule deprecatedApiShouldNotBeUsed =
       GeneralCodingRules.DEPRECATED_API_SHOULD_NOT_BE_USED.because(
-          "直し方：@Deprecated の API を、その Javadoc が示す代わりの API に置き換える。" + ARCHITECTURE_TESTS_DOC);
+          "依存ライブラリの更新で API が削除されても、ビルドが壊れないようにするため。"
+              + "直し方：@Deprecated の API を、その Javadoc が示す代わりの API に置き換える。"
+              + "規約：docs/backend/java-coding.md、docs/adr/ADR-021-group-dependabot-minor-and-patch-updates.md");
 
   /** {@code java.util.Date} などの旧日時 API を禁止する。 */
   @ArchTest

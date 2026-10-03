@@ -52,13 +52,18 @@ class PackageByFeatureOnionArchitectureTest {
   /** 層の責務の規約と、クラスの役割を決めた ADR。 */
   private static final String LAYERS_DOCS = "規約：docs/backend/layers.md、" + ADR_048;
 
-  /** 役割の置き場所と命名の規則の理由（ADR-048 の Context）。 */
-  private static final String ONE_FORM_PER_ROLE =
-      "役割ごとに置き場所と形を一つに決め、同じ役割のクラスが作業者ごとに別の形で作られないようにするため。";
+  /** Repository とその実装を Persistence Adapter に置く規則の理由（jooq-repository.md の定義と ADR-002）。 */
+  private static final String PERSISTENCE_ADAPTER_REASON =
+      "jOOQ と生成型による DB の実装を infrastructure.persistence に閉じ込め、Domain と Application を DB の技術詳細から独立させるため。";
 
-  /** トランザクション境界の規則の理由（ADR-048 の Consequences）。 */
+  /** トランザクション境界の規則の理由（command-handler.md の定義）。 */
   private static final String TRANSACTION_BOUNDARY =
-      "トランザクション境界を CommandHandler の handle、QueryService の public メソッド、Listener の on に集めるため。";
+      "状態を変えるユースケースの処理の順序とトランザクション境界を一か所で決め、"
+          + "一つのユースケースを Command の受け取りから Result の返却まで一つのトランザクションで進めるため。";
+
+  /** トランザクション境界の規約と、クラスの役割を決めた ADR。 */
+  private static final String TRANSACTION_DOCS =
+      "規約：docs/backend/layers.md、docs/backend/class-roles/command-handler.md、" + ADR_048;
 
   /** 機能ルートを公開契約として扱い、Presentation と各 Infrastructure Adapter から Domain へ依存を向ける。 */
   @ArchTest
@@ -154,7 +159,7 @@ class PackageByFeatureOnionArchitectureTest {
           .resideInAnyPackage("..application..", "..domain.service..")
           .allowEmptyShould(true)
           .because(
-              ONE_FORM_PER_ROLE
+              "Application のユースケースと Domain Service だけが @Service を名乗り、Service という名前から役割を区別できるようにするため。"
                   + "直し方：@Service のクラスは application（CommandHandler、QueryService、Listener）か "
                   + "domain.service へ移す。Adapter の Bean には @Repository か @Component を付ける。"
                   + LAYERS_DOCS);
@@ -173,7 +178,7 @@ class PackageByFeatureOnionArchitectureTest {
           .haveSimpleNameEndingWith("Controller")
           .allowEmptyShould(true)
           .because(
-              ONE_FORM_PER_ROLE
+              "HTTP の入力と出力をユースケースの入力と出力に変換する場所を、集約ごとに一つに決めるため。"
                   + "直し方：Controller は <モジュール>.presentation.web へ移し、<Aggregate>Controller と命名する。"
                   + "規約：docs/backend/class-roles/controller.md、"
                   + ADR_048);
@@ -188,11 +193,13 @@ class PackageByFeatureOnionArchitectureTest {
           .resideInAPackage("..infrastructure.persistence..")
           .allowEmptyShould(true)
           .because(
-              ONE_FORM_PER_ROLE
+              PERSISTENCE_ADAPTER_REASON
                   + "直し方：@Repository のクラスは <モジュール>.infrastructure.persistence へ移し、"
                   + "Jooq<Aggregate>Repository にする。"
                   + "規約：docs/backend/class-roles/jooq-repository.md、"
-                  + ADR_048);
+                  + ADR_048
+                  + "、"
+                  + ADR_002);
 
   /** Presentation から Domain への依存を禁止する。 */
   @ArchTest
@@ -205,10 +212,13 @@ class PackageByFeatureOnionArchitectureTest {
           .resideInAPackage("..domain..")
           .allowEmptyShould(true)
           .because(
-              "直し方：Presentation では Application の Command、Result、CommandHandler と、"
+              "Domain の型を Application の外へ出さず、HTTP API の形と Domain を独立に変えられるようにするため。"
+                  + "直し方：Presentation では Application の Command、Result、CommandHandler と、"
                   + "モジュールルートの Queries と record だけを使い、"
                   + "Domain の型との変換は Application の CommandHandler か QueryService の中で行う。"
-                  + LAYERS_DOCS);
+                  + "規約：docs/backend/class-roles/controller.md、docs/backend/class-roles/request.md、"
+                  + "docs/backend/class-roles/response.md、"
+                  + ADR_048);
 
   /** Domain の interface を Domain の外で実装するクラスは Infrastructure に置く。 */
   @ArchTest
@@ -229,11 +239,13 @@ class PackageByFeatureOnionArchitectureTest {
           .resideInAPackage("..infrastructure.persistence..")
           .allowEmptyShould(true)
           .because(
-              ONE_FORM_PER_ROLE
+              PERSISTENCE_ADAPTER_REASON
                   + "直し方：Repository の実装は infrastructure.persistence へ移し、"
                   + "Jooq<Aggregate>Repository と命名する。"
                   + "規約：docs/backend/class-roles/jooq-repository.md、"
-                  + ADR_048);
+                  + ADR_048
+                  + "、"
+                  + ADR_002);
 
   /** Domain の外部システム interface の実装は {@code <ExternalSystem>Client} として Client Adapter に置く。 */
   @ArchTest
@@ -250,7 +262,8 @@ class PackageByFeatureOnionArchitectureTest {
           .resideInAPackage("..infrastructure.client..")
           .allowEmptyShould(true)
           .because(
-              ONE_FORM_PER_ROLE
+              "URL、JSON の形、タイムアウト、サーキットブレーカー、リトライを Client だけが扱い、"
+                  + "CommandHandler が外部システムの HTTP の詳細を知らずに済むようにするため。"
                   + "直し方：外部システムのインタフェースの実装は infrastructure.client へ移し、"
                   + "<ExternalSystem>Client と命名する。"
                   + "規約：docs/backend/class-roles/external-client.md、"
@@ -265,7 +278,7 @@ class PackageByFeatureOnionArchitectureTest {
           .because(
               TRANSACTION_BOUNDARY
                   + "直し方：クラスの @Transactional を外し、Application の public メソッドへ付け直す。"
-                  + LAYERS_DOCS);
+                  + TRANSACTION_DOCS);
 
   /** メソッド単位のトランザクション境界を、合成アノテーション経由も含めて Application の public メソッドに置く。 */
   @ArchTest
@@ -282,7 +295,7 @@ class PackageByFeatureOnionArchitectureTest {
           .because(
               TRANSACTION_BOUNDARY
                   + "直し方：@Transactional と @ApplicationModuleListener は Application の public メソッドへ移す。"
-                  + LAYERS_DOCS);
+                  + TRANSACTION_DOCS);
 
   /** 基底パッケージ配下の各機能モジュールに、外側から内側へ向かう依存を強制する規則を組み立てる。 */
   /* package */ static ArchRule dependenciesPointInwardRule(final String basePackage) {
@@ -323,10 +336,13 @@ class PackageByFeatureOnionArchitectureTest {
                         .and(not(resideInAPackage(basePackage + ".jooq")))))
         .allowEmptyShould(true)
         .because(
-            "直し方：Infrastructure では同じモジュールの domain.model の型だけを使い、"
+            "Adapter がユースケースを呼べると、Presentation のほかに処理の入口ができ、"
+                + "トランザクション境界が Application の外にも広がるため。"
+                + "直し方：Infrastructure では同じモジュールの domain.model の型だけを使い、"
                 + "Application、Domain Service、モジュールルートの型を使う処理は Application の CommandHandler か"
                 + " QueryService へ移す。"
-                + LAYERS_DOCS);
+                + "規約：docs/backend/class-roles/jooq-repository.md、docs/backend/class-roles/external-client.md、"
+                + ADR_048);
   }
 
   /** 機能ルートの型が標準型、JSpecify、同じルートパッケージの型だけに依存することを強制する規則を組み立てる。 */

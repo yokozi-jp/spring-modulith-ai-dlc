@@ -22,6 +22,7 @@ Controller は業務処理の置き場所ではない。
 業務規則、トランザクション、集約の保存を Controller に書かない。
 
 Controller は Domain の型と Repository を使わない。
+Domain の型を Application の外へ出さず、HTTP API の形と Domain を独立に変えられるようにするためである。
 入力は [Request](request.md) と [Command](command.md)、出力は [Result](result.md) と [Response](response.md) で受け渡す。
 
 ## 置き場所と命名

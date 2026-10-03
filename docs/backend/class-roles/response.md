@@ -162,6 +162,7 @@ class OrderSummaryListResponseTest {
   他モジュールとの契約と API の契約が一つになり、片方の変更がもう片方に及ぶ。
 - 一覧を JSON の配列のまま返す。
 - 集約や値オブジェクトを Response に持たせる、または集約から作る。
+  Domain の型が Application の外へ出て、HTTP API の形と Domain を独立に変えられなくなる。
 - 変換を Controller の private メソッドや Mapper のクラスに書く。
 - 区分値の表示名を返す。
 - 日時を整形済みの `String` や `LocalDateTime` で返す。

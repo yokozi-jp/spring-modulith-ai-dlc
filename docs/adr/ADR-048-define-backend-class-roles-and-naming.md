@@ -59,6 +59,7 @@ Proposed
 - CommandHandler の public メソッドは `@Transactional` を付けた `handle(<UseCase>Command)` だけにし、`<UseCase>Result` を返す。
 - `<UseCase>Command` と `<UseCase>Result` は、返す値がなくても必ず作り、標準型だけを持つ record として `application` に置く。Result は少なくとも集約の識別子を持つ。コマンドクエリ分離ではコマンドは値を返さないが（[Fowler, CommandQuerySeparation](https://martinfowler.com/bliki/CommandQuerySeparation.html)）、作成の応答に `Location` を組み立てるには識別子が要るためである。
 - CommandHandler は別の CommandHandler を呼ばない。
+  一つのユースケースを一つのトランザクションで進めるという CommandHandler の定義を保ち、ユースケースが別のユースケースを呼んで連鎖する形を防ぐためである。
 - 参照は機能ごとに一つの `<Feature>QueryService` が担う。QueryService はルートの `<Feature>Queries` を実装し、Repository で集約を読んでルートの record に変換する。参照専用の port は作らず、jOOQ で読み取りモデルへ直接射影しない。public メソッドには `@Transactional(readOnly = true)` を付ける。
 - 他モジュールのイベントは、受信側モジュールの `application` に置く `<Event>Listener` が `@ApplicationModuleListener` を付けた `on` メソッドで受ける。Listener はちょうど一つの CommandHandler を呼ぶ。
 - イベントは CommandHandler が `ApplicationEventPublisher` で発行する。`<Event>Publisher` クラス、`domain.model` の Domain Event、`infrastructure.messaging` は作らない。
@@ -71,11 +72,13 @@ Proposed
 - 作成の成功は 201 と、作成したリソースの URI を示す `Location` で返す。`POST` の対象 URI はコレクションなので、`Location` がないと作成したリソースを示せない（[RFC 9110 15.3.2](https://www.rfc-editor.org/rfc/rfc9110#section-15.3.2)）。Spring では `ResponseEntity.created(URI)` と `ServletUriComponentsBuilder` で組み立てる（[Javadoc: ResponseEntity](https://docs.spring.io/spring-framework/docs/current/javadoc-api/org/springframework/http/ResponseEntity.html)、[Spring, URI Links](https://docs.spring.io/spring-framework/reference/web/webmvc/mvc-uri-building.html)）。
 - Request から Command への変換は Request のインスタンスメソッド `toCommand()` に、ルートの record から Response への変換は Response の static メソッド `from(...)` に置き、`presentation.web` に Mapper クラスを作らない。
 - Presentation は Domain に依存せず、Application の Command、Result、CommandHandler と、ルートの Queries と record だけを使う。
+  Command と Result を標準型だけにするのと同じ考え方で、Domain の型を Application の外へ出さず、HTTP API の形と Domain を独立に変えられるようにするためである。
 - Repository の実装は `infrastructure.persistence` の `Jooq<Aggregate>Repository` とし、jOOQ の生成型と Domain の型の変換もこのクラスに書く。変換のための Mapper のクラスは作らない。
 - 読み取りは、`select` に並べた列を `Field.convertFrom` で値オブジェクトと enum に変え、子の Entity を `multiset` の副問い合わせで同じ SQL で読み、`Records.mapping(Order::restore)` で集約にする（[jOOQ, Ad-hoc converters](https://www.jooq.org/doc/latest/manual/sql-execution/fetching/ad-hoc-converter/)、[jOOQ, The MULTISET value constructor](https://www.jooq.org/doc/latest/manual/sql-building/column-expressions/multiset-value-constructor/)）。jOOQ の作者も、一対多の対応づけにこの形を示している（[Stack Overflow, Mapping a one-to-many relationship to a list of records in jOOQ](https://stackoverflow.com/a/71855430/521799)）。列の数や型が `restore` や Entity のコンストラクタの引数と合わないと、コンパイルが失敗する。
 - 書き込みは、`insertInto` の `set(列, 値)` で全列を書く。
 - 外部システムのインタフェースの実装は `infrastructure.client` の `<ExternalSystem>Client` とする。
 - Infrastructure は、機能モジュールの型のうち同じモジュールの `domain.model` の型だけを使い、Application、Domain Service、モジュールルートの型に依存しない。
+  オニオン規則は Adapter から内側への依存をすべて許すが、Adapter がユースケースを呼べると Presentation のほかに処理の入口ができ、トランザクション境界が Application の外にも広がるためである。
 
 ### モジュール間の連携
 

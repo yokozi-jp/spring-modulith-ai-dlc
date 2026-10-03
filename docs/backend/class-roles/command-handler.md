@@ -220,6 +220,7 @@ class CancelOrderCommandHandlerTest {
 - 状態遷移の判定（`if (order.status() == OrderStatus.SHIPPED)`）を CommandHandler に書く。
   集約が状態を守れず、同じ判定が CommandHandler ごとに重複する。
 - 別の CommandHandler を呼び、ユースケースを入れ子にする。
+  一つのユースケースを一つのトランザクションで進めるという定義が崩れ、ユースケースが別のユースケースを呼んで連鎖する。
 - クラスに `@Transactional` を付ける、または private メソッドに付ける。
 - `Instant.now()` や `LocalDateTime.now()` で現在時刻を取る。
 - 他モジュールの CommandHandler を呼ぶ。

@@ -108,9 +108,12 @@ class ProxyRulesArchTest {
         .no_classes_should_directly_call_other_methods_declared_in_the_same_class_that_are_annotated_with(
             annotationType)
         .because(
-            "直し方：@"
+            "Spring の AOP プロキシは Bean の外からの呼び出しだけを横取りし、同じクラスの中からの呼び出しでは @"
+                + annotationType.getSimpleName()
+                + " が黙って効かないため。"
+                + "直し方：@"
                 + annotationType.getSimpleName()
                 + " のメソッドを同じクラスの中から呼ばず、別の Bean へ移して、その Bean を注入して呼ぶ。"
-                + "規約：docs/backend/architecture-tests.md");
+                + "規約：docs/backend/java-coding.md");
   }
 }

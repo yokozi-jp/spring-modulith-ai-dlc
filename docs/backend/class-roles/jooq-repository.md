@@ -214,6 +214,8 @@ public long countUnshippedByCustomer(final CustomerId customerId) {
 - Spring Data の Repository のインタフェースを継承する。
 - 他モジュールのテーブルを読み書きする。
   他モジュールの情報は、相手の[参照のインタフェース](feature-queries.md)で読む。
+- `application` の CommandHandler や QueryService、`domain.service`、モジュールルートの型を使う。
+  Presentation のほかに処理の入口ができ、トランザクション境界が Application の外にも広がる。
 
 ## 作成時のチェックリスト
 

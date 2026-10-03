@@ -121,7 +121,9 @@ class ClassRoleArchTest {
           .haveSimpleNameEndingWith(COMMAND_HANDLER)
           .allowEmptyShould(true)
           .because(
-              "直し方：共通の業務規則は集約か Domain Service へ移し、"
+              "一つのユースケースを一つのトランザクションで進めるという CommandHandler の定義を保ち、"
+                  + "ユースケースが別のユースケースを呼んで連鎖する形を防ぐため。"
+                  + "直し方：共通の業務規則は集約か Domain Service へ移し、"
                   + "後続の処理はイベントを発行して Listener から別の CommandHandler を呼ぶ。"
                   + "規約：docs/backend/class-roles/command-handler.md、"
                   + ADR_048);
@@ -298,7 +300,7 @@ class ClassRoleArchTest {
         .resideInAPackage("..presentation.web..")
         .allowEmptyShould(true)
         .because(
-            "役割ごとに置き場所と形を一つに決め、同じ役割のクラスが作業者ごとに別の形で作られないようにするため。"
+            "リクエストボディと応答は HTTP の利用者との契約であり、ユースケースの入力や参照の結果とは別に変わるため。"
                 + "直し方：<UseCase>Request と <QueryResult>Response を <モジュール>.presentation.web の record にする。"
                 + "規約：docs/backend/class-roles/request.md、docs/backend/class-roles/response.md、"
                 + ADR_048);

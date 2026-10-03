@@ -46,9 +46,15 @@ class TestConventionsArchTest {
   /** テストコードの規約のパス。 */
   private static final String TESTING_CODE_STYLE_DOC = "docs/backend/testing-code-style.md";
 
-  /** {@code @Disabled} の理由の規則の直し方と規約。 */
-  private static final String DISABLED_REASON_FIX =
-      "直し方：@Disabled(\"<停止理由>\") のように value に停止理由を書く。規約：" + TESTING_CODE_STYLE_DOC;
+  /** テストのメソッドとクラスを public にしない規則の理由（docs/backend/testing-code-style.md）。 */
+  private static final String NOT_PUBLIC_REASON =
+      "JUnit 5 は package-private のテストも実行するので public は要らず、テストを他のパッケージから使わせないため。";
+
+  /** {@code @Disabled} の理由の規則の理由、直し方、規約。 */
+  private static final String DISABLED_REASON_BECAUSE =
+      "止めたテストを、なぜ止めたか分からないまま残さないため。"
+          + "直し方：@Disabled(\"<停止理由>\") のように value に停止理由を書く。規約："
+          + TESTING_CODE_STYLE_DOC;
 
   /** すべての {@code @Test} メソッドに {@code @DisplayName} で検証意図を明記させる。 */
   @ArchTest
@@ -73,7 +79,10 @@ class TestConventionsArchTest {
           .areAnnotatedWith(Test.class)
           .should()
           .notBePublic()
-          .because("直し方：@Test メソッドの public を外し、パッケージプライベートにする。規約：" + TESTING_CODE_STYLE_DOC)
+          .because(
+              NOT_PUBLIC_REASON
+                  + "直し方：@Test メソッドの public を外し、パッケージプライベートにする。規約："
+                  + TESTING_CODE_STYLE_DOC)
           .allowEmptyShould(true);
 
   /** {@code @Test} を持つクラスはパッケージプライベートにする。 */
@@ -84,7 +93,10 @@ class TestConventionsArchTest {
           .containAnyMethodsThat(annotatedWith(Test.class))
           .should()
           .notBePublic()
-          .because("直し方：テストクラスの public を外し、パッケージプライベートにする。規約：" + TESTING_CODE_STYLE_DOC)
+          .because(
+              NOT_PUBLIC_REASON
+                  + "直し方：テストクラスの public を外し、パッケージプライベートにする。規約："
+                  + TESTING_CODE_STYLE_DOC)
           .allowEmptyShould(true);
 
   /** {@code @Test} を持つクラス名は {@code Test} で終わらせ、補助クラスと区別する。 */
@@ -95,7 +107,10 @@ class TestConventionsArchTest {
           .containAnyMethodsThat(annotatedWith(Test.class))
           .should()
           .haveSimpleNameEndingWith("Test")
-          .because("直し方：@Test を持つクラスの名前を単数形の <対象>Test に変える。規約：" + TESTING_CODE_STYLE_DOC)
+          .because(
+              "テストクラスと、合成アノテーションや拡張などテストでない補助クラスを、名前で区別するため。"
+                  + "直し方：@Test を持つクラスの名前を単数形の <対象>Test に変える。規約："
+                  + TESTING_CODE_STYLE_DOC)
           .allowEmptyShould(true);
 
   /** {@code @SpringBootTest} を直接付けたクラスは共有構成を {@code @Import} してコンテキストキャッシュを効かせる。 */
@@ -120,7 +135,9 @@ class TestConventionsArchTest {
           .should()
           .callMethodWhere(target(name("assertTimeoutPreemptively")))
           .because(
-              "直し方：イベントは Spring Modulith の Scenario で、それ以外は対象 API の期限付き条件待機か、"
+              "別スレッドで処理を実行する assertTimeoutPreemptively では、"
+                  + "トランザクション、セキュリティコンテキスト、ログのコンテキストが本番経路と変わり得るため。"
+                  + "直し方：イベントは Spring Modulith の Scenario で、それ以外は対象 API の期限付き条件待機か、"
                   + "非プリエンプティブな assertTimeout で待つ。"
                   + "規約："
                   + TESTING_CODE_STYLE_DOC);
@@ -156,7 +173,7 @@ class TestConventionsArchTest {
           .that()
           .areAnnotatedWith(Disabled.class)
           .should(declareDisabledReason())
-          .because(DISABLED_REASON_FIX)
+          .because(DISABLED_REASON_BECAUSE)
           .allowEmptyShould(true);
 
   /** {@code @Disabled} は無言のスキップを避けるため理由を必須にする（クラス）。 */
@@ -166,7 +183,7 @@ class TestConventionsArchTest {
           .that()
           .areAnnotatedWith(Disabled.class)
           .should(declareDisabledReasonOnClass())
-          .because(DISABLED_REASON_FIX)
+          .because(DISABLED_REASON_BECAUSE)
           .allowEmptyShould(true);
 
   private static ArchCondition<JavaClass> importSharedTestConfiguration() {

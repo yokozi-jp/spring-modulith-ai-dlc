@@ -42,7 +42,7 @@
 
     <rule name="UseLombokSlf4j"
           language="java"
-          message="直し方：Logger フィールドと LoggerFactory の呼び出しを消し、クラスに Lombok の @Slf4j を付けて log を使う。規約：docs/backend/java-coding.md"
+          message="Logger の宣言とログの書き方を一つにするため。直し方：Logger フィールドと LoggerFactory の呼び出しを消し、クラスに Lombok の @Slf4j を付けて log を使う。規約：docs/backend/java-coding.md"
           class="net.sourceforge.pmd.lang.rule.xpath.XPathRule">
         <description>
             SLF4J Logger の生成を @Slf4j に統一し、Logger フィールドと LoggerFactory の直接利用を禁止する。

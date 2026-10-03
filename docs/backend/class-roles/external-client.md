@@ -185,6 +185,8 @@ class PaymentGatewayClientTest {
 - 外部 API の JSON の record を `domain.model` や `application` に置く、またはインタフェースの戻り値にする。
 - URL をコードに直接書く。
 - `@Service` を付ける、または名前を `Adapter` で終える。
+- `application` の CommandHandler や QueryService、`domain.service`、モジュールルートの型を使う。
+  Presentation のほかに処理の入口ができ、トランザクション境界が Application の外にも広がる。
 
 ## 作成時のチェックリスト
 
