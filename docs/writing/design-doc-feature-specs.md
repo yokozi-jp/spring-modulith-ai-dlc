@@ -14,7 +14,7 @@ tags: [convention, writing, design-doc, documentation, future-arch-guidelines]
 
 ## 設計書の単位と識別子
 
-設計書は次の単位で1文書ずつ作り、H1 を「識別子 機能名」にする（例：`# createOrder 注文登録`）。
+設計書は次の単位で1文書ずつ作り、H1 を「識別子 機能名」にする（例：`# placeOrder 注文の受付`）。
 
 - **画面**：route のパス（[フロントエンドのルーティングと状態管理](../frontend/routing-and-state.md)）。
 - **Web API**：OpenAPI の `operationId`（[Orval と API 境界](../frontend/api-client-orval.md)）。
@@ -65,7 +65,7 @@ DB 項目は次のように書く。
 ## Web API の設計書の例
 
 ````markdown
-# createOrder 注文登録
+# placeOrder 注文の受付
 
 ## 処理概要
 

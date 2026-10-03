@@ -32,6 +32,8 @@ Domain の型を Application の外へ出さず、HTTP API の形と Domain を�
 - `@RequestMapping` のパスは `/api/` に集約の複数形を付ける（`/api/orders`）。
   URL の形は[Web APIの方式とURLの設計](../../web-api/api-style.md)に従う。
 - ハンドラメソッドの名前は操作の動詞にする（`place`、`confirm`、`cancel`、`details`、`search`）。
+- ハンドラメソッドには `@Operation(operationId = "...")` で operationId を明示する（`placeOrder`、`confirmOrder`、`cancelOrder`、`findOrderById`、`listOrders`）。
+  名前は[Web APIの方式とURLの設計](../../web-api/api-style.md#operationid)の「operationId」に従う。
 
 注文の Controller は、次の HTTP の形にする。
 
@@ -63,7 +65,7 @@ Domain の型を Application の外へ出さず、HTTP API の形と Domain を�
 
 ## 依存してよい型、してはいけない型
 
-- **依存してよい型**：`java..` の標準型、`org.jspecify..`、同じ `presentation.web` の Request と Response、同じモジュールの `application` の Command、Result、CommandHandler、自モジュールのルートの `<Feature>Queries`、参照の結果、検索条件、Spring MVC の型、Jakarta Bean Validation の `@Valid`。
+- **依存してよい型**：`java..` の標準型、`org.jspecify..`、同じ `presentation.web` の Request と Response、同じモジュールの `application` の Command、Result、CommandHandler、自モジュールのルートの `<Feature>Queries`、参照の結果、検索条件、Spring MVC の型、Jakarta Bean Validation の `@Valid`、OpenAPI の `@Operation`。
 - **依存してはいけない型**：Domain の型（集約、値オブジェクト、Repository）、`<Feature>QueryService`、Infrastructure の型、jOOQ の API と生成型、他モジュールの型、`@Transactional`。
 
 ## 最小の例と典型的な例
@@ -87,6 +89,7 @@ class OrderController {
   }
 
   /** 注文を取り消す。 */
+  @Operation(operationId = "cancelOrder")
   @PostMapping("/{orderId}/cancel")
   /* package */ ResponseEntity<Void> cancel(
       @PathVariable final String orderId, @Valid @RequestBody final CancelOrderRequest request) {
@@ -102,6 +105,7 @@ class OrderController {
 
 ```java
 /** 注文を受け付け、作成した注文の URI を Location に入れて返す。 */
+@Operation(operationId = "placeOrder")
 @PostMapping
 /* package */ ResponseEntity<Void> place(@Valid @RequestBody final PlaceOrderRequest request) {
   final PlaceOrderResult result = placeOrder.handle(request.toCommand());
@@ -114,6 +118,7 @@ class OrderController {
 }
 
 /** 注文の詳細を返す。 */
+@Operation(operationId = "findOrderById")
 @GetMapping("/{orderId}")
 /* package */ OrderDetailsResponse details(@PathVariable final String orderId) {
   return orderQueries
@@ -123,6 +128,7 @@ class OrderController {
 }
 
 /** 顧客の注文の一覧を返す。 */
+@Operation(operationId = "listOrders")
 @GetMapping
 /* package */ OrderSummaryListResponse search(@RequestParam final String customerId) {
   return new OrderSummaryListResponse(
@@ -185,6 +191,7 @@ class OrderControllerTest {
 - [ ] Domain の型と Repository に依存しない。［ArchUnit で検査：PackageByFeatureOnionArchitectureTest.presentationDoesNotDependOnDomain］
 - [ ] Infrastructure に依存しない。［ArchUnit で検査：PackageByFeatureOnionArchitectureTest.dependenciesPointInward］
 - [ ] `@Transactional` を付けない。［ArchUnit で検査：PackageByFeatureOnionArchitectureTest.transactionalMethodsArePublicApplicationMethods］
+- [ ] ハンドラメソッドに `@Operation(operationId = "...")` を付け、名前を api-style.md の「operationId」の形にする。［Spectral で検査：operation-id-naming（形だけ。語彙は自分で点検）］
 - [ ] 集約ごとに一つ作り、`@RequestMapping("/api/<resources>")` を付けた package-private の class にする。［自分で点検］
 - [ ] 状態を変える操作は `@Valid` の Request を `toCommand(...)` で Command にし、パス変数の値は引数で渡す。［自分で点検］
 - [ ] 既存の集約を変える操作は、ロック番号を本文の Request で受ける。［自分で点検］
