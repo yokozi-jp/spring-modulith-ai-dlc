@@ -1,7 +1,7 @@
 ---
 type: Convention
 title: APIのリクエストヘッダーとレスポンスヘッダー
-description: APIが受け付けるリクエストヘッダー、品質値の扱い、Content-Type、Cache-Control、Server-Timingの付け方を定める規約。APIにヘッダーを追加するとき、応答のキャッシュを許可するか決めるとき、処理時間をクライアントへ返すときに読む。
+description: APIが受け付けるリクエストヘッダー、品質値の扱い、Content-Type、Cache-Control、Server-Timingの付け方を定める規約。APIにヘッダーを追加するとき、応答のキャッシュの扱いを確かめるとき、処理時間をクライアントへ返すときに読む。
 tags: [convention, web-api, http, future-arch-guidelines]
 ---
 
@@ -40,7 +40,7 @@ Content-Type: application/json
 
 ## Cache-Control
 
-API応答は既定でキャッシュさせない。
+API応答はキャッシュさせない。
 業務データは利用者ごとに権限で制御され、共有端末のブラウザやCDNに残すと他の利用者が参照できるためである。
 Spring Securityが既定で付けるキャッシュ抑止のヘッダー（`Cache-Control: no-cache, no-store, max-age=0, must-revalidate`）を無効化しない。
 
