@@ -69,6 +69,19 @@ class DateTimeConventionsArchTest {
       Set.of(
           "systemUTC", "systemDefaultZone", "system", "tickMillis", "tickSeconds", "tickMinutes");
 
+  /**
+   * システム {@code Clock} ファクトリの違反に付く修正方法の文。
+   *
+   * <p>{@code because(...)} の共通文は {@code Clock.systemUTC()} などを含むため、拒否テストは違反ごとの修正方法の文で検証する。
+   */
+  private static final String FACTORY_REMEDIATION = " は " + CLOCK_BEAN_METHOD + " 以外では使えない";
+
+  /** {@code Clock} を受け取らない {@code now(...)} の違反に付く修正方法の文。 */
+  private static final String NOW_REMEDIATION = " を Instant.now(clock) に置き換える";
+
+  /** {@code Instant} 以外の {@code now(Clock)} の違反に付く修正方法の文。 */
+  private static final String NOW_CLOCK_REMEDIATION = ".now(Clock) は Clock のゾーンで値を決め";
+
   /** レガシー日時型を用途に対応する {@code java.time} 型へ置き換える。 */
   @ArchTest
   /* package */ static final ArchRule legacyDateTimeTypesAreNotUsed =
@@ -109,15 +122,13 @@ class DateTimeConventionsArchTest {
 
     assertThatThrownBy(() -> injectedClockRule().check(bypassClass))
         .isInstanceOf(AssertionError.class)
-        .hasMessageContaining("InstantSource.system()")
-        .hasMessageContaining("Clock.systemUTC()")
-        .hasMessageContaining("Clock.systemDefaultZone()")
-        .hasMessageContaining("Clock.system(...)")
-        .hasMessageContaining("Clock.tickMillis(...)")
-        .hasMessageContaining("Clock.tickSeconds(...)")
-        .hasMessageContaining("Clock.tickMinutes(...)")
-        .hasMessageContaining(CLOCK_BEAN_METHOD)
-        .hasMessageContaining("Clock をコンストラクタ引数で受け取り");
+        .hasMessageContaining("InstantSource.system()" + FACTORY_REMEDIATION)
+        .hasMessageContaining("Clock.systemUTC()" + FACTORY_REMEDIATION)
+        .hasMessageContaining("Clock.systemDefaultZone()" + FACTORY_REMEDIATION)
+        .hasMessageContaining("Clock.system(...)" + FACTORY_REMEDIATION)
+        .hasMessageContaining("Clock.tickMillis(...)" + FACTORY_REMEDIATION)
+        .hasMessageContaining("Clock.tickSeconds(...)" + FACTORY_REMEDIATION)
+        .hasMessageContaining("Clock.tickMinutes(...)" + FACTORY_REMEDIATION);
   }
 
   /** {@code Clock} を受け取らない {@code now(...)} と、{@code Instant} 以外の {@code now(Clock)} を拒否する。 */
@@ -136,18 +147,18 @@ class DateTimeConventionsArchTest {
 
     assertThatThrownBy(() -> injectedClockRule().check(bypassClass))
         .isInstanceOf(AssertionError.class)
-        .hasMessageContaining("java.time.Instant.now()")
-        .hasMessageContaining("java.time.LocalDate.now(ZoneId)")
-        .hasMessageContaining("java.time.OffsetDateTime.now(ZoneId)")
-        .hasMessageContaining("java.time.LocalDate.now(Clock)")
-        .hasMessageContaining("java.time.LocalDateTime.now(Clock)")
-        .hasMessageContaining("java.time.LocalTime.now(Clock)")
-        .hasMessageContaining("java.time.ZonedDateTime.now(Clock)")
-        .hasMessageContaining("java.time.OffsetDateTime.now(Clock)")
-        .hasMessageContaining("java.time.OffsetTime.now(Clock)")
-        .hasMessageContaining("java.time.Year.now(Clock)")
-        .hasMessageContaining("java.time.YearMonth.now(Clock)")
-        .hasMessageContaining("java.time.MonthDay.now(Clock)");
+        .hasMessageContaining("java.time.Instant.now()" + NOW_REMEDIATION)
+        .hasMessageContaining("java.time.LocalDate.now(ZoneId)" + NOW_REMEDIATION)
+        .hasMessageContaining("java.time.OffsetDateTime.now(ZoneId)" + NOW_REMEDIATION)
+        .hasMessageContaining("java.time.LocalDate" + NOW_CLOCK_REMEDIATION)
+        .hasMessageContaining("java.time.LocalDateTime" + NOW_CLOCK_REMEDIATION)
+        .hasMessageContaining("java.time.LocalTime" + NOW_CLOCK_REMEDIATION)
+        .hasMessageContaining("java.time.ZonedDateTime" + NOW_CLOCK_REMEDIATION)
+        .hasMessageContaining("java.time.OffsetDateTime" + NOW_CLOCK_REMEDIATION)
+        .hasMessageContaining("java.time.OffsetTime" + NOW_CLOCK_REMEDIATION)
+        .hasMessageContaining("java.time.Year" + NOW_CLOCK_REMEDIATION)
+        .hasMessageContaining("java.time.YearMonth" + NOW_CLOCK_REMEDIATION)
+        .hasMessageContaining("java.time.MonthDay" + NOW_CLOCK_REMEDIATION);
   }
 
   /** メソッド参照による迂回も呼び出しと同じく拒否する。 */
@@ -162,10 +173,10 @@ class DateTimeConventionsArchTest {
                 injectedClockRule()
                     .check(new ClassFileImporter().importClasses(MethodReferenceBypass.class)))
         .isInstanceOf(AssertionError.class)
-        .hasMessageContaining("java.time.Instant.now()")
-        .hasMessageContaining("java.time.LocalDate.now(Clock)")
-        .hasMessageContaining("Clock.systemUTC()")
-        .hasMessageContaining("InstantSource.system()");
+        .hasMessageContaining("java.time.Instant.now()" + NOW_REMEDIATION)
+        .hasMessageContaining("java.time.LocalDate" + NOW_CLOCK_REMEDIATION)
+        .hasMessageContaining("Clock.systemUTC()" + FACTORY_REMEDIATION)
+        .hasMessageContaining("InstantSource.system()" + FACTORY_REMEDIATION);
   }
 
   /** 述語が広すぎて許可経路まで拒否しないことを確かめる。 */
