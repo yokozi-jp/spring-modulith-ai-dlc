@@ -9,7 +9,7 @@ tags: [convention, backend, class-role]
 
 `<ExternalSystem>` は、決済などの外部システムをドメインの語彙で表すインタフェースであり、`domain.model` に置く。
 引数と戻り値は値オブジェクトにし、HTTP や製品の型を出さない。
-実装は `infrastructure.client` の `<ExternalSystem>Client` が持ち、呼ぶのは `<UseCase>CommandHandler` だけである。
+実装は `infrastructure.client` の `<ExternalSystem>Client` が持ち、呼ぶのは、イベントを受けた Listener から呼ばれる `<UseCase>CommandHandler`（`ChargeOrderCommandHandler`）だけである。
 役割の決定理由は [ADR-050](../../adr/ADR-050-define-backend-class-roles-and-naming.md) に示す。
 
 ## 定義
@@ -19,7 +19,8 @@ tags: [convention, backend, class-role]
 注文の例では、`PaymentGateway` が注文の代金を請求し、決済の識別子（`PaymentId`）を返す。
 
 インタフェースを Domain に置き、実装を Infrastructure に置くことで、依存は内向きに保たれる。
-外部システムの呼び出しは `<UseCase>CommandHandler` が行い、[集約](aggregate.md)と [Domain Service](domain-service.md) は呼ばない。
+外部システムの呼び出しは、イベントを受けた Listener から呼ばれる `<UseCase>CommandHandler` が行い、画面から呼ばれる CommandHandler、[集約](aggregate.md)、[Domain Service](domain-service.md) は呼ばない。
+画面から呼ばれる CommandHandler のトランザクションの中で呼ばない理由は、[CommandHandler](command-handler.md) と [ADR-050](../../adr/ADR-050-define-backend-class-roles-and-naming.md) に示す。
 
 ## 置き場所と命名
 
@@ -36,6 +37,8 @@ tags: [convention, backend, class-role]
 - メソッドが一つのインタフェースには、`@SuppressWarnings("PMD.ImplicitFunctionalInterface")` を理由のコメントと一緒に付ける。
   PMD が、メソッドが一つのインタフェースを関数型インタフェースとして報告するためである。
 - 引数と戻り値は、値オブジェクトと Java の標準型にする。
+- 副作用のある操作は、重複を防ぐ冪等性キーを引数に持ち、Javadoc にそう書く（`charge` は `OrderId` を冪等性キーにする）。
+  冪等性キーの扱いは[順序保証と冪等性](../../integration/async-ordering-and-idempotency.md)に従う。
 - インタフェースと各メソッドに Javadoc を書く。
 - パッケージの `package-info.java` は集約と共有する。
 
@@ -56,7 +59,12 @@ package com.example.demo.order.domain.model;
 @SuppressWarnings("PMD.ImplicitFunctionalInterface")
 public interface PaymentGateway {
 
-  /** 注文の代金を請求し、決済の識別子を返す。 */
+  /**
+   * 注文の代金を請求し、決済の識別子を返す。
+   *
+   * <p>注文 ID を冪等性キーにする。
+   * 同じ注文 ID の二回目以降の請求では、決済システムは新たに請求せず、最初の請求の決済の識別子を返す。
+   */
   PaymentId charge(OrderId orderId, Money amount);
 }
 ```
@@ -76,23 +84,25 @@ public record PaymentId(String value) {
 }
 ```
 
-典型的な例は、`ConfirmOrderCommandHandler` が注文を確定する前に代金を請求する場面と、実装の宣言である。
+典型的な例は、`ChargeOrderCommandHandler` が、確定した注文の代金を注文 ID を冪等性キーにして請求する場面と、実装の宣言である。
 
 ```java
-// com.example.demo.order.application.ConfirmOrderCommandHandler（抜粋）
-/** ロック番号を確かめ、代金を請求して注文を確定する。 */
+// com.example.demo.order.application.ChargeOrderCommandHandler（抜粋）
+/** 支払い済みでない注文の代金を、注文 ID を冪等性キーにして請求し、支払い済みにして保存する。 */
 @Transactional
-public ConfirmOrderResult handle(final ConfirmOrderCommand command) {
+public ChargeOrderResult handle(final ChargeOrderCommand command) {
   final Order order =
       orderRepository
           .findById(new OrderId(command.orderId()))
           .orElseThrow(
               () -> new NoSuchElementException("order not found: orderId=" + command.orderId()));
-  order.ensureLockNo(command.lockNo());
+  if (order.isPaid()) {
+    return new ChargeOrderResult(order.id().value());
+  }
   paymentGateway.charge(order.id(), order.total());
-  order.confirm();
+  order.markPaid();
   orderRepository.update(order);
-  return new ConfirmOrderResult(order.id().value());
+  return new ChargeOrderResult(order.id().value());
 }
 ```
 
@@ -100,7 +110,7 @@ public ConfirmOrderResult handle(final ConfirmOrderCommand command) {
 // com.example.demo.order.infrastructure.client.PaymentGatewayClient（宣言だけ）
 @Component
 class PaymentGatewayClient implements PaymentGateway {
-  // RestClient で外部の決済システムを呼び、応答を PaymentId に変換する。
+  // RestClient で外部の決済システムを呼び、注文 ID を冪等性キーのヘッダーで送り、応答を PaymentId に変換する。
 }
 ```
 
@@ -115,6 +125,10 @@ class PaymentGatewayClient implements PaymentGateway {
   外部システムを替えると Domain と Application も変わる。
 - 製品名でインタフェースを名付ける（`StripeClient`）。
 - 外部システムを集約や Domain Service から呼ぶ。
+- 画面から呼ばれる CommandHandler から外部システムを呼ぶ。
+  詳細は [CommandHandler](command-handler.md) のアンチパターンに示す。
+- 副作用のある操作に冪等性キーを持たせない。
+  ロールバックやイベント出版の再投入でもう一度呼ぶと、同じ請求が二回実行される。
 - 実装を `infrastructure.client` 以外に置く、または `<ExternalSystem>Adapter` と名付ける。
 - 接続先の URL やタイムアウトをインタフェースの引数で渡す。
   通信の設定は実装の `<ExternalSystem>Client` が持つ。
@@ -127,6 +141,7 @@ class PaymentGatewayClient implements PaymentGateway {
 - [ ] 引数と戻り値は値オブジェクトと Java の標準型にする。［自分で点検］
 - [ ] 実装は `infrastructure.client` の `<ExternalSystem>Client` にする。［ArchUnit で検査：PackageByFeatureOnionArchitectureTest.externalSystemImplementationsAreClients］
 - [ ] Domain の外の実装は `infrastructure` に置く。［ArchUnit で検査：PackageByFeatureOnionArchitectureTest.domainInterfacesAreImplementedInInfrastructure］
-- [ ] 呼び出しは `<UseCase>CommandHandler` から行い、集約と Domain Service から呼ばない。［自分で点検］
+- [ ] 呼び出しは、イベントを受けた Listener から呼ばれる `<UseCase>CommandHandler` から行い、画面から呼ばれる CommandHandler、集約、Domain Service から呼ばない。［自分で点検］
+- [ ] 副作用のある操作は冪等性キーを引数に持ち、Javadoc に書く。［自分で点検］
 - [ ] `@SuppressWarnings("PMD.ImplicitFunctionalInterface")` に理由のコメントを付け、インタフェースと各メソッドに Javadoc を書く。［自分で点検］
 - [ ] `domain.model` のパッケージに `@NullMarked` の `package-info.java` がある。［Error Prone で検査：RequireExplicitNullMarking］

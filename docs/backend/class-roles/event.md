@@ -7,7 +7,7 @@ tags: [convention, backend, class-role]
 
 # クラスの役割：イベント
 
-イベントは、状態の変化を他モジュールへ通知するモジュールルートの record であり、名前は過去形にする。
+イベントは、状態の変化を他モジュールと自モジュールの後続の処理へ通知するモジュールルートの record であり、名前は過去形にする。
 発行側の `<UseCase>CommandHandler` が `handle` のトランザクションの中で `ApplicationEventPublisher` を使って発行する。
 受信側のモジュールは、`application` の `<Event>Listener` で受ける。
 役割の決定理由は [ADR-050](../../adr/ADR-050-define-backend-class-roles-and-naming.md) に示す。
@@ -16,6 +16,9 @@ tags: [convention, backend, class-role]
 
 機能モジュールの間で状態の変化を伝える手段は、イベントだけである。
 **イベント**（`<Event>`）は、すでに起きた業務上の出来事を表す record であり、他モジュールが読む公開契約である。
+
+イベントは、自モジュールで外部システムを呼ぶ処理を、業務データの更新をコミットした後に始める手段でもある（`OrderConfirmed` を受けた `OrderConfirmedListener` が決済を始める）。
+イベント出版レジストリは業務データの更新と同じトランザクションでイベントを記録するため、トランザクションアウトボックスとして働く（[メッセージングの設計](../../integration/async-messaging-design.md)の「DB 更新とメッセージ発行の整合」）。
 
 イベントは、相手に処理を命じるメッセージではない。
 受信側が何をするかは、受信側のモジュールが決める。
@@ -26,9 +29,10 @@ tags: [convention, backend, class-role]
 ## 置き場所と命名
 
 - 発行するモジュールのルート `com.example.demo.<feature>` に置く。
-- 名前は集約の名前と過去分詞にする（`OrderPlaced`、`OrderCancelled`）。
+- 名前は集約の名前と過去分詞にする（`OrderPlaced`、`OrderConfirmed`、`OrderCancelled`）。
   `PlaceOrder`、`OrderPlaceEvent`、`OrderCancelRequested` のような命令形や現在形にしない。
 - 受信するクラスは、受信側のモジュールの `application` に `<Event>Listener` として置く（`OrderPlacedListener`、`OrderCancelledListener`）。
+  自モジュールのイベントは、発行したモジュールの `application` の `<Event>Listener` で受ける（`OrderConfirmedListener`）。
 
 ## 必須の記述
 
@@ -59,6 +63,8 @@ import java.time.Instant;
 /** 注文を取り消したことを他モジュールへ知らせる。 */
 public record OrderCancelled(String orderId, Instant cancelledAt) {}
 ```
+
+注文を確定したことを表す `OrderConfirmed(String orderId, Instant confirmedAt)` も同じ形である。
 
 典型的な例は、`OrderPlaced` の定義、発行、受信の三つである。
 

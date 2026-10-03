@@ -46,6 +46,7 @@ tags: [convention, backend, class-role]
 Domain が投げる JDK の例外は、いまは HTTP の 500 になる。
 ユースケースがこの例外を 400、404、422 で返す必要があるときは、実装を止めて利用者に確認し、対応づけを新しい ADR で決める。
 ステータスコードの使い分けは[HTTPステータスコードの選択](../../web-api/status-codes.md)に、API のエラー契約は [ADR-013](../../adr/ADR-013-standardize-http-api-contracts.md) に従う。
+対応づけの作業は [issue #107](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/107) で扱う。
 
 ## 依存してよい型、してはいけない型
 
@@ -131,6 +132,8 @@ public enum OrderStatus {
   PLACED,
   /** 確定。 */
   CONFIRMED,
+  /** 支払い済み。 */
+  PAID,
   /** 出荷。 */
   SHIPPED,
   /** 取消。 */

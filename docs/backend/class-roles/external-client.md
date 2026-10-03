@@ -14,7 +14,7 @@ tags: [convention, backend, class-role]
 
 ## 定義
 
-CommandHandler は、決済のような外部システムを[外部システムのインタフェース](external-system-interface.md)で呼び、HTTP の詳細を知らない。
+Listener から呼ばれる CommandHandler は、決済のような外部システムを[外部システムのインタフェース](external-system-interface.md)で呼び、HTTP の詳細を知らない。
 **外部システムの Client**（`<ExternalSystem>Client`）は、そのインタフェースを、外部システムの HTTP API の呼び出しで実装するクラスである。
 URL、JSON の形、タイムアウト、サーキットブレーカー、リトライは、Client だけが扱う。
 
@@ -40,7 +40,9 @@ Client はユースケースの進行役でもない。
 - 実装するメソッドに `@CircuitBreaker(name = "payment-gateway")` と `@Retry(name = "payment-gateway")` を付ける。
   リトライはこの層だけで行い、CommandHandler や HTTP クライアントで重ねない。
 - instance の設定は、`application.yaml` の `resilience4j` に、既定の設定を継承して書く。
-  冪等でない操作（`charge`）の `retry` は `default` を継承して試行を一回にし、冪等な操作だけ `idempotent` を継承する。
+  冪等性キーを渡さない更新の操作は `retry` の `default` を、GET などの冪等な操作は `idempotent` を継承する。
+  `charge` は冪等性キーで重複を防げるが、`ChargeOrderCommandHandler` のトランザクションの中で呼ぶため、`default` を継承して試行を一回にし、失敗した請求はイベント出版の再投入でやり直す。
+- 冪等性キーを受け取る操作は、キーを外部システムの API が定めるヘッダー（決済システムの例では `Idempotency-Key`）で送る。
 - 外部システムの応答は、Domain の型（`PaymentId`）に変換して返す。
   応答の本文がないときは `IllegalStateException` を投げる。
 - クラス、定数、フィールド、コンストラクタ、実装するメソッドに Javadoc を書く。
@@ -75,7 +77,7 @@ resilience4j:
 ```java
 package com.example.demo.order.infrastructure.client;
 
-/** 決済システムの HTTP API で、注文の代金を請求する。 */
+/** 決済システムの HTTP API で、注文 ID を冪等性キーにして注文の代金を請求する。 */
 @Component
 class PaymentGatewayClient implements PaymentGateway {
 
@@ -84,6 +86,9 @@ class PaymentGatewayClient implements PaymentGateway {
 
   /** 一回の呼び出しの応答を待つ上限。 */
   private static final Duration READ_TIMEOUT = Duration.ofSeconds(2);
+
+  /** 決済システムが冪等性キーを受け取るヘッダー。 */
+  private static final String IDEMPOTENCY_KEY = "Idempotency-Key";
 
   /** 決済システムを呼ぶ HTTP クライアント。 */
   private final RestClient restClient;
@@ -106,6 +111,7 @@ class PaymentGatewayClient implements PaymentGateway {
         restClient
             .post()
             .uri("/payments")
+            .header(IDEMPOTENCY_KEY, orderId.value())
             .body(new ChargeBody(orderId.value(), amount.amount()))
             .retrieve()
             .body(ChargeReply.class);
@@ -123,14 +129,16 @@ class PaymentGatewayClient implements PaymentGateway {
 }
 ```
 
-典型的な例は、`ConfirmOrderCommandHandler` がインタフェースを通して Client を呼ぶ場面である。
+典型的な例は、`ChargeOrderCommandHandler` がインタフェースを通して Client を呼ぶ場面である。
 CommandHandler は `PaymentGateway` に依存し、`PaymentGatewayClient` を知らない。
 
 ```java
-// com.example.demo.order.application.ConfirmOrderCommandHandler（抜粋）
-order.ensureLockNo(command.lockNo());
+// com.example.demo.order.application.ChargeOrderCommandHandler（抜粋）
+if (order.isPaid()) {
+  return new ChargeOrderResult(order.id().value());
+}
 paymentGateway.charge(order.id(), order.total());
-order.confirm();
+order.markPaid();
 orderRepository.update(order);
 ```
 
@@ -138,6 +146,7 @@ orderRepository.update(order);
 
 Spring を起動しない JUnit のテストで、JDK の `com.sun.net.httpserver.HttpServer` を空いているポートで起動し、Client に URL を渡す。
 HTTP の本文と Domain の型の変換を確かめ、応答を遅らせたときにタイムアウトすることも同じ方法で確かめる。
+冪等性キーのヘッダーも同じ方法で確かめる。
 Spring を起動しないため、このテストでは `@CircuitBreaker` と `@Retry` は働かない。
 
 ```java
@@ -145,13 +154,15 @@ Spring を起動しないため、このテストでは `@CircuitBreaker` と `@
 class PaymentGatewayClientTest {
 
   @Test
-  @DisplayName("決済システムが返した決済 ID を返す")
-  void returnsPaymentIdFromGateway() throws IOException {
+  @DisplayName("注文 ID を冪等性キーにして請求し、決済システムが返した決済 ID を返す")
+  void chargesWithOrderIdAsIdempotencyKey() throws IOException {
+    final AtomicReference<String> idempotencyKey = new AtomicReference<>();
     final HttpServer server =
         HttpServer.create(new InetSocketAddress(InetAddress.getLoopbackAddress(), 0), 0);
     server.createContext(
         "/payments",
         exchange -> {
+          idempotencyKey.set(exchange.getRequestHeaders().getFirst("Idempotency-Key"));
           final byte[] body = "{\"paymentId\":\"PAY-1\"}".getBytes(StandardCharsets.UTF_8);
           exchange.getResponseHeaders().add("Content-Type", "application/json");
           exchange.sendResponseHeaders(201, body.length);
@@ -168,6 +179,7 @@ class PaymentGatewayClientTest {
           client.charge(new OrderId("O-1"), new Money(new BigDecimal("1000")));
 
       assertThat(paymentId).as("orderId=O-1 の決済 ID").isEqualTo(new PaymentId("PAY-1"));
+      assertThat(idempotencyKey).as("orderId=O-1 の請求の冪等性キー").hasValue("O-1");
     } finally {
       server.stop(0);
     }
@@ -181,8 +193,10 @@ class PaymentGatewayClientTest {
 - タイムアウトを設定せず、TimeLimiter だけに中断を任せる。
 - CommandHandler に `@Retry` を付ける、または HTTP クライアントの再試行と重ねる。
   一回の失敗で試行の回数が掛け算で増える。
-- 冪等でない `charge` に `idempotent` を継承させて再試行する。
-  一回の請求が二重に実行されうる。
+- 冪等性キーを渡さない更新の操作に `idempotent` を継承させて再試行する。
+  一回の更新が二重に実行されうる。
+- 冪等性キーを外部システムへ送らない。
+  ロールバックやイベント出版の再投入で `charge` をもう一度呼ぶと、二重に請求する。
 - 外部 API の JSON の record を `domain.model` や `application` に置く、またはインタフェースの戻り値にする。
 - URL をコードに直接書く。
 - `@Service` を付ける、または名前を `Adapter` で終える。
@@ -204,5 +218,6 @@ class PaymentGatewayClientTest {
 - [ ] 名前付きの instance の `@CircuitBreaker` と `@Retry` をメソッドに付け、`application.yaml` に設定を書く。［自分で点検］
 - [ ] 外部システムの応答を Domain の型に変換して返す。［自分で点検］
 - [ ] クラス、定数、フィールド、コンストラクタ、実装するメソッドに Javadoc を書く。［自分で点検］
-- [ ] JDK の `HttpServer` で HTTP の呼び出しを確かめるテストを書く。［自分で点検］
+- [ ] 冪等性キーを受け取る操作は、キーをヘッダーで送る。［自分で点検］
+- [ ] JDK の `HttpServer` で、HTTP の呼び出しと冪等性キーのヘッダーを確かめるテストを書く。［自分で点検］
 - [ ] `infrastructure.client` のパッケージに `@NullMarked` の `package-info.java` を置く。［Error Prone で検査：RequireExplicitNullMarking］

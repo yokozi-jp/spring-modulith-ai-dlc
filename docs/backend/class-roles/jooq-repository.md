@@ -86,6 +86,7 @@ jOOQ の Repository は業務規則を持たない。
 `NoSuchElementException` と `<Aggregate>ConflictException` を 404 と 409 の Problem Details にする対応づけは、まだない。
 いまはどちらも 500 になり、対応づけは [ADR-050](../../adr/ADR-050-define-backend-class-roles-and-naming.md) の Neutral のとおり新しい ADR で決める。
 ステータスコードの使い分けは[HTTPステータスコードの選択](../../web-api/status-codes.md)と[更新の競合制御](../../web-api/optimistic-locking.md)に従う。
+対応づけの作業は [issue #107](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/107) で扱う。
 
 PostgreSQL には MULTISET がなく、jOOQ は `jsonb_agg` による JSON の集約で模倣する。
 子の行が数千に及ぶ集約では、二つの SQL に分けて読むほうが速いことがある。
@@ -260,7 +261,11 @@ public long countUnshippedByCustomer(final CustomerId customerId) {
   return dsl.fetchCount(
       ORDERS,
       ORDERS.CUSTOMER_ID.eq(customerId.value())
-          .and(ORDERS.STATUS.in(OrderStatus.PLACED.name(), OrderStatus.CONFIRMED.name())));
+          .and(
+              ORDERS.STATUS.in(
+                  OrderStatus.PLACED.name(),
+                  OrderStatus.CONFIRMED.name(),
+                  OrderStatus.PAID.name())));
 }
 ```
 

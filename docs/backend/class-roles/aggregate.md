@@ -24,12 +24,15 @@ tags: [convention, backend, class-role]
 注文の集約は、次の状態遷移を持つ。
 
 ```text
-受付（PLACED） ──confirm()──> 確定（CONFIRMED） ──ship()──> 出荷（SHIPPED）
-     │                              │
-     └─────────cancel()─────────────┴──> 取消（CANCELLED）
+受付（PLACED） ──confirm()──> 確定（CONFIRMED） ──markPaid()──> 支払い済み（PAID） ──ship()──> 出荷（SHIPPED）
+     │
+     └──cancel()──> 取消（CANCELLED）
 ```
 
-取消は受付と確定からだけでき、出荷と取消の後の `cancel()` は `IllegalStateException` を投げる。
+取消は受付からだけでき、受付でない注文の `cancel()` は `IllegalStateException` を投げる。
+確定の後は決済が非同期で進み、確定の後の取消には返金が要るため、この例では扱わない（[ADR-050](../../adr/ADR-050-define-backend-class-roles-and-naming.md)）。
+`markPaid()` は確定のときだけでき、`isPaid()` は支払い済みと出荷のときに `true` を返す。
+決済は、確定のイベントを受けた `ChargeOrderCommandHandler` が行う（[CommandHandler](command-handler.md)）。
 割引の適用（`applyDiscount`）と明細の数量の変更（`changeLineQuantity`）は、受付のときだけできる。
 
 集約ルートは、[PostgreSQL の共通カラム](../../database/postgresql-common-columns.md)の `lock_no` を `lockNo` として持つ。
@@ -44,7 +47,8 @@ tags: [convention, backend, class-role]
 - 新規作成は業務の動詞の static メソッドにし（`Order.place`）、保存済みの状態は `Order.restore` で作る。
 - 更新の競合を表す例外は、集約と同じ `domain.model` に、集約の名前に `ConflictException` を付けて置く（`OrderConflictException`）。
   CommandHandler と Repository の実装の両方が使うため、`domain.model` に置く。
-- 状態を変えるメソッドは業務の動詞にし（`confirm`、`ship`、`cancel`、`applyDiscount`、`changeLineQuantity`）、アクセサは `get` を付けず record と同じ形（`id()`）にする。
+- 状態を変えるメソッドは業務の動詞にし（`confirm`、`markPaid`、`ship`、`cancel`、`applyDiscount`、`changeLineQuantity`）、アクセサは `get` を付けず record と同じ形（`id()`）にする。
+  状態を問うメソッドは `is` で始める（`isPaid`）。
 
 ## 必須の記述
 
@@ -65,6 +69,7 @@ tags: [convention, backend, class-role]
 Domain が投げる JDK の例外と `<Aggregate>ConflictException` は、いまは HTTP の 500 になる。
 ユースケースがこの例外を 400、404、409、422 で返す必要があるときは、実装を止めて利用者に確認し、対応づけを新しい ADR で決める。
 ステータスコードの使い分けは[HTTPステータスコードの選択](../../web-api/status-codes.md)に、API のエラー契約は [ADR-013](../../adr/ADR-013-standardize-http-api-contracts.md) に従う。
+対応づけの作業は [issue #107](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/107) で扱う。
 
 ## 依存してよい型、してはいけない型
 
@@ -180,18 +185,26 @@ public void ensureLockNo(final long lockNo) {
   }
 }
 
-/** 確定した注文を出荷する。 */
-public void ship() {
+/** 確定の注文を支払い済みにする。 */
+public void markPaid() {
   ensureStatus(OrderStatus.CONFIRMED);
+  status = OrderStatus.PAID;
+}
+
+/** 代金を支払い済みかを返す。支払い済みと出荷の注文で true を返す。 */
+public boolean isPaid() {
+  return status == OrderStatus.PAID || status == OrderStatus.SHIPPED;
+}
+
+/** 支払い済みの注文を出荷する。 */
+public void ship() {
+  ensureStatus(OrderStatus.PAID);
   status = OrderStatus.SHIPPED;
 }
 
-/** 受付か確定の注文を取り消す。 */
+/** 受付の注文を取り消す。 */
 public void cancel() {
-  if (status != OrderStatus.PLACED && status != OrderStatus.CONFIRMED) {
-    throw new IllegalStateException(
-        "order cannot be cancelled: orderId=" + id.value() + ", status=" + status);
-  }
+  ensureStatus(OrderStatus.PLACED);
   status = OrderStatus.CANCELLED;
 }
 
@@ -260,6 +273,7 @@ class OrderTest {
                     1, new ProductCode("P-1"), new Quantity(2), new Money(new BigDecimal("500")))),
             Instant.parse("2026-10-03T00:00:00Z"));
     order.confirm();
+    order.markPaid();
     order.ship();
 
     assertThatThrownBy(order::cancel)

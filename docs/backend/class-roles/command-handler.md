@@ -1,7 +1,7 @@
 ---
 type: Convention
 title: クラスの役割：CommandHandler
-description: application に置き、状態を変えるユースケースを一つ実行する CommandHandler の定義、置き場所と命名、必須の記述（handle と @Transactional）、依存、例、テスト、アンチパターン、作成時のチェックリストを定める。状態を変えるユースケースを作るとき、トランザクション境界とイベントの発行の場所を確かめるときに読む。
+description: application に置き、状態を変えるユースケースを一つ実行する CommandHandler の定義、置き場所と命名、必須の記述（handle と @Transactional）、依存、例、テスト、アンチパターン、作成時のチェックリストを定める。状態を変えるユースケースを作るとき、トランザクション境界とイベントの発行の場所、外部システムを呼ぶ場所を確かめるときに読む。
 tags: [convention, backend, class-role]
 ---
 
@@ -9,7 +9,7 @@ tags: [convention, backend, class-role]
 
 `<UseCase>CommandHandler` は、状態を変えるユースケース一つを実行するクラスであり、`application` に置いて `@Service` を付ける。
 public メソッドは `@Transactional` を付けた `handle` 一つだけにし、Command を受け取って Result を返す。
-集約と Domain Service を組み合わせて Repository で保存し、他モジュールへはイベントで伝える。
+集約と Domain Service を組み合わせて Repository で保存し、他モジュールと外部システムの呼び出しへはイベントで伝える。
 役割の決定理由は [ADR-050](../../adr/ADR-050-define-backend-class-roles-and-naming.md) に示す。
 
 ## 定義
@@ -26,7 +26,7 @@ CommandHandler は他モジュールから呼ばれない。
 ## 置き場所と命名
 
 - `com.example.demo.<feature>.application` に置く。
-- 状態を変えるユースケースごとに一つ作る（`PlaceOrderCommandHandler`、`ConfirmOrderCommandHandler`、`CancelOrderCommandHandler`）。
+- 状態を変えるユースケースごとに一つ作る（`PlaceOrderCommandHandler`、`ConfirmOrderCommandHandler`、`CancelOrderCommandHandler`、`ChargeOrderCommandHandler`）。
 - 名前は業務の動詞と集約の名前に `CommandHandler` を付ける。
   動詞はユビキタス言語の語（受付の `Place`、確定の `Confirm`、取消の `Cancel`）にし、`Create`、`Update`、`Delete` のような CRUD の語にしない。
 - 参照だけのユースケースは CommandHandler にせず、[QueryService](query-service.md) に置く。
@@ -41,14 +41,23 @@ CommandHandler は他モジュールから呼ばれない。
 - 集約が見つからないときは、`.orElseThrow(() -> new NoSuchElementException("order not found: orderId=" + command.orderId()))` で `NoSuchElementException` を投げる。
 - 新しい集約は Repository の `add` で、状態を変えた既存の集約は `update` で、`handle` の中で保存する。
 - Command がロック番号を持つときは、`findById` の直後、状態を変える操作より前に `order.ensureLockNo(command.lockNo())` を呼ぶ。
-  集約は画面から受け取った値と読んだ値を比べ、Repository の `update` はロックした行の値と集約の値を比べる。
-  この二つで、[PostgreSQL の排他制御](../../database/postgresql-concurrency-control.md)の「ロックしてから、画面から受け取った `lock_no` と比べる」を満たす。
+  `ensureLockNo` はロックしていない読み取りの値と比べるだけなので、Repository の `update` が `SELECT ... FOR UPDATE NOWAIT` でロックした行の値と集約の値をもう一度比べる。
+  この二つの比較で、[PostgreSQL の排他制御](../../database/postgresql-concurrency-control.md)の楽観的ロックの手順（`SELECT ... FOR UPDATE` で行をロックしてから、取得した `lock_no` と画面などから受け取った `lock_no` を比べる）を満たす。
 - イベントは、保存の後に `ApplicationEventPublisher` の `publishEvent` で発行する。
 - 現在時刻は、コンストラクタで受け取った `Clock` から `Instant.now(clock)` で取る。
 - 別の CommandHandler を呼ばない。
   後続の処理はイベントを発行し、受信側の Listener に任せる。
 - 他モジュールの情報は相手の[参照のインタフェース](feature-queries.md)で読み、Domain の型に直して集約と Domain Service に渡す。
-- 外部システムは[外部システムのインタフェース](external-system-interface.md)を通して呼ぶ。
+- 画面から呼ばれる CommandHandler は、外部システムを呼ばない。
+  状態を変えて保存し、イベントを発行して終える（`ConfirmOrderCommandHandler` は `OrderConfirmed` を発行する）。
+  理由は [ADR-050](../../adr/ADR-050-define-backend-class-roles-and-naming.md) に示す。
+- 外部システムは、そのイベントを受けた自モジュールの [Listener](listener.md) が呼ぶ CommandHandler で、[外部システムのインタフェース](external-system-interface.md)を通して呼ぶ（`OrderConfirmedListener` が `ChargeOrderCommandHandler` を呼ぶ）。
+  イベント出版レジストリはトランザクションアウトボックスとして働き、コミットした確定のイベントだけが決済へ渡る（[メッセージングの設計](../../integration/async-messaging-design.md)の「DB 更新とメッセージ発行の整合」）。
+- 外部システムを呼ぶ CommandHandler は、集約がすでにその操作を終えていれば（`order.isPaid()`）何もせずに Result を返し、外部システムに冪等性キー（注文 ID）を渡す。
+  外部システムの呼び出しは `update` より前に置き、呼んでいる間は行をロックしない。
+  同じイベントは再投入で二回以上届く（[メッセージングの設計](../../integration/async-messaging-design.md)の「配信保証」、[順序保証と冪等性](../../integration/async-ordering-and-idempotency.md)）。
+- 外部システムの失敗で未完了のまま残ったイベント出版は、[非同期処理の失敗時の再試行と回復](../../integration/async-failure-recovery.md)の `IncompleteEventPublications` の手順で再投入する。
+  自動の再投入は [issue #108](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/108) で扱う。
 - クラス、フィールド、コンストラクタ、`handle` に Javadoc を書く。
 - `application` のパッケージの `package-info.java` は Command と共有する。
 
@@ -58,10 +67,11 @@ Command の形式は、Controller の `@Valid` で検証済みである。
 Domain が投げる JDK の例外と `<Aggregate>ConflictException` は、いまは HTTP の 500 になる。
 ユースケースがこの例外を 400、404、409、422 で返す必要があるときは、実装を止めて利用者に確認し、対応づけを新しい ADR で決める。
 ステータスコードの使い分けは[HTTPステータスコードの選択](../../web-api/status-codes.md)に、API のエラー契約は [ADR-013](../../adr/ADR-013-standardize-http-api-contracts.md) に従う。
+対応づけの作業は [issue #107](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/107) で扱う。
 
 ## 依存してよい型、してはいけない型
 
-- **依存してよい型**：`java..` の標準型（`Clock` を含む）、`org.jspecify..`、同じ `application` の Command と Result、同じモジュールの `domain.model`（集約、値オブジェクト、Repository、外部システムのインタフェース）と `domain.service`、モジュールルートの型、他モジュールの `<Feature>Queries` とルートの record、`@Service`、`@Transactional`、`ApplicationEventPublisher`。
+- **依存してよい型**：`java..` の標準型（`Clock` を含む）、`org.jspecify..`、同じ `application` の Command と Result、同じモジュールの `domain.model`（集約、値オブジェクト、Repository、外部システムのインタフェース（Listener から呼ばれる CommandHandler だけ））と `domain.service`、モジュールルートの型、他モジュールの `<Feature>Queries` とルートの record、`@Service`、`@Transactional`、`ApplicationEventPublisher`。
 - **依存してはいけない型**：別の CommandHandler、Presentation の型（Request、Response）、Infrastructure の型（`JooqOrderRepository`、`PaymentGatewayClient`）、jOOQ の API と生成型、他モジュールの内部パッケージの型。
 
 ## 最小の例と典型的な例
@@ -162,15 +172,39 @@ private List<OrderLine> toOrderLines(final List<PlaceOrderCommand.Line> commandL
 }
 ```
 
-`ConfirmOrderCommandHandler` は、外部システムのインタフェースで代金を請求してから注文を確定する。
+`ConfirmOrderCommandHandler` は、注文を確定して保存し、確定のイベントを発行する（抜粋）。
+代金は請求せず、決済はこのイベントを受けた `OrderConfirmedListener` が始める。
 
 ```java
 // com.example.demo.order.application.ConfirmOrderCommandHandler（抜粋）
 order.ensureLockNo(command.lockNo());
-paymentGateway.charge(order.id(), order.total());
 order.confirm();
 orderRepository.update(order);
+events.publishEvent(new OrderConfirmed(order.id().value(), Instant.now(clock)));
 return new ConfirmOrderResult(order.id().value());
+```
+
+`ChargeOrderCommandHandler` は、`OrderConfirmedListener` から呼ばれ、確定した注文の代金を請求する（抜粋）。
+依存は `orderRepository` と `paymentGateway` の二つである。
+
+```java
+// com.example.demo.order.application.ChargeOrderCommandHandler（抜粋）
+/** 支払い済みでない注文の代金を、注文 ID を冪等性キーにして請求し、支払い済みにして保存する。 */
+@Transactional
+public ChargeOrderResult handle(final ChargeOrderCommand command) {
+  final Order order =
+      orderRepository
+          .findById(new OrderId(command.orderId()))
+          .orElseThrow(
+              () -> new NoSuchElementException("order not found: orderId=" + command.orderId()));
+  if (order.isPaid()) {
+    return new ChargeOrderResult(order.id().value());
+  }
+  paymentGateway.charge(order.id(), order.total());
+  order.markPaid();
+  orderRepository.update(order);
+  return new ChargeOrderResult(order.id().value());
+}
 ```
 
 ## 対応するテスト
@@ -230,8 +264,11 @@ class CancelOrderCommandHandlerTest {
 - `Instant.now()` や `LocalDateTime.now()` で現在時刻を取る。
 - Command のロック番号を確かめずに `update` する。
   画面が読んだ後に他の人が変えた注文を、気付かずに上書きする。
-- Command のロック番号を、外部システムの呼び出しの後で確かめる。
-  競合して更新しないときも、外部システムへの請求が先に済んでしまう。
+- 画面から呼ばれる CommandHandler のトランザクションの中で外部システムを呼ぶ。
+  遅い外部の呼び出しの間、トランザクションと行のロックを持ち続ける。
+  ロールバックしても外部の副作用は戻らず、同じ `lockNo` の確定が二つ同時に届くと両方が `ensureLockNo` を通って請求まで進み、後の一方が `update` の競合で取り消されても請求は残る（[ADR-050](../../adr/ADR-050-define-backend-class-roles-and-naming.md)）。
+- 外部システムを呼ぶ CommandHandler を冪等にしない（支払い済みでも請求する、冪等性キーを渡さない）。
+  イベント出版の再投入で、二重に請求する。
 - 他モジュールの CommandHandler を呼ぶ。
   同期の状態変更が必要に見えたら、実装を止めて利用者に確認し、ADR を起こす。
 
@@ -249,6 +286,8 @@ class CancelOrderCommandHandlerTest {
 - [ ] Command の値を `handle` の中で値オブジェクトに変換し、業務規則を集約と Domain Service に任せる。［自分で点検］
 - [ ] 新しい集約を `add` で、既存の集約を `update` で保存し、イベントを保存の後に `ApplicationEventPublisher` で発行する。［自分で点検］
 - [ ] Command がロック番号を持つときは、`findById` の直後、状態を変える操作より前に `ensureLockNo(command.lockNo())` を呼ぶ。［自分で点検］
+- [ ] 画面から呼ばれる CommandHandler は外部システムのインタフェースに依存せず、外部システムはイベントを受けた Listener が呼ぶ CommandHandler から呼ぶ。［自分で点検］
+- [ ] 外部システムを呼ぶ CommandHandler は、集約がその操作を終えていれば何もせずに Result を返し、外部システムに冪等性キーを渡す。［自分で点検］
 - [ ] 現在時刻は `Instant.now(clock)` で取る。［自分で点検］
 - [ ] Domain の例外を 400、404、409、422 で返す必要があるなら、実装を止めて利用者に確認した。［自分で点検］
 - [ ] クラス、フィールド、コンストラクタ、`handle` に Javadoc を書く。［自分で点検］

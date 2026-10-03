@@ -55,7 +55,7 @@ package com.example.demo.order.application;
 public record CancelOrderResult(String orderId) {}
 ```
 
-`PlaceOrderResult(String orderId)` と `ConfirmOrderResult(String orderId)` も同じ形である。
+`PlaceOrderResult(String orderId)`、`ConfirmOrderResult(String orderId)`、`ChargeOrderResult(String orderId)` も同じ形である。
 
 典型的な例は、Controller が `PlaceOrderResult` の ID で作成した注文の URI を作り、201 の `Location` に入れる場面である。
 

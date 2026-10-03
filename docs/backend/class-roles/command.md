@@ -40,7 +40,7 @@ Command はモジュールルートの公開契約でもない。
 - 入力が集約の ID とロック番号だけでも Command を作る（`CancelOrderCommand(String orderId, long lockNo)`）。
 - Controller が作り、既存の集約の状態を変える Command は、クライアントが参照の応答で受け取ったロック番号を `long lockNo` に持つ（`ConfirmOrderCommand`、`CancelOrderCommand`、`ShipOrderCommand`）。
   CommandHandler はこの値を集約の `ensureLockNo` に渡し、[PostgreSQL の排他制御](../../database/postgresql-concurrency-control.md)の「画面などから受け取った `lock_no`」との比較にする。
-  新しい集約を作る Command（`PlaceOrderCommand`）と、Listener がイベントから作る Command（`ReserveStockCommand`）は `lockNo` を持たない。
+  新しい集約を作る Command（`PlaceOrderCommand`）と、Listener がイベントから作る Command（`ReserveStockCommand`、`ChargeOrderCommand`）は `lockNo` を持たない。
 - `List` の component は、コンパクトコンストラクタで `List.copyOf` に置き換える。
   置き換えないと `task be-lint` の SpotBugs が報告する。
 - record とネストした record に Javadoc を書く。
@@ -55,6 +55,7 @@ Command はモジュールルートの公開契約でもない。
 Domain が投げる JDK の例外と `<Aggregate>ConflictException` は、いまは HTTP の 500 になる。
 ユースケースがこの例外を 400、404、409、422 で返す必要があるときは、実装を止めて利用者に確認し、対応づけを新しい ADR で決める。
 ステータスコードの使い分けは[HTTPステータスコードの選択](../../web-api/status-codes.md)に、API のエラー契約は [ADR-013](../../adr/ADR-013-standardize-http-api-contracts.md) に従う。
+対応づけの作業は [issue #107](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/107) で扱う。
 
 ## 依存してよい型、してはいけない型
 
@@ -73,6 +74,7 @@ public record CancelOrderCommand(String orderId, long lockNo) {}
 ```
 
 注文を確定する `ConfirmOrderCommand(String orderId, long lockNo)` と、出荷する `ShipOrderCommand(String orderId, long lockNo)` も同じ形である。
+Listener が `OrderConfirmed` から作る `ChargeOrderCommand(String orderId)` は、注文の ID だけを持つ。
 
 典型的な例は、明細をネストした record で持つ `PlaceOrderCommand` である。
 

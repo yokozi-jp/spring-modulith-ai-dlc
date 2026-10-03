@@ -45,7 +45,7 @@ Domain Service は Repository を使ってよく、イベントの発行、外�
 
 - **[`<UseCase>CommandHandler`](class-roles/command-handler.md)**：状態を変えるユースケースを一つ実行する。`<UseCase>Command` を受け取り、集約と Domain Service を組み合わせ、Repository で保存し、`<UseCase>Result` を返す。イベントは `ApplicationEventPublisher` で発行する。
 - **[`<Feature>QueryService`](class-roles/query-service.md)**：モジュールルートの [`<Feature>Queries`](class-roles/feature-queries.md) を実装し、Repository で読んだ集約をルートの record（[参照の結果](class-roles/query-result.md)）に変換する。
-- **[`<Event>Listener`](class-roles/listener.md)**：他モジュールの[イベント](class-roles/event.md)を受信し、自モジュールの CommandHandler をちょうど一つ呼ぶ。
+- **[`<Event>Listener`](class-roles/listener.md)**：他モジュールの[イベント](class-roles/event.md)、または外部システムを呼ぶための自モジュールのイベントを受信し、自モジュールの CommandHandler をちょうど一つ呼ぶ。
 
 [`<UseCase>Command`](class-roles/command.md) と [`<UseCase>Result`](class-roles/result.md) は、Java の標準型だけを持つ record として `application` に置く。
 

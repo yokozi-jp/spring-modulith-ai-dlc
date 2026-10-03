@@ -1,13 +1,13 @@
 ---
 type: Convention
 title: クラスの役割：Listener
-description: 受信する側のモジュールの application に置き、他モジュールのイベントを受ける Listener の定義、置き場所と命名、必須の記述（on と @ApplicationModuleListener）、依存、例、テスト、アンチパターン、作成時のチェックリストを定める。他モジュールのイベントを受けて自モジュールの状態を変えるときに読む。
+description: 受信する側のモジュールの application に置き、他モジュールのイベントか、外部システムを呼ぶための自モジュールのイベントを受ける Listener の定義、置き場所と命名、必須の記述（on と @ApplicationModuleListener）、依存、例、テスト、アンチパターン、作成時のチェックリストを定める。他モジュールのイベントを受けて自モジュールの状態を変えるとき、外部システムの呼び出しをイベントで始めるときに読む。
 tags: [convention, backend, class-role]
 ---
 
 # クラスの役割：Listener
 
-`<Event>Listener` は、他モジュールのイベントを受けるクラスであり、受信する側のモジュールの `application` に package-private で置いて `@Service` を付ける。
+`<Event>Listener` は、他モジュールのイベント、または外部システムを呼ぶための自モジュールのイベントを受けるクラスであり、受信する側のモジュールの `application` に package-private で置いて `@Service` を付ける。
 public メソッドは `@ApplicationModuleListener` を付けた `on` 一つだけにする。
 `on` はイベントから Command を作り、自モジュールの CommandHandler をちょうど一つ呼ぶ。
 役割の決定理由は [ADR-050](../../adr/ADR-050-define-backend-class-roles-and-naming.md) に示す。
@@ -15,6 +15,7 @@ public メソッドは `@ApplicationModuleListener` を付けた `on` 一つだ�
 ## 定義
 
 他モジュールの状態の変化に応じて自モジュールの状態を変えるには、[イベント](event.md)を受ける入口が要る。
+自モジュールの更新をコミットした後に外部システムを呼ぶときも、自モジュールのイベントを受ける入口が要る。
 **Listener**（`<Event>Listener`）は、一つのイベントを受け、自モジュールのユースケースを一つ始めるクラスである。
 `@ApplicationModuleListener` は、発行側のトランザクションがコミットした後に、新しいトランザクション（`REQUIRES_NEW`）で非同期に `on` を呼ぶ。
 
@@ -27,10 +28,11 @@ Listener は Infrastructure の Adapter でもない。
 ## 置き場所と命名
 
 - 受信する側のモジュールの `com.example.demo.<feature>.application` に置く（在庫モジュールの `com.example.demo.inventory.application`）。
+  自モジュールのイベントを受けるときは、発行したモジュールの `application` に置く（`OrderConfirmedListener` は `com.example.demo.order.application`）。
 - 名前はイベントの名前に `Listener` を付ける（`OrderPlacedListener`、`OrderCancelledListener`）。
 - イベント一つに Listener を一つ作る。
 - 受信するメソッドの名前は `on` にする。
-- 呼ぶ CommandHandler は、受信側の業務の動詞で名付ける（`OrderPlacedListener` は `ReserveStockCommandHandler`、`OrderCancelledListener` は `ReleaseStockCommandHandler` を呼ぶ）。
+- 呼ぶ CommandHandler は、受信側の業務の動詞で名付ける（`OrderPlacedListener` は `ReserveStockCommandHandler`、`OrderCancelledListener` は `ReleaseStockCommandHandler`、`OrderConfirmedListener` は `ChargeOrderCommandHandler` を呼ぶ）。
 
 ## 必須の記述
 
@@ -44,6 +46,8 @@ Listener は Infrastructure の Adapter でもない。
 - `on` は短い名前であり、package-private のクラスの public メソッドでもあるため、クラスに `@SuppressWarnings({"PMD.ShortMethodName", "PMD.PublicMemberInNonPublicType"})` を理由のコメントと一緒に付ける。
 - 同じイベントを二回以上受けても結果が変わらないよう、呼ぶ CommandHandler を冪等にする。
   冪等にする方法は[順序保証と冪等性](../../integration/async-ordering-and-idempotency.md)に従う。
+- 受信に失敗したイベント出版はレジストリに未完了のまま残り、[非同期処理の失敗時の再試行と回復](../../integration/async-failure-recovery.md)の `IncompleteEventPublications` の手順で再投入する。
+  自動の再投入は [issue #108](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/108) で扱う。
 - クラス、フィールド、コンストラクタ、`on` に Javadoc を書く。
 - 受信する側の `application` のパッケージの `package-info.java` は Command と共有する。
 
@@ -99,6 +103,19 @@ public void on(final OrderCancelled event) {
 }
 ```
 
+自モジュールのイベントを受ける例は、注文の確定を受けて決済を始める `OrderConfirmedListener` である（抜粋）。
+
+```java
+// com.example.demo.order.application.OrderConfirmedListener（抜粋）
+/** イベントから Command を作り、CommandHandler へ渡す。 */
+@ApplicationModuleListener
+public void on(final OrderConfirmed event) {
+  chargeOrder.handle(new ChargeOrderCommand(event.orderId()));
+}
+```
+
+`ChargeOrderCommandHandler` は、支払い済みの注文では何もせず、注文 ID を冪等性キーにして請求するため、同じイベントを二回受けても二重に請求しない（[CommandHandler](command-handler.md)）。
+
 呼ばれる `ReserveStockCommandHandler` が注文の明細を読む例は、[参照のインタフェース](feature-queries.md)に示す。
 
 ## 対応するテスト
@@ -138,7 +155,7 @@ class OrderPlacedListenerTest {
 - `@ApplicationModuleListener` の代わりに `@EventListener` を付ける。
   発行側のトランザクションの中で同期に動き、受信側の失敗が発行側の更新を巻き戻す。
 - 受信するクラスを `infrastructure` に置く。
-- 同じイベントを二回受けると、在庫を二重に引き当てる。
+- 同じイベントを二回受けると、在庫を二重に引き当てる、または代金を二重に請求する。
 - Listener から別のイベントを発行し、他モジュールへ中継する。
 
 ## 作成時のチェックリスト

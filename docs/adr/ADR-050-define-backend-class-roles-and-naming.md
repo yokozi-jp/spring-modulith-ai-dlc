@@ -44,7 +44,7 @@ Proposed
 - モジュールルート（`com.example.demo.<feature>`）には、record、enum、`<Feature>Queries` インタフェースだけを置く。
 - ルートの型は、`String`、`Instant`、`BigDecimal` などの Java の標準型と、同じルートパッケージの型だけを持つ。
 - `<Feature>Queries` は、他モジュールから読まれるかどうかにかかわらず、すべての機能モジュールに作る。自モジュールの Controller もこれを使う。
-- ルートの record は、参照の結果（`OrderDetails`）、検索条件（`OrderSearchCriteria`）、他モジュールへ通知するイベント（過去形の `OrderPlaced`）である。
+- ルートの record は、参照の結果（`OrderDetails`）、検索条件（`OrderSearchCriteria`）、状態の変化を通知するイベント（過去形の `OrderPlaced`、`OrderConfirmed`）である。
 
 ### Domain
 
@@ -52,6 +52,9 @@ Proposed
 - `domain.model` は Spring、jOOQ、JPA、Jackson に依存しない。
 - 業務規則は、まず値オブジェクトか Entity（集約を含む）に置く。Domain Service は、複数の集約にまたがる規則、どの集約にも自然に属さない計算、Repository を使って確かめる規則（「未出荷の注文は3件まで」）の3つの場合に限って作る。
 - Domain Service は `domain.service` に置き、Spring の `@Service` を付ける。`@Service` は Domain に許す唯一の Spring の型であり、ArchUnit の許可リストで検査する。Domain Service は Repository を引数で受け取ってよく、イベント発行、外部呼び出し、ログ出力は行わない。
+- 注文の集約の状態は、受付、確定、支払い済み、出荷、取消とし、取消は受付のときだけできる。
+  確定の後は決済が非同期で進み、確定の注文の取消を許すと、請求と取消が競合したときに返金が要るためである。
+  返金はこの ADR の例では扱わない。
 
 ### Application
 
@@ -60,8 +63,25 @@ Proposed
 - `<UseCase>Command` と `<UseCase>Result` は、返す値がなくても必ず作り、標準型だけを持つ record として `application` に置く。Result は少なくとも集約の識別子を持つ。コマンドクエリ分離ではコマンドは値を返さないが（[Fowler, CommandQuerySeparation](https://martinfowler.com/bliki/CommandQuerySeparation.html)）、作成の応答に `Location` を組み立てるには識別子が要るためである。
 - CommandHandler は別の CommandHandler を呼ばない。
   一つのユースケースを一つのトランザクションで進めるという CommandHandler の定義を保ち、ユースケースが別のユースケースを呼んで連鎖する形を防ぐためである。
+- 画面から呼ばれる CommandHandler は外部システムを呼ばず、状態を変えて `update` で保存し、ルートのイベント（`OrderConfirmed`）を発行して終える。
+  外部システムは、そのイベントを自モジュールの `<Event>Listener`（`OrderConfirmedListener`）で受け、Listener が呼ぶ CommandHandler（`ChargeOrderCommandHandler`）が `PaymentGateway.charge` で呼ぶ。
+  理由は二つある。
+  一つ目に、確定の `handle` の中で請求すると、遅い外部の呼び出しの間、トランザクションと DB の接続を保ち、ロックを取った後に呼べば行のロックも保つ。
+  二つ目に、ロールバックしても外部の副作用は戻らない。
+  `ensureLockNo` はロックしていない読み取りの値と比べるため、同じ `lockNo` の確定が二つ同時に届くと両方が請求まで進む。
+  後の一方は `update` の `SELECT ... FOR UPDATE NOWAIT` で競合してロールバックするが、請求は残り、顧客に二重に請求する。
+  イベント出版レジストリは業務データの更新と同じトランザクションでイベントを記録するトランザクションアウトボックスであり（[メッセージングの設計](../integration/async-messaging-design.md)の「DB 更新とメッセージ発行の整合」）、コミットした確定のイベントだけが決済へ渡る。
+- 外部システムを呼ぶ CommandHandler は二層で冪等にする。
+  外部システムの操作に冪等性キー（注文 ID）を渡し、集約がすでにその操作を終えていれば（`order.isPaid()`）何もせずに Result を返す。
+  レジストリは at-least-once で配信し、未完了のイベント出版を再投入すると同じイベントが再び届くためである（[メッセージングの設計](../integration/async-messaging-design.md)の「配信保証」、[順序保証と冪等性](../integration/async-ordering-and-idempotency.md)）。
+  請求に失敗したイベント出版はレジストリに未完了のまま残り、[非同期処理の失敗時の再試行と回復](../integration/async-failure-recovery.md)の `IncompleteEventPublications` の手順で再投入する。
+  自動の再投入は [issue #108](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/108) で扱う。
+- 外部システムを呼ぶ CommandHandler も、`@ApplicationModuleListener` が開くトランザクションの中で外部システムを呼ぶ。
+  ただし、呼んでいる間は行をロックせず（ロックは呼んだ後の `update` で取る）、画面の要求を待たせない。
+  トランザクションの長さは Client のタイムアウト（[ADR-019](ADR-019-define-resilience-and-capacity-guardrails.md)）で抑え、ロールバックで戻らない請求は上の冪等性で二重にしない。
+  このため、`charge` の `retry` は一回のままにし、再試行は再投入に任せる。
 - 参照は機能ごとに一つの `<Feature>QueryService` が担う。QueryService はルートの `<Feature>Queries` を実装し、Repository で集約を読んでルートの record に変換する。参照専用の port は作らず、jOOQ で読み取りモデルへ直接射影しない。public メソッドには `@Transactional(readOnly = true)` を付ける。
-- 他モジュールのイベントは、受信側モジュールの `application` に置く `<Event>Listener` が `@ApplicationModuleListener` を付けた `on` メソッドで受ける。Listener はちょうど一つの CommandHandler を呼ぶ。
+- 他モジュールのイベントと、外部システムを呼ぶための自モジュールのイベントは、受信側モジュールの `application` に置く `<Event>Listener` が `@ApplicationModuleListener` を付けた `on` メソッドで受ける。Listener はちょうど一つの CommandHandler を呼ぶ。
 - イベントは CommandHandler が `ApplicationEventPublisher` で発行する。`<Event>Publisher` クラス、`domain.model` の Domain Event、`infrastructure.messaging` は作らない。
 - `application` の `@Service` は、`*CommandHandler`、`*QueryService`、`*Listener` のどれかの名前にする。
 
@@ -113,6 +133,7 @@ Proposed
 - jOOQ と集約の変換では、列の名前の変更と、列と引数の数や型の食い違いがコンパイルで見つかる。変換が Repository の中にあるため、`infrastructure.persistence` に置くクラスは集約ごとに一つで済む。
 - トランザクション境界が Application の `handle`、QueryService の public メソッド、Listener の `on` に集まる。
 - モジュール間で同期の状態変更が起きないため、モジュールごとの統合テスト（`@ApplicationModuleTest`）が成り立つ。
+- 画面の確定と外部システムの呼び出しが別のトランザクションになり、競合して取り消された確定は請求まで進まない。
 
 ### Negative
 
@@ -123,10 +144,13 @@ Proposed
 - PostgreSQL には MULTISET がなく、jOOQ は JSON の集約で模倣する。子の行が数千に及ぶ集約では、二つの SQL に分けて読むほうが速いことがある。規約は `multiset` に固定し、作業者は二つの SQL に分ける前に実装を止めて利用者に確認する。
 - `Jooq<Aggregate>Repository` は変換を含むため、Mapper のクラスに分けた場合より長くなる。
 - 他モジュールの状態を同期で変える設計は、ADR を経ない限り選べない。
+- 決済は確定の応答より後に非同期で行うため、確定済みで未払いの注文が残りうる。
+  請求に失敗したイベント出版は、人が再投入するまで残る（[issue #108](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/108)）。
+- 確定の後の取消を例から外したため、返金を伴う取消は別に設計する必要がある。
 
 ### Neutral
 
-- 業務例外を HTTP の 400、404、409、422 に対応づける仕組みは、この ADR では決めない。いまは `@Valid` の失敗が 400、`ResponseStatusException` がそのステータスになり、Domain、CommandHandler、Repository の実装が投げる JDK の例外と `<Aggregate>ConflictException` は 500 になる。ユースケースが Domain の例外を 400、404、409、422 で返す必要が出たら、作業者は利用者に確認し、対応づけを新しい ADR で決める（[ADR-013](ADR-013-standardize-http-api-contracts.md)）。
+- 業務例外を HTTP の 400、404、409、422 に対応づける仕組みは、この ADR では決めない。いまは `@Valid` の失敗が 400、`ResponseStatusException` がそのステータスになり、Domain、CommandHandler、Repository の実装が投げる JDK の例外と `<Aggregate>ConflictException` は 500 になる。ユースケースが Domain の例外を 400、404、409、422 で返す必要が出たら、作業者は利用者に確認し、対応づけを新しい ADR で決める（[ADR-013](ADR-013-standardize-http-api-contracts.md)）。対応づけの作業は [issue #107](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/107) で扱う。
 - QueryService の `@Transactional(readOnly = true)` は、読み取り専用のトランザクションで参照中の書き込みを DB に拒否させるために付ける。分離レベルは既定の READ COMMITTED のままなので、一つのメソッドの中の複数の SQL が同じスナップショットを見ることまでは保証しない。
 - 参照の性能が Repository 経由で足りなくなったら、読み取りモデルへの直接射影を ADR で決め直す。
 
@@ -222,6 +246,15 @@ Proposed
   この方式そのものの欠陥ではなく、集約を `restore` で作ること、変換の書き方を `Records.mapping` の一通りにすること、機械で検査することと両立しないため却下する。
   集約を通さずに DTO へ直接読む参照系を導入するときは、この判断を見直す。
 
+### 選択肢15: 確定の CommandHandler で、行をロックしてから外部システムを呼ぶ
+
+- **Description**：確定の `handle` の中で、先に集約ルートの行を `SELECT ... FOR UPDATE NOWAIT` でロックして `lockNo` を比べ、その後で `PaymentGateway.charge` を呼んで確定を保存する。
+- **Pros**：一つのトランザクションで済み、確定の応答で決済の成否を返せる。
+  同時の確定は、後の一方がロックで止まり、請求まで進まない。
+- **Cons**：遅い外部の呼び出しの間、行のロックとトランザクションを保ち、その間の同じ注文への要求は `NOWAIT` で競合になる。
+  請求の後にコミットが失敗すると、ロールバックしても請求は残る。
+  トランザクションアウトボックスなら、コミットした確定だけが請求へ進む。
+
 ## References
 
 - [Eric Evans, Domain-Driven Design Reference](https://www.domainlanguage.com/wp-content/uploads/2016/05/DDD_Reference_2015-03.pdf)
@@ -267,6 +300,10 @@ Proposed
 - [MapStruct](https://mapstruct.org/)
 - [ADR-002: package by feature とオニオンアーキテクチャ](ADR-002-package-by-feature-onion-architecture.md)
 - [ADR-013: HTTP API 契約を標準化する](ADR-013-standardize-http-api-contracts.md)
+- [ADR-019: 外部連携の耐障害性と容量制御を標準化する](ADR-019-define-resilience-and-capacity-guardrails.md)
 - [ADR-048: jOOQ の共通処理を共有モジュール shared に置く](ADR-048-add-shared-module-for-jooq-common-code.md)
 - [PostgreSQL の排他制御](../database/postgresql-concurrency-control.md)
 - [PostgreSQL の共通カラム](../database/postgresql-common-columns.md)
+- [メッセージングの設計](../integration/async-messaging-design.md)
+- [順序保証と冪等性](../integration/async-ordering-and-idempotency.md)
+- [非同期処理の失敗時の再試行と回復](../integration/async-failure-recovery.md)

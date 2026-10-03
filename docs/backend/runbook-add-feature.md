@@ -16,10 +16,10 @@ tags: [runbook, backend, spring-modulith]
 新しい機能を追加するときは、次の順序でクラスを置く。
 
 1. Spring Modulith の機能モジュール名を決め、`com.example.demo.<feature>` を作る。
-2. モジュールルートに `<Feature>Queries`、参照の結果と検索条件の record、他モジュールへ通知するイベントの record を置く。
+2. モジュールルートに `<Feature>Queries`、参照の結果と検索条件の record、他モジュールと自モジュールの後続の処理へ通知するイベントの record を置く。
 3. `domain.model` に集約、Entity、値オブジェクト、`<Aggregate>Repository`、外部システムのインタフェースを置く。
 4. 集約にも値オブジェクトにも置けない業務規則を、`domain.service` の Domain Service に置く。
-5. `application` に、状態を変えるユースケースごとの `<UseCase>Command`、`<UseCase>CommandHandler`、`<UseCase>Result` と、`<Feature>QueryService` を置く。他モジュールのイベントを受けるときは、`<Event>Listener` も置く。
+5. `application` に、状態を変えるユースケースごとの `<UseCase>Command`、`<UseCase>CommandHandler`、`<UseCase>Result` と、`<Feature>QueryService` を置く。他モジュールのイベントを受けるとき、外部システムを呼ぶときは、`<Event>Listener` も置く。
 6. `presentation.web` に `<Aggregate>Controller`、`<UseCase>Request`、`<QueryResult>Response` を置く。
 7. `infrastructure.persistence` に `Jooq<Aggregate>Repository` を、`infrastructure.client` に `<ExternalSystem>Client` を置く。
 8. 作成した各 Java パッケージへ `@NullMarked` の `package-info.java` を追加する。
