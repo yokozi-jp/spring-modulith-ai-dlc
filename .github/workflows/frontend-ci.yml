@@ -92,6 +92,9 @@ jobs:
       - name: Verify frontend
         run: PATH="$GITHUB_WORKSPACE/frontend/node_modules/.bin:$PATH" task fe-verify
 
+      - name: Diagnose React
+        run: PATH="$GITHUB_WORKSPACE/frontend/node_modules/.bin:$PATH" task fe-doctor
+
       - name: Upload coverage report
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
