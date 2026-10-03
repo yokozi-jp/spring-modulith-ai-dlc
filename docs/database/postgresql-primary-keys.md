@@ -48,6 +48,7 @@ Spring Modulithのイベント出版テーブルのように、フレームワ�
 単一のDBまたはDBクラスタを前提にする場合は、連番を使う。
 将来シャーディングを前提にする場合は、UUID v7を使う。
 生成順とソート順が一致せずB-treeへの挿入効率が下がるため、UUID v1とv4は主キーに使わない。
+UUID v7の採番方法と機械検査は、UUIDを主キーにするテーブルがまだないため決めておらず、最初のテーブルを作るときに決める。
 
 IDENTITY列の定義は[PostgreSQLのデータ型](postgresql-data-types.md#identity列)に従う。
 

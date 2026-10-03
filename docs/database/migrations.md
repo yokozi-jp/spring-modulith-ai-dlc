@@ -43,6 +43,19 @@ DB変更のないアプリケーションリリースでは、新しいDBスキ�
 
 命令的なGradleの`tag`タスクは誤操作を防ぐため失敗します。
 
+## changesetのidとファイル名
+
+changesetのファイルは、次の規則で作ります。
+
+- changesetの`id`は、ファイル名から拡張子を除いた値と同じにします。
+  Liquibaseはid、author、ファイルのパスの組でchangesetを識別するため、適用した後にどれかを変えると、別のchangesetとみなして再び適用します。
+- `author`は`system`にします。
+  人やツールによってauthorが揺れると、同じ理由でchangesetの識別が変わるためです。
+- 1ファイルには1つのchangesetだけを書きます。
+  idをファイル名と同じにするため、1ファイルに2つ以上のchangesetを書くとidが重複します。
+- ファイル名は`NNN-kebab-case.yaml`とし、`NNN`はゼロ埋めした連番で、番号を重複させません。
+  `includeAll`はファイル名の順にchangesetを適用するため、並行するブランチで番号が衝突すると適用順が崩れます。
+
 ## CIでの検証
 
 バックエンドCIは使い捨てPostgreSQLに対して`verifyDatabaseMigrations`を実行します。
@@ -55,6 +68,7 @@ Liquibaseの`updateTestingRollback`によって、全changesetを適用し、同
 ## 参照資料
 
 - Spring Boot Database Initialization: <https://docs.spring.io/spring-boot/how-to/data-initialization.html>
+- Liquibase changeset: <https://docs.liquibase.com/concepts/changelogs/changeset.html>
 - Liquibase `tagDatabase`: <https://docs.liquibase.com/reference-guide/change-types/tagDatabase>
 - Liquibase `update-to-tag`: <https://docs.liquibase.com/commands/update/update-to-tag.html>
 - Liquibase `update-testing-rollback`: <https://docs.liquibase.com/commands/update/update-testing-rollback.html>
