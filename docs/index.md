@@ -12,7 +12,6 @@ okf_version: '0.2'
 - [可観測性とログ](observability/index.md)：ログのレベル、メッセージ、出力箇所、量を決めるとき、可観測性データの規約や PII 混入時の対応を確認するとき
 - [日時](datetime/index.md)：日時の保存、API の日時表現、表示、日時のテストを扱うとき
 - [コンテナ](container/index.md)：Dockerfile、.dockerignore、Compose ファイルを書く、または直すとき
-- [AWS](aws/index.md)：AWS のアカウント、セキュリティサービス、公開経路、実行基盤、監視、CI/CD、コストを設計するとき
 - [開発ツール](tooling/index.md)：Taskfile、Git フック、CI、Lint とテストのタスクを扱うとき、日常の開発手順を確認するとき
 - [リポジトリ運用](repository/index.md)：main のブランチ保護、必須チェック、CODEOWNERS、release-please によるリリースを扱うとき
 - [文章](writing/index.md)：日本語の docs、ADR、記事を書く、または推敲するとき、依頼や報告のメッセージ、設計書を書くとき
