@@ -1,7 +1,7 @@
 {
   "title": "Demo application",
   "heading": "Get started",
-  "intro": "Edit src/routes/index.tsx and save to test HMR.",
+  "intro": "Edit src/routes/_authenticated/index.tsx and save to test HMR.",
   "documentationHeading": "Documentation",
   "documentationLead": "Find the information needed for development.",
   "exploreVite": "Explore Vite",
@@ -11,5 +11,12 @@
   "stack": "React 19 · TanStack · Base UI",
   "github": "GitHub",
   "discord": "Discord",
-  "count": "Count: {{count, number}}"
+  "count": "Count: {{count, number}}",
+  "loading": "Loading…",
+  "errorHeading": "Something went wrong",
+  "errorDescription": "The page could not be displayed. Try again.",
+  "retry": "Try again",
+  "notFoundHeading": "Page not found",
+  "notFoundDescription": "Check that the URL is correct.",
+  "backToHome": "Back to home"
 }

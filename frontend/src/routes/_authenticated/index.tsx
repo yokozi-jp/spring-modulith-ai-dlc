@@ -13,7 +13,7 @@ function HomePage() {
   }, [t]);
 
   return (
-    <main className="min-h-svh bg-background px-6 py-16 text-foreground sm:px-10">
+    <div className="px-6 py-16 sm:px-10">
       <div className="mx-auto flex w-full max-w-4xl flex-col gap-12">
         <section className="flex flex-col items-start gap-6" aria-labelledby="page-heading">
           <div className="rounded-full border bg-muted px-3 py-1 text-sm text-muted-foreground">
@@ -92,8 +92,8 @@ function HomePage() {
           </section>
         </div>
       </div>
-    </main>
+    </div>
   );
 }
 
-export const Route = createFileRoute("/")({ component: HomePage });
+export const Route = createFileRoute("/_authenticated/")({ component: HomePage });

@@ -17,6 +17,26 @@ describe("home route", () => {
     await i18n.changeLanguage("ja");
   });
 
+  it("renders the home page inside the app shell", async () => {
+    await i18n.changeLanguage("en");
+    vi.spyOn(globalThis, "scrollTo").mockReturnValue();
+    const router = createRouter({
+      history: createMemoryHistory({ initialEntries: ["/"] }),
+      routeTree,
+      context: { queryClient: new QueryClient() },
+    });
+
+    render(
+      <I18nextProvider i18n={i18n}>
+        <RouterProvider router={router} />
+      </I18nextProvider>,
+    );
+
+    const banner = await screen.findByRole("banner");
+    expect(banner.textContent).toContain("Demo application");
+    expect(screen.getByRole("main").contains(screen.getByRole("heading", { level: 1 }))).toBe(true);
+  });
+
   it("reflects the locale and increments the counter", async () => {
     await i18n.changeLanguage("en");
     vi.spyOn(globalThis, "scrollTo").mockReturnValue();

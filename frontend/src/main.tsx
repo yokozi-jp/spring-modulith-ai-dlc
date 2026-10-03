@@ -6,20 +6,12 @@ import { createRoot } from "react-dom/client";
 import { I18nextProvider } from "react-i18next";
 
 import { i18n } from "./i18n";
+import { routerDefaults } from "./router-defaults";
 import { routeTree } from "./routeTree.gen";
 
 const queryClient = new QueryClient();
 
-const router = createRouter({
-  routeTree,
-  context: { queryClient },
-  // リンクへのホバーやフォーカスで遷移先のコードとloaderを先読みする。
-  defaultPreload: "intent",
-  // 先読みしたデータの鮮度はTanStack Queryに任せ、ルーター側ではキャッシュしない。
-  defaultPreloadStaleTime: 0,
-  // ブラウザの戻る操作や進む操作で、遷移前のスクロール位置を復元する。
-  scrollRestoration: true,
-});
+const router = createRouter({ routeTree, context: { queryClient }, ...routerDefaults });
 
 declare module "@tanstack/react-router" {
   interface Register {
