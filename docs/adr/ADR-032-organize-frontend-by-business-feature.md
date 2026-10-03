@@ -32,7 +32,7 @@ React HooksはstatefulなUI logicを関数componentから利用する標準機�
 しかし、custom Hookはディレクトリ分割の単位ではなく、具体的なstateful logicを再利用する単位である。
 すべての処理をHookへ変換すると、純粋関数とReactのrendering lifecycleに属する処理の区別が崩れる。
 
-旧リポジトリでAIエージェントに四つのfeatureを作らせたところ、feature間のimportが6箇所、feature単位の循環が2組できた。
+AIエージェントに四つのfeatureを作らせた検証では、feature間のimportが6箇所、feature単位の循環が2組できた。
 ディレクトリ規約とレビューだけでは、最初のfeatureから境界が崩れうる。
 また、docsはcomponentのファイル名をPascalCaseと定めていたが、Oxlintの `unicorn/filename-case` は既定のkebab-caseを強制しており、docsどおりに作ると `task fe-check` が失敗した。
 routerの既定のerror表示は同梱の英語の固定文言のままであり、agentが `routeTree.gen.ts` などの生成物を手で書き換えることを止める仕組みも無かった。
