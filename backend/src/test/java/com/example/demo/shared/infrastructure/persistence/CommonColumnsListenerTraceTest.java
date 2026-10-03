@@ -9,8 +9,11 @@ import io.micrometer.observation.Observation;
 import io.micrometer.observation.ObservationRegistry;
 import io.micrometer.tracing.Span;
 import io.micrometer.tracing.Tracer;
+import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.atomic.AtomicReference;
+import org.jooq.Field;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -24,9 +27,10 @@ import org.springframework.modulith.test.ApplicationModuleTest;
 import org.springframework.modulith.test.Scenario;
 
 /**
- * 非同期のモジュールのイベントリスナーの中でも、共通カラムの trace ID を取れることを検証する。
+ * 非同期のモジュールのイベントリスナーの中でも、共通カラムの trace ID と pgm_cd を取れることを検証する。
  *
- * <p>trace がなければ共通処理は登録を失敗させるため、イベントを受けた処理の INSERT が常に失敗しないことを確かめる。
+ * <p>trace か pgm_cd がなければ共通処理は登録を失敗させるため、イベントを受けた処理の INSERT が常に失敗しないことを確かめる。 pgm_cd
+ * は、アプリケーションのコンテキストに登録された {@link PgmCdAspect} が束縛する。
  */
 @ApplicationModuleTest
 @Import({SharedTestConfiguration.class, CommonColumnsListenerTraceTest.ProbeConfiguration.class})
@@ -40,10 +44,10 @@ class CommonColumnsListenerTraceTest {
   @Autowired private Tracer tracer;
 
   /** リスナーで組み立てた trace ID か例外を受け取る。 */
-  @Autowired private TraceProbe probe;
+  @Autowired private TraceProbeListener probe;
 
   @Test
-  @DisplayName("@ApplicationModuleListener の中で forInsert が現在の trace ID を登録できる")
+  @DisplayName("@ApplicationModuleListener の中で forInsert が現在の trace ID と Listener の pgm_cd を登録できる")
   void listenerObtainsTraceId(final Scenario scenario) {
     final AtomicReference<String> publisherTraceId = new AtomicReference<>();
 
@@ -60,38 +64,38 @@ class CommonColumnsListenerTraceTest {
             });
 
     assertThat(probe.result())
-        .as("リスナーで登録する created_tx_id。例外ではなく、発行側と同じ trace ID であること")
-        .isInstanceOf(String.class)
-        .asString()
-        .matches("[0-9a-f]{32}")
-        .isEqualTo(publisherTraceId.get());
+        .as("リスナーで登録する created_tx_id と created_pgm_cd。例外ではなく、発行側と同じ trace ID であること")
+        .isEqualTo(List.of(publisherTraceId.get(), "shared.TraceProbe"));
   }
 
   /** リスナーを起動するためのイベント。 */
   /* package */ record TraceProbeEvent() {}
 
-  /** モジュールのイベントリスナーで共通カラムを組み立て、trace ID か例外を記録する。 */
+  /** モジュールのイベントリスナーで共通カラムを組み立て、trace ID と pgm_cd か例外を記録する。 */
   // 非同期とトランザクションのプロキシを作れるよう、final にしない。
-  /* package */ static class TraceProbe {
+  @SuppressWarnings({"PMD.ShortMethodName", "PMD.PublicMemberInNonPublicType"})
+  /* package */ static class TraceProbeListener {
 
     /** 検証対象の共通処理。 */
     private final CommonColumns commonColumns;
 
-    /** リスナーで得た trace ID か例外。 */
+    /** リスナーで得た trace ID と pgm_cd か例外。 */
     private final AtomicReference<@Nullable Object> observed = new AtomicReference<>();
 
-    /* package */ TraceProbe(final CommonColumns commonColumns) {
+    /* package */ TraceProbeListener(final CommonColumns commonColumns) {
       this.commonColumns = commonColumns;
     }
 
     /** イベントを受けて、INSERT の共通カラムを組み立てる。 */
+    // PgmCdAspect の pointcut の対象にするため、public にする。
     @ApplicationModuleListener
-    /* package */ void onTraceProbe(final TraceProbeEvent event) {
+    public void on(final TraceProbeEvent event) {
       try {
+        final Map<Field<?>, Object> values = commonColumns.forInsert(FixtureItemTable.FIXTURE_ITEM);
         observed.set(
-            commonColumns
-                .forInsert(FixtureItemTable.FIXTURE_ITEM, TraceProbe.class)
-                .get(FixtureItemTable.FIXTURE_ITEM.CREATED_TX_ID));
+            List.of(
+                values.get(FixtureItemTable.FIXTURE_ITEM.CREATED_TX_ID),
+                values.get(FixtureItemTable.FIXTURE_ITEM.CREATED_PGM_CD)));
       } catch (IllegalStateException exception) {
         observed.set(exception);
       }
@@ -108,8 +112,8 @@ class CommonColumnsListenerTraceTest {
   /* package */ static class ProbeConfiguration {
 
     @Bean
-    /* package */ TraceProbe traceProbe(final CommonColumns commonColumns) {
-      return new TraceProbe(commonColumns);
+    /* package */ TraceProbeListener traceProbeListener(final CommonColumns commonColumns) {
+      return new TraceProbeListener(commonColumns);
     }
   }
 }

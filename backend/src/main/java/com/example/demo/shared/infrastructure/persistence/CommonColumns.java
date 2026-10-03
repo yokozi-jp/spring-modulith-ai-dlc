@@ -1,6 +1,5 @@
 package com.example.demo.shared.infrastructure.persistence;
 
-import com.example.demo.DemoApplication;
 import io.micrometer.tracing.Span;
 import io.micrometer.tracing.Tracer;
 import java.time.Clock;
@@ -29,19 +28,16 @@ import org.springframework.stereotype.Component;
  * <ul>
  *   <li>{@code *_at}：注入した {@link Clock} の現在時刻。
  *   <li>{@code *_by}：利用者の操作では OIDC の ID トークンの {@code sub}。利用者の操作でない処理では {@code *_pgm_cd} と同じ値。
- *   <li>{@code *_pgm_cd}：{@code モジュール名.ユースケースのクラスの単純名}。
+ *   <li>{@code *_pgm_cd}：{@link PgmCdAspect} が束縛した、呼び出し中のユースケースの値。
  *   <li>{@code *_tx_id}：現在のスパンの trace ID。trace がなければ例外にする。
  * </ul>
  *
  * <p>{@link #forInsert} と {@link #forUpdate} は、共通カラムがない、または型が異なる場合に {@link
- * IllegalArgumentException} を投げる。trace がない場合、または利用者を特定できない認証の場合に {@link IllegalStateException}
- * を投げる。
+ * IllegalArgumentException} を投げる。trace がない場合、{@code *_pgm_cd} が束縛されていない場合、または利用者を特定できない認証の場合に
+ * {@link IllegalStateException} を投げる。
  */
 @Component
 public class CommonColumns {
-
-  /** モジュール名を切り出す基準のベースパッケージ。 */
-  private static final String BASE_PACKAGE = DemoApplication.class.getPackageName() + ".";
 
   /** 更新のカラムを省いてよい、追記だけのワークテーブルの接頭辞。 */
   private static final String WORK_TABLE_PREFIX = "w_";
@@ -62,10 +58,9 @@ public class CommonColumns {
    * INSERT で登録する作成と更新のカラム、{@code lock_no = 1} を返す。
    *
    * @param table 登録先のテーブル
-   * @param useCase 処理を実行するユースケースのクラス。{@code *_pgm_cd} の値になる
    */
-  public Map<Field<?>, Object> forInsert(final Table<?> table, final Class<?> useCase) {
-    final AuditValues audit = audit(useCase);
+  public Map<Field<?>, Object> forInsert(final Table<?> table) {
+    final AuditValues audit = audit();
     final boolean hasUpdated = table.field("updated_at") != null;
     if (!hasUpdated && !table.getName().startsWith(WORK_TABLE_PREFIX)) {
       // ponytail: 更新のカラムを省けるのは接頭辞 w_ のテーブルだけ。changeset の静的検査と同じ接頭辞の判定に頼る。
@@ -88,13 +83,12 @@ public class CommonColumns {
    * UPDATE で登録する更新のカラムと、{@code lock_no = lock_no + 1} を返す。
    *
    * @param table 更新先のテーブル
-   * @param useCase 処理を実行するユースケースのクラス。{@code *_pgm_cd} の値になる
    */
-  public Map<Field<?>, Object> forUpdate(final Table<?> table, final Class<?> useCase) {
+  public Map<Field<?>, Object> forUpdate(final Table<?> table) {
     final Field<Long> lockNo = requiredField(table, "lock_no", Long.class);
     return toMap(
         Stream.concat(
-            audit(useCase).entries(table, "updated_"),
+            audit().entries(table, "updated_"),
             Stream.of(Map.<Field<?>, Object>entry(lockNo, lockNo.plus(1)))));
   }
 
@@ -121,8 +115,8 @@ public class CommonColumns {
   }
 
   /** 1 回の呼び出しで、現在時刻と trace ID を 1 回だけ取る。 */
-  private AuditValues audit(final Class<?> useCase) {
-    final String pgmCd = pgmCd(useCase);
+  private AuditValues audit() {
+    final String pgmCd = PgmCdAspect.current();
     return new AuditValues(Instant.now(clock), operator(pgmCd), pgmCd, traceId());
   }
 
@@ -137,19 +131,6 @@ public class CommonColumns {
                   throw new IllegalStateException("duplicate common column");
                 },
                 LinkedHashMap::new)));
-  }
-
-  private static String pgmCd(final Class<?> useCase) {
-    final String packageName = useCase.getPackageName() + ".";
-    final String simpleName = useCase.getSimpleName();
-    if (!packageName.startsWith(BASE_PACKAGE)
-        || packageName.length() == BASE_PACKAGE.length()
-        || simpleName.isEmpty()) {
-      throw new IllegalArgumentException(
-          "use case must be a named class in a module: useCase=" + useCase.getName());
-    }
-    final String relative = packageName.substring(BASE_PACKAGE.length());
-    return relative.substring(0, relative.indexOf('.')) + "." + simpleName;
   }
 
   private static String operator(final String pgmCd) {

@@ -5,12 +5,12 @@ import static com.example.demo.jooq.tables.FixtureWorkLogTable.FIXTURE_WORK_LOG;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import com.example.demo.DemoApplication;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Supplier;
 import org.jooq.Field;
 import org.jooq.SQLDialect;
 import org.jooq.Table;
@@ -27,6 +27,8 @@ import org.springframework.security.oauth2.core.oidc.OidcIdToken;
 import org.springframework.security.oauth2.core.oidc.user.DefaultOidcUser;
 
 /** 共通カラムへ登録する値の組み立てを検証する。 */
+// 共通カラムの規則ごとにテストを分けるため、メソッドの数の上限を外す。
+@SuppressWarnings("PMD.TooManyMethods")
 class CommonColumnsTest {
 
   /** 固定した現在時刻。 */
@@ -38,8 +40,8 @@ class CommonColumnsTest {
   /** 現在のスパンの trace ID。 */
   private static final String TRACE_ID = "4bf92f3577b34da6a3ce929d0e0e4736";
 
-  /** このテストクラスから求まる pgm_cd。 */
-  private static final String PGM_CD = "shared.CommonColumnsTest";
+  /** 呼び出し中のユースケースとして束縛する pgm_cd。 */
+  private static final String PGM_CD = "order.PlaceOrder";
 
   /** 現在のスパンを持つ、検証対象の共通処理。 */
   private final CommonColumns commonColumns =
@@ -64,8 +66,7 @@ class CommonColumnsTest {
     SecurityContextHolder.getContext()
         .setAuthentication(new OAuth2AuthenticationToken(user, user.getAuthorities(), "web"));
 
-    final Map<Field<?>, Object> values =
-        commonColumns.forInsert(FIXTURE_ITEM, CommonColumnsTest.class);
+    final Map<Field<?>, Object> values = inUseCase(() -> commonColumns.forInsert(FIXTURE_ITEM));
 
     assertThat(values)
         .as("INSERT の共通カラム")
@@ -85,13 +86,12 @@ class CommonColumnsTest {
   @DisplayName("利用者の操作でない処理（認証なし、匿名）では、作成者と更新者に pgm_cd と同じ値を登録する")
   void operatorIsPgmCdForNonUserProcessing() {
     final Map<Field<?>, Object> withoutAuthentication =
-        commonColumns.forInsert(FIXTURE_ITEM, CommonColumnsTest.class);
+        inUseCase(() -> commonColumns.forInsert(FIXTURE_ITEM));
     SecurityContextHolder.getContext()
         .setAuthentication(
             new AnonymousAuthenticationToken(
                 "key", "anonymousUser", AuthorityUtils.createAuthorityList("ROLE_ANONYMOUS")));
-    final Map<Field<?>, Object> anonymous =
-        commonColumns.forUpdate(FIXTURE_ITEM, CommonColumnsTest.class);
+    final Map<Field<?>, Object> anonymous = inUseCase(() -> commonColumns.forUpdate(FIXTURE_ITEM));
 
     assertThat(withoutAuthentication.get(FIXTURE_ITEM.CREATED_BY))
         .as("認証なしの created_by")
@@ -109,7 +109,7 @@ class CommonColumnsTest {
         .setAuthentication(
             UsernamePasswordAuthenticationToken.authenticated("alice", null, List.of()));
 
-    assertThatThrownBy(() -> commonColumns.forInsert(FIXTURE_ITEM, CommonColumnsTest.class))
+    assertThatThrownBy(() -> inUseCase(() -> commonColumns.forInsert(FIXTURE_ITEM)))
         .isInstanceOf(IllegalStateException.class)
         .hasMessageContaining("not an OIDC user");
   }
@@ -121,11 +121,11 @@ class CommonColumnsTest {
     final CommonColumns invalidTrace =
         new CommonColumns(CLOCK, TracerStubs.withTraceId("00000000000000000000000000000000"));
 
-    assertThatThrownBy(() -> withoutSpan.forInsert(FIXTURE_ITEM, CommonColumnsTest.class))
+    assertThatThrownBy(() -> inUseCase(() -> withoutSpan.forInsert(FIXTURE_ITEM)))
         .as("スパンがない")
         .isInstanceOf(IllegalStateException.class)
         .hasMessage("no current trace");
-    assertThatThrownBy(() -> invalidTrace.forUpdate(FIXTURE_ITEM, CommonColumnsTest.class))
+    assertThatThrownBy(() -> inUseCase(() -> invalidTrace.forUpdate(FIXTURE_ITEM)))
         .as("無効な trace ID")
         .isInstanceOf(IllegalStateException.class)
         .hasMessage("no current trace");
@@ -134,8 +134,7 @@ class CommonColumnsTest {
   @Test
   @DisplayName("UPDATE では更新のカラムと lock_no + 1 だけを登録し、作成と patched_* を含めない")
   void updateValuesIncrementLockNo() {
-    final Map<Field<?>, Object> values =
-        commonColumns.forUpdate(FIXTURE_ITEM, CommonColumnsTest.class);
+    final Map<Field<?>, Object> values = inUseCase(() -> commonColumns.forUpdate(FIXTURE_ITEM));
 
     assertThat(values.keySet())
         .as("UPDATE の共通カラム")
@@ -156,8 +155,7 @@ class CommonColumnsTest {
   @Test
   @DisplayName("更新のカラムを省いたワークテーブルの INSERT では、作成のカラムと lock_no だけを登録する")
   void workTableInsertOmitsUpdatedColumns() {
-    final Map<Field<?>, Object> values =
-        commonColumns.forInsert(FIXTURE_WORK_LOG, CommonColumnsTest.class);
+    final Map<Field<?>, Object> values = inUseCase(() -> commonColumns.forInsert(FIXTURE_WORK_LOG));
 
     assertThat(values.keySet())
         .as("ワークテーブルの共通カラム")
@@ -174,25 +172,22 @@ class CommonColumnsTest {
   void nonWorkTableWithoutUpdatedColumnsIsRejected() {
     final Table<?> renamed = FIXTURE_WORK_LOG.as("t_fixture_log");
 
-    assertThatThrownBy(() -> commonColumns.forInsert(renamed, CommonColumnsTest.class))
+    assertThatThrownBy(() -> inUseCase(() -> commonColumns.forInsert(renamed)))
         .isInstanceOf(IllegalArgumentException.class)
         .hasMessageContaining("table=t_fixture_log");
   }
 
   @Test
-  @DisplayName("モジュールに属する名前付きのクラスでなければ、pgm_cd を決められないため例外にする")
-  void useCaseOutsideModuleIsRejected() {
-    final Object anonymous = new Object() {};
-
-    assertThatThrownBy(() -> commonColumns.forInsert(FIXTURE_ITEM, String.class))
-        .as("ベースパッケージの外")
-        .isInstanceOf(IllegalArgumentException.class);
-    assertThatThrownBy(() -> commonColumns.forInsert(FIXTURE_ITEM, DemoApplication.class))
-        .as("ベースパッケージの直下")
-        .isInstanceOf(IllegalArgumentException.class);
-    assertThatThrownBy(() -> commonColumns.forInsert(FIXTURE_ITEM, anonymous.getClass()))
-        .as("匿名クラス")
-        .isInstanceOf(IllegalArgumentException.class);
+  @DisplayName("CommandHandler と Listener の外で呼ばれ、pgm_cd が束縛されていなければ例外にする")
+  void unboundPgmCdIsRejected() {
+    assertThatThrownBy(() -> commonColumns.forInsert(FIXTURE_ITEM))
+        .as("INSERT")
+        .isInstanceOf(IllegalStateException.class)
+        .hasMessageContaining("pgm_cd is not bound");
+    assertThatThrownBy(() -> commonColumns.forUpdate(FIXTURE_ITEM))
+        .as("UPDATE")
+        .isInstanceOf(IllegalStateException.class)
+        .hasMessageContaining("pgm_cd is not bound");
   }
 
   @Test
@@ -206,5 +201,10 @@ class CommonColumnsTest {
         .as("カラムがない")
         .isInstanceOf(IllegalArgumentException.class)
         .hasMessageContaining("column=no_such");
+  }
+
+  /** ユースケースの呼び出しの中として、pgm_cd を束縛して実行する。 */
+  private static <T> T inUseCase(final Supplier<T> call) {
+    return ScopedValue.where(PgmCdAspect.PGM_CD, PGM_CD).call(call::get);
   }
 }

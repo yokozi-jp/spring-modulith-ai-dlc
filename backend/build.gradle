@@ -71,6 +71,8 @@ dependencies {
     implementation 'org.springframework.boot:spring-boot-starter-jooq'
     runtimeOnly 'org.postgresql:postgresql'
     jooqCodegen 'org.postgresql:postgresql'
+    // 共通カラムの pgm_cd を、CommandHandler と Listener の呼び出しの間だけ束縛する（ADR-051）。
+    implementation 'org.springframework.boot:spring-boot-starter-aspectj'
 
     // --- モジュラーモノリス ---
     implementation 'org.springframework.modulith:spring-modulith-starter-core'
