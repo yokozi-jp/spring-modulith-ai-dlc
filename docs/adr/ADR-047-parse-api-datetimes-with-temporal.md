@@ -1,7 +1,7 @@
 ---
 type: ADR
 title: 'ADR-047: フロントエンドで API の日時を Temporal で解析する'
-description: API の絶対時刻を Temporal.Instant、日付だけの値を Temporal.PlainDate で解析し、Date で解析しない決定と、Safari 向けポリフィルを最初の日時画面で追加する方針。
+description: API の絶対時刻を Temporal.Instant、日付だけの値を Temporal.PlainDate で解析し、Date で解析しない決定と、Safari に対応する必要があるときはポリフィルを入れ、その依存を Safari 対応が必要な最初の日時画面で追加する方針。
 tags: [adr, datetime, timezone, frontend]
 ---
 
@@ -34,9 +34,9 @@ APIの絶対時刻は`Temporal.Instant.from(...)`で解析し、`toLocaleString`
 日付だけの値は`Temporal.PlainDate.from(...)`で解析する。
 APIの値を`new Date(string)`や`Date.parse`で解析しない。
 
-Safariを対応ブラウザに含める間は、ポリフィルを使う。
+Safariに対応する必要があるときは、ポリフィルを入れる。
 候補は、proposal-temporalのREADMEが安定版と位置づける[temporal-polyfill](https://www.npmjs.com/package/temporal-polyfill)とする。
-依存は日時を扱う最初の画面と同じ変更で追加し、それまでは追加しない。
+依存はSafariへの対応が必要で日時を扱う最初の画面と同じ変更で追加し、それまでは追加しない。
 SafariがTemporalを出荷し、対応ブラウザとWeb機能の採用基準で使える状態になったら、ポリフィルを外す。
 
 ## Consequences

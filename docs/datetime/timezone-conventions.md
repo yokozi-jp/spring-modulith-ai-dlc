@@ -83,9 +83,9 @@ const label = occurredAt.toLocaleString("ja-JP", {
 ```
 
 2026年10月時点で、ChromeとFirefoxはTemporalを出荷しているが、Safariは出荷しておらず、BaselineはLimited availabilityである（[Web Platform Status, Temporal](https://webstatus.dev/features/temporal)）。
-[対応ブラウザ](../frontend/browser-support.md)はiOS Safariを含むため、SafariがTemporalを出荷するまではポリフィルを必ず使う。
+Safariに対応する必要があるときは、ポリフィルを入れる。
 候補は[proposal-temporal](https://github.com/tc39/proposal-temporal#polyfills)が安定版と位置づける[temporal-polyfill](https://www.npmjs.com/package/temporal-polyfill)とする。
-ポリフィルの依存は、日時を扱う最初の画面を作るときに追加する。
+ポリフィルの依存は、Safariへの対応が必要で日時を扱う最初の画面を作るときに追加する。
 SafariがTemporalを出荷し、[対応ブラウザとWeb機能の採用基準](../frontend/browser-support.md)で使える状態になったら、ポリフィルを外す。
 
 ## UTCへ変換しない値
