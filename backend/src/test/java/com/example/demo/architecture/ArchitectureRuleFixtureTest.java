@@ -64,6 +64,11 @@ class ArchitectureRuleFixtureTest {
             PackageByFeatureOnionArchitectureTest.dependenciesPointInwardRule(VIOLATING),
             "order.infrastructure.messaging.OrderPlacedPublisher"),
         row(
+            "infrastructureDependsOnlyOnDomainModel",
+            PackageByFeatureOnionArchitectureTest.infrastructureDependsOnlyOnDomainModelRule(
+                VIOLATING),
+            "order.infrastructure.persistence.ExpiredOrderSweeper"),
+        row(
             "moduleApiDoesNotExposeInternalTypes",
             PackageByFeatureOnionArchitectureTest.moduleApiDoesNotExposeInternalTypesRule(
                 VIOLATING),
@@ -161,6 +166,8 @@ class ArchitectureRuleFixtureTest {
   private static List<ArchRule> rulesFor(final String basePackage) {
     return List.of(
         PackageByFeatureOnionArchitectureTest.dependenciesPointInwardRule(basePackage),
+        PackageByFeatureOnionArchitectureTest.infrastructureDependsOnlyOnDomainModelRule(
+            basePackage),
         PackageByFeatureOnionArchitectureTest.moduleApiDoesNotExposeInternalTypesRule(basePackage),
         PackageByFeatureOnionArchitectureTest
             .databaseTechnologyApisAreOnlyUsedByPersistenceAdapters,

@@ -81,3 +81,4 @@ DB と外部システムとの接続を扱う外側の領域を **Infrastructure
 - **`infrastructure.client`**：`<ExternalSystem>` を実装する [`<ExternalSystem>Client`](class-roles/external-client.md) を置く。
 
 Persistence、外部 Client、Presentation は別々の Adapter として扱い、互いに依存させない。
+Infrastructure は Application、Domain Service、モジュールルートの型に依存させない。

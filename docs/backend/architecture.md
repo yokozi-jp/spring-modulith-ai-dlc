@@ -144,7 +144,7 @@ infrastructure.client ───────────────────�
 - `presentation.web` は `application` とモジュールルートに依存し、Domain には依存しない。
 - `application` は `domain.service`、`domain.model`、モジュールルートに依存する。
 - `domain.service` は `domain.model` に依存する。
-- `infrastructure.persistence` と `infrastructure.client` は `domain.model` のインタフェースを実装する。
+- `infrastructure.persistence` と `infrastructure.client` は `domain.model` のインタフェースを実装し、`application`、`domain.service`、モジュールルートに依存しない。
 - Domain と Application は、Presentation と Infrastructure に依存しない。
 - Presentation、Persistence、外部 Client は相互に依存しない。
 

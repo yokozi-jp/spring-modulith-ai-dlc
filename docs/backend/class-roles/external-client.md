@@ -192,7 +192,8 @@ class PaymentGatewayClientTest {
 - [ ] Domain のインタフェースの実装を `infrastructure` に置く。［ArchUnit で検査：PackageByFeatureOnionArchitectureTest.domainInterfacesAreImplementedInInfrastructure］
 - [ ] `@Service` を付けない。［ArchUnit で検査：PackageByFeatureOnionArchitectureTest.servicesResideInApplicationOrDomainService］
 - [ ] 外部 API の JSON の record の名前を `Request` と `Response` で終えない。［ArchUnit で検査：ClassRoleArchTest.requestsAndResponsesArePresentationWebRecords］
-- [ ] `application`、`presentation.web`、`infrastructure.persistence` に依存しない。［ArchUnit で検査：PackageByFeatureOnionArchitectureTest.dependenciesPointInward］
+- [ ] `presentation.web`、`infrastructure.persistence` に依存しない。［ArchUnit で検査：PackageByFeatureOnionArchitectureTest.dependenciesPointInward］
+- [ ] `application`、`domain.service`、モジュールルートの型に依存しない。［ArchUnit で検査：PackageByFeatureOnionArchitectureTest.infrastructureDependsOnlyOnDomainModel］
 - [ ] jOOQ の API と生成型を使わない。［ArchUnit で検査：PackageByFeatureOnionArchitectureTest.databaseTechnologyApisAreOnlyUsedByPersistenceAdapters］
 - [ ] `@Transactional` を付けない。［ArchUnit で検査：PackageByFeatureOnionArchitectureTest.transactionalMethodsArePublicApplicationMethods］
 - [ ] `@Component` を付けた package-private の class にし、URL を `@Value` で受け取る。［自分で点検］

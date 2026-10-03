@@ -130,7 +130,8 @@ dsl.batchInsert(OrderRecordMapper.toOrderLinesRecords(order)).execute();
 ## 作成時のチェックリスト
 
 - [ ] `infrastructure.persistence` に置き、jOOQ の生成型をこのパッケージの外へ出さない。［ArchUnit で検査：PackageByFeatureOnionArchitectureTest.databaseTechnologyApisAreOnlyUsedByPersistenceAdapters］
-- [ ] `application`、`presentation.web`、`infrastructure.client` に依存しない。［ArchUnit で検査：PackageByFeatureOnionArchitectureTest.dependenciesPointInward］
+- [ ] `presentation.web`、`infrastructure.client` に依存しない。［ArchUnit で検査：PackageByFeatureOnionArchitectureTest.dependenciesPointInward］
+- [ ] `application`、`domain.service`、モジュールルートの型に依存しない。［ArchUnit で検査：PackageByFeatureOnionArchitectureTest.infrastructureDependsOnlyOnDomainModel］
 - [ ] package-private の `final class` にし、private のコンストラクタと static メソッドだけを持つ。［自分で点検］
 - [ ] 名前を集約の名前に `RecordMapper` を付けた形にする。［自分で点検］
 - [ ] Record から集約を作るときは `restore` を使う。［自分で点検］

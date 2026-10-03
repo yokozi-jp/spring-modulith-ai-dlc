@@ -48,6 +48,11 @@ class PackageByFeatureOnionArchitectureTest {
   /* package */ static final ArchRule dependenciesPointInward =
       dependenciesPointInwardRule(BASE_PACKAGE);
 
+  /** Infrastructure Adapter が使う機能モジュールの型を、同じモジュールの Domain Model に限る。 */
+  @ArchTest
+  /* package */ static final ArchRule infrastructureDependsOnlyOnDomainModel =
+      infrastructureDependsOnlyOnDomainModelRule(BASE_PACKAGE);
+
   /** 機能ルートの公開契約は、標準型、JSpecify、同じルートパッケージの型だけに依存させる。 */
   @ArchTest
   /* package */ static final ArchRule moduleApiDoesNotExposeInternalTypes =
@@ -238,6 +243,31 @@ class PackageByFeatureOnionArchitectureTest {
             "機能モジュール内の依存は外側から内側へ向け、"
                 + "Presentation、Persistence、外部 Client を相互に依存させない。"
                 + "どの層にも属さないパッケージのクラスは、役割に合う層のパッケージへ移す。");
+  }
+
+  /**
+   * Infrastructure Adapter から Application、Domain Service、モジュールルートへの依存を禁止する規則を組み立てる。
+   *
+   * <p>オニオン規則は Adapter から内側の層への依存をすべて許すため、この規則で Domain Model 以外を閉じる。 基底パッケージ直下の jOOQ
+   * 生成型のパッケージはモジュールルートではないので除く。
+   */
+  /* package */ static ArchRule infrastructureDependsOnlyOnDomainModelRule(
+      final String basePackage) {
+    return noClasses()
+        .that()
+        .resideInAPackage(basePackage + ".*.infrastructure..")
+        .should()
+        .dependOnClassesThat(
+            resideInAnyPackage(
+                    basePackage + ".*.application..", basePackage + ".*.domain.service..")
+                .or(
+                    resideInAPackage(basePackage + ".*")
+                        .and(not(resideInAPackage(basePackage + ".jooq")))))
+        .allowEmptyShould(true)
+        .because(
+            "Infrastructure は同じモジュールの domain.model の型だけを使う。"
+                + "Application、Domain Service、モジュールルートの型を使う処理は Application の CommandHandler か"
+                + " QueryService へ移す。");
   }
 
   /** 機能ルートの型が標準型、JSpecify、同じルートパッケージの型だけに依存することを強制する規則を組み立てる。 */
