@@ -1,0 +1,9 @@
+databaseChangeLog:
+  - changeSet:
+      id: "002-drop-lock-no"
+      author: system
+      changes:
+        - dropColumn:
+            tableName: m_item
+            schemaName: item
+            columnName: lock_no

@@ -1,0 +1,48 @@
+databaseChangeLog:
+  - changeSet:
+      id: "001-create-w-item"
+      author: system
+      comment: "追記だけのワークテーブルで書き込みの性能要件を満たすため、更新とデータパッチの共通カラムを省く。"
+      changes:
+        - createTable:
+            tableName: w_item
+            schemaName: item
+            columns:
+              - column:
+                  name: item_id
+                  type: bigint
+                  autoIncrement: true
+                  generationType: ALWAYS
+                  constraints:
+                    primaryKey: true
+                    primaryKeyName: pk_w_item
+              - column:
+                  name: item_code
+                  type: varchar(20)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: created_at
+                  type: timestamptz
+                  constraints:
+                    nullable: false
+              - column:
+                  name: created_by
+                  type: varchar(64)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: created_pgm_cd
+                  type: varchar(64)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: created_tx_id
+                  type: varchar(32)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: lock_no
+                  type: bigint
+                  constraints:
+                    nullable: false

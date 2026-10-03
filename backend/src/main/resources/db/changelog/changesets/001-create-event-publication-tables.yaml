@@ -1,7 +1,7 @@
 databaseChangeLog:
   - changeSet:
       id: 001-create-event-publication-tables
-      author: spring-modulith-ai-dlc
+      author: system
       preConditions:
         - dbms:
             type: postgresql

@@ -105,7 +105,7 @@ liquibase {
 }
 
 jooq {
-    // 公式プラグインとコード生成器をSpring Boot 4.1.1 BOMのjOOQ 3.21.7に一致させる。
+    // 実行時のjOOQはSpring Boot 4.1.1 BOMの3.21.7、コード生成のプラグインと生成器はbuild.gradleで指定した3.21.8を使う。
     configuration {
         jdbc {
             driver = 'org.postgresql.Driver'

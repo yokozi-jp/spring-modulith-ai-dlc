@@ -1,0 +1,10 @@
+databaseChangeLog:
+  - changeSet:
+      id: "002-comment-m-item"
+      author: system
+      changes:
+        - sqlFile:
+            path: sql/comment-m-item.sql
+      rollback:
+        - sql:
+            sql: "COMMENT ON TABLE item.m_item IS NULL;"

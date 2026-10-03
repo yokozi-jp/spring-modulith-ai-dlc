@@ -1,7 +1,7 @@
 # フロントエンド
 
 - [フロントエンドアーキテクチャ](architecture.md)：業務機能の追加や分割、ディレクトリ構成、依存方向、共有コードの置き場所を決めるとき
-- [フロントエンドのルーティングと状態管理](routing-and-state.md)：route や loader を追加するとき、状態の置き場所や custom Hook を作るかを決めるとき
+- [フロントエンドのルーティングと状態管理](routing-and-state.md)：route や loader を追加するとき、状態の置き場所や custom Hook を作るかを決めるとき、Effect を書くとき
 - [OrvalとAPI境界](api-client-orval.md)：業務 API を追加するとき、Orval の生成設定や OpenAPI の tag と operationId、API の呼び出し方を変えるとき
 - [フロントエンドのUIとスタイル](ui-and-style.md)：component、style、アクセシビリティを追加または変更するとき
 - [フロントエンドの国際化](i18n.md)：表示文言、locale、数値表示を追加または変更するとき

@@ -1,0 +1,7 @@
+databaseChangeLog:
+  - changeSet:
+      id: "001-b"
+      author: system
+      changes:
+        - tagDatabase:
+            tag: b
