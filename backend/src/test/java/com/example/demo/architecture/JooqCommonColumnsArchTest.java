@@ -79,10 +79,12 @@ class JooqCommonColumnsArchTest {
                             .getName()
                             .matches("(CREATED|UPDATED|PATCHED)_[A-Z0-9_]+")))
         .because(
-            "共通カラムは shared の共通処理だけが扱い、業務ロジックと画面で参照しない"
-                + "（ADR-048、postgresql-common-columns.md）。"
-                + "INSERT と UPDATE では CommonColumns の forInsert と forUpdate を使う。"
-                + "LOCK_NO は楽観的ロックで参照するため対象外。");
+            "共通カラムの値の作り方をモジュールごとに食い違わせず、業務ロジックと画面で共通カラムを参照しないため。"
+                + "LOCK_NO は楽観的ロックで参照するため対象外にする。"
+                + "直し方：INSERT と UPDATE の共通カラムは shared の CommonColumns の forInsert と forUpdate で登録し、"
+                + "生成クラスの CREATED_*、UPDATED_*、PATCHED_* を直接参照しない。"
+                + "規約：docs/database/postgresql-common-columns.md、"
+                + "docs/adr/ADR-048-add-shared-module-for-jooq-common-code.md");
   }
 
   /** ArchUnit の拒否経路を検証するため、shared の外から共通カラムを参照するフィクスチャ。 */
