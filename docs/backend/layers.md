@@ -1,7 +1,7 @@
 ---
 type: Architecture
 title: バックエンドの層の責務
-description: 機能モジュール内の Domain、Application、Presentation、Infrastructure に何を置き、何に依存させないかを定める。クラスをどの層に置くか決めるとき、トランザクション境界や Adapter の分け方を決めるときに読む。
+description: 機能モジュール内の Domain、Application、Presentation、Infrastructure に置くクラスの役割と、トランザクション境界の置き場所を説明する。クラスをどの層のどの役割にするか決めるとき、トランザクション境界やイベントの発行と受信の置き場所を確かめるときに読む。
 tags: [architecture, backend, onion-architecture]
 ---
 
@@ -9,61 +9,75 @@ tags: [architecture, backend, onion-architecture]
 
 機能モジュールの内部は、内側の Domain と Application、外側の Presentation と Infrastructure に分ける。
 内側の層は外側の実装へ依存させない。
-トランザクション境界は Application Service の public メソッドに置く。
-層の間で許可する依存方向は [バックエンドアーキテクチャ](architecture.md) の「依存方向」に示す。
+トランザクション境界は、Application の CommandHandler の `handle`、QueryService の public メソッド、Listener の `on` に置く。
+層の間で許可する依存方向は [バックエンドアーキテクチャ](architecture.md) の「依存方向」に示し、役割の決定理由は [ADR-044](../adr/ADR-044-define-backend-class-roles-and-naming.md) に示す。
 
 ## Domain
 
 業務状態と業務規則を置く内側の領域を **Domain** とする。
 
-`domain.model` には集約、Entity、Value Object、Domain Event、業務不変条件を置く。
+`domain.model` には次の型を置く。
 
-`domain.service` には、単一の集約へ自然に置けない業務規則だけを置く。
+- **集約**：業務上の一貫性の単位。状態は業務の操作を表すメソッドで変更する。
+- **Entity**：集約の中で識別子を持つ型。
+- **値オブジェクト**：識別子を持たず、値と不変条件を表す record または enum。
+- **`<Aggregate>Repository`**：集約を保存し、取り出すインタフェース。
+- **`<ExternalSystem>`**：決済などの外部システムを、ドメインの語彙で表すインタフェース。
 
-単なるデータ取得や処理の中継は Domain Service に置かない。
+`domain.model` は Spring、jOOQ、JPA、Jackson に依存させない。
+Domain Model を API の Request と Response や、永続化の Record として兼用しない。
 
-Domain は Spring、jOOQ、JPA、Jackson、Web、DB、外部 API クライアントへ依存させない。
+業務規則は、まず値オブジェクトか Entity に置く。
+`domain.service` の **Domain Service** は、次の三つの規則だけを置く。
 
-Domain Model を API DTO や永続化 Record として兼用しない。
+- 複数の集約にまたがる規則。
+- どの集約にも自然に属さない計算。
+- Repository を使って確かめる規則。
 
-Domain Service は Spring の `@Service` を付けない通常の Java クラスとし、フレームワークから独立させる。
+Domain Service には Spring の `@Service` を付ける。
+`@Service` は Domain が依存してよい唯一の Spring の型である。
+Domain Service は Repository を使ってよく、イベントの発行、外部システムの呼び出し、ログ出力は行わない。
 
 ## Application
 
 ユースケースの進行を担当する内側の領域を **Application** とする。
+`application` の `@Service` は、次の三つの役割のどれかにする。
 
-Application Service はモジュールルートの契約を実装し、Domain Model と Domain Service を組み合わせる。
+- **`<UseCase>CommandHandler`**：状態を変えるユースケースを一つ実行する。`<UseCase>Command` を受け取り、集約と Domain Service を組み合わせ、Repository で保存し、`<UseCase>Result` を返す。イベントは `ApplicationEventPublisher` で発行する。
+- **`<Feature>QueryService`**：モジュールルートの `<Feature>Queries` を実装し、Repository で読んだ集約をルートの record に変換する。
+- **`<Event>Listener`**：他モジュールのイベントを受信し、自モジュールの CommandHandler をちょうど一つ呼ぶ。
 
-トランザクション境界は Application Service の public メソッドへ `@Transactional` で明示する。
+`<UseCase>Command` と `<UseCase>Result` は、Java の標準型だけを持つ record として `application` に置く。
 
-クラス単位の `@Transactional` は、public 以外のメソッドへ意図せず適用される可能性を避けるため使用しない。
+CommandHandler は別の CommandHandler を呼ばない。
+
+トランザクション境界は次のメソッドに置く。
+
+- CommandHandler の `handle` に `@Transactional` を付ける。
+- QueryService の public メソッドに `@Transactional(readOnly = true)` を付ける。
+- Listener の `on` に `@ApplicationModuleListener` を付ける。このアノテーションは新しいトランザクションを開く。
+
+クラス単位の `@Transactional` は付けない。
 
 Application は Presentation と Infrastructure の実装へ依存させない。
 
-DB、メッセージブローカー、外部 API へのアクセスを抽象化する必要がある場合は、インタフェースを `application.port` に置く。
-
-Infrastructure はそのインタフェースを実装する。
-
 ## Presentation
 
-HTTP や UI からの入力と出力を扱う外側の領域を **Presentation** とする。
+HTTP からの入力と出力を扱う外側の領域を **Presentation** とする。
 
-`presentation.web` には Spring MVC の Controller、Request、Response、Web 固有の変換処理を置く。
+`presentation.web` には次の型を置く。
 
-Controller は入力を検証して Application のユースケースを呼び出し、Domain Model をそのまま API レスポンスとして返さない。
+- **`<Aggregate>Controller`**：集約ごとの Spring MVC の Controller。Request を Command に変換して CommandHandler を呼び、参照は `<Feature>Queries` を呼ぶ。
+- **`<UseCase>Request`**：リクエストボディを受けるユースケースの入力の record。`toCommand()` で Command に変換する。
+- **`<QueryResult>Response`**：参照の結果の応答の record。`from(...)` でルートの record から作る。
 
-Presentation は Infrastructure の実装へ直接依存させない。
+Presentation は Domain と Infrastructure に依存させない。
 
 ## Infrastructure
 
-DB、メッセージブローカー、外部 API との接続を扱う外側の領域を **Infrastructure** とする。
+DB と外部システムとの接続を扱う外側の領域を **Infrastructure** とする。
 
-`infrastructure.persistence` には jOOQ を使う Repository 実装と、jOOQ の生成型を Domain 型へ変換する Mapper を置く。
+- **`infrastructure.persistence`**：`<Aggregate>Repository` を jOOQ で実装する `Jooq<Aggregate>Repository` と、jOOQ の生成型と Domain の型を変換する `<Aggregate>RecordMapper` を置く。
+- **`infrastructure.client`**：`<ExternalSystem>` を実装する `<ExternalSystem>Client` を置く。
 
-`infrastructure.messaging` にはメッセージの受信、送信、シリアライズ、ブローカー固有の設定を置く。
-
-`infrastructure.client` には外部 API クライアントと、外部形式を内部形式へ変換する処理を置く。
-
-Presentation、Persistence、Messaging、外部 Client は別々の Adapter として扱い、相互に直接依存させない。
-
-メッセージコンシューマーは HTTP と UI を扱う Presentation には含めず、transport 実装として `infrastructure.messaging` に置く。
+Persistence、外部 Client、Presentation は別々の Adapter として扱い、互いに依存させない。

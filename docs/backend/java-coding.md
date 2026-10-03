@@ -16,7 +16,12 @@ Domain Model の状態は業務上の操作を表すメソッドで変更する�
 
 手書きのバックエンドコードでは、Lombok の `@Data` と `@Setter` を使用しない。
 
-Request、Response、Command、Result のようなデータキャリアには、原則として record を使う。
+次のデータキャリアには record を使う。
+
+- モジュールルートの参照の結果、検索条件、イベント。
+- 値オブジェクト。固定の値の集合は enum にする。
+- Application の `<UseCase>Command` と `<UseCase>Result`。
+- Presentation の `<UseCase>Request` と `<QueryResult>Response`。
 
 Domain Model の状態は setter で公開せず、業務上の操作と不変条件を表すメソッドを介して変更する。
 

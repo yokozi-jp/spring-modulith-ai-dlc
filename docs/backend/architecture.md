@@ -1,45 +1,47 @@
 ---
 type: Architecture
 title: バックエンドアーキテクチャ
-description: Package by feature とオニオンアーキテクチャによるバックエンドの構造と依存方向を説明する。パッケージ構成、モジュールルートの公開契約、依存方向、ベースパッケージ直下の全体設定を確認するときに読む。
+description: Package by feature とオニオンアーキテクチャによるバックエンドの構造を説明する。機能モジュールのパッケージ構成とクラスの役割名、モジュールルートの公開契約、依存方向、モジュール間の連携、ベースパッケージ直下の全体設定を確認するときに読む。
 tags: [architecture, backend, spring-modulith]
 ---
 
 # バックエンドアーキテクチャ
 
 最上位を機能で分割し、各機能モジュールを `com.example.demo.<feature>` に置く。
-機能の内部はオニオンアーキテクチャとし、依存を外側から内側へ限定する。
-他の機能モジュールから参照できるのは、モジュールルートの公開契約だけである。
+機能の内部はオニオンアーキテクチャとし、クラスを役割ごとに決まったパッケージと名前で置く。
+他の機能モジュールとは、モジュールルートのイベントと `<Feature>Queries` だけで連携する。
 各層の責務は [バックエンドの層の責務](layers.md) に示す。
 
 ## 方針
 
 バックエンドは、最上位を機能で分割する Package by feature を採用する。
-
 各機能の内部にはオニオンアーキテクチャを適用し、業務ロジックから技術詳細へ向かう依存を禁止する。
+この方針は [ADR-002](../adr/ADR-002-package-by-feature-onion-architecture.md) で決定している。
 
 Spring Modulith は `com.example.demo` の直接サブパッケージをアプリケーションモジュールとして認識するため、**機能モジュール**を `com.example.demo.<feature>` に置く。
 
-依存方向は外側から内側へ限定し、Presentation と Infrastructure は Application を介して Domain のユースケースを実行する。
-
-この方針は [ADR-002](../adr/ADR-002-package-by-feature-onion-architecture.md) で決定している。
+クラスの役割、置き場所、命名は [ADR-044](../adr/ADR-044-define-backend-class-roles-and-naming.md) で決定している。
+更新は `<UseCase>CommandHandler`、参照は `<Feature>QueryService`、イベントの受信は `<Event>Listener` が担う。
 
 ## パッケージ構成
 
-機能モジュールは、必要な役割が生じたパッケージだけを作る。
+機能モジュールのパッケージとクラスは、次の構成と名前にする。
 
 ``` text
 backend/src/main/java/com/example/demo/
 ├── DemoApplication.java
 ├── SecurityConfig.java
+├── OpenApiConfig.java
 ├── OpenTelemetryAppenderInitializer.java
+├── LocaleSupport.java
+├── WebLocaleConfig.java
 ├── package-info.java
 │
 └── <feature>/
     ├── package-info.java
-    ├── <Feature>Operations.java
-    ├── <Command>.java
-    ├── <Result>.java
+    ├── <Feature>Queries.java
+    ├── <QueryResult>.java
+    ├── <SearchCriteria>.java
     ├── <Event>.java
     │
     ├── domain/
@@ -47,93 +49,109 @@ backend/src/main/java/com/example/demo/
     │   │   ├── package-info.java
     │   │   ├── <Aggregate>.java
     │   │   ├── <Entity>.java
-    │   │   └── <ValueObject>.java
+    │   │   ├── <ValueObject>.java
+    │   │   ├── <Aggregate>Repository.java
+    │   │   └── <ExternalSystem>.java
     │   └── service/
     │       ├── package-info.java
     │       └── <DomainService>.java
     │
     ├── application/
     │   ├── package-info.java
-    │   ├── <UseCase>Service.java
-    │   └── port/
-    │       ├── package-info.java
-    │       └── <RepositoryPort>.java
+    │   ├── <UseCase>Command.java
+    │   ├── <UseCase>CommandHandler.java
+    │   ├── <UseCase>Result.java
+    │   ├── <Feature>QueryService.java
+    │   └── <Event>Listener.java
     │
     ├── presentation/
     │   └── web/
     │       ├── package-info.java
-    │       ├── <Feature>Controller.java
-    │       ├── <Feature>Request.java
-    │       └── <Feature>Response.java
+    │       ├── <Aggregate>Controller.java
+    │       ├── <UseCase>Request.java
+    │       └── <QueryResult>Response.java
     │
     └── infrastructure/
         ├── persistence/
         │   ├── package-info.java
-        │   ├── Jooq<Feature>Repository.java
-        │   └── <Feature>RecordMapper.java
-        ├── messaging/
-        │   ├── package-info.java
-        │   ├── <Event>Listener.java
-        │   └── <Event>Publisher.java
+        │   ├── Jooq<Aggregate>Repository.java
+        │   └── <Aggregate>RecordMapper.java
         └── client/
             ├── package-info.java
             └── <ExternalSystem>Client.java
 ```
 
-空ディレクトリは先に作らない。
+`<Event>Listener` は、イベントを受信する側のモジュールの `application` に置く。
 
-`domain.service`、`application.port`、各 Infrastructure Adapter は、その役割を持つ型が必要になった時点で追加する。
+空のパッケージは、そのパッケージの最初のクラスより先に作らない。
 
-Java パッケージを追加するときは、既存の NullAway と JSpecify の規約に従い、`@NullMarked` を宣言する `package-info.java` も追加する。
+Java パッケージを作るときは、`@NullMarked` を宣言する `package-info.java` も作る。
 
 ## モジュールルート
 
 **モジュールルート**は `com.example.demo.<feature>` 直下のパッケージであり、他の機能モジュールへ公開する契約だけを置く。
 
-公開できる型は、ユースケースインタフェース、コマンド、結果、他モジュールへ通知するイベントである。
+ルートに置ける型は、record、enum、`<Feature>Queries` インタフェースだけである。
 
-Spring MVC の Request と Response、Controller、jOOQ の生成型、Repository 実装は置かない。
+- **`<Feature>Queries`**：機能の参照を提供するインタフェース。すべての機能モジュールに作り、自モジュールの Controller と他モジュールがこれを使う。
+- **`<QueryResult>`**：参照の結果を表す record。
+- **`<SearchCriteria>`**：検索条件を表す record。
+- **`<Event>`**：他モジュールへ通知する、過去形の名前のイベントの record。
 
-入口側の契約はモジュールルートで表現できるため、`application.port.in` は作らない。
+ルートの型は、`String`、`Instant`、`BigDecimal` などの Java の標準型と、同じルートパッケージの型だけを持つ。
+Domain の型、Command と Result、Spring MVC の Request と Response、jOOQ の生成型は置かない。
 
-外部依存を反転する必要が生じた場合だけ、Application に `port` を追加する。
-
-Spring Modulith の既定の閉じたモジュールで足りるため、通常は `@ApplicationModule` を付けない。
-
-ルート以外のパッケージを公開する必要が生じた場合だけ `@NamedInterface` を使う。
+モジュールは Spring Modulith の既定の閉じたモジュールとし、`@ApplicationModule` と `@NamedInterface` を付けない。
 
 ## 依存方向
 
-許可する主要な依存方向は次のとおりである。
+許可する依存方向は次のとおりである。
 
 ``` text
-presentation ─┐
-persistence ──┤
-messaging ────┼─> application ─> domain.service ─> domain.model
-client ───────┘
+presentation.web ──> application ──> domain.service ──> domain.model
+       │                 │  │                               ▲
+       │                 │  └───────────────────────────────┤
+       └──> <feature> <──┘                                  │
+infrastructure.persistence ─────────────────────────────────┤
+infrastructure.client ──────────────────────────────────────┘
 ```
 
-外側の Adapter は必要に応じて Domain を直接利用できるが、Domain と Application から外側の実装は参照できない。
+- `presentation.web` は `application` とモジュールルートに依存し、Domain には依存しない。
+- `application` は `domain.service`、`domain.model`、モジュールルートに依存する。
+- `domain.service` は `domain.model` に依存する。
+- `infrastructure.persistence` と `infrastructure.client` は `domain.model` のインタフェースを実装する。
+- Domain と Application は、Presentation と Infrastructure に依存しない。
+- Presentation、Persistence、外部 Client は相互に依存しない。
 
-機能モジュールをまたぐ参照は、相手モジュールのルートに置いた公開契約だけに限定する。
+## モジュール間の連携
+
+機能モジュールの間の連携は、次の二つだけにする。
+
+- **イベント**：状態の変更を伝える。発行側の CommandHandler がルートの `<Event>` を `ApplicationEventPublisher` で発行し、受信側の `<Event>Listener` が受ける。
+- **参照**：相手のルートにある `<Feature>Queries` を呼ぶ。戻り値はルートの record である。
+
+他モジュールの状態を同期で変更しない。
+同期の状態変更が必要に見えたら、実装を止めて利用者に確認し、ADR を起こす。
 
 他モジュールの `domain`、`application`、`presentation`、`infrastructure` は内部パッケージなので参照しない。
+CommandHandler は `application` にあるため、他モジュールから呼ぶと `ApplicationModuleArchitectureTest` の `ApplicationModules.verify()` が失敗する。
+検査の内容は [バックエンドのアーキテクチャテスト](architecture-tests.md) に示す。
 
 ## 全体設定
 
 `com.example.demo` 直下には、アプリケーションの起動クラスと機能横断の設定だけを置く。
 
-現在は `DemoApplication`、`SecurityConfig`、`OpenTelemetryAppenderInitializer` が該当する。
-
 機能固有の Bean や業務ロジックをベースパッケージ直下へ追加しない。
 
-共通パッケージを安易に `com.example.demo` の直接サブパッケージへ作ると、Spring Modulith が機能モジュールとして認識するため避ける。
+共通パッケージを `com.example.demo` の直接サブパッケージへ作ると、Spring Modulith が機能モジュールとして認識する。
+機能横断の API エラー契約は、`error` モジュールの `presentation.web` に置いている。
 
-複数の機能で似た処理が必要になっても、共有される概念と安定した境界が明確になるまでは各機能内に置く。
+複数の機能で似た処理が要るときも、処理は各機能内に置く。
 
 ## 関連資料
 
 - [ADR-002: package by feature とオニオンアーキテクチャ](../adr/ADR-002-package-by-feature-onion-architecture.md)
+- [ADR-044: バックエンドのクラスの役割と命名を定める](../adr/ADR-044-define-backend-class-roles-and-naming.md)
 - [バックエンドの層の責務](layers.md)
 - [バックエンドの Java 実装規約](java-coding.md)
 - [バックエンドのアーキテクチャテスト](architecture-tests.md)

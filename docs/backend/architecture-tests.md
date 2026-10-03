@@ -1,7 +1,7 @@
 ---
 type: Reference
 title: バックエンドのアーキテクチャテスト
-description: Spring Modulith、ArchUnit、PMD、Error Proneでバックエンド規約を検査する実装と解析対象を示し、規約違反の検出方法または解析対象を確認するときに読むリファレンス。
+description: Spring Modulith、ArchUnit、PMD、Error Proneでバックエンド規約を検査する実装、規則名、規則を確かめるフィクスチャ、解析対象を示し、規約違反の検出方法を確認するとき、ArchUnitの規則を追加するときに読むリファレンス。
 tags: [reference, backend, testing, archunit, spring-modulith]
 ---
 
@@ -15,6 +15,8 @@ PMDとError Proneはソースまたはコンパイル時に判定する規約を
 ```text
 backend/src/test/java/com/example/demo/architecture/
 ├── ApplicationModuleArchitectureTest.java
+├── ArchitectureRuleFixtureTest.java
+├── ClassRoleArchTest.java
 ├── DateTimeConventionsArchTest.java
 ├── GeneralCodingRulesArchTest.java
 ├── PackageByFeatureOnionArchitectureTest.java
@@ -27,26 +29,56 @@ backend/src/test/java/com/example/demo/architecture/
 `ApplicationModuleArchitectureTest`はSpring Modulithの`ApplicationModules.verify()`を使い、モジュール間の循環、内部パッケージ参照、許可されていない依存を検出する。
 モジュール構造の決定は[ADR-001](../adr/ADR-001-adopt-spring-modulith-modular-monolith.md)を参照する。
 
-`PackageByFeatureOnionArchitectureTest`はArchUnitの`Architectures.onionArchitecture()`と追加規則で、次の内容を検査する。
+`PackageByFeatureOnionArchitectureTest`はArchUnitの`Architectures.onionArchitecture()`と追加規則で、パッケージの配置と依存を検査する。
+規則名は`@ArchTest`のフィールド名であり、テスト結果にもこの名前で出る。
 
-- Domain Modelは`com.example.demo.*.domain.model..`に置く。
-- Domain Serviceは`com.example.demo.*.domain.service..`に置く。
-- Application Serviceは`com.example.demo.*`または`com.example.demo.*.application..`に置く。
-- Presentation Adapterは`com.example.demo.*.presentation..`に置く。
-- Persistence Adapterは`com.example.demo.*.infrastructure.persistence..`に置く。
-- Messaging Adapterは`com.example.demo.*.infrastructure.messaging..`に置く。
-- 外部Client Adapterは`com.example.demo.*.infrastructure.client..`に置く。
-- jOOQ APIと生成型は`infrastructure.persistence`だけで使う。
-- 機能ルートの公開契約は内部パッケージの型へ依存しない。
-- DomainはSpring、jOOQ、JPA、Jacksonに依存しない。
-- `@Controller`と`@RestController`を付けた型は`presentation`に置く。
-- `@Service`を付けた型は`application`に置く。
-- `@Repository`を付けた型は`infrastructure.persistence`に置く。
-- クラス単位の`@Transactional`を禁止する。
-- `@Transactional`メソッドは`application`のpublicメソッドに限定する。
+- `dependenciesPointInward`：`domain.model`、`domain.service`、モジュールルートと`application`、`presentation`、`infrastructure.persistence`、`infrastructure.client`のオニオン構造で依存を内向きに限り、どの層にも属さないパッケージのクラスを拒否する。
+- `moduleApiDoesNotExposeInternalTypes`：モジュールルートの型は、`java..`、`org.jspecify..`、同じルートパッケージの型だけに依存する。
+- `databaseTechnologyApisAreOnlyUsedByPersistenceAdapters`：jOOQ APIと生成型は`infrastructure.persistence`だけで使う。
+- `domainModelDoesNotDependOnFrameworks`：`domain.model`はSpring、jOOQ、jOOQの生成型、JPA、Jacksonに依存しない。
+- `domainServicesDependOnlyOnDomainAndJava`：`domain.service`は`java..`、`org.jspecify..`、`lombok..`、Domainの型、`@Service`だけに依存する。
+- `domainServicesAreAnnotatedWithService`：`domain.service`のトップレベルのクラスに`@Service`を付ける。
+- `servicesResideInApplicationOrDomainService`：`@Service`を付けた型は`application`か`domain.service`に置く。
+- `controllersResideInPresentationWeb`：`@Controller`と`@RestController`を付けた型は`presentation.web`に置き、名前を`Controller`で終える。
+- `repositoriesResideInPersistenceAdapters`：`@Repository`を付けた型は`infrastructure.persistence`に置く。
+- `presentationDoesNotDependOnDomain`：`presentation`はDomainに依存しない。
+- `domainInterfacesAreImplementedInInfrastructure`：Domainの外で`domain.model`のインタフェースを実装するクラスは`infrastructure`に置く。
+- `repositoryImplementationsAreJooqRepositories`：`domain.model`の`*Repository`を実装するクラスは、`infrastructure.persistence`の`Jooq*Repository`にする。
+- `externalSystemImplementationsAreClients`：Domainの外で`*Repository`以外の`domain.model`のインタフェースを実装するクラスは、`infrastructure.client`の`*Client`にする。
+- `transactionalIsNotDeclaredAtClassLevel`：クラスに`@Transactional`と、それをメタアノテーションに持つアノテーションを付けない。
+- `transactionalMethodsArePublicApplicationMethods`：`@Transactional`と、それをメタアノテーションに持つ`@ApplicationModuleListener`を付けたメソッドは、`application`のpublicメソッドに限る。
 
 ベースパッケージ直下の起動クラスと全体設定は、オニオン規則の所属検査から除外する。
-パッケージ構造の決定は[ADR-002](../adr/ADR-002-package-by-feature-onion-architecture.md)を参照する。
+パッケージ構造の決定は[ADR-002](../adr/ADR-002-package-by-feature-onion-architecture.md)を、クラスの役割の決定は[ADR-044](../adr/ADR-044-define-backend-class-roles-and-naming.md)を参照する。
+
+## クラスの役割
+
+`ClassRoleArchTest`は、クラスの役割ごとの名前と形を検査する。
+
+- `moduleRootTypesAreRecordsEnumsOrQueries`：モジュールルートの型は、record、enum、`*Queries`インタフェースのどれかにする。
+- `applicationServicesHaveRoleNames`：`application`の`@Service`は、`*CommandHandler`、`*QueryService`、`*Listener`のどれかの名前にする。
+- `commandHandlersExposeOnlyTransactionalHandle`：`*CommandHandler`のpublicメソッドは、`@Transactional`を付けた`handle`一つだけにし、`*Command`を一つ受け取り`*Result`を返す。
+- `commandsAndResultsAreApplicationRecords`：`*Command`と`*Result`は`application`のrecordにする。
+- `commandHandlersDoNotDependOnOtherCommandHandlers`：`*CommandHandler`は別の`*CommandHandler`に依存しない。
+- `moduleListenersAreApplicationListeners`：`@ApplicationModuleListener`を付けたメソッドは、`application`の`*Listener`の`on`にする。
+- `listenersExposeOnlyOnAndCallOneCommandHandler`：`*Listener`のpublicメソッドは`@ApplicationModuleListener`を付けた`void on(...)`一つだけにし、呼ぶ`*CommandHandler`はちょうど一つにする。
+- `requestsAndResponsesArePresentationWebRecords`：`*Request`と`*Response`は`presentation.web`のrecordにする。
+- `queryServicesImplementModuleQueries`：`*QueryService`は`application`に置いて自モジュールのルートの`*Queries`を実装し、すべてのpublicメソッドに`@Transactional(readOnly = true)`を付ける。
+
+## 規則を確かめるフィクスチャ
+
+プロダクションの規則は`.allowEmptyShould(true)`を付けるため、対象のクラスがなくても成功する。
+`ArchitectureRuleFixtureTest`は、テスト専用のフィクスチャで各規則が働くことを確かめる。
+
+- `backend/src/test/java/archfixture/conforming/`：規約どおりの`order`モジュールと`inventory`モジュールの最小の例。すべての規則が誤検出しないことを確かめる。
+- `backend/src/test/java/archfixture/violating/`：規則ごとに違反するクラスを置く。各クラスのJavadocに違反する規則名を書く。パラメータ化テストが、規則ごとに対応する違反クラスの完全修飾名を含む失敗を確かめる。
+
+フィクスチャは`com.example.demo`の外に置く。
+そのため、Springのコンポーネントスキャン、Spring Modulithの`ApplicationModules`、プロダクション向けの`@AnalyzeClasses(packagesOf = DemoApplication.class)`は、フィクスチャを読まない。
+`ArchitectureRuleFixtureTest`は`ClassFileImporter`でフィクスチャを読み込み、ベースパッケージを引数に取る`<規則名>Rule(basePackage)`のファクトリか、規則のフィールドをそのまま使う。
+
+規則を追加するときは、違反フィクスチャのクラスを一つ追加し、`eachRuleDetectsItsViolatingFixture`の行と`rulesFor()`に規則を加える。
+この手順で、新しい規則が違反を検出し、規約どおりのコードを誤検出しないことを確かめる。
 
 ## 共通実装とプロキシ
 

@@ -11,6 +11,8 @@ tags: [adr, architecture, onion-architecture, package-by-feature]
 
 Accepted
 
+インタフェースの置き場所と Messaging Adapter の扱いは [ADR-044](ADR-044-define-backend-class-roles-and-naming.md) で改める。
+
 ## Date
 
 2026-09-11
