@@ -121,7 +121,7 @@ final class ChangesetTableRules {
                   + expectedType
                   + "にする（現在は"
                   + column.type()
-                  + "）（docs/adr/ADR-045-detect-column-name-and-type-mismatches.md）。"));
+                  + "）（docs/adr/ADR-047-detect-column-name-and-type-mismatches.md）。"));
     }
     if (BANNED_TYPE.matcher(column.type()).matches()) {
       out.add(
