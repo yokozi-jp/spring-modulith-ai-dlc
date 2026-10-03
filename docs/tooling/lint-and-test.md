@@ -28,6 +28,7 @@ Dockerを使うTaskは、Dockerがないローカル環境ではスキップし�
 - **`task fe-coverage`**：VitestのV8 providerで全体branch coverage 85%を検証する。
 - **`task fe-test-build`**：coverage付きテストと本番ビルドを実行する。
 - **`task fe-verify`**：`fe-check`、`fe-knip`、`fe-test-build`を実行する。
+- **`task fe-route-tree-check`**：ビルドで`routeTree.gen.ts`を再生成し、コミット済みの内容と差分があれば失敗する。
 
 ## バックエンド
 
@@ -90,7 +91,7 @@ Gitフックの条件とコマンドは[`lefthook.yml`](../../lefthook.yml)を�
 
 ## CI対応
 
-- **`frontend-ci.yml`**：`fe-verify`と`fe-doctor`を実行する。
+- **`frontend-ci.yml`**：`fe-verify`、`fe-route-tree-check`、`fe-doctor`を実行する。
 - **`backend-ci.yml`**：`be-lint`相当、`be-verify-migrations`、`be-test`、`be-openapi-lint`、手動実行時の`mutation-test`を実行する。
 - **`betterleaks.yml`**：`scan-secrets-all`相当を実行する。
 - **`static-analysis.yml`**：`lint-semgrep`相当と`lint-duplicates`を実行する。
