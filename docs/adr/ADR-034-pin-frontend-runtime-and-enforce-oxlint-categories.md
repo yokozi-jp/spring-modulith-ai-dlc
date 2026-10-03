@@ -56,6 +56,8 @@ Oxlint の `correctness`、`suspicious`、`pedantic`、`perf`、`style`、`restr
   有効なままだと型名と比べる形しか通らないためであり、上書きと shadowing は有効なままの `no-global-assign` と `no-shadow-restricted-names` が防ぐ。
 - `better-tailwindcss/enforce-canonical-classes` を有効にし、class の表記を正規形にそろえる。
   `enforce-shorthand-classes` は役割が重なるため有効にしない。
+- `src/components/ui/**` では、Oxlint の `react/only-export-components` と React Doctor の `react-doctor/only-export-components` を無効にする。
+  shadcn の生成物は `buttonVariants` のような variant を component と同じファイルから export するためであり、生成物を手で分けずに registry から更新できる形を保つ。
 
 `radix`、`no-new-wrappers`、`typescript/consistent-type-definitions`、`import/no-relative-parent-imports` はカテゴリ指定ですでに有効なので、個別に列挙しない。
 
