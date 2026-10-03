@@ -17,7 +17,20 @@ import com.tngtech.archunit.lang.ArchRule;
 import com.tngtech.archunit.lang.ConditionEvents;
 import com.tngtech.archunit.lang.SimpleConditionEvent;
 import java.time.Clock;
+import java.time.Instant;
+import java.time.InstantSource;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.LocalTime;
+import java.time.MonthDay;
+import java.time.OffsetDateTime;
+import java.time.OffsetTime;
+import java.time.Year;
+import java.time.YearMonth;
+import java.time.ZoneId;
 import java.time.ZoneOffset;
+import java.time.ZonedDateTime;
+import java.time.temporal.TemporalAccessor;
 import java.util.Calendar;
 import java.util.GregorianCalendar;
 import java.util.List;
@@ -30,7 +43,8 @@ import org.junit.jupiter.api.Test;
  * 日時とタイムゾーンの規約（docs/datetime/timezone-conventions.md）をプロダクションコードへ静的に強制する。
  *
  * <p>Error Prone の {@code JavaTimeDefaultTimeZone} が既定タイムゾーン依存の {@code now()} をコンパイル時に弾くのを補完し、
- * ArchUnit ではレガシー日時型の遮断と、注入した {@code Clock} を迂回する時刻取得およびシステム {@code Clock} 生成の遮断を担う。
+ * ArchUnit ではレガシー日時型の遮断と、注入した {@code Clock} を迂回する時刻取得およびシステム {@code Clock} 生成の遮断、 {@code Instant}
+ * 以外の {@code now(Clock)}（UTC の {@code Clock} のゾーンに頼る値）の遮断を担う。
  *
  * <p>ArchUnit の JUnit 5 連携（{@link AnalyzeClasses} と {@link ArchTest}）を使う。解析対象のクラスは
  * {@code @AnalyzeClasses} が import・キャッシュし、{@code @ArchTest} フィールドの各ルールを自動で評価する。テストコードと生成コードは {@link
@@ -44,7 +58,7 @@ class DateTimeConventionsArchTest {
   private static final String CLOCK_BEAN_METHOD = "com.example.demo.DemoApplication.clock()";
 
   /**
-   * 生成を禁止するシステム {@code Clock} ファクトリのメソッド名。
+   * 生成を禁止するシステム {@code Clock} ファクトリのメソッド名。{@code InstantSource.system()} も同じく禁止する。
    *
    * <p>引数に既存 {@code Clock} を受け取る {@code tick(Clock, Duration)} と {@code offset(Clock, Duration)}
    * は、注入 {@code Clock} から派生できるため対象外にする。
@@ -74,7 +88,7 @@ class DateTimeConventionsArchTest {
                   + "絶対時刻には Instant、日付だけの値には LocalDate、時刻だけの値には LocalTime、"
                   + "日時の書式化には DateTimeFormatter を使う。");
 
-  /** 現在時刻を使うクラスへ {@code Clock} をコンストラクタ注入し、引数なしの時刻取得を {@code now(clock)} へ置き換える。 */
+  /** 現在時刻を使うクラスへ {@code Clock} をコンストラクタ注入し、現在時刻を {@code Instant.now(clock)} で取る。 */
   @ArchTest
   /* package */ static final ArchRule currentTimeIsObtainedThroughInjectedClock =
       injectedClockRule();
@@ -86,13 +100,14 @@ class DateTimeConventionsArchTest {
   @SuppressWarnings("PMD.LooseCoupling")
   void systemClockFactoriesAreRejectedOutsideDemoApplicationClockBeanMethod() {
     // フィクスチャを実際に呼び出してIDEにも使用済みと認識させる。拒否判定は続くArchUnitの検査が担う。
-    assertThat(SystemClockFactoryBypass.createForbiddenClocks()).hasSize(6);
+    assertThat(SystemClockFactoryBypass.createForbiddenClocks()).hasSize(7);
 
     final JavaClasses bypassClass =
         new ClassFileImporter().importClasses(SystemClockFactoryBypass.class);
 
     assertThatThrownBy(() -> injectedClockRule().check(bypassClass))
         .isInstanceOf(AssertionError.class)
+        .hasMessageContaining("InstantSource.system()")
         .hasMessageContaining("Clock.systemUTC()")
         .hasMessageContaining("Clock.systemDefaultZone()")
         .hasMessageContaining("Clock.system(...)")
@@ -103,16 +118,65 @@ class DateTimeConventionsArchTest {
         .hasMessageContaining("Clock をコンストラクタ引数で受け取り");
   }
 
+  /** {@code Clock} を受け取らない {@code now(...)} と、{@code Instant} 以外の {@code now(Clock)} を拒否する。 */
+  @Test
+  @DisplayName("Clock を受け取らない now(...) と Instant 以外の now(Clock) を拒否する")
+  // JavaClasses は ArchUnit の import 結果を表す公開 API 型であり、インタフェースへ置き換えられない。
+  @SuppressWarnings("PMD.LooseCoupling")
+  void nowWithoutInjectedClockAndZoneDependentNowClockAreRejected() {
+    // フィクスチャを実際に呼び出してIDEにも使用済みと認識させる。拒否判定は続くArchUnitの検査が担う。
+    assertThat(
+            CurrentTimeBypass.createForbiddenValues(
+                Clock.fixed(Instant.parse("2026-10-03T00:00:00Z"), ZoneOffset.UTC)))
+        .hasSize(12);
+
+    final JavaClasses bypassClass = new ClassFileImporter().importClasses(CurrentTimeBypass.class);
+
+    assertThatThrownBy(() -> injectedClockRule().check(bypassClass))
+        .isInstanceOf(AssertionError.class)
+        .hasMessageContaining("java.time.Instant.now()")
+        .hasMessageContaining("java.time.LocalDate.now(ZoneId)")
+        .hasMessageContaining("java.time.OffsetDateTime.now(ZoneId)")
+        .hasMessageContaining("java.time.LocalDate.now(Clock)")
+        .hasMessageContaining("java.time.LocalDateTime.now(Clock)")
+        .hasMessageContaining("java.time.LocalTime.now(Clock)")
+        .hasMessageContaining("java.time.ZonedDateTime.now(Clock)")
+        .hasMessageContaining("java.time.OffsetDateTime.now(Clock)")
+        .hasMessageContaining("java.time.OffsetTime.now(Clock)")
+        .hasMessageContaining("java.time.Year.now(Clock)")
+        .hasMessageContaining("java.time.YearMonth.now(Clock)")
+        .hasMessageContaining("java.time.MonthDay.now(Clock)");
+  }
+
+  /** 述語が広すぎて許可経路まで拒否しないことを確かめる。 */
+  @Test
+  @DisplayName("Instant.now(clock) と ofInstant による日付の導出を許可する")
+  // JavaClasses は ArchUnit の import 結果を表す公開 API 型であり、インタフェースへ置き換えられない。
+  @SuppressWarnings("PMD.LooseCoupling")
+  void instantNowClockAndOfInstantAreAllowed() {
+    assertThat(
+            InjectedClockUsage.useInjectedClock(
+                Clock.fixed(Instant.parse("2026-10-03T00:00:00Z"), ZoneOffset.UTC),
+                ZoneId.of("Asia/Tokyo")))
+        .hasSize(3);
+
+    final JavaClasses usageClass = new ClassFileImporter().importClasses(InjectedClockUsage.class);
+
+    // 違反があれば check が AssertionError を投げ、テストが失敗する。
+    injectedClockRule().check(usageClass);
+  }
+
   private static ArchRule injectedClockRule() {
     return classes()
         .should(obtainTimeOnlyThroughInjectedClock())
         .because(
             "現在時刻を使うクラスは Clock をコンストラクタ引数で受け取り、"
-                + "java.time 型の now(clock) または clock.millis() を使う。"
+                + "Instant.now(clock) または clock.millis() を使う。"
                 + "システム Clock を生成できるのは "
                 + CLOCK_BEAN_METHOD
                 + " だけであり、このメソッドが Clock.systemUTC() を返す。"
-                + "地域タイムゾーンが必要な処理は ZoneId.systemDefault() を使わず、ZoneId を引数または設定値で明示する。");
+                + "地域の日付や時刻は ZoneId.systemDefault() や Clock のゾーンに頼らず、"
+                + "LocalDate.ofInstant(Instant.now(clock), zone) のように設定値の ZoneId で求める。");
   }
 
   private static ArchCondition<JavaClass> obtainTimeOnlyThroughInjectedClock() {
@@ -142,35 +206,57 @@ class DateTimeConventionsArchTest {
       return "ZoneId.systemDefault() を削除し、使用する ZoneId をコンストラクタ引数または設定値で受け取る。UTCなら ZoneOffset.UTC を使う。";
     }
 
-    final String noArgNowRemediation = remediationForNoArgNow(call, owner, method);
-    if (noArgNowRemediation != null) {
-      return noArgNowRemediation;
+    final String nowRemediation = remediationForNow(call, owner, method);
+    if (nowRemediation != null) {
+      return nowRemediation;
     }
     return remediationForSystemClockFactory(call, owner, method);
   }
 
-  /** 引数なしの {@code java.time} 型 {@code now()}（既定タイムゾーン依存）に対する修正方法を返す。該当しなければ {@code null}。 */
-  private static String remediationForNoArgNow(
+  /**
+   * 注入 {@code Clock} を迂回する {@code now()} と {@code now(ZoneId)}、および {@code Instant} 以外の {@code
+   * now(Clock)} に対する修正方法を返す。該当しなければ {@code null}。
+   *
+   * <p>{@code now(ZoneOffset)} はコンパイラが {@code now(ZoneId)} へ束縛するため、呼び出し先の引数型 {@code ZoneId} で判定できる。
+   */
+  private static String remediationForNow(
       final JavaMethodCall call, final String owner, final String method) {
-    if (owner.startsWith("java.time.")
-        && "now".equals(method)
-        && call.getTarget().getRawParameterTypes().isEmpty()) {
-      return "違反したクラスに Clock をコンストラクタ注入し、" + owner + ".now() を " + owner + ".now(clock) に置き換える。";
+    if (!owner.startsWith("java.time.") || !"now".equals(method)) {
+      return null;
+    }
+    final List<JavaClass> params = call.getTarget().getRawParameterTypes();
+    if (params.isEmpty() || isSoleParameter(params, ZoneId.class)) {
+      final String signature = owner + (params.isEmpty() ? ".now()" : ".now(ZoneId)");
+      return "違反したクラスに Clock をコンストラクタ注入し、"
+          + signature
+          + " を Instant.now(clock) に置き換える。"
+          + "地域の日付や時刻が必要なら LocalDate.ofInstant(Instant.now(clock), zone) のように設定値の ZoneId を明示する。";
+    }
+    if (isSoleParameter(params, Clock.class) && !Instant.class.getName().equals(owner)) {
+      return owner
+          + ".now(Clock) は Clock のゾーンで値を決め、注入 Clock は UTC である。"
+          + "Instant.now(clock) を取り、LocalDate.ofInstant(Instant.now(clock), zone) のように設定値の ZoneId を明示して求める。";
     }
     return null;
   }
 
+  private static boolean isSoleParameter(final List<JavaClass> params, final Class<?> type) {
+    return params.size() == 1 && params.get(0).isEquivalentTo(type);
+  }
+
   /**
-   * {@code DemoApplication.clock()} 以外でのシステム {@code Clock} ファクトリ呼び出しに対する修正方法を返す。該当しなければ {@code
-   * null}。
+   * {@code DemoApplication.clock()} 以外でのシステム {@code Clock} ファクトリと {@code InstantSource.system()}
+   * の呼び出しに対する修正方法を返す。該当しなければ {@code null}。
    */
   private static String remediationForSystemClockFactory(
       final JavaMethodCall call, final String owner, final String method) {
-    if (Clock.class.getName().equals(owner)
-        && SYSTEM_CLOCK_FACTORY_METHODS.contains(method)
-        && !isDemoApplicationClockBeanMethod(call)) {
+    final boolean systemFactory =
+        (Clock.class.getName().equals(owner) && SYSTEM_CLOCK_FACTORY_METHODS.contains(method))
+            || (InstantSource.class.getName().equals(owner) && "system".equals(method));
+    if (systemFactory && !isDemoApplicationClockBeanMethod(call)) {
       final boolean noArgs = call.getTarget().getRawParameterTypes().isEmpty();
-      final String signature = "Clock." + method + (noArgs ? "()" : "(...)");
+      final String signature =
+          call.getTargetOwner().getSimpleName() + "." + method + (noArgs ? "()" : "(...)");
       return signature
           + " は "
           + CLOCK_BEAN_METHOD
@@ -193,8 +279,10 @@ class DateTimeConventionsArchTest {
   @SuppressWarnings("JavaTimeDefaultTimeZone")
   private static final class SystemClockFactoryBypass {
 
-    private static List<Clock> createForbiddenClocks() {
+    private static List<InstantSource> createForbiddenClocks() {
       return List.of(
+          // Clock ではなく InstantSource を返すが、注入 Clock を介さずシステム時刻を読むため禁止する。
+          InstantSource.system(),
           // UTC指定でも、DemoApplication.clock()を介さずシステム Clock を直接生成するため禁止する。
           Clock.systemUTC(),
           // JVMの既定タイムゾーンとシステム時刻へ直接依存するため禁止する。
@@ -207,6 +295,48 @@ class DateTimeConventionsArchTest {
           Clock.tickSeconds(ZoneOffset.UTC),
           // 分単位のtickファクトリも、注入 Clock から派生させられないため禁止する。
           Clock.tickMinutes(ZoneOffset.UTC));
+    }
+  }
+
+  /** ArchUnit の拒否経路を検証するため、注入 Clock を迂回する now と UTC の Clock に頼る now(Clock) を意図的に含めたフィクスチャ。 */
+  @SuppressWarnings("JavaTimeDefaultTimeZone")
+  private static final class CurrentTimeBypass {
+
+    private static List<TemporalAccessor> createForbiddenValues(final Clock clock) {
+      return List.of(
+          // 注入 Clock を介さずシステム時刻を読むため禁止する。
+          Instant.now(),
+          // ZoneIdを明示しても、注入 Clock を介さずシステム時刻を読むため禁止する。
+          LocalDate.now(ZoneId.of("Asia/Tokyo")),
+          // ZoneOffsetはZoneIdの派生型であり、now(ZoneId)と同じく注入 Clock を迂回するため禁止する。
+          OffsetDateTime.now(ZoneOffset.UTC),
+          // 以下は注入 Clock（UTC）のゾーンで値を決め、業務のゾーンと食い違うため禁止する。
+          LocalDate.now(clock),
+          // UTCの日時になり、日本では9時間ずれる。
+          LocalDateTime.now(clock),
+          // UTCの時刻になる。
+          LocalTime.now(clock),
+          // ゾーンがUTCに固定される。
+          ZonedDateTime.now(clock),
+          // オフセットがUTCに固定される。
+          OffsetDateTime.now(clock),
+          // オフセットがUTCに固定される。
+          OffsetTime.now(clock),
+          // 年の境目でUTCの年になる。
+          Year.now(clock),
+          // 月の境目でUTCの年月になる。
+          YearMonth.now(clock),
+          // 日の境目でUTCの月日になる。
+          MonthDay.now(clock));
+    }
+  }
+
+  /** 注入 Clock から絶対時刻を取り、設定値の ZoneId で地域の日付を求める許可経路のフィクスチャ。 */
+  private static final class InjectedClockUsage {
+
+    private static List<Object> useInjectedClock(final Clock clock, final ZoneId zone) {
+      return List.of(
+          Instant.now(clock), LocalDate.ofInstant(Instant.now(clock), zone), clock.millis());
     }
   }
 }
