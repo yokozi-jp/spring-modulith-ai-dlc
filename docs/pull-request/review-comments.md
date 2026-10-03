@@ -2,7 +2,7 @@
 type: Convention
 title: レビューコメントの書き方と承認
 description: レビューコメントのラベルと承認の条件、指摘の具体性と根拠、指摘を出し切る方法、Suggested changesの使い分け、コメントの投稿とレビュー終了の伝え方を定める規約。レビューコメントを書くとき、承認するか判断するときに読む。
-tags: [convention, code-review, communication, future-arch-guidelines]
+tags: [convention, pull-request, communication, future-arch-guidelines]
 ---
 
 # レビューコメントの書き方と承認

@@ -1,11 +1,11 @@
 ---
 type: ADR
-title: 'ADR-044: バックエンドのクラスの役割と命名を定める'
+title: 'ADR-048: バックエンドのクラスの役割と命名を定める'
 description: 機能モジュールのクラスを CQRS の役割名（CommandHandler、QueryService、Listener）と DDD の役割（集約、値オブジェクト、Repository、Domain Service）に分け、置き場所、命名、モジュール間の連携、ArchUnit による検査を定める決定。
 tags: [adr, backend, architecture, ddd, cqrs]
 ---
 
-# ADR-044: バックエンドのクラスの役割と命名を定める
+# ADR-048: バックエンドのクラスの役割と命名を定める
 
 ## Status
 

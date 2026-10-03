@@ -10,7 +10,7 @@ tags: [architecture, backend, onion-architecture]
 機能モジュールの内部は、内側の Domain と Application、外側の Presentation と Infrastructure に分ける。
 内側の層は外側の実装へ依存させない。
 トランザクション境界は、Application の CommandHandler の `handle`、QueryService の public メソッド、Listener の `on` に置く。
-層の間で許可する依存方向は [バックエンドアーキテクチャ](architecture.md) の「依存方向」に示し、役割の決定理由は [ADR-044](../adr/ADR-044-define-backend-class-roles-and-naming.md) に示す。
+層の間で許可する依存方向は [バックエンドアーキテクチャ](architecture.md) の「依存方向」に示し、役割の決定理由は [ADR-048](../adr/ADR-048-define-backend-class-roles-and-naming.md) に示す。
 
 ## Domain
 

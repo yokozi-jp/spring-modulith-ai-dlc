@@ -10,7 +10,7 @@ tags: [convention, backend, class-role]
 `<Aggregate>Controller` は、集約ごとの HTTP API を受ける Spring MVC の Controller であり、`presentation.web` に package-private で置く。
 更新は Request かパス変数から Command を作って CommandHandler を呼び、参照は `<Feature>Queries` を呼ぶ。
 ステータスコード、`Location`、一覧の包み方は docs/web-api の規約に従う。
-役割の決定理由は [ADR-044](../../adr/ADR-044-define-backend-class-roles-and-naming.md) に示す。
+役割の決定理由は [ADR-048](../../adr/ADR-048-define-backend-class-roles-and-naming.md) に示す。
 
 ## 定義
 

@@ -10,7 +10,7 @@ tags: [convention, backend, class-role]
 `<Aggregate>Repository` は、集約ルートを保存し、取り出すインタフェースであり、`domain.model` に置く。
 集約ルートごとに一つ作り、メソッドはドメインの語彙で名付ける。
 実装は `infrastructure.persistence` の `Jooq<Aggregate>Repository` が持つ。
-役割の決定理由は [ADR-044](../../adr/ADR-044-define-backend-class-roles-and-naming.md) に示す。
+役割の決定理由は [ADR-048](../../adr/ADR-048-define-backend-class-roles-and-naming.md) に示す。
 
 ## 定義
 

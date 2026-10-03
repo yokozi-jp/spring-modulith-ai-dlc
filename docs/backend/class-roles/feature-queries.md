@@ -10,7 +10,7 @@ tags: [convention, backend, class-role]
 `<Feature>Queries` は、機能モジュールの参照をモジュールルートで公開するインタフェースである。
 すべての機能モジュールに一つ作り、自モジュールの Controller と他モジュールがこれを使う。
 メソッドは読み取りだけにし、戻り値はルートの record にする。
-役割の決定理由は [ADR-044](../../adr/ADR-044-define-backend-class-roles-and-naming.md) に示す。
+役割の決定理由は [ADR-048](../../adr/ADR-048-define-backend-class-roles-and-naming.md) に示す。
 
 ## 定義
 

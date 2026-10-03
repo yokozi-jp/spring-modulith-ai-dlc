@@ -10,7 +10,7 @@ tags: [convention, backend, class-role]
 `<UseCase>Command` は、状態を変えるユースケース一つの入力を表す record であり、`application` に置く。
 CommandHandler ごとに必ず一つ作り、入力が集約の ID だけのときも作る。
 項目は Java の標準型だけで表し、値オブジェクトへの変換は CommandHandler の `handle` で行う。
-役割の決定理由は [ADR-044](../../adr/ADR-044-define-backend-class-roles-and-naming.md) に示す。
+役割の決定理由は [ADR-048](../../adr/ADR-048-define-backend-class-roles-and-naming.md) に示す。
 
 ## 定義
 

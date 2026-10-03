@@ -10,7 +10,7 @@ tags: [convention, backend, class-role]
 `<Event>Listener` は、他モジュールのイベントを受けるクラスであり、受信する側のモジュールの `application` に package-private で置いて `@Service` を付ける。
 public メソッドは `@ApplicationModuleListener` を付けた `on` 一つだけにする。
 `on` はイベントから Command を作り、自モジュールの CommandHandler をちょうど一つ呼ぶ。
-役割の決定理由は [ADR-044](../../adr/ADR-044-define-backend-class-roles-and-naming.md) に示す。
+役割の決定理由は [ADR-048](../../adr/ADR-048-define-backend-class-roles-and-naming.md) に示す。
 
 ## 定義
 

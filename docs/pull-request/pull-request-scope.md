@@ -2,7 +2,7 @@
 type: Convention
 title: Pull Requestの範囲と分割
 description: 実装前に方針を合意する変更の条件、境界のスキーマを先にレビューする手順、Pull Requestの大きさと分割、差分の大きさと改善の優先順位、ファイルの移動やリネームと編集の分け方を定める規約。変更に着手する前、Pull Requestを分けるか迷ったときに読む。
-tags: [convention, code-review, pull-request, future-arch-guidelines]
+tags: [convention, pull-request, future-arch-guidelines]
 ---
 
 # Pull Requestの範囲と分割

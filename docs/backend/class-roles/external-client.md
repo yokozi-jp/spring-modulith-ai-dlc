@@ -10,7 +10,7 @@ tags: [convention, backend, class-role]
 `<ExternalSystem>Client` は、`domain.model` の外部システムのインタフェースを HTTP で実装するクラスであり、`infrastructure.client` に package-private で置いて `@Component` を付ける。
 接続先の URL は設定から受け取り、タイムアウトを設定した `RestClient` で呼ぶ。
 名前付きの Resilience4j の instance を、この層のメソッドにだけ付ける。
-役割の決定理由は [ADR-044](../../adr/ADR-044-define-backend-class-roles-and-naming.md) に示す。
+役割の決定理由は [ADR-048](../../adr/ADR-048-define-backend-class-roles-and-naming.md) に示す。
 
 ## 定義
 

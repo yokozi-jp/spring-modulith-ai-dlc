@@ -10,7 +10,7 @@ tags: [convention, backend, class-role]
 Entity は、集約の中で識別子によって区別する型であり、`domain.model` に `public final class` として置く。
 等価性は識別子だけで判定し、状態は集約ルートのメソッドを通してだけ変える。
 状態を変えるメソッドはパッケージプライベートにする。
-役割の決定理由は [ADR-044](../../adr/ADR-044-define-backend-class-roles-and-naming.md) に示す。
+役割の決定理由は [ADR-048](../../adr/ADR-048-define-backend-class-roles-and-naming.md) に示す。
 
 ## 定義
 

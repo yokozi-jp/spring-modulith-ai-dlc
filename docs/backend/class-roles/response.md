@@ -10,7 +10,7 @@ tags: [convention, backend, class-role]
 `<QueryResult>Response` は、参照の結果を HTTP の応答の JSON にする record であり、`presentation.web` に置く。
 ルートの参照の結果から static の `from(...)` で作り、一覧は `items` に配列を持つ record で包む。
 ルートの record を JSON としてそのまま返さない。
-役割の決定理由は [ADR-044](../../adr/ADR-044-define-backend-class-roles-and-naming.md) に示す。
+役割の決定理由は [ADR-048](../../adr/ADR-048-define-backend-class-roles-and-naming.md) に示す。
 
 ## 定義
 

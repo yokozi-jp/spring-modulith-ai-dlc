@@ -27,7 +27,6 @@ steering は入口の案内だけを持ち、規約の本文を持たない（[A
 | 可観測性とログ                                                | `docs/observability/index.md`    |
 | 日時とタイムゾーン                                            | `docs/datetime/index.md`         |
 | コンテナ（Dockerfile、Compose）                               | `docs/container/index.md`        |
-| AWS                                                           | `docs/aws/index.md`              |
 | 開発ツール（Taskfile、フック、CI、Lint）                      | `docs/tooling/index.md`          |
 | リポジトリ運用（ブランチ保護、リリース）                      | `docs/repository/index.md`       |
 | 文章（日本語の技術文書、メッセージ、設計書）                  | `docs/writing/index.md`          |
@@ -35,7 +34,8 @@ steering は入口の案内だけを持ち、規約の本文を持たない（[A
 | 非機能要件                                                    | `docs/nfr/index.md`              |
 | 性能テスト                                                    | `docs/performance-test/index.md` |
 | 帳票                                                          | `docs/report/index.md`           |
-| コードレビュー、Pull Request                                  | `docs/code-review/index.md`      |
+| コードレビュー（変更内容の観点）                              | `docs/code-review/index.md`      |
+| Pull Request（作成、依頼、マージの手順）                      | `docs/pull-request/index.md`     |
 | ナレッジ管理（docs と steering の役割分担）                   | `docs/knowledge/index.md`        |
 | エージェント設定                                              | `docs/agents/index.md`           |
 | 設計判断（ADR）                                               | `docs/adr/index.md`              |

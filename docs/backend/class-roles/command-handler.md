@@ -10,7 +10,7 @@ tags: [convention, backend, class-role]
 `<UseCase>CommandHandler` は、状態を変えるユースケース一つを実行するクラスであり、`application` に置いて `@Service` を付ける。
 public メソッドは `@Transactional` を付けた `handle` 一つだけにし、Command を受け取って Result を返す。
 集約と Domain Service を組み合わせて Repository で保存し、他モジュールへはイベントで伝える。
-役割の決定理由は [ADR-044](../../adr/ADR-044-define-backend-class-roles-and-naming.md) に示す。
+役割の決定理由は [ADR-048](../../adr/ADR-048-define-backend-class-roles-and-naming.md) に示す。
 
 ## 定義
 

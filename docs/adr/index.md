@@ -44,4 +44,8 @@
 - [ADR-041: ECS のタスクを Fargate で動かす](ADR-041-run-ecs-tasks-on-fargate.md)（Proposed, 2026-10-01）
 - [ADR-042: 人の利用者の AWS アクセスを IAM Identity Center で管理する](ADR-042-use-iam-identity-center-for-human-access.md)（Proposed, 2026-10-01）
 - [ADR-043: 本番の可観測性データを OpenTelemetry Collector で CloudWatch へ送る](ADR-043-send-production-telemetry-to-cloudwatch-via-otel-collector.md)（Proposed, 2026-10-01）
-- [ADR-044: バックエンドのクラスの役割と命名を定める](ADR-044-define-backend-class-roles-and-naming.md)（Proposed, 2026-10-03）
+- [ADR-044: 絶対時刻の保持精度をマイクロ秒にそろえる](ADR-044-store-absolute-time-at-microsecond-precision.md)（Proposed, 2026-10-03）
+- [ADR-045: AWS の規約と本番 CD のひな型を削除する](ADR-045-remove-aws-docs-and-production-cd-example.md)（Proposed, 2026-10-03）
+- [ADR-046: 業務日付と地域の日時を設定値の業務タイムゾーンで明示して求める](ADR-046-derive-local-dates-with-configured-business-zone.md)（Proposed, 2026-10-03）
+- [ADR-047: フロントエンドで API の日時を Temporal で解析する](ADR-047-parse-api-datetimes-with-temporal.md)（Proposed, 2026-10-03）
+- [ADR-048: バックエンドのクラスの役割と命名を定める](ADR-048-define-backend-class-roles-and-naming.md)（Proposed, 2026-10-03）

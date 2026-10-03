@@ -20,7 +20,7 @@ tags: [architecture, backend, spring-modulith]
 
 Spring Modulith は `com.example.demo` の直接サブパッケージをアプリケーションモジュールとして認識するため、**機能モジュール**を `com.example.demo.<feature>` に置く。
 
-クラスの役割、置き場所、命名は [ADR-044](../adr/ADR-044-define-backend-class-roles-and-naming.md) で決定している。
+クラスの役割、置き場所、命名は [ADR-048](../adr/ADR-048-define-backend-class-roles-and-naming.md) で決定している。
 更新は `<UseCase>CommandHandler`、参照は `<Feature>QueryService`、イベントの受信は `<Event>Listener` が担う。
 
 ## パッケージ構成
@@ -174,7 +174,7 @@ CommandHandler は `application` にあるため、他モジュールから呼�
 ## 関連資料
 
 - [ADR-002: package by feature とオニオンアーキテクチャ](../adr/ADR-002-package-by-feature-onion-architecture.md)
-- [ADR-044: バックエンドのクラスの役割と命名を定める](../adr/ADR-044-define-backend-class-roles-and-naming.md)
+- [ADR-048: バックエンドのクラスの役割と命名を定める](../adr/ADR-048-define-backend-class-roles-and-naming.md)
 - [バックエンドの層の責務](layers.md)
 - [バックエンドの Java 実装規約](java-coding.md)
 - [バックエンドのアーキテクチャテスト](architecture-tests.md)
