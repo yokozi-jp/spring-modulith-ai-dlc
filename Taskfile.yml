@@ -530,7 +530,7 @@ tasks:
       - ./gradlew spotlessCheck pmdMain pmdTest spotbugsMain spotbugsTest
 
   be-openapi-lint:
-    desc: 依存起動済みのテストDBでOpenAPI 3.1契約を生成しSpectralで検査
+    desc: 依存起動済みのテストDBでOpenAPI 3.1契約をopenapi/openapi.yamlへ生成しSpectralで検査
     dir: backend
     cmds:
       - |
@@ -538,9 +538,14 @@ tasks:
         . "../{{.TEST_ENV_FILE}}"
         set +a
         SPRING_CONFIG_IMPORT="optional:file:../{{.TEST_ENV_FILE}}[.properties]" ./gradlew exportOpenApi
-        {{.DOCKER}} run --rm -v "$PWD/..:/repo" -w /repo \
-          stoplight/spectral:6.16.3@sha256:a07aa4455367b9501b574423b684ab0ef3ee42556089013583318ec015249050 \
-          lint backend/build/openapi/openapi.json --ruleset .spectral.yaml
+      - task: api-lint
+
+  be-openapi-check:
+    desc: 依存起動済みのテストDBでOpenAPI契約を再生成し、コミット済みのopenapi/openapi.yamlと一致するか検査
+    cmds:
+      - task: be-openapi-lint
+      - task: api-drift-check
+        vars: { PATHS: openapi/openapi.yaml }
 
   be-test:
     desc: 依存起動済みのテストDBでマイグレーションとテストを実行
@@ -650,6 +655,26 @@ tasks:
         {{.DOCKER}} run --rm -v "$PWD:/repo" -w /repo \
           stoplight/spectral:6.16.3@sha256:a07aa4455367b9501b574423b684ab0ef3ee42556089013583318ec015249050 \
           lint openapi/openapi.yaml --ruleset .spectral.yaml
+
+  # 作業ツリーを index と比べるため、pre-commit で再生成した結果がステージ済みの内容と同じなら通る。
+  # 新しく生成された未追跡のファイルも差分として扱う。
+  api-drift-check:
+    internal: true
+    requires:
+      vars: [PATHS]
+    cmds:
+      - |
+        status=0
+        git diff --exit-code -- {{.PATHS}} || status=1
+        untracked="$(git ls-files --others --exclude-standard -- {{.PATHS}})"
+        if [ -n "$untracked" ]; then
+          printf '未追跡の生成物:\n%s\n' "$untracked"
+          status=1
+        fi
+        if [ "$status" -ne 0 ]; then
+          echo "生成物がコミット済みの内容と一致しません。task api-gen を実行し、差分をコミットしてください。" >&2
+          exit 1
+        fi
 
   # 違反例は、違反ごとの「ルール名|JSON パス」が stylish 出力の同じ行に出ることを確かめる。
   # text 形式は JSON パスを出さないため、既定の stylish 形式を使う。

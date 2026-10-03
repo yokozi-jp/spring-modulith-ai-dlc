@@ -30,10 +30,14 @@ expect 2 "str_replace path" '{"tool_name":"str_replace","tool_input":{"path":"fr
 expect 2 "fsWrite filePath" '{"tool_name":"fsWrite","tool_input":{"filePath":"frontend/src/routeTree.gen.ts"}}'
 expect 2 "delete_file targetFile" '{"tool_name":"delete_file","tool_input":{"targetFile":"frontend/src/api/generated/model/order.ts"}}'
 expect 2 "write file_path" '{"tool_name":"write","tool_input":{"file_path":"frontend/src/routeTree.gen.ts"}}'
+expect 2 "openapi contract" '{"tool_name":"fs_write","tool_input":{"path":"openapi/openapi.yaml"}}'
+expect 2 "absolute openapi contract" '{"tool_name":"str_replace","tool_input":{"path":"/abs/x/openapi/openapi.yaml"}}'
 
 expect 0 "ordinary file" '{"tool_name":"fs_write","tool_input":{"path":"frontend/src/routes/index.tsx"}}'
 expect 0 "fs_read routeTree" '{"tool_name":"fs_read","tool_input":{"path":"frontend/src/routeTree.gen.ts"}}'
 expect 0 "read routeTree" '{"tool_name":"read","tool_input":{"file_path":"frontend/src/routeTree.gen.ts"}}'
+expect 0 "spectral fixture" '{"tool_name":"fs_write","tool_input":{"path":"openapi/spectral-fixtures/valid.yaml"}}'
+expect 0 "read openapi contract" '{"tool_name":"read_file","tool_input":{"path":"openapi/openapi.yaml"}}'
 expect 0 "empty stdin" ''
 expect 0 "invalid json" '{not json'
 
