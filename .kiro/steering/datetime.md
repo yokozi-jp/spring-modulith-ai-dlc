@@ -12,5 +12,5 @@ description: 日時を扱うすべてのタスクで守る短いルール。詳�
 - 絶対時刻は、Java では `Instant`、PostgreSQL では `TIMESTAMP WITH TIME ZONE` にし、UTC で扱う。
 - 現在時刻は `Clock` をコンストラクタで受け取り、`Instant.now(clock)` で取る。`Clock` を受け取らない `now(...)` や `ZoneId.systemDefault()` を使わない。
 - API は絶対時刻を `Z` 付きの RFC 3339 文字列で返す。
-- 表示用のタイムゾーン変換はフロントエンドの `Intl.DateTimeFormat` で行う。
+- 表示用のタイムゾーン変換はフロントエンドの `Temporal.Instant` の `toLocaleString` で行う。
 - テストでは `Clock.fixed(...)` を使い、`Instant` をマイクロ秒精度にそろえる。

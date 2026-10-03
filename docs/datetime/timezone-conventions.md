@@ -58,7 +58,8 @@ APIは絶対時刻をUTCで返し、フロントエンドが画面の要件に�
 
 ## フロントエンド
 
-APIから受け取ったUTCの絶対時刻は`Temporal.Instant.from(...)`で解析し、`toLocaleString`または`Intl.DateTimeFormat`で表示する。
+APIから受け取ったUTCの絶対時刻は`Temporal.Instant.from(...)`で解析し、`toLocaleString`で表示する。
+ポリフィルのオブジェクトはブラウザの`Intl.DateTimeFormat`が直接受け付けない場合があるため、`Intl.DateTimeFormat`へ渡さない。
 日付だけの値は`Temporal.PlainDate.from(...)`で解析する。
 APIの値を`new Date(string)`や`Date.parse`で解析しない。
 ECMAScriptは小数部が3桁の文字列しか解釈を定めず、`Date`はミリ秒までしか持たないため、マイクロ秒の値が実装依存の解釈や精度落ちになる。
@@ -80,7 +81,7 @@ const label = occurredAt.toLocaleString("ja-JP", {
 ```
 
 2026年10月時点で、ChromeとFirefoxはTemporalを出荷しているが、Safariは出荷しておらず、BaselineはLimited availabilityである（[Web Platform Status, Temporal](https://webstatus.dev/features/temporal)）。
-Safariを対応ブラウザに含めるときは、ポリフィルを使う。
+[対応ブラウザ](../frontend/browser-support.md)はiOS Safariを含むため、SafariがTemporalを出荷するまではポリフィルを必ず使う。
 候補は[proposal-temporal](https://github.com/tc39/proposal-temporal#polyfills)が安定版と位置づける[temporal-polyfill](https://www.npmjs.com/package/temporal-polyfill)とする。
 ポリフィルの依存は、日時を扱う最初の画面を作るときに追加する。
 SafariがTemporalを出荷し、[対応ブラウザとWeb機能の採用基準](../frontend/browser-support.md)で使える状態になったら、ポリフィルを外す。

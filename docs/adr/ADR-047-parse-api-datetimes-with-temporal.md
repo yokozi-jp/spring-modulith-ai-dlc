@@ -30,7 +30,7 @@ Temporalは2026年3月にStage 4になり、ChromeとFirefoxは出荷済みで�
 
 ## Decision
 
-APIの絶対時刻は`Temporal.Instant.from(...)`で解析し、`toLocaleString`または`Intl.DateTimeFormat`で表示する。
+APIの絶対時刻は`Temporal.Instant.from(...)`で解析し、`toLocaleString`で表示する。
 日付だけの値は`Temporal.PlainDate.from(...)`で解析する。
 APIの値を`new Date(string)`や`Date.parse`で解析しない。
 

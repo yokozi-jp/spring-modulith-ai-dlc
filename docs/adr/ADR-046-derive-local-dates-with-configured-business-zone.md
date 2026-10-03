@@ -43,10 +43,12 @@ Proposed
 環境変数は`.env.example`にも加える。
 YAMLのキーは、使うモジュールの設定の接頭辞に合わせる。
 
-`DateTimeConventionsArchTest`は次の呼び出しを拒否する。
+`DateTimeConventionsArchTest`は次の呼び出しとメソッド参照（`Instant::now`など）を拒否する。
 
-- `java.time`の`now()`と`now(ZoneId)`。`now(ZoneOffset)`は`now(ZoneId)`へ束縛されるため含まれる。
-- `Instant`以外の`java.time`型の`now(Clock)`。`java.time.chrono`の日付型も含む。
+- `java.time`の`now()`と`now(ZoneId)`。
+  `now(ZoneOffset)`は`now(ZoneId)`へ束縛されるため含まれる。
+- `Instant`以外の`java.time`型の`now(Clock)`。
+  `java.time.chrono`の日付型も含む。
 - `InstantSource.system()`。
 
 ## Consequences

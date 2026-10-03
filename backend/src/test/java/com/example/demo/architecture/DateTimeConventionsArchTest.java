@@ -8,7 +8,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import com.example.demo.DemoApplication;
 import com.tngtech.archunit.core.domain.JavaClass;
 import com.tngtech.archunit.core.domain.JavaClasses;
-import com.tngtech.archunit.core.domain.JavaMethodCall;
+import com.tngtech.archunit.core.domain.JavaCodeUnitAccess;
 import com.tngtech.archunit.core.importer.ClassFileImporter;
 import com.tngtech.archunit.junit.AnalyzeClasses;
 import com.tngtech.archunit.junit.ArchTest;
@@ -36,6 +36,8 @@ import java.util.GregorianCalendar;
 import java.util.List;
 import java.util.Set;
 import java.util.TimeZone;
+import java.util.function.Function;
+import java.util.function.Supplier;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -148,6 +150,24 @@ class DateTimeConventionsArchTest {
         .hasMessageContaining("java.time.MonthDay.now(Clock)");
   }
 
+  /** メソッド参照による迂回も呼び出しと同じく拒否する。 */
+  @Test
+  @DisplayName("Instant::now などのメソッド参照による迂回を拒否する")
+  void methodReferencesBypassingInjectedClockAreRejected() {
+    // フィクスチャを実際に呼び出してIDEにも使用済みと認識させる。拒否判定は続くArchUnitの検査が担う。
+    assertThat(MethodReferenceBypass.createForbiddenReferences()).hasSize(4);
+
+    assertThatThrownBy(
+            () ->
+                injectedClockRule()
+                    .check(new ClassFileImporter().importClasses(MethodReferenceBypass.class)))
+        .isInstanceOf(AssertionError.class)
+        .hasMessageContaining("java.time.Instant.now()")
+        .hasMessageContaining("java.time.LocalDate.now(Clock)")
+        .hasMessageContaining("Clock.systemUTC()")
+        .hasMessageContaining("InstantSource.system()");
+  }
+
   /** 述語が広すぎて許可経路まで拒否しないことを確かめる。 */
   @Test
   @DisplayName("Instant.now(clock) と ofInstant による日付の導出を許可する")
@@ -183,7 +203,9 @@ class DateTimeConventionsArchTest {
     return new ArchCondition<>("obtain current time only through an injected Clock") {
       @Override
       public void check(final JavaClass item, final ConditionEvents events) {
-        for (final JavaMethodCall call : item.getMethodCallsFromSelf()) {
+        // メソッド参照（Instant::now など）も迂回経路になるため、呼び出しと参照の両方を調べる。
+        // コンストラクタは名前が <init> で、どの判定にも一致しない。
+        for (final JavaCodeUnitAccess<?> call : item.getCodeUnitAccessesFromSelf()) {
           final String remediation = remediationForForbiddenCall(call);
           if (remediation != null) {
             events.add(
@@ -195,7 +217,7 @@ class DateTimeConventionsArchTest {
     };
   }
 
-  private static String remediationForForbiddenCall(final JavaMethodCall call) {
+  private static String remediationForForbiddenCall(final JavaCodeUnitAccess<?> call) {
     final String owner = call.getTargetOwner().getFullName();
     final String method = call.getTarget().getName();
 
@@ -220,7 +242,7 @@ class DateTimeConventionsArchTest {
    * <p>{@code now(ZoneOffset)} はコンパイラが {@code now(ZoneId)} へ束縛するため、呼び出し先の引数型 {@code ZoneId} で判定できる。
    */
   private static String remediationForNow(
-      final JavaMethodCall call, final String owner, final String method) {
+      final JavaCodeUnitAccess<?> call, final String owner, final String method) {
     if (!owner.startsWith("java.time.") || !"now".equals(method)) {
       return null;
     }
@@ -249,7 +271,7 @@ class DateTimeConventionsArchTest {
    * の呼び出しに対する修正方法を返す。該当しなければ {@code null}。
    */
   private static String remediationForSystemClockFactory(
-      final JavaMethodCall call, final String owner, final String method) {
+      final JavaCodeUnitAccess<?> call, final String owner, final String method) {
     final boolean systemFactory =
         (Clock.class.getName().equals(owner) && SYSTEM_CLOCK_FACTORY_METHODS.contains(method))
             || (InstantSource.class.getName().equals(owner) && "system".equals(method));
@@ -265,7 +287,7 @@ class DateTimeConventionsArchTest {
     return null;
   }
 
-  private static boolean isDemoApplicationClockBeanMethod(final JavaMethodCall call) {
+  private static boolean isDemoApplicationClockBeanMethod(final JavaCodeUnitAccess<?> call) {
     // 唯一の許可点は @Bean DemoApplication.clock() から Clock.systemUTC() を呼ぶ場合だけとする。
     return DemoApplication.class.getName().equals(call.getOriginOwner().getFullName())
         && "clock".equals(call.getOrigin().getName())
@@ -328,6 +350,19 @@ class DateTimeConventionsArchTest {
           YearMonth.now(clock),
           // 日の境目でUTCの月日になる。
           MonthDay.now(clock));
+    }
+  }
+
+  /** ArchUnit の拒否経路を検証するため、禁止対象をメソッド参照で意図的に含めたフィクスチャ。 */
+  private static final class MethodReferenceBypass {
+
+    private static List<Object> createForbiddenReferences() {
+      // 呼び出しではなく参照なので、ArchUnit では JavaMethodReference として現れる。
+      final Supplier<Instant> now = Instant::now;
+      final Function<Clock, LocalDate> today = LocalDate::now;
+      final Supplier<Clock> clock = Clock::systemUTC;
+      final Supplier<InstantSource> source = InstantSource::system;
+      return List.of(now, today, clock, source);
     }
   }
 
