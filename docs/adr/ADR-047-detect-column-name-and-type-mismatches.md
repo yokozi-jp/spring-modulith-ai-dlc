@@ -1,11 +1,11 @@
 ---
 type: ADR
-title: 'ADR-045: カラム名と型の矛盾を機械検査する'
+title: 'ADR-047: カラム名と型の矛盾を機械検査する'
 description: 命名規約が意味を定める接尾辞と接頭辞（_at、_date、is_、has_）を持つカラムについて、名前と型の矛盾を機械検査し、それ以外の型の選択はレビューに残す決定。
 tags: [adr, database, datetime, naming]
 ---
 
-# ADR-045: カラム名と型の矛盾を機械検査する
+# ADR-047: カラム名と型の矛盾を機械検査する
 
 ## Status
 

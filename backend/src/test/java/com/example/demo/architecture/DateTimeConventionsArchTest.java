@@ -111,7 +111,7 @@ class DateTimeConventionsArchTest {
                 + "java.time 型の now(clock) または clock.millis() を使う。"
                 + "システム Clock を生成できるのは "
                 + CLOCK_BEAN_METHOD
-                + " だけであり、このメソッドが Clock.systemUTC() を返す。"
+                + " だけであり、このメソッドが Clock.systemUTC() をマイクロ秒単位の tick で包んで返す。"
                 + "地域タイムゾーンが必要な処理は ZoneId.systemDefault() を使わず、ZoneId を引数または設定値で明示する。");
   }
 

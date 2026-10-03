@@ -72,7 +72,7 @@ upstream の OpenTelemetry Collector（contrib）は transform processor と `si
 - WARN 以上の標準出力だけは OTLP の経路と重複して保存される。
 - `aws/spans` ロググループの保持期間と緊急削除は、アプリケーションのロググループと別に設定する。
 - Amazon Managed Grafana を追加するかは、見る画面だけの判断であり、この決定を置き換えない。追加する場合は、利用者ごとのライセンス料と、Grafana からの問い合わせによる CloudWatch の料金が増える。
-- 監査ログを長期に保管する場合は、[情報の機密性の分類と取り扱い要件](../aws/data-classification.md)に従い S3 に置く。
+- 監査ログを長期に保管する場合は S3 に置く。
 
 ## Alternatives Considered
 
@@ -129,5 +129,5 @@ upstream の OpenTelemetry Collector（contrib）は transform processor と `si
 - [ADOT Collector の component 一覧](https://github.com/aws-observability/aws-otel-collector/blob/main/pkg/defaultcomponents/defaults.go)
 - [sigv4auth extension](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/v0.161.0/extension/sigv4authextension/README.md)
 - [OpenTelemetry: Collector configuration best practices](https://opentelemetry.io/docs/security/config-best-practices/)
-- [CloudWatch Logsのロググループ](../aws/cloudwatch-logs.md)
+- [可観測性データの規約](../observability/conventions.md)
 - `docker/otel-collector/config.yaml`
