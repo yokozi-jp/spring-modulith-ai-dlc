@@ -146,6 +146,8 @@ Domain の型、Command と Result、Spring MVC の Request と Response、jOOQ 
 - `shared` を使ってよいのは、他のモジュールの `infrastructure.persistence` だけである。
 
 使う場所の制限は、`PackageByFeatureOnionArchitectureTest` の `sharedModuleIsUsedOnlyByPersistenceAdapters` が検査する。
+ただし、`shared` の `PgmCdAspect` は、AOP で `<UseCase>CommandHandler` の `handle` と `<Event>Listener` の呼び出しを囲む（[ADR-051](../adr/ADR-051-bind-pgm-cd-with-scoped-value-and-aspect.md)）。
+この呼び出しはクラスの依存にならないため、ArchUnit では検査できない。
 
 `shared` は機能モジュールではないため、「モジュール間の連携」の対象にならない。
 機能モジュールの間の連携は、`shared` があってもイベントと `<Feature>Queries` だけにする。
