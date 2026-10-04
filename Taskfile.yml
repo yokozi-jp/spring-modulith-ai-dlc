@@ -149,7 +149,7 @@ tasks:
         compose up -d --wait backend
         # healthcheck はコンテナの中から確かめるため、preview の proxy と同じくホストから届くかを別に確かめる。
         if ! curl --fail --silent --show-error --max-time 5 "http://localhost:${SERVER_PORT}/actuator/health/readiness" >/dev/null; then
-          echo "ホストから backend（localhost:${SERVER_PORT}）へ接続できません。Docker Desktop では Settings > Resources > Network の Enable host networking を有効にしてください。" >&2
+          echo "ホストから backend（localhost:${SERVER_PORT}）へ接続できません。frontend/test-results/backend.log の backend のログを確かめてください。" >&2
           exit 1
         fi
         (cd frontend && vp run e2e)

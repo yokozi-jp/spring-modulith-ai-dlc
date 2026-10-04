@@ -37,9 +37,16 @@ setup project が Keycloak の画面でログインし、保存した `storageSt
 公開 API で作れない状態が必要になったときだけ、用途を限定した DB fixture を別の ADR で判断する。
 Datafaker のシーダーと E2E のデータを共有しない。
 
-実行環境は `docker/compose-test.yml` の `e2e` profile とし、backend は既存の `backend/Dockerfile` からビルドして `network_mode: host` で動かす。
-ブラウザと backend が同じ issuer（`127.0.0.1:8081`）で Keycloak へ到達でき、CI の backend スモークテストと同じ接続方式になるためである。
-これは [Compose の規約](../container/compose.md)がアンチパターンとする `localhost` でのサービス間通信の例外である。
+実行環境は `docker/compose-test.yml` の `e2e` profile とし、backend は既存の `backend/Dockerfile` からビルドして compose の network に置く。
+backend は PostgreSQL、Redis、Keycloak へ service 名で接続し、compose が公開する port はすべて `127.0.0.1` に限る。
+
+ブラウザは公開用の `127.0.0.1:8081`、backend は `keycloak:8080` で Keycloak へ到達するため、issuer を次のようにそろえる。
+
+- Keycloak は hostname v2 の `KC_HOSTNAME=http://127.0.0.1:8081` で、issuer とブラウザ向けの endpoint を公開用の URL に固定する。
+  `KC_HOSTNAME_BACKCHANNEL_DYNAMIC=true` で、backend が直接呼ぶ token、jwks、userinfo の endpoint だけを要求の Host から決める。
+- backend は `OIDC_DISCOVERY_URI` を設定したときだけ、discovery を `keycloak:8080` から読む `OidcDiscoveryLocationConfig` を有効にする。
+  discovery の `issuer` が `OIDC_ISSUER_URI` と一致しなければ起動を止め、`ClientRegistrations.fromOidcConfiguration` で issuer と discovery の全体を registration に残す。
+  これにより、ID トークンの `iss` の検査と、`end_session_endpoint` を使う OIDC のログアウトが、discovery を issuer から読む場合と同じに動く。
 
 frontend は build した dist を Vite preview で配信し、ADR-033 と同じ `localhost:5173` と `strictPort` を preview にも適用する。
 proxy は開発サーバーの定義を preview が引き継ぐ。
@@ -61,9 +68,9 @@ E2E の CI は path filter 付きの非必須の check とする。
 - E2E は 5173 と 8080 を使うため、開発用の Vite と Keycloak と同時に実行できない。
 - CI の実行時間と backend イメージのビルドが増える。
 - 失敗時の trace には、ダミーのパスワードと、片付けで破棄した環境のセッション Cookie が入りうる。
-- host network の backend は全インターフェースで待ち受けるため、実行中は Docker Desktop の VM の中、Linux ではホストの全インターフェースに 8080 が開く。
-  値はすべて非機密のダミーで、環境は実行ごとに破棄する。
-- Docker Desktop では host networking の有効化（4.34 以降）が前提になる。
+- backend の本番コードに、`OIDC_DISCOVERY_URI` を設定したときだけ有効になる認証の設定（`OidcDiscoveryLocationConfig`）が増える。
+  有効なときは Boot の自動構成の `ClientRegistrationRepository` を置き換えるため、Boot の registration のプロパティを増やすときはこの設定も確かめる。
+- Keycloak の hostname v2 の 2 つの設定と backend の設定の組み合わせを保つ必要がある。
 
 ### Neutral
 
@@ -97,19 +104,27 @@ E2E の CI は path filter 付きの非必須の check とする。
 - **Pros**：公開 API が無い状態も作れる。
 - **Cons**：テストが DB のスキーマに依存し、公開 API の検証を迂回するため、必要になった時点で別の ADR で判断する。
 
-### 選択肢5: bridge network と service 名による接続
+### 選択肢5: host ネットワークの backend
 
-- **Description**：backend を compose の network に置き、`keycloak:8080` で Keycloak へ接続する。
-- **Pros**：Compose の規約どおりになる。
-- **Cons**：ブラウザが見る issuer（`127.0.0.1:8081`）と backend の issuer が食い違い、Keycloak の hostname の設定が別途必要になるため採らない。
+- **Description**：backend を `network_mode: host` で動かし、ホストへ公開した port に `.env.test` の接続先のまま接続する。
+- **Pros**：backend の設定を足さずに、ブラウザと同じ issuer（`127.0.0.1:8081`）で Keycloak へ到達できる。
+- **Cons**：Docker Desktop では 4.34 以降の opt-in の設定が要り、Enhanced Container Isolation と両立しない。
+  backend が全インターフェースで待ち受け、Compose の規約がアンチパターンとする `localhost` でのサービス間通信の例外にもなるため採らない。
 
-### 選択肢6: ホストの bootRun での backend の起動
+### 選択肢6: Spring Boot のプロパティだけによる endpoint の指定
+
+- **Description**：`issuer-uri` を外し、`authorization-uri`、`token-uri`、`jwk-set-uri` などを Boot のプロパティで個別に指定する。
+- **Pros**：backend にクラスを足さずに済む。
+- **Cons**：registration の `issuerUri` が空になり、ID トークンの `iss` を検査しなくなる。
+  discovery の metadata も空になり、ログアウトが `end_session_endpoint` へ redirect しなくなるため採らない。
+
+### 選択肢7: ホストの bootRun での backend の起動
 
 - **Description**：ホストの Gradle で backend を起動する。
 - **Pros**：イメージのビルドが要らない。
 - **Cons**：本番のイメージを検証できず、バックグラウンドのプロセスの停止を Taskfile で管理する必要があるため採らない。
 
-### 選択肢7: Taskfile でのバックグラウンドの preview の起動
+### 選択肢8: Taskfile でのバックグラウンドの preview の起動
 
 - **Description**：Taskfile で Vite preview をバックグラウンドで起動し、終了時に停止する。
 - **Pros**：Playwright の外で preview を再利用できる。
@@ -125,3 +140,6 @@ E2E の CI は path filter 付きの非必須の check とする。
 - [Playwright, Web server](https://playwright.dev/docs/test-webserver)
 - [Playwright, Retries](https://playwright.dev/docs/test-retries)
 - [Playwright, Continuous Integration](https://playwright.dev/docs/ci)
+- [Keycloak, Configuring the hostname (v2)](https://www.keycloak.org/server/hostname)
+- [Docker, Host network driver](https://docs.docker.com/engine/network/drivers/host/)
+- [spring-security#11515 のコメント](https://github.com/spring-projects/spring-security/issues/11515#issuecomment-1357510068)

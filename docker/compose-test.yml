@@ -46,6 +46,10 @@ services:
       KC_BOOTSTRAP_ADMIN_PASSWORD: admin
       KC_HEALTH_ENABLED: "true"
       KC_METRICS_ENABLED: "true"
+      # hostname v2：ブラウザ向けの URL と issuer を公開用の URL に固定する。
+      # backend が service 名（keycloak:8080）で呼ぶ backchannel の endpoint だけを要求の Host から決める（ADR-056）。
+      KC_HOSTNAME: http://127.0.0.1:8081
+      KC_HOSTNAME_BACKCHANNEL_DYNAMIC: "true"
     ports:
       - "127.0.0.1:8081:8080"
     volumes:
@@ -79,10 +83,8 @@ services:
       start_period: 3s
 
   # E2E 用の backend（e2e profile 限定、ADR-056）。既存の backend/Dockerfile でビルドする。
-  # network_mode: host にし、ホストへ公開した PostgreSQL 5433、Redis 6380、Keycloak 8081 へ .env.test の接続先のまま接続する。
-  # ブラウザと同じ issuer（127.0.0.1:8081）で Keycloak へ到達するためであり、service 名の keycloak:8080 では issuer が食い違う。
-  # Docker Desktop では Settings > Resources > Network の Enable host networking を有効にする（4.34 以降）。
-  # 待ち受けは既定の 0.0.0.0 のままにする。Docker Desktop が VM のループバックの port を WSL へ転送する保証がないため。
+  # compose の network に置き、PostgreSQL、Redis、Keycloak へ service 名で接続する（.env.test の接続先を environment で上書きする）。
+  # issuer は .env.test の公開用の URL（127.0.0.1:8081）のまま検査し、discovery だけを keycloak:8080 から読む（OIDC_DISCOVERY_URI）。
   # migration は task e2e が backend の起動前に be-migrate で適用する（ADR-005）。
   backend:
     profiles: ["e2e"]
@@ -90,8 +92,15 @@ services:
     build:
       context: ../backend
       dockerfile: Dockerfile
-    network_mode: host
     env_file: ../.env.test
+    environment:
+      DB_HOST: postgres
+      DB_PORT: "5432"
+      REDIS_HOST: redis
+      REDIS_PORT: "6379"
+      OIDC_DISCOVERY_URI: http://keycloak:8080/realms/spring-modulith/.well-known/openid-configuration
+    ports:
+      - "127.0.0.1:8080:8080"
     depends_on:
       postgres:
         condition: service_healthy

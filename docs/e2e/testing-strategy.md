@@ -77,7 +77,11 @@ retry の回数を増やして隠さない。
 ## 実行環境
 
 `task e2e` は `docker/compose-test.yml` の `e2e` profile で PostgreSQL、Redis、Keycloak、backend を起動する。
-backend は `network_mode: host` で動き、`.env.test` の接続先のままホストの port に接続する。
+backend は compose の network に置き、PostgreSQL、Redis、Keycloak へ service 名で接続する。
+compose の `environment` が `.env.test` の接続先を service 名に上書きする。
+Keycloak は hostname v2 で issuer をブラウザと同じ `http://127.0.0.1:8081` に固定し、backend は discovery を `OIDC_DISCOVERY_URI`（`keycloak:8080`）から読む。
+backend は discovery の `issuer` が `OIDC_ISSUER_URI` と一致しなければ起動しない（理由は [ADR-056](../adr/ADR-056-adopt-playwright-for-e2e-tests.md)）。
+compose が公開する port は、すべて `127.0.0.1` に限る。
 
 | port | 用途                                                   |
 | ---- | ------------------------------------------------------ |
@@ -90,8 +94,6 @@ backend は `network_mode: host` で動き、`.env.test` の接続先のまま�
 - 5173 と 8080 は開発用の Vite と Keycloak と同じ port である。
   `task e2e` は開始時に両方を確かめ、使用中なら止めるよう示して失敗する。
 - `task test` と同じ Compose project（`spring-modulith-test`）を使うため、同時に実行しない。
-- Docker Desktop では、4.34 以降で Settings、Resources、Network の「Enable host networking」を有効にする。
-  無効のままだと、`task e2e` は backend の起動後にホストから接続できないと示して失敗する。
 - 前提の道具は `task setup` と同じである。
   Chromium は `task e2e` が導入する。
   OS の依存ライブラリは、初回に `sudo` 付きの `vp exec playwright install-deps chromium` で入れる。

@@ -20,7 +20,6 @@ Compose ファイルを作成、編集するときは、以下に従う。
 - サービス間はサービス名で名前解決する（同一ネットワークなら `postgres:5432` のように）。
 
 アンチパターン：1 つの service に複数の役割を詰め込む。ホスト名に `localhost` を使ってサービス間通信を書く。
-例外として、compose-test の E2E 用 backend は `network_mode: host` でホストへ公開した port に接続する（理由は [ADR-056](../adr/ADR-056-adopt-playwright-for-e2e-tests.md)）。
 
 ## イメージの固定
 
