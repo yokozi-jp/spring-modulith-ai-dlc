@@ -1044,21 +1044,33 @@ tasks:
         test -s "$sarif" || fail "SARIF が出力されていません。"
         # Code Scanning は http の URI を受け付けず、リポジトリ内のファイルの位置だけを受け付ける。
         # そのため、位置を実行した plan のファイルへ書き換え、元の URL はメッセージの末尾に残す。
-        # 位置が同じでも別の警告として残るよう、fingerprint を method、URL のパス、evidence、attack、元のメッセージから作る。
-        # URL のクエリは OAuth の state など実行ごとに変わるため、fingerprint には含めない。
+        # URL のクエリとフラグメントは OAuth の state や code など実行ごとに変わるため、メッセージと fingerprint から外す。
+        # 位置が同じでも別の警告として残るよう、fingerprint を rule、method、URL、evidence、attack、元のメッセージから作る。
+        # ZAP は risk を level だけで表す（High は error、Medium は warning、Low は note、Informational は none）。
+        # Informational は Code Scanning に送らず、HTML と JSON のレポートに残す。
+        # GitHub は rule の security-severity で重大度を表示するため、level から付ける（GitHub Docs の SARIF support for code scanning）。
         jq --arg plan "docker/zap/{{.DAST_PLAN}}.yaml" '
           def to_plan: map(.physicalLocation.artifactLocation = {uri: $plan} | .physicalLocation.region.startLine //= 1);
-          .runs[] |= (del(.artifacts, .originalUriBaseIds) | .results[] |= (
-            .locations[0] as $loc
-            | ($loc.physicalLocation.artifactLocation.uri // .webRequest.target // "") as $url
-            | .partialFingerprints.primaryLocationLineHash //= ([.webRequest.method // "", ($url | sub("\\?.*$"; "")),
+          def sev: {error: "8.0", warning: "5.0", note: "2.0"}[. // "warning"];
+          .runs[] |= (del(.artifacts, .originalUriBaseIds) | .results |= map(select((.level // "warning") != "none")
+            | .locations[0] as $loc
+            | (($loc.physicalLocation.artifactLocation.uri // .webRequest.target // "") | sub("[?#].*$"; "")) as $url
+            | .partialFingerprints.primaryLocationLineHash = ([.ruleId, .webRequest.method // "", $url,
                 ($loc.physicalLocation.region.snippet.text // ""), ($loc.properties.attack // ""), .message.text] | join("|"))
             | .message.text += "\nURL: \($url)"
             | .locations |= to_plan
-            | if has("relatedLocations") then .relatedLocations |= to_plan else . end))
+            | if has("relatedLocations") then .relatedLocations |= to_plan else . end)
+            | (reduce .results[] as $r ({}; .[$r.ruleId] = ([.[$r.ruleId], ($r.level | sev)] | map(select(.)) | max_by(tonumber)))) as $sev
+            | .tool.driver.rules |= map(select($sev[.id]) | .properties["security-severity"] = $sev[.id] | .properties.tags = ["security"]))
         ' "$sarif" >"$sarif.tmp" && mv "$sarif.tmp" "$sarif"
         jq -e '[.. | objects | .uri? | strings | select(test("^[A-Za-z][A-Za-z0-9+.-]*:"))] | length == 0' "$sarif" >/dev/null \
           || fail "SARIF に scheme 付きの URI が残っています。"
+        jq -e '[.runs[].results[] | select((.level // "warning") == "none" or has("ruleIndex"))] | length == 0' "$sarif" >/dev/null \
+          || fail "SARIF に Informational の結果か ruleIndex が残っています。"
+        jq -e '[.runs[].results[] | select((.partialFingerprints.primaryLocationLineHash // "" | test("://[^|]*[?#]"))
+            or (.message.text | test("\nURL: [^\n]*[?#]")))] | length == 0' "$sarif" >/dev/null \
+          || fail "SARIF の fingerprint かメッセージの URL にクエリが残っています。"
+        jq -e 'all(.runs[]; .tool.driver.name == "ZAP")' "$sarif" >/dev/null || fail "SARIF の tool 名が ZAP ではありません。"
         echo "DAST のレポートを $report_dir に出力しました。"
 
   # Lint and format

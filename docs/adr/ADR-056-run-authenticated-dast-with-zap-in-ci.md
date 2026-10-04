@@ -65,6 +65,7 @@ POST が 403 なら script が働いていないので、タスクを失敗さ�
 検出があってもタスクとジョブは失敗させない。
 失敗させるのは、起動、ログイン、CSRF の前提確認の失敗のように、スキャンが成立しない場合に限る。
 検出は SARIF で Code Scanning に送り、HTML と JSON のレポートを artifact に残す。
+Informational の検出は SARIF から外して Code Scanning に送らず、artifact のレポートにだけ残す。
 PR の passive scan のジョブは必須チェックにするが、保証するのは完走だけである。
 検出を blocking に切り替える基準は決めず、検出が出たときに都度判断する。
 

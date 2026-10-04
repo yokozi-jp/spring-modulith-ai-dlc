@@ -233,7 +233,7 @@ Gitフックの条件とコマンドは[`lefthook.yml`](../../lefthook.yml)を�
 - **`betterleaks.yml`**：`scan-secrets-all`相当を実行する。
 - **`static-analysis.yml`**：`lint-semgrep`相当と`lint-duplicates`を実行する。
 - **`trivy.yml`**：`scan-vulns`相当を実行する。
-- **`dast.yml`**：PRで`scan-dast`、週1回のscheduleと手動実行で`scan-dast-active`を実行し、SARIFをCode Scanningに送る。
+- **`dast.yml`**：PRで`scan-dast`、週1回のscheduleと手動実行で`scan-dast-active`を実行し、Informationalを除いたSARIFをCode Scanningに送る。
 - **`actionlint.yml`**：`lint-actions`相当を実行する。
 - **`zizmor.yml`**：`lint-actions-security`相当を実行する。
 - **`hadolint.yml`**：`lint-docker`相当、`lint-docker-check`相当、バックエンドイメージのビルドと起動確認を実行する。
