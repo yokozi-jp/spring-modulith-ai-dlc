@@ -2,7 +2,7 @@ name: E2E tests 🎭
 
 on:
   workflow_dispatch:
-  # 必須チェックにしないため、PR では path filter で起動を絞る（ADR-056）。
+  # 必須チェックにしないため、PR では path filter で起動を絞る（ADR-057）。
   # docker/initdb/** と .env.test は compose-test がマウントまたは参照する入力として含める。
   pull_request:
     branches: ["**"]

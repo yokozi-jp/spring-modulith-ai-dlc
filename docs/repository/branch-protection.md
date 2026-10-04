@@ -62,10 +62,12 @@ Pull Request の作成者は自分の変更を承認できないため、コー�
 - `Run hadolint 🐳`
 - `Run docker build --check 🐳`
 - `Build and test backend image 🐳`
+- `Detect DAST changes`
+- `Run ZAP passive scan 🕷️`
 - `Detect API contract changes`
 - `Check API contract 🔀`
 
-Frontend、backend、Docker の workflow は Pull Request ごとに変更対象を検出する。
+Frontend、backend、Docker、DAST の workflow は Pull Request ごとに変更対象を検出する。
 
 関連パスを変更していない場合、重い検査ジョブはジョブ単位で `skipped` を報告し、GitHub は required status check を満たしたものとして扱う。
 
@@ -80,7 +82,9 @@ GitHub Pagesでは通常、APIの設計内容がすべて公開されるため�
 
 検知ジョブやイメージビルドの前段が失敗した場合、後続ジョブが `skipped` になっても前段の失敗によってマージを止めるためである。
 
-Semgrep と Trivy は現在、検出結果を SARIF へ送ってもジョブ自体を失敗させない。
+Semgrep、Trivy、ZAP は現在、検出結果を SARIF へ送ってもジョブ自体を失敗させない（ZAP は [ADR-056](../adr/ADR-056-run-authenticated-dast-with-zap-in-ci.md)）。
+
+`Run ZAP active scan 🕷️` は schedule と手動実行のときだけ動くので、必須チェックにしない。
 
 この必須設定が保証するのはスキャンの完走であり、検出がゼロであることではない。
 
@@ -102,7 +106,7 @@ path filter によって workflow 自体が作られない Pull Request では�
 ## 必須にしないチェック
 
 E2E の `Run E2E tests 🎭` は path filter を持つが、required status checks に登録しない。
-実ブラウザと複数のコンテナを使うため、変更と関係のない原因でも失敗しうる（[ADR-056](../adr/ADR-056-adopt-playwright-for-e2e-tests.md)）。
+実ブラウザと複数のコンテナを使うため、変更と関係のない原因でも失敗しうる（[ADR-057](../adr/ADR-057-adopt-playwright-for-e2e-tests.md)）。
 失敗したときは、レビューで trace と backend のログを確かめて merge を判断する。
 
 ## その他の推奨設定

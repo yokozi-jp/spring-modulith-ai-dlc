@@ -11,7 +11,7 @@ E2E テストは、複数画面にまたがる主要な利用者の流れだけ�
 各テストは公開 API で自分専用のデータを作り、共有データを変更せず、実行順に依存しない。
 認証は setup project が一度だけ Keycloak の画面で行い、`storageState` をコミットしない。
 変更後は `task e2e` で確かめる。
-道具と環境を選んだ理由は [ADR-056](../adr/ADR-056-adopt-playwright-for-e2e-tests.md) にある。
+道具と環境を選んだ理由は [ADR-057](../adr/ADR-057-adopt-playwright-for-e2e-tests.md) にある。
 
 ## 対象
 
@@ -80,7 +80,7 @@ retry の回数を増やして隠さない。
 backend は compose の network に置き、PostgreSQL、Redis、Keycloak へ service 名で接続する。
 compose の `environment` が `.env.test` の接続先を service 名に上書きする。
 Keycloak は hostname v2 で issuer をブラウザと同じ `http://127.0.0.1:8081` に固定し、backend は discovery を `OIDC_DISCOVERY_URI`（`keycloak:8080`）から読む。
-backend は discovery の `issuer` が `OIDC_ISSUER_URI` と一致しなければ起動しない（理由は [ADR-056](../adr/ADR-056-adopt-playwright-for-e2e-tests.md)）。
+backend は discovery の `issuer` が `OIDC_ISSUER_URI` と一致しなければ起動しない（理由は [ADR-057](../adr/ADR-057-adopt-playwright-for-e2e-tests.md)）。
 compose が公開する port は、すべて `127.0.0.1` に限る。
 
 | port | 用途                                                   |

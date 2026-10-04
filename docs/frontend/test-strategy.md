@@ -55,7 +55,7 @@ E2E testの書き方と実行環境は[E2Eテストの方針と書き方](../e2e
 
 - unit testとcomponent testで確かめられる観点に、E2E testを書かない。
 - E2E testの対象は、業務の根幹となる利用者の流れに要る画面と、複数のAPIとcomponentが組み合わさって壊れやすい複雑な画面に限る。
-- E2E testの道具の採用理由は[ADR-056](../adr/ADR-056-adopt-playwright-for-e2e-tests.md)を参照する。
+- E2E testの道具の採用理由は[ADR-057](../adr/ADR-057-adopt-playwright-for-e2e-tests.md)を参照する。
 
 ## アクセシビリティの自動検査
 

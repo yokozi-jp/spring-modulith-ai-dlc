@@ -189,6 +189,8 @@ PITのHTMLとXMLのレポートは、変異対象がある場合に`backend/buil
 - **`task scan-vulns`**：バックエンドとフロントエンドの依存関係をTrivyで検査する。
 - **`task scan-vulns-backend`**：バックエンドのCycloneDX SBOMをTrivyで検査する。
 - **`task scan-vulns-frontend`**：フロントエンドの解決済み依存関係をTrivyで検査する。
+- **`task scan-dast`**：隔離した依存、backend、`vp preview`を起動し、OWASP ZAPで認証付きのpassive scanを実行して片付ける。
+- **`task scan-dast-active`**：同じ環境でactive scanを実行する。
 - **`task lint-actions`**：GitHub Actionsワークフローをactionlintで検査する。
 - **`task lint-actions-security`**：GitHub Actionsワークフローをzizmorで検査する。
 - **`task lint-docker`**：Dockerfileをhadolintで検査する。
@@ -203,6 +205,7 @@ PITのHTMLとXMLのレポートは、変異対象がある場合に`backend/buil
 - **`task adr-check`**：判断が絡む変更にADRが伴うかを確認する。
 
 Knipとjscpdの採用理由は[ADR-035](../adr/ADR-035-adopt-jscpd-and-knip-quality-gates.md)を参照する。
+DASTの検出ではタスクを失敗させず、起動、ログイン、CSRFの前提確認の失敗だけで失敗させる（[ADR-056](../adr/ADR-056-run-authenticated-dast-with-zap-in-ci.md)）。
 OKF検査の採用理由は[ADR-036](../adr/ADR-036-adopt-okf-for-docs-knowledge-bundle.md)と[ADR-038](../adr/ADR-038-route-steering-to-docs-knowledge.md)を参照する。
 
 ## Gitフック対応
@@ -233,6 +236,7 @@ Gitフックの条件とコマンドは[`lefthook.yml`](../../lefthook.yml)を�
 - **`betterleaks.yml`**：`scan-secrets-all`相当を実行する。
 - **`static-analysis.yml`**：`lint-semgrep`相当と`lint-duplicates`を実行する。
 - **`trivy.yml`**：`scan-vulns`相当を実行する。
+- **`dast.yml`**：PRで`scan-dast`、週1回のscheduleと手動実行で`scan-dast-active`を実行し、Informationalを除いたSARIFをCode Scanningに送る。
 - **`actionlint.yml`**：`lint-actions`相当を実行する。
 - **`zizmor.yml`**：`lint-actions-security`相当を実行する。
 - **`hadolint.yml`**：`lint-docker`相当、`lint-docker-check`相当、バックエンドイメージのビルドと起動確認を実行する。

@@ -18,7 +18,7 @@ import org.springframework.security.oauth2.core.ClientAuthenticationMethod;
 import org.springframework.web.client.RestClient;
 
 /**
- * OIDC discovery を issuer と別の URL から読む設定（E2E の compose network 用、ADR-056）。
+ * OIDC discovery を issuer と別の URL から読む設定（E2E の compose network 用、ADR-057）。
  *
  * <p>{@code oidc.discovery-uri}（環境変数 {@code OIDC_DISCOVERY_URI}）を設定したときだけ有効になり、Boot の自動構成の {@link
  * ClientRegistrationRepository} を置き換える。 未設定の環境では何も変わらないため、{@code application.yaml} には書かない（ADR-008 は

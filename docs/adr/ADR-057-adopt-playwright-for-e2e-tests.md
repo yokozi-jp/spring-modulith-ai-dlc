@@ -1,11 +1,11 @@
 ---
 type: ADR
-title: 'ADR-056: E2E テストに Playwright と Chromium を採用し、テストデータを公開 API で作る'
+title: 'ADR-057: E2E テストに Playwright と Chromium を採用し、テストデータを公開 API で作る'
 description: 認証を含む主要な利用者の流れを、compose-test の backend と Vite preview に対して Playwright と Chromium で確かめる決定。テストデータは各テストが公開 API で作り、DB fixture と Datafaker のシーダーを使わない。
 tags: [adr, e2e, playwright, testing, frontend]
 ---
 
-# ADR-056: E2E テストに Playwright と Chromium を採用し、テストデータを公開 API で作る
+# ADR-057: E2E テストに Playwright と Chromium を採用し、テストデータを公開 API で作る
 
 ## Status
 

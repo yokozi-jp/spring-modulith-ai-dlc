@@ -222,6 +222,14 @@ Docker Compose の操作（サービスの起動、停止、状態確認、Keycl
   このタスクは許可していない属性を含むOTLPのログをCollectorに流し、その属性が除かれ、許可した属性が残ることを確かめます。
 - CIも同じタスクを、Collectorの設定、Composeファイル、Taskfileの変更時に実行します。
 
+### 動的解析（DAST）
+
+- `task scan-dast` は隔離した依存、backend、`vp preview` を起動し、OWASP ZAP で認証付きの passive scan を実行します。
+  `task scan-dast-active` は同じ環境で active scan を実行します。
+- CI は Pull Request で passive scan を、週 1 回の schedule と手動実行で active scan を実行します。
+- 検出は SARIF で Security タブに送り、ジョブは失敗させません。
+  失敗させるのは、起動、ログイン、CSRF の前提確認に失敗してスキャンが成立しない場合だけです（[ADR-056](docs/adr/ADR-056-run-authenticated-dast-with-zap-in-ci.md)）。
+
 ### ドキュメント
 
 - `docs/`、`.kiro/steering/`、`Taskfile.yml`を編集したときは`task okf-check`を実行します。

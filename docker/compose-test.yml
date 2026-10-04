@@ -4,7 +4,7 @@
 #   - ホストポートを開発用とずらす（PostgreSQL 5433 / Redis 6380 / Keycloak 8081）。開発の 5432/6379/8080 と衝突しない。
 #   - 名前付きボリュームを持たず使い捨て（down -v で毎回クリーン）。テストは常にまっさらな DB で走らせる。
 #   - Keycloak は backend-smoke profile に限定し、通常の Gradle テストでは起動しない。
-#   - backend と Keycloak は E2E 用の e2e profile でも起動する（task e2e、ADR-056）。
+#   - backend と Keycloak は E2E 用の e2e profile でも起動する（task e2e、ADR-057）。
 #   - テストに不要な OTEL LGTM は含めない。
 #   - 開発用 compose と違い必須変数（${...:?}）や secret には依存せず、値を直書きして自己完結させる
 #     （機密ではない demo/demo の使い捨て。接続情報は .env.test が Gradle・スモーク側へ渡す）。
@@ -47,7 +47,7 @@ services:
       KC_HEALTH_ENABLED: "true"
       KC_METRICS_ENABLED: "true"
       # hostname v2：ブラウザ向けの URL と issuer を公開用の URL に固定する。
-      # backend が service 名（keycloak:8080）で呼ぶ backchannel の endpoint だけを要求の Host から決める（ADR-056）。
+      # backend が service 名（keycloak:8080）で呼ぶ backchannel の endpoint だけを要求の Host から決める（ADR-057）。
       KC_HOSTNAME: http://127.0.0.1:8081
       KC_HOSTNAME_BACKCHANNEL_DYNAMIC: "true"
     ports:
@@ -82,7 +82,7 @@ services:
       retries: 20
       start_period: 3s
 
-  # E2E 用の backend（e2e profile 限定、ADR-056）。既存の backend/Dockerfile でビルドする。
+  # E2E 用の backend（e2e profile 限定、ADR-057）。既存の backend/Dockerfile でビルドする。
   # compose の network に置き、PostgreSQL、Redis、Keycloak へ service 名で接続する（.env.test の接続先を environment で上書きする）。
   # issuer は .env.test の公開用の URL（127.0.0.1:8081）のまま検査し、discovery だけを keycloak:8080 から読む（OIDC_DISCOVERY_URI）。
   # migration は task e2e が backend の起動前に be-migrate で適用する（ADR-005）。

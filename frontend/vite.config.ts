@@ -313,7 +313,7 @@ export default defineConfig(({ mode }) => {
         },
       },
     },
-    // proxy と strictPort は server の値を Vite が引き継ぐ。Keycloak の redirect URI と同じ origin で待ち受ける（ADR-033、ADR-056）。
+    // proxy と strictPort は server の値を Vite が引き継ぐ。Keycloak の redirect URI と同じ origin で待ち受ける（ADR-033、ADR-057）。
     preview: { port: 5173, headers: securityHeaders },
   };
 });
