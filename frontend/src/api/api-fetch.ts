@@ -89,10 +89,19 @@ export function redirectToLoginOnUnauthorized(error: unknown): void {
   globalThis.location.assign(loginPath);
 }
 
-/** 4xx の ApiProblemError は再試行しても結果が変わらないため、再試行しない。 */
+/** 再試行してよい 4xx（RFC 9110 §15.5.9 の 408、RFC 6585 §4 の 429）。 */
+const retryableClientErrors = new Set([408, 429]);
+
+/** 408 と 429 以外の 4xx の ApiProblemError は再試行しても結果が変わらないため、再試行しない。 */
 export function retryUnlessClientError(failureCount: number, error: unknown): boolean {
-  if (error instanceof ApiProblemError && error.status >= 400 && error.status < 500) {
+  if (
+    error instanceof ApiProblemError &&
+    error.status >= 400 &&
+    error.status < 500 &&
+    !retryableClientErrors.has(error.status)
+  ) {
     return false;
   }
+  // ponytail: 429 の Retry-After を見ず、TanStack Query の既定の間隔で再試行する。バックエンドに rate limit を入れるときに Retry-After を見る。
   return failureCount < 3;
 }

@@ -232,9 +232,16 @@ describe("api-fetch", () => {
   });
 
   describe("retryUnlessClientError", () => {
-    it("4xx の ApiProblemError は再試行しない", () => {
+    it("408 と 429 以外の 4xx の ApiProblemError は再試行しない", () => {
       expect(api.retryUnlessClientError(0, new api.ApiProblemError(400, undefined))).toBeFalsy();
       expect(api.retryUnlessClientError(0, new api.ApiProblemError(499, undefined))).toBeFalsy();
+    });
+
+    it.each([408, 429])("%i の ApiProblemError は 3 回まで再試行する", (status) => {
+      const error = new api.ApiProblemError(status, undefined);
+
+      expect(api.retryUnlessClientError(2, error)).toBe(true);
+      expect(api.retryUnlessClientError(3, error)).toBeFalsy();
     });
 
     it("5xx と通信の失敗は 3 回まで再試行する", () => {
