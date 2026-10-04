@@ -190,11 +190,15 @@ INSERTの共通カラムは`CommonColumns.forInsert`で、UPDATEとDELETEは`Tab
   - `DataSource.getConnection`、`ConnectionProvider.acquire`、`Connection`と`Statement`のすべてのメソッド
   - `org.jooq`のパッケージの型の、名前が`$`で始まるメソッド（`QOM`の問い合わせのモデルのAPIは、`$onDuplicateKeyUpdate`でINSERTをUPSERTに組み替えられるため）
   - Spring JDBCの`org.springframework.jdbc`とそのサブパッケージの型（`ResourceDatabasePopulator`と`ScriptUtils`も任意のSQLを流せるため）
+  - `DataSource`、`Connection`、`ConnectionProvider`に代入できる型を引数に取るメソッドとコンストラクタ（Spring Bootの`DataSourceScriptDatabaseInitializer`や`DSL.using(Connection)`のように、接続の元を受け取るライブラリは、パッケージを選ばずに任意のSQLを流せるため）
 
   `Update`と`Delete`を作る入口をすべて禁じるため、`batch`や`subscribe`のように作った問い合わせを受け取って実行するAPIは禁じない。
 - `repositoryUpdateAndDeleteCheckVersion`：`Jooq*Repository`の、集約ルートを受け取る`add`以外のpublicメソッドは、版を比べる入口をそのメソッドの中で直接呼ぶ。
   `update`は`updateCheckingVersion`を、`delete`は`deleteCheckingVersion`を、ほかの名前ならどちらかを呼ぶ。
   名前で対象を選ばないため、`save`のような名前でも検査を外れない。
+  同じメソッドの中で引数の集約ルートの`lockNo()`も呼ぶ。
+  テーブルから読み直した版を期待する版に渡すと、競合を検出しないためである。
+  値の流れは追わないため、`lockNo()`を呼んだうえで別の値を渡す書き方はレビューで見る。
 - `repositoryWritesTakeVersionedAggregates`：`domain.model`の`*Repository`インタフェースの`add`、`update`、`delete`は、集約ルートを一つだけ受け取る。
   集約ルートが`long lockNo()`を持たないと、ほかの規則が集約ルートを見つけられず空のまま通るため、この規則で形を確かめる。
   必須の`add`を対象に含めるため、`save`のような名前で保存するRepositoryでも、`lockNo()`を持たない集約は`add`で検出される。
@@ -267,6 +271,9 @@ Spring Modulith、Error Prone、NullAway、SpotBugs、Spotlessの失敗の文は
 ## 解析対象と実行
 
 プロダクションコード向けArchUnit検査は[ProductionCodeOnly](../../backend/src/test/java/com/example/demo/architecture/ProductionCodeOnly.java)で手書きコードだけを選び、生成コードとテストコードを除外する。
+除外する生成コードは、jOOQの生成先である基底パッケージ直下の`jooq`パッケージだけとする。
+`order.infrastructure.persistence.jooq`のような手書きのパッケージまで除外すると、そこに置いたRepositoryが`tableWritesGoThroughTableWriter`を外れるためである。
+`ProductionCodeOnlyTest`がこの境界を確かめる。
 生成コードを除外しても、手書きコードからjOOQ APIや生成型への依存は検査する。
 
 静的解析は`task be-lint`で、ArchUnitとSpring Modulithの検査は`task test`で実行する。

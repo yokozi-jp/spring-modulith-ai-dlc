@@ -59,11 +59,15 @@ PostgreSQL の READ COMMITTED では、後の UPDATE は先の UPDATE のコミ�
 - `CommonColumns.forUpdate` は `updated_*` だけを返し、package-private にする。
   UPDATE の `lock_no` を書くのは `TableWriter` だけになる。
 - ArchUnit の `TableWriterArchTest` で次を検査する。
-  - `TableWriter`、`LockedRoot`、`DeletedRoot` の外の本番のコードは、jOOQ の UPDATE、DELETE、UPSERT、MERGE の入口、`Update` と `Delete` に代入できる型の実行、問い合わせのモデル（`QOM`）の `$` で始まる API、`UpdatableRecord` と `DAO` の書き込み、Spring JDBC と JDBC の直接の利用を呼ばない。
+  - `TableWriter`、`LockedRoot`、`DeletedRoot` の外の本番のコードは、jOOQ の UPDATE、DELETE、UPSERT、MERGE の入口、`Update` と `Delete` に代入できる型の実行、`org.jooq` の型の、名前が `$` で始まるメソッド（問い合わせのモデルの API）、`UpdatableRecord` と `DAO` の書き込み、Spring JDBC と JDBC の直接の利用を呼ばない。
     判定は、呼び出し先の型が禁じる型に代入できるかで行う。
+    `DataSource`、`Connection`、`ConnectionProvider` を引数に取るメソッドとコンストラクタも呼ばない。
+    接続の元を受け取るライブラリ（Spring Boot の `DataSourceScriptDatabaseInitializer` など）は、パッケージを選ばずに任意の SQL を流せるため、パッケージの一覧ではなく引数の型で禁じる。
+    検査の対象から外す生成コードは、jOOQ の生成先である基底パッケージ直下の `jooq` パッケージだけとし、名前に `jooq` を含む手書きのパッケージは外さない。
     `Update` と `Delete` を作る入口（`DSLContext`、`DSL`、`WithStep` の `update`、`delete`、`deleteFrom`、`updateQuery`、`deleteQuery`）をすべて禁じるため、`batch` のように作った問い合わせを受け取って実行する API は禁じなくてよい。
-  - `Jooq<Aggregate>Repository` の、集約ルートを受け取る `add` 以外の public メソッドは、版を比べる入口を直接呼ぶ。
+  - `Jooq<Aggregate>Repository` の、集約ルートを受け取る `add` 以外の public メソッドは、版を比べる入口と、引数の集約ルートの `lockNo()` を直接呼ぶ。
     名前で対象を選ばないため、`save` のような名前でも検査を外れない。
+    `lockNo()` の呼び出しを求めるのは、テーブルから読み直した版を期待する版に渡すと競合を検出しないためである。
   - `domain.model` の `<Aggregate>Repository` の `add`、`update`、`delete` は、引数のない `long lockNo()` を宣言する集約ルートを一つだけ受け取る。
     集約ルートが `lockNo()` を持たないと、版を比べる規則が集約ルートを見つけられず、空のまま通るためである。
     必須の `add` を含めるため、`save` のような名前で保存する Repository でも、形を外れた集約は `add` で検出される。
@@ -86,7 +90,7 @@ PostgreSQL の READ COMMITTED では、後の UPDATE は先の UPDATE のコミ�
 
 - Repository が書くのは業務の列の値だけになり、版の条件、版の設定、件数の判定、`55P03` の変換を書く場所がなくなる。
 - 入口の選び分けは、期待する版を持っているかだけで決まる。
-- jOOQ、Spring JDBC、JDBC の書き込みの API を `TableWriter` の外で使うと、テスト（ArchUnit）で失敗する。
+- jOOQ、Spring JDBC、JDBC の書き込みの API と、接続の元を受け取るライブラリを `TableWriter` の外で使うと、テスト（ArchUnit）で失敗する。
   禁止の一覧は、テストで固定した jOOQ の版の API で見直してある。
   別のテーブルの列、型の違う値、版を比べない入口の件数の無視は、コンパイルで失敗する。
 - 版を比べない更新も版を進めるため、在庫の引き当てのような Java の更新が先に走れば、その前に読んだ画面の保存は上書きせずに競合として返る。
@@ -117,6 +121,8 @@ PostgreSQL の READ COMMITTED では、後の UPDATE は先の UPDATE のコミ�
     これも規約が受け入れているリスクとする。
     手順書で `WHERE lock_no = ?` を求めることは、将来の緩和策の候補にとどめる。
   - **`ensureLockNo` に渡す値**：ArchUnit は `ensureLockNo` を呼んだかしか見ず、渡した値が `command.lockNo()` かは見ない。
+  - **期待する版に渡す値**：ArchUnit は Repository が集約ルートの `lockNo()` を呼んだかしか見ず、その値を `updateCheckingVersion` と `deleteCheckingVersion` に渡したかは見ない。
+    `lockNo()` を呼んだうえでテーブルから読み直した版を渡すと、競合を検出しない。
 - 同じトランザクションで同じ集約を二度保存すると、二度目は期待する版が古く競合になる。
   CommandHandler は集約を一度だけ保存する規約のままにする。
 - `ColumnValues` の値に別のテーブルの列の式を渡すことは、型で止まらない。
