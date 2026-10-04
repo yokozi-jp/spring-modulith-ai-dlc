@@ -119,7 +119,7 @@ PostgreSQL の READ COMMITTED では、後の UPDATE は先の UPDATE のコミ�
 
 ### 選択肢1: 件数を受け取る共通処理と規約
 
-- **Description**：この ADR の最初の版。Repository が UPDATE を書き、件数を `OptimisticLock.requireUpdated` に渡す。
+- **Description**：この ADR の最初の版で、Repository が UPDATE を書き、件数を `OptimisticLock.requireUpdated` に渡す。
 - **Pros**：共通処理が小さく、SQL が Repository に見える。
 - **Cons**：版の条件、加算、件数の受け渡し、`55P03` の変換のどれを書き忘れても UPDATE は成功し、検査はレビューだけになる。
 
