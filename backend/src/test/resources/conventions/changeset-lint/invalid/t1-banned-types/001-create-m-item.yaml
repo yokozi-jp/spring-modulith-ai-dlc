@@ -1,0 +1,116 @@
+databaseChangeLog:
+  - changeSet:
+      id: "001-create-m-item"
+      author: system
+      changes:
+        - createTable:
+            tableName: m_item
+            schemaName: item
+            columns:
+              - column:
+                  name: item_id
+                  type: bigint
+                  autoIncrement: true
+                  generationType: ALWAYS
+                  constraints:
+                    primaryKey: true
+                    primaryKeyName: pk_m_item
+              - column:
+                  name: item_code
+                  type: varchar(20)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: code_char
+                  type: char(10)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: memo_text
+                  type: text
+                  constraints:
+                    nullable: false
+              - column:
+                  name: memo_varchar
+                  type: varchar
+                  constraints:
+                    nullable: false
+              - column:
+                  name: row_serial
+                  type: serial
+                  constraints:
+                    nullable: false
+              - column:
+                  name: row_bigserial
+                  type: bigserial
+                  constraints:
+                    nullable: false
+              - column:
+                  name: small_count
+                  type: smallint
+                  constraints:
+                    nullable: false
+              - column:
+                  name: ratio_real
+                  type: real
+                  constraints:
+                    nullable: false
+              - column:
+                  name: price_money
+                  type: money
+                  constraints:
+                    nullable: false
+              - column:
+                  name: created_at
+                  type: timestamptz
+                  constraints:
+                    nullable: false
+              - column:
+                  name: created_by
+                  type: varchar(64)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: created_pgm_cd
+                  type: varchar(64)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: created_tx_id
+                  type: varchar(32)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: updated_at
+                  type: timestamptz
+                  constraints:
+                    nullable: false
+              - column:
+                  name: updated_by
+                  type: varchar(64)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: updated_pgm_cd
+                  type: varchar(64)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: updated_tx_id
+                  type: varchar(32)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: lock_no
+                  type: bigint
+                  constraints:
+                    nullable: false
+              - column:
+                  name: patched_at
+                  type: timestamptz
+              - column:
+                  name: patched_by
+                  type: varchar(64)
+              - column:
+                  name: patched_id
+                  type: integer

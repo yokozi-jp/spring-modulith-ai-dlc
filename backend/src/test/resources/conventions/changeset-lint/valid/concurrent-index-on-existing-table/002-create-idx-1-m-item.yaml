@@ -1,0 +1,11 @@
+databaseChangeLog:
+  - changeSet:
+      id: "002-create-idx-1-m-item"
+      author: system
+      runInTransaction: false
+      changes:
+        - sql:
+            sql: "CREATE INDEX CONCURRENTLY idx_1_m_item ON item.m_item (item_code);"
+      rollback:
+        - sql:
+            sql: "DROP INDEX CONCURRENTLY item.idx_1_m_item;"

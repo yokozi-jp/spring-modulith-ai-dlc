@@ -1,11 +1,11 @@
 # フロントエンド
 
 - [フロントエンドアーキテクチャ](architecture.md)：業務機能の追加や分割、ディレクトリ構成、依存方向、共有コードの置き場所を決めるとき
-- [フロントエンドのルーティングと状態管理](routing-and-state.md)：route や loader を追加するとき、状態の置き場所や custom Hook を作るかを決めるとき
+- [フロントエンドのルーティングと状態管理](routing-and-state.md)：route や loader を追加するとき、状態の置き場所や custom Hook を作るかを決めるとき、Effect を書くとき
 - [OrvalとAPI境界](api-client-orval.md)：業務 API を追加するとき、Orval の生成設定や OpenAPI の tag と operationId、API の呼び出し方を変えるとき
 - [フロントエンドのUIとスタイル](ui-and-style.md)：component、style、アクセシビリティを追加または変更するとき
 - [フロントエンドの国際化](i18n.md)：表示文言、locale、数値表示を追加または変更するとき
-- [フロントエンドのテストと検証](testing.md)：テストを書くとき、生成物を更新するとき、変更を `task fe-verify` で検証するとき
+- [フロントエンドのテストと検証](testing.md)：テストを書くとき、クエリや待ち方や mock の範囲を決めるとき、生成物を更新するとき、変更を `task fe-verify` で検証するとき
 - [フロントエンドに利用者向け機能を追加する](runbook-add-feature.md)：新しい画面や業務機能を追加する手順を確認するとき
 - [フロントエンドのURL設計](url-design.md)：route を追加するとき、画面間で値を受け渡す方法を決めるとき
 - [componentの命名と設計](component-design.md)：component を追加するとき、component を分割するか判断するとき
@@ -16,6 +16,6 @@
 - [画面サイズとレスポンシブ対応](screen-size-and-responsive.md)：画面の layout を設計するとき、breakpoint や responsive な style を追加するとき
 - [ダークモード](dark-mode.md)：配色や theme を変えるとき、ダークモードの切替を追加するとき
 - [画像とアイコン](images-and-icons.md)：画像、アイコン、ファビコン、OGP を追加または変更するとき
-- [テスト観点の割り当て](test-strategy.md)：テスト計画を立てるとき、ある観点をどのテストで書くか決めるとき
+- [テスト観点の割り当て](test-strategy.md)：テスト計画を立てるとき、ある観点をどのテストと道具で書くか決めるとき、custom Hook のテストを書くとき
 - [オフライン対応](offline-pwa.md)：オフラインで使える機能や PWA を検討するとき
 - [フロントエンドのビルドと配信](build-and-delivery.md)：配信基盤を選ぶとき、配信点の header や cache を設定するとき、build 設定を変えるとき

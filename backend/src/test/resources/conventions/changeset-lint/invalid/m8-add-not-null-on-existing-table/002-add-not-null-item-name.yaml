@@ -1,0 +1,10 @@
+databaseChangeLog:
+  - changeSet:
+      id: "002-add-not-null-item-name"
+      author: system
+      changes:
+        - addNotNullConstraint:
+            tableName: m_item
+            schemaName: item
+            columnName: item_name
+            columnDataType: varchar(50)

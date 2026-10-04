@@ -98,8 +98,9 @@ class OptimisticLockTest {
   }
 
   /** 集約の競合の例外の代わりに、呼び出し側が渡す例外。 */
-  private static final class FixtureConflictException extends RuntimeException {
+  /* package */ static final class FixtureConflictException extends RuntimeException {
 
+    /** 直列化の版。 */
     private static final long serialVersionUID = 1L;
 
     /* package */ FixtureConflictException(final String message) {

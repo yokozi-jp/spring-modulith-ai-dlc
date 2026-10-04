@@ -144,7 +144,7 @@ describe("project lint config on fixtures", () => {
     });
   });
 
-  describe("test-only imports", () => {
+  describe("test code", () => {
     it("rejects test-only modules from production code", () => {
       expect(countIn("components/msw-import.ts", "eslint(no-restricted-imports)")).toBe(4);
     });
@@ -153,6 +153,16 @@ describe("project lint config on fixtures", () => {
       expect(codesIn("testing/server.ts")).toStrictEqual([]);
       expect(codesIn("testing/render.ts")).toStrictEqual([]);
       expect(codesIn("features/order/order.test.ts")).toStrictEqual([]);
+    });
+
+    it("rejects module mocks with vi.mock and vi.doMock", () => {
+      expect(
+        countIn("features/order/module-mock.test.ts", "vitest(no-restricted-vi-methods)"),
+      ).toBe(2);
+    });
+
+    it("allows replacing globals with vi.stubGlobal and vi.spyOn", () => {
+      expect(codesIn("features/order/global-stub.test.ts")).toStrictEqual([]);
     });
   });
 
