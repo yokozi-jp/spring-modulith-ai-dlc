@@ -722,6 +722,78 @@ tasks:
         fi
         echo "Spectral のルールは合格例を通し、違反例の全件を検出しました。"
 
+  api-client-gen:
+    desc: コミット済みのOpenAPI契約からOrvalでAPI clientとMSW handlerを再生成（DB不要）
+    dir: frontend
+    cmds:
+      - vp run orval
+
+  api-client-check:
+    desc: Orvalで再生成したAPI clientがコミット済みの内容と一致するか検査（DB不要）
+    cmds:
+      - task: api-client-gen
+      - task: api-drift-check
+        vars: { PATHS: frontend/src/api/generated }
+
+  api-gen:
+    desc: テスト用依存を起動し、OpenAPI契約の生成、Spectral検査、Orvalの再生成を実行して片付け
+    silent: true
+    cmds:
+      - |
+        cleanup() {
+          status=$?
+          trap - EXIT
+          cleanup_status=0
+          {{.DOCKER}} compose -f "{{.TEST_COMPOSE_FILE}}" down --volumes --remove-orphans || cleanup_status=$?
+          if [ "$status" -ne 0 ]; then exit "$status"; fi
+          exit "$cleanup_status"
+        }
+        trap cleanup EXIT
+        {{.DOCKER}} compose -f "{{.TEST_COMPOSE_FILE}}" up -d --wait
+        task be-openapi-lint TEST_ENV_FILE="{{.TEST_ENV_FILE}}"
+        task api-client-gen
+
+  api-check:
+    desc: api-genで再生成したOpenAPI契約とAPI clientがコミット済みの内容と一致するか検査
+    cmds:
+      - task: api-gen
+      - task: api-drift-check
+        vars: { PATHS: openapi/openapi.yaml frontend/src/api/generated }
+
+  # api-breaking-approved ラベルの PR では CI が API_BREAKING_APPROVED=true を渡し、結果を記録するだけにする。
+  api-breaking:
+    desc: baseブランチのOpenAPI契約と比べた破壊的変更をoasdiffで検査
+    vars:
+      BASE_REF: '{{.BASE_REF | default "main"}}'
+    env:
+      BASE_REF: '{{.BASE_REF}}'
+    cmds:
+      - |
+        base="origin/$BASE_REF"
+        if ! git cat-file -e "$base:openapi/openapi.yaml" 2>/dev/null; then
+          echo "base に openapi/openapi.yaml がないため比較をとばします。"
+          exit 0
+        fi
+        mkdir -p build
+        git show "$base:openapi/openapi.yaml" > build/openapi-base.yaml
+        fail_on=(--fail-on ERR)
+        if [ "${API_BREAKING_APPROVED:-}" = "true" ]; then
+          fail_on=()
+          echo "api-breaking-approved ラベルがあるため、結果を記録して失敗にしません。PR 本文に理由を書いてください。"
+        fi
+        {{.DOCKER}} run --rm -v "$PWD:/repo" -w /repo \
+          tufin/oasdiff:v1.33.0@sha256:6263a96dd2ef0726c54e21fea9b8e1607eac4841add0079324b424c1f52b819c \
+          breaking build/openapi-base.yaml openapi/openapi.yaml "${fail_on[@]}"
+
+  api-docs:
+    desc: コミット済みのOpenAPI契約からRedocly CLIで静的HTMLの設計書を生成（build/api-docs/index.html）
+    cmds:
+      - mkdir -p build/api-docs
+      - |
+        {{.DOCKER}} run --rm -e REDOCLY_TELEMETRY=off -v "$PWD:/repo" -w /repo \
+          redocly/cli:2.57.0@sha256:e320090ecd380878ff2aa671a928d5ac28fcbb7bb6230250d772790811125aea \
+          build-docs openapi/openapi.yaml --output build/api-docs/index.html --disableGoogleFont
+
   # Compose and services
   compose-up:
     desc: ローカル依存サービスを起動
