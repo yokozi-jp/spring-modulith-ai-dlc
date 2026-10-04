@@ -25,6 +25,9 @@ import org.springframework.stereotype.Component;
  *
  * <p>戻り値の Map は jOOQ の {@code set(Map)} にそのまま渡す。{@code patched_*} はデータパッチだけが更新するため扱わない。
  *
+ * <p>{@link #forInsert} は Repository が INSERT で使う。{@link #forUpdate} は {@link TableWriter}
+ * だけが使い、UPDATE の {@code lock_no} は {@link TableWriter} だけが書く（ADR-054）。
+ *
  * <ul>
  *   <li>{@code *_at}：注入した {@link Clock} の現在時刻。
  *   <li>{@code *_by}：利用者の操作では OIDC の ID トークンの {@code sub}。利用者の操作でない処理では {@code *_pgm_cd} と同じ値。
@@ -80,16 +83,12 @@ public class CommonColumns {
   }
 
   /**
-   * UPDATE で登録する更新のカラムと、{@code lock_no = lock_no + 1} を返す。
+   * UPDATE で登録する更新のカラムだけを返す。{@code lock_no} は {@link TableWriter} が書く。
    *
    * @param table 更新先のテーブル
    */
-  public Map<Field<?>, Object> forUpdate(final Table<?> table) {
-    final Field<Long> lockNo = requiredField(table, "lock_no", Long.class);
-    return toMap(
-        Stream.concat(
-            audit().entries(table, "updated_"),
-            Stream.of(Map.<Field<?>, Object>entry(lockNo, lockNo.plus(1)))));
+  /* package */ Map<Field<?>, Object> forUpdate(final Table<?> table) {
+    return toMap(audit().entries(table, "updated_"));
   }
 
   /**

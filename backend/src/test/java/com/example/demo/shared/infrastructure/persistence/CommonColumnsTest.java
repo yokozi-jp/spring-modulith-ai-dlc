@@ -12,9 +12,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.function.Supplier;
 import org.jooq.Field;
-import org.jooq.SQLDialect;
 import org.jooq.Table;
-import org.jooq.impl.DSL;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -132,24 +130,19 @@ class CommonColumnsTest {
   }
 
   @Test
-  @DisplayName("UPDATE では更新のカラムと lock_no + 1 だけを登録し、作成と patched_* を含めない")
-  void updateValuesIncrementLockNo() {
+  @DisplayName("UPDATE では更新のカラムだけを登録し、lock_no、作成、patched_* を含めない")
+  void updateValuesHaveOnlyUpdatedColumns() {
     final Map<Field<?>, Object> values = inUseCase(() -> commonColumns.forUpdate(FIXTURE_ITEM));
 
     assertThat(values.keySet())
-        .as("UPDATE の共通カラム")
+        .as("UPDATE の共通カラム（lock_no は TableWriter が書く）")
         .containsExactly(
             FIXTURE_ITEM.UPDATED_AT,
             FIXTURE_ITEM.UPDATED_BY,
             FIXTURE_ITEM.UPDATED_PGM_CD,
-            FIXTURE_ITEM.UPDATED_TX_ID,
-            FIXTURE_ITEM.LOCK_NO);
+            FIXTURE_ITEM.UPDATED_TX_ID);
     assertThat(values.get(FIXTURE_ITEM.UPDATED_AT)).as("updated_at").isEqualTo(NOW);
     assertThat(values.get(FIXTURE_ITEM.UPDATED_TX_ID)).as("updated_tx_id").isEqualTo(TRACE_ID);
-    final String sql = DSL.using(SQLDialect.POSTGRES).update(FIXTURE_ITEM).set(values).getSQL();
-    assertThat(sql)
-        .as("lock_no を DB の値から加算すること")
-        .contains("\"lock_no\" = (\"fixture\".\"t_fixture_item\".\"lock_no\" + ?)");
   }
 
   @Test
