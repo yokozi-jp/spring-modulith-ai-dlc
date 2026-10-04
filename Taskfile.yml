@@ -931,9 +931,9 @@ tasks:
       - PATH="$PATH:$HOME/go/bin" betterleaks git --staged --no-banner --redact
 
   scan-secrets-all:
-    desc: リポジトリ全体と履歴をbetterleaksでスキャン
+    desc: リポジトリ全体と現在のブランチの履歴をbetterleaksでスキャン
     cmds:
-      - PATH="$PATH:$HOME/go/bin" betterleaks git . --no-banner --redact --git-workers=16
+      - PATH="$PATH:$HOME/go/bin" betterleaks git . --no-banner --redact --git-workers=16 --log-opts=HEAD
 
   scan-dast:
     desc: 隔離した環境で認証付きのpassive scan（OWASP ZAP）を実行し、レポートをbuild/dastに出力
