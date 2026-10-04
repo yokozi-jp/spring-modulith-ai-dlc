@@ -1,5 +1,6 @@
 {
   "$schema": "https://unpkg.com/knip@6/schema.json",
+  "playwright": { "entry": ["e2e/**/*.{setup,spec}.ts"] },
   "ignore": ["lint/fixtures/**", "src/api/generated/**"],
   "ignoreDependencies": [
     "@tanstack/react-form",
