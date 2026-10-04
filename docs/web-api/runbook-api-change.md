@@ -53,8 +53,19 @@ ControllerやDTOを変えたら`task api-gen`を実行し、`openapi/openapi.yam
    `task api-docs`は`build/api-docs/index.html`を作る。
    このHTMLはRedocのscriptをCDNから読むため、表示にはインターネット接続が要る。
 
-9. 意図した破壊的変更なら、Pull Requestにラベル`api-breaking-approved`を付け、本文に理由を書く。
-   ラベルがあると、CIの`task api-breaking`は結果をログに残して失敗にしない。
+9. 意図した破壊的変更では、次の作業をすべて行う。
+
+   - 手順2に従い、`OpenApiConfig.CONTRACT_VERSION`のMAJORを上げる。
+   - Pull Requestにラベル`api-breaking-approved`を付ける。
+   - Pull Request本文に変更の理由、影響、移行方法を書く。
+   - Pull Requestタイトルまたはsquash commitに`!`を付けるか、commit footerに`BREAKING CHANGE:`を書く。
+
+   `api-breaking-approved`ラベルは、oasdiffの検出結果をログに残したまま、必須チェック`Check API contract 🔀`を失敗させないためだけに使う。
+   ラベルがなければ、検出された破壊的変更によって同チェックが失敗し、mergeできない。
+
+   `api-breaking-approved`ラベルはrelease-pleaseのmajor判定を制御しない。
+   [コミットメッセージの規約](../repository/commit-messages.md#破壊的変更)に従うConventional Commitの`!`または`BREAKING CHANGE:`がアプリケーションのmajor releaseを起動する。
+   版の判定は[リリース管理](../repository/release-management.md#版の決まり方)に従う。
 
 Orvalの設定（`frontend/orval.config.ts`）だけを変えたときは、`task api-gen`の代わりに`task api-client-gen`で生成物だけを再生成する。
 このTaskはDBもJavaも使わない。
@@ -84,7 +95,7 @@ drift（生成し直した内容とコミット済みの内容の差）の検査
 - **`task api-lint`が失敗した**：契約がSpectralのルールに違反している。
   ルール名から[OpenAPIのアノテーションとJavadoc](openapi-annotations.md)の該当箇所を探し、ControllerかDTOを直して`task api-gen`を実行する。
 - **`task api-breaking`が失敗した**：mainの契約と比べて互換でない変更がある。
-  互換な形（項目の追加、任意のパラメータ）に直すか、意図した変更なら手順9のラベルと理由を付ける。
+  互換な形（項目の追加、任意のパラメータ）に直すか、意図した変更なら手順9のラベル、本文、リリース記法を適用する。
 
 ステージしていない手書きの変更だけなら、`task be-openapi-check`は再生成で上書きして成功する。
 その場合は`git status`で生成物が元に戻ったことを確かめる。

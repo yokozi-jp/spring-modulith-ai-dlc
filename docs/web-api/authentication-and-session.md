@@ -20,6 +20,8 @@ tags: [convention, web-api, security, auth, future-arch-guidelines]
 
 ログアウトでは、ADR-007に従ってアプリケーションのセッションを破棄し、IdPのSSOセッションを終了する。
 IdPがトークンの失効エンドポイント（RFC 7009）を提供する場合は、セッションに保持したトークンを失効させてからセッションを破棄する。
+IdPはログアウト後に、利用者をSPAの`/logged-out`へ戻す。
+本番のIdPには`https://<origin>/logged-out`を、post logout redirect URI（Cognitoではsign-out URL）として登録する。
 
 ## セッションCookie
 

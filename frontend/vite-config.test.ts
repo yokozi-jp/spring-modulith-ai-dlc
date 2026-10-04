@@ -59,6 +59,19 @@ describe("Vite configuration", { timeout: 60_000 }, () => {
     }
   });
 
+  it("allows the IdP origin in the development form-action for the logout redirect", async () => {
+    vi.stubEnv("OIDC_ISSUER_URI", "http://localhost:18181/realms/x");
+    const server = await createDevelopmentServer();
+
+    try {
+      expect(server.config.server.headers?.["Content-Security-Policy"]).toContain(
+        "form-action 'self' http://localhost:18181;",
+      );
+    } finally {
+      await server.close();
+    }
+  });
+
   it("does not include development-only CSP allowances in production", async () => {
     const config = await resolveConfig({}, "build", "production");
     const contentSecurityPolicy = config.server.headers?.["Content-Security-Policy"];

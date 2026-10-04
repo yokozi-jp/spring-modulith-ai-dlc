@@ -33,6 +33,8 @@ TanStack Routerのfile-based routingでは、path parameterを `$orderId` のよ
 [ADR-014](../adr/ADR-014-use-same-origin-spa-security-boundary.md)により、配信点は `/api/**`、`/oauth2/**`、`/login/**`、`/logout`、`/error` をバックエンドへ振り分ける。
 画面のpathにはこれらを使わない。
 ログインはSPAのrouteではなく、バックエンドの認証開始URLから始める。
+ログアウト後の画面は、ログインを要求しない `/logged-out` とする。
+このpathはリソースではなく状態を表す画面であり、リソースを中心にpathを構成する規則の例外とする。
 
 ## 命名
 
