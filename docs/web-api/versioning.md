@@ -1,7 +1,7 @@
 ---
 type: Convention
 title: APIの互換性と廃止
-description: APIの改修が後方互換かどうかの判定、バージョンの粒度、APIのバージョンとリリース版の関係、廃止予定の示し方と削除の条件を定める規約。既存APIの契約を変更するとき、APIを廃止するときに読む。
+description: APIの改修が後方互換かどうかの判定、バージョンの粒度、APIのバージョンとリリース版の関係、OpenAPIのinfo.versionの上げ方、廃止予定の示し方と削除の条件を定める規約。既存APIの契約を変更するとき、APIを廃止するときに読む。
 tags: [convention, web-api, versioning, future-arch-guidelines]
 ---
 
@@ -40,6 +40,18 @@ APIのバージョンはメジャーバージョンの粒度で管理し、リ�
 - OpenAPIのスキーマが大きく変わる場合は、バージョンを上げて分離する。
 
 APIのバージョン（`v1`、`v2`）は、[リリース管理](../repository/release-management.md)が扱うセマンティックバージョニングの番号と一致させず、別のライフサイクルで管理する。
+
+## OpenAPI文書の版
+
+OpenAPIの`info.version`は、パスのバージョンとは別の、契約の版を表すセマンティックバージョニングの番号である。
+
+- 値は`OpenApiConfig.CONTRACT_VERSION`で手で管理し、初期値を`0.1.0`にする。
+- 後方互換な追加ではMINORを上げ、後方互換を壊す変更ではMAJORを上げる。
+- `/api/v1`を導入するときに`1.0.0`にする。
+- APIのバージョンと同じく、リリース版の番号と連動させない。
+
+版の上げ忘れは機械で検出できないため、Pull Requestのチェックリストで確かめる。
+決定の理由は[ADR-051](../adr/ADR-051-commit-openapi-contract-and-check-generated-client.md)を参照する。
 
 ## 廃止の予告
 

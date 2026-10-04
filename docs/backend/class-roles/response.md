@@ -40,13 +40,16 @@ Response は Domain の型を持たない。
 - 一覧の Response は `items` だけを持ち、Controller が 1行の Response の `from` で作ったリストを渡す。
 - `List` の component は、コンパクトコンストラクタで `List.copyOf` に置き換える。
 - record、ネストした record、`from` に Javadoc を書く。
+  record の Javadoc には全 component の `@param` を書く（OpenAPI の property の説明になる）。
+- 文字列、数値、日時の component に `@Schema(example = "...")` を付ける。
+  enum、boolean、ネストした record、`List` には付けない（[OpenAPIのアノテーションとJavadoc](../../web-api/openapi-annotations.md#example)）。
 - `presentation.web` のパッケージの `package-info.java` は Controller と共有する。
 
 応答の形は[レスポンスボディの形式](../../web-api/response-body.md)に、日時の形式は[日時とタイムゾーンの規約](../../datetime/timezone-conventions.md)に従う。
 
 ## 依存してよい型、してはいけない型
 
-- **依存してよい型**：`java..` の標準型、`org.jspecify..`、自モジュールのルートの参照の結果、同じ `presentation.web` の Response、自分にネストした record。
+- **依存してよい型**：`java..` の標準型、`org.jspecify..`、自モジュールのルートの参照の結果、同じ `presentation.web` の Response、自分にネストした record、`io.swagger.v3.oas.annotations.media.Schema`（`example` だけに使う）。
 - **依存してはいけない型**：Domain の型（`Order`、`Money`、`OrderStatus`）、`application` の Command と Result、Infrastructure の型、jOOQ の生成型、Jackson のアノテーション、他モジュールの型。
 
 ## 最小の例と典型的な例
@@ -57,12 +60,25 @@ Response は Domain の型を持たない。
 package com.example.demo.order.presentation.web;
 
 import com.example.demo.order.OrderSummary;
+import io.swagger.v3.oas.annotations.media.Schema;
 import java.math.BigDecimal;
 import java.time.Instant;
 
-/** 注文の一覧の1行を返す API の本文。 */
+/**
+ * 注文の一覧の1行を返す API の本文。
+ *
+ * @param orderId 注文の ID
+ * @param status 注文の状態のコード値
+ * @param total 注文の合計金額
+ * @param placedAt 注文を受け付けた時刻
+ * @param lockNo 更新の本文で送り返すロック番号
+ */
 public record OrderSummaryResponse(
-    String orderId, String status, BigDecimal total, Instant placedAt, long lockNo) {
+    @Schema(example = "O-0001") String orderId,
+    @Schema(example = "PLACED") String status,
+    @Schema(example = "1900") BigDecimal total,
+    @Schema(example = "2026-10-03T00:00:00Z") Instant placedAt,
+    @Schema(example = "1") long lockNo) {
 
   /** 参照の結果から作る。 */
   public static OrderSummaryResponse from(final OrderSummary summary) {
@@ -78,7 +94,11 @@ public record OrderSummaryResponse(
 
 ```java
 // com.example.demo.order.presentation.web.OrderSummaryListResponse（宣言だけ）
-/** 注文の一覧を items で包んで返す API の本文。 */
+/**
+ * 注文の一覧を items で包んで返す API の本文。
+ *
+ * @param items 注文の一覧の行
+ */
 public record OrderSummaryListResponse(List<OrderSummaryResponse> items) {
 
   /** 一覧を変更できないリストとして持つ。 */
@@ -92,17 +112,29 @@ public record OrderSummaryListResponse(List<OrderSummaryResponse> items) {
 
 ```java
 // com.example.demo.order.presentation.web.OrderDetailsResponse（宣言だけ）
-/** 注文の詳細を返す API の本文。 */
+/**
+ * 注文の詳細を返す API の本文。
+ *
+ * @param orderId 注文の ID
+ * @param customerId 注文した顧客の ID
+ * @param status 注文の状態のコード値
+ * @param lines 注文の明細
+ * @param subtotal 割引前の小計
+ * @param discount 割引額
+ * @param total 割引後の合計金額
+ * @param placedAt 注文を受け付けた時刻
+ * @param lockNo 更新の本文で送り返すロック番号
+ */
 public record OrderDetailsResponse(
-    String orderId,
-    String customerId,
-    String status,
+    @Schema(example = "O-0001") String orderId,
+    @Schema(example = "C-0001") String customerId,
+    @Schema(example = "PLACED") String status,
     List<OrderDetailsResponse.Line> lines,
-    BigDecimal subtotal,
-    BigDecimal discount,
-    BigDecimal total,
-    Instant placedAt,
-    long lockNo) {
+    @Schema(example = "2000") BigDecimal subtotal,
+    @Schema(example = "100") BigDecimal discount,
+    @Schema(example = "1900") BigDecimal total,
+    @Schema(example = "2026-10-03T00:00:00Z") Instant placedAt,
+    @Schema(example = "1") long lockNo) {
 
   /** 明細を変更できないリストとして持つ。 */
   public OrderDetailsResponse {
@@ -123,8 +155,19 @@ public record OrderDetailsResponse(
         details.lockNo());
   }
 
-  /** 注文の明細の1行。 */
-  public record Line(int lineNumber, String productCode, int quantity, BigDecimal unitPrice) {
+  /**
+   * 注文の明細の1行。
+   *
+   * @param lineNumber 明細の行番号
+   * @param productCode 商品のコード
+   * @param quantity 注文した数量
+   * @param unitPrice 商品の単価
+   */
+  public record Line(
+      @Schema(example = "1") int lineNumber,
+      @Schema(example = "P-0001") String productCode,
+      @Schema(example = "2") int quantity,
+      @Schema(example = "1000") BigDecimal unitPrice) {
 
     /** 参照の結果の明細から作る。 */
     public static Line from(final OrderDetails.Line line) {
@@ -191,5 +234,7 @@ class OrderSummaryListResponseTest {
 - [ ] `List` の component をコンパクトコンストラクタで `List.copyOf` に置き換える。［自分で点検］
 - [ ] Jackson のアノテーションを付けない。［自分で点検］
 - [ ] record、ネストした record、`from` に Javadoc を書く。［自分で点検］
+- [ ] record とネストした record の全 component に `@param` を書く。［Spectral で検査：schema-property-description］
+- [ ] 文字列、数値、日時の component に `@Schema(example = "...")` を付ける。［Spectral で検査：schema-property-example］
 - [ ] `@JsonTest` で JSON の形を確かめる。［自分で点検］
 - [ ] `presentation.web` のパッケージに `@NullMarked` の `package-info.java` がある。［Error Prone で検査：RequireExplicitNullMarking］

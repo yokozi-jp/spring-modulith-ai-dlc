@@ -59,7 +59,12 @@ public record OrderSearchCriteria(String customerId) {}
 
 ```java
 // com.example.demo.order.presentation.web.OrderController（抜粋）
-/** 顧客の注文の一覧を返す。 */
+/**
+ * 顧客の注文の一覧を返す。
+ *
+ * @param customerId 注文した顧客の ID
+ * @return 顧客の注文の一覧
+ */
 @Operation(operationId = "listOrders")
 @GetMapping
 /* package */ OrderSummaryListResponse search(@RequestParam final String customerId) {

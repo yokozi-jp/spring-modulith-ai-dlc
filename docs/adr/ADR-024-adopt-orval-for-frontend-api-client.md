@@ -36,7 +36,7 @@ Orvalの組み込みruntime validationも生成したZod schemaを利用でき�
 
 Frontend API client generatorにOrvalを採用し、開発依存のバージョンを固定する。
 Orvalの推移依存 `esbuild` のinstall scriptは許可せず、pnpmの `allowBuilds` で明示的に無効化する。
-最初の業務APIを追加するとき、Spring Bootが生成してSpectral検査を通したOpenAPI 3.1契約を入力にし、native Fetchを使うTanStack Query client、TypeScript型、Zod schemaを生成する。
+Spring Bootが生成してSpectral検査を通したOpenAPI 3.1契約を入力にし、native Fetchを使うTanStack Query client、TypeScript型、Zod schemaを生成する。
 
 初期構成ではup-fetchを追加せず、Orvalの組み込みFetch clientを使う。
 認証は同一オリジンのセッションCookieを前提とし、生成clientへ不要なtoken管理を追加しない。
@@ -46,8 +46,7 @@ Problem Details、CSRF、timeoutなどの共通処理が組み込みFetchだけ�
 フォーム入力と手書きのruntime境界にもZodを使う。
 API responseのruntime validationが必要な境界では、OpenAPIと同じ定義からOrvalが生成したZod schemaを使い、schemaを手書きで重複させない。
 
-現在は業務APIの `paths` とGit管理するOpenAPI snapshotがないため、Orval設定と空の生成ディレクトリは追加しない。
-最初の業務APIと同じ変更で、契約snapshot、生成Task、drift検査、生成物のGit管理方針を追加する。
+契約snapshotの置き場所、生成Task、drift検査、生成物のGit管理方針は、最初の業務APIより前に[ADR-051](ADR-051-commit-openapi-contract-and-check-generated-client.md)で確定した。
 
 ## Consequences
 
@@ -95,6 +94,7 @@ API responseのruntime validationが必要な境界では、OpenAPIと同じ定�
 ## References
 
 - [ADR-013: HTTP API 契約を標準化する](ADR-013-standardize-http-api-contracts.md)
+- [ADR-051: OpenAPI 契約をリポジトリにコミットし、生成物と破壊的変更を CI で検査する](ADR-051-commit-openapi-contract-and-check-generated-client.md)
 - [ADR-023: TanStack Form と Zod を採用する](ADR-023-adopt-tanstack-form-and-zod.md)
 - [Orval: Fetch](https://orval.dev/docs/guides/fetch/)
 - [Orval: Fetch client for TanStack Query](https://orval.dev/docs/guides/fetch-client/)

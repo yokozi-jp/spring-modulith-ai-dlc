@@ -124,7 +124,7 @@ local UI stateにはReactの組み込みHook、server stateにはTanStack Query�
 custom Hookは、再利用するstateful logicまたは外部systemとの同期を、具体的な用途名で表せる場合にfeature内へ置く。
 純粋な変換は通常の関数にし、生成Hookをそのまま転送するだけのwrapper Hookやトップレベル `hooks` ディレクトリは作らない。
 
-Orvalは最初の業務APIを追加する変更で設定する。
+Orvalの設定、生成Task、生成物のGit管理は[ADR-051](ADR-051-commit-openapi-contract-and-check-generated-client.md)に従う。
 生成clientには `client: 'react-query'`、`httpClient: 'fetch'`、`mode: 'tags-split'` を使い、schemaもtag単位に分割する。
 OpenAPI operationには所有する業務機能のtagを一つ付け、安定した `operationId` を与える。
 Orvalが所有するclient、model、mockの生成先を `api/generated` の専用サブディレクトリへ限定し、手書きのmutator、MSW lifecycle、fixtureを生成先へ置かない。
@@ -155,7 +155,7 @@ Orvalが所有するclient、model、mockの生成先を `api/generated` の専�
 ### Neutral
 
 - `features`、`api`、feature内部のサブディレクトリは空のまま先行作成しない。
-- Orval生成物をGit管理するかどうかは、ADR-024に従って最初の業務APIと生成Taskを追加するときに決める。
+- Orval生成物はGit管理する（[ADR-051](ADR-051-commit-openapi-contract-and-check-generated-client.md)）。
 - `app`、`services`、`stores`、トップレベル `hooks` は禁止語ではないが、現在はそれらが解く責務を持たないため追加しない。
 
 ## Alternatives Considered

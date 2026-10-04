@@ -62,12 +62,20 @@ Pull Request の作成者は自分の変更を承認できないため、コー�
 - `Run hadolint 🐳`
 - `Run docker build --check 🐳`
 - `Build and test backend image 🐳`
+- `Detect API contract changes`
+- `Check API contract 🔀`
 
 Frontend、backend、Docker の workflow は Pull Request ごとに変更対象を検出する。
 
 関連パスを変更していない場合、重い検査ジョブはジョブ単位で `skipped` を報告し、GitHub は required status check を満たしたものとして扱う。
 
 変更検知ジョブ、hadolint、`docker build --check` も必須にする。
+
+`Check API contract 🔀` は、`api-breaking-approved` ラベルの付け外しでも再判定する（[ADR-051](../adr/ADR-051-commit-openapi-contract-and-check-generated-client.md)）。
+
+稼働中の ruleset への追加はリポジトリの所有者が行い、上の一覧と同じ名前で登録する。
+
+`Publish API docs 📘` が設計書を公開するには、所有者が GitHub Pages を有効にし、公開元を GitHub Actions にする。
 
 検知ジョブやイメージビルドの前段が失敗した場合、後続ジョブが `skipped` になっても前段の失敗によってマージを止めるためである。
 
