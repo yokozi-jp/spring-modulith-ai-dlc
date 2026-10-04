@@ -53,3 +53,17 @@ paths = [
 regexes = [
   '''PASSWORD :'[a-zA-Z_][a-zA-Z0-9_]*';''',
 ]
+
+# .env.test の E2E_PASSWORD は docker/keycloak/realm.json の test-user と同じ使い捨てダミー（ADR-056）。
+# この 1 行だけを除外し、.env.test のほかの行は検出対象のまま。
+[[allowlists]]
+description = ".env.test の E2E 用 test-user のダミーパスワード（E2E_PASSWORD=test-password）を除外"
+# paths と regexes の両方に一致した行だけを除外する（既定の OR ではファイル全体が除外される）。
+condition = "AND"
+regexTarget = "line"
+paths = [
+  '''(^|/)\.env\.test$''',
+]
+regexes = [
+  '''(?m)^E2E_PASSWORD=test-password$''',
+]

@@ -4,6 +4,7 @@
 #   - ホストポートを開発用とずらす（PostgreSQL 5433 / Redis 6380 / Keycloak 8081）。開発の 5432/6379/8080 と衝突しない。
 #   - 名前付きボリュームを持たず使い捨て（down -v で毎回クリーン）。テストは常にまっさらな DB で走らせる。
 #   - Keycloak は backend-smoke profile に限定し、通常の Gradle テストでは起動しない。
+#   - backend と Keycloak は E2E 用の e2e profile でも起動する（task e2e、ADR-056）。
 #   - テストに不要な OTEL LGTM は含めない。
 #   - 開発用 compose と違い必須変数（${...:?}）や secret には依存せず、値を直書きして自己完結させる
 #     （機密ではない demo/demo の使い捨て。接続情報は .env.test が Gradle・スモーク側へ渡す）。
@@ -36,7 +37,7 @@ services:
       start_period: 5s
 
   keycloak:
-    profiles: ["backend-smoke"]
+    profiles: ["backend-smoke", "e2e"]
     image: quay.io/keycloak/keycloak:26.8.0@sha256:b0f60d489d51c5d113390bdf5461d4c06e6051be026c05549f2e1e10ec352bcc
     command: ["start-dev", "--import-realm"]
     environment:
@@ -76,3 +77,31 @@ services:
       timeout: 3s
       retries: 20
       start_period: 3s
+
+  # E2E 用の backend（e2e profile 限定、ADR-056）。既存の backend/Dockerfile でビルドする。
+  # network_mode: host にし、ホストへ公開した PostgreSQL 5433、Redis 6380、Keycloak 8081 へ .env.test の接続先のまま接続する。
+  # ブラウザと同じ issuer（127.0.0.1:8081）で Keycloak へ到達するためであり、service 名の keycloak:8080 では issuer が食い違う。
+  # Docker Desktop では Settings > Resources > Network の Enable host networking を有効にする（4.34 以降）。
+  # 待ち受けは既定の 0.0.0.0 のままにする。Docker Desktop が VM のループバックの port を WSL へ転送する保証がないため。
+  # migration は task e2e が backend の起動前に be-migrate で適用する（ADR-005）。
+  backend:
+    profiles: ["e2e"]
+    image: spring-modulith-backend:e2e
+    build:
+      context: ../backend
+      dockerfile: Dockerfile
+    network_mode: host
+    env_file: ../.env.test
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      keycloak:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "--silent", "--show-error", "http://127.0.0.1:8080/actuator/health/readiness"]
+      interval: 5s
+      timeout: 5s
+      retries: 24
+      start_period: 30s

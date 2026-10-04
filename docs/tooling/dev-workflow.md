@@ -78,6 +78,17 @@ OpenAPI契約かOrvalの設定を変更した場合は、`task api-client-check`
 React Doctorは実行に時間がかかるためpre-pushでは実行せず、Frontend CIで`task fe-doctor`を実行する。
 ローカルでReact固有の問題を診断するときは、`task fe-doctor`を手動で実行する。
 
+## E2Eテストを実行するとき
+
+開発用のViteとKeycloakを止めてから実行する。
+
+```bash
+task e2e
+```
+
+失敗した環境を調べるときは`E2E_KEEP_ENV=1 task e2e`で残す。
+前提と調べ方は[E2Eテストの方針と書き方](../e2e/testing-strategy.md)を参照する。
+
 ## ミューテーションテストを実行するとき
 
 ```bash
