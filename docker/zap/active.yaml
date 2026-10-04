@@ -109,7 +109,7 @@ jobs:
     parameters:
       template: sarif-json
       reportDir: /zap/wrk
-      reportFile: zap-active.sarif.json
+      reportFile: zap-active.raw.sarif.json
     confidences: [confirmed, high, medium, low]
 
   - type: report

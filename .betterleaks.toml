@@ -81,5 +81,5 @@ paths = [
   '''(^|/)docker/zap/(passive|preflight|active)\.yaml$''',
 ]
 regexes = [
-  '''password:\s*test-password''',
+  '''^password:\s*test-password$''',
 ]

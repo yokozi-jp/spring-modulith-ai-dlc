@@ -183,7 +183,7 @@ PITのHTMLとXMLのレポートは、変異対象がある場合に`backend/buil
 
 - **`task lint-duplicates`**：生成コードを除く手書きのフロントエンドとバックエンドをjscpdで検査する。
 - **`task scan-secrets`**：ステージ済み変更をbetterleaksでスキャンする。
-- **`task scan-secrets-all`**：リポジトリ全体と履歴をbetterleaksでスキャンする。
+- **`task scan-secrets-all`**：リポジトリ全体と、現在のブランチから辿れる履歴をbetterleaksでスキャンする。
 - **`task lint-semgrep`**：Semgrep OSSで静的解析する。
 - **`task be-sbom`**：バックエンドのCycloneDX SBOMを生成する。
 - **`task scan-vulns`**：バックエンドとフロントエンドの依存関係をTrivyで検査する。
