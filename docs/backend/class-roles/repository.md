@@ -45,7 +45,10 @@ Presentation は Repository を使わない。
   新規と更新を一つの `save` にしない。
 - `update` は、[PostgreSQL の排他制御](../../database/postgresql-concurrency-control.md)の楽観的ロックで保存する。
   集約の行がなければ `NoSuchElementException` を、更新の時点の行の `lock_no` が集約の `lockNo()` と違うか `lock_timeout` までに行のロックを取れなければ `<Aggregate>ConflictException` を投げる。
+  この二つの例外は、実装が使う `shared` の `TableWriter` が投げる（[jOOQ の Repository](jooq-repository.md)）。
   この二つの例外を、インタフェースの Javadoc に書く。
+- 集約の物理削除が要るときは `void delete(集約ルート)` を置き、`update` と同じ二つの例外を Javadoc に書く。
+  期待する版を持つ書き込みは、集約ルートを受け取る `update` と `delete` に限り、識別子と版を受け取るメソッドを作らない。
 - インタフェースと各メソッドに Javadoc を書く。
 - パッケージの `package-info.java` は集約と共有する。
 

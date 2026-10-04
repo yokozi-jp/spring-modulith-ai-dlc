@@ -26,6 +26,7 @@ backend/src/test/java/com/example/demo/architecture/
 ├── JooqCommonColumnsArchTest.java
 ├── PackageByFeatureOnionArchitectureTest.java
 ├── ProxyRulesArchTest.java
+├── TableWriterArchTest.java
 └── TestConventionsArchTest.java
 ```
 
@@ -99,6 +100,11 @@ backend/src/test/java/com/example/demo/architecture/
 `sharedModuleIsUsedOnlyByPersistenceAdapters`は、違反フィクスチャの`application`の`OrderAuditColumns`が`shared.infrastructure.persistence`の型を使うことを検出し、規約どおりのフィクスチャの`JooqOrderRepository`を誤検出しないことを確かめる。
 
 `jooqReflectionMappingIsNotUsed`は、違反フィクスチャの`ReflectiveOrderReader`で禁止するメソッドごとに一行を持ち、それぞれの呼び出しを検出することを確かめる。
+
+`tableWritesGoThroughTableWriter`は、違反フィクスチャの`DirectOrderWriter`で禁止するAPIごとに一行を持つ。
+`DirectOrderWriter`は、ラムダの中の`execute()`、`Update`の変数からの`execute()`、`Update::execute`のメソッド参照も含む。
+`TableWriterArchTest`の残りの規則は、違反フィクスチャの`JooqOrderRepository`と`ApproveOrderCommandHandler`で確かめる。
+`archfixture.conforming`と`archfixture.violating`の`shared.infrastructure.persistence`には、規則が名前で見る`TableWriter`のスタブを置く。
 `typeSafeJooqMappingIsAllowed`は、対応づけの二つの規則が`convertFrom`、`Records.mapping`、`into(Table)`、`fetch(RecordMapper)`、`intoArray(Field, Class)`、`intoSet(Field, Class)`、`fetch(Field, Class)`、`newRecord(Table)`を誤検出しないことを確かめる。
 MapStruct、ModelMapper、Dozerはテストのクラスパスにないため、`mappingLibrariesAreNotUsed`のフィクスチャは`DefaultRecordMapper`と`DefaultRecordUnmapper`への依存だけで確かめる。
 
@@ -162,9 +168,31 @@ Error ProneはすべてのJavaコンパイルで`JavaTimeDefaultTimeZone`と`Jav
 ## 共通カラム
 
 `JooqCommonColumnsArchTest`は、jOOQの生成クラスの`CREATED_*`、`UPDATED_*`、`PATCHED_*`フィールドを参照するクラスが、`com.example.demo.shared.infrastructure.persistence`の外にないことを検査する。
-楽観的ロックで各モジュールが参照する`LOCK_NO`は対象外にする。
+INSERTの共通カラムは`CommonColumns.forInsert`で、UPDATEとDELETEは`TableWriter`で書く。
+`LOCK_NO`は各モジュールが楽観的ロックの版を読むため対象外にし、書き込みは`ColumnValues`が実行時に拒否する。
 生成したRecordのgetterは検査しない。
 共通カラムの扱いは[PostgreSQLの共通カラム](../database/postgresql-common-columns.md)、sharedモジュールの決定は[ADR-048](../adr/ADR-048-add-shared-module-for-jooq-common-code.md)を参照する。
+
+## 書き込みの入口
+
+`TableWriterArchTest`は、業務テーブルのUPDATEとDELETEを`shared`の`TableWriter`に集める規則を検査する（[PostgreSQLの排他制御](../database/postgresql-concurrency-control.md)、[ADR-054](../adr/ADR-054-detect-optimistic-lock-conflicts-by-update-count.md)）。
+集約ルートは、`domain.model`にあり、引数のない`long lockNo()`を宣言する型とする。
+
+- `tableWritesGoThroughTableWriter`：`TableWriter`、`LockedRoot`、`DeletedRoot`の外の本番のコードは、jOOQのUPDATE、DELETE、UPSERT、MERGEの入口、`Update`と`Delete`に代入できる型の実行、`UpdatableRecord`と`DAO`の書き込み、Spring JDBCとJDBCの直接の利用を呼ばず、メソッド参照もしない。
+  呼び出し先の型の代入可能性で判定する。
+  メソッド参照のバイトコードには`execute`を宣言した`Query`が残るため、`Query`、`RowCountQuery`、`DMLQuery`の実行も禁じる。
+- `repositoryUpdateAndDeleteCheckVersion`：`Jooq*Repository`の、集約ルートを一つだけ受け取る`update`と`delete`は、`updateCheckingVersion`と`deleteCheckingVersion`をそのメソッドの中で直接呼ぶ。
+- `aggregateMethodsDoNotUseUnversionedWrites`：集約ルートを引数に取るメソッドとラムダは、`updateWhere`と`deleteWhere`を呼ばない。
+  ラムダは捕捉した変数を引数に持つ合成メソッドになるため、同じ判定で見る。
+- `commandHandlersEnsureScreenLockNo`：`handle`の引数のCommandが`lockNo()`を持つ`*CommandHandler`は、`domain.model`の型の`ensureLockNo`を呼ぶ。
+  渡した値は検査しない。
+- `jooqVersionIsReviewed`：実行時のjOOQの版が、禁止の一覧を見直した版と一致する。
+  版が変わったら[jOOQのSQLの書き方](../database/jooq-usage.md)の「jOOQの版を上げるとき」に従う。
+- `unversionedWritesRequireUsingTheCount`：`updateWhere`と`deleteWhere`が`@CheckReturnValue`を持つ。
+  注釈の型はテストの実行時のクラスパスにないため、バイトコードから読む。
+
+Error Proneの`CheckReturnValue`は既定でerrorであり、`updateWhere`と`deleteWhere`の戻り値を捨てるとコンパイルが失敗する。
+戻り値を変数に入れて読まない場合は、errorにしている`UnusedVariable`で失敗する。
 
 ## DB
 

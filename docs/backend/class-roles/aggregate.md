@@ -58,8 +58,10 @@ tags: [convention, backend, class-role]
 - ロック番号は `private final long lockNo` に持ち、`restore` の最後の引数で受け取る。
   `place` は、INSERT で登録する値と同じ `1` にする。
 - 画面から受け取ったロック番号を比べる public メソッド `ensureLockNo(long lockNo)` を置き、違えば `<Aggregate>ConflictException` を投げる。
-  CommandHandler が DB から読み直した集約の `lockNo` を `ensureLockNo` が画面の値と比べ、Repository の `update` がその `lockNo` を UPDATE の条件で更新の時点の行の値と比べる（[jOOQ の Repository](jooq-repository.md)、[ADR-054](../../adr/ADR-054-detect-optimistic-lock-conflicts-by-update-count.md)）。
-- `<Aggregate>ConflictException` は `RuntimeException` を継承した `public final class` にし、メッセージを受け取るコンストラクタと、メッセージと原因を受け取るコンストラクタを持つ。
+  CommandHandler が DB から読み直した集約の `lockNo` を `ensureLockNo` が画面の値と比べ、Repository の `update` がその `lockNo` を `shared` の `TableWriter` に渡して更新の時点の行の値と比べる（[jOOQ の Repository](jooq-repository.md)、[ADR-054](../../adr/ADR-054-detect-optimistic-lock-conflicts-by-update-count.md)）。
+- `<Aggregate>ConflictException` は `RuntimeException` を継承した `public final class` にし、メッセージを受け取るコンストラクタと、メッセージと `@Nullable Throwable cause` を受け取るコンストラクタを持つ。
+  二つ目のコンストラクタは、`TableWriter` に競合の例外を作る関数（`OrderConflictException::new`）として渡す。
+  `TableWriter` は、行ロックを取れなかったときに原因を、版が違うときに `null` を渡す。
 - setter を作らず、子の Entity のリストは `List.copyOf` で保持する。
 - 他の集約は識別子（`CustomerId`）で持ち、現在時刻は引数の `Instant` で受け取る。
 - 例外のメッセージは英語にし、対象の識別子を `orderId=...` の形で含める。
@@ -234,6 +236,8 @@ public Money total() {
 ```java
 package com.example.demo.order.domain.model;
 
+import org.jspecify.annotations.Nullable;
+
 /** 注文の更新が、ほかの更新と競合したことを表す。 */
 public final class OrderConflictException extends RuntimeException {
 
@@ -245,8 +249,8 @@ public final class OrderConflictException extends RuntimeException {
     super(message);
   }
 
-  /** 競合の内容と、行をロックできなかった原因を受け取る。 */
-  public OrderConflictException(final String message, final Throwable cause) {
+  /** 競合の内容と、行をロックできなかった原因を受け取る。原因がなければ null を受け取る。 */
+  public OrderConflictException(final String message, final @Nullable Throwable cause) {
     super(message, cause);
   }
 }

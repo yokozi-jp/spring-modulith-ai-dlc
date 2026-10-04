@@ -40,6 +40,19 @@ DBロールの決定は[ADR-011](../adr/ADR-011-use-module-owned-database-schema
 - 別接続または別スレッドから見た永続化済み状態。
 - `REQUIRES_NEW`または新しい接続を取得する処理。
 
+## テスト専用テーブル
+
+業務テーブルがまだないため、`shared`の共通処理（`TableWriter`など）を実PostgreSQLで確かめるテストは、[FixtureTablesExtension](../../backend/src/test/java/com/example/demo/testkit/FixtureTablesExtension.java)を`@ExtendWith`で付ける。
+この拡張は、テストクラスの前に`fixture`スキーマとテーブルを作り、後で消す。
+DDLは本番と同じくマイグレーションロール（`.env.test`の`MIGRATION_DB_*`）で実行し、アプリロールにはDMLだけを付与する。
+テストクラスは順に実行されるため、スキーマ検査はこのスキーマを見ない。
+使ってよいのは`shared`の共通処理のテストだけであり、業務テーブルができたらそのテーブルで確かめる。
+
+二つのセッションをまたぐテスト（古い保存の競合、`lock_timeout`）は、`@DatabaseTest`のトランザクションをAとし、`DataSource`から取った二つ目の接続をBにする。
+Bの行はコミットするため、`@AfterTransaction`で自動コミットの接続から消す。
+Aは待った後の再評価で行ロックを取り、ロールバックまで持つため、`@AfterEach`で消すとロック待ちになる。
+接続はテストの接続poolの上限（`DB_POOL_MAXIMUM_SIZE=4`）に収める。
+
 ## Spring Modulithのイベント
 
 イベントの発行、購読、完了を検証するときは、`event_publication`へテストから行を追加しない。
