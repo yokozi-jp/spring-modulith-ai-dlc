@@ -70,8 +70,10 @@ VACUUMは自動バキュームに任せ、`VACUUM FULL`を通常は実行しな�
 - `shared_buffers`は、マネージドサービスが提供する初期値から変えない。
 - `work_mem`はDBクラスタの設定を変えない。特定のSQLで並べ替えがディスクへあふれる場合に限り、レビューで合意してから、そのトランザクションで`SET LOCAL work_mem`を設定する。
 - その他のパラメータは既定値を使い、性能検証で課題が見つかった時点で、レビューで合意してから変える。
+- アプリの接続のロック待ち、文の実行、トランザクション中の待機の上限は、サーバーのパラメータではなく接続ごとに設定する（[DB接続情報とロール分離](connections.md)）。
 
 ## 出典
 
 - フューチャー株式会社「PostgreSQL設計ガイドライン」（[アーキテクチャ設計ガイドライン](https://future-architect.github.io/arch-guidelines/documents/forDB/postgresql_guidelines.html)、commit `e309a6d`）、[CC BY 4.0](https://creativecommons.org/licenses/by/4.0/deed.ja)
 - このリポジトリの規約に合わせて抜粋、再構成、改変している。取り込みの方針は [ADR-040](../adr/ADR-040-import-future-architecture-guidelines.md) に従う。
+- アプリの接続の時間の上限をサーバーのパラメータで設定しない規則を追加している（[ADR-055](../adr/ADR-055-set-db-time-limits-per-connection.md)）。

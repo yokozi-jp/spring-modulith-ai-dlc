@@ -41,8 +41,9 @@ CommandHandler は他モジュールから呼ばれない。
 - 集約が見つからないときは、`.orElseThrow(() -> new NoSuchElementException("order not found: orderId=" + command.orderId()))` で `NoSuchElementException` を投げる。
 - 新しい集約は Repository の `add` で、状態を変えた既存の集約は `update` で、`handle` の中で保存する。
 - Command がロック番号を持つときは、`findById` の直後、状態を変える操作より前に `order.ensureLockNo(command.lockNo())` を呼ぶ。
-  `ensureLockNo` はロックしていない読み取りの値と比べるだけなので、Repository の `update` が `SELECT ... FOR UPDATE NOWAIT` でロックした行の値と集約の値をもう一度比べる。
-  この二つの比較で、[PostgreSQL の排他制御](../../database/postgresql-concurrency-control.md)の楽観的ロックの手順（`SELECT ... FOR UPDATE` で行をロックしてから、取得した `lock_no` と画面などから受け取った `lock_no` を比べる）を満たす。
+  CommandHandler は集約を DB から読み直すため、`ensureLockNo` は画面から受け取った値と読んだ値を比べる。
+  Repository の `update` は、読んだ値と更新の時点の行の値を UPDATE の条件で比べる（[jOOQ の Repository](jooq-repository.md)）。
+  この二つの比較で、[PostgreSQL の排他制御](../../database/postgresql-concurrency-control.md)の楽観的ロック（UPDATE の条件で画面などから受け取った `lock_no` を比べる）を満たす。
 - イベントは、保存の後に `ApplicationEventPublisher` の `publishEvent` で発行する。
 - 現在時刻は、コンストラクタで受け取った `Clock` から `Instant.now(clock)` で取る。
 - 別の CommandHandler を呼ばない。

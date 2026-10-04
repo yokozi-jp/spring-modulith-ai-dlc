@@ -153,7 +153,7 @@ public class CommonColumns {
     final @Nullable Span span = tracer.currentSpan();
     final String traceId = span == null ? "" : span.context().traceId();
     // OpenTelemetry は trace がないとき、すべて 0 の無効な trace ID を返す。
-    if (traceId.matches("0*")) {
+    if (traceId.isEmpty() || traceId.matches("0+")) {
       throw new IllegalStateException("no current trace");
     }
     return traceId;
