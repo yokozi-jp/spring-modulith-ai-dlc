@@ -12,6 +12,7 @@ import com.tngtech.archunit.core.domain.JavaAccess;
 import com.tngtech.archunit.core.domain.JavaClass;
 import com.tngtech.archunit.core.domain.JavaCodeUnit;
 import com.tngtech.archunit.core.domain.JavaMethod;
+import com.tngtech.archunit.core.domain.JavaModifier;
 import com.tngtech.archunit.core.importer.ClassFileImporter;
 import com.tngtech.archunit.junit.AnalyzeClasses;
 import com.tngtech.archunit.junit.ArchTest;
@@ -24,6 +25,7 @@ import java.sql.Statement;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.TreeSet;
 import javax.sql.DataSource;
 import org.jooq.ConnectionProvider;
 import org.jooq.Constants;
@@ -32,11 +34,14 @@ import org.jooq.DMLQuery;
 import org.jooq.DSLContext;
 import org.jooq.Delete;
 import org.jooq.InsertOnDuplicateStep;
+import org.jooq.InsertQuery;
+import org.jooq.LoaderOptionsStep;
 import org.jooq.Merge;
 import org.jooq.Query;
 import org.jooq.RowCountQuery;
 import org.jooq.UpdatableRecord;
 import org.jooq.Update;
+import org.jooq.WithStep;
 import org.jooq.impl.DSL;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -61,6 +66,9 @@ class TableWriterArchTest {
   /** 書き込みの入口を置く shared のパッケージ（基底パッケージからの相対）。 */
   private static final String WRITER_PACKAGE = ".shared.infrastructure.persistence.";
 
+  /** 新しい集約ルートを保存する Repository のメソッドの名前。 */
+  private static final String ADD = "add";
+
   /** 集約ルートを保存する Repository のメソッドの名前。 */
   private static final String UPDATE = "update";
 
@@ -81,13 +89,20 @@ class TableWriterArchTest {
       "docs/database/postgresql-concurrency-control.md、"
           + "docs/adr/ADR-054-detect-optimistic-lock-conflicts-by-update-count.md";
 
-  /** {@code DSLContext} と {@code DSL} の、UPDATE、DELETE、MERGE の入口と接続の直接の利用。 */
+  /**
+   * {@code DSLContext}、{@code DSL}、{@code WithStep} の、UPDATE、DELETE、MERGE の入口と接続の直接の利用。
+   *
+   * <p>{@code Update} と {@code Delete} を作る入口をすべて禁じるため、{@code batch} や {@code subscribe}
+   * のような問い合わせを受け取る実行の API は禁じなくてよい。
+   */
   private static final Set<String> DSL_WRITES =
       Set.of(
           UPDATE,
           DELETE,
           "deleteFrom",
           "mergeInto",
+          "updateQuery",
+          "deleteQuery",
           "batchUpdate",
           "batchStore",
           "batchDelete",
@@ -110,9 +125,15 @@ class TableWriterArchTest {
   private static final Set<String> GENERIC_QUERY_TYPES =
       Set.of(Query.class.getName(), RowCountQuery.class.getName(), DMLQuery.class.getName());
 
-  /** INSERT の途中の段の UPSERT。{@code Loader} の同名のメソッドと分けるため、型で判定する。 */
+  /** {@code InsertOnDuplicateStep} と {@code InsertQuery} の UPSERT。 */
   private static final Set<String> UPSERTS =
-      Set.of("onConflict", "onConflictOnConstraint", "onDuplicateKeyUpdate");
+      Set.of(
+          "onConflict",
+          "onConflictOnConstraint",
+          "onConflictWhere",
+          "onDuplicateKeyUpdate",
+          "addValueForUpdate",
+          "addValuesForUpdate");
 
   /** {@code UpdatableRecord} の書き込み。 */
   private static final Set<String> RECORD_WRITES = Set.of("store", UPDATE, DELETE, "merge");
@@ -128,10 +149,15 @@ class TableWriterArchTest {
   /* package */ static final ArchRule tableWritesGoThroughTableWriter =
       tableWritesGoThroughTableWriterRule(BASE_PACKAGE);
 
-  /** {@code Jooq<Aggregate>Repository} の {@code update} と {@code delete} は版を比べる入口を呼ぶ（H3）。 */
+  /** {@code Jooq<Aggregate>Repository} の、集約ルートを受け取る {@code add} 以外のメソッドは版を比べる入口を呼ぶ（H3）。 */
   @ArchTest
   /* package */ static final ArchRule repositoryUpdateAndDeleteCheckVersion =
       repositoryUpdateAndDeleteCheckVersionRule(BASE_PACKAGE);
+
+  /** Repository の {@code update} と {@code delete} は、{@code long lockNo()} を持つ集約ルートを受け取る（H6）。 */
+  @ArchTest
+  /* package */ static final ArchRule repositoryUpdateAndDeleteTakeVersionedAggregates =
+      repositoryUpdateAndDeleteTakeVersionedAggregatesRule();
 
   /** {@code lockNo} を持つ Command の CommandHandler は {@code ensureLockNo} を呼ぶ（H4）。 */
   @ArchTest
@@ -203,15 +229,33 @@ class TableWriterArchTest {
     return methods()
         .that(
             DescribedPredicate.describe(
-                "Jooq*Repository の、集約ルートを一つだけ受け取る update と delete",
-                TableWriterArchTest::isRepositoryUpdateOrDelete))
+                "Jooq*Repository の、集約ルートを受け取る add 以外の public メソッド",
+                TableWriterArchTest::isRepositoryAggregateWrite))
         .should(callTheVersionedEntryPoint(writer))
         .allowEmptyShould(true)
         .because(
             "集約ルートの保存と削除で版を比べないと、古い画面や古い集約の保存が他の人の更新を上書きするため。"
-                + "直し方：update は TableWriter.updateCheckingVersion を、delete は deleteCheckingVersion を、"
+                + "直し方：集約ルートを受け取るメソッドは add、update、delete だけにし、"
+                + "update は TableWriter.updateCheckingVersion を、delete は deleteCheckingVersion を、"
                 + "そのメソッドの中で直接呼ぶ（別のメソッドやラムダを経由しない）。"
                 + "規約：docs/backend/class-roles/jooq-repository.md、"
+                + DOCS);
+  }
+
+  /** H6 の規則を組み立てる。 */
+  /* package */ static ArchRule repositoryUpdateAndDeleteTakeVersionedAggregatesRule() {
+    return methods()
+        .that(
+            DescribedPredicate.describe(
+                "domain.model の *Repository インタフェースの update と delete",
+                TableWriterArchTest::isRepositoryInterfaceUpdateOrDelete))
+        .should(takeOneAggregateRootWithLockNo())
+        .allowEmptyShould(true)
+        .because(
+            "集約ルートが long lockNo() を持たないと、版を比べる規則がその集約を見つけられず、版を比べない保存が検出されないため。"
+                + "直し方：update と delete は集約ルートを一つだけ受け取り、集約ルートは private final long lockNo と"
+                + "引数のない long lockNo() を持つ。"
+                + "規約：docs/backend/class-roles/repository.md、docs/backend/class-roles/aggregate.md、"
                 + DOCS);
   }
 
@@ -254,7 +298,10 @@ class TableWriterArchTest {
         Map.of(
             DSLContext.class, DSL_WRITES,
             DSL.class, DSL_WRITES,
+            WithStep.class, DSL_WRITES,
             InsertOnDuplicateStep.class, UPSERTS,
+            InsertQuery.class, UPSERTS,
+            LoaderOptionsStep.class, Set.of("onDuplicateKeyUpdate"),
             UpdatableRecord.class, RECORD_WRITES,
             DAO.class, DAO_WRITES,
             DataSource.class, Set.of("getConnection"),
@@ -273,36 +320,73 @@ class TableWriterArchTest {
         || owner.isAssignableTo(Merge.class)
         || owner.isAssignableTo(Connection.class)
         || owner.isAssignableTo(Statement.class)
-        || owner.getPackageName().startsWith("org.springframework.jdbc.core");
+        || owner.getPackageName().startsWith("org.springframework.jdbc.core")
+        || owner.getPackageName().startsWith("org.springframework.jdbc.object");
   }
 
-  /** {@code Jooq*Repository} の、集約ルートを一つだけ受け取る {@code update} か {@code delete} かを返す。 */
-  private static boolean isRepositoryUpdateOrDelete(final JavaMethod method) {
+  /**
+   * {@code Jooq*Repository} の、集約ルートを受け取る {@code add} 以外の public メソッドかを返す。
+   *
+   * <p>{@code update} と {@code delete} の名前に限らないため、{@code save(Order)} のような名前で規則を外れない。
+   */
+  private static boolean isRepositoryAggregateWrite(final JavaMethod method) {
     final JavaClass owner = method.getOwner();
-    return Set.of(UPDATE, DELETE).contains(method.getName())
+    return !ADD.equals(method.getName())
+        && method.getModifiers().contains(JavaModifier.PUBLIC)
+        && !method.getModifiers().contains(JavaModifier.SYNTHETIC)
         && owner.getSimpleName().startsWith("Jooq")
         && owner.getSimpleName().endsWith("Repository")
         && owner.getPackageName().contains(".infrastructure.persistence")
-        && method.getRawParameterTypes().size() == 1
-        && isAggregateRoot(method.getRawParameterTypes().getFirst());
+        && method.getRawParameterTypes().stream().anyMatch(TableWriterArchTest::isAggregateRoot);
   }
 
   private static ArchCondition<JavaMethod> callTheVersionedEntryPoint(final String writer) {
     return new ArchCondition<>("call TableWriter.updateCheckingVersion or deleteCheckingVersion") {
       @Override
       public void check(final JavaMethod item, final ConditionEvents events) {
-        final String expected =
-            UPDATE.equals(item.getName()) ? UPDATE_CHECKING_VERSION : DELETE_CHECKING_VERSION;
+        final Set<String> expected =
+            switch (item.getName()) {
+              case UPDATE -> Set.of(UPDATE_CHECKING_VERSION);
+              case DELETE -> Set.of(DELETE_CHECKING_VERSION);
+              default -> Set.of(UPDATE_CHECKING_VERSION, DELETE_CHECKING_VERSION);
+            };
         final boolean calls =
             item.getMethodCallsFromSelf().stream()
                 .anyMatch(
                     call ->
                         call.getTargetOwner().getFullName().equals(writer)
-                            && call.getName().equals(expected));
+                            && expected.contains(call.getName()));
         if (!calls) {
           events.add(
               SimpleConditionEvent.violated(
-                  item, item.getFullName() + " が TableWriter." + expected + " を直接呼んでいない。"));
+                  item,
+                  item.getFullName()
+                      + " が TableWriter の "
+                      + String.join(" か ", new TreeSet<>(expected))
+                      + " を直接呼んでいない。"));
+        }
+      }
+    };
+  }
+
+  /** {@code domain.model} の {@code *Repository} インタフェースの {@code update} か {@code delete} かを返す。 */
+  private static boolean isRepositoryInterfaceUpdateOrDelete(final JavaMethod method) {
+    final JavaClass owner = method.getOwner();
+    return Set.of(UPDATE, DELETE).contains(method.getName())
+        && owner.isInterface()
+        && owner.getSimpleName().endsWith("Repository")
+        && owner.getPackageName().contains(".domain.model");
+  }
+
+  private static ArchCondition<JavaMethod> takeOneAggregateRootWithLockNo() {
+    return new ArchCondition<>("take exactly one domain.model type declaring long lockNo()") {
+      @Override
+      public void check(final JavaMethod item, final ConditionEvents events) {
+        final List<JavaClass> parameters = item.getRawParameterTypes();
+        if (parameters.size() != 1 || !isAggregateRoot(parameters.getFirst())) {
+          events.add(
+              SimpleConditionEvent.violated(
+                  item, item.getFullName() + " の引数が、引数のない long lockNo() を宣言する集約ルート一つではない。"));
         }
       }
     };

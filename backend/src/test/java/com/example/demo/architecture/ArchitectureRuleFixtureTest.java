@@ -60,6 +60,13 @@ class ArchitectureRuleFixtureTest {
           "dslExecuteDelete",
           "dslConnection",
           "dslConnectionResult",
+          "dslUpdateQuery",
+          "dslDeleteQuery",
+          "withUpdate",
+          "insertQueryOnDuplicateKeyUpdate",
+          "insertQueryAddValueForUpdate",
+          "loaderOnDuplicateKeyUpdate",
+          "springSqlUpdate",
           "staticDslUpdate",
           "lambdaExecute",
           "updateVariableExecute",
@@ -119,7 +126,7 @@ class ArchitectureRuleFixtureTest {
     return Stream.concat(classRoleRows(), tableWriterRows());
   }
 
-  /** TableWriter の規則（H1、H3、H4、H5）が、対応する違反フィクスチャを検出することを確かめる行を作る。 */
+  /** TableWriter の規則（H1、H3、H4、H5、H6）が、対応する違反フィクスチャを検出することを確かめる行を作る。 */
   private static Stream<Arguments> tableWriterRows() {
     return Stream.concat(
         DIRECT_WRITES.stream()
@@ -134,6 +141,14 @@ class ArchitectureRuleFixtureTest {
                 "repositoryUpdateAndDeleteCheckVersion",
                 TableWriterArchTest.repositoryUpdateAndDeleteCheckVersionRule(VIOLATING),
                 UNVERSIONED_REPOSITORY + ".update("),
+            row(
+                "repositoryUpdateAndDeleteCheckVersion: save",
+                TableWriterArchTest.repositoryUpdateAndDeleteCheckVersionRule(VIOLATING),
+                UNVERSIONED_REPOSITORY + ".save("),
+            row(
+                "repositoryUpdateAndDeleteTakeVersionedAggregates",
+                TableWriterArchTest.repositoryUpdateAndDeleteTakeVersionedAggregatesRule(),
+                "order.domain.model.UnversionedOrderRepository.update("),
             row(
                 "commandHandlersEnsureScreenLockNo",
                 TableWriterArchTest.commandHandlersEnsureScreenLockNoRule(),
@@ -372,6 +387,7 @@ class ArchitectureRuleFixtureTest {
         ClassRoleArchTest.jooqReflectionMappingIsNotUsed,
         TableWriterArchTest.tableWritesGoThroughTableWriterRule(basePackage),
         TableWriterArchTest.repositoryUpdateAndDeleteCheckVersionRule(basePackage),
+        TableWriterArchTest.repositoryUpdateAndDeleteTakeVersionedAggregatesRule(),
         TableWriterArchTest.commandHandlersEnsureScreenLockNoRule(),
         TableWriterArchTest.aggregateMethodsDoNotUseUnversionedWritesRule(basePackage));
   }

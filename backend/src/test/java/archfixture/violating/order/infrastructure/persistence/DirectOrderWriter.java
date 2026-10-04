@@ -14,6 +14,8 @@ import org.jooq.DSLContext;
 import org.jooq.Delete;
 import org.jooq.Field;
 import org.jooq.InsertOnDuplicateStep;
+import org.jooq.InsertQuery;
+import org.jooq.LoaderOptionsStep;
 import org.jooq.Merge;
 import org.jooq.Record;
 import org.jooq.Table;
@@ -21,8 +23,10 @@ import org.jooq.TableRecord;
 import org.jooq.UpdatableRecord;
 import org.jooq.Update;
 import org.jooq.UpdateSetMoreStep;
+import org.jooq.WithStep;
 import org.jooq.impl.DSL;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.jdbc.object.SqlUpdate;
 
 /**
  * 違反：tableWritesGoThroughTableWriter（メソッドごとに、TableWriter を通さない書き込みの API を一つ使う）。
@@ -105,6 +109,44 @@ public final class DirectOrderWriter {
   /** {@code DSLContext.connectionResult} を呼ぶ。 */
   public static String dslConnectionResult(final DSLContext dsl) {
     return dsl.connectionResult(connection -> "connected");
+  }
+
+  /** {@code DSLContext.updateQuery} で作った UPDATE を {@code batch} で実行する。 */
+  public static int[] dslUpdateQuery(final DSLContext dsl) {
+    return dsl.batch(dsl.updateQuery(ORDERS)).execute();
+  }
+
+  /** {@code DSLContext.deleteQuery} を呼ぶ。 */
+  public static Object dslDeleteQuery(final DSLContext dsl) {
+    return dsl.deleteQuery(ORDERS);
+  }
+
+  /** {@code WithStep.update} を呼ぶ。 */
+  public static Object withUpdate(final WithStep with) {
+    return with.update(ORDERS);
+  }
+
+  /** {@code InsertQuery.onDuplicateKeyUpdate} を呼ぶ。 */
+  public static InsertQuery<Record> insertQueryOnDuplicateKeyUpdate(
+      final InsertQuery<Record> insert) {
+    insert.onDuplicateKeyUpdate(true);
+    return insert;
+  }
+
+  /** {@code InsertQuery.addValueForUpdate} を呼ぶ。 */
+  public static InsertQuery<Record> insertQueryAddValueForUpdate(final InsertQuery<Record> insert) {
+    insert.addValueForUpdate(ORDER_ID, "O-1");
+    return insert;
+  }
+
+  /** {@code LoaderOptionsStep.onDuplicateKeyUpdate} を呼ぶ。 */
+  public static Object loaderOnDuplicateKeyUpdate(final LoaderOptionsStep<Record> loader) {
+    return loader.onDuplicateKeyUpdate();
+  }
+
+  /** Spring の {@code SqlUpdate} で、接続を取らずに {@code DataSource} から書く。 */
+  public static int springSqlUpdate(final DataSource dataSource) {
+    return new SqlUpdate(dataSource, DELETE_SQL).update();
   }
 
   /** {@code DSL.update} で接続のない UPDATE を作る。 */
