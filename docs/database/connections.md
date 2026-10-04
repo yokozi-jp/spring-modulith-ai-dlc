@@ -1,7 +1,7 @@
 ---
 type: Convention
 title: 'DB接続情報とロール分離'
-description: アプリケーション、Liquibase、jOOQ生成が使う接続先と資格情報の環境変数、スキーマの所有、環境ごとのロール分離を定める。接続用の環境変数やDBロールを追加、変更するとき、ステージングや本番のDBを準備するときに読む。
+description: アプリケーション、Liquibase、jOOQ生成が使う接続先と資格情報の環境変数、スキーマの所有、環境ごとのロール分離、アプリの接続ごとの時間の上限を定める。接続用の環境変数やDBロールを追加、変更するとき、ステージングや本番のDBを準備するときに読む。
 tags: [convention, database, liquibase, security, credentials]
 ---
 
@@ -39,6 +39,24 @@ tags: [convention, database, liquibase, security, credentials]
 - **Gradle用URLの上書き**：`DB_URL`はGradleの共通接続先を上書きします。
   Spring Bootのデータソースは`DB_URL`を参照せず、`DB_HOST`、`DB_PORT`、`DB_NAME`からURLを組み立てます。
 
+## 接続ごとの時間の上限
+
+アプリケーションの接続には、HikariCPの`connection-init-sql`が新しい物理接続ごとに次の3つの上限を設定します。
+値はミリ秒の整数で、`application.yaml`に既定値はなく、未設定ならアプリケーションの起動に失敗します。
+
+- **`DB_LOCK_TIMEOUT_MS`**：`lock_timeout`です。
+  表や行のロックを待つ時間の上限で、超えると文はSQLSTATE `55P03`で失敗します。
+- **`DB_STATEMENT_TIMEOUT_MS`**：`statement_timeout`です。
+  1つの文の実行時間の上限で、超えると文はSQLSTATE `57014`で取り消されます。
+- **`DB_IDLE_IN_TRANSACTION_TIMEOUT_MS`**：`idle_in_transaction_session_timeout`です。
+  トランザクションを開いたまま次の文を待つ時間の上限で、超えるとセッションが終了します。
+
+`lock_timeout`は`statement_timeout`より短くします。
+`postgresql.conf`、RDSのパラメータグループ、`ALTER ROLE`では設定しません。
+1つのトランザクションだけ上限を変えるときは、`SET LOCAL`を使い、理由をコードに書きます。
+LiquibaseとjOOQ生成はHikariCPを通らないため、この上限を受けません。
+値の決め方と開始値は[ADR-055](../adr/ADR-055-set-db-time-limits-per-connection.md)にあります。
+
 ## ロール分離
 
 資格情報にフォールバックはありません。
@@ -68,3 +86,4 @@ Liquibase用アカウントには、DDL、Liquibase管理テーブルの更新�
 ## 参照資料
 
 - Spring Boot Common Application Properties: <https://docs.spring.io/spring-boot/appendix/application-properties/index.html>
+- PostgreSQL Client Connection Defaults: <https://www.postgresql.org/docs/18/runtime-config-client.html>

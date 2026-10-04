@@ -8,13 +8,13 @@ tags: [convention, database, postgresql, concurrency, locking, future-arch-guide
 # PostgreSQLの排他制御
 
 分離レベルはPostgreSQLの既定のREAD COMMITTEDのまま使う。
-同じ行を同時に更新しうる処理には楽観的ロックを使い、更新の直前に`SELECT ... FOR UPDATE`で`lock_no`を比較する。
+同じ行を同時に更新しうる処理には楽観的ロックを使い、UPDATEの条件で`lock_no`を比較して更新件数で判定する。
 画面を開いた時点で行をロックする悲観的ロックは避ける。
 
 ## 分離レベル
 
 分離レベルはREAD COMMITTEDにし、`@Transactional`の`isolation`を指定しない。
-業務処理に必要な整合性は、`SELECT ... FOR UPDATE`による行ロックで守る。
+業務処理に必要な整合性は、UPDATEと`SELECT ... FOR UPDATE`が取る行ロックで守る。
 PostgreSQLではREPEATABLE READ以上にすると、直列化の失敗によるエラーが積極的に起きるためである。
 
 次のどちらかに当てはまる場合に限り、REPEATABLE READを使ってよい。
@@ -38,41 +38,44 @@ DBの行ロックは、在庫の引き当てのように性能が重要になる
 
 ロック番号には[共通カラム](postgresql-common-columns.md)の`lock_no`を使い、最終更新日時で代用しない。
 
-1. 更新の直前に、対象の行を`SELECT ... FOR UPDATE`で取得して行ロックを取る。
-2. 取得した`lock_no`と、画面などから受け取った`lock_no`を比較する。
-3. 一致しなければロールバックし、競合を利用者へ返す。
-4. 一致すれば、`lock_no`を1加算して更新する。
+1. 主キーと、画面などから受け取った`lock_no`をUPDATEの条件に入れ、`lock_no`を1加算して更新する。
+2. 更新件数が1件なら、更新は成功している。
+3. 更新件数が0件なら、主キーで行の有無を確かめる。
+   行がなければ「行がない」、行があれば「他の人が更新した」としてロールバックし、利用者へ返す。
 
-先に`SELECT ... FOR UPDATE`でロックしてから比較する順序を守り、UPDATEの条件にバージョンを指定して更新件数で判定する方式は使わない。
-理由は次の3点である。
+```sql
+UPDATE t_order SET status = 'PAID', lock_no = lock_no + 1
+WHERE order_id = 1 AND lock_no = 6;
+```
 
-- 親の行（集約のルート）をロックすれば、同じトランザクションで更新する子テーブルの行も守られる。
-- SELECTの段階で、「行がない」（404）と「他の人が更新した」（409）を区別できる。
-- SELECTには`NOWAIT`を付けられるが、UPDATEには付けられない。
+集約のように親子のテーブルを一緒に更新するときは、先に親の行（集約のルート）を更新し、子の行は後で更新する。
+親の業務のカラムが変わらなくても、親の行を更新して`lock_no`を加算する。
+この方式を選んだ理由は[ADR-054](../adr/ADR-054-detect-optimistic-lock-conflicts-by-update-count.md)に示す。
 
 ### jOOQの楽観的ロックの機能
 
 jOOQの`Settings`の`executeWithOptimisticLocking`と、コード生成の`recordVersionFields`を使わない。
-理由は次の4点である。
-
-- jOOQはレコードに取得した値と比較するため、画面から受け取った`lock_no`と比較できない。
-- `lock_no`をバージョンのカラムに指定すると、jOOQは`UPDATE ... WHERE lock_no = ?`と更新件数で判定する方式に切り替わる。この方式は上記のとおり使わない。
-- jOOQが発行する`SELECT ... FOR UPDATE`に`NOWAIT`を付けられない。
-- `UpdatableRecord.store()`で更新するときにしか働かない。
+これらは`UpdatableRecord.store()`で更新するときにしか働かず、このリポジトリはUPDATEをDSLで書く（[jOOQのRepository](../backend/class-roles/jooq-repository.md)）ためである。
 
 jOOQの機能の動作は[jOOQのマニュアル](https://www.jooq.org/doc/latest/manual/sql-execution/crud-with-updatablerecords/optimistic-locking/)を参照する。
 
 ## デッドロックの防止
 
 `SELECT ... FOR UPDATE`で複数の行やテーブルをロックする場合は、ロックするテーブルの順序と、行の並び順（主キーの順など）を決め、すべての処理がそれに従う。
+UPDATEも更新する行のロックを取るため、同じ順序に従う。
+楽観的ロックでは、親の行を先に更新し、子の行は主キーの順に更新する。
 
 ## ロック待ち
 
-ロックの待ち方は要件に合わせて選び、既定の無期限待ちのままにしない。
+アプリの接続には`lock_timeout`でロック待ちの上限を設定し、既定の無期限待ちのままにしない（[DB接続情報とロール分離](connections.md)、[ADR-055](../adr/ADR-055-set-db-time-limits-per-connection.md)）。
+上限まで待ってもロックを取れなければ、文はSQLSTATE `55P03`で失敗する。
+楽観的ロックのUPDATEがこの失敗になったら、競合として扱う。
 
-- **`NOWAIT`**：ロックを取れなければ即座にエラーにする。画面からの要求では原則これを使う。
-- **`lock_timeout`**：`SET LOCAL lock_timeout`で待ち時間の上限を決める。
-- **`SKIP LOCKED`**：ロックを取れない行を飛ばし、残りの行をロックする。
+要件に合わせて、次の待ち方も使う。
+
+- **`NOWAIT`**：DBの行ロックやバッチで`SELECT ... FOR UPDATE`に付け、ロックを取れなければ即座にエラーにする。
+- **`SKIP LOCKED`**：バッチで`SELECT ... FOR UPDATE`に付け、ロックを取れない行を飛ばして残りの行をロックする。
+- **`SET LOCAL lock_timeout`**：1つのトランザクションだけ待ち時間の上限を変える。
 
 ## 悲観的ロック
 
@@ -96,4 +99,6 @@ WHERE item_id = 1 AND stock_count >= 5;
 
 - フューチャー株式会社「PostgreSQL設計ガイドライン」（[アーキテクチャ設計ガイドライン](https://future-architect.github.io/arch-guidelines/documents/forDB/postgresql_guidelines.html)、commit `e309a6d`）、[CC BY 4.0](https://creativecommons.org/licenses/by/4.0/deed.ja)
 - このリポジトリの規約に合わせて抜粋、再構成、改変している。取り込みの方針は [ADR-040](../adr/ADR-040-import-future-architecture-guidelines.md) に従う。
-- 楽観的ロックの手順を守る理由を書き直し、jOOQの楽観的ロックの機能を使わない規則を追加している。
+- 楽観的ロックの方式を、先にロックしてから比較する原典の方式から、UPDATEの条件と更新件数で判定する方式に変えている（[ADR-054](../adr/ADR-054-detect-optimistic-lock-conflicts-by-update-count.md)）。
+  jOOQの楽観的ロックの機能を使わない規則を追加している。
+- ロック待ちの上限を、アプリの接続ごとに`lock_timeout`で設定する規則を追加している（[ADR-055](../adr/ADR-055-set-db-time-limits-per-connection.md)）。
