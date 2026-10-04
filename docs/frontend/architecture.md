@@ -237,7 +237,7 @@ feature間のimportと循環依存を作らない。
 routeの近くのテストは、route候補に含めないようファイル名を `-` で始める。
 
 複数のテストで使う準備のコード（MSWのserver、手書きのhandlerとfixture、共通のrender helper）は `src/testing/` に置く。
-`src/testing/` は最初のMSWテストを書くときに作る。
+`src/testing/` は、準備のコードを2つ目のテストファイルで使うときに作る。
 `src/testing/` はテスト用部品のimport制限の例外であり、coverageの計測対象から外している。
 
 ## 関連資料

@@ -218,9 +218,14 @@ class ApiErrorContractTest {
         .andExpect(status().isUnsupportedMediaType());
     assertLogged("API client error", Severity.INFO, 415, Set.of());
 
+    final int errorsBefore = capturedLogRecords.withBody("Unhandled API exception").size();
     mockMvc
         .perform(get("/api/error-fixture/unhandled").with(user("test-user")))
         .andExpect(status().isInternalServerError());
+    assertEquals(
+        errorsBefore + 1,
+        capturedLogRecords.withBody("Unhandled API exception").size(),
+        "catch-all の 500 で ERROR を 1 件だけ出すこと");
     final LogRecordData error =
         assertLogged(
             "Unhandled API exception",
