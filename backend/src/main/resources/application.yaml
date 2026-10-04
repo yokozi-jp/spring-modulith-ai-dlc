@@ -59,12 +59,12 @@ spring:
       schema: modulith
       # 新しい物理接続ごとに、DBセッションの日時解釈と表示をUTCへ固定し、
       # ロック待ち、文の実行、トランザクション中の待機の上限（ミリ秒）を設定する（ADR-055）。
-      # lock_timeout は statement_timeout より短くする。postgresql.conf では設定しない。
+      # 値の条件は起動時に検証する。postgresql.conf では設定しない。
       connection-init-sql: >-
         SET TIME ZONE 'UTC';
-        SET lock_timeout = ${DB_LOCK_TIMEOUT_MS};
-        SET statement_timeout = ${DB_STATEMENT_TIMEOUT_MS};
-        SET idle_in_transaction_session_timeout = ${DB_IDLE_IN_TRANSACTION_TIMEOUT_MS}
+        SET lock_timeout = ${app.database.time-limits.lock-timeout-ms};
+        SET statement_timeout = ${app.database.time-limits.statement-timeout-ms};
+        SET idle_in_transaction_session_timeout = ${app.database.time-limits.idle-in-transaction-session-timeout-ms}
 
   # DBマイグレーションはアプリ起動から分離済み（spring-boot-starter-liquibase を依存に持たず、
   # 起動時の自動実行は起こらない）。変更は ./gradlew migrateDatabase などの明示コマンドで適用する。
@@ -252,3 +252,11 @@ springdoc:
   default-produces-media-type: application/json
   swagger-ui:
     enabled: ${SPRINGDOC_ENABLED}
+
+# DB セッションの時間の上限（ミリ秒）。起動時に DatabaseTimeLimitsEnvironmentPostProcessor が条件を検証する（ADR-055）。
+app:
+  database:
+    time-limits:
+      lock-timeout-ms: ${DB_LOCK_TIMEOUT_MS}
+      statement-timeout-ms: ${DB_STATEMENT_TIMEOUT_MS}
+      idle-in-transaction-session-timeout-ms: ${DB_IDLE_IN_TRANSACTION_TIMEOUT_MS}

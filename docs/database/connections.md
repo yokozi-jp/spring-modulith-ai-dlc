@@ -1,7 +1,7 @@
 ---
 type: Convention
 title: 'DB接続情報とロール分離'
-description: アプリケーション、Liquibase、jOOQ生成が使う接続先と資格情報の環境変数、スキーマの所有、環境ごとのロール分離、アプリの接続ごとの時間の上限を定める。接続用の環境変数やDBロールを追加、変更するとき、ステージングや本番のDBを準備するときに読む。
+description: アプリケーション、Liquibase、jOOQ生成が使う接続先と資格情報の環境変数、スキーマの所有、環境ごとのロール分離、アプリの接続ごとの時間の上限と起動時に検証する条件を定める。接続用の環境変数やDBロールを追加、変更するとき、ステージングや本番のDBを準備するときに読む。
 tags: [convention, database, liquibase, security, credentials]
 ---
 
@@ -51,11 +51,20 @@ tags: [convention, database, liquibase, security, credentials]
 - **`DB_IDLE_IN_TRANSACTION_TIMEOUT_MS`**：`idle_in_transaction_session_timeout`です。
   トランザクションを開いたまま次の文を待つ時間の上限で、超えるとセッションが終了します。
 
-`lock_timeout`は`statement_timeout`より短くします。
+`application.yaml`は3つの環境変数を`app.database.time-limits.*`へ読み込み、`connection-init-sql`はそのプロパティを参照します。
+アプリケーションは起動時に次の条件を検証し、満たさなければ環境変数の名前と破った条件を示して起動に失敗します。
+
+- 3つの値は、1以上のミリ秒の整数にします。
+  `0`、負の値、`1s`のような単位付きの値、空白を含む値は起動に失敗します。
+- `DB_LOCK_TIMEOUT_MS`は`DB_STATEMENT_TIMEOUT_MS`より短くします。
+- `DB_STATEMENT_TIMEOUT_MS`は、HikariCPの`connection-timeout`（`DB_POOL_CONNECTION_TIMEOUT_MS`）の実効値以下にします。
+
+`DB_IDLE_IN_TRANSACTION_TIMEOUT_MS`は、トランザクション中の外部呼び出しの上限と比べません。
+外部連携のクライアントを追加するときに、その時間予算より長いことを確かめます。
 `postgresql.conf`、RDSのパラメータグループ、`ALTER ROLE`では設定しません。
 1つのトランザクションだけ上限を変えるときは、`SET LOCAL`を使い、理由をコードに書きます。
 LiquibaseとjOOQ生成はHikariCPを通らないため、この上限を受けません。
-値の決め方と開始値は[ADR-055](../adr/ADR-055-set-db-time-limits-per-connection.md)にあります。
+値の決め方、開始値、検証の条件の理由は[ADR-055](../adr/ADR-055-set-db-time-limits-per-connection.md)にあります。
 
 ## ロール分離
 
