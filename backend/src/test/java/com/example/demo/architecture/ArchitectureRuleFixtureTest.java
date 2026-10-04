@@ -68,6 +68,7 @@ class ArchitectureRuleFixtureTest {
           "loaderOnDuplicateKeyUpdate",
           "qomOnDuplicateKeyUpdate",
           "springScriptPopulator",
+          "bootScriptInitializer",
           "springSqlUpdate",
           "staticDslUpdate",
           "lambdaExecute",
@@ -147,6 +148,10 @@ class ArchitectureRuleFixtureTest {
                 "repositoryUpdateAndDeleteCheckVersion: save",
                 TableWriterArchTest.repositoryUpdateAndDeleteCheckVersionRule(VIOLATING),
                 UNVERSIONED_REPOSITORY + ".save("),
+            row(
+                "repositoryUpdateAndDeleteCheckVersion: re-read lockNo",
+                TableWriterArchTest.repositoryUpdateAndDeleteCheckVersionRule(VIOLATING),
+                UNVERSIONED_REPOSITORY + ".updateStatus("),
             row(
                 "repositoryWritesTakeVersionedAggregates",
                 TableWriterArchTest.repositoryWritesTakeVersionedAggregatesRule(),

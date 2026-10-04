@@ -8,6 +8,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import com.example.demo.DemoApplication;
 import com.example.demo.shared.infrastructure.persistence.TableWriter;
 import com.tngtech.archunit.base.DescribedPredicate;
+import com.tngtech.archunit.core.domain.AccessTarget;
 import com.tngtech.archunit.core.domain.JavaAccess;
 import com.tngtech.archunit.core.domain.JavaClass;
 import com.tngtech.archunit.core.domain.JavaCodeUnit;
@@ -26,6 +27,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
+import java.util.stream.Collectors;
 import javax.sql.DataSource;
 import org.jooq.ConnectionProvider;
 import org.jooq.Constants;
@@ -149,7 +151,10 @@ class TableWriterArchTest {
   /* package */ static final ArchRule tableWritesGoThroughTableWriter =
       tableWritesGoThroughTableWriterRule(BASE_PACKAGE);
 
-  /** {@code Jooq<Aggregate>Repository} の、集約ルートを受け取る {@code add} 以外のメソッドは版を比べる入口を呼ぶ（H3）。 */
+  /**
+   * {@code Jooq<Aggregate>Repository} の、集約ルートを受け取る {@code add} 以外のメソッドは、版を比べる入口と集約ルートの {@code
+   * lockNo()} を呼ぶ（H3）。
+   */
   @ArchTest
   /* package */ static final ArchRule repositoryUpdateAndDeleteCheckVersion =
       repositoryUpdateAndDeleteCheckVersionRule(BASE_PACKAGE);
@@ -215,7 +220,8 @@ class TableWriterArchTest {
         .accessTargetWhere(
             DescribedPredicate.describe(
                 "jOOQ の UPDATE、DELETE、UPSERT、MERGE、Query 型の実行、問い合わせのモデルの $ で始まる API、"
-                    + "UpdatableRecord と DAO の書き込み、Spring JDBC と JDBC の直接の利用",
+                    + "UpdatableRecord と DAO の書き込み、Spring JDBC と JDBC の直接の利用、"
+                    + "DataSource、Connection、ConnectionProvider を引数に取る呼び出し",
                 TableWriterArchTest::isDirectWrite))
         .because(
             "版の条件、版の設定、件数の判定を書き忘れた UPDATE と DELETE は成功して、他の人の更新を黙って上書きするため。"
@@ -242,6 +248,7 @@ class TableWriterArchTest {
                 + "直し方：集約ルートを受け取るメソッドは add、update、delete だけにし、"
                 + "update は TableWriter.updateCheckingVersion を、delete は deleteCheckingVersion を、"
                 + "そのメソッドの中で直接呼ぶ（別のメソッドやラムダを経由しない）。"
+                + "期待する版には、テーブルから読み直した値ではなく、引数の集約ルートの lockNo() を渡す。"
                 + "規約：docs/backend/class-roles/jooq-repository.md、"
                 + DOCS);
   }
@@ -327,7 +334,24 @@ class TableWriterArchTest {
         // ResourceDatabasePopulator や ScriptUtils も任意の SQL を流せるため、サブパッケージを選ばずに禁じる。
         || owner.getPackageName().startsWith("org.springframework.jdbc")
         // 問い合わせのモデルの API（QOM の $onDuplicateKeyUpdate、$replace など）は、INSERT を UPSERT に組み替えられる。
-        || (owner.getPackageName().startsWith("org.jooq") && name.startsWith("$"));
+        || (owner.getPackageName().startsWith("org.jooq") && name.startsWith("$"))
+        || takesConnectionSource(access);
+  }
+
+  /**
+   * 呼び出し先が {@code DataSource}、{@code Connection}、{@code ConnectionProvider} を引数に取るかを返す。
+   *
+   * <p>接続の元を受け取るライブラリ（Spring Boot の {@code DataSourceScriptDatabaseInitializer}、{@code
+   * DSL.using(Connection)} など）は、パッケージを選ばずに任意の SQL を流せるため、引数の型で禁じる。
+   */
+  private static boolean takesConnectionSource(final JavaAccess<?> access) {
+    return access.getTarget() instanceof AccessTarget.CodeUnitAccessTarget target
+        && target.getRawParameterTypes().stream()
+            .anyMatch(
+                type ->
+                    type.isAssignableTo(DataSource.class)
+                        || type.isAssignableTo(Connection.class)
+                        || type.isAssignableTo(ConnectionProvider.class));
   }
 
   /**
@@ -347,7 +371,8 @@ class TableWriterArchTest {
   }
 
   private static ArchCondition<JavaMethod> callTheVersionedEntryPoint(final String writer) {
-    return new ArchCondition<>("call TableWriter.updateCheckingVersion or deleteCheckingVersion") {
+    return new ArchCondition<>(
+        "call TableWriter.updateCheckingVersion or deleteCheckingVersion and the aggregate's lockNo()") {
       @Override
       public void check(final JavaMethod item, final ConditionEvents events) {
         final Set<String> expected =
@@ -370,6 +395,23 @@ class TableWriterArchTest {
                       + " が TableWriter の "
                       + String.join(" か ", new TreeSet<>(expected))
                       + " を直接呼んでいない。"));
+        }
+        // ponytail: 値の流れは追わず、lockNo() の呼び出しの有無だけを見る。読み直した版を渡しつつ lockNo() も呼ぶ実装は通る。
+        final Set<String> aggregateRoots =
+            item.getRawParameterTypes().stream()
+                .filter(TableWriterArchTest::isAggregateRoot)
+                .map(JavaClass::getFullName)
+                .collect(Collectors.toSet());
+        final boolean readsLockNo =
+            item.getMethodCallsFromSelf().stream()
+                .anyMatch(
+                    call ->
+                        "lockNo".equals(call.getName())
+                            && aggregateRoots.contains(call.getTargetOwner().getFullName()));
+        if (!readsLockNo) {
+          events.add(
+              SimpleConditionEvent.violated(
+                  item, item.getFullName() + " が引数の集約ルートの lockNo() を呼んでいない。"));
         }
       }
     };

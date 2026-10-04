@@ -5,6 +5,7 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.util.List;
 import java.util.function.ToIntFunction;
 import java.util.function.UnaryOperator;
 import javax.sql.DataSource;
@@ -27,6 +28,8 @@ import org.jooq.UpdateSetMoreStep;
 import org.jooq.WithStep;
 import org.jooq.impl.DSL;
 import org.jooq.impl.QOM;
+import org.springframework.boot.jdbc.init.DataSourceScriptDatabaseInitializer;
+import org.springframework.boot.sql.init.DatabaseInitializationSettings;
 import org.springframework.core.io.ByteArrayResource;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.datasource.init.ResourceDatabasePopulator;
@@ -38,7 +41,7 @@ import org.springframework.jdbc.object.SqlUpdate;
  * <p>規則がバイトコードを読むだけで、実行しない。
  */
 // 規則が検出する呼び出しを一つずつ確かめるため、禁止する API ごとに一つのメソッドを置く。
-@SuppressWarnings({"PMD.TooManyMethods", "PMD.CouplingBetweenObjects"})
+@SuppressWarnings({"PMD.TooManyMethods", "PMD.CouplingBetweenObjects", "PMD.ExcessivePublicCount"})
 public final class DirectOrderWriter {
 
   /** 注文のテーブル。 */
@@ -159,6 +162,16 @@ public final class DirectOrderWriter {
             new ByteArrayResource(DELETE_SQL.getBytes(StandardCharsets.UTF_8)))
         .execute(dataSource);
     return dataSource;
+  }
+
+  /**
+   * Spring Boot の {@code DataSourceScriptDatabaseInitializer} で、{@code DataSource} から SQL
+   * のスクリプトを流す。
+   */
+  public static boolean bootScriptInitializer(final DataSource dataSource) {
+    final DatabaseInitializationSettings settings = new DatabaseInitializationSettings();
+    settings.setDataLocations(List.of("classpath:fix-orders.sql"));
+    return new DataSourceScriptDatabaseInitializer(dataSource, settings).initializeDatabase();
   }
 
   /** Spring の {@code SqlUpdate} で、接続を取らずに {@code DataSource} から書く。 */

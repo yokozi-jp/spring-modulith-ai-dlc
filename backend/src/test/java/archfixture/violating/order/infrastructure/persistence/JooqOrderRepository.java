@@ -4,8 +4,9 @@ import archfixture.violating.order.domain.model.Order;
 import archfixture.violating.shared.infrastructure.persistence.TableWriter;
 
 /**
- * 違反：repositoryUpdateAndDeleteCheckVersion（update と save が updateCheckingVersion を呼ばない）と
- * aggregateMethodsDoNotUseUnversionedWrites（集約ルートを受け取るメソッドが updateWhere を呼ぶ）。
+ * 違反：repositoryUpdateAndDeleteCheckVersion（update と save が updateCheckingVersion を呼ばず、updateStatus
+ * が集約ルートの lockNo() を渡さない）と aggregateMethodsDoNotUseUnversionedWrites（集約ルートを受け取るメソッドが updateWhere
+ * を呼ぶ）。
  */
 public final class JooqOrderRepository {
 
@@ -27,7 +28,17 @@ public final class JooqOrderRepository {
     return writeColumns(order.id().value());
   }
 
+  /** 集約ルートの版ではなく、テーブルから読み直した版を期待する版に渡す。 */
+  public String updateStatus(final Order order) {
+    return tableWriter.updateCheckingVersion("orders", currentLockNo(order.id().value()));
+  }
+
   private int writeColumns(final String orderId) {
     return tableWriter.updateWhere(orderId);
+  }
+
+  /** テーブルの今の版を読み直したものとする。 */
+  private long currentLockNo(final String orderId) {
+    return orderId.length();
   }
 }
