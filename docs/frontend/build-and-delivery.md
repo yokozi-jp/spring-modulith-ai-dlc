@@ -22,6 +22,8 @@ tags: [convention, frontend, build, delivery, cache, future-arch-guidelines]
 - 配信点は、バックエンドへ振り分けるpath（`/api/**` など）を除く未知のpathに `index.html` を返す。
 - バックエンドのpathの404を `index.html` で置き換えない。
 - 配信点は、ADR-014が定めるsecurity headerを付けられる方式にする。
+- CSPの`form-action`にIdPのoriginを加える。
+  ログアウトのフォーム送信がIdPへredirectされ、ブラウザがredirect先にもform-actionを適用するためである。
 - 新旧の静的ファイルを並べて置き、切り替えられる方式にする。
 - インターネットに公開する場合はCDNとobject storage、閉域網で配信する場合はreverse proxyまたはweb serverを、基本の候補にする。
 - HTTPSとresponse headerを扱えない静的website hostingの機能だけで配信しない。
