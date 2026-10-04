@@ -18,10 +18,9 @@ class DatabaseTimeLimitsEnvironmentPostProcessorTest {
 
   private static MockEnvironment environment(final int statementTimeoutMs) {
     return new MockEnvironment()
-        .withProperty("app.database.time-limits.lock-timeout-ms", "1")
-        .withProperty(
-            "app.database.time-limits.statement-timeout-ms", String.valueOf(statementTimeoutMs))
-        .withProperty("app.database.time-limits.idle-in-transaction-session-timeout-ms", "10000");
+        .withProperty("DB_LOCK_TIMEOUT_MS", "1")
+        .withProperty("DB_STATEMENT_TIMEOUT_MS", String.valueOf(statementTimeoutMs))
+        .withProperty("DB_IDLE_IN_TRANSACTION_TIMEOUT_MS", "10000");
   }
 
   private void postProcess(final MockEnvironment environment) {
@@ -85,7 +84,6 @@ class DatabaseTimeLimitsEnvironmentPostProcessorTest {
                     "--DB_IDLE_IN_TRANSACTION_TIMEOUT_MS=10000",
                     "--DB_POOL_CONNECTION_TIMEOUT_MS=5000"))
         .isInstanceOf(IllegalArgumentException.class)
-        .hasMessageContaining("DB_LOCK_TIMEOUT_MS")
-        .hasMessageContaining("1 以上");
+        .hasMessageContaining("DB_LOCK_TIMEOUT_MS は 1 以上 2147483647 以下のミリ秒の整数にする");
   }
 }

@@ -12,15 +12,14 @@ import org.springframework.mock.env.MockEnvironment;
 /** DB セッションの時間の上限の値と、値どうしの関係の検証を確かめる。 */
 class DatabaseTimeLimitsTest {
 
-  /** lock_timeout のプロパティ名。 */
-  private static final String LOCK = "app.database.time-limits.lock-timeout-ms";
+  /** lock_timeout の環境変数。 */
+  private static final String LOCK = "DB_LOCK_TIMEOUT_MS";
 
-  /** statement_timeout のプロパティ名。 */
-  private static final String STATEMENT = "app.database.time-limits.statement-timeout-ms";
+  /** statement_timeout の環境変数。 */
+  private static final String STATEMENT = "DB_STATEMENT_TIMEOUT_MS";
 
-  /** idle_in_transaction_session_timeout のプロパティ名。 */
-  private static final String IDLE =
-      "app.database.time-limits.idle-in-transaction-session-timeout-ms";
+  /** idle_in_transaction_session_timeout の環境変数。 */
+  private static final String IDLE = "DB_IDLE_IN_TRANSACTION_TIMEOUT_MS";
 
   private static MockEnvironment validEnvironment() {
     return new MockEnvironment()
@@ -37,57 +36,55 @@ class DatabaseTimeLimitsTest {
   }
 
   @ParameterizedTest(name = "{0}=[{1}]")
-  @DisplayName("1 以上のミリ秒の整数でない値は、環境変数の名前を示して失敗する")
+  @DisplayName("1 以上 2147483647 以下のミリ秒の整数でない値は、環境変数の名前と条件を示して失敗する")
   @CsvSource(
       delimiter = '|',
       quoteCharacter = '"',
       value = {
-        LOCK + "|0|DB_LOCK_TIMEOUT_MS",
-        LOCK + "|-1|DB_LOCK_TIMEOUT_MS",
-        LOCK + "|abc|DB_LOCK_TIMEOUT_MS",
-        LOCK + "|1s|DB_LOCK_TIMEOUT_MS",
-        LOCK + "|\"\"|DB_LOCK_TIMEOUT_MS",
-        LOCK + "|\" 1000\"|DB_LOCK_TIMEOUT_MS",
-        LOCK + "|0x10|DB_LOCK_TIMEOUT_MS",
-        LOCK + "|2147483648|DB_LOCK_TIMEOUT_MS",
-        STATEMENT + "|0|DB_STATEMENT_TIMEOUT_MS",
-        STATEMENT + "|-1|DB_STATEMENT_TIMEOUT_MS",
-        STATEMENT + "|5s|DB_STATEMENT_TIMEOUT_MS",
-        STATEMENT + "|2147483648|DB_STATEMENT_TIMEOUT_MS",
-        IDLE + "|0|DB_IDLE_IN_TRANSACTION_TIMEOUT_MS",
-        IDLE + "|-1|DB_IDLE_IN_TRANSACTION_TIMEOUT_MS",
-        IDLE + "|10s|DB_IDLE_IN_TRANSACTION_TIMEOUT_MS",
-        IDLE + "|2147483648|DB_IDLE_IN_TRANSACTION_TIMEOUT_MS"
+        LOCK + "|0",
+        LOCK + "|-1",
+        LOCK + "|abc",
+        LOCK + "|1s",
+        LOCK + "|\"\"",
+        LOCK + "|\" 1000\"",
+        LOCK + "|0x10",
+        LOCK + "|2147483648",
+        STATEMENT + "|0",
+        STATEMENT + "|-1",
+        STATEMENT + "|5s",
+        STATEMENT + "|2147483648",
+        IDLE + "|0",
+        IDLE + "|-1",
+        IDLE + "|10s",
+        IDLE + "|2147483648"
       })
-  void rejectsValueThatIsNotPositiveMilliseconds(
-      final String property, final String value, final String environmentVariable) {
-    final MockEnvironment environment = validEnvironment().withProperty(property, value);
+  void rejectsValueOutsideMillisecondRange(final String name, final String value) {
+    final MockEnvironment environment = validEnvironment().withProperty(name, value);
 
     assertThatThrownBy(() -> DatabaseTimeLimits.from(environment))
-        .as("%s=[%s]", property, value)
+        .as("%s=[%s]", name, value)
         .isInstanceOf(IllegalArgumentException.class)
-        .hasMessageContaining(environmentVariable)
-        .hasMessageContaining("1 以上のミリ秒の整数");
+        .hasMessageContaining(name + " は 1 以上 2147483647 以下のミリ秒の整数にする");
   }
 
   @Test
-  @DisplayName("プロパティがなければ、環境変数の名前を示して失敗する")
-  void rejectsMissingProperty() {
-    final MockEnvironment environment = new MockEnvironment().withProperty(STATEMENT, "5000");
+  @DisplayName("int の最大値は受け付ける")
+  void acceptsIntMaxValue() {
+    final MockEnvironment environment =
+        validEnvironment().withProperty(STATEMENT, "2147483647").withProperty(IDLE, "2147483647");
 
-    assertThatThrownBy(() -> DatabaseTimeLimits.from(environment))
-        .isInstanceOf(IllegalArgumentException.class)
-        .hasMessageContaining("DB_LOCK_TIMEOUT_MS");
+    assertThat(DatabaseTimeLimits.from(environment).statementTimeoutMs())
+        .isEqualTo(Integer.MAX_VALUE);
   }
 
   @Test
   @DisplayName("環境変数が未設定なら、その環境変数の名前を示して失敗する")
-  void rejectsUnresolvedEnvironmentVariable() {
-    final MockEnvironment environment =
-        validEnvironment().withProperty(LOCK, "${DB_LOCK_TIMEOUT_MS}");
+  void rejectsMissingEnvironmentVariable() {
+    final MockEnvironment environment = new MockEnvironment().withProperty(STATEMENT, "5000");
 
     assertThatThrownBy(() -> DatabaseTimeLimits.from(environment))
-        .hasMessageContaining("DB_LOCK_TIMEOUT_MS");
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessageContaining("DB_LOCK_TIMEOUT_MS を設定する");
   }
 
   @ParameterizedTest(name = "lock_timeout={0}, statement_timeout={1}")

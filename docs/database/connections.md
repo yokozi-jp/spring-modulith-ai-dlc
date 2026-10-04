@@ -51,13 +51,15 @@ tags: [convention, database, liquibase, security, credentials]
 - **`DB_IDLE_IN_TRANSACTION_TIMEOUT_MS`**：`idle_in_transaction_session_timeout`です。
   トランザクションを開いたまま次の文を待つ時間の上限で、超えるとセッションが終了します。
 
-`application.yaml`は3つの環境変数を`app.database.time-limits.*`へ読み込み、`connection-init-sql`はそのプロパティを参照します。
+`connection-init-sql`と起動時の検証は、どちらも3つの環境変数の名前で値を読みます。
 アプリケーションは起動時に次の条件を検証し、満たさなければ環境変数の名前と破った条件を示して起動に失敗します。
 
-- 3つの値は、1以上のミリ秒の整数にします。
+- 3つの値は、1以上2147483647以下のミリ秒の整数にします。
   `0`、負の値、`1s`のような単位付きの値、空白を含む値は起動に失敗します。
 - `DB_LOCK_TIMEOUT_MS`は`DB_STATEMENT_TIMEOUT_MS`より短くします。
 - `DB_STATEMENT_TIMEOUT_MS`は、HikariCPの`connection-timeout`（`DB_POOL_CONNECTION_TIMEOUT_MS`）の実効値以下にします。
+
+検証はすべての`SpringApplication`の起動で動くため、DataSourceを作らないテストスライスも、3つの値と解決できる`connection-timeout`がなければ起動に失敗します。
 
 `DB_IDLE_IN_TRANSACTION_TIMEOUT_MS`は、トランザクション中の外部呼び出しの上限と比べません。
 外部連携のクライアントを追加するときに、その時間予算より長いことを確かめます。

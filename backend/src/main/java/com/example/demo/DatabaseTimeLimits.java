@@ -21,11 +21,21 @@ record DatabaseTimeLimits(
   /** PostgreSQL では 0 が無効を意味するため、上限として働く最小の値。 */
   private static final int MIN_MS = 1;
 
+  /** lock_timeout の値を渡す環境変数。 */
+  private static final String LOCK_TIMEOUT = "DB_LOCK_TIMEOUT_MS";
+
+  /** statement_timeout の値を渡す環境変数。 */
+  private static final String STATEMENT_TIMEOUT = "DB_STATEMENT_TIMEOUT_MS";
+
+  /** idle_in_transaction_session_timeout の値を渡す環境変数。 */
+  private static final String IDLE_IN_TRANSACTION_SESSION_TIMEOUT =
+      "DB_IDLE_IN_TRANSACTION_TIMEOUT_MS";
+
   /** 値が満たすべき条件を検証する。 */
   DatabaseTimeLimits {
-    requirePositive(Setting.LOCK_TIMEOUT, lockTimeoutMs);
-    requirePositive(Setting.STATEMENT_TIMEOUT, statementTimeoutMs);
-    requirePositive(Setting.IDLE_IN_TRANSACTION_SESSION_TIMEOUT, idleInTransactionSessionTimeoutMs);
+    requirePositive(LOCK_TIMEOUT, lockTimeoutMs);
+    requirePositive(STATEMENT_TIMEOUT, statementTimeoutMs);
+    requirePositive(IDLE_IN_TRANSACTION_SESSION_TIMEOUT, idleInTransactionSessionTimeoutMs);
     // 同じか長いと、ロック待ちは 55P03 の競合でなく 57014 の取り消しで終わる。
     if (lockTimeoutMs >= statementTimeoutMs) {
       throw new IllegalArgumentException(
@@ -37,12 +47,12 @@ record DatabaseTimeLimits(
     }
   }
 
-  /** 設定の {@code app.database.time-limits.*} を読み、検証した値を返す。 */
+  /** 環境変数 {@code DB_*_TIMEOUT_MS} を読み、検証した値を返す。 */
   /* default */ static DatabaseTimeLimits from(final PropertyResolver resolver) {
     return new DatabaseTimeLimits(
-        parse(resolver, Setting.LOCK_TIMEOUT),
-        parse(resolver, Setting.STATEMENT_TIMEOUT),
-        parse(resolver, Setting.IDLE_IN_TRANSACTION_SESSION_TIMEOUT));
+        parse(resolver, LOCK_TIMEOUT),
+        parse(resolver, STATEMENT_TIMEOUT),
+        parse(resolver, IDLE_IN_TRANSACTION_SESSION_TIMEOUT));
   }
 
   /**
@@ -62,54 +72,37 @@ record DatabaseTimeLimits(
     }
   }
 
-  private static int parse(final PropertyResolver resolver, final Setting setting) {
-    final String value = resolver.getProperty(setting.property);
+  private static int parse(final PropertyResolver resolver, final String name) {
+    final String value = resolver.getProperty(name);
     if (value == null) {
-      throw new IllegalArgumentException(setting + "を設定する（ADR-055）");
+      throw new IllegalArgumentException(name + " を設定する（ADR-055）");
     }
     if (!DIGITS.matcher(value).matches()) {
-      throw invalid(setting, value);
+      throw invalid(name, value);
     }
     try {
       return Integer.parseInt(value);
     } catch (NumberFormatException e) {
       // PostgreSQL の三つの設定は int のため、int に収まらない値は最初の接続で失敗する。
-      throw new IllegalArgumentException(invalid(setting, value).getMessage(), e);
+      throw new IllegalArgumentException(invalid(name, value).getMessage(), e);
     }
   }
 
-  private static void requirePositive(final Setting setting, final int value) {
+  private static void requirePositive(final String name, final int value) {
     if (value < MIN_MS) {
-      throw invalid(setting, String.valueOf(value));
+      throw invalid(name, String.valueOf(value));
     }
   }
 
-  private static IllegalArgumentException invalid(final Setting setting, final String value) {
-    return new IllegalArgumentException(setting + "は 1 以上のミリ秒の整数にする（ADR-055）: 値=[" + value + "]");
-  }
-
-  /** 検証する設定の環境変数とプロパティ。 */
-  private enum Setting {
-    LOCK_TIMEOUT("DB_LOCK_TIMEOUT_MS", "app.database.time-limits.lock-timeout-ms"),
-    STATEMENT_TIMEOUT("DB_STATEMENT_TIMEOUT_MS", "app.database.time-limits.statement-timeout-ms"),
-    IDLE_IN_TRANSACTION_SESSION_TIMEOUT(
-        "DB_IDLE_IN_TRANSACTION_TIMEOUT_MS",
-        "app.database.time-limits.idle-in-transaction-session-timeout-ms");
-
-    /** 値を渡す環境変数の名前。 */
-    private final String environmentVariable;
-
-    /** application.yaml のプロパティ名。 */
-    private final String property;
-
-    Setting(final String environmentVariable, final String property) {
-      this.environmentVariable = environmentVariable;
-      this.property = property;
-    }
-
-    @Override
-    public String toString() {
-      return this.environmentVariable + "（" + this.property + "）";
-    }
+  private static IllegalArgumentException invalid(final String name, final String value) {
+    return new IllegalArgumentException(
+        name
+            + " は "
+            + MIN_MS
+            + " 以上 "
+            + Integer.MAX_VALUE
+            + " 以下のミリ秒の整数にする（ADR-055）: 値=["
+            + value
+            + "]");
   }
 }

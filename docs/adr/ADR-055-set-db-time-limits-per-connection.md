@@ -39,21 +39,16 @@ PostgreSQL の文書は、`statement_timeout` と `lock_timeout` を `postgresql
 ```yaml
 connection-init-sql: >-
   SET TIME ZONE 'UTC';
-  SET lock_timeout = ${app.database.time-limits.lock-timeout-ms};
-  SET statement_timeout = ${app.database.time-limits.statement-timeout-ms};
-  SET idle_in_transaction_session_timeout = ${app.database.time-limits.idle-in-transaction-session-timeout-ms}
-
-app:
-  database:
-    time-limits:
-      lock-timeout-ms: ${DB_LOCK_TIMEOUT_MS}
-      statement-timeout-ms: ${DB_STATEMENT_TIMEOUT_MS}
-      idle-in-transaction-session-timeout-ms: ${DB_IDLE_IN_TRANSACTION_TIMEOUT_MS}
+  SET lock_timeout = ${DB_LOCK_TIMEOUT_MS};
+  SET statement_timeout = ${DB_STATEMENT_TIMEOUT_MS};
+  SET idle_in_transaction_session_timeout = ${DB_IDLE_IN_TRANSACTION_TIMEOUT_MS}
 ```
 
 - 値はミリ秒の整数で、環境変数 `DB_LOCK_TIMEOUT_MS`、`DB_STATEMENT_TIMEOUT_MS`、`DB_IDLE_IN_TRANSACTION_TIMEOUT_MS` から渡す。
   `application.yaml` には既定値を書かない（[ADR-008](ADR-008-single-application-yaml-external-config.md)）。
-- SET 文は `app.database.time-limits.*` を参照し、起動時に検証した値と同じ値を使う。
+- SET 文と起動時の検証は、どちらも環境変数の名前で値を読み、別のプロパティ名を挟まない。
+  一つの値の名前を一つにし、どの名前を設定するかで迷わないようにする。
+  どちらも Spring の `Environment` の同じ値の源から解決するため、SET 文は検証した文字列と同じ文字列を使う。
 - `postgresql.conf`、RDS のパラメータグループ、`ALTER ROLE ... SET` では設定しない。
 - 5 秒を超えて実行する正当な理由があるトランザクション（レポートやバッチ）は、そのトランザクションだけ `SET LOCAL statement_timeout` で上限を上げ、理由をコードに書く。
   その仕組みは、該当する処理ができるまで作らない。
@@ -74,10 +69,11 @@ ADR-054 の方式では、行のロックは決済を呼んだ後の `update` �
 ### 起動時の検証
 
 アプリの起動時に、ベースパッケージ直下の `DatabaseTimeLimitsEnvironmentPostProcessor` が次の条件を検証する。
-満たさない値では、環境変数とプロパティの名前、破った条件、値を例外のメッセージに書き、起動に失敗する。
+満たさない値では、環境変数の名前、破った条件、値を例外のメッセージに書き、起動に失敗する。
 
-1. 三つの値は 1 以上のミリ秒の整数にする。
-   値は `[0-9]+` の文字列で、PostgreSQL の三つの設定の型である `int` に収まる。
+1. 三つの値は 1 以上 2147483647 以下のミリ秒の整数にする。
+   値は `[0-9]+` の文字列にする。
+   2147483647 は PostgreSQL の三つの設定の型である `int` の最大値で、方針で決めた上限ではない。
    `0` は PostgreSQL では上限なしを意味する。
    負の値と `1s` のような単位付きの値は、検証しなければ起動後の最初の接続で SET 文が失敗する。
    検証した文字列をそのまま SET 文に埋め込むため、空白や符号を含む値も拒む。
@@ -125,6 +121,9 @@ Spring Boot は `spring.datasource.hikari.*` を `HikariConfig` の設定とし�
 - `statement_timeout` で取り消された文は SQLSTATE `57014` になり、今は 500 になる。
 - `idle_in_transaction_session_timeout` を超えたセッションは SQLSTATE `25P03` で終了し、HikariCP はその接続を捨てる。
 - 正当に 5 秒を超える処理を作るときは、`SET LOCAL` を書く手間が増える。
+- 検証はすべての `SpringApplication` の起動で動くため、DataSource を作らないテストスライスも、三つの値と、解決できる `connection-timeout` がなければ起動に失敗する。
+  以前は `connection-init-sql` の値を HikariCP の設定を束縛するときにだけ解決していたため、DataSource を作らない起動は三つの値なしで動いていた。
+  このリポジトリのテストは `.env.test` から値を受け取るため、値を渡さない起動の仕方を新しく作るときに影響する。
 
 ### Neutral
 
@@ -189,6 +188,13 @@ Spring Boot は `spring.datasource.hikari.*` を `HikariConfig` の設定とし�
 - **Pros**：桁を誤った値で起動しない。
 - **Cons**：本番の値は負荷試験で決めるため、上限を変えるたびにコードを変えることになる。
   `lock_timeout` と `statement_timeout` は、条件 2 と 3 で接続取得の待ち時間以下に収まる。
+
+### 選択肢9: app.database.time-limits.* のプロパティを挟む
+
+- **Description**：`application.yaml` で三つの環境変数を `app.database.time-limits.*` に読み込み、SET 文と検証はそのプロパティを参照する。
+- **Pros**：Java のコードが読むキーが `application.yaml` に現れる。
+- **Cons**：一つの値が環境変数とプロパティの二つの名前を持ち、どちらを設定するか迷う。
+  環境変数の名前で読んでも SET 文と同じ値の源から解決するため、プロパティを挟んでも検証の正しさは変わらない。
 
 ## References
 
