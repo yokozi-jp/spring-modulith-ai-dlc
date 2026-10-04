@@ -46,8 +46,14 @@ connection-init-sql: >-
 
 - 値はミリ秒の整数で、環境変数 `DB_LOCK_TIMEOUT_MS`、`DB_STATEMENT_TIMEOUT_MS`、`DB_IDLE_IN_TRANSACTION_TIMEOUT_MS` から渡す。
   `application.yaml` には既定値を書かない（[ADR-008](ADR-008-single-application-yaml-external-config.md)）。
+- 三つの値は 1 以上にする。
+  PostgreSQL は `0` を上限なしとして受け付けるため、`0` を渡すと無期限に待つ。
 - `lock_timeout` は `statement_timeout` より短くする。
   同じか長いと、ロック待ちより先に `statement_timeout` が効き、ロック待ちの上限として働かない。
+- `statement_timeout` は `DB_POOL_CONNECTION_TIMEOUT_MS`（HikariCP の `connection-timeout`）以下にする。
+  1 つの要求の文が、他の要求が接続を待てる時間より長く接続を持たないようにするためである。
+- これらの条件はコメントと文書に書き、起動時には検証しない。
+  三つの値のために検証の仕組みを持つ費用が、ときどきしか変えない設定の誤りを防ぐ効果に見合わないためである。
 - `postgresql.conf`、RDS のパラメータグループ、`ALTER ROLE ... SET` では設定しない。
 - 5 秒を超えて実行する正当な理由があるトランザクション（レポートやバッチ）は、そのトランザクションだけ `SET LOCAL statement_timeout` で上限を上げ、理由をコードに書く。
   その仕組みは、該当する処理ができるまで作らない。
