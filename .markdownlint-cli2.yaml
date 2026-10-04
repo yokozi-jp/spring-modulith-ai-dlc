@@ -39,6 +39,9 @@ config:
 ignores:
   - "**/node_modules/**"
   - "**/build/**"
+  # Playwright が失敗時に書く error-context.md などの成果物（Git から除外済み）
+  - "frontend/playwright-report/**"
+  - "frontend/test-results/**"
   - ".agents/**"
   # release-please が生成する CHANGELOG は整形をツール側が決めるため lint 対象外にする
   # （バージョン見出し直後に空行を 2 つ挿入し MD012 に必ず違反する）

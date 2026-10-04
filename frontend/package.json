@@ -7,6 +7,7 @@
     "dev": "vp dev",
     "build": "tsc && vp build",
     "preview": "vp preview",
+    "e2e": "playwright test",
     "knip": "knip",
     "orval": "orval",
     "react-doctor": "react-doctor . --yes --no-supply-chain --no-telemetry --blocking warning --no-color"
@@ -28,6 +29,7 @@
     "zod": "4.6.5"
   },
   "devDependencies": {
+    "@playwright/test": "1.63.0",
     "@shadcn/lint": "0.1.5",
     "@tailwindcss/vite": "4.3.3",
     "@tanstack/router-plugin": "1.168.40",

@@ -90,6 +90,18 @@ describe("Vite configuration", { timeout: 60_000 }, () => {
     expect(config.preview.headers?.["Content-Security-Policy"]).toBe(contentSecurityPolicy);
   });
 
+  it("serves preview on the pinned origin with the development proxy", async () => {
+    vi.stubEnv("SERVER_PORT", "19091");
+    const config = await resolveConfig({ mode: "test" }, "serve", "production", "production", true);
+
+    expect(config.preview.port).toBe(5173);
+    expect(config.preview.strictPort).toBe(true);
+    expect(config.preview.proxy?.[proxyPath]).toMatchObject({
+      target: "http://localhost:19091",
+      changeOrigin: false,
+    });
+  });
+
   it.each(["invalid", "0x10", "65536"])("rejects invalid SERVER_PORT %s", async (value) => {
     vi.stubEnv("SERVER_PORT", value);
 

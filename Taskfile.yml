@@ -98,10 +98,61 @@ tasks:
         NODE
 
   e2e:
-    desc: E2Eの未整備を案内
+    desc: compose-testでbackendを起動し、Vite previewに対してPlaywrightのE2Eを実行して後片付け
+    silent: true
     cmds:
-      - echo "E2E はまだ整備されていません。docs/e2e-testing-strategy.md を参照してください。"
-      - echo "整備後はフルスタック起動、シード、playwright testをこのタスクに束ねます。"
+      - |
+        # compose の backend と Playwright が .env.test を固定で読むため、TEST_ENV_FILE の上書きには対応しない。
+        # export すると Playwright の loadEnv で .env.test.local より優先されるため、SERVER_PORT を読むだけにする。
+        . ./.env.test
+        compose() { {{.DOCKER}} compose -f "{{.TEST_COMPOSE_FILE}}" --profile e2e "$@"; }
+        keep_env=""
+        if [ "${E2E_KEEP_ENV:-}" = "1" ] && [ -z "${CI:-}" ]; then keep_env="1"; fi
+        # 前回 E2E_KEEP_ENV=1 で残した環境を破棄し、空の DB から始める。
+        compose down --volumes --remove-orphans >/dev/null 2>&1 || true
+        for port in 5173 "$SERVER_PORT"; do
+          rc=0
+          curl --silent --output /dev/null --max-time 2 "http://localhost:${port}/" || rc=$?
+          if [ "$rc" -ne 7 ]; then
+            echo "localhost:${port} は使用中です。開発用の Vite（5173）や Keycloak（${SERVER_PORT}）など、この port を使うプロセスを止めてから実行してください。" >&2
+            exit 1
+          fi
+        done
+        cleanup() {
+          status=$?
+          trap - EXIT
+          keep=""
+          if [ "$status" -ne 0 ]; then
+            mkdir -p frontend/test-results
+            compose logs --no-color backend > frontend/test-results/backend.log 2>&1 || true
+            if [ -n "$keep_env" ] && [ -n "$(compose ps -aq 2>/dev/null)" ]; then keep="1"; fi
+          fi
+          cleanup_status=0
+          # Task の shell では EXIT の trap の中の exit が後続の処理を止めないため、exit に頼らず分岐する。
+          if [ -n "$keep" ]; then
+            echo "E2E_KEEP_ENV=1 のため、compose-test のコンテナと volume を残しました。" >&2
+            echo "  backend のログ：{{.DOCKER}} compose -f {{.TEST_COMPOSE_FILE}} --profile e2e logs backend" >&2
+            echo "  （frontend/test-results/backend.log は pnpm e2e の再実行で消える）" >&2
+            echo "  再実行：cd frontend && pnpm e2e" >&2
+            echo "  片付け：{{.DOCKER}} compose -f {{.TEST_COMPOSE_FILE}} --profile e2e down --volumes --remove-orphans" >&2
+          else
+            compose down --volumes --remove-orphans || cleanup_status=$?
+          fi
+          if [ "$status" -ne 0 ]; then exit "$status"; fi
+          exit "$cleanup_status"
+        }
+        trap cleanup EXIT
+        (cd frontend && vp install --frozen-lockfile && vp run build && vp exec playwright install chromium)
+        compose build backend
+        compose up -d --wait postgres redis keycloak
+        task be-migrate COMPOSE_ENV_FILE=.env.test
+        compose up -d --wait backend
+        # healthcheck はコンテナの中から確かめるため、preview の proxy と同じくホストから届くかを別に確かめる。
+        if ! curl --fail --silent --show-error --max-time 5 "http://localhost:${SERVER_PORT}/actuator/health/readiness" >/dev/null; then
+          echo "ホストから backend（localhost:${SERVER_PORT}）へ接続できません。frontend/test-results/backend.log の backend のログを確かめてください。" >&2
+          exit 1
+        fi
+        (cd frontend && vp run e2e)
 
   # ADR
   adr-check:
