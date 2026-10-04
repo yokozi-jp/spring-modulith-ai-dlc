@@ -1040,8 +1040,11 @@ tasks:
         elif [ "$zap_status" -ne 0 ]; then
           fail "ZAP の {{.DAST_PLAN}} plan が終了コード $zap_status で失敗しました。"
         fi
-        sarif="$report_dir/zap-{{.DAST_PLAN}}.sarif.json"
-        test -s "$sarif" || fail "SARIF が出力されていません。"
+        # ZAP の生の SARIF は別名で受け取り、変換と検査を通ったものだけを CI がアップロードする名前で置く。
+        # 途中で失敗しても、変換前の SARIF が Code Scanning へ送られない。
+        raw_sarif="$report_dir/zap-{{.DAST_PLAN}}.raw.sarif.json"
+        sarif="$report_dir/zap-{{.DAST_PLAN}}.sarif.tmp"
+        test -s "$raw_sarif" || fail "SARIF が出力されていません。"
         # Code Scanning は http の URI を受け付けず、リポジトリ内のファイルの位置だけを受け付ける。
         # そのため、位置を実行した plan のファイルへ書き換え、元の URL はメッセージの末尾に残す。
         # URL のクエリとフラグメントは OAuth の state や code など実行ごとに変わるため、メッセージと fingerprint から外す。
@@ -1062,7 +1065,7 @@ tasks:
             | if has("relatedLocations") then .relatedLocations |= to_plan else . end)
             | (reduce .results[] as $r ({}; .[$r.ruleId] = ([.[$r.ruleId], ($r.level | sev)] | map(select(.)) | max_by(tonumber)))) as $sev
             | .tool.driver.rules |= map(select($sev[.id]) | .properties["security-severity"] = $sev[.id] | .properties.tags = ["security"]))
-        ' "$sarif" >"$sarif.tmp" && mv "$sarif.tmp" "$sarif"
+        ' "$raw_sarif" >"$sarif" || fail "SARIF の変換に失敗しました。"
         jq -e '[.. | objects | .uri? | strings | select(test("^[A-Za-z][A-Za-z0-9+.-]*:"))] | length == 0' "$sarif" >/dev/null \
           || fail "SARIF に scheme 付きの URI が残っています。"
         jq -e '[.runs[].results[] | select((.level // "warning") == "none" or has("ruleIndex"))] | length == 0' "$sarif" >/dev/null \
@@ -1071,6 +1074,7 @@ tasks:
             or (.message.text | test("\nURL: [^\n]*[?#]")))] | length == 0' "$sarif" >/dev/null \
           || fail "SARIF の fingerprint かメッセージの URL にクエリが残っています。"
         jq -e 'all(.runs[]; .tool.driver.name == "ZAP")' "$sarif" >/dev/null || fail "SARIF の tool 名が ZAP ではありません。"
+        mv "$sarif" "$report_dir/zap-{{.DAST_PLAN}}.sarif.json"
         echo "DAST のレポートを $report_dir に出力しました。"
 
   # Lint and format
