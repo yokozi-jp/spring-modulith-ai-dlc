@@ -29,6 +29,7 @@ Dockerを使うTaskは、Dockerがないローカル環境ではスキップし�
 - **`task fe-test-build`**：coverage付きテストと本番ビルドを実行する。
 - **`task fe-verify`**：`fe-check`、`fe-knip`、`fe-test-build`を実行する。
 - **`task fe-route-tree-check`**：ビルドで`routeTree.gen.ts`を再生成し、コミット済みの内容と差分があれば失敗する。
+- **`task api-client-check`**：Orvalで`src/api/generated`を再生成し、コミット済みの内容と差分があれば失敗する（後述の「API契約」）。
 
 ## フロントエンドのLint設定
 
@@ -75,7 +76,8 @@ Oxlintの設定の正本は[`frontend/vite.config.ts`](../../frontend/vite.confi
   TanStack Routerのroute fileは`Route`をexportするためである。
 - **テストファイル**：`react/jsx-no-literals`をoffにし、テストの中の固定文言をcatalogに通さずに書けるようにする。
 
-生成物の`src/routeTree.gen.ts`は、Lint、整形、coverageから外す。
+生成物の`src/routeTree.gen.ts`と`src/api/generated/**`は、Lint、整形、coverageから外す。
+`src/api/generated/**`はKnipとjscpdの対象からも外す。
 違反を含むfixtureの`lint/fixtures/**`は、Lint、整形、テストの収集、Knipから外す。
 
 ### ファイルの範囲ごとの制限
@@ -143,7 +145,8 @@ const params = { ...(cursor !== undefined && { cursor }) };
 ## バックエンド
 
 - **`task be-lint`**：Spotless、PMD、SpotBugsでmainとtestを検査する。
-- **`task be-openapi-lint`**：生成したOpenAPI 3.1契約をSpectralで検査する。
+- **`task be-openapi-lint`**：起動済みのテスト用依存でOpenAPI 3.1契約を`openapi/openapi.yaml`へ生成し、Spectralで検査する。
+- **`task be-openapi-check`**：`be-openapi-lint`で契約を再生成し、コミット済みの`openapi/openapi.yaml`と差分があれば失敗する。
 - **`task be-verify-migrations`**：使い捨てDBでchangesetの適用、rollback、再適用、現在タグを検証する。
 - **`task be-test`**：起動済みのテスト用依存に確定済みchangesetを適用し、テストとcoverage検証を実行する。
 - **`task be-test-dev`**：起動済みのテスト用依存に作りかけのchangesetを含めて適用し、テストを実行する。
@@ -155,6 +158,23 @@ const params = { ...(cursor !== undefined && { cursor }) };
 `task test`と`task mutation-test`は、`docker/compose-test.yml`のPostgreSQL 5433とRedis 6380を`.env.test`で起動する。
 PITのHTMLとXMLのレポートは、変異対象がある場合に`backend/build/reports/pitest/`へ出力する。
 プロパティベーステストとミューテーションテストの採用理由は[ADR-012](../adr/ADR-012-adopt-property-based-and-mutation-testing.md)を参照する。
+
+## API契約
+
+契約と生成物の扱いは[ADR-052](../adr/ADR-052-commit-openapi-contract-and-check-generated-client.md)、手順は[APIを変更する](../web-api/runbook-api-change.md)を参照する。
+
+- **`task api-gen`**：テスト用依存を起動し、契約の生成、Spectralの検査、Orvalの再生成を実行して片付ける。
+- **`task api-check`**：`api-gen`で再生成した契約と生成物を、コミット済みの内容と比べる。
+- **`task api-lint`**：コミット済みの`openapi/openapi.yaml`を`.spectral.yaml`で検査する（DB不要）。
+- **`task api-lint-rules-test`**：Spectralのルールを`openapi/spectral-fixtures/`の合格例と違反例で検査する。
+- **`task api-client-gen`**：コミット済みの契約からOrvalでAPI clientとMSW handlerを再生成する（DB不要）。
+- **`task api-client-check`**：`api-client-gen`で再生成した生成物を、コミット済みの内容と比べる（DB不要）。
+- **`task api-breaking`**：`origin/<BASE_REF>`（既定は`main`）の契約とoasdiffで比べ、破壊的変更があれば失敗する。
+  baseに契約がなければ比較をとばす。
+  環境変数`API_BREAKING_APPROVED=true`（CIではPull Requestのラベル`api-breaking-approved`）のときは、結果をログに残して失敗にしない。
+- **`task api-docs`**：契約からRedocly CLIで静的HTMLの設計書`build/api-docs/index.html`を作る。
+
+差分の比較は作業ツリーをindexと比べ、未追跡の生成物も差分として扱う。
 
 ## リポジトリ全体
 
@@ -186,7 +206,9 @@ OKF検査の採用理由は[ADR-036](../adr/ADR-036-adopt-okf-for-docs-knowledge
 
 - **commit-msg（すべて）**：commitlintを実行する。
 - **pre-commit（すべて）**：`scan-secrets`相当を実行する。
+- **pre-commit（OpenAPI契約、`.spectral.yaml`、Orvalの設定、`frontend/package.json`、生成物の変更）**：`api-lint`（Dockerがなければスキップ）と`api-client-check`を実行する。
 - **pre-commit（フロントエンドまたはTaskfileの変更）**：`fe-check`を実行する。
+  前項と同じgroupで順に実行し、Orvalの再生成と型検査を同時に走らせない。
 - **pre-commit（Dockerfileの変更）**：`lint-docker`相当と`lint-docker-check`相当を実行する。
 - **pre-commit（Composeファイルの変更）**：`lint-compose`相当を実行する。
 - **pre-commit（Markdownの変更）**：変更ファイルへ`lint-md`相当を実行する。
@@ -201,8 +223,10 @@ Gitフックの条件とコマンドは[`lefthook.yml`](../../lefthook.yml)を�
 
 ## CI対応
 
-- **`frontend-ci.yml`**：`fe-verify`、`fe-route-tree-check`、`fe-doctor`を実行する。
-- **`backend-ci.yml`**：`be-lint`相当、`be-verify-migrations`、`be-test`、`be-openapi-lint`、手動実行時の`mutation-test`を実行する。
+- **`frontend-ci.yml`**：`fe-verify`、`fe-route-tree-check`、`api-client-check`、`fe-doctor`を実行する。
+- **`backend-ci.yml`**：`be-lint`相当、`be-verify-migrations`、`be-test`、`be-openapi-check`、手動実行時の`mutation-test`を実行する。
+- **`api-contract.yml`**：`api-lint`、`api-lint-rules-test`、`api-breaking`、`api-docs`を実行し、設計書をartifactにする。
+  mainへのpushでは設計書をGitHub Pagesに公開する。
 - **`betterleaks.yml`**：`scan-secrets-all`相当を実行する。
 - **`static-analysis.yml`**：`lint-semgrep`相当と`lint-duplicates`を実行する。
 - **`trivy.yml`**：`scan-vulns`相当を実行する。

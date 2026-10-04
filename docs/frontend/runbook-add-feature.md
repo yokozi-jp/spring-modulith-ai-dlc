@@ -21,7 +21,7 @@ tags: [runbook, frontend, feature]
 4. URLとsearch parameterを[routeの形](routing-and-state.md#routeの形)に従って`routes`に定義し、routeからfeatureのpageを接続する。
 5. 初期描画に必要なserver stateがある場合は、TanStack Queryのquery optionsをloaderからpreloadする。
 6. OpenAPI operationへ所有featureのtagと安定した`operationId`を付ける。
-7. 最初の業務APIでは[OrvalとAPI境界](api-client-orval.md#生成api境界)に定めた入力と生成設定を用意し、以後のAPI追加では既存設定を使ってOrvalを再生成する。
+7. Orvalの再生成は[APIを変更する](../web-api/runbook-api-change.md)の手順で`task api-gen`を実行する。
 8. local UI state、server state、URL state、form stateを対応する既存機構へ割り当てる。
 9. 利用者向けの固定文言を追加または変更する場合は、[国際化](i18n.md)に従い、`src/i18n/locales/`の`ja.json`と`en.json`を同じ変更で更新する。
 10. custom Hookと共通化は、具体的な再利用または外部system同期が存在する場合だけ追加する。

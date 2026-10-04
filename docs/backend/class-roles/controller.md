@@ -50,6 +50,8 @@ Domain の型を Application の外へ出さず、HTTP API の形と Domain を�
 ## 必須の記述
 
 - `@RestController` と `@RequestMapping("/api/<resources>")` を付けた package-private の `class` にし、`final` を付けない。
+- クラスに `@Tag(name = "<feature>", description = "...")` を付ける。
+  tag の名前は業務機能のパッケージ名の kebab-case にする（[OpenAPIのアノテーションとJavadoc](../../web-api/openapi-annotations.md)）。
 - 依存は package-private のコンストラクタで受け取る。
 - ハンドラメソッドは、マッピングのアノテーションの次の行に `/* package */` を書いた package-private のメソッドにする。
 - 状態を変える操作は `@Valid @RequestBody` で Request を受け、`request.toCommand(...)` で Command にする。
@@ -61,11 +63,13 @@ Domain の型を Application の外へ出さず、HTTP API の形と Domain を�
 - 例外を catch しない。
   エラー応答は `ApiExceptionHandler` が Problem Details にする。
 - クラス、フィールド、コンストラクタ、ハンドラメソッドに Javadoc を書く。
+  ハンドラメソッドの Javadoc は 1 行目を OpenAPI の summary にし、詳細を `<p>` の後に書き、引数ごとの `@param` と `@return` を書く。
+- 404、409、422 は起きるハンドラメソッドにだけ `@ApiResponse(responseCode, ref = "#/components/responses/<Name>Problem")` で書き、そのときは成功応答の `@ApiResponse` も書く。
 - `presentation.web` のパッケージに `@NullMarked` を宣言する `package-info.java` を置く。
 
 ## 依存してよい型、してはいけない型
 
-- **依存してよい型**：`java..` の標準型、`org.jspecify..`、同じ `presentation.web` の Request と Response、同じモジュールの `application` の Command、Result、CommandHandler、自モジュールのルートの `<Feature>Queries`、参照の結果、検索条件、Spring MVC の型、Jakarta Bean Validation の `@Valid`、OpenAPI の `@Operation`。
+- **依存してよい型**：`java..` の標準型、`org.jspecify..`、同じ `presentation.web` の Request と Response、同じモジュールの `application` の Command、Result、CommandHandler、自モジュールのルートの `<Feature>Queries`、参照の結果、検索条件、Spring MVC の型、Jakarta Bean Validation の `@Valid`、`io.swagger.v3.oas.annotations` の `@Operation`、`@Tag`、`@ApiResponse`、`@Header`、`@Content`、`@Schema`。
 - **依存してはいけない型**：Domain の型（集約、値オブジェクト、Repository）、`<Feature>QueryService`、Infrastructure の型、jOOQ の API と生成型、他モジュールの型、`@Transactional`。
 
 ## 最小の例と典型的な例
@@ -78,6 +82,7 @@ package com.example.demo.order.presentation.web;
 /** 注文の HTTP API。 */
 @RestController
 @RequestMapping("/api/orders")
+@Tag(name = "order", description = "注文の API")
 class OrderController {
 
   /** 注文を取り消す CommandHandler。 */
@@ -88,8 +93,18 @@ class OrderController {
     this.cancelOrder = cancelOrder;
   }
 
-  /** 注文を取り消す。 */
+  /**
+   * 注文を取り消す。
+   *
+   * <p>取り消せない状態なら 409 を返す。
+   *
+   * @param orderId 取り消す注文の ID
+   * @param request 画面が読んだ注文のロック番号
+   * @return 本文のない 204 の応答
+   */
   @Operation(operationId = "cancelOrder")
+  @ApiResponse(responseCode = "204")
+  @ApiResponse(responseCode = "409", ref = "#/components/responses/ConflictProblem")
   @PostMapping("/{orderId}/cancel")
   /* package */ ResponseEntity<Void> cancel(
       @PathVariable final String orderId, @Valid @RequestBody final CancelOrderRequest request) {
@@ -102,10 +117,26 @@ class OrderController {
 典型的な例は、残りの操作を足した `OrderController` である（抜粋）。
 依存は `placeOrder`、`confirmOrder`、`cancelOrder`、`orderQueries` の四つである。
 `confirm` は `cancel` と同じ形なので省く。
+`search` は `@ApiResponse` を書かないため、springdoc が 200 を付ける。
 
 ```java
-/** 注文を受け付け、作成した注文の URI を Location に入れて返す。 */
+/**
+ * 注文を受け付ける。
+ *
+ * <p>作成した注文の URI を Location に入れて返す。
+ *
+ * @param request 受け付ける注文の内容
+ * @return 本文のない 201 の応答
+ */
 @Operation(operationId = "placeOrder")
+@ApiResponse(
+    responseCode = "201",
+    headers =
+        @Header(
+            name = "Location",
+            description = "作成した注文の URI",
+            schema = @Schema(type = "string", format = "uri")))
+@ApiResponse(responseCode = "422", ref = "#/components/responses/UnprocessableContentProblem")
 @PostMapping
 /* package */ ResponseEntity<Void> place(@Valid @RequestBody final PlaceOrderRequest request) {
   final PlaceOrderResult result = placeOrder.handle(request.toCommand());
@@ -117,8 +148,17 @@ class OrderController {
   return ResponseEntity.created(location).build();
 }
 
-/** 注文の詳細を返す。 */
+/**
+ * 注文の詳細を返す。
+ *
+ * <p>注文がなければ 404 を返す。
+ *
+ * @param orderId 注文の ID
+ * @return 注文の詳細
+ */
 @Operation(operationId = "findOrderById")
+@ApiResponse(responseCode = "200")
+@ApiResponse(responseCode = "404", ref = "#/components/responses/NotFoundProblem")
 @GetMapping("/{orderId}")
 /* package */ OrderDetailsResponse details(@PathVariable final String orderId) {
   return orderQueries
@@ -127,7 +167,14 @@ class OrderController {
       .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
 }
 
-/** 顧客の注文の一覧を返す。 */
+/**
+ * 顧客の注文の一覧を返す。
+ *
+ * <p>一覧は items で包んで返す。
+ *
+ * @param customerId 注文した顧客の ID
+ * @return 顧客の注文の一覧
+ */
 @Operation(operationId = "listOrders")
 @GetMapping
 /* package */ OrderSummaryListResponse search(@RequestParam final String customerId) {
@@ -192,6 +239,10 @@ class OrderControllerTest {
 - [ ] Infrastructure に依存しない。［ArchUnit で検査：PackageByFeatureOnionArchitectureTest.dependenciesPointInward］
 - [ ] `@Transactional` を付けない。［ArchUnit で検査：PackageByFeatureOnionArchitectureTest.transactionalMethodsArePublicApplicationMethods］
 - [ ] ハンドラメソッドに `@Operation(operationId = "...")` を付け、名前を api-style.md の「operationId」の形にする。［Spectral で検査：operation-id-naming（形だけ。語彙は自分で点検）］
+- [ ] クラスに `@Tag(name, description)` を付け、tag を業務機能の kebab-case にし、`-controller` で終えない。［Spectral で検査：tag-name-format、tag-description、operation-singular-tag］
+- [ ] ハンドラメソッドの Javadoc の 1 行目を summary にし、詳細を `<p>` の後に書く。［Spectral で検査：operation-description（説明の有無だけ。summary の切れ目は自分で点検）］
+- [ ] 404、409、422 は起きるハンドラメソッドにだけ `ref` で書き、成功応答の `@ApiResponse` も書く。［Spectral で検査：error-response-problem-detail、operation-success-response（付け忘れは自分で点検）］
+- [ ] [OpenAPIのアノテーションとJavadoc](../../web-api/openapi-annotations.md) のチェックリストを満たす。［自分で点検］
 - [ ] 集約ごとに一つ作り、`@RequestMapping("/api/<resources>")` を付けた package-private の class にする。［自分で点検］
 - [ ] 状態を変える操作は `@Valid` の Request を `toCommand(...)` で Command にし、パス変数の値は引数で渡す。［自分で点検］
 - [ ] 既存の集約を変える操作は、ロック番号を本文の Request で受ける。［自分で点検］

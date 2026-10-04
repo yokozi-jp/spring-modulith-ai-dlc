@@ -78,8 +78,17 @@ public interface OrderQueries {
 
 ```java
 // com.example.demo.order.presentation.web.OrderController（抜粋）
-/** 注文の詳細を返す。 */
+/**
+ * 注文の詳細を返す。
+ *
+ * <p>注文がなければ 404 を返す。
+ *
+ * @param orderId 注文の ID
+ * @return 注文の詳細
+ */
 @Operation(operationId = "findOrderById")
+@ApiResponse(responseCode = "200")
+@ApiResponse(responseCode = "404", ref = "#/components/responses/NotFoundProblem")
 @GetMapping("/{orderId}")
 /* package */ OrderDetailsResponse details(@PathVariable final String orderId) {
   return orderQueries

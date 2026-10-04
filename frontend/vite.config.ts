@@ -63,7 +63,7 @@ const testOnlyImports = {
 };
 
 // 生成物。整形・静的解析・カバレッジのいずれからも除外する。
-const generatedFiles = ["src/routeTree.gen.ts"];
+const generatedFiles = ["src/routeTree.gen.ts", "src/api/generated/**"];
 // lint 設定のテストが使う、違反を含む fixture。通常の整形、静的解析、テストの収集から外す。
 const lintFixtures = ["lint/fixtures/**"];
 
