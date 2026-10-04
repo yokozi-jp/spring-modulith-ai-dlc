@@ -1,7 +1,7 @@
 ---
 type: Convention
 title: バックエンドのDBテスト
-description: 実PostgreSQLを使うバックエンドテストの隔離環境、ロールバック、コミット後の後始末、イベント検証を定め、DBへ書き込むテストを作るときに読む規約。
+description: 実PostgreSQLを使うバックエンドテストの隔離環境、ロールバック、コミット後の後始末、テスト専用テーブル、イベント検証を定め、DBへ書き込むテストを作るとき、業務テーブルのない共通処理を実DBで確かめるときに読む規約。
 tags: [convention, backend, testing, database, spring-modulith]
 ---
 

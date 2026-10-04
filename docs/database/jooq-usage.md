@@ -33,7 +33,7 @@ jOOQの生成コードには適用しない。
 
 jOOQの楽観的ロックの機能を使わない規則は、[PostgreSQLの排他制御](postgresql-concurrency-control.md)に従う。
 業務テーブルのUPDATEとDELETEは、sharedモジュールの`TableWriter`だけが組み立てて実行する（[ADR-054](../adr/ADR-054-detect-optimistic-lock-conflicts-by-update-count.md)）。
-`DSLContext`の`update`、`delete`、`deleteFrom`、`mergeInto`、UPSERT、`UpdatableRecord`の書き込み、JDBCの直接の利用を、`TableWriter`の外で使わない。
+`TableWriter`、`LockedRoot`、`DeletedRoot`の外で使わない書き込みのAPIの一覧は、[アーキテクチャテスト](../backend/architecture-tests.md)の「書き込みの入口」にある。
 
 ## 共通処理
 
@@ -59,8 +59,9 @@ jOOQの版を上げると、`TableWriterArchTest.tableWritesGoThroughTableWriter
 Spring Bootの版、`backend/build.gradle`のjOOQのコード生成のプラグインの版を変える人と、それらを変えるDependabotのPull Requestをマージする人は、次の手順で見直す。
 
 1. `jooqVersionIsReviewed`が失敗し、新しい実行時の版を示す。
-2. jOOQのリリースノートと、`javap`で`DSLContext`、`DSL`、`Update*`、`Delete*`、`Merge*`、`Insert*Step`、`UpdatableRecord`、`DAO`の公開メソッドを確かめ、UPDATE、DELETE、UPSERT、MERGEを実行する新しいAPIを探す。
-3. 新しい書き込みの入口があれば、`tableWritesGoThroughTableWriter`の禁止の一覧と、違反のフィクスチャ`DirectOrderWriter`に足す。
+2. jOOQのリリースノートと、`javap`で`DSLContext`、`DSL`、`WithStep`、`Update*`、`Delete*`、`Merge*`、`Insert*Step`、`InsertQuery`、`Loader*Step`、`UpdatableRecord`、`DAO`の公開メソッドを確かめ、UPDATE、DELETE、UPSERT、MERGEを作るか実行する新しいAPIを探す。
+   `Update`か`Delete`を戻り値の型に持つメソッドは、作る入口である。
+3. 新しい書き込みの入口があれば、`tableWritesGoThroughTableWriter`の禁止の一覧、違反のフィクスチャ`DirectOrderWriter`、[アーキテクチャテスト](../backend/architecture-tests.md)の「書き込みの入口」に足す。
 4. コード生成のプラグインと実行時のjOOQのマイナー版をそろえ、[jOOQコード生成物の管理](jooq-codegen.md)に従って生成し直す。
 5. `TableWriterArchTest`の`REVIEWED_JOOQ_VERSION`を新しい版に更新する。
 

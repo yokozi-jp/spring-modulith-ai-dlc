@@ -45,7 +45,8 @@ PostgreSQL の READ COMMITTED では、後の UPDATE は先の UPDATE のコミ�
   INSERT は `TableWriter` を通さず、`CommonColumns.forInsert` で書く。
 - 業務の列の値は `ColumnValues<R>` で受け取る。
   `ColumnValues<R>` は `TableField<R, T>` を受け取る二つの `set` だけを持ち、`where` と `execute` を持たない。
-  共通カラム（`lock_no`、`created_*`、`updated_*`、`patched_*`）を渡すと `IllegalArgumentException` にする。
+  [PostgreSQL の共通カラム](../database/postgresql-common-columns.md)の 12 列を名前で照らし、渡すと `IllegalArgumentException` にする。
+  規約にない `updated_reason` のような業務の列は拒否しない。
 - `updateCheckingVersion` は `SET lock_no = 期待値 + 1` と `WHERE 主キー AND lock_no = 期待値` を書く。
   件数が 1 なら成功、0 なら主キーで行の有無を確かめて競合か `NoSuchElementException` に分け、2 以上なら `IllegalStateException` にする。
   `55P03` の `CannotAcquireLockException` は、それを原因に付けた競合の例外に変える。
@@ -53,13 +54,18 @@ PostgreSQL の READ COMMITTED では、後の UPDATE は先の UPDATE のコミ�
   期待する版が 1 未満なら、SQL を実行する前に `IllegalArgumentException` にする。
 - `updateWhere` と子の更新は `SET lock_no = lock_no + 1` を書き、版を比べない更新でも版を進める。
   `updateWhere` と `deleteWhere` は件数を返し、Error Prone の `@CheckReturnValue` を付けて、戻り値の無視をコンパイルの失敗にする。
+  その件数を返す Repository のメソッドにも、インタフェースで `@CheckReturnValue` を付ける。
   `updateWhere` は、業務の列が一つもなければ `IllegalArgumentException` にする。
 - `CommonColumns.forUpdate` は `updated_*` だけを返し、package-private にする。
   UPDATE の `lock_no` を書くのは `TableWriter` だけになる。
 - ArchUnit の `TableWriterArchTest` で次を検査する。
-  - `TableWriter`、`LockedRoot`、`DeletedRoot` の外の本番のコードは、jOOQ の UPDATE、DELETE、UPSERT、MERGE の入口、`Update` と `Delete` に代入できる型の実行、`UpdatableRecord` と `DAO` の書き込み、JDBC の直接の利用を呼ばない。
+  - `TableWriter`、`LockedRoot`、`DeletedRoot` の外の本番のコードは、jOOQ の UPDATE、DELETE、UPSERT、MERGE の入口、`Update` と `Delete` に代入できる型の実行、`UpdatableRecord` と `DAO` の書き込み、Spring JDBC と JDBC の直接の利用を呼ばない。
     判定は、呼び出し先の型が禁じる型に代入できるかで行う。
-  - `Jooq<Aggregate>Repository` の `update` と `delete` は、版を比べる入口を直接呼ぶ。
+    `Update` と `Delete` を作る入口（`DSLContext`、`DSL`、`WithStep` の `update`、`delete`、`deleteFrom`、`updateQuery`、`deleteQuery`）をすべて禁じるため、`batch` のように作った問い合わせを受け取って実行する API は禁じなくてよい。
+  - `Jooq<Aggregate>Repository` の、集約ルートを受け取る `add` 以外の public メソッドは、版を比べる入口を直接呼ぶ。
+    名前で対象を選ばないため、`save` のような名前でも検査を外れない。
+  - `domain.model` の `<Aggregate>Repository` の `update` と `delete` は、引数のない `long lockNo()` を宣言する集約ルートを一つだけ受け取る。
+    集約ルートが `lockNo()` を持たないと、版を比べる規則が集約ルートを見つけられず、空のまま通るためである。
   - 集約ルートを引数に取るメソッドは、版を比べない入口を呼ばない。
   - `lockNo` を持つ Command の CommandHandler は `ensureLockNo` を呼ぶ。
 - jOOQ の実行時の版をテストで固定する。
@@ -79,7 +85,8 @@ PostgreSQL の READ COMMITTED では、後の UPDATE は先の UPDATE のコミ�
 
 - Repository が書くのは業務の列の値だけになり、版の条件、版の設定、件数の判定、`55P03` の変換を書く場所がなくなる。
 - 入口の選び分けは、期待する版を持っているかだけで決まる。
-- Java の書き込みの迂回はテスト（ArchUnit）で失敗する。
+- jOOQ、Spring JDBC、JDBC の書き込みの API を `TableWriter` の外で使うと、テスト（ArchUnit）で失敗する。
+  禁止の一覧は、テストで固定した jOOQ の版の API で見直してある。
   別のテーブルの列、型の違う値、版を比べない入口の件数の無視は、コンパイルで失敗する。
 - 版を比べない更新も版を進めるため、在庫の引き当てのような Java の更新が先に走れば、その前に読んだ画面の保存は上書きせずに競合として返る。
 - 競合と行なしの判定は `TableWriter` の実 PostgreSQL のテストに集まり、Repository のテストは列と集約の往復だけを確かめる。
@@ -88,7 +95,7 @@ PostgreSQL の READ COMMITTED では、後の UPDATE は先の UPDATE のコミ�
 ### Negative
 
 - 次の書き込みの誤りは、機械で検出しない。
-  - **Java の外の writer**：psql のデータパッチと Liquibase のデータ変更は、`lock_no` を進め忘れても何も止めない。
+  - **Java の外の書き込み**：psql のデータパッチと Liquibase のデータ変更は、`lock_no` を進め忘れても何も止めない。
     変えない規約ではデータパッチは `lock_no` を進めないため、パッチの前に開いた画面の保存が、パッチの結果を上書きしうる。
     これは規約が受け入れているリスクとする。
   - **jOOQ の新しい書き込みの API**：jOOQ の版を上げると、ArchUnit の禁止の一覧にない書き込みの API が増えうる。
@@ -98,7 +105,15 @@ PostgreSQL の READ COMMITTED では、後の UPDATE は先の UPDATE のコミ�
   - **`long lockNo` を引数に取るメソッド**：期待する版を `long` の引数で受け取るメソッドが `updateWhere` を使う誤りは検出できない。
     ArchUnit は引数の名前を確実には読めず、`long` の引数を一律に禁じると正当な数量の引数も止まる。
     そこで規約は、期待する版を持つ書き込みを、集約ルートを受け取る `update` と `delete` に限る。
-  - **psql による古い版での物理削除**：手順書で `WHERE lock_no = ?` を必須にするほかない。
+  - **別の集約ルートのテーブルへの子の書き込み**：`LockedRoot.updateChild` と `deleteChildren` は任意のテーブルを受け取る。
+    別の集約ルートのテーブルを渡すと、その行を版を比べずに書く。
+    子のテーブルとルートのテーブルはコードから区別できないため、レビューで見る。
+  - **集約ルートの形を外れた集約**：規則は、`domain.model` にあり引数のない `long lockNo()` を宣言する型を集約ルートとみなす。
+    Repository の `update` と `delete` の引数はこの形を検査するが、Repository のインタフェースを経由せずに保存する集約は、形を外れても規則が空のまま通る。
+  - **件数を返す Repository のメソッドの注釈**：`@CheckReturnValue` の付け忘れは検出せず、呼び出し側で件数を捨てても通る。
+  - **psql による古い版での物理削除**：psql で古い版の行を削除しても、何も検出しない。
+    これも規約が受け入れているリスクとする。
+    手順書で `WHERE lock_no = ?` を求めることは、将来の緩和策の候補にとどめる。
   - **`ensureLockNo` に渡す値**：ArchUnit は `ensureLockNo` を呼んだかしか見ず、渡した値が `command.lockNo()` かは見ない。
 - 同じトランザクションで同じ集約を二度保存すると、二度目は期待する版が古く競合になる。
   CommandHandler は集約を一度だけ保存する規約のままにする。

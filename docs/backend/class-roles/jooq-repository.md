@@ -91,6 +91,10 @@ jOOQ の Repository は業務規則を持たない。
   別のメソッドやラムダを経由すると、ArchUnit の検査が呼び出しを見つけられない。
 - 期待する版を持つ書き込みは、集約ルートを受け取る `update` と `delete` に限る。
   識別子と版を受け取るメソッドを作らず、集約ルートを受け取るメソッドから `updateWhere` と `deleteWhere` を呼ばない。
+  集約ルートを受け取る public メソッドは `add`、`update`、`delete` だけにする。
+- `updateWhere` か `deleteWhere` の件数を返すメソッドには、Error Prone の `@CheckReturnValue` を付ける。
+  Repository のインタフェースのメソッドなら、インタフェースの側に付ける。
+  呼び出し側が件数（在庫の引き当てで 0 件なら在庫不足、など）を捨てると、コンパイルが失敗する。
 - jOOQ の `executeWithOptimisticLocking` と `recordVersionFields` を使わない。
   これらは `UpdatableRecord.store()` でしか働かず、この役割は UPDATE を `TableWriter` で書く（[PostgreSQL の排他制御](../../database/postgresql-concurrency-control.md)）。
 - 子の Entity の行は、`add` では行ごとの INSERT を `dsl.batch` 一つで実行する。
@@ -340,12 +344,14 @@ Repository のテストは列と集約の往復だけを確かめ、競合と行
 - [ ] `multiset` の副問い合わせに、子を識別する列の `orderBy` を付ける（`orderBy(ORDER_LINES.LINE_NUMBER)`）。［自分で点検］
 - [ ] 集約ルートの `LOCK_NO` を選び、`restore` の `lockNo` に渡す。［自分で点検］
 - [ ] `add` は `set(列, 値)` で業務の全列を書き、子の行を行ごとの INSERT の `dsl.batch` 一つで書く。［自分で点検］
-- [ ] `update` は `TableWriter.updateCheckingVersion` を、`delete` は `deleteCheckingVersion` を、そのメソッドの中で直接呼ぶ。［ArchUnit で検査：TableWriterArchTest.repositoryUpdateAndDeleteCheckVersion］
+- [ ] 集約ルートを受け取る `add` 以外の public メソッドは `update` と `delete` だけにし、`update` は `TableWriter.updateCheckingVersion` を、`delete` は `deleteCheckingVersion` を、そのメソッドの中で直接呼ぶ。［ArchUnit で検査：TableWriterArchTest.repositoryUpdateAndDeleteCheckVersion］
 - [ ] 集約ルートを受け取るメソッドから `updateWhere` と `deleteWhere` を呼ばない。［ArchUnit で検査：TableWriterArchTest.aggregateMethodsDoNotUseUnversionedWrites］
 - [ ] 子の行は、集約ルートの書き込みが返す `LockedRoot` か `DeletedRoot` で主キーの順に書き、子の集合が増減するなら差分で書く。［自分で点検］
-- [ ] jOOQ の UPDATE、DELETE、UPSERT（`INSERT ... ON CONFLICT`）、MERGE、`UpdatableRecord` の書き込み（`recordVersionFields` と `store()` を含む）、JDBC の直接の利用を、`TableWriter` の外で使わない。［ArchUnit で検査：TableWriterArchTest.tableWritesGoThroughTableWriter］
-- [ ] jOOQ の `Settings` の `executeWithOptimisticLocking` を使わない。［自分で点検］
-- [ ] INSERT の共通カラムは `CommonColumns.forInsert` で書き、`LOCK_NO` は読むだけにし、`CREATED_*`、`UPDATED_*`、`PATCHED_*` の列を参照しない。［ArchUnit で検査：JooqCommonColumnsArchTest.commonColumnsAreReferencedOnlyBySharedPersistence］
+- [ ] jOOQ の UPDATE、DELETE、UPSERT（`INSERT ... ON CONFLICT`）、MERGE、`UpdatableRecord` と `DAO` の書き込み、Spring JDBC と JDBC の直接の利用を、`TableWriter` の外で使わない（一覧は[アーキテクチャテスト](../architecture-tests.md)の「書き込みの入口」）。［ArchUnit で検査：TableWriterArchTest.tableWritesGoThroughTableWriter］
+- [ ] jOOQ の `Settings` の `executeWithOptimisticLocking` と、コード生成の `recordVersionFields` を使わない。［自分で点検］
+- [ ] `updateWhere` か `deleteWhere` の件数を返すメソッドに `@CheckReturnValue` を付ける。［自分で点検］
+- [ ] 生成クラスの `CREATED_*`、`UPDATED_*`、`PATCHED_*` の列を参照しない。［ArchUnit で検査：JooqCommonColumnsArchTest.commonColumnsAreReferencedOnlyBySharedPersistence］
+- [ ] INSERT の共通カラムは `CommonColumns.forInsert` で書き、`LOCK_NO` は読むだけにする（UPDATE で渡した `LOCK_NO` は `ColumnValues` が実行時に拒否する）。［自分で点検］
 - [ ] `@PlainSQL` の付いた jOOQ の API を使わない。［ArchUnit で検査：DatabaseConventionsArchTest.plainSqlApisAreNotUsed］
 - [ ] `withRenderSchema(false)` を使わない。［ArchUnit で検査：DatabaseConventionsArchTest.renderSchemaIsNotChanged］
 - [ ] 変換で `Order.place`、業務規則、既定値、Mapper のクラス、次の ArchUnit の規則が検査しないリフレクションの対応づけを使わない。［自分で点検］

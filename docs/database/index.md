@@ -16,7 +16,7 @@
 - [PostgreSQLのマルチテナント設計](postgresql-multitenancy.md)：複数テナント向けの設計を始めるとき、テナントの分離方式を見直すとき
 - [PostgreSQLのテーブル以外のDBオブジェクト](postgresql-database-objects.md)：関数、トリガー、ビュー、一時テーブルを作るとき、他システムのDBとつなぐ要件が出たとき
 - [PostgreSQLのパーティションと改廃](postgresql-partitioning-and-retention.md)：大量データのトランを設計するとき、保持期限を過ぎたデータの削除を作るとき
-- [PostgreSQLの排他制御](postgresql-concurrency-control.md)：同じ行を同時に更新しうる機能を実装するとき、分離レベルを変えたくなったとき
+- [PostgreSQLの排他制御](postgresql-concurrency-control.md)：業務テーブルのUPDATEかDELETEを書くとき（集約の保存と削除、在庫の引き当て、保存期間を過ぎた行の削除、ワークテーブルの後始末）、分離レベルを変えたくなったとき
 - [PostgreSQLの性能対策と負荷分散](postgresql-performance.md)：スロークエリを調整するとき、リードレプリカやキャッシュの導入を検討するとき
 - [PostgreSQLのロックを抑えるスキーマ変更](postgresql-online-schema-change.md)：稼働中のテーブルを変更するchangesetを書くとき、レビューするとき
 - [PostgreSQLのサーバー設定と拡張機能](postgresql-server-configuration.md)：DB環境を構築するとき、拡張機能やパラメータを変えたいとき

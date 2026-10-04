@@ -178,10 +178,24 @@ INSERTの共通カラムは`CommonColumns.forInsert`で、UPDATEとDELETEは`Tab
 `TableWriterArchTest`は、業務テーブルのUPDATEとDELETEを`shared`の`TableWriter`に集める規則を検査する（[PostgreSQLの排他制御](../database/postgresql-concurrency-control.md)、[ADR-054](../adr/ADR-054-detect-optimistic-lock-conflicts-by-update-count.md)）。
 集約ルートは、`domain.model`にあり、引数のない`long lockNo()`を宣言する型とする。
 
-- `tableWritesGoThroughTableWriter`：`TableWriter`、`LockedRoot`、`DeletedRoot`の外の本番のコードは、jOOQのUPDATE、DELETE、UPSERT、MERGEの入口、`Update`と`Delete`に代入できる型の実行、`UpdatableRecord`と`DAO`の書き込み、Spring JDBCとJDBCの直接の利用を呼ばず、メソッド参照もしない。
-  呼び出し先の型の代入可能性で判定する。
-  メソッド参照のバイトコードには`execute`を宣言した`Query`が残るため、`Query`、`RowCountQuery`、`DMLQuery`の実行も禁じる。
-- `repositoryUpdateAndDeleteCheckVersion`：`Jooq*Repository`の、集約ルートを一つだけ受け取る`update`と`delete`は、`updateCheckingVersion`と`deleteCheckingVersion`をそのメソッドの中で直接呼ぶ。
+- `tableWritesGoThroughTableWriter`：`TableWriter`、`LockedRoot`、`DeletedRoot`の外の本番のコードは、次のAPIを呼ばず、メソッド参照もしない。
+  呼び出し先の型が、挙げた型に代入できるかで判定する。
+  - `DSLContext`、`DSL`、`WithStep`の`update`、`delete`、`deleteFrom`、`mergeInto`、`updateQuery`、`deleteQuery`
+  - `DSLContext`の`batchUpdate`、`batchStore`、`batchDelete`、`batchMerge`、`executeUpdate`、`executeDelete`、`connection`、`connectionResult`
+  - `Update`と`Delete`の`execute`、`executeAsync`、`returning`、`returningResult`と、名前が`fetch`で始まるメソッド
+  - `Query`、`RowCountQuery`、`DMLQuery`の同じ実行（メソッド参照のバイトコードには`execute`を宣言した`Query`が残るため）
+  - `Merge`のすべてのメソッド
+  - `InsertOnDuplicateStep`と`InsertQuery`の`onConflict`、`onConflictOnConstraint`、`onConflictWhere`、`onDuplicateKeyUpdate`、`addValueForUpdate`、`addValuesForUpdate`と、`LoaderOptionsStep`の`onDuplicateKeyUpdate`
+  - `UpdatableRecord`の`store`、`update`、`delete`、`merge`と、`DAO`の`update`、`delete`、`deleteById`、`merge`
+  - `DataSource.getConnection`、`ConnectionProvider.acquire`、`Connection`と`Statement`のすべてのメソッド
+  - Spring JDBCの`org.springframework.jdbc.core`と`org.springframework.jdbc.object`のパッケージの型
+
+  `Update`と`Delete`を作る入口をすべて禁じるため、`batch`や`subscribe`のように作った問い合わせを受け取って実行するAPIは禁じない。
+- `repositoryUpdateAndDeleteCheckVersion`：`Jooq*Repository`の、集約ルートを受け取る`add`以外のpublicメソッドは、版を比べる入口をそのメソッドの中で直接呼ぶ。
+  `update`は`updateCheckingVersion`を、`delete`は`deleteCheckingVersion`を、ほかの名前ならどちらかを呼ぶ。
+  名前で対象を選ばないため、`save`のような名前でも検査を外れない。
+- `repositoryUpdateAndDeleteTakeVersionedAggregates`：`domain.model`の`*Repository`インタフェースの`update`と`delete`は、集約ルートを一つだけ受け取る。
+  集約ルートが`long lockNo()`を持たないと、ほかの規則が集約ルートを見つけられず空のまま通るため、この規則で形を確かめる。
 - `aggregateMethodsDoNotUseUnversionedWrites`：集約ルートを引数に取るメソッドとラムダは、`updateWhere`と`deleteWhere`を呼ばない。
   ラムダは捕捉した変数を引数に持つ合成メソッドになるため、同じ判定で見る。
 - `commandHandlersEnsureScreenLockNo`：`handle`の引数のCommandが`lockNo()`を持つ`*CommandHandler`は、`domain.model`の型の`ensureLockNo`を呼ぶ。
@@ -193,6 +207,7 @@ INSERTの共通カラムは`CommonColumns.forInsert`で、UPDATEとDELETEは`Tab
 
 Error Proneの`CheckReturnValue`は既定でerrorであり、`updateWhere`と`deleteWhere`の戻り値を捨てるとコンパイルが失敗する。
 戻り値を変数に入れて読まない場合は、errorにしている`UnusedVariable`で失敗する。
+ただし、`UnusedVariable`は`ignored`という名前と`unused`で始まる名前の変数を対象外にするため、その名前で件数を捨てる書き方はレビューで見る。
 
 ## DB
 

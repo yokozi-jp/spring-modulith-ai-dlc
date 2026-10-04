@@ -1,7 +1,7 @@
 ---
 type: Convention
 title: クラスの役割：Repository
-description: domain.model に置く集約の Repository インタフェースの定義、置き場所と命名、必須の記述（新規の add と更新の update）、依存、例、テスト、アンチパターン、作成時のチェックリストを定める。集約を保存し取り出すインタフェースを作るとき、Repository にメソッドを足すときに読む。
+description: domain.model に置く集約の Repository インタフェースの定義、置き場所と命名、必須の記述（新規の add、更新の update、物理削除の delete、件数を返すメソッドの @CheckReturnValue）、依存、例、テスト、アンチパターン、作成時のチェックリストを定める。集約を保存し取り出すインタフェースを作るとき、Repository にメソッドを足すときに読む。
 tags: [convention, backend, class-role]
 ---
 
@@ -49,12 +49,15 @@ Presentation は Repository を使わない。
   この二つの例外を、インタフェースの Javadoc に書く。
 - 集約の物理削除が要るときは `void delete(集約ルート)` を置き、`update` と同じ二つの例外を Javadoc に書く。
   期待する版を持つ書き込みは、集約ルートを受け取る `update` と `delete` に限り、識別子と版を受け取るメソッドを作らない。
+- `update` と `delete` の引数の集約ルートは、引数のない `long lockNo()` を持つ（[集約](aggregate.md)）。
+- 版を比べない UPDATE か DELETE の件数を返すメソッド（在庫を引き当てて件数を返す、など）には、Error Prone の `@CheckReturnValue` を付ける。
+  呼び出し側が件数を捨てると、コンパイルが失敗する。
 - インタフェースと各メソッドに Javadoc を書く。
 - パッケージの `package-info.java` は集約と共有する。
 
 ## 依存してよい型、してはいけない型
 
-- **依存してよい型**：`java..` の標準型、`org.jspecify..`、同じ `domain.model` の集約ルート、値オブジェクト、enum、`<Aggregate>ConflictException`。
+- **依存してよい型**：`java..` の標準型、`org.jspecify..`、`com.google.errorprone.annotations.CheckReturnValue`、同じ `domain.model` の集約ルート、値オブジェクト、enum、`<Aggregate>ConflictException`。
 - **依存してはいけない型**：jOOQ の API と生成型（`DSLContext`、`Condition`、説明用の仮の生成型 `OrdersRecord`）、Spring の型（`Pageable`、`@Repository`）、JPA と Jackson の型、`application`、モジュールルートの型（参照の結果、検索条件）。
 
 ## 最小の例と典型的な例
@@ -182,6 +185,8 @@ class JooqOrderRepositoryTest {
 - [ ] 集約ルートごとに一つ、`<Aggregate>Repository` の名前で作る。［自分で点検］
 - [ ] メソッドはドメインの語彙で名付け、`findById` は `Optional`、複数は `List` を返し、保存は新しい集約の `add` と既存の集約の `update` に分ける。［自分で点検］
 - [ ] `update` の Javadoc に、行がないときの `NoSuchElementException` と、競合したときの `<Aggregate>ConflictException` を書く。［自分で点検］
+- [ ] `update` と `delete` は、引数のない `long lockNo()` を持つ集約ルートを一つだけ受け取る。［ArchUnit で検査：TableWriterArchTest.repositoryUpdateAndDeleteTakeVersionedAggregates］
+- [ ] 版を比べない UPDATE か DELETE の件数を返すメソッドに `@CheckReturnValue` を付ける。［自分で点検］
 - [ ] 実装は `infrastructure.persistence` の `Jooq<Aggregate>Repository` にする。［ArchUnit で検査：PackageByFeatureOnionArchitectureTest.repositoryImplementationsAreJooqRepositories］
 - [ ] Domain の外の実装は `infrastructure` に置く。［ArchUnit で検査：PackageByFeatureOnionArchitectureTest.domainInterfacesAreImplementedInInfrastructure］
 - [ ] Controller から Repository を使わない。［ArchUnit で検査：PackageByFeatureOnionArchitectureTest.presentationDoesNotDependOnDomain］
