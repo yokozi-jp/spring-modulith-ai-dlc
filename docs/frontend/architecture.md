@@ -61,6 +61,8 @@ frontend/src/
 │       ├── button.tsx
 │       └── button.test.tsx
 └── lib/
+    ├── csrf.ts
+    ├── csrf.test.ts
     ├── utils.ts
     └── utils.test.ts
 ```

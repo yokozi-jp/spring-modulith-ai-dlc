@@ -53,8 +53,7 @@ public class SecurityConfig {
     final OidcClientInitiatedLogoutSuccessHandler logoutSuccessHandler =
         new OidcClientInitiatedLogoutSuccessHandler(clientRegistrationRepository);
     final RequestMatcher apiRequests = PathPatternRequestMatcher.withDefaults().matcher("/api/**");
-    // TODO: ログアウト後画面の URL が確定したら、IdP の許可済み URI とともに変更する。
-    logoutSuccessHandler.setPostLogoutRedirectUri("{baseUrl}/actuator/health");
+    logoutSuccessHandler.setPostLogoutRedirectUri("{baseUrl}/logged-out");
 
     http.authorizeHttpRequests(
             auth ->

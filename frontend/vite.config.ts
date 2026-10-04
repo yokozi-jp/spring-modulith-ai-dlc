@@ -1,3 +1,4 @@
+// oxlint-disable max-lines -- Vite、Lint、テストの設定を1つのdefineConfigに集める正本のため、行数で分割しない。
 import tailwindcss from "@tailwindcss/vite";
 import { tanstackRouter } from "@tanstack/router-plugin/vite";
 import react from "@vitejs/plugin-react";
@@ -79,6 +80,10 @@ export default defineConfig(({ mode }) => {
   ) {
     throw new Error(`SERVER_PORT must be an integer between 1 and 65535: ${serverPortValue}`);
   }
+  // ログアウトのフォームはIdPへredirectされ、ChromeとSafariはredirect先にもform-actionを適用する。
+  const idpOrigin = new URL(
+    loadEnv(mode, "..", "OIDC_ISSUER_URI").OIDC_ISSUER_URI ?? "http://localhost:8080",
+  ).origin;
 
   return {
     ...(mode === "development" ? { html: { cspNonce: developmentCspNonce } } : {}),
@@ -285,7 +290,12 @@ export default defineConfig(({ mode }) => {
         ...securityHeaders,
         // ViteのWebSocketとReact Refreshのinline scriptだけをローカル開発で追加許可する。
         "Content-Security-Policy":
-          mode === "development" ? developmentContentSecurityPolicy : contentSecurityPolicy,
+          mode === "development"
+            ? developmentContentSecurityPolicy.replace(
+                "form-action 'self'",
+                `form-action 'self' ${idpOrigin}`,
+              )
+            : contentSecurityPolicy,
       },
       proxy: {
         "^/(api|oauth2|login|logout|error|actuator|v3/api-docs|swagger-ui)(/|$)": {

@@ -18,5 +18,8 @@
   "retry": "Try again",
   "notFoundHeading": "Page not found",
   "notFoundDescription": "Check that the URL is correct.",
-  "backToHome": "Back to home"
+  "backToHome": "Back to home",
+  "logout": "Log out",
+  "loggedOutHeading": "You have been logged out",
+  "loginAgain": "Log in again"
 }

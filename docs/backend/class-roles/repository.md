@@ -43,8 +43,8 @@ Presentation は Repository を使わない。
 - 1件の取り出しは `Optional<集約ルート>` を、複数の取り出しは `List<集約ルート>` を返す。
 - 新しい集約の保存は `void add(集約ルート)` に、既存の集約の保存は `void update(集約ルート)` にする。
   新規と更新を一つの `save` にしない。
-- `update` は、[PostgreSQL の排他制御](../../database/postgresql-concurrency-control.md)の楽観的ロックの順序で保存する。
-  集約の行がなければ `NoSuchElementException` を、行の `lock_no` が集約の `lockNo()` と違うか行をロックできなければ `<Aggregate>ConflictException` を投げる。
+- `update` は、[PostgreSQL の排他制御](../../database/postgresql-concurrency-control.md)の楽観的ロックで保存する。
+  集約の行がなければ `NoSuchElementException` を、更新の時点の行の `lock_no` が集約の `lockNo()` と違うか `lock_timeout` までに行のロックを取れなければ `<Aggregate>ConflictException` を投げる。
   この二つの例外を、インタフェースの Javadoc に書く。
 - インタフェースと各メソッドに Javadoc を書く。
 - パッケージの `package-info.java` は集約と共有する。
@@ -76,7 +76,7 @@ public interface OrderRepository {
    * 既存の注文を保存する。
    *
    * @throws NoSuchElementException 注文の行がないとき
-   * @throws OrderConflictException 注文の行のロック番号が order と違うとき、または行をロックできないとき
+   * @throws OrderConflictException 更新の時点の注文の行のロック番号が order と違うとき、または lock_timeout までに行をロックできないとき
    */
   void update(Order order);
 }
