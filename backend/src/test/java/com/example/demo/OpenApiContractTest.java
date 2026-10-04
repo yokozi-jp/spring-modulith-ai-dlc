@@ -51,6 +51,8 @@ class OpenApiContractTest {
         .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
         .andExpect(jsonPath("$.openapi").value(startsWith("3.1.")))
         .andExpect(jsonPath("$.info.version").value(OpenApiConfig.CONTRACT_VERSION))
+        .andExpect(jsonPath("$.servers[0].url").value("/"))
+        .andExpect(jsonPath("$.servers[0].description").value("現在のオリジン"))
         .andExpect(jsonPath("$.components.schemas.ProblemDetail.type").value("object"))
         .andExpect(jsonPath("$.components.schemas.ProblemDetail.required.length()").value(3))
         .andExpect(problemResponseExists("BadRequestProblem"))

@@ -76,6 +76,7 @@ Frontend、backend、Docker の workflow は Pull Request ごとに変更対象�
 稼働中の ruleset への追加はリポジトリの所有者が行い、上の一覧と同じ名前で登録する。
 
 `Publish API docs 📘` が設計書を公開するには、所有者が GitHub Pages を有効にし、公開元を GitHub Actions にする。
+GitHub Pagesでは通常、APIの設計内容がすべて公開されるため、有効化する前にリポジトリのPages公開範囲を確認する。
 
 検知ジョブやイメージビルドの前段が失敗した場合、後続ジョブが `skipped` になっても前段の失敗によってマージを止めるためである。
 

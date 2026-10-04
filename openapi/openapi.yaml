@@ -4,8 +4,8 @@ info:
   title: Demo API
   version: 0.1.0
 servers:
-- description: Generated server url
-  url: http://localhost
+- description: 現在のオリジン
+  url: /
 paths: {}
 components:
   responses:

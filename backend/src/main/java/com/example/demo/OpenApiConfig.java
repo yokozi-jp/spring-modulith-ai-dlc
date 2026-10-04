@@ -11,6 +11,7 @@ import io.swagger.v3.oas.models.media.ObjectSchema;
 import io.swagger.v3.oas.models.media.Schema;
 import io.swagger.v3.oas.models.media.StringSchema;
 import io.swagger.v3.oas.models.responses.ApiResponse;
+import io.swagger.v3.oas.models.servers.Server;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Consumer;
@@ -52,6 +53,7 @@ public class OpenApiConfig {
                 .title("Demo API")
                 .description("Demo アプリケーションの HTTP API")
                 .version(CONTRACT_VERSION))
+        .servers(List.of(new Server().url("/").description("現在のオリジン")))
         .components(components);
   }
 
@@ -66,13 +68,13 @@ public class OpenApiConfig {
   }
 
   /**
-   * Javadoc から作った summary の前後の空白を除く。
+   * Javadoc から作った summary と description を整える。
    *
-   * <p>springdoc は Javadoc の {@code <p>} の直前までを summary にし、改行と空白を残すため。
+   * <p>summary の前後の空白を除き、description から重複する summary と先頭の {@code <p>} を除く。
    */
   @Bean
   public OpenApiCustomizer trimJavadocSummaries() {
-    return openApi -> forEachOperation(openApi, OpenApiConfig::trimSummary);
+    return openApi -> forEachOperation(openApi, OpenApiConfig::trimJavadoc);
   }
 
   /** 文書の全 operation に処理を適用する。paths がなければ何もしない。 */
@@ -86,12 +88,24 @@ public class OpenApiConfig {
     }
   }
 
-  /** 1 つの operation の summary の前後の空白を除く。 */
-  private static void trimSummary(final Operation operation) {
+  /** 1 つの operation の Javadoc 由来の summary と description を整える。 */
+  private static void trimJavadoc(final Operation operation) {
     final String summary = operation.getSummary();
-    if (summary != null) {
-      operation.setSummary(summary.strip());
+    if (summary == null) {
+      return;
     }
+    final String trimmedSummary = summary.strip();
+    operation.setSummary(trimmedSummary);
+
+    final String description = operation.getDescription();
+    if (description == null || !description.startsWith(trimmedSummary)) {
+      return;
+    }
+    String details = description.substring(trimmedSummary.length()).stripLeading();
+    if (details.startsWith("<p>")) {
+      details = details.substring(3).stripLeading();
+    }
+    operation.setDescription(details);
   }
 
   /** 1 つの operation へ共通の Problem response を足す。 */

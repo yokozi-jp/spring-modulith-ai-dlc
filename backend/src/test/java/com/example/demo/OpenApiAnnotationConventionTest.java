@@ -87,18 +87,15 @@ class OpenApiAnnotationConventionTest {
 
   // ponytail: springdoc 3.1.1 の Javadoc の扱いを固定する。版を上げて変わったら、規約文書と一緒に直す。
   @Test
-  @DisplayName("package-private のハンドラの Javadoc の 1 行目が summary に、本文全体が description になる")
+  @DisplayName("package-private のハンドラの Javadoc が summary と重複のない description になる")
   void summaryAndDescriptionComeFromHandlerJavadoc() throws Exception {
     final ResultActions apiDocs = apiDocs();
     for (final Map.Entry<String, String> summary : SUMMARIES.entrySet()) {
       apiDocs.andExpect(jsonPath(summary.getKey() + ".summary").value(summary.getValue()));
     }
     apiDocs
-        // description は summary の文と <p> の文字列を含んだまま出る。
-        .andExpect(
-            jsonPath(PLACE + ".description")
-                .value("サンプル注文を受け付ける。\n\n <p>受け付けた注文の URI を Location に入れて返す。"))
-        .andExpect(jsonPath(FIND + ".description").value("サンプル注文の詳細を返す。\n\n <p>注文がなければ 404 を返す。"));
+        .andExpect(jsonPath(PLACE + ".description").value("受け付けた注文の URI を Location に入れて返す。"))
+        .andExpect(jsonPath(FIND + ".description").value("注文がなければ 404 を返す。"));
   }
 
   @Test
