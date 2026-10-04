@@ -15,6 +15,8 @@ public final class ProductionCodeOnly implements ImportOption {
    *
    * <p>{@code /jooq/} だけで判定すると、{@code order.infrastructure.persistence.jooq} のような手書きのパッケージも
    * 対象外になり、書き込みの規則（TableWriterArchTest）を外れるため、基底パッケージの直下に限る。
+   *
+   * <p>このパッケージに手書きのクラスを置くとすべての規則を外れるため、生成コードだけがあることを {@code ProductionCodeOnlyTest} が確かめる。
    */
   private static final String GENERATED_JOOQ =
       "/" + DemoApplication.class.getPackageName().replace('.', '/') + "/jooq/";
