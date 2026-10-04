@@ -54,6 +54,9 @@ release-please は `main` に入った Conventional Commits から次版を決�
 - `fix`：patch を上げる。
 - `feat`：minor を上げる。
 - `!` または `BREAKING CHANGE:`：major を上げる。
+
+意図したAPI破壊的変更では、[APIを変更する](../web-api/runbook-api-change.md#手順)に従う。
+
 - `docs`、`test`、`chore` だけでは通常、新しいリリースを作らない。
 
 導入時の版は `0.0.1` である。
