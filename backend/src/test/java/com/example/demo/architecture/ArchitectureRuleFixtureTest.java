@@ -42,6 +42,52 @@ class ArchitectureRuleFixtureTest {
   /** 違反フィクスチャのクラス名の接頭辞。 */
   private static final String VIOLATING_PREFIX = VIOLATING + ".";
 
+  /** TableWriter を通さずに書く違反フィクスチャのクラス名。 */
+  private static final String DIRECT_WRITER = "order.infrastructure.persistence.DirectOrderWriter";
+
+  /** TableWriter の H1 で、違反フィクスチャのメソッドごとに確かめる禁止の API。 */
+  private static final List<String> DIRECT_WRITES =
+      List.of(
+          "dslUpdate",
+          "dslDelete",
+          "dslDeleteFrom",
+          "dslMergeInto",
+          "dslBatchUpdate",
+          "dslBatchStore",
+          "dslBatchDelete",
+          "dslBatchMerge",
+          "dslExecuteUpdate",
+          "dslExecuteDelete",
+          "dslConnection",
+          "dslConnectionResult",
+          "staticDslUpdate",
+          "lambdaExecute",
+          "updateVariableExecute",
+          "updateMethodReference",
+          "updateReturning",
+          "deleteExecute",
+          "mergeExecute",
+          "upsertOnConflict",
+          "upsertOnConflictOnConstraint",
+          "upsertOnDuplicateKeyUpdate",
+          "recordStore",
+          "recordUpdate",
+          "recordDelete",
+          "recordMerge",
+          "daoUpdate",
+          "daoDelete",
+          "daoDeleteById",
+          "daoMerge",
+          "jdbcTemplate",
+          "dataSourceConnection",
+          "jdbcConnection",
+          "jdbcStatement",
+          "connectionProvider");
+
+  /** 版を比べない入口を使う違反フィクスチャの Repository。 */
+  private static final String UNVERSIONED_REPOSITORY =
+      "order.infrastructure.persistence.JooqOrderRepository";
+
   /** リフレクションで対応づける違反フィクスチャのクラス名。 */
   private static final String REFLECTIVE_READER =
       "order.infrastructure.persistence.ReflectiveOrderReader";
@@ -70,6 +116,36 @@ class ArchitectureRuleFixtureTest {
   }
 
   private static Stream<Arguments> eachRuleDetectsItsViolatingFixture() {
+    return Stream.concat(classRoleRows(), tableWriterRows());
+  }
+
+  /** TableWriter の規則（H1、H3、H4、H5）が、対応する違反フィクスチャを検出することを確かめる行を作る。 */
+  private static Stream<Arguments> tableWriterRows() {
+    return Stream.concat(
+        DIRECT_WRITES.stream()
+            .map(
+                method ->
+                    row(
+                        "tableWritesGoThroughTableWriter: " + method,
+                        TableWriterArchTest.tableWritesGoThroughTableWriterRule(VIOLATING),
+                        DIRECT_WRITER + "." + method + "(")),
+        Stream.of(
+            row(
+                "repositoryUpdateAndDeleteCheckVersion",
+                TableWriterArchTest.repositoryUpdateAndDeleteCheckVersionRule(VIOLATING),
+                UNVERSIONED_REPOSITORY + ".update("),
+            row(
+                "commandHandlersEnsureScreenLockNo",
+                TableWriterArchTest.commandHandlersEnsureScreenLockNoRule(),
+                "order.application.ApproveOrderCommandHandler"),
+            row(
+                "aggregateMethodsDoNotUseUnversionedWrites",
+                TableWriterArchTest.aggregateMethodsDoNotUseUnversionedWritesRule(VIOLATING),
+                UNVERSIONED_REPOSITORY + ".update(")));
+  }
+
+  /** クラスの役割と配置の規則が、対応する違反フィクスチャを検出することを確かめる行を作る。 */
+  private static Stream<Arguments> classRoleRows() {
     return Stream.of(
         row(
             "dependenciesPointInward",
@@ -258,7 +334,7 @@ class ArchitectureRuleFixtureTest {
     return Arguments.of(ruleName, rule, VIOLATING_PREFIX + violatingClass);
   }
 
-  /** 両方の検査クラスの全規則を、指定した基底パッケージで組み立てて返す。 */
+  /** 検査クラスの全規則を、指定した基底パッケージで組み立てて返す。 */
   private static List<ArchRule> rulesFor(final String basePackage) {
     return List.of(
         PackageByFeatureOnionArchitectureTest.dependenciesPointInwardRule(basePackage),
@@ -293,6 +369,10 @@ class ArchitectureRuleFixtureTest {
         ClassRoleArchTest.requestsAndResponsesArePresentationWebRecordsRule(basePackage),
         ClassRoleArchTest.queryServicesImplementModuleQueries,
         ClassRoleArchTest.mappingLibrariesAreNotUsed,
-        ClassRoleArchTest.jooqReflectionMappingIsNotUsed);
+        ClassRoleArchTest.jooqReflectionMappingIsNotUsed,
+        TableWriterArchTest.tableWritesGoThroughTableWriterRule(basePackage),
+        TableWriterArchTest.repositoryUpdateAndDeleteCheckVersionRule(basePackage),
+        TableWriterArchTest.commandHandlersEnsureScreenLockNoRule(),
+        TableWriterArchTest.aggregateMethodsDoNotUseUnversionedWritesRule(basePackage));
   }
 }

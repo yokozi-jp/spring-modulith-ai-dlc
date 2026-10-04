@@ -40,8 +40,13 @@ class ArchitectureMetricsReportTest {
   /** 均衡二分木を基準とした正規化累積コンポーネント依存の上限。 */
   private static final double MAX_NORMALIZED_CUMULATIVE_COMPONENT_DEPENDENCY = 1.0D;
 
-  /** 現在の外部可視型数 7、全型数 12 を基準とする global relative visibility の上限。 */
-  private static final double MAX_GLOBAL_RELATIVE_VISIBILITY = 7.0D / 12.0D;
+  /**
+   * 現在の外部可視型数 14、全型数 22 を基準とする global relative visibility の上限。
+   *
+   * <p>shared の TableWriter、ColumnValues、LockedRoot、DeletedRoot は他のモジュールの Repository が使う入口のため
+   * public にしている（ADR-054）。
+   */
+  private static final double MAX_GLOBAL_RELATIVE_VISIBILITY = 14.0D / 22.0D;
 
   /** Lakos、コンポーネント依存、可視性の各指標を計算してレポートへ保存する。 */
   @Test
