@@ -32,6 +32,7 @@ import org.springframework.boot.test.system.CapturedOutput;
 import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.context.support.StaticMessageSource;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotWritableException;
@@ -201,17 +202,40 @@ class ApiExceptionHandlerTest {
   }
 
   @Test
-  @DisplayName("クライアントの切断では null を返し、ERROR も WARN も出さない")
+  @DisplayName("コミット済みの応答での切断では null を返し、ERROR も WARN も出さない")
   void disconnectedClientIsNotLoggedAsFailure(final CapturedOutput output) {
+    final MockHttpServletResponse servletResponse = new MockHttpServletResponse();
+    servletResponse.setCommitted(true);
+
     final ResponseEntity<Object> response =
         handler()
             .handleUnexpectedException(
                 new IOException("Broken pipe"),
-                new ServletWebRequest(new MockHttpServletRequest(), new MockHttpServletResponse()));
+                new ServletWebRequest(new MockHttpServletRequest(), servletResponse));
 
     assertNull(response, "切断なら本文を書かないこと");
     final String log = output.getAll();
     assertFalse(log.contains("ERROR"), () -> "ERROR がないこと: " + log);
     assertFalse(log.contains("WARN"), () -> "WARN がないこと: " + log);
+  }
+
+  @Test
+  @DisplayName("コミット前の connection reset は切断らしく見えても、空の 200 ではなく 500 の Problem Details にする")
+  void connectionResetBeforeCommitIsServerError(final CapturedOutput output) {
+    // 外部 API や DB との通信で受けた reset を模す。ブラウザは接続している。
+    final ResponseEntity<Object> response =
+        handler()
+            .handleUnexpectedException(
+                new IOException("Connection reset by peer"),
+                new ServletWebRequest(new MockHttpServletRequest(), new MockHttpServletResponse()));
+
+    assertNotNull(response, "応答");
+    assertEquals(HttpStatus.INTERNAL_SERVER_ERROR, response.getStatusCode(), "HTTP status");
+    assertEquals(
+        MediaType.APPLICATION_PROBLEM_JSON, response.getHeaders().getContentType(), "Content-Type");
+    assertInstanceOf(ProblemDetail.class, response.getBody(), "本文");
+    final String log = output.getAll();
+    assertTrue(log.contains("Unhandled API exception"), () -> "event 名が残ること: " + log);
+    assertTrue(log.contains("ERROR"), () -> "ERROR で出ること: " + log);
   }
 }

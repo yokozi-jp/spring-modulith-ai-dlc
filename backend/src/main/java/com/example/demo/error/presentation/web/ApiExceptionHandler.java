@@ -109,7 +109,7 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
     return handleExceptionInternal(ex, body, headers, status, request);
   }
 
-  /** 全ての例外が通る。ログを 1 か所で出し、切断とコミット済みの応答では本文を書かない。 */
+  /** 全ての例外が通る。ログを 1 か所で出し、コミット済みの応答では本文を書かない。 */
   @Override
   protected @Nullable ResponseEntity<Object> handleExceptionInternal(
       final Exception ex,
@@ -117,15 +117,21 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
       final HttpHeaders headers,
       final HttpStatusCode statusCode,
       final WebRequest request) {
-    if (DisconnectedClientHelper.isClientDisconnectedException(ex)) {
-      log.atDebug().log("API client disconnected");
-      return null;
-    }
-    logFailure(ex, statusCode);
     if (isCommitted(request)) {
+      // 切断かどうかは例外の型とメッセージからの推測なので、本文を書けないコミット後だけ使う。
+      if (DisconnectedClientHelper.isClientDisconnectedException(ex)) {
+        log.atDebug().log("API client disconnected");
+      } else {
+        logFailure(ex, statusCode);
+      }
       // 基底クラスの WARN を重ねない。
       return null;
     }
+    // コミット前は切断らしく見えても Problem Details を返す。
+    // 外部との通信の "connection reset" を空の 200 にしないためである。
+    // 本当に切断していれば、書き込みの失敗を Spring が切断として DEBUG で捨てる。
+    // ponytail: コミット前にブラウザが切断すると ERROR が 1 件出る。目立つようになったら見直す。
+    logFailure(ex, statusCode);
     return super.handleExceptionInternal(ex, body, headers, statusCode, request);
   }
 
