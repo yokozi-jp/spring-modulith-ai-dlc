@@ -141,7 +141,7 @@ Domain の型、Command と Result、Spring MVC の Request と Response、jOOQ 
 `@Modulithic(sharedModules = "shared")` で Spring Modulith の shared モジュールにし、決定は [ADR-048](../adr/ADR-048-add-shared-module-for-jooq-common-code.md) に示す。
 
 - jOOQ の共通処理を `shared.infrastructure.persistence` に置き、このパッケージを `@NamedInterface` で公開する。
-  楽観的ロックの更新件数を判定する `OptimisticLock` もここに置く（[ADR-052](../adr/ADR-052-detect-optimistic-lock-conflicts-by-update-count.md)）。
+  楽観的ロックの更新件数を判定する `OptimisticLock` もここに置く（[ADR-054](../adr/ADR-054-detect-optimistic-lock-conflicts-by-update-count.md)）。
 - 業務の概念を置かない。
   ルートのパッケージには `package-info.java` だけを置く。
 - `shared` を使ってよいのは、他のモジュールの `infrastructure.persistence` だけである。

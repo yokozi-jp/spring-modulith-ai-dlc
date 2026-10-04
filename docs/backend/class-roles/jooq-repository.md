@@ -51,7 +51,7 @@ jOOQ の Repository は業務規則を持たない。
 `CommonColumns` は `shared.infrastructure.persistence` の共通処理であり（[ADR-048](../../adr/ADR-048-add-shared-module-for-jooq-common-code.md)）、`forInsert(テーブル)` と `forUpdate(テーブル)` は `LOCK_NO` を含む共通カラムの列と値の `Map` を返す。
 `forInsert` は `LOCK_NO` を `1` にし、`forUpdate` は `LOCK_NO` を1加算する。
 `*_PGM_CD` の値の求め方は [PostgreSQL の共通カラム](../../database/postgresql-common-columns.md)に従う。
-`OptimisticLock` も `shared.infrastructure.persistence` の共通処理であり、`requireUpdated(更新件数, テーブル, 主キーの条件, 競合の例外を作る関数)` で楽観的ロックの更新件数を判定する（[ADR-052](../../adr/ADR-052-detect-optimistic-lock-conflicts-by-update-count.md)）。
+`OptimisticLock` も `shared.infrastructure.persistence` の共通処理であり、`requireUpdated(更新件数, テーブル, 主キーの条件, 競合の例外を作る関数)` で楽観的ロックの更新件数を判定する（[ADR-054](../../adr/ADR-054-detect-optimistic-lock-conflicts-by-update-count.md)）。
 
 ## 必須の記述
 

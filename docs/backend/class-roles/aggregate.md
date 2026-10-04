@@ -58,7 +58,7 @@ tags: [convention, backend, class-role]
 - ロック番号は `private final long lockNo` に持ち、`restore` の最後の引数で受け取る。
   `place` は、INSERT で登録する値と同じ `1` にする。
 - 画面から受け取ったロック番号を比べる public メソッド `ensureLockNo(long lockNo)` を置き、違えば `<Aggregate>ConflictException` を投げる。
-  CommandHandler が DB から読み直した集約の `lockNo` を `ensureLockNo` が画面の値と比べ、Repository の `update` がその `lockNo` を UPDATE の条件で更新の時点の行の値と比べる（[jOOQ の Repository](jooq-repository.md)、[ADR-052](../../adr/ADR-052-detect-optimistic-lock-conflicts-by-update-count.md)）。
+  CommandHandler が DB から読み直した集約の `lockNo` を `ensureLockNo` が画面の値と比べ、Repository の `update` がその `lockNo` を UPDATE の条件で更新の時点の行の値と比べる（[jOOQ の Repository](jooq-repository.md)、[ADR-054](../../adr/ADR-054-detect-optimistic-lock-conflicts-by-update-count.md)）。
 - `<Aggregate>ConflictException` は `RuntimeException` を継承した `public final class` にし、メッセージを受け取るコンストラクタと、メッセージと原因を受け取るコンストラクタを持つ。
 - setter を作らず、子の Entity のリストは `List.copyOf` で保持する。
 - 他の集約は識別子（`CustomerId`）で持ち、現在時刻は引数の `Instant` で受け取る。

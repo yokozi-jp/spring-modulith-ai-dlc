@@ -50,7 +50,7 @@ WHERE order_id = 1 AND lock_no = 6;
 
 集約のように親子のテーブルを一緒に更新するときは、先に親の行（集約のルート）を更新し、子の行は後で更新する。
 親の業務のカラムが変わらなくても、親の行を更新して`lock_no`を加算する。
-この方式を選んだ理由は[ADR-052](../adr/ADR-052-detect-optimistic-lock-conflicts-by-update-count.md)に示す。
+この方式を選んだ理由は[ADR-054](../adr/ADR-054-detect-optimistic-lock-conflicts-by-update-count.md)に示す。
 
 ### jOOQの楽観的ロックの機能
 
@@ -67,7 +67,7 @@ UPDATEも更新する行のロックを取るため、同じ順序に従う。
 
 ## ロック待ち
 
-アプリの接続には`lock_timeout`でロック待ちの上限を設定し、既定の無期限待ちのままにしない（[DB接続情報とロール分離](connections.md)、[ADR-053](../adr/ADR-053-set-db-time-limits-per-connection.md)）。
+アプリの接続には`lock_timeout`でロック待ちの上限を設定し、既定の無期限待ちのままにしない（[DB接続情報とロール分離](connections.md)、[ADR-055](../adr/ADR-055-set-db-time-limits-per-connection.md)）。
 上限まで待ってもロックを取れなければ、文はSQLSTATE `55P03`で失敗する。
 楽観的ロックのUPDATEがこの失敗になったら、競合として扱う。
 
@@ -99,6 +99,6 @@ WHERE item_id = 1 AND stock_count >= 5;
 
 - フューチャー株式会社「PostgreSQL設計ガイドライン」（[アーキテクチャ設計ガイドライン](https://future-architect.github.io/arch-guidelines/documents/forDB/postgresql_guidelines.html)、commit `e309a6d`）、[CC BY 4.0](https://creativecommons.org/licenses/by/4.0/deed.ja)
 - このリポジトリの規約に合わせて抜粋、再構成、改変している。取り込みの方針は [ADR-040](../adr/ADR-040-import-future-architecture-guidelines.md) に従う。
-- 楽観的ロックの方式を、先にロックしてから比較する原典の方式から、UPDATEの条件と更新件数で判定する方式に変えている（[ADR-052](../adr/ADR-052-detect-optimistic-lock-conflicts-by-update-count.md)）。
+- 楽観的ロックの方式を、先にロックしてから比較する原典の方式から、UPDATEの条件と更新件数で判定する方式に変えている（[ADR-054](../adr/ADR-054-detect-optimistic-lock-conflicts-by-update-count.md)）。
   jOOQの楽観的ロックの機能を使わない規則を追加している。
-- ロック待ちの上限を、アプリの接続ごとに`lock_timeout`で設定する規則を追加している（[ADR-053](../adr/ADR-053-set-db-time-limits-per-connection.md)）。
+- ロック待ちの上限を、アプリの接続ごとに`lock_timeout`で設定する規則を追加している（[ADR-055](../adr/ADR-055-set-db-time-limits-per-connection.md)）。

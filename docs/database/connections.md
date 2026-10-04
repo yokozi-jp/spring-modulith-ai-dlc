@@ -55,7 +55,7 @@ tags: [convention, database, liquibase, security, credentials]
 `postgresql.conf`、RDSのパラメータグループ、`ALTER ROLE`では設定しません。
 1つのトランザクションだけ上限を変えるときは、`SET LOCAL`を使い、理由をコードに書きます。
 LiquibaseとjOOQ生成はHikariCPを通らないため、この上限を受けません。
-値の決め方と開始値は[ADR-053](../adr/ADR-053-set-db-time-limits-per-connection.md)にあります。
+値の決め方と開始値は[ADR-055](../adr/ADR-055-set-db-time-limits-per-connection.md)にあります。
 
 ## ロール分離
 

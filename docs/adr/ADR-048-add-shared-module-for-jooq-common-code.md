@@ -45,7 +45,7 @@ jOOQ の共通処理は `com.example.demo.shared.infrastructure.persistence` に
 `*_pgm_cd` の値の求め方は [ADR-051](ADR-051-bind-pgm-cd-with-scoped-value-and-aspect.md) で決める。
 ADR-051 の `*_pgm_cd` を束縛する Aspect も、共通カラムの値を組み立てる共通処理の一部として `shared` に置く。
 
-楽観的ロックの更新件数を判定する共通処理 `OptimisticLock` も `shared` に置く（[ADR-052](ADR-052-detect-optimistic-lock-conflicts-by-update-count.md)）。
+楽観的ロックの更新件数を判定する共通処理 `OptimisticLock` も `shared` に置く（[ADR-054](ADR-054-detect-optimistic-lock-conflicts-by-update-count.md)）。
 `shared` は Domain と `error` の型に依存せず、競合の例外は呼び出し側が関数で渡す。
 `shared` を使うのは、他のモジュールの `infrastructure.persistence` のアダプターだけとする。
 
@@ -100,7 +100,7 @@ ADR-051 の `*_pgm_cd` を束縛する Aspect も、共通カラムの値を組�
 - [ADR-002: package by feature とオニオンアーキテクチャ](ADR-002-package-by-feature-onion-architecture.md)
 - [ADR-003: データアクセスに jOOQ を採用](ADR-003-adopt-jooq-for-data-access.md)
 - [ADR-051: 共通カラムの pgm_cd を Aspect と ScopedValue で渡す](ADR-051-bind-pgm-cd-with-scoped-value-and-aspect.md)
-- [ADR-052: 楽観的ロックの競合を UPDATE の条件の lock_no と更新件数で判定する](ADR-052-detect-optimistic-lock-conflicts-by-update-count.md)
+- [ADR-054: 楽観的ロックの競合を UPDATE の条件の lock_no と更新件数で判定する](ADR-054-detect-optimistic-lock-conflicts-by-update-count.md)
 - [バックエンドアーキテクチャ](../backend/architecture.md)
 - [バックエンドのアーキテクチャテスト](../backend/architecture-tests.md)
 - [PostgreSQL の共通カラム](../database/postgresql-common-columns.md)

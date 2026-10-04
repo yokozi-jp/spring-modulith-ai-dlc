@@ -58,7 +58,7 @@ spring:
       # モジュールスキーマ名は環境差を持たないアーキテクチャ上の固定値。
       schema: modulith
       # 新しい物理接続ごとに、DBセッションの日時解釈と表示をUTCへ固定し、
-      # ロック待ち、文の実行、トランザクション中の待機の上限（ミリ秒）を設定する（ADR-053）。
+      # ロック待ち、文の実行、トランザクション中の待機の上限（ミリ秒）を設定する（ADR-055）。
       # lock_timeout は statement_timeout より短くする。postgresql.conf では設定しない。
       connection-init-sql: >-
         SET TIME ZONE 'UTC';

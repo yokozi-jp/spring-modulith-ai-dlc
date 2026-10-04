@@ -31,7 +31,7 @@ jOOQの生成コードには適用しない。
 ## 楽観的ロック
 
 jOOQの楽観的ロックの機能を使わない規則は、[PostgreSQLの排他制御](postgresql-concurrency-control.md)に従う。
-楽観的ロックのUPDATEの更新件数は、sharedモジュールの`OptimisticLock.requireUpdated`で判定する（[ADR-052](../adr/ADR-052-detect-optimistic-lock-conflicts-by-update-count.md)）。
+楽観的ロックのUPDATEの更新件数は、sharedモジュールの`OptimisticLock.requireUpdated`で判定する（[ADR-054](../adr/ADR-054-detect-optimistic-lock-conflicts-by-update-count.md)）。
 
 ## 共通処理
 

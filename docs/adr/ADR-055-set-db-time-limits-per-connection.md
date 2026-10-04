@@ -1,11 +1,11 @@
 ---
 type: ADR
-title: 'ADR-053: DB のロック待ち、文の実行、トランザクション中の待機の上限を接続ごとに設定する'
+title: 'ADR-055: DB のロック待ち、文の実行、トランザクション中の待機の上限を接続ごとに設定する'
 description: アプリの DB 接続ごとに、HikariCP の connection-init-sql で lock_timeout、statement_timeout、idle_in_transaction_session_timeout を環境変数の値で設定する決定。postgresql.conf では設定せず、lock_timeout を statement_timeout より短くする。
 tags: [adr, backend, database, postgresql, resilience]
 ---
 
-# ADR-053: DB のロック待ち、文の実行、トランザクション中の待機の上限を接続ごとに設定する
+# ADR-055: DB のロック待ち、文の実行、トランザクション中の待機の上限を接続ごとに設定する
 
 ## Status
 
@@ -17,7 +17,7 @@ Proposed
 
 ## Context
 
-[ADR-052](ADR-052-detect-optimistic-lock-conflicts-by-update-count.md) で、楽観的ロックを UPDATE の条件の `lock_no` と更新件数で判定する方式に変えた。
+[ADR-054](ADR-054-detect-optimistic-lock-conflicts-by-update-count.md) で、楽観的ロックを UPDATE の条件の `lock_no` と更新件数で判定する方式に変えた。
 `SELECT ... FOR UPDATE NOWAIT` を使わなくなったため、他のトランザクションが更新中の行への UPDATE は、PostgreSQL の既定では無期限にロックを待つ。
 
 長く実行される文と、トランザクションを開いたまま待つセッションも、接続と行のロックを持ち続ける。
@@ -62,7 +62,7 @@ connection-init-sql: >-
 - **`DB_IDLE_IN_TRANSACTION_TIMEOUT_MS=10000`**：`ChargeOrderCommandHandler` は `@ApplicationModuleListener` のトランザクションの中で決済を呼び、その間（全体 2 秒と接続 1 秒）はトランザクション中の待機になる（[ADR-050](ADR-050-define-backend-class-roles-and-naming.md)）。
   この時間より十分に長く、停止時の 30 秒より短くする。
 
-ADR-052 の方式では、行のロックは決済を呼んだ後の `update` の UPDATE が取る。
+ADR-054 の方式では、行のロックは決済を呼んだ後の `update` の UPDATE が取る。
 そのため、`ChargeOrderCommandHandler` は決済を呼んでいる間に行のロックを持たず、`idle_in_transaction_session_timeout` が守るのは接続とトランザクションだけである。
 
 ## Consequences
@@ -71,7 +71,7 @@ ADR-052 の方式では、行のロックは決済を呼んだ後の `update` �
 
 - ロック待ち、長い文、開いたままのトランザクションが、接続と行のロックを無期限に持たない。
 - 値を環境変数で渡し、未設定ならアプリの起動に失敗するため、環境ごとの設定漏れに気付ける。
-- ロック待ちが `lock_timeout` で終わり、楽観的ロックの UPDATE は競合として返る（ADR-052）。
+- ロック待ちが `lock_timeout` で終わり、楽観的ロックの UPDATE は競合として返る（ADR-054）。
 
 ### Negative
 
@@ -128,7 +128,7 @@ ADR-052 の方式では、行のロックは決済を呼んだ後の `update` �
 - [ADR-008: application.yaml を単一にし、設定を外部から注入する](ADR-008-single-application-yaml-external-config.md)
 - [ADR-019: 外部連携の耐障害性と容量制御を標準化する](ADR-019-define-resilience-and-capacity-guardrails.md)
 - [ADR-050: バックエンドのクラスの役割と命名を定める](ADR-050-define-backend-class-roles-and-naming.md)
-- [ADR-052: 楽観的ロックの競合を UPDATE の条件の lock_no と更新件数で判定する](ADR-052-detect-optimistic-lock-conflicts-by-update-count.md)
+- [ADR-054: 楽観的ロックの競合を UPDATE の条件の lock_no と更新件数で判定する](ADR-054-detect-optimistic-lock-conflicts-by-update-count.md)
 - [DB接続情報とロール分離](../database/connections.md)
 - [PostgreSQL の排他制御](../database/postgresql-concurrency-control.md)
 - [PostgreSQL, Client Connection Defaults](https://www.postgresql.org/docs/18/runtime-config-client.html)

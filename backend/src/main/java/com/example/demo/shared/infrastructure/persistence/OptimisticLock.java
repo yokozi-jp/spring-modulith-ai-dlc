@@ -8,7 +8,7 @@ import org.jooq.Table;
 import org.springframework.stereotype.Component;
 
 /**
- * 楽観的ロックの UPDATE の更新件数を判定する（docs/database/postgresql-concurrency-control.md、ADR-052）。
+ * 楽観的ロックの UPDATE の更新件数を判定する（docs/database/postgresql-concurrency-control.md、ADR-054）。
  *
  * <p>Repository は主キーと {@code lock_no} を条件にした UPDATE の更新件数を {@link #requireUpdated} に渡す。
  *

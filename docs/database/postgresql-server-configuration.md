@@ -76,4 +76,4 @@ VACUUMは自動バキュームに任せ、`VACUUM FULL`を通常は実行しな�
 
 - フューチャー株式会社「PostgreSQL設計ガイドライン」（[アーキテクチャ設計ガイドライン](https://future-architect.github.io/arch-guidelines/documents/forDB/postgresql_guidelines.html)、commit `e309a6d`）、[CC BY 4.0](https://creativecommons.org/licenses/by/4.0/deed.ja)
 - このリポジトリの規約に合わせて抜粋、再構成、改変している。取り込みの方針は [ADR-040](../adr/ADR-040-import-future-architecture-guidelines.md) に従う。
-- アプリの接続の時間の上限をサーバーのパラメータで設定しない規則を追加している（[ADR-053](../adr/ADR-053-set-db-time-limits-per-connection.md)）。
+- アプリの接続の時間の上限をサーバーのパラメータで設定しない規則を追加している（[ADR-055](../adr/ADR-055-set-db-time-limits-per-connection.md)）。
