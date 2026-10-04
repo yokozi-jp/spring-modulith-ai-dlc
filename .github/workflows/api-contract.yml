@@ -1,0 +1,150 @@
+name: API Contract 🔀
+
+on:
+  workflow_dispatch:
+  push:
+    branches: ["main"]
+    paths:
+      - "openapi/**"
+      - ".spectral.yaml"
+      - "Taskfile.yml"
+      - ".github/workflows/api-contract.yml"
+  # 必須チェックにしても対象外 PR が Expected のまま残らないよう、PR では常に起動し、
+  # changes ジョブで検査の要否を判定する。
+  # ラベルの付け外しで再判定する（api-breaking-approved、ADR-051）。
+  pull_request:
+    branches: ["**"]
+    types: [opened, synchronize, reopened, labeled, unlabeled]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  # OpenAPI 契約に関わるパスが変わったかを判定する。push（main）では常に true とし、
+  # PR では base ブランチとの diff で判定する。
+  changes:
+    name: Detect API contract changes
+    runs-on: ubuntu-latest
+    outputs:
+      api: ${{ steps.filter.outputs.api }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+
+      - name: Detect changed paths
+        id: filter
+        shell: bash
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BASE_REF: ${{ github.event.pull_request.base.ref }}
+        run: |
+          if [ "$EVENT_NAME" != "pull_request" ]; then
+            echo "api=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          # 差分取得に失敗した場合は検査を実行する側へ倒す。
+          if ! changed_files="$(git diff --name-only "origin/${BASE_REF}...HEAD")"; then
+            echo "差分取得に失敗したため API 契約の検査を実行します。" >&2
+            echo "api=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          # api-contract.yml の push パスフィルタと同じ集合で判定する。
+          if grep -Eq '^(openapi/|\.spectral\.yaml$|Taskfile\.yml$|\.github/workflows/api-contract\.yml$)' \
+            <<< "$changed_files"; then
+            echo "api=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "api=false" >> "$GITHUB_OUTPUT"
+          fi
+
+  # コミット済み契約の Spectral 検査、ルールの fixture テスト、base との破壊的変更の検査を行う。
+  # 契約と生成物の drift は backend-ci と frontend-ci が検査する。
+  check:
+    name: Check API contract 🔀
+    needs: changes
+    if: needs.changes.outputs.api == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          # oasdiff が比べる base ブランチの契約を origin/<base> から読むため、全ブランチを取得する。
+          fetch-depth: 0
+
+      - name: Set up Task
+        uses: go-task/setup-task@a00fbb05ce67b35648be3c78cbc9fd85354c757e # v2
+        with:
+          version: "3.53.1"
+          checksum: a54a408f6861ff921f6e87774180db31bacd8c1e7c944ca696db9fea49a82fc7
+
+      - name: Lint OpenAPI contract
+        run: task api-lint
+
+      - name: Test Spectral rules with fixtures
+        run: task api-lint-rules-test
+
+      # ラベル名は run に埋め込まず env で渡す（zizmor）。
+      # ラベルがあってもジョブを skip せずに実行し、破壊的変更の一覧をログへ残す。
+      - name: Check breaking changes against base
+        env:
+          BASE_REF: ${{ github.event.pull_request.base.ref || 'main' }}
+          API_BREAKING_APPROVED: ${{ contains(github.event.pull_request.labels.*.name, 'api-breaking-approved') }}
+        run: task api-breaking
+
+  # 静的 HTML の API 設計書を生成し、PR では artifact、main では GitHub Pages 用の artifact にする。
+  docs:
+    name: Build API docs 📘
+    needs: changes
+    if: needs.changes.outputs.api == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Task
+        uses: go-task/setup-task@a00fbb05ce67b35648be3c78cbc9fd85354c757e # v2
+        with:
+          version: "3.53.1"
+          checksum: a54a408f6861ff921f6e87774180db31bacd8c1e7c944ca696db9fea49a82fc7
+
+      - name: Build API docs
+        run: task api-docs
+
+      - name: Upload API docs
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: api-docs
+          path: build/api-docs/
+          retention-days: 14
+
+      - name: Upload GitHub Pages artifact
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
+        with:
+          path: build/api-docs/
+
+  # main へのマージで API 設計書を GitHub Pages に公開する。
+  pages:
+    name: Publish API docs 📘
+    needs: docs
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write # Pages へデプロイする
+      id-token: write # deploy-pages がデプロイ元を OIDC で証明する
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5.0.1

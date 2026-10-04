@@ -6,6 +6,7 @@ on:
     branches: ["main"]
     paths:
       - "frontend/**"
+      - "openapi/**"
       - "Taskfile.yml"
       - ".github/workflows/frontend-ci.yml"
   # 必須チェックにしても対象外PRがExpectedのまま残らないよう、PRでは常に起動し、
@@ -49,7 +50,7 @@ jobs:
             echo "frontend=true" >> "$GITHUB_OUTPUT"
             exit 0
           fi
-          if grep -Eq '^(frontend/|Taskfile\.yml$|\.github/workflows/frontend-ci\.yml$)' \
+          if grep -Eq '^(frontend/|openapi/|Taskfile\.yml$|\.github/workflows/frontend-ci\.yml$)' \
             <<< "$changed_files"; then
             echo "frontend=true" >> "$GITHUB_OUTPUT"
           else
@@ -94,6 +95,9 @@ jobs:
 
       - name: Check route tree is up to date
         run: PATH="$GITHUB_WORKSPACE/frontend/node_modules/.bin:$PATH" task fe-route-tree-check
+
+      - name: Check generated API client is up to date
+        run: PATH="$GITHUB_WORKSPACE/frontend/node_modules/.bin:$PATH" task api-client-check
 
       - name: Diagnose React
         run: PATH="$GITHUB_WORKSPACE/frontend/node_modules/.bin:$PATH" task fe-doctor

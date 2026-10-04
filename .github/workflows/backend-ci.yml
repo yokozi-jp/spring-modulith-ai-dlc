@@ -6,6 +6,7 @@ on:
     branches: ["main"]
     paths:
       - "backend/**"
+      - "openapi/**"
       - ".spectral.yaml"
       - "docker/compose-test.yml"
       - "docker/initdb/**"
@@ -60,7 +61,7 @@ jobs:
             exit 0
           fi
           # backend-ci.yml の push パスフィルタと同じ集合で判定する。
-          if grep -Eq '^(backend/|docker/initdb/|\.spectral\.yaml$|docker/compose-test\.yml$|\.env\.test$|Taskfile\.yml$|\.github/workflows/backend-ci\.yml$)' \
+          if grep -Eq '^(backend/|openapi/|docker/initdb/|\.spectral\.yaml$|docker/compose-test\.yml$|\.env\.test$|Taskfile\.yml$|\.github/workflows/backend-ci\.yml$)' \
             <<< "$changed_files"; then
             echo "backend=true" >> "$GITHUB_OUTPUT"
           else
@@ -136,8 +137,8 @@ jobs:
       - name: Migrate test database and run tests
         run: task be-test
 
-      - name: Generate and lint OpenAPI contract
-        run: task be-openapi-lint
+      - name: Generate, lint, and check OpenAPI contract
+        run: task be-openapi-check
 
       - name: Stop test dependencies
         if: always()
