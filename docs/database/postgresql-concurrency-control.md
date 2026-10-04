@@ -9,6 +9,7 @@ tags: [convention, database, postgresql, concurrency, locking, future-arch-guide
 
 分離レベルはPostgreSQLの既定のREAD COMMITTEDのまま使う。
 同じ行を同時に更新しうる処理には楽観的ロックを使い、UPDATEの条件で`lock_no`を比較して更新件数で判定する。
+業務テーブルのUPDATEとDELETEは、sharedモジュールの`TableWriter`だけで書く。
 画面を開いた時点で行をロックする悲観的ロックは避ける。
 
 ## 分離レベル
@@ -37,25 +38,73 @@ DBの行ロックは、在庫の引き当てのように性能が重要になる
 ## 楽観的ロック
 
 ロック番号には[共通カラム](postgresql-common-columns.md)の`lock_no`を使い、最終更新日時で代用しない。
+業務テーブルのUPDATEとDELETEは、sharedモジュールの`TableWriter`だけが組み立てて実行する（[ADR-054](../adr/ADR-054-detect-optimistic-lock-conflicts-by-update-count.md)）。
+版の条件、`lock_no`の設定、更新件数の判定、ロック待ちの失敗の変換は`TableWriter`が持ち、Repositoryは業務の列の値だけを書く。
+Repositoryでの書き方は[jOOQのRepository](../backend/class-roles/jooq-repository.md)に従う。
 
-1. 主キーと、画面などから受け取った`lock_no`をUPDATEの条件に入れ、`lock_no`を1加算して更新する。
-2. 更新件数が1件なら、更新は成功している。
-3. 更新件数が0件なら、主キーで行の有無を確かめる。
-   行がなければ「行がない」、行があれば「他の人が更新した」としてロールバックし、利用者へ返す。
+入口は、呼び出し側が期待する版（以前に読んだ集約ルートの`lock_no`）を持っているかだけで選ぶ。
+
+- **期待する版を持つ**：`updateCheckingVersion`と`deleteCheckingVersion`を使う。
+  更新件数が1件なら成功する。
+  0件なら主キーで行の有無を確かめ、行がなければ`NoSuchElementException`を、行があれば「他の人が更新した」として呼び出し側が渡した競合の例外を投げる。
+  子の行は、戻り値の`LockedRoot`（削除では`DeletedRoot`）で書く。
+- **期待する版を持たない**：`updateWhere`と`deleteWhere`を使う。
+  更新件数を返し、件数の意味は呼び出し側が決める。
+
+どのUPDATEも`lock_no`を1進める。
+`updateCheckingVersion`は、期待する版が6の行に対して次のSQLを実行する。
 
 ```sql
-UPDATE t_order SET status = 'PAID', lock_no = lock_no + 1
+UPDATE t_order SET status = 'PAID', updated_at = ..., updated_by = ..., updated_pgm_cd = ..., updated_tx_id = ..., lock_no = 7
 WHERE order_id = 1 AND lock_no = 6;
 ```
 
-集約のように親子のテーブルを一緒に更新するときは、先に親の行（集約のルート）を更新し、子の行は後で更新する。
-親の業務のカラムが変わらなくても、親の行を更新して`lock_no`を加算する。
-この方式を選んだ理由は[ADR-054](../adr/ADR-054-detect-optimistic-lock-conflicts-by-update-count.md)に示す。
+`updateWhere`は、`lock_no = lock_no + 1`で版を進める。
+版を比べない更新が先に走れば、その前に読んだ画面の保存は上書きせずに競合として返る。
+
+### 対象と対象外の分け方
+
+`lock_no`は全業務テーブルにあるため、列の有無では対象を分けない。
+版を比べるかは、期待する版を持っているかで決まる。
+機械の検査の列は、`TableWriterArchTest`の規則の名前である。
+
+| 書き込みの種類 | 版を比べるか | 使うAPI | 機械の検査 |
+| --- | --- | --- | --- |
+| 画面からの集約の更新（Commandが`lockNo`を持つ） | 比べる（画面の版と読んだ版、読んだ版と行の版） | CommandHandlerの`ensureLockNo`と、Repositoryの`update`の`updateCheckingVersion` | `commandHandlersEnsureScreenLockNo`、`repositoryUpdateAndDeleteCheckVersion`、`aggregateMethodsDoNotUseUnversionedWrites` |
+| Listenerやバッチからの集約の更新（画面の版を持たない） | 比べる（読んだ版と行の版） | Repositoryの`update`の`updateCheckingVersion` | `repositoryUpdateAndDeleteCheckVersion`、`aggregateMethodsDoNotUseUnversionedWrites` |
+| 集約ルートの物理削除 | 比べる | Repositoryの`delete`の`deleteCheckingVersion` | `repositoryUpdateAndDeleteCheckVersion`、`aggregateMethodsDoNotUseUnversionedWrites` |
+| 集約の子の行の更新 | 比べない（ルートの行ロックと版で守る） | `LockedRoot.updateChild` | `tableWritesGoThroughTableWriter` |
+| 集約の子の行の削除（子の集合が減ったとき、ルートを削除したとき） | 比べない | `LockedRoot.deleteChildren`、`DeletedRoot.deleteChildren` | `tableWritesGoThroughTableWriter` |
+| 集約の子の行の追加 | 該当なし（`lock_no = 1`） | `insertInto(...).set(commonColumns.forInsert(...))`。`LockedRoot`を通らない | 既定値のないNOT NULL。ルートを書かない追加は検出しない（ADR-054の残るリスク） |
+| DBの行ロック（在庫の引き当て）、外部同期による状態の上書き、一括更新 | 比べない | `updateWhere`（件数を返す） | `tableWritesGoThroughTableWriter`、`aggregateMethodsDoNotUseUnversionedWrites`、Error Proneの`CheckReturnValue` |
+| ワークテーブルの後始末、保存期間を過ぎた行の削除、集約を読み込まない一括の物理削除 | 比べない | `deleteWhere`（件数を返す） | `tableWritesGoThroughTableWriter`、`aggregateMethodsDoNotUseUnversionedWrites`、Error Proneの`CheckReturnValue` |
+| 集約ルートのINSERT | 該当なし（`lock_no = 1`） | `insertInto(...).set(commonColumns.forInsert(...))` | 既定値のないNOT NULL |
+| 追記だけのワークテーブル（`w_`） | 比べない | 追記だけにする。INSERTは`forInsert`、削除は`deleteWhere` | `tableWritesGoThroughTableWriter` |
+| Javaの外の書き込み（psqlのデータパッチ、Liquibaseのデータ変更、スキーマ変更に伴う値の設定） | 比べない | [共通カラム](postgresql-common-columns.md)（データパッチでは`patched_*`だけを更新する）と[ロックを抑えるスキーマ変更](postgresql-online-schema-change.md)に従う | なし（ADR-054の残るリスク） |
+| フレームワークのテーブル（`modulith`と`liquibase`のスキーマ） | 対象外 | 対象外 | スキーマ検査の対象外（`SchemaConventions.FRAMEWORK_SCHEMAS`） |
+
+期待する版を持つ書き込みは、集約ルートを受け取るRepositoryの`update`と`delete`に限る。
+識別子と版を受け取るRepositoryのメソッドを作らない。
+
+### 親子のテーブルの保存の順序
+
+集約のように親子のテーブルを一緒に書くときは、先に親の行（集約のルート）を`updateCheckingVersion`で更新し、子の行は後で書く。
+親の業務のカラムが変わらなくても、親の行を更新して`lock_no`を進める。
+
+子の集合が増減する集約は、全置換ではなく差分で保存する。
+全置換では、子の`created_*`が保存のたびに変わる。
+
+1. 親を`updateCheckingVersion`で更新する。
+2. 保存済みの子のキーを読む。
+3. 集約にない子を`root.deleteChildren(子のテーブル, 親の条件.and(キー.notIn(集約の子のキー)))`で削除する。
+   集約の子が空なら`notIn`は常に真になり、すべての子を削除する。
+4. 保存済みにない子を`forInsert`でINSERTする。
+5. 両方にある子を`root.updateChild`で更新する。
 
 ### jOOQの楽観的ロックの機能
 
 jOOQの`Settings`の`executeWithOptimisticLocking`と、コード生成の`recordVersionFields`を使わない。
-これらは`UpdatableRecord.store()`で更新するときにしか働かず、このリポジトリはUPDATEをDSLで書く（[jOOQのRepository](../backend/class-roles/jooq-repository.md)）ためである。
+これらは`UpdatableRecord.store()`で更新するときにしか働かず、このリポジトリはUPDATEを`TableWriter`のDSLで書くためである。
 
 jOOQの機能の動作は[jOOQのマニュアル](https://www.jooq.org/doc/latest/manual/sql-execution/crud-with-updatablerecords/optimistic-locking/)を参照する。
 
@@ -69,7 +118,8 @@ UPDATEも更新する行のロックを取るため、同じ順序に従う。
 
 アプリの接続には`lock_timeout`でロック待ちの上限を設定し、既定の無期限待ちのままにしない（[DB接続情報とロール分離](connections.md)、[ADR-055](../adr/ADR-055-set-db-time-limits-per-connection.md)）。
 上限まで待ってもロックを取れなければ、文はSQLSTATE `55P03`で失敗する。
-楽観的ロックのUPDATEがこの失敗になったら、競合として扱う。
+`updateCheckingVersion`と`deleteCheckingVersion`は、この失敗を競合の例外に変える。
+`updateWhere`と`deleteWhere`は、Springの`CannotAcquireLockException`をそのまま投げ、扱いは呼び出し側が決める。
 
 要件に合わせて、次の待ち方も使う。
 
@@ -85,13 +135,17 @@ HTTPの要求と応答をまたいでDBのトランザクションを保てな�
 
 ## DBの行ロック
 
-数量の更新のように、前回の値を確認する必要がない処理では、条件付きのUPDATE文と更新件数で判定してよい。
+数量の更新のように、前回の値を確認する必要がない処理では、`updateWhere`の条件付きのUPDATEと更新件数で判定してよい。
 
-```sql
-UPDATE t_stock SET stock_count = stock_count - 5
-WHERE item_id = 1 AND stock_count >= 5;
+```java
+final int reserved =
+    tableWriter.updateWhere(
+        T_STOCK,
+        T_STOCK.ITEM_ID.eq(itemId).and(T_STOCK.STOCK_COUNT.ge(5)),
+        set -> set.set(T_STOCK.STOCK_COUNT, T_STOCK.STOCK_COUNT.minus(5)));
 ```
 
+このUPDATEも`lock_no = lock_no + 1`で版を進めるため、引き当ての前に読んだ画面の保存は競合になる。
 更新件数が0件なら、在庫不足として利用者へ返し、業務判断を委ねる。
 マスタの保守のように後勝ちの上書きを許容できない更新と、状態の遷移を伴う更新には使わない。
 
@@ -99,6 +153,6 @@ WHERE item_id = 1 AND stock_count >= 5;
 
 - フューチャー株式会社「PostgreSQL設計ガイドライン」（[アーキテクチャ設計ガイドライン](https://future-architect.github.io/arch-guidelines/documents/forDB/postgresql_guidelines.html)、commit `e309a6d`）、[CC BY 4.0](https://creativecommons.org/licenses/by/4.0/deed.ja)
 - このリポジトリの規約に合わせて抜粋、再構成、改変している。取り込みの方針は [ADR-040](../adr/ADR-040-import-future-architecture-guidelines.md) に従う。
-- 楽観的ロックの方式を、先にロックしてから比較する原典の方式から、UPDATEの条件と更新件数で判定する方式に変えている（[ADR-054](../adr/ADR-054-detect-optimistic-lock-conflicts-by-update-count.md)）。
+- 楽観的ロックの方式を、先にロックしてから比較する原典の方式から、UPDATEの条件と更新件数で判定し、業務テーブルのUPDATEとDELETEを`TableWriter`に集める方式に変えている（[ADR-054](../adr/ADR-054-detect-optimistic-lock-conflicts-by-update-count.md)）。
   jOOQの楽観的ロックの機能を使わない規則を追加している。
 - ロック待ちの上限を、アプリの接続ごとに`lock_timeout`で設定する規則を追加している（[ADR-055](../adr/ADR-055-set-db-time-limits-per-connection.md)）。

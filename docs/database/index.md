@@ -3,7 +3,7 @@
 - [DBマイグレーション規約](migrations.md)：changesetやスキーマタグを追加または変更するとき、マイグレーションの実行経路やCI検証を確認または変更するとき
 - [DB操作コマンドのリファレンス](commands.md)：DBを操作するTaskとGradleタスクの動作、影響範囲、必要な確認値を調べるとき
 - [jOOQコード生成物の管理](jooq-codegen.md)：changeset追加後にjOOQコードを生成するとき、生成物の管理方針を確認するとき
-- [jOOQのSQLの書き方](jooq-usage.md)：infrastructure.persistenceでjOOQのクエリを書くとき、jOOQのSettingsを変えたくなったとき
+- [jOOQのSQLの書き方](jooq-usage.md)：infrastructure.persistenceでjOOQのクエリを書くとき、jOOQのSettingsを変えたくなったとき、jOOQかSpring Bootの版を上げるとき（「jOOQの版を上げるとき」）
 - [DB接続情報とロール分離](connections.md)：接続用の環境変数やDBロールを追加、変更するとき、ステージングや本番のDBを準備するとき
 - [DBのデプロイと切り戻し](runbook-deploy-and-rollback.md)：本番マイグレーションのパイプラインを組むとき、DBを切り戻すとき
 - [PostgreSQLのテーブル論理設計](postgresql-logical-design.md)：業務テーブルを新しく設計するとき、区分値、論理削除、多言語データの持ち方を決めるとき

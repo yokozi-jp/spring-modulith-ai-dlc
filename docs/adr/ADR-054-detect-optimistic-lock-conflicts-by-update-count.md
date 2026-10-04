@@ -1,11 +1,11 @@
 ---
 type: ADR
-title: 'ADR-054: 楽観的ロックの競合を UPDATE の条件の lock_no と更新件数で判定する'
-description: 楽観的ロックを、主キーと lock_no を条件にした UPDATE の更新件数で判定する方式に変え、件数の判定を shared の OptimisticLock に置く決定。取り込んだ PostgreSQL 設計ガイドラインの、先に SELECT ... FOR UPDATE でロックする方式を改変する。
+title: 'ADR-054: 楽観的ロックの競合を lock_no の条件と更新件数で判定し、業務テーブルの UPDATE と DELETE を TableWriter に集める'
+description: 楽観的ロックの版の条件、版の設定、件数の判定、55P03 の変換を shared の TableWriter に集め、ArchUnit で迂回を禁じ、版を比べない入口の件数の無視を Error Prone でコンパイルの失敗にする決定。取り込んだ PostgreSQL 設計ガイドラインの、先に SELECT ... FOR UPDATE でロックする方式を改変する。
 tags: [adr, backend, database, jooq, concurrency]
 ---
 
-# ADR-054: 楽観的ロックの競合を UPDATE の条件の lock_no と更新件数で判定する
+# ADR-054: 楽観的ロックの競合を lock_no の条件と更新件数で判定し、業務テーブルの UPDATE と DELETE を TableWriter に集める
 
 ## Status
 
@@ -13,108 +13,164 @@ Proposed
 
 ## Date
 
-2026-10-03
+2026-10-04
 
 ## Context
 
 [PostgreSQL の排他制御](../database/postgresql-concurrency-control.md)は、[ADR-040](ADR-040-import-future-architecture-guidelines.md) で取り込んだフューチャー株式会社の PostgreSQL 設計ガイドラインに従い、先に `SELECT ... FOR UPDATE` で行をロックしてから `lock_no` を比べる方式を定めていた。
-この方式は `NOWAIT` を付けられ、SELECT の段階で「行がない」と「他の人が更新した」を区別できるため、採ってきた。
+この方式では、集約ごとの `Jooq<Aggregate>Repository` に行をロックして比べる private メソッドが要り、比べる処理を書き忘れても UPDATE は成功して他の人の更新を上書きする。
 
-一方、この方式では集約ごとの `Jooq<Aggregate>Repository` に、行をロックして比べる 20 行ほどの private メソッド（`lockOrder`）が要る。
-比べる処理を書き忘れても、UPDATE はそのまま成功して他の人の更新を上書きする。
-Doma の `@Version` による更新は、識別子とバージョンを UPDATE の条件に入れて 1 加算し、更新件数が 0 なら楽観的ロックの失敗にする（[Doma, Update](https://docs.domaframework.org/en/latest/query/update/)）。
-同じ方式なら、Repository は UPDATE の条件に `lock_no` を足し、件数を共通処理に渡すだけで済む。
+この ADR の最初の版（PR #112）は、主キーと `lock_no` を条件にした UPDATE の更新件数で競合を判定し、件数を `shared` の `OptimisticLock.requireUpdated` に渡す形にした。
+しかし、版の条件、版の加算、件数の受け渡し、`55P03` の変換は Repository の手書きに残った。
+どれを書き忘れても UPDATE は成功し、Repository の規約のチェックリストの楽観的ロックの項目はすべて「自分で点検」だった。
+`requireUpdated` を呼ぶ production のコードはまだなく、ADR も Proposed のままであるため、この版で決定を書き直す。
 
-PostgreSQL の READ COMMITTED では、UPDATE は対象の行のロックを取り、他のトランザクションが更新中の行ならその終了を待つ。
-待った後は更新後の行で WHERE の条件を評価し直すため、`lock_no` が進んでいれば件数は 0 になる（[PostgreSQL, Read Committed Isolation Level](https://www.postgresql.org/docs/current/transaction-iso.html#XACT-READ-COMMITTED)）。
+利用者は、共通基盤に次の順で重みを置く。
+AI と開発者が迷わないこと（どこに何を書き、どの API を使うかの答えが一つ）、間違えると機械で失敗すること、システムとして安全であること（古い値の上書き、無期限の待ち、気付けない設定の誤りがない）である。
 
-[ADR-048](ADR-048-add-shared-module-for-jooq-common-code.md) は、楽観的ロックの方式を新しい ADR で決め直すとしていた。
-`lock_no` の設定と加算は、`shared` の `CommonColumns` の `forInsert` と `forUpdate` がすでに担っている。
+PostgreSQL の READ COMMITTED では、後の UPDATE は先の UPDATE のコミットを待ち、更新後の行で WHERE の条件を評価し直す（[PostgreSQL 18, Read Committed Isolation Level](https://www.postgresql.org/docs/18/transaction-iso.html#XACT-READ-COMMITTED)）。
+このため、WHERE に期待する版を入れた UPDATE は、待った後に版が進んでいれば 0 件になる。
+一方、SET の式も更新後の行で評価し直されるため、`SET lock_no = lock_no + 1` の加算だけでは古い保存を止められない。
+
+`lock_no` は全業務テーブルにあり（[PostgreSQL の共通カラム](../database/postgresql-common-columns.md)）、列の有無では楽観的ロックの対象を分けられない。
+規約は、在庫の引き当てのように版を比べない UPDATE と、`lock_no` を進めないデータパッチを認めている。
+
+業務テーブルと production の Repository はまだないため、移行の費用は共通処理、テスト、規約に限られる。
 
 ## Decision
 
-楽観的ロックの `update` は、次の方式で書く。
-
-- 集約ルートの行を `UPDATE ... SET ..., lock_no = lock_no + 1 WHERE 主キー = ? AND lock_no = ?` で更新する。
-  条件の `lock_no` は集約の `lockNo()` にし、`lock_no` の加算は `CommonColumns.forUpdate` が返す値で書く。
-  Repository は `LOCK_NO` を読むだけにし、書かない。
-- 集約ルートの行を先に更新し、子の行は後で更新する。
-  集約ルートの業務の列が変わらなくても、集約ルートの行を更新して `lock_no` を加算する。
-- 更新件数は `shared.infrastructure.persistence` の `OptimisticLock.requireUpdated(更新件数, テーブル, 主キーの条件, 競合の例外を作る関数)` で判定する。
-  1 件なら何もしない。
-  0 件なら主キーで `fetchExists` を実行し、行がなければ `NoSuchElementException` を、行があれば渡された関数が作る例外（`OrderConflictException::new`）を投げる。
-  2 件以上なら、主キーの条件が 1 行を特定していないため `IllegalStateException` を投げる。
-- `OptimisticLock` は Domain と `error` の型に依存しない。
-- 集約ルートの UPDATE が `lock_timeout` でロックを取れず SQLSTATE `55P03` で失敗すると、Spring Boot の jOOQ の例外の変換が `CannotAcquireLockException` を投げる。
-  Repository はこれを catch し、原因に付けた `<Aggregate>ConflictException` を投げる。
-  `requireUpdated` は件数だけを受け取るため、この変換は Repository に置く。
+- 業務テーブルの UPDATE と DELETE は、`shared.infrastructure.persistence` の `TableWriter` だけが組み立てて実行する。
+  期待する版（以前に読んだ集約ルートの `lock_no`）を持つ書き込みは `updateCheckingVersion` と `deleteCheckingVersion` で、持たない書き込みは `updateWhere` と `deleteWhere` で行う。
+  集約の子の行の更新と削除は、ルートの書き込みが返す `LockedRoot`（削除では `DeletedRoot`）で書き、子の集合の変化は差分（削除、追加、更新）で書く。
+  INSERT は `TableWriter` を通さず、`CommonColumns.forInsert` で書く。
+- 業務の列の値は `ColumnValues<R>` で受け取る。
+  `ColumnValues<R>` は `TableField<R, T>` を受け取る二つの `set` だけを持ち、`where` と `execute` を持たない。
+  共通カラム（`lock_no`、`created_*`、`updated_*`、`patched_*`）を渡すと `IllegalArgumentException` にする。
+- `updateCheckingVersion` は `SET lock_no = 期待値 + 1` と `WHERE 主キー AND lock_no = 期待値` を書く。
+  件数が 1 なら成功、0 なら主キーで行の有無を確かめて競合か `NoSuchElementException` に分け、2 以上なら `IllegalStateException` にする。
+  `55P03` の `CannotAcquireLockException` は、それを原因に付けた競合の例外に変える。
+  競合の例外は呼び出し側がメッセージと原因から作る関数（`OrderConflictException::new`）で渡し、`shared` は Domain と `error` の型に依存しない。
+  期待する版が 1 未満なら、SQL を実行する前に `IllegalArgumentException` にする。
+- `updateWhere` と子の更新は `SET lock_no = lock_no + 1` を書き、版を比べない更新でも版を進める。
+  `updateWhere` と `deleteWhere` は件数を返し、Error Prone の `@CheckReturnValue` を付けて、戻り値の無視をコンパイルの失敗にする。
+  `updateWhere` は、業務の列が一つもなければ `IllegalArgumentException` にする。
+- `CommonColumns.forUpdate` は `updated_*` だけを返し、package-private にする。
+  UPDATE の `lock_no` を書くのは `TableWriter` だけになる。
+- ArchUnit の `TableWriterArchTest` で次を検査する。
+  - `TableWriter`、`LockedRoot`、`DeletedRoot` の外の本番のコードは、jOOQ の UPDATE、DELETE、UPSERT、MERGE の入口、`Update` と `Delete` に代入できる型の実行、`UpdatableRecord` と `DAO` の書き込み、JDBC の直接の利用を呼ばない。
+    判定は、呼び出し先の型が禁じる型に代入できるかで行う。
+  - `Jooq<Aggregate>Repository` の `update` と `delete` は、版を比べる入口を直接呼ぶ。
+  - 集約ルートを引数に取るメソッドは、版を比べない入口を呼ばない。
+  - `lockNo` を持つ Command の CommandHandler は `ensureLockNo` を呼ぶ。
+- jOOQ の実行時の版をテストで固定する。
+  版が変わったら、[jOOQ の SQL の書き方](../database/jooq-usage.md)の「jOOQの版を上げるとき」に従って禁止の一覧を見直す。
 - CommandHandler は `order.ensureLockNo(command.lockNo())` を残す。
-  CommandHandler は集約を DB から読み直すため、`ensureLockNo` は画面の値と読んだ値を比べ、UPDATE の条件は読んだ値と更新の時点の行の値を比べる。
+  画面の版が古いとき、業務の検査や外部の呼び出しより先に競合として失敗させるためである。
 - jOOQ の `executeWithOptimisticLocking` と `recordVersionFields` は使わない。
-  これらは `UpdatableRecord.store()` でしか働かず、Repository は UPDATE を DSL で書く。
 - `SELECT ... FOR UPDATE` の `NOWAIT` と `SKIP LOCKED` は、楽観的ロック以外の DB の行ロックとバッチのために規約に残す。
 - `NoSuchElementException` と `<Aggregate>ConflictException` を 404 と 409 にする対応づけは [issue #107](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/107) で扱い、それまではどちらも 500 になる。
 
 この決定は、取り込んだガイドラインを ADR-040 に従って改変し、[ADR-048](ADR-048-add-shared-module-for-jooq-common-code.md) と [ADR-050](ADR-050-define-backend-class-roles-and-naming.md) の `update` の手順を書き換える。
+データパッチの規約（[PostgreSQL の共通カラム](../database/postgresql-common-columns.md)、[PostgreSQL のロックを抑えるスキーマ変更](../database/postgresql-online-schema-change.md)）と、トリガーを使わない規約（[PostgreSQL のテーブル以外の DB オブジェクト](../database/postgresql-database-objects.md)）は変えない。
 
 ## Consequences
 
 ### Positive
 
-- 集約ルートの UPDATE が行ロックを取るため、同じトランザクションで後から更新する子の行も、集約ルートの行ロックで守られる。
-- 「行がない」と「他の人が更新した」を区別する SELECT は、件数が 0 のときだけ実行する。
-  成功する更新は UPDATE だけで済む。
-- 集約ごとの `lockOrder` がなくなり、件数の判定が `requireUpdated` の一か所になる。
-  判定の書き忘れは、Repository の規約のチェックリストと、競合と行がないことを確かめる Repository のテストで見つける。
-- `NOWAIT` の代わりに `lock_timeout` がロック待ちの上限になる（[ADR-055](ADR-055-set-db-time-limits-per-connection.md)）。
+- Repository が書くのは業務の列の値だけになり、版の条件、版の設定、件数の判定、`55P03` の変換を書く場所がなくなる。
+- 入口の選び分けは、期待する版を持っているかだけで決まる。
+- Java の書き込みの迂回はテスト（ArchUnit）で失敗する。
+  別のテーブルの列、型の違う値、版を比べない入口の件数の無視は、コンパイルで失敗する。
+- 版を比べない更新も版を進めるため、在庫の引き当てのような Java の更新が先に走れば、その前に読んだ画面の保存は上書きせずに競合として返る。
+- 競合と行なしの判定は `TableWriter` の実 PostgreSQL のテストに集まり、Repository のテストは列と集約の往復だけを確かめる。
+- 集約ルートの UPDATE が行ロックを取るため、同じトランザクションで後から書く子の行も、`TableWriter` の経路ではルートの行ロックで守られる。
 
 ### Negative
 
+- 次の書き込みの誤りは、機械で検出しない。
+  - **Java の外の writer**：psql のデータパッチと Liquibase のデータ変更は、`lock_no` を進め忘れても何も止めない。
+    変えない規約ではデータパッチは `lock_no` を進めないため、パッチの前に開いた画面の保存が、パッチの結果を上書きしうる。
+    これは規約が受け入れているリスクとする。
+  - **jOOQ の新しい書き込みの API**：jOOQ の版を上げると、ArchUnit の禁止の一覧にない書き込みの API が増えうる。
+    実行時の版を固定したテストが失敗するため、「jOOQの版を上げるとき」の手順で一覧を見直す。
+  - **ルートを通さない子の書き込み**：`updateWhere` と `deleteWhere` に子のテーブルを渡すことと、ルートを書かずに子を INSERT することは止められない。
+    集約ルートを引数に取るメソッドからの `updateWhere` は止まるため、残るのは識別子だけを受け取るメソッドである。
+  - **`long lockNo` を引数に取るメソッド**：期待する版を `long` の引数で受け取るメソッドが `updateWhere` を使う誤りは検出できない。
+    ArchUnit は引数の名前を確実には読めず、`long` の引数を一律に禁じると正当な数量の引数も止まる。
+    そこで規約は、期待する版を持つ書き込みを、集約ルートを受け取る `update` と `delete` に限る。
+  - **psql による古い版での物理削除**：手順書で `WHERE lock_no = ?` を必須にするほかない。
+  - **`ensureLockNo` に渡す値**：ArchUnit は `ensureLockNo` を呼んだかしか見ず、渡した値が `command.lockNo()` かは見ない。
+- 同じトランザクションで同じ集約を二度保存すると、二度目は期待する版が古く競合になる。
+  CommandHandler は集約を一度だけ保存する規約のままにする。
+- `ColumnValues` の値に別のテーブルの列の式を渡すことは、型で止まらない。
+  PostgreSQL が `42P01`（FROM 句にないテーブル）で拒否するため、Repository の往復のテストで失敗する。
 - 取り込んだガイドラインの方式から外れ、出典の節に改変を記す必要がある。
-- 集約ルートの業務の列が変わらない更新でも、集約ルートの行を書くため、WAL が増える。
-- 件数が 0 の UPDATE と `fetchExists` の間に他の人が行を消すと、競合ではなく「行がない」として返る。
-- ロックを取れない UPDATE は、即座に失敗せず、`lock_timeout` まで待ってから競合になる。
+- 集約ルートの業務の列が変わらない更新でも集約ルートの行を書くため、WAL が増える。
+- 件数が 0 の UPDATE と主キーの確認の間に他の人が行を消すと、競合ではなく「行がない」として返る。
+- ロックを取れない UPDATE は、即座に失敗せず、`lock_timeout` まで待ってから競合になる（[ADR-055](ADR-055-set-db-time-limits-per-connection.md)）。
 
 ### Neutral
 
-- `requireUpdated` の呼び忘れは機械では検査しない。
-  集約ができて呼び忘れが問題になったら、ArchUnit の規則を検討する。
+- 子の行は 1 行ずつ更新する。
+  子の行が多い集約が出たら、`LockedRoot` の中で batch にする。
+- `shared` が公開する書き込みの型は、`TableWriter`、`ColumnValues`、`LockedRoot`、`DeletedRoot` の四つになる。
 
 ## Alternatives Considered
 
-### 選択肢1: 先に SELECT ... FOR UPDATE NOWAIT でロックしてから比べる
+### 選択肢1: 件数を受け取る共通処理と規約
+
+- **Description**：この ADR の最初の版。Repository が UPDATE を書き、件数を `OptimisticLock.requireUpdated` に渡す。
+- **Pros**：共通処理が小さく、SQL が Repository に見える。
+- **Cons**：版の条件、加算、件数の受け渡し、`55P03` の変換のどれを書き忘れても UPDATE は成功し、検査はレビューだけになる。
+
+### 選択肢2: 直接の DSL と、Repository ごとの実 DB の古い保存のテスト
+
+- **Description**：共通処理を持たず、各 Repository のテストで競合を確かめる。
+- **Pros**：本番と同じ SQL を実 DB で確かめる。
+- **Cons**：テストを書き忘れると何も止まらない。
+  共通の契約テストの継承を ArchUnit で確かめても、フィクスチャの正しさは確かめられない。
+
+### 選択肢3: 未実行の query を受け取る共通処理
+
+- **Description**：Repository が組み立てた UPDATE を共通処理が実行し、件数を判定する。
+- **Pros**：件数の判定の書き忘れがなくなる。
+- **Cons**：WHERE と SET の中身は共通処理から見えず、版の条件と加算の書き忘れが残る。
+  共通処理に渡さず `execute()` を呼ぶ迂回も止まらない。
+
+### 選択肢4: jOOQ の UpdatableRecord と recordVersionFields
+
+- **Description**：コード生成で `lock_no` をバージョンのカラムにし、Record の `store()` と `delete()` で版を扱う。
+- **Pros**：コード生成で全テーブルに効き、`DataChangedException` を jOOQ が投げる。
+- **Cons**：DSL の UPDATE と、子の更新での親の版には効かない。
+  集約と Record の変換が読み取りと書き込みで別の形になり、共通カラムの値を `CommonColumns` から渡す形とも合わない。
+
+### 選択肢5: ExecuteListener と Query Object Model で SQL を検査する
+
+- **Description**：実行の直前に UPDATE の WHERE と SET を調べ、版の条件がなければ失敗させる。
+- **Pros**：DSL の書き方を変えずに済む。
+- **Cons**：jOOQ の Query Object Model は experimental であり（[jOOQ 3.21, Query object model design](https://www.jooq.org/doc/3.21/manual/sql-building/model-api/model-api-design/)）、木の走査は Open Source Edition で使えない。
+  条件の書き方を網羅できず、版を比べない正当な UPDATE に抜け道の印が要る。
+  JDBC の直接の利用と psql には効かない。
+
+### 選択肢6: 先に SELECT ... FOR UPDATE NOWAIT でロックしてから比べる
 
 - **Description**：取り込んだガイドラインのとおり、行をロックして `lock_no` を比べてから UPDATE する。
 - **Pros**：ロックを取れなければ即座に失敗し、SELECT の段階で「行がない」と「他の人が更新した」を区別できる。
-- **Cons**：集約ごとに `lockOrder` が要り、比べる処理を書き忘れても UPDATE が成功して他の人の更新を上書きする。
+- **Cons**：集約ごとにロックして比べるメソッドが要り、比べる処理を書き忘れても UPDATE が成功する。
   成功する更新でも、SELECT と UPDATE の二つの文を実行する。
 
-### 選択肢2: jOOQ の recordVersionFields と store() を使う
+### 選択肢7: 共通処理が error の共通の例外を投げる
 
-- **Description**：コード生成で `lock_no` をバージョンのカラムにし、`UpdatableRecord.store()` で更新する。
-- **Pros**：jOOQ が件数を判定し、`DataChangedException` を投げる。
-- **Cons**：Repository は UPDATE を DSL で書いており、`store()` を使うと集約と Record の変換の形が変わる。
-  共通カラムの値を `CommonColumns` から渡す形とも合わない。
-
-### 選択肢3: 件数を各 Repository で判定する
-
-- **Description**：`shared` に共通処理を置かず、各 Repository が件数を見て例外を投げる。
-- **Pros**：`shared` の公開する型が増えない。
-- **Cons**：0 件のときの行の有無の確かめ方と例外のメッセージが Repository ごとに食い違い、判定を書き忘れやすい。
-
-### 選択肢4: 共通処理が error の共通の例外を投げる
-
-- **Description**：`OptimisticLock` が `error` モジュールの競合と未検出の例外を投げる。
+- **Description**：`TableWriter` が `error` モジュールの競合と未検出の例外を投げる。
 - **Pros**：呼び出し側が例外を作る関数を渡さずに済む。
 - **Cons**：`shared` が `error` に依存し、依存の向きが内側へ向かなくなる。
-  集約の `Jooq<Aggregate>Repository` が `error` の型に依存すると、`infrastructureDependsOnlyOnDomainModel` の規則にも反する。
 
-### 選択肢5: 共通処理が UPDATE も実行する
+### 選択肢8: DB のトリガーで版の前進を強制する
 
-- **Description**：`OptimisticLock` が UPDATE を組み立てて実行し、`55P03` の変換と件数の判定をまとめて担う。
-- **Pros**：`CannotAcquireLockException` の変換も一か所になる。
-- **Cons**：業務の列の書き方と子の行の更新を共通処理に渡す形が要り、SQL が Repository から離れる。
-  共通処理を件数の判定だけにすれば、Repository の SQL はそのまま読める。
+- **Description**：業務テーブルに BEFORE UPDATE の行トリガーを付け、`lock_no` を 1 進めない UPDATE を拒否する。
+- **Pros**：psql のデータパッチ、Liquibase のデータ変更、別のプロセスの書き込みにも効く。
+- **Cons**：「トリガーは使わない」の規約（[PostgreSQL のテーブル以外の DB オブジェクト](../database/postgresql-database-objects.md)）を保つという利用者の決定により採らない。
+  Java の外の書き込みの誤りは、Negative に書いた残るリスクとして扱う。
 
 ## References
 
@@ -123,8 +179,10 @@ PostgreSQL の READ COMMITTED では、UPDATE は対象の行のロックを取�
 - [ADR-050: バックエンドのクラスの役割と命名を定める](ADR-050-define-backend-class-roles-and-naming.md)
 - [ADR-055: DB のロック待ち、文の実行、トランザクション中の待機の上限を接続ごとに設定する](ADR-055-set-db-time-limits-per-connection.md)
 - [PostgreSQL の排他制御](../database/postgresql-concurrency-control.md)
+- [jOOQ の SQL の書き方](../database/jooq-usage.md)
 - [クラスの役割：jOOQ の Repository](../backend/class-roles/jooq-repository.md)
-- [PostgreSQL, Read Committed Isolation Level](https://www.postgresql.org/docs/current/transaction-iso.html#XACT-READ-COMMITTED)
-- [PostgreSQL, Explicit Locking](https://www.postgresql.org/docs/current/explicit-locking.html)
+- [バックエンドのアーキテクチャテスト](../backend/architecture-tests.md)
+- [PostgreSQL 18, Read Committed Isolation Level](https://www.postgresql.org/docs/18/transaction-iso.html#XACT-READ-COMMITTED)
+- [PostgreSQL 18, Explicit Locking](https://www.postgresql.org/docs/18/explicit-locking.html)
 - [jOOQ, Optimistic locking](https://www.jooq.org/doc/latest/manual/sql-execution/crud-with-updatablerecords/optimistic-locking/)
-- [Doma, Update](https://docs.domaframework.org/en/latest/query/update/)
+- [Error Prone, CheckReturnValue](https://errorprone.info/bugpattern/CheckReturnValue)

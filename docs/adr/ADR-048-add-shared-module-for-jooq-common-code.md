@@ -40,12 +40,13 @@ shared モジュールは、モジュール単位の統合テストでも常に�
 jOOQ の共通処理は `com.example.demo.shared.infrastructure.persistence` に置く。
 このパッケージはモジュールのルートではないため、[バックエンドアーキテクチャ](../backend/architecture.md) の定めに従い `@NamedInterface` で公開する。
 
-`shared` には、共通カラムの値を組み立てる共通処理、NULL を空文字へ変える Converter、楽観的ロックの更新件数を判定する共通処理だけを置き、業務の概念を置かない。
-共通カラムの値には `lock_no` を含め、INSERT では `1`、UPDATE では1加算した値にする。
+`shared` には、共通カラムの値を組み立てる共通処理、NULL を空文字へ変える Converter、業務テーブルの UPDATE と DELETE の入口だけを置き、業務の概念を置かない。
+INSERT の共通カラムの値には `lock_no` を含め、`1` にする。
+UPDATE の共通カラムの値（`forUpdate`）は `updated_*` だけを返し、UPDATE の `lock_no` は `TableWriter` だけが書く。
 `*_pgm_cd` の値の求め方は [ADR-051](ADR-051-bind-pgm-cd-with-scoped-value-and-aspect.md) で決める。
 ADR-051 の `*_pgm_cd` を束縛する Aspect も、共通カラムの値を組み立てる共通処理の一部として `shared` に置く。
 
-楽観的ロックの更新件数を判定する共通処理 `OptimisticLock` も `shared` に置く（[ADR-054](ADR-054-detect-optimistic-lock-conflicts-by-update-count.md)）。
+業務テーブルの UPDATE と DELETE を組み立てて実行する唯一の入口 `TableWriter` も `shared` に置く（[ADR-054](ADR-054-detect-optimistic-lock-conflicts-by-update-count.md)）。
 `shared` は Domain と `error` の型に依存せず、競合の例外は呼び出し側が関数で渡す。
 `shared` を使うのは、他のモジュールの `infrastructure.persistence` のアダプターだけとする。
 
@@ -56,7 +57,7 @@ ADR-051 の `*_pgm_cd` を束縛する Aspect も、共通カラムの値を組�
 
 ### Positive
 
-- 共通カラムの設定と楽観的ロックの更新件数の判定の実装が一つになり、モジュールごとに実装が食い違わない。
+- 共通カラムの設定と、楽観的ロックの版の条件、版の設定、件数の判定の実装が一つになり、モジュールごとに実装が食い違わない。
 - 共通カラムを参照できる場所が一つに限られるため、業務ロジックから共通カラムを参照していないかを ArchUnit で検査できる。
 
 ### Negative
@@ -100,7 +101,7 @@ ADR-051 の `*_pgm_cd` を束縛する Aspect も、共通カラムの値を組�
 - [ADR-002: package by feature とオニオンアーキテクチャ](ADR-002-package-by-feature-onion-architecture.md)
 - [ADR-003: データアクセスに jOOQ を採用](ADR-003-adopt-jooq-for-data-access.md)
 - [ADR-051: 共通カラムの pgm_cd を Aspect と ScopedValue で渡す](ADR-051-bind-pgm-cd-with-scoped-value-and-aspect.md)
-- [ADR-054: 楽観的ロックの競合を UPDATE の条件の lock_no と更新件数で判定する](ADR-054-detect-optimistic-lock-conflicts-by-update-count.md)
+- [ADR-054: 楽観的ロックの競合を lock_no の条件と更新件数で判定し、業務テーブルの UPDATE と DELETE を TableWriter に集める](ADR-054-detect-optimistic-lock-conflicts-by-update-count.md)
 - [バックエンドアーキテクチャ](../backend/architecture.md)
 - [バックエンドのアーキテクチャテスト](../backend/architecture-tests.md)
 - [PostgreSQL の共通カラム](../database/postgresql-common-columns.md)

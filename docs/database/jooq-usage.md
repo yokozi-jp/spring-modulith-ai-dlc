@@ -1,7 +1,7 @@
 ---
 type: Convention
 title: jOOQのSQLの書き方
-description: jOOQでSQLを組み立てるときに使わないAPIと設定を定める規約。infrastructure.persistenceでjOOQのクエリを書くとき、jOOQのSettingsを変えたくなったときに読む。
+description: jOOQでSQLを組み立てるときに使わないAPIと設定、業務テーブルの書き込みの入口、jOOQの版を上げるときの見直しの手順を定める規約。infrastructure.persistenceでjOOQのクエリを書くとき、jOOQのSettingsを変えたくなったとき、jOOQかSpring Bootの版を上げるときに読む。
 tags: [convention, database, jooq]
 ---
 
@@ -9,6 +9,7 @@ tags: [convention, database, jooq]
 
 SQLは生成されたメタモデルのクラスから組み立てる。
 Plain SQLのAPIと`withRenderSchema(false)`は使わない。
+業務テーブルのUPDATEとDELETEは、sharedモジュールの`TableWriter`で書く。
 
 ## 対象
 
@@ -31,11 +32,14 @@ jOOQの生成コードには適用しない。
 ## 楽観的ロック
 
 jOOQの楽観的ロックの機能を使わない規則は、[PostgreSQLの排他制御](postgresql-concurrency-control.md)に従う。
-楽観的ロックのUPDATEの更新件数は、sharedモジュールの`OptimisticLock.requireUpdated`で判定する（[ADR-054](../adr/ADR-054-detect-optimistic-lock-conflicts-by-update-count.md)）。
+業務テーブルのUPDATEとDELETEは、sharedモジュールの`TableWriter`だけが組み立てて実行する（[ADR-054](../adr/ADR-054-detect-optimistic-lock-conflicts-by-update-count.md)）。
+`DSLContext`の`update`、`delete`、`deleteFrom`、`mergeInto`、UPSERT、`UpdatableRecord`の書き込み、JDBCの直接の利用を、`TableWriter`の外で使わない。
 
 ## 共通処理
 
-共通カラムの値は、sharedモジュールの`CommonColumns`の`forInsert(table)`と`forUpdate(table)`が返し、`set(...)`で登録する（[ADR-048](../adr/ADR-048-add-shared-module-for-jooq-common-code.md)）。
+INSERTの共通カラムの値は、sharedモジュールの`CommonColumns.forInsert(table)`が返し、`set(...)`で登録する（[ADR-048](../adr/ADR-048-add-shared-module-for-jooq-common-code.md)）。
+UPDATEの共通カラムの値と`lock_no`は`TableWriter`が書く。
+`CommonColumns.forUpdate`は`TableWriter`だけが使うpackage-privateのメソッドである。
 Repositoryでの書き方は[クラスの役割：jOOQ の Repository](../backend/class-roles/jooq-repository.md)に従う。
 
 NOT NULLの`varchar`には、コード生成がNULLを空文字へそろえるConverterを当てる。
@@ -44,7 +48,23 @@ NOT NULLの`varchar`には、コード生成がNULLを空文字へそろえるCo
 
 ## 検査
 
-Plain SQLのAPIと`withRenderSchema(false)`の使用は、ArchUnitで検査する。
+Plain SQLのAPIと`withRenderSchema(false)`の使用は、ArchUnitの`DatabaseConventionsArchTest`で検査する。
+`TableWriter`の外の書き込みと入口の選び分けは、ArchUnitの`TableWriterArchTest`で検査する（[バックエンドのアーキテクチャテスト](../backend/architecture-tests.md)）。
+
+## jOOQの版を上げるとき
+
+jOOQの版を上げると、`TableWriterArchTest.tableWritesGoThroughTableWriter`の禁止の一覧にない書き込みのAPIが増えうる。
+そのため、実行時のjOOQの版を`TableWriterArchTest.jooqVersionIsReviewed`で固定している。
+
+Spring Bootの版、`backend/build.gradle`のjOOQのコード生成のプラグインの版を変える人と、それらを変えるDependabotのPull Requestをマージする人は、次の手順で見直す。
+
+1. `jooqVersionIsReviewed`が失敗し、新しい実行時の版を示す。
+2. jOOQのリリースノートと、`javap`で`DSLContext`、`DSL`、`Update*`、`Delete*`、`Merge*`、`Insert*Step`、`UpdatableRecord`、`DAO`の公開メソッドを確かめ、UPDATE、DELETE、UPSERT、MERGEを実行する新しいAPIを探す。
+3. 新しい書き込みの入口があれば、`tableWritesGoThroughTableWriter`の禁止の一覧と、違反のフィクスチャ`DirectOrderWriter`に足す。
+4. コード生成のプラグインと実行時のjOOQのマイナー版をそろえ、[jOOQコード生成物の管理](jooq-codegen.md)に従って生成し直す。
+5. `TableWriterArchTest`の`REVIEWED_JOOQ_VERSION`を新しい版に更新する。
+
+実行時の版とコード生成の版の関係は、`backend/gradle/database.gradle`の`jooq`ブロックのコメントに書いている。
 
 ## 参照資料
 

@@ -99,9 +99,9 @@ Proposed
   新規と更新を一つの `save` にすると、実装は行の有無で INSERT と UPDATE を選ぶことになり、他の人が消した集約の更新が新しい行の作成になって、「行がない」（404）として返せないためである。
 - `add` は、`insertInto` の `set(列, 値)` で業務の全列を書き、`lock_no` を含む共通カラムの値は [ADR-048](ADR-048-add-shared-module-for-jooq-common-code.md) の `shared` の共通処理から受け取る。
 - `update` は、[PostgreSQL の排他制御](../database/postgresql-concurrency-control.md)の楽観的ロックに従う（[ADR-054](ADR-054-detect-optimistic-lock-conflicts-by-update-count.md)）。
-  集約ルートの行を、`lock_no` が集約の `lockNo` と一致する条件と、`lock_no` の加算を含む共通カラムの値で先に更新し、子の行はその後で更新する。
-  更新件数は `shared` の `OptimisticLock.requireUpdated` が判定し、0 件のとき、行がなければ `NoSuchElementException` を、行があれば `domain.model` の `<Aggregate>ConflictException` を投げる。
-  `lock_timeout` までに行のロックを取れないときも、`<Aggregate>ConflictException` を投げる。
+  集約ルートの行は `shared` の `TableWriter.updateCheckingVersion` に、集約の `lockNo` と業務の列の値を渡して先に更新し、子の行は戻り値の `LockedRoot` で後から更新する。
+  版の条件、版の設定、件数の判定は `TableWriter` が持ち、0 件のとき、行がなければ `NoSuchElementException` を、行があれば渡した関数が作る `domain.model` の `<Aggregate>ConflictException` を投げる。
+  `lock_timeout` までに行のロックを取れないときも、`TableWriter` が `<Aggregate>ConflictException` に変える。
 - Controller が作り、既存の集約の状態を変える Command は、クライアントが参照の応答で受け取った `lockNo` を持つ。
   CommandHandler は、集約を取り出した直後に集約の `lockNo` と比べ、画面から受け取った値と更新の時点の行の値の比較が成り立つようにする。
 - 外部システムのインタフェースの実装は `infrastructure.client` の `<ExternalSystem>Client` とする。
@@ -304,7 +304,7 @@ Proposed
 - [ADR-013: HTTP API 契約を標準化する](ADR-013-standardize-http-api-contracts.md)
 - [ADR-019: 外部連携の耐障害性と容量制御を標準化する](ADR-019-define-resilience-and-capacity-guardrails.md)
 - [ADR-048: jOOQ の共通処理を共有モジュール shared に置く](ADR-048-add-shared-module-for-jooq-common-code.md)
-- [ADR-054: 楽観的ロックの競合を UPDATE の条件の lock_no と更新件数で判定する](ADR-054-detect-optimistic-lock-conflicts-by-update-count.md)
+- [ADR-054: 楽観的ロックの競合を lock_no の条件と更新件数で判定し、業務テーブルの UPDATE と DELETE を TableWriter に集める](ADR-054-detect-optimistic-lock-conflicts-by-update-count.md)
 - [PostgreSQL の排他制御](../database/postgresql-concurrency-control.md)
 - [PostgreSQL の共通カラム](../database/postgresql-common-columns.md)
 - [メッセージングの設計](../integration/async-messaging-design.md)
