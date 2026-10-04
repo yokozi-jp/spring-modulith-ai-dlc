@@ -1,5 +1,6 @@
 package archfixture.violating.order.infrastructure.persistence;
 
+import java.nio.charset.StandardCharsets;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
@@ -25,7 +26,10 @@ import org.jooq.Update;
 import org.jooq.UpdateSetMoreStep;
 import org.jooq.WithStep;
 import org.jooq.impl.DSL;
+import org.jooq.impl.QOM;
+import org.springframework.core.io.ByteArrayResource;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.jdbc.datasource.init.ResourceDatabasePopulator;
 import org.springframework.jdbc.object.SqlUpdate;
 
 /**
@@ -142,6 +146,19 @@ public final class DirectOrderWriter {
   /** {@code LoaderOptionsStep.onDuplicateKeyUpdate} を呼ぶ。 */
   public static Object loaderOnDuplicateKeyUpdate(final LoaderOptionsStep<Record> loader) {
     return loader.onDuplicateKeyUpdate();
+  }
+
+  /** 問い合わせのモデルの {@code QOM.Insert.$onDuplicateKeyUpdate} で、INSERT を UPSERT に組み替える。 */
+  public static Object qomOnDuplicateKeyUpdate(final QOM.Insert<Record> insert) {
+    return insert.$onDuplicateKeyUpdate(true);
+  }
+
+  /** Spring の {@code ResourceDatabasePopulator} で、接続を取らずに {@code DataSource} から SQL を流す。 */
+  public static DataSource springScriptPopulator(final DataSource dataSource) {
+    new ResourceDatabasePopulator(
+            new ByteArrayResource(DELETE_SQL.getBytes(StandardCharsets.UTF_8)))
+        .execute(dataSource);
+    return dataSource;
   }
 
   /** Spring の {@code SqlUpdate} で、接続を取らずに {@code DataSource} から書く。 */

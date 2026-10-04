@@ -66,6 +66,8 @@ class ArchitectureRuleFixtureTest {
           "insertQueryOnDuplicateKeyUpdate",
           "insertQueryAddValueForUpdate",
           "loaderOnDuplicateKeyUpdate",
+          "qomOnDuplicateKeyUpdate",
+          "springScriptPopulator",
           "springSqlUpdate",
           "staticDslUpdate",
           "lambdaExecute",
@@ -146,9 +148,13 @@ class ArchitectureRuleFixtureTest {
                 TableWriterArchTest.repositoryUpdateAndDeleteCheckVersionRule(VIOLATING),
                 UNVERSIONED_REPOSITORY + ".save("),
             row(
-                "repositoryUpdateAndDeleteTakeVersionedAggregates",
-                TableWriterArchTest.repositoryUpdateAndDeleteTakeVersionedAggregatesRule(),
+                "repositoryWritesTakeVersionedAggregates",
+                TableWriterArchTest.repositoryWritesTakeVersionedAggregatesRule(),
                 "order.domain.model.UnversionedOrderRepository.update("),
+            row(
+                "repositoryWritesTakeVersionedAggregates: add",
+                TableWriterArchTest.repositoryWritesTakeVersionedAggregatesRule(),
+                "order.domain.model.UnversionedOrderRepository.add("),
             row(
                 "commandHandlersEnsureScreenLockNo",
                 TableWriterArchTest.commandHandlersEnsureScreenLockNoRule(),
@@ -387,7 +393,7 @@ class ArchitectureRuleFixtureTest {
         ClassRoleArchTest.jooqReflectionMappingIsNotUsed,
         TableWriterArchTest.tableWritesGoThroughTableWriterRule(basePackage),
         TableWriterArchTest.repositoryUpdateAndDeleteCheckVersionRule(basePackage),
-        TableWriterArchTest.repositoryUpdateAndDeleteTakeVersionedAggregatesRule(),
+        TableWriterArchTest.repositoryWritesTakeVersionedAggregatesRule(),
         TableWriterArchTest.commandHandlersEnsureScreenLockNoRule(),
         TableWriterArchTest.aggregateMethodsDoNotUseUnversionedWritesRule(basePackage));
   }

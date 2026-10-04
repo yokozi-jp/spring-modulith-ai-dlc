@@ -154,10 +154,13 @@ class TableWriterArchTest {
   /* package */ static final ArchRule repositoryUpdateAndDeleteCheckVersion =
       repositoryUpdateAndDeleteCheckVersionRule(BASE_PACKAGE);
 
-  /** Repository の {@code update} と {@code delete} は、{@code long lockNo()} を持つ集約ルートを受け取る（H6）。 */
+  /**
+   * Repository の {@code add}、{@code update}、{@code delete} は、{@code long lockNo()}
+   * を持つ集約ルートを受け取る（H6）。
+   */
   @ArchTest
-  /* package */ static final ArchRule repositoryUpdateAndDeleteTakeVersionedAggregates =
-      repositoryUpdateAndDeleteTakeVersionedAggregatesRule();
+  /* package */ static final ArchRule repositoryWritesTakeVersionedAggregates =
+      repositoryWritesTakeVersionedAggregatesRule();
 
   /** {@code lockNo} を持つ Command の CommandHandler は {@code ensureLockNo} を呼ぶ（H4）。 */
   @ArchTest
@@ -211,7 +214,8 @@ class TableWriterArchTest {
         .should()
         .accessTargetWhere(
             DescribedPredicate.describe(
-                "jOOQ の UPDATE、DELETE、UPSERT、MERGE、Query 型の実行、UpdatableRecord と DAO の書き込み、JDBC の直接の利用",
+                "jOOQ の UPDATE、DELETE、UPSERT、MERGE、Query 型の実行、問い合わせのモデルの $ で始まる API、"
+                    + "UpdatableRecord と DAO の書き込み、Spring JDBC と JDBC の直接の利用",
                 TableWriterArchTest::isDirectWrite))
         .because(
             "版の条件、版の設定、件数の判定を書き忘れた UPDATE と DELETE は成功して、他の人の更新を黙って上書きするため。"
@@ -243,17 +247,17 @@ class TableWriterArchTest {
   }
 
   /** H6 の規則を組み立てる。 */
-  /* package */ static ArchRule repositoryUpdateAndDeleteTakeVersionedAggregatesRule() {
+  /* package */ static ArchRule repositoryWritesTakeVersionedAggregatesRule() {
     return methods()
         .that(
             DescribedPredicate.describe(
-                "domain.model の *Repository インタフェースの update と delete",
-                TableWriterArchTest::isRepositoryInterfaceUpdateOrDelete))
+                "domain.model の *Repository インタフェースの add、update、delete",
+                TableWriterArchTest::isRepositoryInterfaceWrite))
         .should(takeOneAggregateRootWithLockNo())
         .allowEmptyShould(true)
         .because(
             "集約ルートが long lockNo() を持たないと、版を比べる規則がその集約を見つけられず、版を比べない保存が検出されないため。"
-                + "直し方：update と delete は集約ルートを一つだけ受け取り、集約ルートは private final long lockNo と"
+                + "直し方：add、update、delete は集約ルートを一つだけ受け取り、集約ルートは private final long lockNo と"
                 + "引数のない long lockNo() を持つ。"
                 + "規約：docs/backend/class-roles/repository.md、docs/backend/class-roles/aggregate.md、"
                 + DOCS);
@@ -320,8 +324,10 @@ class TableWriterArchTest {
         || owner.isAssignableTo(Merge.class)
         || owner.isAssignableTo(Connection.class)
         || owner.isAssignableTo(Statement.class)
-        || owner.getPackageName().startsWith("org.springframework.jdbc.core")
-        || owner.getPackageName().startsWith("org.springframework.jdbc.object");
+        // ResourceDatabasePopulator や ScriptUtils も任意の SQL を流せるため、サブパッケージを選ばずに禁じる。
+        || owner.getPackageName().startsWith("org.springframework.jdbc")
+        // 問い合わせのモデルの API（QOM の $onDuplicateKeyUpdate、$replace など）は、INSERT を UPSERT に組み替えられる。
+        || (owner.getPackageName().startsWith("org.jooq") && name.startsWith("$"));
   }
 
   /**
@@ -369,10 +375,16 @@ class TableWriterArchTest {
     };
   }
 
-  /** {@code domain.model} の {@code *Repository} インタフェースの {@code update} か {@code delete} かを返す。 */
-  private static boolean isRepositoryInterfaceUpdateOrDelete(final JavaMethod method) {
+  /**
+   * {@code domain.model} の {@code *Repository} インタフェースの {@code add}、{@code update}、{@code delete}
+   * かを返す。
+   *
+   * <p>必須の {@code add} を含めるため、{@code save(Order)} のような名前で保存する Repository でも、{@code lockNo()}
+   * を持たない集約は {@code add} で検出される。
+   */
+  private static boolean isRepositoryInterfaceWrite(final JavaMethod method) {
     final JavaClass owner = method.getOwner();
-    return Set.of(UPDATE, DELETE).contains(method.getName())
+    return Set.of(ADD, UPDATE, DELETE).contains(method.getName())
         && owner.isInterface()
         && owner.getSimpleName().endsWith("Repository")
         && owner.getPackageName().contains(".domain.model");
