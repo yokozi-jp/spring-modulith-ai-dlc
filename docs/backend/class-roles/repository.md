@@ -49,7 +49,7 @@ Presentation は Repository を使わない。
   この二つの例外を、インタフェースの Javadoc に書く。
 - 集約の物理削除が要るときは `void delete(集約ルート)` を置き、`update` と同じ二つの例外を Javadoc に書く。
   期待する版を持つ書き込みは、集約ルートを受け取る `update` と `delete` に限り、識別子と版を受け取るメソッドを作らない。
-- `update` と `delete` の引数の集約ルートは、引数のない `long lockNo()` を持つ（[集約](aggregate.md)）。
+- `add`、`update`、`delete` の引数の集約ルートは、引数のない `long lockNo()` を持つ（[集約](aggregate.md)）。
 - 版を比べない UPDATE か DELETE の件数を返すメソッド（在庫を引き当てて件数を返す、など）には、Error Prone の `@CheckReturnValue` を付ける。
   呼び出し側が件数を捨てると、コンパイルが失敗する。
 - インタフェースと各メソッドに Javadoc を書く。
@@ -115,7 +115,7 @@ public interface OrderRepository {
 // com.example.demo.order.infrastructure.persistence.JooqOrderRepository（宣言だけ）
 @Repository
 class JooqOrderRepository implements OrderRepository {
-  // DSLContext と shared の CommonColumns を受け取り、jOOQ の列と Order の変換もこのクラスに書く。
+  // DSLContext と shared の CommonColumns、TableWriter を受け取り、jOOQ の列と Order の変換もこのクラスに書く。
 }
 ```
 
@@ -123,7 +123,7 @@ class JooqOrderRepository implements OrderRepository {
 
 インタフェース自体の専用のテストは作らない。
 実装の `JooqOrderRepository` を `@DatabaseTest` で、保存してから読み戻す往復で確かめる。
-`update` の競合の確かめ方は [jOOQ の Repository](jooq-repository.md) の「対応するテスト」に示す。
+`update` と `delete` の競合と行がない場合は、Repository ごとには確かめず、`shared` の `TableWriterTest` と `TableWriterConcurrencyTest` が確かめる（[jOOQ の Repository](jooq-repository.md) の「対応するテスト」）。
 jOOQ の列と集約の変換も、この往復で確かめる。
 テストは実装と同じ `com.example.demo.order.infrastructure.persistence` パッケージのテストソースに置く。
 
@@ -141,7 +141,8 @@ class JooqOrderRepositoryTest {
   @Test
   @DisplayName("保存した注文を ID で読み戻せる")
   void savesAndFindsOrder() {
-    final OrderRepository repository = new JooqOrderRepository(dsl, commonColumns);
+    final OrderRepository repository =
+        new JooqOrderRepository(dsl, commonColumns, new TableWriter(dsl, commonColumns));
     final Order order =
         Order.place(
             OrderId.newId(),
@@ -185,7 +186,7 @@ class JooqOrderRepositoryTest {
 - [ ] 集約ルートごとに一つ、`<Aggregate>Repository` の名前で作る。［自分で点検］
 - [ ] メソッドはドメインの語彙で名付け、`findById` は `Optional`、複数は `List` を返し、保存は新しい集約の `add` と既存の集約の `update` に分ける。［自分で点検］
 - [ ] `update` の Javadoc に、行がないときの `NoSuchElementException` と、競合したときの `<Aggregate>ConflictException` を書く。［自分で点検］
-- [ ] `update` と `delete` は、引数のない `long lockNo()` を持つ集約ルートを一つだけ受け取る。［ArchUnit で検査：TableWriterArchTest.repositoryUpdateAndDeleteTakeVersionedAggregates］
+- [ ] `add`、`update`、`delete` は、引数のない `long lockNo()` を持つ集約ルートを一つだけ受け取る。［ArchUnit で検査：TableWriterArchTest.repositoryWritesTakeVersionedAggregates］
 - [ ] 版を比べない UPDATE か DELETE の件数を返すメソッドに `@CheckReturnValue` を付ける。［自分で点検］
 - [ ] 実装は `infrastructure.persistence` の `Jooq<Aggregate>Repository` にする。［ArchUnit で検査：PackageByFeatureOnionArchitectureTest.repositoryImplementationsAreJooqRepositories］
 - [ ] Domain の外の実装は `infrastructure` に置く。［ArchUnit で検査：PackageByFeatureOnionArchitectureTest.domainInterfacesAreImplementedInInfrastructure］

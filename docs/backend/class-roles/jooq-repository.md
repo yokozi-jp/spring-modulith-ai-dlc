@@ -282,7 +282,9 @@ public long countUnshippedByCustomer(final CustomerId customerId) {
 ## 対応するテスト
 
 `@DatabaseTest` で、`add` してから読み戻す往復と、`update` してから読み戻す往復を確かめる。
-Repository のテストは列と集約の往復だけを確かめ、競合と行がない場合のテストを Repository ごとには書かない。
+`delete` を持つ Repository は、`delete` したあとに集約ルートの行と子の行が消え、別の集約ルートの子の行が残ることも確かめる。
+子の行を消す条件は Repository ごとに書くため、条件の誤り（子の行の消し残し、別の集約ルートの子の行の削除）はこのテストでしか見つからない。
+Repository のテストは列と集約の往復と削除の範囲だけを確かめ、競合と行がない場合のテストを Repository ごとには書かない。
 版の条件、件数の判定、競合と行なしの区別、ロック待ちの変換は、`shared` の `TableWriterTest` と `TableWriterConcurrencyTest` が実 PostgreSQL で確かめる。
 共通カラムの値はテストの検証対象にする（[PostgreSQL の共通カラム](../../database/postgresql-common-columns.md)）。
 テストは同じ `infrastructure.persistence` パッケージのテストソースに置き、`new JooqOrderRepository(dsl, commonColumns, new TableWriter(dsl, commonColumns))` でテスト対象を作る。
@@ -344,7 +346,8 @@ Repository のテストは列と集約の往復だけを確かめ、競合と行
 - [ ] `multiset` の副問い合わせに、子を識別する列の `orderBy` を付ける（`orderBy(ORDER_LINES.LINE_NUMBER)`）。［自分で点検］
 - [ ] 集約ルートの `LOCK_NO` を選び、`restore` の `lockNo` に渡す。［自分で点検］
 - [ ] `add` は `set(列, 値)` で業務の全列を書き、子の行を行ごとの INSERT の `dsl.batch` 一つで書く。［自分で点検］
-- [ ] 集約ルートを受け取る `add` 以外の public メソッドは `update` と `delete` だけにし、`update` は `TableWriter.updateCheckingVersion` を、`delete` は `deleteCheckingVersion` を、そのメソッドの中で直接呼ぶ。［ArchUnit で検査：TableWriterArchTest.repositoryUpdateAndDeleteCheckVersion］
+- [ ] 集約ルートを受け取る `add` 以外の public メソッドは、版を比べる入口（`update` は `TableWriter.updateCheckingVersion`、`delete` は `deleteCheckingVersion`、ほかの名前ならどちらか）を、そのメソッドの中で直接呼ぶ。［ArchUnit で検査：TableWriterArchTest.repositoryUpdateAndDeleteCheckVersion］
+- [ ] 集約ルートを受け取る public メソッドは、`add`、`update`、`delete` だけにする（`save` のような名前でも版を比べれば規則は通るため、名前は規則が検査しない）。［自分で点検］
 - [ ] 集約ルートを受け取るメソッドから `updateWhere` と `deleteWhere` を呼ばない。［ArchUnit で検査：TableWriterArchTest.aggregateMethodsDoNotUseUnversionedWrites］
 - [ ] 子の行は、集約ルートの書き込みが返す `LockedRoot` か `DeletedRoot` で主キーの順に書き、子の集合が増減するなら差分で書く。［自分で点検］
 - [ ] jOOQ の UPDATE、DELETE、UPSERT（`INSERT ... ON CONFLICT`）、MERGE、`UpdatableRecord` と `DAO` の書き込み、Spring JDBC と JDBC の直接の利用を、`TableWriter` の外で使わない（一覧は[アーキテクチャテスト](../architecture-tests.md)の「書き込みの入口」）。［ArchUnit で検査：TableWriterArchTest.tableWritesGoThroughTableWriter］
@@ -358,5 +361,5 @@ Repository のテストは列と集約の往復だけを確かめ、競合と行
 - [ ] jOOQ の `into`、`intoMap`、`intoGroups`、`fetchMap`、`fetchGroups`、名前が `Into` で終わるメソッドを `Class` を渡して呼ばず、`Record` の `into(Object)` と `from(Object)`、`DSLContext.newRecord(Table, Object)` を呼ばない。［ArchUnit で検査：ClassRoleArchTest.jooqReflectionMappingIsNotUsed］
 - [ ] MapStruct、ModelMapper、Dozer、`DefaultRecordMapper`、`DefaultRecordUnmapper` に依存しない。［ArchUnit で検査：ClassRoleArchTest.mappingLibrariesAreNotUsed］
 - [ ] クラス、フィールド、コンストラクタに Javadoc を書く。［自分で点検］
-- [ ] `@DatabaseTest` で `add` と `update` の往復を確かめ、競合と行なしの判定は `TableWriterTest` に任せる。［自分で点検］
+- [ ] `@DatabaseTest` で `add` と `update` の往復と、`delete` を持つなら子の行を含む削除の範囲を確かめ、競合と行なしの判定は `TableWriterTest` に任せる。［自分で点検］
 - [ ] `infrastructure.persistence` のパッケージに `@NullMarked` の `package-info.java` を置く。［Error Prone で検査：RequireExplicitNullMarking］

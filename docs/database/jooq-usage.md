@@ -58,8 +58,9 @@ jOOQの版を上げると、`TableWriterArchTest.tableWritesGoThroughTableWriter
 
 Spring Bootの版、`backend/build.gradle`のjOOQのコード生成のプラグインの版を変える人と、それらを変えるDependabotのPull Requestをマージする人は、次の手順で見直す。
 
-1. `jooqVersionIsReviewed`が失敗し、新しい実行時の版を示す。
-2. jOOQのリリースノートと、`javap`で`DSLContext`、`DSL`、`WithStep`、`Update*`、`Delete*`、`Merge*`、`Insert*Step`、`InsertQuery`、`Loader*Step`、`UpdatableRecord`、`DAO`の公開メソッドを確かめ、UPDATE、DELETE、UPSERT、MERGEを作るか実行する新しいAPIを探す。
+1. 実行時のjOOQの版が変われば、`jooqVersionIsReviewed`が失敗し、新しい版を示す。
+   コード生成のプラグインの版だけを変えたときは失敗しないため、2から4の手順で見直す。
+2. jOOQのリリースノートと、`javap`で`DSLContext`、`DSL`、`WithStep`、`Update*`、`Delete*`、`Merge*`、`Insert*Step`、`InsertQuery`、`Loader*Step`、`UpdatableRecord`、`DAO`、`QOM`の公開メソッドを確かめ、UPDATE、DELETE、UPSERT、MERGEを作るか実行する新しいAPIを探す。
    `Update`か`Delete`を戻り値の型に持つメソッドは、作る入口である。
 3. 新しい書き込みの入口があれば、`tableWritesGoThroughTableWriter`の禁止の一覧、違反のフィクスチャ`DirectOrderWriter`、[アーキテクチャテスト](../backend/architecture-tests.md)の「書き込みの入口」に足す。
 4. コード生成のプラグインと実行時のjOOQのマイナー版をそろえ、[jOOQコード生成物の管理](jooq-codegen.md)に従って生成し直す。

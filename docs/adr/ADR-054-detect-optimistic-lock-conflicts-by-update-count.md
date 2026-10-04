@@ -59,13 +59,14 @@ PostgreSQL の READ COMMITTED では、後の UPDATE は先の UPDATE のコミ�
 - `CommonColumns.forUpdate` は `updated_*` だけを返し、package-private にする。
   UPDATE の `lock_no` を書くのは `TableWriter` だけになる。
 - ArchUnit の `TableWriterArchTest` で次を検査する。
-  - `TableWriter`、`LockedRoot`、`DeletedRoot` の外の本番のコードは、jOOQ の UPDATE、DELETE、UPSERT、MERGE の入口、`Update` と `Delete` に代入できる型の実行、`UpdatableRecord` と `DAO` の書き込み、Spring JDBC と JDBC の直接の利用を呼ばない。
+  - `TableWriter`、`LockedRoot`、`DeletedRoot` の外の本番のコードは、jOOQ の UPDATE、DELETE、UPSERT、MERGE の入口、`Update` と `Delete` に代入できる型の実行、問い合わせのモデル（`QOM`）の `$` で始まる API、`UpdatableRecord` と `DAO` の書き込み、Spring JDBC と JDBC の直接の利用を呼ばない。
     判定は、呼び出し先の型が禁じる型に代入できるかで行う。
     `Update` と `Delete` を作る入口（`DSLContext`、`DSL`、`WithStep` の `update`、`delete`、`deleteFrom`、`updateQuery`、`deleteQuery`）をすべて禁じるため、`batch` のように作った問い合わせを受け取って実行する API は禁じなくてよい。
   - `Jooq<Aggregate>Repository` の、集約ルートを受け取る `add` 以外の public メソッドは、版を比べる入口を直接呼ぶ。
     名前で対象を選ばないため、`save` のような名前でも検査を外れない。
-  - `domain.model` の `<Aggregate>Repository` の `update` と `delete` は、引数のない `long lockNo()` を宣言する集約ルートを一つだけ受け取る。
+  - `domain.model` の `<Aggregate>Repository` の `add`、`update`、`delete` は、引数のない `long lockNo()` を宣言する集約ルートを一つだけ受け取る。
     集約ルートが `lockNo()` を持たないと、版を比べる規則が集約ルートを見つけられず、空のまま通るためである。
+    必須の `add` を含めるため、`save` のような名前で保存する Repository でも、形を外れた集約は `add` で検出される。
   - 集約ルートを引数に取るメソッドは、版を比べない入口を呼ばない。
   - `lockNo` を持つ Command の CommandHandler は `ensureLockNo` を呼ぶ。
 - jOOQ の実行時の版をテストで固定する。
@@ -89,7 +90,7 @@ PostgreSQL の READ COMMITTED では、後の UPDATE は先の UPDATE のコミ�
   禁止の一覧は、テストで固定した jOOQ の版の API で見直してある。
   別のテーブルの列、型の違う値、版を比べない入口の件数の無視は、コンパイルで失敗する。
 - 版を比べない更新も版を進めるため、在庫の引き当てのような Java の更新が先に走れば、その前に読んだ画面の保存は上書きせずに競合として返る。
-- 競合と行なしの判定は `TableWriter` の実 PostgreSQL のテストに集まり、Repository のテストは列と集約の往復だけを確かめる。
+- 競合と行なしの判定は `TableWriter` の実 PostgreSQL のテストに集まり、Repository のテストは列と集約の往復と削除の範囲だけを確かめる。
 - 集約ルートの UPDATE が行ロックを取るため、同じトランザクションで後から書く子の行も、`TableWriter` の経路ではルートの行ロックで守られる。
 
 ### Negative
@@ -109,7 +110,8 @@ PostgreSQL の READ COMMITTED では、後の UPDATE は先の UPDATE のコミ�
     別の集約ルートのテーブルを渡すと、その行を版を比べずに書く。
     子のテーブルとルートのテーブルはコードから区別できないため、レビューで見る。
   - **集約ルートの形を外れた集約**：規則は、`domain.model` にあり引数のない `long lockNo()` を宣言する型を集約ルートとみなす。
-    Repository の `update` と `delete` の引数はこの形を検査するが、Repository のインタフェースを経由せずに保存する集約は、形を外れても規則が空のまま通る。
+    Repository の `add`、`update`、`delete` の引数はこの形を検査する。
+    `add` を持たずに `save` のような名前だけで保存する Repository と、Repository のインタフェースを経由せずに保存する集約は、形を外れても規則が空のまま通る。
   - **件数を返す Repository のメソッドの注釈**：`@CheckReturnValue` の付け忘れは検出せず、呼び出し側で件数を捨てても通る。
   - **psql による古い版での物理削除**：psql で古い版の行を削除しても、何も検出しない。
     これも規約が受け入れているリスクとする。

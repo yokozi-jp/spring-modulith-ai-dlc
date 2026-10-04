@@ -103,7 +103,7 @@ backend/src/test/java/com/example/demo/architecture/
 
 `tableWritesGoThroughTableWriter`は、違反フィクスチャの`DirectOrderWriter`で禁止するAPIごとに一行を持つ。
 `DirectOrderWriter`は、ラムダの中の`execute()`、`Update`の変数からの`execute()`、`Update::execute`のメソッド参照も含む。
-`TableWriterArchTest`の残りの規則は、違反フィクスチャの`JooqOrderRepository`と`ApproveOrderCommandHandler`で確かめる。
+`TableWriterArchTest`の残りの規則は、違反フィクスチャの`JooqOrderRepository`、`UnversionedOrderRepository`、`ApproveOrderCommandHandler`で確かめる。
 `archfixture.conforming`と`archfixture.violating`の`shared.infrastructure.persistence`には、規則が名前で見る`TableWriter`のスタブを置く。
 `typeSafeJooqMappingIsAllowed`は、対応づけの二つの規則が`convertFrom`、`Records.mapping`、`into(Table)`、`fetch(RecordMapper)`、`intoArray(Field, Class)`、`intoSet(Field, Class)`、`fetch(Field, Class)`、`newRecord(Table)`を誤検出しないことを確かめる。
 MapStruct、ModelMapper、Dozerはテストのクラスパスにないため、`mappingLibrariesAreNotUsed`のフィクスチャは`DefaultRecordMapper`と`DefaultRecordUnmapper`への依存だけで確かめる。
@@ -188,14 +188,16 @@ INSERTの共通カラムは`CommonColumns.forInsert`で、UPDATEとDELETEは`Tab
   - `InsertOnDuplicateStep`と`InsertQuery`の`onConflict`、`onConflictOnConstraint`、`onConflictWhere`、`onDuplicateKeyUpdate`、`addValueForUpdate`、`addValuesForUpdate`と、`LoaderOptionsStep`の`onDuplicateKeyUpdate`
   - `UpdatableRecord`の`store`、`update`、`delete`、`merge`と、`DAO`の`update`、`delete`、`deleteById`、`merge`
   - `DataSource.getConnection`、`ConnectionProvider.acquire`、`Connection`と`Statement`のすべてのメソッド
-  - Spring JDBCの`org.springframework.jdbc.core`と`org.springframework.jdbc.object`のパッケージの型
+  - `org.jooq`のパッケージの型の、名前が`$`で始まるメソッド（`QOM`の問い合わせのモデルのAPIは、`$onDuplicateKeyUpdate`でINSERTをUPSERTに組み替えられるため）
+  - Spring JDBCの`org.springframework.jdbc`とそのサブパッケージの型（`ResourceDatabasePopulator`と`ScriptUtils`も任意のSQLを流せるため）
 
   `Update`と`Delete`を作る入口をすべて禁じるため、`batch`や`subscribe`のように作った問い合わせを受け取って実行するAPIは禁じない。
 - `repositoryUpdateAndDeleteCheckVersion`：`Jooq*Repository`の、集約ルートを受け取る`add`以外のpublicメソッドは、版を比べる入口をそのメソッドの中で直接呼ぶ。
   `update`は`updateCheckingVersion`を、`delete`は`deleteCheckingVersion`を、ほかの名前ならどちらかを呼ぶ。
   名前で対象を選ばないため、`save`のような名前でも検査を外れない。
-- `repositoryUpdateAndDeleteTakeVersionedAggregates`：`domain.model`の`*Repository`インタフェースの`update`と`delete`は、集約ルートを一つだけ受け取る。
+- `repositoryWritesTakeVersionedAggregates`：`domain.model`の`*Repository`インタフェースの`add`、`update`、`delete`は、集約ルートを一つだけ受け取る。
   集約ルートが`long lockNo()`を持たないと、ほかの規則が集約ルートを見つけられず空のまま通るため、この規則で形を確かめる。
+  必須の`add`を対象に含めるため、`save`のような名前で保存するRepositoryでも、`lockNo()`を持たない集約は`add`で検出される。
 - `aggregateMethodsDoNotUseUnversionedWrites`：集約ルートを引数に取るメソッドとラムダは、`updateWhere`と`deleteWhere`を呼ばない。
   ラムダは捕捉した変数を引数に持つ合成メソッドになるため、同じ判定で見る。
 - `commandHandlersEnsureScreenLockNo`：`handle`の引数のCommandが`lockNo()`を持つ`*CommandHandler`は、`domain.model`の型の`ensureLockNo`を呼ぶ。
