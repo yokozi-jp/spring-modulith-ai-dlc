@@ -62,6 +62,8 @@ Pull Request の作成者は自分の変更を承認できないため、コー�
 - `Run hadolint 🐳`
 - `Run docker build --check 🐳`
 - `Build and test backend image 🐳`
+- `Detect DAST changes`
+- `Run ZAP passive scan 🕷️`
 - `Detect API contract changes`
 - `Check API contract 🔀`
 
@@ -80,7 +82,9 @@ GitHub Pagesでは通常、APIの設計内容がすべて公開されるため�
 
 検知ジョブやイメージビルドの前段が失敗した場合、後続ジョブが `skipped` になっても前段の失敗によってマージを止めるためである。
 
-Semgrep と Trivy は現在、検出結果を SARIF へ送ってもジョブ自体を失敗させない。
+Semgrep、Trivy、ZAP は現在、検出結果を SARIF へ送ってもジョブ自体を失敗させない（ZAP は [ADR-056](../adr/ADR-056-run-authenticated-dast-with-zap-in-ci.md)）。
+
+`Run ZAP active scan 🕷️` は schedule と手動実行のときだけ動くので、必須チェックにしない。
 
 この必須設定が保証するのはスキャンの完走であり、検出がゼロであることではない。
 

@@ -1,0 +1,63 @@
+# DAST の前提確認（ADR-056）。task scan-dast と task scan-dast-active がスキャンの前に実行する。
+# ログイン（GET /api/missing が 404）と CSRF script（POST /api/missing が 404、403 なら失敗）を確かめる。
+# requestor は応答コードの不一致を警告として扱うため、failOnWarning: true で plan を失敗させる。
+# env は preflight.yaml、passive.yaml、active.yaml で同じ内容にそろえる（failOnWarning だけが違う）。
+env:
+  contexts:
+    - name: spring-modulith-dast
+      urls:
+        - http://localhost:4173
+      includePaths:
+        - "http://localhost:4173.*"
+      excludePaths:
+        - "http://localhost:4173/logout.*"
+        - "http://127\\.0\\.0\\.1:8081.*"
+      authentication:
+        method: browser
+        parameters:
+          loginPageUrl: http://localhost:4173/oauth2/authorization/web
+          loginPageWait: 5
+          browserId: firefox-headless
+        verification:
+          method: poll
+          pollUrl: http://localhost:4173/api/missing
+          pollFrequency: 60
+          pollUnits: requests
+          loggedInRegex: '"status"\s*:\s*404'
+          loggedOutRegex: '"status"\s*:\s*401'
+      # 自動検出で APP_SESSION を拾えなければ method: cookie にする。
+      sessionManagement:
+        method: autodetect
+      users:
+        # demo realm（docker/keycloak/realm.json）のテストユーザーで、秘密ではない。
+        - name: test-admin
+          credentials:
+            username: test-admin
+            password: test-password
+  parameters:
+    failOnError: true
+    failOnWarning: true
+    progressToStdout: true
+
+jobs:
+  - type: script
+    parameters:
+      action: add
+      type: httpsender
+      engine: "ECMAScript : Graal.js"
+      name: copy-xsrf-token-to-header.js
+      file: /zap/plans/scripts/httpsender/copy-xsrf-token-to-header.js
+
+  - type: requestor
+    parameters:
+      user: test-admin
+    requests:
+      - url: http://localhost:4173/api/missing
+        method: GET
+        responseCode: 404
+      - url: http://localhost:4173/api/missing
+        method: POST
+        headers:
+          - "Content-Type: application/json"
+        data: "{}"
+        responseCode: 404
