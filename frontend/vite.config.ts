@@ -91,7 +91,7 @@ export default defineConfig(({ mode }) => {
     // エイリアスの正本は tsconfig.json の paths とする。
     resolve: { tsconfigPaths: true },
     test: {
-      exclude: [...defaultExclude, ...lintFixtures],
+      exclude: [...defaultExclude, ...lintFixtures, "e2e/**"],
       coverage: {
         provider: "v8",
         include: ["src/**/*.{ts,tsx}"],
@@ -266,6 +266,14 @@ export default defineConfig(({ mode }) => {
             "react/jsx-no-literals": "off",
           },
         },
+        // Playwright Test の API に vitest plugin の規則が当たるため。
+        {
+          files: ["e2e/**"],
+          rules: {
+            "vitest/consistent-test-filename": "off",
+            "vitest/prefer-importing-vitest-globals": "off",
+          },
+        },
         // ponytail: option が置き換わるため、テストでは層の import 制限も外れる。
         // テストにも層の制限が要るようになったら dependency-cruiser へ移る。
         {
@@ -305,6 +313,7 @@ export default defineConfig(({ mode }) => {
         },
       },
     },
-    preview: { headers: securityHeaders },
+    // proxy と strictPort は server の値を Vite が引き継ぐ。Keycloak の redirect URI と同じ origin で待ち受ける（ADR-033、ADR-056）。
+    preview: { port: 5173, headers: securityHeaders },
   };
 });
