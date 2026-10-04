@@ -20,6 +20,7 @@ import io.opentelemetry.api.common.AttributeKey;
 import io.opentelemetry.api.logs.Severity;
 import io.opentelemetry.instrumentation.logback.appender.v1_0.OpenTelemetryAppender;
 import io.opentelemetry.sdk.logs.data.LogRecordData;
+import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -161,18 +162,37 @@ class ApiErrorContractTest {
         .andExpect(content().string(not(Matchers.containsString("secret-value"))));
   }
 
-  @Test
-  @DisplayName("パラメータの入力検証エラーは /<パラメータ名> の pointer を返す")
-  void parameterValidationErrorsHavePointers() throws Exception {
+  @ParameterizedTest(name = "{0}")
+  @MethodSource("methodValidationCases")
+  @DisplayName("メソッド検証の誤りは引数を起点にした RFC 6901 の pointer を返す")
+  void methodValidationErrorsHavePointers(
+      final String name, final MockHttpServletRequestBuilder request, final List<String> pointers)
+      throws Exception {
     mockMvc
-        .perform(
-            get("/api/error-fixture/items?limit=0")
-                .with(user("test-user"))
-                .header(HttpHeaders.ACCEPT_LANGUAGE, "ja"))
+        .perform(request.with(user("test-user")).header(HttpHeaders.ACCEPT_LANGUAGE, "ja"))
         .andExpect(status().isBadRequest())
-        .andExpect(jsonPath("$.errors.length()").value(1))
-        .andExpect(jsonPath("$.errors[0].pointer").value("/limit"))
-        .andExpect(jsonPath("$.errors[0].detail").isNotEmpty());
+        .andExpect(jsonPath("$.type").value(VALIDATION_ERROR))
+        .andExpect(jsonPath("$.errors[*].pointer").value(Matchers.contains(pointers.toArray())))
+        .andExpect(jsonPath("$.errors[*].detail").value(Matchers.everyItem(not(""))));
+  }
+
+  private static Stream<Arguments> methodValidationCases() {
+    return Stream.of(
+        Arguments.of("パラメータ", get("/api/error-fixture/items?limit=0"), List.of("/limit")),
+        Arguments.of(
+            "本文とほかの制約のある引数",
+            post("/api/error-fixture/items-with-limit?limit=1")
+                .with(csrf())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"name\":\"x\",\"items\":[{\"code\":\"too-long\"}]}"),
+            List.of("/items/0/code")),
+        Arguments.of(
+            "リストのクエリパラメータの要素",
+            get("/api/error-fixture/names").queryParam("names", "", "ok"),
+            List.of("/names/0")),
+        // Spring MVC は引数をまたぐ違反だけでは例外にしない（spring-framework#33271）。
+        // 引数の違反（to < 0）と一緒に起こし、引数をまたぐ違反が "" になることを確かめる。
+        Arguments.of("引数をまたぐ制約", get("/api/error-fixture/range?from=2&to=-1"), List.of("", "/to")));
   }
 
   @Test

@@ -4,6 +4,8 @@ import jakarta.validation.ConstraintViolationException;
 import jakarta.validation.Valid;
 import jakarta.validation.Validator;
 import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.NotBlank;
+import java.util.List;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -44,6 +46,45 @@ class ErrorFixtureController {
    */
   @GetMapping("/items")
   /* package */ ResponseEntity<Void> search(@RequestParam @Min(1) final int limit) {
+    return ResponseEntity.noContent().build();
+  }
+
+  /**
+   * 本文とほかの制約のある引数を、メソッド検証でまとめて検証する。
+   *
+   * @param request 検証する本文
+   * @param limit 1 以上の件数
+   * @return 本文のない 204 の応答
+   */
+  @PostMapping("/items-with-limit")
+  /* package */ ResponseEntity<Void> createWithLimit(
+      @Valid @RequestBody final ErrorFixtureRequest request,
+      @RequestParam @Min(1) final int limit) {
+    return ResponseEntity.noContent().build();
+  }
+
+  /**
+   * クエリパラメータのリストの要素を検証する。
+   *
+   * @param names 空でない名前のリスト
+   * @return 本文のない 204 の応答
+   */
+  @GetMapping("/names")
+  /* package */ ResponseEntity<Void> names(@RequestParam final List<@NotBlank String> names) {
+    return ResponseEntity.noContent().build();
+  }
+
+  /**
+   * 引数をまたぐ制約を検証する。
+   *
+   * @param from 範囲の始まり
+   * @param to 範囲の終わり
+   * @return 本文のない 204 の応答
+   */
+  @GetMapping("/range")
+  @ErrorFixtureRange
+  /* package */ ResponseEntity<Void> range(
+      @RequestParam @Min(0) final int from, @RequestParam @Min(0) final int to) {
     return ResponseEntity.noContent().build();
   }
 
