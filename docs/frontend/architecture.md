@@ -28,7 +28,7 @@ OpenAPIからOrvalでnative FetchのTanStack Query clientを生成し、手書�
 
 ## 現在の構成
 
-現在の `src` は、アプリケーションの起動、ルーティング、アプリシェル、routerの既定の状態表示、共通UI、国際化、小さなutilityだけを持つ。
+現在の `src` は、アプリケーションの起動、ルーティング、アプリシェル、routerの既定の状態表示、API clientのmutatorと生成した型、共通UI、国際化、小さなutilityだけを持つ。
 
 ``` text
 frontend/src/
@@ -36,6 +36,10 @@ frontend/src/
 ├── router-defaults.ts
 ├── router-defaults.test.tsx
 ├── style.css
+├── api/
+│   ├── api-fetch.ts
+│   ├── api-fetch.test.ts
+│   └── generated/models/
 ├── i18n/
 │   ├── index.ts
 │   ├── index.test.ts
@@ -66,6 +70,7 @@ frontend/src/
 ```
 
 `main.tsx` はcomposition rootであり、TanStack Queryの `QueryClient` とTanStack Routerを生成してProviderを接続する。
+`QueryClient` には、`api/api-fetch.ts` の401の処理（`QueryCache` と `MutationCache` の `onError`）と再試行の判定（`defaultOptions.queries.retry`）を渡す。
 
 `router-defaults.ts` はrouterの既定値（pending、error、not foundのcomponentとpreloadの設定）を一つのobjectにまとめ、`main.tsx` とrouteのテストが同じ値でrouterを作る。
 
@@ -74,7 +79,7 @@ frontend/src/
 `routeTree.gen.ts` はTanStack Router pluginの生成物なので、生成元のroute fileを変更して再生成し、生成物を手で編集しない。
 再生成の手順と検査は[フロントエンドのテストと検証](testing.md#生成物)にある。
 
-現在は業務画面と業務APIがないため、`features`、`api`、global storeは存在しない。
+現在は業務画面と業務APIがないため、`features` とglobal storeは存在しない。
 
 ## 目標のディレクトリ構成
 
