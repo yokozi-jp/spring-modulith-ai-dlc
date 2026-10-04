@@ -68,7 +68,7 @@ rules:
       functionOptions:
         match: "^[a-z]+(?:[A-Z][a-z]+)+$"
 
-  # 説明と example は Javadoc と @Schema(example) から生成する（ADR-052）。
+  # 説明と example は Javadoc と @Schema(example) から生成する（ADR-053）。
   # $ref の値そのものを見るルールには resolved: false を付ける。
   schema-property-description:
     description: スキーマのプロパティに説明を書く（record の Javadoc の @param）。

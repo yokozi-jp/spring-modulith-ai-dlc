@@ -647,7 +647,7 @@ tasks:
     cmds:
       - ./gradlew cyclonedxBom
 
-  # API contract（ADR-051）
+  # API contract（ADR-052）
   api-lint:
     desc: コミット済みのOpenAPI契約をSpectralで検査（DB不要）
     cmds:

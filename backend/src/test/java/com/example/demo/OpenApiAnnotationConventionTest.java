@@ -20,7 +20,7 @@ import org.springframework.test.web.servlet.ResultActions;
 import org.springframework.test.web.servlet.ResultMatcher;
 
 /**
- * サンプル Controller から springdoc が作る OpenAPI 文書が、アノテーションと Javadoc の規約どおりになることを検証する（ADR-052）。
+ * サンプル Controller から springdoc が作る OpenAPI 文書が、アノテーションと Javadoc の規約どおりになることを検証する（ADR-053）。
  *
  * <p>サンプル Controller は com.example.demo の外にあり、このテストだけが読み込む。exportOpenApi が書き出す契約には含まれない。
  */

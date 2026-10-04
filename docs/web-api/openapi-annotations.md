@@ -12,7 +12,7 @@ OpenAPI契約の説明はJavadocに書き、springdocがtherapi-runtime-javadoc�
 401、403、500と入力のあるoperationの400は`OpenApiConfig`のcustomizerが付けるため、Controllerに書かない。
 欠落は`task api-lint`のSpectralが失敗にし、springdocの出力の形は`OpenApiAnnotationConventionTest`が固定する。
 
-決定の理由は[ADR-052](../adr/ADR-052-document-openapi-from-javadoc-with-minimal-annotations.md)を参照する。
+決定の理由は[ADR-053](../adr/ADR-053-document-openapi-from-javadoc-with-minimal-annotations.md)を参照する。
 契約を変えたあとの再生成と確認の手順は[APIを変更する](runbook-api-change.md)に示す。
 
 ## 説明文

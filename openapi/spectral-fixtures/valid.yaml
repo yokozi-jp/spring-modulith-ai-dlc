@@ -1,5 +1,5 @@
 # .spectral.yaml の合格例。task api-lint-rules-test が 0 件の error を期待する。
-# springdoc が出力する形にそろえる（ADR-052）。
+# springdoc が出力する形にそろえる（ADR-053）。
 openapi: 3.1.0
 info:
   title: Demo API

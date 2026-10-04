@@ -161,7 +161,7 @@ PITのHTMLとXMLのレポートは、変異対象がある場合に`backend/buil
 
 ## API契約
 
-契約と生成物の扱いは[ADR-051](../adr/ADR-051-commit-openapi-contract-and-check-generated-client.md)、手順は[APIを変更する](../web-api/runbook-api-change.md)を参照する。
+契約と生成物の扱いは[ADR-052](../adr/ADR-052-commit-openapi-contract-and-check-generated-client.md)、手順は[APIを変更する](../web-api/runbook-api-change.md)を参照する。
 
 - **`task api-gen`**：テスト用依存を起動し、契約の生成、Spectralの検査、Orvalの再生成を実行して片付ける。
 - **`task api-check`**：`api-gen`で再生成した契約と生成物を、コミット済みの内容と比べる。

@@ -51,7 +51,7 @@ OpenAPIの`info.version`は、パスのバージョンとは別の、契約の�
 - APIのバージョンと同じく、リリース版の番号と連動させない。
 
 版の上げ忘れは機械で検出できないため、Pull Requestのチェックリストで確かめる。
-決定の理由は[ADR-051](../adr/ADR-051-commit-openapi-contract-and-check-generated-client.md)を参照する。
+決定の理由は[ADR-052](../adr/ADR-052-commit-openapi-contract-and-check-generated-client.md)を参照する。
 
 ## 廃止の予告
 

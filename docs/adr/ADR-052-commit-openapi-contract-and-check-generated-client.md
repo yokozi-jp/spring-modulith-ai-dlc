@@ -1,11 +1,11 @@
 ---
 type: ADR
-title: 'ADR-051: OpenAPI 契約をリポジトリにコミットし、生成物と破壊的変更を CI で検査する'
+title: 'ADR-052: OpenAPI 契約をリポジトリにコミットし、生成物と破壊的変更を CI で検査する'
 description: springdoc が生成する OpenAPI 契約を openapi/openapi.yaml にコミットし、Orval の生成物もコミットしたうえで、drift、Spectral、oasdiff を pre-commit と CI で検査し、info.version を契約の版として手で管理する決定。
 tags: [adr, api, openapi, frontend, ci]
 ---
 
-# ADR-051: OpenAPI 契約をリポジトリにコミットし、生成物と破壊的変更を CI で検査する
+# ADR-052: OpenAPI 契約をリポジトリにコミットし、生成物と破壊的変更を CI で検査する
 
 ## Status
 
@@ -189,7 +189,7 @@ OpenAPI の `info.version` は、仕様では OpenAPI 文書の版であり、�
 
 - [ADR-013: HTTP API 契約を標準化する](ADR-013-standardize-http-api-contracts.md)
 - [ADR-024: Frontend API client 生成に Orval を採用する](ADR-024-adopt-orval-for-frontend-api-client.md)
-- [ADR-052: OpenAPI の説明を Javadoc から生成し、アノテーションを最小限にする](ADR-052-document-openapi-from-javadoc-with-minimal-annotations.md)
+- [ADR-053: OpenAPI の説明を Javadoc から生成し、アノテーションを最小限にする](ADR-053-document-openapi-from-javadoc-with-minimal-annotations.md)
 - [APIの互換性と廃止](../web-api/versioning.md)
 - [OAS 3.1.1 Info Object](https://spec.openapis.org/oas/v3.1.1.html#info-object)
 - [oasdiff](https://github.com/oasdiff/oasdiff)

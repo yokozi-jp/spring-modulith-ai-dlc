@@ -11,7 +11,7 @@ on:
       - ".github/workflows/api-contract.yml"
   # 必須チェックにしても対象外 PR が Expected のまま残らないよう、PR では常に起動し、
   # changes ジョブで検査の要否を判定する。
-  # ラベルの付け外しで再判定する（api-breaking-approved、ADR-051）。
+  # ラベルの付け外しで再判定する（api-breaking-approved、ADR-052）。
   pull_request:
     branches: ["**"]
     types: [opened, synchronize, reopened, labeled, unlabeled]

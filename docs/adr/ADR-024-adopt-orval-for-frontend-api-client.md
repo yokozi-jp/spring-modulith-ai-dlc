@@ -46,7 +46,7 @@ Problem Details、CSRF、timeoutなどの共通処理が組み込みFetchだけ�
 フォーム入力と手書きのruntime境界にもZodを使う。
 API responseのruntime validationが必要な境界では、OpenAPIと同じ定義からOrvalが生成したZod schemaを使い、schemaを手書きで重複させない。
 
-契約snapshotの置き場所、生成Task、drift検査、生成物のGit管理方針は、最初の業務APIより前に[ADR-051](ADR-051-commit-openapi-contract-and-check-generated-client.md)で確定した。
+契約snapshotの置き場所、生成Task、drift検査、生成物のGit管理方針は、最初の業務APIより前に[ADR-052](ADR-052-commit-openapi-contract-and-check-generated-client.md)で確定した。
 
 ## Consequences
 
@@ -94,7 +94,7 @@ API responseのruntime validationが必要な境界では、OpenAPIと同じ定�
 ## References
 
 - [ADR-013: HTTP API 契約を標準化する](ADR-013-standardize-http-api-contracts.md)
-- [ADR-051: OpenAPI 契約をリポジトリにコミットし、生成物と破壊的変更を CI で検査する](ADR-051-commit-openapi-contract-and-check-generated-client.md)
+- [ADR-052: OpenAPI 契約をリポジトリにコミットし、生成物と破壊的変更を CI で検査する](ADR-052-commit-openapi-contract-and-check-generated-client.md)
 - [ADR-023: TanStack Form と Zod を採用する](ADR-023-adopt-tanstack-form-and-zod.md)
 - [Orval: Fetch](https://orval.dev/docs/guides/fetch/)
 - [Orval: Fetch client for TanStack Query](https://orval.dev/docs/guides/fetch-client/)

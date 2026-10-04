@@ -1,11 +1,11 @@
 ---
 type: ADR
-title: 'ADR-052: OpenAPI の説明を Javadoc から生成し、アノテーションを最小限にする'
+title: 'ADR-053: OpenAPI の説明を Javadoc から生成し、アノテーションを最小限にする'
 description: OpenAPI を API 設計書として網羅的に記述するため、説明文を therapi-runtime-javadoc で Javadoc から生成し、アノテーションは tag、operationId、個別のエラー応答、example に限り、共通のエラー応答を OpenApiConfig の customizer で付け、Spectral で検査する決定。
 tags: [adr, api, openapi, backend, javadoc]
 ---
 
-# ADR-052: OpenAPI の説明を Javadoc から生成し、アノテーションを最小限にする
+# ADR-053: OpenAPI の説明を Javadoc から生成し、アノテーションを最小限にする
 
 ## Status
 
@@ -17,7 +17,7 @@ Proposed
 
 ## Context
 
-[ADR-051](ADR-051-commit-openapi-contract-and-check-generated-client.md) は、springdoc が生成する契約をコミットし、API 設計書として公開すると決めた。
+[ADR-052](ADR-052-commit-openapi-contract-and-check-generated-client.md) は、springdoc が生成する契約をコミットし、API 設計書として公開すると決めた。
 設計書として使うには、operation、parameter、tag、schema の property に説明と例が要る。
 [設計書と正本の分担](../writing/design-doc-sources-of-truth.md) も、Web API の契約の正本を springdoc が生成する OpenAPI とし、手で書かないとしている。
 
@@ -150,7 +150,7 @@ springdoc の既定の `override-with-generic-response: true` は、`@Controller
 ## References
 
 - [ADR-013: HTTP API 契約を標準化する](ADR-013-standardize-http-api-contracts.md)
-- [ADR-051: OpenAPI 契約をリポジトリにコミットし、生成物と破壊的変更を CI で検査する](ADR-051-commit-openapi-contract-and-check-generated-client.md)
+- [ADR-052: OpenAPI 契約をリポジトリにコミットし、生成物と破壊的変更を CI で検査する](ADR-052-commit-openapi-contract-and-check-generated-client.md)
 - [クラスの役割：Controller](../backend/class-roles/controller.md)
 - [クエリパラメータ](../web-api/query-parameters.md)
 - [Web APIの方式とURLの設計](../web-api/api-style.md)

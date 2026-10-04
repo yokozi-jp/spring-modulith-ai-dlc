@@ -9,7 +9,7 @@ tags: [runbook, web-api, openapi, orval]
 
 ControllerやDTOを変えたら`task api-gen`を実行し、`openapi/openapi.yaml`と`frontend/src/api/generated`を同じコミットに含める。
 生成物は手で書き換えず、差分を読んで意図どおりかを確かめる。
-契約と生成物の管理方針は[ADR-051](../adr/ADR-051-commit-openapi-contract-and-check-generated-client.md)が定める。
+契約と生成物の管理方針は[ADR-052](../adr/ADR-052-commit-openapi-contract-and-check-generated-client.md)が定める。
 
 ## 前提
 

@@ -71,7 +71,7 @@ Frontend、backend、Docker の workflow は Pull Request ごとに変更対象�
 
 変更検知ジョブ、hadolint、`docker build --check` も必須にする。
 
-`Check API contract 🔀` は、`api-breaking-approved` ラベルの付け外しでも再判定する（[ADR-051](../adr/ADR-051-commit-openapi-contract-and-check-generated-client.md)）。
+`Check API contract 🔀` は、`api-breaking-approved` ラベルの付け外しでも再判定する（[ADR-052](../adr/ADR-052-commit-openapi-contract-and-check-generated-client.md)）。
 
 稼働中の ruleset への追加はリポジトリの所有者が行い、上の一覧と同じ名前で登録する。
 
