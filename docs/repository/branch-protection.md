@@ -67,7 +67,7 @@ Pull Request の作成者は自分の変更を承認できないため、コー�
 - `Detect API contract changes`
 - `Check API contract 🔀`
 
-Frontend、backend、Docker の workflow は Pull Request ごとに変更対象を検出する。
+Frontend、backend、Docker、DAST の workflow は Pull Request ごとに変更対象を検出する。
 
 関連パスを変更していない場合、重い検査ジョブはジョブ単位で `skipped` を報告し、GitHub は required status check を満たしたものとして扱う。
 
