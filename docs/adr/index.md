@@ -56,3 +56,4 @@
 - [ADR-053: OpenAPI の説明を Javadoc から生成し、アノテーションを最小限にする](ADR-053-document-openapi-from-javadoc-with-minimal-annotations.md)（Proposed, 2026-10-03）
 - [ADR-054: 楽観的ロックの競合を UPDATE の条件の lock_no と更新件数で判定する](ADR-054-detect-optimistic-lock-conflicts-by-update-count.md)（Proposed, 2026-10-03）
 - [ADR-055: DB のロック待ち、文の実行、トランザクション中の待機の上限を接続ごとに設定する](ADR-055-set-db-time-limits-per-connection.md)（Proposed, 2026-10-03）
+- [ADR-056: problem type にパスを全部書いた相対 URI を使う](ADR-056-use-path-absolute-relative-uri-for-problem-types.md)（Proposed, 2026-10-04）

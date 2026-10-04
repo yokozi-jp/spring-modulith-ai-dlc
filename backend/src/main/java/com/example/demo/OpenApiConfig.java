@@ -5,6 +5,7 @@ import io.swagger.v3.oas.models.OpenAPI;
 import io.swagger.v3.oas.models.Operation;
 import io.swagger.v3.oas.models.PathItem;
 import io.swagger.v3.oas.models.info.Info;
+import io.swagger.v3.oas.models.media.ArraySchema;
 import io.swagger.v3.oas.models.media.Content;
 import io.swagger.v3.oas.models.media.IntegerSchema;
 import io.swagger.v3.oas.models.media.ObjectSchema;
@@ -21,6 +22,8 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.http.MediaType;
 
 /** OpenAPI 3.1 文書へ全 API が共有する schema と response を登録する。 */
+// 全 API が共有する components の組み立てを 1 か所に置くため、schema ごとの小さなメソッドが増える。
+@SuppressWarnings("PMD.TooManyMethods")
 @Configuration(proxyBeanMethods = false)
 public class OpenApiConfig {
 
@@ -29,24 +32,35 @@ public class OpenApiConfig {
    *
    * <p>互換な追加で MINOR、破壊的変更で MAJOR を上げ、アプリのリリース版と連動させない（docs/web-api/versioning.md）。
    */
-  /* package */ static final String CONTRACT_VERSION = "0.1.0";
+  /* package */ static final String CONTRACT_VERSION = "0.2.0";
 
   /** 共通の Problem response を参照する接頭辞。 */
   private static final String PROBLEM_RESPONSE_REF = "#/components/responses/";
+
+  /** components の schema を参照する接頭辞。 */
+  private static final String SCHEMA_REF = "#/components/schemas/";
+
+  /** RFC 9457 の共通 schema の名前。 */
+  private static final String PROBLEM_DETAIL = "ProblemDetail";
 
   /** API の基本情報と RFC 9457 共通 components を定義する。 */
   @Bean
   public OpenAPI openApi() {
     final Components components =
         new Components()
-            .addSchemas("ProblemDetail", problemDetailSchema())
-            .addResponses("BadRequestProblem", problemResponse("要求の形式または入力値が正しくない"))
-            .addResponses("UnauthorizedProblem", problemResponse("認証されていない"))
-            .addResponses("ForbiddenProblem", problemResponse("操作の権限がない"))
-            .addResponses("NotFoundProblem", problemResponse("対象のリソースが存在しない"))
-            .addResponses("ConflictProblem", problemResponse("リソースの現在の状態と競合する"))
-            .addResponses("UnprocessableContentProblem", problemResponse("業務規則に反するため処理できない"))
-            .addResponses("InternalServerErrorProblem", problemResponse("サーバーの内部エラー"));
+            .addSchemas(PROBLEM_DETAIL, problemDetailSchema())
+            .addSchemas("ValidationError", validationErrorSchema())
+            .addSchemas("ValidationProblem", validationProblemSchema())
+            .addResponses(
+                "BadRequestProblem", problemResponse("要求の形式または入力値が正しくない", "ValidationProblem"))
+            .addResponses("UnauthorizedProblem", problemResponse("認証されていない", PROBLEM_DETAIL))
+            .addResponses("ForbiddenProblem", problemResponse("操作の権限がない", PROBLEM_DETAIL))
+            .addResponses("NotFoundProblem", problemResponse("対象のリソースが存在しない", PROBLEM_DETAIL))
+            .addResponses("ConflictProblem", problemResponse("リソースの現在の状態と競合する", PROBLEM_DETAIL))
+            .addResponses(
+                "UnprocessableContentProblem", problemResponse("業務規則に反するため処理できない", PROBLEM_DETAIL))
+            .addResponses(
+                "InternalServerErrorProblem", problemResponse("サーバーの内部エラー", PROBLEM_DETAIL));
     return new OpenAPI()
         .info(
             new Info()
@@ -135,8 +149,8 @@ public class OpenApiConfig {
     schema.addProperty(
         "type",
         new StringSchema()
-            .format("uri")
-            .description("Problem type の安定した識別 URI")
+            .format("uri-reference")
+            .description("Problem type の識別 URI。about:blank かパスを全部書いた相対 URI")
             .example("about:blank"));
     schema.addProperty("title", new StringSchema().description("Problem type の短い説明"));
     schema.addProperty(
@@ -147,11 +161,47 @@ public class OpenApiConfig {
     return schema;
   }
 
-  /** application/problem+json で ProblemDetail を返す response を作る。 */
-  private static ApiResponse problemResponse(final String description) {
+  /** 入力検証の誤り 1 件の schema を作る。 */
+  private static Schema<?> validationErrorSchema() {
+    final ObjectSchema schema = new ObjectSchema();
+    schema.setDescription("入力検証の誤り");
+    schema.setRequired(List.of("pointer", "detail"));
+    schema.addProperty(
+        "pointer",
+        new StringSchema()
+            .description("誤りのある入力の位置を示す RFC 6901 の JSON Pointer")
+            .example("/items/0/name"));
+    schema.addProperty(
+        "detail", new StringSchema().description("利用者向けの誤りの説明。入力値を含まない").example("この項目は必須です。"));
+    return schema;
+  }
+
+  /** 入力検証の誤りを errors に持つ Problem Details の schema を作る。 */
+  private static Schema<?> validationProblemSchema() {
+    final ObjectSchema extension = new ObjectSchema();
+    extension.addProperty(
+        "type",
+        new StringSchema()
+            .format("uri-reference")
+            .description("入力検証エラーなら /problems/validation-error。それ以外の 400 は about:blank")
+            .example("/problems/validation-error"));
+    extension.addProperty(
+        "errors",
+        new ArraySchema()
+            .items(new Schema<>().$ref(SCHEMA_REF + "ValidationError"))
+            .description("入力検証の誤り。type が /problems/validation-error のときだけ必ず含む"));
+    return new Schema<>()
+        .description(
+            "400 の Problem Details。"
+                + "type が /problems/validation-error なら入力検証エラーで、errors に誤りのある入力の位置と説明を持つ")
+        .allOf(List.of(new Schema<>().$ref(SCHEMA_REF + PROBLEM_DETAIL), extension));
+  }
+
+  /** application/problem+json で指定した schema を返す response を作る。 */
+  private static ApiResponse problemResponse(final String description, final String schemaName) {
     final io.swagger.v3.oas.models.media.MediaType mediaType =
         new io.swagger.v3.oas.models.media.MediaType()
-            .schema(new Schema<>().$ref("#/components/schemas/ProblemDetail"));
+            .schema(new Schema<>().$ref(SCHEMA_REF + schemaName));
     return new ApiResponse()
         .description(description)
         .content(new Content().addMediaType(MediaType.APPLICATION_PROBLEM_JSON_VALUE, mediaType));

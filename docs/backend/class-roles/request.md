@@ -47,7 +47,8 @@ CommandHandler に Request を渡さず、Request に業務の不変条件を書
   enum、boolean、ネストした record、`List` には付けない（[OpenAPIのアノテーションとJavadoc](../../web-api/openapi-annotations.md#example)）。
 - `presentation.web` のパッケージの `package-info.java` は Controller と共有する。
 
-形式の違反は `MethodArgumentNotValidException` になり、`ApiExceptionHandler` が継承する `ResponseEntityExceptionHandler` が 400 の Problem Details にする。
+形式の違反は `MethodArgumentNotValidException` になり、`ApiExceptionHandler` が処理して、type が `/problems/validation-error` の 400 になる。
+`errors` 拡張に、誤りのある項目の JSON Pointer と説明が入る（[ADR-056](../../adr/ADR-056-use-path-absolute-relative-uri-for-problem-types.md)）。
 複数の項目の組み合わせ、マスタの存在、業務の状態に依存する検証は Request に書かず、[APIの入力検証の配置](../../web-api/validation.md)に従ってアプリケーションで行う。
 
 ## 依存してよい型、してはいけない型

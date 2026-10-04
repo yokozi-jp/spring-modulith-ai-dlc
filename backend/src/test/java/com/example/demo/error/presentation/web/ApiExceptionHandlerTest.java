@@ -2,19 +2,37 @@ package com.example.demo.error.presentation.web;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import jakarta.validation.ConstraintViolation;
+import jakarta.validation.ConstraintViolationException;
+import jakarta.validation.Valid;
+import jakarta.validation.Validation;
+import jakarta.validation.Validator;
+import jakarta.validation.ValidatorFactory;
+import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.Size;
 import java.io.IOException;
+import java.net.URI;
+import java.util.List;
 import java.util.Locale;
+import java.util.Map;
+import java.util.Set;
+import java.util.stream.Stream;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.springframework.boot.test.system.CapturedOutput;
 import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.context.support.StaticMessageSource;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotWritableException;
 import org.springframework.mock.web.MockHttpServletRequest;
@@ -22,13 +40,23 @@ import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.web.context.request.ServletWebRequest;
 
 /** 例外を Problem Details へ変換し、ログを 1 か所で出し、切断とコミット済みの応答を扱うことを検証する。 */
-@SuppressWarnings("PMD.TooManyStaticImports")
+@SuppressWarnings({"PMD.AvoidDuplicateLiterals", "PMD.TooManyStaticImports"})
 @ExtendWith(OutputCaptureExtension.class)
 class ApiExceptionHandlerTest {
+
+  /** 違反を作る Bean Validation の Validator。 */
+  private static final Validator VALIDATOR;
+
+  static {
+    try (ValidatorFactory factory = Validation.buildDefaultValidatorFactory()) {
+      VALIDATOR = factory.getValidator();
+    }
+  }
 
   private static ApiExceptionHandler handler() {
     final StaticMessageSource messages = new StaticMessageSource();
     messages.addMessage("problem.title.500", Locale.JAPANESE, "サーバー内部エラー");
+    messages.addMessage("problem.title.validation-error", Locale.JAPANESE, "入力内容に誤りがあります");
     return new ApiExceptionHandler(new ApiProblemDetails(messages));
   }
 
@@ -77,6 +105,82 @@ class ApiExceptionHandlerTest {
     assertTrue(log.contains("ERROR"), () -> "ERROR で出ること: " + log);
     assertTrue(
         log.contains(HttpMessageNotWritableException.class.getName()), () -> "例外の型が残ること: " + log);
+  }
+
+  @ParameterizedTest
+  @MethodSource("constraintViolations")
+  @DisplayName("ConstraintViolationException は入力検証エラーの 400 と errors の pointer にする")
+  void constraintViolationBecomesValidationProblem(
+      final Set<ConstraintViolation<?>> violations, final String pointer) {
+    final ResponseEntity<Object> response =
+        handler()
+            .handleConstraintViolationException(
+                new ConstraintViolationException(violations),
+                new ServletWebRequest(new MockHttpServletRequest()));
+
+    assertNotNull(response, "応答");
+    assertEquals(HttpStatus.BAD_REQUEST, response.getStatusCode(), "HTTP status");
+    final ProblemDetail body = assertInstanceOf(ProblemDetail.class, response.getBody(), "本文");
+    assertEquals(URI.create("/problems/validation-error"), body.getType(), "type");
+    assertEquals("入力内容に誤りがあります", body.getTitle(), "title");
+    assertNull(body.getDetail(), "detail");
+    final Map<String, Object> properties = body.getProperties();
+    assertNotNull(properties, "拡張メンバー");
+    final List<?> errors = assertInstanceOf(List.class, properties.get("errors"), "errors");
+    final ApiProblemDetails.ValidationError error =
+        assertInstanceOf(ApiProblemDetails.ValidationError.class, errors.getFirst(), "誤り");
+    assertEquals(1, errors.size(), "誤りの件数");
+    assertEquals(pointer, error.pointer(), "pointer");
+  }
+
+  @Test
+  @DisplayName("戻り値の制約違反を含む ConstraintViolationException は 500 の about:blank にする")
+  void returnValueViolationIsServerError() throws NoSuchMethodException {
+    final Set<ConstraintViolation<Finder>> violations =
+        VALIDATOR
+            .forExecutables()
+            .validateReturnValue(
+                new Finder(), Finder.class.getDeclaredMethod("find", int.class), 0);
+
+    final ResponseEntity<Object> response =
+        handler()
+            .handleConstraintViolationException(
+                new ConstraintViolationException(violations),
+                new ServletWebRequest(new MockHttpServletRequest()));
+
+    assertNotNull(response, "応答");
+    assertEquals(HttpStatus.INTERNAL_SERVER_ERROR, response.getStatusCode(), "HTTP status");
+    final ProblemDetail body = assertInstanceOf(ProblemDetail.class, response.getBody(), "本文");
+    assertEquals(URI.create("about:blank"), body.getType(), "type");
+  }
+
+  private static Stream<Arguments> constraintViolations() throws NoSuchMethodException {
+    return Stream.of(
+        Arguments.of(VALIDATOR.validate(new Item("too-long")), "/code"),
+        Arguments.of(VALIDATOR.validate(new Order(List.of(new Item("too-long")))), "/items/0/code"),
+        Arguments.of(
+            VALIDATOR
+                .forExecutables()
+                .validateParameters(
+                    new Finder(),
+                    Finder.class.getDeclaredMethod("find", int.class),
+                    new Object[] {0}),
+            "/limit"));
+  }
+
+  /** 制約を持つ要素。 */
+  private record Item(@Size(max = 3) String code) {}
+
+  /** 要素の一覧を入れ子で検証する。 */
+  private record Order(@Valid List<Item> items) {}
+
+  /** 引数と戻り値の制約を持つメソッド。 */
+  private static final class Finder {
+    // Validator が反射で検証するだけで、呼び出さない。
+    @SuppressWarnings("UnusedMethod")
+    /* package */ @Min(1) int find(@Min(1) final int limit) {
+      return limit;
+    }
   }
 
   @Test

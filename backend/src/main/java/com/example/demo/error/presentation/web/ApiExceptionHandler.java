@@ -24,6 +24,8 @@ import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExcep
 import org.springframework.web.util.DisconnectedClientHelper;
 
 /** Spring MVC と Spring Security の例外を RFC 9457 Problem Details へ変換する。 */
+// 基底クラスの override と例外ごとの @ExceptionHandler は、1 つの advice に置く必要がある。
+@SuppressWarnings("PMD.TooManyMethods")
 @Slf4j
 @RestControllerAdvice
 public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
@@ -54,11 +56,57 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
     return problem(exception, HttpStatus.FORBIDDEN, request);
   }
 
+  /** メソッド検証の違反を 400 にする。戻り値の違反は実装の不備なので 500 にする。 */
+  @ExceptionHandler(ConstraintViolationException.class)
+  /* package */ @Nullable ResponseEntity<Object> handleConstraintViolationException(
+      final ConstraintViolationException exception, final WebRequest request) {
+    if (ApiProblemDetails.hasReturnValueViolation(exception)) {
+      return problem(exception, HttpStatus.INTERNAL_SERVER_ERROR, request);
+    }
+    final ProblemDetail body =
+        problemDetails.validationProblem(
+            ApiProblemDetails.validationErrors(exception), resolveLocale(request));
+    return handleExceptionInternal(
+        exception, body, new HttpHeaders(), HttpStatus.BAD_REQUEST, request);
+  }
+
   /** MVC 内の未処理例外を、実装詳細を含まない 500 Problem Details へ変換する。 */
   @ExceptionHandler(Exception.class)
   /* package */ @Nullable ResponseEntity<Object> handleUnexpectedException(
       final Exception exception, final WebRequest request) {
     return problem(exception, HttpStatus.INTERNAL_SERVER_ERROR, request);
+  }
+
+  /** 本文の検証エラーを、errors 拡張を持つ入力検証エラーの 400 にする。 */
+  @Override
+  protected @Nullable ResponseEntity<Object> handleMethodArgumentNotValid(
+      final MethodArgumentNotValidException ex,
+      final HttpHeaders headers,
+      final HttpStatusCode status,
+      final WebRequest request) {
+    final Locale locale = resolveLocale(request);
+    // framework の detail を公開しないよう、ex.getBody() を使わずに作る。
+    final ProblemDetail body =
+        problemDetails.validationProblem(
+            problemDetails.validationErrors(ex.getBindingResult(), locale), locale);
+    return handleExceptionInternal(ex, body, headers, status, request);
+  }
+
+  /** 引数の検証エラーを、errors 拡張を持つ入力検証エラーの 400 にする。 */
+  @Override
+  protected @Nullable ResponseEntity<Object> handleHandlerMethodValidationException(
+      final HandlerMethodValidationException ex,
+      final HttpHeaders headers,
+      final HttpStatusCode status,
+      final WebRequest request) {
+    if (ex.isForReturnValue()) {
+      // 戻り値の違反は基底クラスどおり 500 の about:blank にする。
+      return super.handleHandlerMethodValidationException(ex, headers, status, request);
+    }
+    final Locale locale = resolveLocale(request);
+    final ProblemDetail body =
+        problemDetails.validationProblem(problemDetails.validationErrors(ex, locale), locale);
+    return handleExceptionInternal(ex, body, headers, status, request);
   }
 
   /** 全ての例外が通る。ログを 1 か所で出し、切断とコミット済みの応答では本文を書かない。 */

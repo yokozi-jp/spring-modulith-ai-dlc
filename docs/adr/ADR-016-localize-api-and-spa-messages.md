@@ -85,6 +85,7 @@ SPA が Problem Details を扱う際は、既知の `type` をローカル messa
 
 - API の `type` URI と OpenAPI schema はローカライズしない。
 - 業務固有の検証 problem type と `errors` schema は、最初の業務 API と管理ドメインが確定した時点で ADR-013 に従って追加する。
+  [ADR-056](ADR-056-use-path-absolute-relative-uri-for-problem-types.md) で、管理ドメインを待たずに追加した。
 - 翻訳の追加は API version を上げる変更ではない。
 
 ## Alternatives Considered
@@ -124,5 +125,6 @@ SPA が Problem Details を扱う際は、既知の `type` をローカル messa
 - [i18next: Formatting](https://www.i18next.com/translation-function/formatting)
 - [react-i18next](https://react.i18next.com/)
 - [ADR-013](ADR-013-standardize-http-api-contracts.md)
+- [ADR-056](ADR-056-use-path-absolute-relative-uri-for-problem-types.md)
 - `backend/src/main/resources/application.yaml`
 - `frontend/src/i18n/index.ts`

@@ -6,6 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import java.net.URI;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -62,6 +63,40 @@ class ApiProblemDetailsTest {
     problemDetails.normalize(problem, HttpStatus.CONFLICT, Locale.forLanguageTag(language));
 
     assertEquals(title, problem.getTitle(), "MessageSource の title");
+  }
+
+  @ParameterizedTest
+  @CsvSource({"ja, 入力内容に誤りがあります", "en, Invalid request content"})
+  @DisplayName("入力検証エラーは normalize を通しても type、title、errors を保ち、detail を持たない")
+  void validationProblemSurvivesNormalize(final String language, final String title) {
+    final StaticMessageSource messages = new StaticMessageSource();
+    messages.addMessage("problem.title.validation-error", Locale.JAPANESE, "入力内容に誤りがあります");
+    messages.addMessage("problem.title.400", Locale.JAPANESE, "リクエストが不正です");
+    final ApiProblemDetails problemDetails = new ApiProblemDetails(messages);
+    final Locale locale = Locale.forLanguageTag(language);
+    final List<ApiProblemDetails.ValidationError> errors =
+        List.of(new ApiProblemDetails.ValidationError("/name", "この項目は必須です。"));
+
+    final ProblemDetail problem = problemDetails.validationProblem(errors, locale);
+    problemDetails.normalize(problem, HttpStatus.BAD_REQUEST, locale);
+
+    assertEquals(URI.create("/problems/validation-error"), problem.getType(), "type");
+    assertEquals(title, problem.getTitle(), "key がなければ英語の default title");
+    assertNull(problem.getDetail(), "detail を付けないこと");
+    assertEquals(400, problem.getStatus(), "status");
+    assertEquals(Map.of("errors", errors), problem.getProperties(), "errors");
+  }
+
+  @ParameterizedTest
+  @CsvSource({
+    "a/b~c, /a~1b~0c",
+    "items[0].code, /items/0/code",
+    "lines[key].qty, /lines/key/qty",
+    "'[0].code', /0/code"
+  })
+  @DisplayName("Spring のプロパティパスを RFC 6901 の JSON Pointer にする")
+  void pointerConvertsPropertyPath(final String propertyPath, final String pointer) {
+    assertEquals(pointer, JsonPointers.fromPropertyPath("", propertyPath), propertyPath);
   }
 
   @Test
