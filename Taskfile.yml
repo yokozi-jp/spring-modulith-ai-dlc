@@ -1040,7 +1040,25 @@ tasks:
         elif [ "$zap_status" -ne 0 ]; then
           fail "ZAP の {{.DAST_PLAN}} plan が終了コード $zap_status で失敗しました。"
         fi
-        test -s "$report_dir/zap-{{.DAST_PLAN}}.sarif.json" || fail "SARIF が出力されていません。"
+        sarif="$report_dir/zap-{{.DAST_PLAN}}.sarif.json"
+        test -s "$sarif" || fail "SARIF が出力されていません。"
+        # Code Scanning は http の URI を受け付けず、リポジトリ内のファイルの位置だけを受け付ける。
+        # そのため、位置を実行した plan のファイルへ書き換え、元の URL はメッセージの末尾に残す。
+        # 位置が同じでも別の警告として残るよう、fingerprint を method、URL のパス、evidence、attack、元のメッセージから作る。
+        # URL のクエリは OAuth の state など実行ごとに変わるため、fingerprint には含めない。
+        jq --arg plan "docker/zap/{{.DAST_PLAN}}.yaml" '
+          def to_plan: map(.physicalLocation.artifactLocation = {uri: $plan} | .physicalLocation.region.startLine //= 1);
+          .runs[] |= (del(.artifacts, .originalUriBaseIds) | .results[] |= (
+            .locations[0] as $loc
+            | ($loc.physicalLocation.artifactLocation.uri // .webRequest.target // "") as $url
+            | .partialFingerprints.primaryLocationLineHash //= ([.webRequest.method // "", ($url | sub("\\?.*$"; "")),
+                ($loc.physicalLocation.region.snippet.text // ""), ($loc.properties.attack // ""), .message.text] | join("|"))
+            | .message.text += "\nURL: \($url)"
+            | .locations |= to_plan
+            | if has("relatedLocations") then .relatedLocations |= to_plan else . end))
+        ' "$sarif" >"$sarif.tmp" && mv "$sarif.tmp" "$sarif"
+        jq -e '[.. | objects | .uri? | strings | select(test("^[A-Za-z][A-Za-z0-9+.-]*:"))] | length == 0' "$sarif" >/dev/null \
+          || fail "SARIF に scheme 付きの URI が残っています。"
         echo "DAST のレポートを $report_dir に出力しました。"
 
   # Lint and format
