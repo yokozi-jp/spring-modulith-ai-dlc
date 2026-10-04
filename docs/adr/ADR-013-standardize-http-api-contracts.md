@@ -93,7 +93,7 @@ JSON API は `/api` 配下へ置き、次の契約を適用する。
 - Spectral は既定の OpenAPI ruleset とリポジトリ固有 ruleset を使い、構文だけでなく前項の必須要素を CI で検査する。
 - Spectral の CLI は実装時点の検証済みバージョンへ固定する。
 - Spectral は破壊的変更を検出する道具ではない。
-  独立クライアントが生じた時点で、main ブランチの OpenAPI との差分検査を CI に追加する。
+  main ブランチの OpenAPI との差分検査は [ADR-052](ADR-052-commit-openapi-contract-and-check-generated-client.md) で CI に追加した。
 - MockMvc 契約テストで status、`Content-Type`、Problem Details の必須フィールド、Security の 401 と 403、入力検証、未処理例外、`/error`、OpenAPI 文書を検証する。
 - HTTP 応答に `Instant` が現れる契約では、`Z` 付き文字列との完全一致を検証する。
 
@@ -117,7 +117,8 @@ JSON API は `/api` 配下へ置き、次の契約を適用する。
 ### Neutral
 
 - カスタム problem type の URI 基点は、公開 API の管理ドメインが決まるまで確定しない。
-- API の互換性要件が変わった場合は、バージョニングと OpenAPI 差分検査の判断を ADR へ追加する。
+- API の互換性要件が変わった場合は、バージョニングの判断を ADR へ追加する。
+  OpenAPI の差分検査は [ADR-052](ADR-052-commit-openapi-contract-and-check-generated-client.md) が定める。
 - 冪等性の保持期間は副作用とクライアントの再試行時間に依存するため、対象操作ごとに決める。
 
 ## Alternatives Considered

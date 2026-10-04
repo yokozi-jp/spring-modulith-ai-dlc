@@ -91,6 +91,7 @@
 │   └── index.md          # docs の入口
 ├── frontend/         # VitePlus + TypeScript フロントエンド（pnpm）
 ├── infrastructure/   # インフラ定義（未整備）
+├── openapi/          # コミット済みの OpenAPI 契約（openapi.yaml、生成物）と Spectral のルールの fixture
 ├── .betterleaks.toml # betterleaks（シークレットスキャナ）設定
 ├── .editorconfig     # エディタ共通設定
 ├── .env.example      # 環境変数のサンプル
@@ -160,6 +161,8 @@ cd frontend && vp dev      # SPAを起動し、APIとOIDCを同一オリジン�
 - **`task lint-duplicates`**：フロントエンドとバックエンドの手書きコードの重複検査。
 - **`task verify`**：push 前のバックエンド総合ゲート（静的解析、OpenAPI 契約検査と、使い捨てDBでのマイグレーション検証とテスト、CI と同じ内容）。
 
+API の Controller や DTO を変えたときは `task api-gen` で OpenAPI 契約と Orval の生成物を再生成し、同じコミットに含めます（[API を変更する](docs/web-api/runbook-api-change.md)）。
+
 Docker Compose の操作（サービスの起動、停止、状態確認、Keycloak の realm 再投入）や、「いつ、どのコマンドを、どの順で使うか」のシナリオ別の手順は [開発ワークフロー](docs/tooling/dev-workflow.md) を参照してください。
 
 <p align="right">(<a href="#top">トップへ</a>)</p>
@@ -179,8 +182,19 @@ Docker Compose の操作（サービスの起動、停止、状態確認、Keycl
 - `task fe-doctor`は手動のReact診断とFrontend CIで実行し、15分以内に完了しない場合は検査を失敗させます。
 - React Doctorのwarningとerrorはどちらもblockingとし、Frontend CIを停止します。
 - LefthookはFrontend変更を検出すると、pre-commitで `task fe-check`、pre-pushで `task fe-test-build` を実行します。
-- Frontend CIはPull Requestと `main` へのpushで `task fe-verify`、`task fe-route-tree-check`、`task fe-doctor` を実行し、Knip、生成済みroute treeの一致、React診断、全体branch coverage 85%を強制します。
+- Frontend CIはPull Requestと `main` へのpushで `task fe-verify`、`task fe-route-tree-check`、`task api-client-check`、`task fe-doctor` を実行し、Knip、生成済みroute treeとAPI clientの一致、React診断、全体branch coverage 85%を強制します。
 - coverageレポートは `task fe-coverage` で確認でき、CIでは14日間artifactとして保存します。
+
+### API 契約
+
+- `task api-gen` はテスト用の依存を起動し、`openapi/openapi.yaml` の生成、Spectral の検査、Orval による `frontend/src/api/generated` の再生成を実行します。
+- `task api-check` は再生成した契約と生成物がコミット済みの内容と一致するかを検査します。
+- `task api-client-check` は DB なしで Orval の生成物だけを再生成して検査し、pre-commit と Frontend CI で実行します。
+- `task be-openapi-check` は起動済みのテスト用依存で契約を再生成して検査し、Backend CI で実行します。
+- `task api-breaking` は `origin/main` の契約と oasdiff で比べ、破壊的変更があれば失敗させます。
+  意図した変更は Pull Request にラベル `api-breaking-approved` を付け、本文に理由を書きます。
+- `task api-docs` は Redocly CLI で静的 HTML の設計書を `build/api-docs/index.html` に作ります。
+  main へのマージで GitHub Pages に公開します。
 
 ### 重複コード検査
 

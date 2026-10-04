@@ -4,7 +4,7 @@
     {
       "name": "block-generated-writes",
       "trigger": "PreToolUse",
-      "description": "Blocks agent writes to generated frontend files (frontend/src/routeTree.gen.ts, frontend/src/api/generated/**) and points to the regeneration steps. Fail-open.",
+      "description": "Blocks agent writes to generated files (frontend/src/routeTree.gen.ts, frontend/src/api/generated/**, openapi/openapi.yaml) and points to the regeneration steps. Fail-open.",
       "matcher": "fs_write|fsWrite|write|str_replace|strReplace|fs_append|fsAppend|delete_file|deleteFile",
       "action": {
         "type": "command",

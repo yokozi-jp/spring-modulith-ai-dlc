@@ -42,6 +42,9 @@ CommandHandler に Request を渡さず、Request に業務の不変条件を書
   パス変数のない操作では引数を持たない（`toCommand()`）。
 - `List` の component は、コンパクトコンストラクタで `List.copyOf` に置き換える。
 - record、ネストした record、`toCommand` に Javadoc を書く。
+  record の Javadoc には全 component の `@param` を書く（OpenAPI の property の説明になる）。
+- 文字列と数値の component に `@Schema(example = "...")` を付ける。
+  enum、boolean、ネストした record、`List` には付けない（[OpenAPIのアノテーションとJavadoc](../../web-api/openapi-annotations.md#example)）。
 - `presentation.web` のパッケージの `package-info.java` は Controller と共有する。
 
 形式の違反は `MethodArgumentNotValidException` になり、`ApiExceptionHandler` が継承する `ResponseEntityExceptionHandler` が 400 の Problem Details にする。
@@ -49,7 +52,7 @@ CommandHandler に Request を渡さず、Request に業務の不変条件を書
 
 ## 依存してよい型、してはいけない型
 
-- **依存してよい型**：`java..` の標準型、`org.jspecify..`、Jakarta Bean Validation の制約、自分にネストした record、同じモジュールの `application` の Command。
+- **依存してよい型**：`java..` の標準型、`org.jspecify..`、Jakarta Bean Validation の制約、`io.swagger.v3.oas.annotations.media.Schema`（`example` だけに使う）、自分にネストした record、同じモジュールの `application` の Command。
 - **依存してはいけない型**：Domain の型（`Quantity`、`ProductCode`）、CommandHandler、モジュールルートの型、Infrastructure の型、jOOQ の生成型、他モジュールの型。
 
 ## 最小の例と典型的な例
@@ -60,8 +63,12 @@ CommandHandler に Request を渡さず、Request に業務の不変条件を書
 ```java
 package com.example.demo.order.presentation.web;
 
-/** 注文を取り消す API の本文。 */
-public record CancelOrderRequest(@Min(1) long lockNo) {
+/**
+ * 注文を取り消す API の本文。
+ *
+ * @param lockNo 画面が読んだ注文のロック番号
+ */
+public record CancelOrderRequest(@Min(1) @Schema(example = "1") long lockNo) {
 
   /** パス変数の注文 ID と合わせて Command へ変換する。 */
   public CancelOrderCommand toCommand(final String orderId) {
@@ -75,8 +82,15 @@ public record CancelOrderRequest(@Min(1) long lockNo) {
 ```java
 package com.example.demo.order.presentation.web;
 
-/** 注文を受け付ける API の本文。 */
-public record PlaceOrderRequest(@NotBlank String customerId, @NotEmpty List<@Valid Line> lines) {
+/**
+ * 注文を受け付ける API の本文。
+ *
+ * @param customerId 注文する顧客の ID
+ * @param lines 注文の明細
+ */
+public record PlaceOrderRequest(
+    @NotBlank @Schema(example = "C-0001") String customerId,
+    @NotEmpty List<@Valid PlaceOrderLineRequest> lines) {
 
   /** 明細を変更できないリストとして持つ。 */
   public PlaceOrderRequest {
@@ -92,15 +106,22 @@ public record PlaceOrderRequest(@NotBlank String customerId, @NotEmpty List<@Val
             .toList());
   }
 
-  /** 注文する商品と数量。 */
-  public record Line(@NotBlank String productCode, @Min(1) int quantity) {}
+  /**
+   * 注文する商品と数量。
+   *
+   * @param productCode 注文する商品のコード
+   * @param quantity 注文する数量
+   */
+  public record PlaceOrderLineRequest(
+      @NotBlank @Schema(example = "P-0001") String productCode,
+      @Min(1) @Schema(example = "2") int quantity) {}
 }
 ```
 
 Controller は `@Valid @RequestBody` で受け、`toCommand(...)` の結果を CommandHandler に渡す。
 
 ```java
-// com.example.demo.order.presentation.web.OrderController（抜粋）
+// com.example.demo.order.presentation.web.OrderController（抜粋。Javadoc と 201 の @ApiResponse は Controller の例を参照）
 @Operation(operationId = "placeOrder")
 @PostMapping
 /* package */ ResponseEntity<Void> place(@Valid @RequestBody final PlaceOrderRequest request) {
@@ -138,5 +159,7 @@ Controller の MockMvc のテストで、制約に違反する本文が 400 の 
 - [ ] `toCommand(...)` で Command に変換し、パス変数の値は引数で受け取る。［自分で点検］
 - [ ] `List` の component をコンパクトコンストラクタで `List.copyOf` に置き換える。［自分で点検］
 - [ ] record、ネストした record、`toCommand` に Javadoc を書く。［自分で点検］
+- [ ] record とネストした record の全 component に `@param` を書く。［Spectral で検査：schema-property-description］
+- [ ] 文字列と数値の component に `@Schema(example = "...")` を付ける。［Spectral で検査：schema-property-example］
 - [ ] Controller の MockMvc のテストで、違反が 400 になることを確かめる。［自分で点検］
 - [ ] `presentation.web` のパッケージに `@NullMarked` の `package-info.java` がある。［Error Prone で検査：RequireExplicitNullMarking］

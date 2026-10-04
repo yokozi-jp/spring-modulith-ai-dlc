@@ -61,15 +61,41 @@ pre-commit:
         export PATH="$PATH:$HOME/go/bin"
         betterleaks git --staged --no-banner --redact
 
-    # frontend にステージ済み変更があるとき、作業ツリーを書き換えずformat、lint、型を検査する。
-    - name: frontend-check
-      glob:
-        - "frontend/**"
-        - "Taskfile.yml"
-      run: |
-        echo "{staged_files}" >/dev/null
-        task fe-check
-      fail_text: "Frontendの静的検査に失敗しました。task fe-checkで再実行してください。"
+    # api-contract-check は src/api/generated を再生成し、frontend-check は src を型検査する。
+    # 同時に走ると生成途中のファイルを型検査するため、piped で API の検査を先に順番に実行する。
+    - name: frontend-and-api
+      group:
+        piped: true
+        jobs:
+          # OpenAPI 契約か Orval の入力にステージ済み変更があるとき、DB を使わずに検査する（ADR-052）。
+          # コミット済み契約の Spectral 検査と、Orval で再生成した API client の差分なしを確かめる。
+          # docker が無い環境では Spectral をスキップする（最終担保は CI に任せる）。
+          - name: api-contract-check
+            glob:
+              - "openapi/**"
+              - ".spectral.yaml"
+              - "frontend/orval.config.ts"
+              - "frontend/package.json"
+              - "frontend/src/api/generated/**"
+            run: |
+              echo "{staged_files}" >/dev/null
+              if command -v docker >/dev/null 2>&1; then
+                task api-lint
+              else
+                echo "docker が無いため Spectral をスキップします（CI で検査されます）。" >&2
+              fi
+              task api-client-check
+            fail_text: "OpenAPI契約またはAPI clientの検査に失敗しました。task api-gen で再生成し、差分をコミットしてください。"
+
+          # frontend にステージ済み変更があるとき、作業ツリーを書き換えずformat、lint、型を検査する。
+          - name: frontend-check
+            glob:
+              - "frontend/**"
+              - "Taskfile.yml"
+            run: |
+              echo "{staged_files}" >/dev/null
+              task fe-check
+            fail_text: "Frontendの静的検査に失敗しました。task fe-checkで再実行してください。"
 
     # ステージ済みの Dockerfile をベストプラクティス検査（hadolint）
     # docker が無い環境ではスキップ（最終担保は CI に任せる）。

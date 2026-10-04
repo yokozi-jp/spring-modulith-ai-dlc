@@ -52,5 +52,7 @@
 - [ADR-049: カラム名と型の矛盾を機械検査する](ADR-049-detect-column-name-and-type-mismatches.md)（Proposed, 2026-10-03）
 - [ADR-050: バックエンドのクラスの役割と命名を定める](ADR-050-define-backend-class-roles-and-naming.md)（Proposed, 2026-10-03）
 - [ADR-051: 共通カラムの pgm_cd を Aspect と ScopedValue で渡す](ADR-051-bind-pgm-cd-with-scoped-value-and-aspect.md)（Proposed, 2026-10-03）
+- [ADR-052: OpenAPI 契約をリポジトリにコミットし、生成物と破壊的変更を CI で検査する](ADR-052-commit-openapi-contract-and-check-generated-client.md)（Proposed, 2026-10-03）
+- [ADR-053: OpenAPI の説明を Javadoc から生成し、アノテーションを最小限にする](ADR-053-document-openapi-from-javadoc-with-minimal-annotations.md)（Proposed, 2026-10-03）
 - [ADR-052: 楽観的ロックの競合を UPDATE の条件の lock_no と更新件数で判定する](ADR-052-detect-optimistic-lock-conflicts-by-update-count.md)（Proposed, 2026-10-03）
 - [ADR-053: DB のロック待ち、文の実行、トランザクション中の待機の上限を接続ごとに設定する](ADR-053-set-db-time-limits-per-connection.md)（Proposed, 2026-10-03）

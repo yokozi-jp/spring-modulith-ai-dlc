@@ -2,6 +2,9 @@
 # 実値を持つルート .env のみ無視する（.env.test は非機密ダミーのため追跡する）。
 /.env
 
+# api-* タスクがリポジトリルートに書き出す一時ファイル（oasdiff の base、設計書の HTML）
+/build/
+
 # Logs
 logs
 *.log

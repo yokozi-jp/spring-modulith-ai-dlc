@@ -8,6 +8,7 @@
     "build": "tsc && vp build",
     "preview": "vp preview",
     "knip": "knip",
+    "orval": "orval",
     "react-doctor": "react-doctor . --yes --no-supply-chain --no-telemetry --blocking warning --no-color"
   },
   "dependencies": {

@@ -1,12 +1,11 @@
 {
   "$schema": "https://unpkg.com/knip@6/schema.json",
-  "ignore": ["lint/fixtures/**"],
+  "ignore": ["lint/fixtures/**", "src/api/generated/**"],
   "ignoreDependencies": [
     "@tanstack/react-form",
     "@tanstack/react-table",
     "lucide-react",
     "msw",
-    "orval",
     "zod"
   ]
 }

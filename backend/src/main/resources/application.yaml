@@ -243,5 +243,12 @@ springdoc:
     enabled: ${SPRINGDOC_ENABLED}
     # Spectralとクライアント生成が解釈する契約版を明示する。
     version: openapi-3-1
+  # コミットする契約の差分を安定させる。
+  writer-with-order-by-keys: true
+  # ControllerAdvice 由来の不正確な応答を全 operation に付けない。
+  # 共通のエラー応答は OpenApiConfig で付ける。
+  override-with-generic-response: false
+  # produces を書かない handler の応答を */* でなく JSON として契約に書く。
+  default-produces-media-type: application/json
   swagger-ui:
     enabled: ${SPRINGDOC_ENABLED}

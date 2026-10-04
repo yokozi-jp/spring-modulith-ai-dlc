@@ -61,6 +61,12 @@ dependencies {
     // --- API ドキュメント（OpenAPI / Swagger UI）---
     // springdoc 3.x が Spring Boot 4 系対応（2.x は Boot 3 系）。
     implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:3.1.1'
+    // Javadoc を OpenAPI の summary と description の正本にする（ADR-053）。
+    // Spring BOM の管理外のため版を明示する。springdoc 3.1.1 が optional 依存にする版と同じ。
+    // テストの scribe は、OpenAPI 生成を検証するサンプル Controller の Javadoc を記録する。
+    implementation 'com.github.therapi:therapi-runtime-javadoc:0.15.0'
+    annotationProcessor 'com.github.therapi:therapi-runtime-javadoc-scribe:0.15.0'
+    testAnnotationProcessor 'com.github.therapi:therapi-runtime-javadoc-scribe:0.15.0'
 
     // --- セキュリティ ---
     implementation 'org.springframework.boot:spring-boot-starter-security'
@@ -163,12 +169,15 @@ tasks.named('test') {
 
 tasks.register('exportOpenApi', Test) {
     group = 'verification'
-    description = 'OpenAPI契約テストを実行し、Spectral用のJSONを生成する'
+    description = 'OpenAPI契約テストを実行し、リポジトリのopenapi/openapi.yamlへ書き出す'
     testClassesDirs = sourceSets.test.output.classesDirs
     classpath = sourceSets.test.runtimeClasspath
     useJUnitPlatform()
     systemProperty 'user.timezone', 'UTC'
-    systemProperty 'openapi.output', layout.buildDirectory.file('openapi/openapi.json').get().asFile.absolutePath
+    // 出力に宣言し、コミット済みの契約を書き換えたか消したときに再実行させる。
+    def openApiSpec = layout.projectDirectory.file('../openapi/openapi.yaml').asFile
+    systemProperty 'openapi.output', openApiSpec.absolutePath
+    outputs.file(openApiSpec)
     filter {
         includeTestsMatching 'com.example.demo.OpenApiContractTest'
     }

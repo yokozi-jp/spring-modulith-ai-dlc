@@ -61,8 +61,22 @@ public record CancelOrderResult(String orderId) {}
 
 ```java
 // com.example.demo.order.presentation.web.OrderController（抜粋）
-/** 注文を受け付け、作成した注文の URI を Location に入れて返す。 */
+/**
+ * 注文を受け付ける。
+ *
+ * <p>作成した注文の URI を Location に入れて返す。
+ *
+ * @param request 受け付ける注文の内容
+ * @return 本文のない 201 の応答
+ */
 @Operation(operationId = "placeOrder")
+@ApiResponse(
+    responseCode = "201",
+    headers =
+        @Header(
+            name = "Location",
+            description = "作成した注文の URI",
+            schema = @Schema(type = "string", format = "uri")))
 @PostMapping
 /* package */ ResponseEntity<Void> place(@Valid @RequestBody final PlaceOrderRequest request) {
   final PlaceOrderResult result = placeOrder.handle(request.toCommand());

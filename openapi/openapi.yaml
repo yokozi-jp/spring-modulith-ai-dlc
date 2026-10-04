@@ -1,0 +1,81 @@
+openapi: 3.1.0
+info:
+  description: Demo アプリケーションの HTTP API
+  title: Demo API
+  version: 0.1.0
+servers:
+- description: 現在のオリジン
+  url: /
+paths: {}
+components:
+  responses:
+    BadRequestProblem:
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/ProblemDetail"
+      description: 要求の形式または入力値が正しくない
+    ConflictProblem:
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/ProblemDetail"
+      description: リソースの現在の状態と競合する
+    ForbiddenProblem:
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/ProblemDetail"
+      description: 操作の権限がない
+    InternalServerErrorProblem:
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/ProblemDetail"
+      description: サーバーの内部エラー
+    NotFoundProblem:
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/ProblemDetail"
+      description: 対象のリソースが存在しない
+    UnauthorizedProblem:
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/ProblemDetail"
+      description: 認証されていない
+    UnprocessableContentProblem:
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/ProblemDetail"
+      description: 業務規則に反するため処理できない
+  schemas:
+    ProblemDetail:
+      type: object
+      description: RFC 9457 の Problem Details
+      properties:
+        detail:
+          type: string
+          description: この失敗に固有の、人が読むための説明
+        instance:
+          type: string
+          format: uri-reference
+          description: 失敗発生を識別する URI
+        status:
+          type: integer
+          format: int32
+          description: 実際の HTTP status code
+        title:
+          type: string
+          description: Problem type の短い説明
+        type:
+          type: string
+          format: uri
+          description: Problem type の安定した識別 URI
+          example: about:blank
+      required:
+      - status
+      - title
+      - type
