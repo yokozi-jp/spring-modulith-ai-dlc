@@ -43,6 +43,12 @@ OpenAPI契約の説明はJavadocに書き、springdocがtherapi-runtime-javadoc�
 クエリパラメータは`@RequestParam`で項目ごとに受け、`@ParameterObject`と`@ModelAttribute`でまとめて受けない。
 受け方は[クエリパラメータ](query-parameters.md#controllerでの受け方)に従う。
 
+## component schemaの名前
+
+swagger-coreはcomponent schemaをJavaの単純クラス名で識別するため、API全体のDTOで単純名を重複させない。
+異なるDTOのネスト型に`Line`のような汎用名を再利用せず、`PlaceOrderLineRequest`や`OrderLineResponse`のように役割を含む名前を付ける。
+FQNやcustom resolverで衝突を回避せず、Javaの型名自体を一意にする。
+
 ## example
 
 - 要求と応答のrecordの、文字列と数値のpropertyに`@Schema(example = "...")`を付ける。
@@ -167,7 +173,7 @@ public record PlaceOrderRequest(
 public record OrderDetailsResponse(
     @Schema(example = "O-0001") String orderId,
     @Schema(example = "PLACED") String status,
-    List<OrderDetailsResponse.Line> lines) {}
+    List<OrderDetailsResponse.OrderLineResponse> lines) {}
 ```
 
 ## 旧リポジトリの方式を採らない理由

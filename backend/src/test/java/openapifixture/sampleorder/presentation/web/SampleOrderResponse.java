@@ -13,4 +13,14 @@ import java.util.List;
 record SampleOrderResponse(
     @Schema(example = "SO-0001") String sampleOrderId,
     @Schema(example = "PLACED") String status,
-    List<String> lines) {}
+    List<OrderLineResponse> lines) {
+
+  /**
+   * サンプル注文の明細。
+   *
+   * @param productCode 商品のコード
+   * @param quantity 注文した数量
+   */
+  public record OrderLineResponse(
+      @Schema(example = "P-0001") String productCode, @Schema(example = "2") int quantity) {}
+}

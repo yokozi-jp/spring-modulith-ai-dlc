@@ -170,6 +170,20 @@ class OpenApiAnnotationConventionTest {
         .andExpect(jsonPath(request + ".properties.giftWrap.description").value("ギフト包装をするかどうか"));
   }
 
+  @Test
+  @DisplayName("要求と応答の明細は別の component schema として生成され、それぞれから参照される")
+  void requestAndResponseLinesUseDistinctComponentSchemas() throws Exception {
+    apiDocs()
+        .andExpect(jsonPath("$.components.schemas.PlaceOrderLineRequest").exists())
+        .andExpect(jsonPath("$.components.schemas.OrderLineResponse").exists())
+        .andExpect(
+            jsonPath("$.components.schemas.SampleOrderRequest.properties.lines.items['$ref']")
+                .value("#/components/schemas/PlaceOrderLineRequest"))
+        .andExpect(
+            jsonPath("$.components.schemas.SampleOrderResponse.properties.lines.items['$ref']")
+                .value("#/components/schemas/OrderLineResponse"));
+  }
+
   private ResultActions apiDocs() throws Exception {
     return mockMvc.perform(get("/v3/api-docs")).andExpect(status().isOk());
   }

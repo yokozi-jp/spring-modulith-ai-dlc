@@ -58,7 +58,8 @@ class SampleOrderController {
   @ApiResponse(responseCode = "404", ref = "#/components/responses/NotFoundProblem")
   @GetMapping("/{sampleOrderId}")
   /* package */ SampleOrderResponse details(@PathVariable final String sampleOrderId) {
-    return new SampleOrderResponse(sampleOrderId, "PLACED", List.of("LINE-1"));
+    return new SampleOrderResponse(
+        sampleOrderId, "PLACED", List.of(new SampleOrderResponse.OrderLineResponse("P-0001", 2)));
   }
 
   /**

@@ -129,7 +129,7 @@ public record OrderDetailsResponse(
     @Schema(example = "O-0001") String orderId,
     @Schema(example = "C-0001") String customerId,
     @Schema(example = "PLACED") String status,
-    List<OrderDetailsResponse.Line> lines,
+    List<OrderDetailsResponse.OrderLineResponse> lines,
     @Schema(example = "2000") BigDecimal subtotal,
     @Schema(example = "100") BigDecimal discount,
     @Schema(example = "1900") BigDecimal total,
@@ -147,7 +147,7 @@ public record OrderDetailsResponse(
         details.orderId(),
         details.customerId(),
         details.status(),
-        details.lines().stream().map(Line::from).toList(),
+        details.lines().stream().map(OrderLineResponse::from).toList(),
         details.subtotal(),
         details.discount(),
         details.total(),
@@ -163,15 +163,16 @@ public record OrderDetailsResponse(
    * @param quantity 注文した数量
    * @param unitPrice 商品の単価
    */
-  public record Line(
+  public record OrderLineResponse(
       @Schema(example = "1") int lineNumber,
       @Schema(example = "P-0001") String productCode,
       @Schema(example = "2") int quantity,
       @Schema(example = "1000") BigDecimal unitPrice) {
 
     /** 参照の結果の明細から作る。 */
-    public static Line from(final OrderDetails.Line line) {
-      return new Line(line.lineNumber(), line.productCode(), line.quantity(), line.unitPrice());
+    public static OrderLineResponse from(final OrderDetails.Line line) {
+      return new OrderLineResponse(
+          line.lineNumber(), line.productCode(), line.quantity(), line.unitPrice());
     }
   }
 }

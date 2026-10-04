@@ -90,7 +90,7 @@ package com.example.demo.order.presentation.web;
  */
 public record PlaceOrderRequest(
     @NotBlank @Schema(example = "C-0001") String customerId,
-    @NotEmpty List<@Valid Line> lines) {
+    @NotEmpty List<@Valid PlaceOrderLineRequest> lines) {
 
   /** 明細を変更できないリストとして持つ。 */
   public PlaceOrderRequest {
@@ -112,7 +112,7 @@ public record PlaceOrderRequest(
    * @param productCode 注文する商品のコード
    * @param quantity 注文する数量
    */
-  public record Line(
+  public record PlaceOrderLineRequest(
       @NotBlank @Schema(example = "P-0001") String productCode,
       @Min(1) @Schema(example = "2") int quantity) {}
 }
