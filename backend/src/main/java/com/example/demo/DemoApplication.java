@@ -5,9 +5,12 @@ import java.time.Duration;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.context.annotation.Bean;
+import org.springframework.modulith.Modulithic;
 
 /** Spring Boot アプリケーションのエントリポイント。 */
 @SpringBootApplication
+// 共通処理の shared モジュールを、モジュール単位の統合テストでも常に起動する（ADR-048）。
+@Modulithic(sharedModules = "shared")
 public class DemoApplication {
 
   /** 現在時刻を取得するための、UTC固定でマイクロ秒単位に切り捨てたClockを提供する。 */

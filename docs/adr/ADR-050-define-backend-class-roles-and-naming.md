@@ -97,10 +97,10 @@ Proposed
 - 読み取りは、`select` に並べた列を `Field.convertFrom` で値オブジェクトと enum に変え、子の Entity を `multiset` の副問い合わせで同じ SQL で読み、`Records.mapping(Order::restore)` で集約にする（[jOOQ, Ad-hoc converters](https://www.jooq.org/doc/latest/manual/sql-execution/fetching/ad-hoc-converter/)、[jOOQ, The MULTISET value constructor](https://www.jooq.org/doc/latest/manual/sql-building/column-expressions/multiset-value-constructor/)）。jOOQ の作者も、一対多の対応づけにこの形を示している（[Stack Overflow, Mapping a one-to-many relationship to a list of records in jOOQ](https://stackoverflow.com/a/71855430/521799)）。列の数や型が `restore` や Entity のコンストラクタの引数と合わないと、コンパイルが失敗する。
 - Repository の書き込みは、新しい集約の `add` と、既存の集約の `update` に分ける。
   新規と更新を一つの `save` にすると、実装は行の有無で INSERT と UPDATE を選ぶことになり、他の人が消した集約の更新が新しい行の作成になって、「行がない」（404）として返せないためである。
-- `add` は、`insertInto` の `set(列, 値)` で業務の全列と `lock_no` を書き、ほかの共通カラムの値は [ADR-048](ADR-048-add-shared-module-for-jooq-common-code.md) の `shared` の共通処理から受け取る。
+- `add` は、`insertInto` の `set(列, 値)` で業務の全列を書き、`lock_no` を含む共通カラムの値は [ADR-048](ADR-048-add-shared-module-for-jooq-common-code.md) の `shared` の共通処理から受け取る。
 - `update` は、[PostgreSQL の排他制御](../database/postgresql-concurrency-control.md)の楽観的ロックの順序に従う。
   集約ルートの行を `SELECT ... FOR UPDATE NOWAIT` でロックし、行がなければ `NoSuchElementException` を、`lock_no` が集約の `lockNo` と違うか行をロックできなければ `domain.model` の `<Aggregate>ConflictException` を投げる。
-  一致したら、`lock_no` を1加算し、`updated_*` を `shared` の共通処理から受け取って更新する。
+  一致したら、`lock_no` の加算を含む共通カラムの値を `shared` の共通処理から受け取って更新する。
 - Controller が作り、既存の集約の状態を変える Command は、クライアントが参照の応答で受け取った `lockNo` を持つ。
   CommandHandler は、集約を取り出した直後に集約の `lockNo` と比べ、画面から受け取った値とロックした行の値の比較が成り立つようにする。
 - 外部システムのインタフェースの実装は `infrastructure.client` の `<ExternalSystem>Client` とする。

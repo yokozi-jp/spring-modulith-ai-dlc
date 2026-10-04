@@ -32,6 +32,15 @@ jOOQの生成コードには適用しない。
 
 jOOQの楽観的ロックの機能を使わない規則は、[PostgreSQLの排他制御](postgresql-concurrency-control.md)に従う。
 
+## 共通処理
+
+共通カラムの値は、sharedモジュールの`CommonColumns`の`forInsert(table)`と`forUpdate(table)`が返し、`set(...)`で登録する（[ADR-048](../adr/ADR-048-add-shared-module-for-jooq-common-code.md)）。
+Repositoryでの書き方は[クラスの役割：jOOQ の Repository](../backend/class-roles/jooq-repository.md)に従う。
+
+NOT NULLの`varchar`には、コード生成がNULLを空文字へそろえるConverterを当てる。
+文字列の共通カラムと`patched_*`には当てない（[PostgreSQLのデータ型](postgresql-data-types.md)）。
+このConverterは外部結合（LEFT JOIN）で生じたNULLも空文字に変えるため、結合先の行があるかどうかは文字列のカラムではなく主キーで判定する。
+
 ## 検査
 
 Plain SQLのAPIと`withRenderSchema(false)`の使用は、ArchUnitで検査する。
