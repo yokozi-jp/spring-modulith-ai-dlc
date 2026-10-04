@@ -26,6 +26,7 @@ changesetを追加した変更ではjOOQコードを再生成し、changesetと�
 生成コードは対応するLiquibase changesetと同じ変更へ含める。
 `compileJava`と`bootJar`は、リポジトリで管理する生成コードをコンパイルし、DBへ接続して再生成しない。
 生成コードは手書きコード向けの静的解析とフォーマットから除外する。
+生成先のパッケージ`com.example.demo.jooq`には生成コードだけを置き、手書きのクラスを置かない（[バックエンドのアーキテクチャテスト](../backend/architecture-tests.md)の「解析対象と実行」）。
 
 jOOQ採用と生成環境の決定は[ADR-003](../adr/ADR-003-adopt-jooq-for-data-access.md)を参照する。
 生成物をGit管理する理由は[ADR-004](../adr/ADR-004-commit-jooq-generated-code.md)を参照する。

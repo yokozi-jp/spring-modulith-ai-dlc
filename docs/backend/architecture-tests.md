@@ -273,7 +273,9 @@ Spring Modulith、Error Prone、NullAway、SpotBugs、Spotlessの失敗の文は
 プロダクションコード向けArchUnit検査は[ProductionCodeOnly](../../backend/src/test/java/com/example/demo/architecture/ProductionCodeOnly.java)で手書きコードだけを選び、生成コードとテストコードを除外する。
 除外する生成コードは、jOOQの生成先である基底パッケージ直下の`jooq`パッケージだけとする。
 `order.infrastructure.persistence.jooq`のような手書きのパッケージまで除外すると、そこに置いたRepositoryが`tableWritesGoThroughTableWriter`を外れるためである。
-`ProductionCodeOnlyTest`がこの境界を確かめる。
+除外はクラスの場所で判定するため、基底パッケージ直下の`jooq`パッケージにはjOOQのコード生成の出力だけを置く。
+そこに置いた手書きのクラスは、ソースのディレクトリを問わず、すべてのプロダクションコード向けの規則を外れるためである。
+`ProductionCodeOnlyTest`がこの境界を確かめ、そのパッケージの本番のクラスのソースファイルがすべて`src/generated/jooq`にあることも確かめる。
 生成コードを除外しても、手書きコードからjOOQ APIや生成型への依存は検査する。
 
 静的解析は`task be-lint`で、ArchUnitとSpring Modulithの検査は`task test`で実行する。

@@ -64,6 +64,8 @@ PostgreSQL の READ COMMITTED では、後の UPDATE は先の UPDATE のコミ�
     `DataSource`、`Connection`、`ConnectionProvider` を引数に取るメソッドとコンストラクタも呼ばない。
     接続の元を受け取るライブラリ（Spring Boot の `DataSourceScriptDatabaseInitializer` など）は、パッケージを選ばずに任意の SQL を流せるため、パッケージの一覧ではなく引数の型で禁じる。
     検査の対象から外す生成コードは、jOOQ の生成先である基底パッケージ直下の `jooq` パッケージだけとし、名前に `jooq` を含む手書きのパッケージは外さない。
+    除外はクラスの場所で判定し、そのパッケージに置いた手書きのクラスもすべての検査を外れるため、そのパッケージには jOOQ のコード生成の出力だけを置く。
+    `ProductionCodeOnlyTest` は、そのパッケージの本番のクラスのソースファイルがすべて `src/generated/jooq` にあることを確かめる。
     `Update` と `Delete` を作る入口（`DSLContext`、`DSL`、`WithStep` の `update`、`delete`、`deleteFrom`、`updateQuery`、`deleteQuery`）をすべて禁じるため、`batch` のように作った問い合わせを受け取って実行する API は禁じなくてよい。
   - `Jooq<Aggregate>Repository` の、集約ルートを受け取る `add` 以外の public メソッドは、版を比べる入口と、引数の集約ルートの `lockNo()` を直接呼ぶ。
     名前で対象を選ばないため、`save` のような名前でも検査を外れない。
