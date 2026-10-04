@@ -24,16 +24,16 @@ Trophyの土台は静的解析であり、Oxlintの全カテゴリ、TypeScript�
 
 ## テストの層と道具
 
-| 層            | 道具                                                | 環境  |
-| ------------- | --------------------------------------------------- | ----- |
-| 純粋関数      | Vitest                                              | Node  |
-| component     | Testing Libraryとuser-event                         | jsdom |
-| custom Hook   | Hookを使うcomponentのテスト                         | jsdom |
-| route         | 実際の`routeTree`、memory history、`routerDefaults` | jsdom |
-| APIを使う画面 | componentの道具に加えてMSW                          | jsdom |
-| E2E           | 未定                                                | 未定  |
+| 層            | 道具                                                | 環境                                |
+| ------------- | --------------------------------------------------- | ----------------------------------- |
+| 純粋関数      | Vitest                                              | Node                                |
+| component     | Testing Libraryとuser-event                         | jsdom                               |
+| custom Hook   | Hookを使うcomponentのテスト                         | jsdom                               |
+| route         | 実際の`routeTree`、memory history、`routerDefaults` | jsdom                               |
+| APIを使う画面 | componentの道具に加えてMSW                          | jsdom                               |
+| E2E           | Playwright（Chromium）                              | compose-testのbackendとVite preview |
 
-E2E testの道具と環境は、[ADR-027](../adr/ADR-027-adopt-frontend-testing-stack.md)のとおり要件が生じた時点で判断する。
+E2E testの書き方と実行環境は[E2Eテストの方針と書き方](../e2e/testing-strategy.md)に従う。
 
 ## 観点ごとのテスト
 
@@ -48,14 +48,14 @@ E2E testの道具と環境は、[ADR-027](../adr/ADR-027-adopt-frontend-testing-
 - **画面遷移と遷移先の表示**：test用のrouterを使うcomponent testで検証する。
 - **APIを使う取得と更新の流れ**：画面にロジックがある場合に、MSWを使うcomponent testで検証する。
 - **複数画面にまたがる主要な利用者の流れ**：E2E testで検証する。
-- **HTMLの構造とkeyboard操作**：component testでroleとlabelから操作して検証し、E2E testを導入した後はE2E testでも確かめる。
+- **HTMLの構造とkeyboard操作**：component testでroleとlabelから操作して検証し、主要な利用者の流れではE2E testでも確かめる。
 - **screen readerでの読み上げ**：手動で確認する。
 
 ## E2E testの対象
 
 - unit testとcomponent testで確かめられる観点に、E2E testを書かない。
 - E2E testの対象は、業務の根幹となる利用者の流れに要る画面と、複数のAPIとcomponentが組み合わさって壊れやすい複雑な画面に限る。
-- E2E testの道具は、[ADR-027](../adr/ADR-027-adopt-frontend-testing-stack.md)のとおり要件が生じた時点で判断する。
+- E2E testの道具の採用理由は[ADR-056](../adr/ADR-056-adopt-playwright-for-e2e-tests.md)を参照する。
 
 ## アクセシビリティの自動検査
 
