@@ -1,0 +1,125 @@
+# 認証付きの active scan（ADR-056）。task scan-dast-active が preflight.yaml の後に実行する。
+# 検出はタスクを失敗させない。レポートは /zap/wrk（build/dast）に出力する。
+# env は preflight.yaml、passive.yaml、active.yaml で同じ内容にそろえる（failOnWarning だけが違う）。
+env:
+  contexts:
+    - name: spring-modulith-dast
+      urls:
+        - http://localhost:4173
+      includePaths:
+        - "http://localhost:4173.*"
+      excludePaths:
+        - "http://localhost:4173/logout.*"
+        - "http://127\\.0\\.0\\.1:8081.*"
+      authentication:
+        method: browser
+        parameters:
+          loginPageUrl: http://localhost:4173/oauth2/authorization/web
+          loginPageWait: 5
+          browserId: firefox-headless
+        verification:
+          method: poll
+          pollUrl: http://localhost:4173/api/missing
+          pollFrequency: 60
+          pollUnits: requests
+          loggedInRegex: '"status"\s*:\s*404'
+          loggedOutRegex: '"status"\s*:\s*401'
+      # 自動検出で APP_SESSION を拾えなければ method: cookie にする。
+      sessionManagement:
+        method: autodetect
+      users:
+        # demo realm（docker/keycloak/realm.json）のテストユーザーで、秘密ではない。
+        - name: test-admin
+          credentials:
+            username: test-admin
+            password: test-password
+  parameters:
+    failOnError: true
+    failOnWarning: false
+    progressToStdout: true
+
+jobs:
+  - type: script
+    parameters:
+      action: add
+      type: httpsender
+      engine: "ECMAScript : Graal.js"
+      name: copy-xsrf-token-to-header.js
+      file: /zap/plans/scripts/httpsender/copy-xsrf-token-to-header.js
+
+  # ADR-014 と ADR-030 で受容した差による指摘だけを除外する。X-Forwarded-Host 関連は先回りして除外しない。
+  - type: alertFilter
+    alertFilters:
+      # CSP Header Not Set：ADR-014 は CSP を SPA の HTML に付け、JSON API には要求しない。
+      - ruleId: 10038
+        context: spring-modulith-dast
+        url: "^http://localhost:4173/(api|oauth2|login|logout|error|actuator|v3/api-docs)(/.*)?$"
+        urlRegex: true
+        newRisk: False Positive
+      # Strict-Transport-Security：スキャンは HTTP で動かし、ADR-014 は HSTS を HTTPS の入口で付ける。
+      - ruleId: 10035
+        context: spring-modulith-dast
+        newRisk: False Positive
+      # Cookie Without Secure Flag：.env.test は SESSION_COOKIE_SECURE=false で、ADR-014 は本番を HTTPS の単一 origin で公開する。
+      - ruleId: 10011
+        context: spring-modulith-dast
+        newRisk: False Positive
+      # Cookie No HttpOnly Flag（XSRF-TOKEN だけ）：csrf.spa() は SPA が読む前提で、ADR-014 は X-XSRF-TOKEN を許可している。
+      - ruleId: 10010
+        context: spring-modulith-dast
+        parameter: XSRF-TOKEN
+        newRisk: False Positive
+      # CSP: style-src unsafe-inline（10055-6 だけ）：ADR-030 は style-src-elem だけに unsafe-inline を許し、ADR-014 がこの CSP を定める。CSP が変われば再判定する。
+      - ruleId: "10055-6"
+        context: spring-modulith-dast
+        url: "^http://localhost:4173(/.*)?$"
+        urlRegex: true
+        evidence: "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; form-action 'self'; script-src 'self'; style-src 'self'; style-src-elem 'self' 'unsafe-inline'; style-src-attr 'none'; img-src 'self' data:; font-src 'self'; connect-src 'self'"
+        newRisk: False Positive
+
+  # API の応答も passive scan の対象にするため、spider が見つけにくいパスを先に送る。
+  - type: requestor
+    parameters:
+      user: test-admin
+    requests:
+      - url: http://localhost:4173/
+      - url: http://localhost:4173/logged-out
+      - url: http://localhost:4173/api/missing
+
+  - type: spider
+    parameters:
+      context: spring-modulith-dast
+      user: test-admin
+      url: http://localhost:4173
+      maxDuration: 2
+      logoutAvoidance: true
+
+  - type: passiveScan-wait
+    parameters:
+      maxDuration: 5
+
+  - type: activeScan
+    parameters:
+      context: spring-modulith-dast
+      user: test-admin
+      maxRuleDurationInMins: 5
+      maxScanDurationInMins: 60
+
+  - type: report
+    parameters:
+      template: sarif-json
+      reportDir: /zap/wrk
+      reportFile: zap-active.sarif.json
+    confidences: [confirmed, high, medium, low]
+
+  - type: report
+    parameters:
+      template: traditional-html
+      reportDir: /zap/wrk
+      reportFile: zap-active.html
+
+  - type: report
+    parameters:
+      template: traditional-json
+      reportDir: /zap/wrk
+      reportFile: zap-active.json

@@ -56,3 +56,4 @@
 - [ADR-053: OpenAPI の説明を Javadoc から生成し、アノテーションを最小限にする](ADR-053-document-openapi-from-javadoc-with-minimal-annotations.md)（Proposed, 2026-10-03）
 - [ADR-054: 楽観的ロックの競合を lock_no の条件と更新件数で判定し、業務テーブルの UPDATE と DELETE を TableWriter に集める](ADR-054-detect-optimistic-lock-conflicts-by-update-count.md)（Proposed, 2026-10-04）
 - [ADR-055: DB のロック待ち、文の実行、トランザクション中の待機の上限を接続ごとに設定する](ADR-055-set-db-time-limits-per-connection.md)（Proposed, 2026-10-03）
+- [ADR-056: CI で OWASP ZAP による認証付きの DAST を実行する](ADR-056-run-authenticated-dast-with-zap-in-ci.md)（Proposed, 2026-10-04）
