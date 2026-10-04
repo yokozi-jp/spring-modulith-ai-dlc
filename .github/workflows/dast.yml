@@ -11,9 +11,10 @@ on:
     - cron: "17 3 * * 1"
   workflow_dispatch:
 
+# PR だけ実行中の run を取り消す。schedule の active scan を workflow_dispatch で止めないため（api-contract.yml と同じ）。
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 # SARIF を Code Scanning にアップロードする権限はジョブごとに付与する
 # （ワークフロー全体に広く付与しない）。
