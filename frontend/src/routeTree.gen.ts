@@ -10,10 +10,16 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
+import { Route as LoggedOutRouteImport } from './routes/logged-out'
 import { Route as AuthenticatedIndexRouteImport } from './routes/_authenticated/index'
 
 const AuthenticatedRouteRoute = AuthenticatedRouteRouteImport.update({
   id: '/_authenticated',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const LoggedOutRoute = LoggedOutRouteImport.update({
+  id: '/logged-out',
+  path: '/logged-out',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AuthenticatedIndexRoute = AuthenticatedIndexRouteImport.update({
@@ -24,25 +30,29 @@ const AuthenticatedIndexRoute = AuthenticatedIndexRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof AuthenticatedIndexRoute
+  '/logged-out': typeof LoggedOutRoute
 }
 export interface FileRoutesByTo {
+  '/logged-out': typeof LoggedOutRoute
   '/': typeof AuthenticatedIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/_authenticated': typeof AuthenticatedRouteRouteWithChildren
+  '/logged-out': typeof LoggedOutRoute
   '/_authenticated/': typeof AuthenticatedIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/'
+  fullPaths: '/' | '/logged-out'
   fileRoutesByTo: FileRoutesByTo
-  to: '/'
-  id: '__root__' | '/_authenticated' | '/_authenticated/'
+  to: '/logged-out' | '/'
+  id: '__root__' | '/_authenticated' | '/logged-out' | '/_authenticated/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   AuthenticatedRouteRoute: typeof AuthenticatedRouteRouteWithChildren
+  LoggedOutRoute: typeof LoggedOutRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -52,6 +62,13 @@ declare module '@tanstack/react-router' {
       path: ''
       fullPath: '/'
       preLoaderRoute: typeof AuthenticatedRouteRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/logged-out': {
+      id: '/logged-out'
+      path: '/logged-out'
+      fullPath: '/logged-out'
+      preLoaderRoute: typeof LoggedOutRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/_authenticated/': {
@@ -77,6 +94,7 @@ const AuthenticatedRouteRouteWithChildren =
 
 const rootRouteChildren: RootRouteChildren = {
   AuthenticatedRouteRoute: AuthenticatedRouteRouteWithChildren,
+  LoggedOutRoute: LoggedOutRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

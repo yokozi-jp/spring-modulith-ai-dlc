@@ -18,5 +18,8 @@
   "retry": "再試行",
   "notFoundHeading": "ページが見つかりません",
   "notFoundDescription": "URL が正しいか確認してください。",
-  "backToHome": "ホームへ戻る"
+  "backToHome": "ホームへ戻る",
+  "logout": "ログアウト",
+  "loggedOutHeading": "ログアウトしました",
+  "loginAgain": "もう一度ログイン"
 }

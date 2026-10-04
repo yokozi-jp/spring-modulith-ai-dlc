@@ -46,7 +46,7 @@
       "frontchannelLogout": true,
       "attributes": {
         "pkce.code.challenge.method": "S256",
-        "post.logout.redirect.uris": "http://localhost:5173/actuator/health##http://localhost:18080/actuator/health"
+        "post.logout.redirect.uris": "http://localhost:5173/logged-out"
       }
     }
   ],
