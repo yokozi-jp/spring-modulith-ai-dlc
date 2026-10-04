@@ -9,7 +9,7 @@ tags: [adr, backend, api, error, frontend]
 
 ## Status
 
-Proposed
+Accepted
 
 ## Date
 
