@@ -12,6 +12,8 @@ import com.example.demo.testkit.SharedTestConfiguration;
 import jakarta.servlet.RequestDispatcher;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
@@ -106,6 +108,43 @@ class ApiContractTest {
         .andExpect(jsonPath("$.detail").doesNotExist())
         .andExpect(jsonPath("$.exception").doesNotExist())
         .andExpect(jsonPath("$.trace").doesNotExist());
+  }
+
+  @Test
+  @DisplayName("/error は Accept が text/html でも転送元の status の Problem Details を返す")
+  void errorEndpointIgnoresHtmlAccept() throws Exception {
+    mockMvc
+        .perform(
+            get("/error")
+                .accept(MediaType.TEXT_HTML)
+                .requestAttr(RequestDispatcher.ERROR_STATUS_CODE, 400))
+        .andExpect(status().isBadRequest())
+        .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
+        .andExpect(jsonPath("$.title").value("リクエストが不正です"))
+        .andExpect(jsonPath("$.status").value(400));
+  }
+
+  @ParameterizedTest
+  @CsvSource({
+    "413, ja, リクエストが大きすぎます",
+    "413, en, Content Too Large",
+    "422, ja, 処理できない内容です",
+    "422, en, Unprocessable Content",
+    "429, ja, リクエストが多すぎます",
+    "429, en, Too Many Requests",
+    "503, ja, サービスを利用できません",
+    "503, en, Service Unavailable"
+  })
+  @DisplayName("/error は 413、422、429、503 の title を日本語と英語で返す")
+  void errorEndpointLocalizesAdditionalStatusTitles(
+      final int code, final String language, final String title) throws Exception {
+    mockMvc
+        .perform(
+            get("/error")
+                .header(HttpHeaders.ACCEPT_LANGUAGE, language)
+                .requestAttr(RequestDispatcher.ERROR_STATUS_CODE, code))
+        .andExpect(status().is(code))
+        .andExpect(jsonPath("$.title").value(title));
   }
 
   @Test

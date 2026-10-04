@@ -901,7 +901,8 @@ tasks:
           def value($key): first(.attributes[]? | select(.key == $key) | .value.stringValue);
           any(
             .resourceLogs[]?.scopeLogs[]?.logRecords[]?;
-            ([.attributes[]?.key] | sort) == ["exception.message", "exception.stacktrace", "exception.type"]
+            ([.attributes[]?.key] | sort) == ["exception.message", "exception.stacktrace", "exception.type", "http.response.status_code"]
+              and (first(.attributes[]? | select(.key == "http.response.status_code") | .value.intValue) == "500")
               and value("exception.type") == "java.lang.IllegalStateException"
               and value("exception.message") == "order failed"
               and (value("exception.stacktrace") | contains("OrderService.java:84"))

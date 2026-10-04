@@ -12,6 +12,9 @@ logging:
       service:
         name: ${OTEL_SERVICE_NAME}
         environment: ${OTEL_DEPLOYMENT_ENVIRONMENT_NAME}
+  # 405 で基底クラスが出す WARN を抑える。405 は ApiExceptionHandler が INFO で記録する。
+  level:
+    org.springframework.web.servlet.PageNotFound: error
 
 spring:
   application:

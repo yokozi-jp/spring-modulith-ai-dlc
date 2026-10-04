@@ -14,7 +14,7 @@ processors:
   transform/log_attributes:
     log_statements:
       # ログ属性の allowlist。属性を足すときは docs/observability/conventions.md と同じ変更で直す。
-      - keep_keys(log.attributes, ["exception.type", "exception.message", "exception.stacktrace"])
+      - keep_keys(log.attributes, ["exception.type", "exception.message", "exception.stacktrace", "http.response.status_code"])
 
 exporters:
   # ローカルの Grafana OpenTelemetry LGTM。

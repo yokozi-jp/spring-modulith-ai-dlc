@@ -28,30 +28,27 @@ final class ApiProblemDetails {
     this.messageSource = messageSource;
   }
 
-  /** {@link ApiExceptionHandler} が応答生成時に正規化する Problem Details を生成する。 */
-  /* package */ static ProblemDetail forStatus(final HttpStatus status) {
-    return ProblemDetail.forStatus(status);
-  }
-
   /** advice を通らない {@code /error} 用に、正規化済み Problem Details を生成する。 */
   /* package */ ProblemDetail localizedForStatus(final HttpStatus status, final Locale locale) {
-    final ProblemDetail problem = forStatus(status);
+    final ProblemDetail problem = ProblemDetail.forStatus(status);
     normalize(problem, status, locale);
     return problem;
   }
 
-  /** 標準 type と、人が読む title を API の契約へ正規化する。 */
+  /** 標準 type を補い、about:blank のときだけ title を翻訳して detail を消す。業務 type は変えない。 */
   /* package */ void normalize(
       final ProblemDetail problem, final HttpStatusCode status, final Locale locale) {
     final URI type = Objects.requireNonNullElse(problem.getType(), ABOUT_BLANK);
     problem.setType(type);
     if (ABOUT_BLANK.equals(type)) {
       problem.setDetail(null);
+      final String defaultTitle =
+          status instanceof HttpStatus httpStatus
+              ? httpStatus.getReasonPhrase()
+              : status.toString();
+      problem.setTitle(
+          messageSource.getMessage("problem.title." + status.value(), null, defaultTitle, locale));
     }
-    final String defaultTitle =
-        status instanceof HttpStatus httpStatus ? httpStatus.getReasonPhrase() : status.toString();
-    problem.setTitle(
-        messageSource.getMessage("problem.title." + status.value(), null, defaultTitle, locale));
   }
 
   /** 元の Vary を保ち、Problem Details の media type と選択言語を応答ヘッダへ設定する。 */

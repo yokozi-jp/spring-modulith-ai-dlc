@@ -5,12 +5,10 @@ import io.swagger.v3.oas.annotations.Hidden;
 import jakarta.servlet.RequestDispatcher;
 import jakarta.servlet.http.HttpServletRequest;
 import java.util.Locale;
-import java.util.Optional;
 import org.jspecify.annotations.Nullable;
 import org.springframework.boot.webmvc.error.ErrorController;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
-import org.springframework.http.MediaType;
 import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -33,9 +31,7 @@ public class ApiErrorController implements ErrorController {
   // /error はコンテナが元リクエストの method のまま転送する dispatch 先で、状態変更のない読み取り専用のため
   // method を絞らない（Spring の BasicErrorController も同様）。CSRF の懸念はない。
   // nosemgrep: java.spring.security.unrestricted-request-mapping.unrestricted-request-mapping
-  @RequestMapping(
-      path = "${spring.web.error.path:${error.path:/error}}",
-      produces = MediaType.APPLICATION_PROBLEM_JSON_VALUE)
+  @RequestMapping(path = "${spring.web.error.path:${error.path:/error}}")
   public ResponseEntity<ProblemDetail> error(final HttpServletRequest request) {
     final @Nullable Object statusAttribute =
         request.getAttribute(RequestDispatcher.ERROR_STATUS_CODE);
@@ -47,10 +43,12 @@ public class ApiErrorController implements ErrorController {
   }
 
   private static HttpStatus resolveStatus(final @Nullable Object statusAttribute) {
-    return Optional.ofNullable(statusAttribute)
-        .filter(Integer.class::isInstance)
-        .map(Integer.class::cast)
-        .map(code -> HttpStatus.resolve(code))
-        .orElse(HttpStatus.INTERNAL_SERVER_ERROR);
+    if (statusAttribute instanceof Integer code) {
+      final @Nullable HttpStatus status = HttpStatus.resolve(code);
+      if (status != null) {
+        return status;
+      }
+    }
+    return HttpStatus.INTERNAL_SERVER_ERROR;
   }
 }
