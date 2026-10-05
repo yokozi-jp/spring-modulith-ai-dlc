@@ -117,6 +117,19 @@ class LogoutContractTest {
   }
 
   @Test
+  @DisplayName("誤った CSRF トークン付きの POST /logout は 403 になり、セッションを残す")
+  void logoutWithInvalidCsrfTokenIsForbidden() throws Exception {
+    mockMvc
+        .perform(post("/logout").cookie(sessionCookie).with(csrf().useInvalidToken()))
+        .andExpect(status().isForbidden());
+
+    assertNotNull(
+        sessionRepository.findById(sessionId),
+        () -> "POST /logout（誤った CSRF トークン）の後にセッションが消えた: sessionId=" + sessionId);
+    mockMvc.perform(get("/api/missing").cookie(sessionCookie)).andExpect(status().isNotFound());
+  }
+
+  @Test
   @DisplayName("正しい CSRF トークン付きの POST /logout は IdP の end session endpoint へ redirect する")
   void logoutRedirectsToIdpEndSessionEndpoint() throws Exception {
     final String location =
