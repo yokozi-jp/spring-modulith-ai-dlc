@@ -61,7 +61,9 @@ Proposed
 - 状態を変えるユースケースごとに、`<UseCase>CommandHandler` を一つ作る。ユースケース名はユビキタス言語の動詞にする（`PlaceOrder`、`CancelOrder`）。
 - CommandHandler の public メソッドは `@Transactional` を付けた `handle(<UseCase>Command)` だけにし、`<UseCase>Result` を返す。
 - `<UseCase>Command` と `<UseCase>Result` は、返す値がなくても必ず作り、標準型だけを持つ record として `application` に置く。
-  例外として、既存の集約を変える Command は `shared.concurrency` の `ExpectedLockNo` を持ち、`VersionedCommand` を実装する。Result は少なくとも集約の識別子を持つ。コマンドクエリ分離ではコマンドは値を返さないが（[Fowler, CommandQuerySeparation](https://martinfowler.com/bliki/CommandQuerySeparation.html)）、作成の応答に `Location` を組み立てるには識別子が要るためである。
+  Result は少なくとも集約の識別子を持つ。
+  コマンドクエリ分離ではコマンドは値を返さないが（[Fowler, CommandQuerySeparation](https://martinfowler.com/bliki/CommandQuerySeparation.html)）、作成の応答に `Location` を組み立てるには識別子が要るためである。
+  例外として、既存の集約を変える Command は `shared.concurrency` の `ExpectedLockNo` を持ち、`VersionedCommand` を実装する。
 - CommandHandler は別の CommandHandler を呼ばない。
   一つのユースケースを一つのトランザクションで進めるという CommandHandler の定義を保ち、ユースケースが別のユースケースを呼んで連鎖する形を防ぐためである。
 - 画面から呼ばれる CommandHandler は外部システムを呼ばず、状態を変えて `update` で保存し、ルートのイベント（`OrderConfirmed`）を発行して終える。
