@@ -129,7 +129,7 @@ class ArchitectureRuleFixtureTest {
     return Stream.concat(classRoleRows(), tableWriterRows());
   }
 
-  /** TableWriter の規則（H1、H3、H4、H5、H6）が、対応する違反フィクスチャを検出することを確かめる行を作る。 */
+  /** TableWriter の規則（H1、H3、H5、H6、R1 から R4）が、対応する違反フィクスチャを検出することを確かめる行を作る。 */
   private static Stream<Arguments> tableWriterRows() {
     return Stream.concat(
         DIRECT_WRITES.stream()
@@ -162,8 +162,36 @@ class ArchitectureRuleFixtureTest {
                 "order.domain.model.UnversionedOrderRepository.add("),
             row(
                 "commandHandlersEnsureScreenLockNo",
-                TableWriterArchTest.commandHandlersEnsureScreenLockNoRule(),
+                TableWriterArchTest.commandHandlersEnsureScreenLockNoRule(VIOLATING),
                 "order.application.ApproveOrderCommandHandler"),
+            row(
+                "commandHandlersEnsureScreenLockNo: ensureLockNo(long) overload",
+                TableWriterArchTest.commandHandlersEnsureScreenLockNoRule(VIOLATING),
+                "order.application.OverloadedEnsureCommandHandler"),
+            row(
+                "commandsBuiltByPresentationForWritesAreVersioned",
+                TableWriterArchTest.commandsBuiltByPresentationForWritesAreVersionedRule(VIOLATING),
+                "order.application.ReleaseOrderCommandHandler"),
+            row(
+                "onlyCommandHandlersUpdateOrDeleteAggregates: Domain Service",
+                TableWriterArchTest.onlyCommandHandlersUpdateOrDeleteAggregatesRule(),
+                "order.domain.service.ReopenPolicy.reopen("),
+            row(
+                "onlyCommandHandlersUpdateOrDeleteAggregates: QueryService",
+                TableWriterArchTest.onlyCommandHandlersUpdateOrDeleteAggregatesRule(),
+                "order.application.PurgeOrderQueryService.purge("),
+            row(
+                "expectedLockNoIsCreatedOnlyByRequests: constructor",
+                TableWriterArchTest.expectedLockNoIsCreatedOnlyByRequestsRule(VIOLATING),
+                "order.application.ForgedLockNoCommandHandler.forged("),
+            row(
+                "expectedLockNoIsCreatedOnlyByRequests: constructor reference",
+                TableWriterArchTest.expectedLockNoIsCreatedOnlyByRequestsRule(VIOLATING),
+                "order.application.ForgedLockNoCommandHandler.forgedByReference("),
+            row(
+                "expectedLockNoIsCreatedOnlyByRequests: Controller",
+                TableWriterArchTest.expectedLockNoIsCreatedOnlyByRequestsRule(VIOLATING),
+                "order.presentation.web.OrderLockController.lockNo("),
             row(
                 "aggregateMethodsDoNotUseUnversionedWrites",
                 TableWriterArchTest.aggregateMethodsDoNotUseUnversionedWritesRule(VIOLATING),
@@ -399,7 +427,10 @@ class ArchitectureRuleFixtureTest {
         TableWriterArchTest.tableWritesGoThroughTableWriterRule(basePackage),
         TableWriterArchTest.repositoryUpdateAndDeleteCheckVersionRule(basePackage),
         TableWriterArchTest.repositoryWritesTakeVersionedAggregatesRule(),
-        TableWriterArchTest.commandHandlersEnsureScreenLockNoRule(),
+        TableWriterArchTest.commandHandlersEnsureScreenLockNoRule(basePackage),
+        TableWriterArchTest.commandsBuiltByPresentationForWritesAreVersionedRule(basePackage),
+        TableWriterArchTest.onlyCommandHandlersUpdateOrDeleteAggregatesRule(),
+        TableWriterArchTest.expectedLockNoIsCreatedOnlyByRequestsRule(basePackage),
         TableWriterArchTest.aggregateMethodsDoNotUseUnversionedWritesRule(basePackage));
   }
 }

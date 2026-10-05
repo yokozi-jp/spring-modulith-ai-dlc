@@ -1,5 +1,7 @@
 package archfixture.conforming.order.domain.model;
 
+import archfixture.conforming.shared.concurrency.ConflictException;
+import archfixture.conforming.shared.concurrency.ExpectedLockNo;
 import java.time.Instant;
 
 /** 注文の集約ルート。 */
@@ -44,10 +46,9 @@ public final class Order {
   }
 
   /** 画面が表示した版が、読み込んだ版と同じことを確かめる。 */
-  public void ensureLockNo(final long expectedLockNo) {
-    if (lockNo != expectedLockNo) {
-      throw new IllegalStateException(
-          "order was updated by another request: orderId=" + id.value());
+  public void ensureLockNo(final ExpectedLockNo expectedLockNo) {
+    if (lockNo != expectedLockNo.value()) {
+      throw new ConflictException("order was updated by another request: orderId=" + id.value());
     }
   }
 

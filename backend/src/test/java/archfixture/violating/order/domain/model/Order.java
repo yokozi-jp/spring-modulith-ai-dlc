@@ -17,6 +17,13 @@ public final class Order {
     this.lockNo = lockNo;
   }
 
+  /** 違反：commandHandlersEnsureScreenLockNo の対象外にするための、数値を受け取るオーバーロード。 */
+  public void ensureLockNo(final long expected) {
+    if (lockNo != expected) {
+      throw new IllegalStateException("order was updated by another request");
+    }
+  }
+
   /** 注文 ID を返す。 */
   public OrderId id() {
     return id;

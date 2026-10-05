@@ -7,29 +7,28 @@ import java.util.NoSuchElementException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-/** 画面から注文を取り消す。 */
+/** 期限切れの注文を取り消す。画面の版がないため ensureLockNo を呼ばない。 */
 @Service
-public class CancelOrderCommandHandler {
+public class CancelExpiredOrderCommandHandler {
 
   /** 注文を取り出し、保存する Repository。 */
   private final OrderRepository orderRepository;
 
   /** 依存を受け取る。 */
-  public CancelOrderCommandHandler(final OrderRepository orderRepository) {
+  public CancelExpiredOrderCommandHandler(final OrderRepository orderRepository) {
     this.orderRepository = orderRepository;
   }
 
-  /** 画面の版を確かめてから注文を取り消し、保存する。 */
+  /** 注文を取り消し、読み込んだ版で保存する。 */
   @Transactional
-  public CancelOrderResult handle(final CancelOrderCommand command) {
+  public CancelExpiredOrderResult handle(final CancelExpiredOrderCommand command) {
     final Order order =
         orderRepository
             .findById(new OrderId(command.orderId()))
             .orElseThrow(
                 () -> new NoSuchElementException("order not found: orderId=" + command.orderId()));
-    order.ensureLockNo(command.expectedLockNo());
     order.cancel();
     orderRepository.update(order);
-    return new CancelOrderResult(order.id().value());
+    return new CancelExpiredOrderResult(order.id().value());
   }
 }

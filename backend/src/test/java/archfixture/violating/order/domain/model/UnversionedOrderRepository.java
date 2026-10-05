@@ -8,4 +8,7 @@ public interface UnversionedOrderRepository {
 
   /** 版を持たない識別子で注文を保存する。 */
   void update(OrderId id);
+
+  /** 版を持たない識別子で注文を削除する。 */
+  void delete(OrderId id);
 }

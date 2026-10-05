@@ -4,7 +4,7 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import org.springframework.stereotype.Service;
 
-/** 違反：commandHandlersEnsureScreenLockNo（Command が lockNo を持つのに ensureLockNo を呼ばない）。 */
+/** 違反：commandHandlersEnsureScreenLockNo（VersionedCommand を受け取るのに ensureLockNo を呼ばない）。 */
 @Service
 public class ApproveOrderCommandHandler {
 
