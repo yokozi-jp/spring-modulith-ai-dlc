@@ -9,7 +9,7 @@ tags: [adr, i18n, api, frontend]
 
 ## Status
 
-Proposed
+Accepted
 
 ## Date
 
@@ -60,9 +60,11 @@ i18next の global instance は使わず、`createInstance` で作った instanc
 ブラウザ設定を使う間は、API request の `Accept-Language` を JavaScript で上書きしない。
 将来、アプリ内の言語選択を追加する場合は、その選択を SPA と API の双方へ同じ規則で反映する。
 
-SPA が Problem Details を扱う際は、既知の `type` をローカル message key へ写像する。
-未知の `type` は一般エラーとして扱い、サーバーの `detail` をそのまま HTML へ挿入しない。
-現在は API client が存在しないため、未使用の parser は先に作らず、最初の API client と同時にこの規則を実装する。
+SPA が Problem Details を表示する際は、バックエンドが `Accept-Language` から解決した `title` と業務固有の `detail` をそのまま表示する。
+SPA は `type` を自前の message key へ写像しない。
+SPA は `type` で分岐し、文言では分岐しない。
+SPA は文言を text として描画し、HTML として挿入しない。
+Problem Details がない場合と、画面が一般エラーを表示する場合は、SPA の message catalog の文言を使う。
 
 ## Consequences
 
@@ -87,6 +89,7 @@ SPA が Problem Details を扱う際は、既知の `type` をローカル messa
 - 業務固有の検証 problem type と `errors` schema は、最初の業務 API と管理ドメインが確定した時点で ADR-013 に従って追加する。
   [ADR-058](ADR-058-use-path-absolute-relative-uri-for-problem-types.md) で、管理ドメインを待たずに追加した。
 - 翻訳の追加は API version を上げる変更ではない。
+- `type` は [ADR-058](ADR-058-use-path-absolute-relative-uri-for-problem-types.md) で `/problems/<kebab-case>` に固定したため、必要になれば SPA が `type` ごとに文言を上書きできる。
 
 ## Alternatives Considered
 
@@ -113,6 +116,12 @@ SPA が Problem Details を扱う際は、既知の `type` をローカル messa
 - Description：ICU MessageFormat を標準とする react-intl を使う。
 - Pros：ICU MessageFormat をそのまま書け、翻訳管理サービスとの互換性が高い。
 - Cons：React での採用例と周辺ツールは i18next より少ない。i18next も plugin で ICU MessageFormat を使えるため、ICU が必要になった時点で移行せずに対応できる。
+
+### Alternative 5: SPA が `type` を自前の message key へ写像する
+
+- Description：SPA が既知の `type` を message catalog の key へ写像し、バックエンドの `title` と `detail` を表示しない。
+- Pros：SPA が表示文言を制御できる。
+- Cons：文言の正本がバックエンドと SPA の二つになり、同期を保つ必要がある。バックエンドは言語を解決して `Content-Language` と `Vary` を返しているため、写像は同じ解決を重ねるだけになる。`type` を追加するたびに、同じ Pull Request で catalog も変更する必要がある。
 
 ## References
 
