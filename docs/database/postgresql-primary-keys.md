@@ -55,6 +55,8 @@ IDENTITY列の定義は[PostgreSQLのデータ型](postgresql-data-types.md#iden
 
 UUIDの採番はアプリケーションで行い、DBでは行わない。
 `uuid`カラムに`DEFAULT`を付けず、`uuidv7()`と`gen_random_uuid()`を使わない。
+IDをINSERTの前に確定し、イベントや子テーブルの外部キーに保存を待たず使えるようにするためである。
+永続化用の主キーはRepositoryが発行し、Domain上の外部公開識別子である`public_id`はDomainが発行する。
 主キーの次の値はRepositoryの`nextId()`から得る。
 インタフェースは`domain.model`に、実装は`infrastructure.persistence`の`Jooq<Aggregate>Repository`に置く。
 Javaの型は`java.util.UUID`にし、`String`にしない。

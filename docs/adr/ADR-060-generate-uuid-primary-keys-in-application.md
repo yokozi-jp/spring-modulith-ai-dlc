@@ -1,7 +1,7 @@
 ---
 type: ADR
 title: 'ADR-060: UUID の採番をアプリケーションで行い、DB の DEFAULT で採番しない'
-description: UUID の採番をアプリケーションの Repository.nextId() で行い、uuid カラムの DEFAULT を禁止して機械で検査する決定。public_id は UUID v4、UUID v7 はシャーディングを前提にする主キーだけに使い、v7 の生成の実装は最初のテーブルを作るときに決める。
+description: UUID の採番をアプリケーションで行い、uuid カラムの DEFAULT を禁止して機械で検査する決定。永続化用の主キーは Repository の nextId() が、Domain 上の公開用 ID の public_id は Domain のファクトリが採番する。public_id は UUID v4、UUID v7 はシャーディングを前提にする主キーだけに使い、v7 の生成の実装は最初のテーブルを作るときに決める。
 tags: [adr, database, postgresql, backend]
 ---
 
@@ -33,11 +33,19 @@ Java は 25 で、UUID v7 を作る標準の API がない。
 
 UUID の採番はアプリケーションで行い、DB では行わない。
 `uuid` カラムに `DEFAULT` を付けず、`uuidv7()` と `gen_random_uuid()` を schema に書かない。
+理由は、ID のライフサイクルを INSERT の前に持ってくるためである。
+ID が INSERT の前に決まれば、イベントの発行や子テーブルの外部キーに、保存を待たずに ID を使える。
+
+採番の責務は、ID の役割で分ける。
+永続化用の主キーは Repository が発行する。
+Domain 上の外部公開識別子である `public_id` は Domain が発行する。
+どちらも DB の `DEFAULT` には任せない。
 
 Java の ID の値型は `java.util.UUID` にする。
 jOOQ は PostgreSQL の `uuid` を `UUID` に直接対応づける。
 
 主キーの次の値は Repository の `XxxId nextId()` から得る。
+UUID v7 の生成には時刻などインフラ側の要素が関わる見込みであり、Domain は `shared` に依存できないため、主キーの採番は Repository の背後に置く。
 インタフェースは `domain.model` に、実装は `infrastructure.persistence` の `Jooq*Repository` に置く。
 static メソッドの `OrderId.newId()` は廃止する。
 
@@ -60,8 +68,8 @@ UUID v7 を主キーにする最初のテーブルを作るときに決める。
 ### Positive
 
 - ID が永続化の前に分かるため、イベントや子テーブルの外部キーの値に使える。
-- 採番に DB が要らないため、DB なしでテストできる。
-- 採番の経路が Repository の `nextId()` 一つになる。
+- 主キーの採番の経路が Repository の `nextId()` 一つになる。
+- 結果として、採番に DB が要らず、DB なしでテストできる。
 - `DEFAULT` による DB 採番の混入を、機械で防げる。
 
 ### Negative
