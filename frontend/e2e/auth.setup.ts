@@ -1,17 +1,11 @@
-import type { BrowserContext, Page } from "@playwright/test";
+import type { BrowserContext } from "@playwright/test";
 import { expect, test as setup } from "@playwright/test";
 
-import { authFile, credentials } from "./environment";
+import { authFile, signInOnKeycloak } from "./environment";
 
 async function sessionCookie(context: BrowserContext): Promise<string | undefined> {
   const cookies = await context.cookies();
   return cookies.find(({ name }) => name === "APP_SESSION")?.value;
-}
-
-async function signInOnKeycloak(page: Page): Promise<void> {
-  await page.getByLabel("Username or email").fill(credentials.username);
-  await page.getByLabel("Password", { exact: true }).fill(credentials.password);
-  await page.getByRole("button", { name: "Sign In" }).click();
 }
 
 setup(

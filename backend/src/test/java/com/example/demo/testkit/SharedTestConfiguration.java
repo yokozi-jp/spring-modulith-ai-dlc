@@ -1,5 +1,6 @@
 package com.example.demo.testkit;
 
+import java.util.Map;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Bean;
 import org.springframework.security.oauth2.client.registration.ClientRegistration;
@@ -38,6 +39,9 @@ public class SharedTestConfiguration {
             .userInfoUri("https://issuer.example.test/oauth2/userinfo")
             .userNameAttributeName("sub")
             .clientName("Test Web Client")
+            // OidcClientInitiatedLogoutSuccessHandler は、この metadata がないと IdP へ redirect しない。
+            .providerConfigurationMetadata(
+                Map.of("end_session_endpoint", "https://issuer.example.test/oauth2/logout"))
             .build();
     return new InMemoryClientRegistrationRepository(registration);
   }
