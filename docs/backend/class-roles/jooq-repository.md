@@ -62,6 +62,7 @@ jOOQ の Repository は業務規則を持たない。
 - SQL は生成されたテーブルと列で組み立て、Plain SQL と `withRenderSchema(false)` を使わない（[jOOQのSQLの書き方](../../database/jooq-usage.md)）。
 - 集約を読む SQL の列の選択と変換は、private メソッド `select<Aggregate>s()` 一つに置く。
   取り出しのメソッドは、そこへ `where` と `orderBy` を足す。
+- `nextId()` を実装する。採番の方法は、UUID v7 を主キーにする最初のテーブルを作るときに決める（[PostgreSQLの主キー](../../database/postgresql-primary-keys.md#uuidの採番)）。
 - 列は `convertFrom` で値オブジェクトと enum に変える（`ORDERS.ORDER_ID.convertFrom(OrderId::new)`、`ORDERS.STATUS.convertFrom(OrderStatus::valueOf)`）。
 - 子の Entity は、`multiset` の副問い合わせで集約ルートと同じ SQL で読み、`convertFrom(lines -> lines.map(Records.mapping(OrderLine::new)))` で Entity のリストにする。
   副問い合わせには、子を識別する列の `orderBy` を付ける。
@@ -227,6 +228,7 @@ class JooqOrderRepository implements OrderRepository {
   }
 
   // findByCustomer と countUnshippedByCustomer は典型的な例に示す。
+  // nextId() の採番は、最初の UUID v7 の主キーのテーブルを作るときに決めるため、ここには示さない。
 
   /** 注文の列と明細を、Order.restore の引数の型と順に選ぶ。 */
   private SelectJoinStep<

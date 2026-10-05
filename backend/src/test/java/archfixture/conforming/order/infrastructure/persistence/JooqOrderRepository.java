@@ -11,11 +11,14 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import org.springframework.stereotype.Repository;
 
 /**
  * 注文の Repository の実装。フィクスチャなので jOOQ の代わりに Map へ保存する。
+ *
+ * <p>フィクスチャなので ID の採番は仮の実装である。
  *
  * <p>共通カラムの値は shared の共通処理から受け取り、UPDATE と DELETE は shared の TableWriter で書く。
  */
@@ -39,6 +42,11 @@ class JooqOrderRepository implements OrderRepository {
       final CommonColumns commonColumns, final TableWriter tableWriter) {
     this.commonColumns = commonColumns;
     this.tableWriter = tableWriter;
+  }
+
+  @Override
+  public OrderId nextId() {
+    return new OrderId(UUID.randomUUID());
   }
 
   @Override

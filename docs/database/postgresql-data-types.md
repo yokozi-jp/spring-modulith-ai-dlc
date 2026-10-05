@@ -31,7 +31,7 @@ Spring Modulithのイベント出版テーブルのように、フレームワ�
 - **金額と計算結果**：`numeric(p, s)`。正確な値が必要な金額や使用量に使う。既定値を0にしない。
 - **文字列**：桁数を指定した`varchar(n)`。
 - **フラグ**：`boolean`とし、NOT NULL、既定値`false`にする。`boolean`の前に[真偽値の代替](postgresql-logical-design.md#真偽値の代替)を検討する。
-- **UUID**：`uuid`。`varchar(36)`にしない。
+- **UUID**：`uuid`。`varchar(36)`にしない。`DEFAULT`を付けない（[PostgreSQLの主キー](postgresql-primary-keys.md#uuidの採番)）。
 
 ## 使わない型
 

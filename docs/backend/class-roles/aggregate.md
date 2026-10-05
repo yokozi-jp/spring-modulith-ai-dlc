@@ -244,7 +244,7 @@ class OrderTest {
   void shippedOrderCannotBeCancelled() {
     final Order order =
         Order.place(
-            new OrderId("O-1"),
+            new OrderId(UUID.fromString("00000000-0000-4000-8000-000000000001")),
             new CustomerId("C-1"),
             List.of(
                 new OrderLine(
@@ -256,7 +256,7 @@ class OrderTest {
 
     assertThatThrownBy(order::cancel)
         .isInstanceOf(IllegalStateException.class)
-        .hasMessageContaining("orderId=O-1");
+        .hasMessageContaining("orderId=00000000-0000-4000-8000-000000000001");
   }
 }
 ```

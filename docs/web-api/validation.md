@@ -27,6 +27,9 @@ tags: [convention, web-api, validation, openapi, future-arch-guidelines]
 - マスタの存在確認のように、DBを参照しないと判定できない検証。
 - 在庫数のように、業務の状態に依存する検証。
 
+複数の項目を組み合わせた検証を、Controllerのメソッドに付ける引数をまたぐ制約（cross-parameter constraint）で書かない。
+Spring Framework 7.0.9のメソッド検証は、引数をまたぐ違反だけでは例外にせず、検証されないまま処理を続けるためである。
+
 業務条件を満たさない入力には422を返す。
 ステータスコードの選択は[HTTPステータスコードの選択](status-codes.md)に、エラー応答の形式は[ADR-013](../adr/ADR-013-standardize-http-api-contracts.md)に従う。
 

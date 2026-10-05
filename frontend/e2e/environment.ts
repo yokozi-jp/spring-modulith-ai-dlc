@@ -1,3 +1,4 @@
+import type { Page } from "@playwright/test";
 import { loadEnv } from "vite-plus";
 
 // 作業ディレクトリに依存しないよう、このファイルの位置からパスを決める。
@@ -17,9 +18,16 @@ function requireEnv(name: "E2E_USERNAME" | "E2E_PASSWORD"): string {
 }
 
 export const isCI = Boolean(env.CI);
-export const credentials = {
+const credentials = {
   username: requireEnv("E2E_USERNAME"),
   password: requireEnv("E2E_PASSWORD"),
 };
 // playwright-report/ と test-results/ の外に置き、CI の artifact に入れない。
 export const authFile = pathFromHere(".auth/user.json");
+
+// Keycloak の資格情報の入力画面で test-user としてログインする。
+export async function signInOnKeycloak(page: Page): Promise<void> {
+  await page.getByLabel("Username or email").fill(credentials.username);
+  await page.getByLabel("Password", { exact: true }).fill(credentials.password);
+  await page.getByRole("button", { name: "Sign In" }).click();
+}

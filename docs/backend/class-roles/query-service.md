@@ -82,7 +82,7 @@ class OrderQueryService implements OrderQueries {
   @Override
   @Transactional(readOnly = true)
   public Optional<OrderDetails> findDetails(final String orderId) {
-    return orderRepository.findById(new OrderId(orderId)).map(OrderQueryService::toDetails);
+    return orderRepository.findById(new OrderId(UUID.fromString(orderId))).map(OrderQueryService::toDetails);
   }
 
   @Override
@@ -95,7 +95,7 @@ class OrderQueryService implements OrderQueries {
 
   private static OrderSummary toSummary(final Order order) {
     return new OrderSummary(
-        order.id().value(),
+        order.id().value().toString(),
         order.status().name(),
         order.total().amount(),
         order.placedAt(),
@@ -114,7 +114,7 @@ class OrderQueryService implements OrderQueries {
                         line.unitPrice().amount()))
             .toList();
     return new OrderDetails(
-        order.id().value(),
+        order.id().value().toString(),
         order.customerId().value(),
         order.status().name(),
         lines,
@@ -151,7 +151,7 @@ class OrderQueryServiceTest {
   void findsDetailsOfSavedOrder() {
     final Order order =
         Order.place(
-            OrderId.newId(),
+            orderRepository.nextId(),
             new CustomerId("C-1"),
             List.of(
                 new OrderLine(
@@ -161,7 +161,7 @@ class OrderQueryServiceTest {
 
     final OrderDetails details =
         orderQueries
-            .findDetails(order.id().value())
+            .findDetails(order.id().value().toString())
             .orElseThrow(
                 () -> new AssertionError("order が見つからない: orderId=" + order.id().value()));
     assertThat(details.status()).as("orderId=%s の状態", order.id().value()).isEqualTo("PLACED");

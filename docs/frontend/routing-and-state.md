@@ -84,6 +84,13 @@ errorの表示はcatalogの文言を使い、`error.message` を画面に出さ�
 
 再試行は、`useQueryErrorResetBoundary` の `reset()` でqueryのerrorを戻してから `router.invalidate()` を呼ぶ。
 
+401は `QueryCache` と `MutationCache` の `onError` がログインへ遷移させる。
+30秒以内の2回目は遷移せず、queryは `RouteError`、mutationは呼び出したcomponentのerror状態に任せる。
+
+4xxの `ApiProblemError` は再試行しない。
+ただし、408と429は再試行してよい応答なので（RFC 9110 §15.5.9、RFC 6585 §4）、5xxと同じく再試行する。
+loaderの `ensureQueryData` も `defaultOptions.queries.retry` に従い、5xx、408、429と通信の失敗は最大3回再試行してから `RouteError` になる。
+
 route固有の `pendingComponent` や `errorComponent` は、`react/no-multi-comp` があるためroute fileとは別のファイルに置く。
 
 ## React Hooksと状態

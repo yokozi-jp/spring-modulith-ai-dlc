@@ -9,17 +9,6 @@ const contentSecurityPolicy =
 
 // ponytail: 開発では起動単位でnonceを固定する。本番へ適用するなら配信層でリクエスト単位に生成する。
 const developmentCspNonce = crypto.randomUUID().replaceAll("-", "");
-const developmentContentSecurityPolicy = contentSecurityPolicy
-  .replace("script-src 'self'", `script-src 'self' 'nonce-${developmentCspNonce}'`)
-  .replace("connect-src 'self'", "connect-src 'self' ws://localhost:*");
-
-const securityHeaders = {
-  "Content-Security-Policy": contentSecurityPolicy,
-  "Referrer-Policy": "strict-origin-when-cross-origin",
-  "Permissions-Policy": "camera=(), microphone=(), geolocation=(), payment=(), usb=()",
-  "X-Content-Type-Options": "nosniff",
-  "X-Frame-Options": "DENY",
-};
 
 const restrictedHtmlProperties = [
   "innerHTML",
@@ -80,10 +69,25 @@ export default defineConfig(({ mode }) => {
   ) {
     throw new Error(`SERVER_PORT must be an integer between 1 and 65535: ${serverPortValue}`);
   }
-  // ログアウトのフォームはIdPへredirectされ、ChromeとSafariはredirect先にもform-actionを適用する。
   const idpOrigin = new URL(
     loadEnv(mode, "..", "OIDC_ISSUER_URI").OIDC_ISSUER_URI ?? "http://localhost:8080",
   ).origin;
+  // ログアウトのフォームはIdPへredirectされ、ChromeとSafariはredirect先にもform-actionを適用する。
+  // 開発専用の許可ではないため、本番の見本（production modeとpreview）にも入れる（build-and-delivery.md）。
+  const deliveredContentSecurityPolicy = contentSecurityPolicy.replace(
+    "form-action 'self'",
+    `form-action 'self' ${idpOrigin}`,
+  );
+  const developmentContentSecurityPolicy = deliveredContentSecurityPolicy
+    .replace("script-src 'self'", `script-src 'self' 'nonce-${developmentCspNonce}'`)
+    .replace("connect-src 'self'", "connect-src 'self' ws://localhost:*");
+  const securityHeaders = {
+    "Content-Security-Policy": deliveredContentSecurityPolicy,
+    "Referrer-Policy": "strict-origin-when-cross-origin",
+    "Permissions-Policy": "camera=(), microphone=(), geolocation=(), payment=(), usb=()",
+    "X-Content-Type-Options": "nosniff",
+    "X-Frame-Options": "DENY",
+  };
 
   return {
     ...(mode === "development" ? { html: { cspNonce: developmentCspNonce } } : {}),
@@ -299,11 +303,8 @@ export default defineConfig(({ mode }) => {
         // ViteのWebSocketとReact Refreshのinline scriptだけをローカル開発で追加許可する。
         "Content-Security-Policy":
           mode === "development"
-            ? developmentContentSecurityPolicy.replace(
-                "form-action 'self'",
-                `form-action 'self' ${idpOrigin}`,
-              )
-            : contentSecurityPolicy,
+            ? developmentContentSecurityPolicy
+            : deliveredContentSecurityPolicy,
       },
       proxy: {
         "^/(api|oauth2|login|logout|error|actuator|v3/api-docs|swagger-ui)(/|$)": {

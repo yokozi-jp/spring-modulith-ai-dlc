@@ -135,7 +135,7 @@ CommandHandler は `PaymentGateway` に依存し、`PaymentGatewayClient` を知
 ```java
 // com.example.demo.order.application.ChargeOrderCommandHandler（抜粋）
 if (order.isPaid()) {
-  return new ChargeOrderResult(order.id().value());
+  return new ChargeOrderResult(order.id().value().toString());
 }
 paymentGateway.charge(order.id(), order.total());
 order.markPaid();
@@ -156,6 +156,7 @@ class PaymentGatewayClientTest {
   @Test
   @DisplayName("注文 ID を冪等性キーにして請求し、決済システムが返した決済 ID を返す")
   void chargesWithOrderIdAsIdempotencyKey() throws IOException {
+    final UUID orderUuid = UUID.fromString("00000000-0000-4000-8000-000000000001");
     final AtomicReference<String> idempotencyKey = new AtomicReference<>();
     final HttpServer server =
         HttpServer.create(new InetSocketAddress(InetAddress.getLoopbackAddress(), 0), 0);
@@ -176,10 +177,10 @@ class PaymentGatewayClientTest {
           new PaymentGatewayClient("http://localhost:" + server.getAddress().getPort());
 
       final PaymentId paymentId =
-          client.charge(new OrderId("O-1"), new Money(new BigDecimal("1000")));
+          client.charge(new OrderId(orderUuid), new Money(new BigDecimal("1000")));
 
-      assertThat(paymentId).as("orderId=O-1 の決済 ID").isEqualTo(new PaymentId("PAY-1"));
-      assertThat(idempotencyKey).as("orderId=O-1 の請求の冪等性キー").hasValue("O-1");
+      assertThat(paymentId).as("orderId の決済 ID").isEqualTo(new PaymentId("PAY-1"));
+      assertThat(idempotencyKey).as("orderId の請求の冪等性キー").hasValue(orderUuid.toString());
     } finally {
       server.stop(0);
     }

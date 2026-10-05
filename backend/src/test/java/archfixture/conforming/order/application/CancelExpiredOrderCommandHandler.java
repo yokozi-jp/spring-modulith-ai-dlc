@@ -4,6 +4,7 @@ import archfixture.conforming.order.domain.model.Order;
 import archfixture.conforming.order.domain.model.OrderId;
 import archfixture.conforming.order.domain.model.OrderRepository;
 import java.util.NoSuchElementException;
+import java.util.UUID;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -24,11 +25,11 @@ public class CancelExpiredOrderCommandHandler {
   public CancelExpiredOrderResult handle(final CancelExpiredOrderCommand command) {
     final Order order =
         orderRepository
-            .findById(new OrderId(command.orderId()))
+            .findById(new OrderId(UUID.fromString(command.orderId())))
             .orElseThrow(
                 () -> new NoSuchElementException("order not found: orderId=" + command.orderId()));
     order.cancel();
     orderRepository.update(order);
-    return new CancelExpiredOrderResult(order.id().value());
+    return new CancelExpiredOrderResult(order.id().value().toString());
   }
 }

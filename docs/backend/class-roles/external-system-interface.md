@@ -93,16 +93,16 @@ public record PaymentId(String value) {
 public ChargeOrderResult handle(final ChargeOrderCommand command) {
   final Order order =
       orderRepository
-          .findById(new OrderId(command.orderId()))
+          .findById(new OrderId(UUID.fromString(command.orderId())))
           .orElseThrow(
               () -> new NoSuchElementException("order not found: orderId=" + command.orderId()));
   if (order.isPaid()) {
-    return new ChargeOrderResult(order.id().value());
+    return new ChargeOrderResult(order.id().value().toString());
   }
   paymentGateway.charge(order.id(), order.total());
   order.markPaid();
   orderRepository.update(order);
-  return new ChargeOrderResult(order.id().value());
+  return new ChargeOrderResult(order.id().value().toString());
 }
 ```
 
