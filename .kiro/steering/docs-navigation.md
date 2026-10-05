@@ -21,6 +21,7 @@ steering は入口の案内だけを持ち、規約の本文を持たない（[A
 | ------------------------------------------------------------- | -------------------------------- |
 | バックエンド（アーキテクチャ、テスト）                        | `docs/backend/index.md`          |
 | フロントエンド                                                | `docs/frontend/index.md`         |
+| E2E テスト（Playwright、task e2e）                            | `docs/e2e/index.md`              |
 | データベース（マイグレーション、jOOQ、接続、PostgreSQL 設計） | `docs/database/index.md`         |
 | Web API（HTTP API の設計と契約）                              | `docs/web-api/index.md`          |
 | システム連携と非同期処理                                      | `docs/integration/index.md`      |

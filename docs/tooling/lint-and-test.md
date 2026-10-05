@@ -19,6 +19,7 @@ Dockerを使うTaskは、Dockerがないローカル環境ではスキップし�
 - **`task test`**：隔離した依存を起動し、確定済みマイグレーションの検証、バックエンドテスト、OpenAPI契約検査後に片付ける。
 - **`task test-dev`**：隔離した依存を起動し、作りかけのchangesetを含むバックエンドテスト後に片付ける。
 - **`task mutation-test`**：隔離した依存を使ってバックエンドのPITミューテーションテストを実行する。
+- **`task e2e`**：compose-testでbackendを起動し、Vite previewに対してPlaywrightのE2Eを実行して後片付けする（[E2Eテストの方針と書き方](../e2e/testing-strategy.md)）。
 
 ## フロントエンド
 
@@ -110,6 +111,8 @@ Oxlintの設定の正本は[`frontend/vite.config.ts`](../../frontend/vite.confi
 テストファイルでは層のimport制限も外れる。
 テストにも層の制限が要るようになったら、dependency-cruiserへ移る。
 
+`e2e/**`では、Playwright TestのAPIにvitest pluginの規則が当たるため、`vitest/consistent-test-filename`と`vitest/prefer-importing-vitest-globals`を外す。
+
 feature間のimportは、これとは別にjsPluginの`feature-boundaries/no-cross-feature-import`が`src/features/**`のファイルで禁じる（[フロントエンドアーキテクチャ](../frontend/architecture.md#境界の検査)）。
 
 組み合わせた結果は、`frontend/lint/lint-config.test.js`が`frontend/lint/fixtures/src/**`の違反例と正しい例を実際の設定でLintして確かめる。
@@ -180,7 +183,7 @@ PITのHTMLとXMLのレポートは、変異対象がある場合に`backend/buil
 
 - **`task lint-duplicates`**：生成コードを除く手書きのフロントエンドとバックエンドをjscpdで検査する。
 - **`task scan-secrets`**：ステージ済み変更をbetterleaksでスキャンする。
-- **`task scan-secrets-all`**：リポジトリ全体と履歴をbetterleaksでスキャンする。
+- **`task scan-secrets-all`**：リポジトリ全体と、現在のブランチから辿れる履歴をbetterleaksでスキャンする。
 - **`task lint-semgrep`**：Semgrep OSSで静的解析する。
 - **`task be-sbom`**：バックエンドのCycloneDX SBOMを生成する。
 - **`task scan-vulns`**：バックエンドとフロントエンドの依存関係をTrivyで検査する。
@@ -242,5 +245,7 @@ Gitフックの条件とコマンドは[`lefthook.yml`](../../lefthook.yml)を�
 - **`markdownlint.yml`**：`lint-md`相当を実行する。
 - **`okf-validate.yml`**：`okf-check`を実行する。
 - **`release-please.yml`**：`release-check`を実行する。
+- **`e2e.yml`**：`task e2e`を実行する。
+  必須チェックにしない（[ブランチ保護](../repository/branch-protection.md)）。
 
 各ワークフローの実装は[`.github/workflows/`](../../.github/workflows/)を正とする。

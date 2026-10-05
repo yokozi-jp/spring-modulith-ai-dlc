@@ -103,6 +103,12 @@ path filter によって workflow 自体が作られない Pull Request では�
 
 そのまま全 Pull Request の required status checks に登録すると、対象外の変更が待機状態のまま merge できなくなるため、常時必須の一覧には加えない。
 
+## 必須にしないチェック
+
+E2E の `Run E2E tests 🎭` は path filter を持つが、required status checks に登録しない。
+実ブラウザと複数のコンテナを使うため、変更と関係のない原因でも失敗しうる（[ADR-057](../adr/ADR-057-adopt-playwright-for-e2e-tests.md)）。
+失敗したときは、レビューで trace と backend のログを確かめて merge を判断する。
+
 ## その他の推奨設定
 
 GitHub の General、Pull Requests で次を設定する。

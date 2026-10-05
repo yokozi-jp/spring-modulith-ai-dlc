@@ -83,6 +83,7 @@
 │   ├── container/        # コンテナ（Dockerfile、Compose）の規約
 │   ├── database/         # データベース（マイグレーション、jOOQ、接続）の規約
 │   ├── datetime/         # 日時とタイムゾーンの規約
+│   ├── e2e/              # E2E テスト（Playwright）の規約
 │   ├── frontend/         # フロントエンドの規約
 │   ├── knowledge/        # ナレッジ管理（docs と steering の役割分担）
 │   ├── local-env-setup/  # 開発環境構築手順・スクリプト
@@ -184,6 +185,14 @@ Docker Compose の操作（サービスの起動、停止、状態確認、Keycl
 - LefthookはFrontend変更を検出すると、pre-commitで `task fe-check`、pre-pushで `task fe-test-build` を実行します。
 - Frontend CIはPull Requestと `main` へのpushで `task fe-verify`、`task fe-route-tree-check`、`task api-client-check`、`task fe-doctor` を実行し、Knip、生成済みroute treeとAPI clientの一致、React診断、全体branch coverage 85%を強制します。
 - coverageレポートは `task fe-coverage` で確認でき、CIでは14日間artifactとして保存します。
+
+### E2E
+
+- `task e2e` は frontend と backend イメージをビルドし、compose-test で依存サービスと backend を起動して migration を適用し、Vite preview に対して Playwright を実行してから後片付けします。
+- 開発用の Vite（5173）と Keycloak（8080）を止めてから実行します。
+  失敗した環境を調べるときは `E2E_KEEP_ENV=1 task e2e` で残せます（CI では常に片付けます）。
+- CI の `E2E tests 🎭` は対象パスの変更でだけ起動し、必須チェックにはしていません。
+- 書き方と前提は [E2E テストの方針と書き方](docs/e2e/testing-strategy.md) を参照してください。
 
 ### API 契約
 
