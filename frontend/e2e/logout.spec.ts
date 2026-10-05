@@ -34,13 +34,16 @@ async function expectAuthenticatedHome(page: Page): Promise<void> {
   expect(await apiStatus(page)).toBe(404);
 }
 
+// 未認証の /api/** を browser の context で呼ぶと、Spring Security がその要求を新しいセッションに保存し、
+// 次のログイン後に /api/missing?continue へ戻してしまう。そのため 401 は Cookie を共有しない request で確かめる。
 async function expectApplicationSessionEnded(
-  page: Page,
+  context: BrowserContext,
   request: APIRequestContext,
   oldSession: string,
 ): Promise<void> {
-  expect(await apiStatus(page)).toBe(401);
-  // ログアウトの応答は Cookie を消すため、上の 401 は Cookie がないことによる。
+  // ログアウトの応答は APP_SESSION を消す。
+  const cookies = await context.cookies();
+  expect(cookies.map(({ name }) => name)).not.toContain("APP_SESSION");
   // ログアウト前の APP_SESSION を送り直しても、サーバ側のセッションが消えていれば 401 になる。
   const replayed = await request.get("/api/missing", {
     headers: { Cookie: `APP_SESSION=${oldSession}` },
@@ -120,7 +123,7 @@ test("ログアウト後はアプリと SSO のセッションが終わり、も
   const oldSession = await cookieValue(context, "APP_SESSION");
   await logoutButton(page).click();
   await expectLoggedOutPage(page);
-  await expectApplicationSessionEnded(page, request, oldSession);
+  await expectApplicationSessionEnded(context, request, oldSession);
 
   // Keycloak の SSO セッションが終わっていれば、資格情報の入力を求められる。
   await page.getByRole("link", { name: "もう一度ログイン" }).click();
