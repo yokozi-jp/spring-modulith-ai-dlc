@@ -51,7 +51,13 @@ tags: [convention, database, liquibase, security, credentials]
 - **`DB_IDLE_IN_TRANSACTION_TIMEOUT_MS`**：`idle_in_transaction_session_timeout`です。
   トランザクションを開いたまま次の文を待つ時間の上限で、超えるとセッションが終了します。
 
-`lock_timeout`は`statement_timeout`より短くします。
+値は起動時に検証しないため、設定するときに次の条件を守ります（[ADR-055](../adr/ADR-055-set-db-time-limits-per-connection.md)）。
+
+- 3つとも1以上にします。
+  PostgreSQLは`0`を上限なしとして受け付けるため、`0`を渡すと無期限に待ちます。
+- `lock_timeout`は`statement_timeout`より短くします。
+- `statement_timeout`は`DB_POOL_CONNECTION_TIMEOUT_MS`以下にします。
+
 `postgresql.conf`、RDSのパラメータグループ、`ALTER ROLE`では設定しません。
 1つのトランザクションだけ上限を変えるときは、`SET LOCAL`を使い、理由をコードに書きます。
 LiquibaseとjOOQ生成はHikariCPを通らないため、この上限を受けません。

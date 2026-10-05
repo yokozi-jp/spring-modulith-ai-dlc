@@ -6,6 +6,7 @@ okf_version: '0.2'
 
 - [バックエンド](backend/index.md)：`backend/` のコード、アーキテクチャ、テストを扱うとき
 - [フロントエンド](frontend/index.md)：`frontend/` のコード、ルーティング、状態、API client、UI、テストを扱うとき
+- [E2E テスト](e2e/index.md)：Playwright の E2E テストを書く、実行する、失敗を調べるとき、E2E の実行環境や CI を変えるとき
 - [データベース](database/index.md)：マイグレーション、jOOQ コード生成、DB 接続、DB のデプロイと切り戻しを扱うとき
 - [Web API](web-api/index.md)：HTTP API のパス、メソッド、パラメータ、応答、ステータスコード、互換性を設計または変更するとき
 - [システム連携と非同期処理](integration/index.md)：非同期のイベントやジョブ、別システムとのファイル連携やメッセージ連携を設計するとき

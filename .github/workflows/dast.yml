@@ -1,0 +1,175 @@
+name: DAST (OWASP ZAP) 🕷️
+
+on:
+  # PR ではパスフィルタで workflow をスキップしない（必須チェックが
+  # "Expected" のまま滞留するため）。全 PR で起動し、changes ジョブで
+  # 判定して passive scan を条件付き実行する（skipped は必須チェックで success 扱い）。
+  pull_request:
+    branches: ["**"]
+  # 毎週月曜 03:17 UTC に active scan を実行する。リポジトリで初めての schedule（ADR-056）。
+  schedule:
+    - cron: "17 3 * * 1"
+  workflow_dispatch:
+
+# PR だけ実行中の run を取り消す。schedule の active scan を workflow_dispatch で止めないため（api-contract.yml と同じ）。
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+# SARIF を Code Scanning にアップロードする権限はジョブごとに付与する
+# （ワークフロー全体に広く付与しない）。
+permissions:
+  contents: read
+
+jobs:
+  # DAST の対象が変わったかを判定する。PR 以外では常に true とし、
+  # PR では base ブランチとの diff で判定する。
+  changes:
+    name: Detect DAST changes
+    runs-on: ubuntu-latest
+    outputs:
+      dast: ${{ steps.filter.outputs.dast }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+
+      - name: Detect changed paths
+        id: filter
+        shell: bash
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BASE_REF: ${{ github.event.pull_request.base.ref }}
+        run: |
+          if [ "$EVENT_NAME" != "pull_request" ]; then
+            echo "dast=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          # 差分取得に失敗した場合は DAST を実行する側へ倒す。
+          if ! changed_files="$(git diff --name-only "origin/${BASE_REF}...HEAD")"; then
+            echo "差分取得に失敗したため DAST を実行します。" >&2
+            echo "dast=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          # docker/ は ZAP の plan と script（docker/zap/）と realm（docker/keycloak/）を含む。
+          if grep -Eq '^(backend/|frontend/|docker/|\.env\.test$|Taskfile\.yml$|\.github/workflows/dast\.yml$)' \
+            <<< "$changed_files"; then
+            echo "dast=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "dast=false" >> "$GITHUB_OUTPUT"
+          fi
+
+  passive:
+    name: Run ZAP passive scan 🕷️
+    needs: changes
+    if: github.event_name == 'pull_request' && needs.changes.outputs.dast == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+        with:
+          version: "11.21.0"
+
+      - name: Set up Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: "frontend/.node-version"
+          cache: pnpm
+          cache-dependency-path: frontend/pnpm-lock.yaml
+
+      - name: Set up Task
+        uses: go-task/setup-task@a00fbb05ce67b35648be3c78cbc9fd85354c757e # v2
+        with:
+          version: "3.53.1"
+          checksum: a54a408f6861ff921f6e87774180db31bacd8c1e7c944ca696db9fea49a82fc7
+
+      - name: Install dependencies
+        working-directory: frontend
+        run: pnpm install --frozen-lockfile
+
+      # 検出ではタスクを失敗させない。失敗するのはスキャンが成立しない場合だけ（ADR-056）。
+      - name: Run ZAP passive scan
+        run: PATH="$GITHUB_WORKSPACE/frontend/node_modules/.bin:$PATH" task scan-dast
+
+      - name: Upload SARIF to Code Scanning
+        if: always() && hashFiles('build/dast/zap-passive.sarif.json') != ''
+        uses: github/codeql-action/upload-sarif@2892aa5e19bbd11bc0cff5427e3b750a04d9e3c2 # v4.38.2
+        with:
+          sarif_file: build/dast/zap-passive.sarif.json
+          category: zap-passive
+
+      - name: Upload ZAP report
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: zap-passive-report
+          path: build/dast/
+          if-no-files-found: warn
+          retention-days: 14
+
+  active:
+    name: Run ZAP active scan 🕷️
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+        with:
+          version: "11.21.0"
+
+      - name: Set up Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: "frontend/.node-version"
+          cache: pnpm
+          cache-dependency-path: frontend/pnpm-lock.yaml
+
+      - name: Set up Task
+        uses: go-task/setup-task@a00fbb05ce67b35648be3c78cbc9fd85354c757e # v2
+        with:
+          version: "3.53.1"
+          checksum: a54a408f6861ff921f6e87774180db31bacd8c1e7c944ca696db9fea49a82fc7
+
+      - name: Install dependencies
+        working-directory: frontend
+        run: pnpm install --frozen-lockfile
+
+      # 検出ではタスクを失敗させない。失敗するのはスキャンが成立しない場合だけ（ADR-056）。
+      - name: Run ZAP active scan
+        run: PATH="$GITHUB_WORKSPACE/frontend/node_modules/.bin:$PATH" task scan-dast-active
+
+      - name: Upload SARIF to Code Scanning
+        if: always() && hashFiles('build/dast/zap-active.sarif.json') != ''
+        uses: github/codeql-action/upload-sarif@2892aa5e19bbd11bc0cff5427e3b750a04d9e3c2 # v4.38.2
+        with:
+          sarif_file: build/dast/zap-active.sarif.json
+          category: zap-active
+
+      - name: Upload ZAP report
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: zap-active-report
+          path: build/dast/
+          if-no-files-found: warn
+          retention-days: 14

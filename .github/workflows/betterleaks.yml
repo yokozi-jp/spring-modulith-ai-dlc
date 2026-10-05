@@ -41,7 +41,9 @@ jobs:
           betterleaks git . --no-banner --redact \
             --log-opts="${{ github.event.pull_request.base.sha }}..${{ github.event.pull_request.head.sha }}"
 
-      # main への push では履歴全体をスキャンする。
+      # main への push では main の履歴全体をスキャンする。
+      # fetch-depth: 0 は他のブランチも取得するため、HEAD から辿れるコミットに限る。
+      # 他のブランチのコミットは、その Pull Request の差分スキャンで検査する。
       - name: Scan full history
         if: github.event_name == 'push'
-        run: betterleaks git . --no-banner --redact --git-workers=16
+        run: betterleaks git . --no-banner --redact --git-workers=16 --log-opts=HEAD

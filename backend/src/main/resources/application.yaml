@@ -62,7 +62,8 @@ spring:
       schema: modulith
       # 新しい物理接続ごとに、DBセッションの日時解釈と表示をUTCへ固定し、
       # ロック待ち、文の実行、トランザクション中の待機の上限（ミリ秒）を設定する（ADR-055）。
-      # lock_timeout は statement_timeout より短くする。postgresql.conf では設定しない。
+      # 値は起動時に検証しない。三つとも 1 以上にする（0 は上限なしになる）。
+      # lock_timeout < statement_timeout <= connection-timeout にする。postgresql.conf では設定しない。
       connection-init-sql: >-
         SET TIME ZONE 'UTC';
         SET lock_timeout = ${DB_LOCK_TIMEOUT_MS};
