@@ -4,6 +4,8 @@
  */
 
 export * from './problemDetail.ts';
+export * from './validationError.ts';
+export * from './validationProblem.ts';
 export * from './badRequestProblemResponse.ts';
 export * from './conflictProblemResponse.ts';
 export * from './forbiddenProblemResponse.ts';

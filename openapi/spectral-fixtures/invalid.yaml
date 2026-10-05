@@ -95,11 +95,13 @@ paths:
         "200":
           description: サンプル支払いの一覧
 components:
+  # common-problem-detail-schema（ValidationProblem を定義しない）
   schemas:
     ProblemDetail:
       type: object
       description: RFC 9457 の Problem Details
       properties:
+        # problem-type-uri-reference（相対 URI を許さない uri）
         type:
           type: string
           format: uri
@@ -148,6 +150,13 @@ components:
       required:
         - sampleOrderId
   responses:
+    # bad-request-validation-problem（ValidationProblem を参照しない）
+    BadRequestProblem:
+      description: 要求の形式または入力値が正しくない
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/ProblemDetail"
     UnauthorizedProblem:
       description: 認証されていない
       content:

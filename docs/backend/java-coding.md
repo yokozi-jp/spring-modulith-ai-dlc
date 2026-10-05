@@ -53,6 +53,10 @@ Spring の文書もコンストラクタによる注入を勧めている（[Spr
 
 呼び出し側と `error.presentation.web.ApiExceptionHandler` が例外の型で失敗を区別し、HTTP の応答に対応づけられるようにするためである（[ADR-013](../adr/ADR-013-standardize-http-api-contracts.md)）。
 
+例外に `@ResponseStatus` を付けない。
+`ApiExceptionHandler` の `@ExceptionHandler(Exception.class)` が `ResponseStatusExceptionResolver` より先に例外を受け取るため、注釈したステータスは使われず 500 になる。
+特定のステータスで返す例外は `ErrorResponseException` を継承するか、`ApiExceptionHandler` に対応づけを足す。
+
 ## assert 文のメッセージ
 
 `assert` 文と `new AssertionError()` には、対象と値を示す詳細のメッセージを付ける。
