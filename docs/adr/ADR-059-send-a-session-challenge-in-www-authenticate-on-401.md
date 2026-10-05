@@ -1,7 +1,7 @@
 ---
 type: ADR
 title: 'ADR-059: 401 の WWW-Authenticate に独自の Session challenge を返す'
-description: Cookie セッションに合う登録済みの認証 scheme がないため、すべての 401 に WWW-Authenticate: Session realm="demo" を付ける決定。
+description: 'Cookie セッションに合う登録済みの認証 scheme がないため、すべての 401 に WWW-Authenticate: Session realm="demo" を付ける決定。'
 tags: [adr, backend, api, security, auth]
 ---
 
