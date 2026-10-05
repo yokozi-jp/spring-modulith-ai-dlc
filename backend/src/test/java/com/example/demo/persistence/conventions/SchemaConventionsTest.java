@@ -296,6 +296,54 @@ class SchemaConventionsTest {
     }
 
     @Test
+    @DisplayName("T10：oidのカラムとラージオブジェクトの存在を拒否する")
+    void rejectsLargeObjects() {
+      assertThat(
+              keys(
+                  SchemaConventions.largeObjects(
+                      List.of(column(ITEM, "oid", "b", "", "", null)), 0)))
+          .as("oidのカラム")
+          .containsExactly("T10 item.m_item.item_id");
+      assertThat(keys(SchemaConventions.largeObjects(List.of(), 1)))
+          .as("pg_largeobject_metadataが1件")
+          .containsExactly("T10 pg_largeobject_metadata");
+    }
+
+    @Test
+    @DisplayName("T12：DOMAINとENUMの定義と使用を拒否する")
+    void rejectsDomainsAndEnums() {
+      final List<TypeRow> types = List.of(new TypeRow(ITEM, "item_status", "e"));
+      final List<ColumnRow> columns = List.of(column(ITEM, "item.code", "d", "", "", null));
+
+      assertThat(keys(SchemaConventions.userDefinedTypes(types, columns)))
+          .as("型: %s、カラム: %s", types, columns)
+          .containsExactlyInAnyOrder("T12 item.item_status", "T12 item.m_item.item_id");
+    }
+
+    @Test
+    @DisplayName("modulithとliquibaseのカラムと型を判定しない")
+    void ignoresFrameworkSchemas() {
+      final List<ColumnRow> columns =
+          List.of(
+              column(MODULITH, "oid", "d", "d", "s", "nextval('x'::regclass)"),
+              column(LIQUIBASE, INTEGER, "e", "a", "s", null));
+
+      assertThat(SchemaTableConventions.columns(columns)).as("カラム").isEmpty();
+      assertThat(SchemaConventions.largeObjects(columns, 0)).as("ラージオブジェクト").isEmpty();
+      assertThat(
+              SchemaConventions.userDefinedTypes(
+                  List.of(new TypeRow(MODULITH, "x", "d"), new TypeRow(LIQUIBASE, "y", "e")),
+                  columns))
+          .as("独自型")
+          .isEmpty();
+    }
+  }
+
+  /** uuid カラムの DEFAULT。 */
+  /* package */ @Nested
+  class UuidDefaultRuleTest {
+
+    @Test
     @DisplayName("T13：uuidのDEFAULTにuuidv7()を使うと拒否する")
     void rejectsUuidDefaultedByUuidv7() {
       assertThat(
@@ -357,49 +405,6 @@ class SchemaConventionsTest {
                           "gen_random_uuid()"),
                       new ColumnRow(
                           MODULITH, "event_publication_archive", "id", UUID, "b", "", "", null))))
-          .isEmpty();
-    }
-
-    @Test
-    @DisplayName("T10：oidのカラムとラージオブジェクトの存在を拒否する")
-    void rejectsLargeObjects() {
-      assertThat(
-              keys(
-                  SchemaConventions.largeObjects(
-                      List.of(column(ITEM, "oid", "b", "", "", null)), 0)))
-          .as("oidのカラム")
-          .containsExactly("T10 item.m_item.item_id");
-      assertThat(keys(SchemaConventions.largeObjects(List.of(), 1)))
-          .as("pg_largeobject_metadataが1件")
-          .containsExactly("T10 pg_largeobject_metadata");
-    }
-
-    @Test
-    @DisplayName("T12：DOMAINとENUMの定義と使用を拒否する")
-    void rejectsDomainsAndEnums() {
-      final List<TypeRow> types = List.of(new TypeRow(ITEM, "item_status", "e"));
-      final List<ColumnRow> columns = List.of(column(ITEM, "item.code", "d", "", "", null));
-
-      assertThat(keys(SchemaConventions.userDefinedTypes(types, columns)))
-          .as("型: %s、カラム: %s", types, columns)
-          .containsExactlyInAnyOrder("T12 item.item_status", "T12 item.m_item.item_id");
-    }
-
-    @Test
-    @DisplayName("modulithとliquibaseのカラムと型を判定しない")
-    void ignoresFrameworkSchemas() {
-      final List<ColumnRow> columns =
-          List.of(
-              column(MODULITH, "oid", "d", "d", "s", "nextval('x'::regclass)"),
-              column(LIQUIBASE, INTEGER, "e", "a", "s", null));
-
-      assertThat(SchemaTableConventions.columns(columns)).as("カラム").isEmpty();
-      assertThat(SchemaConventions.largeObjects(columns, 0)).as("ラージオブジェクト").isEmpty();
-      assertThat(
-              SchemaConventions.userDefinedTypes(
-                  List.of(new TypeRow(MODULITH, "x", "d"), new TypeRow(LIQUIBASE, "y", "e")),
-                  columns))
-          .as("独自型")
           .isEmpty();
     }
   }
