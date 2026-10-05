@@ -9,11 +9,14 @@ import archfixture.conforming.shared.infrastructure.persistence.CommonColumns;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import org.springframework.stereotype.Repository;
 
 /**
  * 注文の Repository の実装。フィクスチャなので jOOQ の代わりに Map へ保存する。
+ *
+ * <p>フィクスチャなので ID の採番は仮の実装である。
  *
  * <p>共通カラムの値は shared の共通処理から受け取る。
  */
@@ -32,6 +35,11 @@ class JooqOrderRepository implements OrderRepository {
   /** shared の共通処理を受け取る。 */
   /* package */ JooqOrderRepository(final CommonColumns commonColumns) {
     this.commonColumns = commonColumns;
+  }
+
+  @Override
+  public OrderId nextId() {
+    return new OrderId(UUID.randomUUID());
   }
 
   @Override

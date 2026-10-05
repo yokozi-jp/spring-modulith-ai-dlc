@@ -30,7 +30,7 @@ tags: [convention, backend, class-role]
 - 名前は値を表すユビキタス言語の名詞にする。
   識別子は対象の名前に `Id` を付け（`OrderId`、`CustomerId`、`PaymentId`）、そのほかは `Money`、`Quantity`、`ProductCode` のようにする。
 - 単一の値を持つ record の component は、金額の `Money` だけを `amount` にし、それ以外はすべて `value` にする。
-  例は `OrderId(String value)`、`ProductCode(String value)`、`Quantity(int value)`、`Money(BigDecimal amount)` である。
+  例は `OrderId(UUID value)`、`ProductCode(String value)`、`Quantity(int value)`、`Money(BigDecimal amount)` である。
 - 固定の値の集合は enum にする（`OrderStatus`、`MembershipRank`）。
 
 ## 必須の記述
@@ -39,7 +39,8 @@ tags: [convention, backend, class-role]
 - 不変条件は、コンパクトコンストラクタで検査する。
   満たさない値には `IllegalArgumentException` を投げ、メッセージは英語で、値の名前と値を含める。
 - 演算は新しい値オブジェクトを返すメソッドにする（`plus`、`minus`、`times`）。
-- 新しい識別子の採番は static メソッドにする（`OrderId.newId()`）。
+- 識別子を採番する `newId()` のような static メソッドは作らない。
+  主キーの次の値は Repository の `nextId()` から得る（[Repository](repository.md)）。
 - record、enum、enum の定数、コンパクトコンストラクタ、public メソッドに Javadoc を書く。
 - パッケージの `package-info.java` は集約と共有する。
 
@@ -63,21 +64,10 @@ package com.example.demo.order.domain.model;
 import java.util.UUID;
 
 /** 注文 ID。 */
-public record OrderId(String value) {
-
-  /** 空白だけの ID を拒否する。 */
-  public OrderId {
-    if (value.isBlank()) {
-      throw new IllegalArgumentException("orderId must not be blank");
-    }
-  }
-
-  /** 新しい注文 ID を採番する。 */
-  public static OrderId newId() {
-    return new OrderId(UUID.randomUUID().toString());
-  }
-}
+public record OrderId(UUID value) {}
 ```
+
+`UUID` の型が値の形を表すため、`OrderId` には検査する不変条件がない。
 
 典型的な例は、演算を持つ `Money` と、範囲を検査する `Quantity` と、enum の `OrderStatus` である。
 

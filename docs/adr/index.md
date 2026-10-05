@@ -60,3 +60,4 @@
 - [ADR-057: E2E テストに Playwright と Chromium を採用し、テストデータを公開 API で作る](ADR-057-adopt-playwright-for-e2e-tests.md)（Proposed, 2026-10-04）
 - [ADR-058: problem type にパスを全部書いた相対 URI を使う](ADR-058-use-path-absolute-relative-uri-for-problem-types.md)（Accepted, 2026-10-04）
 - [ADR-059: 401 の WWW-Authenticate に独自の Session challenge を返す](ADR-059-send-a-session-challenge-in-www-authenticate-on-401.md)（Accepted, 2026-10-05）
+- [ADR-060: UUID の採番をアプリケーションで行い、DB の DEFAULT で採番しない](ADR-060-generate-uuid-primary-keys-in-application.md)（Proposed, 2026-10-05）

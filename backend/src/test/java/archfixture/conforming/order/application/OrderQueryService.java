@@ -9,6 +9,7 @@ import archfixture.conforming.order.domain.model.OrderId;
 import archfixture.conforming.order.domain.model.OrderRepository;
 import java.util.List;
 import java.util.Optional;
+import java.util.UUID;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -28,15 +29,15 @@ class OrderQueryService implements OrderQueries {
   @Transactional(readOnly = true)
   public Optional<OrderDetails> findDetails(final String orderId) {
     return orderRepository
-        .findById(new OrderId(orderId))
-        .map(order -> new OrderDetails(order.id().value(), List.of()));
+        .findById(new OrderId(UUID.fromString(orderId)))
+        .map(order -> new OrderDetails(order.id().value().toString(), List.of()));
   }
 
   @Override
   @Transactional(readOnly = true)
   public List<OrderSummary> search(final OrderSearchCriteria criteria) {
     return orderRepository.findByCustomer(new CustomerId(criteria.customerId())).stream()
-        .map(order -> new OrderSummary(order.id().value(), order.status().name()))
+        .map(order -> new OrderSummary(order.id().value().toString(), order.status().name()))
         .toList();
   }
 }
