@@ -31,6 +31,16 @@ ETagと`If-Match`、`Last-Modified`と`If-Unmodified-Since`は使わない。
 412は`If-Match`などの条件付きリクエストで使うコードであり、この方式では使わない。
 エラー応答の形式は[ADR-013](../adr/ADR-013-standardize-http-api-contracts.md)に従う。
 
+## バックエンドの実装
+
+リクエストは数値のバージョン番号を運ぶ。
+サーバーは、RequestのtoCommandで数値から`ExpectedLockNo`を作ってCommandに持たせる。
+数値が1未満なら、Requestの`@Min(1)`が400にする。
+競合は`shared.concurrency`の`ConflictException`で表し、`ApiExceptionHandler`が409のProblem Detailsにする。
+`lock_timeout`までに行のロックを取れなかった失敗も、同じ`ConflictException`になり409を返す。
+応答の本文に、例外の詳細、ID、SQLは含めない。
+クラスの役割は[Request](../backend/class-roles/request.md)と[Command](../backend/class-roles/command.md)に、決定は[ADR-054](../adr/ADR-054-detect-optimistic-lock-conflicts-by-update-count.md)に示す。
+
 ## 親子のテーブル
 
 親子関係のあるテーブルを一つのリソースとして更新する場合は、親テーブルのバージョン番号を使う。

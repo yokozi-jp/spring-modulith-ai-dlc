@@ -39,6 +39,11 @@ backend/src/main/java/com/example/demo/
 │
 ├── shared/
 │   ├── package-info.java
+│   ├── concurrency/
+│   │   ├── package-info.java
+│   │   ├── ConflictException.java
+│   │   ├── ExpectedLockNo.java
+│   │   └── VersionedCommand.java
 │   └── infrastructure/
 │       └── persistence/
 │           ├── package-info.java
@@ -58,7 +63,6 @@ backend/src/main/java/com/example/demo/
     │   │   ├── <Entity>.java
     │   │   ├── <ValueObject>.java
     │   │   ├── <Aggregate>Repository.java
-    │   │   ├── <Aggregate>ConflictException.java
     │   │   └── <ExternalSystem>.java
     │   └── service/
     │       ├── package-info.java
@@ -101,7 +105,8 @@ backend/src/main/java/com/example/demo/
 - **`<Entity>`**：[Entity](class-roles/entity.md)
 - **`<ValueObject>`**：[値オブジェクト](class-roles/value-object.md)
 - **`<Aggregate>Repository`**：[Repository](class-roles/repository.md)
-- **`<Aggregate>ConflictException`**：[集約](class-roles/aggregate.md)
+- **`ConflictException`**：[集約](class-roles/aggregate.md)（`shared.concurrency`）
+- **`ExpectedLockNo`**、**`VersionedCommand`**：[Command](class-roles/command.md)（`shared.concurrency`）
 - **`<ExternalSystem>`**：[外部システムのインタフェース](class-roles/external-system-interface.md)
 - **`<DomainService>`**：[Domain Service](class-roles/domain-service.md)
 - **`<UseCase>Command`**：[Command](class-roles/command.md)
@@ -142,9 +147,12 @@ Domain の型、Command と Result、Spring MVC の Request と Response、jOOQ 
 
 - jOOQ の共通処理を `shared.infrastructure.persistence` に置き、このパッケージを `@NamedInterface` で公開する。
   業務テーブルの UPDATE と DELETE の唯一の入口である `TableWriter` もここに置く（[ADR-054](../adr/ADR-054-detect-optimistic-lock-conflicts-by-update-count.md)）。
+- 楽観的ロックの語彙（`ConflictException`、`ExpectedLockNo`、`VersionedCommand`）を `shared.concurrency` に置き、このパッケージも `@NamedInterface("concurrency")` で公開する。
+  `shared` は Domain と `error` の型、ルートパッケージの型に依存しない。
 - 業務の概念を置かない。
   ルートのパッケージには `package-info.java` だけを置く。
-- `shared` を使ってよいのは、他のモジュールの `infrastructure.persistence` だけである。
+- `shared.infrastructure.persistence` を使ってよいのは、他のモジュールの `infrastructure.persistence` だけである。
+  `shared.concurrency` は、どの層からも使える。
 
 使う場所の制限は、`PackageByFeatureOnionArchitectureTest` の `sharedModuleIsUsedOnlyByPersistenceAdapters` が検査する。
 ただし、`shared` の `PgmCdAspect` は、AOP で `<UseCase>CommandHandler` の `handle` と `<Event>Listener` の呼び出しを囲む（[ADR-051](../adr/ADR-051-bind-pgm-cd-with-scoped-value-and-aspect.md)）。
@@ -171,7 +179,8 @@ infrastructure.client ───────────────────�
 - `domain.service` は `domain.model` に依存する。
 - `infrastructure.persistence` と `infrastructure.client` は `domain.model` のインタフェースを実装し、`application`、`domain.service`、モジュールルートに依存しない。
 - `infrastructure.persistence` は `shared.infrastructure.persistence` に依存してよい。
-  ほかの層は `shared` に依存しない。
+  ほかの層は `shared.infrastructure.persistence` に依存しない。
+- どの層も `shared.concurrency` に依存してよい。`error` の `presentation.web` も `ConflictException` を 409 にするために依存する。
 - Domain と Application は、Presentation と Infrastructure に依存しない。
 - Presentation、Persistence、外部 Client は相互に依存しない。
 
@@ -199,7 +208,7 @@ CommandHandler は `application` にあるため、他モジュールから呼�
 機能横断の API エラー契約は、`error` モジュールの `presentation.web` に置いている。
 
 複数の機能で似た処理が要るときも、処理は各機能内に置く。
-例外は、「共有モジュール shared」に示す jOOQ の共通処理だけである。
+例外は、「共有モジュール shared」に示す jOOQ の共通処理と楽観的ロックの語彙だけである。
 
 ## 関連資料
 

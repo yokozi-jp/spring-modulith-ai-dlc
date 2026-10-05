@@ -70,11 +70,12 @@ jOOQ の Repository は業務規則を持たない。
 - 集約は `fetchOptional(Records.mapping(Order::restore))` か `fetch(Records.mapping(Order::restore))` で作り、`Order.place` を使わない。
 - `add` は、`insertInto(ORDERS)` の `set(列, 値)` で業務の全列を書き、`LOCK_NO` を含む共通カラムを `set(commonColumns.forInsert(ORDERS))` で書く。
   値オブジェクトと enum は、アクセサ（`value()`、`amount()`、`name()`）で列の値に直す。
-- `update` は、`tableWriter.updateCheckingVersion(ORDERS, 主キーの条件, order.lockNo(), 業務の列, OrderConflictException::new)` で集約ルートの行を先に更新する。
+- `update` は、`tableWriter.updateCheckingVersion(ORDERS, 主キーの条件, order.lockNo(), 業務の列)` で集約ルートの行を先に更新する。
   業務の列は、ラムダで `ColumnValues` に `set(列, 値)` で渡し、主キー以外の業務の列をすべて書く。
   集約ルートの業務の列が変わらなくても、集約ルートの行を更新して版を進める。
-  0 件のとき、行がなければ `NoSuchElementException` が、行があれば `<Aggregate>ConflictException` が投げられる。
-  `lock_timeout` までに行のロックを取れないときも、`TableWriter` が `<Aggregate>ConflictException` に変える。
+  0 件のとき、行がなければ `NoSuchElementException` が、行があれば `shared.concurrency` の `ConflictException` が投げられる。
+  `lock_timeout` までに行のロックを取れないときも、`TableWriter` が `ConflictException` に変える。
+  Repository は例外を作らず、関数も渡さない。
 - 子の行は、戻り値の `LockedRoot` の `updateChild` と `deleteChildren` で、集約ルートの後に書く。
   子の行は主キーの順に更新する（[PostgreSQL の排他制御](../../database/postgresql-concurrency-control.md)）。
   集約が持つ子の Entity のリストは `multiset` の `orderBy` の順に並ぶため、その順に `updateChild` を呼ぶ。
@@ -86,7 +87,7 @@ jOOQ の Repository は業務規則を持たない。
      集約の子が空なら、すべての子を削除する。
   4. 保存済みにない子を `insertInto(子のテーブル).set(commonColumns.forInsert(子のテーブル))` で追加する。
   5. 両方にある子を `root.updateChild` で更新する。
-- `delete` は、`tableWriter.deleteCheckingVersion(ORDERS, 主キーの条件, order.lockNo(), OrderConflictException::new)` で集約ルートの行を削除し、子の行は戻り値の `DeletedRoot.deleteChildren` で削除する。
+- `delete` は、`tableWriter.deleteCheckingVersion(ORDERS, 主キーの条件, order.lockNo())` で集約ルートの行を削除し、子の行は戻り値の `DeletedRoot.deleteChildren` で削除する。
 - `update` と `delete` は、`TableWriter` の版を比べる入口と、引数の集約ルートの `lockNo()` を、そのメソッドの中で直接呼ぶ。
   別のメソッドやラムダを経由すると、ArchUnit の検査が呼び出しを見つけられない。
 - 期待する版を持つ書き込みは、集約ルートを受け取る `update` と `delete` に限る。
@@ -104,8 +105,9 @@ jOOQ の Repository は業務規則を持たない。
 - クラス、フィールド、コンストラクタに Javadoc を書く。
 - `infrastructure.persistence` のパッケージに `@NullMarked` を宣言する `package-info.java` を置く。
 
-`NoSuchElementException` と `<Aggregate>ConflictException` を 404 と 409 の Problem Details にする対応づけは、まだない。
-いまはどちらも 500 になり、対応づけは [ADR-050](../../adr/ADR-050-define-backend-class-roles-and-naming.md) の Neutral のとおり新しい ADR で決める。
+`ConflictException` は、`ApiExceptionHandler` が 409 の Problem Details にする（[ADR-054](../../adr/ADR-054-detect-optimistic-lock-conflicts-by-update-count.md)）。
+`NoSuchElementException` を 404 にする対応づけは、まだない。
+いまは 500 になり、対応づけは [ADR-050](../../adr/ADR-050-define-backend-class-roles-and-naming.md) の Neutral のとおり新しい ADR で決める。
 ステータスコードの使い分けは[HTTPステータスコードの選択](../../web-api/status-codes.md)と[更新の競合制御](../../web-api/optimistic-locking.md)に従う。
 対応づけの作業は [issue #107](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/107) で扱う。
 
@@ -116,7 +118,7 @@ PostgreSQL には MULTISET がなく、jOOQ は `jsonb_agg` による JSON の�
 
 ## 依存してよい型、してはいけない型
 
-- **依存してよい型**：`java..` の標準型、`org.jspecify..`、jOOQ の API（`org.jooq..`）、jOOQ の生成型（`com.example.demo.jooq..`）、`shared.infrastructure.persistence` の共通処理（`CommonColumns`、`TableWriter`、`ColumnValues`、`LockedRoot`、`DeletedRoot`）、同じモジュールの `domain.model` の集約、Entity、値オブジェクト、enum、Repository、`<Aggregate>ConflictException`、`@Repository`。
+- **依存してよい型**：`java..` の標準型、`org.jspecify..`、jOOQ の API（`org.jooq..`）、jOOQ の生成型（`com.example.demo.jooq..`）、`shared.infrastructure.persistence` の共通処理（`CommonColumns`、`TableWriter`、`ColumnValues`、`LockedRoot`、`DeletedRoot`）、同じモジュールの `domain.model` の集約、Entity、値オブジェクト、enum、Repository、`@Repository`。
 - **依存してはいけない型**：`application`、`domain.service`、`presentation.web`、`infrastructure.client` の型、モジュールルートの型、他の機能モジュールの型とテーブル、`@Transactional`、対応づけのライブラリ（MapStruct、ModelMapper、Dozer）。
 
 ## 最小の例と典型的な例
@@ -199,8 +201,7 @@ class JooqOrderRepository implements OrderRepository {
                 set.set(ORDERS.CUSTOMER_ID, order.customerId().value())
                     .set(ORDERS.STATUS, order.status().name())
                     .set(ORDERS.DISCOUNT, order.discount().amount())
-                    .set(ORDERS.PLACED_AT, order.placedAt()),
-            OrderConflictException::new);
+                    .set(ORDERS.PLACED_AT, order.placedAt()));
     for (final OrderLine line : order.lines()) {
       root.updateChild(
           ORDER_LINES,
@@ -221,8 +222,7 @@ class JooqOrderRepository implements OrderRepository {
         .deleteCheckingVersion(
             ORDERS,
             ORDERS.ORDER_ID.eq(order.id().value()),
-            order.lockNo(),
-            OrderConflictException::new)
+            order.lockNo())
         .deleteChildren(ORDER_LINES, ORDER_LINES.ORDER_ID.eq(order.id().value()));
   }
 

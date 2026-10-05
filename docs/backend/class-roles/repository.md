@@ -44,12 +44,15 @@ Presentation は Repository を使わない。
 - 新しい集約の保存は `void add(集約ルート)` に、既存の集約の保存は `void update(集約ルート)` にする。
   新規と更新を一つの `save` にしない。
 - `update` は、[PostgreSQL の排他制御](../../database/postgresql-concurrency-control.md)の楽観的ロックで保存する。
-  集約の行がなければ `NoSuchElementException` を、更新の時点の行の `lock_no` が集約の `lockNo()` と違うか `lock_timeout` までに行のロックを取れなければ `<Aggregate>ConflictException` を投げる。
+  集約の行がなければ `NoSuchElementException` を、更新の時点の行の `lock_no` が集約の `lockNo()` と違うか `lock_timeout` までに行のロックを取れなければ `shared.concurrency` の `ConflictException` を投げる。
   この二つの例外は、実装が使う `shared` の `TableWriter` が投げる（[jOOQ の Repository](jooq-repository.md)）。
   この二つの例外を、インタフェースの Javadoc に書く。
 - 集約の物理削除が要るときは `void delete(集約ルート)` を置き、`update` と同じ二つの例外を Javadoc に書く。
   期待する版を持つ書き込みは、集約ルートを受け取る `update` と `delete` に限り、識別子と版を受け取るメソッドを作らない。
 - `add`、`update`、`delete` の引数の集約ルートは、引数のない `long lockNo()` を持つ（[集約](aggregate.md)）。
+- `update` と `delete` を呼べるのは CommandHandler だけである。
+  Domain Service と QueryService は Repository を読み取りにだけ使う。
+  CommandHandler が集約の `ensureLockNo` で画面の版を比べてから保存する流れを、迂回させないためである。
 - 版を比べない UPDATE か DELETE の件数を返すメソッド（在庫を引き当てて件数を返す、など）には、Error Prone の `@CheckReturnValue` を付ける。
   呼び出し側が件数を捨てると、コンパイルが失敗する。
 - インタフェースと各メソッドに Javadoc を書く。
@@ -57,7 +60,7 @@ Presentation は Repository を使わない。
 
 ## 依存してよい型、してはいけない型
 
-- **依存してよい型**：`java..` の標準型、`org.jspecify..`、`com.google.errorprone.annotations.CheckReturnValue`、同じ `domain.model` の集約ルート、値オブジェクト、enum、`<Aggregate>ConflictException`。
+- **依存してよい型**：`java..` の標準型、`org.jspecify..`、`com.google.errorprone.annotations.CheckReturnValue`、同じ `domain.model` の集約ルート、値オブジェクト、enum、`shared.concurrency` の `ConflictException`（Javadoc の `@throws` のため）。
 - **依存してはいけない型**：jOOQ の API と生成型（`DSLContext`、`Condition`、説明用の仮の生成型 `OrdersRecord`）、Spring の型（`Pageable`、`@Repository`）、JPA と Jackson の型、`application`、モジュールルートの型（参照の結果、検索条件）。
 
 ## 最小の例と典型的な例
@@ -67,6 +70,7 @@ Presentation は Repository を使わない。
 ```java
 package com.example.demo.order.domain.model;
 
+import com.example.demo.shared.concurrency.ConflictException;
 import java.util.Optional;
 
 /** 注文の集約を保存し、取り出す。 */
@@ -82,7 +86,7 @@ public interface OrderRepository {
    * 既存の注文を保存する。
    *
    * @throws NoSuchElementException 注文の行がないとき
-   * @throws OrderConflictException 更新の時点の注文の行のロック番号が order と違うとき、または lock_timeout までに行をロックできないとき
+   * @throws ConflictException 更新の時点の注文の行のロック番号が order と違うとき、または lock_timeout までに行をロックできないとき
    */
   void update(Order order);
 }
@@ -185,8 +189,9 @@ class JooqOrderRepositoryTest {
 - [ ] `application` とモジュールルートの型に依存しない。［ArchUnit で検査：PackageByFeatureOnionArchitectureTest.dependenciesPointInward］
 - [ ] 集約ルートごとに一つ、`<Aggregate>Repository` の名前で作る。［自分で点検］
 - [ ] メソッドはドメインの語彙で名付け、`findById` は `Optional`、複数は `List` を返し、保存は新しい集約の `add` と既存の集約の `update` に分ける。［自分で点検］
-- [ ] `update` の Javadoc に、行がないときの `NoSuchElementException` と、競合したときの `<Aggregate>ConflictException` を書く。［自分で点検］
+- [ ] `update` の Javadoc に、行がないときの `NoSuchElementException` と、競合したときの `ConflictException` を書く。［自分で点検］
 - [ ] `add`、`update`、`delete` は、引数のない `long lockNo()` を持つ集約ルートを一つだけ受け取る。［ArchUnit で検査：TableWriterArchTest.repositoryWritesTakeVersionedAggregates］
+- [ ] `update` と `delete` を CommandHandler だけが呼ぶ。［ArchUnit で検査：TableWriterArchTest.onlyCommandHandlersUpdateOrDeleteAggregates］
 - [ ] 版を比べない UPDATE か DELETE の件数を返すメソッドに `@CheckReturnValue` を付ける。［自分で点検］
 - [ ] 実装は `infrastructure.persistence` の `Jooq<Aggregate>Repository` にする。［ArchUnit で検査：PackageByFeatureOnionArchitectureTest.repositoryImplementationsAreJooqRepositories］
 - [ ] Domain の外の実装は `infrastructure` に置く。［ArchUnit で検査：PackageByFeatureOnionArchitectureTest.domainInterfacesAreImplementedInInfrastructure］

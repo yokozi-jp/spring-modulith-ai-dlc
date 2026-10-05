@@ -44,6 +44,7 @@ CommandHandler は Domain Service に、必要な値を Domain の型で渡す�
   `@Configuration` の `@Bean` で登録しない。
 - 依存は public のコンストラクタで受け取り、`private final` フィールドに持つ。
   フィールドは依存と定数だけにし、状態を持たない。
+- Repository は読み取り（`count*`、`find*`）にだけ使い、`update` と `delete` を呼ばない。
 - 規則を満たさないときは `IllegalStateException` を投げ、メッセージは英語で、対象の識別子を含める。
 - `@Transactional` と `@Slf4j` を付けず、`ApplicationEventPublisher` を使わない。
 - クラス、フィールド、コンストラクタ、public メソッドに Javadoc を書く。
@@ -163,6 +164,7 @@ class DiscountPolicyTest {
 - [ ] 依存は Java の標準型、Domain の型、`@Service` だけにし、`@Transactional`、`ApplicationEventPublisher`、ロガー、モジュールルートの型を使わない。［ArchUnit で検査：PackageByFeatureOnionArchitectureTest.domainServicesDependOnlyOnDomainAndJava］
 - [ ] `application` と Infrastructure に依存しない。［ArchUnit で検査：PackageByFeatureOnionArchitectureTest.dependenciesPointInward］
 - [ ] 外部システムのインタフェースを呼ばない。［自分で点検］
+- [ ] Repository の `update` と `delete` を呼ばない。［ArchUnit で検査：TableWriterArchTest.onlyCommandHandlersUpdateOrDeleteAggregates］
 - [ ] 名前は業務規則を表す名詞にする。［自分で点検］
 - [ ] `public class` にし、依存を public のコンストラクタで受け取り、状態を持たない。［自分で点検］
 - [ ] 規則を満たさないときは `IllegalStateException` を投げる。［自分で点検］

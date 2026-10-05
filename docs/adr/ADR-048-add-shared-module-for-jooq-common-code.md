@@ -1,7 +1,7 @@
 ---
 type: ADR
 title: 'ADR-048: jOOQ の共通処理を共有モジュール shared に置く'
-description: 共通カラムの値の設定、NULL から空文字への変換、楽観的ロックの更新件数の判定という jOOQ の共通処理を、Spring Modulith の shared モジュール com.example.demo.shared の infrastructure.persistence に置く決定。
+description: 共通カラムの値の設定、NULL から空文字への変換、楽観的ロックの更新件数の判定という jOOQ の共通処理を、Spring Modulith の shared モジュール com.example.demo.shared の infrastructure.persistence に置き、層をまたぐ楽観的ロックの語彙を shared.concurrency に置く決定。
 tags: [adr, backend, spring-modulith, jooq, database]
 ---
 
@@ -40,7 +40,8 @@ shared モジュールは、モジュール単位の統合テストでも常に�
 jOOQ の共通処理は `com.example.demo.shared.infrastructure.persistence` に置く。
 このパッケージはモジュールのルートではないため、[バックエンドアーキテクチャ](../backend/architecture.md) の定めに従い `@NamedInterface` で公開する。
 
-`shared` には、共通カラムの値を組み立てる共通処理、NULL を空文字へ変える Converter、業務テーブルの UPDATE と DELETE の入口だけを置き、業務の概念を置かない。
+`shared` には、共通カラムの値を組み立てる共通処理、NULL を空文字へ変える Converter、業務テーブルの UPDATE と DELETE の入口と、楽観的ロックの語彙（`shared.concurrency` の `ExpectedLockNo`、`VersionedCommand`、`ConflictException`）だけを置き、業務の概念を置かない。
+`shared.concurrency` も `@NamedInterface("concurrency")` で公開する。
 INSERT の共通カラムの値には `lock_no` を含め、`1` にする。
 UPDATE の共通カラムの値（`forUpdate`）は `updated_*` だけを返し、UPDATE の `lock_no` は `TableWriter` だけが書く。
 `*_pgm_cd` の値の求め方は [ADR-051](ADR-051-bind-pgm-cd-with-scoped-value-and-aspect.md) で決める。
@@ -51,7 +52,8 @@ ADR-051 の `*_pgm_cd` を束縛する Aspect も、共通カラムの値を組�
 楽観的ロックの競合の例外は、`shared.concurrency` の `ConflictException` にする。
 `error` が 409 に変える `ConflictException` のために `error` から `shared` への依存が増えるので、`shared` はルートパッケージの型に依存しない（`PgmCdAspect` は自分のパッケージからベースパッケージを導く）。
 これで、アーキテクチャ指標の NCCD を 1.0 以下に保つ。
-`shared` を使うのは、他のモジュールの `infrastructure.persistence` のアダプターだけとする。ただし `shared.concurrency` は、どの層からも使える。
+`shared.infrastructure.persistence` を使うのは、他のモジュールの `infrastructure.persistence` のアダプターだけとする。
+`shared.concurrency` は、どの層からも使える。
 
 生成クラスの `CREATED_*`、`UPDATED_*`、`PATCHED_*` のフィールドを参照してよいのは、`shared` の共通処理だけとする。
 楽観的ロックで各モジュールが参照する `LOCK_NO` は、この制限から除く。
@@ -66,7 +68,9 @@ ADR-051 の `*_pgm_cd` を束縛する Aspect も、共通カラムの値を組�
 ### Negative
 
 - `shared` の変更がすべての機能モジュールに影響する。
-- `shared` に何でも置かれ、境界のない共通パッケージになるおそれがある。置くものを永続化の技術的な共通処理に限ることで抑える。
+- `shared` に何でも置かれ、境界のない共通パッケージになるおそれがある。置くものを永続化の技術的な共通処理と、楽観的ロックの三つの型に限ることで抑える。
+- `shared.concurrency` は層をまたいで使えるため、`ArchUnit` の `sharedModuleIsUsedOnlyByPersistenceAdapters` の対象から外れる。
+  `shared.infrastructure.persistence` は、変わらず Persistence Adapter だけが使える。
 
 ### Neutral
 

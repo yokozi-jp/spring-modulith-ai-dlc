@@ -39,9 +39,11 @@ backend/src/test/java/com/example/demo/architecture/
 規則名は`@ArchTest`のフィールド名であり、テスト結果にもこの名前で出る。
 
 - `dependenciesPointInward`：`domain.model`、`domain.service`、モジュールルートと`application`、`presentation`、`infrastructure.persistence`、`infrastructure.client`のオニオン構造で依存を内向きに限り、どの層にも属さないパッケージのクラスを拒否する。
+  ベースパッケージ直下と`shared.concurrency`は、所属検査から除く。
 - `infrastructureDependsOnlyOnDomainModel`：`infrastructure`は`application`、`domain.service`、モジュールルートの型に依存せず、機能モジュールの型のうち`domain.model`だけを使う。
-- `sharedModuleIsUsedOnlyByPersistenceAdapters`：`shared`の外で`shared`の型に依存するクラスは、`infrastructure.persistence`に置く。
+- `sharedModuleIsUsedOnlyByPersistenceAdapters`：`shared`の外で`shared.concurrency`以外の`shared`の型に依存するクラスは、`infrastructure.persistence`に置く。
   `shared`の中の依存は対象にしない。
+  `shared.concurrency`は、どの層からも使える（[ADR-048](../adr/ADR-048-add-shared-module-for-jooq-common-code.md)）。
 - `moduleApiDoesNotExposeInternalTypes`：モジュールルートの型は、`java..`、`org.jspecify..`、同じルートパッケージの型だけに依存する。
 - `databaseTechnologyApisAreOnlyUsedByPersistenceAdapters`：jOOQ APIと生成型は`infrastructure.persistence`だけで使う。
 - `domainModelDoesNotDependOnFrameworks`：`domain.model`はSpring、jOOQ、jOOQの生成型、JPA、Jacksonに依存しない。
@@ -62,6 +64,7 @@ backend/src/test/java/com/example/demo/architecture/
 共有モジュール`shared`（[ADR-048](../adr/ADR-048-add-shared-module-for-jooq-common-code.md)）のために、ほかの規則へ例外を足していない。
 `shared.infrastructure.persistence`はオニオン規則の`persistence`の層に入るため、機能モジュールの`infrastructure.persistence`からの依存は同じ層の中の依存になる。
 `infrastructureDependsOnlyOnDomainModel`が拒否するモジュールルートは`com.example.demo.<feature>`の直下だけであり、`shared.infrastructure.persistence`は含まれない。
+`shared.concurrency`の`VersionedCommand`は`Command`で終わるインタフェースなので、`ClassRoleArchTest`の`commandsAndResultsAreApplicationRecords`の対象から`shared.concurrency`を除く。
 `shared`のルートには`package-info.java`だけを置くため、`moduleRootTypesAreRecordsEnumsOrQueries`と`moduleApiDoesNotExposeInternalTypes`に当たる型がない。
 パッケージ構造の決定は[ADR-002](../adr/ADR-002-package-by-feature-onion-architecture.md)を、クラスの役割の決定は[ADR-050](../adr/ADR-050-define-backend-class-roles-and-naming.md)を参照する。
 
@@ -104,6 +107,8 @@ backend/src/test/java/com/example/demo/architecture/
 `tableWritesGoThroughTableWriter`は、違反フィクスチャの`DirectOrderWriter`で禁止するAPIごとに一行を持つ。
 `DirectOrderWriter`は、ラムダの中の`execute()`、`Update`の変数からの`execute()`、`Update::execute`のメソッド参照も含む。
 `TableWriterArchTest`の残りの規則は、違反フィクスチャの`JooqOrderRepository`、`UnversionedOrderRepository`、`ApproveOrderCommandHandler`で確かめる。
+R1は`ReleaseOrderCommandHandler`（`ReleaseOrderCommand`と`ReleaseOrderRequest`）、R2は`ReopenPolicy`（Domain Service）と`PurgeOrderQueryService`、R3は`ForgedLockNoCommandHandler`（コンストラクタと`ExpectedLockNo::new`）と`OrderLockController`、R4は`ApproveOrderCommandHandler`と`OverloadedEnsureCommandHandler`で確かめる。
+規約どおりのフィクスチャには、`shared.concurrency`の型と、Requestが`ExpectedLockNo`を作る`CancelOrderRequest`、Listenerが版のないCommandを作る`OrderPlacedExpiryListener`を置く。
 `archfixture.conforming`と`archfixture.violating`の`shared.infrastructure.persistence`には、規則が名前で見る`TableWriter`のスタブを置く。
 `typeSafeJooqMappingIsAllowed`は、対応づけの二つの規則が`convertFrom`、`Records.mapping`、`into(Table)`、`fetch(RecordMapper)`、`intoArray(Field, Class)`、`intoSet(Field, Class)`、`fetch(Field, Class)`、`newRecord(Table)`を誤検出しないことを確かめる。
 MapStruct、ModelMapper、Dozerはテストのクラスパスにないため、`mappingLibrariesAreNotUsed`のフィクスチャは`DefaultRecordMapper`と`DefaultRecordUnmapper`への依存だけで確かめる。
@@ -204,8 +209,16 @@ INSERTの共通カラムは`CommonColumns.forInsert`で、UPDATEとDELETEは`Tab
   必須の`add`を対象に含めるため、`save`のような名前で保存するRepositoryでも、`lockNo()`を持たない集約は`add`で検出される。
 - `aggregateMethodsDoNotUseUnversionedWrites`：集約ルートを引数に取るメソッドとラムダは、`updateWhere`と`deleteWhere`を呼ばない。
   ラムダは捕捉した変数を引数に持つ合成メソッドになるため、同じ判定で見る。
-- `commandHandlersEnsureScreenLockNo`：`handle`の引数のCommandが`lockNo()`を持つ`*CommandHandler`は、`domain.model`の型の`ensureLockNo`を呼ぶ。
-  渡した値は検査しない。
+- `commandsBuiltByPresentationForWritesAreVersioned`（R1）：`.presentation.`のクラスが作ったCommand（コンストラクタの呼び出しかコンストラクタ参照）を`handle`で受け取り、`domain.model`の`*Repository`の`update`か`delete`を呼ぶ`*CommandHandler`は、そのCommandが`VersionedCommand`を実装する。
+  RequestとListenerの両方が作るCommandは、Request用とListener用に分ける。
+  Listenerが作るCommandは`VersionedCommand`でなくてよい。
+- `onlyCommandHandlersUpdateOrDeleteAggregates`（R2）：`*CommandHandler`と`domain.model`の`*Repository`の実装のどちらでもないクラスは、`domain.model`の`*Repository`の`update`と`delete`を呼ばず、メソッド参照もしない。
+  Domain ServiceとQueryServiceからの保存を止める。
+- `expectedLockNoIsCreatedOnlyByRequests`（R3）：`presentation.web`の`*Request`以外のクラスは、`ExpectedLockNo`のコンストラクタを呼ばず、`ExpectedLockNo::new`も使わない。
+  Repository、`TableWriter`、CommandHandler、Controllerが読んだ版から作ることを止める。
+- `commandHandlersEnsureScreenLockNo`（R4）：`handle`の引数のCommandが`VersionedCommand`である`*CommandHandler`は、`domain.model`の型の`ensureLockNo`で、引数に`ExpectedLockNo`を持つものを呼ぶ。
+  `ensureLockNo(long)`のオーバーロードでは満たせない。
+  別の集約のインスタンスに呼ぶ、業務の検査の後に呼ぶ、`command.expectedLockNo()`以外の値を渡す書き方は検査しない（値の流れは追わない）。
 - `jooqVersionIsReviewed`：実行時のjOOQの版が、禁止の一覧を見直した版と一致する。
   版が変わったら[jOOQのSQLの書き方](../database/jooq-usage.md)の「jOOQの版を上げるとき」に従う。
 - `unversionedWritesRequireUsingTheCount`：`updateWhere`と`deleteWhere`が`@CheckReturnValue`を持つ。

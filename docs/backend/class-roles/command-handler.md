@@ -40,7 +40,7 @@ CommandHandler は他モジュールから呼ばれない。
 - `handle` の中で、Command の標準型の値を値オブジェクトに変換する（`new OrderId(command.orderId())`）。
 - 集約が見つからないときは、`.orElseThrow(() -> new NoSuchElementException("order not found: orderId=" + command.orderId()))` で `NoSuchElementException` を投げる。
 - 新しい集約は Repository の `add` で、状態を変えた既存の集約は `update` で、`handle` の中で保存する。
-- Command がロック番号を持つときは、`findById` の直後、状態を変える操作より前に `order.ensureLockNo(command.lockNo())` を呼ぶ。
+- Command が `VersionedCommand` のときは、`findById` の直後、状態を変える操作より前に `order.ensureLockNo(command.expectedLockNo())` を呼ぶ。
   CommandHandler は集約を DB から読み直すため、`ensureLockNo` は画面から受け取った値と読んだ値を比べる。
   Repository の `update` は、読んだ値と更新の時点の行の値を UPDATE の条件で比べる（[jOOQ の Repository](jooq-repository.md)）。
   この二つの比較で、[PostgreSQL の排他制御](../../database/postgresql-concurrency-control.md)の楽観的ロック（UPDATE の条件で画面などから受け取った `lock_no` を比べる）を満たす。
@@ -65,8 +65,9 @@ CommandHandler は他モジュールから呼ばれない。
 Command の形式は、Controller の `@Valid` で検証済みである。
 形式の違反は、`ApiExceptionHandler` が継承する `ResponseEntityExceptionHandler` が 400 の Problem Details にするため、CommandHandler に届かない。
 
-Domain が投げる JDK の例外と `<Aggregate>ConflictException` は、いまは HTTP の 500 になる。
-ユースケースがこの例外を 400、404、409、422 で返す必要があるときは、実装を止めて利用者に確認し、対応づけを新しい ADR で決める。
+`ConflictException` は、`ApiExceptionHandler` が HTTP の 409 にする。
+Domain が投げる JDK の例外は、いまは HTTP の 500 になる。
+ユースケースがこの例外を 400、404、422 で返す必要があるときは、実装を止めて利用者に確認し、対応づけを新しい ADR で決める。
 ステータスコードの使い分けは[HTTPステータスコードの選択](../../web-api/status-codes.md)に、API のエラー契約は [ADR-013](../../adr/ADR-013-standardize-http-api-contracts.md) に従う。
 対応づけの作業は [issue #107](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/107) で扱う。
 
@@ -113,7 +114,7 @@ public class CancelOrderCommandHandler {
             .findById(new OrderId(command.orderId()))
             .orElseThrow(
                 () -> new NoSuchElementException("order not found: orderId=" + command.orderId()));
-    order.ensureLockNo(command.lockNo());
+    order.ensureLockNo(command.expectedLockNo());
     order.cancel();
     orderRepository.update(order);
     events.publishEvent(new OrderCancelled(order.id().value(), Instant.now(clock)));
@@ -178,7 +179,7 @@ private List<OrderLine> toOrderLines(final List<PlaceOrderCommand.Line> commandL
 
 ```java
 // com.example.demo.order.application.ConfirmOrderCommandHandler（抜粋）
-order.ensureLockNo(command.lockNo());
+order.ensureLockNo(command.expectedLockNo());
 order.confirm();
 orderRepository.update(order);
 events.publishEvent(new OrderConfirmed(order.id().value(), Instant.now(clock)));
@@ -243,7 +244,7 @@ class CancelOrderCommandHandlerTest {
     final String orderId = order.id().value();
 
     scenario
-        .stimulate(() -> cancelOrder.handle(new CancelOrderCommand(orderId, order.lockNo())))
+        .stimulate(() -> cancelOrder.handle(new CancelOrderCommand(orderId, new ExpectedLockNo(order.lockNo()))))
         .andWaitForEventOfType(OrderCancelled.class)
         .matchingMappedValue(OrderCancelled::orderId, orderId)
         .toArrive();
@@ -286,12 +287,12 @@ class CancelOrderCommandHandlerTest {
 - [ ] jOOQ の API と生成型を使わない。［ArchUnit で検査：PackageByFeatureOnionArchitectureTest.databaseTechnologyApisAreOnlyUsedByPersistenceAdapters］
 - [ ] Command の値を `handle` の中で値オブジェクトに変換し、業務規則を集約と Domain Service に任せる。［自分で点検］
 - [ ] 新しい集約を `add` で、既存の集約を `update` で保存し、イベントを保存の後に `ApplicationEventPublisher` で発行する。［自分で点検］
-- [ ] Command がロック番号を持つときは、集約の `ensureLockNo` を呼ぶ。［ArchUnit で検査：TableWriterArchTest.commandHandlersEnsureScreenLockNo］
-- [ ] `ensureLockNo` は `findById` の直後、状態を変える操作より前に呼び、`command.lockNo()` を渡す。［自分で点検］
+- [ ] Command が `VersionedCommand` のときは、集約の `ensureLockNo(ExpectedLockNo)` を呼ぶ。［ArchUnit で検査：TableWriterArchTest.commandHandlersEnsureScreenLockNo］
+- [ ] `ensureLockNo` は `findById` の直後、状態を変える操作より前に呼び、`command.expectedLockNo()` を渡す。型はコンパイルで、呼ぶ位置と渡す値はレビューで確かめる。［自分で点検］
 - [ ] 画面から呼ばれる CommandHandler は外部システムのインタフェースに依存せず、外部システムはイベントを受けた Listener が呼ぶ CommandHandler から呼ぶ。［自分で点検］
 - [ ] 外部システムを呼ぶ CommandHandler は、集約がその操作を終えていれば何もせずに Result を返し、外部システムに冪等性キーを渡す。［自分で点検］
 - [ ] 現在時刻は `Instant.now(clock)` で取る。［自分で点検］
-- [ ] Domain の例外を 400、404、409、422 で返す必要があるなら、実装を止めて利用者に確認した。［自分で点検］
+- [ ] Domain の例外を 400、404、422 で返す必要があるなら、実装を止めて利用者に確認した。［自分で点検］
 - [ ] クラス、フィールド、コンストラクタ、`handle` に Javadoc を書く。［自分で点検］
 - [ ] `@ApplicationModuleTest` と `Scenario` のテストを書く。［自分で点検］
 - [ ] `application` のパッケージに `@NullMarked` の `package-info.java` がある。［Error Prone で検査：RequireExplicitNullMarking］
