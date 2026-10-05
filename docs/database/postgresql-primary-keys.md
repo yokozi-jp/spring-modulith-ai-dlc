@@ -63,7 +63,7 @@ jOOQは`uuid`を`UUID`に対応づける。
 `uuid`カラムの`DEFAULT`は、`SchemaConventionsTest`と`SchemaInspectionTest`が使う`SchemaTableConventions.columns`（規則T13）が検査する。
 Spring Modulithのイベント出版テーブルは対象にしない。
 
-UUID v7の生成方法（時刻と乱数の取り方、JDK 26の`UUID.ofEpochMillis`を使うか、同じミリ秒内の順序）は決めていない。
+UUID v7の生成方法は決めていない。
 UUID v7を主キーにする最初のテーブルを作るときに決める。
 理由は[ADR-058](../adr/ADR-058-generate-uuid-primary-keys-in-application.md)に示す。
 

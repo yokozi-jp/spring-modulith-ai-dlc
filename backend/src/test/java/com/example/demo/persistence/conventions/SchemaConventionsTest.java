@@ -294,11 +294,6 @@ class SchemaConventionsTest {
                       List.of(column(ITEM, BIGINT, "b", "", "s", null)))))
           .containsExactly("T11 item.m_item.item_id");
     }
-  }
-
-  /** uuidカラムのDEFAULT。 */
-  /* package */ @Nested
-  class UuidDefaultRulesTest {
 
     @Test
     @DisplayName("T13：uuidのDEFAULTにuuidv7()を使うと拒否する")

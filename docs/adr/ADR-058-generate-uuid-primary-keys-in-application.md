@@ -28,7 +28,6 @@ UUID v7 はミリ秒の時刻を含むため、値から作成の順序と時刻
 
 このリポジトリの PostgreSQL は 18.6 であり（`docker/compose.yml`）、[`uuidv7()`](https://www.postgresql.org/docs/18/functions-uuid.html) が使える。
 Java は 25 で、UUID v7 を作る標準の API がない。
-JDK 26 で `UUID.ofEpochMillis` が加わるが、26 は LTS ではない。
 
 ## Decision
 
@@ -102,18 +101,6 @@ UUID v7 を主キーにする最初のテーブルを作るときに決める。
 - **Description**：外部に出す ID も v7 にそろえる。
 - **Pros**：生成の方法が一つで済む。
 - **Cons**：作成の順序と時刻が外部から見える。RFC 9562 がセキュリティ用途に v4 を求めることに反する。
-
-### 選択肢5: ライブラリ（uuid-creator）で v7 を生成する
-
-- **Description**：UUID v7 の生成を外部のライブラリに任せる。
-- **Pros**：生成の実装を自分で持たずに済む。
-- **Cons**：v7 の主キーのテーブルがまだなく、今は依存を増やす理由がない。生成の方法は最初のテーブルを作るときに決める。
-
-### 選択肢6: JDK 26 に上げて `UUID.ofEpochMillis` を使う
-
-- **Description**：JDK 26 の API で v7 を作る。
-- **Pros**：標準の API だけで済む。
-- **Cons**：26 は LTS ではなく、採番のためだけに JDK を上げる理由がない。
 
 ## References
 
