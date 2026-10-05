@@ -53,3 +53,33 @@ paths = [
 regexes = [
   '''PASSWORD :'[a-zA-Z_][a-zA-Z0-9_]*';''',
 ]
+
+# .env.test の E2E_PASSWORD は docker/keycloak/realm.json の test-user と同じ使い捨てダミー（ADR-057）。
+# この 1 行だけを除外し、.env.test のほかの行は検出対象のまま。
+[[allowlists]]
+description = ".env.test の E2E 用 test-user のダミーパスワード（E2E_PASSWORD=test-password）を除外"
+# paths と regexes の両方に一致した行だけを除外する（既定の OR ではファイル全体が除外される）。
+condition = "AND"
+regexTarget = "line"
+paths = [
+  '''(^|/)\.env\.test$''',
+]
+regexes = [
+  '''(?m)^E2E_PASSWORD=test-password$''',
+]
+
+# docker/zap の各 plan は、docker/keycloak/realm.json のデモ用 realm のテストユーザー test-admin でログインする。
+# test-password は使い捨てのローカル realm 専用の値で、本番の資格情報ではない。
+# この値の行だけを除外し、同じファイルの他のリテラルは検出対象のまま。
+# 既定の condition は OR で、paths だけでファイル全体が除外されるため AND にする。
+# 既定の regexTarget は secret で値しか照合しないため、キー名を含む match を照合する。
+[[allowlists]]
+description = "docker/zap の plan に書くデモ用 realm のテストユーザーのパスワード（test-password）を除外（他のリテラルは検出対象のまま）"
+condition = "AND"
+regexTarget = "match"
+paths = [
+  '''(^|/)docker/zap/(passive|preflight|active)\.yaml$''',
+]
+regexes = [
+  '''^password:\s*test-password$''',
+]

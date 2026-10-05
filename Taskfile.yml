@@ -98,10 +98,61 @@ tasks:
         NODE
 
   e2e:
-    desc: E2Eの未整備を案内
+    desc: compose-testでbackendを起動し、Vite previewに対してPlaywrightのE2Eを実行して後片付け
+    silent: true
     cmds:
-      - echo "E2E はまだ整備されていません。docs/e2e-testing-strategy.md を参照してください。"
-      - echo "整備後はフルスタック起動、シード、playwright testをこのタスクに束ねます。"
+      - |
+        # compose の backend と Playwright が .env.test を固定で読むため、TEST_ENV_FILE の上書きには対応しない。
+        # export すると Playwright の loadEnv で .env.test.local より優先されるため、SERVER_PORT を読むだけにする。
+        . ./.env.test
+        compose() { {{.DOCKER}} compose -f "{{.TEST_COMPOSE_FILE}}" --profile e2e "$@"; }
+        keep_env=""
+        if [ "${E2E_KEEP_ENV:-}" = "1" ] && [ -z "${CI:-}" ]; then keep_env="1"; fi
+        # 前回 E2E_KEEP_ENV=1 で残した環境を破棄し、空の DB から始める。
+        compose down --volumes --remove-orphans >/dev/null 2>&1 || true
+        for port in 5173 "$SERVER_PORT"; do
+          rc=0
+          curl --silent --output /dev/null --max-time 2 "http://localhost:${port}/" || rc=$?
+          if [ "$rc" -ne 7 ]; then
+            echo "localhost:${port} は使用中です。開発用の Vite（5173）や Keycloak（${SERVER_PORT}）など、この port を使うプロセスを止めてから実行してください。" >&2
+            exit 1
+          fi
+        done
+        cleanup() {
+          status=$?
+          trap - EXIT
+          keep=""
+          if [ "$status" -ne 0 ]; then
+            mkdir -p frontend/test-results
+            compose logs --no-color backend > frontend/test-results/backend.log 2>&1 || true
+            if [ -n "$keep_env" ] && [ -n "$(compose ps -aq 2>/dev/null)" ]; then keep="1"; fi
+          fi
+          cleanup_status=0
+          # Task の shell では EXIT の trap の中の exit が後続の処理を止めないため、exit に頼らず分岐する。
+          if [ -n "$keep" ]; then
+            echo "E2E_KEEP_ENV=1 のため、compose-test のコンテナと volume を残しました。" >&2
+            echo "  backend のログ：{{.DOCKER}} compose -f {{.TEST_COMPOSE_FILE}} --profile e2e logs backend" >&2
+            echo "  （frontend/test-results/backend.log は pnpm e2e の再実行で消える）" >&2
+            echo "  再実行：cd frontend && pnpm e2e" >&2
+            echo "  片付け：{{.DOCKER}} compose -f {{.TEST_COMPOSE_FILE}} --profile e2e down --volumes --remove-orphans" >&2
+          else
+            compose down --volumes --remove-orphans || cleanup_status=$?
+          fi
+          if [ "$status" -ne 0 ]; then exit "$status"; fi
+          exit "$cleanup_status"
+        }
+        trap cleanup EXIT
+        (cd frontend && vp install --frozen-lockfile && vp run build && vp exec playwright install chromium)
+        compose build backend
+        compose up -d --wait postgres redis keycloak
+        task be-migrate COMPOSE_ENV_FILE=.env.test
+        compose up -d --wait backend
+        # healthcheck はコンテナの中から確かめるため、preview の proxy と同じくホストから届くかを別に確かめる。
+        if ! curl --fail --silent --show-error --max-time 5 "http://localhost:${SERVER_PORT}/actuator/health/readiness" >/dev/null; then
+          echo "ホストから backend（localhost:${SERVER_PORT}）へ接続できません。frontend/test-results/backend.log の backend のログを確かめてください。" >&2
+          exit 1
+        fi
+        (cd frontend && vp run e2e)
 
   # ADR
   adr-check:
@@ -931,9 +982,151 @@ tasks:
       - PATH="$PATH:$HOME/go/bin" betterleaks git --staged --no-banner --redact
 
   scan-secrets-all:
-    desc: リポジトリ全体と履歴をbetterleaksでスキャン
+    desc: リポジトリ全体と現在のブランチの履歴をbetterleaksでスキャン
     cmds:
-      - PATH="$PATH:$HOME/go/bin" betterleaks git . --no-banner --redact --git-workers=16
+      - PATH="$PATH:$HOME/go/bin" betterleaks git . --no-banner --redact --git-workers=16 --log-opts=HEAD
+
+  scan-dast:
+    desc: 隔離した環境で認証付きのpassive scan（OWASP ZAP）を実行し、レポートをbuild/dastに出力
+    cmds:
+      - task: dast-run
+        vars: { DAST_PLAN: passive }
+
+  scan-dast-active:
+    desc: 隔離した環境で認証付きのactive scan（OWASP ZAP）を実行し、レポートをbuild/dastに出力
+    cmds:
+      - task: dast-run
+        vars: { DAST_PLAN: active }
+
+  # DAST の本体（ADR-056）。依存、backend、vp preview、ZAP を起動し、失敗したときも片付ける。
+  # 検出では失敗させず、起動、ログイン、CSRF の前提確認の失敗だけで失敗させる。
+  # vp は PATH 上にある前提（CI は frontend/node_modules/.bin を PATH に足す）。
+  dast-run:
+    internal: true
+    silent: true
+    cmds:
+      - |
+        zap_image="zaproxy/zap-stable:2.17.0@sha256:781a2bdaea47324e7bab583e2263f21d257b0aee61ed51521a5be45f5f5081ef"
+        report_dir="$PWD/build/dast"
+        preview_pid_file="$report_dir/preview.pid"
+        compose() { {{.DOCKER}} compose -p spring-modulith-dast -f "{{.TEST_COMPOSE_FILE}}" --profile backend-smoke "$@"; }
+        fail() { echo "✗ $1" >&2; exit 1; }
+
+        # 4173 は preview、18081 は backend、18082 は ZAP の proxy、5433、6380、8081 は compose-test が使う。
+        for port in 4173 18081 18082 5433 6380 8081; do
+          rc=0
+          curl --silent --output /dev/null --connect-timeout 1 "http://127.0.0.1:$port/" || rc=$?
+          if [ "$rc" -ne 7 ]; then
+            echo "✗ ポート $port が使用中のため DAST を開始できません。" >&2
+            echo "  task test や前回の DAST が残っていないか確認してください（開発環境はこれらのポートを使いません）。" >&2
+            exit 1
+          fi
+        done
+
+        cleanup() {
+          status=$?
+          trap - EXIT
+          cleanup_status=0
+          if [ -s "$preview_pid_file" ]; then
+            preview_pid="$(cat "$preview_pid_file")"
+            # Task の組み込みの kill はプロセスグループを指定できないので、外部の kill を使う。
+            env kill -TERM -- "-$preview_pid" 2>/dev/null || true
+            rm -f "$preview_pid_file"
+          fi
+          {{.DOCKER}} logs spring-modulith-dast-backend >"$report_dir/backend.log" 2>&1 || true
+          {{.DOCKER}} rm --force spring-modulith-dast-zap spring-modulith-dast-backend >/dev/null 2>&1 || true
+          compose down --volumes --remove-orphans || cleanup_status=$?
+          if [ "$status" -ne 0 ]; then exit "$status"; fi
+          exit "$cleanup_status"
+        }
+        trap cleanup EXIT
+
+        rm -rf "$report_dir" && mkdir -p "$report_dir" && chmod a+rwx "$report_dir"
+        {{.DOCKER}} build --tag spring-modulith-backend:dast backend
+        (cd frontend && vp build)
+        compose up -d --wait
+
+        {{.DOCKER}} run --detach --name spring-modulith-dast-backend --network host \
+          --env-file "{{.TEST_ENV_FILE}}" --env SERVER_PORT=18081 \
+          spring-modulith-backend:dast >/dev/null
+        ready=0
+        for attempt in $(seq 1 60); do
+          if curl --fail --silent --output /dev/null http://127.0.0.1:18081/actuator/health/readiness; then ready=1; break; fi
+          if [ -z "$({{.DOCKER}} ps --quiet --filter name=spring-modulith-dast-backend --filter status=running)" ]; then break; fi
+          sleep 2
+        done
+        if [ "$ready" -ne 1 ]; then
+          {{.DOCKER}} logs spring-modulith-dast-backend >&2 || true
+          fail "backend が 18081 で ready になりませんでした。"
+        fi
+
+        # preview を別セッションで起動し、片付けでプロセスグループごと止める。
+        setsid sh -c 'echo $$ >"$1"; cd frontend && SERVER_PORT=18081 exec vp preview --host 127.0.0.1 --port 4173' sh "$preview_pid_file" \
+          >"$report_dir/preview.log" 2>&1 &
+        for attempt in $(seq 1 30); do
+          if curl --silent --output /dev/null http://127.0.0.1:4173/; then break; fi
+          sleep 1
+        done
+        # 未認証の /api/missing が 401 なら、preview の proxy が backend へ届いている。
+        code="$(curl --silent --output /dev/null --write-out '%{http_code}' http://localhost:4173/api/missing || true)"
+        if [ "$code" != "401" ]; then
+          cat "$report_dir/preview.log" >&2 || true
+          fail "preview 経由の GET /api/missing が 401 ではありません（$code）。"
+        fi
+
+        zap() {
+          {{.DOCKER}} run --rm --name spring-modulith-dast-zap --network host \
+            -v "$PWD/docker/zap:/zap/plans:ro" -v "$report_dir:/zap/wrk:rw" \
+            "$zap_image" zap.sh -cmd -port 18082 -autorun "/zap/plans/$1.yaml"
+        }
+        if ! zap preflight; then
+          fail "認証付きの前提確認に失敗しました。GET /api/missing（ログイン）と POST /api/missing（CSRF）がどちらも 404 になる必要があります。"
+        fi
+
+        # ZAP は警告があると 2 で終わる。検出では失敗させないので、0 と 2 だけを成功として扱う。
+        zap_status=0
+        zap "{{.DAST_PLAN}}" || zap_status=$?
+        if [ "$zap_status" -eq 2 ]; then
+          echo "ZAP が警告を報告しました。ログを確認してください。"
+        elif [ "$zap_status" -ne 0 ]; then
+          fail "ZAP の {{.DAST_PLAN}} plan が終了コード $zap_status で失敗しました。"
+        fi
+        # ZAP の生の SARIF は別名で受け取り、変換と検査を通ったものだけを CI がアップロードする名前で置く。
+        # 途中で失敗しても、変換前の SARIF が Code Scanning へ送られない。
+        raw_sarif="$report_dir/zap-{{.DAST_PLAN}}.raw.sarif.json"
+        sarif="$report_dir/zap-{{.DAST_PLAN}}.sarif.tmp"
+        test -s "$raw_sarif" || fail "SARIF が出力されていません。"
+        # Code Scanning は http の URI を受け付けず、リポジトリ内のファイルの位置だけを受け付ける。
+        # そのため、位置を実行した plan のファイルへ書き換え、元の URL はメッセージの末尾に残す。
+        # URL のクエリとフラグメントは OAuth の state や code など実行ごとに変わるため、メッセージと fingerprint から外す。
+        # 位置が同じでも別の警告として残るよう、fingerprint を rule、method、URL、evidence、attack、元のメッセージから作る。
+        # ZAP は risk を level だけで表す（High は error、Medium は warning、Low は note、Informational は none）。
+        # Informational は Code Scanning に送らず、HTML と JSON のレポートに残す。
+        # GitHub は rule の security-severity で重大度を表示するため、level から付ける（GitHub Docs の SARIF support for code scanning）。
+        jq --arg plan "docker/zap/{{.DAST_PLAN}}.yaml" '
+          def to_plan: map(.physicalLocation.artifactLocation = {uri: $plan} | .physicalLocation.region.startLine //= 1);
+          def sev: {error: "8.0", warning: "5.0", note: "2.0"}[. // "warning"];
+          .runs[] |= (del(.artifacts, .originalUriBaseIds) | .results |= map(select((.level // "warning") != "none")
+            | .locations[0] as $loc
+            | (($loc.physicalLocation.artifactLocation.uri // .webRequest.target // "") | sub("[?#].*$"; "")) as $url
+            | .partialFingerprints.primaryLocationLineHash = ([.ruleId, .webRequest.method // "", $url,
+                ($loc.physicalLocation.region.snippet.text // ""), ($loc.properties.attack // ""), .message.text] | join("|"))
+            | .message.text += "\nURL: \($url)"
+            | .locations |= to_plan
+            | if has("relatedLocations") then .relatedLocations |= to_plan else . end)
+            | (reduce .results[] as $r ({}; .[$r.ruleId] = ([.[$r.ruleId], ($r.level | sev)] | map(select(.)) | max_by(tonumber)))) as $sev
+            | .tool.driver.rules |= map(select($sev[.id]) | .properties["security-severity"] = $sev[.id] | .properties.tags = ["security"]))
+        ' "$raw_sarif" >"$sarif" || fail "SARIF の変換に失敗しました。"
+        jq -e '[.. | objects | .uri? | strings | select(test("^[A-Za-z][A-Za-z0-9+.-]*:"))] | length == 0' "$sarif" >/dev/null \
+          || fail "SARIF に scheme 付きの URI が残っています。"
+        jq -e '[.runs[].results[] | select((.level // "warning") == "none" or has("ruleIndex"))] | length == 0' "$sarif" >/dev/null \
+          || fail "SARIF に Informational の結果か ruleIndex が残っています。"
+        jq -e '[.runs[].results[] | select((.partialFingerprints.primaryLocationLineHash // "" | test("://[^|]*[?#]"))
+            or (.message.text | test("\nURL: [^\n]*[?#]")))] | length == 0' "$sarif" >/dev/null \
+          || fail "SARIF の fingerprint かメッセージの URL にクエリが残っています。"
+        jq -e 'all(.runs[]; .tool.driver.name == "ZAP")' "$sarif" >/dev/null || fail "SARIF の tool 名が ZAP ではありません。"
+        mv "$sarif" "$report_dir/zap-{{.DAST_PLAN}}.sarif.json"
+        echo "DAST のレポートを $report_dir に出力しました。"
 
   # Lint and format
   lint-actions:

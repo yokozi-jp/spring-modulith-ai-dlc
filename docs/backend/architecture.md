@@ -31,6 +31,7 @@ Spring Modulith は `com.example.demo` の直接サブパッケージをアプ�
 backend/src/main/java/com/example/demo/
 ├── DemoApplication.java
 ├── SecurityConfig.java
+├── OidcDiscoveryLocationConfig.java
 ├── OpenApiConfig.java
 ├── OpenTelemetryAppenderInitializer.java
 ├── LocaleSupport.java

@@ -32,7 +32,7 @@
     "noUnusedParameters": true,
     "erasableSyntaxOnly": true
   },
-  // ponytail: vite.config.ts と orval.config.ts もブラウザ向けの lib と型で検査する。Node API が必要になったら
-  // tsconfig.app.json と tsconfig.node.json の project references に分ける。
-  "include": ["src", "vite.config.ts", "orval.config.ts"]
+  // ponytail: vite.config.ts、orval.config.ts、playwright.config.ts と e2e/ もブラウザ向けの lib と型で検査する。
+  // Node API が必要になったら tsconfig.app.json と tsconfig.node.json の project references に分ける。
+  "include": ["src", "e2e", "vite.config.ts", "orval.config.ts", "playwright.config.ts"]
 }
