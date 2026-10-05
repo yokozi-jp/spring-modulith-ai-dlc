@@ -12,6 +12,8 @@ import com.example.demo.testkit.SharedTestConfiguration;
 import jakarta.servlet.RequestDispatcher;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
@@ -44,7 +46,18 @@ class ApiContractTest {
         .andExpect(header().string(HttpHeaders.CONTENT_LANGUAGE, "ja"))
         .andExpect(header().string(HttpHeaders.VARY, HttpHeaders.ACCEPT_LANGUAGE))
         .andExpect(jsonPath("$.type").value("about:blank"))
+        .andExpect(header().string(HttpHeaders.WWW_AUTHENTICATE, "Session realm=\"demo\""))
         .andExpect(jsonPath("$.title").value("認証が必要です"))
+        .andExpect(jsonPath("$.status").value(401));
+  }
+
+  @Test
+  @DisplayName("/error へ転送された 401 にも WWW-Authenticate の challenge を付ける")
+  void errorEndpointAddsChallengeToUnauthorized() throws Exception {
+    mockMvc
+        .perform(get("/error").requestAttr(RequestDispatcher.ERROR_STATUS_CODE, 401))
+        .andExpect(status().isUnauthorized())
+        .andExpect(header().string(HttpHeaders.WWW_AUTHENTICATE, "Session realm=\"demo\""))
         .andExpect(jsonPath("$.status").value(401));
   }
 
@@ -61,6 +74,7 @@ class ApiContractTest {
         .andExpect(header().string(HttpHeaders.CONTENT_LANGUAGE, "en"))
         .andExpect(header().string(HttpHeaders.VARY, HttpHeaders.ACCEPT_LANGUAGE))
         .andExpect(jsonPath("$.type").value("about:blank"))
+        .andExpect(header().doesNotExist(HttpHeaders.WWW_AUTHENTICATE))
         .andExpect(jsonPath("$.title").value("Forbidden"))
         .andExpect(jsonPath("$.status").value(403));
   }
@@ -78,6 +92,7 @@ class ApiContractTest {
         .andExpect(header().string(HttpHeaders.CONTENT_LANGUAGE, "en"))
         .andExpect(header().string(HttpHeaders.VARY, HttpHeaders.ACCEPT_LANGUAGE))
         .andExpect(jsonPath("$.type").value("about:blank"))
+        .andExpect(header().doesNotExist(HttpHeaders.WWW_AUTHENTICATE))
         .andExpect(jsonPath("$.title").value("Not Found"))
         .andExpect(jsonPath("$.status").value(404))
         .andExpect(jsonPath("$.detail").doesNotExist());
@@ -101,11 +116,49 @@ class ApiContractTest {
         .andExpect(header().string(HttpHeaders.CONTENT_LANGUAGE, "ja"))
         .andExpect(header().string(HttpHeaders.VARY, HttpHeaders.ACCEPT_LANGUAGE))
         .andExpect(jsonPath("$.type").value("about:blank"))
+        .andExpect(header().doesNotExist(HttpHeaders.WWW_AUTHENTICATE))
         .andExpect(jsonPath("$.title").value("サーバー内部エラー"))
         .andExpect(jsonPath("$.status").value(500))
         .andExpect(jsonPath("$.detail").doesNotExist())
         .andExpect(jsonPath("$.exception").doesNotExist())
         .andExpect(jsonPath("$.trace").doesNotExist());
+  }
+
+  @Test
+  @DisplayName("/error は Accept が text/html でも転送元の status の Problem Details を返す")
+  void errorEndpointIgnoresHtmlAccept() throws Exception {
+    mockMvc
+        .perform(
+            get("/error")
+                .accept(MediaType.TEXT_HTML)
+                .requestAttr(RequestDispatcher.ERROR_STATUS_CODE, 400))
+        .andExpect(status().isBadRequest())
+        .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
+        .andExpect(jsonPath("$.title").value("リクエストが不正です"))
+        .andExpect(jsonPath("$.status").value(400));
+  }
+
+  @ParameterizedTest
+  @CsvSource({
+    "413, ja, リクエストが大きすぎます",
+    "413, en, Content Too Large",
+    "422, ja, 処理できない内容です",
+    "422, en, Unprocessable Content",
+    "429, ja, リクエストが多すぎます",
+    "429, en, Too Many Requests",
+    "503, ja, サービスを利用できません",
+    "503, en, Service Unavailable"
+  })
+  @DisplayName("/error は 413、422、429、503 の title を日本語と英語で返す")
+  void errorEndpointLocalizesAdditionalStatusTitles(
+      final int code, final String language, final String title) throws Exception {
+    mockMvc
+        .perform(
+            get("/error")
+                .header(HttpHeaders.ACCEPT_LANGUAGE, language)
+                .requestAttr(RequestDispatcher.ERROR_STATUS_CODE, code))
+        .andExpect(status().is(code))
+        .andExpect(jsonPath("$.title").value(title));
   }
 
   @Test

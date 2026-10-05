@@ -16,7 +16,7 @@
 - [ADR-013: HTTP API 契約を標準化する](ADR-013-standardize-http-api-contracts.md)（Accepted, 2026-09-14）
 - [ADR-014: SPA とバックエンドを同一オリジンで公開する](ADR-014-use-same-origin-spa-security-boundary.md)（Accepted, 2026-09-14）
 - [ADR-015: 可観測性データを構造化し保護する](ADR-015-structure-and-protect-observability-data.md)（Proposed, 2026-09-15）
-- [ADR-016: API と SPA のメッセージをローカライズする](ADR-016-localize-api-and-spa-messages.md)（Proposed, 2026-09-15）
+- [ADR-016: API と SPA のメッセージをローカライズする](ADR-016-localize-api-and-spa-messages.md)（Accepted, 2026-09-15）
 - [ADR-017: トランクベース開発とリポジトリ保護を採用する](ADR-017-adopt-trunk-based-repository-governance.md)（Proposed, 2026-09-15）
 - [ADR-018: release-please でセマンティックリリースを自動化する](ADR-018-automate-semantic-releases.md)（Proposed, 2026-09-15）
 - [ADR-019: 外部連携の耐障害性と容量制御を標準化する](ADR-019-define-resilience-and-capacity-guardrails.md)（Proposed, 2026-09-15）
@@ -58,3 +58,5 @@
 - [ADR-055: DB のロック待ち、文の実行、トランザクション中の待機の上限を接続ごとに設定する](ADR-055-set-db-time-limits-per-connection.md)（Proposed, 2026-10-03）
 - [ADR-056: CI で OWASP ZAP による認証付きの DAST を実行する](ADR-056-run-authenticated-dast-with-zap-in-ci.md)（Proposed, 2026-10-04）
 - [ADR-057: E2E テストに Playwright と Chromium を採用し、テストデータを公開 API で作る](ADR-057-adopt-playwright-for-e2e-tests.md)（Proposed, 2026-10-04）
+- [ADR-058: problem type にパスを全部書いた相対 URI を使う](ADR-058-use-path-absolute-relative-uri-for-problem-types.md)（Accepted, 2026-10-04）
+- [ADR-059: 401 の WWW-Authenticate に独自の Session challenge を返す](ADR-059-send-a-session-challenge-in-www-authenticate-on-401.md)（Accepted, 2026-10-05）

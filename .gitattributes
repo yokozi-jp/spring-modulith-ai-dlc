@@ -1,0 +1,4 @@
+# 生成コードはPull Requestの差分で既定では折りたたむ（docs/code-review/review-scope.md）。
+backend/src/generated/** linguist-generated=true
+frontend/src/api/generated/** linguist-generated=true
+frontend/src/routeTree.gen.ts linguist-generated=true
