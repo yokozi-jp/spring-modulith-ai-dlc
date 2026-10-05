@@ -105,7 +105,8 @@ class ApiProblemDetailsTest {
     final HttpHeaders original = new HttpHeaders();
     original.setVary(List.of(HttpHeaders.ORIGIN));
 
-    final HttpHeaders actual = ApiProblemDetails.responseHeaders(original, Locale.JAPANESE);
+    final HttpHeaders actual =
+        ApiProblemDetails.responseHeaders(original, HttpStatus.BAD_REQUEST, Locale.JAPANESE);
 
     assertEquals(
         List.of(HttpHeaders.ORIGIN, HttpHeaders.ACCEPT_LANGUAGE),
@@ -120,7 +121,8 @@ class ApiProblemDetailsTest {
     final HttpHeaders original = new HttpHeaders();
     original.setVary(List.of(HttpHeaders.ORIGIN, "accept-language"));
 
-    final HttpHeaders actual = ApiProblemDetails.responseHeaders(original, Locale.ENGLISH);
+    final HttpHeaders actual =
+        ApiProblemDetails.responseHeaders(original, HttpStatus.BAD_REQUEST, Locale.ENGLISH);
 
     assertEquals(
         List.of(HttpHeaders.ORIGIN, "accept-language"),
@@ -134,8 +136,25 @@ class ApiProblemDetailsTest {
     final HttpHeaders original = new HttpHeaders();
     original.setVary(List.of("*"));
 
-    final HttpHeaders actual = ApiProblemDetails.responseHeaders(original, Locale.JAPANESE);
+    final HttpHeaders actual =
+        ApiProblemDetails.responseHeaders(original, HttpStatus.BAD_REQUEST, Locale.JAPANESE);
 
     assertEquals(List.of("*"), actual.getVary(), "Vary のアスタリスクを維持すること");
+  }
+
+  @Test
+  @DisplayName("401 にだけ WWW-Authenticate の challenge を付ける")
+  void responseHeadersAddChallengeOnlyToUnauthorized() {
+    final HttpHeaders unauthorized =
+        ApiProblemDetails.responseHeaders(
+            new HttpHeaders(), HttpStatus.UNAUTHORIZED, Locale.JAPANESE);
+    final HttpHeaders forbidden =
+        ApiProblemDetails.responseHeaders(new HttpHeaders(), HttpStatus.FORBIDDEN, Locale.JAPANESE);
+
+    assertEquals(
+        "Session realm=\"demo\"",
+        unauthorized.getFirst(HttpHeaders.WWW_AUTHENTICATE),
+        "401 の challenge");
+    assertNull(forbidden.getFirst(HttpHeaders.WWW_AUTHENTICATE), "403 には付けないこと");
   }
 }

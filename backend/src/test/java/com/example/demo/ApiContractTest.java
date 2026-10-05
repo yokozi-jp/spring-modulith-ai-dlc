@@ -46,7 +46,18 @@ class ApiContractTest {
         .andExpect(header().string(HttpHeaders.CONTENT_LANGUAGE, "ja"))
         .andExpect(header().string(HttpHeaders.VARY, HttpHeaders.ACCEPT_LANGUAGE))
         .andExpect(jsonPath("$.type").value("about:blank"))
+        .andExpect(header().string(HttpHeaders.WWW_AUTHENTICATE, "Session realm=\"demo\""))
         .andExpect(jsonPath("$.title").value("認証が必要です"))
+        .andExpect(jsonPath("$.status").value(401));
+  }
+
+  @Test
+  @DisplayName("/error へ転送された 401 にも WWW-Authenticate の challenge を付ける")
+  void errorEndpointAddsChallengeToUnauthorized() throws Exception {
+    mockMvc
+        .perform(get("/error").requestAttr(RequestDispatcher.ERROR_STATUS_CODE, 401))
+        .andExpect(status().isUnauthorized())
+        .andExpect(header().string(HttpHeaders.WWW_AUTHENTICATE, "Session realm=\"demo\""))
         .andExpect(jsonPath("$.status").value(401));
   }
 
@@ -63,6 +74,7 @@ class ApiContractTest {
         .andExpect(header().string(HttpHeaders.CONTENT_LANGUAGE, "en"))
         .andExpect(header().string(HttpHeaders.VARY, HttpHeaders.ACCEPT_LANGUAGE))
         .andExpect(jsonPath("$.type").value("about:blank"))
+        .andExpect(header().doesNotExist(HttpHeaders.WWW_AUTHENTICATE))
         .andExpect(jsonPath("$.title").value("Forbidden"))
         .andExpect(jsonPath("$.status").value(403));
   }
@@ -80,6 +92,7 @@ class ApiContractTest {
         .andExpect(header().string(HttpHeaders.CONTENT_LANGUAGE, "en"))
         .andExpect(header().string(HttpHeaders.VARY, HttpHeaders.ACCEPT_LANGUAGE))
         .andExpect(jsonPath("$.type").value("about:blank"))
+        .andExpect(header().doesNotExist(HttpHeaders.WWW_AUTHENTICATE))
         .andExpect(jsonPath("$.title").value("Not Found"))
         .andExpect(jsonPath("$.status").value(404))
         .andExpect(jsonPath("$.detail").doesNotExist());
@@ -103,6 +116,7 @@ class ApiContractTest {
         .andExpect(header().string(HttpHeaders.CONTENT_LANGUAGE, "ja"))
         .andExpect(header().string(HttpHeaders.VARY, HttpHeaders.ACCEPT_LANGUAGE))
         .andExpect(jsonPath("$.type").value("about:blank"))
+        .andExpect(header().doesNotExist(HttpHeaders.WWW_AUTHENTICATE))
         .andExpect(jsonPath("$.title").value("サーバー内部エラー"))
         .andExpect(jsonPath("$.status").value(500))
         .andExpect(jsonPath("$.detail").doesNotExist())

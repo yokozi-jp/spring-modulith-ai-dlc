@@ -4,6 +4,7 @@ import io.swagger.v3.oas.models.Components;
 import io.swagger.v3.oas.models.OpenAPI;
 import io.swagger.v3.oas.models.Operation;
 import io.swagger.v3.oas.models.PathItem;
+import io.swagger.v3.oas.models.headers.Header;
 import io.swagger.v3.oas.models.info.Info;
 import io.swagger.v3.oas.models.media.ArraySchema;
 import io.swagger.v3.oas.models.media.Content;
@@ -19,6 +20,7 @@ import java.util.function.Consumer;
 import org.springdoc.core.customizers.OpenApiCustomizer;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 
 /** OpenAPI 3.1 文書へ全 API が共有する schema と response を登録する。 */
@@ -53,7 +55,15 @@ public class OpenApiConfig {
             .addSchemas("ValidationProblem", validationProblemSchema())
             .addResponses(
                 "BadRequestProblem", problemResponse("要求の形式または入力値が正しくない", "ValidationProblem"))
-            .addResponses("UnauthorizedProblem", problemResponse("認証されていない", PROBLEM_DETAIL))
+            .addResponses(
+                "UnauthorizedProblem",
+                problemResponse("認証されていない", PROBLEM_DETAIL)
+                    .addHeaderObject(
+                        HttpHeaders.WWW_AUTHENTICATE,
+                        new Header()
+                            .required(true)
+                            .description("認証の challenge。ブラウザの Cookie セッションを表す独自 scheme（ADR-059）")
+                            .schema(new StringSchema().example("Session realm=\"demo\""))))
             .addResponses("ForbiddenProblem", problemResponse("操作の権限がない", PROBLEM_DETAIL))
             .addResponses("NotFoundProblem", problemResponse("対象のリソースが存在しない", PROBLEM_DETAIL))
             .addResponses("ConflictProblem", problemResponse("リソースの現在の状態と競合する", PROBLEM_DETAIL))

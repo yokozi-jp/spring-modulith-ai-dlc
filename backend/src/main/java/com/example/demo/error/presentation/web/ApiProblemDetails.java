@@ -38,6 +38,13 @@ final class ApiProblemDetails {
   /** VALIDATION_ERROR_TYPE の拡張メンバーで、入力検証の誤りを入れる（ADR-058）。 */
   /* package */ static final String ERRORS = "errors";
 
+  /**
+   * 401 の WWW-Authenticate に入れる challenge（RFC 9110 §15.5.2）。
+   *
+   * <p>Cookie セッションに合う登録済み scheme がないため、独自の Session scheme にする（ADR-059）。
+   */
+  /* package */ static final String WWW_AUTHENTICATE_CHALLENGE = "Session realm=\"demo\"";
+
   /** クライアントとテストが安定するよう、errors を pointer、detail の順に並べる。 */
   private static final Comparator<ValidationError> ERROR_ORDER =
       Comparator.comparing(ValidationError::pointer).thenComparing(ValidationError::detail);
@@ -164,13 +171,20 @@ final class ApiProblemDetails {
     return violations == null ? Set.of() : violations;
   }
 
-  /** 元の Vary を保ち、Problem Details の media type と選択言語を応答ヘッダへ設定する。 */
+  /**
+   * 元の Vary を保ち、Problem Details の media type と選択言語を応答ヘッダへ設定する。
+   *
+   * <p>401 には WWW_AUTHENTICATE_CHALLENGE を付ける。
+   */
   /* package */ static HttpHeaders responseHeaders(
-      final HttpHeaders original, final Locale locale) {
+      final HttpHeaders original, final HttpStatusCode status, final Locale locale) {
     final HttpHeaders headers = new HttpHeaders();
     headers.putAll(original);
     headers.setContentType(MediaType.APPLICATION_PROBLEM_JSON);
     headers.setContentLanguage(locale);
+    if (status.value() == HttpStatus.UNAUTHORIZED.value()) {
+      headers.set(HttpHeaders.WWW_AUTHENTICATE, WWW_AUTHENTICATE_CHALLENGE);
+    }
     final List<String> vary = new ArrayList<>(headers.getVary());
     if (vary.stream()
         .noneMatch(

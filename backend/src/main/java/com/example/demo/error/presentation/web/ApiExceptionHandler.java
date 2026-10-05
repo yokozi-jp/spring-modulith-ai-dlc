@@ -146,7 +146,7 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
       problemDetails.normalize(problem, status, locale);
     }
     return super.createResponseEntity(
-        body, ApiProblemDetails.responseHeaders(headers, locale), status, request);
+        body, ApiProblemDetails.responseHeaders(headers, status, locale), status, request);
   }
 
   private @Nullable ResponseEntity<Object> problem(

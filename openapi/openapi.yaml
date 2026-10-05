@@ -45,6 +45,13 @@ components:
           schema:
             $ref: "#/components/schemas/ProblemDetail"
       description: 認証されていない
+      headers:
+        WWW-Authenticate:
+          description: 認証の challenge。ブラウザの Cookie セッションを表す独自 scheme（ADR-059）
+          required: true
+          schema:
+            type: string
+            example: Session realm="demo"
     UnprocessableContentProblem:
       content:
         application/problem+json:

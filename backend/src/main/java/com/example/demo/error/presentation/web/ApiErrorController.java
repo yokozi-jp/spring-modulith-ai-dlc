@@ -38,7 +38,7 @@ public class ApiErrorController implements ErrorController {
     final HttpStatus status = resolveStatus(statusAttribute);
     final Locale locale = LocaleSupport.resolve(request);
     return ResponseEntity.status(status)
-        .headers(ApiProblemDetails.responseHeaders(new HttpHeaders(), locale))
+        .headers(ApiProblemDetails.responseHeaders(new HttpHeaders(), status, locale))
         .body(problemDetails.localizedForStatus(status, locale));
   }
 
