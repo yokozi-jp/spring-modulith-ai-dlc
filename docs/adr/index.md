@@ -59,3 +59,4 @@
 - [ADR-056: CI で OWASP ZAP による認証付きの DAST を実行する](ADR-056-run-authenticated-dast-with-zap-in-ci.md)（Proposed, 2026-10-04）
 - [ADR-057: E2E テストに Playwright と Chromium を採用し、テストデータを公開 API で作る](ADR-057-adopt-playwright-for-e2e-tests.md)（Proposed, 2026-10-04）
 - [ADR-058: problem type にパスを全部書いた相対 URI を使う](ADR-058-use-path-absolute-relative-uri-for-problem-types.md)（Accepted, 2026-10-04）
+- [ADR-059: 401 の WWW-Authenticate に独自の Session challenge を返す](ADR-059-send-a-session-challenge-in-www-authenticate-on-401.md)（Accepted, 2026-10-05）

@@ -16,6 +16,9 @@ tags: [convention, web-api, security, auth, future-arch-guidelines]
 ブラウザからの認証は[ADR-007](../adr/ADR-007-session-based-auth-with-oidc-pkce.md)に従い、OIDCのAuthorization Code Flow with PKCEでログインし、以降はセッションIDのCookieで認証する。
 アクセストークンはブラウザに渡さない。
 
+未認証のAPIリクエストには、401のProblem Detailsに`WWW-Authenticate: Session realm="demo"`を付けて返す。
+`Session`は登録されていない独自のschemeであり、選んだ理由は[ADR-059](../adr/ADR-059-send-a-session-challenge-in-www-authenticate-on-401.md)にある。
+
 ## ログアウト
 
 ログアウトでは、ADR-007に従ってアプリケーションのセッションを破棄し、IdPのSSOセッションを終了する。
