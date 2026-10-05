@@ -13,6 +13,11 @@ dist
 dist-ssr
 *.local
 
+# Playwright の成果物と認証状態。storageState はコミットせず、CI の artifact にも入れない。
+/playwright-report/
+/test-results/
+/e2e/.auth/
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
