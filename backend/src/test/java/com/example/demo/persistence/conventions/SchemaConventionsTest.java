@@ -40,6 +40,9 @@ class SchemaConventionsTest {
   /** 業務テーブル。 */
   private static final String TABLE = "m_item";
 
+  /** uuidの型名。 */
+  private static final String UUID = "uuid";
+
   /** bigintの型名。 */
   private static final String BIGINT = "bigint";
 
@@ -290,6 +293,76 @@ class SchemaConventionsTest {
                   SchemaTableConventions.columns(
                       List.of(column(ITEM, BIGINT, "b", "", "s", null)))))
           .containsExactly("T11 item.m_item.item_id");
+    }
+  }
+
+  /** uuidカラムのDEFAULT。 */
+  /* package */ @Nested
+  class UuidDefaultRulesTest {
+
+    @Test
+    @DisplayName("T13：uuidのDEFAULTにuuidv7()を使うと拒否する")
+    void rejectsUuidDefaultedByUuidv7() {
+      assertThat(
+              keys(
+                  SchemaTableConventions.columns(
+                      List.of(column(ITEM, UUID, "b", "", "", "uuidv7()")))))
+          .containsExactly("T13 item.m_item.item_id");
+    }
+
+    @Test
+    @DisplayName("T13：uuidのDEFAULTにgen_random_uuid()を使うと拒否する")
+    void rejectsUuidDefaultedByGenRandomUuid() {
+      assertThat(
+              keys(
+                  SchemaTableConventions.columns(
+                      List.of(column(ITEM, UUID, "b", "", "", "gen_random_uuid()")))))
+          .containsExactly("T13 item.m_item.item_id");
+    }
+
+    @Test
+    @DisplayName("T13：DEFAULTのないuuidを許可する")
+    void acceptsUuidWithoutDefault() {
+      assertThat(
+              keys(SchemaTableConventions.columns(List.of(column(ITEM, UUID, "b", "", "", null)))))
+          .isEmpty();
+    }
+
+    @Test
+    @DisplayName("T13：uuid以外のDEFAULTを許可する")
+    void acceptsNonUuidColumnWithDefault() {
+      assertThat(
+              keys(
+                  SchemaTableConventions.columns(
+                      List.of(
+                          column(
+                              ITEM,
+                              "character varying(10)",
+                              "b",
+                              "",
+                              "",
+                              "''::character varying")))))
+          .isEmpty();
+    }
+
+    @Test
+    @DisplayName("T13：イベント出版テーブルのuuidはDEFAULTの有無を問わず対象外にする")
+    void ignoresEventPublicationUuidColumns() {
+      assertThat(
+              SchemaTableConventions.columns(
+                  List.of(
+                      new ColumnRow(
+                          MODULITH,
+                          "event_publication",
+                          "id",
+                          "uuid",
+                          "b",
+                          "",
+                          "",
+                          "gen_random_uuid()"),
+                      new ColumnRow(
+                          MODULITH, "event_publication_archive", "id", UUID, "b", "", "", null))))
+          .isEmpty();
     }
 
     @Test

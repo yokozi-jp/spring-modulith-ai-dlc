@@ -6,6 +6,9 @@ import java.util.Optional;
 /** 注文の集約を保存し、取り出す。 */
 public interface OrderRepository {
 
+  /** 新しい注文の ID を採番する。 */
+  OrderId nextId();
+
   /** ID で注文を探す。 */
   Optional<Order> findById(OrderId id);
 

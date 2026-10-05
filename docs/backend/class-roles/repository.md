@@ -32,7 +32,7 @@ Presentation は Repository を使わない。
 
 - 集約と同じ `com.example.demo.<feature>.domain.model` に置く。
 - 名前は集約ルートの名前に `Repository` を付ける（`OrderRepository`）。
-- 1件の取り出しは `findById`、条件での取り出しは `findBy<条件>`、件数は `count<条件>`、新しい集約の保存は `add`、既存の集約の保存は `update` にする。
+- 1件の取り出しは `findById`、条件での取り出しは `findBy<条件>`、件数は `count<条件>`、新しい ID の採番は `nextId`、新しい集約の保存は `add`、既存の集約の保存は `update` にする。
   条件の名前は業務の語にする（`findByCustomer`、`countUnshippedByCustomer`）。
 - 実装は `infrastructure.persistence` の `Jooq<Aggregate>Repository` にする（`JooqOrderRepository`）。
 
@@ -40,6 +40,8 @@ Presentation は Repository を使わない。
 
 - `public interface` にし、アノテーションを付けない。
 - 引数と戻り値は、集約ルート、値オブジェクト、Java の標準型にする。
+- 主キーが UUID のテーブルの集約だけが、新しい集約の ID を `OrderId nextId()` で採番する。
+  実装は `infrastructure.persistence` の `Jooq<Aggregate>Repository` に置き、DB の DEFAULT では採番しない（[PostgreSQLの主キー](../../database/postgresql-primary-keys.md#uuidの採番)）。
 - 1件の取り出しは `Optional<集約ルート>` を、複数の取り出しは `List<集約ルート>` を返す。
 - 新しい集約の保存は `void add(集約ルート)` に、既存の集約の保存は `void update(集約ルート)` にする。
   新規と更新を一つの `save` にしない。
@@ -66,6 +68,9 @@ import java.util.Optional;
 /** 注文の集約を保存し、取り出す。 */
 public interface OrderRepository {
 
+  /** 新しい注文の ID を採番する。 */
+  OrderId nextId();
+
   /** ID で注文を探す。 */
   Optional<Order> findById(OrderId id);
 
@@ -87,6 +92,9 @@ public interface OrderRepository {
 ```java
 /** 注文の集約を保存し、取り出す。 */
 public interface OrderRepository {
+
+  /** 新しい注文の ID を採番する。 */
+  OrderId nextId();
 
   /** ID で注文を探す。 */
   Optional<Order> findById(OrderId id);
@@ -138,7 +146,7 @@ class JooqOrderRepositoryTest {
     final OrderRepository repository = new JooqOrderRepository(dsl, commonColumns);
     final Order order =
         Order.place(
-            OrderId.newId(),
+            repository.nextId(),
             new CustomerId("C-1"),
             List.of(
                 new OrderLine(
@@ -177,6 +185,7 @@ class JooqOrderRepositoryTest {
 - [ ] `domain.model` に置き、jOOQ、Spring、JPA、Jackson に依存しない。［ArchUnit で検査：PackageByFeatureOnionArchitectureTest.domainModelDoesNotDependOnFrameworks］
 - [ ] `application` とモジュールルートの型に依存しない。［ArchUnit で検査：PackageByFeatureOnionArchitectureTest.dependenciesPointInward］
 - [ ] 集約ルートごとに一つ、`<Aggregate>Repository` の名前で作る。［自分で点検］
+- [ ] 主キーが UUID のテーブルの集約では、`nextId()` を持つ。［自分で点検］
 - [ ] メソッドはドメインの語彙で名付け、`findById` は `Optional`、複数は `List` を返し、保存は新しい集約の `add` と既存の集約の `update` に分ける。［自分で点検］
 - [ ] `update` の Javadoc に、行がないときの `NoSuchElementException` と、競合したときの `<Aggregate>ConflictException` を書く。［自分で点検］
 - [ ] 実装は `infrastructure.persistence` の `Jooq<Aggregate>Repository` にする。［ArchUnit で検査：PackageByFeatureOnionArchitectureTest.repositoryImplementationsAreJooqRepositories］

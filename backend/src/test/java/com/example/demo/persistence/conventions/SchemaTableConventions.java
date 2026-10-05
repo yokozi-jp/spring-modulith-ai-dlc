@@ -11,7 +11,7 @@ import java.util.Map;
 import java.util.Set;
 
 /**
- * 業務テーブルの制約、インデックス、主キー、カラムの規則（O2、K1、K2、K3、K7、K8、K9、P1、P2、T1、T2、T11）を、カタログの行から判定する。
+ * 業務テーブルの制約、インデックス、主キー、カラムの規則（O2、K1、K2、K3、K7、K8、K9、P1、P2、T1、T2、T11、T13）を、カタログの行から判定する。
  *
  * <p>DBに接続しない純粋な関数である。各関数は{@link SchemaConventions#isBusinessSchema(String)}で業務スキーマの行だけを判定する。
  */
@@ -144,7 +144,7 @@ final class SchemaTableConventions {
   }
 
   /**
-   * T1、T2、T11：serial、IDENTITYの種類、生成列。
+   * T1、T2、T11、T13：serial、IDENTITYの種類、生成列、uuidのDEFAULT。
    *
    * @param rows カラム
    * @return 違反
@@ -178,7 +178,25 @@ final class SchemaTableConventions {
       if (!row.generated().isEmpty()) {
         violations.add(new ConventionViolation("T11", target, "生成列を使わない（" + DATA_TYPES_DOC + "）。"));
       }
+      uuidDefault(row, target, violations);
     }
     return violations;
+  }
+
+  /** T13：uuidのDEFAULT。 */
+  private static void uuidDefault(
+      final ColumnRow row, final String target, final List<ConventionViolation> violations) {
+    final String defaultExpression = row.defaultExpression();
+    if ("uuid".equals(row.typeName()) && defaultExpression != null) {
+      violations.add(
+          new ConventionViolation(
+              "T13",
+              target,
+              "uuidはアプリケーションでRepositoryのnextId()から採番し、DEFAULT（"
+                  + defaultExpression
+                  + "）を外す（"
+                  + PRIMARY_KEYS_DOC
+                  + "）。"));
+    }
   }
 }

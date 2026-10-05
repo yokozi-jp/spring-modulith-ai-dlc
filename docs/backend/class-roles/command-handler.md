@@ -37,7 +37,7 @@ CommandHandler は他モジュールから呼ばれない。
 - public メソッドは `public <UseCase>Result handle(final <UseCase>Command command)` の一つだけにする。
   `handle` に `@Transactional` を付け、クラスには付けない。
 - 依存は public のコンストラクタで受け取り、`private final` フィールドに持つ。
-- `handle` の中で、Command の標準型の値を値オブジェクトに変換する（`new OrderId(command.orderId())`）。
+- `handle` の中で、Command の標準型の値を値オブジェクトに変換する（`new OrderId(UUID.fromString(command.orderId()))`）。
 - 集約が見つからないときは、`.orElseThrow(() -> new NoSuchElementException("order not found: orderId=" + command.orderId()))` で `NoSuchElementException` を投げる。
 - 新しい集約は Repository の `add` で、状態を変えた既存の集約は `update` で、`handle` の中で保存する。
 - Command がロック番号を持つときは、`findById` の直後、状態を変える操作より前に `order.ensureLockNo(command.lockNo())` を呼ぶ。
@@ -110,14 +110,14 @@ public class CancelOrderCommandHandler {
   public CancelOrderResult handle(final CancelOrderCommand command) {
     final Order order =
         orderRepository
-            .findById(new OrderId(command.orderId()))
+            .findById(new OrderId(UUID.fromString(command.orderId())))
             .orElseThrow(
                 () -> new NoSuchElementException("order not found: orderId=" + command.orderId()));
     order.ensureLockNo(command.lockNo());
     order.cancel();
     orderRepository.update(order);
-    events.publishEvent(new OrderCancelled(order.id().value(), Instant.now(clock)));
-    return new CancelOrderResult(order.id().value());
+    events.publishEvent(new OrderCancelled(order.id().value().toString(), Instant.now(clock)));
+    return new CancelOrderResult(order.id().value().toString());
   }
 }
 ```
@@ -132,7 +132,7 @@ public PlaceOrderResult handle(final PlaceOrderCommand command) {
   final CustomerId customerId = new CustomerId(command.customerId());
   orderLimitPolicy.ensureCanPlace(customerId);
   final Order order =
-      Order.place(OrderId.newId(), customerId, toOrderLines(command.lines()), Instant.now(clock));
+      Order.place(orderRepository.nextId(), customerId, toOrderLines(command.lines()), Instant.now(clock));
   final CustomerMembership membership =
       customerQueries
           .findMembership(command.customerId())
@@ -143,8 +143,8 @@ public PlaceOrderResult handle(final PlaceOrderCommand command) {
   order.applyDiscount(discountPolicy.discountFor(rank, order.subtotal()));
   orderRepository.add(order);
   events.publishEvent(
-      new OrderPlaced(order.id().value(), order.customerId().value(), order.placedAt()));
-  return new PlaceOrderResult(order.id().value());
+      new OrderPlaced(order.id().value().toString(), order.customerId().value(), order.placedAt()));
+  return new PlaceOrderResult(order.id().value().toString());
 }
 
 /** 商品の価格を参照し、Command の明細を明細番号付きの Entity に変換する。 */
@@ -181,8 +181,8 @@ private List<OrderLine> toOrderLines(final List<PlaceOrderCommand.Line> commandL
 order.ensureLockNo(command.lockNo());
 order.confirm();
 orderRepository.update(order);
-events.publishEvent(new OrderConfirmed(order.id().value(), Instant.now(clock)));
-return new ConfirmOrderResult(order.id().value());
+events.publishEvent(new OrderConfirmed(order.id().value().toString(), Instant.now(clock)));
+return new ConfirmOrderResult(order.id().value().toString());
 ```
 
 `ChargeOrderCommandHandler` は、`OrderConfirmedListener` から呼ばれ、確定した注文の代金を請求する（抜粋）。
@@ -195,16 +195,16 @@ return new ConfirmOrderResult(order.id().value());
 public ChargeOrderResult handle(final ChargeOrderCommand command) {
   final Order order =
       orderRepository
-          .findById(new OrderId(command.orderId()))
+          .findById(new OrderId(UUID.fromString(command.orderId())))
           .orElseThrow(
               () -> new NoSuchElementException("order not found: orderId=" + command.orderId()));
   if (order.isPaid()) {
-    return new ChargeOrderResult(order.id().value());
+    return new ChargeOrderResult(order.id().value().toString());
   }
   paymentGateway.charge(order.id(), order.total());
   order.markPaid();
   orderRepository.update(order);
-  return new ChargeOrderResult(order.id().value());
+  return new ChargeOrderResult(order.id().value().toString());
 }
 ```
 
@@ -233,14 +233,14 @@ class CancelOrderCommandHandlerTest {
   void cancelsPlacedOrderAndPublishesEvent(final Scenario scenario) {
     final Order order =
         Order.place(
-            OrderId.newId(),
+            orderRepository.nextId(),
             new CustomerId("C-1"),
             List.of(
                 new OrderLine(
                     1, new ProductCode("P-1"), new Quantity(1), new Money(new BigDecimal("500")))),
             Instant.parse("2026-10-03T00:00:00Z"));
     orderRepository.add(order);
-    final String orderId = order.id().value();
+    final String orderId = order.id().value().toString();
 
     scenario
         .stimulate(() -> cancelOrder.handle(new CancelOrderCommand(orderId, order.lockNo())))

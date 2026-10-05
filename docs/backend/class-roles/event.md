@@ -83,8 +83,8 @@ public record OrderPlaced(String orderId, String customerId, Instant placedAt) {
 // com.example.demo.order.application.PlaceOrderCommandHandler（抜粋）
 orderRepository.add(order);
 events.publishEvent(
-    new OrderPlaced(order.id().value(), order.customerId().value(), order.placedAt()));
-return new PlaceOrderResult(order.id().value());
+    new OrderPlaced(order.id().value().toString(), order.customerId().value(), order.placedAt()));
+return new PlaceOrderResult(order.id().value().toString());
 ```
 
 受信は、在庫モジュールの `OrderPlacedListener` が行い、自モジュールの CommandHandler を一つ呼ぶ。

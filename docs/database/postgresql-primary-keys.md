@@ -1,7 +1,7 @@
 ---
 type: Convention
 title: PostgreSQLの主キー
-description: サロゲートキーとナチュラルキーの選び方、複合主キーの扱い、連番とUUID v7の使い分け、公開用IDの持ち方を定める規約。テーブルの主キーを決めるとき、IDをURLやAPIに出すときに読む。
+description: サロゲートキーとナチュラルキーの選び方、複合主キーの扱い、連番とUUID v7の使い分け、UUIDの採番、公開用IDの持ち方を定める規約。テーブルの主キーを決めるとき、IDをURLやAPIに出すときに読む。
 tags: [convention, database, postgresql, primary-key, uuid, future-arch-guidelines]
 ---
 
@@ -43,20 +43,41 @@ Spring Modulithのイベント出版テーブルのように、フレームワ�
 ## 連番とUUID
 
 - **連番**：`bigint`のIDENTITY列でDBが採番する。64ビットで済むが、採番がDBに集中し、値から事業規模を推測されうる。
-- **UUID v7**：時刻順に並ぶUUID。アプリケーションで採番でき、PostgreSQL 18では`uuidv7()`でも採番できる。128ビットになるが、DBへアクセスせずにキーを確定できる。
+- **UUID v7**：時刻順に並ぶUUID。アプリケーションで採番でき、DBへアクセスせずにキーを確定できる。128ビットになる。PostgreSQL 18には`uuidv7()`があるが、このリポジトリでは使わない。
 
 単一のDBまたはDBクラスタを前提にする場合は、連番を使う。
 将来シャーディングを前提にする場合は、UUID v7を使う。
 生成順とソート順が一致せずB-treeへの挿入効率が下がるため、UUID v1とv4は主キーに使わない。
-UUID v7の採番方法と機械検査は、UUIDを主キーにするテーブルがまだないため決めておらず、最初のテーブルを作るときに決める。
 
 IDENTITY列の定義は[PostgreSQLのデータ型](postgresql-data-types.md#identity列)に従う。
+
+## UUIDの採番
+
+UUIDの採番はアプリケーションで行い、DBでは行わない。
+`uuid`カラムに`DEFAULT`を付けず、`uuidv7()`と`gen_random_uuid()`を使わない。
+主キーの次の値はRepositoryの`nextId()`から得る。
+インタフェースは`domain.model`に、実装は`infrastructure.persistence`の`Jooq<Aggregate>Repository`に置く。
+Javaの型は`java.util.UUID`にし、`String`にしない。
+jOOQは`uuid`を`UUID`に対応づける。
+
+`uuid`カラムの`DEFAULT`は、`SchemaConventionsTest`と`SchemaInspectionTest`が使う`SchemaTableConventions.columns`（規則T13）が検査する。
+Spring Modulithのイベント出版テーブルは対象にしない。
+
+UUID v7の生成方法（時刻と乱数の取り方、JDK 26の`UUID.ofEpochMillis`を使うか、同じミリ秒内の順序）は決めていない。
+UUID v7を主キーにする最初のテーブルを作るときに決める。
+理由は[ADR-058](../adr/ADR-058-generate-uuid-primary-keys-in-application.md)に示す。
 
 ## 公開用ID
 
 インターネットに公開するURLやAPIに連番を出さない。
 連番の主キーとは別に`public_id`のカラムを作ってUUIDを格納し、ユニークインデックスを張る。
 URLにはUUIDをBase64などで短く変換した値を使ってよい。
+
+`public_id`はUUID v4とし、集約を作るDomainのファクトリで`UUID.randomUUID()`により採番して、値オブジェクト（たとえば`OrderPublicId`）で包む。
+`public_id`は主キーではないカラムなので、v4でよい。
+UUID v7は作成時刻が値に含まれて見えるため、公開用IDに使わない（[RFC 9562](https://www.rfc-editor.org/rfc/rfc9562.html)）。
+テストは値を固定せず、nullでないことと`version()`が4であることを確かめる。
+値を外から渡すオーバーロードは作らない。
 
 ## 出典
 
