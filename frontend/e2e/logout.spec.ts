@@ -36,6 +36,13 @@ async function expectAuthenticatedHome(page: Page): Promise<void> {
 
 // 未認証の /api/** を browser の context で呼ぶと、Spring Security がその要求を新しいセッションに保存し、
 // 次のログイン後に /api/missing?continue へ戻してしまう。そのため 401 は Cookie を共有しない request で確かめる。
+async function replayedApiStatus(request: APIRequestContext, session: string): Promise<number> {
+  const response = await request.get("/api/missing", {
+    headers: { Cookie: `APP_SESSION=${session}` },
+  });
+  return response.status();
+}
+
 async function expectApplicationSessionEnded(
   context: BrowserContext,
   request: APIRequestContext,
@@ -45,10 +52,7 @@ async function expectApplicationSessionEnded(
   const cookies = await context.cookies();
   expect(cookies.map(({ name }) => name)).not.toContain("APP_SESSION");
   // ログアウト前の APP_SESSION を送り直しても、サーバ側のセッションが消えていれば 401 になる。
-  const replayed = await request.get("/api/missing", {
-    headers: { Cookie: `APP_SESSION=${oldSession}` },
-  });
-  expect(replayed.status()).toBe(401);
+  expect(await replayedApiStatus(request, oldSession)).toBe(401);
 }
 
 async function expectLoggedOutPage(page: Page): Promise<void> {
@@ -121,6 +125,8 @@ test("ログアウト後はアプリと SSO のセッションが終わり、も
 }) => {
   await logIn(page);
   const oldSession = await cookieValue(context, "APP_SESSION");
+  // 再送の経路が Cookie を届けていることを、ログアウト前に同じ経路で示す。
+  expect(await replayedApiStatus(request, oldSession)).toBe(404);
   await logoutButton(page).click();
   await expectLoggedOutPage(page);
   await expectApplicationSessionEnded(context, request, oldSession);
