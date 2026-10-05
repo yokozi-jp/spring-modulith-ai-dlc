@@ -1,8 +1,8 @@
 package com.example.demo.shared.infrastructure.persistence;
 
+import com.example.demo.shared.concurrency.ConflictException;
 import com.google.errorprone.annotations.CheckReturnValue;
 import java.util.NoSuchElementException;
-import java.util.function.BiFunction;
 import java.util.function.Consumer;
 import org.jooq.Condition;
 import org.jooq.DSLContext;
@@ -10,7 +10,6 @@ import org.jooq.Field;
 import org.jooq.Query;
 import org.jooq.Record;
 import org.jooq.Table;
-import org.jspecify.annotations.Nullable;
 import org.springframework.dao.CannotAcquireLockException;
 import org.springframework.stereotype.Component;
 
@@ -66,21 +65,19 @@ public class TableWriter {
    * @param byPrimaryKey 主キーで 1 行を特定する条件。{@code lock_no} の条件は含めない
    * @param expectedLockNo 以前に読んだ集約ルートの版
    * @param businessColumns 業務の列の値を {@link ColumnValues} に登録する
-   * @param conflict 競合の例外をメッセージと原因から作る関数（例：{@code OrderConflictException::new}）
    * @return 子の行を更新、削除する {@link LockedRoot}
    * @throws IllegalArgumentException {@code expectedLockNo} が 1 未満の場合、テーブルに {@code lock_no}（{@code
    *     Long}）がない場合、業務の列に共通カラムを渡した場合
    * @throws NoSuchElementException 更新件数が 0 で、主キーの行がない場合
-   * @throws RuntimeException 更新件数が 0 で主キーの行がある場合と、行ロックを {@code lock_timeout} までに取れない場合。{@code
-   *     conflict} が作った例外で、後者は {@link CannotAcquireLockException} を原因に持つ
+   * @throws ConflictException 更新件数が 0 で主キーの行がある場合と、行ロックを {@code lock_timeout} までに取れない場合。後者は {@link
+   *     CannotAcquireLockException} を原因に持つ
    * @throws IllegalStateException 更新件数が 2 以上の場合。主キーの条件が 1 行を特定していない
    */
   public <R extends Record> LockedRoot updateCheckingVersion(
       final Table<R> table,
       final Condition byPrimaryKey,
       final long expectedLockNo,
-      final Consumer<ColumnValues<R>> businessColumns,
-      final BiFunction<String, @Nullable Throwable, ? extends RuntimeException> conflict) {
+      final Consumer<ColumnValues<R>> businessColumns) {
     final Field<Long> lockNo = versionOf(table, expectedLockNo);
     final Query update =
         dsl.update(table)
@@ -88,7 +85,7 @@ public class TableWriter {
             .set(commonColumns.forUpdate(table))
             .set(lockNo, Math.addExact(expectedLockNo, 1))
             .where(byPrimaryKey.and(lockNo.eq(expectedLockNo)));
-    requireOneRow(update, table, byPrimaryKey, expectedLockNo, conflict);
+    requireOneRow(update, table, byPrimaryKey, expectedLockNo);
     return new LockedRoot(this);
   }
 
@@ -100,27 +97,22 @@ public class TableWriter {
    * @param table 集約ルートのテーブル
    * @param byPrimaryKey 主キーで 1 行を特定する条件。{@code lock_no} の条件は含めない
    * @param expectedLockNo 以前に読んだ集約ルートの版
-   * @param conflict 競合の例外をメッセージと原因から作る関数（例：{@code OrderConflictException::new}）
    * @return 子の行を削除する {@link DeletedRoot}
    * @throws IllegalArgumentException {@code expectedLockNo} が 1 未満の場合、テーブルに {@code lock_no}（{@code
    *     Long}）がない場合
    * @throws NoSuchElementException 削除件数が 0 で、主キーの行がない場合
-   * @throws RuntimeException 削除件数が 0 で主キーの行がある場合と、行ロックを {@code lock_timeout} までに取れない場合。{@code
-   *     conflict} が作った例外で、後者は {@link CannotAcquireLockException} を原因に持つ
+   * @throws ConflictException 削除件数が 0 で主キーの行がある場合と、行ロックを {@code lock_timeout} までに取れない場合。後者は {@link
+   *     CannotAcquireLockException} を原因に持つ
    * @throws IllegalStateException 削除件数が 2 以上の場合。主キーの条件が 1 行を特定していない
    */
   public <R extends Record> DeletedRoot deleteCheckingVersion(
-      final Table<R> table,
-      final Condition byPrimaryKey,
-      final long expectedLockNo,
-      final BiFunction<String, @Nullable Throwable, ? extends RuntimeException> conflict) {
+      final Table<R> table, final Condition byPrimaryKey, final long expectedLockNo) {
     final Field<Long> lockNo = versionOf(table, expectedLockNo);
     requireOneRow(
         dsl.deleteFrom(table).where(byPrimaryKey.and(lockNo.eq(expectedLockNo))),
         table,
         byPrimaryKey,
-        expectedLockNo,
-        conflict);
+        expectedLockNo);
     return new DeletedRoot(this);
   }
 
@@ -198,13 +190,12 @@ public class TableWriter {
       final Query query,
       final Table<?> table,
       final Condition byPrimaryKey,
-      final long expectedLockNo,
-      final BiFunction<String, @Nullable Throwable, ? extends RuntimeException> conflict) {
+      final long expectedLockNo) {
     final int changed;
     try {
       changed = query.execute();
     } catch (final CannotAcquireLockException e) {
-      throw conflict.apply(
+      throw new ConflictException(
           "row is locked by another request: " + target(table, byPrimaryKey, expectedLockNo), e);
     }
     if (changed == ONE_ROW) {
@@ -218,7 +209,7 @@ public class TableWriter {
     if (!dsl.fetchExists(table, byPrimaryKey)) {
       throw new NoSuchElementException("row not found: " + target);
     }
-    throw conflict.apply("row was updated by another request: " + target, null);
+    throw new ConflictException("row was updated by another request: " + target);
   }
 
   /** 条件のバインド値を返す。例外のメッセージに SQL を入れず、キーの値だけを入れるために使う。 */

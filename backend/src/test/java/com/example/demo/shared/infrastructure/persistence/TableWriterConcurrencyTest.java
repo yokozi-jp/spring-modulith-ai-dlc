@@ -4,7 +4,7 @@ import static com.example.demo.jooq.tables.FixtureItemTable.FIXTURE_ITEM;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import com.example.demo.shared.infrastructure.persistence.TableWriterTest.ItemConflictException;
+import com.example.demo.shared.concurrency.ConflictException;
 import com.example.demo.testkit.DatabaseTest;
 import com.example.demo.testkit.FixtureTablesExtension;
 import java.sql.Connection;
@@ -95,7 +95,7 @@ class TableWriterConcurrencyTest {
           watcher.submit(() -> commitWhenAnotherSessionWaits(sessionB));
 
       assertThatThrownBy(() -> inUseCase(() -> updateItem(1L)))
-          .isInstanceOf(ItemConflictException.class)
+          .isInstanceOf(ConflictException.class)
           .hasMessageContaining("row was updated by another request")
           .hasNoCause();
       assertThat(committed.get(WAIT_LIMIT.toMillis(), TimeUnit.MILLISECONDS))
@@ -118,7 +118,7 @@ class TableWriterConcurrencyTest {
       updateInSessionB(sessionB);
 
       assertThatThrownBy(() -> inUseCase(() -> updateItem(1L)))
-          .isInstanceOf(ItemConflictException.class)
+          .isInstanceOf(ConflictException.class)
           .hasMessageContaining("row is locked by another request")
           .hasCauseInstanceOf(CannotAcquireLockException.class);
       sessionB.rollback();
@@ -205,8 +205,7 @@ class TableWriterConcurrencyTest {
         FIXTURE_ITEM,
         FIXTURE_ITEM.ITEM_ID.eq(ITEM_ID),
         expectedLockNo,
-        set -> set.set(FIXTURE_ITEM.ITEM_NAME, "A"),
-        ItemConflictException::new);
+        set -> set.set(FIXTURE_ITEM.ITEM_NAME, "A"));
   }
 
   /** ユースケースの呼び出しの中として、pgm_cd を束縛して実行する。 */

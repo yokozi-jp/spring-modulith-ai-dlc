@@ -1,6 +1,7 @@
 package com.example.demo.error.presentation.web;
 
 import com.example.demo.LocaleSupport;
+import com.example.demo.shared.concurrency.ConflictException;
 import jakarta.servlet.http.HttpServletRequest;
 import java.util.Locale;
 import java.util.Objects;
@@ -20,7 +21,7 @@ import org.springframework.web.context.request.ServletWebRequest;
 import org.springframework.web.context.request.WebRequest;
 import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExceptionHandler;
 
-/** Spring MVC と Spring Security の例外を RFC 9457 Problem Details へ変換する。 */
+/** Spring MVC と Spring Security の例外、楽観的ロックの競合を RFC 9457 Problem Details へ変換する。 */
 @Slf4j
 @RestControllerAdvice
 public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
@@ -57,6 +58,25 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
             ApiProblemDetails.forStatus(HttpStatus.FORBIDDEN),
             new HttpHeaders(),
             HttpStatus.FORBIDDEN,
+            request));
+  }
+
+  /**
+   * 楽観的ロックの競合を 409 Problem Details へ変換する。
+   *
+   * <p>クライアントが読み直して再送できる想定内の 4xx なので、ERROR にせず INFO で残す。WARN 以上は起動時と Collector
+   * の障害用のロググループにも出るため使わない。 例外の内容は応答に入れない。
+   */
+  @ExceptionHandler(ConflictException.class)
+  /* package */ ResponseEntity<Object> handleConflictException(
+      final ConflictException exception, final WebRequest request) {
+    log.atInfo().setCause(exception).log("Optimistic lock conflict");
+    return Objects.requireNonNull(
+        handleExceptionInternal(
+            exception,
+            ApiProblemDetails.forStatus(HttpStatus.CONFLICT),
+            new HttpHeaders(),
+            HttpStatus.CONFLICT,
             request));
   }
 

@@ -274,6 +274,8 @@ class ClassRoleArchTest {
     return classes()
         .that(
             resideInAPackage(basePackage + ".*..")
+                .and(
+                    DescribedPredicate.not(resideInAPackage(basePackage + ".shared.concurrency..")))
                 .and(simpleNameEndingWith("Command").or(simpleNameEndingWith("Result"))))
         .should()
         .beRecords()

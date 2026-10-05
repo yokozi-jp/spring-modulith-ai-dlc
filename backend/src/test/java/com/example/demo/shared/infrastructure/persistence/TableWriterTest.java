@@ -5,9 +5,9 @@ import static com.example.demo.jooq.tables.FixtureItemTable.FIXTURE_ITEM;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import com.example.demo.shared.concurrency.ConflictException;
 import com.example.demo.testkit.DatabaseTest;
 import com.example.demo.testkit.FixtureTablesExtension;
-import java.io.Serial;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
@@ -22,7 +22,6 @@ import org.jooq.DSLContext;
 import org.jooq.Record;
 import org.jooq.Table;
 import org.jooq.impl.DSL;
-import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -99,12 +98,7 @@ class TableWriterTest {
 
     inUseCase(
         () ->
-            writer.updateCheckingVersion(
-                FIXTURE_ITEM,
-                FIXTURE_ITEM.ITEM_ID.eq(1L),
-                1L,
-                set -> {},
-                ItemConflictException::new));
+            writer.updateCheckingVersion(FIXTURE_ITEM, FIXTURE_ITEM.ITEM_ID.eq(1L), 1L, set -> {}));
 
     assertThat(item(1L).get(FIXTURE_ITEM.LOCK_NO)).isEqualTo(2L);
     assertThat(item(1L).get(FIXTURE_ITEM.UPDATED_AT)).isEqualTo(NOW);
@@ -117,7 +111,7 @@ class TableWriterTest {
     makeStale(1L);
 
     assertThatThrownBy(() -> inUseCase(() -> updateItem(1L, 1L, "after")))
-        .isInstanceOf(ItemConflictException.class)
+        .isInstanceOf(ConflictException.class)
         .hasMessageContaining("table=t_fixture_item")
         .hasMessageContaining("key=[1]")
         .hasMessageContaining("expectedLockNo=1")
@@ -147,8 +141,7 @@ class TableWriterTest {
                             FIXTURE_ITEM,
                             FIXTURE_ITEM.ITEM_ID.in(1L, 2L),
                             1L,
-                            set -> set.set(FIXTURE_ITEM.ITEM_NAME, "x"),
-                            ItemConflictException::new)))
+                            set -> set.set(FIXTURE_ITEM.ITEM_NAME, "x"))))
         .isInstanceOf(IllegalStateException.class)
         .hasMessageContaining("matched 2 rows");
   }
@@ -180,16 +173,11 @@ class TableWriterTest {
   void tableWithoutLockNoIsRejected() {
     final Condition anyRow = DSL.trueCondition();
 
-    assertThatThrownBy(
-            () ->
-                writer.updateCheckingVersion(
-                    NO_LOCK_TABLE, anyRow, 1L, set -> {}, ItemConflictException::new))
+    assertThatThrownBy(() -> writer.updateCheckingVersion(NO_LOCK_TABLE, anyRow, 1L, set -> {}))
         .as("updateCheckingVersion")
         .isInstanceOf(IllegalArgumentException.class)
         .hasMessageContaining("column=lock_no");
-    assertThatThrownBy(
-            () ->
-                writer.deleteCheckingVersion(NO_LOCK_TABLE, anyRow, 1L, ItemConflictException::new))
+    assertThatThrownBy(() -> writer.deleteCheckingVersion(NO_LOCK_TABLE, anyRow, 1L))
         .as("deleteCheckingVersion")
         .isInstanceOf(IllegalArgumentException.class)
         .hasMessageContaining("column=lock_no");
@@ -212,10 +200,7 @@ class TableWriterTest {
     assertThatThrownBy(
             () ->
                 writer.deleteCheckingVersion(
-                    FIXTURE_ITEM,
-                    FIXTURE_ITEM.ITEM_ID.eq(1L),
-                    expectedLockNo,
-                    ItemConflictException::new))
+                    FIXTURE_ITEM, FIXTURE_ITEM.ITEM_ID.eq(1L), expectedLockNo))
         .as("deleteCheckingVersion")
         .isInstanceOf(IllegalArgumentException.class)
         .hasMessageContaining("expectedLockNo=" + expectedLockNo);
@@ -331,8 +316,7 @@ class TableWriterTest {
     insertDetail(1L, 1, "one");
 
     writer
-        .deleteCheckingVersion(
-            FIXTURE_ITEM, FIXTURE_ITEM.ITEM_ID.eq(1L), 1L, ItemConflictException::new)
+        .deleteCheckingVersion(FIXTURE_ITEM, FIXTURE_ITEM.ITEM_ID.eq(1L), 1L)
         .deleteChildren(FIXTURE_ITEM_DETAIL, FIXTURE_ITEM_DETAIL.ITEM_ID.eq(1L));
 
     assertThat(dsl.fetchCount(FIXTURE_ITEM)).as("ルート").isZero();
@@ -346,16 +330,13 @@ class TableWriterTest {
     makeStale(1L);
 
     assertThatThrownBy(
-            () ->
-                writer.deleteCheckingVersion(
-                    FIXTURE_ITEM, FIXTURE_ITEM.ITEM_ID.eq(1L), 1L, ItemConflictException::new))
+            () -> writer.deleteCheckingVersion(FIXTURE_ITEM, FIXTURE_ITEM.ITEM_ID.eq(1L), 1L))
         .as("版の違い")
-        .isInstanceOf(ItemConflictException.class)
-        .hasMessageContaining("table=t_fixture_item");
+        .isInstanceOf(ConflictException.class)
+        .hasMessageContaining("table=t_fixture_item")
+        .hasNoCause();
     assertThatThrownBy(
-            () ->
-                writer.deleteCheckingVersion(
-                    FIXTURE_ITEM, FIXTURE_ITEM.ITEM_ID.eq(9L), 1L, ItemConflictException::new))
+            () -> writer.deleteCheckingVersion(FIXTURE_ITEM, FIXTURE_ITEM.ITEM_ID.eq(9L), 1L))
         .as("行がない")
         .isInstanceOf(NoSuchElementException.class);
     assertThat(dsl.fetchCount(FIXTURE_ITEM)).as("行は残る").isOne();
@@ -397,8 +378,7 @@ class TableWriterTest {
         FIXTURE_ITEM,
         FIXTURE_ITEM.ITEM_ID.eq(itemId),
         expectedLockNo,
-        set -> set.set(FIXTURE_ITEM.ITEM_NAME, name),
-        ItemConflictException::new);
+        set -> set.set(FIXTURE_ITEM.ITEM_NAME, name));
   }
 
   /** {@code lock_no = 1} の行を作る。 */
@@ -453,15 +433,5 @@ class TableWriterTest {
   /** ユースケースの呼び出しの中として、pgm_cd を束縛して戻り値のない処理を実行する。 */
   private static void runInUseCase(final Runnable call) {
     ScopedValue.where(PgmCdAspect.PGM_CD, PGM_CD).run(call);
-  }
-
-  /** 集約の競合の例外を模した、テストの例外。 */
-  /* package */ static final class ItemConflictException extends RuntimeException {
-
-    @Serial private static final long serialVersionUID = 1L;
-
-    /* package */ ItemConflictException(final String message, final @Nullable Throwable cause) {
-      super(message, cause);
-    }
   }
 }
