@@ -27,4 +27,11 @@ public final class CapturedLogRecords implements LogRecordProcessor {
                 record.getBodyValue() != null && body.equals(record.getBodyValue().asString()))
         .toList();
   }
+
+  /** 指定した instrumentation scope（logger 名）の LogRecord を返す。 */
+  public List<LogRecordData> withScope(final String scopeName) {
+    return records.stream()
+        .filter(record -> scopeName.equals(record.getInstrumentationScopeInfo().getName()))
+        .toList();
+  }
 }

@@ -22,6 +22,7 @@
                     "stringValue": "java.lang.IllegalStateException: order failed\n\tat com.example.demo.OrderService.create(OrderService.java:84)"
                   }
                 },
+                { "key": "http.response.status_code", "value": { "intValue": "500" } },
                 { "key": "user.email", "value": { "stringValue": "person@example.com" } },
                 { "key": "http.request.header.authorization", "value": { "stringValue": "Bearer secret-token" } }
               ]

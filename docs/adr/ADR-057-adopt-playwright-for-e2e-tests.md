@@ -75,7 +75,7 @@ E2E の CI は path filter 付きの非必須の check とする。
 ### Neutral
 
 - ログアウトを検証するテスト（#121）は、共有の `storageState` を使わず専用の browser context でログインする。
-- preview の CSP の `form-action` に IdP を足すかは #121 で判断する。
+- preview の CSP は、本番の配信点と同じく `form-action` に IdP の origin を含める（#121）。
 - 公開 API が増えた時点で、業務の流れのシナリオを追加する。
 
 ## Alternatives Considered

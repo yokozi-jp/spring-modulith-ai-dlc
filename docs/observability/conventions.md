@@ -76,7 +76,7 @@ Collector の設定（`docker/otel-collector/config.yaml`）は、ローカル�
 - **トレースとメトリクス**：加工しない。計装を追加して禁止値が入る属性が見つかった場合は、transform で消す。
 
 ログに属性を追加するときは、Collector の `keep_keys` とこの文書の許可する値を同じ変更で直す。
-現在の `keep_keys` は、使っている `exception.type`、`exception.message`、`exception.stacktrace` だけを持つ。
+現在の `keep_keys` は、使っている `exception.type`、`exception.message`、`exception.stacktrace`、`http.response.status_code` だけを持つ。
 
 自由入力を正規表現でマスクする処理は Collector に置かない。
 表記ゆれによる取りこぼしと誤マスクが起きるため、検知は保存先のデータ保護ポリシーで行う。

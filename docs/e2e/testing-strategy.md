@@ -23,6 +23,7 @@ E2E テストは、複数画面にまたがる主要な利用者の流れだけ�
 
 `frontend/e2e/` に、ログインを行う `*.setup.ts` とシナリオの `*.spec.ts` を置く。
 `frontend/e2e/environment.ts` は、ログイン情報をルートの `.env.test` から読み、`storageState` のパスを決める。
+Keycloak の画面でログインする手順（`signInOnKeycloak`）も持ち、setup とログアウトの spec が共有する。
 `frontend/playwright.config.ts` の設定は次のとおりである。
 
 | 項目              | 値                                                                                  |

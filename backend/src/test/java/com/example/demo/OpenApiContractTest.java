@@ -61,7 +61,16 @@ class OpenApiContractTest {
         .andExpect(problemResponseExists("NotFoundProblem"))
         .andExpect(problemResponseExists("ConflictProblem"))
         .andExpect(problemResponseExists("UnprocessableContentProblem"))
-        .andExpect(problemResponseExists("InternalServerErrorProblem"));
+        .andExpect(problemResponseExists("InternalServerErrorProblem"))
+        .andExpect(
+            jsonPath(
+                    "$.components.responses.BadRequestProblem.content['application/problem+json'].schema['$ref']")
+                .value("#/components/schemas/ValidationProblem"))
+        .andExpect(jsonPath("$.components.schemas.ValidationProblem").exists())
+        .andExpect(jsonPath("$.components.schemas.ValidationError").exists())
+        .andExpect(
+            jsonPath("$.components.schemas.ProblemDetail.properties.type.format")
+                .value("uri-reference"));
 
     exportWhenRequested();
   }

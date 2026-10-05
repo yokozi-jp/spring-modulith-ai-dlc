@@ -90,6 +90,22 @@ describe("Vite configuration", { timeout: 60_000 }, () => {
     expect(config.preview.headers?.["Content-Security-Policy"]).toBe(contentSecurityPolicy);
   });
 
+  it("allows only the IdP origin besides self in the production and preview form-action", async () => {
+    vi.stubEnv("OIDC_ISSUER_URI", "http://localhost:18181/realms/x");
+    const config = await resolveConfig({}, "build", "production");
+    const contentSecurityPolicy = config.server.headers?.["Content-Security-Policy"];
+    if (typeof contentSecurityPolicy !== "string") {
+      throw new TypeError("Production CSP header not configured");
+    }
+
+    const formAction = contentSecurityPolicy
+      .split(";")
+      .map((directive) => directive.trim())
+      .find((directive) => directive.startsWith("form-action"));
+    expect(formAction).toBe("form-action 'self' http://localhost:18181");
+    expect(config.preview.headers?.["Content-Security-Policy"]).toBe(contentSecurityPolicy);
+  });
+
   it("serves preview on the pinned origin with the development proxy", async () => {
     vi.stubEnv("SERVER_PORT", "19091");
     const config = await resolveConfig({ mode: "test" }, "serve", "production", "production", true);

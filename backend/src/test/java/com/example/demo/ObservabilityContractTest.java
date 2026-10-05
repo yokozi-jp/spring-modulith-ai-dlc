@@ -8,12 +8,15 @@ import com.example.demo.testkit.CapturedLogRecords;
 import com.example.demo.testkit.SharedTestConfiguration;
 import io.micrometer.observation.Observation;
 import io.micrometer.observation.ObservationRegistry;
+import io.opentelemetry.api.OpenTelemetry;
 import io.opentelemetry.api.common.AttributeKey;
 import io.opentelemetry.api.common.Attributes;
+import io.opentelemetry.instrumentation.logback.appender.v1_0.OpenTelemetryAppender;
 import io.opentelemetry.sdk.logs.data.LogRecordData;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicReference;
 import lombok.extern.slf4j.Slf4j;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -36,6 +39,15 @@ class ObservabilityContractTest {
 
   /** OTLP へ送る直前の LogRecord。 */
   @Autowired private CapturedLogRecords capturedLogRecords;
+
+  /** このコンテキストの OpenTelemetry。 */
+  @Autowired private OpenTelemetry openTelemetry;
+
+  @BeforeEach
+  void installAppender() {
+    // 別のコンテキストが appender の送り先を差し替えていても、このコンテキストの記録を読む。
+    OpenTelemetryAppender.install(openTelemetry);
+  }
 
   @Test
   @DisplayName("span 内の JSON ログには trace ID と span ID が含まれる")

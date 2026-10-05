@@ -65,7 +65,7 @@ Spring Modulithのイベント出版テーブルは対象にしない。
 
 UUID v7の生成方法は決めていない。
 UUID v7を主キーにする最初のテーブルを作るときに決める。
-理由は[ADR-058](../adr/ADR-058-generate-uuid-primary-keys-in-application.md)に示す。
+理由は[ADR-060](../adr/ADR-060-generate-uuid-primary-keys-in-application.md)に示す。
 
 ## 公開用ID
 

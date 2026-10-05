@@ -1,11 +1,11 @@
 ---
 type: ADR
-title: 'ADR-058: UUID の採番をアプリケーションで行い、DB の DEFAULT で採番しない'
+title: 'ADR-060: UUID の採番をアプリケーションで行い、DB の DEFAULT で採番しない'
 description: UUID の採番をアプリケーションの Repository.nextId() で行い、uuid カラムの DEFAULT を禁止して機械で検査する決定。public_id は UUID v4、UUID v7 はシャーディングを前提にする主キーだけに使い、v7 の生成の実装は最初のテーブルを作るときに決める。
 tags: [adr, database, postgresql, backend]
 ---
 
-# ADR-058: UUID の採番をアプリケーションで行い、DB の DEFAULT で採番しない
+# ADR-060: UUID の採番をアプリケーションで行い、DB の DEFAULT で採番しない
 
 ## Status
 
