@@ -108,7 +108,7 @@ Problem Detailsの本文はZodで検証しない。
 遷移はerrorへの反応であり、loaderとcomponentの401を1か所で扱えるためである。
 扱いの詳細は[状態表示の分担](routing-and-state.md#状態表示の分担)にある。
 
-`problem.type`は本文の文字列のまま比べ、`new URL()`などで解決しない（[ADR-056](../adr/ADR-056-use-path-absolute-relative-uri-for-problem-types.md)）。
+`problem.type`は本文の文字列のまま比べ、`new URL()`などで解決しない（[ADR-058](../adr/ADR-058-use-path-absolute-relative-uri-for-problem-types.md)）。
 
 `X-XSRF-TOKEN` headerはまだ付けない。
 最初の更新系APIを足すPRで`apiFetch`に足す。
@@ -125,7 +125,7 @@ API responseをruntimeで検証する必要がある境界では、OpenAPIから
 - [フロントエンドのテストと検証](testing.md)
 - [ADR-024: Frontend API client生成にOrvalを採用する](../adr/ADR-024-adopt-orval-for-frontend-api-client.md)
 - [ADR-052: OpenAPI 契約をリポジトリにコミットし、生成物と破壊的変更を CI で検査する](../adr/ADR-052-commit-openapi-contract-and-check-generated-client.md)
-- [ADR-056: problem type にパスを全部書いた相対 URI を使う](../adr/ADR-056-use-path-absolute-relative-uri-for-problem-types.md)
+- [ADR-058: problem type にパスを全部書いた相対 URI を使う](../adr/ADR-058-use-path-absolute-relative-uri-for-problem-types.md)
 - [APIを変更する](../web-api/runbook-api-change.md)
 - [Orval: React Query](https://orval.dev/docs/guides/react-query/)
 - [Orval: Output configuration](https://orval.dev/docs/reference/configuration/output/)

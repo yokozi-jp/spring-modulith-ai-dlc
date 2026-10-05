@@ -23,7 +23,7 @@ rules:
         function: truthy
 
   problem-type-uri-reference:
-    description: Problem type は相対 URI を許す uri-reference にする（ADR-056）。
+    description: Problem type は相対 URI を許す uri-reference にする（ADR-058）。
     severity: error
     given: "$.components.schemas.ProblemDetail.properties.type"
     then:
@@ -175,7 +175,7 @@ rules:
           match: "^#/components/schemas/(ProblemDetail|ValidationProblem)$"
 
   bad-request-validation-problem:
-    description: 400 の共通 response は入力検証の ValidationProblem を返す（ADR-056）。
+    description: 400 の共通 response は入力検証の ValidationProblem を返す（ADR-058）。
     severity: error
     resolved: false
     given: "$.components.responses.BadRequestProblem.content['application/problem+json'].schema"

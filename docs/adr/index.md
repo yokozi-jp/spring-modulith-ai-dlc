@@ -58,4 +58,4 @@
 - [ADR-055: DB のロック待ち、文の実行、トランザクション中の待機の上限を接続ごとに設定する](ADR-055-set-db-time-limits-per-connection.md)（Proposed, 2026-10-03）
 - [ADR-056: CI で OWASP ZAP による認証付きの DAST を実行する](ADR-056-run-authenticated-dast-with-zap-in-ci.md)（Proposed, 2026-10-04）
 - [ADR-057: E2E テストに Playwright と Chromium を採用し、テストデータを公開 API で作る](ADR-057-adopt-playwright-for-e2e-tests.md)（Proposed, 2026-10-04）
-- [ADR-056: problem type にパスを全部書いた相対 URI を使う](ADR-056-use-path-absolute-relative-uri-for-problem-types.md)（Accepted, 2026-10-04）
+- [ADR-058: problem type にパスを全部書いた相対 URI を使う](ADR-058-use-path-absolute-relative-uri-for-problem-types.md)（Accepted, 2026-10-04）

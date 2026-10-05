@@ -1,11 +1,11 @@
 ---
 type: ADR
-title: 'ADR-056: problem type にパスを全部書いた相対 URI を使う'
+title: 'ADR-058: problem type にパスを全部書いた相対 URI を使う'
 description: 業務固有の problem type を /problems/<kebab-case> の相対 URI にし、入力検証エラーを /problems/validation-error と errors 拡張で返す決定。ADR-013 の HTTPS URI と URI 基点の先送りを上書きする。
 tags: [adr, backend, api, error, frontend]
 ---
 
-# ADR-056: problem type にパスを全部書いた相対 URI を使う
+# ADR-058: problem type にパスを全部書いた相対 URI を使う
 
 ## Status
 

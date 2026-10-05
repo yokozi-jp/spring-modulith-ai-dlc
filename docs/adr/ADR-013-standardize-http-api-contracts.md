@@ -47,13 +47,13 @@ JSON API は `/api` 配下へ置き、次の契約を適用する。
 - `about:blank` の Problem Details では、Spring MVC が例外から生成した `detail` を公開せず、`type`、ローカライズした `title`、`status` だけを返す。
 - 業務固有の problem type では、入力値と実装詳細を含まないことを確認して明示的に作成した `detail` だけを返す。
 - 業務固有の問題を初めて公開するときは、管理下にある安定した HTTPS URI を `type` に使い、その URI で意味、HTTP status、対処方法を文書化する。
-  URI の形は [ADR-056](ADR-056-use-path-absolute-relative-uri-for-problem-types.md) が変更し、パスを全部書いた相対 URI（`/problems/<kebab-case>`）を使う。
+  URI の形は [ADR-058](ADR-058-use-path-absolute-relative-uri-for-problem-types.md) が変更し、パスを全部書いた相対 URI（`/problems/<kebab-case>`）を使う。
 - `status` は実際の HTTP status と必ず一致させる。
 - `detail`、検証エラー、ログ相関情報にスタックトレース、SQL、秘密情報、存在確認に使える認可情報を含めない。
 - リクエスト追跡が必要な場合は、不透明な `traceId` 拡張を返す。
   `instance` は特定の失敗を識別する URI を用意できる場合だけ設定する。
 - 入力検証エラーは 400 とし、業務固有の `type` と `errors` 拡張を使う。
-  `type` は `/problems/validation-error` とする（[ADR-056](ADR-056-use-path-absolute-relative-uri-for-problem-types.md)）。
+  `type` は `/problems/validation-error` とする（[ADR-058](ADR-058-use-path-absolute-relative-uri-for-problem-types.md)）。
   各要素は `pointer` と `detail` を持ち、`pointer` は可能な限り JSON Pointer で入力位置を示す。
 
 ### 成功応答とページング
@@ -119,7 +119,7 @@ JSON API は `/api` 配下へ置き、次の契約を適用する。
 ### Neutral
 
 - カスタム problem type の URI 基点は、公開 API の管理ドメインが決まるまで確定しない。
-  [ADR-056](ADR-056-use-path-absolute-relative-uri-for-problem-types.md) で相対 URI にしたため、基点を決めずに済む。
+  [ADR-058](ADR-058-use-path-absolute-relative-uri-for-problem-types.md) で相対 URI にしたため、基点を決めずに済む。
 - API の互換性要件が変わった場合は、バージョニングの判断を ADR へ追加する。
   OpenAPI の差分検査は [ADR-052](ADR-052-commit-openapi-contract-and-check-generated-client.md) が定める。
 - 冪等性の保持期間は副作用とクライアントの再試行時間に依存するため、対象操作ごとに決める。
@@ -160,6 +160,6 @@ JSON API は `/api` 配下へ置き、次の契約を適用する。
 - [Zalando RESTful API Guidelines: Pagination](https://github.com/zalando/restful-api-guidelines/blob/main/chapters/pagination.adoc)
 - [Expired Internet-Draft: The Idempotency-Key HTTP Header Field](https://datatracker.ietf.org/doc/draft-ietf-httpapi-idempotency-key-header/)
 - [ADR-006](ADR-006-utc-instant-absolute-time-policy.md)
-- [ADR-056](ADR-056-use-path-absolute-relative-uri-for-problem-types.md)
+- [ADR-058](ADR-058-use-path-absolute-relative-uri-for-problem-types.md)
 - `backend/build.gradle`
 - `backend/src/main/resources/application.yaml`

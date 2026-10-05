@@ -32,10 +32,10 @@ final class ApiProblemDetails {
   /** RFC 9457 が一般的な HTTP エラーに定義する problem type。 */
   private static final URI ABOUT_BLANK = URI.create("about:blank");
 
-  /** 入力検証エラーの problem type。パスを全部書いた相対 URI（ADR-056、RFC 9457 §3.1.1）。 */
+  /** 入力検証エラーの problem type。パスを全部書いた相対 URI（ADR-058、RFC 9457 §3.1.1）。 */
   /* package */ static final URI VALIDATION_ERROR_TYPE = URI.create("/problems/validation-error");
 
-  /** VALIDATION_ERROR_TYPE の拡張メンバーで、入力検証の誤りを入れる（ADR-056）。 */
+  /** VALIDATION_ERROR_TYPE の拡張メンバーで、入力検証の誤りを入れる（ADR-058）。 */
   /* package */ static final String ERRORS = "errors";
 
   /** クライアントとテストが安定するよう、errors を pointer、detail の順に並べる。 */

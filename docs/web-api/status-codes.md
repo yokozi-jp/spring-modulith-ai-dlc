@@ -16,7 +16,7 @@ tags: [convention, web-api, http, future-arch-guidelines]
 エラー応答の本文はRFC 9457のProblem Detailsとし、`status`を実際のステータスコードと一致させる。
 この契約は[ADR-013](../adr/ADR-013-standardize-http-api-contracts.md)が定める。
 ステータス以上の意味がないproblemの`type`は`about:blank`にする。
-業務固有のproblem typeは、パスを全部書いた相対URI`/problems/<kebab-case>`にし、`title`をMessageSourceの`problem.title.<kebab-case>`で日本語と英語に解決する（[ADR-056](../adr/ADR-056-use-path-absolute-relative-uri-for-problem-types.md)）。
+業務固有のproblem typeは、パスを全部書いた相対URI`/problems/<kebab-case>`にし、`title`をMessageSourceの`problem.title.<kebab-case>`で日本語と英語に解決する（[ADR-058](../adr/ADR-058-use-path-absolute-relative-uri-for-problem-types.md)）。
 入力検証エラーは`/problems/validation-error`の400で、`errors`拡張に誤りのある入力のJSON Pointerと説明を入れる。
 OpenAPIへのエラー応答の付け方は[OpenAPIのアノテーションとJavadoc](openapi-annotations.md#エラー応答)に従う。
 
