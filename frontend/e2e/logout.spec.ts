@@ -1,4 +1,4 @@
-import type { BrowserContext, Locator, Page } from "@playwright/test";
+import type { APIRequestContext, BrowserContext, Locator, Page } from "@playwright/test";
 import { expect, test } from "@playwright/test";
 
 import { signInOnKeycloak } from "./environment";
@@ -27,6 +27,27 @@ async function apiStatus(page: Page): Promise<number> {
   return response.status();
 }
 
+// / は SPA が認証を確かめずに表示するため、/api/missing が 404（401 でない）であることで認証済みを確かめる。
+async function expectAuthenticatedHome(page: Page): Promise<void> {
+  await expect(page).toHaveURL("http://localhost:5173/");
+  await expect(homeHeading(page)).toBeVisible();
+  expect(await apiStatus(page)).toBe(404);
+}
+
+async function expectApplicationSessionEnded(
+  page: Page,
+  request: APIRequestContext,
+  oldSession: string,
+): Promise<void> {
+  expect(await apiStatus(page)).toBe(401);
+  // ログアウトの応答は Cookie を消すため、上の 401 は Cookie がないことによる。
+  // ログアウト前の APP_SESSION を送り直しても、サーバ側のセッションが消えていれば 401 になる。
+  const replayed = await request.get("/api/missing", {
+    headers: { Cookie: `APP_SESSION=${oldSession}` },
+  });
+  expect(replayed.status()).toBe(401);
+}
+
 async function expectLoggedOutPage(page: Page): Promise<void> {
   await expect(page).toHaveURL("http://localhost:5173/logged-out");
   await expect(page.getByRole("heading", { level: 1, name: "ログアウトしました" })).toBeVisible();
@@ -45,19 +66,18 @@ async function expectLogoutRejected(page: Page): Promise<string | null> {
   const submittedToken = new URLSearchParams(response.request().postData() ?? "").get("_csrf");
 
   await page.goto("/");
-  await expect(homeHeading(page)).toBeVisible();
-  expect(await apiStatus(page)).toBe(404);
+  await expectAuthenticatedHome(page);
   return submittedToken;
 }
 
-async function xsrfToken(context: BrowserContext): Promise<string> {
+// Cookie がないまま undefined を送り、別の理由で失敗するのを防ぐ。
+async function cookieValue(context: BrowserContext, name: string): Promise<string> {
   const cookies = await context.cookies();
-  const token = cookies.find((cookie) => cookie.name === "XSRF-TOKEN")?.value;
-  // undefined を送って別の理由で 403 になるのを防ぐ。
-  if (token === undefined || token === "") {
-    throw new Error("XSRF-TOKEN Cookie がありません");
+  const value = cookies.find((cookie) => cookie.name === name)?.value;
+  if (value === undefined || value === "") {
+    throw new Error(`${name} Cookie がありません`);
   }
-  return token;
+  return value;
 }
 
 let cspMessages: string[] = [];
@@ -93,20 +113,21 @@ test("ログイン直後に、ほかの操作をせずにログアウトする�
 
 test("ログアウト後はアプリと SSO のセッションが終わり、もう一度ログインして戻れる", async ({
   page,
+  context,
+  request,
 }) => {
   await logIn(page);
+  const oldSession = await cookieValue(context, "APP_SESSION");
   await logoutButton(page).click();
   await expectLoggedOutPage(page);
-  expect(await apiStatus(page)).toBe(401);
+  await expectApplicationSessionEnded(page, request, oldSession);
 
   // Keycloak の SSO セッションが終わっていれば、資格情報の入力を求められる。
   await page.getByRole("link", { name: "もう一度ログイン" }).click();
   await expect(page.getByLabel("Username or email")).toBeVisible();
   await signInOnKeycloak(page);
 
-  await expect(page).toHaveURL("http://localhost:5173/");
-  await expect(homeHeading(page)).toBeVisible();
-  expect(await apiStatus(page)).toBe(404);
+  await expectAuthenticatedHome(page);
 });
 
 test("_csrf を削除して送るとログアウトを拒否する", async ({ page }) => {
@@ -125,7 +146,7 @@ test("_csrf にマスクしない Cookie の値を入れて送るとログアウ
   context,
 }) => {
   await logIn(page);
-  const token = await xsrfToken(context);
+  const token = await cookieValue(context, "XSRF-TOKEN");
   await csrfInput(page).evaluate((input: HTMLInputElement, value) => {
     input.value = value;
   }, token);
