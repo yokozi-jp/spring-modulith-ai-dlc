@@ -9,9 +9,7 @@ tags: [adr, security, csrf, cookie, frontend, backend]
 
 ## Status
 
-Proposed
-
-A を main へ入れる Pull Request（確認用の業務機能の手順 5）の中で Accepted にし、[ADR インデックス](index.md)の行も同じ変更で直す。
+Accepted
 
 ## Date
 
