@@ -18,4 +18,21 @@ describe("preloadQuery", () => {
     expect(queryFn).toHaveBeenCalledOnce();
     expect(queryClient.getQueryData(["/api/items"])).toStrictEqual({ data: "loaded" });
   });
+
+  it("無効化された cache は取得し直す", async () => {
+    const queryClient = createTestQueryClient();
+    let count = 0;
+    const queryFn = vi.fn<() => Promise<{ data: number }>>(() => {
+      count += 1;
+      return Promise.resolve({ data: count });
+    });
+    const options = { queryKey: ["/api/items"], queryFn };
+
+    await preloadQuery(queryClient, options);
+    // observer がないので、無効化しても取得し直さず印だけが付く。
+    await queryClient.invalidateQueries();
+
+    await expect(preloadQuery(queryClient, options)).resolves.toStrictEqual({ data: 2 });
+    expect(queryFn).toHaveBeenCalledTimes(2);
+  });
 });
