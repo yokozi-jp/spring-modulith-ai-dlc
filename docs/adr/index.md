@@ -65,3 +65,4 @@
 - [ADR-062: 業務上の失敗を 3 つの例外の型で表し、404、409、422 の Problem Details に対応づける](ADR-062-map-business-exceptions-to-404-409-422.md)（Proposed, 2026-10-06）
 - [ADR-063: Gradle の依存キャッシュを MIT の範囲で restore-keys 付きに復元する](ADR-063-restore-gradle-cache-with-restore-keys-on-mit-caching.md)（Proposed, 2026-10-06）
 - [ADR-064: OpenAPI 契約を test タスクで書き出し、Backend CI のテスト二重実行をやめる](ADR-064-write-openapi-contract-from-test-task-in-ci.md)（Proposed, 2026-10-06）
+- [ADR-065: 区分値を DB と API で enum の名前のまま持つ](ADR-065-store-category-values-as-enum-names.md)（Proposed, 2026-10-06）

@@ -168,7 +168,7 @@ public record PlaceOrderRequest(
  * 注文の詳細を返す API の本文。
  *
  * @param orderId 注文の ID
- * @param status 注文の状態のコード値
+ * @param status 注文の状態の区分値
  * @param lines 注文の明細
  */
 public record OrderDetailsResponse(

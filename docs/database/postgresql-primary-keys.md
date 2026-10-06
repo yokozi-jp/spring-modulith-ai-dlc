@@ -75,7 +75,7 @@ UUID v7を主キーにする最初のテーブルを作るときに決める。
 連番の主キーとは別に`public_id`のカラムを作ってUUIDを格納し、ユニークインデックスを張る。
 URLにはUUIDをBase64などで短く変換した値を使ってよい。
 
-`public_id`はUUID v4とし、集約を作るDomainのファクトリで`UUID.randomUUID()`により採番して、値オブジェクト（たとえば`OrderPublicId`）で包む。
+`public_id`はUUID v4とし、集約を作るDomainのファクトリで`UUID.randomUUID()`により採番して、値オブジェクト（たとえば[値オブジェクト](../backend/class-roles/value-object.md)の`OrderId(UUID value)`）で包む。
 `public_id`は主キーではないカラムなので、v4でよい。
 UUID v7は作成時刻が値に含まれて見えるため、公開用IDに使わない（[RFC 9562](https://www.rfc-editor.org/rfc/rfc9562.html)）。
 テストは値を固定せず、nullでないことと`version()`が4であることを確かめる。
