@@ -149,12 +149,16 @@ const params = { ...(cursor !== undefined && { cursor }) };
 
 - **`task be-lint`**：Spotless、PMD、SpotBugsでmainとtestを検査する。
 - **`task be-openapi-lint`**：起動済みのテスト用依存でOpenAPI 3.1契約を`openapi/openapi.yaml`へ生成し、Spectralで検査する。
-- **`task be-openapi-check`**：`be-openapi-lint`で契約を再生成し、コミット済みの`openapi/openapi.yaml`と差分があれば失敗する。
+- **`task be-openapi-check`**：直前の`be-test`が書き出した契約をSpectralで検査し、コミット済みの`openapi/openapi.yaml`と差分があれば失敗する。
+  テストを実行しないため、`be-test`の後に実行する。
+  単体で実行すると、コミット済みの契約を自分自身と比べるので、差分を検出できない。
 - **`task be-verify-migrations`**：使い捨てDBでchangesetの適用、rollback、再適用、現在タグを検証する。
 - **`task be-test`**：起動済みのテスト用依存に確定済みchangesetを適用し、テストとcoverage検証を実行する。
+  `-PopenapiExport=true`を渡すので、`OpenApiContractTest`が`openapi/openapi.yaml`を書き出す。
+  素の`./gradlew test`は契約に触れない。
 - **`task be-test-dev`**：起動済みのテスト用依存に作りかけのchangesetを含めて適用し、テストを実行する。
 - **`task be-mutation-test`**：起動済みのテスト用依存でPITを実行する。
-- **`task test`**：テスト用依存の起動、`be-verify-migrations`、`be-test`、`be-openapi-lint`、後片付けを実行する。
+- **`task test`**：テスト用依存の起動、`be-verify-migrations`、`be-test`、`api-lint`、後片付けを実行する。
 - **`task test-dev`**：テスト用依存の起動、`be-test-dev`、後片付けを実行する。
 - **`task mutation-test`**：テスト用依存の起動、マイグレーション検証、`be-mutation-test`、後片付けを実行する。
 
@@ -232,6 +236,7 @@ Gitフックの条件とコマンドは[`lefthook.yml`](../../lefthook.yml)を�
 
 - **`frontend-ci.yml`**：`fe-verify`、`fe-route-tree-check`、`api-client-check`、`fe-doctor`を実行する。
 - **`backend-ci.yml`**：`be-lint`相当、`be-verify-migrations`、`be-test`、`be-openapi-check`、手動実行時の`mutation-test`を実行する。
+  契約は`be-test`が書き出し、`be-openapi-check`は`OpenApiContractTest`を再実行しない（[ADR-064](../adr/ADR-064-write-openapi-contract-from-test-task-in-ci.md)）。
   Gradle User Homeは`setup-gradle`の`cache-provider: external`にして、`actions/cache`のrestoreとsaveで扱う。
   keyはビルドファイルのhashで、restore-keysにより直近のmainのcacheを復元する。
   saveはmainのpushで、restoreが完全一致でなかったときだけ行う（[ADR-063](../adr/ADR-063-restore-gradle-cache-with-restore-keys-on-mit-caching.md)）。

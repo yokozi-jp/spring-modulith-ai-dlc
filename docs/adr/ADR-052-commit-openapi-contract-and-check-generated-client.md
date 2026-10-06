@@ -41,6 +41,7 @@ OpenAPI の `info.version` は、仕様では OpenAPI 文書の版であり、�
 - springdoc の `writer-with-order-by-keys` でキーの順序を固定し、生成のたびに同じ内容のファイルになるようにする。
 - 生成には既存の `exportOpenApi` を流用し、出力先を `openapi/openapi.yaml` に変える。
   新しい Gradle プラグインは入れない。
+  CI と `task test` での書き出しは、全テストを実行する `test` タスクが行う（[ADR-064](ADR-064-write-openapi-contract-from-test-task-in-ci.md)）。
 - `openapi/openapi.yaml` は生成物として扱い、手で編集しない。
 
 ### Orval

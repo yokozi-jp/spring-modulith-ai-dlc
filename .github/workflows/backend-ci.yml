@@ -182,7 +182,7 @@ jobs:
       - name: Migrate test database and run tests
         run: task be-test
 
-      - name: Generate, lint, and check OpenAPI contract
+      - name: Lint OpenAPI contract and check drift
         run: task be-openapi-check
 
       # 保存の条件は lint ジョブと同じ（ADR-063）。

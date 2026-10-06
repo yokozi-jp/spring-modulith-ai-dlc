@@ -153,6 +153,8 @@ dependencyManagement {
     }
 }
 
+def openApiSpec = layout.projectDirectory.file('../openapi/openapi.yaml').asFile
+
 /*
  * テストとカバレッジ
  * JUnit Platform で実行し、完了後に JaCoCo でカバレッジレポート（HTML/XML）を生成する。
@@ -168,8 +170,15 @@ tasks.named('test') {
         showStackTraces = true
     }
     finalizedBy jacocoTestCoverageVerification
+    // -PopenapiExport=true のときだけ、全テストの中で OpenApiContractTest に契約を書き出させる（ADR-064）。
+    // 出力に宣言しないと、build cache の復元時に契約が書かれず、drift 検査が素通りになる。
+    if (providers.gradleProperty('openapiExport').isPresent()) {
+        systemProperty 'openapi.output', openApiSpec.absolutePath
+        outputs.file(openApiSpec)
+    }
 }
 
+// 単体の再生成用。test --tests で絞ると jacocoTestCoverageVerification が走り 85% を割るため、別タスクにしている。
 tasks.register('exportOpenApi', Test) {
     group = 'verification'
     description = 'OpenAPI契約テストを実行し、リポジトリのopenapi/openapi.yamlへ書き出す'
@@ -178,7 +187,6 @@ tasks.register('exportOpenApi', Test) {
     useJUnitPlatform()
     systemProperty 'user.timezone', 'UTC'
     // 出力に宣言し、コミット済みの契約を書き換えたか消したときに再実行させる。
-    def openApiSpec = layout.projectDirectory.file('../openapi/openapi.yaml').asFile
     systemProperty 'openapi.output', openApiSpec.absolutePath
     outputs.file(openApiSpec)
     filter {

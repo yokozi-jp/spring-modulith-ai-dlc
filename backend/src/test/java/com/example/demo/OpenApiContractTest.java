@@ -26,7 +26,9 @@ import org.springframework.test.web.servlet.ResultMatcher;
 /**
  * 生成された OpenAPI 文書の版と共通 RFC 9457 components を検証する。
  *
- * <p>{@code openapi.output} が指定されたときは、springdoc の YAML endpoint の出力をそのパスへ書き出す（exportOpenApi）。
+ * <p>{@code openapi.output} が指定されたときは、springdoc の YAML endpoint の出力をそのパスへ書き出す。
+ *
+ * <p>指定するのは {@code exportOpenApi} と、{@code -PopenapiExport=true} を付けた {@code test} である。
  */
 // MockMvc.perform が Exception を宣言するため、補助メソッドも Exception を宣言する。
 @SuppressWarnings({
