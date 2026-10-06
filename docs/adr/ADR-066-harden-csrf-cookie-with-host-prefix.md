@@ -11,6 +11,8 @@ tags: [adr, security, csrf, cookie, frontend, backend]
 
 Accepted
 
+Proposed として起こし、[#157](https://github.com/yokozi-jp/spring-modulith-ai-dlc/pull/157) でコードと一緒にレビューし、main へ取り込むこの Pull Request で Accepted にした。
+
 ## Date
 
 2026-10-06
@@ -79,7 +81,7 @@ DAST の httpsender script は、要求に Cookie がなければ最後に受け
 
 - 照合は naive double-submit cookie であり、署名した token（signed double-submit cookie）ではない。
 - `__Host-` が Cookie の書き込みを塞ぐのは、ブラウザが cookie prefix を実装していることが前提である。
-- 同じ registrable domain に信頼できない host を置かない。`APP_SESSION` は prefix を持たないため、その host からの書き込みは塞げない。
+- 同じ registrable domain に信頼できない host を置かない。`APP_SESSION` は prefix を持たないため、その host からの書き込みは塞げない。<!-- issue: TBD-session-prefix -->
 - Cookie の名前と header の名前は、frontend（`src/lib/csrf.ts`）、backend（`SecurityConfig`）、ZAP の httpsender script の 3 者の契約である。言語が違うので 1 か所にまとめられず、契約テスト、frontend の単体テスト、E2E、DAST の preflight がそれぞれのずれを検出する。
 - Fetch Metadata（`Sec-Fetch-Site`）と `Origin` の検査は、この ADR では決めない。
 
@@ -100,7 +102,7 @@ DAST の httpsender script は、要求に Cookie がなければ最後に受け
 ### Neutral
 
 - ローカルの Safari が必要になったら、ローカルの Vite を HTTPS にする（証明書の生成と信頼、ADR-033 の origin と Keycloak の redirect URI の変更を伴う）。
-- macOS の Safari が `http://localhost` の `Secure` の Cookie を受け付けると確かめられたら、この ADR の表と `docs/frontend/browser-support.md` の 1 文を消す。
+- macOS の Safari が `http://localhost` の `Secure` の Cookie を受け付けると確かめられたら、この ADR の表と `docs/frontend/browser-support.md` の 1 文を消す。<!-- issue: TBD-safari -->
 
 ## Alternatives Considered
 

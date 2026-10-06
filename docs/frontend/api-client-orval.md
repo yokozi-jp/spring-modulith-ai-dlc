@@ -88,6 +88,8 @@ export default defineConfig({
 loaderと`useSuspenseQuery`での使い方は[状態表示の分担](routing-and-state.md#状態表示の分担)にある。
 `override.fetch.forceSuccessResponse`は、生成した関数の戻り値の型を成功の応答だけにする。
 `apiFetch`が非2xxを投げるので、失敗の応答の型が戻り値に混ざらない。
+業務のoperationがまだないため、この2つの設定は生成物で確かめていない。
+最初の業務APIを足すPRで、`task api-client-check`の再生成の検査と、`get<Operation>SuspenseQueryOptions()`を`preloadQuery`に通すcomponent testを足す。
 `override.mutator`は、生成したAPI関数が呼ぶFetchを`src/api/api-fetch.ts`の`apiFetch`に置き換える（[transportとruntime検証](#transportとruntime検証)）。
 `override.header`は生成物のheaderから`info.version`の行を外し、契約の版を上げても全生成物に差分が出ないようにする。
 `override.zod.version`はZodの出力を版4に固定し、入っているzodの版に生成物が左右されないようにする。
