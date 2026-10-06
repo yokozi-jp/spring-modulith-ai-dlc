@@ -3,7 +3,9 @@
  * Demo API
  */
 import {
-  useQuery
+  queryOptions as queryOptionsBuilder,
+  useQuery,
+  useSuspenseQuery
 } from '@tanstack/react-query';
 import type {
   DataTag,
@@ -14,7 +16,9 @@ import type {
   QueryKey,
   UndefinedInitialDataOptions,
   UseQueryOptions,
-  UseQueryResult
+  UseQueryResult,
+  UseSuspenseQueryOptions,
+  UseSuspenseQueryResult
 } from '@tanstack/react-query';
 
 import type {
@@ -74,8 +78,6 @@ export type listProductsResponseError = (listProductsResponse401 | listProductsR
   headers: Headers;
 };
 
-export type listProductsResponse = (listProductsResponseSuccess | listProductsResponseError)
-
 export const getListProductsUrl = () => {
 
 
@@ -88,9 +90,9 @@ export const getListProductsUrl = () => {
  * 一覧は商品コードの昇順で items で包んで返す。
  * @summary 商品の一覧を返す。
  */
-export const listProducts = async ( options?: Parameters<typeof apiFetch>[1]): Promise<listProductsResponse> => {
+export const listProducts = async ( options?: Parameters<typeof apiFetch>[1]): Promise<listProductsResponseSuccess> => {
 
-  return apiFetch<listProductsResponse>(getListProductsUrl(),
+  return apiFetch<listProductsResponseSuccess>(getListProductsUrl(),
   {
     ...options,
     method: 'GET'
@@ -168,6 +170,61 @@ export function useListProducts<TData = Awaited<ReturnType<typeof listProducts>>
   const queryOptions = getListProductsQueryOptions(options)
 
   const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+export const getListProductsSuspenseQueryOptions = <TData = Awaited<ReturnType<typeof listProducts>>, TError = ErrorType<UnauthorizedProblemResponse | ForbiddenProblemResponse | InternalServerErrorProblemResponse>>( options?: { query?:Partial<UseSuspenseQueryOptions<Awaited<ReturnType<typeof listProducts>>, TError, TData>>, request?: SecondParameter<typeof apiFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListProductsQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listProducts>>> = ({ signal }) => listProducts({ signal, ...requestOptions });
+
+
+
+
+
+   return  queryOptionsBuilder({ queryKey, ...queryOptions, queryFn: queryOptions?.queryFn ?? queryFn}) as UseSuspenseQueryOptions<Awaited<ReturnType<typeof listProducts>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> } & { throwOnError?: ((this: never, error: TError) => boolean) & { readonly __inferenceOnly: never } }
+}
+
+export type ListProductsSuspenseQueryResult = NonNullable<Awaited<ReturnType<typeof listProducts>>>
+export type ListProductsSuspenseQueryError = ErrorType<UnauthorizedProblemResponse | ForbiddenProblemResponse | InternalServerErrorProblemResponse>
+
+
+export function useListProductsSuspense<TData = Awaited<ReturnType<typeof listProducts>>, TError = ErrorType<UnauthorizedProblemResponse | ForbiddenProblemResponse | InternalServerErrorProblemResponse>>(
+  options: { query:Partial<UseSuspenseQueryOptions<Awaited<ReturnType<typeof listProducts>>, TError, TData>>, request?: SecondParameter<typeof apiFetch>}
+ , queryClient?: QueryClient
+  ):  UseSuspenseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useListProductsSuspense<TData = Awaited<ReturnType<typeof listProducts>>, TError = ErrorType<UnauthorizedProblemResponse | ForbiddenProblemResponse | InternalServerErrorProblemResponse>>(
+  options?: { query?:Partial<UseSuspenseQueryOptions<Awaited<ReturnType<typeof listProducts>>, TError, TData>>, request?: SecondParameter<typeof apiFetch>}
+ , queryClient?: QueryClient
+  ):  UseSuspenseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useListProductsSuspense<TData = Awaited<ReturnType<typeof listProducts>>, TError = ErrorType<UnauthorizedProblemResponse | ForbiddenProblemResponse | InternalServerErrorProblemResponse>>(
+  options?: { query?:Partial<UseSuspenseQueryOptions<Awaited<ReturnType<typeof listProducts>>, TError, TData>>, request?: SecondParameter<typeof apiFetch>}
+ , queryClient?: QueryClient
+  ):  UseSuspenseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary 商品の一覧を返す。
+ */
+
+export function useListProductsSuspense<TData = Awaited<ReturnType<typeof listProducts>>, TError = ErrorType<UnauthorizedProblemResponse | ForbiddenProblemResponse | InternalServerErrorProblemResponse>>(
+  options?: { query?:Partial<UseSuspenseQueryOptions<Awaited<ReturnType<typeof listProducts>>, TError, TData>>, request?: SecondParameter<typeof apiFetch>}
+ , queryClient?: QueryClient
+ ):  UseSuspenseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getListProductsSuspenseQueryOptions(options)
+
+  const query = useSuspenseQuery(queryOptions, queryClient) as  UseSuspenseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
 
   return withQueryKey(query, queryOptions.queryKey);
 }

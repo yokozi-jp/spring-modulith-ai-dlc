@@ -7,7 +7,6 @@
     "@tanstack/react-form",
     "@tanstack/react-table",
     "lucide-react",
-    "msw",
     "zod"
   ]
 }

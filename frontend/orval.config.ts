@@ -29,6 +29,10 @@ export default defineConfig({
         generators: [{ type: "msw", useExamples: true }],
       },
       override: {
+        // loader の ensureQueryData と component の useSuspenseQuery が同じ query options を使えるよう、suspense 用を生成する（docs/frontend/routing-and-state.md）。
+        query: { useSuspenseQuery: true },
+        // apiFetch が 2xx 以外を投げるため、戻り値の型を成功の応答だけにする。
+        fetch: { forceSuccessResponse: true },
         // 非 2xx を ApiProblemError として投げる（docs/frontend/api-client-orval.md）。
         mutator: { path: "./src/api/api-fetch.ts", name: "apiFetch" },
         // 任意の項目にも値を入れた mock にし、exactOptionalPropertyTypes の型検査を通す。

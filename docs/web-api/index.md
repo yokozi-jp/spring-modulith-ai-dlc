@@ -9,7 +9,7 @@
 - [APIの入力検証の配置](validation.md)：APIのリクエストに検証を追加するとき、フロントエンドとの検証の分担を決めるとき
 - [更新の競合制御](optimistic-locking.md)：同時に更新されうるリソースの更新APIや削除APIを設計するとき
 - [ファイルのアップロードとダウンロード](file-transfer.md)：画像や文書などのファイルを扱う機能を設計するとき
-- [APIの認証、セッション、権限](authentication-and-session.md)：認証方式やセッション設定を変えるとき、対向システムへAPIを公開するとき、権限の判定を実装するとき
+- [APIの認証、セッション、権限](authentication-and-session.md)：認証方式、セッション設定、CSRFのCookieを変えるとき、対向システムへAPIを公開するとき、権限の判定を実装するとき
 - [APIの互換性と廃止](versioning.md)：既存APIの契約を変更するとき、APIを廃止するとき、OpenAPIのinfo.versionを上げるとき
 - [OpenAPIのアノテーションとJavadoc](openapi-annotations.md)：ControllerやAPIのDTOを作る、または変えるとき、Spectralの違反を直すとき
 - [APIを変更する](runbook-api-change.md)：APIを追加または変更して契約とOrvalの生成物を再生成するとき、契約や生成clientの検査が失敗したとき

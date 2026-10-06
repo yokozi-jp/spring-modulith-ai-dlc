@@ -3,8 +3,10 @@
  * Demo API
  */
 import {
+  queryOptions as queryOptionsBuilder,
   useMutation,
-  useQuery
+  useQuery,
+  useSuspenseQuery
 } from '@tanstack/react-query';
 import type {
   DataTag,
@@ -18,7 +20,9 @@ import type {
   UseMutationOptions,
   UseMutationResult,
   UseQueryOptions,
-  UseQueryResult
+  UseQueryResult,
+  UseSuspenseQueryOptions,
+  UseSuspenseQueryResult
 } from '@tanstack/react-query';
 
 import type {
@@ -93,8 +97,6 @@ export type listOrdersResponseError = (listOrdersResponse400 | listOrdersRespons
   headers: Headers;
 };
 
-export type listOrdersResponse = (listOrdersResponseSuccess | listOrdersResponseError)
-
 export const getListOrdersUrl = (params?: ListOrdersParams,) => {
   const normalizedParams = new URLSearchParams();
 
@@ -114,9 +116,9 @@ export const getListOrdersUrl = (params?: ListOrdersParams,) => {
  * 一覧は作成した時刻の新しい順に items で包んで返す。状態を指定すると、その状態の注文だけを返す。
  * @summary 注文の一覧を返す。
  */
-export const listOrders = async (params?: ListOrdersParams, options?: Parameters<typeof apiFetch>[1]): Promise<listOrdersResponse> => {
+export const listOrders = async (params?: ListOrdersParams, options?: Parameters<typeof apiFetch>[1]): Promise<listOrdersResponseSuccess> => {
 
-  return apiFetch<listOrdersResponse>(getListOrdersUrl(params),
+  return apiFetch<listOrdersResponseSuccess>(getListOrdersUrl(params),
   {
     ...options,
     method: 'GET'
@@ -203,6 +205,61 @@ export function useListOrders<TData = Awaited<ReturnType<typeof listOrders>>, TE
 
 
 
+export const getListOrdersSuspenseQueryOptions = <TData = Awaited<ReturnType<typeof listOrders>>, TError = ErrorType<BadRequestProblemResponse | UnauthorizedProblemResponse | ForbiddenProblemResponse | InternalServerErrorProblemResponse>>(params?: ListOrdersParams, options?: { query?:Partial<UseSuspenseQueryOptions<Awaited<ReturnType<typeof listOrders>>, TError, TData>>, request?: SecondParameter<typeof apiFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListOrdersQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listOrders>>> = ({ signal }) => listOrders(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  queryOptionsBuilder({ queryKey, ...queryOptions, queryFn: queryOptions?.queryFn ?? queryFn}) as UseSuspenseQueryOptions<Awaited<ReturnType<typeof listOrders>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> } & { throwOnError?: ((this: never, error: TError) => boolean) & { readonly __inferenceOnly: never } }
+}
+
+export type ListOrdersSuspenseQueryResult = NonNullable<Awaited<ReturnType<typeof listOrders>>>
+export type ListOrdersSuspenseQueryError = ErrorType<BadRequestProblemResponse | UnauthorizedProblemResponse | ForbiddenProblemResponse | InternalServerErrorProblemResponse>
+
+
+export function useListOrdersSuspense<TData = Awaited<ReturnType<typeof listOrders>>, TError = ErrorType<BadRequestProblemResponse | UnauthorizedProblemResponse | ForbiddenProblemResponse | InternalServerErrorProblemResponse>>(
+ params: undefined |  ListOrdersParams, options: { query:Partial<UseSuspenseQueryOptions<Awaited<ReturnType<typeof listOrders>>, TError, TData>>, request?: SecondParameter<typeof apiFetch>}
+ , queryClient?: QueryClient
+  ):  UseSuspenseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useListOrdersSuspense<TData = Awaited<ReturnType<typeof listOrders>>, TError = ErrorType<BadRequestProblemResponse | UnauthorizedProblemResponse | ForbiddenProblemResponse | InternalServerErrorProblemResponse>>(
+ params?: ListOrdersParams, options?: { query?:Partial<UseSuspenseQueryOptions<Awaited<ReturnType<typeof listOrders>>, TError, TData>>, request?: SecondParameter<typeof apiFetch>}
+ , queryClient?: QueryClient
+  ):  UseSuspenseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useListOrdersSuspense<TData = Awaited<ReturnType<typeof listOrders>>, TError = ErrorType<BadRequestProblemResponse | UnauthorizedProblemResponse | ForbiddenProblemResponse | InternalServerErrorProblemResponse>>(
+ params?: ListOrdersParams, options?: { query?:Partial<UseSuspenseQueryOptions<Awaited<ReturnType<typeof listOrders>>, TError, TData>>, request?: SecondParameter<typeof apiFetch>}
+ , queryClient?: QueryClient
+  ):  UseSuspenseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary 注文の一覧を返す。
+ */
+
+export function useListOrdersSuspense<TData = Awaited<ReturnType<typeof listOrders>>, TError = ErrorType<BadRequestProblemResponse | UnauthorizedProblemResponse | ForbiddenProblemResponse | InternalServerErrorProblemResponse>>(
+ params?: ListOrdersParams, options?: { query?:Partial<UseSuspenseQueryOptions<Awaited<ReturnType<typeof listOrders>>, TError, TData>>, request?: SecondParameter<typeof apiFetch>}
+ , queryClient?: QueryClient
+ ):  UseSuspenseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getListOrdersSuspenseQueryOptions(params,options)
+
+  const query = useSuspenseQuery(queryOptions, queryClient) as  UseSuspenseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
 export type draftOrderResponse201 = {
   data: void
   status: 201
@@ -245,8 +302,6 @@ export type draftOrderResponseError = (draftOrderResponse400 | draftOrderRespons
   headers: Headers;
 };
 
-export type draftOrderResponse = (draftOrderResponseSuccess | draftOrderResponseError)
-
 export const getDraftOrderUrl = () => {
 
 
@@ -259,7 +314,7 @@ export const getDraftOrderUrl = () => {
  * 作成した注文の URI を Location に入れて返す。客先注文番号が既にあれば 409、存在しないか販売終了の商品を指定すると 422 を返す。
  * @summary 下書きの注文を作る。
  */
-export const draftOrder = async (draftOrderRequest: DraftOrderRequest, options?: Parameters<typeof apiFetch>[1]): Promise<draftOrderResponse> => {
+export const draftOrder = async (draftOrderRequest: DraftOrderRequest, options?: Parameters<typeof apiFetch>[1]): Promise<draftOrderResponseSuccess> => {
 
     const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
     if (!h) return {};
@@ -275,7 +330,7 @@ export const draftOrder = async (draftOrderRequest: DraftOrderRequest, options?:
     }
     return headers;
   };
-return apiFetch<draftOrderResponse>(getDraftOrderUrl(),
+return apiFetch<draftOrderResponseSuccess>(getDraftOrderUrl(),
   {
     ...options,
     method: 'POST',
@@ -372,8 +427,6 @@ export type findOrderByIdResponseError = (findOrderByIdResponse400 | findOrderBy
   headers: Headers;
 };
 
-export type findOrderByIdResponse = (findOrderByIdResponseSuccess | findOrderByIdResponseError)
-
 export const getFindOrderByIdUrl = (orderId: string,) => {
 
 
@@ -386,9 +439,9 @@ export const getFindOrderByIdUrl = (orderId: string,) => {
  * 注文がなければ 404 を返す。
  * @summary 注文の詳細を返す。
  */
-export const findOrderById = async (orderId: string, options?: Parameters<typeof apiFetch>[1]): Promise<findOrderByIdResponse> => {
+export const findOrderById = async (orderId: string, options?: Parameters<typeof apiFetch>[1]): Promise<findOrderByIdResponseSuccess> => {
 
-  return apiFetch<findOrderByIdResponse>(getFindOrderByIdUrl(orderId),
+  return apiFetch<findOrderByIdResponseSuccess>(getFindOrderByIdUrl(orderId),
   {
     ...options,
     method: 'GET'
@@ -475,6 +528,61 @@ export function useFindOrderById<TData = Awaited<ReturnType<typeof findOrderById
 
 
 
+export const getFindOrderByIdSuspenseQueryOptions = <TData = Awaited<ReturnType<typeof findOrderById>>, TError = ErrorType<BadRequestProblemResponse | UnauthorizedProblemResponse | ForbiddenProblemResponse | NotFoundProblemResponse | InternalServerErrorProblemResponse>>(orderId: string, options?: { query?:Partial<UseSuspenseQueryOptions<Awaited<ReturnType<typeof findOrderById>>, TError, TData>>, request?: SecondParameter<typeof apiFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getFindOrderByIdQueryKey(orderId);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof findOrderById>>> = ({ signal }) => findOrderById(orderId, { signal, ...requestOptions });
+
+
+
+
+
+   return  queryOptionsBuilder({ queryKey, ...queryOptions, queryFn: queryOptions?.queryFn ?? queryFn}) as UseSuspenseQueryOptions<Awaited<ReturnType<typeof findOrderById>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> } & { throwOnError?: ((this: never, error: TError) => boolean) & { readonly __inferenceOnly: never } }
+}
+
+export type FindOrderByIdSuspenseQueryResult = NonNullable<Awaited<ReturnType<typeof findOrderById>>>
+export type FindOrderByIdSuspenseQueryError = ErrorType<BadRequestProblemResponse | UnauthorizedProblemResponse | ForbiddenProblemResponse | NotFoundProblemResponse | InternalServerErrorProblemResponse>
+
+
+export function useFindOrderByIdSuspense<TData = Awaited<ReturnType<typeof findOrderById>>, TError = ErrorType<BadRequestProblemResponse | UnauthorizedProblemResponse | ForbiddenProblemResponse | NotFoundProblemResponse | InternalServerErrorProblemResponse>>(
+ orderId: string, options: { query:Partial<UseSuspenseQueryOptions<Awaited<ReturnType<typeof findOrderById>>, TError, TData>>, request?: SecondParameter<typeof apiFetch>}
+ , queryClient?: QueryClient
+  ):  UseSuspenseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useFindOrderByIdSuspense<TData = Awaited<ReturnType<typeof findOrderById>>, TError = ErrorType<BadRequestProblemResponse | UnauthorizedProblemResponse | ForbiddenProblemResponse | NotFoundProblemResponse | InternalServerErrorProblemResponse>>(
+ orderId: string, options?: { query?:Partial<UseSuspenseQueryOptions<Awaited<ReturnType<typeof findOrderById>>, TError, TData>>, request?: SecondParameter<typeof apiFetch>}
+ , queryClient?: QueryClient
+  ):  UseSuspenseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useFindOrderByIdSuspense<TData = Awaited<ReturnType<typeof findOrderById>>, TError = ErrorType<BadRequestProblemResponse | UnauthorizedProblemResponse | ForbiddenProblemResponse | NotFoundProblemResponse | InternalServerErrorProblemResponse>>(
+ orderId: string, options?: { query?:Partial<UseSuspenseQueryOptions<Awaited<ReturnType<typeof findOrderById>>, TError, TData>>, request?: SecondParameter<typeof apiFetch>}
+ , queryClient?: QueryClient
+  ):  UseSuspenseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary 注文の詳細を返す。
+ */
+
+export function useFindOrderByIdSuspense<TData = Awaited<ReturnType<typeof findOrderById>>, TError = ErrorType<BadRequestProblemResponse | UnauthorizedProblemResponse | ForbiddenProblemResponse | NotFoundProblemResponse | InternalServerErrorProblemResponse>>(
+ orderId: string, options?: { query?:Partial<UseSuspenseQueryOptions<Awaited<ReturnType<typeof findOrderById>>, TError, TData>>, request?: SecondParameter<typeof apiFetch>}
+ , queryClient?: QueryClient
+ ):  UseSuspenseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getFindOrderByIdSuspenseQueryOptions(orderId,options)
+
+  const query = useSuspenseQuery(queryOptions, queryClient) as  UseSuspenseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
 export type cancelOrderResponse204 = {
   data: void
   status: 204
@@ -522,8 +630,6 @@ export type cancelOrderResponseError = (cancelOrderResponse400 | cancelOrderResp
   headers: Headers;
 };
 
-export type cancelOrderResponse = (cancelOrderResponseSuccess | cancelOrderResponseError)
-
 export const getCancelOrderUrl = (orderId: string,) => {
 
 
@@ -537,7 +643,7 @@ export const getCancelOrderUrl = (orderId: string,) => {
  * @summary 下書きの注文を取り消す。
  */
 export const cancelOrder = async (orderId: string,
-    cancelOrderRequest: CancelOrderRequest, options?: Parameters<typeof apiFetch>[1]): Promise<cancelOrderResponse> => {
+    cancelOrderRequest: CancelOrderRequest, options?: Parameters<typeof apiFetch>[1]): Promise<cancelOrderResponseSuccess> => {
 
     const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
     if (!h) return {};
@@ -553,7 +659,7 @@ export const cancelOrder = async (orderId: string,
     }
     return headers;
   };
-return apiFetch<cancelOrderResponse>(getCancelOrderUrl(orderId),
+return apiFetch<cancelOrderResponseSuccess>(getCancelOrderUrl(orderId),
   {
     ...options,
     method: 'POST',
@@ -660,8 +766,6 @@ export type confirmOrderResponseError = (confirmOrderResponse400 | confirmOrderR
   headers: Headers;
 };
 
-export type confirmOrderResponse = (confirmOrderResponseSuccess | confirmOrderResponseError)
-
 export const getConfirmOrderUrl = (orderId: string,) => {
 
 
@@ -675,7 +779,7 @@ export const getConfirmOrderUrl = (orderId: string,) => {
  * @summary 下書きの注文を確定する。
  */
 export const confirmOrder = async (orderId: string,
-    confirmOrderRequest: ConfirmOrderRequest, options?: Parameters<typeof apiFetch>[1]): Promise<confirmOrderResponse> => {
+    confirmOrderRequest: ConfirmOrderRequest, options?: Parameters<typeof apiFetch>[1]): Promise<confirmOrderResponseSuccess> => {
 
     const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
     if (!h) return {};
@@ -691,7 +795,7 @@ export const confirmOrder = async (orderId: string,
     }
     return headers;
   };
-return apiFetch<confirmOrderResponse>(getConfirmOrderUrl(orderId),
+return apiFetch<confirmOrderResponseSuccess>(getConfirmOrderUrl(orderId),
   {
     ...options,
     method: 'POST',
@@ -798,8 +902,6 @@ export type changeOrderLinesResponseError = (changeOrderLinesResponse400 | chang
   headers: Headers;
 };
 
-export type changeOrderLinesResponse = (changeOrderLinesResponseSuccess | changeOrderLinesResponseError)
-
 export const getChangeOrderLinesUrl = (orderId: string,) => {
 
 
@@ -813,7 +915,7 @@ export const getChangeOrderLinesUrl = (orderId: string,) => {
  * @summary 下書きの注文の明細を置き換える。
  */
 export const changeOrderLines = async (orderId: string,
-    changeOrderLinesRequest: ChangeOrderLinesRequest, options?: Parameters<typeof apiFetch>[1]): Promise<changeOrderLinesResponse> => {
+    changeOrderLinesRequest: ChangeOrderLinesRequest, options?: Parameters<typeof apiFetch>[1]): Promise<changeOrderLinesResponseSuccess> => {
 
     const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
     if (!h) return {};
@@ -829,7 +931,7 @@ export const changeOrderLines = async (orderId: string,
     }
     return headers;
   };
-return apiFetch<changeOrderLinesResponse>(getChangeOrderLinesUrl(orderId),
+return apiFetch<changeOrderLinesResponseSuccess>(getChangeOrderLinesUrl(orderId),
   {
     ...options,
     method: 'PUT',
