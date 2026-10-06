@@ -68,7 +68,7 @@ import java.time.Instant;
  * 注文の一覧の1行を返す API の本文。
  *
  * @param orderId 注文の ID
- * @param status 注文の状態のコード値
+ * @param status 注文の状態の区分値
  * @param total 注文の合計金額
  * @param placedAt 注文を受け付けた時刻
  * @param lockNo 更新の本文で送り返すロック番号
@@ -117,7 +117,7 @@ public record OrderSummaryListResponse(List<OrderSummaryResponse> items) {
  *
  * @param orderId 注文の ID
  * @param customerId 注文した顧客の ID
- * @param status 注文の状態のコード値
+ * @param status 注文の状態の区分値
  * @param lines 注文の明細
  * @param subtotal 割引前の小計
  * @param discount 割引額
