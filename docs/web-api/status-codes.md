@@ -32,6 +32,7 @@ OpenAPIへのエラー応答の付け方は[OpenAPIのアノテーションとJa
 - **404 Not Found**：パスで指定したリソースが存在しない、または参照する権限がない。
 - **405 Method Not Allowed**：エンドポイントが対応しないHTTPメソッドを指定された。
 - **409 Conflict**：楽観ロックの競合、悲観ロックの取得失敗、一意制約違反。
+  楽観ロックの`ConflictException`（`lock_timeout`による失敗を含む）は、`ApiExceptionHandler`が409にする。
 - **413 Content Too Large**：リクエストのヘッダーまたは本文が上限を超えた。
 - **422 Unprocessable Content**：入力が業務処理の条件を満たさない（在庫不足で出荷指示できない場合など）。
 - **429 Too Many Requests**：レート制限を超えた。

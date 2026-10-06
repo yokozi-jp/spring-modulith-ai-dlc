@@ -1,5 +1,6 @@
 package com.example.demo;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -9,6 +10,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.example.demo.testkit.SharedTestConfiguration;
+import conflictfixture.ConflictFixture;
 import jakarta.servlet.RequestDispatcher;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -25,12 +27,13 @@ import org.springframework.test.web.servlet.MockMvc;
 /** API の Problem Details、locale、ブラウザ向けセキュリティヘッダを HTTP レベルで検証する。 */
 @SuppressWarnings({
   "PMD.AvoidDuplicateLiterals",
+  "PMD.TooManyMethods",
   "PMD.TooManyStaticImports",
   "PMD.UnitTestShouldIncludeAssert"
 })
 @SpringBootTest
 @AutoConfigureMockMvc
-@Import(SharedTestConfiguration.class)
+@Import({SharedTestConfiguration.class, ConflictFixture.class})
 class ApiContractTest {
 
   /** 実際の Spring MVC と Security filter chain を通すクライアント。 */
@@ -122,6 +125,65 @@ class ApiContractTest {
         .andExpect(jsonPath("$.detail").doesNotExist())
         .andExpect(jsonPath("$.exception").doesNotExist())
         .andExpect(jsonPath("$.trace").doesNotExist());
+  }
+
+  @Test
+  @DisplayName("ConflictException は日本語の 409 Problem Details になり、例外の内容を含まない")
+  void conflictExceptionReturnsProblemDetailsWithoutImplementationDetails() throws Exception {
+    final String body =
+        mockMvc
+            .perform(get("/api/conflict-fixture/stale").with(user("test-user")))
+            .andExpect(status().isConflict())
+            .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
+            .andExpect(header().string(HttpHeaders.CONTENT_LANGUAGE, "ja"))
+            .andExpect(header().string(HttpHeaders.VARY, HttpHeaders.ACCEPT_LANGUAGE))
+            .andExpect(jsonPath("$.type").value("about:blank"))
+            .andExpect(jsonPath("$.title").value("競合が発生しました"))
+            .andExpect(jsonPath("$.status").value(409))
+            .andExpect(jsonPath("$.detail").doesNotExist())
+            .andExpect(jsonPath("$.exception").doesNotExist())
+            .andExpect(jsonPath("$.trace").doesNotExist())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+
+    assertThat(body).doesNotContain("O-1", "ConflictException", ".java");
+  }
+
+  @Test
+  @DisplayName("行ロックを待ち切れなかった ConflictException は英語の 409 になり、原因の内容を含まない")
+  void lockedConflictExceptionReturnsEnglishProblemDetailsWithoutCause() throws Exception {
+    final String body =
+        mockMvc
+            .perform(
+                get("/api/conflict-fixture/locked")
+                    .with(user("test-user"))
+                    .header(HttpHeaders.ACCEPT_LANGUAGE, "en-US"))
+            .andExpect(status().isConflict())
+            .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
+            .andExpect(header().string(HttpHeaders.CONTENT_LANGUAGE, "en"))
+            .andExpect(jsonPath("$.type").value("about:blank"))
+            .andExpect(jsonPath("$.title").value("Conflict"))
+            .andExpect(jsonPath("$.status").value(409))
+            .andExpect(jsonPath("$.detail").doesNotExist())
+            .andExpect(jsonPath("$.exception").doesNotExist())
+            .andExpect(jsonPath("$.trace").doesNotExist())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+
+    assertThat(body)
+        .doesNotContain("t_x", "secret_sql", "CannotAcquireLockException", "ConflictException")
+        .doesNotContain(".java");
+  }
+
+  @Test
+  @DisplayName("ConflictException ではない IllegalStateException は 409 にならず 500 のままである")
+  void illegalStateExceptionStaysInternalServerError() throws Exception {
+    mockMvc
+        .perform(get("/api/conflict-fixture/illegal-state").with(user("test-user")))
+        .andExpect(status().isInternalServerError())
+        .andExpect(jsonPath("$.status").value(500));
   }
 
   @Test

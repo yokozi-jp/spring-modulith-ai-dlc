@@ -211,6 +211,22 @@ class ApiErrorContractTest {
   }
 
   @Test
+  @DisplayName("422 の ResponseStatusException は 500 の経路でなく標準の処理で返り、reason のテーブルとキーを含まない")
+  void unprocessableContentHidesReason() throws Exception {
+    mockMvc
+        .perform(
+            get("/api/error-fixture/unprocessable")
+                .with(user("test-user"))
+                .header(HttpHeaders.ACCEPT_LANGUAGE, "ja"))
+        .andExpect(status().isUnprocessableContent())
+        .andExpect(jsonPath("$.type").value("about:blank"))
+        .andExpect(jsonPath("$.title").value("処理できない内容です"))
+        .andExpect(jsonPath("$.detail").doesNotExist())
+        .andExpect(content().string(not(Matchers.containsString("fixture_child"))))
+        .andExpect(content().string(not(Matchers.containsString("secret-key"))));
+  }
+
+  @Test
   @DisplayName("JSON の構文エラーと型の不一致は errors を持たない")
   void malformedRequestsHaveNoErrors() throws Exception {
     mockMvc
