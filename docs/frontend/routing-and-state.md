@@ -69,7 +69,9 @@ layout routeにcomponentを持たせるなら、そのcomponentで `<Outlet />` 
 
 ## 状態表示の分担
 
-初期描画のdataは、loaderで生成された `get<Operation>SuspenseQueryOptions()` を `ensureQueryData` し、componentは同じoptionsを `useSuspenseQuery` で読む。
+初期描画のdataは、loaderで生成された `get<Operation>SuspenseQueryOptions()` を `preloadQuery`（`src/api/preload-query.ts`）でcacheに入れ、componentは同じoptionsを `useSuspenseQuery` で読む。
+`preloadQuery` は、TanStack Queryが `ensureQueryData` の後継とする `queryClient.query({ ...options, staleTime: "static" })` を呼び、cacheにdataがあれば取得しない。
+`ensureQueryData` は非推奨（Oxlintの `typescript/no-deprecated` が検出する）であり、suspense用のoptionsは `queryFn` を省略可能とする型のため `exactOptionalPropertyTypes` の下で `query` へそのまま渡せないので、loaderから直接呼ばない。
 
 状態ごとの表示は次のように分担する。
 
@@ -89,7 +91,7 @@ errorの表示はcatalogの文言を使い、`error.message` を画面に出さ�
 
 4xxの `ApiProblemError` は再試行しない。
 ただし、408と429は再試行してよい応答なので（RFC 9110 §15.5.9、RFC 6585 §4）、5xxと同じく再試行する。
-loaderの `ensureQueryData` も `defaultOptions.queries.retry` に従い、5xx、408、429と通信の失敗は最大3回再試行してから `RouteError` になる。
+loaderの `preloadQuery` も `defaultOptions.queries.retry` に従い、5xx、408、429と通信の失敗は最大3回再試行してから `RouteError` になる。
 
 route固有の `pendingComponent` や `errorComponent` は、`react/no-multi-comp` があるためroute fileとは別のファイルに置く。
 
