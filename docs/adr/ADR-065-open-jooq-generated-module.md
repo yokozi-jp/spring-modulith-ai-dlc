@@ -1,11 +1,11 @@
 ---
 type: ADR
-title: 'ADR-063: jOOQ の生成物を Spring Modulith の OPEN のモジュールにする'
+title: 'ADR-065: jOOQ の生成物を Spring Modulith の OPEN のモジュールにする'
 description: jOOQ が生成する com.example.demo.jooq を Spring Modulith の OPEN のモジュールにし、スキーマごとのサブパッケージにある生成型をすべての機能モジュールの Repository から使えるようにする決定。package-info.java は jooqCodegen が生成のたびに書く。
 tags: [adr, backend, database, jooq, spring-modulith]
 ---
 
-# ADR-063: jOOQ の生成物を Spring Modulith の OPEN のモジュールにする
+# ADR-065: jOOQ の生成物を Spring Modulith の OPEN のモジュールにする
 
 ## Status
 
