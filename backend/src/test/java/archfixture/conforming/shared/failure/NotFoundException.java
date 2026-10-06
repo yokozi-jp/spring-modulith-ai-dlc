@@ -7,7 +7,7 @@ public final class NotFoundException extends RuntimeException {
 
   @Serial private static final long serialVersionUID = 1L;
 
-  /** メッセージから見つからないことの例外を作る。 */
+  /** 例外を作る。 */
   public NotFoundException(final String message) {
     super(message);
   }

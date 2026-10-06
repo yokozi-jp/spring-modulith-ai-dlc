@@ -60,11 +60,28 @@ class ApiExceptionHandlerTest {
     }
   }
 
-  /** 出力のうち、logger が ApiExceptionHandler の記録の行だけを返す。 */
+  /**
+   * 出力のうち、logger が ApiExceptionHandler の記録の行だけを返す。Spring のコンテキストを起動する前は Logback の既定の書式、起動した後は JSON
+   * の書式で出るため、どちらの logger の書き方も拾う。
+   */
   private static String handlerLog(final String log) {
+    final String logger = ApiExceptionHandler.class.getName();
     return log.lines()
-        .filter(line -> line.contains("\"logger\":\"" + ApiExceptionHandler.class.getName() + "\""))
+        .filter(line -> line.contains(logger + " ") || line.contains(logger + "\""))
         .collect(Collectors.joining("\n"));
+  }
+
+  /** 業務上の失敗が、このクラスの記録として ERROR と WARN ではなく INFO で例外の型とともに残ることを検証する。 */
+  private static void assertBusinessFailureLoggedAtInfo(
+      final String log, final Class<? extends Exception> type) {
+    assertTrue(log.contains("API business failure"), () -> "event 名が残ること: " + log);
+    assertTrue(log.contains("INFO"), () -> "INFO で残ること: " + log);
+    assertTrue(log.contains(type.getName()), () -> "例外の型が残ること: " + log);
+    // 同じ出力に出るほかのライブラリの WARN と区別するため、このクラスの記録だけを見る。
+    final String handlerLog = handlerLog(log);
+    assertTrue(handlerLog.contains("API business failure"), () -> "このクラスの記録があること: " + log);
+    assertFalse(handlerLog.contains("ERROR"), () -> "ERROR で残さないこと: " + handlerLog);
+    assertFalse(handlerLog.contains("WARN"), () -> "WARN で残さないこと: " + handlerLog);
   }
 
   private static ApiExceptionHandler handler() {
@@ -133,15 +150,7 @@ class ApiExceptionHandlerTest {
 
     assertNotNull(response, "応答");
     assertEquals(HttpStatus.NOT_FOUND, response.getStatusCode(), "HTTP status");
-    final String log = output.getAll();
-    assertTrue(log.contains("API business failure"), () -> "event 名が残ること: " + log);
-    assertTrue(log.contains("INFO"), () -> "INFO で残ること: " + log);
-    assertTrue(log.contains(NotFoundException.class.getName()), () -> "例外の型が残ること: " + log);
-    // 同じ出力に出るほかのライブラリの WARN と区別するため、このクラスの記録だけを見る。
-    final String handlerLog = handlerLog(log);
-    assertTrue(handlerLog.contains("API business failure"), () -> "このクラスの記録があること: " + log);
-    assertFalse(handlerLog.contains("ERROR"), () -> "ERROR で残さないこと: " + handlerLog);
-    assertFalse(handlerLog.contains("WARN"), () -> "WARN で残さないこと: " + handlerLog);
+    assertBusinessFailureLoggedAtInfo(output.getAll(), NotFoundException.class);
   }
 
   @Test
@@ -155,16 +164,7 @@ class ApiExceptionHandlerTest {
 
     assertNotNull(response, "応答");
     assertEquals(HttpStatus.UNPROCESSABLE_CONTENT, response.getStatusCode(), "HTTP status");
-    final String log = output.getAll();
-    assertTrue(log.contains("API business failure"), () -> "event 名が残ること: " + log);
-    assertTrue(log.contains("INFO"), () -> "INFO で残ること: " + log);
-    assertTrue(
-        log.contains(BusinessRuleViolationException.class.getName()), () -> "例外の型が残ること: " + log);
-    // 同じ出力に出るほかのライブラリの WARN と区別するため、このクラスの記録だけを見る。
-    final String handlerLog = handlerLog(log);
-    assertTrue(handlerLog.contains("API business failure"), () -> "このクラスの記録があること: " + log);
-    assertFalse(handlerLog.contains("ERROR"), () -> "ERROR で残さないこと: " + handlerLog);
-    assertFalse(handlerLog.contains("WARN"), () -> "WARN で残さないこと: " + handlerLog);
+    assertBusinessFailureLoggedAtInfo(output.getAll(), BusinessRuleViolationException.class);
   }
 
   @Test
