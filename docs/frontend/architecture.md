@@ -39,6 +39,8 @@ frontend/src/
 ├── api/
 │   ├── api-fetch.ts
 │   ├── api-fetch.test.ts
+│   ├── preload-query.ts
+│   ├── preload-query.test.ts
 │   ├── query-client.ts
 │   ├── query-client.test.ts
 │   └── generated/models/
