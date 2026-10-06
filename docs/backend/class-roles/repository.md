@@ -52,8 +52,8 @@ Presentation は Repository を使わない。
 - 集約の物理削除が要るときは `void delete(集約ルート)` を置き、`update` と同じ二つの例外を Javadoc に書く。
   期待する版を持つ書き込みは、集約ルートを受け取る `update` と `delete` に限り、識別子と版を受け取るメソッドを作らない。
 - `add`、`update`、`delete` の引数の集約ルートは、引数のない `long lockNo()` を持つ（[集約](aggregate.md)）。
-- `update` と `delete` を呼べるのは CommandHandler だけである。
-  Domain Service と QueryService は Repository を読み取りにだけ使う。
+- `add` 以外の書き込み（`update`、`delete` と、`save` のような別名で集約ルートを受け取るメソッド）を呼べるのは CommandHandler だけである。
+  Domain Service、QueryService、別の Repository の実装は、Repository を読み取りにだけ使う。
   CommandHandler が集約の `ensureLockNo` で画面の版を比べてから保存する流れを、迂回させないためである。
 - 版を比べない UPDATE か DELETE の件数を返すメソッド（在庫を引き当てて件数を返す、など）には、Error Prone の `@CheckReturnValue` を付ける。
   呼び出し側が件数を捨てると、コンパイルが失敗する。
@@ -200,7 +200,7 @@ class JooqOrderRepositoryTest {
 - [ ] メソッドはドメインの語彙で名付け、`findById` は `Optional`、複数は `List` を返し、保存は新しい集約の `add` と既存の集約の `update` に分ける。［自分で点検］
 - [ ] `update` の Javadoc に、行がないときの `NoSuchElementException` と、競合したときの `ConflictException` を書く。［自分で点検］
 - [ ] `add`、`update`、`delete` は、引数のない `long lockNo()` を持つ集約ルートを一つだけ受け取る。［ArchUnit で検査：TableWriterArchTest.repositoryWritesTakeVersionedAggregates］
-- [ ] `update` と `delete` を CommandHandler だけが呼ぶ。［ArchUnit で検査：TableWriterArchTest.onlyCommandHandlersUpdateOrDeleteAggregates］
+- [ ] `add` 以外の書き込みを CommandHandler だけが呼ぶ。［ArchUnit で検査：TableWriterArchTest.onlyCommandHandlersUpdateOrDeleteAggregates］
 - [ ] 版を比べない UPDATE か DELETE の件数を返すメソッドに `@CheckReturnValue` を付ける。［自分で点検］
 - [ ] 実装は `infrastructure.persistence` の `Jooq<Aggregate>Repository` にする。［ArchUnit で検査：PackageByFeatureOnionArchitectureTest.repositoryImplementationsAreJooqRepositories］
 - [ ] Domain の外の実装は `infrastructure` に置く。［ArchUnit で検査：PackageByFeatureOnionArchitectureTest.domainInterfacesAreImplementedInInfrastructure］

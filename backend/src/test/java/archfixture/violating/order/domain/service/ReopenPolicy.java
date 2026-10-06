@@ -1,10 +1,13 @@
 package archfixture.violating.order.domain.service;
 
+import archfixture.violating.order.domain.model.Order;
 import archfixture.violating.order.domain.model.OrderId;
 import archfixture.violating.order.domain.model.UnversionedOrderRepository;
 import org.springframework.stereotype.Service;
 
-/** 違反：onlyCommandHandlersUpdateOrDeleteAggregates（Domain Service が Repository の update を呼ぶ）。 */
+/**
+ * 違反：onlyCommandHandlersUpdateOrDeleteAggregates（Domain Service が Repository の update と save を呼ぶ）。
+ */
 @Service
 public class ReopenPolicy {
 
@@ -19,5 +22,10 @@ public class ReopenPolicy {
   /** 注文を再開して保存する。 */
   public void reopen(final OrderId orderId) {
     orderRepository.update(orderId);
+  }
+
+  /** 注文を再開して、update と別の名前の save で保存する。 */
+  public void reopenAggregate(final Order order) {
+    orderRepository.save(order);
   }
 }

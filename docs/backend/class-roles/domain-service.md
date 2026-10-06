@@ -164,7 +164,7 @@ class DiscountPolicyTest {
 - [ ] 依存は Java の標準型、Domain の型、`@Service` だけにし、`@Transactional`、`ApplicationEventPublisher`、ロガー、モジュールルートの型を使わない。［ArchUnit で検査：PackageByFeatureOnionArchitectureTest.domainServicesDependOnlyOnDomainAndJava］
 - [ ] `application` と Infrastructure に依存しない。［ArchUnit で検査：PackageByFeatureOnionArchitectureTest.dependenciesPointInward］
 - [ ] 外部システムのインタフェースを呼ばない。［自分で点検］
-- [ ] Repository の `update` と `delete` を呼ばない。［ArchUnit で検査：TableWriterArchTest.onlyCommandHandlersUpdateOrDeleteAggregates］
+- [ ] Repository の `add` 以外の書き込み（`update`、`delete`、集約ルートを受け取るメソッド）を呼ばない。［ArchUnit で検査：TableWriterArchTest.onlyCommandHandlersUpdateOrDeleteAggregates］
 - [ ] 名前は業務規則を表す名詞にする。［自分で点検］
 - [ ] `public class` にし、依存を public のコンストラクタで受け取り、状態を持たない。［自分で点検］
 - [ ] 規則を満たさないときは `IllegalStateException` を投げる。［自分で点検］

@@ -287,7 +287,7 @@ class CancelOrderCommandHandlerTest {
 - [ ] jOOQ の API と生成型を使わない。［ArchUnit で検査：PackageByFeatureOnionArchitectureTest.databaseTechnologyApisAreOnlyUsedByPersistenceAdapters］
 - [ ] Command の値を `handle` の中で値オブジェクトに変換し、業務規則を集約と Domain Service に任せる。［自分で点検］
 - [ ] 新しい集約を `add` で、既存の集約を `update` で保存し、イベントを保存の後に `ApplicationEventPublisher` で発行する。［自分で点検］
-- [ ] Command が `VersionedCommand` のときは、集約の `ensureLockNo(ExpectedLockNo)` を呼ぶ。［ArchUnit で検査：TableWriterArchTest.commandHandlersEnsureScreenLockNo］
+- [ ] Command が `VersionedCommand` のときは、`handle` の中で直接、集約の `ensureLockNo(ExpectedLockNo)` を呼ぶ。［ArchUnit で検査：TableWriterArchTest.commandHandlersEnsureScreenLockNo］
 - [ ] `ensureLockNo` は `findById` の直後、状態を変える操作より前に呼び、`command.expectedLockNo()` を渡す。型はコンパイルで、呼ぶ位置と渡す値はレビューで確かめる。［自分で点検］
 - [ ] 画面から呼ばれる CommandHandler は外部システムのインタフェースに依存せず、外部システムはイベントを受けた Listener が呼ぶ CommandHandler から呼ぶ。［自分で点検］
 - [ ] 外部システムを呼ぶ CommandHandler は、集約がその操作を終えていれば何もせずに Result を返し、外部システムに冪等性キーを渡す。［自分で点検］

@@ -4,6 +4,7 @@ import static com.tngtech.archunit.core.domain.JavaClass.Predicates.resideInAPac
 import static com.tngtech.archunit.core.domain.JavaClass.Predicates.resideInAnyPackage;
 import static com.tngtech.archunit.core.domain.JavaClass.Predicates.simpleNameEndingWith;
 import static com.tngtech.archunit.core.domain.JavaClass.Predicates.type;
+import static com.tngtech.archunit.core.domain.properties.HasName.Predicates.name;
 import static com.tngtech.archunit.lang.conditions.ArchConditions.be;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.classes;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.methods;
@@ -275,7 +276,8 @@ class ClassRoleArchTest {
         .that(
             resideInAPackage(basePackage + ".*..")
                 .and(
-                    DescribedPredicate.not(resideInAPackage(basePackage + ".shared.concurrency..")))
+                    DescribedPredicate.not(
+                        name(basePackage + ".shared.concurrency.VersionedCommand")))
                 .and(simpleNameEndingWith("Command").or(simpleNameEndingWith("Result"))))
         .should()
         .beRecords()

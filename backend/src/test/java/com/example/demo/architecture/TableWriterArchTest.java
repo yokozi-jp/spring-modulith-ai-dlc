@@ -61,14 +61,15 @@ import org.junit.jupiter.api.Test;
  * <p>画面の版は {@code ExpectedLockNo} と {@code VersionedCommand} で運ぶ。次の規則が、版の比べ忘れを止める。
  *
  * <ul>
- *   <li>R1 {@code commandsBuiltByPresentationForWritesAreVersioned}：presentation が作る Command で保存する
- *       CommandHandler は、その Command を {@code VersionedCommand} にする。
- *   <li>R2 {@code onlyCommandHandlersUpdateOrDeleteAggregates}：{@code update} と {@code delete} は
- *       CommandHandler だけが呼ぶ。
+ *   <li>R1 {@code commandsBuiltByPresentationForWritesAreVersioned}：presentation
+ *       がコンストラクタ、コンストラクタ参照、 Command 自身を返す static factory で作る Command で保存する CommandHandler は、その
+ *       Command を {@code VersionedCommand} にする。
+ *   <li>R2 {@code onlyCommandHandlersUpdateOrDeleteAggregates}：Repository の {@code add}
+ *       以外の書き込み（{@code update}、{@code delete}、集約ルートを受け取るメソッド）は CommandHandler だけが呼ぶ。
  *   <li>R3 {@code expectedLockNoIsCreatedOnlyByRequests}：{@code ExpectedLockNo} は {@code
  *       presentation.web} の Request だけが作る。
  *   <li>R4 {@code commandHandlersEnsureScreenLockNo}：{@code VersionedCommand} を受け取る CommandHandler
- *       は {@code ensureLockNo(ExpectedLockNo)} を呼ぶ。
+ *       の {@code handle} は、その中で直接 {@code ensureLockNo(ExpectedLockNo)} を呼ぶ。
  * </ul>
  *
  * <p>ponytail: 値の流れは追わない。{@code ensureLockNo} を別の集約のインスタンスに呼ぶ実装、業務の検査や外部の呼び出しの後に呼ぶ実装、 {@code
@@ -203,21 +204,22 @@ class TableWriterArchTest {
       repositoryWritesTakeVersionedAggregatesRule();
 
   /**
-   * {@code VersionedCommand} を受け取る CommandHandler は {@code ensureLockNo(ExpectedLockNo)} を呼ぶ（R4、旧
-   * H4）。
+   * {@code VersionedCommand} を受け取る CommandHandler の {@code handle} は、その中で直接 {@code
+   * ensureLockNo(ExpectedLockNo)} を呼ぶ（R4、旧 H4）。
    */
   @ArchTest
   /* package */ static final ArchRule commandHandlersEnsureScreenLockNo =
       commandHandlersEnsureScreenLockNoRule(BASE_PACKAGE);
 
   /**
-   * presentation が作る Command で保存する CommandHandler は、その Command を {@code VersionedCommand} にする（R1）。
+   * presentation がコンストラクタか static factory で作る Command で保存する CommandHandler は、その Command を {@code
+   * VersionedCommand} にする（R1）。
    */
   @ArchTest
   /* package */ static final ArchRule commandsBuiltByPresentationForWritesAreVersioned =
       commandsBuiltByPresentationForWritesAreVersionedRule(BASE_PACKAGE);
 
-  /** Repository の {@code update} と {@code delete} は CommandHandler だけが呼ぶ（R2）。 */
+  /** Repository の {@code add} 以外の書き込みは CommandHandler だけが呼ぶ（R2）。 */
   @ArchTest
   /* package */ static final ArchRule onlyCommandHandlersUpdateOrDeleteAggregates =
       onlyCommandHandlersUpdateOrDeleteAggregatesRule();
@@ -336,12 +338,12 @@ class TableWriterArchTest {
             DescribedPredicate.describe(
                 "handle の引数の Command が VersionedCommand である",
                 type -> handlesCommandAssignableTo(type, versionedCommand)))
-        .should(callEnsureLockNo(expectedLockNo))
+        .should(callEnsureLockNoInHandle(versionedCommand, expectedLockNo))
         .allowEmptyShould(true)
         .because(
             "画面の版を比べないと、別の人が先に更新した集約に対して業務の検査や外部の呼び出しを始めてしまうため。"
-                + "直し方：handle で集約を取り出した直後に、集約の ensureLockNo(command.expectedLockNo()) を呼ぶ。"
-                + "引数が long の ensureLockNo では規則を満たさない。"
+                + "直し方：handle で集約を取り出した直後に、handle の中で直接、集約の ensureLockNo(command.expectedLockNo()) を呼ぶ。"
+                + "別のメソッドやラムダの中の呼び出しと、引数が long の ensureLockNo では規則を満たさない。"
                 + "規約：docs/backend/class-roles/command-handler.md、"
                 + DOCS);
   }
@@ -355,13 +357,15 @@ class TableWriterArchTest {
         .haveSimpleNameEndingWith(COMMAND_HANDLER)
         .and(
             DescribedPredicate.describe(
-                "presentation が作る Command を受け取り、Repository の update か delete を呼ぶ",
+                "presentation がコンストラクタ、コンストラクタ参照、Command 自身を返す static factory の呼び出しかメソッド参照で作る"
+                    + " Command を受け取り、Repository の add 以外の書き込みを呼ぶ",
                 TableWriterArchTest::savesCommandBuiltByPresentation))
         .should(takeVersionedCommand(versionedCommand))
         .allowEmptyShould(true)
         .because(
             "presentation が作る Command が版を持たないと、画面の版を比べずに保存する更新が通るため。"
                 + "直し方：Command を VersionedCommand にして ExpectedLockNo を持たせ、Request の toCommand で作る。"
+                + "コンストラクタではなく Command の static factory で作っても同じ規則の対象になる。"
                 + "Listener が作る Command は VersionedCommand にしない。"
                 + "Request と Listener の両方が作る Command は、別々の Command に分ける。"
                 + "規約：docs/backend/class-roles/command.md、docs/backend/class-roles/request.md、"
@@ -371,21 +375,17 @@ class TableWriterArchTest {
   /** R2 の規則を組み立てる。 */
   /* package */ static ArchRule onlyCommandHandlersUpdateOrDeleteAggregatesRule() {
     return noClasses()
-        .that(
-            DescribedPredicate.describe(
-                "CommandHandler でも、domain.model の Repository の実装でもない",
-                type ->
-                    !type.getSimpleName().endsWith(COMMAND_HANDLER)
-                        && type.getAllRawInterfaces().stream()
-                            .noneMatch(TableWriterArchTest::isDomainRepository)))
+        .that()
+        .haveSimpleNameNotEndingWith(COMMAND_HANDLER)
         .should()
         .accessTargetWhere(
             DescribedPredicate.describe(
-                "domain.model の Repository の update か delete",
-                TableWriterArchTest::isRepositoryUpdateOrDelete))
+                "domain.model の Repository の add 以外の書き込み（update、delete、集約ルートを受け取るメソッド）",
+                TableWriterArchTest::isRepositoryWrite))
         .because(
-            "Domain Service や QueryService からの保存は ensureLockNo の検査を通らないため。"
-                + "直し方：update と delete は CommandHandler から呼ぶ。"
+            "Domain Service、QueryService、Repository の実装からの保存は ensureLockNo の検査を通らないため。"
+                + "直し方：Repository の add 以外の書き込みは CommandHandler から呼び、"
+                + "Repository の実装から別の Repository を呼ばない。"
                 + "業務の規則は Domain Service に残し、保存は CommandHandler が行う。"
                 + "規約：docs/backend/class-roles/repository.md、docs/backend/class-roles/command-handler.md、"
                 + DOCS);
@@ -491,13 +491,12 @@ class TableWriterArchTest {
    */
   private static boolean isRepositoryAggregateWrite(final JavaMethod method) {
     final JavaClass owner = method.getOwner();
-    return !ADD.equals(method.getName())
-        && method.getModifiers().contains(JavaModifier.PUBLIC)
+    return method.getModifiers().contains(JavaModifier.PUBLIC)
         && !method.getModifiers().contains(JavaModifier.SYNTHETIC)
         && owner.getSimpleName().startsWith("Jooq")
         && owner.getSimpleName().endsWith("Repository")
         && owner.getPackageName().contains(".infrastructure.persistence")
-        && method.getRawParameterTypes().stream().anyMatch(TableWriterArchTest::isAggregateRoot);
+        && isAggregateWrite(method.getName(), method.getRawParameterTypes());
   }
 
   private static ArchCondition<JavaMethod> callTheVersionedEntryPoint(final String writer) {
@@ -595,25 +594,49 @@ class TableWriterArchTest {
         && type.getPackageName().contains(DOMAIN_MODEL);
   }
 
-  /** 呼び出し先が、{@code domain.model} の Repository の {@code update} か {@code delete} かを返す。 */
-  private static boolean isRepositoryUpdateOrDelete(final JavaAccess<?> access) {
+  /** {@code add} 以外で、集約ルートを受け取るメソッドかを返す。R1、R2、H3 が同じ判定で書き込みを見つける。 */
+  private static boolean isAggregateWrite(final String name, final List<JavaClass> parameterTypes) {
+    return !ADD.equals(name)
+        && parameterTypes.stream().anyMatch(TableWriterArchTest::isAggregateRoot);
+  }
+
+  /**
+   * 呼び出し先が、{@code domain.model} の Repository の {@code add} 以外の書き込みかを返す。
+   *
+   * <p>{@code save} のような別名でも、集約ルートを受け取れば書き込みとみなす。 {@code update} と {@code delete} は H6
+   * が集約ルートを受け取らせるため、誤って識別子を受け取る形でも名前で書き込みとみなす。
+   */
+  private static boolean isRepositoryWrite(final JavaAccess<?> access) {
+    final String name = access.getName();
     return isDomainRepository(access.getTargetOwner())
-        && (UPDATE.equals(access.getName()) || DELETE.equals(access.getName()));
+        && (UPDATE.equals(name)
+            || DELETE.equals(name)
+            || (access.getTarget() instanceof AccessTarget.CodeUnitAccessTarget target
+                && isAggregateWrite(name, target.getRawParameterTypes())));
   }
 
   /** R1 の対象かを返す。CommandHandler が Repository で保存し、その Command を presentation が作る。 */
   private static boolean savesCommandBuiltByPresentation(final JavaClass handler) {
-    // ponytail: handle の引数の型と、presentation のコンストラクタ呼び出しの対象の型を突き合わせるだけで、値の流れは追わない。
-    return handler.getAccessesFromSelf().stream()
-            .anyMatch(TableWriterArchTest::isRepositoryUpdateOrDelete)
+    // ponytail: handle の引数の型と、presentation が作る Command の型を突き合わせるだけで、値の流れは追わない。
+    return handler.getAccessesFromSelf().stream().anyMatch(TableWriterArchTest::isRepositoryWrite)
         && handleParameters(handler).anyMatch(TableWriterArchTest::isBuiltByPresentation);
   }
 
-  /** コンストラクタ呼び出しとコンストラクタ参照の、どちらかの呼び出し元が presentation かを返す。 */
+  /** コンストラクタ、コンストラクタ参照、Command 自身を返す static factory の呼び出しとメソッド参照の、どれかの呼び出し元が presentation かを返す。 */
   private static boolean isBuiltByPresentation(final JavaClass command) {
-    return Stream.concat(
-            command.getConstructorCallsToSelf().stream(),
-            command.getConstructorReferencesToSelf().stream())
+    final Stream<JavaAccess<?>> factories =
+        command.getMethods().stream()
+            .filter(method -> method.getModifiers().contains(JavaModifier.STATIC))
+            .filter(method -> method.getRawReturnType().isAssignableTo(command.getName()))
+            .flatMap(
+                method ->
+                    Stream.concat(
+                        method.getCallsOfSelf().stream(), method.getReferencesToSelf().stream()));
+    return Stream.<JavaAccess<?>>concat(
+            Stream.concat(
+                command.getConstructorCallsToSelf().stream(),
+                command.getConstructorReferencesToSelf().stream()),
+            factories)
         .anyMatch(access -> access.getOriginOwner().getPackageName().contains(".presentation."));
   }
 
@@ -636,25 +659,36 @@ class TableWriterArchTest {
     };
   }
 
-  private static ArchCondition<JavaClass> callEnsureLockNo(final String expectedLockNo) {
-    return new ArchCondition<>("call ensureLockNo(ExpectedLockNo) on a domain.model type") {
+  private static ArchCondition<JavaClass> callEnsureLockNoInHandle(
+      final String versionedCommand, final String expectedLockNo) {
+    return new ArchCondition<>(
+        "call ensureLockNo(ExpectedLockNo) on a domain.model type in handle") {
       @Override
       public void check(final JavaClass item, final ConditionEvents events) {
-        // クラス単位の呼び出しは、ラムダの本体の呼び出しも含む。
-        // 引数の型まで見るため、ensureLockNo(long) のオーバーロードでは満たせない。
-        final boolean calls =
-            item.getMethodCallsFromSelf().stream()
-                .anyMatch(
-                    call ->
-                        ENSURE_LOCK_NO.equals(call.getName())
-                            && call.getTargetOwner().getPackageName().contains(DOMAIN_MODEL)
-                            && call.getTarget().getRawParameterTypes().stream()
-                                .anyMatch(type -> type.getFullName().equals(expectedLockNo)));
-        if (!calls) {
-          events.add(
-              SimpleConditionEvent.violated(
-                  item, item.getFullName() + " が集約の ensureLockNo(ExpectedLockNo) を呼んでいない。"));
-        }
+        // handle 自身の呼び出しだけを見るため、別のメソッドやラムダの本体の呼び出しでは満たせない。
+        // 引数の型まで見るため、ensureLockNo(long) のオーバーロードでも満たせない。
+        item.getMethods().stream()
+            .filter(method -> HANDLE.equals(method.getName()))
+            .filter(method -> method.getRawParameterTypes().size() == 1)
+            .filter(
+                method -> method.getRawParameterTypes().getFirst().isAssignableTo(versionedCommand))
+            .filter(
+                method ->
+                    method.getMethodCallsFromSelf().stream()
+                        .noneMatch(
+                            call ->
+                                ENSURE_LOCK_NO.equals(call.getName())
+                                    && call.getTargetOwner().getPackageName().contains(DOMAIN_MODEL)
+                                    && call.getTarget().getRawParameterTypes().stream()
+                                        .anyMatch(
+                                            type -> type.getFullName().equals(expectedLockNo))))
+            .forEach(
+                method ->
+                    events.add(
+                        SimpleConditionEvent.violated(
+                            item,
+                            method.getFullName()
+                                + " が集約の ensureLockNo(ExpectedLockNo) を handle の中で直接呼んでいない。")));
       }
     };
   }

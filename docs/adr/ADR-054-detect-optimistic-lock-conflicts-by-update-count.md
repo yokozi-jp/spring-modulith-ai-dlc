@@ -75,15 +75,19 @@ PostgreSQL の READ COMMITTED では、後の UPDATE は先の UPDATE のコミ�
     集約ルートが `lockNo()` を持たないと、版を比べる規則が集約ルートを見つけられず、空のまま通るためである。
     必須の `add` を含めるため、`save` のような名前で保存する Repository でも、形を外れた集約は `add` で検出される。
   - 集約ルートを引数に取るメソッドは、版を比べない入口を呼ばない。
-  - `commandsBuiltByPresentationForWritesAreVersioned`（R1）：presentation が作った Command を受け取り、Repository の `update` か `delete` を呼ぶ CommandHandler の Command は、`VersionedCommand` を実装する。
+  - R1 と R2 は、`domain.model` の Repository の `add` 以外の書き込み（`update`、`delete`、集約ルートを受け取るメソッド）を同じ判定で見つける。
+    `Jooq<Aggregate>Repository` の検査と同じく集約ルートの引数で選ぶため、`save` のような別名でも規則を外れない。
+  - `commandsBuiltByPresentationForWritesAreVersioned`（R1）：presentation が作った Command を受け取り、Repository の `add` 以外の書き込みを呼ぶ CommandHandler の Command は、`VersionedCommand` を実装する。
+    presentation が作るとは、コンストラクタかコンストラクタ参照を呼ぶか、Command 自身を返す static factory を呼ぶかメソッド参照で使うことである。
     Request と Listener の両方が作る Command は、Request 用と Listener 用に分ける。
     Listener が作る Command は版を持たなくてよい。
-  - `onlyCommandHandlersUpdateOrDeleteAggregates`（R2）：CommandHandler と Repository の実装以外のクラスは、`domain.model` の Repository の `update` と `delete` を呼ばない。
-    Domain Service と QueryService からの保存を止める。
+  - `onlyCommandHandlersUpdateOrDeleteAggregates`（R2）：CommandHandler 以外のクラスは、`domain.model` の Repository の `add` 以外の書き込みを呼ばない。
+    Domain Service、QueryService、Repository の実装からの保存を止める。
+    Repository の実装から別の Repository の書き込みを呼ぶ経路も、CommandHandler の `ensureLockNo` を通らないため止める。
   - `expectedLockNoIsCreatedOnlyByRequests`（R3）：`ExpectedLockNo` のコンストラクタ（`ExpectedLockNo::new` を含む）は、`presentation.web` の `*Request` だけが呼ぶ。
     Repository、`TableWriter`、CommandHandler、Controller が読んだ版から作って、比較を常に成り立たせることを止める。
-  - `commandHandlersEnsureScreenLockNo`（R4）：`handle` の引数が `VersionedCommand` である CommandHandler は、`domain.model` の型の `ensureLockNo(ExpectedLockNo)` を呼ぶ。
-    `ensureLockNo(long)` のオーバーロードでは満たせない。
+  - `commandHandlersEnsureScreenLockNo`（R4）：CommandHandler の、引数が `VersionedCommand` である `handle` は、その中で直接 `domain.model` の型の `ensureLockNo(ExpectedLockNo)` を呼ぶ。
+    別のメソッドやラムダの中の呼び出しと、`ensureLockNo(long)` のオーバーロードでは満たせない。
 - jOOQ の実行時の版をテストで固定する。
   版が変わったら、[jOOQ の SQL の書き方](../database/jooq-usage.md)の「jOOQの版を上げるとき」に従って禁止の一覧を見直す。
 - 期待する版は `shared.concurrency` の `ExpectedLockNo`（`long value`、1 未満は `IllegalArgumentException`）で運ぶ。
@@ -148,7 +152,7 @@ PostgreSQL の READ COMMITTED では、後の UPDATE は先の UPDATE のコミ�
   - **psql による古い版での物理削除**：psql で古い版の行を削除しても、何も検出しない。
     これも規約が受け入れているリスクとする。
     手順書で `WHERE lock_no = ?` を求めることは、将来の緩和策の候補にとどめる。
-  - **別の集約のインスタンスへの `ensureLockNo`**：R4 は `ensureLockNo(ExpectedLockNo)` を呼んだかしか見ない。
+  - **別の集約のインスタンスへの `ensureLockNo`**：R4 は `handle` の中で `ensureLockNo(ExpectedLockNo)` を直接呼んだかしか見ない。
     保存する集約と別のインスタンスに呼んでも通る。
   - **`ensureLockNo` の位置と引数**：業務の検査や外部の呼び出しの後に呼ぶ書き方と、`command.expectedLockNo()` 以外の値を渡す書き方は検出しない。
     `ExpectedLockNo` を作れるのは Request だけなので、渡せる値は別の Command か別の Request の値に限られる。

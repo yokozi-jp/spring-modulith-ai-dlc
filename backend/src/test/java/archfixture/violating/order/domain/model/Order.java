@@ -1,5 +1,7 @@
 package archfixture.violating.order.domain.model;
 
+import archfixture.violating.shared.concurrency.ExpectedLockNo;
+
 /** 違反フィクスチャが保存する集約ルート。これ自体は規約どおり。 */
 // record と同じ形のアクセサ（id() など）にそろえるため、フィールド名と同名の短いメソッドを許す。
 @SuppressWarnings({"PMD.AvoidFieldNameMatchingMethodName", "PMD.ShortMethodName"})
@@ -15,6 +17,11 @@ public final class Order {
   public Order(final OrderId id, final long lockNo) {
     this.id = id;
     this.lockNo = lockNo;
+  }
+
+  /** 画面が表示した版と比べる。違反フィクスチャが handle の外から呼ぶ。 */
+  public void ensureLockNo(final ExpectedLockNo expected) {
+    ensureLockNo(expected.value());
   }
 
   /** 違反：commandHandlersEnsureScreenLockNo の対象外にするための、数値を受け取るオーバーロード。 */

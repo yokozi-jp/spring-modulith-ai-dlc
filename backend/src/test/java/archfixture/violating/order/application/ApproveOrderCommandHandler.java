@@ -1,10 +1,15 @@
 package archfixture.violating.order.application;
 
+import archfixture.violating.order.domain.model.Order;
+import archfixture.violating.order.domain.model.OrderId;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import org.springframework.stereotype.Service;
 
-/** 違反：commandHandlersEnsureScreenLockNo（VersionedCommand を受け取るのに ensureLockNo を呼ばない）。 */
+/**
+ * 違反：commandHandlersEnsureScreenLockNo（VersionedCommand を受け取るのに、handle では ensureLockNo を呼ばず、使わない
+ * private メソッドだけが呼ぶ）。
+ */
 @Service
 public class ApproveOrderCommandHandler {
 
@@ -15,5 +20,11 @@ public class ApproveOrderCommandHandler {
   public String handle(final ApproveOrderCommand command) {
     approved.add(command.orderId());
     return command.orderId();
+  }
+
+  // 違反の形を作るため、handle から呼ばない private メソッドだけが ensureLockNo を呼ぶ。
+  @SuppressWarnings({"PMD.UnusedPrivateMethod", "UnusedMethod"})
+  private void ensureScreenLockNo(final ApproveOrderCommand command) {
+    new Order(new OrderId(command.orderId()), 1L).ensureLockNo(command.expectedLockNo());
   }
 }

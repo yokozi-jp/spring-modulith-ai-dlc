@@ -161,9 +161,9 @@ class ArchitectureRuleFixtureTest {
                 TableWriterArchTest.repositoryWritesTakeVersionedAggregatesRule(),
                 "order.domain.model.UnversionedOrderRepository.add("),
             row(
-                "commandHandlersEnsureScreenLockNo",
+                "commandHandlersEnsureScreenLockNo: unused private method",
                 TableWriterArchTest.commandHandlersEnsureScreenLockNoRule(VIOLATING),
-                "order.application.ApproveOrderCommandHandler"),
+                "order.application.ApproveOrderCommandHandler.handle("),
             row(
                 "commandHandlersEnsureScreenLockNo: ensureLockNo(long) overload",
                 TableWriterArchTest.commandHandlersEnsureScreenLockNoRule(VIOLATING),
@@ -172,6 +172,26 @@ class ArchitectureRuleFixtureTest {
                 "commandsBuiltByPresentationForWritesAreVersioned",
                 TableWriterArchTest.commandsBuiltByPresentationForWritesAreVersionedRule(VIOLATING),
                 "order.application.ReleaseOrderCommandHandler"),
+            row(
+                "commandsBuiltByPresentationForWritesAreVersioned: static factory call",
+                TableWriterArchTest.commandsBuiltByPresentationForWritesAreVersionedRule(VIOLATING),
+                "order.application.SuspendOrderCommandHandler"),
+            row(
+                "commandsBuiltByPresentationForWritesAreVersioned: static factory reference",
+                TableWriterArchTest.commandsBuiltByPresentationForWritesAreVersionedRule(VIOLATING),
+                "order.application.ResumeOrderCommandHandler"),
+            row(
+                "commandsBuiltByPresentationForWritesAreVersioned: save",
+                TableWriterArchTest.commandsBuiltByPresentationForWritesAreVersionedRule(VIOLATING),
+                "order.application.ArchiveOrderCommandHandler"),
+            row(
+                "onlyCommandHandlersUpdateOrDeleteAggregates: save",
+                TableWriterArchTest.onlyCommandHandlersUpdateOrDeleteAggregatesRule(),
+                "order.domain.service.ReopenPolicy.reopenAggregate("),
+            row(
+                "onlyCommandHandlersUpdateOrDeleteAggregates: Repository implementation",
+                TableWriterArchTest.onlyCommandHandlersUpdateOrDeleteAggregatesRule(),
+                UNVERSIONED_REPOSITORY + ".save(archfixture.violating.order.domain.model.OrderId)"),
             row(
                 "onlyCommandHandlersUpdateOrDeleteAggregates: Domain Service",
                 TableWriterArchTest.onlyCommandHandlersUpdateOrDeleteAggregatesRule(),
@@ -286,6 +306,10 @@ class ArchitectureRuleFixtureTest {
             "commandsAndResultsAreApplicationRecords",
             ClassRoleArchTest.commandsAndResultsAreApplicationRecordsRule(VIOLATING),
             "order.application.ConfirmOrderCommand"),
+        row(
+            "commandsAndResultsAreApplicationRecords: shared.concurrency",
+            ClassRoleArchTest.commandsAndResultsAreApplicationRecordsRule(VIOLATING),
+            "shared.concurrency.ForceUnlockCommand"),
         row(
             "commandHandlersDoNotDependOnOtherCommandHandlers",
             ClassRoleArchTest.commandHandlersDoNotDependOnOtherCommandHandlers,
