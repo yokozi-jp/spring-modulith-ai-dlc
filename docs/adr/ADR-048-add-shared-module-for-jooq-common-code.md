@@ -40,7 +40,7 @@ shared モジュールは、モジュール単位の統合テストでも常に�
 jOOQ の共通処理は `com.example.demo.shared.infrastructure.persistence` に置く。
 このパッケージはモジュールのルートではないため、[バックエンドアーキテクチャ](../backend/architecture.md) の定めに従い `@NamedInterface` で公開する。
 
-`shared` には、共通カラムの値を組み立てる共通処理、NULL を空文字へ変える Converter、業務テーブルの UPDATE と DELETE の入口と、楽観的ロックの語彙（`shared.concurrency` の `ExpectedLockNo`、`VersionedCommand`、`ConflictException`）、業務上の失敗の例外（`shared.failure` の `NotFoundException`、`BusinessRuleViolationException`、[ADR-061](ADR-061-map-business-exceptions-to-404-409-422.md)）だけを置き、業務の概念を置かない。
+`shared` には、共通カラムの値を組み立てる共通処理、NULL を空文字へ変える Converter、業務テーブルの UPDATE と DELETE の入口と、楽観的ロックの語彙（`shared.concurrency` の `ExpectedLockNo`、`VersionedCommand`、`ConflictException`）、業務上の失敗の例外（`shared.failure` の `NotFoundException`、`BusinessRuleViolationException`、[ADR-062](ADR-062-map-business-exceptions-to-404-409-422.md)）だけを置き、業務の概念を置かない。
 `shared.concurrency` も `@NamedInterface("concurrency")` で公開する。
 INSERT の共通カラムの値には `lock_no` を含め、`1` にする。
 UPDATE の共通カラムの値（`forUpdate`）は `updated_*` だけを返し、UPDATE の `lock_no` は `TableWriter` だけが書く。

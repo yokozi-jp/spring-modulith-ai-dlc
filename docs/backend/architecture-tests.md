@@ -43,7 +43,7 @@ backend/src/test/java/com/example/demo/architecture/
 - `infrastructureDependsOnlyOnDomainModel`：`infrastructure`は`application`、`domain.service`、モジュールルートの型に依存せず、機能モジュールの型のうち`domain.model`だけを使う。
 - `sharedModuleIsUsedOnlyByPersistenceAdapters`：`shared`の外で`shared.concurrency`と`shared.failure`以外の`shared`の型に依存するクラスは、`infrastructure.persistence`に置く。
   `shared`の中の依存は対象にしない。
-  `shared.concurrency`と`shared.failure`は、どの層からも使える（[ADR-048](../adr/ADR-048-add-shared-module-for-jooq-common-code.md)、[ADR-061](../adr/ADR-061-map-business-exceptions-to-404-409-422.md)）。
+  `shared.concurrency`と`shared.failure`は、どの層からも使える（[ADR-048](../adr/ADR-048-add-shared-module-for-jooq-common-code.md)、[ADR-062](../adr/ADR-062-map-business-exceptions-to-404-409-422.md)）。
 - `sharedModuleDoesNotDependOnHttp`：`shared`の型は、Spring Web、Springの HTTP、Servletの型に依存しない。
 - `moduleApiDoesNotExposeInternalTypes`：モジュールルートの型は、`java..`、`org.jspecify..`、同じルートパッケージの型だけに依存する。
 - `databaseTechnologyApisAreOnlyUsedByPersistenceAdapters`：jOOQ APIと生成型は`infrastructure.persistence`だけで使う。
@@ -160,7 +160,7 @@ Class <archfixture.violating.order.application.ShipOrderCommandHandler> is meta-
 - `noClassesShouldAccessStandardStreams`：`System.out`、`System.err`、`printStackTrace()`を使わない。
 - `noClassesShouldThrowGenericExceptions`：`Throwable`、`Exception`、`RuntimeException`、`Error`を投げない。
 - `noSuchElementExceptionIsNotThrown`：`NoSuchElementException`を生成せず、引数なしの`Optional.orElseThrow()`を呼ばない。
-  見つからないことは`shared.failure`の`NotFoundException`で表す（[ADR-061](../adr/ADR-061-map-business-exceptions-to-404-409-422.md)）。
+  見つからないことは`shared.failure`の`NotFoundException`で表す（[ADR-062](../adr/ADR-062-map-business-exceptions-to-404-409-422.md)）。
   `Optional.get()`、`Iterator.next()`、`Optional::orElseThrow`のメソッド参照など、JDKのAPIが中で投げる`NoSuchElementException`は検出しない。
 - `noClassesShouldUseJavaUtilLogging`：`java.util.logging`を使わない。
 - `featureCodeUsesOnlySlf4jFacade`：ベースパッケージ直下以外のクラスは、Logback、Log4j、Apache Commons LoggingのAPIに依存しない。

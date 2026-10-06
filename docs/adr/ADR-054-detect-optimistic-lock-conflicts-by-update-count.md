@@ -60,7 +60,7 @@ PostgreSQL の READ COMMITTED では、後の UPDATE は先の UPDATE のコミ�
 - `LockedRoot.updateChild`、`LockedRoot.deleteChildren`、`DeletedRoot.deleteChildren` も、`55P03` の `CannotAcquireLockException` を、それを原因に付けた `ConflictException`（409）に変える。
   ルートの書き込みの後に子の行のロック待ちで失敗しても、ルートと同じ競合として返すためである。
 - `updateChild` の更新件数が 0 なら、要求された子の変更を今の永続化の状態へ適用できないため、`shared.failure` の `BusinessRuleViolationException` で 422 にする。
-  `ApiExceptionHandler` が 422 の Problem Details にする（[ADR-061](ADR-061-map-business-exceptions-to-404-409-422.md)）。
+  `ApiExceptionHandler` が 422 の Problem Details にする（[ADR-062](ADR-062-map-business-exceptions-to-404-409-422.md)）。
   `ApiExceptionHandler` が上書きした `createResponseEntity` から呼ぶ `ApiProblemDetails.normalize` が `about:blank` の detail を消すため、件数、テーブル名、キーは応答に出ない。
   2 件以上は主キーの条件の誤りなので、`IllegalStateException`（500）のままにする。
 - `CommonColumns.forUpdate` は `updated_*` だけを返し、package-private にする。
@@ -113,7 +113,7 @@ PostgreSQL の READ COMMITTED では、後の UPDATE は先の UPDATE のコミ�
   期待された 4xx は ERROR のスタックトレースで重複して記録しない規約（[可観測性の規約](../observability/conventions.md)）に従うためである。
   WARN 以上は起動時と Collector の障害の調査に使う標準出力のログにも流れるため、競合で埋めないよう WARN にもしない。
   Collector が通す属性は `exception.*` だけなので、キーと値の属性は足さない。
-- 404 と 422 の対応づけは [ADR-061](ADR-061-map-business-exceptions-to-404-409-422.md) で決める。
+- 404 と 422 の対応づけは [ADR-062](ADR-062-map-business-exceptions-to-404-409-422.md) で決める。
   `IllegalStateException` は競合に使わず、409 にも対応づけない。
 
 この決定は、取り込んだガイドラインを ADR-040 に従って改変し、[ADR-048](ADR-048-add-shared-module-for-jooq-common-code.md) と [ADR-050](ADR-050-define-backend-class-roles-and-naming.md) の `update` の手順と、競合の例外の置き場所を書き換える。
@@ -256,7 +256,7 @@ PostgreSQL の READ COMMITTED では、後の UPDATE は先の UPDATE のコミ�
 
 - **Description**：競合に `IllegalStateException` を使い、`ApiExceptionHandler` で 409 にする。
 - **Pros**：例外を新しく作らずに済む。
-- **Cons**：`IllegalStateException` は許されない状態遷移にも使うため、許されない状態遷移（ADR-061 では 422 の `BusinessRuleViolationException`）まで 409 にしてしまう。
+- **Cons**：`IllegalStateException` は許されない状態遷移にも使うため、許されない状態遷移（ADR-062 では 422 の `BusinessRuleViolationException`）まで 409 にしてしまう。
 
 ### 選択肢11: Command の long lockNo を名前の規則で検査する
 
@@ -273,7 +273,7 @@ PostgreSQL の READ COMMITTED では、後の UPDATE は先の UPDATE のコミ�
 - [可観測性の規約](../observability/conventions.md)
 - [HTTP ステータスコード](../web-api/status-codes.md)
 - [issue #107](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/107)
-- [ADR-061: 業務上の失敗を 3 つの例外の型で表し、404、409、422 の Problem Details に対応づける](ADR-061-map-business-exceptions-to-404-409-422.md)
+- [ADR-062: 業務上の失敗を 3 つの例外の型で表し、404、409、422 の Problem Details に対応づける](ADR-062-map-business-exceptions-to-404-409-422.md)
 - [ADR-055: DB のロック待ち、文の実行、トランザクション中の待機の上限を接続ごとに設定する](ADR-055-set-db-time-limits-per-connection.md)
 - [PostgreSQL の排他制御](../database/postgresql-concurrency-control.md)
 - [jOOQ の SQL の書き方](../database/jooq-usage.md)

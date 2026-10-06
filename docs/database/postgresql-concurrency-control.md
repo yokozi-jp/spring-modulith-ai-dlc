@@ -48,7 +48,7 @@ Repositoryでの書き方は[jOOQのRepository](../backend/class-roles/jooq-repo
   更新件数が1件なら成功する。
   0件なら主キーで行の有無を確かめ、行がなければ`shared.failure`の`NotFoundException`を、行があれば「他の人が更新した」として`shared.concurrency`の`ConflictException`を投げる。
   子の行は、戻り値の`LockedRoot`（削除では`DeletedRoot`）で書く。
-  `updateChild`は、子の行が0件なら`shared.failure`の`BusinessRuleViolationException`（422）を、2件以上なら`IllegalStateException`を投げる（[ADR-061](../adr/ADR-061-map-business-exceptions-to-404-409-422.md)）。
+  `updateChild`は、子の行が0件なら`shared.failure`の`BusinessRuleViolationException`（422）を、2件以上なら`IllegalStateException`を投げる（[ADR-062](../adr/ADR-062-map-business-exceptions-to-404-409-422.md)）。
 - **期待する版を持たない**：`updateWhere`と`deleteWhere`を使う。
   更新件数を返し、件数の意味は呼び出し側が決める。
 

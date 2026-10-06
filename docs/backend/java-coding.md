@@ -54,7 +54,7 @@ Spring の文書もコンストラクタによる注入を勧めている（[Spr
 - 業務上の失敗は、`shared.failure` の `NotFoundException`（404）、`BusinessRuleViolationException`（422）と、`shared.concurrency` の `ConflictException`（409）の 3 つの型で投げる（[業務上の失敗の例外](class-roles/business-exception.md)）。
 - プログラムの誤りは `IllegalStateException` と `IllegalArgumentException` で投げ、HTTP では 500 になる。
 - `NoSuchElementException` の生成と引数なしの `Optional.orElseThrow()` は、ArchUnit の `noSuchElementExceptionIsNotThrown` が禁じる。
-- 4 つ目の業務上の失敗の型は ADR で決める（[ADR-061](../adr/ADR-061-map-business-exceptions-to-404-409-422.md)）。
+- 4 つ目の業務上の失敗の型は ADR で決める（[ADR-062](../adr/ADR-062-map-business-exceptions-to-404-409-422.md)）。
 
 呼び出し側と `error.presentation.web.ApiExceptionHandler` が例外の型で失敗を区別し、HTTP の応答に対応づけられるようにするためである（[ADR-013](../adr/ADR-013-standardize-http-api-contracts.md)）。
 

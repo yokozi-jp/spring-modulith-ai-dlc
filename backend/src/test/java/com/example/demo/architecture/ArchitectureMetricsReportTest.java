@@ -46,7 +46,7 @@ class ArchitectureMetricsReportTest {
    * <p>shared の TableWriter、ColumnValues、LockedRoot、DeletedRoot は他のモジュールの Repository が使う入口のため
    * public にしている（ADR-054）。shared.concurrency の ExpectedLockNo、VersionedCommand、ConflictException
    * は全層から使うため public である（ADR-048）。shared.failure の NotFoundException、BusinessRuleViolationException
-   * は全層から使うため public である（ADR-061）。
+   * は全層から使うため public である（ADR-062）。
    */
   private static final double MAX_GLOBAL_RELATIVE_VISIBILITY = 20.0D / 33.0D;
 

@@ -66,7 +66,7 @@ tags: [convention, backend, class-role]
 - クラス、フィールド、public メソッドに Javadoc を書く。
 - `domain.model` のパッケージに `@NullMarked` を宣言する `package-info.java` を置く。
 
-業務上の失敗は[業務上の失敗の例外](business-exception.md)の型で投げ、`ApiExceptionHandler` が `BusinessRuleViolationException` を 422 に、`ConflictException` を 409 にする（[ADR-061](../../adr/ADR-061-map-business-exceptions-to-404-409-422.md)）。
+業務上の失敗は[業務上の失敗の例外](business-exception.md)の型で投げ、`ApiExceptionHandler` が `BusinessRuleViolationException` を 422 に、`ConflictException` を 409 にする（[ADR-062](../../adr/ADR-062-map-business-exceptions-to-404-409-422.md)）。
 不正な引数の `IllegalArgumentException` はプログラムの誤りとして 500 になる。
 ステータスコードの使い分けは[HTTPステータスコードの選択](../../web-api/status-codes.md)に、API のエラー契約は [ADR-013](../../adr/ADR-013-standardize-http-api-contracts.md) に従う。
 

@@ -55,7 +55,7 @@ Command はモジュールルートの公開契約でもない。
   違反は、`ApiExceptionHandler` が継承する `ResponseEntityExceptionHandler` が 400 の Problem Details にする。
 - **業務の不変条件**：CommandHandler が `handle` の中で[値オブジェクト](value-object.md)と[集約](aggregate.md)を作るときに確かめる。
 
-業務上の失敗は[業務上の失敗の例外](business-exception.md)の型で投げる（[ADR-061](../../adr/ADR-061-map-business-exceptions-to-404-409-422.md)）。
+業務上の失敗は[業務上の失敗の例外](business-exception.md)の型で投げる（[ADR-062](../../adr/ADR-062-map-business-exceptions-to-404-409-422.md)）。
 ステータスコードの使い分けは[HTTPステータスコードの選択](../../web-api/status-codes.md)に、API のエラー契約は [ADR-013](../../adr/ADR-013-standardize-http-api-contracts.md) に従う。
 
 ## 依存してよい型、してはいけない型

@@ -110,7 +110,7 @@ jOOQ の Repository は業務規則を持たない。
 - `infrastructure.persistence` のパッケージに `@NullMarked` を宣言する `package-info.java` を置く。
 
 `ConflictException` は、`ApiExceptionHandler` が 409 の Problem Details にする（[ADR-054](../../adr/ADR-054-detect-optimistic-lock-conflicts-by-update-count.md)）。
-行がないときの `NotFoundException` は 404 になる（[ADR-061](../../adr/ADR-061-map-business-exceptions-to-404-409-422.md)）。
+行がないときの `NotFoundException` は 404 になる（[ADR-062](../../adr/ADR-062-map-business-exceptions-to-404-409-422.md)）。
 ステータスコードの使い分けは[HTTPステータスコードの選択](../../web-api/status-codes.md)と[更新の競合制御](../../web-api/optimistic-locking.md)に従う。
 
 PostgreSQL には MULTISET がなく、jOOQ は `jsonb_agg` による JSON の集約で模倣する。

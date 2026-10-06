@@ -46,7 +46,7 @@ tags: [convention, backend, class-role]
 
 値オブジェクトの `IllegalArgumentException` はプログラムの誤りとして HTTP の 500 のままになる。
 利用者の入力の誤りは、[Request](request.md) の形式の検証で 400 にしてから値オブジェクトを作る。
-業務上の失敗は[業務上の失敗の例外](business-exception.md)の型で投げる（[ADR-061](../../adr/ADR-061-map-business-exceptions-to-404-409-422.md)）。
+業務上の失敗は[業務上の失敗の例外](business-exception.md)の型で投げる（[ADR-062](../../adr/ADR-062-map-business-exceptions-to-404-409-422.md)）。
 ステータスコードの使い分けは[HTTPステータスコードの選択](../../web-api/status-codes.md)に、API のエラー契約は [ADR-013](../../adr/ADR-013-standardize-http-api-contracts.md) に従う。
 
 ## 依存してよい型、してはいけない型

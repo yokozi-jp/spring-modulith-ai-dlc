@@ -10,7 +10,7 @@ tags: [convention, backend, class-role]
 業務上の失敗は、`shared.failure` の `NotFoundException`（404）と `BusinessRuleViolationException`（422）、`shared.concurrency` の `ConflictException`（409）の三つの型だけで投げる。
 集約ごとの型を作らず、JDK の例外と Spring の HTTP の例外を業務上の失敗に使わない。
 HTTP のステータスとログレベルは `error` モジュールの `ApiExceptionHandler` が決め、Controller は try と catch を書かない。
-決定理由は [ADR-061](../../adr/ADR-061-map-business-exceptions-to-404-409-422.md) に示す。
+決定理由は [ADR-062](../../adr/ADR-062-map-business-exceptions-to-404-409-422.md) に示す。
 
 ## 定義
 

@@ -72,7 +72,7 @@ class GeneralCodingRulesArchTest {
                   + "Optional は orElseThrow(() -> new NotFoundException(\"order not found: orderId=...\")) で取り出す。"
                   + "プログラムの誤りは IllegalStateException にする。"
                   + "規約：docs/backend/class-roles/business-exception.md、"
-                  + "docs/adr/ADR-061-map-business-exceptions-to-404-409-422.md");
+                  + "docs/adr/ADR-062-map-business-exceptions-to-404-409-422.md");
 
   /** {@code java.util.logging} の使用を禁止し、アプリケーションのロギング実装を統一する。 */
   @ArchTest

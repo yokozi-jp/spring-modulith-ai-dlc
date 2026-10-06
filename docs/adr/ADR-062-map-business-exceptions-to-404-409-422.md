@@ -1,11 +1,11 @@
 ---
 type: ADR
-title: 'ADR-061: 業務上の失敗を 3 つの例外の型で表し、404、409、422 の Problem Details に対応づける'
+title: 'ADR-062: 業務上の失敗を 3 つの例外の型で表し、404、409、422 の Problem Details に対応づける'
 description: 業務上の失敗を shared.failure の NotFoundException と BusinessRuleViolationException、shared.concurrency の ConflictException の 3 つの型に固定し、ApiExceptionHandler が 404、422、409 の about:blank の Problem Details にして INFO で記録し、23505 を TableWriter で 409 に変え、JDK の例外の誤用を ArchUnit で禁じる決定。
 tags: [adr, backend, web-api, error-handling]
 ---
 
-# ADR-061: 業務上の失敗を 3 つの例外の型で表し、404、409、422 の Problem Details に対応づける
+# ADR-062: 業務上の失敗を 3 つの例外の型で表し、404、409、422 の Problem Details に対応づける
 
 ## Status
 
