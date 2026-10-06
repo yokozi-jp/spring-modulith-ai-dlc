@@ -203,6 +203,11 @@ INSERTの共通カラムは`CommonColumns.forInsert`で、UPDATEとDELETEは`Tab
   - `DataSource`、`Connection`、`ConnectionProvider`に代入できる型を引数に取るメソッドとコンストラクタ（Spring Bootの`DataSourceScriptDatabaseInitializer`や`DSL.using(Connection)`のように、接続の元を受け取るライブラリは、パッケージを選ばずに任意のSQLを流せるため）
 
   `Update`と`Delete`を作る入口をすべて禁じるため、`batch`や`subscribe`のように作った問い合わせを受け取って実行するAPIは禁じない。
+
+  `tableWritesGoThroughTableWriter`が除外するのは、`TableWriter`、`LockedRoot`、`DeletedRoot`の三つの完全修飾型名だけである。
+  除外を足す、外す、または除外する型を移すときは、先に[ADR-054](../adr/ADR-054-detect-optimistic-lock-conflicts-by-update-count.md)の判断を変える。
+  同じ変更で、`tableWritesGoThroughTableWriterRule`の完全修飾型名と、除外する型を置く適合フィクスチャ（`archfixture/conforming/shared/infrastructure/persistence/`）を更新する。
+  禁止するAPIの違反フィクスチャ（`DirectOrderWriter`）は、禁止の一覧か`isDirectWrite`の判定を変えるときだけ更新する。
 - `repositoryUpdateAndDeleteCheckVersion`：`Jooq*Repository`の、集約ルートを受け取る`add`以外のpublicメソッドは、版を比べる入口をそのメソッドの中で直接呼ぶ。
   `update`は`updateCheckingVersion`を、`delete`は`deleteCheckingVersion`を、ほかの名前ならどちらかを呼ぶ。
   名前で対象を選ばないため、`save`のような名前でも検査を外れない。

@@ -164,7 +164,7 @@ PostgreSQL の READ COMMITTED では、後の UPDATE は先の UPDATE のコミ�
     `ExpectedLockNo` を作れるのは Request だけなので、渡せる値は別の Command か別の Request の値に限られる。
   - **期待する版に渡す値**：ArchUnit は Repository が集約ルートの `lockNo()` を呼んだかしか見ず、その値を `updateCheckingVersion` と `deleteCheckingVersion` に渡したかは見ない。
     `lockNo()` を呼んだうえでテーブルから読み直した版を渡すと、競合を検出しない。
-- `VersionedCommand` と `ExpectedLockNo` が `shared.concurrency` の公開型になり、Modulith の公開型の数と、アーキテクチャ指標の全体の相対可視性（14/22 から 17/26）が上がる。
+- `VersionedCommand` と `ExpectedLockNo` が `shared.concurrency` の公開型になり、Modulith の公開型の数と、アーキテクチャ指標の全体の相対可視性（7/12 から 17/26）が上がる。
 - 同じトランザクションで同じ集約を二度保存すると、二度目は期待する版が古く競合になる。
   CommandHandler は集約を一度だけ保存する規約のままにする。
 - `ColumnValues` の値に別のテーブルの列の式を渡すことは、型で止まらない。
