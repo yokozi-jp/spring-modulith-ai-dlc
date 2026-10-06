@@ -72,7 +72,7 @@ DAST の httpsender script は、要求に Cookie がなければ最後に受け
 - backend は CSRF の Cookie を `__Host-XSRF-TOKEN` にし、`Secure`（環境によらない）、`Path=/`、`SameSite=Lax` を付け、`Domain` と `HttpOnly` を付けない。`csrf.spa()` の後で `csrfTokenRepository(...)` を呼んで差し替える。
 - header の名前（`X-XSRF-TOKEN`）と form の項目名（`_csrf`）は変えない。
 - `SameSite` は `APP_SESSION` と同じ `Lax` にする。
-- SPA は要求のたびに Cookie を読み、GET、HEAD、OPTIONS 以外の要求にだけ、マスクしない値を `X-XSRF-TOKEN` header で送る。Cookie がなければ header を付けずに送り、backend の 403 に任せる。
+- SPA は要求のたびに Cookie を読み、同じ origin への GET、HEAD、OPTIONS 以外の要求にだけ、マスクしない値を `X-XSRF-TOKEN` header で送る。Cookie がなければ header を付けずに送り、backend の 403 に任せる。
 - ローカルの HTTP の開発環境は Chromium と Firefox で確かめ、Safari は HTTPS の環境で確かめる。
 
 ### 方式の前提
