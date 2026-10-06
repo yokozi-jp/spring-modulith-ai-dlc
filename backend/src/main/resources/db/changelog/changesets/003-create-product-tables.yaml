@@ -1,0 +1,130 @@
+databaseChangeLog:
+  - changeSet:
+      id: 003-create-product-tables
+      author: system
+      preConditions:
+        - dbms:
+            type: postgresql
+      changes:
+        - sql:
+            sql: CREATE SCHEMA product AUTHORIZATION CURRENT_USER;
+        - sql:
+            sql: GRANT USAGE ON SCHEMA product TO "${appDatabaseUsername}";
+        - createTable:
+            tableName: m_product
+            schemaName: product
+            columns:
+              - column:
+                  name: product_id
+                  type: bigint
+                  autoIncrement: true
+                  generationType: ALWAYS
+                  constraints:
+                    primaryKey: true
+                    primaryKeyName: pk_m_product
+              - column:
+                  name: public_id
+                  type: uuid
+                  constraints:
+                    nullable: false
+              - column:
+                  name: product_code
+                  type: varchar(20)
+                  defaultValue: ""
+                  constraints:
+                    nullable: false
+              - column:
+                  name: product_name
+                  type: varchar(100)
+                  defaultValue: ""
+                  constraints:
+                    nullable: false
+              - column:
+                  name: unit_price_jpy
+                  type: numeric(12, 2)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: sales_status_typ
+                  type: varchar(20)
+                  defaultValue: ""
+                  constraints:
+                    nullable: false
+              - column:
+                  name: created_at
+                  type: timestamptz
+                  constraints:
+                    nullable: false
+              - column:
+                  name: created_by
+                  type: varchar(64)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: created_pgm_cd
+                  type: varchar(64)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: created_tx_id
+                  type: varchar(32)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: updated_at
+                  type: timestamptz
+                  constraints:
+                    nullable: false
+              - column:
+                  name: updated_by
+                  type: varchar(64)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: updated_pgm_cd
+                  type: varchar(64)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: updated_tx_id
+                  type: varchar(32)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: lock_no
+                  type: bigint
+                  constraints:
+                    nullable: false
+              - column:
+                  name: patched_at
+                  type: timestamptz
+              - column:
+                  name: patched_by
+                  type: varchar(64)
+              - column:
+                  name: patched_id
+                  type: integer
+        - createIndex:
+            indexName: uk_m_product
+            tableName: m_product
+            schemaName: product
+            unique: true
+            columns:
+              - column:
+                  name: public_id
+        - createIndex:
+            indexName: uk_2_m_product
+            tableName: m_product
+            schemaName: product
+            unique: true
+            columns:
+              - column:
+                  name: product_code
+        - sql:
+            sql: GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE product.m_product TO "${appDatabaseUsername}";
+      rollback:
+        - dropTable:
+            tableName: m_product
+            schemaName: product
+        - sql:
+            sql: DROP SCHEMA product;

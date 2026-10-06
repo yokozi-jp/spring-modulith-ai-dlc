@@ -30,38 +30,56 @@ final class ChangesetLint {
   /** フレームワークがスキーマを定めるため、テーブルの規則を適用しないスキーマ。 */
   /* package */ static final Set<String> FRAMEWORK_SCHEMAS = Set.of("modulith");
 
-  /** 001のchangesetのid。 */
-  private static final String EVENT_PUBLICATION_CHANGESET = "001-create-event-publication-tables";
+  /** 任意のSQLの規則の記号。 */
+  private static final String ARBITRARY_SQL = "M17";
 
-  /** 本番のchangesetの許可リスト。 */
+  /**
+   * 本番のchangesetの許可リスト。
+   *
+   * <p>各モジュールのchangesetは、自スキーマの作成、アプリロールへのUSAGEとテーブルのDMLの付与、rollbackのスキーマの削除を任意のSQLで書く。
+   */
   /* package */ static final List<AllowlistEntry> ALLOWLIST =
-      List.of(
-          eventPublicationSql(
-              EVENT_PUBLICATION_CHANGESET + ": CREATE SCHEMA modulith AUTHORIZATION CURRENT_USER;",
-              "Liquibase OSS 5.0.4にはスキーマを作るChange Typeがない。"
-                  + "ADR-011はモジュールのスキーマをchangesetで作ると定めている。"),
-          eventPublicationSql(
-              EVENT_PUBLICATION_CHANGESET
-                  + ": GRANT USAGE ON SCHEMA modulith TO \"${appDatabaseUsername}\";",
-              "Liquibase OSSにはGRANTのChange Typeがない。"
-                  + "ADR-011は、各changesetが自スキーマのUSAGEをアプリロールに与えると定めている。"),
-          eventPublicationSql(
-              EVENT_PUBLICATION_CHANGESET
-                  + ": GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE modulith.event_publication,"
-                  + " modulith.event_publication_archive TO \"${appDatabaseUsername}\";",
-              "Liquibase OSSにはGRANTのChange Typeがない。"
-                  + "アプリロールへテーブルごとにDMLを与える（ADR-011、docs/database/connections.md）。"),
-          eventPublicationSql(
-              EVENT_PUBLICATION_CHANGESET + ": DROP SCHEMA modulith;",
-              "CREATE SCHEMAのrollbackであり、Liquibase OSSにはスキーマを削除するChange Typeがない。"));
+      Stream.of(
+              moduleSchemaSql(
+                  "001-create-event-publication-tables",
+                  "modulith",
+                  "modulith.event_publication, modulith.event_publication_archive"),
+              moduleSchemaSql("003-create-product-tables", "product", "product.m_product"),
+              moduleSchemaSql(
+                  "004-create-order-tables",
+                  "\"order\"",
+                  "\"order\".t_order, \"order\".t_order_line"))
+          .flatMap(List::stream)
+          .toList();
 
   private ChangesetLint() {
     // 静的メソッドだけを持つ。
   }
 
-  /** 001の任意のSQL（M17）を許可リストに載せる。 */
-  private static AllowlistEntry eventPublicationSql(final String target, final String reason) {
-    return new AllowlistEntry("M17", target, reason);
+  /** モジュールのスキーマの作成、権限の付与、削除の任意のSQL（M17）を許可リストに載せる。 */
+  private static List<AllowlistEntry> moduleSchemaSql(
+      final String changeset, final String schema, final String tables) {
+    final String grantee = " TO \"${appDatabaseUsername}\";";
+    return List.of(
+        new AllowlistEntry(
+            ARBITRARY_SQL,
+            changeset + ": CREATE SCHEMA " + schema + " AUTHORIZATION CURRENT_USER;",
+            "Liquibase OSS 5.0.4にはスキーマを作るChange Typeがない。"
+                + "ADR-011はモジュールのスキーマをchangesetで作ると定めている。"),
+        new AllowlistEntry(
+            ARBITRARY_SQL,
+            changeset + ": GRANT USAGE ON SCHEMA " + schema + grantee,
+            "Liquibase OSSにはGRANTのChange Typeがない。"
+                + "ADR-011は、各changesetが自スキーマのUSAGEをアプリロールに与えると定めている。"),
+        new AllowlistEntry(
+            ARBITRARY_SQL,
+            changeset + ": GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE " + tables + grantee,
+            "Liquibase OSSにはGRANTのChange Typeがない。"
+                + "アプリロールへテーブルごとにDMLを与える（ADR-011、docs/database/connections.md）。"),
+        new AllowlistEntry(
+            ARBITRARY_SQL,
+            changeset + ": DROP SCHEMA " + schema + ";",
+            "CREATE SCHEMAのrollbackであり、Liquibase OSSにはスキーマを削除するChange Typeがない。"));
   }
 
   /**

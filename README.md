@@ -208,7 +208,7 @@ Docker Compose の操作（サービスの起動、停止、状態確認、Keycl
 ### 重複コード検査
 
 - `task lint-duplicates` はTanStack RouterとjOOQの生成コードを除いたFrontendとBackendの手書きソースをjscpdで検査します。
-- 既存の重複行率3.19%を基準に3.2%を上限とし、既存cloneの解消に合わせて閾値を下げます。
+- productとorderを含むサンプルのブランチの重複行率4.23%を基準に4.3%を上限とします（導入時は3.19%を基準に3.2%）。
 
 ### バックエンド
 

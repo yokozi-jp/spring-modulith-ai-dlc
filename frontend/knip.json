@@ -3,6 +3,7 @@
   "playwright": { "entry": ["e2e/**/*.{setup,spec}.ts"] },
   "ignore": ["lint/fixtures/**", "src/api/generated/**"],
   "ignoreDependencies": [
+    "@faker-js/faker",
     "@tanstack/react-form",
     "@tanstack/react-table",
     "lucide-react",

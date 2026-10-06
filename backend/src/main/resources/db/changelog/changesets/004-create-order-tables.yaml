@@ -1,0 +1,230 @@
+databaseChangeLog:
+  - changeSet:
+      id: 004-create-order-tables
+      author: system
+      # スキーマ名の order は PostgreSQL のキーワードなので、Liquibase に引用符付きで出させる。
+      objectQuotingStrategy: QUOTE_ONLY_RESERVED_WORDS
+      preConditions:
+        - dbms:
+            type: postgresql
+      changes:
+        - sql:
+            sql: CREATE SCHEMA "order" AUTHORIZATION CURRENT_USER;
+        - sql:
+            sql: GRANT USAGE ON SCHEMA "order" TO "${appDatabaseUsername}";
+        - createTable:
+            tableName: t_order
+            schemaName: order
+            columns:
+              - column:
+                  name: order_id
+                  type: bigint
+                  autoIncrement: true
+                  generationType: ALWAYS
+                  constraints:
+                    primaryKey: true
+                    primaryKeyName: pk_t_order
+              - column:
+                  name: public_id
+                  type: uuid
+                  constraints:
+                    nullable: false
+              - column:
+                  name: customer_order_code
+                  type: varchar(30)
+                  defaultValue: ""
+                  constraints:
+                    nullable: false
+              - column:
+                  name: order_status_typ
+                  type: varchar(10)
+                  defaultValue: ""
+                  constraints:
+                    nullable: false
+              - column:
+                  name: ordered_at
+                  type: timestamptz
+                  constraints:
+                    nullable: false
+              - column:
+                  name: created_at
+                  type: timestamptz
+                  constraints:
+                    nullable: false
+              - column:
+                  name: created_by
+                  type: varchar(64)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: created_pgm_cd
+                  type: varchar(64)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: created_tx_id
+                  type: varchar(32)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: updated_at
+                  type: timestamptz
+                  constraints:
+                    nullable: false
+              - column:
+                  name: updated_by
+                  type: varchar(64)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: updated_pgm_cd
+                  type: varchar(64)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: updated_tx_id
+                  type: varchar(32)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: lock_no
+                  type: bigint
+                  constraints:
+                    nullable: false
+              - column:
+                  name: patched_at
+                  type: timestamptz
+              - column:
+                  name: patched_by
+                  type: varchar(64)
+              - column:
+                  name: patched_id
+                  type: integer
+        - createTable:
+            tableName: t_order_line
+            schemaName: order
+            columns:
+              - column:
+                  name: order_line_id
+                  type: bigint
+                  autoIncrement: true
+                  generationType: ALWAYS
+                  constraints:
+                    primaryKey: true
+                    primaryKeyName: pk_t_order_line
+              - column:
+                  name: order_id
+                  type: bigint
+                  constraints:
+                    nullable: false
+              - column:
+                  name: line_no
+                  type: integer
+                  constraints:
+                    nullable: false
+              - column:
+                  name: product_public_id
+                  type: uuid
+                  constraints:
+                    nullable: false
+              - column:
+                  name: ordered_count
+                  type: integer
+                  constraints:
+                    nullable: false
+              - column:
+                  name: ordered_unit_price_jpy
+                  type: numeric(12, 2)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: created_at
+                  type: timestamptz
+                  constraints:
+                    nullable: false
+              - column:
+                  name: created_by
+                  type: varchar(64)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: created_pgm_cd
+                  type: varchar(64)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: created_tx_id
+                  type: varchar(32)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: updated_at
+                  type: timestamptz
+                  constraints:
+                    nullable: false
+              - column:
+                  name: updated_by
+                  type: varchar(64)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: updated_pgm_cd
+                  type: varchar(64)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: updated_tx_id
+                  type: varchar(32)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: lock_no
+                  type: bigint
+                  constraints:
+                    nullable: false
+              - column:
+                  name: patched_at
+                  type: timestamptz
+              - column:
+                  name: patched_by
+                  type: varchar(64)
+              - column:
+                  name: patched_id
+                  type: integer
+        - createIndex:
+            indexName: uk_t_order
+            tableName: t_order
+            schemaName: order
+            unique: true
+            columns:
+              - column:
+                  name: public_id
+        - createIndex:
+            indexName: uk_2_t_order
+            tableName: t_order
+            schemaName: order
+            unique: true
+            columns:
+              - column:
+                  name: customer_order_code
+        - createIndex:
+            indexName: uk_t_order_line
+            tableName: t_order_line
+            schemaName: order
+            unique: true
+            columns:
+              - column:
+                  name: order_id
+              - column:
+                  name: line_no
+        - sql:
+            sql: GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE "order".t_order, "order".t_order_line TO "${appDatabaseUsername}";
+      rollback:
+        - dropTable:
+            tableName: t_order_line
+            schemaName: order
+        - dropTable:
+            tableName: t_order
+            schemaName: order
+        - sql:
+            sql: DROP SCHEMA "order";

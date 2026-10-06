@@ -41,7 +41,7 @@ jOOQ の Repository は業務規則を持たない。
 - `com.example.demo.<feature>.infrastructure.persistence` に置く。
 - 名前は `Jooq` と集約の名前と `Repository` をつなげる（`JooqOrderRepository`）。
 - 集約を読む SQL の列の選択と変換を置く private メソッドは、`select` に集約の名前の複数形を付ける（`selectOrders`）。
-- jOOQ の生成型は、`com.example.demo.jooq.Tables` のテーブルと列を使う。
+- jOOQ の生成型は、自モジュールのスキーマの `Tables`（`com.example.demo.jooq.<スキーマ名>.Tables`）のテーブルと列を使う（[ADR-063](../../adr/ADR-063-open-jooq-generated-module.md)）。
 
 この文書の `ORDERS`、`ORDER_LINES` と、その Record の `OrdersRecord`、`OrderLinesRecord` は、説明用の仮の生成型である。
 `ORDERS` は `ORDER_ID`、`CUSTOMER_ID`、`STATUS`、`DISCOUNT`、`PLACED_AT`、`LOCK_NO` の列を、`ORDER_LINES` は `ORDER_ID`、`LINE_NUMBER`、`PRODUCT_CODE`、`QUANTITY`、`UNIT_PRICE`、`LOCK_NO` の列を持つとする。
@@ -130,8 +130,8 @@ PostgreSQL には MULTISET がなく、jOOQ は `jsonb_agg` による JSON の�
 ```java
 package com.example.demo.order.infrastructure.persistence;
 
-import static com.example.demo.jooq.Tables.ORDERS;
-import static com.example.demo.jooq.Tables.ORDER_LINES;
+import static com.example.demo.jooq.order.Tables.ORDERS;
+import static com.example.demo.jooq.order.Tables.ORDER_LINES;
 import static org.jooq.impl.DSL.multiset;
 import static org.jooq.impl.DSL.select;
 

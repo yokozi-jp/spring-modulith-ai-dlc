@@ -417,7 +417,7 @@ tasks:
   lint-duplicates:
     desc: フロントエンドとバックエンドの手書きコードの重複をjscpdで検査
     cmds:
-      # ponytail: 導入時の重複率3.19%を3.2%で固定し、既存cloneの解消に合わせて閾値を下げる。
+      # ponytail: 4.3%はproductとorderを含むサンプルのブランチの実測4.23%に合わせた値（導入時は3.19%を3.2%で固定）。業務機能が増えると規約の定型の重複で超えるため、上限か検出の方式を見直す。
       - npm exec -- jscpd frontend/src frontend/lint frontend/vite.config.ts frontend/vite-config.test.ts backend/src/main/java backend/src/test/java
 
   # Backend

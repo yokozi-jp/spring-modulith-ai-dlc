@@ -31,6 +31,8 @@ export default defineConfig({
       override: {
         // 非 2xx を ApiProblemError として投げる（docs/frontend/api-client-orval.md）。
         mutator: { path: "./src/api/api-fetch.ts", name: "apiFetch" },
+        // 任意の項目にも値を入れた mock にし、exactOptionalPropertyTypes の型検査を通す。
+        mock: { required: true },
         header,
       },
     },

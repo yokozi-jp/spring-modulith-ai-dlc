@@ -4,6 +4,10 @@
 package com.example.demo.jooq;
 
 
+import com.example.demo.jooq.modulith.Modulith;
+import com.example.demo.jooq.order.Order;
+import com.example.demo.jooq.product.Product;
+
 import java.util.Arrays;
 import java.util.List;
 
@@ -41,6 +45,16 @@ public class DefaultCatalog extends CatalogImpl {
     public final Modulith MODULITH = Modulith.MODULITH;
 
     /**
+     * The schema <code>order</code>.
+     */
+    public final Order ORDER = Order.ORDER;
+
+    /**
+     * The schema <code>product</code>.
+     */
+    public final Product PRODUCT = Product.PRODUCT;
+
+    /**
      * No further instances allowed
      */
     private DefaultCatalog() {
@@ -51,7 +65,9 @@ public class DefaultCatalog extends CatalogImpl {
     @NonNull
     public final List<Schema> getSchemas() {
         return Arrays.asList(
-            Modulith.MODULITH
+            Modulith.MODULITH,
+            Order.ORDER,
+            Product.PRODUCT
         );
     }
 

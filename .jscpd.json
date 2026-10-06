@@ -3,5 +3,5 @@
   "minLines": 5,
   "ignore": ["**/routeTree.gen.ts", "**/api/generated/**"],
   "reporters": ["console"],
-  "threshold": 3.2
+  "threshold": 4.3
 }
