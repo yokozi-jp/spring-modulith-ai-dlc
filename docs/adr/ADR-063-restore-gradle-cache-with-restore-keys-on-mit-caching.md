@@ -1,7 +1,7 @@
 ---
 type: ADR
 title: 'ADR-063: Gradle の依存キャッシュを MIT の範囲で restore-keys 付きに復元する'
-description: Gradle User Home のキャッシュを MIT の範囲に保ったまま、setup-gradle v6.4.0 の external と actions/cache の restore-keys で復元し、保存を main だけに限る決定。setup-gradle を v6.3.0 から v6.4.0 へ上げることを含む。
+description: Gradle User Home のキャッシュを MIT の範囲に保ったまま、setup-gradle v6.4.0 の external と actions/cache の restore-keys で復元し、保存を main だけに限り、setup-gradle を v6.3.0 から v6.4.0 へ上げることも含む決定。
 tags: [adr, ci, gradle, cache]
 ---
 

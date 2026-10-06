@@ -96,7 +96,7 @@ jobs:
           # basic は restore-keys を持たず、ビルドファイルの変更で全依存を取り直すため外す（ADR-063）。
           cache-provider: external
 
-      # key の hash が変わっても、同じ lint の直近の main の cache を restore-keys で復元する。
+      # key の hash が変わっても、同じ lint ジョブの直近の main の cache を restore-keys で復元する。
       - name: Restore Gradle cache
         id: gradle-cache
         uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
