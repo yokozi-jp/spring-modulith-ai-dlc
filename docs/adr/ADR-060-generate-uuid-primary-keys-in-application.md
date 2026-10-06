@@ -76,7 +76,8 @@ UUID v7 を主キーにする最初のテーブルを作るときに決める。
 
 - 集約ごとに Repository が `nextId()` を実装する。
 - `uuid` カラムの `DEFAULT` を使う手軽さを失う。
-- 境界の `String` を `UUID.fromString` で変換するため、不正な値は 500 になる。400 への対応づけは [issue #107](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/107) の範囲とする。
+- 境界の `String` を `UUID.fromString` で変換するため、不正な値は 500 になる。
+  400 への対応づけは [ADR-062](ADR-062-map-business-exceptions-to-404-409-422.md) の範囲外とし、別に決める。
 - UUID v7 の生成の実装が決まるまで、v7 の主キーの `nextId()` は実装できない。
 
 ### Neutral

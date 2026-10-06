@@ -8,6 +8,8 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.example.demo.shared.concurrency.ConflictException;
+import com.example.demo.shared.failure.BusinessRuleViolationException;
+import com.example.demo.shared.failure.NotFoundException;
 import jakarta.validation.ConstraintViolation;
 import jakarta.validation.ConstraintViolationException;
 import jakarta.validation.Valid;
@@ -22,6 +24,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -55,6 +58,30 @@ class ApiExceptionHandlerTest {
     try (ValidatorFactory factory = Validation.buildDefaultValidatorFactory()) {
       VALIDATOR = factory.getValidator();
     }
+  }
+
+  /**
+   * 出力のうち、logger が ApiExceptionHandler の記録の行だけを返す。Spring のコンテキストを起動する前は Logback の既定の書式、起動した後は JSON
+   * の書式で出るため、どちらの logger の書き方も拾う。
+   */
+  private static String handlerLog(final String log) {
+    final String logger = ApiExceptionHandler.class.getName();
+    return log.lines()
+        .filter(line -> line.contains(logger + " ") || line.contains(logger + "\""))
+        .collect(Collectors.joining("\n"));
+  }
+
+  /** 業務上の失敗が、このクラスの記録として ERROR と WARN ではなく INFO で例外の型とともに残ることを検証する。 */
+  private static void assertBusinessFailureLoggedAtInfo(
+      final String log, final Class<? extends Exception> type) {
+    assertTrue(log.contains("API business failure"), () -> "event 名が残ること: " + log);
+    assertTrue(log.contains("INFO"), () -> "INFO で残ること: " + log);
+    assertTrue(log.contains(type.getName()), () -> "例外の型が残ること: " + log);
+    // 同じ出力に出るほかのライブラリの WARN と区別するため、このクラスの記録だけを見る。
+    final String handlerLog = handlerLog(log);
+    assertTrue(handlerLog.contains("API business failure"), () -> "このクラスの記録があること: " + log);
+    assertFalse(handlerLog.contains("ERROR"), () -> "ERROR で残さないこと: " + handlerLog);
+    assertFalse(handlerLog.contains("WARN"), () -> "WARN で残さないこと: " + handlerLog);
   }
 
   private static ApiExceptionHandler handler() {
@@ -106,10 +133,38 @@ class ApiExceptionHandlerTest {
     assertNotNull(response, "応答");
     assertEquals(HttpStatus.CONFLICT, response.getStatusCode(), "HTTP status");
     final String log = output.getAll();
-    assertTrue(log.contains("Optimistic lock conflict"), () -> "event 名が残ること: " + log);
+    assertTrue(log.contains("API conflict"), () -> "event 名が残ること: " + log);
     assertTrue(log.contains("INFO"), () -> "INFO で残ること: " + log);
     assertTrue(log.contains(ConflictException.class.getName()), () -> "例外の型が残ること: " + log);
     assertFalse(log.contains("ERROR"), () -> "ERROR で残さないこと: " + log);
+  }
+
+  @Test
+  @DisplayName("NotFoundException は 404 を返し、ERROR と WARN ではなく INFO で例外の型を残す")
+  void notFoundExceptionIsLoggedAtInfo(final CapturedOutput output) {
+    final ResponseEntity<Object> response =
+        handler()
+            .handleNotFoundException(
+                new NotFoundException("order not found: orderId=1"),
+                new ServletWebRequest(new MockHttpServletRequest()));
+
+    assertNotNull(response, "応答");
+    assertEquals(HttpStatus.NOT_FOUND, response.getStatusCode(), "HTTP status");
+    assertBusinessFailureLoggedAtInfo(output.getAll(), NotFoundException.class);
+  }
+
+  @Test
+  @DisplayName("BusinessRuleViolationException は 422 を返し、ERROR と WARN ではなく INFO で例外の型を残す")
+  void businessRuleViolationExceptionIsLoggedAtInfo(final CapturedOutput output) {
+    final ResponseEntity<Object> response =
+        handler()
+            .handleBusinessRuleViolationException(
+                new BusinessRuleViolationException("order is not placed: orderId=1"),
+                new ServletWebRequest(new MockHttpServletRequest()));
+
+    assertNotNull(response, "応答");
+    assertEquals(HttpStatus.UNPROCESSABLE_CONTENT, response.getStatusCode(), "HTTP status");
+    assertBusinessFailureLoggedAtInfo(output.getAll(), BusinessRuleViolationException.class);
   }
 
   @Test

@@ -41,7 +41,7 @@ Domain の型を Application の外へ出さず、HTTP API の形と Domain を�
 - **`POST /api/orders/{orderId}/confirm`**：ロック番号を持つ `ConfirmOrderRequest` を受け、パス変数と合わせて `ConfirmOrderCommand` を作って確定し、204 を返す。
 - **`POST /api/orders/{orderId}/cancel`**：ロック番号を持つ `CancelOrderRequest` を受け、パス変数と合わせて `CancelOrderCommand` を作って取り消し、204 を返す。
 - **`GET /api/orders/{orderId}`**：`OrderQueries.findDetails` の結果を、ロック番号を含む `OrderDetailsResponse` にして 200 で返す。
-  注文がなければ `ResponseStatusException(HttpStatus.NOT_FOUND)` で 404 にする。
+  注文がなければ `shared.failure` の `NotFoundException` を投げ、`ApiExceptionHandler` が 404 にする。
 - **`GET /api/orders?customerId=…`**：`OrderQueries.search` の結果を `OrderSummaryListResponse` の `items` に入れて 200 で返す。
 
 確定と取消は、[Web APIの方式とURLの設計](../../web-api/api-style.md)の「カスタムメソッド」の形にする。
@@ -59,7 +59,7 @@ Domain の型を Application の外へ出さず、HTTP API の形と Domain を�
 - 作成は `ServletUriComponentsBuilder.fromCurrentRequest()` で `Location` の URI を作り、`ResponseEntity.created(location).build()` を返す。
 - 本文のない更新は `ResponseEntity.noContent().build()` を返す。
 - 参照は `<Feature>Queries` を呼び、`XxxResponse.from(...)` で応答にする。
-  見つからないときは `ResponseStatusException(HttpStatus.NOT_FOUND)` を投げる。
+  見つからないときは `NotFoundException` を投げる（[業務上の失敗の例外](business-exception.md)）。
 - 例外を catch しない。
   エラー応答は `ApiExceptionHandler` が Problem Details にする。
 - クラス、フィールド、コンストラクタ、ハンドラメソッドに Javadoc を書く。
@@ -164,7 +164,7 @@ class OrderController {
   return orderQueries
       .findDetails(orderId)
       .map(OrderDetailsResponse::from)
-      .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
+      .orElseThrow(() -> new NotFoundException("order not found: orderId=" + orderId));
 }
 
 /**
@@ -248,7 +248,8 @@ class OrderControllerTest {
 - [ ] 既存の集約を変える操作は、ロック番号を本文の Request で受ける。［自分で点検］
 - [ ] 作成は 201 と `Location`、本文のない更新は 204、見つからない参照は 404 を返す。［自分で点検］
 - [ ] 参照は `<Feature>Queries` を呼んで `from(...)` で Response にし、一覧は `items` で包む。［自分で点検］
-- [ ] 例外を catch せず、`ApiExceptionHandler` に任せる。［自分で点検］
+- [ ] 例外を catch せず、try と catch を書かずに `ApiExceptionHandler` に任せる。［自分で点検］
+- [ ] 見つからない参照は `NotFoundException` で投げ、`ResponseStatusException` を使わない。［自分で点検］
 - [ ] クラスに `@Validated` を付けない。入力検証は `@Valid` と引数の制約で行う。［自分で点検］
 - [ ] クラス、フィールド、コンストラクタ、ハンドラメソッドに Javadoc を書く。［自分で点検］
 - [ ] MockMvc のテストで、ステータスコードと Problem Details を確かめる。［自分で点検］

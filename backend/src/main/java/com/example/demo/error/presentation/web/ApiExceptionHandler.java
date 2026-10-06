@@ -2,6 +2,8 @@ package com.example.demo.error.presentation.web;
 
 import com.example.demo.LocaleSupport;
 import com.example.demo.shared.concurrency.ConflictException;
+import com.example.demo.shared.failure.BusinessRuleViolationException;
+import com.example.demo.shared.failure.NotFoundException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.ConstraintViolationException;
@@ -24,7 +26,10 @@ import org.springframework.web.method.annotation.HandlerMethodValidationExceptio
 import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExceptionHandler;
 import org.springframework.web.util.DisconnectedClientHelper;
 
-/** Spring MVC と Spring Security の例外、楽観的ロックの競合を RFC 9457 Problem Details へ変換する。 */
+/**
+ * Spring MVC と Spring Security の例外と、業務上の失敗（shared.failure と shared.concurrency）を RFC 9457 Problem
+ * Details へ変換する。
+ */
 // 基底クラスの override と例外ごとの @ExceptionHandler は、1 つの advice に置く必要がある。
 @SuppressWarnings("PMD.TooManyMethods")
 @Slf4j
@@ -76,6 +81,20 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
   /* package */ @Nullable ResponseEntity<Object> handleConflictException(
       final ConflictException exception, final WebRequest request) {
     return problem(exception, HttpStatus.CONFLICT, request);
+  }
+
+  /** 見つからない集約や行を 404 Problem Details へ変換する。例外の内容は応答に入れない。 */
+  @ExceptionHandler(NotFoundException.class)
+  /* package */ @Nullable ResponseEntity<Object> handleNotFoundException(
+      final NotFoundException exception, final WebRequest request) {
+    return problem(exception, HttpStatus.NOT_FOUND, request);
+  }
+
+  /** 業務規則の違反を 422 Problem Details へ変換する。例外の内容は応答に入れない。 */
+  @ExceptionHandler(BusinessRuleViolationException.class)
+  /* package */ @Nullable ResponseEntity<Object> handleBusinessRuleViolationException(
+      final BusinessRuleViolationException exception, final WebRequest request) {
+    return problem(exception, HttpStatus.UNPROCESSABLE_CONTENT, request);
   }
 
   /** MVC 内の未処理例外を、実装詳細を含まない 500 Problem Details へ変換する。 */
@@ -172,10 +191,13 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
     } else if (ex instanceof ConflictException) {
       // クライアントが読み直して再送できる想定内の 4xx なので、ERROR にせず INFO で残す。
       // WARN 以上は起動時と Collector の障害用のロググループにも出るため使わない。
+      log.atInfo().setCause(ex).addKeyValue(STATUS_CODE, status.value()).log("API conflict");
+    } else if (ex instanceof NotFoundException || ex instanceof BusinessRuleViolationException) {
+      // 業務上の想定内の 4xx なので INFO で残す。対象を調べられるよう例外を付ける。
       log.atInfo()
           .setCause(ex)
           .addKeyValue(STATUS_CODE, status.value())
-          .log("Optimistic lock conflict");
+          .log("API business failure");
     } else if (ex instanceof MethodArgumentNotValidException
         || ex instanceof HandlerMethodValidationException
         || ex instanceof ConstraintViolationException) {

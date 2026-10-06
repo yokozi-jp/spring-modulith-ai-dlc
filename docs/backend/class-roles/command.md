@@ -55,11 +55,8 @@ Command はモジュールルートの公開契約でもない。
   違反は、`ApiExceptionHandler` が継承する `ResponseEntityExceptionHandler` が 400 の Problem Details にする。
 - **業務の不変条件**：CommandHandler が `handle` の中で[値オブジェクト](value-object.md)と[集約](aggregate.md)を作るときに確かめる。
 
-`ConflictException` は、`ApiExceptionHandler` が HTTP の 409 にする。
-Domain が投げる JDK の例外は、いまは HTTP の 500 になる。
-ユースケースがこの例外を 400、404、422 で返す必要があるときは、実装を止めて利用者に確認し、対応づけを新しい ADR で決める。
+業務上の失敗は[業務上の失敗の例外](business-exception.md)の型で投げる（[ADR-062](../../adr/ADR-062-map-business-exceptions-to-404-409-422.md)）。
 ステータスコードの使い分けは[HTTPステータスコードの選択](../../web-api/status-codes.md)に、API のエラー契約は [ADR-013](../../adr/ADR-013-standardize-http-api-contracts.md) に従う。
-対応づけの作業は [issue #107](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/107) で扱う。
 
 ## 依存してよい型、してはいけない型
 
@@ -143,6 +140,6 @@ ArchUnit が形を検査し、この record を使う側のテストが中身を
 - [ ] component は Java の標準型とネストした record と、`ExpectedLockNo` だけにする。［自分で点検］
 - [ ] Bean Validation の制約を含め、アノテーションを付けない。［自分で点検］
 - [ ] `List` の component をコンパクトコンストラクタで `List.copyOf` に置き換える。［自分で点検］
-- [ ] Domain の例外を 400、404、422 で返す必要があるなら、実装を止めて利用者に確認した。［自分で点検］
+- [ ] 業務上の失敗は[業務上の失敗の例外](business-exception.md)の型で投げる。［自分で点検］
 - [ ] record とネストした record に Javadoc を書く。［自分で点検］
 - [ ] `application` のパッケージに `@NullMarked` の `package-info.java` を置く。［Error Prone で検査：RequireExplicitNullMarking］

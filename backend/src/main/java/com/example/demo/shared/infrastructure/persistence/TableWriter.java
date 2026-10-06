@@ -1,25 +1,28 @@
 package com.example.demo.shared.infrastructure.persistence;
 
 import com.example.demo.shared.concurrency.ConflictException;
+import com.example.demo.shared.failure.NotFoundException;
 import com.google.errorprone.annotations.CheckReturnValue;
-import java.util.NoSuchElementException;
 import java.util.function.Consumer;
 import java.util.function.IntSupplier;
 import java.util.function.Supplier;
 import org.jooq.Condition;
 import org.jooq.DSLContext;
 import org.jooq.Field;
+import org.jooq.Insert;
 import org.jooq.Query;
 import org.jooq.Record;
 import org.jooq.Table;
 import org.springframework.dao.CannotAcquireLockException;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Component;
 
 /**
- * 業務テーブルの UPDATE と DELETE を組み立てて実行する唯一の入口（ADR-054、docs/database/postgresql-concurrency-control.md）。
+ * 業務テーブルの UPDATE と DELETE を組み立てて実行する唯一の入口で、集約ルートの INSERT
+ * の入口（ADR-054、docs/database/postgresql-concurrency-control.md）。
  *
- * <p>版の条件、{@code lock_no} の設定、更新のカラム、実行、件数の判定、{@code 55P03} の変換をここに集める。Repository が書くのは、{@link
- * ColumnValues} に渡す業務の列の値だけである。
+ * <p>版の条件、{@code lock_no} の設定、更新のカラム、実行、件数の判定、{@code 55P03} と {@code 23505} の変換をここに集める。Repository
+ * が書くのは、{@link ColumnValues} に渡す業務の列の値だけである。
  *
  * <p>入口の選び分けは、呼び出し側が期待する版（以前に読んだ集約ルートの {@code lock_no}）を持っているかだけで決まる。
  *
@@ -29,7 +32,8 @@ import org.springframework.stereotype.Component;
  *   <li>持っていない：{@link #updateWhere} と {@link #deleteWhere}。件数の意味は呼び出し側が決める。
  * </ul>
  *
- * <p>どの UPDATE も {@code lock_no} を進める。INSERT はここを通さず、{@link CommonColumns#forInsert} で書く。
+ * <p>どの UPDATE も {@code lock_no} を進める。集約ルートの INSERT は {@link #insert} で実行する。子の行の INSERT
+ * はここを通さず、{@code dsl.batch} と {@link CommonColumns#forInsert} で書く。
  *
  * <p>例外のメッセージには、テーブル名、主キーの条件のバインド値、期待する版を入れ、SQL は入れない（docs/observability/conventions.md）。
  */
@@ -72,9 +76,9 @@ public class TableWriter {
    * @return 子の行を更新、削除する {@link LockedRoot}
    * @throws IllegalArgumentException {@code expectedLockNo} が 1 未満の場合、テーブルに {@code lock_no}（{@code
    *     Long}）がない場合、業務の列に共通カラムを渡した場合
-   * @throws NoSuchElementException 更新件数が 0 で、主キーの行がない場合
-   * @throws ConflictException 更新件数が 0 で主キーの行がある場合と、行ロックを {@code lock_timeout} までに取れない場合。後者は {@link
-   *     CannotAcquireLockException} を原因に持つ
+   * @throws NotFoundException 更新件数が 0 で、主キーの行がない場合
+   * @throws ConflictException 更新件数が 0 で主キーの行がある場合、一意制約に違反した場合（{@link DuplicateKeyException}
+   *     を原因に持つ）、行ロックを {@code lock_timeout} までに取れない場合（{@link CannotAcquireLockException} を原因に持つ）
    * @throws IllegalStateException 更新件数が 2 以上の場合。主キーの条件が 1 行を特定していない
    */
   public <R extends Record> LockedRoot updateCheckingVersion(
@@ -104,9 +108,9 @@ public class TableWriter {
    * @return 子の行を削除する {@link DeletedRoot}
    * @throws IllegalArgumentException {@code expectedLockNo} が 1 未満の場合、テーブルに {@code lock_no}（{@code
    *     Long}）がない場合
-   * @throws NoSuchElementException 削除件数が 0 で、主キーの行がない場合
-   * @throws ConflictException 削除件数が 0 で主キーの行がある場合と、行ロックを {@code lock_timeout} までに取れない場合。後者は {@link
-   *     CannotAcquireLockException} を原因に持つ
+   * @throws NotFoundException 削除件数が 0 で、主キーの行がない場合
+   * @throws ConflictException 削除件数が 0 で主キーの行がある場合、一意制約に違反した場合（{@link DuplicateKeyException}
+   *     を原因に持つ）、行ロックを {@code lock_timeout} までに取れない場合（{@link CannotAcquireLockException} を原因に持つ）
    * @throws IllegalStateException 削除件数が 2 以上の場合。主キーの条件が 1 行を特定していない
    */
   public <R extends Record> DeletedRoot deleteCheckingVersion(
@@ -132,6 +136,7 @@ public class TableWriter {
    * @throws IllegalArgumentException テーブルに {@code lock_no}（{@code
    *     Long}）がない場合、業務の列が一つもない場合、業務の列に共通カラムを渡した場合
    * @throws CannotAcquireLockException 行ロックを {@code lock_timeout} までに取れない場合。変換せずに投げる
+   * @throws DuplicateKeyException 一意制約に違反した場合（{@code 23505}）。変換せずに投げる
    */
   @CheckReturnValue
   public <R extends Record> int updateWhere(
@@ -152,10 +157,27 @@ public class TableWriter {
   }
 
   /**
+   * Repository が組み立てた INSERT を実行する。
+   *
+   * <p>共通カラムは呼び出し側が {@link CommonColumns#forInsert} で設定する。
+   *
+   * <p>ponytail: 上限：子の行の dsl.batch の INSERT は変換しない。子のテーブルに業務の一意インデックスを足したら、batch を受ける入口を足す。
+   *
+   * @param insert {@code dsl.insertInto(...).set(...).set(commonColumns.forInsert(...))} で組み立てた 1
+   *     行の INSERT
+   * @throws ConflictException 一意制約に違反した場合（{@link DuplicateKeyException} を原因に持つ）と、行ロックを {@code
+   *     lock_timeout} までに取れない場合（{@link CannotAcquireLockException} を原因に持つ）
+   */
+  public void insert(final Insert<?> insert) {
+    // テーブル名は Insert の公開 API で取れないため入れない。テーブル、制約名、キーは原因の例外のメッセージにある。
+    executeOrConflict(insert::execute, () -> "insert");
+  }
+
+  /**
    * 子の行を条件で更新し、版を 1 進めて件数を返す。{@link LockedRoot#updateChild} が使う。
    *
-   * @throws ConflictException 行ロックを {@code lock_timeout} までに取れない場合。{@link
-   *     CannotAcquireLockException} を原因に持つ
+   * @throws ConflictException 一意制約に違反した場合（{@link DuplicateKeyException} を原因に持つ）と、行ロックを {@code
+   *     lock_timeout} までに取れない場合（{@link CannotAcquireLockException} を原因に持つ）
    */
   @CheckReturnValue
   /* package */ <R extends Record> int updateChildRows(
@@ -183,8 +205,8 @@ public class TableWriter {
   /**
    * 子の行を条件で削除する。{@link LockedRoot} と {@link DeletedRoot} が使う。
    *
-   * @throws ConflictException 行ロックを {@code lock_timeout} までに取れない場合。{@link
-   *     CannotAcquireLockException} を原因に持つ
+   * @throws ConflictException 一意制約に違反した場合（{@link DuplicateKeyException} を原因に持つ）と、行ロックを {@code
+   *     lock_timeout} までに取れない場合（{@link CannotAcquireLockException} を原因に持つ）
    */
   /* package */ void deleteRows(final Table<?> table, final Condition where) {
     executeOrConflict(
@@ -228,20 +250,22 @@ public class TableWriter {
           "primary key condition matched " + changed + " rows: " + target);
     }
     if (!dsl.fetchExists(table, byPrimaryKey)) {
-      throw new NoSuchElementException("row not found: " + target);
+      throw new NotFoundException("row not found: " + target);
     }
     throw new ConflictException("row was updated by another request: " + target);
   }
 
   /**
-   * 文を実行して件数を返し、{@code 55P03} の {@link CannotAcquireLockException} を、それを原因に持つ {@link
-   * ConflictException} に変える。
+   * 文を実行して件数を返し、{@code 55P03} の {@link CannotAcquireLockException} と {@code 23505} の {@link
+   * DuplicateKeyException} を、それを原因に持つ {@link ConflictException} に変える。
    */
   private static int executeOrConflict(final IntSupplier statement, final Supplier<String> target) {
     try {
       return statement.getAsInt();
     } catch (final CannotAcquireLockException e) {
       throw new ConflictException("row is locked by another request: " + target.get(), e);
+    } catch (final DuplicateKeyException e) {
+      throw new ConflictException("unique key already exists: " + target.get(), e);
     }
   }
 

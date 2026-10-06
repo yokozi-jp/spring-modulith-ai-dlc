@@ -103,7 +103,7 @@ Proposed
 - `add` は、`insertInto` の `set(列, 値)` で業務の全列を書き、`lock_no` を含む共通カラムの値は [ADR-048](ADR-048-add-shared-module-for-jooq-common-code.md) の `shared` の共通処理から受け取る。
 - `update` は、[PostgreSQL の排他制御](../database/postgresql-concurrency-control.md)の楽観的ロックに従う（[ADR-054](ADR-054-detect-optimistic-lock-conflicts-by-update-count.md)）。
   集約ルートの行は `shared` の `TableWriter.updateCheckingVersion` に、集約の `lockNo` と業務の列の値を渡して先に更新し、子の行は戻り値の `LockedRoot` で後から更新する。
-  版の条件、版の設定、件数の判定は `TableWriter` が持ち、0 件のとき、行がなければ `NoSuchElementException` を、行があれば `shared.concurrency` の `ConflictException` を投げる。
+  版の条件、版の設定、件数の判定は `TableWriter` が持ち、0 件のとき、行がなければ `shared.failure` の `NotFoundException` を、行があれば `shared.concurrency` の `ConflictException` を投げる。
   `lock_timeout` までに行のロックを取れないときも、`TableWriter` が `ConflictException` に変える。
 - Controller が作り、既存の集約の状態を変える Command は、クライアントが参照の応答で受け取った `lockNo` を `ExpectedLockNo` にして持ち、`VersionedCommand` を実装する。
   Request が `@Min(1) long lockNo` を受け取り、`toCommand` で `ExpectedLockNo` に変換する。
@@ -156,7 +156,8 @@ Proposed
 
 ### Neutral
 
-- 業務例外を HTTP の 400、404、409、422 に対応づける仕組みは、競合の 409 を除き、この ADR では決めない。いまは `@Valid` の失敗が 400、`ResponseStatusException` がそのステータスになり、Domain、CommandHandler、Repository の実装が投げる JDK の例外は 500 になる。`shared.concurrency` の `ConflictException` は 409 になる（[ADR-054](ADR-054-detect-optimistic-lock-conflicts-by-update-count.md)）。ユースケースが Domain の例外を 400、404、409、422 で返す必要が出たら、作業者は利用者に確認し、対応づけを新しい ADR で決める（[ADR-013](ADR-013-standardize-http-api-contracts.md)）。404 と 422 の対応づけの作業は [issue #107](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/107) で扱う。
+- 業務上の失敗の例外と 404、409、422 の対応づけは [ADR-062](ADR-062-map-business-exceptions-to-404-409-422.md) で決める。
+  400 は入力検証の規約のままとする。
 - QueryService の `@Transactional(readOnly = true)` は、読み取り専用のトランザクションで参照中の書き込みを DB に拒否させるために付ける。分離レベルは既定の READ COMMITTED のままなので、一つのメソッドの中の複数の SQL が同じスナップショットを見ることまでは保証しない。
 - 参照の性能が Repository 経由で足りなくなったら、読み取りモデルへの直接射影を ADR で決め直す。
 

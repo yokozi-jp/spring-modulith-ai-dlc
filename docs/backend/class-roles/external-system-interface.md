@@ -95,7 +95,7 @@ public ChargeOrderResult handle(final ChargeOrderCommand command) {
       orderRepository
           .findById(new OrderId(UUID.fromString(command.orderId())))
           .orElseThrow(
-              () -> new NoSuchElementException("order not found: orderId=" + command.orderId()));
+              () -> new NotFoundException("order not found: orderId=" + command.orderId()));
   if (order.isPaid()) {
     return new ChargeOrderResult(order.id().value().toString());
   }

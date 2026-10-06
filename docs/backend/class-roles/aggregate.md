@@ -9,7 +9,7 @@ tags: [convention, backend, class-role]
 
 集約は業務上の一貫性を保つ単位であり、集約ルートのクラスが状態と不変条件を持つ。
 `domain.model` に `public final class` として置き、状態は業務の操作を表すメソッドだけで変える。
-許されない状態遷移では `IllegalStateException` を、不正な引数では `IllegalArgumentException` を、画面から受け取ったロック番号の不一致では `shared.concurrency` の `ConflictException` を投げる。
+許されない状態遷移では `shared.failure` の `BusinessRuleViolationException` を、不正な引数では `IllegalArgumentException` を、画面から受け取ったロック番号の不一致では `shared.concurrency` の `ConflictException` を投げる。
 役割の決定理由は [ADR-050](../../adr/ADR-050-define-backend-class-roles-and-naming.md) に示す。
 
 ## 定義
@@ -29,7 +29,7 @@ tags: [convention, backend, class-role]
      └──cancel()──> 取消（CANCELLED）
 ```
 
-取消は受付からだけでき、受付でない注文の `cancel()` は `IllegalStateException` を投げる。
+取消は受付からだけでき、受付でない注文の `cancel()` は `BusinessRuleViolationException` を投げる。
 確定の後は決済が非同期で進み、確定の後の取消には返金が要るため、この例では扱わない（[ADR-050](../../adr/ADR-050-define-backend-class-roles-and-naming.md)）。
 `markPaid()` は確定のときだけでき、`isPaid()` は支払い済みと出荷のときに `true` を返す。
 決済は、確定のイベントを受けた `ChargeOrderCommandHandler` が行う（[CommandHandler](command-handler.md)）。
@@ -66,15 +66,13 @@ tags: [convention, backend, class-role]
 - クラス、フィールド、public メソッドに Javadoc を書く。
 - `domain.model` のパッケージに `@NullMarked` を宣言する `package-info.java` を置く。
 
-`ConflictException` は、`ApiExceptionHandler` が HTTP の 409 にする（[ADR-054](../../adr/ADR-054-detect-optimistic-lock-conflicts-by-update-count.md)）。
-Domain が投げる JDK の例外は、いまは HTTP の 500 になる。
-ユースケースがこの例外を 400、404、422 で返す必要があるときは、実装を止めて利用者に確認し、対応づけを新しい ADR で決める。
+業務上の失敗は[業務上の失敗の例外](business-exception.md)の型で投げ、`ApiExceptionHandler` が `BusinessRuleViolationException` を 422 に、`ConflictException` を 409 にする（[ADR-062](../../adr/ADR-062-map-business-exceptions-to-404-409-422.md)）。
+不正な引数の `IllegalArgumentException` はプログラムの誤りとして 500 になる。
 ステータスコードの使い分けは[HTTPステータスコードの選択](../../web-api/status-codes.md)に、API のエラー契約は [ADR-013](../../adr/ADR-013-standardize-http-api-contracts.md) に従う。
-対応づけの作業は [issue #107](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/107) で扱う。
 
 ## 依存してよい型、してはいけない型
 
-- **依存してよい型**：`java..` の標準型、`org.jspecify..`、同じ `domain.model` の Entity、値オブジェクト、enum、`shared.concurrency` の `ConflictException` と `ExpectedLockNo`。
+- **依存してよい型**：`java..` の標準型、`org.jspecify..`、同じ `domain.model` の Entity、値オブジェクト、enum、`shared.concurrency` の `ConflictException` と `ExpectedLockNo`、`shared.failure` の `BusinessRuleViolationException`。
 - **依存してはいけない型**：Spring、jOOQ、jOOQ の生成型、JPA、Jackson の型、`domain.service`、`application`、モジュールルートの型、他モジュールの型、Repository と外部システムのインタフェース、`Clock`。
 
 ## 最小の例と典型的な例
@@ -155,7 +153,7 @@ public final class Order {
 
   private void ensureStatus(final OrderStatus expected) {
     if (status != expected) {
-      throw new IllegalStateException(
+      throw new BusinessRuleViolationException(
           "order is not " + expected + ": orderId=" + id.value() + ", status=" + status);
     }
   }
@@ -255,7 +253,7 @@ class OrderTest {
     order.ship();
 
     assertThatThrownBy(order::cancel)
-        .isInstanceOf(IllegalStateException.class)
+        .isInstanceOf(BusinessRuleViolationException.class)
         .hasMessageContaining("orderId=00000000-0000-4000-8000-000000000001");
   }
 }
@@ -280,13 +278,13 @@ class OrderTest {
 - [ ] `domain.service`、`application`、モジュールルートの型に依存しない。［ArchUnit で検査：PackageByFeatureOnionArchitectureTest.dependenciesPointInward］
 - [ ] `public final class` にし、private のコンストラクタを `place` などの業務の動詞の static メソッドと `restore` から呼ぶ。［自分で点検］
 - [ ] setter を作らず、状態は業務の操作のメソッドだけで変える。［自分で点検］
-- [ ] 許されない状態遷移で `IllegalStateException` を、不正な引数で `IllegalArgumentException` を投げ、メッセージに識別子を含める。［自分で点検］
+- [ ] 許されない状態遷移で `BusinessRuleViolationException` を、不正な引数で `IllegalArgumentException` を投げ、メッセージに識別子を含める。［自分で点検］
 - [ ] `private final long lockNo` を `restore` の最後の引数で受け取り、`place` で `1` にし、`ensureLockNo(ExpectedLockNo)` で違えば `shared.concurrency` の `ConflictException` を投げる。［自分で点検］
 - [ ] 集約ごとの競合の例外を作らない。［自分で点検］
 - [ ] `lockNo` 以外の共通カラムを集約に持たない。［自分で点検］
 - [ ] 他の集約は識別子で持ち、現在時刻は引数で受け取る。［自分で点検］
 - [ ] 子の Entity のリストは `List.copyOf` で持ち、変更できないリストで返す。［自分で点検］
 - [ ] アクセサの `@SuppressWarnings` に理由のコメントを付け、クラス、フィールド、public メソッドに Javadoc を書く。［自分で点検］
-- [ ] Domain の例外を 400、404、422 で返す必要があるなら、実装を止めて利用者に確認した。［自分で点検］
+- [ ] 業務上の失敗は[業務上の失敗の例外](business-exception.md)の型で投げる。［自分で点検］
 - [ ] 状態遷移ごとに、Spring を起動しない JUnit のテストを書く。［自分で点検］
 - [ ] `domain.model` のパッケージに `@NullMarked` の `package-info.java` を置く。［Error Prone で検査：RequireExplicitNullMarking］

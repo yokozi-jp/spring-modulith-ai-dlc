@@ -3,7 +3,7 @@ package archfixture.conforming.order.application;
 import archfixture.conforming.order.domain.model.Order;
 import archfixture.conforming.order.domain.model.OrderId;
 import archfixture.conforming.order.domain.model.OrderRepository;
-import java.util.NoSuchElementException;
+import archfixture.conforming.shared.failure.NotFoundException;
 import java.util.UUID;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -27,7 +27,7 @@ public class CancelOrderCommandHandler {
         orderRepository
             .findById(new OrderId(UUID.fromString(command.orderId())))
             .orElseThrow(
-                () -> new NoSuchElementException("order not found: orderId=" + command.orderId()));
+                () -> new NotFoundException("order not found: orderId=" + command.orderId()));
     order.ensureLockNo(command.expectedLockNo());
     order.cancel();
     orderRepository.update(order);

@@ -1,7 +1,7 @@
 package archfixture.conforming.inventory.application;
 
 import archfixture.conforming.order.OrderQueries;
-import java.util.NoSuchElementException;
+import archfixture.conforming.shared.failure.NotFoundException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -23,7 +23,6 @@ public class ReserveStockCommandHandler {
     return orderQueries
         .findDetails(command.orderId())
         .map(details -> new ReserveStockResult(details.orderId()))
-        .orElseThrow(
-            () -> new NoSuchElementException("order not found: orderId=" + command.orderId()));
+        .orElseThrow(() -> new NotFoundException("order not found: orderId=" + command.orderId()));
   }
 }
