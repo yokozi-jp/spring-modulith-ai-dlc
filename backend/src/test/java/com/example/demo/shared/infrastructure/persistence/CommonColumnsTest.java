@@ -10,7 +10,10 @@ import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.function.Supplier;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 import org.jooq.Field;
 import org.jooq.Table;
 import org.junit.jupiter.api.AfterEach;
@@ -194,6 +197,44 @@ class CommonColumnsTest {
         .as("カラムがない")
         .isInstanceOf(IllegalArgumentException.class)
         .hasMessageContaining("column=no_such");
+  }
+
+  @Test
+  @DisplayName("共通カラムの 12 列は、forInsert と patched_*、ColumnValues、changeset の規則で同じである")
+  void commonColumnNamesAgreeAcrossDefinitions() throws ReflectiveOperationException {
+    final Set<String> written =
+        Stream.concat(
+                inUseCase(() -> commonColumns.forInsert(FIXTURE_ITEM)).keySet().stream(),
+                Stream.of(
+                    FIXTURE_ITEM.PATCHED_AT, FIXTURE_ITEM.PATCHED_BY, FIXTURE_ITEM.PATCHED_ID))
+            .map(Field::getName)
+            .collect(Collectors.toSet());
+    final List<?> changesetRules =
+        (List<?>)
+            privateConstant(
+                Class.forName(
+                    "com.example.demo.persistence.conventions.ChangesetCommonColumnRules"),
+                "COMMON_COLUMNS");
+
+    assertThat(written).as("forInsert と patched_*").hasSize(12);
+    assertThat(
+            ((Set<?>) privateConstant(ColumnValues.class, "COMMON_COLUMNS"))
+                .stream().map(String::valueOf))
+        .as("ColumnValues が拒否する列")
+        .containsExactlyInAnyOrderElementsOf(written);
+    assertThat(
+            changesetRules.stream().map(rule -> String.valueOf(((Map.Entry<?, ?>) rule).getKey())))
+        .as("changeset の共通カラムの規則")
+        .containsExactlyInAnyOrderElementsOf(written);
+  }
+
+  // 本番とテストの private 定数を、可視性を広げずに照らすため。
+  @SuppressWarnings("PMD.AvoidAccessibilityAlteration")
+  private static Object privateConstant(final Class<?> owner, final String name)
+      throws ReflectiveOperationException {
+    final java.lang.reflect.Field field = owner.getDeclaredField(name);
+    field.setAccessible(true);
+    return field.get(null);
   }
 
   /** ユースケースの呼び出しの中として、pgm_cd を束縛して実行する。 */

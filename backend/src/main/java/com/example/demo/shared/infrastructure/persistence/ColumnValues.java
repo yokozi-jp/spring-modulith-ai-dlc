@@ -16,8 +16,8 @@ import org.jspecify.annotations.Nullable;
  * <p>{@code where} も {@code execute} も持たないため、Repository のラムダからは列の値しか書けない。列は更新するテーブルの型 {@code R}
  * に結び付いた {@link TableField} に限るため、別のテーブルの列と型の違う値はコンパイルで失敗する。
  *
- * <p>共通カラム（{@code lock_no} と、{@code created_*}、{@code updated_*}、{@code patched_*} の規約の 11 列）は
- * {@link TableWriter} が書くため、渡すと {@link IllegalArgumentException} を投げる。{@code updated_reason}
+ * <p>共通カラム（{@code lock_no}、{@code created_*}、{@code updated_*}、{@code patched_*} の規約の 12 列）は {@link
+ * TableWriter} が書くため、渡すと {@link IllegalArgumentException} を投げる。{@code updated_reason}
  * のような、規約にない業務の列は拒否しない。
  *
  * @param <R> 更新するテーブルの Record の型
