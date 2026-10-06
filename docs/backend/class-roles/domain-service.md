@@ -44,7 +44,7 @@ CommandHandler は Domain Service に、必要な値を Domain の型で渡す�
   `@Configuration` の `@Bean` で登録しない。
 - 依存は public のコンストラクタで受け取り、`private final` フィールドに持つ。
   フィールドは依存と定数だけにし、状態を持たない。
-- Repository は読み取り（`count*`、`find*`）にだけ使い、`update` と `delete` を呼ばない。
+- Repository は読み取り（`count*`、`find*`）にだけ使い、`add` 以外の書き込み（`update`、`delete`、集約ルートを受け取るメソッド）を呼ばない。
 - 規則を満たさないときは `IllegalStateException` を投げ、メッセージは英語で、対象の識別子を含める。
 - `@Transactional` と `@Slf4j` を付けず、`ApplicationEventPublisher` を使わない。
 - クラス、フィールド、コンストラクタ、public メソッドに Javadoc を書く。

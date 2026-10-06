@@ -60,7 +60,8 @@ PostgreSQL の READ COMMITTED では、後の UPDATE は先の UPDATE のコミ�
 - `LockedRoot.updateChild`、`LockedRoot.deleteChildren`、`DeletedRoot.deleteChildren` も、`55P03` の `CannotAcquireLockException` を、それを原因に付けた `ConflictException`（409）に変える。
   ルートの書き込みの後に子の行のロック待ちで失敗しても、ルートと同じ競合として返すためである。
 - `updateChild` の更新件数が 0 なら、要求された子の変更を今の永続化の状態へ適用できないため、`ResponseStatusException(HttpStatus.UNPROCESSABLE_CONTENT)` で 422 にする。
-  Spring の `ResponseEntityExceptionHandler` が既存の処理で 422 の Problem Details にし、`about:blank` の detail を消すため、件数、テーブル名、キーは応答に出ない。
+  `ApiExceptionHandler` が継承する Spring の `ResponseEntityExceptionHandler` が、既存の処理で 422 の Problem Details にする。
+  `ApiExceptionHandler` が上書きした `createResponseEntity` から呼ぶ `ApiProblemDetails.normalize` が `about:blank` の detail を消すため、件数、テーブル名、キーは応答に出ない。
   2 件以上は主キーの条件の誤りなので、`IllegalStateException`（500）のままにする。
 - `CommonColumns.forUpdate` は `updated_*` だけを返し、package-private にする。
   UPDATE の `lock_no` を書くのは `TableWriter` だけになる。
@@ -162,6 +163,8 @@ PostgreSQL の READ COMMITTED では、後の UPDATE は先の UPDATE のコミ�
     保存する集約と別のインスタンスに呼んでも通る。
   - **`ensureLockNo` の位置と引数**：業務の検査や外部の呼び出しの後に呼ぶ書き方と、`command.expectedLockNo()` 以外の値を渡す書き方は検出しない。
     `ExpectedLockNo` を作れるのは Request だけなので、渡せる値は別の Command か別の Request の値に限られる。
+  - **R1 が見ない Command の作り方**：R1 が画面から作られた Command とみなすのは、コンストラクタの呼び出しと、Command 自身が宣言する static factory の呼び出しだけである。
+    `XxxCommand.builder()...build()` のような builder と、Request が呼ぶ `application` の static な helper や mapper で作る Command は検出しないため、レビューで見る。
   - **期待する版に渡す値**：ArchUnit は Repository が集約ルートの `lockNo()` を呼んだかしか見ず、その値を `updateCheckingVersion` と `deleteCheckingVersion` に渡したかは見ない。
     `lockNo()` を呼んだうえでテーブルから読み直した版を渡すと、競合を検出しない。
 - `VersionedCommand` と `ExpectedLockNo` が `shared.concurrency` の公開型になり、Modulith の公開型の数と、アーキテクチャ指標の全体の相対可視性（7/12 から 17/26）が上がる。
