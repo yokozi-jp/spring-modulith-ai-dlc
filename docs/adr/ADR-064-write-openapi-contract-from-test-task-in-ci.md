@@ -23,7 +23,7 @@ Proposed
 Backend CI の Test ジョブは、この決定の結果として `OpenApiContractTest` を 2 回実行している。
 1 回目は `task be-test` の `./gradlew migrateDatabase test` で、全テストの一部として走る。
 2 回目は `task be-openapi-check` が呼ぶ `be-openapi-lint` の `./gradlew exportOpenApi` で、2 つ目の JVM と Spring context を起動する。
-この 2 段目は約 52 秒かかり、そのうち 35 秒から 40 秒が JVM と Spring context の起動である（CI 高速化の調査報告）。
+この 2 段目は約 52 秒かかり、そのうち 35 秒から 40 秒が JVM と Spring context の起動である。
 ローカルの `task test` も、`be-test` の後に `be-openapi-lint` を呼ぶため、同じ二重実行をしている。
 
 `exportOpenApi` を `test --tests OpenApiContractTest` に置き換える案は採れない。
@@ -83,7 +83,8 @@ Mutation Testing は計測がないため余裕を持たせ、計測が貯まっ
 - `-PopenapiExport=true` を付けた `./gradlew cleanTest` は、出力に宣言した `openapi/openapi.yaml` を削除する。
   `git checkout -- openapi/openapi.yaml` か、再度の `task be-test` で戻る。
 - `test` と `exportOpenApi` は同じファイルを出力に宣言する。
-  同じ起動で両方を指定しない。Taskfile にその組み合わせはない。
+  同じ起動で両方を指定しない。
+  Taskfile にその組み合わせはない。
 - システムプロパティの絶対パスが `test` の build cache のキーに入る。
   リモートの build cache は使わず、CI の runner のパスは安定なので、実害はない。
 - `timeout-minutes` を超えるジョブは失敗する。
@@ -113,7 +114,8 @@ Mutation Testing は計測がないため余裕を持たせ、計測が貯まっ
 
 - **Description**：`./gradlew test exportOpenApi` のように 1 回の起動で両方を実行する。
 - **Pros**：Taskfile の構造を変えずに済む。
-- **Cons**：2 つ目の JVM と Spring context が残る。節約できるのは Gradle の起動の数秒だけである。
+- **Cons**：2 つ目の JVM と Spring context が残る。
+  節約できるのは Gradle の起動の数秒だけである。
 
 ### 選択肢4: 現状を保つ
 
