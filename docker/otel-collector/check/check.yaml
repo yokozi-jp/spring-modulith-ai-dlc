@@ -4,11 +4,16 @@
 exporters:
   file/check:
     path: /out/telemetry.json
+  # フロントエンドの出口は別のファイルにし、既存のバックエンドの jq の検査を変えない。
+  file/check_frontend:
+    path: /out/frontend.json
 
 service:
   pipelines:
     logs:
       exporters: [file/check]
+    logs/frontend:
+      exporters: [file/check_frontend]
     traces:
       exporters: [file/check]
     metrics:

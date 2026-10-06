@@ -9,12 +9,47 @@ receivers:
       http:
         # 既定は localhost（Fargate のサイドカー）。Compose はコンテナ間通信のため 0.0.0.0 に上書きする。
         endpoint: ${env:OTEL_COLLECTOR_OTLP_HTTP_ENDPOINT:-localhost:4318}
+  # ブラウザの Faro SDK が同一オリジンの /collect から送るログ（ADR-066）。どのパスでも受ける。
+  # 同一オリジンで受けるため CORS は設定しない（ADR-014）。
+  faro:
+    # 既定は localhost。Compose はホストの Vite から受けるため 0.0.0.0 に上書きする。
+    endpoint: ${env:OTEL_COLLECTOR_FARO_HTTP_ENDPOINT:-localhost:12347}
+    # Errors だけの既定のバッチ（最大 50 件）に十分な余裕を持たせた上限（1 MiB）。超えると 400 で捨てる。
+    max_request_body_size: 1048576
 
 processors:
   transform/log_attributes:
     log_statements:
       # ログ属性の allowlist。属性を足すときは docs/observability/conventions.md と同じ変更で直す。
       - keep_keys(log.attributes, ["exception.type", "exception.message", "exception.stacktrace", "http.response.status_code"])
+  # フロントエンドのログ。faro receiver はメタデータを本文の logfmt に入れるため、keep_keys だけでは守れない。
+  # 本文を解析して許可した値だけを属性へ移し、本文は固定の文字列に置き換える。
+  # 属性を足すときは docs/observability/conventions.md と同じ変更で直す。
+  transform/frontend_logs:
+    # 解析に失敗した文は飛ばし、本文の置き換えと keep_keys で何も残さない側に倒す。
+    # ignore は失敗の理由に本文を含めて Collector のログに出すため、silent にする。
+    error_mode: silent
+    log_statements:
+      # logfmt は ' を引用符にしないが、ParseKeyValue は引用符として扱う。
+      # 解析の間だけ U+0001 に置き換える。logfmt は制御文字をエスケープするので、本文に生の U+0001 は現れない。
+      - replace_pattern(log.body, "'", "\u0001")
+      - merge_maps(log.cache, ParseKeyValue(log.body), "upsert")
+      - replace_all_patterns(log.cache, "value", "\u0001", "'")
+      - set(log.attributes["exception.type"], log.cache["type"]) where log.attributes["kind"] == "exception"
+      - set(log.attributes["exception.message"], log.cache["value"]) where log.attributes["kind"] == "exception"
+      - set(log.attributes["exception.stacktrace"], log.cache["stacktrace"]) where log.attributes["kind"] == "exception"
+      - set(log.attributes["url.path"], URL(log.cache["page_url"])["url.path"]) where log.cache["page_url"] != nil
+      # URL の query と fragment を消す。1 つ目は stacktrace の frame の :行:列) を残す。
+      # 値の中の \n のエスケープを食べないため、query の部分には \\ と \" 以外のバックスラッシュを含めない。
+      - replace_all_patterns(log.attributes, "value", "(https?://[^\\s?#()\\\\]*)[?#](?:[^\\s()\\\\]|\\\\\\\\)*(:\\d+:\\d+\\))", "$$1$$2")
+      # 2 つ目は frame 以外の URL で、( と ) と \" も query として消す（例外のメッセージの ?token=a(b)c や ?q=\"x\"）。
+      # ponytail: 空白か \n などのエスケープまでを query とみなすので、(see http://h/a?x=1) の閉じ括弧と、query に括弧を含む frame の :行:列) も消える。
+      # 秘密を残すより表示の崩れを取る。崩れが問題になったら、frame 以外の URL の終わりを括弧の対応で決める文を足す。
+      - replace_all_patterns(log.attributes, "value", "(https?://[^\\s?#()\\\\]*)[?#](?:[^\\s\\\\]|\\\\\\\\|\\\\\")*", "$$1")
+      - set(log.body, "Browser exception")
+      # ponytail: ParseKeyValue はエスケープを解かないため、stacktrace の改行は \n、引用符は \" の 2 文字のまま属性の値に残る。
+      # 読みにくさが問題になったら、エスケープを解く文を足す。
+      - keep_keys(log.attributes, ["exception.type", "exception.message", "exception.stacktrace", "url.path"])
 
 exporters:
   # ローカルの Grafana OpenTelemetry LGTM。
@@ -26,6 +61,12 @@ service:
     logs:
       receivers: [otlp]
       processors: [transform/log_attributes]
+      exporters: [otlp_http/lgtm]
+    # バックエンドの allowlist と混ぜないため、フロントエンドの pipeline を分ける。
+    # faro receiver の traces はこのチケットでは使わない。
+    logs/frontend:
+      receivers: [faro]
+      processors: [transform/frontend_logs]
       exporters: [otlp_http/lgtm]
     traces:
       receivers: [otlp]

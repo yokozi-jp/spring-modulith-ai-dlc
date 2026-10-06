@@ -111,9 +111,12 @@ services:
     environment:
       # コンテナ間通信とホストからの送信を受けるため、全インターフェースで待ち受ける。
       OTEL_COLLECTOR_OTLP_HTTP_ENDPOINT: 0.0.0.0:4318
+      OTEL_COLLECTOR_FARO_HTTP_ENDPOINT: 0.0.0.0:12347
     ports:
       # backend は全シグナルを OTLP/HTTP(4318)へ送るため、gRPC(4317)は公開しない。
       - "127.0.0.1:${OTEL_HTTP_PORT:?OTEL_HTTP_PORT is required}:4318"
+      # ホストの Vite が /collect を転送する faro receiver（ADR-066）。ブラウザから直接は受けない。
+      - "127.0.0.1:${OTEL_FARO_HTTP_PORT:?OTEL_FARO_HTTP_PORT is required}:12347"
     volumes:
       - ./otel-collector/config.yaml:/etc/otelcol-contrib/config.yaml:ro
     # イメージにシェルも HTTP クライアントもないため healthcheck を置けない。
@@ -159,6 +162,7 @@ services:
       SPRINGDOC_ENABLED: ${SPRINGDOC_ENABLED:?SPRINGDOC_ENABLED is required}
       OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318
       OTEL_SERVICE_NAME: ${OTEL_SERVICE_NAME:?OTEL_SERVICE_NAME is required}
+      OTEL_SERVICE_NAMESPACE: ${OTEL_SERVICE_NAMESPACE:?OTEL_SERVICE_NAMESPACE is required}
       OTEL_DEPLOYMENT_ENVIRONMENT_NAME: ${OTEL_DEPLOYMENT_ENVIRONMENT_NAME:?OTEL_DEPLOYMENT_ENVIRONMENT_NAME is required}
       MANAGEMENT_TRACING_SAMPLING_PROBABILITY: ${MANAGEMENT_TRACING_SAMPLING_PROBABILITY:?MANAGEMENT_TRACING_SAMPLING_PROBABILITY is required}
     ports:

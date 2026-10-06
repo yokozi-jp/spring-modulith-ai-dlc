@@ -950,11 +950,13 @@ tasks:
           exit "$status"
         }
         trap cleanup EXIT
-        container="$({{.DOCKER}} run -d -p 127.0.0.1::4318 \
+        container="$({{.DOCKER}} run -d -p 127.0.0.1::4318 -p 127.0.0.1::12347 \
           -e OTEL_COLLECTOR_OTLP_HTTP_ENDPOINT=0.0.0.0:4318 \
+          -e OTEL_COLLECTOR_FARO_HTTP_ENDPOINT=0.0.0.0:12347 \
           -v "$PWD/docker/otel-collector:/etc/otelcol-check:ro" -v "$out:/out" \
           "$image" --config /etc/otelcol-check/config.yaml --config /etc/otelcol-check/check/check.yaml)"
         address="$({{.DOCKER}} port "$container" 4318/tcp | head -n 1)"
+        faro_address="$({{.DOCKER}} port "$container" 12347/tcp | head -n 1)"
         accepted=0
         for _ in $(seq 1 30); do
           if curl -fsS -o /dev/null -X POST -H "Content-Type: application/json" 2>/dev/null \
@@ -987,7 +989,70 @@ tasks:
           echo "ログ属性が allowlist または期待値と一致しません。" >&2
           exit 1
         fi
-        echo "Collector OK: 許可した属性だけを残しました。"
+        fail() {
+          echo "$1" >&2
+          {{.DOCKER}} logs "$container" >&2
+          exit 1
+        }
+        # faro receiver の起動は OTLP より遅れうるので、202 になるまで送る。202 の後は再送しない（出口の記録が増えるため）。
+        accepted=0
+        for _ in $(seq 1 30); do
+          status="$(curl -s -o /dev/null -w '%{http_code}' -X POST -H "Content-Type: application/json" \
+            --data-binary "@docker/otel-collector/check/faro.json" "http://$faro_address/collect" || true)"
+          if [ "$status" = "202" ]; then
+            accepted=1
+            break
+          fi
+          sleep 1
+        done
+        if [ "$accepted" -ne 1 ]; then fail "Collector の faro receiver が Faro の payload を受け付けませんでした。"; fi
+        # 受け口の挙動。本文の {} は例外も log も持たないので、出口の記録を増やさない。
+        status="$(curl -s -o /dev/null -w '%{http_code}' "http://$faro_address/collect")"
+        if [ "$status" != "405" ]; then fail "faro receiver が GET に 405 を返しませんでした（$status）。"; fi
+        status="$(curl -s -o /dev/null -w '%{http_code}' -X POST -H "Content-Type: text/plain" --data-binary '{}' "http://$faro_address/collect")"
+        if [ "$status" != "415" ]; then fail "faro receiver が text/plain の POST に 415 を返しませんでした（$status）。"; fi
+        status="$(curl -s -o /dev/null -w '%{http_code}' -X POST -H "Content-Type: application/json" --data-binary '{}' "http://$faro_address/any/path")"
+        if [ "$status" != "202" ]; then fail "faro receiver が /collect 以外のパスの POST に 202 を返しませんでした（$status）。"; fi
+        status="$(head -c 1100000 /dev/zero | tr '\0' ' ' \
+          | curl -s -o /dev/null -w '%{http_code}' -H 'Content-Type: application/json' \
+            --data-binary @- "http://$faro_address/collect")"
+        if [ "$status" != "400" ]; then fail "faro receiver が 1 MiB を超える本文に 400 を返しませんでした（$status）。"; fi
+        for _ in $(seq 1 30); do
+          if grep -qF 'resourceLogs' "$out/frontend.json" 2>/dev/null; then break; fi
+          sleep 1
+        done
+        if [ ! -s "$out/frontend.json" ]; then fail "フロントエンドのログが出口に届きませんでした。"; fi
+        if grep -qE 'secret-query|secret-fragment|secret-paren|secret-quote|person@example\.com|fixture-user-id|fixture-session-id|FixtureAgent' "$out/frontend.json"; then
+          fail "フロントエンドのログに、許可していない値か URL の query か fragment が残りました。"
+        fi
+        # file exporter はバッチごとに一行を書くので -s で読む。
+        if ! jq -s -e --arg apostrophe "can't" '
+          def attr($key): first(.attributes[]? | select(.key == $key) | .value.stringValue);
+          [.[].resourceLogs[]?] as $resources
+          | [$resources[].scopeLogs[]?.logRecords[]?] as $records
+          | ($resources | length) > 0
+            and all($resources[]; .resource
+              | attr("service.name") == "demo-web"
+                and attr("service.namespace") == "demo"
+                and attr("service.version") == "0.0.0-fixture"
+                and attr("deployment.environment.name") == "local")
+            and ($records | length) == 3
+            and all($records[];
+              .body.stringValue == "Browser exception"
+                and ([.attributes[]?.key] | sort) == ["exception.message", "exception.stacktrace", "exception.type", "url.path"]
+                and attr("exception.type") == "Error"
+                and attr("url.path") == "/orders/42")
+            and any($records[];
+              attr("exception.message") == "failed to load http://localhost:5173/api/orders"
+                and (attr("exception.stacktrace") | contains("(http://localhost:5173/assets/index-abc.js:10:5)")))
+            # query の除去が 1 行目の改行（\ と n の 2 文字）を食べていないこと。
+            and any($records[]; attr("exception.stacktrace") | contains("http://localhost:5173/api/orders\\n  at render ("))
+            and any($records[]; attr("exception.message") == $apostrophe)
+            and any($records[]; attr("exception.message") == "bad http://localhost:5173/x tail")
+        ' "$out/frontend.json" >/dev/null; then
+          fail "フロントエンドのログの属性、resource 属性、本文のいずれかが期待値と一致しません。"
+        fi
+        echo "Collector OK: 許可した属性だけを残し、Faro の payload から URL の query と許可していない値を消しました。"
 
   compose-reset:
     desc: 明示確認付きでComposeサービスと全データを削除

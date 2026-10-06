@@ -226,6 +226,11 @@ management:
   opentelemetry:
     resource-attributes:
       "[service.name]": ${OTEL_SERVICE_NAME}
+      "[service.namespace]": ${OTEL_SERVICE_NAMESPACE}
+      # bootJar の manifest の Implementation-Version から Spring Boot が解決する。
+      # task be-run と Gradle のテストは jar から起動しないため値がなく、unknown にする。
+      # 既定値は環境変数ではなく jar の版なので、環境変数に既定値を置かない方針の対象外である。
+      "[service.version]": ${spring.application.version:unknown}
       "[deployment.environment.name]": ${OTEL_DEPLOYMENT_ENVIRONMENT_NAME}
     tracing:
       export:
