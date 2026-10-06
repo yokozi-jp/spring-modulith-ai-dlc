@@ -1,5 +1,22 @@
 # Changelog
 
+## [0.8.0](https://github.com/yokozi-jp/spring-modulith-ai-dlc/compare/v0.7.0...v0.8.0) (2026-10-06)
+
+
+### Features
+
+* **api:** return validation problems and throw problem errors in the api client ([#123](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/123)) ([db8c3bb](https://github.com/yokozi-jp/spring-modulith-ai-dlc/commit/db8c3bbf1c2a5706c617fac85b821ead1349db9e))
+* **backend:** 業務テーブルの更新と削除を TableWriter に集め、楽観的ロックの迂回を ArchUnit で禁じる ([#130](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/130)) ([e0fead3](https://github.com/yokozi-jp/spring-modulith-ai-dlc/commit/e0fead3e140c601cec9a46554a6e81a793a0de76))
+* **ci:** add authenticated owasp zap dast ([#126](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/126)) ([8db8a42](https://github.com/yokozi-jp/spring-modulith-ai-dlc/commit/8db8a429bb3e6c02f6eb787b416616b94c07c74c))
+* **frontend:** 主要なフローを実ブラウザで確かめる E2E テスト基盤を Playwright で導入する ([#128](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/128)) ([9049c94](https://github.com/yokozi-jp/spring-modulith-ai-dlc/commit/9049c94da2d92e75662419cc3795d2276fde711f))
+
+
+### Bug Fixes
+
+* **backend:** 未認証で許可する health を liveness と readiness に限定する ([#142](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/142)) ([492d495](https://github.com/yokozi-jp/spring-modulith-ai-dlc/commit/492d4958b2b0f63078a93cb7c553aa30182c34a9))
+* **ci:** scan only main history in betterleaks and harden dast sarif upload ([#133](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/133)) ([ca2e9e9](https://github.com/yokozi-jp/spring-modulith-ai-dlc/commit/ca2e9e954c9909fe8a95cdca86bd187172d983c5))
+* ログアウトの e2e と csrf の拒否を確かめ、preview の csp の form-action に idp の origin を含める ([#135](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/135)) ([b24b13e](https://github.com/yokozi-jp/spring-modulith-ai-dlc/commit/b24b13e72c80abf92216e6cab5dcf342d08a2f2a))
+
 ## [0.7.0](https://github.com/yokozi-jp/spring-modulith-ai-dlc/compare/v0.6.0...v0.7.0) (2026-10-04)
 
 
