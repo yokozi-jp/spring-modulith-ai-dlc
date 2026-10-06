@@ -82,6 +82,10 @@ describe("project lint config on fixtures", () => {
       expect(countIn("features/order/route-import.ts", "eslint(no-restricted-imports)")).toBe(2);
     });
 
+    it("rejects the telemetry SDK from a feature", () => {
+      expect(countIn("features/order/telemetry-sdk.ts", "eslint(no-restricted-imports)")).toBe(1);
+    });
+
     it("allows the own feature and the API client", () => {
       expect(codesIn("features/order/own-feature.ts")).toStrictEqual([]);
     });
@@ -105,6 +109,10 @@ describe("project lint config on fixtures", () => {
 
     it("allows the API client from shared code", () => {
       expect(codesIn("lib/clean.ts")).toStrictEqual([]);
+    });
+
+    it("allows the telemetry SDK only inside lib/telemetry.ts", () => {
+      expect(codesIn("lib/telemetry.ts")).toStrictEqual([]);
     });
   });
 

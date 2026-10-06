@@ -143,7 +143,7 @@ tasks:
           exit "$cleanup_status"
         }
         trap cleanup EXIT
-        (cd frontend && vp install --frozen-lockfile && vp run build && vp exec playwright install chromium)
+        (cd frontend && vp install --frozen-lockfile && vp build --mode test && vp exec playwright install chromium)
         compose build backend
         compose up -d --wait postgres redis keycloak
         task be-migrate COMPOSE_ENV_FILE=.env.test
@@ -401,7 +401,14 @@ tasks:
     dir: frontend
     cmds:
       - vp test run --coverage
-      - vp run build
+      # ルートの .env で有効にしていても、既定の無効のビルドを検査する（ADR-066）。
+      # vp run の script は cache しないので、環境変数がそのまま渡る。build を run.tasks に移すなら cache.env に FRONTEND_OTEL_* を足す。
+      - FRONTEND_OTEL_ENABLED=false vp run build
+      - |
+        if grep -rqiE 'faro|grafana' dist/assets; then
+          echo "無効のビルドの bundle に Faro の SDK が入っています。" >&2
+          exit 1
+        fi
 
   fe-verify:
     desc: フロントエンドの静的解析、未使用コード検査、テスト、ビルドを実行

@@ -7,8 +7,12 @@ import { I18nextProvider } from "react-i18next";
 
 import { redirectToLoginOnUnauthorized, retryUnlessClientError } from "./api/api-fetch";
 import { i18n } from "./i18n";
+import { initTelemetry } from "./lib/telemetry";
 import { routerDefaults } from "./router-defaults";
 import { routeTree } from "./routeTree.gen";
+
+// SDK は動的 import で読み、描画を待たせない。
+initTelemetry();
 
 const queryClient = new QueryClient({
   queryCache: new QueryCache({ onError: redirectToLoginOnUnauthorized }),
