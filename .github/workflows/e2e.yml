@@ -3,7 +3,7 @@ name: E2E tests 🎭
 on:
   workflow_dispatch:
   # 必須チェックにしないため、PR では path filter で起動を絞る（ADR-057）。
-  # docker/initdb/** と .env.test は compose-test がマウントまたは参照する入力として含める。
+  # docker/initdb/** と .env.test.example（task e2e が .env.test へコピーする）は compose-test がマウントまたは参照する入力として含める。
   pull_request:
     branches: ["**"]
     paths:
@@ -12,7 +12,7 @@ on:
       - "docker/compose-test.yml"
       - "docker/initdb/**"
       - "docker/keycloak/**"
-      - ".env.test"
+      - ".env.test.example"
       - "Taskfile.yml"
       - ".github/workflows/e2e.yml"
 

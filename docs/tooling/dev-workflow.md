@@ -35,12 +35,25 @@ task api-gen
 
 契約と生成物の確認、コミット、CIの検査は[APIを変更する](../web-api/runbook-api-change.md)を参照する。
 
-## ローカルDBを初めて用意するとき
+## ローカル環境を初めて起動するとき
 
 ```bash
-task compose-up
-task be-migrate
+cp .env.example .env       # 環境変数を用意し、パスワードを変更する
+task compose-up            # PostgreSQL、Keycloak、Redis、Collector、Grafanaを起動する
+task be-migrate            # 初回はマイグレーションを明示実行する
+task dev                   # 依存を起動し、バックエンドを起動する
+# 別のターミナルで
+cd frontend && vp dev      # SPAを起動し、APIとOIDCを同一オリジンでproxyする
 ```
+
+公開先は次のとおり。
+
+- フロントエンド：<http://localhost:5173>（ブラウザで開く入口）
+- バックエンド：<http://localhost:18080>
+- Keycloak：<http://localhost:8080>
+- Grafana：<http://localhost:3000>
+
+ツールの導入は[開発環境構築ガイド](../local-env-setup/setup.md)を参照する。
 
 ## changesetを追加するとき
 

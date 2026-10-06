@@ -13,6 +13,7 @@ DBへ書き込むテストは、隔離したテスト用スタックに対して
 ## 実行環境
 
 DBテストは、`docker/compose-test.yml`のPostgreSQL 5433とRedis 6380を`.env.test`で起動した隔離スタックに対して実行する。
+`.env.test`は、Gitで管理する`.env.test.example`からコピーして作るローカルファイルで、`task test`が無ければ作る。
 `task test`は確定済みchangesetを、`task test-dev`は作りかけを含む全changesetを適用し、テスト後にボリュームを削除する。
 どちらのテストアノテーションも、マイグレーション済みのテストDBを前提にする。
 

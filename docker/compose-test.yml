@@ -7,7 +7,7 @@
 #   - backend と Keycloak は E2E 用の e2e profile でも起動する（task e2e、ADR-057）。
 #   - テストに不要な OTEL LGTM は含めない。
 #   - 開発用 compose と違い必須変数（${...:?}）や secret には依存せず、値を直書きして自己完結させる
-#     （機密ではない demo/demo の使い捨て。接続情報は .env.test が Gradle・スモーク側へ渡す）。
+#     （機密ではない demo/demo の使い捨て。接続情報は .env.test が Gradle・スモーク側へ渡す。.env.test は Git 除外で、.env.test.example からコピーして作る）。
 name: spring-modulith-test
 
 services:

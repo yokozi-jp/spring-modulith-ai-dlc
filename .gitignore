@@ -1,6 +1,8 @@
 # Environment
-# 実値を持つルート .env のみ無視する（.env.test は非機密ダミーのため追跡する）。
+# 実値を持つルート .env と、.env.test.example からコピーして作るルート .env.test を無視する。
+# .env.example と .env.test.example はテンプレートとして追跡する。
 /.env
+/.env.test
 
 # api-* タスクがリポジトリルートに書き出す一時ファイル（oasdiff の base、設計書の HTML）
 /build/
