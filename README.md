@@ -6,47 +6,111 @@
 ## 目次
 
 1. [プロジェクトについて](#プロジェクトについて)
-2. [環境](#環境)
-3. [ディレクトリ構成](#ディレクトリ構成)
-4. [開発環境構築](#開発環境構築)
-5. [開発コマンド](#開発コマンド)
-6. [Lint・テスト](#lintテスト)
-7. [設計判断の記録（ADR）](#設計判断の記録adr)
-8. [ドキュメント管理（iwe / OKF）](#ドキュメント管理iwe--okf)
+2. [AI harnessの構成](#ai-harnessの構成)
+3. [Grill駆動開発](#grill駆動開発)
+4. [技術スタック](#技術スタック)
+5. [ディレクトリ構成](#ディレクトリ構成)
+6. [開発環境構築](#開発環境構築)
+7. [開発コマンド](#開発コマンド)
+8. [Lint・テスト](#lintテスト)
+9. [設計判断の記録（ADR）](#設計判断の記録adr)
+10. [ドキュメント管理（iwe / OKF）](#ドキュメント管理iwe--okf)
 
 ## プロジェクトについて
 
-**Spring Modulith** を用いた**モジュラーモノリス**の土台となるプロジェクトです。
-単一のデプロイ単位の内側を業務モジュールへ分割し、モジュール間の境界と依存を Spring Modulith で検証しながら開発することを狙いとしています。
+AI コーディングエージェントが安全に、生産的に働ける環境（**AI harness**）を整えることを主題にしたプロジェクトです。
+業務コードを書く前に、エージェントの変更を機械的に検査する仕組みと、エージェントが従う規約の置き場を用意しています。
 
-現時点で整備済みなのは、業務モジュールを載せる前の基盤部分です。
-
-- **認証と認可**：Keycloak を認可サーバとした OIDC（OAuth2 Client）と、Redis による分散セッション
-- **データアクセス**：Liquibase によるDBマイグレーションと、スキーマから生成する jOOQ コード
-- **可観測性**：OpenTelemetry による計装と、OpenTelemetry Collector でログの属性を絞ってからの Grafana OpenTelemetry LGTM への集約（ログ相関、PII、保持は[可観測性データの規約](docs/observability/conventions.md)を参照）
-- **品質ゲート**：静的解析、シークレットと脆弱性のスキャン、使い捨てDBでのテストを Git フックと CI で強制
+Spring Modulith は、その一部として選んだ道具です。
+モジュール間の境界と依存をテストで検証できるため、エージェントが境界を越える変更を書いても、人のレビューより前に検出できます。
+言語、フレームワーク、ツールは、同じ基準で「変更を機械的に検査できるか」を見て選んでいます。
 
 業務ドメインのモジュールはこれから追加していきます。
 
-## 環境
+## AI harnessの構成
 
-| 言語・フレームワーク       | バージョン |
-| -------------------------- | ---------- |
-| Java (Amazon Corretto)     | 25         |
-| Spring Boot                | 4.1.1      |
-| Spring Modulith            | 2.1.1      |
-| TypeScript                 | 7.0.x      |
-| Node.js                    | 24.21.0    |
-| VitePlus                   | 0.3.3      |
-| pnpm                       | 11.21.0    |
-| PostgreSQL                 | 18         |
-| Redis                      | 7.x        |
-| Keycloak                   | 26.7.3     |
-| Grafana OpenTelemetry LGTM | 0.32.1     |
-| OpenTelemetry Collector    | 0.161.0    |
-| Go (betterleaks 実行用)    | 1.27.x     |
-| Task                       | 3.53.1     |
+harness は、変更が通る複数の関門と、規約の置き場で構成します。
 
+- **構造の検査**：ArchUnit と Spring Modulith の検証テストで、モジュール境界と依存方向を検査します（[ADR-001](docs/adr/ADR-001-adopt-spring-modulith-modular-monolith.md)）。
+  Spotless、PMD、SpotBugs、Error Prone、Oxlint、Knip が、書き方の規約と未使用コードを検査します。
+- **契約の検査**：OpenAPI 契約をコミットし、Spectral、oasdiff、Orval の再生成で差分と破壊的変更を検査します（[ADR-052](docs/adr/ADR-052-commit-openapi-contract-and-check-generated-client.md)）。
+- **Git フック（Lefthook）**：commit-msg で commitlint を実行します。
+  pre-commit では betterleaks のシークレットスキャン、フロントエンドと API 契約の検査、hadolint、Docker ビルド検査、compose config、markdownlint、OKF 検査を実行します。
+  pre-push では ADR 検査、betterleaks の全履歴スキャン、フロントエンドのテストとビルド、バックエンドの lint とテスト、backend イメージのビルド、actionlint、zizmor を実行します。
+- **CI（GitHub Actions）**：Backend CI、Frontend CI、E2E、Docker CI（hadolint）、Secret Scan、Static Analysis（Semgrep）、Trivy による脆弱性スキャン、DAST（OWASP ZAP）、OKF 検証、API Contract（破壊的変更の検出）を実行します。
+  リリースは release-please、依存更新は Dependabot が担います。
+- **steering と docs**：規約の正文は `docs/` に置き、`.kiro/steering/` は読む文書への案内だけを持ちます（[ADR-038](docs/adr/ADR-038-route-steering-to-docs-knowledge.md)）。
+- **ADR**：設計判断は [ADR](#設計判断の記録adr) に残し、pre-push の `task adr-check` で記録漏れに注意喚起します。
+- **Taskfile**：すべての検査とビルドを `task <タスク名>` で呼べる単一の入口にします（[ADR-010](docs/adr/ADR-010-adopt-task-as-project-task-runner.md)）。
+  フック、CI、手元の実行が同じタスクを呼ぶため、結果が食い違いません。
+
+各ゲートの対応は [Lint・テストのリファレンス](docs/tooling/lint-and-test.md) にまとめています。
+
+## Grill駆動開発
+
+[Matt Pocock のスキル](https://github.com/mattpocock/skills)を導入し、**grill 駆動開発**で進められます。
+grill は、エージェントに未決事項を質問させ、答えながら設計を詰めていく対話です。
+実装の前に曖昧さをなくし、確定した用語と判断を docs と ADR に残します。
+
+```text
+/grill-with-docs
+  ↓  必要なら /handoff → /prototype → /handoff
+/to-spec
+  ↓
+/to-tickets
+  ↓
+チケットごとに新しいセッションで /implement（内部で /tdd と /code-review）
+```
+
+- `/grill-with-docs`：アイデアや計画について、エージェントが未決事項を一つずつ質問します。
+  答えながら設計を詰め、確定した用語と設計判断を docs と ADR に記録します。
+- `/to-spec`：ここまでの対話を、追加の質問なしで仕様にまとめ、Issue tracker に登録します。
+- `/to-tickets`：仕様や計画を、単独で実装できる小さなチケットに分けます。
+  チケット間の依存関係（どれが先か）も書きます。
+- `/implement`：チケット一つを実装します。
+  `/tdd` でテストから小さく進め、最後に `/code-review` でプロジェクト規約と仕様への適合を確認します。
+
+スキルは `.agents/skills/` にあります。
+どのスキルを使うか迷うときは `/ask-matt` に状況を渡します。
+プロジェクトの docs と ADR の規約は、外部スキル内の記述より優先します。
+
+手順の詳細は [Matt Pocock スキル運用](docs/agents/matt-pocock-skills/workflow.md)、導入の判断は [ADR-039](docs/adr/ADR-039-adopt-matt-pocock-skills-workflow.md) にあります。
+
+## 技術スタック
+
+| 分類             | 技術                       | バージョン | 用途                                           |
+| ---------------- | -------------------------- | ---------- | ---------------------------------------------- |
+| Backend          | Java (Amazon Corretto)     | 25         |                                                |
+| Backend          | Spring Boot                | 4.1.1      | Web、Security（OIDC Client）、Session（Redis） |
+| Backend          | Spring Modulith            | 2.1.1      | モジュール境界の検証                           |
+| Backend          | jOOQ                       | 3.21.8     | スキーマから生成する型安全な SQL               |
+| Backend          | Liquibase                  |            | DB マイグレーション                            |
+| Backend          | ArchUnit                   | 1.5.0      | アーキテクチャテスト                           |
+| Frontend         | React                      | 19.3.0     |                                                |
+| Frontend         | TypeScript                 | 7.0.x      |                                                |
+| Frontend         | TanStack Router            | 1.170.38   | ファイルベースルーティング                     |
+| Frontend         | TanStack React Query       | 5.103.2    | server state                                   |
+| Frontend         | TanStack React Form        | 1.33.5     | form state                                     |
+| Frontend         | TanStack React Table       | 9.2.4      | テーブル                                       |
+| Frontend         | Zod                        | 4.6.5      | スキーマ検証                                   |
+| Frontend         | i18next                    | 26.4.2     | 多言語対応                                     |
+| Frontend         | Orval                      | 8.36.0     | OpenAPI から API client と MSW handler を生成  |
+| Frontend         | Tailwind CSS               | 4.3.3      | スタイリング                                   |
+| Frontend         | VitePlus                   | 0.3.3      | ビルド、開発サーバー、Oxlint（`vp`）           |
+| Frontend         | Vitest                     | 4.1.11     | 単体テスト                                     |
+| Frontend         | MSW                        | 2.15.0     | API のモック                                   |
+| Frontend         | Playwright                 | 1.63.0     | E2E テスト                                     |
+| Frontend         | Node.js                    | 24.21.0    |                                                |
+| Frontend         | pnpm                       | 11.21.0    |                                                |
+| インフラとツール | PostgreSQL                 | 18         |                                                |
+| インフラとツール | Redis                      | 7.x        | 分散セッション                                 |
+| インフラとツール | Keycloak                   | 26.7.3     | OIDC の認可サーバー                            |
+| インフラとツール | Grafana OpenTelemetry LGTM | 0.32.1     | 可観測性データの集約                           |
+| インフラとツール | OpenTelemetry Collector    | 0.161.0    | ログの属性の絞り込み                           |
+| インフラとツール | Go (betterleaks 実行用)    | 1.27.x     |                                                |
+| インフラとツール | Task                       | 3.53.1     | タスクランナー                                 |
+
+ログ相関、PII、保持は[可観測性データの規約](docs/observability/conventions.md)、フロントエンドの構成は[フロントエンドアーキテクチャ](docs/frontend/architecture.md)を参照してください。
 その他のパッケージのバージョンは `backend/build.gradle` と `frontend/package.json` を参照してください。
 
 <p align="right">(<a href="#top">トップへ</a>)</p>
@@ -80,23 +144,33 @@
 │   ├── adr/              # Architecture Decision Records（設計判断の記録）
 │   ├── agents/           # エージェントスキル用の設定（Issue tracker、Triage ラベル、ドメイン文書）
 │   ├── backend/          # バックエンドの規約（アーキテクチャ、テスト）
+│   ├── code-review/      # コードレビューの規約
 │   ├── container/        # コンテナ（Dockerfile、Compose）の規約
 │   ├── database/         # データベース（マイグレーション、jOOQ、接続）の規約
 │   ├── datetime/         # 日時とタイムゾーンの規約
 │   ├── e2e/              # E2E テスト（Playwright）の規約
 │   ├── frontend/         # フロントエンドの規約
+│   ├── integration/      # システム連携と非同期処理の規約
 │   ├── knowledge/        # ナレッジ管理（docs と steering の役割分担）
 │   ├── local-env-setup/  # 開発環境構築手順・スクリプト
+│   ├── nfr/              # 非機能要件
+│   ├── observability/    # 可観測性とログの規約
+│   ├── performance-test/ # 性能テスト
+│   ├── principles/       # アーキテクチャ原則
+│   ├── pull-request/     # Pull Request の規約
+│   ├── report/           # 帳票
+│   ├── repository/       # リポジトリ運用（ブランチ保護、リリース）
 │   ├── tooling/          # 開発ツール（Taskfile、フック、CI、Lint）の規約
+│   ├── web-api/          # Web API の設計と契約
 │   ├── writing/          # 日本語の技術文書の書き方
 │   └── index.md          # docs の入口
-├── frontend/         # VitePlus + TypeScript フロントエンド（pnpm）
+├── frontend/         # React + TanStack Router + TypeScript の SPA（VitePlus、pnpm）
 ├── infrastructure/   # インフラ定義（未整備）
 ├── openapi/          # コミット済みの OpenAPI 契約（openapi.yaml、生成物）と Spectral のルールの fixture
 ├── .betterleaks.toml # betterleaks（シークレットスキャナ）設定
 ├── .editorconfig     # エディタ共通設定
 ├── .env.example      # 環境変数のサンプル
-├── .env.test         # テスト用の環境変数（非機密ダミー）
+├── .env.test.example # テスト用の環境変数のテンプレート（非機密ダミー。.env.test へコピーして使う）
 ├── .gitignore        # Git 追跡除外設定
 ├── .hadolint.yaml    # hadolint（Dockerfile リンタ）設定
 ├── .jscpd.json       # jscpd（重複コード検査）設定
@@ -125,6 +199,7 @@
 ## 開発環境構築
 
 [開発環境構築ガイド](docs/local-env-setup/setup.md) を参照してください。
+ローカル環境の初回の起動手順と各サービスのポートは [開発ワークフロー](docs/tooling/dev-workflow.md) を参照してください。
 
 <p align="right">(<a href="#top">トップへ</a>)</p>
 
@@ -138,21 +213,7 @@ task <タスク名>
 
 引数なしの`task`、`task help`、または`task --list`で、公開タスクの一覧を表示します。
 
-### Quick Start
-
-初回は次の順で環境を立ち上げます。
-
-```bash
-cp .env.example .env       # 環境変数を用意し、パスワードを変更する
-task compose-up            # PostgreSQL / Keycloak / Redis / Collector / Grafana を起動
-task be-migrate            # 初回はマイグレーションを明示実行する
-task dev                   # 依存起動＋バックエンドを起動
-# 別のターミナルで
-cd frontend && vp dev      # SPAを起動し、APIとOIDCを同一オリジンでproxy
-```
-
-ブラウザは <http://localhost:5173> を開きます。
-バックエンドは <http://localhost:18080>、Keycloak は <http://localhost:8080>、Grafana は <http://localhost:3000> で公開されます。
+初回の環境構築は [開発環境構築ガイド](docs/local-env-setup/setup.md)、初回の起動と日常の流れは [開発ワークフロー](docs/tooling/dev-workflow.md) に従ってください。
 
 日々の開発で使う入口タスクは次の五つです。
 

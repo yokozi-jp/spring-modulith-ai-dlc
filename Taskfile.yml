@@ -100,6 +100,7 @@ tasks:
   e2e:
     desc: compose-testでbackendを起動し、Vite previewに対してPlaywrightのE2Eを実行して後片付け
     silent: true
+    deps: [_ensure-test-env]
     cmds:
       - |
         # compose の backend と Playwright が .env.test を固定で読むため、TEST_ENV_FILE の上書きには対応しない。
@@ -384,6 +385,8 @@ tasks:
   fe-knip:
     desc: フロントエンドの未参照ファイル、未使用export、未使用依存をKnipで検査
     dir: frontend
+    # Knip は playwright.config.ts を読み込み、その先の e2e/environment.ts が .env.test を必須にする。
+    deps: [_ensure-test-env]
     cmds:
       - vp run knip
 
@@ -448,6 +451,13 @@ tasks:
         set +a
         ./gradlew update
 
+  _ensure-test-env:
+    internal: true
+    status:
+      - test -f .env.test
+    cmds:
+      - cp -n .env.test.example .env.test
+
   _require-migration-env:
     internal: true
     preconditions:
@@ -488,6 +498,7 @@ tasks:
   be-verify-migrations:
     desc: 使い捨てDBでマイグレーションとrollbackを検証
     dir: backend
+    deps: [_ensure-test-env]
     cmds:
       - |
         set -a
@@ -583,6 +594,7 @@ tasks:
   be-openapi-lint:
     desc: 依存起動済みのテストDBでOpenAPI 3.1契約をopenapi/openapi.yamlへ生成しSpectralで検査
     dir: backend
+    deps: [_ensure-test-env]
     cmds:
       - |
         set -a
@@ -593,6 +605,7 @@ tasks:
 
   be-openapi-check:
     desc: 依存起動済みのテストDBでOpenAPI契約を再生成し、コミット済みのopenapi/openapi.yamlと一致するか検査
+    deps: [_ensure-test-env]
     cmds:
       - task: be-openapi-lint
       - task: api-drift-check
@@ -601,6 +614,7 @@ tasks:
   be-test:
     desc: 依存起動済みのテストDBでマイグレーションとテストを実行
     dir: backend
+    deps: [_ensure-test-env]
     cmds:
       - |
         set -a
@@ -611,6 +625,7 @@ tasks:
   be-test-dev:
     desc: 作りかけを含むchangesetを適用してテスト
     dir: backend
+    deps: [_ensure-test-env]
     cmds:
       - |
         set -a
@@ -621,6 +636,7 @@ tasks:
   be-mutation-test:
     desc: 依存起動済みのテストDBでPITミューテーションテストを実行
     dir: backend
+    deps: [_ensure-test-env]
     cmds:
       - |
         set -a
@@ -630,17 +646,20 @@ tasks:
 
   test-deps-up:
     desc: テスト専用の依存スタックを起動
+    deps: [_ensure-test-env]
     cmds:
       - '{{.DOCKER}} compose -f "{{.TEST_COMPOSE_FILE}}" up -d --wait'
 
   test-deps-down:
     desc: テスト専用の依存スタックをボリュームごと停止
+    deps: [_ensure-test-env]
     cmds:
       - '{{.DOCKER}} compose -f "{{.TEST_COMPOSE_FILE}}" down --volumes --remove-orphans'
 
   test:
     desc: 隔離依存を起動してマイグレーション検証とテスト後に片付け
     silent: true
+    deps: [_ensure-test-env]
     cmds:
       - |
         cleanup() {
@@ -660,6 +679,7 @@ tasks:
   test-dev:
     desc: 隔離依存を起動して作りかけを含むテスト後に片付け
     silent: true
+    deps: [_ensure-test-env]
     cmds:
       - |
         cleanup() {
@@ -677,6 +697,7 @@ tasks:
   mutation-test:
     desc: 隔離依存を使ってバックエンドのPITミューテーションテストを実行
     silent: true
+    deps: [_ensure-test-env]
     cmds:
       - |
         cleanup() {
@@ -792,6 +813,7 @@ tasks:
   api-gen:
     desc: テスト用依存を起動し、OpenAPI契約の生成、Spectral検査、Orvalの再生成を実行して片付け
     silent: true
+    deps: [_ensure-test-env]
     cmds:
       - |
         cleanup() {
@@ -809,6 +831,7 @@ tasks:
 
   api-check:
     desc: api-genで再生成したOpenAPI契約とAPI clientがコミット済みの内容と一致するか検査
+    deps: [_ensure-test-env]
     cmds:
       - task: api-gen
       - task: api-drift-check
@@ -1008,6 +1031,7 @@ tasks:
   dast-run:
     internal: true
     silent: true
+    deps: [_ensure-test-env]
     cmds:
       - |
         zap_image="zaproxy/zap-stable:2.17.0@sha256:781a2bdaea47324e7bab583e2263f21d257b0aee61ed51521a5be45f5f5081ef"
@@ -1180,6 +1204,7 @@ tasks:
 
   lint-compose:
     desc: 全Composeファイルの構文と変数展開を検証
+    deps: [_ensure-test-env]
     cmds:
       - |
         files="$(git ls-files '**/compose.yml' '**/compose.yaml' '**/compose-test.yml' '**/compose-test.yaml' '**/docker-compose.yml' '**/docker-compose.yaml' 'compose.yml' 'compose.yaml' 'compose-test.yml' 'compose-test.yaml' 'docker-compose.yml' 'docker-compose.yaml')"

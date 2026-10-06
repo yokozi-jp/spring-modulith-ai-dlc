@@ -54,7 +54,7 @@ jobs:
             exit 0
           fi
           # docker/ は ZAP の plan と script（docker/zap/）と realm（docker/keycloak/）を含む。
-          if grep -Eq '^(backend/|frontend/|docker/|\.env\.test$|Taskfile\.yml$|\.github/workflows/dast\.yml$)' \
+          if grep -Eq '^(backend/|frontend/|docker/|\.env\.test\.example$|Taskfile\.yml$|\.github/workflows/dast\.yml$)' \
             <<< "$changed_files"; then
             echo "dast=true" >> "$GITHUB_OUTPUT"
           else

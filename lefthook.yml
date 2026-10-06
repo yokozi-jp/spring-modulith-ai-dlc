@@ -142,6 +142,8 @@ pre-commit:
           echo "docker が無いため docker compose config をスキップします（CI で検査されます）。" >&2
           exit 0
         fi
+        # compose-test.yml の env_file が参照する .env.test は Git 除外のため、無ければ .env.test.example からコピーする。
+        [ -f .env.test ] || cp .env.test.example .env.test
         for composefile in {staged_files}; do
           echo "validating: $composefile"
           docker compose --env-file .env.example -f "$composefile" config --quiet || exit 1

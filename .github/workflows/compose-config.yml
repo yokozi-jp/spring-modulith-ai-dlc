@@ -44,6 +44,8 @@ jobs:
       # Compose ファイルの構文・参照・変数展開を検証（起動はしない）。
       - name: docker compose config
         run: |
+          # compose-test.yml の env_file が参照する .env.test は Git 除外のため、無ければ作る。
+          [ -f .env.test ] || cp .env.test.example .env.test
           mapfile -t composefiles < <(git ls-files -z \
             '**/compose.yml' '**/compose.yaml' \
             '**/compose-test.yml' '**/compose-test.yaml' \
