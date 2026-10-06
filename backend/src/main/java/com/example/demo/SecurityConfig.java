@@ -23,9 +23,10 @@ import org.springframework.web.servlet.HandlerExceptionResolver;
  * <p>独自の {@link SecurityFilterChain} を定義すると Actuator の ManagementWebSecurityAutoConfiguration
  * が後退し、Actuator を含む全リクエストをこの Chain が制御する。
  *
- * <p>ヘルスチェック用のプローブ（{@code /actuator/health}、liveness/readiness）は ALB/ECS が未認証で叩くため 認証不要にする。{@link
- * EndpointRequest#to} でエンドポイントクラスから解決するため、 {@code management.endpoints.web.base-path}
- * を変更してもここを直す必要はない。
+ * <p>ALB、ECS、コンテナの healthcheck は liveness と readiness の probe だけを未認証で叩くため、この二つだけを認証不要にする。 {@code
+ * /actuator/health} のルートとそれ以外の health 配下は、ログイン済みでも誰にも許可しない（ADR-061）。 probe のパスは明示しているため、{@code
+ * management.endpoints.web.base-path} を変えたらここも直す。 拒否する側は {@link EndpointRequest#to}
+ * でエンドポイントクラスから解決する。
  */
 @Configuration
 public class SecurityConfig {
@@ -58,9 +59,12 @@ public class SecurityConfig {
     http.authorizeHttpRequests(
             auth ->
                 auth
-                    // ヘルスチェック用エンドポイント（liveness/readiness を含む）
-                    .requestMatchers(EndpointRequest.to(HealthEndpoint.class))
+                    // ALB、ECS、コンテナの healthcheck が未認証で叩く probe だけを許可する。
+                    .requestMatchers("/actuator/health/liveness", "/actuator/health/readiness")
                     .permitAll()
+                    // ルートの集約やコンポーネント別の health は、ログイン済みでも拒否する。
+                    .requestMatchers(EndpointRequest.to(HealthEndpoint.class))
+                    .denyAll()
                     // OAuth2 の認可開始・コールバックとエラー表示。
                     .requestMatchers("/oauth2/**", "/login/**", "/error")
                     .permitAll()

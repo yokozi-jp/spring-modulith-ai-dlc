@@ -39,15 +39,16 @@ backend/src/test/java/com/example/demo/architecture/
 規則名は`@ArchTest`のフィールド名であり、テスト結果にもこの名前で出る。
 
 - `dependenciesPointInward`：`domain.model`、`domain.service`、モジュールルートと`application`、`presentation`、`infrastructure.persistence`、`infrastructure.client`のオニオン構造で依存を内向きに限り、どの層にも属さないパッケージのクラスを拒否する。
-  ベースパッケージ直下と`shared.concurrency`は、所属検査から除く。
+  ベースパッケージ直下と`shared.concurrency`、`shared.failure`は、所属検査から除く。
 - `infrastructureDependsOnlyOnDomainModel`：`infrastructure`は`application`、`domain.service`、モジュールルートの型に依存せず、機能モジュールの型のうち`domain.model`だけを使う。
-- `sharedModuleIsUsedOnlyByPersistenceAdapters`：`shared`の外で`shared.concurrency`以外の`shared`の型に依存するクラスは、`infrastructure.persistence`に置く。
+- `sharedModuleIsUsedOnlyByPersistenceAdapters`：`shared`の外で`shared.concurrency`と`shared.failure`以外の`shared`の型に依存するクラスは、`infrastructure.persistence`に置く。
   `shared`の中の依存は対象にしない。
-  `shared.concurrency`は、どの層からも使える（[ADR-048](../adr/ADR-048-add-shared-module-for-jooq-common-code.md)）。
+  `shared.concurrency`と`shared.failure`は、どの層からも使える（[ADR-048](../adr/ADR-048-add-shared-module-for-jooq-common-code.md)、[ADR-062](../adr/ADR-062-map-business-exceptions-to-404-409-422.md)）。
+- `sharedModuleDoesNotDependOnHttp`：`shared`の型は、Spring Web、Springの HTTP、Servletの型に依存しない。
 - `moduleApiDoesNotExposeInternalTypes`：モジュールルートの型は、`java..`、`org.jspecify..`、同じルートパッケージの型だけに依存する。
 - `databaseTechnologyApisAreOnlyUsedByPersistenceAdapters`：jOOQ APIと生成型は`infrastructure.persistence`だけで使う。
 - `domainModelDoesNotDependOnFrameworks`：`domain.model`はSpring、jOOQ、jOOQの生成型、JPA、Jacksonに依存しない。
-- `domainServicesDependOnlyOnDomainAndJava`：`domain.service`は`java..`、`org.jspecify..`、`lombok..`、Domainの型、`@Service`だけに依存する。
+- `domainServicesDependOnlyOnDomainAndJava`：`domain.service`は`java..`、`org.jspecify..`、`lombok..`、Domainの型、`shared.failure`の例外、`@Service`だけに依存する。
 - `domainServicesAreAnnotatedWithService`：`domain.service`のトップレベルのクラスに`@Service`を付ける。
 - `servicesResideInApplicationOrDomainService`：`@Service`を付けた型は`application`か`domain.service`に置く。
 - `controllersResideInPresentationWeb`：`@Controller`と`@RestController`を付けた型は`presentation.web`に置き、名前を`Controller`で終える。
@@ -113,9 +114,13 @@ R2は`ReopenPolicy`（Domain Serviceの`update`と`save`）、`PurgeOrderQuerySe
 R3は`ForgedLockNoCommandHandler`（コンストラクタと`ExpectedLockNo::new`）と`OrderLockController`で確かめる。
 R4は`ApproveOrderCommandHandler`（`handle`から呼ばないprivateメソッドだけが`ensureLockNo`を呼ぶ）と`OverloadedEnsureCommandHandler`で確かめる。
 `commandsAndResultsAreApplicationRecords`の型単位の除外は、`shared.concurrency`のrecordではない`ForceUnlockCommand`で確かめる。
-規約どおりのフィクスチャには、`shared.concurrency`の型と、Requestが`ExpectedLockNo`を作る`CancelOrderRequest`、Listenerが版のないCommandを作る`OrderPlacedExpiryListener`を置く。
+規約どおりのフィクスチャには、`shared.concurrency`と`shared.failure`の型と、Requestが`ExpectedLockNo`を作る`CancelOrderRequest`、Listenerが版のないCommandを作る`OrderPlacedExpiryListener`を置く。
 `archfixture.conforming`と`archfixture.violating`の`shared.infrastructure.persistence`には、規則が名前で見る`TableWriter`のスタブを置く。
 `typeSafeJooqMappingIsAllowed`は、対応づけの二つの規則が`convertFrom`、`Records.mapping`、`into(Table)`、`fetch(RecordMapper)`、`intoArray(Field, Class)`、`intoSet(Field, Class)`、`fetch(Field, Class)`、`newRecord(Table)`を誤検出しないことを確かめる。
+`noSuchElementExceptionIsNotThrown`は、違反フィクスチャの`LegacyOrderFinder`の`notFound`（`NoSuchElementException`の生成）と`firstOrFail`（引数なしの`orElseThrow()`）で確かめる。
+規約どおりのフィクスチャの`CancelOrderCommandHandler`、`CancelExpiredOrderCommandHandler`、`ReserveStockCommandHandler`、`OrderController`は`NotFoundException`を、`Order`と`OrderLimitPolicy`は`BusinessRuleViolationException`を投げ、Domain、Application、Presentationから`shared.failure`を使っても規則が通ることを確かめる。
+`programmingErrorsAreAllowed`は、`IllegalStateException`、`IllegalArgumentException`、3つの業務上の失敗の例外の送出と`orElseThrow(Supplier)`を、`noSuchElementExceptionIsNotThrown`が誤検出しないことを確かめる。
+`sharedModuleDoesNotDependOnHttp`は、違反フィクスチャの`shared.infrastructure.persistence`の`ChildRowWriter`が`ResponseStatusException`を投げることを検出する。
 MapStruct、ModelMapper、Dozerはテストのクラスパスにないため、`mappingLibrariesAreNotUsed`のフィクスチャは`DefaultRecordMapper`と`DefaultRecordUnmapper`への依存だけで確かめる。
 
 規則を追加するときは、違反フィクスチャのクラスを一つ追加し、`eachRuleDetectsItsViolatingFixture`の行と`rulesFor()`に規則を加える。
@@ -154,6 +159,9 @@ Class <archfixture.violating.order.application.ShipOrderCommandHandler> is meta-
 
 - `noClassesShouldAccessStandardStreams`：`System.out`、`System.err`、`printStackTrace()`を使わない。
 - `noClassesShouldThrowGenericExceptions`：`Throwable`、`Exception`、`RuntimeException`、`Error`を投げない。
+- `noSuchElementExceptionIsNotThrown`：`NoSuchElementException`を生成せず、引数なしの`Optional.orElseThrow()`を呼ばない。
+  見つからないことは`shared.failure`の`NotFoundException`で表す（[ADR-062](../adr/ADR-062-map-business-exceptions-to-404-409-422.md)）。
+  `Optional.get()`、`Iterator.next()`、`Optional::orElseThrow`のメソッド参照など、JDKのAPIが中で投げる`NoSuchElementException`は検出しない。
 - `noClassesShouldUseJavaUtilLogging`：`java.util.logging`を使わない。
 - `featureCodeUsesOnlySlf4jFacade`：ベースパッケージ直下以外のクラスは、Logback、Log4j、Apache Commons LoggingのAPIに依存しない。
 - `noClassesShouldUseJodaTime`：Joda-Timeを使わない。

@@ -3,9 +3,9 @@ package archfixture.conforming.order.presentation.web;
 import archfixture.conforming.order.OrderQueries;
 import archfixture.conforming.order.application.PlaceOrderCommandHandler;
 import archfixture.conforming.order.application.PlaceOrderResult;
+import archfixture.conforming.shared.failure.NotFoundException;
 import jakarta.validation.Valid;
 import java.net.URI;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -13,7 +13,6 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
-import org.springframework.web.server.ResponseStatusException;
 
 /** 注文の HTTP API。 */
 @RestController
@@ -46,6 +45,6 @@ class OrderController {
     return orderQueries
         .findDetails(orderId)
         .map(OrderDetailsResponse::from)
-        .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
+        .orElseThrow(() -> new NotFoundException("order not found: orderId=" + orderId));
   }
 }

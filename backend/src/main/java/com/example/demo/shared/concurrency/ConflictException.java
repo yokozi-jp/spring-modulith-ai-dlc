@@ -4,9 +4,10 @@ import java.io.Serial;
 import org.jspecify.annotations.Nullable;
 
 /**
- * 楽観的ロックの競合を表す。別のリクエストが先に行を更新した場合と、行ロックを待ち切れなかった場合に投げる。
+ * 読み直せば解消しうる競合を表す。別のリクエストが先に行を更新した場合、行ロックを待ち切れなかった場合、一意制約に違反した場合に投げる。
  *
- * <p>HTTP では 409 Conflict になる。行ロックを待ち切れなかった場合は、原因に {@code CannotAcquireLockException} を持つ。
+ * <p>HTTP では 409 Conflict になる。行ロックは {@code CannotAcquireLockException}、一意制約は {@code
+ * DuplicateKeyException} を原因に持つ。
  */
 public final class ConflictException extends RuntimeException {
 

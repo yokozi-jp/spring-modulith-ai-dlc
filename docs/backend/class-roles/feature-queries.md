@@ -94,7 +94,7 @@ public interface OrderQueries {
   return orderQueries
       .findDetails(orderId)
       .map(OrderDetailsResponse::from)
-      .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
+      .orElseThrow(() -> new NotFoundException("order not found: orderId=" + orderId));
 }
 ```
 
@@ -107,7 +107,7 @@ public ReserveStockResult handle(final ReserveStockCommand command) {
       orderQueries
           .findDetails(command.orderId())
           .orElseThrow(
-              () -> new NoSuchElementException("order not found: orderId=" + command.orderId()));
+              () -> new NotFoundException("order not found: orderId=" + command.orderId()));
   // order.lines() の商品コードと数量で在庫を引き当てる。
   return new ReserveStockResult(order.orderId());
 }
@@ -139,4 +139,5 @@ public ReserveStockResult handle(final ReserveStockCommand command) {
 - [ ] 実装の `<Feature>QueryService` を `application` に置き、すべての public メソッドに `@Transactional(readOnly = true)` を付ける。［ArchUnit で検査：ClassRoleArchTest.queryServicesImplementModuleQueries］
 - [ ] 他モジュールは `<Feature>Queries` とルートの record だけを使い、内部パッケージを参照しない。［Spring Modulith で検査：ApplicationModuleArchitectureTest］
 - [ ] インタフェースと各メソッドに Javadoc を書く。［自分で点検］
+- [ ] 呼び出し側の Controller は、`Optional` が空なら try と catch を書かずに `NotFoundException` を投げる。［自分で点検］
 - [ ] ルートのパッケージに `@NullMarked` の `package-info.java` を置く。［Error Prone で検査：RequireExplicitNullMarking］

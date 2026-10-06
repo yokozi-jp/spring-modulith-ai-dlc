@@ -2,6 +2,7 @@ package archfixture.conforming.order.domain.model;
 
 import archfixture.conforming.shared.concurrency.ConflictException;
 import archfixture.conforming.shared.concurrency.ExpectedLockNo;
+import archfixture.conforming.shared.failure.BusinessRuleViolationException;
 import java.time.Instant;
 
 /** 注文の集約ルート。 */
@@ -40,7 +41,7 @@ public final class Order {
   /** 受付の注文を取り消す。 */
   public void cancel() {
     if (status != OrderStatus.PLACED) {
-      throw new IllegalStateException("order is not placed: orderId=" + id.value());
+      throw new BusinessRuleViolationException("order is not placed: orderId=" + id.value());
     }
     status = OrderStatus.CANCELLED;
   }

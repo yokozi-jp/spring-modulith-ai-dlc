@@ -6,15 +6,17 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.example.demo.shared.concurrency.ConflictException;
+import com.example.demo.shared.failure.BusinessRuleViolationException;
+import com.example.demo.shared.failure.NotFoundException;
 import com.example.demo.testkit.DatabaseTest;
 import com.example.demo.testkit.FixtureTablesExtension;
+import java.sql.SQLException;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.NoSuchElementException;
 import java.util.Set;
 import java.util.function.Supplier;
 import org.jooq.Condition;
@@ -29,8 +31,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.http.HttpStatus;
-import org.springframework.web.server.ResponseStatusException;
+import org.springframework.dao.DuplicateKeyException;
 
 /** {@link TableWriter} の SQL と件数の判定を、テスト専用のテーブルと実 PostgreSQL で確かめる。各テストはロールバックする。 */
 // 入口ごとの成功と失敗の条件をテストに分けるため、メソッドの数の上限を外す。
@@ -122,10 +123,10 @@ class TableWriterTest {
   }
 
   @Test
-  @DisplayName("updateCheckingVersion は主キーの行がなければ NoSuchElementException を投げる")
+  @DisplayName("updateCheckingVersion は主キーの行がなければ NotFoundException を投げる")
   void updateCheckingVersionWithoutRowIsNotFound() {
     assertThatThrownBy(() -> inUseCase(() -> updateItem(1L, 1L, "after")))
-        .isInstanceOf(NoSuchElementException.class)
+        .isInstanceOf(NotFoundException.class)
         .hasMessageContaining("table=t_fixture_item");
   }
 
@@ -149,7 +150,7 @@ class TableWriterTest {
   }
 
   @Test
-  @DisplayName("updateChild は子の行がなければ、状態が 422 の ResponseStatusException を投げる")
+  @DisplayName("updateChild は子の行がなければ BusinessRuleViolationException を投げる")
   void updateChildMatchingNoRowIsUnprocessable() {
     insertItem(1L, "root");
 
@@ -165,9 +166,7 @@ class TableWriterTest {
                                     .eq(1L)
                                     .and(FIXTURE_ITEM_DETAIL.DETAIL_NO.eq(9)),
                                 set -> set.set(FIXTURE_ITEM_DETAIL.DETAIL_TEXT, "x"))))
-        .isInstanceOfSatisfying(
-            ResponseStatusException.class,
-            e -> assertThat(e.getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_CONTENT))
+        .isInstanceOf(BusinessRuleViolationException.class)
         .hasMessageContaining("table=t_fixture_item_detail");
   }
 
@@ -348,7 +347,7 @@ class TableWriterTest {
   }
 
   @Test
-  @DisplayName("deleteCheckingVersion は版が違えば競合の例外を、行がなければ NoSuchElementException を投げる")
+  @DisplayName("deleteCheckingVersion は版が違えば競合の例外を、行がなければ NotFoundException を投げる")
   void deleteCheckingVersionRejectsStaleOrMissingRow() {
     insertItem(1L, "root");
     makeStale(1L);
@@ -362,8 +361,44 @@ class TableWriterTest {
     assertThatThrownBy(
             () -> writer.deleteCheckingVersion(FIXTURE_ITEM, FIXTURE_ITEM.ITEM_ID.eq(9L), 1L))
         .as("行がない")
-        .isInstanceOf(NoSuchElementException.class);
+        .isInstanceOf(NotFoundException.class);
     assertThat(dsl.fetchCount(FIXTURE_ITEM)).as("行は残る").isOne();
+  }
+
+  @Test
+  @DisplayName("insert は Repository が組み立てた INSERT を実行する")
+  void insertWritesRow() {
+    runInUseCase(
+        () ->
+            writer.insert(
+                dsl.insertInto(FIXTURE_ITEM)
+                    .set(FIXTURE_ITEM.ITEM_ID, 1L)
+                    .set(FIXTURE_ITEM.ITEM_NAME, "new")
+                    .set(seedColumns.forInsert(FIXTURE_ITEM))));
+
+    assertThat(item(1L).get(FIXTURE_ITEM.ITEM_NAME)).isEqualTo("new");
+  }
+
+  @Test
+  @DisplayName("insert は一意制約の違反を、23505 の DuplicateKeyException を原因に持つ競合の例外にする")
+  void insertDuplicateKeyConflicts() {
+    insertItem(1L, "one");
+
+    // 23505 の後のトランザクションは中断状態になるため、この後に SQL を実行しない。
+    assertThatThrownBy(
+            () ->
+                runInUseCase(
+                    () ->
+                        writer.insert(
+                            dsl.insertInto(FIXTURE_ITEM)
+                                .set(FIXTURE_ITEM.ITEM_ID, 1L)
+                                .set(FIXTURE_ITEM.ITEM_NAME, "duplicate")
+                                .set(seedColumns.forInsert(FIXTURE_ITEM)))))
+        .isInstanceOf(ConflictException.class)
+        .hasCauseInstanceOf(DuplicateKeyException.class)
+        .rootCause()
+        .isInstanceOfSatisfying(
+            SQLException.class, e -> assertThat(e.getSQLState()).isEqualTo("23505"));
   }
 
   /** 子の集合の差分を、規約の手順の順で保存する。 */

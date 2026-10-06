@@ -4,10 +4,15 @@ import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noMethods;
 
 import com.example.demo.DemoApplication;
+import com.tngtech.archunit.core.domain.JavaCall;
+import com.tngtech.archunit.core.domain.JavaClass;
+import com.tngtech.archunit.core.domain.properties.HasOwner;
 import com.tngtech.archunit.junit.AnalyzeClasses;
 import com.tngtech.archunit.junit.ArchTest;
 import com.tngtech.archunit.lang.ArchRule;
 import com.tngtech.archunit.library.GeneralCodingRules;
+import java.util.NoSuchElementException;
+import java.util.Optional;
 import org.springframework.beans.factory.annotation.Autowired;
 
 /** ArchUnit が提供する汎用コーディング規則をプロダクションコードへ適用する。 */
@@ -40,9 +45,34 @@ class GeneralCodingRulesArchTest {
   /* package */ static final ArchRule noClassesShouldThrowGenericExceptions =
       GeneralCodingRules.NO_CLASSES_SHOULD_THROW_GENERIC_EXCEPTIONS.because(
           "呼び出し側と ApiExceptionHandler が例外の型で失敗を区別し、HTTP の応答に対応づけられるようにするため。"
-              + "直し方：Throwable、Exception、RuntimeException、Error を投げず、"
-              + "NoSuchElementException や IllegalArgumentException などの具体的な例外を投げる。"
-              + "規約：docs/backend/java-coding.md、docs/adr/ADR-013-standardize-http-api-contracts.md");
+              + "直し方：Throwable、Exception、RuntimeException、Error を投げない。"
+              + "業務上の失敗は shared.failure の NotFoundException、BusinessRuleViolationException と "
+              + "shared.concurrency の ConflictException を投げ、"
+              + "プログラムの誤りは IllegalStateException や IllegalArgumentException を投げる。"
+              + "規約：docs/backend/class-roles/business-exception.md、docs/backend/java-coding.md、"
+              + "docs/adr/ADR-013-standardize-http-api-contracts.md");
+
+  /** 見つからないことを {@link NoSuchElementException} で表すことを禁止する。 */
+  // ponytail: 上限：Optional.get()、Iterator.next()、OptionalInt などの orElseThrow() と getAsInt()、
+  // Optional::orElseThrow のメソッド参照のように、JDK の API が中で投げる NoSuchElementException は検出しない。
+  // 漏れが見つかったら、その API の呼び出しを同じ規則に足す。
+  @ArchTest
+  /* package */ static final ArchRule noSuchElementExceptionIsNotThrown =
+      noClasses()
+          .should()
+          .callConstructorWhere(
+              JavaCall.Predicates.target(
+                  HasOwner.Predicates.With.owner(
+                      JavaClass.Predicates.assignableTo(NoSuchElementException.class))))
+          .orShould()
+          .callMethod(Optional.class, "orElseThrow")
+          .because(
+              "見つからないことを JDK の NoSuchElementException で表すと、ApiExceptionHandler が 404 にできず 500 になるため。"
+                  + "直し方：見つからない集約や行には shared.failure の NotFoundException を投げ、"
+                  + "Optional は orElseThrow(() -> new NotFoundException(\"order not found: orderId=...\")) で取り出す。"
+                  + "プログラムの誤りは IllegalStateException にする。"
+                  + "規約：docs/backend/class-roles/business-exception.md、"
+                  + "docs/adr/ADR-062-map-business-exceptions-to-404-409-422.md");
 
   /** {@code java.util.logging} の使用を禁止し、アプリケーションのロギング実装を統一する。 */
   @ArchTest

@@ -44,10 +44,10 @@ tags: [convention, backend, class-role]
 - record、enum、enum の定数、コンパクトコンストラクタ、public メソッドに Javadoc を書く。
 - パッケージの `package-info.java` は集約と共有する。
 
-Domain が投げる JDK の例外は、いまは HTTP の 500 になる。
-ユースケースがこの例外を 400、404、422 で返す必要があるときは、実装を止めて利用者に確認し、対応づけを新しい ADR で決める。
+値オブジェクトの `IllegalArgumentException` はプログラムの誤りとして HTTP の 500 のままになる。
+利用者の入力の誤りは、[Request](request.md) の形式の検証で 400 にしてから値オブジェクトを作る。
+業務上の失敗は[業務上の失敗の例外](business-exception.md)の型で投げる（[ADR-062](../../adr/ADR-062-map-business-exceptions-to-404-409-422.md)）。
 ステータスコードの使い分けは[HTTPステータスコードの選択](../../web-api/status-codes.md)に、API のエラー契約は [ADR-013](../../adr/ADR-013-standardize-http-api-contracts.md) に従う。
-対応づけの作業は [issue #107](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/107) で扱う。
 
 ## 依存してよい型、してはいけない型
 
@@ -173,7 +173,7 @@ class QuantityTest {
 - [ ] 不変条件をコンパクトコンストラクタで検査し、`IllegalArgumentException` を投げる。［自分で点検］
 - [ ] 演算は新しい値オブジェクトを返す。［自分で点検］
 - [ ] 識別子の名前は対象の名前に `Id` を付け、単一の値の component は `Money` だけを `amount`、それ以外を `value` にする。［自分で点検］
-- [ ] Domain の例外を 400、404、422 で返す必要があるなら、実装を止めて利用者に確認した。［自分で点検］
+- [ ] 利用者の入力の誤りは Request の形式の検証で 400 にし、値オブジェクトの `IllegalArgumentException` に頼らない。［自分で点検］
 - [ ] Javadoc を書く。［自分で点検］
 - [ ] 不変条件を QuickTheories のプロパティベーステストで確かめる。［自分で点検］
 - [ ] `domain.model` のパッケージに `@NullMarked` の `package-info.java` がある。［Error Prone で検査：RequireExplicitNullMarking］
