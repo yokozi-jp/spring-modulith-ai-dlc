@@ -148,7 +148,7 @@ Problem Detailsの検証が必要になったら、`readProblem`の型の断定�
 
 `apiFetch`は、method（大文字と小文字を区別しない。省略はGET）がGET、HEAD、OPTIONSでない要求にだけ、CSRFのCookie（`__Host-XSRF-TOKEN`）の値をマスクせずに`X-XSRF-TOKEN` headerで付ける。
 Cookieがないか値が空なら、headerを付けずに送ってバックエンドの403に任せる。
-Cookieの名前と属性の理由は[ADR-064](../adr/ADR-064-harden-csrf-cookie-with-host-prefix.md)にある。
+Cookieの名前と属性の理由は[ADR-066](../adr/ADR-066-harden-csrf-cookie-with-host-prefix.md)にある。
 
 `apiFetch`は同じoriginの相対URLだけを受ける前提でheaderを付ける。
 別のoriginへtokenを送らないよう、Orvalの`baseUrl`を設定しない。

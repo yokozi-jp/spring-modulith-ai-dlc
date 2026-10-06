@@ -1,11 +1,11 @@
 ---
 type: ADR
-title: 'ADR-064: CSRF の Cookie を __Host- の名前にし、SameSite=Lax を付ける'
+title: 'ADR-066: CSRF の Cookie を __Host- の名前にし、SameSite=Lax を付ける'
 description: Spring Security の csrf.spa() が発行する CSRF の Cookie を __Host-XSRF-TOKEN（Secure、Path=/、Domain なし、HttpOnly なし、SameSite=Lax）にし、SPA は GET、HEAD、OPTIONS 以外の要求にだけ X-XSRF-TOKEN を付ける決定と、ローカルの HTTP の Safari を対象外にする扱い。
 tags: [adr, security, csrf, cookie, frontend, backend]
 ---
 
-# ADR-064: CSRF の Cookie を __Host- の名前にし、SameSite=Lax を付ける
+# ADR-066: CSRF の Cookie を __Host- の名前にし、SameSite=Lax を付ける
 
 ## Status
 

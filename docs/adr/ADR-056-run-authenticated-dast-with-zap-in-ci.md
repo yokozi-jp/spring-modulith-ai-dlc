@@ -25,7 +25,7 @@ Proposed
 未認証で到達できるのは health、OAuth2 のログイン、`/error`、API 文書だけで、それ以外は認証が要る。
 このため、未認証のスキャンではほとんどの応答が 401 か Keycloak への 302 になり、検査できる範囲が狭い。
 
-CSRF は Spring Security の `csrf.spa()` で、`__Host-XSRF-TOKEN` Cookie（ADR-064）の値を `X-XSRF-TOKEN` Header で送り返させる。
+CSRF は Spring Security の `csrf.spa()` で、`__Host-XSRF-TOKEN` Cookie（ADR-066）の値を `X-XSRF-TOKEN` Header で送り返させる。
 GET、HEAD、TRACE、OPTIONS 以外はすべてトークンが要り、除外パスはない。
 ZAP の anti-CSRF 処理はフォームのトークンしか扱わず、この Header を付けられない。
 

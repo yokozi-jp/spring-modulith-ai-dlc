@@ -50,7 +50,7 @@ Cookieは、セッションIDとADR-007のCSRFトークン以外の用途に使�
 `__Host-XSRF-TOKEN`にする。
 `Secure`（環境によらない）と`SameSite=Lax`を付け、SPAが読むため`HttpOnly`を付けない。
 有効期間は付けず、発行と削除はSpring Securityに任せる。
-設定は[SecurityConfig](../../backend/src/main/java/com/example/demo/SecurityConfig.java)、理由は[ADR-064](../adr/ADR-064-harden-csrf-cookie-with-host-prefix.md)にある。
+設定は[SecurityConfig](../../backend/src/main/java/com/example/demo/SecurityConfig.java)、理由は[ADR-066](../adr/ADR-066-harden-csrf-cookie-with-host-prefix.md)にある。
 
 ## システム間連携の認証
 

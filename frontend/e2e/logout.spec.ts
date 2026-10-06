@@ -161,7 +161,7 @@ test("_csrf にマスクしない Cookie の値を入れて送るとログアウ
 }) => {
   await logIn(page);
   const csrfCookie = await findCookie(context, "__Host-XSRF-TOKEN");
-  // __Host- の条件（ADR-064）。sameSite は Playwright が属性のない Cookie も "Lax" で埋めるため、下の Set-Cookie の文字列で確かめる。
+  // __Host- の条件（ADR-066）。sameSite は Playwright が属性のない Cookie も "Lax" で埋めるため、下の Set-Cookie の文字列で確かめる。
   expect(csrfCookie).toMatchObject({ secure: true, path: "/", httpOnly: false });
   const token = csrfCookie.value;
   await csrfInput(page).evaluate((input: HTMLInputElement, value) => {
