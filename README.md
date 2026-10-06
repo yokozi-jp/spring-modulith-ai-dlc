@@ -260,7 +260,7 @@ Docker Compose の操作（サービスの起動、停止、状態確認、Keycl
 - `task api-gen` はテスト用の依存を起動し、`openapi/openapi.yaml` の生成、Spectral の検査、Orval による `frontend/src/api/generated` の再生成を実行します。
 - `task api-check` は再生成した契約と生成物がコミット済みの内容と一致するかを検査します。
 - `task api-client-check` は DB なしで Orval の生成物だけを再生成して検査し、pre-commit と Frontend CI で実行します。
-- `task be-openapi-check` は起動済みのテスト用依存で契約を再生成して検査し、Backend CI で実行します。
+- `task be-openapi-check` は直前の `task be-test` が書き出した契約を検査し、Backend CI で実行します。
 - `task api-breaking` は `origin/main` の契約と oasdiff で比べ、破壊的変更があれば失敗させます。
   意図した変更は Pull Request にラベル `api-breaking-approved` を付け、本文に理由を書きます。
 - `task api-docs` は Redocly CLI で静的 HTML の設計書を `build/api-docs/index.html` に作ります。
