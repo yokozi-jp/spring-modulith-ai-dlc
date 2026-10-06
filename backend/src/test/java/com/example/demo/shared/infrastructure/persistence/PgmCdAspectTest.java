@@ -3,6 +3,7 @@ package com.example.demo.shared.infrastructure.persistence;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import com.example.demo.DemoApplication;
 import java.util.List;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -48,6 +49,21 @@ class PgmCdAspectTest {
         .as("役割名でないクラス")
         .isInstanceOf(IllegalStateException.class)
         .hasMessageContaining("pgm_cd is not bound");
+  }
+
+  @Test
+  @DisplayName("ベースパッケージは、DemoApplication のパッケージと末尾の . が同じになる")
+  void basePackageMatchesApplicationPackage() {
+    assertThat(PgmCdAspect.basePackageOf(PgmCdAspect.class.getPackageName()))
+        .isEqualTo(DemoApplication.class.getPackageName() + ".");
+  }
+
+  @Test
+  @DisplayName("パッケージが <base>.shared.infrastructure.persistence でなければ IllegalStateException を投げる")
+  void basePackageOfRejectsOtherPackages() {
+    assertThatThrownBy(() -> PgmCdAspect.basePackageOf("com.example.demo.shared"))
+        .isInstanceOf(IllegalStateException.class)
+        .hasMessageContaining("package=com.example.demo.shared");
   }
 
   private static <T> T proxy(final T target) {

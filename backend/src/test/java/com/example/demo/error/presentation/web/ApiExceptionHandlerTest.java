@@ -7,6 +7,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import com.example.demo.shared.concurrency.ConflictException;
 import jakarta.validation.ConstraintViolation;
 import jakarta.validation.ConstraintViolationException;
 import jakarta.validation.Valid;
@@ -39,9 +40,11 @@ import org.springframework.http.converter.HttpMessageNotWritableException;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.web.context.request.ServletWebRequest;
+import org.springframework.web.server.ResponseStatusException;
 
-/** 例外を Problem Details へ変換し、ログを 1 か所で出し、切断とコミット済みの応答を扱うことを検証する。 */
-@SuppressWarnings({"PMD.AvoidDuplicateLiterals", "PMD.TooManyStaticImports"})
+/** 例外を Problem Details へ変換し、ログを 1 か所で出し、切断とコミット済みの応答、楽観的ロックの競合の 409、子の行がない更新の 422 を扱うことを検証する。 */
+// 例外の種類ごとの変換をテストに分けるため、メソッドの数の上限を外す。
+@SuppressWarnings({"PMD.AvoidDuplicateLiterals", "PMD.TooManyStaticImports", "PMD.TooManyMethods"})
 @ExtendWith(OutputCaptureExtension.class)
 class ApiExceptionHandlerTest {
 
@@ -56,6 +59,7 @@ class ApiExceptionHandlerTest {
 
   private static ApiExceptionHandler handler() {
     final StaticMessageSource messages = new StaticMessageSource();
+    messages.addMessage("problem.title.422", Locale.JAPANESE, "処理できない内容です");
     messages.addMessage("problem.title.500", Locale.JAPANESE, "サーバー内部エラー");
     messages.addMessage("problem.title.validation-error", Locale.JAPANESE, "入力内容に誤りがあります");
     return new ApiExceptionHandler(new ApiProblemDetails(messages));
@@ -91,6 +95,24 @@ class ApiExceptionHandlerTest {
   }
 
   @Test
+  @DisplayName("ConflictException は 409 を返し、ERROR ではなく INFO で例外の型を残す")
+  void conflictExceptionIsLoggedAtInfo(final CapturedOutput output) {
+    final ResponseEntity<Object> response =
+        handler()
+            .handleConflictException(
+                new ConflictException("order was updated by another request"),
+                new ServletWebRequest(new MockHttpServletRequest()));
+
+    assertNotNull(response, "応答");
+    assertEquals(HttpStatus.CONFLICT, response.getStatusCode(), "HTTP status");
+    final String log = output.getAll();
+    assertTrue(log.contains("Optimistic lock conflict"), () -> "event 名が残ること: " + log);
+    assertTrue(log.contains("INFO"), () -> "INFO で残ること: " + log);
+    assertTrue(log.contains(ConflictException.class.getName()), () -> "例外の型が残ること: " + log);
+    assertFalse(log.contains("ERROR"), () -> "ERROR で残さないこと: " + log);
+  }
+
+  @Test
   @DisplayName("既定ハンドラが返す 5xx も ERROR と例外の型をログに残す")
   void defaultHandlerServerErrorIsLogged(final CapturedOutput output) throws Exception {
     final ResponseEntity<Object> response =
@@ -106,6 +128,25 @@ class ApiExceptionHandlerTest {
     assertTrue(log.contains("ERROR"), () -> "ERROR で出ること: " + log);
     assertTrue(
         log.contains(HttpMessageNotWritableException.class.getName()), () -> "例外の型が残ること: " + log);
+  }
+
+  @Test
+  @DisplayName("422 の ResponseStatusException は about:blank の 422 にし、reason を detail に出さない")
+  void unprocessableContentHidesReason() throws Exception {
+    final ResponseEntity<Object> response =
+        handler()
+            .handleException(
+                new ResponseStatusException(
+                    HttpStatus.UNPROCESSABLE_CONTENT,
+                    "child row not found: table=t_fixture_item_detail, key=[1, 9]"),
+                new ServletWebRequest(new MockHttpServletRequest()));
+
+    assertNotNull(response, "応答");
+    assertEquals(HttpStatus.UNPROCESSABLE_CONTENT, response.getStatusCode(), "HTTP status");
+    final ProblemDetail body = assertInstanceOf(ProblemDetail.class, response.getBody(), "本文");
+    assertEquals(URI.create("about:blank"), body.getType(), "type");
+    assertEquals("処理できない内容です", body.getTitle(), "title");
+    assertNull(body.getDetail(), "detail");
   }
 
   @ParameterizedTest

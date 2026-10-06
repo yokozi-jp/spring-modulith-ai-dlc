@@ -1,5 +1,7 @@
 package archfixture.conforming.order.domain.model;
 
+import archfixture.conforming.shared.concurrency.ConflictException;
+import archfixture.conforming.shared.concurrency.ExpectedLockNo;
 import java.time.Instant;
 
 /** 注文の集約ルート。 */
@@ -16,6 +18,9 @@ public final class Order {
   /** 受け付けた時刻。 */
   private final Instant placedAt;
 
+  /** 読み込んだときの版。 */
+  private final long lockNo;
+
   /** 注文の状態。 */
   private OrderStatus status;
 
@@ -23,6 +28,7 @@ public final class Order {
     this.id = id;
     this.customerId = customerId;
     this.placedAt = placedAt;
+    this.lockNo = 1L;
     this.status = OrderStatus.PLACED;
   }
 
@@ -37,6 +43,18 @@ public final class Order {
       throw new IllegalStateException("order is not placed: orderId=" + id.value());
     }
     status = OrderStatus.CANCELLED;
+  }
+
+  /** 画面が表示した版が、読み込んだ版と同じことを確かめる。 */
+  public void ensureLockNo(final ExpectedLockNo expectedLockNo) {
+    if (lockNo != expectedLockNo.value()) {
+      throw new ConflictException("order was updated by another request: orderId=" + id.value());
+    }
+  }
+
+  /** 読み込んだときの版を返す。 */
+  public long lockNo() {
+    return lockNo;
   }
 
   /** 注文 ID を返す。 */

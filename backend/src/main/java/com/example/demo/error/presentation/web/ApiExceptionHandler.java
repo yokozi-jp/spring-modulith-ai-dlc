@@ -1,6 +1,7 @@
 package com.example.demo.error.presentation.web;
 
 import com.example.demo.LocaleSupport;
+import com.example.demo.shared.concurrency.ConflictException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.ConstraintViolationException;
@@ -23,7 +24,7 @@ import org.springframework.web.method.annotation.HandlerMethodValidationExceptio
 import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExceptionHandler;
 import org.springframework.web.util.DisconnectedClientHelper;
 
-/** Spring MVC と Spring Security の例外を RFC 9457 Problem Details へ変換する。 */
+/** Spring MVC と Spring Security の例外、楽観的ロックの競合を RFC 9457 Problem Details へ変換する。 */
 // 基底クラスの override と例外ごとの @ExceptionHandler は、1 つの advice に置く必要がある。
 @SuppressWarnings("PMD.TooManyMethods")
 @Slf4j
@@ -68,6 +69,13 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
             ApiProblemDetails.validationErrors(exception), resolveLocale(request));
     return handleExceptionInternal(
         exception, body, new HttpHeaders(), HttpStatus.BAD_REQUEST, request);
+  }
+
+  /** 楽観的ロックの競合を 409 Problem Details へ変換する。例外の内容は応答に入れない。 */
+  @ExceptionHandler(ConflictException.class)
+  /* package */ @Nullable ResponseEntity<Object> handleConflictException(
+      final ConflictException exception, final WebRequest request) {
+    return problem(exception, HttpStatus.CONFLICT, request);
   }
 
   /** MVC 内の未処理例外を、実装詳細を含まない 500 Problem Details へ変換する。 */
@@ -161,6 +169,13 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
           .setCause(ex)
           .addKeyValue(STATUS_CODE, status.value())
           .log("Unhandled API exception");
+    } else if (ex instanceof ConflictException) {
+      // クライアントが読み直して再送できる想定内の 4xx なので、ERROR にせず INFO で残す。
+      // WARN 以上は起動時と Collector の障害用のロググループにも出るため使わない。
+      log.atInfo()
+          .setCause(ex)
+          .addKeyValue(STATUS_CODE, status.value())
+          .log("Optimistic lock conflict");
     } else if (ex instanceof MethodArgumentNotValidException
         || ex instanceof HandlerMethodValidationException
         || ex instanceof ConstraintViolationException) {

@@ -37,10 +37,13 @@ Command はモジュールルートの公開契約でもない。
 - `public record` にし、アノテーションを付けない。
   Bean Validation の制約も付けない。
 - component は Java の標準型（`String`、`int`、`BigDecimal`、`Instant`、`List`）と、ネストした record だけにする。
-- 入力が集約の ID とロック番号だけでも Command を作る（`CancelOrderCommand(String orderId, long lockNo)`）。
-- Controller が作り、既存の集約の状態を変える Command は、クライアントが参照の応答で受け取ったロック番号を `long lockNo` に持つ（`ConfirmOrderCommand`、`CancelOrderCommand`、`ShipOrderCommand`）。
+  例外として、既存の集約を変える Command は `shared.concurrency` の `ExpectedLockNo` を持てる。
+- 入力が集約の ID とロック番号だけでも Command を作る（`CancelOrderCommand(String orderId, ExpectedLockNo expectedLockNo)`）。
+- Controller が作り、既存の集約の状態を変える Command は、クライアントが参照の応答で受け取ったロック番号を `ExpectedLockNo expectedLockNo` に持ち、`shared.concurrency` の `VersionedCommand` を実装する（`ConfirmOrderCommand`、`CancelOrderCommand`、`ShipOrderCommand`）。
+  [Request](request.md) が受け取った数値から `ExpectedLockNo` を作る。
   CommandHandler はこの値を集約の `ensureLockNo` に渡し、[PostgreSQL の排他制御](../../database/postgresql-concurrency-control.md)の「画面などから受け取った `lock_no`」との比較にする。
-  新しい集約を作る Command（`PlaceOrderCommand`）と、Listener がイベントから作る Command（`ReserveStockCommand`、`ChargeOrderCommand`）は `lockNo` を持たない。
+  新しい集約を作る Command（`PlaceOrderCommand`）と、Listener がイベントから作る Command（`ReserveStockCommand`、`ChargeOrderCommand`）は `ExpectedLockNo` を持たず、`VersionedCommand` を実装しない。
+  同じ Command を Request と Listener の両方が作ると、`VersionedCommand` を外せないため、Request 用と Listener 用に分ける。
 - `List` の component は、コンパクトコンストラクタで `List.copyOf` に置き換える。
   置き換えないと `task be-lint` の SpotBugs が報告する。
 - record とネストした record に Javadoc を書く。
@@ -52,14 +55,15 @@ Command はモジュールルートの公開契約でもない。
   違反は、`ApiExceptionHandler` が継承する `ResponseEntityExceptionHandler` が 400 の Problem Details にする。
 - **業務の不変条件**：CommandHandler が `handle` の中で[値オブジェクト](value-object.md)と[集約](aggregate.md)を作るときに確かめる。
 
-Domain が投げる JDK の例外と `<Aggregate>ConflictException` は、いまは HTTP の 500 になる。
-ユースケースがこの例外を 400、404、409、422 で返す必要があるときは、実装を止めて利用者に確認し、対応づけを新しい ADR で決める。
+`ConflictException` は、`ApiExceptionHandler` が HTTP の 409 にする。
+Domain が投げる JDK の例外は、いまは HTTP の 500 になる。
+ユースケースがこの例外を 400、404、422 で返す必要があるときは、実装を止めて利用者に確認し、対応づけを新しい ADR で決める。
 ステータスコードの使い分けは[HTTPステータスコードの選択](../../web-api/status-codes.md)に、API のエラー契約は [ADR-013](../../adr/ADR-013-standardize-http-api-contracts.md) に従う。
 対応づけの作業は [issue #107](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/107) で扱う。
 
 ## 依存してよい型、してはいけない型
 
-- **依存してよい型**：`java..` の標準型、`org.jspecify..`、自分にネストした record。
+- **依存してよい型**：`java..` の標準型、`org.jspecify..`、自分にネストした record、`shared.concurrency` の `ExpectedLockNo` と `VersionedCommand`。
 - **依存してはいけない型**：Domain の型（`OrderId`、`Quantity`）、モジュールルートの型、`presentation.web` の Request、jOOQ の生成型、Spring と Jakarta Bean Validation の型、他モジュールの型。
 
 ## 最小の例と典型的な例
@@ -69,11 +73,15 @@ Domain が投げる JDK の例外と `<Aggregate>ConflictException` は、いま
 ```java
 package com.example.demo.order.application;
 
+import com.example.demo.shared.concurrency.ExpectedLockNo;
+import com.example.demo.shared.concurrency.VersionedCommand;
+
 /** 注文を取り消すユースケースの入力。 */
-public record CancelOrderCommand(String orderId, long lockNo) {}
+public record CancelOrderCommand(String orderId, ExpectedLockNo expectedLockNo)
+    implements VersionedCommand {}
 ```
 
-注文を確定する `ConfirmOrderCommand(String orderId, long lockNo)` と、出荷する `ShipOrderCommand(String orderId, long lockNo)` も同じ形である。
+注文を確定する `ConfirmOrderCommand(String orderId, ExpectedLockNo expectedLockNo)` と、出荷する `ShipOrderCommand(String orderId, ExpectedLockNo expectedLockNo)` も同じ形である。
 Listener が `OrderConfirmed` から作る `ChargeOrderCommand(String orderId)` は、注文の ID だけを持つ。
 
 典型的な例は、明細をネストした record で持つ `PlaceOrderCommand` である。
@@ -118,7 +126,7 @@ ArchUnit が形を検査し、この record を使う側のテストが中身を
 - Command に `@NotBlank` などの Bean Validation の制約を付け、CommandHandler で検証する。
   形式の検証が Request と Command の二か所に分かれる。
 - 入力が ID とロック番号だけのとき、Command を作らずに `handle(String orderId, long lockNo)` にする。
-- Controller が作り、既存の集約の状態を変える Command に `lockNo` を持たせず、画面が読んだ版を確かめずに更新する。
+- Controller が作り、既存の集約の状態を変える Command に `VersionedCommand` を実装させず、画面が読んだ版を確かめずに更新する。
   他の人の変更を、気付かずに上書きする。
 - Request を CommandHandler に渡し、Command を兼ねさせる。
   API の形を変えると、ユースケースの入力も変わる。
@@ -130,10 +138,11 @@ ArchUnit が形を検査し、この record を使う側のテストが中身を
 - [ ] `application` の record にする。［ArchUnit で検査：ClassRoleArchTest.commandsAndResultsAreApplicationRecords］
 - [ ] 名前を業務の動詞と集約の名前に `Command` を付けた形にし、CRUD の動詞を使わない。［自分で点検］
 - [ ] CommandHandler ごとに一つ作り、入力が ID とロック番号だけでも作る。［自分で点検］
-- [ ] Controller が作り、既存の集約の状態を変える Command は、クライアントから受け取った `long lockNo` を持つ。［自分で点検］
-- [ ] component は Java の標準型とネストした record だけにする。［自分で点検］
+- [ ] Controller が作り、既存の集約の状態を変える Command は、`ExpectedLockNo` を持つ `VersionedCommand` にする。［ArchUnit で検査：TableWriterArchTest.commandsBuiltByPresentationForWritesAreVersioned］
+- [ ] 同じ Command を Request と Listener の両方で作らない。［自分で点検］
+- [ ] component は Java の標準型とネストした record と、`ExpectedLockNo` だけにする。［自分で点検］
 - [ ] Bean Validation の制約を含め、アノテーションを付けない。［自分で点検］
 - [ ] `List` の component をコンパクトコンストラクタで `List.copyOf` に置き換える。［自分で点検］
-- [ ] Domain の例外を 400、404、409、422 で返す必要があるなら、実装を止めて利用者に確認した。［自分で点検］
+- [ ] Domain の例外を 400、404、422 で返す必要があるなら、実装を止めて利用者に確認した。［自分で点検］
 - [ ] record とネストした record に Javadoc を書く。［自分で点検］
 - [ ] `application` のパッケージに `@NullMarked` の `package-info.java` を置く。［Error Prone で検査：RequireExplicitNullMarking］

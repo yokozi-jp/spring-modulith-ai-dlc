@@ -6,6 +6,8 @@ import archfixture.conforming.order.domain.model.OrderId;
 import archfixture.conforming.order.domain.model.OrderRepository;
 import archfixture.conforming.order.domain.model.OrderStatus;
 import archfixture.conforming.shared.infrastructure.persistence.CommonColumns;
+import archfixture.conforming.shared.infrastructure.persistence.TableWriter;
+import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -18,7 +20,7 @@ import org.springframework.stereotype.Repository;
  *
  * <p>フィクスチャなので ID の採番は仮の実装である。
  *
- * <p>共通カラムの値は shared の共通処理から受け取る。
+ * <p>共通カラムの値は shared の共通処理から受け取り、UPDATE と DELETE は shared の TableWriter で書く。
  */
 @Repository
 class JooqOrderRepository implements OrderRepository {
@@ -32,9 +34,14 @@ class JooqOrderRepository implements OrderRepository {
   /** 共通カラムの値を作る shared の共通処理。 */
   private final CommonColumns commonColumns;
 
+  /** 業務テーブルの UPDATE と DELETE の入口。 */
+  private final TableWriter tableWriter;
+
   /** shared の共通処理を受け取る。 */
-  /* package */ JooqOrderRepository(final CommonColumns commonColumns) {
+  /* package */ JooqOrderRepository(
+      final CommonColumns commonColumns, final TableWriter tableWriter) {
     this.commonColumns = commonColumns;
+    this.tableWriter = tableWriter;
   }
 
   @Override
@@ -63,5 +70,17 @@ class JooqOrderRepository implements OrderRepository {
   public void add(final Order order) {
     orders.put(order.id(), order);
     commonColumnValues.put(order.id(), commonColumns.forInsert());
+  }
+
+  @Override
+  public void update(final Order order) {
+    commonColumnValues.put(
+        order.id(), Map.of("result", tableWriter.updateCheckingVersion("orders", order.lockNo())));
+    orders.put(order.id(), order);
+  }
+
+  /** 期限を過ぎた取消済みの注文を、集約を読み込まずに一括で削除し、件数を返す。 */
+  /* package */ int purgeCancelledBefore(final Instant threshold) {
+    return tableWriter.deleteWhere("orders:" + threshold);
   }
 }

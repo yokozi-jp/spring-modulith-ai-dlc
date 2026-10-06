@@ -48,7 +48,7 @@ Proposed
 
 ### Domain
 
-- `domain.model` には、集約、Entity、値オブジェクト、`<Aggregate>Repository` インタフェース、更新の競合を表す `<Aggregate>ConflictException`、外部システムのインタフェース（`PaymentGateway`）を置く。DDD とオニオンアーキテクチャに従い、インタフェースをドメインの語彙で `domain.model` に定義し、実装を Infrastructure に置く。ヘキサゴナルアーキテクチャの port は使わず、`application.port` を廃止する。
+- `domain.model` には、集約、Entity、値オブジェクト、`<Aggregate>Repository` インタフェース、外部システムのインタフェース（`PaymentGateway`）を置く。DDD とオニオンアーキテクチャに従い、インタフェースをドメインの語彙で `domain.model` に定義し、実装を Infrastructure に置く。ヘキサゴナルアーキテクチャの port は使わず、`application.port` を廃止する。
 - `domain.model` は Spring、jOOQ、JPA、Jackson に依存しない。
 - 業務規則は、まず値オブジェクトか Entity（集約を含む）に置く。Domain Service は、複数の集約にまたがる規則、どの集約にも自然に属さない計算、Repository を使って確かめる規則（「未出荷の注文は3件まで」）の3つの場合に限って作る。
 - Domain Service は `domain.service` に置き、Spring の `@Service` を付ける。`@Service` は Domain に許す唯一の Spring の型であり、ArchUnit の許可リストで検査する。Domain Service は Repository を引数で受け取ってよく、イベント発行、外部呼び出し、ログ出力は行わない。
@@ -60,7 +60,10 @@ Proposed
 
 - 状態を変えるユースケースごとに、`<UseCase>CommandHandler` を一つ作る。ユースケース名はユビキタス言語の動詞にする（`PlaceOrder`、`CancelOrder`）。
 - CommandHandler の public メソッドは `@Transactional` を付けた `handle(<UseCase>Command)` だけにし、`<UseCase>Result` を返す。
-- `<UseCase>Command` と `<UseCase>Result` は、返す値がなくても必ず作り、標準型だけを持つ record として `application` に置く。Result は少なくとも集約の識別子を持つ。コマンドクエリ分離ではコマンドは値を返さないが（[Fowler, CommandQuerySeparation](https://martinfowler.com/bliki/CommandQuerySeparation.html)）、作成の応答に `Location` を組み立てるには識別子が要るためである。
+- `<UseCase>Command` と `<UseCase>Result` は、返す値がなくても必ず作り、標準型だけを持つ record として `application` に置く。
+  Result は少なくとも集約の識別子を持つ。
+  コマンドクエリ分離ではコマンドは値を返さないが（[Fowler, CommandQuerySeparation](https://martinfowler.com/bliki/CommandQuerySeparation.html)）、作成の応答に `Location` を組み立てるには識別子が要るためである。
+  例外として、既存の集約を変える Command は `shared.concurrency` の `ExpectedLockNo` を持ち、`VersionedCommand` を実装する。
 - CommandHandler は別の CommandHandler を呼ばない。
   一つのユースケースを一つのトランザクションで進めるという CommandHandler の定義を保ち、ユースケースが別のユースケースを呼んで連鎖する形を防ぐためである。
 - 画面から呼ばれる CommandHandler は外部システムを呼ばず、状態を変えて `update` で保存し、ルートのイベント（`OrderConfirmed`）を発行して終える。
@@ -99,11 +102,12 @@ Proposed
   新規と更新を一つの `save` にすると、実装は行の有無で INSERT と UPDATE を選ぶことになり、他の人が消した集約の更新が新しい行の作成になって、「行がない」（404）として返せないためである。
 - `add` は、`insertInto` の `set(列, 値)` で業務の全列を書き、`lock_no` を含む共通カラムの値は [ADR-048](ADR-048-add-shared-module-for-jooq-common-code.md) の `shared` の共通処理から受け取る。
 - `update` は、[PostgreSQL の排他制御](../database/postgresql-concurrency-control.md)の楽観的ロックに従う（[ADR-054](ADR-054-detect-optimistic-lock-conflicts-by-update-count.md)）。
-  集約ルートの行を、`lock_no` が集約の `lockNo` と一致する条件と、`lock_no` の加算を含む共通カラムの値で先に更新し、子の行はその後で更新する。
-  更新件数は `shared` の `OptimisticLock.requireUpdated` が判定し、0 件のとき、行がなければ `NoSuchElementException` を、行があれば `domain.model` の `<Aggregate>ConflictException` を投げる。
-  `lock_timeout` までに行のロックを取れないときも、`<Aggregate>ConflictException` を投げる。
-- Controller が作り、既存の集約の状態を変える Command は、クライアントが参照の応答で受け取った `lockNo` を持つ。
-  CommandHandler は、集約を取り出した直後に集約の `lockNo` と比べ、画面から受け取った値と更新の時点の行の値の比較が成り立つようにする。
+  集約ルートの行は `shared` の `TableWriter.updateCheckingVersion` に、集約の `lockNo` と業務の列の値を渡して先に更新し、子の行は戻り値の `LockedRoot` で後から更新する。
+  版の条件、版の設定、件数の判定は `TableWriter` が持ち、0 件のとき、行がなければ `NoSuchElementException` を、行があれば `shared.concurrency` の `ConflictException` を投げる。
+  `lock_timeout` までに行のロックを取れないときも、`TableWriter` が `ConflictException` に変える。
+- Controller が作り、既存の集約の状態を変える Command は、クライアントが参照の応答で受け取った `lockNo` を `ExpectedLockNo` にして持ち、`VersionedCommand` を実装する。
+  Request が `@Min(1) long lockNo` を受け取り、`toCommand` で `ExpectedLockNo` に変換する。
+  CommandHandler は、集約を取り出した直後に `order.ensureLockNo(command.expectedLockNo())` で集約の `lockNo` と比べ、画面から受け取った値と更新の時点の行の値の比較が成り立つようにする。
 - 外部システムのインタフェースの実装は `infrastructure.client` の `<ExternalSystem>Client` とする。
 - Infrastructure は、機能モジュールの型のうち同じモジュールの `domain.model` の型だけを使い、Application、Domain Service、モジュールルートの型に依存しない。
   オニオン規則は Adapter から内側への依存をすべて許すが、Adapter がユースケースを呼べると Presentation のほかに処理の入口ができ、トランザクション境界が Application の外にも広がるためである。
@@ -152,7 +156,7 @@ Proposed
 
 ### Neutral
 
-- 業務例外を HTTP の 400、404、409、422 に対応づける仕組みは、この ADR では決めない。いまは `@Valid` の失敗が 400、`ResponseStatusException` がそのステータスになり、Domain、CommandHandler、Repository の実装が投げる JDK の例外と `<Aggregate>ConflictException` は 500 になる。ユースケースが Domain の例外を 400、404、409、422 で返す必要が出たら、作業者は利用者に確認し、対応づけを新しい ADR で決める（[ADR-013](ADR-013-standardize-http-api-contracts.md)）。対応づけの作業は [issue #107](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/107) で扱う。
+- 業務例外を HTTP の 400、404、409、422 に対応づける仕組みは、競合の 409 を除き、この ADR では決めない。いまは `@Valid` の失敗が 400、`ResponseStatusException` がそのステータスになり、Domain、CommandHandler、Repository の実装が投げる JDK の例外は 500 になる。`shared.concurrency` の `ConflictException` は 409 になる（[ADR-054](ADR-054-detect-optimistic-lock-conflicts-by-update-count.md)）。ユースケースが Domain の例外を 400、404、409、422 で返す必要が出たら、作業者は利用者に確認し、対応づけを新しい ADR で決める（[ADR-013](ADR-013-standardize-http-api-contracts.md)）。404 と 422 の対応づけの作業は [issue #107](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/107) で扱う。
 - QueryService の `@Transactional(readOnly = true)` は、読み取り専用のトランザクションで参照中の書き込みを DB に拒否させるために付ける。分離レベルは既定の READ COMMITTED のままなので、一つのメソッドの中の複数の SQL が同じスナップショットを見ることまでは保証しない。
 - 参照の性能が Repository 経由で足りなくなったら、読み取りモデルへの直接射影を ADR で決め直す。
 
@@ -304,7 +308,7 @@ Proposed
 - [ADR-013: HTTP API 契約を標準化する](ADR-013-standardize-http-api-contracts.md)
 - [ADR-019: 外部連携の耐障害性と容量制御を標準化する](ADR-019-define-resilience-and-capacity-guardrails.md)
 - [ADR-048: jOOQ の共通処理を共有モジュール shared に置く](ADR-048-add-shared-module-for-jooq-common-code.md)
-- [ADR-054: 楽観的ロックの競合を UPDATE の条件の lock_no と更新件数で判定する](ADR-054-detect-optimistic-lock-conflicts-by-update-count.md)
+- [ADR-054: 楽観的ロックの競合を lock_no の条件と更新件数で判定し、業務テーブルの UPDATE と DELETE を TableWriter に集める](ADR-054-detect-optimistic-lock-conflicts-by-update-count.md)
 - [PostgreSQL の排他制御](../database/postgresql-concurrency-control.md)
 - [PostgreSQL の共通カラム](../database/postgresql-common-columns.md)
 - [メッセージングの設計](../integration/async-messaging-design.md)
