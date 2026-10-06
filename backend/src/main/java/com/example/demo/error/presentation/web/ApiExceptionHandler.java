@@ -191,10 +191,7 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
     } else if (ex instanceof ConflictException) {
       // クライアントが読み直して再送できる想定内の 4xx なので、ERROR にせず INFO で残す。
       // WARN 以上は起動時と Collector の障害用のロググループにも出るため使わない。
-      log.atInfo()
-          .setCause(ex)
-          .addKeyValue(STATUS_CODE, status.value())
-          .log("Optimistic lock conflict");
+      log.atInfo().setCause(ex).addKeyValue(STATUS_CODE, status.value()).log("API conflict");
     } else if (ex instanceof NotFoundException || ex instanceof BusinessRuleViolationException) {
       // 業務上の想定内の 4xx なので INFO で残す。対象を調べられるよう例外を付ける。
       log.atInfo()

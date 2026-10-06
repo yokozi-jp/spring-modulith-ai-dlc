@@ -68,7 +68,8 @@ ADR-051 の `*_pgm_cd` を束縛する Aspect も、共通カラムの値を組�
 ### Negative
 
 - `shared` の変更がすべての機能モジュールに影響する。
-- `shared` に何でも置かれ、境界のない共通パッケージになるおそれがある。置くものを永続化の技術的な共通処理と、楽観的ロックの三つの型と、業務上の失敗の例外の型に限ることで抑える。
+- `shared` に何でも置かれ、境界のない共通パッケージになるおそれがある。
+  置くものを永続化の技術的な共通処理と、楽観的ロックの三つの型と、業務上の失敗の例外の型に限ることで抑える。
 - `shared.concurrency` と `shared.failure` は層をまたいで使えるため、`ArchUnit` の `sharedModuleIsUsedOnlyByPersistenceAdapters` の対象から外れる。
   `shared.infrastructure.persistence` は、変わらず Persistence Adapter だけが使える。
 

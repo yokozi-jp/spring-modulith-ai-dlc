@@ -116,7 +116,7 @@ class ApiExceptionHandlerTest {
     assertNotNull(response, "応答");
     assertEquals(HttpStatus.CONFLICT, response.getStatusCode(), "HTTP status");
     final String log = output.getAll();
-    assertTrue(log.contains("Optimistic lock conflict"), () -> "event 名が残ること: " + log);
+    assertTrue(log.contains("API conflict"), () -> "event 名が残ること: " + log);
     assertTrue(log.contains("INFO"), () -> "INFO で残ること: " + log);
     assertTrue(log.contains(ConflictException.class.getName()), () -> "例外の型が残ること: " + log);
     assertFalse(log.contains("ERROR"), () -> "ERROR で残さないこと: " + log);

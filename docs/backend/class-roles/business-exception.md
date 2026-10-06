@@ -17,9 +17,11 @@ HTTP のステータスとログレベルは `error` モジュールの `ApiExce
 利用者の要求が業務の上で成り立たないとき、Domain、Application、Infrastructure は、その失敗を例外で呼び出し側へ伝える。
 **業務上の失敗の例外**は、利用者が要求か状態を見直せば解消しうる失敗を表す、次の三つの型である。
 
-- **NotFoundException**：指定された集約や行が存在しない。参照の権限がなく存在を隠す場合も同じ型を投げる。
+- **NotFoundException**：指定された集約や行が存在しない。
+  参照の権限がなく存在を隠す場合も同じ型を投げる。
 - **BusinessRuleViolationException**：許されない状態遷移、業務規則の違反、要求を今の状態へ適用できない。
-- **ConflictException**：版の不一致、行ロックの失敗、一意制約の違反。読み直せば解消しうる。
+- **ConflictException**：版の不一致、行ロックの失敗、一意制約の違反。
+  読み直せば解消しうる。
 
 プログラムの誤り（主キーの条件が 2 行に合う、束縛すべき値がない）は業務上の失敗ではない。
 `IllegalStateException` と `IllegalArgumentException` で投げ、HTTP の 500 にする。
@@ -45,7 +47,8 @@ HTTP のステータスとログレベルは `error` モジュールの `ApiExce
 ## 依存してよい型、してはいけない型
 
 - **依存してよい型**：`java..` の標準型。
-- **依存してはいけない型**：Spring Web、Spring の HTTP、Servlet の型（`ResponseStatusException`、`HttpStatus`）。`shared` の型が HTTP に依存すると、Domain が HTTP の境界に結びつく。
+- **依存してはいけない型**：Spring Web、Spring の HTTP、Servlet の型（`ResponseStatusException`、`HttpStatus`）。
+  `shared` の型が HTTP に依存すると、Domain が HTTP の境界に結びつく。
 
 ## 例外、HTTP、ログ、Listener の対応
 
@@ -53,7 +56,7 @@ HTTP のステータスとログレベルは `error` モジュールの `ApiExce
 | ----------------------------------------------------------------------------------------------- | ---- | ------------------------------------------------------------ | ---------------------------------------------- | ---------------------------- |
 | `NotFoundException`                                                                             | 404  | `about:blank`、`title` は `problem.title.404`、`detail` なし | INFO、`cause` 付き、`API business failure`     | 回復不能として再試行しない   |
 | `BusinessRuleViolationException`                                                                | 422  | `about:blank`、`title` は `problem.title.422`、`detail` なし | INFO、`cause` 付き、`API business failure`     | 回復不能として再試行しない   |
-| `ConflictException`                                                                             | 409  | `about:blank`、`title` は `problem.title.409`、`detail` なし | INFO、`cause` 付き、`Optimistic lock conflict` | 回復不能として再試行しない   |
+| `ConflictException`                                                                             | 409  | `about:blank`、`title` は `problem.title.409`、`detail` なし | INFO、`cause` 付き、`API conflict`             | 回復不能として再試行しない   |
 | JDK の例外ほか（`IllegalStateException`、`IllegalArgumentException`、`NoSuchElementException`） | 500  | `about:blank`、`title` は `problem.title.500`、`detail` なし | ERROR、`cause` 付き、`Unhandled API exception` | 予期しない例外として送出する |
 
 `title` は `Accept-Language` から解決した言語で返り、404 の本文は対象がない場合と存在を隠す場合で同じになる。

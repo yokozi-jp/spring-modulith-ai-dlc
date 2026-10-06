@@ -156,7 +156,8 @@ Proposed
 
 ### Neutral
 
-- 業務上の失敗の例外と 404、409、422 の対応づけは [ADR-062](ADR-062-map-business-exceptions-to-404-409-422.md) で決める。400 は入力検証の規約のままとする。
+- 業務上の失敗の例外と 404、409、422 の対応づけは [ADR-062](ADR-062-map-business-exceptions-to-404-409-422.md) で決める。
+  400 は入力検証の規約のままとする。
 - QueryService の `@Transactional(readOnly = true)` は、読み取り専用のトランザクションで参照中の書き込みを DB に拒否させるために付ける。分離レベルは既定の READ COMMITTED のままなので、一つのメソッドの中の複数の SQL が同じスナップショットを見ることまでは保証しない。
 - 参照の性能が Repository 経由で足りなくなったら、読み取りモデルへの直接射影を ADR で決め直す。
 

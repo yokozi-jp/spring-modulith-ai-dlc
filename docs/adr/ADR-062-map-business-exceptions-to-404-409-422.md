@@ -51,7 +51,7 @@ API のエラー契約は [ADR-013](ADR-013-standardize-http-api-contracts.md) �
   `title` は既存の `problem.title.404`、`problem.title.409`、`problem.title.422` を `Accept-Language` の言語で返し、`detail` は既存の `ApiProblemDetails.normalize` が消す。
   業務固有の `type` と翻訳した `detail` は使わない。
   型を 3 つに固定するため、型から業務固有の `type` を決められないからである。
-- ログは、404 と 422 を INFO の `API business failure`、409 を既存の INFO の `Optimistic lock conflict` で、`http.response.status_code` と例外の `cause` を付けて記録する。
+- ログは、404 と 422 を INFO の `API business failure`、409 を INFO の `API conflict` で、`http.response.status_code` と例外の `cause` を付けて記録する。
   WARN 以上は通知と標準出力のロググループに出るため使わない。
   500 は既存どおり ERROR の `Unhandled API exception` で記録する。
 - 例外、HTTP、ログ、非同期の Listener の対応は、[業務上の失敗の例外](../backend/class-roles/business-exception.md)の表に置く。
@@ -87,7 +87,7 @@ API のエラー契約は [ADR-013](ADR-013-standardize-http-api-contracts.md) �
 - `shared.failure` の 2 つの型が public になり、アーキテクチャ指標の全体の相対可視性の上限を、外部可視型数 20、全型数 33 の実測値に書き直した。
 - `ConflictException` の意味を一意制約の違反へ広げ、楽観的ロックの語彙を置く `shared.concurrency` に置いたままにする。
   パッケージの名前は、3 つの型の一部を表さない。
-- 一意制約の違反の 409 も `Optimistic lock conflict` で記録する。
+- 一意制約の違反の 409 と楽観的ロックの衝突の 409 は、同じ `API conflict` で記録する。
   区別はログの `exception.type` の原因（`DuplicateKeyException`）で行う。
 - `TableWriter.insert` を通さない INSERT と、子の行の `dsl.batch` の INSERT の `23505` は 500 のまま残る。
   ArchUnit では強制しない。

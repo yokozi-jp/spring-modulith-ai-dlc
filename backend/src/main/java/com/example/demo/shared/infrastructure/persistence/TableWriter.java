@@ -77,8 +77,8 @@ public class TableWriter {
    * @throws IllegalArgumentException {@code expectedLockNo} が 1 未満の場合、テーブルに {@code lock_no}（{@code
    *     Long}）がない場合、業務の列に共通カラムを渡した場合
    * @throws NotFoundException 更新件数が 0 で、主キーの行がない場合
-   * @throws ConflictException 更新件数が 0 で主キーの行がある場合と、行ロックを {@code lock_timeout} までに取れない場合。後者は {@link
-   *     CannotAcquireLockException} を原因に持つ
+   * @throws ConflictException 更新件数が 0 で主キーの行がある場合、一意制約に違反した場合（{@link DuplicateKeyException}
+   *     を原因に持つ）、行ロックを {@code lock_timeout} までに取れない場合（{@link CannotAcquireLockException} を原因に持つ）
    * @throws IllegalStateException 更新件数が 2 以上の場合。主キーの条件が 1 行を特定していない
    */
   public <R extends Record> LockedRoot updateCheckingVersion(
@@ -109,8 +109,8 @@ public class TableWriter {
    * @throws IllegalArgumentException {@code expectedLockNo} が 1 未満の場合、テーブルに {@code lock_no}（{@code
    *     Long}）がない場合
    * @throws NotFoundException 削除件数が 0 で、主キーの行がない場合
-   * @throws ConflictException 削除件数が 0 で主キーの行がある場合と、行ロックを {@code lock_timeout} までに取れない場合。後者は {@link
-   *     CannotAcquireLockException} を原因に持つ
+   * @throws ConflictException 削除件数が 0 で主キーの行がある場合、一意制約に違反した場合（{@link DuplicateKeyException}
+   *     を原因に持つ）、行ロックを {@code lock_timeout} までに取れない場合（{@link CannotAcquireLockException} を原因に持つ）
    * @throws IllegalStateException 削除件数が 2 以上の場合。主キーの条件が 1 行を特定していない
    */
   public <R extends Record> DeletedRoot deleteCheckingVersion(
@@ -176,8 +176,8 @@ public class TableWriter {
   /**
    * 子の行を条件で更新し、版を 1 進めて件数を返す。{@link LockedRoot#updateChild} が使う。
    *
-   * @throws ConflictException 行ロックを {@code lock_timeout} までに取れない場合。{@link
-   *     CannotAcquireLockException} を原因に持つ
+   * @throws ConflictException 一意制約に違反した場合（{@link DuplicateKeyException} を原因に持つ）と、行ロックを {@code
+   *     lock_timeout} までに取れない場合（{@link CannotAcquireLockException} を原因に持つ）
    */
   @CheckReturnValue
   /* package */ <R extends Record> int updateChildRows(
@@ -205,8 +205,8 @@ public class TableWriter {
   /**
    * 子の行を条件で削除する。{@link LockedRoot} と {@link DeletedRoot} が使う。
    *
-   * @throws ConflictException 行ロックを {@code lock_timeout} までに取れない場合。{@link
-   *     CannotAcquireLockException} を原因に持つ
+   * @throws ConflictException 一意制約に違反した場合（{@link DuplicateKeyException} を原因に持つ）と、行ロックを {@code
+   *     lock_timeout} までに取れない場合（{@link CannotAcquireLockException} を原因に持つ）
    */
   /* package */ void deleteRows(final Table<?> table, final Condition where) {
     executeOrConflict(
