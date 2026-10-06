@@ -168,13 +168,11 @@ class TableWriterConcurrencyTest {
 
       assertChildLockConflict(
           () ->
-              runInUseCase(
-                  () ->
-                      updateItem(1L)
-                          .updateChild(
-                              FIXTURE_ITEM_DETAIL,
-                              childKey(),
-                              set -> set.set(FIXTURE_ITEM_DETAIL.DETAIL_TEXT, "A"))));
+              updateItem(1L)
+                  .updateChild(
+                      FIXTURE_ITEM_DETAIL,
+                      childKey(),
+                      set -> set.set(FIXTURE_ITEM_DETAIL.DETAIL_TEXT, "A")));
       sessionB.rollback();
     }
   }
@@ -185,8 +183,7 @@ class TableWriterConcurrencyTest {
     try (Connection sessionB = openSessionB()) {
       lockChildInSessionB(sessionB);
 
-      assertChildLockConflict(
-          () -> runInUseCase(() -> updateItem(1L).deleteChildren(FIXTURE_ITEM_DETAIL, childKey())));
+      assertChildLockConflict(() -> updateItem(1L).deleteChildren(FIXTURE_ITEM_DETAIL, childKey()));
       sessionB.rollback();
     }
   }
@@ -206,9 +203,9 @@ class TableWriterConcurrencyTest {
     }
   }
 
-  /** 子の行の書き込みが、ロック待ちを原因に持つ競合の例外になることを確かめる。 */
+  /** ユースケースの呼び出しの中で、子の行の書き込みが、ロック待ちを原因に持つ競合の例外になることを確かめる。 */
   private static void assertChildLockConflict(final Runnable childWrite) {
-    assertThatThrownBy(childWrite::run)
+    assertThatThrownBy(() -> ScopedValue.where(PgmCdAspect.PGM_CD, PGM_CD).run(childWrite))
         .isInstanceOf(ConflictException.class)
         .hasMessageContaining("row is locked by another request")
         .hasMessageContaining("table=t_fixture_item_detail")
@@ -310,10 +307,5 @@ class TableWriterConcurrencyTest {
   /** ユースケースの呼び出しの中として、pgm_cd を束縛して実行する。 */
   private static <T> T inUseCase(final Supplier<T> call) {
     return ScopedValue.where(PgmCdAspect.PGM_CD, PGM_CD).call(call::get);
-  }
-
-  /** ユースケースの呼び出しの中として、pgm_cd を束縛して戻り値のない処理を実行する。 */
-  private static void runInUseCase(final Runnable call) {
-    ScopedValue.where(PgmCdAspect.PGM_CD, PGM_CD).run(call);
   }
 }

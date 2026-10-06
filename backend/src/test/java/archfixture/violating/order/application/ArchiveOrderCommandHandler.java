@@ -12,16 +12,16 @@ import org.springframework.stereotype.Service;
 @Service
 public class ArchiveOrderCommandHandler {
 
-  /** 注文を保存する Repository。 */
-  private final UnversionedOrderRepository orderRepository;
+  /** 保管する注文を保存する Repository。 */
+  private final UnversionedOrderRepository archiveRepository;
 
-  /** Repository を受け取る。 */
-  public ArchiveOrderCommandHandler(final UnversionedOrderRepository orderRepository) {
-    this.orderRepository = orderRepository;
+  /** 保管する注文を保存する Repository を受け取る。 */
+  public ArchiveOrderCommandHandler(final UnversionedOrderRepository archiveRepository) {
+    this.archiveRepository = archiveRepository;
   }
 
   /** 画面の版を持たずに、注文を save で保存する。 */
   public void handle(final ReleaseOrderCommand command) {
-    orderRepository.save(new Order(new OrderId(command.orderId()), 1L));
+    archiveRepository.save(new Order(new OrderId(command.orderId()), 1L));
   }
 }
