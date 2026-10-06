@@ -56,6 +56,10 @@ APIの稼働は、ヘルスチェックを使った外形監視で確認する�
 エンドポイントと公開範囲は[application.yaml](../../backend/src/main/resources/application.yaml)の`management`に従う。
 ヘルスチェックへのアクセスはアクセスログに出力しない。
 
+未認証で許可するのはlivenessとreadinessだけで、`/actuator/health`のルートはログイン済みでも拒否する。
+本番の公開originは`/actuator/**`を振り分けず、ロードバランサーは内部の経路でreadinessかlivenessを呼ぶ。
+理由は[ADR-061](../adr/ADR-061-allow-only-health-probes-unauthenticated.md)に記録する。
+
 ## 出典
 
 - フューチャー株式会社「Web API設計ガイドライン」（[アーキテクチャ設計ガイドライン](https://future-architect.github.io/arch-guidelines/documents/forWebAPI/web_api_guidelines.html)、commit `e309a6d`）、[CC BY 4.0](https://creativecommons.org/licenses/by/4.0/deed.ja)
