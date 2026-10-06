@@ -1,7 +1,7 @@
 ---
 type: Convention
 title: APIの認証、セッション、権限
-description: ブラウザとシステム間連携のAPI認証、ログアウト、セッションCookieの属性、ロールの管理場所を定める規約。APIの認証方式やセッション設定を変更するとき、対向システムへAPIを公開するとき、権限の判定を実装するときに読む。
+description: ブラウザとシステム間連携のAPI認証、ログアウト、セッションとCSRFのCookieの属性、ロールの管理場所を定める規約。APIの認証方式、セッション設定、CSRFのCookieを変更するとき、対向システムへAPIを公開するとき、権限の判定を実装するときに読む。
 tags: [convention, web-api, security, auth, future-arch-guidelines]
 ---
 
@@ -26,19 +26,31 @@ IdPがトークンの失効エンドポイント（RFC 7009）を提供する場
 IdPはログアウト後に、利用者をSPAの`/logged-out`へ戻す。
 本番のIdPには`https://<origin>/logged-out`を、post logout redirect URI（Cognitoではsign-out URL）として登録する。
 
-## セッションCookie
+## Cookie
 
 Cookieは、セッションIDとADR-007のCSRFトークン以外の用途に使わない。
-Cookieの名前、`HttpOnly`、`Secure`、`SameSite`の設定はADR-007と[application.yaml](../../backend/src/main/resources/application.yaml)に従い、そのほかの属性と扱いは次のとおりにする。
+どちらのCookieも次のとおりにする。
 
 - Cookieの値にユーザーIDや権限などの情報を含めない。
-- セッションIDは、フレームワークが暗号論的に安全な乱数で生成した、十分に長く推測困難な値だけにする。
 - `SameSite`を`None`にしない。要件を満たせる場合に限り`Strict`にしてよい。
 - `Path`は`/`にする。
 - `Domain`は省略し、サブドメイン間でCookieを共有しない。
+
+### セッションCookie
+
+セッションCookieの名前、`HttpOnly`、`Secure`、`SameSite`の設定はADR-007と[application.yaml](../../backend/src/main/resources/application.yaml)に従い、そのほかの扱いは次のとおりにする。
+
+- セッションIDは、フレームワークが暗号論的に安全な乱数で生成した、十分に長く推測困難な値だけにする。
 - 有効期間は`Expires`ではなく`Max-Age`で指定し、合意したセッションの有効期間に合わせる。
 - ログインのたびにセッションIDを再生成し、ログイン前の値を引き継がない。
 - ログアウトでは、サーバーのセッションを破棄し、Cookieを`Max-Age=0`で削除する。
+
+### CSRFのCookie
+
+`__Host-XSRF-TOKEN`にする。
+`Secure`（環境によらない）と`SameSite=Lax`を付け、SPAが読むため`HttpOnly`を付けない。
+有効期間は付けず、発行と削除はSpring Securityに任せる。
+設定は[SecurityConfig](../../backend/src/main/java/com/example/demo/SecurityConfig.java)、理由は[ADR-064](../adr/ADR-064-harden-csrf-cookie-with-host-prefix.md)にある。
 
 ## システム間連携の認証
 

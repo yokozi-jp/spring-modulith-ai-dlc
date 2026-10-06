@@ -1,10 +1,12 @@
 package com.example.demo;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.hamcrest.Matchers.nullValue;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.cookie;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -35,6 +37,9 @@ import org.springframework.test.web.servlet.MockMvc;
 @AutoConfigureMockMvc
 @Import({SharedTestConfiguration.class, ConflictFixture.class})
 class ApiContractTest {
+
+  /** frontend と ZAP の script が読む CSRF の Cookie の名前（ADR-064）。 */
+  private static final String CSRF_COOKIE = "__Host-XSRF-TOKEN";
 
   /** 実際の Spring MVC と Security filter chain を通すクライアント。 */
   @Autowired private MockMvc mockMvc;
@@ -80,6 +85,21 @@ class ApiContractTest {
         .andExpect(header().doesNotExist(HttpHeaders.WWW_AUTHENTICATE))
         .andExpect(jsonPath("$.title").value("Forbidden"))
         .andExpect(jsonPath("$.status").value(403));
+  }
+
+  @Test
+  @DisplayName("CSRF の Cookie を __Host- の属性と SameSite=Lax で発行する")
+  void csrfFailureIssuesHostPrefixedCookie() throws Exception {
+    // MockMvc は SameSite を Set-Cookie の文字列に出さないため、Cookie の属性で確かめる（文字列は E2E で確かめる）。
+    mockMvc
+        .perform(post("/api/missing").with(user("test-user")))
+        .andExpect(status().isForbidden())
+        .andExpect(cookie().exists(CSRF_COOKIE))
+        .andExpect(cookie().secure(CSRF_COOKIE, true))
+        .andExpect(cookie().path(CSRF_COOKIE, "/"))
+        .andExpect(cookie().domain(CSRF_COOKIE, nullValue()))
+        .andExpect(cookie().httpOnly(CSRF_COOKIE, false))
+        .andExpect(cookie().sameSite(CSRF_COOKIE, "Lax"));
   }
 
   @Test
