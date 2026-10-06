@@ -21,5 +21,88 @@
   "backToHome": "ホームへ戻る",
   "logout": "ログアウト",
   "loggedOutHeading": "ログアウトしました",
-  "loginAgain": "もう一度ログイン"
+  "loginAgain": "もう一度ログイン",
+  "orders": {
+    "missingValue": "（なし）",
+    "amount": "{{value, currency(currency: JPY)}}",
+    "quantity": "{{value, number}}",
+    "status": {
+      "draft": "下書き",
+      "confirmed": "確定済み",
+      "cancelled": "取消済み"
+    },
+    "salesStatus": {
+      "onSale": "販売中",
+      "discontinued": "販売終了"
+    },
+    "fields": {
+      "customerOrderCode": "客先注文番号",
+      "status": "状態",
+      "totalAmount": "合計金額",
+      "lines": "明細",
+      "lineNumber": "番号",
+      "product": "商品",
+      "quantity": "数量",
+      "unitPrice": "単価",
+      "amount": "金額"
+    },
+    "list": {
+      "title": "注文",
+      "create": "注文を作成する",
+      "filterLabel": "状態で絞り込む",
+      "filterAll": "すべて",
+      "detailColumn": "詳細",
+      "showDetail": "{{code}} の詳細",
+      "empty": "該当する注文はありません。"
+    },
+    "form": {
+      "selectProduct": "商品を選んでください",
+      "discontinuedProduct": "{{name}}（{{status}}）",
+      "lineLegend": "明細 {{number}}",
+      "addLine": "明細を追加する",
+      "removeLine": "明細 {{number}} を削除する",
+      "submitting": "送信しています",
+      "errors": {
+        "customerOrderCodeRequired": "客先注文番号を入力してください。",
+        "customerOrderCodeTooLong": "客先注文番号は {{max, number}} 文字以下にしてください。",
+        "linesRequired": "明細を 1 行以上入力してください。",
+        "linesTooMany": "明細は {{max, number}} 行以下にしてください。",
+        "productRequired": "商品を選んでください。",
+        "quantityRequired": "数量を入力してください。",
+        "quantityRange": "数量は {{min, number}} 以上 {{max, number}} 以下の整数にしてください。"
+      }
+    },
+    "new": {
+      "title": "注文の作成",
+      "submit": "作成する"
+    },
+    "detail": {
+      "title": "注文 {{code}}",
+      "linesHeading": "明細",
+      "editHeading": "明細の変更",
+      "saveLines": "明細を保存する",
+      "confirm": "確定する",
+      "cancel": "取り消す",
+      "backToList": "注文の一覧へ戻る",
+      "discardChanges": "変更を捨てて最新を表示する",
+      "reapplyChanges": "最新の版に変更を適用し直す"
+    },
+    "notice": {
+      "generalTitle": "操作を完了できませんでした",
+      "generalFailure": "時間をおいてもう一度お試しください。",
+      "validation": "入力を確かめてください。",
+      "createConflict": "この客先注文番号は既に使われている可能性があります。客先注文番号を変えるか、時間をおいてもう一度送信してください。",
+      "createUnprocessable": "入力した商品を確かめてください。",
+      "linesChanged": "明細を変更しました。",
+      "latestNotLoaded": "最新の内容を読み込めませんでした。",
+      "linesConflict": "ほかの操作で注文が更新されました。上に最新の内容を表示しています。",
+      "conflictReloadFailed": "最新の内容を読み込めませんでした。時間をおいてもう一度送信してください。",
+      "notEditable": "注文が確定または取り消されたため、変更できません。",
+      "actionConflict": "ほかの操作で注文が更新されました。最新の内容を表示しています。",
+      "linesUnprocessable": "下書きの注文か、販売中の商品かを確かめてください。",
+      "actionUnprocessable": "この注文は今の状態では操作できません。最新の内容を確かめてください。",
+      "confirmed": "注文を確定しました。",
+      "cancelled": "注文を取り消しました。"
+    }
+  }
 }
