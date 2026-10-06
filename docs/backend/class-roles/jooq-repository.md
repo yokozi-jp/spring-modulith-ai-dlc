@@ -70,11 +70,12 @@ jOOQ の Repository は業務規則を持たない。
   集約ルートの `LOCK_NO` も選び、`restore` の `lockNo` に渡す。
 - 集約は `fetchOptional(Records.mapping(Order::restore))` か `fetch(Records.mapping(Order::restore))` で作り、`Order.place` を使わない。
 - `add` は、`insertInto(ORDERS)` の `set(列, 値)` で業務の全列を書き、`LOCK_NO` を含む共通カラムを `set(commonColumns.forInsert(ORDERS))` で書く。
+  集約ルートの INSERT は `tableWriter.insert(...)` で実行し、一意制約の違反（`23505`）を `ConflictException` に変える。
   値オブジェクトと enum は、アクセサ（`value()`、`amount()`、`name()`）で列の値に直す。
 - `update` は、`tableWriter.updateCheckingVersion(ORDERS, 主キーの条件, order.lockNo(), 業務の列)` で集約ルートの行を先に更新する。
   業務の列は、ラムダで `ColumnValues` に `set(列, 値)` で渡し、主キー以外の業務の列をすべて書く。
   集約ルートの業務の列が変わらなくても、集約ルートの行を更新して版を進める。
-  0 件のとき、行がなければ `NoSuchElementException` が、行があれば `shared.concurrency` の `ConflictException` が投げられる。
+  0 件のとき、行がなければ `shared.failure` の `NotFoundException` が、行があれば `shared.concurrency` の `ConflictException` が投げられる。
   `lock_timeout` までに行のロックを取れないときも、`TableWriter` が `ConflictException` に変える。
   Repository は例外を作らず、関数も渡さない。
 - 子の行は、戻り値の `LockedRoot` の `updateChild` と `deleteChildren` で、集約ルートの後に書く。
@@ -102,15 +103,15 @@ jOOQ の Repository は業務規則を持たない。
 - 子の Entity の行は、`add` では行ごとの INSERT を `dsl.batch` 一つで実行する。
 - 共通カラムのうち、このクラスが参照するのは、集約の復元のために読む `LOCK_NO` だけにし、`LOCK_NO` を書かず、`CREATED_*`、`UPDATED_*`、`PATCHED_*` の列を参照しない（[ADR-048](../../adr/ADR-048-add-shared-module-for-jooq-common-code.md)）。
   `ColumnValues` に共通カラムを渡すと `IllegalArgumentException` になる。
+- `updateWhere`、`deleteWhere`、`NOWAIT` が投げる Spring の例外（`CannotAcquireLockException`、`DuplicateKeyException`）を Repository の外へ出さない。
+  外へ出すときは、原因に付けた `ConflictException` に変えて投げる。
 - `@Transactional` を付けない。
 - クラス、フィールド、コンストラクタに Javadoc を書く。
 - `infrastructure.persistence` のパッケージに `@NullMarked` を宣言する `package-info.java` を置く。
 
 `ConflictException` は、`ApiExceptionHandler` が 409 の Problem Details にする（[ADR-054](../../adr/ADR-054-detect-optimistic-lock-conflicts-by-update-count.md)）。
-`NoSuchElementException` を 404 にする対応づけは、まだない。
-いまは 500 になり、対応づけは [ADR-050](../../adr/ADR-050-define-backend-class-roles-and-naming.md) の Neutral のとおり新しい ADR で決める。
+行がないときの `NotFoundException` は 404 になる（[ADR-061](../../adr/ADR-061-map-business-exceptions-to-404-409-422.md)）。
 ステータスコードの使い分けは[HTTPステータスコードの選択](../../web-api/status-codes.md)と[更新の競合制御](../../web-api/optimistic-locking.md)に従う。
-対応づけの作業は [issue #107](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/107) で扱う。
 
 PostgreSQL には MULTISET がなく、jOOQ は `jsonb_agg` による JSON の集約で模倣する。
 子の行が数千に及ぶ集約では、二つの SQL に分けて読むほうが速いことがある。
@@ -168,14 +169,14 @@ class JooqOrderRepository implements OrderRepository {
 
   @Override
   public void add(final Order order) {
-    dsl.insertInto(ORDERS)
-        .set(ORDERS.ORDER_ID, order.id().value())
-        .set(ORDERS.CUSTOMER_ID, order.customerId().value())
-        .set(ORDERS.STATUS, order.status().name())
-        .set(ORDERS.DISCOUNT, order.discount().amount())
-        .set(ORDERS.PLACED_AT, order.placedAt())
-        .set(commonColumns.forInsert(ORDERS))
-        .execute();
+    tableWriter.insert(
+        dsl.insertInto(ORDERS)
+            .set(ORDERS.ORDER_ID, order.id().value())
+            .set(ORDERS.CUSTOMER_ID, order.customerId().value())
+            .set(ORDERS.STATUS, order.status().name())
+            .set(ORDERS.DISCOUNT, order.discount().amount())
+            .set(ORDERS.PLACED_AT, order.placedAt())
+            .set(commonColumns.forInsert(ORDERS)));
     dsl.batch(
             order.lines().stream()
                 .map(
@@ -348,6 +349,8 @@ Repository のテストは列と集約の往復と削除の範囲だけを確か
 - [ ] `multiset` の副問い合わせに、子を識別する列の `orderBy` を付ける（`orderBy(ORDER_LINES.LINE_NUMBER)`）。［自分で点検］
 - [ ] 集約ルートの `LOCK_NO` を選び、`restore` の `lockNo` に渡す。［自分で点検］
 - [ ] `add` は `set(列, 値)` で業務の全列を書き、子の行を行ごとの INSERT の `dsl.batch` 一つで書く。［自分で点検］
+- [ ] 集約ルートの INSERT は `tableWriter.insert(...)` で実行する。［自分で点検］
+- [ ] Spring の例外（`CannotAcquireLockException`、`DuplicateKeyException`）を Repository の外へ出さず、出すときは原因に付けた `ConflictException` に変える。［自分で点検］
 - [ ] 集約ルートを受け取る `add` 以外の public メソッドは、版を比べる入口（`update` は `TableWriter.updateCheckingVersion`、`delete` は `deleteCheckingVersion`、ほかの名前ならどちらか）と引数の集約ルートの `lockNo()` を、そのメソッドの中で直接呼ぶ。［ArchUnit で検査：TableWriterArchTest.repositoryUpdateAndDeleteCheckVersion］
 - [ ] 期待する版には集約ルートの `lockNo()` の値を渡し、テーブルから読み直した版を渡さない。［自分で点検］
 - [ ] 集約ルートを受け取る public メソッドは、`add`、`update`、`delete` だけにする（`save` のような名前でも版を比べれば規則は通るため、名前は規則が検査しない）。［自分で点検］

@@ -38,7 +38,7 @@ CommandHandler は他モジュールから呼ばれない。
   `handle` に `@Transactional` を付け、クラスには付けない。
 - 依存は public のコンストラクタで受け取り、`private final` フィールドに持つ。
 - `handle` の中で、Command の標準型の値を値オブジェクトに変換する（`new OrderId(UUID.fromString(command.orderId()))`）。
-- 集約が見つからないときは、`.orElseThrow(() -> new NoSuchElementException("order not found: orderId=" + command.orderId()))` で `NoSuchElementException` を投げる。
+- 集約が見つからないときは、`.orElseThrow(() -> new NotFoundException("order not found: orderId=" + command.orderId()))` で `shared.failure` の `NotFoundException` を投げる。
 - 新しい集約は Repository の `add` で、状態を変えた既存の集約は `update` で、`handle` の中で保存する。
 - Command が `VersionedCommand` のときは、`findById` の直後、状態を変える操作より前に `order.ensureLockNo(command.expectedLockNo())` を呼ぶ。
   CommandHandler は集約を DB から読み直すため、`ensureLockNo` は画面から受け取った値と読んだ値を比べる。
@@ -65,15 +65,12 @@ CommandHandler は他モジュールから呼ばれない。
 Command の形式は、Controller の `@Valid` で検証済みである。
 形式の違反は、`ApiExceptionHandler` が継承する `ResponseEntityExceptionHandler` が 400 の Problem Details にするため、CommandHandler に届かない。
 
-`ConflictException` は、`ApiExceptionHandler` が HTTP の 409 にする。
-Domain が投げる JDK の例外は、いまは HTTP の 500 になる。
-ユースケースがこの例外を 400、404、422 で返す必要があるときは、実装を止めて利用者に確認し、対応づけを新しい ADR で決める。
+業務上の失敗は[業務上の失敗の例外](business-exception.md)の型で投げ、`ApiExceptionHandler` が 404、409、422 にする（[ADR-061](../../adr/ADR-061-map-business-exceptions-to-404-409-422.md)）。
 ステータスコードの使い分けは[HTTPステータスコードの選択](../../web-api/status-codes.md)に、API のエラー契約は [ADR-013](../../adr/ADR-013-standardize-http-api-contracts.md) に従う。
-対応づけの作業は [issue #107](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/107) で扱う。
 
 ## 依存してよい型、してはいけない型
 
-- **依存してよい型**：`java..` の標準型（`Clock` を含む）、`org.jspecify..`、同じ `application` の Command と Result、同じモジュールの `domain.model`（集約、値オブジェクト、Repository、外部システムのインタフェース（Listener から呼ばれる CommandHandler だけ））と `domain.service`、モジュールルートの型、他モジュールの `<Feature>Queries` とルートの record、`@Service`、`@Transactional`、`ApplicationEventPublisher`。
+- **依存してよい型**：`java..` の標準型（`Clock` を含む）、`org.jspecify..`、`shared.failure` と `shared.concurrency` の例外、同じ `application` の Command と Result、同じモジュールの `domain.model`（集約、値オブジェクト、Repository、外部システムのインタフェース（Listener から呼ばれる CommandHandler だけ））と `domain.service`、モジュールルートの型、他モジュールの `<Feature>Queries` とルートの record、`@Service`、`@Transactional`、`ApplicationEventPublisher`。
 - **依存してはいけない型**：別の CommandHandler、Presentation の型（Request、Response）、Infrastructure の型（`JooqOrderRepository`、`PaymentGatewayClient`）、jOOQ の API と生成型、他モジュールの内部パッケージの型。
 
 ## 最小の例と典型的な例
@@ -113,7 +110,7 @@ public class CancelOrderCommandHandler {
         orderRepository
             .findById(new OrderId(UUID.fromString(command.orderId())))
             .orElseThrow(
-                () -> new NoSuchElementException("order not found: orderId=" + command.orderId()));
+                () -> new NotFoundException("order not found: orderId=" + command.orderId()));
     order.ensureLockNo(command.expectedLockNo());
     order.cancel();
     orderRepository.update(order);
@@ -139,7 +136,7 @@ public PlaceOrderResult handle(final PlaceOrderCommand command) {
           .findMembership(command.customerId())
           .orElseThrow(
               () ->
-                  new NoSuchElementException("customer not found: customerId=" + command.customerId()));
+                  new NotFoundException("customer not found: customerId=" + command.customerId()));
   final MembershipRank rank = MembershipRank.valueOf(membership.rank());
   order.applyDiscount(discountPolicy.discountFor(rank, order.subtotal()));
   orderRepository.add(order);
@@ -161,7 +158,7 @@ private List<OrderLine> toOrderLines(final List<PlaceOrderCommand.Line> commandL
             final PlaceOrderCommand.Line line = commandLines.get(index);
             final BigDecimal unitPrice = unitPrices.get(line.productCode());
             if (unitPrice == null) {
-              throw new NoSuchElementException(
+              throw new NotFoundException(
                   "product not found: productCode=" + line.productCode());
             }
             return new OrderLine(
@@ -198,7 +195,7 @@ public ChargeOrderResult handle(final ChargeOrderCommand command) {
       orderRepository
           .findById(new OrderId(UUID.fromString(command.orderId())))
           .orElseThrow(
-              () -> new NoSuchElementException("order not found: orderId=" + command.orderId()));
+              () -> new NotFoundException("order not found: orderId=" + command.orderId()));
   if (order.isPaid()) {
     return new ChargeOrderResult(order.id().value().toString());
   }
@@ -292,7 +289,7 @@ class CancelOrderCommandHandlerTest {
 - [ ] 画面から呼ばれる CommandHandler は外部システムのインタフェースに依存せず、外部システムはイベントを受けた Listener が呼ぶ CommandHandler から呼ぶ。［自分で点検］
 - [ ] 外部システムを呼ぶ CommandHandler は、集約がその操作を終えていれば何もせずに Result を返し、外部システムに冪等性キーを渡す。［自分で点検］
 - [ ] 現在時刻は `Instant.now(clock)` で取る。［自分で点検］
-- [ ] Domain の例外を 400、404、422 で返す必要があるなら、実装を止めて利用者に確認した。［自分で点検］
+- [ ] 業務上の失敗は[業務上の失敗の例外](business-exception.md)の型で投げる。［ArchUnit で検査：GeneralCodingRulesArchTest.noSuchElementExceptionIsNotThrown］
 - [ ] クラス、フィールド、コンストラクタ、`handle` に Javadoc を書く。［自分で点検］
 - [ ] `@ApplicationModuleTest` と `Scenario` のテストを書く。［自分で点検］
 - [ ] `application` のパッケージに `@NullMarked` の `package-info.java` がある。［Error Prone で検査：RequireExplicitNullMarking］

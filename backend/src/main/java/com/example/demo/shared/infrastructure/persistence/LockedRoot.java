@@ -1,12 +1,11 @@
 package com.example.demo.shared.infrastructure.persistence;
 
 import com.example.demo.shared.concurrency.ConflictException;
+import com.example.demo.shared.failure.BusinessRuleViolationException;
 import java.util.function.Consumer;
 import org.jooq.Condition;
 import org.jooq.Record;
 import org.jooq.Table;
-import org.springframework.http.HttpStatus;
-import org.springframework.web.server.ResponseStatusException;
 
 /**
  * 集約ルートの行を、このトランザクションで版を比べて更新した印（ADR-054）。{@link TableWriter#updateCheckingVersion} だけが作る。
@@ -33,7 +32,7 @@ public final class LockedRoot {
    * @param byPrimaryKey 子の主キーで 1 行を特定する条件
    * @param businessColumns 業務の列の値を {@link ColumnValues} に登録する。一つ以上必要
    * @throws IllegalArgumentException テーブルに {@code lock_no} がない場合、業務の列が一つもない場合、共通カラムを渡した場合
-   * @throws ResponseStatusException 更新件数が 0 の場合。状態は 422 で、要求された子の変更を今の永続化の状態へ適用できない
+   * @throws BusinessRuleViolationException 更新件数が 0 の場合。要求された子の変更を今の永続化の状態へ適用できない
    * @throws IllegalStateException 更新件数が 2 以上の場合。主キーの条件が 1 行を特定していない
    * @throws ConflictException 行ロックを {@code lock_timeout} までに取れない場合。{@link
    *     org.springframework.dao.CannotAcquireLockException} を原因に持つ
@@ -49,9 +48,7 @@ public final class LockedRoot {
     }
     final String target = writer.childTarget(table, byPrimaryKey);
     if (updated == 0) {
-      // 要求された子の変更を今の永続化の状態へ適用できないため 422 にする。reason は ApiProblemDetails.normalize が応答から消す。
-      throw new ResponseStatusException(
-          HttpStatus.UNPROCESSABLE_CONTENT, "child row not found: " + target);
+      throw new BusinessRuleViolationException("child row not found: " + target);
     }
     throw new IllegalStateException(
         "child primary key condition matched " + updated + " rows: " + target);

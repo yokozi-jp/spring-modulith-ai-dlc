@@ -3,10 +3,14 @@ package com.example.demo.architecture;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import com.example.demo.shared.concurrency.ConflictException;
+import com.example.demo.shared.failure.BusinessRuleViolationException;
+import com.example.demo.shared.failure.NotFoundException;
 import com.tngtech.archunit.core.domain.JavaClasses;
 import com.tngtech.archunit.core.importer.ClassFileImporter;
 import com.tngtech.archunit.lang.ArchRule;
 import java.util.List;
+import java.util.Optional;
 import java.util.stream.Stream;
 import org.jooq.DSLContext;
 import org.jooq.Field;
@@ -236,6 +240,18 @@ class ArchitectureRuleFixtureTest {
                 VIOLATING),
             "order.application.OrderAuditColumns"),
         row(
+            "sharedModuleDoesNotDependOnHttp",
+            PackageByFeatureOnionArchitectureTest.sharedModuleDoesNotDependOnHttpRule(VIOLATING),
+            "shared.infrastructure.persistence.ChildRowWriter"),
+        row(
+            "noSuchElementExceptionIsNotThrown",
+            GeneralCodingRulesArchTest.noSuchElementExceptionIsNotThrown,
+            "order.application.LegacyOrderFinder.notFound("),
+        row(
+            "noSuchElementExceptionIsNotThrown: orElseThrow",
+            GeneralCodingRulesArchTest.noSuchElementExceptionIsNotThrown,
+            "order.application.LegacyOrderFinder.firstOrFail("),
+        row(
             "moduleApiDoesNotExposeInternalTypes",
             PackageByFeatureOnionArchitectureTest.moduleApiDoesNotExposeInternalTypesRule(
                 VIOLATING),
@@ -404,6 +420,54 @@ class ArchitectureRuleFixtureTest {
     }
   }
 
+  @Test
+  @DisplayName("プログラムの誤りの例外と業務上の失敗の例外は NoSuchElementException の禁止規則に検出されない")
+  void programmingErrorsAreAllowed() {
+    final JavaClasses usage = new ClassFileImporter().importClasses(ProgrammingErrors.class);
+
+    assertThatCode(() -> GeneralCodingRulesArchTest.noSuchElementExceptionIsNotThrown.check(usage))
+        .doesNotThrowAnyException();
+  }
+
+  /** NoSuchElementException の禁止規則が許す例外の送出と {@code orElseThrow(Supplier)} を持つフィクスチャ。 */
+  /* package */ static final class ProgrammingErrors {
+
+    private ProgrammingErrors() {}
+
+    /** 空のコードを IllegalArgumentException で拒否する。 */
+    /* package */ static void requireCode(final String code) {
+      if (code.isBlank()) {
+        throw new IllegalArgumentException("code must not be blank");
+      }
+    }
+
+    /** 主キーの条件が 1 行を特定しなければ IllegalStateException を投げる。 */
+    /* package */ static void requireSingleRow(final boolean single) {
+      if (!single) {
+        throw new IllegalStateException("primary key condition matched several rows");
+      }
+    }
+
+    /** 受付でない注文を BusinessRuleViolationException で拒否する。 */
+    /* package */ static void requirePlaced(final boolean placed) {
+      if (!placed) {
+        throw new BusinessRuleViolationException("order is not placed");
+      }
+    }
+
+    /** 版が違えば競合の例外を投げる。 */
+    /* package */ static void ensureLockNo(final long expected, final long actual) {
+      if (expected != actual) {
+        throw new ConflictException("row was updated by another request");
+      }
+    }
+
+    /** 空の Optional から、Supplier で作った NotFoundException を投げる。 */
+    /* package */ static String notFound(final Optional<String> order) {
+      return order.orElseThrow(() -> new NotFoundException("order not found: orderId=1"));
+    }
+  }
+
   /** フィクスチャが列を変換する先の値オブジェクト。 */
   private record OrderNumber(String value) {}
 
@@ -420,9 +484,11 @@ class ArchitectureRuleFixtureTest {
             basePackage),
         PackageByFeatureOnionArchitectureTest.sharedModuleIsUsedOnlyByPersistenceAdaptersRule(
             basePackage),
+        PackageByFeatureOnionArchitectureTest.sharedModuleDoesNotDependOnHttpRule(basePackage),
         PackageByFeatureOnionArchitectureTest.moduleApiDoesNotExposeInternalTypesRule(basePackage),
         PackageByFeatureOnionArchitectureTest
             .databaseTechnologyApisAreOnlyUsedByPersistenceAdapters,
+        GeneralCodingRulesArchTest.noSuchElementExceptionIsNotThrown,
         PackageByFeatureOnionArchitectureTest.domainModelDoesNotDependOnFrameworks,
         PackageByFeatureOnionArchitectureTest.domainServicesDependOnlyOnDomainAndJavaRule(
             basePackage),

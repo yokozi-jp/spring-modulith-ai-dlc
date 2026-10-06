@@ -46,14 +46,14 @@ CommandHandler は Domain Service に、必要な値を Domain の型で渡す�
   フィールドは依存と定数だけにし、状態を持たない。
 - Repository は読み取り（`count*`、`find*`）にだけ使い、`add`、`update`、`delete` などの書き込みを呼ばない。
   保存は、トランザクションとイベントの発行を担う `<UseCase>CommandHandler` が行う。
-- 規則を満たさないときは `IllegalStateException` を投げ、メッセージは英語で、対象の識別子を含める。
+- 規則を満たさないときは `shared.failure` の `BusinessRuleViolationException` を投げ、メッセージは英語で、対象の識別子を含める（[業務上の失敗の例外](business-exception.md)）。
 - `@Transactional` と `@Slf4j` を付けず、`ApplicationEventPublisher` を使わない。
 - クラス、フィールド、コンストラクタ、public メソッドに Javadoc を書く。
 - `domain.service` のパッケージに `@NullMarked` を宣言する `package-info.java` を置く。
 
 ## 依存してよい型、してはいけない型
 
-- **依存してよい型**：`java..` の標準型、`org.jspecify..`、`lombok..`、同じモジュールの `domain.model` と `domain.service` の型（Repository を含む）、`org.springframework.stereotype.Service`。
+- **依存してよい型**：`java..` の標準型、`org.jspecify..`、`lombok..`、同じモジュールの `domain.model` と `domain.service` の型（Repository を含む）、`shared.failure` の例外、`org.springframework.stereotype.Service`。
 - **依存してはいけない型**：`@Service` 以外の Spring の型（`@Transactional`、`ApplicationEventPublisher`）、`org.slf4j`、モジュールルートの型と他モジュールの `<Feature>Queries`、`application`、Infrastructure、外部システムのインタフェース（`PaymentGateway`）。
 
 ## 最小の例と典型的な例
@@ -104,7 +104,7 @@ public class OrderLimitPolicy {
   /** 顧客が新しい注文を出せることを確かめる。 */
   public void ensureCanPlace(final CustomerId customerId) {
     if (orderRepository.countUnshippedByCustomer(customerId) >= MAX_UNSHIPPED_ORDERS) {
-      throw new IllegalStateException(
+      throw new BusinessRuleViolationException(
           "unshipped order limit reached: customerId=" + customerId.value());
     }
   }
@@ -121,7 +121,7 @@ final CustomerMembership membership =
         .findMembership(command.customerId())
         .orElseThrow(
             () ->
-                new NoSuchElementException("customer not found: customerId=" + command.customerId()));
+                new NotFoundException("customer not found: customerId=" + command.customerId()));
 final MembershipRank rank = MembershipRank.valueOf(membership.rank());
 order.applyDiscount(discountPolicy.discountFor(rank, order.subtotal()));
 ```
@@ -162,14 +162,14 @@ class DiscountPolicyTest {
 - [ ] 規則を値オブジェクトか Entity に置けず、三つの場合のどれかに当てはまることを確かめた。［自分で点検］
 - [ ] `domain.service` に置き、`@Service` を付ける。［ArchUnit で検査：PackageByFeatureOnionArchitectureTest.domainServicesAreAnnotatedWithService］
 - [ ] `@Service` を付けた型は `application` か `domain.service` にだけ置く。［ArchUnit で検査：PackageByFeatureOnionArchitectureTest.servicesResideInApplicationOrDomainService］
-- [ ] 依存は Java の標準型、Domain の型、`@Service` だけにし、`@Transactional`、`ApplicationEventPublisher`、ロガー、モジュールルートの型を使わない。［ArchUnit で検査：PackageByFeatureOnionArchitectureTest.domainServicesDependOnlyOnDomainAndJava］
+- [ ] 依存は Java の標準型、Domain の型、`shared.failure` の例外、`@Service` だけにし、`@Transactional`、`ApplicationEventPublisher`、ロガー、モジュールルートの型を使わない。［ArchUnit で検査：PackageByFeatureOnionArchitectureTest.domainServicesDependOnlyOnDomainAndJava］
 - [ ] `application` と Infrastructure に依存しない。［ArchUnit で検査：PackageByFeatureOnionArchitectureTest.dependenciesPointInward］
 - [ ] 外部システムのインタフェースを呼ばない。［自分で点検］
 - [ ] Repository は読み取り（`count*`、`find*`）にだけ使い、`add` を呼ばない。［自分で点検］
 - [ ] Repository の `add` 以外の書き込み（`update`、`delete`、集約ルートを受け取るメソッド）を呼ばない。［ArchUnit で検査：TableWriterArchTest.onlyCommandHandlersUpdateOrDeleteAggregates］
 - [ ] 名前は業務規則を表す名詞にする。［自分で点検］
 - [ ] `public class` にし、依存を public のコンストラクタで受け取り、状態を持たない。［自分で点検］
-- [ ] 規則を満たさないときは `IllegalStateException` を投げる。［自分で点検］
+- [ ] 規則を満たさないときは `BusinessRuleViolationException` を投げる。［自分で点検］
 - [ ] クラス、フィールド、コンストラクタ、public メソッドに Javadoc を書く。［自分で点検］
 - [ ] Spring を起動しない JUnit のテストを書く。［自分で点検］
 - [ ] `domain.service` のパッケージに `@NullMarked` の `package-info.java` を置く。［Error Prone で検査：RequireExplicitNullMarking］

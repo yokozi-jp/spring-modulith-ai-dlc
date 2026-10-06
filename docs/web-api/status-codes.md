@@ -30,11 +30,13 @@ OpenAPIへのエラー応答の付け方は[OpenAPIのアノテーションとJa
 - **401 Unauthorized**：認証されていない。
 - **403 Forbidden**：認証済みだが、操作またはエンドポイントを呼び出す権限がない。
 - **404 Not Found**：パスで指定したリソースが存在しない、または参照する権限がない。
+  `shared.failure`の`NotFoundException`は、`ApiExceptionHandler`が404にする（[業務上の失敗の例外](../backend/class-roles/business-exception.md)）。
 - **405 Method Not Allowed**：エンドポイントが対応しないHTTPメソッドを指定された。
 - **409 Conflict**：楽観ロックの競合、悲観ロックの取得失敗、一意制約違反。
-  楽観ロックの`ConflictException`（`lock_timeout`による失敗を含む）は、`ApiExceptionHandler`が409にする。
+  楽観ロックの`ConflictException`（`lock_timeout`による失敗と、一意制約違反を含む）は、`ApiExceptionHandler`が409にする。
 - **413 Content Too Large**：リクエストのヘッダーまたは本文が上限を超えた。
 - **422 Unprocessable Content**：入力が業務処理の条件を満たさない（在庫不足で出荷指示できない場合など）。
+  `shared.failure`の`BusinessRuleViolationException`は、`ApiExceptionHandler`が422にする。
 - **429 Too Many Requests**：レート制限を超えた。
 - **500 Internal Server Error**：DB接続エラー、SQLの実行エラー、外部APIの実行時エラーなどのシステムエラー。
 - **503 Service Unavailable**：メンテナンス中、または一時的な過負荷。前段のリバースプロキシが返す場合もある。

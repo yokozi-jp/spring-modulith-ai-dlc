@@ -27,6 +27,7 @@ ETagと`If-Match`、`Last-Modified`と`If-Unmodified-Since`は使わない。
 ## 競合時の応答
 
 バージョン番号が一致しない場合は409を返す。
+更新と削除の対象の行がなければ、404を返す。
 悲観ロックの取得に失敗した場合も409を返す。
 412は`If-Match`などの条件付きリクエストで使うコードであり、この方式では使わない。
 エラー応答の形式は[ADR-013](../adr/ADR-013-standardize-http-api-contracts.md)に従う。

@@ -20,6 +20,7 @@ import io.opentelemetry.api.common.AttributeKey;
 import io.opentelemetry.api.logs.Severity;
 import io.opentelemetry.instrumentation.logback.appender.v1_0.OpenTelemetryAppender;
 import io.opentelemetry.sdk.logs.data.LogRecordData;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -31,12 +32,14 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
+import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 
@@ -116,6 +119,11 @@ class ApiErrorContractTest {
             VALIDATION_ERROR,
             validation),
         Arguments.of("未処理例外", get("/api/error-fixture/unhandled"), 500, "about:blank", "サーバー内部エラー"),
+        Arguments.of(
+            "404", get("/api/error-fixture/not-found?id=a"), 404, "about:blank", "リソースが見つかりません"),
+        Arguments.of("409", get("/api/error-fixture/conflict"), 409, "about:blank", "競合が発生しました"),
+        Arguments.of(
+            "422", get("/api/error-fixture/unprocessable"), 422, "about:blank", "処理できない内容です"),
         Arguments.of(
             "405",
             delete("/api/error-fixture/items").with(csrf()),
@@ -210,20 +218,83 @@ class ApiErrorContractTest {
         .andExpect(content().string(not(Matchers.containsString("too-long-code"))));
   }
 
-  @Test
-  @DisplayName("422 の ResponseStatusException は 500 の経路でなく標準の処理で返り、reason のテーブルとキーを含まない")
-  void unprocessableContentHidesReason() throws Exception {
+  @ParameterizedTest(name = "{0}")
+  @MethodSource("businessFailureTitleCases")
+  @DisplayName("404 と 422 の title は英語でも返る")
+  void businessFailureTitlesAreEnglish(final String path, final int status, final String title)
+      throws Exception {
     mockMvc
-        .perform(
-            get("/api/error-fixture/unprocessable")
-                .with(user("test-user"))
-                .header(HttpHeaders.ACCEPT_LANGUAGE, "ja"))
-        .andExpect(status().isUnprocessableContent())
-        .andExpect(jsonPath("$.type").value("about:blank"))
-        .andExpect(jsonPath("$.title").value("処理できない内容です"))
-        .andExpect(jsonPath("$.detail").doesNotExist())
+        .perform(get(path).with(user("test-user")).header(HttpHeaders.ACCEPT_LANGUAGE, "en"))
+        .andExpect(status().is(status))
+        .andExpect(jsonPath("$.title").value(title));
+  }
+
+  private static Stream<Arguments> businessFailureTitleCases() {
+    return Stream.of(
+        Arguments.of("/api/error-fixture/not-found?id=a", 404, "Not Found"),
+        Arguments.of("/api/error-fixture/unprocessable", 422, "Unprocessable Content"));
+  }
+
+  @ParameterizedTest(name = "{0}")
+  @ValueSource(
+      strings = {
+        "/api/error-fixture/not-found?id=secret-key",
+        "/api/error-fixture/conflict",
+        "/api/error-fixture/unprocessable"
+      })
+  @DisplayName("404、409、422 の本文は例外のメッセージとクラス名を含まない")
+  void businessFailuresHideExceptionMessages(final String path) throws Exception {
+    mockMvc
+        .perform(get(path).with(user("test-user")).header(HttpHeaders.ACCEPT_LANGUAGE, "ja"))
+        .andExpect(status().is4xxClientError())
+        .andExpect(content().string(not(Matchers.containsString("secret-key"))))
+        .andExpect(content().string(not(Matchers.containsString("orderId"))))
         .andExpect(content().string(not(Matchers.containsString("fixture_child"))))
-        .andExpect(content().string(not(Matchers.containsString("secret-key"))));
+        .andExpect(content().string(not(Matchers.containsString("Exception"))));
+  }
+
+  @Test
+  @DisplayName("識別子の違う 2 つの 404 は、本文と Content-Type、Content-Language が同じになる")
+  void notFoundBodiesAreIdentical() throws Exception {
+    final List<MockHttpServletResponse> responses = new ArrayList<>();
+    for (final String id : List.of("a", "b")) {
+      responses.add(
+          mockMvc
+              .perform(
+                  get("/api/error-fixture/not-found")
+                      .queryParam("id", id)
+                      .with(user("test-user"))
+                      .header(HttpHeaders.ACCEPT_LANGUAGE, "ja"))
+              .andExpect(status().isNotFound())
+              .andReturn()
+              .getResponse());
+    }
+    final MockHttpServletResponse first = responses.getFirst();
+    final MockHttpServletResponse second = responses.getLast();
+
+    assertEquals(first.getContentAsString(), second.getContentAsString(), "本文");
+    assertEquals(first.getContentType(), second.getContentType(), "Content-Type");
+    assertEquals(
+        first.getHeader(HttpHeaders.CONTENT_LANGUAGE),
+        second.getHeader(HttpHeaders.CONTENT_LANGUAGE),
+        "Content-Language");
+  }
+
+  @ParameterizedTest(name = "{0}")
+  @ValueSource(
+      strings = {
+        "/api/error-fixture/unhandled",
+        "/api/error-fixture/illegal-argument",
+        "/api/error-fixture/no-such-element"
+      })
+  @DisplayName("JDK の例外は 500 になり、本文に例外のメッセージ、クラス名、スタックトレースを含まない")
+  void jdkExceptionsAreInternalServerErrors(final String path) throws Exception {
+    mockMvc
+        .perform(get(path).with(user("test-user")).header(HttpHeaders.ACCEPT_LANGUAGE, "ja"))
+        .andExpect(status().isInternalServerError())
+        .andExpect(content().string(not(Matchers.containsString("fixture failure"))))
+        .andExpect(content().string(not(Matchers.containsString("Exception"))))
+        .andExpect(content().string(not(Matchers.containsString("at errorfixture"))));
   }
 
   @Test
@@ -244,7 +315,7 @@ class ApiErrorContractTest {
   }
 
   @Test
-  @DisplayName("入力検証は WARN、その他の 4xx は INFO、未処理例外は ERROR で、status 以外の key-value を持たない")
+  @DisplayName("入力検証は WARN、その他の 4xx は INFO、未処理例外は ERROR で記録し、業務上の失敗と未処理例外だけが例外を持つ")
   void failuresAreLoggedWithStatusOnly() throws Exception {
     mockMvc.perform(invalidBody().with(user("test-user"))).andExpect(status().isBadRequest());
     assertLogged("API validation failed", Severity.WARN, 400, Set.of());
@@ -272,6 +343,17 @@ class ApiErrorContractTest {
         IllegalStateException.class.getName(),
         error.getAttributes().get(AttributeKey.stringKey("exception.type")),
         "例外の型");
+
+    final Set<String> exceptionAttributes =
+        Set.of("exception.type", "exception.message", "exception.stacktrace");
+    mockMvc
+        .perform(get("/api/error-fixture/not-found?id=a").with(user("test-user")))
+        .andExpect(status().isNotFound());
+    assertLogged("API business failure", Severity.INFO, 404, exceptionAttributes);
+    mockMvc
+        .perform(get("/api/error-fixture/unprocessable").with(user("test-user")))
+        .andExpect(status().isUnprocessableContent());
+    assertLogged("API business failure", Severity.INFO, 422, exceptionAttributes);
   }
 
   @Test

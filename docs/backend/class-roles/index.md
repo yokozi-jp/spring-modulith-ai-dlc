@@ -15,6 +15,7 @@
 - [クラスの役割：Result](result.md)：CommandHandler が返す結果の record を作るとき、作成の応答の Location を作るとき
 - [クラスの役割：QueryService](query-service.md)：参照のインタフェースを実装するとき、参照のメソッドを足すとき
 - [クラスの役割：Listener](listener.md)：他モジュールのイベントを受けて自モジュールの状態を変えるとき、外部システムの呼び出しをイベントで始めるとき
+- [クラスの役割：業務上の失敗の例外](business-exception.md)：見つからない、業務規則の違反、競合を例外で表すとき、例外と HTTP のステータス、ログ、Listener での扱いを確かめるとき
 - [クラスの役割：Controller](controller.md)：HTTP API のエンドポイントを作るとき、ステータスコードと Location を確かめるとき
 - [クラスの役割：Request](request.md)：リクエストボディを受ける操作の入力と形式の検証を作るとき
 - [クラスの役割：Response](response.md)：参照の結果を返す API の応答の record を作るとき、応答の項目を足すとき

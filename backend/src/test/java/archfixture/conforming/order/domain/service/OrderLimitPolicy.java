@@ -2,6 +2,7 @@ package archfixture.conforming.order.domain.service;
 
 import archfixture.conforming.order.domain.model.CustomerId;
 import archfixture.conforming.order.domain.model.OrderRepository;
+import archfixture.conforming.shared.failure.BusinessRuleViolationException;
 import org.springframework.stereotype.Service;
 
 /** 「未出荷の注文は 3 件まで」という、複数の注文にまたがる業務規則。 */
@@ -22,7 +23,7 @@ public class OrderLimitPolicy {
   /** 顧客が新しい注文を出せることを確かめる。 */
   public void ensureCanPlace(final CustomerId customerId) {
     if (orderRepository.countUnshippedByCustomer(customerId) >= MAX_UNSHIPPED_ORDERS) {
-      throw new IllegalStateException(
+      throw new BusinessRuleViolationException(
           "unshipped order limit reached: customerId=" + customerId.value());
     }
   }

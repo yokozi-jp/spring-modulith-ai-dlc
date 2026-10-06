@@ -46,9 +46,9 @@ Repositoryでの書き方は[jOOQのRepository](../backend/class-roles/jooq-repo
 
 - **期待する版を持つ**：`updateCheckingVersion`と`deleteCheckingVersion`を使う。
   更新件数が1件なら成功する。
-  0件なら主キーで行の有無を確かめ、行がなければ`NoSuchElementException`を、行があれば「他の人が更新した」として`shared.concurrency`の`ConflictException`を投げる。
+  0件なら主キーで行の有無を確かめ、行がなければ`shared.failure`の`NotFoundException`を、行があれば「他の人が更新した」として`shared.concurrency`の`ConflictException`を投げる。
   子の行は、戻り値の`LockedRoot`（削除では`DeletedRoot`）で書く。
-  `updateChild`は、子の行が0件なら状態が422の`ResponseStatusException`を、2件以上なら`IllegalStateException`を投げる。
+  `updateChild`は、子の行が0件なら`shared.failure`の`BusinessRuleViolationException`（422）を、2件以上なら`IllegalStateException`を投げる（[ADR-061](../adr/ADR-061-map-business-exceptions-to-404-409-422.md)）。
 - **期待する版を持たない**：`updateWhere`と`deleteWhere`を使う。
   更新件数を返し、件数の意味は呼び出し側が決める。
 
@@ -120,7 +120,9 @@ UPDATEも更新する行のロックを取るため、同じ順序に従う。
 アプリの接続には`lock_timeout`でロック待ちの上限を設定し、既定の無期限待ちのままにしない（[DB接続情報とロール分離](connections.md)、[ADR-055](../adr/ADR-055-set-db-time-limits-per-connection.md)）。
 上限まで待ってもロックを取れなければ、文はSQLSTATE `55P03`で失敗する。
 `updateCheckingVersion`、`deleteCheckingVersion`と、子の行の`LockedRoot.updateChild`、`LockedRoot.deleteChildren`、`DeletedRoot.deleteChildren`は、この失敗を`ConflictException`に変える。
-`updateWhere`と`deleteWhere`は、Springの`CannotAcquireLockException`をそのまま投げ、扱いは呼び出し側が決める。
+`updateWhere`と`deleteWhere`は、Springの`CannotAcquireLockException`と、`updateWhere`の`DuplicateKeyException`をそのまま投げ、扱いは呼び出し側が決める。
+一意制約の違反（SQLSTATE `23505`）は、`TableWriter`の版を比べる入口、子の行の書き込み、集約ルートのINSERTの入口`insert`で、`DuplicateKeyException`を原因に付けた`ConflictException`に変える。
+集約ルートのINSERTは`TableWriter.insert`で実行し、子の行の`dsl.batch`のINSERTは変換しない。
 
 要件に合わせて、次の待ち方も使う。
 

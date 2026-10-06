@@ -1,12 +1,15 @@
 package errorfixture.presentation.web;
 
+import com.example.demo.shared.concurrency.ConflictException;
+import com.example.demo.shared.failure.BusinessRuleViolationException;
+import com.example.demo.shared.failure.NotFoundException;
 import jakarta.validation.ConstraintViolationException;
 import jakarta.validation.Valid;
 import jakarta.validation.Validator;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import java.util.List;
-import org.springframework.http.HttpStatus;
+import java.util.NoSuchElementException;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -14,9 +17,10 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
-import org.springframework.web.server.ResponseStatusException;
 
 /** エラー応答の検証用の HTTP API。例外を起こすためだけに使う。 */
+// 1 つの入口が 1 つの例外を投げる形にそろえるため、メソッドの数の上限を外す。
+@SuppressWarnings("PMD.TooManyMethods")
 @RestController
 @RequestMapping("/api/error-fixture")
 class ErrorFixtureController {
@@ -112,13 +116,53 @@ class ErrorFixtureController {
   }
 
   /**
-   * LockedRoot.updateChild の 0 件と同じく、テーブルとキーを reason に持つ 422 を投げる。
+   * IllegalArgumentException を投げる。
+   *
+   * @return 返さない
+   */
+  @GetMapping("/illegal-argument")
+  /* package */ ResponseEntity<Void> illegalArgument() {
+    throw new IllegalArgumentException("fixture failure secret-key");
+  }
+
+  /**
+   * NoSuchElementException を投げる。
+   *
+   * @return 返さない
+   */
+  @GetMapping("/no-such-element")
+  /* package */ ResponseEntity<Void> noSuchElement() {
+    throw new NoSuchElementException("fixture failure secret-key");
+  }
+
+  /**
+   * 業務規則の違反を投げる。
    *
    * @return 返さない
    */
   @GetMapping("/unprocessable")
   /* package */ ResponseEntity<Void> unprocessable() {
-    throw new ResponseStatusException(
-        HttpStatus.UNPROCESSABLE_CONTENT, "child row not found: fixture_child id=secret-key");
+    throw new BusinessRuleViolationException("child row not found: fixture_child id=secret-key");
+  }
+
+  /**
+   * 識別子を含むメッセージで、見つからないことを投げる。
+   *
+   * @param id 見つからない注文の識別子
+   * @return 返さない
+   */
+  @GetMapping("/not-found")
+  /* package */ ResponseEntity<Void> notFound(@RequestParam final String id) {
+    throw new NotFoundException("order not found: orderId=" + id);
+  }
+
+  /**
+   * テーブルとキーを含むメッセージで、競合を投げる。
+   *
+   * @return 返さない
+   */
+  @GetMapping("/conflict")
+  /* package */ ResponseEntity<Void> conflict() {
+    throw new ConflictException("unique key already exists: fixture_child id=secret-key");
   }
 }
