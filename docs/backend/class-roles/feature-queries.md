@@ -28,6 +28,7 @@ tags: [convention, backend, class-role]
 - 名前は機能名に `Queries` を付ける（`OrderQueries`、`CustomerQueries`、`ProductQueries`）。
 - 1件または指定したキーの結果を返すメソッドは `find` で始める（`findDetails`、`findMembership`、`findPrices`）。
 - [検索条件](search-criteria.md)で一覧を返すメソッドは `search` にする。
+- 条件のない一覧は、空の検索条件の record を作らず、引数なしの `search()` にする。
 
 ## 必須の記述
 
@@ -135,7 +136,7 @@ public ReserveStockResult handle(final ReserveStockCommand command) {
 - [ ] 引数と戻り値は、Java の標準型と同じルートの record だけにする。［ArchUnit で検査：PackageByFeatureOnionArchitectureTest.moduleApiDoesNotExposeInternalTypes］
 - [ ] 機能モジュールに `<Feature>Queries` を一つ作った。［自分で点検］
 - [ ] メソッドは読み取りだけにし、1件は `Optional`、一覧は `List` で返す。［自分で点検］
-- [ ] 1件の参照は `find` で始め、検索条件で一覧を返すメソッドは `search` にする。［自分で点検］
+- [ ] 1件の参照は `find` で始め、検索条件で一覧を返すメソッドは `search`、条件のない一覧は引数なしの `search()` にする。［自分で点検］
 - [ ] 実装の `<Feature>QueryService` を `application` に置き、すべての public メソッドに `@Transactional(readOnly = true)` を付ける。［ArchUnit で検査：ClassRoleArchTest.queryServicesImplementModuleQueries］
 - [ ] 他モジュールは `<Feature>Queries` とルートの record だけを使い、内部パッケージを参照しない。［Spring Modulith で検査：ApplicationModuleArchitectureTest］
 - [ ] インタフェースと各メソッドに Javadoc を書く。［自分で点検］
