@@ -89,14 +89,39 @@ jobs:
           java-version: "25"
 
       - name: Setup Gradle
-        uses: gradle/actions/setup-gradle@9c971963bec38e04b3d30dcc455b5382be2fdbfb # v6.3.0
+        uses: gradle/actions/setup-gradle@3f5f9adaf7d9fecd50b5935e54106014257a94e6 # v6.4.0
         with:
-          # OSS（MIT）のキャッシュ実装を明示的に使う（Enhanced Caching の商用条項を避ける）。
-          cache-provider: basic
+          # Gradle User Home は setup-gradle では扱わず、直下の actions/cache で復元と保存をする。
+          # MIT の範囲に収め、Enhanced Caching（gradle-actions-caching）は使わない。
+          # basic は restore-keys を持たず、ビルドファイルの変更で全依存を取り直すため外す（ADR-063）。
+          cache-provider: external
+
+      # key の hash が変わっても、同じ lint の直近の main の cache を restore-keys で復元する。
+      - name: Restore Gradle cache
+        id: gradle-cache
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: gradle-${{ runner.os }}-lint-${{ hashFiles('backend/**/*.gradle*', 'backend/gradle/wrapper/gradle-wrapper.properties') }}
+          restore-keys: |
+            gradle-${{ runner.os }}-lint-
 
       - name: Run Spotless, PMD, SpotBugs
         working-directory: backend
         run: ./gradlew spotlessCheck pmdMain pmdTest spotbugsMain spotbugsTest
+
+      # PR は cache を書かない。
+      # 既存の key は上書きされないため、main の完全一致しなかった run だけが保存する。
+      - name: Save Gradle cache
+        if: github.ref == 'refs/heads/main' && steps.gradle-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: ${{ steps.gradle-cache.outputs.cache-primary-key }}
 
   test:
     name: Test & Coverage ☕
@@ -116,9 +141,22 @@ jobs:
           java-version: "25"
 
       - name: Setup Gradle
-        uses: gradle/actions/setup-gradle@9c971963bec38e04b3d30dcc455b5382be2fdbfb # v6.3.0
+        uses: gradle/actions/setup-gradle@3f5f9adaf7d9fecd50b5935e54106014257a94e6 # v6.4.0
         with:
-          cache-provider: basic
+          # cache の扱いは lint ジョブと同じ（ADR-063）。
+          cache-provider: external
+
+      # lint ジョブと同じ方式で、test の直近の main の cache を復元する。
+      - name: Restore Gradle cache
+        id: gradle-cache
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: gradle-${{ runner.os }}-test-${{ hashFiles('backend/**/*.gradle*', 'backend/gradle/wrapper/gradle-wrapper.properties') }}
+          restore-keys: |
+            gradle-${{ runner.os }}-test-
 
       - name: Set up Task
         uses: go-task/setup-task@a00fbb05ce67b35648be3c78cbc9fd85354c757e # v2
@@ -143,6 +181,16 @@ jobs:
 
       - name: Generate, lint, and check OpenAPI contract
         run: task be-openapi-check
+
+      # 保存の条件は lint ジョブと同じ（ADR-063）。
+      - name: Save Gradle cache
+        if: github.ref == 'refs/heads/main' && steps.gradle-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: ${{ steps.gradle-cache.outputs.cache-primary-key }}
 
       - name: Stop test dependencies
         if: always()
@@ -195,9 +243,22 @@ jobs:
           java-version: "25"
 
       - name: Setup Gradle
-        uses: gradle/actions/setup-gradle@9c971963bec38e04b3d30dcc455b5382be2fdbfb # v6.3.0
+        uses: gradle/actions/setup-gradle@3f5f9adaf7d9fecd50b5935e54106014257a94e6 # v6.4.0
         with:
-          cache-provider: basic
+          # cache の扱いは lint ジョブと同じ（ADR-063）。
+          cache-provider: external
+
+      # mutation は workflow_dispatch だけで動くため、test ジョブの cache を読み取り専用で復元し、保存はしない。
+      - name: Restore Gradle cache
+        id: gradle-cache
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: gradle-${{ runner.os }}-test-${{ hashFiles('backend/**/*.gradle*', 'backend/gradle/wrapper/gradle-wrapper.properties') }}
+          restore-keys: |
+            gradle-${{ runner.os }}-test-
 
       - name: Set up Task
         uses: go-task/setup-task@a00fbb05ce67b35648be3c78cbc9fd85354c757e # v2

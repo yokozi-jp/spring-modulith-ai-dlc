@@ -232,6 +232,9 @@ Gitフックの条件とコマンドは[`lefthook.yml`](../../lefthook.yml)を�
 
 - **`frontend-ci.yml`**：`fe-verify`、`fe-route-tree-check`、`api-client-check`、`fe-doctor`を実行する。
 - **`backend-ci.yml`**：`be-lint`相当、`be-verify-migrations`、`be-test`、`be-openapi-check`、手動実行時の`mutation-test`を実行する。
+  Gradle User Homeは`setup-gradle`の`cache-provider: external`にして、`actions/cache`のrestoreとsaveで扱う。
+  keyはビルドファイルのhashで、restore-keysにより直近のmainのcacheを復元する。
+  saveはmainのpushで、restoreが完全一致でなかったときだけ行う（[ADR-063](../adr/ADR-063-restore-gradle-cache-with-restore-keys-on-mit-caching.md)）。
 - **`api-contract.yml`**：`api-lint`、`api-lint-rules-test`、`api-breaking`、`api-docs`を実行し、設計書をartifactにする。
   mainへのpushでは設計書をGitHub Pagesに公開する。
 - **`betterleaks.yml`**：`scan-secrets-all`相当を実行する。
@@ -247,6 +250,7 @@ Gitフックの条件とコマンドは[`lefthook.yml`](../../lefthook.yml)を�
 - **`okf-validate.yml`**：`okf-check`を実行する。
 - **`release-please.yml`**：`release-check`を実行する。
 - **`e2e.yml`**：`task e2e`を実行する。
+  Backend CIのtestと同じGradle cacheをread-onlyで復元する。
   必須チェックにしない（[ブランチ保護](../repository/branch-protection.md)）。
 
 各ワークフローの実装は[`.github/workflows/`](../../.github/workflows/)を正とする。
