@@ -8,7 +8,7 @@ on:
       - "docker/compose-test.yml"
       - "docker/initdb/**"
       - "docker/keycloak/**"
-      - ".env.test"
+      - ".env.test.example"
       - ".hadolint.yaml"
       - ".github/workflows/hadolint.yml"
   # PR ではパスフィルタで workflow をスキップしない（必須チェックが
@@ -58,7 +58,7 @@ jobs:
             exit 0
           fi
           # hadolint.yml の push パスフィルタと同じ集合で判定する。
-          if grep -Eq '^(backend/|docker/compose-test\.yml$|docker/initdb/|docker/keycloak/|\.env\.test$|\.hadolint\.yaml$|\.github/workflows/hadolint\.yml$)' \
+          if grep -Eq '^(backend/|docker/compose-test\.yml$|docker/initdb/|docker/keycloak/|\.env\.test\.example$|\.hadolint\.yaml$|\.github/workflows/hadolint\.yml$)' \
             <<< "$changed_files"; then
             echo "docker=true" >> "$GITHUB_OUTPUT"
           else
@@ -132,6 +132,10 @@ jobs:
 
       - name: Build backend image
         run: docker build --tag spring-modulith-backend:ci backend
+
+      # .env.test は Git 除外のため、.env.test.example からコピーして作る。
+      - name: Create test env file
+        run: cp .env.test.example .env.test
 
       # 通常テスト用の PostgreSQL / Redis に加え、backend-smoke profile の Keycloak を起動する。
       # backend-ci.yml と task test は profile を有効にしないため、Keycloak の起動コストを負わない。

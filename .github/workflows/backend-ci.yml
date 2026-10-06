@@ -10,7 +10,7 @@ on:
       - ".spectral.yaml"
       - "docker/compose-test.yml"
       - "docker/initdb/**"
-      - ".env.test"
+      - ".env.test.example"
       - "Taskfile.yml"
       - ".github/workflows/backend-ci.yml"
   # PR ではパスフィルタで workflow 自体をスキップしない。スキップすると
@@ -61,7 +61,7 @@ jobs:
             exit 0
           fi
           # backend-ci.yml の push パスフィルタと同じ集合で判定する。
-          if grep -Eq '^(backend/|openapi/|docker/initdb/|\.spectral\.yaml$|docker/compose-test\.yml$|\.env\.test$|Taskfile\.yml$|\.github/workflows/backend-ci\.yml$)' \
+          if grep -Eq '^(backend/|openapi/|docker/initdb/|\.spectral\.yaml$|docker/compose-test\.yml$|\.env\.test\.example$|Taskfile\.yml$|\.github/workflows/backend-ci\.yml$)' \
             <<< "$changed_files"; then
             echo "backend=true" >> "$GITHUB_OUTPUT"
           else
@@ -127,7 +127,11 @@ jobs:
           checksum: a54a408f6861ff921f6e87774180db31bacd8c1e7c944ca696db9fea49a82fc7
 
       # ローカルの task test と同じ隔離スタック（PostgreSQL 5433 / Redis 6380）を使う。
-      # docker/compose-test.yml と .env.test を共用し、ローカルと CI の乖離を防ぐ。
+      # docker/compose-test.yml と .env.test.example を共用し、ローカルと CI の乖離を防ぐ。
+      # .env.test は Git 除外のため、.env.test.example からコピーして作る。
+      - name: Create test env file
+        run: cp .env.test.example .env.test
+
       - name: Start test dependencies
         run: docker compose -f docker/compose-test.yml up -d --wait
 

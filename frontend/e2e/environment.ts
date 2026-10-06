@@ -12,7 +12,9 @@ const env = loadEnv("test", pathFromHere("../.."), ["E2E_", "CI"]);
 function requireEnv(name: "E2E_USERNAME" | "E2E_PASSWORD"): string {
   const value = env[name];
   if (value === undefined || value === "") {
-    throw new Error(`${name} をルートの .env.test に設定してください。`);
+    throw new Error(
+      `${name} をルートの .env.test に設定してください。.env.test が無いときは .env.test.example をコピーして作ります。`,
+    );
   }
   return value;
 }

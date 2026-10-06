@@ -116,6 +116,8 @@ build、コンテナの起動、後片付けは行わない。
 
 - ログイン情報は、ルートの `.env.test` の `E2E_USERNAME` と `E2E_PASSWORD` から読む。
   試しに値を変えるときは、Git から除外されたルートの `.env.test.local` に書く。
+- `.env.test` は、Git で管理する `.env.test.example` からコピーして作る Git 除外のファイルである。
+  `task e2e` は、`.env.test` が無ければ `.env.test.example` からコピーする。
 - `task e2e` は `TEST_ENV_FILE` の上書きに対応せず、`.env.test` を固定で読む。
   compose の backend と Playwright が `.env.test` を固定で読むためである。
 - ローカルで `E2E_KEEP_ENV=1 task e2e` を実行して失敗したときだけ、コンテナと volume を残す。
@@ -136,6 +138,6 @@ build、コンテナの起動、後片付けは行わない。
 
 ## CI
 
-`.github/workflows/e2e.yml` は、Pull Request で frontend、backend（DB の changeset を含む）、Keycloak の設定、compose-test とその入力（`docker/initdb/`、`.env.test`）、Taskfile、この workflow 自体を変えたときだけ `task e2e` を実行する。
+`.github/workflows/e2e.yml` は、Pull Request で frontend、backend（DB の changeset を含む）、Keycloak の設定、compose-test とその入力（`docker/initdb/`、`.env.test.example`）、Taskfile、この workflow 自体を変えたときだけ `task e2e` を実行する。
 retry は 2 回で、失敗時に Playwright の成果物と backend のログを保存する。
 この check は required status checks に登録しない（[ブランチ保護](../repository/branch-protection.md)）。
