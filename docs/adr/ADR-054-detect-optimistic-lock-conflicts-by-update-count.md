@@ -57,6 +57,11 @@ PostgreSQL の READ COMMITTED では、後の UPDATE は先の UPDATE のコミ�
   `updateWhere` と `deleteWhere` は件数を返し、Error Prone の `@CheckReturnValue` を付けて、戻り値の無視をコンパイルの失敗にする。
   その件数を返す Repository のメソッドにも、インタフェースで `@CheckReturnValue` を付ける。
   `updateWhere` は、業務の列が一つもなければ `IllegalArgumentException` にする。
+- `LockedRoot.updateChild`、`LockedRoot.deleteChildren`、`DeletedRoot.deleteChildren` も、`55P03` の `CannotAcquireLockException` を、それを原因に付けた `ConflictException`（409）に変える。
+  ルートの書き込みの後に子の行のロック待ちで失敗しても、ルートと同じ競合として返すためである。
+- `updateChild` の更新件数が 0 なら、要求された子の変更を今の永続化の状態へ適用できないため、`ResponseStatusException(HttpStatus.UNPROCESSABLE_CONTENT)` で 422 にする。
+  Spring の `ResponseEntityExceptionHandler` が既存の処理で 422 の Problem Details にし、`about:blank` の detail を消すため、件数、テーブル名、キーは応答に出ない。
+  2 件以上は主キーの条件の誤りなので、`IllegalStateException`（500）のままにする。
 - `CommonColumns.forUpdate` は `updated_*` だけを返し、package-private にする。
   UPDATE の `lock_no` を書くのは `TableWriter` だけになる。
 - ArchUnit の `TableWriterArchTest` で次を検査する。
@@ -108,6 +113,7 @@ PostgreSQL の READ COMMITTED では、後の UPDATE は先の UPDATE のコミ�
   WARN 以上は起動時と Collector の障害の調査に使う標準出力のログにも流れるため、競合で埋めないよう WARN にもしない。
   Collector が通す属性は `exception.*` だけなので、キーと値の属性は足さない。
 - `NoSuchElementException`（404）と `IllegalStateException`（422）の対応づけは [issue #107](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/107) で扱い、それまでは 500 のままにする。
+  `updateChild` の 0 件は、上のとおり先に 422 にする。
   `IllegalStateException` は競合に使わず、409 にも対応づけない。
 
 この決定は、取り込んだガイドラインを ADR-040 に従って改変し、[ADR-048](ADR-048-add-shared-module-for-jooq-common-code.md) と [ADR-050](ADR-050-define-backend-class-roles-and-naming.md) の `update` の手順と、競合の例外の置き場所を書き換える。

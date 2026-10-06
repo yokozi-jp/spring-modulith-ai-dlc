@@ -1,5 +1,6 @@
 package com.example.demo.shared.infrastructure.persistence;
 
+import static com.example.demo.jooq.tables.FixtureItemDetailTable.FIXTURE_ITEM_DETAIL;
 import static com.example.demo.jooq.tables.FixtureItemTable.FIXTURE_ITEM;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -19,6 +20,7 @@ import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Supplier;
 import javax.sql.DataSource;
+import org.jooq.Condition;
 import org.jooq.DSLContext;
 import org.jooq.Record;
 import org.jooq.SQLDialect;
@@ -36,7 +38,11 @@ import org.springframework.test.context.transaction.AfterTransaction;
  *
  * <p>テストのトランザクション（A）が {@link TableWriter} で書き、{@link DataSource} から取った二つ目の接続（B）が先に同じ行を更新する。B
  * の行はコミットするため、テストのトランザクションが終わった後に自動コミットの接続で消す。接続は A、B、待ちを見張る接続の三つで、テストの pool の上限 4 に収まる。
+ *
+ * <p>子の行のテストでは、B が子の行だけをロックし、A がルートを更新した後の子の行の書き込みで {@code lock_timeout} を待つ。
  */
+// 入口ごとのロック待ちの変換をテストに分けるため、メソッドの数の上限を外す。
+@SuppressWarnings("PMD.TooManyMethods")
 @DatabaseTest
 @ExtendWith(FixtureTablesExtension.class)
 class TableWriterConcurrencyTest {
@@ -52,6 +58,12 @@ class TableWriterConcurrencyTest {
 
   /** B のコミットを待つ上限。 */
   private static final Duration WAIT_LIMIT = Duration.ofSeconds(5);
+
+  /** A の待ちを見つけるまでの上限。待ちを見るテストの A の {@code lock_timeout}（4 秒）より短くする。 */
+  private static final Duration WAIT_DETECTION_LIMIT = Duration.ofSeconds(3);
+
+  /** B がロックする子の行の明細番号。 */
+  private static final int DETAIL_NO = 1;
 
   /** テストのトランザクション（A）の jOOQ のコンテキスト。 */
   @Autowired private DSLContext dsl;
@@ -79,7 +91,9 @@ class TableWriterConcurrencyTest {
   /* package */ void deleteCommittedRows() throws SQLException {
     try (Connection connection = dataSource.getConnection()) {
       connection.setAutoCommit(true);
-      DSL.using(connection, SQLDialect.POSTGRES).deleteFrom(FIXTURE_ITEM).execute();
+      final DSLContext autoCommit = DSL.using(connection, SQLDialect.POSTGRES);
+      autoCommit.deleteFrom(FIXTURE_ITEM_DETAIL).execute();
+      autoCommit.deleteFrom(FIXTURE_ITEM).execute();
     }
   }
 
@@ -88,6 +102,8 @@ class TableWriterConcurrencyTest {
   // A がロックを待つ間に B をコミットするため、見張りを別のスレッドで動かす。
   @SuppressWarnings("PMD.DoNotUseThreads")
   void staleSaveWaitingForCommitConflicts() throws Exception {
+    // 混んだ CI でも見張りが待ちを見つけてから B をコミットできるよう、このテストの A だけ lock_timeout を延ばす。
+    dsl.setLocal(DSL.name("lock_timeout"), DSL.inline("4s")).execute();
     try (ExecutorService watcher = Executors.newSingleThreadExecutor();
         Connection sessionB = openSessionB()) {
       updateInSessionB(sessionB);
@@ -144,6 +160,87 @@ class TableWriterConcurrencyTest {
     }
   }
 
+  @Test
+  @DisplayName("B が子の行のロックを持ち続けると、A の LockedRoot.updateChild は lock_timeout で競合の例外になる")
+  void childUpdateLockTimeoutBecomesConflict() throws SQLException {
+    try (Connection sessionB = openSessionB()) {
+      lockChildInSessionB(sessionB);
+
+      assertChildLockConflict(
+          () ->
+              runInUseCase(
+                  () ->
+                      updateItem(1L)
+                          .updateChild(
+                              FIXTURE_ITEM_DETAIL,
+                              childKey(),
+                              set -> set.set(FIXTURE_ITEM_DETAIL.DETAIL_TEXT, "A"))));
+      sessionB.rollback();
+    }
+  }
+
+  @Test
+  @DisplayName("B が子の行のロックを持ち続けると、A の LockedRoot.deleteChildren は lock_timeout で競合の例外になる")
+  void lockedRootChildDeleteLockTimeoutBecomesConflict() throws SQLException {
+    try (Connection sessionB = openSessionB()) {
+      lockChildInSessionB(sessionB);
+
+      assertChildLockConflict(
+          () -> runInUseCase(() -> updateItem(1L).deleteChildren(FIXTURE_ITEM_DETAIL, childKey())));
+      sessionB.rollback();
+    }
+  }
+
+  @Test
+  @DisplayName("B が子の行のロックを持ち続けると、A の DeletedRoot.deleteChildren は lock_timeout で競合の例外になる")
+  void deletedRootChildDeleteLockTimeoutBecomesConflict() throws SQLException {
+    try (Connection sessionB = openSessionB()) {
+      lockChildInSessionB(sessionB);
+
+      assertChildLockConflict(
+          () ->
+              writer
+                  .deleteCheckingVersion(FIXTURE_ITEM, FIXTURE_ITEM.ITEM_ID.eq(ITEM_ID), 1L)
+                  .deleteChildren(FIXTURE_ITEM_DETAIL, childKey()));
+      sessionB.rollback();
+    }
+  }
+
+  /** 子の行の書き込みが、ロック待ちを原因に持つ競合の例外になることを確かめる。 */
+  private static void assertChildLockConflict(final Runnable childWrite) {
+    assertThatThrownBy(childWrite::run)
+        .isInstanceOf(ConflictException.class)
+        .hasMessageContaining("row is locked by another request")
+        .hasMessageContaining("table=t_fixture_item_detail")
+        .hasCauseInstanceOf(CannotAcquireLockException.class);
+  }
+
+  /** B がロックする子の行の主キーの条件。 */
+  private static Condition childKey() {
+    return FIXTURE_ITEM_DETAIL.ITEM_ID.eq(ITEM_ID).and(FIXTURE_ITEM_DETAIL.DETAIL_NO.eq(DETAIL_NO));
+  }
+
+  /** B で子の行を作ってコミットし、その子の行だけを更新してコミットせずに行ロックを持つ。ルートの行はロックしない。 */
+  private void lockChildInSessionB(final Connection sessionB) throws SQLException {
+    final DSLContext sessionDsl = DSL.using(sessionB, SQLDialect.POSTGRES);
+    ScopedValue.where(PgmCdAspect.PGM_CD, PGM_CD)
+        .run(
+            () ->
+                sessionDsl
+                    .insertInto(FIXTURE_ITEM_DETAIL)
+                    .set(commonColumns.forInsert(FIXTURE_ITEM_DETAIL))
+                    .set(FIXTURE_ITEM_DETAIL.ITEM_ID, ITEM_ID)
+                    .set(FIXTURE_ITEM_DETAIL.DETAIL_NO, DETAIL_NO)
+                    .set(FIXTURE_ITEM_DETAIL.DETAIL_TEXT, "seed")
+                    .execute());
+    sessionB.commit();
+    sessionDsl
+        .update(FIXTURE_ITEM_DETAIL)
+        .set(FIXTURE_ITEM_DETAIL.DETAIL_TEXT, "B")
+        .where(childKey())
+        .execute();
+  }
+
   /** B の接続を開き、{@code lock_no = 1} の行を作ってコミットする。以降の B の文は自動コミットしない。 */
   private Connection openSessionB() throws SQLException {
     final Connection sessionB = dataSource.getConnection();
@@ -174,14 +271,16 @@ class TableWriterConcurrencyTest {
   /**
    * 別のセッションが行ロックを待ち始めたら B をコミットする。待ちが見えないまま上限を過ぎたら、B をコミットして {@code false} を返す。
    *
-   * <p>A の {@code lock_timeout}（テストでは 1 秒）より十分短い 10 ミリ秒ごとに {@code pg_stat_activity} を見る。
+   * <p>このテストの A は {@code SET LOCAL} で {@code lock_timeout} を 4 秒にし、見張りは 10 ミリ秒ごとに最長 3 秒 {@code
+   * pg_stat_activity} を見る。3 秒は A の {@code lock_timeout} より短く、A の {@code lock_timeout} は {@code
+   * statement_timeout}（テストでは 5 秒）より短い。
    */
   private boolean commitWhenAnotherSessionWaits(final Connection sessionB)
       throws SQLException, InterruptedException {
     try (Connection monitor = dataSource.getConnection()) {
       monitor.setAutoCommit(true);
       final DSLContext monitorDsl = DSL.using(monitor, SQLDialect.POSTGRES);
-      final long deadline = System.nanoTime() + WAIT_LIMIT.toNanos();
+      final long deadline = System.nanoTime() + WAIT_DETECTION_LIMIT.toNanos();
       boolean waiting = false;
       while (!waiting && System.nanoTime() < deadline) {
         waiting =
@@ -211,5 +310,10 @@ class TableWriterConcurrencyTest {
   /** ユースケースの呼び出しの中として、pgm_cd を束縛して実行する。 */
   private static <T> T inUseCase(final Supplier<T> call) {
     return ScopedValue.where(PgmCdAspect.PGM_CD, PGM_CD).call(call::get);
+  }
+
+  /** ユースケースの呼び出しの中として、pgm_cd を束縛して戻り値のない処理を実行する。 */
+  private static void runInUseCase(final Runnable call) {
+    ScopedValue.where(PgmCdAspect.PGM_CD, PGM_CD).run(call);
   }
 }

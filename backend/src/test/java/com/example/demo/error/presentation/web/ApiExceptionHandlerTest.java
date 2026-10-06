@@ -40,9 +40,11 @@ import org.springframework.http.converter.HttpMessageNotWritableException;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.web.context.request.ServletWebRequest;
+import org.springframework.web.server.ResponseStatusException;
 
-/** 例外を Problem Details へ変換し、ログを 1 か所で出し、切断とコミット済みの応答、楽観的ロックの競合の 409 を扱うことを検証する。 */
-@SuppressWarnings({"PMD.AvoidDuplicateLiterals", "PMD.TooManyStaticImports"})
+/** 例外を Problem Details へ変換し、ログを 1 か所で出し、切断とコミット済みの応答、楽観的ロックの競合の 409、子の行がない更新の 422 を扱うことを検証する。 */
+// 例外の種類ごとの変換をテストに分けるため、メソッドの数の上限を外す。
+@SuppressWarnings({"PMD.AvoidDuplicateLiterals", "PMD.TooManyStaticImports", "PMD.TooManyMethods"})
 @ExtendWith(OutputCaptureExtension.class)
 class ApiExceptionHandlerTest {
 
@@ -57,6 +59,7 @@ class ApiExceptionHandlerTest {
 
   private static ApiExceptionHandler handler() {
     final StaticMessageSource messages = new StaticMessageSource();
+    messages.addMessage("problem.title.422", Locale.JAPANESE, "処理できない内容です");
     messages.addMessage("problem.title.500", Locale.JAPANESE, "サーバー内部エラー");
     messages.addMessage("problem.title.validation-error", Locale.JAPANESE, "入力内容に誤りがあります");
     return new ApiExceptionHandler(new ApiProblemDetails(messages));
@@ -125,6 +128,25 @@ class ApiExceptionHandlerTest {
     assertTrue(log.contains("ERROR"), () -> "ERROR で出ること: " + log);
     assertTrue(
         log.contains(HttpMessageNotWritableException.class.getName()), () -> "例外の型が残ること: " + log);
+  }
+
+  @Test
+  @DisplayName("422 の ResponseStatusException は about:blank の 422 にし、reason を detail に出さない")
+  void unprocessableContentHidesReason() throws Exception {
+    final ResponseEntity<Object> response =
+        handler()
+            .handleException(
+                new ResponseStatusException(
+                    HttpStatus.UNPROCESSABLE_CONTENT,
+                    "child row not found: table=t_fixture_item_detail, key=[1, 9]"),
+                new ServletWebRequest(new MockHttpServletRequest()));
+
+    assertNotNull(response, "応答");
+    assertEquals(HttpStatus.UNPROCESSABLE_CONTENT, response.getStatusCode(), "HTTP status");
+    final ProblemDetail body = assertInstanceOf(ProblemDetail.class, response.getBody(), "本文");
+    assertEquals(URI.create("about:blank"), body.getType(), "type");
+    assertEquals("処理できない内容です", body.getTitle(), "title");
+    assertNull(body.getDetail(), "detail");
   }
 
   @ParameterizedTest

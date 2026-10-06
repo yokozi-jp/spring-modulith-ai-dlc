@@ -4,6 +4,8 @@ import com.example.demo.shared.concurrency.ConflictException;
 import com.google.errorprone.annotations.CheckReturnValue;
 import java.util.NoSuchElementException;
 import java.util.function.Consumer;
+import java.util.function.IntSupplier;
+import java.util.function.Supplier;
 import org.jooq.Condition;
 import org.jooq.DSLContext;
 import org.jooq.Field;
@@ -31,6 +33,8 @@ import org.springframework.stereotype.Component;
  *
  * <p>例外のメッセージには、テーブル名、主キーの条件のバインド値、期待する版を入れ、SQL は入れない（docs/observability/conventions.md）。
  */
+// 業務テーブルの UPDATE と DELETE の入口、件数の判定、ロック待ちの変換を一つのクラスに集めるため（ADR-054）、メソッドと依存する型の数の上限を外す。
+@SuppressWarnings({"PMD.TooManyMethods", "PMD.CouplingBetweenObjects"})
 @Component
 public class TableWriter {
 
@@ -148,6 +152,22 @@ public class TableWriter {
   }
 
   /**
+   * 子の行を条件で更新し、版を 1 進めて件数を返す。{@link LockedRoot#updateChild} が使う。
+   *
+   * @throws ConflictException 行ロックを {@code lock_timeout} までに取れない場合。{@link
+   *     CannotAcquireLockException} を原因に持つ
+   */
+  @CheckReturnValue
+  /* package */ <R extends Record> int updateChildRows(
+      final Table<R> table,
+      final Condition byPrimaryKey,
+      final Consumer<ColumnValues<R>> businessColumns) {
+    return executeOrConflict(
+        () -> updateWhere(table, byPrimaryKey, businessColumns),
+        () -> childTarget(table, byPrimaryKey));
+  }
+
+  /**
    * 版を比べずに条件に合う行を削除し、件数を返す。
    *
    * @param table 削除するテーブル
@@ -160,9 +180,15 @@ public class TableWriter {
     return dsl.deleteFrom(table).where(where).execute();
   }
 
-  /** 子の行を条件で削除する。{@link LockedRoot} と {@link DeletedRoot} が使う。 */
+  /**
+   * 子の行を条件で削除する。{@link LockedRoot} と {@link DeletedRoot} が使う。
+   *
+   * @throws ConflictException 行ロックを {@code lock_timeout} までに取れない場合。{@link
+   *     CannotAcquireLockException} を原因に持つ
+   */
   /* package */ void deleteRows(final Table<?> table, final Condition where) {
-    dsl.deleteFrom(table).where(where).execute();
+    executeOrConflict(
+        () -> dsl.deleteFrom(table).where(where).execute(), () -> childTarget(table, where));
   }
 
   /** 期待する版を確かめ、テーブルの {@code lock_no} を返す。SQL を実行する前に失敗させる。 */
@@ -191,13 +217,8 @@ public class TableWriter {
       final Table<?> table,
       final Condition byPrimaryKey,
       final long expectedLockNo) {
-    final int changed;
-    try {
-      changed = query.execute();
-    } catch (final CannotAcquireLockException e) {
-      throw new ConflictException(
-          "row is locked by another request: " + target(table, byPrimaryKey, expectedLockNo), e);
-    }
+    final int changed =
+        executeOrConflict(query::execute, () -> target(table, byPrimaryKey, expectedLockNo));
     if (changed == ONE_ROW) {
       return;
     }
@@ -212,18 +233,25 @@ public class TableWriter {
     throw new ConflictException("row was updated by another request: " + target);
   }
 
-  /** 条件のバインド値を返す。例外のメッセージに SQL を入れず、キーの値だけを入れるために使う。 */
-  /* package */ String bindValuesOf(final Condition condition) {
-    return dsl.extractBindValues(condition).toString();
+  /**
+   * 文を実行して件数を返し、{@code 55P03} の {@link CannotAcquireLockException} を、それを原因に持つ {@link
+   * ConflictException} に変える。
+   */
+  private static int executeOrConflict(final IntSupplier statement, final Supplier<String> target) {
+    try {
+      return statement.getAsInt();
+    } catch (final CannotAcquireLockException e) {
+      throw new ConflictException("row is locked by another request: " + target.get(), e);
+    }
+  }
+
+  /** 例外のメッセージに入れる、テーブル名と条件のバインド値。SQL を入れず、キーの値だけを入れる。{@link LockedRoot} も使う。 */
+  /* package */ String childTarget(final Table<?> table, final Condition condition) {
+    return "table=" + table.getName() + ", key=" + dsl.extractBindValues(condition);
   }
 
   /** 例外のメッセージに入れる、テーブル名、主キーの条件のバインド値、期待する版。 */
   private String target(final Table<?> table, final Condition byPrimaryKey, final long expected) {
-    return "table="
-        + table.getName()
-        + ", key="
-        + bindValuesOf(byPrimaryKey)
-        + ", expectedLockNo="
-        + expected;
+    return childTarget(table, byPrimaryKey) + ", expectedLockNo=" + expected;
   }
 }

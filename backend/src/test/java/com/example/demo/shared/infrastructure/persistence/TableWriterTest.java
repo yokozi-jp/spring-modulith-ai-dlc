@@ -29,6 +29,8 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
+import org.springframework.web.server.ResponseStatusException;
 
 /** {@link TableWriter} の SQL と件数の判定を、テスト専用のテーブルと実 PostgreSQL で確かめる。各テストはロールバックする。 */
 // 入口ごとの成功と失敗の条件をテストに分けるため、メソッドの数の上限を外す。
@@ -147,8 +149,8 @@ class TableWriterTest {
   }
 
   @Test
-  @DisplayName("updateChild は子の行が 1 行でなければ IllegalStateException を投げる")
-  void updateChildMatchingNoRowIsRejected() {
+  @DisplayName("updateChild は子の行がなければ、状態が 422 の ResponseStatusException を投げる")
+  void updateChildMatchingNoRowIsUnprocessable() {
     insertItem(1L, "root");
 
     assertThatThrownBy(
@@ -163,8 +165,30 @@ class TableWriterTest {
                                     .eq(1L)
                                     .and(FIXTURE_ITEM_DETAIL.DETAIL_NO.eq(9)),
                                 set -> set.set(FIXTURE_ITEM_DETAIL.DETAIL_TEXT, "x"))))
+        .isInstanceOfSatisfying(
+            ResponseStatusException.class,
+            e -> assertThat(e.getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_CONTENT))
+        .hasMessageContaining("table=t_fixture_item_detail");
+  }
+
+  @Test
+  @DisplayName("updateChild は子の主キーの条件が 2 行に合えば IllegalStateException を投げる")
+  void updateChildMatchingTwoRowsIsRejected() {
+    insertItem(1L, "root");
+    insertDetail(1L, 1, "one");
+    insertDetail(1L, 2, "two");
+
+    assertThatThrownBy(
+            () ->
+                runInUseCase(
+                    () ->
+                        updateItem(1L, 1L, "root")
+                            .updateChild(
+                                FIXTURE_ITEM_DETAIL,
+                                FIXTURE_ITEM_DETAIL.ITEM_ID.eq(1L),
+                                set -> set.set(FIXTURE_ITEM_DETAIL.DETAIL_TEXT, "x"))))
         .isInstanceOf(IllegalStateException.class)
-        .hasMessageContaining("matched 0 rows")
+        .hasMessageContaining("matched 2 rows")
         .hasMessageContaining("table=t_fixture_item_detail");
   }
 
