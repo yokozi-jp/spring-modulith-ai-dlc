@@ -385,6 +385,8 @@ tasks:
   fe-knip:
     desc: フロントエンドの未参照ファイル、未使用export、未使用依存をKnipで検査
     dir: frontend
+    # Knip は playwright.config.ts を読み込み、その先の e2e/environment.ts が .env.test を必須にする。
+    deps: [_ensure-test-env]
     cmds:
       - vp run knip
 

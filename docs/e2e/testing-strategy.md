@@ -117,7 +117,7 @@ build、コンテナの起動、後片付けは行わない。
 - ログイン情報は、ルートの `.env.test` の `E2E_USERNAME` と `E2E_PASSWORD` から読む。
   試しに値を変えるときは、Git から除外されたルートの `.env.test.local` に書く。
 - `.env.test` は、Git で管理する `.env.test.example` からコピーして作る Git 除外のファイルである。
-  `task e2e` は、`.env.test` が無ければ `.env.test.example` からコピーする。
+  `task e2e` と `task fe-knip`（Knip が Playwright の設定を読む）は、`.env.test` が無ければ `.env.test.example` からコピーする。
 - `task e2e` は `TEST_ENV_FILE` の上書きに対応せず、`.env.test` を固定で読む。
   compose の backend と Playwright が `.env.test` を固定で読むためである。
 - ローカルで `E2E_KEEP_ENV=1 task e2e` を実行して失敗したときだけ、コンテナと volume を残す。
