@@ -63,3 +63,4 @@
 - [ADR-060: UUID の採番をアプリケーションで行い、DB の DEFAULT で採番しない](ADR-060-generate-uuid-primary-keys-in-application.md)（Proposed, 2026-10-05）
 - [ADR-061: ヘルスチェックは liveness と readiness だけを未認証で許可する](ADR-061-allow-only-health-probes-unauthenticated.md)（Proposed, 2026-10-06）
 - [ADR-062: 業務上の失敗を 3 つの例外の型で表し、404、409、422 の Problem Details に対応づける](ADR-062-map-business-exceptions-to-404-409-422.md)（Proposed, 2026-10-06）
+- [ADR-064: CSRF の Cookie を __Host- の名前にし、SameSite=Lax を付ける](ADR-064-harden-csrf-cookie-with-host-prefix.md)（Proposed, 2026-10-06）

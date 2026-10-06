@@ -52,6 +52,10 @@ export default defineConfig({
         generators: [{ type: "msw", useExamples: true }],
       },
       override: {
+        // loader の ensureQueryData と component の useSuspenseQuery が同じ query options を使えるよう、suspense 用を生成する（docs/frontend/routing-and-state.md）。
+        query: { useSuspenseQuery: true },
+        // apiFetch が 2xx 以外を投げるため、戻り値の型を成功の応答だけにする。
+        fetch: { forceSuccessResponse: true },
         // 非 2xx を ApiProblemError として投げる（docs/frontend/api-client-orval.md）。
         mutator: { path: "./src/api/api-fetch.ts", name: "apiFetch" },
         header,
@@ -80,6 +84,10 @@ export default defineConfig({
 });
 ```
 
+`override.query.useSuspenseQuery`は、通常のquery optionsと同じquery keyを持つ`get<Operation>SuspenseQueryOptions()`を生成する。
+loaderと`useSuspenseQuery`での使い方は[状態表示の分担](routing-and-state.md#状態表示の分担)にある。
+`override.fetch.forceSuccessResponse`は、生成した関数の戻り値の型を成功の応答だけにする。
+`apiFetch`が非2xxを投げるので、失敗の応答の型が戻り値に混ざらない。
 `override.mutator`は、生成したAPI関数が呼ぶFetchを`src/api/api-fetch.ts`の`apiFetch`に置き換える（[transportとruntime検証](#transportとruntime検証)）。
 `override.header`は生成物のheaderから`info.version`の行を外し、契約の版を上げても全生成物に差分が出ないようにする。
 `override.zod.version`はZodの出力を版4に固定し、入っているzodの版に生成物が左右されないようにする。
@@ -112,7 +120,7 @@ Orvalが生成する`models/shared`は複数tagが参照するschemaの生成先
 
 Orvalの`clean`は生成先を削除して再作成できるため、手書きのmutator、MSW server lifecycle、fixtureを`api/generated`に置かない。
 
-OrvalはMSW handlerを`api/generated/mocks`に生成し、手書きのserver setupは必要になった時点で`src/testing/msw`などの生成対象外へ置く。
+OrvalはMSW handlerを`api/generated/mocks`に生成し、手書きのserver setupは生成対象外の`src/testing/msw.ts`に置く。
 `@/api/generated/mocks/**`はtestと`src/testing`だけがimportでき、production sourceからのimportは`frontend/vite.config.ts`の`testOnlyImports`が禁止する。
 
 ## transportとruntime検証
@@ -138,8 +146,12 @@ Problem Detailsの検証が必要になったら、`readProblem`の型の断定�
 
 `problem.type`は本文の文字列のまま比べ、`new URL()`などで解決しない（[ADR-058](../adr/ADR-058-use-path-absolute-relative-uri-for-problem-types.md)）。
 
-`X-XSRF-TOKEN` headerはまだ付けない。
-最初の更新系APIを足すPRで`apiFetch`に足す。
+`apiFetch`は、method（大文字と小文字を区別しない。省略はGET）がGET、HEAD、OPTIONSでない要求にだけ、CSRFのCookie（`__Host-XSRF-TOKEN`）の値をマスクせずに`X-XSRF-TOKEN` headerで付ける。
+Cookieがないか値が空なら、headerを付けずに送ってバックエンドの403に任せる。
+Cookieの名前と属性の理由は[ADR-064](../adr/ADR-064-harden-csrf-cookie-with-host-prefix.md)にある。
+
+`apiFetch`は同じoriginの相対URLだけを受ける前提でheaderを付ける。
+別のoriginへtokenを送らないよう、Orvalの`baseUrl`を設定しない。
 
 API responseをruntimeで検証する必要がある境界では、OpenAPIからOrvalが生成するZod schemaを使い、同じschemaを手書きしない。
 

@@ -27,6 +27,9 @@ ExperimentalのNewly availableとLimited availabilityの機能は本番のコー
 対応ブラウザは、CSP Level 3の `style-src-elem` と `style-src-attr` に対応している必要がある。
 対応していないブラウザでは、Base UIのinline style要素が拒否される（[ADR-030](../adr/ADR-030-allow-base-ui-inline-style-elements.md)）。
 
+ローカルのHTTPの開発環境（`http://localhost`）は、ChromiumとFirefoxで確かめる。
+Safariは`Secure`のCookieをHTTPで受け付けないため、HTTPSの環境で確かめる（[ADR-064](../adr/ADR-064-harden-csrf-cookie-with-host-prefix.md)）。
+
 ## サポートバージョン
 
 **エバーグリーンブラウザ**：利用者が意識せずに最新版へ自動更新されるブラウザ。

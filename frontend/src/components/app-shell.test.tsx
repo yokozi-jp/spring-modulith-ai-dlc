@@ -1,26 +1,14 @@
 /* @vitest-environment jsdom */
 
-import { QueryClient } from "@tanstack/react-query";
-import { createMemoryHistory, createRouter, RouterProvider } from "@tanstack/react-router";
-import { cleanup, render, screen } from "@testing-library/react";
-import { I18nextProvider } from "react-i18next";
-import { afterEach, describe, expect, it, vi } from "vite-plus/test";
+import { screen } from "@testing-library/react";
+import { describe, expect, it, vi } from "vite-plus/test";
 
-import { i18n } from "@/i18n";
-import { routeTree } from "@/routeTree.gen";
+import { renderRoute } from "@/testing/render-route";
+
+const cookieValue = "0b1e5c1a-4f0e-4c55-9d8e-2f1a3b4c5d6e";
 
 async function renderLogoutForm() {
-  vi.spyOn(globalThis, "scrollTo").mockReturnValue();
-  const router = createRouter({
-    history: createMemoryHistory({ initialEntries: ["/"] }),
-    routeTree,
-    context: { queryClient: new QueryClient() },
-  });
-  render(
-    <I18nextProvider i18n={i18n}>
-      <RouterProvider router={router} />
-    </I18nextProvider>,
-  );
+  await renderRoute("/", { locale: "en" });
   const button = await screen.findByRole("button", { name: "Log out" });
   if (!(button instanceof HTMLButtonElement) || !button.form) {
     throw new Error("Log out button is not inside a form");
@@ -29,15 +17,10 @@ async function renderLogoutForm() {
 }
 
 describe("app shell logout form", () => {
-  afterEach(async () => {
-    cleanup();
-    vi.restoreAllMocks();
-    await i18n.changeLanguage("ja");
-  });
-
-  it("posts to /logout with a hidden CSRF token", async () => {
-    await i18n.changeLanguage("en");
-    vi.spyOn(document, "cookie", "get").mockReturnValue("XSRF-TOKEN=token");
+  it("posts to /logout with a hidden CSRF token made from __Host-XSRF-TOKEN", async () => {
+    vi.spyOn(document, "cookie", "get").mockReturnValue(
+      `XSRF-TOKEN=old; __Host-XSRF-TOKEN=${cookieValue}`,
+    );
 
     const form = await renderLogoutForm();
 
@@ -47,6 +30,9 @@ describe("app shell logout form", () => {
     if (!(field instanceof HTMLInputElement) || field.type !== "hidden") {
       throw new TypeError("hidden _csrf input not found");
     }
-    expect(field.value).not.toBe("");
+    // マスクした値は乱数と XOR の結果を並べるので、元の token の 2 倍の長さになる（戻せることは csrf.test.ts で確かめる）。
+    expect(atob(field.value.replaceAll("-", "+").replaceAll("_", "/"))).toHaveLength(
+      cookieValue.length * 2,
+    );
   });
 });

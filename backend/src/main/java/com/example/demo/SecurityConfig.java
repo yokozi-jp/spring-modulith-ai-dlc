@@ -12,6 +12,7 @@ import org.springframework.security.oauth2.client.web.DefaultOAuth2Authorization
 import org.springframework.security.oauth2.client.web.OAuth2AuthorizationRequestCustomizers;
 import org.springframework.security.oauth2.client.web.OAuth2AuthorizationRequestResolver;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
 import org.springframework.security.web.header.writers.ReferrerPolicyHeaderWriter.ReferrerPolicy;
 import org.springframework.security.web.servlet.util.matcher.PathPatternRequestMatcher;
 import org.springframework.security.web.util.matcher.RequestMatcher;
@@ -30,6 +31,21 @@ import org.springframework.web.servlet.HandlerExceptionResolver;
  */
 @Configuration
 public class SecurityConfig {
+
+  /** SPA が読む CSRF の Cookie の名前。frontend の src/lib/csrf.ts と ZAP の script と同じ値にする（ADR-064）。 */
+  private static final String CSRF_COOKIE_NAME = "__Host-XSRF-TOKEN";
+
+  /** CSRF の Cookie を __Host- の条件（Secure、Path=/、Domain なし）と SameSite=Lax で発行する。 */
+  private static CookieCsrfTokenRepository csrfTokenRepository() {
+    final CookieCsrfTokenRepository repository = CookieCsrfTokenRepository.withHttpOnlyFalse();
+    repository.setCookieName(CSRF_COOKIE_NAME);
+    // __Host- は Path=/ を要求する。context path の既定に頼らず明示する。
+    repository.setCookiePath("/");
+    // ローカルの HTTP でも Secure を付ける。Chromium と Firefox は http://localhost の Secure の Cookie
+    // を受け付けるが、Safari は受け付けない（ADR-064）。
+    repository.setCookieCustomizer(cookie -> cookie.secure(true).sameSite("Lax"));
+    return repository;
+  }
 
   /** OAuth2 認可リクエストへ PKCE（S256）の challenge と verifier を追加する。 */
   @Bean
@@ -99,8 +115,9 @@ public class SecurityConfig {
                         permissions ->
                             permissions.policy(
                                 "camera=(), microphone=(), geolocation=(), payment=(), usb=()")))
-        // SPA が XSRF-TOKEN Cookie を読み、更新系リクエストの X-XSRF-TOKEN Header で送り返す。
-        .csrf(csrf -> csrf.spa())
+        // SPA が __Host-XSRF-TOKEN Cookie を読み、更新系リクエストの X-XSRF-TOKEN Header で送り返す。
+        // spa() も repository を設定するため、その後で差し替える（逆の順では spa() が上書きする）。
+        .csrf(csrf -> csrf.spa().csrfTokenRepository(csrfTokenRepository()))
         .oauth2Login(
             oauth2 ->
                 oauth2.authorizationEndpoint(
