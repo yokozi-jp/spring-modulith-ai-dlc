@@ -15,6 +15,6 @@ export interface ProblemDetail {
   status: number;
   /** Problem type の短い説明 */
   title: string;
-  /** Problem type の安定した識別 URI */
+  /** Problem type の識別 URI。about:blank かパスを全部書いた相対 URI */
   type: string;
 }

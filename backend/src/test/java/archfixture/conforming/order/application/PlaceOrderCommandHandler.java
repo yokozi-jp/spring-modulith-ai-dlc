@@ -3,7 +3,6 @@ package archfixture.conforming.order.application;
 import archfixture.conforming.order.OrderPlaced;
 import archfixture.conforming.order.domain.model.CustomerId;
 import archfixture.conforming.order.domain.model.Order;
-import archfixture.conforming.order.domain.model.OrderId;
 import archfixture.conforming.order.domain.model.OrderRepository;
 import archfixture.conforming.order.domain.service.OrderLimitPolicy;
 import java.time.Clock;
@@ -45,9 +44,10 @@ public class PlaceOrderCommandHandler {
   public PlaceOrderResult handle(final PlaceOrderCommand command) {
     final CustomerId customerId = new CustomerId(command.customerId());
     orderLimitPolicy.ensureCanPlace(customerId);
-    final Order order = Order.place(OrderId.newId(), customerId, Instant.now(clock));
+    final Order order = Order.place(orderRepository.nextId(), customerId, Instant.now(clock));
     orderRepository.add(order);
-    events.publishEvent(new OrderPlaced(order.id().value(), customerId.value(), order.placedAt()));
-    return new PlaceOrderResult(order.id().value());
+    events.publishEvent(
+        new OrderPlaced(order.id().value().toString(), customerId.value(), order.placedAt()));
+    return new PlaceOrderResult(order.id().value().toString());
   }
 }

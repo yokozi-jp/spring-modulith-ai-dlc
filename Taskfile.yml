@@ -766,6 +766,9 @@ tasks:
         schema-property-example|components.schemas.SampleOrderRequest.properties.quantity
         error-response-problem-detail|paths./api/sample-orders/{sampleOrderId}.get.responses[404]
         problem-response-content|components.responses.NotFoundProblem.content
+        common-problem-detail-schema|components.schemas
+        bad-request-validation-problem|components.responses.BadRequestProblem.content.application/problem+json.schema.$ref
+        problem-type-uri-reference|components.schemas.ProblemDetail.properties.type.format
         EOF
         if [ "$missing" -ne 0 ]; then
           printf '%s\n' "$output"
@@ -952,7 +955,8 @@ tasks:
           def value($key): first(.attributes[]? | select(.key == $key) | .value.stringValue);
           any(
             .resourceLogs[]?.scopeLogs[]?.logRecords[]?;
-            ([.attributes[]?.key] | sort) == ["exception.message", "exception.stacktrace", "exception.type"]
+            ([.attributes[]?.key] | sort) == ["exception.message", "exception.stacktrace", "exception.type", "http.response.status_code"]
+              and (first(.attributes[]? | select(.key == "http.response.status_code") | .value.intValue) == "500")
               and value("exception.type") == "java.lang.IllegalStateException"
               and value("exception.message") == "order failed"
               and (value("exception.stacktrace") | contains("OrderService.java:84"))
@@ -1061,7 +1065,9 @@ tasks:
         fi
 
         # preview を別セッションで起動し、片付けでプロセスグループごと止める。
-        setsid sh -c 'echo $$ >"$1"; cd frontend && SERVER_PORT=18081 exec vp preview --host 127.0.0.1 --port 4173' sh "$preview_pid_file" \
+        # production mode は .env.test を読まないため、--mode test で .env.test の OIDC_ISSUER_URI を .env より優先させ、
+        # CSP の form-action の IdP の origin を backend の issuer と揃える。
+        setsid sh -c 'echo $$ >"$1"; cd frontend && SERVER_PORT=18081 exec vp preview --mode test --host 127.0.0.1 --port 4173' sh "$preview_pid_file" \
           >"$report_dir/preview.log" 2>&1 &
         for attempt in $(seq 1 30); do
           if curl --silent --output /dev/null http://127.0.0.1:4173/; then break; fi

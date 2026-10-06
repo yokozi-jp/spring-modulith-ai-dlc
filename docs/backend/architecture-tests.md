@@ -26,6 +26,7 @@ backend/src/test/java/com/example/demo/architecture/
 ├── JooqCommonColumnsArchTest.java
 ├── PackageByFeatureOnionArchitectureTest.java
 ├── ProxyRulesArchTest.java
+├── TableWriterArchTest.java
 └── TestConventionsArchTest.java
 ```
 
@@ -38,9 +39,11 @@ backend/src/test/java/com/example/demo/architecture/
 規則名は`@ArchTest`のフィールド名であり、テスト結果にもこの名前で出る。
 
 - `dependenciesPointInward`：`domain.model`、`domain.service`、モジュールルートと`application`、`presentation`、`infrastructure.persistence`、`infrastructure.client`のオニオン構造で依存を内向きに限り、どの層にも属さないパッケージのクラスを拒否する。
+  ベースパッケージ直下と`shared.concurrency`は、所属検査から除く。
 - `infrastructureDependsOnlyOnDomainModel`：`infrastructure`は`application`、`domain.service`、モジュールルートの型に依存せず、機能モジュールの型のうち`domain.model`だけを使う。
-- `sharedModuleIsUsedOnlyByPersistenceAdapters`：`shared`の外で`shared`の型に依存するクラスは、`infrastructure.persistence`に置く。
+- `sharedModuleIsUsedOnlyByPersistenceAdapters`：`shared`の外で`shared.concurrency`以外の`shared`の型に依存するクラスは、`infrastructure.persistence`に置く。
   `shared`の中の依存は対象にしない。
+  `shared.concurrency`は、どの層からも使える（[ADR-048](../adr/ADR-048-add-shared-module-for-jooq-common-code.md)）。
 - `moduleApiDoesNotExposeInternalTypes`：モジュールルートの型は、`java..`、`org.jspecify..`、同じルートパッケージの型だけに依存する。
 - `databaseTechnologyApisAreOnlyUsedByPersistenceAdapters`：jOOQ APIと生成型は`infrastructure.persistence`だけで使う。
 - `domainModelDoesNotDependOnFrameworks`：`domain.model`はSpring、jOOQ、jOOQの生成型、JPA、Jacksonに依存しない。
@@ -61,6 +64,8 @@ backend/src/test/java/com/example/demo/architecture/
 共有モジュール`shared`（[ADR-048](../adr/ADR-048-add-shared-module-for-jooq-common-code.md)）のために、ほかの規則へ例外を足していない。
 `shared.infrastructure.persistence`はオニオン規則の`persistence`の層に入るため、機能モジュールの`infrastructure.persistence`からの依存は同じ層の中の依存になる。
 `infrastructureDependsOnlyOnDomainModel`が拒否するモジュールルートは`com.example.demo.<feature>`の直下だけであり、`shared.infrastructure.persistence`は含まれない。
+`shared.concurrency`の`VersionedCommand`は`Command`で終わるインタフェースなので、`ClassRoleArchTest`の`commandsAndResultsAreApplicationRecords`の対象から、`VersionedCommand`の完全修飾型名だけを除く。
+`shared.concurrency`に置いたほかの`*Command`は、この規則の対象のままである。
 `shared`のルートには`package-info.java`だけを置くため、`moduleRootTypesAreRecordsEnumsOrQueries`と`moduleApiDoesNotExposeInternalTypes`に当たる型がない。
 パッケージ構造の決定は[ADR-002](../adr/ADR-002-package-by-feature-onion-architecture.md)を、クラスの役割の決定は[ADR-050](../adr/ADR-050-define-backend-class-roles-and-naming.md)を参照する。
 
@@ -99,6 +104,17 @@ backend/src/test/java/com/example/demo/architecture/
 `sharedModuleIsUsedOnlyByPersistenceAdapters`は、違反フィクスチャの`application`の`OrderAuditColumns`が`shared.infrastructure.persistence`の型を使うことを検出し、規約どおりのフィクスチャの`JooqOrderRepository`を誤検出しないことを確かめる。
 
 `jooqReflectionMappingIsNotUsed`は、違反フィクスチャの`ReflectiveOrderReader`で禁止するメソッドごとに一行を持ち、それぞれの呼び出しを検出することを確かめる。
+
+`tableWritesGoThroughTableWriter`は、違反フィクスチャの`DirectOrderWriter`で禁止するAPIごとに一行を持つ。
+`DirectOrderWriter`は、ラムダの中の`execute()`、`Update`の変数からの`execute()`、`Update::execute`のメソッド参照も含む。
+`TableWriterArchTest`の残りの規則は、違反フィクスチャの`JooqOrderRepository`、`UnversionedOrderRepository`、`ApproveOrderCommandHandler`で確かめる。
+R1は`ReleaseOrderCommandHandler`（`ReleaseOrderCommand`と`ReleaseOrderRequest`）、`SuspendOrderCommandHandler`（static factoryの呼び出し）、`ResumeOrderCommandHandler`（static factoryのメソッド参照）、`ArchiveOrderCommandHandler`（`save`という別名の書き込み）で確かめる。
+R2は`ReopenPolicy`（Domain Serviceの`update`と`save`）、`PurgeOrderQueryService`、`JooqOrderRepository.save(OrderId)`（Repositoryの実装から別のRepositoryの`delete`）で確かめる。
+R3は`ForgedLockNoCommandHandler`（コンストラクタと`ExpectedLockNo::new`）と`OrderLockController`で確かめる。
+R4は`ApproveOrderCommandHandler`（`handle`から呼ばないprivateメソッドだけが`ensureLockNo`を呼ぶ）と`OverloadedEnsureCommandHandler`で確かめる。
+`commandsAndResultsAreApplicationRecords`の型単位の除外は、`shared.concurrency`のrecordではない`ForceUnlockCommand`で確かめる。
+規約どおりのフィクスチャには、`shared.concurrency`の型と、Requestが`ExpectedLockNo`を作る`CancelOrderRequest`、Listenerが版のないCommandを作る`OrderPlacedExpiryListener`を置く。
+`archfixture.conforming`と`archfixture.violating`の`shared.infrastructure.persistence`には、規則が名前で見る`TableWriter`のスタブを置く。
 `typeSafeJooqMappingIsAllowed`は、対応づけの二つの規則が`convertFrom`、`Records.mapping`、`into(Table)`、`fetch(RecordMapper)`、`intoArray(Field, Class)`、`intoSet(Field, Class)`、`fetch(Field, Class)`、`newRecord(Table)`を誤検出しないことを確かめる。
 MapStruct、ModelMapper、Dozerはテストのクラスパスにないため、`mappingLibrariesAreNotUsed`のフィクスチャは`DefaultRecordMapper`と`DefaultRecordUnmapper`への依存だけで確かめる。
 
@@ -162,9 +178,70 @@ Error ProneはすべてのJavaコンパイルで`JavaTimeDefaultTimeZone`と`Jav
 ## 共通カラム
 
 `JooqCommonColumnsArchTest`は、jOOQの生成クラスの`CREATED_*`、`UPDATED_*`、`PATCHED_*`フィールドを参照するクラスが、`com.example.demo.shared.infrastructure.persistence`の外にないことを検査する。
-楽観的ロックで各モジュールが参照する`LOCK_NO`は対象外にする。
+INSERTの共通カラムは`CommonColumns.forInsert`で、UPDATEとDELETEは`TableWriter`で書く。
+`LOCK_NO`は各モジュールが楽観的ロックの版を読むため対象外にし、書き込みは`ColumnValues`が実行時に拒否する。
 生成したRecordのgetterは検査しない。
 共通カラムの扱いは[PostgreSQLの共通カラム](../database/postgresql-common-columns.md)、sharedモジュールの決定は[ADR-048](../adr/ADR-048-add-shared-module-for-jooq-common-code.md)を参照する。
+
+## 書き込みの入口
+
+`TableWriterArchTest`は、業務テーブルのUPDATEとDELETEを`shared`の`TableWriter`に集める規則を検査する（[PostgreSQLの排他制御](../database/postgresql-concurrency-control.md)、[ADR-054](../adr/ADR-054-detect-optimistic-lock-conflicts-by-update-count.md)）。
+集約ルートは、`domain.model`にあり、引数のない`long lockNo()`を宣言する型とする。
+
+- `tableWritesGoThroughTableWriter`：`TableWriter`、`LockedRoot`、`DeletedRoot`の外の本番のコードは、次のAPIを呼ばず、メソッド参照もしない。
+  呼び出し先の型が、挙げた型に代入できるかで判定する。
+  - `DSLContext`、`DSL`、`WithStep`の`update`、`delete`、`deleteFrom`、`mergeInto`、`updateQuery`、`deleteQuery`
+  - `DSLContext`の`batchUpdate`、`batchStore`、`batchDelete`、`batchMerge`、`executeUpdate`、`executeDelete`、`connection`、`connectionResult`
+  - `Update`と`Delete`の`execute`、`executeAsync`、`returning`、`returningResult`と、名前が`fetch`で始まるメソッド
+  - `Query`、`RowCountQuery`、`DMLQuery`の同じ実行（メソッド参照のバイトコードには`execute`を宣言した`Query`が残るため）
+  - `Merge`のすべてのメソッド
+  - `InsertOnDuplicateStep`と`InsertQuery`の`onConflict`、`onConflictOnConstraint`、`onConflictWhere`、`onDuplicateKeyUpdate`、`addValueForUpdate`、`addValuesForUpdate`と、`LoaderOptionsStep`の`onDuplicateKeyUpdate`
+  - `UpdatableRecord`の`store`、`update`、`delete`、`merge`と、`DAO`の`update`、`delete`、`deleteById`、`merge`
+  - `DataSource.getConnection`、`ConnectionProvider.acquire`、`Connection`と`Statement`のすべてのメソッド
+  - `org.jooq`のパッケージの型の、名前が`$`で始まるメソッド（`QOM`の問い合わせのモデルのAPIは、`$onDuplicateKeyUpdate`でINSERTをUPSERTに組み替えられるため）
+  - Spring JDBCの`org.springframework.jdbc`とそのサブパッケージの型（`ResourceDatabasePopulator`と`ScriptUtils`も任意のSQLを流せるため）
+  - `DataSource`、`Connection`、`ConnectionProvider`に代入できる型を引数に取るメソッドとコンストラクタ（Spring Bootの`DataSourceScriptDatabaseInitializer`や`DSL.using(Connection)`のように、接続の元を受け取るライブラリは、パッケージを選ばずに任意のSQLを流せるため）
+
+  `Update`と`Delete`を作る入口をすべて禁じるため、`batch`や`subscribe`のように作った問い合わせを受け取って実行するAPIは禁じない。
+
+  `tableWritesGoThroughTableWriter`が除外するのは、`TableWriter`、`LockedRoot`、`DeletedRoot`の三つの完全修飾型名だけである。
+  除外を足す、外す、または除外する型を移すときは、先に[ADR-054](../adr/ADR-054-detect-optimistic-lock-conflicts-by-update-count.md)の判断を変える。
+  同じ変更で、`tableWritesGoThroughTableWriterRule`の完全修飾型名と、除外する型を置く適合フィクスチャ（`archfixture/conforming/shared/infrastructure/persistence/`）を更新する。
+  禁止するAPIの違反フィクスチャ（`DirectOrderWriter`）は、禁止の一覧か`isDirectWrite`の判定を変えるときだけ更新する。
+- `repositoryUpdateAndDeleteCheckVersion`：`Jooq*Repository`の、集約ルートを受け取る`add`以外のpublicメソッドは、版を比べる入口をそのメソッドの中で直接呼ぶ。
+  `update`は`updateCheckingVersion`を、`delete`は`deleteCheckingVersion`を、ほかの名前ならどちらかを呼ぶ。
+  名前で対象を選ばないため、`save`のような名前でも検査を外れない。
+  同じメソッドの中で引数の集約ルートの`lockNo()`も呼ぶ。
+  テーブルから読み直した版を期待する版に渡すと、競合を検出しないためである。
+  値の流れは追わないため、`lockNo()`を呼んだうえで別の値を渡す書き方はレビューで見る。
+- `repositoryWritesTakeVersionedAggregates`：`domain.model`の`*Repository`インタフェースの`add`、`update`、`delete`は、集約ルートを一つだけ受け取る。
+  集約ルートが`long lockNo()`を持たないと、ほかの規則が集約ルートを見つけられず空のまま通るため、この規則で形を確かめる。
+  必須の`add`を対象に含めるため、`save`のような名前で保存するRepositoryでも、`lockNo()`を持たない集約は`add`で検出される。
+- `aggregateMethodsDoNotUseUnversionedWrites`：集約ルートを引数に取るメソッドとラムダは、`updateWhere`と`deleteWhere`を呼ばない。
+  ラムダは捕捉した変数を引数に持つ合成メソッドになるため、同じ判定で見る。
+- R1とR2は、`domain.model`の`*Repository`の`add`以外の書き込みを同じ判定で見つける。
+  書き込みは、`update`、`delete`と、集約ルートを受け取るメソッドである。
+  `repositoryUpdateAndDeleteCheckVersion`と同じく集約ルートの引数で選ぶため、`save`のような別名でも規則を外れない。
+- `commandsBuiltByPresentationForWritesAreVersioned`（R1）：`.presentation.`のクラスが作ったCommandを`handle`で受け取り、Repositoryの`add`以外の書き込みを呼ぶ`*CommandHandler`は、そのCommandが`VersionedCommand`を実装する。
+  作るとは、コンストラクタの呼び出し、コンストラクタ参照、Command自身を返すstatic factoryの呼び出しとメソッド参照のどれかである。
+  RequestとListenerの両方が作るCommandは、Request用とListener用に分ける。
+  Listenerが作るCommandは`VersionedCommand`でなくてよい。
+- `onlyCommandHandlersUpdateOrDeleteAggregates`（R2）：`*CommandHandler`以外のクラスは、Repositoryの`add`以外の書き込みを呼ばず、メソッド参照もしない。
+  Domain Service、QueryService、Repositoryの実装からの保存を止める。
+  Repositoryの実装から別のRepositoryの書き込みを呼ぶ経路も止める。
+- `expectedLockNoIsCreatedOnlyByRequests`（R3）：`presentation.web`の`*Request`以外のクラスは、`ExpectedLockNo`のコンストラクタを呼ばず、`ExpectedLockNo::new`も使わない。
+  Repository、`TableWriter`、CommandHandler、Controllerが読んだ版から作ることを止める。
+- `commandHandlersEnsureScreenLockNo`（R4）：`*CommandHandler`の、引数のCommandが`VersionedCommand`である`handle`は、その中で直接`domain.model`の型の`ensureLockNo`で、引数に`ExpectedLockNo`を持つものを呼ぶ。
+  別のメソッドやラムダの中の呼び出しと、`ensureLockNo(long)`のオーバーロードでは満たせない。
+  別の集約のインスタンスに呼ぶ、業務の検査の後に呼ぶ、`command.expectedLockNo()`以外の値を渡す書き方は検査しない（値の流れは追わない）。
+- `jooqVersionIsReviewed`：実行時のjOOQの版が、禁止の一覧を見直した版と一致する。
+  版が変わったら[jOOQのSQLの書き方](../database/jooq-usage.md)の「jOOQの版を上げるとき」に従う。
+- `unversionedWritesRequireUsingTheCount`：`updateWhere`と`deleteWhere`が`@CheckReturnValue`を持つ。
+  注釈の型はテストの実行時のクラスパスにないため、バイトコードから読む。
+
+Error Proneの`CheckReturnValue`は既定でerrorであり、`updateWhere`と`deleteWhere`の戻り値を捨てるとコンパイルが失敗する。
+戻り値を変数に入れて読まない場合は、errorにしている`UnusedVariable`で失敗する。
+ただし、`UnusedVariable`は`ignored`という名前と`unused`で始まる名前の変数を対象外にするため、その名前で件数を捨てる書き方はレビューで見る。
 
 ## DB
 
@@ -222,6 +299,11 @@ Spring Modulith、Error Prone、NullAway、SpotBugs、Spotlessの失敗の文は
 ## 解析対象と実行
 
 プロダクションコード向けArchUnit検査は[ProductionCodeOnly](../../backend/src/test/java/com/example/demo/architecture/ProductionCodeOnly.java)で手書きコードだけを選び、生成コードとテストコードを除外する。
+除外する生成コードは、jOOQの生成先である基底パッケージ直下の`jooq`パッケージだけとする。
+`order.infrastructure.persistence.jooq`のような手書きのパッケージまで除外すると、そこに置いたRepositoryが`tableWritesGoThroughTableWriter`を外れるためである。
+除外はクラスの場所で判定するため、基底パッケージ直下の`jooq`パッケージにはjOOQのコード生成の出力だけを置く。
+そこに置いた手書きのクラスは、ソースのディレクトリを問わず、すべてのプロダクションコード向けの規則を外れるためである。
+`ProductionCodeOnlyTest`がこの境界を確かめ、そのパッケージの本番のクラスのソースファイルがすべて`src/generated/jooq`にあることも確かめる。
 生成コードを除外しても、手書きコードからjOOQ APIや生成型への依存は検査する。
 
 静的解析は`task be-lint`で、ArchUnitとSpring Modulithの検査は`task test`で実行する。

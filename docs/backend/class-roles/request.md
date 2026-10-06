@@ -38,6 +38,9 @@ CommandHandler に Request を渡さず、Request に業務の不変条件を書
   ネストした record のリストは `List<@Valid Line>` にし、要素も検証する。
 - 既存の集約を変える操作の Request は、参照の応答で返したロック番号を `@Min(1) long lockNo` に持つ。
   ロック番号は[更新の競合制御](../../web-api/optimistic-locking.md)のとおりリクエストボディで受け、`lock_no` は1から始まるため `@Min(1)` を付ける。
+  HTTP の Request と OpenAPI は数値のままにする。
+- `toCommand` で `new ExpectedLockNo(lockNo)` を作って Command に渡す。
+  `ExpectedLockNo` を作ってよいのは `presentation.web` の Request だけであり、CommandHandler、Repository、Controller は作らない。
 - 変換はインスタンスメソッド `public <UseCase>Command toCommand(...)` 一つにし、パス変数の値（`orderId`）は引数で受け取る。
   パス変数のない操作では引数を持たない（`toCommand()`）。
 - `List` の component は、コンパクトコンストラクタで `List.copyOf` に置き換える。
@@ -47,12 +50,13 @@ CommandHandler に Request を渡さず、Request に業務の不変条件を書
   enum、boolean、ネストした record、`List` には付けない（[OpenAPIのアノテーションとJavadoc](../../web-api/openapi-annotations.md#example)）。
 - `presentation.web` のパッケージの `package-info.java` は Controller と共有する。
 
-形式の違反は `MethodArgumentNotValidException` になり、`ApiExceptionHandler` が継承する `ResponseEntityExceptionHandler` が 400 の Problem Details にする。
+形式の違反は `MethodArgumentNotValidException` になり、`ApiExceptionHandler` が処理して、type が `/problems/validation-error` の 400 になる。
+`errors` 拡張に、誤りのある項目の JSON Pointer と説明が入る（[ADR-058](../../adr/ADR-058-use-path-absolute-relative-uri-for-problem-types.md)）。
 複数の項目の組み合わせ、マスタの存在、業務の状態に依存する検証は Request に書かず、[APIの入力検証の配置](../../web-api/validation.md)に従ってアプリケーションで行う。
 
 ## 依存してよい型、してはいけない型
 
-- **依存してよい型**：`java..` の標準型、`org.jspecify..`、Jakarta Bean Validation の制約、`io.swagger.v3.oas.annotations.media.Schema`（`example` だけに使う）、自分にネストした record、同じモジュールの `application` の Command。
+- **依存してよい型**：`java..` の標準型、`org.jspecify..`、Jakarta Bean Validation の制約、`io.swagger.v3.oas.annotations.media.Schema`（`example` だけに使う）、自分にネストした record、同じモジュールの `application` の Command、`shared.concurrency` の `ExpectedLockNo`。
 - **依存してはいけない型**：Domain の型（`Quantity`、`ProductCode`）、CommandHandler、モジュールルートの型、Infrastructure の型、jOOQ の生成型、他モジュールの型。
 
 ## 最小の例と典型的な例
@@ -63,6 +67,8 @@ CommandHandler に Request を渡さず、Request に業務の不変条件を書
 ```java
 package com.example.demo.order.presentation.web;
 
+import com.example.demo.shared.concurrency.ExpectedLockNo;
+
 /**
  * 注文を取り消す API の本文。
  *
@@ -72,7 +78,7 @@ public record CancelOrderRequest(@Min(1) @Schema(example = "1") long lockNo) {
 
   /** パス変数の注文 ID と合わせて Command へ変換する。 */
   public CancelOrderCommand toCommand(final String orderId) {
-    return new CancelOrderCommand(orderId, lockNo);
+    return new CancelOrderCommand(orderId, new ExpectedLockNo(lockNo));
   }
 }
 ```
@@ -154,6 +160,7 @@ Controller の MockMvc のテストで、制約に違反する本文が 400 の 
 - [ ] Domain の型に依存しない。［ArchUnit で検査：PackageByFeatureOnionArchitectureTest.presentationDoesNotDependOnDomain］
 - [ ] 状態を変える操作ごとに作り、名前を Command と同じ `<UseCase>` に `Request` を付けた形にする。［自分で点検］
 - [ ] 既存の集約を変える操作の Request に `@Min(1) long lockNo` を持たせる。［自分で点検］
+- [ ] `ExpectedLockNo` は Request の `toCommand` だけで作る。［ArchUnit で検査：TableWriterArchTest.expectedLockNoIsCreatedOnlyByRequests］
 - [ ] 単項目の形式の検証を Bean Validation の制約で書き、ネストした record のリストは `List<@Valid ...>` にする。［自分で点検］
 - [ ] Controller で `@Valid @RequestBody` で受ける。［自分で点検］
 - [ ] `toCommand(...)` で Command に変換し、パス変数の値は引数で受け取る。［自分で点検］

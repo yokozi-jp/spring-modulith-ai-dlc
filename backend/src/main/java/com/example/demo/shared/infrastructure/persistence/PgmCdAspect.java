@@ -1,6 +1,5 @@
 package com.example.demo.shared.infrastructure.persistence;
 
-import com.example.demo.DemoApplication;
 import org.aspectj.lang.ProceedingJoinPoint;
 import org.aspectj.lang.annotation.Around;
 import org.aspectj.lang.annotation.Aspect;
@@ -18,8 +17,11 @@ import org.springframework.stereotype.Component;
 @Component
 public class PgmCdAspect {
 
-  /** モジュール名を切り出す基準のベースパッケージ。 */
-  private static final String BASE_PACKAGE = DemoApplication.class.getPackageName() + ".";
+  /** このクラスのパッケージの、ベースパッケージより後ろの部分。 */
+  private static final String OWN_PACKAGE_SUFFIX = ".shared.infrastructure.persistence";
+
+  /** モジュール名を切り出す基準のベースパッケージ（末尾に {@code .} を含む）。shared がルートパッケージの型に依存しないよう、自分のパッケージから導く。 */
+  private static final String BASE_PACKAGE = basePackageOf(PgmCdAspect.class.getPackageName());
 
   /** 呼び出し中のユースケースの {@code *_pgm_cd}。 */
   /* package */ static final ScopedValue<String> PGM_CD = ScopedValue.newInstance();
@@ -51,5 +53,19 @@ public class PgmCdAspect {
     final String simpleName =
         useCase.getSimpleName().replaceFirst("(CommandHandler|Listener)$", "");
     return relative.substring(0, relative.indexOf('.')) + "." + simpleName;
+  }
+
+  /**
+   * このクラスのパッケージからベースパッケージを導く。末尾に {@code .} を付けて返す。
+   *
+   * @throws IllegalStateException パッケージが {@code <base>.shared.infrastructure.persistence}
+   *     でない場合。クラスを移したときに起動で気付く
+   */
+  /* package */ static String basePackageOf(final String ownPackage) {
+    if (!ownPackage.endsWith(OWN_PACKAGE_SUFFIX)) {
+      throw new IllegalStateException(
+          "PgmCdAspect must be in <base>" + OWN_PACKAGE_SUFFIX + ": package=" + ownPackage);
+    }
+    return ownPackage.substring(0, ownPackage.length() - OWN_PACKAGE_SUFFIX.length() + 1);
   }
 }

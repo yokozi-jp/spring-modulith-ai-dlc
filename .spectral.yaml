@@ -13,12 +13,24 @@ rules:
         match: "^3\\.1\\."
 
   common-problem-detail-schema:
-    description: RFC 9457 の共通 schema を定義する。
+    description: RFC 9457 の共通 schema と入力検証の schema を定義する。
     severity: error
     given: "$.components.schemas"
     then:
-      field: ProblemDetail
-      function: truthy
+      - field: ProblemDetail
+        function: truthy
+      - field: ValidationProblem
+        function: truthy
+
+  problem-type-uri-reference:
+    description: Problem type は相対 URI を許す uri-reference にする（ADR-058）。
+    severity: error
+    given: "$.components.schemas.ProblemDetail.properties.type"
+    then:
+      field: format
+      function: pattern
+      functionOptions:
+        match: "^uri-reference$"
 
   problem-detail-required-fields:
     description: Problem Details の契約フィールドを必須にする。
@@ -122,7 +134,7 @@ rules:
         notMatch: "-controller$"
 
   error-response-problem-detail:
-    description: 4xx と 5xx の応答は共通の Problem response か ProblemDetail の schema を参照する。
+    description: 4xx と 5xx の応答は共通の Problem response か ProblemDetail か ValidationProblem の schema を参照する。
     severity: error
     resolved: false
     given: "$.paths[*][get,put,post,delete,options,head,patch,trace].responses[?(@property.match(/^[45][0-9][0-9]$/))]"
@@ -147,10 +159,10 @@ rules:
                           required: [$ref]
                           properties:
                             $ref:
-                              const: "#/components/schemas/ProblemDetail"
+                              pattern: "^#/components/schemas/(ProblemDetail|ValidationProblem)$"
 
   problem-response-content:
-    description: 共通の Problem response は application/problem+json で ProblemDetail を返す。
+    description: 共通の Problem response は application/problem+json で ProblemDetail か ValidationProblem を返す。
     severity: error
     resolved: false
     given: "$.components.responses[?(@property.match(/Problem$/))].content"
@@ -160,7 +172,18 @@ rules:
       - field: "application/problem+json.schema.$ref"
         function: pattern
         functionOptions:
-          match: "^#/components/schemas/ProblemDetail$"
+          match: "^#/components/schemas/(ProblemDetail|ValidationProblem)$"
+
+  bad-request-validation-problem:
+    description: 400 の共通 response は入力検証の ValidationProblem を返す（ADR-058）。
+    severity: error
+    resolved: false
+    given: "$.components.responses.BadRequestProblem.content['application/problem+json'].schema"
+    then:
+      field: $ref
+      function: pattern
+      functionOptions:
+        match: "^#/components/schemas/ValidationProblem$"
 
   operation-operationId: error
   operation-success-response: error

@@ -1,15 +1,20 @@
 import "./style.css";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { MutationCache, QueryCache, QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { createRouter, RouterProvider } from "@tanstack/react-router";
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { I18nextProvider } from "react-i18next";
 
+import { redirectToLoginOnUnauthorized, retryUnlessClientError } from "./api/api-fetch";
 import { i18n } from "./i18n";
 import { routerDefaults } from "./router-defaults";
 import { routeTree } from "./routeTree.gen";
 
-const queryClient = new QueryClient();
+const queryClient = new QueryClient({
+  queryCache: new QueryCache({ onError: redirectToLoginOnUnauthorized }),
+  mutationCache: new MutationCache({ onError: redirectToLoginOnUnauthorized }),
+  defaultOptions: { queries: { retry: retryUnlessClientError } },
+});
 
 const router = createRouter({ routeTree, context: { queryClient }, ...routerDefaults });
 

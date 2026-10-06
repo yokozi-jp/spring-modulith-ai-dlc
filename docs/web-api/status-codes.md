@@ -1,7 +1,7 @@
 ---
 type: Convention
 title: HTTPステータスコードの選択
-description: APIが返すHTTPステータスコードの使い分けと、判断に迷いやすいユースケースごとの選択を定める規約。APIの成功応答とエラー応答のステータスコードを決めるとき、OpenAPIに想定するエラー応答を書くときに読む。
+description: APIが返すHTTPステータスコードの使い分けと、判断に迷いやすいユースケースごとの選択を定める規約。APIの成功応答とエラー応答のステータスコードを決めるとき、OpenAPIに想定するエラー応答を書くとき、Problem Detailsのtypeを決めるときに読む。
 tags: [convention, web-api, http, future-arch-guidelines]
 ---
 
@@ -15,6 +15,9 @@ tags: [convention, web-api, http, future-arch-guidelines]
 
 エラー応答の本文はRFC 9457のProblem Detailsとし、`status`を実際のステータスコードと一致させる。
 この契約は[ADR-013](../adr/ADR-013-standardize-http-api-contracts.md)が定める。
+ステータス以上の意味がないproblemの`type`は`about:blank`にする。
+業務固有のproblem typeは、パスを全部書いた相対URI`/problems/<kebab-case>`にし、`title`をMessageSourceの`problem.title.<kebab-case>`で日本語と英語に解決する（[ADR-058](../adr/ADR-058-use-path-absolute-relative-uri-for-problem-types.md)）。
+入力検証エラーは`/problems/validation-error`の400で、`errors`拡張に誤りのある入力のJSON Pointerと説明を入れる。
 OpenAPIへのエラー応答の付け方は[OpenAPIのアノテーションとJavadoc](openapi-annotations.md#エラー応答)に従う。
 
 ## 使うステータスコード
@@ -29,6 +32,7 @@ OpenAPIへのエラー応答の付け方は[OpenAPIのアノテーションとJa
 - **404 Not Found**：パスで指定したリソースが存在しない、または参照する権限がない。
 - **405 Method Not Allowed**：エンドポイントが対応しないHTTPメソッドを指定された。
 - **409 Conflict**：楽観ロックの競合、悲観ロックの取得失敗、一意制約違反。
+  楽観ロックの`ConflictException`（`lock_timeout`による失敗を含む）は、`ApiExceptionHandler`が409にする。
 - **413 Content Too Large**：リクエストのヘッダーまたは本文が上限を超えた。
 - **422 Unprocessable Content**：入力が業務処理の条件を満たさない（在庫不足で出荷指示できない場合など）。
 - **429 Too Many Requests**：レート制限を超えた。

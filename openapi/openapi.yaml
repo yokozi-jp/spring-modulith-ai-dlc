@@ -2,7 +2,7 @@ openapi: 3.1.0
 info:
   description: Demo アプリケーションの HTTP API
   title: Demo API
-  version: 0.1.0
+  version: 0.2.0
 servers:
 - description: 現在のオリジン
   url: /
@@ -13,7 +13,7 @@ components:
       content:
         application/problem+json:
           schema:
-            $ref: "#/components/schemas/ProblemDetail"
+            $ref: "#/components/schemas/ValidationProblem"
       description: 要求の形式または入力値が正しくない
     ConflictProblem:
       content:
@@ -45,6 +45,13 @@ components:
           schema:
             $ref: "#/components/schemas/ProblemDetail"
       description: 認証されていない
+      headers:
+        WWW-Authenticate:
+          description: 認証の challenge。ブラウザの Cookie セッションを表す独自 scheme（ADR-059）
+          required: true
+          schema:
+            type: string
+            example: Session realm="demo"
     UnprocessableContentProblem:
       content:
         application/problem+json:
@@ -72,10 +79,42 @@ components:
           description: Problem type の短い説明
         type:
           type: string
-          format: uri
-          description: Problem type の安定した識別 URI
+          format: uri-reference
+          description: Problem type の識別 URI。about:blank かパスを全部書いた相対 URI
           example: about:blank
       required:
       - status
       - title
       - type
+    ValidationError:
+      type: object
+      description: 入力検証の誤り
+      properties:
+        detail:
+          type: string
+          description: 利用者向けの誤りの説明。入力値を含まない
+          example: この項目は必須です。
+        pointer:
+          type: string
+          description: 誤りのある入力の位置を示す RFC 6901 の JSON Pointer
+          example: /items/0/name
+      required:
+      - detail
+      - pointer
+    ValidationProblem:
+      allOf:
+      - $ref: "#/components/schemas/ProblemDetail"
+      - type: object
+        properties:
+          errors:
+            type: array
+            description: 入力検証の誤り。type が /problems/validation-error のときだけ必ず含む
+            items:
+              $ref: "#/components/schemas/ValidationError"
+          type:
+            type: string
+            format: uri-reference
+            description: 入力検証エラーなら /problems/validation-error。それ以外の 400 は about:blank
+            example: /problems/validation-error
+      description: 400 の Problem Details。type が /problems/validation-error なら入力検証エラーで、errors
+        に誤りのある入力の位置と説明を持つ

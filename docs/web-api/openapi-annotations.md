@@ -60,6 +60,7 @@ FQNやcustom resolverで衝突を回避せず、Javaの型名自体を一意に�
 
 - 400、401、403、500は`OpenApiConfig`のcustomizerが付ける。
   401、403、500は全operationに、400はparameterかrequestBodyがあるoperationにだけ付く。
+- 400の`BadRequestProblem`は`ValidationProblem`（`ProblemDetail`と、typeが`/problems/validation-error`のときの`errors`）を参照する。
 - 404、409、422は、起きるoperationにだけ`@ApiResponse(responseCode, ref = "#/components/responses/<Name>Problem")`で書く。
   `<Name>`は`NotFound`、`Conflict`、`UnprocessableContent`のいずれかである。
 - `springdoc.override-with-generic-response`は`false`であり、`ApiExceptionHandler`の応答は自動では付かない。

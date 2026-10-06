@@ -249,6 +249,7 @@ class OrderControllerTest {
 - [ ] 作成は 201 と `Location`、本文のない更新は 204、見つからない参照は 404 を返す。［自分で点検］
 - [ ] 参照は `<Feature>Queries` を呼んで `from(...)` で Response にし、一覧は `items` で包む。［自分で点検］
 - [ ] 例外を catch せず、`ApiExceptionHandler` に任せる。［自分で点検］
+- [ ] クラスに `@Validated` を付けない。入力検証は `@Valid` と引数の制約で行う。［自分で点検］
 - [ ] クラス、フィールド、コンストラクタ、ハンドラメソッドに Javadoc を書く。［自分で点検］
 - [ ] MockMvc のテストで、ステータスコードと Problem Details を確かめる。［自分で点検］
 - [ ] `presentation.web` のパッケージに `@NullMarked` の `package-info.java` を置く。［Error Prone で検査：RequireExplicitNullMarking］

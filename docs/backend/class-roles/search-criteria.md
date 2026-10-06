@@ -85,7 +85,7 @@ public List<OrderSummary> search(final OrderSearchCriteria criteria) {
       .map(
           order ->
               new OrderSummary(
-                  order.id().value(),
+                  order.id().value().toString(),
                   order.status().name(),
                   order.total().amount(),
                   order.placedAt(),
