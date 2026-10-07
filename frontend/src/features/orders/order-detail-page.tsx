@@ -37,7 +37,7 @@ export function OrderDetailPage() {
       {editor.conflict && editable ? (
         <ConflictChoices onDiscard={editor.handleDiscard} onReapply={editor.handleReapply} />
       ) : undefined}
-      <OrderSummary order={order} />
+      <OrderSummary order={order} orderId={orderId} />
       <h2 className="text-xl font-semibold">{t("orders.detail.linesHeading")}</h2>
       <OrderLinesTable lines={order.lines ?? []} products={products} />
       {editable ? (

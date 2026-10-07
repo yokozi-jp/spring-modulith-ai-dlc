@@ -4,6 +4,7 @@ import { http, HttpResponse } from "msw";
 import { vi } from "vite-plus/test";
 
 import { getFindOrderByIdMockHandler } from "@/api/generated/mocks/order/order.msw";
+import { getListPaymentsMockHandler } from "@/api/generated/mocks/payment/payment.msw";
 import type {
   OrderDetailsResponse,
   OrderSummaryResponse,
@@ -92,10 +93,13 @@ export function errorMessageOf(element: HTMLElement): string | undefined {
     : (document.querySelector(`[id="${id}"]`)?.textContent ?? undefined);
 }
 
-/** 詳細の GET が返す注文を、テストの途中で差し替えられるようにする。 */
+/** 詳細の GET が返す注文を、テストの途中で差し替えられるようにする。決済の参照は既定で 0 件を返す。 */
 export function serveDetail(initial: OrderDetailsResponse) {
   const state = { order: initial };
-  server.use(getFindOrderByIdMockHandler(() => state.order));
+  server.use(
+    getFindOrderByIdMockHandler(() => state.order),
+    getListPaymentsMockHandler({ items: [] }),
+  );
   return state;
 }
 
@@ -121,11 +125,18 @@ async function changeQuantity(user: UserEvent, value: string) {
   await user.type(quantity, value);
 }
 
+/** 決済の欄の外の status（ProblemNotice の output）。 */
 export function notice() {
-  return screen.getByRole("status");
+  const element = screen
+    .getAllByRole("status")
+    .find((el) => el.closest('[aria-labelledby="payment-heading"]') === null);
+  if (element === undefined) {
+    throw new Error("ProblemNotice の status がない");
+  }
+  return element;
 }
 
-/** 最初の詳細の GET だけ成功させ、mutation の後の再取得を 500 にする。 */
+/** 最初の詳細の GET だけ成功させ、mutation の後の再取得を 500 にする。決済の参照は既定で 0 件を返す。 */
 export function serveDetailFailingRefetch(order: OrderDetailsResponse): void {
   let requests = 0;
   server.use(
@@ -135,6 +146,7 @@ export function serveDetailFailingRefetch(order: OrderDetailsResponse): void {
         ? HttpResponse.json(order)
         : problemResponse(500, "Internal Server Error");
     }),
+    getListPaymentsMockHandler({ items: [] }),
   );
 }
 

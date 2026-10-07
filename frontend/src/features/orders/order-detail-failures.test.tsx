@@ -1,7 +1,7 @@
 /* @vitest-environment jsdom */
 
 import { screen, waitFor, within } from "@testing-library/react";
-import { HttpResponse } from "msw";
+import { http, HttpResponse } from "msw";
 import { beforeEach, describe, expect, it } from "vite-plus/test";
 
 import { getListProductsMockHandler } from "@/api/generated/mocks/product/product.msw";
@@ -181,5 +181,31 @@ describe("order detail page failures", () => {
     await waitFor(() => {
       expect(notice().textContent).toContain(text);
     });
+  });
+});
+
+describe("order detail page payment failures", () => {
+  beforeEach(() => {
+    stubCsrfCookie();
+    server.use(getListProductsMockHandler(products));
+  });
+
+  it("決済の参照が 500 なら決済の欄に失敗を出し、注文の見出しと明細と操作を残す", async () => {
+    serveDetail(draftOrder());
+    server.use(http.get("*/api/payments", () => problemResponse(500, "Internal Server Error")));
+
+    await renderRoute(detailPath);
+
+    const region = await screen.findByRole("region", { name: "決済" });
+    await waitFor(() => {
+      expect(within(region).getByRole("status").textContent).toBe(
+        "決済の状態を読み込めませんでした。時間をおいて画面を読み直してください。",
+      );
+    });
+    expect(within(region).queryByText("決済した時刻")).toBeNull();
+    expect(screen.getByRole("heading", { level: 1, name: "注文 C-001" })).toBeTruthy();
+    expect(firstLineRow()?.textContent).toContain("ボールペン");
+    expect(screen.getByRole("button", { name: "確定する" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "取り消す" })).toBeTruthy();
   });
 });

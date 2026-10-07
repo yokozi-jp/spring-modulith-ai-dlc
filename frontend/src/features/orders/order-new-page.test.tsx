@@ -9,6 +9,7 @@ import {
   getFindOrderByIdMockHandler,
   getListOrdersMockHandler,
 } from "@/api/generated/mocks/order/order.msw";
+import { getListPaymentsMockHandler } from "@/api/generated/mocks/payment/payment.msw";
 import { getListProductsMockHandler } from "@/api/generated/mocks/product/product.msw";
 import { server } from "@/testing/msw";
 import {
@@ -74,7 +75,10 @@ describe("order new page", () => {
           headers: { Location: `${globalThis.location.origin}/api/orders/${orderId}` },
         }),
     );
-    server.use(getFindOrderByIdMockHandler(draftOrder()));
+    server.use(
+      getFindOrderByIdMockHandler(draftOrder()),
+      getListPaymentsMockHandler({ items: [] }),
+    );
     const { user, router } = await renderRoute("/orders/new");
 
     await fillForm(user);

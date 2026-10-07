@@ -103,6 +103,16 @@
       "actionUnprocessable": "The order cannot be changed in its current state. Check the latest content.",
       "confirmed": "The order was confirmed.",
       "cancelled": "The order was cancelled."
+    },
+    "payment": {
+      "heading": "Payment",
+      "loading": "Loading the payment status.",
+      "loadFailed": "Could not load the payment status. Wait a moment and reload the page.",
+      "paid": "Paid",
+      "paidAmount": "Paid amount",
+      "paidAt": "Paid at",
+      "notYet": "The payment has not been accepted yet. It is in progress, or it failed and is waiting to be resubmitted.",
+      "notApplicable": "This order is not subject to payment."
     }
   }
 }

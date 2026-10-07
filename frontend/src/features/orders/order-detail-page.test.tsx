@@ -4,6 +4,7 @@ import { screen, waitFor, within } from "@testing-library/react";
 import { http } from "msw";
 import { beforeEach, describe, expect, it, vi } from "vite-plus/test";
 
+import { getListPaymentsMockHandler } from "@/api/generated/mocks/payment/payment.msw";
 import { getListProductsMockHandler } from "@/api/generated/mocks/product/product.msw";
 import { server } from "@/testing/msw";
 import {
@@ -25,6 +26,21 @@ import {
 import { renderRoute } from "@/testing/render-route";
 
 const detailPath = `/orders/${orderId}`;
+const paidAt = "2026-10-06T01:02:03.123456Z";
+
+/** 決済の欄（見出し「決済」の region）。 */
+function paymentRegion() {
+  return screen.findByRole("region", { name: "決済" });
+}
+
+/** 決済の欄の状態の文言が text になるまで待つ。 */
+async function expectPaymentStatus(text: string) {
+  const region = await paymentRegion();
+  await waitFor(() => {
+    expect(within(region).getByRole("status").textContent).toBe(text);
+  });
+  return region;
+}
 
 describe("order detail page", () => {
   beforeEach(() => {
@@ -175,4 +191,67 @@ describe("order detail page", () => {
     await expect(within(notice()).findByText(message)).resolves.toBeTruthy();
     expect(bodies).toHaveLength(1);
   });
+});
+
+describe("order detail page payment status", () => {
+  beforeEach(() => {
+    stubCsrfCookie();
+    server.use(getListProductsMockHandler(products));
+  });
+
+  it("決済記録があれば、決済済みと金額と決済した時刻を出し、time に paidAt を入れる", async () => {
+    serveDetail(draftOrder({ status: "CONFIRMED" }));
+    server.use(getListPaymentsMockHandler({ items: [{ orderId, amount: 240, paidAt }] }));
+
+    await renderRoute(detailPath);
+
+    const region = await expectPaymentStatus("決済済み");
+    expect(within(region).getByText("￥240")).toBeTruthy();
+    const time = within(region).getByText(
+      new Intl.DateTimeFormat("ja", { dateStyle: "medium", timeStyle: "medium" }).format(
+        Temporal.Instant.from(paidAt).epochMilliseconds,
+      ),
+    );
+    expect(time.tagName).toBe("TIME");
+    expect(time.getAttribute("datetime")).toBe(paidAt);
+  });
+
+  it("決済記録の paidAt と金額がなければ「（なし）」を出し、time を出さない", async () => {
+    serveDetail(draftOrder({ status: "CONFIRMED" }));
+    server.use(getListPaymentsMockHandler({ items: [{ orderId }] }));
+
+    await renderRoute(detailPath);
+
+    const region = await expectPaymentStatus("決済済み");
+    expect(within(region).getByText("決済した時刻").nextElementSibling?.textContent).toBe(
+      "（なし）",
+    );
+    expect(within(region).getByText("決済した金額").nextElementSibling?.textContent).toBe(
+      "（なし）",
+    );
+    expect(region.querySelector("time")).toBeNull();
+  });
+
+  it("確定済みで決済記録がなければ、まだ受け付けていないことを出し、決済した時刻を出さない", async () => {
+    serveDetail(draftOrder({ status: "CONFIRMED" }));
+
+    await renderRoute(detailPath);
+
+    const region = await expectPaymentStatus(
+      "決済をまだ受け付けていません。処理中か、失敗して再投入を待っています。",
+    );
+    expect(within(region).queryByText("決済した時刻")).toBeNull();
+  });
+
+  it.each(["DRAFT", "CANCELLED"])(
+    "%s で決済記録がなければ、決済の対象ではないことを出す",
+    async (status) => {
+      serveDetail(draftOrder({ status }));
+
+      await renderRoute(detailPath);
+
+      const region = await expectPaymentStatus("この注文は決済の対象ではありません。");
+      expect(within(region).queryByText("決済した時刻")).toBeNull();
+    },
+  );
 });
