@@ -405,8 +405,11 @@ tasks:
       # vp run の script は cache しないので、環境変数がそのまま渡る。build を run.tasks に移すなら cache.env に FRONTEND_OTEL_* を足す。
       - FRONTEND_OTEL_ENABLED=false vp run build
       - |
-        if grep -rqiE 'faro|grafana' dist/assets; then
-          echo "無効のビルドの bundle に Faro の SDK が入っています。" >&2
+        # grep は一致で 0、不一致で 1、対象がないなどの失敗で 2 を返す。1 以外は失敗にする。
+        status=0
+        grep -rqiE 'faro|grafana' dist/assets || status=$?
+        if [ "$status" -ne 1 ]; then
+          echo "無効のビルドの bundle に Faro の SDK が入っているか、dist/assets を検査できませんでした（grep の終了コード $status）。" >&2
           exit 1
         fi
 

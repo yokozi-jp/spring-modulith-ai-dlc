@@ -46,6 +46,9 @@ task dev                   # 依存を起動し、バックエンドを起動す
 cd frontend && vp dev      # SPAを起動し、APIとOIDCを同一オリジンでproxyする
 ```
 
+`.env.example`か`.env.test.example`に変数が増えたら、`.env`と`.env.test`に同じ変数を足す（`cp -n`は既存のファイルを上書きしない）。
+`task compose-up`などが`OTEL_SERVICE_NAMESPACE is required`のように変数不足で止まったときは、これが原因である。
+
 公開先は次のとおり。
 
 - フロントエンド：<http://localhost:5173>（ブラウザで開く入口）

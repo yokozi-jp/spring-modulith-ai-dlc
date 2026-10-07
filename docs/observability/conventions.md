@@ -59,6 +59,7 @@ Grafana では trace ID を使ってログとトレースを相互に検索す�
 ログの属性で許可するのは、例外の属性（`exception.type`、`exception.message`、`exception.stacktrace`）、HTTP status、trace と span の相関情報、業務上必要な内部 ID である。
 内部 ID と氏名などの表示値を同じ event へ載せない。
 HTTP の URL パスは span に入るため、API のパスに個人データと秘密情報を置かない。
+ブラウザの例外は画面の route path を `url.path` に持つため、画面の path にも個人データと秘密情報を置かず、識別子は内部 ID にする（[フロントエンドのURL設計](../frontend/url-design.md)）。
 DTO やエンティティを logger へ渡さず、許可した値だけを個別の属性として渡す。
 
 ブラウザでは、`frontend/src/lib/telemetry.ts` の `beforeSend` で、送る項目のすべての文字列から絶対 URL の query と fragment を消す。
@@ -144,6 +145,7 @@ faro receiver は処理に失敗すると、payload の全体を Collector 自�
 5. 許可していない属性を持つ検査用 event が、保存前に属性を除かれる。
 6. メールアドレスを含む例外メッセージが、表示時にマスクされる。
 7. `exception.type`、`exception.message`、`exception.stacktrace` が OTLP 属性として検索できる。
+8. ブラウザの例外が `logs/frontend` から本番の保存先へ届き、ローカル向けの `otlp_http/lgtm` へ送られない。
 
 ## 出典
 
