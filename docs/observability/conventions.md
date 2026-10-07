@@ -83,6 +83,7 @@ Collector の設定（`docker/otel-collector/config.yaml`）は、ローカル�
 
 フロントエンドのログは、バックエンドと別の pipeline（`logs/frontend`）の `transform/frontend_logs` で絞る。
 faro receiver はメタデータを本文に入れるので、本文を解析して許可した値だけを属性へ移し、本文を `Browser exception` に置き換える。
+例外でない種類の項目（log、event、measurement）は、例外の記録にしないため `filter/frontend_exceptions` で捨てる。
 許可する属性は `exception.type`、`exception.message`、`exception.stacktrace`、`url.path` である。
 フロントエンドのログに属性を足すときは、`transform/frontend_logs` とこの文書を同じ変更で直す。
 

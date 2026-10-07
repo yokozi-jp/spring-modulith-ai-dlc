@@ -19,6 +19,10 @@
       }
     },
     { "type": "Error", "value": "can't", "timestamp": "2026-10-06T00:00:01.000Z" },
-    { "type": "Error", "value": "bad http://localhost:5173/x?q=\"secret-quote\" tail", "timestamp": "2026-10-06T00:00:02.000Z" }
-  ]
+    { "type": "Error", "value": "bad http://localhost:5173/x?q=\"secret-quote\" tail", "timestamp": "2026-10-06T00:00:02.000Z" },
+    { "type": "Error", "value": "upper HTTPS://H/x?q=secret-upper tail", "timestamp": "2026-10-06T00:00:03.000Z" }
+  ],
+  "logs": [{ "message": "secret-log-item", "level": "info", "timestamp": "2026-10-06T00:00:04.000Z" }],
+  "events": [{ "name": "secret-event-item", "timestamp": "2026-10-06T00:00:05.000Z" }],
+  "measurements": [{ "type": "secret-measurement-item", "values": { "lcp": 1 }, "timestamp": "2026-10-06T00:00:06.000Z" }]
 }

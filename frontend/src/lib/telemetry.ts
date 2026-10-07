@@ -9,9 +9,9 @@ declare const __TELEMETRY_APP__: {
   environment: string;
 };
 
-// ponytail: http と https の絶対 URL だけを対象にする。文中の相対 URL（/api/x?id=1）は消さない。
+// ponytail: http と https の絶対 URL だけを対象にし、scheme の大文字と小文字は区別しない。文中の相対 URL（/api/x?id=1）は消さない。
 // 相対 URL を送る計装（View、Tracing）を足すときは、ここを URL の構文解析に替える。
-const absoluteUrlQueryOrFragment = /(?<url>https?:\/\/[^\s?#]*)[?#]\S*/gu;
+const absoluteUrlQueryOrFragment = /(?<url>https?:\/\/[^\s?#]*)[?#]\S*/giu;
 
 // as による型の表明を避けるため、structuredClone で複製した項目をその場で書き換える。
 function stripStrings(value: unknown): void {

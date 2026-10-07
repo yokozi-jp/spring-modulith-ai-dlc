@@ -1029,7 +1029,7 @@ tasks:
           sleep 1
         done
         if [ ! -s "$out/frontend.json" ]; then fail "フロントエンドのログが出口に届きませんでした。"; fi
-        if grep -qE 'secret-query|secret-fragment|secret-paren|secret-quote|person@example\.com|fixture-user-id|fixture-session-id|FixtureAgent' "$out/frontend.json"; then
+        if grep -qE 'secret-|person@example\.com|fixture-user-id|fixture-session-id|FixtureAgent' "$out/frontend.json"; then
           fail "フロントエンドのログに、許可していない値か URL の query か fragment が残りました。"
         fi
         # file exporter はバッチごとに一行を書くので -s で読む。
@@ -1043,7 +1043,7 @@ tasks:
                 and attr("service.namespace") == "demo"
                 and attr("service.version") == "0.0.0-fixture"
                 and attr("deployment.environment.name") == "local")
-            and ($records | length) == 3
+            and ($records | length) == 4
             and all($records[];
               .body.stringValue == "Browser exception"
                 and ([.attributes[]?.key] | sort) == ["exception.message", "exception.stacktrace", "exception.type", "url.path"]
@@ -1056,6 +1056,8 @@ tasks:
             and any($records[]; attr("exception.stacktrace") | contains("http://localhost:5173/api/orders\\n  at render ("))
             and any($records[]; attr("exception.message") == $apostrophe)
             and any($records[]; attr("exception.message") == "bad http://localhost:5173/x tail")
+            # scheme が大文字でも query を消し、log、event、measurement は捨てる（記録は例外の 4 件だけ）。
+            and any($records[]; attr("exception.message") == "upper HTTPS://H/x tail")
         ' "$out/frontend.json" >/dev/null; then
           fail "フロントエンドのログの属性、resource 属性、本文のいずれかが期待値と一致しません。"
         fi

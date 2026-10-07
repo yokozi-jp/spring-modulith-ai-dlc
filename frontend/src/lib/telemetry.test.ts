@@ -48,6 +48,14 @@ describe("stripUrlQueryAndFragment", () => {
     expect(item.payload).toMatchObject({ value: "failed to load https://h/api/orders now" });
   });
 
+  it("removes the query of a URL with an uppercase scheme", () => {
+    const item = stripUrlQueryAndFragment(
+      exceptionItem("see HTTPS://H/x?q=1 now", "http://h/a.js"),
+    );
+
+    expect(item.payload).toMatchObject({ value: "see HTTPS://H/x now" });
+  });
+
   it("keeps strings without a URL, numbers and booleans", () => {
     const original = { ...exceptionItem("plain /api/x?id=1", "app.js"), meta: {} };
 

@@ -61,6 +61,7 @@ Faro の形式を受ける contrib の `faroreceiver` は、Collector 0.161.0 �
 faroreceiver はブラウザ、ページ、セッションなどのメタデータをログの本文（logfmt）に入れるので、属性の `keep_keys` だけでは保護できない。
 そのため、フロントエンドの pipeline は本文を OTTL の `ParseKeyValue` で解析し、`exception.type`、`exception.message`、`exception.stacktrace`、`url.path` の 4 属性だけを残す。
 本文は固定の文字列 `Browser exception` に置き換える。
+例外でない種類の項目は、計装を足す段階で本文の文字列を決めるまで捨てる。
 
 URL の query と fragment は、ブラウザの `beforeSend` と Collector の両方で消す。
 Collector の除去は、絶対 URL の `?` か `#` から空白かエスケープまでを多めに消す正規表現の処理である。

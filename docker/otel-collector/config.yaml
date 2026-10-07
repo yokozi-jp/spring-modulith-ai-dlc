@@ -22,6 +22,13 @@ processors:
     log_statements:
       # ログ属性の allowlist。属性を足すときは docs/observability/conventions.md と同じ変更で直す。
       - keep_keys(log.attributes, ["exception.type", "exception.message", "exception.stacktrace", "http.response.status_code"])
+  # Errors だけの Faro は例外しか送らない。/collect へ直接送られた log、event、measurement を例外の記録にしないため捨てる。
+  # WebVitals などの計装を足すときは、送る種類をここで許し、transform/frontend_logs に本文の文字列を足す。
+  filter/frontend_exceptions:
+    error_mode: silent
+    logs:
+      log_record:
+        - log.attributes["kind"] != "exception"
   # フロントエンドのログ。faro receiver はメタデータを本文の logfmt に入れるため、keep_keys だけでは守れない。
   # 本文を解析して許可した値だけを属性へ移し、本文は固定の文字列に置き換える。
   # 属性を足すときは docs/observability/conventions.md と同じ変更で直す。
@@ -39,13 +46,13 @@ processors:
       - set(log.attributes["exception.message"], log.cache["value"]) where log.attributes["kind"] == "exception"
       - set(log.attributes["exception.stacktrace"], log.cache["stacktrace"]) where log.attributes["kind"] == "exception"
       - set(log.attributes["url.path"], URL(log.cache["page_url"])["url.path"]) where log.cache["page_url"] != nil
-      # URL の query と fragment を消す。1 つ目は stacktrace の frame の :行:列) を残す。
+      # URL の query と fragment を消す。scheme の大文字と小文字は区別しない。1 つ目は stacktrace の frame の :行:列) を残す。
       # 値の中の \n のエスケープを食べないため、query の部分には \\ と \" 以外のバックスラッシュを含めない。
-      - replace_all_patterns(log.attributes, "value", "(https?://[^\\s?#()\\\\]*)[?#](?:[^\\s()\\\\]|\\\\\\\\)*(:\\d+:\\d+\\))", "$$1$$2")
+      - replace_all_patterns(log.attributes, "value", "(?i)(https?://[^\\s?#()\\\\]*)[?#](?:[^\\s()\\\\]|\\\\\\\\)*(:\\d+:\\d+\\))", "$$1$$2")
       # 2 つ目は frame 以外の URL で、( と ) と \" も query として消す（例外のメッセージの ?token=a(b)c や ?q=\"x\"）。
       # ponytail: 空白か \n などのエスケープまでを query とみなすので、(see http://h/a?x=1) の閉じ括弧と、query に括弧を含む frame の :行:列) も消える。
       # 秘密を残すより表示の崩れを取る。崩れが問題になったら、frame 以外の URL の終わりを括弧の対応で決める文を足す。
-      - replace_all_patterns(log.attributes, "value", "(https?://[^\\s?#()\\\\]*)[?#](?:[^\\s\\\\]|\\\\\\\\|\\\\\")*", "$$1")
+      - replace_all_patterns(log.attributes, "value", "(?i)(https?://[^\\s?#()\\\\]*)[?#](?:[^\\s\\\\]|\\\\\\\\|\\\\\")*", "$$1")
       - set(log.body, "Browser exception")
       # ponytail: ParseKeyValue はエスケープを解かないため、stacktrace の改行は \n、引用符は \" の 2 文字のまま属性の値に残る。
       # 読みにくさが問題になったら、エスケープを解く文を足す。
@@ -66,7 +73,7 @@ service:
     # faro receiver の traces はこのチケットでは使わない。
     logs/frontend:
       receivers: [faro]
-      processors: [transform/frontend_logs]
+      processors: [filter/frontend_exceptions, transform/frontend_logs]
       exporters: [otlp_http/lgtm]
     traces:
       receivers: [otlp]
