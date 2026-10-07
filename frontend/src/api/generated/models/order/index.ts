@@ -3,7 +3,6 @@
  * Demo API
  */
 
-export * from './badRequestProblemResponse.ts';
 export * from './cancelOrderRequest.ts';
 export * from './changeOrderLinesRequest.ts';
 export * from './confirmOrderRequest.ts';
@@ -17,5 +16,3 @@ export * from './orderLineResponse.ts';
 export * from './orderSummaryListResponse.ts';
 export * from './orderSummaryResponse.ts';
 export * from './unprocessableContentProblemResponse.ts';
-export * from './validationError.ts';
-export * from './validationProblem.ts';

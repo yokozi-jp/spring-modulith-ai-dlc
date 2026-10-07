@@ -4,8 +4,12 @@
  */
 
 export * from './problemDetail.ts';
+export * from './validationError.ts';
+export * from './validationProblem.ts';
+export * from './badRequestProblemResponse.ts';
 export * from './forbiddenProblemResponse.ts';
 export * from './internalServerErrorProblemResponse.ts';
 export * from './unauthorizedProblemResponse.ts';
 export * from './order/index.ts';
+export * from './payment/index.ts';
 export * from './product/index.ts';

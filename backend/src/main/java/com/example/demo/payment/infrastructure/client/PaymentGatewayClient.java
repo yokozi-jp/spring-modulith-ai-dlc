@@ -13,11 +13,11 @@ import org.springframework.web.client.ResourceAccessException;
 /**
  * 決済代行の偽物。通信せず、設定値で常に成功か常に失敗にする。
  *
- * <p>成功のときは、注文 ID から決めた識別子を返すため、同じ冪等キーには同じ識別子を返す。 失敗のときは、通信の失敗と同じ {@link ResourceAccessException}
- * を投げる。 通信しないため、接続と呼び出しのタイムアウトを持たない。 circuit breaker と retry は ADR-019 の既定値をそのまま使う（retry は default
+ * <p>成功のときは、注文 ID から決めた識別子を返すため、同じ冪等キーには同じ識別子を返す。失敗のときは、通信の失敗と同じ {@link ResourceAccessException}
+ * を投げる。通信しないため、接続と呼び出しのタイムアウトを持たない。circuit breaker と retry は ADR-019 の既定値をそのまま使う（retry は default
  * を継承して試行 1 回）。
  *
- * <p>retry は CommandHandler のトランザクションの中で呼ぶため試行 1 回にし、やり直しはイベント出版の再投入に任せる。 circuit breaker は依存先の SLO
+ * <p>retry は CommandHandler のトランザクションの中で呼ぶため試行 1 回にし、やり直しはイベント出版の再投入に任せる。circuit breaker は依存先の SLO
  * がない偽物なので既定値のままにする。直近 20 回の窓で 10 回以上呼ばれ、失敗率が 50% 以上のとき（FAIL では 10 回目の失敗で）open になり、{@code
  * CallNotPermittedException} を投げる。
  */

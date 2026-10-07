@@ -2,13 +2,15 @@ openapi: 3.1.0
 info:
   description: Demo アプリケーションの HTTP API
   title: Demo API
-  version: 0.3.0
+  version: 0.4.0
 servers:
 - description: 現在のオリジン
   url: /
 tags:
 - description: 注文の API
   name: order
+- description: 決済の API
+  name: payment
 - description: 商品の API
   name: product
 paths:
@@ -228,6 +230,37 @@ paths:
       summary: 下書きの注文の明細を置き換える。
       tags:
       - order
+  /api/payments:
+    get:
+      description: 決済記録は 1 注文につき 1 件までなので、items に 0 件か 1 件を入れて返す。決済記録がない注文と、存在しない注文では、空の
+        items を返す。
+      operationId: listPayments
+      parameters:
+      - description: 決済した注文の ID
+        in: query
+        name: orderId
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PaymentSummaryListResponse"
+          description: 決済記録の一覧
+        "400":
+          $ref: "#/components/responses/BadRequestProblem"
+        "401":
+          $ref: "#/components/responses/UnauthorizedProblem"
+        "403":
+          $ref: "#/components/responses/ForbiddenProblem"
+        "500":
+          $ref: "#/components/responses/InternalServerErrorProblem"
+      summary: 注文の決済記録を返す。
+      tags:
+      - payment
   /api/products:
     get:
       description: 一覧は商品コードの昇順で items で包んで返す。
@@ -477,6 +510,40 @@ components:
           type: number
           description: 明細の金額の合計
           example: 240.0
+    PaymentSummaryListResponse:
+      type: object
+      description: 決済記録の一覧を items で包んで返す API の本文。
+      properties:
+        items:
+          type: array
+          description: 決済記録の一覧の行。1 注文につき 0 件か 1 件
+          items:
+            $ref: "#/components/schemas/PaymentSummaryResponse"
+    PaymentSummaryResponse:
+      type: object
+      description: 決済記録の一覧の 1 行を返す API の本文。
+      properties:
+        amount:
+          type: number
+          description: 請求した金額
+          example: 240.0
+        gatewayPaymentCode:
+          type: string
+          description: 決済代行が採番した決済の識別子
+          example: fake-5f0c2a8e-7d1b-4c3a-9e6f-1a2b3c4d5e6f
+        orderId:
+          type: string
+          description: 決済した注文の ID
+          example: 5f0c2a8e-7d1b-4c3a-9e6f-1a2b3c4d5e6f
+        paidAt:
+          type: string
+          format: date-time
+          description: 決済した時刻
+          example: 2026-10-06T01:02:03.123456Z
+        paymentId:
+          type: string
+          description: 決済記録の ID
+          example: 7c1e4b2a-3d5f-4a6b-8c9d-0e1f2a3b4c5d
     ProblemDetail:
       type: object
       description: RFC 9457 の Problem Details
