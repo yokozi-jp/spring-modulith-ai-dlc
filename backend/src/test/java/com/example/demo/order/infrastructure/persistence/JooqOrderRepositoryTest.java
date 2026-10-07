@@ -20,6 +20,7 @@ import com.example.demo.shared.infrastructure.persistence.CommonColumns;
 import com.example.demo.shared.infrastructure.persistence.TableWriter;
 import com.example.demo.shared.infrastructure.persistence.TestCommonColumns;
 import com.example.demo.testkit.DatabaseTest;
+import com.example.demo.testkit.UniqueCodes;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
@@ -41,7 +42,7 @@ import org.springframework.dao.DuplicateKeyException;
 class JooqOrderRepositoryTest {
 
   /** 客先注文番号。 */
-  private static final String CUSTOMER_ORDER_CODE = "C-0001";
+  private static final String CUSTOMER_ORDER_CODE = UniqueCodes.next("C");
 
   /** 作成した時刻。 */
   private static final Instant DRAFTED_AT = Instant.parse("2026-10-05T00:00:00Z");
@@ -103,8 +104,9 @@ class JooqOrderRepositoryTest {
   @DisplayName("客先注文番号が重複する保存は、DuplicateKeyException を原因に持つ ConflictException になる")
   void duplicateCustomerOrderCodeBecomesConflict() {
     final OrderRepository repository = repository(ADDED_AT);
-    TestCommonColumns.runAs(() -> repository.add(draft("C-DUP-1", item(PEN, 1))));
-    final Order duplicate = draft("C-DUP-1", item(ERASER, 1));
+    final String customerOrderCode = UniqueCodes.next("C");
+    TestCommonColumns.runAs(() -> repository.add(draft(customerOrderCode, item(PEN, 1))));
+    final Order duplicate = draft(customerOrderCode, item(ERASER, 1));
 
     assertThatThrownBy(() -> TestCommonColumns.runAs(() -> repository.add(duplicate)))
         .isInstanceOf(ConflictException.class)

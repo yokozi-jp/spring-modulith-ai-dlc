@@ -8,6 +8,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.example.demo.product.TestProducts;
 import com.example.demo.testkit.CleanGeneratedTablesExtension;
 import com.example.demo.testkit.SharedTestConfiguration;
+import com.example.demo.testkit.UniqueCodes;
 import java.util.UUID;
 import org.jooq.DSLContext;
 import org.junit.jupiter.api.DisplayName;
@@ -37,19 +38,21 @@ class ProductApiTest {
   @Test
   @DisplayName("商品の一覧を商品コードの昇順で items に入れて返す")
   void listsProductsOrderedByCode() throws Exception {
-    final UUID pen = TestProducts.onSale(dsl, "P-0002", "120.00");
-    final UUID eraser = TestProducts.discontinued(dsl, "P-0001", "80.00");
+    final String base = UniqueCodes.next("P");
+    final UUID pen = TestProducts.onSale(dsl, base + "B", "120.00");
+    final UUID eraser = TestProducts.discontinued(dsl, base + "A", "80.00");
 
     mockMvc
         .perform(get("/api/products").with(oidcLogin()))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.items.length()").value(2))
         .andExpect(jsonPath("$.items[0].productId").value(eraser.toString()))
-        .andExpect(jsonPath("$.items[0].productCode").value("P-0001"))
-        .andExpect(jsonPath("$.items[0].productName").value("name of P-0001"))
+        .andExpect(jsonPath("$.items[0].productCode").value(base + "A"))
+        .andExpect(jsonPath("$.items[0].productName").value("name of " + base + "A"))
         .andExpect(jsonPath("$.items[0].unitPrice").value(80.00))
         .andExpect(jsonPath("$.items[0].salesStatus").value("DISCONTINUED"))
         .andExpect(jsonPath("$.items[1].productId").value(pen.toString()))
+        .andExpect(jsonPath("$.items[1].productCode").value(base + "B"))
         .andExpect(jsonPath("$.items[1].salesStatus").value("ON_SALE"));
   }
 

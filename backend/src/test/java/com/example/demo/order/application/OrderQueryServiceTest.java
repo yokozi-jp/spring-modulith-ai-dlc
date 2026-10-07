@@ -11,6 +11,7 @@ import com.example.demo.product.TestProducts;
 import com.example.demo.shared.concurrency.ExpectedLockNo;
 import com.example.demo.testkit.CleanGeneratedTablesExtension;
 import com.example.demo.testkit.SharedTestConfiguration;
+import com.example.demo.testkit.UniqueCodes;
 import io.micrometer.observation.Observation;
 import io.micrometer.observation.ObservationRegistry;
 import java.math.BigDecimal;
@@ -50,9 +51,10 @@ class OrderQueryServiceTest {
   @Test
   @DisplayName("保存した注文の詳細を、明細の金額と合計と状態の名前で返す")
   void findsDetailsOfSavedOrder() {
-    final UUID pen = TestProducts.onSale(dsl, "P-0001", "120.00");
-    final UUID eraser = TestProducts.onSale(dsl, "P-0002", "80.00");
-    final String orderId = draft("C-0001", pen, 2, eraser, 1);
+    final UUID pen = TestProducts.onSale(dsl, UniqueCodes.next("P"), "120.00");
+    final UUID eraser = TestProducts.onSale(dsl, UniqueCodes.next("P"), "80.00");
+    final String customerOrderCode = UniqueCodes.next("C");
+    final String orderId = draft(customerOrderCode, pen, 2, eraser, 1);
 
     final OrderDetails details =
         orderQueries
@@ -60,7 +62,7 @@ class OrderQueryServiceTest {
             .orElseThrow(() -> new AssertionError("order が見つからない: orderId=" + orderId));
 
     assertThat(details.status()).as("orderId=%s の状態", orderId).isEqualTo("DRAFT");
-    assertThat(details.customerOrderCode()).isEqualTo("C-0001");
+    assertThat(details.customerOrderCode()).isEqualTo(customerOrderCode);
     assertThat(details.lockNo()).isEqualTo(1L);
     assertThat(details.totalAmount()).isEqualByComparingTo(new BigDecimal("320"));
     assertThat(details.lines())
@@ -84,9 +86,9 @@ class OrderQueryServiceTest {
   @Test
   @DisplayName("一覧は作成の新しい順に返し、状態を指定するとその状態の注文だけを返す")
   void searchesByStatus() {
-    final UUID pen = TestProducts.onSale(dsl, "P-0001", "120.00");
-    final String first = draft("C-0001", pen, 1, pen, 1);
-    final String second = draft("C-0002", pen, 1, pen, 1);
+    final UUID pen = TestProducts.onSale(dsl, UniqueCodes.next("P"), "120.00");
+    final String first = draft(UniqueCodes.next("C"), pen, 1, pen, 1);
+    final String second = draft(UniqueCodes.next("C"), pen, 1, pen, 1);
     observed(() -> cancelOrder.handle(new CancelOrderCommand(first, new ExpectedLockNo(1))));
 
     assertThat(orderQueries.search(new OrderSearchCriteria(null)))
