@@ -35,6 +35,7 @@ subject は小文字始まりにし、末尾にピリオドを置かない。
 - subject の末尾にピリオドを置かない（`subject-full-stop`）。
 - `type` と `subject` を空にしない（`type-empty`、`subject-empty`）。
 - header は 100 文字以内にする（`header-max-length`）。
+- body と footer も1行100文字以内にし、長い文は途中で改行する（`body-max-line-length`、`footer-max-line-length`）。
 - body と footer の前に空行を置く（`body-leading-blank`、`footer-leading-blank`）。
 
 ## 破壊的変更
