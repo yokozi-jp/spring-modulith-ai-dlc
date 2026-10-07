@@ -43,6 +43,7 @@ import org.jooq.impl.DSL;
  * を起動せず、Bean にもしないので、ほかのテストのコンテキストでは動かない。環境の確認、「空」の判定、reset の削除を 1 つのトランザクションで行う。
  */
 @Slf4j
+@SuppressWarnings("PMD.TooManyMethods")
 public final class LocalDataSeeder {
 
   /** 実行のモード。 */
@@ -172,11 +173,16 @@ public final class LocalDataSeeder {
 
   /** 引数のモード（auto、seed、reset）で代表データを入れる。異常のときは例外を投げ、終了コードを 1 にする。 */
   public static void main(final String[] args) throws SQLException {
+    run(args, System.getenv());
+  }
+
+  /** 指定した環境変数を使い、引数のモードに従って代表データを入れる。 */
+  /* package */ static void run(final String[] args, final Map<String, String> env)
+      throws SQLException {
     if (args.length == 0) {
       throw new IllegalArgumentException("引数にモード（auto、seed、reset）を渡してください");
     }
     final Mode mode = Mode.valueOf(args[0].toUpperCase(Locale.ROOT));
-    final Map<String, String> env = System.getenv();
     if (mode == Mode.AUTO && !isLocalEnvironment(env)) {
       final String environment = env.get(ENVIRONMENT);
       final String host = env.get(DB_HOST);
