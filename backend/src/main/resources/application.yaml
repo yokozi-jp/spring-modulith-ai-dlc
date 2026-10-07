@@ -45,6 +45,11 @@ spring:
     virtual:
       enabled: true
 
+  # @Async の Listener へ発行元の trace を引き継ぐ（docs/integration/async-observability.md）。
+  task:
+    execution:
+      propagate-context: true
+
   # DB
   datasource:
     # ホスト起動では localhost、Compose の backend profile では postgres サービスを指す。
@@ -150,6 +155,10 @@ spring:
   lifecycle:
     timeout-per-shutdown-phase: 30s
 
+# 決済代行。手順 3 の確認用の偽物で、通信しない。SUCCEED は常に成功、FAIL は常に失敗にする。
+payment-gateway:
+  mode: ${PAYMENT_GATEWAY_MODE}
+
 # 外部 client は依存先ごとに名前付き instance を定義し、client adapter の境界で適用する。
 # 現在の PostgreSQL、Redis、OIDC 通信へは自動適用されない。
 resilience4j:
@@ -162,6 +171,9 @@ resilience4j:
         failure-rate-threshold: 50
         wait-duration-in-open-state: 30s
         permitted-number-of-calls-in-half-open-state: 5
+    instances:
+      payment-gateway:
+        base-config: default
   retry:
     configs:
       # 非冪等処理を重複実行しないよう、明示しない retry は無効にする。
@@ -173,6 +185,10 @@ resilience4j:
         wait-duration: 200ms
         enable-exponential-backoff: true
         exponential-backoff-multiplier: 2
+    instances:
+      # 冪等キーを渡すが、CommandHandler のトランザクションの中で呼ぶため default（試行 1 回）を継承する。
+      payment-gateway:
+        base-config: default
   timelimiter:
     configs:
       default:

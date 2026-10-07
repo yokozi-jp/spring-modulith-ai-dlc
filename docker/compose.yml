@@ -157,6 +157,7 @@ services:
       # コンテナから issuer metadata を取得するため Compose の service 名を使う。
       OIDC_ISSUER_URI: http://keycloak:8080/realms/spring-modulith
       SPRINGDOC_ENABLED: ${SPRINGDOC_ENABLED:?SPRINGDOC_ENABLED is required}
+      PAYMENT_GATEWAY_MODE: ${PAYMENT_GATEWAY_MODE:?PAYMENT_GATEWAY_MODE is required}
       OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318
       OTEL_SERVICE_NAME: ${OTEL_SERVICE_NAME:?OTEL_SERVICE_NAME is required}
       OTEL_DEPLOYMENT_ENVIRONMENT_NAME: ${OTEL_DEPLOYMENT_ENVIRONMENT_NAME:?OTEL_DEPLOYMENT_ENVIRONMENT_NAME is required}

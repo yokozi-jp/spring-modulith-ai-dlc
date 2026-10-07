@@ -5,16 +5,22 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import com.example.demo.payment.domain.model.Money;
+import com.example.demo.payment.domain.model.OrderId;
+import com.example.demo.payment.domain.model.PaymentGateway;
 import com.example.demo.testkit.SharedTestConfiguration;
 import com.zaxxer.hikari.HikariDataSource;
+import io.github.resilience4j.circuitbreaker.CircuitBreaker;
 import io.github.resilience4j.circuitbreaker.CircuitBreakerConfig;
 import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry;
 import io.github.resilience4j.core.IntervalBiFunction;
 import io.github.resilience4j.core.functions.Either;
+import io.github.resilience4j.retry.Retry;
 import io.github.resilience4j.retry.RetryConfig;
 import io.github.resilience4j.retry.RetryRegistry;
 import io.github.resilience4j.timelimiter.TimeLimiterConfig;
 import io.github.resilience4j.timelimiter.TimeLimiterRegistry;
+import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
@@ -22,6 +28,7 @@ import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.Map;
 import java.util.Objects;
+import java.util.UUID;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeoutException;
 import org.junit.jupiter.api.DisplayName;
@@ -39,8 +46,8 @@ import org.springframework.security.oauth2.core.endpoint.OAuth2AuthorizationRequ
 import org.springframework.security.oauth2.core.endpoint.PkceParameterNames;
 
 /** アプリケーション起動時の日時、DB、耐障害性、OIDC 配線を検証する統合テスト。 */
-// 起動時の配線を設定ごとに一つのテストで検証するため、メソッドの数の上限を外す。
-@SuppressWarnings("PMD.TooManyMethods")
+// 起動時の配線を設定ごとに一つのテストで検証するため、メソッドの数と結合する型の数の上限を外す。
+@SuppressWarnings({"PMD.TooManyMethods", "PMD.CouplingBetweenObjects"})
 @SpringBootTest
 @Import(SharedTestConfiguration.class)
 class DemoApplicationTest {
@@ -69,6 +76,9 @@ class DemoApplicationTest {
 
   /** PKCE パラメータを検証する対象の認可リクエストリゾルバ。 */
   @Autowired private OAuth2AuthorizationRequestResolver authorizationRequestResolver;
+
+  /** resilience4j の注釈が掛かることを検証する決済代行の Client。 */
+  @Autowired private PaymentGateway paymentGateway;
 
   /** 起動確認の対象となる {@code ApplicationContext}。 */
   @Autowired private ApplicationContext applicationContext;
@@ -154,6 +164,29 @@ class DemoApplicationTest {
     assertEquals(3, idempotentConfig.getMaxAttempts(), "冪等操作の最大試行回数が三回であること");
     assertEquals(200L, firstRetryDelay, "冪等操作の初回 retry 待機が 200 ミリ秒であること");
     assertEquals(400L, secondRetryDelay, "冪等操作の retry 待機が倍率 2 で増えること");
+  }
+
+  @Test
+  @DisplayName("決済代行の Client に payment-gateway の circuit breaker と retry が掛かる")
+  void paymentGatewayIsGuardedByResilience4j() {
+    // YAML の instance は注釈がなくても registry に作られるため、呼び出しの件数の増加で aspect が掛かったことを確かめる。
+    final CircuitBreaker circuitBreaker = circuitBreakerRegistry.circuitBreaker("payment-gateway");
+    final Retry retry = retryRegistry.retry("payment-gateway");
+    final long callsBefore = circuitBreaker.getMetrics().getNumberOfSuccessfulCalls();
+    final long retryBefore = retry.getMetrics().getNumberOfSuccessfulCallsWithoutRetryAttempt();
+
+    paymentGateway.charge(new OrderId(UUID.randomUUID()), new Money(new BigDecimal("1.00")));
+
+    assertEquals(
+        callsBefore + 1,
+        circuitBreaker.getMetrics().getNumberOfSuccessfulCalls(),
+        "payment-gateway の circuit breaker が成功の呼び出しを 1 件数えること");
+    assertEquals(
+        retryBefore + 1,
+        retry.getMetrics().getNumberOfSuccessfulCallsWithoutRetryAttempt(),
+        "payment-gateway の retry が再試行なしの成功を 1 件数えること");
+    assertEquals(
+        1, retry.getRetryConfig().getMaxAttempts(), "payment-gateway の retry の試行が 1 回であること");
   }
 
   @Test
