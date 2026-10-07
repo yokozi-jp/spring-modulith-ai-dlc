@@ -407,9 +407,9 @@ tasks:
       - |
         # grep は一致で 0、不一致で 1、対象がないなどの失敗で 2 を返す。1 以外は失敗にする。
         status=0
-        grep -rqiE 'faro|grafana' dist/assets || status=$?
+        grep -rqiE 'faro|grafana|opentelemetry' dist/assets || status=$?
         if [ "$status" -ne 1 ]; then
-          echo "無効のビルドの bundle に Faro の SDK が入っているか、dist/assets を検査できませんでした（grep の終了コード $status）。" >&2
+          echo "無効のビルドの bundle に Faro の SDK か OpenTelemetry JS が入っているか、dist/assets を検査できませんでした（grep の終了コード $status）。" >&2
           exit 1
         fi
 
