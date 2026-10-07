@@ -1095,18 +1095,29 @@ tasks:
               | attr("service.name") == "demo-web"
                 and ([.attributes[]?.key] | sort) == ["deployment.environment.name", "service.name", "service.namespace", "service.version"])
             and all($scopes[]; .scope.name == "browser" and ((.scope.version // "") == "") and ((.scope.attributes // []) | length) == 0)
-            and ($spans | length) == 1
+            and ($spans | length) == 3
             and all($spans[];
-              ([.attributes[]?.key] | sort) == ["http.request.method", "http.response.status_code", "url.path"]
-                and attr("url.path") == "/api/orders/42"
-                and attr("http.request.method") == "GET"
-                and .name == "Browser request"
+              .name == "Browser request"
                 and .traceId == "0af7651916cd43dd8448eb211c80319c"
-                and .spanId == "b7ad6b7169203331"
                 and ((.traceState // "") == "")
                 and ((.status.message // "") == "")
                 and ((.events // []) | length) == 0
                 and ((.links // []) | length) == 0)
+            and any($spans[];
+              .spanId == "b7ad6b7169203331"
+                and ([.attributes[]?.key] | sort) == ["http.request.method", "http.response.status_code", "url.path"]
+                and attr("url.path") == "/api/orders/42"
+                and attr("http.request.method") == "GET")
+            and any($spans[];
+              .spanId == "b7ad6b7169203332"
+                and ([.attributes[]?.key] | sort) == ["http.request.method", "http.response.status_code"]
+                and attr("url.path") == null
+                and attr("http.request.method") == "POST")
+            and any($spans[];
+              .spanId == "b7ad6b7169203333"
+                and ([.attributes[]?.key] | sort) == ["http.request.method", "http.response.status_code"]
+                and attr("url.path") == null
+                and attr("http.request.method") == "DELETE")
         ' "$out/frontend-traces.json" >/dev/null; then
           fail "フロントエンドの trace の属性、resource 属性、span の項目のいずれかが期待値と一致しません。"
         fi

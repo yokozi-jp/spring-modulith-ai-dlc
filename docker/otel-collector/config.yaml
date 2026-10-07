@@ -82,6 +82,7 @@ processors:
     error_mode: silent
     trace_statements:
       # url.full は残さず、URL の構文で path だけを取り出す。query と fragment を正規表現で消すより漏れがない。
+      - delete_key(span.attributes, "url.path")
       - set(span.attributes["url.path"], URL(span.attributes["url.full"])["url.path"]) where span.attributes["url.full"] != nil
       # 計装の名前は method だけだが、/collect に直接送られた名前は自由な文字列になりうる。method は http.request.method に残る。
       - set(span.name, "Browser request")
