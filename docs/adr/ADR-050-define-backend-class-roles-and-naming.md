@@ -225,7 +225,7 @@ Proposed
 
 ### 選択肢11: jOOQ の Record と集約の変換を専用の Mapper のクラスに分ける
 
-- **Description**：`infrastructure.persistence` に static メソッドだけを持つ集約ごとの Mapper のクラスを置き、`selectFrom` で読んだ `OrdersRecord` の getter から集約を組み立て、集約から `OrdersRecord` を作る。
+- **Description**：`infrastructure.persistence` に static メソッドだけを持つ集約ごとの Mapper のクラスを置き、`selectFrom` で読んだ `TOrderRecord` の getter から集約を組み立て、集約から `TOrderRecord` を作る。
 - **Pros**：Repository が SQL だけになり、短くなる。
 - **Cons**：子の行を別の SQL で読んで集約ごとに分ける処理は Repository に残り、一つの集約の変換が二つのクラスに分かれる。`convertFrom`、`multiset`、`Records.mapping` を使えば、変換は `select` に並べる列の中に収まり、別のクラスに分ける中身が残らない。役割とクラスが集約ごとに一つずつ増えるだけである。
 
@@ -237,7 +237,7 @@ Proposed
 
 ### 選択肢13: jOOQ のコード生成の `forcedTypes` と `Converter` で値オブジェクトに対応づける
 
-- **Description**：コード生成の設定で、`ORDERS.ORDER_ID` などの列を `Converter` で `OrderId` などの値オブジェクトの型にして生成する（[jOOQ, Forced types](https://www.jooq.org/doc/latest/manual/code-generation/codegen-advanced/codegen-config-database/codegen-database-forced-types/)）。
+- **Description**：コード生成の設定で、`T_ORDER.ORDER_ID` などの列を `Converter` で `OrderId` などの値オブジェクトの型にして生成する（[jOOQ, Forced types](https://www.jooq.org/doc/latest/manual/code-generation/codegen-advanced/codegen-config-database/codegen-database-forced-types/)）。
 - **Pros**：生成型の列が最初から値オブジェクトの型になり、クエリごとの `convertFrom` が要らない。
 - **Cons**：共有の生成パッケージ `com.example.demo.jooq` が、各モジュールの内部パッケージ `domain.model` の型に依存し、モジュールの境界をまたぐ。ArchUnit の規則は生成型が Domain に依存しない向きを前提にしており、生成コードを検査対象から外しているため、この依存は規則でも見つからない。
 
