@@ -225,7 +225,7 @@ OxlintのJS plugin APIはalphaである。
 ``` text
 main.tsx -> api/query-client.ts -> api/api-fetch.ts -> lib
          -> router-defaults.ts -> components
-         -> lib/telemetry.ts -> @grafana/faro-web-sdk（動的import）
+         -> lib/telemetry.ts -> @grafana/faro-web-sdk、@grafana/faro-web-tracing（動的import）
          -> routeTree.gen.ts -> routes
                                   |
                                   +-> features
