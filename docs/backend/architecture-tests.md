@@ -96,8 +96,8 @@ jOOQの生成物の`com.example.demo.jooq`はOPENのモジュールであり、`
 プロダクションの規則は`.allowEmptyShould(true)`を付けるため、対象のクラスがなくても成功する。
 `ArchitectureRuleFixtureTest`は、テスト専用のフィクスチャで各規則が働くことを確かめる。
 
-- `backend/src/test/java/archfixture/conforming/`：規約どおりの`order`モジュール、`inventory`モジュール、`shared`モジュールの最小の例。すべての規則が誤検出しないことを確かめる。
-  `order`の`JooqOrderRepository`が`shared.infrastructure.persistence`の型を使い、`shared`のルートは`package-info.java`だけを持つ。
+- `backend/src/test/java/archfixture/conforming/`：規約どおりの`ordering`モジュール、`inventory`モジュール、`shared`モジュールの最小の例。すべての規則が誤検出しないことを確かめる。
+  `ordering`の`JooqOrderRepository`が`shared.infrastructure.persistence`の型を使い、`shared`のルートは`package-info.java`だけを持つ。
 - `backend/src/test/java/archfixture/violating/`：規則ごとに違反するクラスを置く。各クラスのJavadocに違反する規則名を書く。パラメータ化テストが、規則ごとに対応する違反クラスの完全修飾名を含む失敗を確かめる。
 
 フィクスチャは`com.example.demo`の外に置く。
@@ -146,7 +146,7 @@ ArchUnitは規則の説明の後に`, because`とこの文をつなぎ、違反�
 
 ```text
 Rule 'no classes should be meta-annotated with @Transactional, because 状態を変えるユースケースの処理の順序とトランザクション境界を一か所で決め、一つのユースケースを Command の受け取りから Result の返却まで一つのトランザクションで進めるため。直し方：クラスの @Transactional を外し、Application の public メソッドへ付け直す。規約：docs/backend/layers.md、docs/backend/class-roles/command-handler.md、docs/adr/ADR-050-define-backend-class-roles-and-naming.md' was violated (1 times):
-Class <archfixture.violating.order.application.ShipOrderCommandHandler> is meta-annotated with @Transactional in (ShipOrderCommandHandler.java:0)
+Class <archfixture.violating.ordering.application.ShipOrderCommandHandler> is meta-annotated with @Transactional in (ShipOrderCommandHandler.java:0)
 ```
 
 `ArchitectureRuleMessageTest`は、`architecture`パッケージで`@ArchTest`を付けた`ArchRule`のフィールドをすべて集め、最後のbecauseがこの形であることと、「規約：」の各パスがリポジトリにあることを確かめる。

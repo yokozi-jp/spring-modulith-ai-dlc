@@ -42,7 +42,7 @@ class CommonColumnsTest {
   private static final String TRACE_ID = "4bf92f3577b34da6a3ce929d0e0e4736";
 
   /** 呼び出し中のユースケースとして束縛する pgm_cd。 */
-  private static final String PGM_CD = "order.PlaceOrder";
+  private static final String PGM_CD = "ordering.PlaceOrder";
 
   /** 現在のスパンを持つ、検証対象の共通処理。 */
   private final CommonColumns commonColumns =

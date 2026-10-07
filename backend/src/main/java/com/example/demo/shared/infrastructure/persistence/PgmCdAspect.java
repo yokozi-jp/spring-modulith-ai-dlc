@@ -10,7 +10,7 @@ import org.springframework.stereotype.Component;
  * 共通カラムの {@code *_pgm_cd} の値を、ユースケースの呼び出しの間だけ {@link ScopedValue} に束縛する（ADR-051）。
  *
  * <p>機能モジュールの {@code *CommandHandler} の {@code handle} と、{@code *Listener} の public メソッドを対象にする。値は
- * {@code モジュール名.クラスの単純名から CommandHandler か Listener を除いた名前}（{@code order.PlaceOrder}）である。
+ * {@code モジュール名.クラスの単純名から CommandHandler か Listener を除いた名前}（{@code ordering.PlaceOrder}）である。
  * 束縛の中で別のユースケースが呼ばれたら、その呼び出しの間は内側の値になる。
  *
  * <p>{@code *Listener} の呼び出しの間は、内側の CommandHandler の呼び出しも含めて、Listener の中であることも束縛する。{@link

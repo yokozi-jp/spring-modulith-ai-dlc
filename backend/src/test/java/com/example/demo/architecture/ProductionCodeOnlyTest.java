@@ -31,7 +31,7 @@ class ProductionCodeOnlyTest {
         Location.of(
             URI.create(
                 "file:/app/backend/build/classes/java/main/com/example/demo/"
-                    + "order/infrastructure/persistence/jooq/JooqOrderRepository.class"));
+                    + "ordering/infrastructure/persistence/jooq/JooqOrderRepository.class"));
 
     assertThat(ProductionCodeOnly.isHandwritten(handwritten)).isTrue();
   }
