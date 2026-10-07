@@ -19,7 +19,7 @@ def databaseName = System.getenv('DB_NAME') ?: 'demo'
 def databaseUrl = System.getenv('DB_URL') ?: "jdbc:postgresql://${databaseHost}:${databasePort}/${databaseName}"
 def appDatabaseUsername = System.getenv('DB_USERNAME') ?: ''
 def migrationDatabaseSchema = 'liquibase'
-def databaseSchemas = ['modulith', 'product', 'order']
+def databaseSchemas = ['modulith', 'product', 'order', 'payment']
 
 // 接続先はアプリケーションと共有し、役割差は資格情報だけにする。
 def migrationDatabaseUrl = databaseUrl

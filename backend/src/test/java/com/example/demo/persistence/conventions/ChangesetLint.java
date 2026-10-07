@@ -48,7 +48,8 @@ final class ChangesetLint {
               moduleSchemaSql(
                   "004-create-order-tables",
                   "\"order\"",
-                  "\"order\".t_order, \"order\".t_order_line"))
+                  "\"order\".t_order, \"order\".t_order_line"),
+              moduleSchemaSql("006-create-payment-tables", "payment", "payment.t_payment"))
           .flatMap(List::stream)
           .toList();
 
