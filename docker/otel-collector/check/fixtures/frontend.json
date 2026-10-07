@@ -30,6 +30,66 @@
       }
     }
   ],
+  "traces": {
+    "resourceSpans": [
+      {
+        "resource": {
+          "attributes": [
+            { "key": "service.name", "value": { "stringValue": "demo-api" } },
+            { "key": "service.namespace", "value": { "stringValue": "demo" } },
+            { "key": "service.version", "value": { "stringValue": "0.0.0-fixture" } },
+            { "key": "deployment.environment.name", "value": { "stringValue": "local" } },
+            { "key": "browser.name", "value": { "stringValue": "Chrome" } },
+            { "key": "user_agent.original", "value": { "stringValue": "FixtureAgent/1.0" } },
+            { "key": "session.id", "value": { "stringValue": "fixture-session-id" } }
+          ]
+        },
+        "scopeSpans": [
+          {
+            "scope": {
+              "name": "secret-scope",
+              "version": "secret-scope-version",
+              "attributes": [{ "key": "scope.attr", "value": { "stringValue": "secret-scope-attr" } }]
+            },
+            "spans": [
+              {
+                "traceId": "0af7651916cd43dd8448eb211c80319c",
+                "spanId": "b7ad6b7169203331",
+                "traceState": "secret-trace-state",
+                "name": "secret-span-name",
+                "kind": 3,
+                "startTimeUnixNano": "1791244800000000000",
+                "endTimeUnixNano": "1791244800100000000",
+                "attributes": [
+                  { "key": "url.full", "value": { "stringValue": "http://localhost:5173/api/orders/42?token=secret-query#secret-fragment" } },
+                  { "key": "http.request.method", "value": { "stringValue": "GET" } },
+                  { "key": "http.response.status_code", "value": { "intValue": "200" } },
+                  { "key": "server.address", "value": { "stringValue": "localhost" } },
+                  { "key": "session.id", "value": { "stringValue": "fixture-session-id" } },
+                  { "key": "user.email", "value": { "stringValue": "person@example.com" } }
+                ],
+                "events": [
+                  {
+                    "timeUnixNano": "1791244800050000000",
+                    "name": "secret-event",
+                    "attributes": [{ "key": "exception.message", "value": { "stringValue": "secret-event-attr" } }]
+                  }
+                ],
+                "links": [
+                  {
+                    "traceId": "5b8efff798038103d269b633813fc60c",
+                    "spanId": "eee19b7ec3c1b174",
+                    "attributes": [{ "key": "link.attr", "value": { "stringValue": "secret-link-attr" } }]
+                  }
+                ],
+                "status": { "code": 2, "message": "secret-status" }
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
   "logs": [{ "message": "secret-log-item", "level": "info", "timestamp": "2026-10-06T00:00:04.000Z" }],
   "events": [{ "name": "secret-event-item", "timestamp": "2026-10-06T00:00:05.000Z" }],
   "measurements": [{ "type": "secret-measurement-item", "values": { "lcp": 1 }, "timestamp": "2026-10-06T00:00:06.000Z" }]

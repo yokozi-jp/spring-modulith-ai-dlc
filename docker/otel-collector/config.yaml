@@ -67,6 +67,37 @@ processors:
       # ponytail: ParseKeyValue はエスケープを解かないため、stacktrace の改行は \n、引用符は \" の 2 文字のまま属性の値に残る。
       # 読みにくさが問題になったら、エスケープを解く文を足す。
       - keep_keys(log.attributes, ["exception.type", "exception.message", "exception.stacktrace", "url.path"])
+  # フロントエンドの span も filter と transform の 2 段で守る。/collect は誰でも送れる（ADR-068）ので、送り手が書ける値を信頼しない。
+  # span の event は例外のメッセージなどを持ちうるので、すべて捨てる。
+  filter/frontend_span_events:
+    error_mode: silent
+    traces:
+      spanevent:
+        # 引用符を外すと YAML の bool になり、Collector が起動しない。
+        - 'true'
+  # フロントエンドの span。許可した属性だけを残し、送り手が自由に書ける名前、status の message、trace_state、scope を固定の値か空にする。
+  # 属性を足すときは docs/observability/conventions.md と同じ変更で直す。
+  transform/frontend_traces:
+    # 解析に失敗した文は飛ばし、keep_keys で許可した属性以外を残さない側に倒す。
+    error_mode: silent
+    trace_statements:
+      # url.full は残さず、URL の構文で path だけを取り出す。query と fragment を正規表現で消すより漏れがない。
+      - set(span.attributes["url.path"], URL(span.attributes["url.full"])["url.path"]) where span.attributes["url.full"] != nil
+      # 計装の名前は method だけだが、/collect に直接送られた名前は自由な文字列になりうる。method は http.request.method に残る。
+      - set(span.name, "Browser request")
+      - set(span.status.message, "")
+      - set(span.trace_state, "")
+      # links とその属性も送り手が自由に書ける。ブラウザの計装は links を作らないので、すべて捨てる。
+      - set(span.links, nil)
+      - set(scope.name, "browser")
+      - set(scope.version, "")
+      - keep_keys(scope.attributes, [])
+      # logs/frontend と同じく、service.name は Collector の値で上書きし、バックエンドの名前を名乗らせない。
+      - set(resource.attributes["service.name"], "${env:FRONTEND_OTEL_SERVICE_NAME:-demo-web}")
+      - keep_keys(resource.attributes, ["service.name", "service.namespace", "service.version", "deployment.environment.name"])
+      # ponytail: http.request.method の値は payload のまま残り、送り手が任意の文字列を入れうる。
+      # logs/frontend の exception.message と同じく、保存先の閲覧の制限とマスクで扱う。
+      - keep_keys(span.attributes, ["http.request.method", "http.response.status_code", "url.path"])
 
 exporters:
   # ローカルの Grafana OpenTelemetry LGTM。
@@ -80,13 +111,16 @@ service:
       processors: [transform/log_attributes]
       exporters: [otlp_http/lgtm]
     # バックエンドの allowlist と混ぜないため、フロントエンドの pipeline を分ける。
-    # faro receiver の traces はこのチケットでは使わない。
     logs/frontend:
       receivers: [faro]
       processors: [filter/frontend_exceptions, transform/frontend_logs]
       exporters: [otlp_http/lgtm]
     traces:
       receivers: [otlp]
+      exporters: [otlp_http/lgtm]
+    traces/frontend:
+      receivers: [faro]
+      processors: [filter/frontend_span_events, transform/frontend_traces]
       exporters: [otlp_http/lgtm]
     metrics:
       receivers: [otlp]

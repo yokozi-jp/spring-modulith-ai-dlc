@@ -943,7 +943,7 @@ tasks:
         echo "Login URL: http://localhost:18080/oauth2/authorization/web"
 
   otel-collector-check:
-    desc: Collectorの設定が許可したログ属性だけを残すことを確認
+    desc: Collectorの設定が許可したログとtraceの属性だけを残すことを確認
     silent: true
     cmds:
       - |
@@ -952,7 +952,7 @@ tasks:
         # 個人情報や URL のトークンが保存先に流れ、一度書かれたログは取り消せない。だから設定を変えたら必ず流して確かめる。
         # 検証する内容の正文は docs/observability/conventions.md の「検証」節と ADR-068 にある（Taskfile は手順だけを持つ）。
         # 本物の Grafana を立てず、check/check.yaml で出口だけをファイルに差し替える。processor は config.yaml のまま使う。
-        # 出口はバックエンド（backend.json）とフロントエンド（frontend.json）に分け、それぞれ別の jq で検査する。
+        # 出口はバックエンド（backend.json）、フロントエンドのログ（frontend.json）と trace（frontend-traces.json）に分け、それぞれ別の jq で検査する。
         # 入力の fixture は check/fixtures/ に置き、backend.json は OTLP 形式、frontend.json は Faro の payload 形式である。
         # イメージは Compose の定義から取り、Dependabot の更新と揃える。
         image="$({{.DOCKER}} compose --env-file .env.example -f docker/compose.yml config --format json | jq -r '.services["otel-collector"].image')"
@@ -1076,7 +1076,41 @@ tasks:
         ' "$out/frontend.json" >/dev/null; then
           fail "フロントエンドのログの属性、resource 属性、本文のいずれかが期待値と一致しません。"
         fi
-        echo "Collector OK: 許可した属性だけを残し、Faro の payload から URL の query と許可していない値を消しました。"
+        # 同じ payload の traces は traces/frontend を通り、frontend-traces.json に出る。
+        for _ in $(seq 1 30); do
+          if grep -qF 'resourceSpans' "$out/frontend-traces.json" 2>/dev/null; then break; fi
+          sleep 1
+        done
+        if [ ! -s "$out/frontend-traces.json" ]; then fail "フロントエンドの trace が出口に届きませんでした。"; fi
+        if grep -qE 'secret-|person@example\.com|fixture-user-id|fixture-session-id|FixtureAgent' "$out/frontend-traces.json"; then
+          fail "フロントエンドの trace に、許可していない値か URL の query か fragment が残りました。"
+        fi
+        if ! jq -s -e '
+          def attr($key): first(.attributes[]? | select(.key == $key) | .value.stringValue);
+          [.[].resourceSpans[]?] as $resources
+          | [$resources[].scopeSpans[]?] as $scopes
+          | [$scopes[].spans[]?] as $spans
+          | ($resources | length) > 0
+            and all($resources[]; .resource
+              | attr("service.name") == "demo-web"
+                and ([.attributes[]?.key] | sort) == ["deployment.environment.name", "service.name", "service.namespace", "service.version"])
+            and all($scopes[]; .scope.name == "browser" and ((.scope.version // "") == "") and ((.scope.attributes // []) | length) == 0)
+            and ($spans | length) == 1
+            and all($spans[];
+              ([.attributes[]?.key] | sort) == ["http.request.method", "http.response.status_code", "url.path"]
+                and attr("url.path") == "/api/orders/42"
+                and attr("http.request.method") == "GET"
+                and .name == "Browser request"
+                and .traceId == "0af7651916cd43dd8448eb211c80319c"
+                and .spanId == "b7ad6b7169203331"
+                and ((.traceState // "") == "")
+                and ((.status.message // "") == "")
+                and ((.events // []) | length) == 0
+                and ((.links // []) | length) == 0)
+        ' "$out/frontend-traces.json" >/dev/null; then
+          fail "フロントエンドの trace の属性、resource 属性、span の項目のいずれかが期待値と一致しません。"
+        fi
+        echo "Collector OK: 許可した属性だけを残し、Faro の payload のログと trace から URL の query と許可していない値を消しました。"
 
   compose-reset:
     desc: 明示確認付きでComposeサービスと全データを削除
