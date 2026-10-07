@@ -1,8 +1,8 @@
-import { afterEach, describe, expect, it, vi } from "vite-plus/test";
+import { describe, expect, it, vi } from "vite-plus/test";
 
-import { maskedCsrfToken } from "./csrf";
+import { csrfToken, maskedCsrfToken } from "./csrf";
 
-const csrfToken = "0b1e5c1a-4f0e-4c55-9d8e-2f1a3b4c5d6e";
+const cookieValue = "0b1e5c1a-4f0e-4c55-9d8e-2f1a3b4c5d6e";
 
 // XorCsrfTokenRequestAttributeHandler と同じく、base64url を decode して前半と後半を XOR する。
 function unmask(value: string) {
@@ -17,18 +17,30 @@ function unmask(value: string) {
   return new TextDecoder().decode(token);
 }
 
-describe("maskedCsrfToken", () => {
-  afterEach(() => {
-    vi.unstubAllGlobals();
+describe("csrfToken", () => {
+  it("returns the __Host-XSRF-TOKEN cookie apart from similarly named cookies", () => {
+    vi.stubGlobal("document", {
+      cookie: `XSRF-TOKEN=old; other=1; __Host-XSRF-TOKEN=${cookieValue}`,
+    });
+
+    expect(csrfToken()).toBe(cookieValue);
   });
 
-  it("masks the XSRF-TOKEN cookie so that Spring Security can unmask it", () => {
-    vi.stubGlobal("document", { cookie: `other=1; XSRF-TOKEN=${csrfToken}` });
+  it.each(["other=1", "other=1; __Host-XSRF-TOKEN="])("returns undefined for %j", (cookie) => {
+    vi.stubGlobal("document", { cookie });
+
+    expect(csrfToken()).toBeUndefined();
+  });
+});
+
+describe("maskedCsrfToken", () => {
+  it("masks the __Host-XSRF-TOKEN cookie so that Spring Security can unmask it", () => {
+    vi.stubGlobal("document", { cookie: `other=1; __Host-XSRF-TOKEN=${cookieValue}` });
 
     const masked = maskedCsrfToken();
 
-    expect(masked).not.toBe(csrfToken);
+    expect(masked).not.toBe(cookieValue);
     expect(masked).toMatch(/^[\w-]*={0,2}$/u);
-    expect(unmask(masked)).toBe(csrfToken);
+    expect(unmask(masked)).toBe(cookieValue);
   });
 });

@@ -9,10 +9,10 @@ import {
   RouterProvider,
 } from "@tanstack/react-router";
 import type { AnyRoute } from "@tanstack/react-router";
-import { cleanup, render, screen } from "@testing-library/react";
+import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { I18nextProvider } from "react-i18next";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vite-plus/test";
+import { beforeEach, describe, expect, it, vi } from "vite-plus/test";
 
 import { i18n } from "@/i18n";
 import { routerDefaults } from "@/router-defaults";
@@ -48,12 +48,6 @@ describe("router defaults", () => {
   beforeEach(async () => {
     await i18n.changeLanguage("en");
     vi.spyOn(globalThis, "scrollTo").mockReturnValue();
-  });
-
-  afterEach(async () => {
-    cleanup();
-    vi.restoreAllMocks();
-    await i18n.changeLanguage("ja");
   });
 
   it("shows the localized not-found view with a link back to home", async () => {

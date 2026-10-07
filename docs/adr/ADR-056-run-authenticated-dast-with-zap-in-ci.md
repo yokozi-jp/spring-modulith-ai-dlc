@@ -25,7 +25,7 @@ Proposed
 未認証で到達できるのは health、OAuth2 のログイン、`/error`、API 文書だけで、それ以外は認証が要る。
 このため、未認証のスキャンではほとんどの応答が 401 か Keycloak への 302 になり、検査できる範囲が狭い。
 
-CSRF は Spring Security の `csrf.spa()` で、`XSRF-TOKEN` Cookie の値を `X-XSRF-TOKEN` Header で送り返させる。
+CSRF は Spring Security の `csrf.spa()` で、`__Host-XSRF-TOKEN` Cookie（ADR-066）の値を `X-XSRF-TOKEN` Header で送り返させる。
 GET、HEAD、TRACE、OPTIONS 以外はすべてトークンが要り、除外パスはない。
 ZAP の anti-CSRF 処理はフォームのトークンしか扱わず、この Header を付けられない。
 
@@ -58,7 +58,7 @@ redirect_uri が `http://localhost:4173` から組み立てられるので、`do
 セッション管理は自動検出を使い、うまくいかなければ `APP_SESSION` Cookie を指定する。
 `/logout` はスキャン範囲から外す。
 
-`XSRF-TOKEN` Cookie の値を `X-XSRF-TOKEN` Header に写す httpsender script を作り、リポジトリで管理する。
+`__Host-XSRF-TOKEN` Cookie の値を `X-XSRF-TOKEN` Header に写す httpsender script を作り、リポジトリで管理する。
 スキャンの前に、認証した状態の `GET /api/missing` と `POST /api/missing` がどちらも 404 になることを確かめる。
 POST が 403 なら script が働いていないので、タスクを失敗させる。
 

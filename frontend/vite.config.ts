@@ -96,6 +96,8 @@ export default defineConfig(({ mode }) => {
     resolve: { tsconfigPaths: true },
     test: {
       exclude: [...defaultExclude, ...lintFixtures, "e2e/**"],
+      // MSW の server と後片付けを全テストで共有する（docs/frontend/testing.md）。
+      setupFiles: ["./src/testing/setup.ts"],
       coverage: {
         provider: "v8",
         include: ["src/**/*.{ts,tsx}"],

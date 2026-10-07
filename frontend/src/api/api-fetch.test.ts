@@ -1,21 +1,12 @@
+// oxlint-disable max-lines -- apiFetch の応答、CSRF の header、401 の遷移、再試行の判定を 1 つの module の test に集めるため、行数で分割しない。
 import { http, HttpResponse } from "msw";
-import { setupServer } from "msw/node";
-import {
-  afterAll,
-  afterEach,
-  beforeAll,
-  beforeEach,
-  describe,
-  expect,
-  it,
-  vi,
-} from "vite-plus/test";
+import { beforeEach, describe, expect, it, vi } from "vite-plus/test";
+
+import { server } from "@/testing/msw";
 
 // Node の fetch は相対 URL を解決しないため、絶対 URL にする。
 const baseUrl = "http://localhost";
 const loginPath = "/oauth2/authorization/web";
-// MSW の server はこのファイルだけで使う。2 つ目の MSW のテストを書くときに src/testing/msw へ移す。
-const server = setupServer();
 const assign = vi.fn<(url: string) => void>();
 // fallback の memory の値はモジュールの変数なので、テストごとに読み直す（beforeEach）。
 let api = await import("./api-fetch");
@@ -53,25 +44,13 @@ async function fetchError(path: string): Promise<unknown> {
 }
 
 describe("api-fetch", () => {
-  beforeAll(() => {
-    server.listen({ onUnhandledRequest: "error" });
-  });
-
   beforeEach(async () => {
     vi.resetModules();
     api = await import("./api-fetch");
     assign.mockReset();
-    vi.stubGlobal("location", { assign });
-  });
-
-  afterEach(() => {
-    server.resetHandlers();
-    vi.unstubAllGlobals();
-    vi.useRealTimers();
-  });
-
-  afterAll(() => {
-    server.close();
+    vi.stubGlobal("location", { assign, href: `${baseUrl}/`, origin: baseUrl });
+    // Node には document がないため、Cookie のない document を置く。
+    vi.stubGlobal("document", { cookie: "" });
   });
 
   describe("apiFetch", () => {
@@ -172,6 +151,79 @@ describe("api-fetch", () => {
 
       expect(error).toBeInstanceOf(api.ApiProblemError);
       expect(error).toMatchObject({ status: 500, problem: undefined });
+    });
+  });
+
+  describe("CSRF header", () => {
+    const cookieValue = "0b1e5c1a-4f0e-4c55-9d8e-2f1a3b4c5d6e";
+    const received: Headers[] = [];
+
+    beforeEach(() => {
+      received.length = 0;
+      server.use(
+        // 別の origin への要求も受けるよう、origin を問わない path にする。
+        http.all("*/api/echo", ({ request }) => {
+          received.push(request.headers);
+          // oxlint-disable-next-line unicorn/no-null -- 204 は本文を持てない。
+          return new HttpResponse(null, { status: 204 });
+        }),
+      );
+    });
+
+    async function send(init: RequestInit, origin = baseUrl): Promise<Headers | undefined> {
+      await api.apiFetch(`${origin}/api/echo`, init);
+      return received.at(-1);
+    }
+
+    it.each(["POST", "PUT", "PATCH", "DELETE", "post", "patch"])(
+      "%s に Cookie と同じ値の X-XSRF-TOKEN を付ける",
+      async (method) => {
+        vi.stubGlobal("document", { cookie: `other=1; __Host-XSRF-TOKEN=${cookieValue}` });
+
+        const headers = await send({ method });
+
+        expect(headers?.get("X-XSRF-TOKEN")).toBe(cookieValue);
+      },
+    );
+
+    it.each([{ method: "GET" }, { method: "HEAD" }, {}])("%j には付けない", async (init) => {
+      vi.stubGlobal("document", { cookie: `__Host-XSRF-TOKEN=${cookieValue}` });
+
+      const headers = await send(init);
+
+      expect(headers?.has("X-XSRF-TOKEN")).toBeFalsy();
+    });
+
+    it.each(["other=1", "__Host-XSRF-TOKEN="])(
+      "Cookie が %j のときは付けずに送る",
+      async (cookie) => {
+        vi.stubGlobal("document", { cookie });
+
+        const headers = await send({ method: "POST" });
+
+        expect(headers?.has("X-XSRF-TOKEN")).toBeFalsy();
+      },
+    );
+
+    it("別の origin への POST には付けない", async () => {
+      vi.stubGlobal("document", { cookie: `__Host-XSRF-TOKEN=${cookieValue}` });
+
+      const headers = await send({ method: "POST" }, "http://other.example");
+
+      expect(headers?.has("X-XSRF-TOKEN")).toBeFalsy();
+    });
+
+    it("生成コードが渡す plain object の header を保つ", async () => {
+      vi.stubGlobal("document", { cookie: `__Host-XSRF-TOKEN=${cookieValue}` });
+
+      const headers = await send({
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: "{}",
+      });
+
+      expect(headers?.get("Content-Type")).toBe("application/json");
+      expect(headers?.get("X-XSRF-TOKEN")).toBe(cookieValue);
     });
   });
 

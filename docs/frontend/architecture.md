@@ -28,7 +28,7 @@ OpenAPIからOrvalでnative FetchのTanStack Query clientを生成し、手書�
 
 ## 現在の構成
 
-現在の `src` は、アプリケーションの起動、ルーティング、アプリシェル、routerの既定の状態表示、API clientのmutatorと生成した型、共通UI、国際化、小さなutilityだけを持つ。
+現在の `src` は、アプリケーションの起動、ルーティング、アプリシェル、routerの既定の状態表示、API clientのmutatorと `QueryClient` の生成と生成した型、共通UI、国際化、小さなutility、テストの準備のコードだけを持つ。
 
 ``` text
 frontend/src/
@@ -39,6 +39,10 @@ frontend/src/
 ├── api/
 │   ├── api-fetch.ts
 │   ├── api-fetch.test.ts
+│   ├── preload-query.ts
+│   ├── preload-query.test.ts
+│   ├── query-client.ts
+│   ├── query-client.test.ts
 │   └── generated/models/
 ├── i18n/
 │   ├── index.ts
@@ -64,15 +68,21 @@ frontend/src/
 │   └── ui/
 │       ├── button.tsx
 │       └── button.test.tsx
-└── lib/
-    ├── csrf.ts
-    ├── csrf.test.ts
-    ├── utils.ts
-    └── utils.test.ts
+├── lib/
+│   ├── csrf.ts
+│   ├── csrf.test.ts
+│   ├── utils.ts
+│   └── utils.test.ts
+└── testing/
+    ├── msw.ts
+    ├── query-client.ts
+    ├── render-route.tsx
+    └── setup.ts
 ```
 
-`main.tsx` はcomposition rootであり、TanStack Queryの `QueryClient` とTanStack Routerを生成してProviderを接続する。
-`QueryClient` には、`api/api-fetch.ts` の401の処理（`QueryCache` と `MutationCache` の `onError`）と再試行の判定（`defaultOptions.queries.retry`）を渡す。
+`main.tsx` はcomposition rootであり、`api/query-client.ts` の `createQueryClient()` で `QueryClient` を作り、TanStack Routerを生成してProviderを接続する。
+`createQueryClient()` は、`api/api-fetch.ts` の401の処理（`QueryCache` と `MutationCache` の `onError`）と再試行の判定（`defaultOptions.queries.retry`）を渡し、mutationの後に全queryを無効化する（[mutationの後のcache](routing-and-state.md#mutationの後のcache)）。
+本番とテスト（`testing/query-client.ts`）は同じ関数で `QueryClient` を作る。
 
 `router-defaults.ts` はrouterの既定値（pending、error、not foundのcomponentとpreloadの設定）を一つのobjectにまとめ、`main.tsx` とrouteのテストが同じ値でrouterを作る。
 
@@ -201,7 +211,8 @@ OxlintのJS plugin APIはalphaである。
 許可する主要な依存方向は次のとおりである。
 
 ``` text
-main.tsx -> router-defaults.ts -> components
+main.tsx -> api/query-client.ts -> api/api-fetch.ts -> lib
+         -> router-defaults.ts -> components
          -> routeTree.gen.ts -> routes
                                   |
                                   +-> features
