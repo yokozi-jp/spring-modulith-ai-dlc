@@ -1111,12 +1111,10 @@ tasks:
             and any($spans[];
               .spanId == "b7ad6b7169203332"
                 and ([.attributes[]?.key] | sort) == ["http.request.method", "http.response.status_code"]
-                and attr("url.path") == null
                 and attr("http.request.method") == "POST")
             and any($spans[];
               .spanId == "b7ad6b7169203333"
                 and ([.attributes[]?.key] | sort) == ["http.request.method", "http.response.status_code"]
-                and attr("url.path") == null
                 and attr("http.request.method") == "DELETE")
         ' "$out/frontend-traces.json" >/dev/null; then
           fail "フロントエンドの trace の属性、resource 属性、span の項目のいずれかが期待値と一致しません。"

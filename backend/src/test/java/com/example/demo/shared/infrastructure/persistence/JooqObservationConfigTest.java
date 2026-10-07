@@ -21,6 +21,7 @@ import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
 import org.springframework.context.annotation.Primary;
+import org.springframework.dao.DataIntegrityViolationException;
 
 /** jOOQ の SQL ごとに、SQL の文と値を持たない observation が作られることを検証する。 */
 @DatabaseTest
@@ -40,6 +41,9 @@ class JooqObservationConfigTest {
   void clear() {
     handler.stopped.clear();
     handler.errors.clear();
+    handler.failOnStart = false;
+    handler.failOnStartWithError = false;
+    handler.failOnStop = false;
   }
 
   @Test
@@ -81,9 +85,50 @@ class JooqObservationConfigTest {
     assertThat(handler.errors).as("onError を呼ばないこと").isEmpty();
   }
 
+  @Test
+  @DisplayName("observation の開始処理が失敗しても SQL は成功する")
+  void continuesQueryWhenObservationStartFails() {
+    handler.failOnStart = true;
+
+    assertThat(dsl.selectOne().fetchSingle().value1()).as("SELECT 1 の結果").isEqualTo(1);
+  }
+
+  @Test
+  @DisplayName("observation の Error は SQL から隔離しない")
+  void propagatesObservationError() {
+    handler.failOnStartWithError = true;
+
+    assertThatThrownBy(() -> dsl.selectOne().fetch())
+        .as("JVM の継続が危険な Error を握りつぶさないこと")
+        .isInstanceOf(AssertionError.class)
+        .hasMessage("observation start error");
+  }
+
+  @Test
+  @DisplayName("observation の終了処理が失敗しても SQL は成功する")
+  void continuesQueryWhenObservationStopFails() {
+    handler.failOnStop = true;
+
+    assertThat(dsl.selectOne().fetchSingle().value1()).as("SELECT 1 の結果").isEqualTo(1);
+  }
+
+  @Test
+  @DisplayName("SQL と observation の終了処理が失敗したら元の SQL 例外を返す")
+  void preservesQueryFailureWhenObservationStopAlsoFails() {
+    handler.failOnStop = true;
+
+    assertThatThrownBy(() -> dsl.select(DSL.inline(1).div(0)).fetch())
+        .as("0 で割る SQL の例外が observation の例外に置き換わらないこと")
+        .isInstanceOf(DataIntegrityViolationException.class)
+        .hasMessageContaining("division by zero");
+  }
+
   /** stop された observation の context と、onError の呼び出しを記録する。 */
   /* package */ static final class RecordingHandler
       implements ObservationHandler<Observation.Context> {
+
+    /** jOOQ の SQL を表す observation 名。 */
+    private static final String QUERY_NAME = "jooq.query";
 
     /** stop された context。 */
     private final List<Observation.Context> stopped = new CopyOnWriteArrayList<>();
@@ -91,9 +136,31 @@ class JooqObservationConfigTest {
     /** onError を受けた context。 */
     private final List<Observation.Context> errors = new CopyOnWriteArrayList<>();
 
+    /** onStart で失敗させるか。 */
+    private boolean failOnStart;
+
+    /** onStart で Error を投げるか。 */
+    private boolean failOnStartWithError;
+
+    /** onStop で失敗させるか。 */
+    private boolean failOnStop;
+
+    @Override
+    public void onStart(final Observation.Context context) {
+      if (failOnStart && QUERY_NAME.equals(context.getName())) {
+        throw new IllegalStateException("observation start failure");
+      }
+      if (failOnStartWithError && QUERY_NAME.equals(context.getName())) {
+        throw new AssertionError("observation start error");
+      }
+    }
+
     @Override
     public void onStop(final Observation.Context context) {
       stopped.add(context);
+      if (failOnStop && QUERY_NAME.equals(context.getName())) {
+        throw new IllegalStateException("observation stop failure");
+      }
     }
 
     @Override
@@ -107,7 +174,7 @@ class JooqObservationConfigTest {
     }
 
     /* package */ List<Observation.Context> queries() {
-      return stopped.stream().filter(context -> "jooq.query".equals(context.getName())).toList();
+      return stopped.stream().filter(context -> QUERY_NAME.equals(context.getName())).toList();
     }
   }
 

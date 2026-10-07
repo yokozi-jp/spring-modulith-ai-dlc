@@ -29,6 +29,7 @@ public class JooqObservationConfig {
   }
 
   /** SQL の開始で observation を start し、終了で stop する。 */
+  @SuppressWarnings("PMD.AvoidCatchingGenericException")
   private static final class ObservationListener implements ExecuteListener {
 
     private static final long serialVersionUID = 1L;
@@ -45,30 +46,52 @@ public class JooqObservationConfig {
 
     @Override
     public void start(final ExecuteContext ctx) {
-      final Observation observation =
-          Observation.createNotStarted("jooq.query", registry)
-              .contextualName(ctx.type().name())
-              .lowCardinalityKeyValue("db.system.name", "postgresql")
-              .start();
-      ctx.data(KEY, observation);
+      try {
+        final Observation observation =
+            Observation.createNotStarted("jooq.query", registry)
+                .contextualName(ctx.type().name())
+                .lowCardinalityKeyValue("db.system.name", "postgresql")
+                .start();
+        ctx.data(KEY, observation);
+      } catch (final RuntimeException ignored) {
+        // Observation の失敗で SQL を止めない。
+      }
     }
 
     @Override
     public void exception(final ExecuteContext ctx) {
-      // observation.error は例外のメッセージを span の event に残す。
-      // PostgreSQL のメッセージは制約違反の値を含みうるので、クラス名だけを付ける。
-      // そのため失敗した SQL の span の status は UNSET のままになる（ADR-070）。
-      final RuntimeException exception = ctx.exception();
-      if (ctx.data(KEY) instanceof Observation observation && exception != null) {
-        observation.lowCardinalityKeyValue("error.type", exception.getClass().getName());
+      try {
+        // observation.error は例外のメッセージを span の event に残す。
+        // PostgreSQL のメッセージは制約違反の値を含みうるので、クラス名だけを付ける。
+        // そのため失敗した SQL の span の status は UNSET のままになる（ADR-070）。
+        final RuntimeException exception = ctx.exception();
+        if (ctx.data(KEY) instanceof Observation observation && exception != null) {
+          observation.lowCardinalityKeyValue("error.type", exception.getClass().getName());
+        }
+      } catch (final RuntimeException ignored) {
+        // Observation の失敗で元の SQL 例外を置き換えない。
       }
     }
 
     @Override
     public void end(final ExecuteContext ctx) {
-      if (ctx.data(KEY) instanceof Observation observation) {
-        observation.stop();
-        ctx.data(KEY, null);
+      final Object data;
+      try {
+        data = ctx.data(KEY);
+      } catch (final RuntimeException ignored) {
+        return;
+      }
+      if (data instanceof Observation observation) {
+        try {
+          observation.stop();
+        } catch (final RuntimeException ignored) {
+          // Observation の失敗で SQL の結果を変えない。
+        }
+        try {
+          ctx.data(KEY, null);
+        } catch (final RuntimeException ignored) {
+          // Observation の参照を消せなくても SQL の結果を変えない。
+        }
       }
     }
   }
