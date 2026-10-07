@@ -1,7 +1,7 @@
 import type { APIRequestContext, BrowserContext, Cookie, Locator, Page } from "@playwright/test";
-import { expect, test } from "@playwright/test";
 
 import { signInOnKeycloak } from "./environment";
+import { expect, test } from "./fixtures";
 
 // 共有の storageState のセッションを終わらせないよう、各テストは専用の context でログインする。
 test.use({ storageState: { cookies: [], origins: [] } });
@@ -172,7 +172,7 @@ test("_csrf にマスクしない Cookie の値を入れて送るとログアウ
   expect(await expectLogoutRejected(page)).toBe(token);
 });
 
-// task e2e は Faro を有効にしてビルドする（ADR-068）。E2E に Collector はないので、/collect は page.route で返す。
+// task e2e は Faro を有効にしてビルドする（ADR-068）。fixtures の既定の 202 を page.route の 503 で上書きする。
 test("/collect が 503 を返しても、ログインとログアウトのフォームを送信できる", async ({ page }) => {
   // 最初の goto の前に登録し、ログインの間に送られても 503 にする。
   await page.route("**/collect", (route) => route.fulfill({ status: 503 }));

@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./fixtures";
 
 test("認証済みのトップページで見出しを確かめ、カウントを増やせる", async ({ page }) => {
   await page.goto("/");

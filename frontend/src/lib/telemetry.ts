@@ -10,6 +10,7 @@ declare const __TELEMETRY_APP__: {
 };
 
 // ponytail: http と https の絶対 URL だけを対象にし、scheme の大文字と小文字は区別しない。文中の相対 URL（/api/x?id=1）は消さない。
+// ponytail: query は空白までとみなすので、(see http://h/a?x=1) の閉じ括弧も消える。秘密を残すより表示の崩れを取る。
 // 相対 URL を送る計装（View、Tracing）を足すときは、ここを URL の構文解析に替える。
 const absoluteUrlQueryOrFragment = /(?<url>https?:\/\/[^\s?#]*)[?#]\S*/giu;
 
@@ -27,16 +28,33 @@ function stripStrings(value: unknown): void {
   }
 }
 
-/** 送る項目のすべての文字列から、絶対 URL の query と fragment を消す。 */
-export function stripUrlQueryAndFragment(item: TransportItem): TransportItem {
-  const copy = structuredClone(item);
-  stripStrings(copy);
-  return copy;
+/** 送る項目のすべての文字列から、絶対 URL の query と fragment を消す。消せない項目は捨てる。 */
+export function stripUrlQueryAndFragment(item: TransportItem): TransportItem | null {
+  try {
+    const copy = structuredClone(item);
+    stripStrings(copy);
+    return copy;
+  } catch {
+    // 複製できない値や循環を含む項目は、query を残したまま送らないよう捨てる。
+    // Faro は beforeSend の例外を捕まえず、batch の buffer に戻して送信が止まる（faro-core の BatchExecutor.flush）。
+    // oxlint-disable-next-line unicorn/no-null -- Faro の BeforeSendHook は null で項目を捨てる。
+    return null;
+  }
+}
+
+// reportCaughtError が使う Faro の部分。テストは pushError だけを持つ値を渡す。
+interface ErrorSink {
+  api: Pick<Faro["api"], "pushError">;
 }
 
 // oxlint-disable-next-line eslint/init-declarations -- 無効のビルドでは代入せず、undefined のままにする。
-let faroReady: Promise<Faro | undefined> | undefined;
+let faroReady: Promise<ErrorSink | undefined> | undefined;
 const reported = new WeakSet<Error>();
+
+/** テストから送り先を差し替える。アプリケーションのコードからは呼ばない。 */
+export function replaceTelemetryForTesting(sink?: ErrorSink): void {
+  faroReady = Promise.resolve(sink);
+}
 
 /** composition root から一度だけ呼ぶ。SDK の読み込みを待たない。 */
 export function initTelemetry(): void {

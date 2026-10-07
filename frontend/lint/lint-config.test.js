@@ -40,6 +40,8 @@ function lintFixtures() {
     const { error, stdout } = spawnSync("vp", ["lint", "src", "--format", "json"], {
       cwd: directory,
       encoding: "utf8",
+      // 複製先に version.txt はない。シェルで有効にしていても、無効の設定を読ませる。
+      env: { ...process.env, FRONTEND_OTEL_ENABLED: "false" },
       timeout: 60_000,
     });
     if (error) {

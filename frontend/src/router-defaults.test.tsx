@@ -12,11 +12,14 @@ import type { AnyRoute } from "@tanstack/react-router";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { I18nextProvider } from "react-i18next";
-import { beforeEach, describe, expect, it, vi } from "vite-plus/test";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vite-plus/test";
 
 import { i18n } from "@/i18n";
+import { replaceTelemetryForTesting } from "@/lib/telemetry";
 import { routerDefaults } from "@/router-defaults";
 import { routeTree } from "@/routeTree.gen";
+
+type Sink = NonNullable<Parameters<typeof replaceTelemetryForTesting>[0]>;
 
 function LoadedPage() {
   return <p>loaded</p>;
@@ -50,6 +53,10 @@ describe("router defaults", () => {
     vi.spyOn(globalThis, "scrollTo").mockReturnValue();
   });
 
+  afterEach(() => {
+    replaceTelemetryForTesting();
+  });
+
   it("shows the localized not-found view with a link back to home", async () => {
     renderRouter(routeTree, "/no-such-page");
 
@@ -77,6 +84,22 @@ describe("router defaults", () => {
 
     await expect(screen.findByText("loaded")).resolves.toBeTruthy();
     expect(loader).toHaveBeenCalledTimes(2);
+  });
+
+  it("reports the caught loader error to telemetry", async () => {
+    vi.spyOn(console, "warn").mockReturnValue();
+    vi.spyOn(console, "error").mockReturnValue();
+    const pushError = vi.fn<Sink["api"]["pushError"]>();
+    replaceTelemetryForTesting({ api: { pushError } });
+    const error = new Error("internal detail");
+    renderRouter(
+      treeWithLoader(() => Promise.reject(error)),
+      "/",
+    );
+
+    await vi.waitFor(() => {
+      expect(pushError).toHaveBeenCalledWith(error);
+    });
   });
 
   it("shows the localized pending view while the loader runs", async () => {
