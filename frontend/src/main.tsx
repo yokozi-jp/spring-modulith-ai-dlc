@@ -25,6 +25,11 @@ if (!rootElement) {
   throw new Error("#root element not found");
 }
 
+// Temporal を出荷していないブラウザ（2026 年 10 月時点の Safari）だけ polyfill を読み込む（ADR-047、#122 の P-15）。
+if (!("Temporal" in globalThis)) {
+  await import("temporal-polyfill/global");
+}
+
 createRoot(rootElement).render(
   <StrictMode>
     <I18nextProvider i18n={i18n}>

@@ -1,3 +1,6 @@
+// Node 24 は Temporal をフラグなしで持たないため、テストでは常に polyfill を入れる（native があれば native を使う）。
+// oxlint-disable-next-line import/no-unassigned-import -- グローバルの Temporal を入れる副作用だけの import である。
+import "temporal-polyfill/global";
 import { cleanup } from "@testing-library/react";
 import { afterAll, afterEach, beforeAll, vi } from "vite-plus/test";
 
