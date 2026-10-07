@@ -57,6 +57,8 @@ Faro の形式を受ける contrib の `faroreceiver` は、Collector 0.161.0 �
 - Grafana Alloy は入れず、出口を既存の Collector の一つに保つ。
 - フロントエンド用の pipeline（`logs/frontend`、processor は `transform/frontend_logs`）を、バックエンド用と分ける。
   バックエンドのログ属性の allowlist はそのまま残す。
+- faro receiver の traces は、フロントエンド用の `traces/frontend`（processor は `filter/frontend_span_events` と `transform/frontend_traces`）で受ける。
+  バックエンドの `traces` pipeline は加工しないまま残す。
 
 faroreceiver はブラウザ、ページ、セッションなどのメタデータをログの本文（logfmt）に入れるので、属性の `keep_keys` だけでは保護できない。
 そのため、フロントエンドの pipeline は本文を OTTL の `ParseKeyValue` で解析し、`exception.type`、`exception.message`、`exception.stacktrace`、`url.path` の 4 属性だけを残す。
@@ -69,6 +71,15 @@ Collector の除去は、絶対 URL の `?` か `#` から空白かエスケー�
 例外にするのは、自由入力を推測して探すのではなく、URL という構文の決まった部分を消すためである。
 消し過ぎて表示が崩れることは、秘密が残ることより害が小さい。
 
+フロントエンドの span は、送り手が書ける値を信頼せず、許可したものだけを残す。
+resource 属性はログと同じ 4 つに絞り、`service.name` は Collector の値で上書きする。
+span の属性は `http.request.method`、`http.response.status_code`、`url.path` の 3 つだけにする。
+`url.path` は `url.full` を OTTL の `URL()` で解析して取り出し、`url.full` は残さない。
+正規表現で query を消すより、URL の構文で path だけを取り出すほうが漏れがないためである。
+span の名前は固定の `Browser request` にし、status の message、`trace_state`、links、instrumentation scope の名前と版と属性も固定の値か空にする。
+span の event は例外のメッセージなどを持ちうるので、すべて捨てる。
+trace ID、span ID、親の span ID は属性ではないので残り、バックエンドの span とつながる。
+
 ### SDK とセッション
 
 - 入れるのは `@grafana/faro-web-sdk`（後の段階で `@grafana/faro-web-tracing`）だけにし、exact version に固定する。
@@ -79,7 +90,12 @@ Collector の除去は、絶対 URL の `?` か `#` から空白かエスケー�
   feature から SDK を呼ばず、route のエラー表示はこのファイルの関数を通して例外を送る。
 - 画面遷移は、TanStack Router の遷移の完了時に route の template を View として通知する。
 - `traceparent` は同一オリジンの `/api/**` だけに付ける。
+  範囲は Faro の設定の `ignoreUrls` に「同一オリジンの `/api/**` 以外」に一致する正規表現を 1 つ渡して決める。
+  IdP を含む別オリジンには `propagateTraceHeaderCorsUrls` を指定しないので付かず、`/collect` は Faro の既定の除外で付かない。
+  `TracingInstrumentation` の `fetchInstrumentationOptions.ignoreUrls` に渡すと、transport の既定の `/collect` の除外を上書きして消すので使わない。
 - ブラウザでは sampling しない。
+  web-tracing の sampler は、Faro の session の meta が `isSampled` を持つときだけ記録する。
+  Session の計装（#152）を入れるまでは、`sessionTracking.session` の初期値で `isSampled` を渡し、sampled flag が 0 の `traceparent` を送らないようにする。
 - 送信の失敗や受け口の停止でアプリを止めず、SDK の初期化を待たずに描画を始める。
 - Cookie を Collector へ送らない（`credentials: "omit"`）。
 - セッションは Faro の既定（sessionStorage、15 分の非操作か 4 時間で切り替え）を使い、ログアウトで作り直し、利用者の ID や `APP_SESSION` と結び付けない。
@@ -104,7 +120,9 @@ Collector の除去は、絶対 URL の `?` か `#` から空白かエスケー�
 ### 段階
 
 最初の段階（#150）で入れるのは Errors だけである。
-WebVitals、Session、View、Tracing、CSP 違反の報告は、#149 の 2/4 から 4/4 のチケットで入れる。
+2 つ目の段階（#151）で、`@grafana/faro-web-tracing` の Tracing（fetch と XHR）と `traces/frontend` を入れる。
+SQL の span は、ブラウザと関係なく効くバックエンドの判断なので、[ADR-070](ADR-070-record-sql-spans-with-jooq-execute-listener.md) に分ける。
+WebVitals、Session、View、CSP 違反の報告は、#149 の 3/4 と 4/4 のチケットで入れる。
 
 ### 本番の方針
 
@@ -154,8 +172,15 @@ Faro を更新するたびに、lockfile で `ua-parser-js` の版を確かめ�
 - faroreceiver は alpha で、Collector の更新で壊れうる。
   `task otel-collector-check` の Faro の fixture で検出する。
 - 本文の解析は、faroreceiver が書く logfmt（go-logfmt）と OTTL の `ParseKeyValue` の差に依存する（`'` を解析の間だけ U+0001 に置き換えている）。
-- 相対 URL の query は、ブラウザでも Collector でも消せない。
+- ブラウザの `beforeSend` が消す相対 URL の query は、文字列の先頭、空白、`(`、`"`、`'`、`=` の直後の `/` から始まるものに限る（`:` の直後などは残る）。
+  Collector はログの相対 URL の query を消さない。
+  span の URL は Collector で `url.path` だけを残すので、query は保存先に届かない。
 - Faro の chunk は使わない計装も含むので、有効のときの chunk が大きい（約 112.5 kB、gzip で約 38.3 kB）。
+- Tracing を入れると、有効のビルドの JavaScript が合わせて約 89.3 kB（gzip で約 28.7 kB）増える。
+  web-tracing と OpenTelemetry JS の chunk（84.1 kB、gzip で 26.3 kB）と、SDK と共有する chunk（3.0 kB、gzip で 1.3 kB）が増え、SDK の chunk が約 1.6 kB 増える。
+  無効のビルドの bundle は変わらない。
+- `ignoreUrls` は Tracing だけでなく Faro の全計装の除外にも効く。
+  Performance や UserAction を有効にするときは、範囲の指定を Tracing の option に移す必要がある。
 - `ua-parser-js@1.0.41` を provenance のないまま受け入れる。
 
 ### Neutral
@@ -163,8 +188,8 @@ Faro を更新するたびに、lockfile で `ua-parser-js` の版を確かめ�
 - バックエンドの名前が `demo` から `demo-api` に変わるので、既存の Grafana の検索を直す必要がある。
 - `docker/otel-collector/config.yaml` は本番と共有する（ADR-043）ので、本番のサイドカーの Collector も faro receiver を起動する。
   gateway を作るまでは、サイドカーの faro receiver は `localhost` で待ち受け、ブラウザから届かないので何も受けない。
-- 本番の上書きファイルは `logs/frontend` の exporters も定めなければならず、定めなければ `otlp_http/lgtm` のままになる。
-- gateway を作るときに、faro receiver と `logs/frontend` を共有の設定から gateway の設定へ移す。
+- 本番の上書きファイルは `logs/frontend` と `traces/frontend` の exporters も定めなければならず、定めなければ `otlp_http/lgtm` のままになる。
+- gateway を作るときに、faro receiver と `logs/frontend` と `traces/frontend` を共有の設定から gateway の設定へ移す。
 - ルートの `.env` と `.env.test` を、新しい `.env.example` と `.env.test.example` から作り直す必要がある。
 
 ## Alternatives Considered
@@ -260,10 +285,14 @@ Faro を更新するたびに、lockfile で `ua-parser-js` の版を確かめ�
 - [faroreceiver v0.161.0 の receiver.go](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/v0.161.0/receiver/faroreceiver/receiver.go)
 - [faro_to_logs.go v0.161.0](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/v0.161.0/pkg/translator/faro/faro_to_logs.go)
 - [OTTL の ParseKeyValue](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/v0.161.0/pkg/ottl/ottlfuncs/README.md#parsekeyvalue)
+- [#151: 2/4 画面の操作から DB までを一本のトレースで見られるようにする](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/151)
 - [Grafana Faro Web SDK 2.12.1](https://www.npmjs.com/package/@grafana/faro-web-sdk/v/2.12.1)
+- [Grafana Faro Web Tracing 2.12.1](https://www.npmjs.com/package/@grafana/faro-web-tracing/v/2.12.1)
+- [OpenTelemetry の instrumentation-fetch 0.222.0](https://www.npmjs.com/package/@opentelemetry/instrumentation-fetch/v/0.222.0)
 - [OpenTelemetry JavaScript](https://opentelemetry.io/docs/languages/js/)
 - [ADR-014: SPA とバックエンドを同一オリジンで公開する](ADR-014-use-same-origin-spa-security-boundary.md)
 - [ADR-015: 可観測性データを構造化し保護する](ADR-015-structure-and-protect-observability-data.md)
 - [ADR-022: semver 6.3.1 を pnpm trust policy の例外にする](ADR-022-exclude-semver-from-pnpm-trust-policy.md)
 - [ADR-032: Frontend を業務機能単位で構成する](ADR-032-organize-frontend-by-business-feature.md)
 - [ADR-043: 本番の可観測性データを OpenTelemetry Collector で CloudWatch へ送る](ADR-043-send-production-telemetry-to-cloudwatch-via-otel-collector.md)
+- [ADR-070: SQL の span を jOOQ の ExecuteListener で作り、SQL の文と値を入れない](ADR-070-record-sql-spans-with-jooq-execute-listener.md)

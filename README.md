@@ -280,8 +280,15 @@ Docker Compose の操作（サービスの起動、停止、状態確認、Keycl
 ### 可観測性
 
 - `docker/otel-collector/config.yaml` を変更したときは `task otel-collector-check` を実行します。
-  このタスクは許可していない属性を含むOTLPのログとFaroのpayloadをCollectorに流し、許可していない値とURLのqueryとfragmentが除かれ、許可した属性が残ることを確かめます。
+  このタスクは許可していない属性を含むOTLPのログとFaroのpayload（例外とtrace）をCollectorに流し、許可していない値とURLのqueryとfragmentが除かれ、許可した属性が残ることを確かめます。
 - ブラウザの例外をローカルで送るには、`.env` に `FRONTEND_OTEL_ENABLED=true` を書いて `task compose-up` を実行し、`vp dev` を再起動して、Grafana で `{service_name="demo-web"}` を検索します（[ADR-068](docs/adr/ADR-068-collect-browser-telemetry-with-faro-via-collector.md)）。
+- 画面の API 呼び出しからバックエンドまでの trace は、次の手順で確かめます。
+  1. 上と同じく `FRONTEND_OTEL_ENABLED=true` で `task compose-up` を実行し、バックエンドと `vp dev` を起動します。
+  2. ログインして画面を開き、開発者ツールの console で `fetch("/api/missing")` を実行します。
+  3. Grafana の Explore で Tempo を選び、`{resource.service.name="demo-web"}` を検索して trace を開きます。
+     `demo-web` の `Browser request` の span の子に、`demo-api` の server span がつながります。
+  4. SQL を発行する `/api/**` を呼ぶと、同じ trace に `jooq.query` の span（名前は `READ` など）が入ります（[ADR-070](docs/adr/ADR-070-record-sql-spans-with-jooq-execute-listener.md)）。
+     main には SQL を発行する `/api/**` がまだありません。
 - CIも同じタスクを、Collectorの設定、Composeファイル、Taskfileの変更時に実行します。
 
 ### 動的解析（DAST）
