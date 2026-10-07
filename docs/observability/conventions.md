@@ -85,6 +85,7 @@ Collector の設定（`docker/otel-collector/config.yaml`）は、ローカル�
 faro receiver はメタデータを本文に入れるので、本文を解析して許可した値だけを属性へ移し、本文を `Browser exception` に置き換える。
 例外でない種類の項目（log、event、measurement）は、例外の記録にしないため `filter/frontend_exceptions` で捨てる。
 許可する属性は `exception.type`、`exception.message`、`exception.stacktrace`、`url.path` である。
+resource 属性は `service.name`、`service.namespace`、`service.version`、`deployment.environment.name` だけを残し、`service.name` は payload の値ではなく Collector の `FRONTEND_OTEL_SERVICE_NAME` で上書きする。
 フロントエンドのログに属性を足すときは、`transform/frontend_logs` とこの文書を同じ変更で直す。
 
 自由入力を正規表現でマスクする処理は Collector に置かない。

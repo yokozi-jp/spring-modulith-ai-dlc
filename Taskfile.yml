@@ -1042,8 +1042,10 @@ tasks:
               | attr("service.name") == "demo-web"
                 and attr("service.namespace") == "demo"
                 and attr("service.version") == "0.0.0-fixture"
-                and attr("deployment.environment.name") == "local")
-            and ($records | length) == 4
+                and attr("deployment.environment.name") == "local"
+                # payload の meta.app に関わらず、resource 属性は許可した 4 つだけにする。
+                and ([.attributes[]?.key] | sort) == ["deployment.environment.name", "service.name", "service.namespace", "service.version"])
+            and ($records | length) == 5
             and all($records[];
               .body.stringValue == "Browser exception"
                 and ([.attributes[]?.key] | sort) == ["exception.message", "exception.stacktrace", "exception.type", "url.path"]
@@ -1056,8 +1058,11 @@ tasks:
             and any($records[]; attr("exception.stacktrace") | contains("http://localhost:5173/api/orders\\n  at render ("))
             and any($records[]; attr("exception.message") == $apostrophe)
             and any($records[]; attr("exception.message") == "bad http://localhost:5173/x tail")
-            # scheme が大文字でも query を消し、log、event、measurement は捨てる（記録は例外の 4 件だけ）。
+            # scheme が大文字でも query を消し、log、event、measurement は捨てる（記録は例外の 5 件だけ）。
             and any($records[]; attr("exception.message") == "upper HTTPS://H/x tail")
+            # path に括弧を含む URL でも query を消し、frame の :行:列) は残す。
+            and any($records[]; attr("exception.message") == "paren https://example.test/a(b) tail"
+              and (attr("exception.stacktrace") | contains("(http://localhost:5173/assets/a(b).js:1:2)")))
         ' "$out/frontend.json" >/dev/null; then
           fail "フロントエンドのログの属性、resource 属性、本文のいずれかが期待値と一致しません。"
         fi

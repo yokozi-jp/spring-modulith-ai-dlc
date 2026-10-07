@@ -47,13 +47,19 @@ processors:
       - set(log.attributes["exception.stacktrace"], log.cache["stacktrace"]) where log.attributes["kind"] == "exception"
       - set(log.attributes["url.path"], URL(log.cache["page_url"])["url.path"]) where log.cache["page_url"] != nil
       # URL の query と fragment を消す。scheme の大文字と小文字は区別しない。1 つ目は stacktrace の frame の :行:列) を残す。
+      # path は ( と ) を含んでよい（RFC 3986）。一致は https?:// から始まるので、frame の前の ( は含まない。
       # 値の中の \n のエスケープを食べないため、query の部分には \\ と \" 以外のバックスラッシュを含めない。
-      - replace_all_patterns(log.attributes, "value", "(?i)(https?://[^\\s?#()\\\\]*)[?#](?:[^\\s()\\\\]|\\\\\\\\)*(:\\d+:\\d+\\))", "$$1$$2")
+      - replace_all_patterns(log.attributes, "value", "(?i)(https?://[^\\s?#\\\\]*)[?#](?:[^\\s()\\\\]|\\\\\\\\)*(:\\d+:\\d+\\))", "$$1$$2")
       # 2 つ目は frame 以外の URL で、( と ) と \" も query として消す（例外のメッセージの ?token=a(b)c や ?q=\"x\"）。
       # ponytail: 空白か \n などのエスケープまでを query とみなすので、(see http://h/a?x=1) の閉じ括弧と、query に括弧を含む frame の :行:列) も消える。
       # 秘密を残すより表示の崩れを取る。崩れが問題になったら、frame 以外の URL の終わりを括弧の対応で決める文を足す。
-      - replace_all_patterns(log.attributes, "value", "(?i)(https?://[^\\s?#()\\\\]*)[?#](?:[^\\s\\\\]|\\\\\\\\|\\\\\")*", "$$1")
+      - replace_all_patterns(log.attributes, "value", "(?i)(https?://[^\\s?#\\\\]*)[?#](?:[^\\s\\\\]|\\\\\\\\|\\\\\")*", "$$1")
       - set(log.body, "Browser exception")
+      # payload の meta.app は誰でも書けるので、service.name は Collector の値で上書きし、バックエンドの名前を名乗らせない。
+      # ponytail: service.version、service.namespace、deployment.environment.name は payload の値のまま残り、版の数だけ resource が増えうる。
+      # 公開の gateway を作るときに、Collector の環境変数で上書きする文を足す。
+      - set(resource.attributes["service.name"], "${env:FRONTEND_OTEL_SERVICE_NAME:-demo-web}")
+      - keep_keys(resource.attributes, ["service.name", "service.namespace", "service.version", "deployment.environment.name"])
       # ponytail: ParseKeyValue はエスケープを解かないため、stacktrace の改行は \n、引用符は \" の 2 文字のまま属性の値に残る。
       # 読みにくさが問題になったら、エスケープを解く文を足す。
       - keep_keys(log.attributes, ["exception.type", "exception.message", "exception.stacktrace", "url.path"])
