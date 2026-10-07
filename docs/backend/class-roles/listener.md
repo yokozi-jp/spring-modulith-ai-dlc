@@ -46,7 +46,7 @@ Listener は Infrastructure の Adapter でもない。
 - `on` は短い名前であり、package-private のクラスの public メソッドでもあるため、クラスに `@SuppressWarnings({"PMD.ShortMethodName", "PMD.PublicMemberInNonPublicType"})` を理由のコメントと一緒に付ける。
 - 同じイベントを二回以上受けても結果が変わらないよう、呼ぶ CommandHandler を冪等にする。
   冪等にする方法は[順序保証と冪等性](../../integration/async-ordering-and-idempotency.md)に従う。
-- 受信に失敗したイベント出版はレジストリに未完了のまま残り、[非同期処理の失敗時の再試行と回復](../../integration/async-failure-recovery.md)の `IncompleteEventPublications` の手順で再投入する。
+- 受信に失敗したイベント出版はレジストリに未完了のまま残り、[非同期処理の失敗時の再試行と回復](../../integration/async-failure-recovery.md)の `FailedEventPublications` の手順で再投入する。
   自動の再投入は [issue #108](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/108) で扱う。
 - CommandHandler が投げた業務上の失敗の扱いは、[業務上の失敗の例外](business-exception.md)の表に従う。
 - クラス、フィールド、コンストラクタ、`on` に Javadoc を書く。

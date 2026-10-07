@@ -34,9 +34,12 @@ Repository の実装は、どのユースケースから呼ばれたかを引数
 - `PgmCdAspect` は、`com.example.demo.<モジュール>..` の `*CommandHandler` の `handle` と、`*Listener` の public メソッドの呼び出しを `@Around` で囲む。
 - 呼び出しの間だけ、`ScopedValue<String>` に `モジュール名.クラスの単純名から CommandHandler か Listener を除いた名前`（`order.PlaceOrder`）を束縛する。
 - 呼び出しが入れ子になったら、その間は内側の値になり、戻ると外側の値に戻る。
-  ADR-050 では `<Event>Listener` の `on` が `<UseCase>CommandHandler` の `handle` を一つだけ呼ぶため、イベントを受けた書き込みの `*_pgm_cd` には、内側の CommandHandler の名前（`order.ChargeOrder`）が入る。
+  ADR-050 では `<Event>Listener` の `on` が `<UseCase>CommandHandler` の `handle` を一つだけ呼ぶため、イベントを受けた書き込みの `*_pgm_cd` には、内側の CommandHandler の名前（`payment.ChargeOrder`）が入る。
 - `CommonColumns` の `forInsert(Table)` と `forUpdate(Table)` は、束縛された値を `*_pgm_cd` に登録する。
   何も束縛されていなければ `IllegalStateException` を投げ、登録を失敗させる。
+- `PgmCdAspect` は、`*Listener` の呼び出しの間、内側の CommandHandler の呼び出しも含めて、Listener の中であることも `ScopedValue<Boolean>` に束縛する。
+  `CommonColumns` は、Listener の中の書き込みの `*_by` に、伝わった利用者の認証を使わず `*_pgm_cd` と同じ値を登録する。
+  `spring.task.execution.propagate-context` は trace と一緒に SecurityContext も Listener のスレッドへ渡すため、認証で決めると、通常の配信は確定した利用者の `sub`、認証のないスレッドからの再投入は `*_pgm_cd` になり、同じ処理で値が変わるからである。
 
 Aspect は Spring AOP のプロキシで動かし、ロード時やコンパイル時のウィービングは使わない。
 

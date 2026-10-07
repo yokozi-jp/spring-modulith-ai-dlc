@@ -27,6 +27,8 @@ changesetを追加した変更ではjOOQコードを再生成し、changesetと�
 `compileJava`と`bootJar`は、リポジトリで管理する生成コードをコンパイルし、DBへ接続して再生成しない。
 生成コードは手書きコード向けの静的解析とフォーマットから除外する。
 生成先のパッケージ`com.example.demo.jooq`には生成コードだけを置き、手書きのクラスを置かない（[バックエンドのアーキテクチャテスト](../backend/architecture-tests.md)の「解析対象と実行」）。
+スキーマが2つ以上あると、テーブルはスキーマごとのパッケージ（`com.example.demo.jooq.<スキーマ名>`）の`Tables`に生成され、ルートの`Tables`はなくなり、`DefaultCatalog`だけがルートに残る。
+`com.example.demo.jooq`はSpring ModulithのOPENのモジュールにし、`jooqCodegen`が生成のたびにその`package-info.java`を書く（[ADR-067](../adr/ADR-067-open-jooq-generated-module.md)）。
 
 jOOQ採用と生成環境の決定は[ADR-003](../adr/ADR-003-adopt-jooq-for-data-access.md)を参照する。
 生成物をGit管理する理由は[ADR-004](../adr/ADR-004-commit-jooq-generated-code.md)を参照する。

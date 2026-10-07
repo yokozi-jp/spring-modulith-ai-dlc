@@ -10,6 +10,8 @@ import org.junit.jupiter.api.Test;
 import org.springframework.aop.aspectj.annotation.AspectJProxyFactory;
 
 /** CommandHandler と Listener の呼び出しの間だけ、pgm_cd が束縛されることを検証する。 */
+// fixture の CommandHandler と Listener は、pointcut の対象にするためメソッドを public にする。
+@SuppressWarnings("PMD.PublicMemberInNonPublicType")
 class PgmCdAspectTest {
 
   @Test
@@ -36,6 +38,16 @@ class PgmCdAspectTest {
     assertThat(listener.on())
         .as("呼ぶ前、CommandHandler の中、戻った後の pgm_cd")
         .containsExactly("shared.OrderConfirmed", "shared.ChargeOrder", "shared.OrderConfirmed");
+  }
+
+  @Test
+  @DisplayName("Listener の中では、内側の CommandHandler の呼び出しも Listener の中とみなす。Listener の外ではみなさない")
+  void listenerMarksNestedCallsAsInListener() {
+    final ProbeCommandHandler handler = proxy(new ProbeCommandHandler());
+
+    assertThat(PgmCdAspect.inListener()).as("束縛の外").isFalse();
+    assertThat(handler.handle()).as("Listener の外の CommandHandler").isFalse();
+    assertThat(proxy(new ProbeListener(handler)).on()).as("Listener の中の CommandHandler").isTrue();
   }
 
   @Test
@@ -75,7 +87,6 @@ class PgmCdAspectTest {
 
   /** pointcut の対象になる CommandHandler。 */
   // CGLIB のプロキシを作れるよう、final にしない。pointcut の対象にするため、メソッドを public にする。
-  @SuppressWarnings("PMD.PublicMemberInNonPublicType")
   /* package */ static class ChargeOrderCommandHandler {
 
     /** 束縛された pgm_cd を返す。 */
@@ -90,7 +101,7 @@ class PgmCdAspectTest {
   }
 
   /** pointcut の対象になる Listener。ADR-050 のとおり、on から CommandHandler を一つ呼ぶ。 */
-  @SuppressWarnings({"PMD.ShortMethodName", "PMD.PublicMemberInNonPublicType"})
+  @SuppressWarnings("PMD.ShortMethodName")
   /* package */ static class OrderConfirmedListener {
 
     /** on の中で呼ぶ CommandHandler。 */
@@ -108,8 +119,33 @@ class PgmCdAspectTest {
     }
   }
 
+  /** Listener の中かどうかを返す CommandHandler。 */
+  /* package */ static class ProbeCommandHandler {
+
+    /** Listener の中なら true を返す。 */
+    public boolean handle() {
+      return PgmCdAspect.inListener();
+    }
+  }
+
+  /** on から {@link ProbeCommandHandler} を呼ぶ Listener。 */
+  @SuppressWarnings("PMD.ShortMethodName")
+  /* package */ static class ProbeListener {
+
+    /** on の中で呼ぶ CommandHandler。 */
+    private final ProbeCommandHandler handler;
+
+    /* package */ ProbeListener(final ProbeCommandHandler handler) {
+      this.handler = handler;
+    }
+
+    /** 内側の CommandHandler が Listener の中とみなされたかを返す。 */
+    public boolean on() {
+      return handler.handle();
+    }
+  }
+
   /** 役割名でないため、pointcut の対象にならないクラス。 */
-  @SuppressWarnings("PMD.PublicMemberInNonPublicType")
   /* package */ static class ChargeOrderService {
 
     /** 束縛された pgm_cd を返す。 */

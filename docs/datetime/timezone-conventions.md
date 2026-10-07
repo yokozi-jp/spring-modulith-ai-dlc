@@ -86,6 +86,7 @@ const label = occurredAt.toLocaleString("ja-JP", {
 Safariに対応する必要があるときは、ポリフィルを入れる。
 候補は[proposal-temporal](https://github.com/tc39/proposal-temporal#polyfills)が安定版と位置づける[temporal-polyfill](https://www.npmjs.com/package/temporal-polyfill)とする。
 ポリフィルの依存は、Safariへの対応が必要で日時を扱う最初の画面を作るときに追加する。
+`main.tsx`は、`Temporal`を持たないブラウザでだけ`temporal-polyfill/global`を動的に読み込み、`Temporal`を持つブラウザにはポリフィルの本体を配らない。
 SafariがTemporalを出荷し、[対応ブラウザとWeb機能の採用基準](../frontend/browser-support.md)で使える状態になったら、ポリフィルを外す。
 
 ## UTCへ変換しない値

@@ -141,6 +141,8 @@ class JooqOrderRepository implements OrderRepository {
 `update` と `delete` の競合と行がない場合は、Repository ごとには確かめず、`shared` の `TableWriterTest` と `TableWriterConcurrencyTest` が確かめる（[jOOQ の Repository](jooq-repository.md) の「対応するテスト」）。
 jOOQ の列と集約の変換も、この往復で確かめる。
 テストは実装と同じ `com.example.demo.order.infrastructure.persistence` パッケージのテストソースに置く。
+共通カラムの trace と `*_pgm_cd` は、`shared` のテストソースの `TestCommonColumns` で用意する。
+`TestCommonColumns.at` は現在時刻と trace ID を固定した `CommonColumns` を返し、`TestCommonColumns.runAs` は呼び出しの間だけ `*_pgm_cd` を束縛する。
 
 ```java
 /** 注文の保存と読み戻しを検証する。 */
@@ -150,12 +152,10 @@ class JooqOrderRepositoryTest {
   /** テスト対象が使う jOOQ のコンテキスト。 */
   @Autowired private DSLContext dsl;
 
-  /** テスト対象が使う shared の共通処理。 */
-  @Autowired private CommonColumns commonColumns;
-
   @Test
   @DisplayName("保存した注文を ID で読み戻せる")
   void savesAndFindsOrder() {
+    final CommonColumns commonColumns = TestCommonColumns.at(Instant.parse("2026-10-03T00:00:00Z"));
     final OrderRepository repository =
         new JooqOrderRepository(dsl, commonColumns, new TableWriter(dsl, commonColumns));
     final Order order =
@@ -166,7 +166,7 @@ class JooqOrderRepositoryTest {
                 new OrderLine(
                     1, new ProductCode("P-1"), new Quantity(2), new Money(new BigDecimal("500")))),
             Instant.parse("2026-10-03T00:00:00Z"));
-    repository.add(order);
+    TestCommonColumns.runAs(() -> repository.add(order));
 
     final Order found =
         repository

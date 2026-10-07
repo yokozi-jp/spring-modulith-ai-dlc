@@ -46,6 +46,7 @@ spring:
       enabled: true
 
   # @Async の Listener へ発行元の trace を引き継ぐ（docs/integration/async-observability.md）。
+  # 利用者の認証も伝わるが、Listener の中の書き込みの *_by は認証を使わず pgm_cd にする（ADR-051）。
   task:
     execution:
       propagate-context: true

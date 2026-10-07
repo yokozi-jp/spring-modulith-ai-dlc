@@ -57,7 +57,7 @@ CommandHandler は他モジュールから呼ばれない。
 - 外部システムを呼ぶ CommandHandler は、集約がすでにその操作を終えていれば（`order.isPaid()`）何もせずに Result を返し、外部システムに冪等性キー（注文 ID）を渡す。
   外部システムの呼び出しは `update` より前に置き、呼んでいる間は行をロックしない。
   同じイベントは再投入で二回以上届く（[メッセージングの設計](../../integration/async-messaging-design.md)の「配信保証」、[順序保証と冪等性](../../integration/async-ordering-and-idempotency.md)）。
-- 外部システムの失敗で未完了のまま残ったイベント出版は、[非同期処理の失敗時の再試行と回復](../../integration/async-failure-recovery.md)の `IncompleteEventPublications` の手順で再投入する。
+- 外部システムの失敗で未完了のまま残ったイベント出版は、[非同期処理の失敗時の再試行と回復](../../integration/async-failure-recovery.md)の `FailedEventPublications` の手順で再投入する。
   自動の再投入は [issue #108](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/108) で扱う。
 - クラス、フィールド、コンストラクタ、`handle` に Javadoc を書く。
 - `application` のパッケージの `package-info.java` は Command と共有する。

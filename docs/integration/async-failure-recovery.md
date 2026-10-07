@@ -31,7 +31,11 @@ DLQ はソースキューごとに置き、アプリケーションによる即�
 
 外部ブローカーを導入するまでは、リスナーが失敗したイベント出版がレジストリに未完了のまま残り、これが DLQ の役割を兼ねる。
 
-- 未完了のイベント出版の再投入は、Spring Modulith の `IncompleteEventPublications` を使う手順に一本化する。
+- リスナーが例外で終わり `FAILED` になった出版の再投入は、Spring Modulith の `FailedEventPublications.resubmit(ResubmissionOptions)` を使う。
+  対象は `withMinAge` で出版から間もないものを外し、`withBatchSize` で一度に読む件数を絞り、`withFilter` でイベントの型を選ぶ。
+- `IncompleteEventPublications` は、処理中（`PROCESSING`）のまま止まった出版も対象にするため、プロセスの停止などで処理中に残った出版を回復するときだけ使う。
+- 再投入でリスナーは同じイベントをもう一度受けるため、リスナーは同じイベントを二度受けても結果が変わらないようにする（[順序保証と冪等性](async-ordering-and-idempotency.md)）。
+- 運用者が動いているアプリケーションで再投入する入口（画面、API、コマンド）と、定期の再投入はまだ決めていない（#108）。
 - 起動時の自動再配信は使わない（[ADR-001](../adr/ADR-001-adopt-spring-modulith-modular-monolith.md)）。
 - 回復不能と判定したエラーは、ステータス管理テーブルを FAILED にして失敗の内容を記録し、リスナーを正常終了させて再投入の対象から外す（[非同期処理のステータス管理](async-job-status.md)）。
 - 予期しない例外はリスナーから送出し、イベント出版を未完了のまま残す。

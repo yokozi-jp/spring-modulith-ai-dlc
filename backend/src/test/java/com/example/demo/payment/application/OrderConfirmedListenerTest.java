@@ -1,15 +1,11 @@
 package com.example.demo.payment.application;
 
-import static com.example.demo.jooq.modulith.Tables.EVENT_PUBLICATION;
-import static com.example.demo.jooq.modulith.Tables.EVENT_PUBLICATION_ARCHIVE;
 import static com.example.demo.jooq.payment.Tables.T_PAYMENT;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.example.demo.order.OrderConfirmed;
-import com.example.demo.order.application.ConfirmOrderCommand;
-import com.example.demo.order.application.ConfirmOrderCommandHandler;
-import com.example.demo.order.application.DraftOrderCommand;
-import com.example.demo.order.application.DraftOrderCommandHandler;
+import com.example.demo.order.application.CancelOrderCommand;
+import com.example.demo.order.application.CancelOrderCommandHandler;
 import com.example.demo.payment.PaymentQueries;
 import com.example.demo.payment.PaymentSearchCriteria;
 import com.example.demo.payment.PaymentSummary;
@@ -17,14 +13,10 @@ import com.example.demo.payment.domain.model.GatewayPaymentCode;
 import com.example.demo.payment.domain.model.Money;
 import com.example.demo.payment.domain.model.OrderId;
 import com.example.demo.payment.domain.model.PaymentGateway;
-import com.example.demo.product.TestProducts;
 import com.example.demo.shared.concurrency.ExpectedLockNo;
 import com.example.demo.testkit.CapturedLogRecords;
 import com.example.demo.testkit.CleanGeneratedTablesExtension;
 import com.example.demo.testkit.SharedTestConfiguration;
-import com.example.demo.testkit.UniqueCodes;
-import io.micrometer.observation.Observation;
-import io.micrometer.observation.ObservationRegistry;
 import io.micrometer.tracing.Span;
 import io.micrometer.tracing.Tracer;
 import io.opentelemetry.api.common.AttributeKey;
@@ -43,11 +35,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
-import java.util.function.Predicate;
-import java.util.function.Supplier;
-import org.awaitility.core.ConditionTimeoutException;
 import org.jooq.DSLContext;
-import org.jooq.Records;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -80,21 +68,22 @@ import org.springframework.web.client.ResourceAccessException;
 // 確定から再投入までのイベント出版の状態を一つの文脈で確かめるため、型とメソッドの数が多い。
 @SuppressWarnings({"PMD.CouplingBetweenObjects", "PMD.TooManyMethods"})
 @ApplicationModuleTest(mode = BootstrapMode.ALL_DEPENDENCIES)
-@Import({SharedTestConfiguration.class, OrderConfirmedListenerTest.GatewayConfiguration.class})
+@Import({
+  SharedTestConfiguration.class,
+  OrderConfirmedFixture.class,
+  OrderConfirmedListenerTest.GatewayConfiguration.class
+})
 @ExtendWith(CleanGeneratedTablesExtension.class)
 class OrderConfirmedListenerTest {
 
   /** 固定した現在時刻。決済した時刻と、イベント出版の時刻になる。 */
   private static final Instant NOW = Instant.parse("2026-10-06T01:02:03.123456Z");
 
-  /** 確定する利用者の OIDC の {@code sub}。 */
+  /** 確定する利用者の OIDC の {@code sub}。Listener に伝わっても {@code *_by} に使われない。 */
   private static final String USER_SUB = "listener-test-user";
 
-  /** 決済の CommandHandler の {@code *_pgm_cd}。 */
+  /** 決済の CommandHandler の {@code *_pgm_cd}。Listener の中の書き込みの {@code *_by} も同じ値になる。 */
   private static final String PGM_CD = "payment.ChargeOrder";
-
-  /** イベント出版レジストリの {@code event_type}。 */
-  private static final String EVENT_TYPE = OrderConfirmed.class.getName();
 
   /** 失敗した出版の ERROR を記録する Spring の処理。 */
   private static final String ASYNC_ERROR_SCOPE =
@@ -103,11 +92,11 @@ class OrderConfirmedListenerTest {
   /** 決済の参照。 */
   @Autowired private PaymentQueries paymentQueries;
 
-  /** 確定する注文を作る CommandHandler。 */
-  @Autowired private DraftOrderCommandHandler draftOrder;
+  /** 確定する注文を作り、出版の状態を読む補助。 */
+  @Autowired private OrderConfirmedFixture fixture;
 
-  /** 注文を確定する CommandHandler。 */
-  @Autowired private ConfirmOrderCommandHandler confirmOrder;
+  /** 注文を取り消す CommandHandler。 */
+  @Autowired private CancelOrderCommandHandler cancelOrder;
 
   /** 切り替えられる決済代行。 */
   @Autowired private ControllablePaymentGateway gateway;
@@ -115,11 +104,8 @@ class OrderConfirmedListenerTest {
   /** 失敗した出版の再投入。 */
   @Autowired private FailedEventPublications failedEventPublications;
 
-  /** 商品の行を登録し、レジストリと決済記録を読む jOOQ のコンテキスト。 */
+  /** 決済記録を読む jOOQ のコンテキスト。 */
   @Autowired private DSLContext dsl;
-
-  /** 共通カラムの trace ID を作る observation registry。 */
-  @Autowired private ObservationRegistry observationRegistry;
 
   /** 確定の observation の trace ID を読む。 */
   @Autowired private Tracer tracer;
@@ -133,21 +119,21 @@ class OrderConfirmedListenerTest {
   }
 
   @Test
-  @DisplayName("確定した注文の合計を注文 ID で 1 回請求し、確定の trace と利用者で決済記録を作り、出版を完了にする")
+  @DisplayName("確定した注文の合計を注文 ID で 1 回請求し、確定の trace と処理の名前で決済記録を作り、出版を完了にする")
   void chargesConfirmedOrder(final Scenario scenario) {
-    final String orderId = draftedOrderId();
+    final String orderId = fixture.draftedOrderId();
     final AtomicReference<String> confirmTraceId = new AtomicReference<>();
 
     runAsUser(
         () ->
-            observed(
+            fixture.observed(
                 () -> {
                   confirmTraceId.set(currentTraceId());
-                  await(
-                      scenario.stimulate(() -> confirm(orderId)),
+                  OrderConfirmedFixture.await(
+                      scenario.stimulate(() -> fixture.confirm(orderId)),
                       orderId,
                       "完了した出版",
-                      () -> registry(orderId),
+                      () -> fixture.registry(orderId),
                       state -> state.archived() == 1);
                   return null;
                 }));
@@ -164,30 +150,21 @@ class OrderConfirmedListenerTest {
         .as("orderId=%s の請求の trace ID は確定の trace ID と同じ", orderId)
         .containsExactly(confirmTraceId.get());
     assertThat(createdByAndPgmCd(orderId))
-        .as("orderId=%s の決済記録の created_by と created_pgm_cd", orderId)
-        .isEqualTo(List.of(USER_SUB, PGM_CD));
+        .as("orderId=%s の決済記録の created_by は、確定した利用者でなく pgm_cd", orderId)
+        .isEqualTo(List.of(PGM_CD, PGM_CD));
   }
 
   @Test
   @DisplayName("同じ注文の OrderConfirmed を二度受けても、決済記録は 1 件のままで二度目は請求しない")
   void secondDeliveryDoesNotChargeAgain(final Scenario scenario) {
-    final String orderId = draftedOrderId();
-    observed(
-        () -> {
-          await(
-              scenario.stimulate(() -> confirm(orderId)),
-              orderId,
-              "1 件目の完了した出版",
-              () -> registry(orderId),
-              state -> state.archived() == 1);
-          return null;
-        });
+    final String orderId = fixture.draftedOrderId();
+    fixture.confirmAndAwait(scenario, orderId, "1 件目の完了した出版", state -> state.archived() == 1);
 
-    await(
+    OrderConfirmedFixture.await(
         scenario.publish(new OrderConfirmed(orderId, NOW)),
         orderId,
         "2 件目の完了した出版",
-        () -> registry(orderId),
+        () -> fixture.registry(orderId),
         state -> state.archived() == 2);
 
     assertThat(payments(orderId)).as("orderId=%s の決済記録", orderId).hasSize(1);
@@ -197,23 +174,15 @@ class OrderConfirmedListenerTest {
   @Test
   @DisplayName("決済代行が失敗すると出版は FAILED で残り、再投入すると PROCESSING を経て attempts 2 で完了する")
   void failedChargeIsResubmittedAndCompleted(final Scenario scenario) {
-    final String orderId = draftedOrderId();
+    final String orderId = fixture.draftedOrderId();
     gateway.setFailing(true);
 
     // 1. 失敗：出版は FAILED、attempts 1、決済記録はなく、Spring が ERROR を記録する。
     runAsUser(
         () ->
-            observed(
-                () -> {
-                  await(
-                      scenario.stimulate(() -> confirm(orderId)),
-                      orderId,
-                      "FAILED の出版",
-                      () -> registry(orderId),
-                      state -> "FAILED".equals(state.status()));
-                  return null;
-                }));
-    final RegistryState failed = registry(orderId);
+            fixture.confirmAndAwait(
+                scenario, orderId, "FAILED の出版", state -> "FAILED".equals(state.status())));
+    final OrderConfirmedFixture.RegistryState failed = fixture.registry(orderId);
     assertThat(failed.attempts()).as("orderId=%s の FAILED の attempts", orderId).isEqualTo(1);
     assertThat(failed.completionDate()).as("orderId=%s の completion_date", orderId).isNull();
     assertThat(payments(orderId)).as("orderId=%s の失敗後の決済記録", orderId).isEmpty();
@@ -239,13 +208,13 @@ class OrderConfirmedListenerTest {
                           && event.orderId().equals(orderId)));
 
       // 4. 請求の手前で止まっている間、出版は PROCESSING、attempts 2。
-      await(
+      OrderConfirmedFixture.await(
           scenario.stimulate(() -> {}),
           orderId,
           "再投入の請求の呼び出し",
-          () -> registry(orderId),
+          () -> fixture.registry(orderId),
           state -> gateway.waitingCalls() > 0);
-      final RegistryState processing = registry(orderId);
+      final OrderConfirmedFixture.RegistryState processing = fixture.registry(orderId);
       assertThat(processing.status()).as("orderId=%s の再投入中の状態", orderId).isEqualTo("PROCESSING");
       assertThat(processing.attempts()).as("orderId=%s の再投入中の attempts", orderId).isEqualTo(2);
       assertThat(processing.lastResubmissionDate())
@@ -255,14 +224,14 @@ class OrderConfirmedListenerTest {
       // 5. 請求を進め、完了を待つ。
       gateway.release();
     }
-    await(
+    OrderConfirmedFixture.await(
         scenario.stimulate(() -> {}),
         orderId,
         "再投入の完了した出版",
-        () -> registry(orderId),
+        () -> fixture.registry(orderId),
         state -> state.archived() == 1);
 
-    final RegistryState completed = registry(orderId);
+    final OrderConfirmedFixture.RegistryState completed = fixture.registry(orderId);
     assertThat(completed.status()).as("orderId=%s の再投入の後の状態", orderId).isEqualTo("COMPLETED");
     assertThat(completed.attempts()).as("orderId=%s の再投入の後の attempts", orderId).isEqualTo(2);
     assertThat(completed.lastResubmissionDate()).isNotNull();
@@ -275,37 +244,46 @@ class OrderConfirmedListenerTest {
   }
 
   @Test
+  @DisplayName("取り消した注文の OrderConfirmed では請求せず、決済記録を作らず、出版は FAILED で残る")
+  void cancelledOrderIsNotCharged(final Scenario scenario) {
+    final String orderId = fixture.draftedOrderId();
+    fixture.observed(
+        () -> cancelOrder.handle(new CancelOrderCommand(orderId, new ExpectedLockNo(1))));
+
+    OrderConfirmedFixture.await(
+        scenario.publish(new OrderConfirmed(orderId, NOW)),
+        orderId,
+        "FAILED の出版",
+        () -> fixture.registry(orderId),
+        state -> "FAILED".equals(state.status()));
+
+    assertThat(gateway.recordedTraceIds()).as("orderId=%s の取消後の決済代行の呼び出し", orderId).isEmpty();
+    assertThat(payments(orderId)).as("orderId=%s の取消後の決済記録", orderId).isEmpty();
+    assertThat(capturedLogRecords.withScope(ASYNC_ERROR_SCOPE))
+        .as("orderId=%s の確定していない注文の ERROR のログ", orderId)
+        .anySatisfy(
+            log ->
+                assertThat(log.getAttributes().get(AttributeKey.stringKey("exception.message")))
+                    .contains("order is not CONFIRMED: orderId=" + orderId + ", status=CANCELLED"));
+  }
+
+  @Test
   @DisplayName("存在しない注文の OrderConfirmed では請求せず、決済記録を作らず、出版は未完了で残る")
   void missingOrderLeavesPublicationIncomplete(final Scenario scenario) {
     final String orderId = UUID.randomUUID().toString();
 
-    await(
+    OrderConfirmedFixture.await(
         scenario.publish(new OrderConfirmed(orderId, NOW)),
         orderId,
         "FAILED の出版",
-        () -> registry(orderId),
+        () -> fixture.registry(orderId),
         state -> "FAILED".equals(state.status()));
 
     assertThat(gateway.chargedOrders()).as("orderId=%s の請求", orderId).isEmpty();
     assertThat(payments(orderId)).as("orderId=%s の決済記録", orderId).isEmpty();
-    assertThat(registry(orderId).incomplete()).as("orderId=%s の未完了の出版", orderId).isEqualTo(1);
-  }
-
-  /** 単価 120 円の商品を 2 個の下書きの注文を作り、注文 ID を返す。 */
-  private String draftedOrderId() {
-    final UUID productId = TestProducts.onSale(dsl, UniqueCodes.next("P"), "120.00");
-    return observed(
-        () ->
-            draftOrder
-                .handle(
-                    new DraftOrderCommand(
-                        UniqueCodes.next("C"),
-                        List.of(new DraftOrderCommand.Line(productId.toString(), 2))))
-                .orderId());
-  }
-
-  private Object confirm(final String orderId) {
-    return confirmOrder.handle(new ConfirmOrderCommand(orderId, new ExpectedLockNo(1)));
+    assertThat(fixture.registry(orderId).incomplete())
+        .as("orderId=%s の未完了の出版", orderId)
+        .isEqualTo(1);
   }
 
   private List<PaymentSummary> payments(final String orderId) {
@@ -315,11 +293,6 @@ class OrderConfirmedListenerTest {
   private String currentTraceId() {
     final Span span = Objects.requireNonNull(tracer.currentSpan(), "確定の observation に span があること");
     return span.context().traceId();
-  }
-
-  /** 共通カラムの trace ID を取れるよう、observation の中で処理を呼ぶ。 */
-  private <T> T observed(final Supplier<T> action) {
-    return Observation.createNotStarted("payment-test", observationRegistry).observe(action);
   }
 
   /** 確定した利用者の認証を置いて処理を呼び、最後に外す。 */
@@ -341,71 +314,6 @@ class OrderConfirmedListenerTest {
     }
   }
 
-  /** 状態が条件を満たすまで待つ。満たさなければ注文 ID と最後に読んだ状態を出して失敗する。 */
-  private static void await(
-      final Scenario.When<?> when,
-      final String orderId,
-      final String expectation,
-      final Supplier<RegistryState> read,
-      final Predicate<RegistryState> done) {
-    final AtomicReference<@Nullable RegistryState> last = new AtomicReference<>();
-    try {
-      when.andWaitForStateChange(
-              () -> {
-                final RegistryState state = read.get();
-                last.set(state);
-                return done.test(state);
-              },
-              Boolean.TRUE::equals)
-          .andVerify(reached -> {});
-    } catch (ConditionTimeoutException exception) {
-      throw new AssertionError(
-          "orderId=" + orderId + " の" + expectation + "を待ったが届かない: 最後の状態=" + last.get(), exception);
-    }
-  }
-
-  /** 注文 ID の OrderConfirmed の出版の、未完了の行と archive の行を読む。 */
-  private RegistryState registry(final String orderId) {
-    final List<Row> incomplete =
-        dsl.select(
-                EVENT_PUBLICATION.STATUS,
-                EVENT_PUBLICATION.COMPLETION_ATTEMPTS,
-                EVENT_PUBLICATION.LAST_RESUBMISSION_DATE,
-                EVENT_PUBLICATION.COMPLETION_DATE)
-            .from(EVENT_PUBLICATION)
-            .where(
-                EVENT_PUBLICATION
-                    .EVENT_TYPE
-                    .eq(EVENT_TYPE)
-                    .and(EVENT_PUBLICATION.SERIALIZED_EVENT.contains(orderId)))
-            .fetch(Records.mapping(Row::new));
-    final List<Row> archived =
-        dsl.select(
-                EVENT_PUBLICATION_ARCHIVE.STATUS,
-                EVENT_PUBLICATION_ARCHIVE.COMPLETION_ATTEMPTS,
-                EVENT_PUBLICATION_ARCHIVE.LAST_RESUBMISSION_DATE,
-                EVENT_PUBLICATION_ARCHIVE.COMPLETION_DATE)
-            .from(EVENT_PUBLICATION_ARCHIVE)
-            .where(
-                EVENT_PUBLICATION_ARCHIVE
-                    .EVENT_TYPE
-                    .eq(EVENT_TYPE)
-                    .and(EVENT_PUBLICATION_ARCHIVE.SERIALIZED_EVENT.contains(orderId)))
-            .fetch(Records.mapping(Row::new));
-    // 未完了の行があればその値を、なければ archive の最後の行の値を状態とする。
-    final Row row =
-        incomplete.isEmpty()
-            ? archived.isEmpty() ? new Row(null, null, null, null) : archived.getLast()
-            : incomplete.getFirst();
-    return new RegistryState(
-        incomplete.size(),
-        archived.size(),
-        row.status(),
-        row.attempts(),
-        row.lastResubmissionDate(),
-        row.completionDate());
-  }
-
   /** 決済記録の created_by と created_pgm_cd を読む。 */
   private List<String> createdByAndPgmCd(final String orderId) {
     return dsl.select(T_PAYMENT.CREATED_BY, T_PAYMENT.CREATED_PGM_CD)
@@ -417,31 +325,6 @@ class OrderConfirmedListenerTest {
   private static OrderId orderId(final String orderId) {
     return new OrderId(UUID.fromString(orderId));
   }
-
-  /** イベント出版レジストリの 1 行の状態、回数、時刻。 */
-  /* package */ record Row(
-      @Nullable String status,
-      @Nullable Integer attempts,
-      @Nullable Instant lastResubmissionDate,
-      @Nullable Instant completionDate) {}
-
-  /**
-   * 注文 ID の OrderConfirmed の出版の状態。
-   *
-   * @param incomplete 未完了の行の数
-   * @param archived archive の行の数
-   * @param status 未完了の行があればその状態、なければ archive の最後の行の状態
-   * @param attempts 同じ行の {@code completion_attempts}
-   * @param lastResubmissionDate 同じ行の {@code last_resubmission_date}
-   * @param completionDate 同じ行の {@code completion_date}
-   */
-  /* package */ record RegistryState(
-      int incomplete,
-      int archived,
-      @Nullable String status,
-      @Nullable Integer attempts,
-      @Nullable Instant lastResubmissionDate,
-      @Nullable Instant completionDate) {}
 
   /** 失敗の切り替え、呼び出しの記録、請求の手前で止める門を持つ決済代行。 */
   /* package */ static final class ControllablePaymentGateway implements PaymentGateway {

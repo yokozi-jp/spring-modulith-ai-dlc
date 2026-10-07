@@ -63,7 +63,7 @@ HTTP のステータスとログレベルは `error` モジュールの `ApiExce
 Listener の扱いは[非同期処理の失敗時の再試行と回復](../../integration/async-failure-recovery.md)の「Spring Modulith のイベントの失敗」に合わせる。
 業務上の失敗の三つの型は、自動で再試行しない。
 ステータス管理テーブル（[非同期処理のステータス管理](../../integration/async-job-status.md)）を持つ処理は FAILED と失敗の内容を記録して正常終了し、持たない処理は `on` から送出してイベント出版を未完了のまま残す（レジストリが DLQ を兼ねる）。
-ステータス管理テーブルを持たない処理では、`ConflictException` で未完了のまま残ったイベント出版を運用者が `IncompleteEventPublications` で再投入すると、読み直して成功する見込みがある。
+ステータス管理テーブルを持たない処理では、`ConflictException` で未完了のまま残ったイベント出版を運用者が `FailedEventPublications` で再投入すると、読み直して成功する見込みがある。
 
 `23505` と `55P03` の原因の例外のメッセージには SQL が入り、`23505` では重複したキーの値も入って、INFO のログに出る。
 扱いは[可観測性の規約](../../observability/conventions.md)の「発生源で渡さない値」に従い、閲覧の制限と表示時のマスクで守る。
