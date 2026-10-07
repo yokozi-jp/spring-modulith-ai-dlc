@@ -44,7 +44,7 @@ jOOQ の Repository は業務規則を持たない。
 - jOOQ の生成型は、自モジュールのスキーマの `Tables`（`com.example.demo.jooq.<スキーマ名>.Tables`）のテーブルと列を使う（[ADR-067](../../adr/ADR-067-open-jooq-generated-module.md)）。
 
 この文書の `T_ORDER`、`T_ORDER_LINE` と、その Record の `TOrderRecord`、`TOrderLineRecord` は、説明用の仮の生成型である。
-`T_ORDER` は `ORDER_ID`、`CUSTOMER_ID`、`STATUS`、`DISCOUNT_JPY`、`PLACED_AT`、`LOCK_NO` の列を、`T_ORDER_LINE` は `ORDER_ID`、`LINE_NO`、`PRODUCT_CODE`、`QUANTITY`、`UNIT_PRICE_JPY`、`LOCK_NO` の列を持つとする。
+`T_ORDER` は `ORDER_ID`、`CUSTOMER_ID`、`ORDER_STATUS_TYP`、`DISCOUNT_JPY`、`PLACED_AT`、`LOCK_NO` の列を、`T_ORDER_LINE` は `ORDER_ID`、`LINE_NO`、`PRODUCT_CODE`、`ORDERED_COUNT`、`UNIT_PRICE_JPY`、`LOCK_NO` の列を持つとする。
 二つのテーブルは、ほかに[共通カラム](../../database/postgresql-common-columns.md)の `CREATED_*`、`UPDATED_*`、`PATCHED_*` を持つ。
 `PLACED_AT` の生成型は、[日時とタイムゾーンの規約](../../datetime/timezone-conventions.md)のとおり `Instant` である。
 生成型の扱いは[jOOQコード生成物の管理](../../database/jooq-codegen.md)に従う。
@@ -63,7 +63,7 @@ jOOQ の Repository は業務規則を持たない。
 - 集約を読む SQL の列の選択と変換は、private メソッド `select<Aggregate>s()` 一つに置く。
   取り出しのメソッドは、そこへ `where` と `orderBy` を足す。
 - `nextId()` を実装する。採番の方法は、UUID v7 を主キーにする最初のテーブルを作るときに決める（[PostgreSQLの主キー](../../database/postgresql-primary-keys.md#uuidの採番)）。
-- 列は `convertFrom` で値オブジェクトと enum に変える（`T_ORDER.ORDER_ID.convertFrom(OrderId::new)`、`T_ORDER.STATUS.convertFrom(OrderStatus::valueOf)`）。
+- 列は `convertFrom` で値オブジェクトと enum に変える（`T_ORDER.ORDER_ID.convertFrom(OrderId::new)`、`T_ORDER.ORDER_STATUS_TYP.convertFrom(OrderStatus::valueOf)`）。
 - 子の Entity は、`multiset` の副問い合わせで集約ルートと同じ SQL で読み、`convertFrom(lines -> lines.map(Records.mapping(OrderLine::new)))` で Entity のリストにする。
   副問い合わせには、子を識別する列の `orderBy` を付ける。
 - `select` に並べる列の順は、`Order.restore` と Entity のコンストラクタの引数の順に合わせる。
@@ -173,7 +173,7 @@ class JooqOrderRepository implements OrderRepository {
         dsl.insertInto(T_ORDER)
             .set(T_ORDER.ORDER_ID, order.id().value())
             .set(T_ORDER.CUSTOMER_ID, order.customerId().value())
-            .set(T_ORDER.STATUS, order.status().name())
+            .set(T_ORDER.ORDER_STATUS_TYP, order.status().name())
             .set(T_ORDER.DISCOUNT_JPY, order.discount().amount())
             .set(T_ORDER.PLACED_AT, order.placedAt())
             .set(commonColumns.forInsert(T_ORDER)));
@@ -185,7 +185,7 @@ class JooqOrderRepository implements OrderRepository {
                             .set(T_ORDER_LINE.ORDER_ID, order.id().value())
                             .set(T_ORDER_LINE.LINE_NO, line.lineNumber())
                             .set(T_ORDER_LINE.PRODUCT_CODE, line.productCode().value())
-                            .set(T_ORDER_LINE.QUANTITY, line.quantity().value())
+                            .set(T_ORDER_LINE.ORDERED_COUNT, line.quantity().value())
                             .set(T_ORDER_LINE.UNIT_PRICE_JPY, line.unitPrice().amount())
                             .set(commonColumns.forInsert(T_ORDER_LINE)))
                 .toList())
@@ -201,7 +201,7 @@ class JooqOrderRepository implements OrderRepository {
             order.lockNo(),
             set ->
                 set.set(T_ORDER.CUSTOMER_ID, order.customerId().value())
-                    .set(T_ORDER.STATUS, order.status().name())
+                    .set(T_ORDER.ORDER_STATUS_TYP, order.status().name())
                     .set(T_ORDER.DISCOUNT_JPY, order.discount().amount())
                     .set(T_ORDER.PLACED_AT, order.placedAt()));
     for (final OrderLine line : order.lines()) {
@@ -213,7 +213,7 @@ class JooqOrderRepository implements OrderRepository {
               .and(T_ORDER_LINE.LINE_NO.eq(line.lineNumber())),
           set ->
               set.set(T_ORDER_LINE.PRODUCT_CODE, line.productCode().value())
-                  .set(T_ORDER_LINE.QUANTITY, line.quantity().value())
+                  .set(T_ORDER_LINE.ORDERED_COUNT, line.quantity().value())
                   .set(T_ORDER_LINE.UNIT_PRICE_JPY, line.unitPrice().amount()));
     }
   }
@@ -238,12 +238,12 @@ class JooqOrderRepository implements OrderRepository {
     return dsl.select(
             T_ORDER.ORDER_ID.convertFrom(OrderId::new),
             T_ORDER.CUSTOMER_ID.convertFrom(CustomerId::new),
-            T_ORDER.STATUS.convertFrom(OrderStatus::valueOf),
+            T_ORDER.ORDER_STATUS_TYP.convertFrom(OrderStatus::valueOf),
             multiset(
                     select(
                             T_ORDER_LINE.LINE_NO,
                             T_ORDER_LINE.PRODUCT_CODE.convertFrom(ProductCode::new),
-                            T_ORDER_LINE.QUANTITY.convertFrom(Quantity::new),
+                            T_ORDER_LINE.ORDERED_COUNT.convertFrom(Quantity::new),
                             T_ORDER_LINE.UNIT_PRICE_JPY.convertFrom(Money::new))
                         .from(T_ORDER_LINE)
                         .where(T_ORDER_LINE.ORDER_ID.eq(T_ORDER.ORDER_ID))
@@ -275,7 +275,7 @@ public long countUnshippedByCustomer(final CustomerId customerId) {
       T_ORDER,
       T_ORDER.CUSTOMER_ID.eq(customerId.value())
           .and(
-              T_ORDER.STATUS.in(
+              T_ORDER.ORDER_STATUS_TYP.in(
                   OrderStatus.PLACED.name(),
                   OrderStatus.CONFIRMED.name(),
                   OrderStatus.PAID.name())));
