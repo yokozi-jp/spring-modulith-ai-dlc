@@ -947,6 +947,13 @@ tasks:
     silent: true
     cmds:
       - |
+        # このタスクは、Collector の config.yaml が「残してよい値だけを残し、漏れてはいけない値を捨てる」ことの回帰テストである。
+        # allowlist は YAML の設定で、型検査もコンパイルも効かない。processor を 1 行、正規表現を 1 文字間違えると、
+        # 個人情報や URL のトークンが保存先に流れ、一度書かれたログは取り消せない。だから設定を変えたら必ず流して確かめる。
+        # 検証する内容の正文は docs/observability/conventions.md の「検証」節と ADR-068 にある（Taskfile は手順だけを持つ）。
+        # 本物の Grafana を立てず、check/check.yaml で出口だけをファイルに差し替える。processor は config.yaml のまま使う。
+        # 出口はバックエンド（backend.json）とフロントエンド（frontend.json）に分け、それぞれ別の jq で検査する。
+        # 入力の fixture は check/fixtures/ に置き、backend.json は OTLP 形式、frontend.json は Faro の payload 形式である。
         # イメージは Compose の定義から取り、Dependabot の更新と揃える。
         image="$({{.DOCKER}} compose --env-file .env.example -f docker/compose.yml config --format json | jq -r '.services["otel-collector"].image')"
         out="$(mktemp -d)"
@@ -970,7 +977,7 @@ tasks:
         accepted=0
         for _ in $(seq 1 30); do
           if curl -fsS -o /dev/null -X POST -H "Content-Type: application/json" 2>/dev/null \
-            --data-binary "@docker/otel-collector/check/logs.json" "http://$address/v1/logs"; then
+            --data-binary "@docker/otel-collector/check/fixtures/backend.json" "http://$address/v1/logs"; then
             accepted=1
             break
           fi
@@ -982,7 +989,7 @@ tasks:
           exit 1
         fi
         for _ in $(seq 1 30); do
-          if grep -qF 'resourceLogs' "$out/telemetry.json" 2>/dev/null; then break; fi
+          if grep -qF 'resourceLogs' "$out/backend.json" 2>/dev/null; then break; fi
           sleep 1
         done
         if ! jq -e '
@@ -995,7 +1002,7 @@ tasks:
               and value("exception.message") == "order failed"
               and (value("exception.stacktrace") | contains("OrderService.java:84"))
           )
-        ' "$out/telemetry.json" >/dev/null; then
+        ' "$out/backend.json" >/dev/null; then
           echo "ログ属性が allowlist または期待値と一致しません。" >&2
           exit 1
         fi
@@ -1008,7 +1015,7 @@ tasks:
         accepted=0
         for _ in $(seq 1 30); do
           status="$(curl -s -o /dev/null -w '%{http_code}' -X POST -H "Content-Type: application/json" \
-            --data-binary "@docker/otel-collector/check/faro.json" "http://$faro_address/collect" || true)"
+            --data-binary "@docker/otel-collector/check/fixtures/frontend.json" "http://$faro_address/collect" || true)"
           if [ "$status" = "202" ]; then
             accepted=1
             break

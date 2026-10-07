@@ -65,6 +65,14 @@ DTO やエンティティを logger へ渡さず、許可した値だけを個�
 ブラウザでは、`frontend/src/lib/telemetry.ts` の `beforeSend` で、送る項目のすべての文字列から絶対 URL の query と fragment を消す。
 Collector へは Cookie を送らない（`credentials: "omit"`）。
 
+ブラウザの例外を送るかはビルド時の `FRONTEND_OTEL_ENABLED` で決め、既定は無効にする（[ADR-068](../adr/ADR-068-collect-browser-telemetry-with-faro-via-collector.md)）。
+環境ごとの値は次のとおり。
+
+- 開発（`.env`）：既定は `false`。ローカルで例外を送って確かめるときだけ `true` にし、`task compose-up` と `vp dev` の再起動で有効にする（README の手順）。
+- E2E（`.env.test`）：`true`。`task e2e` が Faro を有効にしてビルドし、`/collect` は `page.route` で止める。
+- CI の本番ビルド検査（`task fe-test-build`）：`false` を強制し、無効のビルドに SDK が入らないことを grep で確かめる。
+- 本番と STG：faro receiver を公開する gateway を作るまで無効にする（親 Issue #149）。gateway が整うまで有効にしても受け口がないため届かない。
+
 例外メッセージに個人データが混ざることは、例外を記録する以上避けられない。
 これは発生源で禁じず、保存先の閲覧の制限と表示時のマスクで扱う。
 例外メッセージに秘密情報が入る例外をアプリケーションで投げない。

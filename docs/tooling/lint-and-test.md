@@ -209,7 +209,7 @@ PITのHTMLとXMLのレポートは、変異対象がある場合に`backend/buil
 - **`task lint-docker-check`**：Dockerfileを`docker build --check`で検査する。
 - **`task lint-compose`**：Composeファイルの構文、参照、変数展開を検証する。
 - **`task otel-collector-check`**：許可していない属性を含むOTLPのログをCollectorに流し、その属性が除かれ、許可した属性が残ることを確かめる。
-  Faroのfixture（`docker/otel-collector/check/faro.json`）もフロントエンドのpipelineに流し、許可した4属性と固定の本文だけが残り、URLのqueryとfragmentが消えることと、faro receiverの405、415、202、400の応答を確かめる。
+  Faroのfixture（`docker/otel-collector/check/fixtures/frontend.json`）もフロントエンドのpipelineに流し、許可した4属性と固定の本文だけが残り、URLのqueryとfragmentが消えることと、faro receiverの405、415、202、400の応答を確かめる。
 - **`task lint-md`**：`.markdownlint-cli2.yaml`の除外設定に従いMarkdownを検査する。
 - **`task lint-md-fix`**：markdownlint-cli2で安全に修正できるMarkdownの問題を修正する。
 - **`task okf-check`**：OKF適合、内部リンク、孤立文書、文書責務の見直し合図、steering境界、Taskfile文書同期候補を検査する。
