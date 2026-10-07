@@ -1,16 +1,16 @@
 ---
 type: Convention
 title: 可観測性データの規約
-description: OpenTelemetry へ記録するデータ、例外の記録、ログとトレースの相関、発生源で渡さない値、Collector の allowlist、本番のロググループ、保持、アクセス、本番の受け入れ条件を定め、可観測性データの実装、Collector の設定、本番収集基盤を変更するときに読む規約。
+description: OpenTelemetry へ記録するデータ、例外の記録、ログとトレースの相関、発生源で渡さない値、Collector の allowlist、本番のロググループ、保持、アクセス、本番の受け入れ条件を定め、可観測性データの実装、Collector の設定、本番収集基盤を変更するとき、フロントエンドのテレメトリに値を足すときに読む規約。
 tags: [convention, observability, opentelemetry, security]
 ---
 
 # 可観測性データの規約
 
-バックエンドはログ、トレース、メトリクスを OpenTelemetry で Collector へ送り、コンソールにも ECS JSON を出す。
+バックエンドはログ、トレース、メトリクスを OpenTelemetry で Collector へ送ってコンソールにも ECS JSON を出し、フロントエンドは Faro Web SDK でブラウザの例外だけを Collector へ送る。
 例外は logger へ渡して標準どおりに記録し、禁止値はアプリケーションから渡さない。
 ログの属性は Collector の allowlist で絞り、保存先で閲覧の制限と表示時のマスクを行う。
-設計判断は [ADR-015](../adr/ADR-015-structure-and-protect-observability-data.md)、[ADR-043](../adr/ADR-043-send-production-telemetry-to-cloudwatch-via-otel-collector.md)、[ADR-045](../adr/ADR-045-remove-aws-docs-and-production-cd-example.md) に記録している。
+設計判断は [ADR-015](../adr/ADR-015-structure-and-protect-observability-data.md)、[ADR-043](../adr/ADR-043-send-production-telemetry-to-cloudwatch-via-otel-collector.md)、[ADR-045](../adr/ADR-045-remove-aws-docs-and-production-cd-example.md)、[ADR-066](../adr/ADR-066-collect-browser-telemetry-with-faro-via-collector.md) に記録している。
 
 ## 記録
 
@@ -61,6 +61,9 @@ Grafana では trace ID を使ってログとトレースを相互に検索す�
 HTTP の URL パスは span に入るため、API のパスに個人データと秘密情報を置かない。
 DTO やエンティティを logger へ渡さず、許可した値だけを個別の属性として渡す。
 
+ブラウザでは、`frontend/src/lib/telemetry.ts` の `beforeSend` で、送る項目のすべての文字列から絶対 URL の query と fragment を消す。
+Collector へは Cookie を送らない（`credentials: "omit"`）。
+
 例外メッセージに個人データが混ざることは、例外を記録する以上避けられない。
 これは発生源で禁じず、保存先の閲覧の制限と表示時のマスクで扱う。
 例外メッセージに秘密情報が入る例外をアプリケーションで投げない。
@@ -78,12 +81,23 @@ Collector の設定（`docker/otel-collector/config.yaml`）は、ローカル�
 ログに属性を追加するときは、Collector の `keep_keys` とこの文書の許可する値を同じ変更で直す。
 現在の `keep_keys` は、使っている `exception.type`、`exception.message`、`exception.stacktrace`、`http.response.status_code` だけを持つ。
 
+フロントエンドのログは、バックエンドと別の pipeline（`logs/frontend`）の `transform/frontend_logs` で絞る。
+faro receiver はメタデータを本文に入れるので、本文を解析して許可した値だけを属性へ移し、本文を `Browser exception` に置き換える。
+許可する属性は `exception.type`、`exception.message`、`exception.stacktrace`、`url.path` である。
+フロントエンドのログに属性を足すときは、`transform/frontend_logs` とこの文書を同じ変更で直す。
+
 自由入力を正規表現でマスクする処理は Collector に置かない。
 表記ゆれによる取りこぼしと誤マスクが起きるため、検知は保存先のデータ保護ポリシーで行う。
+URL の query と fragment の除去はこの規則の対象外とし、フロントエンドの pipeline に限って置く（[ADR-066](../adr/ADR-066-collect-browser-telemetry-with-faro-via-collector.md)）。
+
+faro receiver は処理に失敗すると、payload の全体を Collector 自身のログに ERROR で出す（[ADR-066](../adr/ADR-066-collect-browser-telemetry-with-faro-via-collector.md)）。
 
 ## 検証
 
-- **`task otel-collector-check`**：許可していない属性を含む OTLP のログを Collector に流し、出口に残らないことと、許可した属性が残ることを確かめる。Collector の設定を変えたら実行する。
+- **`task otel-collector-check`**：許可していない属性を含む OTLP のログを Collector に流し、出口に残らないことと、許可した属性が残ることを確かめる。
+  Faro の fixture もフロントエンドの pipeline に流し、許可していない値と URL の query と fragment が出口に残らないことを確かめる。
+  faro receiver の受け口が、GET に 405、`text/plain` に 415、別のパスに 202、1 MiB を超える本文に 400 を返すことも確かめる。
+  Collector の設定を変えたら実行する。
 - **`ObservabilityContractTest`**：key-value と例外が LogRecord の属性になることを確かめる。
 
 ## 本番の保存先
@@ -92,6 +106,8 @@ Collector の設定（`docker/otel-collector/config.yaml`）は、ローカル�
 
 - アプリケーションは OTLP を Fargate タスクのサイドカーの OpenTelemetry Collector（contrib）へ送る。Collector はログを CloudWatch Logs、トレースを X-Ray、メトリクスを CloudWatch へ送る。
 - 本番の Collector は `docker/otel-collector/config.yaml` に、exporter と拡張と各 pipeline の exporters だけを定める上書きファイルを重ねる。processors は上書きしない。
+  上書きファイルは `logs/frontend` の exporters も定める。
+  gateway を作るまで、サイドカーの faro receiver は `localhost` で待ち受け、何も受けない（[ADR-066](../adr/ADR-066-collect-browser-telemetry-with-faro-via-collector.md)）。
 - アプリケーションのロググループ、標準出力のロググループ、`aws/spans` ロググループに CloudWatch Logs のデータ保護ポリシーを設定し、個人データと秘密情報を検知して表示時にマスクする。日本の氏名と電話番号は custom data identifier で補う。
 - 標準出力は WARN 以上だけを別のロググループへ送り、起動時と Collector の障害時の調査に使う。
 

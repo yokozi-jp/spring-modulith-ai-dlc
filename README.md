@@ -280,7 +280,8 @@ Docker Compose の操作（サービスの起動、停止、状態確認、Keycl
 ### 可観測性
 
 - `docker/otel-collector/config.yaml` を変更したときは `task otel-collector-check` を実行します。
-  このタスクは許可していない属性を含むOTLPのログをCollectorに流し、その属性が除かれ、許可した属性が残ることを確かめます。
+  このタスクは許可していない属性を含むOTLPのログとFaroのpayloadをCollectorに流し、許可していない値とURLのqueryとfragmentが除かれ、許可した属性が残ることを確かめます。
+- ブラウザの例外をローカルで送るには、`.env` に `FRONTEND_OTEL_ENABLED=true` を書いて `task compose-up` を実行し、`vp dev` を再起動して、Grafana で `{service_name="demo-web"}` を検索します（[ADR-066](docs/adr/ADR-066-collect-browser-telemetry-with-faro-via-collector.md)）。
 - CIも同じタスクを、Collectorの設定、Composeファイル、Taskfileの変更時に実行します。
 
 ### 動的解析（DAST）

@@ -1,7 +1,7 @@
 ---
 type: Convention
 title: 処理ごとに記録するログ
-description: 起動時、HTTP アクセス、一括処理で記録するログの時点と項目、フロントエンドでログを出力しない規則を定める規約。起動処理、HTTP のログ出力、大量件数を扱う処理を実装するとき、ブラウザでエラーを収集したくなったときに読む。
+description: 起動時、HTTP アクセス、一括処理で記録するログの時点と項目、フロントエンドでログを出力しない規則を定める規約。起動処理、HTTP のログ出力、大量件数を扱う処理を実装するとき、ブラウザの例外の送り方を確かめるときに読む。
 tags: [convention, observability, logging, future-arch-guidelines]
 ---
 
@@ -69,7 +69,7 @@ Spring Boot が出力する起動ログで足りる段階は、アプリケー�
 SPA はブラウザの console へログを出力しない。
 この規則は Oxlint の restriction カテゴリに含まれる `no-console` で検出する。
 
-ブラウザで発生したエラーを収集する必要が生じた場合は、収集先とデータの扱いを ADR で決めてから導入する。
+ブラウザの例外は、console ではなく Faro で Collector へ送る（[ADR-066](../adr/ADR-066-collect-browser-telemetry-with-faro-via-collector.md)）。
 
 ## 出典
 
