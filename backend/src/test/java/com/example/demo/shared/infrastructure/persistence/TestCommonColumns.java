@@ -36,6 +36,11 @@ public final class TestCommonColumns {
 
   /** {@code *_pgm_cd} を {@link #PGM_CD} に束縛して処理を呼ぶ。 */
   public static void runAs(final Runnable action) {
-    ScopedValue.where(PgmCdAspect.PGM_CD, PGM_CD).run(action);
+    runAs(PGM_CD, action);
+  }
+
+  /** {@code *_pgm_cd} を {@code pgmCd} に束縛して処理を呼ぶ。 */
+  public static void runAs(final String pgmCd, final Runnable action) {
+    ScopedValue.where(PgmCdAspect.PGM_CD, pgmCd).run(action);
   }
 }

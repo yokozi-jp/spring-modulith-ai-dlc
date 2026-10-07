@@ -425,10 +425,51 @@ tasks:
 
   # Backend
   be-run:
-    desc: バックエンドをホスト上で起動
+    desc: 業務データが空なら代表データを入れてから、バックエンドをホスト上で起動
     dir: backend
     cmds:
+      # bootRun のアプリは常に ../.env を読むので、シードも .env に固定して接続先をそろえる。
+      - task: _be-seed
+        vars: { SEED_MODE: auto, SEED_ENV_FILE: .env }
       - ./gradlew bootRun
+
+  be-seed:
+    desc: ローカルの業務データが空のときだけ代表データを入れる
+    cmds:
+      - task: _be-seed
+        vars: { SEED_MODE: seed, SEED_ENV_FILE: '{{.COMPOSE_ENV_FILE}}' }
+
+  be-seed-reset:
+    desc: 明示確認付きでローカルの業務データを消して代表データを入れ直す
+    env:
+      CONFIRM_RESET: '{{.CONFIRM_RESET}}'
+    cmds:
+      - |
+        if [ "$CONFIRM_RESET" != "yes" ]; then
+          echo "業務データ（product、ordering、payment）を削除して代表データを入れ直します。実行するには CONFIRM_RESET=yes を指定してください（例: task be-seed-reset CONFIRM_RESET=yes）。" >&2
+          exit 1
+        fi
+      - task: _be-seed
+        vars: { SEED_MODE: reset, SEED_ENV_FILE: '{{.COMPOSE_ENV_FILE}}' }
+
+  # 環境の判定は持たない。ローカルかテストかは LocalDataSeeder が確かめる。
+  _be-seed:
+    internal: true
+    dir: backend
+    cmds:
+      - |
+        if [ ! -f "../{{.SEED_ENV_FILE}}" ]; then
+          if [ "{{.SEED_MODE}}" = "auto" ]; then
+            echo "{{.SEED_ENV_FILE}} がないため、代表データを入れません。" >&2
+            exit 0
+          fi
+          echo "{{.SEED_ENV_FILE}} がありません。" >&2
+          exit 1
+        fi
+        set -a
+        . "../{{.SEED_ENV_FILE}}"
+        set +a
+        ./gradlew seedLocalData -PseedMode={{.SEED_MODE}}
 
   # Database
   be-migrate:
