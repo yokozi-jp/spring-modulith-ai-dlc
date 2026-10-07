@@ -56,7 +56,7 @@ tags: [convention, backend, class-role]
 最小の例は、注文を取り消したことを表す `OrderCancelled` である。
 
 ```java
-package com.example.demo.order;
+package com.example.demo.ordering;
 
 import java.time.Instant;
 
@@ -69,7 +69,7 @@ public record OrderCancelled(String orderId, Instant cancelledAt) {}
 典型的な例は、`OrderPlaced` の定義、発行、受信の三つである。
 
 ```java
-package com.example.demo.order;
+package com.example.demo.ordering;
 
 import java.time.Instant;
 
@@ -80,7 +80,7 @@ public record OrderPlaced(String orderId, String customerId, Instant placedAt) {
 発行は、注文を保存した直後に `PlaceOrderCommandHandler` の `handle` の中で行う。
 
 ```java
-// com.example.demo.order.application.PlaceOrderCommandHandler（抜粋）
+// com.example.demo.ordering.application.PlaceOrderCommandHandler（抜粋）
 orderRepository.add(order);
 events.publishEvent(
     new OrderPlaced(order.id().value().toString(), order.customerId().value(), order.placedAt()));

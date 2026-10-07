@@ -75,7 +75,7 @@ resilience4j:
 最小の例は、決済システムに代金を請求する `PaymentGatewayClient` である。
 
 ```java
-package com.example.demo.order.infrastructure.client;
+package com.example.demo.ordering.infrastructure.client;
 
 /** 決済システムの HTTP API で、注文 ID を冪等性キーにして注文の代金を請求する。 */
 @Component
@@ -133,7 +133,7 @@ class PaymentGatewayClient implements PaymentGateway {
 CommandHandler は `PaymentGateway` に依存し、`PaymentGatewayClient` を知らない。
 
 ```java
-// com.example.demo.order.application.ChargeOrderCommandHandler（抜粋）
+// com.example.demo.ordering.application.ChargeOrderCommandHandler（抜粋）
 if (order.isPaid()) {
   return new ChargeOrderResult(order.id().value().toString());
 }

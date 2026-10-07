@@ -49,7 +49,7 @@ Result は集約を返す手段でもない。
 最小の例は、取り消した注文の ID だけを持つ `CancelOrderResult` である。
 
 ```java
-package com.example.demo.order.application;
+package com.example.demo.ordering.application;
 
 /** 注文を取り消すユースケースの結果。 */
 public record CancelOrderResult(String orderId) {}
@@ -60,7 +60,7 @@ public record CancelOrderResult(String orderId) {}
 典型的な例は、Controller が `PlaceOrderResult` の ID で作成した注文の URI を作り、201 の `Location` に入れる場面である。
 
 ```java
-// com.example.demo.order.presentation.web.OrderController（抜粋）
+// com.example.demo.ordering.presentation.web.OrderController（抜粋）
 /**
  * 注文を受け付ける。
  *
