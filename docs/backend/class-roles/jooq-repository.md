@@ -44,7 +44,7 @@ jOOQ の Repository は業務規則を持たない。
 - jOOQ の生成型は、自モジュールのスキーマの `Tables`（`com.example.demo.jooq.<スキーマ名>.Tables`）のテーブルと列を使う（[ADR-067](../../adr/ADR-067-open-jooq-generated-module.md)）。
 
 この文書の `T_ORDER`、`T_ORDER_LINE` と、その Record の `TOrderRecord`、`TOrderLineRecord` は、説明用の仮の生成型である。
-`T_ORDER` は `ORDER_ID`、`CUSTOMER_ID`、`STATUS`、`DISCOUNT`、`PLACED_AT`、`LOCK_NO` の列を、`T_ORDER_LINE` は `ORDER_ID`、`LINE_NUMBER`、`PRODUCT_CODE`、`QUANTITY`、`UNIT_PRICE`、`LOCK_NO` の列を持つとする。
+`T_ORDER` は `ORDER_ID`、`CUSTOMER_ID`、`STATUS`、`DISCOUNT_JPY`、`PLACED_AT`、`LOCK_NO` の列を、`T_ORDER_LINE` は `ORDER_ID`、`LINE_NO`、`PRODUCT_CODE`、`QUANTITY`、`UNIT_PRICE_JPY`、`LOCK_NO` の列を持つとする。
 二つのテーブルは、ほかに[共通カラム](../../database/postgresql-common-columns.md)の `CREATED_*`、`UPDATED_*`、`PATCHED_*` を持つ。
 `PLACED_AT` の生成型は、[日時とタイムゾーンの規約](../../datetime/timezone-conventions.md)のとおり `Instant` である。
 生成型の扱いは[jOOQコード生成物の管理](../../database/jooq-codegen.md)に従う。
@@ -174,7 +174,7 @@ class JooqOrderRepository implements OrderRepository {
             .set(T_ORDER.ORDER_ID, order.id().value())
             .set(T_ORDER.CUSTOMER_ID, order.customerId().value())
             .set(T_ORDER.STATUS, order.status().name())
-            .set(T_ORDER.DISCOUNT, order.discount().amount())
+            .set(T_ORDER.DISCOUNT_JPY, order.discount().amount())
             .set(T_ORDER.PLACED_AT, order.placedAt())
             .set(commonColumns.forInsert(T_ORDER)));
     dsl.batch(
@@ -183,10 +183,10 @@ class JooqOrderRepository implements OrderRepository {
                     line ->
                         dsl.insertInto(T_ORDER_LINE)
                             .set(T_ORDER_LINE.ORDER_ID, order.id().value())
-                            .set(T_ORDER_LINE.LINE_NUMBER, line.lineNumber())
+                            .set(T_ORDER_LINE.LINE_NO, line.lineNumber())
                             .set(T_ORDER_LINE.PRODUCT_CODE, line.productCode().value())
                             .set(T_ORDER_LINE.QUANTITY, line.quantity().value())
-                            .set(T_ORDER_LINE.UNIT_PRICE, line.unitPrice().amount())
+                            .set(T_ORDER_LINE.UNIT_PRICE_JPY, line.unitPrice().amount())
                             .set(commonColumns.forInsert(T_ORDER_LINE)))
                 .toList())
         .execute();
@@ -202,7 +202,7 @@ class JooqOrderRepository implements OrderRepository {
             set ->
                 set.set(T_ORDER.CUSTOMER_ID, order.customerId().value())
                     .set(T_ORDER.STATUS, order.status().name())
-                    .set(T_ORDER.DISCOUNT, order.discount().amount())
+                    .set(T_ORDER.DISCOUNT_JPY, order.discount().amount())
                     .set(T_ORDER.PLACED_AT, order.placedAt()));
     for (final OrderLine line : order.lines()) {
       root.updateChild(
@@ -210,11 +210,11 @@ class JooqOrderRepository implements OrderRepository {
           T_ORDER_LINE
               .ORDER_ID
               .eq(order.id().value())
-              .and(T_ORDER_LINE.LINE_NUMBER.eq(line.lineNumber())),
+              .and(T_ORDER_LINE.LINE_NO.eq(line.lineNumber())),
           set ->
               set.set(T_ORDER_LINE.PRODUCT_CODE, line.productCode().value())
                   .set(T_ORDER_LINE.QUANTITY, line.quantity().value())
-                  .set(T_ORDER_LINE.UNIT_PRICE, line.unitPrice().amount()));
+                  .set(T_ORDER_LINE.UNIT_PRICE_JPY, line.unitPrice().amount()));
     }
   }
 
@@ -241,15 +241,15 @@ class JooqOrderRepository implements OrderRepository {
             T_ORDER.STATUS.convertFrom(OrderStatus::valueOf),
             multiset(
                     select(
-                            T_ORDER_LINE.LINE_NUMBER,
+                            T_ORDER_LINE.LINE_NO,
                             T_ORDER_LINE.PRODUCT_CODE.convertFrom(ProductCode::new),
                             T_ORDER_LINE.QUANTITY.convertFrom(Quantity::new),
-                            T_ORDER_LINE.UNIT_PRICE.convertFrom(Money::new))
+                            T_ORDER_LINE.UNIT_PRICE_JPY.convertFrom(Money::new))
                         .from(T_ORDER_LINE)
                         .where(T_ORDER_LINE.ORDER_ID.eq(T_ORDER.ORDER_ID))
-                        .orderBy(T_ORDER_LINE.LINE_NUMBER))
+                        .orderBy(T_ORDER_LINE.LINE_NO))
                 .convertFrom(lines -> lines.map(Records.mapping(OrderLine::new))),
-            T_ORDER.DISCOUNT.convertFrom(Money::new),
+            T_ORDER.DISCOUNT_JPY.convertFrom(Money::new),
             T_ORDER.PLACED_AT,
             T_ORDER.LOCK_NO)
         .from(T_ORDER);
@@ -346,7 +346,7 @@ Repository のテストは列と集約の往復と削除の範囲だけを確か
 - [ ] package-private の class にし、`DSLContext` と `shared` の `CommonColumns`、`TableWriter` をコンストラクタで受け取る。［自分で点検］
 - [ ] 列の選択と変換を `select<Aggregate>s()` 一つに置き、列を `convertFrom` で値オブジェクトと enum に変える。［自分で点検］
 - [ ] 子の Entity を `multiset` で集約ルートと同じ SQL で読み、集約を `Records.mapping(Order::restore)` で作る。［自分で点検］
-- [ ] `multiset` の副問い合わせに、子を識別する列の `orderBy` を付ける（`orderBy(T_ORDER_LINE.LINE_NUMBER)`）。［自分で点検］
+- [ ] `multiset` の副問い合わせに、子を識別する列の `orderBy` を付ける（`orderBy(T_ORDER_LINE.LINE_NO)`）。［自分で点検］
 - [ ] 集約ルートの `LOCK_NO` を選び、`restore` の `lockNo` に渡す。［自分で点検］
 - [ ] `add` は `set(列, 値)` で業務の全列を書き、子の行を行ごとの INSERT の `dsl.batch` 一つで書く。［自分で点検］
 - [ ] 集約ルートの INSERT は `tableWriter.insert(...)` で実行する。［自分で点検］

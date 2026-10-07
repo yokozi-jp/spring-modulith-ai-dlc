@@ -75,6 +75,7 @@ PostgreSQLの識別子は63バイトを超えると切り詰められる。
 - **区分**：`{名前}_typ`（例：`item_category_typ`）
 - **単位を持つ数値**：`{名前}_{単位}`（例：`route_distance_km`、`duration_min`）
 - **件数や数量**：`{名前}_count`（例：`order_count`）
+- **番号**：`{名前}_no`（例：`line_no`）。連番など、画面に出してもよい順序の番号に使う。
 
 ## インデックス名
 
