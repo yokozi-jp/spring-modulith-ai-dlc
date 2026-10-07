@@ -1,4 +1,7 @@
 // oxlint-disable max-lines -- Vite、Lint、テストの設定を1つのdefineConfigに集める正本のため、行数で分割しない。
+// oxlint-disable-next-line import/no-nodejs-modules -- service.version の正本の version.txt を、ビルド時に一度だけ読む。
+import { readFileSync } from "node:fs";
+
 import tailwindcss from "@tailwindcss/vite";
 import { tanstackRouter } from "@tanstack/router-plugin/vite";
 import react from "@vitejs/plugin-react";
@@ -51,24 +54,63 @@ const testOnlyImports = {
   group: ["msw", "msw/**", "@/api/generated/mocks/**", "@/testing/**", "@testing-library/**"],
   message: "Use test-only modules only in test files and src/testing.",
 };
+// ponytail: no-restricted-imports は静的な import だけを見る。feature からの動的 import("@grafana/...") は通る。
+// 違反が起きたら、lint/feature-boundaries.js と同じく ImportExpression を見る規則に移す。
+const telemetrySdkImports = {
+  group: ["@grafana/*"],
+  message: "Call the telemetry SDK only through src/lib/telemetry.ts (ADR-068).",
+};
 
 // 生成物。整形・静的解析・カバレッジのいずれからも除外する。
 const generatedFiles = ["src/routeTree.gen.ts", "src/api/generated/**"];
 // lint 設定のテストが使う、違反を含む fixture。通常の整形、静的解析、テストの収集から外す。
 const lintFixtures = ["lint/fixtures/**"];
 
-export default defineConfig(({ mode }) => {
-  // ルートの.envは秘密情報も含むため、proxyに必要な変数だけを読み込む。
-  const serverPortValue = loadEnv(mode, "..", "SERVER_PORT").SERVER_PORT ?? "18080";
-  const serverPort = Number(serverPortValue);
-  if (
-    !/^\d+$/u.test(serverPortValue) ||
-    !Number.isInteger(serverPort) ||
-    serverPort < 1 ||
-    serverPort > 65_535
-  ) {
-    throw new Error(`SERVER_PORT must be an integer between 1 and 65535: ${serverPortValue}`);
+// ルートの.envは秘密情報も含むため、proxyに必要な変数だけを読み込む。
+function portFromEnv(mode: string, name: string, fallback: string): number {
+  const value = loadEnv(mode, "..", name)[name] ?? fallback;
+  const port = Number(value);
+  if (!/^\d+$/u.test(value) || !Number.isInteger(port) || port < 1 || port > 65_535) {
+    throw new Error(`${name} must be an integer between 1 and 65535: ${value}`);
   }
+  return port;
+}
+
+// src/lib/telemetry.ts が参照するビルド時の定数（ADR-068）。
+function telemetryDefine(mode: string) {
+  // ルートの.envは秘密情報も含むため、テレメトリに必要な変数だけを読み込む（VITE_接頭辞で公開しない）。
+  const telemetryEnv = loadEnv(mode, "..", [
+    "FRONTEND_OTEL_",
+    "OTEL_SERVICE_NAMESPACE",
+    "OTEL_DEPLOYMENT_ENVIRONMENT_NAME",
+  ]);
+  const telemetryEnabledValue = telemetryEnv.FRONTEND_OTEL_ENABLED ?? "false";
+  if (telemetryEnabledValue !== "true" && telemetryEnabledValue !== "false") {
+    throw new Error(`FRONTEND_OTEL_ENABLED must be true or false: ${telemetryEnabledValue}`);
+  }
+  const telemetryEnabled = telemetryEnabledValue === "true";
+  const telemetryApp = {
+    name: telemetryEnv.FRONTEND_OTEL_SERVICE_NAME ?? "",
+    namespace: telemetryEnv.OTEL_SERVICE_NAMESPACE ?? "",
+    // 無効のビルドは版を使わない。lint 設定のテストは、この設定を version.txt のない一時ディレクトリへ複製して読む。
+    version: telemetryEnabled
+      ? readFileSync(new URL("../version.txt", import.meta.url), "utf8").trim()
+      : "",
+    environment: telemetryEnv.OTEL_DEPLOYMENT_ENVIRONMENT_NAME ?? "",
+  };
+  const emptyKey = Object.entries(telemetryApp).find(([, value]) => value === "")?.[0];
+  if (telemetryEnabled && emptyKey !== undefined) {
+    throw new Error(`Telemetry app.${emptyKey} must not be empty when FRONTEND_OTEL_ENABLED=true`);
+  }
+  return {
+    __TELEMETRY_ENABLED__: JSON.stringify(telemetryEnabled),
+    __TELEMETRY_APP__: JSON.stringify(telemetryApp),
+  };
+}
+
+export default defineConfig(({ mode }) => {
+  const serverPort = portFromEnv(mode, "SERVER_PORT", "18080");
+  const faroPort = portFromEnv(mode, "OTEL_FARO_HTTP_PORT", "12347");
   const idpOrigin = new URL(
     loadEnv(mode, "..", "OIDC_ISSUER_URI").OIDC_ISSUER_URI ?? "http://localhost:8080",
   ).origin;
@@ -92,6 +134,7 @@ export default defineConfig(({ mode }) => {
   return {
     ...(mode === "development" ? { html: { cspNonce: developmentCspNonce } } : {}),
     plugins: [tanstackRouter({ target: "react" }), react({ compiler: true }), tailwindcss()],
+    define: telemetryDefine(mode),
     // エイリアスの正本は tsconfig.json の paths とする。
     resolve: { tsconfigPaths: true },
     test: {
@@ -169,6 +212,11 @@ export default defineConfig(({ mode }) => {
         "func-style": "off",
         // react-i18next の慣用名である翻訳関数 t だけを短い識別子として許可する。
         "id-length": ["error", { exceptions: ["t"] }],
+        // vite.config.ts の define が置き換えるビルド時の定数だけを、ほかの識別子と衝突しない名前として許す（ADR-068）。
+        "no-underscore-dangle": [
+          "error",
+          { allow: ["__TELEMETRY_ENABLED__", "__TELEMETRY_APP__"] },
+        ],
         "max-lines-per-function": "off",
         "no-duplicate-imports": ["error", { allowSeparateTypeImports: true }],
         "no-magic-numbers": "off",
@@ -191,7 +239,10 @@ export default defineConfig(({ mode }) => {
         "vite-plus/prefer-vite-plus-imports": "error",
         "react/no-danger": "error",
         "vitest/no-restricted-vi-methods": ["error", { mock: mockMessage, doMock: mockMessage }],
-        "no-restricted-imports": ["error", { patterns: [baseUiImports, testOnlyImports] }],
+        "no-restricted-imports": [
+          "error",
+          { patterns: [baseUiImports, testOnlyImports, telemetrySdkImports] },
+        ],
         "no-restricted-globals": ["error", ...htmlSinkGlobals, ...networkGlobals],
         "no-restricted-properties": ["error", ...htmlSinkProperties, ...networkProperties],
         "local-security/no-jsx-srcdoc": "error",
@@ -230,6 +281,18 @@ export default defineConfig(({ mode }) => {
           rules: {
             "no-restricted-imports": [
               "error",
+              {
+                patterns: [sharedLayerImports, baseUiImports, testOnlyImports, telemetrySdkImports],
+              },
+            ],
+          },
+        },
+        // テレメトリの SDK を呼ぶ唯一のファイル（ADR-068）。
+        {
+          files: ["src/lib/telemetry.ts"],
+          rules: {
+            "no-restricted-imports": [
+              "error",
               { patterns: [sharedLayerImports, baseUiImports, testOnlyImports] },
             ],
           },
@@ -239,7 +302,7 @@ export default defineConfig(({ mode }) => {
           rules: {
             "no-restricted-imports": [
               "error",
-              { patterns: [featureImports, baseUiImports, testOnlyImports] },
+              { patterns: [featureImports, baseUiImports, testOnlyImports, telemetrySdkImports] },
             ],
           },
         },
@@ -249,7 +312,10 @@ export default defineConfig(({ mode }) => {
             "shadcn/no-restyle": "off",
             "shadcn/no-arbitrary-values": "off",
             "shadcn/require-static-classes": "off",
-            "no-restricted-imports": ["error", { patterns: [sharedLayerImports, testOnlyImports] }],
+            "no-restricted-imports": [
+              "error",
+              { patterns: [sharedLayerImports, testOnlyImports, telemetrySdkImports] },
+            ],
             "react/only-export-components": "off",
           },
         },
@@ -285,7 +351,7 @@ export default defineConfig(({ mode }) => {
         {
           files: ["**/*.{test,spec}.{ts,tsx,js,jsx}", "src/testing/**"],
           rules: {
-            "no-restricted-imports": ["error", { patterns: [baseUiImports] }],
+            "no-restricted-imports": ["error", { patterns: [baseUiImports, telemetrySdkImports] }],
           },
         },
       ],
@@ -312,6 +378,12 @@ export default defineConfig(({ mode }) => {
         "^/(api|oauth2|login|logout|error|actuator|v3/api-docs|swagger-ui)(/|$)": {
           // 開発専用の転送先。本番はCloudFront等が振り分けるためこのproxyは効かない。
           target: `http://localhost:${serverPort}`,
+          changeOrigin: false,
+        },
+        // ブラウザのテレメトリ（ADR-068）。Collector の faro receiver へ転送し、Spring Boot を通さない。
+        // 完全一致にし、将来の /collections のような画面の path を転送しない。
+        "^/collect$": {
+          target: `http://localhost:${faroPort}`,
           changeOrigin: false,
         },
       },

@@ -2,13 +2,18 @@
 # config.yaml の processors はそのまま使い、出口だけをファイルに差し替える。
 
 exporters:
+  # バックエンドとフロントエンドで出口を分け、それぞれ別の jq で検査する。
   file/check:
-    path: /out/telemetry.json
+    path: /out/backend.json
+  file/check_frontend:
+    path: /out/frontend.json
 
 service:
   pipelines:
     logs:
       exporters: [file/check]
+    logs/frontend:
+      exporters: [file/check_frontend]
     traces:
       exporters: [file/check]
     metrics:

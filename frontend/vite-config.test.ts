@@ -1,3 +1,6 @@
+// oxlint-disable-next-line import/no-nodejs-modules -- 設定が読む version.txt を、テストでも同じ場所から読んで比べる。
+import { readFileSync } from "node:fs";
+
 import { createServer, resolveConfig } from "vite-plus";
 import { afterEach, describe, expect, it, vi } from "vite-plus/test";
 
@@ -5,6 +8,13 @@ const proxyPath = "^/(api|oauth2|login|logout|error|actuator|v3/api-docs|swagger
 
 const createDevelopmentServer = () =>
   createServer({ mode: "development", server: { middlewareMode: true } });
+
+const enableTelemetry = () => {
+  vi.stubEnv("FRONTEND_OTEL_ENABLED", "true");
+  vi.stubEnv("FRONTEND_OTEL_SERVICE_NAME", "demo-web");
+  vi.stubEnv("OTEL_SERVICE_NAMESPACE", "demo");
+  vi.stubEnv("OTEL_DEPLOYMENT_ENVIRONMENT_NAME", "test");
+};
 
 // 実際に Vite の設定を読み込み開発サーバーを生成するため、所要時間は CPU の空きに比例する。
 // pre-push では backend のテストやイメージビルドと並列に走るので、既定の 5 秒では足りないことがある。
@@ -125,5 +135,74 @@ describe("Vite configuration", { timeout: 60_000 }, () => {
     await expect(
       createServer({ mode: "development", logLevel: "silent", server: { middlewareMode: true } }),
     ).rejects.toThrow(`SERVER_PORT must be an integer between 1 and 65535: ${value}`);
+  });
+
+  // ローカルの .env と .env.test が結果を変えないよう、FRONTEND_OTEL_ENABLED は各テストで与える。
+  describe("telemetry", () => {
+    it("proxies only /collect to the faro receiver on OTEL_FARO_HTTP_PORT", async () => {
+      vi.stubEnv("FRONTEND_OTEL_ENABLED", "false");
+      vi.stubEnv("OTEL_FARO_HTTP_PORT", "19347");
+      const server = await createDevelopmentServer();
+
+      try {
+        expect(server.config.server.proxy?.["^/collect$"]).toMatchObject({
+          target: "http://localhost:19347",
+          changeOrigin: false,
+        });
+      } finally {
+        await server.close();
+      }
+    });
+
+    it("does not send /collect to the backend", () => {
+      expect("/collect").not.toMatch(new RegExp(proxyPath, "u"));
+    });
+
+    it("rejects an OTEL_FARO_HTTP_PORT out of range", async () => {
+      vi.stubEnv("FRONTEND_OTEL_ENABLED", "false");
+      vi.stubEnv("OTEL_FARO_HTTP_PORT", "65536");
+
+      await expect(
+        createServer({ mode: "development", logLevel: "silent", server: { middlewareMode: true } }),
+      ).rejects.toThrow("OTEL_FARO_HTTP_PORT must be an integer between 1 and 65535: 65536");
+    });
+
+    it("rejects FRONTEND_OTEL_ENABLED other than true or false", async () => {
+      vi.stubEnv("FRONTEND_OTEL_ENABLED", "yes");
+
+      await expect(
+        createServer({ mode: "development", logLevel: "silent", server: { middlewareMode: true } }),
+      ).rejects.toThrow("FRONTEND_OTEL_ENABLED must be true or false: yes");
+    });
+
+    it("rejects an empty service name when enabled", async () => {
+      enableTelemetry();
+      vi.stubEnv("FRONTEND_OTEL_SERVICE_NAME", "");
+
+      await expect(
+        createServer({ mode: "development", logLevel: "silent", server: { middlewareMode: true } }),
+      ).rejects.toThrow("Telemetry app.name must not be empty when FRONTEND_OTEL_ENABLED=true");
+    });
+
+    it("defines telemetry as disabled when FRONTEND_OTEL_ENABLED=false", async () => {
+      vi.stubEnv("FRONTEND_OTEL_ENABLED", "false");
+      const config = await resolveConfig({}, "build", "production");
+
+      expect(config.define?.__TELEMETRY_ENABLED__).toBe("false");
+    });
+
+    it("defines the app version from version.txt when enabled", async () => {
+      enableTelemetry();
+      const config = await resolveConfig({}, "build", "production");
+      const app: unknown = JSON.parse(String(config.define?.__TELEMETRY_APP__));
+
+      expect(config.define?.__TELEMETRY_ENABLED__).toBe("true");
+      expect(app).toStrictEqual({
+        name: "demo-web",
+        namespace: "demo",
+        version: readFileSync(new URL("../version.txt", import.meta.url), "utf8").trim(),
+        environment: "test",
+      });
+    });
   });
 });

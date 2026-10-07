@@ -2,7 +2,7 @@
   "resourceLogs": [
     {
       "resource": {
-        "attributes": [{ "key": "service.name", "value": { "stringValue": "demo" } }]
+        "attributes": [{ "key": "service.name", "value": { "stringValue": "demo-api" } }]
       },
       "scopeLogs": [
         {

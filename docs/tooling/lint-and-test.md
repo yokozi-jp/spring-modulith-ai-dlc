@@ -15,7 +15,7 @@ Dockerを使うTaskは、Dockerがないローカル環境ではスキップし�
 
 - **`task check`**：バックエンドの静的解析を実行する。
 - **`task verify`**：バックエンドの静的解析、マイグレーション検証、テストを実行する。
-- **`task fe-verify`**：フロントエンドの静的解析、未使用コード検査、テスト、本番ビルドを実行する。
+- **`task fe-verify`**：フロントエンドの静的解析、未使用コード検査、テスト、テレメトリを無効にした本番ビルドを実行する。
 - **`task test`**：隔離した依存を起動し、確定済みマイグレーションの検証、バックエンドテスト、OpenAPI契約検査後に片付ける。
 - **`task test-dev`**：隔離した依存を起動し、作りかけのchangesetを含むバックエンドテスト後に片付ける。
 - **`task mutation-test`**：隔離した依存を使ってバックエンドのPITミューテーションテストを実行する。
@@ -27,8 +27,9 @@ Dockerを使うTaskは、Dockerがないローカル環境ではスキップし�
 - **`task fe-knip`**：未参照ファイル、未使用export、未使用依存をKnipで検査する。
 - **`task fe-doctor`**：React Doctorでwarningとerrorを検出し、検出または15分超過で失敗する。
 - **`task fe-coverage`**：VitestのV8 providerで全体branch coverage 85%を検証する。
-- **`task fe-test-build`**：coverage付きテストと本番ビルドを実行する。
-- **`task fe-verify`**：`fe-check`、`fe-knip`、`fe-test-build`を実行する。
+- **`task fe-test-build`**：coverage付きテストと、`FRONTEND_OTEL_ENABLED=false`を強制した本番ビルドを実行する。
+  ビルドの後に`dist/assets`を`faro|grafana`でgrepし、bundleにFaroのSDKが入っていれば失敗する（[ADR-068](../adr/ADR-068-collect-browser-telemetry-with-faro-via-collector.md)）。
+- **`task fe-verify`**：`fe-check`、`fe-knip`、`fe-test-build`（テレメトリを無効にした本番ビルドとgrepを含む）を実行する。
 - **`task fe-route-tree-check`**：ビルドで`routeTree.gen.ts`を再生成し、コミット済みの内容と差分があれば失敗する。
 - **`task api-client-check`**：Orvalで`src/api/generated`を再生成し、コミット済みの内容と差分があれば失敗する（後述の「API契約」）。
 
@@ -60,6 +61,8 @@ Oxlintの設定の正本は[`frontend/vite.config.ts`](../../frontend/vite.confi
   Oxfmtと役割が重複するか、可読性を下げるためである。
 - **短い識別子**：`id-length`で`t`だけを例外にする。
   react-i18nextの翻訳関数の慣用名であるためである。
+- **ビルド時の定数**：`no-underscore-dangle`で`__TELEMETRY_ENABLED__`と`__TELEMETRY_APP__`だけを許可する。
+  `vite.config.ts`の`define`が置き換える定数を、ほかの識別子と衝突しない名前にするためである（[ADR-068](../adr/ADR-068-collect-browser-telemetry-with-faro-via-collector.md)）。
 - **型のimport**：`no-duplicate-imports`を`allowSeparateTypeImports: true`にし、型のimportを分けて書けるようにする。
 - **Vitestの書き方**：`vitest/no-conditional-in-test`、`vitest/no-hooks`、`vitest/no-importing-vitest-globals`、`vitest/prefer-called-times`、`vitest/prefer-describe-function-title`、`vitest/prefer-expect-assertions`、`vitest/prefer-lowercase-title`、`vitest/prefer-strict-boolean-matchers`、`vitest/prefer-to-be-truthy`、`vitest/require-hook`、`vitest/require-test-timeout`をoffにする。
   Vitestの標準APIと競合するか、互いに矛盾するためである。
@@ -87,14 +90,15 @@ Oxlintの設定の正本は[`frontend/vite.config.ts`](../../frontend/vite.confi
 そのため禁止の一覧を`vite.config.ts`の定数に分け、overrideごとに組み合わせている。
 同じファイルに複数のoverrideが一致すると、後のoverrideのoptionだけが効くので、overrideの並び順を変えるときは組み合わせ結果を確かめる。
 
-| 対象のファイル                     | `no-restricted-imports`        | `no-restricted-globals`と`no-restricted-properties` |
-| ---------------------------------- | ------------------------------ | --------------------------------------------------- |
-| すべて（top-level）                | Base UI、テスト用部品          | HTML sink、network                                  |
-| `src/{api,components,lib,i18n}/**` | 共有層、Base UI、テスト用部品  | top-levelを引き継ぐ                                 |
-| `src/features/**`                  | feature、Base UI、テスト用部品 | top-levelを引き継ぐ                                 |
-| `src/components/ui/**`             | 共有層、テスト用部品           | top-levelを引き継ぐ                                 |
-| `src/api/**`                       | 共有層の設定を引き継ぐ         | HTML sinkだけ                                       |
-| テストファイルと`src/testing/**`   | Base UIだけ                    | top-levelを引き継ぐ                                 |
+| 対象のファイル                     | `no-restricted-imports`                       | `no-restricted-globals`と`no-restricted-properties` |
+| ---------------------------------- | --------------------------------------------- | --------------------------------------------------- |
+| すべて（top-level）                | Base UI、テスト用部品、テレメトリSDK          | HTML sink、network                                  |
+| `src/{api,components,lib,i18n}/**` | 共有層、Base UI、テスト用部品、テレメトリSDK  | top-levelを引き継ぐ                                 |
+| `src/lib/telemetry.ts`             | 共有層、Base UI、テスト用部品                 | top-levelを引き継ぐ                                 |
+| `src/features/**`                  | feature、Base UI、テスト用部品、テレメトリSDK | top-levelを引き継ぐ                                 |
+| `src/components/ui/**`             | 共有層、テスト用部品、テレメトリSDK           | top-levelを引き継ぐ                                 |
+| `src/api/**`                       | 共有層の設定を引き継ぐ                        | HTML sinkだけ                                       |
+| テストファイルと`src/testing/**`   | Base UI、テレメトリSDK                        | top-levelを引き継ぐ                                 |
 
 各禁止の中身は次のとおりである。
 
@@ -104,6 +108,9 @@ Oxlintの設定の正本は[`frontend/vite.config.ts`](../../frontend/vite.confi
 - **Base UI**：`@base-ui/**`。
   `@/components/ui`からimportする。
 - **テスト用部品**：`msw`、`msw/**`、`@/api/generated/mocks/**`、`@/testing/**`、`@testing-library/**`。
+- **テレメトリSDK**：`@grafana/*`。
+  `src/lib/telemetry.ts`を通して呼ぶ（[ADR-068](../adr/ADR-068-collect-browser-telemetry-with-faro-via-collector.md)）。
+  静的importだけを検出し、`import()`は検出しない。
 - **HTML sink**：globalの`DOMParser`、`innerHTML`などのHTML系property、`document.write`、`document.writeln`。
 - **network**：globalの`fetch`と`XMLHttpRequest`、`window.fetch`、`globalThis.fetch`。
   `src/api`の生成clientを使う。
@@ -202,6 +209,7 @@ PITのHTMLとXMLのレポートは、変異対象がある場合に`backend/buil
 - **`task lint-docker-check`**：Dockerfileを`docker build --check`で検査する。
 - **`task lint-compose`**：Composeファイルの構文、参照、変数展開を検証する。
 - **`task otel-collector-check`**：許可していない属性を含むOTLPのログをCollectorに流し、その属性が除かれ、許可した属性が残ることを確かめる。
+  Faroのfixture（`docker/otel-collector/check/fixtures/frontend.json`）もフロントエンドのpipelineに流し、許可した4属性と固定の本文だけが残り、URLのqueryとfragmentが消えることと、faro receiverの405、415、202、400の応答を確かめる。
 - **`task lint-md`**：`.markdownlint-cli2.yaml`の除外設定に従いMarkdownを検査する。
 - **`task lint-md-fix`**：markdownlint-cli2で安全に修正できるMarkdownの問題を修正する。
 - **`task okf-check`**：OKF適合、内部リンク、孤立文書、文書責務の見直し合図、steering境界、Taskfile文書同期候補を検査する。

@@ -1,14 +1,21 @@
 import { useQueryErrorResetBoundary } from "@tanstack/react-query";
+import type { ErrorComponentProps } from "@tanstack/react-router";
 import { useRouter } from "@tanstack/react-router";
+import { useEffect } from "react";
 import { useTranslation } from "react-i18next";
 
 import { Button } from "@/components/ui/button";
+import { reportCaughtError } from "@/lib/telemetry";
 
 // error.message は内部情報を含みうるため表示せず、カタログの文言だけを出す。
-export function RouteError() {
+export function RouteError({ error }: ErrorComponentProps) {
   const { t } = useTranslation();
   const { reset } = useQueryErrorResetBoundary();
   const router = useRouter();
+
+  useEffect(() => {
+    reportCaughtError(error);
+  }, [error]);
 
   return (
     <section className="flex flex-col items-start gap-4 px-6 py-16 sm:px-10" role="alert">
