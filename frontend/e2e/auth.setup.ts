@@ -1,7 +1,7 @@
 import type { BrowserContext } from "@playwright/test";
-import { expect, test as setup } from "@playwright/test";
 
 import { authFile, signInOnKeycloak } from "./environment";
+import { expect, test as setup } from "./fixtures";
 
 async function sessionCookie(context: BrowserContext): Promise<string | undefined> {
   const cookies = await context.cookies();

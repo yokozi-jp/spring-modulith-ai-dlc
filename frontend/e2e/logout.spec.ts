@@ -1,7 +1,7 @@
 import type { APIRequestContext, BrowserContext, Cookie, Locator, Page } from "@playwright/test";
-import { expect, test } from "@playwright/test";
 
 import { signInOnKeycloak } from "./environment";
+import { expect, test } from "./fixtures";
 
 // 共有の storageState のセッションを終わらせないよう、各テストは専用の context でログインする。
 test.use({ storageState: { cookies: [], origins: [] } });
@@ -170,6 +170,34 @@ test("_csrf にマスクしない Cookie の値を入れて送るとログアウ
 
   // token を送らなかったのではなく、マスクしない値を送って拒否されたことを確かめる。
   expect(await expectLogoutRejected(page)).toBe(token);
+});
+
+// task e2e は Faro を有効にしてビルドする（ADR-068）。fixtures の既定の 202 を page.route の 503 で上書きする。
+test("/collect が 503 を返しても、ログインとログアウトのフォームを送信できる", async ({ page }) => {
+  // 最初の goto の前に登録し、ログインの間に送られても 503 にする。
+  await page.route("**/collect", (route) => route.fulfill({ status: 503 }));
+  await logIn(page);
+  await expect(homeHeading(page)).toBeVisible();
+
+  // SDK は動的 import で読むので、初期化を待ってから例外を投げる。
+  // Faro は既定で window.faro を公開する（preventGlobalExposure は false、globalObjectKey は faro）。
+  await page.waitForFunction(() => "faro" in globalThis);
+
+  // Faro が実際に /collect へ送り、503 を受けたことを確かめ、無効のビルドで検査が空振りするのを防ぐ。
+  // route.fulfill の応答も response の event になる。Faro の再送は待たない。
+  const collect = page.waitForResponse(
+    (response) => new URL(response.url()).pathname === "/collect" && response.status() === 503,
+  );
+  // setTimeout の中で投げ、page.evaluate を失敗させずに window.onerror へ届ける。
+  await page.evaluate(() => {
+    setTimeout(() => {
+      throw new Error("e2e telemetry probe");
+    }, 0);
+  });
+  await collect;
+
+  await logoutButton(page).click();
+  await expectLoggedOutPage(page);
 });
 
 // CsrfFilter は Cookie のない要求でだけ新しい token を発行する（RepositoryDeferredCsrfToken）。

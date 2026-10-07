@@ -28,7 +28,7 @@ OpenAPIからOrvalでnative FetchのTanStack Query clientを生成し、手書�
 
 ## 現在の構成
 
-現在の `src` は、アプリケーションの起動、ルーティング、アプリシェル、routerの既定の状態表示、API clientのmutatorと `QueryClient` の生成と生成した型、共通UI、国際化、小さなutility、テストの準備のコードだけを持つ。
+現在の `src` は、アプリケーションの起動、ルーティング、アプリシェル、routerの既定の状態表示、API clientのmutatorと `QueryClient` の生成と生成した型、共通UI、国際化、テレメトリの初期化と送信、小さなutility、テストの準備のコードだけを持つ。
 
 ``` text
 frontend/src/
@@ -71,6 +71,8 @@ frontend/src/
 ├── lib/
 │   ├── csrf.ts
 │   ├── csrf.test.ts
+│   ├── telemetry.ts
+│   ├── telemetry.test.ts
 │   ├── utils.ts
 │   └── utils.test.ts
 └── testing/
@@ -83,6 +85,11 @@ frontend/src/
 `main.tsx` はcomposition rootであり、`api/query-client.ts` の `createQueryClient()` で `QueryClient` を作り、TanStack Routerを生成してProviderを接続する。
 `createQueryClient()` は、`api/api-fetch.ts` の401の処理（`QueryCache` と `MutationCache` の `onError`）と再試行の判定（`defaultOptions.queries.retry`）を渡し、mutationの後に全queryを無効化する（[mutationの後のcache](routing-and-state.md#mutationの後のcache)）。
 本番とテスト（`testing/query-client.ts`）は同じ関数で `QueryClient` を作る。
+`main.tsx` は描画の前に `lib/telemetry.ts` の `initTelemetry()` を呼ぶが、SDKの読み込みを待たずに描画を始める。
+
+`lib/telemetry.ts` はFaro Web SDK（`@grafana/*`）を呼ぶ唯一のファイルであり、featureとrouteからSDKを呼ばない。
+routerの既定のエラー表示（`components/route-error.tsx`）は、捕捉したエラーをこのファイルの `reportCaughtError` で送る。
+SDKはビルド時の定数で有効にしたときだけ動的importで読み込み、既定の無効のビルドには含まれない（[ADR-068](../adr/ADR-068-collect-browser-telemetry-with-faro-via-collector.md)）。
 
 `router-defaults.ts` はrouterの既定値（pending、error、not foundのcomponentとpreloadの設定）を一つのobjectにまとめ、`main.tsx` とrouteのテストが同じ値でrouterを作る。
 
@@ -183,6 +190,11 @@ feature間の境界は、`frontend/lint/feature-boundaries.js` のOxlint JS plug
 共有層、route、Base UI、`fetch`、テスト用部品のimportの制限は、`no-restricted-imports`、`no-restricted-globals`、`no-restricted-properties` のoverrideで書いている。
 ファイルの範囲ごとに効く制限は[Lintとテストのリファレンス](../tooling/lint-and-test.md#フロントエンドのlint設定)にある。
 
+`@grafana/*` のimportは、`no-restricted-imports` のすべての禁止の一覧に加え、`src/lib/telemetry.ts` のoverrideだけで外している。
+テストファイルもSDKをimportできない。
+`no-restricted-imports` は静的importだけを見るので、`import("@grafana/...")` の動的importは検出しない。
+動的importはレビューで確かめる。
+
 jsPluginは、動的な境界規則をこの一本だけと想定している。
 アプリやパッケージに分かれたとき、または動的な規則が三本を超えたときは、dependency-cruiserへ移る。
 OxlintのJS plugin APIはalphaである。
@@ -213,6 +225,7 @@ OxlintのJS plugin APIはalphaである。
 ``` text
 main.tsx -> api/query-client.ts -> api/api-fetch.ts -> lib
          -> router-defaults.ts -> components
+         -> lib/telemetry.ts -> @grafana/faro-web-sdk（動的import）
          -> routeTree.gen.ts -> routes
                                   |
                                   +-> features
@@ -227,6 +240,7 @@ features -> api/generated
          -> i18n
 
 components -> components/ui
+           -> lib
            -> i18n
 ```
 

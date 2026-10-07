@@ -24,6 +24,8 @@ trustPolicy: no-downgrade
 # ADR-022: TanStack Router のビルド時依存に限定して provenance 不在を許容する。
 trustPolicyExclude:
   - "semver@6.3.1"
+  # ADR-068: Faro Web SDK が固定する版に限定して provenance 不在を許容する。
+  - "ua-parser-js@1.0.41"
 # 推移的依存が Git リポジトリや直接 URL などの exotic なソースから取得されることを禁止する。
 blockExoticSubdeps: true
 allowBuilds:

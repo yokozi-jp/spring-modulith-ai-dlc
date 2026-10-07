@@ -68,6 +68,7 @@ setup project は、`storageState` を持たない browser context で `/` を�
 - `test.only` は CI の `forbidOnly` が失敗させる。
 - Lint は `vite.config.ts` の設定で `vp check` が検査する。
   Playwright Test の API に当たる vitest plugin の規則だけを `e2e/**` で外している（[Lintとテストのリファレンス](../tooling/lint-and-test.md)）。
+  `e2e/**` からもテレメトリの SDK（`@grafana/*`）を import できない。
 
 ## 不安定なテスト
 
@@ -105,11 +106,15 @@ compose が公開する port は、すべて `127.0.0.1` に限る。
 
 1. 前回残した環境を破棄し、5173 と 8080 が空いていることを確かめる。
 2. frontend の依存の導入と build、Chromium の導入、backend イメージの build を行う。
+   frontend は `vp build --mode test` で build し、`.env.test` の `FRONTEND_OTEL_ENABLED=true` で Faro を有効にする。
 3. PostgreSQL、Redis、Keycloak を起動し、`task be-migrate` で migration を適用する。
 4. backend を起動し、ホストから readiness を確かめる。
 5. Playwright を実行する。
    Playwright が `webServer` で Vite preview を起動し、終了時に止める。
 6. 成否にかかわらず、コンテナと volume を削除する。
+
+E2E には Collector を置かず、テストが `/collect` を `page.route` で応答する（[ADR-068](../adr/ADR-068-collect-browser-telemetry-with-faro-via-collector.md)）。
+`frontend/e2e/logout.spec.ts` は、`/collect` が 503 を返してもログインとログアウトのフォームを送信できることを確かめる。
 
 起動済みの環境に対して Playwright だけを実行するときは、`frontend/` で `pnpm e2e`（`vp run e2e` と同じ）を実行する。
 build、コンテナの起動、後片付けは行わない。

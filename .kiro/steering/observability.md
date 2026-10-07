@@ -1,6 +1,6 @@
 ---
 inclusion: fileMatch
-fileMatchPattern: ["backend/src/main/resources/logback-spring.xml", "docker/otel-collector/**"]
+fileMatchPattern: ["backend/src/main/resources/logback-spring.xml", "docker/otel-collector/**", "frontend/src/lib/telemetry.ts"]
 name: observability
 description: Logback の設定、Collector の設定、ログの出力、OpenTelemetry へ送る可観測性データを追加や変更するときに使う。ログのレベル、メッセージ、出力箇所、量の規約の入口を示す。
 ---

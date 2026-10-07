@@ -143,7 +143,7 @@ tasks:
           exit "$cleanup_status"
         }
         trap cleanup EXIT
-        (cd frontend && vp install --frozen-lockfile && vp run build && vp exec playwright install chromium)
+        (cd frontend && vp install --frozen-lockfile && vp build --mode test && vp exec playwright install chromium)
         compose build backend
         compose up -d --wait postgres redis keycloak
         task be-migrate COMPOSE_ENV_FILE=.env.test
@@ -401,7 +401,17 @@ tasks:
     dir: frontend
     cmds:
       - vp test run --coverage
-      - vp run build
+      # ルートの .env で有効にしていても、既定の無効のビルドを検査する（ADR-068）。
+      # vp run の script は cache しないので、環境変数がそのまま渡る。build を run.tasks に移すなら cache.env に FRONTEND_OTEL_* を足す。
+      - FRONTEND_OTEL_ENABLED=false vp run build
+      - |
+        # grep は一致で 0、不一致で 1、対象がないなどの失敗で 2 を返す。1 以外は失敗にする。
+        status=0
+        grep -rqiE 'faro|grafana' dist/assets || status=$?
+        if [ "$status" -ne 1 ]; then
+          echo "無効のビルドの bundle に Faro の SDK が入っているか、dist/assets を検査できませんでした（grep の終了コード $status）。" >&2
+          exit 1
+        fi
 
   fe-verify:
     desc: フロントエンドの静的解析、未使用コード検査、テスト、ビルドを実行
@@ -937,6 +947,13 @@ tasks:
     silent: true
     cmds:
       - |
+        # このタスクは、Collector の config.yaml が「残してよい値だけを残し、漏れてはいけない値を捨てる」ことの回帰テストである。
+        # allowlist は YAML の設定で、型検査もコンパイルも効かない。processor を 1 行、正規表現を 1 文字間違えると、
+        # 個人情報や URL のトークンが保存先に流れ、一度書かれたログは取り消せない。だから設定を変えたら必ず流して確かめる。
+        # 検証する内容の正文は docs/observability/conventions.md の「検証」節と ADR-068 にある（Taskfile は手順だけを持つ）。
+        # 本物の Grafana を立てず、check/check.yaml で出口だけをファイルに差し替える。processor は config.yaml のまま使う。
+        # 出口はバックエンド（backend.json）とフロントエンド（frontend.json）に分け、それぞれ別の jq で検査する。
+        # 入力の fixture は check/fixtures/ に置き、backend.json は OTLP 形式、frontend.json は Faro の payload 形式である。
         # イメージは Compose の定義から取り、Dependabot の更新と揃える。
         image="$({{.DOCKER}} compose --env-file .env.example -f docker/compose.yml config --format json | jq -r '.services["otel-collector"].image')"
         out="$(mktemp -d)"
@@ -950,15 +967,17 @@ tasks:
           exit "$status"
         }
         trap cleanup EXIT
-        container="$({{.DOCKER}} run -d -p 127.0.0.1::4318 \
+        container="$({{.DOCKER}} run -d -p 127.0.0.1::4318 -p 127.0.0.1::12347 \
           -e OTEL_COLLECTOR_OTLP_HTTP_ENDPOINT=0.0.0.0:4318 \
+          -e OTEL_COLLECTOR_FARO_HTTP_ENDPOINT=0.0.0.0:12347 \
           -v "$PWD/docker/otel-collector:/etc/otelcol-check:ro" -v "$out:/out" \
           "$image" --config /etc/otelcol-check/config.yaml --config /etc/otelcol-check/check/check.yaml)"
         address="$({{.DOCKER}} port "$container" 4318/tcp | head -n 1)"
+        faro_address="$({{.DOCKER}} port "$container" 12347/tcp | head -n 1)"
         accepted=0
         for _ in $(seq 1 30); do
           if curl -fsS -o /dev/null -X POST -H "Content-Type: application/json" 2>/dev/null \
-            --data-binary "@docker/otel-collector/check/logs.json" "http://$address/v1/logs"; then
+            --data-binary "@docker/otel-collector/check/fixtures/backend.json" "http://$address/v1/logs"; then
             accepted=1
             break
           fi
@@ -970,7 +989,7 @@ tasks:
           exit 1
         fi
         for _ in $(seq 1 30); do
-          if grep -qF 'resourceLogs' "$out/telemetry.json" 2>/dev/null; then break; fi
+          if grep -qF 'resourceLogs' "$out/backend.json" 2>/dev/null; then break; fi
           sleep 1
         done
         if ! jq -e '
@@ -983,11 +1002,81 @@ tasks:
               and value("exception.message") == "order failed"
               and (value("exception.stacktrace") | contains("OrderService.java:84"))
           )
-        ' "$out/telemetry.json" >/dev/null; then
+        ' "$out/backend.json" >/dev/null; then
           echo "ログ属性が allowlist または期待値と一致しません。" >&2
           exit 1
         fi
-        echo "Collector OK: 許可した属性だけを残しました。"
+        fail() {
+          echo "$1" >&2
+          {{.DOCKER}} logs "$container" >&2
+          exit 1
+        }
+        # faro receiver の起動は OTLP より遅れうるので、202 になるまで送る。202 の後は再送しない（出口の記録が増えるため）。
+        accepted=0
+        for _ in $(seq 1 30); do
+          status="$(curl -s -o /dev/null -w '%{http_code}' -X POST -H "Content-Type: application/json" \
+            --data-binary "@docker/otel-collector/check/fixtures/frontend.json" "http://$faro_address/collect" || true)"
+          if [ "$status" = "202" ]; then
+            accepted=1
+            break
+          fi
+          sleep 1
+        done
+        if [ "$accepted" -ne 1 ]; then fail "Collector の faro receiver が Faro の payload を受け付けませんでした。"; fi
+        # 受け口の挙動。本文の {} は例外も log も持たないので、出口の記録を増やさない。
+        status="$(curl -s -o /dev/null -w '%{http_code}' "http://$faro_address/collect")"
+        if [ "$status" != "405" ]; then fail "faro receiver が GET に 405 を返しませんでした（$status）。"; fi
+        status="$(curl -s -o /dev/null -w '%{http_code}' -X POST -H "Content-Type: text/plain" --data-binary '{}' "http://$faro_address/collect")"
+        if [ "$status" != "415" ]; then fail "faro receiver が text/plain の POST に 415 を返しませんでした（$status）。"; fi
+        status="$(curl -s -o /dev/null -w '%{http_code}' -X POST -H "Content-Type: application/json" --data-binary '{}' "http://$faro_address/any/path")"
+        if [ "$status" != "202" ]; then fail "faro receiver が /collect 以外のパスの POST に 202 を返しませんでした（$status）。"; fi
+        status="$(head -c 1100000 /dev/zero | tr '\0' ' ' \
+          | curl -s -o /dev/null -w '%{http_code}' -H 'Content-Type: application/json' \
+            --data-binary @- "http://$faro_address/collect")"
+        if [ "$status" != "400" ]; then fail "faro receiver が 1 MiB を超える本文に 400 を返しませんでした（$status）。"; fi
+        for _ in $(seq 1 30); do
+          if grep -qF 'resourceLogs' "$out/frontend.json" 2>/dev/null; then break; fi
+          sleep 1
+        done
+        if [ ! -s "$out/frontend.json" ]; then fail "フロントエンドのログが出口に届きませんでした。"; fi
+        if grep -qE 'secret-|person@example\.com|fixture-user-id|fixture-session-id|FixtureAgent' "$out/frontend.json"; then
+          fail "フロントエンドのログに、許可していない値か URL の query か fragment が残りました。"
+        fi
+        # file exporter はバッチごとに一行を書くので -s で読む。
+        if ! jq -s -e --arg apostrophe "can't" '
+          def attr($key): first(.attributes[]? | select(.key == $key) | .value.stringValue);
+          [.[].resourceLogs[]?] as $resources
+          | [$resources[].scopeLogs[]?.logRecords[]?] as $records
+          | ($resources | length) > 0
+            and all($resources[]; .resource
+              | attr("service.name") == "demo-web"
+                and attr("service.namespace") == "demo"
+                and attr("service.version") == "0.0.0-fixture"
+                and attr("deployment.environment.name") == "local"
+                # payload の meta.app に関わらず、resource 属性は許可した 4 つだけにする。
+                and ([.attributes[]?.key] | sort) == ["deployment.environment.name", "service.name", "service.namespace", "service.version"])
+            and ($records | length) == 5
+            and all($records[];
+              .body.stringValue == "Browser exception"
+                and ([.attributes[]?.key] | sort) == ["exception.message", "exception.stacktrace", "exception.type", "url.path"]
+                and attr("exception.type") == "Error"
+                and attr("url.path") == "/orders/42")
+            and any($records[];
+              attr("exception.message") == "failed to load http://localhost:5173/api/orders"
+                and (attr("exception.stacktrace") | contains("(http://localhost:5173/assets/index-abc.js:10:5)")))
+            # query の除去が 1 行目の改行（\ と n の 2 文字）を食べていないこと。
+            and any($records[]; attr("exception.stacktrace") | contains("http://localhost:5173/api/orders\\n  at render ("))
+            and any($records[]; attr("exception.message") == $apostrophe)
+            and any($records[]; attr("exception.message") == "bad http://localhost:5173/x tail")
+            # scheme が大文字でも query を消し、log、event、measurement は捨てる（記録は例外の 5 件だけ）。
+            and any($records[]; attr("exception.message") == "upper HTTPS://H/x tail")
+            # path に括弧を含む URL でも query を消し、frame の :行:列) は残す。
+            and any($records[]; attr("exception.message") == "paren https://example.test/a(b) tail"
+              and (attr("exception.stacktrace") | contains("(http://localhost:5173/assets/a(b).js:1:2)")))
+        ' "$out/frontend.json" >/dev/null; then
+          fail "フロントエンドのログの属性、resource 属性、本文のいずれかが期待値と一致しません。"
+        fi
+        echo "Collector OK: 許可した属性だけを残し、Faro の payload から URL の query と許可していない値を消しました。"
 
   compose-reset:
     desc: 明示確認付きでComposeサービスと全データを削除
