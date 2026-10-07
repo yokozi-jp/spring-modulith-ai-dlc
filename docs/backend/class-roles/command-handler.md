@@ -57,6 +57,7 @@ CommandHandler は他モジュールから呼ばれない。
   イベント出版レジストリはトランザクションアウトボックスとして働き、コミットした確定のイベントだけが決済へ渡る（[メッセージングの設計](../../integration/async-messaging-design.md)の「DB 更新とメッセージ発行の整合」）。
 - 外部システムを呼ぶ CommandHandler は、集約がすでにその操作を終えていれば（`order.isPaid()`）何もせずに Result を返し、外部システムに冪等性キー（注文 ID）を渡す。
   外部システムの呼び出しは `update` より前に置き、呼んでいる間は行をロックしない。
+  `isPaid()` の確認は二回目の請求を省くためのもので、二重の処理は `update` の楽観的ロックで止める（[順序保証と冪等性](../../integration/async-ordering-and-idempotency.md)の「集約の楽観的ロック」）。
   同じイベントは再投入で二回以上届く（[メッセージングの設計](../../integration/async-messaging-design.md)の「配信保証」、[順序保証と冪等性](../../integration/async-ordering-and-idempotency.md)）。
 - 外部システムの失敗で `FAILED` のまま残ったイベント出版は、[非同期処理の失敗時の再試行と回復](../../integration/async-failure-recovery.md)の `FailedEventPublications` の手順で再投入する。
   自動の再投入は [issue #108](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/108) で扱う。
@@ -213,6 +214,7 @@ public ChargeOrderResult handle(final ChargeOrderCommand command) {
 `@ApplicationModuleTest` でモジュールを起動し、`Scenario` で `handle` を呼んで、発行されたイベントを確かめる。
 `Scenario` は `handle` をコミットするトランザクションで呼ぶため、`CleanGeneratedTablesExtension` で各テスト後に後始末する。
 他モジュールの `<Feature>Queries` を使う CommandHandler は、`@ApplicationModuleTest(mode = BootstrapMode.DIRECT_DEPENDENCIES)` で相手のモジュールも起動する。
+相手のモジュールがさらに別のモジュールに依存するときは、`BootstrapMode.ALL_DEPENDENCIES` で間接の依存まで起動する（[Listener](listener.md)の「対応するテスト」）。
 書き方は[バックエンドのDBテスト](../testing-database.md)の「Spring Modulithのイベント」と「コミットするテスト」に従う。
 
 ```java
