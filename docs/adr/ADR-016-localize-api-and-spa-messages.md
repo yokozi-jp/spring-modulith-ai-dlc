@@ -56,6 +56,7 @@ i18next の global instance は使わず、`createInstance` で作った instanc
 選択結果を `document.documentElement.lang` と画面 title に反映する。
 数値と複数形は翻訳済みの固定文字列へ変換せず、i18next の formatting と plural を使う（どちらも内部で `Intl.NumberFormat` と `Intl.PluralRules` を使う）。
 日時は表示境界で `Intl.DateTimeFormat` を使う。
+[ADR-047](ADR-047-parse-api-datetimes-with-temporal.md) で、API の絶対時刻は `Temporal.Instant` の `toLocaleString`（内部で `Intl.DateTimeFormat` を使う）で表示する形に上書きした。
 
 ブラウザ設定を使う間は、API request の `Accept-Language` を JavaScript で上書きしない。
 将来、アプリ内の言語選択を追加する場合は、その選択を SPA と API の双方へ同じ規則で反映する。
@@ -134,6 +135,7 @@ Problem Details がない場合と、画面が一般エラーを表示する場�
 - [i18next: Formatting](https://www.i18next.com/translation-function/formatting)
 - [react-i18next](https://react.i18next.com/)
 - [ADR-013](ADR-013-standardize-http-api-contracts.md)
+- [ADR-047](ADR-047-parse-api-datetimes-with-temporal.md)
 - [ADR-058](ADR-058-use-path-absolute-relative-uri-for-problem-types.md)
 - `backend/src/main/resources/application.yaml`
 - `frontend/src/i18n/index.ts`

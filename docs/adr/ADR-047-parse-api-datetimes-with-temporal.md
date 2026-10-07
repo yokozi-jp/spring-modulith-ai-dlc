@@ -31,6 +31,8 @@ Temporalは2026年3月にStage 4になり、ChromeとFirefoxは出荷済みで�
 ## Decision
 
 APIの絶対時刻は`Temporal.Instant.from(...)`で解析し、`toLocaleString`で表示する。
+`toLocaleString`は内部で`Intl.DateTimeFormat`を使う。
+この決定は、[ADR-016](ADR-016-localize-api-and-spa-messages.md)の「日時は表示境界で`Intl.DateTimeFormat`を使う」を上書きし、`Temporal`のオブジェクトを`Intl.DateTimeFormat`へ直接渡さない。
 日付だけの値は`Temporal.PlainDate.from(...)`で解析する。
 APIの値を`new Date(string)`や`Date.parse`で解析しない。
 
@@ -78,5 +80,6 @@ SafariがTemporalを出荷し、対応ブラウザとWeb機能の採用基準で
 - [日時とタイムゾーンの規約](../datetime/timezone-conventions.md)
 - [対応ブラウザとWeb機能の採用基準](../frontend/browser-support.md)
 - [ADR-006: 絶対時刻を UTC / Instant / timestamptz に統一する](ADR-006-utc-instant-absolute-time-policy.md)
+- [ADR-016: API と SPA のメッセージをローカライズする](ADR-016-localize-api-and-spa-messages.md)
 - TC39, Temporal: <https://github.com/tc39/proposal-temporal>
 - npm, temporal-polyfill: <https://www.npmjs.com/package/temporal-polyfill>
