@@ -68,3 +68,4 @@
 - [ADR-065: 区分値を DB と API で enum の名前のまま持つ](ADR-065-store-category-values-as-enum-names.md)（Proposed, 2026-10-06）
 - [ADR-066: CSRF の Cookie を __Host- の名前にし、SameSite=Lax を付ける](ADR-066-harden-csrf-cookie-with-host-prefix.md)（Accepted, 2026-10-06）
 - [ADR-068: ブラウザのテレメトリを Faro Web SDK で集め、同一オリジンの /collect から Collector へ送る](ADR-068-collect-browser-telemetry-with-faro-via-collector.md)（Proposed, 2026-10-06）
+- [ADR-071: 作業で得た学びを 5 つの層へ還元し、上の層を優先する](ADR-071-reinforce-learnings-into-five-layers.md)（Proposed, 2026-10-08）
