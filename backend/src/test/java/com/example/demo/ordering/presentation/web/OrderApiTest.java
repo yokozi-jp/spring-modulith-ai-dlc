@@ -267,6 +267,13 @@ class OrderApiTest {
         .andExpect(jsonPath("$.items[0].totalAmount").value(120.00))
         .andExpect(jsonPath("$.items[0].lockNo").value(1));
     mockMvc
+        .perform(get("/api/orders").param("status", "CONFIRMED").with(oidcLogin()))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.items.length()").value(1))
+        .andExpect(jsonPath("$.items[0].orderId").value(confirmedId))
+        .andExpect(jsonPath("$.items[0].status").value("CONFIRMED"))
+        .andExpect(jsonPath("$.items[0].lockNo").value(2));
+    mockMvc
         .perform(get("/api/orders").param("status", "CANCELLED").with(oidcLogin()))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.items.length()").value(0));

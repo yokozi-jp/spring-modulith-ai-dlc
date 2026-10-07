@@ -1,7 +1,7 @@
 /* @vitest-environment jsdom */
 
 import { screen, waitFor, within } from "@testing-library/react";
-import { describe, expect, it } from "vite-plus/test";
+import { describe, expect, expectTypeOf, it } from "vite-plus/test";
 
 import { getListOrdersMockHandler } from "@/api/generated/mocks/ordering/ordering.msw";
 import type { OrderSummaryListResponse, OrderSummaryResponse } from "@/api/generated/models";
@@ -33,7 +33,10 @@ function currentOf(name: string) {
 
 describe("orders page", () => {
   it("一覧の行に客先注文番号、状態、合計金額、詳細へのリンクを出す", async () => {
-    const [, row] = await rowsOf([orderSummary()]);
+    const summary = orderSummary({ lockNo: 2 });
+    expectTypeOf(summary.lockNo).toEqualTypeOf<number | undefined>();
+
+    const [, row] = await rowsOf([summary]);
 
     expect(row?.textContent).toContain("C-001");
     expect(row?.textContent).toContain("下書き");
