@@ -34,6 +34,8 @@ backend/src/test/java/com/example/demo/architecture/
 
 `ApplicationModuleArchitectureTest`はSpring Modulithの`ApplicationModules.verify()`を使い、モジュール間の循環、内部パッケージ参照、許可されていない依存を検出する。
 モジュール構造の決定は[ADR-001](../adr/ADR-001-adopt-spring-modulith-modular-monolith.md)を参照する。
+jOOQの生成物の`com.example.demo.jooq`はOPENのモジュールであり、`verify()`は生成型への依存を内部の型への依存として扱わない。
+他モジュールのテーブルを読む誤りは、jOOQのRepositoryの規約とレビューで防ぐ（[ADR-067](../adr/ADR-067-open-jooq-generated-module.md)）。
 
 `PackageByFeatureOnionArchitectureTest`はArchUnitの`Architectures.onionArchitecture()`と追加規則で、パッケージの配置と依存を検査する。
 規則名は`@ArchTest`のフィールド名であり、テスト結果にもこの名前で出る。
@@ -312,6 +314,7 @@ Spring Modulith、Error Prone、NullAway、SpotBugs、Spotlessの失敗の文は
 除外はクラスの場所で判定するため、基底パッケージ直下の`jooq`パッケージにはjOOQのコード生成の出力だけを置く。
 そこに置いた手書きのクラスは、ソースのディレクトリを問わず、すべてのプロダクションコード向けの規則を外れるためである。
 `ProductionCodeOnlyTest`がこの境界を確かめ、そのパッケージの本番のクラスのソースファイルがすべて`src/generated/jooq`にあることも確かめる。
+生成コードの基準の型には、スキーマの数によらずルートに残る`DefaultCatalog`を使う。
 生成コードを除外しても、手書きコードからjOOQ APIや生成型への依存は検査する。
 
 静的解析は`task be-lint`で、ArchUnitとSpring Modulithの検査は`task test`で実行する。

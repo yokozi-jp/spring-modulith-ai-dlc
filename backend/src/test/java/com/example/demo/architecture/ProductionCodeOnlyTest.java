@@ -2,7 +2,7 @@ package com.example.demo.architecture;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import com.example.demo.jooq.Tables;
+import com.example.demo.jooq.DefaultCatalog;
 import com.tngtech.archunit.core.domain.JavaClass;
 import com.tngtech.archunit.core.domain.JavaClasses;
 import com.tngtech.archunit.core.domain.Source;
@@ -40,7 +40,9 @@ class ProductionCodeOnlyTest {
   @DisplayName("jOOQ の生成コードは ArchUnit の規則の対象から外す")
   void excludesGeneratedJooqCode() throws URISyntaxException {
     final Location generated =
-        Location.of(Objects.requireNonNull(Tables.class.getResource("Tables.class")).toURI());
+        Location.of(
+            Objects.requireNonNull(DefaultCatalog.class.getResource("DefaultCatalog.class"))
+                .toURI());
 
     assertThat(ProductionCodeOnly.isHandwritten(generated)).isFalse();
   }
@@ -59,8 +61,8 @@ class ProductionCodeOnlyTest {
     final JavaClasses classes =
         new ClassFileImporter()
             .withImportOption(new ImportOption.DoNotIncludeTests())
-            .importPackages(Tables.class.getPackageName());
-    assertThat(classes.contain(Tables.class)).as("生成コードの Tables を読み込めたか").isTrue();
+            .importPackages(DefaultCatalog.class.getPackageName());
+    assertThat(classes.contain(DefaultCatalog.class)).as("生成コードの DefaultCatalog を読み込めたか").isTrue();
 
     final List<String> notGenerated =
         classes.stream()
@@ -71,7 +73,7 @@ class ProductionCodeOnlyTest {
     assertThat(notGenerated)
         .as(
             "%s には jOOQ のコード生成の出力だけを置く（ADR-054）。手書きのクラスは別のパッケージへ移す。照らした生成コード: %s",
-            Tables.class.getPackageName(), generatedSources)
+            DefaultCatalog.class.getPackageName(), generatedSources)
         .isEmpty();
   }
 
@@ -90,7 +92,7 @@ class ProductionCodeOnlyTest {
   private static Path backendDirectory() throws URISyntaxException {
     final Path classesRoot =
         Path.of(
-            Objects.requireNonNull(Tables.class.getProtectionDomain().getCodeSource())
+            Objects.requireNonNull(DefaultCatalog.class.getProtectionDomain().getCodeSource())
                 .getLocation()
                 .toURI());
     for (Path directory = classesRoot; directory != null; directory = directory.getParent()) {
