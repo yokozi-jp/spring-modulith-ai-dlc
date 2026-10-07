@@ -122,13 +122,15 @@ public void on(final OrderConfirmed event) {
 ## 対応するテスト
 
 `@ApplicationModuleTest` で受信する側のモジュールを起動し、`Scenario` の `publish` でイベントを発行して、CommandHandler が変えた状態を `andWaitForStateChange` で待つ。
-`ReserveStockCommandHandler` は注文モジュールの `OrderQueries` を使うため、`BootstrapMode.DIRECT_DEPENDENCIES` で注文モジュールも起動する。
+`ReserveStockCommandHandler` は注文モジュールの `OrderQueries` を使い、注文モジュールは顧客モジュールの `CustomerQueries` と商品モジュールの `ProductQueries` を使う（[CommandHandler](command-handler.md)）。
+`BootstrapMode.DIRECT_DEPENDENCIES` は直接依存するモジュールだけを起動するため、注文モジュールの Bean が使う顧客と商品のモジュールの Bean がなく、文脈が起動しない。
+依存するモジュールがさらに別のモジュールに依存するときは、`BootstrapMode.ALL_DEPENDENCIES` で間接の依存まで起動する。
 Listener の処理はコミットされるため、`CleanGeneratedTablesExtension` で各テスト後に後始末する。
 書き方は[バックエンドのDBテスト](../testing-database.md)の「Spring Modulithのイベント」と、[バックエンドのテストコードの書き方](../testing-code-style.md)の「非同期待機」に従う。
 
 ```java
 /** 注文の受付のイベントで在庫を引き当てることを検証する。 */
-@ApplicationModuleTest(mode = BootstrapMode.DIRECT_DEPENDENCIES)
+@ApplicationModuleTest(mode = BootstrapMode.ALL_DEPENDENCIES)
 @Import(SharedTestConfiguration.class)
 @ExtendWith(CleanGeneratedTablesExtension.class)
 class OrderPlacedListenerTest {
