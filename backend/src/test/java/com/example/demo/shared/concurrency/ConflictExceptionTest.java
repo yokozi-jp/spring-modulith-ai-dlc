@@ -1,36 +1,34 @@
 package com.example.demo.shared.concurrency;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.lang.reflect.Modifier;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
-/** {@link ConflictException} のメッセージ、原因、型の形を確かめる。 */
+/** {@link ConflictException} の種類、メッセージ、原因を持たないこと、型の形を確かめる。 */
 class ConflictExceptionTest {
 
   @Test
-  @DisplayName("メッセージだけで作ると、原因は null である")
-  void messageOnlyHasNoCause() {
-    final ConflictException exception = new ConflictException("stale");
+  @DisplayName("種類とメッセージを保ち、原因は null である")
+  void keepsKindAndMessageWithoutCause() {
+    final ConflictException exception =
+        new ConflictException(ConflictException.Kind.UNIQUE, "duplicate");
 
-    assertThat(exception).hasMessage("stale").hasNoCause();
+    assertThat(exception.kind()).isEqualTo(ConflictException.Kind.UNIQUE);
+    assertThat(exception).hasMessage("duplicate").hasNoCause();
   }
 
   @Test
-  @DisplayName("メッセージと原因で作ると、どちらも保つ")
-  void keepsMessageAndCause() {
-    final IllegalStateException cause = new IllegalStateException("lock timeout");
+  @DisplayName("後から原因を付けられない")
+  void rejectsInitCause() {
+    final ConflictException exception =
+        new ConflictException(ConflictException.Kind.LOCK, "locked");
 
-    final ConflictException exception = new ConflictException("locked", cause);
-
-    assertThat(exception).hasMessage("locked").hasCause(cause);
-  }
-
-  @Test
-  @DisplayName("原因に null を渡せる")
-  void acceptsNullCause() {
-    assertThat(new ConflictException("stale", null)).hasNoCause();
+    assertThatThrownBy(() -> exception.initCause(new IllegalStateException("select secret")))
+        .isInstanceOf(IllegalStateException.class);
+    assertThat(exception).hasNoCause();
   }
 
   @Test

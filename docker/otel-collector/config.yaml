@@ -21,7 +21,7 @@ processors:
   transform/log_attributes:
     log_statements:
       # ログ属性の allowlist。属性を足すときは docs/observability/conventions.md と同じ変更で直す。
-      - keep_keys(log.attributes, ["exception.type", "exception.message", "exception.stacktrace", "http.response.status_code"])
+      - keep_keys(log.attributes, ["exception.type", "exception.message", "exception.stacktrace", "http.response.status_code", "conflict.kind"])
   # フロントエンドのログは filter と transform の 2 段で守る。filter は種別の門番、transform は中身の洗浄で、
   # 2 つ揃って初めて意図した保護になる。/collect は認証なしで誰でも POST できる受け口（ADR-068）なので、
   # 自分たちの SDK が ErrorsInstrumentation だけでも、受け口に来る種別は信頼しない。

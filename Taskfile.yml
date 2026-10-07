@@ -1002,6 +1002,12 @@ tasks:
               and value("exception.message") == "order failed"
               and (value("exception.stacktrace") | contains("OrderService.java:84"))
           )
+          and any(
+            .resourceLogs[]?.scopeLogs[]?.logRecords[]?;
+            ([.attributes[]?.key] | sort) == ["conflict.kind", "exception.message", "exception.stacktrace", "exception.type", "http.response.status_code"]
+              and (first(.attributes[]? | select(.key == "http.response.status_code") | .value.intValue) == "409")
+              and value("conflict.kind") == "unique"
+          )
         ' "$out/backend.json" >/dev/null; then
           echo "ログ属性が allowlist または期待値と一致しません。" >&2
           exit 1

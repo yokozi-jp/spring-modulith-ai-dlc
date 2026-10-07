@@ -163,6 +163,7 @@ class ErrorFixtureController {
    */
   @GetMapping("/conflict")
   /* package */ ResponseEntity<Void> conflict() {
-    throw new ConflictException("unique key already exists: fixture_child id=secret-key");
+    throw new ConflictException(
+        ConflictException.Kind.UNIQUE, "unique key already exists: fixture_child id=secret-key");
   }
 }

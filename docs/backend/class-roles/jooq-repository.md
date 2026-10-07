@@ -104,7 +104,9 @@ jOOQ の Repository は業務規則を持たない。
 - 共通カラムのうち、このクラスが参照するのは、集約の復元のために読む `LOCK_NO` だけにし、`LOCK_NO` を書かず、`CREATED_*`、`UPDATED_*`、`PATCHED_*` の列を参照しない（[ADR-048](../../adr/ADR-048-add-shared-module-for-jooq-common-code.md)）。
   `ColumnValues` に共通カラムを渡すと `IllegalArgumentException` になる。
 - `updateWhere`、`deleteWhere`、`NOWAIT` が投げる Spring の例外（`CannotAcquireLockException`、`DuplicateKeyException`）を Repository の外へ出さない。
-  外へ出すときは、原因に付けた `ConflictException` に変えて投げる。
+  外へ出すときは、原因を付けずに、種類（`ConflictException.Kind.LOCK` か `Kind.UNIQUE`）を付けた `ConflictException` に変えて投げる。
+  原因の例外のメッセージには SQL と入力値が入り、ログに出るためである（[ADR-062](../../adr/ADR-062-map-business-exceptions-to-404-409-422.md)）。
+  catch した例外を原因に渡さないと PMD の `PreserveStackTrace` と Error Prone の `UnusedException` が警告するため、そのメソッドに `@SuppressWarnings({"PMD.PreserveStackTrace", "UnusedException"})` を付け、直前に理由のコメントを書く。
 - `@Transactional` を付けない。
 - クラス、フィールド、コンストラクタに Javadoc を書く。
 - `infrastructure.persistence` のパッケージに `@NullMarked` を宣言する `package-info.java` を置く。
@@ -350,7 +352,7 @@ Repository のテストは列と集約の往復と削除の範囲だけを確か
 - [ ] 集約ルートの `LOCK_NO` を選び、`restore` の `lockNo` に渡す。［自分で点検］
 - [ ] `add` は `set(列, 値)` で業務の全列を書き、子の行を行ごとの INSERT の `dsl.batch` 一つで書く。［自分で点検］
 - [ ] 集約ルートの INSERT は `tableWriter.insert(...)` で実行する。［自分で点検］
-- [ ] Spring の例外（`CannotAcquireLockException`、`DuplicateKeyException`）を Repository の外へ出さず、出すときは原因に付けた `ConflictException` に変える。［自分で点検］
+- [ ] Spring の例外（`CannotAcquireLockException`、`DuplicateKeyException`）を Repository の外へ出さず、出すときは原因を付けずに種類を付けた `ConflictException` に変える。［自分で点検］
 - [ ] 集約ルートを受け取る `add` 以外の public メソッドは、版を比べる入口（`update` は `TableWriter.updateCheckingVersion`、`delete` は `deleteCheckingVersion`、ほかの名前ならどちらか）と引数の集約ルートの `lockNo()` を、そのメソッドの中で直接呼ぶ。［ArchUnit で検査：TableWriterArchTest.repositoryUpdateAndDeleteCheckVersion］
 - [ ] 期待する版には集約ルートの `lockNo()` の値を渡し、テーブルから読み直した版を渡さない。［自分で点検］
 - [ ] 集約ルートを受け取る public メソッドは、`add`、`update`、`delete` だけにする（`save` のような名前でも版を比べれば規則は通るため、名前は規則が検査しない）。［自分で点検］

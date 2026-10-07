@@ -8,6 +8,8 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import com.example.demo.shared.concurrency.ConflictException;
 import com.example.demo.testkit.DatabaseTest;
 import com.example.demo.testkit.FixtureTablesExtension;
+import java.io.PrintWriter;
+import java.io.StringWriter;
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.time.Clock;
@@ -19,6 +21,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Supplier;
+import java.util.regex.Pattern;
 import javax.sql.DataSource;
 import org.jooq.Condition;
 import org.jooq.DSLContext;
@@ -46,6 +49,10 @@ import org.springframework.test.context.transaction.AfterTransaction;
 @DatabaseTest
 @ExtendWith(FixtureTablesExtension.class)
 class TableWriterConcurrencyTest {
+
+  /** jOOQ が描く SQL 文の始まり。キーワードの後に引用符付きのテーブル名が続く。 */
+  private static final Pattern SQL_STATEMENT =
+      Pattern.compile("(?i)\\b(insert into|update|select|delete from)\\s+\"");
 
   /** 各テストで使う行の主キー。 */
   private static final long ITEM_ID = 1L;
@@ -113,7 +120,7 @@ class TableWriterConcurrencyTest {
       assertThatThrownBy(() -> inUseCase(() -> updateItem(1L)))
           .isInstanceOf(ConflictException.class)
           .hasMessageContaining("row was updated by another request")
-          .hasNoCause();
+          .satisfies(thrown -> assertConflictWithoutSql(thrown, ConflictException.Kind.VERSION));
       assertThat(committed.get(WAIT_LIMIT.toMillis(), TimeUnit.MILLISECONDS))
           .as("A がロックを待ってから B がコミットした")
           .isTrue();
@@ -136,7 +143,7 @@ class TableWriterConcurrencyTest {
       assertThatThrownBy(() -> inUseCase(() -> updateItem(1L)))
           .isInstanceOf(ConflictException.class)
           .hasMessageContaining("row is locked by another request")
-          .hasCauseInstanceOf(CannotAcquireLockException.class);
+          .satisfies(thrown -> assertConflictWithoutSql(thrown, ConflictException.Kind.LOCK));
       sessionB.rollback();
     }
   }
@@ -203,13 +210,33 @@ class TableWriterConcurrencyTest {
     }
   }
 
-  /** ユースケースの呼び出しの中で、子の行の書き込みが、ロック待ちを原因に持つ競合の例外になることを確かめる。 */
+  /** ユースケースの呼び出しの中で、子の行の書き込みが、原因を持たない LOCK の競合の例外になることを確かめる。 */
   private static void assertChildLockConflict(final Runnable childWrite) {
     assertThatThrownBy(() -> ScopedValue.where(PgmCdAspect.PGM_CD, PGM_CD).run(childWrite))
         .isInstanceOf(ConflictException.class)
         .hasMessageContaining("row is locked by another request")
         .hasMessageContaining("table=t_fixture_item_detail")
-        .hasCauseInstanceOf(CannotAcquireLockException.class);
+        .satisfies(thrown -> assertConflictWithoutSql(thrown, ConflictException.Kind.LOCK));
+  }
+
+  /**
+   * 投げられた競合の例外が、種類を持ち、原因を持たず、ログに記録される文字列に SQL と入力値を含まないことを確かめる。
+   *
+   * <p>{@code ApiExceptionHandler} は例外を {@code setCause} で記録し、OTLP の {@code exception.stacktrace}
+   * には {@link Throwable#printStackTrace} と同じ文字列が入る。
+   */
+  private static void assertConflictWithoutSql(
+      final Throwable thrown, final ConflictException.Kind kind) {
+    assertThat(thrown)
+        .isInstanceOfSatisfying(
+            ConflictException.class, conflict -> assertThat(conflict.kind()).isEqualTo(kind))
+        .hasNoCause();
+    final StringWriter stackTrace = new StringWriter();
+    thrown.printStackTrace(new PrintWriter(stackTrace));
+    assertThat(stackTrace.toString())
+        .as("記録される stack trace")
+        .doesNotContain("Caused by", "Key (", "SQL [", "ERROR:")
+        .doesNotContainPattern(SQL_STATEMENT);
   }
 
   /** B がロックする子の行の主キーの条件。 */

@@ -39,6 +39,9 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
   /** ログの属性名（OpenTelemetry の semantic conventions）。 */
   private static final String STATUS_CODE = "http.response.status_code";
 
+  /** 409 の種類のログの属性名（version、lock、unique）。 */
+  private static final String CONFLICT_KIND = "conflict.kind";
+
   /** Problem Details の共通フィールドを生成する。 */
   private final ApiProblemDetails problemDetails;
 
@@ -188,10 +191,15 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
           .setCause(ex)
           .addKeyValue(STATUS_CODE, status.value())
           .log("Unhandled API exception");
-    } else if (ex instanceof ConflictException) {
+    } else if (ex instanceof ConflictException conflict) {
       // クライアントが読み直して再送できる想定内の 4xx なので、ERROR にせず INFO で残す。
       // WARN 以上は起動時と Collector の障害用のロググループにも出るため使わない。
-      log.atInfo().setCause(ex).addKeyValue(STATUS_CODE, status.value()).log("API conflict");
+      // 例外は原因を持たないので、SQL と入力値は出ない。どの競合かは conflict.kind で区別する（ADR-062）。
+      log.atInfo()
+          .setCause(ex)
+          .addKeyValue(STATUS_CODE, status.value())
+          .addKeyValue(CONFLICT_KIND, conflict.kind().name().toLowerCase(Locale.ROOT))
+          .log("API conflict");
     } else if (ex instanceof NotFoundException || ex instanceof BusinessRuleViolationException) {
       // 業務上の想定内の 4xx なので INFO で残す。対象を調べられるよう例外を付ける。
       log.atInfo()

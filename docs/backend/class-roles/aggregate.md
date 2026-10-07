@@ -180,6 +180,7 @@ public static Order restore(
 public void ensureLockNo(final ExpectedLockNo expectedLockNo) {
   if (lockNo != expectedLockNo.value()) {
     throw new ConflictException(
+        ConflictException.Kind.VERSION,
         "order was updated by another request: orderId=" + id.value());
   }
 }
