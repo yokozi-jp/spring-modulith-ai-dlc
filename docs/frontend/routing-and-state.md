@@ -1,7 +1,7 @@
 ---
 type: Convention
 title: フロントエンドのルーティングと状態管理
-description: TanStack Router の route file の責務と形、認証が要る画面の layout、loader による server state の preload、状態表示の分担、状態の置き場所、custom Hook を作る条件と名前、Effect の使いどころと検査を定める。route、loader、state、Hook、Effect を追加または変更するときに読む。
+description: TanStack Router の route file の責務と形、認証が要る画面の layout、loader による server state の preload、状態表示の分担、mutation の後の cache の無効化、状態の置き場所、custom Hook を作る条件と名前、Effect の使いどころと検査を定める。route、loader、mutation、state、Hook、Effect を追加または変更するときに読む。
 tags: [convention, frontend, routing, state, react]
 ---
 
@@ -69,7 +69,10 @@ layout routeにcomponentを持たせるなら、そのcomponentで `<Outlet />` 
 
 ## 状態表示の分担
 
-初期描画のdataはloaderで `ensureQueryData` し、componentは `useSuspenseQuery` で読む。
+初期描画のdataは、loaderで生成された `get<Operation>SuspenseQueryOptions()` を `preloadQuery`（`src/api/preload-query.ts`）でcacheに入れ、componentは同じoptionsを `useSuspenseQuery` で読む。
+`preloadQuery` は、TanStack Queryが `ensureQueryData` の後継とする `queryClient.query()` を呼び、cacheにdataがあれば取得しない。
+ただし、mutationの後に無効化されたqueryは取得し直すので、更新の後に遷移した画面は古い値を描画せずにpendingを表示する。
+`ensureQueryData` は非推奨（Oxlintの `typescript/no-deprecated` が検出する）であり、suspense用のoptionsは `queryFn` を省略可能とする型のため `exactOptionalPropertyTypes` の下で `query` へそのまま渡せないので、loaderから直接呼ばない。
 
 状態ごとの表示は次のように分担する。
 
@@ -89,9 +92,22 @@ errorの表示はcatalogの文言を使い、`error.message` を画面に出さ�
 
 4xxの `ApiProblemError` は再試行しない。
 ただし、408と429は再試行してよい応答なので（RFC 9110 §15.5.9、RFC 6585 §4）、5xxと同じく再試行する。
-loaderの `ensureQueryData` も `defaultOptions.queries.retry` に従い、5xx、408、429と通信の失敗は最大3回再試行してから `RouteError` になる。
+loaderの `preloadQuery` も `defaultOptions.queries.retry` に従い、5xx、408、429と通信の失敗は最大3回再試行してから `RouteError` になる。
 
 route固有の `pendingComponent` や `errorComponent` は、`react/no-multi-comp` があるためroute fileとは別のファイルに置く。
+
+## mutationの後のcache
+
+mutationの後のcacheは次のとおりに扱う。
+
+- mutationのたびに、`createQueryClient()`（`src/api/query-client.ts`）の `MutationCache` の `onSettled` が全queryを無効化する。成功でも失敗でも無効化し、描画中のqueryの再取得（再試行を含む）が終わるまで、mutationは `isPending` のままになる。
+- 無効化の範囲を絞るときは、mutationに `mutationKey` か `meta` を付けてglobalの `onSettled` で分けるか、Orvalの `mutationInvalidates` を使う。
+- 個別に無効化するときは、生成された `get<Operation>QueryKey()` を使い、配列のkeyを手書きしない。OrvalのkeyはURLの文字列を先頭に持つので、手書きのkeyは一致しない。
+- `router.invalidate()` は呼ばない。例外は、mutationの結果が `beforeLoad` やloaderの戻り値（`useLoaderData` で読む値）を変える場合である。
+- 画面遷移と通知は `mutate` に渡すcallbackに置き、`useMutation` のoptionsやglobalのcallbackに置かない。`mutate` のcallbackは再取得が終わった後に呼ばれるので、最新のcacheを読める。
+- 応答を `setQueryData` でcacheに書くときは、cacheの形（`{ data, status, headers }`）と型をqueryの型に合わせる。
+
+409が返る画面の扱いは[更新の競合（409）の画面の扱い](update-conflicts.md)に従う。
 
 ## React Hooksと状態
 

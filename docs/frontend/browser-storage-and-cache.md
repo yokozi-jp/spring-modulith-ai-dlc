@@ -35,6 +35,7 @@ URLの構成は[フロントエンドのURL設計](url-design.md)、状態の置
 - API responseはTanStack Queryのmemory上のcacheだけで保持し、Web StorageとIndexedDBへ永続化しない。
 - queryの `staleTime` は既定値のまま使い、画面の表示ごとに再取得させる。
 - 古い値を許容でき、呼び出し回数が多いデータ（マスタデータなど）に限り、そのquery optionsで `staleTime` を延ばす。
+- loaderの `preloadQuery` が指定する `staleTime` はloaderで取得するかどうかだけを決め、componentの `useSuspenseQuery` の再取得は上の `staleTime` に従う（[状態表示の分担](routing-and-state.md#状態表示の分担)）。
 - バックエンドのAPI応答では、Spring Securityの既定の `Cache-Control`（`no-store` を含む）を無効化せず、機密データをブラウザのHTTP cacheに残さない（[ADR-014](../adr/ADR-014-use-same-origin-spa-security-boundary.md)）。
 
 静的ファイルのcacheは[フロントエンドのビルドと配信](build-and-delivery.md)に従う。

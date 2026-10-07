@@ -10,6 +10,7 @@
 - [フロントエンドのURL設計](url-design.md)：route を追加するとき、画面間で値を受け渡す方法を決めるとき
 - [componentの命名と設計](component-design.md)：component を追加するとき、component を分割するか判断するとき
 - [フォームの入力検証](form-validation.md)：業務フォームを追加するとき、入力検証やエラー表示を変えるとき
+- [更新の競合（409）の画面の扱い](update-conflicts.md)：楽観的ロックの競合や一意制約の違反で 409 が返る画面を作るとき
 - [画面の認可制御](authorization-ui.md)：権限によって画面や component の表示を変えるとき、権限が必要な route を追加するとき
 - [ブラウザに保持するデータとキャッシュ](browser-storage-and-cache.md)：ブラウザに値を保存するとき、TanStack Query の cache 設定を変えるとき
 - [対応ブラウザとWeb機能の採用基準](browser-support.md)：対応ブラウザを決めるとき、新しい HTML、CSS、JavaScript の機能を使うか判断するとき

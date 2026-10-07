@@ -131,7 +131,7 @@ event handlerからPromiseを返す関数を呼ぶときは、handlerの中で`v
 ```tsx
 <Button
   onClick={() => {
-    void queryClient.invalidateQueries({ queryKey: ["orders"] });
+    void queryClient.invalidateQueries({ queryKey: getListOrdersQueryKey() });
   }}
 />
 ```

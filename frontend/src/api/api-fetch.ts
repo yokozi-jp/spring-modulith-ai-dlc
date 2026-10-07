@@ -1,4 +1,5 @@
 import type { ProblemDetail } from "@/api/generated/models";
+import { csrfToken } from "@/lib/csrf";
 
 /** API が 2xx 以外を返したことを表す。problem は application/problem+json の本文。 */
 export class ApiProblemError extends Error {
@@ -26,12 +27,33 @@ async function readProblem(response: Response): Promise<ProblemDetail | undefine
   }
 }
 
+/** CSRF の検査の対象外の method（RFC 9110 §9.2.1 の safe method のうち fetch で送れるもの）。 */
+const csrfExemptMethods = new Set(["GET", "HEAD", "OPTIONS"]);
+
+/** 更新系の要求にだけ、CSRF の Cookie の値を X-XSRF-TOKEN で付けた header を返す。 */
+function requestHeaders(url: string, options: RequestInit): Headers {
+  const headers = new Headers(options.headers);
+  // 別の origin へ token を送らないよう、送信先を location の上で解決した origin が同じときだけ付ける。
+  // method を省いた要求は Fetch の既定どおり GET として扱う。
+  if (
+    !csrfExemptMethods.has((options.method ?? "GET").toUpperCase()) &&
+    new URL(url, globalThis.location.href).origin === globalThis.location.origin
+  ) {
+    // token は認証とログアウトの成功時に作り直されるため、要求のたびに Cookie から読む。マスクはしない（csrf.spa() は header の値を素のまま照合する）。
+    const token = csrfToken();
+    if (token !== undefined) {
+      headers.set("X-XSRF-TOKEN", token);
+    }
+  }
+  return headers;
+}
+
 /**
  * Orval が生成した API 関数から呼ばれる mutator。
  * @public
  */
 export async function apiFetch<TResponse>(url: string, options: RequestInit): Promise<TResponse> {
-  const response = await fetch(url, options);
+  const response = await fetch(url, { ...options, headers: requestHeaders(url, options) });
   if (!response.ok) {
     throw new ApiProblemError(response.status, await readProblem(response));
   }

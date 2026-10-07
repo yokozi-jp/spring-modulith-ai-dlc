@@ -1,4 +1,4 @@
-import type { APIRequestContext, BrowserContext, Locator, Page } from "@playwright/test";
+import type { APIRequestContext, BrowserContext, Cookie, Locator, Page } from "@playwright/test";
 import { expect, test } from "@playwright/test";
 
 import { signInOnKeycloak } from "./environment";
@@ -78,12 +78,17 @@ async function expectLogoutRejected(page: Page): Promise<string | null> {
 }
 
 // Cookie がないまま undefined を送り、別の理由で失敗するのを防ぐ。
-async function cookieValue(context: BrowserContext, name: string): Promise<string> {
+async function findCookie(context: BrowserContext, name: string): Promise<Cookie> {
   const cookies = await context.cookies();
-  const value = cookies.find((cookie) => cookie.name === name)?.value;
-  if (value === undefined || value === "") {
+  const cookie = cookies.find((candidate) => candidate.name === name);
+  if (cookie === undefined || cookie.value === "") {
     throw new Error(`${name} Cookie がありません`);
   }
+  return cookie;
+}
+
+async function cookieValue(context: BrowserContext, name: string): Promise<string> {
+  const { value } = await findCookie(context, name);
   return value;
 }
 
@@ -149,13 +154,16 @@ test("_csrf を削除して送るとログアウトを拒否する", async ({ pa
 });
 
 // csrf.spa() はフォームの _csrf を XorCsrfTokenRequestAttributeHandler で URL-safe Base64 として復号する。
-// マスクしない XSRF-TOKEN の値（36 文字の UUID）は 27 バイトになり、必要な 72 バイトと一致しないため token は null になる。
+// マスクしない __Host-XSRF-TOKEN の値（36 文字の UUID）は 27 バイトになり、必要な 72 バイトと一致しないため token は null になる。
 test("_csrf にマスクしない Cookie の値を入れて送るとログアウトを拒否する", async ({
   page,
   context,
 }) => {
   await logIn(page);
-  const token = await cookieValue(context, "XSRF-TOKEN");
+  const csrfCookie = await findCookie(context, "__Host-XSRF-TOKEN");
+  // __Host- の条件（ADR-066）。sameSite は Playwright が属性のない Cookie も "Lax" で埋めるため、下の Set-Cookie の文字列で確かめる。
+  expect(csrfCookie).toMatchObject({ secure: true, path: "/", httpOnly: false });
+  const token = csrfCookie.value;
   await csrfInput(page).evaluate((input: HTMLInputElement, value) => {
     input.value = value;
   }, token);
@@ -190,6 +198,25 @@ test("/collect が 503 を返しても、ログインとログアウトのフォ
 
   await logoutButton(page).click();
   await expectLoggedOutPage(page);
+});
+
+// CsrfFilter は Cookie のない要求でだけ新しい token を発行する（RepositoryDeferredCsrfToken）。
+// page.request は context の __Host- の Cookie を http://localhost にも送るため、Cookie を共有しない request で送る。
+// request が Cookie を持たないのは、file 先頭の test.use で storageState を空にしているためである。
+// 別の spec へ移すときは storageState を空にする。
+// ApiContractTest は MockMvc で Set-Cookie の文字列を作らず、DAST は 10054 で失敗しないので、実際の server の文字列はここで確かめる。
+test("CSRF の Cookie を __Host- の属性で発行する", async ({ request }) => {
+  const response = await request.post("/api/missing");
+  expect(response.status()).toBe(403);
+  const setCookie = response
+    .headersArray()
+    .filter(({ name }) => name.toLowerCase() === "set-cookie")
+    .map(({ value }) => value)
+    .find((value) => value.startsWith("__Host-XSRF-TOKEN="));
+  expect(setCookie).toMatch(/; Path=\/(?:;|$)/u);
+  expect(setCookie).toMatch(/; Secure(?:;|$)/u);
+  expect(setCookie).toMatch(/; SameSite=Lax(?:;|$)/u);
+  expect(setCookie).not.toMatch(/; (?:Domain|HttpOnly)/iu);
 });
 
 // AppShell の header で「ログアウト」が最初に focus を受け取る要素であることに依存する。
