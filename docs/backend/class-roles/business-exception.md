@@ -17,7 +17,7 @@ HTTP のステータスとログレベルは `error` モジュールの `ApiExce
 利用者の要求が業務の上で成り立たないとき、Domain、Application、Infrastructure は、その失敗を例外で呼び出し側へ伝える。
 **業務上の失敗の例外**は、利用者が要求か状態を見直せば解消しうる失敗を表す、次の三つの型である。
 
-- **NotFoundException**：指定された集約や行が存在しない。
+- **NotFoundException**：パスで指定した集約や行が存在しない。
   参照の権限がなく存在を隠す場合も同じ型を投げる。
 - **BusinessRuleViolationException**：許されない状態遷移、業務規則の違反、要求を今の状態へ適用できない。
 - **ConflictException**：版の不一致、行ロックの失敗、一意制約の違反。
