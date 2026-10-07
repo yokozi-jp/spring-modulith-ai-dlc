@@ -28,7 +28,7 @@ Dockerを使うTaskは、Dockerがないローカル環境ではスキップし�
 - **`task fe-doctor`**：React Doctorでwarningとerrorを検出し、検出または15分超過で失敗する。
 - **`task fe-coverage`**：VitestのV8 providerで全体branch coverage 85%を検証する。
 - **`task fe-test-build`**：coverage付きテストと、`FRONTEND_OTEL_ENABLED=false`を強制した本番ビルドを実行する。
-  ビルドの後に`dist/assets`を`faro|grafana`でgrepし、bundleにFaroのSDKが入っていれば失敗する（[ADR-068](../adr/ADR-068-collect-browser-telemetry-with-faro-via-collector.md)）。
+  ビルドの後に`dist/assets`を`faro|grafana|opentelemetry`でgrepし、bundleにFaroのSDKかOpenTelemetry JSが入っていれば失敗する（[ADR-068](../adr/ADR-068-collect-browser-telemetry-with-faro-via-collector.md)）。
 - **`task fe-verify`**：`fe-check`、`fe-knip`、`fe-test-build`（テレメトリを無効にした本番ビルドとgrepを含む）を実行する。
 - **`task fe-route-tree-check`**：ビルドで`routeTree.gen.ts`を再生成し、コミット済みの内容と差分があれば失敗する。
 - **`task api-client-check`**：Orvalで`src/api/generated`を再生成し、コミット済みの内容と差分があれば失敗する（後述の「API契約」）。
@@ -210,6 +210,7 @@ PITのHTMLとXMLのレポートは、変異対象がある場合に`backend/buil
 - **`task lint-compose`**：Composeファイルの構文、参照、変数展開を検証する。
 - **`task otel-collector-check`**：許可していない属性を含むOTLPのログをCollectorに流し、その属性が除かれ、許可した属性が残ることを確かめる。
   Faroのfixture（`docker/otel-collector/check/fixtures/frontend.json`）もフロントエンドのpipelineに流し、許可した4属性と固定の本文だけが残り、URLのqueryとfragmentが消えることと、faro receiverの405、415、202、400の応答を確かめる。
+  同じfixtureのtraceは`traces/frontend`の出口（`frontend-traces.json`）で検査し、spanの属性が`http.request.method`、`http.response.status_code`、`url.path`だけで、resource属性、spanの名前、event、links、scopeが許可した値だけであることを確かめる。
 - **`task lint-md`**：`.markdownlint-cli2.yaml`の除外設定に従いMarkdownを検査する。
 - **`task lint-md-fix`**：markdownlint-cli2で安全に修正できるMarkdownの問題を修正する。
 - **`task okf-check`**：OKF適合、内部リンク、孤立文書、文書責務の見直し合図、steering境界、Taskfile文書同期候補を検査する。
