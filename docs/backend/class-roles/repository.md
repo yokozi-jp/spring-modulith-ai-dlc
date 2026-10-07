@@ -142,6 +142,9 @@ class JooqOrderRepository implements OrderRepository {
 jOOQ の列と集約の変換も、この往復で確かめる。
 テストは実装と同じ `com.example.demo.order.infrastructure.persistence` パッケージのテストソースに置く。
 
+`CommonColumns` は、trace と `*_pgm_cd` の束縛がないと登録を失敗させる（[ADR-051](../../adr/ADR-051-bind-pgm-cd-with-scoped-value-and-aspect.md)）。
+Spring のテストではどちらもないため、`shared` のテストの補助 `TestCommonColumns` で、時刻と trace ID を固定した共通処理を作り、`*_pgm_cd` を束縛して保存する。
+
 ```java
 /** 注文の保存と読み戻しを検証する。 */
 @DatabaseTest
@@ -150,12 +153,10 @@ class JooqOrderRepositoryTest {
   /** テスト対象が使う jOOQ のコンテキスト。 */
   @Autowired private DSLContext dsl;
 
-  /** テスト対象が使う shared の共通処理。 */
-  @Autowired private CommonColumns commonColumns;
-
   @Test
   @DisplayName("保存した注文を ID で読み戻せる")
   void savesAndFindsOrder() {
+    final CommonColumns commonColumns = TestCommonColumns.at(Instant.parse("2026-10-03T00:00:00Z"));
     final OrderRepository repository =
         new JooqOrderRepository(dsl, commonColumns, new TableWriter(dsl, commonColumns));
     final Order order =
@@ -166,7 +167,7 @@ class JooqOrderRepositoryTest {
                 new OrderLine(
                     1, new ProductCode("P-1"), new Quantity(2), new Money(new BigDecimal("500")))),
             Instant.parse("2026-10-03T00:00:00Z"));
-    repository.add(order);
+    TestCommonColumns.runAs(() -> repository.add(order));
 
     final Order found =
         repository
