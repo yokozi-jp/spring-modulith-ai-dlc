@@ -79,7 +79,7 @@ frontend/src/
 
 `lib/telemetry.ts` はFaro Web SDK（`@grafana/*`）を呼ぶ唯一のファイルであり、featureとrouteからSDKを呼ばない。
 routerの既定のエラー表示（`components/route-error.tsx`）は、捕捉したエラーをこのファイルの `reportCaughtError` で送る。
-SDKはビルド時の定数で有効にしたときだけ動的importで読み込み、既定の無効のビルドには含まれない（[ADR-066](../adr/ADR-066-collect-browser-telemetry-with-faro-via-collector.md)）。
+SDKはビルド時の定数で有効にしたときだけ動的importで読み込み、既定の無効のビルドには含まれない（[ADR-068](../adr/ADR-068-collect-browser-telemetry-with-faro-via-collector.md)）。
 
 `router-defaults.ts` はrouterの既定値（pending、error、not foundのcomponentとpreloadの設定）を一つのobjectにまとめ、`main.tsx` とrouteのテストが同じ値でrouterを作る。
 

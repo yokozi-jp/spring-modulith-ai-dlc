@@ -164,7 +164,7 @@ test("_csrf にマスクしない Cookie の値を入れて送るとログアウ
   expect(await expectLogoutRejected(page)).toBe(token);
 });
 
-// task e2e は Faro を有効にしてビルドする（ADR-066）。E2E に Collector はないので、/collect は page.route で返す。
+// task e2e は Faro を有効にしてビルドする（ADR-068）。E2E に Collector はないので、/collect は page.route で返す。
 test("/collect が 503 を返しても、ログインとログアウトのフォームを送信できる", async ({ page }) => {
   // 最初の goto の前に登録し、ログインの間に送られても 503 にする。
   await page.route("**/collect", (route) => route.fulfill({ status: 503 }));

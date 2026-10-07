@@ -1,6 +1,6 @@
 import type { Faro, TransportItem } from "@grafana/faro-web-sdk";
 
-// vite.config.ts の define がビルド時に置き換える（ADR-066）。
+// vite.config.ts の define がビルド時に置き換える（ADR-068）。
 declare const __TELEMETRY_ENABLED__: boolean;
 declare const __TELEMETRY_APP__: {
   name: string;
@@ -40,7 +40,7 @@ const reported = new WeakSet<Error>();
 
 /** composition root から一度だけ呼ぶ。SDK の読み込みを待たない。 */
 export function initTelemetry(): void {
-  // import() はこの分岐の中に直接書く。定数の false で分岐ごと消え、SDK の chunk が出力されない（ADR-066）。
+  // import() はこの分岐の中に直接書く。定数の false で分岐ごと消え、SDK の chunk が出力されない（ADR-068）。
   // 早期 return の後に import() を置く形にしない。到達しない文の除去は bundler に依存する。
   if (__TELEMETRY_ENABLED__) {
     faroReady = (async (): Promise<Faro | undefined> => {

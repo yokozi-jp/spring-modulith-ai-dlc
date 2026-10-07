@@ -1,11 +1,11 @@
 ---
 type: ADR
-title: 'ADR-066: ブラウザのテレメトリを Faro Web SDK で集め、同一オリジンの /collect から Collector へ送る'
+title: 'ADR-068: ブラウザのテレメトリを Faro Web SDK で集め、同一オリジンの /collect から Collector へ送る'
 description: ブラウザの例外などのテレメトリを Faro Web SDK で集め、同一オリジンの /collect から既存の OpenTelemetry Collector の faro receiver へ送り、フロントエンド用の pipeline で許可した値だけを残す決定。本番の方針と、ua-parser-js 1.0.41 を pnpm trust policy の例外にすることも含む。
 tags: [adr, observability, frontend, opentelemetry, security]
 ---
 
-# ADR-066: ブラウザのテレメトリを Faro Web SDK で集め、同一オリジンの /collect から Collector へ送る
+# ADR-068: ブラウザのテレメトリを Faro Web SDK で集め、同一オリジンの /collect から Collector へ送る
 
 ## Status
 

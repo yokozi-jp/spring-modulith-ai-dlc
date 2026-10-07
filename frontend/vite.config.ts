@@ -58,7 +58,7 @@ const testOnlyImports = {
 // 違反が起きたら、lint/feature-boundaries.js と同じく ImportExpression を見る規則に移す。
 const telemetrySdkImports = {
   group: ["@grafana/*"],
-  message: "Call the telemetry SDK only through src/lib/telemetry.ts (ADR-066).",
+  message: "Call the telemetry SDK only through src/lib/telemetry.ts (ADR-068).",
 };
 
 // 生成物。整形・静的解析・カバレッジのいずれからも除外する。
@@ -76,7 +76,7 @@ function portFromEnv(mode: string, name: string, fallback: string): number {
   return port;
 }
 
-// src/lib/telemetry.ts が参照するビルド時の定数（ADR-066）。
+// src/lib/telemetry.ts が参照するビルド時の定数（ADR-068）。
 function telemetryDefine(mode: string) {
   // ルートの.envは秘密情報も含むため、テレメトリに必要な変数だけを読み込む（VITE_接頭辞で公開しない）。
   const telemetryEnv = loadEnv(mode, "..", [
@@ -210,7 +210,7 @@ export default defineConfig(({ mode }) => {
         "func-style": "off",
         // react-i18next の慣用名である翻訳関数 t だけを短い識別子として許可する。
         "id-length": ["error", { exceptions: ["t"] }],
-        // vite.config.ts の define が置き換えるビルド時の定数だけを、ほかの識別子と衝突しない名前として許す（ADR-066）。
+        // vite.config.ts の define が置き換えるビルド時の定数だけを、ほかの識別子と衝突しない名前として許す（ADR-068）。
         "no-underscore-dangle": [
           "error",
           { allow: ["__TELEMETRY_ENABLED__", "__TELEMETRY_APP__"] },
@@ -285,7 +285,7 @@ export default defineConfig(({ mode }) => {
             ],
           },
         },
-        // テレメトリの SDK を呼ぶ唯一のファイル（ADR-066）。
+        // テレメトリの SDK を呼ぶ唯一のファイル（ADR-068）。
         {
           files: ["src/lib/telemetry.ts"],
           rules: {
@@ -378,7 +378,7 @@ export default defineConfig(({ mode }) => {
           target: `http://localhost:${serverPort}`,
           changeOrigin: false,
         },
-        // ブラウザのテレメトリ（ADR-066）。Collector の faro receiver へ転送し、Spring Boot を通さない。
+        // ブラウザのテレメトリ（ADR-068）。Collector の faro receiver へ転送し、Spring Boot を通さない。
         // 完全一致にし、将来の /collections のような画面の path を転送しない。
         "^/collect$": {
           target: `http://localhost:${faroPort}`,

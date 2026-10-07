@@ -10,7 +10,7 @@ tags: [convention, observability, opentelemetry, security]
 バックエンドはログ、トレース、メトリクスを OpenTelemetry で Collector へ送ってコンソールにも ECS JSON を出し、フロントエンドは Faro Web SDK でブラウザの例外だけを Collector へ送る。
 例外は logger へ渡して標準どおりに記録し、禁止値はアプリケーションから渡さない。
 ログの属性は Collector の allowlist で絞り、保存先で閲覧の制限と表示時のマスクを行う。
-設計判断は [ADR-015](../adr/ADR-015-structure-and-protect-observability-data.md)、[ADR-043](../adr/ADR-043-send-production-telemetry-to-cloudwatch-via-otel-collector.md)、[ADR-045](../adr/ADR-045-remove-aws-docs-and-production-cd-example.md)、[ADR-066](../adr/ADR-066-collect-browser-telemetry-with-faro-via-collector.md) に記録している。
+設計判断は [ADR-015](../adr/ADR-015-structure-and-protect-observability-data.md)、[ADR-043](../adr/ADR-043-send-production-telemetry-to-cloudwatch-via-otel-collector.md)、[ADR-045](../adr/ADR-045-remove-aws-docs-and-production-cd-example.md)、[ADR-068](../adr/ADR-068-collect-browser-telemetry-with-faro-via-collector.md) に記録している。
 
 ## 記録
 
@@ -89,9 +89,9 @@ faro receiver はメタデータを本文に入れるので、本文を解析し
 
 自由入力を正規表現でマスクする処理は Collector に置かない。
 表記ゆれによる取りこぼしと誤マスクが起きるため、検知は保存先のデータ保護ポリシーで行う。
-URL の query と fragment の除去はこの規則の対象外とし、フロントエンドの pipeline に限って置く（[ADR-066](../adr/ADR-066-collect-browser-telemetry-with-faro-via-collector.md)）。
+URL の query と fragment の除去はこの規則の対象外とし、フロントエンドの pipeline に限って置く（[ADR-068](../adr/ADR-068-collect-browser-telemetry-with-faro-via-collector.md)）。
 
-faro receiver は処理に失敗すると、payload の全体を Collector 自身のログに ERROR で出す（[ADR-066](../adr/ADR-066-collect-browser-telemetry-with-faro-via-collector.md)）。
+faro receiver は処理に失敗すると、payload の全体を Collector 自身のログに ERROR で出す（[ADR-068](../adr/ADR-068-collect-browser-telemetry-with-faro-via-collector.md)）。
 
 ## 検証
 
@@ -108,7 +108,7 @@ faro receiver は処理に失敗すると、payload の全体を Collector 自�
 - アプリケーションは OTLP を Fargate タスクのサイドカーの OpenTelemetry Collector（contrib）へ送る。Collector はログを CloudWatch Logs、トレースを X-Ray、メトリクスを CloudWatch へ送る。
 - 本番の Collector は `docker/otel-collector/config.yaml` に、exporter と拡張と各 pipeline の exporters だけを定める上書きファイルを重ねる。processors は上書きしない。
   上書きファイルは `logs/frontend` の exporters も定める。
-  gateway を作るまで、サイドカーの faro receiver は `localhost` で待ち受け、何も受けない（[ADR-066](../adr/ADR-066-collect-browser-telemetry-with-faro-via-collector.md)）。
+  gateway を作るまで、サイドカーの faro receiver は `localhost` で待ち受け、何も受けない（[ADR-068](../adr/ADR-068-collect-browser-telemetry-with-faro-via-collector.md)）。
 - アプリケーションのロググループ、標準出力のロググループ、`aws/spans` ロググループに CloudWatch Logs のデータ保護ポリシーを設定し、個人データと秘密情報を検知して表示時にマスクする。日本の氏名と電話番号は custom data identifier で補う。
 - 標準出力は WARN 以上だけを別のロググループへ送り、起動時と Collector の障害時の調査に使う。
 

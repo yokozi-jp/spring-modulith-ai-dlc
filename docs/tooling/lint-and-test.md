@@ -28,7 +28,7 @@ Dockerを使うTaskは、Dockerがないローカル環境ではスキップし�
 - **`task fe-doctor`**：React Doctorでwarningとerrorを検出し、検出または15分超過で失敗する。
 - **`task fe-coverage`**：VitestのV8 providerで全体branch coverage 85%を検証する。
 - **`task fe-test-build`**：coverage付きテストと、`FRONTEND_OTEL_ENABLED=false`を強制した本番ビルドを実行する。
-  ビルドの後に`dist/assets`を`faro|grafana`でgrepし、bundleにFaroのSDKが入っていれば失敗する（[ADR-066](../adr/ADR-066-collect-browser-telemetry-with-faro-via-collector.md)）。
+  ビルドの後に`dist/assets`を`faro|grafana`でgrepし、bundleにFaroのSDKが入っていれば失敗する（[ADR-068](../adr/ADR-068-collect-browser-telemetry-with-faro-via-collector.md)）。
 - **`task fe-verify`**：`fe-check`、`fe-knip`、`fe-test-build`（テレメトリを無効にした本番ビルドとgrepを含む）を実行する。
 - **`task fe-route-tree-check`**：ビルドで`routeTree.gen.ts`を再生成し、コミット済みの内容と差分があれば失敗する。
 - **`task api-client-check`**：Orvalで`src/api/generated`を再生成し、コミット済みの内容と差分があれば失敗する（後述の「API契約」）。
@@ -62,7 +62,7 @@ Oxlintの設定の正本は[`frontend/vite.config.ts`](../../frontend/vite.confi
 - **短い識別子**：`id-length`で`t`だけを例外にする。
   react-i18nextの翻訳関数の慣用名であるためである。
 - **ビルド時の定数**：`no-underscore-dangle`で`__TELEMETRY_ENABLED__`と`__TELEMETRY_APP__`だけを許可する。
-  `vite.config.ts`の`define`が置き換える定数を、ほかの識別子と衝突しない名前にするためである（[ADR-066](../adr/ADR-066-collect-browser-telemetry-with-faro-via-collector.md)）。
+  `vite.config.ts`の`define`が置き換える定数を、ほかの識別子と衝突しない名前にするためである（[ADR-068](../adr/ADR-068-collect-browser-telemetry-with-faro-via-collector.md)）。
 - **型のimport**：`no-duplicate-imports`を`allowSeparateTypeImports: true`にし、型のimportを分けて書けるようにする。
 - **Vitestの書き方**：`vitest/no-conditional-in-test`、`vitest/no-hooks`、`vitest/no-importing-vitest-globals`、`vitest/prefer-called-times`、`vitest/prefer-describe-function-title`、`vitest/prefer-expect-assertions`、`vitest/prefer-lowercase-title`、`vitest/prefer-strict-boolean-matchers`、`vitest/prefer-to-be-truthy`、`vitest/require-hook`、`vitest/require-test-timeout`をoffにする。
   Vitestの標準APIと競合するか、互いに矛盾するためである。
@@ -109,7 +109,7 @@ Oxlintの設定の正本は[`frontend/vite.config.ts`](../../frontend/vite.confi
   `@/components/ui`からimportする。
 - **テスト用部品**：`msw`、`msw/**`、`@/api/generated/mocks/**`、`@/testing/**`、`@testing-library/**`。
 - **テレメトリSDK**：`@grafana/*`。
-  `src/lib/telemetry.ts`を通して呼ぶ（[ADR-066](../adr/ADR-066-collect-browser-telemetry-with-faro-via-collector.md)）。
+  `src/lib/telemetry.ts`を通して呼ぶ（[ADR-068](../adr/ADR-068-collect-browser-telemetry-with-faro-via-collector.md)）。
   静的importだけを検出し、`import()`は検出しない。
 - **HTML sink**：globalの`DOMParser`、`innerHTML`などのHTML系property、`document.write`、`document.writeln`。
 - **network**：globalの`fetch`と`XMLHttpRequest`、`window.fetch`、`globalThis.fetch`。

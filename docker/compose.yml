@@ -115,7 +115,7 @@ services:
     ports:
       # backend は全シグナルを OTLP/HTTP(4318)へ送るため、gRPC(4317)は公開しない。
       - "127.0.0.1:${OTEL_HTTP_PORT:?OTEL_HTTP_PORT is required}:4318"
-      # ホストの Vite が /collect を転送する faro receiver（ADR-066）。ブラウザから直接は受けない。
+      # ホストの Vite が /collect を転送する faro receiver（ADR-068）。ブラウザから直接は受けない。
       - "127.0.0.1:${OTEL_FARO_HTTP_PORT:?OTEL_FARO_HTTP_PORT is required}:12347"
     volumes:
       - ./otel-collector/config.yaml:/etc/otelcol-contrib/config.yaml:ro

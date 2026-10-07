@@ -69,7 +69,7 @@ Spring Boot が出力する起動ログで足りる段階は、アプリケー�
 SPA はブラウザの console へログを出力しない。
 この規則は Oxlint の restriction カテゴリに含まれる `no-console` で検出する。
 
-ブラウザの例外は、console ではなく Faro で Collector へ送る（[ADR-066](../adr/ADR-066-collect-browser-telemetry-with-faro-via-collector.md)）。
+ブラウザの例外は、console ではなく Faro で Collector へ送る（[ADR-068](../adr/ADR-068-collect-browser-telemetry-with-faro-via-collector.md)）。
 
 ## 出典
 

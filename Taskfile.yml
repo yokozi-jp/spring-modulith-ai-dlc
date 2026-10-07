@@ -401,7 +401,7 @@ tasks:
     dir: frontend
     cmds:
       - vp test run --coverage
-      # ルートの .env で有効にしていても、既定の無効のビルドを検査する（ADR-066）。
+      # ルートの .env で有効にしていても、既定の無効のビルドを検査する（ADR-068）。
       # vp run の script は cache しないので、環境変数がそのまま渡る。build を run.tasks に移すなら cache.env に FRONTEND_OTEL_* を足す。
       - FRONTEND_OTEL_ENABLED=false vp run build
       - |

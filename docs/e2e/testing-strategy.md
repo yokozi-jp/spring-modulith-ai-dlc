@@ -113,7 +113,7 @@ compose が公開する port は、すべて `127.0.0.1` に限る。
    Playwright が `webServer` で Vite preview を起動し、終了時に止める。
 6. 成否にかかわらず、コンテナと volume を削除する。
 
-E2E には Collector を置かず、テストが `/collect` を `page.route` で応答する（[ADR-066](../adr/ADR-066-collect-browser-telemetry-with-faro-via-collector.md)）。
+E2E には Collector を置かず、テストが `/collect` を `page.route` で応答する（[ADR-068](../adr/ADR-068-collect-browser-telemetry-with-faro-via-collector.md)）。
 `frontend/e2e/logout.spec.ts` は、`/collect` が 503 を返してもログインとログアウトのフォームを送信できることを確かめる。
 
 起動済みの環境に対して Playwright だけを実行するときは、`frontend/` で `pnpm e2e`（`vp run e2e` と同じ）を実行する。

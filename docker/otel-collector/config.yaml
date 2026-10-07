@@ -9,7 +9,7 @@ receivers:
       http:
         # 既定は localhost（Fargate のサイドカー）。Compose はコンテナ間通信のため 0.0.0.0 に上書きする。
         endpoint: ${env:OTEL_COLLECTOR_OTLP_HTTP_ENDPOINT:-localhost:4318}
-  # ブラウザの Faro SDK が同一オリジンの /collect から送るログ（ADR-066）。どのパスでも受ける。
+  # ブラウザの Faro SDK が同一オリジンの /collect から送るログ（ADR-068）。どのパスでも受ける。
   # 同一オリジンで受けるため CORS は設定しない（ADR-014）。
   faro:
     # 既定は localhost。Compose はホストの Vite から受けるため 0.0.0.0 に上書きする。
