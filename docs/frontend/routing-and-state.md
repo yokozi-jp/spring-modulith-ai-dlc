@@ -70,7 +70,8 @@ layout routeにcomponentを持たせるなら、そのcomponentで `<Outlet />` 
 ## 状態表示の分担
 
 初期描画のdataは、loaderで生成された `get<Operation>SuspenseQueryOptions()` を `preloadQuery`（`src/api/preload-query.ts`）でcacheに入れ、componentは同じoptionsを `useSuspenseQuery` で読む。
-`preloadQuery` は、TanStack Queryが `ensureQueryData` の後継とする `queryClient.query({ ...options, staleTime: "static" })` を呼び、cacheにdataがあれば取得しない。
+`preloadQuery` は、TanStack Queryが `ensureQueryData` の後継とする `queryClient.query()` を呼び、cacheにdataがあれば取得しない。
+ただし、mutationの後に無効化されたqueryは取得し直すので、更新の後に遷移した画面は古い値を描画せずにpendingを表示する。
 `ensureQueryData` は非推奨（Oxlintの `typescript/no-deprecated` が検出する）であり、suspense用のoptionsは `queryFn` を省略可能とする型のため `exactOptionalPropertyTypes` の下で `query` へそのまま渡せないので、loaderから直接呼ばない。
 
 状態ごとの表示は次のように分担する。

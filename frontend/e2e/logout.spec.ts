@@ -161,7 +161,7 @@ test("_csrf にマスクしない Cookie の値を入れて送るとログアウ
 }) => {
   await logIn(page);
   const csrfCookie = await findCookie(context, "__Host-XSRF-TOKEN");
-  // __Host- の条件（ADR-064）。sameSite は Playwright が属性のない Cookie も "Lax" で埋めるため、下の Set-Cookie の文字列で確かめる。
+  // __Host- の条件（ADR-066）。sameSite は Playwright が属性のない Cookie も "Lax" で埋めるため、下の Set-Cookie の文字列で確かめる。
   expect(csrfCookie).toMatchObject({ secure: true, path: "/", httpOnly: false });
   const token = csrfCookie.value;
   await csrfInput(page).evaluate((input: HTMLInputElement, value) => {
@@ -174,6 +174,9 @@ test("_csrf にマスクしない Cookie の値を入れて送るとログアウ
 
 // CsrfFilter は Cookie のない要求でだけ新しい token を発行する（RepositoryDeferredCsrfToken）。
 // page.request は context の __Host- の Cookie を http://localhost にも送るため、Cookie を共有しない request で送る。
+// request が Cookie を持たないのは、file 先頭の test.use で storageState を空にしているためである。
+// 別の spec へ移すときは storageState を空にする。
+// ApiContractTest は MockMvc で Set-Cookie の文字列を作らず、DAST は 10054 で失敗しないので、実際の server の文字列はここで確かめる。
 test("CSRF の Cookie を __Host- の属性で発行する", async ({ request }) => {
   const response = await request.post("/api/missing");
   expect(response.status()).toBe(403);

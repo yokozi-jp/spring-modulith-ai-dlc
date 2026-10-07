@@ -23,7 +23,7 @@ API の契約は OpenAPI、テーブル定義は Liquibase の changeset、区�
 - **Web API のパス、パラメータ、リクエストとレスポンスの項目、エラー応答**：コードから springdoc-openapi が生成する OpenAPI（[ADR-013](../adr/ADR-013-standardize-http-api-contracts.md)）。`openapi.yaml` を手で書かない。
 - **単項目の入力検証**：リクエスト DTO の Bean Validation の制約と、そこから生成される OpenAPI スキーマ（[API の入力検証の配置](../web-api/validation.md)）。
 - **テーブル、カラム、制約、インデックス**：Liquibase の changeset（[DB マイグレーション規約](../database/migrations.md)）。テーブル定義書を別に作らない。
-- **区分値のコード値と名称の対応**：ソースコードまたは定義ファイル（[PostgreSQL の論理設計](../database/postgresql-logical-design.md)）。区分値の一覧表を設計書に作らない。
+- **区分値と名称の対応**：ソースコードまたは定義ファイル（[PostgreSQL の論理設計](../database/postgresql-logical-design.md)）。区分値の一覧表を設計書に作らない。
 - **区分値の表示名と画面の固定文言**：フロントエンドの message catalog（[フロントエンドの国際化](../frontend/i18n.md)）。
 - **API が返す文言と問題種別**：バックエンドの `MessageSource` と Problem Details の `type`（[ADR-013](../adr/ADR-013-standardize-http-api-contracts.md)、[ADR-016](../adr/ADR-016-localize-api-and-spa-messages.md)）。メッセージ定義表を設計書に作らない。
 - **ログの event 名と属性**：ソースコード（[ログメッセージと属性の書き方](../observability/log-messages.md)）。

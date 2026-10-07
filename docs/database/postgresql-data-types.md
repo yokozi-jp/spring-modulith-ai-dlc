@@ -19,7 +19,7 @@ Spring Modulithのイベント出版テーブルのように、フレームワ�
 ## 値の種類ごとの型
 
 - **コード**：`varchar(n)`。商品コードのように値が数字だけでも文字列にする。
-- **区分**：`varchar(n)`とし、NOT NULLにする。値が数字だけでも区分値はコードとして扱う。
+- **区分**：`varchar(n)`とし、NOT NULLにする。値はenumの名前の文字列にする（[区分値](postgresql-logical-design.md#区分値)）。
 - **絶対時刻**：`timestamptz`。扱いは[日時とタイムゾーンの規約](../datetime/timezone-conventions.md)に従う。
   期間の検索は開始を含み終了を含まない半開区間（`>= start AND < end`）で書き、`BETWEEN`を使わない。
   `BETWEEN`は両端を含むため、終了の境界ちょうどの値が隣の期間と二重に数えられる。

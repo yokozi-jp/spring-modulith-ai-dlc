@@ -64,7 +64,7 @@ jobs:
       - ruleId: 10011
         context: spring-modulith-dast
         newRisk: False Positive
-      # Cookie No HttpOnly Flag（__Host-XSRF-TOKEN だけ）：csrf.spa() は SPA が読む前提で、ADR-014 は X-XSRF-TOKEN を許可している（ADR-064）。
+      # Cookie No HttpOnly Flag（__Host-XSRF-TOKEN だけ）：csrf.spa() は SPA が読む前提で、ADR-014 は X-XSRF-TOKEN を許可している（ADR-066）。
       - ruleId: 10010
         context: spring-modulith-dast
         parameter: __Host-XSRF-TOKEN

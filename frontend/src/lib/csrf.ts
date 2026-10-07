@@ -1,7 +1,11 @@
-/** CSRF の Cookie の名前。backend の SecurityConfig と ZAP の script と同じ値にする（ADR-064）。 */
+/** CSRF の Cookie の名前。backend の SecurityConfig と ZAP の script と同じ値にする（ADR-066）。 */
 const csrfCookieName = "__Host-XSRF-TOKEN";
 
-/** CSRF の Cookie の値。Cookie がないか値が空なら undefined を返す（ADR-064）。 */
+/**
+ * CSRF の Cookie の値。Cookie がないか値が空なら undefined を返す（ADR-066）。
+ * browser だけで呼ぶ前提で document を読む。
+ * Node のテストでは document を stub する。
+ */
 export function csrfToken(): string | undefined {
   const value = document.cookie
     .split("; ")

@@ -73,7 +73,7 @@ Orvalの設定（`frontend/orval.config.ts`）だけを変えたときは、`tas
 ## CIが検査すること
 
 - **pre-commit**：契約、`.spectral.yaml`、Orvalの設定、生成物の変更で、コミット済みの契約のSpectralと`task api-client-check`を実行する。
-- **Backend CI**：`task be-openapi-check`で契約を再生成し、コミット済みの`openapi/openapi.yaml`と比べる。
+- **Backend CI**：`task be-test`が書き出した契約を、`task be-openapi-check`でコミット済みの`openapi/openapi.yaml`と比べる。
 - **Frontend CI**：`task api-client-check`で生成物を再生成し、コミット済みの内容と比べる。
 - **API Contract**（`api-contract.yml`）：`task api-lint`、`task api-lint-rules-test`、`task api-breaking`を実行し、`task api-docs`の設計書をartifactにする。
   mainへのmergeでは、設計書をGitHub Pagesに公開する。
@@ -97,5 +97,5 @@ drift（生成し直した内容とコミット済みの内容の差）の検査
 - **`task api-breaking`が失敗した**：mainの契約と比べて互換でない変更がある。
   互換な形（項目の追加、任意のパラメータ）に直すか、意図した変更なら手順9のラベル、本文、リリース記法を適用する。
 
-ステージしていない手書きの変更だけなら、`task be-openapi-check`は再生成で上書きして成功する。
+ステージしていない手書きの変更だけなら、`task be-test`か`task api-gen`の再生成で上書きされて解消する。
 その場合は`git status`で生成物が元に戻ったことを確かめる。

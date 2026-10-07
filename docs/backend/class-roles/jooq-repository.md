@@ -41,7 +41,7 @@ jOOQ の Repository は業務規則を持たない。
 - `com.example.demo.<feature>.infrastructure.persistence` に置く。
 - 名前は `Jooq` と集約の名前と `Repository` をつなげる（`JooqOrderRepository`）。
 - 集約を読む SQL の列の選択と変換を置く private メソッドは、`select` に集約の名前の複数形を付ける（`selectOrders`）。
-- jOOQ の生成型は、自モジュールのスキーマの `Tables`（`com.example.demo.jooq.<スキーマ名>.Tables`）のテーブルと列を使う（[ADR-065](../../adr/ADR-065-open-jooq-generated-module.md)）。
+- jOOQ の生成型は、自モジュールのスキーマの `Tables`（`com.example.demo.jooq.<スキーマ名>.Tables`）のテーブルと列を使う（[ADR-067](../../adr/ADR-067-open-jooq-generated-module.md)）。
 
 この文書の `ORDERS`、`ORDER_LINES` と、その Record の `OrdersRecord`、`OrderLinesRecord` は、説明用の仮の生成型である。
 `ORDERS` は `ORDER_ID`、`CUSTOMER_ID`、`STATUS`、`DISCOUNT`、`PLACED_AT`、`LOCK_NO` の列を、`ORDER_LINES` は `ORDER_ID`、`LINE_NUMBER`、`PRODUCT_CODE`、`QUANTITY`、`UNIT_PRICE`、`LOCK_NO` の列を持つとする。

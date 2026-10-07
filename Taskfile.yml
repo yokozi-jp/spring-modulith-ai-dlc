@@ -604,15 +604,14 @@ tasks:
       - task: api-lint
 
   be-openapi-check:
-    desc: 依存起動済みのテストDBでOpenAPI契約を再生成し、コミット済みのopenapi/openapi.yamlと一致するか検査
-    deps: [_ensure-test-env]
+    desc: 直前のbe-testが書き出したOpenAPI契約をSpectralで検査し、コミット済みの内容と一致するか検査（前提はbe-testの実行済み。単体ではdriftを検出できない）
     cmds:
-      - task: be-openapi-lint
+      - task: api-lint
       - task: api-drift-check
         vars: { PATHS: openapi/openapi.yaml }
 
   be-test:
-    desc: 依存起動済みのテストDBでマイグレーションとテストを実行
+    desc: 依存起動済みのテストDBでマイグレーションとテストを実行し、OpenApiContractTestがopenapi/openapi.yamlを書き出す
     dir: backend
     deps: [_ensure-test-env]
     cmds:
@@ -620,7 +619,7 @@ tasks:
         set -a
         . "../{{.TEST_ENV_FILE}}"
         set +a
-        SPRING_CONFIG_IMPORT="optional:file:../{{.TEST_ENV_FILE}}[.properties]" ./gradlew migrateDatabase test
+        SPRING_CONFIG_IMPORT="optional:file:../{{.TEST_ENV_FILE}}[.properties]" ./gradlew migrateDatabase test -PopenapiExport=true
 
   be-test-dev:
     desc: 作りかけを含むchangesetを適用してテスト
@@ -674,7 +673,7 @@ tasks:
         {{.DOCKER}} compose -f "{{.TEST_COMPOSE_FILE}}" up -d --wait
         task be-verify-migrations TEST_ENV_FILE="{{.TEST_ENV_FILE}}"
         task be-test TEST_ENV_FILE="{{.TEST_ENV_FILE}}"
-        task be-openapi-lint TEST_ENV_FILE="{{.TEST_ENV_FILE}}"
+        task api-lint
 
   test-dev:
     desc: 隔離依存を起動して作りかけを含むテスト後に片付け

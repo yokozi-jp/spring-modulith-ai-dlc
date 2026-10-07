@@ -1,5 +1,5 @@
 // ZAP httpsender script（ADR-056）。
-// Spring Security の csrf.spa() は __Host-XSRF-TOKEN Cookie（ADR-064）の値を X-XSRF-TOKEN Header で送り返させる。
+// Spring Security の csrf.spa() は __Host-XSRF-TOKEN Cookie（ADR-066）の値を X-XSRF-TOKEN Header で送り返させる。
 // ZAP の anti-CSRF 処理はフォームのトークンしか扱わないため、unsafe メソッドの要求にこの Header を付ける。
 // Cookie が要求に付いていなければ、最後に受け取った Set-Cookie の値を Cookie と Header の両方に付ける。
 var ScriptVars = Java.type("org.zaproxy.zap.extension.script.ScriptVars");

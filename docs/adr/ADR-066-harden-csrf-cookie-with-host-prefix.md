@@ -1,17 +1,17 @@
 ---
 type: ADR
-title: 'ADR-064: CSRF の Cookie を __Host- の名前にし、SameSite=Lax を付ける'
+title: 'ADR-066: CSRF の Cookie を __Host- の名前にし、SameSite=Lax を付ける'
 description: Spring Security の csrf.spa() が発行する CSRF の Cookie を __Host-XSRF-TOKEN（Secure、Path=/、Domain なし、HttpOnly なし、SameSite=Lax）にし、SPA は GET、HEAD、OPTIONS 以外の要求にだけ X-XSRF-TOKEN を付ける決定と、ローカルの HTTP の Safari を対象外にする扱い。
 tags: [adr, security, csrf, cookie, frontend, backend]
 ---
 
-# ADR-064: CSRF の Cookie を __Host- の名前にし、SameSite=Lax を付ける
+# ADR-066: CSRF の Cookie を __Host- の名前にし、SameSite=Lax を付ける
 
 ## Status
 
-Proposed
+Accepted
 
-A を main へ入れる Pull Request（確認用の業務機能の手順 5）の中で Accepted にし、[ADR インデックス](index.md)の行も同じ変更で直す。
+Proposed として起こし、[#157](https://github.com/yokozi-jp/spring-modulith-ai-dlc/pull/157) でコードと一緒にレビューし、main へ取り込むこの Pull Request で Accepted にした。
 
 ## Date
 
@@ -74,14 +74,14 @@ DAST の httpsender script は、要求に Cookie がなければ最後に受け
 - backend は CSRF の Cookie を `__Host-XSRF-TOKEN` にし、`Secure`（環境によらない）、`Path=/`、`SameSite=Lax` を付け、`Domain` と `HttpOnly` を付けない。`csrf.spa()` の後で `csrfTokenRepository(...)` を呼んで差し替える。
 - header の名前（`X-XSRF-TOKEN`）と form の項目名（`_csrf`）は変えない。
 - `SameSite` は `APP_SESSION` と同じ `Lax` にする。
-- SPA は要求のたびに Cookie を読み、GET、HEAD、OPTIONS 以外の要求にだけ、マスクしない値を `X-XSRF-TOKEN` header で送る。Cookie がなければ header を付けずに送り、backend の 403 に任せる。
+- SPA は要求のたびに Cookie を読み、同じ origin への GET、HEAD、OPTIONS 以外の要求にだけ、マスクしない値を `X-XSRF-TOKEN` header で送る。Cookie がなければ header を付けずに送り、backend の 403 に任せる。
 - ローカルの HTTP の開発環境は Chromium と Firefox で確かめ、Safari は HTTPS の環境で確かめる。
 
 ### 方式の前提
 
 - 照合は naive double-submit cookie であり、署名した token（signed double-submit cookie）ではない。
 - `__Host-` が Cookie の書き込みを塞ぐのは、ブラウザが cookie prefix を実装していることが前提である。
-- 同じ registrable domain に信頼できない host を置かない。`APP_SESSION` は prefix を持たないため、その host からの書き込みは塞げない。
+- 同じ registrable domain に信頼できない host を置かない。`APP_SESSION` は prefix を持たないため、その host からの書き込みは塞げない（[issue #159](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/159)）。
 - Cookie の名前と header の名前は、frontend（`src/lib/csrf.ts`）、backend（`SecurityConfig`）、ZAP の httpsender script の 3 者の契約である。言語が違うので 1 か所にまとめられず、契約テスト、frontend の単体テスト、E2E、DAST の preflight がそれぞれのずれを検出する。
 - Fetch Metadata（`Sec-Fetch-Site`）と `Origin` の検査は、この ADR では決めない。
 
@@ -102,7 +102,7 @@ DAST の httpsender script は、要求に Cookie がなければ最後に受け
 ### Neutral
 
 - ローカルの Safari が必要になったら、ローカルの Vite を HTTPS にする（証明書の生成と信頼、ADR-033 の origin と Keycloak の redirect URI の変更を伴う）。
-- macOS の Safari が `http://localhost` の `Secure` の Cookie を受け付けると確かめられたら、この ADR の表と `docs/frontend/browser-support.md` の 1 文を消す。
+- macOS の Safari が `http://localhost` の `Secure` の Cookie を受け付けると確かめられたら、この ADR の表と `docs/frontend/browser-support.md` の 1 文を消す（[issue #158](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/158)）。
 
 ## Alternatives Considered
 
@@ -140,6 +140,8 @@ DAST の httpsender script は、要求に Cookie がなければ最後に受け
 
 - [issue #105](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/105)
 - [issue #125](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/125)
+- [issue #158](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/158)（macOS の Safari の確認）
+- [issue #159](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/159)（`APP_SESSION` の prefix）
 - [RFC 6265bis: Cookies: HTTP State Management Mechanism](https://datatracker.ietf.org/doc/draft-ietf-httpbis-rfc6265bis/)（cookie prefix と `Secure` の受け入れ）
 - [W3C Secure Contexts](https://www.w3.org/TR/secure-contexts/)
 - [OWASP Cross-Site Request Forgery Prevention Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Cross-Site_Request_Forgery_Prevention_Cheat_Sheet.html)

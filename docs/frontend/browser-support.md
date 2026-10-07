@@ -28,7 +28,7 @@ ExperimentalのNewly availableとLimited availabilityの機能は本番のコー
 対応していないブラウザでは、Base UIのinline style要素が拒否される（[ADR-030](../adr/ADR-030-allow-base-ui-inline-style-elements.md)）。
 
 ローカルのHTTPの開発環境（`http://localhost`）は、ChromiumとFirefoxで確かめる。
-Safariは`Secure`のCookieをHTTPで受け付けないため、HTTPSの環境で確かめる（[ADR-064](../adr/ADR-064-harden-csrf-cookie-with-host-prefix.md)）。
+Safariは`Secure`のCookieをHTTPで受け付けないため、HTTPSの環境で確かめる（[ADR-066](../adr/ADR-066-harden-csrf-cookie-with-host-prefix.md)、[issue #158](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/158)）。
 
 ## サポートバージョン
 

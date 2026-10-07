@@ -38,7 +38,7 @@ import org.springframework.test.web.servlet.MockMvc;
 @Import({SharedTestConfiguration.class, ConflictFixture.class})
 class ApiContractTest {
 
-  /** frontend と ZAP の script が読む CSRF の Cookie の名前（ADR-064）。 */
+  /** frontend と ZAP の script が読む CSRF の Cookie の名前（ADR-066）。 */
   private static final String CSRF_COOKIE = "__Host-XSRF-TOKEN";
 
   /** 実際の Spring MVC と Security filter chain を通すクライアント。 */

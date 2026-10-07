@@ -66,6 +66,8 @@ describe("createQueryClient", () => {
   beforeEach(() => {
     // POST の apiFetch が CSRF の Cookie を読むため、Node に document を置く。
     vi.stubGlobal("document", { cookie: "" });
+    // 更新系の apiFetch が送信先の origin を location と比べるため、Node に location を置く。
+    vi.stubGlobal("location", { href: "http://localhost/", origin: "http://localhost" });
   });
 
   it("mutation の成功の後に描画中の query を取り直し、終わるまで pending を保つ", async () => {

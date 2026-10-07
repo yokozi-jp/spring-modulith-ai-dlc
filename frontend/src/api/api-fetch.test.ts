@@ -1,3 +1,4 @@
+// oxlint-disable max-lines -- apiFetch の応答、CSRF の header、401 の遷移、再試行の判定を 1 つの module の test に集めるため、行数で分割しない。
 import { http, HttpResponse } from "msw";
 import { beforeEach, describe, expect, it, vi } from "vite-plus/test";
 
@@ -47,7 +48,7 @@ describe("api-fetch", () => {
     vi.resetModules();
     api = await import("./api-fetch");
     assign.mockReset();
-    vi.stubGlobal("location", { assign });
+    vi.stubGlobal("location", { assign, href: `${baseUrl}/`, origin: baseUrl });
     // Node には document がないため、Cookie のない document を置く。
     vi.stubGlobal("document", { cookie: "" });
   });
@@ -160,7 +161,8 @@ describe("api-fetch", () => {
     beforeEach(() => {
       received.length = 0;
       server.use(
-        http.all(`${baseUrl}/api/echo`, ({ request }) => {
+        // 別の origin への要求も受けるよう、origin を問わない path にする。
+        http.all("*/api/echo", ({ request }) => {
           received.push(request.headers);
           // oxlint-disable-next-line unicorn/no-null -- 204 は本文を持てない。
           return new HttpResponse(null, { status: 204 });
@@ -168,8 +170,8 @@ describe("api-fetch", () => {
       );
     });
 
-    async function send(init: RequestInit): Promise<Headers | undefined> {
-      await api.apiFetch(`${baseUrl}/api/echo`, init);
+    async function send(init: RequestInit, origin = baseUrl): Promise<Headers | undefined> {
+      await api.apiFetch(`${origin}/api/echo`, init);
       return received.at(-1);
     }
 
@@ -202,6 +204,14 @@ describe("api-fetch", () => {
         expect(headers?.has("X-XSRF-TOKEN")).toBeFalsy();
       },
     );
+
+    it("別の origin への POST には付けない", async () => {
+      vi.stubGlobal("document", { cookie: `__Host-XSRF-TOKEN=${cookieValue}` });
+
+      const headers = await send({ method: "POST" }, "http://other.example");
+
+      expect(headers?.has("X-XSRF-TOKEN")).toBeFalsy();
+    });
 
     it("生成コードが渡す plain object の header を保つ", async () => {
       vi.stubGlobal("document", { cookie: `__Host-XSRF-TOKEN=${cookieValue}` });

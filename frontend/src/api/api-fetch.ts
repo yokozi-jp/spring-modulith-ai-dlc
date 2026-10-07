@@ -31,11 +31,14 @@ async function readProblem(response: Response): Promise<ProblemDetail | undefine
 const csrfExemptMethods = new Set(["GET", "HEAD", "OPTIONS"]);
 
 /** 更新系の要求にだけ、CSRF の Cookie の値を X-XSRF-TOKEN で付けた header を返す。 */
-function requestHeaders(options: RequestInit): Headers {
+function requestHeaders(url: string, options: RequestInit): Headers {
   const headers = new Headers(options.headers);
-  // 同じ origin の相対 URL だけを受ける前提で header を付ける。別の origin へ token を送らないよう、Orval の baseUrl を設定しない（docs/frontend/api-client-orval.md）。
+  // 別の origin へ token を送らないよう、送信先を location の上で解決した origin が同じときだけ付ける。
   // method を省いた要求は Fetch の既定どおり GET として扱う。
-  if (!csrfExemptMethods.has((options.method ?? "GET").toUpperCase())) {
+  if (
+    !csrfExemptMethods.has((options.method ?? "GET").toUpperCase()) &&
+    new URL(url, globalThis.location.href).origin === globalThis.location.origin
+  ) {
     // token は認証とログアウトの成功時に作り直されるため、要求のたびに Cookie から読む。マスクはしない（csrf.spa() は header の値を素のまま照合する）。
     const token = csrfToken();
     if (token !== undefined) {
@@ -50,7 +53,7 @@ function requestHeaders(options: RequestInit): Headers {
  * @public
  */
 export async function apiFetch<TResponse>(url: string, options: RequestInit): Promise<TResponse> {
-  const response = await fetch(url, { ...options, headers: requestHeaders(options) });
+  const response = await fetch(url, { ...options, headers: requestHeaders(url, options) });
   if (!response.ok) {
     throw new ApiProblemError(response.status, await readProblem(response));
   }

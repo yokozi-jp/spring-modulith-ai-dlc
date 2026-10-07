@@ -32,7 +32,7 @@ import org.springframework.web.servlet.HandlerExceptionResolver;
 @Configuration
 public class SecurityConfig {
 
-  /** SPA が読む CSRF の Cookie の名前。frontend の src/lib/csrf.ts と ZAP の script と同じ値にする（ADR-064）。 */
+  /** SPA が読む CSRF の Cookie の名前。frontend の src/lib/csrf.ts と ZAP の script と同じ値にする（ADR-066）。 */
   private static final String CSRF_COOKIE_NAME = "__Host-XSRF-TOKEN";
 
   /** CSRF の Cookie を __Host- の条件（Secure、Path=/、Domain なし）と SameSite=Lax で発行する。 */
@@ -42,7 +42,7 @@ public class SecurityConfig {
     // __Host- は Path=/ を要求する。context path の既定に頼らず明示する。
     repository.setCookiePath("/");
     // ローカルの HTTP でも Secure を付ける。Chromium と Firefox は http://localhost の Secure の Cookie
-    // を受け付けるが、Safari は受け付けない（ADR-064）。
+    // を受け付けるが、Safari は受け付けない（ADR-066）。
     repository.setCookieCustomizer(cookie -> cookie.secure(true).sameSite("Lax"));
     return repository;
   }
