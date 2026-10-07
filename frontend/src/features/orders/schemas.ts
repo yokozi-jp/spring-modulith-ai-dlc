@@ -8,7 +8,7 @@ import {
   draftOrderBodyCustomerOrderCodeMax,
   draftOrderBodyLinesItemQuantityMax,
   draftOrderBodyLinesMax,
-} from "@/api/generated/zod/order/order.zod";
+} from "@/api/generated/zod/ordering/ordering.zod";
 
 /** 入力欄の値。数量は input の値のまま文字列で持ち、送信時の検証で数値にする。 */
 export interface OrderLineValues {

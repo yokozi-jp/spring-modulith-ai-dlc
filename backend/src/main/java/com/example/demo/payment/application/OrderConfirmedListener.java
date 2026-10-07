@@ -1,6 +1,6 @@
 package com.example.demo.payment.application;
 
-import com.example.demo.order.OrderConfirmed;
+import com.example.demo.ordering.OrderConfirmed;
 import org.springframework.modulith.events.ApplicationModuleListener;
 import org.springframework.stereotype.Service;
 

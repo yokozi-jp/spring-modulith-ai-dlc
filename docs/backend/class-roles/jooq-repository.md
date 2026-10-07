@@ -128,10 +128,10 @@ PostgreSQL には MULTISET がなく、jOOQ は `jsonb_agg` による JSON の�
 最小の例は、`findById`、`add`、`update`、`delete` を実装した `JooqOrderRepository` である。
 
 ```java
-package com.example.demo.order.infrastructure.persistence;
+package com.example.demo.ordering.infrastructure.persistence;
 
-import static com.example.demo.jooq.order.Tables.ORDERS;
-import static com.example.demo.jooq.order.Tables.ORDER_LINES;
+import static com.example.demo.jooq.ordering.Tables.ORDERS;
+import static com.example.demo.jooq.ordering.Tables.ORDER_LINES;
 import static org.jooq.impl.DSL.multiset;
 import static org.jooq.impl.DSL.select;
 

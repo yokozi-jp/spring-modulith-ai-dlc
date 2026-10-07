@@ -3,7 +3,7 @@ import type { UserEvent } from "@testing-library/user-event";
 import { http, HttpResponse } from "msw";
 import { vi } from "vite-plus/test";
 
-import { getFindOrderByIdMockHandler } from "@/api/generated/mocks/order/order.msw";
+import { getFindOrderByIdMockHandler } from "@/api/generated/mocks/ordering/ordering.msw";
 import { getListPaymentsMockHandler } from "@/api/generated/mocks/payment/payment.msw";
 import type {
   OrderDetailsResponse,

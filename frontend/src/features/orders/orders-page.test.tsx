@@ -3,7 +3,7 @@
 import { screen, waitFor, within } from "@testing-library/react";
 import { describe, expect, it } from "vite-plus/test";
 
-import { getListOrdersMockHandler } from "@/api/generated/mocks/order/order.msw";
+import { getListOrdersMockHandler } from "@/api/generated/mocks/ordering/ordering.msw";
 import type { OrderSummaryListResponse, OrderSummaryResponse } from "@/api/generated/models";
 import { server } from "@/testing/msw";
 import { orderId, orderSummary } from "@/testing/orders";

@@ -2,19 +2,17 @@ databaseChangeLog:
   - changeSet:
       id: 004-create-order-tables
       author: system
-      # スキーマ名の order は PostgreSQL のキーワードなので、Liquibase に引用符付きで出させる。
-      objectQuotingStrategy: QUOTE_ONLY_RESERVED_WORDS
       preConditions:
         - dbms:
             type: postgresql
       changes:
         - sql:
-            sql: CREATE SCHEMA "order" AUTHORIZATION CURRENT_USER;
+            sql: CREATE SCHEMA ordering AUTHORIZATION CURRENT_USER;
         - sql:
-            sql: GRANT USAGE ON SCHEMA "order" TO "${appDatabaseUsername}";
+            sql: GRANT USAGE ON SCHEMA ordering TO "${appDatabaseUsername}";
         - createTable:
             tableName: t_order
-            schemaName: order
+            schemaName: ordering
             columns:
               - column:
                   name: order_id
@@ -102,7 +100,7 @@ databaseChangeLog:
                   type: integer
         - createTable:
             tableName: t_order_line
-            schemaName: order
+            schemaName: ordering
             columns:
               - column:
                   name: order_line_id
@@ -194,7 +192,7 @@ databaseChangeLog:
         - createIndex:
             indexName: uk_t_order
             tableName: t_order
-            schemaName: order
+            schemaName: ordering
             unique: true
             columns:
               - column:
@@ -202,7 +200,7 @@ databaseChangeLog:
         - createIndex:
             indexName: uk_2_t_order
             tableName: t_order
-            schemaName: order
+            schemaName: ordering
             unique: true
             columns:
               - column:
@@ -210,7 +208,7 @@ databaseChangeLog:
         - createIndex:
             indexName: uk_t_order_line
             tableName: t_order_line
-            schemaName: order
+            schemaName: ordering
             unique: true
             columns:
               - column:
@@ -218,13 +216,13 @@ databaseChangeLog:
               - column:
                   name: line_no
         - sql:
-            sql: GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE "order".t_order, "order".t_order_line TO "${appDatabaseUsername}";
+            sql: GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE ordering.t_order, ordering.t_order_line TO "${appDatabaseUsername}";
       rollback:
         - dropTable:
             tableName: t_order_line
-            schemaName: order
+            schemaName: ordering
         - dropTable:
             tableName: t_order
-            schemaName: order
+            schemaName: ordering
         - sql:
-            sql: DROP SCHEMA "order";
+            sql: DROP SCHEMA ordering;

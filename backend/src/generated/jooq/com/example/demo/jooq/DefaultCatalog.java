@@ -5,7 +5,7 @@ package com.example.demo.jooq;
 
 
 import com.example.demo.jooq.modulith.Modulith;
-import com.example.demo.jooq.order.Order;
+import com.example.demo.jooq.ordering.Ordering;
 import com.example.demo.jooq.payment.Payment;
 import com.example.demo.jooq.product.Product;
 
@@ -46,9 +46,9 @@ public class DefaultCatalog extends CatalogImpl {
     public final Modulith MODULITH = Modulith.MODULITH;
 
     /**
-     * The schema <code>order</code>.
+     * The schema <code>ordering</code>.
      */
-    public final Order ORDER = Order.ORDER;
+    public final Ordering ORDERING = Ordering.ORDERING;
 
     /**
      * The schema <code>payment</code>.
@@ -72,7 +72,7 @@ public class DefaultCatalog extends CatalogImpl {
     public final List<Schema> getSchemas() {
         return Arrays.asList(
             Modulith.MODULITH,
-            Order.ORDER,
+            Ordering.ORDERING,
             Payment.PAYMENT,
             Product.PRODUCT
         );

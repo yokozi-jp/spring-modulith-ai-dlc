@@ -46,9 +46,7 @@ final class ChangesetLint {
                   "modulith.event_publication, modulith.event_publication_archive"),
               moduleSchemaSql("003-create-product-tables", "product", "product.m_product"),
               moduleSchemaSql(
-                  "004-create-order-tables",
-                  "\"order\"",
-                  "\"order\".t_order, \"order\".t_order_line"),
+                  "004-create-order-tables", "ordering", "ordering.t_order, ordering.t_order_line"),
               moduleSchemaSql("006-create-payment-tables", "payment", "payment.t_payment"))
           .flatMap(List::stream)
           .toList();

@@ -78,7 +78,7 @@ Command の形式は、Controller の `@Valid` で検証済みである。
 最小の例は、注文を取り消す `CancelOrderCommandHandler` である。
 
 ```java
-package com.example.demo.order.application;
+package com.example.demo.ordering.application;
 
 /** 注文を取り消す。 */
 @Service
@@ -175,7 +175,7 @@ private List<OrderLine> toOrderLines(final List<PlaceOrderCommand.Line> commandL
 代金は請求せず、決済はこのイベントを受けた `OrderConfirmedListener` が始める。
 
 ```java
-// com.example.demo.order.application.ConfirmOrderCommandHandler（抜粋）
+// com.example.demo.ordering.application.ConfirmOrderCommandHandler（抜粋）
 order.ensureLockNo(command.expectedLockNo());
 order.confirm();
 orderRepository.update(order);
@@ -187,7 +187,7 @@ return new ConfirmOrderResult(order.id().value().toString());
 依存は `orderRepository` と `paymentGateway` の二つである。
 
 ```java
-// com.example.demo.order.application.ChargeOrderCommandHandler（抜粋）
+// com.example.demo.ordering.application.ChargeOrderCommandHandler（抜粋）
 /** 支払い済みでない注文の代金を、注文 ID を冪等性キーにして請求し、支払い済みにして保存する。 */
 @Transactional
 public ChargeOrderResult handle(final ChargeOrderCommand command) {

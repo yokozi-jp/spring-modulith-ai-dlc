@@ -40,7 +40,7 @@ jooq-codegen 3.21 は、スキーマが 2 つ以上のとき、スキーマの�
 - 生成物は null の契約を満たさないため、`@NullMarked` ではなく `@NullUnmarked` にする。
   Error Prone の `RequireExplicitNullMarking` は、明示した `@NullUnmarked` で満たす。
 - `ProductionCodeOnlyTest` は、生成コードの基準の型をルートに残る `DefaultCatalog` にする。
-- 機能モジュールの Repository は、スキーマごとの `Tables`（`com.example.demo.jooq.order.Tables.T_ORDER` など）のテーブルと列を使う。
+- 機能モジュールの Repository は、スキーマごとの `Tables`（`com.example.demo.jooq.ordering.Tables.T_ORDER` など）のテーブルと列を使う。
 
 ## Consequences
 

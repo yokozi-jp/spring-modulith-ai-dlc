@@ -68,3 +68,4 @@
 - [ADR-065: 区分値を DB と API で enum の名前のまま持つ](ADR-065-store-category-values-as-enum-names.md)（Proposed, 2026-10-06）
 - [ADR-066: CSRF の Cookie を __Host- の名前にし、SameSite=Lax を付ける](ADR-066-harden-csrf-cookie-with-host-prefix.md)（Accepted, 2026-10-06）
 - [ADR-067: jOOQ の生成物を Spring Modulith の OPEN のモジュールにする](ADR-067-open-jooq-generated-module.md)（Proposed, 2026-10-06）
+- [ADR-069: モジュール名とスキーマ名に SQL の予約語を使わない](ADR-069-avoid-sql-reserved-words-in-module-names.md)（Proposed, 2026-10-07）

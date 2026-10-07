@@ -8,7 +8,7 @@ import { beforeEach, describe, expect, it, vi } from "vite-plus/test";
 import {
   getFindOrderByIdMockHandler,
   getListOrdersMockHandler,
-} from "@/api/generated/mocks/order/order.msw";
+} from "@/api/generated/mocks/ordering/ordering.msw";
 import { getListPaymentsMockHandler } from "@/api/generated/mocks/payment/payment.msw";
 import { getListProductsMockHandler } from "@/api/generated/mocks/product/product.msw";
 import { server } from "@/testing/msw";

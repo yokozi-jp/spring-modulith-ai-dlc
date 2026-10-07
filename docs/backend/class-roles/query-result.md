@@ -51,7 +51,7 @@ API の応答の形は Presentation の `<QueryResult>Response` が決めるた�
 最小の例は、一覧の1行を表す `OrderSummary` である。
 
 ```java
-package com.example.demo.order;
+package com.example.demo.ordering;
 
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -64,7 +64,7 @@ public record OrderSummary(
 典型的な例は、明細をネストした record で持つ `OrderDetails` である。
 
 ```java
-package com.example.demo.order;
+package com.example.demo.ordering;
 
 import java.math.BigDecimal;
 import java.time.Instant;

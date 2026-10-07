@@ -7,7 +7,7 @@ import { useTranslation } from "react-i18next";
 import {
   getFindOrderByIdQueryKey,
   useChangeOrderLines,
-} from "@/api/generated/endpoints/order/order";
+} from "@/api/generated/endpoints/ordering/ordering";
 import type { OrderDetailsResponse, OrderLineRequest } from "@/api/generated/models";
 import { useAppForm } from "@/features/orders/form";
 import { formFailure, problemNotice, problemStatus } from "@/features/orders/notice";

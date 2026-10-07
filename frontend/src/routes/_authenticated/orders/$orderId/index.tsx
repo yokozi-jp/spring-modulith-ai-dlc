@@ -1,7 +1,7 @@
 import { createFileRoute, notFound } from "@tanstack/react-router";
 
 import { ApiProblemError } from "@/api/api-fetch";
-import { getFindOrderByIdSuspenseQueryOptions } from "@/api/generated/endpoints/order/order";
+import { getFindOrderByIdSuspenseQueryOptions } from "@/api/generated/endpoints/ordering/ordering";
 import { getListProductsSuspenseQueryOptions } from "@/api/generated/endpoints/product/product";
 import { preloadQuery } from "@/api/preload-query";
 import { OrderDetailPage } from "@/features/orders/order-detail-page";

@@ -2,7 +2,7 @@ package com.example.demo.payment.application;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import com.example.demo.order.OrderConfirmed;
+import com.example.demo.ordering.OrderConfirmed;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;

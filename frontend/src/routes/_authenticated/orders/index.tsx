@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 
-import { getListOrdersSuspenseQueryOptions } from "@/api/generated/endpoints/order/order";
-import { ListOrdersQueryParams } from "@/api/generated/zod/order/order.zod";
+import { getListOrdersSuspenseQueryOptions } from "@/api/generated/endpoints/ordering/ordering";
+import { ListOrdersQueryParams } from "@/api/generated/zod/ordering/ordering.zod";
 import { preloadQuery } from "@/api/preload-query";
 import { isOrderStatus, listOrdersParams } from "@/features/orders/order-status";
 import { OrdersPage } from "@/features/orders/orders-page";

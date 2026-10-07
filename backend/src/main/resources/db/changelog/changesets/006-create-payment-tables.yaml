@@ -27,7 +27,7 @@ databaseChangeLog:
                   type: uuid
                   constraints:
                     nullable: false
-              # 決済した注文（order.t_order.public_id）。モジュールの間に外部キーを作らない。
+              # 決済した注文（ordering.t_order.public_id）。モジュールの間に外部キーを作らない。
               - column:
                   name: order_public_id
                   type: uuid

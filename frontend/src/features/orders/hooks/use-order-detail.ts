@@ -2,7 +2,7 @@ import { useSuspenseQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
-import { getFindOrderByIdSuspenseQueryOptions } from "@/api/generated/endpoints/order/order";
+import { getFindOrderByIdSuspenseQueryOptions } from "@/api/generated/endpoints/ordering/ordering";
 import { getListProductsSuspenseQueryOptions } from "@/api/generated/endpoints/product/product";
 import type { Notice } from "@/features/orders/notice";
 

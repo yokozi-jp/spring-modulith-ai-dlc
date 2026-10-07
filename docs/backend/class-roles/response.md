@@ -57,9 +57,9 @@ Response は Domain の型を持たない。
 最小の例は、一覧の1行の `OrderSummaryResponse` と、それを包む `OrderSummaryListResponse` である。
 
 ```java
-package com.example.demo.order.presentation.web;
+package com.example.demo.ordering.presentation.web;
 
-import com.example.demo.order.OrderSummary;
+import com.example.demo.ordering.OrderSummary;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -93,7 +93,7 @@ public record OrderSummaryResponse(
 ```
 
 ```java
-// com.example.demo.order.presentation.web.OrderSummaryListResponse（宣言だけ）
+// com.example.demo.ordering.presentation.web.OrderSummaryListResponse（宣言だけ）
 /**
  * 注文の一覧を items で包んで返す API の本文。
  *
@@ -111,7 +111,7 @@ public record OrderSummaryListResponse(List<OrderSummaryResponse> items) {
 典型的な例は、明細をネストした record で持つ `OrderDetailsResponse` である。
 
 ```java
-// com.example.demo.order.presentation.web.OrderDetailsResponse（宣言だけ）
+// com.example.demo.ordering.presentation.web.OrderDetailsResponse（宣言だけ）
 /**
  * 注文の詳細を返す API の本文。
  *

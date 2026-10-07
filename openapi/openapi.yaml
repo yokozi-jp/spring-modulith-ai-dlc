@@ -8,7 +8,7 @@ servers:
   url: /
 tags:
 - description: 注文の API
-  name: order
+  name: ordering
 - description: 決済の API
   name: payment
 - description: 商品の API
@@ -43,7 +43,7 @@ paths:
           $ref: "#/components/responses/InternalServerErrorProblem"
       summary: 注文の一覧を返す。
       tags:
-      - order
+      - ordering
     post:
       description: 作成した注文の URI を Location に入れて返す。客先注文番号が既にあれば 409、存在しないか販売終了の商品を指定すると
         422 を返す。
@@ -79,7 +79,7 @@ paths:
           $ref: "#/components/responses/InternalServerErrorProblem"
       summary: 下書きの注文を作る。
       tags:
-      - order
+      - ordering
   /api/orders/{orderId}:
     get:
       description: 注文がなければ 404 を返す。
@@ -111,7 +111,7 @@ paths:
           $ref: "#/components/responses/InternalServerErrorProblem"
       summary: 注文の詳細を返す。
       tags:
-      - order
+      - ordering
   /api/orders/{orderId}/cancel:
     post:
       description: 注文がなければ 404、画面が読んだ後に注文が変わっていれば 409、下書きでなければ 422 を返す。
@@ -150,7 +150,7 @@ paths:
           $ref: "#/components/responses/InternalServerErrorProblem"
       summary: 下書きの注文を取り消す。
       tags:
-      - order
+      - ordering
   /api/orders/{orderId}/confirm:
     post:
       description: 注文がなければ 404、画面が読んだ後に注文が変わっていれば 409、下書きでなければ 422 を返す。
@@ -189,7 +189,7 @@ paths:
           $ref: "#/components/responses/InternalServerErrorProblem"
       summary: 下書きの注文を確定する。
       tags:
-      - order
+      - ordering
   /api/orders/{orderId}/lines:
     put:
       description: 注文がなければ 404、画面が読んだ後に注文が変わっていれば 409、下書きでないか、存在しないか販売終了の商品を指定すると
@@ -229,7 +229,7 @@ paths:
           $ref: "#/components/responses/InternalServerErrorProblem"
       summary: 下書きの注文の明細を置き換える。
       tags:
-      - order
+      - ordering
   /api/payments:
     get:
       description: 決済記録は 1 注文につき 1 件までなので、items に 0 件か 1 件を入れて返す。決済記録がない注文と、存在しない注文では、空の

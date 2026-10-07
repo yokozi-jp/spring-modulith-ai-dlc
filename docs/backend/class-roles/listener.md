@@ -28,7 +28,7 @@ Listener は Infrastructure の Adapter でもない。
 ## 置き場所と命名
 
 - 受信する側のモジュールの `com.example.demo.<feature>.application` に置く（在庫モジュールの `com.example.demo.inventory.application`）。
-  自モジュールのイベントを受けるときは、発行したモジュールの `application` に置く（`OrderConfirmedListener` は `com.example.demo.order.application`）。
+  自モジュールのイベントを受けるときは、発行したモジュールの `application` に置く（`OrderConfirmedListener` は `com.example.demo.ordering.application`）。
 - 名前はイベントの名前に `Listener` を付ける（`OrderPlacedListener`、`OrderCancelledListener`）。
 - イベント一つに Listener を一つ作る。
 - 受信するメソッドの名前は `on` にする。
@@ -66,7 +66,7 @@ Listener は Infrastructure の Adapter でもない。
 ```java
 package com.example.demo.inventory.application;
 
-import com.example.demo.order.OrderPlaced;
+import com.example.demo.ordering.OrderPlaced;
 import org.springframework.modulith.events.ApplicationModuleListener;
 import org.springframework.stereotype.Service;
 
@@ -107,7 +107,7 @@ public void on(final OrderCancelled event) {
 自モジュールのイベントを受ける例は、注文の確定を受けて決済を始める `OrderConfirmedListener` である（抜粋）。
 
 ```java
-// com.example.demo.order.application.OrderConfirmedListener（抜粋）
+// com.example.demo.ordering.application.OrderConfirmedListener（抜粋）
 /** イベントから Command を作り、CommandHandler へ渡す。 */
 @ApplicationModuleListener
 public void on(final OrderConfirmed event) {

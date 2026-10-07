@@ -48,7 +48,7 @@ tags: [convention, backend, class-role]
 最小の例は、顧客で絞り込む `OrderSearchCriteria` である。
 
 ```java
-package com.example.demo.order;
+package com.example.demo.ordering;
 
 /** 注文の一覧の検索条件。 */
 public record OrderSearchCriteria(String customerId) {}
@@ -58,7 +58,7 @@ public record OrderSearchCriteria(String customerId) {}
 次の二つは抜粋である。
 
 ```java
-// com.example.demo.order.presentation.web.OrderController（抜粋）
+// com.example.demo.ordering.presentation.web.OrderController（抜粋）
 /**
  * 顧客の注文の一覧を返す。
  *
@@ -77,7 +77,7 @@ public record OrderSearchCriteria(String customerId) {}
 ```
 
 ```java
-// com.example.demo.order.application.OrderQueryService（抜粋）
+// com.example.demo.ordering.application.OrderQueryService（抜粋）
 @Override
 @Transactional(readOnly = true)
 public List<OrderSummary> search(final OrderSearchCriteria criteria) {

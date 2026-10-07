@@ -72,7 +72,7 @@ Presentation は Repository を使わない。
 最小の例は、ID で取り出し、新しい注文と既存の注文を保存する `OrderRepository` である。
 
 ```java
-package com.example.demo.order.domain.model;
+package com.example.demo.ordering.domain.model;
 
 import com.example.demo.shared.concurrency.ConflictException;
 import com.example.demo.shared.failure.NotFoundException;
@@ -127,7 +127,7 @@ public interface OrderRepository {
 ```
 
 ```java
-// com.example.demo.order.infrastructure.persistence.JooqOrderRepository（宣言だけ）
+// com.example.demo.ordering.infrastructure.persistence.JooqOrderRepository（宣言だけ）
 @Repository
 class JooqOrderRepository implements OrderRepository {
   // DSLContext と shared の CommonColumns、TableWriter を受け取り、jOOQ の列と Order の変換もこのクラスに書く。
@@ -140,7 +140,7 @@ class JooqOrderRepository implements OrderRepository {
 実装の `JooqOrderRepository` を `@DatabaseTest` で、保存してから読み戻す往復で確かめる。
 `update` と `delete` の競合と行がない場合は、Repository ごとには確かめず、`shared` の `TableWriterTest` と `TableWriterConcurrencyTest` が確かめる（[jOOQ の Repository](jooq-repository.md) の「対応するテスト」）。
 jOOQ の列と集約の変換も、この往復で確かめる。
-テストは実装と同じ `com.example.demo.order.infrastructure.persistence` パッケージのテストソースに置く。
+テストは実装と同じ `com.example.demo.ordering.infrastructure.persistence` パッケージのテストソースに置く。
 共通カラムの trace と `*_pgm_cd` は、`shared` のテストソースの `TestCommonColumns` で用意する。
 `TestCommonColumns.at` は現在時刻と trace ID を固定した `CommonColumns` を返し、`TestCommonColumns.runAs` は呼び出しの間だけ `*_pgm_cd` を束縛する。
 

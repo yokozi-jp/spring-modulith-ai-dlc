@@ -3,11 +3,11 @@ package com.example.demo.payment.application;
 import static com.example.demo.jooq.modulith.Tables.EVENT_PUBLICATION;
 import static com.example.demo.jooq.modulith.Tables.EVENT_PUBLICATION_ARCHIVE;
 
-import com.example.demo.order.OrderConfirmed;
-import com.example.demo.order.application.ConfirmOrderCommand;
-import com.example.demo.order.application.ConfirmOrderCommandHandler;
-import com.example.demo.order.application.DraftOrderCommand;
-import com.example.demo.order.application.DraftOrderCommandHandler;
+import com.example.demo.ordering.OrderConfirmed;
+import com.example.demo.ordering.application.ConfirmOrderCommand;
+import com.example.demo.ordering.application.ConfirmOrderCommandHandler;
+import com.example.demo.ordering.application.DraftOrderCommand;
+import com.example.demo.ordering.application.DraftOrderCommandHandler;
 import com.example.demo.product.TestProducts;
 import com.example.demo.shared.concurrency.ExpectedLockNo;
 import com.example.demo.testkit.UniqueCodes;

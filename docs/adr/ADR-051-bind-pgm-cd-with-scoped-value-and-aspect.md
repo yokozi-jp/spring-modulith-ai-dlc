@@ -32,7 +32,7 @@ Repository の実装は、どのユースケースから呼ばれたかを引数
 `org.springframework.boot:spring-boot-starter-aspectj` を依存に加え、`shared.infrastructure.persistence` に `@Aspect` の `PgmCdAspect` を置く。
 
 - `PgmCdAspect` は、`com.example.demo.<モジュール>..` の `*CommandHandler` の `handle` と、`*Listener` の public メソッドの呼び出しを `@Around` で囲む。
-- 呼び出しの間だけ、`ScopedValue<String>` に `モジュール名.クラスの単純名から CommandHandler か Listener を除いた名前`（`order.PlaceOrder`）を束縛する。
+- 呼び出しの間だけ、`ScopedValue<String>` に `モジュール名.クラスの単純名から CommandHandler か Listener を除いた名前`（`ordering.PlaceOrder`）を束縛する。
 - 呼び出しが入れ子になったら、その間は内側の値になり、戻ると外側の値に戻る。
   ADR-050 では `<Event>Listener` の `on` が `<UseCase>CommandHandler` の `handle` を一つだけ呼ぶため、イベントを受けた書き込みの `*_pgm_cd` には、内側の CommandHandler の名前（`payment.ChargeOrder`）が入る。
 - `CommonColumns` の `forInsert(Table)` と `forUpdate(Table)` は、束縛された値を `*_pgm_cd` に登録する。

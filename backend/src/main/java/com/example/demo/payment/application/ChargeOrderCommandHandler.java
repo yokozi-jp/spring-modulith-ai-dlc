@@ -1,7 +1,7 @@
 package com.example.demo.payment.application;
 
-import com.example.demo.order.OrderDetails;
-import com.example.demo.order.OrderQueries;
+import com.example.demo.ordering.OrderDetails;
+import com.example.demo.ordering.OrderQueries;
 import com.example.demo.payment.domain.model.GatewayPaymentCode;
 import com.example.demo.payment.domain.model.Money;
 import com.example.demo.payment.domain.model.OrderId;

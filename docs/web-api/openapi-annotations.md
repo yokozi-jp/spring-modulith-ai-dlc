@@ -34,7 +34,7 @@ OpenAPI契約の説明はJavadocに書き、springdocがtherapi-runtime-javadoc�
 
 - Controllerのクラスに`@Tag(name, description)`を付け、tagの説明は`description`に書く。
   `@Tag`を明示すると、クラスのJavadocはtagの説明に使われない。
-- tagの名前は業務機能のパッケージ名をkebab-caseにし（`order`、`delivery-schedule`）、`-controller`で終わらせない。
+- tagの名前は業務機能のパッケージ名をkebab-caseにし（`ordering`、`delivery-schedule`）、`-controller`で終わらせない。
 - 1つのoperationにtagを1つだけ付ける。
 - operationIdは`@Operation(operationId = "...")`で明示し、名前は[Web APIの方式とURLの設計](api-style.md#operationid)に従う。
 
@@ -88,7 +88,7 @@ FQNやcustom resolverで衝突を回避せず、Javaの型名自体を一意に�
 /** 注文の HTTP API。 */
 @RestController
 @RequestMapping("/api/orders")
-@Tag(name = "order", description = "注文の API")
+@Tag(name = "ordering", description = "注文の API")
 class OrderController {
 
   /**

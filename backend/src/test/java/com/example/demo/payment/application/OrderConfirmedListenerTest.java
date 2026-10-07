@@ -3,9 +3,9 @@ package com.example.demo.payment.application;
 import static com.example.demo.jooq.payment.Tables.T_PAYMENT;
 import static org.assertj.core.api.Assertions.assertThat;
 
-import com.example.demo.order.OrderConfirmed;
-import com.example.demo.order.application.CancelOrderCommand;
-import com.example.demo.order.application.CancelOrderCommandHandler;
+import com.example.demo.ordering.OrderConfirmed;
+import com.example.demo.ordering.application.CancelOrderCommand;
+import com.example.demo.ordering.application.CancelOrderCommandHandler;
 import com.example.demo.payment.PaymentQueries;
 import com.example.demo.payment.PaymentSearchCriteria;
 import com.example.demo.payment.PaymentSummary;

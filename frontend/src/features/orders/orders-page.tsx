@@ -3,7 +3,7 @@ import { getRouteApi, Link } from "@tanstack/react-router";
 import { useEffect } from "react";
 import { useTranslation } from "react-i18next";
 
-import { getListOrdersSuspenseQueryOptions } from "@/api/generated/endpoints/order/order";
+import { getListOrdersSuspenseQueryOptions } from "@/api/generated/endpoints/ordering/ordering";
 import { buttonVariants } from "@/components/ui/button";
 
 import { OrderStatusFilter } from "./components/order-status-filter";

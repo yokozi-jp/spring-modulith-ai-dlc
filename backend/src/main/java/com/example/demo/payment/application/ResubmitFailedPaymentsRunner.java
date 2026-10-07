@@ -1,6 +1,6 @@
 package com.example.demo.payment.application;
 
-import com.example.demo.order.OrderConfirmed;
+import com.example.demo.ordering.OrderConfirmed;
 import java.util.concurrent.atomic.AtomicInteger;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.ApplicationArguments;
