@@ -77,7 +77,7 @@ Proposed
 - 外部システムを呼ぶ CommandHandler は二層で冪等にする。
   外部システムの操作に冪等性キー（注文 ID）を渡し、集約がすでにその操作を終えていれば（`order.isPaid()`）何もせずに Result を返す。
   レジストリは at-least-once で配信し、未完了のイベント出版を再投入すると同じイベントが再び届くためである（[メッセージングの設計](../integration/async-messaging-design.md)の「配信保証」、[順序保証と冪等性](../integration/async-ordering-and-idempotency.md)）。
-  請求に失敗したイベント出版はレジストリに未完了のまま残り、[非同期処理の失敗時の再試行と回復](../integration/async-failure-recovery.md)の `IncompleteEventPublications` の手順で再投入する。
+  請求に失敗したイベント出版はレジストリに `FAILED` で残り、[非同期処理の失敗時の再試行と回復](../integration/async-failure-recovery.md)の失敗した出版の再投入の手順で再投入する。
   自動の再投入は [issue #108](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/108) で扱う。
 - 外部システムを呼ぶ CommandHandler も、`@ApplicationModuleListener` が開くトランザクションの中で外部システムを呼ぶ。
   ただし、呼んでいる間は行をロックせず（行のロックは呼んだ後の `update` の UPDATE が取る）、画面の要求を待たせない。
