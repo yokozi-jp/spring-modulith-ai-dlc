@@ -2,6 +2,13 @@ import type { APIRequestContext, BrowserContext, Cookie, Locator, Page } from "@
 
 import { signInOnKeycloak } from "./environment";
 import { expect, test } from "./fixtures";
+import {
+  collectTelemetry,
+  exerciseSession,
+  expectWireLimits,
+  sessionId,
+  waitForTelemetry,
+} from "./telemetry";
 
 // 共有の storageState のセッションを終わらせないよう、各テストは専用の context でログインする。
 test.use({ storageState: { cookies: [], origins: [] } });
@@ -92,6 +99,37 @@ async function cookieValue(context: BrowserContext, name: string): Promise<strin
   return value;
 }
 
+// 再読み込みしても同じ session のまま、URL の query と fragment を送らないことを確かめる。
+async function reloadWithSecretUrl(page: Page): Promise<void> {
+  await page.goto("/?token=secret-query#secret-fragment");
+  await expect(homeHeading(page)).toBeVisible();
+}
+
+// ログアウトの後の画面遷移が、前と違う session ID を持つことを確かめて返す。
+async function logOutToNewSession(
+  page: Page,
+  payloads: string[],
+  oldSession: string,
+): Promise<string> {
+  await logoutButton(page).click();
+  await expectLoggedOutPage(page);
+  await waitForTelemetry(payloads, '"toView":"/logged-out"');
+  const newSession = sessionId(
+    payloads.find((payload) => payload.includes('"toView":"/logged-out"')) ?? "",
+  );
+  expect(newSession).not.toBe(oldSession);
+  return newSession;
+}
+
+// もう一度ログインし、その前に届いていた payload の数を返す。
+async function logInAgain(page: Page, payloads: string[]): Promise<number> {
+  const startIndex = payloads.length;
+  await page.getByRole("link", { name: "もう一度ログイン" }).click();
+  await signInOnKeycloak(page);
+  await expectAuthenticatedHome(page);
+  return startIndex;
+}
+
 let cspMessages: string[] = [];
 
 test.beforeEach(({ page }) => {
@@ -121,6 +159,29 @@ test("ログイン直後に、ほかの操作をせずにログアウトする�
   );
   await expectLoggedOutPage(page);
   await expect(page).toHaveTitle("デモアプリケーション");
+});
+
+test("例外、画面遷移、Web Vitals をログアウト前後の匿名 session で相関できる", async ({ page }) => {
+  const payloads = await collectTelemetry(page);
+  await logIn(page);
+  await reloadWithSecretUrl(page);
+  const oldSession = await exerciseSession(page, {
+    payloads,
+    error: "old-session-error",
+    view: '"view_changed"',
+    startIndex: 0,
+  });
+
+  const newSession = await logOutToNewSession(page, payloads, oldSession);
+  const startIndex = await logInAgain(page, payloads);
+  const reloginSession = await exerciseSession(page, {
+    payloads,
+    error: "new-session-error",
+    view: '"toView":"/"',
+    startIndex,
+  });
+  expect(reloginSession).toBe(newSession);
+  expectWireLimits(payloads);
 });
 
 test("ログアウト後はアプリと SSO のセッションが終わり、もう一度ログインして戻れる", async ({
@@ -176,17 +237,20 @@ test("_csrf にマスクしない Cookie の値を入れて送るとログアウ
 test("/collect が 503 を返しても、ログインとログアウトのフォームを送信できる", async ({ page }) => {
   // 最初の goto の前に登録し、ログインの間に送られても 503 にする。
   await page.route("**/collect", (route) => route.fulfill({ status: 503 }));
+  // 最初の view_changed の公開 wire payload で SDK の初期化完了を確かめる。
+  const ready = page.waitForRequest(
+    (request) =>
+      new URL(request.url()).pathname === "/collect" &&
+      (request.postData() ?? "").includes('"view_changed"'),
+  );
   await logIn(page);
   await expect(homeHeading(page)).toBeVisible();
+  await ready;
 
-  // SDK は動的 import で読むので、初期化を待ってから例外を投げる。
-  // Faro は既定で window.faro を公開する（preventGlobalExposure は false、globalObjectKey は faro）。
-  await page.waitForFunction(() => "faro" in globalThis);
-
-  // Faro が実際に /collect へ送り、503 を受けたことを確かめ、無効のビルドで検査が空振りするのを防ぐ。
-  // route.fulfill の応答も response の event になる。Faro の再送は待たない。
-  const collect = page.waitForResponse(
-    (response) => new URL(response.url()).pathname === "/collect" && response.status() === 503,
+  const collect = page.waitForRequest(
+    (request) =>
+      new URL(request.url()).pathname === "/collect" &&
+      (request.postData() ?? "").includes("e2e telemetry probe"),
   );
   // setTimeout の中で投げ、page.evaluate を失敗させずに window.onerror へ届ける。
   await page.evaluate(() => {

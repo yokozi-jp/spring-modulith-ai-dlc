@@ -3,32 +3,42 @@
     "sdk": { "name": "faro", "version": "2.12.1" },
     "app": { "name": "demo-api", "namespace": "demo", "version": "0.0.0-fixture", "environment": "local", "bundleId": "secret-bundle-id" },
     "user": { "email": "person@example.com", "id": "fixture-user-id" },
-    "session": { "id": "fixture-session-id" },
-    "page": { "url": "http://localhost:5173/orders/42?token=secret-query#secret-fragment" },
+    "session": { "id": "Abc2345678" },
+    "view": { "name": "/" },
+    "page": { "url": "/orders/42?token=secret-query#secret-fragment" },
     "browser": { "name": "Chrome", "version": "140", "os": "Linux", "mobile": false, "userAgent": "FixtureAgent/1.0", "language": "ja-JP" }
   },
   "exceptions": [
     {
       "type": "Error",
-      "value": "failed to load http://localhost:5173/api/orders?token=secret-query(secret-paren)#secret-fragment",
+      "value": "absolute https://host/orders/42?token=secret-query#secret-fragment relative:/orders/42?token=secret-query#secret-fragment blob:blob:https://host/orders/42?token=x#f file:file:///orders/42?token=x#f webpack:webpack://app/orders/42?token=x#f data:data:text/plain,secret-query#secret-fragment boundaries [https://host/orders/42?token=x#f] (https://host/orders/42?token=x#f) \"https://host/orders/42?token=x#f\",/orders/42?token=x#f colon:/orders/42?token=x#f fullwidth：/orders/42?token=x#f comma、/orders/42?token=x#f period。/orders/42?token=x#f 日本語/orders/42?token=x#f multiple https://host/orders/42?token=x#f /orders/42?token=x#f escaped HTTPS://HOST/orders/42?token=x#f\\n asset /assets/app-1.js:2:3 forged https://host/orders/42?t=/assets/app-1.js:2:3 query /assets/app-1.js?v=secret-query:2:3 plain a/b?c",
       "timestamp": "2026-10-06T00:00:00.000Z",
       "stacktrace": {
         "frames": [
-          { "filename": "http://localhost:5173/assets/index-abc.js?v=secret-query#secret-fragment", "function": "render", "lineno": 10, "colno": 5 }
+          { "filename": "http://localhost:5173/assets/index-abc.js?v=secret-query#secret-fragment", "function": "render", "lineno": 10, "colno": 5 },
+          { "filename": "http://localhost:5173/assets/index-abc.js", "function": "render", "lineno": 10, "colno": 5 },
+          { "filename": "/assets/vendor.min-1.js", "function": "a", "lineno": 1, "colno": 2 },
+          { "filename": "https://host/orders/42/assets/x.js", "function": "c", "lineno": 3, "colno": 4 }
         ]
       }
     },
-    { "type": "Error", "value": "can't", "timestamp": "2026-10-06T00:00:01.000Z" },
-    { "type": "Error", "value": "bad http://localhost:5173/x?q=\"secret-quote\" tail", "timestamp": "2026-10-06T00:00:02.000Z" },
-    { "type": "Error", "value": "upper HTTPS://H/x?q=secret-upper tail", "timestamp": "2026-10-06T00:00:03.000Z" },
-    {
-      "type": "Error",
-      "value": "paren https://example.test/a(b)?token=secret-paren-path tail",
-      "timestamp": "2026-10-06T00:00:03.500Z",
-      "stacktrace": {
-        "frames": [{ "filename": "http://localhost:5173/assets/a(b).js?v=secret-paren-frame", "function": "render", "lineno": 1, "colno": 2 }]
-      }
-    }
+    { "type": "", "value": "invalid exception", "timestamp": "2026-10-06T00:00:00.500Z" }
+  ],
+  "events": [
+    { "name": "view_changed", "timestamp": "2026-10-06T00:00:01.000Z", "attributes": { "fromView": "unknown", "toView": "/", "secret": "secret-event-data" } },
+    { "name": "view_changed", "timestamp": "2026-10-06T00:00:01.500Z", "attributes": { "toView": "/orders/42" } },
+    { "name": "secret-event", "timestamp": "2026-10-06T00:00:01.600Z" }
+  ],
+  "measurements": [
+    { "type": "web-vitals", "values": { "lcp": 123.4, "delta": 3, "element_render_delay": 1 }, "timestamp": "2026-10-06T00:00:02.000Z" },
+    { "type": "web-vitals", "values": { "inp": 18, "delta": 2, "input_delay": 1 }, "timestamp": "2026-10-06T00:00:03.000Z" },
+    { "type": "web-vitals", "values": { "cls": 0.12, "delta": 0.01, "layout_shift": 0.02 }, "timestamp": "2026-10-06T00:00:04.000Z" },
+    { "type": "web-vitals", "values": { "fcp": 1 }, "timestamp": "2026-10-06T00:00:05.000Z" },
+    { "type": "web-vitals", "values": { "ttfb": 1 }, "timestamp": "2026-10-06T00:00:06.000Z" },
+    { "type": "web-vitals", "values": { "lcp": 1, "cls": 1 }, "timestamp": "2026-10-06T00:00:07.000Z" },
+    { "type": "web-vitals", "values": { "lcp": -1 }, "timestamp": "2026-10-06T00:00:08.000Z" },
+    { "type": "web-vitals", "values": { "lcp": 1e3 }, "timestamp": "2026-10-06T00:00:09.000Z" },
+    { "type": "web-vitals", "values": { "lcp": 111111111111111111111111111111111 }, "timestamp": "2026-10-06T00:00:10.000Z" }
   ],
   "traces": {
     "resourceSpans": [
@@ -39,77 +49,42 @@
             { "key": "service.namespace", "value": { "stringValue": "demo" } },
             { "key": "service.version", "value": { "stringValue": "0.0.0-fixture" } },
             { "key": "deployment.environment.name", "value": { "stringValue": "local" } },
-            { "key": "browser.name", "value": { "stringValue": "Chrome" } },
-            { "key": "user_agent.original", "value": { "stringValue": "FixtureAgent/1.0" } },
-            { "key": "session.id", "value": { "stringValue": "fixture-session-id" } }
+            { "key": "user.email", "value": { "stringValue": "person@example.com" } }
           ]
         },
         "scopeSpans": [
           {
-            "scope": {
-              "name": "secret-scope",
-              "version": "secret-scope-version",
-              "attributes": [{ "key": "scope.attr", "value": { "stringValue": "secret-scope-attr" } }]
-            },
+            "scope": { "name": "secret-scope", "version": "secret-version" },
             "spans": [
               {
                 "traceId": "0af7651916cd43dd8448eb211c80319c",
                 "spanId": "b7ad6b7169203331",
-                "traceState": "secret-trace-state",
+                "parentSpanId": "00f067aa0ba902b7",
                 "name": "secret-span-name",
                 "kind": 3,
                 "startTimeUnixNano": "1791244800000000000",
                 "endTimeUnixNano": "1791244800100000000",
                 "attributes": [
                   { "key": "url.full", "value": { "stringValue": "http://localhost:5173/api/orders/42?token=secret-query#secret-fragment" } },
-                  { "key": "url.path", "value": { "stringValue": "secret-sender-path-valid" } },
+                  { "key": "url.path", "value": { "stringValue": "/api/orders/42" } },
+                  { "key": "url.scheme", "value": { "stringValue": "http" } },
                   { "key": "http.request.method", "value": { "stringValue": "GET" } },
                   { "key": "http.response.status_code", "value": { "intValue": "200" } },
-                  { "key": "server.address", "value": { "stringValue": "localhost" } },
-                  { "key": "session.id", "value": { "stringValue": "fixture-session-id" } },
                   { "key": "user.email", "value": { "stringValue": "person@example.com" } }
-                ],
-                "events": [
-                  {
-                    "timeUnixNano": "1791244800050000000",
-                    "name": "secret-event",
-                    "attributes": [{ "key": "exception.message", "value": { "stringValue": "secret-event-attr" } }]
-                  }
-                ],
-                "links": [
-                  {
-                    "traceId": "5b8efff798038103d269b633813fc60c",
-                    "spanId": "eee19b7ec3c1b174",
-                    "attributes": [{ "key": "link.attr", "value": { "stringValue": "secret-link-attr" } }]
-                  }
-                ],
-                "status": { "code": 2, "message": "secret-status" }
-              },
-              {
-                "traceId": "0af7651916cd43dd8448eb211c80319c",
-                "spanId": "b7ad6b7169203332",
-                "name": "missing-url-full",
-                "kind": 3,
-                "startTimeUnixNano": "1791244800200000000",
-                "endTimeUnixNano": "1791244800300000000",
-                "attributes": [
-                  { "key": "url.path", "value": { "stringValue": "secret-sender-path-missing" } },
-                  { "key": "http.request.method", "value": { "stringValue": "POST" } },
-                  { "key": "http.response.status_code", "value": { "intValue": "201" } }
                 ]
               },
               {
                 "traceId": "0af7651916cd43dd8448eb211c80319c",
-                "spanId": "b7ad6b7169203333",
-                "name": "invalid-url-full",
+                "spanId": "b7ad6b7169203332",
+                "parentSpanId": "00f067aa0ba902b7",
+                "name": "invalid-attributes",
                 "kind": 3,
-                "startTimeUnixNano": "1791244800400000000",
-                "endTimeUnixNano": "1791244800500000000",
+                "startTimeUnixNano": "1791244800200000000",
+                "endTimeUnixNano": "1791244800300000000",
                 "attributes": [
-                  { "key": "url.full", "value": { "stringValue": "http://localhost:5173/%" } },
-                  { "key": "url.path", "value": { "stringValue": "secret-sender-path-invalid" } },
-                  { "key": "http.request.method", "value": { "stringValue": "DELETE" } },
-                  { "key": "http.response.status_code", "value": { "intValue": "400" } }
+                  { "key": "url.full", "value": { "stringValue": "custom:secret" } },
+                  { "key": "http.request.method", "value": { "stringValue": "SECRET" } },
+                  { "key": "http.response.status_code", "value": { "intValue": "999" } }
                 ]
               }
             ]
@@ -117,8 +92,5 @@
         ]
       }
     ]
-  },
-  "logs": [{ "message": "secret-log-item", "level": "info", "timestamp": "2026-10-06T00:00:04.000Z" }],
-  "events": [{ "name": "secret-event-item", "timestamp": "2026-10-06T00:00:05.000Z" }],
-  "measurements": [{ "type": "secret-measurement-item", "values": { "lcp": 1 }, "timestamp": "2026-10-06T00:00:06.000Z" }]
+  }
 }
