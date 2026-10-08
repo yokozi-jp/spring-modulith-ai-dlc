@@ -102,6 +102,23 @@ describe("app shell logout form", () => {
     });
   });
 
+  it("keeps logout disabled when the page is shown without the back/forward cache", async () => {
+    const user = userEvent.setup();
+    const nativeSubmit = vi.spyOn(HTMLFormElement.prototype, "submit").mockImplementation(noop);
+    replaceTelemetryForTesting({ api: { pushError: vi.fn<Sink["api"]["pushError"]>() } });
+    await renderLogoutForm();
+    const button = screen.getByRole("button", { name: "Log out" });
+
+    await user.click(button);
+    await vi.waitFor(() => {
+      expect(nativeSubmit).toHaveBeenCalledOnce();
+    });
+    globalThis.dispatchEvent(new PageTransitionEvent("pageshow", { persisted: false }));
+    await user.click(button);
+
+    expect(nativeSubmit).toHaveBeenCalledOnce();
+  });
+
   it("posts to /logout with a hidden CSRF token made from __Host-XSRF-TOKEN", async () => {
     vi.spyOn(document, "cookie", "get").mockReturnValue(
       `XSRF-TOKEN=old; __Host-XSRF-TOKEN=${cookieValue}`,

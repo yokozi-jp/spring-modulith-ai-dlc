@@ -133,6 +133,23 @@ describe("resetTelemetrySession", () => {
     await expect(resetTelemetrySession()).resolves.toBeUndefined();
     expect(unpause).not.toHaveBeenCalled();
   });
+
+  it("keeps sending suppressed when unpause fails", async () => {
+    const pushError = vi.fn<Sink["api"]["pushError"]>();
+    replaceTelemetryForTesting({
+      api: { pushError },
+      unpause: () => {
+        throw new Error("unpause failed");
+      },
+    });
+
+    await resetTelemetrySession();
+    reportCaughtError(new Error("after switch"));
+    // 送信は faroReady を待つ 1 つの microtask の後に起きるので、それより後に確かめる。
+    await Promise.resolve();
+
+    expect(pushError).not.toHaveBeenCalled();
+  });
 });
 
 describe("untracedUrl", () => {

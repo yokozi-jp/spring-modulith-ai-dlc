@@ -227,8 +227,8 @@ function switchSession(sink: TelemetrySink): void {
   }
   try {
     sink.api.setSession({ id: sink.genShortID() });
-    sendingSuppressed = false;
     sink.unpause();
+    sendingSuppressed = false;
   } catch {
     // 旧 session へ新しい signal を加えないため pause のままにする。
   }
