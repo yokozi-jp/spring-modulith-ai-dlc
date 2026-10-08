@@ -33,6 +33,7 @@ import org.springframework.modulith.test.ApplicationModuleTest.BootstrapMode;
 import org.springframework.modulith.test.Scenario;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
+import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.HttpServerErrorException;
 
 /**
@@ -40,9 +41,10 @@ import org.springframework.web.client.HttpServerErrorException;
  *
  * <p>成功の応答は、compose の WireMock と同じ {@code docker/wiremock/mappings} のスタブで返し、Client
  * とスタブの契約が合うことを確かめる。 失敗は、注文 ID の冪等性キーに合う優先度の高いスタブをテストの中で足す。決済代行を差し替えず、Resilience4j の retry と
- * circuit breaker を通す。URL の設定の違いで {@link OrderConfirmedListenerTest} とは別の Spring のコンテキストになる。
+ * circuit breaker を通す。4xx は circuit breaker が失敗として数えず、再試行もしないことを確かめる。URL の設定の違いで {@link
+ * OrderConfirmedListenerTest} とは別の Spring のコンテキストになる。
  */
-// 成功、5xx、タイムアウト、遅延、circuit breaker を一つの WireMock の文脈で確かめるため、メソッドが多い。
+// 成功、5xx、4xx、タイムアウト、遅延、circuit breaker を一つの WireMock の文脈で確かめるため、メソッドが多い。
 @SuppressWarnings("PMD.TooManyMethods")
 @ApplicationModuleTest(mode = BootstrapMode.ALL_DEPENDENCIES)
 @Import({SharedTestConfiguration.class, OrderConfirmedFixture.class})
@@ -203,6 +205,30 @@ class PaymentGatewayClientIntegrationTest {
         .isEqualTo(CircuitBreaker.State.OPEN);
     assertThatThrownBy(() -> paymentGateway.charge(orderId, amount))
         .isInstanceOf(CallNotPermittedException.class);
+    WIREMOCK.verify(CALLS_TO_OPEN, WireMock.postRequestedFor(WireMock.urlEqualTo(CHARGES)));
+  }
+
+  @Test
+  @DisplayName("決済代行が 4xx を返し続けても、circuit breaker は失敗として数えず閉じたままで、再試行もしない")
+  void clientErrorsAreNotCountedOrRetried() {
+    WIREMOCK.stubFor(
+        WireMock.post(WireMock.urlEqualTo(CHARGES))
+            .atPriority(1)
+            .willReturn(WireMock.badRequest()));
+    final Money amount = new Money(new BigDecimal("1.00"));
+    final OrderId orderId = new OrderId(UUID.randomUUID());
+
+    for (int call = 0; call < CALLS_TO_OPEN; call++) {
+      assertThatThrownBy(() -> paymentGateway.charge(orderId, amount))
+          .isInstanceOf(HttpClientErrorException.class);
+    }
+
+    assertThat(circuitBreaker.getState())
+        .as("%d 回の 4xx の後の circuit breaker", CALLS_TO_OPEN)
+        .isEqualTo(CircuitBreaker.State.CLOSED);
+    assertThat(circuitBreaker.getMetrics().getNumberOfFailedCalls())
+        .as("%d 回の 4xx で circuit breaker が数えた失敗", CALLS_TO_OPEN)
+        .isZero();
     WIREMOCK.verify(CALLS_TO_OPEN, WireMock.postRequestedFor(WireMock.urlEqualTo(CHARGES)));
   }
 

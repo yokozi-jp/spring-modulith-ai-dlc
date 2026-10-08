@@ -22,6 +22,10 @@ import org.springframework.web.client.RestClient;
  * <p>タイムアウト、circuit breaker、retry は ADR-019 の既定値のままにする。決済代行の SLO がまだないため、値を変える根拠がない。retry は {@code
  * ChargeOrderCommandHandler} のトランザクションの中で呼ぶため default を継承して試行 1 回にし、失敗した請求はイベント出版の再投入でやり直す。
  * 再投入で同じ注文をもう一度請求しても、冪等性キーで二重の請求を防ぐ。
+ *
+ * <p>決済代行の 4xx（{@link
+ * org.springframework.web.client.HttpClientErrorException}）はこちらの要求や契約の誤りなので、circuit breaker
+ * は失敗として数えない。 retry は試行 1 回なので、4xx も再試行しない。
  */
 @Component
 class PaymentGatewayClient implements PaymentGateway {

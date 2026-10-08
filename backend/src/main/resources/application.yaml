@@ -175,6 +175,11 @@ resilience4j:
     instances:
       payment-gateway:
         base-config: default
+        # 4xx はこちらの要求や契約の誤りで、決済代行の不調ではないので失敗として数えない。
+        # ponytail: 429 も HttpClientErrorException なので数えない。
+        # 決済代行の流量制限の契約が決まったら（ADR-072）、429 だけを数える ignore-exception-predicate に替える。
+        ignore-exceptions:
+          - org.springframework.web.client.HttpClientErrorException
   retry:
     configs:
       # 非冪等処理を重複実行しないよう、明示しない retry は無効にする。
