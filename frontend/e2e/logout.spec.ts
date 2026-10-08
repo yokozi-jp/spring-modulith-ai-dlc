@@ -1,4 +1,4 @@
-/* oxlint-disable eslint/max-statements, eslint/max-lines, unicorn/no-array-callback-reference -- セッション前後の公開 wire 契約を一つの利用者フローで検査する。 */
+/* oxlint-disable eslint/max-statements, eslint/max-lines, unicorn/no-array-callback-reference, promise/avoid-new -- セッション前後の公開 wire 契約を一つの利用者フローで検査する。 */
 import type { APIRequestContext, BrowserContext, Cookie, Locator, Page } from "@playwright/test";
 
 import { signInOnKeycloak } from "./environment";
@@ -156,20 +156,82 @@ test("例外、画面遷移、Web Vitals をログアウト前後の匿名 sessi
 
   await logIn(page);
   await waitForTelemetry(payloads, '"view_changed"');
-  await page.getByText("デモアプリケーション").click();
-  await page.waitForTimeout(600);
   await page.evaluate(() => {
-    const element = document.createElement("div");
-    element.style.height = "100px";
-    document.querySelector("main")?.prepend(element);
+    const button = document.createElement("button");
+    button.textContent = "INP probe";
+    button.addEventListener("click", () => {
+      const end = performance.now() + 200;
+      while (performance.now() < end) {
+        // 実際の click に Event Timing entry ができるまで main thread を占有する。
+      }
+    });
+    document.querySelector("main")?.prepend(button);
   });
+  const inpObserved = page.evaluate(
+    () =>
+      new Promise<boolean>((resolve) => {
+        const observer = new PerformanceObserver((list) => {
+          if (
+            list
+              .getEntries()
+              .some(
+                (entry) =>
+                  "interactionId" in entry &&
+                  typeof entry.interactionId === "number" &&
+                  entry.interactionId > 0,
+              )
+          ) {
+            observer.disconnect();
+            resolve(true);
+          }
+        });
+        observer.observe({ type: "event", buffered: true });
+        setTimeout(() => {
+          resolve(false);
+        }, 5000);
+      }),
+  );
+  const inpProbe = page.getByRole("button", { name: "INP probe" });
+  await inpProbe.click();
+  await inpProbe.click();
+  await inpProbe.click();
+  expect(await inpObserved).toBe(true);
+  const clsObserved = await page.evaluate(
+    () =>
+      new Promise<boolean>((resolve) => {
+        const observer = new PerformanceObserver((list) => {
+          if (
+            list
+              .getEntries()
+              .some((entry) => "hadRecentInput" in entry && entry.hadRecentInput === false)
+          ) {
+            observer.disconnect();
+            resolve(true);
+          }
+        });
+        observer.observe({ type: "layout-shift", buffered: true });
+        setTimeout(() => {
+          const element = document.createElement("div");
+          element.style.height = "100px";
+          document.querySelector("main")?.prepend(element);
+        }, 600);
+        setTimeout(() => {
+          resolve(false);
+        }, 5000);
+      }),
+  );
+  expect(clsObserved).toBe(true);
   await throwBrowserError(page, "old-session-error");
   await waitForTelemetry(payloads, "old-session-error");
-  await page.goto("/?token=secret-query#secret-fragment");
-  await expect(homeHeading(page)).toBeVisible();
+  await page.evaluate(() => {
+    Object.defineProperty(document, "visibilityState", { configurable: true, value: "hidden" });
+    document.dispatchEvent(new Event("visibilitychange"));
+  });
   await waitForTelemetry(payloads, '"lcp"');
   await waitForTelemetry(payloads, '"inp"');
   await waitForTelemetry(payloads, '"cls"');
+  await page.goto("/?token=secret-query#secret-fragment");
+  await expect(homeHeading(page)).toBeVisible();
 
   const oldPayloads = payloads.filter((payload) =>
     ["old-session-error", '"view_changed"', '"lcp"', '"inp"', '"cls"'].some((value) =>

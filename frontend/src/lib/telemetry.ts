@@ -146,18 +146,18 @@ function normalizeViewEvent(payloadValue: unknown): Record<string, unknown> | un
 export function sanitizeTelemetryItem(item: TransportItem): TransportItem | null {
   try {
     const copy = structuredClone(item);
-    redactStrings(copy.payload);
     const type: string = copy.type;
-    if (type === "trace") removeTraceUrls(copy.payload);
     if (type === "measurement") {
       const payload = normalizeMeasurement(copy.payload);
       if (!payload) return null;
       Reflect.set(copy, "payload", payload);
-    }
-    if (type === "event") {
+    } else if (type === "event") {
       const payload = normalizeViewEvent(copy.payload);
       if (!payload) return null;
       Reflect.set(copy, "payload", payload);
+    } else {
+      redactStrings(copy.payload);
+      if (type === "trace") removeTraceUrls(copy.payload);
     }
     Reflect.set(copy, "meta", normalizedMeta(copy.meta));
     return copy;

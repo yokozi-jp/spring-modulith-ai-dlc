@@ -97,7 +97,7 @@ describe("sanitizeTelemetryItem", () => {
     });
   });
 
-  it("keeps only a valid view transition", () => {
+  it("keeps only trusted route templates in a view transition", () => {
     replaceTelemetryForTesting({
       api: { pushError: vi.fn() },
       trustedRoutes: ["/", "/logged-out"],
@@ -107,7 +107,7 @@ describe("sanitizeTelemetryItem", () => {
       {
         name: "view_changed",
         timestamp: "2026-10-06T00:00:00Z",
-        attributes: { fromView: "unknown", toView: "/" },
+        attributes: { fromView: "/", toView: "/logged-out" },
       },
       exceptionItem("x", "x").meta,
     );
@@ -115,7 +115,7 @@ describe("sanitizeTelemetryItem", () => {
     expect(sanitizeTelemetryItem(event)?.payload).toStrictEqual({
       name: "view_changed",
       timestamp: "2026-10-06T00:00:00Z",
-      attributes: { toView: "/" },
+      attributes: { fromView: "/", toView: "/logged-out" },
     });
   });
 
