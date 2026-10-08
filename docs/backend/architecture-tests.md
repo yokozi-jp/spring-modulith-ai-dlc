@@ -35,6 +35,7 @@ backend/src/test/java/com/example/demo/architecture/
 `ApplicationModuleArchitectureTest`はSpring Modulithの`ApplicationModules.verify()`を使い、モジュール間の循環、内部パッケージ参照、許可されていない依存を検出する。
 モジュール構造の決定は[ADR-001](../adr/ADR-001-adopt-spring-modulith-modular-monolith.md)を参照する。
 jOOQの生成物の`com.example.demo.jooq`はOPENのモジュールであり、`verify()`は生成型への依存を内部の型への依存として扱わない。
+`ApplicationModuleArchitectureTest`がこれを確かめる。
 他モジュールのテーブルを読む誤りは、jOOQのRepositoryの規約とレビューで防ぐ（[ADR-067](../adr/ADR-067-open-jooq-generated-module.md)）。
 
 `PackageByFeatureOnionArchitectureTest`はArchUnitの`Architectures.onionArchitecture()`と追加規則で、パッケージの配置と依存を検査する。

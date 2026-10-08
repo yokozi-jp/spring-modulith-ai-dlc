@@ -40,7 +40,9 @@ Spring Modulith 2.1.1 のイベント出版は、次の状態を持つ（[Spring
 - **`FAILED`**：リスナーが例外を送出した、または Staleness Monitor が古いと判定した。
 - **`RESUBMITTED`**：失敗した出版を再投入し、実行を待っている。
 
-出版は、リスナーを呼んだ回数（completion attempts）も持ち、`PROCESSING` に移るときに増える。
+出版は試行の回数（`completion_attempts`）も持つ。
+公式のリファレンスは `PROCESSING` に移るときに増えると書くが、2.1.1 の JDBC の実装は、出版を作るときに 1 を入れ、再投入で `RESUBMITTED` にするたびに 1 増やし、`PROCESSING` に移るときには増やさない。
+このため値は、リスナーを呼んだ回数ではなく、作成と再投入の予約の回数であり、1 を引くと再投入の回数になる。
 再投入したかどうかは `completion_attempts` で見る。
 2.1.1 の JDBC の実装は、作成時の `last_resubmission_date` に `publication_date` と同じ値を入れるためである（[issue #108 の確認結果](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/108#issuecomment-6032559650)）。
 
@@ -49,8 +51,12 @@ Spring Modulith 2.1.1 のイベント出版は、次の状態を持つ（[Spring
 - 失敗した出版の再投入は、`FailedEventPublications.resubmit(ResubmissionOptions)` を使う。
   `ResubmissionOptions` で、一度に扱う件数、同時に実行する件数、最小の経過時間、条件（イベントの型、`completionAttempts` の上限）を付ける。
   回数の上限を超えた出版は自動で再投入せず、人の確認に回す。
-  `resubmit` は再投入した件数を返さないため、件数を記録するときは条件の関数の中で数える。
-- Staleness Monitor（`spring.modulith.events.staleness.*`）は、`PUBLISHED`、`PROCESSING`、`RESUBMITTED` のまま設定した時間を過ぎた出版を `FAILED` にする。
+  `resubmit` は再投入した件数を返さない。
+  条件の関数は `RESUBMITTED` への更新より前に呼ばれ、更新できなかった出版でも呼ばれるため、そこで数えた値は再投入の候補の件数であり、再投入した件数ではない。
+  再投入した件数の記録の方法は [issue #108](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/108) で決める。
+- Staleness Monitor（`spring.modulith.events.staleness.*`）は、状態が `PUBLISHED`、`PROCESSING`、`RESUBMITTED` の出版のうち、最初に出版した日時（`publication_date`）から状態ごとに設定した時間を過ぎたものを `FAILED` にする。
+  その状態に入ってからの時間や、`last_resubmission_date` からの時間では測らない（2.1.1 の `DefaultEventPublicationRegistry`）。
+  このため、`RESUBMITTED` の時間より古い出版を再投入すると、リスナーが終わる前の次の判定で `FAILED` に戻ることがある。
   既定ではどの時間も 0 で動かず、main は設定していない。
 - `IncompleteEventPublications` は、処理中のものを含めて、完了していない出版をすべて対象にする。
   通常の失敗には使わず、Staleness Monitor を使わない環境で、落ちたまま残った出版を経過時間で絞って回復する場合に限って使う。

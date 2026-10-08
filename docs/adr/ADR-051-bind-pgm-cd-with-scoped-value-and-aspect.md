@@ -64,7 +64,7 @@ Aspect は Spring AOP のプロキシで動かし、ロード時やコンパイ�
 - AspectJ の依存（`aspectjweaver`）が増える。
 - `*_pgm_cd` の値が、クラスの名前の規約（ADR-050 の役割名）に依存する。
   役割名を変えるときは、`PgmCdAspect` の pointcut も変える必要がある。
-- Spring AOP のプロキシを通らない呼び出し（同じクラスの中からの呼び出し、Bean でないインスタンスの呼び出し）では束縛されない。
+- Spring AOP のプロキシを通らない呼び出し（同じクラスの中からの呼び出し、Bean でないインスタンスの呼び出し）と、別のスレッドへ渡した処理では束縛されない。
 - バッチのように CommandHandler と Listener を通らない書き込みの入口を作るときは、入口の役割と pointcut を決め直す必要がある。
 
 ### Neutral

@@ -39,7 +39,7 @@ CommandHandler は他モジュールから呼ばれない。
 - 依存は public のコンストラクタで受け取り、`private final` フィールドに持つ。
 - `handle` の中で、Command の標準型の値を値オブジェクトに変換する（`new OrderId(UUID.fromString(command.orderId()))`）。
 - 集約が見つからないときは、`.orElseThrow(() -> new NotFoundException("order not found: orderId=" + command.orderId()))` で `shared.failure` の `NotFoundException` を投げる。
-  `NotFoundException` は Command が対象にする集約（パスで指定したもの）に使い、Command が参照する別の集約や別モジュールの値が見つからないときは `BusinessRuleViolationException` を投げる（[HTTPステータスコードの選択](../../web-api/status-codes.md)）。
+  `NotFoundException` は Command が対象にする集約（HTTP API では要求のパスで指定したもの）に使い、Command が参照する別の集約や別モジュールの値が見つからないときは `BusinessRuleViolationException` を投げる（[HTTPステータスコードの選択](../../web-api/status-codes.md)）。
 - 新しい集約は Repository の `add` で、状態を変えた既存の集約は `update` で、`handle` の中で保存する。
 - Command が `VersionedCommand` のときは、`findById` の直後、状態を変える操作より前に `order.ensureLockNo(command.expectedLockNo())` を呼ぶ。
   CommandHandler は集約を DB から読み直すため、`ensureLockNo` は画面から受け取った値と読んだ値を比べる。

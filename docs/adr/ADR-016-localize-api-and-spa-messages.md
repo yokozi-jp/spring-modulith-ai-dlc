@@ -11,6 +11,8 @@ tags: [adr, i18n, api, frontend]
 
 Accepted
 
+日時の表示の方式（「日時は表示境界で `Intl.DateTimeFormat` を使う」）は [ADR-047](ADR-047-parse-api-datetimes-with-temporal.md) で改める。
+
 ## Date
 
 2026-09-15
@@ -56,7 +58,6 @@ i18next の global instance は使わず、`createInstance` で作った instanc
 選択結果を `document.documentElement.lang` と画面 title に反映する。
 数値と複数形は翻訳済みの固定文字列へ変換せず、i18next の formatting と plural を使う（どちらも内部で `Intl.NumberFormat` と `Intl.PluralRules` を使う）。
 日時は表示境界で `Intl.DateTimeFormat` を使う。
-[ADR-047](ADR-047-parse-api-datetimes-with-temporal.md) で、API の絶対時刻は `Temporal.Instant` の `toLocaleString`（内部で `Intl.DateTimeFormat` を使う）で表示する形に上書きした。
 
 ブラウザ設定を使う間は、API request の `Accept-Language` を JavaScript で上書きしない。
 将来、アプリ内の言語選択を追加する場合は、その選択を SPA と API の双方へ同じ規則で反映する。
