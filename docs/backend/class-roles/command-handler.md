@@ -39,6 +39,7 @@ CommandHandler は他モジュールから呼ばれない。
 - 依存は public のコンストラクタで受け取り、`private final` フィールドに持つ。
 - `handle` の中で、Command の標準型の値を値オブジェクトに変換する（`new OrderId(UUID.fromString(command.orderId()))`）。
 - 集約が見つからないときは、`.orElseThrow(() -> new NotFoundException("order not found: orderId=" + command.orderId()))` で `shared.failure` の `NotFoundException` を投げる。
+  `NotFoundException` は Command が対象にする集約（HTTP API では要求のパスで指定したもの）に使い、Command が参照する別の集約や別モジュールの値が見つからないときは `BusinessRuleViolationException` を投げる（[HTTPステータスコードの選択](../../web-api/status-codes.md)）。
 - 新しい集約は Repository の `add` で、状態を変えた既存の集約は `update` で、`handle` の中で保存する。
 - Command が `VersionedCommand` のときは、`findById` の直後、状態を変える操作より前に `order.ensureLockNo(command.expectedLockNo())` を呼ぶ。
   CommandHandler は集約を DB から読み直すため、`ensureLockNo` は画面から受け取った値と読んだ値を比べる。
@@ -56,8 +57,9 @@ CommandHandler は他モジュールから呼ばれない。
   イベント出版レジストリはトランザクションアウトボックスとして働き、コミットした確定のイベントだけが決済へ渡る（[メッセージングの設計](../../integration/async-messaging-design.md)の「DB 更新とメッセージ発行の整合」）。
 - 外部システムを呼ぶ CommandHandler は、集約がすでにその操作を終えていれば（`order.isPaid()`）何もせずに Result を返し、外部システムに冪等性キー（注文 ID）を渡す。
   外部システムの呼び出しは `update` より前に置き、呼んでいる間は行をロックしない。
+  `isPaid()` の確認は二回目の請求を省くためのもので、二重の処理は `update` の楽観的ロックで止める（[順序保証と冪等性](../../integration/async-ordering-and-idempotency.md)の「集約の楽観的ロック」）。
   同じイベントは再投入で二回以上届く（[メッセージングの設計](../../integration/async-messaging-design.md)の「配信保証」、[順序保証と冪等性](../../integration/async-ordering-and-idempotency.md)）。
-- 外部システムの失敗で未完了のまま残ったイベント出版は、[非同期処理の失敗時の再試行と回復](../../integration/async-failure-recovery.md)の `IncompleteEventPublications` の手順で再投入する。
+- 外部システムの失敗で `FAILED` のまま残ったイベント出版は、[非同期処理の失敗時の再試行と回復](../../integration/async-failure-recovery.md)の `FailedEventPublications` の手順で再投入する。
   自動の再投入は [issue #108](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/108) で扱う。
 - クラス、フィールド、コンストラクタ、`handle` に Javadoc を書く。
 - `application` のパッケージの `package-info.java` は Command と共有する。
@@ -78,7 +80,7 @@ Command の形式は、Controller の `@Valid` で検証済みである。
 最小の例は、注文を取り消す `CancelOrderCommandHandler` である。
 
 ```java
-package com.example.demo.order.application;
+package com.example.demo.ordering.application;
 
 /** 注文を取り消す。 */
 @Service
@@ -136,7 +138,8 @@ public PlaceOrderResult handle(final PlaceOrderCommand command) {
           .findMembership(command.customerId())
           .orElseThrow(
               () ->
-                  new NotFoundException("customer not found: customerId=" + command.customerId()));
+                  new BusinessRuleViolationException(
+                      "customer not found: customerId=" + command.customerId()));
   final MembershipRank rank = MembershipRank.valueOf(membership.rank());
   order.applyDiscount(discountPolicy.discountFor(rank, order.subtotal()));
   orderRepository.add(order);
@@ -158,7 +161,7 @@ private List<OrderLine> toOrderLines(final List<PlaceOrderCommand.Line> commandL
             final PlaceOrderCommand.Line line = commandLines.get(index);
             final BigDecimal unitPrice = unitPrices.get(line.productCode());
             if (unitPrice == null) {
-              throw new NotFoundException(
+              throw new BusinessRuleViolationException(
                   "product not found: productCode=" + line.productCode());
             }
             return new OrderLine(
@@ -175,7 +178,7 @@ private List<OrderLine> toOrderLines(final List<PlaceOrderCommand.Line> commandL
 代金は請求せず、決済はこのイベントを受けた `OrderConfirmedListener` が始める。
 
 ```java
-// com.example.demo.order.application.ConfirmOrderCommandHandler（抜粋）
+// com.example.demo.ordering.application.ConfirmOrderCommandHandler（抜粋）
 order.ensureLockNo(command.expectedLockNo());
 order.confirm();
 orderRepository.update(order);
@@ -187,7 +190,7 @@ return new ConfirmOrderResult(order.id().value().toString());
 依存は `orderRepository` と `paymentGateway` の二つである。
 
 ```java
-// com.example.demo.order.application.ChargeOrderCommandHandler（抜粋）
+// com.example.demo.ordering.application.ChargeOrderCommandHandler（抜粋）
 /** 支払い済みでない注文の代金を、注文 ID を冪等性キーにして請求し、支払い済みにして保存する。 */
 @Transactional
 public ChargeOrderResult handle(final ChargeOrderCommand command) {
@@ -211,6 +214,7 @@ public ChargeOrderResult handle(final ChargeOrderCommand command) {
 `@ApplicationModuleTest` でモジュールを起動し、`Scenario` で `handle` を呼んで、発行されたイベントを確かめる。
 `Scenario` は `handle` をコミットするトランザクションで呼ぶため、`CleanGeneratedTablesExtension` で各テスト後に後始末する。
 他モジュールの `<Feature>Queries` を使う CommandHandler は、`@ApplicationModuleTest(mode = BootstrapMode.DIRECT_DEPENDENCIES)` で相手のモジュールも起動する。
+相手のモジュールがさらに別のモジュールに依存するときは、`BootstrapMode.ALL_DEPENDENCIES` で間接の依存まで起動する（[Listener](listener.md)の「対応するテスト」）。
 書き方は[バックエンドのDBテスト](../testing-database.md)の「Spring Modulithのイベント」と「コミットするテスト」に従う。
 
 ```java

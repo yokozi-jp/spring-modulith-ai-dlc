@@ -10,8 +10,11 @@ import org.springframework.stereotype.Component;
  * 共通カラムの {@code *_pgm_cd} の値を、ユースケースの呼び出しの間だけ {@link ScopedValue} に束縛する（ADR-051）。
  *
  * <p>機能モジュールの {@code *CommandHandler} の {@code handle} と、{@code *Listener} の public メソッドを対象にする。値は
- * {@code モジュール名.クラスの単純名から CommandHandler か Listener を除いた名前}（{@code order.PlaceOrder}）である。
+ * {@code モジュール名.クラスの単純名から CommandHandler か Listener を除いた名前}（{@code ordering.PlaceOrder}）である。
  * 束縛の中で別のユースケースが呼ばれたら、その呼び出しの間は内側の値になる。
+ *
+ * <p>{@code *Listener} の呼び出しの間は、内側の CommandHandler の呼び出しも含めて、Listener の中であることも束縛する。{@link
+ * CommonColumns} は、Listener の中の書き込みの {@code *_by} に、起点の利用者でなく {@code *_pgm_cd} と同じ値を登録する。
  */
 @Aspect
 @Component
@@ -26,13 +29,23 @@ public class PgmCdAspect {
   /** 呼び出し中のユースケースの {@code *_pgm_cd}。 */
   /* package */ static final ScopedValue<String> PGM_CD = ScopedValue.newInstance();
 
+  /** 呼び出し中のユースケースが、{@code *Listener} の呼び出しの中にあるか。 */
+  private static final ScopedValue<Boolean> IN_LISTENER = ScopedValue.newInstance();
+
   /** 呼び出し中のユースケースの {@code *_pgm_cd} を、呼び出しの間だけ束縛する。 */
   @Around(
       "execution(* com.example.demo.*..*CommandHandler.handle(..))"
           + " || execution(public * com.example.demo.*..*Listener.*(..))")
   public @Nullable Object bindPgmCd(final ProceedingJoinPoint joinPoint) throws Throwable {
-    return ScopedValue.where(PGM_CD, pgmCd(joinPoint.getSignature().getDeclaringType()))
+    final Class<?> useCase = joinPoint.getSignature().getDeclaringType();
+    return ScopedValue.where(PGM_CD, pgmCd(useCase))
+        .where(IN_LISTENER, inListener() || useCase.getSimpleName().endsWith("Listener"))
         .call(joinPoint::proceed);
+  }
+
+  /** 呼び出し中のユースケースが {@code *Listener} の呼び出しの中にあれば true を返す。束縛の外では false を返す。 */
+  /* package */ static boolean inListener() {
+    return IN_LISTENER.orElse(Boolean.FALSE);
   }
 
   /**

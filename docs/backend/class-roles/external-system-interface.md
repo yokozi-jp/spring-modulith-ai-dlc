@@ -52,7 +52,7 @@ tags: [convention, backend, class-role]
 最小の例は、注文の代金を請求する `PaymentGateway` と、決済の識別子の `PaymentId` である。
 
 ```java
-package com.example.demo.order.domain.model;
+package com.example.demo.ordering.domain.model;
 
 /** 外部の決済システム。 */
 // 外部システムの interface であり、ラムダで実装する関数型 interface ではない。
@@ -70,7 +70,7 @@ public interface PaymentGateway {
 ```
 
 ```java
-package com.example.demo.order.domain.model;
+package com.example.demo.ordering.domain.model;
 
 /** 外部の決済システムが採番した決済の識別子。 */
 public record PaymentId(String value) {
@@ -87,7 +87,7 @@ public record PaymentId(String value) {
 典型的な例は、`ChargeOrderCommandHandler` が、確定した注文の代金を注文 ID を冪等性キーにして請求する場面と、実装の宣言である。
 
 ```java
-// com.example.demo.order.application.ChargeOrderCommandHandler（抜粋）
+// com.example.demo.ordering.application.ChargeOrderCommandHandler（抜粋）
 /** 支払い済みでない注文の代金を、注文 ID を冪等性キーにして請求し、支払い済みにして保存する。 */
 @Transactional
 public ChargeOrderResult handle(final ChargeOrderCommand command) {
@@ -107,7 +107,7 @@ public ChargeOrderResult handle(final ChargeOrderCommand command) {
 ```
 
 ```java
-// com.example.demo.order.infrastructure.client.PaymentGatewayClient（宣言だけ）
+// com.example.demo.ordering.infrastructure.client.PaymentGatewayClient（宣言だけ）
 @Component
 class PaymentGatewayClient implements PaymentGateway {
   // RestClient で外部の決済システムを呼び、注文 ID を冪等性キーのヘッダーで送り、応答を PaymentId に変換する。

@@ -17,9 +17,11 @@ HTTP のステータスとログレベルは `error` モジュールの `ApiExce
 利用者の要求が業務の上で成り立たないとき、Domain、Application、Infrastructure は、その失敗を例外で呼び出し側へ伝える。
 **業務上の失敗の例外**は、利用者が要求か状態を見直せば解消しうる失敗を表す、次の三つの型である。
 
-- **NotFoundException**：指定された集約や行が存在しない。
+- **NotFoundException**：ユースケースが対象にする集約や行が存在しない。
+  HTTP API では、要求のパスで指定したリソースにあたる。
   参照の権限がなく存在を隠す場合も同じ型を投げる。
 - **BusinessRuleViolationException**：許されない状態遷移、業務規則の違反、要求を今の状態へ適用できない。
+  要求が参照する別の集約や値が存在しない場合も、この型を投げる。
 - **ConflictException**：版の不一致、行ロックの失敗、一意制約の違反。
   読み直せば解消しうる。
 
@@ -62,8 +64,8 @@ HTTP のステータスとログレベルは `error` モジュールの `ApiExce
 `title` は `Accept-Language` から解決した言語で返り、404 の本文は対象がない場合と存在を隠す場合で同じになる。
 Listener の扱いは[非同期処理の失敗時の再試行と回復](../../integration/async-failure-recovery.md)の「Spring Modulith のイベントの失敗」に合わせる。
 業務上の失敗の三つの型は、自動で再試行しない。
-ステータス管理テーブル（[非同期処理のステータス管理](../../integration/async-job-status.md)）を持つ処理は FAILED と失敗の内容を記録して正常終了し、持たない処理は `on` から送出してイベント出版を未完了のまま残す（レジストリが DLQ を兼ねる）。
-ステータス管理テーブルを持たない処理では、`ConflictException` で未完了のまま残ったイベント出版を運用者が `IncompleteEventPublications` で再投入すると、読み直して成功する見込みがある。
+ステータス管理テーブル（[非同期処理のステータス管理](../../integration/async-job-status.md)）を持つ処理は FAILED と失敗の内容を記録して正常終了し、持たない処理は `on` から送出してイベント出版を `FAILED` で残す（レジストリが DLQ を兼ねる）。
+ステータス管理テーブルを持たない処理では、`ConflictException` で `FAILED` のまま残ったイベント出版を運用者が `FailedEventPublications` で再投入すると、読み直して成功する見込みがある。
 
 `23505` と `55P03` の原因の例外のメッセージには SQL が入り、`23505` では重複したキーの値も入って、INFO のログに出る。
 扱いは[可観測性の規約](../../observability/conventions.md)の「発生源で渡さない値」に従い、閲覧の制限と表示時のマスクで守る。

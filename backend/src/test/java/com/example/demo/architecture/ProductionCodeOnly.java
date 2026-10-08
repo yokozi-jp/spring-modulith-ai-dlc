@@ -13,7 +13,7 @@ public final class ProductionCodeOnly implements ImportOption {
   /**
    * jOOQ の生成コードのパッケージの場所（backend/gradle/database.gradle の {@code packageName}）。
    *
-   * <p>{@code /jooq/} だけで判定すると、{@code order.infrastructure.persistence.jooq} のような手書きのパッケージも
+   * <p>{@code /jooq/} だけで判定すると、{@code ordering.infrastructure.persistence.jooq} のような手書きのパッケージも
    * 対象外になり、書き込みの規則（TableWriterArchTest）を外れるため、基底パッケージの直下に限る。
    *
    * <p>このパッケージに手書きのクラスを置くとすべての規則を外れるため、生成コードだけがあることを {@code ProductionCodeOnlyTest} が確かめる。

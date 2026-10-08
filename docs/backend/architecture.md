@@ -26,6 +26,7 @@ Spring Modulith は `com.example.demo` の直接サブパッケージをアプ�
 ## パッケージ構成
 
 機能モジュールのパッケージとクラスは、次の構成と名前にする。
+`<feature>` のモジュール名はスキーマ名と一致するため、SQL の予約語にしない（`order` ではなく `ordering`、[PostgreSQLの命名規約](../database/postgresql-naming.md)の「使わない名前」）。
 
 ``` text
 backend/src/main/java/com/example/demo/

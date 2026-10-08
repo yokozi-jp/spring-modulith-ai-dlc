@@ -77,12 +77,12 @@ Domain の型を Application の外へ出さず、HTTP API の形と Domain を�
 最小の例は、パス変数の注文 ID と本文のロック番号で注文を取り消す `OrderController` である。
 
 ```java
-package com.example.demo.order.presentation.web;
+package com.example.demo.ordering.presentation.web;
 
 /** 注文の HTTP API。 */
 @RestController
 @RequestMapping("/api/orders")
-@Tag(name = "order", description = "注文の API")
+@Tag(name = "ordering", description = "注文の API")
 class OrderController {
 
   /** 注文を取り消す CommandHandler。 */

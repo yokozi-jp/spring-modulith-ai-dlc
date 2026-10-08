@@ -54,7 +54,7 @@ Entity は[値オブジェクト](value-object.md)ではない。
 最小の例は、注文の明細の `OrderLine` である。
 
 ```java
-package com.example.demo.order.domain.model;
+package com.example.demo.ordering.domain.model;
 
 /** 注文の明細。注文の中で明細番号によって識別する。 */
 // record と同じ形のアクセサ（lineNumber() など）にそろえるため、フィールド名と同名のメソッドを許す。
@@ -113,7 +113,7 @@ public final class OrderLine {
 外からは `Order.changeLineQuantity` だけを呼び、`OrderLine.changeQuantity` を直接呼ばない。
 
 ```java
-// com.example.demo.order.domain.model.Order（抜粋）
+// com.example.demo.ordering.domain.model.Order（抜粋）
 /** 受付の注文の明細の数量を変える。 */
 public void changeLineQuantity(final int lineNumber, final Quantity quantity) {
   ensureStatus(OrderStatus.PLACED);

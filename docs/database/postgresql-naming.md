@@ -1,13 +1,13 @@
 ---
 type: Convention
 title: PostgreSQLの命名規約
-description: 論物変換辞書、予約語、テーブル種別の接頭辞、カラム名の接尾辞、インデックス名とシーケンス名の付け方を定める規約。テーブル、カラム、インデックス、シーケンスを追加するとき、物理名を決めるときに読む。
+description: 論物変換辞書、予約語、モジュール名とスキーマ名の予約語、テーブル種別の接頭辞、カラム名の接尾辞、インデックス名とシーケンス名の付け方を定める規約。テーブル、カラム、インデックス、シーケンスを追加するとき、物理名を決めるときに読む。
 tags: [convention, database, postgresql, naming, future-arch-guidelines]
 ---
 
 # PostgreSQLの命名規約
 
-物理名は論物変換辞書から組み立て、SQLのキーワードを使わない。
+物理名は論物変換辞書から組み立て、テーブル名とカラム名にSQLのキーワードを、モジュール名とスキーマ名にSQLの予約語を使わない。
 テーブル名は種別の接頭辞を付けた単数形にし、カラム名は値の種類を表す接尾辞で終える。
 インデックス名とシーケンス名にはテーブル名を含める。
 
@@ -37,6 +37,11 @@ PostgreSQLの識別子は63バイトを超えると切り詰められる。
 [PostgreSQLのSQLキーワード一覧](https://www.postgresql.org/docs/current/sql-keywords-appendix.html)にあるキーワードは、予約語かどうかに関係なく、テーブル名とカラム名に使わない。
 物理名は引用符を必要としない小文字とアンダースコアで書く。
 テーブル名と、そのテーブルのカラム名を同じにしない。
+
+モジュール名とスキーマ名には、SQLの予約語を使わない（[ADR-069](../adr/ADR-069-avoid-sql-reserved-words-in-module-names.md)）。
+予約語かどうかは、同じキーワード一覧の表で、PostgreSQLの列がreservedの語として確かめる（`order`はreservedのため使わず、non-reservedの`ordering`は使える）。
+スキーマ名はモジュール名と一致する（[ADR-011](../adr/ADR-011-use-module-owned-database-schemas.md)）ため、予約語にすると手書きのSQLで毎回引用符が要る。
+付け忘れは実行するまで分からず、引用符の有無で大文字と小文字の扱いも変わる。
 
 ## テーブル名
 
@@ -70,6 +75,7 @@ PostgreSQLの識別子は63バイトを超えると切り詰められる。
 - **区分**：`{名前}_typ`（例：`item_category_typ`）
 - **単位を持つ数値**：`{名前}_{単位}`（例：`route_distance_km`、`duration_min`）
 - **件数や数量**：`{名前}_count`（例：`order_count`）
+- **番号**：`{名前}_no`（例：`line_no`、`lock_no`）。表示する順序などの連番と、排他制御の版番号に使う。
 
 ## インデックス名
 

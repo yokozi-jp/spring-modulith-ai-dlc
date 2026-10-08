@@ -61,7 +61,7 @@ CommandHandler は Domain Service に、必要な値を Domain の型で渡す�
 最小の例は、Repository を使わない `DiscountPolicy` である。
 
 ```java
-package com.example.demo.order.domain.service;
+package com.example.demo.ordering.domain.service;
 
 /** 会員ランクと注文の小計から割引額を決める。 */
 @Service
@@ -84,7 +84,7 @@ public class DiscountPolicy {
 典型的な例は、Repository で数えて規則を確かめる `OrderLimitPolicy` である。
 
 ```java
-package com.example.demo.order.domain.service;
+package com.example.demo.ordering.domain.service;
 
 /** 「未出荷の注文は3件まで」という、複数の注文にまたがる業務規則。 */
 @Service
@@ -114,7 +114,7 @@ public class OrderLimitPolicy {
 `PlaceOrderCommandHandler` は、他モジュールから読んだ値を Domain の型に直して Domain Service に渡す。
 
 ```java
-// com.example.demo.order.application.PlaceOrderCommandHandler（抜粋）
+// com.example.demo.ordering.application.PlaceOrderCommandHandler（抜粋）
 orderLimitPolicy.ensureCanPlace(customerId);
 final CustomerMembership membership =
     customerQueries

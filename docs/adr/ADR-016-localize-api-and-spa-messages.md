@@ -11,6 +11,8 @@ tags: [adr, i18n, api, frontend]
 
 Accepted
 
+日時の表示の方式（「日時は表示境界で `Intl.DateTimeFormat` を使う」）は [ADR-047](ADR-047-parse-api-datetimes-with-temporal.md) で改める。
+
 ## Date
 
 2026-09-15
@@ -134,6 +136,7 @@ Problem Details がない場合と、画面が一般エラーを表示する場�
 - [i18next: Formatting](https://www.i18next.com/translation-function/formatting)
 - [react-i18next](https://react.i18next.com/)
 - [ADR-013](ADR-013-standardize-http-api-contracts.md)
+- [ADR-047](ADR-047-parse-api-datetimes-with-temporal.md)
 - [ADR-058](ADR-058-use-path-absolute-relative-uri-for-problem-types.md)
 - `backend/src/main/resources/application.yaml`
 - `frontend/src/i18n/index.ts`

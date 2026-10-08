@@ -1,6 +1,6 @@
 package archfixture.conforming.inventory.application;
 
-import archfixture.conforming.order.OrderPlaced;
+import archfixture.conforming.ordering.OrderPlaced;
 import org.springframework.modulith.events.ApplicationModuleListener;
 import org.springframework.stereotype.Service;
 
