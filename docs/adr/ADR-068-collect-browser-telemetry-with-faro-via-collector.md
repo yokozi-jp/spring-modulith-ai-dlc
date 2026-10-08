@@ -130,6 +130,9 @@ Faro の CSP の計装は無効のままにし、二重に送らない。
   Collector も `csp-violation` 以外の型を捨てる。
 - 旧形式の `report-uri` は併記しない。
   Chromium は `report-to` があると `report-uri` を使わないためである。
+- `webhook_event` は `required_header` で `Content-Type: application/reports+json` を必須にし、完全一致しない request を 401 で捨てる。
+  CORS を設定しなくても、別オリジンのページは preflight のない `text/plain` の POST を送れるので、本文が正しくても受けない。
+  Chromium は charset を付けずに送るので、完全一致で足りる。
 - 報告は `logs/frontend_csp` で受ける。
   1 回の POST は複数の報告を持つ配列なので、`unroll` で報告ごとの record に分け、`logs/frontend` と同じ検証、filter、正規化の三段で処理する。
   型が `csp-violation` で、directive と disposition が形式に合う record だけを通す。
@@ -140,8 +143,12 @@ Faro の CSP の計装は無効のままにし、二重に送らない。
   違反の位置はファイル名と行番号で、環境は resource 属性で分かる。
 - `blockedURL` は、`inline` などのキーワードはそのまま、階層を持つ URL は `scheme://host[:port]`、それ以外の URL は scheme だけに縮約する。
   CSP の許可は origin を単位に書くので、修正の判断に path は要らず、別オリジンの path にはこちらが管理しない値が入りうる。
-- `sourceFile` は、origin を落として `/assets/<名前>.js` の path だけを残し、query か fragment を持つ URL は残さない。
-  例外の stack frame と同じ規則である。
+  authority の全体が hostname（英数字、`.`、`-`）か角括弧の IPv6 と数値の port に一致しなければ、`csp.blocked` を残さない。
+  数値でない port や `@` を重ねた userinfo は、URL の解析とずれた値を host として残すためである。
+- `sourceFile` は、`documentURL` と同一オリジンの `/assets/<名前>.js` だけを、origin を落とした path で残し、query か fragment を持つ URL は残さない。
+  別オリジンの同名の path を自分の asset と取り違えないためである。
+  比べる相手を設定に持たず `documentURL` にするのは、本番の origin が環境ごとに違い、どちらも送り手が書ける値である点は変わらないためである。
+  `documentURL` は比べるだけで残さない。
 - `originalPolicy`、`sample`、`user_agent` は捨てる。
   CSP に `'report-sample'` を足さない（足すと `sample` に DOM の文字列が入る）。
 - Chromium は HTTP の `localhost` では `Reporting-Endpoints` を登録せず、報告を送らない。
@@ -162,6 +169,14 @@ SQL の span は、ブラウザと関係なく効くバックエンドの判断�
   また、tail sampling は同じ trace の span を 1 か所に集めないと動かない。
   gateway は `/collect` と同じく `/csp-report` も受ける。
 - 入口（CDN か ALB と WAF）で、サイズ、レート、Origin を制限する。
+- CDN と reverse proxy は、`/collect` と `/csp-report` を転送するときに `Cookie`、`Authorization`、`Proxy-Authorization` を消す。
+  Reporting API は同一オリジンの報告に Cookie を付けるので、`APP_SESSION` が認証に使わない Collector まで届くためである。
+  開発では Vite の proxy が同じ header を消す。
+- Loki は OTLP の log の属性を structured metadata に入れ、index label にするのは `service.name` などの一部の resource 属性だけである。
+  `csp.blocked`、`code.file.path`、`code.line.number`、`code.column.number`、`session.id`、`measurement.value` は濃度が高いので、index label に昇格しない。
+  `logs/frontend_csp` の resource 属性は Collector の環境変数の固定値なので、送り手は stream を増やせない。
+  `logs/frontend` の `service.namespace` と `deployment.environment.name` は送り手の値を形式だけ検証して使うので、送り手が stream を増やしうる。
+  これを Collector の値で上書きするかは、gateway のレートと Origin の制限と同時に決める。
 - sampling は gateway の tail sampling で決める（エラーと遅い trace を残し、通常の trace は一定割合にする）。
 - 本番の保存先は CloudWatch（ADR-043）とし、exporter の上書きで変えられる。
 - ソースマップは hidden で生成し、配信物から除き、非公開の場所に release ごとに保存する。
@@ -217,6 +232,9 @@ Faro を更新するたびに、lockfile で `ua-parser-js` の版を確かめ�
 - `logs/frontend_csp` が使う `unroll` processor は logs で alpha で、Collector の更新で壊れうる。
   `task otel-collector-check` の CSP の fixture の件数の検査で検出する。
 - HTTP のローカル開発では CSP の報告が届かない。
+- 報告は Reporting API を実装した Chromium 系のブラウザからだけ届く。
+  Firefox と Safari は `report-to` を無視するので、これらのブラウザの違反は届かない。
+  報告がないことを、違反がないことと読むわけにはいかない。
 
 ### Neutral
 
@@ -227,6 +245,8 @@ Faro を更新するたびに、lockfile で `ua-parser-js` の版を確かめ�
 - 本番の上書きファイルは `logs/frontend`、`logs/frontend_csp`、`traces/frontend` の exporters も定めなければならず、定めなければ `otlp_http/lgtm` のままになる。
 - gateway を作るときに、faro receiver、`webhook_event` receiver、`logs/frontend`、`logs/frontend_csp`、`traces/frontend` を共有の設定から gateway の設定へ移す。
 - CSP の報告の `service.version` は、Compose が `version.txt` から渡す環境変数を Collector が付ける。
+  この版は報告を送った bundle の版ではなく、Collector が起動したときに配信していた版を指す。
+  Collector は報告から bundle の版を知れないので、配信の直後は古い bundle の違反が新しい版として記録されうる。
   `version.txt` の形式は版の検査が守り、検証の正規表現は形式に合わない値を消す。
 - ルートの `.env` と `.env.test` を、新しい `.env.example` と `.env.test.example` から作り直す必要がある。
 
@@ -327,6 +347,7 @@ Faro を更新するたびに、lockfile で `ua-parser-js` の版を確かめ�
 - [#153: 4/4 CSP 違反の報告を Grafana で見られるようにする](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/153)
 - [W3C Reporting API](https://www.w3.org/TR/reporting-1/)
 - [webhookeventreceiver v0.161.0](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/v0.161.0/receiver/webhookeventreceiver)
+- [Loki の OTLP 取り込み](https://grafana.com/docs/loki/latest/send-data/otel/)
 - [unrollprocessor v0.161.0](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/v0.161.0/processor/unrollprocessor)
 - [Grafana Faro Web SDK 2.12.1](https://www.npmjs.com/package/@grafana/faro-web-sdk/v/2.12.1)
 - [Grafana Faro Web Tracing 2.12.1](https://www.npmjs.com/package/@grafana/faro-web-tracing/v/2.12.1)

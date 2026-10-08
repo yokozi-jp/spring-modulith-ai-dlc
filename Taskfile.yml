@@ -1180,17 +1180,25 @@ tasks:
           sleep 1
         done
         if [ "$accepted" -ne 1 ]; then fail "Collector の webhook_event receiver が CSP の報告を受け付けませんでした。"; fi
-        # 出口に届かない本文と受け口の挙動。旧形式（report-uri）、JSON でない本文、文字列の配列は 200 で受けて捨てる。
+        # 出口に届かない本文と受け口の挙動。
+        # Content-Type が application/reports+json でない request（旧形式の report-uri、header なし、text/plain の有効な本文）は 401 で捨てる。
+        # 正しい Content-Type の JSON でない本文と文字列の配列は 200 で受けて、本文の検証で捨てる。
         csp_status() {
           curl -s -o /dev/null -w '%{http_code}' "$@" || true
         }
         status="$(csp_status -X POST -H "Content-Type: application/csp-report" \
           --data-binary '{"csp-report":{"document-uri":"https://localhost:5173/?secret-legacy=1","effective-directive":"img-src","disposition":"enforce","blocked-uri":"https://blocked.example/?secret-legacy=1"}}' \
           "http://$csp_address/csp-report")"
-        if [ "$status" != "200" ]; then fail "webhook_event receiver が旧形式の報告に 200 を返しませんでした（$status）。"; fi
+        if [ "$status" != "401" ]; then fail "webhook_event receiver が旧形式の報告に 401 を返しませんでした（$status）。"; fi
         status="$(csp_status -X POST --data-binary 'not json secret-junk' "http://$csp_address/csp-report")"
+        if [ "$status" != "401" ]; then fail "webhook_event receiver が Content-Type のない POST に 401 を返しませんでした（$status）。"; fi
+        # 別オリジンのページが preflight なしで送れる形。有効な本文でも出口に届かないことを、後の件数の検査で確かめる。
+        status="$(csp_status -X POST -H "Content-Type: text/plain" \
+          --data-binary "@docker/otel-collector/check/fixtures/csp-reports.json" "http://$csp_address/csp-report")"
+        if [ "$status" != "401" ]; then fail "webhook_event receiver が text/plain の有効な本文に 401 を返しませんでした（$status）。"; fi
+        status="$(csp_status -X POST -H "Content-Type: application/reports+json" --data-binary 'not json secret-junk' "http://$csp_address/csp-report")"
         if [ "$status" != "200" ]; then fail "webhook_event receiver が JSON でない本文に 200 を返しませんでした（$status）。"; fi
-        status="$(csp_status -X POST --data-binary '["secret-junk"]' "http://$csp_address/csp-report")"
+        status="$(csp_status -X POST -H "Content-Type: application/reports+json" --data-binary '["secret-junk"]' "http://$csp_address/csp-report")"
         if [ "$status" != "200" ]; then fail "webhook_event receiver が文字列の配列に 200 を返しませんでした（$status）。"; fi
         status="$(head -c 65537 /dev/zero | tr '\0' ' ' \
           | csp_status -X POST -H "Content-Type: application/reports+json" --data-binary @- "http://$csp_address/csp-report")"
@@ -1227,7 +1235,7 @@ tasks:
                 and string_attr("deployment.environment.name") == "local"
                 and ([.attributes[]?.key] | sort) == ["deployment.environment.name", "service.name", "service.namespace", "service.version"])
             and all($scopes[]; ((.scope.attributes // []) | length) == 0)
-            and ($records | length) == 9
+            and ($records | length) == 11
             and all($records[];
               .body.stringValue == "Browser CSP violation"
                 and string_attr("telemetry.signal") == "csp-violation"
@@ -1242,7 +1250,10 @@ tasks:
             and any($records[]; string_attr("csp.blocked") == "eval" and int_attr("code.line.number") == null)
             and any($records[]; int_attr("code.line.number") == "10" and string_attr("csp.blocked") == null)
             and any($records[]; string_attr("csp.blocked") == "https://evil.example" and string_attr("csp.directive") == "connect-src")
-            and any($records[]; string_attr("code.file.path") == "/assets/x.js" and string_attr("csp.directive") == "script-src-elem")
+            and any($records[]; string_attr("csp.directive") == "script-src-elem" and string_attr("code.file.path") == null)
+            and any($records[]; int_attr("code.line.number") == "20" and string_attr("csp.blocked") == null)
+            and any($records[]; int_attr("code.line.number") == "21" and string_attr("csp.blocked") == null)
+            and all($records[]; string_attr("csp.blocked") != "https")
             and any($records[]; string_attr("csp.directive") == "script-src-attr" and int_attr("code.line.number") == null)
         ' "$out/frontend-csp.json" >/dev/null; then
           fail "CSP の報告の属性、resource 属性、scope の属性、件数のいずれかが期待値と一致しません。"

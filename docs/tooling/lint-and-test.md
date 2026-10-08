@@ -30,6 +30,7 @@ Dockerを使うTaskは、Dockerがないローカル環境ではスキップし�
 - **`task fe-test-build`**：coverage付きテストと、`FRONTEND_OTEL_ENABLED=false`を強制した本番ビルドを実行する。
   ビルドの後に`dist/assets`を`faro|grafana|opentelemetry|web.?vitals`でgrepし、bundleにFaro、OpenTelemetry JS、Web Vitalsのコードが入っていれば失敗する（[ADR-068](../adr/ADR-068-collect-browser-telemetry-with-faro-via-collector.md)）。
 - **`task fe-verify`**：`fe-check`、`fe-knip`、`fe-test-build`（テレメトリを無効にした本番ビルドとgrepを含む）を実行する。
+  テストのうち`frontend/vite-config.test.ts`は、ZAPの10055-6の除外の`evidence`（`docker/zap/passive.yaml`と`active.yaml`）が配信するCSPと一致することも検査する。
 - **`task fe-route-tree-check`**：ビルドで`routeTree.gen.ts`を再生成し、コミット済みの内容と差分があれば失敗する。
   再生成した`fullPaths`がCollectorのroute allowlist（`transform/frontend_validate`の1か所）と一致しなければ、差分の検査より前に失敗する。
 - **`task api-client-check`**：Orvalで`src/api/generated`を再生成し、コミット済みの内容と差分があれば失敗する（後述の「API契約」）。
@@ -214,7 +215,12 @@ PITのHTMLとXMLのレポートは、変異対象がある場合に`backend/buil
   Faroのfixtureもフロントエンドのpipelineに流し、例外、View、LCP、INP、CLSが同じ匿名session IDを持つことを確かめる。
   許可していない属性、URL token、UUIDのsession IDが出口に残らないことも検査する。
   同一オリジンの`/assets/<名前>.js`のstack frameだけが、pathと行と列で残ることも検査する。
-  CSP違反の報告のfixtureを`logs/frontend_csp`に流し、許可した7つの属性だけが残り、CSP以外の報告の型と64 KiBを超える本文が捨てられることも検査する。
+  CSP違反の報告のfixtureを`logs/frontend_csp`に流し、許可した7つの属性だけが残り、CSP以外の報告の型、`disposition`のない報告、64 KiBを超える本文が捨てられることも検査する。
+  数値でないportと`@`を重ねたuserinfoの`blockedURL`が`csp.blocked`に残らず、別オリジンの`sourceFile`が`code.file.path`に残らないことも検査する。
+  受け口が`application/reports+json`以外の`Content-Type`に401を返し、`text/plain`で送った有効な本文が出口に届かないことも検査する。
+  このタスクは`webhook_event`のportを直接叩き、Viteのproxyを通らない。
+  Viteのproxyのhop（`/csp-report`と`/collect`の転送と資格情報のheaderの削除）は、`frontend/vite-config.test.ts`が偽の受け口で検査する。
+  ブラウザがHTTPSの配信から報告を送り、Grafanaに届くまでの経路全体は手動で実測する。
   同じfixtureのtraceは`traces/frontend`の出口を別のファイルに分け、URL属性がなく、許可したHTTP属性とresource属性だけが残り、trace ID、span ID、親span IDが保たれることを確かめる。
 - **`task lint-md`**：`.markdownlint-cli2.yaml`の除外設定に従いMarkdownを検査する。
 - **`task lint-md-fix`**：markdownlint-cli2で安全に修正できるMarkdownの問題を修正する。

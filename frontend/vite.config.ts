@@ -6,6 +6,7 @@ import tailwindcss from "@tailwindcss/vite";
 import { tanstackRouter } from "@tanstack/router-plugin/vite";
 import react from "@vitejs/plugin-react";
 import { defaultExclude, defineConfig, loadEnv } from "vite-plus";
+import type { ProxyOptions } from "vite-plus";
 
 const contentSecurityPolicy =
   "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; form-action 'self'; script-src 'self'; style-src 'self'; style-src-elem 'self' 'unsafe-inline'; style-src-attr 'none'; img-src 'self' data:; font-src 'self'; connect-src 'self'; report-to csp-endpoint";
@@ -75,6 +76,16 @@ function portFromEnv(mode: string, name: string, fallback: string): number {
   }
   return port;
 }
+
+// Reporting API は同一オリジンの報告に Cookie を付ける。
+// Collector は認証に使わないので、資格情報の header を Collector へ渡さない（ADR-068）。
+const withoutCredentials: ProxyOptions["configure"] = (proxy) => {
+  proxy.on("proxyReq", (proxyReq) => {
+    for (const name of ["cookie", "authorization", "proxy-authorization"]) {
+      proxyReq.removeHeader(name);
+    }
+  });
+};
 
 // src/lib/telemetry.ts が参照するビルド時の定数（ADR-068）。
 function telemetryDefine(mode: string) {
@@ -388,12 +399,14 @@ export default defineConfig(({ mode }) => {
         "^/collect$": {
           target: `http://localhost:${faroPort}`,
           changeOrigin: false,
+          configure: withoutCredentials,
         },
         // CSP 違反の報告（ADR-068）。ブラウザが Reporting API で送り、Collector の webhook_event receiver へ転送する。
         // 完全一致にし、画面の path を転送しない。
         "^/csp-report$": {
           target: `http://localhost:${cspReportPort}`,
           changeOrigin: false,
+          configure: withoutCredentials,
         },
       },
     },

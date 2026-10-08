@@ -27,6 +27,9 @@ tags: [convention, frontend, build, delivery, cache, future-arch-guidelines]
 - CSPの最後に `report-to csp-endpoint` を置き、`Reporting-Endpoints: csp-endpoint="/csp-report"` を付ける（[ADR-068](../adr/ADR-068-collect-browser-telemetry-with-faro-via-collector.md)）。
 - 配信点は `/csp-report` のPOSTを報告の受け口へ振り分ける。
   振り分けがなくても報告の送信が失敗するだけで、画面には影響しない。
+- 配信点は `/csp-report` と `/collect` を転送するときに、`Cookie`、`Authorization`、`Proxy-Authorization` のheaderを消す。
+  Reporting APIは同一オリジンの報告にCookieを付けて送るが、受け口のCollectorは認証に使わないためである（[ADR-068](../adr/ADR-068-collect-browser-telemetry-with-faro-via-collector.md)）。
+  開発ではViteのproxyが同じheaderを消す。
 - ChromiumはHTTPSの配信でだけ報告を送り、HTTPの `localhost` では送らない。
 - 新旧の静的ファイルを並べて置き、切り替えられる方式にする。
 - インターネットに公開する場合はCDNとobject storage、閉域網で配信する場合はreverse proxyまたはweb serverを、基本の候補にする。

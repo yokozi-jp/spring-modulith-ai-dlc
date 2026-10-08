@@ -17,11 +17,16 @@ receivers:
     # Errors だけの既定のバッチ（最大 50 件）に十分な余裕を持たせた上限（1 MiB）。超えると 400 で捨てる。
     max_request_body_size: 1048576
   # ブラウザが Reporting API で同一オリジンの /csp-report から送る CSP 違反の報告（ADR-068）。
-  # 同一オリジンで受けるため CORS は設定しない（ADR-014）。Content-Type は検査されない。
+  # 同一オリジンで受けるため CORS は設定しない（ADR-014）。
   webhook_event:
     # 既定は localhost。Compose はホストの Vite から受けるため 0.0.0.0 に上書きする。
     endpoint: ${env:OTEL_COLLECTOR_CSP_REPORT_HTTP_ENDPOINT:-localhost:12348}
     path: /csp-report
+    # Chromium が送る Content-Type と完全一致しない request は 401 で捨てる（charset 付きも拒否する）。
+    # 別オリジンのページが preflight なしで送れる text/plain の POST を受けないためである。
+    required_header:
+      key: Content-Type
+      value: application/reports+json
     # 報告 1 件は約 800 バイト。1 回の POST で約 80 件まで受ける上限（64 KiB）。超えると 400 で捨てる。
     max_request_body_size: 65536
 
@@ -129,17 +134,20 @@ processors:
       # inline、eval、data などのキーワードはそのまま残す。
       - set(log.attributes["csp.blocked"], log.cache["blocked"]) where IsMatch(log.cache["blocked"], "^[a-z-]{1,32}$$")
       # 階層を持つ URL は scheme と host と port だけにし、userinfo、path、path parameter、query、fragment を落とす。
-      # userinfo に \ を許さないので、\@ で区切りをごまかした URL は \ の前の host になる。
-      - set(log.attributes["csp.blocked"], ExtractPatterns(log.cache["blocked"], "^(?P<origin>[A-Za-z][A-Za-z0-9+.-]*://)(?:[^/?#@\\s\\\\]*@)?(?P<host>[^/?#@\\s;\\\\]+)")["origin"]) where log.attributes["csp.blocked"] == nil
-      - set(log.cache["host"], ExtractPatterns(log.cache["blocked"], "^[A-Za-z][A-Za-z0-9+.-]*://(?:[^/?#@\\s\\\\]*@)?(?P<host>[^/?#@\\s;\\\\]+)")["host"])
-      - set(log.attributes["csp.blocked"], Concat([log.attributes["csp.blocked"], log.cache["host"]], "")) where log.cache["host"] != nil
-      # data: のような階層を持たない URL は scheme だけを残す。
-      - set(log.attributes["csp.blocked"], ExtractPatterns(log.cache["blocked"], "^(?P<scheme>[A-Za-z][A-Za-z0-9+.-]*):")["scheme"]) where log.attributes["csp.blocked"] == nil
+      # authority の全体が hostname か角括弧の IPv6 と数値の port に一致しなければ残さない。@ を重ねた URL と数値でない port は落とす。
+      # \ は WHATWG URL と同じく path の始まりとみなすので、\@ で区切りをごまかした URL は \ の前の host になる。
+      - set(log.cache["origin"], ExtractPatterns(log.cache["blocked"], "^(?P<scheme>[A-Za-z][A-Za-z0-9+.-]*://)(?:[^/?#@\\s\\\\]*@)?(?P<authority>(?:[A-Za-z0-9.-]+|\\[[0-9A-Fa-f:.]+\\])(?::[0-9]{1,5})?)(?:[/?#;\\\\]|$$)"))
+      - set(log.attributes["csp.blocked"], Concat([log.cache["origin"]["scheme"], log.cache["origin"]["authority"]], "")) where log.attributes["csp.blocked"] == nil and log.cache["origin"]["authority"] != nil
+      # data: のような階層を持たない URL は scheme だけを残す。authority が不正な階層 URL を scheme に縮約しない。
+      - set(log.attributes["csp.blocked"], ExtractPatterns(log.cache["blocked"], "^(?P<scheme>[A-Za-z][A-Za-z0-9+.-]*):")["scheme"]) where log.attributes["csp.blocked"] == nil and not IsMatch(log.cache["blocked"], "^[A-Za-z][A-Za-z0-9+.-]*://")
       - set(log.attributes["csp.blocked"], ConvertCase(log.attributes["csp.blocked"], "lower")) where log.attributes["csp.blocked"] != nil
       # 長すぎる origin は送り手が任意の値を詰められるので残さない。
       - delete_key(log.attributes, "csp.blocked") where Len(log.attributes["csp.blocked"]) > 300
-      # logs/frontend の stack frame と同じ規則で、origin を落とし、/assets/<名前>.js の path だけを残す。query か fragment を持つ URL は残さない。
-      - set(log.attributes["code.file.path"], ExtractPatterns(log.cache["source"], "^(?:[Hh][Tt][Tt][Pp][Ss]?://[^/\\s\\\\?#]+)?(?P<path>/assets/[\\w.-]+\\.js)$$")["path"])
+      # 違反した文書と同一オリジンの /assets/<名前>.js だけを、origin を落とした path で残す。query か fragment を持つ URL は残さない。
+      # 別オリジンの同名の path を自分の asset と取り違えないためである。documentURL は比べるだけで属性に残さない。
+      - set(log.cache["document_origin"], ConvertCase(ExtractPatterns(log.body["body"]["documentURL"], "^(?P<origin>[Hh][Tt][Tt][Pp][Ss]?://[A-Za-z0-9.-]+(?::[0-9]{1,5})?)(?:[/?#;]|$$)")["origin"], "lower")) where IsString(log.body["body"]["documentURL"]) and Len(log.body["body"]["documentURL"]) <= 8192
+      - set(log.cache["source_match"], ExtractPatterns(log.cache["source"], "^(?P<origin>[Hh][Tt][Tt][Pp][Ss]?://[A-Za-z0-9.-]+(?::[0-9]{1,5})?)(?P<path>/assets/[\\w.-]+\\.js)$$"))
+      - set(log.attributes["code.file.path"], log.cache["source_match"]["path"]) where log.cache["document_origin"] != nil and ConvertCase(log.cache["source_match"]["origin"], "lower") == log.cache["document_origin"]
       - set(log.attributes["code.line.number"], Int(log.body["body"]["lineNumber"])) where IsDouble(log.body["body"]["lineNumber"]) and log.body["body"]["lineNumber"] >= 0 and log.body["body"]["lineNumber"] <= 2147483647
       - set(log.attributes["code.column.number"], Int(log.body["body"]["columnNumber"])) where IsDouble(log.body["body"]["columnNumber"]) and log.body["body"]["columnNumber"] >= 0 and log.body["body"]["columnNumber"] <= 2147483647
       - set(log.attributes["csp.directive"], log.body["body"]["effectiveDirective"])

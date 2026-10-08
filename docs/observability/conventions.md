@@ -77,9 +77,10 @@ Web Vitals は LCP、INP、CLS の主値を一つだけ残し、付加情報を�
 ログアウトの送信前に session ID を切り替え、`APP_SESSION` と利用者情報へ結び付けない。
 `traceparent` は同一オリジンの `/api/**` への fetch と XHR だけに付け、IdP を含む別オリジン、`/collect`、`/api/**` 以外のパスには付けない。
 Collector へは Cookie を送らない（`credentials: "omit"`）。
+CSP 違反の報告は Reporting API が同一オリジンの Cookie を付けて送るので、`/collect` と `/csp-report` を転送する層（開発は Vite の proxy、本番は CDN か reverse proxy）が `Cookie`、`Authorization`、`Proxy-Authorization` を消す（[ADR-068](../adr/ADR-068-collect-browser-telemetry-with-faro-via-collector.md)）。
 
 CSP 違反の報告は、ブラウザが文書の URL、`referrer`、`user_agent`、適用中の CSP の全体を本文に入れて送る。
-Collector は文書の URL を残さず、`blockedURL` を origin か scheme かキーワードまで、`sourceFile` を `/assets/<名前>.js` の path まで縮約する（[ADR-068](../adr/ADR-068-collect-browser-telemetry-with-faro-via-collector.md)）。
+Collector は文書の URL を残さず、`blockedURL` を origin か scheme かキーワードまで、`sourceFile` を文書と同一オリジンの `/assets/<名前>.js` の path まで縮約する（[ADR-068](../adr/ADR-068-collect-browser-telemetry-with-faro-via-collector.md)）。
 CSP に `'report-sample'` を足さない。
 足すと、報告の `sample` に違反した DOM の文字列が入る。
 
@@ -138,11 +139,13 @@ CSP 違反の報告は、`webhook_event` receiver から別の pipeline（`logs/
 - `telemetry.signal`：`csp-violation` に固定する。
 - `csp.directive`、`csp.disposition`：検証済みの `effectiveDirective` と `disposition`。
 - `csp.blocked`：`blockedURL` のキーワード（`inline` など）、階層を持つ URL の `scheme://host[:port]`、それ以外の URL の scheme のいずれかを小文字で残す。300 文字を超える値は残さない。
-- `code.file.path`：`sourceFile` の origin を落とし、`/assets/<名前>.js` の path だけを残す。query か fragment を持つ URL は残さない。
+  authority の全体が hostname（英数字、`.`、`-`）か角括弧の IPv6 と数値の port に一致しない階層 URL（数値でない port、`@` を重ねた userinfo など）は残さない。
+- `code.file.path`：`sourceFile` が `documentURL` と同一オリジンの `/assets/<名前>.js` のときだけ、origin を落とした path を残す。別オリジンの URL と、query か fragment を持つ URL は残さない。
 - `code.line.number`、`code.column.number`：0 以上 2147483647 以下の整数だけを残す。
 
 resource 属性はフロントエンドのログと同じ 4 つを Collector の値で付け、receiver が付ける scope の属性は消す。
 `service.version` は Compose が `version.txt` から渡す `FRONTEND_SERVICE_VERSION` である。
+この版は報告を送った bundle の版ではなく、Collector の起動時に配信していた版を指す。
 
 自由入力を正規表現でマスクする処理は Collector に置かない。
 表記ゆれによる取りこぼしと誤マスクが起きるため、検知は保存先のデータ保護ポリシーで行う。
@@ -160,8 +163,8 @@ faro receiver は処理に失敗すると、payload の全体を Collector 自�
   同じ fixture の trace は `traces/frontend` の出口を別のファイルに分けて検査し、URL 属性がなく、許可した HTTP 属性と resource 属性だけが残り、trace ID、span ID、親 span ID が保たれることを確かめる。
   faro receiver の受け口が、GET に 405、`text/plain` に 415、別のパスに 202、1 MiB を超える本文に 400 を返すことも確かめる。
   CSP の報告の fixture（`csp-reports.json`）を `logs/frontend_csp` に流し、出口の件数、7 つの属性、縮約した URL、resource 属性、空の scope の属性を確かめる。
-  fixture は、query と fragment、大文字の scheme、userinfo、path の ID、長すぎる origin、範囲外の行番号、CSP 以外の型（deprecation、intervention、crash）を含み、CSP 以外の型と不正な directive が捨てられることを確かめる。
-  `webhook_event` の受け口が、旧形式と JSON でない本文に 200（出口には残さない）、64 KiB を超える本文と空の本文に 400、GET に 405、別のパスに 404 を返すことも確かめる。
+  fixture は、query と fragment、大文字の scheme、userinfo、path の ID、長すぎる origin、数値でない port、`@` を重ねた userinfo、別オリジンの `sourceFile`、範囲外の行番号、`disposition` のない報告、CSP 以外の型（deprecation、intervention、crash）を含み、CSP 以外の型、不正な directive、`disposition` のない報告が捨てられることを確かめる。
+  `webhook_event` の受け口が、`application/reports+json` 以外の `Content-Type`（旧形式、header なし、有効な本文の `text/plain`）に 401、正しい `Content-Type` の JSON でない本文に 200（出口には残さない）、64 KiB を超える本文と空の本文に 400、GET に 405、別のパスに 404 を返すことも確かめる。
   Collector の設定を変えたら実行する。
 - **`ObservabilityContractTest`**：key-value と例外が LogRecord の属性になることを確かめる。
 

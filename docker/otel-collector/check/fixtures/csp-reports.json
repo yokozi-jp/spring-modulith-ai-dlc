@@ -156,5 +156,40 @@
     },
     "type": "csp-violation",
     "url": "https://localhost:5173/"
+  },
+  {
+    "age": 1,
+    "body": {
+      "blockedURL": "https://blocked.example:secret-api-key/path",
+      "disposition": "enforce",
+      "documentURL": "https://localhost:5173/",
+      "effectiveDirective": "img-src",
+      "lineNumber": 20
+    },
+    "type": "csp-violation",
+    "url": "https://localhost:5173/"
+  },
+  {
+    "age": 1,
+    "body": {
+      "blockedURL": "https://user:secret-token@@evil.example/x",
+      "disposition": "enforce",
+      "documentURL": "https://localhost:5173/",
+      "effectiveDirective": "img-src",
+      "lineNumber": 21
+    },
+    "type": "csp-violation",
+    "url": "https://localhost:5173/"
+  },
+  {
+    "age": 1,
+    "body": {
+      "blockedURL": "https://secret-nodisposition.example/x",
+      "documentURL": "https://localhost:5173/",
+      "effectiveDirective": "img-src",
+      "lineNumber": 22
+    },
+    "type": "csp-violation",
+    "url": "https://localhost:5173/"
   }
 ]
