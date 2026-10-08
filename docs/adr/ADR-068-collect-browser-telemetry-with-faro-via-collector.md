@@ -120,23 +120,47 @@ trace ID、span ID、親 span ID は属性ではないので残り、バック�
 
 ### CSP 違反の報告
 
-- W3C の Reporting API（`Reporting-Endpoints` と CSP の `report-to`）で、ブラウザ自身が `/csp-report` へ送り、Collector の `webhook_event` receiver で受ける。
-- 対象は CSP だけにする。
-- `webhook_event` で受けられなければ Faro の CSP の計装に切り替え、その理由をこの ADR に追記する。
-  二重に送らないよう、どちらか一方だけにする。
+W3C の Reporting API（`Reporting-Endpoints` と CSP の `report-to`）で、ブラウザ自身が同一オリジンの `/csp-report` へ送り、Collector の `webhook_event` receiver で受ける。
+Faro の CSP の計装には切り替えない。
+Issue #153 の検証で、Chromium が送る `application/reports+json` の本文が、そのまま 1 件のログの本文として `webhook_event` に届き、OTTL の `ParseJSON` で解析できることを確かめたためである。
+Faro の CSP の計装は無効のままにし、二重に送らない。
+
+- endpoint の名前は `csp-endpoint` にし、`default` にしない。
+  Reporting API は deprecation、intervention、crash の報告を `default` の endpoint にだけ送るので、CSP 以外の報告はブラウザから送られない。
+  Collector も `csp-violation` 以外の型を捨てる。
+- 旧形式の `report-uri` は併記しない。
+  Chromium は `report-to` があると `report-uri` を使わないためである。
+- 報告は `logs/frontend_csp` で受ける。
+  1 回の POST は複数の報告を持つ配列なので、`unroll` で報告ごとの record に分け、`logs/frontend` と同じ検証、filter、正規化の三段で処理する。
+  型が `csp-violation` で、directive と disposition が形式に合う record だけを通す。
+- 本文は `Browser CSP violation` に固定し、属性は `telemetry.signal`、`csp.directive`、`csp.disposition`、`csp.blocked`、`code.file.path`、`code.line.number`、`code.column.number` だけを残す。
+  resource 属性は `logs/frontend` と同じ 4 つを Collector の値で付け、receiver が付ける scope の属性は消す。
+- 文書の URL（`documentURL`、`url`、`referrer`）は残さない。
+  画面に対応する URL は route template だけを残す方針で、Collector は生の path から route template を作れないためである。
+  違反の位置はファイル名と行番号で、環境は resource 属性で分かる。
+- `blockedURL` は、`inline` などのキーワードはそのまま、階層を持つ URL は `scheme://host[:port]`、それ以外の URL は scheme だけに縮約する。
+  CSP の許可は origin を単位に書くので、修正の判断に path は要らず、別オリジンの path にはこちらが管理しない値が入りうる。
+- `sourceFile` は、origin を落として `/assets/<名前>.js` の path だけを残し、query か fragment を持つ URL は残さない。
+  例外の stack frame と同じ規則である。
+- `originalPolicy`、`sample`、`user_agent` は捨てる。
+  CSP に `'report-sample'` を足さない（足すと `sample` に DOM の文字列が入る）。
+- Chromium は HTTP の `localhost` では `Reporting-Endpoints` を登録せず、報告を送らない。
+  ローカルの `vp dev` と `vp preview` は HTTP なので、報告を見るには HTTPS で配信する必要がある。
 
 ### 段階
 
 最初の段階（#150）で入れるのは Errors だけである。
 2 つ目の段階（#151）で、`@grafana/faro-web-tracing` の Tracing（fetch と XHR）と `traces/frontend` を入れる。
 SQL の span は、ブラウザと関係なく効くバックエンドの判断なので、[ADR-070](ADR-070-record-sql-spans-with-jooq-execute-listener.md) に分ける。
-WebVitals、Session、View、CSP 違反の報告は、#149 の 3/4 と 4/4 のチケットで入れる。
+3 つ目の段階（#152）で、WebVitals、Session、View を入れる。
+4 つ目の段階（#153）で、CSP 違反の報告と `logs/frontend_csp` を入れる。
 
 ### 本番の方針
 
 - 本番の受け口は、アプリのサイドカーと分けた受信専用の Collector（gateway）に置く。
   ADR-043 のサイドカーは `localhost` で待ち受けるので、ブラウザから届かない。
   また、tail sampling は同じ trace の span を 1 か所に集めないと動かない。
+  gateway は `/collect` と同じく `/csp-report` も受ける。
 - 入口（CDN か ALB と WAF）で、サイズ、レート、Origin を制限する。
 - sampling は gateway の tail sampling で決める（エラーと遅い trace を残し、通常の trace は一定割合にする）。
 - 本番の保存先は CloudWatch（ADR-043）とし、exporter の上書きで変えられる。
@@ -190,14 +214,20 @@ Faro を更新するたびに、lockfile で `ua-parser-js` の版を確かめ�
 - `ignoreUrls` は Tracing だけでなく Faro の全計装の除外にも効く。
   Performance や UserAction を有効にするときは、範囲の指定を Tracing の option に移す必要がある。
 - `ua-parser-js@1.0.41` を provenance のないまま受け入れる。
+- `logs/frontend_csp` が使う `unroll` processor は logs で alpha で、Collector の更新で壊れうる。
+  `task otel-collector-check` の CSP の fixture の件数の検査で検出する。
+- HTTP のローカル開発では CSP の報告が届かない。
 
 ### Neutral
 
 - バックエンドの名前が `demo` から `demo-api` に変わるので、既存の Grafana の検索を直す必要がある。
 - `docker/otel-collector/config.yaml` は本番と共有する（ADR-043）ので、本番のサイドカーの Collector も faro receiver を起動する。
   gateway を作るまでは、サイドカーの faro receiver は `localhost` で待ち受け、ブラウザから届かないので何も受けない。
-- 本番の上書きファイルは `logs/frontend` と `traces/frontend` の exporters も定めなければならず、定めなければ `otlp_http/lgtm` のままになる。
-- gateway を作るときに、faro receiver と `logs/frontend` と `traces/frontend` を共有の設定から gateway の設定へ移す。
+  `webhook_event` receiver も同じく `localhost` で起動し、何も受けない。
+- 本番の上書きファイルは `logs/frontend`、`logs/frontend_csp`、`traces/frontend` の exporters も定めなければならず、定めなければ `otlp_http/lgtm` のままになる。
+- gateway を作るときに、faro receiver、`webhook_event` receiver、`logs/frontend`、`logs/frontend_csp`、`traces/frontend` を共有の設定から gateway の設定へ移す。
+- CSP の報告の `service.version` は、Compose が `version.txt` から渡す環境変数を Collector が付ける。
+  `version.txt` の形式は版の検査が守り、検証の正規表現は形式に合わない値を消す。
 - ルートの `.env` と `.env.test` を、新しい `.env.example` と `.env.test.example` から作り直す必要がある。
 
 ## Alternatives Considered
@@ -294,6 +324,10 @@ Faro を更新するたびに、lockfile で `ua-parser-js` の版を確かめ�
 - [faro_to_logs.go v0.161.0](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/v0.161.0/pkg/translator/faro/faro_to_logs.go)
 - [OTTL の ParseKeyValue](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/v0.161.0/pkg/ottl/ottlfuncs/README.md#parsekeyvalue)
 - [#151: 2/4 画面の操作から DB までを一本のトレースで見られるようにする](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/151)
+- [#153: 4/4 CSP 違反の報告を Grafana で見られるようにする](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/153)
+- [W3C Reporting API](https://www.w3.org/TR/reporting-1/)
+- [webhookeventreceiver v0.161.0](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/v0.161.0/receiver/webhookeventreceiver)
+- [unrollprocessor v0.161.0](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/v0.161.0/processor/unrollprocessor)
 - [Grafana Faro Web SDK 2.12.1](https://www.npmjs.com/package/@grafana/faro-web-sdk/v/2.12.1)
 - [Grafana Faro Web Tracing 2.12.1](https://www.npmjs.com/package/@grafana/faro-web-tracing/v/2.12.1)
 - [OpenTelemetry の instrumentation-fetch 0.222.0](https://www.npmjs.com/package/@opentelemetry/instrumentation-fetch/v/0.222.0)

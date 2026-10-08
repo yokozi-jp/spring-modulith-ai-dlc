@@ -6,6 +6,11 @@ import { afterEach, describe, expect, it, vi } from "vite-plus/test";
 
 const proxyPath = "^/(api|oauth2|login|logout|error|actuator|v3/api-docs|swagger-ui)(/|$)";
 
+const cspReportingEndpoints = 'csp-endpoint="/csp-report"';
+
+const lastDirective = (contentSecurityPolicy: unknown) =>
+  String(contentSecurityPolicy).split(";").at(-1)?.trim();
+
 const createDevelopmentServer = () =>
   createServer({ mode: "development", server: { middlewareMode: true } });
 
@@ -98,6 +103,75 @@ describe("Vite configuration", { timeout: 60_000 }, () => {
       .find((directive) => directive.startsWith("connect-src"));
     expect(connectSrc).toBe("connect-src 'self'");
     expect(config.preview.headers?.["Content-Security-Policy"]).toBe(contentSecurityPolicy);
+  });
+
+  // CSP 違反の報告（ADR-068）。ブラウザが同一オリジンの /csp-report へ送る。
+  describe("CSP reporting", () => {
+    it("reports to the same-origin endpoint in development", async () => {
+      const server = await createDevelopmentServer();
+
+      try {
+        const { headers } = server.config.server;
+        expect(headers?.["Reporting-Endpoints"]).toBe(cspReportingEndpoints);
+        expect(lastDirective(headers?.["Content-Security-Policy"])).toBe("report-to csp-endpoint");
+      } finally {
+        await server.close();
+      }
+    });
+
+    it("reports to the same-origin endpoint in production and preview", async () => {
+      const config = await resolveConfig({}, "build", "production");
+
+      for (const headers of [config.server.headers, config.preview.headers]) {
+        expect(headers?.["Reporting-Endpoints"]).toBe(cspReportingEndpoints);
+        expect(lastDirective(headers?.["Content-Security-Policy"])).toBe("report-to csp-endpoint");
+      }
+    });
+
+    it("proxies only /csp-report to the webhook_event receiver on OTEL_CSP_REPORT_HTTP_PORT", async () => {
+      vi.stubEnv("FRONTEND_OTEL_ENABLED", "false");
+      vi.stubEnv("OTEL_CSP_REPORT_HTTP_PORT", "19348");
+      const server = await createDevelopmentServer();
+
+      try {
+        expect(server.config.server.proxy?.["^/csp-report$"]).toMatchObject({
+          target: "http://localhost:19348",
+          changeOrigin: false,
+        });
+      } finally {
+        await server.close();
+      }
+    });
+
+    it("proxies /csp-report in preview", async () => {
+      vi.stubEnv("FRONTEND_OTEL_ENABLED", "false");
+      vi.stubEnv("OTEL_CSP_REPORT_HTTP_PORT", "19349");
+      const config = await resolveConfig(
+        { mode: "test" },
+        "serve",
+        "production",
+        "production",
+        true,
+      );
+
+      expect(config.preview.proxy?.["^/csp-report$"]).toMatchObject({
+        target: "http://localhost:19349",
+        changeOrigin: false,
+      });
+    });
+
+    it("does not send /csp-report to the backend", () => {
+      expect("/csp-report").not.toMatch(new RegExp(proxyPath, "u"));
+    });
+
+    it("rejects an OTEL_CSP_REPORT_HTTP_PORT out of range", async () => {
+      vi.stubEnv("FRONTEND_OTEL_ENABLED", "false");
+      vi.stubEnv("OTEL_CSP_REPORT_HTTP_PORT", "65536");
+
+      await expect(
+        createServer({ mode: "development", logLevel: "silent", server: { middlewareMode: true } }),
+      ).rejects.toThrow("OTEL_CSP_REPORT_HTTP_PORT must be an integer between 1 and 65535: 65536");
+    });
   });
 
   it("allows only the IdP origin besides self in the production and preview form-action", async () => {

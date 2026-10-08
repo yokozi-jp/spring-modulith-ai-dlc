@@ -8,7 +8,7 @@ import react from "@vitejs/plugin-react";
 import { defaultExclude, defineConfig, loadEnv } from "vite-plus";
 
 const contentSecurityPolicy =
-  "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; form-action 'self'; script-src 'self'; style-src 'self'; style-src-elem 'self' 'unsafe-inline'; style-src-attr 'none'; img-src 'self' data:; font-src 'self'; connect-src 'self'";
+  "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; form-action 'self'; script-src 'self'; style-src 'self'; style-src-elem 'self' 'unsafe-inline'; style-src-attr 'none'; img-src 'self' data:; font-src 'self'; connect-src 'self'; report-to csp-endpoint";
 
 // ponytail: 開発では起動単位でnonceを固定する。本番へ適用するなら配信層でリクエスト単位に生成する。
 const developmentCspNonce = crypto.randomUUID().replaceAll("-", "");
@@ -111,6 +111,7 @@ function telemetryDefine(mode: string) {
 export default defineConfig(({ mode }) => {
   const serverPort = portFromEnv(mode, "SERVER_PORT", "18080");
   const faroPort = portFromEnv(mode, "OTEL_FARO_HTTP_PORT", "12347");
+  const cspReportPort = portFromEnv(mode, "OTEL_CSP_REPORT_HTTP_PORT", "12348");
   const idpOrigin = new URL(
     loadEnv(mode, "..", "OIDC_ISSUER_URI").OIDC_ISSUER_URI ?? "http://localhost:8080",
   ).origin;
@@ -129,6 +130,8 @@ export default defineConfig(({ mode }) => {
     "Permissions-Policy": "camera=(), microphone=(), geolocation=(), payment=(), usb=()",
     "X-Content-Type-Options": "nosniff",
     "X-Frame-Options": "DENY",
+    // CSP の report-to が参照する endpoint（ADR-068）。default にしないので、CSP 以外の報告は送られない。
+    "Reporting-Endpoints": 'csp-endpoint="/csp-report"',
   };
 
   return {
@@ -384,6 +387,12 @@ export default defineConfig(({ mode }) => {
         // 完全一致にし、将来の /collections のような画面の path を転送しない。
         "^/collect$": {
           target: `http://localhost:${faroPort}`,
+          changeOrigin: false,
+        },
+        // CSP 違反の報告（ADR-068）。ブラウザが Reporting API で送り、Collector の webhook_event receiver へ転送する。
+        // 完全一致にし、画面の path を転送しない。
+        "^/csp-report$": {
+          target: `http://localhost:${cspReportPort}`,
           changeOrigin: false,
         },
       },

@@ -24,6 +24,10 @@ tags: [convention, frontend, build, delivery, cache, future-arch-guidelines]
 - 配信点は、ADR-014が定めるsecurity headerを付けられる方式にする。
 - CSPの`form-action`にIdPのoriginを加える。
   ログアウトのフォーム送信がIdPへredirectされ、ブラウザがredirect先にもform-actionを適用するためである。
+- CSPの最後に `report-to csp-endpoint` を置き、`Reporting-Endpoints: csp-endpoint="/csp-report"` を付ける（[ADR-068](../adr/ADR-068-collect-browser-telemetry-with-faro-via-collector.md)）。
+- 配信点は `/csp-report` のPOSTを報告の受け口へ振り分ける。
+  振り分けがなくても報告の送信が失敗するだけで、画面には影響しない。
+- ChromiumはHTTPSの配信でだけ報告を送り、HTTPの `localhost` では送らない。
 - 新旧の静的ファイルを並べて置き、切り替えられる方式にする。
 - インターネットに公開する場合はCDNとobject storage、閉域網で配信する場合はreverse proxyまたはweb serverを、基本の候補にする。
 - HTTPSとresponse headerを扱えない静的website hostingの機能だけで配信しない。

@@ -214,6 +214,7 @@ PITのHTMLとXMLのレポートは、変異対象がある場合に`backend/buil
   Faroのfixtureもフロントエンドのpipelineに流し、例外、View、LCP、INP、CLSが同じ匿名session IDを持つことを確かめる。
   許可していない属性、URL token、UUIDのsession IDが出口に残らないことも検査する。
   同一オリジンの`/assets/<名前>.js`のstack frameだけが、pathと行と列で残ることも検査する。
+  CSP違反の報告のfixtureを`logs/frontend_csp`に流し、許可した7つの属性だけが残り、CSP以外の報告の型と64 KiBを超える本文が捨てられることも検査する。
   同じfixtureのtraceは`traces/frontend`の出口を別のファイルに分け、URL属性がなく、許可したHTTP属性とresource属性だけが残り、trace ID、span ID、親span IDが保たれることを確かめる。
 - **`task lint-md`**：`.markdownlint-cli2.yaml`の除外設定に従いMarkdownを検査する。
 - **`task lint-md-fix`**：markdownlint-cli2で安全に修正できるMarkdownの問題を修正する。

@@ -1,0 +1,160 @@
+[
+  {
+    "age": 101,
+    "body": {
+      "blockedURL": "https://blocked.example/pixel.png?secret-img=1",
+      "disposition": "enforce",
+      "documentURL": "https://localhost:5173/?secret-page=1",
+      "effectiveDirective": "img-src",
+      "lineNumber": 16,
+      "originalPolicy": "default-src 'self'; img-src 'self' data:; report-to csp-endpoint",
+      "referrer": "",
+      "sample": "",
+      "sourceFile": "https://localhost:5173/",
+      "statusCode": 200
+    },
+    "type": "csp-violation",
+    "url": "https://localhost:5173/?secret-page=1",
+    "user_agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/153.0.0.0 Safari/537.36"
+  },
+  {
+    "age": 101,
+    "body": {
+      "blockedURL": "inline",
+      "disposition": "enforce",
+      "documentURL": "https://localhost:5173/orders/42?secret-page=1#secret-fragment",
+      "effectiveDirective": "style-src-attr",
+      "lineNumber": 13,
+      "originalPolicy": "default-src 'self'; secret-policy; report-to csp-endpoint",
+      "referrer": "https://ref.example/path?secret-ref=1",
+      "sample": "secret-sample",
+      "sourceFile": "https://localhost:5173/assets/index-abc.js?v=secret-src#secret-src-fragment",
+      "statusCode": 200
+    },
+    "type": "csp-violation",
+    "url": "https://localhost:5173/orders/42?secret-page=1#secret-fragment",
+    "user_agent": "FixtureAgent/1.0"
+  },
+  {
+    "age": 1,
+    "body": {
+      "blockedURL": "HTTPS://user:secret-pass@Blocked.Example:8443/pixel/42.png;jsessionid=secret-semi?secret-img=1#secret-img-fragment",
+      "columnNumber": 7,
+      "disposition": "report",
+      "documentURL": "HTTPS://LOCALHOST:5173/orders/42;jsessionid=secret-semi",
+      "effectiveDirective": "img-src",
+      "lineNumber": 3,
+      "sourceFile": "https://localhost:5173/assets/index-abc.js",
+      "statusCode": 200
+    },
+    "type": "csp-violation",
+    "url": "HTTPS://LOCALHOST:5173/orders/42;jsessionid=secret-semi"
+  },
+  {
+    "age": 1,
+    "body": {
+      "blockedURL": "data:image/png;base64,c2VjcmV0LWRhdGE=",
+      "disposition": "enforce",
+      "documentURL": "https://localhost:5173/",
+      "effectiveDirective": "img-src",
+      "lineNumber": 4
+    },
+    "type": "csp-violation",
+    "url": "https://localhost:5173/"
+  },
+  {
+    "age": 1,
+    "body": {
+      "blockedURL": "inline",
+      "disposition": "enforce",
+      "documentURL": "https://localhost:5173/",
+      "effectiveDirective": "Script-Src secret-directive",
+      "lineNumber": 5
+    },
+    "type": "csp-violation",
+    "url": "https://localhost:5173/"
+  },
+  {
+    "age": 1,
+    "body": {
+      "blockedURL": "eval",
+      "disposition": "enforce",
+      "documentURL": "https://localhost:5173/",
+      "effectiveDirective": "script-src",
+      "lineNumber": -1
+    },
+    "type": "csp-violation",
+    "url": "https://localhost:5173/"
+  },
+  {
+    "age": 1,
+    "body": {
+      "id": "secret-deprecation",
+      "message": "secret-deprecation",
+      "sourceFile": "https://localhost:5173/?secret-dep=1"
+    },
+    "type": "deprecation",
+    "url": "https://localhost:5173/?secret-dep=1"
+  },
+  {
+    "age": 1,
+    "body": { "id": "secret-intervention", "message": "secret-intervention" },
+    "type": "intervention",
+    "url": "https://localhost:5173/?secret-int=1"
+  },
+  {
+    "age": 1,
+    "body": { "reason": "oom", "stack": "secret-crash" },
+    "type": "crash",
+    "url": "https://localhost:5173/?secret-crash=1"
+  },
+  {
+    "age": 1,
+    "body": {
+      "blockedURL": "https://aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.example/x",
+      "disposition": "enforce",
+      "documentURL": "https://localhost:5173/",
+      "effectiveDirective": "img-src",
+      "lineNumber": 10
+    },
+    "type": "csp-violation",
+    "url": "https://localhost:5173/"
+  },
+  {
+    "age": 1,
+    "body": {
+      "blockedURL": "https://evil.example\\@good/x",
+      "disposition": "enforce",
+      "documentURL": "https://localhost:5173/",
+      "effectiveDirective": "connect-src",
+      "lineNumber": 11
+    },
+    "type": "csp-violation",
+    "url": "https://localhost:5173/"
+  },
+  {
+    "age": 1,
+    "body": {
+      "blockedURL": "inline",
+      "disposition": "enforce",
+      "documentURL": "https://localhost:5173/",
+      "effectiveDirective": "script-src-elem",
+      "lineNumber": 12,
+      "sourceFile": "https://evil.example/assets/x.js"
+    },
+    "type": "csp-violation",
+    "url": "https://localhost:5173/"
+  },
+  {
+    "age": 1,
+    "body": {
+      "blockedURL": "inline",
+      "disposition": "enforce",
+      "documentURL": "https://localhost:5173/",
+      "effectiveDirective": "script-src-attr",
+      "lineNumber": 1e300
+    },
+    "type": "csp-violation",
+    "url": "https://localhost:5173/"
+  }
+]
