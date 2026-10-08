@@ -1,6 +1,8 @@
-/* oxlint-disable eslint/max-statements, eslint/max-lines, eslint/prefer-named-capture-group, typescript/method-signature-style, eslint/curly, unicorn/no-null, unicorn/no-useless-undefined, promise/avoid-new, eslint/no-promise-executor-return, typescript/strict-void-return -- telemetry の信頼境界を一ファイルに閉じ、SDK の beforeSend 契約に null を返す。 */
-import type { Faro, TransportItem } from "@grafana/faro-web-sdk";
+import type { Faro } from "@grafana/faro-web-sdk";
 
+import { sanitizeTelemetryItem } from "./telemetry-sanitize";
+
+// vite.config.ts の define がビルド時に置き換える（ADR-068）。
 declare const __TELEMETRY_ENABLED__: boolean;
 declare const __TELEMETRY_APP__: {
   name: string;
@@ -9,161 +11,44 @@ declare const __TELEMETRY_APP__: {
   environment: string;
 };
 
-const sessionStorageKey = globalThis.atob("Y29tLmdyYWZhbmEuZmFyby5zZXNzaW9u");
-const sessionAlphabet = "abcdefghijkmnopqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ0123456789";
-const absoluteUrl = /(^|[^A-Za-z0-9+.-])([A-Za-z][A-Za-z0-9+.-]*:[^\s\\]+)/gu;
-const relativeUrl = /(^|[^A-Za-z0-9%/._~-])(\/[^\s\\]+)/gu;
-const coreWebVitals = ["lcp", "inp", "cls"] as const;
-
 interface RouterTelemetrySource {
   readonly state: { readonly matches: readonly { readonly fullPath: string }[] };
-  subscribe(
+  subscribe: (
     eventType: "onResolved",
     listener: (event: { readonly hrefChanged: boolean }) => void,
-  ): () => void;
+  ) => () => void;
 }
 
 type TelemetryApi = Pick<Faro["api"], "pushError" | "pushEvent" | "setSession" | "setView">;
 interface TelemetrySink {
   api: TelemetryApi;
-  pause: Faro["pause"];
-  unpause: Faro["unpause"];
+  pause: () => void;
+  unpause: () => void;
+  genShortID: () => string;
 }
 
 interface TelemetryTestSink {
   api: Pick<TelemetryApi, "pushError"> & Partial<Omit<TelemetryApi, "pushError">>;
   pause?: () => void;
   unpause?: () => void;
-  resetSession?: () => Promise<void>;
+  genShortID?: () => string;
+  storedSessionKey?: string;
   trustedRoutes?: readonly string[];
 }
 
-let faroReady: Promise<TelemetrySink | undefined> | undefined = Promise.resolve<
-  TelemetrySink | undefined
->(undefined);
-let testSink: TelemetryTestSink | undefined = undefined;
+// oxlint-disable-next-line eslint/init-declarations -- 無効のビルドでは代入せず、undefined のままにする。
+let faroReady: Promise<TelemetrySink | undefined> | undefined;
 let telemetryEnabled = false;
 let sendingSuppressed = false;
-let currentView: string | undefined = undefined;
+// route template は / で始まるので、空文字は未送信を表す。
+let currentView = "";
+// 有効のビルドだけが SDK の session の保存先を持つ。
+let storedSessionKey = "";
 const trustedRoutes = new Set<string>();
 const reported = new WeakSet<Error>();
 
 function noop(): void {
   // テストが使わない SDK method を補う。
-}
-
-function record(value: unknown): Record<string, unknown> | undefined {
-  if (typeof value !== "object" || value === null || Array.isArray(value)) return undefined;
-  return Object.fromEntries(Object.entries(value));
-}
-
-function redactUrlTokens(value: string): string {
-  return value
-    .replaceAll(absoluteUrl, "$1[redacted-url]")
-    .replaceAll(relativeUrl, "$1[redacted-url]");
-}
-
-function redactStrings(value: unknown): void {
-  if (typeof value !== "object" || value === null) return;
-  for (const [key, child] of Object.entries(value)) {
-    if (typeof child === "string") Reflect.set(value, key, redactUrlTokens(child));
-    else redactStrings(child);
-  }
-}
-
-function removeTraceUrls(value: unknown): void {
-  if (typeof value !== "object" || value === null) return;
-  if (Array.isArray(value)) {
-    for (const child of value) removeTraceUrls(child);
-    return;
-  }
-  for (const [key, child] of Object.entries(value)) {
-    if (key === "attributes" && Array.isArray(child)) {
-      Reflect.set(
-        value,
-        key,
-        child.filter((attribute) => {
-          const candidate = record(attribute);
-          return typeof candidate?.key !== "string" || !candidate.key.startsWith("url.");
-        }),
-      );
-    } else {
-      removeTraceUrls(child);
-    }
-  }
-}
-
-function normalizedMeta(metaValue: unknown): Record<string, unknown> {
-  const meta = record(metaValue);
-  const app = record(meta?.app);
-  const session = record(meta?.session);
-  const view = record(meta?.view);
-  const normalized: Record<string, unknown> = {};
-
-  if (app) {
-    normalized.app = Object.fromEntries(
-      ["name", "namespace", "version", "environment"]
-        .filter((key) => typeof app[key] === "string")
-        .map((key) => [key, app[key]]),
-    );
-  }
-  if (typeof session?.id === "string") {
-    normalized.session = { id: session.id, attributes: { isSampled: "true" } };
-  }
-  if (typeof view?.name === "string" && trustedRoutes.has(view.name)) {
-    normalized.view = { name: view.name };
-    normalized.page = { url: view.name };
-  }
-  return normalized;
-}
-
-function normalizeMeasurement(payloadValue: unknown): Record<string, unknown> | undefined {
-  const payload = record(payloadValue);
-  const values = record(payload?.values);
-  if (payload?.type !== "web-vitals" || !values) return undefined;
-  const present = coreWebVitals.filter((name) => Object.hasOwn(values, name));
-  if (present.length !== 1) return undefined;
-  const [name] = present;
-  if (!name) return undefined;
-  const value: unknown = values[name];
-  if (typeof value !== "number" || !Number.isFinite(value) || value < 0) return undefined;
-  return { type: "web-vitals", timestamp: payload.timestamp, values: { [name]: value } };
-}
-
-function normalizeViewEvent(payloadValue: unknown): Record<string, unknown> | undefined {
-  const payload = record(payloadValue);
-  const attributes = record(payload?.attributes);
-  if (payload?.name !== "view_changed" || typeof attributes?.toView !== "string") return undefined;
-  if (!trustedRoutes.has(attributes.toView)) return undefined;
-  const normalizedAttributes: Record<string, string> = { toView: attributes.toView };
-  if (typeof attributes.fromView === "string" && trustedRoutes.has(attributes.fromView)) {
-    normalizedAttributes.fromView = attributes.fromView;
-  }
-  return { name: "view_changed", timestamp: payload.timestamp, attributes: normalizedAttributes };
-}
-
-/** beforeSend で URL、付加情報、未検証の値を縮約する。 */
-export function sanitizeTelemetryItem(item: TransportItem): TransportItem | null {
-  try {
-    const copy = structuredClone(item);
-    const type: string = copy.type;
-    if (type === "measurement") {
-      const payload = normalizeMeasurement(copy.payload);
-      if (!payload) return null;
-      Reflect.set(copy, "payload", payload);
-    } else if (type === "event") {
-      const payload = normalizeViewEvent(copy.payload);
-      if (!payload) return null;
-      Reflect.set(copy, "payload", payload);
-    } else {
-      redactStrings(copy.payload);
-      if (type === "trace") removeTraceUrls(copy.payload);
-    }
-    Reflect.set(copy, "meta", normalizedMeta(copy.meta));
-    return copy;
-  } catch {
-    return null;
-  }
 }
 
 export function untracedUrl(origin: string): RegExp {
@@ -178,7 +63,9 @@ function validRouteTemplate(value: string | undefined): value is string {
 }
 
 function processRoute(template: string, sink: TelemetrySink | undefined): void {
-  if (!sink || sendingSuppressed) return;
+  if (!sink || sendingSuppressed) {
+    return;
+  }
   trustedRoutes.add(template);
   try {
     if (currentView === template) {
@@ -197,9 +84,13 @@ function processRoute(template: string, sink: TelemetrySink | undefined): void {
 /** TanStack Router が解決した route template を View として送る。 */
 export function bindRouterTelemetry(router: RouterTelemetrySource): () => void {
   return router.subscribe("onResolved", ({ hrefChanged }) => {
-    if (!hrefChanged || !telemetryEnabled || sendingSuppressed) return;
+    if (!hrefChanged || !telemetryEnabled || sendingSuppressed) {
+      return;
+    }
     const template = router.state.matches.at(-1)?.fullPath;
-    if (!validRouteTemplate(template)) return;
+    if (!validRouteTemplate(template)) {
+      return;
+    }
     void (async () => {
       const sink = await faroReady;
       processRoute(template, sink);
@@ -207,36 +98,40 @@ export function bindRouterTelemetry(router: RouterTelemetrySource): () => void {
   });
 }
 
-/** テストから SDK 境界の送り先を差し替える。 */
-export function replaceTelemetryForTesting(sink?: TelemetryTestSink): void {
-  testSink = sink;
-  telemetryEnabled = sink !== undefined;
-  sendingSuppressed = false;
-  currentView = undefined;
-  trustedRoutes.clear();
-  for (const route of sink?.trustedRoutes ?? []) trustedRoutes.add(route);
-  if (!sink) {
-    faroReady = Promise.resolve(undefined);
-    return;
-  }
-  const api: TelemetryApi = {
-    pushError: sink.api.pushError,
-    pushEvent: sink.api.pushEvent ?? noop,
-    setSession: sink.api.setSession ?? noop,
-    setView: sink.api.setView ?? noop,
-  };
-  faroReady = Promise.resolve({
-    api,
+function testTelemetrySink(sink: TelemetryTestSink): TelemetrySink {
+  return {
+    api: {
+      pushError: sink.api.pushError,
+      pushEvent: sink.api.pushEvent ?? noop,
+      setSession: sink.api.setSession ?? noop,
+      setView: sink.api.setView ?? noop,
+    },
     pause: sink.pause ?? noop,
     unpause: sink.unpause ?? noop,
-  });
+    genShortID: sink.genShortID ?? (() => "Abc2345678"),
+  };
+}
+
+/** テストから SDK 境界の送り先を差し替える。 */
+export function replaceTelemetryForTesting(sink?: TelemetryTestSink): void {
+  telemetryEnabled = sink !== undefined;
+  sendingSuppressed = false;
+  currentView = "";
+  storedSessionKey = sink?.storedSessionKey ?? "";
+  trustedRoutes.clear();
+  for (const route of sink?.trustedRoutes ?? []) {
+    trustedRoutes.add(route);
+  }
+  faroReady = sink ? Promise.resolve(testTelemetrySink(sink)) : undefined;
 }
 
 /** composition root から一度だけ呼ぶ。SDK の読み込みを待たない。 */
 export function initTelemetry(): void {
   if (__TELEMETRY_ENABLED__) {
     telemetryEnabled = true;
-    faroReady = (async (): Promise<Faro | undefined> => {
+    // ponytail: SDK の STORAGE_KEY と同じ値。SDK が 500 ms 以内に読み込まれなくても消せるよう直書きし、切り替えは e2e で確かめる。
+    storedSessionKey = "com.grafana.faro.session";
+    faroReady = (async (): Promise<TelemetrySink | undefined> => {
       try {
         const [
           {
@@ -246,6 +141,7 @@ export function initTelemetry(): void {
             SessionInstrumentation,
             ViewInstrumentation,
             WebVitalsInstrumentation,
+            genShortID,
             initializeFaro,
           },
           { TracingInstrumentation },
@@ -269,10 +165,19 @@ export function initTelemetry(): void {
           transports: [
             new FetchTransport({ url: "/collect", requestOptions: { credentials: "omit" } }),
           ],
-          beforeSend: sanitizeTelemetryItem,
+          beforeSend: (item) => sanitizeTelemetryItem(item, trustedRoutes),
           internalLoggerLevel: InternalLoggerLevel.OFF,
         });
-        return faro;
+        return {
+          api: faro.api,
+          pause: () => {
+            faro.pause();
+          },
+          unpause: () => {
+            faro.unpause();
+          },
+          genShortID,
+        };
       } catch {
         return undefined;
       }
@@ -281,7 +186,9 @@ export function initTelemetry(): void {
 }
 
 export function reportCaughtError(error: unknown): void {
-  if (!(error instanceof Error) || reported.has(error) || sendingSuppressed) return;
+  if (!(error instanceof Error) || reported.has(error) || sendingSuppressed) {
+    return;
+  }
   reported.add(error);
   void (async () => {
     const faro = await faroReady;
@@ -289,34 +196,28 @@ export function reportCaughtError(error: unknown): void {
   })();
 }
 
-function randomSessionId(): string {
-  const maximum = Math.floor(256 / sessionAlphabet.length) * sessionAlphabet.length;
-  let id = "";
-  while (id.length < 10) {
-    const bytes = crypto.getRandomValues(new Uint8Array(10 - id.length));
-    for (const byte of bytes) {
-      if (byte < maximum) id += sessionAlphabet[byte % sessionAlphabet.length];
-    }
+function removeStoredSession(): void {
+  if (storedSessionKey === "") {
+    return;
   }
-  return id;
-}
-
-/** logout の送信前に匿名の Faro session を切り替える。 */
-export async function resetTelemetrySession(): Promise<void> {
   try {
-    sessionStorage.removeItem(sessionStorageKey);
+    sessionStorage.removeItem(storedSessionKey);
   } catch {
     // storage が使えなくても logout を続ける。
   }
-  if (testSink?.resetSession) {
-    await testSink.resetSession();
-    return;
-  }
-  const sink = await Promise.race([
+}
+
+function sinkWithin(milliseconds: number): Promise<TelemetrySink | undefined> {
+  return Promise.race([
     faroReady,
-    new Promise<undefined>((resolve) => setTimeout(resolve, 500)),
+    // oxlint-disable-next-line promise/avoid-new -- setTimeout を待つ標準の Promise がない。
+    new Promise<undefined>((resolve) => {
+      setTimeout(resolve, milliseconds);
+    }),
   ]);
-  if (!sink || sendingSuppressed) return;
+}
+
+function switchSession(sink: TelemetrySink): void {
   try {
     sink.pause();
     sendingSuppressed = true;
@@ -325,10 +226,19 @@ export async function resetTelemetrySession(): Promise<void> {
     return;
   }
   try {
-    sink.api.setSession({ id: randomSessionId() });
+    sink.api.setSession({ id: sink.genShortID() });
     sendingSuppressed = false;
     sink.unpause();
   } catch {
     // 旧 session へ新しい signal を加えないため pause のままにする。
+  }
+}
+
+/** logout の送信前に匿名の Faro session を切り替える。 */
+export async function resetTelemetrySession(): Promise<void> {
+  removeStoredSession();
+  const sink = await sinkWithin(500);
+  if (sink && !sendingSuppressed) {
+    switchSession(sink);
   }
 }

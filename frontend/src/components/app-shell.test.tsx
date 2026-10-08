@@ -1,4 +1,3 @@
-/* oxlint-disable eslint/max-statements, eslint/init-declarations, promise/avoid-new, vitest/prefer-mock-return-shorthand, unicorn/no-useless-undefined, vitest/require-mock-type-parameters, typescript/strict-void-return -- 制御可能な Promise と native submit の spy で logout の順序を検査する。 */
 /* @vitest-environment jsdom */
 
 import { screen } from "@testing-library/react";
@@ -8,7 +7,13 @@ import { afterEach, describe, expect, it, vi } from "vite-plus/test";
 import { replaceTelemetryForTesting } from "@/lib/telemetry";
 import { renderRoute } from "@/testing/render-route";
 
+type Sink = NonNullable<Parameters<typeof replaceTelemetryForTesting>[0]>;
+
 const cookieValue = "0b1e5c1a-4f0e-4c55-9d8e-2f1a3b4c5d6e";
+
+function noop(): void {
+  // native submit の画面遷移を止める。
+}
 
 async function renderLogoutForm() {
   await renderRoute("/", { locale: "en" });
@@ -24,42 +29,49 @@ describe("app shell logout form", () => {
     replaceTelemetryForTesting();
   });
 
-  it("waits for the telemetry session reset and submits only once", async () => {
+  it("switches the telemetry session before one native submit", async () => {
     const user = userEvent.setup();
-    let finishReset: (() => void) | undefined;
-    const resetSession = vi.fn(
-      () =>
-        new Promise<void>((resolve) => {
-          finishReset = resolve;
-        }),
-    );
-    const nativeSubmit = vi
-      .spyOn(HTMLFormElement.prototype, "submit")
-      .mockImplementation(() => undefined);
-    replaceTelemetryForTesting({ api: { pushError: vi.fn() }, resetSession });
-    const form = await renderLogoutForm();
-    const button = screen.getByRole("button", { name: "Log out" });
-
-    await user.click(button);
-    form.dispatchEvent(new SubmitEvent("submit", { bubbles: true, cancelable: true }));
-    expect(resetSession).toHaveBeenCalledOnce();
-    expect(nativeSubmit).not.toHaveBeenCalled();
-
-    finishReset?.();
-    await vi.waitFor(() => {
-      expect(nativeSubmit).toHaveBeenCalledOnce();
+    const calls: string[] = [];
+    const nativeSubmit = vi.spyOn(HTMLFormElement.prototype, "submit").mockImplementation(() => {
+      calls.push("submit");
     });
-    expect(nativeSubmit.mock.instances[0]).toBe(form);
+    replaceTelemetryForTesting({
+      api: {
+        pushError: vi.fn<Sink["api"]["pushError"]>(),
+        setSession: (session) => {
+          calls.push(`set:${session?.id ?? ""}`);
+        },
+      },
+      pause: () => {
+        calls.push("pause");
+      },
+      unpause: () => {
+        calls.push("unpause");
+      },
+    });
+    const form = await renderLogoutForm();
+
+    await user.click(screen.getByRole("button", { name: "Log out" }));
+    form.dispatchEvent(new SubmitEvent("submit", { bubbles: true, cancelable: true }));
+
+    await vi.waitFor(() => {
+      expect(calls).toStrictEqual(["pause", "set:Abc2345678", "unpause", "submit"]);
+    });
+    expect(nativeSubmit.mock.instances).toStrictEqual([form]);
   });
 
-  it("submits even when the telemetry session reset fails", async () => {
+  it("submits even when the telemetry session switch fails", async () => {
     const user = userEvent.setup();
-    const nativeSubmit = vi
-      .spyOn(HTMLFormElement.prototype, "submit")
-      .mockImplementation(() => undefined);
+    const nativeSubmit = vi.spyOn(HTMLFormElement.prototype, "submit").mockImplementation(noop);
+    const unpause = vi.fn<() => void>();
     replaceTelemetryForTesting({
-      api: { pushError: vi.fn() },
-      resetSession: vi.fn<() => Promise<void>>().mockRejectedValue(new Error("failed")),
+      api: {
+        pushError: vi.fn<Sink["api"]["pushError"]>(),
+        setSession: () => {
+          throw new Error("failed");
+        },
+      },
+      unpause,
     });
     await renderLogoutForm();
 
@@ -67,6 +79,26 @@ describe("app shell logout form", () => {
 
     await vi.waitFor(() => {
       expect(nativeSubmit).toHaveBeenCalledOnce();
+    });
+    expect(unpause).not.toHaveBeenCalled();
+  });
+
+  it("allows logout again after the page returns from the back/forward cache", async () => {
+    const user = userEvent.setup();
+    const nativeSubmit = vi.spyOn(HTMLFormElement.prototype, "submit").mockImplementation(noop);
+    replaceTelemetryForTesting({ api: { pushError: vi.fn<Sink["api"]["pushError"]>() } });
+    await renderLogoutForm();
+    const button = screen.getByRole("button", { name: "Log out" });
+
+    await user.click(button);
+    await vi.waitFor(() => {
+      expect(nativeSubmit).toHaveBeenCalledOnce();
+    });
+    globalThis.dispatchEvent(new PageTransitionEvent("pageshow", { persisted: true }));
+    await user.click(button);
+
+    await vi.waitFor(() => {
+      expect(nativeSubmit).toHaveBeenCalledTimes(2);
     });
   });
 

@@ -31,6 +31,7 @@ Dockerを使うTaskは、Dockerがないローカル環境ではスキップし�
   ビルドの後に`dist/assets`を`faro|grafana|opentelemetry|web.?vitals`でgrepし、bundleにFaro、OpenTelemetry JS、Web Vitalsのコードが入っていれば失敗する（[ADR-068](../adr/ADR-068-collect-browser-telemetry-with-faro-via-collector.md)）。
 - **`task fe-verify`**：`fe-check`、`fe-knip`、`fe-test-build`（テレメトリを無効にした本番ビルドとgrepを含む）を実行する。
 - **`task fe-route-tree-check`**：ビルドで`routeTree.gen.ts`を再生成し、コミット済みの内容と差分があれば失敗する。
+  再生成した`fullPaths`がCollectorのroute allowlist（`transform/frontend_validate`の1か所）と一致しなければ、差分の検査より前に失敗する。
 - **`task api-client-check`**：Orvalで`src/api/generated`を再生成し、コミット済みの内容と差分があれば失敗する（後述の「API契約」）。
 
 ## フロントエンドのLint設定
@@ -209,8 +210,10 @@ PITのHTMLとXMLのレポートは、変異対象がある場合に`backend/buil
 - **`task lint-docker-check`**：Dockerfileを`docker build --check`で検査する。
 - **`task lint-compose`**：Composeファイルの構文、参照、変数展開を検証する。
 - **`task otel-collector-check`**：許可していない属性を含むOTLPのログをCollectorに流し、その属性が除かれ、許可した属性が残ることを確かめる。
+  最初に、Collectorのroute allowlistが`routeTree.gen.ts`の`fullPaths`と一致することを確かめる。
   Faroのfixtureもフロントエンドのpipelineに流し、例外、View、LCP、INP、CLSが同じ匿名session IDを持つことを確かめる。
   許可していない属性、URL token、UUIDのsession IDが出口に残らないことも検査する。
+  同一オリジンの`/assets/<名前>.js`のstack frameだけが、pathと行と列で残ることも検査する。
   同じfixtureのtraceは`traces/frontend`の出口を別のファイルに分け、URL属性がなく、許可したHTTP属性とresource属性だけが残り、trace ID、span ID、親span IDが保たれることを確かめる。
 - **`task lint-md`**：`.markdownlint-cli2.yaml`の除外設定に従いMarkdownを検査する。
 - **`task lint-md-fix`**：markdownlint-cli2で安全に修正できるMarkdownの問題を修正する。

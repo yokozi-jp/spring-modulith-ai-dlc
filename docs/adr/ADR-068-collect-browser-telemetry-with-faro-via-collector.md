@@ -63,11 +63,15 @@ Faro の形式を受ける contrib の `faroreceiver` は、Collector 0.161.0 �
 faroreceiver はブラウザ、ページ、セッションなどのメタデータをログの本文（logfmt）に入れるので、属性の `keep_keys` だけでは保護できない。
 そのため、フロントエンドの pipeline は検証、filter、正規化の三段で本文を処理する。
 例外、`view_changed`、LCP、INP、CLS の必須値と型を検証し、10 文字の匿名 session ID と `/` または `/logged-out` の route template を持つ record だけを通す。
+route template の allowlist は Collector の設定の 1 か所だけに書き、`routeTree.gen.ts` との不一致は Task の検査で失敗させる。
 本文は signal ごとに `Browser exception`、`Browser view`、`Browser web vital` のいずれかへ固定する。
 Web Vitals は LCP、INP、CLS の主値を一つだけ残し、delta と attribution を含む付加情報を捨てる。
 
 画面に対応する URL は TanStack Router が解決した route template だけを残す。
 例外メッセージと stacktrace の絶対 URL と相対 URL は、scheme、path、query、fragment を含む token 全体を `[redacted-url]` に置き換える。
+例外として、同一オリジンのビルドのファイル名（`/assets/<名前>.js`）に行と列が続く stack frame は、origin を落とした path と行と列を残す。
+Vite が付ける hash 付きのファイル名は秘密を含まず、本番の方針の source map で元の位置へ戻すのに要るためである。
+query か fragment を持つ URL は、ファイル名が一致しても token 全体を置き換える。
 ブラウザと Collector の両方で縮約し、実際の ID を推測して一部だけ加工する方式は使わない。
 
 フロントエンドの span は、送り手が書ける値を信頼せず、許可したものだけを残す。
@@ -88,6 +92,7 @@ trace ID、span ID、親 span ID は属性ではないので残り、バック�
 - 画面遷移は、TanStack Router の遷移の完了時に最後の match の `fullPath` を View として通知する。
   生の location、path parameter、query、fragment は読まない。
 - SDK を呼ぶコードは `frontend/src/lib/telemetry.ts` の 1 ファイルにまとめ、初期化は composition root の `main.tsx` で行う。
+  SDK に依存しない `beforeSend` の縮約は `frontend/src/lib/telemetry-sanitize.ts` に分け、`telemetry.ts` だけが呼ぶ。
   feature と route と component から SDK を呼ばない。
 - `traceparent` は同一オリジンの `/api/**` だけに付ける。
   範囲は Faro の設定の `ignoreUrls` に「同一オリジンの `/api/**` 以外」に一致する正規表現を 1 つ渡して決める。
@@ -97,7 +102,7 @@ trace ID、span ID、親 span ID は属性ではないので残り、バック�
   sampled flag が 1 の `traceparent` を維持する。
 - session は `persistent=false` とし、Faro の volatile session を `sessionStorage` に保持する。
   15 分の非操作または開始から 4 時間で切り替える。
-- ログアウトの native submit より前に送信を pause し、暗号学的乱数から 10 文字の匿名 ID を作って `setSession` した後で送信を再開する。
+- ログアウトの native submit より前に送信を pause し、SDK の `genShortID` で 10 文字の匿名 ID を作って `setSession` した後で送信を再開する。
   切替に失敗した場合は pause のままにし、旧 session ID へ新しい signal を追加しない。
 - session ID は利用者 ID、認証 session、`APP_SESSION`、氏名、メールアドレスへ結び付けない。
 - 送信の失敗や受け口の停止でアプリを止めず、SDK の初期化を待たずに描画を始める。
@@ -165,7 +170,7 @@ Faro を更新するたびに、lockfile で `ua-parser-js` の版を確かめ�
 - 出口が Collector の一つのままなので、本番の保存先は exporter の上書きで選び直せる。
 - 例外、View、LCP、INP、CLS を匿名 session ID で相関でき、URL token と利用者情報を保存先へ残さない。
 - 既定のビルドには SDK が入らないので、転用先は明示的に有効にするまで利用者のデータを集めない。
-- SDK を差し替えるときの変更が `lib/telemetry.ts` の 1 ファイルに収まる。
+- SDK を差し替えるときの変更が `lib/telemetry.ts` の 1 ファイルに収まる（縮約の `lib/telemetry-sanitize.ts` は SDK に依存しない）。
 
 ### Negative
 

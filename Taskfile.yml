@@ -425,6 +425,7 @@ tasks:
     dir: frontend
     cmds:
       - vp build
+      - task: _frontend-view-allowlist-check
       - git diff --exit-code -- src/routeTree.gen.ts
 
   lint-duplicates:
@@ -460,6 +461,24 @@ tasks:
         . "../{{.COMPOSE_ENV_FILE}}"
         set +a
         ./gradlew update
+
+  _frontend-view-allowlist-check:
+    internal: true
+    silent: true
+    cmds:
+      - |
+        # Collector の route allowlist（docker/otel-collector/config.yaml）が routeTree.gen.ts の fullPaths と同じ集合かを確かめる。
+        # ponytail: 生成物の fullPaths の文字列リテラルと、allowlist のリテラルの選択肢だけを読む。$id のような route params を足すときは正規表現のエスケープが要る。
+        routes="$(sed -n "/^  fullPaths:/,/^  fileRoutesByTo:/p" frontend/src/routeTree.gen.ts | grep -o "'[^']*'" | tr -d "'" | sort -u)"
+        patterns="$(grep -oF 'IsMatch(log.cache["route"], "^(?:' docker/otel-collector/config.yaml | wc -l)"
+        allowed="$(grep -o 'IsMatch(log.cache\["route"\], "\^(?:[^)]*)\$\$")' docker/otel-collector/config.yaml \
+          | sed -e 's/^IsMatch(log.cache\["route"\], "^(?://' -e 's/)\$\$")$//' | tr '|' '\n' | sort -u)"
+        if [ "$patterns" -ne 1 ] || [ -z "$routes" ] || [ -z "$allowed" ] || [ "$routes" != "$allowed" ]; then
+          echo "Collector の route allowlist（transform/frontend_validate の 1 か所）が routeTree.gen.ts の fullPaths と一致しません。" >&2
+          echo "routeTree.gen.ts: $(echo $routes)" >&2
+          echo "config.yaml（$patterns か所）: $(echo $allowed)" >&2
+          exit 1
+        fi
 
   _ensure-test-env:
     internal: true
@@ -946,6 +965,7 @@ tasks:
     desc: Collectorの設定が許可したログとtraceの属性だけを残すことを確認
     silent: true
     cmds:
+      - task: _frontend-view-allowlist-check
       - |
         # このタスクは、Collector の config.yaml が「残してよい値だけを残し、漏れてはいけない値を捨てる」ことの回帰テストである。
         # allowlist は YAML の設定で、型検査もコンパイルも効かない。processor を 1 行、正規表現を 1 文字間違えると、
@@ -1077,12 +1097,16 @@ tasks:
             and all($records[]; string_attr("session.id") == "Abc2345678")
             and ([ $records[] | string_attr("telemetry.signal") ] | sort) == ["exception", "view", "web-vital", "web-vital", "web-vital", "web-vital"]
             and any($records[]; .body.stringValue == "Browser exception"
-              and ([.attributes[]?.key] | sort) == ["exception.message", "exception.stacktrace", "exception.type", "session.id", "telemetry.signal", "url.path", "view.name"]
+              and ([.attributes[]?.key] | sort) == ["exception.message", "exception.stacktrace", "exception.type", "session.id", "telemetry.signal", "view.name"]
               and string_attr("exception.type") == "Error"
-              and string_attr("url.path") == "/"
               and string_attr("view.name") == "/"
-              and (string_attr("exception.message") | contains("[redacted-url]") and contains("plain a/b?c"))
-              and (string_attr("exception.stacktrace") | contains("([redacted-url]:10:5)")))
+              and (string_attr("exception.message") | contains("[redacted-url]") and contains("asset /assets/app-1.js:2:3") and contains("query [redacted-url] plain a/b?c"))
+              and (string_attr("exception.stacktrace")
+                | contains("([redacted-url]:10:5)")
+                  and contains("(/assets/index-abc.js:10:5)")
+                  and contains("(/assets/vendor.min-1.js:1:2)")
+                  and contains("([redacted-url]:3:4)")
+                  and (contains("localhost:5173") | not)))
             and any($records[]; .body.stringValue == "Browser view" and string_attr("view.name") == "/")
             and ([ $records[] | select(string_attr("measurement.name") == "lcp") | number_attr("measurement.value") ] | sort) == [123.4, 1000]
             and any($records[]; string_attr("measurement.name") == "inp" and number_attr("measurement.value") == 18)

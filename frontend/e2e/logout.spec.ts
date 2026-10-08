@@ -1,8 +1,14 @@
-/* oxlint-disable eslint/max-statements, eslint/max-lines, unicorn/no-array-callback-reference, promise/avoid-new -- セッション前後の公開 wire 契約を一つの利用者フローで検査する。 */
 import type { APIRequestContext, BrowserContext, Cookie, Locator, Page } from "@playwright/test";
 
 import { signInOnKeycloak } from "./environment";
 import { expect, test } from "./fixtures";
+import {
+  collectTelemetry,
+  exerciseSession,
+  expectWireLimits,
+  sessionId,
+  waitForTelemetry,
+} from "./telemetry";
 
 // 共有の storageState のセッションを終わらせないよう、各テストは専用の context でログインする。
 test.use({ storageState: { cookies: [], origins: [] } });
@@ -93,105 +99,35 @@ async function cookieValue(context: BrowserContext, name: string): Promise<strin
   return value;
 }
 
-async function waitForTelemetry(payloads: string[], value: string, startIndex = 0): Promise<void> {
-  await expect
-    .poll(() => payloads.slice(startIndex).some((payload) => payload.includes(value)), {
-      timeout: 15_000,
-    })
-    .toBe(true);
+// 再読み込みしても同じ session のまま、URL の query と fragment を送らないことを確かめる。
+async function reloadWithSecretUrl(page: Page): Promise<void> {
+  await page.goto("/?token=secret-query#secret-fragment");
+  await expect(homeHeading(page)).toBeVisible();
 }
 
-function sessionId(payload: string): string {
-  const match = /"session":\{[^}]*"id":"(?<id>[^"]+)"/u.exec(payload);
-  const id = match?.groups?.id;
-  if (typeof id !== "string" || id === "") {
-    throw new Error("Faro payload に session ID がありません");
-  }
-  return id;
+// ログアウトの後の画面遷移が、前と違う session ID を持つことを確かめて返す。
+async function logOutToNewSession(
+  page: Page,
+  payloads: string[],
+  oldSession: string,
+): Promise<string> {
+  await logoutButton(page).click();
+  await expectLoggedOutPage(page);
+  await waitForTelemetry(payloads, '"toView":"/logged-out"');
+  const newSession = sessionId(
+    payloads.find((payload) => payload.includes('"toView":"/logged-out"')) ?? "",
+  );
+  expect(newSession).not.toBe(oldSession);
+  return newSession;
 }
 
-async function throwBrowserError(page: Page, message: string): Promise<void> {
-  await page.evaluate((errorMessage) => {
-    setTimeout(() => {
-      throw new Error(errorMessage);
-    }, 0);
-  }, message);
-}
-
-async function exerciseWebVitals(page: Page, payloads: string[]): Promise<void> {
+// もう一度ログインし、その前に届いていた payload の数を返す。
+async function logInAgain(page: Page, payloads: string[]): Promise<number> {
   const startIndex = payloads.length;
-  await page.evaluate(() => {
-    const button = document.createElement("button");
-    button.textContent = "INP probe";
-    button.addEventListener("click", () => {
-      const end = performance.now() + 200;
-      while (performance.now() < end) {
-        // 実際の click に Event Timing entry ができるまで main thread を占有する。
-      }
-    });
-    document.querySelector("main")?.prepend(button);
-  });
-  const inpObserved = page.evaluate(
-    () =>
-      new Promise<boolean>((resolve) => {
-        const observer = new PerformanceObserver((list) => {
-          if (
-            list
-              .getEntries()
-              .some(
-                (entry) =>
-                  "interactionId" in entry &&
-                  typeof entry.interactionId === "number" &&
-                  entry.interactionId > 0,
-              )
-          ) {
-            observer.disconnect();
-            resolve(true);
-          }
-        });
-        observer.observe({ type: "event", buffered: true });
-        setTimeout(() => {
-          resolve(false);
-        }, 5000);
-      }),
-  );
-  const inpProbe = page.getByRole("button", { name: "INP probe" });
-  await inpProbe.click();
-  await inpProbe.click();
-  await inpProbe.click();
-  expect(await inpObserved).toBe(true);
-  const clsObserved = await page.evaluate(
-    () =>
-      new Promise<boolean>((resolve) => {
-        const observer = new PerformanceObserver((list) => {
-          if (
-            list
-              .getEntries()
-              .some((entry) => "hadRecentInput" in entry && entry.hadRecentInput === false)
-          ) {
-            observer.disconnect();
-            resolve(true);
-          }
-        });
-        observer.observe({ type: "layout-shift", buffered: true });
-        setTimeout(() => {
-          const element = document.createElement("div");
-          element.style.height = "100px";
-          document.querySelector("main")?.prepend(element);
-        }, 600);
-        setTimeout(() => {
-          resolve(false);
-        }, 5000);
-      }),
-  );
-  expect(clsObserved).toBe(true);
-  await page.evaluate(() => {
-    Object.defineProperty(document, "visibilityState", { configurable: true, value: "hidden" });
-    document.dispatchEvent(new Event("visibilitychange"));
-  });
-  await waitForTelemetry(payloads, '"lcp"', startIndex);
-  await waitForTelemetry(payloads, '"inp"', startIndex);
-  await waitForTelemetry(payloads, '"cls"', startIndex);
+  await page.getByRole("link", { name: "もう一度ログイン" }).click();
+  await signInOnKeycloak(page);
+  await expectAuthenticatedHome(page);
+  return startIndex;
 }
 
 let cspMessages: string[] = [];
@@ -226,69 +162,26 @@ test("ログイン直後に、ほかの操作をせずにログアウトする�
 });
 
 test("例外、画面遷移、Web Vitals をログアウト前後の匿名 session で相関できる", async ({ page }) => {
-  const payloads: string[] = [];
-  await page.route("**/collect", async (route) => {
-    payloads.push(route.request().postData() ?? "");
-    await route.fulfill({ status: 202 });
+  const payloads = await collectTelemetry(page);
+  await logIn(page);
+  await reloadWithSecretUrl(page);
+  const oldSession = await exerciseSession(page, {
+    payloads,
+    error: "old-session-error",
+    view: '"view_changed"',
+    startIndex: 0,
   });
 
-  await logIn(page);
-  await waitForTelemetry(payloads, '"view_changed"');
-  await exerciseWebVitals(page, payloads);
-  await throwBrowserError(page, "old-session-error");
-  await waitForTelemetry(payloads, "old-session-error");
-  await page.goto("/?token=secret-query#secret-fragment");
-  await expect(homeHeading(page)).toBeVisible();
-
-  const oldPayloads = payloads.filter((payload) =>
-    ["old-session-error", '"view_changed"', '"lcp"', '"inp"', '"cls"'].some((value) =>
-      payload.includes(value),
-    ),
-  );
-  const oldSession = sessionId(
-    oldPayloads.find((payload) => payload.includes("old-session-error")) ?? "",
-  );
-  expect(new Set(oldPayloads.map(sessionId))).toStrictEqual(new Set([oldSession]));
-
-  await logoutButton(page).click();
-  await expectLoggedOutPage(page);
-  await waitForTelemetry(payloads, '"toView":"/logged-out"');
-  const loggedOutPayload =
-    payloads.find((payload) => payload.includes('"toView":"/logged-out"')) ?? "";
-  const newSession = sessionId(loggedOutPayload);
-  expect(newSession).not.toBe(oldSession);
-
-  const reloginStart = payloads.length;
-  await page.getByRole("link", { name: "もう一度ログイン" }).click();
-  await signInOnKeycloak(page);
-  await expectAuthenticatedHome(page);
-  await waitForTelemetry(payloads, '"toView":"/"', reloginStart);
-  await exerciseWebVitals(page, payloads);
-  await throwBrowserError(page, "new-session-error");
-  await waitForTelemetry(payloads, "new-session-error", reloginStart);
-
-  const newPayloads = payloads
-    .slice(reloginStart)
-    .filter((payload) =>
-      ["new-session-error", '"toView":"/"', '"lcp"', '"inp"', '"cls"'].some((value) =>
-        payload.includes(value),
-      ),
-    );
-  expect(newPayloads.length).toBeGreaterThanOrEqual(5);
-  for (const signal of ["new-session-error", '"toView":"/"', '"lcp"', '"inp"', '"cls"']) {
-    expect(newPayloads.some((payload) => payload.includes(signal))).toBe(true);
-  }
-  expect(new Set(newPayloads.map(sessionId))).toStrictEqual(new Set([newSession]));
-
-  for (const payload of payloads) {
-    const itemCount = ["exceptions", "events", "measurements"].filter((key) =>
-      new RegExp(`"${key}":\\[[^\\]]`, "u").test(payload),
-    ).length;
-    expect(itemCount).toBeLessThanOrEqual(1);
-  }
-  expect(payloads.join("\n")).not.toMatch(
-    /secret-query|secret-fragment|APP_SESSION|person@example\.com|isSampled|unknown|#secret-selector/u,
-  );
+  const newSession = await logOutToNewSession(page, payloads, oldSession);
+  const startIndex = await logInAgain(page, payloads);
+  const reloginSession = await exerciseSession(page, {
+    payloads,
+    error: "new-session-error",
+    view: '"toView":"/"',
+    startIndex,
+  });
+  expect(reloginSession).toBe(newSession);
+  expectWireLimits(payloads);
 });
 
 test("ログアウト後はアプリと SSO のセッションが終わり、もう一度ログインして戻れる", async ({

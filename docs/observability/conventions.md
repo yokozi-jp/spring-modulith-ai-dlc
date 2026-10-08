@@ -59,13 +59,16 @@ Grafana では trace ID を使ってログとトレースを相互に検索す�
 ログの属性で許可するのは、例外の属性（`exception.type`、`exception.message`、`exception.stacktrace`）、HTTP status、409 の種類（`conflict.kind`）、trace と span の相関情報、業務上必要な内部 ID である。
 内部 ID と氏名などの表示値を同じ event へ載せない。
 HTTP の URL パスは span に入るため、API のパスに個人データと秘密情報を置かない。
-ブラウザの例外は画面の route path を `url.path` に持つため、画面の path にも個人データと秘密情報を置かず、識別子は内部 ID にする（[フロントエンドのURL設計](../frontend/url-design.md)）。
+ブラウザの例外は画面の route template を `view.name` に持つため、画面の path にも個人データと秘密情報を置かず、識別子は内部 ID にする（[フロントエンドのURL設計](../frontend/url-design.md)）。
 DTO やエンティティを logger へ渡さず、許可した値だけを個別の属性として渡す。
 
 SQL の span（jOOQ の `jooq.query`）は、SQL の種類だけを名前に持ち、SQL の文、バインドの値、例外のメッセージを持たない（[ADR-070](../adr/ADR-070-record-sql-spans-with-jooq-execute-listener.md)）。
 
-ブラウザでは、TanStack Router が解決した route template だけを画面の `view.name` と `url.path` に使う。
+ブラウザでは、TanStack Router が解決した route template だけを画面の `view.name` に使う。
 例外のメッセージと stacktrace に含まれる絶対 URL と `/` で始まる相対 URL は、scheme、path、query、fragment を含む token 全体を `[redacted-url]` に置き換える。
+ただし、同一オリジンのビルドのファイル名（`/assets/<名前>.js`）に行と列が続く stack frame は、origin を落とした path と行と列だけを残す。
+hash 付きのファイル名は秘密を含まず、source map で元の位置に戻すのに要るためである。
+query か fragment を持つ URL、別オリジンの URL、`/assets/` 以外の path は、ファイル名が `.js` で終わっても token 全体を置き換える。
 ブラウザ API trace の `url.*` 属性はすべて削除し、trace ID、span ID、親 span ID は維持する。
 Session、View、Errors、WebVitals、Tracing だけを明示的に有効にし、Console、Performance、UserAction、Frustration、Navigation、CSP は有効にしない。
 Web Vitals は LCP、INP、CLS の主値を一つだけ残し、付加情報を送らない。
@@ -104,13 +107,17 @@ Collector の設定（`docker/otel-collector/config.yaml`）は、ローカル�
 
 許可する record は次のとおりである。
 
-- 例外は本文を `Browser exception` に固定し、`telemetry.signal`、`exception.type`、`exception.message`、任意の `exception.stacktrace`、`session.id`、検証済み View がある場合の `url.path` と `view.name` だけを残す。
+- 例外は本文を `Browser exception` に固定し、`telemetry.signal`、`exception.type`、`exception.message`、任意の `exception.stacktrace`、`session.id`、検証済み View がある場合の `view.name` だけを残す。
 - 画面遷移は本文を `Browser view` に固定し、`telemetry.signal`、`view.name`、`session.id` だけを残す。
 - Web Vitals は本文を `Browser web vital` に固定し、`telemetry.signal`、`measurement.type`、`measurement.name`、`measurement.value`、`view.name`、`session.id` だけを残す。
 
-route template の allowlist は `/` と `/logged-out` である。
-route を追加するときは Collector の allowlist、fixture、この文書を同じ変更で更新する。
+route template の allowlist は `/` と `/logged-out` で、`transform/frontend_validate` の 1 か所だけに書く。
+`task fe-route-tree-check` と `task otel-collector-check` は、この allowlist が `routeTree.gen.ts` の `fullPaths` と一致しなければ失敗する。
+route を追加するときは、Collector の allowlist とこの文書を同じ変更で更新する。
+allowlist は環境変数にしない。
+Collector は環境変数の既定値に `$` を書けず、本番で上書きして広げられる値にもしないためである。
 session ID は `^[a-km-zA-HJ-NP-Z0-9]{10}$` に一致する匿名の Faro ID だけを許可し、UUID の `APP_SESSION` を拒否する。
+この形式も `transform/frontend_validate` の 1 か所だけに書く。
 resource 属性は `service.name`、`service.namespace`、`service.version`、`deployment.environment.name` だけを残し、`service.name` は Collector の `FRONTEND_OTEL_SERVICE_NAME` で上書きする。
 
 フロントエンドのトレースは、バックエンドの `traces` と別の pipeline（`traces/frontend`）で絞る。
@@ -129,6 +136,8 @@ faro receiver は処理に失敗すると、payload の全体を Collector 自�
 - **`task otel-collector-check`**：許可していない属性を含む OTLP のログを Collector に流し、出口に残らないことと、許可した属性が残ることを確かめる。
   Faro の fixture もフロントエンドの pipeline に流し、同じ session ID の例外、View、LCP、INP、CLS だけが残ることを確かめる。
   URL token、UUID の session ID、利用者情報、DOM 情報、追加の measurement 値が出口に残らないことも確かめる。
+  同一オリジンの `/assets/<名前>.js` の stack frame が path と行と列だけで残り、query か fragment を持つ URL と別の path が置き換わることも確かめる。
+  最初に、route の allowlist と `routeTree.gen.ts` の一致も確かめる。
   同じ fixture の trace は `traces/frontend` の出口を別のファイルに分けて検査し、URL 属性がなく、許可した HTTP 属性と resource 属性だけが残り、trace ID、span ID、親 span ID が保たれることを確かめる。
   faro receiver の受け口が、GET に 405、`text/plain` に 415、別のパスに 202、1 MiB を超える本文に 400 を返すことも確かめる。
   Collector の設定を変えたら実行する。

@@ -11,11 +11,14 @@
   "exceptions": [
     {
       "type": "Error",
-      "value": "absolute https://host/orders/42?token=secret-query#secret-fragment relative:/orders/42?token=secret-query#secret-fragment blob:blob:https://host/orders/42?token=x#f file:file:///orders/42?token=x#f webpack:webpack://app/orders/42?token=x#f data:data:text/plain,secret-query#secret-fragment boundaries [https://host/orders/42?token=x#f] (https://host/orders/42?token=x#f) \"https://host/orders/42?token=x#f\",/orders/42?token=x#f colon:/orders/42?token=x#f fullwidth：/orders/42?token=x#f comma、/orders/42?token=x#f period。/orders/42?token=x#f 日本語/orders/42?token=x#f multiple https://host/orders/42?token=x#f /orders/42?token=x#f escaped HTTPS://HOST/orders/42?token=x#f\\n plain a/b?c",
+      "value": "absolute https://host/orders/42?token=secret-query#secret-fragment relative:/orders/42?token=secret-query#secret-fragment blob:blob:https://host/orders/42?token=x#f file:file:///orders/42?token=x#f webpack:webpack://app/orders/42?token=x#f data:data:text/plain,secret-query#secret-fragment boundaries [https://host/orders/42?token=x#f] (https://host/orders/42?token=x#f) \"https://host/orders/42?token=x#f\",/orders/42?token=x#f colon:/orders/42?token=x#f fullwidth：/orders/42?token=x#f comma、/orders/42?token=x#f period。/orders/42?token=x#f 日本語/orders/42?token=x#f multiple https://host/orders/42?token=x#f /orders/42?token=x#f escaped HTTPS://HOST/orders/42?token=x#f\\n asset /assets/app-1.js:2:3 forged https://host/orders/42?t=/assets/app-1.js:2:3 query /assets/app-1.js?v=secret-query:2:3 plain a/b?c",
       "timestamp": "2026-10-06T00:00:00.000Z",
       "stacktrace": {
         "frames": [
-          { "filename": "http://localhost:5173/assets/index-abc.js?v=secret-query#secret-fragment", "function": "render", "lineno": 10, "colno": 5 }
+          { "filename": "http://localhost:5173/assets/index-abc.js?v=secret-query#secret-fragment", "function": "render", "lineno": 10, "colno": 5 },
+          { "filename": "http://localhost:5173/assets/index-abc.js", "function": "render", "lineno": 10, "colno": 5 },
+          { "filename": "/assets/vendor.min-1.js", "function": "a", "lineno": 1, "colno": 2 },
+          { "filename": "https://host/orders/42/assets/x.js", "function": "c", "lineno": 3, "colno": 4 }
         ]
       }
     },

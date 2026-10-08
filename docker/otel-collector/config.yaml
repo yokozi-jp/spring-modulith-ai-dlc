@@ -27,21 +27,26 @@ processors:
     error_mode: silent
     log_statements:
       - delete_key(log.attributes, "frontend.accepted")
+      - delete_key(log.attributes, "frontend.session")
+      - delete_key(log.attributes, "frontend.view")
       - replace_pattern(log.body, "'", "\u0001")
       - merge_maps(log.cache, ParseKeyValue(log.body), "upsert")
       - replace_all_patterns(log.cache, "value", "\u0001", "'")
       - set(log.attributes["frontend.type"], log.cache["type"])
       - set(log.attributes["frontend.value"], log.cache["value"])
       - set(log.attributes["frontend.stacktrace"], log.cache["stacktrace"]) where log.cache["stacktrace"] != nil
-      - set(log.attributes["frontend.session"], log.cache["session_id"])
-      - set(log.attributes["frontend.view"], log.cache["view_name"]) where log.cache["view_name"] != nil
-      - set(log.attributes["frontend.event_to_view"], log.cache["event_data_toView"]) where log.cache["event_data_toView"] != nil
+      # session ID の形式（Faro の genShortID が作る 10 文字）はここだけに書く。
+      - set(log.attributes["frontend.session"], log.cache["session_id"]) where IsMatch(log.cache["session_id"], "^[a-km-zA-HJ-NP-Z0-9]{10}$$")
+      - set(log.cache["route"], log.cache["view_name"]) where log.attributes["kind"] != "event"
+      - set(log.cache["route"], log.cache["event_data_toView"]) where log.attributes["kind"] == "event"
+      # route の allowlist はこの 1 行だけに書く。task fe-route-tree-check と task otel-collector-check が routeTree.gen.ts と照合する。
+      - set(log.attributes["frontend.view"], log.cache["route"]) where IsMatch(log.cache["route"], "^(?:/|/logged-out)$$")
       - set(log.attributes["frontend.lcp"], Double(log.cache["value_lcp"])) where Len(log.cache["value_lcp"]) >= 1 and Len(log.cache["value_lcp"]) <= 32 and IsMatch(log.cache["value_lcp"], "^[0-9]+(?:\\.[0-9]+)?$$")
       - set(log.attributes["frontend.inp"], Double(log.cache["value_inp"])) where Len(log.cache["value_inp"]) >= 1 and Len(log.cache["value_inp"]) <= 32 and IsMatch(log.cache["value_inp"], "^[0-9]+(?:\\.[0-9]+)?$$")
       - set(log.attributes["frontend.cls"], Double(log.cache["value_cls"])) where Len(log.cache["value_cls"]) >= 1 and Len(log.cache["value_cls"]) <= 32 and IsMatch(log.cache["value_cls"], "^[0-9]+(?:\\.[0-9]+)?$$")
-      - set(log.attributes["frontend.accepted"], "true") where log.attributes["kind"] == "exception" and IsMatch(log.cache["session_id"], "^[a-km-zA-HJ-NP-Z0-9]{10}$$") and IsMatch(log.cache["type"], "^[A-Za-z_$$][A-Za-z0-9_$$.]{0,127}$$") and Len(log.cache["value"]) <= 8192 and (log.cache["stacktrace"] == nil or Len(log.cache["stacktrace"]) <= 65536)
-      - set(log.attributes["frontend.accepted"], "true") where log.attributes["kind"] == "event" and log.cache["event_name"] == "view_changed" and IsMatch(log.cache["session_id"], "^[a-km-zA-HJ-NP-Z0-9]{10}$$") and IsMatch(log.cache["event_data_toView"], "^/(?:logged-out)?$$")
-      - set(log.attributes["frontend.accepted"], "true") where log.attributes["kind"] == "measurement" and log.cache["type"] == "web-vitals" and IsMatch(log.cache["session_id"], "^[a-km-zA-HJ-NP-Z0-9]{10}$$") and IsMatch(log.cache["view_name"], "^/(?:logged-out)?$$") and ((log.attributes["frontend.lcp"] != nil and log.attributes["frontend.lcp"] >= 0 and log.cache["value_inp"] == nil and log.cache["value_cls"] == nil) or (log.cache["value_lcp"] == nil and log.attributes["frontend.inp"] != nil and log.attributes["frontend.inp"] >= 0 and log.cache["value_cls"] == nil) or (log.cache["value_lcp"] == nil and log.cache["value_inp"] == nil and log.attributes["frontend.cls"] != nil and log.attributes["frontend.cls"] >= 0))
+      - set(log.attributes["frontend.accepted"], "true") where log.attributes["kind"] == "exception" and log.attributes["frontend.session"] != nil and IsMatch(log.cache["type"], "^[A-Za-z_$$][A-Za-z0-9_$$.]{0,127}$$") and Len(log.cache["value"]) <= 8192 and (log.cache["stacktrace"] == nil or Len(log.cache["stacktrace"]) <= 65536)
+      - set(log.attributes["frontend.accepted"], "true") where log.attributes["kind"] == "event" and log.cache["event_name"] == "view_changed" and log.attributes["frontend.session"] != nil and log.attributes["frontend.view"] != nil
+      - set(log.attributes["frontend.accepted"], "true") where log.attributes["kind"] == "measurement" and log.cache["type"] == "web-vitals" and log.attributes["frontend.session"] != nil and log.attributes["frontend.view"] != nil and ((log.attributes["frontend.lcp"] != nil and log.attributes["frontend.lcp"] >= 0 and log.cache["value_inp"] == nil and log.cache["value_cls"] == nil) or (log.cache["value_lcp"] == nil and log.attributes["frontend.inp"] != nil and log.attributes["frontend.inp"] >= 0 and log.cache["value_cls"] == nil) or (log.cache["value_lcp"] == nil and log.cache["value_inp"] == nil and log.attributes["frontend.cls"] != nil and log.attributes["frontend.cls"] >= 0))
   filter/frontend_logs:
     error_mode: silent
     logs:
@@ -52,12 +57,7 @@ processors:
     error_mode: silent
     log_statements:
       - set(log.attributes["exception.type"], log.attributes["frontend.type"]) where log.attributes["kind"] == "exception"
-      - set(log.attributes["exception.message"], log.attributes["frontend.value"]) where log.attributes["kind"] == "exception"
-      - set(log.attributes["exception.stacktrace"], log.attributes["frontend.stacktrace"]) where log.attributes["kind"] == "exception" and log.attributes["frontend.stacktrace"] != nil
-      - set(log.attributes["view.name"], log.attributes["frontend.view"]) where log.attributes["kind"] == "exception" and IsMatch(log.attributes["frontend.view"], "^/(?:logged-out)?$$")
-      - set(log.attributes["url.path"], log.attributes["frontend.view"]) where log.attributes["kind"] == "exception" and IsMatch(log.attributes["frontend.view"], "^/(?:logged-out)?$$")
-      - set(log.attributes["view.name"], log.attributes["frontend.event_to_view"]) where log.attributes["kind"] == "event"
-      - set(log.attributes["view.name"], log.attributes["frontend.view"]) where log.attributes["kind"] == "measurement"
+      - set(log.attributes["view.name"], log.attributes["frontend.view"]) where log.attributes["frontend.view"] != nil
       - set(log.attributes["session.id"], log.attributes["frontend.session"])
       - set(log.attributes["telemetry.signal"], "exception") where log.attributes["kind"] == "exception"
       - set(log.attributes["telemetry.signal"], "view") where log.attributes["kind"] == "event"
@@ -69,10 +69,20 @@ processors:
       - set(log.attributes["measurement.value"], log.attributes["frontend.lcp"]) where log.attributes["frontend.lcp"] != nil
       - set(log.attributes["measurement.value"], log.attributes["frontend.inp"]) where log.attributes["frontend.inp"] != nil
       - set(log.attributes["measurement.value"], log.attributes["frontend.cls"]) where log.attributes["frontend.cls"] != nil
+      # 例外の文字列だけを log.cache で置換し、view.name などの属性に置換を及ぼさない。
+      - set(log.cache["exception.message"], log.attributes["frontend.value"]) where log.attributes["kind"] == "exception"
+      - set(log.cache["exception.stacktrace"], log.attributes["frontend.stacktrace"]) where log.attributes["kind"] == "exception" and log.attributes["frontend.stacktrace"] != nil
+      # 送り手が置いた退避用の制御文字を先に消す。
+      - replace_all_patterns(log.cache, "value", "[\u0002\u0003]", "") where log.attributes["kind"] == "exception"
+      # 同一オリジンのビルドのファイル名（/assets/<名前>.js:行:列）だけを退避する（ADR-068）。
+      # hash 付きのファイル名は秘密を含まず、source map で行と列を戻すのに要る。origin は落とし、query か fragment を持つ URL は退避しない。
+      - replace_all_patterns(log.cache, "value", "(^|[^A-Za-z0-9+.-])(?:[Hh][Tt][Tt][Pp][Ss]?://[^/\\s\\\\?#]+)?/assets/([\\w.-]+)\\.js:(\\d+):(\\d+)(\\)|\\s|$$)", "$$1\u0002$$2\u0003:$$3:$$4$$5") where log.attributes["kind"] == "exception"
       # stack frame の URL を先に置換し、行番号と列番号を残す。その後、一般の URL token 全体を置換する。
-      - replace_all_patterns(log.attributes, "value", "(^|[^A-Za-z0-9+.-])([A-Za-z][A-Za-z0-9+.-]*:[^\\s\\\\]*)(:\\d+:\\d+\\))", "$$1[redacted-url]$$3") where log.attributes["kind"] == "exception"
-      - replace_all_patterns(log.attributes, "value", "(^|[^A-Za-z0-9+.-])([A-Za-z][A-Za-z0-9+.-]*:[^\\s\\\\]+)", "$$1[redacted-url]") where log.attributes["kind"] == "exception"
-      - replace_all_patterns(log.attributes, "value", "(^|[^A-Za-z0-9%/._~-])(/[^\\s\\\\]+)", "$$1[redacted-url]") where log.attributes["kind"] == "exception"
+      - replace_all_patterns(log.cache, "value", "(^|[^A-Za-z0-9+.-])([A-Za-z][A-Za-z0-9+.-]*:[^\\s\\\\]*)(:\\d+:\\d+\\))", "$$1[redacted-url]$$3") where log.attributes["kind"] == "exception"
+      - replace_all_patterns(log.cache, "value", "(^|[^A-Za-z0-9+.-])([A-Za-z][A-Za-z0-9+.-]*:[^\\s\\\\]+)", "$$1[redacted-url]") where log.attributes["kind"] == "exception"
+      - replace_all_patterns(log.cache, "value", "(^|[^A-Za-z0-9%/._~-])(/[^\\s\\\\]+)", "$$1[redacted-url]") where log.attributes["kind"] == "exception"
+      - replace_all_patterns(log.cache, "value", "\u0002([\\w.-]+)\u0003", "/assets/$$1.js") where log.attributes["kind"] == "exception"
+      - merge_maps(log.attributes, log.cache, "upsert") where log.attributes["kind"] == "exception"
       - set(log.body, "Browser exception") where log.attributes["kind"] == "exception"
       - set(log.body, "Browser view") where log.attributes["kind"] == "event"
       - set(log.body, "Browser web vital") where log.attributes["kind"] == "measurement"
@@ -81,7 +91,7 @@ processors:
       - delete_key(resource.attributes, "service.version") where not IsMatch(resource.attributes["service.version"], "^[A-Za-z0-9._-]{1,64}$$")
       - delete_key(resource.attributes, "deployment.environment.name") where not IsMatch(resource.attributes["deployment.environment.name"], "^[A-Za-z0-9._-]{1,64}$$")
       - keep_keys(resource.attributes, ["service.name", "service.namespace", "service.version", "deployment.environment.name"])
-      - keep_keys(log.attributes, ["telemetry.signal", "exception.type", "exception.message", "exception.stacktrace", "url.path", "view.name", "measurement.type", "measurement.name", "measurement.value", "session.id"])
+      - keep_keys(log.attributes, ["telemetry.signal", "exception.type", "exception.message", "exception.stacktrace", "view.name", "measurement.type", "measurement.name", "measurement.value", "session.id"])
   # フロントエンドの span も filter と transform の 2 段で守る。/collect は誰でも送れる（ADR-068）ので、送り手が書ける値を信頼しない。
   # span の event は例外のメッセージなどを持ちうるので、すべて捨てる。
   filter/frontend_span_events:

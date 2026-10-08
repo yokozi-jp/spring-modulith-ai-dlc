@@ -1,5 +1,6 @@
 import { Outlet } from "@tanstack/react-router";
-import { useRef } from "react";
+import { useEffect, useRef } from "react";
+import type { SubmitEvent } from "react";
 import { useTranslation } from "react-i18next";
 
 import { Button } from "@/components/ui/button";
@@ -18,10 +19,19 @@ async function submitAfterSessionReset(form: HTMLFormElement): Promise<void> {
 export function AppShell() {
   const { t } = useTranslation();
   const logoutStarted = useRef(false);
-  const submitLogout = (event: {
-    preventDefault: () => void;
-    readonly currentTarget: HTMLFormElement;
-  }): void => {
+  useEffect(() => {
+    // bfcache から戻った画面は ref が true のままなので、ボタンが効かなくなる。
+    const reopen = (event: PageTransitionEvent): void => {
+      if (event.persisted) {
+        logoutStarted.current = false;
+      }
+    };
+    globalThis.addEventListener("pageshow", reopen);
+    return () => {
+      globalThis.removeEventListener("pageshow", reopen);
+    };
+  }, []);
+  const submitLogout = (event: SubmitEvent<HTMLFormElement>): void => {
     event.preventDefault();
     if (logoutStarted.current) {
       return;
