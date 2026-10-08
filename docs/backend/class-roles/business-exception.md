@@ -106,6 +106,8 @@ Repository の実装は、`NOWAIT` のロックの失敗を、原因を付けず
 }
 ```
 
+catch した例外を原因に渡さないため、この断片を写したメソッドには PMD と Error Prone の警告の抑止が要り、その書き方は [jOOQ の Repository](jooq-repository.md) に従う。
+
 Controller は参照の結果がなければ `NotFoundException` を投げ、ステータスを自分で決めない（[Controller](controller.md)）。
 
 ```java
