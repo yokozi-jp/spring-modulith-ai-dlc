@@ -61,40 +61,30 @@ class CommonColumnsListenerTraceTest {
   @Test
   @DisplayName("@ApplicationModuleListener の中で forInsert が現在の trace ID と Listener の pgm_cd を登録できる")
   void listenerObtainsTraceId(final Scenario scenario) {
-    final String publisherTraceId = publishInSpan(scenario);
+    final String publisherTraceId = publishInSpan(scenario, false);
 
     assertThat(probe.result())
-        .as("リスナーで登録する created_tx_id、created_pgm_cd、created_by。例外ではなく、発行側と同じ trace ID であること")
-        .isEqualTo(List.of(publisherTraceId, LISTENER_PGM_CD, LISTENER_PGM_CD));
+        .as(
+            "リスナーで登録する created_tx_id、created_pgm_cd、created_by、updated_by。例外ではなく、発行側と同じ trace ID であること")
+        .isEqualTo(List.of(publisherTraceId, LISTENER_PGM_CD, LISTENER_PGM_CD, LISTENER_PGM_CD));
   }
 
   @Test
-  @DisplayName("利用者の要求の中で発行したイベントでも、Listener の created_by は利用者の sub ではなく Listener の pgm_cd になる")
-  void listenerOperatorIsPgmCdEvenWhenPublishedByUser(final Scenario scenario) {
-    final Instant issuedAt = Instant.parse("2026-10-03T00:00:00Z");
-    final OidcIdToken idToken =
-        OidcIdToken.withTokenValue("id-token")
-            .subject("user-sub")
-            .issuedAt(issuedAt)
-            .expiresAt(issuedAt.plusSeconds(300))
-            .build();
-    final DefaultOidcUser user =
-        new DefaultOidcUser(AuthorityUtils.createAuthorityList("OIDC_USER"), idToken);
-    SecurityContextHolder.getContext()
-        .setAuthentication(new OAuth2AuthenticationToken(user, user.getAuthorities(), "web"));
-    try {
-      final String publisherTraceId = publishInSpan(scenario);
+  @DisplayName("Listener の中に利用者の認証があっても、created_by と updated_by は Listener の pgm_cd になる")
+  void listenerOperatorIsPgmCdEvenWithUserAuthentication(final Scenario scenario) {
+    final String publisherTraceId = publishInSpan(scenario, true);
 
-      assertThat(probe.result())
-          .as("リスナーで登録する created_tx_id、created_pgm_cd、created_by")
-          .isEqualTo(List.of(publisherTraceId, LISTENER_PGM_CD, LISTENER_PGM_CD));
-    } finally {
-      SecurityContextHolder.clearContext();
-    }
+    assertThat(probe.result())
+        .as("リスナーで登録する created_tx_id、created_pgm_cd、created_by、updated_by")
+        .isEqualTo(List.of(publisherTraceId, LISTENER_PGM_CD, LISTENER_PGM_CD, LISTENER_PGM_CD));
   }
 
-  /** 発行側の span の中でイベントを発行し、Listener が動くまで待って、発行側の trace ID を返す。 */
-  private String publishInSpan(final Scenario scenario) {
+  /**
+   * 発行側の span の中でイベントを発行し、Listener が動くまで待って、発行側の trace ID を返す。
+   *
+   * <p>{@code asUser} なら、Listener は自身の中で利用者の認証を立ててから共通カラムを組み立てる。
+   */
+  private String publishInSpan(final Scenario scenario, final boolean asUser) {
     probe.reset();
     final AtomicReference<String> publisherTraceId = new AtomicReference<>();
 
@@ -105,15 +95,15 @@ class CommonColumnsListenerTraceTest {
                   Objects.requireNonNull(tracer.currentSpan(), "発行側に現在の span があること");
               publisherTraceId.set(publisherSpan.context().traceId());
               scenario
-                  .publish(new TraceProbeEvent())
+                  .publish(new TraceProbeEvent(asUser))
                   .andWaitForStateChange(probe::result)
                   .andVerify(result -> {});
             });
     return publisherTraceId.get();
   }
 
-  /** リスナーを起動するためのイベント。 */
-  /* package */ record TraceProbeEvent() {}
+  /** リスナーを起動するためのイベント。{@code asUser} なら、Listener の中で利用者の認証を立てる。 */
+  /* package */ record TraceProbeEvent(boolean asUser) {}
 
   /** モジュールのイベントリスナーで共通カラムを組み立て、trace ID、pgm_cd、作成者か例外を記録する。 */
   // 非同期とトランザクションのプロキシを作れるよう、final にしない。
@@ -130,22 +120,50 @@ class CommonColumnsListenerTraceTest {
       this.commonColumns = commonColumns;
     }
 
-    /** イベントを受けて、INSERT の共通カラムを組み立てる。 */
+    /**
+     * イベントを受けて、INSERT と UPDATE の共通カラムを組み立てる。
+     *
+     * <p>認証が Listener のスレッドへ渡るかは非同期の実行の設定に依存するため（ADR-051）、利用者の認証は Listener の中で立てる。
+     */
     // PgmCdAspect の pointcut の対象にするため、public にする。
     @ApplicationModuleListener
     public void on(final TraceProbeEvent event) {
       try {
-        final Map<Field<?>, Object> values = commonColumns.forInsert(FixtureItemTable.FIXTURE_ITEM);
+        if (event.asUser()) {
+          SecurityContextHolder.getContext().setAuthentication(userAuthentication());
+        }
+        final Map<Field<?>, Object> inserted =
+            commonColumns.forInsert(FixtureItemTable.FIXTURE_ITEM);
+        final Map<Field<?>, Object> updated =
+            commonColumns.forUpdate(FixtureItemTable.FIXTURE_ITEM);
         observed.set(
             List.of(
-                values.get(FixtureItemTable.FIXTURE_ITEM.CREATED_TX_ID),
-                values.get(FixtureItemTable.FIXTURE_ITEM.CREATED_PGM_CD),
-                values.get(FixtureItemTable.FIXTURE_ITEM.CREATED_BY)));
+                inserted.get(FixtureItemTable.FIXTURE_ITEM.CREATED_TX_ID),
+                inserted.get(FixtureItemTable.FIXTURE_ITEM.CREATED_PGM_CD),
+                inserted.get(FixtureItemTable.FIXTURE_ITEM.CREATED_BY),
+                updated.get(FixtureItemTable.FIXTURE_ITEM.UPDATED_BY)));
       } catch (IllegalStateException exception) {
         observed.set(exception);
+      } finally {
+        SecurityContextHolder.clearContext();
       }
     }
 
+    /** sub が {@code user-sub} の OIDC の利用者の認証を作る。 */
+    private static OAuth2AuthenticationToken userAuthentication() {
+      final Instant issuedAt = Instant.parse("2026-10-03T00:00:00Z");
+      final OidcIdToken idToken =
+          OidcIdToken.withTokenValue("id-token")
+              .subject("user-sub")
+              .issuedAt(issuedAt)
+              .expiresAt(issuedAt.plusSeconds(300))
+              .build();
+      final DefaultOidcUser user =
+          new DefaultOidcUser(AuthorityUtils.createAuthorityList("OIDC_USER"), idToken);
+      return new OAuth2AuthenticationToken(user, user.getAuthorities(), "web");
+    }
+
+    // ponytail: probe はテストクラスで共有し、逐次実行を前提にする。並列実行を入れるときはテストごとに probe を分ける。
     /** 前のテストの結果を消す。 */
     /* package */ void reset() {
       observed.set(null);

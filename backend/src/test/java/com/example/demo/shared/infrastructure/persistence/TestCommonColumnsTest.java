@@ -61,6 +61,7 @@ class TestCommonColumnsTest {
     final CommonColumns commonColumns = TestCommonColumns.at(NOW);
 
     assertThatThrownBy(() -> commonColumns.forInsert(FIXTURE_ITEM))
-        .isInstanceOf(IllegalStateException.class);
+        .isInstanceOf(IllegalStateException.class)
+        .hasMessageContaining("pgm_cd is not bound");
   }
 }
