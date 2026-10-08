@@ -97,6 +97,28 @@ describe("sanitizeTelemetryItem", () => {
     });
   });
 
+  it("keeps an initial root view without the unknown source", () => {
+    replaceTelemetryForTesting({
+      api: { pushError: vi.fn() },
+      trustedRoutes: ["/"],
+    });
+    const event = item(
+      "event",
+      {
+        name: "view_changed",
+        timestamp: "2026-10-06T00:00:00Z",
+        attributes: { fromView: "unknown", toView: "/" },
+      },
+      exceptionItem("x", "x").meta,
+    );
+
+    expect(sanitizeTelemetryItem(event)?.payload).toStrictEqual({
+      name: "view_changed",
+      timestamp: "2026-10-06T00:00:00Z",
+      attributes: { toView: "/" },
+    });
+  });
+
   it("keeps only trusted route templates in a view transition", () => {
     replaceTelemetryForTesting({
       api: { pushError: vi.fn() },
