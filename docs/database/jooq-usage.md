@@ -20,6 +20,7 @@ jOOQの生成コードには適用しない。
 
 `@PlainSQL`の付いたメソッドを使わない。
 たとえば`DSL.sql(String)`、`DSL.field(String)`、`DSL.condition(String)`、`DSLContext.fetch(String)`、`DSLContext.execute(String)`、`DSLContext.resultQuery(String)`が該当する。
+`@PlainSQL`の付かない`DSL.unquotedName`と`DSL.keyword`も、文字列を引用符なしでそのままSQLに出力するため使わない。
 テーブルとカラムは生成されたクラスから参照する。
 
 文字列のSQLは、jOOQを採用した理由であるスキーマとのコンパイル時の照合を失う（[ADR-003](../adr/ADR-003-adopt-jooq-for-data-access.md)）。
@@ -28,6 +29,11 @@ jOOQの生成コードには適用しない。
 
 `Settings.withRenderSchema(false)`を使わず、SQLをスキーマ名で修飾したままにする。
 `search_path`による暗黙の振り分けは[ADR-011](../adr/ADR-011-use-module-owned-database-schemas.md)が禁止している。
+
+## 文の種類とバインド変数
+
+`Settings`の`statementType`と`paramType`は、既定の`PREPARED_STATEMENT`と`INDEXED`から変えない。
+値をSQLへ埋め込まず、バインド変数で渡すためである。
 
 ## 楽観的ロック
 
@@ -48,7 +54,7 @@ NOT NULLの`varchar`には、コード生成がNULLを空文字へそろえるCo
 
 ## 検査
 
-Plain SQLのAPIと`withRenderSchema(false)`の使用は、ArchUnitの`DatabaseConventionsArchTest`で検査する。
+Plain SQLのAPI、`DSL.unquotedName`と`DSL.keyword`、`withRenderSchema(false)`、`statementType`と`paramType`の変更は、ArchUnitの`DatabaseConventionsArchTest`で検査する。
 `TableWriter`の外の書き込みと入口の選び分けは、ArchUnitの`TableWriterArchTest`で検査する（[バックエンドのアーキテクチャテスト](../backend/architecture-tests.md)）。
 
 ## jOOQの版を上げるとき

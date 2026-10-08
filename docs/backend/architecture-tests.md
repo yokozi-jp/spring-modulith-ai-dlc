@@ -261,7 +261,9 @@ Error Proneの`CheckReturnValue`は既定でerrorであり、`updateWhere`と`de
 
 - `transactionIsolationIsNotDeclared`：Springの`@Transactional`をクラスまたはメソッドに付けるとき、`isolation`を指定しない。
 - `plainSqlApisAreNotUsed`：`@PlainSQL`の付いたjOOQのAPIを呼び出さず、メソッド参照もしない。
+- `verbatimSqlApisAreNotUsed`：`DSL.unquotedName`と`DSL.keyword`を呼び出さず、メソッド参照もしない。どちらも`@PlainSQL`を持たないが、文字列をそのままSQLに出力する。
 - `renderSchemaIsNotChanged`：`Settings.withRenderSchema`と`Settings.setRenderSchema`を呼び出さず、メソッド参照もしない。引数の値はバイトコードに残らないため、`withRenderSchema(false)`の禁止を呼び出しの禁止で近似する。
+- `statementTypeAndParamTypeAreNotChanged`：`Settings`の`withStatementType`、`setStatementType`、`withParamType`、`setParamType`を呼び出さず、メソッド参照もしない。
 
 DBの規約のほかの検査は`backend/src/test/java/com/example/demo/persistence/conventions/`に置く。
 
