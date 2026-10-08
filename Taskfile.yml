@@ -407,7 +407,7 @@ tasks:
       - |
         # grep は一致で 0、不一致で 1、対象がないなどの失敗で 2 を返す。1 以外は失敗にする。
         status=0
-        grep -rqiE 'faro|grafana|opentelemetry' dist/assets || status=$?
+        grep -rqiE 'faro|grafana|opentelemetry|web.?vitals' dist/assets || status=$?
         if [ "$status" -ne 1 ]; then
           echo "無効のビルドの bundle に Faro の SDK か OpenTelemetry JS が入っているか、dist/assets を検査できませんでした（grep の終了コード $status）。" >&2
           exit 1
@@ -1029,6 +1029,12 @@ tasks:
           sleep 1
         done
         if [ "$accepted" -ne 1 ]; then fail "Collector の faro receiver が Faro の payload を受け付けませんでした。"; fi
+        invalid="$out/invalid-session.json"
+        jq '.meta.session.id = "0b1e5c1a-4f0e-4c55-9d8e-2f1a3b4c5d6e" | .meta.app.version = "invalid-session-probe" | del(.traces)' \
+          docker/otel-collector/check/fixtures/frontend.json > "$invalid"
+        status="$(curl -s -o /dev/null -w '%{http_code}' -X POST -H "Content-Type: application/json" \
+          --data-binary "@$invalid" "http://$faro_address/collect")"
+        if [ "$status" != "202" ]; then fail "不正 session の Faro payload を送れませんでした（$status）。"; fi
         # 受け口の挙動。本文の {} は例外も log も持たないので、出口の記録を増やさない。
         status="$(curl -s -o /dev/null -w '%{http_code}' "http://$faro_address/collect")"
         if [ "$status" != "405" ]; then fail "faro receiver が GET に 405 を返しませんでした（$status）。"; fi
@@ -1045,42 +1051,43 @@ tasks:
           sleep 1
         done
         if [ ! -s "$out/frontend.json" ]; then fail "フロントエンドのログが出口に届きませんでした。"; fi
-        if grep -qE 'secret-|person@example\.com|fixture-user-id|fixture-session-id|FixtureAgent' "$out/frontend.json"; then
-          fail "フロントエンドのログに、許可していない値か URL の query か fragment が残りました。"
+        if grep -qE 'secret-|person@example\.com|fixture-user-id|FixtureAgent|invalid-session-probe|0b1e5c1a|orders/42|secret-query|secret-fragment' "$out/frontend.json"; then
+          fail "フロントエンドのログに、許可していない値、URL、または不正 session が残りました。"
         fi
         # file exporter はバッチごとに一行を書くので -s で読む。
-        if ! jq -s -e --arg apostrophe "can't" '
-          def attr($key): first(.attributes[]? | select(.key == $key) | .value.stringValue);
+        if ! jq -s -e '
+          def string_attr($key): first(.attributes[]? | select(.key == $key) | .value.stringValue);
+          def number_attr($key): first(.attributes[]? | select(.key == $key) | .value.doubleValue);
           [.[].resourceLogs[]?] as $resources
           | [$resources[].scopeLogs[]?.logRecords[]?] as $records
           | ($resources | length) > 0
             and all($resources[]; .resource
-              | attr("service.name") == "demo-web"
-                and attr("service.namespace") == "demo"
-                and attr("service.version") == "0.0.0-fixture"
-                and attr("deployment.environment.name") == "local"
-                # payload の meta.app に関わらず、resource 属性は許可した 4 つだけにする。
+              | string_attr("service.name") == "demo-web"
+                and string_attr("service.namespace") == "demo"
+                and string_attr("service.version") == "0.0.0-fixture"
+                and string_attr("deployment.environment.name") == "local"
                 and ([.attributes[]?.key] | sort) == ["deployment.environment.name", "service.name", "service.namespace", "service.version"])
             and ($records | length) == 5
-            and all($records[];
-              .body.stringValue == "Browser exception"
-                and ([.attributes[]?.key] | sort) == ["exception.message", "exception.stacktrace", "exception.type", "url.path"]
-                and attr("exception.type") == "Error"
-                and attr("url.path") == "/orders/42")
-            and any($records[];
-              attr("exception.message") == "failed to load http://localhost:5173/api/orders"
-                and (attr("exception.stacktrace") | contains("(http://localhost:5173/assets/index-abc.js:10:5)")))
-            # query の除去が 1 行目の改行（\ と n の 2 文字）を食べていないこと。
-            and any($records[]; attr("exception.stacktrace") | contains("http://localhost:5173/api/orders\\n  at render ("))
-            and any($records[]; attr("exception.message") == $apostrophe)
-            and any($records[]; attr("exception.message") == "bad http://localhost:5173/x tail")
-            # scheme が大文字でも query を消し、log、event、measurement は捨てる（記録は例外の 5 件だけ）。
-            and any($records[]; attr("exception.message") == "upper HTTPS://H/x tail")
-            # path に括弧を含む URL でも query を消し、frame の :行:列) は残す。
-            and any($records[]; attr("exception.message") == "paren https://example.test/a(b) tail"
-              and (attr("exception.stacktrace") | contains("(http://localhost:5173/assets/a(b).js:1:2)")))
+            and all($records[]; string_attr("session.id") == "Abc2345678")
+            and ([ $records[] | string_attr("telemetry.signal") ] | sort) == ["exception", "view", "web-vital", "web-vital", "web-vital"]
+            and any($records[]; .body.stringValue == "Browser exception"
+              and ([.attributes[]?.key] | sort) == ["exception.message", "exception.stacktrace", "exception.type", "session.id", "telemetry.signal", "url.path", "view.name"]
+              and string_attr("exception.type") == "Error"
+              and string_attr("url.path") == "/"
+              and string_attr("view.name") == "/"
+              and (string_attr("exception.message") | contains("[redacted-url]") and contains("plain a/b?c"))
+              and (string_attr("exception.stacktrace") | contains("([redacted-url]:10:5)")))
+            and any($records[]; .body.stringValue == "Browser view" and string_attr("view.name") == "/")
+            and any($records[]; string_attr("measurement.name") == "lcp" and number_attr("measurement.value") == 123.4)
+            and any($records[]; string_attr("measurement.name") == "inp" and number_attr("measurement.value") == 18)
+            and any($records[]; string_attr("measurement.name") == "cls" and number_attr("measurement.value") == 0.12)
+            and all($records[] | select(string_attr("telemetry.signal") == "web-vital");
+              .body.stringValue == "Browser web vital"
+                and string_attr("measurement.type") == "web-vitals"
+                and string_attr("view.name") == "/"
+                and ([.attributes[]?.key] | sort) == ["measurement.name", "measurement.type", "measurement.value", "session.id", "telemetry.signal", "view.name"])
         ' "$out/frontend.json" >/dev/null; then
-          fail "フロントエンドのログの属性、resource 属性、本文のいずれかが期待値と一致しません。"
+          fail "フロントエンドの例外、View、Web Vitals、session の正規形が期待値と一致しません。"
         fi
         # 同じ payload の traces は traces/frontend を通り、frontend-traces.json に出る。
         for _ in $(seq 1 30); do
@@ -1101,27 +1108,22 @@ tasks:
               | attr("service.name") == "demo-web"
                 and ([.attributes[]?.key] | sort) == ["deployment.environment.name", "service.name", "service.namespace", "service.version"])
             and all($scopes[]; .scope.name == "browser" and ((.scope.version // "") == "") and ((.scope.attributes // []) | length) == 0)
-            and ($spans | length) == 3
+            and ($spans | length) == 2
             and all($spans[];
               .name == "Browser request"
                 and .traceId == "0af7651916cd43dd8448eb211c80319c"
+                and .parentSpanId == "00f067aa0ba902b7"
                 and ((.traceState // "") == "")
                 and ((.status.message // "") == "")
                 and ((.events // []) | length) == 0
                 and ((.links // []) | length) == 0)
             and any($spans[];
               .spanId == "b7ad6b7169203331"
-                and ([.attributes[]?.key] | sort) == ["http.request.method", "http.response.status_code", "url.path"]
-                and attr("url.path") == "/api/orders/42"
+                and ([.attributes[]?.key] | sort) == ["http.request.method", "http.response.status_code"]
                 and attr("http.request.method") == "GET")
             and any($spans[];
               .spanId == "b7ad6b7169203332"
-                and ([.attributes[]?.key] | sort) == ["http.request.method", "http.response.status_code"]
-                and attr("http.request.method") == "POST")
-            and any($spans[];
-              .spanId == "b7ad6b7169203333"
-                and ([.attributes[]?.key] | sort) == ["http.request.method", "http.response.status_code"]
-                and attr("http.request.method") == "DELETE")
+                and ([.attributes[]?.key] | length) == 0)
         ' "$out/frontend-traces.json" >/dev/null; then
           fail "フロントエンドの trace の属性、resource 属性、span の項目のいずれかが期待値と一致しません。"
         fi

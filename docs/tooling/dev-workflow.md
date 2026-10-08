@@ -131,6 +131,7 @@ task otel-collector-check
 ```
 
 このタスクは、バックエンドのログに加えて Faro の fixture もフロントエンドの pipeline（`logs/frontend` と `traces/frontend`）に流して出口を検査する。
+例外、View、LCP、INP、CLS の session 相関と、URL token、UUID の session ID、利用者情報、trace の URL 属性が残らないことを確かめる。
 ログ属性の allowlist は[可観測性データの規約](../observability/conventions.md)を参照する。
 
 ## DASTを実行するとき

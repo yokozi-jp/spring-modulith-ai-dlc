@@ -1,3 +1,4 @@
+/* oxlint-disable eslint/max-statements, eslint/max-lines, unicorn/no-array-callback-reference -- セッション前後の公開 wire 契約を一つの利用者フローで検査する。 */
 import type { APIRequestContext, BrowserContext, Cookie, Locator, Page } from "@playwright/test";
 
 import { signInOnKeycloak } from "./environment";
@@ -92,6 +93,29 @@ async function cookieValue(context: BrowserContext, name: string): Promise<strin
   return value;
 }
 
+async function waitForTelemetry(payloads: string[], value: string): Promise<void> {
+  await expect
+    .poll(() => payloads.some((payload) => payload.includes(value)), { timeout: 15_000 })
+    .toBe(true);
+}
+
+function sessionId(payload: string): string {
+  const match = /"session":\{[^}]*"id":"(?<id>[^"]+)"/u.exec(payload);
+  const id = match?.groups?.id;
+  if (typeof id !== "string" || id === "") {
+    throw new Error("Faro payload に session ID がありません");
+  }
+  return id;
+}
+
+async function throwBrowserError(page: Page, message: string): Promise<void> {
+  await page.evaluate((errorMessage) => {
+    setTimeout(() => {
+      throw new Error(errorMessage);
+    }, 0);
+  }, message);
+}
+
 let cspMessages: string[] = [];
 
 test.beforeEach(({ page }) => {
@@ -121,6 +145,67 @@ test("ログイン直後に、ほかの操作をせずにログアウトする�
   );
   await expectLoggedOutPage(page);
   await expect(page).toHaveTitle("デモアプリケーション");
+});
+
+test("例外、画面遷移、Web Vitals をログアウト前後の匿名 session で相関できる", async ({ page }) => {
+  const payloads: string[] = [];
+  await page.route("**/collect", async (route) => {
+    payloads.push(route.request().postData() ?? "");
+    await route.fulfill({ status: 202 });
+  });
+
+  await logIn(page);
+  await waitForTelemetry(payloads, '"view_changed"');
+  await page.getByText("デモアプリケーション").click();
+  await page.waitForTimeout(600);
+  await page.evaluate(() => {
+    const element = document.createElement("div");
+    element.style.height = "100px";
+    document.querySelector("main")?.prepend(element);
+  });
+  await throwBrowserError(page, "old-session-error");
+  await waitForTelemetry(payloads, "old-session-error");
+  await page.goto("/?token=secret-query#secret-fragment");
+  await expect(homeHeading(page)).toBeVisible();
+  await waitForTelemetry(payloads, '"lcp"');
+  await waitForTelemetry(payloads, '"inp"');
+  await waitForTelemetry(payloads, '"cls"');
+
+  const oldPayloads = payloads.filter((payload) =>
+    ["old-session-error", '"view_changed"', '"lcp"', '"inp"', '"cls"'].some((value) =>
+      payload.includes(value),
+    ),
+  );
+  const oldSession = sessionId(
+    oldPayloads.find((payload) => payload.includes("old-session-error")) ?? "",
+  );
+  expect(new Set(oldPayloads.map(sessionId))).toStrictEqual(new Set([oldSession]));
+
+  await logoutButton(page).click();
+  await expectLoggedOutPage(page);
+  await waitForTelemetry(payloads, '"toView":"/logged-out"');
+  const loggedOutPayload =
+    payloads.find((payload) => payload.includes('"toView":"/logged-out"')) ?? "";
+  const newSession = sessionId(loggedOutPayload);
+  expect(newSession).not.toBe(oldSession);
+
+  await page.getByRole("link", { name: "もう一度ログイン" }).click();
+  await signInOnKeycloak(page);
+  await expectAuthenticatedHome(page);
+  await throwBrowserError(page, "new-session-error");
+  await waitForTelemetry(payloads, "new-session-error");
+  const newErrorPayload = payloads.find((payload) => payload.includes("new-session-error")) ?? "";
+  expect(sessionId(newErrorPayload)).toBe(newSession);
+
+  for (const payload of payloads) {
+    const itemCount = ["exceptions", "events", "measurements"].filter((key) =>
+      new RegExp(`"${key}":\\[[^\\]]`, "u").test(payload),
+    ).length;
+    expect(itemCount).toBeLessThanOrEqual(1);
+  }
+  expect(payloads.join("\n")).not.toMatch(
+    /secret-query|secret-fragment|APP_SESSION|person@example\.com|isSampled|unknown|#secret-selector/u,
+  );
 });
 
 test("ログアウト後はアプリと SSO のセッションが終わり、もう一度ログインして戻れる", async ({
@@ -176,17 +261,20 @@ test("_csrf にマスクしない Cookie の値を入れて送るとログアウ
 test("/collect が 503 を返しても、ログインとログアウトのフォームを送信できる", async ({ page }) => {
   // 最初の goto の前に登録し、ログインの間に送られても 503 にする。
   await page.route("**/collect", (route) => route.fulfill({ status: 503 }));
+  // 最初の view_changed の公開 wire payload で SDK の初期化完了を確かめる。
+  const ready = page.waitForRequest(
+    (request) =>
+      new URL(request.url()).pathname === "/collect" &&
+      (request.postData() ?? "").includes('"view_changed"'),
+  );
   await logIn(page);
   await expect(homeHeading(page)).toBeVisible();
+  await ready;
 
-  // SDK は動的 import で読むので、初期化を待ってから例外を投げる。
-  // Faro は既定で window.faro を公開する（preventGlobalExposure は false、globalObjectKey は faro）。
-  await page.waitForFunction(() => "faro" in globalThis);
-
-  // Faro が実際に /collect へ送り、503 を受けたことを確かめ、無効のビルドで検査が空振りするのを防ぐ。
-  // route.fulfill の応答も response の event になる。Faro の再送は待たない。
-  const collect = page.waitForResponse(
-    (response) => new URL(response.url()).pathname === "/collect" && response.status() === 503,
+  const collect = page.waitForRequest(
+    (request) =>
+      new URL(request.url()).pathname === "/collect" &&
+      (request.postData() ?? "").includes("e2e telemetry probe"),
   );
   // setTimeout の中で投げ、page.evaluate を失敗させずに window.onerror へ届ける。
   await page.evaluate(() => {

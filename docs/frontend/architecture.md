@@ -87,7 +87,8 @@ frontend/src/
 本番とテスト（`testing/query-client.ts`）は同じ関数で `QueryClient` を作る。
 `main.tsx` は描画の前に `lib/telemetry.ts` の `initTelemetry()` を呼ぶが、SDKの読み込みを待たずに描画を始める。
 
-`lib/telemetry.ts` はFaro Web SDK（`@grafana/*`）を呼ぶ唯一のファイルであり、featureとrouteからSDKを呼ばない。
+`lib/telemetry.ts` はFaro Web SDK（`@grafana/*`）を呼ぶ唯一のファイルであり、featureとrouteとcomponentからSDKを呼ばない。
+Session、View、Errors、WebVitals、Tracingを明示的に有効にし、routerが解決したroute templateと匿名session IDで例外、画面遷移、LCP、INP、CLSを相関する。
 routerの既定のエラー表示（`components/route-error.tsx`）は、捕捉したエラーをこのファイルの `reportCaughtError` で送る。
 SDKはビルド時の定数で有効にしたときだけ動的importで読み込み、既定の無効のビルドには含まれない（[ADR-068](../adr/ADR-068-collect-browser-telemetry-with-faro-via-collector.md)）。
 
