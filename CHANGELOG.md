@@ -1,5 +1,23 @@
 # Changelog
 
+## [0.9.0](https://github.com/yokozi-jp/spring-modulith-ai-dlc/compare/v0.8.0...v0.9.0) (2026-10-08)
+
+
+### Features
+
+* [#122](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/122) で見つかった規約と例の食い違いの残りを直す ([#161](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/161)) ([c4c5c00](https://github.com/yokozi-jp/spring-modulith-ai-dlc/commit/c4c5c00eb832997bb6b57ea37fea172906ddfc0c))
+* **backend:** 業務上の失敗を shared.failure の例外で表し、404 と 422 の problem details にする ([#143](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/143)) ([ff7fa8b](https://github.com/yokozi-jp/spring-modulith-ai-dlc/commit/ff7fa8b4944c4f21a0bc64915d5c6ca185f91a5e))
+* csrf の cookie を __Host- の名前にし、更新系の要求だけに header を付ける ([#157](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/157)) ([4e49e8a](https://github.com/yokozi-jp/spring-modulith-ai-dlc/commit/4e49e8acd05ebc7fbcb6b08d7177f0dfd37b846a))
+* **frontend-observability:** csp 違反の報告を reporting api と webhook_event で grafana に送る ([#175](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/175)) ([ec2a12d](https://github.com/yokozi-jp/spring-modulith-ai-dlc/commit/ec2a12d88d538d2f8f7c04b28947206a70c0d644))
+* **frontend:** ブラウザの fetch から sql までを tempo の 1 本の trace で追えるようにする ([#163](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/163)) ([863cfa9](https://github.com/yokozi-jp/spring-modulith-ai-dlc/commit/863cfa9b875cae03fb8b8983a07b6e319041bb80))
+* **frontend:** ブラウザの例外を Faro と Collector で Grafana に出す ([#160](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/160)) ([2fa16de](https://github.com/yokozi-jp/spring-modulith-ai-dlc/commit/2fa16de23f414d747eef01b44476aadb58c25a42))
+* **frontend:** 画面遷移と web vitals をセッション単位で grafana で見られるようにする ([#173](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/173)) ([84410ff](https://github.com/yokozi-jp/spring-modulith-ai-dlc/commit/84410ffdca5b88bfd57e42eaffceef51f275f659))
+
+
+### Bug Fixes
+
+* **backend:** 409 の例外に原因を付けず、種類を conflict.kind で記録する ([#162](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/162)) ([f69a437](https://github.com/yokozi-jp/spring-modulith-ai-dlc/commit/f69a437a4e5dce3df370aaeb633d8006a0952ccc))
+
 ## [0.8.0](https://github.com/yokozi-jp/spring-modulith-ai-dlc/compare/v0.7.0...v0.8.0) (2026-10-06)
 
 
