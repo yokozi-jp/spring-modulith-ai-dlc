@@ -25,11 +25,11 @@ const lastDirective = (contentSecurityPolicy: unknown) =>
 
 const credentialHeaders = new Set(["cookie", "authorization", "proxy-authorization"]);
 
-const portOf = (address: AddressInfo | string | null | undefined) => {
+const tcpAddressOf = (address: AddressInfo | string | null | undefined) => {
   if (address === null || address === undefined || typeof address === "string") {
     throw new TypeError("Server is not listening on a TCP port");
   }
-  return address.port;
+  return address;
 };
 
 // 偽の Collector。受けた request の path と header を記録して 200 を返し、Vite の転送先をこの port にする。
@@ -43,7 +43,7 @@ const startCollector = async () => {
   });
   collector.listen(0, "localhost");
   await once(collector, "listening");
-  const port = String(portOf(collector.address()));
+  const port = String(tcpAddressOf(collector.address()).port);
   vi.stubEnv("OTEL_CSP_REPORT_HTTP_PORT", port);
   vi.stubEnv("OTEL_FARO_HTTP_PORT", port);
   vi.stubEnv("FRONTEND_OTEL_ENABLED", "false");
@@ -53,12 +53,13 @@ const startCollector = async () => {
 };
 
 // ブラウザの Reporting API と同じく、Cookie などの資格情報を付けて送る。
-const postWithCredentials = (port: number, path: string) =>
+// Vite は localhost で待ち受け、OS によって ::1 と 127.0.0.1 のどちらかに束ねるので、実際に束ねた address へ送る。
+const postWithCredentials = ({ address, port }: AddressInfo, path: string) =>
   // oxlint-disable-next-line promise/avoid-new -- events.once は応答を any で返すので、型の付いた callback を Promise で待つ。
   new Promise<number | undefined>((resolve, reject) => {
     const req = request(
       {
-        host: "127.0.0.1",
+        host: address,
         port,
         path,
         method: "POST",
@@ -240,7 +241,10 @@ describe("Vite configuration", { timeout: 60_000 }, () => {
 
         try {
           await server.listen();
-          const status = await postWithCredentials(portOf(server.httpServer?.address()), path);
+          const status = await postWithCredentials(
+            tcpAddressOf(server.httpServer?.address()),
+            path,
+          );
 
           expect({
             status,
