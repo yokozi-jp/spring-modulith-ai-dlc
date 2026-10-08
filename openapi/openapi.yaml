@@ -530,7 +530,7 @@ components:
         gatewayPaymentCode:
           type: string
           description: 決済代行が採番した決済の識別子
-          example: fake-5f0c2a8e-7d1b-4c3a-9e6f-1a2b3c4d5e6f
+          example: ch_5f0c2a8e-7d1b-4c3a-9e6f-1a2b3c4d5e6f
         orderId:
           type: string
           description: 決済した注文の ID

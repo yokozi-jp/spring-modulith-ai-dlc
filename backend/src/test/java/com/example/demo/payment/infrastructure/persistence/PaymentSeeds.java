@@ -21,7 +21,13 @@ public final class PaymentSeeds {
 
   private PaymentSeeds() {}
 
-  /** 決済記録を入れる。{@code gateway_payment_code} は偽物の決済代行と同じ {@code fake-<注文 ID>} にする。 */
+  /**
+   * 決済記録を入れる。
+   *
+   * <p>{@code gateway_payment_code} は WireMock のスタブ（{@code
+   * docker/wiremock/mappings/payment-gateway-charge.json}）が返す {@code chargeId} と同じ {@code ch_<注文
+   * ID>} にする。
+   */
   public static void insert(
       final DSLContext dsl,
       final UUID paymentId,
@@ -33,7 +39,7 @@ public final class PaymentSeeds {
             new PaymentId(paymentId),
             new OrderId(orderId),
             new Money(amount),
-            new GatewayPaymentCode("fake-" + orderId),
+            new GatewayPaymentCode("ch_" + orderId),
             paidAt,
             1L);
     final CommonColumns commonColumns = TestCommonColumns.at(paidAt);

@@ -62,7 +62,7 @@ class PaymentApiTest {
         .andExpect(jsonPath("$.items[0].paymentId").value(paymentId.toString()))
         .andExpect(jsonPath("$.items[0].orderId").value(orderId.toString()))
         .andExpect(jsonPath("$.items[0].amount").value(240.00))
-        .andExpect(jsonPath("$.items[0].gatewayPaymentCode").value("fake-" + orderId))
+        .andExpect(jsonPath("$.items[0].gatewayPaymentCode").value("ch_" + orderId))
         .andExpect(jsonPath("$.items[0].paidAt").value("2026-10-06T01:02:03.123456Z"))
         .andExpect(jsonPath("$.items[0].paidAt").value(endsWith("Z")));
   }
@@ -112,7 +112,7 @@ class PaymentApiTest {
                 .set(T_PAYMENT.PUBLIC_ID, paymentId)
                 .set(T_PAYMENT.ORDER_PUBLIC_ID, orderId)
                 .set(T_PAYMENT.CHARGED_AMOUNT_JPY, new BigDecimal("240.00"))
-                .set(T_PAYMENT.GATEWAY_PAYMENT_CODE, "fake-" + orderId)
+                .set(T_PAYMENT.GATEWAY_PAYMENT_CODE, "ch_" + orderId)
                 .set(T_PAYMENT.PAID_AT, PAID_AT)
                 .set(TestCommonColumns.at(PAID_AT).forInsert(T_PAYMENT))
                 .execute());
