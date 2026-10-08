@@ -33,7 +33,6 @@ import org.jooq.Result;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.dao.DuplicateKeyException;
 
 /** 注文の保存と読み戻しと、明細の差分の保存を検証する。競合と行なしは TableWriterTest が確かめる。 */
 // 生成したテーブルと AssertJ の tuple を static import で読みやすくする。
@@ -101,7 +100,7 @@ class JooqOrderRepositoryTest {
   }
 
   @Test
-  @DisplayName("客先注文番号が重複する保存は、DuplicateKeyException を原因に持つ ConflictException になる")
+  @DisplayName("客先注文番号が重複する保存は、種類が UNIQUE の ConflictException になる")
   void duplicateCustomerOrderCodeBecomesConflict() {
     final OrderRepository repository = repository(ADDED_AT);
     final String customerOrderCode = UniqueCodes.next("C");
@@ -109,8 +108,12 @@ class JooqOrderRepositoryTest {
     final Order duplicate = draft(customerOrderCode, item(ERASER, 1));
 
     assertThatThrownBy(() -> TestCommonColumns.runAs(() -> repository.add(duplicate)))
-        .isInstanceOf(ConflictException.class)
-        .hasCauseInstanceOf(DuplicateKeyException.class);
+        .isInstanceOfSatisfying(
+            ConflictException.class,
+            conflict ->
+                assertThat(conflict.kind())
+                    .as("customerOrderCode=%s の 2 件目の保存の衝突の種類", customerOrderCode)
+                    .isEqualTo(ConflictException.Kind.UNIQUE));
   }
 
   @Test

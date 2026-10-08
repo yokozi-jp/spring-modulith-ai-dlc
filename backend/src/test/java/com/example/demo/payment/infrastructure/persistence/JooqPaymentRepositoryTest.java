@@ -20,7 +20,6 @@ import org.jooq.DSLContext;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.dao.DuplicateKeyException;
 
 /** 決済記録の保存と読み戻しと、同じ注文の 2 件目の保存の拒否を検証する。 */
 @DatabaseTest
@@ -57,7 +56,7 @@ class JooqPaymentRepositoryTest {
   }
 
   @Test
-  @DisplayName("同じ注文の 2 件目の保存は、DuplicateKeyException を原因に持つ ConflictException になる")
+  @DisplayName("同じ注文の 2 件目の保存は、種類が UNIQUE の ConflictException になる")
   void secondPaymentOfSameOrderBecomesConflict() {
     final OrderId orderId = new OrderId(UUID.randomUUID());
     final PaymentRepository repository = repository();
@@ -65,8 +64,12 @@ class JooqPaymentRepositoryTest {
     final Payment duplicate = payment(orderId, AMOUNT);
 
     assertThatThrownBy(() -> TestCommonColumns.runAs(() -> repository.add(duplicate)))
-        .isInstanceOf(ConflictException.class)
-        .hasCauseInstanceOf(DuplicateKeyException.class);
+        .isInstanceOfSatisfying(
+            ConflictException.class,
+            conflict ->
+                assertThat(conflict.kind())
+                    .as("orderId=%s の 2 件目の保存の衝突の種類", orderId.value())
+                    .isEqualTo(ConflictException.Kind.UNIQUE));
   }
 
   private PaymentRepository repository() {
