@@ -77,8 +77,8 @@ public class TableWriter {
    * @throws IllegalArgumentException {@code expectedLockNo} が 1 未満の場合、テーブルに {@code lock_no}（{@code
    *     Long}）がない場合、業務の列に共通カラムを渡した場合
    * @throws NotFoundException 更新件数が 0 で、主キーの行がない場合
-   * @throws ConflictException 更新件数が 0 で主キーの行がある場合、一意制約に違反した場合（{@link DuplicateKeyException}
-   *     を原因に持つ）、行ロックを {@code lock_timeout} までに取れない場合（{@link CannotAcquireLockException} を原因に持つ）
+   * @throws ConflictException 更新件数が 0 で主キーの行がある場合、一意制約に違反した場合（種類は {@code UNIQUE}）、行ロックを {@code
+   *     lock_timeout} までに取れない場合（種類は {@code LOCK}）。原因は持たない
    * @throws IllegalStateException 更新件数が 2 以上の場合。主キーの条件が 1 行を特定していない
    */
   public <R extends Record> LockedRoot updateCheckingVersion(
@@ -109,8 +109,8 @@ public class TableWriter {
    * @throws IllegalArgumentException {@code expectedLockNo} が 1 未満の場合、テーブルに {@code lock_no}（{@code
    *     Long}）がない場合
    * @throws NotFoundException 削除件数が 0 で、主キーの行がない場合
-   * @throws ConflictException 削除件数が 0 で主キーの行がある場合、一意制約に違反した場合（{@link DuplicateKeyException}
-   *     を原因に持つ）、行ロックを {@code lock_timeout} までに取れない場合（{@link CannotAcquireLockException} を原因に持つ）
+   * @throws ConflictException 削除件数が 0 で主キーの行がある場合、一意制約に違反した場合（種類は {@code UNIQUE}）、行ロックを {@code
+   *     lock_timeout} までに取れない場合（種類は {@code LOCK}）。原因は持たない
    * @throws IllegalStateException 削除件数が 2 以上の場合。主キーの条件が 1 行を特定していない
    */
   public <R extends Record> DeletedRoot deleteCheckingVersion(
@@ -165,19 +165,19 @@ public class TableWriter {
    *
    * @param insert {@code dsl.insertInto(...).set(...).set(commonColumns.forInsert(...))} で組み立てた 1
    *     行の INSERT
-   * @throws ConflictException 一意制約に違反した場合（{@link DuplicateKeyException} を原因に持つ）と、行ロックを {@code
-   *     lock_timeout} までに取れない場合（{@link CannotAcquireLockException} を原因に持つ）
+   * @throws ConflictException 一意制約に違反した場合（種類は {@code UNIQUE}）と、行ロックを {@code lock_timeout}
+   *     までに取れない場合（種類は {@code LOCK}）。原因は持たない
    */
   public void insert(final Insert<?> insert) {
-    // テーブル名は Insert の公開 API で取れないため入れない。テーブル、制約名、キーは原因の例外のメッセージにある。
+    // テーブル名は Insert の公開 API で取れないため入れない。原因の例外は SQL と値を持つため付けない（ADR-062）。
     executeOrConflict(insert::execute, () -> "insert");
   }
 
   /**
    * 子の行を条件で更新し、版を 1 進めて件数を返す。{@link LockedRoot#updateChild} が使う。
    *
-   * @throws ConflictException 一意制約に違反した場合（{@link DuplicateKeyException} を原因に持つ）と、行ロックを {@code
-   *     lock_timeout} までに取れない場合（{@link CannotAcquireLockException} を原因に持つ）
+   * @throws ConflictException 一意制約に違反した場合（種類は {@code UNIQUE}）と、行ロックを {@code lock_timeout}
+   *     までに取れない場合（種類は {@code LOCK}）。原因は持たない
    */
   @CheckReturnValue
   /* package */ <R extends Record> int updateChildRows(
@@ -205,8 +205,8 @@ public class TableWriter {
   /**
    * 子の行を条件で削除する。{@link LockedRoot} と {@link DeletedRoot} が使う。
    *
-   * @throws ConflictException 一意制約に違反した場合（{@link DuplicateKeyException} を原因に持つ）と、行ロックを {@code
-   *     lock_timeout} までに取れない場合（{@link CannotAcquireLockException} を原因に持つ）
+   * @throws ConflictException 一意制約に違反した場合（種類は {@code UNIQUE}）と、行ロックを {@code lock_timeout}
+   *     までに取れない場合（種類は {@code LOCK}）。原因は持たない
    */
   /* package */ void deleteRows(final Table<?> table, final Condition where) {
     executeOrConflict(
@@ -252,20 +252,28 @@ public class TableWriter {
     if (!dsl.fetchExists(table, byPrimaryKey)) {
       throw new NotFoundException("row not found: " + target);
     }
-    throw new ConflictException("row was updated by another request: " + target);
+    throw new ConflictException(
+        ConflictException.Kind.VERSION, "row was updated by another request: " + target);
   }
 
   /**
-   * 文を実行して件数を返し、{@code 55P03} の {@link CannotAcquireLockException} と {@code 23505} の {@link
-   * DuplicateKeyException} を、それを原因に持つ {@link ConflictException} に変える。
+   * 文を実行して件数を返し、{@code 55P03} の {@link CannotAcquireLockException} を種類 {@code LOCK}、{@code 23505} の
+   * {@link DuplicateKeyException} を種類 {@code UNIQUE} の {@link ConflictException} に変える。原因は付けない。
+   *
+   * <p>ponytail: 上限：{@link #insert} の 409 のメッセージはテーブル名と制約名を持たない。必要になったら、{@code insert}
+   * にテーブルを渡す入口を足す。
    */
+  // 原因の例外のメッセージに SQL と重複したキーの値が入るため、原因を付けない（ADR-062、docs/observability/conventions.md）。
+  @SuppressWarnings({"PMD.PreserveStackTrace", "UnusedException"})
   private static int executeOrConflict(final IntSupplier statement, final Supplier<String> target) {
     try {
       return statement.getAsInt();
     } catch (final CannotAcquireLockException e) {
-      throw new ConflictException("row is locked by another request: " + target.get(), e);
+      throw new ConflictException(
+          ConflictException.Kind.LOCK, "row is locked by another request: " + target.get());
     } catch (final DuplicateKeyException e) {
-      throw new ConflictException("unique key already exists: " + target.get(), e);
+      throw new ConflictException(
+          ConflictException.Kind.UNIQUE, "unique key already exists: " + target.get());
     }
   }
 

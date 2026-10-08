@@ -81,6 +81,11 @@ layout routeにcomponentを持たせるなら、そのcomponentで `<Outlet />` 
 - **存在しないresource**：loaderで `notFound()` を投げ、routerの `defaultNotFoundComponent`（`components/route-not-found.tsx`）が表示する。
 - **Empty**と**Content**：画面のcomponentが分ける。
 
+例外は、画面の主な内容とは別の補足の情報（別のモジュールが持つ状態など）を出す欄で、その欄の取得に失敗しても画面の残りの表示と操作を残す必要があるときだけにする。
+その欄は、loaderでpreloadせず、欄のcomponentで生成されたsuspenseなしの `use<Operation>` で読み、LoadingとErrorを欄の中で出す。
+欄の失敗は `RouteError` にならず、画面の残りはそのまま使える。
+画面の主な内容と、取得できなければ画面が意味をなさないdataには、この例外を使わない。
+
 既定値は `src/router-defaults.ts` の `routerDefaults` にまとめ、`main.tsx` とrouteのテストが同じobjectを `createRouter` に渡す。
 
 errorの表示はcatalogの文言を使い、`error.message` を画面に出さない。

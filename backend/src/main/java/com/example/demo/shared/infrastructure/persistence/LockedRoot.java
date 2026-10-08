@@ -34,8 +34,7 @@ public final class LockedRoot {
    * @throws IllegalArgumentException テーブルに {@code lock_no} がない場合、業務の列が一つもない場合、共通カラムを渡した場合
    * @throws BusinessRuleViolationException 更新件数が 0 の場合。要求された子の変更を今の永続化の状態へ適用できない
    * @throws IllegalStateException 更新件数が 2 以上の場合。主キーの条件が 1 行を特定していない
-   * @throws ConflictException 行ロックを {@code lock_timeout} までに取れない場合。{@link
-   *     org.springframework.dao.CannotAcquireLockException} を原因に持つ
+   * @throws ConflictException 行ロックを {@code lock_timeout} までに取れない場合。種類は {@code LOCK} で、原因は持たない
    */
   public <R extends Record> void updateChild(
       final Table<R> table,
@@ -59,8 +58,7 @@ public final class LockedRoot {
    *
    * @param table 子のテーブル
    * @param where 削除する子の行の条件
-   * @throws ConflictException 行ロックを {@code lock_timeout} までに取れない場合。{@link
-   *     org.springframework.dao.CannotAcquireLockException} を原因に持つ
+   * @throws ConflictException 行ロックを {@code lock_timeout} までに取れない場合。種類は {@code LOCK} で、原因は持たない
    */
   public void deleteChildren(final Table<?> table, final Condition where) {
     writer.deleteRows(table, where);

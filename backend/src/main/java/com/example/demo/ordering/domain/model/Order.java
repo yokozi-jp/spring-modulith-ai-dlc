@@ -124,6 +124,7 @@ public final class Order {
   public void ensureLockNo(final ExpectedLockNo expectedLockNo) {
     if (lockNo != expectedLockNo.value()) {
       throw new ConflictException(
+          ConflictException.Kind.VERSION,
           String.format(
               Locale.ROOT,
               "lock number mismatch: orderId=%s, expectedLockNo=%d, lockNo=%d",

@@ -6,10 +6,10 @@ import java.time.ZoneOffset;
 import java.util.function.Supplier;
 
 /**
- * 業務機能のテストが、Spring の外で共通カラムを登録するための補助。
+ * Spring の外で共通カラムを登録するテストが使う補助。
  *
  * <p>{@link CommonColumns} は trace と {@code *_pgm_cd} の束縛がないと登録を失敗させる。trace は {@link TracerStubs}
- * で固定し、{@code *_pgm_cd} は {@link #callAs} の間だけ束縛する。
+ * で固定し、{@code *_pgm_cd} は {@link #runAs} と {@link #callAs} の間だけ束縛する。
  */
 // テストの補助であり、テストケースを持たない。at は「その時刻の共通処理」と読ませるため短い名前にする。
 @SuppressWarnings({"PMD.TestClassWithoutTestCases", "PMD.ShortMethodName"})

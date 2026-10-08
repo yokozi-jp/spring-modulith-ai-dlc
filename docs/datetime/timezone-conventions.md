@@ -86,7 +86,24 @@ const label = occurredAt.toLocaleString("ja-JP", {
 Safariに対応する必要があるときは、ポリフィルを入れる。
 候補は[proposal-temporal](https://github.com/tc39/proposal-temporal#polyfills)が安定版と位置づける[temporal-polyfill](https://www.npmjs.com/package/temporal-polyfill)とする。
 ポリフィルの依存は、Safariへの対応が必要で日時を扱う最初の画面を作るときに追加する。
-`main.tsx`は、`Temporal`を持たないブラウザでだけ`temporal-polyfill/global`を動的に読み込み、`Temporal`を持つブラウザにはポリフィルの本体を配らない。
+
+依存を追加したら、`frontend/src/main.tsx`で描画の前に、`globalThis`に`Temporal`がないときだけ`await import("temporal-polyfill/global")`で読み込む。
+Temporalを出荷したChromeとFirefoxには、ポリフィルのchunkを配らない。
+次は[issue #122](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/122)の確認用のブランチ（`e999bd8`）で動かした例である。
+
+```typescript
+// Temporal を出荷していないブラウザだけ polyfill を読み込む（ADR-047）。
+if (!("Temporal" in globalThis)) {
+  await import("temporal-polyfill/global");
+}
+```
+
+`import { Temporal } from "temporal-polyfill"`のponyfillの形は使わない。
+ponyfillはすべてのブラウザに配られ、ブラウザが`Temporal`を持っていても使われず、外すときにすべてのimportを直すことになるためである。
+コードはグローバルの`Temporal`を使い、SafariがTemporalを出荷したら読み込みの数行を消すだけで外せるようにする。
+
+Node.jsはTemporalを持たないため、テストのsetup（`frontend/src/testing/setup.ts`）では常に`import "temporal-polyfill/global"`で読み込む。
+型は`frontend/tsconfig.json`の`lib`に`"ESNext.Temporal"`を足して得る。
 SafariがTemporalを出荷し、[対応ブラウザとWeb機能の採用基準](../frontend/browser-support.md)で使える状態になったら、ポリフィルを外す。
 
 ## UTCへ変換しない値

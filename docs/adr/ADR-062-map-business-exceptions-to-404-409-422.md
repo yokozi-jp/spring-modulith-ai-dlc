@@ -1,7 +1,7 @@
 ---
 type: ADR
 title: 'ADR-062: 業務上の失敗を 3 つの例外の型で表し、404、409、422 の Problem Details に対応づける'
-description: 業務上の失敗を shared.failure の NotFoundException と BusinessRuleViolationException、shared.concurrency の ConflictException の 3 つの型に固定し、ApiExceptionHandler が 404、422、409 の about:blank の Problem Details にして INFO で記録し、23505 を TableWriter で 409 に変え、JDK の例外の誤用を ArchUnit で禁じる決定。
+description: 業務上の失敗を shared.failure の NotFoundException と BusinessRuleViolationException、shared.concurrency の ConflictException の 3 つの原因を持たない型に固定し、ApiExceptionHandler が 404、422、409 の about:blank の Problem Details にして INFO で記録し（409 は conflict.kind で種類を区別する）、23505 を TableWriter で原因を付けずに 409 に変え、JDK の例外の誤用を ArchUnit で禁じる決定。
 tags: [adr, backend, web-api, error-handling]
 ---
 
@@ -32,6 +32,12 @@ Proposed
 機能モジュールはまだ main になく、例外の型を決めても移行の費用は共通処理、テスト、文書に限られる。
 API のエラー契約は [ADR-013](ADR-013-standardize-http-api-contracts.md) の RFC 9457 Problem Details、`title` の翻訳は [ADR-016](ADR-016-localize-api-and-spa-messages.md)、ログの扱いは [ADR-015](ADR-015-structure-and-protect-observability-data.md) に従う。
 
+この版は [issue #145](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/145) を受けて決定を改めた。
+最初の版は、`23505` と `55P03` の Spring の例外を原因に付けて `ConflictException` に変えていた。
+`ApiExceptionHandler` は例外を付けて記録するため、409 の `exception.stacktrace` の `Caused by` に、jOOQ の SQL と PostgreSQL の `Key (...)=(...)` の入力値が出ていた。
+これは、SQL と入力値をアプリから渡さないとする[可観測性の規約](../observability/conventions.md)と食い違う。
+ADR は Proposed のままであるため、新しい ADR を起こさず、この版で決定を書き直す。
+
 ## Decision
 
 - 業務上の失敗は、次の 3 つの型だけで表す。
@@ -51,7 +57,11 @@ API のエラー契約は [ADR-013](ADR-013-standardize-http-api-contracts.md) �
   `title` は既存の `problem.title.404`、`problem.title.409`、`problem.title.422` を `Accept-Language` の言語で返し、`detail` は既存の `ApiProblemDetails.normalize` が消す。
   業務固有の `type` と翻訳した `detail` は使わない。
   型を 3 つに固定するため、型から業務固有の `type` を決められないからである。
-- ログは、404 と 422 を INFO の `API business failure`、409 を INFO の `API conflict` で、`http.response.status_code` と例外の `cause` を付けて記録する。
+- ログは、404 と 422 を INFO の `API business failure`、409 を INFO の `API conflict` で、`http.response.status_code` と例外を付けて記録する。
+  409 には、競合の種類（`version`、`lock`、`unique`）を属性 `conflict.kind` で足す。
+  3 つの型は原因（cause）を持たない。
+  コンストラクタは原因を `null` に決め、原因を受け取るコンストラクタを置かないため、後から `initCause` を呼ぶと `IllegalStateException` になる。
+  原因の例外のメッセージには SQL と入力値が入るため、例外を記録する経路（API のログ、span の例外のイベント、Listener の失敗のログ）のどこにも渡さない。
   WARN 以上は通知と標準出力のロググループに出るため使わない。
   500 は既存どおり ERROR の `Unhandled API exception` で記録する。
 - 例外、HTTP、ログ、非同期の Listener の対応は、[業務上の失敗の例外](../backend/class-roles/business-exception.md)の表に置く。
@@ -60,11 +70,11 @@ API のエラー契約は [ADR-013](ADR-013-standardize-http-api-contracts.md) �
   これらはプログラムの誤りにも使われ、まとめて 4xx にすると誤りが 4xx に化けて隠れるためである。
 - `TableWriter` は、主キーの行がないときに `NotFoundException` を投げる。
   `LockedRoot.updateChild` の 0 件は `BusinessRuleViolationException` にし、`shared.infrastructure.persistence` から Spring Web への依存をなくす。
-- `23505` は、`TableWriter` の既存の変換の入口 `executeOrConflict` で、`DuplicateKeyException` を原因に付けた `ConflictException` に変える。
+- `23505` は、`TableWriter` の既存の変換の入口 `executeOrConflict` で、原因を付けずに `Kind.UNIQUE` の `ConflictException` に変える。
   集約ルートの INSERT の入口 `TableWriter.insert` を足し、同じ変換を通す。
   `DataIntegrityViolationException` の他の違反（外部キー、NOT NULL、CHECK、排他制約）は、入力の検証か実装の誤りであるため 500 のままにする。
 - Repository の実装は、`updateWhere`、`deleteWhere`、`NOWAIT` が投げる Spring の例外（`CannotAcquireLockException`、`DuplicateKeyException`）を Repository の外へ出さない。
-  外へ出すときは、原因に付けた `ConflictException` に変えて投げる。
+  外へ出すときは、原因を付けずに、種類（`Kind.LOCK` か `Kind.UNIQUE`）を付けた `ConflictException` に変えて投げる。
 - ArchUnit に 2 つの規則を足す。
   `noSuchElementExceptionIsNotThrown` は、`NoSuchElementException` の生成と引数なしの `Optional.orElseThrow()` を禁じる。
   `sharedModuleDoesNotDependOnHttp` は、`shared` から Spring Web、Spring の HTTP、Servlet の型への依存を禁じる。
@@ -81,14 +91,21 @@ API のエラー契約は [ADR-013](ADR-013-standardize-http-api-contracts.md) �
 - `shared.infrastructure.persistence` から Spring Web への依存が消え、`shared` が HTTP に依存しないことを ArchUnit で検査する。
 - 一意制約の違反が、500 ではなく 409 になる。
 - 見つからないことを `NoSuchElementException` で表す誤りを、ArchUnit が検出する。
+- 409 のログに SQL と入力値が出ない。
+  原因の連鎖を発生源で作らないため、Collector や logback で文字列を消す設定が要らない。
+- 一意制約の違反、ロック待ちの失敗、版の不一致の 409 を、ログの `conflict.kind` で区別できる。
 
 ### Negative
 
 - `shared.failure` の 2 つの型が public になり、アーキテクチャ指標の全体の相対可視性の上限を、外部可視型数 20、全型数 33 の実測値に書き直した。
 - `ConflictException` の意味を一意制約の違反へ広げ、楽観的ロックの語彙を置く `shared.concurrency` に置いたままにする。
   パッケージの名前は、3 つの型の一部を表さない。
-- 一意制約の違反の 409 と楽観的ロックの衝突の 409 は、同じ `API conflict` で記録する。
-  区別はログの `exception.type` の原因（`DuplicateKeyException`）で行う。
+- `TableWriter.insert` の 409 のメッセージは、テーブル名と制約名を持たない。
+  テーブル名は jOOQ の `Insert` の公開 API で取れず、制約名を取るには PostgreSQL の JDBC ドライバへのコンパイル時の依存が要る。
+  必要になったら、`insert` にテーブルを渡す入口を足す。
+- 原因がないため、PostgreSQL のエラーの詳細（`detail`、`hint`）をログで見られない。
+- `ConflictException.Kind` で public の型が 1 つ増え、アーキテクチャ指標の全体の相対可視性の上限を書き直した。
+- `TableWriter.executeOrConflict` は catch した例外を原因に渡さないため、PMD の `PreserveStackTrace` と Error Prone の `UnusedException` を、そのメソッドに限って抑止する。
 - `TableWriter.insert` を通さない INSERT と、子の行の `dsl.batch` の INSERT の `23505` は 500 のまま残る。
   ArchUnit では強制しない。
 - `Optional.get()`、`Iterator.next()`、`Optional::orElseThrow` のメソッド参照などが中で投げる `NoSuchElementException` は検出しない。
@@ -145,6 +162,22 @@ API のエラー契約は [ADR-013](ADR-013-standardize-http-api-contracts.md) �
 - **Cons**：Spring Boot の `ExceptionTranslatorExecuteListener` を差し替えるか、その順序に依存する。
   ADR-054 が変換を `TableWriter` に集めた方針から外れ、`@JooqTest` のスライスに Bean を足す必要がある。
 
+### 選択肢7: 原因を付けたまま、Collector か logback で Caused by を消す
+
+- **Description**：`ConflictException` は原因を持ったままにし、Collector の transform か logback の設定で、409 の `exception.stacktrace` から `Caused by` 以降を消す。
+- **Pros**：アプリのコードを変えず、PostgreSQL のエラーの詳細を例外に残せる。
+- **Cons**：文字列のフィルタが Collector とアプリの設定に散り、どこで何を消しているかを追いにくい。
+  規約は、禁止された値をアプリから渡さないと定めている。
+  API のログ以外で例外を記録する経路（span の例外のイベント、Listener の失敗のログ）には SQL が残る。
+
+### 選択肢8: 原因を連鎖に残し、ログでだけ例外を付けない
+
+- **Description**：`TableWriter` は原因を付けたままにし、`ApiExceptionHandler` の 409 で `setCause` を呼ばない。
+- **Pros**：例外の型を変えない。
+- **Cons**：`exception.type`、`exception.message`、`exception.stacktrace` がすべて消え、どのテーブルの競合かも分からなくなる。
+  SLF4J には連鎖の一部だけを落とす API がなく、残すには例外を作り直すか整形することになり、規約の「例外の詳細を独自に整形しない」に反する。
+  ログ以外で例外を記録する経路には SQL が残る。
+
 ## References
 
 - [ADR-013: HTTP API 契約を標準化する](ADR-013-standardize-http-api-contracts.md)
@@ -160,3 +193,5 @@ API のエラー契約は [ADR-013](ADR-013-standardize-http-api-contracts.md) �
 - [HTTPステータスコードの選択](../web-api/status-codes.md)
 - [非同期処理の失敗時の再試行と回復](../integration/async-failure-recovery.md)
 - [issue #107](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/107)
+- [issue #145](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/145)
+- [可観測性の規約](../observability/conventions.md)

@@ -10,7 +10,8 @@ import com.example.demo.shared.failure.BusinessRuleViolationException;
 import com.example.demo.shared.failure.NotFoundException;
 import com.example.demo.testkit.DatabaseTest;
 import com.example.demo.testkit.FixtureTablesExtension;
-import java.sql.SQLException;
+import java.io.PrintWriter;
+import java.io.StringWriter;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
@@ -19,6 +20,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.function.Supplier;
+import java.util.regex.Pattern;
 import org.jooq.Condition;
 import org.jooq.DSLContext;
 import org.jooq.Record;
@@ -31,7 +33,6 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.dao.DuplicateKeyException;
 
 /** {@link TableWriter} の SQL と件数の判定を、テスト専用のテーブルと実 PostgreSQL で確かめる。各テストはロールバックする。 */
 // 入口ごとの成功と失敗の条件をテストに分けるため、メソッドの数の上限を外す。
@@ -55,6 +56,10 @@ class TableWriterTest {
 
   /** 現在のスパンの trace ID。 */
   private static final String TRACE_ID = "4bf92f3577b34da6a3ce929d0e0e4736";
+
+  /** jOOQ が描く SQL 文の始まり。キーワードの後に引用符付きのテーブル名が続く。 */
+  private static final Pattern SQL_STATEMENT =
+      Pattern.compile("(?i)\\b(insert into|update|select|delete from)\\s+\"");
 
   /** lock_no を持たないテーブル。 */
   private static final Table<Record> NO_LOCK_TABLE = DSL.table(DSL.name("t_no_lock"));
@@ -118,7 +123,8 @@ class TableWriterTest {
         .hasMessageContaining("table=t_fixture_item")
         .hasMessageContaining("key=[1]")
         .hasMessageContaining("expectedLockNo=1")
-        .hasNoCause();
+        .hasNoCause()
+        .satisfies(thrown -> assertConflictWithoutSql(thrown, ConflictException.Kind.VERSION));
     assertThat(item(1L).get(FIXTURE_ITEM.ITEM_NAME)).isEqualTo("before");
   }
 
@@ -357,7 +363,7 @@ class TableWriterTest {
         .as("版の違い")
         .isInstanceOf(ConflictException.class)
         .hasMessageContaining("table=t_fixture_item")
-        .hasNoCause();
+        .satisfies(thrown -> assertConflictWithoutSql(thrown, ConflictException.Kind.VERSION));
     assertThatThrownBy(
             () -> writer.deleteCheckingVersion(FIXTURE_ITEM, FIXTURE_ITEM.ITEM_ID.eq(9L), 1L))
         .as("行がない")
@@ -380,7 +386,7 @@ class TableWriterTest {
   }
 
   @Test
-  @DisplayName("insert は一意制約の違反を、23505 の DuplicateKeyException を原因に持つ競合の例外にする")
+  @DisplayName("insert は一意制約の違反を、原因を付けず SQL と値を含まない UNIQUE の競合の例外にする")
   void insertDuplicateKeyConflicts() {
     insertItem(1L, "one");
 
@@ -395,10 +401,28 @@ class TableWriterTest {
                                 .set(FIXTURE_ITEM.ITEM_NAME, "duplicate")
                                 .set(seedColumns.forInsert(FIXTURE_ITEM)))))
         .isInstanceOf(ConflictException.class)
-        .hasCauseInstanceOf(DuplicateKeyException.class)
-        .rootCause()
+        .hasMessage("unique key already exists: insert")
+        .satisfies(thrown -> assertConflictWithoutSql(thrown, ConflictException.Kind.UNIQUE));
+  }
+
+  /**
+   * 投げられた競合の例外が、種類を持ち、原因を持たず、ログに記録される文字列に SQL と入力値を含まないことを確かめる。
+   *
+   * <p>{@code ApiExceptionHandler} は例外を {@code setCause} で記録し、OTLP の {@code exception.stacktrace}
+   * には {@link Throwable#printStackTrace} と同じ文字列が入る。
+   */
+  private static void assertConflictWithoutSql(
+      final Throwable thrown, final ConflictException.Kind kind) {
+    assertThat(thrown)
         .isInstanceOfSatisfying(
-            SQLException.class, e -> assertThat(e.getSQLState()).isEqualTo("23505"));
+            ConflictException.class, conflict -> assertThat(conflict.kind()).isEqualTo(kind))
+        .hasNoCause();
+    final StringWriter stackTrace = new StringWriter();
+    thrown.printStackTrace(new PrintWriter(stackTrace));
+    assertThat(stackTrace.toString())
+        .as("記録される stack trace")
+        .doesNotContain("Caused by", "Key (", "SQL [", "ERROR:")
+        .doesNotContainPattern(SQL_STATEMENT);
   }
 
   /** 子の集合の差分を、規約の手順の順で保存する。 */

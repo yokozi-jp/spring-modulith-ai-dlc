@@ -65,7 +65,7 @@ Presentation は Repository を使わない。
 ## 依存してよい型、してはいけない型
 
 - **依存してよい型**：`java..` の標準型、`org.jspecify..`、`com.google.errorprone.annotations.CheckReturnValue`、同じ `domain.model` の集約ルート、値オブジェクト、enum、`shared.concurrency` の `ConflictException` と `shared.failure` の `NotFoundException`（Javadoc の `@throws` のため）。
-- **依存してはいけない型**：jOOQ の API と生成型（`DSLContext`、`Condition`、説明用の仮の生成型 `OrdersRecord`）、Spring の型（`Pageable`、`@Repository`）、JPA と Jackson の型、`application`、モジュールルートの型（参照の結果、検索条件）。
+- **依存してはいけない型**：jOOQ の API と生成型（`DSLContext`、`Condition`、説明用の仮の生成型 `TOrderRecord`）、Spring の型（`Pageable`、`@Repository`）、JPA と Jackson の型、`application`、モジュールルートの型（参照の結果、検索条件）。
 
 ## 最小の例と典型的な例
 
@@ -141,8 +141,9 @@ class JooqOrderRepository implements OrderRepository {
 `update` と `delete` の競合と行がない場合は、Repository ごとには確かめず、`shared` の `TableWriterTest` と `TableWriterConcurrencyTest` が確かめる（[jOOQ の Repository](jooq-repository.md) の「対応するテスト」）。
 jOOQ の列と集約の変換も、この往復で確かめる。
 テストは実装と同じ `com.example.demo.ordering.infrastructure.persistence` パッケージのテストソースに置く。
-共通カラムの trace と `*_pgm_cd` は、`shared` のテストソースの `TestCommonColumns` で用意する。
-`TestCommonColumns.at` は現在時刻と trace ID を固定した `CommonColumns` を返し、`TestCommonColumns.runAs` は呼び出しの間だけ `*_pgm_cd` を束縛する。
+
+`CommonColumns` は、trace と `*_pgm_cd` の束縛がないと登録を失敗させる（[ADR-051](../../adr/ADR-051-bind-pgm-cd-with-scoped-value-and-aspect.md)）。
+Spring のテストではどちらもないため、`shared` のテストの補助 `TestCommonColumns` で、時刻と trace ID を固定した共通処理を作り、`*_pgm_cd` を束縛して保存する。
 
 ```java
 /** 注文の保存と読み戻しを検証する。 */

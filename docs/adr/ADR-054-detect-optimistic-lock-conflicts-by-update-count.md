@@ -24,6 +24,7 @@ Proposed
 しかし、版の条件、版の加算、件数の受け渡し、`55P03` の変換は Repository の手書きに残った。
 どれを書き忘れても UPDATE は成功し、Repository の規約のチェックリストの楽観的ロックの項目はすべて「自分で点検」だった。
 `requireUpdated` を呼ぶ production のコードはまだなく、ADR も Proposed のままであるため、この版で決定を書き直す。
+その後、[ADR-062](ADR-062-map-business-exceptions-to-404-409-422.md) の改訂（[issue #145](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/145)）に合わせ、`55P03` の変換で原因を付けないよう、この版で決定を書き直す。
 
 利用者は、共通基盤に次の順で重みを置く。
 AI と開発者が迷わないこと（どこに何を書き、どの API を使うかの答えが一つ）、間違えると機械で失敗すること、システムとして安全であること（古い値の上書き、無期限の待ち、気付けない設定の誤りがない）である。
@@ -49,7 +50,7 @@ PostgreSQL の READ COMMITTED では、後の UPDATE は先の UPDATE のコミ�
   規約にない `updated_reason` のような業務の列は拒否しない。
 - `updateCheckingVersion` は `SET lock_no = 期待値 + 1` と `WHERE 主キー AND lock_no = 期待値` を書く。
   件数が 1 なら成功、0 なら主キーで行の有無を確かめて競合か `NotFoundException` に分け、2 以上なら `IllegalStateException` にする。
-  `55P03` の `CannotAcquireLockException` は、それを原因に付けた競合の例外に変える。
+  `55P03` の `CannotAcquireLockException` は、原因を付けずに `Kind.LOCK` の `ConflictException` に変える（ADR-062）。
   競合の例外は `shared.concurrency` の `ConflictException` で、`TableWriter` が自分で投げる。
   競合の例外を作る関数は引数に取らない。
   期待する版が 1 未満なら、SQL を実行する前に `IllegalArgumentException` にする。
@@ -57,7 +58,7 @@ PostgreSQL の READ COMMITTED では、後の UPDATE は先の UPDATE のコミ�
   `updateWhere` と `deleteWhere` は件数を返し、Error Prone の `@CheckReturnValue` を付けて、戻り値の無視をコンパイルの失敗にする。
   その件数を返す Repository のメソッドにも、インタフェースで `@CheckReturnValue` を付ける。
   `updateWhere` は、業務の列が一つもなければ `IllegalArgumentException` にする。
-- `LockedRoot.updateChild`、`LockedRoot.deleteChildren`、`DeletedRoot.deleteChildren` も、`55P03` の `CannotAcquireLockException` を、それを原因に付けた `ConflictException`（409）に変える。
+- `LockedRoot.updateChild`、`LockedRoot.deleteChildren`、`DeletedRoot.deleteChildren` も、`55P03` の `CannotAcquireLockException` を、原因を付けずに `Kind.LOCK` の `ConflictException`（409）に変える（ADR-062）。
   ルートの書き込みの後に子の行のロック待ちで失敗しても、ルートと同じ競合として返すためである。
 - `updateChild` の更新件数が 0 なら、要求された子の変更を今の永続化の状態へ適用できないため、`shared.failure` の `BusinessRuleViolationException` で 422 にする。
   `ApiExceptionHandler` が 422 の Problem Details にする（[ADR-062](ADR-062-map-business-exceptions-to-404-409-422.md)）。
@@ -112,7 +113,7 @@ PostgreSQL の READ COMMITTED では、後の UPDATE は先の UPDATE のコミ�
   ログは INFO で、`setCause` で例外を付ける。
   期待された 4xx は ERROR のスタックトレースで重複して記録しない規約（[可観測性の規約](../observability/conventions.md)）に従うためである。
   WARN 以上は起動時と Collector の障害の調査に使う標準出力のログにも流れるため、競合で埋めないよう WARN にもしない。
-  Collector が通す属性は `exception.*` だけなので、キーと値の属性は足さない。
+  409 の種類は `conflict.kind` で記録する（ADR-062）。
 - 404 と 422 の対応づけは [ADR-062](ADR-062-map-business-exceptions-to-404-409-422.md) で決める。
   `IllegalStateException` は競合に使わず、409 にも対応づけない。
 

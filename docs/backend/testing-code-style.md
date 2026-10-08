@@ -27,7 +27,10 @@ tags: [convention, backend, testing, spring]
 ## Springコンテキスト
 
 フルの`@SpringBootTest`は、[SharedTestConfiguration](../../backend/src/test/java/com/example/demo/testkit/SharedTestConfiguration.java)を`@Import`するか、それを内蔵する合成アノテーションを使う。
-テストごとの`@Import`や`@MockBean`で共有構成を分岐させない。
+`@SpringBootTest`では、テストごとの`@Import`や`@MockBean`で共有構成を分岐させない。
+SpringのTestContextは構成が違うテストごとに別のcontextを起動してキャッシュするため、分岐させるほど起動が増える。
+この決まりの範囲は`@SpringBootTest`に限り、`TestConventionsArchTest`が検査する範囲と同じである。
+`@ApplicationModuleTest`のように元から別のcontextを起動するテストでも、設定の違いで構成を分けるのは、振る舞いを確かめるために必要な場合だけにする。
 OIDCクライアント登録など複数のテストで使う差し替えは、共有構成へ集約する。
 
 ## 失敗時の診断情報

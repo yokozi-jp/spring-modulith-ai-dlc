@@ -1,6 +1,6 @@
 package archfixture.conforming.inventory.application;
 
-import archfixture.conforming.order.OrderQueries;
+import archfixture.conforming.ordering.OrderQueries;
 import archfixture.conforming.shared.failure.NotFoundException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;

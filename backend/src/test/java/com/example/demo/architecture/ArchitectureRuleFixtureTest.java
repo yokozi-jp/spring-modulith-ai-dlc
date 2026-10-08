@@ -47,7 +47,8 @@ class ArchitectureRuleFixtureTest {
   private static final String VIOLATING_PREFIX = VIOLATING + ".";
 
   /** TableWriter を通さずに書く違反フィクスチャのクラス名。 */
-  private static final String DIRECT_WRITER = "order.infrastructure.persistence.DirectOrderWriter";
+  private static final String DIRECT_WRITER =
+      "ordering.infrastructure.persistence.DirectOrderWriter";
 
   /** TableWriter の H1 で、違反フィクスチャのメソッドごとに確かめる禁止の API。 */
   private static final List<String> DIRECT_WRITES =
@@ -100,11 +101,11 @@ class ArchitectureRuleFixtureTest {
 
   /** 版を比べない入口を使う違反フィクスチャの Repository。 */
   private static final String UNVERSIONED_REPOSITORY =
-      "order.infrastructure.persistence.JooqOrderRepository";
+      "ordering.infrastructure.persistence.JooqOrderRepository";
 
   /** リフレクションで対応づける違反フィクスチャのクラス名。 */
   private static final String REFLECTIVE_READER =
-      "order.infrastructure.persistence.ReflectiveOrderReader";
+      "ordering.infrastructure.persistence.ReflectiveOrderReader";
 
   @Test
   @DisplayName("規約どおりのフィクスチャはすべてのクラス役割規則を満たす")
@@ -159,63 +160,64 @@ class ArchitectureRuleFixtureTest {
             row(
                 "repositoryWritesTakeVersionedAggregates",
                 TableWriterArchTest.repositoryWritesTakeVersionedAggregatesRule(),
-                "order.domain.model.UnversionedOrderRepository.update("),
+                "ordering.domain.model.UnversionedOrderRepository.update("),
             row(
                 "repositoryWritesTakeVersionedAggregates: add",
                 TableWriterArchTest.repositoryWritesTakeVersionedAggregatesRule(),
-                "order.domain.model.UnversionedOrderRepository.add("),
+                "ordering.domain.model.UnversionedOrderRepository.add("),
             row(
                 "commandHandlersEnsureScreenLockNo: unused private method",
                 TableWriterArchTest.commandHandlersEnsureScreenLockNoRule(VIOLATING),
-                "order.application.ApproveOrderCommandHandler.handle("),
+                "ordering.application.ApproveOrderCommandHandler.handle("),
             row(
                 "commandHandlersEnsureScreenLockNo: ensureLockNo(long) overload",
                 TableWriterArchTest.commandHandlersEnsureScreenLockNoRule(VIOLATING),
-                "order.application.OverloadedEnsureCommandHandler"),
+                "ordering.application.OverloadedEnsureCommandHandler"),
             row(
                 "commandsBuiltByPresentationForWritesAreVersioned",
                 TableWriterArchTest.commandsBuiltByPresentationForWritesAreVersionedRule(VIOLATING),
-                "order.application.ReleaseOrderCommandHandler"),
+                "ordering.application.ReleaseOrderCommandHandler"),
             row(
                 "commandsBuiltByPresentationForWritesAreVersioned: static factory call",
                 TableWriterArchTest.commandsBuiltByPresentationForWritesAreVersionedRule(VIOLATING),
-                "order.application.SuspendOrderCommandHandler"),
+                "ordering.application.SuspendOrderCommandHandler"),
             row(
                 "commandsBuiltByPresentationForWritesAreVersioned: static factory reference",
                 TableWriterArchTest.commandsBuiltByPresentationForWritesAreVersionedRule(VIOLATING),
-                "order.application.ResumeOrderCommandHandler"),
+                "ordering.application.ResumeOrderCommandHandler"),
             row(
                 "commandsBuiltByPresentationForWritesAreVersioned: save",
                 TableWriterArchTest.commandsBuiltByPresentationForWritesAreVersionedRule(VIOLATING),
-                "order.application.ArchiveOrderCommandHandler"),
+                "ordering.application.ArchiveOrderCommandHandler"),
             row(
                 "onlyCommandHandlersUpdateOrDeleteAggregates: save",
                 TableWriterArchTest.onlyCommandHandlersUpdateOrDeleteAggregatesRule(),
-                "order.domain.service.ReopenPolicy.reopenAggregate("),
+                "ordering.domain.service.ReopenPolicy.reopenAggregate("),
             row(
                 "onlyCommandHandlersUpdateOrDeleteAggregates: Repository implementation",
                 TableWriterArchTest.onlyCommandHandlersUpdateOrDeleteAggregatesRule(),
-                UNVERSIONED_REPOSITORY + ".save(archfixture.violating.order.domain.model.OrderId)"),
+                UNVERSIONED_REPOSITORY
+                    + ".save(archfixture.violating.ordering.domain.model.OrderId)"),
             row(
                 "onlyCommandHandlersUpdateOrDeleteAggregates: Domain Service",
                 TableWriterArchTest.onlyCommandHandlersUpdateOrDeleteAggregatesRule(),
-                "order.domain.service.ReopenPolicy.reopen("),
+                "ordering.domain.service.ReopenPolicy.reopen("),
             row(
                 "onlyCommandHandlersUpdateOrDeleteAggregates: QueryService",
                 TableWriterArchTest.onlyCommandHandlersUpdateOrDeleteAggregatesRule(),
-                "order.application.PurgeOrderQueryService.purge("),
+                "ordering.application.PurgeOrderQueryService.purge("),
             row(
                 "expectedLockNoIsCreatedOnlyByRequests: constructor",
                 TableWriterArchTest.expectedLockNoIsCreatedOnlyByRequestsRule(VIOLATING),
-                "order.application.ForgedLockNoCommandHandler.forged("),
+                "ordering.application.ForgedLockNoCommandHandler.forged("),
             row(
                 "expectedLockNoIsCreatedOnlyByRequests: constructor reference",
                 TableWriterArchTest.expectedLockNoIsCreatedOnlyByRequestsRule(VIOLATING),
-                "order.application.ForgedLockNoCommandHandler.forgedByReference("),
+                "ordering.application.ForgedLockNoCommandHandler.forgedByReference("),
             row(
                 "expectedLockNoIsCreatedOnlyByRequests: Controller",
                 TableWriterArchTest.expectedLockNoIsCreatedOnlyByRequestsRule(VIOLATING),
-                "order.presentation.web.OrderLockController.lockNo("),
+                "ordering.presentation.web.OrderLockController.lockNo("),
             row(
                 "aggregateMethodsDoNotUseUnversionedWrites",
                 TableWriterArchTest.aggregateMethodsDoNotUseUnversionedWritesRule(VIOLATING),
@@ -228,17 +230,17 @@ class ArchitectureRuleFixtureTest {
         row(
             "dependenciesPointInward",
             PackageByFeatureOnionArchitectureTest.dependenciesPointInwardRule(VIOLATING),
-            "order.infrastructure.messaging.OrderPlacedPublisher"),
+            "ordering.infrastructure.messaging.OrderPlacedPublisher"),
         row(
             "infrastructureDependsOnlyOnDomainModel",
             PackageByFeatureOnionArchitectureTest.infrastructureDependsOnlyOnDomainModelRule(
                 VIOLATING),
-            "order.infrastructure.persistence.ExpiredOrderSweeper"),
+            "ordering.infrastructure.persistence.ExpiredOrderSweeper"),
         row(
             "sharedModuleIsUsedOnlyByPersistenceAdapters",
             PackageByFeatureOnionArchitectureTest.sharedModuleIsUsedOnlyByPersistenceAdaptersRule(
                 VIOLATING),
-            "order.application.OrderAuditColumns"),
+            "ordering.application.OrderAuditColumns"),
         row(
             "sharedModuleDoesNotDependOnHttp",
             PackageByFeatureOnionArchitectureTest.sharedModuleDoesNotDependOnHttpRule(VIOLATING),
@@ -246,82 +248,82 @@ class ArchitectureRuleFixtureTest {
         row(
             "noSuchElementExceptionIsNotThrown",
             GeneralCodingRulesArchTest.noSuchElementExceptionIsNotThrown,
-            "order.application.LegacyOrderFinder.notFound("),
+            "ordering.application.LegacyOrderFinder.notFound("),
         row(
             "noSuchElementExceptionIsNotThrown: orElseThrow",
             GeneralCodingRulesArchTest.noSuchElementExceptionIsNotThrown,
-            "order.application.LegacyOrderFinder.firstOrFail("),
+            "ordering.application.LegacyOrderFinder.firstOrFail("),
         row(
             "moduleApiDoesNotExposeInternalTypes",
             PackageByFeatureOnionArchitectureTest.moduleApiDoesNotExposeInternalTypesRule(
                 VIOLATING),
-            "order.OrderPlacedWithModel"),
+            "ordering.OrderPlacedWithModel"),
         row(
             "domainModelDoesNotDependOnFrameworks",
             PackageByFeatureOnionArchitectureTest.domainModelDoesNotDependOnFrameworks,
-            "order.domain.model.OrderFactory"),
+            "ordering.domain.model.OrderFactory"),
         row(
             "domainServicesDependOnlyOnDomainAndJava",
             PackageByFeatureOnionArchitectureTest.domainServicesDependOnlyOnDomainAndJavaRule(
                 VIOLATING),
-            "order.domain.service.DiscountPolicy"),
+            "ordering.domain.service.DiscountPolicy"),
         row(
             "domainServicesAreAnnotatedWithService",
             PackageByFeatureOnionArchitectureTest.domainServicesAreAnnotatedWithService,
-            "order.domain.service.ShippingFeeCalculator"),
+            "ordering.domain.service.ShippingFeeCalculator"),
         row(
             "servicesResideInApplicationOrDomainService",
             PackageByFeatureOnionArchitectureTest.servicesResideInApplicationOrDomainService,
-            "order.infrastructure.client.PaymentService"),
+            "ordering.infrastructure.client.PaymentService"),
         row(
             "controllersResideInPresentationWeb",
             PackageByFeatureOnionArchitectureTest.controllersResideInPresentationWeb,
-            "order.presentation.OrderResource"),
+            "ordering.presentation.OrderResource"),
         row(
             "presentationDoesNotDependOnDomain",
             PackageByFeatureOnionArchitectureTest.presentationDoesNotDependOnDomain,
-            "order.presentation.web.OrderDetailsResponse"),
+            "ordering.presentation.web.OrderDetailsResponse"),
         row(
             "domainInterfacesAreImplementedInInfrastructure",
             PackageByFeatureOnionArchitectureTest
                 .domainInterfacesAreImplementedInInfrastructureRule(VIOLATING),
-            "order.application.InMemoryOrderRepository"),
+            "ordering.application.InMemoryOrderRepository"),
         row(
             "repositoryImplementationsAreJooqRepositories",
             PackageByFeatureOnionArchitectureTest.repositoryImplementationsAreJooqRepositories,
-            "order.application.InMemoryOrderRepository"),
+            "ordering.application.InMemoryOrderRepository"),
         row(
             "externalSystemImplementationsAreClients",
             PackageByFeatureOnionArchitectureTest.externalSystemImplementationsAreClients,
-            "order.infrastructure.client.PaymentGatewayAdapter"),
+            "ordering.infrastructure.client.PaymentGatewayAdapter"),
         row(
             "transactionalIsNotDeclaredAtClassLevel",
             PackageByFeatureOnionArchitectureTest.transactionalIsNotDeclaredAtClassLevel,
-            "order.application.ShipOrderCommandHandler"),
+            "ordering.application.ShipOrderCommandHandler"),
         row(
             "transactionalMethodsArePublicApplicationMethods",
             PackageByFeatureOnionArchitectureTest.transactionalMethodsArePublicApplicationMethods,
-            "order.infrastructure.persistence.OrderAuditRecorder"),
+            "ordering.infrastructure.persistence.OrderAuditRecorder"),
         row(
             "moduleListenersAreApplicationListeners",
             ClassRoleArchTest.moduleListenersAreApplicationListeners,
-            "order.infrastructure.persistence.OrderAuditRecorder"),
+            "ordering.infrastructure.persistence.OrderAuditRecorder"),
         row(
             "moduleRootTypesAreRecordsEnumsOrQueries",
             ClassRoleArchTest.moduleRootTypesAreRecordsEnumsOrQueriesRule(VIOLATING),
-            "order.OrderOperations"),
+            "ordering.OrderOperations"),
         row(
             "applicationServicesHaveRoleNames",
             ClassRoleArchTest.applicationServicesHaveRoleNames,
-            "order.application.PlaceOrderService"),
+            "ordering.application.PlaceOrderService"),
         row(
             "commandHandlersExposeOnlyTransactionalHandle",
             ClassRoleArchTest.commandHandlersExposeOnlyTransactionalHandle,
-            "order.application.CancelOrderCommandHandler"),
+            "ordering.application.CancelOrderCommandHandler"),
         row(
             "commandsAndResultsAreApplicationRecords",
             ClassRoleArchTest.commandsAndResultsAreApplicationRecordsRule(VIOLATING),
-            "order.application.ConfirmOrderCommand"),
+            "ordering.application.ConfirmOrderCommand"),
         row(
             "commandsAndResultsAreApplicationRecords: shared.concurrency",
             ClassRoleArchTest.commandsAndResultsAreApplicationRecordsRule(VIOLATING),
@@ -329,7 +331,7 @@ class ArchitectureRuleFixtureTest {
         row(
             "commandHandlersDoNotDependOnOtherCommandHandlers",
             ClassRoleArchTest.commandHandlersDoNotDependOnOtherCommandHandlers,
-            "order.application.ConfirmOrderCommandHandler"),
+            "ordering.application.ConfirmOrderCommandHandler"),
         row(
             "listenersExposeOnlyOnAndCallOneCommandHandler",
             ClassRoleArchTest.listenersExposeOnlyOnAndCallOneCommandHandler,
@@ -337,11 +339,11 @@ class ArchitectureRuleFixtureTest {
         row(
             "requestsAndResponsesArePresentationWebRecords",
             ClassRoleArchTest.requestsAndResponsesArePresentationWebRecordsRule(VIOLATING),
-            "order.presentation.web.PlaceOrderRequest"),
+            "ordering.presentation.web.PlaceOrderRequest"),
         row(
             "queryServicesImplementModuleQueries",
             ClassRoleArchTest.queryServicesImplementModuleQueries,
-            "order.application.OrderQueryService"),
+            "ordering.application.OrderQueryService"),
         row(
             "mappingLibrariesAreNotUsed",
             ClassRoleArchTest.mappingLibrariesAreNotUsed,
@@ -458,7 +460,8 @@ class ArchitectureRuleFixtureTest {
     /** 版が違えば競合の例外を投げる。 */
     /* package */ static void ensureLockNo(final long expected, final long actual) {
       if (expected != actual) {
-        throw new ConflictException("row was updated by another request");
+        throw new ConflictException(
+            ConflictException.Kind.VERSION, "row was updated by another request");
       }
     }
 

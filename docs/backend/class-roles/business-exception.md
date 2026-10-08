@@ -17,9 +17,11 @@ HTTP のステータスとログレベルは `error` モジュールの `ApiExce
 利用者の要求が業務の上で成り立たないとき、Domain、Application、Infrastructure は、その失敗を例外で呼び出し側へ伝える。
 **業務上の失敗の例外**は、利用者が要求か状態を見直せば解消しうる失敗を表す、次の三つの型である。
 
-- **NotFoundException**：指定された集約や行が存在しない。
+- **NotFoundException**：ユースケースが対象にする集約や行が存在しない。
+  HTTP API では、要求のパスで指定したリソースにあたる。
   参照の権限がなく存在を隠す場合も同じ型を投げる。
 - **BusinessRuleViolationException**：許されない状態遷移、業務規則の違反、要求を今の状態へ適用できない。
+  要求が参照する別の集約や値が存在しない場合も、この型を投げる。
 - **ConflictException**：版の不一致、行ロックの失敗、一意制約の違反。
   読み直せば解消しうる。
 
@@ -42,7 +44,10 @@ HTTP のステータスとログレベルは `error` モジュールの `ApiExce
 - `Optional` からは `orElseThrow(() -> new NotFoundException("order not found: orderId=" + orderId))` で取り出す。
 - 集約の状態遷移と Domain Service の業務規則の違反は `BusinessRuleViolationException` で投げる。
 - Repository の実装は、Spring と jOOQ の例外（`CannotAcquireLockException`、`DuplicateKeyException`）を Repository の外へ出さない。
-  外へ出すときは、原因に付けた `ConflictException` に変えて投げる（[jOOQ の Repository](jooq-repository.md)）。
+  外へ出すときは、原因を付けずに、種類を付けた `ConflictException` に変えて投げる（[jOOQ の Repository](jooq-repository.md)）。
+  種類は、版の不一致が `ConflictException.Kind.VERSION`、行ロックの失敗が `Kind.LOCK`、一意制約の違反が `Kind.UNIQUE` である。
+- 三つの型は原因（cause）を持たない。
+  コンストラクタは原因を受け取らず、後から `initCause` を呼ぶと `IllegalStateException` になる。
 
 ## 依存してよい型、してはいけない型
 
@@ -52,21 +57,22 @@ HTTP のステータスとログレベルは `error` モジュールの `ApiExce
 
 ## 例外、HTTP、ログ、Listener の対応
 
-| 例外                                                                                            | HTTP | 本文                                                         | API のログ                                     | 非同期の Listener            |
-| ----------------------------------------------------------------------------------------------- | ---- | ------------------------------------------------------------ | ---------------------------------------------- | ---------------------------- |
-| `NotFoundException`                                                                             | 404  | `about:blank`、`title` は `problem.title.404`、`detail` なし | INFO、`cause` 付き、`API business failure`     | 回復不能として再試行しない   |
-| `BusinessRuleViolationException`                                                                | 422  | `about:blank`、`title` は `problem.title.422`、`detail` なし | INFO、`cause` 付き、`API business failure`     | 回復不能として再試行しない   |
-| `ConflictException`                                                                             | 409  | `about:blank`、`title` は `problem.title.409`、`detail` なし | INFO、`cause` 付き、`API conflict`             | 回復不能として再試行しない   |
-| JDK の例外ほか（`IllegalStateException`、`IllegalArgumentException`、`NoSuchElementException`） | 500  | `about:blank`、`title` は `problem.title.500`、`detail` なし | ERROR、`cause` 付き、`Unhandled API exception` | 予期しない例外として送出する |
+| 例外                                                                                            | HTTP | 本文                                                         | API のログ                                                    | 非同期の Listener            |
+| ----------------------------------------------------------------------------------------------- | ---- | ------------------------------------------------------------ | ------------------------------------------------------------- | ---------------------------- |
+| `NotFoundException`                                                                             | 404  | `about:blank`、`title` は `problem.title.404`、`detail` なし | INFO、例外付き（原因なし）、`API business failure`            | 回復不能として再試行しない   |
+| `BusinessRuleViolationException`                                                                | 422  | `about:blank`、`title` は `problem.title.422`、`detail` なし | INFO、例外付き（原因なし）、`API business failure`            | 回復不能として再試行しない   |
+| `ConflictException`                                                                             | 409  | `about:blank`、`title` は `problem.title.409`、`detail` なし | INFO、例外付き（原因なし）、`conflict.kind`、`API conflict`   | 回復不能として再試行しない   |
+| JDK の例外ほか（`IllegalStateException`、`IllegalArgumentException`、`NoSuchElementException`） | 500  | `about:blank`、`title` は `problem.title.500`、`detail` なし | ERROR、例外と原因の連鎖付き、`Unhandled API exception`        | 予期しない例外として送出する |
 
 `title` は `Accept-Language` から解決した言語で返り、404 の本文は対象がない場合と存在を隠す場合で同じになる。
 Listener の扱いは[非同期処理の失敗時の再試行と回復](../../integration/async-failure-recovery.md)の「Spring Modulith のイベントの失敗」に合わせる。
 業務上の失敗の三つの型は、自動で再試行しない。
-ステータス管理テーブル（[非同期処理のステータス管理](../../integration/async-job-status.md)）を持つ処理は FAILED と失敗の内容を記録して正常終了し、持たない処理は `on` から送出してイベント出版を未完了のまま残す（レジストリが DLQ を兼ねる）。
-ステータス管理テーブルを持たない処理では、`ConflictException` で未完了のまま残ったイベント出版を運用者が `FailedEventPublications` で再投入すると、読み直して成功する見込みがある。
+ステータス管理テーブル（[非同期処理のステータス管理](../../integration/async-job-status.md)）を持つ処理は FAILED と失敗の内容を記録して正常終了し、持たない処理は `on` から送出してイベント出版を `FAILED` で残す（レジストリが DLQ を兼ねる）。
+ステータス管理テーブルを持たない処理では、`ConflictException` で `FAILED` のまま残ったイベント出版を運用者が `FailedEventPublications` で再投入すると、読み直して成功する見込みがある。
 
-`23505` と `55P03` の原因の例外のメッセージには SQL が入り、`23505` では重複したキーの値も入って、INFO のログに出る。
-扱いは[可観測性の規約](../../observability/conventions.md)の「発生源で渡さない値」に従い、閲覧の制限と表示時のマスクで守る。
+`23505` と `55P03` の Spring の例外のメッセージには SQL が入り、`23505` では重複したキーの値も入る。
+三つの型は原因を持たないため、これらの SQL と値は INFO のログに出ない（[可観測性の規約](../../observability/conventions.md)の「発生源で渡さない値」）。
+409 の `conflict.kind` は `version`、`lock`、`unique` のどれかで、どの競合かをログで区別する。
 
 ## 最小の例と典型的な例
 
@@ -90,6 +96,17 @@ private void ensureStatus(final OrderStatus expected) {
   }
 }
 ```
+
+Repository の実装は、`NOWAIT` のロックの失敗を、原因を付けずに種類を付けた `ConflictException` に変える（抜粋）。
+
+```java
+} catch (final CannotAcquireLockException e) {
+  throw new ConflictException(
+      ConflictException.Kind.LOCK, "row is locked by another request: orderId=" + orderId);
+}
+```
+
+catch した例外を原因に渡さないため、この断片を写したメソッドには PMD と Error Prone の警告の抑止が要り、その書き方は [jOOQ の Repository](jooq-repository.md) に従う。
 
 Controller は参照の結果がなければ `NotFoundException` を投げ、ステータスを自分で決めない（[Controller](controller.md)）。
 
@@ -134,5 +151,6 @@ Controller は参照の結果がなければ `NotFoundException` を投げ、ス
 - [ ] 集約ごとの例外の型を作らない。［自分で点検］
 - [ ] メッセージは英語にし、対象の識別子を含める。［自分で点検］
 - [ ] Controller に try と catch を書かない。［自分で点検］
-- [ ] Repository の実装は Spring と jOOQ の例外を外へ出さず、出すときは原因に付けた `ConflictException` に変える。［自分で点検］
+- [ ] Repository の実装は Spring と jOOQ の例外を外へ出さず、出すときは原因を付けずに種類を付けた `ConflictException` に変える。［自分で点検］
+- [ ] 三つの型に原因を付けない（`initCause` を呼ばない）。［実行時に検査：`initCause` は `IllegalStateException` になる］
 - [ ] 単体テストで例外の型を確かめる。［自分で点検］

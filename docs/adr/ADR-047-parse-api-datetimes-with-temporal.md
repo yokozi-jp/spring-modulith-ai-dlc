@@ -1,7 +1,7 @@
 ---
 type: ADR
 title: 'ADR-047: フロントエンドで API の日時を Temporal で解析する'
-description: API の絶対時刻を Temporal.Instant、日付だけの値を Temporal.PlainDate で解析し、Date で解析しない決定と、Safari に対応する必要があるときはポリフィルを入れ、その依存を Safari 対応が必要な最初の日時画面で追加する方針。
+description: API の絶対時刻を Temporal.Instant、日付だけの値を Temporal.PlainDate で解析し、Date で解析しない決定と、Safari に対応する必要があるときはポリフィルを Temporal を持たないブラウザだけで読み込み、その依存を Safari 対応が必要な最初の日時画面で追加する方針。
 tags: [adr, datetime, timezone, frontend]
 ---
 
@@ -31,12 +31,16 @@ Temporalは2026年3月にStage 4になり、ChromeとFirefoxは出荷済みで�
 ## Decision
 
 APIの絶対時刻は`Temporal.Instant.from(...)`で解析し、`toLocaleString`で表示する。
+`toLocaleString`は内部で`Intl.DateTimeFormat`を使う。
+この決定は、[ADR-016](ADR-016-localize-api-and-spa-messages.md)の「日時は表示境界で`Intl.DateTimeFormat`を使う」を上書きし、`Temporal`のオブジェクトを`Intl.DateTimeFormat`へ直接渡さない。
 日付だけの値は`Temporal.PlainDate.from(...)`で解析する。
 APIの値を`new Date(string)`や`Date.parse`で解析しない。
 
 Safariに対応する必要があるときは、ポリフィルを入れる。
 候補は、proposal-temporalのREADMEが安定版と位置づける[temporal-polyfill](https://www.npmjs.com/package/temporal-polyfill)とする。
 依存はSafariへの対応が必要で日時を扱う最初の画面と同じ変更で追加し、それまでは追加しない。
+ポリフィルは`Temporal`を持たないブラウザだけで動的に読み込み、ponyfillの形（`import { Temporal } from "temporal-polyfill"`）を使わない（読み込み方は[日時とタイムゾーンの規約](../datetime/timezone-conventions.md)）。
+Temporalを出荷したブラウザにポリフィルを配らず、外すときに読み込みの数行を消すだけで済むためである。
 SafariがTemporalを出荷し、対応ブラウザとWeb機能の採用基準で使える状態になったら、ポリフィルを外す。
 
 ## Consequences
@@ -48,12 +52,13 @@ SafariがTemporalを出荷し、対応ブラウザとWeb機能の採用基準で
 
 ### Negative
 
-- ポリフィルを入れると、配信するJavaScriptが増える。
+- `Temporal`を持たないブラウザでは、配信するJavaScriptが増える。
 - ポリフィルのオブジェクトはブラウザの`Intl.DateTimeFormat`が直接受け付けない場合があり、表示は`toLocaleString`に寄せる必要がある。
 
 ### Neutral
 
-- ポリフィルを使う間は、ブラウザのTemporalではなくライブラリに依存するため、Limited availabilityの機能を直接使うことにはならない。
+- Temporalを出荷したChromeとFirefoxはブラウザのTemporalを使い、`Temporal`を持たないブラウザはポリフィルのTemporalを使う。
+  どのブラウザでも`Temporal`があるため、ポリフィルなしでLimited availabilityの機能に頼ることにはならない。
 - ポリフィルを外す時期は、SafariのTemporal出荷後に判断する。
 
 ## Alternatives Considered
@@ -75,5 +80,6 @@ SafariがTemporalを出荷し、対応ブラウザとWeb機能の採用基準で
 - [日時とタイムゾーンの規約](../datetime/timezone-conventions.md)
 - [対応ブラウザとWeb機能の採用基準](../frontend/browser-support.md)
 - [ADR-006: 絶対時刻を UTC / Instant / timestamptz に統一する](ADR-006-utc-instant-absolute-time-policy.md)
+- [ADR-016: API と SPA のメッセージをローカライズする](ADR-016-localize-api-and-spa-messages.md)
 - TC39, Temporal: <https://github.com/tc39/proposal-temporal>
 - npm, temporal-polyfill: <https://www.npmjs.com/package/temporal-polyfill>

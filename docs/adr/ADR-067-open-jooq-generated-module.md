@@ -21,12 +21,15 @@ jOOQ の生成物は `backend/src/generated/jooq` の `com.example.demo.jooq` �
 このパッケージはベースパッケージの直下にあるため、Spring Modulith は `jooq` をアプリケーションのモジュールとして扱う。
 Spring Modulith は、モジュールのルートのパッケージの型だけを公開し、サブパッケージの型を内部の型として扱う。
 
-最初の業務機能（[issue #122](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/122) の `product` と `order`）で、生成の対象のスキーマが `modulith`、`product`、`order` の 3 つになった。
+main は今 `modulith` のスキーマだけを生成し、生成型はルートの `com.example.demo.jooq.Tables` とサブパッケージの `com.example.demo.jooq.tables` にある。
+本番コードから生成型を使うクラスがまだないため、main ではモジュールの検査が失敗していない。
+
+確認用のサンプル機能（[issue #122](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/122) の `product` と `order`）を作るブランチで、生成の対象のスキーマを `modulith`、`product`、`order` の 3 つにした。
 jooq-codegen 3.21 は、スキーマが 2 つ以上のとき、スキーマの定義とその下の `Tables`、テーブル、Record を `com.example.demo.jooq.<スキーマ名>` のサブパッケージに生成する。
 ルートに残るのは `DefaultCatalog` だけで、ルートの `Tables` はなくなる。
 
 この状態で `JooqProductRepository` が `com.example.demo.jooq.product.Tables.M_PRODUCT` を使うと、`ApplicationModules.verify()`（`ApplicationModuleArchitectureTest`）が「Module 'product' depends on non-exposed type com.example.demo.jooq.product.tables.MProduct within module 'jooq'」で失敗した。
-今まで表に出なかったのは、本番コードから生成型を使うクラスがなかったためである。
+最初の業務スキーマを足す変更でこの失敗が起きないよう、業務スキーマを足す前に main へ入れる。
 
 生成先は `clean = true` で毎回消されるため、生成先に手書きのファイルを置いても次の生成で消える。
 また `ProductionCodeOnlyTest` は、`com.example.demo.jooq` の本番のクラスのソースが `src/generated/jooq` にあることを求める。
@@ -59,8 +62,7 @@ jooq-codegen 3.21 は、スキーマが 2 つ以上のとき、スキーマの�
 
 ### Neutral
 
-- 生成物の置き場所はこの変更でコードが変わるため、[jOOQ の Repository](../backend/class-roles/jooq-repository.md) の「`com.example.demo.jooq.Tables` を使う」は、同じ変更でスキーマごとの `Tables` に直した。
-  OPEN のモジュールにする判断を規約の docs へ書き足すのは、この ADR が Accepted になるときに行う。
+- [jOOQコード生成物の管理](../database/jooq-codegen.md)、[jOOQ の Repository](../backend/class-roles/jooq-repository.md)、[バックエンドのアーキテクチャテスト](../backend/architecture-tests.md) は、この ADR と同じ変更で、生成物のモジュールとスキーマごとの `Tables` に合わせて直した。
 
 ## Alternatives Considered
 

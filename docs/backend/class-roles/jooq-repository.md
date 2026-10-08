@@ -43,8 +43,8 @@ jOOQ の Repository は業務規則を持たない。
 - 集約を読む SQL の列の選択と変換を置く private メソッドは、`select` に集約の名前の複数形を付ける（`selectOrders`）。
 - jOOQ の生成型は、自モジュールのスキーマの `Tables`（`com.example.demo.jooq.<スキーマ名>.Tables`）のテーブルと列を使う（[ADR-067](../../adr/ADR-067-open-jooq-generated-module.md)）。
 
-この文書の `ORDERS`、`ORDER_LINES` と、その Record の `OrdersRecord`、`OrderLinesRecord` は、説明用の仮の生成型である。
-`ORDERS` は `ORDER_ID`、`CUSTOMER_ID`、`STATUS`、`DISCOUNT`、`PLACED_AT`、`LOCK_NO` の列を、`ORDER_LINES` は `ORDER_ID`、`LINE_NUMBER`、`PRODUCT_CODE`、`QUANTITY`、`UNIT_PRICE`、`LOCK_NO` の列を持つとする。
+この文書の `T_ORDER`、`T_ORDER_LINE` と、その Record の `TOrderRecord`、`TOrderLineRecord` は、説明用の仮の生成型である。
+`T_ORDER` は `ORDER_ID`、`CUSTOMER_ID`、`ORDER_STATUS_TYP`、`DISCOUNT_JPY`、`PLACED_AT`、`LOCK_NO` の列を、`T_ORDER_LINE` は `ORDER_ID`、`LINE_NO`、`PRODUCT_CODE`、`ORDERED_COUNT`、`UNIT_PRICE_JPY`、`LOCK_NO` の列を持つとする。
 二つのテーブルは、ほかに[共通カラム](../../database/postgresql-common-columns.md)の `CREATED_*`、`UPDATED_*`、`PATCHED_*` を持つ。
 `PLACED_AT` の生成型は、[日時とタイムゾーンの規約](../../datetime/timezone-conventions.md)のとおり `Instant` である。
 生成型の扱いは[jOOQコード生成物の管理](../../database/jooq-codegen.md)に従う。
@@ -63,16 +63,16 @@ jOOQ の Repository は業務規則を持たない。
 - 集約を読む SQL の列の選択と変換は、private メソッド `select<Aggregate>s()` 一つに置く。
   取り出しのメソッドは、そこへ `where` と `orderBy` を足す。
 - `nextId()` を実装する。採番の方法は、UUID v7 を主キーにする最初のテーブルを作るときに決める（[PostgreSQLの主キー](../../database/postgresql-primary-keys.md#uuidの採番)）。
-- 列は `convertFrom` で値オブジェクトと enum に変える（`ORDERS.ORDER_ID.convertFrom(OrderId::new)`、`ORDERS.STATUS.convertFrom(OrderStatus::valueOf)`）。
+- 列は `convertFrom` で値オブジェクトと enum に変える（`T_ORDER.ORDER_ID.convertFrom(OrderId::new)`、`T_ORDER.ORDER_STATUS_TYP.convertFrom(OrderStatus::valueOf)`）。
 - 子の Entity は、`multiset` の副問い合わせで集約ルートと同じ SQL で読み、`convertFrom(lines -> lines.map(Records.mapping(OrderLine::new)))` で Entity のリストにする。
   副問い合わせには、子を識別する列の `orderBy` を付ける。
 - `select` に並べる列の順は、`Order.restore` と Entity のコンストラクタの引数の順に合わせる。
   集約ルートの `LOCK_NO` も選び、`restore` の `lockNo` に渡す。
 - 集約は `fetchOptional(Records.mapping(Order::restore))` か `fetch(Records.mapping(Order::restore))` で作り、`Order.place` を使わない。
-- `add` は、`insertInto(ORDERS)` の `set(列, 値)` で業務の全列を書き、`LOCK_NO` を含む共通カラムを `set(commonColumns.forInsert(ORDERS))` で書く。
+- `add` は、`insertInto(T_ORDER)` の `set(列, 値)` で業務の全列を書き、`LOCK_NO` を含む共通カラムを `set(commonColumns.forInsert(T_ORDER))` で書く。
   集約ルートの INSERT は `tableWriter.insert(...)` で実行し、一意制約の違反（`23505`）を `ConflictException` に変える。
   値オブジェクトと enum は、アクセサ（`value()`、`amount()`、`name()`）で列の値に直す。
-- `update` は、`tableWriter.updateCheckingVersion(ORDERS, 主キーの条件, order.lockNo(), 業務の列)` で集約ルートの行を先に更新する。
+- `update` は、`tableWriter.updateCheckingVersion(T_ORDER, 主キーの条件, order.lockNo(), 業務の列)` で集約ルートの行を先に更新する。
   業務の列は、ラムダで `ColumnValues` に `set(列, 値)` で渡し、主キー以外の業務の列をすべて書く。
   集約ルートの業務の列が変わらなくても、集約ルートの行を更新して版を進める。
   0 件のとき、行がなければ `shared.failure` の `NotFoundException` が、行があれば `shared.concurrency` の `ConflictException` が投げられる。
@@ -89,7 +89,7 @@ jOOQ の Repository は業務規則を持たない。
      集約の子が空なら、すべての子を削除する。
   4. 保存済みにない子を `insertInto(子のテーブル).set(commonColumns.forInsert(子のテーブル))` で追加する。
   5. 両方にある子を `root.updateChild` で更新する。
-- `delete` は、`tableWriter.deleteCheckingVersion(ORDERS, 主キーの条件, order.lockNo())` で集約ルートの行を削除し、子の行は戻り値の `DeletedRoot.deleteChildren` で削除する。
+- `delete` は、`tableWriter.deleteCheckingVersion(T_ORDER, 主キーの条件, order.lockNo())` で集約ルートの行を削除し、子の行は戻り値の `DeletedRoot.deleteChildren` で削除する。
 - `update` と `delete` は、`TableWriter` の版を比べる入口と、引数の集約ルートの `lockNo()` を、そのメソッドの中で直接呼ぶ。
   別のメソッドやラムダを経由すると、ArchUnit の検査が呼び出しを見つけられない。
 - 期待する版を持つ書き込みは、集約ルートを受け取る `update` と `delete` に限る。
@@ -104,7 +104,9 @@ jOOQ の Repository は業務規則を持たない。
 - 共通カラムのうち、このクラスが参照するのは、集約の復元のために読む `LOCK_NO` だけにし、`LOCK_NO` を書かず、`CREATED_*`、`UPDATED_*`、`PATCHED_*` の列を参照しない（[ADR-048](../../adr/ADR-048-add-shared-module-for-jooq-common-code.md)）。
   `ColumnValues` に共通カラムを渡すと `IllegalArgumentException` になる。
 - `updateWhere`、`deleteWhere`、`NOWAIT` が投げる Spring の例外（`CannotAcquireLockException`、`DuplicateKeyException`）を Repository の外へ出さない。
-  外へ出すときは、原因に付けた `ConflictException` に変えて投げる。
+  外へ出すときは、原因を付けずに、種類（`ConflictException.Kind.LOCK` か `Kind.UNIQUE`）を付けた `ConflictException` に変えて投げる。
+  原因の例外のメッセージには SQL と入力値が入り、ログに出るためである（[ADR-062](../../adr/ADR-062-map-business-exceptions-to-404-409-422.md)）。
+  catch した例外を原因に渡さないと PMD の `PreserveStackTrace` と Error Prone の `UnusedException` が警告するため、そのメソッドに `@SuppressWarnings({"PMD.PreserveStackTrace", "UnusedException"})` を付け、直前に理由のコメントを書く。
 - `@Transactional` を付けない。
 - クラス、フィールド、コンストラクタに Javadoc を書く。
 - `infrastructure.persistence` のパッケージに `@NullMarked` を宣言する `package-info.java` を置く。
@@ -130,8 +132,8 @@ PostgreSQL には MULTISET がなく、jOOQ は `jsonb_agg` による JSON の�
 ```java
 package com.example.demo.ordering.infrastructure.persistence;
 
-import static com.example.demo.jooq.ordering.Tables.ORDERS;
-import static com.example.demo.jooq.ordering.Tables.ORDER_LINES;
+import static com.example.demo.jooq.ordering.Tables.T_ORDER;
+import static com.example.demo.jooq.ordering.Tables.T_ORDER_LINE;
 import static org.jooq.impl.DSL.multiset;
 import static org.jooq.impl.DSL.select;
 
@@ -163,31 +165,31 @@ class JooqOrderRepository implements OrderRepository {
   @Override
   public Optional<Order> findById(final OrderId id) {
     return selectOrders()
-        .where(ORDERS.ORDER_ID.eq(id.value()))
+        .where(T_ORDER.ORDER_ID.eq(id.value()))
         .fetchOptional(Records.mapping(Order::restore));
   }
 
   @Override
   public void add(final Order order) {
     tableWriter.insert(
-        dsl.insertInto(ORDERS)
-            .set(ORDERS.ORDER_ID, order.id().value())
-            .set(ORDERS.CUSTOMER_ID, order.customerId().value())
-            .set(ORDERS.STATUS, order.status().name())
-            .set(ORDERS.DISCOUNT, order.discount().amount())
-            .set(ORDERS.PLACED_AT, order.placedAt())
-            .set(commonColumns.forInsert(ORDERS)));
+        dsl.insertInto(T_ORDER)
+            .set(T_ORDER.ORDER_ID, order.id().value())
+            .set(T_ORDER.CUSTOMER_ID, order.customerId().value())
+            .set(T_ORDER.ORDER_STATUS_TYP, order.status().name())
+            .set(T_ORDER.DISCOUNT_JPY, order.discount().amount())
+            .set(T_ORDER.PLACED_AT, order.placedAt())
+            .set(commonColumns.forInsert(T_ORDER)));
     dsl.batch(
             order.lines().stream()
                 .map(
                     line ->
-                        dsl.insertInto(ORDER_LINES)
-                            .set(ORDER_LINES.ORDER_ID, order.id().value())
-                            .set(ORDER_LINES.LINE_NUMBER, line.lineNumber())
-                            .set(ORDER_LINES.PRODUCT_CODE, line.productCode().value())
-                            .set(ORDER_LINES.QUANTITY, line.quantity().value())
-                            .set(ORDER_LINES.UNIT_PRICE, line.unitPrice().amount())
-                            .set(commonColumns.forInsert(ORDER_LINES)))
+                        dsl.insertInto(T_ORDER_LINE)
+                            .set(T_ORDER_LINE.ORDER_ID, order.id().value())
+                            .set(T_ORDER_LINE.LINE_NO, line.lineNumber())
+                            .set(T_ORDER_LINE.PRODUCT_CODE, line.productCode().value())
+                            .set(T_ORDER_LINE.ORDERED_COUNT, line.quantity().value())
+                            .set(T_ORDER_LINE.UNIT_PRICE_JPY, line.unitPrice().amount())
+                            .set(commonColumns.forInsert(T_ORDER_LINE)))
                 .toList())
         .execute();
   }
@@ -196,25 +198,25 @@ class JooqOrderRepository implements OrderRepository {
   public void update(final Order order) {
     final LockedRoot root =
         tableWriter.updateCheckingVersion(
-            ORDERS,
-            ORDERS.ORDER_ID.eq(order.id().value()),
+            T_ORDER,
+            T_ORDER.ORDER_ID.eq(order.id().value()),
             order.lockNo(),
             set ->
-                set.set(ORDERS.CUSTOMER_ID, order.customerId().value())
-                    .set(ORDERS.STATUS, order.status().name())
-                    .set(ORDERS.DISCOUNT, order.discount().amount())
-                    .set(ORDERS.PLACED_AT, order.placedAt()));
+                set.set(T_ORDER.CUSTOMER_ID, order.customerId().value())
+                    .set(T_ORDER.ORDER_STATUS_TYP, order.status().name())
+                    .set(T_ORDER.DISCOUNT_JPY, order.discount().amount())
+                    .set(T_ORDER.PLACED_AT, order.placedAt()));
     for (final OrderLine line : order.lines()) {
       root.updateChild(
-          ORDER_LINES,
-          ORDER_LINES
+          T_ORDER_LINE,
+          T_ORDER_LINE
               .ORDER_ID
               .eq(order.id().value())
-              .and(ORDER_LINES.LINE_NUMBER.eq(line.lineNumber())),
+              .and(T_ORDER_LINE.LINE_NO.eq(line.lineNumber())),
           set ->
-              set.set(ORDER_LINES.PRODUCT_CODE, line.productCode().value())
-                  .set(ORDER_LINES.QUANTITY, line.quantity().value())
-                  .set(ORDER_LINES.UNIT_PRICE, line.unitPrice().amount()));
+              set.set(T_ORDER_LINE.PRODUCT_CODE, line.productCode().value())
+                  .set(T_ORDER_LINE.ORDERED_COUNT, line.quantity().value())
+                  .set(T_ORDER_LINE.UNIT_PRICE_JPY, line.unitPrice().amount()));
     }
   }
 
@@ -222,10 +224,10 @@ class JooqOrderRepository implements OrderRepository {
   public void delete(final Order order) {
     tableWriter
         .deleteCheckingVersion(
-            ORDERS,
-            ORDERS.ORDER_ID.eq(order.id().value()),
+            T_ORDER,
+            T_ORDER.ORDER_ID.eq(order.id().value()),
             order.lockNo())
-        .deleteChildren(ORDER_LINES, ORDER_LINES.ORDER_ID.eq(order.id().value()));
+        .deleteChildren(T_ORDER_LINE, T_ORDER_LINE.ORDER_ID.eq(order.id().value()));
   }
 
   // findByCustomer と countUnshippedByCustomer は典型的な例に示す。
@@ -236,23 +238,23 @@ class JooqOrderRepository implements OrderRepository {
           Record7<OrderId, CustomerId, OrderStatus, List<OrderLine>, Money, Instant, Long>>
       selectOrders() {
     return dsl.select(
-            ORDERS.ORDER_ID.convertFrom(OrderId::new),
-            ORDERS.CUSTOMER_ID.convertFrom(CustomerId::new),
-            ORDERS.STATUS.convertFrom(OrderStatus::valueOf),
+            T_ORDER.ORDER_ID.convertFrom(OrderId::new),
+            T_ORDER.CUSTOMER_ID.convertFrom(CustomerId::new),
+            T_ORDER.ORDER_STATUS_TYP.convertFrom(OrderStatus::valueOf),
             multiset(
                     select(
-                            ORDER_LINES.LINE_NUMBER,
-                            ORDER_LINES.PRODUCT_CODE.convertFrom(ProductCode::new),
-                            ORDER_LINES.QUANTITY.convertFrom(Quantity::new),
-                            ORDER_LINES.UNIT_PRICE.convertFrom(Money::new))
-                        .from(ORDER_LINES)
-                        .where(ORDER_LINES.ORDER_ID.eq(ORDERS.ORDER_ID))
-                        .orderBy(ORDER_LINES.LINE_NUMBER))
+                            T_ORDER_LINE.LINE_NO,
+                            T_ORDER_LINE.PRODUCT_CODE.convertFrom(ProductCode::new),
+                            T_ORDER_LINE.ORDERED_COUNT.convertFrom(Quantity::new),
+                            T_ORDER_LINE.UNIT_PRICE_JPY.convertFrom(Money::new))
+                        .from(T_ORDER_LINE)
+                        .where(T_ORDER_LINE.ORDER_ID.eq(T_ORDER.ORDER_ID))
+                        .orderBy(T_ORDER_LINE.LINE_NO))
                 .convertFrom(lines -> lines.map(Records.mapping(OrderLine::new))),
-            ORDERS.DISCOUNT.convertFrom(Money::new),
-            ORDERS.PLACED_AT,
-            ORDERS.LOCK_NO)
-        .from(ORDERS);
+            T_ORDER.DISCOUNT_JPY.convertFrom(Money::new),
+            T_ORDER.PLACED_AT,
+            T_ORDER.LOCK_NO)
+        .from(T_ORDER);
   }
 }
 ```
@@ -264,18 +266,18 @@ class JooqOrderRepository implements OrderRepository {
 @Override
 public List<Order> findByCustomer(final CustomerId customerId) {
   return selectOrders()
-      .where(ORDERS.CUSTOMER_ID.eq(customerId.value()))
-      .orderBy(ORDERS.PLACED_AT.desc())
+      .where(T_ORDER.CUSTOMER_ID.eq(customerId.value()))
+      .orderBy(T_ORDER.PLACED_AT.desc())
       .fetch(Records.mapping(Order::restore));
 }
 
 @Override
 public long countUnshippedByCustomer(final CustomerId customerId) {
   return dsl.fetchCount(
-      ORDERS,
-      ORDERS.CUSTOMER_ID.eq(customerId.value())
+      T_ORDER,
+      T_ORDER.CUSTOMER_ID.eq(customerId.value())
           .and(
-              ORDERS.STATUS.in(
+              T_ORDER.ORDER_STATUS_TYP.in(
                   OrderStatus.PLACED.name(),
                   OrderStatus.CONFIRMED.name(),
                   OrderStatus.PAID.name())));
@@ -346,11 +348,11 @@ Repository のテストは列と集約の往復と削除の範囲だけを確か
 - [ ] package-private の class にし、`DSLContext` と `shared` の `CommonColumns`、`TableWriter` をコンストラクタで受け取る。［自分で点検］
 - [ ] 列の選択と変換を `select<Aggregate>s()` 一つに置き、列を `convertFrom` で値オブジェクトと enum に変える。［自分で点検］
 - [ ] 子の Entity を `multiset` で集約ルートと同じ SQL で読み、集約を `Records.mapping(Order::restore)` で作る。［自分で点検］
-- [ ] `multiset` の副問い合わせに、子を識別する列の `orderBy` を付ける（`orderBy(ORDER_LINES.LINE_NUMBER)`）。［自分で点検］
+- [ ] `multiset` の副問い合わせに、子を識別する列の `orderBy` を付ける（`orderBy(T_ORDER_LINE.LINE_NO)`）。［自分で点検］
 - [ ] 集約ルートの `LOCK_NO` を選び、`restore` の `lockNo` に渡す。［自分で点検］
 - [ ] `add` は `set(列, 値)` で業務の全列を書き、子の行を行ごとの INSERT の `dsl.batch` 一つで書く。［自分で点検］
 - [ ] 集約ルートの INSERT は `tableWriter.insert(...)` で実行する。［自分で点検］
-- [ ] Spring の例外（`CannotAcquireLockException`、`DuplicateKeyException`）を Repository の外へ出さず、出すときは原因に付けた `ConflictException` に変える。［自分で点検］
+- [ ] Spring の例外（`CannotAcquireLockException`、`DuplicateKeyException`）を Repository の外へ出さず、出すときは原因を付けずに種類を付けた `ConflictException` に変える。［自分で点検］
 - [ ] 集約ルートを受け取る `add` 以外の public メソッドは、版を比べる入口（`update` は `TableWriter.updateCheckingVersion`、`delete` は `deleteCheckingVersion`、ほかの名前ならどちらか）と引数の集約ルートの `lockNo()` を、そのメソッドの中で直接呼ぶ。［ArchUnit で検査：TableWriterArchTest.repositoryUpdateAndDeleteCheckVersion］
 - [ ] 期待する版には集約ルートの `lockNo()` の値を渡し、テーブルから読み直した版を渡さない。［自分で点検］
 - [ ] 集約ルートを受け取る public メソッドは、`add`、`update`、`delete` だけにする（`save` のような名前でも版を比べれば規則は通るため、名前は規則が検査しない）。［自分で点検］
@@ -362,7 +364,9 @@ Repository のテストは列と集約の往復と削除の範囲だけを確か
 - [ ] 生成クラスの `CREATED_*`、`UPDATED_*`、`PATCHED_*` の列を参照しない。［ArchUnit で検査：JooqCommonColumnsArchTest.commonColumnsAreReferencedOnlyBySharedPersistence］
 - [ ] INSERT の共通カラムは `CommonColumns.forInsert` で書き、`LOCK_NO` は読むだけにする（UPDATE で渡した `LOCK_NO` は `ColumnValues` が実行時に拒否する）。［自分で点検］
 - [ ] `@PlainSQL` の付いた jOOQ の API を使わない。［ArchUnit で検査：DatabaseConventionsArchTest.plainSqlApisAreNotUsed］
+- [ ] `DSL.unquotedName` と `DSL.keyword` を使わない。［ArchUnit で検査：DatabaseConventionsArchTest.verbatimSqlApisAreNotUsed］
 - [ ] `withRenderSchema(false)` を使わない。［ArchUnit で検査：DatabaseConventionsArchTest.renderSchemaIsNotChanged］
+- [ ] jOOQ の `Settings` の `statementType` と `paramType` を変えない。［ArchUnit で検査：DatabaseConventionsArchTest.statementTypeAndParamTypeAreNotChanged］
 - [ ] 変換で `Order.place`、業務規則、既定値、Mapper のクラス、次の ArchUnit の規則が検査しないリフレクションの対応づけを使わない。［自分で点検］
 - [ ] jOOQ の `into`、`intoMap`、`intoGroups`、`fetchMap`、`fetchGroups`、名前が `Into` で終わるメソッドを `Class` を渡して呼ばず、`Record` の `into(Object)` と `from(Object)`、`DSLContext.newRecord(Table, Object)` を呼ばない。［ArchUnit で検査：ClassRoleArchTest.jooqReflectionMappingIsNotUsed］
 - [ ] MapStruct、ModelMapper、Dozer、`DefaultRecordMapper`、`DefaultRecordUnmapper` に依存しない。［ArchUnit で検査：ClassRoleArchTest.mappingLibrariesAreNotUsed］

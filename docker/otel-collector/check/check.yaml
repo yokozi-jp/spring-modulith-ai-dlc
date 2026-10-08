@@ -7,6 +7,8 @@ exporters:
     path: /out/backend.json
   file/check_frontend:
     path: /out/frontend.json
+  file/check_frontend_traces:
+    path: /out/frontend-traces.json
 
 service:
   pipelines:
@@ -16,5 +18,7 @@ service:
       exporters: [file/check_frontend]
     traces:
       exporters: [file/check]
+    traces/frontend:
+      exporters: [file/check_frontend_traces]
     metrics:
       exporters: [file/check]

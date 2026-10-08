@@ -41,15 +41,17 @@ class ArchitectureMetricsReportTest {
   private static final double MAX_NORMALIZED_CUMULATIVE_COMPONENT_DEPENDENCY = 1.0D;
 
   /**
-   * 現在の外部可視型数 67、全型数 97（product と order を含む）を基準とする global relative visibility の上限。
+   * 現在の外部可視型数 84、全型数 128（product、ordering、payment を含む）を基準とする global relative visibility の上限。
    *
    * <p>shared の TableWriter、ColumnValues、LockedRoot、DeletedRoot は他のモジュールの Repository が使う入口のため
    * public にしている（ADR-054）。shared.concurrency の ExpectedLockNo、VersionedCommand、ConflictException
    * は全層から使うため public である（ADR-048）。shared.failure の NotFoundException、BusinessRuleViolationException
-   * は全層から使うため public である（ADR-062）。product と order は、モジュールルートの公開契約、Domain の型、CommandHandler、Command、
-   * Result、Request、Response を規約どおり public にしている（docs/backend/class-roles/index.md）。
+   * は全層から使うため public である（ADR-062）。409 の種類を表す ConflictException.Kind は ApiExceptionHandler
+   * がログに記録するため public である（ADR-062）。 product、ordering、payment は、モジュールルートの公開契約、Domain
+   * の型、CommandHandler、Command、 Result、Request、Response を規約どおり public
+   * にしている（docs/backend/class-roles/index.md）。
    */
-  private static final double MAX_GLOBAL_RELATIVE_VISIBILITY = 67.0D / 97.0D;
+  private static final double MAX_GLOBAL_RELATIVE_VISIBILITY = 84.0D / 128.0D;
 
   /** Lakos、コンポーネント依存、可視性の各指標を計算してレポートへ保存する。 */
   @Test

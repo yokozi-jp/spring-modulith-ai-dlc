@@ -23,7 +23,7 @@ public final class DeletedRoot {
    * @param table 子のテーブル
    * @param where 削除する子の行の条件（親の主キーの条件など）
    * @throws com.example.demo.shared.concurrency.ConflictException 子の行のロックを {@code lock_timeout}
-   *     までに取れない場合（原因は {@link org.springframework.dao.CannotAcquireLockException}）
+   *     までに取れない場合（種類は {@code LOCK} で、原因は持たない）
    */
   public void deleteChildren(final Table<?> table, final Condition where) {
     writer.deleteRows(table, where);

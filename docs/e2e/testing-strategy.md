@@ -115,6 +115,7 @@ compose が公開する port は、すべて `127.0.0.1` に限る。
 
 E2E には Collector を置かず、テストが `/collect` を `page.route` で応答する（[ADR-068](../adr/ADR-068-collect-browser-telemetry-with-faro-via-collector.md)）。
 `frontend/e2e/logout.spec.ts` は、`/collect` が 503 を返してもログインとログアウトのフォームを送信できることを確かめる。
+`frontend/e2e/tracing.spec.ts` は、この stub のもとで要求の `traceparent` を観測し、同一オリジンの `/api/**` にだけ sampled flag が 1 の値が付き、`/api/**` 以外のパス、`/collect`、IdP には付かないことを確かめる。
 
 起動済みの環境に対して Playwright だけを実行するときは、`frontend/` で `pnpm e2e`（`vp run e2e` と同じ）を実行する。
 build、コンテナの起動、後片付けは行わない。

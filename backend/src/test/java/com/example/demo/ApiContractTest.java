@@ -171,8 +171,9 @@ class ApiContractTest {
   }
 
   @Test
-  @DisplayName("行ロックを待ち切れなかった ConflictException は英語の 409 になり、原因の内容を含まない")
-  void lockedConflictExceptionReturnsEnglishProblemDetailsWithoutCause() throws Exception {
+  @DisplayName("行ロックを待ち切れなかった ConflictException は英語の 409 になり、例外の内容を含まない")
+  void lockedConflictExceptionReturnsEnglishProblemDetailsWithoutImplementationDetails()
+      throws Exception {
     final String body =
         mockMvc
             .perform(
@@ -192,9 +193,7 @@ class ApiContractTest {
             .getResponse()
             .getContentAsString();
 
-    assertThat(body)
-        .doesNotContain("t_x", "secret_sql", "CannotAcquireLockException", "ConflictException")
-        .doesNotContain(".java");
+    assertThat(body).doesNotContain("t_x", "ConflictException", ".java");
   }
 
   @Test
