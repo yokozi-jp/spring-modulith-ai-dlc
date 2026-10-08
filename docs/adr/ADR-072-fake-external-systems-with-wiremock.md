@@ -40,6 +40,12 @@ Proposed
 - Client の単体テストは JDK の `HttpServer` のままにする。
   WireMock（`org.wiremock:wiremock-standalone` 3.13.2、`testImplementation` だけ）は、リトライとサーキットブレーカーを確かめる Spring の結合テストと E2E に使う。
 - 本番の URL が WireMock を指すことは、URL に既定値を置かず未設定なら起動に失敗させることと、WireMock の URL を env の例と compose ファイルにだけ書くことで防ぐ。
+  WireMock はローカル、テスト、E2E だけで使い、本番には置かない。
+- 決済代行の 4xx は、サーキットブレーカーの失敗に数えず、再試行もしない。
+  4xx はこちらの要求や契約の誤りであり、決済代行の不調を示さないためである。
+  `payment-gateway` の instance の `ignore-exceptions` に `HttpClientErrorException` を書き、5xx、タイムアウト、接続の失敗だけを失敗に数える。
+  リトライは `default`（試行 1 回）を継承するため、4xx も 5xx も再試行しない。
+  4xx の例外は Client の外へ投げられ、決済は記録されず、イベント出版は 5xx と同じく FAILED のまま再投入を待つ。
 
 決済代行の偽物の HTTP の契約は次のとおりである。
 実際の決済代行の契約が決まるまでは、このリポジトリが決めた契約である。
@@ -67,13 +73,22 @@ Proposed
   Dependabot は両者を別々の Pull Request で更新する。
 - `@RegisterExtension` の `WireMockExtension` は `@DynamicPropertySource` と組み合わせられず、static の初期化でサーバを起動する。
   Spring のコンテキストが URL を読む時点で、拡張がサーバを起動していないためである。
-- `PAYMENT_GATEWAY_BASE_URL` を持たない古い `.env.test` では、Spring のテストと E2E の `requireEnv` が失敗し、開発者が変数を足す必要がある。
+- `PAYMENT_GATEWAY_BASE_URL` を持たない古い `.env.test` では、Spring のテストが `${PAYMENT_GATEWAY_BASE_URL}` のプレースホルダーを解決できず失敗する。
+  E2E は、`frontend/e2e/environment.ts` の `requireEnv` が失敗する。
+  Task のテスト系タスクは、その前に `.env.test.example` にあって `.env.test` に無い変数の名前を並べて止まる。
+  移行では、既存の `.env.test` に `PAYMENT_GATEWAY_BASE_URL=http://127.0.0.1:8082` を、既存の `.env` に `.env.example` の `PAYMENT_GATEWAY_BASE_URL` の行を足す。
 
 ### Neutral
 
-- 4xx を 5xx と区別しておらず、4xx もサーキットブレーカーの失敗に数える。
-- `base-url` は `http://` を受け付け、資格情報を送らない。
-  TLS の強制と資格情報は、実際の決済代行の契約が決まるときに判断する。
+- 429 も `HttpClientErrorException` のため、サーキットブレーカーの失敗に数えない。
+  Resilience4j では `ignore-exceptions` が `record-exceptions` より優先され、設定だけでは 429 だけを失敗に数えられない。
+  決済代行の流量制限の契約が決まったら、429 だけを数える `ignore-exception-predicate` に替える。
+- 未決事項として、本番の接続の TLS と資格情報を、実際の決済代行の契約を選ぶときに決める。
+  今の `base-url` は `http://` を受け付け、Client は資格情報を送らず、起動時の検査も置かない。
+  1. TLS の強制：本番は `https://` にする。
+     強制する場所（アプリの起動のコードでなく、デプロイの設定や IaC のレビュー）と、証明書のピン留めや独自のトラストストアの要否を決める。
+  2. 資格情報の扱い：決済代行が求める認証の方式（API キーのヘッダー、OAuth 2.0 の client credentials、mTLS）を決める。
+     秘密の取得元（[ADR-008](ADR-008-single-application-yaml-external-config.md) に従い、ECS タスク定義の `secrets` で Secrets Manager などから注入する環境変数）、ローテーション、ログに出さない方法も決める。
 - 本番の profile で URL を検査する仕組みは、未設定で起動に失敗すること以外に持たない。
 - backend を通して決済の失敗と再投入を確かめる E2E は、後続の作業（[#167](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/167)）で書く。
 
@@ -112,6 +127,7 @@ Proposed
 - [#166 参照業務機能を main に導入し、開発基盤を継続的に検証する](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/166)
 - [#122 開発基盤を確かめる注文と決済のサンプル機能を追加する](https://github.com/yokozi-jp/spring-modulith-ai-dlc/pull/122)
 - [#167 参照業務機能の主要フローと障害回復を検証する](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/167)
+- [ADR-008: application.yaml を単一にし、設定を外部から注入する](ADR-008-single-application-yaml-external-config.md)
 - [ADR-019: 外部連携の耐障害性と容量制御を標準化する](ADR-019-define-resilience-and-capacity-guardrails.md)
 - [ADR-050: バックエンドのクラスの役割と命名を定める](ADR-050-define-backend-class-roles-and-naming.md)
 - [ADR-057: E2E テストに Playwright と Chromium を採用し、テストデータを公開 API で作る](ADR-057-adopt-playwright-for-e2e-tests.md)

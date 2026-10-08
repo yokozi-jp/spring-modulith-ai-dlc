@@ -141,7 +141,8 @@ build、コンテナの起動、後片付けは行わない。
 - `.env.test` は、Git で管理する `.env.test.example` からコピーして作る Git 除外のファイルである。
   `task e2e` と `task fe-knip`（Knip が Playwright の設定を読む）は、`.env.test` が無ければ `.env.test.example` からコピーする。
 - `PAYMENT_GATEWAY_BASE_URL` を足す前にコピーした `.env.test` では、`environment.ts` の `requireEnv` が失敗する。
-  コピーは既存のファイルを上書きしない（`cp -n`）ため、`.env.test.example` から変数を手で足す。
+  既存の `.env.test` は上書きされず、`task e2e` は `.env.test.example` にあって `.env.test` に無い変数の名前を並べて止まる。
+  既存の `.env.test` に `PAYMENT_GATEWAY_BASE_URL=http://127.0.0.1:8082` を足す（[ADR-072](../adr/ADR-072-fake-external-systems-with-wiremock.md)）。
 - `task e2e` は `TEST_ENV_FILE` の上書きに対応せず、`.env.test` を固定で読む。
   compose の backend と Playwright が `.env.test` を固定で読むためである。
 - ローカルで `E2E_KEEP_ENV=1 task e2e` を実行して失敗したときだけ、コンテナと volume を残す。

@@ -1,7 +1,7 @@
 ---
 type: Convention
 title: Compose の作り方
-description: Docker Compose ファイルのサービス分離、イメージの固定、起動順序と healthcheck、restart、環境変数と Secrets、volumes、ports、networks、profiles、build、検証手段を定める規約。compose.yaml や docker-compose.yml を書く、または直すときに読む。
+description: Docker Compose ファイルのサービス分離、イメージの固定、起動順序と healthcheck、restart、環境変数と Secrets、volumes、ports、networks、profiles、外部システムの偽物（WireMock）と管理 API、build、検証手段を定める規約。compose.yaml や docker-compose.yml を書く、または直すとき、外部システムを WireMock で偽るときに読む。
 tags: [convention, container, docker, compose]
 ---
 

@@ -1,7 +1,7 @@
 ---
 type: Convention
 title: クラスの役割：外部システムの Client
-description: infrastructure.client に置き、外部システムのインタフェースを HTTP で実装する Client の定義、置き場所と命名、必須の記述（タイムアウトと名前付きの Resilience4j の instance）、依存、例、テスト、アンチパターン、作成時のチェックリストを定める。外部システムの HTTP API を呼ぶ実装を作るときに読む。
+description: infrastructure.client に置き、外部システムのインタフェースを HTTP で実装する Client の定義、置き場所と命名、必須の記述（タイムアウトと名前付きの Resilience4j の instance）、依存、例、テスト（HttpServer の単体テストと WireMock で外部システムを偽る結合テスト）、アンチパターン、作成時のチェックリストを定める。外部システムの HTTP API を呼ぶ実装を作るとき、テストで外部システムを WireMock で偽るときに読む。
 tags: [convention, backend, class-role]
 ---
 
@@ -44,6 +44,10 @@ Client はユースケースの進行役でもない。
 - instance の設定は、`application.yaml` の `resilience4j` に、既定の設定を継承して書く。
   冪等性キーを渡さない更新の操作は `retry` の `default` を、GET などの冪等な操作は `idempotent` を継承する。
   `charge` は冪等性キーで重複を防げるが、`ChargeOrderCommandHandler` のトランザクションの中で呼ぶため、`default` を継承して試行を一回にし、失敗した請求はイベント出版の再投入でやり直す。
+- サーキットブレーカーの instance に `ignore-exceptions: [org.springframework.web.client.HttpClientErrorException]` を書き、外部システムの 4xx を失敗に数えない。
+  5xx、タイムアウト、接続の失敗は失敗に数える。
+  4xx も再試行しない（`default` の試行は一回）。
+  4xx の例外は Client の外へ投げ、5xx と同じくイベント出版を FAILED のまま残す（[ADR-072](../../adr/ADR-072-fake-external-systems-with-wiremock.md)）。
 - 冪等性キーを受け取る操作は、キーを外部システムの API が定めるヘッダー（決済システムの例では `Idempotency-Key`）で送る。
 - 外部システムの応答は、Domain の型（`PaymentId`）に変換して返す。
   応答の本文がないときは `IllegalStateException` を投げる。
@@ -61,6 +65,8 @@ resilience4j:
     instances:
       payment-gateway:
         base-config: default
+        ignore-exceptions:
+          - org.springframework.web.client.HttpClientErrorException
   retry:
     instances:
       payment-gateway:

@@ -21,3 +21,4 @@
 - [クラスの役割：Response](response.md)：参照の結果を返す API の応答の record を作るとき、応答の項目を足すとき
 - [クラスの役割：jOOQ の Repository](jooq-repository.md)：Repository を jOOQ で実装するとき、SQL を足すとき、jOOQ の列と集約を変換するとき、列や項目を足すとき
 - [クラスの役割：外部システムの Client](external-client.md)：外部システムの HTTP API を呼ぶ実装を作るとき
+- [クラスの役割：外部システムの Client の HttpServer と WireMock の使い分け](external-client.md#httpserver-と-wiremock-の使い分け)：Client のテストで外部システムを偽るとき、WireMock でリトライとサーキットブレーカーを確かめる結合テストを書くとき
