@@ -10,6 +10,7 @@ on:
       - ".spectral.yaml"
       - "docker/compose-test.yml"
       - "docker/initdb/**"
+      - "docker/wiremock/**"
       - ".env.test.example"
       - "Taskfile.yml"
       - ".github/workflows/backend-ci.yml"
@@ -62,7 +63,7 @@ jobs:
             exit 0
           fi
           # backend-ci.yml の push パスフィルタと同じ集合で判定する。
-          if grep -Eq '^(backend/|openapi/|docker/initdb/|\.spectral\.yaml$|docker/compose-test\.yml$|\.env\.test\.example$|Taskfile\.yml$|\.github/workflows/backend-ci\.yml$)' \
+          if grep -Eq '^(backend/|openapi/|docker/initdb/|docker/wiremock/|\.spectral\.yaml$|docker/compose-test\.yml$|\.env\.test\.example$|Taskfile\.yml$|\.github/workflows/backend-ci\.yml$)' \
             <<< "$changed_files"; then
             echo "backend=true" >> "$GITHUB_OUTPUT"
           else

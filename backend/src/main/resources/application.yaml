@@ -156,9 +156,9 @@ spring:
   lifecycle:
     timeout-per-shutdown-phase: 30s
 
-# 決済代行。手順 3 の確認用の偽物で、通信しない。SUCCEED は常に成功、FAIL は常に失敗にする。
+# 決済代行の URL。既定値を置かず、未設定なら起動に失敗する。ローカルと E2E だけが WireMock を指す。
 payment-gateway:
-  mode: ${PAYMENT_GATEWAY_MODE}
+  base-url: ${PAYMENT_GATEWAY_BASE_URL}
 
 # 外部 client は依存先ごとに名前付き instance を定義し、client adapter の境界で適用する。
 # 現在の PostgreSQL、Redis、OIDC 通信へは自動適用されない。

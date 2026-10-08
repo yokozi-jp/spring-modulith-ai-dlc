@@ -1,0 +1,25 @@
+{
+  "priority": 10,
+  "request": {
+    "method": "POST",
+    "url": "/v1/charges",
+    "headers": {
+      "Idempotency-Key": { "matches": ".+" },
+      "Content-Type": { "contains": "application/json" }
+    },
+    "bodyPatterns": [
+      { "matchesJsonPath": "$.orderId" },
+      { "matchesJsonPath": "$.amount" },
+      { "matchesJsonPath": "$[?(@.currency == 'JPY')]" }
+    ]
+  },
+  "response": {
+    "status": 201,
+    "headers": { "Content-Type": "application/json" },
+    "jsonBody": {
+      "chargeId": "ch_{{jsonPath request.body '$.orderId'}}",
+      "status": "SUCCEEDED"
+    },
+    "transformers": ["response-template"]
+  }
+}

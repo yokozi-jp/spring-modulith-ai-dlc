@@ -11,6 +11,7 @@ on:
       - "backend/**"
       - "docker/compose-test.yml"
       - "docker/initdb/**"
+      - "docker/wiremock/**"
       - "docker/keycloak/**"
       - ".env.test.example"
       - "Taskfile.yml"

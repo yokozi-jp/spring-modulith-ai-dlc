@@ -132,6 +132,9 @@ dependencies {
     testImplementation 'com.tngtech.archunit:archunit-junit5:1.5.0'
     // 開発用の代表データの生成値（#114）。シーダーだけが使う。Spring BOM の管理外のため版を明示する。
     testImplementation 'net.datafaker:datafaker:2.7.0'
+    // 決済代行の結合テストの偽物。standalone は Jetty を shade 済みで Spring Boot の依存と衝突しない。
+    // compose の WireMock のイメージと同じ版にそろえる。Spring BOM の管理外のため版を明示する。
+    testImplementation 'org.wiremock:wiremock-standalone:3.13.2'
     testCompileOnly 'org.projectlombok:lombok'
     testAnnotationProcessor 'org.projectlombok:lombok'
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
@@ -187,6 +190,8 @@ tasks.named('test') {
         showStackTraces = true
     }
     finalizedBy jacocoTestCoverageVerification
+    // 決済代行の結合テストは docker/wiremock のスタブを読むため、スタブを変えたらテストをやり直す。
+    inputs.dir(layout.projectDirectory.dir('../docker/wiremock')).withPropertyName('wiremockStubs')
     // -PopenapiExport=true のときだけ、全テストの中で OpenApiContractTest に契約を書き出させる（ADR-064）。
     // 出力に宣言しないと、build cache の復元時に契約が書かれず、drift 検査が素通りになる。
     if (providers.gradleProperty('openapiExport').isPresent()) {

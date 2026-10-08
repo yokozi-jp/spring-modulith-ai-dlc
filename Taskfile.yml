@@ -145,7 +145,7 @@ tasks:
         trap cleanup EXIT
         (cd frontend && vp install --frozen-lockfile && vp build --mode test && vp exec playwright install chromium)
         compose build backend
-        compose up -d --wait postgres redis keycloak
+        compose up -d --wait postgres redis keycloak wiremock
         task be-migrate COMPOSE_ENV_FILE=.env.test
         compose up -d --wait backend
         # healthcheck はコンテナの中から確かめるため、preview の proxy と同じくホストから届くかを別に確かめる。
@@ -1218,8 +1218,8 @@ tasks:
         compose() { {{.DOCKER}} compose -p spring-modulith-dast -f "{{.TEST_COMPOSE_FILE}}" --profile backend-smoke "$@"; }
         fail() { echo "✗ $1" >&2; exit 1; }
 
-        # 4173 は preview、18081 は backend、18082 は ZAP の proxy、5433、6380、8081 は compose-test が使う。
-        for port in 4173 18081 18082 5433 6380 8081; do
+        # 4173 は preview、18081 は backend、18082 は ZAP の proxy、5433、6380、8081、8082 は compose-test が使う。
+        for port in 4173 18081 18082 5433 6380 8081 8082; do
           rc=0
           curl --silent --output /dev/null --connect-timeout 1 "http://127.0.0.1:$port/" || rc=$?
           if [ "$rc" -ne 7 ]; then

@@ -6,62 +6,97 @@ import com.example.demo.payment.domain.model.OrderId;
 import com.example.demo.payment.domain.model.PaymentGateway;
 import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
 import io.github.resilience4j.retry.annotation.Retry;
+import java.math.BigDecimal;
+import java.net.http.HttpClient;
+import java.time.Duration;
+import org.jspecify.annotations.Nullable;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.MediaType;
+import org.springframework.http.client.JdkClientHttpRequestFactory;
 import org.springframework.stereotype.Component;
-import org.springframework.web.client.ResourceAccessException;
+import org.springframework.web.client.RestClient;
 
 /**
- * 決済代行の偽物。通信せず、設定値で常に成功か常に失敗にする。
+ * 決済代行の HTTP API で、注文 ID を冪等性キーにして注文の代金を請求する。
  *
- * <p>成功のときは、注文 ID から決めた識別子を返すため、同じ冪等キーには同じ識別子を返す。失敗のときは、通信の失敗と同じ {@link ResourceAccessException}
- * を投げる。通信しないため、接続と呼び出しのタイムアウトを持たない。circuit breaker と retry は ADR-019 の既定値をそのまま使う（retry は default
- * を継承して試行 1 回）。
- *
- * <p>retry は CommandHandler のトランザクションの中で呼ぶため試行 1 回にし、やり直しはイベント出版の再投入に任せる。circuit breaker は依存先の SLO
- * がない偽物なので既定値のままにする。直近 20 回の窓で 10 回以上呼ばれ、失敗率が 50% 以上のとき（FAIL では 10 回目の失敗で）open になり、{@code
- * CallNotPermittedException} を投げる。
+ * <p>タイムアウト、circuit breaker、retry は ADR-019 の既定値のままにする。決済代行の SLO がまだないため、値を変える根拠がない。retry は {@code
+ * ChargeOrderCommandHandler} のトランザクションの中で呼ぶため default を継承して試行 1 回にし、失敗した請求はイベント出版の再投入でやり直す。
+ * 再投入で同じ注文をもう一度請求しても、冪等性キーで二重の請求を防ぐ。
  */
 @Component
 class PaymentGatewayClient implements PaymentGateway {
 
-  /** 成功のときに返す識別子の接頭辞。 */
-  private static final String CODE_PREFIX = "fake-";
+  /** 接続の確立を待つ上限。 */
+  private static final Duration CONNECT_TIMEOUT = Duration.ofSeconds(1);
 
-  /** 常に成功か常に失敗か。 */
-  private final Mode mode;
+  /** 一回の呼び出しの応答を待つ上限。 */
+  private static final Duration READ_TIMEOUT = Duration.ofSeconds(2);
 
-  /** 設定値 {@code payment-gateway.mode}（SUCCEED か FAIL）を受け取る。 */
-  /* package */ PaymentGatewayClient(@Value("${payment-gateway.mode}") final String mode) {
-    this.mode = Mode.parse(mode);
+  /** 決済代行が冪等性キーを受け取るヘッダー。 */
+  private static final String IDEMPOTENCY_KEY = "Idempotency-Key";
+
+  /** 請求の通貨。{@link Money} は円の金額である。 */
+  private static final String CURRENCY = "JPY";
+
+  /** 請求が成功したときの状態。 */
+  private static final String SUCCEEDED = "SUCCEEDED";
+
+  /** 決済代行を呼ぶ HTTP クライアント。 */
+  private final RestClient restClient;
+
+  /** 決済代行の URL を受け取り、タイムアウトを設定した HTTP クライアントを作る。 */
+  /* package */ PaymentGatewayClient(@Value("${payment-gateway.base-url}") final String baseUrl) {
+    final JdkClientHttpRequestFactory requestFactory =
+        new JdkClientHttpRequestFactory(
+            HttpClient.newBuilder().connectTimeout(CONNECT_TIMEOUT).build());
+    requestFactory.setReadTimeout(READ_TIMEOUT);
+    this.restClient = RestClient.builder().baseUrl(baseUrl).requestFactory(requestFactory).build();
   }
 
-  /** 失敗の設定なら通信の失敗を投げ、成功の設定なら注文 ID から決めた識別子を返す。 */
+  /**
+   * 注文の代金を請求し、決済代行が採番した識別子を返す。
+   *
+   * <p>応答の本文がない、または状態が成功でないときは {@link IllegalStateException} を投げ、成功していない請求を支払い済みとして記録しない。
+   */
   @CircuitBreaker(name = "payment-gateway")
   @Retry(name = "payment-gateway")
   @Override
   public GatewayPaymentCode charge(final OrderId orderId, final Money amount) {
-    if (mode == Mode.FAIL) {
-      throw new ResourceAccessException(
-          "payment gateway is configured to fail: orderId=" + orderId.value());
+    final String key = orderId.value().toString();
+    final ChargeReply reply =
+        restClient
+            .post()
+            .uri("/v1/charges")
+            .header(IDEMPOTENCY_KEY, key)
+            .contentType(MediaType.APPLICATION_JSON)
+            .body(new ChargeBody(key, amount.amount(), CURRENCY))
+            .retrieve()
+            .body(ChargeReply.class);
+    if (reply == null) {
+      throw new IllegalStateException("payment gateway returned no body: orderId=" + key);
     }
-    return new GatewayPaymentCode(CODE_PREFIX + orderId.value());
+    final String chargeId = reply.chargeId();
+    if (!SUCCEEDED.equals(reply.status()) || chargeId == null) {
+      throw new IllegalStateException(
+          "payment gateway did not succeed: orderId=" + key + ", status=" + reply.status());
+    }
+    return new GatewayPaymentCode(chargeId);
   }
 
-  /** 偽物の振る舞い。 */
-  private enum Mode {
-    /** 常に成功する。 */
-    SUCCEED,
-    /** 常に失敗する。 */
-    FAIL;
+  /**
+   * 請求の API に送る本文。
+   *
+   * @param orderId 請求する注文の ID
+   * @param amount 請求する金額
+   * @param currency 通貨
+   */
+  private record ChargeBody(String orderId, BigDecimal amount, String currency) {}
 
-    /** 設定値を読む。値が許された値でなければ起動を失敗させる。 */
-    /* package */ static Mode parse(final String value) {
-      try {
-        return valueOf(value);
-      } catch (IllegalArgumentException exception) {
-        throw new IllegalStateException(
-            "payment-gateway.mode must be SUCCEED or FAIL: mode=" + value, exception);
-      }
-    }
-  }
+  /**
+   * 請求の API が返す本文。
+   *
+   * @param chargeId 決済代行が採番した請求の識別子
+   * @param status 請求の状態
+   */
+  private record ChargeReply(@Nullable String chargeId, @Nullable String status) {}
 }

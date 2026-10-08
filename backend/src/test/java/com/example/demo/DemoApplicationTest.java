@@ -170,6 +170,7 @@ class DemoApplicationTest {
   @DisplayName("決済代行の Client に payment-gateway の circuit breaker と retry が掛かる")
   void paymentGatewayIsGuardedByResilience4j() {
     // YAML の instance は注釈がなくても registry に作られるため、呼び出しの件数の増加で aspect が掛かったことを確かめる。
+    // 請求は compose-test の WireMock（.env.test の PAYMENT_GATEWAY_BASE_URL）の共有のスタブが成功で返す。
     final CircuitBreaker circuitBreaker = circuitBreakerRegistry.circuitBreaker("payment-gateway");
     final Retry retry = retryRegistry.retry("payment-gateway");
     final long callsBefore = circuitBreaker.getMetrics().getNumberOfSuccessfulCalls();
