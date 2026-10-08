@@ -172,7 +172,8 @@ class ApiContractTest {
 
   @Test
   @DisplayName("行ロックを待ち切れなかった ConflictException は英語の 409 になり、例外の内容を含まない")
-  void lockedConflictExceptionReturnsEnglishProblemDetailsWithoutImplementationDetails() throws Exception {
+  void lockedConflictExceptionReturnsEnglishProblemDetailsWithoutImplementationDetails()
+      throws Exception {
     final String body =
         mockMvc
             .perform(
