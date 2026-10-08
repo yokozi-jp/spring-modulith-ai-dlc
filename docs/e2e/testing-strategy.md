@@ -24,7 +24,6 @@ E2E テストは、複数画面にまたがる主要な利用者の流れだけ�
 `frontend/e2e/` に、ログインを行う `*.setup.ts` とシナリオの `*.spec.ts` を置く。
 `frontend/e2e/environment.ts` は、ログイン情報をルートの `.env.test` から読み、`storageState` のパスを決める。
 Keycloak の画面でログインする手順（`signInOnKeycloak`）も持ち、setup とログアウトの spec が共有する。
-決済代行の WireMock の URL も `.env.test` の `PAYMENT_GATEWAY_BASE_URL` から読み、その応答を切り替える補助は `frontend/e2e/payment-gateway.ts` に置く。
 `frontend/playwright.config.ts` の設定は次のとおりである。
 
 | 項目              | 値                                                                                  |
@@ -71,20 +70,6 @@ setup project は、`storageState` を持たない browser context で `/` を�
   Playwright Test の API に当たる vitest plugin の規則だけを `e2e/**` で外している（[Lintとテストのリファレンス](../tooling/lint-and-test.md)）。
   `e2e/**` からもテレメトリの SDK（`@grafana/*`）を import できない。
 
-## 外部システムの応答の切り替え
-
-E2E は、外部システムの応答を WireMock の管理 API で注文ごとに実行中に切り替え、backend を再起動しない（[ADR-072](../adr/ADR-072-fake-external-systems-with-wiremock.md)）。
-管理 API の使い方の規則は [Compose の作り方](../container/compose.md)に従う。
-
-- `frontend/e2e/payment-gateway.ts` の `failChargesFor(request, orderId, failure)` を使う。
-  `failure` は `{ kind: "status", status }` か `{ kind: "delay", milliseconds }` である。
-- `failChargesFor` は、その注文 ID の `Idempotency-Key` にだけ一致する優先度 1 のスタブを足す。
-  `fullyParallel` の他のテストと他の注文は、共有の成功のスタブのままになる。
-- 返された後片付けの関数は、必ず `finally` で呼ぶ。
-- タイムアウトを起こすときは、backend の呼び出しのタイムアウト（2 秒）より長い遅延（3000 ms など）にする。
-- 今の `payment-gateway.spec.ts` は、request fixture と空の `storageState` で WireMock を直接呼ぶ。
-  確かめるのはスタブと補助の関数であり、backend を通した流れではない。
-
 ## 不安定なテスト
 
 CI の retry は、不安定なテストを見つけるためにある。
@@ -93,8 +78,8 @@ retry の回数を増やして隠さない。
 
 ## 実行環境
 
-`task e2e` は `docker/compose-test.yml` の `e2e` profile で PostgreSQL、Redis、Keycloak、決済代行の WireMock、backend を起動する。
-backend は compose の network に置き、PostgreSQL、Redis、Keycloak、WireMock へ service 名で接続する（WireMock は `PAYMENT_GATEWAY_BASE_URL: http://wiremock:8080`）。
+`task e2e` は `docker/compose-test.yml` の `e2e` profile で PostgreSQL、Redis、Keycloak、backend を起動する。
+backend は compose の network に置き、PostgreSQL、Redis、Keycloak へ service 名で接続する。
 compose の `environment` が `.env.test` の接続先を service 名に上書きする。
 Keycloak は hostname v2 で issuer をブラウザと同じ `http://127.0.0.1:8081` に固定し、backend は discovery を `OIDC_DISCOVERY_URI`（`keycloak:8080`）から読む。
 backend は discovery の `issuer` が `OIDC_ISSUER_URI` と一致しなければ起動しない（理由は [ADR-057](../adr/ADR-057-adopt-playwright-for-e2e-tests.md)）。
@@ -107,7 +92,6 @@ compose が公開する port は、すべて `127.0.0.1` に限る。
 | 5433 | PostgreSQL                                             |
 | 6380 | Redis                                                  |
 | 8081 | Keycloak                                               |
-| 8082 | 決済代行の WireMock                                    |
 
 - 5173 と 8080 は開発用の Vite と Keycloak と同じ port である。
   `task e2e` は開始時に両方を確かめ、使用中なら止めるよう示して失敗する。
@@ -123,7 +107,7 @@ compose が公開する port は、すべて `127.0.0.1` に限る。
 1. 前回残した環境を破棄し、5173 と 8080 が空いていることを確かめる。
 2. frontend の依存の導入と build、Chromium の導入、backend イメージの build を行う。
    frontend は `vp build --mode test` で build し、`.env.test` の `FRONTEND_OTEL_ENABLED=true` で Faro を有効にする。
-3. PostgreSQL、Redis、Keycloak、WireMock を起動し、`task be-migrate` で migration を適用する。
+3. PostgreSQL、Redis、Keycloak を起動し、`task be-migrate` で migration を適用する。
 4. backend を起動し、ホストから readiness を確かめる。
 5. Playwright を実行する。
    Playwright が `webServer` で Vite preview を起動し、終了時に止める。
@@ -140,9 +124,6 @@ build、コンテナの起動、後片付けは行わない。
   試しに値を変えるときは、Git から除外されたルートの `.env.test.local` に書く。
 - `.env.test` は、Git で管理する `.env.test.example` からコピーして作る Git 除外のファイルである。
   `task e2e` と `task fe-knip`（Knip が Playwright の設定を読む）は、`.env.test` が無ければ `.env.test.example` からコピーする。
-- `PAYMENT_GATEWAY_BASE_URL` を足す前にコピーした `.env.test` では、`environment.ts` の `requireEnv` が失敗する。
-  既存の `.env.test` は上書きされず、`task e2e` は `.env.test.example` にあって `.env.test` に無い変数の名前を並べて止まる。
-  既存の `.env.test` に `PAYMENT_GATEWAY_BASE_URL=http://127.0.0.1:8082` を足す（[ADR-072](../adr/ADR-072-fake-external-systems-with-wiremock.md)）。
 - `task e2e` は `TEST_ENV_FILE` の上書きに対応せず、`.env.test` を固定で読む。
   compose の backend と Playwright が `.env.test` を固定で読むためである。
 - ローカルで `E2E_KEEP_ENV=1 task e2e` を実行して失敗したときだけ、コンテナと volume を残す。
@@ -163,6 +144,6 @@ build、コンテナの起動、後片付けは行わない。
 
 ## CI
 
-`.github/workflows/e2e.yml` は、Pull Request で frontend、backend（DB の changeset を含む）、Keycloak の設定、compose-test とその入力（`docker/initdb/`、`docker/wiremock/`、`.env.test.example`）、Taskfile、この workflow 自体を変えたときだけ `task e2e` を実行する。
+`.github/workflows/e2e.yml` は、Pull Request で frontend、backend（DB の changeset を含む）、Keycloak の設定、compose-test とその入力（`docker/initdb/`、`.env.test.example`）、Taskfile、この workflow 自体を変えたときだけ `task e2e` を実行する。
 retry は 2 回で、失敗時に Playwright の成果物と backend のログを保存する。
 この check は required status checks に登録しない（[ブランチ保護](../repository/branch-protection.md)）。

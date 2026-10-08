@@ -1,7 +1,7 @@
 ---
 type: Convention
 title: クラスの役割：外部システムの Client
-description: infrastructure.client に置き、外部システムのインタフェースを HTTP で実装する Client の定義、置き場所と命名、必須の記述（タイムアウトと名前付きの Resilience4j の instance）、依存、例、テスト（HttpServer の単体テストと WireMock で外部システムを偽る結合テスト）、アンチパターン、作成時のチェックリストを定める。外部システムの HTTP API を呼ぶ実装を作るとき、テストで外部システムを WireMock で偽るときに読む。
+description: infrastructure.client に置き、外部システムのインタフェースを HTTP で実装する Client の定義、置き場所と命名、必須の記述（タイムアウトと名前付きの Resilience4j の instance）、依存、例、テスト、アンチパターン、作成時のチェックリストを定める。外部システムの HTTP API を呼ぶ実装を作るときに読む。
 tags: [convention, backend, class-role]
 ---
 
@@ -36,21 +36,12 @@ Client はユースケースの進行役でもない。
 
 - `@Component` を付けた package-private の `class` にし、`final` を付けず、外部システムのインタフェースを実装する。
 - コンストラクタは一つにし、`@Value("${payment-gateway.base-url}") final String baseUrl` を受け取る。
-- 接続先の URL は `application.yaml` で既定値を置かず（`${PAYMENT_GATEWAY_BASE_URL}`）、未設定なら起動に失敗させる。
-  偽物の URL は `.env.example`、`.env.test.example`、compose ファイルにだけ書く（[ADR-072](../../adr/ADR-072-fake-external-systems-with-wiremock.md)）。
 - コンストラクタで、`JdkClientHttpRequestFactory` に接続のタイムアウト 1 秒と呼び出しのタイムアウト 2 秒を設定し、`RestClient` を作る。
 - 実装するメソッドに `@CircuitBreaker(name = "payment-gateway")` と `@Retry(name = "payment-gateway")` を付ける。
   リトライはこの層だけで行い、CommandHandler や HTTP クライアントで重ねない。
 - instance の設定は、`application.yaml` の `resilience4j` に、既定の設定を継承して書く。
   冪等性キーを渡さない更新の操作は `retry` の `default` を、GET などの冪等な操作は `idempotent` を継承する。
   `charge` は冪等性キーで重複を防げるが、`ChargeOrderCommandHandler` のトランザクションの中で呼ぶため、`default` を継承して試行を一回にし、失敗した請求はイベント出版の再投入でやり直す。
-- サーキットブレーカーの instance に `ignore-exceptions: [org.springframework.web.client.HttpClientErrorException]` を書き、外部システムの 4xx を失敗に数えない。
-  5xx、タイムアウト、接続の失敗は失敗に数える。
-  `retry` の `default` を継承する instance は試行が一回なので、4xx も再試行しない。
-  `payment-gateway` の `retry` は `default` を継承し、例外の除外を書かない。
-  `idempotent` は試行が三回で、除外する例外を持たないため、継承した instance は 4xx も再試行する。
-  `idempotent` を継承する instance には `ignore-exceptions` に `HttpClientErrorException` を書き、4xx を再試行から明示して除く。
-  4xx の例外は Client の外へ投げ、5xx と同じくイベント出版を FAILED のまま残す（[ADR-072](../../adr/ADR-072-fake-external-systems-with-wiremock.md)）。
 - 冪等性キーを受け取る操作は、キーを外部システムの API が定めるヘッダー（決済システムの例では `Idempotency-Key`）で送る。
 - 外部システムの応答は、Domain の型（`PaymentId`）に変換して返す。
   応答の本文がないときは `IllegalStateException` を投げる。
@@ -68,8 +59,6 @@ resilience4j:
     instances:
       payment-gateway:
         base-config: default
-        ignore-exceptions:
-          - org.springframework.web.client.HttpClientErrorException
   retry:
     instances:
       payment-gateway:
@@ -199,48 +188,6 @@ class PaymentGatewayClientTest {
 }
 ```
 
-## HttpServer と WireMock の使い分け
-
-Client の単体テストは JDK の `HttpServer` で書き、リトライとサーキットブレーカーは JVM の中の WireMock を使う Spring の結合テストで確かめる。
-ローカルと E2E では compose の WireMock が外部システムを偽る（[ADR-072](../../adr/ADR-072-fake-external-systems-with-wiremock.md)）。
-
-- **Client の単体テスト**：上の例のとおり JDK の `HttpServer` を使い、`@CircuitBreaker` と `@Retry` は働かない。
-- **Spring の結合テスト**：JVM の中の `WireMockServer`（`org.wiremock:wiremock-standalone`）を使う。
-  依存は `testImplementation` だけにし、`runtimeClasspath` と bootJar に入れない。
-  `@CircuitBreaker` と `@Retry` を通して、試行の回数、サーキットブレーカーの open、イベント出版の FAILED を確かめる。
-- **ローカルと E2E**：compose の WireMock のコンテナを使う（[Compose の作り方](../../container/compose.md)、[E2E テストの方針と書き方](../../e2e/testing-strategy.md)）。
-
-結合テストは次のように書く。
-
-- サーバは static の初期化で起動し、`@AfterAll` で止める。
-  `@RegisterExtension` の `WireMockExtension` は、`@DynamicPropertySource` が URL を読む時点でサーバを起動していない。
-- `payment-gateway.base-url` は `@DynamicPropertySource` で設定する。
-- 共有のスタブを `usingFilesUnderDirectory("../docker/wiremock")` で読み、Client と compose のスタブをそろえる。
-- `http2PlainDisabled(true)` を設定する。
-  JDK の `HttpClient` が平文の HTTP で HTTP/2 への upgrade を試み、本文付きの POST が切れるためである。
-- `@BeforeEach` で `resetToDefaultMappings()` と `resetRequests()` を呼び、サーキットブレーカーを `reset()` する。
-- 失敗は `atPriority(1)` のスタブにし、冪等性キーが注文 ID に一致する要求だけに当てる。
-
-```java
-private static final WireMockServer WIREMOCK = startWireMock();
-
-@DynamicPropertySource
-/* package */ static void gatewayUrl(final DynamicPropertyRegistry registry) {
-  registry.add("payment-gateway.base-url", WIREMOCK::baseUrl);
-}
-
-private static WireMockServer startWireMock() {
-  final WireMockServer server =
-      new WireMockServer(
-          WireMockConfiguration.wireMockConfig()
-              .dynamicPort()
-              .http2PlainDisabled(true)
-              .usingFilesUnderDirectory("../docker/wiremock"));
-  server.start();
-  return server;
-}
-```
-
 ## アンチパターン
 
 - CommandHandler や Domain Service で `RestClient` を直接使う。
@@ -256,8 +203,6 @@ private static WireMockServer startWireMock() {
 - `@Service` を付ける、または名前を `Adapter` で終える。
 - `application` の CommandHandler や QueryService、`domain.service`、モジュールルートの型を使う。
   Presentation のほかに処理の入口ができ、トランザクション境界が Application の外にも広がる。
-- 本番のコードに偽物の分岐や、成功と失敗を切り替える mode を置く（[ADR-072](../../adr/ADR-072-fake-external-systems-with-wiremock.md)）。
-- `base-url` に、WireMock や localhost を指す既定値を置く。
 
 ## 作成時のチェックリスト
 
@@ -277,5 +222,3 @@ private static WireMockServer startWireMock() {
 - [ ] 冪等性キーを受け取る操作は、キーをヘッダーで送る。［自分で点検］
 - [ ] JDK の `HttpServer` で、HTTP の呼び出しと冪等性キーのヘッダーを確かめるテストを書く。［自分で点検］
 - [ ] `infrastructure.client` のパッケージに `@NullMarked` の `package-info.java` を置く。［Error Prone で検査：RequireExplicitNullMarking］
-- [ ] 接続先の URL に既定値を置かない。［テストで検査：URL の設定がない起動の失敗］
-- [ ] リトライとサーキットブレーカーを、JVM の中の WireMock を使う Spring の結合テストで確かめる。［自分で点検］

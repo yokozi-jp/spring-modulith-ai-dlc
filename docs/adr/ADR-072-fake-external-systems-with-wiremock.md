@@ -35,31 +35,50 @@ Proposed
   Client は既定値のない接続先の URL、タイムアウト、名前付きの Resilience4j の instance で構成し、偽物の分岐や mode の設定を持たない。
 - ローカルとテストでは、`docker/compose.yml` と `docker/compose-test.yml` で版を固定した WireMock のイメージを起動し、接続先の URL をそこへ向ける。
 - 成功のスタブは `docker/wiremock/mappings/` の 1 つのマッピングファイルにし、2 つの compose ファイルと JVM の中の結合テストが共有する。
-- 失敗は、冪等性キーに一致する注文ごとのスタブで、共有のスタブより優先度を高くして作る。
+- 失敗と業務上の拒否は、冪等性キーに一致する注文ごとのスタブで、共有のスタブより優先度を高くして作る。
   E2E は管理 API（`POST /__admin/mappings`、`DELETE /__admin/mappings/{id}`）で、結合テストは Java の DSL で、実行中に足して取り除く。
 - Client の単体テストは JDK の `HttpServer` のままにする。
   WireMock（`org.wiremock:wiremock-standalone` 3.13.2、`testImplementation` だけ）は、リトライとサーキットブレーカーを確かめる Spring の結合テストと E2E に使う。
-- 本番の URL が WireMock を指すことは、URL に既定値を置かず未設定なら起動に失敗させることと、WireMock の URL を env の例と compose ファイルにだけ書くことで防ぐ。
+- 接続先の URL に既定値を置かず、未設定なら起動に失敗させる。
+  WireMock の URL は env の例と compose ファイルにだけ書き、本番が既定値のまま WireMock を向くことを防ぐ。
+  明示した誤った値（平文の `http://` や誤ったホスト）は起動の時点で止まらず、デプロイの設定のレビューに依存する。
   WireMock はローカル、テスト、E2E だけで使い、本番には置かない。
-- 決済代行の 4xx は、サーキットブレーカーの失敗に数えず、再試行もしない。
-  4xx はこちらの要求や契約の誤りであり、決済代行の不調を示さないためである。
-  `payment-gateway` の instance の `ignore-exceptions` に `HttpClientErrorException` を書き、5xx、タイムアウト、接続の失敗だけを失敗に数える。
-  `payment-gateway` の `retry` の instance は `default`（試行 1 回）を継承し、例外の除外を書かないため、4xx も 5xx も再試行しない。
-  4xx を再試行しないのは `default` を継承するためであり、`idempotent`（試行 3 回、例外の除外なし）を継承する instance は 4xx も再試行する。
-  `idempotent` を継承する instance は、`retry` の `ignore-exceptions` に `HttpClientErrorException` を書いて 4xx を明示して除く。
-  4xx の例外は Client の外へ投げられ、決済は記録されず、イベント出版は 5xx と同じく FAILED のまま再投入を待つ。
+- 決済代行の呼び出しの結果を次の四つに分け、再投入で回復できるものだけをイベント出版の `FAILED` に残す。
+  回復不能なエラーの扱いは [非同期処理の失敗時の再試行と回復](../integration/async-failure-recovery.md) に従う。
+  1. 一時障害（接続の失敗、タイムアウト、429、5xx）：サーキットブレーカーの失敗に数え、例外を Client の外へ投げ、イベント出版を `FAILED` のまま再投入を待つ。
+  2. 業務上の拒否（カードの拒否、限度額の超過）：Client は例外を投げずに拒否を表す結果を返し、呼び出し元が決済の拒否を業務の状態に記録する。
+     リスナーは正常終了し、イベント出版は `COMPLETED` になる。
+  3. 資格情報の不備（401、403）：サーキットブレーカーの失敗に数えず、例外を Client の外へ投げ、イベント出版を `FAILED` に残す。
+     資格情報を直したあとの再投入で回復できるためである。
+  4. 契約の不備（1 と 3 以外の 4xx）：サーキットブレーカーの失敗に数えず、回復不能なエラーとして決済の失敗を業務の状態に記録し、リスナーを正常終了させる。
+     同じ要求を再投入しても回復しないためである。
+- サーキットブレーカーの `payment-gateway` の instance は、429 以外の `HttpClientErrorException` を無視する述語を `ignore-exception-predicate` に指定する。
+  `ignore-exceptions` に `HttpClientErrorException` を書くと、[ADR-019](ADR-019-define-resilience-and-capacity-guardrails.md) が一時障害に挙げる 429 まで無視するためである。
+  Resilience4j では `ignore-exceptions` が `record-exceptions` より優先され、型の列挙では 429 だけを失敗に数えられない。
+- `retry` の `payment-gateway` の instance は `default`（試行 1 回）を継承し、どの結果も再試行しない。
+  `idempotent` を継承する instance は、`retry-exceptions` に ADR-019 の再試行の対象だけを書く。
+  対象は、接続の失敗とタイムアウトの `ResourceAccessException`、`HttpClientErrorException$TooManyRequests`、`HttpServerErrorException$BadGateway`、`HttpServerErrorException$ServiceUnavailable`、`HttpServerErrorException$GatewayTimeout` である。
+- backend の Gradle の `test` タスクは、`docker/wiremock` を入力（`inputs.dir`）に宣言する。
+  結合テストがそこのスタブを読むため、スタブを変えるとテストがやり直される。
+- compose-test の WireMock には profile を付けず、`task test` と `task e2e` の両方で起動する。
+  Spring のテストの一部が、`.env.test` の `PAYMENT_GATEWAY_BASE_URL` を通して compose-test の WireMock の共有のスタブを呼ぶためである。
+- E2E は、setup project の開始時に `POST /__admin/mappings/reset` を一度呼ぶ。
+  前の実行で後片付けが走らずに残った注文ごとのスタブを持ち越さないためである。
 
 決済代行の偽物の HTTP の契約は次のとおりである。
 実際の決済代行の契約が決まるまでは、このリポジトリが決めた契約である。
 
 - 要求は `POST /v1/charges` で、本文は `{orderId, amount, currency: "JPY"}`、ヘッダーは `Idempotency-Key: <orderId>` である。
 - 成功の応答は `201 {chargeId, status: "SUCCEEDED"}` である。
+- 拒否の応答は `201 {chargeId, status: "DECLINED"}` である。
+  Client は `status` が `DECLINED` なら、例外を投げずに拒否を表す結果を返す。
 
 ## Consequences
 
 ### Positive
 
-- 本番のコードに偽物の状態がなくなり、設定の誤りで本番が失敗し続ける状態を作れない。
+- 本番のコードに偽物の状態がなくなり、mode の設定で本番を失敗し続ける状態にできない。
+- 決済の拒否と契約の不備が再投入の列に積まれず、イベント出版の `FAILED` は再投入で回復できるものだけになる。
 - 5xx、タイムアウト、遅延、サーキットブレーカーの open を、実際の HTTP を通して確かめられる。
 - backend を再起動せずに、シナリオの途中で注文ごとに応答を切り替えられる。
 - 成功のスタブが 1 ファイルなので、Client と偽物の契約がずれにくい。
@@ -69,6 +88,7 @@ Proposed
 ### Negative
 
 - コンテナが 1 つ増え、ホストのポート（開発用 8090、compose-test 8082）を使う。
+  compose-test の 8082 は 5433、6380、8081 と同じく compose-test だけが使うため、`task e2e` の開始時の空きの確認には足さない。
 - JDK の `HttpClient` が平文の HTTP で HTTP/2 への upgrade（h2c）を試み、WireMock（Jetty）では本文付きの POST が切れた。
   偽物の側で compose の `--disable-http2-plain` と結合テストの `http2PlainDisabled(true)` を指定する必要がある。
 - テストの依存の jar の版とイメージのタグを、人の手で同じに保つ必要がある。
@@ -82,17 +102,19 @@ Proposed
 
 ### Neutral
 
-- 429 も `HttpClientErrorException` のため、サーキットブレーカーの失敗に数えない。
-  Resilience4j では `ignore-exceptions` が `record-exceptions` より優先され、設定だけでは 429 だけを失敗に数えられない。
-  決済代行の流量制限の契約が決まったら、429 だけを数える `ignore-exception-predicate` に替える。
-- 未決事項として、本番の接続の TLS と資格情報を、実際の決済代行の契約を選ぶときに決める。
+- 未決事項として、次の三つを実際の決済代行の契約を選ぶときに決める。
   今の `base-url` は `http://` を受け付け、Client は資格情報を送らず、起動時の検査も置かない。
   1. TLS の強制：本番は `https://` にする。
-     強制する場所（アプリの起動のコードでなく、デプロイの設定や IaC のレビュー）と、証明書のピン留めや独自のトラストストアの要否を決める。
+     `https://` と許可するホストを検査する場所（アプリの起動のコードでなく、デプロイの設定や IaC のレビュー）と、証明書のピン留めや独自のトラストストアの要否を決める。
+     このリポジトリにはまだ IaC が無く、決まるまで検査は無い。
   2. 資格情報の扱い：決済代行が求める認証の方式（API キーのヘッダー、OAuth 2.0 の client credentials、mTLS）を決める。
      秘密の取得元（[ADR-008](ADR-008-single-application-yaml-external-config.md) に従い、ECS タスク定義の `secrets` で Secrets Manager などから注入する環境変数）、ローテーション、ログに出さない方法も決める。
-- 本番の profile で URL を検査する仕組みは、未設定で起動に失敗すること以外に持たない。
+  3. 契約の分類：拒否の表し方（2xx の本文か、402 などの 4xx か）と、各 HTTP の状態を Decision の四つの分類のどれに当てるかを決める。
+     決まるまでは、このリポジトリの暫定の契約と分類に従う。
+- 本番の URL の誤設定は、未設定を除いて起動の時点で止まらず、未決事項の 1 で検査の場所を決めるまで運用のレビューに依存する。
 - backend を通して決済の失敗と再投入を確かめる E2E は、後続の作業（[#167](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/167)）で書く。
+- この ADR は Proposed であり、規約文書はまだ変えない。
+  規約文書（`docs/backend/class-roles/external-client.md`、`docs/backend/testing-strategy.md`、`docs/container/compose.md`、`docs/e2e/testing-strategy.md`、`docs/integration/async-failure-recovery.md`）は、実装の Pull Request（#122、#167）で ADR を Accepted にする変更と同じ変更で更新する（[ADR の運用ルール](conventions.md)）。
 
 ## Alternatives Considered
 
@@ -131,6 +153,8 @@ Proposed
 - [#167 参照業務機能の主要フローと障害回復を検証する](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/167)
 - [ADR-008: application.yaml を単一にし、設定を外部から注入する](ADR-008-single-application-yaml-external-config.md)
 - [ADR-019: 外部連携の耐障害性と容量制御を標準化する](ADR-019-define-resilience-and-capacity-guardrails.md)
+- [ADR の運用ルール](conventions.md)
+- [非同期処理の失敗時の再試行と回復](../integration/async-failure-recovery.md)
 - [ADR-050: バックエンドのクラスの役割と命名を定める](ADR-050-define-backend-class-roles-and-naming.md)
 - [ADR-057: E2E テストに Playwright と Chromium を採用し、テストデータを公開 API で作る](ADR-057-adopt-playwright-for-e2e-tests.md)
 - [クラスの役割：外部システムの Client](../backend/class-roles/external-client.md)
