@@ -44,7 +44,9 @@ Proposed
 - 決済代行の 4xx は、サーキットブレーカーの失敗に数えず、再試行もしない。
   4xx はこちらの要求や契約の誤りであり、決済代行の不調を示さないためである。
   `payment-gateway` の instance の `ignore-exceptions` に `HttpClientErrorException` を書き、5xx、タイムアウト、接続の失敗だけを失敗に数える。
-  リトライは `default`（試行 1 回）を継承するため、4xx も 5xx も再試行しない。
+  `payment-gateway` の `retry` の instance は `default`（試行 1 回）を継承し、例外の除外を書かないため、4xx も 5xx も再試行しない。
+  4xx を再試行しないのは `default` を継承するためであり、`idempotent`（試行 3 回、例外の除外なし）を継承する instance は 4xx も再試行する。
+  `idempotent` を継承する instance は、`retry` の `ignore-exceptions` に `HttpClientErrorException` を書いて 4xx を明示して除く。
   4xx の例外は Client の外へ投げられ、決済は記録されず、イベント出版は 5xx と同じく FAILED のまま再投入を待つ。
 
 決済代行の偽物の HTTP の契約は次のとおりである。

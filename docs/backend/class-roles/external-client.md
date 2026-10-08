@@ -46,7 +46,10 @@ Client はユースケースの進行役でもない。
   `charge` は冪等性キーで重複を防げるが、`ChargeOrderCommandHandler` のトランザクションの中で呼ぶため、`default` を継承して試行を一回にし、失敗した請求はイベント出版の再投入でやり直す。
 - サーキットブレーカーの instance に `ignore-exceptions: [org.springframework.web.client.HttpClientErrorException]` を書き、外部システムの 4xx を失敗に数えない。
   5xx、タイムアウト、接続の失敗は失敗に数える。
-  4xx も再試行しない（`default` の試行は一回）。
+  `retry` の `default` を継承する instance は試行が一回なので、4xx も再試行しない。
+  `payment-gateway` の `retry` は `default` を継承し、例外の除外を書かない。
+  `idempotent` は試行が三回で、除外する例外を持たないため、継承した instance は 4xx も再試行する。
+  `idempotent` を継承する instance には `ignore-exceptions` に `HttpClientErrorException` を書き、4xx を再試行から明示して除く。
   4xx の例外は Client の外へ投げ、5xx と同じくイベント出版を FAILED のまま残す（[ADR-072](../../adr/ADR-072-fake-external-systems-with-wiremock.md)）。
 - 冪等性キーを受け取る操作は、キーを外部システムの API が定めるヘッダー（決済システムの例では `Idempotency-Key`）で送る。
 - 外部システムの応答は、Domain の型（`PaymentId`）に変換して返す。
