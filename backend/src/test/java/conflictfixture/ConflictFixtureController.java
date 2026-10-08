@@ -1,7 +1,6 @@
 package conflictfixture;
 
 import com.example.demo.shared.concurrency.ConflictException;
-import org.springframework.dao.CannotAcquireLockException;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -14,15 +13,15 @@ class ConflictFixtureController {
   /** 版が違う場合の競合を投げる。 */
   @GetMapping("/stale")
   /* package */ void stale() {
-    throw new ConflictException("order was updated by another request: orderId=O-1");
+    throw new ConflictException(
+        ConflictException.Kind.VERSION, "order was updated by another request: orderId=O-1");
   }
 
   /** 行ロックを待ち切れなかった場合の競合を投げる。 */
   @GetMapping("/locked")
   /* package */ void locked() {
     throw new ConflictException(
-        "row is locked by another request: table=t_x",
-        new CannotAcquireLockException("SELECT secret_sql"));
+        ConflictException.Kind.LOCK, "row is locked by another request: table=t_x");
   }
 
   /** 競合ではない IllegalStateException を投げる。 */

@@ -460,7 +460,8 @@ class ArchitectureRuleFixtureTest {
     /** 版が違えば競合の例外を投げる。 */
     /* package */ static void ensureLockNo(final long expected, final long actual) {
       if (expected != actual) {
-        throw new ConflictException("row was updated by another request");
+        throw new ConflictException(
+            ConflictException.Kind.VERSION, "row was updated by another request");
       }
     }
 

@@ -2,6 +2,7 @@ package com.example.demo;
 
 import static org.hamcrest.Matchers.not;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
@@ -354,6 +355,24 @@ class ApiErrorContractTest {
         .perform(get("/api/error-fixture/unprocessable").with(user("test-user")))
         .andExpect(status().isUnprocessableContent());
     assertLogged("API business failure", Severity.INFO, 422, exceptionAttributes);
+
+    mockMvc
+        .perform(get("/api/error-fixture/conflict").with(user("test-user")))
+        .andExpect(status().isConflict());
+    final LogRecordData conflict =
+        assertLogged(
+            "API conflict",
+            Severity.INFO,
+            409,
+            Set.of("exception.type", "exception.message", "exception.stacktrace", "conflict.kind"));
+    assertEquals(
+        "unique", conflict.getAttributes().get(AttributeKey.stringKey("conflict.kind")), "409 の種類");
+    assertFalse(
+        conflict
+            .getAttributes()
+            .get(AttributeKey.stringKey("exception.stacktrace"))
+            .contains("Caused by"),
+        "原因の連鎖を持たないこと");
   }
 
   @Test

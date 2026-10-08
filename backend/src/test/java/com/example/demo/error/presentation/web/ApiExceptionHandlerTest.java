@@ -7,6 +7,10 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import ch.qos.logback.classic.Level;
+import ch.qos.logback.classic.Logger;
+import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.core.read.ListAppender;
 import com.example.demo.shared.concurrency.ConflictException;
 import com.example.demo.shared.failure.BusinessRuleViolationException;
 import com.example.demo.shared.failure.NotFoundException;
@@ -32,6 +36,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
+import org.slf4j.LoggerFactory;
 import org.springframework.boot.test.system.CapturedOutput;
 import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.context.support.StaticMessageSource;
@@ -121,22 +126,48 @@ class ApiExceptionHandlerTest {
     assertTrue(log.contains("OrderRepository.java:57"), () -> "cause の発生行が残ること: " + log);
   }
 
-  @Test
-  @DisplayName("ConflictException は 409 を返し、ERROR ではなく INFO で例外の型を残す")
-  void conflictExceptionIsLoggedAtInfo(final CapturedOutput output) {
-    final ResponseEntity<Object> response =
-        handler()
-            .handleConflictException(
-                new ConflictException("order was updated by another request"),
-                new ServletWebRequest(new MockHttpServletRequest()));
+  private static Stream<Arguments> conflictKinds() {
+    return Stream.of(
+        Arguments.of(ConflictException.Kind.VERSION, "version"),
+        Arguments.of(ConflictException.Kind.LOCK, "lock"),
+        Arguments.of(ConflictException.Kind.UNIQUE, "unique"));
+  }
+
+  @ParameterizedTest
+  @MethodSource("conflictKinds")
+  @DisplayName("ConflictException は 409 を返し、INFO で例外の型と conflict.kind を残す")
+  // 記録を書くのではなく、検証対象の logger に appender を付けて読むため、LoggerFactory を使う。
+  @SuppressWarnings("PMD.UseLombokSlf4j")
+  void conflictExceptionIsLoggedAtInfo(final ConflictException.Kind kind, final String value) {
+    // key-value はコンソールの書式によって出ないため、Logback の記録そのものを読む。
+    final Logger logger = (Logger) LoggerFactory.getLogger(ApiExceptionHandler.class);
+    final ListAppender<ILoggingEvent> appender = new ListAppender<>();
+    appender.start();
+    logger.addAppender(appender);
+    final ResponseEntity<Object> response;
+    try {
+      response =
+          handler()
+              .handleConflictException(
+                  new ConflictException(kind, "order was updated by another request"),
+                  new ServletWebRequest(new MockHttpServletRequest()));
+    } finally {
+      logger.detachAppender(appender);
+    }
 
     assertNotNull(response, "応答");
     assertEquals(HttpStatus.CONFLICT, response.getStatusCode(), "HTTP status");
-    final String log = output.getAll();
-    assertTrue(log.contains("API conflict"), () -> "event 名が残ること: " + log);
-    assertTrue(log.contains("INFO"), () -> "INFO で残ること: " + log);
-    assertTrue(log.contains(ConflictException.class.getName()), () -> "例外の型が残ること: " + log);
-    assertFalse(log.contains("ERROR"), () -> "ERROR で残さないこと: " + log);
+    assertEquals(1, appender.list.size(), "記録の件数");
+    final ILoggingEvent event = appender.list.getFirst();
+    assertEquals("API conflict", event.getMessage(), "event 名");
+    assertEquals(Level.INFO, event.getLevel(), "レベル");
+    assertNotNull(event.getThrowableProxy(), "例外");
+    assertEquals(
+        ConflictException.class.getName(), event.getThrowableProxy().getClassName(), "例外の型");
+    final Map<String, Object> keyValues =
+        event.getKeyValuePairs().stream()
+            .collect(Collectors.toMap(pair -> pair.key, pair -> pair.value));
+    assertEquals(Map.of("http.response.status_code", 409, "conflict.kind", value), keyValues, "属性");
   }
 
   @Test

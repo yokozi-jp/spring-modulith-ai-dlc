@@ -119,9 +119,10 @@ UPDATEも更新する行のロックを取るため、同じ順序に従う。
 
 アプリの接続には`lock_timeout`でロック待ちの上限を設定し、既定の無期限待ちのままにしない（[DB接続情報とロール分離](connections.md)、[ADR-055](../adr/ADR-055-set-db-time-limits-per-connection.md)）。
 上限まで待ってもロックを取れなければ、文はSQLSTATE `55P03`で失敗する。
-`updateCheckingVersion`、`deleteCheckingVersion`と、子の行の`LockedRoot.updateChild`、`LockedRoot.deleteChildren`、`DeletedRoot.deleteChildren`は、この失敗を`ConflictException`に変える。
+`updateCheckingVersion`、`deleteCheckingVersion`と、子の行の`LockedRoot.updateChild`、`LockedRoot.deleteChildren`、`DeletedRoot.deleteChildren`は、この失敗を、原因を付けずに種類`lock`（`ConflictException.Kind.LOCK`）の`ConflictException`に変える。
 `updateWhere`と`deleteWhere`は、Springの`CannotAcquireLockException`と、`updateWhere`の`DuplicateKeyException`をそのまま投げ、扱いは呼び出し側が決める。
-一意制約の違反（SQLSTATE `23505`）は、`TableWriter`の版を比べる入口、子の行の書き込み、集約ルートのINSERTの入口`insert`で、`DuplicateKeyException`を原因に付けた`ConflictException`に変える。
+一意制約の違反（SQLSTATE `23505`）は、`TableWriter`の版を比べる入口、子の行の書き込み、集約ルートのINSERTの入口`insert`で、`DuplicateKeyException`を、原因を付けずに種類`unique`（`ConflictException.Kind.UNIQUE`）の`ConflictException`に変える。
+原因の例外のメッセージにはSQLと重複したキーの値が入るため、原因を付けない（[ADR-062](../adr/ADR-062-map-business-exceptions-to-404-409-422.md)）。
 集約ルートのINSERTは`TableWriter.insert`で実行し、子の行の`dsl.batch`のINSERTは変換しない。
 
 要件に合わせて、次の待ち方も使う。

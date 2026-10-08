@@ -11,8 +11,9 @@ public final class BusinessRuleViolationException extends RuntimeException {
 
   @Serial private static final long serialVersionUID = 1L;
 
-  /** メッセージから業務規則の違反の例外を作る。 */
+  /** メッセージから業務規則の違反の例外を作る。原因は持たない。 */
   public BusinessRuleViolationException(final String message) {
-    super(message);
+    // 原因を持たせない。原因の例外のメッセージが SQL や入力値をログに出さないようにするため（ADR-062）。
+    super(message, null);
   }
 }
