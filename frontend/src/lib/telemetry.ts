@@ -1,4 +1,6 @@
-import type { Faro, TransportItem } from "@grafana/faro-web-sdk";
+import type { Faro } from "@grafana/faro-web-sdk";
+
+import { sanitizeTelemetryItem } from "./telemetry-sanitize";
 
 // vite.config.ts の define がビルド時に置き換える（ADR-068）。
 declare const __TELEMETRY_ENABLED__: boolean;
@@ -9,115 +11,182 @@ declare const __TELEMETRY_APP__: {
   environment: string;
 };
 
-// 対象は http と https の絶対 URL（scheme の大文字と小文字は区別しない）と、/ で始まる相対 URL である。
-// 相対 URL とみなすのは、文字列の先頭、空白、(、"、'、= の直後の / からで、a/b?c のような語の途中は対象にしない。
-// 文の中の URL も消すので、new URL() による構文解析ではなく正規表現にする。
-// ponytail: : の直後の相対 URL の query は消さない（error:/api/x?id=1 など）。
-// ponytail: query は空白までとみなすので、(see http://h/a?x=1) の閉じ括弧も消える。秘密を残すより表示の崩れを取る。
-const urlQueryOrFragment = /(?<url>(?:https?:\/\/|(?<=^|[\s("'=])\/)[^\s?#]*)[?#]\S*/giu;
-
-// as による型の表明を避けるため、structuredClone で複製した項目をその場で書き換える。
-function stripStrings(value: unknown): void {
-  if (typeof value !== "object" || value === null) {
-    return;
-  }
-  for (const [key, child] of Object.entries(value)) {
-    if (typeof child === "string") {
-      Reflect.set(value, key, child.replaceAll(urlQueryOrFragment, "$<url>"));
-    } else {
-      stripStrings(child);
-    }
-  }
+interface RouterTelemetrySource {
+  readonly state: { readonly matches: readonly { readonly fullPath: string }[] };
+  subscribe: (
+    eventType: "onResolved",
+    listener: (event: { readonly hrefChanged: boolean }) => void,
+  ) => () => void;
 }
 
-/** 送る項目のすべての文字列から、絶対 URL と / で始まる相対 URL の query と fragment を消す。消せない項目は捨てる。 */
-export function stripUrlQueryAndFragment(item: TransportItem): TransportItem | null {
-  try {
-    const copy = structuredClone(item);
-    stripStrings(copy);
-    return copy;
-  } catch {
-    // 複製できない値や循環を含む項目は、query を残したまま送らないよう捨てる。
-    // Faro は beforeSend の例外を捕まえず、batch の buffer に戻して送信が止まる（faro-core の BatchExecutor.flush）。
-    // oxlint-disable-next-line unicorn/no-null -- Faro の BeforeSendHook は null で項目を捨てる。
-    return null;
-  }
+type TelemetryApi = Pick<Faro["api"], "pushError" | "pushEvent" | "setSession" | "setView">;
+interface TelemetrySink {
+  api: TelemetryApi;
+  pause: () => void;
+  unpause: () => void;
+  genShortID: () => string;
 }
 
-/**
- * 同一オリジンの /api と /api/**（query と fragment を含む）以外の URL に一致する正規表現を返す。
- * Faro の ignoreUrls に渡し、traceparent と span を同一オリジンの /api/** の要求だけにする。
- */
-export function untracedUrl(origin: string): RegExp {
-  const escaped = origin.replaceAll(/[.*+?^${}()|[\]\\]/gu, String.raw`\$&`);
-  // flag は u だけにする。OpenTelemetry の isUrlIgnored は test で比べ、g と y は lastIndex を持ち越すため。
-  return new RegExp(`^(?!${escaped}/api(?:[/?#]|$))`, "u");
-}
-
-// reportCaughtError が使う Faro の部分。テストは pushError だけを持つ値を渡す。
-interface ErrorSink {
-  api: Pick<Faro["api"], "pushError">;
+interface TelemetryTestSink {
+  api: Pick<TelemetryApi, "pushError"> & Partial<Omit<TelemetryApi, "pushError">>;
+  pause?: () => void;
+  unpause?: () => void;
+  genShortID?: () => string;
+  storedSessionKey?: string;
+  trustedRoutes?: readonly string[];
 }
 
 // oxlint-disable-next-line eslint/init-declarations -- 無効のビルドでは代入せず、undefined のままにする。
-let faroReady: Promise<ErrorSink | undefined> | undefined;
+let faroReady: Promise<TelemetrySink | undefined> | undefined;
+let telemetryEnabled = false;
+let sendingSuppressed = false;
+// route template は / で始まるので、空文字は未送信を表す。
+let currentView = "";
+// 有効のビルドだけが SDK の session の保存先を持つ。
+let storedSessionKey = "";
+const trustedRoutes = new Set<string>();
 const reported = new WeakSet<Error>();
 
-/** テストから送り先を差し替える。アプリケーションのコードからは呼ばない。 */
-export function replaceTelemetryForTesting(sink?: ErrorSink): void {
-  faroReady = Promise.resolve(sink);
+function noop(): void {
+  // テストが使わない SDK method を補う。
+}
+
+export function untracedUrl(origin: string): RegExp {
+  const escaped = origin.replaceAll(/[.*+?^${}()|[\]\\]/gu, String.raw`\$&`);
+  return new RegExp(`^(?!${escaped}/api(?:[/?#]|$))`, "u");
+}
+
+function validRouteTemplate(value: string | undefined): value is string {
+  return (
+    value !== undefined && value.startsWith("/") && !value.includes("?") && !value.includes("#")
+  );
+}
+
+function processRoute(template: string, sink: TelemetrySink | undefined): void {
+  if (!sink || sendingSuppressed) {
+    return;
+  }
+  trustedRoutes.add(template);
+  try {
+    if (currentView === template) {
+      sink.api.pushEvent("view_changed", { fromView: template, toView: template }, undefined, {
+        skipDedupe: true,
+      });
+    } else {
+      sink.api.setView({ name: template });
+      currentView = template;
+    }
+  } catch {
+    // テレメトリの失敗で画面遷移を止めない。
+  }
+}
+
+/** TanStack Router が解決した route template を View として送る。 */
+export function bindRouterTelemetry(router: RouterTelemetrySource): () => void {
+  return router.subscribe("onResolved", ({ hrefChanged }) => {
+    if (!hrefChanged || !telemetryEnabled || sendingSuppressed) {
+      return;
+    }
+    const template = router.state.matches.at(-1)?.fullPath;
+    if (!validRouteTemplate(template)) {
+      return;
+    }
+    void (async () => {
+      const sink = await faroReady;
+      processRoute(template, sink);
+    })();
+  });
+}
+
+function testTelemetrySink(sink: TelemetryTestSink): TelemetrySink {
+  return {
+    api: {
+      pushError: sink.api.pushError,
+      pushEvent: sink.api.pushEvent ?? noop,
+      setSession: sink.api.setSession ?? noop,
+      setView: sink.api.setView ?? noop,
+    },
+    pause: sink.pause ?? noop,
+    unpause: sink.unpause ?? noop,
+    genShortID: sink.genShortID ?? (() => "Abc2345678"),
+  };
+}
+
+/** テストから SDK 境界の送り先を差し替える。 */
+export function replaceTelemetryForTesting(sink?: TelemetryTestSink): void {
+  telemetryEnabled = sink !== undefined;
+  sendingSuppressed = false;
+  currentView = "";
+  storedSessionKey = sink?.storedSessionKey ?? "";
+  trustedRoutes.clear();
+  for (const route of sink?.trustedRoutes ?? []) {
+    trustedRoutes.add(route);
+  }
+  faroReady = sink ? Promise.resolve(testTelemetrySink(sink)) : undefined;
 }
 
 /** composition root から一度だけ呼ぶ。SDK の読み込みを待たない。 */
 export function initTelemetry(): void {
-  // import() はこの分岐の中に直接書く。定数の false で分岐ごと消え、SDK の chunk が出力されない（ADR-068）。
-  // 早期 return の後に import() を置く形にしない。到達しない文の除去は bundler に依存する。
   if (__TELEMETRY_ENABLED__) {
-    faroReady = (async (): Promise<Faro | undefined> => {
+    telemetryEnabled = true;
+    // ponytail: SDK の STORAGE_KEY と同じ値。SDK が 500 ms 以内に読み込まれなくても消せるよう直書きし、切り替えは e2e で確かめる。
+    storedSessionKey = "com.grafana.faro.session";
+    faroReady = (async (): Promise<TelemetrySink | undefined> => {
       try {
         const [
-          { ErrorsInstrumentation, FetchTransport, InternalLoggerLevel, initializeFaro },
+          {
+            ErrorsInstrumentation,
+            FetchTransport,
+            InternalLoggerLevel,
+            SessionInstrumentation,
+            ViewInstrumentation,
+            WebVitalsInstrumentation,
+            genShortID,
+            initializeFaro,
+          },
           { TracingInstrumentation },
         ] = await Promise.all([
           import("@grafana/faro-web-sdk"),
           import("@grafana/faro-web-tracing"),
         ]);
-        return initializeFaro({
+        const faro = initializeFaro({
           app: __TELEMETRY_APP__,
-          // getWebInstrumentations() は使わない。
-          // Errors（window.onerror と unhandledrejection）と、fetch と XHR の Tracing だけにする。
-          instrumentations: [new ErrorsInstrumentation(), new TracingInstrumentation()],
-          // この値は Faro の全計装の除外にも効く。
-          // Performance や UserAction を有効にするときは、Tracing の fetchInstrumentationOptions と xhrInstrumentationOptions に移す。
+          batching: { enabled: false },
+          sessionTracking: { enabled: true, persistent: false, samplingRate: 1 },
+          webVitalsInstrumentation: { reportAllChanges: false, trackAttributionSources: false },
+          instrumentations: [
+            new SessionInstrumentation(),
+            new ViewInstrumentation(),
+            new ErrorsInstrumentation(),
+            new WebVitalsInstrumentation(),
+            new TracingInstrumentation(),
+          ],
           ignoreUrls: [untracedUrl(globalThis.location.origin)],
-          // ponytail: web-tracing の sampler が session の isSampled の属性を読む実装に依存する。
-          // SessionInstrumentation がないと sampled flag が 0 の traceparent が送られるので、初期値で sampled にする。
-          // #152 で SessionInstrumentation を入れたら、この初期値を消す。
-          sessionTracking: { session: { attributes: { isSampled: "true" } } },
-          // Cookie を Collector へ送らない。
           transports: [
             new FetchTransport({ url: "/collect", requestOptions: { credentials: "omit" } }),
           ],
-          beforeSend: stripUrlQueryAndFragment,
-          // 送信の失敗を console に出さない（docs/observability/log-output-points.md）。
+          beforeSend: (item) => sanitizeTelemetryItem(item, trustedRoutes),
           internalLoggerLevel: InternalLoggerLevel.OFF,
         });
+        return {
+          api: faro.api,
+          pause: () => {
+            faro.pause();
+          },
+          unpause: () => {
+            faro.unpause();
+          },
+          genShortID,
+        };
       } catch {
-        // SDK の読み込みと初期化の失敗で画面を止めない。
         return undefined;
       }
     })();
   }
 }
 
-/**
- * route のエラー表示で捕捉したエラーを送る。同じ Error は一度だけ送る。
- * DOM の組み込みの reportError と取り違えないため、この名前にする。
- */
 export function reportCaughtError(error: unknown): void {
-  // TanStack Router の CatchBoundary は throw された値を変換せずに渡す。
-  // Error でない値は WeakSet に入らず、Faro の pushError も Error を前提にするため送らない。
-  if (!(error instanceof Error) || reported.has(error)) {
+  if (!(error instanceof Error) || reported.has(error) || sendingSuppressed) {
     return;
   }
   reported.add(error);
@@ -125,4 +194,51 @@ export function reportCaughtError(error: unknown): void {
     const faro = await faroReady;
     faro?.api.pushError(error);
   })();
+}
+
+function removeStoredSession(): void {
+  if (storedSessionKey === "") {
+    return;
+  }
+  try {
+    sessionStorage.removeItem(storedSessionKey);
+  } catch {
+    // storage が使えなくても logout を続ける。
+  }
+}
+
+function sinkWithin(milliseconds: number): Promise<TelemetrySink | undefined> {
+  return Promise.race([
+    faroReady,
+    // oxlint-disable-next-line promise/avoid-new -- setTimeout を待つ標準の Promise がない。
+    new Promise<undefined>((resolve) => {
+      setTimeout(resolve, milliseconds);
+    }),
+  ]);
+}
+
+function switchSession(sink: TelemetrySink): void {
+  try {
+    sink.pause();
+    sendingSuppressed = true;
+  } catch {
+    sendingSuppressed = true;
+    return;
+  }
+  try {
+    sink.api.setSession({ id: sink.genShortID() });
+    sink.unpause();
+    sendingSuppressed = false;
+  } catch {
+    // 旧 session へ新しい signal を加えないため pause のままにする。
+  }
+}
+
+/** logout の送信前に匿名の Faro session を切り替える。 */
+export async function resetTelemetrySession(): Promise<void> {
+  removeStoredSession();
+  const sink = await sinkWithin(500);
+  if (sink && !sendingSuppressed) {
+    switchSession(sink);
+  }
 }

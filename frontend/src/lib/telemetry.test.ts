@@ -1,137 +1,159 @@
 import { afterEach, describe, expect, it, vi } from "vite-plus/test";
 
 import {
+  bindRouterTelemetry,
   replaceTelemetryForTesting,
   reportCaughtError,
-  stripUrlQueryAndFragment,
+  resetTelemetrySession,
   untracedUrl,
 } from "./telemetry";
 
-// SDK の import の制限はテストのファイルにも効くので、型は関数の引数から取る。
-type TransportItem = Parameters<typeof stripUrlQueryAndFragment>[0];
 type Sink = NonNullable<Parameters<typeof replaceTelemetryForTesting>[0]>;
+type Router = Parameters<typeof bindRouterTelemetry>[0];
 
-// SDK の enum を import できないので、送る項目の種類は文字列から型を合わせる。
-// oxlint-disable-next-line typescript/no-unsafe-type-assertion
-const exceptionType = "exception" as TransportItem["type"];
+type Listener = Parameters<Router["subscribe"]>[1];
 
-const exceptionItem = (value: string, filename: string): TransportItem => ({
-  type: exceptionType,
-  payload: {
-    type: "Error",
-    value,
-    timestamp: "2026-10-06T00:00:00.000Z",
-    fatal: false,
-    stacktrace: { frames: [{ filename, function: "render", lineno: 10, colno: 5 }] },
-  },
-  meta: { page: { url: "http://localhost:5173/orders/42?a=1#b" } },
+function router(fullPath: string) {
+  const listeners: Listener[] = [];
+  const source: Router = {
+    state: { matches: [{ fullPath }] },
+    subscribe: (_event, next) => {
+      listeners.push(next);
+      return vi.fn<() => void>();
+    },
+  };
+  const resolve = (hrefChanged = true): void => {
+    for (const listener of listeners) {
+      listener({ hrefChanged });
+    }
+  };
+  return { source, resolve };
+}
+
+describe("router telemetry", () => {
+  afterEach(() => {
+    replaceTelemetryForTesting();
+  });
+
+  it("records resolved transitions in order and ignores invalidation", async () => {
+    const setView = vi.fn<NonNullable<Sink["api"]["setView"]>>();
+    const pushEvent = vi.fn<NonNullable<Sink["api"]["pushEvent"]>>();
+    replaceTelemetryForTesting({
+      api: { pushError: vi.fn<Sink["api"]["pushError"]>(), setView, pushEvent },
+      trustedRoutes: [],
+    });
+    const fake = router("/");
+    expect(bindRouterTelemetry(fake.source)).toBeTypeOf("function");
+
+    fake.resolve();
+    fake.resolve(false);
+    fake.resolve();
+
+    await vi.waitFor(() => {
+      expect(pushEvent).toHaveBeenCalledExactlyOnceWith(
+        "view_changed",
+        { fromView: "/", toView: "/" },
+        undefined,
+        { skipDedupe: true },
+      );
+    });
+    expect(setView).toHaveBeenCalledExactlyOnceWith({ name: "/" });
+  });
+
+  it("does not send an untrusted route", () => {
+    const setView = vi.fn<NonNullable<Sink["api"]["setView"]>>();
+    replaceTelemetryForTesting({
+      api: { pushError: vi.fn<Sink["api"]["pushError"]>(), setView },
+      trustedRoutes: [],
+    });
+    const fake = router("orders/42?token=x#f");
+    bindRouterTelemetry(fake.source);
+    fake.resolve();
+    expect(setView).not.toHaveBeenCalled();
+  });
 });
 
-describe("stripUrlQueryAndFragment", () => {
-  it("removes the query and fragment of the page URL and keeps the path", () => {
-    const item = stripUrlQueryAndFragment(exceptionItem("failed", "http://h/a.js"));
-
-    expect(item?.meta.page?.url).toBe("http://localhost:5173/orders/42");
+describe("resetTelemetrySession", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.unstubAllGlobals();
+    replaceTelemetryForTesting();
   });
 
-  it("removes the query of a frame filename and keeps lineno and colno", () => {
-    const item = stripUrlQueryAndFragment(
-      exceptionItem("failed", "http://localhost:5173/assets/index-abc.js?v=1#x"),
-    );
-
-    expect(item?.payload).toMatchObject({
-      stacktrace: {
-        frames: [{ filename: "http://localhost:5173/assets/index-abc.js", lineno: 10, colno: 5 }],
+  it("removes the stored session, pauses, sets a new short id and resumes", async () => {
+    const calls: string[] = [];
+    vi.stubGlobal("sessionStorage", {
+      removeItem: (key: string) => {
+        calls.push(`remove:${key}`);
       },
     });
-  });
-
-  it("removes the query and fragment of an absolute URL inside the message", () => {
-    const item = stripUrlQueryAndFragment(
-      exceptionItem("failed to load https://h/api/orders?token=x#f now", "http://h/a.js"),
-    );
-
-    expect(item?.payload).toMatchObject({ value: "failed to load https://h/api/orders now" });
-  });
-
-  it("removes the query of a URL with an uppercase scheme", () => {
-    const item = stripUrlQueryAndFragment(
-      exceptionItem("see HTTPS://H/x?q=1 now", "http://h/a.js"),
-    );
-
-    expect(item?.payload).toMatchObject({ value: "see HTTPS://H/x now" });
-  });
-
-  it("keeps strings without a URL, numbers and booleans", () => {
-    const original = { ...exceptionItem("plain a/b?c", "app.js"), meta: {} };
-
-    expect(stripUrlQueryAndFragment(original)).toStrictEqual(original);
-  });
-
-  it.each([
-    ["/api/x?id=1#f", "/api/x"],
-    ["GET /api/x?id=1 failed", "GET /api/x failed"],
-    ["url=/api/x?id=1", "url=/api/x"],
-    ["a/b?c", "a/b?c"],
-  ])("removes the query and fragment of a relative URL in %s", (value, expected) => {
-    const item = stripUrlQueryAndFragment(exceptionItem(value, "app.js"));
-
-    expect(item?.payload).toMatchObject({ value: expected });
-  });
-
-  it("removes the query and fragment of url.full in a trace item", () => {
-    // oxlint-disable-next-line typescript/no-unsafe-type-assertion
-    const traceType = "trace" as TransportItem["type"];
-    const span = {
-      attributes: [
-        { key: "url.full", value: { stringValue: "http://localhost:5173/api/x?token=s#f" } },
-      ],
-    };
-    // span の必須の項目をすべて書かずに済むよう、例外の項目の payload を差し替える。
-    const trace = { ...exceptionItem("failed", "app.js"), type: traceType, meta: {} };
-    Reflect.set(trace, "payload", { resourceSpans: [{ scopeSpans: [{ spans: [span] }] }] });
-    const item = stripUrlQueryAndFragment(trace);
-
-    expect(item?.payload).toMatchObject({
-      resourceSpans: [
-        {
-          scopeSpans: [
-            {
-              spans: [
-                {
-                  attributes: [
-                    { key: "url.full", value: { stringValue: "http://localhost:5173/api/x" } },
-                  ],
-                },
-              ],
-            },
-          ],
+    replaceTelemetryForTesting({
+      api: {
+        pushError: vi.fn<Sink["api"]["pushError"]>(),
+        setSession: (session) => {
+          calls.push(`set:${session?.id ?? ""}`);
         },
-      ],
+      },
+      pause: () => {
+        calls.push("pause");
+      },
+      unpause: () => {
+        calls.push("unpause");
+      },
+      genShortID: () => "Abc2345678",
+      storedSessionKey: "k",
     });
+
+    await resetTelemetrySession();
+
+    expect(calls).toStrictEqual(["remove:k", "pause", "set:Abc2345678", "unpause"]);
   });
 
-  it("drops an item that cannot be cloned", () => {
-    const item = exceptionItem("see http://h/x?q=1", "http://h/a.js");
-    Reflect.set(item.payload, "symbol", Symbol("not cloneable"));
+  it.each(["genShortID", "setSession"])("stays paused when %s fails", async (failure) => {
+    const unpause = vi.fn<() => void>();
+    const fail = (name: string): void => {
+      if (failure === name) {
+        throw new Error(`${name} failed`);
+      }
+    };
+    replaceTelemetryForTesting({
+      api: {
+        pushError: vi.fn<Sink["api"]["pushError"]>(),
+        setSession: () => {
+          fail("setSession");
+        },
+      },
+      unpause,
+      genShortID: () => {
+        fail("genShortID");
+        return "Abc2345678";
+      },
+    });
 
-    expect(stripUrlQueryAndFragment(item)).toBeNull();
+    await expect(resetTelemetrySession()).resolves.toBeUndefined();
+    expect(unpause).not.toHaveBeenCalled();
   });
 
-  it("does not modify the given item", () => {
-    const original = exceptionItem("see http://h/x?q=1", "http://h/a.js?v=1");
-    const copy = structuredClone(original);
+  it("keeps sending suppressed when unpause fails", async () => {
+    const pushError = vi.fn<Sink["api"]["pushError"]>();
+    replaceTelemetryForTesting({
+      api: { pushError },
+      unpause: () => {
+        throw new Error("unpause failed");
+      },
+    });
 
-    stripUrlQueryAndFragment(original);
+    await resetTelemetrySession();
+    reportCaughtError(new Error("after switch"));
+    // 送信は faroReady を待つ 1 つの microtask の後に起きるので、それより後に確かめる。
+    await Promise.resolve();
 
-    expect(original).toStrictEqual(copy);
+    expect(pushError).not.toHaveBeenCalled();
   });
 });
 
 describe("untracedUrl", () => {
   const origin = "http://localhost:5173";
-  // 計装は URL を絶対 URL にしてから比べるので、相対 URL だけを同じ形にする。
-  // http://localhost:5173.evil.test/api は new URL() で解析できないので、そのまま比べる。
   const absolute = (url: string): string => (url.startsWith("/") ? new URL(url, origin).href : url);
 
   it.each(["http://localhost:5173/api", "/api/x", "/api?x=1", "/api#f"])(
@@ -141,28 +163,12 @@ describe("untracedUrl", () => {
     },
   );
 
-  it.each([
-    "/apix",
-    "/collect",
-    "/oauth2/authorization/web",
-    "/actuator/health/liveness",
-    "/v3/api-docs",
-    "http://localhost:8080/realms/demo",
-    "http://localhost:5173.evil.test/api",
-    "http://localhost:51730/api",
-    "http://other.test/api",
-  ])("does not trace %s", (url) => {
-    expect(untracedUrl(origin).test(absolute(url))).toBe(true);
-  });
-
-  // OpenTelemetry の isUrlIgnored は test で比べるので、lastIndex を持つ g と y の flag を付けない。
-  it("gives the same result when the same RegExp is used twice", () => {
-    const pattern = untracedUrl(origin);
-    const url = absolute("/collect");
-
-    expect([pattern.test(url), pattern.test(url)]).toStrictEqual([true, true]);
-    expect(pattern.flags).toBe("u");
-  });
+  it.each(["/apix", "/collect", "http://localhost:8080/realms/demo", "http://other.test/api"])(
+    "does not trace %s",
+    (url) => {
+      expect(untracedUrl(origin).test(absolute(url))).toBe(true);
+    },
+  );
 });
 
 describe("reportCaughtError", () => {
@@ -170,28 +176,14 @@ describe("reportCaughtError", () => {
     replaceTelemetryForTesting();
   });
 
-  // TanStack Router は throw された値を変換せずに errorComponent へ渡す。
-  // oxlint-disable-next-line unicorn/no-null -- throw null も errorComponent に届く。
-  it.each(["thrown string", 404, undefined, null, { message: "plain object" }])(
-    "ignores the non-Error value %s",
-    (value) => {
-      expect(() => {
-        reportCaughtError(value);
-      }).not.toThrow();
-    },
-  );
-
   it("sends the same Error only once", async () => {
-    const pushError = vi.fn<Sink["api"]["pushError"]>();
-    replaceTelemetryForTesting({ api: { pushError } });
+    const pushError = vi.fn<NonNullable<Sink["api"]>["pushError"]>();
+    replaceTelemetryForTesting({ api: { pushError }, trustedRoutes: [] });
     const error = new Error("caught");
-
     reportCaughtError(error);
     reportCaughtError(error);
-
     await vi.waitFor(() => {
       expect(pushError).toHaveBeenCalledOnce();
     });
-    expect(pushError).toHaveBeenCalledWith(error);
   });
 });

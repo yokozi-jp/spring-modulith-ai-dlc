@@ -7,7 +7,7 @@ import { I18nextProvider } from "react-i18next";
 
 import { createQueryClient } from "./api/query-client";
 import { i18n } from "./i18n";
-import { initTelemetry } from "./lib/telemetry";
+import { bindRouterTelemetry, initTelemetry } from "./lib/telemetry";
 import { routerDefaults } from "./router-defaults";
 import { routeTree } from "./routeTree.gen";
 
@@ -17,6 +17,10 @@ initTelemetry();
 const queryClient = createQueryClient();
 
 const router = createRouter({ routeTree, context: { queryClient }, ...routerDefaults });
+const unbindRouterTelemetry = bindRouterTelemetry(router);
+if (import.meta.hot) {
+  import.meta.hot.dispose(unbindRouterTelemetry);
+}
 
 declare module "@tanstack/react-router" {
   interface Register {

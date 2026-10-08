@@ -7,7 +7,7 @@ tags: [convention, observability, opentelemetry, security]
 
 # 可観測性データの規約
 
-バックエンドはログ、トレース、メトリクスを OpenTelemetry で Collector へ送ってコンソールにも ECS JSON を出し、フロントエンドは Faro Web SDK でブラウザの例外と同一オリジンの `/api/**` の要求の trace を Collector へ送る。
+バックエンドはログ、トレース、メトリクスを OpenTelemetry で Collector へ送ってコンソールにも ECS JSON を出し、フロントエンドは Faro Web SDK でブラウザの例外、画面遷移、Core Web Vitals、同一オリジンの `/api/**` の要求の trace を Collector へ送る。
 例外は logger へ渡して標準どおりに記録し、禁止値はアプリケーションから渡さない。
 ログの属性は Collector の allowlist で絞り、保存先で閲覧の制限と表示時のマスクを行う。
 設計判断は [ADR-015](../adr/ADR-015-structure-and-protect-observability-data.md)、[ADR-043](../adr/ADR-043-send-production-telemetry-to-cloudwatch-via-otel-collector.md)、[ADR-045](../adr/ADR-045-remove-aws-docs-and-production-cd-example.md)、[ADR-068](../adr/ADR-068-collect-browser-telemetry-with-faro-via-collector.md)、[ADR-070](../adr/ADR-070-record-sql-spans-with-jooq-execute-listener.md) に記録している。
@@ -50,7 +50,7 @@ Grafana では trace ID を使ってログとトレースを相互に検索す�
 
 次の値は、アプリケーションのコードから message、属性、URL、span のいずれにも渡さない。
 
-- Authorization、Cookie、session ID、token、password、secret、接続文字列
+- Authorization、Cookie、認証 session ID、利用者へ結び付く ID、token、password、secret、接続文字列
 - request body、response body、フォーム入力、DOM text
 - query string、URL fragment
 - SQL、認可判断で存在確認に使える値
@@ -59,13 +59,21 @@ Grafana では trace ID を使ってログとトレースを相互に検索す�
 ログの属性で許可するのは、例外の属性（`exception.type`、`exception.message`、`exception.stacktrace`）、HTTP status、409 の種類（`conflict.kind`）、trace と span の相関情報、業務上必要な内部 ID である。
 内部 ID と氏名などの表示値を同じ event へ載せない。
 HTTP の URL パスは span に入るため、API のパスに個人データと秘密情報を置かない。
-ブラウザの例外は画面の route path を `url.path` に持つため、画面の path にも個人データと秘密情報を置かず、識別子は内部 ID にする（[フロントエンドのURL設計](../frontend/url-design.md)）。
+ブラウザの例外は画面の route template を `view.name` に持つため、画面の path にも個人データと秘密情報を置かず、識別子は内部 ID にする（[フロントエンドのURL設計](../frontend/url-design.md)）。
 DTO やエンティティを logger へ渡さず、許可した値だけを個別の属性として渡す。
 
 SQL の span（jOOQ の `jooq.query`）は、SQL の種類だけを名前に持ち、SQL の文、バインドの値、例外のメッセージを持たない（[ADR-070](../adr/ADR-070-record-sql-spans-with-jooq-execute-listener.md)）。
 
-ブラウザでは、`frontend/src/lib/telemetry.ts` の `beforeSend` で、送る項目のすべての文字列から絶対 URL と `/` で始まる相対 URL の query と fragment を消す。
-相対 URL とみなすのは、文字列の先頭、空白、`(`、`"`、`'`、`=` の直後の `/` から始まる部分である。
+ブラウザでは、TanStack Router が解決した route template だけを画面の `view.name` に使う。
+例外のメッセージと stacktrace に含まれる絶対 URL と `/` で始まる相対 URL は、scheme、path、query、fragment を含む token 全体を `[redacted-url]` に置き換える。
+ただし、同一オリジンのビルドのファイル名（`/assets/<名前>.js`）に行と列が続く stack frame は、origin を落とした path と行と列だけを残す。
+hash 付きのファイル名は秘密を含まず、source map で元の位置に戻すのに要るためである。
+query か fragment を持つ URL、別オリジンの URL、`/assets/` 以外の path は、ファイル名が `.js` で終わっても token 全体を置き換える。
+ブラウザ API trace の `url.*` 属性はすべて削除し、trace ID、span ID、親 span ID は維持する。
+Session、View、Errors、WebVitals、Tracing だけを明示的に有効にし、Console、Performance、UserAction、Frustration、Navigation、CSP は有効にしない。
+Web Vitals は LCP、INP、CLS の主値を一つだけ残し、付加情報を送らない。
+匿名の Faro session ID は同じタブの signal の相関だけに使い、`sessionStorage` に保持する。
+ログアウトの送信前に session ID を切り替え、`APP_SESSION` と利用者情報へ結び付けない。
 `traceparent` は同一オリジンの `/api/**` への fetch と XHR だけに付け、IdP を含む別オリジン、`/collect`、`/api/**` 以外のパスには付けない。
 Collector へは Cookie を送らない（`credentials: "omit"`）。
 
@@ -94,19 +102,28 @@ Collector の設定（`docker/otel-collector/config.yaml`）は、ローカル�
 ログに属性を追加するときは、Collector の `keep_keys` とこの文書の許可する値を同じ変更で直す。
 現在の `keep_keys` は、使っている `exception.type`、`exception.message`、`exception.stacktrace`、`http.response.status_code`、`conflict.kind` だけを持つ。
 
-フロントエンドのログは、バックエンドと別の pipeline（`logs/frontend`）の `transform/frontend_logs` で絞る。
-faro receiver はメタデータを本文に入れるので、本文を解析して許可した値だけを属性へ移し、本文を `Browser exception` に置き換える。
-例外でない種類の項目（log、event、measurement）は、例外の記録にしないため `filter/frontend_exceptions` で捨てる。
-許可する属性は `exception.type`、`exception.message`、`exception.stacktrace`、`url.path` である。
-resource 属性は `service.name`、`service.namespace`、`service.version`、`deployment.environment.name` だけを残し、`service.name` は payload の値ではなく Collector の `FRONTEND_OTEL_SERVICE_NAME` で上書きする。
-フロントエンドのログに属性を足すときは、`transform/frontend_logs` とこの文書を同じ変更で直す。
+フロントエンドのログは、バックエンドと別の pipeline（`logs/frontend`）で絞る。
+検証、filter、正規化の三段で faro receiver の logfmt 本文を処理し、検証済みの record だけを保存先へ送る。
+
+許可する record は次のとおりである。
+
+- 例外は本文を `Browser exception` に固定し、`telemetry.signal`、`exception.type`、`exception.message`、任意の `exception.stacktrace`、`session.id`、検証済み View がある場合の `view.name` だけを残す。
+- 画面遷移は本文を `Browser view` に固定し、`telemetry.signal`、`view.name`、`session.id` だけを残す。
+- Web Vitals は本文を `Browser web vital` に固定し、`telemetry.signal`、`measurement.type`、`measurement.name`、`measurement.value`、`view.name`、`session.id` だけを残す。
+
+route template の allowlist は `/` と `/logged-out` で、`transform/frontend_validate` の 1 か所だけに書く。
+`task fe-route-tree-check` と `task otel-collector-check` は、この allowlist が `routeTree.gen.ts` の `fullPaths` と一致しなければ失敗する。
+route を追加するときは、Collector の allowlist とこの文書を同じ変更で更新する。
+allowlist は環境変数にしない。
+Collector は環境変数の既定値に `$` を書けず、本番で上書きして広げられる値にもしないためである。
+session ID は `^[a-km-zA-HJ-NP-Z0-9]{10}$` に一致する匿名の Faro ID だけを許可し、UUID の `APP_SESSION` を拒否する。
+この形式も `transform/frontend_validate` の 1 か所だけに書く。
+resource 属性は `service.name`、`service.namespace`、`service.version`、`deployment.environment.name` だけを残し、`service.name` は Collector の `FRONTEND_OTEL_SERVICE_NAME` で上書きする。
 
 フロントエンドのトレースは、バックエンドの `traces` と別の pipeline（`traces/frontend`）で絞る。
-`filter/frontend_span_events` で span の event をすべて捨て、`transform/frontend_traces` で許可した値だけを残す。
-span の属性は `http.request.method`、`http.response.status_code`、`url.path` だけを残し、`url.path` は `url.full` の path を取り出したものにする。
-resource 属性はフロントエンドのログと同じ 4 つに絞り、`service.name` を Collector の値で上書きする。
-span の名前は `Browser request` に固定し、status の message、`trace_state`、links、instrumentation scope の版と属性を消し、scope の名前を `browser` にする。
-フロントエンドの span に属性を足すときは、`transform/frontend_traces` とこの文書を同じ変更で直す。
+span の event と link を捨て、属性は検証済みの `http.request.method` と `http.response.status_code` だけを残す。
+すべての `url.*` 属性を削除するが、trace ID、span ID、親 span ID は変更しない。
+resource 属性はフロントエンドのログと同じ 4 つに絞り、span の名前を `Browser request`、scope の名前を `browser` に固定する。
 
 自由入力を正規表現でマスクする処理は Collector に置かない。
 表記ゆれによる取りこぼしと誤マスクが起きるため、検知は保存先のデータ保護ポリシーで行う。
@@ -117,8 +134,11 @@ faro receiver は処理に失敗すると、payload の全体を Collector 自�
 ## 検証
 
 - **`task otel-collector-check`**：許可していない属性を含む OTLP のログを Collector に流し、出口に残らないことと、許可した属性が残ることを確かめる。
-  Faro の fixture もフロントエンドの pipeline に流し、許可していない値と URL の query と fragment が出口に残らないことを確かめる。
-  同じ fixture の trace は `traces/frontend` の出口を別のファイルに分けて検査し、span の属性と resource 属性が許可したものだけで、`service.name` が `demo-web`、span の名前が `Browser request` で、event と links がなく、trace ID と span ID が保たれることを確かめる。
+  Faro の fixture もフロントエンドの pipeline に流し、同じ session ID の例外、View、LCP、INP、CLS だけが残ることを確かめる。
+  URL token、UUID の session ID、利用者情報、DOM 情報、追加の measurement 値が出口に残らないことも確かめる。
+  同一オリジンの `/assets/<名前>.js` の stack frame が path と行と列だけで残り、query か fragment を持つ URL と別の path が置き換わることも確かめる。
+  最初に、route の allowlist と `routeTree.gen.ts` の一致も確かめる。
+  同じ fixture の trace は `traces/frontend` の出口を別のファイルに分けて検査し、URL 属性がなく、許可した HTTP 属性と resource 属性だけが残り、trace ID、span ID、親 span ID が保たれることを確かめる。
   faro receiver の受け口が、GET に 405、`text/plain` に 415、別のパスに 202、1 MiB を超える本文に 400 を返すことも確かめる。
   Collector の設定を変えたら実行する。
 - **`ObservabilityContractTest`**：key-value と例外が LogRecord の属性になることを確かめる。

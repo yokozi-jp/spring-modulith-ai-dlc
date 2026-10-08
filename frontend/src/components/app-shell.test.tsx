@@ -1,11 +1,19 @@
 /* @vitest-environment jsdom */
 
 import { screen } from "@testing-library/react";
-import { describe, expect, it, vi } from "vite-plus/test";
+import userEvent from "@testing-library/user-event";
+import { afterEach, describe, expect, it, vi } from "vite-plus/test";
 
+import { replaceTelemetryForTesting } from "@/lib/telemetry";
 import { renderRoute } from "@/testing/render-route";
 
+type Sink = NonNullable<Parameters<typeof replaceTelemetryForTesting>[0]>;
+
 const cookieValue = "0b1e5c1a-4f0e-4c55-9d8e-2f1a3b4c5d6e";
+
+function noop(): void {
+  // native submit の画面遷移を止める。
+}
 
 async function renderLogoutForm() {
   await renderRoute("/", { locale: "en" });
@@ -17,6 +25,100 @@ async function renderLogoutForm() {
 }
 
 describe("app shell logout form", () => {
+  afterEach(() => {
+    replaceTelemetryForTesting();
+  });
+
+  it("switches the telemetry session before one native submit", async () => {
+    const user = userEvent.setup();
+    const calls: string[] = [];
+    const nativeSubmit = vi.spyOn(HTMLFormElement.prototype, "submit").mockImplementation(() => {
+      calls.push("submit");
+    });
+    replaceTelemetryForTesting({
+      api: {
+        pushError: vi.fn<Sink["api"]["pushError"]>(),
+        setSession: (session) => {
+          calls.push(`set:${session?.id ?? ""}`);
+        },
+      },
+      pause: () => {
+        calls.push("pause");
+      },
+      unpause: () => {
+        calls.push("unpause");
+      },
+    });
+    const form = await renderLogoutForm();
+
+    await user.click(screen.getByRole("button", { name: "Log out" }));
+    form.dispatchEvent(new SubmitEvent("submit", { bubbles: true, cancelable: true }));
+
+    await vi.waitFor(() => {
+      expect(calls).toStrictEqual(["pause", "set:Abc2345678", "unpause", "submit"]);
+    });
+    expect(nativeSubmit.mock.instances).toStrictEqual([form]);
+  });
+
+  it("submits even when the telemetry session switch fails", async () => {
+    const user = userEvent.setup();
+    const nativeSubmit = vi.spyOn(HTMLFormElement.prototype, "submit").mockImplementation(noop);
+    const unpause = vi.fn<() => void>();
+    replaceTelemetryForTesting({
+      api: {
+        pushError: vi.fn<Sink["api"]["pushError"]>(),
+        setSession: () => {
+          throw new Error("failed");
+        },
+      },
+      unpause,
+    });
+    await renderLogoutForm();
+
+    await user.click(screen.getByRole("button", { name: "Log out" }));
+
+    await vi.waitFor(() => {
+      expect(nativeSubmit).toHaveBeenCalledOnce();
+    });
+    expect(unpause).not.toHaveBeenCalled();
+  });
+
+  it("allows logout again after the page returns from the back/forward cache", async () => {
+    const user = userEvent.setup();
+    const nativeSubmit = vi.spyOn(HTMLFormElement.prototype, "submit").mockImplementation(noop);
+    replaceTelemetryForTesting({ api: { pushError: vi.fn<Sink["api"]["pushError"]>() } });
+    await renderLogoutForm();
+    const button = screen.getByRole("button", { name: "Log out" });
+
+    await user.click(button);
+    await vi.waitFor(() => {
+      expect(nativeSubmit).toHaveBeenCalledOnce();
+    });
+    globalThis.dispatchEvent(new PageTransitionEvent("pageshow", { persisted: true }));
+    await user.click(button);
+
+    await vi.waitFor(() => {
+      expect(nativeSubmit).toHaveBeenCalledTimes(2);
+    });
+  });
+
+  it("keeps logout disabled when the page is shown without the back/forward cache", async () => {
+    const user = userEvent.setup();
+    const nativeSubmit = vi.spyOn(HTMLFormElement.prototype, "submit").mockImplementation(noop);
+    replaceTelemetryForTesting({ api: { pushError: vi.fn<Sink["api"]["pushError"]>() } });
+    await renderLogoutForm();
+    const button = screen.getByRole("button", { name: "Log out" });
+
+    await user.click(button);
+    await vi.waitFor(() => {
+      expect(nativeSubmit).toHaveBeenCalledOnce();
+    });
+    globalThis.dispatchEvent(new PageTransitionEvent("pageshow", { persisted: false }));
+    await user.click(button);
+
+    expect(nativeSubmit).toHaveBeenCalledOnce();
+  });
+
   it("posts to /logout with a hidden CSRF token made from __Host-XSRF-TOKEN", async () => {
     vi.spyOn(document, "cookie", "get").mockReturnValue(
       `XSRF-TOKEN=old; __Host-XSRF-TOKEN=${cookieValue}`,
