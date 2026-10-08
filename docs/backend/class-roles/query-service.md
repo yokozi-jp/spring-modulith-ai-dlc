@@ -52,7 +52,7 @@ jOOQ で画面ごとの射影を読まず、[Repository](repository.md) が返�
 最小の例は、Repository の集約を一覧の1行に変換する `search` である（抜粋）。
 
 ```java
-// com.example.demo.order.application.OrderQueryService（抜粋）
+// com.example.demo.ordering.application.OrderQueryService（抜粋）
 @Override
 @Transactional(readOnly = true)
 public List<OrderSummary> search(final OrderSearchCriteria criteria) {
@@ -65,7 +65,7 @@ public List<OrderSummary> search(final OrderSearchCriteria criteria) {
 典型的な例は、`OrderQueries` の二つのメソッドを実装した `OrderQueryService` の全体である。
 
 ```java
-package com.example.demo.order.application;
+package com.example.demo.ordering.application;
 
 /** 注文の参照を、Repository で読んだ集約から作る。 */
 @Service

@@ -80,7 +80,7 @@ tags: [convention, backend, class-role]
 最小の例は、注文を受け付けて確定するまでの `Order` である。
 
 ```java
-package com.example.demo.order.domain.model;
+package com.example.demo.ordering.domain.model;
 
 /** 注文の集約ルート。 */
 // record と同じ形のアクセサ（id() など）にそろえるため、フィールド名と同名の短いメソッドを許す。
@@ -230,7 +230,7 @@ public Money total() {
 
 ## 対応するテスト
 
-Spring を起動しない JUnit のテストを、集約と同じパッケージのテストソースに置く（`backend/src/test/java/com/example/demo/order/domain/model/OrderTest.java`）。
+Spring を起動しない JUnit のテストを、集約と同じパッケージのテストソースに置く（`backend/src/test/java/com/example/demo/ordering/domain/model/OrderTest.java`）。
 許される状態遷移と許されない状態遷移を、操作ごとに確かめる。
 `ensureLockNo` は、違うロック番号で `ConflictException` を投げることを確かめる。
 

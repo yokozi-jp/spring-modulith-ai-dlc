@@ -130,7 +130,7 @@ task release-check
 task otel-collector-check
 ```
 
-このタスクは、バックエンドのログに加えて Faro の fixture もフロントエンドの pipeline に流して出口を検査する。
+このタスクは、バックエンドのログに加えて Faro の fixture もフロントエンドの pipeline（`logs/frontend` と `traces/frontend`）に流して出口を検査する。
 ログ属性の allowlist は[可観測性データの規約](../observability/conventions.md)を参照する。
 
 ## DASTを実行するとき

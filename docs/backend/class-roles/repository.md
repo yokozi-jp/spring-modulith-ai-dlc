@@ -65,14 +65,14 @@ Presentation は Repository を使わない。
 ## 依存してよい型、してはいけない型
 
 - **依存してよい型**：`java..` の標準型、`org.jspecify..`、`com.google.errorprone.annotations.CheckReturnValue`、同じ `domain.model` の集約ルート、値オブジェクト、enum、`shared.concurrency` の `ConflictException` と `shared.failure` の `NotFoundException`（Javadoc の `@throws` のため）。
-- **依存してはいけない型**：jOOQ の API と生成型（`DSLContext`、`Condition`、説明用の仮の生成型 `OrdersRecord`）、Spring の型（`Pageable`、`@Repository`）、JPA と Jackson の型、`application`、モジュールルートの型（参照の結果、検索条件）。
+- **依存してはいけない型**：jOOQ の API と生成型（`DSLContext`、`Condition`、説明用の仮の生成型 `TOrderRecord`）、Spring の型（`Pageable`、`@Repository`）、JPA と Jackson の型、`application`、モジュールルートの型（参照の結果、検索条件）。
 
 ## 最小の例と典型的な例
 
 最小の例は、ID で取り出し、新しい注文と既存の注文を保存する `OrderRepository` である。
 
 ```java
-package com.example.demo.order.domain.model;
+package com.example.demo.ordering.domain.model;
 
 import com.example.demo.shared.concurrency.ConflictException;
 import com.example.demo.shared.failure.NotFoundException;
@@ -127,7 +127,7 @@ public interface OrderRepository {
 ```
 
 ```java
-// com.example.demo.order.infrastructure.persistence.JooqOrderRepository（宣言だけ）
+// com.example.demo.ordering.infrastructure.persistence.JooqOrderRepository（宣言だけ）
 @Repository
 class JooqOrderRepository implements OrderRepository {
   // DSLContext と shared の CommonColumns、TableWriter を受け取り、jOOQ の列と Order の変換もこのクラスに書く。
@@ -140,7 +140,10 @@ class JooqOrderRepository implements OrderRepository {
 実装の `JooqOrderRepository` を `@DatabaseTest` で、保存してから読み戻す往復で確かめる。
 `update` と `delete` の競合と行がない場合は、Repository ごとには確かめず、`shared` の `TableWriterTest` と `TableWriterConcurrencyTest` が確かめる（[jOOQ の Repository](jooq-repository.md) の「対応するテスト」）。
 jOOQ の列と集約の変換も、この往復で確かめる。
-テストは実装と同じ `com.example.demo.order.infrastructure.persistence` パッケージのテストソースに置く。
+テストは実装と同じ `com.example.demo.ordering.infrastructure.persistence` パッケージのテストソースに置く。
+
+`CommonColumns` は、trace と `*_pgm_cd` の束縛がないと登録を失敗させる（[ADR-051](../../adr/ADR-051-bind-pgm-cd-with-scoped-value-and-aspect.md)）。
+Spring のテストではどちらもないため、`shared` のテストの補助 `TestCommonColumns` で、時刻と trace ID を固定した共通処理を作り、`*_pgm_cd` を束縛して保存する。
 
 ```java
 /** 注文の保存と読み戻しを検証する。 */
@@ -150,12 +153,10 @@ class JooqOrderRepositoryTest {
   /** テスト対象が使う jOOQ のコンテキスト。 */
   @Autowired private DSLContext dsl;
 
-  /** テスト対象が使う shared の共通処理。 */
-  @Autowired private CommonColumns commonColumns;
-
   @Test
   @DisplayName("保存した注文を ID で読み戻せる")
   void savesAndFindsOrder() {
+    final CommonColumns commonColumns = TestCommonColumns.at(Instant.parse("2026-10-03T00:00:00Z"));
     final OrderRepository repository =
         new JooqOrderRepository(dsl, commonColumns, new TableWriter(dsl, commonColumns));
     final Order order =
@@ -166,7 +167,7 @@ class JooqOrderRepositoryTest {
                 new OrderLine(
                     1, new ProductCode("P-1"), new Quantity(2), new Money(new BigDecimal("500")))),
             Instant.parse("2026-10-03T00:00:00Z"));
-    repository.add(order);
+    TestCommonColumns.runAs(() -> repository.add(order));
 
     final Order found =
         repository

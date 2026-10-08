@@ -68,7 +68,7 @@ Command はモジュールルートの公開契約でもない。
 最小の例は、取り消す注文の ID とロック番号だけを持つ `CancelOrderCommand` である。
 
 ```java
-package com.example.demo.order.application;
+package com.example.demo.ordering.application;
 
 import com.example.demo.shared.concurrency.ExpectedLockNo;
 import com.example.demo.shared.concurrency.VersionedCommand;
@@ -84,7 +84,7 @@ Listener が `OrderConfirmed` から作る `ChargeOrderCommand(String orderId)` 
 典型的な例は、明細をネストした record で持つ `PlaceOrderCommand` である。
 
 ```java
-package com.example.demo.order.application;
+package com.example.demo.ordering.application;
 
 import java.util.List;
 
@@ -104,7 +104,7 @@ public record PlaceOrderCommand(String customerId, List<PlaceOrderCommand.Line> 
 Controller は Request から Command を作り、パス変数の値は `toCommand` の引数で渡す。
 
 ```java
-// com.example.demo.order.presentation.web.OrderController（抜粋）
+// com.example.demo.ordering.presentation.web.OrderController（抜粋）
 final PlaceOrderResult result = placeOrder.handle(request.toCommand());
 cancelOrder.handle(request.toCommand(orderId));
 ```

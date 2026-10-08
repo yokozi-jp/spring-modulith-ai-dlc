@@ -59,7 +59,7 @@ tags: [convention, backend, class-role]
 最小の例は、注文の識別子の `OrderId` である。
 
 ```java
-package com.example.demo.order.domain.model;
+package com.example.demo.ordering.domain.model;
 
 import java.util.UUID;
 

@@ -43,7 +43,7 @@ tags: [convention, backend, class-role]
 ```java
 /** 注文モジュールの公開契約。 */
 @NullMarked
-package com.example.demo.order;
+package com.example.demo.ordering;
 
 import org.jspecify.annotations.NullMarked;
 ```
@@ -58,7 +58,7 @@ import org.jspecify.annotations.NullMarked;
 最小の例は、注文モジュールの `OrderQueries` である。
 
 ```java
-package com.example.demo.order;
+package com.example.demo.ordering;
 
 import java.util.List;
 import java.util.Optional;
@@ -78,7 +78,7 @@ public interface OrderQueries {
 次の二つは抜粋であり、フィールドとコンストラクタを省いている。
 
 ```java
-// com.example.demo.order.presentation.web.OrderController（抜粋）
+// com.example.demo.ordering.presentation.web.OrderController（抜粋）
 /**
  * 注文の詳細を返す。
  *

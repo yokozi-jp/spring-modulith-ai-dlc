@@ -37,7 +37,7 @@ Proposed
 ## Decision
 
 機能モジュールのクラスを次の役割に分け、置き場所、命名、形を一つに決める。
-例には注文（`order`）モジュールを使う。
+例には注文（`ordering`）モジュールを使う。
 
 ### モジュールルート
 
@@ -77,7 +77,7 @@ Proposed
 - 外部システムを呼ぶ CommandHandler は二層で冪等にする。
   外部システムの操作に冪等性キー（注文 ID）を渡し、集約がすでにその操作を終えていれば（`order.isPaid()`）何もせずに Result を返す。
   レジストリは at-least-once で配信し、未完了のイベント出版を再投入すると同じイベントが再び届くためである（[メッセージングの設計](../integration/async-messaging-design.md)の「配信保証」、[順序保証と冪等性](../integration/async-ordering-and-idempotency.md)）。
-  請求に失敗したイベント出版はレジストリに未完了のまま残り、[非同期処理の失敗時の再試行と回復](../integration/async-failure-recovery.md)の `IncompleteEventPublications` の手順で再投入する。
+  請求に失敗したイベント出版はレジストリに `FAILED` で残り、[非同期処理の失敗時の再試行と回復](../integration/async-failure-recovery.md)の失敗した出版の再投入の手順で再投入する。
   自動の再投入は [issue #108](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/108) で扱う。
 - 外部システムを呼ぶ CommandHandler も、`@ApplicationModuleListener` が開くトランザクションの中で外部システムを呼ぶ。
   ただし、呼んでいる間は行をロックせず（行のロックは呼んだ後の `update` の UPDATE が取る）、画面の要求を待たせない。
@@ -225,7 +225,7 @@ Proposed
 
 ### 選択肢11: jOOQ の Record と集約の変換を専用の Mapper のクラスに分ける
 
-- **Description**：`infrastructure.persistence` に static メソッドだけを持つ集約ごとの Mapper のクラスを置き、`selectFrom` で読んだ `OrdersRecord` の getter から集約を組み立て、集約から `OrdersRecord` を作る。
+- **Description**：`infrastructure.persistence` に static メソッドだけを持つ集約ごとの Mapper のクラスを置き、`selectFrom` で読んだ `TOrderRecord` の getter から集約を組み立て、集約から `TOrderRecord` を作る。
 - **Pros**：Repository が SQL だけになり、短くなる。
 - **Cons**：子の行を別の SQL で読んで集約ごとに分ける処理は Repository に残り、一つの集約の変換が二つのクラスに分かれる。`convertFrom`、`multiset`、`Records.mapping` を使えば、変換は `select` に並べる列の中に収まり、別のクラスに分ける中身が残らない。役割とクラスが集約ごとに一つずつ増えるだけである。
 
@@ -237,7 +237,7 @@ Proposed
 
 ### 選択肢13: jOOQ のコード生成の `forcedTypes` と `Converter` で値オブジェクトに対応づける
 
-- **Description**：コード生成の設定で、`ORDERS.ORDER_ID` などの列を `Converter` で `OrderId` などの値オブジェクトの型にして生成する（[jOOQ, Forced types](https://www.jooq.org/doc/latest/manual/code-generation/codegen-advanced/codegen-config-database/codegen-database-forced-types/)）。
+- **Description**：コード生成の設定で、`T_ORDER.ORDER_ID` などの列を `Converter` で `OrderId` などの値オブジェクトの型にして生成する（[jOOQ, Forced types](https://www.jooq.org/doc/latest/manual/code-generation/codegen-advanced/codegen-config-database/codegen-database-forced-types/)）。
 - **Pros**：生成型の列が最初から値オブジェクトの型になり、クエリごとの `convertFrom` が要らない。
 - **Cons**：共有の生成パッケージ `com.example.demo.jooq` が、各モジュールの内部パッケージ `domain.model` の型に依存し、モジュールの境界をまたぐ。ArchUnit の規則は生成型が Domain に依存しない向きを前提にしており、生成コードを検査対象から外しているため、この依存は規則でも見つからない。
 

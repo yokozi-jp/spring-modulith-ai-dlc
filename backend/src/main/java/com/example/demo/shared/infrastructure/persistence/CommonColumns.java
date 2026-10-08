@@ -30,14 +30,15 @@ import org.springframework.stereotype.Component;
  *
  * <ul>
  *   <li>{@code *_at}：注入した {@link Clock} の現在時刻。
- *   <li>{@code *_by}：利用者の操作では OIDC の ID トークンの {@code sub}。利用者の操作でない処理では {@code *_pgm_cd} と同じ値。
+ *   <li>{@code *_by}：利用者の操作では OIDC の ID トークンの {@code sub}。利用者の操作でない処理と、{@code *Listener} の中の処理では
+ *       {@code *_pgm_cd} と同じ値。Listener の中では、伝わった利用者の認証を使わない。
  *   <li>{@code *_pgm_cd}：{@link PgmCdAspect} が束縛した、呼び出し中のユースケースの値。
  *   <li>{@code *_tx_id}：現在のスパンの trace ID。trace がなければ例外にする。
  * </ul>
  *
  * <p>{@link #forInsert} と {@link #forUpdate} は、共通カラムがない、または型が異なる場合に {@link
- * IllegalArgumentException} を投げる。trace がない場合、{@code *_pgm_cd} が束縛されていない場合、または利用者を特定できない認証の場合に
- * {@link IllegalStateException} を投げる。
+ * IllegalArgumentException} を投げる。trace がない場合、{@code *_pgm_cd} が束縛されていない場合、または Listener
+ * の外で利用者を特定できない認証の場合に {@link IllegalStateException} を投げる。
  */
 @Component
 public class CommonColumns {
@@ -116,7 +117,8 @@ public class CommonColumns {
   /** 1 回の呼び出しで、現在時刻と trace ID を 1 回だけ取る。 */
   private AuditValues audit() {
     final String pgmCd = PgmCdAspect.current();
-    return new AuditValues(Instant.now(clock), operator(pgmCd), pgmCd, traceId());
+    final String operator = PgmCdAspect.inListener() ? pgmCd : operator(pgmCd);
+    return new AuditValues(Instant.now(clock), operator, pgmCd, traceId());
   }
 
   /** SQL を決定的にするため、カラムの順序を保った変更できない Map にする。 */

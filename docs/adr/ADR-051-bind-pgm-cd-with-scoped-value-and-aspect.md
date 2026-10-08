@@ -32,11 +32,21 @@ Repository の実装は、どのユースケースから呼ばれたかを引数
 `org.springframework.boot:spring-boot-starter-aspectj` を依存に加え、`shared.infrastructure.persistence` に `@Aspect` の `PgmCdAspect` を置く。
 
 - `PgmCdAspect` は、`com.example.demo.<モジュール>..` の `*CommandHandler` の `handle` と、`*Listener` の public メソッドの呼び出しを `@Around` で囲む。
-- 呼び出しの間だけ、`ScopedValue<String>` に `モジュール名.クラスの単純名から CommandHandler か Listener を除いた名前`（`order.PlaceOrder`）を束縛する。
+- 呼び出しの間だけ、`ScopedValue<String>` に `モジュール名.クラスの単純名から CommandHandler か Listener を除いた名前`（`ordering.PlaceOrder`）を束縛する。
 - 呼び出しが入れ子になったら、その間は内側の値になり、戻ると外側の値に戻る。
-  ADR-050 では `<Event>Listener` の `on` が `<UseCase>CommandHandler` の `handle` を一つだけ呼ぶため、イベントを受けた書き込みの `*_pgm_cd` には、内側の CommandHandler の名前（`order.ChargeOrder`）が入る。
+  ADR-050 では `<Event>Listener` の `on` が `<UseCase>CommandHandler` の `handle` を一つだけ呼ぶため、イベントを受けた書き込みの `*_pgm_cd` には、内側の CommandHandler の名前（`ordering.ChargeOrder`）が入る。
 - `CommonColumns` の `forInsert(Table)` と `forUpdate(Table)` は、束縛された値を `*_pgm_cd` に登録する。
   何も束縛されていなければ `IllegalStateException` を投げ、登録を失敗させる。
+- `PgmCdAspect` は、`*Listener` の呼び出しの間、内側の CommandHandler の呼び出しも含めて、Listener の中であることも `ScopedValue<Boolean>` に束縛する。
+  `CommonColumns` は、Listener の中の書き込みの `*_by` に、伝わった利用者の認証を使わず `*_pgm_cd` と同じ値を登録する。
+  理由は次の三つである。
+  - 同じ種類の行の `*_by` が、配信の経路で意味を変えないようにする。
+    通常の配信は利用者の要求のスレッドから認証を受け継ぐことがあるが、再投入は認証のないスレッドから呼ばれる。
+    認証で決めると、同じ処理の行が利用者の `sub` と処理の名前に分かれる。
+  - Listener のスレッドに認証が渡るかは非同期の実行の設定に依存し、その仕組みはアプリケーションのコードから読めない（[issue #122](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/122) の確認では、`spring.task.execution.propagate-context` を外しても渡った）。
+    その引き継ぎに頼らない。
+  - 起点の利用者は、起点の集約の行の `*_by` と、`*_tx_id` の trace からたどれる。
+  起点の利用者を行に残す要件が出たら、利用者をイベントに明示的に載せ、`*_by` とは別の列に書く形で足す。
 
 Aspect は Spring AOP のプロキシで動かし、ロード時やコンパイル時のウィービングは使わない。
 
@@ -54,7 +64,7 @@ Aspect は Spring AOP のプロキシで動かし、ロード時やコンパイ�
 - AspectJ の依存（`aspectjweaver`）が増える。
 - `*_pgm_cd` の値が、クラスの名前の規約（ADR-050 の役割名）に依存する。
   役割名を変えるときは、`PgmCdAspect` の pointcut も変える必要がある。
-- Spring AOP のプロキシを通らない呼び出し（同じクラスの中からの呼び出し、Bean でないインスタンスの呼び出し）では束縛されない。
+- Spring AOP のプロキシを通らない呼び出し（同じクラスの中からの呼び出し、Bean でないインスタンスの呼び出し）と、別のスレッドへ渡した処理では束縛されない。
 - バッチのように CommandHandler と Listener を通らない書き込みの入口を作るときは、入口の役割と pointcut を決め直す必要がある。
 
 ### Neutral

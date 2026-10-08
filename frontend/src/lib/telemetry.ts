@@ -9,10 +9,12 @@ declare const __TELEMETRY_APP__: {
   environment: string;
 };
 
-// ponytail: http と https の絶対 URL だけを対象にし、scheme の大文字と小文字は区別しない。文中の相対 URL（/api/x?id=1）は消さない。
+// 対象は http と https の絶対 URL（scheme の大文字と小文字は区別しない）と、/ で始まる相対 URL である。
+// 相対 URL とみなすのは、文字列の先頭、空白、(、"、'、= の直後の / からで、a/b?c のような語の途中は対象にしない。
+// 文の中の URL も消すので、new URL() による構文解析ではなく正規表現にする。
+// ponytail: : の直後の相対 URL の query は消さない（error:/api/x?id=1 など）。
 // ponytail: query は空白までとみなすので、(see http://h/a?x=1) の閉じ括弧も消える。秘密を残すより表示の崩れを取る。
-// 相対 URL を送る計装（View、Tracing）を足すときは、ここを URL の構文解析に替える。
-const absoluteUrlQueryOrFragment = /(?<url>https?:\/\/[^\s?#]*)[?#]\S*/giu;
+const urlQueryOrFragment = /(?<url>(?:https?:\/\/|(?<=^|[\s("'=])\/)[^\s?#]*)[?#]\S*/giu;
 
 // as による型の表明を避けるため、structuredClone で複製した項目をその場で書き換える。
 function stripStrings(value: unknown): void {
@@ -21,14 +23,14 @@ function stripStrings(value: unknown): void {
   }
   for (const [key, child] of Object.entries(value)) {
     if (typeof child === "string") {
-      Reflect.set(value, key, child.replaceAll(absoluteUrlQueryOrFragment, "$<url>"));
+      Reflect.set(value, key, child.replaceAll(urlQueryOrFragment, "$<url>"));
     } else {
       stripStrings(child);
     }
   }
 }
 
-/** 送る項目のすべての文字列から、絶対 URL の query と fragment を消す。消せない項目は捨てる。 */
+/** 送る項目のすべての文字列から、絶対 URL と / で始まる相対 URL の query と fragment を消す。消せない項目は捨てる。 */
 export function stripUrlQueryAndFragment(item: TransportItem): TransportItem | null {
   try {
     const copy = structuredClone(item);
@@ -40,6 +42,16 @@ export function stripUrlQueryAndFragment(item: TransportItem): TransportItem | n
     // oxlint-disable-next-line unicorn/no-null -- Faro の BeforeSendHook は null で項目を捨てる。
     return null;
   }
+}
+
+/**
+ * 同一オリジンの /api と /api/**（query と fragment を含む）以外の URL に一致する正規表現を返す。
+ * Faro の ignoreUrls に渡し、traceparent と span を同一オリジンの /api/** の要求だけにする。
+ */
+export function untracedUrl(origin: string): RegExp {
+  const escaped = origin.replaceAll(/[.*+?^${}()|[\]\\]/gu, String.raw`\$&`);
+  // flag は u だけにする。OpenTelemetry の isUrlIgnored は test で比べ、g と y は lastIndex を持ち越すため。
+  return new RegExp(`^(?!${escaped}/api(?:[/?#]|$))`, "u");
 }
 
 // reportCaughtError が使う Faro の部分。テストは pushError だけを持つ値を渡す。
@@ -63,12 +75,25 @@ export function initTelemetry(): void {
   if (__TELEMETRY_ENABLED__) {
     faroReady = (async (): Promise<Faro | undefined> => {
       try {
-        const { ErrorsInstrumentation, FetchTransport, InternalLoggerLevel, initializeFaro } =
-          await import("@grafana/faro-web-sdk");
+        const [
+          { ErrorsInstrumentation, FetchTransport, InternalLoggerLevel, initializeFaro },
+          { TracingInstrumentation },
+        ] = await Promise.all([
+          import("@grafana/faro-web-sdk"),
+          import("@grafana/faro-web-tracing"),
+        ]);
         return initializeFaro({
           app: __TELEMETRY_APP__,
-          // getWebInstrumentations() は使わない。Errors（window.onerror と unhandledrejection）だけにする。
-          instrumentations: [new ErrorsInstrumentation()],
+          // getWebInstrumentations() は使わない。
+          // Errors（window.onerror と unhandledrejection）と、fetch と XHR の Tracing だけにする。
+          instrumentations: [new ErrorsInstrumentation(), new TracingInstrumentation()],
+          // この値は Faro の全計装の除外にも効く。
+          // Performance や UserAction を有効にするときは、Tracing の fetchInstrumentationOptions と xhrInstrumentationOptions に移す。
+          ignoreUrls: [untracedUrl(globalThis.location.origin)],
+          // ponytail: web-tracing の sampler が session の isSampled の属性を読む実装に依存する。
+          // SessionInstrumentation がないと sampled flag が 0 の traceparent が送られるので、初期値で sampled にする。
+          // #152 で SessionInstrumentation を入れたら、この初期値を消す。
+          sessionTracking: { session: { attributes: { isSampled: "true" } } },
           // Cookie を Collector へ送らない。
           transports: [
             new FetchTransport({ url: "/collect", requestOptions: { credentials: "omit" } }),

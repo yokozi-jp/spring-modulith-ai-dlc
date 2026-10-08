@@ -1,8 +1,8 @@
 package archfixture.violating.inventory.application;
 
-import archfixture.violating.order.OrderPlaced;
-import archfixture.violating.order.application.ConfirmOrderCommand;
-import archfixture.violating.order.application.ConfirmOrderCommandHandler;
+import archfixture.violating.ordering.OrderPlaced;
+import archfixture.violating.ordering.application.ConfirmOrderCommand;
+import archfixture.violating.ordering.application.ConfirmOrderCommandHandler;
 import org.springframework.modulith.events.ApplicationModuleListener;
 import org.springframework.stereotype.Service;
 

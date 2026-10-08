@@ -34,6 +34,9 @@ backend/src/test/java/com/example/demo/architecture/
 
 `ApplicationModuleArchitectureTest`はSpring Modulithの`ApplicationModules.verify()`を使い、モジュール間の循環、内部パッケージ参照、許可されていない依存を検出する。
 モジュール構造の決定は[ADR-001](../adr/ADR-001-adopt-spring-modulith-modular-monolith.md)を参照する。
+jOOQの生成物の`com.example.demo.jooq`はOPENのモジュールであり、`verify()`は生成型への依存を内部の型への依存として扱わない。
+`ApplicationModuleArchitectureTest`がこれを確かめる。
+他モジュールのテーブルを読む誤りは、jOOQのRepositoryの規約とレビューで防ぐ（[ADR-067](../adr/ADR-067-open-jooq-generated-module.md)）。
 
 `PackageByFeatureOnionArchitectureTest`はArchUnitの`Architectures.onionArchitecture()`と追加規則で、パッケージの配置と依存を検査する。
 規則名は`@ArchTest`のフィールド名であり、テスト結果にもこの名前で出る。
@@ -94,8 +97,8 @@ backend/src/test/java/com/example/demo/architecture/
 プロダクションの規則は`.allowEmptyShould(true)`を付けるため、対象のクラスがなくても成功する。
 `ArchitectureRuleFixtureTest`は、テスト専用のフィクスチャで各規則が働くことを確かめる。
 
-- `backend/src/test/java/archfixture/conforming/`：規約どおりの`order`モジュール、`inventory`モジュール、`shared`モジュールの最小の例。すべての規則が誤検出しないことを確かめる。
-  `order`の`JooqOrderRepository`が`shared.infrastructure.persistence`の型を使い、`shared`のルートは`package-info.java`だけを持つ。
+- `backend/src/test/java/archfixture/conforming/`：規約どおりの`ordering`モジュール、`inventory`モジュール、`shared`モジュールの最小の例。すべての規則が誤検出しないことを確かめる。
+  `ordering`の`JooqOrderRepository`が`shared.infrastructure.persistence`の型を使い、`shared`のルートは`package-info.java`だけを持つ。
 - `backend/src/test/java/archfixture/violating/`：規則ごとに違反するクラスを置く。各クラスのJavadocに違反する規則名を書く。パラメータ化テストが、規則ごとに対応する違反クラスの完全修飾名を含む失敗を確かめる。
 
 フィクスチャは`com.example.demo`の外に置く。
@@ -144,7 +147,7 @@ ArchUnitは規則の説明の後に`, because`とこの文をつなぎ、違反�
 
 ```text
 Rule 'no classes should be meta-annotated with @Transactional, because 状態を変えるユースケースの処理の順序とトランザクション境界を一か所で決め、一つのユースケースを Command の受け取りから Result の返却まで一つのトランザクションで進めるため。直し方：クラスの @Transactional を外し、Application の public メソッドへ付け直す。規約：docs/backend/layers.md、docs/backend/class-roles/command-handler.md、docs/adr/ADR-050-define-backend-class-roles-and-naming.md' was violated (1 times):
-Class <archfixture.violating.order.application.ShipOrderCommandHandler> is meta-annotated with @Transactional in (ShipOrderCommandHandler.java:0)
+Class <archfixture.violating.ordering.application.ShipOrderCommandHandler> is meta-annotated with @Transactional in (ShipOrderCommandHandler.java:0)
 ```
 
 `ArchitectureRuleMessageTest`は、`architecture`パッケージで`@ArchTest`を付けた`ArchRule`のフィールドをすべて集め、最後のbecauseがこの形であることと、「規約：」の各パスがリポジトリにあることを確かめる。
@@ -298,7 +301,7 @@ Spring Modulith、Error Prone、NullAway、SpotBugs、Spotlessの失敗の文は
 
 | ツール          | 典型的な失敗の文                                                                                     | 意味                                                                                          | 直し方                                                              | 文書                                                                             |
 | --------------- | ---------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------- | ------------------------------------------------------------------- | -------------------------------------------------------------------------------- |
-| Spring Modulith | `Module 'order' depends on non-exposed type ... within module 'inventory'!`                          | 他モジュールの内部パッケージの型を使っている                                                  | 相手のルートの`<Feature>Queries`かイベントで連携する                | [バックエンドアーキテクチャ](architecture.md)                                    |
+| Spring Modulith | `Module 'ordering' depends on non-exposed type ... within module 'inventory'!`                       | 他モジュールの内部パッケージの型を使っている                                                  | 相手のルートの`<Feature>Queries`かイベントで連携する                | [バックエンドアーキテクチャ](architecture.md)                                    |
 | Error Prone     | `error: [JavaTimeDefaultTimeZone] LocalDate.now() is not allowed ...`                                | 角括弧の中がチェック名で、`(see https://errorprone.info/bugpattern/<チェック名>)`に説明がある | 日時のチェックは、注入した`Clock`と設定値の`ZoneId`で求める形に直す | [日時とタイムゾーンの規約](../datetime/timezone-conventions.md)                  |
 | NullAway        | `error: [NullAway] dereferenced expression 's' is @Nullable`                                         | `@NullMarked`のコードで、`@Nullable`の値をnullを確かめずに使った                              | nullを確かめてから使うか、値を必ず渡して`@Nullable`を外す           | [NullAway, Error Messages](https://github.com/uber/NullAway/wiki/Error-Messages) |
 | SpotBugs        | `Verification failed: SpotBugs ended with exit code 1. See the report at: ...`                       | バイトコードからバグのパターンを検出した                                                      | レポートのバグのパターンの説明と行を見て直す                        | [Lintとテストのリファレンス](../tooling/lint-and-test.md)                        |
@@ -308,10 +311,11 @@ Spring Modulith、Error Prone、NullAway、SpotBugs、Spotlessの失敗の文は
 
 プロダクションコード向けArchUnit検査は[ProductionCodeOnly](../../backend/src/test/java/com/example/demo/architecture/ProductionCodeOnly.java)で手書きコードだけを選び、生成コードとテストコードを除外する。
 除外する生成コードは、jOOQの生成先である基底パッケージ直下の`jooq`パッケージだけとする。
-`order.infrastructure.persistence.jooq`のような手書きのパッケージまで除外すると、そこに置いたRepositoryが`tableWritesGoThroughTableWriter`を外れるためである。
+`ordering.infrastructure.persistence.jooq`のような手書きのパッケージまで除外すると、そこに置いたRepositoryが`tableWritesGoThroughTableWriter`を外れるためである。
 除外はクラスの場所で判定するため、基底パッケージ直下の`jooq`パッケージにはjOOQのコード生成の出力だけを置く。
 そこに置いた手書きのクラスは、ソースのディレクトリを問わず、すべてのプロダクションコード向けの規則を外れるためである。
 `ProductionCodeOnlyTest`がこの境界を確かめ、そのパッケージの本番のクラスのソースファイルがすべて`src/generated/jooq`にあることも確かめる。
+生成コードの基準の型には、スキーマの数によらずルートに残る`DefaultCatalog`を使う。
 生成コードを除外しても、手書きコードからjOOQ APIや生成型への依存は検査する。
 
 静的解析は`task be-lint`で、ArchUnitとSpring Modulithの検査は`task test`で実行する。

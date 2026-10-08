@@ -48,6 +48,7 @@ DBロールの決定は[ADR-011](../adr/ADR-011-use-module-owned-database-schema
 DDLは本番と同じくマイグレーションロール（`.env.test`の`MIGRATION_DB_*`）で実行し、アプリロールにはDMLだけを付与する。
 テストクラスは順に実行されるため、スキーマ検査はこのスキーマを見ない。
 使ってよいのは`shared`の共通処理のテストだけであり、業務テーブルができたらそのテーブルで確かめる。
+Springの外で共通カラムを登録するテストは、[TestCommonColumns](../../backend/src/test/java/com/example/demo/shared/infrastructure/persistence/TestCommonColumns.java)の`at`で共通処理を作り、`runAs`の中で登録する。
 
 二つのセッションをまたぐテスト（古い保存の競合、`lock_timeout`）は、`@DatabaseTest`のトランザクションをAとし、`DataSource`から取った二つ目の接続をBにする。
 Bの行はコミットするため、`@AfterTransaction`で自動コミットの接続から消す。

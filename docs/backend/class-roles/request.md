@@ -65,7 +65,7 @@ CommandHandler に Request を渡さず、Request に業務の不変条件を書
 `ConfirmOrderRequest` も同じ形である。
 
 ```java
-package com.example.demo.order.presentation.web;
+package com.example.demo.ordering.presentation.web;
 
 import com.example.demo.shared.concurrency.ExpectedLockNo;
 
@@ -86,7 +86,7 @@ public record CancelOrderRequest(@Min(1) @Schema(example = "1") long lockNo) {
 典型的な例は、明細をネストした record で持つ `PlaceOrderRequest` である。
 
 ```java
-package com.example.demo.order.presentation.web;
+package com.example.demo.ordering.presentation.web;
 
 /**
  * 注文を受け付ける API の本文。
@@ -127,7 +127,7 @@ public record PlaceOrderRequest(
 Controller は `@Valid @RequestBody` で受け、`toCommand(...)` の結果を CommandHandler に渡す。
 
 ```java
-// com.example.demo.order.presentation.web.OrderController（抜粋。Javadoc と 201 の @ApiResponse は Controller の例を参照）
+// com.example.demo.ordering.presentation.web.OrderController（抜粋。Javadoc と 201 の @ApiResponse は Controller の例を参照）
 @Operation(operationId = "placeOrder")
 @PostMapping
 /* package */ ResponseEntity<Void> place(@Valid @RequestBody final PlaceOrderRequest request) {

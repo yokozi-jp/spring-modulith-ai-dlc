@@ -67,4 +67,8 @@
 - [ADR-064: OpenAPI 契約を test タスクで書き出し、Backend CI のテスト二重実行をやめる](ADR-064-write-openapi-contract-from-test-task-in-ci.md)（Proposed, 2026-10-06）
 - [ADR-065: 区分値を DB と API で enum の名前のまま持つ](ADR-065-store-category-values-as-enum-names.md)（Proposed, 2026-10-06）
 - [ADR-066: CSRF の Cookie を __Host- の名前にし、SameSite=Lax を付ける](ADR-066-harden-csrf-cookie-with-host-prefix.md)（Accepted, 2026-10-06）
+- [ADR-067: jOOQ の生成物を Spring Modulith の OPEN のモジュールにする](ADR-067-open-jooq-generated-module.md)（Proposed, 2026-10-06）
 - [ADR-068: ブラウザのテレメトリを Faro Web SDK で集め、同一オリジンの /collect から Collector へ送る](ADR-068-collect-browser-telemetry-with-faro-via-collector.md)（Proposed, 2026-10-06）
+- [ADR-069: モジュール名とスキーマ名に SQL の予約語を使わない](ADR-069-avoid-sql-reserved-words-in-module-names.md)（Proposed, 2026-10-07）
+- [ADR-070: SQL の span を jOOQ の ExecuteListener で作り、SQL の文と値を入れない](ADR-070-record-sql-spans-with-jooq-execute-listener.md)（Proposed, 2026-10-07）
+- [ADR-071: 作業で得た学びを 5 つの層へ還元し、上の層を優先する](ADR-071-reinforce-learnings-into-five-layers.md)（Proposed, 2026-10-08）

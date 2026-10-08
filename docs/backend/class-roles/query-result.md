@@ -36,6 +36,7 @@ API の応答の形は Presentation の `<QueryResult>Response` が決めるた�
 - 集約の状態は、Domain の enum ではなく `OrderStatus.name()` の文字列で持つ。
 - 一覧の1行と1件の詳細は、集約の `lockNo()` を `long lockNo` に持つ。
   クライアントは、この値を更新の本文で送り返す（[更新の競合制御](../../web-api/optimistic-locking.md)）。
+  利用者が判断に使った表示の版を送り返すためであり、更新の直前に版を取り直して差し替えると、ほかの人の更新に気づかず上書きし、楽観的ロックの意味がなくなる。
 - `List` の component は、コンパクトコンストラクタで `List.copyOf` に置き換える。
   置き換えないと、`task be-lint` の SpotBugs が `EI_EXPOSE_REP` と `EI_EXPOSE_REP2` を報告する。
 - record とネストした record に Javadoc を書く。
@@ -51,7 +52,7 @@ API の応答の形は Presentation の `<QueryResult>Response` が決めるた�
 最小の例は、一覧の1行を表す `OrderSummary` である。
 
 ```java
-package com.example.demo.order;
+package com.example.demo.ordering;
 
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -64,7 +65,7 @@ public record OrderSummary(
 典型的な例は、明細をネストした record で持つ `OrderDetails` である。
 
 ```java
-package com.example.demo.order;
+package com.example.demo.ordering;
 
 import java.math.BigDecimal;
 import java.time.Instant;
