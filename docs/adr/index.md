@@ -72,4 +72,4 @@
 - [ADR-069: モジュール名とスキーマ名に SQL の予約語を使わない](ADR-069-avoid-sql-reserved-words-in-module-names.md)（Proposed, 2026-10-07）
 - [ADR-070: SQL の span を jOOQ の ExecuteListener で作り、SQL の文と値を入れない](ADR-070-record-sql-spans-with-jooq-execute-listener.md)（Proposed, 2026-10-07）
 - [ADR-071: 作業で得た学びを 5 つの層へ還元し、上の層を優先する](ADR-071-reinforce-learnings-into-five-layers.md)（Proposed, 2026-10-08）
-- [ADR-072: 外部システムを本番のコードで偽らず、WireMock のコンテナで偽る](ADR-072-fake-external-systems-with-wiremock.md)（Proposed, 2026-10-08）
+- [ADR-072: 外部システムを本番のコードで偽らず、WireMock のコンテナで偽る](ADR-072-fake-external-systems-with-wiremock.md)（Accepted, 2026-10-08）

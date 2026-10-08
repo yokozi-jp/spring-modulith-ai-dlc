@@ -4,6 +4,17 @@ import { useTranslation } from "react-i18next";
 import { useListPayments } from "@/api/generated/endpoints/payment/payment";
 import type { PaymentSummaryResponse } from "@/api/generated/models";
 
+// 決済記録の結果（ADR-072）。拒否と契約の不備は再投入を待たないため、処理中の文言と分ける。
+function resultMessage(t: TFunction, payment: PaymentSummaryResponse): string {
+  if (payment.status === "DECLINED") {
+    return t("orders.payment.declined");
+  }
+  if (payment.status === "FAILED") {
+    return t("orders.payment.failed");
+  }
+  return t("orders.payment.paid");
+}
+
 function paymentMessage(
   t: TFunction,
   state: {
@@ -20,7 +31,7 @@ function paymentMessage(
     return t("orders.payment.loadFailed");
   }
   if (state.payment !== undefined) {
-    return t("orders.payment.paid");
+    return resultMessage(t, state.payment);
   }
   return state.orderStatus === "CONFIRMED"
     ? t("orders.payment.notYet")
@@ -78,7 +89,9 @@ export function PaymentStatus({
       <output className="block">
         {paymentMessage(t, { isPending, isError, payment, orderStatus })}
       </output>
-      {payment === undefined ? undefined : paidDetails(t, i18n.language, payment)}
+      {payment === undefined || payment.status === "DECLINED" || payment.status === "FAILED"
+        ? undefined
+        : paidDetails(t, i18n.language, payment)}
     </section>
   );
 }

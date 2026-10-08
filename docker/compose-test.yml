@@ -84,6 +84,7 @@ services:
 
   # 決済代行の偽物。開発用と同じ docker/wiremock/mappings の成功のスタブを返す。
   # 失敗は、E2E が管理 API（/__admin/mappings）で注文ごとに実行中に足す。
+  # profile を付けない。task test の Spring のテストが .env.test の PAYMENT_GATEWAY_BASE_URL で共有のスタブを呼び、task e2e も使う（ADR-072）。
   wiremock:
     image: wiremock/wiremock:3.13.2@sha256:d737d2de3664a7e1bf96f73a7bd48a0d47d61988f7ca88a6e51ea44b8c1f687d
     # JDK の HttpClient が平文の HTTP/2 へ upgrade すると、本文付きの POST が切れるため、平文の HTTP/2 を止める。

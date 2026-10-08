@@ -62,9 +62,24 @@ class PaymentApiTest {
         .andExpect(jsonPath("$.items[0].paymentId").value(paymentId.toString()))
         .andExpect(jsonPath("$.items[0].orderId").value(orderId.toString()))
         .andExpect(jsonPath("$.items[0].amount").value(240.00))
+        .andExpect(jsonPath("$.items[0].status").value("PAID"))
         .andExpect(jsonPath("$.items[0].gatewayPaymentCode").value("ch_" + orderId))
         .andExpect(jsonPath("$.items[0].paidAt").value("2026-10-06T01:02:03.123456Z"))
         .andExpect(jsonPath("$.items[0].paidAt").value(endsWith("Z")));
+  }
+
+  @Test
+  @DisplayName("契約の不備で失敗した注文では、status を FAILED にし、識別子と paidAt を省く")
+  void listsFailedPaymentWithoutPaidAt() throws Exception {
+    final UUID orderId = UUID.randomUUID();
+    insertPayment(orderId, "FAILED", "");
+
+    mockMvc
+        .perform(payments(orderId.toString()))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.items[0].status").value("FAILED"))
+        .andExpect(jsonPath("$.items[0].gatewayPaymentCode").doesNotExist())
+        .andExpect(jsonPath("$.items[0].paidAt").doesNotExist());
   }
 
   @Test
@@ -105,6 +120,10 @@ class PaymentApiTest {
   }
 
   private UUID insertPayment(final UUID orderId) {
+    return insertPayment(orderId, "PAID", "ch_" + orderId);
+  }
+
+  private UUID insertPayment(final UUID orderId, final String status, final String code) {
     final UUID paymentId = UUID.randomUUID();
     TestCommonColumns.runAs(
         () ->
@@ -112,8 +131,9 @@ class PaymentApiTest {
                 .set(T_PAYMENT.PUBLIC_ID, paymentId)
                 .set(T_PAYMENT.ORDER_PUBLIC_ID, orderId)
                 .set(T_PAYMENT.CHARGED_AMOUNT_JPY, new BigDecimal("240.00"))
-                .set(T_PAYMENT.GATEWAY_PAYMENT_CODE, "ch_" + orderId)
-                .set(T_PAYMENT.PAID_AT, PAID_AT)
+                .set(T_PAYMENT.PAYMENT_STATUS_TYP, status)
+                .set(T_PAYMENT.GATEWAY_PAYMENT_CODE, code)
+                .set(T_PAYMENT.RECORDED_AT, PAID_AT)
                 .set(TestCommonColumns.at(PAID_AT).forInsert(T_PAYMENT))
                 .execute());
     return paymentId;

@@ -29,6 +29,7 @@ tags: [convention, backend, class-role]
   製品名（`StripeClient`）、`Port`、`Interface` の接尾辞、`I` の接頭辞を付けない。
 - メソッドは業務の動詞にする（`charge`）。
 - 外部システムが返す識別子は、同じ `domain.model` の[値オブジェクト](value-object.md)にする（`PaymentId`）。
+- 業務上の拒否のように、例外でなく業務の状態に記録する応答があるときは、結果の値オブジェクトを返す（`payment` モジュールの `ChargeOutcome`、[ADR-072](../../adr/ADR-072-fake-external-systems-with-wiremock.md)）。
 - 実装は `infrastructure.client` の `<ExternalSystem>Client` にする（`PaymentGatewayClient`）。
 
 ## 必須の記述

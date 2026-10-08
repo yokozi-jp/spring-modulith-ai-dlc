@@ -9,7 +9,7 @@ tags: [adr, backend, testing, external-system, wiremock]
 
 ## Status
 
-Proposed
+Accepted
 
 ## Date
 
@@ -113,8 +113,7 @@ Proposed
      決まるまでは、このリポジトリの暫定の契約と分類に従う。
 - 本番の URL の誤設定は、未設定を除いて起動の時点で止まらず、未決事項の 1 で検査の場所を決めるまで運用のレビューに依存する。
 - backend を通して決済の失敗と再投入を確かめる E2E は、後続の作業（[#167](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/167)）で書く。
-- この ADR は Proposed であり、規約文書はまだ変えない。
-  規約文書（`docs/backend/class-roles/external-client.md`、`docs/backend/testing-strategy.md`、`docs/container/compose.md`、`docs/e2e/testing-strategy.md`、`docs/integration/async-failure-recovery.md`）は、実装の Pull Request（#122、#167）で ADR を Accepted にする変更と同じ変更で更新する（[ADR の運用ルール](conventions.md)）。
+- 規約文書（`docs/backend/class-roles/external-client.md`、`docs/backend/testing-strategy.md`、`docs/container/compose.md`、`docs/e2e/testing-strategy.md`、`docs/integration/async-failure-recovery.md`）は、この ADR を Accepted にする #122 の変更で更新した（[ADR の運用ルール](conventions.md)）。
 
 ## Alternatives Considered
 

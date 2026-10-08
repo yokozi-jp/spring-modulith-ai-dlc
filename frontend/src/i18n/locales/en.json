@@ -109,6 +109,8 @@
       "loading": "Loading the payment status.",
       "loadFailed": "Could not load the payment status. Wait a moment and reload the page.",
       "paid": "Paid",
+      "declined": "The payment gateway declined the payment.",
+      "failed": "The payment failed. Resubmitting does not fix it, so contact the administrator.",
       "paidAmount": "Paid amount",
       "paidAt": "Paid at",
       "notYet": "The payment has not been accepted yet. It is in progress, or it failed and is waiting to be resubmitted.",

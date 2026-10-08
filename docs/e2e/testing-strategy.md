@@ -1,7 +1,7 @@
 ---
 type: Convention
 title: E2E テストの方針と書き方
-description: E2E テストの対象、配置、テストデータ、認証、書き方、不安定なテスト、実行環境、後片付け、失敗の調べ方、CI を定める規約。E2E テストを追加、変更するとき、Playwright の設定や task e2e、E2E の CI を変えるとき、E2E の失敗を調べるときに読む。
+description: E2E テストの対象、配置、テストデータ、外部システムの偽物、認証、書き方、不安定なテスト、実行環境、後片付け、失敗の調べ方、CI を定める規約。E2E テストを追加、変更するとき、Playwright の設定や task e2e、E2E の CI を変えるとき、E2E の失敗を調べるときに読む。
 tags: [convention, e2e, playwright, testing]
 ---
 
@@ -21,9 +21,10 @@ E2E テストは、複数画面にまたがる主要な利用者の流れだけ�
 
 ## 配置と構成
 
-`frontend/e2e/` に、ログインを行う `*.setup.ts` とシナリオの `*.spec.ts` を置く。
+`frontend/e2e/` に、ログインや WireMock の初期化を行う `*.setup.ts` とシナリオの `*.spec.ts` を置く。
 `frontend/e2e/environment.ts` は、ログイン情報をルートの `.env.test` から読み、`storageState` のパスを決める。
 Keycloak の画面でログインする手順（`signInOnKeycloak`）も持ち、setup とログアウトの spec が共有する。
+`frontend/e2e/payment-gateway.ts` は、決済代行の WireMock の管理 API を呼ぶ補助を持つ。
 `frontend/playwright.config.ts` の設定は次のとおりである。
 
 | 項目              | 値                                                                                  |
@@ -45,6 +46,19 @@ Keycloak の画面でログインする手順（`signInOnKeycloak`）も持ち�
 - テストの実行順や、他のテストが作ったデータに依存しない。
 - 公開 API で作れない状態が必要になったら、DB fixture を使う前に ADR で判断する。
 - Datafaker のシーダー（ローカル開発用）と E2E のデータを共有しない。
+
+## 外部システムの偽物
+
+外部システムは、compose-test の WireMock が偽る（[ADR-072](../adr/ADR-072-fake-external-systems-with-wiremock.md)）。
+backend を再起動せず、シナリオの途中で注文ごとに応答を切り替える。
+
+- 成功の応答は、`docker/wiremock/mappings/` の共有のスタブが返す。
+- 失敗（5xx、遅延）と業務上の拒否（`201` の `status: DECLINED`）は、`failChargesFor` で管理 API（`POST /__admin/mappings`）から足し、テストの終わりに返された関数で取り除く（`DELETE /__admin/mappings/{id}`）。
+  スタブは冪等性キー（注文 ID）で絞り、共有のスタブより優先度を高くするため、並列のテストと他の注文は成功のままになる。
+- setup project の `payment-gateway.setup.ts` が、開始時に `POST /__admin/mappings/reset` を一度呼ぶ。
+  前の実行で後片付けが走らずに残った注文ごとのスタブを持ち越さないためである。
+- 全体に効く失敗のスタブを足さない。
+  並列のテストと他の注文まで失敗させる。
 
 ## 認証
 
@@ -78,8 +92,9 @@ retry の回数を増やして隠さない。
 
 ## 実行環境
 
-`task e2e` は `docker/compose-test.yml` の `e2e` profile で PostgreSQL、Redis、Keycloak、backend を起動する。
-backend は compose の network に置き、PostgreSQL、Redis、Keycloak へ service 名で接続する。
+`task e2e` は `docker/compose-test.yml` の `e2e` profile で PostgreSQL、Redis、Keycloak、決済代行の WireMock、backend を起動する。
+WireMock には profile を付けず、`task test` と共有する。
+backend は compose の network に置き、PostgreSQL、Redis、Keycloak、WireMock へ service 名で接続する。
 compose の `environment` が `.env.test` の接続先を service 名に上書きする。
 Keycloak は hostname v2 で issuer をブラウザと同じ `http://127.0.0.1:8081` に固定し、backend は discovery を `OIDC_DISCOVERY_URI`（`keycloak:8080`）から読む。
 backend は discovery の `issuer` が `OIDC_ISSUER_URI` と一致しなければ起動しない（理由は [ADR-057](../adr/ADR-057-adopt-playwright-for-e2e-tests.md)）。
@@ -92,9 +107,11 @@ compose が公開する port は、すべて `127.0.0.1` に限る。
 | 5433 | PostgreSQL                                             |
 | 6380 | Redis                                                  |
 | 8081 | Keycloak                                               |
+| 8082 | 決済代行の WireMock（Playwright が管理 API を呼ぶ）    |
 
 - 5173 と 8080 は開発用の Vite と Keycloak と同じ port である。
   `task e2e` は開始時に両方を確かめ、使用中なら止めるよう示して失敗する。
+  5433、6380、8081、8082 は compose-test だけが使うため、開始時には確かめない。
 - `task test` と同じ Compose project（`spring-modulith-test`）を使うため、同時に実行しない。
 - 前提の道具は `task setup` と同じである。
   Chromium は `task e2e` が導入する。
@@ -107,7 +124,7 @@ compose が公開する port は、すべて `127.0.0.1` に限る。
 1. 前回残した環境を破棄し、5173 と 8080 が空いていることを確かめる。
 2. frontend の依存の導入と build、Chromium の導入、backend イメージの build を行う。
    frontend は `vp build --mode test` で build し、`.env.test` の `FRONTEND_OTEL_ENABLED=true` で Faro を有効にする。
-3. PostgreSQL、Redis、Keycloak を起動し、`task be-migrate` で migration を適用する。
+3. PostgreSQL、Redis、Keycloak、WireMock を起動し、`task be-migrate` で migration を適用する。
 4. backend を起動し、ホストから readiness を確かめる。
 5. Playwright を実行する。
    Playwright が `webServer` で Vite preview を起動し、終了時に止める。

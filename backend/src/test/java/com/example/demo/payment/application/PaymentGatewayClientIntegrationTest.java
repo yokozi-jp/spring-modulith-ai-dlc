@@ -6,6 +6,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import com.example.demo.payment.PaymentQueries;
 import com.example.demo.payment.PaymentSearchCriteria;
 import com.example.demo.payment.PaymentSummary;
+import com.example.demo.payment.domain.model.ChargeOutcome;
 import com.example.demo.payment.domain.model.Money;
 import com.example.demo.payment.domain.model.OrderId;
 import com.example.demo.payment.domain.model.PaymentGateway;
@@ -21,6 +22,7 @@ import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.UUID;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -41,10 +43,11 @@ import org.springframework.web.client.HttpServerErrorException;
  *
  * <p>成功の応答は、compose の WireMock と同じ {@code docker/wiremock/mappings} のスタブで返し、Client
  * とスタブの契約が合うことを確かめる。 失敗は、注文 ID の冪等性キーに合う優先度の高いスタブをテストの中で足す。決済代行を差し替えず、Resilience4j の retry と
- * circuit breaker を通す。4xx は circuit breaker が失敗として数えず、再試行もしないことを確かめる。URL の設定の違いで {@link
- * OrderConfirmedListenerTest} とは別の Spring のコンテキストになる。
+ * circuit breaker を通す。ADR-072 の四つの分類ごとに、出版の状態（拒否と契約の不備は COMPLETED、一時障害と資格情報の不備は FAILED）と決済記録を確かめる。
+ * 429 以外の 4xx は circuit breaker が失敗として数えず、429 は数える。URL の設定の違いで {@link OrderConfirmedListenerTest}
+ * とは別の Spring のコンテキストになる。
  */
-// 成功、5xx、4xx、タイムアウト、遅延、circuit breaker を一つの WireMock の文脈で確かめるため、メソッドが多い。
+// 成功、拒否、5xx、4xx、429、タイムアウト、遅延、circuit breaker を一つの WireMock の文脈で確かめるため、メソッドが多い。
 @SuppressWarnings("PMD.TooManyMethods")
 @ApplicationModuleTest(mode = BootstrapMode.ALL_DEPENDENCIES)
 @Import({SharedTestConfiguration.class, OrderConfirmedFixture.class})
@@ -59,6 +62,18 @@ class PaymentGatewayClientIntegrationTest {
 
   /** 決済代行が冪等性キーを受け取るヘッダー。 */
   private static final String IDEMPOTENCY_KEY = "Idempotency-Key";
+
+  /** イベント出版の状態と、請求の結果の FAILED。 */
+  private static final String FAILED = "FAILED";
+
+  /** 完了した出版を待つときの説明。 */
+  private static final String COMPLETED_PUBLICATION = "完了した出版";
+
+  /** FAILED の出版を待つときの説明。 */
+  private static final String FAILED_PUBLICATION = "FAILED の出版";
+
+  /** 決済記録の検査の説明。 */
+  private static final String PAYMENTS_OF = "orderId=%s の決済記録";
 
   /** circuit breaker が open になるまでの失敗の数（application.yaml の minimum-number-of-calls）。 */
   private static final int CALLS_TO_OPEN = 10;
@@ -111,10 +126,12 @@ class PaymentGatewayClientIntegrationTest {
   void chargesThroughSharedStub(final Scenario scenario) {
     final String orderId = fixture.draftedOrderId();
 
-    fixture.confirmAndAwait(scenario, orderId, "完了した出版", state -> state.archived() == 1);
+    fixture.confirmAndAwait(
+        scenario, orderId, COMPLETED_PUBLICATION, state -> state.archived() == 1);
 
     final List<PaymentSummary> payments = paymentQueries.search(new PaymentSearchCriteria(orderId));
-    assertThat(payments).as("orderId=%s の決済記録", orderId).hasSize(1);
+    assertThat(payments).as(PAYMENTS_OF, orderId).hasSize(1);
+    assertThat(payments.getFirst().status()).as("orderId=%s の請求の結果", orderId).isEqualTo("PAID");
     assertThat(payments.getFirst().gatewayPaymentCode())
         .as("orderId=%s の決済代行の識別子", orderId)
         .isEqualTo("ch_" + orderId);
@@ -140,7 +157,7 @@ class PaymentGatewayClientIntegrationTest {
             .willReturn(WireMock.serviceUnavailable()));
 
     fixture.confirmAndAwait(
-        scenario, orderId, "FAILED の出版", state -> "FAILED".equals(state.status()));
+        scenario, orderId, FAILED_PUBLICATION, state -> FAILED.equals(state.status()));
 
     assertFailedOnce(orderId);
     assertThat(circuitBreaker.getMetrics().getNumberOfFailedCalls())
@@ -162,7 +179,7 @@ class PaymentGatewayClientIntegrationTest {
             .willReturn(succeeded(orderId).withFixedDelay(3000)));
 
     fixture.confirmAndAwait(
-        scenario, orderId, "FAILED の出版", state -> "FAILED".equals(state.status()));
+        scenario, orderId, FAILED_PUBLICATION, state -> FAILED.equals(state.status()));
 
     assertFailedOnce(orderId);
   }
@@ -177,10 +194,11 @@ class PaymentGatewayClientIntegrationTest {
             .withHeader(IDEMPOTENCY_KEY, WireMock.equalTo(orderId))
             .willReturn(succeeded(orderId).withFixedDelay(1000)));
 
-    fixture.confirmAndAwait(scenario, orderId, "完了した出版", state -> state.archived() == 1);
+    fixture.confirmAndAwait(
+        scenario, orderId, COMPLETED_PUBLICATION, state -> state.archived() == 1);
 
     assertThat(paymentQueries.search(new PaymentSearchCriteria(orderId)))
-        .as("orderId=%s の決済記録", orderId)
+        .as(PAYMENTS_OF, orderId)
         .hasSize(1);
   }
 
@@ -209,27 +227,125 @@ class PaymentGatewayClientIntegrationTest {
   }
 
   @Test
+  @DisplayName("決済代行が DECLINED を返せば、拒否を決済記録に残し、出版を完了にする")
+  void declinedIsRecordedAndCompletes(final Scenario scenario) {
+    final String orderId = fixture.draftedOrderId();
+    WIREMOCK.stubFor(
+        WireMock.post(WireMock.urlEqualTo(CHARGES))
+            .atPriority(1)
+            .withHeader(IDEMPOTENCY_KEY, WireMock.equalTo(orderId))
+            .willReturn(reply(orderId, "DECLINED")));
+
+    fixture.confirmAndAwait(
+        scenario, orderId, COMPLETED_PUBLICATION, state -> state.archived() == 1);
+
+    assertRecordedOnce(orderId, "DECLINED", "ch_" + orderId);
+  }
+
+  @Test
+  @DisplayName("決済代行が契約の不備の 4xx を返せば、失敗を決済記録に残し、出版を完了にし、circuit breaker は失敗に数えない")
+  void contractErrorIsRecordedAndCompletes(final Scenario scenario) {
+    final String orderId = fixture.draftedOrderId();
+    WIREMOCK.stubFor(
+        WireMock.post(WireMock.urlEqualTo(CHARGES))
+            .atPriority(1)
+            .withHeader(IDEMPOTENCY_KEY, WireMock.equalTo(orderId))
+            .willReturn(WireMock.badRequest()));
+
+    fixture.confirmAndAwait(
+        scenario, orderId, COMPLETED_PUBLICATION, state -> state.archived() == 1);
+
+    assertRecordedOnce(orderId, FAILED, null);
+    assertThat(circuitBreaker.getMetrics().getNumberOfFailedCalls())
+        .as("orderId=%s の 400 で circuit breaker が数えた失敗", orderId)
+        .isZero();
+  }
+
+  @Test
+  @DisplayName("決済代行が 401 を返せば、決済記録を作らず、出版は FAILED、attempts 1 で残り、circuit breaker は失敗に数えない")
+  void unauthorizedLeavesPublicationFailed(final Scenario scenario) {
+    final String orderId = fixture.draftedOrderId();
+    WIREMOCK.stubFor(
+        WireMock.post(WireMock.urlEqualTo(CHARGES))
+            .atPriority(1)
+            .withHeader(IDEMPOTENCY_KEY, WireMock.equalTo(orderId))
+            .willReturn(WireMock.unauthorized()));
+
+    fixture.confirmAndAwait(
+        scenario, orderId, FAILED_PUBLICATION, state -> FAILED.equals(state.status()));
+
+    assertFailedOnce(orderId);
+    assertThat(circuitBreaker.getMetrics().getNumberOfFailedCalls())
+        .as("orderId=%s の 401 で circuit breaker が数えた失敗", orderId)
+        .isZero();
+  }
+
+  @Test
+  @DisplayName("決済代行が 429 を返せば、決済記録を作らず、出版は FAILED、attempts 1 で残り、circuit breaker は失敗に数える")
+  void tooManyRequestsLeavesPublicationFailed(final Scenario scenario) {
+    final String orderId = fixture.draftedOrderId();
+    WIREMOCK.stubFor(
+        WireMock.post(WireMock.urlEqualTo(CHARGES))
+            .atPriority(1)
+            .withHeader(IDEMPOTENCY_KEY, WireMock.equalTo(orderId))
+            .willReturn(WireMock.status(429)));
+
+    fixture.confirmAndAwait(
+        scenario, orderId, FAILED_PUBLICATION, state -> FAILED.equals(state.status()));
+
+    assertFailedOnce(orderId);
+    assertThat(circuitBreaker.getMetrics().getNumberOfFailedCalls())
+        .as("orderId=%s の 429 で circuit breaker が数えた失敗", orderId)
+        .isEqualTo(1);
+  }
+
+  @Test
   @DisplayName("決済代行が 4xx を返し続けても、circuit breaker は失敗として数えず閉じたままで、再試行もしない")
   void clientErrorsAreNotCountedOrRetried() {
     WIREMOCK.stubFor(
         WireMock.post(WireMock.urlEqualTo(CHARGES))
             .atPriority(1)
             .willReturn(WireMock.badRequest()));
-    final Money amount = new Money(new BigDecimal("1.00"));
+    WIREMOCK.stubFor(
+        WireMock.post(WireMock.urlEqualTo(CHARGES))
+            .atPriority(1)
+            .withRequestBody(WireMock.containing("\"amount\":2.00"))
+            .willReturn(WireMock.forbidden()));
     final OrderId orderId = new OrderId(UUID.randomUUID());
+    final Money badRequestAmount = new Money(new BigDecimal("1.00"));
+    final Money forbiddenAmount = new Money(new BigDecimal("2.00"));
+    final ChargeOutcome failed = ChargeOutcome.failed();
 
     for (int call = 0; call < CALLS_TO_OPEN; call++) {
-      assertThatThrownBy(() -> paymentGateway.charge(orderId, amount))
-          .isInstanceOf(HttpClientErrorException.class);
+      assertThat(paymentGateway.charge(orderId, badRequestAmount))
+          .as("400 の請求の結果")
+          .isEqualTo(failed);
+      assertThatThrownBy(() -> paymentGateway.charge(orderId, forbiddenAmount))
+          .isInstanceOf(HttpClientErrorException.Forbidden.class);
     }
 
     assertThat(circuitBreaker.getState())
-        .as("%d 回の 4xx の後の circuit breaker", CALLS_TO_OPEN)
+        .as("%d 回ずつの 400 と 403 の後の circuit breaker", CALLS_TO_OPEN)
         .isEqualTo(CircuitBreaker.State.CLOSED);
     assertThat(circuitBreaker.getMetrics().getNumberOfFailedCalls())
-        .as("%d 回の 4xx で circuit breaker が数えた失敗", CALLS_TO_OPEN)
+        .as("%d 回ずつの 400 と 403 で circuit breaker が数えた失敗", CALLS_TO_OPEN)
         .isZero();
-    WIREMOCK.verify(CALLS_TO_OPEN, WireMock.postRequestedFor(WireMock.urlEqualTo(CHARGES)));
+    WIREMOCK.verify(2 * CALLS_TO_OPEN, WireMock.postRequestedFor(WireMock.urlEqualTo(CHARGES)));
+  }
+
+  /** 決済記録が 1 件だけで、結果と識別子が期待どおりで、決済代行が 1 回だけ呼ばれたことを確かめる。 */
+  private void assertRecordedOnce(
+      final String orderId, final String status, final @Nullable String gatewayPaymentCode) {
+    final List<PaymentSummary> payments = paymentQueries.search(new PaymentSearchCriteria(orderId));
+    assertThat(payments).as(PAYMENTS_OF, orderId).hasSize(1);
+    assertThat(payments.getFirst().status()).as("orderId=%s の請求の結果", orderId).isEqualTo(status);
+    assertThat(payments.getFirst().gatewayPaymentCode())
+        .as("orderId=%s の決済代行の識別子", orderId)
+        .isEqualTo(gatewayPaymentCode);
+    WIREMOCK.verify(
+        1,
+        WireMock.postRequestedFor(WireMock.urlEqualTo(CHARGES))
+            .withHeader(IDEMPOTENCY_KEY, WireMock.equalTo(orderId)));
   }
 
   /** 決済記録を作らず、出版が attempts 1 で FAILED に残り、決済代行が 1 回だけ呼ばれたことを確かめる。 */
@@ -238,7 +354,7 @@ class PaymentGatewayClientIntegrationTest {
         .as("orderId=%s の FAILED の attempts", orderId)
         .isEqualTo(1);
     assertThat(paymentQueries.search(new PaymentSearchCriteria(orderId)))
-        .as("orderId=%s の決済記録", orderId)
+        .as(PAYMENTS_OF, orderId)
         .isEmpty();
     WIREMOCK.verify(
         1,
@@ -261,9 +377,14 @@ class PaymentGatewayClientIntegrationTest {
 
   /** 注文の成功の応答。 */
   private static ResponseDefinitionBuilder succeeded(final String orderId) {
+    return reply(orderId, "SUCCEEDED");
+  }
+
+  /** 注文の 201 の応答。状態は SUCCEEDED か DECLINED。 */
+  private static ResponseDefinitionBuilder reply(final String orderId, final String status) {
     return WireMock.aResponse()
         .withStatus(201)
         .withHeader("Content-Type", "application/json")
-        .withBody("{\"chargeId\":\"ch_" + orderId + "\",\"status\":\"SUCCEEDED\"}");
+        .withBody("{\"chargeId\":\"ch_" + orderId + "\",\"status\":\"" + status + "\"}");
   }
 }

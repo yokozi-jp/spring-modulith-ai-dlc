@@ -16,10 +16,11 @@ export const ListPaymentsQueryParams = zod.object({
 export const ListPaymentsResponse = zod.object({
   "items": zod.array(zod.object({
   "amount": zod.number().optional().describe('請求した金額'),
-  "gatewayPaymentCode": zod.string().optional().describe('決済代行が採番した決済の識別子'),
-  "orderId": zod.string().optional().describe('決済した注文の ID'),
-  "paidAt": zod.iso.datetime({"offset":true}).optional().describe('決済した時刻'),
-  "paymentId": zod.string().optional().describe('決済記録の ID')
+  "gatewayPaymentCode": zod.string().optional().describe('決済代行が採番した決済の識別子。採番されなかったときは省く'),
+  "orderId": zod.string().optional().describe('請求した注文の ID'),
+  "paidAt": zod.iso.datetime({"offset":true}).optional().describe('決済した時刻。status が PAID のときだけ返す'),
+  "paymentId": zod.string().optional().describe('決済記録の ID'),
+  "status": zod.string().optional().describe('請求の結果のコード値（PAID、DECLINED、FAILED）')
 }).describe('決済記録の一覧の 1 行を返す API の本文。')).optional().describe('決済記録の一覧の行。1 注文につき 0 件か 1 件')
 }).describe('決済記録の一覧を items で包んで返す API の本文。')
 

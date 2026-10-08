@@ -3,6 +3,7 @@ package com.example.demo.payment.infrastructure.client;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import com.example.demo.payment.domain.model.ChargeOutcome;
 import com.example.demo.payment.domain.model.GatewayPaymentCode;
 import com.example.demo.payment.domain.model.Money;
 import com.example.demo.payment.domain.model.OrderId;
@@ -24,17 +25,21 @@ import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.boot.autoconfigure.AutoConfigurations;
 import org.springframework.boot.autoconfigure.context.PropertyPlaceholderAutoConfiguration;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 import org.springframework.core.NestedExceptionUtils;
 import org.springframework.core.env.StandardEnvironment;
+import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.HttpServerErrorException;
 import org.springframework.web.client.ResourceAccessException;
 
 /** 決済代行の Client の HTTP の呼び出しと、URL の設定の検査を検証する。 */
 // 起動の確認は ApplicationContextRunner の run の中の AssertJ で書く。
-@SuppressWarnings("PMD.UnitTestShouldIncludeAssert")
+// 成功、拒否、4xx の分類、5xx、タイムアウト、URL の設定を一つの HttpServer の文脈で確かめるため、メソッドが多い。
+@SuppressWarnings({"PMD.UnitTestShouldIncludeAssert", "PMD.TooManyMethods"})
 class PaymentGatewayClientTest {
 
   /** 請求する注文。 */
@@ -93,11 +98,11 @@ class PaymentGatewayClientTest {
               reply(exchange, 201, SUCCEEDED_REPLY);
             });
 
-    final GatewayPaymentCode code = client.charge(ORDER_ID, AMOUNT);
+    final ChargeOutcome outcome = client.charge(ORDER_ID, AMOUNT);
 
-    assertThat(code)
-        .as("orderId=%s の識別子", ORDER_ID.value())
-        .isEqualTo(new GatewayPaymentCode("ch_1"));
+    assertThat(outcome)
+        .as("orderId=%s の請求の結果", ORDER_ID.value())
+        .isEqualTo(ChargeOutcome.paid(new GatewayPaymentCode("ch_1")));
     assertThat(method).as("orderId=%s の請求のメソッド", ORDER_ID.value()).hasValue("POST");
     assertThat(path).as("orderId=%s の請求のパス", ORDER_ID.value()).hasValue("/v1/charges");
     assertThat(idempotencyKey)
@@ -121,15 +126,47 @@ class PaymentGatewayClientTest {
   }
 
   @Test
-  @DisplayName("状態が SUCCEEDED でなければ、状態を含む IllegalStateException を投げる")
-  void rejectsNotSucceeded() throws IOException {
+  @DisplayName("状態が DECLINED なら、例外を投げずに識別子付きの拒否を返す")
+  void declinedReturnsDeclined() throws IOException {
     final PaymentGatewayClient client =
         start(exchange -> reply(exchange, 201, "{\"chargeId\":\"ch_1\",\"status\":\"DECLINED\"}"));
+
+    assertThat(client.charge(ORDER_ID, AMOUNT))
+        .as("orderId=%s の請求の結果", ORDER_ID.value())
+        .isEqualTo(ChargeOutcome.declined(new GatewayPaymentCode("ch_1")));
+  }
+
+  @Test
+  @DisplayName("状態が SUCCEEDED でも DECLINED でもなければ、状態を含む IllegalStateException を投げる")
+  void rejectsUnknownStatus() throws IOException {
+    final PaymentGatewayClient client =
+        start(exchange -> reply(exchange, 201, "{\"chargeId\":\"ch_1\",\"status\":\"PENDING\"}"));
 
     assertThatThrownBy(() -> client.charge(ORDER_ID, AMOUNT))
         .isInstanceOf(IllegalStateException.class)
         .hasMessage(
-            "payment gateway did not succeed: orderId=" + ORDER_ID.value() + ", status=DECLINED");
+            "payment gateway did not succeed: orderId=" + ORDER_ID.value() + ", status=PENDING");
+  }
+
+  @ParameterizedTest
+  @ValueSource(ints = {400, 404, 409, 422})
+  @DisplayName("401、403、429 以外の 4xx は契約の不備なので、例外を投げずに失敗を返す")
+  void contractErrorReturnsFailed(final int status) throws IOException {
+    final PaymentGatewayClient client = start(exchange -> reply(exchange, status, ""));
+
+    assertThat(client.charge(ORDER_ID, AMOUNT))
+        .as("orderId=%s の %d の請求の結果", ORDER_ID.value(), status)
+        .isEqualTo(ChargeOutcome.failed());
+  }
+
+  @ParameterizedTest
+  @ValueSource(ints = {401, 403, 429})
+  @DisplayName("401、403、429 は再投入で回復できるので、HttpClientErrorException を投げる")
+  void recoverableClientErrorThrows(final int status) throws IOException {
+    final PaymentGatewayClient client = start(exchange -> reply(exchange, status, ""));
+
+    assertThatThrownBy(() -> client.charge(ORDER_ID, AMOUNT))
+        .isInstanceOf(HttpClientErrorException.class);
   }
 
   @Test

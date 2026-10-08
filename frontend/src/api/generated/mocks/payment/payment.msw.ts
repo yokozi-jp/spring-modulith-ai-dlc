@@ -19,7 +19,7 @@ import type {
 } from '../../models';
 
 
-export const getListPaymentsResponseMock = (overrideResponse: Partial<Extract<PaymentSummaryListResponse, object>> = {}): PaymentSummaryListResponse => ({items: Array.from({ length: faker.number.int({min: 1, max: 10}) }, (_, i) => i + 1).map(() => ({amount: 240, gatewayPaymentCode: "ch_5f0c2a8e-7d1b-4c3a-9e6f-1a2b3c4d5e6f", orderId: "5f0c2a8e-7d1b-4c3a-9e6f-1a2b3c4d5e6f", paidAt: "2026-10-06T01:02:03.123456Z", paymentId: "7c1e4b2a-3d5f-4a6b-8c9d-0e1f2a3b4c5d"})), ...overrideResponse})
+export const getListPaymentsResponseMock = (overrideResponse: Partial<Extract<PaymentSummaryListResponse, object>> = {}): PaymentSummaryListResponse => ({items: Array.from({ length: faker.number.int({min: 1, max: 10}) }, (_, i) => i + 1).map(() => ({amount: 240, gatewayPaymentCode: "ch_5f0c2a8e-7d1b-4c3a-9e6f-1a2b3c4d5e6f", orderId: "5f0c2a8e-7d1b-4c3a-9e6f-1a2b3c4d5e6f", paidAt: "2026-10-06T01:02:03.123456Z", paymentId: "7c1e4b2a-3d5f-4a6b-8c9d-0e1f2a3b4c5d", status: "PAID"})), ...overrideResponse})
 
 
 export const getListPaymentsMockHandler = (overrideResponse?: PaymentSummaryListResponse | ((info: Parameters<Parameters<typeof http.get>[1]>[0]) => Promise<PaymentSummaryListResponse> | PaymentSummaryListResponse), options?: RequestHandlerOptions) => {

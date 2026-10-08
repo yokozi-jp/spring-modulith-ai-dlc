@@ -1,7 +1,7 @@
 ---
 type: Convention
 title: クラスの役割：外部システムの Client
-description: infrastructure.client に置き、外部システムのインタフェースを HTTP で実装する Client の定義、置き場所と命名、必須の記述（タイムアウトと名前付きの Resilience4j の instance）、依存、例、テスト、アンチパターン、作成時のチェックリストを定める。外部システムの HTTP API を呼ぶ実装を作るときに読む。
+description: infrastructure.client に置き、外部システムのインタフェースを HTTP で実装する Client の定義、置き場所と命名、必須の記述（タイムアウトと名前付きの Resilience4j の instance）、呼び出しの結果の分類、依存、例、テスト（JDK の HttpServer と WireMock）、アンチパターン、作成時のチェックリストを定める。外部システムの HTTP API を呼ぶ実装を作るときに読む。
 tags: [convention, backend, class-role]
 ---
 
@@ -10,7 +10,9 @@ tags: [convention, backend, class-role]
 `<ExternalSystem>Client` は、`domain.model` の外部システムのインタフェースを HTTP で実装するクラスであり、`infrastructure.client` に package-private で置いて `@Component` を付ける。
 接続先の URL は設定から受け取り、タイムアウトを設定した `RestClient` で呼ぶ。
 名前付きの Resilience4j の instance を、この層のメソッドにだけ付ける。
-役割の決定理由は [ADR-050](../../adr/ADR-050-define-backend-class-roles-and-naming.md) に示す。
+呼び出しの結果は四つに分け、再投入で回復できる失敗だけを例外で投げる。
+本番のコードに外部システムの偽物を置かず、ローカルとテストでは WireMock が外部システムを偽る。
+役割の決定理由は [ADR-050](../../adr/ADR-050-define-backend-class-roles-and-naming.md) に、偽物と結果の分類の決定理由は [ADR-072](../../adr/ADR-072-fake-external-systems-with-wiremock.md) に示す。
 
 ## 定義
 
@@ -20,6 +22,7 @@ URL、JSON の形、タイムアウト、サーキットブレーカー、リト
 
 Client は業務規則を持たない。
 外部システムの応答を Domain の型に変換して返すだけにする。
+本番のコードには実際の HTTP の Client だけを置き、偽物の分岐や mode の設定を持たない。
 
 Client はユースケースの進行役でもない。
 いつ呼ぶかは、インタフェースを通して呼ぶ [CommandHandler](command-handler.md) が決める。
@@ -36,6 +39,8 @@ Client はユースケースの進行役でもない。
 
 - `@Component` を付けた package-private の `class` にし、`final` を付けず、外部システムのインタフェースを実装する。
 - コンストラクタは一つにし、`@Value("${payment-gateway.base-url}") final String baseUrl` を受け取る。
+  `application.yaml` の `base-url` は既定値のない環境変数（`${PAYMENT_GATEWAY_BASE_URL}`）にし、未設定なら起動に失敗させる。
+  WireMock の URL は env の例と compose ファイルにだけ書く。
 - コンストラクタで、`JdkClientHttpRequestFactory` に接続のタイムアウト 1 秒と呼び出しのタイムアウト 2 秒を設定し、`RestClient` を作る。
 - 実装するメソッドに `@CircuitBreaker(name = "payment-gateway")` と `@Retry(name = "payment-gateway")` を付ける。
   リトライはこの層だけで行い、CommandHandler や HTTP クライアントで重ねない。
@@ -45,6 +50,7 @@ Client はユースケースの進行役でもない。
 - 冪等性キーを受け取る操作は、キーを外部システムの API が定めるヘッダー（決済システムの例では `Idempotency-Key`）で送る。
 - 外部システムの応答は、Domain の型（`PaymentId`）に変換して返す。
   応答の本文がないときは `IllegalStateException` を投げる。
+- 呼び出しの結果は、次の節の四つに分けて扱う。
 - クラス、定数、フィールド、コンストラクタ、実装するメソッドに Javadoc を書く。
 - `infrastructure.client` のパッケージに `@NullMarked` を宣言する `package-info.java` を置く。
 
@@ -59,20 +65,53 @@ resilience4j:
     instances:
       payment-gateway:
         base-config: default
+        ignore-exception-predicate: com.example.demo.payment.infrastructure.client.IgnoredClientErrorPredicate
   retry:
+    configs:
+      idempotent:
+        retry-exceptions:
+          - org.springframework.web.client.ResourceAccessException
+          - org.springframework.web.client.HttpClientErrorException$TooManyRequests
+          - org.springframework.web.client.HttpServerErrorException$BadGateway
+          - org.springframework.web.client.HttpServerErrorException$ServiceUnavailable
+          - org.springframework.web.client.HttpServerErrorException$GatewayTimeout
     instances:
       payment-gateway:
         base-config: default
 ```
 
+## 呼び出しの結果の分類
+
+Client は、外部システムの呼び出しの結果を次の四つに分ける。
+再投入で回復できる結果だけを例外にしてイベント出版の `FAILED` に残し、回復しない結果は呼び出し元が業務の状態に記録する。
+回復不能なエラーの扱いは[非同期処理の失敗時の再試行と回復](../../integration/async-failure-recovery.md)に従う。
+
+| 分類           | 例                                          | Client                     | circuit breaker | イベント出版 |
+| -------------- | ------------------------------------------- | -------------------------- | --------------- | ------------ |
+| 一時障害       | 接続の失敗、タイムアウト、429、5xx          | 例外を投げる               | 失敗に数える    | `FAILED`     |
+| 業務上の拒否   | カードの拒否（`201` の `status: DECLINED`） | 拒否を表す結果を返す       | 数えない        | `COMPLETED`  |
+| 資格情報の不備 | 401、403                                    | 例外を投げる               | 数えない        | `FAILED`     |
+| 契約の不備     | 401、403、429 以外の 4xx                    | 失敗を表す結果を返す       | 数えない        | `COMPLETED`  |
+
+- 結果は `domain.model` の型（`ChargeOutcome` と、`PAID`、`DECLINED`、`FAILED` の `PaymentStatus`）で返す。
+  CommandHandler は結果を集約に記録して正常に返し、リスナーを正常終了させる。
+- 契約の不備は、Client が `HttpClientErrorException` を捕まえて失敗の結果に変え、状態のコードを WARN のログに残す。
+- circuit breaker の instance は、429 以外の `HttpClientErrorException` を無視する述語を `ignore-exception-predicate` に指定する。
+  Resilience4j は述語を引数のないコンストラクタで作るため、述語のクラスは `public` にする。
+- `ignore-exceptions` に `HttpClientErrorException` を書かない。
+  一時障害の 429 まで無視し、型の列挙では 429 だけを失敗に数えられないためである。
+- `idempotent` の retry は、`retry-exceptions` に [ADR-019](../../adr/ADR-019-define-resilience-and-capacity-guardrails.md) の一時障害（接続の失敗とタイムアウト、429、502、503、504）だけを書き、継承する instance はこれを使う。
+  `default`（試行 1 回）を継承する instance は、どの結果も再試行しない。
+
 ## 依存してよい型、してはいけない型
 
-- **依存してよい型**：`java..` の標準型、`org.jspecify..`、同じモジュールの `domain.model` の外部システムのインタフェースと値オブジェクト、Spring の `RestClient`、`JdkClientHttpRequestFactory`、`@Component`、`@Value`、Resilience4j の `@CircuitBreaker` と `@Retry`。
+- **依存してよい型**：`java..` の標準型、`org.jspecify..`、同じモジュールの `domain.model` の外部システムのインタフェースと値オブジェクト、Spring の `RestClient`、`JdkClientHttpRequestFactory`、`HttpClientErrorException`、`HttpStatus`、`@Component`、`@Value`、Resilience4j の `@CircuitBreaker` と `@Retry`、Lombok の `@Slf4j`。
 - **依存してはいけない型**：`application`、`domain.service`、`presentation.web`、`infrastructure.persistence` の型、jOOQ の API と生成型、モジュールルートの型、他モジュールの型、`@Service`、`@Transactional`。
 
 ## 最小の例と典型的な例
 
 最小の例は、決済システムに代金を請求する `PaymentGatewayClient` である。
+成功の応答だけを扱い、結果の分類は省いている。
 
 ```java
 package com.example.demo.ordering.infrastructure.client;
@@ -129,24 +168,49 @@ class PaymentGatewayClient implements PaymentGateway {
 }
 ```
 
-典型的な例は、`ChargeOrderCommandHandler` がインタフェースを通して Client を呼ぶ場面である。
-CommandHandler は `PaymentGateway` に依存し、`PaymentGatewayClient` を知らない。
+典型的な例は、`payment` モジュールの `PaymentGatewayClient` が結果を分類し、`ChargeOrderCommandHandler` がインタフェースを通してその結果を記録する場面である。
+CommandHandler は `PaymentGateway` に依存し、`PaymentGatewayClient` と HTTP の例外を知らない。
 
 ```java
-// com.example.demo.ordering.application.ChargeOrderCommandHandler（抜粋）
-if (order.isPaid()) {
-  return new ChargeOrderResult(order.id().value().toString());
+// com.example.demo.payment.infrastructure.client.PaymentGatewayClient（抜粋）
+private static ChargeOutcome contractError(
+    final String key, final HttpClientErrorException exception) {
+  final int status = exception.getStatusCode().value();
+  if (status == HttpStatus.UNAUTHORIZED.value()
+      || status == HttpStatus.FORBIDDEN.value()
+      || status == HttpStatus.TOO_MANY_REQUESTS.value()) {
+    throw exception;
+  }
+  log.warn(
+      "Payment gateway rejected the charge request as a contract error: orderId={}, status={}",
+      key,
+      status);
+  return ChargeOutcome.failed();
 }
-paymentGateway.charge(order.id(), order.total());
-order.markPaid();
-orderRepository.update(order);
+
+// toOutcome（抜粋）
+if (DECLINED.equals(reply.status())) {
+  return ChargeOutcome.declined(chargeId == null ? null : new GatewayPaymentCode(chargeId));
+}
+```
+
+```java
+// com.example.demo.payment.application.ChargeOrderCommandHandler（抜粋）
+final ChargeOutcome outcome = paymentGateway.charge(orderId, amount);
+final Payment payment = Payment.record(orderId, amount, outcome, Instant.now(clock));
+paymentRepository.add(payment);
 ```
 
 ## 対応するテスト
 
+Client の単体テストは JDK の `HttpServer` で、リトライ、circuit breaker、イベント出版を通す結合テストと E2E は WireMock で書く。
+
+### Client の単体テスト
+
 Spring を起動しない JUnit のテストで、JDK の `com.sun.net.httpserver.HttpServer` を空いているポートで起動し、Client に URL を渡す。
 HTTP の本文と Domain の型の変換を確かめ、応答を遅らせたときにタイムアウトすることも同じ方法で確かめる。
 冪等性キーのヘッダーも同じ方法で確かめる。
+結果の分類（拒否、契約の不備の 4xx、例外を投げる 401、403、429）も同じ方法で確かめる。
 Spring を起動しないため、このテストでは `@CircuitBreaker` と `@Retry` は働かない。
 
 ```java
@@ -188,6 +252,23 @@ class PaymentGatewayClientTest {
 }
 ```
 
+### WireMock の結合テスト
+
+リトライ、circuit breaker、イベント出版の状態は、`@ApplicationModuleTest` の中で Client を WireMock（`org.wiremock:wiremock-standalone`、`testImplementation` だけ）に向けて確かめる。
+例は `PaymentGatewayClientIntegrationTest` である。
+
+- `WireMockServer` を static のフィールドの初期化で起動し、`@AfterAll` で止める。
+  `@RegisterExtension` の `WireMockExtension` は、Spring のコンテキストが `@DynamicPropertySource` で URL を読む時点でまだサーバを起動していないため使わない。
+- `@DynamicPropertySource` で `payment-gateway.base-url` を WireMock の URL に向ける。
+- `http2PlainDisabled(true)` を指定する。
+  JDK の `HttpClient` は平文の HTTP で HTTP/2 への upgrade（h2c）を試み、WireMock（Jetty）では本文付きの POST が切れるためである。
+- `usingFilesUnderDirectory("../docker/wiremock")` で、compose の WireMock と同じ成功のスタブを読む。
+  Gradle の `test` タスクは `docker/wiremock` を入力（`inputs.dir`）に宣言しているため、スタブを変えるとテストがやり直される。
+- 失敗と拒否は、冪等性キーに一致する注文ごとのスタブを `atPriority(1)` で共有のスタブより優先して足す。
+  `@BeforeEach` で `resetToDefaultMappings()` と `resetRequests()` を呼び、circuit breaker を `reset()` する。
+- 四つの分類ごとに、公開の境界（注文の確定から始まるイベント）から出版の状態（`COMPLETED` か `FAILED`）、決済記録、circuit breaker の失敗の件数を確かめる。
+- テストの依存の jar の版は、compose の WireMock のイメージのタグと同じにする。
+
 ## アンチパターン
 
 - CommandHandler や Domain Service で `RestClient` を直接使う。
@@ -199,7 +280,11 @@ class PaymentGatewayClientTest {
 - 冪等性キーを外部システムへ送らない。
   ロールバックやイベント出版の再投入で `charge` をもう一度呼ぶと、二重に請求する。
 - 外部 API の JSON の record を `domain.model` や `application` に置く、またはインタフェースの戻り値にする。
-- URL をコードに直接書く。
+- URL をコードに直接書く、または `base-url` に既定値を置く。
+- 本番のコードに外部システムの偽物を置き、mode の設定で成功と失敗を切り替える。
+- `ignore-exceptions` に `HttpClientErrorException` を書き、一時障害の 429 まで circuit breaker の失敗に数えない。
+- 業務上の拒否や契約の不備を例外にして、再投入しても回復しない出版を `FAILED` に積む。
+- Spring の結合テストで `WireMockExtension` を `@RegisterExtension` で登録し、`@DynamicPropertySource` から URL を読む。
 - `@Service` を付ける、または名前を `Adapter` で終える。
 - `application` の CommandHandler や QueryService、`domain.service`、モジュールルートの型を使う。
   Presentation のほかに処理の入口ができ、トランザクション境界が Application の外にも広がる。
@@ -217,8 +302,11 @@ class PaymentGatewayClientTest {
 - [ ] `@Component` を付けた package-private の class にし、URL を `@Value` で受け取る。［自分で点検］
 - [ ] 接続 1 秒、呼び出し 2 秒のタイムアウトを設定する。［自分で点検］
 - [ ] 名前付きの instance の `@CircuitBreaker` と `@Retry` をメソッドに付け、`application.yaml` に設定を書く。［自分で点検］
+- [ ] circuit breaker の instance に、429 以外の 4xx を無視する `ignore-exception-predicate` を指定する。［結合テストで検査：PaymentGatewayClientIntegrationTest］
+- [ ] 業務上の拒否と契約の不備を結果で返し、一時障害と資格情報の不備を例外で投げる。［結合テストで検査：PaymentGatewayClientIntegrationTest］
 - [ ] 外部システムの応答を Domain の型に変換して返す。［自分で点検］
 - [ ] クラス、定数、フィールド、コンストラクタ、実装するメソッドに Javadoc を書く。［自分で点検］
 - [ ] 冪等性キーを受け取る操作は、キーをヘッダーで送る。［自分で点検］
 - [ ] JDK の `HttpServer` で、HTTP の呼び出しと冪等性キーのヘッダーを確かめるテストを書く。［自分で点検］
+- [ ] WireMock の結合テストで、リトライ、circuit breaker、イベント出版の状態を確かめる。［自分で点検］
 - [ ] `infrastructure.client` のパッケージに `@NullMarked` の `package-info.java` を置く。［Error Prone で検査：RequireExplicitNullMarking］

@@ -52,6 +52,23 @@ test.describe("決済代行の WireMock のスタブと管理 API の補助（ba
     expect(await chargeStatus(request, failing), `取り除いた後の orderId=${failing}`).toBe(201);
   });
 
+  test("管理 API で足した拒否は、その注文の請求だけに 201 の DECLINED を返す", async ({
+    request,
+  }) => {
+    const declined = crypto.randomUUID();
+    const other = crypto.randomUUID();
+    const restore = await failChargesFor(request, declined, { kind: "declined" });
+    try {
+      const response = await charge(request, declined);
+
+      expect(response.status(), `orderId=${declined} の請求`).toBe(201);
+      expect(await response.json()).toEqual({ chargeId: `ch_${declined}`, status: "DECLINED" });
+      expect(await chargeStatus(request, other), `orderId=${other} の請求`).toBe(201);
+    } finally {
+      await restore();
+    }
+  });
+
   test("管理 API で足した遅延は、backend の呼び出しのタイムアウト 2 秒より長く応答を遅らせる", async ({
     request,
   }) => {

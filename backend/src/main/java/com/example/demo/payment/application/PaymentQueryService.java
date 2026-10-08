@@ -3,6 +3,7 @@ package com.example.demo.payment.application;
 import com.example.demo.payment.PaymentQueries;
 import com.example.demo.payment.PaymentSearchCriteria;
 import com.example.demo.payment.PaymentSummary;
+import com.example.demo.payment.domain.model.GatewayPaymentCode;
 import com.example.demo.payment.domain.model.OrderId;
 import com.example.demo.payment.domain.model.Payment;
 import com.example.demo.payment.domain.model.PaymentRepository;
@@ -34,11 +35,13 @@ class PaymentQueryService implements PaymentQueries {
   }
 
   private static PaymentSummary toSummary(final Payment payment) {
+    final GatewayPaymentCode code = payment.gatewayPaymentCode();
     return new PaymentSummary(
         payment.id().value().toString(),
         payment.orderId().value().toString(),
         payment.amount().amount(),
-        payment.gatewayPaymentCode().value(),
-        payment.paidAt());
+        payment.status().name(),
+        code == null ? null : code.value(),
+        payment.recordedAt());
   }
 }

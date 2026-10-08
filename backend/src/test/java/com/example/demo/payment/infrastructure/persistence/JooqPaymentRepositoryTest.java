@@ -3,11 +3,13 @@ package com.example.demo.payment.infrastructure.persistence;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import com.example.demo.payment.domain.model.ChargeOutcome;
 import com.example.demo.payment.domain.model.GatewayPaymentCode;
 import com.example.demo.payment.domain.model.Money;
 import com.example.demo.payment.domain.model.OrderId;
 import com.example.demo.payment.domain.model.Payment;
 import com.example.demo.payment.domain.model.PaymentRepository;
+import com.example.demo.payment.domain.model.PaymentStatus;
 import com.example.demo.shared.concurrency.ConflictException;
 import com.example.demo.shared.infrastructure.persistence.CommonColumns;
 import com.example.demo.shared.infrastructure.persistence.TableWriter;
@@ -25,8 +27,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 @DatabaseTest
 class JooqPaymentRepositoryTest {
 
-  /** 決済した時刻。マイクロ秒の桁まで往復することを確かめる。 */
-  private static final Instant PAID_AT = Instant.parse("2026-10-06T01:02:03.123456Z");
+  /** 請求の結果を記録した時刻。マイクロ秒の桁まで往復することを確かめる。 */
+  private static final Instant RECORDED_AT = Instant.parse("2026-10-06T01:02:03.123456Z");
 
   /** 請求した金額。 */
   private static final String AMOUNT = "240.00";
@@ -49,10 +51,39 @@ class JooqPaymentRepositoryTest {
     assertThat(found.id()).isEqualTo(payment.id());
     assertThat(found.orderId()).isEqualTo(orderId);
     assertThat(found.amount().amount()).isEqualByComparingTo(new BigDecimal(AMOUNT));
+    assertThat(found.status()).isEqualTo(PaymentStatus.PAID);
     assertThat(found.gatewayPaymentCode()).isEqualTo(payment.gatewayPaymentCode());
-    assertThat(found.paidAt()).isEqualTo(PAID_AT);
+    assertThat(found.recordedAt()).isEqualTo(RECORDED_AT);
     assertThat(found.lockNo()).isEqualTo(1L);
     assertThat(repository().findByOrderId(new OrderId(UUID.randomUUID()))).isEmpty();
+  }
+
+  @Test
+  @DisplayName("識別子のない契約の不備の失敗と、識別子付きの拒否を、結果ごと読み戻せる")
+  void savesFailedAndDeclined() {
+    final OrderId failedOrder = new OrderId(UUID.randomUUID());
+    final OrderId declinedOrder = new OrderId(UUID.randomUUID());
+    final GatewayPaymentCode declinedCode = new GatewayPaymentCode("ch_" + declinedOrder.value());
+    final PaymentRepository repository = repository();
+    TestCommonColumns.runAs(
+        () -> repository.add(payment(failedOrder, AMOUNT, ChargeOutcome.failed())));
+    TestCommonColumns.runAs(
+        () -> repository.add(payment(declinedOrder, AMOUNT, ChargeOutcome.declined(declinedCode))));
+
+    assertThat(repository.findByOrderId(failedOrder))
+        .as("orderId=%s の契約の不備の決済記録", failedOrder.value())
+        .hasValueSatisfying(
+            found -> {
+              assertThat(found.status()).isEqualTo(PaymentStatus.FAILED);
+              assertThat(found.gatewayPaymentCode()).isNull();
+            });
+    assertThat(repository.findByOrderId(declinedOrder))
+        .as("orderId=%s の拒否の決済記録", declinedOrder.value())
+        .hasValueSatisfying(
+            found -> {
+              assertThat(found.status()).isEqualTo(PaymentStatus.DECLINED);
+              assertThat(found.gatewayPaymentCode()).isEqualTo(declinedCode);
+            });
   }
 
   @Test
@@ -73,15 +104,17 @@ class JooqPaymentRepositoryTest {
   }
 
   private PaymentRepository repository() {
-    final CommonColumns commonColumns = TestCommonColumns.at(PAID_AT);
+    final CommonColumns commonColumns = TestCommonColumns.at(RECORDED_AT);
     return new JooqPaymentRepository(dsl, commonColumns, new TableWriter(dsl, commonColumns));
   }
 
   private static Payment payment(final OrderId orderId, final String amount) {
-    return Payment.record(
-        orderId,
-        new Money(new BigDecimal(amount)),
-        new GatewayPaymentCode("test-" + orderId.value()),
-        PAID_AT);
+    return payment(
+        orderId, amount, ChargeOutcome.paid(new GatewayPaymentCode("test-" + orderId.value())));
+  }
+
+  private static Payment payment(
+      final OrderId orderId, final String amount, final ChargeOutcome outcome) {
+    return Payment.record(orderId, new Money(new BigDecimal(amount)), outcome, RECORDED_AT);
   }
 }

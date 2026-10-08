@@ -64,6 +64,9 @@ Spring Modulith 2.1.1 のイベント出版は、次の状態を持つ（[Spring
 - 回復不能と判定したエラーは、ステータス管理テーブルを FAILED にして失敗の内容を記録し、リスナーを正常終了させて再投入の対象から外す（[非同期処理のステータス管理](async-job-status.md)）。
   このときイベント出版は `COMPLETED` になり、ステータス管理テーブルの FAILED は出版の `FAILED` とは別の値である。
 - 予期しない例外はリスナーから送出し、イベント出版を `FAILED` で残す。
+- 外部システムの呼び出しの結果は、一時障害、業務上の拒否、資格情報の不備、契約の不備に分ける（[ADR-072](../adr/ADR-072-fake-external-systems-with-wiremock.md)）。
+  再投入で回復できる一時障害と資格情報の不備だけを例外にして出版を `FAILED` に残し、業務上の拒否と契約の不備は業務の状態に記録してリスナーを正常終了させる。
+  分類の詳細は[外部システムの Client](../backend/class-roles/external-client.md)に従う。
 
 本番で運用者が再投入する入口（コマンド、API、ジョブ）と定期の再投入は [issue #108](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/108) で決め、main にはまだない。
 `completion-mode: archive` で完了した出版を移す archive の表の保存期間と消し方も決めていない（issue #108）。

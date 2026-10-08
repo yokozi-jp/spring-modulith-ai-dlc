@@ -2,7 +2,7 @@ openapi: 3.1.0
 info:
   description: Demo アプリケーションの HTTP API
   title: Demo API
-  version: 0.4.0
+  version: 0.5.0
 servers:
 - description: 現在のオリジン
   url: /
@@ -529,21 +529,25 @@ components:
           example: 240.0
         gatewayPaymentCode:
           type: string
-          description: 決済代行が採番した決済の識別子
+          description: 決済代行が採番した決済の識別子。採番されなかったときは省く
           example: ch_5f0c2a8e-7d1b-4c3a-9e6f-1a2b3c4d5e6f
         orderId:
           type: string
-          description: 決済した注文の ID
+          description: 請求した注文の ID
           example: 5f0c2a8e-7d1b-4c3a-9e6f-1a2b3c4d5e6f
         paidAt:
           type: string
           format: date-time
-          description: 決済した時刻
+          description: 決済した時刻。status が PAID のときだけ返す
           example: 2026-10-06T01:02:03.123456Z
         paymentId:
           type: string
           description: 決済記録の ID
           example: 7c1e4b2a-3d5f-4a6b-8c9d-0e1f2a3b4c5d
+        status:
+          type: string
+          description: 請求の結果のコード値（PAID、DECLINED、FAILED）
+          example: PAID
     ProblemDetail:
       type: object
       description: RFC 9457 の Problem Details

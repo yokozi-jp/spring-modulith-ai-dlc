@@ -1,0 +1,46 @@
+databaseChangeLog:
+  - changeSet:
+      id: 008-add-payment-status
+      author: system
+      preConditions:
+        - dbms:
+            type: postgresql
+      changes:
+        # 請求の結果（PaymentStatus の PAID、DECLINED、FAILED）。決済代行の拒否と契約の不備も記録する（ADR-072）。
+        - addColumn:
+            tableName: t_payment
+            schemaName: payment
+            columns:
+              - column:
+                  name: payment_status_typ
+                  type: varchar(10)
+                  defaultValue: ""
+                  constraints:
+                    nullable: false
+        # 008 より前の決済記録は、請求を受け付けた結果だけである。
+        - update:
+            tableName: t_payment
+            schemaName: payment
+            columns:
+              - column:
+                  name: payment_status_typ
+                  value: PAID
+            where: payment_status_typ = ''
+        # 拒否と失敗の記録にも入るため、決済した時刻から請求の結果を記録した時刻に改める。
+        - renameColumn:
+            tableName: t_payment
+            schemaName: payment
+            oldColumnName: paid_at
+            newColumnName: recorded_at
+            columnDataType: timestamptz
+      rollback:
+        - renameColumn:
+            tableName: t_payment
+            schemaName: payment
+            oldColumnName: recorded_at
+            newColumnName: paid_at
+            columnDataType: timestamptz
+        - dropColumn:
+            tableName: t_payment
+            schemaName: payment
+            columnName: payment_status_typ

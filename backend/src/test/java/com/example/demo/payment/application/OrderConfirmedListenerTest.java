@@ -9,6 +9,7 @@ import com.example.demo.ordering.application.CancelOrderCommandHandler;
 import com.example.demo.payment.PaymentQueries;
 import com.example.demo.payment.PaymentSearchCriteria;
 import com.example.demo.payment.PaymentSummary;
+import com.example.demo.payment.domain.model.ChargeOutcome;
 import com.example.demo.payment.domain.model.GatewayPaymentCode;
 import com.example.demo.payment.domain.model.Money;
 import com.example.demo.payment.domain.model.OrderId;
@@ -142,7 +143,8 @@ class OrderConfirmedListenerTest {
     assertThat(payments).as("orderId=%s の決済記録", orderId).hasSize(1);
     assertThat(payments.getFirst().orderId()).isEqualTo(orderId);
     assertThat(payments.getFirst().amount()).isEqualByComparingTo(new BigDecimal("240.00"));
-    assertThat(payments.getFirst().paidAt()).isEqualTo(NOW);
+    assertThat(payments.getFirst().status()).isEqualTo("PAID");
+    assertThat(payments.getFirst().recordedAt()).isEqualTo(NOW);
     assertThat(gateway.chargedOrders())
         .as("orderId=%s の請求", orderId)
         .containsExactly(orderId(orderId));
@@ -357,7 +359,7 @@ class OrderConfirmedListenerTest {
     @Override
     // 門で待つ間に割り込まれたら、割り込みの状態を戻して失敗させる。
     @SuppressWarnings("PMD.DoNotUseThreads")
-    public GatewayPaymentCode charge(final OrderId orderId, final Money amount) {
+    public ChargeOutcome charge(final OrderId orderId, final Money amount) {
       final @Nullable Span span = tracer.currentSpan();
       traceIds.add(span == null ? "" : span.context().traceId());
       final @Nullable CountDownLatch latch = gate.get();
@@ -377,7 +379,7 @@ class OrderConfirmedListenerTest {
             "test gateway is configured to fail: orderId=" + orderId.value());
       }
       charged.add(orderId);
-      return new GatewayPaymentCode("test-" + orderId.value());
+      return ChargeOutcome.paid(new GatewayPaymentCode("test-" + orderId.value()));
     }
 
     /* package */ void reset() {

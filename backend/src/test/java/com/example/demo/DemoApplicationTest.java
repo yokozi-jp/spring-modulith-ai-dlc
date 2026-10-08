@@ -31,6 +31,7 @@ import java.util.Objects;
 import java.util.UUID;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeoutException;
+import java.util.function.Predicate;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -39,11 +40,15 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.ApplicationContext;
 import org.springframework.context.annotation.Import;
 import org.springframework.core.task.AsyncTaskExecutor;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.security.oauth2.client.web.OAuth2AuthorizationRequestResolver;
 import org.springframework.security.oauth2.core.endpoint.OAuth2AuthorizationRequest;
 import org.springframework.security.oauth2.core.endpoint.PkceParameterNames;
+import org.springframework.web.client.HttpClientErrorException;
+import org.springframework.web.client.HttpServerErrorException;
 
 /** アプリケーション起動時の日時、DB、耐障害性、OIDC 配線を検証する統合テスト。 */
 // 起動時の配線を設定ごとに一つのテストで検証するため、メソッドの数と結合する型の数の上限を外す。
@@ -164,6 +169,15 @@ class DemoApplicationTest {
     assertEquals(3, idempotentConfig.getMaxAttempts(), "冪等操作の最大試行回数が三回であること");
     assertEquals(200L, firstRetryDelay, "冪等操作の初回 retry 待機が 200 ミリ秒であること");
     assertEquals(400L, secondRetryDelay, "冪等操作の retry 待機が倍率 2 で増えること");
+    final Predicate<Throwable> retryable = idempotentConfig.getExceptionPredicate();
+    assertEquals(
+        Map.of(429, true, 503, true, 500, false, 400, false),
+        Map.of(
+            429, retryable.test(httpError(HttpStatus.TOO_MANY_REQUESTS)),
+            503, retryable.test(httpError(HttpStatus.SERVICE_UNAVAILABLE)),
+            500, retryable.test(httpError(HttpStatus.INTERNAL_SERVER_ERROR)),
+            400, retryable.test(httpError(HttpStatus.BAD_REQUEST))),
+        "冪等操作が ADR-019 の一時障害の 429 と 503 だけを再試行し、500 と 400 を再試行しないこと");
   }
 
   @Test
@@ -289,5 +303,12 @@ class DemoApplicationTest {
     assertNotNull(
         authorizationRequest.getAttributes().get(PkceParameterNames.CODE_VERIFIER),
         "PKCE の code_verifier が保持されること");
+  }
+
+  /** 状態のコードに合う RestClient の HTTP の例外を作る。 */
+  private static RuntimeException httpError(final HttpStatus status) {
+    return status.is4xxClientError()
+        ? HttpClientErrorException.create(status, "", HttpHeaders.EMPTY, new byte[0], null)
+        : HttpServerErrorException.create(status, "", HttpHeaders.EMPTY, new byte[0], null);
   }
 }

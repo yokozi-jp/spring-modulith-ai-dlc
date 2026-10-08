@@ -1,5 +1,6 @@
 package com.example.demo.payment.infrastructure.persistence;
 
+import com.example.demo.payment.domain.model.ChargeOutcome;
 import com.example.demo.payment.domain.model.GatewayPaymentCode;
 import com.example.demo.payment.domain.model.Money;
 import com.example.demo.payment.domain.model.OrderId;
@@ -22,7 +23,7 @@ public final class PaymentSeeds {
   private PaymentSeeds() {}
 
   /**
-   * 決済記録を入れる。
+   * 請求を受け付けた決済記録を入れる。
    *
    * <p>{@code gateway_payment_code} は WireMock のスタブ（{@code
    * docker/wiremock/mappings/payment-gateway-charge.json}）が返す {@code chargeId} と同じ {@code ch_<注文
@@ -39,7 +40,7 @@ public final class PaymentSeeds {
             new PaymentId(paymentId),
             new OrderId(orderId),
             new Money(amount),
-            new GatewayPaymentCode("ch_" + orderId),
+            ChargeOutcome.paid(new GatewayPaymentCode("ch_" + orderId)),
             paidAt,
             1L);
     final CommonColumns commonColumns = TestCommonColumns.at(paidAt);

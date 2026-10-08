@@ -201,7 +201,9 @@ describe("order detail page payment status", () => {
 
   it("決済記録があれば、決済済みと金額と決済した時刻を出し、time に paidAt を入れる", async () => {
     serveDetail(draftOrder({ status: "CONFIRMED" }));
-    server.use(getListPaymentsMockHandler({ items: [{ orderId, amount: 240, paidAt }] }));
+    server.use(
+      getListPaymentsMockHandler({ items: [{ orderId, amount: 240, status: "PAID", paidAt }] }),
+    );
 
     await renderRoute(detailPath);
 
@@ -230,6 +232,19 @@ describe("order detail page payment status", () => {
       "（なし）",
     );
     expect(region.querySelector("time")).toBeNull();
+  });
+
+  it.each([
+    ["DECLINED", "決済代行が決済を拒否しました。"],
+    ["FAILED", "決済に失敗しました。再投入では回復しないため、管理者に連絡してください。"],
+  ])("決済記録が %s なら、その結果を出し、決済した時刻を出さない", async (status, message) => {
+    serveDetail(draftOrder({ status: "CONFIRMED" }));
+    server.use(getListPaymentsMockHandler({ items: [{ orderId, amount: 240, status }] }));
+
+    await renderRoute(detailPath);
+
+    const region = await expectPaymentStatus(message);
+    expect(within(region).queryByText("決済した時刻")).toBeNull();
   });
 
   it("確定済みで決済記録がなければ、まだ受け付けていないことを出し、決済した時刻を出さない", async () => {
