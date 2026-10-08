@@ -9,6 +9,8 @@ exporters:
     path: /out/frontend.json
   file/check_frontend_traces:
     path: /out/frontend-traces.json
+  file/check_frontend_csp:
+    path: /out/frontend-csp.json
 
 service:
   pipelines:
@@ -16,6 +18,8 @@ service:
       exporters: [file/check]
     logs/frontend:
       exporters: [file/check_frontend]
+    logs/frontend_csp:
+      exporters: [file/check_frontend_csp]
     traces:
       exporters: [file/check]
     traces/frontend:

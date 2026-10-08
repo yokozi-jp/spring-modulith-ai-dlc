@@ -1,10 +1,83 @@
-// oxlint-disable-next-line import/no-nodejs-modules -- 設定が読む version.txt を、テストでも同じ場所から読んで比べる。
+// oxlint-disable max-lines -- Vite の設定の契約（port、proxy、CSP、テレメトリ）を 1 つの設定ファイルの test に集めるため、行数で分割しない。
+// oxlint-disable-next-line import/no-nodejs-modules -- Vite の proxy の hop を通すため、listen と応答を event で待つ。
+import { once } from "node:events";
+// oxlint-disable-next-line import/no-nodejs-modules -- 設定が読む version.txt と ZAP の設定を、テストでも同じ場所から読んで比べる。
 import { readFileSync } from "node:fs";
+// oxlint-disable-next-line import/no-nodejs-modules -- Vite の proxy の hop を通すため、偽の受け口と request を node:http で作る（fetch は lint で禁止）。
+import { createServer as createHttpServer, request } from "node:http";
+// oxlint-disable-next-line import/no-nodejs-modules -- 偽の受け口が受けた header の型。
+import type { IncomingHttpHeaders } from "node:http";
+// oxlint-disable-next-line import/no-nodejs-modules -- listen した server のポートを型で取り出す。
+import type { AddressInfo } from "node:net";
 
+import { http, passthrough } from "msw";
 import { createServer, resolveConfig } from "vite-plus";
 import { afterEach, describe, expect, it, vi } from "vite-plus/test";
 
+import { server as mswServer } from "./src/testing/msw";
+
 const proxyPath = "^/(api|oauth2|login|logout|error|actuator|v3/api-docs|swagger-ui)(/|$)";
+
+const cspReportingEndpoints = 'csp-endpoint="/csp-report"';
+
+const lastDirective = (contentSecurityPolicy: unknown) =>
+  String(contentSecurityPolicy).split(";").at(-1)?.trim();
+
+const credentialHeaders = new Set(["cookie", "authorization", "proxy-authorization"]);
+
+const tcpAddressOf = (address: AddressInfo | string | null | undefined) => {
+  if (address === null || address === undefined || typeof address === "string") {
+    throw new TypeError("Server is not listening on a TCP port");
+  }
+  return address;
+};
+
+// 偽の Collector。受けた request の path と header を記録して 200 を返し、Vite の転送先をこの port にする。
+// proxy の転送先は http://localhost:<port> なので、同じ名前で解決した address で待ち受ける。
+const startCollector = async () => {
+  const received: { path?: string; headers?: IncomingHttpHeaders } = {};
+  const collector = createHttpServer((req, res) => {
+    received.path = req.url;
+    received.headers = req.headers;
+    res.end();
+  });
+  collector.listen(0, "localhost");
+  await once(collector, "listening");
+  const port = String(tcpAddressOf(collector.address()).port);
+  vi.stubEnv("OTEL_CSP_REPORT_HTTP_PORT", port);
+  vi.stubEnv("OTEL_FARO_HTTP_PORT", port);
+  vi.stubEnv("FRONTEND_OTEL_ENABLED", "false");
+  // 共有の MSW は未登録の request を失敗させるので、この hop だけは実際の通信に通す。
+  mswServer.use(http.all("*", () => passthrough()));
+  return { collector, received };
+};
+
+// ブラウザの Reporting API と同じく、Cookie などの資格情報を付けて送る。
+// Vite は localhost で待ち受け、OS によって ::1 と 127.0.0.1 のどちらかに束ねるので、実際に束ねた address へ送る。
+const postWithCredentials = ({ address, port }: AddressInfo, path: string) =>
+  // oxlint-disable-next-line promise/avoid-new -- events.once は応答を any で返すので、型の付いた callback を Promise で待つ。
+  new Promise<number | undefined>((resolve, reject) => {
+    const req = request(
+      {
+        host: address,
+        port,
+        path,
+        method: "POST",
+        headers: {
+          Cookie: "APP_SESSION=secret",
+          Authorization: "Bearer secret",
+          "Proxy-Authorization": "Basic secret",
+          "Content-Type": "application/reports+json",
+        },
+      },
+      (response) => {
+        response.resume();
+        resolve(response.statusCode);
+      },
+    );
+    req.on("error", reject);
+    req.end("[]");
+  });
 
 const createDevelopmentServer = () =>
   createServer({ mode: "development", server: { middlewareMode: true } });
@@ -98,6 +171,124 @@ describe("Vite configuration", { timeout: 60_000 }, () => {
       .find((directive) => directive.startsWith("connect-src"));
     expect(connectSrc).toBe("connect-src 'self'");
     expect(config.preview.headers?.["Content-Security-Policy"]).toBe(contentSecurityPolicy);
+  });
+
+  // CSP 違反の報告（ADR-068）。ブラウザが同一オリジンの /csp-report へ送る。
+  describe("CSP reporting", () => {
+    it("reports to the same-origin endpoint in development", async () => {
+      const server = await createDevelopmentServer();
+
+      try {
+        const { headers } = server.config.server;
+        expect(headers?.["Reporting-Endpoints"]).toBe(cspReportingEndpoints);
+        expect(lastDirective(headers?.["Content-Security-Policy"])).toBe("report-to csp-endpoint");
+      } finally {
+        await server.close();
+      }
+    });
+
+    it("reports to the same-origin endpoint in production and preview", async () => {
+      const config = await resolveConfig({}, "build", "production");
+
+      for (const headers of [config.server.headers, config.preview.headers]) {
+        expect(headers?.["Reporting-Endpoints"]).toBe(cspReportingEndpoints);
+        expect(lastDirective(headers?.["Content-Security-Policy"])).toBe("report-to csp-endpoint");
+      }
+    });
+
+    it("proxies only /csp-report to the webhook_event receiver on OTEL_CSP_REPORT_HTTP_PORT", async () => {
+      vi.stubEnv("FRONTEND_OTEL_ENABLED", "false");
+      vi.stubEnv("OTEL_CSP_REPORT_HTTP_PORT", "19348");
+      const server = await createDevelopmentServer();
+
+      try {
+        expect(server.config.server.proxy?.["^/csp-report$"]).toMatchObject({
+          target: "http://localhost:19348",
+          changeOrigin: false,
+        });
+      } finally {
+        await server.close();
+      }
+    });
+
+    it("proxies /csp-report in preview", async () => {
+      vi.stubEnv("FRONTEND_OTEL_ENABLED", "false");
+      vi.stubEnv("OTEL_CSP_REPORT_HTTP_PORT", "19349");
+      const config = await resolveConfig(
+        { mode: "test" },
+        "serve",
+        "production",
+        "production",
+        true,
+      );
+
+      expect(config.preview.proxy?.["^/csp-report$"]).toMatchObject({
+        target: "http://localhost:19349",
+        changeOrigin: false,
+      });
+    });
+
+    // 実際の proxy の hop を通し、資格情報の header が Collector へ届かないことを確かめる（ADR-068）。
+    it.each(["/csp-report", "/collect"])(
+      "forwards %s to the collector without credentials",
+      async (path) => {
+        const { collector, received } = await startCollector();
+        const server = await createServer({
+          mode: "development",
+          logLevel: "silent",
+          server: { port: 0, strictPort: false, hmr: false },
+        });
+
+        try {
+          await server.listen();
+          const status = await postWithCredentials(
+            tcpAddressOf(server.httpServer?.address()),
+            path,
+          );
+
+          expect({
+            status,
+            path: received.path,
+            type: received.headers?.["content-type"],
+          }).toStrictEqual({
+            status: 200,
+            path,
+            type: "application/reports+json",
+          });
+          expect(
+            Object.keys(received.headers ?? {}).filter((name) => credentialHeaders.has(name)),
+          ).toStrictEqual([]);
+        } finally {
+          await server.close();
+          collector.close();
+        }
+      },
+    );
+
+    // ZAP の 10055-6 の除外は CSP の完全一致なので、CSP を変えたら evidence も直す（ADR-030）。
+    it("keeps the ZAP alert filter evidence equal to the delivered CSP", async () => {
+      vi.stubEnv("OIDC_ISSUER_URI", "http://127.0.0.1:8081/realms/spring-modulith");
+      const config = await resolveConfig({}, "build", "production");
+      const contentSecurityPolicy = String(config.preview.headers?.["Content-Security-Policy"]);
+
+      for (const file of ["passive.yaml", "active.yaml"]) {
+        const zapPlan = readFileSync(new URL(`../docker/zap/${file}`, import.meta.url), "utf8");
+        expect(zapPlan).toContain(`evidence: "${contentSecurityPolicy}"`);
+      }
+    });
+
+    it("does not send /csp-report to the backend", () => {
+      expect("/csp-report").not.toMatch(new RegExp(proxyPath, "u"));
+    });
+
+    it("rejects an OTEL_CSP_REPORT_HTTP_PORT out of range", async () => {
+      vi.stubEnv("FRONTEND_OTEL_ENABLED", "false");
+      vi.stubEnv("OTEL_CSP_REPORT_HTTP_PORT", "65536");
+
+      await expect(
+        createServer({ mode: "development", logLevel: "silent", server: { middlewareMode: true } }),
+      ).rejects.toThrow("OTEL_CSP_REPORT_HTTP_PORT must be an integer between 1 and 65535: 65536");
+    });
   });
 
   it("allows only the IdP origin besides self in the production and preview form-action", async () => {

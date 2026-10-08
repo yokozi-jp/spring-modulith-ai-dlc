@@ -6,9 +6,10 @@ import tailwindcss from "@tailwindcss/vite";
 import { tanstackRouter } from "@tanstack/router-plugin/vite";
 import react from "@vitejs/plugin-react";
 import { defaultExclude, defineConfig, loadEnv } from "vite-plus";
+import type { ProxyOptions } from "vite-plus";
 
 const contentSecurityPolicy =
-  "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; form-action 'self'; script-src 'self'; style-src 'self'; style-src-elem 'self' 'unsafe-inline'; style-src-attr 'none'; img-src 'self' data:; font-src 'self'; connect-src 'self'";
+  "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; form-action 'self'; script-src 'self'; style-src 'self'; style-src-elem 'self' 'unsafe-inline'; style-src-attr 'none'; img-src 'self' data:; font-src 'self'; connect-src 'self'; report-to csp-endpoint";
 
 // ponytail: 開発では起動単位でnonceを固定する。本番へ適用するなら配信層でリクエスト単位に生成する。
 const developmentCspNonce = crypto.randomUUID().replaceAll("-", "");
@@ -76,6 +77,16 @@ function portFromEnv(mode: string, name: string, fallback: string): number {
   return port;
 }
 
+// Reporting API は同一オリジンの報告に Cookie を付ける。
+// Collector は認証に使わないので、資格情報の header を Collector へ渡さない（ADR-068）。
+const withoutCredentials: ProxyOptions["configure"] = (proxy) => {
+  proxy.on("proxyReq", (proxyReq) => {
+    for (const name of ["cookie", "authorization", "proxy-authorization"]) {
+      proxyReq.removeHeader(name);
+    }
+  });
+};
+
 // src/lib/telemetry.ts が参照するビルド時の定数（ADR-068）。
 function telemetryDefine(mode: string) {
   // ルートの.envは秘密情報も含むため、テレメトリに必要な変数だけを読み込む（VITE_接頭辞で公開しない）。
@@ -111,6 +122,7 @@ function telemetryDefine(mode: string) {
 export default defineConfig(({ mode }) => {
   const serverPort = portFromEnv(mode, "SERVER_PORT", "18080");
   const faroPort = portFromEnv(mode, "OTEL_FARO_HTTP_PORT", "12347");
+  const cspReportPort = portFromEnv(mode, "OTEL_CSP_REPORT_HTTP_PORT", "12348");
   const idpOrigin = new URL(
     loadEnv(mode, "..", "OIDC_ISSUER_URI").OIDC_ISSUER_URI ?? "http://localhost:8080",
   ).origin;
@@ -129,6 +141,8 @@ export default defineConfig(({ mode }) => {
     "Permissions-Policy": "camera=(), microphone=(), geolocation=(), payment=(), usb=()",
     "X-Content-Type-Options": "nosniff",
     "X-Frame-Options": "DENY",
+    // CSP の report-to が参照する endpoint（ADR-068）。default にしないので、CSP 以外の報告は送られない。
+    "Reporting-Endpoints": 'csp-endpoint="/csp-report"',
   };
 
   return {
@@ -385,6 +399,14 @@ export default defineConfig(({ mode }) => {
         "^/collect$": {
           target: `http://localhost:${faroPort}`,
           changeOrigin: false,
+          configure: withoutCredentials,
+        },
+        // CSP 違反の報告（ADR-068）。ブラウザが Reporting API で送り、Collector の webhook_event receiver へ転送する。
+        // 完全一致にし、画面の path を転送しない。
+        "^/csp-report$": {
+          target: `http://localhost:${cspReportPort}`,
+          changeOrigin: false,
+          configure: withoutCredentials,
         },
       },
     },

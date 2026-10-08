@@ -16,6 +16,19 @@ receivers:
     endpoint: ${env:OTEL_COLLECTOR_FARO_HTTP_ENDPOINT:-localhost:12347}
     # Errors だけの既定のバッチ（最大 50 件）に十分な余裕を持たせた上限（1 MiB）。超えると 400 で捨てる。
     max_request_body_size: 1048576
+  # ブラウザが Reporting API で同一オリジンの /csp-report から送る CSP 違反の報告（ADR-068）。
+  # 同一オリジンで受けるため CORS は設定しない（ADR-014）。
+  webhook_event:
+    # 既定は localhost。Compose はホストの Vite から受けるため 0.0.0.0 に上書きする。
+    endpoint: ${env:OTEL_COLLECTOR_CSP_REPORT_HTTP_ENDPOINT:-localhost:12348}
+    path: /csp-report
+    # Chromium が送る Content-Type と完全一致しない request は 401 で捨てる（charset 付きも拒否する）。
+    # 別オリジンのページが preflight なしで送れる text/plain の POST を受けないためである。
+    required_header:
+      key: Content-Type
+      value: application/reports+json
+    # 報告 1 件は約 800 バイト。1 回の POST で約 80 件まで受ける上限（64 KiB）。超えると 400 で捨てる。
+    max_request_body_size: 65536
 
 processors:
   transform/log_attributes:
@@ -92,6 +105,67 @@ processors:
       - delete_key(resource.attributes, "deployment.environment.name") where not IsMatch(resource.attributes["deployment.environment.name"], "^[A-Za-z0-9._-]{1,64}$$")
       - keep_keys(resource.attributes, ["service.name", "service.namespace", "service.version", "deployment.environment.name"])
       - keep_keys(log.attributes, ["telemetry.signal", "exception.type", "exception.message", "exception.stacktrace", "view.name", "measurement.type", "measurement.name", "measurement.value", "session.id"])
+  # webhook_event の本文（application/reports+json の配列の文字列）を解析する。解析できなければ文字列のまま残り、検証で捨てる。
+  transform/frontend_csp_parse:
+    error_mode: silent
+    log_statements:
+      - set(log.body, ParseJSON(log.body)) where IsString(log.body)
+  # 1 回の POST が持つ複数の報告を、報告ごとの record に分ける。Slice でない本文はそのまま通り、検証で捨てる。
+  unroll/frontend_csp: {}
+  # csp-violation の型と値を検証した record だけへ Collector 内部の印を付ける。
+  # deprecation、intervention、crash などの他の型と、旧形式の report-uri の本文には印が付かない。
+  transform/frontend_csp_validate:
+    error_mode: silent
+    log_statements:
+      - delete_key(log.attributes, "frontend.accepted")
+      - set(log.attributes["frontend.accepted"], "true") where IsMap(log.body) and log.body["type"] == "csp-violation" and IsMap(log.body["body"]) and IsMatch(log.body["body"]["effectiveDirective"], "^[a-z-]{1,64}$$") and IsMatch(log.body["body"]["disposition"], "^(enforce|report)$$")
+  filter/frontend_csp:
+    error_mode: silent
+    logs:
+      log_record:
+        - log.attributes["frontend.accepted"] != "true"
+  # 検証済みの報告から固定本文と最終属性を作る。文書の URL は残さず、blockedURL は origin か scheme かキーワードまで縮約する。
+  # 属性を足すときは docs/observability/conventions.md と同じ変更で直す。
+  transform/frontend_csp:
+    error_mode: silent
+    log_statements:
+      - set(log.cache["blocked"], log.body["body"]["blockedURL"]) where IsString(log.body["body"]["blockedURL"]) and Len(log.body["body"]["blockedURL"]) <= 8192
+      - set(log.cache["source"], log.body["body"]["sourceFile"]) where IsString(log.body["body"]["sourceFile"]) and Len(log.body["body"]["sourceFile"]) <= 8192
+      # inline、eval、data などのキーワードはそのまま残す。
+      - set(log.attributes["csp.blocked"], log.cache["blocked"]) where IsMatch(log.cache["blocked"], "^[a-z-]{1,32}$$")
+      # 階層を持つ URL は scheme と host と port だけにし、userinfo、path、path parameter、query、fragment を落とす。
+      # authority の全体が hostname か角括弧の IPv6 と数値の port に一致しなければ残さない。@ を重ねた URL と数値でない port は落とす。
+      # \ は WHATWG URL と同じく path の始まりとみなすので、\@ で区切りをごまかした URL は \ の前の host になる。
+      - set(log.cache["origin"], ExtractPatterns(log.cache["blocked"], "^(?P<scheme>[A-Za-z][A-Za-z0-9+.-]*://)(?:[^/?#@\\s\\\\]*@)?(?P<authority>(?:[A-Za-z0-9.-]+|\\[[0-9A-Fa-f:.]+\\])(?::[0-9]{1,5})?)(?:[/?#;\\\\]|$$)"))
+      - set(log.attributes["csp.blocked"], Concat([log.cache["origin"]["scheme"], log.cache["origin"]["authority"]], "")) where log.attributes["csp.blocked"] == nil and log.cache["origin"]["authority"] != nil
+      # data: のような階層を持たない URL は scheme だけを残す。authority が不正な階層 URL を scheme に縮約しない。
+      - set(log.attributes["csp.blocked"], ExtractPatterns(log.cache["blocked"], "^(?P<scheme>[A-Za-z][A-Za-z0-9+.-]*):")["scheme"]) where log.attributes["csp.blocked"] == nil and not IsMatch(log.cache["blocked"], "^[A-Za-z][A-Za-z0-9+.-]*://")
+      - set(log.attributes["csp.blocked"], ConvertCase(log.attributes["csp.blocked"], "lower")) where log.attributes["csp.blocked"] != nil
+      # 長すぎる origin は送り手が任意の値を詰められるので残さない。
+      - delete_key(log.attributes, "csp.blocked") where Len(log.attributes["csp.blocked"]) > 300
+      # 違反した文書と同一オリジンの /assets/<名前>.js だけを、origin を落とした path で残す。query か fragment を持つ URL は残さない。
+      # 別オリジンの同名の path を自分の asset と取り違えないためである。documentURL は比べるだけで属性に残さない。
+      - set(log.cache["document_origin"], ConvertCase(ExtractPatterns(log.body["body"]["documentURL"], "^(?P<origin>[Hh][Tt][Tt][Pp][Ss]?://[A-Za-z0-9.-]+(?::[0-9]{1,5})?)(?:[/?#;]|$$)")["origin"], "lower")) where IsString(log.body["body"]["documentURL"]) and Len(log.body["body"]["documentURL"]) <= 8192
+      - set(log.cache["source_match"], ExtractPatterns(log.cache["source"], "^(?P<origin>[Hh][Tt][Tt][Pp][Ss]?://[A-Za-z0-9.-]+(?::[0-9]{1,5})?)(?P<path>/assets/[\\w.-]+\\.js)$$"))
+      - set(log.attributes["code.file.path"], log.cache["source_match"]["path"]) where log.cache["document_origin"] != nil and ConvertCase(log.cache["source_match"]["origin"], "lower") == log.cache["document_origin"]
+      - set(log.attributes["code.line.number"], Int(log.body["body"]["lineNumber"])) where IsDouble(log.body["body"]["lineNumber"]) and log.body["body"]["lineNumber"] >= 0 and log.body["body"]["lineNumber"] <= 2147483647
+      - set(log.attributes["code.column.number"], Int(log.body["body"]["columnNumber"])) where IsDouble(log.body["body"]["columnNumber"]) and log.body["body"]["columnNumber"] >= 0 and log.body["body"]["columnNumber"] <= 2147483647
+      - set(log.attributes["csp.directive"], log.body["body"]["effectiveDirective"])
+      - set(log.attributes["csp.disposition"], log.body["body"]["disposition"])
+      - set(log.attributes["telemetry.signal"], "csp-violation")
+      - set(log.body, "Browser CSP violation")
+      # webhook_event は resource 属性を付けない。logs/frontend と同じ 4 つを Collector の値で付ける。
+      - set(resource.attributes["service.name"], "${env:FRONTEND_OTEL_SERVICE_NAME:-demo-web}")
+      - set(resource.attributes["service.namespace"], "${env:OTEL_SERVICE_NAMESPACE:-}")
+      - set(resource.attributes["service.version"], "${env:FRONTEND_SERVICE_VERSION:-unknown}")
+      - set(resource.attributes["deployment.environment.name"], "${env:OTEL_DEPLOYMENT_ENVIRONMENT_NAME:-}")
+      - delete_key(resource.attributes, "service.namespace") where not IsMatch(resource.attributes["service.namespace"], "^[A-Za-z0-9._-]{1,64}$$")
+      - delete_key(resource.attributes, "service.version") where not IsMatch(resource.attributes["service.version"], "^[A-Za-z0-9._-]{1,64}$$")
+      - delete_key(resource.attributes, "deployment.environment.name") where not IsMatch(resource.attributes["deployment.environment.name"], "^[A-Za-z0-9._-]{1,64}$$")
+      - keep_keys(resource.attributes, ["service.name", "service.namespace", "service.version", "deployment.environment.name"])
+      # receiver が付ける scope の属性（source、receiver）は traces/frontend と同じく消す。
+      - keep_keys(scope.attributes, [])
+      - keep_keys(log.attributes, ["telemetry.signal", "csp.directive", "csp.disposition", "csp.blocked", "code.file.path", "code.line.number", "code.column.number"])
   # フロントエンドの span も filter と transform の 2 段で守る。/collect は誰でも送れる（ADR-068）ので、送り手が書ける値を信頼しない。
   # span の event は例外のメッセージなどを持ちうるので、すべて捨てる。
   filter/frontend_span_events:
@@ -138,6 +212,11 @@ service:
     logs/frontend:
       receivers: [faro]
       processors: [transform/frontend_validate, filter/frontend_logs, transform/frontend_logs]
+      exporters: [otlp_http/lgtm]
+    # CSP 違反の報告。faro と本文の形式も allowlist も違うので、logs/frontend と分ける。
+    logs/frontend_csp:
+      receivers: [webhook_event]
+      processors: [transform/frontend_csp_parse, unroll/frontend_csp, transform/frontend_csp_validate, filter/frontend_csp, transform/frontend_csp]
       exporters: [otlp_http/lgtm]
     traces:
       receivers: [otlp]
