@@ -504,10 +504,15 @@ tasks:
 
   _ensure-test-env:
     internal: true
-    status:
-      - test -f .env.test
     cmds:
-      - cp -n .env.test.example .env.test
+      - test -f .env.test || cp .env.test.example .env.test
+      # 既存の .env.test は上書きしないので、.env.test.example に増えた変数の不足をここで止める。
+      - |
+        missing="$(sed -n 's/^\([A-Za-z_][A-Za-z0-9_]*\)=.*/\1/p' .env.test.example | while read -r key; do grep -q "^${key}=" .env.test || printf ' %s' "$key"; done)"
+        if [ -n "$missing" ]; then
+          echo ".env.test に .env.test.example の変数がありません:${missing}。.env.test.example の行を .env.test へ足してください。" >&2
+          exit 1
+        fi
 
   _require-migration-env:
     internal: true

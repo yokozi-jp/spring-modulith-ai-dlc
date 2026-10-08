@@ -51,7 +51,10 @@ cd frontend && vp dev      # SPAを起動し、APIとOIDCを同一オリジン�
 シーダーはテストのソースにあるので、テストのソースがコンパイルできないと`task be-run`と`task dev`は起動しない。
 その場合はテストを直すか、`backend`で`./gradlew bootRun`を直接実行する。
 
-`.env.example`か`.env.test.example`に変数が増えたら、`.env`と`.env.test`に同じ変数を足す（`cp -n`は既存のファイルを上書きしない）。
+`.env.example`か`.env.test.example`に変数が増えたら、`.env`と`.env.test`に同じ変数を足す。
+既存の`.env`と`.env.test`は上書きされない。
+Taskのテスト系タスクは、`.env.test`に足りない変数があると、その変数名を並べて止まる。
+たとえば決済代行のClientを足した変更の後は、既存の`.env.test`へ`PAYMENT_GATEWAY_BASE_URL=http://127.0.0.1:8082`を足し、既存の`.env`へ`.env.example`の`PAYMENT_GATEWAY_BASE_URL`の行を足す。
 `task compose-up`などが`OTEL_SERVICE_NAMESPACE is required`のように変数不足で止まったときは、これが原因である。
 
 公開先は次のとおり。

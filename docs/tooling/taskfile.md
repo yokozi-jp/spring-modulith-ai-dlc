@@ -57,7 +57,9 @@ Taskfile変数とシェル環境変数は同じものではない。
 ローカルDB操作だけが`.env`を読み、テストだけが`.env.test`を読む。
 `.env`は`.env.example`から、`.env.test`は`.env.test.example`から、それぞれ`cp`で作るGit除外のローカルファイルである。
 テンプレートの`.env.test.example`だけをGitで管理する。
-`.env.test`を読むタスクは、内部タスク`_ensure-test-env`を`deps`に持ち、`.env.test`が無いときだけ`.env.test.example`からコピーする。
+`.env.test`を読むタスクは、内部タスク`_ensure-test-env`を`deps`に持つ。
+`_ensure-test-env`は、`.env.test`が無いときは`.env.test.example`からコピーする。
+`.env.test`があるときは上書きせず、`.env.test.example`にあって`.env.test`に無い変数があれば、その変数名を並べて止まる。
 `task`を通らないCIのcomposeとdocker runは、workflowの`cp .env.test.example .env.test`でコピーする。
 本番マイグレーションとDB切り戻しはローカルの環境ファイルを読まず、CIまたはデプロイ環境から注入された資格情報だけを使う。
 
