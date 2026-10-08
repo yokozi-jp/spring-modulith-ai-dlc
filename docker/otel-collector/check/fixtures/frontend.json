@@ -11,7 +11,7 @@
   "exceptions": [
     {
       "type": "Error",
-      "value": "absolute https://host/orders/42?token=secret-query#secret-fragment relative:/orders/42?token=secret-query#secret-fragment blob:blob:https://host/orders/42?token=x#f file:file:///orders/42?token=x#f webpack:webpack://app/orders/42?token=x#f data:data:text/plain,secret-query#secret-fragment 日本語/orders/42?token=x#f plain a/b?c",
+      "value": "absolute https://host/orders/42?token=secret-query#secret-fragment relative:/orders/42?token=secret-query#secret-fragment blob:blob:https://host/orders/42?token=x#f file:file:///orders/42?token=x#f webpack:webpack://app/orders/42?token=x#f data:data:text/plain,secret-query#secret-fragment boundaries [https://host/orders/42?token=x#f] (https://host/orders/42?token=x#f) \"https://host/orders/42?token=x#f\",/orders/42?token=x#f colon:/orders/42?token=x#f fullwidth：/orders/42?token=x#f comma、/orders/42?token=x#f period。/orders/42?token=x#f 日本語/orders/42?token=x#f multiple https://host/orders/42?token=x#f /orders/42?token=x#f escaped HTTPS://HOST/orders/42?token=x#f\\n plain a/b?c",
       "timestamp": "2026-10-06T00:00:00.000Z",
       "stacktrace": {
         "frames": [
@@ -33,7 +33,9 @@
     { "type": "web-vitals", "values": { "fcp": 1 }, "timestamp": "2026-10-06T00:00:05.000Z" },
     { "type": "web-vitals", "values": { "ttfb": 1 }, "timestamp": "2026-10-06T00:00:06.000Z" },
     { "type": "web-vitals", "values": { "lcp": 1, "cls": 1 }, "timestamp": "2026-10-06T00:00:07.000Z" },
-    { "type": "web-vitals", "values": { "lcp": -1 }, "timestamp": "2026-10-06T00:00:08.000Z" }
+    { "type": "web-vitals", "values": { "lcp": -1 }, "timestamp": "2026-10-06T00:00:08.000Z" },
+    { "type": "web-vitals", "values": { "lcp": 1e3 }, "timestamp": "2026-10-06T00:00:09.000Z" },
+    { "type": "web-vitals", "values": { "lcp": 111111111111111111111111111111111 }, "timestamp": "2026-10-06T00:00:10.000Z" }
   ],
   "traces": {
     "resourceSpans": [

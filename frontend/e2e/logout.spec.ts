@@ -93,9 +93,11 @@ async function cookieValue(context: BrowserContext, name: string): Promise<strin
   return value;
 }
 
-async function waitForTelemetry(payloads: string[], value: string): Promise<void> {
+async function waitForTelemetry(payloads: string[], value: string, startIndex = 0): Promise<void> {
   await expect
-    .poll(() => payloads.some((payload) => payload.includes(value)), { timeout: 15_000 })
+    .poll(() => payloads.slice(startIndex).some((payload) => payload.includes(value)), {
+      timeout: 15_000,
+    })
     .toBe(true);
 }
 
@@ -116,46 +118,8 @@ async function throwBrowserError(page: Page, message: string): Promise<void> {
   }, message);
 }
 
-let cspMessages: string[] = [];
-
-test.beforeEach(({ page }) => {
-  cspMessages = [];
-  // ログアウトのフォームは IdP へ redirect されるため、form-action の違反は console に出る。
-  // Keycloak の画面のメッセージも区別せずに集め、隠さない。
-  page.on("console", (message) => {
-    if (message.text().includes("Content Security Policy")) {
-      cspMessages.push(message.text());
-    }
-  });
-});
-
-test.afterEach(() => {
-  expect(cspMessages).toEqual([]);
-});
-
-test("ログイン直後に、ほかの操作をせずにログアウトすると /logged-out へ移る", async ({ page }) => {
-  await logIn(page);
-
-  const endSession = page.waitForRequest((request) => request.url().startsWith(endSessionEndpoint));
-  await logoutButton(page).click();
-  const request = await endSession;
-
-  expect(new URL(request.url()).searchParams.get("post_logout_redirect_uri")).toBe(
-    "http://localhost:5173/logged-out",
-  );
-  await expectLoggedOutPage(page);
-  await expect(page).toHaveTitle("デモアプリケーション");
-});
-
-test("例外、画面遷移、Web Vitals をログアウト前後の匿名 session で相関できる", async ({ page }) => {
-  const payloads: string[] = [];
-  await page.route("**/collect", async (route) => {
-    payloads.push(route.request().postData() ?? "");
-    await route.fulfill({ status: 202 });
-  });
-
-  await logIn(page);
-  await waitForTelemetry(payloads, '"view_changed"');
+async function exerciseWebVitals(page: Page, payloads: string[]): Promise<void> {
+  const startIndex = payloads.length;
   await page.evaluate(() => {
     const button = document.createElement("button");
     button.textContent = "INP probe";
@@ -221,15 +185,58 @@ test("例外、画面遷移、Web Vitals をログアウト前後の匿名 sessi
       }),
   );
   expect(clsObserved).toBe(true);
-  await throwBrowserError(page, "old-session-error");
-  await waitForTelemetry(payloads, "old-session-error");
   await page.evaluate(() => {
     Object.defineProperty(document, "visibilityState", { configurable: true, value: "hidden" });
     document.dispatchEvent(new Event("visibilitychange"));
   });
-  await waitForTelemetry(payloads, '"lcp"');
-  await waitForTelemetry(payloads, '"inp"');
-  await waitForTelemetry(payloads, '"cls"');
+  await waitForTelemetry(payloads, '"lcp"', startIndex);
+  await waitForTelemetry(payloads, '"inp"', startIndex);
+  await waitForTelemetry(payloads, '"cls"', startIndex);
+}
+
+let cspMessages: string[] = [];
+
+test.beforeEach(({ page }) => {
+  cspMessages = [];
+  // ログアウトのフォームは IdP へ redirect されるため、form-action の違反は console に出る。
+  // Keycloak の画面のメッセージも区別せずに集め、隠さない。
+  page.on("console", (message) => {
+    if (message.text().includes("Content Security Policy")) {
+      cspMessages.push(message.text());
+    }
+  });
+});
+
+test.afterEach(() => {
+  expect(cspMessages).toEqual([]);
+});
+
+test("ログイン直後に、ほかの操作をせずにログアウトすると /logged-out へ移る", async ({ page }) => {
+  await logIn(page);
+
+  const endSession = page.waitForRequest((request) => request.url().startsWith(endSessionEndpoint));
+  await logoutButton(page).click();
+  const request = await endSession;
+
+  expect(new URL(request.url()).searchParams.get("post_logout_redirect_uri")).toBe(
+    "http://localhost:5173/logged-out",
+  );
+  await expectLoggedOutPage(page);
+  await expect(page).toHaveTitle("デモアプリケーション");
+});
+
+test("例外、画面遷移、Web Vitals をログアウト前後の匿名 session で相関できる", async ({ page }) => {
+  const payloads: string[] = [];
+  await page.route("**/collect", async (route) => {
+    payloads.push(route.request().postData() ?? "");
+    await route.fulfill({ status: 202 });
+  });
+
+  await logIn(page);
+  await waitForTelemetry(payloads, '"view_changed"');
+  await exerciseWebVitals(page, payloads);
+  await throwBrowserError(page, "old-session-error");
+  await waitForTelemetry(payloads, "old-session-error");
   await page.goto("/?token=secret-query#secret-fragment");
   await expect(homeHeading(page)).toBeVisible();
 
@@ -251,13 +258,27 @@ test("例外、画面遷移、Web Vitals をログアウト前後の匿名 sessi
   const newSession = sessionId(loggedOutPayload);
   expect(newSession).not.toBe(oldSession);
 
+  const reloginStart = payloads.length;
   await page.getByRole("link", { name: "もう一度ログイン" }).click();
   await signInOnKeycloak(page);
   await expectAuthenticatedHome(page);
+  await waitForTelemetry(payloads, '"toView":"/"', reloginStart);
+  await exerciseWebVitals(page, payloads);
   await throwBrowserError(page, "new-session-error");
-  await waitForTelemetry(payloads, "new-session-error");
-  const newErrorPayload = payloads.find((payload) => payload.includes("new-session-error")) ?? "";
-  expect(sessionId(newErrorPayload)).toBe(newSession);
+  await waitForTelemetry(payloads, "new-session-error", reloginStart);
+
+  const newPayloads = payloads
+    .slice(reloginStart)
+    .filter((payload) =>
+      ["new-session-error", '"toView":"/"', '"lcp"', '"inp"', '"cls"'].some((value) =>
+        payload.includes(value),
+      ),
+    );
+  expect(newPayloads.length).toBeGreaterThanOrEqual(5);
+  for (const signal of ["new-session-error", '"toView":"/"', '"lcp"', '"inp"', '"cls"']) {
+    expect(newPayloads.some((payload) => payload.includes(signal))).toBe(true);
+  }
+  expect(new Set(newPayloads.map(sessionId))).toStrictEqual(new Set([newSession]));
 
   for (const payload of payloads) {
     const itemCount = ["exceptions", "events", "measurements"].filter((key) =>

@@ -36,12 +36,12 @@ processors:
       - set(log.attributes["frontend.session"], log.cache["session_id"])
       - set(log.attributes["frontend.view"], log.cache["view_name"]) where log.cache["view_name"] != nil
       - set(log.attributes["frontend.event_to_view"], log.cache["event_data_toView"]) where log.cache["event_data_toView"] != nil
-      - set(log.attributes["frontend.lcp"], log.cache["value_lcp"]) where log.cache["value_lcp"] != nil
-      - set(log.attributes["frontend.inp"], log.cache["value_inp"]) where log.cache["value_inp"] != nil
-      - set(log.attributes["frontend.cls"], log.cache["value_cls"]) where log.cache["value_cls"] != nil
+      - set(log.attributes["frontend.lcp"], Double(log.cache["value_lcp"])) where Len(log.cache["value_lcp"]) >= 1 and Len(log.cache["value_lcp"]) <= 32 and IsMatch(log.cache["value_lcp"], "^[0-9]+(?:\\.[0-9]+)?$$")
+      - set(log.attributes["frontend.inp"], Double(log.cache["value_inp"])) where Len(log.cache["value_inp"]) >= 1 and Len(log.cache["value_inp"]) <= 32 and IsMatch(log.cache["value_inp"], "^[0-9]+(?:\\.[0-9]+)?$$")
+      - set(log.attributes["frontend.cls"], Double(log.cache["value_cls"])) where Len(log.cache["value_cls"]) >= 1 and Len(log.cache["value_cls"]) <= 32 and IsMatch(log.cache["value_cls"], "^[0-9]+(?:\\.[0-9]+)?$$")
       - set(log.attributes["frontend.accepted"], "true") where log.attributes["kind"] == "exception" and IsMatch(log.cache["session_id"], "^[a-km-zA-HJ-NP-Z0-9]{10}$$") and IsMatch(log.cache["type"], "^[A-Za-z_$$][A-Za-z0-9_$$.]{0,127}$$") and Len(log.cache["value"]) <= 8192 and (log.cache["stacktrace"] == nil or Len(log.cache["stacktrace"]) <= 65536)
       - set(log.attributes["frontend.accepted"], "true") where log.attributes["kind"] == "event" and log.cache["event_name"] == "view_changed" and IsMatch(log.cache["session_id"], "^[a-km-zA-HJ-NP-Z0-9]{10}$$") and IsMatch(log.cache["event_data_toView"], "^/(?:logged-out)?$$")
-      - set(log.attributes["frontend.accepted"], "true") where log.attributes["kind"] == "measurement" and log.cache["type"] == "web-vitals" and IsMatch(log.cache["session_id"], "^[a-km-zA-HJ-NP-Z0-9]{10}$$") and IsMatch(log.cache["view_name"], "^/(?:logged-out)?$$") and ((IsMatch(log.cache["value_lcp"], "^[0-9]+(?:\\.[0-9]+)?$$") and log.cache["value_inp"] == nil and log.cache["value_cls"] == nil) or (log.cache["value_lcp"] == nil and IsMatch(log.cache["value_inp"], "^[0-9]+(?:\\.[0-9]+)?$$") and log.cache["value_cls"] == nil) or (log.cache["value_lcp"] == nil and log.cache["value_inp"] == nil and IsMatch(log.cache["value_cls"], "^[0-9]+(?:\\.[0-9]+)?$$")))
+      - set(log.attributes["frontend.accepted"], "true") where log.attributes["kind"] == "measurement" and log.cache["type"] == "web-vitals" and IsMatch(log.cache["session_id"], "^[a-km-zA-HJ-NP-Z0-9]{10}$$") and IsMatch(log.cache["view_name"], "^/(?:logged-out)?$$") and ((log.attributes["frontend.lcp"] != nil and log.attributes["frontend.lcp"] >= 0 and log.cache["value_inp"] == nil and log.cache["value_cls"] == nil) or (log.cache["value_lcp"] == nil and log.attributes["frontend.inp"] != nil and log.attributes["frontend.inp"] >= 0 and log.cache["value_cls"] == nil) or (log.cache["value_lcp"] == nil and log.cache["value_inp"] == nil and log.attributes["frontend.cls"] != nil and log.attributes["frontend.cls"] >= 0))
   filter/frontend_logs:
     error_mode: silent
     logs:
@@ -66,9 +66,9 @@ processors:
       - set(log.attributes["measurement.name"], "lcp") where log.attributes["frontend.lcp"] != nil
       - set(log.attributes["measurement.name"], "inp") where log.attributes["frontend.inp"] != nil
       - set(log.attributes["measurement.name"], "cls") where log.attributes["frontend.cls"] != nil
-      - set(log.attributes["measurement.value"], Double(log.attributes["frontend.lcp"])) where log.attributes["frontend.lcp"] != nil
-      - set(log.attributes["measurement.value"], Double(log.attributes["frontend.inp"])) where log.attributes["frontend.inp"] != nil
-      - set(log.attributes["measurement.value"], Double(log.attributes["frontend.cls"])) where log.attributes["frontend.cls"] != nil
+      - set(log.attributes["measurement.value"], log.attributes["frontend.lcp"]) where log.attributes["frontend.lcp"] != nil
+      - set(log.attributes["measurement.value"], log.attributes["frontend.inp"]) where log.attributes["frontend.inp"] != nil
+      - set(log.attributes["measurement.value"], log.attributes["frontend.cls"]) where log.attributes["frontend.cls"] != nil
       # stack frame の URL を先に置換し、行番号と列番号を残す。その後、一般の URL token 全体を置換する。
       - replace_all_patterns(log.attributes, "value", "(^|[^A-Za-z0-9+.-])([A-Za-z][A-Za-z0-9+.-]*:[^\\s\\\\]*)(:\\d+:\\d+\\))", "$$1[redacted-url]$$3") where log.attributes["kind"] == "exception"
       - replace_all_patterns(log.attributes, "value", "(^|[^A-Za-z0-9+.-])([A-Za-z][A-Za-z0-9+.-]*:[^\\s\\\\]+)", "$$1[redacted-url]") where log.attributes["kind"] == "exception"
