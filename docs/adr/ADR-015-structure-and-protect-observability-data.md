@@ -58,7 +58,7 @@ OTLP では SDK が `exception.type`、`exception.message`、`exception.stacktra
 
 次の値は、アプリケーションのコードから message、属性、URL のいずれにも渡さない。
 
-- Authorization、Cookie、session ID、token、password、secret、接続文字列
+- Authorization、Cookie、認証 session ID、利用者へ結び付く ID、token、password、secret、接続文字列
 - request body、response body、フォーム入力、DOM text
 - query string と URL fragment
 - SQL、認可判断で存在確認に使える値
@@ -66,6 +66,9 @@ OTLP では SDK が `exception.type`、`exception.message`、`exception.stacktra
 
 アプリケーションのログは静的な event 名と、許可した構造化属性だけを出す。
 内部 ID を記録する場合は、業務上必要な非公開 ID に限定し、表示名を併記しない。
+
+フロントエンド pipeline では、[ADR-068](ADR-068-collect-browser-telemetry-with-faro-via-collector.md) の条件を満たす 10 文字の匿名 Faro session ID だけを相関に使ってよい。
+この ID は同じタブの短い区間だけで有効にし、認証 session、`APP_SESSION`、利用者 ID、氏名、メールアドレスへ結び付けない。
 
 例外メッセージに個人データが混ざることは、例外を記録する以上避けられない。
 これは発生源で禁じず、保存先の保護と表示時のマスクで扱う。

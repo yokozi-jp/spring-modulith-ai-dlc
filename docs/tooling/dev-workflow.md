@@ -111,6 +111,7 @@ task lint-duplicates
 
 フロントエンドだけ、またはバックエンドだけを変更した場合は、変更していない領域のTaskを省く。
 `frontend/src/routes/`を変更した場合は、`task fe-route-tree-check`で`routeTree.gen.ts`の再生成漏れがないことを確かめる。
+このTaskは、Collectorのroute allowlistが`routeTree.gen.ts`の`fullPaths`と一致することも確かめる。
 OpenAPI契約かOrvalの設定を変更した場合は、`task api-client-check`で`src/api/generated`の再生成漏れがないことを確かめる。
 React Doctorは実行に時間がかかるためpre-pushでは実行せず、Frontend CIで`task fe-doctor`を実行する。
 ローカルでReact固有の問題を診断するときは、`task fe-doctor`を手動で実行する。
@@ -152,6 +153,8 @@ task otel-collector-check
 ```
 
 このタスクは、バックエンドのログに加えて Faro の fixture もフロントエンドの pipeline（`logs/frontend` と `traces/frontend`）に流して出口を検査する。
+例外、View、LCP、INP、CLS の session 相関と、URL token、UUID の session ID、利用者情報、trace の URL 属性が残らないことを確かめる。
+最初に、Collector の route allowlist が `routeTree.gen.ts` の `fullPaths` と一致することを確かめる。
 ログ属性の allowlist は[可観測性データの規約](../observability/conventions.md)を参照する。
 
 ## DASTを実行するとき

@@ -61,44 +61,52 @@ Faro の形式を受ける contrib の `faroreceiver` は、Collector 0.161.0 �
   バックエンドの `traces` pipeline は加工しないまま残す。
 
 faroreceiver はブラウザ、ページ、セッションなどのメタデータをログの本文（logfmt）に入れるので、属性の `keep_keys` だけでは保護できない。
-そのため、フロントエンドの pipeline は本文を OTTL の `ParseKeyValue` で解析し、`exception.type`、`exception.message`、`exception.stacktrace`、`url.path` の 4 属性だけを残す。
-本文は固定の文字列 `Browser exception` に置き換える。
-例外でない種類の項目は、計装を足す段階で本文の文字列を決めるまで捨てる。
+そのため、フロントエンドの pipeline は検証、filter、正規化の三段で本文を処理する。
+例外、`view_changed`、LCP、INP、CLS の必須値と型を検証し、10 文字の匿名 session ID と `/` または `/logged-out` の route template を持つ record だけを通す。
+route template の allowlist は Collector の設定の 1 か所だけに書き、`routeTree.gen.ts` との不一致は Task の検査で失敗させる。
+本文は signal ごとに `Browser exception`、`Browser view`、`Browser web vital` のいずれかへ固定する。
+Web Vitals は LCP、INP、CLS の主値を一つだけ残し、delta と attribution を含む付加情報を捨てる。
 
-URL の query と fragment は、ブラウザの `beforeSend` と Collector の両方で消す。
-Collector の除去は、絶対 URL の `?` か `#` から空白かエスケープまでを多めに消す正規表現の処理である。
-これは「自由入力を正規表現でマスクする処理を Collector に置かない」規則の例外であり、フロントエンドの pipeline に限る。
-例外にするのは、自由入力を推測して探すのではなく、URL という構文の決まった部分を消すためである。
-消し過ぎて表示が崩れることは、秘密が残ることより害が小さい。
+画面に対応する URL は TanStack Router が解決した route template だけを残す。
+例外メッセージと stacktrace の絶対 URL と相対 URL は、scheme、path、query、fragment を含む token 全体を `[redacted-url]` に置き換える。
+例外として、同一オリジンのビルドのファイル名（`/assets/<名前>.js`）に行と列が続く stack frame は、origin を落とした path と行と列を残す。
+Vite が付ける hash 付きのファイル名は秘密を含まず、本番の方針の source map で元の位置へ戻すのに要るためである。
+query か fragment を持つ URL は、ファイル名が一致しても token 全体を置き換える。
+ブラウザと Collector の両方で縮約し、実際の ID を推測して一部だけ加工する方式は使わない。
 
 フロントエンドの span は、送り手が書ける値を信頼せず、許可したものだけを残す。
 resource 属性はログと同じ 4 つに絞り、`service.name` は Collector の値で上書きする。
-span の属性は `http.request.method`、`http.response.status_code`、`url.path` の 3 つだけにする。
-`url.path` は `url.full` を OTTL の `URL()` で解析して取り出し、`url.full` は残さない。
-正規表現で query を消すより、URL の構文で path だけを取り出すほうが漏れがないためである。
+span の属性は検証済みの `http.request.method` と `http.response.status_code` だけにし、すべての `url.*` 属性を削除する。
 span の名前は固定の `Browser request` にし、status の message、`trace_state`、links、instrumentation scope の名前と版と属性も固定の値か空にする。
 span の event は例外のメッセージなどを持ちうるので、すべて捨てる。
-trace ID、span ID、親の span ID は属性ではないので残り、バックエンドの span とつながる。
+trace ID、span ID、親 span ID は属性ではないので残り、バックエンドの span とつながる。
 
 ### SDK とセッション
 
 - 入れるのは `@grafana/faro-web-sdk`（後の段階で `@grafana/faro-web-tracing`）だけにし、exact version に固定する。
   `@grafana/faro-react` は入れない。
-- `getWebInstrumentations()` の既定は使わず、有効にする計装を列挙する。
-  最終的に有効にするのは Errors、WebVitals、Session、View、Tracing で、Console、Performance、UserAction、Frustration、Navigation、CSP は無効のままにする。
+- `getWebInstrumentations()` の既定は使わず、Session、View、Errors、WebVitals、Tracing の順で明示的に有効にする。
+  Console、Performance、UserAction、Frustration、Navigation、CSP は無効のままにする。
+- batching は無効にし、一つの signal を一つの HTTP envelope で送る。
+  Faro 2.12.1 の公開 API に flush の完了待ちがないため、session の切替前後を同じ envelope に混ぜないことを優先する。
+- 画面遷移は、TanStack Router の遷移の完了時に最後の match の `fullPath` を View として通知する。
+  生の location、path parameter、query、fragment は読まない。
 - SDK を呼ぶコードは `frontend/src/lib/telemetry.ts` の 1 ファイルにまとめ、初期化は composition root の `main.tsx` で行う。
-  feature から SDK を呼ばず、route のエラー表示はこのファイルの関数を通して例外を送る。
-- 画面遷移は、TanStack Router の遷移の完了時に route の template を View として通知する。
+  SDK に依存しない `beforeSend` の縮約は `frontend/src/lib/telemetry-sanitize.ts` に分け、`telemetry.ts` だけが呼ぶ。
+  feature と route と component から SDK を呼ばない。
 - `traceparent` は同一オリジンの `/api/**` だけに付ける。
   範囲は Faro の設定の `ignoreUrls` に「同一オリジンの `/api/**` 以外」に一致する正規表現を 1 つ渡して決める。
   IdP を含む別オリジンには `propagateTraceHeaderCorsUrls` を指定しないので付かず、`/collect` は Faro の既定の除外で付かない。
   `TracingInstrumentation` の `fetchInstrumentationOptions.ignoreUrls` に渡すと、transport の既定の `/collect` の除外を上書きして消すので使わない。
-- ブラウザでは sampling しない。
-  web-tracing の sampler は、Faro の session の meta が `isSampled` を持つときだけ記録する。
-  Session の計装（#152）を入れるまでは、`sessionTracking.session` の初期値で `isSampled` を渡し、sampled flag が 0 の `traceparent` を送らないようにする。
+- ブラウザでは sampling せず、Session instrumentation の `samplingRate=1` を使う。
+  sampled flag が 1 の `traceparent` を維持する。
+- session は `persistent=false` とし、Faro の volatile session を `sessionStorage` に保持する。
+  15 分の非操作または開始から 4 時間で切り替える。
+- ログアウトの native submit より前に送信を pause し、SDK の `genShortID` で 10 文字の匿名 ID を作って `setSession` した後で送信を再開する。
+  切替に失敗した場合は pause のままにし、旧 session ID へ新しい signal を追加しない。
+- session ID は利用者 ID、認証 session、`APP_SESSION`、氏名、メールアドレスへ結び付けない。
 - 送信の失敗や受け口の停止でアプリを止めず、SDK の初期化を待たずに描画を始める。
 - Cookie を Collector へ送らない（`credentials: "omit"`）。
-- セッションは Faro の既定（sessionStorage、15 分の非操作か 4 時間で切り替え）を使い、ログアウトで作り直し、利用者の ID や `APP_SESSION` と結び付けない。
 
 有効にするかはビルド時の定数（ルートの `.env` の `FRONTEND_OTEL_ENABLED`）で決め、既定は無効にする。
 無効のビルドでは `import()` の分岐ごと消え、bundle に SDK のコードが入らない。
@@ -160,9 +168,9 @@ Faro を更新するたびに、lockfile で `ua-parser-js` の版を確かめ�
 
 - ブラウザの例外を、バックエンドと同じ Grafana で `service.name=demo-web` として見られる。
 - 出口が Collector の一つのままなので、本番の保存先は exporter の上書きで選び直せる。
-- 許可した 4 属性と固定の本文だけが保存先に届き、ブラウザのメタデータ（user agent、セッション、URL の query など）は残らない。
+- 例外、View、LCP、INP、CLS を匿名 session ID で相関でき、URL token と利用者情報を保存先へ残さない。
 - 既定のビルドには SDK が入らないので、転用先は明示的に有効にするまで利用者のデータを集めない。
-- SDK を差し替えるときの変更が `lib/telemetry.ts` の 1 ファイルに収まる。
+- SDK を差し替えるときの変更が `lib/telemetry.ts` の 1 ファイルに収まる（縮約の `lib/telemetry-sanitize.ts` は SDK に依存しない）。
 
 ### Negative
 
@@ -172,9 +180,9 @@ Faro を更新するたびに、lockfile で `ua-parser-js` の版を確かめ�
 - faroreceiver は alpha で、Collector の更新で壊れうる。
   `task otel-collector-check` の Faro の fixture で検出する。
 - 本文の解析は、faroreceiver が書く logfmt（go-logfmt）と OTTL の `ParseKeyValue` の差に依存する（`'` を解析の間だけ U+0001 に置き換えている）。
-- ブラウザの `beforeSend` が消す相対 URL の query は、文字列の先頭、空白、`(`、`"`、`'`、`=` の直後の `/` から始まるものに限る（`:` の直後などは残る）。
-  Collector はログの相対 URL の query を消さない。
-  span の URL は Collector で `url.path` だけを残すので、query は保存先に届かない。
+- URL token は終端まで多めに置換するため、URL の直後に空白なしで続く句読点も消える。
+  秘密を残さないことを表示の再現性より優先する。
+- batching を無効にするため、有効なビルドでは signal ごとに `/collect` の HTTP request が発生する。
 - Faro の chunk は使わない計装も含むので、有効のときの chunk が大きい（約 112.5 kB、gzip で約 38.3 kB）。
 - Tracing を入れると、有効のビルドの JavaScript が合わせて約 89.3 kB（gzip で約 28.7 kB）増える。
   web-tracing と OpenTelemetry JS の chunk（84.1 kB、gzip で 26.3 kB）と、SDK と共有する chunk（3.0 kB、gzip で 1.3 kB）が増え、SDK の chunk が約 1.6 kB 増える。

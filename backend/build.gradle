@@ -17,12 +17,12 @@ plugins {
     id 'io.spring.dependency-management' version '1.1.7'
     id 'org.cyclonedx.bom' version '3.4.1'
     id 'jacoco'
-    id 'com.diffplug.spotless' version '8.10.2'
+    id 'com.diffplug.spotless' version '8.10.3'
     id 'pmd'
-    id 'com.github.spotbugs' version '6.5.11'
+    id 'com.github.spotbugs' version '6.5.12'
     id 'net.ltgt.errorprone' version '5.1.1'
     id 'org.liquibase.gradle' version '3.1.0'
-    id 'org.jooq.jooq-codegen-gradle' version '3.21.8'
+    id 'org.jooq.jooq-codegen-gradle' version '3.21.9'
     id 'info.solidsoft.pitest' version '1.19.0'
 }
 
@@ -129,7 +129,7 @@ dependencies {
     // ArchUnit の JUnit 5 連携（@AnalyzeClasses / @ArchTest）。
     // コア（com.tngtech.archunit:archunit）は spring-modulith-starter-test 経由で 1.4.2 が入るため、
     // JUnit 5 エンジンも同じ 1.4.2 に揃える。
-    testImplementation 'com.tngtech.archunit:archunit-junit5:1.5.0'
+    testImplementation 'com.tngtech.archunit:archunit-junit5:1.5.1'
     // 開発用の代表データの生成値（#114）。シーダーだけが使う。Spring BOM の管理外のため版を明示する。
     testImplementation 'net.datafaker:datafaker:2.7.0'
     // 決済代行の結合テストの偽物。standalone は Jetty を shade 済みで Spring Boot の依存と衝突しない。
@@ -144,9 +144,9 @@ dependencies {
     implementation 'org.jspecify:jspecify:1.0.1'
     // TableWriter が付ける @CheckReturnValue の注釈。log4j-api 経由で 2.38.0 が推移的に入っているが、推移的な経路に頼らないよう明示する。
     // Spring BOM の管理外のため版を明示し、解決済みの版にそろえる。
-    compileOnly 'com.google.errorprone:error_prone_annotations:2.38.0'
+    compileOnly 'com.google.errorprone:error_prone_annotations:2.50.0'
     errorprone 'com.google.errorprone:error_prone_core:2.50.0'
-    errorprone 'com.uber.nullaway:nullaway:0.14.1'
+    errorprone 'com.uber.nullaway:nullaway:0.14.2'
 }
 
 dependencyManagement {

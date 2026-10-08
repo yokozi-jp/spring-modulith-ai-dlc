@@ -246,6 +246,7 @@ Docker Compose の操作（サービスの起動、停止、状態確認、Keycl
 - Tailwind CSSと共有UI componentのdesign-system規則に加え、`dangerouslySetInnerHTML` と生のDOM HTML APIによる任意HTML描画をblocking検査します。
 - フロントエンド変更時は `task fe-verify` で静的解析、Knipによる未使用コード検査、テスト、本番ビルドを実行します。
 - `task fe-route-tree-check` はビルドで `routeTree.gen.ts` を再生成し、コミット済みの内容との差分があれば失敗させます。
+  Collector の route allowlist が再生成した `fullPaths` と一致しない場合も失敗させます。
 - `task fe-doctor`は手動のReact診断とFrontend CIで実行し、15分以内に完了しない場合は検査を失敗させます。
 - React Doctorのwarningとerrorはどちらもblockingとし、Frontend CIを停止します。
 - LefthookはFrontend変更を検出すると、pre-commitで `task fe-check`、pre-pushで `task fe-test-build` を実行します。
@@ -285,7 +286,9 @@ Docker Compose の操作（サービスの起動、停止、状態確認、Keycl
 ### 可観測性
 
 - `docker/otel-collector/config.yaml` を変更したときは `task otel-collector-check` を実行します。
-  このタスクは許可していない属性を含むOTLPのログとFaroのpayload（例外とtrace）をCollectorに流し、許可していない値とURLのqueryとfragmentが除かれ、許可した属性が残ることを確かめます。
+  このタスクは許可していない属性を含むOTLPのログとFaroのpayload（例外、View、LCP、INP、CLS、trace）をCollectorに流し、匿名session IDで相関できる許可済みの値だけが残ることを確かめます。
+  URL token、UUIDのsession ID、利用者情報、DOM情報、traceの`url.*`属性が残らないことも検査します。
+  最初に、Collector の route allowlist が `routeTree.gen.ts` と一致することを確かめます。
 - ブラウザの例外をローカルで送るには、`.env` に `FRONTEND_OTEL_ENABLED=true` を書いて `task compose-up` を実行し、`vp dev` を再起動して、Grafana で `{service_name="demo-web"}` を検索します（[ADR-068](docs/adr/ADR-068-collect-browser-telemetry-with-faro-via-collector.md)）。
 - 画面の API 呼び出しからバックエンドまでの trace は、次の手順で確かめます。
   1. 上と同じく `FRONTEND_OTEL_ENABLED=true` で `task compose-up` を実行し、バックエンドと `vp dev` を起動します。
