@@ -25,8 +25,11 @@ import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Stream;
 import org.jooq.Field;
+import org.jooq.Name;
 import org.jooq.PlainSQL;
+import org.jooq.conf.ParamType;
 import org.jooq.conf.Settings;
+import org.jooq.conf.StatementType;
 import org.jooq.impl.DSL;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -36,7 +39,8 @@ import org.springframework.transaction.annotation.Transactional;
 /**
  * DBアクセスの規約（docs/database/postgresql-concurrency-control.md、docs/database/jooq-usage.md）をプロダクションコードへ静的に強制する。
  *
- * <p>トランザクションの分離レベルの指定、jOOQのPlain SQLのAPI、スキーマ名の出力の無効化を検出する。テストコードと生成コードは {@link
+ * <p>トランザクションの分離レベルの指定、jOOQのPlain
+ * SQLのAPI、文字列をそのままSQLに出力するAPI、スキーマ名の出力の無効化、文の種類とバインド変数の設定の変更を検出する。テストコードと生成コードは {@link
  * ProductionCodeOnly} で対象外にする。
  *
  * <p>分離レベルの検査は、Springの {@code @Transactional} をクラスかメソッドに直接付けた場合だけを対象にし、それを含む合成アノテーションは対象にしない。
@@ -53,6 +57,9 @@ class DatabaseConventionsArchTest {
   /** {@code @PlainSQL} の付いたjOOQのAPIを呼ばず、メソッド参照もしない。 */
   @ArchTest /* package */ static final ArchRule plainSqlApisAreNotUsed = plainSqlRule();
 
+  /** 文字列をそのままSQLに出力する {@code DSL.unquotedName} と {@code DSL.keyword} を呼ばず、メソッド参照もしない。 */
+  @ArchTest /* package */ static final ArchRule verbatimSqlApisAreNotUsed = verbatimSqlRule();
+
   /**
    * {@code Settings.withRenderSchema} と {@code setRenderSchema} を呼ばず、メソッド参照もしない。
    *
@@ -60,13 +67,17 @@ class DatabaseConventionsArchTest {
    */
   @ArchTest /* package */ static final ArchRule renderSchemaIsNotChanged = renderSchemaRule();
 
+  /** {@code Settings} の {@code statementType} と {@code paramType} を変えるメソッドを呼ばず、メソッド参照もしない。 */
+  @ArchTest /* package */
+  static final ArchRule statementTypeAndParamTypeAreNotChanged = statementTypeAndParamTypeRule();
+
   @Test
   @DisplayName("DB規約に反するコードを拒否する")
   // JavaClasses は ArchUnit の import 結果を表す公開 API 型であり、インタフェースへ置き換えられない。
   @SuppressWarnings("PMD.LooseCoupling")
   void databaseConventionBypassesAreRejected() {
     // フィクスチャを実際に呼び出してIDEにも使用済みと認識させる。拒否判定は続くArchUnitの検査が担う。
-    assertThat(DatabaseConventionBypass.useForbiddenApis()).hasSize(4);
+    assertThat(DatabaseConventionBypass.useForbiddenApis()).hasSize(9);
 
     final JavaClasses bypassClass =
         new ClassFileImporter().importClasses(DatabaseConventionBypass.class);
@@ -83,6 +94,13 @@ class DatabaseConventionsArchTest {
         .isInstanceOf(AssertionError.class)
         .hasMessageContaining("calls method <org.jooq.impl.DSL.field(java.lang.String)>")
         .hasMessageContaining("references method <org.jooq.impl.DSL.field(java.lang.String)>");
+    assertThatThrownBy(() -> verbatimSqlRule().check(bypassClass))
+        .as("文字列をそのまま出力するAPI")
+        .isInstanceOf(AssertionError.class)
+        .hasMessageContaining("calls method <org.jooq.impl.DSL.unquotedName(java.lang.String)>")
+        .hasMessageContaining(
+            "references method <org.jooq.impl.DSL.unquotedName(java.lang.String)>")
+        .hasMessageContaining("calls method <org.jooq.impl.DSL.keyword(java.lang.String)>");
     assertThatThrownBy(() -> renderSchemaRule().check(bypassClass))
         .as("スキーマ名の出力の無効化")
         .isInstanceOf(AssertionError.class)
@@ -90,6 +108,13 @@ class DatabaseConventionsArchTest {
             "calls method <org.jooq.conf.Settings.withRenderSchema(java.lang.Boolean)>")
         .hasMessageContaining(
             "references method <org.jooq.conf.Settings.withRenderSchema(java.lang.Boolean)>");
+    assertThatThrownBy(() -> statementTypeAndParamTypeRule().check(bypassClass))
+        .as("文の種類とバインド変数の設定の変更")
+        .isInstanceOf(AssertionError.class)
+        .hasMessageContaining(
+            "calls method <org.jooq.conf.Settings.withStatementType(org.jooq.conf.StatementType)>")
+        .hasMessageContaining(
+            "calls method <org.jooq.conf.Settings.withParamType(org.jooq.conf.ParamType)>");
   }
 
   private static ArchRule isolationRule() {
@@ -112,6 +137,19 @@ class DatabaseConventionsArchTest {
                 + "規約：docs/database/jooq-usage.md、docs/adr/ADR-003-adopt-jooq-for-data-access.md");
   }
 
+  private static ArchRule verbatimSqlRule() {
+    return noClasses()
+        .should()
+        .accessTargetWhere(
+            JavaAccess.Predicates.target(
+                AccessTarget.Predicates.declaredIn(JavaClass.Predicates.assignableTo(DSL.class))
+                    .and(HasName.Predicates.nameMatching("unquotedName|keyword"))))
+        .because(
+            "@PlainSQL は付かないが、文字列を引用符なしでそのまま SQL に出力し、リクエストの値を渡すとインジェクションが成立するため。"
+                + "直し方：unquotedName と keyword の呼び出しを削除し、テーブルとカラムは生成されたクラスから参照する。"
+                + "規約：docs/database/jooq-usage.md");
+  }
+
   private static ArchRule renderSchemaRule() {
     return noClasses()
         .should()
@@ -123,6 +161,19 @@ class DatabaseConventionsArchTest {
             "search_path による暗黙の振り分けを避け、SQL をスキーマ名で修飾したままにするため。"
                 + "直し方：renderSchema は既定の true のまま変えず、withRenderSchema と setRenderSchema の呼び出しを削除する。"
                 + "規約：docs/database/jooq-usage.md、docs/adr/ADR-011-use-module-owned-database-schemas.md");
+  }
+
+  private static ArchRule statementTypeAndParamTypeRule() {
+    return noClasses()
+        .should()
+        .accessTargetWhere(
+            JavaAccess.Predicates.target(
+                AccessTarget.Predicates.declaredIn(Settings.class)
+                    .and(HasName.Predicates.nameMatching("(with|set)(StatementType|ParamType)"))))
+        .because(
+            "値を SQL へ埋め込まず、バインド変数で渡すため。"
+                + "直し方：statementType と paramType は既定の PREPARED_STATEMENT と INDEXED のまま変えず、withStatementType、setStatementType、withParamType、setParamType の呼び出しを削除する。"
+                + "規約：docs/database/jooq-usage.md");
   }
 
   private static ArchCondition<JavaClass> notDeclareTransactionIsolation() {
@@ -161,11 +212,20 @@ class DatabaseConventionsArchTest {
       // メソッド参照もPlain SQLのAPIの利用として検出する。
       final Function<String, Field<Object>> plainSqlField = DSL::field;
       final Function<Boolean, Settings> renderSchema = new Settings()::withRenderSchema;
+      final Function<String, Name> unquotedName = DSL::unquotedName;
       return List.of(
           new DatabaseConventionBypass().repeatableRead(),
           plainSqlField.apply("x"),
           new Settings().withRenderSchema(false),
-          renderSchema.apply(false));
+          renderSchema.apply(false),
+          // 引用符を付けずに出力するAPIは禁止する。
+          DSL.unquotedName("x"),
+          unquotedName.apply("x"),
+          // キーワードとして文字列をそのまま出力するAPIは禁止する。
+          DSL.keyword("x"),
+          // 値をSQLへ埋め込む設定は禁止する。
+          new Settings().withStatementType(StatementType.STATIC_STATEMENT),
+          new Settings().withParamType(ParamType.INLINED));
     }
 
     // 分離レベルを指定した @Transactional は禁止する。
