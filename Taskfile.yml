@@ -506,11 +506,12 @@ tasks:
     internal: true
     cmds:
       - test -f .env.test || cp .env.test.example .env.test
-      # 既存の .env.test は上書きしないので、.env.test.example に増えた変数の不足をここで止める。
+      # 既存の環境ファイルは上書きしないので、TEST_ENV_FILE で選んだファイルに .env.test.example の変数が足りなければここで止める。
       - |
-        missing="$(sed -n 's/^\([A-Za-z_][A-Za-z0-9_]*\)=.*/\1/p' .env.test.example | while read -r key; do grep -q "^${key}=" .env.test || printf ' %s' "$key"; done)"
+        test -f "{{.TEST_ENV_FILE}}" || { echo "{{.TEST_ENV_FILE}} がありません。" >&2; exit 1; }
+        missing="$(sed -n 's/^\([A-Za-z_][A-Za-z0-9_]*\)=.*/\1/p' .env.test.example | while read -r key; do grep -q "^${key}=" "{{.TEST_ENV_FILE}}" || printf ' %s' "$key"; done)"
         if [ -n "$missing" ]; then
-          echo ".env.test に .env.test.example の変数がありません:${missing}。.env.test.example の行を .env.test へ足してください。" >&2
+          echo "{{.TEST_ENV_FILE}} に .env.test.example の変数がありません:${missing}。.env.test.example の行を {{.TEST_ENV_FILE}} へ足してください。" >&2
           exit 1
         fi
 
