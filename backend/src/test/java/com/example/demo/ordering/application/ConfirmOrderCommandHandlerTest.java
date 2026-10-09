@@ -4,17 +4,14 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.example.demo.ordering.OrderConfirmed;
-import com.example.demo.product.TestProducts;
+import com.example.demo.ordering.TestOrders;
 import com.example.demo.shared.concurrency.ConflictException;
 import com.example.demo.shared.concurrency.ExpectedLockNo;
 import com.example.demo.shared.failure.BusinessRuleViolationException;
 import com.example.demo.testkit.CleanGeneratedTablesExtension;
 import com.example.demo.testkit.SharedTestConfiguration;
-import com.example.demo.testkit.UniqueCodes;
 import io.micrometer.observation.Observation;
 import io.micrometer.observation.ObservationRegistry;
-import java.util.List;
-import java.util.UUID;
 import java.util.function.Supplier;
 import org.jooq.DSLContext;
 import org.junit.jupiter.api.DisplayName;
@@ -111,15 +108,7 @@ class ConfirmOrderCommandHandlerTest {
 
   /** 販売中の商品で下書きの注文を作り、注文 ID を返す。 */
   private String draftedOrderId() {
-    final UUID productId = TestProducts.onSale(dsl, UniqueCodes.next("P"), "120.00");
-    return observed(
-        () ->
-            draftOrder
-                .handle(
-                    new DraftOrderCommand(
-                        UniqueCodes.next("C"),
-                        List.of(new DraftOrderCommand.Line(productId.toString(), 2))))
-                .orderId());
+    return TestOrders.drafted(dsl, draftOrder, observationRegistry);
   }
 
   /** 共通カラムの trace ID を取れるよう、observation の中で処理を呼ぶ。 */

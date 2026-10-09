@@ -30,6 +30,15 @@ function invalid(text: string | undefined, id: string) {
   return text === undefined ? {} : { "aria-invalid": true, "aria-errormessage": id };
 }
 
+/** 欄の直下の誤りの文言。aria-errormessage が id で指す。 */
+function errorText(text: string | undefined, id: string) {
+  return text === undefined ? undefined : (
+    <p id={id} className="text-sm text-destructive">
+      {text}
+    </p>
+  );
+}
+
 /** 作成と明細の変更が共有する明細の入力欄。送信時の検証とサーバーの 400 の両方を欄の直下に出す。 */
 export const OrderLinesFields = withFieldGroup({
   defaultValues,
@@ -54,11 +63,7 @@ export const OrderLinesFields = withFieldGroup({
           return (
             <fieldset className="flex flex-col gap-4">
               <legend className="font-semibold">{t("orders.fields.lines")}</legend>
-              {linesError === undefined ? undefined : (
-                <p id={`${idPrefix}-lines-error`} className="text-sm text-destructive">
-                  {linesError}
-                </p>
-              )}
+              {errorText(linesError, `${idPrefix}-lines-error`)}
               {linesField.state.value.map((line, index) => {
                 const number = index + 1;
                 const productName = `lines[${index}].productId` as const;
@@ -97,11 +102,7 @@ export const OrderLinesFields = withFieldGroup({
                                 </option>
                               ))}
                             </select>
-                            {error === undefined ? undefined : (
-                              <p id={`${id}-error`} className="text-sm text-destructive">
-                                {error}
-                              </p>
-                            )}
+                            {errorText(error, `${id}-error`)}
                           </div>
                         );
                       }}
@@ -130,11 +131,7 @@ export const OrderLinesFields = withFieldGroup({
                               }}
                               {...invalid(error, `${id}-error`)}
                             />
-                            {error === undefined ? undefined : (
-                              <p id={`${id}-error`} className="text-sm text-destructive">
-                                {error}
-                              </p>
-                            )}
+                            {errorText(error, `${id}-error`)}
                           </div>
                         );
                       }}

@@ -240,26 +240,12 @@ class PaymentGatewayClientIntegrationTest {
     assertRecordedOnce(orderId, "DECLINED", CHARGE_ID_PREFIX + orderId);
   }
 
-  @Test
-  @DisplayName("決済代行が契約の不備の 4xx を返せば、失敗を決済記録に残し、出版を完了にし、circuit breaker は失敗に数えない")
-  void contractErrorIsRecordedAndCompletes(final Scenario scenario) {
-    final String orderId = fixture.draftedOrderId();
-    stubCharge(orderId, WireMock.badRequest());
-
-    fixture.confirmAndAwait(
-        scenario, orderId, COMPLETED_PUBLICATION, state -> state.archived() == 1);
-
-    assertRecordedOnce(orderId, FAILED, null);
-    assertThat(circuitBreaker.getMetrics().getNumberOfFailedCalls())
-        .as("orderId=%s の 400 で circuit breaker が数えた失敗", orderId)
-        .isZero();
-  }
-
   @ParameterizedTest(name = "{0} {1}")
   @CsvSource(
       delimiter = '|',
       quoteCharacter = '\'',
       value = {
+        "400 | ''",
         "200 | {\"chargeId\":\"ch_1\",\"status\":\"SUCCEEDED\"}",
         "202 | {\"chargeId\":\"ch_1\",\"status\":\"SUCCEEDED\"}",
         "201 | ''",
@@ -269,7 +255,7 @@ class PaymentGatewayClientIntegrationTest {
         "201 | {\"chargeId\":\"\",\"status\":\"DECLINED\"}",
         "200 | {\"chargeId\":\"ch_1\",\"status\":\"DECLINED\"}",
       })
-  @DisplayName("決済代行の応答が契約に合わなければ、失敗を決済記録に残し、出版を完了にし、circuit breaker は失敗に数えない")
+  @DisplayName("決済代行が契約の不備の 4xx か契約に合わない応答を返せば、失敗を決済記録に残し、出版を完了にし、circuit breaker は失敗に数えない")
   void contractViolatingReplyIsRecordedAndCompletes(
       final int status, final String body, final Scenario scenario) {
     final String orderId = fixture.draftedOrderId();

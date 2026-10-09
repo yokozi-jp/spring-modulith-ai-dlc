@@ -4,18 +4,15 @@ import static com.example.demo.jooq.modulith.Tables.EVENT_PUBLICATION;
 import static com.example.demo.jooq.modulith.Tables.EVENT_PUBLICATION_ARCHIVE;
 
 import com.example.demo.ordering.OrderConfirmed;
+import com.example.demo.ordering.TestOrders;
 import com.example.demo.ordering.application.ConfirmOrderCommand;
 import com.example.demo.ordering.application.ConfirmOrderCommandHandler;
-import com.example.demo.ordering.application.DraftOrderCommand;
 import com.example.demo.ordering.application.DraftOrderCommandHandler;
-import com.example.demo.product.TestProducts;
 import com.example.demo.shared.concurrency.ExpectedLockNo;
-import com.example.demo.testkit.UniqueCodes;
 import io.micrometer.observation.Observation;
 import io.micrometer.observation.ObservationRegistry;
 import java.time.Instant;
 import java.util.List;
-import java.util.UUID;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Predicate;
 import java.util.function.Supplier;
@@ -60,15 +57,7 @@ final class OrderConfirmedFixture {
 
   /** 単価 120 円の商品を 2 個の下書きの注文を作り、注文 ID を返す。 */
   /* package */ String draftedOrderId() {
-    final UUID productId = TestProducts.onSale(dsl, UniqueCodes.next("P"), "120.00");
-    return observed(
-        () ->
-            draftOrder
-                .handle(
-                    new DraftOrderCommand(
-                        UniqueCodes.next("C"),
-                        List.of(new DraftOrderCommand.Line(productId.toString(), 2))))
-                .orderId());
+    return TestOrders.drafted(dsl, draftOrder, observationRegistry);
   }
 
   /** 作った直後（{@code lockNo} 1）の下書きの注文を確定する。 */
