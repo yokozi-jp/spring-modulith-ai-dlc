@@ -30,6 +30,7 @@ import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.boot.autoconfigure.AutoConfigurations;
 import org.springframework.boot.autoconfigure.context.PropertyPlaceholderAutoConfiguration;
+import org.springframework.boot.convert.ApplicationConversionService;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 import org.springframework.core.NestedExceptionUtils;
 import org.springframework.core.env.StandardEnvironment;
@@ -67,7 +68,15 @@ class PaymentGatewayClientTest {
                       .getEnvironment()
                       .getPropertySources()
                       .remove(StandardEnvironment.SYSTEM_ENVIRONMENT_PROPERTY_SOURCE_NAME))
+          // SpringApplication と同じく、1s のような Duration の値を変換できるようにする。
+          .withInitializer(
+              context ->
+                  context
+                      .getBeanFactory()
+                      .setConversionService(ApplicationConversionService.getSharedInstance()))
           .withConfiguration(AutoConfigurations.of(PropertyPlaceholderAutoConfiguration.class))
+          .withPropertyValues(
+              "payment-gateway.connect-timeout=1s", "payment-gateway.read-timeout=2s")
           .withBean(PaymentGatewayClient.class);
 
   /** テストごとに起動する決済代行の代わりの HTTP サーバ。 */
@@ -258,7 +267,9 @@ class PaymentGatewayClientTest {
         "http://"
             + InetAddress.getLoopbackAddress().getHostAddress()
             + ":"
-            + started.getAddress().getPort());
+            + started.getAddress().getPort(),
+        Duration.ofSeconds(1),
+        Duration.ofSeconds(2));
   }
 
   /** JSON の本文で応答する。本文が空なら本文を送らない。 */

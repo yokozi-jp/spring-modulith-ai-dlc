@@ -159,6 +159,12 @@ spring:
 # 決済代行の URL。既定値を置かず、未設定なら起動に失敗する。ローカルと E2E だけが WireMock を指す。
 payment-gateway:
   base-url: ${PAYMENT_GATEWAY_BASE_URL}
+  # ADR-019 の開始値。環境で変えないため固定値にする。
+  # Listener はトランザクションの中で決済代行を呼ぶ（ADR-050）ため、
+  # (connect-timeout + read-timeout) × retry の試行回数 + 再試行の待ちの合計を、
+  # どの環境でも DB_IDLE_IN_TRANSACTION_TIMEOUT_MS より短くする（ADR-055）。DemoApplicationTest が確かめる。
+  connect-timeout: 1s
+  read-timeout: 2s
 
 # 外部 client は依存先ごとに名前付き instance を定義し、client adapter の境界で適用する。
 # 現在の PostgreSQL、Redis、OIDC 通信へは自動適用されない。

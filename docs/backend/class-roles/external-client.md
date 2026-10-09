@@ -38,10 +38,17 @@ Client はユースケースの進行役でもない。
 ## 必須の記述
 
 - `@Component` を付けた package-private の `class` にし、`final` を付けず、外部システムのインタフェースを実装する。
-- コンストラクタは一つにし、`@Value("${payment-gateway.base-url}") final String baseUrl` を受け取る。
+- コンストラクタは一つにし、`@Value("${payment-gateway.base-url}") final String baseUrl` と、`@Value` の `Duration` の `connect-timeout` と `read-timeout` を受け取る。
   `application.yaml` の `base-url` は既定値のない環境変数（`${PAYMENT_GATEWAY_BASE_URL}`）にし、未設定なら起動に失敗させる。
   WireMock の URL は env の例と compose ファイルにだけ書く。
-- コンストラクタで、`JdkClientHttpRequestFactory` に接続のタイムアウト 1 秒と呼び出しのタイムアウト 2 秒を設定し、`RestClient` を作る。
+- コンストラクタで、`JdkClientHttpRequestFactory` に接続のタイムアウト（1 秒）と呼び出しのタイムアウト（2 秒）を設定し、`RestClient` を作る。
+  値は `application.yaml` の `payment-gateway` に固定値で書き、テストが同じ値を読めるようにする。
+- トランザクションの中で呼ぶ Client は、最悪の時間を `idle_in_transaction_session_timeout` より短くする。
+  [ADR-050](../../adr/ADR-050-define-backend-class-roles-and-naming.md) により、Listener は CommandHandler のトランザクションの中で外部システムを呼ぶ。
+  最悪の時間は、(接続のタイムアウト + 呼び出しのタイムアウト) × retry の試行の回数 + 再試行の待ちの合計である。
+  これが `DB_IDLE_IN_TRANSACTION_TIMEOUT_MS`（[ADR-055](../../adr/ADR-055-set-db-time-limits-per-connection.md)）以上だと、待つ間に PostgreSQL が接続を切り、結果を記録できない。
+  今の値は 1 × (1 秒 + 2 秒) + 0 = 3 秒で、ローカルとテストの 10 秒より短い。
+  `DemoApplicationTest` が束縛した設定からこれを確かめる。
 - 実装するメソッドに `@CircuitBreaker(name = "payment-gateway")` と `@Retry(name = "payment-gateway")` を付ける。
   リトライはこの層だけで行い、CommandHandler や HTTP クライアントで重ねない。
 - instance の設定は、`application.yaml` の `resilience4j` に、既定の設定を継承して書く。
@@ -61,6 +68,8 @@ Client はユースケースの進行役でもない。
 ```yaml
 payment-gateway:
   base-url: ${PAYMENT_GATEWAY_BASE_URL}
+  connect-timeout: 1s
+  read-timeout: 2s
 
 resilience4j:
   circuitbreaker:
@@ -116,7 +125,8 @@ Client は、外部システムの呼び出しの結果を次の四つに分け�
 ## 最小の例と典型的な例
 
 最小の例は、決済システムに代金を請求する `PaymentGatewayClient` である。
-成功の応答だけを扱い、結果の分類は省いている。
+成功の応答だけを受付にし、ほかの応答は契約の不備にする。
+4xx と 5xx の分類とログは省いている。
 
 ```java
 package com.example.demo.ordering.infrastructure.client;
@@ -125,51 +135,50 @@ package com.example.demo.ordering.infrastructure.client;
 @Component
 class PaymentGatewayClient implements PaymentGateway {
 
-  /** 接続の確立を待つ上限。 */
-  private static final Duration CONNECT_TIMEOUT = Duration.ofSeconds(1);
-
-  /** 一回の呼び出しの応答を待つ上限。 */
-  private static final Duration READ_TIMEOUT = Duration.ofSeconds(2);
-
   /** 決済システムが冪等性キーを受け取るヘッダー。 */
   private static final String IDEMPOTENCY_KEY = "Idempotency-Key";
 
   /** 決済システムを呼ぶ HTTP クライアント。 */
   private final RestClient restClient;
 
-  /** 決済システムの URL を受け取り、タイムアウトを設定した HTTP クライアントを作る。 */
-  /* package */ PaymentGatewayClient(@Value("${payment-gateway.base-url}") final String baseUrl) {
+  /** 決済システムの URL とタイムアウトを受け取り、HTTP クライアントを作る。 */
+  /* package */ PaymentGatewayClient(
+      @Value("${payment-gateway.base-url}") final String baseUrl,
+      @Value("${payment-gateway.connect-timeout}") final Duration connectTimeout,
+      @Value("${payment-gateway.read-timeout}") final Duration readTimeout) {
     final JdkClientHttpRequestFactory requestFactory =
-        new JdkClientHttpRequestFactory(
-            HttpClient.newBuilder().connectTimeout(CONNECT_TIMEOUT).build());
-    requestFactory.setReadTimeout(READ_TIMEOUT);
+        new JdkClientHttpRequestFactory(HttpClient.newBuilder().connectTimeout(connectTimeout).build());
+    requestFactory.setReadTimeout(readTimeout);
     this.restClient = RestClient.builder().baseUrl(baseUrl).requestFactory(requestFactory).build();
   }
 
-  /** 注文の代金を請求し、決済 ID を返す。 */
+  /** 注文の代金を請求し、結果を返す。 */
   @CircuitBreaker(name = "payment-gateway")
   @Retry(name = "payment-gateway")
   @Override
-  public PaymentId charge(final OrderId orderId, final Money amount) {
-    final ChargeReply reply =
+  public ChargeOutcome charge(final OrderId orderId, final Money amount) {
+    final ResponseEntity<ChargeReply> response =
         restClient
             .post()
             .uri("/payments")
             .header(IDEMPOTENCY_KEY, orderId.value())
             .body(new ChargeBody(orderId.value(), amount.amount()))
             .retrieve()
-            .body(ChargeReply.class);
-    if (reply == null) {
-      throw new IllegalStateException("payment gateway returned no body: orderId=" + orderId.value());
+            .toEntity(ChargeReply.class);
+    final ChargeReply reply = response.getBody();
+    if (response.getStatusCode().value() != HttpStatus.CREATED.value()
+        || reply == null
+        || reply.paymentId() == null) {
+      return ChargeOutcome.failed();
     }
-    return new PaymentId(reply.paymentId());
+    return ChargeOutcome.paid(new GatewayPaymentCode(reply.paymentId()));
   }
 
   /** 請求の API に送る本文。 */
   private record ChargeBody(String orderId, BigDecimal amount) {}
 
   /** 請求の API が返す本文。 */
-  private record ChargeReply(String paymentId) {}
+  private record ChargeReply(@Nullable String paymentId) {}
 }
 ```
 
@@ -251,7 +260,10 @@ class PaymentGatewayClientTest {
     server.start();
     try {
       final PaymentGatewayClient client =
-          new PaymentGatewayClient("http://localhost:" + server.getAddress().getPort());
+          new PaymentGatewayClient(
+              "http://localhost:" + server.getAddress().getPort(),
+              Duration.ofSeconds(1),
+              Duration.ofSeconds(2));
 
       final PaymentId paymentId =
           client.charge(new OrderId(orderUuid), new Money(new BigDecimal("1000")));
@@ -313,7 +325,8 @@ class PaymentGatewayClientTest {
 - [ ] jOOQ の API と生成型を使わない。［ArchUnit で検査：PackageByFeatureOnionArchitectureTest.databaseTechnologyApisAreOnlyUsedByPersistenceAdapters］
 - [ ] `@Transactional` を付けない。［ArchUnit で検査：PackageByFeatureOnionArchitectureTest.transactionalMethodsArePublicApplicationMethods］
 - [ ] `@Component` を付けた package-private の class にし、URL を `@Value` で受け取る。［自分で点検］
-- [ ] 接続 1 秒、呼び出し 2 秒のタイムアウトを設定する。［自分で点検］
+- [ ] 接続 1 秒、呼び出し 2 秒のタイムアウトを `application.yaml` に書き、コンストラクタで受け取る。［自分で点検］
+- [ ] トランザクションの中で呼ぶなら、最悪の時間を `DB_IDLE_IN_TRANSACTION_TIMEOUT_MS` より短くする。［結合テストで検査：DemoApplicationTest.paymentGatewayWorstCaseFitsIdleInTransactionTimeout］
 - [ ] 名前付きの instance の `@CircuitBreaker` と `@Retry` をメソッドに付け、`application.yaml` に設定を書く。［自分で点検］
 - [ ] circuit breaker の instance に、429 以外の 4xx を無視する `ignore-exception-predicate` を指定する。［結合テストで検査：PaymentGatewayClientIntegrationTest］
 - [ ] 業務上の拒否と契約の不備を結果で返し、一時障害と資格情報の不備を例外で投げる。［結合テストで検査：PaymentGatewayClientIntegrationTest］

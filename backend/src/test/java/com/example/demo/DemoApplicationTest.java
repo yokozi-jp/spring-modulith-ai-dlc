@@ -205,6 +205,45 @@ class DemoApplicationTest {
   }
 
   @Test
+  @DisplayName("決済代行の呼び出しの最悪の時間は、トランザクション中の待機の上限より短い")
+  void paymentGatewayWorstCaseFitsIdleInTransactionTimeout() {
+    // Listener はトランザクションの中で決済代行を呼ぶ（ADR-050）。待つ間に idle_in_transaction_session_timeout を超えると、
+    // PostgreSQL が接続を切り、請求の結果を記録できない（ADR-055）。
+    final Duration connectTimeout =
+        applicationContext
+            .getEnvironment()
+            .getRequiredProperty("payment-gateway.connect-timeout", Duration.class);
+    final Duration readTimeout =
+        applicationContext
+            .getEnvironment()
+            .getRequiredProperty("payment-gateway.read-timeout", Duration.class);
+    final RetryConfig retryConfig = retryRegistry.retry("payment-gateway").getRetryConfig();
+    final IntervalBiFunction<Object> intervalFunction =
+        Objects.requireNonNull(
+            retryConfig.getIntervalBiFunction(), "payment-gateway の retry の interval function");
+    final Either<Throwable, Object> failure = Either.left(new IllegalStateException("一時障害のテスト入力"));
+    final int attempts = retryConfig.getMaxAttempts();
+    long worstCaseMillis = attempts * (connectTimeout.toMillis() + readTimeout.toMillis());
+    for (int retry = 1; retry < attempts; retry++) {
+      worstCaseMillis += Objects.requireNonNull(intervalFunction.apply(retry, failure), "再試行の待ち");
+    }
+    final long idleTimeoutMillis =
+        applicationContext
+            .getEnvironment()
+            .getRequiredProperty("DB_IDLE_IN_TRANSACTION_TIMEOUT_MS", Long.class);
+    final long worstCase = worstCaseMillis;
+
+    assertTrue(
+        worstCase < idleTimeoutMillis,
+        () ->
+            "決済代行の最悪の時間 "
+                + worstCase
+                + " ms が DB_IDLE_IN_TRANSACTION_TIMEOUT_MS "
+                + idleTimeoutMillis
+                + " ms より短いこと");
+  }
+
+  @Test
   @DisplayName("time limiter は外部呼び出しを二秒で打ち切る")
   void timeLimiterUsesProjectDefault() {
     final TimeLimiterConfig config = timeLimiterRegistry.getDefaultConfig();

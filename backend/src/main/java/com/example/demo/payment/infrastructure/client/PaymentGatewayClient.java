@@ -27,9 +27,9 @@ import org.springframework.web.client.UnknownContentTypeException;
 /**
  * 決済代行の HTTP API で、注文 ID を冪等性キーにして注文の代金を請求する。
  *
- * <p>タイムアウト、circuit breaker、retry は ADR-019 の既定値のままにする。決済代行の SLO がまだないため、値を変える根拠がない。retry は {@code
- * ChargeOrderCommandHandler} のトランザクションの中で呼ぶため default を継承して試行 1 回にし、失敗した請求はイベント出版の再投入でやり直す。
- * 再投入で同じ注文をもう一度請求しても、冪等性キーで二重の請求を防ぐ。
+ * <p>タイムアウト（application.yaml の {@code payment-gateway}）、circuit breaker、retry は ADR-019
+ * の既定値のままにする。決済代行の SLO がまだないため、値を変える根拠がない。retry は {@code ChargeOrderCommandHandler}
+ * のトランザクションの中で呼ぶため default を継承して試行 1 回にし、失敗した請求はイベント出版の再投入でやり直す。 再投入で同じ注文をもう一度請求しても、冪等性キーで二重の請求を防ぐ。
  *
  * <p>結果は ADR-072 の四つの分類に分ける。拒否（{@code DECLINED}）と契約の不備は結果で返し、呼び出し元が業務の状態に記録する。 契約の不備は、401、403、429
  * 以外の 4xx と、契約に合わない応答である。契約に合う応答は、201 で、JSON の本文に空でない {@code chargeId} と {@code SUCCEEDED} か {@code
@@ -41,12 +41,6 @@ import org.springframework.web.client.UnknownContentTypeException;
 @Slf4j
 @Component
 class PaymentGatewayClient implements PaymentGateway {
-
-  /** 接続の確立を待つ上限。 */
-  private static final Duration CONNECT_TIMEOUT = Duration.ofSeconds(1);
-
-  /** 一回の呼び出しの応答を待つ上限。 */
-  private static final Duration READ_TIMEOUT = Duration.ofSeconds(2);
 
   /** 決済代行が冪等性キーを受け取るヘッダー。 */
   private static final String IDEMPOTENCY_KEY = "Idempotency-Key";
@@ -63,12 +57,21 @@ class PaymentGatewayClient implements PaymentGateway {
   /** 決済代行を呼ぶ HTTP クライアント。 */
   private final RestClient restClient;
 
-  /** 決済代行の URL を受け取り、タイムアウトを設定した HTTP クライアントを作る。 */
-  /* package */ PaymentGatewayClient(@Value("${payment-gateway.base-url}") final String baseUrl) {
+  /**
+   * 決済代行の URL とタイムアウトを受け取り、HTTP クライアントを作る。
+   *
+   * @param baseUrl 決済代行の URL
+   * @param connectTimeout 接続の確立を待つ上限
+   * @param readTimeout 一回の呼び出しの応答を待つ上限
+   */
+  /* package */ PaymentGatewayClient(
+      @Value("${payment-gateway.base-url}") final String baseUrl,
+      @Value("${payment-gateway.connect-timeout}") final Duration connectTimeout,
+      @Value("${payment-gateway.read-timeout}") final Duration readTimeout) {
     final JdkClientHttpRequestFactory requestFactory =
         new JdkClientHttpRequestFactory(
-            HttpClient.newBuilder().connectTimeout(CONNECT_TIMEOUT).build());
-    requestFactory.setReadTimeout(READ_TIMEOUT);
+            HttpClient.newBuilder().connectTimeout(connectTimeout).build());
+    requestFactory.setReadTimeout(readTimeout);
     this.restClient = RestClient.builder().baseUrl(baseUrl).requestFactory(requestFactory).build();
   }
 

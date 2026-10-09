@@ -57,6 +57,9 @@ tags: [convention, database, liquibase, security, credentials]
   PostgreSQLは`0`を上限なしとして受け付けるため、`0`を渡すと無期限に待ちます。
 - `lock_timeout`は`statement_timeout`より短くします。
 - `statement_timeout`は`DB_POOL_CONNECTION_TIMEOUT_MS`以下にします。
+- `idle_in_transaction_session_timeout`は、トランザクションの中で呼ぶ外部システムの最悪の時間より長くします。
+  決済のListenerはトランザクションの中で決済代行を呼び、待つ間はトランザクションを開いたままです（[ADR-050](../adr/ADR-050-define-backend-class-roles-and-naming.md)）。
+  今の最悪の時間は3秒で、計算と検査は[外部システムのClient](../backend/class-roles/external-client.md)と`DemoApplicationTest`にあります。
 
 `postgresql.conf`、RDSのパラメータグループ、`ALTER ROLE`では設定しません。
 1つのトランザクションだけ上限を変えるときは、`SET LOCAL`を使い、理由をコードに書きます。
