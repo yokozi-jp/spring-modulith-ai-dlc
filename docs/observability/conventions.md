@@ -8,6 +8,7 @@ tags: [convention, observability, opentelemetry, security]
 # 可観測性データの規約
 
 バックエンドはログ、トレース、メトリクスを OpenTelemetry で Collector へ送ってコンソールにも ECS JSON を出し、フロントエンドは Faro Web SDK でブラウザの例外、画面遷移、Core Web Vitals、同一オリジンの `/api/**` の要求の trace を Collector へ送る。
+CSP 違反は、ブラウザ自身が Reporting API で同一オリジンの `/csp-report` から Collector へ送る。
 例外は logger へ渡して標準どおりに記録し、禁止値はアプリケーションから渡さない。
 ログの属性は Collector の allowlist で絞り、保存先で閲覧の制限と表示時のマスクを行う。
 設計判断は [ADR-015](../adr/ADR-015-structure-and-protect-observability-data.md)、[ADR-043](../adr/ADR-043-send-production-telemetry-to-cloudwatch-via-otel-collector.md)、[ADR-045](../adr/ADR-045-remove-aws-docs-and-production-cd-example.md)、[ADR-068](../adr/ADR-068-collect-browser-telemetry-with-faro-via-collector.md)、[ADR-070](../adr/ADR-070-record-sql-spans-with-jooq-execute-listener.md) に記録している。
@@ -76,6 +77,12 @@ Web Vitals は LCP、INP、CLS の主値を一つだけ残し、付加情報を�
 ログアウトの送信前に session ID を切り替え、`APP_SESSION` と利用者情報へ結び付けない。
 `traceparent` は同一オリジンの `/api/**` への fetch と XHR だけに付け、IdP を含む別オリジン、`/collect`、`/api/**` 以外のパスには付けない。
 Collector へは Cookie を送らない（`credentials: "omit"`）。
+CSP 違反の報告は Reporting API が同一オリジンの Cookie を付けて送るので、`/collect` と `/csp-report` を転送する層（開発は Vite の proxy、本番は CDN か reverse proxy）が `Cookie`、`Authorization`、`Proxy-Authorization` を消す（[ADR-068](../adr/ADR-068-collect-browser-telemetry-with-faro-via-collector.md)）。
+
+CSP 違反の報告は、ブラウザが文書の URL、`referrer`、`user_agent`、適用中の CSP の全体を本文に入れて送る。
+Collector は文書の URL を残さず、`blockedURL` を origin か scheme かキーワードまで、`sourceFile` を文書と同一オリジンの `/assets/<名前>.js` の path まで縮約する（[ADR-068](../adr/ADR-068-collect-browser-telemetry-with-faro-via-collector.md)）。
+CSP に `'report-sample'` を足さない。
+足すと、報告の `sample` に違反した DOM の文字列が入る。
 
 ブラウザの例外と trace を送るかはビルド時の `FRONTEND_OTEL_ENABLED` で決め、既定は無効にする（[ADR-068](../adr/ADR-068-collect-browser-telemetry-with-faro-via-collector.md)）。
 環境ごとの値は次のとおり。
@@ -126,6 +133,21 @@ span の event と link を捨て、属性は検証済みの `http.request.metho
 すべての `url.*` 属性を削除するが、trace ID、span ID、親 span ID は変更しない。
 resource 属性はフロントエンドのログと同じ 4 つに絞り、span の名前を `Browser request`、scope の名前を `browser` に固定する。
 
+CSP 違反の報告は、`webhook_event` receiver から別の pipeline（`logs/frontend_csp`）で絞る。
+`unroll` で報告ごとの record に分け、型が `csp-violation` で directive と disposition が形式に合う record だけを通す。
+本文は `Browser CSP violation` に固定し、残す属性は次の 7 つである。
+
+- `telemetry.signal`：`csp-violation` に固定する。
+- `csp.directive`、`csp.disposition`：検証済みの `effectiveDirective` と `disposition`。
+- `csp.blocked`：`blockedURL` のキーワード（`inline` など）、階層を持つ URL の `scheme://host[:port]`、それ以外の URL の scheme のいずれかを小文字で残す。300 文字を超える値は残さない。
+  authority の全体が hostname（英数字、`.`、`-`）か角括弧の IPv6 と数値の port に一致しない階層 URL（数値でない port、`@` を重ねた userinfo など）は残さない。
+- `code.file.path`：`sourceFile` が `documentURL` と同一オリジンの `/assets/<名前>.js` のときだけ、origin を落とした path を残す。別オリジンの URL と、query か fragment を持つ URL は残さない。
+- `code.line.number`、`code.column.number`：0 以上 2147483647 以下の整数だけを残す。
+
+resource 属性はフロントエンドのログと同じ 4 つを Collector の値で付け、receiver が付ける scope の属性は消す。
+`service.version` は Compose が `version.txt` から渡す `FRONTEND_SERVICE_VERSION` である。
+この版は報告を送った bundle の版ではなく、Collector の起動時に配信していた版を指す。
+
 自由入力を正規表現でマスクする処理は Collector に置かない。
 表記ゆれによる取りこぼしと誤マスクが起きるため、検知は保存先のデータ保護ポリシーで行う。
 URL の query と fragment の除去はこの規則の対象外とし、フロントエンドの pipeline に限って置く（[ADR-068](../adr/ADR-068-collect-browser-telemetry-with-faro-via-collector.md)）。
@@ -141,6 +163,9 @@ faro receiver は処理に失敗すると、payload の全体を Collector 自�
   最初に、route の allowlist と `routeTree.gen.ts` の一致も確かめる。
   同じ fixture の trace は `traces/frontend` の出口を別のファイルに分けて検査し、URL 属性がなく、許可した HTTP 属性と resource 属性だけが残り、trace ID、span ID、親 span ID が保たれることを確かめる。
   faro receiver の受け口が、GET に 405、`text/plain` に 415、別のパスに 202、1 MiB を超える本文に 400 を返すことも確かめる。
+  CSP の報告の fixture（`csp-reports.json`）を `logs/frontend_csp` に流し、出口の件数、7 つの属性、縮約した URL、resource 属性、空の scope の属性を確かめる。
+  fixture は、query と fragment、大文字の scheme、userinfo、path の ID、長すぎる origin、数値でない port、`@` を重ねた userinfo、別オリジンの `sourceFile`、範囲外の行番号、`disposition` のない報告、CSP 以外の型（deprecation、intervention、crash）を含み、CSP 以外の型、不正な directive、`disposition` のない報告が捨てられることを確かめる。
+  `webhook_event` の受け口が、`application/reports+json` 以外の `Content-Type`（旧形式、header なし、有効な本文の `text/plain`）に 401、正しい `Content-Type` の JSON でない本文に 200（出口には残さない）、64 KiB を超える本文と空の本文に 400、GET に 405、別のパスに 404 を返すことも確かめる。
   Collector の設定を変えたら実行する。
 - **`ObservabilityContractTest`**：key-value と例外が LogRecord の属性になることを確かめる。
 
@@ -150,8 +175,8 @@ faro receiver は処理に失敗すると、payload の全体を Collector 自�
 
 - アプリケーションは OTLP を Fargate タスクのサイドカーの OpenTelemetry Collector（contrib）へ送る。Collector はログを CloudWatch Logs、トレースを X-Ray、メトリクスを CloudWatch へ送る。
 - 本番の Collector は `docker/otel-collector/config.yaml` に、exporter と拡張と各 pipeline の exporters だけを定める上書きファイルを重ねる。processors は上書きしない。
-  上書きファイルは `logs/frontend` の exporters も定める。
-  gateway を作るまで、サイドカーの faro receiver は `localhost` で待ち受け、何も受けない（[ADR-068](../adr/ADR-068-collect-browser-telemetry-with-faro-via-collector.md)）。
+  上書きファイルは `logs/frontend` と `logs/frontend_csp` の exporters も定める。
+  gateway を作るまで、サイドカーの faro receiver と `webhook_event` receiver は `localhost` で待ち受け、何も受けない（[ADR-068](../adr/ADR-068-collect-browser-telemetry-with-faro-via-collector.md)）。
 - アプリケーションのロググループ、標準出力のロググループ、`aws/spans` ロググループに CloudWatch Logs のデータ保護ポリシーを設定し、個人データと秘密情報を検知して表示時にマスクする。日本の氏名と電話番号は custom data identifier で補う。
 - 標準出力は WARN 以上だけを別のロググループへ送り、起動時と Collector の障害時の調査に使う。
 

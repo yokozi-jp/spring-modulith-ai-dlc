@@ -288,6 +288,7 @@ Docker Compose の操作（サービスの起動、停止、状態確認、Keycl
 - `docker/otel-collector/config.yaml` を変更したときは `task otel-collector-check` を実行します。
   このタスクは許可していない属性を含むOTLPのログとFaroのpayload（例外、View、LCP、INP、CLS、trace）をCollectorに流し、匿名session IDで相関できる許可済みの値だけが残ることを確かめます。
   URL token、UUIDのsession ID、利用者情報、DOM情報、traceの`url.*`属性が残らないことも検査します。
+  CSP違反の報告（Reporting APIの形式）も流し、文書のURL、query、fragmentが残らず、CSP以外の報告の型が捨てられることを確かめます。
   最初に、Collector の route allowlist が `routeTree.gen.ts` と一致することを確かめます。
 - ブラウザの例外をローカルで送るには、`.env` に `FRONTEND_OTEL_ENABLED=true` を書いて `task compose-up` を実行し、`vp dev` を再起動して、Grafana で `{service_name="demo-web"}` を検索します（[ADR-068](docs/adr/ADR-068-collect-browser-telemetry-with-faro-via-collector.md)）。
 - 画面の API 呼び出しからバックエンドまでの trace は、次の手順で確かめます。
@@ -297,6 +298,8 @@ Docker Compose の操作（サービスの起動、停止、状態確認、Keycl
      `demo-web` の `Browser request` の span の子に、`demo-api` の server span がつながります。
   4. SQL を発行する `/api/**` を呼ぶと、同じ trace に `jooq.query` の span（名前は `READ` など）が入ります（[ADR-070](docs/adr/ADR-070-record-sql-spans-with-jooq-execute-listener.md)）。
      main には SQL を発行する `/api/**` がまだありません。
+- CSP違反の報告は、Collectorの`webhook_event` receiverが受け、Grafanaで`{service_name="demo-web"} | telemetry_signal="csp-violation"`を検索して見ます。
+  ChromiumはHTTPの`localhost`では報告を送らないので、`vp dev`と`vp preview`で開いた画面からは届きません（[ADR-068](docs/adr/ADR-068-collect-browser-telemetry-with-faro-via-collector.md)）。
 - CIも同じタスクを、Collectorの設定、Composeファイル、Taskfileの変更時に実行します。
 
 ### 動的解析（DAST）

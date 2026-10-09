@@ -134,11 +134,19 @@ services:
       OTEL_COLLECTOR_FARO_HTTP_ENDPOINT: 0.0.0.0:12347
       # transform/frontend_logs が service.name をこの値で上書きする（ADR-068）。
       FRONTEND_OTEL_SERVICE_NAME: ${FRONTEND_OTEL_SERVICE_NAME:?FRONTEND_OTEL_SERVICE_NAME is required}
+      OTEL_COLLECTOR_CSP_REPORT_HTTP_ENDPOINT: 0.0.0.0:12348
+      # webhook_event は resource 属性を付けないので、transform/frontend_csp がこの 3 つを CSP の報告に付ける（ADR-068）。
+      OTEL_SERVICE_NAMESPACE: ${OTEL_SERVICE_NAMESPACE:?OTEL_SERVICE_NAMESPACE is required}
+      OTEL_DEPLOYMENT_ENVIRONMENT_NAME: ${OTEL_DEPLOYMENT_ENVIRONMENT_NAME:?OTEL_DEPLOYMENT_ENVIRONMENT_NAME is required}
+      # 正本は version.txt で、task compose-up が渡す。Task を通さない docker compose config でも解決できるよう既定値を持つ。
+      FRONTEND_SERVICE_VERSION: ${FRONTEND_SERVICE_VERSION:-unknown}
     ports:
       # backend は全シグナルを OTLP/HTTP(4318)へ送るため、gRPC(4317)は公開しない。
       - "127.0.0.1:${OTEL_HTTP_PORT:?OTEL_HTTP_PORT is required}:4318"
       # ホストの Vite が /collect を転送する faro receiver（ADR-068）。ブラウザから直接は受けない。
       - "127.0.0.1:${OTEL_FARO_HTTP_PORT:?OTEL_FARO_HTTP_PORT is required}:12347"
+      # ホストの Vite が /csp-report を転送する webhook_event receiver（ADR-068）。ブラウザから直接は受けない。
+      - "127.0.0.1:${OTEL_CSP_REPORT_HTTP_PORT:?OTEL_CSP_REPORT_HTTP_PORT is required}:12348"
     volumes:
       - ./otel-collector/config.yaml:/etc/otelcol-contrib/config.yaml:ro
     # イメージにシェルも HTTP クライアントもないため healthcheck を置けない。

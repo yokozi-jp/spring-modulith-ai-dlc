@@ -61,6 +61,8 @@ X-Content-Type-Options: nosniff
 X-Frame-Options: DENY
 ```
 
+この一覧は [ADR-068](ADR-068-collect-browser-telemetry-with-faro-via-collector.md) が拡張し、CSP 違反の報告のために `Reporting-Endpoints` と CSP の `report-to` を足す。
+
 CSPではinline scriptと `unsafe-eval` を許可しない。
 Base UIのstyle要素に限らないinline style要素の許可と、任意HTML sinkを静的解析で遮断する代替防御はADR-030で定める。
 外部接続、Web Worker、画像CDNなどが実際に必要になった場合だけ、該当directiveへ個別に追加する。

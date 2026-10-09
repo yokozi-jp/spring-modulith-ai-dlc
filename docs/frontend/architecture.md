@@ -96,6 +96,9 @@ SDKに依存しない `beforeSend` の縮約は `lib/telemetry-sanitize.ts` に�
 このファイルは `@grafana/*` を型も含めてimportせず、`lib/telemetry.ts` だけが呼ぶ。
 SDKはビルド時の定数で有効にしたときだけ動的importで読み込み、既定の無効のビルドには含まれない（[ADR-068](../adr/ADR-068-collect-browser-telemetry-with-faro-via-collector.md)）。
 
+CSP違反の報告はFaroと `lib/telemetry.ts` を通さない。
+ブラウザが `Reporting-Endpoints` とCSPの `report-to` に従って `/csp-report` へ直接送るので、アプリのコードは何もしない。
+
 `router-defaults.ts` はrouterの既定値（pending、error、not foundのcomponentとpreloadの設定）を一つのobjectにまとめ、`main.tsx` とrouteのテストが同じ値でrouterを作る。
 
 `routes/_authenticated/route.tsx` は認証が要る画面のpathless layoutであり、アプリシェルを描画する。
