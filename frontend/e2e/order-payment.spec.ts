@@ -207,7 +207,6 @@ test.describe("シーダーの代表の状態を、一覧と詳細と作成の�
     const onSale = await onSaleProduct(page.request);
 
     await page.goto("/orders/new");
-    await page.getByRole("button", { name: "明細を追加する" }).click();
 
     const select = page.getByLabel("商品");
     await expect(

@@ -46,7 +46,7 @@ export async function createOrder(
 ): Promise<string> {
   await page.goto("/orders/new");
   await page.getByLabel("客先注文番号").fill(order.code);
-  await page.getByRole("button", { name: "明細を追加する" }).click();
+  // 作成の画面は空の明細を 1 行持って開くので、明細を追加せずにその行を埋める。
   await page.getByLabel("商品").selectOption({ label: order.productName });
   await page.getByLabel("数量").fill(String(order.quantity));
   await page.getByRole("button", { name: "作成する" }).click();
