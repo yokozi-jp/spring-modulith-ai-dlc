@@ -267,7 +267,7 @@ Gitフックの条件とコマンドは[`lefthook.yml`](../../lefthook.yml)を�
 - **`markdownlint.yml`**：`lint-md`相当を実行する。
 - **`okf-validate.yml`**：`okf-check`を実行する。
 - **`release-please.yml`**：`release-check`を実行する。
-- **`e2e.yml`**：`task e2e`を実行する。
+- **`e2e.yml`**：`task e2e`を実行し、compose-testのコンテナとvolumeが残っていないことを確かめる。
   Backend CIのtestと同じGradle cacheをread-onlyで復元する。
   必須チェックにしない（[ブランチ保護](../repository/branch-protection.md)）。
 

@@ -2,6 +2,7 @@ import type { APIRequestContext } from "@playwright/test";
 
 import { paymentGatewayUrl } from "./environment";
 import { expect } from "./fixtures";
+import { readJson } from "./orders";
 
 // 決済代行の WireMock に足す失敗と拒否（ADR-072）。
 // status は応答の status、delay は成功の応答を遅らせる時間、declined は 201 の DECLINED の拒否。
@@ -33,6 +34,23 @@ function chargeResponse(orderId: string, failure: ChargeFailure) {
 export async function resetPaymentGatewayStubs(request: APIRequestContext): Promise<void> {
   const reset = await request.post(`${paymentGatewayUrl}/__admin/mappings/reset`);
   expect(reset.ok(), "決済代行の WireMock のスタブの初期化").toBe(true);
+}
+
+// 決済代行の WireMock が、注文 ID を冪等性キーにした請求を受けた回数。backend の本番の Client が呼んだことを確かめる。
+export async function chargeRequestCount(
+  request: APIRequestContext,
+  orderId: string,
+): Promise<number> {
+  const response = await request.post(`${paymentGatewayUrl}/__admin/requests/count`, {
+    data: {
+      method: "POST",
+      url: "/v1/charges",
+      headers: { "Idempotency-Key": { equalTo: orderId } },
+    },
+  });
+  expect(response.ok(), `orderId=${orderId} の請求の回数`).toBe(true);
+  const body = await readJson<{ count: number }>(response);
+  return body.count;
 }
 
 // 注文 ID の請求だけを失敗させる、または拒否させるスタブを、WireMock の管理 API で実行中に足し、取り除く関数を返す。

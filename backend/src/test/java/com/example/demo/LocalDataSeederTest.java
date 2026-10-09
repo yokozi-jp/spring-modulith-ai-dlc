@@ -27,6 +27,8 @@ import java.util.stream.Stream;
 import org.jooq.DSLContext;
 import org.jooq.Field;
 import org.jooq.Record2;
+import org.jooq.Record3;
+import org.jooq.Result;
 import org.jooq.Table;
 import org.jooq.impl.DSL;
 import org.junit.jupiter.api.DisplayName;
@@ -47,7 +49,7 @@ class LocalDataSeederTest {
   @Autowired private DSLContext dsl;
 
   @Test
-  @DisplayName("空の DB に商品 5 件、注文 4 件、決済 1 件を入れ、2 回目は何も入れない")
+  @DisplayName("空の DB に商品 5 件、注文 6 件、決済 2 件を入れ、2 回目は何も入れない")
   void seedsRepresentativeDataOnlyWhenEmpty() {
     LocalDataSeeder.BUSINESS_TABLES.forEach(table -> dsl.deleteFrom(table).execute());
     final int publications = dsl.fetchCount(EVENT_PUBLICATION);
@@ -66,7 +68,7 @@ class LocalDataSeederTest {
                 .from(T_ORDER)
                 .groupBy(T_ORDER.ORDER_STATUS_TYP)
                 .fetchMap(T_ORDER.ORDER_STATUS_TYP, DSL.count()))
-        .isEqualTo(Map.of("DRAFT", 2, "CONFIRMED", 1, "CANCELLED", 1));
+        .isEqualTo(Map.of("DRAFT", 2, "CONFIRMED", 3, "CANCELLED", 1));
     assertThat(
             dsl.fetchCount(
                 T_ORDER,
@@ -75,25 +77,31 @@ class LocalDataSeederTest {
                         .from(T_ORDER_LINE)
                         .where(T_ORDER_LINE.ORDER_ID.eq(T_ORDER.ORDER_ID)))))
         .isZero();
-    final UUID confirmed =
-        dsl.select(T_ORDER.PUBLIC_ID)
-            .from(T_ORDER)
-            .where(T_ORDER.ORDER_STATUS_TYP.eq("CONFIRMED"))
-            .fetchSingle(T_ORDER.PUBLIC_ID);
-    final BigDecimal total =
-        dsl.select(DSL.sum(T_ORDER_LINE.ORDERED_UNIT_PRICE_JPY.mul(T_ORDER_LINE.ORDERED_COUNT)))
-            .from(T_ORDER_LINE)
-            .join(T_ORDER)
-            .on(T_ORDER.ORDER_ID.eq(T_ORDER_LINE.ORDER_ID))
-            .where(T_ORDER.PUBLIC_ID.eq(confirmed))
-            .fetchSingle()
-            .value1();
-    final Record2<UUID, BigDecimal> payment =
-        dsl.select(T_PAYMENT.ORDER_PUBLIC_ID, T_PAYMENT.CHARGED_AMOUNT_JPY)
+    assertThat(
+            dsl.select(
+                    T_ORDER.CUSTOMER_ORDER_CODE,
+                    DSL.coalesce(T_PAYMENT.PAYMENT_STATUS_TYP, DSL.inline("NONE")))
+                .from(T_ORDER)
+                .leftJoin(T_PAYMENT)
+                .on(T_PAYMENT.ORDER_PUBLIC_ID.eq(T_ORDER.PUBLIC_ID))
+                .where(T_ORDER.ORDER_STATUS_TYP.eq("CONFIRMED"))
+                .fetchMap(Record2::value1, Record2::value2))
+        .isEqualTo(Map.of("SEED-C03", "PAID", "SEED-C05", "DECLINED", "SEED-C06", "NONE"));
+    final Result<Record3<String, BigDecimal, BigDecimal>> amounts =
+        dsl.select(
+                T_PAYMENT.GATEWAY_PAYMENT_CODE,
+                T_PAYMENT.CHARGED_AMOUNT_JPY,
+                DSL.sum(T_ORDER_LINE.ORDERED_UNIT_PRICE_JPY.mul(T_ORDER_LINE.ORDERED_COUNT)))
             .from(T_PAYMENT)
-            .fetchSingle();
-    assertThat(payment.value1()).isEqualTo(confirmed);
-    assertThat(payment.value2()).isEqualByComparingTo(total);
+            .join(T_ORDER)
+            .on(T_ORDER.PUBLIC_ID.eq(T_PAYMENT.ORDER_PUBLIC_ID))
+            .join(T_ORDER_LINE)
+            .on(T_ORDER_LINE.ORDER_ID.eq(T_ORDER.ORDER_ID))
+            .groupBy(T_PAYMENT.GATEWAY_PAYMENT_CODE, T_PAYMENT.CHARGED_AMOUNT_JPY)
+            .fetch();
+    assertThat(amounts).hasSize(2);
+    assertThat(amounts)
+        .allSatisfy(row -> assertThat(row.value2()).isEqualByComparingTo(row.value3()));
     assertThat(createdPgmCds(M_PRODUCT, M_PRODUCT.CREATED_PGM_CD, M_PRODUCT.CREATED_BY))
         .containsOnly("product.SeedLocalData");
     assertThat(createdPgmCds(T_ORDER, T_ORDER.CREATED_PGM_CD, T_ORDER.CREATED_BY))
@@ -185,7 +193,7 @@ class LocalDataSeederTest {
             .flatMap(List::stream)
             .toList();
 
-    assertThat(ids).hasSize(10);
+    assertThat(ids).hasSize(13);
     assertThat(ids)
         .allSatisfy(id -> assertThat(List.of(id.version(), id.variant())).isEqualTo(List.of(4, 2)));
   }

@@ -17,7 +17,11 @@ import java.util.UUID;
 import java.util.function.Supplier;
 import org.jooq.DSLContext;
 
-/** 開発用の代表データ（#114）の注文 C01〜C04 を入れる。DRAFT 2 件、CONFIRMED 1 件、CANCELLED 1 件にする。 */
+/**
+ * 開発用の代表データ（#114）の注文 C01〜C06 を入れる。DRAFT 2 件、CONFIRMED 3 件、CANCELLED 1 件にする。
+ *
+ * <p>CONFIRMED は、決済済み（C03）、決済代行が拒否した決済（C05）、決済記録の無い再投入待ち（C06）の 3 つの状態に使う（#167）。
+ */
 public final class OrderSeeds {
 
   /** シーダーが書く {@code *_pgm_cd}。 */
@@ -29,13 +33,13 @@ public final class OrderSeeds {
   private OrderSeeds() {}
 
   /**
-   * 注文を入れ、CONFIRMED の C03 を返す。
+   * 注文を入れ、決済記録を付ける CONFIRMED の C03 と C05 を返す。
    *
    * @param offers P01〜P04 の順の販売中の商品
-   * @param ids 注文 ID を C01〜C04 の順に 1 つずつ引く
-   * @param base {@code ordered_at} の基準。C01〜C04 は 4〜1 時間前にする
+   * @param ids 注文 ID を C01〜C06 の順に 1 つずつ引く
+   * @param base {@code ordered_at} の基準。C01〜C06 は 6〜1 時間前にする
    */
-  public static Order insert(
+  public static Confirmed insert(
       final DSLContext dsl,
       final List<ProductOffer> offers,
       final Supplier<UUID> ids,
@@ -56,8 +60,11 @@ public final class OrderSeeds {
           orders.add(add(dsl, ids, base, 2, OrderStatus.DRAFT, line(p03, 1)));
           orders.add(add(dsl, ids, base, 3, OrderStatus.CONFIRMED, line(p01, 2), line(p04, 1)));
           orders.add(add(dsl, ids, base, 4, OrderStatus.CANCELLED, line(p02, 1)));
+          // C05 と C06 は C04 の後に引き、C01〜C04 の ID を変えない。
+          orders.add(add(dsl, ids, base, 5, OrderStatus.CONFIRMED, line(p03, 2)));
+          orders.add(add(dsl, ids, base, 6, OrderStatus.CONFIRMED, line(p04, 1), line(p03, 1)));
         });
-    return orders.get(2);
+    return new Confirmed(orders.get(2), orders.get(4));
   }
 
   private static Order add(
@@ -77,7 +84,7 @@ public final class OrderSeeds {
               new Quantity(line.quantity()),
               line.offer().unitPrice()));
     }
-    final Instant orderedAt = base.minus(Duration.ofHours(5L - number));
+    final Instant orderedAt = base.minus(Duration.ofHours(7L - number));
     final Order order =
         Order.restore(
             new OrderId(ids.get()), "SEED-C0" + number, status, orderLines, orderedAt, 1L);
@@ -90,6 +97,14 @@ public final class OrderSeeds {
   private static Line line(final ProductOffer offer, final int quantity) {
     return new Line(offer, quantity);
   }
+
+  /**
+   * 決済記録を付ける CONFIRMED の注文。
+   *
+   * @param paid 決済済みにする C03
+   * @param declined 決済代行が拒否した決済にする C05
+   */
+  public record Confirmed(Order paid, Order declined) {}
 
   /** 明細の商品と数量。 */
   private record Line(ProductOffer offer, int quantity) {}

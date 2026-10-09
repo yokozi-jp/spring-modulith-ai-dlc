@@ -128,7 +128,7 @@ public final class LocalDataSeeder {
     final Random random = new Random(RANDOM_SEED);
     final Faker faker = new Faker(Locale.ENGLISH, random);
     final Supplier<UUID> ids = () -> uuidV4(random);
-    // faker と ids は同じ random を引く。順（商品 P01〜P05、注文 C01〜C04、決済）を変えると値が変わる。
+    // faker と ids は同じ random を引く。順（商品 P01〜P05、注文 C01〜C06、決済 C03、C05）を変えると値が変わる。
     final List<ProductOffer> offers =
         ProductSeeds.insert(dsl, faker, ids, base.minus(Duration.ofDays(1))).stream()
             .filter(ProductSeeds.Seeded::onSale)
@@ -137,14 +137,22 @@ public final class LocalDataSeeder {
                     new ProductOffer(
                         new ProductId(s.publicId()), new Money(s.unitPrice()), s.onSale()))
             .toList();
-    final Order confirmed = OrderSeeds.insert(dsl, offers, ids, base);
+    final OrderSeeds.Confirmed confirmed = OrderSeeds.insert(dsl, offers, ids, base);
+    insertPayment(dsl, ids, confirmed.paid(), false);
+    insertPayment(dsl, ids, confirmed.declined(), true);
+    return Outcome.SEEDED;
+  }
+
+  /** 注文の合計金額で、確定の 1 分後に決済記録を入れる。 */
+  private static void insertPayment(
+      final DSLContext dsl, final Supplier<UUID> ids, final Order order, final boolean declined) {
     PaymentSeeds.insert(
         dsl,
         ids.get(),
-        confirmed.id().value(),
-        confirmed.total().amount(),
-        confirmed.orderedAt().plus(Duration.ofMinutes(1)));
-    return Outcome.SEEDED;
+        order.id().value(),
+        order.total().amount(),
+        declined,
+        order.orderedAt().plus(Duration.ofMinutes(1)));
   }
 
   // ponytail: DB_HOST の loopback の判定は、SSH のポート転送で STG の DB を localhost に向けた場合を防げない。

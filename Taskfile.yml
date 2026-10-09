@@ -123,9 +123,16 @@ tasks:
           status=$?
           trap - EXIT
           keep=""
+          # 成否にかかわらず backend のログを証拠に残し、秘密の値が入っていれば失敗にする。
+          mkdir -p frontend/test-results
+          compose logs --no-color backend > frontend/test-results/backend.log 2>&1 || true
+          for secret in "$OIDC_CLIENT_SECRET" "$E2E_PASSWORD"; do
+            if [ -n "$secret" ] && grep -F -q -- "$secret" frontend/test-results/backend.log; then
+              echo "frontend/test-results/backend.log に .env.test の OIDC_CLIENT_SECRET か E2E_PASSWORD の値が入っています。ログに出す値を確かめてください。" >&2
+              if [ "$status" -eq 0 ]; then status=1; fi
+            fi
+          done
           if [ "$status" -ne 0 ]; then
-            mkdir -p frontend/test-results
-            compose logs --no-color backend > frontend/test-results/backend.log 2>&1 || true
             if [ -n "$keep_env" ] && [ -n "$(compose ps -aq 2>/dev/null)" ]; then keep="1"; fi
           fi
           cleanup_status=0
@@ -147,6 +154,8 @@ tasks:
         compose build backend
         compose up -d --wait postgres redis keycloak wiremock
         task be-migrate COMPOSE_ENV_FILE=.env.test
+        # spec が読む商品と代表の注文を入れる（ADR-073）。.env.test は test の目印と loopback の DB_HOST を持つ。
+        task be-seed COMPOSE_ENV_FILE=.env.test
         compose up -d --wait backend
         # healthcheck はコンテナの中から確かめるため、preview の proxy と同じくホストから届くかを別に確かめる。
         if ! curl --fail --silent --show-error --max-time 5 "http://localhost:${SERVER_PORT}/actuator/health/readiness" >/dev/null; then

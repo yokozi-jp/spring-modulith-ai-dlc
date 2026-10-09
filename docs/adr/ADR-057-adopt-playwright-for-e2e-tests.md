@@ -135,6 +135,7 @@ E2E の CI は path filter 付きの非必須の check とする。
 - [Issue #116](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/116)
 - [ADR-005](ADR-005-decouple-liquibase-from-app-startup.md)、[ADR-014](ADR-014-use-same-origin-spa-security-boundary.md)、[ADR-027](ADR-027-adopt-frontend-testing-stack.md)、[ADR-033](ADR-033-pin-vite-dev-origin-and-source-proxy-port.md)
 - [E2E テストの方針と書き方](../e2e/testing-strategy.md)
+- [ADR-073: E2E はシーダーの代表データを読むだけにし、変更するデータは各テストが作る](ADR-073-read-seeded-data-in-e2e.md)（テストデータの「シーダーと共有しない」を、読むだけの共有に改める）
 - [Playwright, Authentication](https://playwright.dev/docs/auth)
 - [Playwright, Test configuration](https://playwright.dev/docs/test-configuration)
 - [Playwright, Web server](https://playwright.dev/docs/test-webserver)

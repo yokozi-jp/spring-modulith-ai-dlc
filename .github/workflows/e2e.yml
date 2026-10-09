@@ -90,6 +90,32 @@ jobs:
       - name: Run E2E tests
         run: PATH="$GITHUB_WORKSPACE/frontend/node_modules/.bin:$PATH" task e2e
 
+      # task test と共有する Compose project のコンテナと volume が、後片付けの後に残っていないことを確かめる。
+      - name: Check no compose-test leftovers
+        if: always()
+        run: |
+          label=com.docker.compose.project=spring-modulith-test
+          left="$(docker ps -aq --filter "label=$label")$(docker volume ls -q --filter "label=$label")"
+          if [ -n "$left" ]; then
+            docker ps -a --filter "label=$label"
+            docker volume ls --filter "label=$label"
+            echo "::error::compose-test のコンテナか volume が残っています。"
+            exit 1
+          fi
+
+      # 成功時も、HTML report と backend のログを証拠に残す。trace は失敗時だけ保存するため、Cookie は入らない。
+      - name: Upload E2E evidence
+        if: success()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: e2e-evidence
+          path: |
+            frontend/playwright-report/
+            frontend/test-results/backend.log
+            !frontend/e2e/.auth/
+          if-no-files-found: error
+          retention-days: 14
+
       # storageState（frontend/e2e/.auth/）は対象の外にあり、念のため除外も指定する。
       - name: Upload E2E artifacts
         if: failure()

@@ -25,6 +25,15 @@ E2E テストは、複数画面にまたがる主要な利用者の流れだけ�
 `frontend/e2e/environment.ts` は、ログイン情報をルートの `.env.test` から読み、`storageState` のパスを決める。
 Keycloak の画面でログインする手順（`signInOnKeycloak`）も持ち、setup とログアウトの spec が共有する。
 `frontend/e2e/payment-gateway.ts` は、決済代行の WireMock の管理 API を呼ぶ補助を持つ。
+注文ごとの失敗のスタブ（`failChargesFor`）と、注文 ID を冪等性キーにした請求の回数（`chargeRequestCount`）である。
+`frontend/e2e/orders.ts` は、注文の作成の画面の操作、シーダーの商品の読み取り、決済の欄の文言の確認（`expectPaymentText`）を持つ。
+決済の欄は再取得しないため、`expectPaymentText` は画面を読み直して待つ。
+
+業務の流れの spec は次の 2 つである。
+
+- `order-payment.spec.ts`：注文の作成、確定、Listener の請求、決済の表示と、決済代行の 5xx、タイムアウト、拒否、CSRF、シーダーの代表の状態の表示を確かめる。
+- `order-conflict.spec.ts`：同じ注文を 2 つのタブで開き、楽観的ロックの競合と、画面が示す回復の選択肢ごとの結果を確かめる。
+
 `frontend/playwright.config.ts` の設定は次のとおりである。
 
 | 項目              | 値                                                                                  |
@@ -45,7 +54,10 @@ Keycloak の画面でログインする手順（`signInOnKeycloak`）も持ち�
 - 共有のデータ（`test-user` など）は読むだけにし、変更しない。
 - テストの実行順や、他のテストが作ったデータに依存しない。
 - 公開 API で作れない状態が必要になったら、DB fixture を使う前に ADR で判断する。
-- Datafaker のシーダー（ローカル開発用）と E2E のデータを共有しない。
+- `task e2e` は migration の後に Datafaker のシーダーで代表データを一度入れる（[ADR-073](../adr/ADR-073-read-seeded-data-in-e2e.md)）。
+  spec はシーダーの商品と代表の注文（`SEED-C01` から `SEED-C06`）を読むだけにし、変更しない。
+  商品名は乱数の値なので固定で書かず、`GET /api/products` の結果で選ぶ。
+  変更する注文は、そのテストが画面か公開 API で作る。
 
 ## 外部システムの偽物
 
@@ -124,11 +136,12 @@ compose が公開する port は、すべて `127.0.0.1` に限る。
 1. 前回残した環境を破棄し、5173 と 8080 が空いていることを確かめる。
 2. frontend の依存の導入と build、Chromium の導入、backend イメージの build を行う。
    frontend は `vp build --mode test` で build し、`.env.test` の `FRONTEND_OTEL_ENABLED=true` で Faro を有効にする。
-3. PostgreSQL、Redis、Keycloak、WireMock を起動し、`task be-migrate` で migration を適用する。
+3. PostgreSQL、Redis、Keycloak、WireMock を起動し、`task be-migrate` で migration を適用し、`task be-seed` で代表データを入れる。
 4. backend を起動し、ホストから readiness を確かめる。
 5. Playwright を実行する。
    Playwright が `webServer` で Vite preview を起動し、終了時に止める。
-6. 成否にかかわらず、コンテナと volume を削除する。
+6. 成否にかかわらず、backend のログを `frontend/test-results/backend.log` に書き、コンテナと volume を削除する。
+   ログに `.env.test` の `OIDC_CLIENT_SECRET` か `E2E_PASSWORD` の値が入っていれば、テストが成功していても失敗にする。
 
 E2E には Collector を置かず、テストが `/collect` を `page.route` で応答する（[ADR-068](../adr/ADR-068-collect-browser-telemetry-with-faro-via-collector.md)）。
 `frontend/e2e/logout.spec.ts` は、`/collect` が 503 を返してもログインとログアウトのフォームを送信できることを確かめる。
@@ -154,13 +167,33 @@ build、コンテナの起動、後片付けは行わない。
 
 - `frontend/playwright-report/` の HTML report を開く。
 - `frontend/test-results/` の trace を `vp exec playwright show-trace <trace.zip>` で開く。
-- 失敗時は `task e2e` が backend のログを `frontend/test-results/backend.log` に書く。
+- `task e2e` は成否にかかわらず backend のログを `frontend/test-results/backend.log` に書く。
   `test-results/` は Playwright の出力先のため、`pnpm e2e` を再実行すると `backend.log` も消える。
   残した環境では `docker compose -f docker/compose-test.yml --profile e2e logs backend` で読む。
 - CI では、失敗時に `e2e-results` artifact に report、trace、`backend.log` を保存する。
 
+## 証拠
+
+- spec は、主要な状態（決済済み、再投入待ち、競合の選択肢）の screenshot を `testInfo.attach` で HTML report に添付する。
+- CI は、成功時に `e2e-evidence` artifact に HTML report と `backend.log` を保存する。
+  trace は失敗時だけ保存するため、成功時の artifact に Cookie は入らない。
+- `backend.log` に秘密の値が入っていないことは、`task e2e` の後片付けが検査する（[実行と後片付け](#実行と後片付け)）。
+
+## E2E で確かめない範囲
+
+- イベント出版の状態、試行の回数、再投入の後の決済記録は、backend の `PaymentGatewayClientIntegrationTest` が本番の Client と既存の再投入の入口で確かめる。
+  出版の状態を読む公開の入口も、再投入の公開の入口も無く（運用者の入口と定期の再投入は [#108](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/108) で扱う）、共有の backend を `resubmit-once` の profile で再起動すると並列のテストを壊すためである。
+  E2E は、一時障害のあいだと成功に戻した後に、画面が再投入待ちを表示し、請求が 1 回のままであることだけを確かめる。
+- Safari と WebKit では実行しない。
+  CSRF の Cookie は `Secure` の `__Host-` の名前で（[ADR-066](../adr/ADR-066-harden-csrf-cookie-with-host-prefix.md)）、Safari が `http://localhost` でこの Cookie を保存するかは未確認である（[#158](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/158)）。
+  保存しなければ更新の要求に token を付けられないため、WebKit では CSRF で守る更新、ログアウト、注文の流れの全体が未検証である。
+- Tempo と Loki での trace とログのつながり（ブラウザ、backend、ordering、Listener、payment）は、`task e2e` では確かめない。
+  E2E には Collector を置かない（[ADR-068](../adr/ADR-068-collect-browser-telemetry-with-faro-via-collector.md)）。
+  代わりに、`tracing.spec.ts` がブラウザの `traceparent` を、backend の `OrderConfirmedListenerTest` と `CommonColumnsListenerTraceTest` が確定の trace の Listener への引き継ぎを確かめる。
+
 ## CI
 
 `.github/workflows/e2e.yml` は、Pull Request で frontend、backend（DB の changeset を含む）、Keycloak の設定、compose-test とその入力（`docker/initdb/`、`.env.test.example`）、Taskfile、この workflow 自体を変えたときだけ `task e2e` を実行する。
-retry は 2 回で、失敗時に Playwright の成果物と backend のログを保存する。
+retry は 2 回で、失敗時に Playwright の成果物と backend のログを、成功時に HTML report と backend のログを保存する。
+`task e2e` の後に、Compose project `spring-modulith-test` のコンテナと volume が残っていれば失敗にする。
 この check は required status checks に登録しない（[ブランチ保護](../repository/branch-protection.md)）。

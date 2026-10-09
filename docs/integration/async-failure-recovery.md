@@ -69,6 +69,7 @@ Spring Modulith 2.1.1 のイベント出版は、次の状態を持つ（[Spring
   分類の詳細は[外部システムの Client](../backend/class-roles/external-client.md)に従う。
 
 本番で運用者が再投入する入口（コマンド、API、ジョブ）と定期の再投入は [issue #108](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/108) で決め、main にはまだない。
+それまでの再投入の検証は、決済の `PaymentGatewayClientIntegrationTest` が、本番の Client と手で確かめる入口の `ResubmitFailedPaymentsRunner` で、一時障害の `FAILED` から試行の回数 2 の `COMPLETED` になり決済記録が 1 件になることを確かめる。
 `completion-mode: archive` で完了した出版を移す archive の表の保存期間と消し方も決めていない（issue #108）。
 
 ## DLQ の構成

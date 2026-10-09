@@ -6,7 +6,7 @@ import { failChargesFor } from "./payment-gateway";
 
 // この spec は、compose-test の WireMock のスタブと、payment-gateway.ts の管理 API の補助だけを検証する。
 // backend を通した経路は検証しない。
-// backend を通して請求の成否を切り替える検証は #167 で行う。
+// backend を通して請求の成否を切り替える検証は order-payment.spec.ts で行う。
 
 // WireMock だけを呼び、ログインのセッションを使わない。
 test.use({ storageState: { cookies: [], origins: [] } });
@@ -24,7 +24,7 @@ async function chargeStatus(request: APIRequestContext, orderId: string): Promis
   return response.status();
 }
 
-test.describe("決済代行の WireMock のスタブと管理 API の補助（backend を通した請求の切り替えは #167 で検証する）", () => {
+test.describe("決済代行の WireMock のスタブと管理 API の補助（backend を通した請求の切り替えは order-payment.spec.ts で検証する）", () => {
   test("決済代行の WireMock は、共有のスタブで注文 ID から決めた識別子を返す", async ({
     request,
   }) => {
