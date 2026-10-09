@@ -26,6 +26,7 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.boot.autoconfigure.AutoConfigurations;
 import org.springframework.boot.autoconfigure.context.PropertyPlaceholderAutoConfiguration;
@@ -38,7 +39,7 @@ import org.springframework.web.client.ResourceAccessException;
 
 /** 決済代行の Client の HTTP の呼び出しと、URL の設定の検査を検証する。 */
 // 起動の確認は ApplicationContextRunner の run の中の AssertJ で書く。
-// 成功、拒否、4xx の分類、5xx、タイムアウト、URL の設定を一つの HttpServer の文脈で確かめるため、メソッドが多い。
+// 成功、拒否、4xx の分類、契約に合わない応答、5xx、タイムアウト、URL の設定を一つの HttpServer の文脈で確かめるため、メソッドが多い。
 @SuppressWarnings({"PMD.UnitTestShouldIncludeAssert", "PMD.TooManyMethods"})
 class PaymentGatewayClientTest {
 
@@ -116,16 +117,6 @@ class PaymentGatewayClientTest {
   }
 
   @Test
-  @DisplayName("成功の応答に本文がなければ、IllegalStateException を投げる")
-  void rejectsEmptyBody() throws IOException {
-    final PaymentGatewayClient client = start(exchange -> reply(exchange, 201, ""));
-
-    assertThatThrownBy(() -> client.charge(ORDER_ID, AMOUNT))
-        .isInstanceOf(IllegalStateException.class)
-        .hasMessage("payment gateway returned no body: orderId=" + ORDER_ID.value());
-  }
-
-  @Test
   @DisplayName("状態が DECLINED なら、例外を投げずに識別子付きの拒否を返す")
   void declinedReturnsDeclined() throws IOException {
     final PaymentGatewayClient client =
@@ -136,16 +127,49 @@ class PaymentGatewayClientTest {
         .isEqualTo(ChargeOutcome.declined(new GatewayPaymentCode("ch_1")));
   }
 
-  @Test
-  @DisplayName("状態が SUCCEEDED でも DECLINED でもなければ、状態を含む IllegalStateException を投げる")
-  void rejectsUnknownStatus() throws IOException {
-    final PaymentGatewayClient client =
-        start(exchange -> reply(exchange, 201, "{\"chargeId\":\"ch_1\",\"status\":\"PENDING\"}"));
+  @ParameterizedTest(name = "{0} {1}")
+  @CsvSource(
+      delimiter = '|',
+      quoteCharacter = '\'',
+      value = {
+        "201 | ''",
+        "200 | {\"chargeId\":\"ch_1\",\"status\":\"SUCCEEDED\"}",
+        "202 | {\"chargeId\":\"ch_1\",\"status\":\"SUCCEEDED\"}",
+        "200 | {\"chargeId\":\"ch_1\",\"status\":\"DECLINED\"}",
+        "201 | {\"chargeId\":\"ch_1\",\"status\":\"PENDING\"}",
+        "201 | {\"chargeId\":\"ch_1\"}",
+        "201 | {\"chargeId\":\" \",\"status\":\"SUCCEEDED\"}",
+        "201 | {\"status\":\"SUCCEEDED\"}",
+        "201 | {\"status\":\"DECLINED\"}",
+        "201 | {\"chargeId\":\"\",\"status\":\"DECLINED\"}",
+        "201 | {\"chargeId\":",
+      })
+  @DisplayName("契約に合わない応答は契約の不備なので、例外を投げずに失敗を返す")
+  void contractViolatingReplyReturnsFailed(final int status, final String body) throws IOException {
+    final PaymentGatewayClient client = start(exchange -> reply(exchange, status, body));
 
-    assertThatThrownBy(() -> client.charge(ORDER_ID, AMOUNT))
-        .isInstanceOf(IllegalStateException.class)
-        .hasMessage(
-            "payment gateway did not succeed: orderId=" + ORDER_ID.value() + ", status=PENDING");
+    assertThat(client.charge(ORDER_ID, AMOUNT))
+        .as("orderId=%s の %d %s の請求の結果", ORDER_ID.value(), status, body)
+        .isEqualTo(ChargeOutcome.failed());
+  }
+
+  @Test
+  @DisplayName("本文が JSON でなければ、契約の不備なので、例外を投げずに失敗を返す")
+  void nonJsonReplyReturnsFailed() throws IOException {
+    final PaymentGatewayClient client =
+        start(
+            exchange -> {
+              final byte[] bytes = "ok".getBytes(StandardCharsets.UTF_8);
+              exchange.getResponseHeaders().add("Content-Type", "text/plain");
+              exchange.sendResponseHeaders(201, bytes.length);
+              try (OutputStream out = exchange.getResponseBody()) {
+                out.write(bytes);
+              }
+            });
+
+    assertThat(client.charge(ORDER_ID, AMOUNT))
+        .as("orderId=%s の text/plain の請求の結果", ORDER_ID.value())
+        .isEqualTo(ChargeOutcome.failed());
   }
 
   @ParameterizedTest

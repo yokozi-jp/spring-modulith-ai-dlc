@@ -48,8 +48,10 @@ Client はユースケースの進行役でもない。
   冪等性キーを渡さない更新の操作は `retry` の `default` を、GET などの冪等な操作は `idempotent` を継承する。
   `charge` は冪等性キーで重複を防げるが、`ChargeOrderCommandHandler` のトランザクションの中で呼ぶため、`default` を継承して試行を一回にし、失敗した請求はイベント出版の再投入でやり直す。
 - 冪等性キーを受け取る操作は、キーを外部システムの API が定めるヘッダー（決済システムの例では `Idempotency-Key`）で送る。
-- 外部システムの応答は、Domain の型（`PaymentId`）に変換して返す。
-  応答の本文がないときは `IllegalStateException` を投げる。
+- 外部システムの応答は、Domain の型（`ChargeOutcome`、`GatewayPaymentCode`）に変換して返す。
+- 応答は `toEntity` で状態のコードと本文を受け取り、契約に合うことを確かめてから変換する。
+  決済代行の契約では、状態のコードが `201` で、JSON の本文に空でない `chargeId` と既知の `status`（`SUCCEEDED` か `DECLINED`）があることを確かめる。
+  合わない応答は例外にせず、契約の不備の結果にする。
 - 呼び出しの結果は、次の節の四つに分けて扱う。
 - クラス、定数、フィールド、コンストラクタ、実装するメソッドに Javadoc を書く。
 - `infrastructure.client` のパッケージに `@NullMarked` を宣言する `package-info.java` を置く。
@@ -91,11 +93,14 @@ Client は、外部システムの呼び出しの結果を次の四つに分け�
 | 一時障害       | 接続の失敗、タイムアウト、429、5xx          | 例外を投げる               | 失敗に数える    | `FAILED`     |
 | 業務上の拒否   | カードの拒否（`201` の `status: DECLINED`） | 拒否を表す結果を返す       | 数えない        | `COMPLETED`  |
 | 資格情報の不備 | 401、403                                    | 例外を投げる               | 数えない        | `FAILED`     |
-| 契約の不備     | 401、403、429 以外の 4xx                    | 失敗を表す結果を返す       | 数えない        | `COMPLETED`  |
+| 契約の不備     | 401、403、429 以外の 4xx、契約に合わない応答 | 失敗を表す結果を返す       | 数えない        | `COMPLETED`  |
 
 - 結果は `domain.model` の型（`ChargeOutcome` と、`PAID`、`DECLINED`、`FAILED` の `PaymentStatus`）で返す。
   CommandHandler は結果を集約に記録して正常に返し、リスナーを正常終了させる。
 - 契約の不備は、Client が `HttpClientErrorException` を捕まえて失敗の結果に変え、状態のコードを WARN のログに残す。
+- 契約に合わない応答は、`201` 以外の 2xx と 3xx、本文がない、JSON として読めない（`UnknownContentTypeException`、原因が `HttpMessageNotReadableException`）、`status` が未知かない、`chargeId` がないか空白だけの応答である。
+  同じ要求を再投入しても直らないため、Client は失敗の結果に変え、状態のコードと `status` を WARN のログに残し、本文はログに出さない。
+  `IllegalStateException` を投げると、どの分類にも入らない失敗が出版の `FAILED` に残り続けるため投げない。
 - circuit breaker の instance は、429 以外の `HttpClientErrorException` を無視する述語を `ignore-exception-predicate` に指定する。
   Resilience4j は述語を引数のないコンストラクタで作るため、述語のクラスは `public` にする。
 - `ignore-exceptions` に `HttpClientErrorException` を書かない。
@@ -189,9 +194,17 @@ private static ChargeOutcome contractError(
 }
 
 // toOutcome（抜粋）
-if (DECLINED.equals(reply.status())) {
-  return ChargeOutcome.declined(chargeId == null ? null : new GatewayPaymentCode(chargeId));
+if (httpStatus != HttpStatus.CREATED.value() || reply == null) {
+  return contractViolation(key, httpStatus, reply == null ? null : reply.status());
 }
+// chargeId の検査（略）
+if (SUCCEEDED.equals(reply.status())) {
+  return ChargeOutcome.paid(code);
+}
+if (DECLINED.equals(reply.status())) {
+  return ChargeOutcome.declined(code);
+}
+return contractViolation(key, httpStatus, reply.status());
 ```
 
 ```java
@@ -210,7 +223,7 @@ Client の単体テストは JDK の `HttpServer` で、リトライ、circuit b
 Spring を起動しない JUnit のテストで、JDK の `com.sun.net.httpserver.HttpServer` を空いているポートで起動し、Client に URL を渡す。
 HTTP の本文と Domain の型の変換を確かめ、応答を遅らせたときにタイムアウトすることも同じ方法で確かめる。
 冪等性キーのヘッダーも同じ方法で確かめる。
-結果の分類（拒否、契約の不備の 4xx、例外を投げる 401、403、429）も同じ方法で確かめる。
+結果の分類（拒否、契約の不備の 4xx、契約に合わない応答、例外を投げる 401、403、429）も同じ方法で確かめる。
 Spring を起動しないため、このテストでは `@CircuitBreaker` と `@Retry` は働かない。
 
 ```java
@@ -305,6 +318,7 @@ class PaymentGatewayClientTest {
 - [ ] circuit breaker の instance に、429 以外の 4xx を無視する `ignore-exception-predicate` を指定する。［結合テストで検査：PaymentGatewayClientIntegrationTest］
 - [ ] 業務上の拒否と契約の不備を結果で返し、一時障害と資格情報の不備を例外で投げる。［結合テストで検査：PaymentGatewayClientIntegrationTest］
 - [ ] 外部システムの応答を Domain の型に変換して返す。［自分で点検］
+- [ ] 契約に合わない応答（201 以外の 2xx、本文がない、状態が未知、識別子がない）を契約の不備の結果にする。［結合テストで検査：PaymentGatewayClientIntegrationTest］
 - [ ] クラス、定数、フィールド、コンストラクタ、実装するメソッドに Javadoc を書く。［自分で点検］
 - [ ] 冪等性キーを受け取る操作は、キーをヘッダーで送る。［自分で点検］
 - [ ] JDK の `HttpServer` で、HTTP の呼び出しと冪等性キーのヘッダーを確かめるテストを書く。［自分で点検］

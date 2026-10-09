@@ -90,6 +90,9 @@ class OrderConfirmedListenerTest {
   private static final String ASYNC_ERROR_SCOPE =
       "org.springframework.aop.interceptor.SimpleAsyncUncaughtExceptionHandler";
 
+  /** 確定していない注文の請求を見送ったことを記録する CommandHandler。 */
+  private static final String HANDLER_SCOPE = ChargeOrderCommandHandler.class.getName();
+
   /** 決済の参照。 */
   @Autowired private PaymentQueries paymentQueries;
 
@@ -246,7 +249,7 @@ class OrderConfirmedListenerTest {
   }
 
   @Test
-  @DisplayName("取り消した注文の OrderConfirmed では請求せず、決済記録を作らず、出版は FAILED で残る")
+  @DisplayName("取り消した注文の OrderConfirmed では請求せず、決済記録を作らず、INFO を記録して出版を完了にする")
   void cancelledOrderIsNotCharged(final Scenario scenario) {
     final String orderId = fixture.draftedOrderId();
     fixture.observed(
@@ -255,22 +258,31 @@ class OrderConfirmedListenerTest {
     OrderConfirmedFixture.await(
         scenario.publish(new OrderConfirmed(orderId, NOW)),
         orderId,
-        "FAILED の出版",
+        "完了した出版",
         () -> fixture.registry(orderId),
-        state -> "FAILED".equals(state.status()));
+        state -> state.archived() == 1);
 
     assertThat(gateway.recordedTraceIds()).as("orderId=%s の取消後の決済代行の呼び出し", orderId).isEmpty();
     assertThat(payments(orderId)).as("orderId=%s の取消後の決済記録", orderId).isEmpty();
+    assertThat(capturedLogRecords.withScope(HANDLER_SCOPE))
+        .as("orderId=%s の確定していない注文の INFO のログ", orderId)
+        .anySatisfy(
+            log -> {
+              assertThat(log.getSeverity()).isEqualTo(Severity.INFO);
+              assertThat(log.getBodyValue()).isNotNull();
+              assertThat(log.getBodyValue().asString())
+                  .contains("orderId=" + orderId + ", status=CANCELLED");
+            });
     assertThat(capturedLogRecords.withScope(ASYNC_ERROR_SCOPE))
         .as("orderId=%s の確定していない注文の ERROR のログ", orderId)
-        .anySatisfy(
+        .noneSatisfy(
             log ->
                 assertThat(log.getAttributes().get(AttributeKey.stringKey("exception.message")))
-                    .contains("order is not CONFIRMED: orderId=" + orderId + ", status=CANCELLED"));
+                    .contains("orderId=" + orderId));
   }
 
   @Test
-  @DisplayName("存在しない注文の OrderConfirmed では請求せず、決済記録を作らず、出版は未完了で残る")
+  @DisplayName("存在しない注文の OrderConfirmed では請求せず、決済記録を作らず、ERROR を記録して出版をデッドレターの FAILED に残す")
   void missingOrderLeavesPublicationIncomplete(final Scenario scenario) {
     final String orderId = UUID.randomUUID().toString();
 
@@ -286,6 +298,14 @@ class OrderConfirmedListenerTest {
     assertThat(fixture.registry(orderId).incomplete())
         .as("orderId=%s の未完了の出版", orderId)
         .isEqualTo(1);
+    assertThat(capturedLogRecords.withScope(ASYNC_ERROR_SCOPE))
+        .as("orderId=%s の存在しない注文の ERROR のログ", orderId)
+        .anySatisfy(
+            log -> {
+              assertThat(log.getSeverity()).isEqualTo(Severity.ERROR);
+              assertThat(log.getAttributes().get(AttributeKey.stringKey("exception.message")))
+                  .contains("order not found: orderId=" + orderId);
+            });
   }
 
   private List<PaymentSummary> payments(final String orderId) {

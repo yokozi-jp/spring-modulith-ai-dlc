@@ -32,6 +32,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.DefaultApplicationArguments;
@@ -56,7 +57,7 @@ import org.springframework.web.client.HttpServerErrorException;
  * 件になることと、同じイベントの再配送で請求しないことを、本番の Client を通してここで確かめる（E2E は画面に見える状態だけを確かめる）。URL の設定の違いで {@link
  * OrderConfirmedListenerTest} とは別の Spring のコンテキストになる。
  */
-// 成功、拒否、5xx、4xx、429、タイムアウト、遅延、circuit breaker を一つの WireMock の文脈で確かめるため、メソッドが多い。
+// 成功、拒否、契約に合わない応答、5xx、4xx、429、タイムアウト、遅延、circuit breaker を一つの WireMock の文脈で確かめるため、メソッドが多い。
 @SuppressWarnings("PMD.TooManyMethods")
 @ApplicationModuleTest(mode = BootstrapMode.ALL_DEPENDENCIES)
 @Import({SharedTestConfiguration.class, OrderConfirmedFixture.class})
@@ -251,6 +252,40 @@ class PaymentGatewayClientIntegrationTest {
     assertRecordedOnce(orderId, FAILED, null);
     assertThat(circuitBreaker.getMetrics().getNumberOfFailedCalls())
         .as("orderId=%s の 400 で circuit breaker が数えた失敗", orderId)
+        .isZero();
+  }
+
+  @ParameterizedTest(name = "{0} {1}")
+  @CsvSource(
+      delimiter = '|',
+      quoteCharacter = '\'',
+      value = {
+        "200 | {\"chargeId\":\"ch_1\",\"status\":\"SUCCEEDED\"}",
+        "202 | {\"chargeId\":\"ch_1\",\"status\":\"SUCCEEDED\"}",
+        "201 | ''",
+        "201 | {\"chargeId\":\"ch_1\",\"status\":\"PENDING\"}",
+        "201 | {\"chargeId\":\" \",\"status\":\"SUCCEEDED\"}",
+        "201 | {\"status\":\"DECLINED\"}",
+        "201 | {\"chargeId\":\"\",\"status\":\"DECLINED\"}",
+        "200 | {\"chargeId\":\"ch_1\",\"status\":\"DECLINED\"}",
+      })
+  @DisplayName("決済代行の応答が契約に合わなければ、失敗を決済記録に残し、出版を完了にし、circuit breaker は失敗に数えない")
+  void contractViolatingReplyIsRecordedAndCompletes(
+      final int status, final String body, final Scenario scenario) {
+    final String orderId = fixture.draftedOrderId();
+    stubCharge(
+        orderId,
+        WireMock.aResponse()
+            .withStatus(status)
+            .withHeader("Content-Type", "application/json")
+            .withBody(body));
+
+    fixture.confirmAndAwait(
+        scenario, orderId, COMPLETED_PUBLICATION, state -> state.archived() == 1);
+
+    assertRecordedOnce(orderId, FAILED, null);
+    assertThat(circuitBreaker.getMetrics().getNumberOfFailedCalls())
+        .as("orderId=%s の %d %s で circuit breaker が数えた失敗", orderId, status, body)
         .isZero();
   }
 
