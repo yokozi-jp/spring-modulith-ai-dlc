@@ -9,7 +9,7 @@ tags: [adr, e2e, testing, seed]
 
 ## Status
 
-Proposed
+Accepted
 
 ## Date
 
