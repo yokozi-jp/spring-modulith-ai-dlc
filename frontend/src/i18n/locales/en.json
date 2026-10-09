@@ -21,5 +21,103 @@
   "backToHome": "Back to home",
   "logout": "Log out",
   "loggedOutHeading": "You have been logged out",
-  "loginAgain": "Log in again"
+  "loginAgain": "Log in again",
+  "orders": {
+    "missingValue": "(none)",
+    "amount": "{{value, currency(currency: JPY)}}",
+    "quantity": "{{value, number}}",
+    "status": {
+      "draft": "Draft",
+      "confirmed": "Confirmed",
+      "cancelled": "Cancelled"
+    },
+    "salesStatus": {
+      "onSale": "On sale",
+      "discontinued": "Discontinued"
+    },
+    "fields": {
+      "customerOrderCode": "Customer order code",
+      "status": "Status",
+      "totalAmount": "Total amount",
+      "lines": "Lines",
+      "lineNumber": "No.",
+      "product": "Product",
+      "quantity": "Quantity",
+      "unitPrice": "Unit price",
+      "amount": "Amount"
+    },
+    "list": {
+      "title": "Orders",
+      "create": "Create an order",
+      "filterLabel": "Filter by status",
+      "filterAll": "All",
+      "detailColumn": "Details",
+      "showDetail": "Details of {{code}}",
+      "empty": "No matching orders."
+    },
+    "form": {
+      "selectProduct": "Select a product",
+      "discontinuedProduct": "{{name}} ({{status}})",
+      "lineLegend": "Line {{number}}",
+      "addLine": "Add a line",
+      "removeLine": "Remove line {{number}}",
+      "submitting": "Sending…",
+      "errors": {
+        "customerOrderCodeRequired": "Enter the customer order code.",
+        "customerOrderCodeTooLong": "Use {{max, number}} characters or fewer for the customer order code.",
+        "linesRequired": "Enter at least one line.",
+        "linesTooMany": "Use {{max, number}} lines or fewer.",
+        "productRequired": "Select a product.",
+        "quantityRequired": "Enter the quantity.",
+        "quantityRange": "Enter a whole number from {{min, number}} to {{max, number}} for the quantity."
+      }
+    },
+    "new": {
+      "title": "Create an order",
+      "submit": "Create"
+    },
+    "detail": {
+      "title": "Order {{code}}",
+      "linesHeading": "Lines",
+      "editHeading": "Change lines",
+      "saveLines": "Save lines",
+      "confirm": "Confirm",
+      "cancel": "Cancel order",
+      "backToList": "Back to orders",
+      "discardChanges": "Discard my changes and show the latest",
+      "reapplyChanges": "Apply my changes to the latest version"
+    },
+    "notice": {
+      "generalTitle": "The operation could not be completed",
+      "generalFailure": "Try again later.",
+      "validation": "Check your input.",
+      "createConflict": "This customer order code may already be in use. Change the code or send again later.",
+      "createUnprocessable": "Check the products you entered.",
+      "linesChanged": "The lines were changed.",
+      "latestNotLoaded": "The latest content could not be loaded.",
+      "linesConflict": "The order was updated by another operation. The latest content is shown above.",
+      "conflictReloadFailed": "The latest content could not be loaded. Send again later.",
+      "notEditable": "The order was confirmed or cancelled, so it can no longer be changed.",
+      "actionConflict": "The order was updated by another operation. The latest content is shown.",
+      "linesUnprocessable": "Check that the order is a draft and the products are on sale.",
+      "actionUnprocessable": "The order cannot be changed in its current state. Check the latest content.",
+      "confirmed": "The order was confirmed.",
+      "cancelled": "The order was cancelled."
+    },
+    "payment": {
+      "heading": "Payment",
+      "loading": "Loading the payment status.",
+      "loadFailed": "Could not load the payment status. Wait a moment and reload the page.",
+      "paid": "Paid",
+      "declined": "The payment gateway declined the payment.",
+      "failed": "The payment failed. Resubmitting does not fix it, so contact the administrator.",
+      "unknown": "The payment status is unknown. Contact the administrator.",
+      "chargedAmount": "Charged amount",
+      "recordedAt": "Recorded at",
+      "processing": "Checking the payment result.",
+      "reload": "Reload the payment status",
+      "notYet": "The payment has not been accepted yet. It is in progress, or it failed and is waiting to be resubmitted.",
+      "notApplicable": "This order is not subject to payment."
+    }
+  }
 }

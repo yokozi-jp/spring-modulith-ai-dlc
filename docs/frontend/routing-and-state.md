@@ -111,6 +111,9 @@ mutationの後のcacheは次のとおりに扱う。
 - `router.invalidate()` は呼ばない。例外は、mutationの結果が `beforeLoad` やloaderの戻り値（`useLoaderData` で読む値）を変える場合である。
 - 画面遷移と通知は `mutate` に渡すcallbackに置き、`useMutation` のoptionsやglobalのcallbackに置かない。`mutate` のcallbackは再取得が終わった後に呼ばれるので、最新のcacheを読める。
 - 応答を `setQueryData` でcacheに書くときは、cacheの形（`{ data, status, headers }`）と型をqueryの型に合わせる。
+- mutationの結果が非同期のListenerで後から決まるとき（確定の後の決済記録）は、無効化の再取得だけでは結果を拾えない。
+  queryの `refetchInterval` を関数にし、結果がない間だけ読み直し、期間か回数の上限を名前付きの定数で置き、失敗したら止める。
+  上限を過ぎたら読み直しのボタンを出し、状態の文言はlive regionに入れる（例は `payment-status.tsx`）。
 
 409が返る画面の扱いは[更新の競合（409）の画面の扱い](update-conflicts.md)に従う。
 

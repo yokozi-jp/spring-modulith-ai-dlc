@@ -1,6 +1,6 @@
 package com.example.demo.persistence;
 
-import static com.example.demo.jooq.tables.EventPublication.EVENT_PUBLICATION;
+import static com.example.demo.jooq.modulith.tables.EventPublication.EVENT_PUBLICATION;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import com.example.demo.testkit.DatabaseTest;

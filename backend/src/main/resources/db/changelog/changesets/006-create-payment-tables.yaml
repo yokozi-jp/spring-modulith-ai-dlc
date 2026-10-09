@@ -1,0 +1,130 @@
+databaseChangeLog:
+  - changeSet:
+      id: 006-create-payment-tables
+      author: system
+      preConditions:
+        - dbms:
+            type: postgresql
+      changes:
+        - sql:
+            sql: CREATE SCHEMA payment AUTHORIZATION CURRENT_USER;
+        - sql:
+            sql: GRANT USAGE ON SCHEMA payment TO "${appDatabaseUsername}";
+        - createTable:
+            tableName: t_payment
+            schemaName: payment
+            columns:
+              - column:
+                  name: payment_id
+                  type: bigint
+                  autoIncrement: true
+                  generationType: ALWAYS
+                  constraints:
+                    primaryKey: true
+                    primaryKeyName: pk_t_payment
+              - column:
+                  name: public_id
+                  type: uuid
+                  constraints:
+                    nullable: false
+              # 決済した注文（ordering.t_order.public_id）。モジュールの間に外部キーを作らない。
+              - column:
+                  name: order_public_id
+                  type: uuid
+                  constraints:
+                    nullable: false
+              - column:
+                  name: charged_amount_jpy
+                  type: numeric(18, 2)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: gateway_payment_code
+                  type: varchar(64)
+                  defaultValue: ""
+                  constraints:
+                    nullable: false
+              - column:
+                  name: paid_at
+                  type: timestamptz
+                  constraints:
+                    nullable: false
+              - column:
+                  name: created_at
+                  type: timestamptz
+                  constraints:
+                    nullable: false
+              - column:
+                  name: created_by
+                  type: varchar(64)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: created_pgm_cd
+                  type: varchar(64)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: created_tx_id
+                  type: varchar(32)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: updated_at
+                  type: timestamptz
+                  constraints:
+                    nullable: false
+              - column:
+                  name: updated_by
+                  type: varchar(64)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: updated_pgm_cd
+                  type: varchar(64)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: updated_tx_id
+                  type: varchar(32)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: lock_no
+                  type: bigint
+                  constraints:
+                    nullable: false
+              - column:
+                  name: patched_at
+                  type: timestamptz
+              - column:
+                  name: patched_by
+                  type: varchar(64)
+              - column:
+                  name: patched_id
+                  type: integer
+        - createIndex:
+            indexName: uk_t_payment
+            tableName: t_payment
+            schemaName: payment
+            unique: true
+            columns:
+              - column:
+                  name: public_id
+        # 1 注文に決済記録は 1 件まで。並行の配信の二重の INSERT をこの索引が拒む。
+        - createIndex:
+            indexName: uk_2_t_payment
+            tableName: t_payment
+            schemaName: payment
+            unique: true
+            columns:
+              - column:
+                  name: order_public_id
+        - sql:
+            sql: GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE payment.t_payment TO "${appDatabaseUsername}";
+      rollback:
+        - dropTable:
+            tableName: t_payment
+            schemaName: payment
+        - sql:
+            sql: DROP SCHEMA payment;

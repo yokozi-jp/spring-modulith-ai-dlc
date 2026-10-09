@@ -1,7 +1,7 @@
-# テスト専用の依存スタック（PostgreSQL + Redis、バックエンドスモーク時のみ Keycloak）。
+# テスト専用の依存スタック（PostgreSQL + Redis + 決済代行の WireMock、バックエンドスモーク時のみ Keycloak）。
 # 目的: 開発用スタック（docker/compose.yml）と隔離し、開発を止めずにテストを回す。
 #   - プロジェクト名を分け（name: spring-modulith-test）、ネットワーク/コンテナを別空間にする。
-#   - ホストポートを開発用とずらす（PostgreSQL 5433 / Redis 6380 / Keycloak 8081）。開発の 5432/6379/8080 と衝突しない。
+#   - ホストポートを開発用とずらす（PostgreSQL 5433 / Redis 6380 / Keycloak 8081 / WireMock 8082）。開発の 5432/6379/8080/8090 と衝突しない。
 #   - 名前付きボリュームを持たず使い捨て（down -v で毎回クリーン）。テストは常にまっさらな DB で走らせる。
 #   - Keycloak は backend-smoke profile に限定し、通常の Gradle テストでは起動しない。
 #   - backend と Keycloak は E2E 用の e2e profile でも起動する（task e2e、ADR-057）。
@@ -82,6 +82,26 @@ services:
       retries: 20
       start_period: 3s
 
+  # 決済代行の偽物。開発用と同じ docker/wiremock/mappings の成功のスタブを返す。
+  # 失敗は、E2E が管理 API（/__admin/mappings）で注文ごとに実行中に足す。
+  # profile を付けない。task test の Spring のテストが .env.test の PAYMENT_GATEWAY_BASE_URL で共有のスタブを呼び、task e2e も使う（ADR-072）。
+  wiremock:
+    image: wiremock/wiremock:3.13.2@sha256:d737d2de3664a7e1bf96f73a7bd48a0d47d61988f7ca88a6e51ea44b8c1f687d
+    # JDK の HttpClient が平文の HTTP/2 へ upgrade すると、本文付きの POST が切れるため、平文の HTTP/2 を止める。
+    command: ["--disable-banner", "--disable-http2-plain"]
+    environment:
+      TZ: UTC
+    ports:
+      - "127.0.0.1:8082:8080"
+    volumes:
+      - ./wiremock/mappings:/home/wiremock/mappings:ro
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "--silent", "http://localhost:8080/__admin/health"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+      start_period: 3s
+
   # E2E 用の backend（e2e profile 限定、ADR-057）。既存の backend/Dockerfile でビルドする。
   # compose の network に置き、PostgreSQL、Redis、Keycloak へ service 名で接続する（.env.test の接続先を environment で上書きする）。
   # issuer は .env.test の公開用の URL（127.0.0.1:8081）のまま検査し、discovery だけを keycloak:8080 から読む（OIDC_DISCOVERY_URI）。
@@ -99,6 +119,7 @@ services:
       REDIS_HOST: redis
       REDIS_PORT: "6379"
       OIDC_DISCOVERY_URI: http://keycloak:8080/realms/spring-modulith/.well-known/openid-configuration
+      PAYMENT_GATEWAY_BASE_URL: http://wiremock:8080
     ports:
       - "127.0.0.1:8080:8080"
     depends_on:
@@ -107,6 +128,8 @@ services:
       redis:
         condition: service_healthy
       keycloak:
+        condition: service_healthy
+      wiremock:
         condition: service_healthy
     healthcheck:
       test: ["CMD", "curl", "--fail", "--silent", "--show-error", "http://127.0.0.1:8080/actuator/health/readiness"]

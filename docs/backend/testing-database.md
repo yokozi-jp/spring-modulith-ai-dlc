@@ -32,6 +32,8 @@ DBテストは、`docker/compose-test.yml`のPostgreSQL 5433とRedis 6380を`.en
 [CleanGeneratedTablesExtension](../../backend/src/test/java/com/example/demo/testkit/CleanGeneratedTablesExtension.java)は、各テスト後にjOOQ生成対象のアプリケーションテーブルを`DELETE`する。
 Liquibase管理テーブルはコード生成から除外されているため、後始末の対象にしない。
 後始末は本番と同じDML限定のアプリロールで実行し、`TRUNCATE`を使わない。
+消す前に、状態が`PUBLISHED`、`PROCESSING`、`RESUBMITTED`のイベント出版がなくなるまで最大10秒待つ。
+非同期のListenerはテストの本体の後にコミットすることがあり、待たずに消すと、後から書いた行が次のテストに残るためである。
 DBロールの決定は[ADR-011](../adr/ADR-011-use-module-owned-database-schemas.md)を参照する。
 
 次の挙動を検証するときは、テストへロールバック用トランザクションを被せない。

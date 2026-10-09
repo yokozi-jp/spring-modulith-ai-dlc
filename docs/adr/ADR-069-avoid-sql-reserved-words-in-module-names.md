@@ -20,7 +20,7 @@ Proposed
 機能モジュールのテーブルは、モジュール名と同じ名前のスキーマに置く（[ADR-011](ADR-011-use-module-owned-database-schemas.md)）。
 [PostgreSQLの命名規約](../database/postgresql-naming.md)は、テーブル名とカラム名に SQL のキーワードを使わないと定めていたが、スキーマ名とモジュール名の扱いを定めていなかった。
 
-確認用のサンプル機能（[issue #122](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/122)）では、注文のモジュールを `order` にし、同じ名前のスキーマを作った。
+参照業務機能（[issue #122](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/122)）では、注文のモジュールを `order` にし、同じ名前のスキーマを作った。
 `ORDER` は PostgreSQL の予約語であるため、次のことが起きた。
 
 - Liquibase の changeset に、予約語を引用符で囲ませる `objectQuotingStrategy: QUOTE_ONLY_RESERVED_WORDS` を付ける必要があった。

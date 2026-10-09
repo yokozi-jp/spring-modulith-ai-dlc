@@ -123,9 +123,21 @@ tasks:
           status=$?
           trap - EXIT
           keep=""
+          # 成否にかかわらず backend のログを証拠に残し、秘密の値が入っていれば失敗にする。
+          mkdir -p frontend/test-results
+          compose logs --no-color backend > frontend/test-results/backend.log 2>&1 || true
+          for secret in "$OIDC_CLIENT_SECRET" "$E2E_PASSWORD"; do
+            if [ -n "$secret" ] && grep -F -q -- "$secret" frontend/test-results/backend.log; then
+              echo "frontend/test-results/backend.log に .env.test の OIDC_CLIENT_SECRET か E2E_PASSWORD の値が入っています。ログに出す値を確かめてください。" >&2
+              if [ "$status" -eq 0 ]; then status=1; fi
+            fi
+          done
+          # 値の一致では見つからない、セッションの Cookie の値と JWT の形（eyJ で始まる 3 つの base64url）も失敗にする。
+          if grep -E -q 'APP_SESSION=[^;[:space:]"]+|eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+' frontend/test-results/backend.log; then
+            echo "frontend/test-results/backend.log に APP_SESSION の Cookie の値か JWT の形の文字列が入っています。ログに出す値を確かめてください。" >&2
+            if [ "$status" -eq 0 ]; then status=1; fi
+          fi
           if [ "$status" -ne 0 ]; then
-            mkdir -p frontend/test-results
-            compose logs --no-color backend > frontend/test-results/backend.log 2>&1 || true
             if [ -n "$keep_env" ] && [ -n "$(compose ps -aq 2>/dev/null)" ]; then keep="1"; fi
           fi
           cleanup_status=0
@@ -145,8 +157,10 @@ tasks:
         trap cleanup EXIT
         (cd frontend && vp install --frozen-lockfile && vp build --mode test && vp exec playwright install chromium)
         compose build backend
-        compose up -d --wait postgres redis keycloak
+        compose up -d --wait postgres redis keycloak wiremock
         task be-migrate COMPOSE_ENV_FILE=.env.test
+        # spec が読む商品と代表の注文を入れる（ADR-073）。.env.test は test の目印と loopback の DB_HOST を持つ。
+        task be-seed COMPOSE_ENV_FILE=.env.test
         compose up -d --wait backend
         # healthcheck はコンテナの中から確かめるため、preview の proxy と同じくホストから届くかを別に確かめる。
         if ! curl --fail --silent --show-error --max-time 5 "http://localhost:${SERVER_PORT}/actuator/health/readiness" >/dev/null; then
@@ -431,15 +445,56 @@ tasks:
   lint-duplicates:
     desc: フロントエンドとバックエンドの手書きコードの重複をjscpdで検査
     cmds:
-      # ponytail: 導入時の重複率3.19%を3.2%で固定し、既存cloneの解消に合わせて閾値を下げる。
+      # ponytail: 4.0%は参照業務機能（product、ordering、payment）の手書きの重複を除いた後の実測3.93%に合わせた値（ADR-074。ADR-035の3.2%を改めた）。残りは、モジュールごとのクラスの役割とテストの規約が求める import、注釈、フィールドの定型である。業務機能が増えて規約の定型の重複で4.0%を超えたら、上限を上げる前に検出の方式を見直す。
       - npm exec -- jscpd frontend/src frontend/lint frontend/vite.config.ts frontend/vite-config.test.ts backend/src/main/java backend/src/test/java
 
   # Backend
   be-run:
-    desc: バックエンドをホスト上で起動
+    desc: 業務データが空なら代表データを入れてから、バックエンドをホスト上で起動
     dir: backend
     cmds:
+      # bootRun のアプリは常に ../.env を読むので、シードも .env に固定して接続先をそろえる。
+      - task: _be-seed
+        vars: { SEED_MODE: auto, SEED_ENV_FILE: .env }
       - ./gradlew bootRun
+
+  be-seed:
+    desc: ローカルの業務データが空のときだけ代表データを入れる
+    cmds:
+      - task: _be-seed
+        vars: { SEED_MODE: seed, SEED_ENV_FILE: '{{.COMPOSE_ENV_FILE}}' }
+
+  be-seed-reset:
+    desc: 明示確認付きでローカルの業務データを消して代表データを入れ直す
+    env:
+      CONFIRM_RESET: '{{.CONFIRM_RESET}}'
+    cmds:
+      - |
+        if [ "$CONFIRM_RESET" != "yes" ]; then
+          echo "業務データ（product、ordering、payment）を削除して代表データを入れ直します。実行するには CONFIRM_RESET=yes を指定してください（例: task be-seed-reset CONFIRM_RESET=yes）。" >&2
+          exit 1
+        fi
+      - task: _be-seed
+        vars: { SEED_MODE: reset, SEED_ENV_FILE: '{{.COMPOSE_ENV_FILE}}' }
+
+  # 環境の判定は持たない。ローカルかテストかは LocalDataSeeder が確かめる。
+  _be-seed:
+    internal: true
+    dir: backend
+    cmds:
+      - |
+        if [ ! -f "../{{.SEED_ENV_FILE}}" ]; then
+          if [ "{{.SEED_MODE}}" = "auto" ]; then
+            echo "{{.SEED_ENV_FILE}} がないため、代表データを入れません。" >&2
+            exit 0
+          fi
+          echo "{{.SEED_ENV_FILE}} がありません。" >&2
+          exit 1
+        fi
+        set -a
+        . "../{{.SEED_ENV_FILE}}"
+        set +a
+        ./gradlew seedLocalData -PseedMode={{.SEED_MODE}}
 
   # Database
   be-migrate:
@@ -468,11 +523,11 @@ tasks:
     cmds:
       - |
         # Collector の route allowlist（docker/otel-collector/config.yaml）が routeTree.gen.ts の fullPaths と同じ集合かを確かめる。
-        # ponytail: 生成物の fullPaths の文字列リテラルと、allowlist のリテラルの選択肢だけを読む。$id のような route params を足すときは正規表現のエスケープが要る。
+        # ponytail: 生成物の fullPaths の文字列リテラルと、allowlist のリテラルの選択肢だけを読む。route params の $ は allowlist で [$$] と書き、照合の前に $ へ戻す。
         routes="$(sed -n "/^  fullPaths:/,/^  fileRoutesByTo:/p" frontend/src/routeTree.gen.ts | grep -o "'[^']*'" | tr -d "'" | sort -u)"
         patterns="$(grep -oF 'IsMatch(log.cache["route"], "^(?:' docker/otel-collector/config.yaml | wc -l)"
         allowed="$(grep -o 'IsMatch(log.cache\["route"\], "\^(?:[^)]*)\$\$")' docker/otel-collector/config.yaml \
-          | sed -e 's/^IsMatch(log.cache\["route"\], "^(?://' -e 's/)\$\$")$//' | tr '|' '\n' | sort -u)"
+          | sed -e 's/^IsMatch(log.cache\["route"\], "^(?://' -e 's/)\$\$")$//' -e 's/\[\$\$\]/$/g' | tr '|' '\n' | sort -u)"
         if [ "$patterns" -ne 1 ] || [ -z "$routes" ] || [ -z "$allowed" ] || [ "$routes" != "$allowed" ]; then
           echo "Collector の route allowlist（transform/frontend_validate の 1 か所）が routeTree.gen.ts の fullPaths と一致しません。" >&2
           echo "routeTree.gen.ts: $(echo $routes)" >&2
@@ -482,10 +537,16 @@ tasks:
 
   _ensure-test-env:
     internal: true
-    status:
-      - test -f .env.test
     cmds:
-      - cp -n .env.test.example .env.test
+      - test -f .env.test || cp .env.test.example .env.test
+      # 既存の環境ファイルは上書きしないので、TEST_ENV_FILE で選んだファイルに .env.test.example の変数が足りなければここで止める。
+      - |
+        test -f "{{.TEST_ENV_FILE}}" || { echo "{{.TEST_ENV_FILE}} がありません。" >&2; exit 1; }
+        missing="$(sed -n 's/^\([A-Za-z_][A-Za-z0-9_]*\)=.*/\1/p' .env.test.example | while read -r key; do grep -q "^${key}=" "{{.TEST_ENV_FILE}}" || printf ' %s' "$key"; done)"
+        if [ -n "$missing" ]; then
+          echo "{{.TEST_ENV_FILE}} に .env.test.example の変数がありません:${missing}。.env.test.example の行を {{.TEST_ENV_FILE}} へ足してください。" >&2
+          exit 1
+        fi
 
   _require-migration-env:
     internal: true
@@ -683,6 +744,20 @@ tasks:
     deps: [_ensure-test-env]
     cmds:
       - '{{.DOCKER}} compose -f "{{.TEST_COMPOSE_FILE}}" down --volumes --remove-orphans'
+
+  test-deps-leftover-check:
+    desc: compose-testのコンテナとvolumeが残っていないか検査
+    silent: true
+    cmds:
+      - |
+        label=com.docker.compose.project=spring-modulith-test
+        left="$({{.DOCKER}} ps -aq --filter "label=$label")$({{.DOCKER}} volume ls -q --filter "label=$label")"
+        if [ -n "$left" ]; then
+          {{.DOCKER}} ps -a --filter "label=$label"
+          {{.DOCKER}} volume ls --filter "label=$label"
+          echo "compose-test のコンテナか volume が残っています。" >&2
+          exit 1
+        fi
 
   test:
     desc: 隔離依存を起動してマイグレーション検証とテスト後に片付け
@@ -1310,8 +1385,8 @@ tasks:
         compose() { {{.DOCKER}} compose -p spring-modulith-dast -f "{{.TEST_COMPOSE_FILE}}" --profile backend-smoke "$@"; }
         fail() { echo "✗ $1" >&2; exit 1; }
 
-        # 4173 は preview、18081 は backend、18082 は ZAP の proxy、5433、6380、8081 は compose-test が使う。
-        for port in 4173 18081 18082 5433 6380 8081; do
+        # 4173 は preview、18081 は backend、18082 は ZAP の proxy、5433、6380、8081、8082 は compose-test が使う。
+        for port in 4173 18081 18082 5433 6380 8081 8082; do
           rc=0
           curl --silent --output /dev/null --connect-timeout 1 "http://127.0.0.1:$port/" || rc=$?
           if [ "$rc" -ne 7 ]; then

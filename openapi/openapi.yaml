@@ -2,11 +2,285 @@ openapi: 3.1.0
 info:
   description: Demo アプリケーションの HTTP API
   title: Demo API
-  version: 0.2.0
+  version: 0.3.0
 servers:
 - description: 現在のオリジン
   url: /
-paths: {}
+tags:
+- description: 注文の API
+  name: ordering
+- description: 決済の API
+  name: payment
+- description: 商品の API
+  name: product
+paths:
+  /api/orders:
+    get:
+      description: 一覧は作成した時刻の新しい順に items で包んで返す。状態を指定すると、その状態の注文だけを返す。
+      operationId: listOrders
+      parameters:
+      - description: 絞り込む注文の状態（DRAFT、CONFIRMED、CANCELLED）。省略するとすべての状態
+        in: query
+        name: status
+        required: false
+        schema:
+          type: string
+          pattern: ^(DRAFT|CONFIRMED|CANCELLED)$
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OrderSummaryListResponse"
+          description: 注文の一覧
+        "400":
+          $ref: "#/components/responses/BadRequestProblem"
+        "401":
+          $ref: "#/components/responses/UnauthorizedProblem"
+        "403":
+          $ref: "#/components/responses/ForbiddenProblem"
+        "500":
+          $ref: "#/components/responses/InternalServerErrorProblem"
+      summary: 注文の一覧を返す。
+      tags:
+      - ordering
+    post:
+      description: 作成した注文の URI を Location に入れて返す。客先注文番号が既にあれば 409、存在しないか販売終了の商品を指定すると
+        422 を返す。
+      operationId: draftOrder
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DraftOrderRequest"
+        description: 作る注文の内容
+        required: true
+      responses:
+        "201":
+          description: 本文のない 201 の応答
+          headers:
+            Location:
+              description: 作成した注文の URI
+              schema:
+                type: string
+                format: uri
+              style: simple
+        "400":
+          $ref: "#/components/responses/BadRequestProblem"
+        "401":
+          $ref: "#/components/responses/UnauthorizedProblem"
+        "403":
+          $ref: "#/components/responses/ForbiddenProblem"
+        "409":
+          $ref: "#/components/responses/ConflictProblem"
+        "422":
+          $ref: "#/components/responses/UnprocessableContentProblem"
+        "500":
+          $ref: "#/components/responses/InternalServerErrorProblem"
+      summary: 下書きの注文を作る。
+      tags:
+      - ordering
+  /api/orders/{orderId}:
+    get:
+      description: 注文がなければ 404 を返す。
+      operationId: findOrderById
+      parameters:
+      - description: 注文の ID
+        in: path
+        name: orderId
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OrderDetailsResponse"
+          description: 注文の詳細
+        "400":
+          $ref: "#/components/responses/BadRequestProblem"
+        "401":
+          $ref: "#/components/responses/UnauthorizedProblem"
+        "403":
+          $ref: "#/components/responses/ForbiddenProblem"
+        "404":
+          $ref: "#/components/responses/NotFoundProblem"
+        "500":
+          $ref: "#/components/responses/InternalServerErrorProblem"
+      summary: 注文の詳細を返す。
+      tags:
+      - ordering
+  /api/orders/{orderId}/cancel:
+    post:
+      description: 注文がなければ 404、画面が読んだ後に注文が変わっていれば 409、下書きでなければ 422 を返す。
+      operationId: cancelOrder
+      parameters:
+      - description: 取り消す注文の ID
+        in: path
+        name: orderId
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CancelOrderRequest"
+        description: 画面が読んだ注文のロック番号
+        required: true
+      responses:
+        "204":
+          description: 本文のない 204 の応答
+        "400":
+          $ref: "#/components/responses/BadRequestProblem"
+        "401":
+          $ref: "#/components/responses/UnauthorizedProblem"
+        "403":
+          $ref: "#/components/responses/ForbiddenProblem"
+        "404":
+          $ref: "#/components/responses/NotFoundProblem"
+        "409":
+          $ref: "#/components/responses/ConflictProblem"
+        "422":
+          $ref: "#/components/responses/UnprocessableContentProblem"
+        "500":
+          $ref: "#/components/responses/InternalServerErrorProblem"
+      summary: 下書きの注文を取り消す。
+      tags:
+      - ordering
+  /api/orders/{orderId}/confirm:
+    post:
+      description: 注文がなければ 404、画面が読んだ後に注文が変わっていれば 409、下書きでなければ 422 を返す。
+      operationId: confirmOrder
+      parameters:
+      - description: 確定する注文の ID
+        in: path
+        name: orderId
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ConfirmOrderRequest"
+        description: 画面が読んだ注文のロック番号
+        required: true
+      responses:
+        "204":
+          description: 本文のない 204 の応答
+        "400":
+          $ref: "#/components/responses/BadRequestProblem"
+        "401":
+          $ref: "#/components/responses/UnauthorizedProblem"
+        "403":
+          $ref: "#/components/responses/ForbiddenProblem"
+        "404":
+          $ref: "#/components/responses/NotFoundProblem"
+        "409":
+          $ref: "#/components/responses/ConflictProblem"
+        "422":
+          $ref: "#/components/responses/UnprocessableContentProblem"
+        "500":
+          $ref: "#/components/responses/InternalServerErrorProblem"
+      summary: 下書きの注文を確定する。
+      tags:
+      - ordering
+  /api/orders/{orderId}/lines:
+    put:
+      description: 注文がなければ 404、画面が読んだ後に注文が変わっていれば 409、下書きでないか、存在しないか販売終了の商品を指定すると
+        422 を返す。
+      operationId: changeOrderLines
+      parameters:
+      - description: 明細を置き換える注文の ID
+        in: path
+        name: orderId
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ChangeOrderLinesRequest"
+        description: 置き換えた後の明細と、画面が読んだ注文のロック番号
+        required: true
+      responses:
+        "204":
+          description: 本文のない 204 の応答
+        "400":
+          $ref: "#/components/responses/BadRequestProblem"
+        "401":
+          $ref: "#/components/responses/UnauthorizedProblem"
+        "403":
+          $ref: "#/components/responses/ForbiddenProblem"
+        "404":
+          $ref: "#/components/responses/NotFoundProblem"
+        "409":
+          $ref: "#/components/responses/ConflictProblem"
+        "422":
+          $ref: "#/components/responses/UnprocessableContentProblem"
+        "500":
+          $ref: "#/components/responses/InternalServerErrorProblem"
+      summary: 下書きの注文の明細を置き換える。
+      tags:
+      - ordering
+  /api/payments:
+    get:
+      description: 決済記録は 1 注文につき 1 件までなので、items に 0 件か 1 件を入れて返す。決済記録がない注文と、存在しない注文では、空の
+        items を返す。
+      operationId: listPayments
+      parameters:
+      - description: 決済した注文の ID
+        in: query
+        name: orderId
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PaymentSummaryListResponse"
+          description: 決済記録の一覧
+        "400":
+          $ref: "#/components/responses/BadRequestProblem"
+        "401":
+          $ref: "#/components/responses/UnauthorizedProblem"
+        "403":
+          $ref: "#/components/responses/ForbiddenProblem"
+        "500":
+          $ref: "#/components/responses/InternalServerErrorProblem"
+      summary: 注文の決済記録を返す。
+      tags:
+      - payment
+  /api/products:
+    get:
+      description: 一覧は商品コードの昇順で items で包んで返す。
+      operationId: listProducts
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProductSummaryListResponse"
+          description: 商品の一覧
+        "401":
+          $ref: "#/components/responses/UnauthorizedProblem"
+        "403":
+          $ref: "#/components/responses/ForbiddenProblem"
+        "500":
+          $ref: "#/components/responses/InternalServerErrorProblem"
+      summary: 商品の一覧を返す。
+      tags:
+      - product
 components:
   responses:
     BadRequestProblem:
@@ -59,6 +333,258 @@ components:
             $ref: "#/components/schemas/ProblemDetail"
       description: 業務規則に反するため処理できない
   schemas:
+    CancelOrderRequest:
+      type: object
+      description: 下書きの注文を取り消す API の本文。
+      properties:
+        lockNo:
+          type: integer
+          format: int64
+          description: 画面が読んだ注文のロック番号
+          example: 1
+          minimum: 1
+      required:
+      - lockNo
+    ChangeOrderLinesRequest:
+      type: object
+      description: 下書きの注文の明細を置き換える API の本文。
+      properties:
+        lines:
+          type: array
+          description: 置き換えた後の明細
+          items:
+            $ref: "#/components/schemas/OrderLineRequest"
+          maxItems: 100
+          minItems: 1
+        lockNo:
+          type: integer
+          format: int64
+          description: 画面が読んだ注文のロック番号
+          example: 1
+          minimum: 1
+      required:
+      - lines
+      - lockNo
+    ConfirmOrderRequest:
+      type: object
+      description: 下書きの注文を確定する API の本文。
+      properties:
+        lockNo:
+          type: integer
+          format: int64
+          description: 画面が読んだ注文のロック番号
+          example: 1
+          minimum: 1
+      required:
+      - lockNo
+    DraftOrderRequest:
+      type: object
+      description: 下書きの注文を作る API の本文。
+      properties:
+        customerOrderCode:
+          type: string
+          description: 客先注文番号。注文ごとに一意にする
+          example: C-2026-0001
+          maxLength: 30
+          minLength: 1
+        lines:
+          type: array
+          description: 注文の明細
+          items:
+            $ref: "#/components/schemas/OrderLineRequest"
+          maxItems: 100
+          minItems: 1
+      required:
+      - customerOrderCode
+      - lines
+    OrderDetailsResponse:
+      type: object
+      description: 注文の詳細を返す API の本文。
+      properties:
+        customerOrderCode:
+          type: string
+          description: 客先注文番号
+          example: C-2026-0001
+        lines:
+          type: array
+          description: 注文の明細
+          items:
+            $ref: "#/components/schemas/OrderLineResponse"
+        lockNo:
+          type: integer
+          format: int64
+          description: 更新の本文で送り返すロック番号
+          example: 1
+        orderId:
+          type: string
+          description: 注文の ID
+          example: 5f0c2a8e-7d1b-4c3a-9e6f-1a2b3c4d5e6f
+        orderedAt:
+          type: string
+          format: date-time
+          description: 注文を作成した時刻
+          example: 2026-10-05T01:02:03.123456Z
+        status:
+          type: string
+          description: 注文の状態のコード値（DRAFT、CONFIRMED、CANCELLED）
+          example: DRAFT
+        totalAmount:
+          type: number
+          description: 明細の金額の合計
+          example: 240.0
+      required:
+      - customerOrderCode
+      - lines
+      - lockNo
+      - orderId
+      - orderedAt
+      - status
+      - totalAmount
+    OrderLineRequest:
+      type: object
+      description: 注文する商品と数量。
+      properties:
+        productId:
+          type: string
+          format: uuid
+          description: 注文する商品の ID
+          example: 0b6c8f6e-2f4a-4c1e-9d3b-7a1e5c2d4f60
+        quantity:
+          type: integer
+          format: int32
+          description: 注文する数量
+          example: 2
+          maximum: 9999
+          minimum: 1
+      required:
+      - productId
+      - quantity
+    OrderLineResponse:
+      type: object
+      description: 注文の明細の1行。
+      properties:
+        amount:
+          type: number
+          description: 単価と数量の積
+          example: 240.0
+        lineNumber:
+          type: integer
+          format: int32
+          description: 明細の番号（1 から）
+          example: 1
+        productId:
+          type: string
+          description: 商品の ID
+          example: 0b6c8f6e-2f4a-4c1e-9d3b-7a1e5c2d4f60
+        quantity:
+          type: integer
+          format: int32
+          description: 注文した数量
+          example: 2
+        unitPrice:
+          type: number
+          description: 作成時に読んだ単価
+          example: 120.0
+      required:
+      - amount
+      - lineNumber
+      - productId
+      - quantity
+      - unitPrice
+    OrderSummaryListResponse:
+      type: object
+      description: 注文の一覧を items で包んで返す API の本文。
+      properties:
+        items:
+          type: array
+          description: 注文の一覧の行
+          items:
+            $ref: "#/components/schemas/OrderSummaryResponse"
+      required:
+      - items
+    OrderSummaryResponse:
+      type: object
+      description: 注文の一覧の1行を返す API の本文。
+      properties:
+        customerOrderCode:
+          type: string
+          description: 客先注文番号
+          example: C-2026-0001
+        lockNo:
+          type: integer
+          format: int64
+          description: 更新の本文で送り返すロック番号
+          example: 1
+        orderId:
+          type: string
+          description: 注文の ID
+          example: 5f0c2a8e-7d1b-4c3a-9e6f-1a2b3c4d5e6f
+        orderedAt:
+          type: string
+          format: date-time
+          description: 注文を作成した時刻
+          example: 2026-10-05T01:02:03.123456Z
+        status:
+          type: string
+          description: 注文の状態のコード値（DRAFT、CONFIRMED、CANCELLED）
+          example: DRAFT
+        totalAmount:
+          type: number
+          description: 明細の金額の合計
+          example: 240.0
+      required:
+      - customerOrderCode
+      - lockNo
+      - orderId
+      - orderedAt
+      - status
+      - totalAmount
+    PaymentSummaryListResponse:
+      type: object
+      description: 決済記録の一覧を items で包んで返す API の本文。
+      properties:
+        items:
+          type: array
+          description: 決済記録の一覧の行。1 注文につき 0 件か 1 件
+          items:
+            $ref: "#/components/schemas/PaymentSummaryResponse"
+      required:
+      - items
+    PaymentSummaryResponse:
+      type: object
+      description: 決済記録の一覧の 1 行を返す API の本文。
+      properties:
+        amount:
+          type: number
+          description: 請求した金額
+          example: 240.0
+        gatewayPaymentCode:
+          type: string
+          description: 決済代行が採番した決済の識別子。採番されなかったときは省く
+          example: ch_5f0c2a8e-7d1b-4c3a-9e6f-1a2b3c4d5e6f
+        orderId:
+          type: string
+          description: 請求した注文の ID
+          example: 5f0c2a8e-7d1b-4c3a-9e6f-1a2b3c4d5e6f
+        paymentId:
+          type: string
+          description: 決済記録の ID
+          example: 7c1e4b2a-3d5f-4a6b-8c9d-0e1f2a3b4c5d
+        recordedAt:
+          type: string
+          format: date-time
+          description: 請求の結果を記録した時刻。status が意味を決める
+          example: 2026-10-06T01:02:03.123456Z
+        status:
+          type: string
+          description: 請求の結果のコード値（PAID、DECLINED、FAILED）
+          example: PAID
+      required:
+      - amount
+      - orderId
+      - paymentId
+      - recordedAt
+      - status
     ProblemDetail:
       type: object
       description: RFC 9457 の Problem Details
@@ -86,6 +612,47 @@ components:
       - status
       - title
       - type
+    ProductSummaryListResponse:
+      type: object
+      description: 商品の一覧を items で包んで返す API の本文。
+      properties:
+        items:
+          type: array
+          description: 商品の一覧の行
+          items:
+            $ref: "#/components/schemas/ProductSummaryResponse"
+      required:
+      - items
+    ProductSummaryResponse:
+      type: object
+      description: 商品の一覧の1行を返す API の本文。
+      properties:
+        productCode:
+          type: string
+          description: 商品コード
+          example: P-0001
+        productId:
+          type: string
+          description: 商品の ID
+          example: 0b6c8f6e-2f4a-4c1e-9d3b-7a1e5c2d4f60
+        productName:
+          type: string
+          description: 商品名
+          example: ボールペン
+        salesStatus:
+          type: string
+          description: 販売の状態のコード値（ON_SALE か DISCONTINUED）
+          example: ON_SALE
+        unitPrice:
+          type: number
+          description: 単価
+          example: 120.0
+      required:
+      - productCode
+      - productId
+      - productName
+      - salesStatus
+      - unitPrice
     ValidationError:
       type: object
       description: 入力検証の誤り

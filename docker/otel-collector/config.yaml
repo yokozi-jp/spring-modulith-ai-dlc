@@ -53,7 +53,7 @@ processors:
       - set(log.cache["route"], log.cache["view_name"]) where log.attributes["kind"] != "event"
       - set(log.cache["route"], log.cache["event_data_toView"]) where log.attributes["kind"] == "event"
       # route の allowlist はこの 1 行だけに書く。task fe-route-tree-check と task otel-collector-check が routeTree.gen.ts と照合する。
-      - set(log.attributes["frontend.view"], log.cache["route"]) where IsMatch(log.cache["route"], "^(?:/|/logged-out)$$")
+      - set(log.attributes["frontend.view"], log.cache["route"]) where IsMatch(log.cache["route"], "^(?:/|/logged-out|/orders/|/orders/[$$]orderId/|/orders/new)$$")
       - set(log.attributes["frontend.lcp"], Double(log.cache["value_lcp"])) where Len(log.cache["value_lcp"]) >= 1 and Len(log.cache["value_lcp"]) <= 32 and IsMatch(log.cache["value_lcp"], "^[0-9]+(?:\\.[0-9]+)?$$")
       - set(log.attributes["frontend.inp"], Double(log.cache["value_inp"])) where Len(log.cache["value_inp"]) >= 1 and Len(log.cache["value_inp"]) <= 32 and IsMatch(log.cache["value_inp"], "^[0-9]+(?:\\.[0-9]+)?$$")
       - set(log.attributes["frontend.cls"], Double(log.cache["value_cls"])) where Len(log.cache["value_cls"]) >= 1 and Len(log.cache["value_cls"]) <= 32 and IsMatch(log.cache["value_cls"], "^[0-9]+(?:\\.[0-9]+)?$$")

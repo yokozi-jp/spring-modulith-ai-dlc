@@ -5,16 +5,22 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import com.example.demo.payment.domain.model.Money;
+import com.example.demo.payment.domain.model.OrderId;
+import com.example.demo.payment.domain.model.PaymentGateway;
 import com.example.demo.testkit.SharedTestConfiguration;
 import com.zaxxer.hikari.HikariDataSource;
+import io.github.resilience4j.circuitbreaker.CircuitBreaker;
 import io.github.resilience4j.circuitbreaker.CircuitBreakerConfig;
 import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry;
 import io.github.resilience4j.core.IntervalBiFunction;
 import io.github.resilience4j.core.functions.Either;
+import io.github.resilience4j.retry.Retry;
 import io.github.resilience4j.retry.RetryConfig;
 import io.github.resilience4j.retry.RetryRegistry;
 import io.github.resilience4j.timelimiter.TimeLimiterConfig;
 import io.github.resilience4j.timelimiter.TimeLimiterRegistry;
+import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
@@ -22,8 +28,10 @@ import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.Map;
 import java.util.Objects;
+import java.util.UUID;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeoutException;
+import java.util.function.Predicate;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -32,15 +40,20 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.ApplicationContext;
 import org.springframework.context.annotation.Import;
 import org.springframework.core.task.AsyncTaskExecutor;
+import org.springframework.core.task.SimpleAsyncTaskExecutor;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.security.oauth2.client.web.OAuth2AuthorizationRequestResolver;
 import org.springframework.security.oauth2.core.endpoint.OAuth2AuthorizationRequest;
 import org.springframework.security.oauth2.core.endpoint.PkceParameterNames;
+import org.springframework.web.client.HttpClientErrorException;
+import org.springframework.web.client.HttpServerErrorException;
 
 /** アプリケーション起動時の日時、DB、耐障害性、OIDC 配線を検証する統合テスト。 */
-// 起動時の配線を設定ごとに一つのテストで検証するため、メソッドの数の上限を外す。
-@SuppressWarnings("PMD.TooManyMethods")
+// 起動時の配線を設定ごとに一つのテストで検証するため、メソッドの数と結合する型の数の上限を外す。
+@SuppressWarnings({"PMD.TooManyMethods", "PMD.CouplingBetweenObjects"})
 @SpringBootTest
 @Import(SharedTestConfiguration.class)
 class DemoApplicationTest {
@@ -69,6 +82,9 @@ class DemoApplicationTest {
 
   /** PKCE パラメータを検証する対象の認可リクエストリゾルバ。 */
   @Autowired private OAuth2AuthorizationRequestResolver authorizationRequestResolver;
+
+  /** resilience4j の注釈が掛かることを検証する決済代行の Client。 */
+  @Autowired private PaymentGateway paymentGateway;
 
   /** 起動確認の対象となる {@code ApplicationContext}。 */
   @Autowired private ApplicationContext applicationContext;
@@ -113,6 +129,21 @@ class DemoApplicationTest {
   }
 
   @Test
+  @DisplayName("アプリケーション executor の同時実行数は、DB の接続の pool の半分以下に制限する")
+  void applicationExecutorConcurrencyLeavesConnectionsForRequests() {
+    assertTrue(
+        applicationTaskExecutor instanceof SimpleAsyncTaskExecutor,
+        "仮想スレッドの executor が SimpleAsyncTaskExecutor であること");
+    // executor は Spring が閉じるため、ローカル変数に取らずに読む。
+    final int limit = ((SimpleAsyncTaskExecutor) applicationTaskExecutor).getConcurrencyLimit();
+    final int poolSize = hikariDataSource.getMaximumPoolSize();
+
+    assertTrue(
+        limit >= 1 && limit * 2 <= poolSize,
+        () -> "同時実行数 " + limit + " が 1 以上で、pool " + poolSize + " の半分以下であること");
+  }
+
+  @Test
   @DisplayName("circuit breaker の既定値が障害の連鎖を制限する")
   void circuitBreakerUsesProjectDefaults() {
     final CircuitBreakerConfig config = circuitBreakerRegistry.getDefaultConfig();
@@ -154,6 +185,78 @@ class DemoApplicationTest {
     assertEquals(3, idempotentConfig.getMaxAttempts(), "冪等操作の最大試行回数が三回であること");
     assertEquals(200L, firstRetryDelay, "冪等操作の初回 retry 待機が 200 ミリ秒であること");
     assertEquals(400L, secondRetryDelay, "冪等操作の retry 待機が倍率 2 で増えること");
+    final Predicate<Throwable> retryable = idempotentConfig.getExceptionPredicate();
+    assertEquals(
+        Map.of(429, true, 503, true, 500, false, 400, false),
+        Map.of(
+            429, retryable.test(httpError(HttpStatus.TOO_MANY_REQUESTS)),
+            503, retryable.test(httpError(HttpStatus.SERVICE_UNAVAILABLE)),
+            500, retryable.test(httpError(HttpStatus.INTERNAL_SERVER_ERROR)),
+            400, retryable.test(httpError(HttpStatus.BAD_REQUEST))),
+        "冪等操作が ADR-019 の一時障害の 429 と 503 だけを再試行し、500 と 400 を再試行しないこと");
+  }
+
+  @Test
+  @DisplayName("決済代行の Client に payment-gateway の circuit breaker と retry が掛かる")
+  void paymentGatewayIsGuardedByResilience4j() {
+    // YAML の instance は注釈がなくても registry に作られるため、呼び出しの件数の増加で aspect が掛かったことを確かめる。
+    // 請求は compose-test の WireMock（.env.test の PAYMENT_GATEWAY_BASE_URL）の共有のスタブが成功で返す。
+    final CircuitBreaker circuitBreaker = circuitBreakerRegistry.circuitBreaker("payment-gateway");
+    final Retry retry = retryRegistry.retry("payment-gateway");
+    final long callsBefore = circuitBreaker.getMetrics().getNumberOfSuccessfulCalls();
+    final long retryBefore = retry.getMetrics().getNumberOfSuccessfulCallsWithoutRetryAttempt();
+
+    paymentGateway.charge(new OrderId(UUID.randomUUID()), new Money(new BigDecimal("1.00")));
+
+    assertEquals(
+        callsBefore + 1,
+        circuitBreaker.getMetrics().getNumberOfSuccessfulCalls(),
+        "payment-gateway の circuit breaker が成功の呼び出しを 1 件数えること");
+    assertEquals(
+        retryBefore + 1,
+        retry.getMetrics().getNumberOfSuccessfulCallsWithoutRetryAttempt(),
+        "payment-gateway の retry が再試行なしの成功を 1 件数えること");
+    assertEquals(
+        1, retry.getRetryConfig().getMaxAttempts(), "payment-gateway の retry の試行が 1 回であること");
+  }
+
+  @Test
+  @DisplayName("決済代行の呼び出しの最悪の時間は、トランザクション中の待機の上限より短い")
+  void paymentGatewayWorstCaseFitsIdleInTransactionTimeout() {
+    // Listener はトランザクションの中で決済代行を呼ぶ（ADR-050）。待つ間に idle_in_transaction_session_timeout を超えると、
+    // PostgreSQL が接続を切り、請求の結果を記録できない（ADR-055）。
+    final Duration connectTimeout =
+        applicationContext
+            .getEnvironment()
+            .getRequiredProperty("payment-gateway.connect-timeout", Duration.class);
+    final Duration readTimeout =
+        applicationContext
+            .getEnvironment()
+            .getRequiredProperty("payment-gateway.read-timeout", Duration.class);
+    final RetryConfig retryConfig = retryRegistry.retry("payment-gateway").getRetryConfig();
+    final IntervalBiFunction<Object> intervalFunction =
+        Objects.requireNonNull(
+            retryConfig.getIntervalBiFunction(), "payment-gateway の retry の interval function");
+    final Either<Throwable, Object> failure = Either.left(new IllegalStateException("一時障害のテスト入力"));
+    final int attempts = retryConfig.getMaxAttempts();
+    long worstCaseMillis = attempts * (connectTimeout.toMillis() + readTimeout.toMillis());
+    for (int retry = 1; retry < attempts; retry++) {
+      worstCaseMillis += Objects.requireNonNull(intervalFunction.apply(retry, failure), "再試行の待ち");
+    }
+    final long idleTimeoutMillis =
+        applicationContext
+            .getEnvironment()
+            .getRequiredProperty("DB_IDLE_IN_TRANSACTION_TIMEOUT_MS", Long.class);
+    final long worstCase = worstCaseMillis;
+
+    assertTrue(
+        worstCase < idleTimeoutMillis,
+        () ->
+            "決済代行の最悪の時間 "
+                + worstCase
+                + " ms が DB_IDLE_IN_TRANSACTION_TIMEOUT_MS "
+                + idleTimeoutMillis
+                + " ms より短いこと");
   }
 
   @Test
@@ -255,5 +358,12 @@ class DemoApplicationTest {
     assertNotNull(
         authorizationRequest.getAttributes().get(PkceParameterNames.CODE_VERIFIER),
         "PKCE の code_verifier が保持されること");
+  }
+
+  /** 状態のコードに合う RestClient の HTTP の例外を作る。 */
+  private static RuntimeException httpError(final HttpStatus status) {
+    return status.is4xxClientError()
+        ? HttpClientErrorException.create(status, "", HttpHeaders.EMPTY, new byte[0], null)
+        : HttpServerErrorException.create(status, "", HttpHeaders.EMPTY, new byte[0], null);
   }
 }

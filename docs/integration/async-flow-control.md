@@ -28,6 +28,14 @@ DB を使うコンシューマーの同時実行数は、DB 接続の予算に�
 Spring Modulith の非同期リスナーは、アプリケーションの task executor で実行される。
 仮想スレッドはスレッドの費用を下げるが DB 接続を増やさないため、DB を使うリスナーの同時実行数は HikariCP の接続予算に収め、同期リクエストが使う接続を残す（[ADR-019](../adr/ADR-019-define-resilience-and-capacity-guardrails.md)）。
 
+このリポジトリは `application.yaml` の `spring.task.execution.simple.concurrency-limit` を 2 にする。
+仮想スレッドの `SimpleAsyncTaskExecutor` は、この値で同時に動くリスナーの数を制限する。
+値は最小の接続の pool（テストの `DB_POOL_MAXIMUM_SIZE` の 4）の半分で、残りの接続を同期リクエストに残す。
+`DemoApplicationTest` は、上限が 1 以上で pool の半分以下であることを確かめる。
+上限に達すると、コミットの後にリスナーを投入する要求のスレッドは、接続を持ったまま空きを待つ。
+`reject-tasks-when-limit-reached` で断ると出版が未完了のまま残るため、断らずに待たせる。
+本番の pool の大きさを負荷試験で決めたら、上限を pool から導いた環境変数にする。
+
 ## 受信方式ごとの流量制御
 
 コンシューマーの受信方式によって、流量の制御方法が変わる。

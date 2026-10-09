@@ -20,6 +20,8 @@ tags: [convention, backend, testing]
 - コミット時にだけ起きるDB挙動は`@CommittedDatabaseTest`を使う。
 - モジュールとイベントの挙動は、`@ApplicationModuleTest`、`Scenario`、`PublishedEvents`または`AssertablePublishedEvents`を使う。
 - アプリケーション全体の起動と横断的な配線は、フルの`@SpringBootTest`で検証する。
+- 外部システムのClientのHTTPの変換は、JDKの`HttpServer`を使うSpringを起動しないJUnitテストで検証する。
+  リトライ、circuit breaker、イベント出版の状態は、WireMockを使う`@ApplicationModuleTest`で検証する（[外部システムのClient](class-roles/external-client.md)、[ADR-072](../adr/ADR-072-fake-external-systems-with-wiremock.md)）。
 - 既存テストが業務コードの変化を検出できるか確認するときは、PITミューテーションテストを使う。
 
 プロパティベーステストとミューテーションテストの採用理由は[ADR-012](../adr/ADR-012-adopt-property-based-and-mutation-testing.md)を参照する。

@@ -11,6 +11,7 @@ on:
       - "backend/**"
       - "docker/compose-test.yml"
       - "docker/initdb/**"
+      - "docker/wiremock/**"
       - "docker/keycloak/**"
       - ".env.test.example"
       - "Taskfile.yml"
@@ -88,6 +89,25 @@ jobs:
       # CI=true のため、task e2e は E2E_KEEP_ENV にかかわらず後片付けする。
       - name: Run E2E tests
         run: PATH="$GITHUB_WORKSPACE/frontend/node_modules/.bin:$PATH" task e2e
+
+      # task test と共有する Compose project のコンテナと volume が、後片付けの後に残っていないことを確かめる。
+      - name: Check no compose-test leftovers
+        if: always()
+        run: task test-deps-leftover-check
+
+      # 成功時も、HTML report を証拠に残す。backend のログは失敗の調査にだけ使うため、失敗時だけ残す。
+      # retry で成功したテストは失敗した試行の trace を report に残すため、Cookie を含みうる trace（data/*.zip）を除く。
+      - name: Upload E2E evidence
+        if: success()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: e2e-evidence
+          path: |
+            frontend/playwright-report/
+            !frontend/playwright-report/data/*.zip
+            !frontend/e2e/.auth/
+          if-no-files-found: error
+          retention-days: 14
 
       # storageState（frontend/e2e/.auth/）は対象の外にあり、念のため除外も指定する。
       - name: Upload E2E artifacts

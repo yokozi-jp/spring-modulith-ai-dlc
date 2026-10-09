@@ -118,7 +118,8 @@ Collector の設定（`docker/otel-collector/config.yaml`）は、ローカル�
 - 画面遷移は本文を `Browser view` に固定し、`telemetry.signal`、`view.name`、`session.id` だけを残す。
 - Web Vitals は本文を `Browser web vital` に固定し、`telemetry.signal`、`measurement.type`、`measurement.name`、`measurement.value`、`view.name`、`session.id` だけを残す。
 
-route template の allowlist は `/` と `/logged-out` で、`transform/frontend_validate` の 1 か所だけに書く。
+route template の allowlist は `/`、`/logged-out`、`/orders/`、`/orders/$orderId/`、`/orders/new` で、`transform/frontend_validate` の 1 か所だけに書く。
+route params の `$` は、Collector の環境変数の展開と正規表現の終端を避けるため、allowlist に `[$$]` と書く。
 `task fe-route-tree-check` と `task otel-collector-check` は、この allowlist が `routeTree.gen.ts` の `fullPaths` と一致しなければ失敗する。
 route を追加するときは、Collector の allowlist とこの文書を同じ変更で更新する。
 allowlist は環境変数にしない。

@@ -89,7 +89,7 @@ Safariに対応する必要があるときは、ポリフィルを入れる。
 
 依存を追加したら、`frontend/src/main.tsx`で描画の前に、`globalThis`に`Temporal`がないときだけ`await import("temporal-polyfill/global")`で読み込む。
 Temporalを出荷したChromeとFirefoxには、ポリフィルのchunkを配らない。
-次は[issue #122](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/122)の確認用のブランチ（`e999bd8`）で動かした例である。
+次は[issue #122](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/122)の参照業務機能のブランチ（`e999bd8`）で動かした例である。
 
 ```typescript
 // Temporal を出荷していないブラウザだけ polyfill を読み込む（ADR-047）。

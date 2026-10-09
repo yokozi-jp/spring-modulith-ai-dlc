@@ -25,7 +25,10 @@ Spring Modulith は、その一部として選んだ道具です。
 モジュール間の境界と依存をテストで検証できるため、エージェントが境界を越える変更を書いても、人のレビューより前に検出できます。
 言語、フレームワーク、ツールは、同じ基準で「変更を機械的に検査できるか」を見て選んでいます。
 
-業務ドメインのモジュールはこれから追加していきます。
+`product`、`ordering`、`payment` の 3 つのモジュールは、AI harness を継続して検証する**参照業務機能**です。
+商品の閲覧、注文の作成と確定、イベントの Listener と外部の HTTP の Client を通した決済を持つ、通常の機能モジュールです。
+harness を変えるたびに、`task verify`、`task fe-verify`、`task e2e` が実際の業務の流れで変更を確かめられるよう、恒久的に保守します。
+新しいモジュールも同じ規約に従います。
 
 ## AI harnessの構成
 
@@ -217,11 +220,16 @@ task <タスク名>
 
 日々の開発で使う入口タスクは次の五つです。
 
-- **`task dev`**：依存サービスを起動してバックエンドを起動（日々の開発の入口）。
+- **`task dev`**：依存サービスを起動してバックエンドを起動（日々の開発の入口）。業務データが空のDBには、起動の前に開発用の代表データを入れる。
 - **`task check`**：素早いローカル確認（バックエンドの静的解析）。
 - **`task fe-verify`**：フロントエンドの静的解析、未使用コード検査、テスト、本番ビルド。
 - **`task lint-duplicates`**：フロントエンドとバックエンドの手書きコードの重複検査。
 - **`task verify`**：push 前のバックエンド総合ゲート（静的解析、OpenAPI 契約検査と、使い捨てDBでのマイグレーション検証とテスト、CI と同じ内容）。
+
+開発用の代表データは次の二つで入れます。
+
+- **`task be-seed`**：ローカルの業務データが空のときだけ代表データを入れる。
+- **`task be-seed-reset CONFIRM_RESET=yes`**：ローカルの業務データを消して代表データを入れ直す。
 
 API の Controller や DTO を変えたときは `task api-gen` で OpenAPI 契約と Orval の生成物を再生成し、同じコミットに含めます（[API を変更する](docs/web-api/runbook-api-change.md)）。
 
@@ -250,7 +258,7 @@ Docker Compose の操作（サービスの起動、停止、状態確認、Keycl
 
 ### E2E
 
-- `task e2e` は frontend と backend イメージをビルドし、compose-test で依存サービスと backend を起動して migration を適用し、Vite preview に対して Playwright を実行してから後片付けします。
+- `task e2e` は frontend と backend イメージをビルドし、compose-test で依存サービスと backend を起動して migration と代表データを入れ、Vite preview に対して Playwright を実行してから、backend のログを `frontend/test-results/backend.log` に残して後片付けします。
 - 開発用の Vite（5173）と Keycloak（8080）を止めてから実行します。
   失敗した環境を調べるときは `E2E_KEEP_ENV=1 task e2e` で残せます（CI では常に片付けます）。
 - CI の `E2E tests 🎭` は対象パスの変更でだけ起動し、必須チェックにはしていません。
@@ -270,7 +278,8 @@ Docker Compose の操作（サービスの起動、停止、状態確認、Keycl
 ### 重複コード検査
 
 - `task lint-duplicates` はTanStack RouterとjOOQの生成コードを除いたFrontendとBackendの手書きソースをjscpdで検査します。
-- 既存の重複行率3.19%を基準に3.2%を上限とし、既存cloneの解消に合わせて閾値を下げます。
+- 参照業務機能（product、ordering、payment）の手書きの重複を除いた後の重複行率3.93%を基準に4.0%を上限とします。
+  残りの重複は、モジュールごとのクラスの役割とテストの規約が求める import、注釈、フィールドの定型です（[ADR-074](docs/adr/ADR-074-raise-jscpd-threshold-for-class-role-boilerplate.md)）。
 
 ### バックエンド
 

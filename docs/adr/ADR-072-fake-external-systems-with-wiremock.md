@@ -9,7 +9,7 @@ tags: [adr, backend, testing, external-system, wiremock]
 
 ## Status
 
-Proposed
+Accepted
 
 ## Date
 
@@ -17,7 +17,7 @@ Proposed
 
 ## Context
 
-[#122](https://github.com/yokozi-jp/spring-modulith-ai-dlc/pull/122) のサンプルの注文と決済は、決済代行を呼ぶ `PaymentGatewayClient` の偽物を本番のコードに持ち、`payment-gateway.mode` の設定で成功と失敗を切り替えていた。
+[#122](https://github.com/yokozi-jp/spring-modulith-ai-dlc/pull/122) の参照業務機能の注文と決済は、決済代行を呼ぶ `PaymentGatewayClient` の偽物を本番のコードに持ち、`payment-gateway.mode` の設定で成功と失敗を切り替えていた。
 [#164](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/164) は、この形に三つの問題があると指摘した。
 一つ目に、本番のコードを失敗する状態に設定できる。
 二つ目に、失敗の種類が一つしかなく、5xx、タイムアウト、遅延を区別して確かめられない。
@@ -43,15 +43,22 @@ Proposed
   WireMock の URL は env の例と compose ファイルにだけ書き、本番が既定値のまま WireMock を向くことを防ぐ。
   明示した誤った値（平文の `http://` や誤ったホスト）は起動の時点で止まらず、デプロイの設定のレビューに依存する。
   WireMock はローカル、テスト、E2E だけで使い、本番には置かない。
-- 決済代行の呼び出しの結果を次の四つに分け、再投入で回復できるものだけをイベント出版の `FAILED` に残す。
+- 決済代行の呼び出しの結果を次の四つに分け、再投入で回復できるものをイベント出版の `FAILED` に残す。
   回復不能なエラーの扱いは [非同期処理の失敗時の再試行と回復](../integration/async-failure-recovery.md) に従う。
   1. 一時障害（接続の失敗、タイムアウト、429、5xx）：サーキットブレーカーの失敗に数え、例外を Client の外へ投げ、イベント出版を `FAILED` のまま再投入を待つ。
   2. 業務上の拒否（カードの拒否、限度額の超過）：Client は例外を投げずに拒否を表す結果を返し、呼び出し元が決済の拒否を業務の状態に記録する。
      リスナーは正常終了し、イベント出版は `COMPLETED` になる。
   3. 資格情報の不備（401、403）：サーキットブレーカーの失敗に数えず、例外を Client の外へ投げ、イベント出版を `FAILED` に残す。
      資格情報を直したあとの再投入で回復できるためである。
-  4. 契約の不備（1 と 3 以外の 4xx）：サーキットブレーカーの失敗に数えず、回復不能なエラーとして決済の失敗を業務の状態に記録し、リスナーを正常終了させる。
+  4. 契約の不備（1 と 3 以外の 4xx と、契約に合わない応答）：サーキットブレーカーの失敗に数えず、回復不能なエラーとして決済の失敗を業務の状態に記録し、リスナーを正常終了させる。
      同じ要求を再投入しても回復しないためである。
+     契約に合わない応答は、`201` 以外の 2xx と 3xx、本文がないか JSON として読めない、`status` が未知かない、`chargeId` がないか空白だけの応答である。
+- イベント出版の `FAILED` には、再投入で回復できる失敗のほかに、内部の不変条件の違反をデッドレターとして意図して残す。
+  例は、`OrderConfirmed` を受けたのに注文がない場合である。
+  不具合でしか起きず、業務の状態に記録すると不具合が隠れるため、例外を投げる。
+  出版がイベントを保ち、ERROR のログが運用者に届き、不具合を直したあとに再投入できる（運用者の入口は [#108](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/108)）。
+- リスナーが動く前に取り消したような、`CONFIRMED` でない注文の `OrderConfirmed` は、業務の結果として請求せずに INFO のログを残し、リスナーを正常終了させる。
+  再投入しても結果は変わらないためである。
 - サーキットブレーカーの `payment-gateway` の instance は、429 以外の `HttpClientErrorException` を無視する述語を `ignore-exception-predicate` に指定する。
   `ignore-exceptions` に `HttpClientErrorException` を書くと、[ADR-019](ADR-019-define-resilience-and-capacity-guardrails.md) が一時障害に挙げる 429 まで無視するためである。
   Resilience4j では `ignore-exceptions` が `record-exceptions` より優先され、型の列挙では 429 だけを失敗に数えられない。
@@ -72,13 +79,15 @@ Proposed
 - 成功の応答は `201 {chargeId, status: "SUCCEEDED"}` である。
 - 拒否の応答は `201 {chargeId, status: "DECLINED"}` である。
   Client は `status` が `DECLINED` なら、例外を投げずに拒否を表す結果を返す。
+- 成功と拒否のどちらも、状態のコードは `201` だけで、`chargeId` は空でない 64 文字以下の文字列で必ずある。
+  これ以外の 2xx と 3xx の応答は、Decision の 4 の契約の不備である。
 
 ## Consequences
 
 ### Positive
 
 - 本番のコードに偽物の状態がなくなり、mode の設定で本番を失敗し続ける状態にできない。
-- 決済の拒否と契約の不備が再投入の列に積まれず、イベント出版の `FAILED` は再投入で回復できるものだけになる。
+- 決済の拒否と契約の不備が再投入の列に積まれず、イベント出版の `FAILED` は再投入で回復できるものと、意図して残す内部の不変条件の違反だけになる。
 - 5xx、タイムアウト、遅延、サーキットブレーカーの open を、実際の HTTP を通して確かめられる。
 - backend を再起動せずに、シナリオの途中で注文ごとに応答を切り替えられる。
 - 成功のスタブが 1 ファイルなので、Client と偽物の契約がずれにくい。
@@ -104,17 +113,16 @@ Proposed
 
 - 未決事項として、次の三つを実際の決済代行の契約を選ぶときに決める。
   今の `base-url` は `http://` を受け付け、Client は資格情報を送らず、起動時の検査も置かない。
-  1. TLS の強制：本番は `https://` にする。
+  1. TLS の強制：本番は `https://` にする（[#187](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/187)）。
      `https://` と許可するホストを検査する場所（アプリの起動のコードでなく、デプロイの設定や IaC のレビュー）と、証明書のピン留めや独自のトラストストアの要否を決める。
      このリポジトリにはまだ IaC が無く、決まるまで検査は無い。
-  2. 資格情報の扱い：決済代行が求める認証の方式（API キーのヘッダー、OAuth 2.0 の client credentials、mTLS）を決める。
+  2. 資格情報の扱い：決済代行が求める認証の方式（API キーのヘッダー、OAuth 2.0 の client credentials、mTLS）を決める（[#187](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/187)）。
      秘密の取得元（[ADR-008](ADR-008-single-application-yaml-external-config.md) に従い、ECS タスク定義の `secrets` で Secrets Manager などから注入する環境変数）、ローテーション、ログに出さない方法も決める。
   3. 契約の分類：拒否の表し方（2xx の本文か、402 などの 4xx か）と、各 HTTP の状態を Decision の四つの分類のどれに当てるかを決める。
      決まるまでは、このリポジトリの暫定の契約と分類に従う。
 - 本番の URL の誤設定は、未設定を除いて起動の時点で止まらず、未決事項の 1 で検査の場所を決めるまで運用のレビューに依存する。
 - backend を通して決済の失敗と再投入を確かめる E2E は、後続の作業（[#167](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/167)）で書く。
-- この ADR は Proposed であり、規約文書はまだ変えない。
-  規約文書（`docs/backend/class-roles/external-client.md`、`docs/backend/testing-strategy.md`、`docs/container/compose.md`、`docs/e2e/testing-strategy.md`、`docs/integration/async-failure-recovery.md`）は、実装の Pull Request（#122、#167）で ADR を Accepted にする変更と同じ変更で更新する（[ADR の運用ルール](conventions.md)）。
+- 規約文書（`docs/backend/class-roles/external-client.md`、`docs/backend/testing-strategy.md`、`docs/container/compose.md`、`docs/e2e/testing-strategy.md`、`docs/integration/async-failure-recovery.md`）は、この ADR を Accepted にする #122 の変更で更新した（[ADR の運用ルール](conventions.md)）。
 
 ## Alternatives Considered
 
@@ -149,8 +157,9 @@ Proposed
 
 - [#164 外部システムを本番のコードで偽らず、WireMock のコンテナで偽る](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/164)
 - [#166 参照業務機能を main に導入し、開発基盤を継続的に検証する](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/166)
-- [#122 開発基盤を確かめる注文と決済のサンプル機能を追加する](https://github.com/yokozi-jp/spring-modulith-ai-dlc/pull/122)
+- [#122 product、ordering、payment を参照業務機能として導入する](https://github.com/yokozi-jp/spring-modulith-ai-dlc/pull/122)
 - [#167 参照業務機能の主要フローと障害回復を検証する](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/167)
+- [#187 決済代行の接続で TLS を強制し、資格情報の扱いを決める](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/187)
 - [ADR-008: application.yaml を単一にし、設定を外部から注入する](ADR-008-single-application-yaml-external-config.md)
 - [ADR-019: 外部連携の耐障害性と容量制御を標準化する](ADR-019-define-resilience-and-capacity-guardrails.md)
 - [ADR の運用ルール](conventions.md)

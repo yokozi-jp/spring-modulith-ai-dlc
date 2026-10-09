@@ -45,6 +45,19 @@ spring:
     virtual:
       enabled: true
 
+  # @Async の Listener へ発行元の trace を引き継ぐ（docs/integration/async-observability.md）。
+  # 利用者の認証も伝わるが、Listener の中の書き込みの *_by は認証を使わず pgm_cd にする（ADR-051）。
+  task:
+    execution:
+      propagate-context: true
+      # 非同期の Listener の同時実行数の上限（docs/integration/async-flow-control.md）。
+      # Listener は DB 接続を使い、決済代行を待つ間も接続を持つため、同期リクエストの接続を残すよう、
+      # 最小の pool（テストの DB_POOL_MAXIMUM_SIZE=4）の半分にする。DemoApplicationTest が pool の半分以下であることを確かめる。
+      # ponytail: 上限に達すると SimpleAsyncTaskExecutor は、コミットの後に Listener を投入する要求のスレッドを、接続を持ったまま待たせる。
+      # 負荷試験で本番の pool の大きさが決まったら、pool から導いた環境変数にする。
+      simple:
+        concurrency-limit: 2
+
   # DB
   datasource:
     # ホスト起動では localhost、Compose の backend profile では postgres サービスを指す。
@@ -150,6 +163,16 @@ spring:
   lifecycle:
     timeout-per-shutdown-phase: 30s
 
+# 決済代行の URL。既定値を置かず、未設定なら起動に失敗する。ローカルと E2E だけが WireMock を指す。
+payment-gateway:
+  base-url: ${PAYMENT_GATEWAY_BASE_URL}
+  # ADR-019 の開始値。環境で変えないため固定値にする。
+  # Listener はトランザクションの中で決済代行を呼ぶ（ADR-050）ため、
+  # (connect-timeout + read-timeout) × retry の試行回数 + 再試行の待ちの合計を、
+  # どの環境でも DB_IDLE_IN_TRANSACTION_TIMEOUT_MS より短くする（ADR-055）。DemoApplicationTest が確かめる。
+  connect-timeout: 1s
+  read-timeout: 2s
+
 # 外部 client は依存先ごとに名前付き instance を定義し、client adapter の境界で適用する。
 # 現在の PostgreSQL、Redis、OIDC 通信へは自動適用されない。
 resilience4j:
@@ -162,6 +185,12 @@ resilience4j:
         failure-rate-threshold: 50
         wait-duration-in-open-state: 30s
         permitted-number-of-calls-in-half-open-state: 5
+    instances:
+      payment-gateway:
+        base-config: default
+        # 429 以外の 4xx は資格情報か契約の不備で、決済代行の不調ではないので失敗として数えない（ADR-072）。
+        # 429 は一時障害なので数える。ignore-exceptions に HttpClientErrorException を書くと 429 まで無視するため、述語にする。
+        ignore-exception-predicate: com.example.demo.payment.infrastructure.client.IgnoredClientErrorPredicate
   retry:
     configs:
       # 非冪等処理を重複実行しないよう、明示しない retry は無効にする。
@@ -173,6 +202,17 @@ resilience4j:
         wait-duration: 200ms
         enable-exponential-backoff: true
         exponential-backoff-multiplier: 2
+        # 再試行は ADR-019 の一時障害（接続の失敗とタイムアウト、429、502、503、504）に限る（ADR-072）。
+        retry-exceptions:
+          - org.springframework.web.client.ResourceAccessException
+          - org.springframework.web.client.HttpClientErrorException$TooManyRequests
+          - org.springframework.web.client.HttpServerErrorException$BadGateway
+          - org.springframework.web.client.HttpServerErrorException$ServiceUnavailable
+          - org.springframework.web.client.HttpServerErrorException$GatewayTimeout
+    instances:
+      # 冪等キーを渡すが、CommandHandler のトランザクションの中で呼ぶため default（試行 1 回）を継承する。
+      payment-gateway:
+        base-config: default
   timelimiter:
     configs:
       default:

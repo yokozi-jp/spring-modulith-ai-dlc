@@ -55,6 +55,11 @@ FQNやcustom resolverで衝突を回避せず、Javaの型名自体を一意に�
 - enum、boolean、ネストしたrecord（`$ref`）、object、配列のpropertyには付けない。
 - recordのpropertyでは、`@Schema`を`example`だけに使い、`description`、`requiredMode`、`type`を書かない。
   必須と形式はBean Validationの制約（`@NotBlank`、`@Positive`）から生成される。
+- 要求のprimitiveのpropertyと、応答の省かないpropertyに`@NotNull`を付け、`required`に出す。
+  応答の`@NotNull`は検証されず、契約の記述にだけ使う。
+  省くことのある応答のpropertyは`@Nullable`にし、`@NotNull`を付けない。
+- `@NotBlank`や`@NotEmpty`と`@Size(max = N)`を組み合わせるときは、`@Size(min = 1, max = N)`と書く。
+  springdocは`@Size`の`min`の既定値0を`minLength: 0`や`minItems: 0`として出し、実行時の検証より弱い契約になるためである。
 
 ## エラー応答
 

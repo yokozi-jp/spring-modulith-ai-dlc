@@ -1,7 +1,7 @@
 ---
 type: Convention
 title: Compose の作り方
-description: Docker Compose ファイルのサービス分離、イメージの固定、起動順序と healthcheck、restart、環境変数と Secrets、volumes、ports、networks、profiles、build、検証手段を定める規約。compose.yaml や docker-compose.yml を書く、または直すときに読む。
+description: Docker Compose ファイルのサービス分離、イメージの固定、起動順序と healthcheck、restart、環境変数と Secrets、volumes、ports、networks、profiles、外部システムの偽物（WireMock）、build、検証手段を定める規約。compose.yaml や docker-compose.yml を書く、または直すときに読む。
 tags: [convention, container, docker, compose]
 ---
 
@@ -90,6 +90,25 @@ services:
   backend:
     profiles: ["fullstack"]
 ```
+
+- 複数の用途が使う service には profile を付けない。
+  例：compose-test の WireMock は、`task test` の Spring のテストが `.env.test` の `PAYMENT_GATEWAY_BASE_URL` を通して共有のスタブを呼び、`task e2e` も使うため、profile を付けない。
+
+## 外部システムの偽物
+
+外部システムは、本番のコードで偽らず、ローカルとテストの compose に置く WireMock で偽る（[ADR-072](../adr/ADR-072-fake-external-systems-with-wiremock.md)）。
+例は `docker/compose.yml` と `docker/compose-test.yml` の `wiremock` である。
+
+- WireMock のイメージはタグと digest で固定し、テストの依存の `org.wiremock:wiremock-standalone` と同じ版にする。
+- `command` に `--disable-http2-plain` を付ける。
+  JDK の `HttpClient` は平文の HTTP で HTTP/2 への upgrade（h2c）を試み、WireMock（Jetty）では本文付きの POST が切れるためである。
+- 成功のスタブは `docker/wiremock/mappings/` に置き、`/home/wiremock/mappings` へ `:ro` でマウントする。
+  2 つの compose ファイルと JVM の中の結合テストが同じファイルを読む。
+- healthcheck は `/__admin/health` を `curl` で確かめる。
+- ポートは `127.0.0.1` に限って公開する（開発用 8090、compose-test 8082）。
+  backend は compose の network の中から service 名（`http://wiremock:8080`）で呼ぶ。
+- 失敗と拒否は、マッピングファイルに置かず、テストが管理 API で実行中に足す。
+- WireMock は本番の構成に置かない。
 
 ## build
 

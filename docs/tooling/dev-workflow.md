@@ -46,7 +46,15 @@ task dev                   # 依存を起動し、バックエンドを起動す
 cd frontend && vp dev      # SPAを起動し、APIとOIDCを同一オリジンでproxyする
 ```
 
-`.env.example`か`.env.test.example`に変数が増えたら、`.env`と`.env.test`に同じ変数を足す（`cp -n`は既存のファイルを上書きしない）。
+`task dev`（`task be-run`）は、業務データ（product、ordering、payment）が空なら、バックエンドの起動の前に開発用の代表データを入れる。
+`task be-migrate`の前に`task dev`を実行したときは表がないので入らず、マイグレーションの後の次の起動で入る。
+シーダーはテストのソースにあるので、テストのソースがコンパイルできないと`task be-run`と`task dev`は起動しない。
+その場合はテストを直すか、`backend`で`./gradlew bootRun`を直接実行する。
+
+`.env.example`か`.env.test.example`に変数が増えたら、`.env`と`.env.test`に同じ変数を足す。
+既存の`.env`と`.env.test`は上書きされない。
+Taskのテスト系タスクは、`.env.test`に足りない変数があると、その変数名を並べて止まる。
+たとえば決済代行のClientを足した変更の後は、既存の`.env.test`へ`PAYMENT_GATEWAY_BASE_URL=http://127.0.0.1:8082`を足し、既存の`.env`へ`.env.example`の`PAYMENT_GATEWAY_BASE_URL`の行を足す。
 `task compose-up`などが`OTEL_SERVICE_NAMESPACE is required`のように変数不足で止まったときは、これが原因である。
 
 公開先は次のとおり。
@@ -57,6 +65,19 @@ cd frontend && vp dev      # SPAを起動し、APIとOIDCを同一オリジン�
 - Grafana：<http://localhost:3000>
 
 ツールの導入は[開発環境構築ガイド](../local-env-setup/setup.md)を参照する。
+
+## 代表データを入れ直すとき
+
+```bash
+task be-seed-reset CONFIRM_RESET=yes   # 業務データを消して代表データを入れ直す
+task be-seed                           # 業務データが空のときだけ代表データを入れる
+```
+
+reset は業務の4表（`product.m_product`、`ordering.t_order`、`ordering.t_order_line`、`payment.t_payment`）だけを消す。
+`modulith`の出版の表とLiquibaseの管理表は残す。
+消した注文を指す出版が残ることがあり、`resubmit-once`で再投入しても注文がないか状態が違うので、決済代行は呼ばれない。
+出版も消したいときは`task compose-reset CONFIRM_RESET=yes`でDBを作り直す。
+接続先がローカルかテストでないとき（`OTEL_DEPLOYMENT_ENVIRONMENT_NAME`が`local`か`test`でない、または`DB_HOST`がloopbackでない）は、DBに触れずに失敗する。
 
 ## changesetを追加するとき
 

@@ -229,7 +229,7 @@ PITのHTMLとXMLのレポートは、変異対象がある場合に`backend/buil
 - **`task lint-taskfile`**：Task本体でTaskfileのYAML構文とスキーマ構造を検証する。
 - **`task adr-check`**：判断が絡む変更にADRが伴うかを確認する。
 
-Knipとjscpdの採用理由は[ADR-035](../adr/ADR-035-adopt-jscpd-and-knip-quality-gates.md)を参照する。
+Knipとjscpdの採用理由は[ADR-035](../adr/ADR-035-adopt-jscpd-and-knip-quality-gates.md)を、jscpdの閾値を4.0%にする理由は[ADR-074](../adr/ADR-074-raise-jscpd-threshold-for-class-role-boilerplate.md)を参照する。
 DASTの検出ではタスクを失敗させず、起動、ログイン、CSRFの前提確認の失敗だけで失敗させる（[ADR-056](../adr/ADR-056-run-authenticated-dast-with-zap-in-ci.md)）。
 OKF検査の採用理由は[ADR-036](../adr/ADR-036-adopt-okf-for-docs-knowledge-bundle.md)と[ADR-038](../adr/ADR-038-route-steering-to-docs-knowledge.md)を参照する。
 
@@ -256,6 +256,7 @@ Gitフックの条件とコマンドは[`lefthook.yml`](../../lefthook.yml)を�
 
 - **`frontend-ci.yml`**：`fe-verify`、`fe-route-tree-check`、`api-client-check`、`fe-doctor`を実行する。
 - **`backend-ci.yml`**：`be-lint`相当、`be-verify-migrations`、`be-test`、`be-openapi-check`、手動実行時の`mutation-test`を実行する。
+  compose-testを止めた後に`test-deps-leftover-check`を実行する。
   契約は`be-test`が書き出し、`be-openapi-check`は`OpenApiContractTest`を再実行しない（[ADR-064](../adr/ADR-064-write-openapi-contract-from-test-task-in-ci.md)）。
   Gradle User Homeは`setup-gradle`の`cache-provider: external`にして、`actions/cache`のrestoreとsaveで扱う。
   keyはビルドファイルのhashで、restore-keysにより直近のmainのcacheを復元する。
@@ -274,7 +275,7 @@ Gitフックの条件とコマンドは[`lefthook.yml`](../../lefthook.yml)を�
 - **`markdownlint.yml`**：`lint-md`相当を実行する。
 - **`okf-validate.yml`**：`okf-check`を実行する。
 - **`release-please.yml`**：`release-check`を実行する。
-- **`e2e.yml`**：`task e2e`を実行する。
+- **`e2e.yml`**：`task e2e`を実行し、`test-deps-leftover-check`でcompose-testのコンテナとvolumeが残っていないことを確かめる。
   Backend CIのtestと同じGradle cacheをread-onlyで復元する。
   必須チェックにしない（[ブランチ保護](../repository/branch-protection.md)）。
 

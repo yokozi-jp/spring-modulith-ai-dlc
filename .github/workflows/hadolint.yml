@@ -7,6 +7,7 @@ on:
       - "backend/**"
       - "docker/compose-test.yml"
       - "docker/initdb/**"
+      - "docker/wiremock/**"
       - "docker/keycloak/**"
       - ".env.test.example"
       - ".hadolint.yaml"
@@ -58,7 +59,7 @@ jobs:
             exit 0
           fi
           # hadolint.yml の push パスフィルタと同じ集合で判定する。
-          if grep -Eq '^(backend/|docker/compose-test\.yml$|docker/initdb/|docker/keycloak/|\.env\.test\.example$|\.hadolint\.yaml$|\.github/workflows/hadolint\.yml$)' \
+          if grep -Eq '^(backend/|docker/compose-test\.yml$|docker/initdb/|docker/wiremock/|docker/keycloak/|\.env\.test\.example$|\.hadolint\.yaml$|\.github/workflows/hadolint\.yml$)' \
             <<< "$changed_files"; then
             echo "docker=true" >> "$GITHUB_OUTPUT"
           else

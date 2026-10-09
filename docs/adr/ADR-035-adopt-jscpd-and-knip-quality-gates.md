@@ -11,6 +11,8 @@ tags: [adr, quality, ci, lint]
 
 Proposed
 
+jscpd の閾値の値（3.2%）は [ADR-074](ADR-074-raise-jscpd-threshold-for-class-role-boilerplate.md) で 4.0% に改める。
+
 ## Date
 
 2026-10-01
@@ -87,5 +89,6 @@ jscpd は既存のリポジトリ横断静的解析 workflow で実行し、Knip
 - [Knip](https://knip.dev/)
 - [ADR-010: プロジェクトのタスクランナーにTaskを採用する](ADR-010-adopt-task-as-project-task-runner.md)
 - [ADR-031: Frontend の型検査を厳格化し、tsconfig を正本にする](ADR-031-tighten-frontend-typescript-checks.md)
+- [ADR-074: jscpd の閾値を、クラスの役割の定型を含む実測の 3.93% に合わせて 4.0% にする](ADR-074-raise-jscpd-threshold-for-class-role-boilerplate.md)（閾値の値を改める）
 - `Taskfile.yml`
 - `.github/workflows/static-analysis.yml`

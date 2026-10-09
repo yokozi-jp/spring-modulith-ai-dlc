@@ -37,6 +37,10 @@ tags: [reference, database, liquibase, jooq, taskfile, gradle]
   `MIGRATION_DB_*`が示すDBへchangesetを適用する。
 - **`task be-rollback DB_ROLLBACK_TAG=<tag> CONFIRM_ROLLBACK=yes`**：指定タグより後のchangesetを切り戻す。
   対象DBのスキーマまたはデータを失う可能性がある。
+- **`task be-seed`**：ローカルの業務データが空のときだけ開発用の代表データを入れる。
+  ローカルかテストのDBの業務の表へ行を追加する。
+- **`task be-seed-reset CONFIRM_RESET=yes`**：ローカルの業務データを消して代表データを入れ直す。
+  ローカルかテストのDBの業務の4表の行を失う。
 
 場面ごとのローカル実行順は[開発ワークフロー](../tooling/dev-workflow.md)を参照する。
 本番の前進適用と切り戻し手順は[DBのデプロイと切り戻し](runbook-deploy-and-rollback.md)を参照する。

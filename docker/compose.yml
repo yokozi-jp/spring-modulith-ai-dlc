@@ -79,6 +79,26 @@ services:
       start_period: 5s
     restart: unless-stopped
 
+  wiremock:
+    # ローカル専用の決済代行の偽物。docker/wiremock/mappings の請求の成功のスタブを返す。
+    # 失敗は管理 API（/__admin/mappings）で実行中に足す。本番は実際の決済代行の URL を注入する。
+    image: wiremock/wiremock:3.13.2@sha256:d737d2de3664a7e1bf96f73a7bd48a0d47d61988f7ca88a6e51ea44b8c1f687d
+    # JDK の HttpClient が平文の HTTP/2 へ upgrade すると、本文付きの POST が切れるため、平文の HTTP/2 を止める。
+    command: ["--disable-banner", "--disable-http2-plain"]
+    environment:
+      TZ: UTC
+    ports:
+      - "127.0.0.1:8090:8080"
+    volumes:
+      - ./wiremock/mappings:/home/wiremock/mappings:ro
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "--silent", "http://localhost:8080/__admin/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 5s
+    restart: unless-stopped
+
   otel-lgtm:
     image: grafana/otel-lgtm:0.34.0@sha256:b966ea107831d526d9eb8fe4d2d86c9e5731392fad9dce8296bcf2072031f07c
     entrypoint:
@@ -170,6 +190,8 @@ services:
       # コンテナから issuer metadata を取得するため Compose の service 名を使う。
       OIDC_ISSUER_URI: http://keycloak:8080/realms/spring-modulith
       SPRINGDOC_ENABLED: ${SPRINGDOC_ENABLED:?SPRINGDOC_ENABLED is required}
+      # 決済代行はローカルの WireMock を Compose の service 名で呼ぶ。
+      PAYMENT_GATEWAY_BASE_URL: http://wiremock:8080
       OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318
       OTEL_SERVICE_NAME: ${OTEL_SERVICE_NAME:?OTEL_SERVICE_NAME is required}
       OTEL_SERVICE_NAMESPACE: ${OTEL_SERVICE_NAMESPACE:?OTEL_SERVICE_NAMESPACE is required}
@@ -185,6 +207,8 @@ services:
       keycloak:
         condition: service_healthy
       redis:
+        condition: service_healthy
+      wiremock:
         condition: service_healthy
       otel-collector:
         condition: service_started

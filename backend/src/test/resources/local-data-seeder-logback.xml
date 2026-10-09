@@ -1,0 +1,8 @@
+<configuration>
+  <!-- seedLocalData（JavaExec）だけが -Dlogback.configurationFile で読む。logback-test.xml にすると既存のテストのログが変わる。 -->
+  <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+    <encoder><pattern>%-5level [seed] %msg%n</pattern></encoder>
+  </appender>
+  <logger name="com.example.demo.LocalDataSeeder" level="INFO"/>
+  <root level="WARN"><appender-ref ref="CONSOLE"/></root>
+</configuration>

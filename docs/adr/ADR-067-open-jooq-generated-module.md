@@ -24,7 +24,7 @@ Spring Modulith は、モジュールのルートのパッケージの型だけ�
 main は今 `modulith` のスキーマだけを生成し、生成型はルートの `com.example.demo.jooq.Tables` とサブパッケージの `com.example.demo.jooq.tables` にある。
 本番コードから生成型を使うクラスがまだないため、main ではモジュールの検査が失敗していない。
 
-確認用のサンプル機能（[issue #122](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/122) の `product` と `order`）を作るブランチで、生成の対象のスキーマを `modulith`、`product`、`order` の 3 つにした。
+参照業務機能（[issue #122](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/122) の `product` と `order`）を作るブランチで、生成の対象のスキーマを `modulith`、`product`、`order` の 3 つにした。
 jooq-codegen 3.21 は、スキーマが 2 つ以上のとき、スキーマの定義とその下の `Tables`、テーブル、Record を `com.example.demo.jooq.<スキーマ名>` のサブパッケージに生成する。
 ルートに残るのは `DefaultCatalog` だけで、ルートの `Tables` はなくなる。
 
