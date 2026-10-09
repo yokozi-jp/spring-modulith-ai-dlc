@@ -2,6 +2,7 @@ package com.example.demo;
 
 import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -40,6 +41,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.ApplicationContext;
 import org.springframework.context.annotation.Import;
 import org.springframework.core.task.AsyncTaskExecutor;
+import org.springframework.core.task.SimpleAsyncTaskExecutor;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -125,6 +127,20 @@ class DemoApplicationTest {
         applicationTaskExecutor.submit(() -> Thread.currentThread().isVirtual()).get(5, SECONDS);
 
     assertTrue(isVirtual, "applicationTaskExecutor のタスクが仮想スレッドで動くこと");
+  }
+
+  @Test
+  @DisplayName("アプリケーション executor の同時実行数は、DB の接続の pool の半分以下に制限する")
+  void applicationExecutorConcurrencyLeavesConnectionsForRequests() {
+    final SimpleAsyncTaskExecutor executor =
+        assertInstanceOf(
+            SimpleAsyncTaskExecutor.class, applicationTaskExecutor, "仮想スレッドの executor");
+    final int limit = executor.getConcurrencyLimit();
+    final int poolSize = hikariDataSource.getMaximumPoolSize();
+
+    assertTrue(
+        limit >= 1 && limit * 2 <= poolSize,
+        () -> "同時実行数 " + limit + " が 1 以上で、pool " + poolSize + " の半分以下であること");
   }
 
   @Test

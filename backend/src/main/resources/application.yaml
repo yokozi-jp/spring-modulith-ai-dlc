@@ -50,6 +50,13 @@ spring:
   task:
     execution:
       propagate-context: true
+      # 非同期の Listener の同時実行数の上限（docs/integration/async-flow-control.md）。
+      # Listener は DB 接続を使い、決済代行を待つ間も接続を持つため、同期リクエストの接続を残すよう、
+      # 最小の pool（テストの DB_POOL_MAXIMUM_SIZE=4）の半分にする。DemoApplicationTest が pool の半分以下であることを確かめる。
+      # ponytail: 上限に達すると SimpleAsyncTaskExecutor は、コミットの後に Listener を投入する要求のスレッドを、接続を持ったまま待たせる。
+      # 負荷試験で本番の pool の大きさが決まったら、pool から導いた環境変数にする。
+      simple:
+        concurrency-limit: 2
 
   # DB
   datasource:
