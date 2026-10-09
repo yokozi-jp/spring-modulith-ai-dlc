@@ -61,6 +61,7 @@ test("注文を作成し確定すると、Listener が決済代行へ請求し�
 });
 
 // 決済代行を成功に戻した後も、決済の欄は再投入待ちのままで、請求は 1 回のままである。
+// 戻した直後だけを確かめる。#108 で定期の再投入が入ったら、待つか状態を明示して観測する形に直す。
 async function expectNotResubmitted(page: Page, orderId: string): Promise<void> {
   await page.reload();
   await expect(paymentOutput(page)).toHaveText(notYet);
