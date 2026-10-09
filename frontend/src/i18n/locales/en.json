@@ -111,6 +111,7 @@
       "paid": "Paid",
       "declined": "The payment gateway declined the payment.",
       "failed": "The payment failed. Resubmitting does not fix it, so contact the administrator.",
+      "unknown": "The payment status is unknown. Contact the administrator.",
       "paidAmount": "Paid amount",
       "paidAt": "Paid at",
       "notYet": "The payment has not been accepted yet. It is in progress, or it failed and is waiting to be resubmitted.",

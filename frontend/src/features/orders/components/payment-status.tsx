@@ -5,14 +5,18 @@ import { useListPayments } from "@/api/generated/endpoints/payment/payment";
 import type { PaymentSummaryResponse } from "@/api/generated/models";
 
 // 決済記録の結果（ADR-072）。拒否と契約の不備は再投入を待たないため、処理中の文言と分ける。
+// 知らない状態は決済済みと見なさず、不明として出す。
 function resultMessage(t: TFunction, payment: PaymentSummaryResponse): string {
+  if (payment.status === "PAID") {
+    return t("orders.payment.paid");
+  }
   if (payment.status === "DECLINED") {
     return t("orders.payment.declined");
   }
   if (payment.status === "FAILED") {
     return t("orders.payment.failed");
   }
-  return t("orders.payment.paid");
+  return t("orders.payment.unknown");
 }
 
 function paymentMessage(
@@ -89,9 +93,7 @@ export function PaymentStatus({
       <output className="block">
         {paymentMessage(t, { isPending, isError, payment, orderStatus })}
       </output>
-      {payment === undefined || payment.status === "DECLINED" || payment.status === "FAILED"
-        ? undefined
-        : paidDetails(t, i18n.language, payment)}
+      {payment?.status === "PAID" ? paidDetails(t, i18n.language, payment) : undefined}
     </section>
   );
 }

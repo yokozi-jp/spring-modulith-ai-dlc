@@ -220,7 +220,7 @@ describe("order detail page payment status", () => {
 
   it("決済記録の paidAt と金額がなければ「（なし）」を出し、time を出さない", async () => {
     serveDetail(draftOrder({ status: "CONFIRMED" }));
-    server.use(getListPaymentsMockHandler({ items: [{ orderId }] }));
+    server.use(getListPaymentsMockHandler({ items: [{ orderId, status: "PAID" }] }));
 
     await renderRoute(detailPath);
 
@@ -246,6 +246,26 @@ describe("order detail page payment status", () => {
     const region = await expectPaymentStatus(message);
     expect(within(region).queryByText("決済した時刻")).toBeNull();
   });
+
+  it.each([
+    ["なし", {}],
+    ["REFUNDED", { status: "REFUNDED" }],
+  ])(
+    "決済記録の状態が %s なら、決済済みとせず不明を出し、決済した時刻を出さない",
+    async (_label, status) => {
+      serveDetail(draftOrder({ status: "CONFIRMED" }));
+      server.use(
+        getListPaymentsMockHandler({ items: [{ orderId, amount: 240, paidAt, ...status }] }),
+      );
+
+      await renderRoute(detailPath);
+
+      const region = await expectPaymentStatus(
+        "決済の状態が分かりません。管理者に連絡してください。",
+      );
+      expect(within(region).queryByText("決済した時刻")).toBeNull();
+    },
+  );
 
   it("確定済みで決済記録がなければ、まだ受け付けていないことを出し、決済した時刻を出さない", async () => {
     serveDetail(draftOrder({ status: "CONFIRMED" }));
