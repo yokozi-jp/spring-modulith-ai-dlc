@@ -740,6 +740,20 @@ tasks:
     cmds:
       - '{{.DOCKER}} compose -f "{{.TEST_COMPOSE_FILE}}" down --volumes --remove-orphans'
 
+  test-deps-leftover-check:
+    desc: compose-testのコンテナとvolumeが残っていないか検査
+    silent: true
+    cmds:
+      - |
+        label=com.docker.compose.project=spring-modulith-test
+        left="$({{.DOCKER}} ps -aq --filter "label=$label")$({{.DOCKER}} volume ls -q --filter "label=$label")"
+        if [ -n "$left" ]; then
+          {{.DOCKER}} ps -a --filter "label=$label"
+          {{.DOCKER}} volume ls --filter "label=$label"
+          echo "compose-test のコンテナか volume が残っています。" >&2
+          exit 1
+        fi
+
   test:
     desc: 隔離依存を起動してマイグレーション検証とテスト後に片付け
     silent: true

@@ -200,6 +200,11 @@ jobs:
         if: always()
         run: docker compose -f docker/compose-test.yml down --volumes --remove-orphans
 
+      # task e2e と共有する Compose project のコンテナと volume が、後片付けの後に残っていないことを確かめる。
+      - name: Check no compose-test leftovers
+        if: always()
+        run: task test-deps-leftover-check
+
       - name: Upload test results
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1

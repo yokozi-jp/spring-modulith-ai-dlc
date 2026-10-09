@@ -176,7 +176,9 @@ build、コンテナの起動、後片付けは行わない。
 
 - spec は、主要な状態（決済済み、再投入待ち、競合の選択肢）の screenshot を `testInfo.attach` で HTML report に添付する。
 - CI は、成功時に `e2e-evidence` artifact に HTML report と `backend.log` を保存する。
-  trace は失敗時だけ保存するため、成功時の artifact に Cookie は入らない。
+  retry で成功したテストも、失敗した試行の trace を HTML report に残す。
+  成功時の artifact は `playwright-report/data/*.zip` を除くため、trace と、trace に入る Cookie を含まない。
+  失敗した試行の screenshot は、成功時の artifact にも残る。
 - `backend.log` に秘密の値が入っていないことは、`task e2e` の後片付けが検査する（[実行と後片付け](#実行と後片付け)）。
 
 ## E2E で確かめない範囲
@@ -195,5 +197,6 @@ build、コンテナの起動、後片付けは行わない。
 
 `.github/workflows/e2e.yml` は、Pull Request で frontend、backend（DB の changeset を含む）、Keycloak の設定、compose-test とその入力（`docker/initdb/`、`.env.test.example`）、Taskfile、この workflow 自体を変えたときだけ `task e2e` を実行する。
 retry は 2 回で、失敗時に Playwright の成果物と backend のログを、成功時に HTML report と backend のログを保存する。
-`task e2e` の後に、Compose project `spring-modulith-test` のコンテナと volume が残っていれば失敗にする。
+`task e2e` の後に、`task test-deps-leftover-check` で Compose project `spring-modulith-test` のコンテナと volume を調べ、残っていれば失敗にする。
+Backend CI も、compose-test を止めた後に同じ task で確かめる。
 この check は required status checks に登録しない（[ブランチ保護](../repository/branch-protection.md)）。

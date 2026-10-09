@@ -256,6 +256,7 @@ Gitフックの条件とコマンドは[`lefthook.yml`](../../lefthook.yml)を�
 
 - **`frontend-ci.yml`**：`fe-verify`、`fe-route-tree-check`、`api-client-check`、`fe-doctor`を実行する。
 - **`backend-ci.yml`**：`be-lint`相当、`be-verify-migrations`、`be-test`、`be-openapi-check`、手動実行時の`mutation-test`を実行する。
+  compose-testを止めた後に`test-deps-leftover-check`を実行する。
   契約は`be-test`が書き出し、`be-openapi-check`は`OpenApiContractTest`を再実行しない（[ADR-064](../adr/ADR-064-write-openapi-contract-from-test-task-in-ci.md)）。
   Gradle User Homeは`setup-gradle`の`cache-provider: external`にして、`actions/cache`のrestoreとsaveで扱う。
   keyはビルドファイルのhashで、restore-keysにより直近のmainのcacheを復元する。
@@ -274,7 +275,7 @@ Gitフックの条件とコマンドは[`lefthook.yml`](../../lefthook.yml)を�
 - **`markdownlint.yml`**：`lint-md`相当を実行する。
 - **`okf-validate.yml`**：`okf-check`を実行する。
 - **`release-please.yml`**：`release-check`を実行する。
-- **`e2e.yml`**：`task e2e`を実行し、compose-testのコンテナとvolumeが残っていないことを確かめる。
+- **`e2e.yml`**：`task e2e`を実行し、`test-deps-leftover-check`でcompose-testのコンテナとvolumeが残っていないことを確かめる。
   Backend CIのtestと同じGradle cacheをread-onlyで復元する。
   必須チェックにしない（[ブランチ保護](../repository/branch-protection.md)）。
 
