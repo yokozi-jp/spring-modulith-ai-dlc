@@ -2,7 +2,6 @@ package com.example.demo;
 
 import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -132,10 +131,11 @@ class DemoApplicationTest {
   @Test
   @DisplayName("アプリケーション executor の同時実行数は、DB の接続の pool の半分以下に制限する")
   void applicationExecutorConcurrencyLeavesConnectionsForRequests() {
-    final SimpleAsyncTaskExecutor executor =
-        assertInstanceOf(
-            SimpleAsyncTaskExecutor.class, applicationTaskExecutor, "仮想スレッドの executor");
-    final int limit = executor.getConcurrencyLimit();
+    assertTrue(
+        applicationTaskExecutor instanceof SimpleAsyncTaskExecutor,
+        "仮想スレッドの executor が SimpleAsyncTaskExecutor であること");
+    // executor は Spring が閉じるため、ローカル変数に取らずに読む。
+    final int limit = ((SimpleAsyncTaskExecutor) applicationTaskExecutor).getConcurrencyLimit();
     final int poolSize = hikariDataSource.getMaximumPoolSize();
 
     assertTrue(
