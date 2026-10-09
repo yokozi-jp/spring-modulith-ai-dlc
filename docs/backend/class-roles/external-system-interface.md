@@ -16,7 +16,7 @@ tags: [convention, backend, class-role]
 
 ユースケースが外部システムを呼ぶとき、通信の方式や製品の API に Application を依存させたくない。
 **外部システムのインタフェース**（`<ExternalSystem>`）は、外部システムに頼む業務の操作をドメインの語彙で定める型である。
-注文の例では、`PaymentGateway` が注文の代金を請求し、決済の識別子（`PaymentId`）を返す。
+決済の例では、`PaymentGateway` が注文の代金を請求し、請求の結果（`ChargeOutcome`）を返す。
 
 インタフェースを Domain に置き、実装を Infrastructure に置くことで、依存は内向きに保たれる。
 外部システムの呼び出しは、イベントを受けた Listener から呼ばれる `<UseCase>CommandHandler` が行い、画面から呼ばれる CommandHandler、[集約](aggregate.md)、[Domain Service](domain-service.md) は呼ばない。
@@ -28,8 +28,8 @@ tags: [convention, backend, class-role]
 - 名前は外部システムの業務上の役割を表す名詞にする（`PaymentGateway`）。
   製品名（`StripeClient`）、`Port`、`Interface` の接尾辞、`I` の接頭辞を付けない。
 - メソッドは業務の動詞にする（`charge`）。
-- 外部システムが返す識別子は、同じ `domain.model` の[値オブジェクト](value-object.md)にする（`PaymentId`）。
-- 業務上の拒否のように、例外でなく業務の状態に記録する応答があるときは、結果の値オブジェクトを返す（`payment` モジュールの `ChargeOutcome`、[ADR-072](../../adr/ADR-072-fake-external-systems-with-wiremock.md)）。
+- 外部システムが返す識別子は、同じ `domain.model` の[値オブジェクト](value-object.md)にする（`GatewayPaymentCode`）。
+- 業務上の拒否のように、例外でなく業務の状態に記録する応答があるときは、結果の値オブジェクトを返す（`ChargeOutcome`、[ADR-072](../../adr/ADR-072-fake-external-systems-with-wiremock.md)）。
 - 実装は `infrastructure.client` の `<ExternalSystem>Client` にする（`PaymentGatewayClient`）。
 
 ## 必須の記述
@@ -50,68 +50,57 @@ tags: [convention, backend, class-role]
 
 ## 最小の例と典型的な例
 
-最小の例は、注文の代金を請求する `PaymentGateway` と、決済の識別子の `PaymentId` である。
+最小の例は、注文の代金を請求する `PaymentGateway` と、決済代行が採番した識別子の `GatewayPaymentCode` である。
+請求の結果の `ChargeOutcome` は、`GatewayPaymentCode` と `PaymentStatus` を持つ値オブジェクトである。
 
 ```java
-package com.example.demo.ordering.domain.model;
+package com.example.demo.payment.domain.model;
 
-/** 外部の決済システム。 */
+/** 外部の決済代行。 */
 // 外部システムの interface であり、ラムダで実装する関数型 interface ではない。
 @SuppressWarnings("PMD.ImplicitFunctionalInterface")
 public interface PaymentGateway {
 
   /**
-   * 注文の代金を請求し、決済の識別子を返す。
+   * 注文の代金を請求し、業務の状態に記録する結果を返す。
    *
    * <p>注文 ID を冪等性キーにする。
-   * 同じ注文 ID の二回目以降の請求では、決済システムは新たに請求せず、最初の請求の決済の識別子を返す。
+   * 同じ注文 ID の二回目以降の請求では、決済代行は新たに請求せず、最初の請求の結果を返す。
    */
-  PaymentId charge(OrderId orderId, Money amount);
+  ChargeOutcome charge(OrderId orderId, Money amount);
 }
 ```
 
 ```java
-package com.example.demo.ordering.domain.model;
+package com.example.demo.payment.domain.model;
 
-/** 外部の決済システムが採番した決済の識別子。 */
-public record PaymentId(String value) {
+/** 決済代行が採番した決済の識別子。 */
+public record GatewayPaymentCode(String value) {
 
-  /** 空白だけの ID を拒否する。 */
-  public PaymentId {
+  /** 空白だけの識別子を拒否する。 */
+  public GatewayPaymentCode {
     if (value.isBlank()) {
-      throw new IllegalArgumentException("paymentId must not be blank");
+      throw new IllegalArgumentException("gatewayPaymentCode must not be blank");
     }
   }
 }
 ```
 
-典型的な例は、`ChargeOrderCommandHandler` が、確定した注文の代金を注文 ID を冪等性キーにして請求する場面と、実装の宣言である。
+典型的な例は、`ChargeOrderCommandHandler` が、確定した注文の代金を注文 ID を冪等性キーにして請求し、結果を決済記録に保存する場面と、実装の宣言である。
 
 ```java
-// com.example.demo.ordering.application.ChargeOrderCommandHandler（抜粋）
-/** 支払い済みでない注文の代金を、注文 ID を冪等性キーにして請求し、支払い済みにして保存する。 */
-@Transactional
-public ChargeOrderResult handle(final ChargeOrderCommand command) {
-  final Order order =
-      orderRepository
-          .findById(new OrderId(UUID.fromString(command.orderId())))
-          .orElseThrow(
-              () -> new NotFoundException("order not found: orderId=" + command.orderId()));
-  if (order.isPaid()) {
-    return new ChargeOrderResult(order.id().value().toString());
-  }
-  paymentGateway.charge(order.id(), order.total());
-  order.markPaid();
-  orderRepository.update(order);
-  return new ChargeOrderResult(order.id().value().toString());
-}
+// com.example.demo.payment.application.ChargeOrderCommandHandler（抜粋）
+final Money amount = new Money(details.totalAmount());
+final ChargeOutcome outcome = paymentGateway.charge(orderId, amount);
+final Payment payment = Payment.record(orderId, amount, outcome, Instant.now(clock));
+paymentRepository.add(payment);
 ```
 
 ```java
-// com.example.demo.ordering.infrastructure.client.PaymentGatewayClient（宣言だけ）
+// com.example.demo.payment.infrastructure.client.PaymentGatewayClient（宣言だけ）
 @Component
 class PaymentGatewayClient implements PaymentGateway {
-  // RestClient で外部の決済システムを呼び、注文 ID を冪等性キーのヘッダーで送り、応答を PaymentId に変換する。
+  // RestClient で決済代行を呼び、注文 ID を冪等性キーのヘッダーで送り、応答を ChargeOutcome に変換する。
 }
 ```
 

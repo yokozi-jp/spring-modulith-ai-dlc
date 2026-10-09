@@ -129,7 +129,7 @@ Client は、外部システムの呼び出しの結果を次の四つに分け�
 4xx と 5xx の分類とログは省いている。
 
 ```java
-package com.example.demo.ordering.infrastructure.client;
+package com.example.demo.payment.infrastructure.client;
 
 /** 決済システムの HTTP API で、注文 ID を冪等性キーにして注文の代金を請求する。 */
 @Component
@@ -160,25 +160,26 @@ class PaymentGatewayClient implements PaymentGateway {
     final ResponseEntity<ChargeReply> response =
         restClient
             .post()
-            .uri("/payments")
-            .header(IDEMPOTENCY_KEY, orderId.value())
-            .body(new ChargeBody(orderId.value(), amount.amount()))
+            .uri("/v1/charges")
+            .header(IDEMPOTENCY_KEY, orderId.value().toString())
+            .body(new ChargeBody(orderId.value().toString(), amount.amount()))
             .retrieve()
             .toEntity(ChargeReply.class);
     final ChargeReply reply = response.getBody();
     if (response.getStatusCode().value() != HttpStatus.CREATED.value()
         || reply == null
-        || reply.paymentId() == null) {
+        || reply.chargeId() == null
+        || !"SUCCEEDED".equals(reply.status())) {
       return ChargeOutcome.failed();
     }
-    return ChargeOutcome.paid(new GatewayPaymentCode(reply.paymentId()));
+    return ChargeOutcome.paid(new GatewayPaymentCode(reply.chargeId()));
   }
 
   /** 請求の API に送る本文。 */
   private record ChargeBody(String orderId, BigDecimal amount) {}
 
   /** 請求の API が返す本文。 */
-  private record ChargeReply(@Nullable String paymentId) {}
+  private record ChargeReply(@Nullable String chargeId, @Nullable String status) {}
 }
 ```
 
@@ -240,17 +241,17 @@ Spring を起動しないため、このテストでは `@CircuitBreaker` と `@
 class PaymentGatewayClientTest {
 
   @Test
-  @DisplayName("注文 ID を冪等性キーにして請求し、決済システムが返した決済 ID を返す")
+  @DisplayName("注文 ID を冪等性キーにして請求し、決済システムが返した識別子付きの受付を返す")
   void chargesWithOrderIdAsIdempotencyKey() throws IOException {
     final UUID orderUuid = UUID.fromString("00000000-0000-4000-8000-000000000001");
     final AtomicReference<String> idempotencyKey = new AtomicReference<>();
     final HttpServer server =
         HttpServer.create(new InetSocketAddress(InetAddress.getLoopbackAddress(), 0), 0);
     server.createContext(
-        "/payments",
+        "/v1/charges",
         exchange -> {
           idempotencyKey.set(exchange.getRequestHeaders().getFirst("Idempotency-Key"));
-          final byte[] body = "{\"paymentId\":\"PAY-1\"}".getBytes(StandardCharsets.UTF_8);
+          final byte[] body = "{\"chargeId\":\"ch_1\",\"status\":\"SUCCEEDED\"}".getBytes(StandardCharsets.UTF_8);
           exchange.getResponseHeaders().add("Content-Type", "application/json");
           exchange.sendResponseHeaders(201, body.length);
           try (OutputStream out = exchange.getResponseBody()) {
@@ -265,10 +266,12 @@ class PaymentGatewayClientTest {
               Duration.ofSeconds(1),
               Duration.ofSeconds(2));
 
-      final PaymentId paymentId =
+      final ChargeOutcome outcome =
           client.charge(new OrderId(orderUuid), new Money(new BigDecimal("1000")));
 
-      assertThat(paymentId).as("orderId の決済 ID").isEqualTo(new PaymentId("PAY-1"));
+      assertThat(outcome)
+          .as("orderId の請求の結果")
+          .isEqualTo(ChargeOutcome.paid(new GatewayPaymentCode("ch_1")));
       assertThat(idempotencyKey).as("orderId の請求の冪等性キー").hasValue(orderUuid.toString());
     } finally {
       server.stop(0);
