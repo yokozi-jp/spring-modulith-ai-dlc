@@ -51,7 +51,7 @@ export function useOrderStatusActions(
       );
     },
     // ponytail: 取消は戻せないが、確認の dialog を挟まずに送る。明細の変更の form が dirty でも確定と取消を送り、
-    // 成功すると DRAFT でなくなって form ごと入力が消える。main に入れるときは shadcn の AlertDialog を足し、dirty の間は確認を挟む。
+    // 成功すると DRAFT でなくなって form ごと入力が消える。確認の dialog を挟むのは #186 で扱う。
     handleCancel: () => {
       if (isPending) {
         return;
