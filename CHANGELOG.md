@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.10.0](https://github.com/yokozi-jp/spring-modulith-ai-dlc/compare/v0.9.0...v0.10.0) (2026-10-09)
+
+
+### Features
+
+* product、ordering、payment を参照業務機能として main に導入する ([#122](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/122)) ([8d3479d](https://github.com/yokozi-jp/spring-modulith-ai-dlc/commit/8d3479d6fcd10d760fbe4710931ab5700432a438))
+
 ## [0.9.0](https://github.com/yokozi-jp/spring-modulith-ai-dlc/compare/v0.8.0...v0.9.0) (2026-10-08)
 
 
