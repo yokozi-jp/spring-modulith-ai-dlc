@@ -7,7 +7,6 @@ import {
   listPayments,
   listProducts,
   onSaleProduct,
-  paymentOutput,
   readJson,
   uniqueCode,
 } from "./orders";
@@ -60,11 +59,11 @@ test("注文を作成し確定すると、Listener が決済代行へ請求し�
   await attachScreenshot(page, testInfo, "paid");
 });
 
-// 決済代行を成功に戻した後も、決済の欄は再投入待ちのままで、請求は 1 回のままである。
-// 戻した直後だけを確かめる。#108 で定期の再投入が入ったら、待つか状態を明示して観測する形に直す。
+// 決済代行を成功に戻した後に読み直しのボタンで読み直しても、決済の欄は再投入待ちのままで、請求は 1 回のままである。
+// 戻した直後の読み直しの期間だけを確かめる。#108 で定期の再投入が入ったら、待つか状態を明示して観測する形に直す。
 async function expectNotResubmitted(page: Page, orderId: string): Promise<void> {
-  await page.reload();
-  await expect(paymentOutput(page)).toHaveText(notYet);
+  await page.getByRole("button", { name: "決済の状態を読み直す" }).click();
+  await expectPaymentText(page, notYet);
   expect(await chargeRequestCount(page.request, orderId), `orderId=${orderId} の請求`).toBe(1);
 }
 
@@ -74,6 +73,8 @@ async function expectTransientFailure(
   testInfo: TestInfo,
   failure: ChargeFailure,
 ): Promise<void> {
+  // 決済の欄の読み直しの期間（15 秒）を、確定の後と読み直しのボタンの後の二度待つため、既定の 30 秒を超える。
+  test.slow();
   const restores: (() => Promise<void>)[] = [];
   const { orderId } = await createAndConfirm(page, "E2E-FAIL", async (id) => {
     restores.push(await failChargesFor(page.request, id, failure));
@@ -81,8 +82,8 @@ async function expectTransientFailure(
   try {
     // backend の本番の Client が、切り替えた WireMock を呼んだ。
     await expect.poll(() => chargeRequestCount(page.request, orderId)).toBeGreaterThanOrEqual(1);
-    await page.reload();
-    await expect(paymentOutput(page)).toHaveText(notYet);
+    // 欄は読み直しの期間が過ぎるまで処理中を出し、その後に再投入待ちを出す。
+    await expectPaymentText(page, notYet);
     expect(await listPayments(page.request, orderId), `orderId=${orderId}`).toEqual([]);
     await attachScreenshot(page, testInfo, `${failure.kind}-not-yet`);
   } finally {
@@ -156,7 +157,8 @@ test("画面の作成は、CSRF の Cookie の値を X-XSRF-TOKEN で送って�
 async function expectDetail(page: Page, code: string, text: string): Promise<void> {
   await page.goto("/orders");
   await page.getByRole("link", { name: `${code} の詳細` }).click();
-  await expect(paymentOutput(page)).toHaveText(text);
+  // SEED-C06 は記録が無いため、読み直しの期間が過ぎてから再投入待ちを出す。
+  await expectPaymentText(page, text);
 }
 
 test.describe("シーダーの代表の状態を、一覧と詳細と作成の画面で表示する（読むだけ）", () => {

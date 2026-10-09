@@ -27,7 +27,10 @@ Keycloak の画面でログインする手順（`signInOnKeycloak`）も持ち�
 `frontend/e2e/payment-gateway.ts` は、決済代行の WireMock の管理 API を呼ぶ補助を持つ。
 注文ごとの失敗のスタブ（`failChargesFor`）と、注文 ID を冪等性キーにした請求の回数（`chargeRequestCount`）である。
 `frontend/e2e/orders.ts` は、注文の作成の画面の操作、シーダーの商品の読み取り、決済の欄の文言の確認（`expectPaymentText`）を持つ。
-決済の欄は再取得しないため、`expectPaymentText` は画面を読み直して待つ。
+決済の欄は、確定した注文に決済記録がない間、確定から 15 秒まで 1 秒ごとに自分で読み直し、その間は処理中を出す。
+期間が過ぎても記録がなければ再投入待ちを出し、読み直しのボタンを出す。
+`expectPaymentText` は画面を読み直さず、欄の文言が変わるのを最大 30 秒待つ。
+再投入しないことの確認は、画面を読み直さずに読み直しのボタンを押す。
 
 業務の流れの spec は次の 2 つである。
 

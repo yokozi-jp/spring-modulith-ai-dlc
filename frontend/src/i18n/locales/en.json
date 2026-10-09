@@ -114,6 +114,8 @@
       "unknown": "The payment status is unknown. Contact the administrator.",
       "chargedAmount": "Charged amount",
       "recordedAt": "Recorded at",
+      "processing": "Checking the payment result.",
+      "reload": "Reload the payment status",
       "notYet": "The payment has not been accepted yet. It is in progress, or it failed and is waiting to be resubmitted.",
       "notApplicable": "This order is not subject to payment."
     }

@@ -190,7 +190,7 @@ describe("order detail page payment failures", () => {
     server.use(getListProductsMockHandler(products));
   });
 
-  it("決済の参照が 500 なら決済の欄に失敗を出し、注文の見出しと明細と操作を残す", async () => {
+  it("決済の参照が 500 なら決済の欄に失敗と読み直しのボタンを出し、注文の見出しと明細と操作を残す", async () => {
     serveDetail(draftOrder());
     server.use(http.get("*/api/payments", () => problemResponse(500, "Internal Server Error")));
 
@@ -202,7 +202,7 @@ describe("order detail page payment failures", () => {
         "決済の状態を読み込めませんでした。時間をおいて画面を読み直してください。",
       );
     });
-    expect(within(region).queryByText("結果を記録した時刻")).toBeNull();
+    expect(within(region).getByRole("button", { name: "決済の状態を読み直す" })).toBeTruthy();
     expect(screen.getByRole("heading", { level: 1, name: "注文 C-001" })).toBeTruthy();
     expect(firstLineRow()?.textContent).toContain("ボールペン");
     expect(screen.getByRole("button", { name: "確定する" })).toBeTruthy();

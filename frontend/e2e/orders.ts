@@ -55,16 +55,16 @@ export async function createOrder(
 }
 
 // 詳細の画面の「決済」の欄の状態の文言（live region）。
-export function paymentOutput(page: Page): Locator {
+function paymentOutput(page: Page): Locator {
   return page.getByRole("region", { name: "決済" }).getByRole("status");
 }
 
-// 決済の欄は再取得しないため、Listener の処理を待つ間は画面を読み直して確かめる。
+// 決済の欄の文言を待つ上限。欄は確定から 15 秒まで自分で読み直すため、その期間と Listener の処理の時間より長くする。
+const PAYMENT_TEXT_TIMEOUT_MS = 30_000;
+
+// 決済の欄が自分で読み直して文言を変えるのを、画面を読み直さずに待つ。
 export async function expectPaymentText(page: Page, text: string): Promise<void> {
-  await expect(async () => {
-    await page.reload();
-    await expect(paymentOutput(page)).toHaveText(text, { timeout: 2000 });
-  }).toPass({ timeout: 20_000 });
+  await expect(paymentOutput(page)).toHaveText(text, { timeout: PAYMENT_TEXT_TIMEOUT_MS });
 }
 
 // 注文の決済記録を、公開 API（GET、CSRF の token は要らない）で読む。

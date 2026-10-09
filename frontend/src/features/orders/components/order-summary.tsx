@@ -20,7 +20,8 @@ export function OrderSummary({ order, orderId }: { order: OrderDetailsResponse; 
         <dt className="text-muted-foreground">{t("orders.fields.totalAmount")}</dt>
         <dd>{t("orders.amount", { value: order.totalAmount })}</dd>
       </dl>
-      <PaymentStatus orderId={orderId} orderStatus={order.status} />
+      {/* 注文の状態が変わったら作り直し、確定の直後から読み直しの期間を数え直す。 */}
+      <PaymentStatus key={order.status} orderId={orderId} orderStatus={order.status} />
     </>
   );
 }
