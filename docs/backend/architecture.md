@@ -219,6 +219,13 @@ CommandHandler は `application` にあるため、他モジュールから呼�
 複数の機能で似た処理が要るときも、処理は各機能内に置く。
 例外は、「共有モジュール shared」に示す jOOQ の共通処理と楽観的ロックの語彙と業務上の失敗の例外だけである。
 
+## 参照業務機能
+
+`product`、`ordering`、`payment` は、AI harness を実際の業務の流れで継続して検証する参照業務機能である（[README](../../README.md)）。
+3 つは通常の機能モジュールであり、参照業務機能だけの層やパッケージを持たない。
+機能モジュールを追加するときは、この 3 つを実例として読み、[バックエンドの機能追加時の確認](runbook-add-feature.md)に従う。
+3 つの変更も、API の契約の版とマイグレーションの通常の規約に従う。
+
 ## 関連資料
 
 - [ADR-002: package by feature とオニオンアーキテクチャ](../adr/ADR-002-package-by-feature-onion-architecture.md)

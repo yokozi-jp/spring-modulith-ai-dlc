@@ -17,7 +17,7 @@ Accepted
 
 ## Context
 
-[#122](https://github.com/yokozi-jp/spring-modulith-ai-dlc/pull/122) のサンプルの注文と決済は、決済代行を呼ぶ `PaymentGatewayClient` の偽物を本番のコードに持ち、`payment-gateway.mode` の設定で成功と失敗を切り替えていた。
+[#122](https://github.com/yokozi-jp/spring-modulith-ai-dlc/pull/122) の参照業務機能の注文と決済は、決済代行を呼ぶ `PaymentGatewayClient` の偽物を本番のコードに持ち、`payment-gateway.mode` の設定で成功と失敗を切り替えていた。
 [#164](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/164) は、この形に三つの問題があると指摘した。
 一つ目に、本番のコードを失敗する状態に設定できる。
 二つ目に、失敗の種類が一つしかなく、5xx、タイムアウト、遅延を区別して確かめられない。
@@ -148,7 +148,7 @@ Accepted
 
 - [#164 外部システムを本番のコードで偽らず、WireMock のコンテナで偽る](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/164)
 - [#166 参照業務機能を main に導入し、開発基盤を継続的に検証する](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/166)
-- [#122 開発基盤を確かめる注文と決済のサンプル機能を追加する](https://github.com/yokozi-jp/spring-modulith-ai-dlc/pull/122)
+- [#122 product、ordering、payment を参照業務機能として導入する](https://github.com/yokozi-jp/spring-modulith-ai-dlc/pull/122)
 - [#167 参照業務機能の主要フローと障害回復を検証する](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/167)
 - [ADR-008: application.yaml を単一にし、設定を外部から注入する](ADR-008-single-application-yaml-external-config.md)
 - [ADR-019: 外部連携の耐障害性と容量制御を標準化する](ADR-019-define-resilience-and-capacity-guardrails.md)
