@@ -518,11 +518,11 @@ tasks:
     cmds:
       - |
         # Collector の route allowlist（docker/otel-collector/config.yaml）が routeTree.gen.ts の fullPaths と同じ集合かを確かめる。
-        # ponytail: 生成物の fullPaths の文字列リテラルと、allowlist のリテラルの選択肢だけを読む。$id のような route params を足すときは正規表現のエスケープが要る。
+        # ponytail: 生成物の fullPaths の文字列リテラルと、allowlist のリテラルの選択肢だけを読む。route params の $ は allowlist で [$$] と書き、照合の前に $ へ戻す。
         routes="$(sed -n "/^  fullPaths:/,/^  fileRoutesByTo:/p" frontend/src/routeTree.gen.ts | grep -o "'[^']*'" | tr -d "'" | sort -u)"
         patterns="$(grep -oF 'IsMatch(log.cache["route"], "^(?:' docker/otel-collector/config.yaml | wc -l)"
         allowed="$(grep -o 'IsMatch(log.cache\["route"\], "\^(?:[^)]*)\$\$")' docker/otel-collector/config.yaml \
-          | sed -e 's/^IsMatch(log.cache\["route"\], "^(?://' -e 's/)\$\$")$//' | tr '|' '\n' | sort -u)"
+          | sed -e 's/^IsMatch(log.cache\["route"\], "^(?://' -e 's/)\$\$")$//' -e 's/\[\$\$\]/$/g' | tr '|' '\n' | sort -u)"
         if [ "$patterns" -ne 1 ] || [ -z "$routes" ] || [ -z "$allowed" ] || [ "$routes" != "$allowed" ]; then
           echo "Collector の route allowlist（transform/frontend_validate の 1 か所）が routeTree.gen.ts の fullPaths と一致しません。" >&2
           echo "routeTree.gen.ts: $(echo $routes)" >&2
