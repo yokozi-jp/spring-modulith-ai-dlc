@@ -95,7 +95,7 @@ jobs:
         if: always()
         run: task test-deps-leftover-check
 
-      # 成功時も、HTML report と backend のログを証拠に残す。
+      # 成功時も、HTML report を証拠に残す。backend のログは失敗の調査にだけ使うため、失敗時だけ残す。
       # retry で成功したテストは失敗した試行の trace を report に残すため、Cookie を含みうる trace（data/*.zip）を除く。
       - name: Upload E2E evidence
         if: success()
@@ -104,7 +104,6 @@ jobs:
           name: e2e-evidence
           path: |
             frontend/playwright-report/
-            frontend/test-results/backend.log
             !frontend/playwright-report/data/*.zip
             !frontend/e2e/.auth/
           if-no-files-found: error

@@ -145,6 +145,7 @@ compose が公開する port は、すべて `127.0.0.1` に限る。
    Playwright が `webServer` で Vite preview を起動し、終了時に止める。
 6. 成否にかかわらず、backend のログを `frontend/test-results/backend.log` に書き、コンテナと volume を削除する。
    ログに `.env.test` の `OIDC_CLIENT_SECRET` か `E2E_PASSWORD` の値が入っていれば、テストが成功していても失敗にする。
+   値の一致で見つからない秘密として、`APP_SESSION=` に続く Cookie の値と、`eyJ` で始まる 3 つの base64url をつないだ JWT の形の文字列も失敗にする。
 
 E2E には Collector を置かず、テストが `/collect` を `page.route` で応答する（[ADR-068](../adr/ADR-068-collect-browser-telemetry-with-faro-via-collector.md)）。
 `frontend/e2e/logout.spec.ts` は、`/collect` が 503 を返してもログインとログアウトのフォームを送信できることを確かめる。
@@ -178,11 +179,12 @@ build、コンテナの起動、後片付けは行わない。
 ## 証拠
 
 - spec は、主要な状態（決済済み、再投入待ち、競合の選択肢）の screenshot を `testInfo.attach` で HTML report に添付する。
-- CI は、成功時に `e2e-evidence` artifact に HTML report と `backend.log` を保存する。
+- CI は、成功時に `e2e-evidence` artifact に HTML report を保存する。
+  `backend.log` は失敗の調査にだけ使うため、成功時には保存せず、失敗時の `e2e-results` だけに入れる。
   retry で成功したテストも、失敗した試行の trace を HTML report に残す。
   成功時の artifact は `playwright-report/data/*.zip` を除くため、trace と、trace に入る Cookie を含まない。
   失敗した試行の screenshot は、成功時の artifact にも残る。
-- `backend.log` に秘密の値が入っていないことは、`task e2e` の後片付けが検査する（[実行と後片付け](#実行と後片付け)）。
+- `backend.log` に秘密の値、セッションの Cookie の値、JWT の形の文字列が入っていないことは、`task e2e` の後片付けが検査する（[実行と後片付け](#実行と後片付け)）。
 
 ## E2E で確かめない範囲
 
@@ -199,7 +201,7 @@ build、コンテナの起動、後片付けは行わない。
 ## CI
 
 `.github/workflows/e2e.yml` は、Pull Request で frontend、backend（DB の changeset を含む）、Keycloak の設定、compose-test とその入力（`docker/initdb/`、`docker/wiremock/`、`.env.test.example`）、Taskfile、この workflow 自体を変えたときだけ `task e2e` を実行する。
-retry は 2 回で、失敗時に Playwright の成果物と backend のログを、成功時に HTML report と backend のログを保存する。
+retry は 2 回で、失敗時に Playwright の成果物と backend のログを、成功時に HTML report だけを保存する。
 `task e2e` の後に、`task test-deps-leftover-check` で Compose project `spring-modulith-test` のコンテナと volume を調べ、残っていれば失敗にする。
 Backend CI も、compose-test を止めた後に同じ task で確かめる。
 この check は required status checks に登録しない（[ブランチ保護](../repository/branch-protection.md)）。

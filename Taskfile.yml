@@ -132,6 +132,11 @@ tasks:
               if [ "$status" -eq 0 ]; then status=1; fi
             fi
           done
+          # 値の一致では見つからない、セッションの Cookie の値と JWT の形（eyJ で始まる 3 つの base64url）も失敗にする。
+          if grep -E -q 'APP_SESSION=[^;[:space:]"]+|eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+' frontend/test-results/backend.log; then
+            echo "frontend/test-results/backend.log に APP_SESSION の Cookie の値か JWT の形の文字列が入っています。ログに出す値を確かめてください。" >&2
+            if [ "$status" -eq 0 ]; then status=1; fi
+          fi
           if [ "$status" -ne 0 ]; then
             if [ -n "$keep_env" ] && [ -n "$(compose ps -aq 2>/dev/null)" ]; then keep="1"; fi
           fi
