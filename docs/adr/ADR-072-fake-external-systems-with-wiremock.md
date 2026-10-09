@@ -113,10 +113,10 @@ Accepted
 
 - 未決事項として、次の三つを実際の決済代行の契約を選ぶときに決める。
   今の `base-url` は `http://` を受け付け、Client は資格情報を送らず、起動時の検査も置かない。
-  1. TLS の強制：本番は `https://` にする。
+  1. TLS の強制：本番は `https://` にする（[#187](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/187)）。
      `https://` と許可するホストを検査する場所（アプリの起動のコードでなく、デプロイの設定や IaC のレビュー）と、証明書のピン留めや独自のトラストストアの要否を決める。
      このリポジトリにはまだ IaC が無く、決まるまで検査は無い。
-  2. 資格情報の扱い：決済代行が求める認証の方式（API キーのヘッダー、OAuth 2.0 の client credentials、mTLS）を決める。
+  2. 資格情報の扱い：決済代行が求める認証の方式（API キーのヘッダー、OAuth 2.0 の client credentials、mTLS）を決める（[#187](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/187)）。
      秘密の取得元（[ADR-008](ADR-008-single-application-yaml-external-config.md) に従い、ECS タスク定義の `secrets` で Secrets Manager などから注入する環境変数）、ローテーション、ログに出さない方法も決める。
   3. 契約の分類：拒否の表し方（2xx の本文か、402 などの 4xx か）と、各 HTTP の状態を Decision の四つの分類のどれに当てるかを決める。
      決まるまでは、このリポジトリの暫定の契約と分類に従う。
@@ -159,6 +159,7 @@ Accepted
 - [#166 参照業務機能を main に導入し、開発基盤を継続的に検証する](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/166)
 - [#122 product、ordering、payment を参照業務機能として導入する](https://github.com/yokozi-jp/spring-modulith-ai-dlc/pull/122)
 - [#167 参照業務機能の主要フローと障害回復を検証する](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/167)
+- [#187 決済代行の接続で TLS を強制し、資格情報の扱いを決める](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/187)
 - [ADR-008: application.yaml を単一にし、設定を外部から注入する](ADR-008-single-application-yaml-external-config.md)
 - [ADR-019: 外部連携の耐障害性と容量制御を標準化する](ADR-019-define-resilience-and-capacity-guardrails.md)
 - [ADR の運用ルール](conventions.md)

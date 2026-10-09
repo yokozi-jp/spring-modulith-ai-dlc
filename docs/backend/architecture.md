@@ -226,6 +226,11 @@ CommandHandler は `application` にあるため、他モジュールから呼�
 機能モジュールを追加するときは、この 3 つを実例として読み、[バックエンドの機能追加時の確認](runbook-add-feature.md)に従う。
 3 つの変更も、API の契約の版とマイグレーションの通常の規約に従う。
 
+参照業務機能は、注文と決済の API を認証済みの利用者だけに許し、注文の持ち主を確かめない。
+このため、認証済みの利用者なら誰でも、ほかの利用者の注文と決済記録を読み、下書きの注文を変更、確定、取消できる。
+これは参照業務機能の割り切りであり、実例として持ち主の確認を写さない。
+持ち主に限る認可は [#188](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/188) で扱う。
+
 ## 関連資料
 
 - [ADR-002: package by feature とオニオンアーキテクチャ](../adr/ADR-002-package-by-feature-onion-architecture.md)
