@@ -19,7 +19,7 @@
   "editor.codeActionsOnSave": {
     "source.fixAll.oxc": "explicit"
   },
-  "java.compile.nullAnalysis.mode": "automatic",
+  "java.compile.nullAnalysis.mode": "disabled",
   "java.configuration.updateBuildConfiguration": "automatic",
   "java.jdt.ls.java.home": "/usr/lib/jvm/java-25-amazon-corretto",
   "java.configuration.runtimes": [
