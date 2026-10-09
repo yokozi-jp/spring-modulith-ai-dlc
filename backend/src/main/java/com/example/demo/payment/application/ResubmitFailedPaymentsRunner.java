@@ -11,11 +11,11 @@ import org.springframework.modulith.events.ResubmissionOptions;
 import org.springframework.stereotype.Component;
 
 /**
- * 失敗した OrderConfirmed のイベント出版を一度だけ再投入する、手で確かめるための入口。
+ * 失敗した OrderConfirmed のイベント出版を一度だけ再投入する入口。
  *
  * <p>resubmit-once のプロファイルのときだけ作る。起動のたびに 1 回だけ動き、定期には動かない。
  */
-// 手で確かめるための入口で、class-roles にない役割である（design-step3.md の P-14）。
+// 運用者の入口と定期の再投入（#108）が入るまでの再投入の入口で、docs/backend/class-roles/index.md にない役割である。
 @Slf4j
 @Component
 @Profile("resubmit-once")

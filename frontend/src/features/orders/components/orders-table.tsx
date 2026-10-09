@@ -4,7 +4,7 @@ import { useTranslation } from "react-i18next";
 import type { OrderSummaryResponse } from "@/api/generated/models";
 import { orderStatusLabel } from "@/features/orders/order-status";
 
-// 作成の時刻は出さない（Safari の Temporal の対応と polyfill の要否を決めていないため。#122）。
+// この画面は作成の時刻を出さない。出すときは ADR-047 に従い Temporal.Instant で読む。
 export function OrdersTable({ items }: { items: OrderSummaryResponse[] }) {
   const { t } = useTranslation();
   const missing = t("orders.missingValue");

@@ -13,7 +13,7 @@ import type {
 
 import { server } from "./msw";
 
-// 確認用の注文の画面のテストが共有する固定の値（生成された MSW handler に渡す）。
+// 注文の画面のテストが共有する固定の値（生成された MSW handler に渡す）。
 export const penId = "11111111-1111-4111-8111-111111111111";
 export const notebookId = "22222222-2222-4222-8222-222222222222";
 export const eraserId = "33333333-3333-4333-8333-333333333333";

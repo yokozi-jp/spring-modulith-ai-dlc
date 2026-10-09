@@ -66,7 +66,7 @@ function paidDetails(t: TFunction, language: string, payment: PaymentSummaryResp
   );
 }
 
-// 注文の詳細とは別に決済の参照を suspense なしで読み、失敗しても注文の表示と操作を残す（#122 の P-11）。
+// 注文の詳細とは別に決済の参照を suspense なしで読み、失敗しても注文の表示と操作を残す。
 export function PaymentStatus({
   orderId,
   orderStatus,

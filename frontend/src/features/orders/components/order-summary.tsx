@@ -5,7 +5,7 @@ import { orderStatusLabel } from "@/features/orders/order-status";
 
 import { PaymentStatus } from "./payment-status";
 
-// 作成の時刻は出さない（Safari の Temporal の対応と polyfill の要否を決めていないため。#122）。
+// この画面は作成の時刻を出さない。出すときは ADR-047 に従い Temporal.Instant で読む。
 // 決済の状態は、注文の要約の後に別の見出しの欄で出す。
 export function OrderSummary({ order, orderId }: { order: OrderDetailsResponse; orderId: string }) {
   const { t } = useTranslation();

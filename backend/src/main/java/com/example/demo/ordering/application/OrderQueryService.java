@@ -38,7 +38,7 @@ class OrderQueryService implements OrderQueries {
   @Override
   @Transactional(readOnly = true)
   public List<OrderSummary> search(final OrderSearchCriteria criteria) {
-    // ponytail: ページングしない。確認用で件数が少ない。数百件を超えるなら ADR-013 のカーソルを足す。
+    // ponytail: ページングしない。参照業務機能の注文の件数は少ない。数百件を超えるなら ADR-013 のカーソルを足す。
     final @Nullable String status = criteria.status();
     final List<Order> orders =
         status == null

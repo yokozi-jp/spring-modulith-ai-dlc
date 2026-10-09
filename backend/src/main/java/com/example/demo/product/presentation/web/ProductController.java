@@ -31,7 +31,7 @@ class ProductController {
   @Operation(operationId = "listProducts")
   @GetMapping
   /* package */ ProductSummaryListResponse search() {
-    // ponytail: ページングしない。確認用の商品は数件である。数百件を超えるなら ADR-013 のカーソルを足す。
+    // ponytail: ページングしない。参照業務機能の商品は数件である。数百件を超えるなら ADR-013 のカーソルを足す。
     return new ProductSummaryListResponse(
         productQueries.search().stream().map(ProductSummaryResponse::from).toList());
   }

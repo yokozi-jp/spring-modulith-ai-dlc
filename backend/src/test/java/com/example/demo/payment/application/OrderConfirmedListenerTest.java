@@ -63,8 +63,8 @@ import org.springframework.web.client.ResourceAccessException;
  * 注文の確定を受けて決済記録を作ること、二度目の配信で二重に請求しないこと、失敗した出版を再投入で完了できることを検証する。
  *
  * <p>{@code payment} の直接の依存は {@code order} だけだが、{@code order} の CommandHandler が {@code product}
- * の参照を要るため、すべての依存を起動する（design-step3.md の P-4）。決済代行は切り替えられる偽物に、時計は固定の時刻に差し替える （P-13）。Listener
- * の処理はコミットされるため、各テストの後に全テーブルを消す。
+ * の参照を要るため、すべての依存を起動する。決済代行の port はこのテストの中で結果を切り替えられる実装に、時計は固定の時刻に差し替える。HTTP の Client と WireMock
+ * の結合は {@link PaymentGatewayClientIntegrationTest} で検証する。Listener の処理はコミットされるため、各テストの後に全テーブルを消す。
  */
 // 確定から再投入までのイベント出版の状態を一つの文脈で確かめるため、型とメソッドの数が多い。
 @SuppressWarnings({"PMD.CouplingBetweenObjects", "PMD.TooManyMethods"})
