@@ -40,8 +40,17 @@ import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilde
 @ExtendWith(CleanGeneratedTablesExtension.class)
 class PaymentApiTest {
 
+  /** 請求の結果を記録した時刻の、API が返す形。 */
+  private static final String RECORDED_AT_TEXT = "2026-10-06T01:02:03.123456Z";
+
   /** 請求の結果を記録した時刻。 */
-  private static final Instant RECORDED_AT = Instant.parse("2026-10-06T01:02:03.123456Z");
+  private static final Instant RECORDED_AT = Instant.parse(RECORDED_AT_TEXT);
+
+  /** 決済代行の識別子の接頭辞。 */
+  private static final String CHARGE_ID_PREFIX = "ch_";
+
+  /** 1 件目の決済記録の、記録した時刻の JSON path。 */
+  private static final String FIRST_RECORDED_AT = "$.items[0].recordedAt";
 
   /** 実際の Spring MVC と Security filter chain を通すクライアント。 */
   @Autowired private MockMvc mockMvc;
@@ -63,9 +72,9 @@ class PaymentApiTest {
         .andExpect(jsonPath("$.items[0].orderId").value(orderId.toString()))
         .andExpect(jsonPath("$.items[0].amount").value(240.00))
         .andExpect(jsonPath("$.items[0].status").value("PAID"))
-        .andExpect(jsonPath("$.items[0].gatewayPaymentCode").value("ch_" + orderId))
-        .andExpect(jsonPath("$.items[0].recordedAt").value("2026-10-06T01:02:03.123456Z"))
-        .andExpect(jsonPath("$.items[0].recordedAt").value(endsWith("Z")));
+        .andExpect(jsonPath("$.items[0].gatewayPaymentCode").value(CHARGE_ID_PREFIX + orderId))
+        .andExpect(jsonPath(FIRST_RECORDED_AT).value(RECORDED_AT_TEXT))
+        .andExpect(jsonPath(FIRST_RECORDED_AT).value(endsWith("Z")));
   }
 
   @Test
@@ -79,21 +88,21 @@ class PaymentApiTest {
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.items[0].status").value("FAILED"))
         .andExpect(jsonPath("$.items[0].gatewayPaymentCode").doesNotExist())
-        .andExpect(jsonPath("$.items[0].recordedAt").value("2026-10-06T01:02:03.123456Z"));
+        .andExpect(jsonPath(FIRST_RECORDED_AT).value(RECORDED_AT_TEXT));
   }
 
   @Test
   @DisplayName("拒否された注文では、status を DECLINED にし、識別子と記録した時刻を返す")
   void listsDeclinedPaymentWithRecordedAt() throws Exception {
     final UUID orderId = UUID.randomUUID();
-    insertPayment(orderId, "DECLINED", "ch_" + orderId);
+    insertPayment(orderId, "DECLINED", CHARGE_ID_PREFIX + orderId);
 
     mockMvc
         .perform(payments(orderId.toString()))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.items[0].status").value("DECLINED"))
-        .andExpect(jsonPath("$.items[0].gatewayPaymentCode").value("ch_" + orderId))
-        .andExpect(jsonPath("$.items[0].recordedAt").value("2026-10-06T01:02:03.123456Z"));
+        .andExpect(jsonPath("$.items[0].gatewayPaymentCode").value(CHARGE_ID_PREFIX + orderId))
+        .andExpect(jsonPath(FIRST_RECORDED_AT).value(RECORDED_AT_TEXT));
   }
 
   @Test
@@ -134,7 +143,7 @@ class PaymentApiTest {
   }
 
   private UUID insertPayment(final UUID orderId) {
-    return insertPayment(orderId, "PAID", "ch_" + orderId);
+    return insertPayment(orderId, "PAID", CHARGE_ID_PREFIX + orderId);
   }
 
   private UUID insertPayment(final UUID orderId, final String status, final String code) {
