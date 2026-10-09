@@ -10,13 +10,13 @@ import type { Notice } from "@/features/orders/notice";
  */
 export function useOrderStatusActions(
   orderId: string,
-  lockNo: number | undefined,
+  lockNo: number,
   setNotice: (notice: Notice | undefined) => void,
 ) {
   const { t } = useTranslation();
   const confirmMutation = useConfirmOrder();
   const cancelMutation = useCancelOrder();
-  const data = lockNo === undefined ? {} : { lockNo };
+  const data = { lockNo };
   const isPending = confirmMutation.isPending || cancelMutation.isPending;
 
   const onError = (error: unknown) => {

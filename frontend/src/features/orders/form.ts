@@ -35,11 +35,8 @@ export function productOptions(
   selectedId: string,
 ): ProductOption[] {
   const options: ProductOption[] = [];
-  for (const { productId, productName, salesStatus } of products) {
-    const name = productName ?? productId ?? "";
-    if (productId === undefined) {
-      // 識別子のない商品は選べない。
-    } else if (salesStatus === "ON_SALE") {
+  for (const { productId, productName: name, salesStatus } of products) {
+    if (salesStatus === "ON_SALE") {
       options.push({ productId, label: name });
     } else if (productId === selectedId) {
       options.push({

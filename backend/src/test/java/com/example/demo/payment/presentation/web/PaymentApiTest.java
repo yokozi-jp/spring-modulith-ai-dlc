@@ -40,8 +40,8 @@ import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilde
 @ExtendWith(CleanGeneratedTablesExtension.class)
 class PaymentApiTest {
 
-  /** 決済した時刻。 */
-  private static final Instant PAID_AT = Instant.parse("2026-10-06T01:02:03.123456Z");
+  /** 請求の結果を記録した時刻。 */
+  private static final Instant RECORDED_AT = Instant.parse("2026-10-06T01:02:03.123456Z");
 
   /** 実際の Spring MVC と Security filter chain を通すクライアント。 */
   @Autowired private MockMvc mockMvc;
@@ -50,7 +50,7 @@ class PaymentApiTest {
   @Autowired private DSLContext dsl;
 
   @Test
-  @DisplayName("決済記録がある注文では、items に 1 件を入れ、paidAt を Z 付きで返す")
+  @DisplayName("決済記録がある注文では、items に 1 件を入れ、recordedAt を Z 付きで返す")
   void listsPaymentOfOrder() throws Exception {
     final UUID orderId = UUID.randomUUID();
     final UUID paymentId = insertPayment(orderId);
@@ -64,13 +64,13 @@ class PaymentApiTest {
         .andExpect(jsonPath("$.items[0].amount").value(240.00))
         .andExpect(jsonPath("$.items[0].status").value("PAID"))
         .andExpect(jsonPath("$.items[0].gatewayPaymentCode").value("ch_" + orderId))
-        .andExpect(jsonPath("$.items[0].paidAt").value("2026-10-06T01:02:03.123456Z"))
-        .andExpect(jsonPath("$.items[0].paidAt").value(endsWith("Z")));
+        .andExpect(jsonPath("$.items[0].recordedAt").value("2026-10-06T01:02:03.123456Z"))
+        .andExpect(jsonPath("$.items[0].recordedAt").value(endsWith("Z")));
   }
 
   @Test
-  @DisplayName("契約の不備で失敗した注文では、status を FAILED にし、識別子と paidAt を省く")
-  void listsFailedPaymentWithoutPaidAt() throws Exception {
+  @DisplayName("契約の不備で失敗した注文では、status を FAILED にし、識別子を省き、記録した時刻を返す")
+  void listsFailedPaymentWithRecordedAt() throws Exception {
     final UUID orderId = UUID.randomUUID();
     insertPayment(orderId, "FAILED", "");
 
@@ -79,7 +79,21 @@ class PaymentApiTest {
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.items[0].status").value("FAILED"))
         .andExpect(jsonPath("$.items[0].gatewayPaymentCode").doesNotExist())
-        .andExpect(jsonPath("$.items[0].paidAt").doesNotExist());
+        .andExpect(jsonPath("$.items[0].recordedAt").value("2026-10-06T01:02:03.123456Z"));
+  }
+
+  @Test
+  @DisplayName("拒否された注文では、status を DECLINED にし、識別子と記録した時刻を返す")
+  void listsDeclinedPaymentWithRecordedAt() throws Exception {
+    final UUID orderId = UUID.randomUUID();
+    insertPayment(orderId, "DECLINED", "ch_" + orderId);
+
+    mockMvc
+        .perform(payments(orderId.toString()))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.items[0].status").value("DECLINED"))
+        .andExpect(jsonPath("$.items[0].gatewayPaymentCode").value("ch_" + orderId))
+        .andExpect(jsonPath("$.items[0].recordedAt").value("2026-10-06T01:02:03.123456Z"));
   }
 
   @Test
@@ -133,8 +147,8 @@ class PaymentApiTest {
                 .set(T_PAYMENT.CHARGED_AMOUNT_JPY, new BigDecimal("240.00"))
                 .set(T_PAYMENT.PAYMENT_STATUS_TYP, status)
                 .set(T_PAYMENT.GATEWAY_PAYMENT_CODE, code)
-                .set(T_PAYMENT.RECORDED_AT, PAID_AT)
-                .set(TestCommonColumns.at(PAID_AT).forInsert(T_PAYMENT))
+                .set(T_PAYMENT.RECORDED_AT, RECORDED_AT)
+                .set(TestCommonColumns.at(RECORDED_AT).forInsert(T_PAYMENT))
                 .execute());
     return paymentId;
   }

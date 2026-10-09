@@ -4,6 +4,7 @@ import com.example.demo.ordering.application.ConfirmOrderCommand;
 import com.example.demo.shared.concurrency.ExpectedLockNo;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.NotNull;
 import java.util.UUID;
 
 /**
@@ -11,7 +12,7 @@ import java.util.UUID;
  *
  * @param lockNo 画面が読んだ注文のロック番号
  */
-public record ConfirmOrderRequest(@Min(1) @Schema(example = "1") long lockNo) {
+public record ConfirmOrderRequest(@NotNull @Min(1) @Schema(example = "1") long lockNo) {
 
   /** パス変数の注文 ID と合わせて Command へ変換する。 */
   public ConfirmOrderCommand toCommand(final UUID orderId) {

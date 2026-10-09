@@ -202,7 +202,7 @@ describe("order detail page payment failures", () => {
         "決済の状態を読み込めませんでした。時間をおいて画面を読み直してください。",
       );
     });
-    expect(within(region).queryByText("決済した時刻")).toBeNull();
+    expect(within(region).queryByText("結果を記録した時刻")).toBeNull();
     expect(screen.getByRole("heading", { level: 1, name: "注文 C-001" })).toBeTruthy();
     expect(firstLineRow()?.textContent).toContain("ボールペン");
     expect(screen.getByRole("button", { name: "確定する" })).toBeTruthy();

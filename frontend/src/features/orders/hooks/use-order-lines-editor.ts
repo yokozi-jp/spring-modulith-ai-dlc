@@ -19,10 +19,10 @@ import type { ServerFieldErrors } from "@/features/orders/server-errors";
 
 function linesValues(order: OrderDetailsResponse): OrderLinesValues {
   return {
-    lines: (order.lines ?? []).map((line) => ({
+    lines: order.lines.map((line) => ({
       rowKey: crypto.randomUUID(),
-      productId: line.productId ?? "",
-      quantity: line.quantity === undefined ? "" : String(line.quantity),
+      productId: line.productId,
+      quantity: String(line.quantity),
     })),
   };
 }
@@ -57,7 +57,7 @@ function conflictOutcome(
 }
 
 interface Base {
-  lockNo: number | undefined;
+  lockNo: number;
   values: OrderLinesValues;
 }
 
@@ -93,13 +93,13 @@ export function useOrderLinesEditor(
 
   const send = (
     lines: OrderLineRequest[],
-    lockNo: number | undefined,
+    lockNo: number,
     reset: (values: OrderLinesValues) => void,
   ) => {
     setNotice(undefined);
     setFeedback({ conflict: false, serverErrors: noServerErrors });
     mutation.mutate(
-      { orderId, data: lockNo === undefined ? { lines } : { lines, lockNo } },
+      { orderId, data: { lines, lockNo } },
       {
         // mutate の callback は全 query の再取得の後に呼ばれるので、cache の詳細は最新である（docs/frontend/routing-and-state.md）。
         onSuccess: () => {
@@ -171,7 +171,8 @@ export function useOrderLinesEditor(
     },
     /** 今の入力を、最新の lockNo で 1 回だけ送る。また 409 なら同じ流れを繰り返す。 */
     handleReapply: () => {
-      const lockNo = reloadedOrder(queryClient, orderId)?.lockNo;
+      // 最新を読めなければ持っている版で送り、古ければ 409 の流れで読み直しの失敗を通知する。
+      const lockNo = reloadedOrder(queryClient, orderId)?.lockNo ?? base.lockNo;
       setBase((current) => ({ ...current, lockNo }));
       void form.handleSubmit({ lockNo });
     },

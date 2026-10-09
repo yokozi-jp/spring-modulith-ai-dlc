@@ -6,6 +6,7 @@ import { beforeEach, describe, expect, it, vi } from "vite-plus/test";
 
 import { getListPaymentsMockHandler } from "@/api/generated/mocks/payment/payment.msw";
 import { getListProductsMockHandler } from "@/api/generated/mocks/product/product.msw";
+import type { PaymentSummaryResponse } from "@/api/generated/models";
 import { server } from "@/testing/msw";
 import {
   draftOrder,
@@ -26,7 +27,19 @@ import {
 import { renderRoute } from "@/testing/render-route";
 
 const detailPath = `/orders/${orderId}`;
-const paidAt = "2026-10-06T01:02:03.123456Z";
+const recordedAt = "2026-10-06T01:02:03.123456Z";
+
+/** 注文の決済記録。 */
+function payment(overrides: Partial<PaymentSummaryResponse> = {}): PaymentSummaryResponse {
+  return {
+    paymentId: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+    orderId,
+    amount: 240,
+    status: "PAID",
+    recordedAt,
+    ...overrides,
+  };
+}
 
 /** 決済の欄（見出し「決済」の region）。 */
 function paymentRegion() {
@@ -80,13 +93,18 @@ describe("order detail page", () => {
     ]);
   });
 
-  it("明細の欠けた値は「（なし）」を、引けない商品は productId をそのまま出す", async () => {
-    serveDetail(draftOrder({ lines: [{ productId: "unknown-product" }] }));
+  it("引けない商品は productId をそのまま出す", async () => {
+    serveDetail(
+      draftOrder({
+        lines: [
+          { lineNumber: 1, productId: "unknown-product", quantity: 1, unitPrice: 80, amount: 80 },
+        ],
+      }),
+    );
 
     await renderRoute(detailPath);
 
     await expect(screen.findByText("unknown-product")).resolves.toBeTruthy();
-    expect(firstLineRow()?.textContent?.match(/（なし）/gu)).toHaveLength(4);
   });
 
   it.each([404, 400])("詳細が %i なら not found を表示する", async (status) => {
@@ -99,16 +117,12 @@ describe("order detail page", () => {
     ).resolves.toBeTruthy();
   });
 
-  it.each([
-    { label: "確定済み", order: draftOrder({ status: "CONFIRMED" }) },
-    { label: "下書き", order: (({ lockNo: _lockNo, ...unlocked }) => unlocked)(draftOrder()) },
-    { label: "下書き", order: (({ orderId: _orderId, ...anonymous }) => anonymous)(draftOrder()) },
-  ])("下書きでないか lockNo がなければ更新の操作を出さない（$label）", async ({ label, order }) => {
-    serveDetail(order);
+  it("下書きでなければ更新の操作を出さない", async () => {
+    serveDetail(draftOrder({ status: "CONFIRMED" }));
 
     await renderRoute(detailPath);
 
-    await expect(screen.findByText(label)).resolves.toBeTruthy();
+    await expect(screen.findByText("確定済み")).resolves.toBeTruthy();
     expect(screen.queryByLabelText("数量")).toBeNull();
     expect(screen.queryByRole("button", { name: "確定する" })).toBeNull();
   });
@@ -116,7 +130,7 @@ describe("order detail page", () => {
   it("明細の変更を続けて 2 回送ると、2 回目は 1 回目の後に取り直した lockNo で送る", async () => {
     const detail = serveDetail(draftOrder());
     const bodies = serveUpdate("put", "lines", () => {
-      detail.order = draftOrder({ lockNo: (detail.order.lockNo ?? 0) + 1 });
+      detail.order = draftOrder({ lockNo: detail.order.lockNo + 1 });
       return noContent();
     });
     const { user } = await renderRoute(detailPath);
@@ -199,75 +213,45 @@ describe("order detail page payment status", () => {
     server.use(getListProductsMockHandler(products));
   });
 
-  it("決済記録があれば、決済済みと金額と決済した時刻を出し、time に paidAt を入れる", async () => {
-    serveDetail(draftOrder({ status: "CONFIRMED" }));
-    server.use(
-      getListPaymentsMockHandler({ items: [{ orderId, amount: 240, status: "PAID", paidAt }] }),
-    );
-
-    await renderRoute(detailPath);
-
-    const region = await expectPaymentStatus("決済済み");
-    expect(within(region).getByText("￥240")).toBeTruthy();
-    const time = within(region).getByText(
-      new Intl.DateTimeFormat("ja", { dateStyle: "medium", timeStyle: "medium" }).format(
-        Temporal.Instant.from(paidAt).epochMilliseconds,
-      ),
-    );
-    expect(time.tagName).toBe("TIME");
-    expect(time.getAttribute("datetime")).toBe(paidAt);
-  });
-
-  it("決済記録の paidAt と金額がなければ「（なし）」を出し、time を出さない", async () => {
-    serveDetail(draftOrder({ status: "CONFIRMED" }));
-    server.use(getListPaymentsMockHandler({ items: [{ orderId, status: "PAID" }] }));
-
-    await renderRoute(detailPath);
-
-    const region = await expectPaymentStatus("決済済み");
-    expect(within(region).getByText("決済した時刻").nextElementSibling?.textContent).toBe(
-      "（なし）",
-    );
-    expect(within(region).getByText("決済した金額").nextElementSibling?.textContent).toBe(
-      "（なし）",
-    );
-    expect(region.querySelector("time")).toBeNull();
-  });
-
   it.each([
+    ["PAID", "決済済み"],
     ["DECLINED", "決済代行が決済を拒否しました。"],
     ["FAILED", "決済に失敗しました。再投入では回復しないため、管理者に連絡してください。"],
-  ])("決済記録が %s なら、その結果を出し、決済した時刻を出さない", async (status, message) => {
-    serveDetail(draftOrder({ status: "CONFIRMED" }));
-    server.use(getListPaymentsMockHandler({ items: [{ orderId, amount: 240, status }] }));
-
-    await renderRoute(detailPath);
-
-    const region = await expectPaymentStatus(message);
-    expect(within(region).queryByText("決済した時刻")).toBeNull();
-  });
-
-  it.each([
-    ["なし", {}],
-    ["REFUNDED", { status: "REFUNDED" }],
   ])(
-    "決済記録の状態が %s なら、決済済みとせず不明を出し、決済した時刻を出さない",
-    async (_label, status) => {
+    "決済記録が %s なら、その結果と金額と記録した時刻を出し、time に recordedAt を入れる",
+    async (status, message) => {
       serveDetail(draftOrder({ status: "CONFIRMED" }));
-      server.use(
-        getListPaymentsMockHandler({ items: [{ orderId, amount: 240, paidAt, ...status }] }),
-      );
+      server.use(getListPaymentsMockHandler({ items: [payment({ status })] }));
 
       await renderRoute(detailPath);
 
-      const region = await expectPaymentStatus(
-        "決済の状態が分かりません。管理者に連絡してください。",
+      const region = await expectPaymentStatus(message);
+      expect(within(region).getByText("請求した金額").nextElementSibling?.textContent).toBe(
+        "￥240",
       );
-      expect(within(region).queryByText("決済した時刻")).toBeNull();
+      const time = within(region).getByText(
+        new Intl.DateTimeFormat("ja", { dateStyle: "medium", timeStyle: "medium" }).format(
+          Temporal.Instant.from(recordedAt).epochMilliseconds,
+        ),
+      );
+      expect(time.tagName).toBe("TIME");
+      expect(time.getAttribute("datetime")).toBe(recordedAt);
     },
   );
 
-  it("確定済みで決済記録がなければ、まだ受け付けていないことを出し、決済した時刻を出さない", async () => {
+  it("決済記録の状態が知らない値なら、決済済みとせず不明を出す", async () => {
+    serveDetail(draftOrder({ status: "CONFIRMED" }));
+    server.use(getListPaymentsMockHandler({ items: [payment({ status: "REFUNDED" })] }));
+
+    await renderRoute(detailPath);
+
+    const region = await expectPaymentStatus(
+      "決済の状態が分かりません。管理者に連絡してください。",
+    );
+    expect(within(region).getByText("請求した金額")).toBeTruthy();
+  });
+
+  it("確定済みで決済記録がなければ、まだ受け付けていないことを出し、記録した時刻を出さない", async () => {
     serveDetail(draftOrder({ status: "CONFIRMED" }));
 
     await renderRoute(detailPath);
@@ -275,7 +259,7 @@ describe("order detail page payment status", () => {
     const region = await expectPaymentStatus(
       "決済をまだ受け付けていません。処理中か、失敗して再投入を待っています。",
     );
-    expect(within(region).queryByText("決済した時刻")).toBeNull();
+    expect(within(region).queryByText("結果を記録した時刻")).toBeNull();
   });
 
   it.each(["DRAFT", "CANCELLED"])(
@@ -286,7 +270,7 @@ describe("order detail page payment status", () => {
       await renderRoute(detailPath);
 
       const region = await expectPaymentStatus("この注文は決済の対象ではありません。");
-      expect(within(region).queryByText("決済した時刻")).toBeNull();
+      expect(within(region).queryByText("結果を記録した時刻")).toBeNull();
     },
   );
 });

@@ -9,5 +9,5 @@ import type { PaymentSummaryResponse } from './paymentSummaryResponse.ts';
  */
 export interface PaymentSummaryListResponse {
   /** 決済記録の一覧の行。1 注文につき 0 件か 1 件 */
-  items?: PaymentSummaryResponse[];
+  items: PaymentSummaryResponse[];
 }

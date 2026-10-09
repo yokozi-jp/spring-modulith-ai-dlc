@@ -14,5 +14,5 @@ export interface OrderLineRequest {
      * @minimum 1
      * @maximum 9999
      */
-  quantity?: number;
+  quantity: number;
 }

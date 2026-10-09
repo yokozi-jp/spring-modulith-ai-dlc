@@ -8,13 +8,13 @@
  */
 export interface ProductSummaryResponse {
   /** 商品コード */
-  productCode?: string;
+  productCode: string;
   /** 商品の ID */
-  productId?: string;
+  productId: string;
   /** 商品名 */
-  productName?: string;
+  productName: string;
   /** 販売の状態のコード値（ON_SALE か DISCONTINUED） */
-  salesStatus?: string;
+  salesStatus: string;
   /** 単価 */
-  unitPrice?: number;
+  unitPrice: number;
 }

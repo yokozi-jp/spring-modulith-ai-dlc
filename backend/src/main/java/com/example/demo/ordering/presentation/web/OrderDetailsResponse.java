@@ -2,6 +2,7 @@ package com.example.demo.ordering.presentation.web;
 
 import com.example.demo.ordering.OrderDetails;
 import io.swagger.v3.oas.annotations.media.Schema;
+import jakarta.validation.constraints.NotNull;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
@@ -18,13 +19,13 @@ import java.util.List;
  * @param lines 注文の明細
  */
 public record OrderDetailsResponse(
-    @Schema(example = "5f0c2a8e-7d1b-4c3a-9e6f-1a2b3c4d5e6f") String orderId,
-    @Schema(example = "C-2026-0001") String customerOrderCode,
-    @Schema(example = "DRAFT") String status,
-    @Schema(example = "2026-10-05T01:02:03.123456Z") Instant orderedAt,
-    @Schema(example = "240.00") BigDecimal totalAmount,
-    @Schema(example = "1") long lockNo,
-    List<OrderDetailsResponse.OrderLineResponse> lines) {
+    @NotNull @Schema(example = "5f0c2a8e-7d1b-4c3a-9e6f-1a2b3c4d5e6f") String orderId,
+    @NotNull @Schema(example = "C-2026-0001") String customerOrderCode,
+    @NotNull @Schema(example = "DRAFT") String status,
+    @NotNull @Schema(example = "2026-10-05T01:02:03.123456Z") Instant orderedAt,
+    @NotNull @Schema(example = "240.00") BigDecimal totalAmount,
+    @NotNull @Schema(example = "1") long lockNo,
+    @NotNull List<OrderDetailsResponse.OrderLineResponse> lines) {
 
   /** 明細を変更できないリストとして持つ。 */
   public OrderDetailsResponse {
@@ -53,11 +54,11 @@ public record OrderDetailsResponse(
    * @param amount 単価と数量の積
    */
   public record OrderLineResponse(
-      @Schema(example = "1") int lineNumber,
-      @Schema(example = "0b6c8f6e-2f4a-4c1e-9d3b-7a1e5c2d4f60") String productId,
-      @Schema(example = "2") int quantity,
-      @Schema(example = "120.00") BigDecimal unitPrice,
-      @Schema(example = "240.00") BigDecimal amount) {
+      @NotNull @Schema(example = "1") int lineNumber,
+      @NotNull @Schema(example = "0b6c8f6e-2f4a-4c1e-9d3b-7a1e5c2d4f60") String productId,
+      @NotNull @Schema(example = "2") int quantity,
+      @NotNull @Schema(example = "120.00") BigDecimal unitPrice,
+      @NotNull @Schema(example = "240.00") BigDecimal amount) {
 
     /** 参照の結果の明細から作る。 */
     public static OrderLineResponse from(final OrderDetails.Line line) {

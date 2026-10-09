@@ -4,7 +4,7 @@ import { screen, waitFor, within } from "@testing-library/react";
 import { describe, expect, expectTypeOf, it } from "vite-plus/test";
 
 import { getListOrdersMockHandler } from "@/api/generated/mocks/ordering/ordering.msw";
-import type { OrderSummaryListResponse, OrderSummaryResponse } from "@/api/generated/models";
+import type { OrderSummaryResponse } from "@/api/generated/models";
 import { server } from "@/testing/msw";
 import { orderId, orderSummary } from "@/testing/orders";
 import { renderRoute } from "@/testing/render-route";
@@ -34,7 +34,7 @@ function currentOf(name: string) {
 describe("orders page", () => {
   it("一覧の行に客先注文番号、状態、合計金額、詳細へのリンクを出す", async () => {
     const summary = orderSummary({ lockNo: 2 });
-    expectTypeOf(summary.lockNo).toEqualTypeOf<number | undefined>();
+    expectTypeOf(summary.lockNo).toEqualTypeOf<number>();
 
     const [, row] = await rowsOf([summary]);
 
@@ -46,12 +46,10 @@ describe("orders page", () => {
     );
   });
 
-  it("対応にない状態はコード値を、欠けた値は「（なし）」を出し、orderId がない行はリンクを出さない", async () => {
-    const [, row] = await rowsOf([{ customerOrderCode: "C-002", status: "PAID" }]);
+  it("対応にない状態はコード値を出す", async () => {
+    const [, row] = await rowsOf([orderSummary({ customerOrderCode: "C-002", status: "PAID" })]);
 
     expect(row?.textContent).toContain("PAID");
-    expect(row?.textContent).toContain("（なし）");
-    expect(within(row ?? document.body).queryByRole("link")).toBeNull();
   });
 
   it("keyboard で状態のリンクを選ぶと、その状態で絞り込んだ要求を送り、選択中を示す", async () => {
@@ -81,11 +79,8 @@ describe("orders page", () => {
     expect(currentOf("すべて")).toBe("page");
   });
 
-  it.each<[string, OrderSummaryListResponse]>([
-    ["空の items", { items: [] }],
-    ["items のない本文", {}],
-  ])("0 件（%s）なら空の状態の文言と作成へのリンクを出す", async (_case, body) => {
-    server.use(getListOrdersMockHandler(body));
+  it("0 件なら空の状態の文言と作成へのリンクを出す", async () => {
+    server.use(getListOrdersMockHandler({ items: [] }));
 
     await renderRoute("/orders", { locale: "en" });
 

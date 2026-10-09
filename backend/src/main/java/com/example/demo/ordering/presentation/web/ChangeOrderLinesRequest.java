@@ -6,6 +6,7 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotEmpty;
+import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 import java.util.List;
 import java.util.UUID;
@@ -17,8 +18,8 @@ import java.util.UUID;
  * @param lockNo 画面が読んだ注文のロック番号
  */
 public record ChangeOrderLinesRequest(
-    @NotEmpty @Size(max = 100) List<@Valid OrderLineRequest> lines,
-    @Min(1) @Schema(example = "1") long lockNo) {
+    @NotEmpty @Size(min = 1, max = 100) List<@Valid OrderLineRequest> lines,
+    @NotNull @Min(1) @Schema(example = "1") long lockNo) {
 
   /** 明細を変更できないリストとして持つ。 */
   public ChangeOrderLinesRequest {

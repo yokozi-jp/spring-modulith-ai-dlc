@@ -198,6 +198,36 @@ class OrderApiTest {
     assertThat(detailsBody(orderId)).as("orderId=%s の 422 の後の詳細", orderId).isEqualTo(before);
   }
 
+  @ParameterizedTest(name = "{0} {1} {2}")
+  @CsvSource(
+      delimiter = '|',
+      value = {
+        "POST | /confirm | {}",
+        "POST | /cancel | {}",
+        "PUT | /lines | {\"lines\":[{\"productId\":\"0b6c8f6e-2f4a-4c1e-9d3b-7a1e5c2d4f60\",\"quantity\":1}]}",
+        "PUT | /lines | {\"lines\":[{\"productId\":\"0b6c8f6e-2f4a-4c1e-9d3b-7a1e5c2d4f60\"}],\"lockNo\":1}",
+        "PUT | /lines | {\"lines\":[],\"lockNo\":1}",
+      })
+  @DisplayName("契約で必須の lockNo と quantity がないか、明細が空なら、検証の 400 を返し、注文を変えない")
+  void missingRequiredFieldReturnsValidationProblem(
+      final String method, final String suffix, final String body) throws Exception {
+    final String orderId = draftAndGetId(UniqueCodes.next("C"), pen, 1);
+    final String before = detailsBody(orderId);
+
+    mockMvc
+        .perform(
+            MockMvcRequestBuilders.request(
+                    HttpMethod.valueOf(method), "/api/orders/" + orderId + suffix)
+                .with(oidcLogin())
+                .with(csrf())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(body))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.type").value("/problems/validation-error"));
+
+    assertThat(detailsBody(orderId)).as("orderId=%s の 400 の後の詳細", orderId).isEqualTo(before);
+  }
+
   @ParameterizedTest(name = "{0} {1}")
   @CsvSource({"PUT, /lines", "POST, /confirm", "POST, /cancel"})
   @DisplayName("古いロック番号の明細の変更、確定、取消は 409 を返し、注文を変えない")

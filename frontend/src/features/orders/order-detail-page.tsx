@@ -39,7 +39,7 @@ export function OrderDetailPage() {
       ) : undefined}
       <OrderSummary order={order} orderId={orderId} />
       <h2 className="text-xl font-semibold">{t("orders.detail.linesHeading")}</h2>
-      <OrderLinesTable lines={order.lines ?? []} products={products} />
+      <OrderLinesTable lines={order.lines} products={products} />
       {editable ? (
         <>
           <OrderLinesEditor editor={editor} products={products} />

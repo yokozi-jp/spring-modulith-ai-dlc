@@ -10,13 +10,13 @@ import type { OrderLineRequest } from './orderLineRequest.ts';
 export interface DraftOrderRequest {
   /**
      * 客先注文番号。注文ごとに一意にする
-     * @minLength 0
+     * @minLength 1
      * @maxLength 30
      */
   customerOrderCode: string;
   /**
      * 注文の明細
-     * @minItems 0
+     * @minItems 1
      * @maxItems 100
      */
   lines: OrderLineRequest[];

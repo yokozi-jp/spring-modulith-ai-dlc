@@ -343,6 +343,8 @@ components:
           description: 画面が読んだ注文のロック番号
           example: 1
           minimum: 1
+      required:
+      - lockNo
     ChangeOrderLinesRequest:
       type: object
       description: 下書きの注文の明細を置き換える API の本文。
@@ -353,7 +355,7 @@ components:
           items:
             $ref: "#/components/schemas/OrderLineRequest"
           maxItems: 100
-          minItems: 0
+          minItems: 1
         lockNo:
           type: integer
           format: int64
@@ -362,6 +364,7 @@ components:
           minimum: 1
       required:
       - lines
+      - lockNo
     ConfirmOrderRequest:
       type: object
       description: 下書きの注文を確定する API の本文。
@@ -372,6 +375,8 @@ components:
           description: 画面が読んだ注文のロック番号
           example: 1
           minimum: 1
+      required:
+      - lockNo
     DraftOrderRequest:
       type: object
       description: 下書きの注文を作る API の本文。
@@ -381,14 +386,14 @@ components:
           description: 客先注文番号。注文ごとに一意にする
           example: C-2026-0001
           maxLength: 30
-          minLength: 0
+          minLength: 1
         lines:
           type: array
           description: 注文の明細
           items:
             $ref: "#/components/schemas/OrderLineRequest"
           maxItems: 100
-          minItems: 0
+          minItems: 1
       required:
       - customerOrderCode
       - lines
@@ -427,6 +432,14 @@ components:
           type: number
           description: 明細の金額の合計
           example: 240.0
+      required:
+      - customerOrderCode
+      - lines
+      - lockNo
+      - orderId
+      - orderedAt
+      - status
+      - totalAmount
     OrderLineRequest:
       type: object
       description: 注文する商品と数量。
@@ -445,6 +458,7 @@ components:
           minimum: 1
       required:
       - productId
+      - quantity
     OrderLineResponse:
       type: object
       description: 注文の明細の1行。
@@ -471,6 +485,12 @@ components:
           type: number
           description: 作成時に読んだ単価
           example: 120.0
+      required:
+      - amount
+      - lineNumber
+      - productId
+      - quantity
+      - unitPrice
     OrderSummaryListResponse:
       type: object
       description: 注文の一覧を items で包んで返す API の本文。
@@ -480,6 +500,8 @@ components:
           description: 注文の一覧の行
           items:
             $ref: "#/components/schemas/OrderSummaryResponse"
+      required:
+      - items
     OrderSummaryResponse:
       type: object
       description: 注文の一覧の1行を返す API の本文。
@@ -510,6 +532,13 @@ components:
           type: number
           description: 明細の金額の合計
           example: 240.0
+      required:
+      - customerOrderCode
+      - lockNo
+      - orderId
+      - orderedAt
+      - status
+      - totalAmount
     PaymentSummaryListResponse:
       type: object
       description: 決済記録の一覧を items で包んで返す API の本文。
@@ -519,6 +548,8 @@ components:
           description: 決済記録の一覧の行。1 注文につき 0 件か 1 件
           items:
             $ref: "#/components/schemas/PaymentSummaryResponse"
+      required:
+      - items
     PaymentSummaryResponse:
       type: object
       description: 決済記録の一覧の 1 行を返す API の本文。
@@ -535,19 +566,25 @@ components:
           type: string
           description: 請求した注文の ID
           example: 5f0c2a8e-7d1b-4c3a-9e6f-1a2b3c4d5e6f
-        paidAt:
-          type: string
-          format: date-time
-          description: 決済した時刻。status が PAID のときだけ返す
-          example: 2026-10-06T01:02:03.123456Z
         paymentId:
           type: string
           description: 決済記録の ID
           example: 7c1e4b2a-3d5f-4a6b-8c9d-0e1f2a3b4c5d
+        recordedAt:
+          type: string
+          format: date-time
+          description: 請求の結果を記録した時刻。status が意味を決める
+          example: 2026-10-06T01:02:03.123456Z
         status:
           type: string
           description: 請求の結果のコード値（PAID、DECLINED、FAILED）
           example: PAID
+      required:
+      - amount
+      - orderId
+      - paymentId
+      - recordedAt
+      - status
     ProblemDetail:
       type: object
       description: RFC 9457 の Problem Details
@@ -584,6 +621,8 @@ components:
           description: 商品の一覧の行
           items:
             $ref: "#/components/schemas/ProductSummaryResponse"
+      required:
+      - items
     ProductSummaryResponse:
       type: object
       description: 商品の一覧の1行を返す API の本文。
@@ -608,6 +647,12 @@ components:
           type: number
           description: 単価
           example: 120.0
+      required:
+      - productCode
+      - productId
+      - productName
+      - salesStatus
+      - unitPrice
     ValidationError:
       type: object
       description: 入力検証の誤り

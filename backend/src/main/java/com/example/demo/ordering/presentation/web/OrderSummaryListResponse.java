@@ -1,5 +1,6 @@
 package com.example.demo.ordering.presentation.web;
 
+import jakarta.validation.constraints.NotNull;
 import java.util.List;
 
 /**
@@ -7,7 +8,7 @@ import java.util.List;
  *
  * @param items 注文の一覧の行
  */
-public record OrderSummaryListResponse(List<OrderSummaryResponse> items) {
+public record OrderSummaryListResponse(@NotNull List<OrderSummaryResponse> items) {
 
   /** 一覧を変更できないリストとして持つ。 */
   public OrderSummaryListResponse {

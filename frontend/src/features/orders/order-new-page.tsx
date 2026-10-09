@@ -48,7 +48,7 @@ export function OrderNewPage() {
           form={form}
           fields={{ lines: "lines" }}
           idPrefix={idPrefix}
-          products={products.data.items ?? []}
+          products={products.data.items}
           serverErrors={serverErrors}
           onFieldChange={handleFieldChange}
         />

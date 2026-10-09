@@ -8,13 +8,13 @@
  */
 export interface OrderLineResponse {
   /** 単価と数量の積 */
-  amount?: number;
+  amount: number;
   /** 明細の番号（1 から） */
-  lineNumber?: number;
+  lineNumber: number;
   /** 商品の ID */
-  productId?: string;
+  productId: string;
   /** 注文した数量 */
-  quantity?: number;
+  quantity: number;
   /** 作成時に読んだ単価 */
-  unitPrice?: number;
+  unitPrice: number;
 }

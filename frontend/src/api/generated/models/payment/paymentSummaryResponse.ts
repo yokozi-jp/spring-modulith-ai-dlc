@@ -8,15 +8,15 @@
  */
 export interface PaymentSummaryResponse {
   /** 請求した金額 */
-  amount?: number;
+  amount: number;
   /** 決済代行が採番した決済の識別子。採番されなかったときは省く */
   gatewayPaymentCode?: string;
   /** 請求した注文の ID */
-  orderId?: string;
-  /** 決済した時刻。status が PAID のときだけ返す */
-  paidAt?: string;
+  orderId: string;
   /** 決済記録の ID */
-  paymentId?: string;
+  paymentId: string;
+  /** 請求の結果を記録した時刻。status が意味を決める */
+  recordedAt: string;
   /** 請求の結果のコード値（PAID、DECLINED、FAILED） */
-  status?: string;
+  status: string;
 }

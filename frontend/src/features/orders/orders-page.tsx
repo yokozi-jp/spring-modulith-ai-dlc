@@ -16,7 +16,7 @@ export function OrdersPage() {
   const { t } = useTranslation();
   const { status } = routeApi.useLoaderDeps();
   const { data } = useSuspenseQuery(getListOrdersSuspenseQueryOptions(listOrdersParams(status)));
-  const items = data.data.items ?? [];
+  const { items } = data.data;
 
   useEffect(() => {
     document.title = t("orders.list.title");

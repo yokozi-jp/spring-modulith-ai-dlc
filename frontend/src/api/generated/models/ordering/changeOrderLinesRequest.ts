@@ -10,7 +10,7 @@ import type { OrderLineRequest } from './orderLineRequest.ts';
 export interface ChangeOrderLinesRequest {
   /**
      * 置き換えた後の明細
-     * @minItems 0
+     * @minItems 1
      * @maxItems 100
      */
   lines: OrderLineRequest[];
@@ -18,5 +18,5 @@ export interface ChangeOrderLinesRequest {
      * 画面が読んだ注文のロック番号
      * @minimum 1
      */
-  lockNo?: number;
+  lockNo: number;
 }

@@ -17,21 +17,21 @@ describe("order form helpers", () => {
     expect(firstErrorMessage([])).toBeUndefined();
   });
 
-  it("販売中の商品と、選択中の販売終了の商品だけを選択肢にし、識別子のない商品は出さない", () => {
+  it("販売中の商品と、選択中の販売終了の商品だけを選択肢にする", () => {
+    const product = { productCode: "P", unitPrice: 1 };
     const options = productOptions(
       t,
       [
-        { productId: "a", productName: "A", salesStatus: "ON_SALE" },
-        { productId: "b", productName: "B", salesStatus: "DISCONTINUED" },
-        { productId: "c", salesStatus: "DISCONTINUED" },
-        { productName: "no id", salesStatus: "ON_SALE" },
+        { ...product, productId: "a", productName: "A", salesStatus: "ON_SALE" },
+        { ...product, productId: "b", productName: "B", salesStatus: "DISCONTINUED" },
+        { ...product, productId: "c", productName: "C", salesStatus: "DISCONTINUED" },
       ],
       "c",
     );
 
     expect(options).toStrictEqual([
       { productId: "a", label: "A" },
-      { productId: "c", label: "c（販売終了）" },
+      { productId: "c", label: "C（販売終了）" },
     ]);
   });
 

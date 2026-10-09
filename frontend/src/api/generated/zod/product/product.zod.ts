@@ -11,11 +11,11 @@ import * as zod from 'zod';
  */
 export const ListProductsResponse = zod.object({
   "items": zod.array(zod.object({
-  "productCode": zod.string().optional().describe('商品コード'),
-  "productId": zod.string().optional().describe('商品の ID'),
-  "productName": zod.string().optional().describe('商品名'),
-  "salesStatus": zod.string().optional().describe('販売の状態のコード値（ON_SALE か DISCONTINUED）'),
-  "unitPrice": zod.number().optional().describe('単価')
-}).describe('商品の一覧の1行を返す API の本文。')).optional().describe('商品の一覧の行')
+  "productCode": zod.string().describe('商品コード'),
+  "productId": zod.string().describe('商品の ID'),
+  "productName": zod.string().describe('商品名'),
+  "salesStatus": zod.string().describe('販売の状態のコード値（ON_SALE か DISCONTINUED）'),
+  "unitPrice": zod.number().describe('単価')
+}).describe('商品の一覧の1行を返す API の本文。')).describe('商品の一覧の行')
 }).describe('商品の一覧を items で包んで返す API の本文。')
 

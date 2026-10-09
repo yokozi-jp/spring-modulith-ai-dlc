@@ -11,10 +11,7 @@ export function OrderLinesTable({
   products: readonly ProductSummaryResponse[];
 }) {
   const { t } = useTranslation();
-  const missing = t("orders.missingValue");
   const names = new Map(products.map((product) => [product.productId, product.productName]));
-  const amount = (value: number | undefined) =>
-    value === undefined ? missing : t("orders.amount", { value });
 
   return (
     <table className="w-full text-left text-sm">
@@ -39,19 +36,12 @@ export function OrderLinesTable({
       </thead>
       <tbody>
         {lines.map((line) => (
-          <tr
-            key={line.lineNumber ?? `${line.productId ?? ""}:${line.quantity ?? ""}`}
-            className="border-b"
-          >
-            <td className="py-2">{line.lineNumber ?? missing}</td>
-            <td className="py-2">{names.get(line.productId) ?? line.productId ?? missing}</td>
-            <td className="py-2 text-right">
-              {line.quantity === undefined
-                ? missing
-                : t("orders.quantity", { value: line.quantity })}
-            </td>
-            <td className="py-2 text-right">{amount(line.unitPrice)}</td>
-            <td className="py-2 text-right">{amount(line.amount)}</td>
+          <tr key={line.lineNumber} className="border-b">
+            <td className="py-2">{line.lineNumber}</td>
+            <td className="py-2">{names.get(line.productId) ?? line.productId}</td>
+            <td className="py-2 text-right">{t("orders.quantity", { value: line.quantity })}</td>
+            <td className="py-2 text-right">{t("orders.amount", { value: line.unitPrice })}</td>
+            <td className="py-2 text-right">{t("orders.amount", { value: line.amount })}</td>
           </tr>
         ))}
       </tbody>

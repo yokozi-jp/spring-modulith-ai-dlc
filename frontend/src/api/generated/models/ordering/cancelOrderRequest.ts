@@ -11,5 +11,5 @@ export interface CancelOrderRequest {
      * 画面が読んだ注文のロック番号
      * @minimum 1
      */
-  lockNo?: number;
+  lockNo: number;
 }

@@ -15,8 +15,8 @@ import java.util.List;
  * @param lines 注文の明細
  */
 public record DraftOrderRequest(
-    @NotBlank @Size(max = 30) @Schema(example = "C-2026-0001") String customerOrderCode,
-    @NotEmpty @Size(max = 100) List<@Valid OrderLineRequest> lines) {
+    @NotBlank @Size(min = 1, max = 30) @Schema(example = "C-2026-0001") String customerOrderCode,
+    @NotEmpty @Size(min = 1, max = 100) List<@Valid OrderLineRequest> lines) {
 
   /** 明細を変更できないリストとして持つ。 */
   public DraftOrderRequest {

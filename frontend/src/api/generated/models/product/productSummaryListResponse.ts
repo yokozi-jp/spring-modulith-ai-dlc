@@ -9,5 +9,5 @@ import type { ProductSummaryResponse } from './productSummaryResponse.ts';
  */
 export interface ProductSummaryListResponse {
   /** 商品の一覧の行 */
-  items?: ProductSummaryResponse[];
+  items: ProductSummaryResponse[];
 }

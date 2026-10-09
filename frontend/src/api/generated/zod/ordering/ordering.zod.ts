@@ -18,35 +18,33 @@ export const ListOrdersQueryParams = zod.object({
 
 export const ListOrdersResponse = zod.object({
   "items": zod.array(zod.object({
-  "customerOrderCode": zod.string().optional().describe('客先注文番号'),
-  "lockNo": zod.int().optional().describe('更新の本文で送り返すロック番号'),
-  "orderId": zod.string().optional().describe('注文の ID'),
-  "orderedAt": zod.iso.datetime({"offset":true}).optional().describe('注文を作成した時刻'),
-  "status": zod.string().optional().describe('注文の状態のコード値（DRAFT、CONFIRMED、CANCELLED）'),
-  "totalAmount": zod.number().optional().describe('明細の金額の合計')
-}).describe('注文の一覧の1行を返す API の本文。')).optional().describe('注文の一覧の行')
+  "customerOrderCode": zod.string().describe('客先注文番号'),
+  "lockNo": zod.int().describe('更新の本文で送り返すロック番号'),
+  "orderId": zod.string().describe('注文の ID'),
+  "orderedAt": zod.iso.datetime({"offset":true}).describe('注文を作成した時刻'),
+  "status": zod.string().describe('注文の状態のコード値（DRAFT、CONFIRMED、CANCELLED）'),
+  "totalAmount": zod.number().describe('明細の金額の合計')
+}).describe('注文の一覧の1行を返す API の本文。')).describe('注文の一覧の行')
 }).describe('注文の一覧を items で包んで返す API の本文。')
 
 /**
  * 作成した注文の URI を Location に入れて返す。客先注文番号が既にあれば 409、存在しないか販売終了の商品を指定すると 422 を返す。
  * @summary 下書きの注文を作る。
  */
-export const draftOrderBodyCustomerOrderCodeMin = 0;
 export const draftOrderBodyCustomerOrderCodeMax = 30;
 
 export const draftOrderBodyLinesItemQuantityMax = 9999;
 
-export const draftOrderBodyLinesMin = 0;
 export const draftOrderBodyLinesMax = 100;
 
 
 
 export const DraftOrderBody = zod.object({
-  "customerOrderCode": zod.string().min(draftOrderBodyCustomerOrderCodeMin).max(draftOrderBodyCustomerOrderCodeMax).describe('客先注文番号。注文ごとに一意にする'),
+  "customerOrderCode": zod.string().min(1).max(draftOrderBodyCustomerOrderCodeMax).describe('客先注文番号。注文ごとに一意にする'),
   "lines": zod.array(zod.object({
   "productId": zod.uuid().describe('注文する商品の ID'),
-  "quantity": zod.int().min(1).max(draftOrderBodyLinesItemQuantityMax).optional().describe('注文する数量')
-}).describe('注文する商品と数量。')).min(draftOrderBodyLinesMin).max(draftOrderBodyLinesMax).describe('注文の明細')
+  "quantity": zod.int().min(1).max(draftOrderBodyLinesItemQuantityMax).describe('注文する数量')
+}).describe('注文する商品と数量。')).min(1).max(draftOrderBodyLinesMax).describe('注文の明細')
 }).describe('下書きの注文を作る API の本文。')
 
 export const DraftOrderResponse = zod.void()
@@ -60,19 +58,19 @@ export const FindOrderByIdParams = zod.object({
 })
 
 export const FindOrderByIdResponse = zod.object({
-  "customerOrderCode": zod.string().optional().describe('客先注文番号'),
+  "customerOrderCode": zod.string().describe('客先注文番号'),
   "lines": zod.array(zod.object({
-  "amount": zod.number().optional().describe('単価と数量の積'),
-  "lineNumber": zod.int().optional().describe('明細の番号（1 から）'),
-  "productId": zod.string().optional().describe('商品の ID'),
-  "quantity": zod.int().optional().describe('注文した数量'),
-  "unitPrice": zod.number().optional().describe('作成時に読んだ単価')
-}).describe('注文の明細の1行。')).optional().describe('注文の明細'),
-  "lockNo": zod.int().optional().describe('更新の本文で送り返すロック番号'),
-  "orderId": zod.string().optional().describe('注文の ID'),
-  "orderedAt": zod.iso.datetime({"offset":true}).optional().describe('注文を作成した時刻'),
-  "status": zod.string().optional().describe('注文の状態のコード値（DRAFT、CONFIRMED、CANCELLED）'),
-  "totalAmount": zod.number().optional().describe('明細の金額の合計')
+  "amount": zod.number().describe('単価と数量の積'),
+  "lineNumber": zod.int().describe('明細の番号（1 から）'),
+  "productId": zod.string().describe('商品の ID'),
+  "quantity": zod.int().describe('注文した数量'),
+  "unitPrice": zod.number().describe('作成時に読んだ単価')
+}).describe('注文の明細の1行。')).describe('注文の明細'),
+  "lockNo": zod.int().describe('更新の本文で送り返すロック番号'),
+  "orderId": zod.string().describe('注文の ID'),
+  "orderedAt": zod.iso.datetime({"offset":true}).describe('注文を作成した時刻'),
+  "status": zod.string().describe('注文の状態のコード値（DRAFT、CONFIRMED、CANCELLED）'),
+  "totalAmount": zod.number().describe('明細の金額の合計')
 }).describe('注文の詳細を返す API の本文。')
 
 /**
@@ -87,7 +85,7 @@ export const CancelOrderParams = zod.object({
 
 
 export const CancelOrderBody = zod.object({
-  "lockNo": zod.int().min(1).optional().describe('画面が読んだ注文のロック番号')
+  "lockNo": zod.int().min(1).describe('画面が読んだ注文のロック番号')
 }).describe('下書きの注文を取り消す API の本文。')
 
 export const CancelOrderResponse = zod.void()
@@ -104,7 +102,7 @@ export const ConfirmOrderParams = zod.object({
 
 
 export const ConfirmOrderBody = zod.object({
-  "lockNo": zod.int().min(1).optional().describe('画面が読んだ注文のロック番号')
+  "lockNo": zod.int().min(1).describe('画面が読んだ注文のロック番号')
 }).describe('下書きの注文を確定する API の本文。')
 
 export const ConfirmOrderResponse = zod.void()
@@ -119,7 +117,6 @@ export const ChangeOrderLinesParams = zod.object({
 
 export const changeOrderLinesBodyLinesItemQuantityMax = 9999;
 
-export const changeOrderLinesBodyLinesMin = 0;
 export const changeOrderLinesBodyLinesMax = 100;
 
 
@@ -128,9 +125,9 @@ export const changeOrderLinesBodyLinesMax = 100;
 export const ChangeOrderLinesBody = zod.object({
   "lines": zod.array(zod.object({
   "productId": zod.uuid().describe('注文する商品の ID'),
-  "quantity": zod.int().min(1).max(changeOrderLinesBodyLinesItemQuantityMax).optional().describe('注文する数量')
-}).describe('注文する商品と数量。')).min(changeOrderLinesBodyLinesMin).max(changeOrderLinesBodyLinesMax).describe('置き換えた後の明細'),
-  "lockNo": zod.int().min(1).optional().describe('画面が読んだ注文のロック番号')
+  "quantity": zod.int().min(1).max(changeOrderLinesBodyLinesItemQuantityMax).describe('注文する数量')
+}).describe('注文する商品と数量。')).min(1).max(changeOrderLinesBodyLinesMax).describe('置き換えた後の明細'),
+  "lockNo": zod.int().min(1).describe('画面が読んだ注文のロック番号')
 }).describe('下書きの注文の明細を置き換える API の本文。')
 
 export const ChangeOrderLinesResponse = zod.void()

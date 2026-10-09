@@ -21,14 +21,11 @@ export function useOrderDetail(orderId: string) {
 
   return {
     order: order.data,
-    products: products.data.items ?? [],
+    products: products.data.items,
     editor,
     actions,
     notice: pending ? { heading: t("orders.form.submitting") } : notice,
-    // lockNo か orderId がない詳細では、更新の操作を出さない。
-    editable:
-      order.data.status === "DRAFT" &&
-      order.data.lockNo !== undefined &&
-      order.data.orderId !== undefined,
+    // lockNo と orderId は契約で必須なので、下書きなら更新の操作を出す。
+    editable: order.data.status === "DRAFT",
   };
 }

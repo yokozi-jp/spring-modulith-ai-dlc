@@ -8,15 +8,15 @@
  */
 export interface OrderSummaryResponse {
   /** 客先注文番号 */
-  customerOrderCode?: string;
+  customerOrderCode: string;
   /** 更新の本文で送り返すロック番号 */
-  lockNo?: number;
+  lockNo: number;
   /** 注文の ID */
-  orderId?: string;
+  orderId: string;
   /** 注文を作成した時刻 */
-  orderedAt?: string;
+  orderedAt: string;
   /** 注文の状態のコード値（DRAFT、CONFIRMED、CANCELLED） */
-  status?: string;
+  status: string;
   /** 明細の金額の合計 */
-  totalAmount?: number;
+  totalAmount: number;
 }
