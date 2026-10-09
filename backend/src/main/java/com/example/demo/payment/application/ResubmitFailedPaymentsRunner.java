@@ -14,6 +14,10 @@ import org.springframework.stereotype.Component;
  * 失敗した OrderConfirmed のイベント出版を一度だけ再投入する入口。
  *
  * <p>resubmit-once のプロファイルのときだけ作る。起動のたびに 1 回だけ動き、定期には動かない。
+ *
+ * <p>resubmit-once で動くインスタンスが 1 つだけであることを前提にする。複数のインスタンスが同時に動くと、同じ FAILED の出版を並行して再投入しうる。 そのとき二つ目の
+ * Listener の実行は決済記録の一意制約に当たり、出版が FAILED に戻ることがある。決済代行への請求は冪等性キーで二重にならない。
+ * 複数のインスタンスで調整する運用者の入口と定期の再投入は #108 で扱う。
  */
 // 運用者の入口と定期の再投入（#108）が入るまでの再投入の入口で、docs/backend/class-roles/index.md にない役割である。
 @Slf4j
