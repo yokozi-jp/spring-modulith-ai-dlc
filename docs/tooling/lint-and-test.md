@@ -229,7 +229,7 @@ PITのHTMLとXMLのレポートは、変異対象がある場合に`backend/buil
 - **`task lint-taskfile`**：Task本体でTaskfileのYAML構文とスキーマ構造を検証する。
 - **`task adr-check`**：判断が絡む変更にADRが伴うかを確認する。
 
-Knipとjscpdの採用理由は[ADR-035](../adr/ADR-035-adopt-jscpd-and-knip-quality-gates.md)を参照する。
+Knipとjscpdの採用理由は[ADR-035](../adr/ADR-035-adopt-jscpd-and-knip-quality-gates.md)を、jscpdの閾値を4.0%にする理由は[ADR-074](../adr/ADR-074-raise-jscpd-threshold-for-class-role-boilerplate.md)を参照する。
 DASTの検出ではタスクを失敗させず、起動、ログイン、CSRFの前提確認の失敗だけで失敗させる（[ADR-056](../adr/ADR-056-run-authenticated-dast-with-zap-in-ci.md)）。
 OKF検査の採用理由は[ADR-036](../adr/ADR-036-adopt-okf-for-docs-knowledge-bundle.md)と[ADR-038](../adr/ADR-038-route-steering-to-docs-knowledge.md)を参照する。
 
