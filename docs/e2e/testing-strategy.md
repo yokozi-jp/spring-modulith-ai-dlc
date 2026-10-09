@@ -195,7 +195,7 @@ build、コンテナの起動、後片付けは行わない。
 
 ## CI
 
-`.github/workflows/e2e.yml` は、Pull Request で frontend、backend（DB の changeset を含む）、Keycloak の設定、compose-test とその入力（`docker/initdb/`、`.env.test.example`）、Taskfile、この workflow 自体を変えたときだけ `task e2e` を実行する。
+`.github/workflows/e2e.yml` は、Pull Request で frontend、backend（DB の changeset を含む）、Keycloak の設定、compose-test とその入力（`docker/initdb/`、`docker/wiremock/`、`.env.test.example`）、Taskfile、この workflow 自体を変えたときだけ `task e2e` を実行する。
 retry は 2 回で、失敗時に Playwright の成果物と backend のログを、成功時に HTML report と backend のログを保存する。
 `task e2e` の後に、`task test-deps-leftover-check` で Compose project `spring-modulith-test` のコンテナと volume を調べ、残っていれば失敗にする。
 Backend CI も、compose-test を止めた後に同じ task で確かめる。
