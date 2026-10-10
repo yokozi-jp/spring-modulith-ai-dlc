@@ -25,6 +25,7 @@ Proposed
 どれを書き忘れても UPDATE は成功し、Repository の規約のチェックリストの楽観的ロックの項目はすべて「自分で点検」だった。
 `requireUpdated` を呼ぶ production のコードはまだなく、ADR も Proposed のままであるため、この版で決定を書き直す。
 その後、[ADR-062](ADR-062-map-business-exceptions-to-404-409-422.md) の改訂（[issue #145](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/145)）に合わせ、`55P03` の変換で原因を付けないよう、この版で決定を書き直す。
+また、ADR-062 が集約ルートの INSERT の入口 `TableWriter.insert` を足したため、INSERT は `TableWriter` を通さないとしていた決定を、この版で書き直す。
 
 利用者は、共通基盤に次の順で重みを置く。
 AI と開発者が迷わないこと（どこに何を書き、どの API を使うかの答えが一つ）、間違えると機械で失敗すること、システムとして安全であること（古い値の上書き、無期限の待ち、気付けない設定の誤りがない）である。
@@ -43,7 +44,9 @@ PostgreSQL の READ COMMITTED では、後の UPDATE は先の UPDATE のコミ�
 - 業務テーブルの UPDATE と DELETE は、`shared.infrastructure.persistence` の `TableWriter` だけが組み立てて実行する。
   期待する版（以前に読んだ集約ルートの `lock_no`）を持つ書き込みは `updateCheckingVersion` と `deleteCheckingVersion` で、持たない書き込みは `updateWhere` と `deleteWhere` で行う。
   集約の子の行の更新と削除は、ルートの書き込みが返す `LockedRoot`（削除では `DeletedRoot`）で書き、子の集合の変化は差分（削除、追加、更新）で書く。
-  INSERT は `TableWriter` を通さず、`CommonColumns.forInsert` で書く。
+  集約ルートの INSERT は `TableWriter.insert` で実行し、一意制約の違反（`23505`）を `ConflictException` に変える（[ADR-062](ADR-062-map-business-exceptions-to-404-409-422.md)）。
+  INSERT の共通カラムは、集約ルートでも子の行でも `CommonColumns.forInsert` で書く。
+  子の行の INSERT は `TableWriter` を通さずに実行し（`add` では `dsl.batch`）、`23505` を変換しない（ADR-062 の Negative）。
 - 業務の列の値は `ColumnValues<R>` で受け取る。
   `ColumnValues<R>` は `TableField<R, T>` を受け取る二つの `set` だけを持ち、`where` と `execute` を持たない。
   [PostgreSQL の共通カラム](../database/postgresql-common-columns.md)の 12 列を名前で照らし、渡すと `IllegalArgumentException` にする。
