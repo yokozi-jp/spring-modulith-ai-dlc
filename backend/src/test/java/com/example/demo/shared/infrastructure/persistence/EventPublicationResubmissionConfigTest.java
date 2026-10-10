@@ -2,8 +2,17 @@ package com.example.demo.shared.infrastructure.persistence;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
+import java.time.Clock;
+import java.time.Duration;
+import java.time.Instant;
+import java.time.ZoneOffset;
+import java.util.List;
+import org.jooq.DSLContext;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.mockito.Mockito;
 import org.springframework.boot.autoconfigure.AutoConfigurations;
 import org.springframework.boot.autoconfigure.task.TaskExecutionAutoConfiguration;
 import org.springframework.boot.autoconfigure.task.TaskSchedulingAutoConfiguration;
@@ -11,8 +20,12 @@ import org.springframework.boot.context.properties.bind.validation.BindValidatio
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 import org.springframework.boot.validation.autoconfigure.ValidationAutoConfiguration;
 import org.springframework.core.task.SimpleAsyncTaskExecutor;
+import org.springframework.modulith.events.FailedEventPublications;
 import org.springframework.scheduling.TaskScheduler;
 import org.springframework.scheduling.annotation.AsyncConfigurer;
+import org.springframework.scheduling.config.FixedDelayTask;
+import org.springframework.scheduling.config.ScheduledTask;
+import org.springframework.scheduling.config.ScheduledTaskHolder;
 
 /** {@link EventPublicationResubmissionConfig} の有効と無効の条件、設定値の検証、{@code @Async} の executor を検証する。 */
 // ApplicationContextRunner の run に渡す callback の中で assert するため、PMD はテストメソッドの assert を検出できない。
@@ -52,6 +65,36 @@ class EventPublicationResubmissionConfigTest {
                 assertThat(context)
                     .hasNotFailed()
                     .hasSingleBean(EventPublicationResubmissionConfig.Scheduling.class));
+  }
+
+  @Test
+  @DisplayName("enabled が true なら resubmitOnce を interval の固定の遅延のタスクとして 1 つ登録する")
+  void enabledRegistersResubmitOnceAsFixedDelayTask() {
+    runner
+        .withConfiguration(AutoConfigurations.of(TaskSchedulingAutoConfiguration.class))
+        .withUserConfiguration(EventPublicationResubmitter.class)
+        // 初回の遅延が 1 分あり、テストの間にタスクは動かないため、依存は mock で足りる。
+        .withBean(DSLContext.class, () -> Mockito.mock(DSLContext.class))
+        .withBean(FailedEventPublications.class, () -> Mockito.mock(FailedEventPublications.class))
+        .withBean(
+            Clock.class,
+            () -> Clock.fixed(Instant.parse("2026-01-01T00:00:00.000000Z"), ZoneOffset.UTC))
+        .withBean(MeterRegistry.class, SimpleMeterRegistry::new)
+        .withPropertyValues("event-publication.resubmission.enabled=true")
+        .run(
+            context -> {
+              final List<FixedDelayTask> tasks =
+                  context.getBean(ScheduledTaskHolder.class).getScheduledTasks().stream()
+                      .map(ScheduledTask::getTask)
+                      .filter(FixedDelayTask.class::isInstance)
+                      .map(FixedDelayTask.class::cast)
+                      .toList();
+              assertThat(tasks).as("固定の遅延のタスク").hasSize(1);
+              assertThat(tasks.getFirst().getIntervalDuration()).isEqualTo(Duration.ofMinutes(1));
+              assertThat(tasks.getFirst().getInitialDelayDuration())
+                  .isEqualTo(Duration.ofMinutes(1));
+              assertThat(tasks.getFirst().getRunnable().toString()).contains("resubmitOnce");
+            });
   }
 
   @Test

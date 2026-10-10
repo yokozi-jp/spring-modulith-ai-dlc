@@ -166,6 +166,10 @@ spring:
         processing: ${event-publication.resubmission.wait-age}
         resubmitted: ${event-publication.resubmission.wait-age}
         check-interval: ${event-publication.resubmission.interval}
+    # Moments は使わない。既定で有効なまま残すと @EnableScheduling を常に足し、
+    # event-publication.resubmission.enabled=false でも定期の実行と Staleness Monitor が動く（ADR-075）。
+    moments:
+      enabled: false
 
   # グレースフルシャットダウン（Spring Boot 4 ではデフォルトで有効）の待ち時間。
   # 処理中リクエストの完了を待つ上限。ECS の stopTimeout はこの値より大きくすること。

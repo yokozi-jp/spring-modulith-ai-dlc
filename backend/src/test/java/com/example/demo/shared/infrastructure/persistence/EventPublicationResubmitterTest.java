@@ -38,6 +38,7 @@ import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Bean;
@@ -46,6 +47,7 @@ import org.springframework.context.annotation.Primary;
 import org.springframework.modulith.events.ApplicationModuleListener;
 import org.springframework.modulith.test.EnableScenarios;
 import org.springframework.modulith.test.Scenario;
+import org.springframework.scheduling.config.ScheduledTaskHolder;
 import org.springframework.test.context.TestPropertySource;
 
 /**
@@ -110,6 +112,9 @@ class EventPublicationResubmitterTest {
   /** OTLP へ送る LogRecord。 */
   @Autowired private CapturedLogRecords capturedLogRecords;
 
+  /** 定期のタスクを持つ bean。@EnableScheduling がなければ空である。 */
+  @Autowired private ObjectProvider<ScheduledTaskHolder> scheduledTaskHolders;
+
   @BeforeEach
   void reset() {
     clock.set(T0);
@@ -173,6 +178,15 @@ class EventPublicationResubmitterTest {
 
     assertThat(exhaustedErrors(publicationId)).as("id=%s の 2 回目の後の ERROR", id).hasSize(1);
     assertThat(state(id).attempts()).as("id=%s の 2 回目の後の attempts", id).isEqualTo(2);
+  }
+
+  @Test
+  @DisplayName("enabled が false なら、アプリ全体の文脈で定期のタスクを 1 つも登録しない")
+  void disabledRegistersNoScheduledTaskInTheApplicationContext() {
+    // 依存のライブラリ（Spring Modulith Moments など）が @EnableScheduling を足すと、enabled=false でもジョブが動く。
+    assertThat(scheduledTaskHolders.stream().flatMap(holder -> holder.getScheduledTasks().stream()))
+        .as("登録された定期のタスク")
+        .isEmpty();
   }
 
   @Test
