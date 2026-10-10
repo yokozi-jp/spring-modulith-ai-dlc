@@ -56,6 +56,16 @@ jobs:
             --metrics off \
             --disable-version-check
 
+      # Semgrep は nosemgrep で抑止した検出も suppressions 付きで SARIF に残すが、
+      # Code Scanning は suppressions を読まずアラートを開いたままにするため、送る前に除く。
+      # 抑止の妥当性は nosemgrep コメントの理由をコードレビューで確かめる。
+      - name: Drop suppressed findings from SARIF
+        if: always() && hashFiles('semgrep.sarif') != ''
+        run: |
+          jq '.runs[].results |= map(select((.suppressions // []) | length == 0))' \
+            semgrep.sarif > semgrep.filtered.sarif
+          mv semgrep.filtered.sarif semgrep.sarif
+
       # 検出結果を GitHub Code Scanning にアップロードする。
       # スキャンが失敗しても、生成済みの SARIF は必ずアップロードする。
       - name: Upload SARIF to code scanning
