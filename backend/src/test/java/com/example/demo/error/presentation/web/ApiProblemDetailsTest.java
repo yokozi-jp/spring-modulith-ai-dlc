@@ -14,6 +14,7 @@ import org.junit.jupiter.params.provider.CsvSource;
 import org.springframework.context.support.StaticMessageSource;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.HttpStatusCode;
 import org.springframework.http.ProblemDetail;
 
 /** Problem Details の公開情報と応答ヘッダを API 契約へ正規化することを検証する。 */
@@ -63,6 +64,19 @@ class ApiProblemDetailsTest {
     problemDetails.normalize(problem, HttpStatus.CONFLICT, Locale.forLanguageTag(language));
 
     assertEquals(title, problem.getTitle(), "MessageSource の title");
+  }
+
+  @Test
+  @DisplayName("HttpStatus に定義のない status は status を保ち、MessageSource に key がなければ数値を title にする")
+  void localizedForStatusKeepsUndefinedStatus() {
+    final ProblemDetail problem =
+        new ApiProblemDetails(new StaticMessageSource())
+            .localizedForStatus(HttpStatusCode.valueOf(499), Locale.JAPANESE);
+
+    assertEquals(499, problem.getStatus(), "status");
+    assertEquals(URI.create("about:blank"), problem.getType(), "type");
+    assertEquals("499", problem.getTitle(), "key がなければ status の数値");
+    assertNull(problem.getDetail(), "detail を付けないこと");
   }
 
   @ParameterizedTest

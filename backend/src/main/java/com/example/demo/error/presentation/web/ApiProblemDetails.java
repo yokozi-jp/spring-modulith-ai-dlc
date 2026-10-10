@@ -58,7 +58,7 @@ final class ApiProblemDetails {
   }
 
   /** advice を通らない {@code /error} 用に、正規化済み Problem Details を生成する。 */
-  /* package */ ProblemDetail localizedForStatus(final HttpStatus status, final Locale locale) {
+  /* package */ ProblemDetail localizedForStatus(final HttpStatusCode status, final Locale locale) {
     final ProblemDetail problem = ProblemDetail.forStatus(status);
     normalize(problem, status, locale);
     return problem;
