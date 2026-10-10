@@ -6,6 +6,7 @@ import java.util.List;
  * 商品の参照を、自モジュールの Controller と他モジュールへ公開する。
  *
  * <p>{@link ProductSummary#salesStatus()} は {@code ON_SALE}（販売中）か {@code DISCONTINUED}（販売終了）である。
+ * 他モジュールは販売中かを {@link ProductSummary#onSale()} で判断する。
  */
 public interface ProductQueries {
 
