@@ -9,7 +9,8 @@ tags: [convention, backend, class-role]
 
 `Jooq<Aggregate>Repository` は、`domain.model` の `<Aggregate>Repository` を jOOQ で実装するクラスであり、`infrastructure.persistence` に package-private で置いて `@Repository` を付ける。
 jOOQ と集約の変換もこのクラスに書き、読み取りは `convertFrom`、`multiset`、`Records.mapping` で列の数と型をコンパイルで検査しながら集約にする。
-書き込みは `add`、`update`、`delete` に分け、INSERT は `shared` の `CommonColumns.forInsert` で、UPDATE と DELETE は `shared` の `TableWriter` で書く。
+書き込みは `add`、`update`、`delete` に分け、UPDATE と DELETE は `shared` の `TableWriter` で書く。
+INSERT の共通カラムは `shared` の `CommonColumns.forInsert` で書き、集約ルートの INSERT は `TableWriter.insert` で実行し、子の行の INSERT は `TableWriter` を通さずに実行する（`add` では `dsl.batch`）。
 `update` と `delete` は `TableWriter` の版を比べる入口を呼び、Repository は業務の列の値だけを渡す。
 役割の決定理由は [ADR-050](../../adr/ADR-050-define-backend-class-roles-and-naming.md) に示す。
 
