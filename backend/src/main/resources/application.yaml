@@ -157,11 +157,33 @@ spring:
         enabled: false
       # 複数インスタンスでの競合を避けるため、起動時には自動再配信しない。
       republish-outstanding-events-on-restart: false
+      # 落ちたまま PUBLISHED、PROCESSING、RESUBMITTED に残った出版を FAILED に戻し、再投入の対象にする（ADR-075）。
+      # publication_date から測るため、再投入した出版を早く FAILED に戻すことがあるが、
+      # 再投入のジョブは last_resubmission_date から wait-age を待つため、再投入の後は重ねて動かさない。
+      # 最初の配信が concurrency-limit の空きを待つ間に published を過ぎた出版は重ねて再投入しうる。リスナーの冪等性に頼る。
+      staleness:
+        published: ${event-publication.resubmission.wait-age}
+        processing: ${event-publication.resubmission.wait-age}
+        resubmitted: ${event-publication.resubmission.wait-age}
+        check-interval: ${event-publication.resubmission.interval}
 
   # グレースフルシャットダウン（Spring Boot 4 ではデフォルトで有効）の待ち時間。
   # 処理中リクエストの完了を待つ上限。ECS の stopTimeout はこの値より大きくすること。
   lifecycle:
     timeout-per-shutdown-phase: 30s
+
+# 失敗したイベント出版の定期の再投入（ADR-075）。
+event-publication:
+  resubmission:
+    # 定期の実行と Staleness Monitor を動かすか。テストは false にする。
+    enabled: ${EVENT_PUBLICATION_RESUBMISSION_ENABLED}
+    # 最後の試行から再投入するまでの待ち時間。リスナーの処理時間より十分に長くする。
+    wait-age: ${EVENT_PUBLICATION_RESUBMISSION_WAIT_AGE}
+    # 前の回の終わりから次の回までの間隔。
+    interval: ${EVENT_PUBLICATION_RESUBMISSION_INTERVAL}
+    # 環境で変えないため固定値にする。
+    max-resubmissions: 5
+    max-per-run: 100
 
 # 決済代行の URL。既定値を置かず、未設定なら起動に失敗する。ローカルと E2E だけが WireMock を指す。
 payment-gateway:

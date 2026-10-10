@@ -16,10 +16,12 @@ import org.springframework.stereotype.Component;
  * <p>resubmit-once のプロファイルのときだけ作る。起動のたびに 1 回だけ動き、定期には動かない。
  *
  * <p>resubmit-once で動くインスタンスが 1 つだけであることを前提にする。複数のインスタンスが同時に動くと、同じ FAILED の出版を並行して再投入しうる。 そのとき二つ目の
- * Listener の実行は決済記録の一意制約に当たり、出版が FAILED に戻ることがある。決済代行への請求は冪等性キーで二重にならない。
- * 複数のインスタンスで調整する運用者の入口と定期の再投入は #108 で扱う。
+ * Listener の実行は決済記録の一意制約に当たり、出版が FAILED に戻ることがある。決済代行への請求は冪等性キーで二重にならない。 定期の再投入（ADR-075 の
+ * EventPublicationResubmitter）は advisory lock でインスタンスを 1 つに絞るが、この入口はロックを取らない。 重ねて動かしたくないときは、先に
+ * EVENT_PUBLICATION_RESUBMISSION_ENABLED=false にする。
+ * 定期の再投入の上限に達した出版を、運用者が原因を直したあとに手で再投入する入口として使う（docs/observability/runbook-event-publication-resubmission.md）。
  */
-// 運用者の入口と定期の再投入（#108）が入るまでの再投入の入口で、docs/backend/class-roles/index.md にない役割である。
+// 定期の再投入の上限に達した出版を手で再投入する運用者の入口で、docs/backend/class-roles/index.md にない役割である。
 @Slf4j
 @Component
 @Profile("resubmit-once")
@@ -42,7 +44,7 @@ class ResubmitFailedPaymentsRunner implements ApplicationRunner {
   public void run(final ApplicationArguments args) {
     final AtomicInteger matched = new AtomicInteger();
     // ponytail: LIMIT（BATCH_SIZE）の後に filter が掛かるため、OrderConfirmed 以外の失敗した出版が 100 件を超えると
-    // その起動では OrderConfirmed に届かない。そのときは起動し直すか、#108 の定期の再投入に替える。
+    // その起動では OrderConfirmed に届かない。そのときは起動し直すか、上限に達した出版を Runbook の手順で片付ける。
     failedEventPublications.resubmit(
         ResubmissionOptions.defaults()
             .withFilter(

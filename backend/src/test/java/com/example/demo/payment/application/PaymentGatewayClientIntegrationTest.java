@@ -52,8 +52,8 @@ import org.springframework.web.client.HttpServerErrorException;
  * <p>成功の応答は、compose の WireMock と同じ {@code docker/wiremock/mappings} のスタブで返し、Client
  * とスタブの契約が合うことを確かめる。 失敗は、注文 ID の冪等性キーに合う優先度の高いスタブをテストの中で足す。決済代行を差し替えず、Resilience4j の retry と
  * circuit breaker を通す。ADR-072 の四つの分類ごとに、出版の状態（拒否と契約の不備は COMPLETED、一時障害と資格情報の不備は FAILED）と決済記録を確かめる。
- * 429 以外の 4xx は circuit breaker が失敗として数えず、429 は数える。出版の状態を読む公開の入口も再投入の公開の入口も無い（運用者の入口と定期の再投入は
- * #108）ため、5xx とタイムアウトの FAILED から既存の再投入の入口（{@link ResubmitFailedPaymentsRunner}）で回復し、決済記録が 1
+ * 429 以外の 4xx は circuit breaker が失敗として数えず、429 は数える。出版の状態を読む公開の入口も再投入の公開の入口も無く、定期の再投入（ADR-075）は
+ * テストで無効にしているため、5xx とタイムアウトの FAILED から既存の再投入の入口（{@link ResubmitFailedPaymentsRunner}）で回復し、決済記録が 1
  * 件になることと、同じイベントの再配送で請求しないことを、本番の Client を通してここで確かめる（E2E は画面に見える状態だけを確かめる）。URL の設定の違いで {@link
  * OrderConfirmedListenerTest} とは別の Spring のコンテキストになる。
  */
