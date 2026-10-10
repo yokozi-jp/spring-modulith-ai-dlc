@@ -53,6 +53,8 @@ function noop(): void {
 
 export function untracedUrl(origin: string): RegExp {
   const escaped = origin.replaceAll(/[.*+?^${}()|[\]\\]/gu, String.raw`\$&`);
+  // origin は location.origin で利用者が制御できず、メタ文字をすべてエスケープした固定文字列の否定先読みなので ReDoS は起きない。
+  // nosemgrep: javascript.lang.security.audit.detect-non-literal-regexp.detect-non-literal-regexp
   return new RegExp(`^(?!${escaped}/api(?:[/?#]|$))`, "u");
 }
 
