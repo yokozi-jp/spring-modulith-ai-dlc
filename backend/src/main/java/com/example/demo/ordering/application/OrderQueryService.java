@@ -62,6 +62,7 @@ class OrderQueryService implements OrderQueries {
         order.id().value().toString(),
         order.customerOrderCode(),
         order.status().name(),
+        order.status() == OrderStatus.CONFIRMED,
         order.orderedAt(),
         order.total().amount(),
         order.lockNo(),

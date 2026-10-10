@@ -39,6 +39,9 @@ class OrderQueryServiceTest {
   /** 参照する注文を作る CommandHandler。 */
   @Autowired private DraftOrderCommandHandler draftOrder;
 
+  /** 確定の判定の準備に注文を確定する CommandHandler。 */
+  @Autowired private ConfirmOrderCommandHandler confirmOrder;
+
   /** 状態の絞り込みの準備に注文を取り消す CommandHandler。 */
   @Autowired private CancelOrderCommandHandler cancelOrder;
 
@@ -62,6 +65,7 @@ class OrderQueryServiceTest {
             .orElseThrow(() -> new AssertionError("order が見つからない: orderId=" + orderId));
 
     assertThat(details.status()).as("orderId=%s の状態", orderId).isEqualTo("DRAFT");
+    assertThat(details.confirmed()).as("orderId=%s の確定", orderId).isFalse();
     assertThat(details.customerOrderCode()).isEqualTo(customerOrderCode);
     assertThat(details.lockNo()).isEqualTo(1L);
     assertThat(details.totalAmount()).isEqualByComparingTo(new BigDecimal("320"));
@@ -73,6 +77,23 @@ class OrderQueryServiceTest {
             OrderDetails.Line::quantity)
         .containsExactly(tuple(1, pen.toString(), 2), tuple(2, eraser.toString(), 1));
     assertThat(details.lines().get(0).amount()).isEqualByComparingTo(new BigDecimal("240"));
+  }
+
+  @Test
+  @DisplayName("詳細の confirmed は、確定した注文だけ true を返す")
+  void confirmedIsTrueOnlyForConfirmedOrder() {
+    final UUID pen = TestProducts.onSale(dsl, UniqueCodes.next("P"), "120.00");
+    final String confirmed = draft(UniqueCodes.next("C"), pen, 1, pen, 1);
+    final String cancelled = draft(UniqueCodes.next("C"), pen, 1, pen, 1);
+    observed(() -> confirmOrder.handle(new ConfirmOrderCommand(confirmed, new ExpectedLockNo(1))));
+    observed(() -> cancelOrder.handle(new CancelOrderCommand(cancelled, new ExpectedLockNo(1))));
+
+    assertThat(orderQueries.findDetails(confirmed))
+        .as("orderId=%s の確定", confirmed)
+        .hasValueSatisfying(details -> assertThat(details.confirmed()).isTrue());
+    assertThat(orderQueries.findDetails(cancelled))
+        .as("orderId=%s の確定", cancelled)
+        .hasValueSatisfying(details -> assertThat(details.confirmed()).isFalse());
   }
 
   @Test
