@@ -44,6 +44,7 @@ tags: [convention, integration, async, observability, opentelemetry, future-arch
 アプリケーションのメトリクスは、処理のレイテンシやエラー率に SLO が定められている場合だけ導入を検討する。
 SLO がある場合も、基盤のメトリクスだけで対応できないかを先に検討する。
 すべての失敗を処理し切ることが求められる業務システムのように SLO を設けない領域では、基盤のメトリクスと適切なログで足りる。
+失敗したイベント出版の定期の再投入は、ジョブの実行の結果と再投入の件数を確かめる要求があるため、SLO がなくても実行の回数と再投入の件数の Counter を出す（[ADR-075](../adr/ADR-075-resubmit-failed-event-publications-periodically-with-advisory-lock.md)）。
 
 ## DLQ の監視
 

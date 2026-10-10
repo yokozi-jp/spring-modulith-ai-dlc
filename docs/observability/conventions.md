@@ -58,6 +58,8 @@ Grafana では trace ID を使ってログとトレースを相互に検索す�
 - 氏名、メールアドレス、login ID、住所、電話番号
 
 ログの属性で許可するのは、例外の属性（`exception.type`、`exception.message`、`exception.stacktrace`）、HTTP status、409 の種類（`conflict.kind`）、trace と span の相関情報、業務上必要な内部 ID である。
+イベント出版の定期の再投入は、業務上必要な内部 ID として出版の ID、イベントの型とリスナーの完全修飾名、試行の回数（`event_publication.id`、`event_publication.event_type`、`event_publication.listener_id`、`event_publication.completion_attempts`）と、1 回の実行の件数（`event_publication.resubmitted.count`、`event_publication.exhausted.count`）を出す（[ADR-075](../adr/ADR-075-resubmit-failed-event-publications-periodically-with-advisory-lock.md)）。
+イベントの本文（`serialized_event`）は読まず、ログへ渡さない。
 内部 ID と氏名などの表示値を同じ event へ載せない。
 HTTP の URL パスは span に入るため、API のパスに個人データと秘密情報を置かない。
 ブラウザの例外は画面の route template を `view.name` に持つため、画面の path にも個人データと秘密情報を置かず、識別子は内部 ID にする（[フロントエンドのURL設計](../frontend/url-design.md)）。
@@ -107,7 +109,7 @@ Collector の設定（`docker/otel-collector/config.yaml`）は、ローカル�
 - **バックエンドのトレースとメトリクス**：加工しない。計装を追加して禁止値が入る属性が見つかった場合は、transform で消す。
 
 ログに属性を追加するときは、Collector の `keep_keys` とこの文書の許可する値を同じ変更で直す。
-現在の `keep_keys` は、使っている `exception.type`、`exception.message`、`exception.stacktrace`、`http.response.status_code`、`conflict.kind` だけを持つ。
+現在の `keep_keys` は、使っている `exception.type`、`exception.message`、`exception.stacktrace`、`http.response.status_code`、`conflict.kind`、`event_publication.id`、`event_publication.event_type`、`event_publication.listener_id`、`event_publication.completion_attempts`、`event_publication.resubmitted.count`、`event_publication.exhausted.count` だけを持つ。
 
 フロントエンドのログは、バックエンドと別の pipeline（`logs/frontend`）で絞る。
 検証、filter、正規化の三段で faro receiver の logfmt 本文を処理し、検証済みの record だけを保存先へ送る。

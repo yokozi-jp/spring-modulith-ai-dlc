@@ -60,7 +60,7 @@ CommandHandler は他モジュールから呼ばれない。
   `isPaid()` の確認は二回目の請求を省くためのもので、二重の処理は `update` の楽観的ロックで止める（[順序保証と冪等性](../../integration/async-ordering-and-idempotency.md)の「集約の楽観的ロック」）。
   同じイベントは再投入で二回以上届く（[メッセージングの設計](../../integration/async-messaging-design.md)の「配信保証」、[順序保証と冪等性](../../integration/async-ordering-and-idempotency.md)）。
 - 外部システムの失敗で `FAILED` のまま残ったイベント出版は、[非同期処理の失敗時の再試行と回復](../../integration/async-failure-recovery.md)の `FailedEventPublications` の手順で再投入する。
-  自動の再投入は [issue #108](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/108) で扱う。
+  自動の再投入は定期のジョブが行う（[ADR-075](../../adr/ADR-075-resubmit-failed-event-publications-periodically-with-advisory-lock.md)）。
 - クラス、フィールド、コンストラクタ、`handle` に Javadoc を書く。
 - `application` のパッケージの `package-info.java` は Command と共有する。
 
