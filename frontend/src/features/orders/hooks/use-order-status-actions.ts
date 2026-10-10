@@ -1,7 +1,7 @@
 import { useTranslation } from "react-i18next";
 
 import { useCancelOrder, useConfirmOrder } from "@/api/generated/endpoints/ordering/ordering";
-import { problemNotice, problemStatus } from "@/features/orders/notice";
+import { failureNotice } from "@/features/orders/notice";
 import type { Notice } from "@/features/orders/notice";
 
 /**
@@ -20,17 +20,12 @@ export function useOrderStatusActions(
   const isPending = confirmMutation.isPending || cancelMutation.isPending;
 
   const onError = (error: unknown) => {
-    const status = problemStatus(error);
-    if (status === 409) {
-      setNotice(problemNotice(t, error, t("orders.notice.actionConflict")));
-    } else if (status === 422) {
-      setNotice(problemNotice(t, error, t("orders.notice.actionUnprocessable")));
-    } else {
-      setNotice({
-        heading: t("orders.notice.generalTitle"),
-        description: t("orders.notice.generalFailure"),
-      });
-    }
+    setNotice(
+      failureNotice(t, error, {
+        conflict: t("orders.notice.actionConflict"),
+        unprocessable: t("orders.notice.actionUnprocessable"),
+      }),
+    );
   };
 
   return {
