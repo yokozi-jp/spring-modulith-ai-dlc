@@ -3,6 +3,8 @@
  * Aspect（ADR-051）と、業務テーブルの UPDATE と DELETE の唯一の入口である {@link
  * com.example.demo.shared.infrastructure.persistence.TableWriter}（ADR-054）を含む。
  *
+ * <p>Spring Modulith のイベント出版のレジストリの、失敗した出版の定期の再投入（ADR-075）も置く。レジストリは全モジュールが共有する基盤で、業務の概念を持たない。
+ *
  * <p>使ってよいのは、他のモジュールの {@code infrastructure.persistence} のアダプターだけとする。業務の概念を置かない。
  */
 @NamedInterface("persistence")

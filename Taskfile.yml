@@ -1114,6 +1114,20 @@ tasks:
               and (first(.attributes[]? | select(.key == "http.response.status_code") | .value.intValue) == "409")
               and value("conflict.kind") == "unique"
           )
+          and any(
+            .resourceLogs[]?.scopeLogs[]?.logRecords[]?;
+            ([.attributes[]?.key] | sort) == ["event_publication.completion_attempts", "event_publication.event_type", "event_publication.id", "event_publication.listener_id"]
+              and value("event_publication.id") == "3f2b8c1e-5d4a-4e6f-9a7b-1c2d3e4f5a6b"
+              and value("event_publication.event_type") == "com.example.demo.ordering.OrderConfirmed"
+              and (value("event_publication.listener_id") | startswith("com.example.demo.payment.application.OrderConfirmedListener.on"))
+              and (first(.attributes[]? | select(.key == "event_publication.completion_attempts") | .value.intValue) == "6")
+          )
+          and any(
+            .resourceLogs[]?.scopeLogs[]?.logRecords[]?;
+            ([.attributes[]?.key] | sort) == ["event_publication.exhausted.count", "event_publication.resubmitted.count"]
+              and (first(.attributes[]? | select(.key == "event_publication.resubmitted.count") | .value.intValue) == "3")
+              and (first(.attributes[]? | select(.key == "event_publication.exhausted.count") | .value.intValue) == "1")
+          )
         ' "$out/backend.json" >/dev/null; then
           echo "ログ属性が allowlist または期待値と一致しません。" >&2
           exit 1

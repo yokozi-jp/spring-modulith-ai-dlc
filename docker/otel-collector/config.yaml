@@ -34,7 +34,7 @@ processors:
   transform/log_attributes:
     log_statements:
       # ログ属性の allowlist。属性を足すときは docs/observability/conventions.md と同じ変更で直す。
-      - keep_keys(log.attributes, ["exception.type", "exception.message", "exception.stacktrace", "http.response.status_code", "conflict.kind"])
+      - keep_keys(log.attributes, ["exception.type", "exception.message", "exception.stacktrace", "http.response.status_code", "conflict.kind", "event_publication.id", "event_publication.event_type", "event_publication.listener_id", "event_publication.completion_attempts", "event_publication.resubmitted.count", "event_publication.exhausted.count"])
   # faro receiver の logfmt 本文を解析し、型と値を検証した record だけへ Collector 内部の印を付ける。
   transform/frontend_validate:
     error_mode: silent

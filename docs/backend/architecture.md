@@ -154,6 +154,9 @@ Domain の型、Command と Result、Spring MVC の Request と Response、jOOQ 
 
 - jOOQ の共通処理を `shared.infrastructure.persistence` に置き、このパッケージを `@NamedInterface` で公開する。
   業務テーブルの UPDATE と DELETE の唯一の入口である `TableWriter` もここに置く（[ADR-054](../adr/ADR-054-detect-optimistic-lock-conflicts-by-update-count.md)）。
+- Spring Modulith のイベント出版のレジストリの、失敗した出版の定期の再投入（`EventPublicationResubmitter`）も `shared.infrastructure.persistence` に置く（[ADR-075](../adr/ADR-075-resubmit-failed-event-publications-periodically-with-advisory-lock.md)）。
+  レジストリは全モジュールが共有する基盤で業務の概念を持たず、jOOQ を使う処理は `infrastructure.persistence` に置くためである。
+  クラスは package-private にし、他のモジュールから使えないようにする。
 - 楽観的ロックの語彙（`ConflictException`、`ExpectedLockNo`、`VersionedCommand`）を `shared.concurrency` に置き、このパッケージも `@NamedInterface("concurrency")` で公開する。
 - 業務上の失敗の例外（`NotFoundException`、`BusinessRuleViolationException`）を `shared.failure` に置き、このパッケージも `@NamedInterface("failure")` で公開する（[ADR-062](../adr/ADR-062-map-business-exceptions-to-404-409-422.md)）。
   `shared` は Spring Web、Spring の HTTP、Servlet の型に依存しない。
@@ -217,7 +220,7 @@ CommandHandler は `application` にあるため、他モジュールから呼�
 機能横断の API エラー契約は、`error` モジュールの `presentation.web` に置いている。
 
 複数の機能で似た処理が要るときも、処理は各機能内に置く。
-例外は、「共有モジュール shared」に示す jOOQ の共通処理と楽観的ロックの語彙と業務上の失敗の例外だけである。
+例外は、「共有モジュール shared」に示す jOOQ の共通処理と楽観的ロックの語彙と業務上の失敗の例外と、イベント出版の定期の再投入だけである。
 
 ## 参照業務機能
 

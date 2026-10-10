@@ -45,6 +45,33 @@
                 { "key": "conflict.kind", "value": { "stringValue": "unique" } },
                 { "key": "db.query.text", "value": { "stringValue": "insert into t_order (order_id) values ('secret-value')" } }
               ]
+            },
+            {
+              "timeUnixNano": "1790000000000000002",
+              "severityNumber": 17,
+              "severityText": "ERROR",
+              "body": { "stringValue": "Event publication resubmission exhausted" },
+              "attributes": [
+                { "key": "event_publication.id", "value": { "stringValue": "3f2b8c1e-5d4a-4e6f-9a7b-1c2d3e4f5a6b" } },
+                { "key": "event_publication.event_type", "value": { "stringValue": "com.example.demo.ordering.OrderConfirmed" } },
+                {
+                  "key": "event_publication.listener_id",
+                  "value": { "stringValue": "com.example.demo.payment.application.OrderConfirmedListener.on(com.example.demo.ordering.OrderConfirmed)" }
+                },
+                { "key": "event_publication.completion_attempts", "value": { "intValue": "6" } },
+                { "key": "event_publication.serialized_event", "value": { "stringValue": "{\"orderId\":\"secret-value\"}" } }
+              ]
+            },
+            {
+              "timeUnixNano": "1790000000000000003",
+              "severityNumber": 9,
+              "severityText": "INFO",
+              "body": { "stringValue": "Event publications resubmitted" },
+              "attributes": [
+                { "key": "event_publication.resubmitted.count", "value": { "intValue": "3" } },
+                { "key": "event_publication.exhausted.count", "value": { "intValue": "1" } },
+                { "key": "user.email", "value": { "stringValue": "person@example.com" } }
+              ]
             }
           ]
         }

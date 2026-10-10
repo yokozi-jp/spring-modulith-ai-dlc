@@ -199,7 +199,7 @@ INSERTの共通カラムは`CommonColumns.forInsert`で、UPDATEとDELETEは`Tab
 `TableWriterArchTest`は、業務テーブルのUPDATEとDELETEを`shared`の`TableWriter`に集める規則を検査する（[PostgreSQLの排他制御](../database/postgresql-concurrency-control.md)、[ADR-054](../adr/ADR-054-detect-optimistic-lock-conflicts-by-update-count.md)）。
 集約ルートは、`domain.model`にあり、引数のない`long lockNo()`を宣言する型とする。
 
-- `tableWritesGoThroughTableWriter`：`TableWriter`、`LockedRoot`、`DeletedRoot`の外の本番のコードは、次のAPIを呼ばず、メソッド参照もしない。
+- `tableWritesGoThroughTableWriter`：`TableWriter`、`LockedRoot`、`DeletedRoot`、`EventPublicationResubmitter`の外の本番のコードは、次のAPIを呼ばず、メソッド参照もしない。
   呼び出し先の型が、挙げた型に代入できるかで判定する。
   - `DSLContext`、`DSL`、`WithStep`の`update`、`delete`、`deleteFrom`、`mergeInto`、`updateQuery`、`deleteQuery`
   - `DSLContext`の`batchUpdate`、`batchStore`、`batchDelete`、`batchMerge`、`executeUpdate`、`executeDelete`、`connection`、`connectionResult`
@@ -215,8 +215,10 @@ INSERTの共通カラムは`CommonColumns.forInsert`で、UPDATEとDELETEは`Tab
 
   `Update`と`Delete`を作る入口をすべて禁じるため、`batch`や`subscribe`のように作った問い合わせを受け取って実行するAPIは禁じない。
 
-  `tableWritesGoThroughTableWriter`が除外するのは、`TableWriter`、`LockedRoot`、`DeletedRoot`の三つの完全修飾型名だけである。
-  除外を足す、外す、または除外する型を移すときは、先に[ADR-054](../adr/ADR-054-detect-optimistic-lock-conflicts-by-update-count.md)の判断を変える。
+  `tableWritesGoThroughTableWriter`が除外するのは、`shared.infrastructure.persistence`の`TableWriter`、`LockedRoot`、`DeletedRoot`、`EventPublicationResubmitter`の四つの完全修飾型名だけである。
+  `EventPublicationResubmitter`は、セッションのadvisory lockのために接続を1本固定する（[ADR-075](../adr/ADR-075-resubmit-failed-event-publications-periodically-with-advisory-lock.md)）。
+  業務テーブルを書かず、`modulith.event_publication`を読むだけである。
+  除外を足す、外す、または除外する型を移すときは、先に[ADR-054](../adr/ADR-054-detect-optimistic-lock-conflicts-by-update-count.md)の判断を変えるか、新しいADRで例外を決める。
   同じ変更で、`tableWritesGoThroughTableWriterRule`の完全修飾型名と、除外する型を置く適合フィクスチャ（`archfixture/conforming/shared/infrastructure/persistence/`）を更新する。
   禁止するAPIの違反フィクスチャ（`DirectOrderWriter`）は、禁止の一覧か`isDirectWrite`の判定を変えるときだけ更新する。
 - `repositoryUpdateAndDeleteCheckVersion`：`Jooq*Repository`の、集約ルートを受け取る`add`以外のpublicメソッドは、版を比べる入口をそのメソッドの中で直接呼ぶ。

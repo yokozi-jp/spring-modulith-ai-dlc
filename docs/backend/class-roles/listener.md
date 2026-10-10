@@ -47,7 +47,7 @@ Listener は Infrastructure の Adapter でもない。
 - 同じイベントを二回以上受けても結果が変わらないよう、呼ぶ CommandHandler を冪等にする。
   冪等にする方法は[順序保証と冪等性](../../integration/async-ordering-and-idempotency.md)に従う。
 - 受信に失敗したイベント出版はレジストリに `FAILED` で残り、[非同期処理の失敗時の再試行と回復](../../integration/async-failure-recovery.md)の `FailedEventPublications` の手順で再投入する。
-  自動の再投入は [issue #108](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/108) で扱う。
+  定期のジョブが、最後の試行から待ち時間を過ぎた出版を上限の回数まで自動で再投入する（[ADR-075](../../adr/ADR-075-resubmit-failed-event-publications-periodically-with-advisory-lock.md)）。
 - CommandHandler が投げた業務上の失敗の扱いは、[業務上の失敗の例外](business-exception.md)の表に従う。
 - クラス、フィールド、コンストラクタ、`on` に Javadoc を書く。
 - 受信する側の `application` のパッケージの `package-info.java` は Command と共有する。
@@ -147,6 +147,51 @@ class OrderPlacedListenerTest {
   }
 
   // savePlacedOrder() は注文を保存してその ID を返し、isReserved(orderId) は在庫の引き当てを読む（省略）。
+}
+```
+
+## 冪等の書き方の例
+
+同じイベントは、定期の再投入と手での再投入で二回以上届き、同時に二つ届くこともある。
+次の二つは決済の実コードからの抜粋である。
+
+一つ目は、CommandHandler が結果の行を先に読み、あれば外部システムを呼ばずに返す例である（`ChargeOrderCommandHandler`）。
+並行に届いた二つ目の配信は先読みをすり抜けるため、決済記録の INSERT の一意制約が `ConflictException` にして止める。
+
+```java
+public ChargeOrderResult handle(final ChargeOrderCommand command) {
+  final OrderId orderId = new OrderId(UUID.fromString(command.orderId()));
+  // 二度目の請求を避けるための先読み。並行の配信は INSERT の一意制約が ConflictException にする。
+  final Optional<Payment> existing = paymentRepository.findByOrderId(orderId);
+  if (existing.isPresent()) {
+    return new ChargeOrderResult(existing.get().id().value().toString());
+  }
+  // ...
+  final ChargeOutcome outcome = paymentGateway.charge(orderId, amount);
+  final Payment payment = Payment.record(orderId, amount, outcome, Instant.now(clock));
+  paymentRepository.add(payment);
+  return new ChargeOrderResult(payment.id().value().toString());
+}
+```
+
+二つ目は、外部システムの Client が注文 ID を冪等性キーとして `Idempotency-Key` のヘッダーで送る例である（`PaymentGatewayClient`）。
+先読みをすり抜けた二つ目の配信は、一意制約で止まる前に請求を呼ぶが、決済代行は同じキーの請求を二重にしない。
+
+```java
+public ChargeOutcome charge(final OrderId orderId, final Money amount) {
+  final String key = orderId.value().toString();
+  // ...
+}
+
+private ResponseEntity<ChargeReply> post(final String key, final Money amount) {
+  return restClient
+      .post()
+      .uri("/v1/charges")
+      .header(IDEMPOTENCY_KEY, key)
+      .contentType(MediaType.APPLICATION_JSON)
+      .body(new ChargeBody(key, amount.amount(), CURRENCY))
+      .retrieve()
+      .toEntity(ChargeReply.class);
 }
 ```
 

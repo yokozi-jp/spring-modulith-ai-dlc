@@ -34,6 +34,8 @@ PostgreSQLではREPEATABLE READ以上にすると、直列化の失敗による�
 楽観的ロックを優先して使う。
 悲観的ロックの画面設計は、入力中のデータを破棄することが業務上どうしても許容できない場合を除き避ける。
 DBの行ロックは、在庫の引き当てのように性能が重要になる処理でだけ使う。
+複数のインスタンスで定期のジョブを1つに絞るときは、自動コミットの接続でセッションのadvisory lock（`pg_try_advisory_lock`）を使う。
+トランザクションのadvisory lockと行ロックは使わない（[ADR-075](../adr/ADR-075-resubmit-failed-event-publications-periodically-with-advisory-lock.md)）。
 
 ## 楽観的ロック
 
@@ -152,6 +154,23 @@ final int reserved =
 このUPDATEも`lock_no = lock_no + 1`で版を進めるため、引き当ての前に読んだ画面の保存は競合になる。
 更新件数が0件なら、在庫不足として利用者へ返し、業務判断を委ねる。
 マスタの保守のように後勝ちの上書きを許容できない更新と、状態の遷移を伴う更新には使わない。
+
+## advisory lock
+
+セッションのadvisory lockは、取得から解放まで同じ1本の接続を固定し、トランザクションを開かずに持つ。
+インスタンスが落ちると接続が切れ、PostgreSQLがロックを放すため、ロックの期限を設けない。
+アプリで使うキーは次の表だけにし、新しいキーを足すときは同じ変更で表に足す。
+
+| キー  | 使うクラス                                                         | 用途                                                                                                                                                           |
+| ----- | ------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `108` | `shared.infrastructure.persistence`の`EventPublicationResubmitter` | 失敗したイベント出版の定期の再投入を1つのインスタンスに絞る（[ADR-075](../adr/ADR-075-resubmit-failed-event-publications-periodically-with-advisory-lock.md)） |
+
+`EventPublicationResubmitter`は、接続を固定するために`DSLContext.connection`を使うため、`tableWritesGoThroughTableWriter`（H1）の例外にする。
+業務テーブルを書かず、`modulith.event_publication`を読むだけである。
+例外の一覧は[アーキテクチャテスト](../backend/architecture-tests.md)の「書き込みの入口」にある。
+
+セッションのadvisory lockは、アプリからPostgreSQLへの接続が直結であることを前提にする。
+RDS ProxyやPgBouncerのトランザクションモードのような接続を多重化するプロキシを入れるときは、セッションのadvisory lockの方式を見直す。
 
 ## 出典
 

@@ -60,14 +60,14 @@ test("注文を作成し確定すると、Listener が決済代行へ請求し�
 });
 
 // 決済代行を成功に戻した後に読み直しのボタンで読み直しても、決済の欄は再投入待ちのままで、請求は 1 回のままである。
-// 戻した直後の読み直しの期間だけを確かめる。#108 で定期の再投入が入ったら、待つか状態を明示して観測する形に直す。
+// 戻した直後の読み直しの期間だけを確かめる。
 async function expectNotResubmitted(page: Page, orderId: string): Promise<void> {
   await page.getByRole("button", { name: "決済の状態を読み直す" }).click();
   await expectPaymentText(page, notYet);
   expect(await chargeRequestCount(page.request, orderId), `orderId=${orderId} の請求`).toBe(1);
 }
 
-// 一時障害のあいだは決済記録が無く、成功に戻しても自動では再投入しない（運用者の入口と定期の再投入は #108 で扱う）。
+// 一時障害のあいだは決済記録が無い。E2E の backend は `.env.test` で定期の再投入を無効にしているため（ADR-075）、成功に戻しても自動では再投入しない。
 async function expectTransientFailure(
   page: Page,
   testInfo: TestInfo,

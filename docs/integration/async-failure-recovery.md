@@ -30,7 +30,7 @@ DLQ はソースキューごとに置き、アプリケーションによる即�
 ## Spring Modulith のイベントの失敗
 
 外部ブローカーを導入するまでは、リスナーが失敗したイベント出版がレジストリに `FAILED` の状態で残り、これが DLQ の役割を兼ねる。
-失敗した出版の再投入は `FailedEventPublications` を使い、`IncompleteEventPublications` は落ちたまま残った出版の回復に限る。
+失敗した出版の再投入は `FailedEventPublications` を使い、落ちたまま残った出版は Staleness Monitor で `FAILED` に戻してから同じ再投入で扱う。
 
 Spring Modulith 2.1.1 のイベント出版は、次の状態を持つ（[Spring Modulith: Event Publication Lifecycle](https://docs.spring.io/spring-modulith/reference/events.html)）。
 
@@ -53,13 +53,18 @@ Spring Modulith 2.1.1 のイベント出版は、次の状態を持つ（[Spring
   回数の上限を超えた出版は自動で再投入せず、人の確認に回す。
   `resubmit` は再投入した件数を返さない。
   条件の関数は `RESUBMITTED` への更新より前に呼ばれ、更新できなかった出版でも呼ばれるため、そこで数えた値は再投入の候補の件数であり、再投入した件数ではない。
-  再投入した件数の記録の方法は [issue #108](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/108) で決める。
+  定期の再投入は、条件の関数で数えた候補の件数を advisory lock の中で `event.publication.resubmissions` に記録する。
+  ロックの中では他の定期の再投入が動かないため、手での再投入と同時に動いた場合を除き、候補の件数は再投入した件数と一致する（[ADR-075](../adr/ADR-075-resubmit-failed-event-publications-periodically-with-advisory-lock.md)）。
 - Staleness Monitor（`spring.modulith.events.staleness.*`）は、状態が `PUBLISHED`、`PROCESSING`、`RESUBMITTED` の出版のうち、最初に出版した日時（`publication_date`）から状態ごとに設定した時間を過ぎたものを `FAILED` にする。
   その状態に入ってからの時間や、`last_resubmission_date` からの時間では測らない（2.1.1 の `DefaultEventPublicationRegistry`）。
   このため、`RESUBMITTED` の時間より古い出版を再投入すると、リスナーが終わる前の次の判定で `FAILED` に戻ることがある。
-  既定ではどの時間も 0 で動かず、main は設定していない。
+  既定ではどの時間も 0 で動かないため、main は三つの時間を定期の再投入の待ち時間と同じ値にし、判定の間隔を定期の再投入の間隔と同じにして有効にする（[ADR-075](../adr/ADR-075-resubmit-failed-event-publications-periodically-with-advisory-lock.md)）。
+  再投入の後に早く `FAILED` に戻っても、定期の再投入は `last_resubmission_date` から待ち時間を過ぎるまでその出版を対象にしないため、重ねて動かさない。
+  ただし、最初の配信が `concurrency-limit` の空きを待つ間に待ち時間を過ぎた出版は、`FAILED` に戻った次の回で重ねて再投入しうる。
+  その場合はリスナーの冪等性で結果を保つ。
+  Staleness Monitor は定期の再投入を無効にすると一緒に止まる。
 - `IncompleteEventPublications` は、処理中のものを含めて、完了していない出版をすべて対象にする。
-  通常の失敗には使わず、Staleness Monitor を使わない環境で、落ちたまま残った出版を経過時間で絞って回復する場合に限って使う。
+  Staleness Monitor を有効にしたため、落ちたまま残った出版の回復にも使わない。
 - 起動時の自動再配信（`republish-outstanding-events-on-restart`）は使わない（[ADR-001](../adr/ADR-001-adopt-spring-modulith-modular-monolith.md)）。
 - 回復不能と判定したエラーは、ステータス管理テーブルを FAILED にして失敗の内容を記録し、リスナーを正常終了させて再投入の対象から外す（[非同期処理のステータス管理](async-job-status.md)）。
   このときイベント出版は `COMPLETED` になり、ステータス管理テーブルの FAILED は出版の `FAILED` とは別の値である。
@@ -71,13 +76,17 @@ Spring Modulith 2.1.1 のイベント出版は、次の状態を持つ（[Spring
 - 出版の `FAILED` に残すのは、再投入で回復できる失敗と、内部の不変条件の違反である。
   内部の不変条件の違反は、確定のイベントを受けたのに注文がないような、不具合でしか起きない状態である。
   業務の状態に記録すると不具合が隠れるため、例外を投げてデッドレターとして意図して残す。
-  出版はイベントを保ち、ERROR のログが運用者に届き、不具合を直したあとに再投入できる（[issue #108](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/108)）。
+  出版はイベントを保ち、ERROR のログが運用者に届き、不具合を直したあとに再投入できる。
+  定期の再投入は失敗の原因を見分けないため、この出版も上限の回数まで再投入する（[ADR-075](../adr/ADR-075-resubmit-failed-event-publications-periodically-with-advisory-lock.md)）。
 - リスナーが動く前に業務の状態が変わったとき（確定のあとに取り消した注文）は、業務の結果として処理せずに正常終了させる。
   再投入しても結果は変わらないため、`FAILED` に残さない。
 
-本番で運用者が再投入する入口（コマンド、API、ジョブ）と定期の再投入は [issue #108](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/108) で決め、main にはまだない。
-それまでの再投入の検証は、決済の `PaymentGatewayClientIntegrationTest` が、本番の Client と手で確かめる入口の `ResubmitFailedPaymentsRunner` で、一時障害の `FAILED` から試行の回数 2 の `COMPLETED` になり決済記録が 1 件になることを確かめる。
-`completion-mode: archive` で完了した出版を移す archive の表の保存期間と消し方も決めていない（issue #108）。
+失敗した出版は、定期のジョブ（`shared.infrastructure.persistence` の `EventPublicationResubmitter`）が、最後の試行から待ち時間を過ぎたものを上限の回数まで自動で再投入する（[ADR-075](../adr/ADR-075-resubmit-failed-event-publications-periodically-with-advisory-lock.md)）。
+ジョブは PostgreSQL の advisory lock で、同時に 1 つのインスタンスだけが動く。
+上限に達した出版は出版ごとの ERROR のログで知らせ、運用者が手での入口（`resubmit-once` の profile の `ResubmitFailedPaymentsRunner`）で再投入するか片付ける。
+調べ方と手順は[イベント出版の再投入のログイベント](../observability/runbook-event-publication-resubmission.md)にある。
+再投入の検証は、決済の `PaymentGatewayClientIntegrationTest` が、本番の Client と手での入口で、一時障害の `FAILED` から試行の回数 2 の `COMPLETED` になり決済記録が 1 件になることを確かめる。
+`completion-mode: archive` で完了した出版を移す archive の表の保存期間と消し方は、別の Issue で決める。
 
 ## DLQ の構成
 
