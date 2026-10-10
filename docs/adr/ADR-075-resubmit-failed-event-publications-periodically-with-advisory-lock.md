@@ -42,6 +42,8 @@ Staleness Monitor は落ちたまま残った出版を `FAILED` に戻せるが�
 
 - ジョブは `shared.infrastructure.persistence` の `EventPublicationResubmitter` に置き、`@Scheduled` の固定の遅延で動かす。
   `event-publication.resubmission.enabled` が偽なら、定期の実行も Staleness Monitor も登録しない。
+  Spring Modulith の starter が入れる Moments は、既定で有効なとき `@EnableScheduling` を足し、この切り替えを効かなくする。
+  Moments は使っていないため、`spring.modulith.moments.enabled` を偽にする。
 - 実行の本体は、PostgreSQL のセッションの advisory lock（`pg_try_advisory_lock`、キー 108）を取れたインスタンスだけが行う。
   ロックは自動コミットの接続で持ち、実行の終わりに放す。
   取れなければ、その回は何もしない。
@@ -54,7 +56,9 @@ Staleness Monitor は落ちたまま残った出版を `FAILED` に戻せるが�
   `LIMIT` は掛けず、1 回の件数の上限は条件の関数で数える。
 - 試行の回数は Spring Modulith の `completion_attempts` で持ち、表を足さない。
 - 上限に達した出版は自動の対象から外し、出版ごとの ERROR のログで知らせる。
-  運用者への通知はこのログの監視だけで行い、件数と最古の経過時間の Gauge（`state=exhausted`）は表示と確認に使い、警報にしない。
+  件数の Gauge（`state=exhausted`）は表示と確認に使い、警報にしない。
+  最古の経過時間の Gauge（`state=exhausted`）は、`async-observability.md` の DLQ の滞留時間の監視として、1 日を超えたら通知する。
+  ERROR はインスタンスごとに 1 回しか出ないため、見落とした出版をこの警報で拾う。
   その後は既存の手動の入口（`resubmit-once` の profile）と Runbook に引き継ぐ。
 - `FAILED` の出版の件数と最古の経過時間の Gauge（`state=retrying`）は、`async-observability.md` の基盤のメトリクスの `FAILED` の部分として出す。
 - ジョブの実行の回数（`event.publication.resubmission.runs`）と再投入の件数（`event.publication.resubmissions`）の Counter は、SLO がないためアプリケーションのメトリクスを出さないという `async-observability.md` の原則の例外とする。

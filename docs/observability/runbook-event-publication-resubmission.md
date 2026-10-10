@@ -103,9 +103,12 @@ DELETE FROM modulith.event_publication
 - Gauge はすべてのインスタンスが毎回同じ値を集計して出すため、インスタンスの間の最大値で見る。
 - 定期の実行を無効にした環境では更新されず、0 のままである。
 - `failed{state=retrying}` は、`concurrency-limit` の空きを待つ間に Staleness Monitor が `FAILED` に戻した処理中の出版も数えうるため、実際の失敗より多く出ることがある。
-- `failed{state=exhausted}` とその経過時間は、残っている件数の表示と片付けたあとの確認に使い、警報にしない。
-  上限に達した出版の通知は ERROR のログの監視だけで行う。
-- 警報は `failed.oldest.age{state=retrying}` に置く（次の節）。
+- `failed{state=exhausted}` の件数は、残っている件数の表示と片付けたあとの確認に使い、警報にしない。
+  上限に達した出版を知る主な通知は ERROR のログの監視である。
+- `failed.oldest.age{state=exhausted}` が 1 日を超えたら通知する。
+  ERROR はインスタンスごとに 1 回しか出ないため、見落とした出版が残り続けるのをこの警報で拾う。
+  通知を受けたら「Event publication resubmission exhausted」の節の手順で片付ける。
+- `failed.oldest.age{state=retrying}` にも警報を置く（次の節）。
 
 ## イベントの型の名前を変えた出版
 
