@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.10.1](https://github.com/yokozi-jp/spring-modulith-ai-dlc/compare/v0.10.0...v0.10.1) (2026-10-10)
+
+
+### Bug Fixes
+
+* **docs:** task setup で iwe 導入時に Vite+ の npm を PATH に通す ([#198](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/198)) ([e6cbcb6](https://github.com/yokozi-jp/spring-modulith-ai-dlc/commit/e6cbcb6463d162b1d76a1a965a7106039bdd1605))
+* **frontend:** untracedUrlのsemgrep誤検知を理由付きで抑止する ([#194](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/194)) ([a3f0937](https://github.com/yokozi-jp/spring-modulith-ai-dlc/commit/a3f093764409541d758826f20c4d5f7da3e204cf))
+
 ## [0.10.0](https://github.com/yokozi-jp/spring-modulith-ai-dlc/compare/v0.9.0...v0.10.0) (2026-10-09)
 
 
