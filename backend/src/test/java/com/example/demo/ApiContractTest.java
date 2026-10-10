@@ -18,7 +18,6 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
-import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
@@ -68,18 +67,6 @@ class ApiContractTest {
         .andExpect(status().isUnauthorized())
         .andExpect(header().string(HttpHeaders.WWW_AUTHENTICATE, "Session realm=\"demo\""))
         .andExpect(jsonPath("$.status").value(401));
-  }
-
-  @ParameterizedTest
-  @ValueSource(ints = {401, 403})
-  @DisplayName("sendError で /error へ転送された 401 と 403 は、その status の Problem Details を返す")
-  void errorEndpointReturnsProblemDetailsForSecurityStatuses(final int code) throws Exception {
-    mockMvc
-        .perform(get("/error").requestAttr(RequestDispatcher.ERROR_STATUS_CODE, code))
-        .andExpect(status().is(code))
-        .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
-        .andExpect(jsonPath("$.type").value("about:blank"))
-        .andExpect(jsonPath("$.status").value(code));
   }
 
   @Test

@@ -153,7 +153,7 @@ public class SecurityConfig {
    * <p>sendError にするとコンテナが {@code /error} へ転送し、{@code ApiErrorController} が同じ Problem Details
    * を返す。戻り値を捨てると何も書かれず、空の 200 が返る。
    */
-  /* package */ static void resolveOrSendError(
+  private static void resolveOrSendError(
       final HandlerExceptionResolver resolver,
       final HttpServletRequest request,
       final HttpServletResponse response,
