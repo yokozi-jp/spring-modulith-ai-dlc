@@ -1,10 +1,14 @@
 package com.example.demo;
 
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
+import java.io.IOException;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.health.actuate.endpoint.HealthEndpoint;
 import org.springframework.boot.security.autoconfigure.actuate.web.servlet.EndpointRequest;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.oauth2.client.oidc.web.logout.OidcClientInitiatedLogoutSuccessHandler;
 import org.springframework.security.oauth2.client.registration.ClientRegistrationRepository;
@@ -98,13 +102,21 @@ public class SecurityConfig {
                 exceptions
                     .defaultAuthenticationEntryPointFor(
                         (request, response, exception) ->
-                            handlerExceptionResolver.resolveException(
-                                request, response, null, exception),
+                            resolveOrSendError(
+                                handlerExceptionResolver,
+                                request,
+                                response,
+                                exception,
+                                HttpStatus.UNAUTHORIZED),
                         apiRequests)
                     .defaultAccessDeniedHandlerFor(
                         (request, response, exception) ->
-                            handlerExceptionResolver.resolveException(
-                                request, response, null, exception),
+                            resolveOrSendError(
+                                handlerExceptionResolver,
+                                request,
+                                response,
+                                exception,
+                                HttpStatus.FORBIDDEN),
                         apiRequests))
         .headers(
             headers ->
@@ -133,5 +145,23 @@ public class SecurityConfig {
                     .clearAuthentication(true)
                     .deleteCookies("APP_SESSION"));
     return http.build();
+  }
+
+  /**
+   * 例外を MVC の Problem Details 変換へ渡し、どの resolver も扱わなかったときは {@code status} で sendError する。
+   *
+   * <p>sendError にするとコンテナが {@code /error} へ転送し、{@code ApiErrorController} が同じ Problem Details
+   * を返す。戻り値を捨てると何も書かれず、空の 200 が返る。
+   */
+  /* package */ static void resolveOrSendError(
+      final HandlerExceptionResolver resolver,
+      final HttpServletRequest request,
+      final HttpServletResponse response,
+      final Exception exception,
+      final HttpStatus status)
+      throws IOException {
+    if (resolver.resolveException(request, response, null, exception) == null) {
+      response.sendError(status.value());
+    }
   }
 }
