@@ -1,17 +1,21 @@
 package archfixture.conforming.ordering.presentation.web;
 
 import archfixture.conforming.ordering.OrderQueries;
+import archfixture.conforming.ordering.OrderSearchCriteria;
+import archfixture.conforming.ordering.OrderSummary;
 import archfixture.conforming.ordering.application.PlaceOrderCommandHandler;
 import archfixture.conforming.ordering.application.PlaceOrderResult;
 import archfixture.conforming.shared.failure.NotFoundException;
 import jakarta.validation.Valid;
 import java.net.URI;
+import java.util.List;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 /** 注文の HTTP API。 */
@@ -46,5 +50,13 @@ class OrderController {
         .findDetails(orderId)
         .map(OrderDetailsResponse::from)
         .orElseThrow(() -> new NotFoundException("order not found: orderId=" + orderId));
+  }
+
+  /** 顧客の注文の状態の名前を返す。状態を持つモジュールの中なので、状態の名前を読んでよい。 */
+  @GetMapping
+  /* package */ List<String> statuses(@RequestParam final String customerId) {
+    return orderQueries.search(new OrderSearchCriteria(customerId)).stream()
+        .map(OrderSummary::status)
+        .toList();
   }
 }
