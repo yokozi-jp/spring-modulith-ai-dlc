@@ -20,7 +20,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 /**
- * コミット済みの OpenAPI 契約の operation と応答の status の組ごとに、MockMvc の契約テストがあることを検査する（ADR-076）。
+ * コミット済みの OpenAPI 契約の operation と応答の status の組ごとに、MockMvc の契約テストがあることを検査する（ADR-077）。
  *
  * <p>契約テストは {@link ContractCase} で確かめる組を宣言する。この検査は Spring も DB も起動しない。
  */
@@ -98,7 +98,7 @@ class ApiContractCoverageTest {
 
   /** 手書きのテストコードに付いた {@link ContractCase} の組を返す。 */
   // ponytail: 宣言は自己申告で、テストが実際にその status を期待するかは見ない。
-  // 宣言と andExpect のずれが問題になったら、MockMvc の実行結果を記録して突き合わせる方式に替える（ADR-076）。
+  // 宣言と andExpect のずれが問題になったら、MockMvc の実行結果を記録して突き合わせる方式に替える（ADR-077）。
   private static Set<String> coveredResponses() {
     return new ClassFileImporter()
         .withImportOption(new TestCodeOnly()).importPackagesOf(DemoApplication.class).stream()

@@ -11,7 +11,7 @@ import org.springframework.web.bind.annotation.RequestMethod;
  * MockMvc のテストメソッドが確かめる operation と HTTP status の組を宣言する。
  *
  * <p>{@code ApiContractCoverageTest} が、コミット済みの {@code openapi/openapi.yaml} の operation と応答の status
- * の組ごとに、この宣言があることを検査する（ADR-076）。宣言は、そのテストが実際にその status を期待していることを表す。
+ * の組ごとに、この宣言があることを検査する（ADR-077）。宣言は、そのテストが実際にその status を期待していることを表す。
  */
 @Target(ElementType.METHOD)
 @Retention(RetentionPolicy.RUNTIME)

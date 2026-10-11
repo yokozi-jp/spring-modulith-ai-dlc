@@ -193,7 +193,7 @@ class OrderController {
 
 テストメソッドには `@ContractCase(method, path, status)` を付け、確かめる operation と status の組を宣言する。
 `path` は OpenAPI の path の形（`/api/orders/{orderId}`）で書き、宣言する status はそのテストが `andExpect(status()...)` で期待する値に限る。
-`ApiContractCoverageTest` は、コミット済みの `openapi/openapi.yaml` の組のうち宣言のないものがあれば失敗する（[ADR-076](../../adr/ADR-076-check-contract-test-coverage-per-response-status.md)）。
+`ApiContractCoverageTest` は、コミット済みの `openapi/openapi.yaml` の組のうち宣言のないものがあれば失敗する（[ADR-077](../../adr/ADR-077-check-contract-test-coverage-per-response-status.md)）。
 401 と更新の 403 は `ApiContractTest` が全 operation をまとめて確かめるので、新しい operation を足したらその `@CsvSource` と宣言に加える。
 
 ```java

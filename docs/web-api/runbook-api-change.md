@@ -76,7 +76,7 @@ Orvalの設定（`frontend/orval.config.ts`）だけを変えたときは、`tas
 
 - **pre-commit**：契約、`.spectral.yaml`、Orvalの設定、生成物の変更で、コミット済みの契約のSpectralと`task api-client-check`を実行する。
 - **Backend CI**：`task be-test`が書き出した契約を、`task be-openapi-check`でコミット済みの`openapi/openapi.yaml`と比べる。
-  `task be-test`の`ApiContractCoverageTest`は、契約のoperationとstatusの組ごとに`@ContractCase`の宣言があるかを検査する（[ADR-076](../adr/ADR-076-check-contract-test-coverage-per-response-status.md)）。
+  `task be-test`の`ApiContractCoverageTest`は、契約のoperationとstatusの組ごとに`@ContractCase`の宣言があるかを検査する（[ADR-077](../adr/ADR-077-check-contract-test-coverage-per-response-status.md)）。
 - **Frontend CI**：`task api-client-check`で生成物を再生成し、コミット済みの内容と比べる。
 - **API Contract**（`api-contract.yml`）：`task api-lint`、`task api-lint-rules-test`、`task api-breaking`を実行し、`task api-docs`の設計書をartifactにする。
   mainへのmergeでは、設計書をGitHub Pagesに公開する。

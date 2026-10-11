@@ -1,11 +1,11 @@
 ---
 type: ADR
-title: 'ADR-076: OpenAPI 契約の operation と status の組ごとに、MockMvc の契約テストの宣言を検査する'
+title: 'ADR-077: OpenAPI 契約の operation と status の組ごとに、MockMvc の契約テストの宣言を検査する'
 description: 契約テストは @ContractCase で確かめる operation と status の組を宣言し、ApiContractCoverageTest がコミット済みの openapi/openapi.yaml と /error の status の組をすべて宣言と突き合わせる。共通の 500 と GET の 403 は理由付きで除外する決定。
 tags: [adr, testing, openapi, web-api]
 ---
 
-# ADR-076: OpenAPI 契約の operation と status の組ごとに、MockMvc の契約テストの宣言を検査する
+# ADR-077: OpenAPI 契約の operation と status の組ごとに、MockMvc の契約テストの宣言を検査する
 
 ## Status
 
