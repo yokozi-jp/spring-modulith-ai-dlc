@@ -83,16 +83,19 @@ class OrderQueryServiceTest {
   @DisplayName("詳細の confirmed は、確定した注文だけ true を返す")
   void confirmedIsTrueOnlyForConfirmedOrder() {
     final UUID pen = TestProducts.onSale(dsl, UniqueCodes.next("P"), "120.00");
-    final String confirmed = draft(UniqueCodes.next("C"), pen, 1, pen, 1);
-    final String cancelled = draft(UniqueCodes.next("C"), pen, 1, pen, 1);
-    observed(() -> confirmOrder.handle(new ConfirmOrderCommand(confirmed, new ExpectedLockNo(1))));
-    observed(() -> cancelOrder.handle(new CancelOrderCommand(cancelled, new ExpectedLockNo(1))));
+    final String confirmedOrderId = draft(UniqueCodes.next("C"), pen, 1, pen, 1);
+    final String cancelledOrderId = draft(UniqueCodes.next("C"), pen, 1, pen, 1);
+    observed(
+        () ->
+            confirmOrder.handle(new ConfirmOrderCommand(confirmedOrderId, new ExpectedLockNo(1))));
+    observed(
+        () -> cancelOrder.handle(new CancelOrderCommand(cancelledOrderId, new ExpectedLockNo(1))));
 
-    assertThat(orderQueries.findDetails(confirmed))
-        .as("orderId=%s の確定", confirmed)
+    assertThat(orderQueries.findDetails(confirmedOrderId))
+        .as("orderId=%s の確定", confirmedOrderId)
         .hasValueSatisfying(details -> assertThat(details.confirmed()).isTrue());
-    assertThat(orderQueries.findDetails(cancelled))
-        .as("orderId=%s の確定", cancelled)
+    assertThat(orderQueries.findDetails(cancelledOrderId))
+        .as("orderId=%s の確定", cancelledOrderId)
         .hasValueSatisfying(details -> assertThat(details.confirmed()).isFalse());
   }
 

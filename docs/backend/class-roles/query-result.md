@@ -34,9 +34,10 @@ API の応答の形は Presentation の `<QueryResult>Response` が決めるた�
 - `public record` にし、アノテーションを付けない。
 - component は Java の標準型（`String`、`int`、`BigDecimal`、`Instant`、`List`）と、同じルートの record と enum だけにする。
 - 集約の状態は、Domain の enum ではなく `OrderStatus.name()` の文字列で持つ。
-- 他モジュールが集約の状態で分岐するときは、状態を持つモジュールが分岐の意味を表す項目（`boolean confirmed`、`boolean onSale`）を足す。
-  読む側が `"CONFIRMED".equals(details.status())` のように状態の名前を文字列で比べると、持ち主が enum の定数の名前を変えてもコンパイルが通り、分岐だけが黙って壊れる。
-  状態の意味が定数ごとに決まるとき（販売中か）は、enum のコンストラクタの引数に持たせ、定数を足すときに決め忘れるとコンパイルで失敗させる。
+- 状態の名前の文字列と並べて、他モジュールが分岐に使う状態の意味を boolean の項目（`boolean confirmed`、`boolean onSale`）で持つ。
+  項目の値は、Domain の enum が定数ごとに持つ意味（[値オブジェクト](value-object.md)の「必須の記述」）を写す（`order.status().isConfirmed()`）。
+- 他モジュールは状態の名前を読まず、意味の項目で分岐する。
+  理由と例外は [ADR-075](../../adr/ADR-075-return-state-meaning-in-query-results.md) に示す。
 - 一覧の1行と1件の詳細は、集約の `lockNo()` を `long lockNo` に持つ。
   クライアントは、この値を更新の本文で送り返す（[更新の競合制御](../../web-api/optimistic-locking.md)）。
   利用者が判断に使った表示の版を送り返すためであり、更新の直前に版を取り直して差し替えると、ほかの人の更新に気づかず上書きし、楽観的ロックの意味がなくなる。
@@ -79,6 +80,7 @@ public record OrderDetails(
     String orderId,
     String customerId,
     String status,
+    boolean confirmed,
     List<OrderDetails.Line> lines,
     BigDecimal subtotal,
     BigDecimal discount,
@@ -112,6 +114,7 @@ ArchUnit が形を検査し、この record を使う側のテストが中身を
   応答の形を変えると、他モジュールとの契約も変わる。
 - 状態を Domain の `OrderStatus` で持つ。
 - 他モジュールが状態の名前の文字列を比べて分岐する。
+- QueryService が定数と比べて意味の項目を作る（`order.status() == OrderStatus.CONFIRMED`）。
 - `List` の component をコピーせずに持つ。
 
 ## 作成時のチェックリスト
@@ -121,7 +124,8 @@ ArchUnit が形を検査し、この record を使う側のテストが中身を
 - [ ] 一覧の1行と1件の詳細を別の record にし、内容を表す名前を付ける。［自分で点検］
 - [ ] 結果の一部はネストした record にする。［自分で点検］
 - [ ] 状態は `OrderStatus.name()` の文字列で持つ。［自分で点検］
-- [ ] 他モジュールが状態で分岐するなら、分岐の意味を表す項目を持ち、読む側に状態の名前を比べさせない。［自分で点検］
+- [ ] 他モジュールが分岐に使う状態の意味を boolean の項目で持ち、Domain の enum の `is<意味>()` の値を写す。［自分で点検］
+- [ ] 他モジュールに状態の名前を読ませない。［ArchUnit で検査：ClassRoleArchTest.queryResultStatusIsNotReadByOtherModules］
 - [ ] 一覧の1行と1件の詳細に `long lockNo` を持つ。［自分で点検］
 - [ ] `List` の component をコンパクトコンストラクタで `List.copyOf` に置き換える。［自分で点検］
 - [ ] アノテーションを付けない。［自分で点検］

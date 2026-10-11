@@ -38,6 +38,7 @@ class ProductQueryServiceTest {
     final UUID eraser = TestProducts.discontinued(dsl, UniqueCodes.next("P"), "80.00");
 
     assertThat(productQueries.findByIds(List.of(pen.toString(), eraser.toString())))
+        .as("productId=%s と %s の販売中", pen, eraser)
         .extracting(ProductSummary::productId, ProductSummary::salesStatus, ProductSummary::onSale)
         .containsExactlyInAnyOrder(
             tuple(pen.toString(), "ON_SALE", true),

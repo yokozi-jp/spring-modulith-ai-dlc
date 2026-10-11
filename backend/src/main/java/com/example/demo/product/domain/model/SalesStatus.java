@@ -7,14 +7,14 @@ public enum SalesStatus {
   /** 販売終了。 */
   DISCONTINUED(false);
 
-  /** 注文できる販売中の状態か。 */
+  /** 販売中の状態か。 */
   private final boolean onSale;
 
   SalesStatus(final boolean onSale) {
     this.onSale = onSale;
   }
 
-  /** 注文できる販売中の状態なら true を返す。 */
+  /** 販売中の状態なら true を返す。 */
   public boolean isOnSale() {
     return onSale;
   }

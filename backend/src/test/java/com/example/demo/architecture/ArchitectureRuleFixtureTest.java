@@ -345,6 +345,14 @@ class ArchitectureRuleFixtureTest {
             ClassRoleArchTest.queryServicesImplementModuleQueries,
             "ordering.application.OrderQueryService"),
         row(
+            "queryResultStatusIsNotReadByOtherModules: status()",
+            ClassRoleArchTest.queryResultStatusIsNotReadByOtherModulesRule(VIOLATING),
+            "inventory.application.OrderStatusGuard.isConfirmed("),
+        row(
+            "queryResultStatusIsNotReadByOtherModules: *Status method reference",
+            ClassRoleArchTest.queryResultStatusIsNotReadByOtherModulesRule(VIOLATING),
+            "inventory.application.OrderStatusGuard.paidStatuses("),
+        row(
             "mappingLibrariesAreNotUsed",
             ClassRoleArchTest.mappingLibrariesAreNotUsed,
             REFLECTIVE_READER + ".defaultRecordMapper("),
@@ -515,6 +523,7 @@ class ArchitectureRuleFixtureTest {
         ClassRoleArchTest.listenersExposeOnlyOnAndCallOneCommandHandler,
         ClassRoleArchTest.requestsAndResponsesArePresentationWebRecordsRule(basePackage),
         ClassRoleArchTest.queryServicesImplementModuleQueries,
+        ClassRoleArchTest.queryResultStatusIsNotReadByOtherModulesRule(basePackage),
         ClassRoleArchTest.mappingLibrariesAreNotUsed,
         ClassRoleArchTest.jooqReflectionMappingIsNotUsed,
         TableWriterArchTest.tableWritesGoThroughTableWriterRule(basePackage),
