@@ -324,7 +324,10 @@ class PackageByFeatureOnionArchitectureTest {
         .adapter("persistence", basePackage + ".*.infrastructure.persistence..")
         .adapter("external-client", basePackage + ".*.infrastructure.client..")
         .ensureAllClassesAreContainedInArchitectureIgnoring(
-            basePackage, basePackage + ".shared.concurrency..", basePackage + ".shared.failure..")
+            basePackage,
+            basePackage + ".shared.concurrency..",
+            basePackage + ".shared.failure..",
+            basePackage + ".shared.events..")
         .withOptionalLayers(true)
         .because(
             "Domain と Application を Web、DB、外部 API の技術詳細から独立させ、テストと変更をしやすくするため。"
@@ -366,27 +369,28 @@ class PackageByFeatureOnionArchitectureTest {
   /**
    * shared の外で shared の型に依存するクラスを、{@code infrastructure.persistence} に限る規則を組み立てる。
    *
-   * <p>shared 自身の中の依存は対象にしない。楽観的ロックの語彙を置く {@code shared.concurrency} と、業務上の失敗の例外を置く {@code
-   * shared.failure} は、どの層からも使えるため対象にしない。
+   * <p>shared 自身の中の依存は対象にしない。楽観的ロックの語彙を置く {@code shared.concurrency}、業務上の失敗の例外を置く {@code
+   * shared.failure}、イベントの再投入の語彙を置く {@code shared.events} は、どの層からも使えるため対象にしない。
    */
   /* package */ static ArchRule sharedModuleIsUsedOnlyByPersistenceAdaptersRule(
       final String basePackage) {
     final String sharedPackage = basePackage + ".shared..";
     final String concurrencyPackage = basePackage + ".shared.concurrency..";
     final String failurePackage = basePackage + ".shared.failure..";
+    final String eventsPackage = basePackage + ".shared.events..";
     return noClasses()
         .that()
         .resideOutsideOfPackages(sharedPackage, PERSISTENCE_PACKAGE)
         .should()
         .dependOnClassesThat(
             resideInAPackage(sharedPackage)
-                .and(not(resideInAnyPackage(concurrencyPackage, failurePackage))))
+                .and(not(resideInAnyPackage(concurrencyPackage, failurePackage, eventsPackage))))
         .because(
             "shared は永続化の技術的な共通処理を置くモジュールであり、"
                 + "使う場所を他のモジュールの infrastructure.persistence に限って、"
                 + "業務の処理が共通処理と共通カラムに依存しないようにするため。"
-                + "どの層からも使ってよいのは、楽観的ロックの語彙を置く shared.concurrency と、"
-                + "業務上の失敗の例外を置く shared.failure だけである。"
+                + "どの層からも使ってよいのは、楽観的ロックの語彙を置く shared.concurrency、"
+                + "業務上の失敗の例外を置く shared.failure、イベントの再投入の語彙を置く shared.events だけである。"
                 + "直し方：shared の型を使う処理を <モジュール>.infrastructure.persistence の "
                 + "Jooq<Aggregate>Repository へ移し、Application と Domain からは Repository を通して使う。"
                 + "規約：docs/backend/architecture.md、"

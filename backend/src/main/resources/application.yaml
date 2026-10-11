@@ -159,7 +159,7 @@ spring:
       republish-outstanding-events-on-restart: false
       # 落ちたまま PUBLISHED、PROCESSING、RESUBMITTED に残った出版を FAILED に戻し、再投入の対象にする（ADR-075）。
       # publication_date から測るため、再投入した出版を早く FAILED に戻すことがあるが、
-      # 再投入のジョブは last_resubmission_date から wait-age を待つため、再投入の後は重ねて動かさない。
+      # 再投入のジョブは last_resubmission_date から wait-age 以上を待つため、再投入の後は重ねて動かさない。
       # 最初の配信が concurrency-limit の空きを待つ間に published を過ぎた出版は重ねて再投入しうる。リスナーの冪等性に頼る。
       staleness:
         published: ${event-publication.resubmission.wait-age}
@@ -176,18 +176,35 @@ spring:
   lifecycle:
     timeout-per-shutdown-phase: 30s
 
-# 失敗したイベント出版の定期の再投入（ADR-075）。
+# 失敗したイベント出版の再投入（ADR-075）。
 event-publication:
   resubmission:
     # 定期の実行と Staleness Monitor を動かすか。テストは false にする。
     enabled: ${EVENT_PUBLICATION_RESUBMISSION_ENABLED}
-    # 最後の試行から再投入するまでの待ち時間。リスナーの処理時間より十分に長くする。
+    # 最初の失敗から 1 回目の再投入までの待ち時間で、2 回目からの待ち時間の基準。リスナーの処理時間より十分に長くする。
     wait-age: ${EVENT_PUBLICATION_RESUBMISSION_WAIT_AGE}
-    # 前の回の終わりから次の回までの間隔。
+    # 前の回の終わりから次の回までの間隔。ロックを持つ下限はこの半分にする。
     interval: ${EVENT_PUBLICATION_RESUBMISSION_INTERVAL}
-    # 環境で変えないため固定値にする。
-    max-resubmissions: 5
+    # 以下は環境で変えないため固定値にする。
     max-per-run: 100
+    # ロックを持つ上限。1 回の実行（max-per-run 件の再投入。concurrency-limit の空きを待つ間も含む）の最長より十分に長くし、interval より長くする。
+    lock-at-most-for: PT10M
+    # リスナーの再投入の方針。リスナーの on に @ResubmissionPolicy("<名前>") を付けて選び、付けなければ default にする。
+    # n 回目の再投入の前に、最後の試行から min(wait-age × multiplier^(n-1), max-wait) だけ待つ。
+    policies:
+      default:
+        max-resubmissions: 5
+        multiplier: 2
+        max-wait: PT1H
+      payment:
+        max-resubmissions: 5
+        multiplier: 2
+        max-wait: PT1H
+  # 手での 1 回の再投入。対象（target）は起動のときだけ環境変数 EVENT_PUBLICATION_RESUBMIT_ONCE_TARGET で渡す。
+  # 渡すと Web のサーバーと定期の実行を動かさず、再投入した出版の処理を待って終了コードを返す。
+  resubmit-once:
+    # 再投入した出版の処理が終わるのを待つ上限。
+    completion-timeout: PT10M
 
 # 決済代行の URL。既定値を置かず、未設定なら起動に失敗する。ローカルと E2E だけが WireMock を指す。
 payment-gateway:

@@ -72,6 +72,19 @@
                 { "key": "event_publication.exhausted.count", "value": { "intValue": "1" } },
                 { "key": "user.email", "value": { "stringValue": "person@example.com" } }
               ]
+            },
+            {
+              "timeUnixNano": "1790000000000000004",
+              "severityNumber": 13,
+              "severityText": "WARN",
+              "body": { "stringValue": "Event publication resubmit-once incomplete" },
+              "attributes": [
+                { "key": "event_publication.resubmitted.count", "value": { "intValue": "4" } },
+                { "key": "event_publication.completed.count", "value": { "intValue": "2" } },
+                { "key": "event_publication.incomplete.count", "value": { "intValue": "2" } },
+                { "key": "event_publication.remaining.count", "value": { "intValue": "5" } },
+                { "key": "user.email", "value": { "stringValue": "person@example.com" } }
+              ]
             }
           ]
         }

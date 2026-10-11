@@ -1,6 +1,7 @@
 package com.example.demo.testkit;
 
 import static com.example.demo.jooq.modulith.Tables.EVENT_PUBLICATION;
+import static com.example.demo.jooq.modulith.Tables.SHEDLOCK;
 
 import com.example.demo.jooq.DefaultCatalog;
 import java.time.Duration;
@@ -22,6 +23,9 @@ import org.springframework.test.context.junit.jupiter.SpringExtension;
  * <p>生成対象は Liquibase 管理テーブル（{@code DATABASECHANGELOG} など）を codegen で除外済みなので、
  * マイグレーション状態を壊さずアプリのデータだけを消す。テーブルを追加して codegen を再生成すれば、 後始末の対象も自動で増える。コミットを伴う {@link
  * CommittedDatabaseTest} 用の後始末機構。
+ *
+ * <p>ShedLock の表（{@code modulith.shedlock}）は消さない。ShedLock
+ * はロックの行を作ったことをメモリに覚え、行を消すと同じ文脈では作り直さず、ロックを取れなくなるためである（ADR-075）。
  *
  * <p>消す前に、未完了のイベント出版（{@code PUBLISHED}、{@code PROCESSING}、{@code RESUBMITTED}）がなくなるまで待つ。非同期の
  * Listener はテストの本体が終わった後にコミットすることがあり、消した後に書いた決済記録や出版が次のテストに残るためである。{@code FAILED} は終わった状態なので待たない。
@@ -45,6 +49,9 @@ public final class CleanGeneratedTablesExtension implements AfterEachCallback {
                     == 0);
     for (final Schema schema : DefaultCatalog.DEFAULT_CATALOG.getSchemas()) {
       for (final Table<?> table : schema.getTables()) {
+        if (SHEDLOCK.equals(table)) {
+          continue;
+        }
         dslContext.deleteFrom(table).execute();
       }
     }

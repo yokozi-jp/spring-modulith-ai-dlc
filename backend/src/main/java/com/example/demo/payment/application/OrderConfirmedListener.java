@@ -1,6 +1,7 @@
 package com.example.demo.payment.application;
 
 import com.example.demo.ordering.OrderConfirmed;
+import com.example.demo.shared.events.ResubmissionPolicy;
 import org.springframework.modulith.events.ApplicationModuleListener;
 import org.springframework.stereotype.Service;
 
@@ -18,8 +19,9 @@ class OrderConfirmedListener {
     this.chargeOrder = chargeOrder;
   }
 
-  /** イベントから Command を作り、CommandHandler へ渡す。 */
+  /** イベントから Command を作り、CommandHandler へ渡す。失敗した出版は payment の方針で再投入する（ADR-075）。 */
   @ApplicationModuleListener
+  @ResubmissionPolicy("payment")
   public void on(final OrderConfirmed event) {
     chargeOrder.handle(new ChargeOrderCommand(event.orderId()));
   }

@@ -182,10 +182,7 @@ class TableWriterArchTest {
   /** 期待する jOOQ の実行時の版。上げるときは H1 の禁止の一覧を見直す。 */
   private static final String REVIEWED_JOOQ_VERSION = "3.21.7";
 
-  /**
-   * 業務テーブルの UPDATE と DELETE は、TableWriter、LockedRoot、DeletedRoot だけが組み立てて実行する（H1）。 接続を直接扱えるのは、この 3
-   * クラスと、advisory lock のために接続を固定する EventPublicationResubmitter だけである。
-   */
+  /** 業務テーブルの UPDATE と DELETE は、TableWriter、LockedRoot、DeletedRoot だけが組み立てて実行する（H1）。 */
   @ArchTest
   /* package */ static final ArchRule tableWritesGoThroughTableWriter =
       tableWritesGoThroughTableWriterRule(BASE_PACKAGE);
@@ -266,12 +263,7 @@ class TableWriterArchTest {
     assertThat(annotated).containsExactlyInAnyOrderElementsOf(UNVERSIONED_WRITES);
   }
 
-  /**
-   * H1 の規則を組み立てる。例外は基底パッケージの shared にある 4 クラスだけにする。
-   *
-   * <p>{@code EventPublicationResubmitter} は、セッションの advisory lock のために接続を 1
-   * 本固定する（ADR-075）。業務テーブルを書かず、 {@code modulith.event_publication} を読むだけである。
-   */
+  /** H1 の規則を組み立てる。例外は基底パッケージの shared にある 3 クラスだけにする。 */
   /* package */ static ArchRule tableWritesGoThroughTableWriterRule(final String basePackage) {
     final String writerPackage = basePackage + WRITER_PACKAGE;
     return noClasses()
@@ -281,8 +273,6 @@ class TableWriterArchTest {
         .doNotHaveFullyQualifiedName(writerPackage + "LockedRoot")
         .and()
         .doNotHaveFullyQualifiedName(writerPackage + "DeletedRoot")
-        .and()
-        .doNotHaveFullyQualifiedName(writerPackage + "EventPublicationResubmitter")
         .should()
         .accessTargetWhere(
             DescribedPredicate.describe(

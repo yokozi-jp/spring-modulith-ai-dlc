@@ -9,24 +9,25 @@ import io.micrometer.core.instrument.TimeGauge;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
-import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
 import lombok.extern.slf4j.Slf4j;
+import net.javacrumbs.shedlock.core.LockConfiguration;
+import net.javacrumbs.shedlock.core.LockingTaskExecutor;
+import net.javacrumbs.shedlock.support.LockException;
 import org.jooq.Condition;
 import org.jooq.DSLContext;
-import org.jooq.Field;
 import org.jooq.Record4;
 import org.jooq.Record5;
 import org.jooq.Result;
 import org.jooq.impl.DSL;
 import org.jspecify.annotations.Nullable;
-import org.springframework.modulith.events.EventPublication;
 import org.springframework.modulith.events.FailedEventPublications;
 import org.springframework.modulith.events.ResubmissionOptions;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -35,23 +36,15 @@ import org.springframework.stereotype.Component;
 /**
  * 失敗したイベント出版を定期的に再投入するジョブ（ADR-075）。
  *
- * <p>PostgreSQL のセッションの advisory lock を取れたインスタンスだけが、待ち時間を過ぎ、再投入の回数が上限未満の {@code FAILED}
- * の出版を再投入する。上限に達した出版は ERROR のログで知らせ、自動の対象から外す。
- *
- * <p>ロックを持つ間は接続を 1 本固定するため、H1 の規則（{@code tableWritesGoThroughTableWriter}）の例外である。業務テーブルを書かず、 {@code
- * modulith.event_publication} を読むだけにする。
+ * <p>ShedLock のロックを取れたインスタンスだけが、リスナーの方針（{@link ResubmissionPolicies}）の待ち時間を過ぎ、再投入の回数が上限未満の {@code
+ * FAILED} の出版を再投入する。上限に達した出版は ERROR のログで知らせ、自動の対象から外す。 件数と最古の経過時間の Gauge は、ロックの外ですべてのインスタンスが集計する。
  */
-// 集計、ロック、通知、再投入の手順を、接続を固定した 1 つの実行に集めるため、メソッドの数の上限を外す。
-@SuppressWarnings("PMD.TooManyMethods")
 @Slf4j
 @Component
 class EventPublicationResubmitter {
 
-  /**
-   * advisory lock のキー。アプリで advisory lock を使うのはこのジョブだけである（ADR-075、
-   * docs/database/postgresql-concurrency-control.md）。
-   */
-  /* package */ static final long LOCK_KEY = 108L;
+  /** 定期の再投入と手での 1 回の再投入が共有するロックの名前。 */
+  /* package */ static final String LOCK_NAME = "event-publication-resubmission";
 
   /** Spring Modulith の失敗した出版の状態。 */
   private static final String FAILED = "FAILED";
@@ -67,6 +60,12 @@ class EventPublicationResubmitter {
 
   /** Spring Modulith の失敗した出版の再投入。 */
   private final FailedEventPublications failedEventPublications;
+
+  /** ロックの実行。 */
+  private final LockingTaskExecutor lockingTaskExecutor;
+
+  /** リスナーの再投入の方針。 */
+  private final ResubmissionPolicies policies;
 
   /** 現在時刻。 */
   private final Clock clock;
@@ -104,11 +103,15 @@ class EventPublicationResubmitter {
   /* package */ EventPublicationResubmitter(
       final DSLContext dsl,
       final FailedEventPublications failedEventPublications,
+      final LockingTaskExecutor eventPublicationLockingTaskExecutor,
+      final ResubmissionPolicies policies,
       final Clock clock,
       final MeterRegistry meterRegistry,
       final EventPublicationResubmissionConfig.Properties properties) {
     this.dsl = dsl;
     this.failedEventPublications = failedEventPublications;
+    this.lockingTaskExecutor = eventPublicationLockingTaskExecutor;
+    this.policies = policies;
     this.clock = clock;
     this.properties = properties;
     this.completedRuns = runs(meterRegistry, "completed");
@@ -151,69 +154,40 @@ class EventPublicationResubmitter {
       initialDelayString = "${event-publication.resubmission.interval}")
   /* package */ void resubmitOnce() {
     try {
-      // Spring Boot の構成（ADR-070 の ExecuteListener、例外の変換、Settings）を保ち、接続だけを固定する。
-      dsl.connection(connection -> runOn(dsl.configuration().derive(connection).dsl()));
+      final Instant now = Instant.now(clock);
+      updateGauges(now);
+      final AtomicReference<@Nullable Run> run = new AtomicReference<>();
+      lockingTaskExecutor.executeWithLock(
+          (Runnable) () -> run.set(new Run(reportExhausted(), resubmit(now))),
+          new LockConfiguration(
+              now, LOCK_NAME, properties.lockAtMostFor(), properties.lockAtLeastFor()));
+      final @Nullable Run done = run.get();
+      if (done == null) {
+        skippedRuns.increment();
+        log.debug("Event publication resubmission skipped");
+        return;
+      }
+      // 解放のあとに数え、解放に失敗した回を completed と failed の両方に数えない。
+      resubmissions.increment(done.resubmitted());
+      if (done.resubmitted() > 0 || done.exhausted() > 0) {
+        log.atInfo()
+            .addKeyValue("event_publication.resubmitted.count", done.resubmitted())
+            .addKeyValue("event_publication.exhausted.count", done.exhausted())
+            .log("Event publications resubmitted");
+      }
+      completedRuns.increment();
     } catch (org.springframework.dao.DataAccessException
-        | org.jooq.exception.DataAccessException e) {
+        | org.jooq.exception.DataAccessException
+        | LockException e) {
       failedRuns.increment();
       log.atWarn().setCause(e).log("Event publication resubmission failed");
     }
   }
 
-  private void runOn(final DSLContext session) {
-    final Instant now = Instant.now(clock);
-    updateGauges(session, now);
-    // ponytail: セッションの advisory lock は接続の直結が前提。実行の途中でこの接続が切れるとロックが消え、その回の残りは排他されない。
-    // その間の重複はリスナーの冪等性に頼る。接続を多重化するプロキシ（RDS Proxy、PgBouncer のトランザクションモード）を入れるときはロックの方式を見直す（ADR-075）。
-    if (!tryLock(session)) {
-      skippedRuns.increment();
-      log.debug("Event publication resubmission skipped");
-      return;
-    }
-    final int exhaustedCount;
-    final int resubmitted;
-    try {
-      exhaustedCount = reportExhausted(session);
-      resubmitted = resubmit(now);
-    } finally {
-      unlock(session);
-    }
-    // 解放のあとに数え、解放に失敗した回を completed と failed の両方に数えない。
-    resubmissions.increment(resubmitted);
-    if (resubmitted > 0 || exhaustedCount > 0) {
-      log.atInfo()
-          .addKeyValue("event_publication.resubmitted.count", resubmitted)
-          .addKeyValue("event_publication.exhausted.count", exhaustedCount)
-          .log("Event publications resubmitted");
-    }
-    completedRuns.increment();
-  }
-
-  private static boolean tryLock(final DSLContext session) {
-    return Boolean.TRUE.equals(
-        session.select(advisoryLockFunction("pg_try_advisory_lock")).fetchOne(0, Boolean.class));
-  }
-
-  private static void unlock(final DSLContext session) {
-    final @Nullable Boolean released =
-        session.select(advisoryLockFunction("pg_advisory_unlock")).fetchOne(0, Boolean.class);
-    if (!Boolean.TRUE.equals(released)) {
-      // ponytail: 偽はこのセッションがロックを持っていない状態。再入で残った回数は数えず、その接続が pool から退く（max-lifetime）までロックが残りうる。
-      // 問題になったら、解放に失敗した接続を pool から外す（Connection.abort）拡張をする。
-      throw new org.jooq.exception.DataAccessException(
-          "pg_advisory_unlock(" + LOCK_KEY + ") returned false");
-    }
-  }
-
-  private static Field<Boolean> advisoryLockFunction(final String function) {
-    return DSL.function(DSL.name(function), Boolean.class, DSL.val(LOCK_KEY));
-  }
-
   private int resubmit(final Instant now) {
-    final Instant cutoff = now.minus(properties.waitAge());
     final AtomicInteger candidates = new AtomicInteger();
-    // ponytail: LIMIT の後に条件が掛かり、2.1.1 の SQL では withMinAge も FAILED に効かないため、毎回 FAILED
-    // の行をすべて読む。行が大量に溜まると毎回の読み込みが重くなる。
+    // ponytail: 2.1.1 では LIMIT が条件の関数より先に掛かり、withMinAge も FAILED に効かないため、毎回 FAILED
+    // の行をすべて読む（ResubmissionQuirksLearningTest）。行が大量に溜まると毎回の読み込みが重くなる。
     // 上限に達した出版は Runbook で片付ける。Spring Modulith が回数の条件を SQL へ渡せるようになったら LIMIT にする。
     failedEventPublications.resubmit(
         ResubmissionOptions.defaults()
@@ -221,32 +195,24 @@ class EventPublicationResubmitter {
             .withBatchSize(Integer.MAX_VALUE)
             .withFilter(
                 publication ->
-                    publication.getCompletionAttempts() <= properties.maxResubmissions()
-                        && lastAttempt(publication).isBefore(cutoff)
+                    policies.isDue(publication, now)
                         && candidates.get() < properties.maxPerRun()
                         && candidates.incrementAndGet() > 0));
     return candidates.get();
   }
 
-  /** 最後の試行の時刻。再投入していなければ最初の試行の時刻。 */
-  private static Instant lastAttempt(final EventPublication publication) {
-    return Objects.requireNonNullElse(
-        publication.getLastResubmissionDate(), publication.getPublicationDate());
-  }
-
   private Condition retryingCondition() {
-    return EVENT_PUBLICATION.COMPLETION_ATTEMPTS.le(properties.maxResubmissions());
+    return EVENT_PUBLICATION.COMPLETION_ATTEMPTS.le(policies.maxResubmissions());
   }
 
   private Condition exhaustedCondition() {
-    return EVENT_PUBLICATION.COMPLETION_ATTEMPTS.gt(properties.maxResubmissions());
+    return EVENT_PUBLICATION.COMPLETION_ATTEMPTS.gt(policies.maxResubmissions());
   }
 
-  /** FAILED の出版の件数と最古の経過時間を集計し、Gauge の値にする。 */
-  private void updateGauges(final DSLContext session, final Instant now) {
+  /** FAILED の出版の件数と最古の経過時間を、リスナーの方針の上限で分けて集計し、Gauge の値にする。 */
+  private void updateGauges(final Instant now) {
     final Record4<Integer, Instant, Integer, Instant> row =
-        session
-            .select(
+        dsl.select(
                 DSL.count().filterWhere(retryingCondition()),
                 DSL.min(EVENT_PUBLICATION.PUBLICATION_DATE).filterWhere(retryingCondition()),
                 DSL.count().filterWhere(exhaustedCondition()),
@@ -265,11 +231,10 @@ class EventPublicationResubmitter {
   }
 
   /** 上限に達した出版のうち、このインスタンスでまだ記録していないものを ERROR で記録し、上限に達した件数を返す。 */
-  private int reportExhausted(final DSLContext session) {
+  private int reportExhausted() {
     // serialized_event はイベントの本文なので読まない（ADR-015）。
     final Result<Record5<UUID, String, String, Instant, Integer>> rows =
-        session
-            .select(
+        dsl.select(
                 EVENT_PUBLICATION.ID,
                 EVENT_PUBLICATION.EVENT_TYPE,
                 EVENT_PUBLICATION.LISTENER_ID,
@@ -280,7 +245,7 @@ class EventPublicationResubmitter {
             .orderBy(EVENT_PUBLICATION.PUBLICATION_DATE)
             .fetch();
     // ponytail: 記録済みの ID はインスタンスのメモリにあるため、同じ出版の ERROR はロックを取ったインスタンスの数と再起動の回数だけ重なりうる。
-    // 重複を許さなくなったら、記録済みの ID を持つ表を足す。
+    // 監視の通知は event_publication.id でまとめる（Runbook）。重複を DB で防ぐ必要が出たら、記録済みの ID を持つ表を足す。
     reported.retainAll(rows.stream().map(Record5::value1).collect(Collectors.toSet()));
     int reportedThisRun = 0;
     for (final Record5<UUID, String, String, Instant, Integer> row : rows) {
@@ -299,4 +264,12 @@ class EventPublicationResubmitter {
     }
     return rows.size();
   }
+
+  /**
+   * ロックの中の 1 回の実行の結果。
+   *
+   * @param exhausted 上限に達した出版の件数
+   * @param resubmitted 再投入の候補にした出版の件数
+   */
+  private record Run(int exhausted, int resubmitted) {}
 }
