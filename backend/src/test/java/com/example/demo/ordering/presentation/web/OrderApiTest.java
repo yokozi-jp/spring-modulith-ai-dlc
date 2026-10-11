@@ -312,8 +312,18 @@ class OrderApiTest {
   }
 
   @Test
-  @DisplayName("取り消した注文を確定すると 422 を返す")
+  @DisplayName("下書きの注文を取り消すと 204 を返し、状態を CANCELLED にする")
   @ContractCase(method = RequestMethod.POST, path = "/api/orders/{orderId}/cancel", status = 204)
+  void cancelMakesOrderCancelled() throws Exception {
+    final String orderId = draftAndGetId(UniqueCodes.next("C"), pen, 1);
+
+    operate("POST", orderId, "/cancel", 1).andExpect(status().isNoContent());
+
+    details(orderId).andExpect(jsonPath("$.status").value("CANCELLED"));
+  }
+
+  @Test
+  @DisplayName("取り消した注文を確定すると 422 を返す")
   void confirmCancelledOrderReturnsUnprocessable() throws Exception {
     final String orderId = draftAndGetId(UniqueCodes.next("C"), pen, 1);
     operate("POST", orderId, "/cancel", 1).andExpect(status().isNoContent());

@@ -54,6 +54,9 @@ drift の検査は、契約が実装と一致することを確かめる。
 - **すべての operation の 500**：`ApiExceptionHandler` の catch-all が operation に依らず返し、`ApiErrorContractTest` の未処理例外の case で確かめる。
 - **GET の 403**：`OpenApiConfig` が全 operation に付けるが、GET は CSRF の検査の対象外で、`/api/**` に権限の規則もないため、起こす経路がない。
 
+除外は OpenAPI の operation の組にだけ当て、`/error` の 500 と 403 には当てない。
+`/error` は転送元の status を保つため、この理由が成り立たない。
+
 `main` の欠けていた組には、除外ではなく契約テストを足す。
 
 `test` タスクは、`-PopenapiExport=true` のときを除き、`openapi/openapi.yaml` を入力に宣言する。

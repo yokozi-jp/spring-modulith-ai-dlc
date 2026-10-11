@@ -121,8 +121,15 @@ class ApiContractCoverageTest {
     return EXEMPTIONS.keySet().stream().anyMatch(exemption -> matches(exemption, response));
   }
 
-  /** 除外のキー「メソッド status」が、組「メソッド path status」に当たるかを返す。 */
+  /**
+   * 除外のキー「メソッド status」が、組「メソッド path status」に当たるかを返す。
+   *
+   * <p>除外の理由は OpenAPI の operation にだけ当てはまるため、{@code /error} の組には当てない。
+   */
   private static boolean matches(final String exemption, final String response) {
+    if (response.startsWith(key("GET", "/error", ""))) {
+      return false;
+    }
     final int space = exemption.indexOf(' ');
     final String method = exemption.substring(0, space);
     final String status = exemption.substring(space);
