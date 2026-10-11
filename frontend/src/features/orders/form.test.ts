@@ -1,15 +1,9 @@
-import { createInstance } from "i18next";
 import { describe, expect, it } from "vite-plus/test";
 
-import ja from "@/i18n/locales/ja.json";
+import { t } from "@/testing/catalog-i18n";
 
 import { firstErrorMessage, productOptions } from "./form";
 import { orderStatusLabel, salesStatusLabel } from "./order-status";
-
-// @/i18n は document を使うため、Node のテストでは catalog だけを読んだ instance を作る。
-const i18n = createInstance();
-await i18n.init({ lng: "ja", resources: { ja: { translation: ja } } });
-const { t } = i18n;
 
 describe("order form helpers", () => {
   it("errors の最初の issue の message を返し、なければ undefined を返す", () => {

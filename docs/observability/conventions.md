@@ -58,7 +58,7 @@ Grafana では trace ID を使ってログとトレースを相互に検索す�
 - 氏名、メールアドレス、login ID、住所、電話番号
 
 ログの属性で許可するのは、例外の属性（`exception.type`、`exception.message`、`exception.stacktrace`）、HTTP status、409 の種類（`conflict.kind`）、trace と span の相関情報、業務上必要な内部 ID である。
-イベント出版の定期の再投入と手での 1 回の再投入は、業務上必要な内部 ID として出版の ID、イベントの型とリスナーの完全修飾名、試行の回数（`event_publication.id`、`event_publication.event_type`、`event_publication.listener_id`、`event_publication.completion_attempts`）と、1 回の実行の件数（`event_publication.resubmitted.count`、`event_publication.exhausted.count`）と、手での 1 回の再投入の結果の件数（`event_publication.completed.count`、`event_publication.incomplete.count`、`event_publication.remaining.count`）を出す（[ADR-075](../adr/ADR-075-resubmit-failed-event-publications-periodically-with-shedlock.md)）。
+イベント出版の定期の再投入と手での 1 回の再投入は、業務上必要な内部 ID として出版の ID、イベントの型とリスナーの完全修飾名、試行の回数（`event_publication.id`、`event_publication.event_type`、`event_publication.listener_id`、`event_publication.completion_attempts`）と、1 回の実行の件数（`event_publication.resubmitted.count`、`event_publication.exhausted.count`）と、手での 1 回の再投入の結果の件数（`event_publication.completed.count`、`event_publication.incomplete.count`、`event_publication.remaining.count`）を出す（[ADR-077](../adr/ADR-077-resubmit-failed-event-publications-periodically-with-shedlock.md)）。
 イベントの本文（`serialized_event`）は読まず、ログへ渡さない。
 内部 ID と氏名などの表示値を同じ event へ載せない。
 HTTP の URL パスは span に入るため、API のパスに個人データと秘密情報を置かない。

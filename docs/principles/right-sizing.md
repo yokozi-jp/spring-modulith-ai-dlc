@@ -49,7 +49,7 @@ tags: [convention, principles, architecture, future-arch-guidelines]
 - 実行基盤（ECS、Kubernetes、単一のホストなど）。
 - メッセージブローカーの有無。
 
-たとえば、セッションの advisory lock で定期のジョブを 1 台に絞る設計は、接続の経路が直結であることを前提にするため入れず、DB の表で持つロック（ShedLock）にする（[ADR-075](../adr/ADR-075-resubmit-failed-event-publications-periodically-with-shedlock.md)）。
+たとえば、セッションの advisory lock で定期のジョブを 1 台に絞る設計は、接続の経路が直結であることを前提にするため入れず、DB の表で持つロック（ShedLock）にする（[ADR-077](../adr/ADR-077-resubmit-failed-event-publications-periodically-with-shedlock.md)）。
 本番のコードがセッションに状態を残す SQL を使わないことは、`task lint-session-sql` が検査する（[Lintとテストのリファレンス](../tooling/lint-and-test.md)）。
 
 一方で、利用先に依存しない上限（件数、計算量、全件の走査など）は、上限と作り替えのきっかけを `ponytail:` のコメントで書けば残してよい。

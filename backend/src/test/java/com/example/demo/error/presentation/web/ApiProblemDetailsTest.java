@@ -14,6 +14,7 @@ import org.junit.jupiter.params.provider.CsvSource;
 import org.springframework.context.support.StaticMessageSource;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.HttpStatusCode;
 import org.springframework.http.ProblemDetail;
 
 /** Problem Details の公開情報と応答ヘッダを API 契約へ正規化することを検証する。 */
@@ -63,6 +64,35 @@ class ApiProblemDetailsTest {
     problemDetails.normalize(problem, HttpStatus.CONFLICT, Locale.forLanguageTag(language));
 
     assertEquals(title, problem.getTitle(), "MessageSource の title");
+  }
+
+  @ParameterizedTest
+  @CsvSource({
+    "499, ja, リクエストが不正です",
+    "499, en, Bad Request",
+    "599, ja, サーバー内部エラー",
+    "599, en, Internal Server Error",
+    // fr は key を登録しないので、400 と 500 の reason phrase になる。
+    "499, fr, Bad Request",
+    "599, fr, Internal Server Error"
+  })
+  @DisplayName("HttpStatus に定義のない status は status を保ち、4xx は 400、5xx は 500 の title にする")
+  void localizedForStatusKeepsUndefinedStatus(
+      final int code, final String language, final String title) {
+    final StaticMessageSource messages = new StaticMessageSource();
+    messages.addMessage("problem.title.400", Locale.JAPANESE, "リクエストが不正です");
+    messages.addMessage("problem.title.400", Locale.ENGLISH, "Bad Request");
+    messages.addMessage("problem.title.500", Locale.JAPANESE, "サーバー内部エラー");
+    messages.addMessage("problem.title.500", Locale.ENGLISH, "Internal Server Error");
+
+    final ProblemDetail problem =
+        new ApiProblemDetails(messages)
+            .localizedForStatus(HttpStatusCode.valueOf(code), Locale.forLanguageTag(language));
+
+    assertEquals(code, problem.getStatus(), "status: 入力 " + code);
+    assertEquals(URI.create("about:blank"), problem.getType(), "type: 入力 " + code);
+    assertEquals(title, problem.getTitle(), "title: 入力 " + code + ", " + language);
+    assertNull(problem.getDetail(), "detail を付けないこと: 入力 " + code);
   }
 
   @ParameterizedTest

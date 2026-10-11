@@ -23,7 +23,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 /**
- * 失敗したイベント出版を、運用者の指定で 1 回だけ再投入し、リスナーの処理が終わるまで待つ（ADR-075）。
+ * 失敗したイベント出版を、運用者の指定で 1 回だけ再投入し、リスナーの処理が終わるまで待つ（ADR-077）。
  *
  * <p>定期の再投入の上限に達した出版を、原因を直したあとに手で再投入する入口で使う。待ち時間と回数の上限は見ず、対象に合う {@code FAILED} の出版を {@code
  * max-per-run} 件まで再投入する。定期の再投入と同じロックを取り、取れるまで {@code lock-at-most-for} を上限に待つ。

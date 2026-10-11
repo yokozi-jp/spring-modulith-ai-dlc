@@ -1,10 +1,15 @@
 package com.example.demo;
 
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
+import java.io.IOException;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.health.actuate.endpoint.HealthEndpoint;
 import org.springframework.boot.security.autoconfigure.actuate.web.servlet.EndpointRequest;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.oauth2.client.oidc.web.logout.OidcClientInitiatedLogoutSuccessHandler;
 import org.springframework.security.oauth2.client.registration.ClientRegistrationRepository;
@@ -29,6 +34,7 @@ import org.springframework.web.servlet.HandlerExceptionResolver;
  * management.endpoints.web.base-path} を変えたらここも直す。 拒否する側は {@link EndpointRequest#to}
  * でエンドポイントクラスから解決する。
  */
+@Slf4j
 @Configuration
 public class SecurityConfig {
 
@@ -98,13 +104,21 @@ public class SecurityConfig {
                 exceptions
                     .defaultAuthenticationEntryPointFor(
                         (request, response, exception) ->
-                            handlerExceptionResolver.resolveException(
-                                request, response, null, exception),
+                            resolveOrSendError(
+                                handlerExceptionResolver,
+                                request,
+                                response,
+                                exception,
+                                HttpStatus.UNAUTHORIZED),
                         apiRequests)
                     .defaultAccessDeniedHandlerFor(
                         (request, response, exception) ->
-                            handlerExceptionResolver.resolveException(
-                                request, response, null, exception),
+                            resolveOrSendError(
+                                handlerExceptionResolver,
+                                request,
+                                response,
+                                exception,
+                                HttpStatus.FORBIDDEN),
                         apiRequests))
         .headers(
             headers ->
@@ -133,5 +147,36 @@ public class SecurityConfig {
                     .clearAuthentication(true)
                     .deleteCookies("APP_SESSION"));
     return http.build();
+  }
+
+  /**
+   * 例外を MVC の Problem Details 変換へ渡し、どの resolver も扱わなかったときは WARN を残して {@code status} で sendError する。
+   *
+   * <p>sendError にするとコンテナが {@code /error} へ転送し、{@code ApiErrorController} が Problem Details
+   * を返す。戻り値を捨てると何も書かれず、空の 200 が返る。 応答が commit 済みなら sendError は {@code IllegalStateException}
+   * になるため、WARN だけを残して何も書かない。
+   */
+  /* package */ static void resolveOrSendError(
+      final HandlerExceptionResolver resolver,
+      final HttpServletRequest request,
+      final HttpServletResponse response,
+      final Exception exception,
+      final HttpStatus status)
+      throws IOException {
+    if (resolver.resolveException(request, response, null, exception) != null) {
+      return;
+    }
+    // advice が security の例外を扱わないのは実装の不備なので、通常経路の INFO と区別して WARN で残す。
+    final boolean committed = response.isCommitted();
+    log.atWarn()
+        .setCause(exception)
+        .addKeyValue("http.response.status_code", status.value())
+        .log(
+            committed
+                ? "Unresolved API security exception after commit"
+                : "Unresolved API security exception");
+    if (!committed) {
+      response.sendError(status.value());
+    }
   }
 }

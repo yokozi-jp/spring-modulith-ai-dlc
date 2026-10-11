@@ -54,7 +54,7 @@ final class ChangesetLint {
                       "010-create-shedlock-table: GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE"
                           + " modulith.shedlock TO \"${appDatabaseUsername}\";",
                       "Liquibase OSSにはGRANTのChange Typeがない。"
-                          + "既存のmodulithスキーマに足すShedLockの表へ、アプリロールのDMLを与える（ADR-075）。")))
+                          + "既存のmodulithスキーマに足すShedLockの表へ、アプリロールのDMLを与える（ADR-077）。")))
           .flatMap(List::stream)
           .toList();
 

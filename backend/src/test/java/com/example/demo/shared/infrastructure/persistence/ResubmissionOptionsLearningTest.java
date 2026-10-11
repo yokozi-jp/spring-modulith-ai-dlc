@@ -29,11 +29,11 @@ import org.springframework.test.context.TestPropertySource;
 
 /**
  * Spring Modulith 2.1.1 の {@link FailedEventPublications#resubmit(ResubmissionOptions)}
- * の癖を固定する学習テスト（ADR-075）。
+ * の癖を固定する学習テスト（ADR-077）。
  *
  * <p>{@link EventPublicationResubmitter} と {@link EventPublicationResubmitOnce} は、この癖を前提に、{@code
  * withMinAge} に頼らず条件の関数で待ち時間を判定し、{@code withBatchSize} を {@link Integer#MAX_VALUE} にして FAILED
- * の行をすべて読む。 Spring Modulith の版を上げてこのテストが失敗したら、癖が直ったので、ADR-075 と両方のクラスの読み方（{@code LIMIT} と待ち時間）を見直す。
+ * の行をすべて読む。 Spring Modulith の版を上げてこのテストが失敗したら、癖が直ったので、ADR-077 と両方のクラスの読み方（{@code LIMIT} と待ち時間）を見直す。
  */
 @CommittedDatabaseTest
 @EnableScenarios

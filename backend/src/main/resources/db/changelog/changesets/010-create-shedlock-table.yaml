@@ -6,7 +6,7 @@ databaseChangeLog:
         - dbms:
             type: postgresql
       changes:
-        # ShedLock のロックの表（ADR-075）。列は ShedLock の文書の PostgreSQL の DDL に合わせ、時刻だけを timestamptz にする（ADR-006）。
+        # ShedLock のロックの表（ADR-077）。列は ShedLock の文書の PostgreSQL の DDL に合わせ、時刻だけを timestamptz にする（ADR-006）。
         # ロックの期限は DB の時刻で書き込み、比べるため、インスタンスの時計に依存しない。
         - createTable:
             tableName: shedlock

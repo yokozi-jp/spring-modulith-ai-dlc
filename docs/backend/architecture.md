@@ -153,8 +153,8 @@ Domain の型、Command と Result、Spring MVC の Request と Response、jOOQ 
 `@Modulithic(sharedModules = "shared")` で Spring Modulith の shared モジュールにし、決定は [ADR-048](../adr/ADR-048-add-shared-module-for-jooq-common-code.md) に示す。
 
 - jOOQ の共通処理を `shared.infrastructure.persistence` に置き、このパッケージを `@NamedInterface` で公開する。
-  業務テーブルの UPDATE と DELETE の唯一の入口である `TableWriter` もここに置く（[ADR-054](../adr/ADR-054-detect-optimistic-lock-conflicts-by-update-count.md)）。
-- Spring Modulith のイベント出版のレジストリの、失敗した出版の定期の再投入（`EventPublicationResubmitter`）と手での 1 回の再投入（`EventPublicationResubmitOnce`）も `shared.infrastructure.persistence` に置く（[ADR-075](../adr/ADR-075-resubmit-failed-event-publications-periodically-with-shedlock.md)）。
+  業務テーブルの UPDATE と DELETE を組み立てて実行する唯一の入口で、集約ルートの INSERT の入口である `TableWriter` もここに置く（[ADR-054](../adr/ADR-054-detect-optimistic-lock-conflicts-by-update-count.md)）。
+- Spring Modulith のイベント出版のレジストリの、失敗した出版の定期の再投入（`EventPublicationResubmitter`）と手での 1 回の再投入（`EventPublicationResubmitOnce`）も `shared.infrastructure.persistence` に置く（[ADR-077](../adr/ADR-077-resubmit-failed-event-publications-periodically-with-shedlock.md)）。
   レジストリは全モジュールが共有する基盤で業務の概念を持たず、jOOQ を使う処理は `infrastructure.persistence` に置くためである。
   `EventPublicationResubmitOnce` 以外のクラスは package-private にし、他のモジュールから使えないようにする。
   `EventPublicationResubmitOnce` は、他のモジュールの結合テストがリスナーの回復を確かめるため public にする。
@@ -162,7 +162,7 @@ Domain の型、Command と Result、Spring MVC の Request と Response、jOOQ 
 - 業務上の失敗の例外（`NotFoundException`、`BusinessRuleViolationException`）を `shared.failure` に置き、このパッケージも `@NamedInterface("failure")` で公開する（[ADR-062](../adr/ADR-062-map-business-exceptions-to-404-409-422.md)）。
   `shared` は Spring Web、Spring の HTTP、Servlet の型に依存しない。
   `shared` は Domain と `error` の型、ルートパッケージの型に依存しない。
-- リスナーが失敗した出版の再投入の方針を選ぶ注釈（`ResubmissionPolicy`）を `shared.events` に置き、このパッケージも `@NamedInterface("events")` で公開する（[ADR-075](../adr/ADR-075-resubmit-failed-event-publications-periodically-with-shedlock.md)）。
+- リスナーが失敗した出版の再投入の方針を選ぶ注釈（`ResubmissionPolicy`）を `shared.events` に置き、このパッケージも `@NamedInterface("events")` で公開する（[ADR-077](../adr/ADR-077-resubmit-failed-event-publications-periodically-with-shedlock.md)）。
 - 業務の概念を置かない。
   ルートのパッケージには `package-info.java` だけを置く。
 - `shared.infrastructure.persistence` を使ってよいのは、他のモジュールの `infrastructure.persistence` だけである。

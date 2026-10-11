@@ -36,7 +36,7 @@ Spring Modulith の非同期リスナーは、アプリケーションの task e
 `reject-tasks-when-limit-reached` で断ると出版が未完了のまま残るため、断らずに待たせる。
 本番の pool の大きさを負荷試験で決めたら、上限を pool から導いた環境変数にする。
 
-失敗したイベント出版の再投入のロック（ShedLock）は DB の表の行で持ち、ロックの間も接続を固定しない（[ADR-075](../adr/ADR-075-resubmit-failed-event-publications-periodically-with-shedlock.md)）。
+失敗したイベント出版の再投入のロック（ShedLock）は DB の表の行で持ち、ロックの間も接続を固定しない（[ADR-077](../adr/ADR-077-resubmit-failed-event-publications-periodically-with-shedlock.md)）。
 再投入したリスナーは同じ `concurrency-limit` の中で動き、上限に達するとジョブのスレッドが空きを待つ。
 ロックを持つ上限（`lock-at-most-for`）は、この待ちを含む 1 回の実行（`max-per-run` 件）の最長より長くする。
 

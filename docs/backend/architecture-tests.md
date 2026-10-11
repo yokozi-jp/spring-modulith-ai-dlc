@@ -46,7 +46,7 @@ jOOQの生成物の`com.example.demo.jooq`はOPENのモジュールであり、`
 - `infrastructureDependsOnlyOnDomainModel`：`infrastructure`は`application`、`domain.service`、モジュールルートの型に依存せず、機能モジュールの型のうち`domain.model`だけを使う。
 - `sharedModuleIsUsedOnlyByPersistenceAdapters`：`shared`の外で`shared.concurrency`、`shared.failure`、`shared.events`以外の`shared`の型に依存するクラスは、`infrastructure.persistence`に置く。
   `shared`の中の依存は対象にしない。
-  `shared.concurrency`、`shared.failure`、`shared.events`は、どの層からも使える（[ADR-048](../adr/ADR-048-add-shared-module-for-jooq-common-code.md)、[ADR-062](../adr/ADR-062-map-business-exceptions-to-404-409-422.md)、[ADR-075](../adr/ADR-075-resubmit-failed-event-publications-periodically-with-shedlock.md)）。
+  `shared.concurrency`、`shared.failure`、`shared.events`は、どの層からも使える（[ADR-048](../adr/ADR-048-add-shared-module-for-jooq-common-code.md)、[ADR-062](../adr/ADR-062-map-business-exceptions-to-404-409-422.md)、[ADR-077](../adr/ADR-077-resubmit-failed-event-publications-periodically-with-shedlock.md)）。
 - `sharedModuleDoesNotDependOnHttp`：`shared`の型は、Spring Web、Springの HTTP、Servletの型に依存しない。
 - `moduleApiDoesNotExposeInternalTypes`：モジュールルートの型は、`java..`、`org.jspecify..`、同じルートパッケージの型だけに依存する。
 - `databaseTechnologyApisAreOnlyUsedByPersistenceAdapters`：jOOQ APIと生成型は`infrastructure.persistence`だけで使う。
@@ -86,6 +86,8 @@ jOOQの生成物の`com.example.demo.jooq`はOPENのモジュールであり、`
 - `listenersExposeOnlyOnAndCallOneCommandHandler`：`*Listener`のpublicメソッドは`@ApplicationModuleListener`を付けた`void on(...)`一つだけにし、呼ぶ`*CommandHandler`はちょうど一つにする。
 - `requestsAndResponsesArePresentationWebRecords`：`*Request`と`*Response`は`presentation.web`のrecordにする。
 - `queryServicesImplementModuleQueries`：`*QueryService`は`application`に置いて自モジュールのルートの`*Queries`を実装し、すべてのpublicメソッドに`@Transactional(readOnly = true)`を付ける。
+- `queryResultStatusIsNotReadByOtherModules`：モジュールルートのrecordの`status()`と、名前が`Status`で終わるメソッドを、そのモジュールの外から呼ばず、メソッド参照もしない。
+  ログに注文の状態を出す`payment.application.ChargeOrderCommandHandler`だけを、完全修飾型名で除く（[ADR-077](../adr/ADR-075-return-state-meaning-in-query-results.md)）。
 - `mappingLibrariesAreNotUsed`：MapStruct、ModelMapper、Dozerのパッケージと、jOOQの`DefaultRecordMapper`、`DefaultRecordUnmapper`に依存しない。
 - `jooqReflectionMappingIsNotUsed`：名前のリフレクションで列と項目を対応づけるjOOQのメソッドを呼ばない。
   読み取りは、`into`、`intoMap`、`intoGroups`、`fetchMap`、`fetchGroups`と名前が`Into`で終わるメソッドのうち、`Class`を受け取るもの（`into(Class)`、`fetchInto(Class)`、`fetchMap(Field, Class)`など）を検出する。
@@ -97,7 +99,7 @@ jOOQの生成物の`com.example.demo.jooq`はOPENのモジュールであり、`
 プロダクションの規則は`.allowEmptyShould(true)`を付けるため、対象のクラスがなくても成功する。
 `ArchitectureRuleFixtureTest`は、テスト専用のフィクスチャで各規則が働くことを確かめる。
 
-- `backend/src/test/java/archfixture/conforming/`：規約どおりの`ordering`モジュール、`inventory`モジュール、`shared`モジュールの最小の例。すべての規則が誤検出しないことを確かめる。
+- `backend/src/test/java/archfixture/conforming/`：規約どおりの`ordering`モジュール、`inventory`モジュール、`payment`モジュール、`shared`モジュールの最小の例。すべての規則が誤検出しないことを確かめる。
   `ordering`の`JooqOrderRepository`が`shared.infrastructure.persistence`の型を使い、`shared`のルートは`package-info.java`だけを持つ。
 - `backend/src/test/java/archfixture/violating/`：規則ごとに違反するクラスを置く。各クラスのJavadocに違反する規則名を書く。パラメータ化テストが、規則ごとに対応する違反クラスの完全修飾名を含む失敗を確かめる。
 
@@ -106,6 +108,9 @@ jOOQの生成物の`com.example.demo.jooq`はOPENのモジュールであり、`
 `ArchitectureRuleFixtureTest`は`ClassFileImporter`でフィクスチャを読み込み、ベースパッケージを引数に取る`<規則名>Rule(basePackage)`のファクトリか、規則のフィールドをそのまま使う。
 
 `sharedModuleIsUsedOnlyByPersistenceAdapters`は、違反フィクスチャの`application`の`OrderAuditColumns`が`shared.infrastructure.persistence`の型を使うことを検出し、規約どおりのフィクスチャの`JooqOrderRepository`を誤検出しないことを確かめる。
+
+`queryResultStatusIsNotReadByOtherModules`は、違反フィクスチャの`inventory.application.OrderStatusGuard`が`ordering`の`OrderSummary`の`status()`を呼ぶことと、`paymentStatus`をメソッド参照することを検出する。
+規約どおりのフィクスチャでは、`ordering`の`OrderController`が自モジュールの`OrderSummary::status`を読み、除外する`payment.application.ChargeOrderCommandHandler`が他モジュールの`OrderSummary::status`を読んでも、規則が通ることを確かめる。
 
 `jooqReflectionMappingIsNotUsed`は、違反フィクスチャの`ReflectiveOrderReader`で禁止するメソッドごとに一行を持ち、それぞれの呼び出しを検出することを確かめる。
 
@@ -116,6 +121,7 @@ R1は`ReleaseOrderCommandHandler`（`ReleaseOrderCommand`と`ReleaseOrderRequest
 R2は`ReopenPolicy`（Domain Serviceの`update`と`save`）、`PurgeOrderQueryService`、`JooqOrderRepository.save(OrderId)`（Repositoryの実装から別のRepositoryの`delete`）で確かめる。
 R3は`ForgedLockNoCommandHandler`（コンストラクタと`ExpectedLockNo::new`）と`OrderLockController`で確かめる。
 R4は`ApproveOrderCommandHandler`（`handle`から呼ばないprivateメソッドだけが`ensureLockNo`を呼ぶ）と`OverloadedEnsureCommandHandler`で確かめる。
+`aggregateRootInsertsGoThroughTableWriter`は、違反フィクスチャの`JooqOrderDraftRepository`の`add`（`Insert`の`execute()`の直接の呼び出し）で確かめる。
 `commandsAndResultsAreApplicationRecords`の型単位の除外は、`shared.concurrency`のrecordではない`ForceUnlockCommand`で確かめる。
 規約どおりのフィクスチャには、`shared.concurrency`と`shared.failure`の型と、Requestが`ExpectedLockNo`を作る`CancelOrderRequest`、Listenerが版のないCommandを作る`OrderPlacedExpiryListener`を置く。
 `archfixture.conforming`と`archfixture.violating`の`shared.infrastructure.persistence`には、規則が名前で見る`TableWriter`のスタブを置く。
@@ -189,14 +195,15 @@ Error ProneはすべてのJavaコンパイルで`JavaTimeDefaultTimeZone`と`Jav
 ## 共通カラム
 
 `JooqCommonColumnsArchTest`は、jOOQの生成クラスの`CREATED_*`、`UPDATED_*`、`PATCHED_*`フィールドを参照するクラスが、`com.example.demo.shared.infrastructure.persistence`の外にないことを検査する。
-INSERTの共通カラムは`CommonColumns.forInsert`で、UPDATEとDELETEは`TableWriter`で書く。
+INSERTの共通カラムは`CommonColumns.forInsert`で、UPDATEとDELETEの共通カラムは`TableWriter`で書く。
+集約ルートのINSERTは、`CommonColumns.forInsert`で共通カラムを書いたうえで`TableWriter.insert`で実行する。
 `LOCK_NO`は各モジュールが楽観的ロックの版を読むため対象外にし、書き込みは`ColumnValues`が実行時に拒否する。
 生成したRecordのgetterは検査しない。
 共通カラムの扱いは[PostgreSQLの共通カラム](../database/postgresql-common-columns.md)、sharedモジュールの決定は[ADR-048](../adr/ADR-048-add-shared-module-for-jooq-common-code.md)を参照する。
 
 ## 書き込みの入口
 
-`TableWriterArchTest`は、業務テーブルのUPDATEとDELETEを`shared`の`TableWriter`に集める規則を検査する（[PostgreSQLの排他制御](../database/postgresql-concurrency-control.md)、[ADR-054](../adr/ADR-054-detect-optimistic-lock-conflicts-by-update-count.md)）。
+`TableWriterArchTest`は、業務テーブルのUPDATEとDELETEと集約ルートのINSERTを`shared`の`TableWriter`に集める規則を検査する（[PostgreSQLの排他制御](../database/postgresql-concurrency-control.md)、[ADR-054](../adr/ADR-054-detect-optimistic-lock-conflicts-by-update-count.md)）。
 集約ルートは、`domain.model`にあり、引数のない`long lockNo()`を宣言する型とする。
 
 - `tableWritesGoThroughTableWriter`：`TableWriter`、`LockedRoot`、`DeletedRoot`の外の本番のコードは、次のAPIを呼ばず、メソッド参照もしない。
@@ -230,6 +237,10 @@ INSERTの共通カラムは`CommonColumns.forInsert`で、UPDATEとDELETEは`Tab
   必須の`add`を対象に含めるため、`save`のような名前で保存するRepositoryでも、`lockNo()`を持たない集約は`add`で検出される。
 - `aggregateMethodsDoNotUseUnversionedWrites`：集約ルートを引数に取るメソッドとラムダは、`updateWhere`と`deleteWhere`を呼ばない。
   ラムダは捕捉した変数を引数に持つ合成メソッドになるため、同じ判定で見る。
+- `aggregateRootInsertsGoThroughTableWriter`：`Jooq*Repository`の`add`とその中のラムダは、`Insert`に代入できる型の`execute`、`executeAsync`、`returning`、`returningResult`と、名前が`fetch`で始まるメソッドを呼ばない。
+  集約ルートのINSERTは`TableWriter.insert`に渡し、子の行のINSERTは`dsl.batch`で実行する。
+  `update`で子の行のINSERTを直接実行するため、対象を`add`に限る。
+  検出しない書き方は[ADR-054](../adr/ADR-054-detect-optimistic-lock-conflicts-by-update-count.md)のNegativeに示す。
 - R1とR2は、`domain.model`の`*Repository`の`add`以外の書き込みを同じ判定で見つける。
   書き込みは、`update`、`delete`と、集約ルートを受け取るメソッドである。
   `repositoryUpdateAndDeleteCheckVersion`と同じく集約ルートの引数で選ぶため、`save`のような別名でも規則を外れない。

@@ -29,9 +29,6 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class ChargeOrderCommandHandler {
 
-  /** 請求できる注文の状態。 */
-  private static final String CONFIRMED = "CONFIRMED";
-
   /** 決済記録を取り出して保存する Repository。 */
   private final PaymentRepository paymentRepository;
 
@@ -77,9 +74,10 @@ public class ChargeOrderCommandHandler {
             .orElseThrow(
                 () -> new NotFoundException("order not found: orderId=" + command.orderId()));
     // 他モジュールの参照の結果に対する前提の確認であり、決済の業務規則ではないため、集約に置かない。
-    final String orderStatus = details.status();
-    if (!CONFIRMED.equals(orderStatus)) {
+    if (!details.confirmed()) {
       final String orderIdValue = command.orderId();
+      // 状態の名前はログに出すだけで、分岐に使わない（ADR-075 の ArchUnit の例外）。
+      final String orderStatus = details.status();
       log.info(
           "Skipped charging an order that is not confirmed: orderId={}, status={}",
           orderIdValue,

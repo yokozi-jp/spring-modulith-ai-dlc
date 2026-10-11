@@ -19,7 +19,7 @@ class OrderConfirmedListener {
     this.chargeOrder = chargeOrder;
   }
 
-  /** イベントから Command を作り、CommandHandler へ渡す。失敗した出版は payment の方針で再投入する（ADR-075）。 */
+  /** イベントから Command を作り、CommandHandler へ渡す。失敗した出版は payment の方針で再投入する（ADR-077）。 */
   @ApplicationModuleListener
   @ResubmissionPolicy("payment")
   public void on(final OrderConfirmed event) {
