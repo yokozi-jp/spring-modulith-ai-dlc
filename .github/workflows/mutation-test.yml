@@ -1,0 +1,96 @@
+name: Mutation Testing ☕
+
+on:
+  workflow_dispatch:
+  push:
+    branches: ["main"]
+    paths:
+      - "backend/**"
+      - "openapi/**"
+      - ".spectral.yaml"
+      - "docker/compose-test.yml"
+      - "docker/initdb/**"
+      - "docker/wiremock/**"
+      - ".env.test.example"
+      - "Taskfile.yml"
+      - ".github/workflows/mutation-test.yml"
+  # 必須チェックにしないため、PR では Backend CI の push と同じ path filter で起動を絞る（ADR-076）。
+  pull_request:
+    branches: ["**"]
+    paths:
+      - "backend/**"
+      - "openapi/**"
+      - ".spectral.yaml"
+      - "docker/compose-test.yml"
+      - "docker/initdb/**"
+      - "docker/wiremock/**"
+      - ".env.test.example"
+      - "Taskfile.yml"
+      - ".github/workflows/mutation-test.yml"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  # スコアの閾値を持たず、必須チェックにもしない。テストの失敗などで PIT が完走しないときだけ失敗する（ADR-076）。
+  mutation:
+    name: Mutation Testing ☕
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          # PR では origin/<base> との差分から変異させるクラスを求めるため、全履歴を取得する。
+          fetch-depth: 0
+
+      - name: Set up JDK
+        uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
+        with:
+          distribution: corretto
+          java-version: "25"
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@3f5f9adaf7d9fecd50b5935e54106014257a94e6 # v6.4.0
+        with:
+          # cache の扱いは Backend CI の lint ジョブと同じ（ADR-063）。
+          cache-provider: external
+
+      # Backend CI の test ジョブの cache を読み取り専用で復元し、保存はしない。
+      - name: Restore Gradle cache
+        id: gradle-cache
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: gradle-${{ runner.os }}-test-${{ hashFiles('backend/**/*.gradle*', 'backend/gradle/wrapper/gradle-wrapper.properties') }}
+          restore-keys: |
+            gradle-${{ runner.os }}-test-
+
+      - name: Set up Task
+        uses: go-task/setup-task@a00fbb05ce67b35648be3c78cbc9fd85354c757e # v2
+        with:
+          version: "3.53.1"
+          checksum: a54a408f6861ff921f6e87774180db31bacd8c1e7c944ca696db9fea49a82fc7
+
+      # PR では base との差分のクラスだけを変異させ、push と手動実行では全体を変異させる。
+      # 対象の求め方は Taskfile の be-mutation-test にある。
+      - name: Run mutation tests
+        env:
+          CHANGED_SINCE: ${{ github.event_name == 'pull_request' && format('origin/{0}', github.event.pull_request.base.ref) || '' }}
+        run: task mutation-test PIT_CHANGED_SINCE="$CHANGED_SINCE"
+
+      - name: Upload PIT report
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: pitest-report
+          path: backend/build/reports/pitest/
+          if-no-files-found: ignore
+          retention-days: 14

@@ -11,6 +11,8 @@ vars:
   DB_ROLLBACK_TAG: '{{.DB_ROLLBACK_TAG | default ""}}'
   CONFIRM_ROLLBACK: '{{.CONFIRM_ROLLBACK | default ""}}'
   CONFIRM_RESET: '{{.CONFIRM_RESET | default ""}}'
+  # 空なら全体を、git の参照（origin/main など）なら、そこからの差分のクラスだけを PIT で変異させる。
+  PIT_CHANGED_SINCE: '{{.PIT_CHANGED_SINCE | default ""}}'
 
 # 引数なしのtaskは安全なタスク一覧だけを表示する。
 tasks:
@@ -417,16 +419,38 @@ tasks:
       - vp run knip
 
   fe-coverage:
-    desc: フロントエンドの全体branch coverage 85%を検証
+    desc: フロントエンドの全体と各ファイルのbranchとline coverageを検証
     dir: frontend
+    silent: true
     cmds:
+      # 全体の下限は vite.config.ts の thresholds が検査する。
       - vp test run --coverage
+      # ファイルごとの下限は coverage-summary.json で検査する（ADR-076）。
+      # ponytail: Vitest 4.1 の perFile は全体の下限をファイルごとに当てるだけで、別の値を持てない。
+      # perFile にオブジェクトを渡せる版へ上がったら、この検査を vite.config.ts の thresholds.perFile へ移す。
+      - |
+        node --input-type=module <<'NODE'
+        import { readFileSync } from "node:fs";
+
+        const minimum = { branches: 60, lines: 65 };
+        const summary = JSON.parse(readFileSync("coverage/coverage-summary.json", "utf8"));
+        const failures = Object.entries(summary)
+          .filter(([file]) => file !== "total")
+          .flatMap(([file, metrics]) =>
+            Object.entries(minimum)
+              // 計測する行や分岐のないファイル（re-export だけなど）は、JaCoCo と同じく検査しない。
+              .filter(([key, min]) => metrics[key].total > 0 && metrics[key].pct < min)
+              .map(([key, min]) => `${key} ${metrics[key].pct}% < ${min}%: ${file}`),
+          );
+        for (const failure of failures) console.error(`ファイルの coverage が下限を下回りました。${failure}`);
+        process.exit(failures.length === 0 ? 0 : 1);
+        NODE
 
   fe-test-build:
-    desc: フロントエンドの85% branch coverage、テスト、本番ビルドを実行
+    desc: フロントエンドのcoverage検証付きテストと本番ビルドを実行
     dir: frontend
     cmds:
-      - vp test run --coverage
+      - task: fe-coverage
       # ルートの .env で有効にしていても、既定の無効のビルドを検査する（ADR-068）。
       # vp run の script は cache しないので、環境変数がそのまま渡る。build を run.tasks に移すなら cache.env に FRONTEND_OTEL_* を足す。
       - FRONTEND_OTEL_ENABLED=false vp run build
@@ -743,7 +767,24 @@ tasks:
         set -a
         . "../{{.TEST_ENV_FILE}}"
         set +a
-        SPRING_CONFIG_IMPORT="optional:file:../{{.TEST_ENV_FILE}}[.properties]" ./gradlew migrateDatabase pitest
+        # PIT_CHANGED_SINCE があれば、そこからの差分の main のクラスと内部クラスだけを変異させる（ADR-076）。
+        # 差分の取得に失敗したとき、対象のクラスがないとき、多すぎるときは全体を変異させる。
+        # ponytail: 上限の 30 クラスは所要時間の目安で、PR の実測で 60 分の timeout に近づいたら見直す。
+        pit_args=""
+        if [ -n "{{.PIT_CHANGED_SINCE}}" ]; then
+          classes=""
+          if files="$(git diff --relative --name-only --diff-filter=d "{{.PIT_CHANGED_SINCE}}...HEAD" -- 'src/main/java/*.java')"; then
+            classes="$(printf '%s\n' "$files" | grep -v -e '^$' -e 'package-info\.java$' | sed -e 's|^src/main/java/||' -e 's|\.java$||' -e 's|/|.|g' || true)"
+          fi
+          count="$(printf '%s' "$classes" | grep -c . || true)"
+          if [ "$count" -ge 1 ] && [ "$count" -le 30 ]; then
+            pit_args="-PpitTargetClasses=$(printf '%s\n' "$classes" | sed 's/.*/&,&$*/' | paste -sd, -)"
+            echo "差分の ${count} クラスだけを変異させます。" >&2
+          else
+            echo "差分のクラスが ${count} 件のため、全体を変異させます。" >&2
+          fi
+        fi
+        SPRING_CONFIG_IMPORT="optional:file:../{{.TEST_ENV_FILE}}[.properties]" ./gradlew migrateDatabase pitest ${pit_args:+"$pit_args"}
 
   test-deps-up:
     desc: テスト専用の依存スタックを起動
@@ -826,7 +867,7 @@ tasks:
         trap cleanup EXIT
         {{.DOCKER}} compose -f "{{.TEST_COMPOSE_FILE}}" up -d --wait
         task be-verify-migrations TEST_ENV_FILE="{{.TEST_ENV_FILE}}"
-        task be-mutation-test TEST_ENV_FILE="{{.TEST_ENV_FILE}}"
+        task be-mutation-test TEST_ENV_FILE="{{.TEST_ENV_FILE}}" PIT_CHANGED_SINCE="{{.PIT_CHANGED_SINCE}}"
 
   be-sbom:
     desc: バックエンドのCycloneDX SBOMを生成
