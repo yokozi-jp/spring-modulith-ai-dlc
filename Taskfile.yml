@@ -11,6 +11,8 @@ vars:
   DB_ROLLBACK_TAG: '{{.DB_ROLLBACK_TAG | default ""}}'
   CONFIRM_ROLLBACK: '{{.CONFIRM_ROLLBACK | default ""}}'
   CONFIRM_RESET: '{{.CONFIRM_RESET | default ""}}'
+  # 空なら全体を、git の参照（origin/main など）なら、そこからの差分のクラスだけを PIT で変異させる。
+  PIT_CHANGED_SINCE: '{{.PIT_CHANGED_SINCE | default ""}}'
 
 # 引数なしのtaskは安全なタスク一覧だけを表示する。
 tasks:
@@ -417,16 +419,38 @@ tasks:
       - vp run knip
 
   fe-coverage:
-    desc: フロントエンドの全体branch coverage 85%を検証
+    desc: フロントエンドの全体と各ファイルのbranchとline coverageを検証
     dir: frontend
+    silent: true
     cmds:
+      # 全体の下限は vite.config.ts の thresholds が検査する。
       - vp test run --coverage
+      # ファイルごとの下限は coverage-summary.json で検査する（ADR-076）。
+      # ponytail: Vitest 4.1 の perFile は全体の下限をファイルごとに当てるだけで、別の値を持てない。
+      # perFile にオブジェクトを渡せる版へ上がったら、この検査を vite.config.ts の thresholds.perFile へ移す。
+      - |
+        node --input-type=module <<'NODE'
+        import { readFileSync } from "node:fs";
+
+        const minimum = { branches: 60, lines: 65 };
+        const summary = JSON.parse(readFileSync("coverage/coverage-summary.json", "utf8"));
+        const failures = Object.entries(summary)
+          .filter(([file]) => file !== "total")
+          .flatMap(([file, metrics]) =>
+            Object.entries(minimum)
+              // 計測する行や分岐のないファイル（re-export だけなど）は、JaCoCo と同じく検査しない。
+              .filter(([key, min]) => metrics[key].total > 0 && metrics[key].pct < min)
+              .map(([key, min]) => `${key} ${metrics[key].pct}% < ${min}%: ${file}`),
+          );
+        for (const failure of failures) console.error(`ファイルの coverage が下限を下回りました。${failure}`);
+        process.exit(failures.length === 0 ? 0 : 1);
+        NODE
 
   fe-test-build:
-    desc: フロントエンドの85% branch coverage、テスト、本番ビルドを実行
+    desc: フロントエンドのcoverage検証付きテストと本番ビルドを実行
     dir: frontend
     cmds:
-      - vp test run --coverage
+      - task: fe-coverage
       # ルートの .env で有効にしていても、既定の無効のビルドを検査する（ADR-068）。
       # vp run の script は cache しないので、環境変数がそのまま渡る。build を run.tasks に移すなら cache.env に FRONTEND_OTEL_* を足す。
       - FRONTEND_OTEL_ENABLED=false vp run build
@@ -738,12 +762,38 @@ tasks:
     desc: 依存起動済みのテストDBでPITミューテーションテストを実行
     dir: backend
     deps: [_ensure-test-env]
+    # git の参照をシェルの本文へ展開せず、環境変数で渡す。
+    env:
+      PIT_CHANGED_SINCE: '{{.PIT_CHANGED_SINCE}}'
     cmds:
       - |
         set -a
         . "../{{.TEST_ENV_FILE}}"
         set +a
-        SPRING_CONFIG_IMPORT="optional:file:../{{.TEST_ENV_FILE}}[.properties]" ./gradlew migrateDatabase pitest
+        # PIT_CHANGED_SINCE があれば、差分の main のクラスと、差分のテスト（FooTest）が名前で対応する main のクラスだけを変異させる（ADR-076）。
+        # テストは対象のクラスのパッケージ以下に絞る。対象のクラスがなければ PIT を実行しない。
+        target_classes=""
+        target_tests=""
+        if [ -n "$PIT_CHANGED_SINCE" ]; then
+          files="$(git diff --relative --name-only --diff-filter=d --end-of-options "${PIT_CHANGED_SINCE}...HEAD" -- 'src/main/java/*.java' 'src/test/java/*Test.java')"
+          classes="$(printf '%s\n' "$files" | while IFS= read -r f; do
+            case "$f" in
+              *package-info.java | '') continue ;;
+              src/test/java/*) f="src/main/java/${f#src/test/java/}"; f="${f%Test.java}.java"; [ -f "$f" ] || continue ;;
+            esac
+            f="${f#src/main/java/}"
+            printf '%s\n' "${f%.java}" | tr / .
+          done | sort -u)"
+          if [ -z "$classes" ]; then
+            echo "差分に変異させる main のクラスがないため、PIT を実行しません。" >&2
+            exit 0
+          fi
+          target_classes="$(printf '%s\n' "$classes" | sed 's/.*/&,&$*/' | paste -sd, -)"
+          target_tests="$(printf '%s\n' "$classes" | sed 's/\.[^.]*$/.*/' | sort -u | paste -sd, -)"
+          echo "差分の $(printf '%s\n' "$classes" | wc -l | tr -d ' ') クラスを、${target_tests} のテストで変異させます。" >&2
+        fi
+        SPRING_CONFIG_IMPORT="optional:file:../{{.TEST_ENV_FILE}}[.properties]" ./gradlew migrateDatabase pitest \
+          ${target_classes:+"-PpitTargetClasses=$target_classes"} ${target_tests:+"-PpitTargetTests=$target_tests"}
 
   test-deps-up:
     desc: テスト専用の依存スタックを起動
@@ -813,6 +863,8 @@ tasks:
     desc: 隔離依存を使ってバックエンドのPITミューテーションテストを実行
     silent: true
     deps: [_ensure-test-env]
+    env:
+      PIT_CHANGED_SINCE: '{{.PIT_CHANGED_SINCE}}'
     cmds:
       - |
         cleanup() {
@@ -826,7 +878,7 @@ tasks:
         trap cleanup EXIT
         {{.DOCKER}} compose -f "{{.TEST_COMPOSE_FILE}}" up -d --wait
         task be-verify-migrations TEST_ENV_FILE="{{.TEST_ENV_FILE}}"
-        task be-mutation-test TEST_ENV_FILE="{{.TEST_ENV_FILE}}"
+        task be-mutation-test TEST_ENV_FILE="{{.TEST_ENV_FILE}}" PIT_CHANGED_SINCE="$PIT_CHANGED_SINCE"
 
   be-sbom:
     desc: バックエンドのCycloneDX SBOMを生成

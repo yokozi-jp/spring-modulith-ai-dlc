@@ -30,10 +30,16 @@ Dockerを使うTaskは、Dockerがないローカル環境ではスキップし�
   単体で実行すると、コミット済みの契約を自分自身と比べるので、差分を検出できない。
 - **`task be-verify-migrations`**：使い捨てDBでchangesetの適用、rollback、再適用、現在タグを検証する。
 - **`task be-test`**：起動済みのテスト用依存に確定済みchangesetを適用し、テストとcoverage検証を実行する。
+  JaCoCoの下限は、全体のbranch 88%とline 95%、クラスごとのbranch 65%とline 70%で、下回ると失敗する（[ADR-076](../adr/ADR-076-run-mutation-tests-per-change-and-tighten-coverage-gates.md)）。
   `-PopenapiExport=true`を渡すので、`OpenApiContractTest`が`openapi/openapi.yaml`を書き出す。
   素の`./gradlew test`は契約に触れない。
 - **`task be-test-dev`**：起動済みのテスト用依存に作りかけのchangesetを含めて適用し、テストを実行する。
 - **`task be-mutation-test`**：起動済みのテスト用依存でPITを実行する。
+  `PIT_CHANGED_SINCE`にgitの参照（`origin/main`など）を渡すと、そこからの差分の`src/main/java`のクラスと内部クラスだけを変異させる。
+  差分のテスト`FooTest`は、同じパッケージの`Foo`を変異させる対象に加える。
+  テストは対象のクラスのパッケージ以下のものだけを使う。
+  対象のクラスがないときはPITを実行せず、差分を取れないときは失敗する。
+  minionは共有のテストDBを使うため並列にせず、Springの起動を待てるようにtimeoutを既定より広げる。
 - **`task test`**：テスト用依存の起動、`be-verify-migrations`、`be-test`、`api-lint`、後片付けを実行する。
 - **`task test-dev`**：テスト用依存の起動、`be-test-dev`、後片付けを実行する。
 - **`task mutation-test`**：テスト用依存の起動、マイグレーション検証、`be-mutation-test`、後片付けを実行する。
@@ -48,8 +54,9 @@ PITのHTMLとXMLのレポートは、変異対象がある場合に`backend/buil
 - **`task fe-check`**：Oxfmt、Oxlint、TypeScriptの型を非破壊で検査する。
 - **`task fe-knip`**：未参照ファイル、未使用export、未使用依存をKnipで検査する。
 - **`task fe-doctor`**：React Doctorでwarningとerrorを検出し、検出または15分超過で失敗する。
-- **`task fe-coverage`**：VitestのV8 providerで全体branch coverage 85%を検証する。
-- **`task fe-test-build`**：coverage付きテストと、`FRONTEND_OTEL_ENABLED=false`を強制した本番ビルドを実行する。
+- **`task fe-coverage`**：VitestのV8 providerで、全体のbranch 88%とline 95%、ファイルごとのbranch 60%とline 65%を検証する。
+  全体の下限は`vite.config.ts`の`thresholds`が、ファイルごとの下限はTaskが`coverage/coverage-summary.json`から検査する（[ADR-076](../adr/ADR-076-run-mutation-tests-per-change-and-tighten-coverage-gates.md)）。
+- **`task fe-test-build`**：`fe-coverage`と、`FRONTEND_OTEL_ENABLED=false`を強制した本番ビルドを実行する。
   ビルドの後に`dist/assets`を`faro|grafana|opentelemetry|web.?vitals`でgrepし、bundleにFaro、OpenTelemetry JS、Web Vitalsのコードが入っていれば失敗する（[ADR-068](../adr/ADR-068-collect-browser-telemetry-with-faro-via-collector.md)）。
 - **`task fe-verify`**：`fe-check`、`fe-knip`、`fe-test-build`（テレメトリを無効にした本番ビルドとgrepを含む）を実行する。
   テストのうち`frontend/vite-config.test.ts`は、ZAPの10055-6の除外の`evidence`（`docker/zap/passive.yaml`と`active.yaml`）が配信するCSPと一致することも検査する。
@@ -254,12 +261,18 @@ Gitフックの条件とコマンドは[`lefthook.yml`](../../lefthook.yml)を�
 
 ## CI対応
 
-- **`backend-ci.yml`**：`be-lint`相当、`be-verify-migrations`、`be-test`、`be-openapi-check`、手動実行時の`mutation-test`を実行する。
+- **`backend-ci.yml`**：`be-lint`相当、`be-verify-migrations`、`be-test`、`be-openapi-check`を実行する。
   compose-testを止めた後に`test-deps-leftover-check`を実行する。
   契約は`be-test`が書き出し、`be-openapi-check`は`OpenApiContractTest`を再実行しない（[ADR-064](../adr/ADR-064-write-openapi-contract-from-test-task-in-ci.md)）。
   Gradle User Homeは`setup-gradle`の`cache-provider: external`にして、`actions/cache`のrestoreとsaveで扱う。
   keyはビルドファイルのhashで、restore-keysにより直近のmainのcacheを復元する。
   saveはmainのpushで、restoreが完全一致でなかったときだけ行う（[ADR-063](../adr/ADR-063-restore-gradle-cache-with-restore-keys-on-mit-caching.md)）。
+- **`mutation-test.yml`**：Backend CIと同じパスの変更を含むPR、mainへのpush、手動実行で`mutation-test`を実行し、PITのレポートをartifactにする。
+  PRでは`PIT_CHANGED_SINCE=origin/<base>`を渡して差分のクラスだけを、pushと手動実行では全体を変異させる。
+  ジョブのtimeoutはPRで60分、pushと手動実行で180分とし、mainの実行は後のpushで取り消さない。
+  スコアの閾値を持たず、PITが完走しないときだけ失敗する。
+  Backend CIのtestと同じGradle cacheをread-onlyで復元する。
+  必須チェックにしない（[ADR-076](../adr/ADR-076-run-mutation-tests-per-change-and-tighten-coverage-gates.md)）。
 - **`frontend-ci.yml`**：`fe-verify`、`fe-route-tree-check`、`api-client-check`、`fe-doctor`を実行する。
 - **`api-contract.yml`**：`api-lint`、`api-lint-rules-test`、`api-breaking`、`api-docs`を実行し、設計書をartifactにする。
   mainへのpushでは設計書をGitHub Pagesに公開する。
