@@ -68,7 +68,7 @@ describe("注文操作の失敗の通知", () => {
     });
   });
 
-  it("409 を呼び出し側で扱うと明示した画面で競合したら、一般の見出しと説明を出す", () => {
+  it("競合を画面が自分で扱う場合に競合したら、一般の見出しと説明を出す", () => {
     const error = new ApiProblemError(409, { type: "about:blank", title: "Conflict", status: 409 });
 
     expect(
