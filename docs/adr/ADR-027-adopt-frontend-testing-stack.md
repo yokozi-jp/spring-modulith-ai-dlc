@@ -11,6 +11,8 @@ tags: [adr, frontend, testing]
 
 Proposed
 
+coverage の下限（全体の branch 85% だけ）は [ADR-076](ADR-076-run-mutation-tests-per-change-and-tighten-coverage-gates.md) で、全体とファイルごとの branch と line の下限に改める。
+
 ## Date
 
 2026-09-29

@@ -21,10 +21,12 @@ task check
 ## フロントエンドを開発するとき
 
 ```bash
-cd frontend && vp dev
+task fe-dev
 # コードを変更する
-cd .. && task fe-check
+task fe-check
 ```
+
+`frontend/package.json`か`frontend/pnpm-lock.yaml`が変わったとき（ライブラリを追加、更新したときや、それを含む変更をpullしたとき）は、`task fe-dev`の前に`task fe-install`を実行する。
 
 ## APIを変更するとき
 
@@ -43,7 +45,8 @@ task compose-up            # PostgreSQL、Keycloak、Redis、Collector、Grafana
 task be-migrate            # 初回はマイグレーションを明示実行する
 task dev                   # 依存を起動し、バックエンドを起動する
 # 別のターミナルで
-cd frontend && vp dev      # SPAを起動し、APIとOIDCを同一オリジンでproxyする
+task fe-install            # 初回はフロントエンドの依存をインストールする
+task fe-dev                # SPAを起動し、APIとOIDCを同一オリジンでproxyする
 ```
 
 `task dev`（`task be-run`）は、業務データ（product、ordering、payment）が空なら、バックエンドの起動の前に開発用の代表データを入れる。
@@ -104,12 +107,12 @@ task test
 変更した領域の入口Taskを実行し、最後に重複検査を実行する。
 
 ```bash
-task fe-verify
 task verify
+task fe-verify
 task lint-duplicates
 ```
 
-フロントエンドだけ、またはバックエンドだけを変更した場合は、変更していない領域のTaskを省く。
+バックエンドだけ、またはフロントエンドだけを変更した場合は、変更していない領域のTaskを省く。
 `frontend/src/routes/`を変更した場合は、`task fe-route-tree-check`で`routeTree.gen.ts`の再生成漏れがないことを確かめる。
 このTaskは、Collectorのroute allowlistが`routeTree.gen.ts`の`fullPaths`と一致することも確かめる。
 OpenAPI契約かOrvalの設定を変更した場合は、`task api-client-check`で`src/api/generated`の再生成漏れがないことを確かめる。
@@ -131,6 +134,12 @@ task e2e
 
 ```bash
 task mutation-test
+```
+
+PRのCIと同じく差分のクラスだけを変異させるときは、比べる参照を渡す。
+
+```bash
+task mutation-test PIT_CHANGED_SINCE=origin/main
 ```
 
 ## docsを変更するとき
