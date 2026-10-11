@@ -9,7 +9,7 @@ tags: [convention, frontend, testing]
 
 テストは対象ファイルへ併置し、利用者から見える結果をTesting Libraryとuser-eventで検証する。
 APIを使うcomponent testはMSWでHTTP境界を置き換え、`vi.mock`でmoduleを差し替えない。
-画面が提供する状態遷移を検証し、手書きproduction source全体のbranch coverage 85%を維持する。
+画面が提供する状態遷移を検証し、手書きproduction sourceの全体とファイルごとのcoverageの下限を維持する。
 
 ## 配置と実行環境
 
@@ -56,7 +56,9 @@ route loaderとTanStack Queryを組み合わせた画面では、loading、succe
 
 起動処理、test、型宣言、自動生成されたroute tree、Orval生成物を除く手書きproduction source全体をcoverage対象にする。
 
-branch coverage 85%をファイル単位ではなく全体で維持する。
+全体でbranch 88%とline 95%、ファイルごとにbranch 60%とline 65%を維持する。
+計測する分岐や行がないファイルは、ファイルごとの下限を検査しない。
+下限の値の根拠は[ADR-076](../adr/ADR-076-run-mutation-tests-per-change-and-tighten-coverage-gates.md)を参照する。
 
 coverageは検証していないコードを見つけるために使い、数値そのものを目標にしない。
 coverageを上げるためだけのテストは書かない。

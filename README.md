@@ -249,7 +249,8 @@ Docker Compose の操作（サービスの起動、停止、状態確認、Keycl
 
 - バックエンド変更時は push 前に `task verify`（静的解析、OpenAPI 契約検査と、使い捨てDBでのマイグレーション検証とテスト、CI と同じ内容）を実行します。
 - 入力範囲が広い契約にはQuickTheoriesによるプロパティベーステストを使い、通常のテストと一緒に実行します。
-- テストの検出力を確認するときは `task mutation-test` でPITを明示実行しますが、実行コストが高いため `task verify` には含めません。
+- テストの検出力を確認するときは `task mutation-test` でPITを実行しますが、実行コストが高いため `task verify` には含めません。
+  CIでは必須でないMutation TestingのワークフローがPRの差分のクラスと、mainへのpushで全体を変異させます。
 
 ### フロントエンド
 
@@ -262,7 +263,7 @@ Docker Compose の操作（サービスの起動、停止、状態確認、Keycl
 - `task fe-doctor`は手動のReact診断とFrontend CIで実行し、15分以内に完了しない場合は検査を失敗させます。
 - React Doctorのwarningとerrorはどちらもblockingとし、Frontend CIを停止します。
 - LefthookはFrontend変更を検出すると、pre-commitで `task fe-check`、pre-pushで `task fe-test-build` を実行します。
-- Frontend CIはPull Requestと `main` へのpushで `task fe-verify`、`task fe-route-tree-check`、`task api-client-check`、`task fe-doctor` を実行し、Knip、生成済みroute treeとAPI clientの一致、React診断、全体branch coverage 85%を強制します。
+- Frontend CIはPull Requestと `main` へのpushで `task fe-verify`、`task fe-route-tree-check`、`task api-client-check`、`task fe-doctor` を実行し、Knip、生成済みroute treeとAPI clientの一致、React診断、全体とファイルごとのbranchとline coverageの下限を強制します。
 - coverageレポートは `task fe-coverage` で確認でき、CIでは14日間artifactとして保存します。
 
 ### E2E

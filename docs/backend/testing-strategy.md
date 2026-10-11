@@ -23,8 +23,12 @@ tags: [convention, backend, testing]
 - 外部システムのClientのHTTPの変換は、JDKの`HttpServer`を使うSpringを起動しないJUnitテストで検証する。
   リトライ、circuit breaker、イベント出版の状態は、WireMockを使う`@ApplicationModuleTest`で検証する（[外部システムのClient](class-roles/external-client.md)、[ADR-072](../adr/ADR-072-fake-external-systems-with-wiremock.md)）。
 - 既存テストが業務コードの変化を検出できるか確認するときは、PITミューテーションテストを使う。
+  PRでは必須でない`mutation-test.yml`が差分のクラスを変異させるので、生き残った変異をレポートで確かめる。
 
-プロパティベーステストとミューテーションテストの採用理由は[ADR-012](../adr/ADR-012-adopt-property-based-and-mutation-testing.md)を参照する。
+`task be-test`は、JaCoCoで全体のbranch 88%とline 95%、クラスごとのbranch 65%とline 70%を下回ると失敗する。
+下限を満たすためだけのテストは書かず、テストで到達しない分岐は削除するか、振る舞いとして検証する。
+
+プロパティベーステストとミューテーションテストの採用理由は[ADR-012](../adr/ADR-012-adopt-property-based-and-mutation-testing.md)を、PITの実行の契機とcoverageの下限は[ADR-076](../adr/ADR-076-run-mutation-tests-per-change-and-tighten-coverage-gates.md)を参照する。
 DBテストの隔離とトランザクションは[バックエンドのDBテスト](testing-database.md)を参照する。
 テストコード、Springコンテキスト、失敗診断、非同期待機の書き方は[バックエンドのテストコードの書き方](testing-code-style.md)を参照する。
 静的な検査の実装は[バックエンドのアーキテクチャテスト](architecture-tests.md)を参照する。
