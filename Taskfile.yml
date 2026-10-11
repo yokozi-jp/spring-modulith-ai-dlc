@@ -11,6 +11,8 @@ vars:
   DB_ROLLBACK_TAG: '{{.DB_ROLLBACK_TAG | default ""}}'
   CONFIRM_ROLLBACK: '{{.CONFIRM_ROLLBACK | default ""}}'
   CONFIRM_RESET: '{{.CONFIRM_RESET | default ""}}'
+  # 空なら全体を、git の参照（origin/main など）なら、そこからの差分のクラスだけを PIT で変異させる。
+  PIT_CHANGED_SINCE: '{{.PIT_CHANGED_SINCE | default ""}}'
 
 # 引数なしのtaskは安全なタスク一覧だけを表示する。
 tasks:
@@ -119,55 +121,54 @@ tasks:
             exit 1
           fi
         done
-        cleanup() {
-          status=$?
-          trap - EXIT
-          keep=""
-          # 成否にかかわらず backend のログを証拠に残し、秘密の値が入っていれば失敗にする。
-          mkdir -p frontend/test-results
-          compose logs --no-color backend > frontend/test-results/backend.log 2>&1 || true
-          for secret in "$OIDC_CLIENT_SECRET" "$E2E_PASSWORD"; do
-            if [ -n "$secret" ] && grep -F -q -- "$secret" frontend/test-results/backend.log; then
-              echo "frontend/test-results/backend.log に .env.test の OIDC_CLIENT_SECRET か E2E_PASSWORD の値が入っています。ログに出す値を確かめてください。" >&2
-              if [ "$status" -eq 0 ]; then status=1; fi
-            fi
-          done
-          # 値の一致では見つからない、セッションの Cookie の値と JWT の形（eyJ で始まる 3 つの base64url）も失敗にする。
-          if grep -E -q 'APP_SESSION=[^;[:space:]"]+|eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+' frontend/test-results/backend.log; then
-            echo "frontend/test-results/backend.log に APP_SESSION の Cookie の値か JWT の形の文字列が入っています。ログに出す値を確かめてください。" >&2
+        # 本体と後片付けの終了コードの扱いは docs/tooling/taskfile.md の「後片付けと終了コード」を参照する。
+        status=0
+        (
+          set -e
+          (cd frontend && vp install --frozen-lockfile && vp build --mode test && vp exec playwright install chromium)
+          compose build backend
+          compose up -d --wait postgres redis keycloak wiremock
+          task be-migrate COMPOSE_ENV_FILE=.env.test
+          # spec が読む商品と代表の注文を入れる（ADR-073）。.env.test は test の目印と loopback の DB_HOST を持つ。
+          task be-seed COMPOSE_ENV_FILE=.env.test
+          compose up -d --wait backend
+          # healthcheck はコンテナの中から確かめるため、preview の proxy と同じくホストから届くかを別に確かめる。
+          if ! curl --fail --silent --show-error --max-time 5 "http://localhost:${SERVER_PORT}/actuator/health/readiness" >/dev/null; then
+            echo "ホストから backend（localhost:${SERVER_PORT}）へ接続できません。frontend/test-results/backend.log の backend のログを確かめてください。" >&2
+            exit 1
+          fi
+          (cd frontend && vp run e2e)
+        ) || status=$?
+        cleanup_status=0
+        keep=""
+        # 成否にかかわらず backend のログを証拠に残し、秘密の値が入っていれば失敗にする。
+        mkdir -p frontend/test-results || cleanup_status=$?
+        compose logs --no-color backend > frontend/test-results/backend.log 2>&1 || true
+        for secret in "$OIDC_CLIENT_SECRET" "$E2E_PASSWORD"; do
+          if [ -n "$secret" ] && grep -F -q -- "$secret" frontend/test-results/backend.log; then
+            echo "frontend/test-results/backend.log に .env.test の OIDC_CLIENT_SECRET か E2E_PASSWORD の値が入っています。ログに出す値を確かめてください。" >&2
             if [ "$status" -eq 0 ]; then status=1; fi
           fi
-          if [ "$status" -ne 0 ]; then
-            if [ -n "$keep_env" ] && [ -n "$(compose ps -aq 2>/dev/null)" ]; then keep="1"; fi
-          fi
-          cleanup_status=0
-          # Task の shell では EXIT の trap の中の exit が後続の処理を止めないため、exit に頼らず分岐する。
-          if [ -n "$keep" ]; then
-            echo "E2E_KEEP_ENV=1 のため、compose-test のコンテナと volume を残しました。" >&2
-            echo "  backend のログ：{{.DOCKER}} compose -f {{.TEST_COMPOSE_FILE}} --profile e2e logs backend" >&2
-            echo "  （frontend/test-results/backend.log は pnpm e2e の再実行で消える）" >&2
-            echo "  再実行：cd frontend && pnpm e2e" >&2
-            echo "  片付け：{{.DOCKER}} compose -f {{.TEST_COMPOSE_FILE}} --profile e2e down --volumes --remove-orphans" >&2
-          else
-            compose down --volumes --remove-orphans || cleanup_status=$?
-          fi
-          if [ "$status" -ne 0 ]; then exit "$status"; fi
-          exit "$cleanup_status"
-        }
-        trap cleanup EXIT
-        (cd frontend && vp install --frozen-lockfile && vp build --mode test && vp exec playwright install chromium)
-        compose build backend
-        compose up -d --wait postgres redis keycloak wiremock
-        task be-migrate COMPOSE_ENV_FILE=.env.test
-        # spec が読む商品と代表の注文を入れる（ADR-073）。.env.test は test の目印と loopback の DB_HOST を持つ。
-        task be-seed COMPOSE_ENV_FILE=.env.test
-        compose up -d --wait backend
-        # healthcheck はコンテナの中から確かめるため、preview の proxy と同じくホストから届くかを別に確かめる。
-        if ! curl --fail --silent --show-error --max-time 5 "http://localhost:${SERVER_PORT}/actuator/health/readiness" >/dev/null; then
-          echo "ホストから backend（localhost:${SERVER_PORT}）へ接続できません。frontend/test-results/backend.log の backend のログを確かめてください。" >&2
-          exit 1
+        done
+        # 値の一致では見つからない、セッションの Cookie の値と JWT の形（eyJ で始まる 3 つの base64url）も失敗にする。
+        if grep -E -q 'APP_SESSION=[^;[:space:]"]+|eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+' frontend/test-results/backend.log; then
+          echo "frontend/test-results/backend.log に APP_SESSION の Cookie の値か JWT の形の文字列が入っています。ログに出す値を確かめてください。" >&2
+          if [ "$status" -eq 0 ]; then status=1; fi
         fi
-        (cd frontend && vp run e2e)
+        if [ "$status" -ne 0 ]; then
+          if [ -n "$keep_env" ] && [ -n "$(compose ps -aq 2>/dev/null)" ]; then keep="1"; fi
+        fi
+        if [ -n "$keep" ]; then
+          echo "E2E_KEEP_ENV=1 のため、compose-test のコンテナと volume を残しました。" >&2
+          echo "  backend のログ：{{.DOCKER}} compose -f {{.TEST_COMPOSE_FILE}} --profile e2e logs backend" >&2
+          echo "  （frontend/test-results/backend.log は pnpm e2e の再実行で消える）" >&2
+          echo "  再実行：cd frontend && pnpm e2e" >&2
+          echo "  片付け：{{.DOCKER}} compose -f {{.TEST_COMPOSE_FILE}} --profile e2e down --volumes --remove-orphans" >&2
+        else
+          compose down --volumes --remove-orphans || cleanup_status=$?
+        fi
+        if [ "$status" -ne 0 ]; then exit "$status"; fi
+        exit "$cleanup_status"
 
   # ADR
   adr-check:
@@ -378,6 +379,18 @@ tasks:
         ./06-setup-iwe.sh
 
   # Frontend
+  fe-install:
+    desc: フロントエンドの依存をインストール（初回と、package.jsonかpnpm-lock.yamlが変わったとき）
+    dir: frontend
+    cmds:
+      - vp install
+
+  fe-dev:
+    desc: フロントエンドの開発サーバーを起動（APIとOIDCを同一オリジンでproxy）
+    dir: frontend
+    cmds:
+      - vp dev
+
   fe-format:
     desc: フロントエンドをOxfmtで整形
     dir: frontend
@@ -405,16 +418,38 @@ tasks:
       - vp run knip
 
   fe-coverage:
-    desc: フロントエンドの全体branch coverage 85%を検証
+    desc: フロントエンドの全体と各ファイルのbranchとline coverageを検証
     dir: frontend
+    silent: true
     cmds:
+      # 全体の下限は vite.config.ts の thresholds が検査する。
       - vp test run --coverage
+      # ファイルごとの下限は coverage-summary.json で検査する（ADR-076）。
+      # ponytail: Vitest 4.1 の perFile は全体の下限をファイルごとに当てるだけで、別の値を持てない。
+      # perFile にオブジェクトを渡せる版へ上がったら、この検査を vite.config.ts の thresholds.perFile へ移す。
+      - |
+        node --input-type=module <<'NODE'
+        import { readFileSync } from "node:fs";
+
+        const minimum = { branches: 60, lines: 65 };
+        const summary = JSON.parse(readFileSync("coverage/coverage-summary.json", "utf8"));
+        const failures = Object.entries(summary)
+          .filter(([file]) => file !== "total")
+          .flatMap(([file, metrics]) =>
+            Object.entries(minimum)
+              // 計測する行や分岐のないファイル（re-export だけなど）は、JaCoCo と同じく検査しない。
+              .filter(([key, min]) => metrics[key].total > 0 && metrics[key].pct < min)
+              .map(([key, min]) => `${key} ${metrics[key].pct}% < ${min}%: ${file}`),
+          );
+        for (const failure of failures) console.error(`ファイルの coverage が下限を下回りました。${failure}`);
+        process.exit(failures.length === 0 ? 0 : 1);
+        NODE
 
   fe-test-build:
-    desc: フロントエンドの85% branch coverage、テスト、本番ビルドを実行
+    desc: フロントエンドのcoverage検証付きテストと本番ビルドを実行
     dir: frontend
     cmds:
-      - vp test run --coverage
+      - task: fe-coverage
       # ルートの .env で有効にしていても、既定の無効のビルドを検査する（ADR-068）。
       # vp run の script は cache しないので、環境変数がそのまま渡る。build を run.tasks に移すなら cache.env に FRONTEND_OTEL_* を足す。
       - FRONTEND_OTEL_ENABLED=false vp run build
@@ -726,12 +761,38 @@ tasks:
     desc: 依存起動済みのテストDBでPITミューテーションテストを実行
     dir: backend
     deps: [_ensure-test-env]
+    # git の参照をシェルの本文へ展開せず、環境変数で渡す。
+    env:
+      PIT_CHANGED_SINCE: '{{.PIT_CHANGED_SINCE}}'
     cmds:
       - |
         set -a
         . "../{{.TEST_ENV_FILE}}"
         set +a
-        SPRING_CONFIG_IMPORT="optional:file:../{{.TEST_ENV_FILE}}[.properties]" ./gradlew migrateDatabase pitest
+        # PIT_CHANGED_SINCE があれば、差分の main のクラスと、差分のテスト（FooTest）が名前で対応する main のクラスだけを変異させる（ADR-076）。
+        # テストは対象のクラスのパッケージ以下に絞る。対象のクラスがなければ PIT を実行しない。
+        target_classes=""
+        target_tests=""
+        if [ -n "$PIT_CHANGED_SINCE" ]; then
+          files="$(git diff --relative --name-only --diff-filter=d --end-of-options "${PIT_CHANGED_SINCE}...HEAD" -- 'src/main/java/*.java' 'src/test/java/*Test.java')"
+          classes="$(printf '%s\n' "$files" | while IFS= read -r f; do
+            case "$f" in
+              *package-info.java | '') continue ;;
+              src/test/java/*) f="src/main/java/${f#src/test/java/}"; f="${f%Test.java}.java"; [ -f "$f" ] || continue ;;
+            esac
+            f="${f#src/main/java/}"
+            printf '%s\n' "${f%.java}" | tr / .
+          done | sort -u)"
+          if [ -z "$classes" ]; then
+            echo "差分に変異させる main のクラスがないため、PIT を実行しません。" >&2
+            exit 0
+          fi
+          target_classes="$(printf '%s\n' "$classes" | sed 's/.*/&,&$*/' | paste -sd, -)"
+          target_tests="$(printf '%s\n' "$classes" | sed 's/\.[^.]*$/.*/' | sort -u | paste -sd, -)"
+          echo "差分の $(printf '%s\n' "$classes" | wc -l | tr -d ' ') クラスを、${target_tests} のテストで変異させます。" >&2
+        fi
+        SPRING_CONFIG_IMPORT="optional:file:../{{.TEST_ENV_FILE}}[.properties]" ./gradlew migrateDatabase pitest \
+          ${target_classes:+"-PpitTargetClasses=$target_classes"} ${target_tests:+"-PpitTargetTests=$target_tests"}
 
   test-deps-up:
     desc: テスト専用の依存スタックを起動
@@ -765,19 +826,19 @@ tasks:
     deps: [_ensure-test-env]
     cmds:
       - |
-        cleanup() {
-          status=$?
-          trap - EXIT
-          cleanup_status=0
-          {{.DOCKER}} compose -f "{{.TEST_COMPOSE_FILE}}" down --volumes --remove-orphans || cleanup_status=$?
-          if [ "$status" -ne 0 ]; then exit "$status"; fi
-          exit "$cleanup_status"
-        }
-        trap cleanup EXIT
-        {{.DOCKER}} compose -f "{{.TEST_COMPOSE_FILE}}" up -d --wait
-        task be-verify-migrations TEST_ENV_FILE="{{.TEST_ENV_FILE}}"
-        task be-test TEST_ENV_FILE="{{.TEST_ENV_FILE}}"
-        task api-lint
+        # 本体と後片付けの終了コードの扱いは docs/tooling/taskfile.md の「後片付けと終了コード」を参照する。
+        status=0
+        (
+          set -e
+          {{.DOCKER}} compose -f "{{.TEST_COMPOSE_FILE}}" up -d --wait
+          task be-verify-migrations TEST_ENV_FILE="{{.TEST_ENV_FILE}}"
+          task be-test TEST_ENV_FILE="{{.TEST_ENV_FILE}}"
+          task api-lint
+        ) || status=$?
+        cleanup_status=0
+        {{.DOCKER}} compose -f "{{.TEST_COMPOSE_FILE}}" down --volumes --remove-orphans || cleanup_status=$?
+        if [ "$status" -ne 0 ]; then exit "$status"; fi
+        exit "$cleanup_status"
 
   test-dev:
     desc: 隔離依存を起動して作りかけを含むテスト後に片付け
@@ -785,36 +846,38 @@ tasks:
     deps: [_ensure-test-env]
     cmds:
       - |
-        cleanup() {
-          status=$?
-          trap - EXIT
-          cleanup_status=0
-          {{.DOCKER}} compose -f "{{.TEST_COMPOSE_FILE}}" down --volumes --remove-orphans || cleanup_status=$?
-          if [ "$status" -ne 0 ]; then exit "$status"; fi
-          exit "$cleanup_status"
-        }
-        trap cleanup EXIT
-        {{.DOCKER}} compose -f "{{.TEST_COMPOSE_FILE}}" up -d --wait
-        task be-test-dev TEST_ENV_FILE="{{.TEST_ENV_FILE}}"
+        # 本体と後片付けの終了コードの扱いは docs/tooling/taskfile.md の「後片付けと終了コード」を参照する。
+        status=0
+        (
+          set -e
+          {{.DOCKER}} compose -f "{{.TEST_COMPOSE_FILE}}" up -d --wait
+          task be-test-dev TEST_ENV_FILE="{{.TEST_ENV_FILE}}"
+        ) || status=$?
+        cleanup_status=0
+        {{.DOCKER}} compose -f "{{.TEST_COMPOSE_FILE}}" down --volumes --remove-orphans || cleanup_status=$?
+        if [ "$status" -ne 0 ]; then exit "$status"; fi
+        exit "$cleanup_status"
 
   mutation-test:
     desc: 隔離依存を使ってバックエンドのPITミューテーションテストを実行
     silent: true
     deps: [_ensure-test-env]
+    env:
+      PIT_CHANGED_SINCE: '{{.PIT_CHANGED_SINCE}}'
     cmds:
       - |
-        cleanup() {
-          status=$?
-          trap - EXIT
-          cleanup_status=0
-          {{.DOCKER}} compose -f "{{.TEST_COMPOSE_FILE}}" down --volumes --remove-orphans || cleanup_status=$?
-          if [ "$status" -ne 0 ]; then exit "$status"; fi
-          exit "$cleanup_status"
-        }
-        trap cleanup EXIT
-        {{.DOCKER}} compose -f "{{.TEST_COMPOSE_FILE}}" up -d --wait
-        task be-verify-migrations TEST_ENV_FILE="{{.TEST_ENV_FILE}}"
-        task be-mutation-test TEST_ENV_FILE="{{.TEST_ENV_FILE}}"
+        # 本体と後片付けの終了コードの扱いは docs/tooling/taskfile.md の「後片付けと終了コード」を参照する。
+        status=0
+        (
+          set -e
+          {{.DOCKER}} compose -f "{{.TEST_COMPOSE_FILE}}" up -d --wait
+          task be-verify-migrations TEST_ENV_FILE="{{.TEST_ENV_FILE}}"
+          task be-mutation-test TEST_ENV_FILE="{{.TEST_ENV_FILE}}" PIT_CHANGED_SINCE="$PIT_CHANGED_SINCE"
+        ) || status=$?
+        cleanup_status=0
+        {{.DOCKER}} compose -f "{{.TEST_COMPOSE_FILE}}" down --volumes --remove-orphans || cleanup_status=$?
+        if [ "$status" -ne 0 ]; then exit "$status"; fi
+        exit "$cleanup_status"
 
   be-sbom:
     desc: バックエンドのCycloneDX SBOMを生成
@@ -919,18 +982,18 @@ tasks:
     deps: [_ensure-test-env]
     cmds:
       - |
-        cleanup() {
-          status=$?
-          trap - EXIT
-          cleanup_status=0
-          {{.DOCKER}} compose -f "{{.TEST_COMPOSE_FILE}}" down --volumes --remove-orphans || cleanup_status=$?
-          if [ "$status" -ne 0 ]; then exit "$status"; fi
-          exit "$cleanup_status"
-        }
-        trap cleanup EXIT
-        {{.DOCKER}} compose -f "{{.TEST_COMPOSE_FILE}}" up -d --wait
-        task be-openapi-lint TEST_ENV_FILE="{{.TEST_ENV_FILE}}"
-        task api-client-gen
+        # 本体と後片付けの終了コードの扱いは docs/tooling/taskfile.md の「後片付けと終了コード」を参照する。
+        status=0
+        (
+          set -e
+          {{.DOCKER}} compose -f "{{.TEST_COMPOSE_FILE}}" up -d --wait
+          task be-openapi-lint TEST_ENV_FILE="{{.TEST_ENV_FILE}}"
+          task api-client-gen
+        ) || status=$?
+        cleanup_status=0
+        {{.DOCKER}} compose -f "{{.TEST_COMPOSE_FILE}}" down --volumes --remove-orphans || cleanup_status=$?
+        if [ "$status" -ne 0 ]; then exit "$status"; fi
+        exit "$cleanup_status"
 
   api-check:
     desc: api-genで再生成したOpenAPI契約とAPI clientがコミット済みの内容と一致するか検査
@@ -1069,6 +1132,7 @@ tasks:
           rm -rf "$out"
           exit "$status"
         }
+        # 後片付けの失敗は無視する（残るのはコンテナと一時ディレクトリだけ）ため、終了コードを合成せず trap のままにする。
         trap cleanup EXIT
         container="$({{.DOCKER}} run -d -p 127.0.0.1::4318 -p 127.0.0.1::12347 -p 127.0.0.1::12348 \
           -e OTEL_COLLECTOR_OTLP_HTTP_ENDPOINT=0.0.0.0:4318 \
@@ -1384,6 +1448,9 @@ tasks:
         preview_pid_file="$report_dir/preview.pid"
         compose() { {{.DOCKER}} compose -p spring-modulith-dast -f "{{.TEST_COMPOSE_FILE}}" --profile backend-smoke "$@"; }
         fail() { echo "✗ $1" >&2; exit 1; }
+        # 中断で後片付けが走らなかった前回のコンテナと compose を破棄し、名前とポートの衝突を避ける。
+        {{.DOCKER}} rm --force spring-modulith-dast-zap spring-modulith-dast-backend >/dev/null 2>&1 || true
+        compose down --volumes --remove-orphans >/dev/null 2>&1 || true
 
         # 4173 は preview、18081 は backend、18082 は ZAP の proxy、5433、6380、8081、8082 は compose-test が使う。
         for port in 4173 18081 18082 5433 6380 8081 8082; do
@@ -1396,112 +1463,111 @@ tasks:
           fi
         done
 
-        cleanup() {
-          status=$?
-          trap - EXIT
-          cleanup_status=0
-          if [ -s "$preview_pid_file" ]; then
-            preview_pid="$(cat "$preview_pid_file")"
-            # Task の組み込みの kill はプロセスグループを指定できないので、外部の kill を使う。
-            env kill -TERM -- "-$preview_pid" 2>/dev/null || true
-            rm -f "$preview_pid_file"
+        # 本体と後片付けの終了コードの扱いは docs/tooling/taskfile.md の「後片付けと終了コード」を参照する。
+        status=0
+        (
+          set -e
+          rm -rf "$report_dir" && mkdir -p "$report_dir" && chmod a+rwx "$report_dir"
+          {{.DOCKER}} build --tag spring-modulith-backend:dast backend
+          (cd frontend && vp build)
+          compose up -d --wait
+
+          {{.DOCKER}} run --detach --name spring-modulith-dast-backend --network host \
+            --env-file "{{.TEST_ENV_FILE}}" --env SERVER_PORT=18081 \
+            spring-modulith-backend:dast >/dev/null
+          ready=0
+          for attempt in $(seq 1 60); do
+            if curl --fail --silent --output /dev/null http://127.0.0.1:18081/actuator/health/readiness; then ready=1; break; fi
+            if [ -z "$({{.DOCKER}} ps --quiet --filter name=spring-modulith-dast-backend --filter status=running)" ]; then break; fi
+            sleep 2
+          done
+          if [ "$ready" -ne 1 ]; then
+            {{.DOCKER}} logs spring-modulith-dast-backend >&2 || true
+            fail "backend が 18081 で ready になりませんでした。"
           fi
-          {{.DOCKER}} logs spring-modulith-dast-backend >"$report_dir/backend.log" 2>&1 || true
-          {{.DOCKER}} rm --force spring-modulith-dast-zap spring-modulith-dast-backend >/dev/null 2>&1 || true
-          compose down --volumes --remove-orphans || cleanup_status=$?
-          if [ "$status" -ne 0 ]; then exit "$status"; fi
-          exit "$cleanup_status"
-        }
-        trap cleanup EXIT
 
-        rm -rf "$report_dir" && mkdir -p "$report_dir" && chmod a+rwx "$report_dir"
-        {{.DOCKER}} build --tag spring-modulith-backend:dast backend
-        (cd frontend && vp build)
-        compose up -d --wait
+          # preview を別セッションで起動し、片付けでプロセスグループごと止める。
+          # production mode は .env.test を読まないため、--mode test で .env.test の OIDC_ISSUER_URI を .env より優先させ、
+          # CSP の form-action の IdP の origin を backend の issuer と揃える。
+          setsid sh -c 'echo $$ >"$1"; cd frontend && SERVER_PORT=18081 exec vp preview --mode test --host 127.0.0.1 --port 4173' sh "$preview_pid_file" \
+            >"$report_dir/preview.log" 2>&1 &
+          for attempt in $(seq 1 30); do
+            if curl --silent --output /dev/null http://127.0.0.1:4173/; then break; fi
+            sleep 1
+          done
+          # 未認証の /api/missing が 401 なら、preview の proxy が backend へ届いている。
+          code="$(curl --silent --output /dev/null --write-out '%{http_code}' http://localhost:4173/api/missing || true)"
+          if [ "$code" != "401" ]; then
+            cat "$report_dir/preview.log" >&2 || true
+            fail "preview 経由の GET /api/missing が 401 ではありません（$code）。"
+          fi
 
-        {{.DOCKER}} run --detach --name spring-modulith-dast-backend --network host \
-          --env-file "{{.TEST_ENV_FILE}}" --env SERVER_PORT=18081 \
-          spring-modulith-backend:dast >/dev/null
-        ready=0
-        for attempt in $(seq 1 60); do
-          if curl --fail --silent --output /dev/null http://127.0.0.1:18081/actuator/health/readiness; then ready=1; break; fi
-          if [ -z "$({{.DOCKER}} ps --quiet --filter name=spring-modulith-dast-backend --filter status=running)" ]; then break; fi
-          sleep 2
-        done
-        if [ "$ready" -ne 1 ]; then
-          {{.DOCKER}} logs spring-modulith-dast-backend >&2 || true
-          fail "backend が 18081 で ready になりませんでした。"
+          zap() {
+            {{.DOCKER}} run --rm --name spring-modulith-dast-zap --network host \
+              -v "$PWD/docker/zap:/zap/plans:ro" -v "$report_dir:/zap/wrk:rw" \
+              "$zap_image" zap.sh -cmd -port 18082 -autorun "/zap/plans/$1.yaml"
+          }
+          if ! zap preflight; then
+            fail "認証付きの前提確認に失敗しました。GET /api/missing（ログイン）と POST /api/missing（CSRF）がどちらも 404 になる必要があります。"
+          fi
+
+          # ZAP は警告があると 2 で終わる。検出では失敗させないので、0 と 2 だけを成功として扱う。
+          zap_status=0
+          zap "{{.DAST_PLAN}}" || zap_status=$?
+          if [ "$zap_status" -eq 2 ]; then
+            echo "ZAP が警告を報告しました。ログを確認してください。"
+          elif [ "$zap_status" -ne 0 ]; then
+            fail "ZAP の {{.DAST_PLAN}} plan が終了コード $zap_status で失敗しました。"
+          fi
+          # ZAP の生の SARIF は別名で受け取り、変換と検査を通ったものだけを CI がアップロードする名前で置く。
+          # 途中で失敗しても、変換前の SARIF が Code Scanning へ送られない。
+          raw_sarif="$report_dir/zap-{{.DAST_PLAN}}.raw.sarif.json"
+          sarif="$report_dir/zap-{{.DAST_PLAN}}.sarif.tmp"
+          test -s "$raw_sarif" || fail "SARIF が出力されていません。"
+          # Code Scanning は http の URI を受け付けず、リポジトリ内のファイルの位置だけを受け付ける。
+          # そのため、位置を実行した plan のファイルへ書き換え、元の URL はメッセージの末尾に残す。
+          # URL のクエリとフラグメントは OAuth の state や code など実行ごとに変わるため、メッセージと fingerprint から外す。
+          # 位置が同じでも別の警告として残るよう、fingerprint を rule、method、URL、evidence、attack、元のメッセージから作る。
+          # ZAP は risk を level だけで表す（High は error、Medium は warning、Low は note、Informational は none）。
+          # Informational は Code Scanning に送らず、HTML と JSON のレポートに残す。
+          # GitHub は rule の security-severity で重大度を表示するため、level から付ける（GitHub Docs の SARIF support for code scanning）。
+          jq --arg plan "docker/zap/{{.DAST_PLAN}}.yaml" '
+            def to_plan: map(.physicalLocation.artifactLocation = {uri: $plan} | .physicalLocation.region.startLine //= 1);
+            def sev: {error: "8.0", warning: "5.0", note: "2.0"}[. // "warning"];
+            .runs[] |= (del(.artifacts, .originalUriBaseIds) | .results |= map(select((.level // "warning") != "none")
+              | .locations[0] as $loc
+              | (($loc.physicalLocation.artifactLocation.uri // .webRequest.target // "") | sub("[?#].*$"; "")) as $url
+              | .partialFingerprints.primaryLocationLineHash = ([.ruleId, .webRequest.method // "", $url,
+                  ($loc.physicalLocation.region.snippet.text // ""), ($loc.properties.attack // ""), .message.text] | join("|"))
+              | .message.text += "\nURL: \($url)"
+              | .locations |= to_plan
+              | if has("relatedLocations") then .relatedLocations |= to_plan else . end)
+              | (reduce .results[] as $r ({}; .[$r.ruleId] = ([.[$r.ruleId], ($r.level | sev)] | map(select(.)) | max_by(tonumber)))) as $sev
+              | .tool.driver.rules |= map(select($sev[.id]) | .properties["security-severity"] = $sev[.id] | .properties.tags = ["security"]))
+          ' "$raw_sarif" >"$sarif" || fail "SARIF の変換に失敗しました。"
+          jq -e '[.. | objects | .uri? | strings | select(test("^[A-Za-z][A-Za-z0-9+.-]*:"))] | length == 0' "$sarif" >/dev/null \
+            || fail "SARIF に scheme 付きの URI が残っています。"
+          jq -e '[.runs[].results[] | select((.level // "warning") == "none" or has("ruleIndex"))] | length == 0' "$sarif" >/dev/null \
+            || fail "SARIF に Informational の結果か ruleIndex が残っています。"
+          jq -e '[.runs[].results[] | select((.partialFingerprints.primaryLocationLineHash // "" | test("://[^|]*[?#]"))
+              or (.message.text | test("\nURL: [^\n]*[?#]")))] | length == 0' "$sarif" >/dev/null \
+            || fail "SARIF の fingerprint かメッセージの URL にクエリが残っています。"
+          jq -e 'all(.runs[]; .tool.driver.name == "ZAP")' "$sarif" >/dev/null || fail "SARIF の tool 名が ZAP ではありません。"
+          mv "$sarif" "$report_dir/zap-{{.DAST_PLAN}}.sarif.json"
+          echo "DAST のレポートを $report_dir に出力しました。"
+        ) || status=$?
+        cleanup_status=0
+        if [ -s "$preview_pid_file" ]; then
+          preview_pid="$(cat "$preview_pid_file")" || cleanup_status=$?
+          # Task の組み込みの kill はプロセスグループを指定できないので、外部の kill を使う。
+          if [ -n "${preview_pid:-}" ]; then env kill -TERM -- "-$preview_pid" 2>/dev/null || true; fi
+          rm -f "$preview_pid_file" || cleanup_status=$?
         fi
-
-        # preview を別セッションで起動し、片付けでプロセスグループごと止める。
-        # production mode は .env.test を読まないため、--mode test で .env.test の OIDC_ISSUER_URI を .env より優先させ、
-        # CSP の form-action の IdP の origin を backend の issuer と揃える。
-        setsid sh -c 'echo $$ >"$1"; cd frontend && SERVER_PORT=18081 exec vp preview --mode test --host 127.0.0.1 --port 4173' sh "$preview_pid_file" \
-          >"$report_dir/preview.log" 2>&1 &
-        for attempt in $(seq 1 30); do
-          if curl --silent --output /dev/null http://127.0.0.1:4173/; then break; fi
-          sleep 1
-        done
-        # 未認証の /api/missing が 401 なら、preview の proxy が backend へ届いている。
-        code="$(curl --silent --output /dev/null --write-out '%{http_code}' http://localhost:4173/api/missing || true)"
-        if [ "$code" != "401" ]; then
-          cat "$report_dir/preview.log" >&2 || true
-          fail "preview 経由の GET /api/missing が 401 ではありません（$code）。"
-        fi
-
-        zap() {
-          {{.DOCKER}} run --rm --name spring-modulith-dast-zap --network host \
-            -v "$PWD/docker/zap:/zap/plans:ro" -v "$report_dir:/zap/wrk:rw" \
-            "$zap_image" zap.sh -cmd -port 18082 -autorun "/zap/plans/$1.yaml"
-        }
-        if ! zap preflight; then
-          fail "認証付きの前提確認に失敗しました。GET /api/missing（ログイン）と POST /api/missing（CSRF）がどちらも 404 になる必要があります。"
-        fi
-
-        # ZAP は警告があると 2 で終わる。検出では失敗させないので、0 と 2 だけを成功として扱う。
-        zap_status=0
-        zap "{{.DAST_PLAN}}" || zap_status=$?
-        if [ "$zap_status" -eq 2 ]; then
-          echo "ZAP が警告を報告しました。ログを確認してください。"
-        elif [ "$zap_status" -ne 0 ]; then
-          fail "ZAP の {{.DAST_PLAN}} plan が終了コード $zap_status で失敗しました。"
-        fi
-        # ZAP の生の SARIF は別名で受け取り、変換と検査を通ったものだけを CI がアップロードする名前で置く。
-        # 途中で失敗しても、変換前の SARIF が Code Scanning へ送られない。
-        raw_sarif="$report_dir/zap-{{.DAST_PLAN}}.raw.sarif.json"
-        sarif="$report_dir/zap-{{.DAST_PLAN}}.sarif.tmp"
-        test -s "$raw_sarif" || fail "SARIF が出力されていません。"
-        # Code Scanning は http の URI を受け付けず、リポジトリ内のファイルの位置だけを受け付ける。
-        # そのため、位置を実行した plan のファイルへ書き換え、元の URL はメッセージの末尾に残す。
-        # URL のクエリとフラグメントは OAuth の state や code など実行ごとに変わるため、メッセージと fingerprint から外す。
-        # 位置が同じでも別の警告として残るよう、fingerprint を rule、method、URL、evidence、attack、元のメッセージから作る。
-        # ZAP は risk を level だけで表す（High は error、Medium は warning、Low は note、Informational は none）。
-        # Informational は Code Scanning に送らず、HTML と JSON のレポートに残す。
-        # GitHub は rule の security-severity で重大度を表示するため、level から付ける（GitHub Docs の SARIF support for code scanning）。
-        jq --arg plan "docker/zap/{{.DAST_PLAN}}.yaml" '
-          def to_plan: map(.physicalLocation.artifactLocation = {uri: $plan} | .physicalLocation.region.startLine //= 1);
-          def sev: {error: "8.0", warning: "5.0", note: "2.0"}[. // "warning"];
-          .runs[] |= (del(.artifacts, .originalUriBaseIds) | .results |= map(select((.level // "warning") != "none")
-            | .locations[0] as $loc
-            | (($loc.physicalLocation.artifactLocation.uri // .webRequest.target // "") | sub("[?#].*$"; "")) as $url
-            | .partialFingerprints.primaryLocationLineHash = ([.ruleId, .webRequest.method // "", $url,
-                ($loc.physicalLocation.region.snippet.text // ""), ($loc.properties.attack // ""), .message.text] | join("|"))
-            | .message.text += "\nURL: \($url)"
-            | .locations |= to_plan
-            | if has("relatedLocations") then .relatedLocations |= to_plan else . end)
-            | (reduce .results[] as $r ({}; .[$r.ruleId] = ([.[$r.ruleId], ($r.level | sev)] | map(select(.)) | max_by(tonumber)))) as $sev
-            | .tool.driver.rules |= map(select($sev[.id]) | .properties["security-severity"] = $sev[.id] | .properties.tags = ["security"]))
-        ' "$raw_sarif" >"$sarif" || fail "SARIF の変換に失敗しました。"
-        jq -e '[.. | objects | .uri? | strings | select(test("^[A-Za-z][A-Za-z0-9+.-]*:"))] | length == 0' "$sarif" >/dev/null \
-          || fail "SARIF に scheme 付きの URI が残っています。"
-        jq -e '[.runs[].results[] | select((.level // "warning") == "none" or has("ruleIndex"))] | length == 0' "$sarif" >/dev/null \
-          || fail "SARIF に Informational の結果か ruleIndex が残っています。"
-        jq -e '[.runs[].results[] | select((.partialFingerprints.primaryLocationLineHash // "" | test("://[^|]*[?#]"))
-            or (.message.text | test("\nURL: [^\n]*[?#]")))] | length == 0' "$sarif" >/dev/null \
-          || fail "SARIF の fingerprint かメッセージの URL にクエリが残っています。"
-        jq -e 'all(.runs[]; .tool.driver.name == "ZAP")' "$sarif" >/dev/null || fail "SARIF の tool 名が ZAP ではありません。"
-        mv "$sarif" "$report_dir/zap-{{.DAST_PLAN}}.sarif.json"
-        echo "DAST のレポートを $report_dir に出力しました。"
+        {{.DOCKER}} logs spring-modulith-dast-backend >"$report_dir/backend.log" 2>&1 || true
+        {{.DOCKER}} rm --force spring-modulith-dast-zap spring-modulith-dast-backend >/dev/null 2>&1 || true
+        compose down --volumes --remove-orphans || cleanup_status=$?
+        if [ "$status" -ne 0 ]; then exit "$status"; fi
+        exit "$cleanup_status"
 
   # Lint and format
   lint-actions:
@@ -1573,12 +1639,13 @@ tasks:
       - npx --yes markdownlint-cli2 --fix "**/*.md"
 
   lint-taskfile:
-    desc: TaskfileをTask本体で解析しYAML構文とスキーマ構造を検証
+    desc: TaskfileをTask本体で解析しYAML構文とスキーマ構造、後片付けの終了コードを検証
     silent: true
     cmds:
       - |
         task --list-all >/dev/null
         echo "Taskfile OK: YAML構文とスキーマ構造の解析に成功しました。"
+        bash tooling/taskfile-cleanup/test.sh
 
   lint-semgrep:
     desc: Semgrep OSSで静的解析

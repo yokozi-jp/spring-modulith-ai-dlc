@@ -103,3 +103,24 @@ jobs:
 
       - name: Check duplicate code
         run: task lint-duplicates
+
+  taskfile:
+    name: Check Taskfile
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Task
+        uses: go-task/setup-task@a00fbb05ce67b35648be3c78cbc9fd85354c757e # v2
+        with:
+          version: "3.53.1"
+          checksum: a54a408f6861ff921f6e87774180db31bacd8c1e7c944ca696db9fea49a82fc7
+
+      # スキーマ構造と、後片付けの終了コードの fixture を検査する。
+      - name: Check Taskfile
+        run: task lint-taskfile
