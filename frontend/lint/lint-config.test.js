@@ -133,6 +133,18 @@ describe("project lint config on fixtures", () => {
   });
 
   describe("Base UI", () => {
+    describe("Tailwind classes", () => {
+      it("rejects class names built from a value", () => {
+        expect(
+          countIn("features/order/dynamic-class.tsx", "tailwind-classes(no-dynamic-class-name)"),
+        ).toBe(3);
+      });
+
+      it("allows complete classes joined with a value", () => {
+        expect(codesIn("features/order/static-class.tsx")).toStrictEqual([]);
+      });
+    });
+
     it("rejects Base UI outside components/ui", () => {
       expect(countIn("features/order/base-ui.tsx", "eslint(no-restricted-imports)")).toBe(1);
     });

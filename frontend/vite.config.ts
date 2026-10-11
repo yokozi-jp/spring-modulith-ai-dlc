@@ -212,6 +212,7 @@ export default defineConfig(({ mode }) => {
         { name: "local-security", specifier: "./lint/local-security.js" },
         { name: "shadcn", specifier: "@shadcn/lint" },
         { name: "better-tailwindcss", specifier: "eslint-plugin-better-tailwindcss" },
+        { name: "tailwind-classes", specifier: "./lint/tailwind-classes.js" },
         { name: "feature-boundaries", specifier: "./lint/feature-boundaries.js" },
         { name: "ui-composition", specifier: "./lint/ui-composition.js" },
       ],
@@ -292,6 +293,7 @@ export default defineConfig(({ mode }) => {
         "better-tailwindcss/no-unnecessary-whitespace": "error",
         "better-tailwindcss/no-conflicting-classes": "error",
         "better-tailwindcss/enforce-canonical-classes": "error",
+        "tailwind-classes/no-dynamic-class-name": "error",
       },
       settings: {
         "better-tailwindcss": { entryPoint: "src/style.css" },
