@@ -1,7 +1,7 @@
 import { useTranslation } from "react-i18next";
 
 import { useCancelOrder, useConfirmOrder } from "@/api/generated/endpoints/ordering/ordering";
-import { problemNotice, problemStatus } from "@/features/orders/notice";
+import { failureNotice } from "@/features/orders/notice";
 import type { Notice } from "@/features/orders/notice";
 
 /**
@@ -14,23 +14,19 @@ export function useOrderStatusActions(
   setNotice: (notice: Notice | undefined) => void,
 ) {
   const { t } = useTranslation();
-  const confirmMutation = useConfirmOrder();
-  const cancelMutation = useCancelOrder();
+  // 毎回作り直される mutation の結果ではなく、安定した mutate を取り出して React Compiler の memo を効かせる。
+  const { mutate: confirm, isPending: isConfirming } = useConfirmOrder();
+  const { mutate: cancel, isPending: isCancelling } = useCancelOrder();
   const data = { lockNo };
-  const isPending = confirmMutation.isPending || cancelMutation.isPending;
+  const isPending = isConfirming || isCancelling;
 
   const onError = (error: unknown) => {
-    const status = problemStatus(error);
-    if (status === 409) {
-      setNotice(problemNotice(t, error, t("orders.notice.actionConflict")));
-    } else if (status === 422) {
-      setNotice(problemNotice(t, error, t("orders.notice.actionUnprocessable")));
-    } else {
-      setNotice({
-        heading: t("orders.notice.generalTitle"),
-        description: t("orders.notice.generalFailure"),
-      });
-    }
+    setNotice(
+      failureNotice(t, error, {
+        conflict: t("orders.notice.actionConflict"),
+        unprocessable: t("orders.notice.actionUnprocessable"),
+      }),
+    );
   };
 
   return {
@@ -40,7 +36,7 @@ export function useOrderStatusActions(
         return;
       }
       setNotice(undefined);
-      confirmMutation.mutate(
+      confirm(
         { orderId, data },
         {
           onSuccess: () => {
@@ -57,7 +53,7 @@ export function useOrderStatusActions(
         return;
       }
       setNotice(undefined);
-      cancelMutation.mutate(
+      cancel(
         { orderId, data },
         {
           onSuccess: () => {
