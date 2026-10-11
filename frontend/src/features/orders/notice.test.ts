@@ -1,16 +1,10 @@
-import { createInstance } from "i18next";
 import { describe, expect, it } from "vite-plus/test";
 
 import { ApiProblemError } from "@/api/api-fetch";
 import type { ValidationProblem } from "@/api/generated/models";
-import ja from "@/i18n/locales/ja.json";
+import { t } from "@/testing/catalog-i18n";
 
 import { failureNotice, formFailure } from "./notice";
-
-// @/i18n は document を使うため、Node のテストでは catalog だけを読んだ instance を作る。
-const i18n = createInstance();
-await i18n.init({ lng: "ja", resources: { ja: { translation: ja } } });
-const { t } = i18n;
 
 const descriptions = { conflict: "競合の説明", unprocessable: "処理できない説明" };
 const general = {
@@ -18,8 +12,8 @@ const general = {
   description: "時間をおいてもう一度お試しください。",
 };
 
-describe("failure notice", () => {
-  it("409 は backend の title を見出しに、競合の説明を出す", () => {
+describe("注文操作の失敗の通知", () => {
+  it("ほかの操作と競合したら、サーバーの見出しと操作ごとの競合の説明を出す", () => {
     const error = new ApiProblemError(409, { type: "about:blank", title: "Conflict", status: 409 });
 
     expect(failureNotice(t, error, descriptions)).toStrictEqual({
@@ -28,7 +22,7 @@ describe("failure notice", () => {
     });
   });
 
-  it("422 は backend の title を見出しに、処理できない説明を出す", () => {
+  it("業務の規則で受け付けられなかったら、サーバーの見出しと操作ごとの説明を出す", () => {
     const error = new ApiProblemError(422, {
       type: "about:blank",
       title: "Unprocessable",
@@ -41,11 +35,22 @@ describe("failure notice", () => {
     });
   });
 
-  it("API の problem でない失敗は、一般の見出しと説明を出し、message を出さない", () => {
+  it("サーバーの応答でない失敗は、一般の見出しと説明だけを出し、エラーの文を出さない", () => {
     expect(failureNotice(t, new Error("internal"), descriptions)).toStrictEqual(general);
   });
 
-  it("problem の本文がない 409 は、一般の見出しに競合の説明を出す", () => {
+  it("サーバーの内部の失敗は、サーバーが返した見出しと詳細を出さず、一般の見出しと説明だけを出す", () => {
+    const error = new ApiProblemError(500, {
+      type: "about:blank",
+      title: "Internal Server Error",
+      status: 500,
+      detail: "SQLException: relation orders",
+    });
+
+    expect(failureNotice(t, error, descriptions)).toStrictEqual(general);
+  });
+
+  it("サーバーの見出しがない競合は、一般の見出しに競合の説明を出す", () => {
     const error = new ApiProblemError(409, undefined);
 
     expect(failureNotice(t, error, descriptions)).toStrictEqual({
@@ -54,7 +59,22 @@ describe("failure notice", () => {
     });
   });
 
-  it("入力検証の 400 は、入力欄のエラーと入力欄に写せない detail に分ける", () => {
+  it("サーバーの見出しがない業務の規則の失敗は、一般の見出しに操作ごとの説明を出す", () => {
+    const error = new ApiProblemError(422, undefined);
+
+    expect(failureNotice(t, error, descriptions)).toStrictEqual({
+      heading: general.heading,
+      description: "処理できない説明",
+    });
+  });
+
+  it("競合の説明を渡さない画面で競合したら、一般の見出しと説明を出す", () => {
+    const error = new ApiProblemError(409, { type: "about:blank", title: "Conflict", status: 409 });
+
+    expect(failureNotice(t, error, { unprocessable: "処理できない説明" })).toStrictEqual(general);
+  });
+
+  it("入力の誤りは、入力欄ごとのエラーと、入力欄に結びつかない説明に分ける", () => {
     const problem: ValidationProblem = {
       type: "/problems/validation-error",
       title: "Bad Request",
@@ -76,7 +96,7 @@ describe("failure notice", () => {
     });
   });
 
-  it("400 でも入力検証でない失敗は、一般の見出しと説明を出す", () => {
+  it("入力の誤り以外で受け付けられなかったら、一般の見出しと説明を出す", () => {
     const error = new ApiProblemError(400, {
       type: "about:blank",
       title: "Bad Request",

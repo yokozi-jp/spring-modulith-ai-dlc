@@ -124,7 +124,6 @@ export function useOrderLinesEditor(
             return;
           }
           const failure = formFailure(t, error, {
-            conflict: t("orders.notice.linesConflict"),
             unprocessable: t("orders.notice.linesUnprocessable"),
           });
           setNotice(failure.notice);
