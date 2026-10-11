@@ -191,6 +191,11 @@ class OrderController {
 ステータスコード、`Location`、Problem Details、Request の制約の違反を HTTP の形で確かめる。
 更新の操作には `with(user(...))` と `with(csrf())` を付ける。
 
+テストメソッドには `@ContractCase(method, path, status)` を付け、確かめる operation と status の組を宣言する。
+`path` は OpenAPI の path の形（`/api/orders/{orderId}`）で書き、宣言する status はそのテストが `andExpect(status()...)` で期待する値に限る。
+`ApiContractCoverageTest` は、コミット済みの `openapi/openapi.yaml` の組のうち宣言のないものがあれば失敗する（[ADR-076](../../adr/ADR-076-check-contract-test-coverage-per-response-status.md)）。
+401 と更新の 403 は `ApiContractTest` が全 operation をまとめて確かめるので、新しい operation を足したらその `@CsvSource` と宣言に加える。
+
 ```java
 /** 注文の HTTP API の契約を検証する。 */
 @SpringBootTest
@@ -203,6 +208,7 @@ class OrderControllerTest {
 
   @Test
   @DisplayName("明細のない注文の受付は 400 の Problem Details を返す")
+  @ContractCase(method = RequestMethod.POST, path = "/api/orders", status = 400)
   void placeWithoutLinesReturnsBadRequest() throws Exception {
     mockMvc
         .perform(
@@ -253,4 +259,5 @@ class OrderControllerTest {
 - [ ] クラスに `@Validated` を付けない。入力検証は `@Valid` と引数の制約で行う。［自分で点検］
 - [ ] クラス、フィールド、コンストラクタ、ハンドラメソッドに Javadoc を書く。［自分で点検］
 - [ ] MockMvc のテストで、ステータスコードと Problem Details を確かめる。［自分で点検］
+- [ ] 契約の operation と status の組ごとに、`@ContractCase` を付けたテストがある。［JUnit で検査：ApiContractCoverageTest（宣言と期待する status の一致は自分で点検）］
 - [ ] `presentation.web` のパッケージに `@NullMarked` の `package-info.java` を置く。［Error Prone で検査：RequireExplicitNullMarking］
