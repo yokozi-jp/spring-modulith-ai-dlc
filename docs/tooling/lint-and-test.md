@@ -124,16 +124,23 @@ Oxlintの設定の正本は[`frontend/vite.config.ts`](../../frontend/vite.confi
 | 対象のファイル                     | `no-restricted-imports`                       | `no-restricted-globals`と`no-restricted-properties` |
 | ---------------------------------- | --------------------------------------------- | --------------------------------------------------- |
 | すべて（top-level）                | Base UI、テスト用部品、テレメトリSDK          | HTML sink、network                                  |
-| `src/{api,components,lib,i18n}/**` | 共有層、Base UI、テスト用部品、テレメトリSDK  | top-levelを引き継ぐ                                 |
-| `src/lib/telemetry.ts`             | 共有層、Base UI、テスト用部品                 | top-levelを引き継ぐ                                 |
+| `src/{api,components,i18n}/**`     | 共有層、Base UI、テスト用部品、テレメトリSDK  | top-levelを引き継ぐ                                 |
+| `src/lib/**`                       | lib、Base UI、テスト用部品、テレメトリSDK     | top-levelを引き継ぐ                                 |
+| `src/lib/telemetry.ts`             | lib、Base UI、テスト用部品                    | top-levelを引き継ぐ                                 |
 | `src/features/**`                  | feature、Base UI、テスト用部品、テレメトリSDK | top-levelを引き継ぐ                                 |
-| `src/components/ui/**`             | 共有層、テスト用部品、テレメトリSDK           | top-levelを引き継ぐ                                 |
-| `src/api/**`                       | 共有層の設定を引き継ぐ                        | HTML sinkだけ                                       |
+| `src/components/ui/**`             | ui、テスト用部品、テレメトリSDK               | top-levelを引き継ぐ                                 |
+| `src/api/**`                       | api、Base UI、テスト用部品、テレメトリSDK     | HTML sinkだけ                                       |
 | テストファイルと`src/testing/**`   | Base UI、テレメトリSDK                        | top-levelを引き継ぐ                                 |
 
 各禁止の中身は次のとおりである。
 
 - **共有層**：`@/features/**`、`@/routes/**`、`@/routeTree.gen`。
+- **lib**：共有層の禁止に加えて`@/components/**`。
+  `lib`は依存の最下層であり、UIを参照しない。
+- **api**：共有層の禁止に加えて`@/components/**`。
+  通信層からUIを参照しない。
+- **ui**：共有層の禁止に加えて、`@/components/ui/**`以外の`@/components/**`。
+  UI primitiveからアプリシェルやrouterの状態表示を参照しない。
 - **feature**：`@/routes/**`、`@/routeTree.gen`。
   routeの情報は`getRouteApi`で取る。
 - **Base UI**：`@base-ui/**`。

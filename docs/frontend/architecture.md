@@ -261,6 +261,10 @@ components -> components/ui
 
 `api`、`components`、`lib`、`i18n` からfeatureとrouteを参照しない。
 
+`lib` は最下層であり、`components` も参照しない。
+
+`api` から `components` を、`components/ui` から `ui` 以外の `components` を参照しない。
+
 featureからrouteを参照せず、routeの情報は `getRouteApi` で取る。
 
 feature間のimportと循環依存を作らない。

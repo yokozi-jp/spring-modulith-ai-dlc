@@ -43,6 +43,21 @@ const sharedLayerImports = {
   group: ["@/features/**", "@/routes/**", "@/routeTree.gen"],
   message: "Shared code must not depend on features or routes.",
 };
+// lib は最下層であり、共有層の禁止に加えて components も参照しない。
+const libLayerImports = {
+  group: [...sharedLayerImports.group, "@/components/**"],
+  message: "lib must not depend on components, features or routes.",
+};
+// api は通信層であり、共有層の禁止に加えて UI を参照しない。
+const apiLayerImports = {
+  group: [...sharedLayerImports.group, "@/components/**"],
+  message: "api must not depend on components, features or routes.",
+};
+// components/ui は UI primitive の層であり、共有層の禁止に加えてアプリシェルなど ui 以外の components を参照しない。
+const uiLayerImports = {
+  group: [...sharedLayerImports.group, "@/components/**", "!@/components/ui/**"],
+  message: "components/ui must not depend on other components, features or routes.",
+};
 const featureImports = {
   group: ["@/routes/**", "@/routeTree.gen"],
   message: "Use getRouteApi instead of importing a route.",
@@ -296,12 +311,23 @@ export default defineConfig(({ mode }) => {
           },
         },
         {
-          files: ["src/{api,components,lib,i18n}/**"],
+          files: ["src/{api,components,i18n}/**"],
           rules: {
             "no-restricted-imports": [
               "error",
               {
                 patterns: [sharedLayerImports, baseUiImports, testOnlyImports, telemetrySdkImports],
+              },
+            ],
+          },
+        },
+        {
+          files: ["src/lib/**"],
+          rules: {
+            "no-restricted-imports": [
+              "error",
+              {
+                patterns: [libLayerImports, baseUiImports, testOnlyImports, telemetrySdkImports],
               },
             ],
           },
@@ -312,7 +338,7 @@ export default defineConfig(({ mode }) => {
           rules: {
             "no-restricted-imports": [
               "error",
-              { patterns: [sharedLayerImports, baseUiImports, testOnlyImports] },
+              { patterns: [libLayerImports, baseUiImports, testOnlyImports] },
             ],
           },
         },
@@ -333,7 +359,7 @@ export default defineConfig(({ mode }) => {
             "shadcn/require-static-classes": "off",
             "no-restricted-imports": [
               "error",
-              { patterns: [sharedLayerImports, testOnlyImports, telemetrySdkImports] },
+              { patterns: [uiLayerImports, testOnlyImports, telemetrySdkImports] },
             ],
             "react/only-export-components": "off",
           },
@@ -341,6 +367,12 @@ export default defineConfig(({ mode }) => {
         {
           files: ["src/api/**"],
           rules: {
+            "no-restricted-imports": [
+              "error",
+              {
+                patterns: [apiLayerImports, baseUiImports, testOnlyImports, telemetrySdkImports],
+              },
+            ],
             "no-restricted-globals": ["error", ...htmlSinkGlobals],
             "no-restricted-properties": ["error", ...htmlSinkProperties],
           },

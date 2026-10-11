@@ -109,6 +109,20 @@ describe("project lint config on fixtures", () => {
       expect(countIn("components/route-import.tsx", "eslint(no-restricted-imports)")).toBe(1);
     });
 
+    it("rejects components from lib", () => {
+      expect(countIn("lib/component-import.ts", "eslint(no-restricted-imports)")).toBe(1);
+    });
+
+    it("rejects components from api", () => {
+      expect(countIn("api/component-import.ts", "eslint(no-restricted-imports)")).toBe(1);
+    });
+
+    it("rejects other components from components/ui but allows ui primitives", () => {
+      expect(
+        countIn("components/ui/app-component-import.ts", "eslint(no-restricted-imports)"),
+      ).toBe(1);
+    });
+
     it("allows the API client from shared code", () => {
       expect(codesIn("lib/clean.ts")).toStrictEqual([]);
     });
