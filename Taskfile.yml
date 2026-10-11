@@ -119,40 +119,8 @@ tasks:
             exit 1
           fi
         done
-        cleanup() {
-          keep=""
-          # 成否にかかわらず backend のログを証拠に残し、秘密の値が入っていれば失敗にする。
-          mkdir -p frontend/test-results
-          compose logs --no-color backend > frontend/test-results/backend.log 2>&1 || true
-          for secret in "$OIDC_CLIENT_SECRET" "$E2E_PASSWORD"; do
-            if [ -n "$secret" ] && grep -F -q -- "$secret" frontend/test-results/backend.log; then
-              echo "frontend/test-results/backend.log に .env.test の OIDC_CLIENT_SECRET か E2E_PASSWORD の値が入っています。ログに出す値を確かめてください。" >&2
-              if [ "$status" -eq 0 ]; then status=1; fi
-            fi
-          done
-          # 値の一致では見つからない、セッションの Cookie の値と JWT の形（eyJ で始まる 3 つの base64url）も失敗にする。
-          if grep -E -q 'APP_SESSION=[^;[:space:]"]+|eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+' frontend/test-results/backend.log; then
-            echo "frontend/test-results/backend.log に APP_SESSION の Cookie の値か JWT の形の文字列が入っています。ログに出す値を確かめてください。" >&2
-            if [ "$status" -eq 0 ]; then status=1; fi
-          fi
-          if [ "$status" -ne 0 ]; then
-            if [ -n "$keep_env" ] && [ -n "$(compose ps -aq 2>/dev/null)" ]; then keep="1"; fi
-          fi
-          cleanup_status=0
-          if [ -n "$keep" ]; then
-            echo "E2E_KEEP_ENV=1 のため、compose-test のコンテナと volume を残しました。" >&2
-            echo "  backend のログ：{{.DOCKER}} compose -f {{.TEST_COMPOSE_FILE}} --profile e2e logs backend" >&2
-            echo "  （frontend/test-results/backend.log は pnpm e2e の再実行で消える）" >&2
-            echo "  再実行：cd frontend && pnpm e2e" >&2
-            echo "  片付け：{{.DOCKER}} compose -f {{.TEST_COMPOSE_FILE}} --profile e2e down --volumes --remove-orphans" >&2
-          else
-            compose down --volumes --remove-orphans || cleanup_status=$?
-          fi
-          if [ "$status" -ne 0 ]; then exit "$status"; fi
-          exit "$cleanup_status"
-        }
-        # Task の shell では EXIT の trap の中の exit が終了コードに反映されないため、本体をサブシェルで実行して終了コードを保存する。
-        set +e
+        # 本体と後片付けの終了コードの扱いは docs/tooling/taskfile.md の「後片付けと終了コード」を参照する。
+        status=0
         (
           set -e
           (cd frontend && vp install --frozen-lockfile && vp build --mode test && vp exec playwright install chromium)
@@ -168,10 +136,37 @@ tasks:
             exit 1
           fi
           (cd frontend && vp run e2e)
-        )
-        status=$?
-        set -e
-        cleanup
+        ) || status=$?
+        cleanup_status=0
+        keep=""
+        # 成否にかかわらず backend のログを証拠に残し、秘密の値が入っていれば失敗にする。
+        mkdir -p frontend/test-results || cleanup_status=$?
+        compose logs --no-color backend > frontend/test-results/backend.log 2>&1 || true
+        for secret in "$OIDC_CLIENT_SECRET" "$E2E_PASSWORD"; do
+          if [ -n "$secret" ] && grep -F -q -- "$secret" frontend/test-results/backend.log; then
+            echo "frontend/test-results/backend.log に .env.test の OIDC_CLIENT_SECRET か E2E_PASSWORD の値が入っています。ログに出す値を確かめてください。" >&2
+            if [ "$status" -eq 0 ]; then status=1; fi
+          fi
+        done
+        # 値の一致では見つからない、セッションの Cookie の値と JWT の形（eyJ で始まる 3 つの base64url）も失敗にする。
+        if grep -E -q 'APP_SESSION=[^;[:space:]"]+|eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+' frontend/test-results/backend.log; then
+          echo "frontend/test-results/backend.log に APP_SESSION の Cookie の値か JWT の形の文字列が入っています。ログに出す値を確かめてください。" >&2
+          if [ "$status" -eq 0 ]; then status=1; fi
+        fi
+        if [ "$status" -ne 0 ]; then
+          if [ -n "$keep_env" ] && [ -n "$(compose ps -aq 2>/dev/null)" ]; then keep="1"; fi
+        fi
+        if [ -n "$keep" ]; then
+          echo "E2E_KEEP_ENV=1 のため、compose-test のコンテナと volume を残しました。" >&2
+          echo "  backend のログ：{{.DOCKER}} compose -f {{.TEST_COMPOSE_FILE}} --profile e2e logs backend" >&2
+          echo "  （frontend/test-results/backend.log は pnpm e2e の再実行で消える）" >&2
+          echo "  再実行：cd frontend && pnpm e2e" >&2
+          echo "  片付け：{{.DOCKER}} compose -f {{.TEST_COMPOSE_FILE}} --profile e2e down --volumes --remove-orphans" >&2
+        else
+          compose down --volumes --remove-orphans || cleanup_status=$?
+        fi
+        if [ "$status" -ne 0 ]; then exit "$status"; fi
+        exit "$cleanup_status"
 
   # ADR
   adr-check:
@@ -769,24 +764,19 @@ tasks:
     deps: [_ensure-test-env]
     cmds:
       - |
-        cleanup() {
-          cleanup_status=0
-          {{.DOCKER}} compose -f "{{.TEST_COMPOSE_FILE}}" down --volumes --remove-orphans || cleanup_status=$?
-          if [ "$status" -ne 0 ]; then exit "$status"; fi
-          exit "$cleanup_status"
-        }
-        # Task の shell では EXIT の trap の中の exit が終了コードに反映されないため、本体をサブシェルで実行して終了コードを保存する。
-        set +e
+        # 本体と後片付けの終了コードの扱いは docs/tooling/taskfile.md の「後片付けと終了コード」を参照する。
+        status=0
         (
           set -e
           {{.DOCKER}} compose -f "{{.TEST_COMPOSE_FILE}}" up -d --wait
           task be-verify-migrations TEST_ENV_FILE="{{.TEST_ENV_FILE}}"
           task be-test TEST_ENV_FILE="{{.TEST_ENV_FILE}}"
           task api-lint
-        )
-        status=$?
-        set -e
-        cleanup
+        ) || status=$?
+        cleanup_status=0
+        {{.DOCKER}} compose -f "{{.TEST_COMPOSE_FILE}}" down --volumes --remove-orphans || cleanup_status=$?
+        if [ "$status" -ne 0 ]; then exit "$status"; fi
+        exit "$cleanup_status"
 
   test-dev:
     desc: 隔離依存を起動して作りかけを含むテスト後に片付け
@@ -794,22 +784,17 @@ tasks:
     deps: [_ensure-test-env]
     cmds:
       - |
-        cleanup() {
-          cleanup_status=0
-          {{.DOCKER}} compose -f "{{.TEST_COMPOSE_FILE}}" down --volumes --remove-orphans || cleanup_status=$?
-          if [ "$status" -ne 0 ]; then exit "$status"; fi
-          exit "$cleanup_status"
-        }
-        # Task の shell では EXIT の trap の中の exit が終了コードに反映されないため、本体をサブシェルで実行して終了コードを保存する。
-        set +e
+        # 本体と後片付けの終了コードの扱いは docs/tooling/taskfile.md の「後片付けと終了コード」を参照する。
+        status=0
         (
           set -e
           {{.DOCKER}} compose -f "{{.TEST_COMPOSE_FILE}}" up -d --wait
           task be-test-dev TEST_ENV_FILE="{{.TEST_ENV_FILE}}"
-        )
-        status=$?
-        set -e
-        cleanup
+        ) || status=$?
+        cleanup_status=0
+        {{.DOCKER}} compose -f "{{.TEST_COMPOSE_FILE}}" down --volumes --remove-orphans || cleanup_status=$?
+        if [ "$status" -ne 0 ]; then exit "$status"; fi
+        exit "$cleanup_status"
 
   mutation-test:
     desc: 隔離依存を使ってバックエンドのPITミューテーションテストを実行
@@ -817,23 +802,18 @@ tasks:
     deps: [_ensure-test-env]
     cmds:
       - |
-        cleanup() {
-          cleanup_status=0
-          {{.DOCKER}} compose -f "{{.TEST_COMPOSE_FILE}}" down --volumes --remove-orphans || cleanup_status=$?
-          if [ "$status" -ne 0 ]; then exit "$status"; fi
-          exit "$cleanup_status"
-        }
-        # Task の shell では EXIT の trap の中の exit が終了コードに反映されないため、本体をサブシェルで実行して終了コードを保存する。
-        set +e
+        # 本体と後片付けの終了コードの扱いは docs/tooling/taskfile.md の「後片付けと終了コード」を参照する。
+        status=0
         (
           set -e
           {{.DOCKER}} compose -f "{{.TEST_COMPOSE_FILE}}" up -d --wait
           task be-verify-migrations TEST_ENV_FILE="{{.TEST_ENV_FILE}}"
           task be-mutation-test TEST_ENV_FILE="{{.TEST_ENV_FILE}}"
-        )
-        status=$?
-        set -e
-        cleanup
+        ) || status=$?
+        cleanup_status=0
+        {{.DOCKER}} compose -f "{{.TEST_COMPOSE_FILE}}" down --volumes --remove-orphans || cleanup_status=$?
+        if [ "$status" -ne 0 ]; then exit "$status"; fi
+        exit "$cleanup_status"
 
   be-sbom:
     desc: バックエンドのCycloneDX SBOMを生成
@@ -938,23 +918,18 @@ tasks:
     deps: [_ensure-test-env]
     cmds:
       - |
-        cleanup() {
-          cleanup_status=0
-          {{.DOCKER}} compose -f "{{.TEST_COMPOSE_FILE}}" down --volumes --remove-orphans || cleanup_status=$?
-          if [ "$status" -ne 0 ]; then exit "$status"; fi
-          exit "$cleanup_status"
-        }
-        # Task の shell では EXIT の trap の中の exit が終了コードに反映されないため、本体をサブシェルで実行して終了コードを保存する。
-        set +e
+        # 本体と後片付けの終了コードの扱いは docs/tooling/taskfile.md の「後片付けと終了コード」を参照する。
+        status=0
         (
           set -e
           {{.DOCKER}} compose -f "{{.TEST_COMPOSE_FILE}}" up -d --wait
           task be-openapi-lint TEST_ENV_FILE="{{.TEST_ENV_FILE}}"
           task api-client-gen
-        )
-        status=$?
-        set -e
-        cleanup
+        ) || status=$?
+        cleanup_status=0
+        {{.DOCKER}} compose -f "{{.TEST_COMPOSE_FILE}}" down --volumes --remove-orphans || cleanup_status=$?
+        if [ "$status" -ne 0 ]; then exit "$status"; fi
+        exit "$cleanup_status"
 
   api-check:
     desc: api-genで再生成したOpenAPI契約とAPI clientがコミット済みの内容と一致するか検査
@@ -1093,6 +1068,7 @@ tasks:
           rm -rf "$out"
           exit "$status"
         }
+        # 後片付けの失敗は無視する（残るのはコンテナと一時ディレクトリだけ）ため、終了コードを合成せず trap のままにする。
         trap cleanup EXIT
         container="$({{.DOCKER}} run -d -p 127.0.0.1::4318 -p 127.0.0.1::12347 -p 127.0.0.1::12348 \
           -e OTEL_COLLECTOR_OTLP_HTTP_ENDPOINT=0.0.0.0:4318 \
@@ -1408,6 +1384,9 @@ tasks:
         preview_pid_file="$report_dir/preview.pid"
         compose() { {{.DOCKER}} compose -p spring-modulith-dast -f "{{.TEST_COMPOSE_FILE}}" --profile backend-smoke "$@"; }
         fail() { echo "✗ $1" >&2; exit 1; }
+        # 中断で後片付けが走らなかった前回のコンテナと compose を破棄し、名前とポートの衝突を避ける。
+        {{.DOCKER}} rm --force spring-modulith-dast-zap spring-modulith-dast-backend >/dev/null 2>&1 || true
+        compose down --volumes --remove-orphans >/dev/null 2>&1 || true
 
         # 4173 は preview、18081 は backend、18082 は ZAP の proxy、5433、6380、8081、8082 は compose-test が使う。
         for port in 4173 18081 18082 5433 6380 8081 8082; do
@@ -1420,23 +1399,8 @@ tasks:
           fi
         done
 
-        cleanup() {
-          cleanup_status=0
-          if [ -s "$preview_pid_file" ]; then
-            preview_pid="$(cat "$preview_pid_file")"
-            # Task の組み込みの kill はプロセスグループを指定できないので、外部の kill を使う。
-            env kill -TERM -- "-$preview_pid" 2>/dev/null || true
-            rm -f "$preview_pid_file"
-          fi
-          {{.DOCKER}} logs spring-modulith-dast-backend >"$report_dir/backend.log" 2>&1 || true
-          {{.DOCKER}} rm --force spring-modulith-dast-zap spring-modulith-dast-backend >/dev/null 2>&1 || true
-          compose down --volumes --remove-orphans || cleanup_status=$?
-          if [ "$status" -ne 0 ]; then exit "$status"; fi
-          exit "$cleanup_status"
-        }
-
-        # Task の shell では EXIT の trap の中の exit が終了コードに反映されないため、本体をサブシェルで実行して終了コードを保存する。
-        set +e
+        # 本体と後片付けの終了コードの扱いは docs/tooling/taskfile.md の「後片付けと終了コード」を参照する。
+        status=0
         (
           set -e
           rm -rf "$report_dir" && mkdir -p "$report_dir" && chmod a+rwx "$report_dir"
@@ -1527,10 +1491,19 @@ tasks:
           jq -e 'all(.runs[]; .tool.driver.name == "ZAP")' "$sarif" >/dev/null || fail "SARIF の tool 名が ZAP ではありません。"
           mv "$sarif" "$report_dir/zap-{{.DAST_PLAN}}.sarif.json"
           echo "DAST のレポートを $report_dir に出力しました。"
-        )
-        status=$?
-        set -e
-        cleanup
+        ) || status=$?
+        cleanup_status=0
+        if [ -s "$preview_pid_file" ]; then
+          preview_pid="$(cat "$preview_pid_file")" || cleanup_status=$?
+          # Task の組み込みの kill はプロセスグループを指定できないので、外部の kill を使う。
+          if [ -n "${preview_pid:-}" ]; then env kill -TERM -- "-$preview_pid" 2>/dev/null || true; fi
+          rm -f "$preview_pid_file" || cleanup_status=$?
+        fi
+        {{.DOCKER}} logs spring-modulith-dast-backend >"$report_dir/backend.log" 2>&1 || true
+        {{.DOCKER}} rm --force spring-modulith-dast-zap spring-modulith-dast-backend >/dev/null 2>&1 || true
+        compose down --volumes --remove-orphans || cleanup_status=$?
+        if [ "$status" -ne 0 ]; then exit "$status"; fi
+        exit "$cleanup_status"
 
   # Lint and format
   lint-actions:
@@ -1602,12 +1575,13 @@ tasks:
       - npx --yes markdownlint-cli2 --fix "**/*.md"
 
   lint-taskfile:
-    desc: TaskfileをTask本体で解析しYAML構文とスキーマ構造を検証
+    desc: TaskfileをTask本体で解析しYAML構文とスキーマ構造、後片付けの終了コードを検証
     silent: true
     cmds:
       - |
         task --list-all >/dev/null
         echo "Taskfile OK: YAML構文とスキーマ構造の解析に成功しました。"
+        bash tooling/taskfile-cleanup/test.sh
 
   lint-semgrep:
     desc: Semgrep OSSで静的解析

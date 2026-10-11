@@ -90,10 +90,36 @@ tasks:
 `CI` が空でなければ例外を無視して必ず片付ける（[ADR-057](../adr/ADR-057-adopt-playwright-for-e2e-tests.md)）。
 
 Taskの`defer`で実行した後片付けの失敗は、元のタスクを失敗させない。
-また、Taskのシェルでは`trap`の`EXIT`の中で呼んだ`exit`の値がタスクの終了コードに反映されない。
-後片付けの失敗も検出する必要があるワンショットタスクでは、`set +e`のあと本体を`set -e`のサブシェルで実行して`$?`を保存し、後片付けの後に返す終了コードを選んで`exit`する（`task test`を参照）。
+また、Taskのシェルでは`trap`の`EXIT`の中で呼んだ`exit`の値がタスクの終了コードに反映されず、`trap`に入る前の終了状態がそのまま返る。
+そのため`trap`で壊れるのは、本体が成功して後片付けだけが失敗する経路に限られる。
+本体が失敗すれば`trap`の前の非0がそのまま返り、後片付けの失敗を無視するタスク（`otel-collector-check`）では`trap`のままでよい。
+
+後片付けが初めて非0を作る経路を持つワンショットタスクでは、次の定型で終了コードを合成する（`task test`を参照）。
+
+```sh
+status=0
+(
+  set -e
+  # 本体
+) || status=$?
+cleanup_status=0
+first-cleanup || cleanup_status=$?
+second-cleanup || cleanup_status=$?
+if [ "$status" -ne 0 ]; then exit "$status"; fi
+exit "$cleanup_status"
+```
+
+本体の失敗を`|| status=$?`で受けるため、外側の`errexit`を切る区間がない。
+Taskのシェルは`||`の左のサブシェルでも`set -e`を守るが、bashは守らないため、この定型をbashのスクリプトへ移すときは書き直す。
+後片付けの各操作は個別に`|| cleanup_status=$?`で受け、前段が失敗しても後段（ログの保存や`compose down`）を走らせる。
+複数の操作が失敗したときは、最後に失敗した操作の終了コードを返す。
 サブシェルの中で代入した変数は後片付けから見えないため、後片付けが読む値はサブシェルの外で設定するか、ファイルに書いて渡す。
 Taskはコマンドの失敗を既定で終了コード201にまとめるため、元の終了コードを確かめるときは`task -x`（`--exit-code`）で実行する。
+`task lint-taskfile`は、この定型をDockerなしで再現する`tooling/taskfile-cleanup/`のfixtureを実行し、終了コードと後片付けの実行を検査する。
+
+Ctrl-CやCIのキャンセルで中断すると、Taskはシェルを止めるため後片付けは走らない。
+`task e2e`、`task scan-dast`、`task scan-dast-active`は、開始時に前回のcomposeと固定名のコンテナを破棄して自己回復する。
+ただしDASTのpreviewのプロセス（4173番ポート）は残ることがあり、その場合はポートの検査で止まるため、プロセスを止めてから再実行する。
 
 ## 破壊操作の確認
 
