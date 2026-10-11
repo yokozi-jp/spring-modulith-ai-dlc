@@ -12,6 +12,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.example.demo.product.TestProducts;
 import com.example.demo.testkit.CleanGeneratedTablesExtension;
+import com.example.demo.testkit.ContractCase;
 import com.example.demo.testkit.SharedTestConfiguration;
 import com.example.demo.testkit.UniqueCodes;
 import java.util.Locale;
@@ -36,6 +37,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.ResultActions;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders;
+import org.springframework.web.bind.annotation.RequestMethod;
 
 /** 注文の API のステータスコード、Location、Problem Details を HTTP の形で検証する。 */
 // MockMvc の期待値は andExpect で書く。一つの API の契約を一つのクラスで確かめるため、メソッドと static import が多い。
@@ -81,6 +83,8 @@ class OrderApiTest {
 
   @Test
   @DisplayName("下書きの注文を作ると 201 と Location を返し、詳細は DRAFT とロック番号 1 と明細の金額を返す")
+  @ContractCase(method = RequestMethod.POST, path = "/api/orders", status = 201)
+  @ContractCase(method = RequestMethod.GET, path = "/api/orders/{orderId}", status = 200)
   void draftReturnsCreatedAndDetails() throws Exception {
     final String customerOrderCode = UniqueCodes.next("C");
     final String location =
@@ -109,6 +113,7 @@ class OrderApiTest {
 
   @Test
   @DisplayName("同じ客先注文番号の注文を作ると 409 を返し、先の注文は残る")
+  @ContractCase(method = RequestMethod.POST, path = "/api/orders", status = 409)
   void duplicateCustomerOrderCodeReturnsConflict() throws Exception {
     final String customerOrderCode = UniqueCodes.next("C");
     final String orderId = draftAndGetId(customerOrderCode, pen, 1);
@@ -122,6 +127,7 @@ class OrderApiTest {
 
   @Test
   @DisplayName("存在しない商品で注文を作ると 422 を返し、注文を作らない")
+  @ContractCase(method = RequestMethod.POST, path = "/api/orders", status = 422)
   void draftWithMissingProductReturnsUnprocessable() throws Exception {
     expectProblem(draft(UniqueCodes.next("C"), UUID.randomUUID(), 1), 422);
     mockMvc
@@ -136,13 +142,37 @@ class OrderApiTest {
   }
 
   @Test
+  @DisplayName("明細が空の注文を作ると検証の 400 を返し、注文を作らない")
+  @ContractCase(method = RequestMethod.POST, path = "/api/orders", status = 400)
+  void draftWithoutLinesReturnsValidationProblem() throws Exception {
+    mockMvc
+        .perform(
+            post("/api/orders")
+                .with(oidcLogin())
+                .with(csrf())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    String.format(
+                        Locale.ROOT,
+                        "{\"customerOrderCode\":\"%s\",\"lines\":[]}",
+                        UniqueCodes.next("C"))))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.type").value("/problems/validation-error"));
+    mockMvc
+        .perform(get("/api/orders").with(oidcLogin()))
+        .andExpect(jsonPath("$.items.length()").value(0));
+  }
+
+  @Test
   @DisplayName("存在しない注文の詳細は 404 を返す")
+  @ContractCase(method = RequestMethod.GET, path = "/api/orders/{orderId}", status = 404)
   void missingOrderDetailsReturnsNotFound() throws Exception {
     expectProblem(details(UUID.randomUUID().toString()), 404);
   }
 
   @Test
   @DisplayName("UUID でない注文 ID の詳細は about:blank の 400 を返す")
+  @ContractCase(method = RequestMethod.GET, path = "/api/orders/{orderId}", status = 400)
   void malformedOrderIdReturnsBadRequest() throws Exception {
     expectProblem(details("not-a-uuid"), 400);
   }
@@ -150,6 +180,9 @@ class OrderApiTest {
   @ParameterizedTest(name = "{0} {1}")
   @CsvSource({"PUT, /lines", "POST, /confirm", "POST, /cancel"})
   @DisplayName("存在しない注文の明細の変更、確定、取消は 404 を返す")
+  @ContractCase(method = RequestMethod.PUT, path = "/api/orders/{orderId}/lines", status = 404)
+  @ContractCase(method = RequestMethod.POST, path = "/api/orders/{orderId}/confirm", status = 404)
+  @ContractCase(method = RequestMethod.POST, path = "/api/orders/{orderId}/cancel", status = 404)
   void operationOnMissingOrderReturnsNotFound(final String method, final String suffix)
       throws Exception {
     expectProblem(operate(method, UUID.randomUUID().toString(), suffix, 1), 404);
@@ -157,6 +190,7 @@ class OrderApiTest {
 
   @Test
   @DisplayName("正しいロック番号で明細を置き換えると 204 を返し、明細と合計を置き換えてロック番号を進める")
+  @ContractCase(method = RequestMethod.PUT, path = "/api/orders/{orderId}/lines", status = 204)
   void changeLinesReplacesLines() throws Exception {
     final String orderId = draftAndGetId(UniqueCodes.next("C"), pen, 1);
 
@@ -188,6 +222,7 @@ class OrderApiTest {
   @ParameterizedTest(name = "商品が販売終了で存在する={0}")
   @ValueSource(booleans = {false, true})
   @DisplayName("明細の変更で存在しない商品か販売終了の商品を指定すると 422 を返し、注文を変えない")
+  @ContractCase(method = RequestMethod.PUT, path = "/api/orders/{orderId}/lines", status = 422)
   void changeLinesWithUnavailableProductReturnsUnprocessable(final boolean exists)
       throws Exception {
     final String orderId = draftAndGetId(UniqueCodes.next("C"), pen, 1);
@@ -209,6 +244,9 @@ class OrderApiTest {
         "PUT | /lines | {\"lines\":[],\"lockNo\":1}",
       })
   @DisplayName("契約で必須の lockNo と quantity がないか、明細が空なら、検証の 400 を返し、注文を変えない")
+  @ContractCase(method = RequestMethod.PUT, path = "/api/orders/{orderId}/lines", status = 400)
+  @ContractCase(method = RequestMethod.POST, path = "/api/orders/{orderId}/confirm", status = 400)
+  @ContractCase(method = RequestMethod.POST, path = "/api/orders/{orderId}/cancel", status = 400)
   void missingRequiredFieldReturnsValidationProblem(
       final String method, final String suffix, final String body) throws Exception {
     final String orderId = draftAndGetId(UniqueCodes.next("C"), pen, 1);
@@ -231,6 +269,9 @@ class OrderApiTest {
   @ParameterizedTest(name = "{0} {1}")
   @CsvSource({"PUT, /lines", "POST, /confirm", "POST, /cancel"})
   @DisplayName("古いロック番号の明細の変更、確定、取消は 409 を返し、注文を変えない")
+  @ContractCase(method = RequestMethod.PUT, path = "/api/orders/{orderId}/lines", status = 409)
+  @ContractCase(method = RequestMethod.POST, path = "/api/orders/{orderId}/confirm", status = 409)
+  @ContractCase(method = RequestMethod.POST, path = "/api/orders/{orderId}/cancel", status = 409)
   void staleLockNoReturnsConflict(final String method, final String suffix) throws Exception {
     final String orderId = draftAndGetId(UniqueCodes.next("C"), pen, 1);
     final String before = detailsBody(orderId);
@@ -242,6 +283,7 @@ class OrderApiTest {
 
   @Test
   @DisplayName("下書きの注文を確定すると 204 を返し、状態を CONFIRMED にする")
+  @ContractCase(method = RequestMethod.POST, path = "/api/orders/{orderId}/confirm", status = 204)
   void confirmMakesOrderConfirmed() throws Exception {
     final String orderId = draftAndGetId(UniqueCodes.next("C"), pen, 1);
 
@@ -255,6 +297,9 @@ class OrderApiTest {
   @ParameterizedTest(name = "{0} {1}")
   @CsvSource({"PUT, /lines", "POST, /confirm", "POST, /cancel"})
   @DisplayName("確定済みの注文の明細の変更、確定、取消は最新のロック番号でも 422 を返し、注文を変えない")
+  @ContractCase(method = RequestMethod.PUT, path = "/api/orders/{orderId}/lines", status = 422)
+  @ContractCase(method = RequestMethod.POST, path = "/api/orders/{orderId}/confirm", status = 422)
+  @ContractCase(method = RequestMethod.POST, path = "/api/orders/{orderId}/cancel", status = 422)
   void operationOnConfirmedOrderReturnsUnprocessable(final String method, final String suffix)
       throws Exception {
     final String orderId = draftAndGetId(UniqueCodes.next("C"), pen, 1);
@@ -268,6 +313,7 @@ class OrderApiTest {
 
   @Test
   @DisplayName("取り消した注文を確定すると 422 を返す")
+  @ContractCase(method = RequestMethod.POST, path = "/api/orders/{orderId}/cancel", status = 204)
   void confirmCancelledOrderReturnsUnprocessable() throws Exception {
     final String orderId = draftAndGetId(UniqueCodes.next("C"), pen, 1);
     operate("POST", orderId, "/cancel", 1).andExpect(status().isNoContent());
@@ -278,6 +324,7 @@ class OrderApiTest {
 
   @Test
   @DisplayName("一覧は状態で絞り込め、該当がなければ空の items を返す")
+  @ContractCase(method = RequestMethod.GET, path = "/api/orders", status = 200)
   void listFiltersByStatus() throws Exception {
     final String draftCode = UniqueCodes.next("C");
     final String draftId = draftAndGetId(draftCode, pen, 1);
@@ -311,6 +358,7 @@ class OrderApiTest {
 
   @Test
   @DisplayName("一覧の状態に定義にない値を指定すると 400 を返す")
+  @ContractCase(method = RequestMethod.GET, path = "/api/orders", status = 400)
   void listWithUnknownStatusReturnsBadRequest() throws Exception {
     mockMvc
         .perform(get("/api/orders").param("status", "draft").with(oidcLogin()))

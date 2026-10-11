@@ -2,15 +2,18 @@ package com.example.demo;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.nullValue;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.request;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.cookie;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.example.demo.testkit.ContractCase;
 import com.example.demo.testkit.SharedTestConfiguration;
 import conflictfixture.ConflictFixture;
 import jakarta.servlet.RequestDispatcher;
@@ -23,8 +26,10 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.web.bind.annotation.RequestMethod;
 
 /** API の Problem Details、locale、ブラウザ向けセキュリティヘッダを HTTP レベルで検証する。 */
 @SuppressWarnings({
@@ -59,8 +64,60 @@ class ApiContractTest {
         .andExpect(jsonPath("$.status").value(401));
   }
 
+  @ParameterizedTest(name = "{0} {1}")
+  @CsvSource({
+    "GET, /api/orders",
+    "POST, /api/orders",
+    "GET, /api/orders/0b6c8f6e-2f4a-4c1e-9d3b-7a1e5c2d4f60",
+    "PUT, /api/orders/0b6c8f6e-2f4a-4c1e-9d3b-7a1e5c2d4f60/lines",
+    "POST, /api/orders/0b6c8f6e-2f4a-4c1e-9d3b-7a1e5c2d4f60/confirm",
+    "POST, /api/orders/0b6c8f6e-2f4a-4c1e-9d3b-7a1e5c2d4f60/cancel",
+    "GET, /api/payments",
+    "GET, /api/products"
+  })
+  @DisplayName("未認証の各 operation は WWW-Authenticate 付きの 401 Problem Details を返す")
+  @ContractCase(method = RequestMethod.GET, path = "/api/orders", status = 401)
+  @ContractCase(method = RequestMethod.POST, path = "/api/orders", status = 401)
+  @ContractCase(method = RequestMethod.GET, path = "/api/orders/{orderId}", status = 401)
+  @ContractCase(method = RequestMethod.PUT, path = "/api/orders/{orderId}/lines", status = 401)
+  @ContractCase(method = RequestMethod.POST, path = "/api/orders/{orderId}/confirm", status = 401)
+  @ContractCase(method = RequestMethod.POST, path = "/api/orders/{orderId}/cancel", status = 401)
+  @ContractCase(method = RequestMethod.GET, path = "/api/payments", status = 401)
+  @ContractCase(method = RequestMethod.GET, path = "/api/products", status = 401)
+  void unauthenticatedOperationReturnsUnauthorized(final String method, final String path)
+      throws Exception {
+    mockMvc
+        .perform(request(HttpMethod.valueOf(method), path).with(csrf()))
+        .andExpect(status().isUnauthorized())
+        .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
+        .andExpect(header().string(HttpHeaders.WWW_AUTHENTICATE, "Session realm=\"demo\""))
+        .andExpect(jsonPath("$.status").value(401));
+  }
+
+  @ParameterizedTest(name = "{0} {1}")
+  @CsvSource({
+    "POST, /api/orders",
+    "PUT, /api/orders/0b6c8f6e-2f4a-4c1e-9d3b-7a1e5c2d4f60/lines",
+    "POST, /api/orders/0b6c8f6e-2f4a-4c1e-9d3b-7a1e5c2d4f60/confirm",
+    "POST, /api/orders/0b6c8f6e-2f4a-4c1e-9d3b-7a1e5c2d4f60/cancel"
+  })
+  @DisplayName("CSRF トークンのない更新の operation は 403 Problem Details を返す")
+  @ContractCase(method = RequestMethod.POST, path = "/api/orders", status = 403)
+  @ContractCase(method = RequestMethod.PUT, path = "/api/orders/{orderId}/lines", status = 403)
+  @ContractCase(method = RequestMethod.POST, path = "/api/orders/{orderId}/confirm", status = 403)
+  @ContractCase(method = RequestMethod.POST, path = "/api/orders/{orderId}/cancel", status = 403)
+  void updateWithoutCsrfTokenReturnsForbidden(final String method, final String path)
+      throws Exception {
+    mockMvc
+        .perform(request(HttpMethod.valueOf(method), path).with(user("test-user")))
+        .andExpect(status().isForbidden())
+        .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
+        .andExpect(jsonPath("$.status").value(403));
+  }
+
   @Test
   @DisplayName("/error へ転送された 401 にも WWW-Authenticate の challenge を付ける")
+  @ContractCase(method = RequestMethod.GET, path = "/error", status = 401)
   void errorEndpointAddsChallengeToUnauthorized() throws Exception {
     mockMvc
         .perform(get("/error").requestAttr(RequestDispatcher.ERROR_STATUS_CODE, 401))
@@ -123,6 +180,7 @@ class ApiContractTest {
 
   @Test
   @DisplayName("/error は日本語でも実装詳細を含まない Problem Details を返す")
+  @ContractCase(method = RequestMethod.GET, path = "/error", status = 500)
   void errorEndpointReturnsLocalizedProblemDetailsWithoutImplementationDetails() throws Exception {
     mockMvc
         .perform(
@@ -207,6 +265,7 @@ class ApiContractTest {
 
   @Test
   @DisplayName("/error は Accept が text/html でも転送元の status の Problem Details を返す")
+  @ContractCase(method = RequestMethod.GET, path = "/error", status = 400)
   void errorEndpointIgnoresHtmlAccept() throws Exception {
     mockMvc
         .perform(
@@ -221,8 +280,20 @@ class ApiContractTest {
 
   @ParameterizedTest
   @CsvSource({
+    "403, ja, アクセス権限がありません",
+    "403, en, Forbidden",
+    "404, ja, リソースが見つかりません",
+    "404, en, Not Found",
+    "405, ja, 許可されていないメソッドです",
+    "405, en, Method Not Allowed",
+    "406, ja, 受け付けられない形式です",
+    "406, en, Not Acceptable",
+    "409, ja, 競合が発生しました",
+    "409, en, Conflict",
     "413, ja, リクエストが大きすぎます",
     "413, en, Content Too Large",
+    "415, ja, 対応していないメディアタイプです",
+    "415, en, Unsupported Media Type",
     "422, ja, 処理できない内容です",
     "422, en, Unprocessable Content",
     "429, ja, リクエストが多すぎます",
@@ -230,7 +301,11 @@ class ApiContractTest {
     "503, ja, サービスを利用できません",
     "503, en, Service Unavailable"
   })
-  @DisplayName("/error は 413、422、429、503 の title を日本語と英語で返す")
+  @DisplayName("/error は title を持つ 4xx と 5xx の title を日本語と英語で返す")
+  @ContractCase(
+      method = RequestMethod.GET,
+      path = "/error",
+      status = {403, 404, 405, 406, 409, 413, 415, 422, 429, 503})
   void errorEndpointLocalizesAdditionalStatusTitles(
       final int code, final String language, final String title) throws Exception {
     mockMvc
