@@ -169,6 +169,16 @@ pre-commit:
         task okf-check
       fail_text: "OKF バンドルの検証に失敗しました。task okf-check で再実行してください。"
 
+    # Taskfile か後片付けの fixture にステージ済み変更があるとき、スキーマ構造と後片付けの終了コードを検証（task lint-taskfile）。
+    - name: lint-taskfile
+      glob:
+        - "Taskfile.yml"
+        - "tooling/taskfile-cleanup/**"
+      run: |
+        echo "{staged_files}" >/dev/null
+        task lint-taskfile
+      fail_text: "Taskfileの検証に失敗しました。task lint-taskfile で再実行してください。"
+
 pre-push:
   parallel: true
   jobs:
