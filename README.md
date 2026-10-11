@@ -39,7 +39,7 @@ harness は、変更が通る複数の関門と、規約の置き場で構成し
 - **契約の検査**：OpenAPI 契約をコミットし、Spectral、oasdiff、Orval の再生成で差分と破壊的変更を検査します（[ADR-052](docs/adr/ADR-052-commit-openapi-contract-and-check-generated-client.md)）。
 - **Git フック（Lefthook）**：commit-msg で commitlint を実行します。
   pre-commit では betterleaks のシークレットスキャン、フロントエンドと API 契約の検査、hadolint、Docker ビルド検査、compose config、markdownlint、OKF 検査を実行します。
-  pre-push では ADR 検査、betterleaks の全履歴スキャン、フロントエンドのテストとビルド、バックエンドの lint とテスト、backend イメージのビルド、actionlint、zizmor を実行します。
+  pre-push では ADR 検査、betterleaks の全履歴スキャン、バックエンドの lint とテスト、backend イメージのビルド、フロントエンドのテストとビルド、actionlint、zizmor を実行します。
 - **CI（GitHub Actions）**：Backend CI、Frontend CI、E2E、Docker CI（hadolint）、Secret Scan、Static Analysis（Semgrep）、Trivy による脆弱性スキャン、DAST（OWASP ZAP）、OKF 検証、API Contract（破壊的変更の検出）を実行します。
   リリースは release-please、依存更新は Dependabot が担います。
 - **steering と docs**：規約の正文は `docs/` に置き、`.kiro/steering/` は読む文書への案内だけを持ちます（[ADR-038](docs/adr/ADR-038-route-steering-to-docs-knowledge.md)）。
@@ -218,13 +218,16 @@ task <タスク名>
 
 初回の環境構築は [開発環境構築ガイド](docs/local-env-setup/setup.md)、初回の起動と日常の流れは [開発ワークフロー](docs/tooling/dev-workflow.md) に従ってください。
 
-日々の開発で使う入口タスクは次の五つです。
+日々の開発で使う入口タスクは次の六つです。
 
 - **`task dev`**：依存サービスを起動してバックエンドを起動（日々の開発の入口）。業務データが空のDBには、起動の前に開発用の代表データを入れる。
 - **`task check`**：素早いローカル確認（バックエンドの静的解析）。
-- **`task fe-verify`**：フロントエンドの静的解析、未使用コード検査、テスト、本番ビルド。
-- **`task lint-duplicates`**：フロントエンドとバックエンドの手書きコードの重複検査。
 - **`task verify`**：push 前のバックエンド総合ゲート（静的解析、OpenAPI 契約検査と、使い捨てDBでのマイグレーション検証とテスト、CI と同じ内容）。
+- **`task fe-dev`**：フロントエンドの開発サーバーを起動（`task dev`とは別のターミナルで実行する）。APIとOIDCを同一オリジンでproxyする。
+- **`task fe-verify`**：フロントエンドの静的解析、未使用コード検査、テスト、本番ビルド。
+- **`task lint-duplicates`**：バックエンドとフロントエンドの手書きコードの重複検査。
+
+初めて起動するときと、`frontend/package.json`か`frontend/pnpm-lock.yaml`が変わったときは、`task fe-dev`の前に`task fe-install`でフロントエンドの依存をインストールします。
 
 開発用の代表データは次の二つで入れます。
 
@@ -241,6 +244,12 @@ Docker Compose の操作（サービスの起動、停止、状態確認、Keycl
 
 静的解析、シークレットと脆弱性のスキャン、テストは、いずれも [`Taskfile.yml`](Taskfile.yml) のタスクとして実行できます（`task <タスク名>`）。
 各タスクの一覧と内容、Git フックと CI での自動実行の対応は [Lint・テストのリファレンス](docs/tooling/lint-and-test.md) にまとめています。
+
+### バックエンド
+
+- バックエンド変更時は push 前に `task verify`（静的解析、OpenAPI 契約検査と、使い捨てDBでのマイグレーション検証とテスト、CI と同じ内容）を実行します。
+- 入力範囲が広い契約にはQuickTheoriesによるプロパティベーステストを使い、通常のテストと一緒に実行します。
+- テストの検出力を確認するときは `task mutation-test` でPITを明示実行しますが、実行コストが高いため `task verify` には含めません。
 
 ### フロントエンド
 
@@ -277,15 +286,9 @@ Docker Compose の操作（サービスの起動、停止、状態確認、Keycl
 
 ### 重複コード検査
 
-- `task lint-duplicates` はTanStack RouterとjOOQの生成コードを除いたFrontendとBackendの手書きソースをjscpdで検査します。
+- `task lint-duplicates` はTanStack RouterとjOOQの生成コードを除いたBackendとFrontendの手書きソースをjscpdで検査します。
 - 参照業務機能（product、ordering、payment）の手書きの重複を除いた後の重複行率3.93%を基準に4.0%を上限とします。
   残りの重複は、モジュールごとのクラスの役割とテストの規約が求める import、注釈、フィールドの定型です（[ADR-074](docs/adr/ADR-074-raise-jscpd-threshold-for-class-role-boilerplate.md)）。
-
-### バックエンド
-
-- バックエンド変更時は push 前に `task verify`（静的解析、OpenAPI 契約検査と、使い捨てDBでのマイグレーション検証とテスト、CI と同じ内容）を実行します。
-- 入力範囲が広い契約にはQuickTheoriesによるプロパティベーステストを使い、通常のテストと一緒に実行します。
-- テストの検出力を確認するときは `task mutation-test` でPITを明示実行しますが、実行コストが高いため `task verify` には含めません。
 
 ### 可観測性
 
@@ -294,9 +297,9 @@ Docker Compose の操作（サービスの起動、停止、状態確認、Keycl
   URL token、UUIDのsession ID、利用者情報、DOM情報、traceの`url.*`属性が残らないことも検査します。
   CSP違反の報告（Reporting APIの形式）も流し、文書のURL、query、fragmentが残らず、CSP以外の報告の型が捨てられることを確かめます。
   最初に、Collector の route allowlist が `routeTree.gen.ts` と一致することを確かめます。
-- ブラウザの例外をローカルで送るには、`.env` に `FRONTEND_OTEL_ENABLED=true` を書いて `task compose-up` を実行し、`vp dev` を再起動して、Grafana で `{service_name="demo-web"}` を検索します（[ADR-068](docs/adr/ADR-068-collect-browser-telemetry-with-faro-via-collector.md)）。
+- ブラウザの例外をローカルで送るには、`.env` に `FRONTEND_OTEL_ENABLED=true` を書いて `task compose-up` を実行し、`task fe-dev` を再起動して、Grafana で `{service_name="demo-web"}` を検索します（[ADR-068](docs/adr/ADR-068-collect-browser-telemetry-with-faro-via-collector.md)）。
 - 画面の API 呼び出しからバックエンドまでの trace は、次の手順で確かめます。
-  1. 上と同じく `FRONTEND_OTEL_ENABLED=true` で `task compose-up` を実行し、バックエンドと `vp dev` を起動します。
+  1. 上と同じく `FRONTEND_OTEL_ENABLED=true` で `task compose-up` を実行し、`task dev` と `task fe-dev` を起動します。
   2. ログインして画面を開き、開発者ツールの console で `fetch("/api/missing")` を実行します。
   3. Grafana の Explore で Tempo を選び、`{resource.service.name="demo-web"}` を検索して trace を開きます。
      `demo-web` の `Browser request` の span の子に、`demo-api` の server span がつながります。
