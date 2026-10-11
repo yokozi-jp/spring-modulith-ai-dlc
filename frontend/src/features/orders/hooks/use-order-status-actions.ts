@@ -14,10 +14,11 @@ export function useOrderStatusActions(
   setNotice: (notice: Notice | undefined) => void,
 ) {
   const { t } = useTranslation();
-  const confirmMutation = useConfirmOrder();
-  const cancelMutation = useCancelOrder();
+  // 毎回作り直される mutation の結果ではなく、安定した mutate を取り出して React Compiler の memo を効かせる。
+  const { mutate: confirm, isPending: isConfirming } = useConfirmOrder();
+  const { mutate: cancel, isPending: isCancelling } = useCancelOrder();
   const data = { lockNo };
-  const isPending = confirmMutation.isPending || cancelMutation.isPending;
+  const isPending = isConfirming || isCancelling;
 
   const onError = (error: unknown) => {
     setNotice(
@@ -35,7 +36,7 @@ export function useOrderStatusActions(
         return;
       }
       setNotice(undefined);
-      confirmMutation.mutate(
+      confirm(
         { orderId, data },
         {
           onSuccess: () => {
@@ -52,7 +53,7 @@ export function useOrderStatusActions(
         return;
       }
       setNotice(undefined);
-      cancelMutation.mutate(
+      cancel(
         { orderId, data },
         {
           onSuccess: () => {
