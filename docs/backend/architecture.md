@@ -153,7 +153,7 @@ Domain の型、Command と Result、Spring MVC の Request と Response、jOOQ 
 `@Modulithic(sharedModules = "shared")` で Spring Modulith の shared モジュールにし、決定は [ADR-048](../adr/ADR-048-add-shared-module-for-jooq-common-code.md) に示す。
 
 - jOOQ の共通処理を `shared.infrastructure.persistence` に置き、このパッケージを `@NamedInterface` で公開する。
-  業務テーブルの UPDATE と DELETE の唯一の入口である `TableWriter` もここに置く（[ADR-054](../adr/ADR-054-detect-optimistic-lock-conflicts-by-update-count.md)）。
+  業務テーブルの UPDATE と DELETE を組み立てて実行する唯一の入口で、集約ルートの INSERT の入口である `TableWriter` もここに置く（[ADR-054](../adr/ADR-054-detect-optimistic-lock-conflicts-by-update-count.md)）。
 - 楽観的ロックの語彙（`ConflictException`、`ExpectedLockNo`、`VersionedCommand`）を `shared.concurrency` に置き、このパッケージも `@NamedInterface("concurrency")` で公開する。
 - 業務上の失敗の例外（`NotFoundException`、`BusinessRuleViolationException`）を `shared.failure` に置き、このパッケージも `@NamedInterface("failure")` で公開する（[ADR-062](../adr/ADR-062-map-business-exceptions-to-404-409-422.md)）。
   `shared` は Spring Web、Spring の HTTP、Servlet の型に依存しない。

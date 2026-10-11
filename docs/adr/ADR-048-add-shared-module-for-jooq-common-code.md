@@ -47,7 +47,7 @@ UPDATE の共通カラムの値（`forUpdate`）は `updated_*` だけを返し�
 `*_pgm_cd` の値の求め方は [ADR-051](ADR-051-bind-pgm-cd-with-scoped-value-and-aspect.md) で決める。
 ADR-051 の `*_pgm_cd` を束縛する Aspect も、共通カラムの値を組み立てる共通処理の一部として `shared` に置く。
 
-業務テーブルの UPDATE と DELETE を組み立てて実行する唯一の入口 `TableWriter` も `shared` に置く（[ADR-054](ADR-054-detect-optimistic-lock-conflicts-by-update-count.md)）。
+業務テーブルの UPDATE と DELETE を組み立てて実行する唯一の入口で、集約ルートの INSERT の入口である `TableWriter` も `shared` に置く（[ADR-054](ADR-054-detect-optimistic-lock-conflicts-by-update-count.md)）。
 `shared` は Domain と `error` の型に依存しない。
 楽観的ロックの競合の例外は、`shared.concurrency` の `ConflictException` にする。
 `error` が 409 に変える `ConflictException` のために `error` から `shared` への依存が増えるので、`shared` はルートパッケージの型に依存しない（`PgmCdAspect` は自分のパッケージからベースパッケージを導く）。

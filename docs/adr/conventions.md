@@ -52,6 +52,7 @@ tags: [adr, convention, governance]
 
 - 状態は Proposed、Accepted、Deprecated、Superseded で管理する。
 - 新しい決定は実装前に Proposed として起こし、Pull Request でコードと一緒にレビューする。
+- Proposed の間は、同じ版のまま Decision を書き直してよく、書き直した理由を Context に残す。
 - 置き換えるときは、新旧の ADR を `Superseded by ADR-NNN` で相互リンクする。
 
 ## 規約文書との同期
