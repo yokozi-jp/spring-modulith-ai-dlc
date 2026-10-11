@@ -64,7 +64,7 @@ Taskのテスト系タスクは、`.env.test`に足りない変数があると�
 失敗したイベント出版の定期の再投入を足した変更の後は、既存の`.env`へ`.env.example`の`EVENT_PUBLICATION_RESUBMISSION_ENABLED`、`EVENT_PUBLICATION_RESUBMISSION_WAIT_AGE`、`EVENT_PUBLICATION_RESUBMISSION_INTERVAL`の3行を、既存の`.env.test`へ`.env.test.example`の同じ3行を足す（[ADR-075](../adr/ADR-075-resubmit-failed-event-publications-periodically-with-shedlock.md)）。
 ローカルでは定期の再投入が短い間隔で有効なので、`FAILED`の出版は消した注文を指すものもリスナーの方針の上限の回数まで自動で再投入され、そのたびにリスナーのERRORが出る。
 
-定期の再投入のロックの表（`010-create-shedlock-table`）を足した変更の後は、スキーマタグを付けるまで`task be-migrate`では適用されないため、既存のローカルのDBに`task be-migrate-dev`を実行する。
+定期の再投入のロックの表（`010-create-shedlock-table`）を足した変更の後は、既存のローカルのDBに`task be-migrate`を実行する。
 表がないと、定期の再投入は毎回`Event publication resubmission failed`のWARNで失敗する。
 
 公開先は次のとおり。
