@@ -19,7 +19,8 @@
 
 ADR は追加していない。
 既存のログの規約とテストの規約に合わせた変更で、ADR を作る基準に当たらないためである。
-docs を変更していないため、`task okf-check` は実行していない。
+再レビューの指摘（WARN の event に運用定義がない）に対応し、`docs/observability/runbook-api-errors.md` に `Unresolved API security exception` と `Unresolved API security exception after commit` の運用定義を追加した。
+あわせて、同じ文書の description と `docs/observability/index.md` の「いつ読むか」に security の entry point を加えた。
 
 ## 実行したコマンドと結果
 
@@ -27,6 +28,9 @@ docs を変更していないため、`task okf-check` は実行していない�
 - `./gradlew spotlessCheck pmdMain pmdTest spotbugsMain spotbugsTest`（`task be-lint` と同じ）：成功。
 - `./gradlew test -x jacocoTestCoverageVerification --tests com.example.demo.SecurityExceptionFallbackTest --tests 'com.example.demo.architecture.*' --tests com.example.demo.error.presentation.web.ApiExceptionHandlerTest`：成功。
   `SecurityExceptionFallbackTest` は 4 件、architecture の 15 クラスは 375 件、`ApiExceptionHandlerTest` は 15 件で、失敗はなかった。
+- `task okf-check`：成功（終了コード 0）。
+  250 行超の警告は既存の文書だけで、今回の変更とは関係がない。
+  iwe がないため OKF の検査はスキップされ、CI で検査される。
 - 手動の mutation：`if (!committed)` を `if (true)` に変えると、commit 済みのテストが失敗することを確かめ、元に戻した。
 
 ## 実行できなかったもの
