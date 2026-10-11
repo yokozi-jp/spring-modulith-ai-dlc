@@ -25,12 +25,12 @@ export function problemStatus(error: unknown): number | undefined {
 /**
  * 409 と 422 は操作ごとの説明を、それ以外は一般の失敗を通知にする。
  * 入力検証の 400 は扱わないので、form のある画面では formFailure を使う。
- * 409 を呼び出し側で扱う場合は conflict を渡さない。
+ * conflict は省略できない。409 を呼び出し側で先に扱う場合だけ、明示して undefined を渡す。
  */
 export function failureNotice(
   t: TFunction,
   error: unknown,
-  descriptions: { conflict?: string; unprocessable: string },
+  descriptions: { conflict: string | undefined; unprocessable: string },
 ): Notice {
   const status = problemStatus(error);
   if (status === 409 && descriptions.conflict !== undefined) {
@@ -50,7 +50,7 @@ export function failureNotice(
 export function formFailure(
   t: TFunction,
   error: unknown,
-  descriptions: { conflict?: string; unprocessable: string },
+  descriptions: { conflict: string | undefined; unprocessable: string },
 ): { notice: Notice; serverErrors: ServerFieldErrors } {
   const fieldErrors = serverFieldErrors(error);
   if (fieldErrors !== undefined) {

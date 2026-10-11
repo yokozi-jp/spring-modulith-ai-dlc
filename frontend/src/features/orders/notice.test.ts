@@ -68,10 +68,14 @@ describe("注文操作の失敗の通知", () => {
     });
   });
 
-  it("競合の説明を渡さない画面で競合したら、一般の見出しと説明を出す", () => {
+  it("409 を呼び出し側で扱うと明示した画面で競合したら、一般の見出しと説明を出す", () => {
     const error = new ApiProblemError(409, { type: "about:blank", title: "Conflict", status: 409 });
 
-    expect(failureNotice(t, error, { unprocessable: "処理できない説明" })).toStrictEqual(general);
+    expect(
+      failureNotice(t, error, { conflict: undefined, unprocessable: "処理できない説明" }),
+    ).toStrictEqual(general);
+    // @ts-expect-error conflict の渡し忘れは型エラーにする。
+    failureNotice(t, error, { unprocessable: "処理できない説明" });
   });
 
   it("入力の誤りは、入力欄ごとのエラーと、入力欄に結びつかない説明に分ける", () => {
