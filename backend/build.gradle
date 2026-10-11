@@ -293,8 +293,17 @@ pitest {
     targetClasses = providers.gradleProperty('pitTargetClasses')
         .map { it.split(',').toList() }
         .getOrElse(['com.example.demo.*'])
-    // 既定の targetTests は targetClasses と同じになり、差分のクラスに絞るとテストが選ばれないため、全テストを固定する。
-    targetTests = ['com.example.demo.*']
+    // PR では対象のクラスのパッケージ以下のテストを -PpitTargetTests で渡し、全体では全テストを使う。
+    // 既定の targetTests は targetClasses と同じになり、差分のクラスに絞るとテストが選ばれないため、明示する。
+    targetTests = providers.gradleProperty('pitTargetTests')
+        .map { it.split(',').toList() }
+        .getOrElse(['com.example.demo.*'])
+    // ponytail: テストが共有のテスト DB の表を消すため、minion を並列にしない。DB を minion ごとに分けたら threads を上げる。
+    threads = 1
+    // 新しい minion は Spring のコンテキストを作り直し、coverage の計測時より遅い。
+    // 既定の 1.25 倍と 4 秒ではその起動を TIMED_OUT とみなし、minion の再起動を繰り返すため広げる。
+    timeoutFactor = 2.0
+    timeoutConstInMillis = 30000
     // Springの配線はコンテキストキャッシュで誤検知しやすいため、業務ロジックだけを測る。
     excludedClasses = [
         'com.example.demo.DemoApplication',

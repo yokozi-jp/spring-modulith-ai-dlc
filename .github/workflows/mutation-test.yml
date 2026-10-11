@@ -30,7 +30,8 @@ on:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  # main の全体の実行はスコアの基準値になるため、取り消すのは PR の実行だけにする（ADR-076）。
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 permissions:
   contents: read
@@ -40,7 +41,8 @@ jobs:
   mutation:
     name: Mutation Testing ☕
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    # PR は差分のクラスとそのパッケージのテストに絞るため 60 分、全体を変異させる main と手動実行は 180 分を上限にする。
+    timeout-minutes: ${{ github.event_name == 'pull_request' && 60 || 180 }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -79,7 +81,7 @@ jobs:
           version: "3.53.1"
           checksum: a54a408f6861ff921f6e87774180db31bacd8c1e7c944ca696db9fea49a82fc7
 
-      # PR では base との差分のクラスだけを変異させ、push と手動実行では全体を変異させる。
+      # PR では base との差分のクラスだけを、そのパッケージのテストで変異させ、push と手動実行では全体を変異させる。
       # 対象の求め方は Taskfile の be-mutation-test にある。
       - name: Run mutation tests
         env:

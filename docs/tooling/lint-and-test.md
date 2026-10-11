@@ -36,7 +36,10 @@ Dockerを使うTaskは、Dockerがないローカル環境ではスキップし�
 - **`task be-test-dev`**：起動済みのテスト用依存に作りかけのchangesetを含めて適用し、テストを実行する。
 - **`task be-mutation-test`**：起動済みのテスト用依存でPITを実行する。
   `PIT_CHANGED_SINCE`にgitの参照（`origin/main`など）を渡すと、そこからの差分の`src/main/java`のクラスと内部クラスだけを変異させる。
-  差分のクラスがないとき、30を超えるとき、差分を取れないときは全体を変異させる。
+  差分のテスト`FooTest`は、同じパッケージの`Foo`を変異させる対象に加える。
+  テストは対象のクラスのパッケージ以下のものだけを使う。
+  対象のクラスがないときはPITを実行せず、差分を取れないときは失敗する。
+  minionは共有のテストDBを使うため並列にせず、Springの起動を待てるようにtimeoutを既定より広げる。
 - **`task test`**：テスト用依存の起動、`be-verify-migrations`、`be-test`、`api-lint`、後片付けを実行する。
 - **`task test-dev`**：テスト用依存の起動、`be-test-dev`、後片付けを実行する。
 - **`task mutation-test`**：テスト用依存の起動、マイグレーション検証、`be-mutation-test`、後片付けを実行する。
@@ -266,6 +269,7 @@ Gitフックの条件とコマンドは[`lefthook.yml`](../../lefthook.yml)を�
   saveはmainのpushで、restoreが完全一致でなかったときだけ行う（[ADR-063](../adr/ADR-063-restore-gradle-cache-with-restore-keys-on-mit-caching.md)）。
 - **`mutation-test.yml`**：Backend CIと同じパスの変更を含むPR、mainへのpush、手動実行で`mutation-test`を実行し、PITのレポートをartifactにする。
   PRでは`PIT_CHANGED_SINCE=origin/<base>`を渡して差分のクラスだけを、pushと手動実行では全体を変異させる。
+  ジョブのtimeoutはPRで60分、pushと手動実行で180分とし、mainの実行は後のpushで取り消さない。
   スコアの閾値を持たず、PITが完走しないときだけ失敗する。
   Backend CIのtestと同じGradle cacheをread-onlyで復元する。
   必須チェックにしない（[ADR-076](../adr/ADR-076-run-mutation-tests-per-change-and-tighten-coverage-gates.md)）。
