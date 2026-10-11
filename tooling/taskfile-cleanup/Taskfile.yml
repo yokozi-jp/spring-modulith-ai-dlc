@@ -1,0 +1,28 @@
+# ルートの Taskfile.yml の後片付けの定型（test、e2e、dast-run など）を Docker なしで再現する fixture。
+# test.sh が終了コードと実行された操作を検査する。
+version: "3"
+set: [errexit, nounset, pipefail]
+
+tasks:
+  run:
+    silent: true
+    vars:
+      BODY: '{{.BODY | default "0"}}'
+      CLEAN1: '{{.CLEAN1 | default "0"}}'
+      CLEAN2: '{{.CLEAN2 | default "0"}}'
+    cmds:
+      - |
+        status=0
+        (
+          set -e
+          echo body >>"{{.LOG}}"
+          sh -c 'exit {{.BODY}}'
+          echo body-rest >>"{{.LOG}}"
+        ) || status=$?
+        cleanup_status=0
+        echo clean1 >>"{{.LOG}}"
+        sh -c 'exit {{.CLEAN1}}' || cleanup_status=$?
+        echo clean2 >>"{{.LOG}}"
+        sh -c 'exit {{.CLEAN2}}' || cleanup_status=$?
+        if [ "$status" -ne 0 ]; then exit "$status"; fi
+        exit "$cleanup_status"

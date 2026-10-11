@@ -124,7 +124,8 @@ export function useOrderLinesEditor(
             return;
           }
           const failure = formFailure(t, error, {
-            conflict: t("orders.notice.linesConflict"),
+            // 409 は上の conflictOutcome で扱ったので、ここには届かない。
+            conflict: undefined,
             unprocessable: t("orders.notice.linesUnprocessable"),
           });
           setNotice(failure.notice);

@@ -9,6 +9,7 @@ import org.jspecify.annotations.Nullable;
 import org.springframework.boot.webmvc.error.ErrorController;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.HttpStatusCode;
 import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -27,7 +28,7 @@ public class ApiErrorController implements ErrorController {
     this.problemDetails = problemDetails;
   }
 
-  /** 転送元の HTTP status を保ち、内部例外を公開せずにエラーを返す。 */
+  /** 転送元の 4xx と 5xx の HTTP status を保ち、内部例外を公開せずにエラーを返す。 */
   // /error はコンテナが元リクエストの method のまま転送する dispatch 先で、状態変更のない読み取り専用のため
   // method を絞らない（Spring の BasicErrorController も同様）。CSRF の懸念はない。
   // nosemgrep: java.spring.security.unrestricted-request-mapping.unrestricted-request-mapping
@@ -35,18 +36,19 @@ public class ApiErrorController implements ErrorController {
   public ResponseEntity<ProblemDetail> error(final HttpServletRequest request) {
     final @Nullable Object statusAttribute =
         request.getAttribute(RequestDispatcher.ERROR_STATUS_CODE);
-    final HttpStatus status = resolveStatus(statusAttribute);
+    final HttpStatusCode status = resolveStatus(statusAttribute);
     final Locale locale = LocaleSupport.resolve(request);
     return ResponseEntity.status(status)
         .headers(ApiProblemDetails.responseHeaders(new HttpHeaders(), status, locale))
         .body(problemDetails.localizedForStatus(status, locale));
   }
 
-  private static HttpStatus resolveStatus(final @Nullable Object statusAttribute) {
+  /** 4xx と 5xx は HttpStatus に定義がなくても保ち、それ以外は 500 にする（ADR-013）。 */
+  private static HttpStatusCode resolveStatus(final @Nullable Object statusAttribute) {
     if (statusAttribute instanceof Integer code) {
-      final @Nullable HttpStatus status = HttpStatus.resolve(code);
-      if (status != null) {
-        return status;
+      final HttpStatus.@Nullable Series series = HttpStatus.Series.resolve(code);
+      if (series == HttpStatus.Series.CLIENT_ERROR || series == HttpStatus.Series.SERVER_ERROR) {
+        return HttpStatusCode.valueOf(code);
       }
     }
     return HttpStatus.INTERNAL_SERVER_ERROR;

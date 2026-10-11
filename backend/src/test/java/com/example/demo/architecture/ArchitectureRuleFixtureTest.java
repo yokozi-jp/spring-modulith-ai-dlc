@@ -134,7 +134,7 @@ class ArchitectureRuleFixtureTest {
     return Stream.concat(classRoleRows(), tableWriterRows());
   }
 
-  /** TableWriter の規則（H1、H3、H5、H6、R1 から R4）が、対応する違反フィクスチャを検出することを確かめる行を作る。 */
+  /** TableWriter の規則（H1、H3、H5、H6、H7、R1 から R4）が、対応する違反フィクスチャを検出することを確かめる行を作る。 */
   private static Stream<Arguments> tableWriterRows() {
     return Stream.concat(
         DIRECT_WRITES.stream()
@@ -221,7 +221,11 @@ class ArchitectureRuleFixtureTest {
             row(
                 "aggregateMethodsDoNotUseUnversionedWrites",
                 TableWriterArchTest.aggregateMethodsDoNotUseUnversionedWritesRule(VIOLATING),
-                UNVERSIONED_REPOSITORY + ".update(")));
+                UNVERSIONED_REPOSITORY + ".update("),
+            row(
+                "aggregateRootInsertsGoThroughTableWriter",
+                TableWriterArchTest.aggregateRootInsertsGoThroughTableWriterRule(),
+                "ordering.infrastructure.persistence.JooqOrderDraftRepository.add(")));
   }
 
   /** クラスの役割と配置の規則が、対応する違反フィクスチャを検出することを確かめる行を作る。 */
@@ -344,6 +348,14 @@ class ArchitectureRuleFixtureTest {
             "queryServicesImplementModuleQueries",
             ClassRoleArchTest.queryServicesImplementModuleQueries,
             "ordering.application.OrderQueryService"),
+        row(
+            "queryResultStatusIsNotReadByOtherModules: status()",
+            ClassRoleArchTest.queryResultStatusIsNotReadByOtherModulesRule(VIOLATING),
+            "inventory.application.OrderStatusGuard.isConfirmed("),
+        row(
+            "queryResultStatusIsNotReadByOtherModules: *Status method reference",
+            ClassRoleArchTest.queryResultStatusIsNotReadByOtherModulesRule(VIOLATING),
+            "inventory.application.OrderStatusGuard.paidStatuses("),
         row(
             "mappingLibrariesAreNotUsed",
             ClassRoleArchTest.mappingLibrariesAreNotUsed,
@@ -515,6 +527,7 @@ class ArchitectureRuleFixtureTest {
         ClassRoleArchTest.listenersExposeOnlyOnAndCallOneCommandHandler,
         ClassRoleArchTest.requestsAndResponsesArePresentationWebRecordsRule(basePackage),
         ClassRoleArchTest.queryServicesImplementModuleQueries,
+        ClassRoleArchTest.queryResultStatusIsNotReadByOtherModulesRule(basePackage),
         ClassRoleArchTest.mappingLibrariesAreNotUsed,
         ClassRoleArchTest.jooqReflectionMappingIsNotUsed,
         TableWriterArchTest.tableWritesGoThroughTableWriterRule(basePackage),
@@ -524,6 +537,7 @@ class ArchitectureRuleFixtureTest {
         TableWriterArchTest.commandsBuiltByPresentationForWritesAreVersionedRule(basePackage),
         TableWriterArchTest.onlyCommandHandlersUpdateOrDeleteAggregatesRule(),
         TableWriterArchTest.expectedLockNoIsCreatedOnlyByRequestsRule(basePackage),
-        TableWriterArchTest.aggregateMethodsDoNotUseUnversionedWritesRule(basePackage));
+        TableWriterArchTest.aggregateMethodsDoNotUseUnversionedWritesRule(basePackage),
+        TableWriterArchTest.aggregateRootInsertsGoThroughTableWriterRule());
   }
 }

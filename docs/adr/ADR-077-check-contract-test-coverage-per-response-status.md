@@ -83,7 +83,6 @@ drift の検査は、契約が実装と一致することを確かめる。
 
 - 応答の本文の形は、これまでどおり各テストの `andExpect` が確かめ、この検査は status の有無だけを見る。
 - 権限の規則を加えて GET の 403 が起きるようになったら、除外を消して case を足す。
-- PR #192 が `main` に入ったら、`ERROR_ENDPOINT_STATUSES` に 499 と 599 を足し、`errorEndpointKeepsUndefinedStatus` に `@ContractCase` を付ける。
 
 ## Alternatives Considered
 

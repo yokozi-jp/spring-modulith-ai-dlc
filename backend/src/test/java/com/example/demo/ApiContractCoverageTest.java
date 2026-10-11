@@ -32,10 +32,11 @@ class ApiContractCoverageTest {
   /**
    * OpenAPI に載らない {@code /error} が返しうる status。
    *
-   * <p>{@code ApiErrorController} は転送元の status を保つため、title を持つ status をすべて契約テストで確かめる。
+   * <p>{@code ApiErrorController} は転送元の status を保つため、title を持つ status と、{@code HttpStatus} に定義のない
+   * 4xx と 5xx の代表（499 と 599）を契約テストで確かめる。
    */
   private static final Set<Integer> ERROR_ENDPOINT_STATUSES =
-      Set.of(400, 401, 403, 404, 405, 406, 409, 413, 415, 422, 429, 500, 503);
+      Set.of(400, 401, 403, 404, 405, 406, 409, 413, 415, 422, 429, 499, 500, 503, 599);
 
   /**
    * operation ごとの契約テストを求めない組と理由。キーは「HTTP メソッド status」で、メソッドの {@code *} はすべてのメソッドを表す。

@@ -317,6 +317,34 @@ class ApiContractTest {
         .andExpect(jsonPath("$.title").value(title));
   }
 
+  @ParameterizedTest
+  @CsvSource({
+    "499, ja, リクエストが不正です",
+    "499, en, Bad Request",
+    "599, ja, サーバー内部エラー",
+    "599, en, Internal Server Error"
+  })
+  @DisplayName("/error は HttpStatus に定義のない 4xx と 5xx を保ち、400 か 500 の title で返す")
+  @ContractCase(
+      method = RequestMethod.GET,
+      path = "/error",
+      status = {499, 599})
+  void errorEndpointKeepsUndefinedStatus(final int code, final String language, final String title)
+      throws Exception {
+    mockMvc
+        .perform(
+            get("/error")
+                .header(HttpHeaders.ACCEPT_LANGUAGE, language)
+                .requestAttr(RequestDispatcher.ERROR_STATUS_CODE, code))
+        .andExpect(status().is(code))
+        .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
+        .andExpect(header().string(HttpHeaders.CONTENT_LANGUAGE, language))
+        .andExpect(jsonPath("$.type").value("about:blank"))
+        .andExpect(jsonPath("$.title").value(title))
+        .andExpect(jsonPath("$.status").value(code))
+        .andExpect(jsonPath("$.detail").doesNotExist());
+  }
+
   @Test
   @DisplayName("別オリジンのブラウザクライアントを許可しない")
   void crossOriginBrowserClientIsNotAllowed() throws Exception {

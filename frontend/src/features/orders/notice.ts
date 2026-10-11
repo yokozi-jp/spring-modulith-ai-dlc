@@ -22,11 +22,35 @@ export function problemStatus(error: unknown): number | undefined {
   return error instanceof ApiProblemError ? error.status : undefined;
 }
 
+/**
+ * 409 と 422 は操作ごとの説明を、それ以外は一般の失敗を通知にする。
+ * 入力検証の 400 は扱わないので、form のある画面では formFailure を使う。
+ * conflict は省略できない。409 を呼び出し側で先に扱う場合だけ、明示して undefined を渡す。
+ */
+export function failureNotice(
+  t: TFunction,
+  error: unknown,
+  descriptions: { conflict: string | undefined; unprocessable: string },
+): Notice {
+  const status = problemStatus(error);
+  if (status === 409 && descriptions.conflict !== undefined) {
+    return problemNotice(t, error, descriptions.conflict);
+  }
+  if (status === 422) {
+    return problemNotice(t, error, descriptions.unprocessable);
+  }
+  // error.message と detail は内部情報を含みうるため出さない。
+  return {
+    heading: t("orders.notice.generalTitle"),
+    description: t("orders.notice.generalFailure"),
+  };
+}
+
 /** 作成と明細の変更の失敗を、通知と入力欄のサーバーのエラーに分ける。入力は呼び出し側が残す。 */
 export function formFailure(
   t: TFunction,
   error: unknown,
-  descriptions: { conflict: string; unprocessable: string },
+  descriptions: { conflict: string | undefined; unprocessable: string },
 ): { notice: Notice; serverErrors: ServerFieldErrors } {
   const fieldErrors = serverFieldErrors(error);
   if (fieldErrors !== undefined) {
@@ -38,22 +62,5 @@ export function formFailure(
       serverErrors: fieldErrors,
     };
   }
-  const status = problemStatus(error);
-  if (status === 409) {
-    return { notice: problemNotice(t, error, descriptions.conflict), serverErrors: noServerErrors };
-  }
-  if (status === 422) {
-    return {
-      notice: problemNotice(t, error, descriptions.unprocessable),
-      serverErrors: noServerErrors,
-    };
-  }
-  // error.message と detail は内部情報を含みうるため出さない。
-  return {
-    notice: {
-      heading: t("orders.notice.generalTitle"),
-      description: t("orders.notice.generalFailure"),
-    },
-    serverErrors: noServerErrors,
-  };
+  return { notice: failureNotice(t, error, descriptions), serverErrors: noServerErrors };
 }

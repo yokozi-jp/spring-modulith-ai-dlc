@@ -136,6 +136,12 @@ task e2e
 task mutation-test
 ```
 
+PRのCIと同じく差分のクラスだけを変異させるときは、比べる参照を渡す。
+
+```bash
+task mutation-test PIT_CHANGED_SINCE=origin/main
+```
+
 ## docsを変更するとき
 
 ```bash
