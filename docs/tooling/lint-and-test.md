@@ -153,6 +153,10 @@ Oxlintの設定の正本は[`frontend/vite.config.ts`](../../frontend/vite.confi
 
 feature間のimportは、これとは別にjsPluginの`feature-boundaries/no-cross-feature-import`が`src/features/**`のファイルで禁じる（[フロントエンドアーキテクチャ](../frontend/architecture.md#境界の検査)）。
 
+linkとbuttonの入れ子は、jsPluginの`ui-composition/no-button-in-link`がすべてのファイルで禁じる（[フロントエンドのUIとスタイル](../frontend/ui-and-style.md#uiの書き方)）。
+`Link`か`a`の内側の`Button`か`button`と、`Button`の`render`に渡した`Link`か`a`を報告する。
+要素は名前だけで判定するので、別名でimportしたcomponentは検出しない。
+
 組み合わせた結果は、`frontend/lint/lint-config.test.js`が`frontend/lint/fixtures/src/**`の違反例と正しい例を実際の設定でLintして確かめる。
 
 ### Lintを通る書き方

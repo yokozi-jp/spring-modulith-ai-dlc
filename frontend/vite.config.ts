@@ -199,6 +199,7 @@ export default defineConfig(({ mode }) => {
         { name: "shadcn", specifier: "@shadcn/lint" },
         { name: "better-tailwindcss", specifier: "eslint-plugin-better-tailwindcss" },
         { name: "feature-boundaries", specifier: "./lint/feature-boundaries.js" },
+        { name: "ui-composition", specifier: "./lint/ui-composition.js" },
       ],
       rules: {
         // automatic JSX runtime、Vite設定、TanStack Routerの規約と両立しない規則。
@@ -264,6 +265,7 @@ export default defineConfig(({ mode }) => {
         "no-restricted-properties": ["error", ...htmlSinkProperties, ...networkProperties],
         "local-security/no-jsx-srcdoc": "error",
         "feature-boundaries/no-cross-feature-import": "error",
+        "ui-composition/no-button-in-link": "error",
         "shadcn/no-restyle": ["error", { allow: ["layout"] }],
         "shadcn/no-raw-colors": "error",
         "shadcn/no-arbitrary-values": ["error", { allow: ["layout"] }],
