@@ -60,6 +60,11 @@ route loaderとTanStack Queryを組み合わせた画面では、loading、succe
 計測する分岐や行がないファイルは、ファイルごとの下限を検査しない。
 下限の値の根拠は[ADR-076](../adr/ADR-076-run-mutation-tests-per-change-and-tighten-coverage-gates.md)を参照する。
 
+coverageはReact Compilerを外して測る。
+Compilerが足すmemoの分岐を分母に入れないためである。
+テストの実行はCompilerを有効にしたまま別に行い、`task fe-coverage`が両方を実行する。
+理由は[ADR-078](../adr/ADR-078-measure-frontend-coverage-without-react-compiler.md)を参照する。
+
 coverageは検証していないコードを見つけるために使い、数値そのものを目標にしない。
 coverageを上げるためだけのテストは書かない。
 テストで到達しない分岐は、削除するか、利用者から見える振る舞いとして検証する。
