@@ -11,6 +11,8 @@ tags: [adr, testing, quality]
 
 Proposed
 
+PIT の実行の契機（手動実行だけ）は [ADR-076](ADR-076-run-mutation-tests-per-change-and-tighten-coverage-gates.md) で、必須でない別のワークフローの PR ごとと main への push ごとの実行に改める。
+
 ## Date
 
 2026-09-14
