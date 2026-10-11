@@ -64,19 +64,26 @@ final class ApiProblemDetails {
     return problem;
   }
 
-  /** 標準 type を補い、about:blank のときだけ title を翻訳して detail を消す。業務 type は変えない。 */
+  /**
+   * 標準 type を補い、about:blank のときだけ title を翻訳して detail を消す。業務 type は変えない。
+   *
+   * <p>HttpStatus に定義のない status の title は、4xx なら 400、それ以外なら 500 の文言にする。 status は変えない。
+   */
   /* package */ void normalize(
       final ProblemDetail problem, final HttpStatusCode status, final Locale locale) {
     final URI type = Objects.requireNonNullElse(problem.getType(), ABOUT_BLANK);
     problem.setType(type);
     if (ABOUT_BLANK.equals(type)) {
       problem.setDetail(null);
-      final String defaultTitle =
+      final HttpStatus titleStatus =
           status instanceof HttpStatus httpStatus
-              ? httpStatus.getReasonPhrase()
-              : status.toString();
+              ? httpStatus
+              : status.is4xxClientError()
+                  ? HttpStatus.BAD_REQUEST
+                  : HttpStatus.INTERNAL_SERVER_ERROR;
       problem.setTitle(
-          messageSource.getMessage("problem.title." + status.value(), null, defaultTitle, locale));
+          messageSource.getMessage(
+              "problem.title." + titleStatus.value(), null, titleStatus.getReasonPhrase(), locale));
     }
   }
 

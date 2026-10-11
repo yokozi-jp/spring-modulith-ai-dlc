@@ -66,17 +66,33 @@ class ApiProblemDetailsTest {
     assertEquals(title, problem.getTitle(), "MessageSource の title");
   }
 
-  @Test
-  @DisplayName("HttpStatus に定義のない status は status を保ち、MessageSource に key がなければ数値を title にする")
-  void localizedForStatusKeepsUndefinedStatus() {
-    final ProblemDetail problem =
-        new ApiProblemDetails(new StaticMessageSource())
-            .localizedForStatus(HttpStatusCode.valueOf(499), Locale.JAPANESE);
+  @ParameterizedTest
+  @CsvSource({
+    "499, ja, リクエストが不正です",
+    "499, en, Bad Request",
+    "599, ja, サーバー内部エラー",
+    "599, en, Internal Server Error",
+    // fr は key を登録しないので、400 と 500 の reason phrase になる。
+    "499, fr, Bad Request",
+    "599, fr, Internal Server Error"
+  })
+  @DisplayName("HttpStatus に定義のない status は status を保ち、4xx は 400、5xx は 500 の title にする")
+  void localizedForStatusKeepsUndefinedStatus(
+      final int code, final String language, final String title) {
+    final StaticMessageSource messages = new StaticMessageSource();
+    messages.addMessage("problem.title.400", Locale.JAPANESE, "リクエストが不正です");
+    messages.addMessage("problem.title.400", Locale.ENGLISH, "Bad Request");
+    messages.addMessage("problem.title.500", Locale.JAPANESE, "サーバー内部エラー");
+    messages.addMessage("problem.title.500", Locale.ENGLISH, "Internal Server Error");
 
-    assertEquals(499, problem.getStatus(), "status");
-    assertEquals(URI.create("about:blank"), problem.getType(), "type");
-    assertEquals("499", problem.getTitle(), "key がなければ status の数値");
-    assertNull(problem.getDetail(), "detail を付けないこと");
+    final ProblemDetail problem =
+        new ApiProblemDetails(messages)
+            .localizedForStatus(HttpStatusCode.valueOf(code), Locale.forLanguageTag(language));
+
+    assertEquals(code, problem.getStatus(), "status: 入力 " + code);
+    assertEquals(URI.create("about:blank"), problem.getType(), "type: 入力 " + code);
+    assertEquals(title, problem.getTitle(), "title: 入力 " + code + ", " + language);
+    assertNull(problem.getDetail(), "detail を付けないこと: 入力 " + code);
   }
 
   @ParameterizedTest
