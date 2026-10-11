@@ -73,7 +73,7 @@ coverageの対象と基準を含むテスト基盤の判断理由は[ADR-027](..
 
 | 生成物                          | 生成元                                           | 再生成                                                              |
 | ------------------------------- | ------------------------------------------------ | ------------------------------------------------------------------- |
-| `frontend/src/routeTree.gen.ts` | `frontend/src/routes/` のroute file              | `cd frontend && vp build`、または `vp dev` を起動しておく           |
+| `frontend/src/routeTree.gen.ts` | `frontend/src/routes/` のroute file              | `cd frontend && vp build`、または `task fe-dev` を起動しておく      |
 | `openapi/openapi.yaml`          | ControllerとDTOのJavadoc、`OpenApiConfig`        | `task api-gen`（[APIを変更する](../web-api/runbook-api-change.md)） |
 | `frontend/src/api/generated/**` | `openapi/openapi.yaml` とOrval設定               | `task api-gen`（契約から）、`task api-client-gen`（Orval設定だけ）  |
 

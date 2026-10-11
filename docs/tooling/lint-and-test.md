@@ -15,11 +15,33 @@ Dockerを使うTaskは、Dockerがないローカル環境ではスキップし�
 
 - **`task check`**：バックエンドの静的解析を実行する。
 - **`task verify`**：バックエンドの静的解析、マイグレーション検証、テストを実行する。
-- **`task fe-verify`**：フロントエンドの静的解析、未使用コード検査、テスト、テレメトリを無効にした本番ビルドを実行する。
 - **`task test`**：隔離した依存を起動し、確定済みマイグレーションの検証、バックエンドテスト、OpenAPI契約検査後に片付ける。
 - **`task test-dev`**：隔離した依存を起動し、作りかけのchangesetを含むバックエンドテスト後に片付ける。
 - **`task mutation-test`**：隔離した依存を使ってバックエンドのPITミューテーションテストを実行する。
+- **`task fe-verify`**：フロントエンドの静的解析、未使用コード検査、テスト、テレメトリを無効にした本番ビルドを実行する。
 - **`task e2e`**：compose-testでbackendを起動し、Vite previewに対してPlaywrightのE2Eを実行して後片付けする（[E2Eテストの方針と書き方](../e2e/testing-strategy.md)）。
+
+## バックエンド
+
+- **`task be-lint`**：Spotless、PMD、SpotBugsでmainとtestを検査する。
+- **`task be-openapi-lint`**：起動済みのテスト用依存でOpenAPI 3.1契約を`openapi/openapi.yaml`へ生成し、Spectralで検査する。
+- **`task be-openapi-check`**：直前の`be-test`が書き出した契約をSpectralで検査し、コミット済みの`openapi/openapi.yaml`と差分があれば失敗する。
+  テストを実行しないため、`be-test`の後に実行する。
+  単体で実行すると、コミット済みの契約を自分自身と比べるので、差分を検出できない。
+- **`task be-verify-migrations`**：使い捨てDBでchangesetの適用、rollback、再適用、現在タグを検証する。
+- **`task be-test`**：起動済みのテスト用依存に確定済みchangesetを適用し、テストとcoverage検証を実行する。
+  `-PopenapiExport=true`を渡すので、`OpenApiContractTest`が`openapi/openapi.yaml`を書き出す。
+  素の`./gradlew test`は契約に触れない。
+- **`task be-test-dev`**：起動済みのテスト用依存に作りかけのchangesetを含めて適用し、テストを実行する。
+- **`task be-mutation-test`**：起動済みのテスト用依存でPITを実行する。
+- **`task test`**：テスト用依存の起動、`be-verify-migrations`、`be-test`、`api-lint`、後片付けを実行する。
+- **`task test-dev`**：テスト用依存の起動、`be-test-dev`、後片付けを実行する。
+- **`task mutation-test`**：テスト用依存の起動、マイグレーション検証、`be-mutation-test`、後片付けを実行する。
+
+`task test`と`task mutation-test`は、`docker/compose-test.yml`のPostgreSQL 5433とRedis 6380を`.env.test`で起動する。
+`.env.test`は、Gitで管理する`.env.test.example`からコピーして作るローカルファイルで、無ければTaskが作る。
+PITのHTMLとXMLのレポートは、変異対象がある場合に`backend/build/reports/pitest/`へ出力する。
+プロパティベーステストとミューテーションテストの採用理由は[ADR-012](../adr/ADR-012-adopt-property-based-and-mutation-testing.md)を参照する。
 
 ## フロントエンド
 
@@ -154,28 +176,6 @@ event handlerからPromiseを返す関数を呼ぶときは、handlerの中で`v
 const params = { ...(cursor !== undefined && { cursor }) };
 ```
 
-## バックエンド
-
-- **`task be-lint`**：Spotless、PMD、SpotBugsでmainとtestを検査する。
-- **`task be-openapi-lint`**：起動済みのテスト用依存でOpenAPI 3.1契約を`openapi/openapi.yaml`へ生成し、Spectralで検査する。
-- **`task be-openapi-check`**：直前の`be-test`が書き出した契約をSpectralで検査し、コミット済みの`openapi/openapi.yaml`と差分があれば失敗する。
-  テストを実行しないため、`be-test`の後に実行する。
-  単体で実行すると、コミット済みの契約を自分自身と比べるので、差分を検出できない。
-- **`task be-verify-migrations`**：使い捨てDBでchangesetの適用、rollback、再適用、現在タグを検証する。
-- **`task be-test`**：起動済みのテスト用依存に確定済みchangesetを適用し、テストとcoverage検証を実行する。
-  `-PopenapiExport=true`を渡すので、`OpenApiContractTest`が`openapi/openapi.yaml`を書き出す。
-  素の`./gradlew test`は契約に触れない。
-- **`task be-test-dev`**：起動済みのテスト用依存に作りかけのchangesetを含めて適用し、テストを実行する。
-- **`task be-mutation-test`**：起動済みのテスト用依存でPITを実行する。
-- **`task test`**：テスト用依存の起動、`be-verify-migrations`、`be-test`、`api-lint`、後片付けを実行する。
-- **`task test-dev`**：テスト用依存の起動、`be-test-dev`、後片付けを実行する。
-- **`task mutation-test`**：テスト用依存の起動、マイグレーション検証、`be-mutation-test`、後片付けを実行する。
-
-`task test`と`task mutation-test`は、`docker/compose-test.yml`のPostgreSQL 5433とRedis 6380を`.env.test`で起動する。
-`.env.test`は、Gitで管理する`.env.test.example`からコピーして作るローカルファイルで、無ければTaskが作る。
-PITのHTMLとXMLのレポートは、変異対象がある場合に`backend/build/reports/pitest/`へ出力する。
-プロパティベーステストとミューテーションテストの採用理由は[ADR-012](../adr/ADR-012-adopt-property-based-and-mutation-testing.md)を参照する。
-
 ## API契約
 
 契約と生成物の扱いは[ADR-052](../adr/ADR-052-commit-openapi-contract-and-check-generated-client.md)、手順は[APIを変更する](../web-api/runbook-api-change.md)を参照する。
@@ -195,7 +195,7 @@ PITのHTMLとXMLのレポートは、変異対象がある場合に`backend/buil
 
 ## リポジトリ全体
 
-- **`task lint-duplicates`**：生成コードを除く手書きのフロントエンドとバックエンドをjscpdで検査する。
+- **`task lint-duplicates`**：生成コードを除く手書きのバックエンドとフロントエンドをjscpdで検査する。
 - **`task scan-secrets`**：ステージ済み変更をbetterleaksでスキャンする。
 - **`task scan-secrets-all`**：リポジトリ全体と、現在のブランチから辿れる履歴をbetterleaksでスキャンする。
 - **`task lint-semgrep`**：Semgrep OSSで静的解析する。
@@ -245,26 +245,27 @@ OKF検査の採用理由は[ADR-036](../adr/ADR-036-adopt-okf-for-docs-knowledge
 - **pre-commit（Markdownの変更）**：変更ファイルへ`lint-md`相当を実行する。
 - **pre-commit（docs、steering、Taskfileの変更）**：`okf-check`を実行する。
 - **pre-push（すべて）**：`adr-check`と`scan-secrets-all`相当を実行する。
-- **pre-push（フロントエンドまたはTaskfileの変更）**：`fe-test-build`を実行する。
 - **pre-push（バックエンドのJavaまたはGradle変更）**：`be-lint`相当と`test`を実行する。
 - **pre-push（バックエンドまたはDockerfileの変更）**：バックエンドイメージのbuild stageをビルドする。
+- **pre-push（フロントエンドまたはTaskfileの変更）**：`fe-test-build`を実行する。
 - **pre-push（GitHub Actionsワークフローの変更）**：`lint-actions`相当と`lint-actions-security`相当を実行する。
 
 Gitフックの条件とコマンドは[`lefthook.yml`](../../lefthook.yml)を正とする。
 
 ## CI対応
 
-- **`frontend-ci.yml`**：`fe-verify`、`fe-route-tree-check`、`api-client-check`、`fe-doctor`を実行する。
 - **`backend-ci.yml`**：`be-lint`相当、`be-verify-migrations`、`be-test`、`be-openapi-check`、手動実行時の`mutation-test`を実行する。
   compose-testを止めた後に`test-deps-leftover-check`を実行する。
   契約は`be-test`が書き出し、`be-openapi-check`は`OpenApiContractTest`を再実行しない（[ADR-064](../adr/ADR-064-write-openapi-contract-from-test-task-in-ci.md)）。
   Gradle User Homeは`setup-gradle`の`cache-provider: external`にして、`actions/cache`のrestoreとsaveで扱う。
   keyはビルドファイルのhashで、restore-keysにより直近のmainのcacheを復元する。
   saveはmainのpushで、restoreが完全一致でなかったときだけ行う（[ADR-063](../adr/ADR-063-restore-gradle-cache-with-restore-keys-on-mit-caching.md)）。
+- **`frontend-ci.yml`**：`fe-verify`、`fe-route-tree-check`、`api-client-check`、`fe-doctor`を実行する。
 - **`api-contract.yml`**：`api-lint`、`api-lint-rules-test`、`api-breaking`、`api-docs`を実行し、設計書をartifactにする。
   mainへのpushでは設計書をGitHub Pagesに公開する。
 - **`betterleaks.yml`**：`scan-secrets-all`相当を実行する。
 - **`static-analysis.yml`**：`lint-semgrep`相当と`lint-duplicates`を実行する。
+  Code ScanningはSARIFの`suppressions`を読まないため、`nosemgrep`で抑止した検出をSARIFから除いてから送る。
 - **`trivy.yml`**：`scan-vulns`相当を実行する。
 - **`dast.yml`**：PRで`scan-dast`、週1回のscheduleと手動実行で`scan-dast-active`を実行し、Informationalを除いたSARIFをCode Scanningに送る。
 - **`actionlint.yml`**：`lint-actions`相当を実行する。

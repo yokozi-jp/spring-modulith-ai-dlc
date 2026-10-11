@@ -378,6 +378,18 @@ tasks:
         ./06-setup-iwe.sh
 
   # Frontend
+  fe-install:
+    desc: フロントエンドの依存をインストール（初回と、package.jsonかpnpm-lock.yamlが変わったとき）
+    dir: frontend
+    cmds:
+      - vp install
+
+  fe-dev:
+    desc: フロントエンドの開発サーバーを起動（APIとOIDCを同一オリジンでproxy）
+    dir: frontend
+    cmds:
+      - vp dev
+
   fe-format:
     desc: フロントエンドをOxfmtで整形
     dir: frontend
