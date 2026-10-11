@@ -1,7 +1,7 @@
 ---
 type: ADR
 title: 'ADR-054: 楽観的ロックの競合を lock_no の条件と更新件数で判定し、業務テーブルの UPDATE と DELETE を TableWriter に集める'
-description: 楽観的ロックの版の条件、版の設定、件数の判定、55P03 の変換を shared の TableWriter に集め、競合を shared.concurrency の ConflictException で 409 にし、期待する版を ExpectedLockNo と VersionedCommand で運び、ArchUnit で迂回と検査の抜けを禁じる決定。取り込んだ PostgreSQL 設計ガイドラインの、先に SELECT ... FOR UPDATE でロックする方式を改変する。
+description: 楽観的ロックの版の条件、版の設定、件数の判定、55P03 の変換を shared の TableWriter に集め、集約ルートの INSERT も TableWriter.insert で実行して 23505 と 55P03 を ConflictException に変え、競合を shared.concurrency の ConflictException で 409 にし、期待する版を ExpectedLockNo と VersionedCommand で運び、ArchUnit で迂回と検査の抜けを禁じる決定。取り込んだ PostgreSQL 設計ガイドラインの、先に SELECT ... FOR UPDATE でロックする方式を改変する。
 tags: [adr, backend, database, jooq, concurrency, http]
 ---
 
@@ -25,6 +25,7 @@ Proposed
 どれを書き忘れても UPDATE は成功し、Repository の規約のチェックリストの楽観的ロックの項目はすべて「自分で点検」だった。
 `requireUpdated` を呼ぶ production のコードはまだなく、ADR も Proposed のままであるため、この版で決定を書き直す。
 その後、[ADR-062](ADR-062-map-business-exceptions-to-404-409-422.md) の改訂（[issue #145](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/145)）に合わせ、`55P03` の変換で原因を付けないよう、この版で決定を書き直す。
+また、ADR-062 が集約ルートの INSERT の入口 `TableWriter.insert` を足したため、INSERT は `TableWriter` を通さないとしていた決定を、この版で書き直す。
 
 利用者は、共通基盤に次の順で重みを置く。
 AI と開発者が迷わないこと（どこに何を書き、どの API を使うかの答えが一つ）、間違えると機械で失敗すること、システムとして安全であること（古い値の上書き、無期限の待ち、気付けない設定の誤りがない）である。
@@ -36,14 +37,19 @@ PostgreSQL の READ COMMITTED では、後の UPDATE は先の UPDATE のコミ�
 `lock_no` は全業務テーブルにあり（[PostgreSQL の共通カラム](../database/postgresql-common-columns.md)）、列の有無では楽観的ロックの対象を分けられない。
 規約は、在庫の引き当てのように版を比べない UPDATE と、`lock_no` を進めないデータパッチを認めている。
 
-業務テーブルと production の Repository はまだないため、移行の費用は共通処理、テスト、規約に限られる。
+最初の版の時点では業務テーブルと production の Repository がなく、移行の費用は共通処理、テスト、規約に限られていた。
+その後、`t_order` と `t_payment` の業務テーブルと、`JooqOrderRepository`、`JooqPaymentRepository`、`JooqProductRepository` が加わった。
+書き込む `JooqOrderRepository` と `JooqPaymentRepository` は、この決定の入口を使っている。
 
 ## Decision
 
 - 業務テーブルの UPDATE と DELETE は、`shared.infrastructure.persistence` の `TableWriter` だけが組み立てて実行する。
   期待する版（以前に読んだ集約ルートの `lock_no`）を持つ書き込みは `updateCheckingVersion` と `deleteCheckingVersion` で、持たない書き込みは `updateWhere` と `deleteWhere` で行う。
   集約の子の行の更新と削除は、ルートの書き込みが返す `LockedRoot`（削除では `DeletedRoot`）で書き、子の集合の変化は差分（削除、追加、更新）で書く。
-  INSERT は `TableWriter` を通さず、`CommonColumns.forInsert` で書く。
+- 集約ルートの INSERT は、Repository が `dsl.insertInto(...)` で組み立て、`TableWriter.insert` が実行する（[ADR-062](ADR-062-map-business-exceptions-to-404-409-422.md)）。
+  `TableWriter.insert` は、一意制約の違反（`23505`）を `Kind.UNIQUE` の、`55P03` の `CannotAcquireLockException` を `Kind.LOCK` の `ConflictException` に、原因を付けずに変える。
+  INSERT の共通カラムは、集約ルートでも子の行でも `CommonColumns.forInsert` で書く。
+  子の行の INSERT は `TableWriter` を通さずに実行し（`add` では `dsl.batch`）、`23505` を変換しない（ADR-062 の Negative）。
 - 業務の列の値は `ColumnValues<R>` で受け取る。
   `ColumnValues<R>` は `TableField<R, T>` を受け取る二つの `set` だけを持ち、`where` と `execute` を持たない。
   [PostgreSQL の共通カラム](../database/postgresql-common-columns.md)の 12 列を名前で照らし、渡すと `IllegalArgumentException` にする。
@@ -82,6 +88,8 @@ PostgreSQL の READ COMMITTED では、後の UPDATE は先の UPDATE のコミ�
     集約ルートが `lockNo()` を持たないと、版を比べる規則が集約ルートを見つけられず、空のまま通るためである。
     必須の `add` を含めるため、`save` のような名前で保存する Repository でも、形を外れた集約は `add` で検出される。
   - 集約ルートを引数に取るメソッドは、版を比べない入口を呼ばない。
+  - `aggregateRootInsertsGoThroughTableWriter`：`Jooq<Aggregate>Repository` の `add` とその中のラムダは、`Insert` に代入できる型の実行（`execute`、`executeAsync`、`returning`、`returningResult`、名前が `fetch` で始まるメソッド）を呼ばない。
+    子の行の INSERT は `update` で直接実行するため、対象を `add` に限る。
   - R1 と R2 は、`domain.model` の Repository の `add` 以外の書き込み（`update`、`delete`、集約ルートを受け取るメソッド）を同じ判定で見つける。
     `Jooq<Aggregate>Repository` の検査と同じく集約ルートの引数で選ぶため、`save` のような別名でも規則を外れない。
   - `commandsBuiltByPresentationForWritesAreVersioned`（R1）：presentation が作った Command を受け取り、Repository の `add` 以外の書き込みを呼ぶ CommandHandler の Command は、`VersionedCommand` を実装する。
@@ -144,6 +152,9 @@ PostgreSQL の READ COMMITTED では、後の UPDATE は先の UPDATE のコミ�
     これは規約が受け入れているリスクとする。
   - **jOOQ の新しい書き込みの API**：jOOQ の版を上げると、ArchUnit の禁止の一覧にない書き込みの API が増えうる。
     実行時の版を固定したテストが失敗するため、「jOOQの版を上げるとき」の手順で一覧を見直す。
+  - **`add` の外の集約ルートの INSERT**：`aggregateRootInsertsGoThroughTableWriter` は `Jooq<Aggregate>Repository` の `add` とその中のラムダだけを見る。
+    `add` から呼ぶ private メソッドの中の実行、`add` 以外の名前のメソッドと `Jooq<Aggregate>Repository` 以外のクラスからの集約ルートの INSERT、`dsl.batch` に渡した集約ルートの INSERT は検出しない。
+    INSERT の先のテーブルはバイトコードから区別できないため、`update` の子の行の INSERT と集約ルートの INSERT も区別しない。
   - **ルートを通さない子の書き込み**：`updateWhere` と `deleteWhere` に子のテーブルを渡すことと、ルートを書かずに子を INSERT することは止められない。
     集約ルートを引数に取るメソッドからの `updateWhere` は止まるため、残るのは識別子だけを受け取るメソッドである。
   - **`long lockNo` を引数に取るメソッド**：期待する版を `long` の引数で受け取るメソッドが `updateWhere` を使う誤りは検出できない。
