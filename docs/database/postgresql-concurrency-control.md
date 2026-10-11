@@ -34,8 +34,7 @@ PostgreSQLではREPEATABLE READ以上にすると、直列化の失敗による�
 楽観的ロックを優先して使う。
 悲観的ロックの画面設計は、入力中のデータを破棄することが業務上どうしても許容できない場合を除き避ける。
 DBの行ロックは、在庫の引き当てのように性能が重要になる処理でだけ使う。
-複数のインスタンスで定期のジョブを1つに絞るときは、自動コミットの接続でセッションのadvisory lock（`pg_try_advisory_lock`）を使う。
-トランザクションのadvisory lockと行ロックは使わない（[ADR-075](../adr/ADR-075-resubmit-failed-event-publications-periodically-with-advisory-lock.md)）。
+複数のインスタンスで定期のジョブを1つに絞るときは、ShedLockのロックを使う（後述の「定期のジョブの排他」）。
 
 ## 楽観的ロック
 
@@ -155,22 +154,23 @@ final int reserved =
 更新件数が0件なら、在庫不足として利用者へ返し、業務判断を委ねる。
 マスタの保守のように後勝ちの上書きを許容できない更新と、状態の遷移を伴う更新には使わない。
 
-## advisory lock
+## 定期のジョブの排他
 
-セッションのadvisory lockは、取得から解放まで同じ1本の接続を固定し、トランザクションを開かずに持つ。
-インスタンスが落ちると接続が切れ、PostgreSQLがロックを放すため、ロックの期限を設けない。
-アプリで使うキーは次の表だけにし、新しいキーを足すときは同じ変更で表に足す。
+複数のインスタンスで定期のジョブを1つに絞るときは、ShedLockのjOOQのproviderで`modulith.shedlock`の行にロックを持つ（[ADR-075](../adr/ADR-075-resubmit-failed-event-publications-periodically-with-shedlock.md)）。
+ロックの期限はDBの時刻で書き込んで比べ、ロックの操作は1文ずつの新しいトランザクションで終える。
+接続を固定しないため、RDS ProxyやPgBouncerのトランザクションモードの後ろでも動き、`tableWritesGoThroughTableWriter`（H1）の例外も要らない。
+アプリで使うロックの名前は次の表だけにし、新しい名前を足すときは同じ変更で表に足す。
 
-| キー  | 使うクラス                                                         | 用途                                                                                                                                                           |
-| ----- | ------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `108` | `shared.infrastructure.persistence`の`EventPublicationResubmitter` | 失敗したイベント出版の定期の再投入を1つのインスタンスに絞る（[ADR-075](../adr/ADR-075-resubmit-failed-event-publications-periodically-with-advisory-lock.md)） |
+| 名前                             | 使うクラス                                                                                         | 用途                                                                           |
+| -------------------------------- | -------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------ |
+| `event-publication-resubmission` | `shared.infrastructure.persistence`の`EventPublicationResubmitter`、`EventPublicationResubmitOnce` | 失敗したイベント出版の定期の再投入と手での1回の再投入を1つのインスタンスに絞る |
 
-`EventPublicationResubmitter`は、接続を固定するために`DSLContext.connection`を使うため、`tableWritesGoThroughTableWriter`（H1）の例外にする。
-業務テーブルを書かず、`modulith.event_publication`を読むだけである。
-例外の一覧は[アーキテクチャテスト](../backend/architecture-tests.md)の「書き込みの入口」にある。
+セッションのadvisory lock（`pg_advisory_lock`、`pg_try_advisory_lock`）は使わない。
+ロックがセッションの状態であり、接続を多重化するプロキシの後ろでは保たれないためである（[設計の作り込みの程度と段階的な再構築](../principles/right-sizing.md)の「テンプレートの利用先で変わる前提」）。
+本番のコードに使っていないことは`task lint-session-sql`が検査する。
 
-セッションのadvisory lockは、アプリからPostgreSQLへの接続が直結であることを前提にする。
-RDS ProxyやPgBouncerのトランザクションモードのような接続を多重化するプロキシを入れるときは、セッションのadvisory lockの方式を見直す。
+ShedLockはロックの行を作ったことをメモリに覚えるため、`modulith.shedlock`の行を手で消さない。
+消すと、同じインスタンスは再起動までロックを取れない。
 
 ## 出典
 

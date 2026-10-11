@@ -42,11 +42,11 @@ jOOQの生成物の`com.example.demo.jooq`はOPENのモジュールであり、`
 規則名は`@ArchTest`のフィールド名であり、テスト結果にもこの名前で出る。
 
 - `dependenciesPointInward`：`domain.model`、`domain.service`、モジュールルートと`application`、`presentation`、`infrastructure.persistence`、`infrastructure.client`のオニオン構造で依存を内向きに限り、どの層にも属さないパッケージのクラスを拒否する。
-  ベースパッケージ直下と`shared.concurrency`、`shared.failure`は、所属検査から除く。
+  ベースパッケージ直下と`shared.concurrency`、`shared.failure`、`shared.events`は、所属検査から除く。
 - `infrastructureDependsOnlyOnDomainModel`：`infrastructure`は`application`、`domain.service`、モジュールルートの型に依存せず、機能モジュールの型のうち`domain.model`だけを使う。
-- `sharedModuleIsUsedOnlyByPersistenceAdapters`：`shared`の外で`shared.concurrency`と`shared.failure`以外の`shared`の型に依存するクラスは、`infrastructure.persistence`に置く。
+- `sharedModuleIsUsedOnlyByPersistenceAdapters`：`shared`の外で`shared.concurrency`、`shared.failure`、`shared.events`以外の`shared`の型に依存するクラスは、`infrastructure.persistence`に置く。
   `shared`の中の依存は対象にしない。
-  `shared.concurrency`と`shared.failure`は、どの層からも使える（[ADR-048](../adr/ADR-048-add-shared-module-for-jooq-common-code.md)、[ADR-062](../adr/ADR-062-map-business-exceptions-to-404-409-422.md)）。
+  `shared.concurrency`、`shared.failure`、`shared.events`は、どの層からも使える（[ADR-048](../adr/ADR-048-add-shared-module-for-jooq-common-code.md)、[ADR-062](../adr/ADR-062-map-business-exceptions-to-404-409-422.md)、[ADR-075](../adr/ADR-075-resubmit-failed-event-publications-periodically-with-shedlock.md)）。
 - `sharedModuleDoesNotDependOnHttp`：`shared`の型は、Spring Web、Springの HTTP、Servletの型に依存しない。
 - `moduleApiDoesNotExposeInternalTypes`：モジュールルートの型は、`java..`、`org.jspecify..`、同じルートパッケージの型だけに依存する。
 - `databaseTechnologyApisAreOnlyUsedByPersistenceAdapters`：jOOQ APIと生成型は`infrastructure.persistence`だけで使う。
@@ -199,7 +199,7 @@ INSERTの共通カラムは`CommonColumns.forInsert`で、UPDATEとDELETEは`Tab
 `TableWriterArchTest`は、業務テーブルのUPDATEとDELETEを`shared`の`TableWriter`に集める規則を検査する（[PostgreSQLの排他制御](../database/postgresql-concurrency-control.md)、[ADR-054](../adr/ADR-054-detect-optimistic-lock-conflicts-by-update-count.md)）。
 集約ルートは、`domain.model`にあり、引数のない`long lockNo()`を宣言する型とする。
 
-- `tableWritesGoThroughTableWriter`：`TableWriter`、`LockedRoot`、`DeletedRoot`、`EventPublicationResubmitter`の外の本番のコードは、次のAPIを呼ばず、メソッド参照もしない。
+- `tableWritesGoThroughTableWriter`：`TableWriter`、`LockedRoot`、`DeletedRoot`の外の本番のコードは、次のAPIを呼ばず、メソッド参照もしない。
   呼び出し先の型が、挙げた型に代入できるかで判定する。
   - `DSLContext`、`DSL`、`WithStep`の`update`、`delete`、`deleteFrom`、`mergeInto`、`updateQuery`、`deleteQuery`
   - `DSLContext`の`batchUpdate`、`batchStore`、`batchDelete`、`batchMerge`、`executeUpdate`、`executeDelete`、`connection`、`connectionResult`
@@ -215,10 +215,8 @@ INSERTの共通カラムは`CommonColumns.forInsert`で、UPDATEとDELETEは`Tab
 
   `Update`と`Delete`を作る入口をすべて禁じるため、`batch`や`subscribe`のように作った問い合わせを受け取って実行するAPIは禁じない。
 
-  `tableWritesGoThroughTableWriter`が除外するのは、`shared.infrastructure.persistence`の`TableWriter`、`LockedRoot`、`DeletedRoot`、`EventPublicationResubmitter`の四つの完全修飾型名だけである。
-  `EventPublicationResubmitter`は、セッションのadvisory lockのために接続を1本固定する（[ADR-075](../adr/ADR-075-resubmit-failed-event-publications-periodically-with-advisory-lock.md)）。
-  業務テーブルを書かず、`modulith.event_publication`を読むだけである。
-  除外を足す、外す、または除外する型を移すときは、先に[ADR-054](../adr/ADR-054-detect-optimistic-lock-conflicts-by-update-count.md)の判断を変えるか、新しいADRで例外を決める。
+  `tableWritesGoThroughTableWriter`が除外するのは、`TableWriter`、`LockedRoot`、`DeletedRoot`の三つの完全修飾型名だけである。
+  除外を足す、外す、または除外する型を移すときは、先に[ADR-054](../adr/ADR-054-detect-optimistic-lock-conflicts-by-update-count.md)の判断を変える。
   同じ変更で、`tableWritesGoThroughTableWriterRule`の完全修飾型名と、除外する型を置く適合フィクスチャ（`archfixture/conforming/shared/infrastructure/persistence/`）を更新する。
   禁止するAPIの違反フィクスチャ（`DirectOrderWriter`）は、禁止の一覧か`isDirectWrite`の判定を変えるときだけ更新する。
 - `repositoryUpdateAndDeleteCheckVersion`：`Jooq*Repository`の、集約ルートを受け取る`add`以外のpublicメソッドは、版を比べる入口をそのメソッドの中で直接呼ぶ。
