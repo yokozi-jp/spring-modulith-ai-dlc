@@ -70,8 +70,7 @@ const testOnlyImports = {
   group: ["msw", "msw/**", "@/api/generated/mocks/**", "@/testing/**", "@testing-library/**"],
   message: "Use test-only modules only in test files and src/testing.",
 };
-// ponytail: no-restricted-imports は静的な import だけを見る。feature からの動的 import("@grafana/...") は通る。
-// 違反が起きたら、lint/feature-boundaries.js と同じく ImportExpression を見る規則に移す。
+// no-restricted-imports は静的な import に加えて import("@grafana/...") も検出する（lint/fixtures の telemetry-sdk.ts で確かめている）。
 const telemetrySdkImports = {
   group: ["@grafana/*"],
   message: "Call the telemetry SDK only through src/lib/telemetry.ts (ADR-068).",

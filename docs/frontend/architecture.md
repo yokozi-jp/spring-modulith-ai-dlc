@@ -200,8 +200,7 @@ feature間の境界は、`frontend/lint/feature-boundaries.js` のOxlint JS plug
 
 `@grafana/*` のimportは、`no-restricted-imports` のすべての禁止の一覧に加え、`src/lib/telemetry.ts` のoverrideだけで外している。
 テストファイルもSDKをimportできない。
-`no-restricted-imports` は静的importだけを見るので、`import("@grafana/...")` の動的importは検出しない。
-動的importはレビューで確かめる。
+`no-restricted-imports` は静的importに加えて `import("@grafana/...")` の動的importも検出する。
 
 jsPluginは、動的な境界規則をこの一本だけと想定している。
 アプリやパッケージに分かれたとき、または動的な規則が三本を超えたときは、dependency-cruiserへ移る。

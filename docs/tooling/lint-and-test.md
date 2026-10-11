@@ -148,7 +148,7 @@ Oxlintの設定の正本は[`frontend/vite.config.ts`](../../frontend/vite.confi
 - **テスト用部品**：`msw`、`msw/**`、`@/api/generated/mocks/**`、`@/testing/**`、`@testing-library/**`。
 - **テレメトリSDK**：`@grafana/*`。
   `src/lib/telemetry.ts`を通して呼ぶ（[ADR-068](../adr/ADR-068-collect-browser-telemetry-with-faro-via-collector.md)）。
-  静的importだけを検出し、`import()`は検出しない。
+  静的importと`import()`の両方を検出する。
 - **HTML sink**：globalの`DOMParser`、`innerHTML`などのHTML系property、`document.write`、`document.writeln`。
 - **network**：globalの`fetch`と`XMLHttpRequest`、`window.fetch`、`globalThis.fetch`。
   `src/api`の生成clientを使う。

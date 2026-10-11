@@ -85,7 +85,7 @@ describe("project lint config on fixtures", () => {
     });
 
     it("rejects the telemetry SDK from a feature", () => {
-      expect(countIn("features/order/telemetry-sdk.ts", "eslint(no-restricted-imports)")).toBe(1);
+      expect(countIn("features/order/telemetry-sdk.ts", "eslint(no-restricted-imports)")).toBe(2);
     });
 
     it("allows the own feature and the API client", () => {
