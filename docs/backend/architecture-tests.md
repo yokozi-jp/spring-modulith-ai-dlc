@@ -87,7 +87,7 @@ jOOQの生成物の`com.example.demo.jooq`はOPENのモジュールであり、`
 - `requestsAndResponsesArePresentationWebRecords`：`*Request`と`*Response`は`presentation.web`のrecordにする。
 - `queryServicesImplementModuleQueries`：`*QueryService`は`application`に置いて自モジュールのルートの`*Queries`を実装し、すべてのpublicメソッドに`@Transactional(readOnly = true)`を付ける。
 - `queryResultStatusIsNotReadByOtherModules`：モジュールルートのrecordの`status()`と、名前が`Status`で終わるメソッドを、そのモジュールの外から呼ばず、メソッド参照もしない。
-  ログに注文の状態を出す`payment.application.ChargeOrderCommandHandler`だけを、完全修飾型名で除く（[ADR-077](../adr/ADR-075-return-state-meaning-in-query-results.md)）。
+  ログに注文の状態を出す`payment.application.ChargeOrderCommandHandler`だけを、完全修飾型名で除く（[ADR-075](../adr/ADR-075-return-state-meaning-in-query-results.md)）。
 - `mappingLibrariesAreNotUsed`：MapStruct、ModelMapper、Dozerのパッケージと、jOOQの`DefaultRecordMapper`、`DefaultRecordUnmapper`に依存しない。
 - `jooqReflectionMappingIsNotUsed`：名前のリフレクションで列と項目を対応づけるjOOQのメソッドを呼ばない。
   読み取りは、`into`、`intoMap`、`intoGroups`、`fetchMap`、`fetchGroups`と名前が`Into`で終わるメソッドのうち、`Class`を受け取るもの（`into(Class)`、`fetchInto(Class)`、`fetchMap(Field, Class)`など）を検出する。
