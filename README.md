@@ -221,8 +221,8 @@ task <タスク名>
 日々の開発で使う入口タスクは次の六つです。
 
 - **`task dev`**：依存サービスを起動してバックエンドを起動（日々の開発の入口）。業務データが空のDBには、起動の前に開発用の代表データを入れる。
-- **`task check`**：素早いローカル確認（バックエンドの静的解析）。
-- **`task verify`**：push 前のバックエンド総合ゲート（静的解析、OpenAPI 契約検査と、使い捨てDBでのマイグレーション検証とテスト、CI と同じ内容）。
+- **`task check`**：素早いローカル確認（バックエンドの静的解析と、セッションに状態を残す SQL の検査）。
+- **`task verify`**：push 前のバックエンド総合ゲート（静的解析、セッションに状態を残す SQL の検査、OpenAPI 契約検査と、使い捨てDBでのマイグレーション検証とテスト、CI と同じ内容）。
 - **`task fe-dev`**：フロントエンドの開発サーバーを起動（`task dev`とは別のターミナルで実行する）。APIとOIDCを同一オリジンでproxyする。
 - **`task fe-verify`**：フロントエンドの静的解析、未使用コード検査、テスト、本番ビルド。
 - **`task lint-duplicates`**：バックエンドとフロントエンドの手書きコードの重複検査。
@@ -283,6 +283,11 @@ Docker Compose の操作（サービスの起動、停止、状態確認、Keycl
   意図した変更は Pull Request にラベル `api-breaking-approved` を付け、本文に理由を書きます。
 - `task api-docs` は Redocly CLI で静的 HTML の設計書を `build/api-docs/index.html` に作ります。
   main へのマージで GitHub Pages に公開します。
+
+### セッションに状態を残す SQL の検査
+
+- `task lint-session-sql` は、PgBouncer のトランザクションモードや RDS Proxy の後ろで壊れる SQL（セッションの advisory lock、`LISTEN`、`WITH HOLD`、`PREPARE`、`DEALLOCATE`、`ON COMMIT PRESERVE ROWS` と `ON COMMIT DELETE ROWS`、`LOAD`）を、バックエンドの本番のコードと changelog から検出します。
+  `task check`、`task verify`、Backend CI の lint で実行します（[設計の作り込みの程度と段階的な再構築](docs/principles/right-sizing.md)）。
 
 ### 重複コード検査
 

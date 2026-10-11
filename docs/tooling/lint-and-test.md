@@ -13,8 +13,8 @@ Dockerを使うTaskは、Dockerがないローカル環境ではスキップし�
 
 ## 入口Task
 
-- **`task check`**：バックエンドの静的解析を実行する。
-- **`task verify`**：バックエンドの静的解析、マイグレーション検証、テストを実行する。
+- **`task check`**：`lint-session-sql`とバックエンドの静的解析を実行する。
+- **`task verify`**：`lint-session-sql`、バックエンドの静的解析、マイグレーション検証、テストを実行する。
 - **`task test`**：隔離した依存を起動し、確定済みマイグレーションの検証、バックエンドテスト、OpenAPI契約検査後に片付ける。
 - **`task test-dev`**：隔離した依存を起動し、作りかけのchangesetを含むバックエンドテスト後に片付ける。
 - **`task mutation-test`**：隔離した依存を使ってバックエンドのPITミューテーションテストを実行する。
@@ -24,6 +24,13 @@ Dockerを使うTaskは、Dockerがないローカル環境ではスキップし�
 ## バックエンド
 
 - **`task be-lint`**：Spotless、PMD、SpotBugsでmainとtestを検査する。
+- **`task lint-session-sql`**：`backend/src/main/java`のJavaと`backend/src/main/resources/db`のSQLとYAMLから、接続を多重化するプロキシ（PgBouncerのトランザクションモード、RDS Proxy）の後ろで壊れる、セッションに状態を残すSQLを検出し、あれば失敗する。
+  対象は、[PgBouncerの機能の表](https://www.pgbouncer.org/features.html)でTransaction poolingがNeverの機能のうち、セッションのadvisory lock（`pg_advisory_lock`、`pg_try_advisory_lock`、`pg_advisory_unlock`、`pg_advisory_unlock_all`と`_shared`の版）、`LISTEN`、`WITH HOLD`のカーソル、`PREPARE`と`DEALLOCATE`の文、`ON COMMIT PRESERVE ROWS`と`ON COMMIT DELETE ROWS`の一時表、`LOAD`である。
+  大文字と小文字を区別せず、Javadoc、行コメント、YAMLとSQLのコメントの行は除く。
+  トランザクションのadvisory lock（`pg_advisory_xact_lock`、`pg_try_advisory_xact_lock`）、`ON COMMIT DROP`、`LISTENER_ID`のような識別子は検出しない。
+  検出の前に、検出すべき文と検出しない文の例で式を自己検査する。
+  `SET`と`RESET`も同じ表でNeverだが、`spring.datasource.hikari.connection-init-sql`がセッションの`SET`を使うため検出しない（[ADR-075](../adr/ADR-075-resubmit-failed-event-publications-periodically-with-shedlock.md)）。
+  設計の理由は[設計の作り込みの程度と段階的な再構築](../principles/right-sizing.md)の「テンプレートの利用先で変わる前提」にある。
 - **`task be-openapi-lint`**：起動済みのテスト用依存でOpenAPI 3.1契約を`openapi/openapi.yaml`へ生成し、Spectralで検査する。
 - **`task be-openapi-check`**：直前の`be-test`が書き出した契約をSpectralで検査し、コミット済みの`openapi/openapi.yaml`と差分があれば失敗する。
   テストを実行しないため、`be-test`の後に実行する。
@@ -254,7 +261,7 @@ Gitフックの条件とコマンドは[`lefthook.yml`](../../lefthook.yml)を�
 
 ## CI対応
 
-- **`backend-ci.yml`**：`be-lint`相当、`be-verify-migrations`、`be-test`、`be-openapi-check`、手動実行時の`mutation-test`を実行する。
+- **`backend-ci.yml`**：`be-lint`相当、`lint-session-sql`、`be-verify-migrations`、`be-test`、`be-openapi-check`、手動実行時の`mutation-test`を実行する。
   compose-testを止めた後に`test-deps-leftover-check`を実行する。
   契約は`be-test`が書き出し、`be-openapi-check`は`OpenApiContractTest`を再実行しない（[ADR-064](../adr/ADR-064-write-openapi-contract-from-test-task-in-ci.md)）。
   Gradle User Homeは`setup-gradle`の`cache-provider: external`にして、`actions/cache`のrestoreとsaveで扱う。

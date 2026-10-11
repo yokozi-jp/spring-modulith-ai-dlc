@@ -115,6 +115,16 @@ jobs:
         working-directory: backend
         run: ./gradlew spotlessCheck pmdMain pmdTest spotbugsMain spotbugsTest
 
+      - name: Set up Task
+        uses: go-task/setup-task@a00fbb05ce67b35648be3c78cbc9fd85354c757e # v2
+        with:
+          version: "3.53.1"
+          checksum: a54a408f6861ff921f6e87774180db31bacd8c1e7c944ca696db9fea49a82fc7
+
+      # PgBouncer のトランザクションモードや RDS Proxy の後ろで壊れるセッションの SQL を検出する。
+      - name: Check session-level SQL
+        run: task lint-session-sql
+
       # PR は cache を書かない。
       # 既存の key は上書きされないため、main の完全一致しなかった run だけが保存する。
       - name: Save Gradle cache
