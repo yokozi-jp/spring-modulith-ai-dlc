@@ -1,6 +1,6 @@
 /**
  * jOOQ の技術的な共通処理を置く（ADR-048）。共通カラムの値、NULL から空文字への変換、共通カラムの {@code *_pgm_cd} を束縛する
- * Aspect（ADR-051）と、業務テーブルの UPDATE と DELETE の唯一の入口である {@link
+ * Aspect（ADR-051）と、業務テーブルの UPDATE と DELETE を組み立てて実行する唯一の入口で、集約ルートの INSERT の入口である {@link
  * com.example.demo.shared.infrastructure.persistence.TableWriter}（ADR-054）を含む。
  *
  * <p>使ってよいのは、他のモジュールの {@code infrastructure.persistence} のアダプターだけとする。業務の概念を置かない。

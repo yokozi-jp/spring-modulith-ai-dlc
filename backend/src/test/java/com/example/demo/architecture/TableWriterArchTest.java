@@ -36,6 +36,7 @@ import org.jooq.DAO;
 import org.jooq.DMLQuery;
 import org.jooq.DSLContext;
 import org.jooq.Delete;
+import org.jooq.Insert;
 import org.jooq.InsertOnDuplicateStep;
 import org.jooq.InsertQuery;
 import org.jooq.LoaderOptionsStep;
@@ -50,7 +51,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 /**
- * 業務テーブルの UPDATE と DELETE を {@code TableWriter} に集め、楽観的ロックの版の比べ忘れを止める（ADR-054、
+ * 業務テーブルの UPDATE と DELETE と集約ルートの INSERT を {@code TableWriter} に集め、楽観的ロックの版の比べ忘れを止める（ADR-054、
  * docs/database/postgresql-concurrency-control.md）。
  *
  * <p>基底パッケージを含む規則は {@code xxxRule(basePackage)} のファクトリで組み立て、{@link ArchitectureRuleFixtureTest}
@@ -233,6 +234,11 @@ class TableWriterArchTest {
   @ArchTest
   /* package */ static final ArchRule aggregateMethodsDoNotUseUnversionedWrites =
       aggregateMethodsDoNotUseUnversionedWritesRule(BASE_PACKAGE);
+
+  /** {@code Jooq*Repository} の {@code add} は、{@code Insert} を直接実行しない（H7）。 */
+  @ArchTest
+  /* package */ static final ArchRule aggregateRootInsertsGoThroughTableWriter =
+      aggregateRootInsertsGoThroughTableWriterRule();
 
   @Test
   @DisplayName("jOOQ の実行時の版は、書き込みの禁止の一覧を見直した版である")
@@ -429,6 +435,60 @@ class TableWriterArchTest {
                 + "updateWhere と deleteWhere は、識別子や条件だけを受け取るメソッドで使う。"
                 + "規約："
                 + DOCS);
+  }
+
+  /**
+   * H7 の規則を組み立てる。
+   *
+   * <p>子の行の INSERT は {@code update} で直接実行してよいため、{@code add} とその中のラムダだけを対象にする。
+   */
+  /* package */ static ArchRule aggregateRootInsertsGoThroughTableWriterRule() {
+    return methods()
+        .that(
+            DescribedPredicate.describe(
+                "infrastructure.persistence の Jooq*Repository の add とその中のラムダ",
+                TableWriterArchTest::isRepositoryAdd))
+        .should(notExecuteInsertDirectly())
+        .allowEmptyShould(true)
+        .because(
+            "TableWriter.insert を通さない集約ルートの INSERT は、一意制約の違反（23505）とロック待ち（55P03）を"
+                + "ConflictException に変えず、409 ではなく 500 を返すため。"
+                + "直し方：add では dsl.insertInto(...) で組み立てた INSERT を TableWriter.insert に渡す。"
+                + "子の行の INSERT は dsl.batch で実行する。"
+                + "規約：docs/backend/class-roles/jooq-repository.md、"
+                + DOCS);
+  }
+
+  /** {@code Jooq*Repository} の {@code add} か、その中のラムダの合成メソッドかを返す。 */
+  private static boolean isRepositoryAdd(final JavaMethod method) {
+    final JavaClass owner = method.getOwner();
+    return (ADD.equals(method.getName()) || method.getName().startsWith("lambda$add$"))
+        && owner.getSimpleName().startsWith("Jooq")
+        && owner.getSimpleName().endsWith(REPOSITORY)
+        && owner.getPackageName().contains(".infrastructure.persistence");
+  }
+
+  private static ArchCondition<JavaMethod> notExecuteInsertDirectly() {
+    return new ArchCondition<>("not execute a jOOQ Insert directly") {
+      @Override
+      public void check(final JavaMethod item, final ConditionEvents events) {
+        item.getAccessesFromSelf().stream()
+            .filter(access -> access.getTargetOwner().isAssignableTo(Insert.class))
+            .filter(
+                access ->
+                    QUERY_EXECUTIONS.contains(access.getName())
+                        || access.getName().startsWith("fetch"))
+            .forEach(
+                access ->
+                    events.add(
+                        SimpleConditionEvent.violated(
+                            item,
+                            item.getFullName()
+                                + " が "
+                                + access.getTarget().getFullName()
+                                + " で INSERT を直接実行する。")));
+      }
+    };
   }
 
   /** 呼び出し先が、TableWriter を通さない業務テーブルの書き込みかを返す。 */
