@@ -33,7 +33,7 @@ final class OrderedItems {
                 new ProductOffer(
                     new ProductId(UUID.fromString(summary.productId())),
                     new Money(summary.unitPrice()),
-                    "ON_SALE".equals(summary.salesStatus())))
+                    summary.onSale()))
         .collect(Collectors.toMap(ProductOffer::productId, Function.identity()));
   }
 }

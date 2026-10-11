@@ -44,6 +44,7 @@ class ProductQueryService implements ProductQueries {
         product.productCode(),
         product.productName(),
         product.unitPrice(),
-        product.salesStatus().name());
+        product.salesStatus().name(),
+        product.salesStatus().isOnSale());
   }
 }

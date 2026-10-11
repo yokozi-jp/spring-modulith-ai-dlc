@@ -39,6 +39,9 @@ tags: [convention, backend, class-role]
 - 不変条件は、コンパクトコンストラクタで検査する。
   満たさない値には `IllegalArgumentException` を投げ、メッセージは英語で、値の名前と値を含める。
 - 演算は新しい値オブジェクトを返すメソッドにする（`plus`、`minus`、`times`）。
+- 他モジュールが[参照の結果](query-result.md)の意味の項目で分岐に使う状態の意味（確定か、販売中か）は、enum の各定数のコンストラクタの引数で決め、`isConfirmed()`、`isOnSale()` のような public メソッドで返す。
+  定数を足すときに引数を書かないと、コンパイルが失敗する。
+  理由は [ADR-075](../../adr/ADR-075-return-state-meaning-in-query-results.md) に示す。
 - 識別子を採番する `newId()` のような static メソッドは作らない。
   主キーの次の値は Repository の `nextId()` から得る（[Repository](repository.md)）。
 - record、enum、enum の定数、コンパクトコンストラクタ、public メソッドに Javadoc を書く。
@@ -131,6 +134,30 @@ public enum OrderStatus {
 }
 ```
 
+他モジュールが分岐に使う状態の意味を持つ enum は、商品の `SalesStatus` のように定数ごとに引数で意味を決める。
+
+```java
+/** 商品の販売の状態。定数を足すときは、販売中かをコンストラクタの引数で決める。 */
+public enum SalesStatus {
+  /** 販売中。 */
+  ON_SALE(true),
+  /** 販売終了。 */
+  DISCONTINUED(false);
+
+  /** 販売中の状態か。 */
+  private final boolean onSale;
+
+  SalesStatus(final boolean onSale) {
+    this.onSale = onSale;
+  }
+
+  /** 販売中の状態なら true を返す。 */
+  public boolean isOnSale() {
+    return onSale;
+  }
+}
+```
+
 ## 対応するテスト
 
 Spring を起動しない JUnit のテストを、値オブジェクトと同じパッケージのテストソースに置く（`QuantityTest`、`MoneyTest`）。
@@ -164,6 +191,8 @@ class QuantityTest {
 - 値オブジェクトを class にして setter を付け、作った後で値を変える。
 - 値オブジェクトを Command、Result、モジュールルートの record に持たせる。
 - 固定の値の集合を `String` の定数で表す。
+- 他モジュールが分岐に使う状態の意味を、enum の外で定数と比べて求める（`order.status() == OrderStatus.CONFIRMED`）。
+  定数を足しても、意味の決め忘れをコンパイルで検出できない。
 
 ## 作成時のチェックリスト
 
@@ -172,6 +201,7 @@ class QuantityTest {
 - [ ] `public record` にし、固定の値の集合は `public enum` にする。［自分で点検］
 - [ ] 不変条件をコンパクトコンストラクタで検査し、`IllegalArgumentException` を投げる。［自分で点検］
 - [ ] 演算は新しい値オブジェクトを返す。［自分で点検］
+- [ ] 他モジュールが分岐に使う状態の意味は、enum の定数ごとにコンストラクタの引数で決める。［自分で点検］
 - [ ] 識別子の名前は対象の名前に `Id` を付け、単一の値の component は `Money` だけを `amount`、それ以外を `value` にする。［自分で点検］
 - [ ] 利用者の入力の誤りは Request の形式の検証で 400 にし、値オブジェクトの `IllegalArgumentException` に頼らない。［自分で点検］
 - [ ] Javadoc を書く。［自分で点検］

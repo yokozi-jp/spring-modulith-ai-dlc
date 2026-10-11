@@ -86,6 +86,8 @@ jOOQの生成物の`com.example.demo.jooq`はOPENのモジュールであり、`
 - `listenersExposeOnlyOnAndCallOneCommandHandler`：`*Listener`のpublicメソッドは`@ApplicationModuleListener`を付けた`void on(...)`一つだけにし、呼ぶ`*CommandHandler`はちょうど一つにする。
 - `requestsAndResponsesArePresentationWebRecords`：`*Request`と`*Response`は`presentation.web`のrecordにする。
 - `queryServicesImplementModuleQueries`：`*QueryService`は`application`に置いて自モジュールのルートの`*Queries`を実装し、すべてのpublicメソッドに`@Transactional(readOnly = true)`を付ける。
+- `queryResultStatusIsNotReadByOtherModules`：モジュールルートのrecordの`status()`と、名前が`Status`で終わるメソッドを、そのモジュールの外から呼ばず、メソッド参照もしない。
+  ログに注文の状態を出す`payment.application.ChargeOrderCommandHandler`だけを、完全修飾型名で除く（[ADR-075](../adr/ADR-075-return-state-meaning-in-query-results.md)）。
 - `mappingLibrariesAreNotUsed`：MapStruct、ModelMapper、Dozerのパッケージと、jOOQの`DefaultRecordMapper`、`DefaultRecordUnmapper`に依存しない。
 - `jooqReflectionMappingIsNotUsed`：名前のリフレクションで列と項目を対応づけるjOOQのメソッドを呼ばない。
   読み取りは、`into`、`intoMap`、`intoGroups`、`fetchMap`、`fetchGroups`と名前が`Into`で終わるメソッドのうち、`Class`を受け取るもの（`into(Class)`、`fetchInto(Class)`、`fetchMap(Field, Class)`など）を検出する。
@@ -97,7 +99,7 @@ jOOQの生成物の`com.example.demo.jooq`はOPENのモジュールであり、`
 プロダクションの規則は`.allowEmptyShould(true)`を付けるため、対象のクラスがなくても成功する。
 `ArchitectureRuleFixtureTest`は、テスト専用のフィクスチャで各規則が働くことを確かめる。
 
-- `backend/src/test/java/archfixture/conforming/`：規約どおりの`ordering`モジュール、`inventory`モジュール、`shared`モジュールの最小の例。すべての規則が誤検出しないことを確かめる。
+- `backend/src/test/java/archfixture/conforming/`：規約どおりの`ordering`モジュール、`inventory`モジュール、`payment`モジュール、`shared`モジュールの最小の例。すべての規則が誤検出しないことを確かめる。
   `ordering`の`JooqOrderRepository`が`shared.infrastructure.persistence`の型を使い、`shared`のルートは`package-info.java`だけを持つ。
 - `backend/src/test/java/archfixture/violating/`：規則ごとに違反するクラスを置く。各クラスのJavadocに違反する規則名を書く。パラメータ化テストが、規則ごとに対応する違反クラスの完全修飾名を含む失敗を確かめる。
 
@@ -106,6 +108,9 @@ jOOQの生成物の`com.example.demo.jooq`はOPENのモジュールであり、`
 `ArchitectureRuleFixtureTest`は`ClassFileImporter`でフィクスチャを読み込み、ベースパッケージを引数に取る`<規則名>Rule(basePackage)`のファクトリか、規則のフィールドをそのまま使う。
 
 `sharedModuleIsUsedOnlyByPersistenceAdapters`は、違反フィクスチャの`application`の`OrderAuditColumns`が`shared.infrastructure.persistence`の型を使うことを検出し、規約どおりのフィクスチャの`JooqOrderRepository`を誤検出しないことを確かめる。
+
+`queryResultStatusIsNotReadByOtherModules`は、違反フィクスチャの`inventory.application.OrderStatusGuard`が`ordering`の`OrderSummary`の`status()`を呼ぶことと、`paymentStatus`をメソッド参照することを検出する。
+規約どおりのフィクスチャでは、`ordering`の`OrderController`が自モジュールの`OrderSummary::status`を読み、除外する`payment.application.ChargeOrderCommandHandler`が他モジュールの`OrderSummary::status`を読んでも、規則が通ることを確かめる。
 
 `jooqReflectionMappingIsNotUsed`は、違反フィクスチャの`ReflectiveOrderReader`で禁止するメソッドごとに一行を持ち、それぞれの呼び出しを検出することを確かめる。
 

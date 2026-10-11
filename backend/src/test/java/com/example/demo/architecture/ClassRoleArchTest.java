@@ -12,6 +12,7 @@ import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
 
 import com.example.demo.DemoApplication;
 import com.tngtech.archunit.base.DescribedPredicate;
+import com.tngtech.archunit.core.domain.JavaAccess;
 import com.tngtech.archunit.core.domain.JavaClass;
 import com.tngtech.archunit.core.domain.JavaMethod;
 import com.tngtech.archunit.core.domain.JavaMethodCall;
@@ -56,6 +57,9 @@ class ClassRoleArchTest {
 
   /** クラスの役割を決めた ADR のパス。 */
   private static final String ADR_050 = "docs/adr/ADR-050-define-backend-class-roles-and-naming.md";
+
+  /** 参照の結果で状態の意味を返すと決めた ADR のパス。 */
+  private static final String ADR_075 = "docs/adr/ADR-075-return-state-meaning-in-query-results.md";
 
   /** jOOQ の Repository の規約のパス。 */
   private static final String JOOQ_REPOSITORY_DOC = "docs/backend/class-roles/jooq-repository.md";
@@ -242,6 +246,53 @@ class ClassRoleArchTest {
                   + JOOQ_REPOSITORY_DOC
                   + "、"
                   + ADR_050);
+
+  /** 参照の結果の状態の名前は、状態を持つモジュールの中だけで読む。 */
+  @ArchTest
+  /* package */ static final ArchRule queryResultStatusIsNotReadByOtherModules =
+      queryResultStatusIsNotReadByOtherModulesRule(BASE_PACKAGE);
+
+  /**
+   * 参照の結果の {@code status()} と名前が {@code Status} で終わるメソッドを、別のモジュールから呼ばない規則を組み立てる。
+   *
+   * <p>メソッド参照も検出する。ログに注文の状態を出す決済の {@code ChargeOrderCommandHandler} だけを除く（ADR-075）。
+   */
+  // ponytail: 除外はクラス単位なので、除外したクラスに状態の名前による分岐を足しても検出しない。
+  // 除外を外すには、ログを状態の名前なしにするか、OrderDetails に表示用の項目を足す（ADR-075）。
+  /* package */ static ArchRule queryResultStatusIsNotReadByOtherModulesRule(
+      final String basePackage) {
+    final String loggingException = basePackage + ".payment.application.ChargeOrderCommandHandler";
+    return noClasses()
+        .that(DescribedPredicate.not(name(loggingException)))
+        .should()
+        .accessTargetWhere(
+            DescribedPredicate.describe(
+                "the status name of a query result owned by another module",
+                (JavaAccess<?> access) -> readsOtherModuleStatus(basePackage, access)))
+        .because(
+            "状態の名前を文字列で比べて分岐すると、持ち主が enum の定数の名前を変えたり定数を足したりしてもコンパイルが通り、分岐だけが黙って壊れるため。"
+                + "直し方：状態を持つモジュールの参照の結果に意味の項目（boolean confirmed、boolean onSale）を足し、"
+                + "読む側はその項目で分岐する。"
+                + "規約：docs/backend/class-roles/query-result.md、"
+                + ADR_075);
+  }
+
+  /** アクセスが、別のモジュールのルートの record の状態の名前を読むかを返す。 */
+  private static boolean readsOtherModuleStatus(
+      final String basePackage, final JavaAccess<?> access) {
+    final JavaClass owner = access.getTargetOwner();
+    final String ownerPackage = owner.getPackageName();
+    final String name = access.getName();
+    final boolean statusOfModuleRootRecord =
+        owner.isRecord()
+            && ownerPackage.startsWith(basePackage + ".")
+            && ownerPackage.indexOf('.', basePackage.length() + 1) < 0
+            && ("status".equals(name) || name.endsWith("Status"));
+    final String callerPackage = access.getOriginOwner().getPackageName();
+    return statusOfModuleRootRecord
+        && !callerPackage.equals(ownerPackage)
+        && !callerPackage.startsWith(ownerPackage + ".");
+  }
 
   /** モジュールルートの型を record、enum、{@code *Queries} interface に限る規則を組み立てる。 */
   /* package */ static ArchRule moduleRootTypesAreRecordsEnumsOrQueriesRule(
