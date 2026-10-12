@@ -132,6 +132,9 @@ class ApiContractCoverageTest {
       return false;
     }
     final int space = exemption.indexOf(' ');
+    if (space < 0) {
+      throw new IllegalArgumentException("除外のキーは「HTTP メソッド status」の形で書く: " + exemption);
+    }
     final String method = exemption.substring(0, space);
     final String status = exemption.substring(space);
     return ("*".equals(method) || response.startsWith(method + " ")) && response.endsWith(status);
