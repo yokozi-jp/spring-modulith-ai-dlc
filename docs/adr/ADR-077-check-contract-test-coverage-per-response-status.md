@@ -84,6 +84,8 @@ drift の検査は、契約が実装と一致することを確かめる。
 ### Neutral
 
 - 応答の本文の形は、これまでどおり各テストの `andExpect` が確かめ、この検査は status の有無だけを見る。
+- 全 operation をまとめて確かめる 401 と更新の 403 は、`ContractCaseArguments` が宣言から送る要求を作る。
+  要求と宣言を別々に書かないので、片方だけ消えて検査をすり抜けることがない。
 - 権限の規則を加えて GET の 403 が起きるようになったら、除外を消して case を足す。
 
 ## Alternatives Considered

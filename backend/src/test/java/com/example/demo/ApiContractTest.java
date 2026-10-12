@@ -14,12 +14,14 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.example.demo.testkit.ContractCase;
+import com.example.demo.testkit.ContractCaseArguments;
 import com.example.demo.testkit.SharedTestConfiguration;
 import conflictfixture.ConflictFixture;
 import jakarta.servlet.RequestDispatcher;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ArgumentsSource;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -65,16 +67,7 @@ class ApiContractTest {
   }
 
   @ParameterizedTest(name = "{0} {1}")
-  @CsvSource({
-    "GET, /api/orders",
-    "POST, /api/orders",
-    "GET, /api/orders/0b6c8f6e-2f4a-4c1e-9d3b-7a1e5c2d4f60",
-    "PUT, /api/orders/0b6c8f6e-2f4a-4c1e-9d3b-7a1e5c2d4f60/lines",
-    "POST, /api/orders/0b6c8f6e-2f4a-4c1e-9d3b-7a1e5c2d4f60/confirm",
-    "POST, /api/orders/0b6c8f6e-2f4a-4c1e-9d3b-7a1e5c2d4f60/cancel",
-    "GET, /api/payments",
-    "GET, /api/products"
-  })
+  @ArgumentsSource(ContractCaseArguments.class)
   @DisplayName("未認証の各 operation は WWW-Authenticate 付きの 401 Problem Details を返す")
   @ContractCase(method = RequestMethod.GET, path = "/api/orders", status = 401)
   @ContractCase(method = RequestMethod.POST, path = "/api/orders", status = 401)
@@ -95,12 +88,7 @@ class ApiContractTest {
   }
 
   @ParameterizedTest(name = "{0} {1}")
-  @CsvSource({
-    "POST, /api/orders",
-    "PUT, /api/orders/0b6c8f6e-2f4a-4c1e-9d3b-7a1e5c2d4f60/lines",
-    "POST, /api/orders/0b6c8f6e-2f4a-4c1e-9d3b-7a1e5c2d4f60/confirm",
-    "POST, /api/orders/0b6c8f6e-2f4a-4c1e-9d3b-7a1e5c2d4f60/cancel"
-  })
+  @ArgumentsSource(ContractCaseArguments.class)
   @DisplayName("CSRF トークンのない更新の operation は 403 Problem Details を返す")
   @ContractCase(method = RequestMethod.POST, path = "/api/orders", status = 403)
   @ContractCase(method = RequestMethod.PUT, path = "/api/orders/{orderId}/lines", status = 403)
