@@ -234,6 +234,7 @@ tasks:
     cmds:
       - task: lint-docs-sync
       - task: docs-boundary-check
+      - task: adr-lint
       - |
         if ! command -v iwe >/dev/null 2>&1; then
           echo "OKF check: iwe が無いためスキップします（CI で検査されます）。" >&2
@@ -261,6 +262,17 @@ tasks:
           printf '%s' "$stats" | jq -r '.orphans[] | "    - " + .' >&2
           exit 1
         fi
+
+  # ADR の番号の重複、索引の行、索引と本文の状態と日付、リンクのラベルと宛先の番号を検査する（docs/adr/conventions.md）。
+  # 検査の本体は tooling/adr-lint/adr-lint.mjs に置き、壊れた fixture に対する自己検査（test.sh）を先に実行する。
+  # ponytail: okf-validate の paths は backend/src/** を含まないため、バックエンドの Javadoc だけを変える PR では CI が動かない。
+  # 限界に当たったら paths に backend/src/** を足す。
+  adr-lint:
+    internal: true
+    silent: true
+    cmds:
+      - bash tooling/adr-lint/test.sh
+      - node tooling/adr-lint/adr-lint.mjs
 
   # steering → docs の一方向依存、frontmatter、文書責務の見直し合図を検査する（ADR-038）。
   # 依存方向、frontmatter、パスの実在は失敗、docs の250行超とsteeringの行数超過は警告にとどめる。

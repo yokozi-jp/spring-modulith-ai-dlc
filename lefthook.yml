@@ -155,8 +155,8 @@ pre-commit:
       glob: "*.md"
       run: npx --yes markdownlint-cli2 {staged_files}
 
-    # docs、steering、Taskfile にステージ済み変更があるとき、OKF v0.2 バンドルの適合、
-    # 内部リンク、steering → docs の境界、Taskfile と利用文書の同期候補を検証（task okf-check）。
+    # docs、steering、Taskfile、README、adr-lint にステージ済み変更があるとき、OKF v0.2 バンドルの適合、
+    # 内部リンク、steering → docs の境界、ADR の整合、Taskfile と利用文書の同期候補を検証（task okf-check）。
     # iwe が無い環境は OKF 部分をタスク側でスキップ（最終担保は CI の okf-validate に任せる）。
     - name: okf-check
       glob:
@@ -164,6 +164,8 @@ pre-commit:
         - "docs/.iwe/**"
         - ".kiro/steering/**"
         - "Taskfile.yml"
+        - "README.md"
+        - "tooling/adr-lint/**"
       run: |
         echo "{staged_files}" >/dev/null
         task okf-check
