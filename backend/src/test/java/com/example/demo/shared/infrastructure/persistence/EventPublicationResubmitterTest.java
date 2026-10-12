@@ -46,6 +46,8 @@ import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Primary;
 import org.springframework.modulith.events.ApplicationModuleListener;
+import org.springframework.modulith.events.config.StalenessProperties;
+import org.springframework.modulith.events.core.EventPublicationRegistry;
 import org.springframework.modulith.test.EnableScenarios;
 import org.springframework.modulith.test.Scenario;
 import org.springframework.scheduling.config.ScheduledTaskHolder;
@@ -82,6 +84,9 @@ class EventPublicationResubmitterTest {
 
   /** リスナーの呼び出しの回数の説明。 */
   private static final String CALLS = "id=%s のリスナーの呼び出し";
+
+  /** archive の行の数の説明。 */
+  private static final String ARCHIVED = "id=%s の archive の行";
 
   /** {@code completion_attempts} の説明。 */
   private static final String ATTEMPTS = "id=%s の attempts";
@@ -130,6 +135,12 @@ class EventPublicationResubmitterTest {
 
   /** メトリクス。 */
   @Autowired private MeterRegistry meterRegistry;
+
+  /** Staleness Monitor が呼ぶ、古い出版を FAILED に戻す処理。 */
+  @Autowired private EventPublicationRegistry registry;
+
+  /** 設定した Staleness Monitor の閾値。 */
+  @Autowired private StalenessProperties staleness;
 
   /** OTLP へ送る LogRecord。 */
   @Autowired private CapturedLogRecords capturedLogRecords;
@@ -346,7 +357,7 @@ class EventPublicationResubmitterTest {
 
     final State state = state(id);
     assertThat(listener.calls()).as(CALLS, id).isEqualTo(1);
-    assertThat(state.archived()).as("id=%s の archive の行", id).isEqualTo(1);
+    assertThat(state.archived()).as(ARCHIVED, id).isEqualTo(1);
     assertThat(state.incomplete()).as("id=%s の未完了の行", id).isZero();
     assertThat(state.attempts()).as(ATTEMPTS, id).isEqualTo(1);
   }
@@ -392,7 +403,7 @@ class EventPublicationResubmitterTest {
     final String id = failedOnce(scenario);
     final CountDownLatch gate = listener.close();
     final CompletableFuture<EventPublicationResubmitOnce.Outcome> future =
-        runOnceAsync("policy:probe");
+        ResubmissionTestSupport.onVirtualThread(() -> resubmitOnce.run("policy:probe"));
     awaitListenerAtGate(id);
     assertThat(future).as("門で待つ間の手での再投入").isNotDone();
     gate.countDown();
@@ -404,7 +415,28 @@ class EventPublicationResubmitterTest {
     assertThat(listener.finished()).as("戻った時点で終わったリスナーの呼び出し").isEqualTo(2);
     assertThat(result).isEqualTo(new EventPublicationResubmitOnce.Outcome(1, 1, 0, 0));
     assertThat(result.succeeded()).isTrue();
-    assertThat(state(id).archived()).as("id=%s の archive の行", id).isEqualTo(1);
+    assertThat(state(id).archived()).as(ARCHIVED, id).isEqualTo(1);
+  }
+
+  @Test
+  @DisplayName("Staleness Monitor は、wait-age より古い出版を再投入して処理している間も FAILED に戻さず、手での 1 回の再投入は完了まで待つ")
+  void resubmitOnceKeepsInFlightPublicationAgainstStalenessMonitor(final Scenario scenario)
+      throws Exception {
+    final String id = failedOnce(scenario);
+    // publication_date（T0）からの経過が published の閾値（wait-age）を超える。
+    clock.set(T0.plus(WAIT_AGE).plus(Duration.ofMinutes(1)));
+    final CountDownLatch gate = listener.close();
+    final CompletableFuture<EventPublicationResubmitOnce.Outcome> future =
+        ResubmissionTestSupport.onVirtualThread(() -> resubmitOnce.run("policy:probe"));
+    awaitListenerAtGate(id);
+
+    registry.markStalePublicationsFailed(staleness);
+
+    assertThat(state(id).status()).as("id=%s の門で待つ間の状態", id).isIn("PROCESSING", "RESUBMITTED");
+    gate.countDown();
+    assertThat(future.get(JOIN_TIMEOUT_SECONDS, TimeUnit.SECONDS))
+        .isEqualTo(new EventPublicationResubmitOnce.Outcome(1, 1, 0, 0));
+    assertThat(state(id).archived()).as(ARCHIVED, id).isEqualTo(1);
   }
 
   @Test
@@ -420,7 +452,7 @@ class EventPublicationResubmitterTest {
     listener.failTimes(1);
     final String other = failedOnce(scenario);
     assertThat(resubmitOnce.run(ALL).completed()).as("all").isEqualTo(1);
-    assertThat(state(other).archived()).as("id=%s の archive の行", other).isEqualTo(1);
+    assertThat(state(other).archived()).as(ARCHIVED, other).isEqualTo(1);
     assertThatThrownBy(() -> resubmitOnce.run("policy:missing"))
         .isInstanceOf(IllegalArgumentException.class);
     assertThatThrownBy(() -> resubmitOnce.run("OrderConfirmed"))
@@ -449,7 +481,8 @@ class EventPublicationResubmitterTest {
     assertThat(state(id).attempts()).as("id=%s の失敗の後の attempts", id).isEqualTo(1);
 
     final SimpleLock released = holdLock();
-    final CompletableFuture<EventPublicationResubmitOnce.Outcome> future = runOnceAsync(ALL);
+    final CompletableFuture<EventPublicationResubmitOnce.Outcome> future =
+        ResubmissionTestSupport.onVirtualThread(() -> resubmitOnce.run(ALL));
     Awaitility.await("ロックを持つ間の手での再投入")
         .during(Duration.ofSeconds(1))
         .atMost(Duration.ofSeconds(3))
@@ -508,14 +541,6 @@ class EventPublicationResubmitterTest {
         s -> FAILED.equals(s.status()));
     assertThat(state(id).attempts()).as("id=%s の最初の attempts", id).isEqualTo(1);
     return id;
-  }
-
-  // 手での再投入が待つ間に、テストのスレッドで門やロックを操作するため、別のスレッドで呼ぶ。
-  @SuppressWarnings("PMD.DoNotUseThreads")
-  private CompletableFuture<EventPublicationResubmitOnce.Outcome> runOnceAsync(
-      final String target) {
-    return CompletableFuture.supplyAsync(
-        () -> resubmitOnce.run(target), task -> Thread.ofVirtual().start(task));
   }
 
   /** 再投入したリスナーが門に着くまで待つ。着かなければイベントの ID と最後の呼び出しの回数を出して失敗する。 */

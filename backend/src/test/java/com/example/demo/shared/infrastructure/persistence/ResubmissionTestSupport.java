@@ -14,6 +14,8 @@ import java.lang.annotation.Target;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
+import java.util.function.Supplier;
 import org.jooq.DSLContext;
 import org.springframework.context.annotation.Import;
 import org.springframework.test.context.TestPropertySource;
@@ -40,6 +42,13 @@ final class ResubmissionTestSupport {
         "event-publication.resubmission.policies.probe.max-wait=PT20M"
       })
   @interface SharedContext {}
+
+  /** 処理を仮想スレッドで呼び、その結果を返す。 */
+  // テストのスレッドが待たずに、別のスレッドの処理の途中を操作するため。
+  @SuppressWarnings("PMD.DoNotUseThreads")
+  /* package */ static <T> CompletableFuture<T> onVirtualThread(final Supplier<T> task) {
+    return CompletableFuture.supplyAsync(task, runnable -> Thread.ofVirtual().start(runnable));
+  }
 
   /** ロックの期限を過去にする。期限は DB の時刻で決まり、固定の時計では進まないため。 */
   /* package */ static void expireLock(final DSLContext dsl) {
