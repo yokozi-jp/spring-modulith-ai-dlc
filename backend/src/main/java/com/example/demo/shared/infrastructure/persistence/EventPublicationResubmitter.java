@@ -16,7 +16,6 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
-import java.util.stream.Collectors;
 import lombok.extern.slf4j.Slf4j;
 import net.javacrumbs.shedlock.core.LockConfiguration;
 import net.javacrumbs.shedlock.core.LockingTaskExecutor;
@@ -175,10 +174,10 @@ class EventPublicationResubmitter {
       }
       // 解放のあとに数え、解放に失敗した回を completed と failed の両方に数えない。
       resubmissions.increment(done.resubmitted());
-      if (done.resubmitted() > 0 || done.exhausted() > 0) {
+      if (done.resubmitted() > 0 || done.newlyReported() > 0) {
         log.atInfo()
             .addKeyValue("event_publication.resubmitted.count", done.resubmitted())
-            .addKeyValue("event_publication.exhausted.count", done.exhausted())
+            .addKeyValue("event_publication.exhausted.count", done.newlyReported())
             .log("Event publications resubmitted");
       }
       completedRuns.increment();
@@ -241,8 +240,18 @@ class EventPublicationResubmitter {
     return oldest == null ? 0 : Math.max(0, Duration.between(oldest, now).toSeconds());
   }
 
-  /** 上限に達した出版のうち、このインスタンスでまだ記録していないものを ERROR で記録し、上限に達した件数を返す。 */
+  /**
+   * 上限に達した出版のうち、このインスタンスでまだ記録していないものを最大 {@code max-per-run} 件まで ERROR で記録し、新しく記録した件数を返す。
+   *
+   * <p>2 回の読み込みに分ける。(a) 記録済みの ID のうち、行が消えたか上限未満に戻ったものを記録から外す。(b) 記録済みでない上限到達の出版を、古い順に {@code
+   * max-per-run} 件だけ読む。どちらも上限に達した全件は読まない。
+   */
   private int reportExhausted() {
+    forgetResolved();
+    final Condition notReported =
+        reported.isEmpty()
+            ? DSL.noCondition()
+            : EVENT_PUBLICATION.ID.ne(DSL.all(reported.toArray(UUID[]::new)));
     // serialized_event はイベントの本文なので読まない（ADR-015）。
     final Result<Record5<UUID, String, String, Instant, Integer>> rows =
         dsl.select(
@@ -252,19 +261,14 @@ class EventPublicationResubmitter {
                 EVENT_PUBLICATION.PUBLICATION_DATE,
                 EVENT_PUBLICATION.COMPLETION_ATTEMPTS)
             .from(EVENT_PUBLICATION)
-            .where(EVENT_PUBLICATION.STATUS.eq(FAILED).and(exhaustedCondition()))
+            .where(EVENT_PUBLICATION.STATUS.eq(FAILED).and(exhaustedCondition()).and(notReported))
             .orderBy(EVENT_PUBLICATION.PUBLICATION_DATE)
+            .limit(properties.maxPerRun())
             .fetch();
-    // ponytail: 記録済みの ID はインスタンスのメモリにあるため、同じ出版の ERROR はロックを取ったインスタンスの数と再起動の回数だけ重なりうる。
-    // 監視の通知は event_publication.id でまとめる（Runbook）。重複を DB で防ぐ必要が出たら、記録済みの ID を持つ表を足す。
-    reported.retainAll(rows.stream().map(Record5::value1).collect(Collectors.toSet()));
-    int reportedThisRun = 0;
+    int newlyReported = 0;
     for (final Record5<UUID, String, String, Instant, Integer> row : rows) {
-      if (reportedThisRun >= properties.maxPerRun()) {
-        break;
-      }
       if (reported.add(row.value1())) {
-        reportedThisRun++;
+        newlyReported++;
         log.atError()
             .addKeyValue("event_publication.id", row.value1().toString())
             .addKeyValue("event_publication.event_type", row.value2())
@@ -273,14 +277,36 @@ class EventPublicationResubmitter {
             .log("Event publication resubmission exhausted");
       }
     }
-    return rows.size();
+    return newlyReported;
+  }
+
+  /** 記録済みの ID のうち、まだ FAILED で上限に達しているものだけを残す。行が消えるか上限未満に戻った ID は、再び上限に達したら再び記録する。 */
+  private void forgetResolved() {
+    if (reported.isEmpty()) {
+      return;
+    }
+    // ponytail: 記録済みの ID はインスタンスのメモリにあり、大きさは放置された上限到達の出版の数に比例する。
+    // 運用の上限は failed.oldest.age{state=exhausted} の 1 日の警報で、片付ける前提である。
+    // 同じ出版の ERROR は、ロックを取ったインスタンスの数と再起動の回数だけ重なりうる。監視の通知は event_publication.id でまとめる（Runbook）。
+    // 放置が常態になるか、重複を DB で防ぐ必要が出たら、記録済みの ID を持つ表を足す。
+    // ID は 1 つの配列として bind するため、NOT IN の個別の bind と違い PostgreSQL の bind の数の上限に当たらない。
+    reported.retainAll(
+        dsl.select(EVENT_PUBLICATION.ID)
+            .from(EVENT_PUBLICATION)
+            .where(
+                EVENT_PUBLICATION
+                    .ID
+                    .eq(DSL.any(reported.toArray(UUID[]::new)))
+                    .and(EVENT_PUBLICATION.STATUS.eq(FAILED))
+                    .and(exhaustedCondition()))
+            .fetchSet(EVENT_PUBLICATION.ID));
   }
 
   /**
    * ロックの中の 1 回の実行の結果。
    *
-   * @param exhausted 上限に達した出版の件数
+   * @param newlyReported このインスタンスで新しく ERROR にした、上限に達した出版の件数
    * @param resubmitted 再投入の候補にした出版の件数
    */
-  private record Run(int exhausted, int resubmitted) {}
+  private record Run(int newlyReported, int resubmitted) {}
 }
