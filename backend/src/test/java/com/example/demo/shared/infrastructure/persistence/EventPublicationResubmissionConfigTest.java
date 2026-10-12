@@ -11,6 +11,8 @@ import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicBoolean;
+import org.awaitility.Awaitility;
 import org.jooq.DSLContext;
 import org.jooq.SQLDialect;
 import org.jooq.impl.DSL;
@@ -31,6 +33,7 @@ import org.springframework.boot.validation.autoconfigure.ValidationAutoConfigura
 import org.springframework.core.env.MapPropertySource;
 import org.springframework.core.io.support.SpringFactoriesLoader;
 import org.springframework.core.task.SimpleAsyncTaskExecutor;
+import org.springframework.core.task.TaskExecutor;
 import org.springframework.mock.env.MockEnvironment;
 import org.springframework.modulith.events.ApplicationModuleListener;
 import org.springframework.modulith.events.FailedEventPublications;
@@ -55,6 +58,14 @@ class EventPublicationResubmissionConfigTest {
   /** 手での 1 回の再投入の対象のキー。 */
   private static final String RESUBMIT_ONCE_TARGET =
       EventPublicationResubmissionConfig.RESUBMIT_ONCE_TARGET;
+
+  /** 終了の前に executor のタスクの完了を待つかのキー。 */
+  private static final String AWAIT_TERMINATION =
+      "spring.task.execution.shutdown.await-termination";
+
+  /** 終了の前に executor のタスクの完了を待つ上限のキー。 */
+  private static final String AWAIT_TERMINATION_PERIOD =
+      "spring.task.execution.shutdown.await-termination-period";
 
   /** 妥当な設定値。 */
   private static final String[] VALID = {
@@ -279,8 +290,47 @@ class EventPublicationResubmissionConfigTest {
 
     assertThat(once.getProperty("spring.main.web-application-type")).isEqualTo("none");
     assertThat(once.getProperty(ENABLED)).isEqualTo("false");
+    assertThat(once.getProperty(AWAIT_TERMINATION)).isEqualTo("true");
+    assertThat(once.getProperty(AWAIT_TERMINATION_PERIOD)).isEqualTo("20s");
     assertThat(normal.getProperty("spring.main.web-application-type")).isNull();
     assertThat(normal.getProperty(ENABLED)).isEqualTo("true");
+    assertThat(normal.getProperty(AWAIT_TERMINATION)).isNull();
+    assertThat(normal.getProperty(AWAIT_TERMINATION_PERIOD)).isNull();
+  }
+
+  @Test
+  @DisplayName("手での 1 回の再投入の終了の設定では、文脈を閉じる前に applicationTaskExecutor の処理中のリスナーの完了を待つ")
+  void resubmitOnceShutdownWaitsForRunningListener() {
+    final AtomicBoolean running = new AtomicBoolean();
+    final AtomicBoolean exiting = new AtomicBoolean();
+    final AtomicBoolean done = new AtomicBoolean();
+    new ApplicationContextRunner()
+        .withConfiguration(AutoConfigurations.of(TaskExecutionAutoConfiguration.class))
+        .withPropertyValues(
+            "spring.threads.virtual.enabled=true",
+            "spring.task.execution.shutdown.await-termination=true",
+            "spring.task.execution.shutdown.await-termination-period=20s")
+        .run(
+            context -> {
+              // 終了を始めてから終わるタスクで、処理中のリスナーを表す。
+              context
+                  .getBean("applicationTaskExecutor", TaskExecutor.class)
+                  .execute(
+                      () -> {
+                        running.set(true);
+                        Awaitility.await("終了を始める")
+                            .atMost(Duration.ofSeconds(10))
+                            .untilTrue(exiting);
+                        done.set(true);
+                      });
+
+              Awaitility.await("リスナーが動き始める").atMost(Duration.ofSeconds(10)).untilTrue(running);
+              exiting.set(true);
+              EventPublicationResubmissionConfig.awaitRunningListeners(context);
+
+              assertThat(done).as("文脈を閉じる前のリスナーの完了").isTrue();
+              assertThat(context.isActive()).as("DataSource などがまだ使える").isTrue();
+            });
   }
 
   @Test

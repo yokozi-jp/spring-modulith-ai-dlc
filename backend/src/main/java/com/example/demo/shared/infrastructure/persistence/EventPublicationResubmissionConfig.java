@@ -22,8 +22,10 @@ import org.springframework.boot.ApplicationRunner;
 import org.springframework.boot.EnvironmentPostProcessor;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBooleanProperty;
+import org.springframework.boot.autoconfigure.task.TaskExecutionAutoConfiguration;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
+import org.springframework.context.ApplicationContext;
 import org.springframework.context.ConfigurableApplicationContext;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Condition;
@@ -33,6 +35,7 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.core.env.ConfigurableEnvironment;
 import org.springframework.core.env.MapPropertySource;
 import org.springframework.core.env.PropertyResolver;
+import org.springframework.core.task.SimpleAsyncTaskExecutor;
 import org.springframework.core.type.AnnotatedTypeMetadata;
 import org.springframework.scheduling.annotation.EnableScheduling;
 import org.springframework.transaction.PlatformTransactionManager;
@@ -130,8 +133,26 @@ class EventPublicationResubmissionConfig {
       final ConfigurableApplicationContext context) {
     return args -> {
       final int exitCode = resubmitOnceExitCode(job, properties.target());
+      awaitRunningListeners(context);
       exit(SpringApplication.exit(context, () -> exitCode));
     };
+  }
+
+  /**
+   * 文脈を閉じる前に {@code applicationTaskExecutor} を閉じ、処理中のリスナーの完了を待つ。
+   *
+   * <p>待つ上限は {@code spring.task.execution.shutdown.await-termination-period} である（{@link
+   * ResubmitOnceEnvironment}）。 文脈を閉じるときに任せないのは、executor が DataSource より先に作られ、後で閉じられるためである。
+   * 任せると、待っている間のリスナーは閉じた DataSource で失敗する。 このアプリは {@code spring.threads.virtual.enabled=true}
+   * で動くため、SimpleAsyncTaskExecutor だけを閉じる。
+   */
+  // executor は Bean であり、ここで閉じるのは文脈より先に待つためで、使い終えた資源の閉じ忘れではない。
+  @SuppressWarnings("PMD.CloseResource")
+  /* package */ static void awaitRunningListeners(final ApplicationContext context) {
+    if (context.getBean(TaskExecutionAutoConfiguration.APPLICATION_TASK_EXECUTOR_BEAN_NAME)
+        instanceof SimpleAsyncTaskExecutor executor) {
+      executor.close();
+    }
   }
 
   /** 全件を完了したら 0、それ以外と例外では 1 を返す。 */
@@ -168,6 +189,13 @@ class EventPublicationResubmissionConfig {
    * 手での 1 回の再投入の対象があるとき、Web のサーバーと定期の実行（Staleness Monitor を含む）を止める。
    *
    * <p>同じイメージを 1 回だけ起動する入口であり、対象の設定 1 つで、HTTP の待ち受けと定期の再投入を動かさないようにする。 環境変数の値より優先するため、プロパティの先頭に足す。
+   *
+   * <p>終了の前に、処理中のリスナーの完了を最大 20 秒待つ（{@link
+   * EventPublicationResubmissionConfig#awaitRunningListeners}）。 処理を待つ上限を過ぎたり、他のインスタンスが出版を FAILED
+   * に戻したりして終わることがあり、そのまま JVM を終えるとリスナーが途中で切れるためである。 仮想スレッドの {@code
+   * applicationTaskExecutor}（SimpleAsyncTaskExecutor）は、Spring Boot がこの設定を {@code
+   * taskTerminationTimeout} に渡す。 20 秒は、{@code spring.lifecycle.timeout-per-shutdown-phase} の 30 秒と
+   * ECS の既定の stopTimeout の 30 秒より短く、1 回の試行のリスナーの最長より長い。
    */
   /* package */ static class ResubmitOnceEnvironment implements EnvironmentPostProcessor {
 
@@ -186,7 +214,11 @@ class EventPublicationResubmissionConfig {
                       "spring.main.web-application-type",
                       "none",
                       "event-publication.resubmission.enabled",
-                      "false")));
+                      "false",
+                      "spring.task.execution.shutdown.await-termination",
+                      "true",
+                      "spring.task.execution.shutdown.await-termination-period",
+                      "20s")));
     }
   }
 
