@@ -195,12 +195,14 @@ class EventPublicationResubmitter {
 
   private int resubmit(final Instant now) {
     final AtomicInteger candidates = new AtomicInteger();
-    // ponytail: 2.1.1 では LIMIT が条件の関数より先に掛かり、withMinAge も FAILED に効かないため、毎回 FAILED
-    // の行をすべて読む（ResubmissionQuirksLearningTest）。行が大量に溜まると毎回の読み込みが重くなる。
+    // ponytail: 2.1.1 では LIMIT が条件の関数より先に掛かり、withMinAge も FAILED に効かないため、withMinAge は呼ばず、毎回 FAILED
+    // の行をすべて読む。
+    // 根拠は ResubmissionOptionsLearningTest の minAgeDoesNotFilterFailedPublications と
+    // batchSizeLimitIsAppliedBeforeFilter である。
+    // withBatchSize(Integer.MAX_VALUE) で全件をヒープへ読むため、メモリの上限は FAILED の出版の数に比例し、行が大量に溜まると毎回の読み込みも重くなる。
     // 上限に達した出版は Runbook で片付ける。Spring Modulith が回数の条件を SQL へ渡せるようになったら LIMIT にする。
     failedEventPublications.resubmit(
         ResubmissionOptions.defaults()
-            .withMinAge(properties.waitAge())
             .withBatchSize(Integer.MAX_VALUE)
             .withFilter(
                 publication ->
