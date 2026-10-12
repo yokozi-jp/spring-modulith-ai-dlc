@@ -4,7 +4,7 @@
  * com.example.demo.shared.infrastructure.persistence.TableWriter}（ADR-054）を含む。
  *
  * <p>Spring Modulith のイベント出版のレジストリの、失敗した出版の定期の再投入と手での 1
- * 回の再投入（ADR-077）も置く。レジストリは全モジュールが共有する基盤で、業務の概念を持たない。
+ * 回の再投入（ADR-079）も置く。レジストリは全モジュールが共有する基盤で、業務の概念を持たない。
  *
  * <p>使ってよいのは、他のモジュールの {@code infrastructure.persistence} のアダプターだけとする。業務の概念を置かない。
  */

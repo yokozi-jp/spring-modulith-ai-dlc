@@ -99,9 +99,9 @@ dependencies {
     implementation 'org.springframework.modulith:spring-modulith-starter-core'
     implementation 'org.springframework.modulith:spring-modulith-starter-jdbc'
     implementation 'org.springframework.modulith:spring-modulith-starter-insight'
-    // 再投入の条件の関数で、出版のリスナーの ID（TargetEventPublication）を読む（ADR-077）。starter が実行時に入れる版をコンパイルにも使う。
+    // 再投入の条件の関数で、出版のリスナーの ID（TargetEventPublication）を読む（ADR-079）。starter が実行時に入れる版をコンパイルにも使う。
     implementation 'org.springframework.modulith:spring-modulith-events-core'
-    // 失敗したイベント出版の再投入を、DB の時刻で期限を決めるロックで 1 つのインスタンスに絞る（ADR-077）。
+    // 失敗したイベント出版の再投入を、DB の時刻で期限を決めるロックで 1 つのインスタンスに絞る（ADR-079）。
     // Spring BOM の管理外のため版を明示する。jOOQ は Spring Boot が管理する版に解決される。
     implementation 'net.javacrumbs.shedlock:shedlock-provider-jooq:7.10.1'
 

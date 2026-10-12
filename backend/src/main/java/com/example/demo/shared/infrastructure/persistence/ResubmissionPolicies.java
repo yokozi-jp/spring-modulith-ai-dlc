@@ -26,7 +26,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.util.ClassUtils;
 
 /**
- * イベント出版を、リスナーの {@code on} に付けた {@link ResubmissionPolicy} の方針に対応づける（ADR-077）。
+ * イベント出版を、リスナーの {@code on} に付けた {@link ResubmissionPolicy} の方針に対応づける（ADR-079）。
  *
  * <p>出版はリスナーの ID（{@code listener_id}、{@link TargetEventPublication#getTargetIdentifier()}）で区別する。
  * Spring Modulith 2.1.1 は、{@code TransactionalApplicationListener.getListenerId()} を ID にし、Spring

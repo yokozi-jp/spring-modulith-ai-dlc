@@ -29,7 +29,7 @@ Dockerを使うTaskは、Dockerがないローカル環境ではスキップし�
   大文字と小文字を区別せず、Javadoc、行コメント、YAMLとSQLのコメントの行は除く。
   トランザクションのadvisory lock（`pg_advisory_xact_lock`、`pg_try_advisory_xact_lock`）、`ON COMMIT DROP`、`LISTENER_ID`のような識別子は検出しない。
   検出の前に、検出すべき文と検出しない文の例で式を自己検査する。
-  `SET`と`RESET`も同じ表でNeverだが、`spring.datasource.hikari.connection-init-sql`がセッションの`SET`を使うため検出しない（[ADR-077](../adr/ADR-077-resubmit-failed-event-publications-periodically-with-shedlock.md)）。
+  `SET`と`RESET`も同じ表でNeverだが、`spring.datasource.hikari.connection-init-sql`がセッションの`SET`を使うため検出しない（[ADR-079](../adr/ADR-079-resubmit-failed-event-publications-periodically-with-shedlock.md)）。
   設計の理由は[設計の作り込みの程度と段階的な再構築](../principles/right-sizing.md)の「テンプレートの利用先で変わる前提」にある。
 - **`task be-openapi-lint`**：起動済みのテスト用依存でOpenAPI 3.1契約を`openapi/openapi.yaml`へ生成し、Spectralで検査する。
 - **`task be-openapi-check`**：直前の`be-test`が書き出した契約をSpectralで検査し、コミット済みの`openapi/openapi.yaml`と差分があれば失敗する。

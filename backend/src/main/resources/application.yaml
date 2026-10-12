@@ -157,7 +157,7 @@ spring:
         enabled: false
       # 複数インスタンスでの競合を避けるため、起動時には自動再配信しない。
       republish-outstanding-events-on-restart: false
-      # 落ちたまま PUBLISHED、PROCESSING、RESUBMITTED に残った出版を FAILED に戻し、再投入の対象にする（ADR-077）。
+      # 落ちたまま PUBLISHED、PROCESSING、RESUBMITTED に残った出版を FAILED に戻し、再投入の対象にする（ADR-079）。
       # publication_date から測るため、再投入した出版を早く FAILED に戻すことがあるが、
       # 再投入のジョブは last_resubmission_date から wait-age 以上を待つため、再投入の後は重ねて動かさない。
       # 最初の配信が concurrency-limit の空きを待つ間に published を過ぎた出版は重ねて再投入しうる。リスナーの冪等性に頼る。
@@ -167,7 +167,7 @@ spring:
         resubmitted: ${event-publication.resubmission.wait-age}
         check-interval: ${event-publication.resubmission.interval}
     # Moments は使わない。既定で有効なまま残すと @EnableScheduling を常に足し、
-    # event-publication.resubmission.enabled=false でも定期の実行と Staleness Monitor が動く（ADR-077）。
+    # event-publication.resubmission.enabled=false でも定期の実行と Staleness Monitor が動く（ADR-079）。
     moments:
       enabled: false
 
@@ -176,7 +176,7 @@ spring:
   lifecycle:
     timeout-per-shutdown-phase: 30s
 
-# 失敗したイベント出版の再投入（ADR-077）。
+# 失敗したイベント出版の再投入（ADR-079）。
 event-publication:
   resubmission:
     # 定期の実行と Staleness Monitor を動かすか。テストは false にする。

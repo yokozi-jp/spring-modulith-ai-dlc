@@ -41,7 +41,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.validation.annotation.Validated;
 
 /**
- * 失敗したイベント出版の再投入の設定値、ロック、有効なときだけの定期の実行、手での 1 回の再投入の起動を構成する（ADR-077）。
+ * 失敗したイベント出版の再投入の設定値、ロック、有効なときだけの定期の実行、手での 1 回の再投入の起動を構成する（ADR-079）。
  *
  * <p>ロックは ShedLock の jOOQ の provider で取る。provider はロックの期限を DB の時刻で書き込んで比べるため、インスタンスの時計がずれても排他が崩れない。
  * ロックの操作は 1 文ずつのトランザクションで終わり、接続を固定しないため、接続を多重化するプロキシ（RDS Proxy、PgBouncer のトランザクションモード）の後ろでも動く。

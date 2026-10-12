@@ -33,7 +33,7 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
 /**
- * 失敗したイベント出版を定期的に再投入するジョブ（ADR-077）。
+ * 失敗したイベント出版を定期的に再投入するジョブ（ADR-079）。
  *
  * <p>ShedLock のロックを取れたインスタンスだけが、リスナーの方針（{@link ResubmissionPolicies}）の待ち時間を過ぎ、再投入の回数が上限未満の {@code
  * FAILED} の出版を再投入する。上限に達した出版は ERROR のログで知らせ、自動の対象から外す。 件数と最古の経過時間の Gauge は、ロックの外ですべてのインスタンスが集計する。

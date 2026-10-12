@@ -32,7 +32,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.env.Environment;
 
 /**
- * ShedLock のロックの期限が、接続のセッションの TimeZone によらず守られることを検証する（ADR-077）。
+ * ShedLock のロックの期限が、接続のセッションの TimeZone によらず守られることを検証する（ADR-079）。
  *
  * <p>ShedLock の jOOQ の provider は、期限を {@code cast(current_timestamp(6) as timestamp)}（セッションの
  * TimeZone での時刻帯のない値。{@code localtimestamp(6)} と同じ）で書き込んで比べる。 表の列が {@code TIMESTAMP WITH TIME ZONE}

@@ -67,7 +67,7 @@ async function expectNotResubmitted(page: Page, orderId: string): Promise<void> 
   expect(await chargeRequestCount(page.request, orderId), `orderId=${orderId} の請求`).toBe(1);
 }
 
-// 一時障害のあいだは決済記録が無い。E2E の backend は `.env.test` で定期の再投入を無効にしているため（ADR-077）、成功に戻しても自動では再投入しない。
+// 一時障害のあいだは決済記録が無い。E2E の backend は `.env.test` で定期の再投入を無効にしているため（ADR-079）、成功に戻しても自動では再投入しない。
 async function expectTransientFailure(
   page: Page,
   testInfo: TestInfo,

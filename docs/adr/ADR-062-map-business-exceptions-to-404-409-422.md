@@ -11,7 +11,7 @@ tags: [adr, backend, web-api, error-handling]
 
 Proposed
 
-自動の再投入は [ADR-077](ADR-077-resubmit-failed-event-publications-periodically-with-shedlock.md) で定める。
+自動の再投入は [ADR-079](ADR-079-resubmit-failed-event-publications-periodically-with-shedlock.md) で定める。
 
 ## Date
 
@@ -115,7 +115,7 @@ ADR は Proposed のままであるため、新しい ADR を起こさず、こ�
 
 ### Neutral
 
-- Listener の try と catch、ステータス管理テーブルは [issue #108](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/108) で扱い、自動の再投入は [ADR-077](ADR-077-resubmit-failed-event-publications-periodically-with-shedlock.md) で定める。
+- Listener の try と catch、ステータス管理テーブルは [issue #108](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/108) で扱い、自動の再投入は [ADR-079](ADR-079-resubmit-failed-event-publications-periodically-with-shedlock.md) で定める。
 - [ADR-060](ADR-060-generate-uuid-primary-keys-in-application.md) の不正な UUID の 400 は、この ADR の範囲外とする。
 - [ADR-048](ADR-048-add-shared-module-for-jooq-common-code.md) の `shared` の範囲に `shared.failure` を足した。
 - 業務固有の `type` が要るユースケースが出たら、[ADR-058](ADR-058-use-path-absolute-relative-uri-for-problem-types.md) に従って別に決める。

@@ -47,7 +47,7 @@ Listener は Infrastructure の Adapter でもない。
 - 同じイベントを二回以上受けても結果が変わらないよう、呼ぶ CommandHandler を冪等にする。
   冪等にする方法は[順序保証と冪等性](../../integration/async-ordering-and-idempotency.md)に従う。
 - 受信に失敗したイベント出版はレジストリに `FAILED` で残り、[非同期処理の失敗時の再試行と回復](../../integration/async-failure-recovery.md)の `FailedEventPublications` の手順で再投入する。
-  定期のジョブが、リスナーの方針の待ち時間を過ぎた出版を方針の上限の回数まで自動で再投入する（[ADR-077](../../adr/ADR-077-resubmit-failed-event-publications-periodically-with-shedlock.md)）。
+  定期のジョブが、リスナーの方針の待ち時間を過ぎた出版を方針の上限の回数まで自動で再投入する（[ADR-079](../../adr/ADR-079-resubmit-failed-event-publications-periodically-with-shedlock.md)）。
 - 方針を `default` から変えるときは、`on` に `@ResubmissionPolicy("<名前>")`（`shared.events`）を付け、`application.yaml` の `event-publication.resubmission.policies` に同じ名前の方針を置く。
   設定にない名前を付けると起動に失敗する。
 - CommandHandler が投げた業務上の失敗の扱いは、[業務上の失敗の例外](business-exception.md)の表に従う。

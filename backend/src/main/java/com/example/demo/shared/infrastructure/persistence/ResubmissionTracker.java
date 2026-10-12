@@ -20,7 +20,7 @@ import org.jooq.impl.DSL;
 import org.jspecify.annotations.Nullable;
 
 /**
- * 定期のジョブが再投入した出版を覚え、次の回以降に結果を DB から読み戻して数える（ADR-077）。
+ * 定期のジョブが再投入した出版を覚え、次の回以降に結果を DB から読み戻して数える（ADR-079）。
  *
  * <p>Spring Modulith 2.1.1 の {@code FailedEventPublications.resubmit} は件数を返さず、成功と再失敗を知らせる hook もない。
  * そのため、公開された表（{@code event_publication} と {@code event_publication_archive}）の列だけで判定する。

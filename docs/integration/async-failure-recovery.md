@@ -53,11 +53,11 @@ Spring Modulith 2.1.1 のイベント出版は、次の状態を持つ（[Spring
   回数の上限を超えた出版は自動で再投入せず、人の確認に回す。
   `resubmit` は再投入した件数を返さない。
   条件の関数は `RESUBMITTED` への更新より前に呼ばれ、更新できなかった出版でも呼ばれるため、そこで数えた値は再投入の候補の件数であり、再投入した件数ではない。
-  定期の再投入は、再投入のあとに `event_publication` と archive の表を読み戻し、実際に `RESUBMITTED` へ進んだ出版の件数を `event.publication.resubmissions` に記録する（[ADR-077](../adr/ADR-077-resubmit-failed-event-publications-periodically-with-shedlock.md)）。
+  定期の再投入は、再投入のあとに `event_publication` と archive の表を読み戻し、実際に `RESUBMITTED` へ進んだ出版の件数を `event.publication.resubmissions` に記録する（[ADR-079](../adr/ADR-079-resubmit-failed-event-publications-periodically-with-shedlock.md)）。
 - Staleness Monitor（`spring.modulith.events.staleness.*`）は、状態が `PUBLISHED`、`PROCESSING`、`RESUBMITTED` の出版のうち、最初に出版した日時（`publication_date`）から状態ごとに設定した時間を過ぎたものを `FAILED` にする。
   その状態に入ってからの時間や、`last_resubmission_date` からの時間では測らない（2.1.1 の `DefaultEventPublicationRegistry`）。
   このため、`RESUBMITTED` の時間より古い出版を再投入すると、リスナーが終わる前の次の判定で `FAILED` に戻ることがある。
-  既定ではどの時間も 0 で動かないため、main は三つの時間を定期の再投入の最初の待ち時間（`wait-age`）と同じ値にし、判定の間隔を定期の再投入の間隔と同じにして有効にする（[ADR-077](../adr/ADR-077-resubmit-failed-event-publications-periodically-with-shedlock.md)）。
+  既定ではどの時間も 0 で動かないため、main は三つの時間を定期の再投入の最初の待ち時間（`wait-age`）と同じ値にし、判定の間隔を定期の再投入の間隔と同じにして有効にする（[ADR-079](../adr/ADR-079-resubmit-failed-event-publications-periodically-with-shedlock.md)）。
   再投入の後に早く `FAILED` に戻っても、定期の再投入は `last_resubmission_date` から `wait-age` 以上の待ち時間を過ぎるまでその出版を対象にしないため、重ねて動かさない。
   ただし、最初の配信が `concurrency-limit` の空きを待つ間に待ち時間を過ぎた出版は、`FAILED` に戻った次の回で重ねて再投入しうる。
   その場合はリスナーの冪等性で結果を保つ。
@@ -76,11 +76,11 @@ Spring Modulith 2.1.1 のイベント出版は、次の状態を持つ（[Spring
   内部の不変条件の違反は、確定のイベントを受けたのに注文がないような、不具合でしか起きない状態である。
   業務の状態に記録すると不具合が隠れるため、例外を投げてデッドレターとして意図して残す。
   出版はイベントを保ち、ERROR のログが運用者に届き、不具合を直したあとに再投入できる。
-  定期の再投入は失敗の原因を見分けないため、この出版もリスナーの方針の上限の回数まで再投入する（[ADR-077](../adr/ADR-077-resubmit-failed-event-publications-periodically-with-shedlock.md)）。
+  定期の再投入は失敗の原因を見分けないため、この出版もリスナーの方針の上限の回数まで再投入する（[ADR-079](../adr/ADR-079-resubmit-failed-event-publications-periodically-with-shedlock.md)）。
 - リスナーが動く前に業務の状態が変わったとき（確定のあとに取り消した注文）は、業務の結果として処理せずに正常終了させる。
   再投入しても結果は変わらないため、`FAILED` に残さない。
 
-失敗した出版は、定期のジョブ（`shared.infrastructure.persistence` の `EventPublicationResubmitter`）が、リスナーの方針の待ち時間を過ぎたものを方針の上限の回数まで自動で再投入する（[ADR-077](../adr/ADR-077-resubmit-failed-event-publications-periodically-with-shedlock.md)）。
+失敗した出版は、定期のジョブ（`shared.infrastructure.persistence` の `EventPublicationResubmitter`）が、リスナーの方針の待ち時間を過ぎたものを方針の上限の回数まで自動で再投入する（[ADR-079](../adr/ADR-079-resubmit-failed-event-publications-periodically-with-shedlock.md)）。
 方針はリスナーの `on` に付ける `@ResubmissionPolicy`（`shared.events`）で選び、付けなければ `default` になる。
 n 回目の再投入の前に、最後の試行から `min(wait-age × multiplier^(n-1), max-wait)` を待つ。
 ジョブは ShedLock のロックで、同時に 1 つのインスタンスだけが動く。

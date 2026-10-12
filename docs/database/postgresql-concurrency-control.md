@@ -156,7 +156,7 @@ final int reserved =
 
 ## 定期のジョブの排他
 
-複数のインスタンスで定期のジョブを1つに絞るときは、ShedLockのjOOQのproviderで`modulith.shedlock`の行にロックを持つ（[ADR-077](../adr/ADR-077-resubmit-failed-event-publications-periodically-with-shedlock.md)）。
+複数のインスタンスで定期のジョブを1つに絞るときは、ShedLockのjOOQのproviderで`modulith.shedlock`の行にロックを持つ（[ADR-079](../adr/ADR-079-resubmit-failed-event-publications-periodically-with-shedlock.md)）。
 ロックの期限はDBの時刻で書き込んで比べ、ロックの操作は1文ずつの新しいトランザクションで終える。
 接続を固定しないため、RDS ProxyやPgBouncerのトランザクションモードの後ろでも動き、`tableWritesGoThroughTableWriter`（H1）の例外も要らない。
 アプリで使うロックの名前は次の表だけにし、新しい名前を足すときは同じ変更で表に足す。
