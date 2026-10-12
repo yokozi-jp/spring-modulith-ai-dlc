@@ -5,10 +5,11 @@ import static com.example.demo.jooq.modulith.Tables.EVENT_PUBLICATION;
 import com.example.demo.shared.events.ResubmissionPolicy;
 import java.lang.reflect.Method;
 import java.time.Instant;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
 import java.util.StringJoiner;
-import java.util.concurrent.ConcurrentHashMap;
+import lombok.extern.slf4j.Slf4j;
 import org.jooq.CaseValueStep;
 import org.jooq.CaseWhenStep;
 import org.jooq.Field;
@@ -32,6 +33,7 @@ import org.springframework.util.ClassUtils;
  * Framework は、注釈の {@code id} が空ならメソッドの完全修飾名と引数の型（{@code <クラス>.<メソッド>(<型>,...)}）を ID にする。 起動のときに
  * bean のメソッドを走査して同じ ID を作る。
  */
+@Slf4j
 @Component
 class ResubmissionPolicies {
 
@@ -53,13 +55,14 @@ class ResubmissionPolicies {
   }
 
   /** bean の {@link ResubmissionPolicy} を付けたメソッドを走査し、リスナーの ID と方針の名前を返す。設定にない名前があれば起動に失敗する。 */
+  // 走査は構築の中の 1 スレッドで終わり、共有するのは Map.copyOf で不変にした後なので、並行の Map は要らない。
+  @SuppressWarnings("PMD.UseConcurrentHashMap")
   private static Map<String, String> scan(
       final ConfigurableListableBeanFactory beanFactory,
       final EventPublicationResubmissionConfig.Properties properties) {
-    final Map<String, String> names = new ConcurrentHashMap<>();
+    final Map<String, String> names = new HashMap<>();
     for (final String beanName : beanFactory.getBeanDefinitionNames()) {
-      // EventListenerMethodProcessor と同じく、proxy の元のクラスのメソッドを見る。
-      final @Nullable Class<?> type = AutoProxyUtils.determineTargetClass(beanFactory, beanName);
+      final @Nullable Class<?> type = targetClassOf(beanFactory, beanName);
       if (type == null) {
         continue;
       }
@@ -84,6 +87,29 @@ class ResubmissionPolicies {
           });
     }
     return names;
+  }
+
+  /**
+   * bean の proxy の元のクラスを返す。型を解決できない bean は {@code null} を返して読み飛ばす。
+   *
+   * <p>{@code EventListenerMethodProcessor} も同じ呼び出しを囲んで読み飛ばす。 型を解決できない bean は
+   * {@code @ApplicationModuleListener} を持てないため、再投入と無関係な bean 1 つで起動を落とさない。 {@code OutOfMemoryError}
+   * などの {@code Error} は受けない。
+   */
+  // 遅延の bean や欠けたクラスで型の解決が RuntimeException か LinkageError になり、種類を絞れないため受ける。
+  @SuppressWarnings("PMD.AvoidCatchingGenericException")
+  private static @Nullable Class<?> targetClassOf(
+      final ConfigurableListableBeanFactory beanFactory, final String beanName) {
+    try {
+      // EventListenerMethodProcessor と同じく、proxy の元のクラスのメソッドを見る。
+      return AutoProxyUtils.determineTargetClass(beanFactory, beanName);
+    } catch (RuntimeException | LinkageError e) {
+      log.atDebug()
+          .addKeyValue("bean", beanName)
+          .setCause(e)
+          .log("Skipped a bean whose type cannot be resolved");
+      return null;
+    }
   }
 
   /** Spring Framework の {@code ApplicationListenerMethodAdapter} と同じ規則で、リスナーの ID を作る。 */
