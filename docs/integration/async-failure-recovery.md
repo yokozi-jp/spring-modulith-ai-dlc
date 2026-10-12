@@ -56,9 +56,12 @@ Spring Modulith 2.1.1 のイベント出版は、次の状態を持つ（[Spring
   定期の再投入は、再投入のあとに `event_publication` と archive の表を読み戻し、実際に `RESUBMITTED` へ進んだ出版の件数を `event.publication.resubmissions` に記録する（[ADR-079](../adr/ADR-079-resubmit-failed-event-publications-periodically-with-shedlock.md)）。
 - Staleness Monitor（`spring.modulith.events.staleness.*`）は、状態が `PUBLISHED`、`PROCESSING`、`RESUBMITTED` の出版のうち、最初に出版した日時（`publication_date`）から状態ごとに設定した時間を過ぎたものを `FAILED` にする。
   その状態に入ってからの時間や、`last_resubmission_date` からの時間では測らない（2.1.1 の `DefaultEventPublicationRegistry`）。
-  このため、`RESUBMITTED` の時間より古い出版を再投入すると、リスナーが終わる前の次の判定で `FAILED` に戻ることがある。
-  既定ではどの時間も 0 で動かないため、main は三つの時間を定期の再投入の最初の待ち時間（`wait-age`）と同じ値にし、判定の間隔を定期の再投入の間隔と同じにして有効にする（[ADR-079](../adr/ADR-079-resubmit-failed-event-publications-periodically-with-shedlock.md)）。
-  再投入の後に早く `FAILED` に戻っても、定期の再投入は `last_resubmission_date` から `wait-age` 以上の待ち時間を過ぎるまでその出版を対象にしないため、重ねて動かさない。
+  このため、`RESUBMITTED` や `PROCESSING` の時間より古い出版を再投入すると、リスナーが終わる前の次の判定で `FAILED` に戻る。
+  状態ごとの時間の 0 はその状態を止めず、その状態の出版をすべて `FAILED` にする。
+  三つの時間がすべて 0 のときだけ Staleness Monitor は動かない。
+  main は `PUBLISHED` の時間を定期の再投入の最初の待ち時間（`wait-age`）と同じにし、判定の間隔を定期の再投入の間隔と同じにして有効にする。
+  `PROCESSING` と `RESUBMITTED` の時間は `in-flight-staleness` にし、方針の最後の再投入とリスナーの処理が終わるまでの最長の時間より長いことを起動時に検証する（[ADR-079](../adr/ADR-079-resubmit-failed-event-publications-periodically-with-shedlock.md)）。
+  その代わり、落ちたまま `PROCESSING` や `RESUBMITTED` に残った出版の回復は `in-flight-staleness` まで遅れる。
   ただし、最初の配信が `concurrency-limit` の空きを待つ間に待ち時間を過ぎた出版は、`FAILED` に戻った次の回で重ねて再投入しうる。
   その場合はリスナーの冪等性で結果を保つ。
   Staleness Monitor は定期の再投入を無効にすると一緒に止まる。
