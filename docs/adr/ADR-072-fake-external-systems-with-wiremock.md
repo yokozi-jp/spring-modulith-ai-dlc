@@ -56,7 +56,7 @@ Accepted
 - イベント出版の `FAILED` には、再投入で回復できる失敗のほかに、内部の不変条件の違反をデッドレターとして意図して残す。
   例は、`OrderConfirmed` を受けたのに注文がない場合である。
   不具合でしか起きず、業務の状態に記録すると不具合が隠れるため、例外を投げる。
-  出版がイベントを保ち、ERROR のログが運用者に届き、不具合を直したあとに再投入できる（運用者の入口は [ADR-079 の手での 1 回の再投入](ADR-079-resubmit-failed-event-publications-periodically-with-shedlock.md)）。
+  出版がイベントを保ち、ERROR のログが運用者に届き、不具合を直したあとに再投入できる（運用者の入口は [#108](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/108)）。
 - リスナーが動く前に取り消したような、`CONFIRMED` でない注文の `OrderConfirmed` は、業務の結果として請求せずに INFO のログを残し、リスナーを正常終了させる。
   再投入しても結果は変わらないためである。
 - サーキットブレーカーの `payment-gateway` の instance は、429 以外の `HttpClientErrorException` を無視する述語を `ignore-exception-predicate` に指定する。

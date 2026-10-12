@@ -11,8 +11,6 @@ tags: [adr, backend, architecture, ddd, cqrs]
 
 Proposed
 
-自動の再投入は [ADR-079](ADR-079-resubmit-failed-event-publications-periodically-with-shedlock.md) で定める。
-
 ## Date
 
 2026-10-03
