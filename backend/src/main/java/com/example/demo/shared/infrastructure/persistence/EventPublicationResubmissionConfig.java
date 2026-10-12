@@ -153,7 +153,12 @@ class EventPublicationResubmissionConfig {
     System.exit(exitCode);
   }
 
-  /** 有効で、手での 1 回の再投入でないときだけ、@Scheduled と Staleness Monitor を動かす。 */
+  /**
+   * 有効で、手での 1 回の再投入でないときだけ、@Scheduled と Staleness Monitor を動かす。
+   *
+   * <p>有効かどうかを決めるのはこの条件だけで、{@link Properties} には持たない。 Boot の束ね方は {@code yes} や {@code 1}
+   * も真と読むが、この条件は {@code true}（大文字小文字を問わない）だけを真とするためである。
+   */
   @Configuration(proxyBeanMethods = false)
   @EnableScheduling
   @ConditionalOnBooleanProperty("event-publication.resubmission.enabled")
@@ -188,7 +193,6 @@ class EventPublicationResubmissionConfig {
   /**
    * 再投入の設定値。
    *
-   * @param enabled 定期の実行と Staleness Monitor を動かすか
    * @param waitAge 最初の失敗から 1 回目の再投入までの待ち時間で、2 回目からの待ち時間の基準。Staleness Monitor
    *     の閾値にも使う。リスナーの処理時間より十分に長くする
    * @param interval 前の回の終わりから次の回までの間隔
@@ -199,7 +203,6 @@ class EventPublicationResubmissionConfig {
   /* package */ @ConfigurationProperties("event-publication.resubmission")
   @Validated
   record Properties(
-      boolean enabled,
       @NotNull @DurationMin(seconds = 1) Duration waitAge,
       @NotNull @DurationMin(seconds = 1) Duration interval,
       @Min(1) int maxPerRun,
