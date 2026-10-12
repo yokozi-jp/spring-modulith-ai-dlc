@@ -20,6 +20,8 @@ main では `payment.application.OrderConfirmedListener` が `payment` を使い
 
 n 回目の再投入の前に、最後の試行から `min(wait-age × multiplier^(n-1), max-wait)` を待つ。
 `wait-age` は環境変数 `EVENT_PUBLICATION_RESUBMISSION_WAIT_AGE` である。
+Staleness Monitor が処理中の出版を `FAILED` に戻すまでの `in-flight-staleness` は環境変数 `EVENT_PUBLICATION_RESUBMISSION_IN_FLIGHT_STALENESS` で、本番は `PT4H` である。
+`in-flight-staleness` は、どの方針でも `Σ_{n=1..max-resubmissions} min(wait-age × multiplier^(n-1), max-wait) + max-resubmissions × (interval + lock-at-most-for) + lock-at-most-for` より長くし、短いと起動に失敗する。
 
 出版の `listener_id` は、リスナーのメソッドの完全修飾名と引数の型である（例：`com.example.demo.payment.application.OrderConfirmedListener.on(com.example.demo.ordering.OrderConfirmed)`）。
 次の節の SQL は、`policy` の行にリスナーの ID と方針の上限を並べ、並べないリスナーを `default` の上限で扱う。
@@ -74,7 +76,12 @@ n 回目の再投入の前に、最後の試行から `min(wait-age × multiplie
 - **発生原因**：原因が直っておらずリスナーがまた失敗した（`incomplete`）。
   リスナーが `completion-timeout`（10 分）を過ぎても終わらない（`incomplete`）。
   対象が `max-per-run`（100 件）より多い（`remaining`）。
+  `in-flight-staleness`（本番 4 時間）より古い出版を、他のインスタンスの Staleness Monitor が処理中のまま `FAILED` に戻した（`incomplete`）。
+  上限に達した出版は多くがこの古さであり、このときリスナーは終了の前の最大 20 秒の待ちで完了しうる。
 - **対応**：`incomplete` が 0 でなければ、リスナーの ERROR で原因を確かめ、直してから起動し直す。
+  リスナーの ERROR がなければ、archive の表にその出版の `id` があるかを確かめる。
+  archive にあれば完了しており、`FAILED` に残っていれば同じ対象で起動し直す。
+  完了した出版は `FAILED` に残らないため、同じ対象で起動し直しても重ねて処理しない。
   `remaining` だけが 0 でなければ、同じ対象でもう一度起動する。
   運用者が起動したジョブの結果なので、監視の通知は要らない。
 
@@ -204,10 +211,11 @@ DELETE FROM modulith.event_publication
 - Counter は、再投入したインスタンスだけが数える。
   インスタンスの間で二重に数えないため、ダッシュボードは合計（`sum`）で集める。
   Gauge とは逆である。
+- ロックの解放に失敗した回の再投入は、`event.publication.resubmissions` に数えず、次の回に `event.publication.resubmission.outcomes` にだけ数えるため、2 つの Counter の値は一致しないことがある。
 - `outcomes` は再投入した次の回の先頭で数えるため、結果の判定は最大で間隔と処理時間だけ遅れる。
   `outcome=completed` は `completion-mode: archive` が前提で、`update` の `COMPLETED` の行は数えない。
   処理中の出版は次の回に回し、運用者が消した出版は数えずに忘れる。
-  未完了のまま `max(3 × lock-at-most-for, wait-age + interval)` を過ぎた出版も数えずに捨てる。
+  未完了のまま `max(3 × lock-at-most-for, in-flight-staleness + interval)` を過ぎた出版も数えずに捨てる。
 - 再投入した直後にそのインスタンスが落ちると、その回の結果は数えない。
   `failed` と `exhausted` の Gauge と、最古の経過時間の警報が補う。
 - Gauge は、ロックを取ったかどうかによらず、すべてのインスタンスが毎回同じ値を集計して出す。
