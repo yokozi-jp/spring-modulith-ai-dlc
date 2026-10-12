@@ -29,6 +29,8 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
  * max-per-run} 件まで再投入する。定期の再投入と同じロックを取り、取れるまで {@code lock-at-most-for} を上限に待つ。
  * リスナーは別のスレッドで動くため、再投入した出版が {@code PUBLISHED}、{@code PROCESSING}、{@code RESUBMITTED}
  * でなくなるまで待ち、件数を記録する。
+ *
+ * <p>定期の再投入にある {@code lock-at-most-for} の半分の時間予算は適用しない。この入口は完了を待つ設計で、{@code max-per-run} だけで件数を抑える。
  */
 // 定期の再投入の上限に達した出版を手で再投入する運用者の入口で、docs/backend/class-roles/index.md にない役割である。
 // 結合テストが他のモジュールのリスナーの回復を確かめるため public にする。他のモジュールの本番のコードからは ArchUnit が使わせない。

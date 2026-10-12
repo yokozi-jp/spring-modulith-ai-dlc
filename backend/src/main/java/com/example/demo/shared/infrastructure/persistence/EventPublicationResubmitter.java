@@ -200,12 +200,18 @@ class EventPublicationResubmitter {
     // batchSizeLimitIsAppliedBeforeFilter である。
     // withBatchSize(Integer.MAX_VALUE) で全件をヒープへ読むため、メモリの上限は FAILED の出版の数に比例し、行が大量に溜まると毎回の読み込みも重くなる。
     // 上限に達した出版は Runbook で片付ける。Spring Modulith が回数の条件を SQL へ渡せるようになったら LIMIT にする。
+    // ponytail: 読んだ一覧は古くなる。実行が長引くと、その間に再び FAILED に戻った行を、一覧が古いまま方針の上限を超えて再投入しうる。
+    // 実行の長さを lockAtMostFor の半分までに抑え、超えた後の行は候補にせず次の回に回す（古い行から取るので飢えない）。
+    // 実行が固まっても lockAtMostFor でロックは切れるため、KeepAliveLockProvider で延長しない。
+    // 手での入口（EventPublicationResubmitOnce）は完了を待つ設計なので、この予算を適用しない。
+    final Duration budget = properties.lockAtMostFor().dividedBy(2);
     failedEventPublications.resubmit(
         ResubmissionOptions.defaults()
             .withBatchSize(Integer.MAX_VALUE)
             .withFilter(
                 publication ->
-                    policies.isDue(publication, now)
+                    Duration.between(now, Instant.now(clock)).compareTo(budget) <= 0
+                        && policies.isDue(publication, now)
                         && candidates.get() < properties.maxPerRun()
                         && candidates.incrementAndGet() > 0));
     return candidates.get();
