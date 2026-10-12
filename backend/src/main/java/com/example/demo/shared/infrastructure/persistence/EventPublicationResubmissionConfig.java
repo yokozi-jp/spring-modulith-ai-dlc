@@ -193,8 +193,10 @@ class EventPublicationResubmissionConfig {
   /**
    * 再投入の設定値。
    *
-   * @param waitAge 最初の失敗から 1 回目の再投入までの待ち時間で、2 回目からの待ち時間の基準。Staleness Monitor
+   * @param waitAge 最初の失敗から 1 回目の再投入までの待ち時間で、2 回目からの待ち時間の基準。PUBLISHED の Staleness Monitor
    *     の閾値にも使う。リスナーの処理時間より十分に長くする
+   * @param inFlightStaleness PROCESSING と RESUBMITTED の Staleness Monitor の閾値。Spring Modulith 2.1.1
+   *     は publication_date から測るため、{@link #maxInFlightAge} より長くする
    * @param interval 前の回の終わりから次の回までの間隔
    * @param maxPerRun 1 回の実行で再投入する件数と、新しく記録する ERROR の件数の上限
    * @param lockAtMostFor ロックを持つ上限。実行が落ちて解放できなかったとき、この時間を過ぎると他のインスタンスが取れる。1 回の実行の最長の時間より十分に長くする
@@ -204,6 +206,7 @@ class EventPublicationResubmissionConfig {
   @Validated
   record Properties(
       @NotNull @DurationMin(seconds = 1) Duration waitAge,
+      @NotNull @DurationMin(seconds = 1) Duration inFlightStaleness,
       @NotNull @DurationMin(seconds = 1) Duration interval,
       @Min(1) int maxPerRun,
       @NotNull @DurationMin(seconds = 1) Duration lockAtMostFor,
@@ -245,6 +248,48 @@ class EventPublicationResubmissionConfig {
                       policy == null
                           || policy.maxWait() == null
                           || policy.maxWait().compareTo(waitAge) >= 0);
+    }
+
+    /**
+     * 方針の再投入で、出版の publication_date からリスナーの処理が終わるまでの最長の時間。
+     *
+     * <p>{@code Σ_{n=1..max-resubmissions} min(wait-age × multiplier^(n-1), max-wait) +
+     * max-resubmissions × (interval + lock-at-most-for) + lock-at-most-for} である。
+     * 和の項は、最後の再投入が期限に来る時刻を publication_date から測ったものである。 各回の再投入は、期限から最大で間隔 1 つと 1 回の実行（{@code
+     * lock-at-most-for} が上限）だけ遅れて始まる。 最後の {@code lock-at-most-for} はリスナーの処理の上限である。
+     * リスナーの処理の時間の上限は別に持たず、{@code lock-at-most-for} で代える。 {@code lock-at-most-for} は
+     * concurrency-limit の空きを待つ時間を含めて 1 回の実行より長くするため、他のリスナーの処理もこの中に収まる前提をすでに置いているからである。
+     */
+    /* package */ Duration maxInFlightAge(final Policy policy) {
+      Duration age = lockAtMostFor;
+      for (int n = 1; n <= policy.maxResubmissions(); n++) {
+        age = age.plus(policy.waitBefore(waitAge, n)).plus(interval).plus(lockAtMostFor);
+      }
+      return age;
+    }
+
+    /**
+     * PROCESSING と RESUBMITTED の Staleness Monitor の閾値が、どの方針の {@link #maxInFlightAge} より長いか。
+     *
+     * <p>Spring Modulith 2.1.1 は再投入した出版も publication_date から測るため、短いと処理中の出版を FAILED に戻す。
+     */
+    @AssertTrue(
+        message =
+            "event-publication.resubmission.in-flight-staleness must be longer than, for every"
+                + " policy, the sum of min(wait-age * multiplier^(n-1), max-wait) for n = 1.."
+                + "max-resubmissions plus max-resubmissions * (interval + lock-at-most-for) plus"
+                + " lock-at-most-for")
+    /* package */ boolean isInFlightStalenessLongerThanResubmissions() {
+      if (inFlightStaleness == null
+          || waitAge == null
+          || interval == null
+          || lockAtMostFor == null
+          || policies == null) {
+        return true;
+      }
+      return policies.values().stream()
+          .filter(policy -> policy != null && policy.maxWait() != null)
+          .allMatch(policy -> inFlightStaleness.compareTo(maxInFlightAge(policy)) > 0);
     }
   }
 

@@ -175,6 +175,7 @@ class EventPublicationResubmitterExhaustedTest {
       final Duration interval, final int maxPerRun) {
     return new EventPublicationResubmissionConfig.Properties(
         properties.waitAge(),
+        properties.inFlightStaleness(),
         interval,
         maxPerRun,
         // lock-at-least-for（interval の半分）が lock-at-most-for 以下でないと、ロックの設定が不正になる。

@@ -31,6 +31,7 @@ class ResubmissionPoliciesTest {
   private static final EventPublicationResubmissionConfig.Properties PROPERTIES =
       new EventPublicationResubmissionConfig.Properties(
           Duration.ofMinutes(5),
+          Duration.ofHours(4),
           Duration.ofMinutes(1),
           100,
           Duration.ofMinutes(10),

@@ -59,6 +59,7 @@ class EventPublicationResubmissionConfigTest {
   /** 妥当な設定値。 */
   private static final String[] VALID = {
     "event-publication.resubmission.wait-age=PT5M",
+    "event-publication.resubmission.in-flight-staleness=PT4H",
     "event-publication.resubmission.interval=PT1M",
     "event-publication.resubmission.max-per-run=100",
     "event-publication.resubmission.lock-at-most-for=PT10M",
@@ -164,6 +165,7 @@ class EventPublicationResubmissionConfigTest {
             PlatformTransactionManager.class, () -> Mockito.mock(PlatformTransactionManager.class))
         .withPropertyValues(
             "event-publication.resubmission.wait-age=PT5M",
+            "event-publication.resubmission.in-flight-staleness=PT4H",
             "event-publication.resubmission.interval=PT1M",
             "event-publication.resubmission.max-per-run=100",
             "event-publication.resubmission.lock-at-most-for=PT10M",
@@ -190,6 +192,30 @@ class EventPublicationResubmissionConfigTest {
   @DisplayName("ロックを持つ上限が間隔以下だと起動に失敗する")
   void lockAtMostForNotLongerThanIntervalFailsStartup() {
     assertBindFailure("event-publication.resubmission.lock-at-most-for=PT1M");
+  }
+
+  @Test
+  @DisplayName("処理中の出版の閾値が、方針の再投入とリスナーの処理が終わるまでの最長の時間以下だと起動に失敗する")
+  void inFlightStalenessShorterThanResubmissionsFailsStartup() {
+    assertBindFailure("event-publication.resubmission.in-flight-staleness=PT3H");
+  }
+
+  @Test
+  @DisplayName("処理中の出版の最長の時間は、待ち時間の和、各回の間隔とロックの上限、リスナーの上限の和である")
+  void maxInFlightAgeSumsWaitsDelaysAndListenerBound() {
+    final EventPublicationResubmissionConfig.Policy policy =
+        new EventPublicationResubmissionConfig.Policy(5, 2, Duration.ofHours(1));
+    final EventPublicationResubmissionConfig.Properties properties =
+        new EventPublicationResubmissionConfig.Properties(
+            Duration.ofMinutes(5),
+            Duration.ofHours(4),
+            Duration.ofMinutes(1),
+            100,
+            Duration.ofMinutes(10),
+            Map.of(EventPublicationResubmissionConfig.DEFAULT_POLICY, policy));
+
+    // 5 + 10 + 20 + 40 + 60 分の待ち、5 回の (1 + 10) 分、リスナーの 10 分。
+    assertThat(properties.maxInFlightAge(policy)).isEqualTo(Duration.ofMinutes(200));
   }
 
   @Test

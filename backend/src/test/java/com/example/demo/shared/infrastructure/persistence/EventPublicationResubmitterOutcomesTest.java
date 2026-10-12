@@ -137,6 +137,7 @@ class EventPublicationResubmitterOutcomesTest {
         newResubmitter(
             new EventPublicationResubmissionConfig.Properties(
                 properties.waitAge(),
+                properties.inFlightStaleness(),
                 properties.interval(),
                 2,
                 properties.lockAtMostFor(),
@@ -225,6 +226,7 @@ class EventPublicationResubmitterOutcomesTest {
         newResubmitter(
             new EventPublicationResubmissionConfig.Properties(
                 properties.waitAge(),
+                properties.inFlightStaleness(),
                 Duration.ofHours(1),
                 properties.maxPerRun(),
                 Duration.ofHours(2),
@@ -260,12 +262,13 @@ class EventPublicationResubmitterOutcomesTest {
   }
 
   @Test
-  @DisplayName("未完了のまま覚える期間（max(3 × lock-at-most-for, wait-age + interval)）ちょうどでは覚え、1 マイクロ秒過ぎると捨てる")
+  @DisplayName(
+      "未完了のまま覚える期間（max(3 × lock-at-most-for, in-flight-staleness + interval)）ちょうどでは覚え、1 マイクロ秒過ぎると捨てる")
   void unfinishedPublicationExpiresAfterLifetime() {
     final Duration lifetime = ResubmissionTracker.lifetimeOf(properties);
     assertThat(lifetime)
-        .as("wait-age + interval が lock-at-most-for × 3 より長い")
-        .isEqualTo(Duration.ofSeconds(302));
+        .as("in-flight-staleness + interval が lock-at-most-for × 3 より長い")
+        .isEqualTo(Duration.ofHours(4).plusSeconds(2));
     final UUID kept = insert(FAILED, 0);
     final EventPublicationResubmitter keeping = newResubmitter(properties);
     final Instant resubmittedAt = clock.instant();

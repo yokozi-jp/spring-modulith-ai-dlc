@@ -158,13 +158,15 @@ spring:
       # 複数インスタンスでの競合を避けるため、起動時には自動再配信しない。
       republish-outstanding-events-on-restart: false
       # 落ちたまま PUBLISHED、PROCESSING、RESUBMITTED に残った出版を FAILED に戻し、再投入の対象にする（ADR-079）。
-      # publication_date から測るため、再投入した出版を早く FAILED に戻すことがあるが、
-      # 再投入のジョブは last_resubmission_date から wait-age 以上を待つため、再投入の後は重ねて動かさない。
+      # Spring Modulith 2.1.1 はどの状態も last_resubmission_date でなく publication_date から測る。
+      # 状態ごとの 0 はその状態を止めず、その状態の出版をすべて FAILED にする。3 つとも 0 のときだけ監視が止まる。
+      # published は wait-age にする。processing と resubmitted は、再投入して処理中の出版を FAILED に戻さないよう in-flight-staleness にし、長さは起動時に検証する。
       # 最初の配信が concurrency-limit の空きを待つ間に published を過ぎた出版は重ねて再投入しうる。リスナーの冪等性に頼る。
+      # ponytail: 落ちたまま PROCESSING に残った出版の回復は最大 in-flight-staleness（本番 PT4H）遅れる。Spring Modulith 2.1.2（GH-1837）で last_resubmission_date から測るようになったら、in-flight-staleness を wait-age 程度に戻す。
       staleness:
         published: ${event-publication.resubmission.wait-age}
-        processing: ${event-publication.resubmission.wait-age}
-        resubmitted: ${event-publication.resubmission.wait-age}
+        processing: ${event-publication.resubmission.in-flight-staleness}
+        resubmitted: ${event-publication.resubmission.in-flight-staleness}
         check-interval: ${event-publication.resubmission.interval}
     # Moments は使わない。既定で有効なまま残すと @EnableScheduling を常に足し、
     # event-publication.resubmission.enabled=false でも定期の実行と Staleness Monitor が動く（ADR-079）。
@@ -183,6 +185,9 @@ event-publication:
     enabled: ${EVENT_PUBLICATION_RESUBMISSION_ENABLED}
     # 最初の失敗から 1 回目の再投入までの待ち時間で、2 回目からの待ち時間の基準。リスナーの処理時間より十分に長くする。
     wait-age: ${EVENT_PUBLICATION_RESUBMISSION_WAIT_AGE}
+    # Staleness Monitor が PROCESSING と RESUBMITTED の出版を FAILED に戻すまでの、publication_date からの時間。
+    # どの方針でも Σ_{n=1..max-resubmissions} min(wait-age × multiplier^(n-1), max-wait) + max-resubmissions × (interval + lock-at-most-for) + lock-at-most-for より長くする。短いと起動に失敗する。
+    in-flight-staleness: ${EVENT_PUBLICATION_RESUBMISSION_IN_FLIGHT_STALENESS}
     # 前の回の終わりから次の回までの間隔。ロックを持つ下限はこの半分にする。
     interval: ${EVENT_PUBLICATION_RESUBMISSION_INTERVAL}
     # 以下は環境で変えないため固定値にする。
