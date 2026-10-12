@@ -432,12 +432,15 @@ tasks:
       - vp run knip
 
   fe-coverage:
-    desc: フロントエンドの全体と各ファイルのbranchとline coverageを検証
+    desc: フロントエンドのテストと、全体と各ファイルのbranchとline coverageを検証
     dir: frontend
     silent: true
     cmds:
+      # 本番ビルドと同じく React Compiler を有効にして、振る舞いを検証する（ADR-078）。
+      - vp test run
+      # coverage は Compiler を外して測る。Compiler が足す memo の分岐を分母に入れない。
       # 全体の下限は vite.config.ts の thresholds が検査する。
-      - vp test run --coverage
+      - FRONTEND_REACT_COMPILER=false vp test run --coverage
       # ファイルごとの下限は coverage-summary.json で検査する（ADR-076）。
       # ponytail: Vitest 4.1 の perFile は全体の下限をファイルごとに当てるだけで、別の値を持てない。
       # perFile にオブジェクトを渡せる版へ上がったら、この検査を vite.config.ts の thresholds.perFile へ移す。

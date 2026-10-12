@@ -202,6 +202,9 @@ tasks.named('test') {
     if (providers.gradleProperty('openapiExport').isPresent()) {
         systemProperty 'openapi.output', openApiSpec.absolutePath
         outputs.file(openApiSpec)
+    } else {
+        // ApiContractCoverageTest はコミット済みの契約を読むため、契約を変えたらテストをやり直す（ADR-077）。
+        inputs.file(openApiSpec).withPropertyName('openApiContract')
     }
 }
 
