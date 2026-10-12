@@ -117,6 +117,10 @@ Taskのシェルは`||`の左のサブシェルでも`set -e`を守るが、bash
 Taskはコマンドの失敗を既定で終了コード201にまとめるため、元の終了コードを確かめるときは`task -x`（`--exit-code`）で実行する。
 `task lint-taskfile`は、この定型をDockerなしで再現する`tooling/taskfile-cleanup/`のfixtureを実行し、終了コードと後片付けの実行を検査する。
 
+検査の本体を別ファイルに置き、壊れたfixtureで自己検査する先例は`tooling/adr-lint/`である。
+内部タスクのコマンドはfixtureのルートを渡せないため、検査はルートを引数で受けるスクリプト（`adr-lint.mjs`）に置き、`test.sh`がfixtureごとに終了コードと出力を確かめる。
+内部タスクは`okf-check`の`dir: docs`ではなくリポジトリのルートで動くため、パスはルート相対で書く。
+
 Ctrl-CやCIのキャンセルで中断すると、Taskはシェルを止めるため後片付けは走らない。
 `task e2e`、`task scan-dast`、`task scan-dast-active`は、開始時に前回のcomposeと固定名のコンテナを破棄して自己回復する。
 ただしDASTのpreviewのプロセス（4173番ポート）は残ることがあり、その場合はポートの検査で止まるため、プロセスを止めてから再実行する。

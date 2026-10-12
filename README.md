@@ -325,8 +325,9 @@ Docker Compose の操作（サービスの起動、停止、状態確認、Keycl
 
 ### ドキュメント
 
-- `docs/`、`.kiro/steering/`、`Taskfile.yml`を編集したときは`task okf-check`を実行します。
+- `docs/`、`.kiro/steering/`、`Taskfile.yml`、`README.md`、`tooling/adr-lint/`を編集したときは`task okf-check`を実行します。
   このタスクはOpen Knowledge Format v0.2バンドルの適合、docs内部のリンク切れ、孤立ドキュメント、steeringのfrontmatterとdocsとの境界を検査し、非index文書の250行超を責務混在の見直し合図として警告します。
+  ADRの番号の重複、索引と本文の状態と日付の不一致、リンクのラベルと宛先の番号の不一致も失敗にします。
   Taskfileと利用文書の同期候補も警告します。
 - Lefthookは対象ファイルの変更を検出すると、pre-commitで同じ検査を実行します。
 
@@ -356,6 +357,8 @@ push 前には `task adr-check` が pre-push で走り、判断が絡む変更�
   導入は [開発環境構築](docs/local-env-setup/setup.md) を参照してください。
 - OKF適合、docs内部のリンク切れ、孤立ドキュメント、steeringのfrontmatterとdocsとの境界は`task okf-check`で検証し、非index文書の250行超は責務混在の見直し合図として警告します。
   同じタスクは、Taskfileの公開タスクを変更した場合にREADMEと関連docsの同期候補も警告します。
+  バックエンドのJavadocだけを変えるPull Requestは、CIの`okf-validate`を起動しません。
+  ADRへのリンクを含むJavadocを変えたときは、手元で`task okf-check`を実行します。
 - 検証スキーマは `docs/.iwe/schemas/` に置き、`docs/index.md` を目次の起点としています。
   各領域の `docs/<領域>/index.md` は、どの文書をいつ読むかを示す入口です。
 - AI エージェント向けの作成規約は [`.kiro/steering/documentation-authoring.md`](.kiro/steering/documentation-authoring.md)、docs の読み方は [`.kiro/steering/docs-navigation.md`](.kiro/steering/docs-navigation.md) にあります。

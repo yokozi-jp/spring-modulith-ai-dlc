@@ -156,6 +156,9 @@ task lint-md
 task okf-check
 ```
 
+`task okf-check`は、ADRの番号の重複、索引と本文の不一致、リンクのラベルと宛先の番号の不一致も検査します。
+ADRを追加または番号を変えたときは、`docs/adr/index.md`の行も同じ変更で直します。
+
 ## リリース設定を変更するとき
 
 ```bash
