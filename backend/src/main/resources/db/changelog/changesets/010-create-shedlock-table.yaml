@@ -8,6 +8,7 @@ databaseChangeLog:
       changes:
         # ShedLock のロックの表（ADR-077）。列は ShedLock の文書の PostgreSQL の DDL に合わせ、時刻だけを timestamptz にする（ADR-006）。
         # ロックの期限は DB の時刻で書き込み、比べるため、インスタンスの時計に依存しない。
+        # TIMESTAMP WITH TIME ZONE を TIMESTAMP に変えない。ShedLock は時刻帯のない現在時刻で書き込み、timestamptz の列だけが接続の TimeZone によらず正しく比べられる（ShedLockSessionTimeZoneTest が守る）。
         - createTable:
             tableName: shedlock
             schemaName: modulith
