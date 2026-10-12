@@ -29,6 +29,9 @@ n 回目の再投入の前に、最後の試行から `min(wait-age × multiplie
 - **event 名**：`Event publication resubmission exhausted`
 - **レベル**：`ERROR`
 - **事象**：再投入の回数がリスナーの方針の上限（`max-resubmissions`）に達した出版を、そのインスタンスで初めて見つけ、自動の再投入の対象から外した。
+  見つける経路は二つある。再投入したインスタンスが次の回に結果を読み戻して `FAILED` に戻ったと知る経路と、回収（sweep）である。
+  sweep は、ロックを取った実行の最初の回と以後 1 時間ごとに、記録していない上限到達の出版を `max-per-run` 件まで読む。
+  再投入したインスタンスが落ちた出版や、Staleness Monitor が `FAILED` に戻した出版は、sweep が拾うため最大 1 時間遅れる。
 - **属性**：`event_publication.id`、`event_publication.event_type`、`event_publication.listener_id`、`event_publication.completion_attempts`
 - **発生原因**：外部システムの障害が方針の待ち時間と上限の回数を超えて続いた。
   リスナーの不具合や内部の不変条件の違反（ADR-072 のデッドレター）で、何度動かしても失敗する。
@@ -47,6 +50,19 @@ n 回目の再投入の前に、最後の試行から `min(wait-age × multiplie
 - **発生原因**：接続の pool の枯渇（`connection-timeout`）、DB の停止、`statement_timeout`、`modulith.shedlock` の読み書きの失敗（ShedLock の `LockException`）。
 - **対応**：次の回で再試行するため、1 回だけなら対応しない。
   続くときは自動の回復が止まっているので、当日中に DB の状態と接続の pool を確かめる。
+
+## Event publication resubmission crashed
+
+- **event 名**：`Event publication resubmission crashed`
+- **レベル**：`ERROR`
+- **事象**：定期のジョブの 1 回の実行が、DB の例外とロックの例外以外の予期しない実行時の例外で失敗し、その回の再投入をしなかった。`event.publication.resubmission.runs{outcome=failed}` に数える。
+- **属性**：`exception.type`、`exception.message`、`exception.stacktrace`
+- **発生原因**：コードの不具合（`NullPointerException` など）、方針や設定の不整合、ライブラリの版を上げたあとの挙動の変化。
+- **対応**：例外の型とスタックトレースで原因を特定し、当日中に直してデプロイする。
+  回ごとに同じ例外が続くため、自動の回復は止まっている。
+  直すまでの間は、必要な出版を「手での再投入」で再投入する。
+- **通知**：`ERROR` のため通知する。
+  同じ原因で回ごとに出るため、通知は例外の型でまとめる。
 
 ## Event publication resubmit-once incomplete
 
@@ -122,10 +138,13 @@ SELECT p.event_type, p.listener_id, count(*) AS publications, min(p.publication_
 - **`policy:<名前>`**：その方針のリスナーの出版（例：`policy:payment`）。
 - **`event-type:<クラス>`**：そのイベントの出版（例：`event-type:com.example.demo.ordering.OrderConfirmed`）。
 
+対象は空白なら通常の起動で、空白以外なら `false` を含めて手での再投入の求めと読む。
+`all`、`policy:<名前>`、`event-type:<クラス>` のどれでもない値は、何もせずに起動せず、終了コード 1 で失敗する。
 対象を渡すと、アプリは Web のサーバーと定期の実行（Staleness Monitor を含む）を動かさない。
 定期のジョブと同じロックを取るため、定期のジョブを止めずに起動してよい。
 待ち時間と上限の回数を見ずに、対象の `FAILED` の出版を `max-per-run`（100 件）まで再投入し、リスナーの処理が終わるまで待ってから終わる。
 すべて完了したら終了コード 0、それ以外は 1 である。
+定期のジョブと違い、時間の予算（次の節）は適用しない。運用者が完了を待つ入口であり、件数は `max-per-run` が抑える。
 
 ローカルでは Compose の `backend` サービスで起動する。
 
@@ -136,6 +155,17 @@ docker compose --env-file .env -f docker/compose.yml --profile backend run --rm 
 
 本番と STG では、同じタスク定義を ECS の RunTask で 1 回だけ動かすか、Kubernetes の Job にし、環境変数を足す。
 起動した後は、`Event publications resubmitted once` の `INFO` の件数と終了コードで結果を確かめる。
+
+## 定期の実行の時間の予算
+
+定期の 1 回の実行は、開始から `lock-at-most-for / 2`（main では 5 分）を過ぎたら、以降の候補を選ばずに次の回へ回す。
+古い出版から処理するため、残りは次の回で先に処理される。
+`lock-at-most-for` を超えるとロックが切れて他のインスタンスが動くため、その手前で止める。
+
+main の見積もりは次のとおりである。
+決済のリスナーの 1 件の最悪は、connect 1 秒 + read 2 秒の約 3 秒で、試行は 1 回である。
+`concurrency-limit` は 2 で、100 件（`max-per-run`）ではおよそ 2.5 分になり、`lock-at-most-for` の 10 分に収まる。
+リスナーを増やした場合は、予算で止まった回が増えていないか、`failed.oldest.age{state=retrying}` で確かめる。
 
 ## 再投入しない出版の片付け
 
@@ -153,24 +183,40 @@ DELETE FROM modulith.event_publication
 ## 自動の再投入の停止
 
 環境変数 `EVENT_PUBLICATION_RESUBMISSION_ENABLED` を `false` にしてデプロイする。
+値は `true` か `false` だけを使う。
+条件は `true`（大文字小文字を区別しない）だけを真と読み、`yes` や `1` は静かに無効の扱いになる。
 定期の実行と Spring Modulith の Staleness Monitor が一緒に止まり、落ちたまま `PUBLISHED`、`PROCESSING`、`RESUBMITTED` に残った出版も `FAILED` に戻らなくなる。
 再開するときは `true` に戻してデプロイする。
 
 ## メトリクスの見方
 
-| 名前                                           | 見方                                                                                                                          |
-| ---------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
-| `event.publication.resubmission.runs{outcome}` | `completed` はロックを取って最後まで動いた回、`skipped` は他のインスタンスがロックを持っていた回、`failed` は WARN の回である |
-| `event.publication.resubmissions`              | 定期のジョブが再投入の候補にした出版の数。ロックの中で数えるため、再投入した数と一致する                                      |
-| `event.publication.failed{state}`              | `retrying` は自動の再投入を待つ `FAILED` の出版、`exhausted` はリスナーの方針の上限に達した出版の数である                     |
-| `event.publication.failed.oldest.age{state}`   | 各状態で最も古い出版の `publication_date` からの経過秒数である                                                                |
+| 名前                                               | 見方                                                                                                                                                                |
+| -------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `event.publication.resubmission.runs{outcome}`     | `completed` はロックを取って最後まで動いた回、`skipped` は他のインスタンスがロックを持っていた回、`failed` は WARN の `failed` か ERROR の `crashed` の回である     |
+| `event.publication.resubmissions`                  | 再投入した（実際に `RESUBMITTED` へ進んだ）出版の数。他の更新で進めなかった出版と、`max-per-run` で止まった候補は数えない                                           |
+| `event.publication.resubmission.outcomes{outcome}` | 再投入した出版の結果。`completed` は archive に移った数、`failed` は `FAILED` に戻った数（Staleness Monitor が戻した場合を含む）。1 回の再投入につき 1 回だけ数える |
+| `event.publication.resubmission.exhausted`         | 再投入のあとの失敗で、リスナーの方針の `max-resubmissions` を超えた遷移の数。数えるときに ERROR の `exhausted` を 1 回記録する                                      |
+| `event.publication.failed{state}`                  | `retrying` は自動の再投入を待つ `FAILED` の出版、`exhausted` はリスナーの方針の上限に達した出版の数である                                                           |
+| `event.publication.failed.oldest.age{state}`       | 各状態で最も古い出版の `publication_date` からの経過秒数である                                                                                                      |
 
+- Counter は、再投入したインスタンスだけが数える。
+  インスタンスの間で二重に数えないため、ダッシュボードは合計（`sum`）で集める。
+  Gauge とは逆である。
+- `outcomes` は再投入した次の回の先頭で数えるため、結果の判定は最大で間隔と処理時間だけ遅れる。
+  `outcome=completed` は `completion-mode: archive` が前提で、`update` の `COMPLETED` の行は数えない。
+  処理中の出版は次の回に回し、運用者が消した出版は数えずに忘れる。
+  未完了のまま `max(3 × lock-at-most-for, wait-age + interval)` を過ぎた出版も数えずに捨てる。
+- 再投入した直後にそのインスタンスが落ちると、その回の結果は数えない。
+  `failed` と `exhausted` の Gauge と、最古の経過時間の警報が補う。
 - Gauge は、ロックを取ったかどうかによらず、すべてのインスタンスが毎回同じ値を集計して出す。
   ダッシュボードと警報はインスタンスの間の最大値（`max`）で集め、合計（`sum`）しない。
   合計すると、同じ出版をインスタンスの数だけ数える。
 - 定期の実行を無効にした環境では更新されず、0 のままである。
 - `failed{state=retrying}` は、`concurrency-limit` の空きを待つ間に Staleness Monitor が `FAILED` に戻した処理中の出版も数えうるため、実際の失敗より多く出ることがある。
 - `failed{state=exhausted}` の件数は、残っている件数の表示と片付けたあとの確認に使い、警報にしない。
+- 定期のジョブの INFO `Event publications resubmitted` の `event_publication.exhausted.count` は、その回の sweep が新しく ERROR にした件数である。
+  再投入の結果を読み戻して記録した ERROR は含まない。
+  上限に達した出版の総数は Gauge の `state=exhausted` で見る。
   上限に達した出版を知る主な通知は ERROR のログの監視である。
 - `failed.oldest.age{state=exhausted}` が 1 日を超えたら通知する。
   ERROR はインスタンスごとに 1 回しか出ないため、見落とした出版が残り続けるのをこの警報で拾う。
