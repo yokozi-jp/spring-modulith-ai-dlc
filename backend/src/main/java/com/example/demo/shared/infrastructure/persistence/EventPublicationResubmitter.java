@@ -51,6 +51,9 @@ class EventPublicationResubmitter {
   /** ジョブの実行の回数の Counter の名前。 */
   private static final String RUNS_METRIC = "event.publication.resubmission.runs";
 
+  /** 上限に達した出版の取りこぼしを探す間隔。設定値にはしない。 */
+  private static final Duration SWEEP_PERIOD = Duration.ofHours(1);
+
   /** 状態の tag の名前。 */
   private static final String STATE = "state";
 
@@ -96,6 +99,12 @@ class EventPublicationResubmitter {
   /** 上限に達した最も古い出版の経過秒数。 */
   private final AtomicLong exhaustedOldestAge = new AtomicLong();
 
+  /** 上限に達した出版の取りこぼしを探す回の間隔。ロックを取った実行の回数で数える。 */
+  private final long sweepEvery;
+
+  /** ロックを取った実行の回数。 */
+  private final AtomicLong lockedRuns = new AtomicLong();
+
   /** 再投入した出版の覚え書きと、結果の読み戻し。 */
   private final ResubmissionTracker tracker;
 
@@ -113,6 +122,9 @@ class EventPublicationResubmitter {
     this.policies = policies;
     this.clock = clock;
     this.properties = properties;
+    // ponytail: 時計でなく実行の回数で数え、テストを決定的にする。周期は固定で、設定にする必要が出たら Properties に足す。
+    this.sweepEvery =
+        Math.max(1, Math.ceilDiv(SWEEP_PERIOD.toMillis(), properties.interval().toMillis()));
     this.tracker = new ResubmissionTracker(dsl, policies, meterRegistry, properties);
     this.completedRuns = runs(meterRegistry, "completed");
     this.skippedRuns = runs(meterRegistry, "skipped");
@@ -165,7 +177,12 @@ class EventPublicationResubmitter {
       tracker.reconcile(now);
       final AtomicReference<@Nullable Run> run = new AtomicReference<>();
       lockingTaskExecutor.executeWithLock(
-          (Runnable) () -> run.set(new Run(reportExhausted(), resubmit(now))),
+          (Runnable)
+              () ->
+                  run.set(
+                      new Run(
+                          reportExhausted(lockedRuns.getAndIncrement() % sweepEvery == 0),
+                          resubmit(now))),
           new LockConfiguration(
               now, LOCK_NAME, properties.lockAtMostFor(), properties.lockAtLeastFor()));
       final @Nullable Run done = run.get();
@@ -256,9 +273,18 @@ class EventPublicationResubmitter {
    *
    * <p>2 回の読み込みに分ける。(a) 記録済みの ID のうち、行が消えたか上限未満に戻ったものを記録から外す。(b) 記録済みでない上限到達の出版を、古い順に {@code
    * max-per-run} 件だけ読む。どちらも上限に達した全件は読まない。
+   *
+   * <p>(a) は毎回行う。(b) は取りこぼしの回収で、ロックを取った実行の最初の回と、以後 1 時間ごと（{@code ceil(1 時間 / interval)} 回ごと）にだけ行う。
+   * 再投入した出版の上限到達は {@link ResubmissionTracker} が結果の読み戻しで記録するため、(b) が拾うのは、再投入したインスタンスが落ちた出版、Staleness
+   * Monitor が FAILED に戻した出版、再起動の前から残る出版である。
    */
-  private int reportExhausted() {
+  // ponytail: 取りこぼしの ERROR は最大で 1 時間遅れる。遅れを縮めるなら SWEEP_PERIOD を短くする（設定にするのは上位互換）。
+  // 実行の回数は再起動で 0 に戻るため、起動後の最初の回で必ず 1 回回収する。
+  private int reportExhausted(final boolean sweep) {
     forgetResolved();
+    if (!sweep) {
+      return 0;
+    }
     final Set<UUID> reported = tracker.reportedIds();
     final Condition notReported =
         reported.isEmpty()

@@ -240,7 +240,15 @@ class EventPublicationResubmitterOutcomesTest {
   @DisplayName("再投入した出版が再び失敗して上限に達したら failed と exhausted を 1 だけ数え、ERROR も 1 回だけ記録する")
   void exhaustionIsCountedAndReportedOnce() {
     final UUID id = insert(FAILED, 1);
-    final EventPublicationResubmitter resubmitter = newResubmitter(properties);
+    // interval が 1 時間なら毎回の実行が回収も行うので、回収と読み戻しが同じ出版を重ねて記録しないことも確かめる。
+    final EventPublicationResubmitter resubmitter =
+        newResubmitter(
+            new EventPublicationResubmissionConfig.Properties(
+                properties.waitAge(),
+                Duration.ofHours(1),
+                properties.maxPerRun(),
+                Duration.ofHours(2),
+                properties.policies()));
     resubmitter.resubmitOnce();
     assertThat(attempts(id)).isEqualTo(2);
 
