@@ -80,3 +80,4 @@
 - [ADR-077: OpenAPI 契約の operation と status の組ごとに、MockMvc の契約テストの宣言を検査する](ADR-077-check-contract-test-coverage-per-response-status.md)（Proposed, 2026-10-11）
 - [ADR-078: フロントエンドの coverage を React Compiler を外して測る](ADR-078-measure-frontend-coverage-without-react-compiler.md)（Proposed, 2026-10-12）
 - [ADR-079: 失敗したイベント出版を、ShedLock で 1 つのインスタンスに絞った定期のジョブで、リスナーごとの方針で再投入する](ADR-079-resubmit-failed-event-publications-periodically-with-shedlock.md)（Proposed, 2026-10-10）
+- [ADR-080: バックエンドのテストの非同期の条件の待ちに Awaitility を使う](ADR-080-wait-for-async-conditions-with-awaitility.md)（Proposed, 2026-10-12）
