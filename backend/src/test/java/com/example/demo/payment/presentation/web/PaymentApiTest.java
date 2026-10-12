@@ -9,6 +9,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.example.demo.shared.infrastructure.persistence.TestCommonColumns;
 import com.example.demo.testkit.CleanGeneratedTablesExtension;
+import com.example.demo.testkit.ContractCase;
 import com.example.demo.testkit.SharedTestConfiguration;
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -25,6 +26,7 @@ import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.context.annotation.Import;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
+import org.springframework.web.bind.annotation.RequestMethod;
 
 /** 注文の決済記録の API を HTTP の形で検証する。 */
 // MockMvc の期待値は andExpect で書き、AssertJ の assert を使わないため、static import が多い。
@@ -39,6 +41,9 @@ import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilde
 @Import(SharedTestConfiguration.class)
 @ExtendWith(CleanGeneratedTablesExtension.class)
 class PaymentApiTest {
+
+  /** 決済記録の一覧の API の path。 */
+  private static final String PAYMENTS_PATH = "/api/payments";
 
   /** 請求の結果を記録した時刻の、API が返す形。 */
   private static final String RECORDED_AT_TEXT = "2026-10-06T01:02:03.123456Z";
@@ -60,6 +65,7 @@ class PaymentApiTest {
 
   @Test
   @DisplayName("決済記録がある注文では、items に 1 件を入れ、recordedAt を Z 付きで返す")
+  @ContractCase(method = RequestMethod.GET, path = PAYMENTS_PATH, status = 200)
   void listsPaymentOfOrder() throws Exception {
     final UUID orderId = UUID.randomUUID();
     final UUID paymentId = insertPayment(orderId);
@@ -118,8 +124,9 @@ class PaymentApiTest {
 
   @Test
   @DisplayName("orderId がなければ 400 の Problem Details を返す")
+  @ContractCase(method = RequestMethod.GET, path = PAYMENTS_PATH, status = 400)
   void missingOrderIdReturnsBadRequest() throws Exception {
-    expectBadRequest(get("/api/payments").with(oidcLogin()));
+    expectBadRequest(get(PAYMENTS_PATH).with(oidcLogin()));
   }
 
   @ParameterizedTest
@@ -130,7 +137,7 @@ class PaymentApiTest {
   }
 
   private static MockHttpServletRequestBuilder payments(final String orderId) {
-    return get("/api/payments").param("orderId", orderId).with(oidcLogin());
+    return get(PAYMENTS_PATH).param("orderId", orderId).with(oidcLogin());
   }
 
   private void expectBadRequest(final MockHttpServletRequestBuilder request) throws Exception {

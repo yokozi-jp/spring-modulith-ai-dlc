@@ -7,6 +7,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.example.demo.product.TestProducts;
 import com.example.demo.testkit.CleanGeneratedTablesExtension;
+import com.example.demo.testkit.ContractCase;
 import com.example.demo.testkit.SharedTestConfiguration;
 import com.example.demo.testkit.UniqueCodes;
 import java.util.UUID;
@@ -19,6 +20,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.context.annotation.Import;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.web.bind.annotation.RequestMethod;
 
 /** 商品の一覧の API を HTTP の形で検証する。 */
 // MockMvc の期待値は andExpect で書き、AssertJ の assert を使わない。
@@ -37,6 +39,7 @@ class ProductApiTest {
 
   @Test
   @DisplayName("商品の一覧を商品コードの昇順で items に入れて返す")
+  @ContractCase(method = RequestMethod.GET, path = "/api/products", status = 200)
   void listsProductsOrderedByCode() throws Exception {
     final String base = UniqueCodes.next("P");
     final UUID pen = TestProducts.onSale(dsl, base + "B", "120.00");
