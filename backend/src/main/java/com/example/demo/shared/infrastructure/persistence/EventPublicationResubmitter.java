@@ -79,7 +79,7 @@ class EventPublicationResubmitter {
   /** 他のインスタンスがロックを持っていて省いた回。 */
   private final Counter skippedRuns;
 
-  /** DB の例外で失敗した回。 */
+  /** DB やロックの既知の失敗と、予期しない例外で失敗した回。 */
   private final Counter failedRuns;
 
   /** 再投入の候補にした出版の数。 */
@@ -148,7 +148,13 @@ class EventPublicationResubmitter {
     return Counter.builder(RUNS_METRIC).tag("outcome", outcome).register(meterRegistry);
   }
 
-  /** ロックを取れたら、上限に達した出版を知らせ、待ち時間を過ぎた失敗した出版を再投入する。DB の例外では投げずに戻る。 */
+  /**
+   * ロックを取れたら、上限に達した出版を知らせ、待ち時間を過ぎた失敗した出版を再投入する。投げずに戻る。
+   *
+   * <p>DB やロックの既知の失敗は WARN で、予期しない実行時の例外は ERROR の {@code crashed} で記録し、どちらも {@code failed} の回に数える。
+   */
+  // スケジューラの既定のエラーハンドラに例外を漏らすと、ログは出ても runs のどの tag も動かず、停止に気づけないため、予期しない実行時の例外も受けて数える。
+  @SuppressWarnings("PMD.AvoidCatchingGenericException")
   @Scheduled(
       fixedDelayString = "${event-publication.resubmission.interval}",
       initialDelayString = "${event-publication.resubmission.interval}")
@@ -181,6 +187,9 @@ class EventPublicationResubmitter {
         | LockException e) {
       failedRuns.increment();
       log.atWarn().setCause(e).log("Event publication resubmission failed");
+    } catch (RuntimeException e) {
+      failedRuns.increment();
+      log.atError().setCause(e).log("Event publication resubmission crashed");
     }
   }
 
