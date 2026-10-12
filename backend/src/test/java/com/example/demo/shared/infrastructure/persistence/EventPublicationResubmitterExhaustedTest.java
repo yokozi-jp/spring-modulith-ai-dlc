@@ -3,9 +3,7 @@ package com.example.demo.shared.infrastructure.persistence;
 import static com.example.demo.jooq.modulith.Tables.EVENT_PUBLICATION;
 import static org.assertj.core.api.Assertions.assertThat;
 
-import com.example.demo.jooq.modulith.Tables;
 import com.example.demo.testkit.CapturedLogRecords;
-import com.example.demo.testkit.CommittedDatabaseTest;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import io.opentelemetry.api.common.AttributeKey;
 import io.opentelemetry.sdk.logs.data.LogRecordData;
@@ -21,9 +19,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.context.annotation.Import;
 import org.springframework.modulith.events.FailedEventPublications;
-import org.springframework.test.context.TestPropertySource;
 
 /**
  * 上限に達した出版の ERROR の記録（{@code reportExhausted}）を、DB の行を直接作って検証する。
@@ -34,26 +30,11 @@ import org.springframework.test.context.TestPropertySource;
  */
 // 出版の行の準備、ジョブの設定の差し替え、ERROR と INFO の読み出しを同じ文脈で扱うため、メソッドの数が多い。
 @SuppressWarnings("PMD.TooManyMethods")
-@CommittedDatabaseTest
-@Import(EventPublicationResubmitterTest.ProbeConfiguration.class)
-@TestPropertySource(
-    properties = {
-      "event-publication.resubmission.wait-age=PT5M",
-      "event-publication.resubmission.interval=PT2S",
-      "event-publication.resubmission.lock-at-most-for=PT3S",
-      "event-publication.resubmission.max-per-run=100",
-      "event-publication.resubmission.policies.default.max-resubmissions=1",
-      "event-publication.resubmission.policies.probe.max-resubmissions=2",
-      "event-publication.resubmission.policies.probe.multiplier=2",
-      "event-publication.resubmission.policies.probe.max-wait=PT20M"
-    })
+@ResubmissionTestSupport.SharedContext
 class EventPublicationResubmitterExhaustedTest {
 
   /** 最初の出版の時刻。マイクロ秒の精度にする。 */
   private static final Instant T0 = Instant.parse("2026-10-10T01:02:03.123456Z");
-
-  /** 上限に達した出版の ERROR の本文。 */
-  private static final String EXHAUSTED = "Event publication resubmission exhausted";
 
   /** 再投入と記録の INFO の本文。 */
   private static final String RESUBMITTED = "Event publications resubmitted";
@@ -186,16 +167,8 @@ class EventPublicationResubmitterExhaustedTest {
   }
 
   private UUID insertExhausted(final UUID id, final int offsetSeconds) {
-    dsl.insertInto(EVENT_PUBLICATION)
-        .set(EVENT_PUBLICATION.ID, id)
-        .set(EVENT_PUBLICATION.LISTENER_ID, LISTENER_ID)
-        .set(EVENT_PUBLICATION.EVENT_TYPE, "test.event")
-        .set(EVENT_PUBLICATION.SERIALIZED_EVENT, "{}")
-        .set(EVENT_PUBLICATION.PUBLICATION_DATE, T0.plusSeconds(offsetSeconds))
-        .set(EVENT_PUBLICATION.STATUS, "FAILED")
-        .set(EVENT_PUBLICATION.COMPLETION_ATTEMPTS, EXHAUSTED_ATTEMPTS)
-        .execute();
-    return id;
+    return ResubmissionTestSupport.insertPublication(
+        dsl, id, LISTENER_ID, T0.plusSeconds(offsetSeconds), "FAILED", EXHAUSTED_ATTEMPTS);
   }
 
   private EventPublicationResubmissionConfig.Properties withIntervalAndMaxPerRun(
@@ -222,23 +195,14 @@ class EventPublicationResubmitterExhaustedTest {
   }
 
   private List<LogRecordData> exhaustedErrors(final UUID id) {
-    return capturedLogRecords.withBody(EXHAUSTED).stream()
-        .filter(
-            record ->
-                id.toString()
-                    .equals(
-                        record.getAttributes().get(AttributeKey.stringKey("event_publication.id"))))
-        .toList();
+    return ResubmissionTestSupport.exhaustedErrors(capturedLogRecords, id.toString());
   }
 
   private static long exhaustedCount(final LogRecordData record) {
     return record.getAttributes().get(AttributeKey.longKey("event_publication.exhausted.count"));
   }
 
-  /** ロックの期限を過去にする。期限は DB の時刻で決まり、固定の時計では進まないため。 */
   private void expireLock() {
-    dsl.update(Tables.SHEDLOCK)
-        .set(Tables.SHEDLOCK.LOCK_UNTIL, Tables.SHEDLOCK.LOCKED_AT)
-        .execute();
+    ResubmissionTestSupport.expireLock(dsl);
   }
 }

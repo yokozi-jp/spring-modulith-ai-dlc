@@ -6,7 +6,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.example.demo.shared.infrastructure.persistence.EventPublicationResubmitterTest.ProbeListener;
 import com.example.demo.shared.infrastructure.persistence.EventPublicationResubmitterTest.ResubmissionProbe;
-import com.example.demo.testkit.CommittedDatabaseTest;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
@@ -20,12 +19,10 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.context.annotation.Import;
 import org.springframework.modulith.events.FailedEventPublications;
 import org.springframework.modulith.events.ResubmissionOptions;
 import org.springframework.modulith.test.EnableScenarios;
 import org.springframework.modulith.test.Scenario;
-import org.springframework.test.context.TestPropertySource;
 
 /**
  * Spring Modulith 2.1.1 の {@link FailedEventPublications#resubmit(ResubmissionOptions)}
@@ -35,21 +32,8 @@ import org.springframework.test.context.TestPropertySource;
  * withMinAge} に頼らず条件の関数で待ち時間を判定し、{@code withBatchSize} を {@link Integer#MAX_VALUE} にして FAILED
  * の行をすべて読む。 Spring Modulith の版を上げてこのテストが失敗したら、癖が直ったので、ADR-079 と両方のクラスの読み方（{@code LIMIT} と待ち時間）を見直す。
  */
-@CommittedDatabaseTest
+@ResubmissionTestSupport.SharedContext
 @EnableScenarios
-@Import(EventPublicationResubmitterTest.ProbeConfiguration.class)
-// EventPublicationResubmitterTest と同じ設定にし、Spring のテストの文脈を共有する。
-@TestPropertySource(
-    properties = {
-      "event-publication.resubmission.wait-age=PT5M",
-      "event-publication.resubmission.interval=PT2S",
-      "event-publication.resubmission.lock-at-most-for=PT3S",
-      "event-publication.resubmission.max-per-run=100",
-      "event-publication.resubmission.policies.default.max-resubmissions=1",
-      "event-publication.resubmission.policies.probe.max-resubmissions=2",
-      "event-publication.resubmission.policies.probe.multiplier=2",
-      "event-publication.resubmission.policies.probe.max-wait=PT20M"
-    })
 class ResubmissionOptionsLearningTest {
 
   /** 最初の出版の時刻。マイクロ秒の精度にする。 */

@@ -5,10 +5,8 @@ import static com.example.demo.jooq.modulith.Tables.EVENT_PUBLICATION_ARCHIVE;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import com.example.demo.jooq.modulith.Tables;
 import com.example.demo.shared.events.ResubmissionPolicy;
 import com.example.demo.testkit.CapturedLogRecords;
-import com.example.demo.testkit.CommittedDatabaseTest;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.opentelemetry.api.common.AttributeKey;
 import io.opentelemetry.api.logs.Severity;
@@ -44,13 +42,11 @@ import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Import;
 import org.springframework.context.annotation.Primary;
 import org.springframework.modulith.events.ApplicationModuleListener;
 import org.springframework.modulith.test.EnableScenarios;
 import org.springframework.modulith.test.Scenario;
 import org.springframework.scheduling.config.ScheduledTaskHolder;
-import org.springframework.test.context.TestPropertySource;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 
@@ -66,20 +62,8 @@ import org.springframework.transaction.support.TransactionTemplate;
  */
 // 一つの文脈で出版の状態、メトリクス、ログ、ロック、方針を確かめるため、型とメソッドの数が多い。
 @SuppressWarnings({"PMD.CouplingBetweenObjects", "PMD.TooManyMethods"})
-@CommittedDatabaseTest
+@ResubmissionTestSupport.SharedContext
 @EnableScenarios
-@Import(EventPublicationResubmitterTest.ProbeConfiguration.class)
-@TestPropertySource(
-    properties = {
-      "event-publication.resubmission.wait-age=PT5M",
-      "event-publication.resubmission.interval=PT2S",
-      "event-publication.resubmission.lock-at-most-for=PT3S",
-      "event-publication.resubmission.max-per-run=100",
-      "event-publication.resubmission.policies.default.max-resubmissions=1",
-      "event-publication.resubmission.policies.probe.max-resubmissions=2",
-      "event-publication.resubmission.policies.probe.multiplier=2",
-      "event-publication.resubmission.policies.probe.max-wait=PT20M"
-    })
 class EventPublicationResubmitterTest {
 
   /** 最初の出版の時刻。マイクロ秒の精度にする。 */
@@ -90,9 +74,6 @@ class EventPublicationResubmitterTest {
 
   /** テストのイベントの {@code event_type}。 */
   private static final String EVENT_TYPE = ResubmissionProbe.class.getName();
-
-  /** 上限に達した出版の ERROR の本文。 */
-  private static final String EXHAUSTED = "Event publication resubmission exhausted";
 
   /** FAILED の状態。 */
   private static final String FAILED = "FAILED";
@@ -472,9 +453,7 @@ class EventPublicationResubmitterTest {
   }
 
   private void expireLock() {
-    dsl.update(Tables.SHEDLOCK)
-        .set(Tables.SHEDLOCK.LOCK_UNTIL, Tables.SHEDLOCK.LOCKED_AT)
-        .execute();
+    ResubmissionTestSupport.expireLock(dsl);
   }
 
   /** 他のインスタンスの代わりに、同じロックを 1 分持つ。 */
@@ -579,15 +558,8 @@ class EventPublicationResubmitterTest {
 
   /** リスナーを持たない FAILED の出版の行を、default の方針で作る。 */
   private void insertFailed(final int completionAttempts, final Instant publicationDate) {
-    dsl.insertInto(EVENT_PUBLICATION)
-        .set(EVENT_PUBLICATION.ID, UUID.randomUUID())
-        .set(EVENT_PUBLICATION.LISTENER_ID, "gauge-test")
-        .set(EVENT_PUBLICATION.EVENT_TYPE, "test.event")
-        .set(EVENT_PUBLICATION.SERIALIZED_EVENT, "{}")
-        .set(EVENT_PUBLICATION.PUBLICATION_DATE, publicationDate)
-        .set(EVENT_PUBLICATION.STATUS, FAILED)
-        .set(EVENT_PUBLICATION.COMPLETION_ATTEMPTS, completionAttempts)
-        .execute();
+    ResubmissionTestSupport.insertPublication(
+        dsl, UUID.randomUUID(), "gauge-test", publicationDate, FAILED, completionAttempts);
   }
 
   private double outcome(final String outcome) {
@@ -607,12 +579,7 @@ class EventPublicationResubmitterTest {
   }
 
   private List<LogRecordData> exhaustedErrors(final String publicationId) {
-    return capturedLogRecords.withBody(EXHAUSTED).stream()
-        .filter(
-            record ->
-                publicationId.equals(
-                    record.getAttributes().get(AttributeKey.stringKey("event_publication.id"))))
-        .toList();
+    return ResubmissionTestSupport.exhaustedErrors(capturedLogRecords, publicationId);
   }
 
   /** 状態が条件を満たすまで待つ。満たさなければイベントの ID と最後に読んだ状態を出して失敗する。 */

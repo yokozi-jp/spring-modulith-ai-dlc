@@ -2,9 +2,7 @@ package com.example.demo.shared.infrastructure.persistence;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import com.example.demo.jooq.modulith.Tables;
 import com.example.demo.testkit.CapturedLogRecords;
-import com.example.demo.testkit.CommittedDatabaseTest;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import io.opentelemetry.api.common.AttributeKey;
 import io.opentelemetry.api.logs.Severity;
@@ -23,9 +21,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.context.annotation.Import;
 import org.springframework.modulith.events.FailedEventPublications;
-import org.springframework.test.context.TestPropertySource;
 
 /**
  * {@link EventPublicationResubmitter#resubmitOnce()} のジョブの実行の回数 {@code
@@ -35,19 +31,7 @@ import org.springframework.test.context.TestPropertySource;
  * <p>ジョブは、本物の DB とロックの表、モックの {@link FailedEventPublications}、テストごとの {@link SimpleMeterRegistry}
  * で作る。 Spring の文脈は {@link EventPublicationResubmitterTest} と同じ設定で共有する。
  */
-@CommittedDatabaseTest
-@Import(EventPublicationResubmitterTest.ProbeConfiguration.class)
-@TestPropertySource(
-    properties = {
-      "event-publication.resubmission.wait-age=PT5M",
-      "event-publication.resubmission.interval=PT2S",
-      "event-publication.resubmission.lock-at-most-for=PT3S",
-      "event-publication.resubmission.max-per-run=100",
-      "event-publication.resubmission.policies.default.max-resubmissions=1",
-      "event-publication.resubmission.policies.probe.max-resubmissions=2",
-      "event-publication.resubmission.policies.probe.multiplier=2",
-      "event-publication.resubmission.policies.probe.max-wait=PT20M"
-    })
+@ResubmissionTestSupport.SharedContext
 class EventPublicationResubmitterRunsTest {
 
   /** 完了した回の outcome。 */
@@ -198,10 +182,7 @@ class EventPublicationResubmitterRunsTest {
         .count();
   }
 
-  /** ロックの期限を過去にする。期限は DB の時刻で決まり、固定の時計では進まないため。 */
   private void expireLock() {
-    dsl.update(Tables.SHEDLOCK)
-        .set(Tables.SHEDLOCK.LOCK_UNTIL, Tables.SHEDLOCK.LOCKED_AT)
-        .execute();
+    ResubmissionTestSupport.expireLock(dsl);
   }
 }

@@ -4,11 +4,8 @@ import static com.example.demo.jooq.modulith.Tables.EVENT_PUBLICATION;
 import static com.example.demo.jooq.modulith.Tables.EVENT_PUBLICATION_ARCHIVE;
 import static org.assertj.core.api.Assertions.assertThat;
 
-import com.example.demo.jooq.modulith.Tables;
 import com.example.demo.testkit.CapturedLogRecords;
-import com.example.demo.testkit.CommittedDatabaseTest;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
-import io.opentelemetry.api.common.AttributeKey;
 import io.opentelemetry.sdk.logs.data.LogRecordData;
 import java.time.Duration;
 import java.time.Instant;
@@ -28,11 +25,9 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.context.annotation.Import;
 import org.springframework.modulith.events.EventPublication;
 import org.springframework.modulith.events.FailedEventPublications;
 import org.springframework.modulith.events.ResubmissionOptions;
-import org.springframework.test.context.TestPropertySource;
 
 /**
  * 定期の再投入が数える {@code event.publication.resubmissions} と、再投入の結果の Counter を、DB の行を直接動かして検証する。
@@ -44,19 +39,7 @@ import org.springframework.test.context.TestPropertySource;
  */
 // 行の準備、リスナーの完了と再失敗の再現、Counter の読み出しを同じ文脈で扱うため、メソッドの数が多い。
 @SuppressWarnings("PMD.TooManyMethods")
-@CommittedDatabaseTest
-@Import(EventPublicationResubmitterTest.ProbeConfiguration.class)
-@TestPropertySource(
-    properties = {
-      "event-publication.resubmission.wait-age=PT5M",
-      "event-publication.resubmission.interval=PT2S",
-      "event-publication.resubmission.lock-at-most-for=PT3S",
-      "event-publication.resubmission.max-per-run=100",
-      "event-publication.resubmission.policies.default.max-resubmissions=1",
-      "event-publication.resubmission.policies.probe.max-resubmissions=2",
-      "event-publication.resubmission.policies.probe.multiplier=2",
-      "event-publication.resubmission.policies.probe.max-wait=PT20M"
-    })
+@ResubmissionTestSupport.SharedContext
 class EventPublicationResubmitterOutcomesTest {
 
   /** 出版の時刻。マイクロ秒の精度にする。待ち時間を十分に過ぎた時刻でジョブを動かす。 */
@@ -82,9 +65,6 @@ class EventPublicationResubmitterOutcomesTest {
 
   /** 上限に達した出版の Counter の名前。 */
   private static final String EXHAUSTED = "event.publication.resubmission.exhausted";
-
-  /** 上限に達した出版の ERROR の本文。 */
-  private static final String EXHAUSTED_MESSAGE = "Event publication resubmission exhausted";
 
   /** 再投入した出版の数の Counter の名前。 */
   private static final String RESUBMISSIONS = "event.publication.resubmissions";
@@ -437,16 +417,8 @@ class EventPublicationResubmitterOutcomesTest {
   }
 
   private UUID insert(final UUID id, final String status, final int completionAttempts) {
-    dsl.insertInto(EVENT_PUBLICATION)
-        .set(EVENT_PUBLICATION.ID, id)
-        .set(EVENT_PUBLICATION.LISTENER_ID, LISTENER_ID)
-        .set(EVENT_PUBLICATION.EVENT_TYPE, "test.event")
-        .set(EVENT_PUBLICATION.SERIALIZED_EVENT, "{}")
-        .set(EVENT_PUBLICATION.PUBLICATION_DATE, T0)
-        .set(EVENT_PUBLICATION.STATUS, status)
-        .set(EVENT_PUBLICATION.COMPLETION_ATTEMPTS, completionAttempts)
-        .execute();
-    return id;
+    return ResubmissionTestSupport.insertPublication(
+        dsl, id, LISTENER_ID, T0, status, completionAttempts);
   }
 
   private int attempts(final UUID id) {
@@ -478,23 +450,14 @@ class EventPublicationResubmitterOutcomesTest {
   }
 
   private List<LogRecordData> exhaustedErrors(final UUID id) {
-    return capturedLogRecords.withBody(EXHAUSTED_MESSAGE).stream()
-        .filter(
-            record ->
-                id.toString()
-                    .equals(
-                        record.getAttributes().get(AttributeKey.stringKey("event_publication.id"))))
-        .toList();
+    return ResubmissionTestSupport.exhaustedErrors(capturedLogRecords, id.toString());
   }
 
   private double count(final String name) {
     return meterRegistry.get(name).counter().count();
   }
 
-  /** ロックの期限を過去にする。期限は DB の時刻で決まり、固定の時計では進まないため。 */
   private void expireLock() {
-    dsl.update(Tables.SHEDLOCK)
-        .set(Tables.SHEDLOCK.LOCK_UNTIL, Tables.SHEDLOCK.LOCKED_AT)
-        .execute();
+    ResubmissionTestSupport.expireLock(dsl);
   }
 }
