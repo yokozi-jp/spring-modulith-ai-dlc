@@ -9,11 +9,11 @@ import io.micrometer.core.instrument.TimeGauge;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 import lombok.extern.slf4j.Slf4j;
@@ -81,7 +81,7 @@ class EventPublicationResubmitter {
   /** DB やロックの既知の失敗と、予期しない例外で失敗した回。 */
   private final Counter failedRuns;
 
-  /** 再投入の候補にした出版の数。 */
+  /** 再投入した（{@code RESUBMITTED} に進んだ）出版の数。 */
   private final Counter resubmissions;
 
   /** 自動の再投入を待つ FAILED の出版の数。 */
@@ -95,6 +95,9 @@ class EventPublicationResubmitter {
 
   /** 上限に達した最も古い出版の経過秒数。 */
   private final AtomicLong exhaustedOldestAge = new AtomicLong();
+
+  /** 再投入した出版の読み戻し。 */
+  private final ResubmissionTracker tracker;
 
   /** このインスタンスで ERROR を記録した、上限に達した出版の ID。 */
   private final Set<UUID> reported = ConcurrentHashMap.newKeySet();
@@ -113,12 +116,13 @@ class EventPublicationResubmitter {
     this.policies = policies;
     this.clock = clock;
     this.properties = properties;
+    this.tracker = new ResubmissionTracker(dsl);
     this.completedRuns = runs(meterRegistry, "completed");
     this.skippedRuns = runs(meterRegistry, "skipped");
     this.failedRuns = runs(meterRegistry, "failed");
     this.resubmissions =
         Counter.builder("event.publication.resubmissions")
-            .description("再投入の候補にした出版の数。ロックの中では再投入した数と一致する")
+            .description("再投入した（RESUBMITTED に進んだ）出版の数")
             .register(meterRegistry);
     // Micrometer は状態のオブジェクトを弱い参照で持つため、final のフィールドを渡す。
     Gauge.builder("event.publication.failed", retrying, AtomicLong::get)
@@ -193,7 +197,8 @@ class EventPublicationResubmitter {
   }
 
   private int resubmit(final Instant now) {
-    final AtomicInteger candidates = new AtomicInteger();
+    // 候補にした出版の ID と、再投入の前の completion_attempts。
+    final Map<UUID, Integer> candidates = new ConcurrentHashMap<>();
     // ponytail: 2.1.1 では LIMIT が条件の関数より先に掛かり、withMinAge も FAILED に効かないため、withMinAge は呼ばず、毎回 FAILED
     // の行をすべて読む。
     // 根拠は ResubmissionOptionsLearningTest の minAgeDoesNotFilterFailedPublications と
@@ -212,9 +217,11 @@ class EventPublicationResubmitter {
                 publication ->
                     Duration.between(now, Instant.now(clock)).compareTo(budget) <= 0
                         && policies.isDue(publication, now)
-                        && candidates.get() < properties.maxPerRun()
-                        && candidates.incrementAndGet() > 0));
-    return candidates.get();
+                        && candidates.size() < properties.maxPerRun()
+                        && candidates.put(
+                                publication.getIdentifier(), publication.getCompletionAttempts())
+                            == null));
+    return tracker.advancedAmong(candidates).size();
   }
 
   private Condition retryingCondition() {
@@ -312,7 +319,7 @@ class EventPublicationResubmitter {
    * ロックの中の 1 回の実行の結果。
    *
    * @param newlyReported このインスタンスで新しく ERROR にした、上限に達した出版の件数
-   * @param resubmitted 再投入の候補にした出版の件数
+   * @param resubmitted 再投入した（{@code RESUBMITTED} に進んだ）出版の件数
    */
   private record Run(int newlyReported, int resubmitted) {}
 }

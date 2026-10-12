@@ -10,6 +10,7 @@ import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.UUID;
 import java.util.function.Predicate;
 import net.javacrumbs.shedlock.core.LockingTaskExecutor;
 import org.jooq.DSLContext;
@@ -93,7 +94,8 @@ class EventPublicationResubmitterBudgetTest {
 
     assertThat(accepted).as("ちょうど予算は通り、1 マイクロ秒後からは通らない").containsExactly(true, true, false, false);
     assertThat(meterRegistry.get("event.publication.resubmissions").counter().count())
-        .isEqualTo(2.0);
+        .as("モックは行を RESUBMITTED に進めないので、進んだ出版は数えない")
+        .isZero();
 
     // 予算を超えた行は FAILED のまま残り、新しい実行（開始時刻が進む）の先頭で候補になる。
     accepted.clear();
@@ -107,6 +109,7 @@ class EventPublicationResubmitterBudgetTest {
   /** 待ち時間を十分に過ぎた、default の方針の FAILED の出版。 */
   private static EventPublication dueRow(final Instant runStart) {
     final EventPublication publication = Mockito.mock(EventPublication.class);
+    Mockito.when(publication.getIdentifier()).thenReturn(UUID.randomUUID());
     Mockito.when(publication.getPublicationDate()).thenReturn(runStart.minus(Duration.ofDays(1)));
     return publication;
   }
