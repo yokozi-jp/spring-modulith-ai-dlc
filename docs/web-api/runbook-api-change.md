@@ -20,7 +20,8 @@ ControllerやDTOを変えたら`task api-gen`を実行し、`openapi/openapi.yam
 
 1. ControllerとDTOを[OpenAPIのアノテーションとJavadoc](openapi-annotations.md)に従って変える。
    契約に足す応答のstatusごとにMockMvcの契約テストを書き、`@ContractCase`で組を宣言する（[Controllerの対応するテスト](../backend/class-roles/controller.md#対応するテスト)）。
-   `/error`に新しいstatusを扱わせたときは、`ApiContractCoverageTest`の`ERROR_ENDPOINT_STATUSES`にも足す。
+   `/error`が返すstatusのうち、titleを持つものは`messages.properties`の`problem.title.<3桁>`から検査が導く。
+   `HttpStatus`に定義のないstatusを新しく扱わせたときだけ、`ApiContractCoverageTest`の`ERROR_ENDPOINT_STATUSES`に足す。
 2. `OpenApiConfig.CONTRACT_VERSION`を[OpenAPI文書の版](versioning.md#openapi文書の版)に従って上げる（互換な追加はMINOR、破壊的変更はMAJOR）。
 3. 契約と生成物を再生成する。
 

@@ -9,15 +9,22 @@ import com.tngtech.archunit.core.importer.ClassFileImporter;
 import io.swagger.v3.core.util.Yaml31;
 import io.swagger.v3.oas.models.OpenAPI;
 import java.io.IOException;
+import java.lang.reflect.Method;
 import java.nio.file.Path;
 import java.util.Arrays;
+import java.util.Locale;
 import java.util.Map;
+import java.util.ResourceBundle;
 import java.util.Set;
 import java.util.TreeSet;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
+import java.util.stream.Stream;
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestTemplate;
+import org.junit.platform.commons.support.AnnotationSupport;
 
 /**
  * コミット済みの OpenAPI 契約の operation と応答の status の組ごとに、MockMvc の契約テストがあることを検査する（ADR-077）。
@@ -32,11 +39,10 @@ class ApiContractCoverageTest {
   /**
    * OpenAPI に載らない {@code /error} が返しうる status。
    *
-   * <p>{@code ApiErrorController} は転送元の status を保つため、title を持つ status と、{@code HttpStatus} に定義のない
-   * 4xx と 5xx の代表（499 と 599）を契約テストで確かめる。
+   * <p>{@code ApiErrorController} は転送元の status を保つ。title を持つ status は {@code messages.properties} の
+   * {@code problem.title.<3 桁>} から導き、{@code HttpStatus} に定義のない 4xx と 5xx の代表（499 と 599）だけを手で足す。
    */
-  private static final Set<Integer> ERROR_ENDPOINT_STATUSES =
-      Set.of(400, 401, 403, 404, 405, 406, 409, 413, 415, 422, 429, 499, 500, 503, 599);
+  private static final Set<Integer> ERROR_ENDPOINT_STATUSES = errorEndpointStatuses();
 
   /**
    * operation ごとの契約テストを求めない組と理由。キーは「HTTP メソッド status」で、メソッドの {@code *} はすべてのメソッドを表す。
@@ -51,6 +57,15 @@ class ApiContractCoverageTest {
           "GET 403",
           "GET は CSRF の検査の対象外で、/api/** に権限の規則もないため、403 を起こす経路がない。"
               + "権限の規則を加えたら、この除外を消して case を足す。");
+
+  private static Set<Integer> errorEndpointStatuses() {
+    final String prefix = "problem.title.";
+    final Stream<Integer> titled =
+        ResourceBundle.getBundle("messages", Locale.ROOT).keySet().stream()
+            .filter(key -> key.matches("problem\\.title\\.\\d{3}"))
+            .map(key -> Integer.valueOf(key.substring(prefix.length())));
+    return Stream.concat(titled, Stream.of(499, 599)).collect(Collectors.toUnmodifiableSet());
+  }
 
   @Test
   @DisplayName("契約の operation と status の組と /error の status は、すべて MockMvc の契約テストで確かめる")
@@ -98,13 +113,14 @@ class ApiContractCoverageTest {
   }
 
   /** 手書きのテストコードに付いた {@link ContractCase} の組を返す。 */
-  // ponytail: 宣言は自己申告で、テストが実際にその status を期待するかは見ない。
+  // ponytail: 宣言は自己申告で、テストが実際にその status を期待するかは見ない（実行されるテストかどうかは見る）。
   // 宣言と andExpect のずれが問題になったら、MockMvc の実行結果を記録して突き合わせる方式に替える（ADR-077）。
   private static Set<String> coveredResponses() {
     return new ClassFileImporter()
         .withImportOption(new TestCodeOnly()).importPackagesOf(DemoApplication.class).stream()
             .flatMap(javaClass -> javaClass.getMethods().stream())
             .map(JavaMethod::reflect)
+            .filter(ApiContractCoverageTest::isEnabledTest)
             .flatMap(method -> Arrays.stream(method.getAnnotationsByType(ContractCase.class)))
             .flatMap(
                 contractCase ->
@@ -116,6 +132,14 @@ class ApiContractCoverageTest {
                                     contractCase.path(),
                                     String.valueOf(status))))
             .collect(Collectors.toCollection(TreeSet::new));
+  }
+
+  /** 実行されるテストのメソッドか。宣言を付けただけの補助メソッドや、無効にしたテストの宣言は数えない。 */
+  private static boolean isEnabledTest(final Method method) {
+    return (AnnotationSupport.isAnnotated(method, Test.class)
+            || AnnotationSupport.isAnnotated(method, TestTemplate.class))
+        && !AnnotationSupport.isAnnotated(method, Disabled.class)
+        && !AnnotationSupport.isAnnotated(method.getDeclaringClass(), Disabled.class);
   }
 
   private static boolean isExempt(final String response) {

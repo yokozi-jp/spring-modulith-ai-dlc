@@ -1,7 +1,7 @@
 ---
 type: ADR
 title: 'ADR-077: OpenAPI 契約の operation と status の組ごとに、MockMvc の契約テストの宣言を検査する'
-description: 契約テストは @ContractCase で確かめる operation と status の組を宣言し、ApiContractCoverageTest がコミット済みの openapi/openapi.yaml と /error の status の組をすべて宣言と突き合わせる。共通の 500 と GET の 403 は理由付きで除外する決定。
+description: 契約テストは @ContractCase で確かめる operation と status の組を宣言し、ApiContractCoverageTest がコミット済みの openapi/openapi.yaml と /error の status の組をすべて宣言と突き合わせ、共通の 500 と GET の 403 だけを理由付きで除外する決定。
 tags: [adr, testing, openapi, web-api]
 ---
 
@@ -38,11 +38,13 @@ drift の検査は、契約が実装と一致することを確かめる。
 契約テストのメソッドに `@ContractCase(method, path, status)` を付け、確かめる operation と status の組を宣言する。
 `path` は OpenAPI の path の形（`/api/orders/{orderId}`）で書く。
 宣言は、そのテストメソッドがその status を期待していることを表す。
+実行されるテスト（`@Test` か `@TestTemplate` 系で、`@Disabled` でないもの）に付いた宣言だけを数える。
 
 `ApiContractCoverageTest` は、Spring も DB も起動しない JUnit テストとして、次を検査する。
 
 - コミット済みの `openapi/openapi.yaml` の operation と応答の status の組に、`@ContractCase` の宣言がある。
-- OpenAPI に載らない `GET /error` の status は、テストの定数 `ERROR_ENDPOINT_STATUSES` に書き、同じく宣言を求める。
+- OpenAPI に載らない `GET /error` の status は、同じく宣言を求める。
+  title を持つ status は `messages.properties` の `problem.title.<3 桁>` から導き、`HttpStatus` に定義のない 499 と 599 だけをテストの定数 `ERROR_ENDPOINT_STATUSES` に手で書く。
 - 契約にない組を宣言していない（path の書き間違いと、消した operation の宣言の残りを見つける）。
 - 除外のうち、どの組にも当たらなくなったものがない。
 
@@ -76,8 +78,8 @@ drift の検査は、契約が実装と一致することを確かめる。
 - 宣言は自己申告であり、宣言したテストが実際にその status を期待しているかは検査しない。
   宣言と `andExpect(status()...)` の一致は、レビューで確かめる。
 - 契約テストに `@ContractCase` を書く手間が増える。
-- `ERROR_ENDPOINT_STATUSES` は手で保つ。
-  `ApiErrorController` が扱う status を増やして定数を直し忘れると、検査をすり抜ける。
+- `ERROR_ENDPOINT_STATUSES` のうち、499 と 599 は手で保つ。
+  `ApiErrorController` が `HttpStatus` に定義のない status を増やして定数を直し忘れると、検査をすり抜ける。
 
 ### Neutral
 
