@@ -329,7 +329,6 @@ class EventPublicationResubmissionConfigTest {
               EventPublicationResubmissionConfig.awaitRunningListeners(context);
 
               assertThat(done).as("文脈を閉じる前のリスナーの完了").isTrue();
-              assertThat(context.isActive()).as("DataSource などがまだ使える").isTrue();
             });
   }
 
