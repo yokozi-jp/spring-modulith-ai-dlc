@@ -13,6 +13,7 @@ on:
       - "docker/wiremock/**"
       - ".env.test.example"
       - "Taskfile.yml"
+      - "tooling/session-sql-lint/**"
       - ".github/workflows/backend-ci.yml"
   # PR ではパスフィルタで workflow 自体をスキップしない。スキップすると
   # check run が生成されず、必須チェックが "Expected" のまま PR が永久に
@@ -63,7 +64,7 @@ jobs:
             exit 0
           fi
           # backend-ci.yml の push パスフィルタと同じ集合で判定する。
-          if grep -Eq '^(backend/|openapi/|docker/initdb/|docker/wiremock/|\.spectral\.yaml$|docker/compose-test\.yml$|\.env\.test\.example$|Taskfile\.yml$|\.github/workflows/backend-ci\.yml$)' \
+          if grep -Eq '^(backend/|openapi/|docker/initdb/|docker/wiremock/|\.spectral\.yaml$|docker/compose-test\.yml$|\.env\.test\.example$|Taskfile\.yml$|tooling/session-sql-lint/|\.github/workflows/backend-ci\.yml$)' \
             <<< "$changed_files"; then
             echo "backend=true" >> "$GITHUB_OUTPUT"
           else

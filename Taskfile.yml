@@ -507,28 +507,9 @@ tasks:
     desc: バックエンドの本番のコードに、接続を多重化するプロキシの後ろで壊れるセッションの SQL がないか検査
     silent: true
     cmds:
-      - |
-        pattern='\bpg_(try_)?advisory_(lock|unlock|unlock_all)(_shared)?\b|(^|[^a-z0-9_])listen[[:space:]]+[a-z_"]|\bwith[[:space:]]+hold\b|\bprepare[[:space:]]+[a-z_"][a-z0-9_"]*[[:space:]]*(\([^)]*\))?[[:space:]]*as\b|\bdeallocate\b|\bon[[:space:]]+commit[[:space:]]+(preserve|delete)[[:space:]]+rows\b|\bload[[:space:]]+'"'"
-        # 検出の式の自己検査。検出すべき文を逃すか、トランザクションの advisory lock や識別子を誤検出したら失敗する。
-        for sample in "SELECT pg_try_advisory_lock(1)" "select pg_advisory_unlock_all()" "LISTEN orders" "DECLARE c CURSOR WITH HOLD FOR SELECT 1" \
-          "PREPARE q (int) AS SELECT 1" "DEALLOCATE q" "CREATE TEMP TABLE t (id int) ON COMMIT DELETE ROWS" "LOAD 'auto_explain'"; do
-          printf '%s\n' "$sample" | grep -qEi "$pattern" || { echo "✗ lint-session-sql の式が「$sample」を検出しません。" >&2; exit 1; }
-        done
-        for sample in "SELECT pg_try_advisory_xact_lock(1)" "SELECT pg_advisory_xact_lock(1)" "EVENT_PUBLICATION.LISTENER_ID" \
-          "connection.prepareStatement(sql)" "CREATE TEMP TABLE t (id int) ON COMMIT DROP" "loadFactories()"; do
-          if printf '%s\n' "$sample" | grep -qEi "$pattern"; then echo "✗ lint-session-sql の式が「$sample」を誤検出します。" >&2; exit 1; fi
-        done
-        # Javadoc、行コメント、YAML と SQL のコメントの行は除く。
-        found="$({ grep -rnEiI --include='*.java' "$pattern" backend/src/main/java || true
-          grep -rnEiI --include='*.sql' --include='*.yaml' --include='*.yml' "$pattern" backend/src/main/resources/db || true; } \
-          | grep -vE '^[^:]+:[0-9]+:[[:space:]]*(\*|//|/\*|#|--)' || true)"
-        if [ -n "$found" ]; then
-          printf '%s\n' "$found" >&2
-          echo "✗ 接続を多重化するプロキシ（PgBouncer のトランザクションモード、RDS Proxy）の後ろで壊れる、セッションに状態を残す SQL があります。" >&2
-          echo "  トランザクションの中で閉じる方式（pg_try_advisory_xact_lock、ON COMMIT DROP など）か、DB の表のロック（ShedLock）に替えてください。" >&2
-          echo "  規約: docs/principles/right-sizing.md、docs/tooling/lint-and-test.md" >&2
-          exit 1
-        fi
+      # 検出の式の自己検査。検出すべき文を逃すか、トランザクションの advisory lock や識別子やコメントを誤検出したら失敗する。
+      - bash tooling/session-sql-lint/test.sh
+      - bash tooling/session-sql-lint/session-sql-lint.sh .
 
   # Backend
   be-run:
