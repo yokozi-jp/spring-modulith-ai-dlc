@@ -335,6 +335,12 @@ class EventPublicationResubmitterTest {
         .isInstanceOf(IllegalArgumentException.class);
     assertThatThrownBy(() -> resubmitOnce.run("OrderConfirmed"))
         .isInstanceOf(IllegalArgumentException.class);
+    // 空白以外で対象として読めない値は、false も含めて黙って何もしないのではなく失敗する。
+    for (final String invalid : List.of("false", "", "event-type:")) {
+      assertThatThrownBy(() -> resubmitOnce.run(invalid))
+          .as("対象 '%s'", invalid)
+          .isInstanceOf(IllegalArgumentException.class);
+    }
   }
 
   @Test

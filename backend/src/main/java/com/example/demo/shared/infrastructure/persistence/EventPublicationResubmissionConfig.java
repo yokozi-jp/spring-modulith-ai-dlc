@@ -22,14 +22,18 @@ import org.springframework.boot.ApplicationRunner;
 import org.springframework.boot.EnvironmentPostProcessor;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBooleanProperty;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.ConfigurableApplicationContext;
 import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Condition;
+import org.springframework.context.annotation.ConditionContext;
+import org.springframework.context.annotation.Conditional;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.env.ConfigurableEnvironment;
 import org.springframework.core.env.MapPropertySource;
+import org.springframework.core.env.PropertyResolver;
+import org.springframework.core.type.AnnotatedTypeMetadata;
 import org.springframework.scheduling.annotation.EnableScheduling;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.TransactionDefinition;
@@ -98,9 +102,28 @@ class EventPublicationResubmissionConfig {
         .dsl();
   }
 
-  /** 手での 1 回の再投入の対象があるときだけ、起動の後に 1 回だけ再投入し、終了コードを返して JVM を終える。 */
+  /**
+   * 手での 1 回の再投入が求められているか。Runner の生成と、Web と定期の実行の停止は、この述語だけで決める。
+   *
+   * <p>対象が空白なら通常の起動である。空白以外の値は、{@code false} を含めて手での再投入の求めとして扱う。 不正な値は Runner が {@link
+   * IllegalArgumentException} で受けて終了コード 1 にするため、何もせずに起動する状態を作らない。
+   */
+  /* package */ static boolean isResubmitOnceRequested(final PropertyResolver environment) {
+    return !environment.getProperty(RESUBMIT_ONCE_TARGET, "").isBlank();
+  }
+
+  /** {@link #isResubmitOnceRequested} を {@code @Conditional} から呼ぶための条件。 */
+  /* package */ static class ResubmitOnceRequested implements Condition {
+
+    @Override
+    public boolean matches(final ConditionContext context, final AnnotatedTypeMetadata metadata) {
+      return isResubmitOnceRequested(context.getEnvironment());
+    }
+  }
+
+  /** 手での 1 回の再投入が求められているときだけ、起動の後に 1 回だけ再投入し、終了コードを返して JVM を終える。 */
   @Bean
-  @ConditionalOnProperty(RESUBMIT_ONCE_TARGET)
+  @Conditional(ResubmitOnceRequested.class)
   /* package */ ApplicationRunner resubmitOnceRunner(
       final EventPublicationResubmitOnce job,
       final ResubmitOnceProperties properties,
@@ -146,7 +169,7 @@ class EventPublicationResubmissionConfig {
     @Override
     public void postProcessEnvironment(
         final ConfigurableEnvironment environment, final SpringApplication application) {
-      if (environment.getProperty(RESUBMIT_ONCE_TARGET, "").isBlank()) {
+      if (!isResubmitOnceRequested(environment)) {
         return;
       }
       environment

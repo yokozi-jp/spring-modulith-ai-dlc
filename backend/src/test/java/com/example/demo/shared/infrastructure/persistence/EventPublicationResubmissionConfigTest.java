@@ -10,11 +10,14 @@ import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.List;
+import java.util.Map;
 import org.jooq.DSLContext;
 import org.jooq.SQLDialect;
 import org.jooq.impl.DSL;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.mockito.Answers;
 import org.mockito.Mockito;
 import org.springframework.boot.EnvironmentPostProcessor;
@@ -25,6 +28,7 @@ import org.springframework.boot.autoconfigure.task.TaskSchedulingAutoConfigurati
 import org.springframework.boot.context.properties.bind.validation.BindValidationException;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 import org.springframework.boot.validation.autoconfigure.ValidationAutoConfiguration;
+import org.springframework.core.env.MapPropertySource;
 import org.springframework.core.io.support.SpringFactoriesLoader;
 import org.springframework.core.task.SimpleAsyncTaskExecutor;
 import org.springframework.mock.env.MockEnvironment;
@@ -47,6 +51,10 @@ class EventPublicationResubmissionConfigTest {
 
   /** 定期の実行の有効と無効のキー。 */
   private static final String ENABLED = "event-publication.resubmission.enabled";
+
+  /** 手での 1 回の再投入の対象のキー。 */
+  private static final String RESUBMIT_ONCE_TARGET =
+      EventPublicationResubmissionConfig.RESUBMIT_ONCE_TARGET;
 
   /** 妥当な設定値。 */
   private static final String[] VALID = {
@@ -237,7 +245,8 @@ class EventPublicationResubmissionConfigTest {
         new MockEnvironment()
             .withProperty("event-publication.resubmit-once.target", "policy:payment")
             .withProperty(ENABLED, "true");
-    final MockEnvironment normal = new MockEnvironment().withProperty(ENABLED, "true");
+    final MockEnvironment normal =
+        new MockEnvironment().withProperty(ENABLED, Boolean.TRUE.toString());
 
     postProcessor.postProcessEnvironment(once, new SpringApplication());
     postProcessor.postProcessEnvironment(normal, new SpringApplication());
@@ -262,9 +271,57 @@ class EventPublicationResubmissionConfigTest {
             EventPublicationResubmissionConfig.ResubmitOnceEnvironment.class);
   }
 
+  @ParameterizedTest(name = "[{0}] 通常の起動: {1}")
+  @CsvSource(
+      value = {
+        "'', true",
+        "' ', true",
+        "false, false",
+        "FALSE, false",
+        "all, false",
+        "policy:payment, false"
+      },
+      quoteCharacter = '\'')
+  @DisplayName("手での 1 回の再投入の対象が空白でなければ、Web と定期の実行を止め、runner も作る（false も同じ）")
+  void resubmitOnceGatesAgree(final String target, final boolean normalStartup) {
+    final MockEnvironment environment =
+        new MockEnvironment()
+            .withProperty(RESUBMIT_ONCE_TARGET, target)
+            .withProperty(ENABLED, Boolean.TRUE.toString());
+    new EventPublicationResubmissionConfig.ResubmitOnceEnvironment()
+        .postProcessEnvironment(environment, new SpringApplication());
+
+    assertThat(environment.getProperty("spring.main.web-application-type") == null)
+        .as("Web を止めない")
+        .isEqualTo(normalStartup);
+    assertThat(environment.getProperty(ENABLED)).isEqualTo(Boolean.toString(normalStartup));
+    assertThat(EventPublicationResubmissionConfig.isResubmitOnceRequested(environment))
+        .isEqualTo(!normalStartup);
+    runner
+        .withBean(
+            EventPublicationResubmitOnce.class,
+            () -> Mockito.mock(EventPublicationResubmitOnce.class))
+        .withInitializer(
+            context ->
+                context
+                    .getEnvironment()
+                    .getPropertySources()
+                    .addFirst(
+                        new MapPropertySource("target", Map.of(RESUBMIT_ONCE_TARGET, target))))
+        .run(
+            context -> {
+              assertThat(context).hasNotFailed();
+              assertThat(context.containsBean("resubmitOnceRunner")).isEqualTo(!normalStartup);
+            });
+  }
+
   @Test
-  @DisplayName("手での 1 回の再投入の対象がなければ、起動の後に再投入して終了する runner を作らない")
-  void resubmitOnceRunnerIsCreatedOnlyWithTarget() {
+  @DisplayName("手での 1 回の再投入の対象が設定されていなければ、runner を作らず、Web と定期の実行を止めない")
+  void unsetTargetIsNormalStartup() {
+    final MockEnvironment environment =
+        new MockEnvironment().withProperty(ENABLED, Boolean.TRUE.toString());
+
+    assertThat(EventPublicationResubmissionConfig.isResubmitOnceRequested(environment)).isFalse();
     runner.run(context -> assertThat(context).doesNotHaveBean("resubmitOnceRunner"));
   }
 
