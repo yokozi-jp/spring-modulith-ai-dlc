@@ -111,7 +111,8 @@ Spring Modulith 2.1.1 には、再投入の結果を知らせる公開の hook �
   `exhausted` は、`FAILED` に戻った出版の `completion_attempts` がリスナーの方針の `max-resubmissions` を超えた遷移の数で、同時に ERROR を 1 回記録する。
   覚えておく期間は `max(3 × lock-at-most-for, wait-age + interval)` で、未完了の状態の出版だけに適用する。
   期限を超えた未完了の出版は数えずに捨て、`FAILED` と archive の終端の状態は期限によらず数える。
-- 結果の Counter は再投入したインスタンスだけが数えるため、インスタンスの間で二重に数えず、ダッシュボードは合計（`sum`）で集める。Gauge は逆に最大値（`max`）で集める。
+- 結果の Counter は再投入したインスタンスだけが数えるため、インスタンスの間で二重に数えず、ダッシュボードは合計（`sum`）で集める。
+  Gauge は逆に最大値（`max`）で集める。
 - 予期しない実行時の例外は、ERROR の `Event publication resubmission crashed` で記録し、`runs{outcome=failed}` に数える。
   スケジューラの既定のエラーハンドラに例外を漏らすと、ログは出ても `runs` のどの tag も動かず、停止に気づけないためである。
   DB とロックの既知の失敗は、これまでどおり WARN の `Event publication resubmission failed` である。
@@ -152,7 +153,9 @@ shared の範囲は、ADR-048 の jOOQ の共通処理に加えて、Spring Modu
 - ShedLock の依存と、`modulith.shedlock` の表と Liquibase の changeset が増える。
 - ロックを持つ上限は 1 回の実行の最長より長くする必要があり、実行がそれを超えると二つ目のインスタンスが動く。
   `markResubmitted` は `UPDATE ... WHERE STATUS != 'RESUBMITTED'` で原子的に更新するため、二つ目の実行が同じ出版を二重に投入することはない。
-  残る害は二つある。二つの実行が executor の枠（`concurrency-limit`）を奪い合うことと、先の実行が古い一覧を持つため、再び `FAILED` に戻った出版を方針の上限を超えて再投入しうることである。
+  残る害は二つある。
+  一つは、二つの実行が executor の枠（`concurrency-limit`）を奪い合うことである。
+  もう一つは、先の実行が古い一覧を持つため、再び `FAILED` に戻った出版を方針の上限を超えて再投入しうることである。
 - 時間の予算（`lock-at-most-for / 2`）は、最悪の時間の見積もりに基づく。
   決済のリスナーの呼び出しは `payment-gateway` の retry が `base-config: default` で試行 1 回のため、1 件の最悪は connect 1 秒 + read 2 秒の約 3 秒である。
   `concurrency-limit` は 2 で、100 件では約 49 回分の処理を待ち、およそ 2.5 分になる。
@@ -164,7 +167,8 @@ shared の範囲は、ADR-048 の jOOQ の共通処理に加えて、Spring Modu
   上限に達した出版の記録の読み込みは二段にし、`max-per-run` 件までに絞る。
   `FAILED` の全件読みのメモリの上限は残る。
 - 結果の突き合わせにも限界がある。
-  再投入した直後にそのインスタンスが落ちると、その回の結果は数えない。`failed` と `exhausted` の Gauge と最古の経過時間の警報が補う。
+  再投入した直後にそのインスタンスが落ちると、その回の結果は数えない。
+  `failed` と `exhausted` の Gauge と最古の経過時間の警報が補う。
   結果の判定は次の回まで遅れ、最大で `interval` と処理時間かかる。
   上限に達した出版の ERROR は、再投入したインスタンスが落ちた場合に sweep まで最大 1 時間遅れる。
   覚えているのは再投入したインスタンスだけなので、再起動で記憶は消える。
@@ -180,9 +184,10 @@ shared の範囲は、ADR-048 の jOOQ の共通処理に加えて、Spring Modu
 - 本番と STG の環境変数の注入は、ECS のタスク定義を作るときに足す。
 - archive の表の保存期間と消し方は別の Issue で決める。
 - `spring.datasource.hikari.connection-init-sql` の `SET` と HikariCP の `schema`（`search_path`）もセッションの設定であり、接続を多重化するプロキシの後ろでは保たれない。この ADR では扱わず、`lint-session-sql` も検出しない。
-- ShedLock の期限の式は、`localtimestamp(6)` で時刻を書き、同じ式で比べる。
+- ShedLock の期限の式は、`cast(current_timestamp(6) as timestamp)`（セッションの TimeZone での時刻帯のない現在時刻）で時刻を書き、同じ式で比べる。
   `modulith.shedlock` の `lock_until` は `timestamptz` の列であり、書くときと読むときに同じセッションの TimeZone で変換されるため、接続の TimeZone によらず正しく動く（PostgreSQL 17 で実測）。
-  列を `timestamp` にすると壊れるため、変えない。`ShedLockSessionTimeZoneTest` がこれを守る。
+  列を `timestamp` にすると壊れるため、変えない。
+  `ShedLockSessionTimeZoneTest` がこれを守る。
 - ADR-019 の「retry は client adapter の一層だけ」は呼び出しの即時の再試行についての決定であり、分単位の間隔と回数の上限を持つ出版の再投入はそれと別の層である。
   1 件の出版あたりの外部の呼び出しは、client adapter の試行の回数と再投入の回数の積が上限になる。
 

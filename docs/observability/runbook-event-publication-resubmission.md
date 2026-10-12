@@ -55,7 +55,8 @@ n 回目の再投入の前に、最後の試行から `min(wait-age × multiplie
 
 - **event 名**：`Event publication resubmission crashed`
 - **レベル**：`ERROR`
-- **事象**：定期のジョブの 1 回の実行が、DB の例外とロックの例外以外の予期しない実行時の例外で失敗し、その回の再投入をしなかった。`event.publication.resubmission.runs{outcome=failed}` に数える。
+- **事象**：定期のジョブの 1 回の実行が、DB の例外とロックの例外以外の予期しない実行時の例外で失敗し、その回の再投入をしなかった。
+  この回は `event.publication.resubmission.runs{outcome=failed}` に数える。
 - **属性**：`exception.type`、`exception.message`、`exception.stacktrace`
 - **発生原因**：コードの不具合（`NullPointerException` など）、方針や設定の不整合、ライブラリの版を上げたあとの挙動の変化。
 - **対応**：例外の型とスタックトレースで原因を特定し、当日中に直してデプロイする。
@@ -139,12 +140,13 @@ SELECT p.event_type, p.listener_id, count(*) AS publications, min(p.publication_
 - **`event-type:<クラス>`**：そのイベントの出版（例：`event-type:com.example.demo.ordering.OrderConfirmed`）。
 
 対象は空白なら通常の起動で、空白以外なら `false` を含めて手での再投入の求めと読む。
-`all`、`policy:<名前>`、`event-type:<クラス>` のどれでもない値は、何もせずに起動せず、終了コード 1 で失敗する。
+`all`、`policy:<名前>`、`event-type:<クラス>` のどれでもない値は、起動して何もしない状態にはならず、終了コード 1 で失敗する。
 対象を渡すと、アプリは Web のサーバーと定期の実行（Staleness Monitor を含む）を動かさない。
 定期のジョブと同じロックを取るため、定期のジョブを止めずに起動してよい。
 待ち時間と上限の回数を見ずに、対象の `FAILED` の出版を `max-per-run`（100 件）まで再投入し、リスナーの処理が終わるまで待ってから終わる。
 すべて完了したら終了コード 0、それ以外は 1 である。
-定期のジョブと違い、時間の予算（次の節）は適用しない。運用者が完了を待つ入口であり、件数は `max-per-run` が抑える。
+定期のジョブと違い、時間の予算（次の節）は適用しない。
+運用者が完了を待つ入口であり、件数は `max-per-run` が抑える。
 
 ローカルでは Compose の `backend` サービスで起動する。
 
