@@ -104,6 +104,9 @@ class EventPublicationResubmitterTest {
   /** すべての FAILED の出版を対象にする手での 1 回の再投入の指定。 */
   private static final String ALL = "all";
 
+  /** 再投入の結果の Counter の名前。 */
+  private static final String OUTCOMES = "event.publication.resubmission.outcomes";
+
   /** 完了の待ちの説明。 */
   private static final String COMPLETED = "完了した出版";
 
@@ -212,6 +215,8 @@ class EventPublicationResubmitterTest {
   @DisplayName("方針の上限に達した出版は再投入せず、Gauge の exhausted を 1 にし、ERROR を同じインスタンスで 1 回だけ記録する")
   void exhaustedPublicationIsReportedOnceAndNotResubmitted(final Scenario scenario) {
     listener.failTimes(Integer.MAX_VALUE);
+    final double failedBefore = outcome("failed");
+    final double exhaustedBefore = exhaustedCount();
     final String id = failedOnce(scenario);
     final Instant first = T0.plus(WAIT_AGE).plusSeconds(1);
     resubmitAndAwaitFailure(scenario, id, first, 2);
@@ -229,6 +234,8 @@ class EventPublicationResubmitterTest {
         .as("上限に達した出版の数")
         .isEqualTo(1.0);
     final List<LogRecordData> errors = exhaustedErrors(publicationId);
+    assertThat(outcome("failed") - failedBefore).as("再投入の後の再失敗").isEqualTo(2.0);
+    assertThat(exhaustedCount() - exhaustedBefore).as("上限に達した遷移").isEqualTo(1.0);
     assertThat(errors).as("id=%s の上限に達した ERROR", id).hasSize(1);
     final LogRecordData error = errors.getFirst();
     assertThat(error.getSeverity()).isEqualTo(Severity.ERROR);
@@ -239,6 +246,34 @@ class EventPublicationResubmitterTest {
 
     assertThat(exhaustedErrors(publicationId)).as("id=%s の 2 回目の後の ERROR", id).hasSize(1);
     assertThat(state(id).attempts()).as("id=%s の 2 回目の後の attempts", id).isEqualTo(3);
+  }
+
+  @Test
+  @DisplayName("再投入した出版が処理中の間は数えず、リスナーが終わった後の次の回に completed を 1 だけ数える")
+  void completionIsCountedOnTheRunAfterTheListenerFinishes(final Scenario scenario) {
+    final String id = failedOnce(scenario);
+    final CountDownLatch gate = listener.close();
+    final double completedBefore = outcome("completed");
+    final double resubmissionsBefore =
+        meterRegistry.get("event.publication.resubmissions").counter().count();
+    clock.set(T0.plus(WAIT_AGE).plusSeconds(1));
+
+    runJob();
+    runJob();
+
+    assertThat(
+            meterRegistry.get("event.publication.resubmissions").counter().count()
+                - resubmissionsBefore)
+        .as("再投入した出版の数")
+        .isEqualTo(1.0);
+    assertThat(outcome("completed") - completedBefore).as("処理中").isZero();
+
+    gate.countDown();
+    awaitState(scenario.stimulate(() -> {}), id, COMPLETED, s -> s.archived() == 1);
+    runJob();
+    runJob();
+
+    assertThat(outcome("completed") - completedBefore).as("完了した後は 1 回だけ").isEqualTo(1.0);
   }
 
   @Test
@@ -461,6 +496,14 @@ class EventPublicationResubmitterTest {
         | java.util.concurrent.TimeoutException exception) {
       throw new IllegalStateException("concurrent resubmission did not finish", exception);
     }
+  }
+
+  private double outcome(final String outcome) {
+    return meterRegistry.get(OUTCOMES).tag("outcome", outcome).counter().count();
+  }
+
+  private double exhaustedCount() {
+    return meterRegistry.get("event.publication.resubmission.exhausted").counter().count();
   }
 
   private double skippedRuns() {

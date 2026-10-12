@@ -96,11 +96,8 @@ class EventPublicationResubmitter {
   /** 上限に達した最も古い出版の経過秒数。 */
   private final AtomicLong exhaustedOldestAge = new AtomicLong();
 
-  /** 再投入した出版の読み戻し。 */
+  /** 再投入した出版の覚え書きと、結果の読み戻し。 */
   private final ResubmissionTracker tracker;
-
-  /** このインスタンスで ERROR を記録した、上限に達した出版の ID。 */
-  private final Set<UUID> reported = ConcurrentHashMap.newKeySet();
 
   /* package */ EventPublicationResubmitter(
       final DSLContext dsl,
@@ -116,7 +113,7 @@ class EventPublicationResubmitter {
     this.policies = policies;
     this.clock = clock;
     this.properties = properties;
-    this.tracker = new ResubmissionTracker(dsl);
+    this.tracker = new ResubmissionTracker(dsl, policies, meterRegistry, properties);
     this.completedRuns = runs(meterRegistry, "completed");
     this.skippedRuns = runs(meterRegistry, "skipped");
     this.failedRuns = runs(meterRegistry, "failed");
@@ -165,6 +162,7 @@ class EventPublicationResubmitter {
     try {
       final Instant now = Instant.now(clock);
       updateGauges(now);
+      tracker.reconcile(now);
       final AtomicReference<@Nullable Run> run = new AtomicReference<>();
       lockingTaskExecutor.executeWithLock(
           (Runnable) () -> run.set(new Run(reportExhausted(), resubmit(now))),
@@ -221,7 +219,7 @@ class EventPublicationResubmitter {
                         && candidates.put(
                                 publication.getIdentifier(), publication.getCompletionAttempts())
                             == null));
-    return tracker.advancedAmong(candidates).size();
+    return tracker.track(candidates, now);
   }
 
   private Condition retryingCondition() {
@@ -261,6 +259,7 @@ class EventPublicationResubmitter {
    */
   private int reportExhausted() {
     forgetResolved();
+    final Set<UUID> reported = tracker.reportedIds();
     final Condition notReported =
         reported.isEmpty()
             ? DSL.noCondition()
@@ -280,14 +279,8 @@ class EventPublicationResubmitter {
             .fetch();
     int newlyReported = 0;
     for (final Record5<UUID, String, String, Instant, Integer> row : rows) {
-      if (reported.add(row.value1())) {
+      if (tracker.report(row.value1(), row.value2(), row.value3(), row.value5())) {
         newlyReported++;
-        log.atError()
-            .addKeyValue("event_publication.id", row.value1().toString())
-            .addKeyValue("event_publication.event_type", row.value2())
-            .addKeyValue("event_publication.listener_id", row.value3())
-            .addKeyValue("event_publication.completion_attempts", row.value5())
-            .log("Event publication resubmission exhausted");
       }
     }
     return newlyReported;
@@ -295,6 +288,7 @@ class EventPublicationResubmitter {
 
   /** 記録済みの ID のうち、まだ FAILED で上限に達しているものだけを残す。行が消えるか上限未満に戻った ID は、再び上限に達したら再び記録する。 */
   private void forgetResolved() {
+    final Set<UUID> reported = tracker.reportedIds();
     if (reported.isEmpty()) {
       return;
     }
