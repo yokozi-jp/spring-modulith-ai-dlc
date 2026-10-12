@@ -21,6 +21,7 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -32,6 +33,7 @@ import java.util.function.Predicate;
 import net.javacrumbs.shedlock.core.LockConfiguration;
 import net.javacrumbs.shedlock.core.LockProvider;
 import net.javacrumbs.shedlock.core.SimpleLock;
+import org.awaitility.Awaitility;
 import org.jooq.DSLContext;
 import org.jooq.Records;
 import org.jspecify.annotations.Nullable;
@@ -386,12 +388,17 @@ class EventPublicationResubmitterTest {
 
   @Test
   @DisplayName("手での 1 回の再投入は、待ち時間の前でも対象の出版を再投入し、別のスレッドのリスナーが終わるまで戻らない")
-  void resubmitOnceWaitsForListenerOnAnotherThread(final Scenario scenario) {
+  void resubmitOnceWaitsForListenerOnAnotherThread(final Scenario scenario) throws Exception {
     final String id = failedOnce(scenario);
     final CountDownLatch gate = listener.close();
-    releaseLater(gate::countDown, Duration.ofSeconds(2));
+    final CompletableFuture<EventPublicationResubmitOnce.Outcome> future =
+        runOnceAsync("policy:probe");
+    awaitListenerAtGate(id);
+    assertThat(future).as("門で待つ間の手での再投入").isNotDone();
+    gate.countDown();
 
-    final EventPublicationResubmitOnce.Outcome result = resubmitOnce.run("policy:probe");
+    final EventPublicationResubmitOnce.Outcome result =
+        future.get(JOIN_TIMEOUT_SECONDS, TimeUnit.SECONDS);
 
     // 戻った時点でリスナーが終わっていなければ、JVM を終えるとリスナーの処理が途中で切れる。
     assertThat(listener.finished()).as("戻った時点で終わったリスナーの呼び出し").isEqualTo(2);
@@ -428,7 +435,7 @@ class EventPublicationResubmitterTest {
 
   @Test
   @DisplayName("手での 1 回の再投入は、ロックが空くまで待ち、lock-at-most-for の間に空かなければ失敗する")
-  void resubmitOnceWaitsForLockAndGivesUp(final Scenario scenario) {
+  void resubmitOnceWaitsForLockAndGivesUp(final Scenario scenario) throws Exception {
     final String id = failedOnce(scenario);
 
     final SimpleLock held = holdLock();
@@ -442,8 +449,15 @@ class EventPublicationResubmitterTest {
     assertThat(state(id).attempts()).as("id=%s の失敗の後の attempts", id).isEqualTo(1);
 
     final SimpleLock released = holdLock();
-    releaseLater(released::unlock, Duration.ofSeconds(1));
-    assertThat(resubmitOnce.run(ALL).completed()).as("ロックが空いた後").isEqualTo(1);
+    final CompletableFuture<EventPublicationResubmitOnce.Outcome> future = runOnceAsync(ALL);
+    Awaitility.await("ロックを持つ間の手での再投入")
+        .during(Duration.ofSeconds(1))
+        .atMost(Duration.ofSeconds(3))
+        .until(() -> !future.isDone());
+    released.unlock();
+    assertThat(future.get(JOIN_TIMEOUT_SECONDS, TimeUnit.SECONDS).completed())
+        .as("ロックが空いた後")
+        .isEqualTo(1);
   }
 
   /** ロックの期限を過去にしてから、定期の再投入を呼ぶ。期限は DB の時刻で決まり、固定の時計では進まないため。 */
@@ -496,20 +510,19 @@ class EventPublicationResubmitterTest {
     return id;
   }
 
-  // 他のスレッドの処理の途中を作るため、別のスレッドで決めた時間だけ待ってから放す。
+  // 手での再投入が待つ間に、テストのスレッドで門やロックを操作するため、別のスレッドで呼ぶ。
   @SuppressWarnings("PMD.DoNotUseThreads")
-  private static void releaseLater(final Runnable release, final Duration after) {
-    Thread.ofVirtual()
-        .start(
-            () -> {
-              try {
-                Thread.sleep(after);
-              } catch (InterruptedException exception) {
-                Thread.currentThread().interrupt();
-                return;
-              }
-              release.run();
-            });
+  private CompletableFuture<EventPublicationResubmitOnce.Outcome> runOnceAsync(
+      final String target) {
+    return CompletableFuture.supplyAsync(
+        () -> resubmitOnce.run(target), task -> Thread.ofVirtual().start(task));
+  }
+
+  /** 再投入したリスナーが門に着くまで待つ。着かなければイベントの ID と最後の呼び出しの回数を出して失敗する。 */
+  private void awaitListenerAtGate(final String id) {
+    Awaitility.await("id=" + id + " の再投入したリスナーが門に着く")
+        .atMost(Duration.ofSeconds(JOIN_TIMEOUT_SECONDS))
+        .untilAsserted(() -> assertThat(listener.calls()).as(CALLS, id).isEqualTo(2));
   }
 
   // 2 つのスレッドの同時の開始と完了を待つ。開始の合図を待って呼ぶ。
