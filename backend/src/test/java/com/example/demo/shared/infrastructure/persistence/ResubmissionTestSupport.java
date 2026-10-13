@@ -2,8 +2,8 @@ package com.example.demo.shared.infrastructure.persistence;
 
 import static com.example.demo.jooq.modulith.Tables.EVENT_PUBLICATION;
 
-import com.example.demo.jooq.modulith.Tables;
 import com.example.demo.testkit.CapturedLogRecords;
+import com.example.demo.testkit.CleanGeneratedTablesExtension;
 import com.example.demo.testkit.CommittedDatabaseTest;
 import io.opentelemetry.api.common.AttributeKey;
 import io.opentelemetry.sdk.logs.data.LogRecordData;
@@ -50,11 +50,9 @@ final class ResubmissionTestSupport {
     return CompletableFuture.supplyAsync(task, runnable -> Thread.ofVirtual().start(runnable));
   }
 
-  /** ロックの期限を過去にする。期限は DB の時刻で決まり、固定の時計では進まないため。 */
+  /** ロックの期限を過去にする。 */
   /* package */ static void expireLock(final DSLContext dsl) {
-    dsl.update(Tables.SHEDLOCK)
-        .set(Tables.SHEDLOCK.LOCK_UNTIL, Tables.SHEDLOCK.LOCKED_AT)
-        .execute();
+    CleanGeneratedTablesExtension.expireLocks(dsl);
   }
 
   /** {@code test.event} の出版の行を作り、その ID を返す。 */
