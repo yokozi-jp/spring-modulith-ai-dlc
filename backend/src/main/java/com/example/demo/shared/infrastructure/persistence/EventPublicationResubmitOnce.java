@@ -107,9 +107,9 @@ public class EventPublicationResubmitOnce {
     final Predicate<EventPublication> selected = selector(target);
     final List<UUID> resubmitted = new CopyOnWriteArrayList<>();
     final AtomicInteger remaining = new AtomicInteger();
-    final long lockAttempts = properties.lockAtMostFor().dividedBy(POLL_INTERVAL);
+    final int lockAttempts = pollsWithin(properties.lockAtMostFor());
     boolean locked = tryResubmit(selected, resubmitted, remaining);
-    for (long attempt = 0; attempt < lockAttempts && !locked; attempt++) {
+    for (int attempt = 0; attempt < lockAttempts && !locked; attempt++) {
       sleep();
       locked = tryResubmit(selected, resubmitted, remaining);
     }
@@ -205,9 +205,9 @@ public class EventPublicationResubmitOnce {
 
   /** 再投入した出版の処理が終わるまで待ち、結果を数える。完了した出版は未完了の表から消えるため、残った行で数える。 */
   private Outcome awaitCompletion(final List<UUID> ids, final int remaining) {
-    final long polls = onceProperties.completionTimeout().dividedBy(POLL_INTERVAL);
+    final int polls = pollsWithin(onceProperties.completionTimeout());
     Map<String, Integer> byStatus = countByStatus(ids);
-    for (long poll = 0; poll < polls && inFlight(byStatus) > 0; poll++) {
+    for (int poll = 0; poll < polls && inFlight(byStatus) > 0; poll++) {
       sleep();
       byStatus = countByStatus(ids);
     }
@@ -228,6 +228,15 @@ public class EventPublicationResubmitOnce {
 
   private static int inFlight(final Map<String, Integer> byStatus) {
     return IN_FLIGHT.stream().mapToInt(status -> byStatus.getOrDefault(status, 0)).sum();
+  }
+
+  /**
+   * {@code limit} の間に確かめる回数。int を超える上限は切り捨てず {@link ArithmeticException} で失敗する。
+   *
+   * <p>回数を int にするのは、PIT が int のループの増分の変異を無限ループとして除くためである。long の増分は除かれず、待ちの上限まで止まる。
+   */
+  private static int pollsWithin(final Duration limit) {
+    return Math.toIntExact(limit.dividedBy(POLL_INTERVAL));
   }
 
   // ロックの解放とリスナーの完了を、短い間隔で確かめるため待つ。
