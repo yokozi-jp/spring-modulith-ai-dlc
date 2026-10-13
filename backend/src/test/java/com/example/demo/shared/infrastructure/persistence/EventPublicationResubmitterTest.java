@@ -107,7 +107,10 @@ class EventPublicationResubmitterTest {
   private static final String COMPLETED = "完了した出版";
 
   /** 2 つのスレッドの完了を待つ上限の秒数。 */
-  private static final long JOIN_TIMEOUT_SECONDS = 30;
+  private static final long JOIN_TIMEOUT_SECONDS = 10;
+
+  /** 他のインスタンスの代わりにロックを持つ時間。lock-at-most-for（3 秒）の待ちと、ロックを持つ間の 3 秒の待ちより長くする。 */
+  private static final Duration HELD_LOCK = Duration.ofSeconds(10);
 
   /** 検証対象の定期のジョブ。 */
   @Autowired private EventPublicationResubmitter resubmitter;
@@ -503,14 +506,14 @@ class EventPublicationResubmitterTest {
     ResubmissionTestSupport.expireLock(dsl);
   }
 
-  /** 他のインスタンスの代わりに、同じロックを 1 分持つ。 */
+  /** 他のインスタンスの代わりに、同じロックを {@link #HELD_LOCK} だけ持つ。 */
   private SimpleLock holdLock() {
     final Optional<SimpleLock> lock =
         lockProvider.lock(
             new LockConfiguration(
                 Instant.now(clock),
                 EventPublicationResubmitter.LOCK_NAME,
-                Duration.ofMinutes(1),
+                HELD_LOCK,
                 Duration.ZERO));
     return lock.orElseThrow(
         () -> new AssertionError("テストのロック " + EventPublicationResubmitter.LOCK_NAME + " を取れない"));

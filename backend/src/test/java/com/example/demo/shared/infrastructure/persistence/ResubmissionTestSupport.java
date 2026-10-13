@@ -39,7 +39,9 @@ final class ResubmissionTestSupport {
         "event-publication.resubmission.policies.default.max-resubmissions=1",
         "event-publication.resubmission.policies.probe.max-resubmissions=2",
         "event-publication.resubmission.policies.probe.multiplier=2",
-        "event-publication.resubmission.policies.probe.max-wait=PT20M"
+        "event-publication.resubmission.policies.probe.max-wait=PT20M",
+        // リスナーが進めない変異で、手での再投入が application.yaml の PT10M まで待たないようにする。
+        "event-publication.resubmit-once.completion-timeout=PT15S"
       })
   @interface SharedContext {}
 

@@ -124,10 +124,18 @@ class PaymentGatewayClientIntegrationTest {
     WIREMOCK.stop();
   }
 
-  /** 決済代行の URL を WireMock に向ける。 */
+  /**
+   * 決済代行の URL を WireMock に向け、手での 1 回の再投入の待ちを短くする。
+   *
+   * <p>ロックが残っても、再投入が application.yaml の PT10M まで待たずに失敗するようにする。lock-at-most-for は interval
+   * より長くする必要があるため、定期の実行を無効にしたまま interval も短くする。
+   */
   @DynamicPropertySource
   /* package */ static void gatewayUrl(final DynamicPropertyRegistry registry) {
     registry.add("payment-gateway.base-url", WIREMOCK::baseUrl);
+    registry.add("event-publication.resubmission.interval", () -> "PT2S");
+    registry.add("event-publication.resubmission.lock-at-most-for", () -> "PT5S");
+    registry.add("event-publication.resubmit-once.completion-timeout", () -> "PT15S");
   }
 
   /** テストの順序に依存しないよう、スタブと受けた要求を共有のスタブだけに戻し、circuit breaker を閉じて件数を消す。 */
