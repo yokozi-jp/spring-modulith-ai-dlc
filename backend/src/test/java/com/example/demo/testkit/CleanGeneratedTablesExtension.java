@@ -31,12 +31,15 @@ import org.springframework.test.context.junit.jupiter.SpringExtension;
  * <p>消す前に、未完了のイベント出版（{@code PUBLISHED}、{@code PROCESSING}、{@code RESUBMITTED}）がなくなるまで待つ。非同期の
  * Listener はテストの本体が終わった後にコミットすることがあり、消した後に書いた決済記録や出版が次のテストに残るためである。{@code FAILED} は終わった状態なので待たない。
  * 待っても未完了の出版が残るときは、消してからテストを失敗させる。消さずに失敗すると、終わらない行が残り、後のすべてのテストの待ちが上限まで延び、後始末も止まるためである。
+ * 消すことも失敗したときは、待ちの失敗を投げ、消すときの例外は {@code addSuppressed} で添える。
  */
 public final class CleanGeneratedTablesExtension implements AfterEachCallback {
 
   /** 未完了の出版がなくなるのを待つ上限。決済代行の最悪の時間（3 秒）より長くする。 */
   private static final Duration IN_FLIGHT_TIMEOUT = Duration.ofSeconds(10);
 
+  // 待ちの失敗は ConditionTimeoutException も条件の評価の DB の例外もあり、どれでも消してから元の失敗を投げるため、実行時の例外を受ける。
+  @SuppressWarnings("PMD.AvoidCatchingGenericException")
   @Override
   public void afterEach(final ExtensionContext context) {
     final DSLContext dslContext =
@@ -50,17 +53,28 @@ public final class CleanGeneratedTablesExtension implements AfterEachCallback {
                           EVENT_PUBLICATION,
                           EVENT_PUBLICATION.STATUS.in("PUBLISHED", "PROCESSING", "RESUBMITTED"))
                       == 0);
-    } finally {
-      for (final Schema schema : DefaultCatalog.DEFAULT_CATALOG.getSchemas()) {
-        for (final Table<?> table : schema.getTables()) {
-          if (SHEDLOCK.equals(table)) {
-            continue;
-          }
-          dslContext.deleteFrom(table).execute();
-        }
+    } catch (final RuntimeException failure) {
+      try {
+        deleteAll(dslContext);
+      } catch (final RuntimeException cleanup) {
+        failure.addSuppressed(cleanup);
       }
-      expireLocks(dslContext);
+      throw failure;
     }
+    deleteAll(dslContext);
+  }
+
+  /** ShedLock の表のほかの生成したテーブルの行を消し、ロックの期限を過去にする。 */
+  private static void deleteAll(final DSLContext dslContext) {
+    for (final Schema schema : DefaultCatalog.DEFAULT_CATALOG.getSchemas()) {
+      for (final Table<?> table : schema.getTables()) {
+        if (SHEDLOCK.equals(table)) {
+          continue;
+        }
+        dslContext.deleteFrom(table).execute();
+      }
+    }
+    expireLocks(dslContext);
   }
 
   /** ShedLock のすべてのロックの期限を過去にする。期限は DB の時刻で決まり、固定の時計では進まないため。 */
