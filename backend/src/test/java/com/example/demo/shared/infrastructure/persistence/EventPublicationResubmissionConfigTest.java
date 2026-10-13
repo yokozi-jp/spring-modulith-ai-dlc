@@ -22,6 +22,7 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.mockito.Answers;
 import org.mockito.Mockito;
+import org.springframework.boot.ApplicationRunner;
 import org.springframework.boot.EnvironmentPostProcessor;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.AutoConfigurations;
@@ -386,7 +387,12 @@ class EventPublicationResubmissionConfigTest {
         .run(
             context -> {
               assertThat(context).hasNotFailed();
-              assertThat(context.containsBean("resubmitOnceRunner")).isEqualTo(!normalStartup);
+              assertThat(
+                      context
+                          .getBeansOfType(ApplicationRunner.class)
+                          .containsKey("resubmitOnceRunner"))
+                  .as("runner の bean")
+                  .isEqualTo(!normalStartup);
             });
   }
 

@@ -6,6 +6,8 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import com.example.demo.shared.events.ResubmissionPolicy;
 import java.time.Duration;
 import java.util.Map;
+import org.jooq.SQLDialect;
+import org.jooq.impl.DSL;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.aop.framework.autoproxy.AutoProxyUtils;
@@ -40,6 +42,15 @@ class ResubmissionPoliciesTest {
               new EventPublicationResubmissionConfig.Policy(5, 2, Duration.ofHours(1)),
               PAYMENT,
               new EventPublicationResubmissionConfig.Policy(3, 2, Duration.ofHours(1))));
+
+  @Test
+  @DisplayName("方針を指定したリスナーがなければ、再投入の回数の上限の式は既定の方針の上限になる")
+  void maxResubmissionsFallsBackToDefaultPolicyWithoutAnnotatedListeners() {
+    final ResubmissionPolicies policies =
+        new ResubmissionPolicies(new DefaultListableBeanFactory(), PROPERTIES);
+
+    assertThat(DSL.using(SQLDialect.POSTGRES).render(policies.maxResubmissions())).isEqualTo("5");
+  }
 
   @Test
   @DisplayName("型を解決できない bean があっても起動を失敗させず、他の bean の方針を対応づける")
