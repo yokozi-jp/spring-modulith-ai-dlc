@@ -37,6 +37,7 @@ import org.awaitility.Awaitility;
 import org.jooq.DSLContext;
 import org.jooq.Records;
 import org.jspecify.annotations.Nullable;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -106,7 +107,7 @@ class EventPublicationResubmitterTest {
   /** 完了の待ちの説明。 */
   private static final String COMPLETED = "完了した出版";
 
-  /** 2 つのスレッドの完了を待つ上限の秒数。 */
+  /** 2 つのスレッドの完了と、リスナーが門で待つ上限の秒数。 */
   private static final long JOIN_TIMEOUT_SECONDS = 10;
 
   /** 他のインスタンスの代わりにロックを持つ時間。lock-at-most-for（3 秒）の待ちと、ロックを持つ間の 3 秒の待ちより長くする。 */
@@ -155,7 +156,16 @@ class EventPublicationResubmitterTest {
   void reset() {
     clock.set(T0);
     listener.reset();
-    expireLock();
+    ResubmissionTestSupport.expireLock(dsl);
+  }
+
+  /**
+   * 変異などでテストが先に終わっても、リスナーを門に残さず、後始末（{@code CleanGeneratedTablesExtension}）が消した後に行を書かせないため。 JUnit は
+   * {@code @AfterEach} を拡張の後始末より先に呼ぶ。
+   */
+  @AfterEach
+  void openGate() {
+    listener.open();
   }
 
   @Test
@@ -498,12 +508,8 @@ class EventPublicationResubmitterTest {
 
   /** ロックの期限を過去にしてから、定期の再投入を呼ぶ。期限は DB の時刻で決まり、固定の時計では進まないため。 */
   private void runJob() {
-    expireLock();
-    resubmitter.resubmitOnce();
-  }
-
-  private void expireLock() {
     ResubmissionTestSupport.expireLock(dsl);
+    resubmitter.resubmitOnce();
   }
 
   /** 他のインスタンスの代わりに、同じロックを {@link #HELD_LOCK} だけ持つ。 */
@@ -706,9 +712,6 @@ class EventPublicationResubmitterTest {
   @SuppressWarnings("PMD.ShortMethodName")
   /* package */ static class ProbeListener {
 
-    /** 門が開くのを待つ上限の秒数。 */
-    private static final long GATE_TIMEOUT_SECONDS = 30;
-
     /** 呼び出しの回数。 */
     private final AtomicInteger callCount = new AtomicInteger();
 
@@ -729,7 +732,7 @@ class EventPublicationResubmitterTest {
       callCount.incrementAndGet();
       try {
         final @Nullable CountDownLatch latch = gate.get();
-        if (latch != null && !latch.await(GATE_TIMEOUT_SECONDS, TimeUnit.SECONDS)) {
+        if (latch != null && !latch.await(JOIN_TIMEOUT_SECONDS, TimeUnit.SECONDS)) {
           throw new IllegalStateException("gate was not opened: id=" + event.id());
         }
       } catch (InterruptedException exception) {
@@ -749,7 +752,15 @@ class EventPublicationResubmitterTest {
       callCount.set(0);
       finishedCount.set(0);
       remainingFailures.set(0);
-      gate.set(null);
+      open();
+    }
+
+    /** 門を開け、待っている呼び出しを進める。 */
+    /* package */ void open() {
+      final @Nullable CountDownLatch latch = gate.getAndSet(null);
+      if (latch != null) {
+        latch.countDown();
+      }
     }
 
     /* package */ void failTimes(final int times) {

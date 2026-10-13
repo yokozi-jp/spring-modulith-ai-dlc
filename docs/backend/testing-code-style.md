@@ -76,6 +76,7 @@ final Instant actual =
 Awaitilityは`await("<対象IDと期待>").atMost(<期限>)`で別名と期限を必ず付け、状態は`untilAsserted`とAssertJの`as`で確かめる。
 「変わらないままである」ことは`during`で確かめる。
 タイムアウト時には、対象ID、期待条件、期限、最後に観測した状態を出す。
+リスナーを止めるlatchは、待つ上限をテストの待ち以下にし、`@AfterEach`で開ける。
 `assertTimeoutPreemptively`は使わない。
 `assertTimeoutPreemptively`は別スレッドで処理を実行するため、トランザクション、セキュリティコンテキスト、ログのコンテキストが本番経路と変わり得る。
 
