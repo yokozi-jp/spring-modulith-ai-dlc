@@ -30,15 +30,16 @@ import org.springframework.test.context.junit.jupiter.SpringExtension;
  *
  * <p>消す前に、未完了のイベント出版（{@code PUBLISHED}、{@code PROCESSING}、{@code RESUBMITTED}）がなくなるまで待つ。非同期の
  * Listener はテストの本体が終わった後にコミットすることがあり、消した後に書いた決済記録や出版が次のテストに残るためである。{@code FAILED} は終わった状態なので待たない。
- * 待っても未完了の出版が残るときは、消してからテストを失敗させる。消さずに失敗すると、終わらない行が残り、後のすべてのテストの待ちが上限まで延び、後始末も止まるためである。
- * 消すことも失敗したときは、待ちの失敗を投げ、消すときの例外は {@code addSuppressed} で添える。
+ * 待っても未完了の出版が残るときは、消してからテストを失敗させる。消さずに失敗すると、終わらない行が残り、後のすべてのテストの待ちが上限まで延び、後始末も止まるためである。 待ちが {@code
+ * Error} で失敗したときも消す。消すことも失敗したときは、待ちの失敗を投げ、消すときの例外は {@code addSuppressed} で添える。
  */
 public final class CleanGeneratedTablesExtension implements AfterEachCallback {
 
   /** 未完了の出版がなくなるのを待つ上限。決済代行の最悪の時間（3 秒）より長くする。 */
   private static final Duration IN_FLIGHT_TIMEOUT = Duration.ofSeconds(10);
 
-  // 待ちの失敗は ConditionTimeoutException も条件の評価の DB の例外もあり、どれでも消してから元の失敗を投げるため、実行時の例外を受ける。
+  // 待ちの失敗は ConditionTimeoutException も条件の評価の DB の例外も AssertionError などの Error もあり、
+  // どれでも消してから元の失敗を投げるため、Throwable を受ける。投げ直しは型が保たれ、検査例外を宣言しない。
   @SuppressWarnings("PMD.AvoidCatchingGenericException")
   @Override
   public void afterEach(final ExtensionContext context) {
@@ -53,10 +54,10 @@ public final class CleanGeneratedTablesExtension implements AfterEachCallback {
                           EVENT_PUBLICATION,
                           EVENT_PUBLICATION.STATUS.in("PUBLISHED", "PROCESSING", "RESUBMITTED"))
                       == 0);
-    } catch (final RuntimeException failure) {
+    } catch (final Throwable failure) {
       try {
         deleteAll(dslContext);
-      } catch (final RuntimeException cleanup) {
+      } catch (final Throwable cleanup) {
         failure.addSuppressed(cleanup);
       }
       throw failure;
