@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.11.0](https://github.com/yokozi-jp/spring-modulith-ai-dlc/compare/v0.10.1...v0.11.0) (2026-10-14)
+
+
+### Features
+
+* **shared:** 失敗したイベント出版を定期のジョブで自動で再投入する ([#201](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/201)) ([6ac9ae6](https://github.com/yokozi-jp/spring-modulith-ai-dlc/commit/6ac9ae64c502842ec25286cd2b6db6e016dc5b5d))
+
 ## [0.10.1](https://github.com/yokozi-jp/spring-modulith-ai-dlc/compare/v0.10.0...v0.10.1) (2026-10-12)
 
 
