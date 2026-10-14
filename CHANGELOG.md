@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.10.1](https://github.com/yokozi-jp/spring-modulith-ai-dlc/compare/v0.10.0...v0.10.1) (2026-10-12)
+
+
+### Bug Fixes
+
+* **backend:** /error が定義のないステータスコードをそのまま返す ([#192](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/192)) ([35140c6](https://github.com/yokozi-jp/spring-modulith-ai-dlc/commit/35140c6c12449cd9f4f9ceef88cff7e2727226bd))
+* **backend:** security の entry point で解決できない例外を sendError にフォールバックする ([#193](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/193)) ([9ae392e](https://github.com/yokozi-jp/spring-modulith-ai-dlc/commit/9ae392e47fd507b35130fefd4561453dc00d0c09))
+* **docs:** task setup で iwe 導入時に Vite+ の npm を PATH に通す ([#198](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/198)) ([e6cbcb6](https://github.com/yokozi-jp/spring-modulith-ai-dlc/commit/e6cbcb6463d162b1d76a1a965a7106039bdd1605))
+* **frontend:** untracedUrlのsemgrep誤検知を理由付きで抑止する ([#194](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/194)) ([a3f0937](https://github.com/yokozi-jp/spring-modulith-ai-dlc/commit/a3f093764409541d758826f20c4d5f7da3e204cf))
+* **tooling:** taskfile の後片付けの失敗を終了コードに反映する ([#191](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/191)) ([3570a70](https://github.com/yokozi-jp/spring-modulith-ai-dlc/commit/3570a700b82ba3cc046275855568b2d05d789885))
+
 ## [0.10.0](https://github.com/yokozi-jp/spring-modulith-ai-dlc/compare/v0.9.0...v0.10.0) (2026-10-09)
 
 
