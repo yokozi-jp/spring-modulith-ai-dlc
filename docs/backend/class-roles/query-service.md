@@ -1,7 +1,7 @@
 ---
 type: Convention
 title: クラスの役割：QueryService
-description: application に置き、参照のインタフェースを実装する QueryService の定義、置き場所と命名、必須の記述（readOnly のトランザクション）、依存、例、テスト、アンチパターン、作成時のチェックリストを定める。参照のインタフェースを実装するとき、参照のメソッドを足すときに読む。
+description: application に置き、参照のインタフェースを実装する QueryService の定義、置き場所と命名、必須の記述（readOnly のトランザクション）、並び順の変換、依存、例、テスト、アンチパターン、作成時のチェックリストを定める。参照のインタフェースを実装するとき、参照のメソッドを足すとき、一覧の sort を Repository の並び順に直すときに読む。
 tags: [convention, backend, class-role]
 ---
 
@@ -41,6 +41,60 @@ jOOQ で画面ごとの射影を読まず、[Repository](repository.md) が返�
 - クラス、フィールド、コンストラクタに Javadoc を書く。
   `@Override` のメソッドの説明は `<Feature>Queries` の Javadoc に書く。
 - `application` のパッケージの `package-info.java` は Command と共有する。
+
+## 並び順の変換
+
+並べ替えできる一覧では、QueryService が検索条件の `sort` の要素（[クエリパラメータ](../../web-api/query-parameters.md#ソート)の `項目名:desc` など）を、Repository が受け取る `domain.model` の `OrderSort` に直す。
+許可値にない要素は Controller の Bean Validation が 400 で拒否するので、QueryService には検査済みの要素だけが届く。
+列への写し方は [jOOQ の Repository](jooq-repository.md#並び順の許可リスト) に、この写し方を選んだ理由は [ADR-081](../../adr/ADR-081-map-list-sort-via-domain-enum-and-exhaustive-switch.md) に示す。
+
+- 要素は最後の `:` で項目名と方向に分け、方向は `asc` と `desc` を `switch` 式で降順かどうかに写す。
+- 項目名と enum（`OrderSortKey`）の対応は、enum から応答 JSON の項目名を返す `default` のない `switch` 式一つに書く。
+  enum に定数を足して項目名を書き忘れると、コンパイルが失敗する。
+- 項目名（`placedAt`）は定数名（`PLACED_AT`）と違うので、`valueOf` を使わず、`OrderSortKey.values()` をその `switch` 式で項目名に写して enum を探す。
+- 対応のない項目名と方向は、Controller の検査とこの対応がずれたプログラムの誤りなので、`IllegalStateException` を投げて 500 にする。
+- Controller で OpenAPI に `enum`、`style: form`、`explode: false` を出す書き方は未決である。
+  `@Pattern` で検査すると OpenAPI には `enum` ではなく `pattern` が出るので、並べ替えできる最初の一覧 API を作るときに書き方を [Controller](controller.md) に足す。
+
+```java
+// com.example.demo.ordering.application.OrderQueryService（抜粋）
+@Override
+@Transactional(readOnly = true)
+public List<OrderSummary> search(final OrderSearchCriteria criteria) {
+  final List<OrderSort> sorts = criteria.sort().stream().map(OrderQueryService::toSort).toList();
+  return orderRepository
+      .findByCustomerSortedBy(new CustomerId(criteria.customerId()), sorts)
+      .stream()
+      .map(OrderQueryService::toSummary)
+      .toList();
+}
+
+/** Controller が検査した sort の要素を並び順に直す。 */
+private static OrderSort toSort(final String element) {
+  final int colon = element.lastIndexOf(':');
+  final String itemName = element.substring(0, colon);
+  final OrderSortKey key =
+      Arrays.stream(OrderSortKey.values())
+          .filter(candidate -> itemNameOf(candidate).equals(itemName))
+          .findFirst()
+          .orElseThrow(() -> new IllegalStateException("unknown sort item: " + itemName));
+  final boolean descending =
+      switch (element.substring(colon + 1)) {
+        case "asc" -> false;
+        case "desc" -> true;
+        default -> throw new IllegalStateException("unknown sort direction: " + element);
+      };
+  return new OrderSort(key, descending);
+}
+
+/** 並べる項目を応答 JSON の項目名に写す。項目名と enum の対応はここだけに書く。 */
+private static String itemNameOf(final OrderSortKey key) {
+  return switch (key) {
+    case PLACED_AT -> "placedAt";
+    case STATUS -> "status";
+  };
+}
+```
 
 ## 依存してよい型、してはいけない型
 
@@ -190,6 +244,7 @@ class OrderQueryServiceTest {
 - [ ] Presentation と Infrastructure に依存しない。［ArchUnit で検査：PackageByFeatureOnionArchitectureTest.dependenciesPointInward］
 - [ ] package-private の class にし、依存は Repository だけにする。［自分で点検］
 - [ ] 集約を標準型の値でルートの record に変換し、状態を変えない。［自分で点検］
+- [ ] 並び順の項目名と enum の対応を `default` のない `switch` 式一つに書き、`valueOf` で引かない。［自分で点検］
 - [ ] クラス、フィールド、コンストラクタに Javadoc を書く。［自分で点検］
 - [ ] `@ApplicationModuleTest` で `<Feature>Queries` を通したテストを書く。［自分で点検］
 - [ ] `application` のパッケージに `@NullMarked` の `package-info.java` がある。［Error Prone で検査：RequireExplicitNullMarking］

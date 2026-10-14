@@ -54,6 +54,7 @@ sort=status:asc,releasedAt:desc
 
 - 項目名には応答JSONの項目名を使う。
 - 指定できる値はOpenAPIの`enum`で列挙し、`style: form`と`explode: false`で定義する。
+- 指定できない値は、ControllerのBean Validationが400で拒否する（[APIの入力検証の配置](validation.md)）。QueryServiceは検査済みの値をenumに直し、Repositoryの許可リストはenumを列に写すだけである（[クラスの役割：QueryService](../backend/class-roles/query-service.md#並び順の変換)）。
 - 昇順と降順を`+`と`-`で表さない。URLでは`+`が空白として扱われるためである。
 - 項目名と昇順降順を別のパラメータ（`sort`と`order_by`など）に分けない。二つのパラメータの要素数が一致することをOpenAPIで検証できないためである。
 
