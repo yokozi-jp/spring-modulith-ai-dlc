@@ -17,14 +17,7 @@ tags: [architecture, integration, async, spring-modulith, resilience]
 上限に達した出版は ERROR のログで知らせ、運用者が手で扱う。
 設計の理由と代替案は [ADR-079](../adr/ADR-079-resubmit-failed-event-publications-periodically-with-shedlock.md) にある。
 
-出版の状態は次の 5 つである。
-定義の正文は[非同期処理の失敗時の再試行と回復](async-failure-recovery.md)にある。
-
-- **`PUBLISHED`**：記録され、リスナーの実行を待っている。
-- **`PROCESSING`**：リスナーが実行している。
-- **`COMPLETED`**：リスナーが成功した。
-- **`FAILED`**：リスナーが失敗した、または Staleness Monitor が古いと判定した。
-- **`RESUBMITTED`**：再投入され、実行を待っている。
+出版の状態（`PUBLISHED`、`PROCESSING`、`COMPLETED`、`FAILED`、`RESUBMITTED`）の定義は[非同期処理の失敗時の再試行と回復](async-failure-recovery.md)にある。
 
 構成要素は次のとおりである。
 
@@ -68,7 +61,9 @@ circuit breaker が open の間に回数を消費する限界は、ADR-079 の C
 設定箇所は次のとおりである。
 
 - **読み込み**：`backend/src/main/resources/application.yaml` の `event-publication.resubmission`。
-- **ローカル**：`.env.example` から作る `.env`（ENABLED `true`、WAIT_AGE `PT1M`、INTERVAL `PT30S`、IN_FLIGHT_STALENESS `PT2H`）。
-- **テスト**：`.env.test.example` から作る `.env.test`（ENABLED `false`、WAIT_AGE `PT5M`、INTERVAL `PT1M`、IN_FLIGHT_STALENESS `PT4H`）。
-- **コンテナ**：`docker/compose.yml` が `.env` の値を渡す。4 つとも必須である。
-- **本番**：このリポジトリに ECS のタスク定義はなく、値は未設定である。ADR-079 は WAIT_AGE 5 分、INTERVAL 1 分、IN_FLIGHT_STALENESS 4 時間を想定する。
+- **ローカル**：`.env.example` から作る `.env`。値は `.env.example` を見る。
+- **テスト**：`.env.test.example` から作る `.env.test`。値は `.env.test.example` を見る。
+- **コンテナ**：`docker/compose.yml` が `.env` の値を渡す。
+  4 つとも必須である。
+- **本番**：このリポジトリに ECS のタスク定義はなく、値は未設定である。
+  想定する値は ADR-079 にある。
