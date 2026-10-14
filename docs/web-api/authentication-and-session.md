@@ -51,7 +51,12 @@ Cookieは、セッションIDとADR-007のCSRFトークン以外の用途に使�
 `Secure`（環境によらない）と`SameSite=Lax`を付け、SPAが読むため`HttpOnly`を付けない。
 有効期間は付けず、発行と削除はSpring Securityに任せる。
 CSRFトークンの検証に失敗した403は、権限不足の403と区別できるよう`/problems/csrf-token-invalid`で返す。
-SPAは、この403を受けたときだけ、Cookieを読み直して1回だけ再送する。
+対象は、`/api/**`の更新系と、`/logout`のフォームの送信である。
+`SecurityConfig`が登録する例外処理のhandlerは1つだけで、Spring Securityはhandlerが1つのとき対象のpathを見ずにすべての拒否へ使うため、`/logout`も同じadviceを通る。
+SPAは、`apiFetch`を通る更新でこの403を受けたときだけ、Cookieを読み直して1回だけ再送する。
+再送が効くのは、CSRFのCookieがない場合と、ログインへの遷移などでトークンが入れ替わった競合である。
+Cookieはあるが`X-XSRF-TOKEN` headerと食い違う場合は、403がCookieを作り直さないので、再送しても同じ403になる。
+`/logout`はフォームの送信なので再送しない。
 設定は[SecurityConfig](../../backend/src/main/java/com/example/demo/SecurityConfig.java)、理由は[ADR-066](../adr/ADR-066-harden-csrf-cookie-with-host-prefix.md)にある。
 
 ## システム間連携の認証

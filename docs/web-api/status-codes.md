@@ -21,8 +21,8 @@ tags: [convention, web-api, http, future-arch-guidelines]
 ステータス以上の意味がないproblemの`type`は`about:blank`にする。
 業務固有のproblem typeは、パスを全部書いた相対URI`/problems/<kebab-case>`にし、`title`をMessageSourceの`problem.title.<kebab-case>`で日本語と英語に解決する（[ADR-058](../adr/ADR-058-use-path-absolute-relative-uri-for-problem-types.md)）。
 CSRFトークンの検証に失敗した403は`/problems/csrf-token-invalid`にする。
+対象は`/api/**`の更新系と`/logout`で、理由は[CSRFのCookie](authentication-and-session.md#csrfのcookie)にある。
 権限不足の403は`about:blank`のままにする。
-前者だけが、トークンを取り直せば通る。
 入力検証エラーは`/problems/validation-error`の400で、`errors`拡張に誤りのある入力のJSON Pointerと説明を入れる。
 OpenAPIへのエラー応答の付け方は[OpenAPIのアノテーションとJavadoc](openapi-annotations.md#エラー応答)に従う。
 
