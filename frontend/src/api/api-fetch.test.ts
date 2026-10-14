@@ -1,4 +1,7 @@
 // oxlint-disable max-lines -- apiFetch の応答、CSRF の header、401 の遷移、再試行の判定を 1 つの module の test に集めるため、行数で分割しない。
+// oxlint-disable-next-line import/no-nodejs-modules -- 再送の発火条件の type を、コミット済みの OpenAPI 契約と突き合わせる。
+import { readFileSync } from "node:fs";
+
 import { http, HttpResponse } from "msw";
 import { beforeEach, describe, expect, it, vi } from "vite-plus/test";
 
@@ -42,6 +45,10 @@ async function fetchError(path: string): Promise<unknown> {
   }
   throw new Error("apiFetch did not throw");
 }
+
+const csrfTokenInvalidType = "/problems/csrf-token-invalid";
+const csrfProblem = { type: csrfTokenInvalidType, title: "Invalid", status: 403 };
+const permissionProblem = { type: "about:blank", title: "Forbidden", status: 403 };
 
 function forbidden(problem: object) {
   return HttpResponse.json(problem, {
@@ -235,16 +242,17 @@ describe("api-fetch", () => {
   });
 
   describe("CSRF の 403 の再試行", () => {
-    const csrfProblem = { type: "/problems/csrf-token-invalid", title: "Invalid", status: 403 };
-    const permissionProblem = { type: "about:blank", title: "Forbidden", status: 403 };
     const tokens: (string | undefined)[] = [];
 
     // 応答の Set-Cookie と同じく、403 を返すたびにブラウザの Cookie を新しい値にする。
-    function respondWith(responses: (() => Response)[]) {
+    // rotateCookie を false にすると、Cookie がある不一致の枝のように、403 でも Cookie を変えない。
+    function respondWith(responses: (() => Response)[], rotateCookie = true) {
       server.use(
         http.post(`${baseUrl}/api/items`, ({ request }) => {
           tokens.push(request.headers.get("X-XSRF-TOKEN") ?? undefined);
-          vi.stubGlobal("document", { cookie: `__Host-XSRF-TOKEN=fresh${tokens.length}` });
+          if (rotateCookie) {
+            vi.stubGlobal("document", { cookie: `__Host-XSRF-TOKEN=fresh${tokens.length}` });
+          }
           const respond = responses[tokens.length - 1];
           return respond === undefined ? new HttpResponse(undefined, { status: 500 }) : respond();
         }),
@@ -288,6 +296,26 @@ describe("api-fetch", () => {
       expect(error).toBeInstanceOf(api.ApiProblemError);
       expect(error).toMatchObject({ status: 403, problem: csrfProblem });
       expect(tokens).toHaveLength(2);
+    });
+
+    it("403 でも Cookie が変わらない不一致は、同じ token で 1 回だけ再送し、2 回目の 403 で終わる", async () => {
+      respondWith([() => forbidden(csrfProblem), () => forbidden(csrfProblem)], false);
+
+      const error = await post();
+
+      expect(error).toBeInstanceOf(api.ApiProblemError);
+      expect(error).toMatchObject({ status: 403, problem: csrfProblem });
+      expect(tokens).toStrictEqual(["stale", "stale"]);
+    });
+
+    it("再送の発火条件の type は、コミット済みの OpenAPI 契約にある", () => {
+      // 契約の type と食い違うと再送が静かに止まる。上の再送のテストは、同じ定数で本体の発火を確かめている。
+      const contract = readFileSync(
+        new URL("../../../openapi/openapi.yaml", import.meta.url),
+        "utf8",
+      );
+
+      expect(contract).toContain(csrfTokenInvalidType);
     });
 
     it("権限不足の 403 は再送せず、problem をそのまま ApiProblemError にする", async () => {
