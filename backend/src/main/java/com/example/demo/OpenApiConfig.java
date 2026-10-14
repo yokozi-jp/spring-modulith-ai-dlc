@@ -67,7 +67,7 @@ public class OpenApiConfig {
             .addResponses(
                 "ForbiddenProblem",
                 problemResponse(
-                    "操作の権限がない。または CSRF トークンが無効（type が /problems/csrf-token-invalid）",
+                    "操作の権限がない。CSRF トークンの検証に失敗したときの type は /problems/csrf-token-invalid",
                     PROBLEM_DETAIL))
             .addResponses("NotFoundProblem", problemResponse("対象のリソースが存在しない", PROBLEM_DETAIL))
             .addResponses("ConflictProblem", problemResponse("リソースの現在の状態と競合する", PROBLEM_DETAIL))
@@ -164,8 +164,7 @@ public class OpenApiConfig {
         "type",
         new StringSchema()
             .format("uri-reference")
-            .description(
-                "Problem type の識別 URI。about:blank、/problems/validation-error、/problems/csrf-token-invalid のいずれか")
+            .description("Problem type の識別 URI。about:blank かパスを全部書いた相対 URI")
             .example("about:blank"));
     schema.addProperty("title", new StringSchema().description("Problem type の短い説明"));
     schema.addProperty(
