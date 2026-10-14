@@ -61,8 +61,10 @@ circuit breaker が open の間に回数を消費する限界は、ADR-079 の C
 設定箇所は次のとおりである。
 
 - **読み込み**：`backend/src/main/resources/application.yaml` の `event-publication.resubmission`。
-- **ローカル**：`.env.example` から作る `.env`。値は `.env.example` を見る。
-- **テスト**：`.env.test.example` から作る `.env.test`。値は `.env.test.example` を見る。
+- **ローカル**：`.env.example` から作る `.env`。
+  値は `.env.example` を見る。
+- **テスト**：`.env.test.example` から作る `.env.test`。
+  値は `.env.test.example` を見る。
 - **コンテナ**：`docker/compose.yml` が `.env` の値を渡す。
   4 つとも必須である。
 - **本番**：このリポジトリに ECS のタスク定義はなく、値は未設定である。
