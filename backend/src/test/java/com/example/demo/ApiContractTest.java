@@ -48,6 +48,9 @@ class ApiContractTest {
   /** frontend と ZAP の script が読む CSRF の Cookie の名前（ADR-066）。 */
   private static final String CSRF_COOKIE = "__Host-XSRF-TOKEN";
 
+  /** CSRF トークンの検証失敗による 403 の problem type（ADR-058）。 */
+  private static final String CSRF_TOKEN_INVALID = "/problems/csrf-token-invalid";
+
   /** 実際の Spring MVC と Security filter chain を通すクライアント。 */
   @Autowired private MockMvc mockMvc;
 
@@ -100,7 +103,18 @@ class ApiContractTest {
         .perform(request(HttpMethod.valueOf(method), path).with(user("test-user")))
         .andExpect(status().isForbidden())
         .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
+        .andExpect(jsonPath("$.type").value(CSRF_TOKEN_INVALID))
         .andExpect(jsonPath("$.status").value(403));
+  }
+
+  @Test
+  @DisplayName("誤った CSRF トークンの更新も、トークンがない場合と同じ type の 403 を返す")
+  void updateWithInvalidCsrfTokenReturnsCsrfProblemType() throws Exception {
+    mockMvc
+        .perform(post("/api/missing").with(user("test-user")).with(csrf().useInvalidToken()))
+        .andExpect(status().isForbidden())
+        .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
+        .andExpect(jsonPath("$.type").value(CSRF_TOKEN_INVALID));
   }
 
   @Test
@@ -126,9 +140,9 @@ class ApiContractTest {
         .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
         .andExpect(header().string(HttpHeaders.CONTENT_LANGUAGE, "en"))
         .andExpect(header().string(HttpHeaders.VARY, HttpHeaders.ACCEPT_LANGUAGE))
-        .andExpect(jsonPath("$.type").value("about:blank"))
+        .andExpect(jsonPath("$.type").value(CSRF_TOKEN_INVALID))
         .andExpect(header().doesNotExist(HttpHeaders.WWW_AUTHENTICATE))
-        .andExpect(jsonPath("$.title").value("Forbidden"))
+        .andExpect(jsonPath("$.title").value("Invalid or missing CSRF token"))
         .andExpect(jsonPath("$.status").value(403));
   }
 

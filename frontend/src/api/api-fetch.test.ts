@@ -43,6 +43,13 @@ async function fetchError(path: string): Promise<unknown> {
   throw new Error("apiFetch did not throw");
 }
 
+function forbidden(problem: object) {
+  return HttpResponse.json(problem, {
+    status: 403,
+    headers: { "Content-Type": "application/problem+json" },
+  });
+}
+
 describe("api-fetch", () => {
   beforeEach(async () => {
     vi.resetModules();
@@ -224,6 +231,92 @@ describe("api-fetch", () => {
 
       expect(headers?.get("Content-Type")).toBe("application/json");
       expect(headers?.get("X-XSRF-TOKEN")).toBe(cookieValue);
+    });
+  });
+
+  describe("CSRF の 403 の再試行", () => {
+    const csrfProblem = { type: "/problems/csrf-token-invalid", title: "Invalid", status: 403 };
+    const permissionProblem = { type: "about:blank", title: "Forbidden", status: 403 };
+    const tokens: (string | undefined)[] = [];
+
+    // 応答の Set-Cookie と同じく、403 を返すたびにブラウザの Cookie を新しい値にする。
+    function respondWith(responses: (() => Response)[]) {
+      server.use(
+        http.post(`${baseUrl}/api/items`, ({ request }) => {
+          tokens.push(request.headers.get("X-XSRF-TOKEN") ?? undefined);
+          vi.stubGlobal("document", { cookie: `__Host-XSRF-TOKEN=fresh${tokens.length}` });
+          const respond = responses[tokens.length - 1];
+          return respond === undefined ? new HttpResponse(undefined, { status: 500 }) : respond();
+        }),
+      );
+    }
+
+    async function post(): Promise<unknown> {
+      try {
+        return await api.apiFetch(`${baseUrl}/api/items`, { method: "POST", body: "{}" });
+      } catch (error) {
+        return error;
+      }
+    }
+
+    beforeEach(() => {
+      tokens.length = 0;
+      vi.stubGlobal("document", { cookie: "__Host-XSRF-TOKEN=stale" });
+    });
+
+    it("CSRF の 403 を Cookie を読み直して 1 回だけ再送し、成功を返す", async () => {
+      respondWith([
+        () => forbidden(csrfProblem),
+        () => new HttpResponse(undefined, { status: 204 }),
+      ]);
+
+      const result = await post();
+
+      expect(result).toMatchObject({ status: 204 });
+      expect(tokens).toStrictEqual(["stale", "fresh1"]);
+    });
+
+    it("CSRF の 403 が続くと 2 回で止め、2 回目の ApiProblemError を投げる", async () => {
+      respondWith([
+        () => forbidden(csrfProblem),
+        () => forbidden(csrfProblem),
+        () => forbidden(csrfProblem),
+      ]);
+
+      const error = await post();
+
+      expect(error).toBeInstanceOf(api.ApiProblemError);
+      expect(error).toMatchObject({ status: 403, problem: csrfProblem });
+      expect(tokens).toHaveLength(2);
+    });
+
+    it("権限不足の 403 は再送せず、problem をそのまま ApiProblemError にする", async () => {
+      respondWith([() => forbidden(permissionProblem)]);
+
+      const error = await post();
+
+      expect(error).toBeInstanceOf(api.ApiProblemError);
+      expect(error).toMatchObject({ status: 403, problem: permissionProblem });
+      expect(tokens).toHaveLength(1);
+    });
+
+    it.each([
+      ["problem+json 以外", () => new HttpResponse("denied", { status: 403 })],
+      [
+        "壊れた problem+json",
+        () =>
+          new HttpResponse("{", {
+            status: 403,
+            headers: { "Content-Type": "application/problem+json" },
+          }),
+      ],
+    ])("%s の 403 は再送しない", async (_name, response) => {
+      respondWith([response]);
+
+      const error = await post();
+
+      expect(error).toMatchObject({ status: 403, problem: undefined });
+      expect(tokens).toHaveLength(1);
     });
   });
 

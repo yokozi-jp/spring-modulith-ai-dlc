@@ -17,6 +17,8 @@ import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.AuthenticationException;
+import org.springframework.security.web.csrf.InvalidCsrfTokenException;
+import org.springframework.security.web.csrf.MissingCsrfTokenException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
@@ -58,10 +60,19 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
     return problem(exception, HttpStatus.UNAUTHORIZED, request);
   }
 
-  /** 権限または CSRF token が不足する API リクエストを 403 Problem Details へ変換する。 */
+  /** 権限が不足する API リクエストを 403 の about:blank に、CSRF token の失敗を専用の type に変換する。 */
   @ExceptionHandler(AccessDeniedException.class)
   /* package */ @Nullable ResponseEntity<Object> handleAccessDeniedException(
       final AccessDeniedException exception, final WebRequest request) {
+    if (exception instanceof InvalidCsrfTokenException
+        || exception instanceof MissingCsrfTokenException) {
+      return handleExceptionInternal(
+          exception,
+          problemDetails.csrfTokenProblem(resolveLocale(request)),
+          new HttpHeaders(),
+          HttpStatus.FORBIDDEN,
+          request);
+    }
     return problem(exception, HttpStatus.FORBIDDEN, request);
   }
 

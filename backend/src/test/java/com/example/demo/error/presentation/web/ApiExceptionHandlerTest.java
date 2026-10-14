@@ -47,6 +47,10 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotWritableException;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
+import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.web.csrf.DefaultCsrfToken;
+import org.springframework.security.web.csrf.InvalidCsrfTokenException;
+import org.springframework.security.web.csrf.MissingCsrfTokenException;
 import org.springframework.web.context.request.ServletWebRequest;
 import org.springframework.web.server.ResponseStatusException;
 
@@ -91,6 +95,8 @@ class ApiExceptionHandlerTest {
 
   private static ApiExceptionHandler handler() {
     final StaticMessageSource messages = new StaticMessageSource();
+    messages.addMessage("problem.title.403", Locale.JAPANESE, "アクセス権限がありません");
+    messages.addMessage("problem.title.csrf-token-invalid", Locale.JAPANESE, "CSRF トークンが無効です");
     messages.addMessage("problem.title.422", Locale.JAPANESE, "処理できない内容です");
     messages.addMessage("problem.title.500", Locale.JAPANESE, "サーバー内部エラー");
     messages.addMessage("problem.title.validation-error", Locale.JAPANESE, "入力内容に誤りがあります");
@@ -232,6 +238,47 @@ class ApiExceptionHandlerTest {
     final ProblemDetail body = assertInstanceOf(ProblemDetail.class, response.getBody(), "本文");
     assertEquals(URI.create("about:blank"), body.getType(), "type");
     assertEquals("処理できない内容です", body.getTitle(), "title");
+    assertNull(body.getDetail(), "detail");
+  }
+
+  @ParameterizedTest
+  @MethodSource("csrfExceptions")
+  @DisplayName("CSRF トークンの検証失敗は、専用の type の 403 にし、detail を出さない")
+  void csrfFailureBecomesCsrfTokenProblem(final AccessDeniedException exception) {
+    final ResponseEntity<Object> response =
+        handler()
+            .handleAccessDeniedException(
+                exception, new ServletWebRequest(new MockHttpServletRequest()));
+
+    assertNotNull(response, "応答");
+    assertEquals(HttpStatus.FORBIDDEN, response.getStatusCode(), "HTTP status");
+    final ProblemDetail body = assertInstanceOf(ProblemDetail.class, response.getBody(), "本文");
+    assertEquals(URI.create("/problems/csrf-token-invalid"), body.getType(), "type");
+    assertEquals("CSRF トークンが無効です", body.getTitle(), "title");
+    assertNull(body.getDetail(), "detail");
+  }
+
+  private static Stream<AccessDeniedException> csrfExceptions() {
+    return Stream.of(
+        new MissingCsrfTokenException("actual"),
+        new InvalidCsrfTokenException(
+            new DefaultCsrfToken("X-XSRF-TOKEN", "_csrf", "t"), "actual"));
+  }
+
+  @Test
+  @DisplayName("権限不足の AccessDeniedException は about:blank の 403 のままにする")
+  void accessDeniedStaysAboutBlank() {
+    final ResponseEntity<Object> response =
+        handler()
+            .handleAccessDeniedException(
+                new AccessDeniedException("denied"),
+                new ServletWebRequest(new MockHttpServletRequest()));
+
+    assertNotNull(response, "応答");
+    assertEquals(HttpStatus.FORBIDDEN, response.getStatusCode(), "HTTP status");
+    final ProblemDetail body = assertInstanceOf(ProblemDetail.class, response.getBody(), "本文");
+    assertEquals(URI.create("about:blank"), body.getType(), "type");
+    assertEquals("アクセス権限がありません", body.getTitle(), "title");
     assertNull(body.getDetail(), "detail");
   }
 

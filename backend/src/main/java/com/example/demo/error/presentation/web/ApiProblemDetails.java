@@ -26,6 +26,8 @@ import org.springframework.validation.method.ParameterErrors;
 import org.springframework.web.method.annotation.HandlerMethodValidationException;
 
 /** RFC 9457 Problem Details の共通フィールドを生成する。 */
+// problem type ごとの生成と検証の誤りの組み立てを 1 つの MessageSource に集めるため、メソッドの数の上限を外す。
+@SuppressWarnings("PMD.TooManyMethods")
 @Component
 final class ApiProblemDetails {
 
@@ -34,6 +36,9 @@ final class ApiProblemDetails {
 
   /** 入力検証エラーの problem type。パスを全部書いた相対 URI（ADR-058、RFC 9457 §3.1.1）。 */
   /* package */ static final URI VALIDATION_ERROR_TYPE = URI.create("/problems/validation-error");
+
+  /** CSRF トークンの検証失敗による 403 の problem type。トークンを取り直せば通る（ADR-058）。 */
+  private static final URI CSRF_TOKEN_INVALID_TYPE = URI.create("/problems/csrf-token-invalid");
 
   /** VALIDATION_ERROR_TYPE の拡張メンバーで、入力検証の誤りを入れる（ADR-058）。 */
   /* package */ static final String ERRORS = "errors";
@@ -100,6 +105,16 @@ final class ApiProblemDetails {
         messageSource.getMessage(
             "problem.title.validation-error", null, "Invalid request content", locale));
     problem.setProperty(ERRORS, errors);
+    return problem;
+  }
+
+  /** CSRF トークンの検証失敗の 403 を作る。title は problem.title.csrf-token-invalid を解決し、detail は付けない。 */
+  /* package */ ProblemDetail csrfTokenProblem(final Locale locale) {
+    final ProblemDetail problem = ProblemDetail.forStatus(HttpStatus.FORBIDDEN);
+    problem.setType(CSRF_TOKEN_INVALID_TYPE);
+    problem.setTitle(
+        messageSource.getMessage(
+            "problem.title.csrf-token-invalid", null, "Invalid or missing CSRF token", locale));
     return problem;
   }
 

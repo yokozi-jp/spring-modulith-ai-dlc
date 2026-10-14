@@ -80,7 +80,7 @@ components:
         type:
           type: string
           format: uri-reference
-          description: Problem type の識別 URI。about:blank かパスを全部書いた相対 URI
+          description: Problem type の識別 URI。about:blank、/problems/validation-error、/problems/csrf-token-invalid のいずれか
           example: about:blank
         title:
           type: string
@@ -209,7 +209,7 @@ components:
           schema:
             $ref: "#/components/schemas/ProblemDetail"
     ForbiddenProblem:
-      description: 操作の権限がない
+      description: 操作の権限がない。または CSRF トークンが無効（type が /problems/csrf-token-invalid）
       content:
         application/problem+json:
           schema:

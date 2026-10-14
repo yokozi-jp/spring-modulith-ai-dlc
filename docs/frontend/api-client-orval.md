@@ -150,6 +150,8 @@ Problem Detailsの検証が必要になったら、`readProblem`の型の断定�
 
 `apiFetch`は、method（大文字と小文字を区別しない。省略はGET）がGET、HEAD、OPTIONSでない要求にだけ、CSRFのCookie（`__Host-XSRF-TOKEN`）の値をマスクせずに`X-XSRF-TOKEN` headerで付ける。
 Cookieがないか値が空なら、headerを付けずに送ってバックエンドの403に任せる。
+403の`problem.type`が`/problems/csrf-token-invalid`のときだけ、403の応答が置いたCookieを読み直して1回だけ再送する。
+権限不足の403（`about:blank`）と、再送後の2回目の403は再送せず、`ApiProblemError`にする。
 Cookieの名前と属性の理由は[ADR-066](../adr/ADR-066-harden-csrf-cookie-with-host-prefix.md)にある。
 
 `apiFetch`は、送信先のURLを`location`の上で解決したoriginが同じときだけheaderを付ける。

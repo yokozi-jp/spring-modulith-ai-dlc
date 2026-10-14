@@ -2,7 +2,7 @@ openapi: 3.1.0
 info:
   description: Demo アプリケーションの HTTP API
   title: Demo API
-  version: 0.3.0
+  version: 0.4.0
 servers:
 - description: 現在のオリジン
   url: /
@@ -300,7 +300,7 @@ components:
         application/problem+json:
           schema:
             $ref: "#/components/schemas/ProblemDetail"
-      description: 操作の権限がない
+      description: 操作の権限がない。または CSRF トークンが無効（type が /problems/csrf-token-invalid）
     InternalServerErrorProblem:
       content:
         application/problem+json:
@@ -606,7 +606,7 @@ components:
         type:
           type: string
           format: uri-reference
-          description: Problem type の識別 URI。about:blank かパスを全部書いた相対 URI
+          description: Problem type の識別 URI。about:blank、/problems/validation-error、/problems/csrf-token-invalid のいずれか
           example: about:blank
       required:
       - status

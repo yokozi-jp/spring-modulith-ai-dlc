@@ -11,6 +11,7 @@ import jakarta.validation.constraints.NotBlank;
 import java.util.List;
 import java.util.NoSuchElementException;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -113,6 +114,16 @@ class ErrorFixtureController {
   @GetMapping("/unhandled")
   /* package */ ResponseEntity<Void> unhandled() {
     throw new IllegalStateException("fixture failure");
+  }
+
+  /**
+   * 権限不足の AccessDeniedException を投げる。
+   *
+   * @return 返さない
+   */
+  @GetMapping("/forbidden")
+  /* package */ ResponseEntity<Void> forbidden() {
+    throw new AccessDeniedException("fixture access denied");
   }
 
   /**
