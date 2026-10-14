@@ -99,6 +99,9 @@ public class SecurityConfig {
                     .anyRequest()
                     .authenticated())
         // API の認証・認可エラーも MVC と同じ Problem Details 変換へ集約する。
+        // ponytail: 登録が 1 つのときは Spring Security が matcher を見ず全ての拒否に使うため、/logout の CSRF 失敗も同じ advice
+        // を通る。
+        // 2 つ目を足すと /logout は既定の handler（/error 経由の about:blank）に変わる。LogoutContractTest が固定する。
         .exceptionHandling(
             exceptions ->
                 exceptions

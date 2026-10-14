@@ -27,6 +27,7 @@ import org.springframework.web.method.annotation.HandlerMethodValidationExceptio
 
 /** RFC 9457 Problem Details の共通フィールドを生成する。 */
 // problem type ごとの生成と検証の誤りの組み立てを 1 つの MessageSource に集めるため、メソッドの数の上限を外す。
+// type と title の対応は businessProblem の 1 か所に閉じている。型ごとに分けると MessageSource の受け渡しが増える。
 @SuppressWarnings("PMD.TooManyMethods")
 @Component
 final class ApiProblemDetails {
@@ -34,13 +35,10 @@ final class ApiProblemDetails {
   /** RFC 9457 が一般的な HTTP エラーに定義する problem type。 */
   private static final URI ABOUT_BLANK = URI.create("about:blank");
 
-  /** 入力検証エラーの problem type。パスを全部書いた相対 URI（ADR-058、RFC 9457 §3.1.1）。 */
-  /* package */ static final URI VALIDATION_ERROR_TYPE = URI.create("/problems/validation-error");
+  /** 業務固有の problem type の接頭辞。パスを全部書いた相対 URI にする（ADR-058、RFC 9457 §3.1.1）。 */
+  private static final String PROBLEM_TYPE_PREFIX = "/problems/";
 
-  /** CSRF トークンの検証失敗による 403 の problem type。トークンを取り直せば通る（ADR-058）。 */
-  private static final URI CSRF_TOKEN_INVALID_TYPE = URI.create("/problems/csrf-token-invalid");
-
-  /** VALIDATION_ERROR_TYPE の拡張メンバーで、入力検証の誤りを入れる（ADR-058）。 */
+  /** 入力検証エラー（/problems/validation-error）の拡張メンバーで、入力検証の誤りを入れる（ADR-058）。 */
   /* package */ static final String ERRORS = "errors";
 
   /**
@@ -99,22 +97,34 @@ final class ApiProblemDetails {
    */
   /* package */ ProblemDetail validationProblem(
       final List<ValidationError> errors, final Locale locale) {
-    final ProblemDetail problem = ProblemDetail.forStatus(HttpStatus.BAD_REQUEST);
-    problem.setType(VALIDATION_ERROR_TYPE);
-    problem.setTitle(
-        messageSource.getMessage(
-            "problem.title.validation-error", null, "Invalid request content", locale));
+    final ProblemDetail problem =
+        businessProblem(
+            HttpStatus.BAD_REQUEST, "validation-error", "Invalid request content", locale);
     problem.setProperty(ERRORS, errors);
     return problem;
   }
 
   /** CSRF トークンの検証失敗の 403 を作る。title は problem.title.csrf-token-invalid を解決し、detail は付けない。 */
   /* package */ ProblemDetail csrfTokenProblem(final Locale locale) {
-    final ProblemDetail problem = ProblemDetail.forStatus(HttpStatus.FORBIDDEN);
-    problem.setType(CSRF_TOKEN_INVALID_TYPE);
+    return businessProblem(
+        HttpStatus.FORBIDDEN, "csrf-token-invalid", "Invalid or missing CSRF token", locale);
+  }
+
+  /**
+   * 業務固有の problem type の Problem Details を作る。
+   *
+   * <p>type は {@code /problems/<kebab-case>}、title は {@code problem.title.<kebab-case>} を解決する。
+   * normalize は about:blank 以外の title と detail を変えないため、ここで title を決め、detail は付けない。
+   */
+  private ProblemDetail businessProblem(
+      final HttpStatus status,
+      final String kebabName,
+      final String defaultTitle,
+      final Locale locale) {
+    final ProblemDetail problem = ProblemDetail.forStatus(status);
+    problem.setType(URI.create(PROBLEM_TYPE_PREFIX + kebabName));
     problem.setTitle(
-        messageSource.getMessage(
-            "problem.title.csrf-token-invalid", null, "Invalid or missing CSRF token", locale));
+        messageSource.getMessage("problem.title." + kebabName, null, defaultTitle, locale));
     return problem;
   }
 

@@ -48,6 +48,7 @@ import org.springframework.http.converter.HttpMessageNotWritableException;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.web.csrf.CsrfException;
 import org.springframework.security.web.csrf.DefaultCsrfToken;
 import org.springframework.security.web.csrf.InvalidCsrfTokenException;
 import org.springframework.security.web.csrf.MissingCsrfTokenException;
@@ -260,6 +261,8 @@ class ApiExceptionHandlerTest {
 
   private static Stream<AccessDeniedException> csrfExceptions() {
     return Stream.of(
+        // 親の CsrfException を直接投げても、subtype の列挙に頼らず専用の type にする。
+        new CsrfException("subtype なしの CSRF 失敗"),
         new MissingCsrfTokenException("actual"),
         new InvalidCsrfTokenException(
             new DefaultCsrfToken("X-XSRF-TOKEN", "_csrf", "t"), "actual"));

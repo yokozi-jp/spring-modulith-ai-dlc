@@ -17,8 +17,7 @@ import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.AuthenticationException;
-import org.springframework.security.web.csrf.InvalidCsrfTokenException;
-import org.springframework.security.web.csrf.MissingCsrfTokenException;
+import org.springframework.security.web.csrf.CsrfException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
@@ -64,8 +63,8 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
   @ExceptionHandler(AccessDeniedException.class)
   /* package */ @Nullable ResponseEntity<Object> handleAccessDeniedException(
       final AccessDeniedException exception, final WebRequest request) {
-    if (exception instanceof InvalidCsrfTokenException
-        || exception instanceof MissingCsrfTokenException) {
+    // Invalid と Missing の親にあたる CsrfException で受け、subtype が増えても専用の type にする。
+    if (exception instanceof CsrfException) {
       return handleExceptionInternal(
           exception,
           problemDetails.csrfTokenProblem(resolveLocale(request)),

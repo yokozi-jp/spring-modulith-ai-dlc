@@ -18,6 +18,7 @@ import com.example.demo.testkit.ContractCaseArguments;
 import com.example.demo.testkit.SharedTestConfiguration;
 import conflictfixture.ConflictFixture;
 import jakarta.servlet.RequestDispatcher;
+import jakarta.servlet.http.Cookie;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -115,6 +116,25 @@ class ApiContractTest {
         .andExpect(status().isForbidden())
         .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
         .andExpect(jsonPath("$.type").value(CSRF_TOKEN_INVALID));
+  }
+
+  @Test
+  @DisplayName("Cookie と header の CSRF トークンが食い違う更新は、専用の type の 403 で、Cookie を作り直さない")
+  void updateWithMismatchedCsrfTokenDoesNotReissueCookie() throws Exception {
+    // csrf().useInvalidToken() は repository を差し替えるため Set-Cookie を観測できない。実際の Cookie と header
+    // で食い違わせる。
+    // CsrfFilter は token を生成したときだけ保存するので、Cookie がある不一致の枝は Set-Cookie を付けない。
+    // SPA の再送が救うのは Cookie の欠落などで token が入れ替わった競合で、不一致そのものは同じ 403 になる。
+    mockMvc
+        .perform(
+            post("/api/missing")
+                .with(user("test-user"))
+                .cookie(new Cookie(CSRF_COOKIE, "stored-token"))
+                .header("X-XSRF-TOKEN", "other-token"))
+        .andExpect(status().isForbidden())
+        .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
+        .andExpect(jsonPath("$.type").value(CSRF_TOKEN_INVALID))
+        .andExpect(cookie().doesNotExist(CSRF_COOKIE));
   }
 
   @Test
