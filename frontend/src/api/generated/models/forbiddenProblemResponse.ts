@@ -5,6 +5,6 @@
 import type { ProblemDetail } from './problemDetail.ts';
 
 /**
- * 操作の権限がない
+ * 操作の権限がない。CSRF トークンの検証に失敗したときの type は /problems/csrf-token-invalid
  */
 export type ForbiddenProblemResponse = ProblemDetail;

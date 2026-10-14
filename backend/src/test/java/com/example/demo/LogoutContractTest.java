@@ -8,6 +8,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.example.demo.testkit.SharedTestConfiguration;
@@ -25,6 +27,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContext;
@@ -114,6 +117,19 @@ class LogoutContractTest {
         sessionRepository.findById(sessionId),
         () -> "POST /logout（CSRF トークンなし）の後にセッションが消えた: sessionId=" + sessionId);
     mockMvc.perform(get("/api/missing").cookie(sessionCookie)).andExpect(status().isNotFound());
+  }
+
+  @Test
+  @DisplayName("CSRF トークンのない POST /logout も /api/** と同じ専用 type の 403 Problem Details を返す")
+  @SuppressWarnings("PMD.UnitTestShouldIncludeAssert") // 検証は MockMvc の andExpect で行う。
+  void logoutCsrfFailureReturnsCsrfProblemType() throws Exception {
+    // 例外処理の handler は 1 つだけ登録しており、Spring Security は mapping が 1 つのとき matcher を見ずに全ての拒否へ使う。
+    // そのため /logout の CSRF 失敗も /api/** と同じ advice を通る。2 つ目の handler を足すと /logout は変わるため、ここで固定する。
+    mockMvc
+        .perform(post("/logout").cookie(sessionCookie))
+        .andExpect(status().isForbidden())
+        .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
+        .andExpect(jsonPath("$.type").value("/problems/csrf-token-invalid"));
   }
 
   @Test

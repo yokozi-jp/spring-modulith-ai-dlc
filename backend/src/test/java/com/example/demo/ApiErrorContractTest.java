@@ -122,6 +122,8 @@ class ApiErrorContractTest {
         Arguments.of("未処理例外", get("/api/error-fixture/unhandled"), 500, "about:blank", "サーバー内部エラー"),
         Arguments.of(
             "404", get("/api/error-fixture/not-found?id=a"), 404, "about:blank", "リソースが見つかりません"),
+        Arguments.of(
+            "権限不足の 403", get("/api/error-fixture/forbidden"), 403, "about:blank", "アクセス権限がありません"),
         Arguments.of("409", get("/api/error-fixture/conflict"), 409, "about:blank", "競合が発生しました"),
         Arguments.of(
             "422", get("/api/error-fixture/unprocessable"), 422, "about:blank", "処理できない内容です"),
