@@ -125,27 +125,12 @@ PostgreSQL には MULTISET がなく、jOOQ は `jsonb_agg` による JSON の�
 
 ## 並び順の許可リスト
 
-一覧の API は、`sort` で受けた項目名で並び順を変えることがある（[クエリパラメータ](../../web-api/query-parameters.md#ソート)）。
-この節は、その項目名を生成済みの列へ写す方法を定める。
-
-Repository は、並び順を `domain.model` の enum と record で受け取る。
-enum（`OrderSortKey`）は並べられる項目を、record（`OrderSort`）は項目と降順かどうかを表す。
+一覧の取り出しは、並び順を `domain.model` の enum（`OrderSortKey`）と record（`OrderSort`）のリストで受け取ることがある。
 jOOQ の Repository は、`default` のない `switch` 式で enum の定数ごとに生成済みの列を返す。
 この `switch` 式が許可リストであり、enum に定数を足して列を足し忘れると、コンパイルが失敗する。
-`Map` で写すと、足し忘れは実行時の `null` になるため使わない。
-
-リクエストの値は、`DSL.name(..)`、`DSL.quotedName(..)`、`DSL.field(Name)`、`Table.field(String)` に渡さない。
-識別子は引用符で囲まれるため SQL インジェクションにはならないが、生成済みのメタモデルにない列、ほかのテーブルの列、共通カラムを参照できてしまう。
-列は、`switch` 式で生成済みの列から選ぶ。
-
-許可リストにない項目名は、Repository に届く前に 400 で拒否する。
-Controller が `sort` の各要素を Bean Validation で検査し、失敗を 400 にする（[APIの入力検証の配置](../../web-api/validation.md)）。
-`<Feature>QueryService` が項目名を enum に直し、Repository は enum だけを受け取る。
-状態の文字列を `OrderStatus.valueOf` で直して渡す絞り込みと同じ流れである。
-応答 JSON の項目名は、Repository に持ち込まない。
-
-並び順の最後には、主キーを一意な tie-breaker として足す（[ADR-013](../../adr/ADR-013-standardize-http-api-contracts.md)）。
-並び順の指定がなければ、Repository のインタフェースの Javadoc に書いた既定の並び順で並べる。
+並び順の最後には主キーを一意な tie-breaker として足し、指定がなければ Repository のインタフェースの Javadoc に書いた既定の並び順で並べる（[ADR-013](../../adr/ADR-013-standardize-http-api-contracts.md)）。
+`sort` の項目名を enum に直すのは [QueryService](query-service.md#並び順の変換) であり、この写し方を選んだ理由は [ADR-081](../../adr/ADR-081-map-list-sort-via-domain-enum-and-exhaustive-switch.md) に示す。
+列を名前で作る API の扱いは[jOOQのSQLの書き方](../../database/jooq-usage.md)に従う。
 
 ```java
 // com.example.demo.ordering.domain.model.OrderSortKey
@@ -164,13 +149,22 @@ public enum OrderSortKey {
  * @param key 並べる項目
  * @param descending 降順なら true
  */
-public record OrderSort(OrderSortKey key, boolean descending) {}
+public record OrderSort(OrderSortKey key, boolean descending) {
+
+  /** 項目のない並び順を拒否する。 */
+  public OrderSort {
+    if (key == null) {
+      throw new IllegalArgumentException("key must not be null");
+    }
+  }
+}
 ```
 
 ```java
 // com.example.demo.ordering.infrastructure.persistence.JooqOrderRepository（抜粋）
 @Override
-public List<Order> findByCustomer(final CustomerId customerId, final List<OrderSort> sorts) {
+public List<Order> findByCustomerSortedBy(
+    final CustomerId customerId, final List<OrderSort> sorts) {
   return selectOrders()
       .where(T_ORDER.CUSTOMER_ID.eq(customerId.value()))
       .orderBy(orderByOf(sorts))
@@ -347,7 +341,7 @@ class JooqOrderRepository implements OrderRepository {
 public List<Order> findByCustomer(final CustomerId customerId) {
   return selectOrders()
       .where(T_ORDER.CUSTOMER_ID.eq(customerId.value()))
-      .orderBy(T_ORDER.PLACED_AT.desc())
+      .orderBy(T_ORDER.PLACED_AT.desc(), T_ORDER.ORDER_ID.desc())
       .fetch(Records.mapping(Order::restore));
 }
 
@@ -400,10 +394,7 @@ Repository のテストは列と集約の往復と削除の範囲だけを確か
 - 集約を作るときに `Order.place` を使う。
   保存済みの状態と割引額が、受付の初期値に戻る。
 - 変換の中で、業務規則を判定する、または既定値を補う。
-- `sort` の項目名を `DSL.name(..)`、`DSL.field(Name)`、`Table.field(String)` に渡して列を作る。
-  生成済みのメタモデルにない列や、ほかのテーブルの列で並べられてしまう。
-- 並び順の項目を、応答 JSON の項目名の文字列のまま Repository に渡し、`Map<String, Field<?>>` で列を引く。
-  許可値と `Map` のキーがずれてもコンパイルで見つからず、Presentation の語彙が Infrastructure に入る。
+- 並び順の項目を、応答 JSON の項目名の文字列のまま Repository に渡し、`Map<String, Field<?>>` で列を引く（[ADR-081](../../adr/ADR-081-map-list-sort-via-domain-enum-and-exhaustive-switch.md)）。
 - `into(Class)`、`fetchInto(Class)`、`fetchMap(Field, Class)`、`from(Object)`、`DefaultRecordMapper`、ModelMapper、Dozer で、列と項目を名前のリフレクションで対応づける。
   列や項目の名前を変えたときの誤りが、コンパイルで見つからない。
   集約が `Order.restore` と値オブジェクトの検証を通らず、private のフィールドへ直接書き込まれることがある。
@@ -449,8 +440,8 @@ Repository のテストは列と集約の往復と削除の範囲だけを確か
 - [ ] INSERT の共通カラムは `CommonColumns.forInsert` で書き、`LOCK_NO` は読むだけにする（UPDATE で渡した `LOCK_NO` は `ColumnValues` が実行時に拒否する）。［自分で点検］
 - [ ] `@PlainSQL` の付いた jOOQ の API を使わない。［ArchUnit で検査：DatabaseConventionsArchTest.plainSqlApisAreNotUsed］
 - [ ] `DSL.unquotedName` と `DSL.keyword` を使わない。［ArchUnit で検査：DatabaseConventionsArchTest.verbatimSqlApisAreNotUsed］
-- [ ] `DSL.name`、`DSL.quotedName`、`DSL.systemName` を使わない。［ArchUnit で検査：DatabaseConventionsArchTest.namesAreNotBuiltFromStrings］
-- [ ] 並び順は `domain.model` の enum で受け取り、`default` のない `switch` 式で生成済みの列に写し、主キーを最後に足す。リクエストの値を `Table.field(String)` に渡さない。［自分で点検］
+- [ ] `DSL.name`、`DSL.quotedName`、`DSL.systemName`、`Name.append` を使わない。［ArchUnit で検査：DatabaseConventionsArchTest.nameBuildingApisAreNotUsed］
+- [ ] 並び順は `domain.model` の enum で受け取り、`default` のない `switch` 式で生成済みの列に写し、主キーを最後に足す。リクエストの値を `Table.field(String)` と `DSL.field(Name)` に渡さない。［自分で点検］
 - [ ] `withRenderSchema(false)` を使わない。［ArchUnit で検査：DatabaseConventionsArchTest.renderSchemaIsNotChanged］
 - [ ] jOOQ の `Settings` の `statementType` と `paramType` を変えない。［ArchUnit で検査：DatabaseConventionsArchTest.statementTypeAndParamTypeAreNotChanged］
 - [ ] 変換で `Order.place`、業務規則、既定値、Mapper のクラス、次の ArchUnit の規則が検査しないリフレクションの対応づけを使わない。［自分で点検］

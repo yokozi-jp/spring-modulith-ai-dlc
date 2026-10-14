@@ -28,6 +28,8 @@ tags: [convention, backend, class-role]
 - component の名前は、絞り込む業務の項目の名前にする（`customerId`）。
 - ページングする一覧では、component に `cursor` と `limit` を加える。
   `limit` の既定値と上限は ADR-013 に、クエリパラメータの語彙は[クエリパラメータ](../../web-api/query-parameters.md)に従う。
+- 並べ替えできる一覧では、component に `sort`（`List<String>`）を加え、クエリパラメータの要素（`placedAt:desc`）をそのまま入れる。
+  要素を Domain の並び順に直すのは [QueryService](query-service.md#並び順の変換) である。
 
 ## 必須の記述
 

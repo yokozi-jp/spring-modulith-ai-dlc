@@ -273,7 +273,7 @@ Error Proneの`CheckReturnValue`は既定でerrorであり、`updateWhere`と`de
 - `transactionIsolationIsNotDeclared`：Springの`@Transactional`をクラスまたはメソッドに付けるとき、`isolation`を指定しない。
 - `plainSqlApisAreNotUsed`：`@PlainSQL`の付いたjOOQのAPIを呼び出さず、メソッド参照もしない。
 - `verbatimSqlApisAreNotUsed`：`DSL.unquotedName`と`DSL.keyword`を呼び出さず、メソッド参照もしない。どちらも`@PlainSQL`を持たないが、文字列をそのままSQLに出力する。
-- `namesAreNotBuiltFromStrings`：`DSL.name`、`DSL.quotedName`、`DSL.systemName`を呼び出さず、メソッド参照もしない。識別子は引用符で囲まれるが、リクエストの値を渡すと生成済みのメタモデルにない列やテーブルを参照できる。
+- `nameBuildingApisAreNotUsed`：識別子の`Name`を作る`DSL.name`、`DSL.quotedName`、`DSL.systemName`、`Name.append`を、引数の型によらず呼び出さず、メソッド参照もしない。理由と規則の範囲は[jOOQのSQLの書き方](../database/jooq-usage.md)に示す。
 - `renderSchemaIsNotChanged`：`Settings.withRenderSchema`と`Settings.setRenderSchema`を呼び出さず、メソッド参照もしない。引数の値はバイトコードに残らないため、`withRenderSchema(false)`の禁止を呼び出しの禁止で近似する。
 - `statementTypeAndParamTypeAreNotChanged`：`Settings`の`withStatementType`、`setStatementType`、`withParamType`、`setParamType`を呼び出さず、メソッド参照もしない。
 

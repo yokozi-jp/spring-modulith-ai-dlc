@@ -40,8 +40,8 @@ import org.springframework.transaction.annotation.Transactional;
  * DBアクセスの規約（docs/database/postgresql-concurrency-control.md、docs/database/jooq-usage.md）をプロダクションコードへ静的に強制する。
  *
  * <p>トランザクションの分離レベルの指定、jOOQのPlain
- * SQLのAPI、文字列をそのままSQLに出力するAPI、識別子の名前を文字列から作るAPI、スキーマ名の出力の無効化、文の種類とバインド変数の設定の変更を検出する。テストコードと生成コードは
- * {@link ProductionCodeOnly} で対象外にする。
+ * SQLのAPI、文字列をそのままSQLに出力するAPI、識別子の名前を作るAPI、スキーマ名の出力の無効化、文の種類とバインド変数の設定の変更を検出する。テストコードと生成コードは {@link
+ * ProductionCodeOnly} で対象外にする。
  *
  * <p>分離レベルの検査は、Springの {@code @Transactional} をクラスかメソッドに直接付けた場合だけを対象にし、それを含む合成アノテーションは対象にしない。
  */
@@ -60,9 +60,11 @@ class DatabaseConventionsArchTest {
   /** 文字列をそのままSQLに出力する {@code DSL.unquotedName} と {@code DSL.keyword} を呼ばず、メソッド参照もしない。 */
   @ArchTest /* package */ static final ArchRule verbatimSqlApisAreNotUsed = verbatimSqlRule();
 
-  /** {@code DSL.name}、{@code DSL.quotedName}、{@code DSL.systemName} を呼ばず、メソッド参照もしない。 */
-  @ArchTest /* package */
-  static final ArchRule namesAreNotBuiltFromStrings = namesFromStringsRule();
+  /**
+   * 識別子の名前を作る {@code DSL.name}、{@code DSL.quotedName}、{@code DSL.systemName}、{@code Name.append}
+   * を、引数の型によらず呼ばず、メソッド参照もしない。
+   */
+  @ArchTest /* package */ static final ArchRule nameBuildingApisAreNotUsed = nameBuildingRule();
 
   /**
    * {@code Settings.withRenderSchema} と {@code setRenderSchema} を呼ばず、メソッド参照もしない。
@@ -81,7 +83,7 @@ class DatabaseConventionsArchTest {
   @SuppressWarnings("PMD.LooseCoupling")
   void databaseConventionBypassesAreRejected() {
     // フィクスチャを実際に呼び出してIDEにも使用済みと認識させる。拒否判定は続くArchUnitの検査が担う。
-    assertThat(DatabaseConventionBypass.useForbiddenApis()).hasSize(13);
+    assertThat(DatabaseConventionBypass.useForbiddenApis()).hasSize(14);
 
     final JavaClasses bypassClass =
         new ClassFileImporter().importClasses(DatabaseConventionBypass.class);
@@ -105,13 +107,14 @@ class DatabaseConventionsArchTest {
         .hasMessageContaining(
             "references method <org.jooq.impl.DSL.unquotedName(java.lang.String)>")
         .hasMessageContaining("calls method <org.jooq.impl.DSL.keyword(java.lang.String)>");
-    assertThatThrownBy(() -> namesFromStringsRule().check(bypassClass))
-        .as("識別子の名前を文字列から作るAPI")
+    assertThatThrownBy(() -> nameBuildingRule().check(bypassClass))
+        .as("識別子の名前を作るAPI")
         .isInstanceOf(AssertionError.class)
         .hasMessageContaining("calls method <org.jooq.impl.DSL.name(java.lang.String)>")
         .hasMessageContaining("references method <org.jooq.impl.DSL.name(java.lang.String)>")
         .hasMessageContaining("calls method <org.jooq.impl.DSL.quotedName(java.lang.String)>")
-        .hasMessageContaining("calls method <org.jooq.impl.DSL.systemName(java.lang.String)>");
+        .hasMessageContaining("calls method <org.jooq.impl.DSL.systemName(java.lang.String)>")
+        .hasMessageContaining("calls method <org.jooq.Name.append(java.lang.String)>");
     assertThatThrownBy(() -> renderSchemaRule().check(bypassClass))
         .as("スキーマ名の出力の無効化")
         .isInstanceOf(AssertionError.class)
@@ -161,16 +164,20 @@ class DatabaseConventionsArchTest {
                 + "規約：docs/database/jooq-usage.md");
   }
 
-  private static ArchRule namesFromStringsRule() {
+  private static ArchRule nameBuildingRule() {
     return noClasses()
         .should()
         .accessTargetWhere(
             JavaAccess.Predicates.target(
                 AccessTarget.Predicates.declaredIn(JavaClass.Predicates.assignableTo(DSL.class))
-                    .and(HasName.Predicates.nameMatching("name|quotedName|systemName"))))
+                    .and(HasName.Predicates.nameMatching("name|quotedName|systemName"))
+                    .or(
+                        AccessTarget.Predicates.declaredIn(
+                                JavaClass.Predicates.assignableTo(Name.class))
+                            .and(HasName.Predicates.name("append")))))
         .because(
-            "識別子は引用符で囲まれるが、リクエストの値を渡すと生成済みのメタモデルにない列やテーブルを参照できるため。"
-                + "直し方：name、quotedName、systemName の呼び出しを削除し、テーブルとカラムは生成されたクラスから参照する。"
+            "リクエストの値を渡すと、生成済みのメタモデルにない列やテーブルを参照できるため。"
+                + "直し方：name、quotedName、systemName、Name.append の呼び出しを削除し、テーブルとカラムは生成されたクラスから参照する。"
                 + "並び順は domain.model の enum を switch 式で生成済みの列に写す。"
                 + "規約：docs/database/jooq-usage.md、docs/backend/class-roles/jooq-repository.md");
   }
@@ -255,6 +262,8 @@ class DatabaseConventionsArchTest {
           // 引用符の付け方を指定して識別子の名前を作るAPIも禁止する。
           DSL.quotedName("x"),
           DSL.systemName("x"),
+          // 名前に文字列を足して識別子の名前を作るAPIも禁止する。
+          name.apply("y").append("x"),
           // 値をSQLへ埋め込む設定は禁止する。
           new Settings().withStatementType(StatementType.STATIC_STATEMENT),
           new Settings().withParamType(ParamType.INLINED));
