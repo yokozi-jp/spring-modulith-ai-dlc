@@ -1,7 +1,7 @@
 ---
 type: Convention
 title: クラスの役割：jOOQ の Repository
-description: infrastructure.persistence に置き、domain.model の Repository を jOOQ で実装し、jOOQ と集約の変換も持つクラスの定義、置き場所と命名、必須の記述（@Repository、DSLContext、convertFrom、multiset、Records.mapping、add、update、delete、shared の TableWriter による楽観的ロック、shared の共通カラムの処理）、依存、例、テスト、アンチパターン、作成時のチェックリストを定める。Repository を jOOQ で実装するとき、SQL や列を足すときに読む。
+description: infrastructure.persistence に置き、domain.model の Repository を jOOQ で実装し、jOOQ と集約の変換も持つクラスの定義、置き場所と命名、必須の記述（@Repository、DSLContext、convertFrom、multiset、Records.mapping、add、update、delete、shared の TableWriter による楽観的ロック、shared の共通カラムの処理）、並び順の許可リスト、依存、例、テスト、アンチパターン、作成時のチェックリストを定める。Repository を jOOQ で実装するとき、SQL や列を足すとき、並び順を受け取る取り出しを書くときに読む。
 tags: [convention, backend, class-role]
 ---
 
@@ -122,6 +122,83 @@ PostgreSQL には MULTISET がなく、jOOQ は `jsonb_agg` による JSON の�
 子の行が数千に及ぶ集約では、二つの SQL に分けて読むほうが速いことがある。
 この規約は子の Entity の読み取りを `multiset` に固定する。
 速度が足りないと判断したら、二つの SQL に分ける前に実装を止めて利用者に確認する。
+
+## 並び順の許可リスト
+
+一覧の API は、`sort` で受けた項目名で並び順を変えることがある（[クエリパラメータ](../../web-api/query-parameters.md#ソート)）。
+この節は、その項目名を生成済みの列へ写す方法を定める。
+
+Repository は、並び順を `domain.model` の enum と record で受け取る。
+enum（`OrderSortKey`）は並べられる項目を、record（`OrderSort`）は項目と降順かどうかを表す。
+jOOQ の Repository は、`default` のない `switch` 式で enum の定数ごとに生成済みの列を返す。
+この `switch` 式が許可リストであり、enum に定数を足して列を足し忘れると、コンパイルが失敗する。
+`Map` で写すと、足し忘れは実行時の `null` になるため使わない。
+
+リクエストの値は、`DSL.name(..)`、`DSL.quotedName(..)`、`DSL.field(Name)`、`Table.field(String)` に渡さない。
+識別子は引用符で囲まれるため SQL インジェクションにはならないが、生成済みのメタモデルにない列、ほかのテーブルの列、共通カラムを参照できてしまう。
+列は、`switch` 式で生成済みの列から選ぶ。
+
+許可リストにない項目名は、Repository に届く前に 400 で拒否する。
+Controller が `sort` の各要素を Bean Validation で検査し、失敗を 400 にする（[APIの入力検証の配置](../../web-api/validation.md)）。
+`<Feature>QueryService` が項目名を enum に直し、Repository は enum だけを受け取る。
+状態の文字列を `OrderStatus.valueOf` で直して渡す絞り込みと同じ流れである。
+応答 JSON の項目名は、Repository に持ち込まない。
+
+並び順の最後には、主キーを一意な tie-breaker として足す（[ADR-013](../../adr/ADR-013-standardize-http-api-contracts.md)）。
+並び順の指定がなければ、Repository のインタフェースの Javadoc に書いた既定の並び順で並べる。
+
+```java
+// com.example.demo.ordering.domain.model.OrderSortKey
+/** 注文の一覧を並べられる項目。 */
+public enum OrderSortKey {
+  /** 受け付けた時刻。 */
+  PLACED_AT,
+  /** 注文の状態。 */
+  STATUS
+}
+
+// com.example.demo.ordering.domain.model.OrderSort
+/**
+ * 注文の一覧の並び順の一つ。
+ *
+ * @param key 並べる項目
+ * @param descending 降順なら true
+ */
+public record OrderSort(OrderSortKey key, boolean descending) {}
+```
+
+```java
+// com.example.demo.ordering.infrastructure.persistence.JooqOrderRepository（抜粋）
+@Override
+public List<Order> findByCustomer(final CustomerId customerId, final List<OrderSort> sorts) {
+  return selectOrders()
+      .where(T_ORDER.CUSTOMER_ID.eq(customerId.value()))
+      .orderBy(orderByOf(sorts))
+      .fetch(Records.mapping(Order::restore));
+}
+
+/** 並び順を生成済みの列の SortField にし、最後に主キーを足す。 */
+private static List<SortField<?>> orderByOf(final List<OrderSort> sorts) {
+  final List<SortField<?>> fields = new ArrayList<>();
+  for (final OrderSort sort : sorts) {
+    final Field<?> column = columnOf(sort.key());
+    fields.add(sort.descending() ? column.desc() : column.asc());
+  }
+  if (sorts.isEmpty()) {
+    fields.add(T_ORDER.PLACED_AT.desc());
+  }
+  fields.add(T_ORDER.ORDER_ID.desc());
+  return fields;
+}
+
+/** 並べる項目を生成済みの列に写す。この switch 式が並び順の許可リストである。 */
+private static Field<?> columnOf(final OrderSortKey key) {
+  return switch (key) {
+    case PLACED_AT -> T_ORDER.PLACED_AT;
+    case STATUS -> T_ORDER.ORDER_STATUS_TYP;
+  };
+}
+```
 
 ## 依存してよい型、してはいけない型
 
@@ -323,6 +400,10 @@ Repository のテストは列と集約の往復と削除の範囲だけを確か
 - 集約を作るときに `Order.place` を使う。
   保存済みの状態と割引額が、受付の初期値に戻る。
 - 変換の中で、業務規則を判定する、または既定値を補う。
+- `sort` の項目名を `DSL.name(..)`、`DSL.field(Name)`、`Table.field(String)` に渡して列を作る。
+  生成済みのメタモデルにない列や、ほかのテーブルの列で並べられてしまう。
+- 並び順の項目を、応答 JSON の項目名の文字列のまま Repository に渡し、`Map<String, Field<?>>` で列を引く。
+  許可値と `Map` のキーがずれてもコンパイルで見つからず、Presentation の語彙が Infrastructure に入る。
 - `into(Class)`、`fetchInto(Class)`、`fetchMap(Field, Class)`、`from(Object)`、`DefaultRecordMapper`、ModelMapper、Dozer で、列と項目を名前のリフレクションで対応づける。
   列や項目の名前を変えたときの誤りが、コンパイルで見つからない。
   集約が `Order.restore` と値オブジェクトの検証を通らず、private のフィールドへ直接書き込まれることがある。
@@ -368,6 +449,8 @@ Repository のテストは列と集約の往復と削除の範囲だけを確か
 - [ ] INSERT の共通カラムは `CommonColumns.forInsert` で書き、`LOCK_NO` は読むだけにする（UPDATE で渡した `LOCK_NO` は `ColumnValues` が実行時に拒否する）。［自分で点検］
 - [ ] `@PlainSQL` の付いた jOOQ の API を使わない。［ArchUnit で検査：DatabaseConventionsArchTest.plainSqlApisAreNotUsed］
 - [ ] `DSL.unquotedName` と `DSL.keyword` を使わない。［ArchUnit で検査：DatabaseConventionsArchTest.verbatimSqlApisAreNotUsed］
+- [ ] `DSL.name`、`DSL.quotedName`、`DSL.systemName` を使わない。［ArchUnit で検査：DatabaseConventionsArchTest.namesAreNotBuiltFromStrings］
+- [ ] 並び順は `domain.model` の enum で受け取り、`default` のない `switch` 式で生成済みの列に写し、主キーを最後に足す。リクエストの値を `Table.field(String)` に渡さない。［自分で点検］
 - [ ] `withRenderSchema(false)` を使わない。［ArchUnit で検査：DatabaseConventionsArchTest.renderSchemaIsNotChanged］
 - [ ] jOOQ の `Settings` の `statementType` と `paramType` を変えない。［ArchUnit で検査：DatabaseConventionsArchTest.statementTypeAndParamTypeAreNotChanged］
 - [ ] 変換で `Order.place`、業務規則、既定値、Mapper のクラス、次の ArchUnit の規則が検査しないリフレクションの対応づけを使わない。［自分で点検］

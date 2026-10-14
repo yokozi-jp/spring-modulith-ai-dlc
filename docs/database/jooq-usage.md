@@ -21,6 +21,8 @@ jOOQの生成コードには適用しない。
 `@PlainSQL`の付いたメソッドを使わない。
 たとえば`DSL.sql(String)`、`DSL.field(String)`、`DSL.condition(String)`、`DSLContext.fetch(String)`、`DSLContext.execute(String)`、`DSLContext.resultQuery(String)`が該当する。
 `@PlainSQL`の付かない`DSL.unquotedName`と`DSL.keyword`も、文字列を引用符なしでそのままSQLに出力するため使わない。
+`DSL.name`、`DSL.quotedName`、`DSL.systemName`も使わない。
+識別子は引用符で囲まれるが、リクエストの値を渡すと生成済みのメタモデルにない列やテーブルを参照できるためである（[並び順の許可リスト](../backend/class-roles/jooq-repository.md#並び順の許可リスト)）。
 テーブルとカラムは生成されたクラスから参照する。
 
 文字列のSQLは、jOOQを採用した理由であるスキーマとのコンパイル時の照合を失う（[ADR-003](../adr/ADR-003-adopt-jooq-for-data-access.md)）。
@@ -54,7 +56,7 @@ NOT NULLの`varchar`には、コード生成がNULLを空文字へそろえるCo
 
 ## 検査
 
-Plain SQLのAPI、`DSL.unquotedName`と`DSL.keyword`、`withRenderSchema(false)`、`statementType`と`paramType`の変更は、ArchUnitの`DatabaseConventionsArchTest`で検査する。
+Plain SQLのAPI、`DSL.unquotedName`と`DSL.keyword`、`DSL.name`、`DSL.quotedName`、`DSL.systemName`、`withRenderSchema(false)`、`statementType`と`paramType`の変更は、ArchUnitの`DatabaseConventionsArchTest`で検査する。
 `TableWriter`の外の書き込みと入口の選び分けは、ArchUnitの`TableWriterArchTest`で検査する（[バックエンドのアーキテクチャテスト](../backend/architecture-tests.md)）。
 
 ## jOOQの版を上げるとき

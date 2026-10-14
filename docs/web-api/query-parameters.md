@@ -54,6 +54,7 @@ sort=status:asc,releasedAt:desc
 
 - 項目名には応答JSONの項目名を使う。
 - 指定できる値はOpenAPIの`enum`で列挙し、`style: form`と`explode: false`で定義する。
+- 項目名とDBの列の対応は、Repositoryの許可リストで決める（[クラスの役割：jOOQ の Repository](../backend/class-roles/jooq-repository.md#並び順の許可リスト)）。許可リストにない値は400で拒否する。
 - 昇順と降順を`+`と`-`で表さない。URLでは`+`が空白として扱われるためである。
 - 項目名と昇順降順を別のパラメータ（`sort`と`order_by`など）に分けない。二つのパラメータの要素数が一致することをOpenAPIで検証できないためである。
 
