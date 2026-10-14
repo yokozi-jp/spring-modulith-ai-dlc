@@ -42,11 +42,11 @@ jOOQの生成物の`com.example.demo.jooq`はOPENのモジュールであり、`
 規則名は`@ArchTest`のフィールド名であり、テスト結果にもこの名前で出る。
 
 - `dependenciesPointInward`：`domain.model`、`domain.service`、モジュールルートと`application`、`presentation`、`infrastructure.persistence`、`infrastructure.client`のオニオン構造で依存を内向きに限り、どの層にも属さないパッケージのクラスを拒否する。
-  ベースパッケージ直下と`shared.concurrency`、`shared.failure`は、所属検査から除く。
+  ベースパッケージ直下と`shared.concurrency`、`shared.failure`、`shared.events`は、所属検査から除く。
 - `infrastructureDependsOnlyOnDomainModel`：`infrastructure`は`application`、`domain.service`、モジュールルートの型に依存せず、機能モジュールの型のうち`domain.model`だけを使う。
-- `sharedModuleIsUsedOnlyByPersistenceAdapters`：`shared`の外で`shared.concurrency`と`shared.failure`以外の`shared`の型に依存するクラスは、`infrastructure.persistence`に置く。
+- `sharedModuleIsUsedOnlyByPersistenceAdapters`：`shared`の外で`shared.concurrency`、`shared.failure`、`shared.events`以外の`shared`の型に依存するクラスは、`infrastructure.persistence`に置く。
   `shared`の中の依存は対象にしない。
-  `shared.concurrency`と`shared.failure`は、どの層からも使える（[ADR-048](../adr/ADR-048-add-shared-module-for-jooq-common-code.md)、[ADR-062](../adr/ADR-062-map-business-exceptions-to-404-409-422.md)）。
+  `shared.concurrency`、`shared.failure`、`shared.events`は、どの層からも使える（[ADR-048](../adr/ADR-048-add-shared-module-for-jooq-common-code.md)、[ADR-062](../adr/ADR-062-map-business-exceptions-to-404-409-422.md)、[ADR-079](../adr/ADR-079-resubmit-failed-event-publications-periodically-with-shedlock.md)）。
 - `sharedModuleDoesNotDependOnHttp`：`shared`の型は、Spring Web、Springの HTTP、Servletの型に依存しない。
 - `moduleApiDoesNotExposeInternalTypes`：モジュールルートの型は、`java..`、`org.jspecify..`、同じルートパッケージの型だけに依存する。
 - `databaseTechnologyApisAreOnlyUsedByPersistenceAdapters`：jOOQ APIと生成型は`infrastructure.persistence`だけで使う。

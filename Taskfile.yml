@@ -38,11 +38,13 @@ tasks:
   check:
     desc: バックエンドの静的解析で素早く確認
     cmds:
+      - task: lint-session-sql
       - task: be-lint
 
   verify:
     desc: push前の静的解析と隔離テストを実行
     cmds:
+      - task: lint-session-sql
       - task: be-lint
       - task: test
 
@@ -232,6 +234,7 @@ tasks:
     cmds:
       - task: lint-docs-sync
       - task: docs-boundary-check
+      - task: adr-lint
       - |
         if ! command -v iwe >/dev/null 2>&1; then
           echo "OKF check: iwe が無いためスキップします（CI で検査されます）。" >&2
@@ -259,6 +262,17 @@ tasks:
           printf '%s' "$stats" | jq -r '.orphans[] | "    - " + .' >&2
           exit 1
         fi
+
+  # ADR の番号の重複、索引の行、索引と本文の状態と日付、リンクのラベルと宛先の番号を検査する（docs/adr/conventions.md）。
+  # 検査の本体は tooling/adr-lint/adr-lint.mjs に置き、壊れた fixture に対する自己検査（test.sh）を先に実行する。
+  # ponytail: okf-validate の paths は backend/src/** を含まないため、バックエンドの Javadoc だけを変える PR では CI が動かない。
+  # 限界に当たったら paths に backend/src/** を足す。
+  adr-lint:
+    internal: true
+    silent: true
+    cmds:
+      - bash tooling/adr-lint/test.sh
+      - node tooling/adr-lint/adr-lint.mjs
 
   # steering → docs の一方向依存、frontmatter、文書責務の見直し合図を検査する（ADR-038）。
   # 依存方向、frontmatter、パスの実在は失敗、docs の250行超とsteeringの行数超過は警告にとどめる。
@@ -485,6 +499,17 @@ tasks:
     cmds:
       # ponytail: 4.0%は参照業務機能（product、ordering、payment）の手書きの重複を除いた後の実測3.93%に合わせた値（ADR-074。ADR-035の3.2%を改めた）。残りは、モジュールごとのクラスの役割とテストの規約が求める import、注釈、フィールドの定型である。業務機能が増えて規約の定型の重複で4.0%を超えたら、上限を上げる前に検出の方式を見直す。
       - npm exec -- jscpd frontend/src frontend/lint frontend/vite.config.ts frontend/vite-config.test.ts backend/src/main/java backend/src/test/java
+
+  # PgBouncer のトランザクションモードや RDS Proxy の後ろで壊れる、セッションに状態を残す SQL を本番のコードから検出する。
+  # 一覧は https://www.pgbouncer.org/features.html の「SQL feature map for pooling modes」で Transaction pooling が Never の機能である。
+  # SET はここでは検出しない（docs/tooling/lint-and-test.md）。
+  lint-session-sql:
+    desc: バックエンドの本番のコードに、接続を多重化するプロキシの後ろで壊れるセッションの SQL がないか検査
+    silent: true
+    cmds:
+      # 検出の式の自己検査。検出すべき文を逃すか、トランザクションの advisory lock や識別子やコメントを誤検出したら失敗する。
+      - bash tooling/session-sql-lint/test.sh
+      - bash tooling/session-sql-lint/session-sql-lint.sh .
 
   # Backend
   be-run:
@@ -1180,6 +1205,25 @@ tasks:
             ([.attributes[]?.key] | sort) == ["conflict.kind", "exception.message", "exception.stacktrace", "exception.type", "http.response.status_code"]
               and (first(.attributes[]? | select(.key == "http.response.status_code") | .value.intValue) == "409")
               and value("conflict.kind") == "unique"
+          )
+          and any(
+            .resourceLogs[]?.scopeLogs[]?.logRecords[]?;
+            ([.attributes[]?.key] | sort) == ["event_publication.completion_attempts", "event_publication.event_type", "event_publication.id", "event_publication.listener_id"]
+              and value("event_publication.id") == "3f2b8c1e-5d4a-4e6f-9a7b-1c2d3e4f5a6b"
+              and value("event_publication.event_type") == "com.example.demo.ordering.OrderConfirmed"
+              and (value("event_publication.listener_id") | startswith("com.example.demo.payment.application.OrderConfirmedListener.on"))
+              and (first(.attributes[]? | select(.key == "event_publication.completion_attempts") | .value.intValue) == "6")
+          )
+          and any(
+            .resourceLogs[]?.scopeLogs[]?.logRecords[]?;
+            ([.attributes[]?.key] | sort) == ["event_publication.exhausted.count", "event_publication.resubmitted.count"]
+              and (first(.attributes[]? | select(.key == "event_publication.resubmitted.count") | .value.intValue) == "3")
+              and (first(.attributes[]? | select(.key == "event_publication.exhausted.count") | .value.intValue) == "1")
+          )
+          and any(
+            .resourceLogs[]?.scopeLogs[]?.logRecords[]?;
+            ([.attributes[]?.key] | sort) == ["event_publication.completed.count", "event_publication.incomplete.count", "event_publication.remaining.count", "event_publication.resubmitted.count"]
+              and (first(.attributes[]? | select(.key == "event_publication.remaining.count") | .value.intValue) == "5")
           )
         ' "$out/backend.json" >/dev/null; then
           echo "ログ属性が allowlist または期待値と一致しません。" >&2

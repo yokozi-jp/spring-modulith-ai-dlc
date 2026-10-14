@@ -7,6 +7,7 @@ package com.example.demo.jooq.modulith;
 import com.example.demo.jooq.DefaultCatalog;
 import com.example.demo.jooq.modulith.tables.EventPublication;
 import com.example.demo.jooq.modulith.tables.EventPublicationArchive;
+import com.example.demo.jooq.modulith.tables.Shedlock;
 
 import java.util.Arrays;
 import java.util.List;
@@ -51,6 +52,11 @@ public class Modulith extends SchemaImpl {
     public final EventPublicationArchive EVENT_PUBLICATION_ARCHIVE = EventPublicationArchive.EVENT_PUBLICATION_ARCHIVE;
 
     /**
+     * The table <code>modulith.shedlock</code>.
+     */
+    public final Shedlock SHEDLOCK = Shedlock.SHEDLOCK;
+
+    /**
      * No further instances allowed
      */
     private Modulith() {
@@ -69,7 +75,8 @@ public class Modulith extends SchemaImpl {
     public final List<Table<?>> getTables() {
         return Arrays.asList(
             EventPublication.EVENT_PUBLICATION,
-            EventPublicationArchive.EVENT_PUBLICATION_ARCHIVE
+            EventPublicationArchive.EVENT_PUBLICATION_ARCHIVE,
+            Shedlock.SHEDLOCK
         );
     }
 }

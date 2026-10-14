@@ -221,8 +221,8 @@ task <タスク名>
 日々の開発で使う入口タスクは次の六つです。
 
 - **`task dev`**：依存サービスを起動してバックエンドを起動（日々の開発の入口）。業務データが空のDBには、起動の前に開発用の代表データを入れる。
-- **`task check`**：素早いローカル確認（バックエンドの静的解析）。
-- **`task verify`**：push 前のバックエンド総合ゲート（静的解析、OpenAPI 契約検査と、使い捨てDBでのマイグレーション検証とテスト、CI と同じ内容）。
+- **`task check`**：素早いローカル確認（バックエンドの静的解析と、セッションに状態を残す SQL の検査）。
+- **`task verify`**：push 前のバックエンド総合ゲート（静的解析、セッションに状態を残す SQL の検査、OpenAPI 契約検査と、使い捨てDBでのマイグレーション検証とテスト、CI と同じ内容）。
 - **`task fe-dev`**：フロントエンドの開発サーバーを起動（`task dev`とは別のターミナルで実行する）。APIとOIDCを同一オリジンでproxyする。
 - **`task fe-verify`**：フロントエンドの静的解析、未使用コード検査、テスト、本番ビルド。
 - **`task lint-duplicates`**：バックエンドとフロントエンドの手書きコードの重複検査。
@@ -285,6 +285,11 @@ Docker Compose の操作（サービスの起動、停止、状態確認、Keycl
 - `task api-docs` は Redocly CLI で静的 HTML の設計書を `build/api-docs/index.html` に作ります。
   main へのマージで GitHub Pages に公開します。
 
+### セッションに状態を残す SQL の検査
+
+- `task lint-session-sql` は、PgBouncer のトランザクションモードや RDS Proxy の後ろで壊れる SQL（セッションの advisory lock、`LISTEN`、`WITH HOLD`、`PREPARE`、`DEALLOCATE`、`ON COMMIT PRESERVE ROWS` と `ON COMMIT DELETE ROWS`、`LOAD`）を、バックエンドの本番のコードと changelog から検出します。
+  `task check`、`task verify`、Backend CI の lint で実行します（[設計の作り込みの程度と段階的な再構築](docs/principles/right-sizing.md)）。
+
 ### 重複コード検査
 
 - `task lint-duplicates` はTanStack RouterとjOOQの生成コードを除いたBackendとFrontendの手書きソースをjscpdで検査します。
@@ -320,8 +325,9 @@ Docker Compose の操作（サービスの起動、停止、状態確認、Keycl
 
 ### ドキュメント
 
-- `docs/`、`.kiro/steering/`、`Taskfile.yml`を編集したときは`task okf-check`を実行します。
+- `docs/`、`.kiro/steering/`、`Taskfile.yml`、`README.md`、`tooling/adr-lint/`を編集したときは`task okf-check`を実行します。
   このタスクはOpen Knowledge Format v0.2バンドルの適合、docs内部のリンク切れ、孤立ドキュメント、steeringのfrontmatterとdocsとの境界を検査し、非index文書の250行超を責務混在の見直し合図として警告します。
+  ADRの番号の重複、索引と本文の状態と日付の不一致、リンクのラベルと宛先の番号の不一致も失敗にします。
   Taskfileと利用文書の同期候補も警告します。
 - Lefthookは対象ファイルの変更を検出すると、pre-commitで同じ検査を実行します。
 
@@ -351,6 +357,8 @@ push 前には `task adr-check` が pre-push で走り、判断が絡む変更�
   導入は [開発環境構築](docs/local-env-setup/setup.md) を参照してください。
 - OKF適合、docs内部のリンク切れ、孤立ドキュメント、steeringのfrontmatterとdocsとの境界は`task okf-check`で検証し、非index文書の250行超は責務混在の見直し合図として警告します。
   同じタスクは、Taskfileの公開タスクを変更した場合にREADMEと関連docsの同期候補も警告します。
+  バックエンドのJavadocだけを変えるPull Requestは、CIの`okf-validate`を起動しません。
+  ADRへのリンクを含むJavadocを変えたときは、手元で`task okf-check`を実行します。
 - 検証スキーマは `docs/.iwe/schemas/` に置き、`docs/index.md` を目次の起点としています。
   各領域の `docs/<領域>/index.md` は、どの文書をいつ読むかを示す入口です。
 - AI エージェント向けの作成規約は [`.kiro/steering/documentation-authoring.md`](.kiro/steering/documentation-authoring.md)、docs の読み方は [`.kiro/steering/docs-navigation.md`](.kiro/steering/docs-navigation.md) にあります。

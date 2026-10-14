@@ -6,6 +6,7 @@ package com.example.demo.jooq.modulith;
 
 import com.example.demo.jooq.modulith.tables.EventPublication;
 import com.example.demo.jooq.modulith.tables.EventPublicationArchive;
+import com.example.demo.jooq.modulith.tables.Shedlock;
 
 import javax.annotation.processing.Generated;
 
@@ -32,4 +33,9 @@ public class Tables {
      * The table <code>modulith.event_publication_archive</code>.
      */
     public static final EventPublicationArchive EVENT_PUBLICATION_ARCHIVE = EventPublicationArchive.EVENT_PUBLICATION_ARCHIVE;
+
+    /**
+     * The table <code>modulith.shedlock</code>.
+     */
+    public static final Shedlock SHEDLOCK = Shedlock.SHEDLOCK;
 }

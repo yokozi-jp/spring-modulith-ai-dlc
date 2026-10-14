@@ -1,0 +1,43 @@
+databaseChangeLog:
+  - changeSet:
+      id: 010-create-shedlock-table
+      author: system
+      preConditions:
+        - dbms:
+            type: postgresql
+      changes:
+        # ShedLock のロックの表（ADR-079）。列は ShedLock の文書の PostgreSQL の DDL に合わせ、型の書き方は業務テーブルと同じ小文字（varchar、timestamptz）にする（ADR-006）。
+        # ロックの期限は DB の時刻で書き込み、比べるため、インスタンスの時計に依存しない。
+        # timestamptz を timestamp に変えない。ShedLock は時刻帯のない現在時刻で書き込み、timestamptz の列だけが接続の TimeZone によらず正しく比べられる（ShedLockSessionTimeZoneTest が守る）。
+        - createTable:
+            tableName: shedlock
+            schemaName: modulith
+            columns:
+              - column:
+                  name: name
+                  type: varchar(64)
+                  constraints:
+                    nullable: false
+                    primaryKey: true
+                    primaryKeyName: shedlock_pkey
+              - column:
+                  name: lock_until
+                  type: timestamptz
+                  constraints:
+                    nullable: false
+              - column:
+                  name: locked_at
+                  type: timestamptz
+                  constraints:
+                    nullable: false
+              - column:
+                  name: locked_by
+                  type: varchar(255)
+                  constraints:
+                    nullable: false
+        - sql:
+            sql: GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE modulith.shedlock TO "${appDatabaseUsername}";
+      rollback:
+        - dropTable:
+            tableName: shedlock
+            schemaName: modulith

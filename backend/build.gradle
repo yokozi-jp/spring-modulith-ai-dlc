@@ -99,6 +99,11 @@ dependencies {
     implementation 'org.springframework.modulith:spring-modulith-starter-core'
     implementation 'org.springframework.modulith:spring-modulith-starter-jdbc'
     implementation 'org.springframework.modulith:spring-modulith-starter-insight'
+    // 再投入の条件の関数で、出版のリスナーの ID（TargetEventPublication）を読む（ADR-079）。starter が実行時に入れる版をコンパイルにも使う。
+    implementation 'org.springframework.modulith:spring-modulith-events-core'
+    // 失敗したイベント出版の再投入を、DB の時刻で期限を決めるロックで 1 つのインスタンスに絞る（ADR-079）。
+    // Spring BOM の管理外のため版を明示する。jOOQ は Spring Boot が管理する版に解決される。
+    implementation 'net.javacrumbs.shedlock:shedlock-provider-jooq:7.10.1'
 
     // --- 可観測性・メトリクス ---
     implementation 'org.springframework.boot:spring-boot-starter-actuator'
@@ -124,6 +129,8 @@ dependencies {
     testImplementation 'org.springframework.boot:spring-boot-starter-actuator-test'
     testImplementation 'org.springframework.boot:spring-boot-starter-opentelemetry-test'
     testImplementation 'org.springframework.modulith:spring-modulith-starter-test'
+    // 非同期の条件の待ち（ADR-080）。spring-modulith-starter-test の推移的な依存に頼らず明示する。版は Spring Boot が管理する。
+    testImplementation 'org.awaitility:awaitility'
     // JUnit Jupiter テスト内でプロパティ生成と反例の縮小を行う。
     testImplementation 'org.quicktheories:quicktheories:0.26'
     // ArchUnit の JUnit 5 連携（@AnalyzeClasses / @ArchTest）。

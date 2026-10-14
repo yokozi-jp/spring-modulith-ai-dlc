@@ -6,8 +6,10 @@ package com.example.demo.jooq.modulith;
 
 import com.example.demo.jooq.modulith.tables.EventPublication;
 import com.example.demo.jooq.modulith.tables.EventPublicationArchive;
+import com.example.demo.jooq.modulith.tables.Shedlock;
 import com.example.demo.jooq.modulith.tables.records.EventPublicationArchiveRecord;
 import com.example.demo.jooq.modulith.tables.records.EventPublicationRecord;
+import com.example.demo.jooq.modulith.tables.records.ShedlockRecord;
 
 import javax.annotation.processing.Generated;
 
@@ -37,4 +39,5 @@ public class Keys {
 
     public static final UniqueKey<EventPublicationRecord> EVENT_PUBLICATION_PKEY = Internal.createUniqueKey(EventPublication.EVENT_PUBLICATION, DSL.name("event_publication_pkey"), new TableField[] { EventPublication.EVENT_PUBLICATION.ID }, true);
     public static final UniqueKey<EventPublicationArchiveRecord> EVENT_PUBLICATION_ARCHIVE_PKEY = Internal.createUniqueKey(EventPublicationArchive.EVENT_PUBLICATION_ARCHIVE, DSL.name("event_publication_archive_pkey"), new TableField[] { EventPublicationArchive.EVENT_PUBLICATION_ARCHIVE.ID }, true);
+    public static final UniqueKey<ShedlockRecord> SHEDLOCK_PKEY = Internal.createUniqueKey(Shedlock.SHEDLOCK, DSL.name("shedlock_pkey"), new TableField[] { Shedlock.SHEDLOCK.NAME }, true);
 }

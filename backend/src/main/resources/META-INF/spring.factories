@@ -1,0 +1,3 @@
+# 手での 1 回の再投入の対象があるとき、Web のサーバーと定期の実行を止める（ADR-079）。
+org.springframework.boot.EnvironmentPostProcessor=\
+com.example.demo.shared.infrastructure.persistence.EventPublicationResubmissionConfig$ResubmitOnceEnvironment

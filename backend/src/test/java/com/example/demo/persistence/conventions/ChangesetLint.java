@@ -47,7 +47,14 @@ final class ChangesetLint {
               moduleSchemaSql("003-create-product-tables", "product", "product.m_product"),
               moduleSchemaSql(
                   "004-create-order-tables", "ordering", "ordering.t_order, ordering.t_order_line"),
-              moduleSchemaSql("006-create-payment-tables", "payment", "payment.t_payment"))
+              moduleSchemaSql("006-create-payment-tables", "payment", "payment.t_payment"),
+              List.of(
+                  new AllowlistEntry(
+                      ARBITRARY_SQL,
+                      "010-create-shedlock-table: GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE"
+                          + " modulith.shedlock TO \"${appDatabaseUsername}\";",
+                      "Liquibase OSSにはGRANTのChange Typeがない。"
+                          + "既存のmodulithスキーマに足すShedLockの表へ、アプリロールのDMLを与える（ADR-079）。")))
           .flatMap(List::stream)
           .toList();
 
