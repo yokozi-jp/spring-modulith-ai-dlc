@@ -9,6 +9,7 @@ tags: [runbook, observability, logging, operations, integration, spring-modulith
 
 定期のジョブは、リスナーの失敗で `FAILED` に残ったイベント出版を、リスナーの方針の待ち時間の後に、方針の上限の回数まで再投入する（[ADR-079](../adr/ADR-079-resubmit-failed-event-publications-periodically-with-shedlock.md)）。
 上限に達した出版は出版ごとの `ERROR` で知らせ、その後は運用者がこの文書の手順で扱う。
+仕組みの全体像は[イベント出版の再投入の全体像](../integration/event-publication-resubmission.md)を参照する。
 運用定義の項目は[運用者が対応するログイベントの管理](log-operational-events.md)に従う。
 `Event publications resubmitted` と `Event publications resubmitted once`（`INFO`）、`Event publication resubmission skipped`（`DEBUG`）は運用定義を要求しないため書かない。
 

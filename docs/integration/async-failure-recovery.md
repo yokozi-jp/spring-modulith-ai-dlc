@@ -25,6 +25,9 @@ DLQ はソースキューごとに置き、アプリケーションによる即�
 - 外部呼び出しの即時の再試行は、client adapter の一層だけで行う（[ADR-019](../adr/ADR-019-define-resilience-and-capacity-guardrails.md)）。コンシューマーで client adapter を囲む再試行のループを書かない。
 - メッセージの再配信の間隔は、基盤が指数バックオフをサポートしていれば使う。指数バックオフに独自の実装が必要な場合は、実装費用に見合う効果がある場合だけ採用する。
 
+client adapter の短期の再試行と、イベント出版の持続的な再投入は別の層である。
+層の関係と判断の理由は [ADR-079](../adr/ADR-079-resubmit-failed-event-publications-periodically-with-shedlock.md) の選択肢 9 に従う。
+
 回復不能なエラーは、資源の浪費と他の処理への影響を避けるため、再試行を打ち切って DLQ へ退避する。
 
 ## Spring Modulith のイベントの失敗

@@ -207,6 +207,14 @@ shared の範囲は、ADR-048 の jOOQ の共通処理に加えて、Spring Modu
   リスナーのトランザクションは戻るため出版は失われず、次の再投入の対象に残る。
 - リスナーの処理が `lock-at-most-for` を超えると、Staleness Monitor が処理中の出版を `FAILED` に戻し、結果の Counter がその出版を `failed` と数えうる。
 - 最初の配信が `concurrency-limit` の空きを待つ間に `wait-age` を過ぎた出版は、Staleness Monitor が `FAILED` に戻し、ジョブが重ねて再投入しうる。その場合はリスナーの冪等性に頼る。その間、`FAILED` の出版の Gauge は処理中の出版も数える。
+- 決済の circuit breaker（`payment-gateway`）が open の間の再投入は、外部を呼ばずに `CallNotPermittedException` で `FAILED` になり、`completion_attempts` を 1 消費する。
+  コードで確認したのは次の 3 点である。
+  `OrderConfirmedListener.on` と `ChargeOrderCommandHandler` はこの例外を捕まえず（main に捕まえる箇所はない）、`PaymentGatewayClientIntegrationTest.consecutiveFailuresOpenCircuitBreaker` が open のときにこの例外が出て決済代行を呼ばないことを確かめている。
+  再投入の予約（`markResubmitted`）が `completion_attempts` を 1 増やす。
+  上限の判定は回数だけを見て（`ResubmissionPolicies.isDue`、`EventPublicationResubmitter.exhaustedCondition`）、失敗の原因を見分けない。
+  確認していないのは頻度である。
+  open は 30 秒で half-open に移るため、最初の待ち時間（本番想定 5 分）の後の再投入では多くの場合閉じているとみられるが、障害が続くと再び open になり、同じ時刻に再投入された複数の出版が呼び出しなしで回数を消費しうる。
+  本番で観測してから `CallNotPermittedException` の扱いを見直す。
 - 指数的な待ち時間のため、上限に達するまでの時間が延び（本番の `default` でおよそ 2 時間 20 分）、`failed.oldest.age{state=retrying}` の警報の閾値もそれに合わせて長くなる。
 
 ### Neutral
@@ -222,7 +230,8 @@ shared の範囲は、ADR-048 の jOOQ の共通処理に加えて、Spring Modu
   列を `timestamp` にすると壊れるため、変えない。
   `ShedLockSessionTimeZoneTest` がこれを守る。
 - ADR-019 の「retry は client adapter の一層だけ」は呼び出しの即時の再試行についての決定であり、分単位の間隔と回数の上限を持つ出版の再投入はそれと別の層である。
-  1 件の出版あたりの外部の呼び出しは、client adapter の試行の回数と再投入の回数の積が上限になる。
+  決済の client は試行 1 回なので、1 件の出版あたりの外部の呼び出しは最大 6 回（最初の 1 回と再投入 5 回）である（`PaymentGatewayClient.java:83-84`、`application.yaml:262-263`、`application.yaml:201-205`）。
+  `idempotent` の retry を継承すると 6 × 3 = 18 回になるが、再投入の間隔は 5 分から 1 時間なので、即時の連続した呼び出しにはならない。
 
 ## Alternatives Considered
 
@@ -273,6 +282,17 @@ shared の範囲は、ADR-048 の jOOQ の共通処理に加えて、Spring Modu
 - **Description**：手での再投入はロックを取らず、重ねたくなければ先に定期のジョブを止める。
 - **Pros**：手での入口のコードが少ない。
 - **Cons**：手順を忘れると重ねて再投入する。起動したアプリが Web のサーバーと定期の実行も動かし、リスナーの完了を待たずに終わるかどうかが起動の仕方で変わる。
+
+### 選択肢9: 決済の呼び出しの circuit breaker と retry（または Spring Retry）をイベントのリスナーで使い、再投入のジョブを置かない
+
+- **Description**：リスナーの境界で Resilience4j の circuit breaker と retry（または Spring Retry）を掛け、失敗したら再投入のジョブの代わりにその場の再試行に任せる。
+- **Pros**：依存はすでにあり（`spring-cloud-starter-circuitbreaker-resilience4j`）、設定が少なく、短い障害をその場で吸収できる。
+- **Cons**：状態がインスタンスのメモリにあり、再起動で消える。
+  インスタンスごとに別の状態を持つため、全体の障害を調整できない。
+  circuit breaker は呼び出しを拒否するだけで、イベントを保持しない。
+  時間の尺が違い、Resilience4j はミリ秒から秒、再投入は分から時間である。
+
+Resilience4j は再投入と補完関係にあり、ADR-019 のとおり client adapter に残す。
 
 ## References
 
