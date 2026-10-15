@@ -30,7 +30,7 @@ services:
     restart: unless-stopped
 
   keycloak:
-    image: quay.io/keycloak/keycloak:26.8.0@sha256:b0f60d489d51c5d113390bdf5461d4c06e6051be026c05549f2e1e10ec352bcc
+    image: quay.io/keycloak/keycloak:26.8.1@sha256:79c623a22abacf3fe6c00a5fb30f5b7843d717b234033b80995891c06116d244
     # ローカル専用の使い捨て IdP（本番ではCognitoを使う想定）。127.0.0.1 のみに公開し
     # start-dev で動かすため、管理者資格情報は開発用の admin/admin を直書きする
     # （機密ではなく、上書きの必要もない）。
@@ -82,7 +82,7 @@ services:
   wiremock:
     # ローカル専用の決済代行の偽物。docker/wiremock/mappings の請求の成功のスタブを返す。
     # 失敗は管理 API（/__admin/mappings）で実行中に足す。本番は実際の決済代行の URL を注入する。
-    image: wiremock/wiremock:3.13.2@sha256:d737d2de3664a7e1bf96f73a7bd48a0d47d61988f7ca88a6e51ea44b8c1f687d
+    image: wiremock/wiremock:3.13.2@sha256:0d4ecb3e4dc8213fd7a4d37d6a78f6e6b553a6d2e15bd51b0999781282ac61b3
     # JDK の HttpClient が平文の HTTP/2 へ upgrade すると、本文付きの POST が切れるため、平文の HTTP/2 を止める。
     command: ["--disable-banner", "--disable-http2-plain"]
     environment:
@@ -100,7 +100,7 @@ services:
     restart: unless-stopped
 
   otel-lgtm:
-    image: grafana/otel-lgtm:0.34.0@sha256:b966ea107831d526d9eb8fe4d2d86c9e5731392fad9dce8296bcf2072031f07c
+    image: grafana/otel-lgtm:0.35.0@sha256:2de1094c593c671cbfca878a28ffcd7e46ff5e32f2ce966c0cf33003f6cf4266
     entrypoint:
       - /bin/bash
       - -ec
@@ -126,7 +126,7 @@ services:
 
   # 可観測性データの唯一の出口。ログの属性を allowlist で絞ってから LGTM へ送る（本番と同じ設定）。
   otel-collector:
-    image: otel/opentelemetry-collector-contrib:0.161.0-386@sha256:76fd04f2d75922e93e447381bafcd0b78d24f1c5cdcc13f424d9a16f0342c087
+    image: otel/opentelemetry-collector-contrib:0.162.0@sha256:39923a8e431bd1f57be82411999d389fcfe40857492e4365456d97a4c1f74be6
     command: ["--config", "/etc/otelcol-contrib/config.yaml"]
     environment:
       # コンテナ間通信とホストからの送信を受けるため、全インターフェースで待ち受ける。
