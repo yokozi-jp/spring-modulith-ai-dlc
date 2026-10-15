@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.12.0](https://github.com/yokozi-jp/spring-modulith-ai-dlc/compare/v0.11.0...v0.12.0) (2026-10-14)
+
+
+### Features
+
+* **api:** csrf トークン失敗の 403 を専用の problem type で返す ([#210](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/210)) ([3ca5314](https://github.com/yokozi-jp/spring-modulith-ai-dlc/commit/3ca5314ca3e2e7f3b88b7c05b4af2c8d2c4a7ac1))
+
 ## [0.11.0](https://github.com/yokozi-jp/spring-modulith-ai-dlc/compare/v0.10.1...v0.11.0) (2026-10-14)
 
 
