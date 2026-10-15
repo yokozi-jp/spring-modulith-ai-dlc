@@ -1,0 +1,170 @@
+package com.example.demo;
+
+import static org.assertj.core.api.Assertions.assertThat;
+
+import com.example.demo.architecture.TestCodeOnly;
+import com.example.demo.testkit.ContractCase;
+import com.tngtech.archunit.core.domain.JavaMethod;
+import com.tngtech.archunit.core.importer.ClassFileImporter;
+import io.swagger.v3.core.util.Yaml31;
+import io.swagger.v3.oas.models.OpenAPI;
+import java.io.IOException;
+import java.lang.reflect.Method;
+import java.nio.file.Path;
+import java.util.Arrays;
+import java.util.Locale;
+import java.util.Map;
+import java.util.ResourceBundle;
+import java.util.Set;
+import java.util.TreeSet;
+import java.util.stream.Collectors;
+import java.util.stream.IntStream;
+import java.util.stream.Stream;
+import org.junit.jupiter.api.Disabled;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestTemplate;
+import org.junit.platform.commons.support.AnnotationSupport;
+
+/**
+ * コミット済みの OpenAPI 契約の operation と応答の status の組ごとに、MockMvc の契約テストがあることを検査する（ADR-077）。
+ *
+ * <p>契約テストは {@link ContractCase} で確かめる組を宣言する。この検査は Spring も DB も起動しない。
+ */
+class ApiContractCoverageTest {
+
+  /** コミット済みの OpenAPI 契約。テストは backend を作業ディレクトリにして走る。 */
+  private static final Path OPENAPI = Path.of("..", "openapi", "openapi.yaml");
+
+  /**
+   * OpenAPI に載らない {@code /error} が返しうる status。
+   *
+   * <p>{@code ApiErrorController} は転送元の status を保つ。title を持つ status は {@code messages.properties} の
+   * {@code problem.title.<3 桁>} から導き、{@code HttpStatus} に定義のない 4xx と 5xx の代表（499 と 599）だけを手で足す。
+   */
+  private static final Set<Integer> ERROR_ENDPOINT_STATUSES = errorEndpointStatuses();
+
+  /**
+   * operation ごとの契約テストを求めない組と理由。キーは「HTTP メソッド status」で、メソッドの {@code *} はすべてのメソッドを表す。
+   *
+   * <p>どちらも {@code OpenApiConfig} の customizer が全 operation に付ける共通の応答である。
+   */
+  private static final Map<String, String> EXEMPTIONS =
+      Map.of(
+          "* 500",
+          "operation に依らない ApiExceptionHandler の catch-all が返す。"
+              + "ApiErrorContractTest の未処理例外と JDK の例外の case で確かめる。",
+          "GET 403",
+          "GET は CSRF の検査の対象外で、/api/** に権限の規則もないため、403 を起こす経路がない。"
+              + "権限の規則を加えたら、この除外を消して case を足す。");
+
+  private static Set<Integer> errorEndpointStatuses() {
+    final String prefix = "problem.title.";
+    final Stream<Integer> titled =
+        ResourceBundle.getBundle("messages", Locale.ROOT).keySet().stream()
+            .filter(key -> key.matches("problem\\.title\\.\\d{3}"))
+            .map(key -> Integer.valueOf(key.substring(prefix.length())));
+    return Stream.concat(titled, Stream.of(499, 599)).collect(Collectors.toUnmodifiableSet());
+  }
+
+  @Test
+  @DisplayName("契約の operation と status の組と /error の status は、すべて MockMvc の契約テストで確かめる")
+  void everyDeclaredResponseHasContractCase() throws IOException {
+    final Set<String> declared = declaredResponses();
+    final Set<String> covered = coveredResponses();
+
+    final Set<String> missing = new TreeSet<>(declared);
+    missing.removeAll(covered);
+    missing.removeIf(ApiContractCoverageTest::isExempt);
+    assertThat(missing).as("@ContractCase のない組。契約テストを足し、@ContractCase を付ける（%s）", OPENAPI).isEmpty();
+
+    final Set<String> unknown = new TreeSet<>(covered);
+    unknown.removeAll(declared);
+    assertThat(unknown).as("契約にない組を宣言した @ContractCase。path の形と status を直す").isEmpty();
+
+    final Set<String> unusedExemptions = new TreeSet<>(EXEMPTIONS.keySet());
+    unusedExemptions.removeIf(
+        exemption ->
+            declared.stream()
+                .filter(response -> !covered.contains(response))
+                .anyMatch(response -> matches(exemption, response)));
+    assertThat(unusedExemptions).as("どの組にも当たらなくなった除外。EXEMPTIONS から消す").isEmpty();
+  }
+
+  /** 契約の operation と応答の status の組と、{@code /error} の status を「メソッド path status」で返す。 */
+  private static Set<String> declaredResponses() throws IOException {
+    final OpenAPI openApi = Yaml31.mapper().readValue(OPENAPI.toFile(), OpenAPI.class);
+    final Set<String> responses = new TreeSet<>();
+    openApi
+        .getPaths()
+        .forEach(
+            (path, item) ->
+                item.readOperationsMap()
+                    .forEach(
+                        (method, operation) ->
+                            operation
+                                .getResponses()
+                                .keySet()
+                                .forEach(
+                                    status -> responses.add(key(method.name(), path, status)))));
+    ERROR_ENDPOINT_STATUSES.forEach(
+        status -> responses.add(key("GET", "/error", String.valueOf(status))));
+    return responses;
+  }
+
+  /** 手書きのテストコードに付いた {@link ContractCase} の組を返す。 */
+  // ponytail: 宣言は自己申告で、テストが実際にその status を期待するかは見ない（実行されるテストかどうかは見る）。
+  // 宣言と andExpect のずれが問題になったら、MockMvc の実行結果を記録して突き合わせる方式に替える（ADR-077）。
+  private static Set<String> coveredResponses() {
+    return new ClassFileImporter()
+        .withImportOption(new TestCodeOnly()).importPackagesOf(DemoApplication.class).stream()
+            .flatMap(javaClass -> javaClass.getMethods().stream())
+            .map(JavaMethod::reflect)
+            .filter(ApiContractCoverageTest::isEnabledTest)
+            .flatMap(method -> Arrays.stream(method.getAnnotationsByType(ContractCase.class)))
+            .flatMap(
+                contractCase ->
+                    IntStream.of(contractCase.status())
+                        .mapToObj(
+                            status ->
+                                key(
+                                    contractCase.method().name(),
+                                    contractCase.path(),
+                                    String.valueOf(status))))
+            .collect(Collectors.toCollection(TreeSet::new));
+  }
+
+  /** 実行されるテストのメソッドか。宣言を付けただけの補助メソッドや、無効にしたテストの宣言は数えない。 */
+  private static boolean isEnabledTest(final Method method) {
+    return (AnnotationSupport.isAnnotated(method, Test.class)
+            || AnnotationSupport.isAnnotated(method, TestTemplate.class))
+        && !AnnotationSupport.isAnnotated(method, Disabled.class)
+        && !AnnotationSupport.isAnnotated(method.getDeclaringClass(), Disabled.class);
+  }
+
+  private static boolean isExempt(final String response) {
+    return EXEMPTIONS.keySet().stream().anyMatch(exemption -> matches(exemption, response));
+  }
+
+  /**
+   * 除外のキー「メソッド status」が、組「メソッド path status」に当たるかを返す。
+   *
+   * <p>除外の理由は OpenAPI の operation にだけ当てはまるため、{@code /error} の組には当てない。
+   */
+  private static boolean matches(final String exemption, final String response) {
+    if (response.startsWith(key("GET", "/error", ""))) {
+      return false;
+    }
+    final int space = exemption.indexOf(' ');
+    if (space < 0) {
+      throw new IllegalArgumentException("除外のキーは「HTTP メソッド status」の形で書く: " + exemption);
+    }
+    final String method = exemption.substring(0, space);
+    final String status = exemption.substring(space);
+    return ("*".equals(method) || response.startsWith(method + " ")) && response.endsWith(status);
+  }
+
+  private static String key(final String method, final String path, final String status) {
+    return method + " " + path + " " + status;
+  }
+}

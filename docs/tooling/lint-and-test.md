@@ -13,8 +13,8 @@ Dockerを使うTaskは、Dockerがないローカル環境ではスキップし�
 
 ## 入口Task
 
-- **`task check`**：バックエンドの静的解析を実行する。
-- **`task verify`**：バックエンドの静的解析、マイグレーション検証、テストを実行する。
+- **`task check`**：`lint-session-sql`とバックエンドの静的解析を実行する。
+- **`task verify`**：`lint-session-sql`、バックエンドの静的解析、マイグレーション検証、テストを実行する。
 - **`task test`**：隔離した依存を起動し、確定済みマイグレーションの検証、バックエンドテスト、OpenAPI契約検査後に片付ける。
 - **`task test-dev`**：隔離した依存を起動し、作りかけのchangesetを含むバックエンドテスト後に片付ける。
 - **`task mutation-test`**：隔離した依存を使ってバックエンドのPITミューテーションテストを実行する。
@@ -24,6 +24,13 @@ Dockerを使うTaskは、Dockerがないローカル環境ではスキップし�
 ## バックエンド
 
 - **`task be-lint`**：Spotless、PMD、SpotBugsでmainとtestを検査する。
+- **`task lint-session-sql`**：`backend/src/main/java`のJavaと`backend/src/main/resources/db`のSQLとYAMLから、接続を多重化するプロキシ（PgBouncerのトランザクションモード、RDS Proxy）の後ろで壊れる、セッションに状態を残すSQLを検出し、あれば失敗する。
+  対象は、[PgBouncerの機能の表](https://www.pgbouncer.org/features.html)でTransaction poolingがNeverの機能のうち、セッションのadvisory lock（`pg_advisory_lock`、`pg_try_advisory_lock`、`pg_advisory_unlock`、`pg_advisory_unlock_all`と`_shared`の版）、`LISTEN`、`WITH HOLD`のカーソル、`PREPARE`と`DEALLOCATE`の文、`ON COMMIT PRESERVE ROWS`と`ON COMMIT DELETE ROWS`の一時表、`LOAD`である。
+  大文字と小文字を区別せず、Javadoc、行コメント、YAMLとSQLのコメントの行は除く。
+  トランザクションのadvisory lock（`pg_advisory_xact_lock`、`pg_try_advisory_xact_lock`）、`ON COMMIT DROP`、`LISTENER_ID`のような識別子は検出しない。
+  検査の本体は`tooling/session-sql-lint/session-sql-lint.sh`で、検出の前に`tooling/session-sql-lint/test.sh`が、検出すべき文と検出しない文のfixtureで終了コードと出力を確かめる。
+  `SET`と`RESET`も同じ表でNeverだが、`spring.datasource.hikari.connection-init-sql`がセッションの`SET`を使うため検出しない（[ADR-079](../adr/ADR-079-resubmit-failed-event-publications-periodically-with-shedlock.md)）。
+  設計の理由は[設計の作り込みの程度と段階的な再構築](../principles/right-sizing.md)の「テンプレートの利用先で変わる前提」にある。
 - **`task be-openapi-lint`**：起動済みのテスト用依存でOpenAPI 3.1契約を`openapi/openapi.yaml`へ生成し、Spectralで検査する。
 - **`task be-openapi-check`**：直前の`be-test`が書き出した契約をSpectralで検査し、コミット済みの`openapi/openapi.yaml`と差分があれば失敗する。
   テストを実行しないため、`be-test`の後に実行する。
@@ -54,8 +61,9 @@ PITのHTMLとXMLのレポートは、変異対象がある場合に`backend/buil
 - **`task fe-check`**：Oxfmt、Oxlint、TypeScriptの型を非破壊で検査する。
 - **`task fe-knip`**：未参照ファイル、未使用export、未使用依存をKnipで検査する。
 - **`task fe-doctor`**：React Doctorでwarningとerrorを検出し、検出または15分超過で失敗する。
-- **`task fe-coverage`**：VitestのV8 providerで、全体のbranch 88%とline 95%、ファイルごとのbranch 60%とline 65%を検証する。
+- **`task fe-coverage`**：React Compilerを有効にしてテストを実行したあと、Compilerを外した状態でVitestのV8 providerのcoverageを測り、全体のbranch 88%とline 95%、ファイルごとのbranch 60%とline 65%を検証する。
   全体の下限は`vite.config.ts`の`thresholds`が、ファイルごとの下限はTaskが`coverage/coverage-summary.json`から検査する（[ADR-076](../adr/ADR-076-run-mutation-tests-per-change-and-tighten-coverage-gates.md)）。
+  Compilerを外すのは環境変数`FRONTEND_REACT_COMPILER=false`で、理由は[ADR-078](../adr/ADR-078-measure-frontend-coverage-without-react-compiler.md)にある。
 - **`task fe-test-build`**：`fe-coverage`と、`FRONTEND_OTEL_ENABLED=false`を強制した本番ビルドを実行する。
   ビルドの後に`dist/assets`を`faro|grafana|opentelemetry|web.?vitals`でgrepし、bundleにFaro、OpenTelemetry JS、Web Vitalsのコードが入っていれば失敗する（[ADR-068](../adr/ADR-068-collect-browser-telemetry-with-faro-via-collector.md)）。
 - **`task fe-verify`**：`fe-check`、`fe-knip`、`fe-test-build`（テレメトリを無効にした本番ビルドとgrepを含む）を実行する。
@@ -244,7 +252,15 @@ const params = { ...(cursor !== undefined && { cursor }) };
   同じfixtureのtraceは`traces/frontend`の出口を別のファイルに分け、URL属性がなく、許可したHTTP属性とresource属性だけが残り、trace ID、span ID、親span IDが保たれることを確かめる。
 - **`task lint-md`**：`.markdownlint-cli2.yaml`の除外設定に従いMarkdownを検査する。
 - **`task lint-md-fix`**：markdownlint-cli2で安全に修正できるMarkdownの問題を修正する。
-- **`task okf-check`**：OKF適合、内部リンク、孤立文書、文書責務の見直し合図、steering境界、Taskfile文書同期候補を検査する。
+- **`task okf-check`**：OKF適合、内部リンク、孤立文書、文書責務の見直し合図、steering境界、ADRの整合（`adr-lint`）、Taskfile文書同期候補を検査する。
+  `adr-lint`は内部タスクで、`okf-check`の中でだけ動く。
+  `tooling/adr-lint/test.sh`が壊れたfixtureで期待の終了コードを確かめてから、`tooling/adr-lint/adr-lint.mjs`が実際のツリーを検査する。
+  失敗にするのは、ADR番号の重複、ADRファイルごとに索引の行がちょうど1つでない状態、索引と本文の状態と日付の不一致、`[ADR-NNN](…ADR-MMM-….md)`のラベルと宛先の番号の不一致である。
+  状態は`Superseded by ...`を先頭の語に揃えて比べる。
+  番号の欠けは警告にとどめる。
+  リンクの検査は`docs/`、`README.md`、`CONTRIBUTING.md`、`.kiro/steering/`、`backend/src`のJavadocとMarkdownを対象にする。
+  既知の限界として、`okf-validate.yml`の`paths`は`backend/src/**`を含まないため、バックエンドのJavadocだけを変えるPull RequestではCIが動かない。
+  ADRの番号を振り直す変更はdocsの変更を伴うため、そこで検出する。
 - **`task release-check`**：release-pleaseのmanifest、版ファイル、Gradle版、設定の一致を検証する。
 - **`task lint-taskfile`**：Task本体でTaskfileのYAML構文とスキーマ構造を検証する。
   `tooling/taskfile-cleanup/`のfixtureで、後片付けの定型が本体の終了コードを優先し、前段が失敗しても後段の後片付けを走らせることを検査する。
@@ -264,7 +280,7 @@ OKF検査の採用理由は[ADR-036](../adr/ADR-036-adopt-okf-for-docs-knowledge
 - **pre-commit（Dockerfileの変更）**：`lint-docker`相当と`lint-docker-check`相当を実行する。
 - **pre-commit（Composeファイルの変更）**：`lint-compose`相当を実行する。
 - **pre-commit（Markdownの変更）**：変更ファイルへ`lint-md`相当を実行する。
-- **pre-commit（docs、steering、Taskfileの変更）**：`okf-check`を実行する。
+- **pre-commit（docs、steering、Taskfile、README、`tooling/adr-lint/`の変更）**：`okf-check`を実行する。
 - **pre-commit（Taskfileか`tooling/taskfile-cleanup/`の変更）**：`lint-taskfile`を実行する。
 - **pre-push（すべて）**：`adr-check`と`scan-secrets-all`相当を実行する。
 - **pre-push（バックエンドのJavaまたはGradle変更）**：`be-lint`相当と`test`を実行する。
@@ -276,7 +292,7 @@ Gitフックの条件とコマンドは[`lefthook.yml`](../../lefthook.yml)を�
 
 ## CI対応
 
-- **`backend-ci.yml`**：`be-lint`相当、`be-verify-migrations`、`be-test`、`be-openapi-check`を実行する。
+- **`backend-ci.yml`**：`be-lint`相当、`lint-session-sql`、`be-verify-migrations`、`be-test`、`be-openapi-check`、手動実行時の`mutation-test`を実行する。
   compose-testを止めた後に`test-deps-leftover-check`を実行する。
   契約は`be-test`が書き出し、`be-openapi-check`は`OpenApiContractTest`を再実行しない（[ADR-064](../adr/ADR-064-write-openapi-contract-from-test-task-in-ci.md)）。
   Gradle User Homeは`setup-gradle`の`cache-provider: external`にして、`actions/cache`のrestoreとsaveで扱う。

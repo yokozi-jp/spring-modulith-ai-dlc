@@ -19,6 +19,9 @@ ControllerやDTOを変えたら`task api-gen`を実行し、`openapi/openapi.yam
 ## 手順
 
 1. ControllerとDTOを[OpenAPIのアノテーションとJavadoc](openapi-annotations.md)に従って変える。
+   契約に足す応答のstatusごとにMockMvcの契約テストを書き、`@ContractCase`で組を宣言する（[Controllerの対応するテスト](../backend/class-roles/controller.md#対応するテスト)）。
+   `/error`が返すstatusのうち、titleを持つものは`messages.properties`の`problem.title.<3桁>`から検査が導く。
+   `HttpStatus`に定義のないstatusを新しく扱わせたときだけ、`ApiContractCoverageTest`の`ERROR_ENDPOINT_STATUSES`に足す。
 2. `OpenApiConfig.CONTRACT_VERSION`を[OpenAPI文書の版](versioning.md#openapi文書の版)に従って上げる（互換な追加はMINOR、破壊的変更はMAJOR）。
 3. 契約と生成物を再生成する。
 
@@ -74,6 +77,7 @@ Orvalの設定（`frontend/orval.config.ts`）だけを変えたときは、`tas
 
 - **pre-commit**：契約、`.spectral.yaml`、Orvalの設定、生成物の変更で、コミット済みの契約のSpectralと`task api-client-check`を実行する。
 - **Backend CI**：`task be-test`が書き出した契約を、`task be-openapi-check`でコミット済みの`openapi/openapi.yaml`と比べる。
+  `task be-test`の`ApiContractCoverageTest`は、契約のoperationとstatusの組ごとに`@ContractCase`の宣言があるかを検査する（[ADR-077](../adr/ADR-077-check-contract-test-coverage-per-response-status.md)）。
 - **Frontend CI**：`task api-client-check`で生成物を再生成し、コミット済みの内容と比べる。
 - **API Contract**（`api-contract.yml`）：`task api-lint`、`task api-lint-rules-test`、`task api-breaking`を実行し、`task api-docs`の設計書をartifactにする。
   mainへのmergeでは、設計書をGitHub Pagesに公開する。
@@ -94,6 +98,10 @@ drift（生成し直した内容とコミット済みの内容の差）の検査
   表示されたファイルを`git add`する。
 - **`task api-lint`が失敗した**：契約がSpectralのルールに違反している。
   ルール名から[OpenAPIのアノテーションとJavadoc](openapi-annotations.md)の該当箇所を探し、ControllerかDTOを直して`task api-gen`を実行する。
+- **`ApiContractCoverageTest`が失敗した**：失敗のメッセージが、宣言のない組、契約にない宣言、当たらなくなった除外のどれかを示す。
+  宣言のない組には、そのstatusを起こす契約テストを書いて`@ContractCase`を付ける。
+  契約にない宣言は、`path`の形とstatusを契約に合わせる。
+  当たらなくなった除外は、`EXEMPTIONS`から消す。
 - **`task api-breaking`が失敗した**：mainの契約と比べて互換でない変更がある。
   互換な形（項目の追加、任意のパラメータ）に直すか、意図した変更なら手順9のラベル、本文、リリース記法を適用する。
 

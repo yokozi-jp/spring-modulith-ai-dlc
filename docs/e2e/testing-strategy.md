@@ -188,8 +188,9 @@ build、コンテナの起動、後片付けは行わない。
 
 ## E2E で確かめない範囲
 
-- イベント出版の状態、試行の回数、再投入の後の決済記録は、backend の `PaymentGatewayClientIntegrationTest` が本番の Client と既存の再投入の入口で確かめる。
-  出版の状態を読む公開の入口も、再投入の公開の入口も無く（運用者の入口と定期の再投入は [#108](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/108) で扱う）、共有の backend を `resubmit-once` の profile で再起動すると並列のテストを壊すためである。
+- イベント出版の状態、試行の回数、再投入の後の決済記録は、backend の `PaymentGatewayClientIntegrationTest` が本番の Client と手での 1 回の再投入で確かめる。
+  出版の状態を読む公開の入口も、再投入の公開の入口も無く、共有の backend の DB に手での 1 回の再投入を起動すると並列のテストの出版も再投入して壊すためである。
+  E2E の backend は `.env.test` で定期の再投入を無効にしている（[ADR-079](../adr/ADR-079-resubmit-failed-event-publications-periodically-with-shedlock.md)）。
   E2E は、一時障害のあいだと成功に戻した後に、画面が再投入待ちを表示し、請求が 1 回のままであることだけを確かめる。
 - Safari と WebKit では実行しない。
   CSRF の Cookie は `Secure` の `__Host-` の名前で（[ADR-066](../adr/ADR-066-harden-csrf-cookie-with-host-prefix.md)）、Safari が `http://localhost` でこの Cookie を保存するかは未確認である（[#158](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/158)）。

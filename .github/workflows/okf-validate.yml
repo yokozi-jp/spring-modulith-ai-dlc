@@ -8,6 +8,8 @@ on:
       - "docs/.iwe/**"
       - ".kiro/steering/**"
       - "Taskfile.yml"
+      - "README.md"
+      - "tooling/adr-lint/**"
   pull_request:
     branches: ["**"]
     paths:
@@ -15,6 +17,8 @@ on:
       - "docs/.iwe/**"
       - ".kiro/steering/**"
       - "Taskfile.yml"
+      - "README.md"
+      - "tooling/adr-lint/**"
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}

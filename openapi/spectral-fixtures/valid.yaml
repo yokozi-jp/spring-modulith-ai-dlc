@@ -209,7 +209,7 @@ components:
           schema:
             $ref: "#/components/schemas/ProblemDetail"
     ForbiddenProblem:
-      description: 操作の権限がない
+      description: 操作の権限がない。CSRF トークンの検証に失敗したときの type は /problems/csrf-token-invalid
       content:
         application/problem+json:
           schema:

@@ -11,6 +11,7 @@ import com.example.demo.payment.domain.model.ChargeOutcome;
 import com.example.demo.payment.domain.model.Money;
 import com.example.demo.payment.domain.model.OrderId;
 import com.example.demo.payment.domain.model.PaymentGateway;
+import com.example.demo.shared.infrastructure.persistence.EventPublicationResubmitOnce;
 import com.example.demo.testkit.CleanGeneratedTablesExtension;
 import com.example.demo.testkit.SharedTestConfiguration;
 import com.github.tomakehurst.wiremock.WireMockServer;
@@ -35,9 +36,7 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.DefaultApplicationArguments;
 import org.springframework.context.annotation.Import;
-import org.springframework.modulith.events.FailedEventPublications;
 import org.springframework.modulith.test.ApplicationModuleTest;
 import org.springframework.modulith.test.ApplicationModuleTest.BootstrapMode;
 import org.springframework.modulith.test.Scenario;
@@ -52,8 +51,8 @@ import org.springframework.web.client.HttpServerErrorException;
  * <p>成功の応答は、compose の WireMock と同じ {@code docker/wiremock/mappings} のスタブで返し、Client
  * とスタブの契約が合うことを確かめる。 失敗は、注文 ID の冪等性キーに合う優先度の高いスタブをテストの中で足す。決済代行を差し替えず、Resilience4j の retry と
  * circuit breaker を通す。ADR-072 の四つの分類ごとに、出版の状態（拒否と契約の不備は COMPLETED、一時障害と資格情報の不備は FAILED）と決済記録を確かめる。
- * 429 以外の 4xx は circuit breaker が失敗として数えず、429 は数える。出版の状態を読む公開の入口も再投入の公開の入口も無い（運用者の入口と定期の再投入は
- * #108）ため、5xx とタイムアウトの FAILED から既存の再投入の入口（{@link ResubmitFailedPaymentsRunner}）で回復し、決済記録が 1
+ * 429 以外の 4xx は circuit breaker が失敗として数えず、429 は数える。出版の状態を読む公開の入口も再投入の公開の入口も無く、定期の再投入（ADR-079）は
+ * テストで無効にしているため、5xx とタイムアウトの FAILED から手での 1 回の再投入（{@link EventPublicationResubmitOnce}）で回復し、決済記録が 1
  * 件になることと、同じイベントの再配送で請求しないことを、本番の Client を通してここで確かめる（E2E は画面に見える状態だけを確かめる）。URL の設定の違いで {@link
  * OrderConfirmedListenerTest} とは別の Spring のコンテキストになる。
  */
@@ -107,8 +106,8 @@ class PaymentGatewayClientIntegrationTest {
   /** 決済の参照。 */
   @Autowired private PaymentQueries paymentQueries;
 
-  /** Spring Modulith の失敗した出版の再投入。再投入の入口の Runner に渡す。 */
-  @Autowired private FailedEventPublications failedEventPublications;
+  /** 手での 1 回の再投入。 */
+  @Autowired private EventPublicationResubmitOnce resubmitOnce;
 
   /** Resilience4j の aspect を通る決済代行の Client。 */
   @Autowired private PaymentGateway paymentGateway;
@@ -125,10 +124,18 @@ class PaymentGatewayClientIntegrationTest {
     WIREMOCK.stop();
   }
 
-  /** 決済代行の URL を WireMock に向ける。 */
+  /**
+   * 決済代行の URL を WireMock に向け、手での 1 回の再投入の待ちを短くする。
+   *
+   * <p>ロックが残っても、再投入が application.yaml の PT10M まで待たずに失敗するようにする。lock-at-most-for は interval
+   * より長くする必要があるため、定期の実行を無効にしたまま interval も短くする。
+   */
   @DynamicPropertySource
   /* package */ static void gatewayUrl(final DynamicPropertyRegistry registry) {
     registry.add("payment-gateway.base-url", WIREMOCK::baseUrl);
+    registry.add("event-publication.resubmission.interval", () -> "PT2S");
+    registry.add("event-publication.resubmission.lock-at-most-for", () -> "PT5S");
+    registry.add("event-publication.resubmit-once.completion-timeout", () -> "PT15S");
   }
 
   /** テストの順序に依存しないよう、スタブと受けた要求を共有のスタブだけに戻し、circuit breaker を閉じて件数を消す。 */
@@ -357,13 +364,14 @@ class PaymentGatewayClientIntegrationTest {
         scenario, orderId, FAILED_PUBLICATION, state -> FAILED.equals(state.status()));
     assertFailedOnce(orderId);
 
-    // 2. 決済代行を共有の成功のスタブに戻し、既存の再投入の入口（resubmit-once のプロファイルの Runner）を呼ぶ。
+    // 2. 決済代行を共有の成功のスタブに戻し、payment の方針の出版を手での 1 回の再投入で再投入する。
+    // 1 回の再投入は本番と同じくトランザクションの外から呼び、リスナーの完了まで待ってから戻る。
     WIREMOCK.removeStub(failing);
+    assertThat(resubmitOnce.run("policy:payment").succeeded())
+        .as("orderId=%s の 1 回の再投入の結果", orderId)
+        .isTrue();
     OrderConfirmedFixture.await(
-        scenario.stimulate(
-            () ->
-                new ResubmitFailedPaymentsRunner(failedEventPublications)
-                    .run(new DefaultApplicationArguments())),
+        scenario.stimulate(() -> {}),
         orderId,
         "再投入の完了した出版",
         () -> fixture.registry(orderId),

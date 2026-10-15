@@ -34,6 +34,7 @@ PostgreSQLではREPEATABLE READ以上にすると、直列化の失敗による�
 楽観的ロックを優先して使う。
 悲観的ロックの画面設計は、入力中のデータを破棄することが業務上どうしても許容できない場合を除き避ける。
 DBの行ロックは、在庫の引き当てのように性能が重要になる処理でだけ使う。
+複数のインスタンスで定期のジョブを1つに絞るときは、ShedLockのロックを使う（後述の「定期のジョブの排他」）。
 
 ## 楽観的ロック
 
@@ -79,7 +80,7 @@ WHERE order_id = 1 AND lock_no = 6;
 | 集約の子の行の追加                                                                          | 該当なし（`lock_no = 1`）                      | `insertInto(...).set(commonColumns.forInsert(...))`。`LockedRoot`を通らない                                                                                     | 既定値のないNOT NULL。ルートを書かない追加は検出しない（ADR-054のNegative）                                                                                                                                                                                                                                      |
 | DBの行ロック（在庫の引き当て）、外部同期による状態の上書き、一括更新                        | 比べない                                       | `updateWhere`（件数を返す）                                                                                                                                     | `tableWritesGoThroughTableWriter`、`aggregateMethodsDoNotUseUnversionedWrites`、Error Proneの`CheckReturnValue`                                                                                                                                                                                                  |
 | ワークテーブルの後始末、保存期間を過ぎた行の削除、集約を読み込まない一括の物理削除          | 比べない                                       | `deleteWhere`（件数を返す）                                                                                                                                     | `tableWritesGoThroughTableWriter`、`aggregateMethodsDoNotUseUnversionedWrites`、Error Proneの`CheckReturnValue`                                                                                                                                                                                                  |
-| 集約ルートのINSERT                                                                          | 該当なし（`lock_no = 1`）                      | `insertInto(...).set(commonColumns.forInsert(...))`                                                                                                             | 既定値のないNOT NULL                                                                                                                                                                                                                                                                                             |
+| 集約ルートのINSERT                                                                          | 該当なし（`lock_no = 1`）                      | `TableWriter.insert(insertInto(...).set(commonColumns.forInsert(...)))`                                                                                         | `aggregateRootInsertsGoThroughTableWriter`、既定値のないNOT NULL。`Jooq<Aggregate>Repository`の`add`とその中のラムダだけを見る（検出しない範囲はADR-054のNegative）                                                                                                                                              |
 | 追記だけのワークテーブル（`w_`）                                                            | 比べない                                       | 追記だけにする。INSERTは`forInsert`、削除は`deleteWhere`                                                                                                        | `tableWritesGoThroughTableWriter`                                                                                                                                                                                                                                                                                |
 | Javaの外の書き込み（psqlのデータパッチ、Liquibaseのデータ変更、スキーマ変更に伴う値の設定） | 比べない                                       | [共通カラム](postgresql-common-columns.md)（データパッチでは`patched_*`だけを更新する）と[ロックを抑えるスキーマ変更](postgresql-online-schema-change.md)に従う | なし（ADR-054のNegative）                                                                                                                                                                                                                                                                                        |
 | フレームワークのテーブル（`modulith`と`liquibase`のスキーマ）                               | 対象外                                         | 対象外                                                                                                                                                          | スキーマ検査の対象外（`SchemaConventions.FRAMEWORK_SCHEMAS`）                                                                                                                                                                                                                                                    |
@@ -119,7 +120,7 @@ UPDATEも更新する行のロックを取るため、同じ順序に従う。
 
 アプリの接続には`lock_timeout`でロック待ちの上限を設定し、既定の無期限待ちのままにしない（[DB接続情報とロール分離](connections.md)、[ADR-055](../adr/ADR-055-set-db-time-limits-per-connection.md)）。
 上限まで待ってもロックを取れなければ、文はSQLSTATE `55P03`で失敗する。
-`updateCheckingVersion`、`deleteCheckingVersion`と、子の行の`LockedRoot.updateChild`、`LockedRoot.deleteChildren`、`DeletedRoot.deleteChildren`は、この失敗を、原因を付けずに種類`lock`（`ConflictException.Kind.LOCK`）の`ConflictException`に変える。
+`updateCheckingVersion`、`deleteCheckingVersion`、集約ルートのINSERTの入口`insert`と、子の行の`LockedRoot.updateChild`、`LockedRoot.deleteChildren`、`DeletedRoot.deleteChildren`は、この失敗を、原因を付けずに種類`lock`（`ConflictException.Kind.LOCK`）の`ConflictException`に変える。
 `updateWhere`と`deleteWhere`は、Springの`CannotAcquireLockException`と、`updateWhere`の`DuplicateKeyException`をそのまま投げ、扱いは呼び出し側が決める。
 一意制約の違反（SQLSTATE `23505`）は、`TableWriter`の版を比べる入口、子の行の書き込み、集約ルートのINSERTの入口`insert`で、`DuplicateKeyException`を、原因を付けずに種類`unique`（`ConflictException.Kind.UNIQUE`）の`ConflictException`に変える。
 原因の例外のメッセージにはSQLと重複したキーの値が入るため、原因を付けない（[ADR-062](../adr/ADR-062-map-business-exceptions-to-404-409-422.md)）。
@@ -152,6 +153,24 @@ final int reserved =
 このUPDATEも`lock_no = lock_no + 1`で版を進めるため、引き当ての前に読んだ画面の保存は競合になる。
 更新件数が0件なら、在庫不足として利用者へ返し、業務判断を委ねる。
 マスタの保守のように後勝ちの上書きを許容できない更新と、状態の遷移を伴う更新には使わない。
+
+## 定期のジョブの排他
+
+複数のインスタンスで定期のジョブを1つに絞るときは、ShedLockのjOOQのproviderで`modulith.shedlock`の行にロックを持つ（[ADR-079](../adr/ADR-079-resubmit-failed-event-publications-periodically-with-shedlock.md)）。
+ロックの期限はDBの時刻で書き込んで比べ、ロックの操作は1文ずつの新しいトランザクションで終える。
+接続を固定しないため、RDS ProxyやPgBouncerのトランザクションモードの後ろでも動き、`tableWritesGoThroughTableWriter`（H1）の例外も要らない。
+アプリで使うロックの名前は次の表だけにし、新しい名前を足すときは同じ変更で表に足す。
+
+| 名前                             | 使うクラス                                                                                         | 用途                                                                           |
+| -------------------------------- | -------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------ |
+| `event-publication-resubmission` | `shared.infrastructure.persistence`の`EventPublicationResubmitter`、`EventPublicationResubmitOnce` | 失敗したイベント出版の定期の再投入と手での1回の再投入を1つのインスタンスに絞る |
+
+セッションのadvisory lock（`pg_advisory_lock`、`pg_try_advisory_lock`）は使わない。
+ロックがセッションの状態であり、接続を多重化するプロキシの後ろでは保たれないためである（[設計の作り込みの程度と段階的な再構築](../principles/right-sizing.md)の「テンプレートの利用先で変わる前提」）。
+本番のコードに使っていないことは`task lint-session-sql`が検査する。
+
+ShedLockはロックの行を作ったことをメモリに覚えるため、`modulith.shedlock`の行を手で消さない。
+消すと、同じインスタンスは再起動までロックを取れない。
 
 ## 出典
 

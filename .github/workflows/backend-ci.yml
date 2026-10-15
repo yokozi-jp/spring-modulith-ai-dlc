@@ -13,6 +13,7 @@ on:
       - "docker/wiremock/**"
       - ".env.test.example"
       - "Taskfile.yml"
+      - "tooling/session-sql-lint/**"
       - ".github/workflows/backend-ci.yml"
   # PR ではパスフィルタで workflow 自体をスキップしない。スキップすると
   # check run が生成されず、必須チェックが "Expected" のまま PR が永久に
@@ -63,7 +64,7 @@ jobs:
             exit 0
           fi
           # backend-ci.yml の push パスフィルタと同じ集合で判定する。
-          if grep -Eq '^(backend/|openapi/|docker/initdb/|docker/wiremock/|\.spectral\.yaml$|docker/compose-test\.yml$|\.env\.test\.example$|Taskfile\.yml$|\.github/workflows/backend-ci\.yml$)' \
+          if grep -Eq '^(backend/|openapi/|docker/initdb/|docker/wiremock/|\.spectral\.yaml$|docker/compose-test\.yml$|\.env\.test\.example$|Taskfile\.yml$|tooling/session-sql-lint/|\.github/workflows/backend-ci\.yml$)' \
             <<< "$changed_files"; then
             echo "backend=true" >> "$GITHUB_OUTPUT"
           else
@@ -114,6 +115,16 @@ jobs:
       - name: Run Spotless, PMD, SpotBugs
         working-directory: backend
         run: ./gradlew spotlessCheck pmdMain pmdTest spotbugsMain spotbugsTest
+
+      - name: Set up Task
+        uses: go-task/setup-task@a00fbb05ce67b35648be3c78cbc9fd85354c757e # v2
+        with:
+          version: "3.53.1"
+          checksum: a54a408f6861ff921f6e87774180db31bacd8c1e7c944ca696db9fea49a82fc7
+
+      # PgBouncer のトランザクションモードや RDS Proxy の後ろで壊れるセッションの SQL を検出する。
+      - name: Check session-level SQL
+        run: task lint-session-sql
 
       # PR は cache を書かない。
       # 既存の key は上書きされないため、main の完全一致しなかった run だけが保存する。

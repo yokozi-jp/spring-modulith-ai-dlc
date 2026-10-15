@@ -47,11 +47,14 @@ tags: [adr, convention, governance]
 - 番号は連番（ADR-001、ADR-002、…）で、廃止しても再利用しない。
 - ファイル名は `ADR-NNN-<kebab-case-title>.md` とする。
 - 追加したら [ADR インデックス](index.md) に、状態と日付を添えて 1 行加える。
+- 番号の重複、索引の欠落、索引と本文の状態と日付の不一致、リンクのラベルと宛先の番号の不一致は、`task okf-check`（`adr-lint`）が失敗にする。
+- 番号の欠けは警告にとどめる。
 
 ## ライフサイクル
 
 - 状態は Proposed、Accepted、Deprecated、Superseded で管理する。
 - 新しい決定は実装前に Proposed として起こし、Pull Request でコードと一緒にレビューする。
+- Proposed の間は、同じ版のまま Decision を書き直してよく、書き直した理由を Context に残す。
 - 置き換えるときは、新旧の ADR を `Superseded by ADR-NNN` で相互リンクする。
 
 ## 規約文書との同期

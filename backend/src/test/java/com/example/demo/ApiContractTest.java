@@ -2,29 +2,37 @@ package com.example.demo;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.nullValue;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.request;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.cookie;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.example.demo.testkit.ContractCase;
+import com.example.demo.testkit.ContractCaseArguments;
 import com.example.demo.testkit.SharedTestConfiguration;
 import conflictfixture.ConflictFixture;
 import jakarta.servlet.RequestDispatcher;
+import jakarta.servlet.http.Cookie;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ArgumentsSource;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.web.bind.annotation.RequestMethod;
 
 /** API の Problem Details、locale、ブラウザ向けセキュリティヘッダを HTTP レベルで検証する。 */
 @SuppressWarnings({
@@ -40,6 +48,9 @@ class ApiContractTest {
 
   /** frontend と ZAP の script が読む CSRF の Cookie の名前（ADR-066）。 */
   private static final String CSRF_COOKIE = "__Host-XSRF-TOKEN";
+
+  /** CSRF トークンの検証失敗による 403 の problem type（ADR-058）。 */
+  private static final String CSRF_TOKEN_INVALID = "/problems/csrf-token-invalid";
 
   /** 実際の Spring MVC と Security filter chain を通すクライアント。 */
   @Autowired private MockMvc mockMvc;
@@ -59,8 +70,76 @@ class ApiContractTest {
         .andExpect(jsonPath("$.status").value(401));
   }
 
+  @ParameterizedTest(name = "{0} {1}")
+  @ArgumentsSource(ContractCaseArguments.class)
+  @DisplayName("未認証の各 operation は WWW-Authenticate 付きの 401 Problem Details を返す")
+  @ContractCase(method = RequestMethod.GET, path = "/api/orders", status = 401)
+  @ContractCase(method = RequestMethod.POST, path = "/api/orders", status = 401)
+  @ContractCase(method = RequestMethod.GET, path = "/api/orders/{orderId}", status = 401)
+  @ContractCase(method = RequestMethod.PUT, path = "/api/orders/{orderId}/lines", status = 401)
+  @ContractCase(method = RequestMethod.POST, path = "/api/orders/{orderId}/confirm", status = 401)
+  @ContractCase(method = RequestMethod.POST, path = "/api/orders/{orderId}/cancel", status = 401)
+  @ContractCase(method = RequestMethod.GET, path = "/api/payments", status = 401)
+  @ContractCase(method = RequestMethod.GET, path = "/api/products", status = 401)
+  void unauthenticatedOperationReturnsUnauthorized(final String method, final String path)
+      throws Exception {
+    mockMvc
+        .perform(request(HttpMethod.valueOf(method), path).with(csrf()))
+        .andExpect(status().isUnauthorized())
+        .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
+        .andExpect(header().string(HttpHeaders.WWW_AUTHENTICATE, "Session realm=\"demo\""))
+        .andExpect(jsonPath("$.status").value(401));
+  }
+
+  @ParameterizedTest(name = "{0} {1}")
+  @ArgumentsSource(ContractCaseArguments.class)
+  @DisplayName("CSRF トークンのない更新の operation は 403 Problem Details を返す")
+  @ContractCase(method = RequestMethod.POST, path = "/api/orders", status = 403)
+  @ContractCase(method = RequestMethod.PUT, path = "/api/orders/{orderId}/lines", status = 403)
+  @ContractCase(method = RequestMethod.POST, path = "/api/orders/{orderId}/confirm", status = 403)
+  @ContractCase(method = RequestMethod.POST, path = "/api/orders/{orderId}/cancel", status = 403)
+  void updateWithoutCsrfTokenReturnsForbidden(final String method, final String path)
+      throws Exception {
+    mockMvc
+        .perform(request(HttpMethod.valueOf(method), path).with(user("test-user")))
+        .andExpect(status().isForbidden())
+        .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
+        .andExpect(jsonPath("$.type").value(CSRF_TOKEN_INVALID))
+        .andExpect(jsonPath("$.status").value(403));
+  }
+
+  @Test
+  @DisplayName("誤った CSRF トークンの更新も、トークンがない場合と同じ type の 403 を返す")
+  void updateWithInvalidCsrfTokenReturnsCsrfProblemType() throws Exception {
+    mockMvc
+        .perform(post("/api/missing").with(user("test-user")).with(csrf().useInvalidToken()))
+        .andExpect(status().isForbidden())
+        .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
+        .andExpect(jsonPath("$.type").value(CSRF_TOKEN_INVALID));
+  }
+
+  @Test
+  @DisplayName("Cookie と header の CSRF トークンが食い違う更新は、専用の type の 403 で、Cookie を作り直さない")
+  void updateWithMismatchedCsrfTokenDoesNotReissueCookie() throws Exception {
+    // csrf().useInvalidToken() は repository を差し替えるため Set-Cookie を観測できない。実際の Cookie と header
+    // で食い違わせる。
+    // CsrfFilter は token を生成したときだけ保存するので、Cookie がある不一致の枝は Set-Cookie を付けない。
+    // SPA の再送が救うのは Cookie の欠落などで token が入れ替わった競合で、不一致そのものは同じ 403 になる。
+    mockMvc
+        .perform(
+            post("/api/missing")
+                .with(user("test-user"))
+                .cookie(new Cookie(CSRF_COOKIE, "stored-token"))
+                .header("X-XSRF-TOKEN", "other-token"))
+        .andExpect(status().isForbidden())
+        .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
+        .andExpect(jsonPath("$.type").value(CSRF_TOKEN_INVALID))
+        .andExpect(cookie().doesNotExist(CSRF_COOKIE));
+  }
+
   @Test
   @DisplayName("/error へ転送された 401 にも WWW-Authenticate の challenge を付ける")
+  @ContractCase(method = RequestMethod.GET, path = "/error", status = 401)
   void errorEndpointAddsChallengeToUnauthorized() throws Exception {
     mockMvc
         .perform(get("/error").requestAttr(RequestDispatcher.ERROR_STATUS_CODE, 401))
@@ -81,9 +160,9 @@ class ApiContractTest {
         .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
         .andExpect(header().string(HttpHeaders.CONTENT_LANGUAGE, "en"))
         .andExpect(header().string(HttpHeaders.VARY, HttpHeaders.ACCEPT_LANGUAGE))
-        .andExpect(jsonPath("$.type").value("about:blank"))
+        .andExpect(jsonPath("$.type").value(CSRF_TOKEN_INVALID))
         .andExpect(header().doesNotExist(HttpHeaders.WWW_AUTHENTICATE))
-        .andExpect(jsonPath("$.title").value("Forbidden"))
+        .andExpect(jsonPath("$.title").value("Invalid or missing CSRF token"))
         .andExpect(jsonPath("$.status").value(403));
   }
 
@@ -123,6 +202,7 @@ class ApiContractTest {
 
   @Test
   @DisplayName("/error は日本語でも実装詳細を含まない Problem Details を返す")
+  @ContractCase(method = RequestMethod.GET, path = "/error", status = 500)
   void errorEndpointReturnsLocalizedProblemDetailsWithoutImplementationDetails() throws Exception {
     mockMvc
         .perform(
@@ -207,6 +287,7 @@ class ApiContractTest {
 
   @Test
   @DisplayName("/error は Accept が text/html でも転送元の status の Problem Details を返す")
+  @ContractCase(method = RequestMethod.GET, path = "/error", status = 400)
   void errorEndpointIgnoresHtmlAccept() throws Exception {
     mockMvc
         .perform(
@@ -221,8 +302,20 @@ class ApiContractTest {
 
   @ParameterizedTest
   @CsvSource({
+    "403, ja, アクセス権限がありません",
+    "403, en, Forbidden",
+    "404, ja, リソースが見つかりません",
+    "404, en, Not Found",
+    "405, ja, 許可されていないメソッドです",
+    "405, en, Method Not Allowed",
+    "406, ja, 受け付けられない形式です",
+    "406, en, Not Acceptable",
+    "409, ja, 競合が発生しました",
+    "409, en, Conflict",
     "413, ja, リクエストが大きすぎます",
     "413, en, Content Too Large",
+    "415, ja, 対応していないメディアタイプです",
+    "415, en, Unsupported Media Type",
     "422, ja, 処理できない内容です",
     "422, en, Unprocessable Content",
     "429, ja, リクエストが多すぎます",
@@ -230,7 +323,11 @@ class ApiContractTest {
     "503, ja, サービスを利用できません",
     "503, en, Service Unavailable"
   })
-  @DisplayName("/error は 413、422、429、503 の title を日本語と英語で返す")
+  @DisplayName("/error は title を持つ 4xx と 5xx の title を日本語と英語で返す")
+  @ContractCase(
+      method = RequestMethod.GET,
+      path = "/error",
+      status = {403, 404, 405, 406, 409, 413, 415, 422, 429, 503})
   void errorEndpointLocalizesAdditionalStatusTitles(
       final int code, final String language, final String title) throws Exception {
     mockMvc
@@ -250,6 +347,10 @@ class ApiContractTest {
     "599, en, Internal Server Error"
   })
   @DisplayName("/error は HttpStatus に定義のない 4xx と 5xx を保ち、400 か 500 の title で返す")
+  @ContractCase(
+      method = RequestMethod.GET,
+      path = "/error",
+      status = {499, 599})
   void errorEndpointKeepsUndefinedStatus(final int code, final String language, final String title)
       throws Exception {
     mockMvc

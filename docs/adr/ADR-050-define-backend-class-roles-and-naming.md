@@ -78,7 +78,7 @@ Proposed
   外部システムの操作に冪等性キー（注文 ID）を渡し、集約がすでにその操作を終えていれば（`order.isPaid()`）何もせずに Result を返す。
   レジストリは at-least-once で配信し、未完了のイベント出版を再投入すると同じイベントが再び届くためである（[メッセージングの設計](../integration/async-messaging-design.md)の「配信保証」、[順序保証と冪等性](../integration/async-ordering-and-idempotency.md)）。
   請求に失敗したイベント出版はレジストリに `FAILED` で残り、[非同期処理の失敗時の再試行と回復](../integration/async-failure-recovery.md)の失敗した出版の再投入の手順で再投入する。
-  自動の再投入は [issue #108](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/108) で扱う。
+  自動の再投入は [ADR-079](ADR-079-resubmit-failed-event-publications-periodically-with-shedlock.md) で定める。
 - 外部システムを呼ぶ CommandHandler も、`@ApplicationModuleListener` が開くトランザクションの中で外部システムを呼ぶ。
   ただし、呼んでいる間は行をロックせず（行のロックは呼んだ後の `update` の UPDATE が取る）、画面の要求を待たせない。
   トランザクションの長さは Client のタイムアウト（[ADR-019](ADR-019-define-resilience-and-capacity-guardrails.md)）で抑え、ロールバックで戻らない請求は上の冪等性で二重にしない。
@@ -150,7 +150,7 @@ Proposed
 - `Jooq<Aggregate>Repository` は変換を含むため、Mapper のクラスに分けた場合より長くなる。
 - 他モジュールの状態を同期で変える設計は、ADR を経ない限り選べない。
 - 決済は確定の応答より後に非同期で行うため、確定済みで未払いの注文が残りうる。
-  請求に失敗したイベント出版は、人が再投入するまで残る（[issue #108](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/108)）。
+  請求に失敗したイベント出版は、定期のジョブが方針の上限まで自動で再投入し、上限に達したものは人が再投入するまで残る（[ADR-079](ADR-079-resubmit-failed-event-publications-periodically-with-shedlock.md)）。
 - 確定の後の取消を例から外したため、返金を伴う取消は別に設計する必要がある。
 - カードの拒否のように請求が回復不能に失敗した注文は、確定のまま次の状態へ進めない。この失敗の扱いも、返金と同じく例の範囲の外とし、別に設計する。
 

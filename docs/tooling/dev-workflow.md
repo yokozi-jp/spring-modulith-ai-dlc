@@ -18,6 +18,8 @@ task dev
 task check
 ```
 
+`task check`は、バックエンドの静的解析の前に`task lint-session-sql`でセッションに状態を残すSQLがないことを確かめる。
+
 ## フロントエンドを開発するとき
 
 ```bash
@@ -59,6 +61,11 @@ task fe-dev                # SPAを起動し、APIとOIDCを同一オリジン�
 Taskのテスト系タスクは、`.env.test`に足りない変数があると、その変数名を並べて止まる。
 たとえば決済代行のClientを足した変更の後は、既存の`.env.test`へ`PAYMENT_GATEWAY_BASE_URL=http://127.0.0.1:8082`を足し、既存の`.env`へ`.env.example`の`PAYMENT_GATEWAY_BASE_URL`の行を足す。
 `task compose-up`などが`OTEL_SERVICE_NAMESPACE is required`のように変数不足で止まったときは、これが原因である。
+失敗したイベント出版の定期の再投入を足した変更の後は、既存の`.env`へ`.env.example`の`EVENT_PUBLICATION_RESUBMISSION_ENABLED`、`EVENT_PUBLICATION_RESUBMISSION_WAIT_AGE`、`EVENT_PUBLICATION_RESUBMISSION_IN_FLIGHT_STALENESS`、`EVENT_PUBLICATION_RESUBMISSION_INTERVAL`の4行を、既存の`.env.test`へ`.env.test.example`の同じ4行を足す（[ADR-079](../adr/ADR-079-resubmit-failed-event-publications-periodically-with-shedlock.md)）。
+ローカルでは定期の再投入が短い間隔で有効なので、`FAILED`の出版は消した注文を指すものもリスナーの方針の上限の回数まで自動で再投入され、そのたびにリスナーのERRORが出る。
+
+定期の再投入のロックの表（`010-create-shedlock-table`）を足した変更の後は、既存のローカルのDBに`task be-migrate`を実行する。
+表がないと、定期の再投入は毎回`Event publication resubmission failed`のWARNで失敗する。
 
 公開先は次のとおり。
 
@@ -78,7 +85,7 @@ task be-seed                           # 業務データが空のときだけ代
 
 reset は業務の4表（`product.m_product`、`ordering.t_order`、`ordering.t_order_line`、`payment.t_payment`）だけを消す。
 `modulith`の出版の表とLiquibaseの管理表は残す。
-消した注文を指す出版が残ることがあり、`resubmit-once`で再投入しても注文がないか状態が違うので、決済代行は呼ばれない。
+消した注文を指す出版が残ることがあり、手での1回の再投入（`EVENT_PUBLICATION_RESUBMIT_ONCE_TARGET`）で再投入しても注文がないか状態が違うので、決済代行は呼ばれない。
 出版も消したいときは`task compose-reset CONFIRM_RESET=yes`でDBを作り直す。
 接続先がローカルかテストでないとき（`OTEL_DEPLOYMENT_ENVIRONMENT_NAME`が`local`か`test`でない、または`DB_HOST`がloopbackでない）は、DBに触れずに失敗する。
 
@@ -148,6 +155,9 @@ task mutation-test PIT_CHANGED_SINCE=origin/main
 task lint-md
 task okf-check
 ```
+
+`task okf-check`は、ADRの番号の重複、索引と本文の不一致、リンクのラベルと宛先の番号の不一致も検査します。
+ADRを追加または番号を変えたときは、`docs/adr/index.md`の行も同じ変更で直します。
 
 ## リリース設定を変更するとき
 

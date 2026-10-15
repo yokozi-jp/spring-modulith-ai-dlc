@@ -34,7 +34,7 @@ public class OpenApiConfig {
    *
    * <p>互換な追加で MINOR、破壊的変更で MAJOR を上げ、アプリのリリース版と連動させない（docs/web-api/versioning.md）。
    */
-  /* package */ static final String CONTRACT_VERSION = "0.3.0";
+  /* package */ static final String CONTRACT_VERSION = "0.4.0";
 
   /** 共通の Problem response を参照する接頭辞。 */
   private static final String PROBLEM_RESPONSE_REF = "#/components/responses/";
@@ -64,7 +64,11 @@ public class OpenApiConfig {
                             .required(true)
                             .description("認証の challenge。ブラウザの Cookie セッションを表す独自 scheme（ADR-059）")
                             .schema(new StringSchema().example("Session realm=\"demo\""))))
-            .addResponses("ForbiddenProblem", problemResponse("操作の権限がない", PROBLEM_DETAIL))
+            .addResponses(
+                "ForbiddenProblem",
+                problemResponse(
+                    "操作の権限がない。CSRF トークンの検証に失敗したときの type は /problems/csrf-token-invalid",
+                    PROBLEM_DETAIL))
             .addResponses("NotFoundProblem", problemResponse("対象のリソースが存在しない", PROBLEM_DETAIL))
             .addResponses("ConflictProblem", problemResponse("リソースの現在の状態と競合する", PROBLEM_DETAIL))
             .addResponses(

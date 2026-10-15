@@ -75,4 +75,10 @@
 - [ADR-072: 外部システムを本番のコードで偽らず、WireMock のコンテナで偽る](ADR-072-fake-external-systems-with-wiremock.md)（Accepted, 2026-10-08）
 - [ADR-073: E2E はシーダーの代表データを読むだけにし、変更するデータは各テストが作る](ADR-073-read-seeded-data-in-e2e.md)（Accepted, 2026-10-08）
 - [ADR-074: jscpd の閾値を、クラスの役割の定型を含む実測の 3.93% に合わせて 4.0% にする](ADR-074-raise-jscpd-threshold-for-class-role-boilerplate.md)（Proposed, 2026-10-09）
+- [ADR-075: 他モジュールが分岐に使う状態の意味を、状態を持つモジュールが参照の結果の boolean で返す](ADR-075-return-state-meaning-in-query-results.md)（Proposed, 2026-10-11）
 - [ADR-076: PIT を必須でない別のワークフローで変更ごとに実行し、coverage の下限に line とクラスやファイルごとの下限を加える](ADR-076-run-mutation-tests-per-change-and-tighten-coverage-gates.md)（Proposed, 2026-10-11）
+- [ADR-077: OpenAPI 契約の operation と status の組ごとに、MockMvc の契約テストの宣言を検査する](ADR-077-check-contract-test-coverage-per-response-status.md)（Proposed, 2026-10-11）
+- [ADR-078: フロントエンドの coverage を React Compiler を外して測る](ADR-078-measure-frontend-coverage-without-react-compiler.md)（Proposed, 2026-10-12）
+- [ADR-079: 失敗したイベント出版を、ShedLock で 1 つのインスタンスに絞った定期のジョブで、リスナーごとの方針で再投入する](ADR-079-resubmit-failed-event-publications-periodically-with-shedlock.md)（Proposed, 2026-10-10）
+- [ADR-080: バックエンドのテストの非同期の条件の待ちに Awaitility を使う](ADR-080-wait-for-async-conditions-with-awaitility.md)（Proposed, 2026-10-12）
+- [ADR-081: 一覧 API の sort を domain.model の enum で受け、default のない switch 式で項目名と列に写す](ADR-081-map-list-sort-via-domain-enum-and-exhaustive-switch.md)（Proposed, 2026-10-14）

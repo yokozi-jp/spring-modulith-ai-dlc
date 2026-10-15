@@ -77,6 +77,8 @@ async function expectLogoutRejected(page: Page): Promise<string | null> {
   await logoutButton(page).click();
   const response = await logoutResponse;
   expect(response.status()).toBe(403);
+  // /logout の CSRF 失敗も /api/** と同じ advice を通り、専用の type で返る（SecurityConfig、LogoutContractTest）。
+  expect(await response.json()).toMatchObject({ type: "/problems/csrf-token-invalid" });
   const submittedToken = new URLSearchParams(response.request().postData() ?? "").get("_csrf");
 
   await page.goto("/");

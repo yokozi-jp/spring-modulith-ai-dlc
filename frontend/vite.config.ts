@@ -161,7 +161,12 @@ export default defineConfig(({ mode }) => {
 
   return {
     ...(mode === "development" ? { html: { cspNonce: developmentCspNonce } } : {}),
-    plugins: [tanstackRouter({ target: "react" }), react({ compiler: true }), tailwindcss()],
+    // coverage の計測だけ React Compiler を外す。Compiler が足す memo の分岐が分母に入るため（ADR-078）。
+    plugins: [
+      tanstackRouter({ target: "react" }),
+      react({ compiler: process.env.FRONTEND_REACT_COMPILER !== "false" }),
+      tailwindcss(),
+    ],
     define: telemetryDefine(mode),
     // エイリアスの正本は tsconfig.json の paths とする。
     resolve: { tsconfigPaths: true },

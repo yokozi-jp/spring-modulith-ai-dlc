@@ -70,8 +70,13 @@ final Instant actual =
 
 固定時間を待つ`Thread.sleep()`を使わない。
 イベントの発行と購読はSpring Modulithの`Scenario`で条件を待つ。
-それ以外の非同期処理は、対象APIの期限付き条件待機か、JUnitの非プリエンプティブな`assertTimeout`を使う。
+それ以外の非同期の条件は、Awaitilityの期限付きの条件待機で待つ（[ADR-080](../adr/ADR-080-wait-for-async-conditions-with-awaitility.md)）。
+対象APIが期限付きの条件待機を持つときは、そのAPIを使ってよい。
+処理時間の上限を測るときは、JUnitの非プリエンプティブな`assertTimeout`を使ってよい。
+Awaitilityは`await("<対象IDと期待>").atMost(<期限>)`で別名と期限を必ず付け、状態は`untilAsserted`とAssertJの`as`で確かめる。
+「変わらないままである」ことは`during`で確かめる。
 タイムアウト時には、対象ID、期待条件、期限、最後に観測した状態を出す。
+リスナーを止めるlatchは、待つ上限をテストの待ち以下にし、`@AfterEach`で開ける。
 `assertTimeoutPreemptively`は使わない。
 `assertTimeoutPreemptively`は別スレッドで処理を実行するため、トランザクション、セキュリティコンテキスト、ログのコンテキストが本番経路と変わり得る。
 
