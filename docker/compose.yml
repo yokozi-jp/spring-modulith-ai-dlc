@@ -82,7 +82,7 @@ services:
   wiremock:
     # ローカル専用の決済代行の偽物。docker/wiremock/mappings の請求の成功のスタブを返す。
     # 失敗は管理 API（/__admin/mappings）で実行中に足す。本番は実際の決済代行の URL を注入する。
-    image: wiremock/wiremock:3.13.2@sha256:d737d2de3664a7e1bf96f73a7bd48a0d47d61988f7ca88a6e51ea44b8c1f687d
+    image: wiremock/wiremock:3.13.2@sha256:0d4ecb3e4dc8213fd7a4d37d6a78f6e6b553a6d2e15bd51b0999781282ac61b3
     # JDK の HttpClient が平文の HTTP/2 へ upgrade すると、本文付きの POST が切れるため、平文の HTTP/2 を止める。
     command: ["--disable-banner", "--disable-http2-plain"]
     environment:
