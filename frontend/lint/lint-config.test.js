@@ -85,7 +85,7 @@ describe("project lint config on fixtures", () => {
     });
 
     it("rejects the telemetry SDK from a feature", () => {
-      expect(countIn("features/order/telemetry-sdk.ts", "eslint(no-restricted-imports)")).toBe(1);
+      expect(countIn("features/order/telemetry-sdk.ts", "eslint(no-restricted-imports)")).toBe(2);
     });
 
     it("allows the own feature and the API client", () => {
@@ -109,6 +109,20 @@ describe("project lint config on fixtures", () => {
       expect(countIn("components/route-import.tsx", "eslint(no-restricted-imports)")).toBe(1);
     });
 
+    it("rejects components from lib", () => {
+      expect(countIn("lib/component-import.ts", "eslint(no-restricted-imports)")).toBe(1);
+    });
+
+    it("rejects components from api", () => {
+      expect(countIn("api/component-import.ts", "eslint(no-restricted-imports)")).toBe(1);
+    });
+
+    it("rejects other components from components/ui but allows ui primitives", () => {
+      expect(
+        countIn("components/ui/app-component-import.ts", "eslint(no-restricted-imports)"),
+      ).toBe(1);
+    });
+
     it("allows the API client from shared code", () => {
       expect(codesIn("lib/clean.ts")).toStrictEqual([]);
     });
@@ -119,6 +133,18 @@ describe("project lint config on fixtures", () => {
   });
 
   describe("Base UI", () => {
+    describe("Tailwind classes", () => {
+      it("rejects class names built from a value", () => {
+        expect(
+          countIn("features/order/dynamic-class.tsx", "tailwind-classes(no-dynamic-class-name)"),
+        ).toBe(3);
+      });
+
+      it("allows complete classes joined with a value", () => {
+        expect(codesIn("features/order/static-class.tsx")).toStrictEqual([]);
+      });
+    });
+
     it("rejects Base UI outside components/ui", () => {
       expect(countIn("features/order/base-ui.tsx", "eslint(no-restricted-imports)")).toBe(1);
     });
@@ -133,6 +159,16 @@ describe("project lint config on fixtures", () => {
 
     it("keeps Base UI banned in test files", () => {
       expect(countIn("features/order/base-ui.test.ts", "eslint(no-restricted-imports)")).toBe(1);
+    });
+
+    it("rejects a button inside a link and a link passed to render of Button", () => {
+      expect(
+        countIn("features/order/button-in-link.tsx", "ui-composition(no-button-in-link)"),
+      ).toBe(3);
+    });
+
+    it("allows a link beside a button", () => {
+      expect(codesIn("features/order/link-beside-button.tsx")).toStrictEqual([]);
     });
   });
 
