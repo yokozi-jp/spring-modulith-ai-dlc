@@ -199,11 +199,18 @@ pre-push:
 
     # frontend に変更があるpushのとき、テストと本番ビルドを実行する。
     - name: frontend-test-build
+      # pushする変更のファイル。run の {files} で参照し、glob で絞る。
+      # 組み込みの {push_files} は、@{push} が無い新しいブランチでは HEAD と origin/HEAD の差分を使う。
+      # その差分は分岐後に main へ入った変更も含み、触っていない backend の検査まで走るため、main との merge-base から比べる。
+      # 以降の job は同じ値を *push-files で参照する。
+      files: &push-files >-
+        git diff --name-only @{push} HEAD 2>/dev/null ||
+        git diff --name-only "$(git merge-base HEAD origin/main)" HEAD
       glob:
         - "frontend/**"
         - "Taskfile.yml"
       run: |
-        echo "{push_files}" >/dev/null
+        echo "{files}" >/dev/null
         task fe-test-build
       fail_text: "Frontendのテストまたはビルドに失敗しました。task fe-test-buildで再実行してください。"
 
@@ -211,8 +218,9 @@ pre-push:
     # Gradle は重いため pre-commit ではなく pre-push で実行する。
     - name: be-lint
       glob: "backend/**/*.{java,gradle}"
+      files: *push-files
       run: |
-        echo "{push_files}" >/dev/null
+        echo "{files}" >/dev/null
         cd backend && ./gradlew spotlessCheck pmdMain pmdTest spotbugsMain spotbugsTest
 
     # backend に変更がある push のときだけテスト実行（カバレッジ検証含む）
@@ -221,8 +229,9 @@ pre-push:
     # docker が無い環境ではスキップ（最終担保は CI に任せる）。
     - name: be-test
       glob: "backend/**/*.{java,gradle}"
+      files: *push-files
       run: |
-        echo "{push_files}" >/dev/null
+        echo "{files}" >/dev/null
         if ! command -v docker >/dev/null 2>&1; then
           echo "docker が無いため task test をスキップします（CI で検査されます）。" >&2
           exit 0
@@ -241,8 +250,9 @@ pre-push:
         - "backend/**/*.{java,gradle}"
         - "backend/gradle.properties"
         - "backend/gradlew"
+      files: *push-files
       run: |
-        echo "{push_files}" >/dev/null
+        echo "{files}" >/dev/null
         if ! command -v docker >/dev/null 2>&1; then
           echo "docker が無いため docker build --target build をスキップします（CI で検査されます）。" >&2
           exit 0
@@ -250,12 +260,13 @@ pre-push:
         docker build --target build --tag spring-modulith-backend:prepush-check backend
 
     # GitHub Actions ワークフローに変更がある push のときだけ Lint（actionlint）
-    # glob を効かせるため run 内で {push_files} を参照する。
+    # glob を効かせるため run 内で {files} を参照する。
     # docker が無い環境ではスキップ（最終担保は CI に任せる）。
     - name: actionlint
       glob: ".github/workflows/*.{yml,yaml}"
+      files: *push-files
       run: |
-        echo "{push_files}" >/dev/null
+        echo "{files}" >/dev/null
         if ! command -v docker >/dev/null 2>&1; then
           echo "docker が無いため actionlint をスキップします（CI で検査されます）。" >&2
           exit 0
@@ -268,8 +279,9 @@ pre-push:
     # docker が無い環境ではスキップ（最終担保は CI に任せる）。
     - name: zizmor
       glob: ".github/workflows/*.{yml,yaml}"
+      files: *push-files
       run: |
-        echo "{push_files}" >/dev/null
+        echo "{files}" >/dev/null
         if ! command -v docker >/dev/null 2>&1; then
           echo "docker が無いため zizmor をスキップします（CI で検査されます）。" >&2
           exit 0
