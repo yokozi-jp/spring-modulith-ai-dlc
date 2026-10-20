@@ -132,43 +132,47 @@ describe("project lint config on fixtures", () => {
     });
   });
 
-  describe("Base UI", () => {
+  describe("UI", () => {
+    describe("Base UI imports", () => {
+      it("rejects Base UI outside components/ui", () => {
+        expect(countIn("features/order/base-ui.tsx", "eslint(no-restricted-imports)")).toBe(1);
+      });
+
+      it("allows Base UI inside components/ui", () => {
+        expect(codesIn("components/ui/primitive.tsx")).toStrictEqual([]);
+      });
+
+      it("keeps the shared layer and test-only bans inside components/ui", () => {
+        expect(countIn("components/ui/shared-layer.tsx", "eslint(no-restricted-imports)")).toBe(2);
+      });
+
+      it("keeps Base UI banned in test files", () => {
+        expect(countIn("features/order/base-ui.test.ts", "eslint(no-restricted-imports)")).toBe(1);
+      });
+    });
+
     describe("Tailwind classes", () => {
       it("rejects class names built from a value", () => {
         expect(
           countIn("features/order/dynamic-class.tsx", "tailwind-classes(no-dynamic-class-name)"),
-        ).toBe(3);
+        ).toBe(4);
       });
 
-      it("allows complete classes joined with a value", () => {
+      it("allows complete classes joined with a value or picked by a built key", () => {
         expect(codesIn("features/order/static-class.tsx")).toStrictEqual([]);
       });
     });
 
-    it("rejects Base UI outside components/ui", () => {
-      expect(countIn("features/order/base-ui.tsx", "eslint(no-restricted-imports)")).toBe(1);
-    });
+    describe("link and button composition", () => {
+      it("rejects a button inside a link and a link passed to render of Button", () => {
+        expect(
+          countIn("features/order/button-in-link.tsx", "ui-composition(no-button-in-link)"),
+        ).toBe(5);
+      });
 
-    it("allows Base UI inside components/ui", () => {
-      expect(codesIn("components/ui/primitive.tsx")).toStrictEqual([]);
-    });
-
-    it("keeps the shared layer and test-only bans inside components/ui", () => {
-      expect(countIn("components/ui/shared-layer.tsx", "eslint(no-restricted-imports)")).toBe(2);
-    });
-
-    it("keeps Base UI banned in test files", () => {
-      expect(countIn("features/order/base-ui.test.ts", "eslint(no-restricted-imports)")).toBe(1);
-    });
-
-    it("rejects a button inside a link and a link passed to render of Button", () => {
-      expect(
-        countIn("features/order/button-in-link.tsx", "ui-composition(no-button-in-link)"),
-      ).toBe(3);
-    });
-
-    it("allows a link beside a button", () => {
-      expect(codesIn("features/order/link-beside-button.tsx")).toStrictEqual([]);
+      it("allows a link beside a button", () => {
+        expect(codesIn("features/order/link-beside-button.tsx")).toStrictEqual([]);
+      });
     });
   });
 

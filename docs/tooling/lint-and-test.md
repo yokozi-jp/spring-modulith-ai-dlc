@@ -110,7 +110,8 @@ Oxlintの設定の正本は[`frontend/vite.config.ts`](../../frontend/vite.confi
   この規則はrestrictionカテゴリで有効だが、optionを指定しないと何も禁止しない。
 - **Tailwindのclass**：`better-tailwindcss/enforce-canonical-classes`を有効にし、classを正規形にそろえる（`--fix`で直せる）。
   `better-tailwindcss/enforce-shorthand-classes`は役割が重なるため有効にしない。
-  jsPluginの`tailwind-classes/no-dynamic-class-name`は、`className`の中で値からclass名を組み立てるテンプレートリテラル（`` `pl-${depth}` ``）を禁じる（[フロントエンドのUIとスタイル](../frontend/ui-and-style.md#uiの書き方)）。
+  jsPluginの`tailwind-classes/no-dynamic-class-name`は、`className`の中で値からclass名を組み立てるテンプレートリテラル（`` `pl-${depth}` ``、`` `${tone}${depth}` ``）を禁じる（[フロントエンドのUIとスタイル](../frontend/ui-and-style.md#uiの書き方)）。
+  objectや配列からclassを選ぶkey（`` tones[`${tone}-strong`] ``）は対象にしない。
   `className`の外で組み立てた文字列と、`cn()`に渡す変数は検出しない。
 - **`lint/**`**：`import/no-nodejs-modules`、`new-cap`、`typescript/no-unsafe-assignment`、`typescript/no-unsafe-call`、`typescript/no-unsafe-member-access`をoffにする。
   Node側のLintツールであり、OxlintのJS plugin APIに型が無いためである。
@@ -172,7 +173,9 @@ feature間のimportは、これとは別にjsPluginの`feature-boundaries/no-cro
 
 linkとbuttonの入れ子は、jsPluginの`ui-composition/no-button-in-link`がすべてのファイルで禁じる（[フロントエンドのUIとスタイル](../frontend/ui-and-style.md#uiの書き方)）。
 `Link`か`a`の内側の`Button`か`button`と、`Button`の`render`に渡した`Link`か`a`を報告する。
+`render`に関数を渡す場合は、関数が直接返す`Link`か`a`を報告する。
 要素は名前だけで判定するので、別名でimportしたcomponentは検出しない。
+変数に入れてから返す要素と、条件演算子で返す要素も検出しない。
 
 組み合わせた結果は、`frontend/lint/lint-config.test.js`が`frontend/lint/fixtures/src/**`の違反例と正しい例を実際の設定でLintして確かめる。
 

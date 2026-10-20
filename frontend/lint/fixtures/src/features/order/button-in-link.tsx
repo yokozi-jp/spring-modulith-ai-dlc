@@ -14,6 +14,12 @@ export function ButtonInLink({ label }: { label: string }) {
         </span>
       </a>
       <Button render={<Link to="/" />} />
+      <Button render={(props) => <Link to="/" {...props} />} />
+      <Button
+        render={(props) => {
+          return <a href="/" {...props} />;
+        }}
+      />
     </>
   );
 }
