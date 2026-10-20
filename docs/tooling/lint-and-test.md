@@ -110,6 +110,8 @@ Oxlintの設定の正本は[`frontend/vite.config.ts`](../../frontend/vite.confi
   この規則はrestrictionカテゴリで有効だが、optionを指定しないと何も禁止しない。
 - **Tailwindのclass**：`better-tailwindcss/enforce-canonical-classes`を有効にし、classを正規形にそろえる（`--fix`で直せる）。
   `better-tailwindcss/enforce-shorthand-classes`は役割が重なるため有効にしない。
+  jsPluginの`tailwind-classes/no-dynamic-class-name`は、`className`の中で値からclass名を組み立てるテンプレートリテラル（`` `pl-${depth}` ``）を禁じる（[フロントエンドのUIとスタイル](../frontend/ui-and-style.md#uiの書き方)）。
+  `className`の外で組み立てた文字列と、`cn()`に渡す変数は検出しない。
 - **`lint/**`**：`import/no-nodejs-modules`、`new-cap`、`typescript/no-unsafe-assignment`、`typescript/no-unsafe-call`、`typescript/no-unsafe-member-access`をoffにする。
   Node側のLintツールであり、OxlintのJS plugin APIに型が無いためである。
 - **`src/components/ui/**`**：shadcnの生成物の書き方に合わせて`shadcn/no-restyle`、`shadcn/no-arbitrary-values`、`shadcn/require-static-classes`をoffにする。
@@ -132,16 +134,23 @@ Oxlintの設定の正本は[`frontend/vite.config.ts`](../../frontend/vite.confi
 | 対象のファイル                     | `no-restricted-imports`                       | `no-restricted-globals`と`no-restricted-properties` |
 | ---------------------------------- | --------------------------------------------- | --------------------------------------------------- |
 | すべて（top-level）                | Base UI、テスト用部品、テレメトリSDK          | HTML sink、network                                  |
-| `src/{api,components,lib,i18n}/**` | 共有層、Base UI、テスト用部品、テレメトリSDK  | top-levelを引き継ぐ                                 |
-| `src/lib/telemetry.ts`             | 共有層、Base UI、テスト用部品                 | top-levelを引き継ぐ                                 |
+| `src/{api,components,i18n}/**`     | 共有層、Base UI、テスト用部品、テレメトリSDK  | top-levelを引き継ぐ                                 |
+| `src/lib/**`                       | lib、Base UI、テスト用部品、テレメトリSDK     | top-levelを引き継ぐ                                 |
+| `src/lib/telemetry.ts`             | lib、Base UI、テスト用部品                    | top-levelを引き継ぐ                                 |
 | `src/features/**`                  | feature、Base UI、テスト用部品、テレメトリSDK | top-levelを引き継ぐ                                 |
-| `src/components/ui/**`             | 共有層、テスト用部品、テレメトリSDK           | top-levelを引き継ぐ                                 |
-| `src/api/**`                       | 共有層の設定を引き継ぐ                        | HTML sinkだけ                                       |
+| `src/components/ui/**`             | ui、テスト用部品、テレメトリSDK               | top-levelを引き継ぐ                                 |
+| `src/api/**`                       | api、Base UI、テスト用部品、テレメトリSDK     | HTML sinkだけ                                       |
 | テストファイルと`src/testing/**`   | Base UI、テレメトリSDK                        | top-levelを引き継ぐ                                 |
 
 各禁止の中身は次のとおりである。
 
 - **共有層**：`@/features/**`、`@/routes/**`、`@/routeTree.gen`。
+- **lib**：共有層の禁止に加えて`@/components/**`。
+  `lib`は依存の最下層であり、UIを参照しない。
+- **api**：共有層の禁止に加えて`@/components/**`。
+  通信層からUIを参照しない。
+- **ui**：共有層の禁止に加えて、`@/components/ui/**`以外の`@/components/**`。
+  UI primitiveからアプリシェルやrouterの状態表示を参照しない。
 - **feature**：`@/routes/**`、`@/routeTree.gen`。
   routeの情報は`getRouteApi`で取る。
 - **Base UI**：`@base-ui/**`。
@@ -149,7 +158,7 @@ Oxlintの設定の正本は[`frontend/vite.config.ts`](../../frontend/vite.confi
 - **テスト用部品**：`msw`、`msw/**`、`@/api/generated/mocks/**`、`@/testing/**`、`@testing-library/**`。
 - **テレメトリSDK**：`@grafana/*`。
   `src/lib/telemetry.ts`を通して呼ぶ（[ADR-068](../adr/ADR-068-collect-browser-telemetry-with-faro-via-collector.md)）。
-  静的importだけを検出し、`import()`は検出しない。
+  静的importと`import()`の両方を検出する。
 - **HTML sink**：globalの`DOMParser`、`innerHTML`などのHTML系property、`document.write`、`document.writeln`。
 - **network**：globalの`fetch`と`XMLHttpRequest`、`window.fetch`、`globalThis.fetch`。
   `src/api`の生成clientを使う。
@@ -160,6 +169,10 @@ Oxlintの設定の正本は[`frontend/vite.config.ts`](../../frontend/vite.confi
 `e2e/**`では、Playwright TestのAPIにvitest pluginの規則が当たるため、`vitest/consistent-test-filename`と`vitest/prefer-importing-vitest-globals`を外す。
 
 feature間のimportは、これとは別にjsPluginの`feature-boundaries/no-cross-feature-import`が`src/features/**`のファイルで禁じる（[フロントエンドアーキテクチャ](../frontend/architecture.md#境界の検査)）。
+
+linkとbuttonの入れ子は、jsPluginの`ui-composition/no-button-in-link`がすべてのファイルで禁じる（[フロントエンドのUIとスタイル](../frontend/ui-and-style.md#uiの書き方)）。
+`Link`か`a`の内側の`Button`か`button`と、`Button`の`render`に渡した`Link`か`a`を報告する。
+要素は名前だけで判定するので、別名でimportしたcomponentは検出しない。
 
 組み合わせた結果は、`frontend/lint/lint-config.test.js`が`frontend/lint/fixtures/src/**`の違反例と正しい例を実際の設定でLintして確かめる。
 
