@@ -79,6 +79,7 @@ function portFromEnv(mode: string, name: string, fallback: string): number {
 
 // Reporting API は同一オリジンの報告に Cookie を付ける。
 // Collector は認証に使わないので、資格情報の header を Collector へ渡さない（ADR-068）。
+// oxlint-disable-next-line func-style -- ProxyOptions の callback 型から proxy の型を推論させる。
 const withoutCredentials: ProxyOptions["configure"] = (proxy) => {
   proxy.on("proxyReq", (proxyReq) => {
     for (const name of ["cookie", "authorization", "proxy-authorization"]) {
@@ -231,8 +232,8 @@ export default defineConfig(({ mode }) => {
         "typescript/promise-function-async": "off",
         // Oxfmtや型推論と役割が重複するか、可読性を下げる一律のstyle規則。
         "capitalized-comments": "off",
-        // 名前付きの関数は関数宣言にそろえ、型注釈付きの変数だけアロー関数を許す（ADR-082）。
-        "func-style": ["error", "declaration", { allowTypeAnnotation: true }],
+        // 名前付きの関数は関数宣言にそろえる。型注釈付きのアロー関数は理由付きで行単位に許す。
+        "func-style": ["error", "declaration"],
         // react-i18next の慣用名である翻訳関数 t だけを短い識別子として許可する。
         "id-length": ["error", { exceptions: ["t"] }],
         // vite.config.ts の define が置き換えるビルド時の定数だけを、ほかの識別子と衝突しない名前として許す（ADR-068）。

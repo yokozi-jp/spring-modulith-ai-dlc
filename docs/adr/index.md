@@ -82,4 +82,3 @@
 - [ADR-079: 失敗したイベント出版を、ShedLock で 1 つのインスタンスに絞った定期のジョブで、リスナーごとの方針で再投入する](ADR-079-resubmit-failed-event-publications-periodically-with-shedlock.md)（Proposed, 2026-10-10）
 - [ADR-080: バックエンドのテストの非同期の条件の待ちに Awaitility を使う](ADR-080-wait-for-async-conditions-with-awaitility.md)（Proposed, 2026-10-12）
 - [ADR-081: 一覧 API の sort を domain.model の enum で受け、default のない switch 式で項目名と列に写す](ADR-081-map-list-sort-via-domain-enum-and-exhaustive-switch.md)（Proposed, 2026-10-14）
-- [ADR-082: フロントエンドの名前付きの関数を関数宣言にそろえ、Oxlint の func-style で強制する](ADR-082-define-named-frontend-functions-as-declarations.md)（Proposed, 2026-10-20）

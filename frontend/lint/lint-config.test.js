@@ -199,6 +199,10 @@ describe("project lint config on fixtures", () => {
         expect(countIn("lib/arrow-function.ts", "eslint(func-style)")).toBe(2);
       });
 
+      it("rejects type-annotated function expressions", () => {
+        expect(countIn("lib/typed-function-expression.ts", "eslint(func-style)")).toBe(1);
+      });
+
       it("allows a type-annotated arrow function and arrow callbacks", () => {
         expect(codesIn("lib/typed-arrow-function.ts")).toStrictEqual([]);
       });

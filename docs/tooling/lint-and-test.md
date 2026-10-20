@@ -98,8 +98,8 @@ Oxlintの設定の正本は[`frontend/vite.config.ts`](../../frontend/vite.confi
   上書きとshadowingは、有効なままの`no-global-assign`と`no-shadow-restricted-names`が防ぐ。
 - **一律のstyle規則**：`capitalized-comments`、`max-lines-per-function`、`no-magic-numbers`、`no-ternary`、`one-var`、`sort-imports`、`sort-keys`をoffにする。
   Oxfmtと役割が重複するか、可読性を下げるためである。
-- **関数の書き方**：`func-style`を`"declaration"`と`allowTypeAnnotation: true`にする（[ADR-082](../adr/ADR-082-define-named-frontend-functions-as-declarations.md)）。
-  書き方は後述する。
+- **関数の書き方**：`func-style`を`"declaration"`にする。
+  名前付き関数は関数宣言にし、関数の型注釈から引数を推論させるアロー関数だけを理由付きの行単位の抑制で許す。
 - **短い識別子**：`id-length`で`t`だけを例外にする。
   react-i18nextの翻訳関数の慣用名であるためである。
 - **ビルド時の定数**：`no-underscore-dangle`で`__TELEMETRY_ENABLED__`と`__TELEMETRY_APP__`だけを許可する。
@@ -169,7 +169,8 @@ feature間のimportは、これとは別にjsPluginの`feature-boundaries/no-cro
 
 名前を付ける関数は、トップレベルでもcomponentやHookの中でも関数宣言で書く。
 その場で渡すコールバックはアロー関数で書く（`prefer-arrow-callback`）。
-変数に関数の型を注釈するときだけ、アロー関数を変数に代入してよい。
+関数の型注釈から引数を推論させる必要がある場合だけ、理由を付けて`func-style`を行単位で抑制し、アロー関数を変数に代入してよい。
+`allowTypeAnnotation`は型注釈付きの関数式も許すため、使わない。
 
 ```tsx
 function OrderRow({ order }: OrderRowProps) {
@@ -179,6 +180,7 @@ function OrderRow({ order }: OrderRowProps) {
   return <Button onClick={handleSelect}>{order.code}</Button>;
 }
 
+// oxlint-disable-next-line func-style -- ChangeEventHandlerからeventの型を推論させる。
 const onChange: ChangeEventHandler<HTMLInputElement> = (event) => {
   setCode(event.target.value);
 };
