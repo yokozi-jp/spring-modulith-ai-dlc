@@ -199,13 +199,15 @@ pre-push:
 
     # frontend に変更があるpushのとき、テストと本番ビルドを実行する。
     - name: frontend-test-build
-      # pushする変更のファイル。run の {files} で参照し、glob で絞る。
-      # 組み込みの {push_files} は、@{push} が無い新しいブランチでは HEAD と origin/HEAD の差分を使う。
-      # その差分は分岐後に main へ入った変更も含み、触っていない backend の検査まで走るため、main との merge-base から比べる。
+      # ブランチが main から変えたファイル。run の {files} で参照し、glob で絞る。
+      # 組み込みの {push_files} は @{push} か origin/HEAD との差分を使い、rebase 後や新しいブランチでは
+      # 分岐後に main へ入った変更も含むため、触っていない backend の検査まで走る。
+      # origin/main が無く merge-base を取れないときは、安全側に倒して全ファイルを対象にする。
       # 以降の job は同じ値を *push-files で参照する。
       files: &push-files >-
-        git diff --name-only @{push} HEAD 2>/dev/null ||
-        git diff --name-only "$(git merge-base HEAD origin/main)" HEAD
+        base="$(git merge-base HEAD origin/main 2>/dev/null)" &&
+        git diff --name-only "$base" HEAD ||
+        (echo "origin/main との merge-base を取れないため、全ファイルを pre-push の検査の対象にします。" >&2 && git ls-files)
       glob:
         - "frontend/**"
         - "Taskfile.yml"

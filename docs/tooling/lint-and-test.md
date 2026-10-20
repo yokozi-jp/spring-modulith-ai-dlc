@@ -295,8 +295,10 @@ OKF検査の採用理由は[ADR-036](../adr/ADR-036-adopt-okf-for-docs-knowledge
 - **pre-push（GitHub Actionsワークフローの変更）**：`lint-actions`相当と`lint-actions-security`相当を実行する。
 
 Gitフックの条件とコマンドは[`lefthook.yml`](../../lefthook.yml)を正とする。
-pre-pushの「変更」は、pushしたことのあるブランチでは`@{push}`との差分、新しいブランチでは`origin/main`とのmerge-baseからの差分で判定する。
+pre-pushの「変更」は、push済みかどうかやrebaseの有無によらず、`origin/main`とのmerge-baseからの差分で判定する。
 分岐後にmainへ入った変更では、触っていない領域の検査は走らない。
+2回目以降のpushでも、ブランチ全体の変更に対して検査が走る。
+`origin/main`が無くmerge-baseを取れないときは、全ファイルを対象にして全検査を走らせる。
 
 ## CI対応
 
