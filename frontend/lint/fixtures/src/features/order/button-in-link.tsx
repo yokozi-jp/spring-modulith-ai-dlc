@@ -17,6 +17,7 @@ export function ButtonInLink({ label }: { label: string }) {
       <Button render={(props) => <Link to="/" {...props} />} />
       <Button
         render={(props) => {
+          // block body の return を検出する例。arrow-body-style にも違反するが、テストは数えない。
           return <a href="/" {...props} />;
         }}
       />

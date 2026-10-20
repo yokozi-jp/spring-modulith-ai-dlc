@@ -152,10 +152,10 @@ describe("project lint config on fixtures", () => {
     });
 
     describe("Tailwind classes", () => {
-      it("rejects class names built from a value", () => {
+      it("rejects class names built from a value or picked by a key passed to a function", () => {
         expect(
           countIn("features/order/dynamic-class.tsx", "tailwind-classes(no-dynamic-class-name)"),
-        ).toBe(4);
+        ).toBe(5);
       });
 
       it("allows complete classes joined with a value or picked by a built key", () => {

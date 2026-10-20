@@ -1,3 +1,5 @@
+const toneClasses = new Map([["danger-strong", "bg-destructive"]]);
+
 export function DynamicClass({ depth, tone, label }: { depth: number; tone: string; label: string }) {
   return (
     <>
@@ -5,6 +7,7 @@ export function DynamicClass({ depth, tone, label }: { depth: number; tone: stri
       <div className={`flex bg-${tone}-500`}>{label}</div>
       <div className={`${tone}-500`}>{label}</div>
       <div className={`${tone}${depth}`}>{label}</div>
+      <div className={toneClasses.get(`${tone}-strong`)}>{label}</div>
     </>
   );
 }
