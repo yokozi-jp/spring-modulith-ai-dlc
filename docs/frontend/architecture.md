@@ -203,7 +203,8 @@ feature間の境界は、`frontend/lint/feature-boundaries.js` のOxlint JS plug
 `no-restricted-imports` は静的importに加えて `import("@grafana/...")` の動的importも検出する。
 
 jsPluginは、動的な境界規則をこの一本だけと想定している。
-アプリやパッケージに分かれたとき、または動的な規則が三本を超えたときは、dependency-cruiserへ移る。
+アプリやパッケージに分かれたとき、または動的な境界規則が三本を超えたときは、dependency-cruiserへ移る。
+境界でない規則のjsPlugin（`ui-composition`、`tailwind-classes`、`local-security`）は、この本数に数えない。
 OxlintのJS plugin APIはalphaである。
 
 ## 共有コード

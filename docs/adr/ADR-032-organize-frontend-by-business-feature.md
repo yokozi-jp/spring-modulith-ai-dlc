@@ -37,6 +37,10 @@ AIエージェントに四つのfeatureを作らせた検証では、feature間�
 また、docsはcomponentのファイル名をPascalCaseと定めていたが、Oxlintの `unicorn/filename-case` は既定のkebab-caseを強制しており、docsどおりに作ると `task fe-check` が失敗した。
 routerの既定のerror表示は同梱の英語の固定文言のままであり、agentが `routeTree.gen.ts` などの生成物を手で書き換えることを止める仕組みも無かった。
 
+Decisionは次の二点を書き直した。
+loaderで呼ぶ関数は、TanStack Queryが `ensureQueryData` を非推奨にしたため、実装に合わせて `preloadQuery` に改めた。
+jsPluginの上限は、linkとbuttonの入れ子やTailwindのclass名のような境界でない規則のjsPluginを足すにあたり、境界の規則だけを数えると明記した。
+
 ## Decision
 
 Frontendは、業務機能を最上位の変更単位にする軽量なfeature-first構成を採用する。
@@ -104,13 +108,14 @@ feature間の境界は、`frontend/lint/feature-boundaries.js` のOxlint JS plug
 `../` は既存の `import/no-relative-parent-imports` が禁じているため、aliasだけを見る。
 共有層、route、Base UI、`fetch`、テスト用部品のimportの制限は、組み込みの `no-restricted-*` のoverrideで書く（[ADR-034](ADR-034-pin-frontend-runtime-and-enforce-oxlint-categories.md)）。
 jsPluginは動的な境界規則をこの一本だけと想定する。
-アプリやパッケージに分かれたとき、または動的な規則が三本を超えたときは、dependency-cruiserへ移る。
+アプリやパッケージに分かれたとき、または動的な境界規則が三本を超えたときは、dependency-cruiserへ移る。
+境界でない規則のjsPlugin（UIの組み合わせやclass名の検査など）は、この本数に数えない。
 
 routeはdirectory形式で書き、一覧、新規、詳細、編集は `index.tsx` と名前付きのrouteで置き、親のlayout routeを作らない。
 `_` 接尾辞は、親のlayoutを共有する子のうち一部だけを外す場面に限り、lintでは制限しない。
 認証が要る画面はpathless layoutの `_authenticated` の下に置き、共通の `beforeLoad` とアプリシェルをそこに置く。
 layout routeにcomponentを持たせるなら `<Outlet />` を描画する。
-初期描画のdataはloaderで `ensureQueryData` し、componentは `useSuspenseQuery` で読む。
+初期描画のdataはloaderで `preloadQuery`（`src/api/preload-query.ts`）によりcacheへ入れ、componentは `useSuspenseQuery` で読む。
 Loadingはrouterの `defaultPendingComponent`、Errorは `defaultErrorComponent`、存在しないresourceはloaderの `notFound()` と `defaultNotFoundComponent` で受け、画面のcomponentはEmptyとContentだけを分ける。
 既定のerror表示はcatalogの文言を使って `error.message` を画面に出さず、再試行はqueryのerrorをresetしてから `router.invalidate()` を呼ぶ。
 routerの既定値は `src/router-defaults.ts` にまとめ、`main.tsx` とrouteのテストが同じ値を使う。
