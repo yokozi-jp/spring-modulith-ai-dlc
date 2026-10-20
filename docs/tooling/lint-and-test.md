@@ -115,6 +115,7 @@ Oxlintの設定の正本は[`frontend/vite.config.ts`](../../frontend/vite.confi
   `className`の外で組み立てた文字列と、`cn()`に渡す変数は検出しない。
 - **`lint/**`**：`import/no-nodejs-modules`、`new-cap`、`typescript/no-unsafe-assignment`、`typescript/no-unsafe-call`、`typescript/no-unsafe-member-access`をoffにする。
   Node側のLintツールであり、OxlintのJS plugin APIに型が無いためである。
+  `lint/**`はtsconfigの対象外で型検査が未定義の識別子を止めないため、Nodeのglobalを許した`no-undef`を有効にする。
 - **`src/components/ui/**`**：shadcnの生成物の書き方に合わせて`shadcn/no-restyle`、`shadcn/no-arbitrary-values`、`shadcn/require-static-classes`をoffにする。
   `react/only-export-components`もoffにし、React Doctorの同じruleも`frontend/doctor.config.json`で外す。
   shadcnの生成物は`buttonVariants`のようなvariantをcomponentと同じファイルからexportするためである。
@@ -178,6 +179,7 @@ linkとbuttonの入れ子は、jsPluginの`ui-composition/no-button-in-link`が�
 変数に入れてから返す要素と、条件演算子で返す要素も検出しない。
 
 組み合わせた結果は、`frontend/lint/lint-config.test.js`が`frontend/lint/fixtures/src/**`の違反例と正しい例を実際の設定でLintして確かめる。
+jsPluginやoverrideの挙動を試すときも、一時ディレクトリへ設定を手で複製せず、fixtureを足して`frontend`で`vp test run lint/lint-config.test.js`を実行する。
 
 ### Lintを通る書き方
 
@@ -292,6 +294,8 @@ OKF検査の採用理由は[ADR-036](../adr/ADR-036-adopt-okf-for-docs-knowledge
 - **pre-push（GitHub Actionsワークフローの変更）**：`lint-actions`相当と`lint-actions-security`相当を実行する。
 
 Gitフックの条件とコマンドは[`lefthook.yml`](../../lefthook.yml)を正とする。
+pre-pushの「変更」は、pushしたことのあるブランチでは`@{push}`との差分、新しいブランチでは`origin/main`とのmerge-baseからの差分で判定する。
+分岐後にmainへ入った変更では、触っていない領域の検査は走らない。
 
 ## CI対応
 

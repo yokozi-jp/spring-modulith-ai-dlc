@@ -30,6 +30,33 @@ task fe-check
 
 `frontend/package.json`か`frontend/pnpm-lock.yaml`が変わったとき（ライブラリを追加、更新したときや、それを含む変更をpullしたとき）は、`task fe-dev`の前に`task fe-install`を実行する。
 
+`frontend`でパッケージのコマンドを直接実行するときは、`npx`ではなく`vp`（`vp exec <コマンド>`、`vp test run <ファイル>`）を使う。
+`frontend/package.json`の`devEngines`がpnpmを指定しているため、`npx`はnpmとして拒否される。
+
+## git worktreeで作業するとき
+
+worktreeには`node_modules`が無いため、作った直後にルートとフロントエンドの依存を入れる。
+
+```bash
+git worktree add -b <ブランチ> ../<ディレクトリ> origin/main
+cd ../<ディレクトリ>
+npm install        # Lefthookとcommitlint
+task fe-install    # フロントエンド
+```
+
+依存を入れないと、commitとpushのフックがcommitlintとフロントエンドの検査の依存を見つけられずに失敗する。
+
+## エージェントがcommitとpushをするとき
+
+Lefthookの出力を失敗と要約だけに絞り、色の制御文字を外す。
+
+```bash
+LEFTHOOK_OUTPUT=summary,failure NO_COLOR=1 git commit -F <ファイル>
+LEFTHOOK_OUTPUT=summary,failure NO_COLOR=1 git push -u origin <ブランチ>
+```
+
+既定の出力は、成功した検査の出力と装飾の枠を含み、一回のcommitで数KBになる。
+
 ## APIを変更するとき
 
 ```bash

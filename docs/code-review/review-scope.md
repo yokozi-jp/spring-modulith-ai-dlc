@@ -29,6 +29,9 @@ tags: [convention, code-review, ci, future-arch-guidelines]
 検査ツールで検出できる指摘を繰り返しているときは、該当する検査をTaskfileとCIへ追加する。
 既存の検査の内容と実行場所は[Lintとテストのリファレンス](../tooling/lint-and-test.md)を参照する。
 
+冗長に見える書き方を簡略化するよう指摘する前に、簡略化した版がLintと型検査を通るかを確かめる。
+`frontend/lint/`のjsPluginのようにASTが`any`になるコードでは、`=== true`のような比較が`strict-boolean-expressions`に必要なことがある。
+
 ## 未記載の方針を規約へ戻す
 
 機能上は問題ないが他の実装と方針が揃っていない変更には、既存の方針へ合わせるよう指摘する。
