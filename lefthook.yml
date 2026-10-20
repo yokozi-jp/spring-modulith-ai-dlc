@@ -45,11 +45,13 @@
 # 実運用設定
 # ---------------------------------------------------------------------------
 
-# 成功した job の出力と lefthook の版の表示を省き、失敗した job の出力と要約だけを出す。
+# lefthook の版の表示、skip の行、EXECUTE の行を省く。
+# job の出力は残す。adr-check の注意喚起は成功の扱いで出るため、成功した job の出力も消さない。
 # 全部を出すときは LEFTHOOK_OUTPUT=meta,summary,success,failure,execution,execution_out,execution_info,skips を付ける。
 output:
   - summary
   - failure
+  - execution_out
 
 # コミットメッセージを Conventional Commits 規約で検証（commitlint）
 commit-msg:

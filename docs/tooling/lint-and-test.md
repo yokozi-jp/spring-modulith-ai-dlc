@@ -316,7 +316,8 @@ OKF検査の採用理由は[ADR-036](../adr/ADR-036-adopt-okf-for-docs-knowledge
 - **pre-push（GitHub Actionsワークフローの変更）**：`lint-actions`相当と`lint-actions-security`相当を実行する。
 
 Gitフックの条件とコマンドは[`lefthook.yml`](../../lefthook.yml)を正とする。
-Lefthookは失敗したjobの出力と要約だけを出す（`output`）。
+Lefthookは版の表示、skipの行、`EXECUTE`の行を省き、jobの出力と要約を出す（`output`）。
+成功したjobの出力も残すのは、`adr-check`の注意喚起が成功の扱いで出るためである。
 すべてを出すときは、`LEFTHOOK_OUTPUT`に`meta,summary,success,failure,execution,execution_out,execution_info,skips`を渡す。
 
 ## CI対応
