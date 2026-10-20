@@ -308,7 +308,10 @@ export default defineConfig(({ mode }) => {
       overrides: [
         {
           files: ["lint/**"],
+          // lint/** は tsconfig の対象外で型検査が効かないため、未定義の識別子を no-undef で止める。
+          env: { node: true },
           rules: {
+            "no-undef": "error",
             "import/no-nodejs-modules": "off",
             "new-cap": "off",
             "typescript/no-unsafe-assignment": "off",
