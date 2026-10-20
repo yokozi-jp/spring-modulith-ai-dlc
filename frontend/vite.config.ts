@@ -43,6 +43,21 @@ const sharedLayerImports = {
   group: ["@/features/**", "@/routes/**", "@/routeTree.gen"],
   message: "Shared code must not depend on features or routes.",
 };
+// lib は最下層であり、共有層の禁止に加えて components も参照しない。
+const libLayerImports = {
+  group: [...sharedLayerImports.group, "@/components/**"],
+  message: "lib must not depend on components, features or routes.",
+};
+// api は通信層であり、共有層の禁止に加えて UI を参照しない。
+const apiLayerImports = {
+  group: [...sharedLayerImports.group, "@/components/**"],
+  message: "api must not depend on components, features or routes.",
+};
+// components/ui は UI primitive の層であり、共有層の禁止に加えてアプリシェルなど ui 以外の components を参照しない。
+const uiLayerImports = {
+  group: [...sharedLayerImports.group, "@/components/**", "!@/components/ui/**"],
+  message: "components/ui must not depend on other components, features or routes.",
+};
 const featureImports = {
   group: ["@/routes/**", "@/routeTree.gen"],
   message: "Use getRouteApi instead of importing a route.",
@@ -55,8 +70,7 @@ const testOnlyImports = {
   group: ["msw", "msw/**", "@/api/generated/mocks/**", "@/testing/**", "@testing-library/**"],
   message: "Use test-only modules only in test files and src/testing.",
 };
-// ponytail: no-restricted-imports は静的な import だけを見る。feature からの動的 import("@grafana/...") は通る。
-// 違反が起きたら、lint/feature-boundaries.js と同じく ImportExpression を見る規則に移す。
+// no-restricted-imports は静的な import に加えて import("@grafana/...") も検出する（lint/fixtures の telemetry-sdk.ts で確かめている）。
 const telemetrySdkImports = {
   group: ["@grafana/*"],
   message: "Call the telemetry SDK only through src/lib/telemetry.ts (ADR-068).",
@@ -204,7 +218,9 @@ export default defineConfig(({ mode }) => {
         { name: "local-security", specifier: "./lint/local-security.js" },
         { name: "shadcn", specifier: "@shadcn/lint" },
         { name: "better-tailwindcss", specifier: "eslint-plugin-better-tailwindcss" },
+        { name: "tailwind-classes", specifier: "./lint/tailwind-classes.js" },
         { name: "feature-boundaries", specifier: "./lint/feature-boundaries.js" },
+        { name: "ui-composition", specifier: "./lint/ui-composition.js" },
       ],
       rules: {
         // automatic JSX runtime、Vite設定、TanStack Routerの規約と両立しない規則。
@@ -271,6 +287,7 @@ export default defineConfig(({ mode }) => {
         "no-restricted-properties": ["error", ...htmlSinkProperties, ...networkProperties],
         "local-security/no-jsx-srcdoc": "error",
         "feature-boundaries/no-cross-feature-import": "error",
+        "ui-composition/no-button-in-link": "error",
         "shadcn/no-restyle": ["error", { allow: ["layout"] }],
         "shadcn/no-raw-colors": "error",
         "shadcn/no-arbitrary-values": ["error", { allow: ["layout"] }],
@@ -283,6 +300,7 @@ export default defineConfig(({ mode }) => {
         "better-tailwindcss/no-unnecessary-whitespace": "error",
         "better-tailwindcss/no-conflicting-classes": "error",
         "better-tailwindcss/enforce-canonical-classes": "error",
+        "tailwind-classes/no-dynamic-class-name": "error",
       },
       settings: {
         "better-tailwindcss": { entryPoint: "src/style.css" },
@@ -301,12 +319,23 @@ export default defineConfig(({ mode }) => {
           },
         },
         {
-          files: ["src/{api,components,lib,i18n}/**"],
+          files: ["src/{api,components,i18n}/**"],
           rules: {
             "no-restricted-imports": [
               "error",
               {
                 patterns: [sharedLayerImports, baseUiImports, testOnlyImports, telemetrySdkImports],
+              },
+            ],
+          },
+        },
+        {
+          files: ["src/lib/**"],
+          rules: {
+            "no-restricted-imports": [
+              "error",
+              {
+                patterns: [libLayerImports, baseUiImports, testOnlyImports, telemetrySdkImports],
               },
             ],
           },
@@ -317,7 +346,7 @@ export default defineConfig(({ mode }) => {
           rules: {
             "no-restricted-imports": [
               "error",
-              { patterns: [sharedLayerImports, baseUiImports, testOnlyImports] },
+              { patterns: [libLayerImports, baseUiImports, testOnlyImports] },
             ],
           },
         },
@@ -338,7 +367,7 @@ export default defineConfig(({ mode }) => {
             "shadcn/require-static-classes": "off",
             "no-restricted-imports": [
               "error",
-              { patterns: [sharedLayerImports, testOnlyImports, telemetrySdkImports] },
+              { patterns: [uiLayerImports, testOnlyImports, telemetrySdkImports] },
             ],
             "react/only-export-components": "off",
           },
@@ -346,6 +375,12 @@ export default defineConfig(({ mode }) => {
         {
           files: ["src/api/**"],
           rules: {
+            "no-restricted-imports": [
+              "error",
+              {
+                patterns: [apiLayerImports, baseUiImports, testOnlyImports, telemetrySdkImports],
+              },
+            ],
             "no-restricted-globals": ["error", ...htmlSinkGlobals],
             "no-restricted-properties": ["error", ...htmlSinkProperties],
           },
