@@ -53,8 +53,9 @@ export const OrderLinesFields = withFieldGroup({
     onFieldChange,
   }) {
     const { t } = useTranslation();
-    const message = (name: string, errors: readonly unknown[]) =>
-      firstErrorMessage(errors) ?? serverErrors.fields[name];
+    function message(name: string, errors: readonly unknown[]) {
+      return firstErrorMessage(errors) ?? serverErrors.fields[name];
+    }
 
     return (
       <group.Field name="lines" mode="array">

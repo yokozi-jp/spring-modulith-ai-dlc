@@ -85,10 +85,13 @@ export function PaymentStatus({
 }) {
   const { t, i18n } = useTranslation();
   const [pollingSince, setPollingSince] = useState(() => Date.now());
-  const awaitingResult = (items: readonly PaymentSummaryResponse[], updatedAt: number) =>
-    orderStatus === "CONFIRMED" &&
-    items.length === 0 &&
-    updatedAt - pollingSince < PAYMENT_POLL_WINDOW_MS;
+  function awaitingResult(items: readonly PaymentSummaryResponse[], updatedAt: number) {
+    return (
+      orderStatus === "CONFIRMED" &&
+      items.length === 0 &&
+      updatedAt - pollingSince < PAYMENT_POLL_WINDOW_MS
+    );
+  }
   // 再試行しない。mutation の後の全 query の無効化はこの query の再取得も待つため、
   // 5xx の再試行の待ちの間、確定や明細の変更が「送信しています」のまま残る。
   // 失敗したら読み直しをやめ、ボタンで読み直させる。

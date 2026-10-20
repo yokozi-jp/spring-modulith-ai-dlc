@@ -22,12 +22,12 @@ export const noCrossFeatureImport = {
     if (source === "") {
       return {};
     }
-    const check = (node) => {
+    function check(node) {
       const target = featureName(importPattern, node.source?.value ?? "");
       if (target !== "" && target !== source) {
         context.report({ node: node.source, messageId: "forbidden", data: { source, target } });
       }
-    };
+    }
     return {
       ImportDeclaration: check,
       ExportNamedDeclaration: check,

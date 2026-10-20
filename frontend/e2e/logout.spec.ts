@@ -17,11 +17,16 @@ test.use({ storageState: { cookies: [], origins: [] } });
 const endSessionEndpoint =
   "http://127.0.0.1:8081/realms/spring-modulith/protocol/openid-connect/logout?";
 
-const logoutButton = (page: Page): Locator => page.getByRole("button", { name: "ログアウト" });
-const homeHeading = (page: Page): Locator =>
-  page.getByRole("main").getByRole("heading", { level: 1, name: "はじめる" });
+function logoutButton(page: Page): Locator {
+  return page.getByRole("button", { name: "ログアウト" });
+}
+function homeHeading(page: Page): Locator {
+  return page.getByRole("main").getByRole("heading", { level: 1, name: "はじめる" });
+}
 // hidden input は role を持たないため、規約の例外として locator で取る。
-const csrfInput = (page: Page): Locator => page.locator('input[name="_csrf"]');
+function csrfInput(page: Page): Locator {
+  return page.locator('input[name="_csrf"]');
+}
 
 async function logIn(page: Page): Promise<void> {
   await page.goto("/oauth2/authorization/web");
@@ -94,11 +99,6 @@ async function findCookie(context: BrowserContext, name: string): Promise<Cookie
     throw new Error(`${name} Cookie がありません`);
   }
   return cookie;
-}
-
-async function cookieValue(context: BrowserContext, name: string): Promise<string> {
-  const { value } = await findCookie(context, name);
-  return value;
 }
 
 // 再読み込みしても同じ session のまま、URL の query と fragment を送らないことを確かめる。
@@ -192,7 +192,7 @@ test("ログアウト後はアプリと SSO のセッションが終わり、も
   request,
 }) => {
   await logIn(page);
-  const oldSession = await cookieValue(context, "APP_SESSION");
+  const { value: oldSession } = await findCookie(context, "APP_SESSION");
   // 再送の経路が Cookie を届けていることを、ログアウト前に同じ経路で示す。
   expect(await replayedApiStatus(request, oldSession)).toBe(404);
   await logoutButton(page).click();

@@ -43,7 +43,9 @@ export function serverFieldErrors(error: unknown): ServerFieldErrors | undefined
 
 /** 入力欄が変わったら、その欄のサーバーのエラーだけを消す。明細の追加と削除では行の位置がずれるため、明細のエラーをすべて消す。 */
 export function withoutField(errors: ServerFieldErrors, name: string): ServerFieldErrors {
-  const removed = (key: string) => key === name || (name === "lines" && key.startsWith("lines"));
+  function removed(key: string) {
+    return key === name || (name === "lines" && key.startsWith("lines"));
+  }
   const keys = Object.keys(errors.fields);
   if (!keys.some((key) => removed(key))) {
     return errors;

@@ -6,7 +6,9 @@ const origin = "http://localhost:5173";
 const root = new Set(["/"]);
 
 // SDK の enum をテストへ import しない。
-const item = (type: string, payload: object, meta: object = {}) => ({ type, payload, meta });
+function item(type: string, payload: object, meta: object = {}) {
+  return { type, payload, meta };
+}
 
 const meta = {
   app: { name: "demo-web", namespace: "demo", version: "1.0.0", environment: "local" },
@@ -16,8 +18,8 @@ const meta = {
   user: { email: "person@example.com" },
 };
 
-const exceptionItem = (value: string, filename: string) =>
-  item(
+function exceptionItem(value: string, filename: string) {
+  return item(
     "exception",
     {
       type: "Error",
@@ -28,16 +30,23 @@ const exceptionItem = (value: string, filename: string) =>
     },
     meta,
   );
+}
 
-const viewEvent = (attributes: object) =>
-  item("event", { name: "view_changed", timestamp: "2026-10-06T00:00:00Z", attributes }, meta);
+function viewEvent(attributes: object) {
+  return item(
+    "event",
+    { name: "view_changed", timestamp: "2026-10-06T00:00:00Z", attributes },
+    meta,
+  );
+}
 
-const measurement = (values: object) =>
-  item(
+function measurement(values: object) {
+  return item(
     "measurement",
     { type: "web-vitals", timestamp: "2026-10-06T00:00:00Z", values, context: { secret: "x" } },
     meta,
   );
+}
 
 describe("sanitizeTelemetryItem URLs", () => {
   beforeEach(() => {

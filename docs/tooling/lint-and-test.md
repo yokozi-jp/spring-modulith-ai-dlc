@@ -96,8 +96,10 @@ Oxlintの設定の正本は[`frontend/vite.config.ts`](../../frontend/vite.confi
   event handlerでrejectしないPromiseを捨てる文を書けるようにするためである（後述）。
 - **`undefined`**：`no-undefined`をoffにし、`x === undefined`で比較する。
   上書きとshadowingは、有効なままの`no-global-assign`と`no-shadow-restricted-names`が防ぐ。
-- **一律のstyle規則**：`capitalized-comments`、`func-style`、`max-lines-per-function`、`no-magic-numbers`、`no-ternary`、`one-var`、`sort-imports`、`sort-keys`をoffにする。
+- **一律のstyle規則**：`capitalized-comments`、`max-lines-per-function`、`no-magic-numbers`、`no-ternary`、`one-var`、`sort-imports`、`sort-keys`をoffにする。
   Oxfmtと役割が重複するか、可読性を下げるためである。
+- **関数の書き方**：`func-style`を`"declaration"`と`allowTypeAnnotation: true`にする（[ADR-082](../adr/ADR-082-define-named-frontend-functions-as-declarations.md)）。
+  書き方は後述する。
 - **短い識別子**：`id-length`で`t`だけを例外にする。
   react-i18nextの翻訳関数の慣用名であるためである。
 - **ビルド時の定数**：`no-underscore-dangle`で`__TELEMETRY_ENABLED__`と`__TELEMETRY_APP__`だけを許可する。
@@ -164,6 +166,23 @@ feature間のimportは、これとは別にjsPluginの`feature-boundaries/no-cro
 組み合わせた結果は、`frontend/lint/lint-config.test.js`が`frontend/lint/fixtures/src/**`の違反例と正しい例を実際の設定でLintして確かめる。
 
 ### Lintを通る書き方
+
+名前を付ける関数は、トップレベルでもcomponentやHookの中でも関数宣言で書く。
+その場で渡すコールバックはアロー関数で書く（`prefer-arrow-callback`）。
+変数に関数の型を注釈するときだけ、アロー関数を変数に代入してよい。
+
+```tsx
+function OrderRow({ order }: OrderRowProps) {
+  function handleSelect() {
+    onSelect(order.id);
+  }
+  return <Button onClick={handleSelect}>{order.code}</Button>;
+}
+
+const onChange: ChangeEventHandler<HTMLInputElement> = (event) => {
+  setCode(event.target.value);
+};
+```
 
 event handlerからPromiseを返す関数を呼ぶときは、handlerの中で`void`を付けた文にする。
 

@@ -231,7 +231,8 @@ export default defineConfig(({ mode }) => {
         "typescript/promise-function-async": "off",
         // Oxfmtや型推論と役割が重複するか、可読性を下げる一律のstyle規則。
         "capitalized-comments": "off",
-        "func-style": "off",
+        // 名前付きの関数は関数宣言にそろえ、型注釈付きの変数だけアロー関数を許す（ADR-082）。
+        "func-style": ["error", "declaration", { allowTypeAnnotation: true }],
         // react-i18next の慣用名である翻訳関数 t だけを短い識別子として許可する。
         "id-length": ["error", { exceptions: ["t"] }],
         // vite.config.ts の define が置き換えるビルド時の定数だけを、ほかの識別子と衝突しない名前として許す（ADR-068）。

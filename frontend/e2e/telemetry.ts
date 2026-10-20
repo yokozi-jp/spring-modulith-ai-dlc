@@ -132,13 +132,9 @@ interface SessionRun {
   readonly startIndex: number;
 }
 
-const sessionSignals = ({ error, view }: SessionRun): string[] => [
-  error,
-  view,
-  '"lcp"',
-  '"inp"',
-  '"cls"',
-];
+function sessionSignals({ error, view }: SessionRun): string[] {
+  return [error, view, '"lcp"', '"inp"', '"cls"'];
+}
 
 export async function collectTelemetry(page: Page): Promise<string[]> {
   const payloads: string[] = [];
