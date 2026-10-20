@@ -45,6 +45,12 @@
 # 実運用設定
 # ---------------------------------------------------------------------------
 
+# 成功した job の出力と lefthook の版の表示を省き、失敗した job の出力と要約だけを出す。
+# 全部を出すときは LEFTHOOK_OUTPUT=meta,summary,success,failure,execution,execution_out,execution_info,skips を付ける。
+output:
+  - summary
+  - failure
+
 # コミットメッセージを Conventional Commits 規約で検証（commitlint）
 commit-msg:
   jobs:
@@ -204,7 +210,7 @@ pre-push:
         - "Taskfile.yml"
       run: |
         echo "{push_files}" >/dev/null
-        task fe-test-build
+        task fe-test-build FE_TEST_ARGS="--reporter=dot --coverage.reporter=json-summary"
       fail_text: "Frontendのテストまたはビルドに失敗しました。task fe-test-buildで再実行してください。"
 
     # backend に変更がある push のときだけ Lint（Spotless + PMD + SpotBugs）

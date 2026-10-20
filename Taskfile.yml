@@ -186,6 +186,8 @@ tasks:
         changed="$(git diff --name-only "$base"...HEAD)"
         if [ -z "$changed" ]; then exit 0; fi
         sig="$(printf '%s\n' "$changed" | grep -E '^(frontend/|backend/build\.gradle|backend/buildSrc/|backend/gradle/[^/]+\.gradle|backend/src/main/resources/application(-[^/]+)?\.yaml|backend/src/main/resources/db/changelog/|backend/src/main/java/com/example/demo/SecurityConfig\.java|docker/|infrastructure/|\.github/workflows/)' || true)"
+        # テスト、E2E、lint の fixture は判断を含まないので、frontend の変更から外す。
+        sig="$(printf '%s\n' "$sig" | grep -vE '^frontend/(e2e/|lint/fixtures/|src/testing/)|\.(test|spec)\.[cm]?[jt]sx?$' || true)"
         if [ -z "$sig" ]; then exit 0; fi
         adr="$(printf '%s\n' "$changed" | grep -E '^docs/adr/ADR-[0-9]+.*\.md$' || true)"
         if [ -n "$adr" ]; then exit 0; fi
@@ -198,6 +200,7 @@ tasks:
         echo "  対象の変更:" >&2
         printf '    - %s\n' $sig >&2
         echo "  重要な設計判断なら docs/adr/ に ADR を追加してください（規約: docs/adr/conventions.md）。" >&2
+        echo "  日常的な実装選択、コード整形、自明に可逆な決定は ADR にしません（同じ規約の「ADR を作らないもの」）。" >&2
         echo "  該当しない場合は ADR_ACK=1 を付けて再実行できます（例: ADR_ACK=1 git push）。" >&2
         echo "" >&2
         if [ "${ADR_STRICT:-}" = "1" ]; then exit 1; fi
@@ -435,12 +438,15 @@ tasks:
     desc: フロントエンドのテストと、全体と各ファイルのbranchとline coverageを検証
     dir: frontend
     silent: true
+    vars:
+      # Vitest へ足す引数。pre-push は成功の一覧と coverage の表を省くために使う（lefthook.yml）。
+      FE_TEST_ARGS: '{{.FE_TEST_ARGS | default ""}}'
     cmds:
       # 本番ビルドと同じく React Compiler を有効にして、振る舞いを検証する（ADR-078）。
-      - vp test run
+      - vp test run {{.FE_TEST_ARGS}}
       # coverage は Compiler を外して測る。Compiler が足す memo の分岐を分母に入れない。
       # 全体の下限は vite.config.ts の thresholds が検査する。
-      - FRONTEND_REACT_COMPILER=false vp test run --coverage
+      - FRONTEND_REACT_COMPILER=false vp test run --coverage {{.FE_TEST_ARGS}}
       # ファイルごとの下限は coverage-summary.json で検査する（ADR-076）。
       # ponytail: Vitest 4.1 の perFile は全体の下限をファイルごとに当てるだけで、別の値を持てない。
       # perFile にオブジェクトを渡せる版へ上がったら、この検査を vite.config.ts の thresholds.perFile へ移す。
@@ -602,13 +608,15 @@ tasks:
     internal: true
     cmds:
       - test -f .env.test || cp .env.test.example .env.test
-      # 既存の環境ファイルは上書きしないので、TEST_ENV_FILE で選んだファイルに .env.test.example の変数が足りなければここで止める。
+      # 既存の値は上書きせず、TEST_ENV_FILE で選んだファイルに無い変数だけを .env.test.example の行のまま追記する。
       - |
         test -f "{{.TEST_ENV_FILE}}" || { echo "{{.TEST_ENV_FILE}} がありません。" >&2; exit 1; }
         missing="$(sed -n 's/^\([A-Za-z_][A-Za-z0-9_]*\)=.*/\1/p' .env.test.example | while read -r key; do grep -q "^${key}=" "{{.TEST_ENV_FILE}}" || printf ' %s' "$key"; done)"
         if [ -n "$missing" ]; then
-          echo "{{.TEST_ENV_FILE}} に .env.test.example の変数がありません:${missing}。.env.test.example の行を {{.TEST_ENV_FILE}} へ足してください。" >&2
-          exit 1
+          # 末尾に改行の無いファイルへ追記すると、最後の行と最初の追記がつながるため。
+          test -z "$(tail -c 1 "{{.TEST_ENV_FILE}}")" || echo >> "{{.TEST_ENV_FILE}}"
+          for key in $missing; do grep -m 1 "^${key}=" .env.test.example >> "{{.TEST_ENV_FILE}}"; done
+          echo "{{.TEST_ENV_FILE}} に .env.test.example の変数を追記しました:${missing}" >&2
         fi
 
   _require-migration-env:

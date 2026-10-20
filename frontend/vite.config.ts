@@ -173,6 +173,9 @@ export default defineConfig(({ mode }) => {
     resolve: { tsconfigPaths: true },
     test: {
       exclude: [...defaultExclude, ...lintFixtures, "e2e/**"],
+      // pre-push では backend のテストやシークレットスキャンと並列に走り、既定の 5 秒を超えることがある。
+      // ponytail: タイムアウトは性能の検証ではなくハング検出のためなので、負荷時の実測（5 秒超）に余裕を持たせた 30 秒にする。
+      testTimeout: 30_000,
       // MSW の server と後片付けを全テストで共有する（docs/frontend/testing.md）。
       setupFiles: ["./src/testing/setup.ts"],
       coverage: {
