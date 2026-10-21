@@ -1,7 +1,7 @@
 {
   "telemetry.enabled": false,
   "chat.defaultModel": "auto",
-  "chat.defaultAgent": "default",
+  "chat.defaultAgent": "kiro_default",
   "chat.ui": "tui",
   "chat.agentEngine": "v3"
 }
