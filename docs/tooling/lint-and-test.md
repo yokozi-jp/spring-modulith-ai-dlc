@@ -114,10 +114,13 @@ Oxlintの設定の正本は[`frontend/vite.config.ts`](../../frontend/vite.confi
   この規則はrestrictionカテゴリで有効だが、optionを指定しないと何も禁止しない。
 - **Tailwindのclass**：`better-tailwindcss/enforce-canonical-classes`を有効にし、classを正規形にそろえる（`--fix`で直せる）。
   `better-tailwindcss/enforce-shorthand-classes`は役割が重なるため有効にしない。
-  jsPluginの`tailwind-classes/no-dynamic-class-name`は、`className`の中で値からclass名を組み立てるテンプレートリテラル（`` `pl-${depth}` ``）を禁じる（[フロントエンドのUIとスタイル](../frontend/ui-and-style.md#uiの書き方)）。
+  jsPluginの`tailwind-classes/no-dynamic-class-name`は、`className`の中で値からclass名を組み立てるテンプレートリテラル（`` `pl-${depth}` ``、`` `${tone}${depth}` ``）を禁じる（[フロントエンドのUIとスタイル](../frontend/ui-and-style.md#uiの書き方)）。
+  objectや配列からclassを選ぶkey（`` tones[`${tone}-strong`] ``）は対象にしない。
+  関数の引数に渡すkey（`` tones.get(`${tone}-strong`) ``）は報告するため、classはobjectか配列に並べて選ぶ。
   `className`の外で組み立てた文字列と、`cn()`に渡す変数は検出しない。
 - **`lint/**`**：`import/no-nodejs-modules`、`new-cap`、`typescript/no-unsafe-assignment`、`typescript/no-unsafe-call`、`typescript/no-unsafe-member-access`をoffにする。
   Node側のLintツールであり、OxlintのJS plugin APIに型が無いためである。
+  `lint/**`はtsconfigの対象外で型検査が未定義の識別子を止めないため、Nodeのglobalを許した`no-undef`を有効にする。
 - **`src/components/ui/**`**：shadcnの生成物の書き方に合わせて`shadcn/no-restyle`、`shadcn/no-arbitrary-values`、`shadcn/require-static-classes`をoffにする。
   `react/only-export-components`もoffにし、React Doctorの同じruleも`frontend/doctor.config.json`で外す。
   shadcnの生成物は`buttonVariants`のようなvariantをcomponentと同じファイルからexportするためである。
@@ -176,11 +179,14 @@ feature間のimportは、これとは別にjsPluginの`feature-boundaries/no-cro
 
 linkとbuttonの入れ子は、jsPluginの`ui-composition/no-button-in-link`がすべてのファイルで禁じる（[フロントエンドのUIとスタイル](../frontend/ui-and-style.md#uiの書き方)）。
 `Link`か`a`の内側の`Button`か`button`と、`Button`の`render`に渡した`Link`か`a`を報告する。
+`render`に関数を渡す場合は、関数が直接返す`Link`か`a`を報告する。
 要素は名前だけで判定するので、別名でimportしたcomponentは検出しない。
+変数に入れてから返す要素と、条件演算子で返す要素も検出しない。
 
 組み合わせた結果は、`frontend/lint/lint-config.test.js`が`frontend/lint/fixtures/src/**`の違反例と正しい例を実際の設定でLintして確かめる。
 規則のoptionを追加または変更するときは、optionが許す範囲のすぐ外側の書き方を拒否するfixtureも置く。
 optionの名前から許す範囲を推測せず、規則の文書とfixtureで確かめる。
+jsPluginやoverrideの挙動を試すときも、一時ディレクトリへ設定を手で複製せず、fixtureを足して`frontend`で`vp test run lint/lint-config.test.js`を実行する。
 
 ### Lintを通る書き方
 
@@ -319,6 +325,12 @@ Gitフックの条件とコマンドは[`lefthook.yml`](../../lefthook.yml)を�
 Lefthookは版の表示、skipの行、`EXECUTE`の行を省き、jobの出力と要約を出す（`output`）。
 成功したjobの出力も残すのは、`adr-check`の注意喚起が成功の扱いで出るためである。
 すべてを出すときは、`LEFTHOOK_OUTPUT`に`meta,summary,success,failure,execution,execution_out,execution_info,skips`を渡す。
+pre-pushの「変更」は、push済みかどうかやrebaseの有無によらず、`origin/main`とのmerge-baseからの差分で判定する。
+分岐後にmainへ入った変更では、触っていない領域の検査は走らない。
+2回目以降のpushでも、ブランチ全体の変更に対して検査が走る。
+一度backendを変えたブランチでは、以降docsだけを直してpushしてもbackendの検査が毎回走る。
+直前のpushからの差分だけを見る方式は、rebase後にmainの変更を含んでしまうため採らず、この重複を受け入れる。
+`origin/main`が無くmerge-baseを取れないときは、全ファイルを対象にして全検査を走らせる。
 
 ## CI対応
 

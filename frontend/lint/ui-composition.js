@@ -1,11 +1,33 @@
 // ponytail: 要素を名前（Link、a、Button、button）だけで判定する。別名で import した component は見逃す。
+// render に渡す関数は、直接返す JSX だけを見る。変数に入れてから返す要素や、条件演算子で返す要素は見逃す。
 // 見逃しが起きたら、import の解決元（@tanstack/react-router、@/components/ui/button）で判定する規則に移す。
 // Oxlint の JS plugin API は alpha である。
 const linkNames = new Set(["Link", "a"]);
 const buttonNames = new Set(["Button", "button"]);
+const functionTypes = new Set(["ArrowFunctionExpression", "FunctionExpression"]);
 
 function elementName(openingElement) {
   return openingElement?.name?.type === "JSXIdentifier" ? String(openingElement.name.name) : "";
+}
+
+// render は要素と、要素を返す関数（`(props) => <Link {...props} />`）のどちらも受け取る。
+// AST は型を持たず some() の戻り値も any になるため、strict-boolean-expressions に合わせて true と比べる。
+/** @returns {boolean} */
+function rendersLink(expression) {
+  if (expression?.type === "JSXElement") {
+    return linkNames.has(elementName(expression.openingElement));
+  }
+  if (!functionTypes.has(String(expression?.type))) {
+    return false;
+  }
+  if (expression.body?.type !== "BlockStatement") {
+    return rendersLink(expression.body);
+  }
+  return (
+    expression.body.body.some(
+      (statement) => statement.type === "ReturnStatement" && rendersLink(statement.argument),
+    ) === true
+  );
 }
 
 function isInsideLink(node) {
@@ -38,12 +60,10 @@ export const noButtonInLink = {
           context.report({ node, messageId: "nested" });
         }
         for (const attribute of node.attributes) {
-          const expression = attribute.value?.expression;
           if (
             attribute.type === "JSXAttribute" &&
             attribute.name.name === "render" &&
-            expression?.type === "JSXElement" &&
-            linkNames.has(elementName(expression.openingElement))
+            rendersLink(attribute.value?.expression)
           ) {
             context.report({ node: attribute, messageId: "render" });
           }

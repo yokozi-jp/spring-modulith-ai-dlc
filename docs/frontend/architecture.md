@@ -265,6 +265,9 @@ components -> components/ui
 
 `api` から `components` を、`components/ui` から `ui` 以外の `components` を参照しない。
 
+`lib` から `api/generated`、`i18n` から `components`、`components` から `api` の向きは、図に定めがないためlintでは止めていない。
+使う場面が出たら、図に向きを書いてから検査を加えるか外す。
+
 featureからrouteを参照せず、routeの情報は `getRouteApi` で取る。
 
 feature間のimportと循環依存を作らない。

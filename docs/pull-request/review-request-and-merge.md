@@ -28,6 +28,16 @@ Draftのままではレビューを依頼せず、レビューを受けられる
 Files changedは、レビュアーの立場で差分を読み直すセルフレビューにも使う。
 必須チェックの一覧とマージ条件は[mainブランチの保護設定](../repository/branch-protection.md)を参照する。
 
+CIの完了は、必須チェックだけに絞って待つ。
+
+```bash
+gh pr checks <番号> --required --watch --fail-fast
+```
+
+`--required`を付けないと、必須でないE2EやDASTの完了まで待つ。
+エージェントは、このコマンドを長時間の処理としてbackgroundで実行する。
+Snyk Codeは必須チェックではないため待たない。
+
 ## AssigneesとReviewers
 
 - **Assignees**：作成者自身を設定する。別の担当者へ引き継ぐときはAssigneesも変更する。Assigneesに設定された人が、マージかクローズかが決まるまで推進する。
