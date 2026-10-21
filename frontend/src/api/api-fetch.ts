@@ -57,10 +57,10 @@ function requestHeaders(url: string, options: RequestInit): Headers {
  */
 export async function apiFetch<TResponse>(url: string, options: RequestInit): Promise<TResponse> {
   // 送るたびに Cookie から token を読み直す。
-  const send = async () => {
+  async function send() {
     const response = await fetch(url, { ...options, headers: requestHeaders(url, options) });
     return { response, problem: response.ok ? undefined : await readProblem(response) };
-  };
+  }
   let { response, problem } = await send();
   // CSRF の 403 だけ、Cookie を読み直して 1 回だけ再送する。権限不足の 403（about:blank）と 2 回目の失敗は再送しない。
   // 再送してよい根拠：この type を返すのは CSRF filter の失敗だけで、1 通目は controller に届いていない。非冪等な POST でも二重には実行されない。

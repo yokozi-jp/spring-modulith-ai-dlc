@@ -1,4 +1,6 @@
 import { render } from "@testing-library/react";
 import type { ReactElement } from "react";
 
-export const renderPage = (ui: ReactElement) => render(ui);
+export function renderPage(ui: ReactElement) {
+  return render(ui);
+}

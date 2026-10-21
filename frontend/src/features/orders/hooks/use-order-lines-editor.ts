@@ -91,11 +91,11 @@ export function useOrderLinesEditor(
   });
   const schema = changeOrderLinesFormSchema(t);
 
-  const send = (
+  function send(
     lines: OrderLineRequest[],
     lockNo: number,
     reset: (values: OrderLinesValues) => void,
-  ) => {
+  ) {
     setNotice(undefined);
     setFeedback({ conflict: false, serverErrors: noServerErrors });
     mutation.mutate(
@@ -133,7 +133,7 @@ export function useOrderLinesEditor(
         },
       },
     );
-  };
+  }
 
   const form = useAppForm({
     defaultValues: base.values,

@@ -27,10 +27,11 @@ test.beforeEach(({ page }) => {
   });
 });
 
-const traceparentsOf = (path: string): (string | undefined)[] =>
-  requests
+function traceparentsOf(path: string): (string | undefined)[] {
+  return requests
     .filter(({ url }) => url.origin === origin && url.pathname === path)
     .map(({ traceparent }) => traceparent);
+}
 
 async function logIn(page: Page): Promise<void> {
   await page.goto("/oauth2/authorization/web");

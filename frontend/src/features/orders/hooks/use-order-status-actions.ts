@@ -20,14 +20,14 @@ export function useOrderStatusActions(
   const data = { lockNo };
   const isPending = isConfirming || isCancelling;
 
-  const onError = (error: unknown) => {
+  function onError(error: unknown) {
     setNotice(
       failureNotice(t, error, {
         conflict: t("orders.notice.actionConflict"),
         unprocessable: t("orders.notice.actionUnprocessable"),
       }),
     );
-  };
+  }
 
   return {
     isPending,

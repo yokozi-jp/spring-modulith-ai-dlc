@@ -1,1 +1,3 @@
-export const loadOrders = () => fetch("/api/orders");
+export function loadOrders() {
+  return fetch("/api/orders");
+}

@@ -22,11 +22,11 @@ function router(fullPath: string) {
       return vi.fn<() => void>();
     },
   };
-  const resolve = (hrefChanged = true): void => {
+  function resolve(hrefChanged = true): void {
     for (const listener of listeners) {
       listener({ hrefChanged });
     }
-  };
+  }
   return { source, resolve };
 }
 
@@ -111,11 +111,11 @@ describe("resetTelemetrySession", () => {
 
   it.each(["genShortID", "setSession"])("stays paused when %s fails", async (failure) => {
     const unpause = vi.fn<() => void>();
-    const fail = (name: string): void => {
+    function fail(name: string): void {
       if (failure === name) {
         throw new Error(`${name} failed`);
       }
-    };
+    }
     replaceTelemetryForTesting({
       api: {
         pushError: vi.fn<Sink["api"]["pushError"]>(),
@@ -154,7 +154,9 @@ describe("resetTelemetrySession", () => {
 
 describe("untracedUrl", () => {
   const origin = "http://localhost:5173";
-  const absolute = (url: string): string => (url.startsWith("/") ? new URL(url, origin).href : url);
+  function absolute(url: string): string {
+    return url.startsWith("/") ? new URL(url, origin).href : url;
+  }
 
   it.each(["http://localhost:5173/api", "/api/x", "/api?x=1", "/api#f"])(
     "traces the same-origin API URL %s",
