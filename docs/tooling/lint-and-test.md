@@ -298,6 +298,8 @@ Gitフックの条件とコマンドは[`lefthook.yml`](../../lefthook.yml)を�
 pre-pushの「変更」は、push済みかどうかやrebaseの有無によらず、`origin/main`とのmerge-baseからの差分で判定する。
 分岐後にmainへ入った変更では、触っていない領域の検査は走らない。
 2回目以降のpushでも、ブランチ全体の変更に対して検査が走る。
+一度backendを変えたブランチでは、以降docsだけを直してpushしてもbackendの検査が毎回走る。
+直前のpushからの差分だけを見る方式は、rebase後にmainの変更を含んでしまうため採らず、この重複を受け入れる。
 `origin/main`が無くmerge-baseを取れないときは、全ファイルを対象にして全検査を走らせる。
 
 ## CI対応

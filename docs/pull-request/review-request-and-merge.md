@@ -36,7 +36,7 @@ gh pr checks <番号> --required --watch --fail-fast
 
 `--required`を付けないと、必須でないE2EやDASTの完了まで待つ。
 エージェントは、このコマンドを長時間の処理としてbackgroundで実行する。
-Snyk Codeの`Code test limit reached`による失敗は、外部サービスの利用上限によるもので、必須チェックではないため待たない。
+Snyk Codeは必須チェックではないため待たない。
 
 ## AssigneesとReviewers
 
