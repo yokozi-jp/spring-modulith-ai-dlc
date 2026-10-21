@@ -26,6 +26,7 @@ steering に書いた知識は iwe の検索とリンク検査の対象になら
 ## 依存方向
 
 - docs から `.kiro/` 配下へリンクしない。
+- `docs/agents/` と ADR 以外の docs は、特定のエージェントのスキル名やコマンドに依存しない。スキルの使い方は `docs/agents/` に書き、他の領域の docs からは必要なときだけ `docs/agents/` を指す。
 - steering から docs を指すときは、パスを文字列（`docs/backend/index.md` など）で書く。
 - steering で `#[[file:docs/...]]` を使わない。展開した docs は、その steering が読み込まれるたびに全文がコンテキストに入る。
 - steering からソースコードや設定ファイルを `#[[file:...]]` で参照するのはよい。

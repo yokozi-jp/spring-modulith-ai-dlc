@@ -278,7 +278,7 @@ tasks:
       - node tooling/adr-lint/adr-lint.mjs
 
   # steering → docs の一方向依存、frontmatter、文書責務の見直し合図を検査する（ADR-038）。
-  # 依存方向、frontmatter、パスの実在は失敗、docs の250行超とsteeringの行数超過は警告にとどめる。
+  # 依存方向、frontmatter、パスの実在は失敗、変更した docs の250行超とsteeringの行数超過は警告にとどめる。
   docs-boundary-check:
     internal: true
     silent: true
@@ -366,7 +366,15 @@ tasks:
         then
           fail=1
         fi
+        # 250行超は、今回の変更で触れた文書だけを警告する。触れていない文書の警告は毎回出ても見直せないため。
+        # 比較起点が無いときは、すべての文書を対象にする。
+        base="${DOCS_DIFF_BASE:-origin/main}"
+        changed=""
+        if git rev-parse --verify --quiet "$base" >/dev/null; then
+          changed="$({ git diff --name-only "$base"...HEAD; git diff --name-only; git diff --cached --name-only; } | sort -u)"
+        fi
         for f in $(find docs -name '*.md' ! -name 'index.md' -not -path '*/node_modules/*'); do
+          if [ -n "$changed" ] && ! printf '%s\n' "$changed" | grep -qx "$f"; then continue; fi
           n="$(wc -l < "$f")"
           if [ "$n" -gt 250 ]; then echo "⚠ $f は $n 行です（250行超）。行数だけで分割せず、1ファイル1責務とtypeと本文の一致を見直してください。" >&2; fi
         done
@@ -379,6 +387,16 @@ tasks:
         if [ "$total" -gt 500 ]; then echo "⚠ steering の合計は $total 行です（目安 500 行以内）。" >&2; fi
         exit "$fail"
 
+
+  # スキルの skills-lock.json、.agents/skills の実体、.kiro/skills のリンクの整合を検査する。
+  # 検査の本体は tooling/skills-check/skills-check.mjs に置き、壊れた木に対する自己検査（test.sh）を先に実行する。
+  # 手順の正文は docs/agents/matt-pocock-skills/workflow.md の「取得元と更新」にある。
+  skills-check:
+    desc: スキルの skills-lock.json、.agents/skills の実体、.kiro/skills のリンクの整合を検証
+    silent: true
+    cmds:
+      - bash tooling/skills-check/test.sh
+      - node tooling/skills-check/skills-check.mjs
 
   # Setup
   setup:

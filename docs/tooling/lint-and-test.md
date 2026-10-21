@@ -283,7 +283,7 @@ const params = { ...(cursor !== undefined && { cursor }) };
   同じfixtureのtraceは`traces/frontend`の出口を別のファイルに分け、URL属性がなく、許可したHTTP属性とresource属性だけが残り、trace ID、span ID、親span IDが保たれることを確かめる。
 - **`task lint-md`**：`.markdownlint-cli2.yaml`の除外設定に従いMarkdownを検査する。
 - **`task lint-md-fix`**：markdownlint-cli2で安全に修正できるMarkdownの問題を修正する。
-- **`task okf-check`**：OKF適合、内部リンク、孤立文書、文書責務の見直し合図、steering境界、ADRの整合（`adr-lint`）、Taskfile文書同期候補を検査する。
+- **`task okf-check`**：OKF適合、内部リンク、孤立文書、変更した文書の責務の見直し合図（250行超の警告）、steering境界、ADRの整合（`adr-lint`）、Taskfile文書同期候補を検査する。
   `adr-lint`は内部タスクで、`okf-check`の中でだけ動く。
   `tooling/adr-lint/test.sh`が壊れたfixtureで期待の終了コードを確かめてから、`tooling/adr-lint/adr-lint.mjs`が実際のツリーを検査する。
   失敗にするのは、ADR番号の重複、ADRファイルごとに索引の行がちょうど1つでない状態、索引と本文の状態と日付の不一致、`[ADR-NNN](…ADR-MMM-….md)`のラベルと宛先の番号の不一致である。
@@ -292,6 +292,11 @@ const params = { ...(cursor !== undefined && { cursor }) };
   リンクの検査は`docs/`、`README.md`、`CONTRIBUTING.md`、`.kiro/steering/`、`backend/src`のJavadocとMarkdownを対象にする。
   既知の限界として、`okf-validate.yml`の`paths`は`backend/src/**`を含まないため、バックエンドのJavadocだけを変えるPull RequestではCIが動かない。
   ADRの番号を振り直す変更はdocsの変更を伴うため、そこで検出する。
+- **`task skills-check`**：`skills-lock.json`、`.agents/skills`の実体、`.kiro/skills`のシンボリックリンクの整合を検査する。
+  `tooling/skills-check/test.sh`が壊れた木で期待の終了コードを確かめてから、`tooling/skills-check/skills-check.mjs`が実際の木を検査する。
+  失敗にするのは、`SKILL.md`の欠落、`name`とディレクトリ名の不一致、`description`の欠落、`.kiro/skills`が`../../.agents/skills/<名前>`へのリンクでない状態、内容ハッシュの不一致、取得元ごとの`ref`が複数ある状態、lockにない実体またはリンクである。
+  `note`を持つlockの項目（`skill-creator`）は、意図して上流から変えているため内容ハッシュを比べない。
+  手順の正文は[Matt Pocock スキル運用](../agents/matt-pocock-skills/workflow.md)の「取得元と更新」である。
 - **`task release-check`**：release-pleaseのmanifest、版ファイル、Gradle版、設定の一致を検証する。
 - **`task lint-taskfile`**：Task本体でTaskfileのYAML構文とスキーマ構造を検証する。
   `tooling/taskfile-cleanup/`のfixtureで、後片付けの定型が本体の終了コードを優先し、前段が失敗しても後段の後片付けを走らせることを検査する。
@@ -314,6 +319,7 @@ OKF検査の採用理由は[ADR-036](../adr/ADR-036-adopt-okf-for-docs-knowledge
 - **pre-commit（Composeファイルの変更）**：`lint-compose`相当を実行する。
 - **pre-commit（Markdownの変更）**：変更ファイルへ`lint-md`相当を実行する。
 - **pre-commit（docs、steering、Taskfile、README、`tooling/adr-lint/`の変更）**：`okf-check`を実行する。
+- **pre-commit（`.agents/skills/`、`.kiro/skills/`、`skills-lock.json`、`tooling/skills-check/`の変更）**：`skills-check`を実行する。
 - **pre-commit（Taskfileか`tooling/taskfile-cleanup/`の変更）**：`lint-taskfile`を実行する。
 - **pre-push（すべて）**：`adr-check`と`scan-secrets-all`相当を実行する。
 - **pre-push（バックエンドのJavaまたはGradle変更）**：`be-lint`相当と`test`を実行する。
@@ -361,6 +367,7 @@ pre-pushの「変更」は、push済みかどうかやrebaseの有無によら�
 - **`otel-collector.yml`**：`otel-collector-check`を実行する。
 - **`markdownlint.yml`**：`lint-md`相当を実行する。
 - **`okf-validate.yml`**：`okf-check`を実行する。
+- **`skills-check.yml`**：`skills-check`を実行する。
 - **`release-please.yml`**：`release-check`を実行する。
 - **`e2e.yml`**：`task e2e`を実行し、`test-deps-leftover-check`でcompose-testのコンテナとvolumeが残っていないことを確かめる。
   Backend CIのtestと同じGradle cacheをread-onlyで復元する。
