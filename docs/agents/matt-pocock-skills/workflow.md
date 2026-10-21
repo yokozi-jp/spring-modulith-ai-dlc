@@ -11,6 +11,7 @@ tags: [runbook, workflow, agent-skills, matt-pocock]
 
 - 通常の変更は `/grill-with-docs`、`/to-spec`、`/to-tickets`、`/implement` の順で進める。
 - `/grill-with-docs` から `/to-tickets` までは同じセッションを維持し、チケットごとの `/implement` は新しいセッションで実行する。
+- タスクがひと段落したら、セッションを消去する前に `/retro` を実行し、エージェントの環境の改善候補を受け取る。
 - 実装前の対話だけでは決められない設計は、`/handoff` と `/prototype` を使って別のセッションで検証する。
 - 通常フローに当てはまらない作業は `/ask-matt` に入口を選ばせる。
 - プロジェクトの docs と ADR の規約は、外部スキル内の記述より優先する。
@@ -38,6 +39,8 @@ idea
   ├─ /tdd
   └─ /code-review
   ↓
+/retro（同じセッションで、消去する前に）
+  ↓
 ship
 ```
 
@@ -57,6 +60,23 @@ ship
 `/implement` は `/tdd` で小さな red、green、refactor の単位を進め、最後に `/code-review` でプロジェクト規約と仕様への適合を別々に確認する。
 チケットは単独で実装できる情報を持たせ、前のチケットの会話へ依存させない。
 
+## 振り返り
+
+タスクがひと段落したら、対象のセッションを消去する前に、同じセッションで `/retro` を実行する。
+ひと段落とは、`/implement` が `/code-review` まで終えたとき、または利用者が作業の区切りを示したときである。
+消去してしまった場合は、そのセッションのログを指定して実行する。
+`/retro` は `disable-model-invocation: true` の利用者呼び出しのスキルであるため、エージェントが実行する根拠は `AGENTS.md` の「学びの還元」に置く。
+
+`/retro` は改善候補を提示するだけで、何も変更しない。
+利用者が選んだ候補だけを、[学びを仕組みへ還元し続ける](../../principles/continuous-reinforcement.md)の5つの層の優先順位に従って還元する。
+次の読み替えで、上流の記述をこのリポジトリに合わせる。
+
+- 上流が `CODING_STANDARDS.md` に置く判断を要する規約は、該当する領域の docs に置き、`docs/code-review/review-viewpoints.md` から辿れるようにする。`CODING_STANDARDS.md` は作らない。
+- 機械的な誤りは、`docs/tooling/lint-and-test.md` の既存の検査から探し、接続されていない検査を先に指摘する。
+- steering と `AGENTS.md` は案内に限る。規約の本文は docs へ置く（[ADR-038](../../adr/ADR-038-route-steering-to-docs-knowledge.md)）。
+- 文書を書く前に、`/writing-for-agents` の基準に加えて、`docs/knowledge/documentation-authoring.md` と `docs/knowledge/steering-authoring.md` を読む。
+- 戻しにくい還元は、`docs/adr/conventions.md` の基準に当たれば ADR を起こす。
+
 ## 例外時の入口
 
 - **入口に迷う場合**：`/ask-matt` に状況を渡し、使うスキル列を選ばせる。
@@ -66,6 +86,7 @@ ship
 - **コードベースの構造を改善する候補探し**：`/improve-codebase-architecture` で候補を調べ、`/codebase-design` で選んだ境界とインターフェースを検討する。
 - **一次資料の調査**：`/research` で出典付きの調査文書を作り、その結果を `/grill-with-docs` へ渡す。
 - **他の担当者だけが答えられる判断**：`/to-questionnaire` で質問票を作り、回答を `/grill-with-docs` または `/to-spec` へ渡す。
+- **エージェント向け文書の執筆**：スキル、`AGENTS.md`、参照先 docs を書くときは `/writing-for-agents` を基準にし、日本語の書き方と docs の作成手順はプロジェクトの規約を優先する。
 - **ドメイン用語と設計判断の整理**：`/domain-modeling` で Glossary と ADR を更新する。
 
 ## 文書の扱い
@@ -94,6 +115,7 @@ implement
 improve-codebase-architecture
 prototype
 research
+retro
 setup-matt-pocock-skills
 tdd
 to-questionnaire
@@ -101,6 +123,7 @@ to-spec
 to-tickets
 triage
 wayfinder
+writing-for-agents
 ```
 
 ## 取得元と更新
@@ -115,7 +138,7 @@ wayfinder
 
 ## 検証
 
-`skills` CLI 1.7.0 の `list --json` で20スキルが Kiro CLI 用として認識されることを確認する。
+`skills` CLI 1.7.0 の `list --json` で、固定コミットから導入した22スキルが Kiro CLI 用として認識されることを確認する。
 各 `.agents/skills/<name>/SKILL.md` の `name` とディレクトリ名が一致し、`description` が存在することを確認する。
 各 `.kiro/skills/<name>` が対応する `.agents/skills/<name>` への相対シンボリックリンクであることを確認する。
 各ロックエントリの `ref` が固定コミットと一致することを確認する。

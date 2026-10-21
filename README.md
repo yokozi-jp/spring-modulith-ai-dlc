@@ -63,6 +63,8 @@ grill は、エージェントに未決事項を質問させ、答えながら�
 /to-tickets
   ↓
 チケットごとに新しいセッションで /implement（内部で /tdd と /code-review）
+  ↓
+/retro（同じセッションで、消去する前に）
 ```
 
 - `/grill-with-docs`：アイデアや計画について、エージェントが未決事項を一つずつ質問します。
@@ -72,12 +74,16 @@ grill は、エージェントに未決事項を質問させ、答えながら�
   チケット間の依存関係（どれが先か）も書きます。
 - `/implement`：チケット一つを実装します。
   `/tdd` でテストから小さく進め、最後に `/code-review` でプロジェクト規約と仕様への適合を確認します。
+- `/retro`：タスクがひと段落したら、セッションを消去する前に実行します。
+  セッションで起きた出来事から、ナビゲーション、機械的な検査、規約、steering、ツールなど、エージェントの環境の改善候補を深刻度順に提示します。
+  提示するだけで何も変更せず、利用者が選んだ候補を学びの還元の優先順位に従って docs や検査に反映します。
+  `AGENTS.md` の「学びの還元」で、タスクの区切りでの実行を定めています。
 
 スキルは `.agents/skills/` にあります。
 どのスキルを使うか迷うときは `/ask-matt` に状況を渡します。
 プロジェクトの docs と ADR の規約は、外部スキル内の記述より優先します。
 
-手順の詳細は [Matt Pocock スキル運用](docs/agents/matt-pocock-skills/workflow.md)、導入の判断は [ADR-039](docs/adr/ADR-039-adopt-matt-pocock-skills-workflow.md) にあります。
+手順の詳細は [Matt Pocock スキル運用](docs/agents/matt-pocock-skills/workflow.md)、導入の判断は [ADR-039](docs/adr/ADR-039-adopt-matt-pocock-skills-workflow.md)、`/retro` の導入と実行のタイミングは [ADR-082](docs/adr/ADR-082-adopt-retro-and-run-it-at-task-boundaries.md) にあります。
 
 ## 技術スタック
 
