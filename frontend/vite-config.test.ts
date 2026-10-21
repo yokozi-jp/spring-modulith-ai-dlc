@@ -93,8 +93,8 @@ function enableTelemetry() {
 }
 
 // 実際に Vite の設定を読み込み開発サーバーを生成するため、所要時間は CPU の空きに比例する。
-// pre-push では backend のテストやイメージビルドと並列に走るので、既定の 5 秒では足りないことがある。
-// ponytail: タイムアウトは性能の検証ではなくハング検出のためなので、負荷時の実測（5 秒超）に余裕を持たせた 60 秒にする。
+// 開発サーバーの生成はほかのテストより重いので、vite.config.ts の testTimeout（30 秒）より長くする。
+// ponytail: タイムアウトは性能の検証ではなくハング検出のためなので、pre-push の並列実行の負荷にも余裕を持たせた 60 秒にする。
 describe("Vite configuration", { timeout: 60_000 }, () => {
   afterEach(() => {
     vi.unstubAllEnvs();

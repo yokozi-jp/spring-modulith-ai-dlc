@@ -187,7 +187,7 @@ tasks:
         if [ -z "$changed" ]; then exit 0; fi
         sig="$(printf '%s\n' "$changed" | grep -E '^(frontend/|backend/build\.gradle|backend/buildSrc/|backend/gradle/[^/]+\.gradle|backend/src/main/resources/application(-[^/]+)?\.yaml|backend/src/main/resources/db/changelog/|backend/src/main/java/com/example/demo/SecurityConfig\.java|docker/|infrastructure/|\.github/workflows/)' || true)"
         # テスト、E2E、lint の fixture は判断を含まないので、frontend の変更から外す。
-        sig="$(printf '%s\n' "$sig" | grep -vE '^frontend/(e2e/|lint/fixtures/|src/testing/)|\.(test|spec)\.[cm]?[jt]sx?$' || true)"
+        sig="$(printf '%s\n' "$sig" | grep -vE '^frontend/((e2e|lint/fixtures|src/testing)/|.*\.(test|spec)\.[cm]?[jt]sx?$)' || true)"
         if [ -z "$sig" ]; then exit 0; fi
         adr="$(printf '%s\n' "$changed" | grep -E '^docs/adr/ADR-[0-9]+.*\.md$' || true)"
         if [ -n "$adr" ]; then exit 0; fi

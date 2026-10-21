@@ -56,7 +56,7 @@ task fe-dev                # SPAを起動し、APIとOIDCを同一オリジン�
 シーダーはテストのソースにあるので、テストのソースがコンパイルできないと`task be-run`と`task dev`は起動しない。
 その場合はテストを直すか、`backend`で`./gradlew bootRun`を直接実行する。
 
-`.env.example`か`.env.test.example`に変数が増えたら、`.env`に同じ変数を足す。
+`.env.example`に変数が増えたら、`.env`に同じ変数を足す。
 既存の`.env`と`.env.test`の値は上書きされない。
 Taskのテスト系タスクは、`.env.test`に足りない変数を`.env.test.example`の行のまま追記し、追記した変数名を出す。
 たとえば決済代行のClientを足した変更の後は、既存の`.env`へ`.env.example`の`PAYMENT_GATEWAY_BASE_URL`の行を足す。

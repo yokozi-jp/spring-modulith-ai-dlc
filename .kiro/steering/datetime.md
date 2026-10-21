@@ -1,8 +1,7 @@
 ---
-inclusion: fileMatch
-fileMatchPattern: ["backend/src/**/*.java", "backend/src/main/resources/db/**", "frontend/src/**/*.{ts,tsx}", "docs/datetime/**"]
+inclusion: always
 name: datetime
-description: 日時の保存、API、表示、テストを変更するときに守る短いルール。Java、DB の changeset、フロントエンドのコードを扱うときに読み込む。詳細な規約は docs/datetime/ にある。
+description: 日時を扱うすべてのタスクで守る短いルール。詳細な規約は docs/datetime/ にある。日時の保存、API、表示、テストを変更するときに使用する。
 ---
 
 # 日時の短いルール
