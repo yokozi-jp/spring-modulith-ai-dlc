@@ -187,6 +187,14 @@ task okf-check
 `task okf-check`は、ADRの番号の重複、索引と本文の不一致、リンクのラベルと宛先の番号の不一致も検査します。
 ADRを追加または番号を変えたときは、`docs/adr/index.md`の行も同じ変更で直します。
 
+## スキルを導入または更新するとき
+
+```bash
+task skills-check
+```
+
+導入と更新の手順は[Matt Pocock スキル運用](../agents/matt-pocock-skills/workflow.md)の「取得元と更新」に従います。
+
 ## リリース設定を変更するとき
 
 ```bash

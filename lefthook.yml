@@ -179,6 +179,18 @@ pre-commit:
         task okf-check
       fail_text: "OKF バンドルの検証に失敗しました。task okf-check で再実行してください。"
 
+    # スキルの実体、Kiro 用リンク、lock、検査にステージ済み変更があるとき、lock との整合を検証（task skills-check）。
+    - name: skills-check
+      glob:
+        - ".agents/skills/**"
+        - ".kiro/skills/**"
+        - "skills-lock.json"
+        - "tooling/skills-check/**"
+      run: |
+        echo "{staged_files}" >/dev/null
+        task skills-check
+      fail_text: "スキルの整合の検証に失敗しました。task skills-check で再実行してください。"
+
     # Taskfile か後片付けの fixture にステージ済み変更があるとき、スキーマ構造と後片付けの終了コードを検証（task lint-taskfile）。
     - name: lint-taskfile
       glob:

@@ -14,6 +14,7 @@
 - [improve-codebase-architecture](improve-codebase-architecture.md)：コードベースから構造改善の候補を探すとき
 - [prototype](prototype.md)：設計上の問いを使い捨てコードで検証するとき
 - [research](research.md)：一次資料を調査して根拠付き文書を作るとき
+- [retro](retro.md)：セッションを振り返り、エージェントの環境の改善候補を提案するとき
 - [setup-matt-pocock-skills](setup-matt-pocock-skills.md)：スキル群のIssue管理とドメイン文書を初期設定するとき
 - [tdd](tdd.md)：公開インターフェースの振る舞いをテストファーストで実装するとき
 - [to-questionnaire](to-questionnaire.md)：別の人だけが答えられる判断を質問票にするとき
@@ -21,3 +22,4 @@
 - [to-tickets](to-tickets.md)：仕様や計画を依存関係付きの縦切りチケットへ分割するとき
 - [triage](triage.md)：Issueと対象の外部PRを分類して実行可能な状態へ進めるとき
 - [wayfinder](wayfinder.md)：一セッションに収まらない構想を判断チケットの地図へ分けるとき
+- [writing-for-agents](writing-for-agents.md)：スキル、AGENTS.md、参照先 docs などエージェントが読む文書を書くとき

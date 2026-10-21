@@ -11,9 +11,11 @@ tags: [runbook, workflow, agent-skills, matt-pocock]
 
 - 通常の変更は `/grill-with-docs`、`/to-spec`、`/to-tickets`、`/implement` の順で進める。
 - `/grill-with-docs` から `/to-tickets` までは同じセッションを維持し、チケットごとの `/implement` は新しいセッションで実行する。
+- タスクがひと段落したら、セッションを消去する前に `/retro` を実行し、エージェントの環境の改善候補を受け取る。
 - 実装前の対話だけでは決められない設計は、`/handoff` と `/prototype` を使って別のセッションで検証する。
 - 通常フローに当てはまらない作業は `/ask-matt` に入口を選ばせる。
 - プロジェクトの docs と ADR の規約は、外部スキル内の記述より優先する。
+- 上流とは、スキルの取得元である `mattpocock/skills` リポジトリを指す。
 
 ## 初回設定
 
@@ -38,6 +40,8 @@ idea
   ├─ /tdd
   └─ /code-review
   ↓
+/retro（同じセッションで、消去する前に）
+  ↓
 ship
 ```
 
@@ -57,6 +61,28 @@ ship
 `/implement` は `/tdd` で小さな red、green、refactor の単位を進め、最後に `/code-review` でプロジェクト規約と仕様への適合を別々に確認する。
 チケットは単独で実装できる情報を持たせ、前のチケットの会話へ依存させない。
 
+## 振り返り
+
+タスクがひと段落したら、対象のセッションを消去する前に、同じセッションで `/retro` を実行する。
+ひと段落とは、次のいずれかが最初に起きたときである。
+
+- チケットの `/implement` が `/code-review` まで終わった。
+- Pull Request を作成した。
+- 利用者が作業の区切りを示した。
+
+消去してしまった場合は、そのセッションのログを指定して実行する。
+`/retro` は `disable-model-invocation: true` の利用者呼び出しのスキルであるため、エージェントが実行する根拠は `AGENTS.md` の「学びの還元」に置く。
+
+`/retro` は改善候補を提示するだけで、何も変更しない。
+利用者が選んだ候補だけを、[学びを仕組みへ還元し続ける](../../principles/continuous-reinforcement.md)の5つの層の優先順位に従って還元する。
+次の読み替えで、上流の記述をこのリポジトリに合わせる。
+
+- 上流が `CODING_STANDARDS.md` に置く判断を要する規約は、該当する領域の docs に置き、`docs/code-review/review-viewpoints.md` から辿れるようにする。`CODING_STANDARDS.md` は作らない。
+- 機械的な誤りは、`docs/tooling/lint-and-test.md` の既存の検査から探し、接続されていない検査を先に指摘する。
+- steering と `AGENTS.md` は案内に限る。規約の本文は docs へ置く（[ADR-038](../../adr/ADR-038-route-steering-to-docs-knowledge.md)）。
+- 文書を書く前に、`/writing-for-agents` の基準に加えて、`docs/knowledge/documentation-authoring.md` と `docs/knowledge/steering-authoring.md` を読む。
+- 戻しにくい還元は、`docs/adr/conventions.md` の基準に当たれば ADR を起こす。
+
 ## 例外時の入口
 
 - **入口に迷う場合**：`/ask-matt` に状況を渡し、使うスキル列を選ばせる。
@@ -66,6 +92,7 @@ ship
 - **コードベースの構造を改善する候補探し**：`/improve-codebase-architecture` で候補を調べ、`/codebase-design` で選んだ境界とインターフェースを検討する。
 - **一次資料の調査**：`/research` で出典付きの調査文書を作り、その結果を `/grill-with-docs` へ渡す。
 - **他の担当者だけが答えられる判断**：`/to-questionnaire` で質問票を作り、回答を `/grill-with-docs` または `/to-spec` へ渡す。
+- **エージェント向け文書の執筆**：スキル、`AGENTS.md`、参照先 docs を書くときは `/writing-for-agents` を基準にし、日本語の書き方と docs の作成手順はプロジェクトの規約を優先する。
 - **ドメイン用語と設計判断の整理**：`/domain-modeling` で Glossary と ADR を更新する。
 
 ## 文書の扱い
@@ -78,36 +105,24 @@ ADR は `docs/adr/conventions.md` の条件、採番、書式に従う。
 Matt Pocock の `ADR-FORMAT.md` が示す簡略書式は使わない。
 `docs/` に新しい Markdown を作る場合は iwe を使い、該当する index からリンクする。
 
-## 導入済みスキル
-
-```text
-ask-matt
-code-review
-codebase-design
-diagnosing-bugs
-domain-modeling
-grill-me
-grill-with-docs
-grilling
-handoff
-implement
-improve-codebase-architecture
-prototype
-research
-setup-matt-pocock-skills
-tdd
-to-questionnaire
-to-spec
-to-tickets
-triage
-wayfinder
-```
-
 ## 取得元と更新
 
 取得元は `mattpocock/skills` で、コミット `d81f3a183412e71a5b1e84ca21bc1a35eea03a60` に固定する。
-導入には `skills` CLI 1.7.0 を使う。
-内容ハッシュは `skills-lock.json` で管理し、上流の `SKILL.md` と同梱リソースは直接編集しない。
+導入済みのスキルは `skills-lock.json` が正で、この文書には一覧を写さない。
+導入には `skills` CLI 1.7.0 を使い、上流の `SKILL.md` と同梱リソースは直接編集しない。
+
+導入するときは、固定コミットを指定して取得し、実体を `.agents/skills/`、Kiro の検出用リンクを `.kiro/skills/` に揃える。
+`-a kiro-cli` を指定すると CLI は `.kiro/skills/` に実体をコピーするため、実体を `.agents/skills/` へ移して相対シンボリックリンクに直す。
+
+```bash
+npx skills@1.7.0 add "mattpocock/skills#d81f3a183412e71a5b1e84ca21bc1a35eea03a60" -s <スキル名> -a kiro-cli -y
+mv .kiro/skills/<スキル名> .agents/skills/<スキル名>
+ln -s ../../.agents/skills/<スキル名> .kiro/skills/<スキル名>
+task skills-check
+```
+
+スキルが別のスキルを呼ぶ場合は、呼ばれるスキルも同じ手順で導入する。
+`SKILL.md` の本文に、呼び出すスキルの名前があるかを確かめる。
 
 更新するときは新しいコミットを指定して取得し、現在の固定コミットとの差分を確認する。
 `skills update` で無条件に最新版へ追従しない。
@@ -115,10 +130,10 @@ wayfinder
 
 ## 検証
 
-`skills` CLI 1.7.0 の `list --json` で20スキルが Kiro CLI 用として認識されることを確認する。
-各 `.agents/skills/<name>/SKILL.md` の `name` とディレクトリ名が一致し、`description` が存在することを確認する。
-各 `.kiro/skills/<name>` が対応する `.agents/skills/<name>` への相対シンボリックリンクであることを確認する。
-各ロックエントリの `ref` が固定コミットと一致することを確認する。
+導入と更新のあとは `task skills-check` を実行する。
+このタスクは、`skills-lock.json`、`.agents/skills/` の実体、`.kiro/skills/` のシンボリックリンクの整合を検査する。
+`SKILL.md` の `name` がディレクトリ名と一致し、`description` があること、内容ハッシュが lock と一致すること、取得元ごとの `ref` が一つであることも確かめる。
+検査の範囲は [Lint・テストのリファレンス](../../tooling/lint-and-test.md) にある。
 
 ローカルの `quick_validate.py` は、上流が使う `disable-model-invocation` と `argument-hint` を許可しないため、この外部スキル群の検証には使わない。
 上流拡張フィールドを削除すると内容ハッシュと一致しなくなるため、スキルは変更せずに保持する。
