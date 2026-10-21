@@ -167,7 +167,7 @@ describe("project lint config on fixtures", () => {
       it("rejects a button inside a link and a link passed to render of Button", () => {
         expect(
           countIn("features/order/button-in-link.tsx", "ui-composition(no-button-in-link)"),
-        ).toBe(5);
+        ).toBe(6);
       });
 
       it("allows a link beside a button", () => {
