@@ -1,1 +1,3 @@
-export const isMissing = (value: string | undefined) => value === undefined;
+export function isMissing(value: string | undefined) {
+  return value === undefined;
+}

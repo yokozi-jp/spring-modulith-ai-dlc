@@ -20,21 +20,22 @@ const proxyPath = "^/(api|oauth2|login|logout|error|actuator|v3/api-docs|swagger
 
 const cspReportingEndpoints = 'csp-endpoint="/csp-report"';
 
-const lastDirective = (contentSecurityPolicy: unknown) =>
-  String(contentSecurityPolicy).split(";").at(-1)?.trim();
+function lastDirective(contentSecurityPolicy: unknown) {
+  return String(contentSecurityPolicy).split(";").at(-1)?.trim();
+}
 
 const credentialHeaders = new Set(["cookie", "authorization", "proxy-authorization"]);
 
-const tcpAddressOf = (address: AddressInfo | string | null | undefined) => {
+function tcpAddressOf(address: AddressInfo | string | null | undefined) {
   if (address === null || address === undefined || typeof address === "string") {
     throw new TypeError("Server is not listening on a TCP port");
   }
   return address;
-};
+}
 
 // 偽の Collector。受けた request の path と header を記録して 200 を返し、Vite の転送先をこの port にする。
 // proxy の転送先は http://localhost:<port> なので、同じ名前で解決した address で待ち受ける。
-const startCollector = async () => {
+async function startCollector() {
   const received: { path?: string; headers?: IncomingHttpHeaders } = {};
   const collector = createHttpServer((req, res) => {
     received.path = req.url;
@@ -50,13 +51,13 @@ const startCollector = async () => {
   // 共有の MSW は未登録の request を失敗させるので、この hop だけは実際の通信に通す。
   mswServer.use(http.all("*", () => passthrough()));
   return { collector, received };
-};
+}
 
 // ブラウザの Reporting API と同じく、Cookie などの資格情報を付けて送る。
 // Vite は localhost で待ち受け、OS によって ::1 と 127.0.0.1 のどちらかに束ねるので、実際に束ねた address へ送る。
-const postWithCredentials = ({ address, port }: AddressInfo, path: string) =>
+function postWithCredentials({ address, port }: AddressInfo, path: string) {
   // oxlint-disable-next-line promise/avoid-new -- events.once は応答を any で返すので、型の付いた callback を Promise で待つ。
-  new Promise<number | undefined>((resolve, reject) => {
+  return new Promise<number | undefined>((resolve, reject) => {
     const req = request(
       {
         host: address,
@@ -78,20 +79,22 @@ const postWithCredentials = ({ address, port }: AddressInfo, path: string) =>
     req.on("error", reject);
     req.end("[]");
   });
+}
 
-const createDevelopmentServer = () =>
-  createServer({ mode: "development", server: { middlewareMode: true } });
+function createDevelopmentServer() {
+  return createServer({ mode: "development", server: { middlewareMode: true } });
+}
 
-const enableTelemetry = () => {
+function enableTelemetry() {
   vi.stubEnv("FRONTEND_OTEL_ENABLED", "true");
   vi.stubEnv("FRONTEND_OTEL_SERVICE_NAME", "demo-web");
   vi.stubEnv("OTEL_SERVICE_NAMESPACE", "demo");
   vi.stubEnv("OTEL_DEPLOYMENT_ENVIRONMENT_NAME", "test");
-};
+}
 
 // 実際に Vite の設定を読み込み開発サーバーを生成するため、所要時間は CPU の空きに比例する。
-// pre-push では backend のテストやイメージビルドと並列に走るので、既定の 5 秒では足りないことがある。
-// ponytail: タイムアウトは性能の検証ではなくハング検出のためなので、負荷時の実測（5 秒超）に余裕を持たせた 60 秒にする。
+// 開発サーバーの生成はほかのテストより重いので、vite.config.ts の testTimeout（30 秒）より長くする。
+// ponytail: タイムアウトは性能の検証ではなくハング検出のためなので、pre-push の並列実行の負荷にも余裕を持たせた 60 秒にする。
 describe("Vite configuration", { timeout: 60_000 }, () => {
   afterEach(() => {
     vi.unstubAllEnvs();

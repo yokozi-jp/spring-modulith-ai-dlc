@@ -65,3 +65,4 @@ tags: [reference, code-review]
 
 - [バックエンドのテスト種別](../backend/testing-strategy.md)
 - [テスト観点の割り当て](../frontend/test-strategy.md)
+- [Lintとテストのリファレンス](../tooling/lint-and-test.md)：Lintの規則やoptionを変える差分で、fixtureがoptionの許す範囲の外側を拒否しているかを確かめるとき

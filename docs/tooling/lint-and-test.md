@@ -64,6 +64,8 @@ PITのHTMLとXMLのレポートは、変異対象がある場合に`backend/buil
 - **`task fe-coverage`**：React Compilerを有効にしてテストを実行したあと、Compilerを外した状態でVitestのV8 providerのcoverageを測り、全体のbranch 88%とline 95%、ファイルごとのbranch 60%とline 65%を検証する。
   全体の下限は`vite.config.ts`の`thresholds`が、ファイルごとの下限はTaskが`coverage/coverage-summary.json`から検査する（[ADR-076](../adr/ADR-076-run-mutation-tests-per-change-and-tighten-coverage-gates.md)）。
   Compilerを外すのは環境変数`FRONTEND_REACT_COMPILER=false`で、理由は[ADR-078](../adr/ADR-078-measure-frontend-coverage-without-react-compiler.md)にある。
+  `FE_TEST_ARGS`に渡した値は、2回のVitestの実行の両方に足す（例：`task fe-verify FE_TEST_ARGS=--reporter=dot`）。
+  テストのtimeoutは`vite.config.ts`の`testTimeout`で30秒にする。
 - **`task fe-test-build`**：`fe-coverage`と、`FRONTEND_OTEL_ENABLED=false`を強制した本番ビルドを実行する。
   ビルドの後に`dist/assets`を`faro|grafana|opentelemetry|web.?vitals`でgrepし、bundleにFaro、OpenTelemetry JS、Web Vitalsのコードが入っていれば失敗する（[ADR-068](../adr/ADR-068-collect-browser-telemetry-with-faro-via-collector.md)）。
 - **`task fe-verify`**：`fe-check`、`fe-knip`、`fe-test-build`（テレメトリを無効にした本番ビルドとgrepを含む）を実行する。
@@ -96,8 +98,10 @@ Oxlintの設定の正本は[`frontend/vite.config.ts`](../../frontend/vite.confi
   event handlerでrejectしないPromiseを捨てる文を書けるようにするためである（後述）。
 - **`undefined`**：`no-undefined`をoffにし、`x === undefined`で比較する。
   上書きとshadowingは、有効なままの`no-global-assign`と`no-shadow-restricted-names`が防ぐ。
-- **一律のstyle規則**：`capitalized-comments`、`func-style`、`max-lines-per-function`、`no-magic-numbers`、`no-ternary`、`one-var`、`sort-imports`、`sort-keys`をoffにする。
+- **一律のstyle規則**：`capitalized-comments`、`max-lines-per-function`、`no-magic-numbers`、`no-ternary`、`one-var`、`sort-imports`、`sort-keys`をoffにする。
   Oxfmtと役割が重複するか、可読性を下げるためである。
+- **関数の書き方**：`func-style`を`"declaration"`にする。
+  名前付き関数は関数宣言にし、関数の型注釈から引数を推論させるアロー関数だけを理由付きの行単位の抑制で許す。
 - **短い識別子**：`id-length`で`t`だけを例外にする。
   react-i18nextの翻訳関数の慣用名であるためである。
 - **ビルド時の定数**：`no-underscore-dangle`で`__TELEMETRY_ENABLED__`と`__TELEMETRY_APP__`だけを許可する。
@@ -175,8 +179,29 @@ linkとbuttonの入れ子は、jsPluginの`ui-composition/no-button-in-link`が�
 要素は名前だけで判定するので、別名でimportしたcomponentは検出しない。
 
 組み合わせた結果は、`frontend/lint/lint-config.test.js`が`frontend/lint/fixtures/src/**`の違反例と正しい例を実際の設定でLintして確かめる。
+規則のoptionを追加または変更するときは、optionが許す範囲のすぐ外側の書き方を拒否するfixtureも置く。
+optionの名前から許す範囲を推測せず、規則の文書とfixtureで確かめる。
 
 ### Lintを通る書き方
+
+名前を付ける関数は、トップレベルでもcomponentやHookの中でも関数宣言で書く。
+その場で渡すコールバックはアロー関数で書く（`prefer-arrow-callback`）。
+関数の型注釈から引数を推論させる必要がある場合だけ、理由を付けて`func-style`を行単位で抑制し、アロー関数を変数に代入してよい。
+`allowTypeAnnotation`は型注釈付きの関数式も許すため、使わない。
+
+```tsx
+function OrderRow({ order }: OrderRowProps) {
+  function handleSelect() {
+    onSelect(order.id);
+  }
+  return <Button onClick={handleSelect}>{order.code}</Button>;
+}
+
+// oxlint-disable-next-line func-style -- ChangeEventHandlerからeventの型を推論させる。
+const onChange: ChangeEventHandler<HTMLInputElement> = (event) => {
+  setCode(event.target.value);
+};
+```
 
 event handlerからPromiseを返す関数を呼ぶときは、handlerの中で`void`を付けた文にする。
 
@@ -265,6 +290,8 @@ const params = { ...(cursor !== undefined && { cursor }) };
 - **`task lint-taskfile`**：Task本体でTaskfileのYAML構文とスキーマ構造を検証する。
   `tooling/taskfile-cleanup/`のfixtureで、後片付けの定型が本体の終了コードを優先し、前段が失敗しても後段の後片付けを走らせることを検査する。
 - **`task adr-check`**：判断が絡む変更にADRが伴うかを確認する。
+  `frontend/`の変更のうち、テストファイル（`*.test.*`、`*.spec.*`）、`frontend/e2e/`、`frontend/lint/fixtures/`、`frontend/src/testing/`は対象から外す。
+  警告は止めず、`ADR_STRICT=1`で失敗にし、`ADR_ACK=1`で抑制する。
 
 Knipとjscpdの採用理由は[ADR-035](../adr/ADR-035-adopt-jscpd-and-knip-quality-gates.md)を、jscpdの閾値を4.0%にする理由は[ADR-074](../adr/ADR-074-raise-jscpd-threshold-for-class-role-boilerplate.md)を参照する。
 DASTの検出ではタスクを失敗させず、起動、ログイン、CSRFの前提確認の失敗だけで失敗させる（[ADR-056](../adr/ADR-056-run-authenticated-dast-with-zap-in-ci.md)）。
@@ -285,10 +312,13 @@ OKF検査の採用理由は[ADR-036](../adr/ADR-036-adopt-okf-for-docs-knowledge
 - **pre-push（すべて）**：`adr-check`と`scan-secrets-all`相当を実行する。
 - **pre-push（バックエンドのJavaまたはGradle変更）**：`be-lint`相当と`test`を実行する。
 - **pre-push（バックエンドまたはDockerfileの変更）**：バックエンドイメージのbuild stageをビルドする。
-- **pre-push（フロントエンドまたはTaskfileの変更）**：`fe-test-build`を実行する。
+- **pre-push（フロントエンドまたはTaskfileの変更）**：`fe-test-build`を、Vitestのdot reporterとjson-summaryだけのcoverageで実行する。
 - **pre-push（GitHub Actionsワークフローの変更）**：`lint-actions`相当と`lint-actions-security`相当を実行する。
 
 Gitフックの条件とコマンドは[`lefthook.yml`](../../lefthook.yml)を正とする。
+Lefthookは版の表示、skipの行、`EXECUTE`の行を省き、jobの出力と要約を出す（`output`）。
+成功したjobの出力も残すのは、`adr-check`の注意喚起が成功の扱いで出るためである。
+すべてを出すときは、`LEFTHOOK_OUTPUT`に`meta,summary,success,failure,execution,execution_out,execution_info,skips`を渡す。
 
 ## CI対応
 

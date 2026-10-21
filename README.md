@@ -342,7 +342,7 @@ Docker Compose の操作（サービスの起動、停止、状態確認、Keycl
 - ADR の一覧は [`docs/adr/index.md`](docs/adr/index.md) を参照してください。
   `docs/adr/` はワークフロー外と横断の判断を残す場所です。
 
-push 前には `task adr-check` が pre-push で走り、判断が絡む変更（依存、セキュリティ、DB、インフラ、ワークフロー、およびフロントエンド全体）に `docs/adr/` の更新が伴わないとき注意喚起します。
+push 前には `task adr-check` が pre-push で走り、判断が絡む変更（依存、セキュリティ、DB、インフラ、ワークフロー、およびテストと E2E と lint の fixture を除くフロントエンド）に `docs/adr/` の更新が伴わないとき注意喚起します。
 既定は非ブロッキングで、該当しない場合は `ADR_ACK=1 git push` で抑制できます。
 
 <p align="right">(<a href="#top">トップへ</a>)</p>

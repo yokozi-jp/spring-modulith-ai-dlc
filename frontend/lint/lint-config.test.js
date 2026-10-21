@@ -212,19 +212,36 @@ describe("project lint config on fixtures", () => {
     });
   });
 
-  describe("void", () => {
-    it("allows void as a statement", () => {
-      expect(codesIn("features/order/refresh-button.tsx")).toStrictEqual([]);
+  // docs/tooling/lint-and-test.md の「Lintを通る書き方」の規則。
+  describe("writing style", () => {
+    describe("void", () => {
+      it("allows void as a statement", () => {
+        expect(codesIn("features/order/refresh-button.tsx")).toStrictEqual([]);
+      });
+
+      it("rejects void inside an expression", () => {
+        expect(countIn("lib/void-expression.ts", "eslint(no-void)")).toBe(1);
+      });
     });
 
-    it("rejects void inside an expression", () => {
-      expect(countIn("lib/void-expression.ts", "eslint(no-void)")).toBe(1);
+    describe("undefined", () => {
+      it("allows comparing with undefined", () => {
+        expect(codesIn("lib/is-missing.ts")).toStrictEqual([]);
+      });
     });
-  });
 
-  describe("undefined", () => {
-    it("allows comparing with undefined", () => {
-      expect(codesIn("lib/is-missing.ts")).toStrictEqual([]);
+    describe("function style", () => {
+      it("rejects arrow functions and function expressions assigned to a variable", () => {
+        expect(countIn("lib/arrow-function.ts", "eslint(func-style)")).toBe(2);
+      });
+
+      it("rejects type-annotated function expressions", () => {
+        expect(countIn("lib/typed-function-expression.ts", "eslint(func-style)")).toBe(1);
+      });
+
+      it("allows a type-annotated arrow function and arrow callbacks", () => {
+        expect(codesIn("lib/typed-arrow-function.ts")).toStrictEqual([]);
+      });
     });
   });
 

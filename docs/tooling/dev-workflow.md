@@ -56,12 +56,12 @@ task fe-dev                # SPAを起動し、APIとOIDCを同一オリジン�
 シーダーはテストのソースにあるので、テストのソースがコンパイルできないと`task be-run`と`task dev`は起動しない。
 その場合はテストを直すか、`backend`で`./gradlew bootRun`を直接実行する。
 
-`.env.example`か`.env.test.example`に変数が増えたら、`.env`と`.env.test`に同じ変数を足す。
-既存の`.env`と`.env.test`は上書きされない。
-Taskのテスト系タスクは、`.env.test`に足りない変数があると、その変数名を並べて止まる。
-たとえば決済代行のClientを足した変更の後は、既存の`.env.test`へ`PAYMENT_GATEWAY_BASE_URL=http://127.0.0.1:8082`を足し、既存の`.env`へ`.env.example`の`PAYMENT_GATEWAY_BASE_URL`の行を足す。
+`.env.example`に変数が増えたら、`.env`に同じ変数を足す。
+既存の`.env`と`.env.test`の値は上書きされない。
+Taskのテスト系タスクは、`.env.test`に足りない変数を`.env.test.example`の行のまま追記し、追記した変数名を出す。
+たとえば決済代行のClientを足した変更の後は、既存の`.env`へ`.env.example`の`PAYMENT_GATEWAY_BASE_URL`の行を足す。
 `task compose-up`などが`OTEL_SERVICE_NAMESPACE is required`のように変数不足で止まったときは、これが原因である。
-失敗したイベント出版の定期の再投入を足した変更の後は、既存の`.env`へ`.env.example`の`EVENT_PUBLICATION_RESUBMISSION_ENABLED`、`EVENT_PUBLICATION_RESUBMISSION_WAIT_AGE`、`EVENT_PUBLICATION_RESUBMISSION_IN_FLIGHT_STALENESS`、`EVENT_PUBLICATION_RESUBMISSION_INTERVAL`の4行を、既存の`.env.test`へ`.env.test.example`の同じ4行を足す（[ADR-079](../adr/ADR-079-resubmit-failed-event-publications-periodically-with-shedlock.md)）。
+失敗したイベント出版の定期の再投入を足した変更の後は、既存の`.env`へ`.env.example`の`EVENT_PUBLICATION_RESUBMISSION_ENABLED`、`EVENT_PUBLICATION_RESUBMISSION_WAIT_AGE`、`EVENT_PUBLICATION_RESUBMISSION_IN_FLIGHT_STALENESS`、`EVENT_PUBLICATION_RESUBMISSION_INTERVAL`の4行を足す（[ADR-079](../adr/ADR-079-resubmit-failed-event-publications-periodically-with-shedlock.md)）。
 ローカルでは定期の再投入が短い間隔で有効なので、`FAILED`の出版は消した注文を指すものもリスナーの方針の上限の回数まで自動で再投入され、そのたびにリスナーのERRORが出る。
 
 定期の再投入のロックの表（`010-create-shedlock-table`）を足した変更の後は、既存のローカルのDBに`task be-migrate`を実行する。

@@ -21,24 +21,24 @@ export function AppShell() {
   const logoutStarted = useRef(false);
   useEffect(() => {
     // bfcache から戻った画面は ref が true のままなので、ボタンが効かなくなる。
-    const reopen = (event: PageTransitionEvent): void => {
+    function reopen(event: PageTransitionEvent): void {
       if (event.persisted) {
         logoutStarted.current = false;
       }
-    };
+    }
     globalThis.addEventListener("pageshow", reopen);
     return () => {
       globalThis.removeEventListener("pageshow", reopen);
     };
   }, []);
-  const submitLogout = (event: SubmitEvent<HTMLFormElement>): void => {
+  function submitLogout(event: SubmitEvent<HTMLFormElement>): void {
     event.preventDefault();
     if (logoutStarted.current) {
       return;
     }
     logoutStarted.current = true;
     void submitAfterSessionReset(event.currentTarget);
-  };
+  }
 
   return (
     <div className="min-h-svh bg-background text-foreground">
