@@ -23,7 +23,7 @@ public class ApproveOrderCommandHandler {
   }
 
   // 違反の形を作るため、handle から呼ばない private メソッドだけが ensureLockNo を呼ぶ。
-  @SuppressWarnings({"PMD.UnusedPrivateMethod", "UnusedMethod"})
+  @SuppressWarnings({"UnusedMethod", "unused"})
   private void ensureScreenLockNo(final ApproveOrderCommand command) {
     new Order(new OrderId(command.orderId()), 1L).ensureLockNo(command.expectedLockNo());
   }
