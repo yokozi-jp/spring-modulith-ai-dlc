@@ -41,8 +41,10 @@ import org.springframework.transaction.annotation.Transactional;
  * がフィクスチャのパッケージで同じ規則を再利用する。
  */
 // ArchUnit の JUnit 5 エンジンが @ArchTest フィールドを読むため、規則ファクトリだけを持つクラスでもユーティリティクラスにしない。
+// 規則ごとの条件を名前の付いたメソッドに分けるため、メソッドの数は規則の数に比例する。
 @SuppressWarnings({
   "PMD.TestClassWithoutTestCases",
+  "PMD.TooManyMethods",
   "PMD.TooManyStaticImports",
   "PMD.UseUtilityClass"
 })
@@ -55,11 +57,18 @@ class ClassRoleArchTest {
   /** CommandHandler の名前の接尾辞。 */
   private static final String COMMAND_HANDLER = "CommandHandler";
 
+  /** Listener の名前の接尾辞。 */
+  private static final String LISTENER = "Listener";
+
   /** クラスの役割を決めた ADR のパス。 */
   private static final String ADR_050 = "docs/adr/ADR-050-define-backend-class-roles-and-naming.md";
 
   /** 参照の結果で状態の意味を返すと決めた ADR のパス。 */
   private static final String ADR_075 = "docs/adr/ADR-075-return-state-meaning-in-query-results.md";
+
+  /** pgm_cd を Aspect で渡すと決めた ADR のパス。 */
+  private static final String ADR_051 =
+      "docs/adr/ADR-051-bind-pgm-cd-with-scoped-value-and-aspect.md";
 
   /** jOOQ の Repository の規約のパス。 */
   private static final String JOOQ_REPOSITORY_DOC = "docs/backend/class-roles/jooq-repository.md";
@@ -82,7 +91,7 @@ class ClassRoleArchTest {
           .orShould()
           .haveSimpleNameEndingWith("QueryService")
           .orShould()
-          .haveSimpleNameEndingWith("Listener")
+          .haveSimpleNameEndingWith(LISTENER)
           .allowEmptyShould(true)
           .because(
               "クラス名の接尾辞だけで、更新、参照、イベントの受信のどれかが分かるようにするため。"
@@ -146,7 +155,7 @@ class ClassRoleArchTest {
           .resideInAPackage("..application..")
           .andShould()
           .beDeclaredInClassesThat()
-          .haveSimpleNameEndingWith("Listener")
+          .haveSimpleNameEndingWith(LISTENER)
           .allowEmptyShould(true)
           .because(
               "@ApplicationModuleListener は新しいトランザクションを開き、受信のメソッドがトランザクション境界になるため、"
@@ -160,7 +169,7 @@ class ClassRoleArchTest {
   /* package */ static final ArchRule listenersExposeOnlyOnAndCallOneCommandHandler =
       classes()
           .that()
-          .haveSimpleNameEndingWith("Listener")
+          .haveSimpleNameEndingWith(LISTENER)
           .and()
           .resideInAPackage("..application..")
           .should(exposeOnlyOnAndCallOneCommandHandler())
@@ -172,6 +181,24 @@ class ClassRoleArchTest {
                   + "イベントから Command を作って一つの CommandHandler の handle を呼ぶ。"
                   + "規約：docs/backend/class-roles/listener.md、"
                   + ADR_050);
+
+  /** CommandHandler と Listener は、Java 標準の型以外のクラスを継承せず、継承も実装もさせない。 */
+  @ArchTest
+  /* package */ static final ArchRule commandHandlersAndListenersDoNotUseInheritance =
+      classes()
+          .that()
+          .haveSimpleNameEndingWith(COMMAND_HANDLER)
+          .or()
+          .haveSimpleNameEndingWith(LISTENER)
+          .should(notExtendOrBeExtended())
+          .allowEmptyShould(true)
+          .because(
+              "PgmCdAspect の pointcut はクラスの名前で対象を決め、継承した handle と on には *_pgm_cd を束縛しないため。"
+                  + "直し方：基底クラスとサブクラスをやめ、共通の処理は集約、Domain Service、"
+                  + "またはコンストラクタで受け取るクラスへ移す。"
+                  + "規約：docs/backend/class-roles/command-handler.md、"
+                  + "docs/backend/class-roles/listener.md、"
+                  + ADR_051);
 
   /** Request と Response は {@code presentation.web} の record にする。 */
   @ArchTest
@@ -359,6 +386,27 @@ class ClassRoleArchTest {
                 + "直し方：<UseCase>Request と <QueryResult>Response を <モジュール>.presentation.web の record にする。"
                 + "規約：docs/backend/class-roles/request.md、docs/backend/class-roles/response.md、"
                 + ADR_050);
+  }
+
+  private static ArchCondition<JavaClass> notExtendOrBeExtended() {
+    return new ArchCondition<>("not extend a non-Java class and not be extended or implemented") {
+      @Override
+      public void check(final JavaClass item, final ConditionEvents events) {
+        item.getRawSuperclass()
+            .filter(superclass -> !superclass.getPackageName().startsWith("java."))
+            .ifPresent(
+                superclass ->
+                    events.add(
+                        SimpleConditionEvent.violated(
+                            item,
+                            item.getFullName() + " が " + superclass.getFullName() + " を継承している。")));
+        for (final JavaClass subclass : item.getSubclasses()) {
+          events.add(
+              SimpleConditionEvent.violated(
+                  item, subclass.getFullName() + " が " + item.getFullName() + " を継承または実装している。"));
+        }
+      }
+    };
   }
 
   private static ArchCondition<JavaClass> exposeOnlyTransactionalHandle() {
