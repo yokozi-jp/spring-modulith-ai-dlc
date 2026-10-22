@@ -46,6 +46,14 @@ class ArchitectureRuleFixtureTest {
   /** 違反フィクスチャのクラス名の接頭辞。 */
   private static final String VIOLATING_PREFIX = VIOLATING + ".";
 
+  /**
+   * 違反フィクスチャの import 結果。
+   *
+   * <p>import はクラスパス全体を走査して遅く、パラメータごとに繰り返すと全体の大半を占める。規則の検査は import 結果を読むだけなので、全パラメータで共有する。
+   */
+  private static final JavaClasses VIOLATING_CLASSES =
+      new ClassFileImporter().importPackages(VIOLATING);
+
   /** TableWriter を通さずに書く違反フィクスチャのクラス名。 */
   private static final String DIRECT_WRITER =
       "ordering.infrastructure.persistence.DirectOrderWriter";
@@ -122,9 +130,7 @@ class ArchitectureRuleFixtureTest {
   @DisplayName("各クラス役割規則は対応する違反フィクスチャを検出する")
   void eachRuleDetectsItsViolatingFixture(
       final String ruleName, final ArchRule rule, final String violatingClass) {
-    final JavaClasses violating = new ClassFileImporter().importPackages(VIOLATING);
-
-    assertThatThrownBy(() -> rule.check(violating))
+    assertThatThrownBy(() -> rule.check(VIOLATING_CLASSES))
         .as(ruleName)
         .isInstanceOf(AssertionError.class)
         .hasMessageContaining(violatingClass);
