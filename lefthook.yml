@@ -168,6 +168,7 @@ pre-commit:
     # iwe が無い環境は OKF 部分をタスク側でスキップ（最終担保は CI の okf-validate に任せる）。
     - name: okf-check
       glob:
+        - "docs/*.md"
         - "docs/**/*.md"
         - "docs/.iwe/**"
         - ".kiro/steering/**"
@@ -238,7 +239,11 @@ pre-push:
     # backend に変更がある push のときだけ Lint（Spotless + PMD + SpotBugs）
     # Gradle は重いため pre-commit ではなく pre-push で実行する。
     - name: be-lint
-      glob: "backend/**/*.{java,gradle}"
+      # lefthook の既定の照合では ** が 1 階層以上にしか一致しないため、backend 直下の build.gradle と
+      # settings.gradle を別のパターンで拾う。
+      glob:
+        - "backend/*.gradle"
+        - "backend/**/*.{java,gradle}"
       files: *push-files
       run: |
         echo "{files}" >/dev/null
@@ -249,7 +254,11 @@ pre-push:
     # PostgreSQL 5433 / Redis 6380）と .env.test を使う task test で実行する。
     # docker が無い環境ではスキップ（最終担保は CI に任せる）。
     - name: be-test
-      glob: "backend/**/*.{java,gradle}"
+      # lefthook の既定の照合では ** が 1 階層以上にしか一致しないため、backend 直下の build.gradle と
+      # settings.gradle を別のパターンで拾う。
+      glob:
+        - "backend/*.gradle"
+        - "backend/**/*.{java,gradle}"
       files: *push-files
       run: |
         echo "{files}" >/dev/null
@@ -268,6 +277,7 @@ pre-push:
       glob:
         - "backend/Dockerfile"
         - "backend/.dockerignore"
+        - "backend/*.gradle"
         - "backend/**/*.{java,gradle}"
         - "backend/gradle.properties"
         - "backend/gradlew"
