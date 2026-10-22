@@ -58,6 +58,18 @@ NO_COLOR=1 git push -u origin <ブランチ>
 Lefthookの出力は`lefthook.yml`の`output`で絞ってある（[Lintとテストのリファレンス](lint-and-test.md)）。
 `LEFTHOOK_OUTPUT=summary,failure`でさらに絞ると、成功の扱いで出る`adr-check`の注意喚起が消えるため、付けない。
 
+`backend/`のJavaかGradleを変えたpushでは、pre-pushが`be-lint`、`be-test`（全テスト）、`be-image-build`を並列に実行し、数分かかる。
+tool callの時間切れや中断でフックは止まらないため、pushはバックグラウンドで実行し、完了の印のファイルを待つ。
+
+```bash
+(nohup bash -c 'NO_COLOR=1 git push -u origin <ブランチ> > /tmp/push.log 2>&1; echo "exit=$?" > /tmp/push.done' >/dev/null 2>&1 &)
+cat /tmp/push.done          # 完了するまで間を置いて確かめる
+grep -E '^(✓|✗)' /tmp/push.log
+```
+
+pushをやり直す前に、`pgrep -fa "lefthook run pre-push"`で前のフックが残っていないことを確かめる。
+残っていれば、終えるのを待つか止めてから、`docker compose -f docker/compose-test.yml down --volumes --remove-orphans`でテスト用の依存を片付ける。
+
 ## APIを変更するとき
 
 ```bash
