@@ -89,6 +89,9 @@ Spring の AOP プロキシは、Bean の外からの呼び出しだけを横取
 
 アノテーションを付けたメソッドは別の Bean へ移し、その Bean を注入して外から呼ぶ。
 
+`@Around` などの AspectJ の advice と `@Pointcut` の式には `within(<パッケージ>..*<役割名>)` を書き、`execution` にはメソッドの名前と修飾子だけを書く。
+`execution` の宣言型だけで対象を絞ると、AspectJ がすべての Bean のすべてのメソッドで上位型をたどって照合し、Spring のコンテキストの起動が数倍遅くなる（[ADR-051](../adr/ADR-051-bind-pgm-cd-with-scoped-value-and-aspect.md)）。
+
 いまのコードで使っていないアノテーションの規則も、検査の費用がほぼなく使い始めたときの事故を防げるため残す。
 
 ## 警告の抑制

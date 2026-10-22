@@ -27,11 +27,18 @@ Repository の実装は、どのユースケースから呼ばれたかを引数
 一方、ユースケースの入口は ADR-050 で `<UseCase>CommandHandler` の `handle` と `<Event>Listener` の `on` に決まっており、名前は ArchUnit で検査している。
 入口の名前から、ユースケース名を機械的に求められる。
 
+当初の pointcut は `execution(* com.example.demo.*..*CommandHandler.handle(..))` のように、`execution` の宣言型に名前の型パターンを書いていた。
+この形では、AspectJ がすべての Bean のすべてのメソッドで上位型をたどって照合する。
+Spring のコンテキストを起動するたびに、この照合で時間がかかっていた（ローカルの JFR で、`ActuatorHealthSecurityTest` の CPU サンプルの 77.5%）。
+そこで Decision の pointcut の形を、下の `within` の形に書き直した。
+
 ## Decision
 
 `org.springframework.boot:spring-boot-starter-aspectj` を依存に加え、`shared.infrastructure.persistence` に `@Aspect` の `PgmCdAspect` を置く。
 
 - `PgmCdAspect` は、`com.example.demo.<モジュール>..` の `*CommandHandler` の `handle` と、`*Listener` の public メソッドの呼び出しを `@Around` で囲む。
+- pointcut は `within(com.example.demo.*..*CommandHandler) && execution(* handle(..))` の形にし、対象のクラスを `within` の名前だけで決める。
+  `within` は継承した型を対象にしないため、`*CommandHandler` と `*Listener` に継承を使わせないことを、ArchUnit の `commandHandlersAndListenersDoNotUseInheritance` で検査する。
 - 呼び出しの間だけ、`ScopedValue<String>` に `モジュール名.クラスの単純名から CommandHandler か Listener を除いた名前`（`ordering.PlaceOrder`）を束縛する。
 - 呼び出しが入れ子になったら、その間は内側の値になり、戻ると外側の値に戻る。
   ADR-050 では `<Event>Listener` の `on` が `<UseCase>CommandHandler` の `handle` を一つだけ呼ぶため、イベントを受けた書き込みの `*_pgm_cd` には、内側の CommandHandler の名前（`ordering.ChargeOrder`）が入る。
@@ -64,6 +71,7 @@ Aspect は Spring AOP のプロキシで動かし、ロード時やコンパイ�
 - AspectJ の依存（`aspectjweaver`）が増える。
 - `*_pgm_cd` の値が、クラスの名前の規約（ADR-050 の役割名）に依存する。
   役割名を変えるときは、`PgmCdAspect` の pointcut も変える必要がある。
+- `*CommandHandler` と `*Listener` は、基底クラスやサブクラスで共通の処理をまとめられない。
 - Spring AOP のプロキシを通らない呼び出し（同じクラスの中からの呼び出し、Bean でないインスタンスの呼び出し）と、別のスレッドへ渡した処理では束縛されない。
 - バッチのように CommandHandler と Listener を通らない書き込みの入口を作るときは、入口の役割と pointcut を決め直す必要がある。
 

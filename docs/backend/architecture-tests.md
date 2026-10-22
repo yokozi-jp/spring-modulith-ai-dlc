@@ -82,6 +82,8 @@ jOOQの生成物の`com.example.demo.jooq`はOPENのモジュールであり、`
 - `commandHandlersExposeOnlyTransactionalHandle`：`*CommandHandler`のpublicメソッドは、`@Transactional`を付けた`handle`一つだけにし、`*Command`を一つ受け取り`*Result`を返す。
 - `commandsAndResultsAreApplicationRecords`：`*Command`と`*Result`は`application`のrecordにする。
 - `commandHandlersDoNotDependOnOtherCommandHandlers`：`*CommandHandler`は別の`*CommandHandler`に依存しない。
+- `commandHandlersAndListenersDoNotUseInheritance`：`*CommandHandler`と`*Listener`は、Java標準の型以外のクラスを継承せず、継承も実装もさせない（[ADR-051](../adr/ADR-051-bind-pgm-cd-with-scoped-value-and-aspect.md)）。
+  違反フィクスチャの`ReopenOrderHandler`（サブクラス）、`RestoreOrderCommandHandler`（基底クラスの`OrderHandlerSupport`）、`OrderShippedReceiver`（インタフェースの実装）で確かめる。
 - `moduleListenersAreApplicationListeners`：`@ApplicationModuleListener`を付けたメソッドは、`application`の`*Listener`の`on`にする。
 - `listenersExposeOnlyOnAndCallOneCommandHandler`：`*Listener`のpublicメソッドは`@ApplicationModuleListener`を付けた`void on(...)`一つだけにし、呼ぶ`*CommandHandler`はちょうど一つにする。
 - `requestsAndResponsesArePresentationWebRecords`：`*Request`と`*Response`は`presentation.web`のrecordにする。
@@ -182,6 +184,8 @@ Class <archfixture.violating.ordering.application.ShipOrderCommandHandler> is me
 
 `ProxyRulesArchTest`は、プロキシで動くアノテーションを付けたメソッドへの同一クラス内の直接呼び出しを検査する。
 対象のアノテーションの一覧と規則の理由は、[バックエンドのJava実装規約](java-coding.md)の「プロキシで動くアノテーション」に示す。
+同じクラスの`pointcutsNarrowTargetsWithWithin`は、AspectJのadviceと`@Pointcut`の式（`value`と`pointcut`）に`within(`があることを検査する。
+違反フィクスチャの`shared.infrastructure.persistence.SlowPgmCdAspect`で確かめ、規約どおりのフィクスチャの`PgmCdAspect`を誤検出しないことも確かめる。
 
 ## 日時
 

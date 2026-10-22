@@ -34,6 +34,8 @@ CommandHandler は他モジュールから呼ばれない。
 ## 必須の記述
 
 - `public class` にし、`final` を付けず、`@Service` を付ける。
+- クラスを継承せず、継承もさせない。
+  `PgmCdAspect` は名前で対象を決め、継承した `handle` には `*_pgm_cd` を束縛しない（[ADR-051](../../adr/ADR-051-bind-pgm-cd-with-scoped-value-and-aspect.md)）。
 - public メソッドは `public <UseCase>Result handle(final <UseCase>Command command)` の一つだけにする。
   `handle` に `@Transactional` を付け、クラスには付けない。
 - 依存は public のコンストラクタで受け取り、`private final` フィールドに持つ。
