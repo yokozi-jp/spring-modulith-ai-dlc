@@ -204,11 +204,13 @@ public class OpenApiConfig {
         new ArraySchema()
             .items(new Schema<>().$ref(SCHEMA_REF + "ValidationError"))
             .description("入力検証の誤り。type が /problems/validation-error のときだけ必ず含む"));
-    return new Schema<>()
-        .description(
-            "400 の Problem Details。"
-                + "type が /problems/validation-error なら入力検証エラーで、errors に誤りのある入力の位置と説明を持つ")
-        .allOf(List.of(new Schema<>().$ref(SCHEMA_REF + PROBLEM_DETAIL), extension));
+    // Schema#description と #allOf は raw type の Schema を返すので、メソッドチェーンにしない。
+    final Schema<Object> problem = new Schema<>();
+    problem.setDescription(
+        "400 の Problem Details。"
+            + "type が /problems/validation-error なら入力検証エラーで、errors に誤りのある入力の位置と説明を持つ");
+    problem.setAllOf(List.of(new Schema<>().$ref(SCHEMA_REF + PROBLEM_DETAIL), extension));
+    return problem;
   }
 
   /** application/problem+json で指定した schema を返す response を作る。 */
