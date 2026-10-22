@@ -1,3 +1,8 @@
+// Distinct package so CodeQL's buildless scan does not see this fixture's
+// fully-qualified name clash with the detects/ fixture's Sample. The linter
+// greps file contents, so the package has no effect on detection.
+package fixtures.ok;
+
 class Sample {
   // LISTEN x
   /*
