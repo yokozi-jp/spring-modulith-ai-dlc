@@ -83,3 +83,4 @@
 - [ADR-080: バックエンドのテストの非同期の条件の待ちに Awaitility を使う](ADR-080-wait-for-async-conditions-with-awaitility.md)（Proposed, 2026-10-12）
 - [ADR-081: 一覧 API の sort を domain.model の enum で受け、default のない switch 式で項目名と列に写す](ADR-081-map-list-sort-via-domain-enum-and-exhaustive-switch.md)（Proposed, 2026-10-14）
 - [ADR-082: retro を導入し、タスクがひと段落したら必ず実行する](ADR-082-adopt-retro-and-run-it-at-task-boundaries.md)（Proposed, 2026-10-21）
+- [ADR-083: CodeQL を advanced setup で管理し、build-mode を明示する](ADR-083-manage-codeql-as-advanced-setup-with-explicit-build-mode.md)（Proposed, 2026-10-22）

@@ -1,0 +1,72 @@
+# CodeQL を advanced setup（コミット済みワークフロー）で管理する（ADR-083）。
+# default setup から移行し、Java の build-mode を明示する。
+# このワークフローを有効にする前に、GitHub 側の Code scanning default setup を
+# 無効化する。両方を残すと同じ言語の解析が二重になる。
+name: CodeQL 🛡️
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+    branches: ["**"]
+  # default setup と同じ水準で、週次でも解析する。
+  schedule:
+    - cron: "31 4 * * 4"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  analyze:
+    name: Analyze (${{ matrix.language }}) 🛡️
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      # SARIF を Code Scanning にアップロードするため、このジョブだけに付与する。
+      security-events: write
+      contents: read
+      # プライベートリポジトリで upload-sarif が workflow run 情報を読むのに必要。
+      actions: read
+      # Gradle が GitHub Packages の依存を解決する場合に備える。
+      packages: read
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # ビルド不要の言語はビルドレスで抽出する。
+          - language: actions
+            build-mode: none
+          - language: javascript-typescript
+            build-mode: none
+          # Java は autobuild で Gradle をビルドして解析し、精度を上げる（ADR-083）。
+          - language: java-kotlin
+            build-mode: autobuild
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      # Java の autobuild が Corretto 25 を使うよう、init の前に JDK を用意する
+      # （Backend CI と同じ版）。
+      - name: Set up JDK
+        if: matrix.language == 'java-kotlin'
+        uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
+        with:
+          distribution: corretto
+          java-version: "25"
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@24c54180a607b1449ed407dd24f251e4e9147c8d # v4.38.3
+        with:
+          languages: ${{ matrix.language }}
+          build-mode: ${{ matrix.build-mode }}
+
+      - name: Perform CodeQL analysis
+        uses: github/codeql-action/analyze@24c54180a607b1449ed407dd24f251e4e9147c8d # v4.38.3
+        with:
+          category: "/language:${{ matrix.language }}"
