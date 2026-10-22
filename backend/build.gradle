@@ -15,11 +15,11 @@ plugins {
     id 'java'
     id 'org.springframework.boot' version '4.1.1'
     id 'io.spring.dependency-management' version '1.1.7'
-    id 'org.cyclonedx.bom' version '3.5.0'
+    id 'org.cyclonedx.bom' version '3.5.1'
     id 'jacoco'
-    id 'com.diffplug.spotless' version '8.10.3'
+    id 'com.diffplug.spotless' version '8.10.4'
     id 'pmd'
-    id 'com.github.spotbugs' version '6.5.12'
+    id 'com.github.spotbugs' version '6.5.13'
     id 'net.ltgt.errorprone' version '5.1.1'
     id 'org.liquibase.gradle' version '3.1.0'
     id 'org.jooq.jooq-codegen-gradle' version '3.21.9'
@@ -172,9 +172,9 @@ dependencyManagement {
         // --- 脆弱性対応（推移的依存のバージョン強制） ---
         // Spring Boot 4.1.1 BOM が引く Tomcat に認証バイパス等の CVE が判明したため上書き。
         // CVE-2026-65182 / CVE-2026-65905 / CVE-2026-68525 対応。
-        dependency 'org.apache.tomcat.embed:tomcat-embed-core:11.0.26'
-        dependency 'org.apache.tomcat.embed:tomcat-embed-el:11.0.26'
-        dependency 'org.apache.tomcat.embed:tomcat-embed-websocket:11.0.26'
+        dependency 'org.apache.tomcat.embed:tomcat-embed-core:11.0.27'
+        dependency 'org.apache.tomcat.embed:tomcat-embed-el:11.0.27'
+        dependency 'org.apache.tomcat.embed:tomcat-embed-websocket:11.0.27'
         // CVE-2026-0636（LDAP インジェクション）対応。
         dependency 'org.bouncycastle:bcprov-jdk18on:1.86'
     }
