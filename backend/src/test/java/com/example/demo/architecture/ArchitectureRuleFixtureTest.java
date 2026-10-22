@@ -355,6 +355,14 @@ class ArchitectureRuleFixtureTest {
             ClassRoleArchTest.commandHandlersAndListenersDoNotUseInheritance,
             "ordering.application.OrderShippedReceiver"),
         row(
+            "pointcutsNarrowTargetsWithWithin: value",
+            ProxyRulesArchTest.pointcutsNarrowTargetsWithWithin,
+            "shared.infrastructure.persistence.SlowPgmCdAspect.bind("),
+        row(
+            "pointcutsNarrowTargetsWithWithin: pointcut",
+            ProxyRulesArchTest.pointcutsNarrowTargetsWithWithin,
+            "shared.infrastructure.persistence.SlowPgmCdAspect.afterListener("),
+        row(
             "listenersExposeOnlyOnAndCallOneCommandHandler",
             ClassRoleArchTest.listenersExposeOnlyOnAndCallOneCommandHandler,
             "inventory.application.OrderPlacedListener"),
@@ -542,6 +550,7 @@ class ArchitectureRuleFixtureTest {
         ClassRoleArchTest.commandsAndResultsAreApplicationRecordsRule(basePackage),
         ClassRoleArchTest.commandHandlersDoNotDependOnOtherCommandHandlers,
         ClassRoleArchTest.commandHandlersAndListenersDoNotUseInheritance,
+        ProxyRulesArchTest.pointcutsNarrowTargetsWithWithin,
         ClassRoleArchTest.moduleListenersAreApplicationListeners,
         ClassRoleArchTest.listenersExposeOnlyOnAndCallOneCommandHandler,
         ClassRoleArchTest.requestsAndResponsesArePresentationWebRecordsRule(basePackage),

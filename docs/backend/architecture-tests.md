@@ -184,6 +184,8 @@ Class <archfixture.violating.ordering.application.ShipOrderCommandHandler> is me
 
 `ProxyRulesArchTest`は、プロキシで動くアノテーションを付けたメソッドへの同一クラス内の直接呼び出しを検査する。
 対象のアノテーションの一覧と規則の理由は、[バックエンドのJava実装規約](java-coding.md)の「プロキシで動くアノテーション」に示す。
+同じクラスの`pointcutsNarrowTargetsWithWithin`は、AspectJのadviceと`@Pointcut`の式（`value`と`pointcut`）に`within(`があることを検査する。
+違反フィクスチャの`shared.infrastructure.persistence.SlowPgmCdAspect`で確かめ、規約どおりのフィクスチャの`PgmCdAspect`を誤検出しないことも確かめる。
 
 ## 日時
 
