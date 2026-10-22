@@ -1,7 +1,7 @@
 ---
 type: Convention
 title: バックエンドの Java 実装規約
-description: 手書きのバックエンドコードで使う Lombok、record、Domain Model の状態変更、ロギング、依存の注入、例外、assert、非推奨の API、プロキシで動くアノテーションの規約と理由を定める。データキャリアやログ出力を書くとき、Bean の依存や例外を書くとき、これらの PMD や ArchUnit の規則で失敗したときに読む。
+description: 手書きのバックエンドコードで使う Lombok、record、Domain Model の状態変更、ロギング、依存の注入、例外、assert、非推奨の API、プロキシで動くアノテーション、警告の抑制の規約と理由を定める。データキャリアやログ出力を書くとき、Bean の依存や例外を書くとき、@SuppressWarnings を書くとき、これらの PMD や ArchUnit の規則で失敗したときに読む。
 tags: [convention, backend, java, logging]
 ---
 
@@ -10,6 +10,7 @@ tags: [convention, backend, java, logging]
 Lombok の `@Data` と `@Setter` を使わず、データキャリアは record にし、Domain Model の状態は業務上の操作を表すメソッドで変更する。
 ロギングは SLF4J facade と Lombok の `@Slf4j` に統一し、依存はコンストラクタで受け取り、具体的な例外を投げ、`assert` に詳細を書き、非推奨の API を使わない。
 プロキシで動くアノテーションを付けたメソッドは、同じクラスの中から呼ばない。
+`@SuppressWarnings` には、警告を出すツールごとのトークンを書く。
 これらの規則の検査方法は [バックエンドのアーキテクチャテスト](architecture-tests.md) に示す。
 
 ## 規約
@@ -92,3 +93,19 @@ Spring の AOP プロキシは、Bean の外からの呼び出しだけを横取
 `execution` の宣言型だけで対象を絞ると、AspectJ がすべての Bean のすべてのメソッドで上位型をたどって照合し、Spring のコンテキストの起動が数倍遅くなる（[ADR-051](../adr/ADR-051-bind-pgm-cd-with-scoped-value-and-aspect.md)）。
 
 いまのコードで使っていないアノテーションの規則も、検査の費用がほぼなく使い始めたときの事故を防げるため残す。
+
+## 警告の抑制
+
+`@SuppressWarnings` には、警告を出すツールのトークンを書き、ツールごとに必要なものだけを並べる。
+
+| ツール                   | 未使用の private メソッドのトークン |
+| ------------------------ | ----------------------------------- |
+| Eclipse JDT（VSCode）    | `"unused"`                          |
+| Error Prone              | `"UnusedMethod"`                    |
+| PMD                      | `"unused"` で抑制される             |
+
+PMD は `"unused"` を `PMD.UnusedPrivateMethod` の抑制として扱う。
+`"unused"` と `"PMD.UnusedPrivateMethod"` を両方書くと、PMD の `UnnecessaryWarningSuppression` が後者を不要として失敗させる。
+
+型引数のない型（raw type）を返すメソッドをチェーンでつなぐと、javac は `[unchecked]` を警告する（`-Xlint:rawtypes,unchecked`）。
+警告を抑制せず、戻り値を型引数付きの変数に受けて、セッターで設定する。

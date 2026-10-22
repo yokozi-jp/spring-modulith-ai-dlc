@@ -367,7 +367,8 @@ spotbugs {
     toolVersion = '4.9.8'
     ignoreFailures = false
     showStackTraces = true
-    showProgress = true
+    // 進捗は \r で上書きする数万文字の1行になり、tail で削れずログとエージェントの出力を埋めるため出さない。
+    showProgress = false
     excludeFilter = file('config/spotbugs/exclusion-filter.xml')
 }
 
@@ -409,6 +410,8 @@ tasks.named('spotbugsTest') {
  *   （= 黙って @NullUnmarked 扱いになり無検査化する事故）をビルドで検出する。
  */
 tasks.withType(JavaCompile).configureEach {
+    // raw type の呼び出しを javac の警告に出す。IDE（JDT）だけが出していた警告をビルドでも見えるようにする。
+    options.compilerArgs += ['-Xlint:rawtypes,unchecked']
     options.errorprone {
         error('NullAway')
         error('RequireExplicitNullMarking')
