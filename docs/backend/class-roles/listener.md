@@ -37,6 +37,8 @@ Listener は Infrastructure の Adapter でもない。
 ## 必須の記述
 
 - `@Service` を付けた package-private の `class` にし、`final` を付けない。
+- クラスを継承せず、継承も実装もさせない。
+  `PgmCdAspect` は名前で対象を決め、継承した `on` には `*_pgm_cd` を束縛しない（[ADR-051](../../adr/ADR-051-bind-pgm-cd-with-scoped-value-and-aspect.md)）。
 - public メソッドは `@ApplicationModuleListener public void on(final <Event> event)` の一つだけにする。
 - `on` はイベントの値で [Command](command.md) を作り（`new ReserveStockCommand(event.orderId())`）、CommandHandler の `handle` を一回呼ぶ。
 - `@Transactional` を付けない。

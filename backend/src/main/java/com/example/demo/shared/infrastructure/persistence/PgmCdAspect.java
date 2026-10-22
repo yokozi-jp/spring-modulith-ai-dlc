@@ -32,10 +32,16 @@ public class PgmCdAspect {
   /** 呼び出し中のユースケースが、{@code *Listener} の呼び出しの中にあるか。 */
   private static final ScopedValue<Boolean> IN_LISTENER = ScopedValue.newInstance();
 
-  /** 呼び出し中のユースケースの {@code *_pgm_cd} を、呼び出しの間だけ束縛する。 */
+  /**
+   * 呼び出し中のユースケースの {@code *_pgm_cd} を、呼び出しの間だけ束縛する。
+   *
+   * <p>対象のクラスは {@code within} の名前で絞る。{@code execution} の宣言型に名前の型パターンを書くと、AspectJ はすべての Bean
+   * のすべてのメソッドで上位型をたどって照合し、起動が数倍遅くなる。{@code within} は継承した型を対象にしないため、CommandHandler と Listener の継承を
+   * ArchUnit の {@code commandHandlersAndListenersDoNotUseInheritance} で禁じる。
+   */
   @Around(
-      "execution(* com.example.demo.*..*CommandHandler.handle(..))"
-          + " || execution(public * com.example.demo.*..*Listener.*(..))")
+      "(within(com.example.demo.*..*CommandHandler) && execution(* handle(..)))"
+          + " || (within(com.example.demo.*..*Listener) && execution(public * *(..)))")
   public @Nullable Object bindPgmCd(final ProceedingJoinPoint joinPoint) throws Throwable {
     final Class<?> useCase = joinPoint.getSignature().getDeclaringType();
     return ScopedValue.where(PGM_CD, pgmCd(useCase))
