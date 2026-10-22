@@ -343,6 +343,26 @@ class ArchitectureRuleFixtureTest {
             ClassRoleArchTest.commandHandlersDoNotDependOnOtherCommandHandlers,
             "ordering.application.ConfirmOrderCommandHandler"),
         row(
+            "commandHandlersAndListenersDoNotUseInheritance: 役割名でないサブクラス",
+            ClassRoleArchTest.commandHandlersAndListenersDoNotUseInheritance,
+            "ordering.application.ReopenOrderHandler"),
+        row(
+            "commandHandlersAndListenersDoNotUseInheritance: 基底クラス",
+            ClassRoleArchTest.commandHandlersAndListenersDoNotUseInheritance,
+            "ordering.application.OrderHandlerSupport"),
+        row(
+            "commandHandlersAndListenersDoNotUseInheritance: インタフェースの実装",
+            ClassRoleArchTest.commandHandlersAndListenersDoNotUseInheritance,
+            "ordering.application.OrderShippedReceiver"),
+        row(
+            "pointcutsNarrowTargetsWithWithin: value",
+            ProxyRulesArchTest.pointcutsNarrowTargetsWithWithin,
+            "shared.infrastructure.persistence.SlowPgmCdAspect.bind("),
+        row(
+            "pointcutsNarrowTargetsWithWithin: pointcut",
+            ProxyRulesArchTest.pointcutsNarrowTargetsWithWithin,
+            "shared.infrastructure.persistence.SlowPgmCdAspect.afterListener("),
+        row(
             "listenersExposeOnlyOnAndCallOneCommandHandler",
             ClassRoleArchTest.listenersExposeOnlyOnAndCallOneCommandHandler,
             "inventory.application.OrderPlacedListener"),
@@ -529,6 +549,8 @@ class ArchitectureRuleFixtureTest {
         ClassRoleArchTest.commandHandlersExposeOnlyTransactionalHandle,
         ClassRoleArchTest.commandsAndResultsAreApplicationRecordsRule(basePackage),
         ClassRoleArchTest.commandHandlersDoNotDependOnOtherCommandHandlers,
+        ClassRoleArchTest.commandHandlersAndListenersDoNotUseInheritance,
+        ProxyRulesArchTest.pointcutsNarrowTargetsWithWithin,
         ClassRoleArchTest.moduleListenersAreApplicationListeners,
         ClassRoleArchTest.listenersExposeOnlyOnAndCallOneCommandHandler,
         ClassRoleArchTest.requestsAndResponsesArePresentationWebRecordsRule(basePackage),
