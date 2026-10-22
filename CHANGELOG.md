@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.13.0](https://github.com/yokozi-jp/spring-modulith-ai-dlc/compare/v0.12.0...v0.13.0) (2026-10-22)
+
+
+### Features
+
+* **skills:** retroとwriting-for-agentsを導入しタスクの区切りで実行する ([#220](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/220)) ([625c127](https://github.com/yokozi-jp/spring-modulith-ai-dlc/commit/625c1278451f1600fcc43babb415d6c9563962b5))
+
+
+### Bug Fixes
+
+* **hooks:** backend直下のgradleファイルとdocs直下のmdをフックの対象にする ([#230](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/230)) ([9075d79](https://github.com/yokozi-jp/spring-modulith-ai-dlc/commit/9075d79cf6ec8e4fe5734d17902ced49ba931582))
+
 ## [0.12.0](https://github.com/yokozi-jp/spring-modulith-ai-dlc/compare/v0.11.0...v0.12.0) (2026-10-21)
 
 
