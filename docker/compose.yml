@@ -100,7 +100,7 @@ services:
     restart: unless-stopped
 
   otel-lgtm:
-    image: grafana/otel-lgtm:0.36.0@sha256:57c04cbd8e7022f32bb84c4ac005d79baf8b08e2c5be44facf11f5f1f9944ba2
+    image: grafana/otel-lgtm:0.37.0@sha256:57b5ab1ca6619beb180174e2fccce04762470750669d043f544b4726d0582d07
     entrypoint:
       - /bin/bash
       - -ec
@@ -126,7 +126,7 @@ services:
 
   # 可観測性データの唯一の出口。ログの属性を allowlist で絞ってから LGTM へ送る（本番と同じ設定）。
   otel-collector:
-    image: otel/opentelemetry-collector-contrib:0.162.0-386@sha256:8b9211dbe1b3642eca91b237f39ede8baae9abaf97d6dcc88116f77f29545359
+    image: otel/opentelemetry-collector-contrib:0.163.2-386@sha256:bd0aac7fc525d8016b7bba1e35287b1f3a43c1e2d52e2426e2496d8d45668784
     command: ["--config", "/etc/otelcol-contrib/config.yaml"]
     environment:
       # コンテナ間通信とホストからの送信を受けるため、全インターフェースで待ち受ける。
