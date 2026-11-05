@@ -63,7 +63,7 @@ services:
     restart: unless-stopped
 
   redis:
-    image: redis:8.10.2-alpine3.23@sha256:3811787313eba226a2ef38658c6ccb91cd5e110edc89c37767de373120a0e5a0
+    image: redis:8.10.3-alpine3.23@sha256:21090af93f8324db2f0f0f4f38a7c60369d47d917e000c3423d89d2ae2883537
     command: ["redis-server", "--appendonly", "yes"]
     environment:
       TZ: UTC
@@ -100,7 +100,7 @@ services:
     restart: unless-stopped
 
   otel-lgtm:
-    image: grafana/otel-lgtm:0.37.0@sha256:57b5ab1ca6619beb180174e2fccce04762470750669d043f544b4726d0582d07
+    image: grafana/otel-lgtm:0.38.1@sha256:0df9bc14142000b161344bd24caf6ddd319b7319055aedaf9b0692b125730af7
     entrypoint:
       - /bin/bash
       - -ec
@@ -126,7 +126,7 @@ services:
 
   # 可観測性データの唯一の出口。ログの属性を allowlist で絞ってから LGTM へ送る（本番と同じ設定）。
   otel-collector:
-    image: otel/opentelemetry-collector-contrib:0.163.2-386@sha256:bd0aac7fc525d8016b7bba1e35287b1f3a43c1e2d52e2426e2496d8d45668784
+    image: otel/opentelemetry-collector-contrib:0.164.0@sha256:340c9ca6a36617084c6661bdc4f0fe92b7cda5a805d61673ec8db375fddc522b
     command: ["--config", "/etc/otelcol-contrib/config.yaml"]
     environment:
       # コンテナ間通信とホストからの送信を受けるため、全インターフェースで待ち受ける。
