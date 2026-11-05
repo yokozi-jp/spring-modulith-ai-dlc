@@ -21,7 +21,7 @@
 # -----------------------------------------------------------------------------
 # Stage 1: ビルド（JDK + Gradle）
 # -----------------------------------------------------------------------------
-FROM amazoncorretto:25-alpine3.22@sha256:b22e63eec97c799c8fdad5c462421e88b6aad5ced26547b27aa53ef36fad08de AS build
+FROM amazoncorretto:25-alpine3.22@sha256:775fda8fc10aa8593c4added5cdd43af6d5504f35ff22f130b0505956c6b9ed6 AS build
 
 WORKDIR /workspace
 
