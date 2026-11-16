@@ -181,7 +181,7 @@ class TableWriterArchTest {
   private static final Set<String> DAO_WRITES = Set.of(UPDATE, DELETE, "deleteById", "merge");
 
   /** 期待する jOOQ の実行時の版。上げるときは H1 の禁止の一覧を見直す。 */
-  private static final String REVIEWED_JOOQ_VERSION = "3.21.7";
+  private static final String REVIEWED_JOOQ_VERSION = "3.21.9";
 
   /** 業務テーブルの UPDATE と DELETE は、TableWriter、LockedRoot、DeletedRoot だけが組み立てて実行する（H1）。 */
   @ArchTest
