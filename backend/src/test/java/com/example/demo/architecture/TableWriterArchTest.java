@@ -259,10 +259,8 @@ class TableWriterArchTest {
         new ClassFileImporter()
             .importClasses(TableWriter.class).get(TableWriter.class).getMethods().stream()
                 .filter(method -> UNVERSIONED_WRITES.contains(method.getName()))
-                .filter(
-                    method ->
-                        method.isAnnotatedWith(
-                            "com.google.errorprone.annotations.CheckReturnValue"))
+                .filter(method ->
+                    method.isAnnotatedWith("com.google.errorprone.annotations.CheckReturnValue"))
                 .map(JavaMethod::getName)
                 .toList();
 
@@ -474,19 +472,16 @@ class TableWriterArchTest {
       public void check(final JavaMethod item, final ConditionEvents events) {
         item.getAccessesFromSelf().stream()
             .filter(access -> access.getTargetOwner().isAssignableTo(Insert.class))
-            .filter(
-                access ->
-                    QUERY_EXECUTIONS.contains(access.getName())
-                        || access.getName().startsWith("fetch"))
-            .forEach(
-                access ->
-                    events.add(
-                        SimpleConditionEvent.violated(
-                            item,
-                            item.getFullName()
-                                + " が "
-                                + access.getTarget().getFullName()
-                                + " で INSERT を直接実行する。")));
+            .filter(access ->
+                QUERY_EXECUTIONS.contains(access.getName()) || access.getName().startsWith("fetch"))
+            .forEach(access ->
+                events.add(
+                    SimpleConditionEvent.violated(
+                        item,
+                        item.getFullName()
+                            + " が "
+                            + access.getTarget().getFullName()
+                            + " で INSERT を直接実行する。")));
       }
     };
   }
@@ -537,11 +532,10 @@ class TableWriterArchTest {
   private static boolean takesConnectionSource(final JavaAccess<?> access) {
     return access.getTarget() instanceof AccessTarget.CodeUnitAccessTarget target
         && target.getRawParameterTypes().stream()
-            .anyMatch(
-                type ->
-                    type.isAssignableTo(DataSource.class)
-                        || type.isAssignableTo(Connection.class)
-                        || type.isAssignableTo(ConnectionProvider.class));
+            .anyMatch(type ->
+                type.isAssignableTo(DataSource.class)
+                    || type.isAssignableTo(Connection.class)
+                    || type.isAssignableTo(ConnectionProvider.class));
   }
 
   /**
@@ -572,10 +566,9 @@ class TableWriterArchTest {
             };
         final boolean calls =
             item.getMethodCallsFromSelf().stream()
-                .anyMatch(
-                    call ->
-                        call.getTargetOwner().getFullName().equals(writer)
-                            && expected.contains(call.getName()));
+                .anyMatch(call ->
+                    call.getTargetOwner().getFullName().equals(writer)
+                        && expected.contains(call.getName()));
         if (!calls) {
           events.add(
               SimpleConditionEvent.violated(
@@ -593,10 +586,9 @@ class TableWriterArchTest {
                 .collect(Collectors.toSet());
         final boolean readsLockNo =
             item.getMethodCallsFromSelf().stream()
-                .anyMatch(
-                    call ->
-                        "lockNo".equals(call.getName())
-                            && aggregateRoots.contains(call.getTargetOwner().getFullName()));
+                .anyMatch(call ->
+                    "lockNo".equals(call.getName())
+                        && aggregateRoots.contains(call.getTargetOwner().getFullName()));
         if (!readsLockNo) {
           events.add(
               SimpleConditionEvent.violated(
@@ -688,10 +680,9 @@ class TableWriterArchTest {
         command.getMethods().stream()
             .filter(method -> method.getModifiers().contains(JavaModifier.STATIC))
             .filter(method -> method.getRawReturnType().isAssignableTo(command.getName()))
-            .flatMap(
-                method ->
-                    Stream.concat(
-                        method.getCallsOfSelf().stream(), method.getReferencesToSelf().stream()));
+            .flatMap(method ->
+                Stream.concat(
+                    method.getCallsOfSelf().stream(), method.getReferencesToSelf().stream()));
     return Stream.<JavaAccess<?>>concat(
             Stream.concat(
                 command.getConstructorCallsToSelf().stream(),
@@ -706,15 +697,14 @@ class TableWriterArchTest {
       public void check(final JavaClass item, final ConditionEvents events) {
         handleParameters(item)
             .filter(command -> !command.isAssignableTo(versionedCommand))
-            .forEach(
-                command ->
-                    events.add(
-                        SimpleConditionEvent.violated(
-                            item,
-                            item.getFullName()
-                                + " が受け取る "
-                                + command.getFullName()
-                                + " は presentation が作るが VersionedCommand ではない。")));
+            .forEach(command ->
+                events.add(
+                    SimpleConditionEvent.violated(
+                        item,
+                        item.getFullName()
+                            + " が受け取る "
+                            + command.getFullName()
+                            + " は presentation が作るが VersionedCommand ではない。")));
       }
     };
   }
@@ -732,23 +722,19 @@ class TableWriterArchTest {
             .filter(method -> method.getRawParameterTypes().size() == 1)
             .filter(
                 method -> method.getRawParameterTypes().getFirst().isAssignableTo(versionedCommand))
-            .filter(
-                method ->
-                    method.getMethodCallsFromSelf().stream()
-                        .noneMatch(
-                            call ->
-                                ENSURE_LOCK_NO.equals(call.getName())
-                                    && call.getTargetOwner().getPackageName().contains(DOMAIN_MODEL)
-                                    && call.getTarget().getRawParameterTypes().stream()
-                                        .anyMatch(
-                                            type -> type.getFullName().equals(expectedLockNo))))
-            .forEach(
-                method ->
-                    events.add(
-                        SimpleConditionEvent.violated(
-                            item,
-                            method.getFullName()
-                                + " が集約の ensureLockNo(ExpectedLockNo) を handle の中で直接呼んでいない。")));
+            .filter(method ->
+                method.getMethodCallsFromSelf().stream()
+                    .noneMatch(call ->
+                        ENSURE_LOCK_NO.equals(call.getName())
+                            && call.getTargetOwner().getPackageName().contains(DOMAIN_MODEL)
+                            && call.getTarget().getRawParameterTypes().stream()
+                                .anyMatch(type -> type.getFullName().equals(expectedLockNo))))
+            .forEach(method ->
+                events.add(
+                    SimpleConditionEvent.violated(
+                        item,
+                        method.getFullName()
+                            + " が集約の ensureLockNo(ExpectedLockNo) を handle の中で直接呼んでいない。")));
       }
     };
   }
@@ -763,10 +749,9 @@ class TableWriterArchTest {
         for (final JavaCodeUnit codeUnit : item.getCodeUnits()) {
           final boolean callsUnversioned =
               codeUnit.getAccessesFromSelf().stream()
-                  .anyMatch(
-                      access ->
-                          access.getTargetOwner().getFullName().equals(writer)
-                              && UNVERSIONED_WRITES.contains(access.getName()));
+                  .anyMatch(access ->
+                      access.getTargetOwner().getFullName().equals(writer)
+                          && UNVERSIONED_WRITES.contains(access.getName()));
           if (callsUnversioned
               && codeUnit.getRawParameterTypes().stream()
                   .anyMatch(TableWriterArchTest::isAggregateRoot)) {
@@ -783,10 +768,9 @@ class TableWriterArchTest {
   private static boolean isAggregateRoot(final JavaClass type) {
     return type.getPackageName().contains(DOMAIN_MODEL)
         && type.getMethods().stream()
-            .anyMatch(
-                method ->
-                    "lockNo".equals(method.getName())
-                        && method.getRawParameterTypes().isEmpty()
-                        && method.getRawReturnType().isEquivalentTo(long.class));
+            .anyMatch(method ->
+                "lockNo".equals(method.getName())
+                    && method.getRawParameterTypes().isEmpty()
+                    && method.getRawReturnType().isEquivalentTo(long.class));
   }
 }
