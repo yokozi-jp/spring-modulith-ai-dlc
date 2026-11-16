@@ -7,7 +7,7 @@ tools: ["read", "write", "shell"]
 permissions:
   rules:
     - capability: shell
-      match: ["git commit *", "git push *", "git reset *", "git checkout *", "git restore *", "git switch *", "git stash *", "git rebase *", "git merge *"]
+      match: ["git commit *", "git push *", "git reset *", "git checkout *", "git restore *", "git switch *", "git stash *", "git rebase *", "git merge *", "git apply *", "git add *", "git cherry-pick *", "git pull *", "git clean *", "git am *", "git revert *"]
       effect: deny
 ---
 

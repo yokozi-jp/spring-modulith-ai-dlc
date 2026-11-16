@@ -7,12 +7,13 @@ policies: [edit-workspace, dev-shell]
 rules:
   # Never touch secrets.
   - capability: filesystem
-    match: ["**/.env", "**/.env.*", "**/*.pem", "**/*.key"]
+    # .env.example and .env.*.example stay readable and editable.
+    match: ["**/.env", "**/.env.local", "**/.env.test", "**/.env.development", "**/.env.staging", "**/.env.production", "**/.env.*.local", "**/*.pem", "**/*.key"]
     effect: deny
 
   # Never run destructive commands, even after an "Always allow".
   - capability: shell
-    match: ["rm -rf *", "sudo *", "git push --force*", "git push -f *", "git reset --hard*"]
+    match: ["rm -rf *", "rm -fr *", "rm -r -f *", "rm -f -r *", "sudo *", "git push *--force*", "git push *-f", "git push *-f *", "git push * +*", "git reset --hard*"]
     effect: deny
 
   # Start the subagents without a prompt.
@@ -25,5 +26,5 @@ rules:
     effect: allow
   # ...except the ones that act on their own.
   - capability: skill
-    match: ["swarm", "automate-me", "ketchup", "ketchup-video", "make-bot-ui", "figure-it-out"]
+    match: ["swarm", "automate-me", "ketchup", "figure-it-out"]
     effect: ask
