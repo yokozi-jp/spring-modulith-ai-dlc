@@ -297,7 +297,7 @@ const params = { ...(cursor !== undefined && { cursor }) };
   失敗にするのは、`SKILL.md`の欠落、`name`とディレクトリ名の不一致、`description`の欠落、`.kiro/skills`が`../../.agents/skills/<名前>`へのリンクでない状態、内容ハッシュの不一致、取得元ごとの`ref`が複数ある状態、lockにない実体またはリンクである。
   `.kiro/.kiro-plugins-installed`に載るファイルは、記録した内容ハッシュとの不一致、ハッシュの欠落、ファイルの欠落、lockとの重複を失敗にし、lockにないことは失敗にしない。
   `note`を持つlockの項目（`skill-creator`）は、意図して上流から変えているため内容ハッシュを比べない。
-  手順の正文は[Matt Pocock スキル運用](../agents/matt-pocock-skills/workflow.md)の「取得元と更新」と、[RGDD の開発フロー](../agents/rgdd.md)の「pstack と thermos」である。
+  手順の正文は[スキルの取得元と更新](../agents/skill-sources.md)である。
 - **`task release-check`**：release-pleaseのmanifest、版ファイル、Gradle版、設定の一致を検証する。
 - **`task lint-taskfile`**：Task本体でTaskfileのYAML構文とスキーマ構造を検証する。
   `tooling/taskfile-cleanup/`のfixtureで、後片付けの定型が本体の終了コードを優先し、前段が失敗しても後段の後片付けを走らせることを検査する。
@@ -320,7 +320,7 @@ OKF検査の採用理由は[ADR-036](../adr/ADR-036-adopt-okf-for-docs-knowledge
 - **pre-commit（Composeファイルの変更）**：`lint-compose`相当を実行する。
 - **pre-commit（Markdownの変更）**：変更ファイルへ`lint-md`相当を実行する。
 - **pre-commit（docs、steering、Taskfile、README、`tooling/adr-lint/`の変更）**：`okf-check`を実行する。
-- **pre-commit（`.agents/skills/`、`.kiro/skills/`、`.kiro/agents/`、`.kiro/steering/kiro-adapter.md`、`.kiro/.kiro-plugins-installed`、`.kiro/kiro-permissions.yaml`、`skills-lock.json`、`tooling/skills-check/`の変更）**：`skills-check`を実行する。
+- **pre-commit（`.agents/skills/`、`.kiro/`、`skills-lock.json`、`tooling/skills-check/`の変更）**：`skills-check`を実行する。
 - **pre-commit（Taskfileか`tooling/taskfile-cleanup/`の変更）**：`lint-taskfile`を実行する。
 - **pre-push（すべて）**：`adr-check`と`scan-secrets-all`相当を実行する。
 - **pre-push（バックエンドのJavaまたはGradle変更）**：`be-lint`相当と`test`を実行する。

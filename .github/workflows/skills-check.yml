@@ -5,22 +5,14 @@ on:
     branches: ["main"]
     paths:
       - ".agents/skills/**"
-      - ".kiro/skills/**"
-      - ".kiro/agents/**"
-      - ".kiro/steering/kiro-adapter.md"
-      - ".kiro/.kiro-plugins-installed"
-      - ".kiro/kiro-permissions.yaml"
+      - ".kiro/**"
       - "skills-lock.json"
       - "tooling/skills-check/**"
   pull_request:
     branches: ["**"]
     paths:
       - ".agents/skills/**"
-      - ".kiro/skills/**"
-      - ".kiro/agents/**"
-      - ".kiro/steering/kiro-adapter.md"
-      - ".kiro/.kiro-plugins-installed"
-      - ".kiro/kiro-permissions.yaml"
+      - ".kiro/**"
       - "skills-lock.json"
       - "tooling/skills-check/**"
 

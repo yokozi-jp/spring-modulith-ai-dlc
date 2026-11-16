@@ -388,11 +388,11 @@ tasks:
         exit "$fail"
 
 
-  # スキルの skills-lock.json、.agents/skills の実体、.kiro/skills のリンクの整合を検査する。
+  # スキルの skills-lock.json、.agents/skills の実体、.kiro/skills のリンク、kiro/install.sh が入れたファイルの内容ハッシュを検査する。
   # 検査の本体は tooling/skills-check/skills-check.mjs に置き、壊れた木に対する自己検査（test.sh）を先に実行する。
-  # 手順の正文は docs/agents/matt-pocock-skills/workflow.md の「取得元と更新」にある。
+  # 手順の正文は docs/agents/skill-sources.md にある。
   skills-check:
-    desc: スキルの skills-lock.json、.agents/skills の実体、.kiro/skills のリンクの整合を検証
+    desc: スキルの skills-lock.json、.agents/skills の実体、.kiro/skills のリンク、kiro/install.sh が入れたファイルの内容ハッシュを検証
     silent: true
     cmds:
       - bash tooling/skills-check/test.sh
