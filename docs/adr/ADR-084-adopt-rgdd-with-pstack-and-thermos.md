@@ -1,7 +1,7 @@
 ---
 type: ADR
 title: 'ADR-084: pstack と thermos を導入し、RGDD の5つのフェーズで開発する'
-description: pstack、thermos、cursor-team-kit の一部を cursor-plugins の kiro/install.sh で導入し、Matt Pocock の実装とレビューのスキルを外して、README から検証までの5つのフェーズで開発する決定。
+description: README から検証までの5つのフェーズ（RGDD）で開発し、pstack、thermos、cursor-team-kit の一部を cursor-plugins の kiro/install.sh で固定コミットから導入する決定。
 tags: [adr, workflow, agent-skills, pstack, thermos, matt-pocock]
 ---
 
@@ -17,10 +17,33 @@ Proposed
 
 ## Context
 
-[ADR-039](ADR-039-adopt-matt-pocock-skills-workflow.md) は、Matt Pocock のスキルで `/grill-with-docs`、`/to-spec`、`/to-tickets`、`/implement`（内部で `/tdd` と `/code-review`）の順に開発すると定めた。
+[ADR-039](ADR-039-adopt-matt-pocock-skills-workflow.md) は、Matt Pocock のスキルで `/grill-with-docs`、`/to-spec`、`/to-tickets`、`/implement`（内部で `/tdd` と `/code-review`）の順に開発すると定め、スキルを固定コミットから `skills` CLI で取得すると定めた。
 
-利用者は、実装、レビュー、検証を pstack と thermos に任せる進め方（README駆動 with Grill Driven Development、以下 RGDD）へ移ることを求めた。
-RGDD は、README、`GLOSSARY.md`、ADR をコードより先に置き、次の5つのフェーズでそれらに書き足し、確かめて直し続ける。
+利用者は、実装、レビュー、検証を pstack と thermos に任せる進め方へ移ることを求めた。
+この進め方を README駆動 with Grill Driven Development（以下 RGDD）と呼ぶ。
+RGDD は、README、`GLOSSARY.md`、ADR をコードより先に置き、各フェーズでそれらに書き足し、確かめて直し続ける。
+
+pstack と thermos は Cursor 向けに書かれている。
+利用者が保守する [yokozi-jp/cursor-plugins](https://github.com/yokozi-jp/cursor-plugins) は cursor/plugins のフォークで、上流のファイルを変えずに `kiro/` だけを足し、Kiro 向けのエージェント、Cursor の名前の読み替え、権限の雛形、導入スクリプトを持つ。
+
+外部スキルはエージェントへ手順を与え、一部は同梱スクリプトを実行し、ファイルを書き、コミットや push を指示する。
+ADR-039 が Matt Pocock のスキルで懸念したとおり、上流の更新をレビューせずに取り込むと、権限の境界やこのリポジトリの規約に反する手順が入る。
+
+Matt Pocock のスキルのうち、実装とレビューを担うものは pstack と thermos の役割と重なる。
+`/tdd` は同じ名前で役割が違い、両方は置けない。
+一方、`grilling`、`grill-with-docs`、`domain-modeling` はフェーズ2で、Issue tracker と連携するスキルは pstack にない用途で使う。
+`retro` は [ADR-071](ADR-071-reinforce-learnings-into-five-layers.md) の5つの層へ環境を還元する候補を返す。
+
+Proposed の間に、Pull Request のレビュー（`/thermos`）の指摘を受けて、Decision を次の点で書き直した。
+ADR-039 を置き換えず、開発の流れと導入するスキルの範囲だけを改めるようにした。
+cursor-plugins の取り込み元を固定コミットにし、更新のレビューを決定に加えた。
+入れないスキルとその理由を決定に加えた。
+[ADR-082](ADR-082-adopt-retro-and-run-it-at-task-boundaries.md) のうち改める箇所を明示した。
+
+## Decision
+
+開発は、次の RGDD の5つのフェーズで進める。
+手順の正文は [RGDD の開発フロー](../agents/rgdd.md)に置く。
 
 1. 開発者が README に、ユーザーから見た使い方を書く。
 2. `/grill-with-docs` で、ドメイン用語と ADR を作る。
@@ -28,50 +51,61 @@ RGDD は、README、`GLOSSARY.md`、ADR をコードより先に置き、次の5
 4. `/thermos` でレビューする。
 5. `/create-verification-skill` で検証スキルと Feature Map を作り、`/maintain-verification-skill` で保つ。
 
-pstack と thermos は Cursor 向けに書かれている。
-利用者が保守する [yokozi-jp/cursor-plugins](https://github.com/yokozi-jp/cursor-plugins) は cursor/plugins のフォークで、上流のファイルを変えずに `kiro/` だけを足し、Kiro 向けのエージェント、Cursor の名前の読み替え、権限の雛形、導入スクリプトを持つ。
+pstack、thermos、cursor-team-kit の `deslop`、`control-cli`、`control-ui` を、cursor-plugins の `kiro/install.sh --repo` で `.kiro/` にコピーして導入する。
+pstack のうち、次のスキルは入れない。
 
-Matt Pocock のスキルのうち、実装とレビューを担うものは pstack と thermos の役割と重なる。
-`/tdd` は同じ名前で役割が違い、両方は置けない。
-一方、`grilling`、`grill-with-docs`、`domain-modeling` はフェーズ2に、Issue tracker と連携するスキルは pstack にない用途に使う。
-`wayfinder` はチケットの解決に `research` と `prototype` を呼ぶ。
-`retro` は [ADR-071](ADR-071-reinforce-learnings-into-five-layers.md) の5つの層へ環境を還元する候補を返し、pstack の `reflect` は改善の行き先をスキルに置くため、このリポジトリの還元先と合わない。
+- **`setup-pstack`**：モデルは cursor-plugins の `kiro/agents/` のエージェントファイルで決まり、設定する対象がない。
+- **`make-bot-ui`**：Cursor の `update_state` ツールと Routines パネルを前提にし、手順に `curl ... | sudo sh` を含む。
+- **`ketchup-video`**：動画を埋め込めるチャットを前提にする。
+- **`reflect`**：採用した学びを入れたスキルの編集として還元し、記録した内容ハッシュと合わなくなる。改善の行き先も ADR-071 の5つの層と合わない。
 
-## Decision
+取り込み元は、`.kiro/.kiro-plugins-installed` の1行目に記録する cursor-plugins のコミットに固定する。
+`kiro/install.sh` は、未コミットの変更がある checkout からは入れない。
+更新は固定コミットを変える Pull Request で行い、旧と新のコミットの差分（同梱スクリプト、発火条件、権限、ファイルを書くコマンド）をレビューしてから入れ、Pull Request の説明に旧と新のコミットを書く。
+入れたファイルとその内容ハッシュは `.kiro/.kiro-plugins-installed` に記録し、`task skills-check` が記録と比べる。
+入れたファイルは編集せず、変更は cursor-plugins の `kiro/` か上流で行う。
+このリポジトリで書く取得元のない skill は、規約の正文を docs に置いて入口だけを持たせ、`skills-lock.json` に `sourceType: "local"` と `note` で記録する。
+手順の正文は [スキルの取得元と更新](../agents/skill-sources.md)に置く。
 
-pstack（`setup-pstack` を除く）、thermos、cursor-team-kit の `deslop`、`control-cli`、`control-ui` を、cursor-plugins の `kiro/install.sh --repo` で `.kiro/` にコピーして導入する。
-導入したファイルとその内容ハッシュは `.kiro/.kiro-plugins-installed` に記録し、`task skills-check` が記録と比べる。
-導入したファイルは編集せず、変更は cursor-plugins の `kiro/` か上流で行う。
+ADR-039 の決定のうち、開発の流れと、導入する Matt Pocock のスキルの範囲だけを改める。
+残す Matt Pocock のスキルの取得元、固定コミット、`skills` CLI での取得、上流のファイルを変えないこと、更新を固定コミットを変える Pull Request でレビューすることは、ADR-039 のまま変えない。
 
-開発は RGDD の5つのフェーズで進め、手順の正文は [RGDD の開発フロー](../agents/rgdd.md)に置く。
+ADR-082 の決定のうち、次の3点だけを改める。
 
-Matt Pocock のスキルから、`ask-matt`、`code-review`、`codebase-design`、`diagnosing-bugs`、`grill-me`、`handoff`、`implement`、`improve-codebase-architecture`、`using-git-worktrees`、`tdd` を外す。
-`tdd` は pstack の同名のスキルに置き換える。
-`grilling`、`grill-with-docs`、`domain-modeling`、`to-spec`、`to-tickets`、`triage`、`wayfinder`、`to-questionnaire`、`setup-matt-pocock-skills`、`research`、`prototype`、`retro`、`writing-for-agents`、`skill-creator` は ADR-039 と同じ方法と固定コミットで残す。
-
-[ADR-082](ADR-082-adopt-retro-and-run-it-at-task-boundaries.md) の、タスクの区切りで `/retro` を実行する規則は残し、区切りの例から `/implement` の完了を外す。
-
-この ADR は ADR-039 を置き換える。
+- タスクの区切りの例から `/implement` の完了を外し、`/thermos` の指摘を直し終えたときを加える。
+- 振り返りの手順の正文を、[Matt Pocock スキル運用](../agents/matt-pocock-skills/workflow.md)の「振り返り」から、RGDD の開発フローの「振り返り」へ移す。
+- ADR-082 が Matt Pocock スキル運用の「取得元と更新」に一か所だけ書くとした導入手順は、cursor-plugins の手順を加え、取得元ごとの節を持つ一つの文書（スキルの取得元と更新）へ移す。
 
 ## Consequences
 
 ### Positive
 
 - 実装、レビュー、検証を、pstack のプレイブック、thermos の2つの監査、プロジェクト専用の検証スキルで行える。
-- pstack と thermos の更新は、cursor-plugins で上流と同期して `kiro/install.sh --repo` を再実行するだけで取り込める。
+- マニフェストの1行目に取り込み元のコミットが残るため、入れた版を再現でき、更新の差分をコミットの間でレビューできる。
 - 導入したファイルの編集を、`skills-lock.json` で管理するスキルと同じく内容ハッシュで検出できる。
 
 ### Negative
 
 - スキルの取得元が2つになり、`skills-lock.json` と `.kiro/.kiro-plugins-installed` の2つの記録を読む必要がある。
+- Kiro はスキルの名前と description をスキルの一覧として読み込むため、毎回のコンテキストが増える。
+  cursor-plugins で入れる61スキルの description は合計12,491文字である。
+  `skills-lock.json` の15スキルを合わせると76スキルで14,823文字になり、この変更の前（24スキル、3,879文字）の約3.8倍になる。
+  文字数は、各 `SKILL.md` の frontmatter の `description` の値を数えた。
+- 更新のたびに、旧と新のコミットの間の pstack、thermos、`kiro/` の差分を読む手間がかかる。
 - pstack と thermos のエージェントは `claude-opus-5.5` に固定され、呼び出しごとのクレジットが増える。
 - Kiro には呼び出しごとにモデルを選ぶ手段がないため、pstack の複数モデルのパネルは1つのモデルで動く。
-- `code-review` が持っていた、このリポジトリの規約に照らすレビューは、steering `code-review` と `docs/code-review/` が担う。
+- pstack のプレイブックには、このリポジトリの規約と食い違う指示（Pull Request を Draft にしない、`--force-with-lease` で push する）がある。
+  RGDD の開発フローが規約を優先する箇所を示すが、上流の更新で新しい食い違いが入りうるため、更新のレビューで探す。
+- 外す `code-review` が持っていた、このリポジトリの規約に照らすレビューは thermos の監査に含まれない。
+  フェーズ4で `docs/code-review/` の観点に照らして見直す手順を置くが、エージェントがその手順を飛ばしても検出する仕組みはない。
 
 ### Neutral
 
+- 実装とレビューの入口を pstack と thermos にそろえるため、役割が重なる Matt Pocock の `ask-matt`、`code-review`、`codebase-design`、`diagnosing-bugs`、`grill-me`、`handoff`、`implement`、`improve-codebase-architecture`、`using-git-worktrees`、`tdd` を外す。
+  `tdd` は pstack の同名のスキルに置き換わる。
 - 外したスキルの日本語リファレンスは削除し、上流と git の履歴に残す。
 - `skills-lock.json` の項目と、`.kiro/.kiro-plugins-installed` の項目は重ならない。重なると `task skills-check` が失敗にする。
+- `/maintain-verification-skill` を実行する頻度は、[#366](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/366) で決める。
 
 ## Alternatives Considered
 
@@ -93,10 +127,18 @@ Matt Pocock のスキルから、`ask-matt`、`code-review`、`codebase-design`�
 - **Pros**：記録が1つで済む。
 - **Cons**：Kiro 向けのエージェントと読み替えを `skills` CLI では配れず、cursor-plugins の導入スクリプトと二重に管理することになる。
 
+### cursor-plugins の main に追従し、コミットを固定しない
+
+- **Description**：更新のたびに cursor-plugins の main を取得して入れ直す。
+- **Pros**：コミットを選ぶ手間がない。
+- **Cons**：上流の変更がレビューなしで入り、マニフェストから入れた版を再現できない。
+
 ## References
 
 - [RGDD の開発フロー](../agents/rgdd.md)
-- [Matt Pocock スキル運用](../agents/matt-pocock-skills/workflow.md)
+- [スキルの取得元と更新](../agents/skill-sources.md)
+- [ADR-039: Matt Pocock のスキルフローを導入する](ADR-039-adopt-matt-pocock-skills-workflow.md)
+- [ADR-082: retro を導入し、タスクがひと段落したら必ず実行する](ADR-082-adopt-retro-and-run-it-at-task-boundaries.md)
 - [yokozi-jp/cursor-plugins の kiro/README.ja.md](https://github.com/yokozi-jp/cursor-plugins/blob/main/kiro/README.ja.md)
 - [cursor/plugins の pstack](https://github.com/cursor/plugins/tree/main/pstack)
 - [cursor/plugins の thermos](https://github.com/cursor/plugins/tree/main/thermos)

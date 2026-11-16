@@ -9,7 +9,10 @@ tags: [adr, workflow, agent-skills, matt-pocock]
 
 ## Status
 
-Superseded by [ADR-084](ADR-084-adopt-rgdd-with-pstack-and-thermos.md)
+Proposed
+
+開発の流れと、導入するスキルの範囲は [ADR-084](ADR-084-adopt-rgdd-with-pstack-and-thermos.md) で改める。
+残す Matt Pocock のスキルの取得元、固定コミット、取得方法、更新のレビューは、この ADR のまま変えない。
 
 ## Date
 
@@ -85,3 +88,4 @@ Matt Pocock の開発フローを採用し、[Matt Pocock スキル運用 Runboo
 - [ADR-037: AI-DLC フレームワークの利用をやめる](ADR-037-remove-aidlc-framework.md)
 - [ADR-038: steering をナビゲーションに限定し、規約の正文を docs/ に置く](ADR-038-route-steering-to-docs-knowledge.md)
 - [Matt Pocock skills](https://github.com/mattpocock/skills/tree/d81f3a183412e71a5b1e84ca21bc1a35eea03a60)
+- [ADR-084: pstack と thermos を導入し、RGDD の5つのフェーズで開発する](ADR-084-adopt-rgdd-with-pstack-and-thermos.md)（開発の流れと導入するスキルの範囲を改める）

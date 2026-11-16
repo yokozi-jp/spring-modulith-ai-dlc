@@ -1,7 +1,7 @@
 ---
 type: Runbook
 title: RGDD の開発フロー
-description: README、grill-with-docs、poteto-mode、thermos、検証スキルの5つのフェーズで開発し、各フェーズのコンテキストを育てる手順と、pstack と thermos の導入と更新。
+description: README、grill-with-docs、poteto-mode、thermos、検証スキルの5つのフェーズと振り返りで開発する手順と、外部スキルの記述がリポジトリの規約と食い違うときの扱い。機能を作り始めるとき、pstack と thermos を使うとき、タスクの区切りで振り返るときに読む。
 tags: [runbook, workflow, agent-skills, pstack, thermos]
 ---
 
@@ -9,34 +9,22 @@ tags: [runbook, workflow, agent-skills, pstack, thermos]
 
 ## 要約
 
-- 開発は README駆動 with Grill Driven Development（RGDD）の5つのフェーズで進める（[ADR-084](../adr/ADR-084-adopt-rgdd-with-pstack-and-thermos.md)）。
-- README、`GLOSSARY.md`、ADR をコードより先に置き、エージェントにそれらを読ませながら開発する。
-- 各フェーズは、前のフェーズが残した文書を読み、書き足すか、確かめて直す。
-- pstack と thermos は cursor-plugins の `kiro/install.sh` で入れ、`.kiro/` の中では編集しない。
+- 開発は RGDD（README駆動 with Grill Driven Development）の5つのフェーズで進め、タスクの区切りで `/retro` を実行する（[ADR-084](../adr/ADR-084-adopt-rgdd-with-pstack-and-thermos.md)）。
+- 各フェーズは、前のフェーズが残した README、`GLOSSARY.md`、ADR を読み、書き足すか、確かめて直す。
+- 外部から入れたスキル（`skills-lock.json` と `.kiro/.kiro-plugins-installed` に載るもの）の記述が docs の規約や ADR と食い違うときは、docs の規約と ADR に従う。食い違いの例はフェーズ3にある。
+- スキルの導入と更新は [スキルの取得元と更新](skill-sources.md) に従う。
 
 ## 5つのフェーズ
 
-```text
-1. README            開発者が、ユーザーから見た使い方を書く
-  ↓
-2. /grill-with-docs  用語を GLOSSARY.md に、判断を ADR に残す
-  ↓
-3. /poteto-mode      コードと Pull Request を作る
-  ↓
-4. /thermos          差分を2つの観点で監査し、指摘を直す
-  ↓
-5. /create-verification-skill  最初の機能が動いたら、検証スキルと Feature Map を作る
-  ↓
-/retro（タスクの区切りで、セッションを消去する前に）
-```
+各フェーズで読む文書と、書き足すか確かめて直す文書は次のとおり。
 
 | フェーズ                        | 読むもの                                | 書き足すもの、確かめて直すもの   |
 | ------------------------------- | --------------------------------------- | -------------------------------- |
 | 1. README                       | なし                                    | 誰が、何のために、どう使うか     |
 | 2. `/grill-with-docs`           | README                                  | `GLOSSARY.md` の用語、ADR        |
 | 3. `/poteto-mode`               | README、`GLOSSARY.md`、ADR、docs の規約 | コード、Pull Request             |
-| 4. `/thermos`                   | フェーズ3の差分                         | 差分の問題。直してからマージする |
-| 5. `/create-verification-skill` | 動くアプリ                              | Feature Map、確かめ方            |
+| 4. `/thermos`                   | フェーズ3の差分、`docs/code-review/`    | 差分の問題。直してからマージする |
+| 5. `/create-verification-skill` | 動くアプリ                              | 検証スキル、Feature Map          |
 
 ### 1. README
 
@@ -50,9 +38,9 @@ tags: [runbook, workflow, agent-skills, pstack, thermos]
 `/grilling` が未決事項を前提の順に質問し、`/domain-modeling` が用語を `GLOSSARY.md` に書き、ADR にすべき判断を提案する。
 ADR は [ADR の運用ルール](../adr/conventions.md)の基準と書式に従う。
 
-仕様と実装チケットに分けるときは、同じセッションで `/to-spec`、`/to-tickets` を続ける。
-一つのセッションに収まらない仕事は `/wayfinder`、他の担当者だけが答えられる判断は `/to-questionnaire` を使う。
-これらのスキルの扱いは [Matt Pocock スキル運用](matt-pocock-skills/workflow.md)に従う。
+仕様と実装チケットに分けるときは、同じセッションで `/to-spec`、`/to-tickets` を続け、対話で決めた前提を仕様とチケットへ引き継ぐ。
+チケットには単独で実装できる情報を持たせ、前のチケットの会話へ依存させない。
+外部から来た Issue、一つのセッションに収まらない仕事、試作で確かめる問いなど、この流れに乗らない作業の入口は [Matt Pocock スキル運用](matt-pocock-skills/workflow.md)の「例外時の入口」にある。
 
 ### 3. /poteto-mode
 
@@ -62,14 +50,21 @@ ADR は [ADR の運用ルール](../adr/conventions.md)の基準と書式に従�
 仕組みを知りたいときは `/how`、設計の理由を知りたいときは `/why`、最近の経緯を集めたいときは `/recall` を使う。
 `/why` は、コミットと Pull Request の記録に加えて ADR を読む。
 
+pstack のプレイブックには、このリポジトリの規約と食い違う指示がある。
+次の場面では、プレイブックではなくリポジトリの規約に従う。
+
+- **Pull Request の作成**：`opening-a-pr.md` と `multi-phase-plan.md` は Draft にせずに開くよう指示する。このリポジトリでは Draft で作り、CI と差分を確かめてから Ready for review にする（[レビュー依頼からマージまで](../pull-request/review-request-and-merge.md)）。
+- **rebase した履歴の push**：`babysit.md`、`autopilot-full.md`、`shipping.md` は `git push --force-with-lease` を使う。権限の雛形（`.kiro/kiro-permissions.yaml`）は `git push *--force*` を拒否するため、エージェントは force push をせず、履歴の書き換えが要る場面では止めて利用者に報告する。
+
 ### 4. /thermos
 
 `/thermos` が、正しさとセキュリティの監査と、保守性の監査を、2つのサブエージェントで並列に行い、指摘を一つの一覧にまとめる。
-`/thermos` はコードを直さないので、指摘を直してからマージする。
-このリポジトリの規約に照らすレビューは、steering `code-review` と [コードレビュー](../code-review/index.md) が担う。
+2つの監査の観点は汎用で、このリポジトリの docs の規約を読まない。
+そのため、`/thermos` を実行したセッションで、差分を [レビュー観点と参照する規約](../code-review/review-viewpoints.md) に照らして見直し、見つけた問題を同じ一覧に加える。
+`/thermos` はコードを直さないので、一覧の指摘を直してからマージする。
 
 レビューする Pull Request のブランチをチェックアウトし、その中で Kiro CLI を起動して実行する。
-対象から `.kiro/` の中の `kiro/install.sh` で入れたファイル（`.kiro/.kiro-plugins-installed` に載るもの）を外し、重点を置くファイルを伝える。
+対象から `.kiro/.kiro-plugins-installed` に載るファイルを外し、重点を置くファイルを伝える。
 
 ```text
 /thermos PR #<番号>（<ブランチ> と main の差分）をレビューして。
@@ -96,55 +91,29 @@ Kiro では、これらのサブエージェントは呼び出し元のチャッ
 
 ### 5. /create-verification-skill
 
-最初の機能が動いたら、`/create-verification-skill` で検証スキルと Feature Map を作る。
-以降はエージェントが毎回のタスクでその検証スキルを使って変更を確かめ、`/maintain-verification-skill` を少なくとも1日1回実行して検証スキルと Feature Map を最新に保つ。
+フェーズ4を終えた時点で、`.kiro/skills/` にこのリポジトリの検証スキル（`verify-<アプリ名>`）がなければ、`/create-verification-skill` で検証スキルと Feature Map を作る。
+作った検証スキルは、`skills-lock.json` か `.kiro/.kiro-plugins-installed` に載らないと `task skills-check` が失敗するため、[スキルの取得元と更新](skill-sources.md)に従って記録する。
+以降は、エージェントが毎回のタスクでその検証スキルを使って変更を確かめ、`/maintain-verification-skill` で検証スキルと Feature Map を最新に保つ。
+`/maintain-verification-skill` を実行する頻度は [#366](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/366) で決める。
 
-### 振り返り
+## 振り返り
 
-タスクの区切りで `/retro` を実行する。
-手順と還元先は [Matt Pocock スキル運用](matt-pocock-skills/workflow.md)の「振り返り」に従う。
+タスクがひと段落したら、対象のセッションを消去する前に、同じセッションで `/retro` を実行する。
+ひと段落とは、次のいずれかが最初に起きたときである。
 
-## pstack と thermos
+- `/thermos` の指摘を直し終えた。
+- Pull Request を作成した。
+- 利用者が作業の区切りを示した。
 
-### 何が入っているか
+消去してしまった場合は、そのセッションのログを指定して実行する。
+`/retro` は `disable-model-invocation: true` の利用者呼び出しのスキルであるため、エージェントが実行する根拠は `AGENTS.md` の「学びの還元」に置く。
 
-[yokozi-jp/cursor-plugins](https://github.com/yokozi-jp/cursor-plugins) の `kiro/install.sh` が、次のものを `.kiro/` にコピーする。
+`/retro` は改善候補を提示するだけで、何も変更しない。
+利用者が選んだ候補だけを、[学びを仕組みへ還元し続ける](../principles/continuous-reinforcement.md)の5つの層の優先順位に従って還元する。
+次の読み替えで、上流の記述をこのリポジトリに合わせる。
 
-- `skills/`：pstack（`setup-pstack` を除く）、thermos、cursor-team-kit の `deslop`、`control-cli`、`control-ui`、Cursor の名前を Kiro の名前に読み替える `kiro-adapter`
-- `agents/`：`poteto-agent`、`comment-sicko`、thermos の2つのレビュー役
-- `steering/kiro-adapter.md`：スキルに従う前に `kiro-adapter` を読むよう案内する
-- `kiro-permissions.yaml`：利用者の `~/.kiro/settings/permissions.yaml` の雛形
-
-入れたファイルと内容ハッシュは `.kiro/.kiro-plugins-installed` に記録される。
-モデルはエージェントファイルで決まるので、`/setup-pstack` は使わない。
-
-### 使い始める
-
-clone したら、リポジトリの中で1回だけ実行する。
-
-```bash
-mkdir -p ~/.kiro/settings && [ -e ~/.kiro/settings/permissions.yaml ] || cp .kiro/kiro-permissions.yaml ~/.kiro/settings/permissions.yaml
-```
-
-### 更新する
-
-```bash
-git -C ~/cursor-plugins pull
-~/cursor-plugins/kiro/install.sh --repo .
-task skills-check
-```
-
-前回入れたファイルが新しい版に置き換わる。
-`skip: ... already exists` と出たものは入っていないので、同じ名前のファイルを確かめる。
-変更を commit し、Pull Request にする。
-
-### 禁止事項
-
-- `.kiro/.kiro-plugins-installed` に載るファイルを編集しない。`task skills-check` が失敗し、次の更新で上書きされる。変更は cursor-plugins の `kiro/` か上流で行う。
-- 同じスキルを `skills-lock.json` と `.kiro/.kiro-plugins-installed` の両方で管理しない。
-
-## 検証
-
-導入と更新のあとは `task skills-check` を実行する。
-このタスクは、`.kiro/.kiro-plugins-installed` の各ファイルが記録した内容ハッシュと一致するかと、`skills-lock.json` のスキルの整合を検査する。
-検査の範囲は [Lint・テストのリファレンス](../tooling/lint-and-test.md) にある。
+- 上流が `CODING_STANDARDS.md` に置く判断を要する規約は、該当する領域の docs に置き、`docs/code-review/review-viewpoints.md` から辿れるようにする。`CODING_STANDARDS.md` は作らない。
+- 機械的な誤りは、`docs/tooling/lint-and-test.md` の既存の検査から探し、接続されていない検査を先に指摘する。
+- steering と `AGENTS.md` は案内に限る。規約の本文は docs へ置く（[ADR-038](../adr/ADR-038-route-steering-to-docs-knowledge.md)）。
+- 文書を書く前に、`/writing-for-agents` の基準に加えて、`docs/knowledge/documentation-authoring.md` と `docs/knowledge/steering-authoring.md` を読む。
+- 戻しにくい還元は、`docs/adr/conventions.md` の基準に当たれば ADR を起こす。

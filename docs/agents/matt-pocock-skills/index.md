@@ -1,6 +1,6 @@
 # Matt Pocock スキル日本語リファレンス
 
-- [Matt Pocock スキル運用](workflow.md)：Matt Pocock のスキルを使う前に、このプロジェクトでの使い方、振り返り、取得元と更新方法を確かめるとき
+- [Matt Pocock スキル運用](workflow.md)：Matt Pocock のスキルを使う前に、RGDD のフェーズ2に乗らない作業の入口、初回設定、文書の扱いを確かめるとき
 - [domain-modeling](domain-modeling.md)：用語集とADRを設計中に更新するとき
 - [grill-with-docs](grill-with-docs.md)：計画や設計を質問で詰めながら文書へ記録するとき
 - [grilling](grilling.md)：未決事項を依存関係に沿って質問するとき

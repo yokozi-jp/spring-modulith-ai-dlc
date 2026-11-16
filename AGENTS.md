@@ -5,18 +5,19 @@
 作業で得た学びは、その作業の中で仕組みへ還元し、同じ誤りを次に起こさないようにする。
 還元先はアーキテクチャ、型と静的検査、振る舞いのテスト、エージェント向けのdocs、人のレビューの順に検討し、上の層を優先する。
 不具合を直したとき、レビューで指摘を受けたとき、エージェントが誤った変更をしたときは、`docs/principles/continuous-reinforcement.md` を読む。
-タスクがひと段落したら（`/thermos` の指摘を直し終えたとき、Pull Request の作成、または利用者が示した区切り）、セッションを消去する前に必ず `/retro` を実行する。
-`/retro` は改善候補を提示するだけなので、還元するのは利用者が選んだ候補に限る（手順は `docs/agents/matt-pocock-skills/workflow.md` の「振り返り」）。
+タスクがひと段落したら（`/thermos` の指摘を直し終えた、Pull Request を作成した、利用者が作業の区切りを示した、のいずれかが最初に起きたとき）、セッションを消去する前に必ず `/retro` を実行する。
+`/retro` は改善候補を提示するだけなので、還元するのは利用者が選んだ候補に限る（手順は `docs/agents/rgdd.md` の「振り返り」）。
 
 ## Agent skills
 
 機能を作り始める前に `docs/agents/rgdd.md` を読む。
+外部から入れたスキル（`skills-lock.json` と `.kiro/.kiro-plugins-installed` に載るもの）の記述と docs の規約や ADR が食い違うときは、docs の規約と ADR に従う。
+スキルを導入、更新する前に `docs/agents/skill-sources.md` を読む。
 `.kiro/.kiro-plugins-installed` に載るファイル（pstack と thermos）は編集しない。
 
 ### Matt Pocock skills
 
 Matt Pocock のスキルを使う前に `docs/agents/matt-pocock-skills/workflow.md` を読む。
-スキルの手順とプロジェクトの規約が食い違うときは、docs の規約と ADR を優先する。
 
 ### Issue tracker
 

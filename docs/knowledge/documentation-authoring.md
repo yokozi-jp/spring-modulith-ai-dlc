@@ -77,6 +77,8 @@ frontmatterの`type`と本文を照合し、異なるtypeの責務を一つの�
 
 エージェントが繰り返す手順はRunbookを正文にする。
 skillを作る場合は、そのRunbookを参照するだけにする。
+規約（Convention）の正文もdocsに置き、skillはdocsへの入口だけを持つ。
+skillに規約を書くと、docsと食い違っても`task okf-check`が検出できない。
 
 日本語の文章は[日本語技術文書の文章規範](../writing/japanese-tech-writing.md)に従う。
 ADRの作成条件、採番、書式、ライフサイクルは[ADRの運用ルール](../adr/conventions.md)に従う。

@@ -7,7 +7,7 @@ tags: [reference, agent-skills, matt-pocock]
 # エージェント環境の改善を提案する retro リファレンス
 
 この文書は実行用の `SKILL.md` ではなく、固定した上流版の日本語リファレンスである。
-プロジェクトでの運用は [Matt Pocock スキル運用](workflow.md) を優先する。
+プロジェクトでの運用は [RGDD の開発フロー](../rgdd.md)の「振り返り」を優先する。
 
 ## 概要
 

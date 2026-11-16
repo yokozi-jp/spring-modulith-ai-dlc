@@ -11,6 +11,8 @@ tags: [adr, workflow, agent-skills, matt-pocock, continuous-improvement]
 
 Proposed
 
+タスクの区切りの例、振り返りの手順の置き場所、導入手順の置き場所は [ADR-084](ADR-084-adopt-rgdd-with-pstack-and-thermos.md) で改める。
+
 ## Date
 
 2026-10-21
@@ -82,3 +84,4 @@ Proposed
 - [学びを仕組みへ還元し続ける](../principles/continuous-reinforcement.md)
 - [retro リファレンス](../agents/matt-pocock-skills/retro.md)
 - [writing-for-agents リファレンス](../agents/matt-pocock-skills/writing-for-agents.md)
+- [ADR-084: pstack と thermos を導入し、RGDD の5つのフェーズで開発する](ADR-084-adopt-rgdd-with-pstack-and-thermos.md)（区切りの例と手順の置き場所を改める）

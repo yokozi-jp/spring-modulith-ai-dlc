@@ -52,43 +52,11 @@ harness は、変更が通る複数の関門と、規約の置き場で構成し
 ## RGDD（README駆動 with Grill Driven Development）
 
 エージェントが読む文書（README、`GLOSSARY.md`、ADR）をコードより先に置き、エージェントにそれらを読ませながら開発します。
-各フェーズが前のフェーズの文書を読み、書き足すか、確かめて直すので、文書は開発を続けるほど育ちます。
+README、`/grill-with-docs`、`/poteto-mode`、`/thermos`、`/create-verification-skill` の5つのフェーズで進め、各フェーズが前のフェーズの文書を読み、書き足すか、確かめて直します。
+`/grill-with-docs` は [Matt Pocock のスキル](https://github.com/mattpocock/skills)、`/poteto-mode` は [pstack](https://github.com/cursor/plugins/tree/main/pstack)、`/thermos` は [thermos](https://github.com/cursor/plugins/tree/main/thermos) のスキルです。
 
-```text
-1. README                      ユーザーから見た使い方を書く（開発者）
-  ↓
-2. /grill-with-docs            用語を GLOSSARY.md に、判断を ADR に残す
-  ↓  必要なら /to-spec → /to-tickets
-3. /poteto-mode                コードと Pull Request を作る
-  ↓
-4. /thermos                    差分を2つの観点で監査し、指摘を直す
-  ↓
-5. /create-verification-skill  最初の機能が動いたら、検証スキルと Feature Map を作る
-  ↓
-/retro（タスクの区切りで、セッションを消去する前に）
-```
-
-- `/grill-with-docs`：エージェントが未決事項を質問し、確定した用語と設計判断を `GLOSSARY.md` と ADR に記録します。
-  [Matt Pocock のスキル](https://github.com/mattpocock/skills)です。
-- `/poteto-mode`：作業の種類に合う手順を選び、Pull Request まで進めます。
-  仕組みは `/how`、設計の理由は `/why`、最近の経緯は `/recall` で調べます。
-  [pstack](https://github.com/cursor/plugins/tree/main/pstack) のスキルです。
-- `/thermos`：正しさとセキュリティ、保守性の2つの監査を並列に行い、指摘を一つにまとめます。
-  [thermos](https://github.com/cursor/plugins/tree/main/thermos) のスキルです。
-- `/create-verification-skill`：エージェントがアプリを操作して証拠を取るための、プロジェクト専用の検証スキルを作ります。
-  `/maintain-verification-skill` で最新に保ちます。
-- `/retro`：セッションの出来事から、エージェントの環境の改善候補を深刻度順に提示します。
-  `AGENTS.md` の「学びの還元」で、タスクの区切りでの実行を定めています。
-
-pstack と thermos は [yokozi-jp/cursor-plugins](https://github.com/yokozi-jp/cursor-plugins) の `kiro/install.sh` で `.kiro/` に入れています。
-clone したら、Kiro の権限の雛形を一度だけ置きます。
-
-```bash
-mkdir -p ~/.kiro/settings && [ -e ~/.kiro/settings/permissions.yaml ] || cp .kiro/kiro-permissions.yaml ~/.kiro/settings/permissions.yaml
-```
-
-手順の詳細と更新方法は [RGDD の開発フロー](docs/agents/rgdd.md)、導入の判断は [ADR-084](docs/adr/ADR-084-adopt-rgdd-with-pstack-and-thermos.md) にあります。
-Issue tracker と連携するスキル（`/to-spec`、`/to-tickets`、`/triage`、`/wayfinder`）の扱いは [Matt Pocock スキル運用](docs/agents/matt-pocock-skills/workflow.md) にあります。
+手順は [RGDD の開発フロー](docs/agents/rgdd.md)、導入の判断は [ADR-084](docs/adr/ADR-084-adopt-rgdd-with-pstack-and-thermos.md) にあります。
+clone したら、[スキルの取得元と更新](docs/agents/skill-sources.md)の「Kiro の権限の雛形を置く」に従い、Kiro の権限の雛形を置いてください。
 
 ## 技術スタック
 
@@ -133,7 +101,7 @@ Issue tracker と連携するスキル（`/to-spec`、`/to-tickets`、`/triage`�
 
 ```text
 .
-├── .agents/          # Matt Pocock のスキル定義（.agents/skills）
+├── .agents/          # skills-lock.json で管理するスキルの実体（Matt Pocock、skill-creator、このリポジトリで書いたもの）
 ├── .github/          # GitHub 設定
 │   ├── ISSUE_TEMPLATE/   # Issue テンプレート
 │   ├── workflows/        # GitHub Actions（Lint・シークレットスキャン等）
@@ -348,7 +316,7 @@ Docker Compose の操作（サービスの起動、停止、状態確認、Keycl
 - `task skills-check`は、`skills-lock.json`、`.agents/skills`の実体、`.kiro/skills`のシンボリックリンクの整合と、pstack と thermos の内容ハッシュを検査します。
   上流のスキルのファイルを編集していないこと（内容ハッシュ）と、取得元ごとに固定コミットが一つであることも確かめます。
   Lefthookはスキルまたはlockの変更を検出するとpre-commitで、CIの`Validate skills lock`は同じパスの変更で実行します。
-  導入と更新の手順は[Matt Pocock スキル運用](docs/agents/matt-pocock-skills/workflow.md)の「取得元と更新」にあります。
+  導入と更新の手順は[スキルの取得元と更新](docs/agents/skill-sources.md)にあります。
 
 <p align="right">(<a href="#top">トップへ</a>)</p>
 
