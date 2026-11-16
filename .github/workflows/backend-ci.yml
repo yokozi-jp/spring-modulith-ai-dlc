@@ -137,6 +137,24 @@ jobs:
             ~/.gradle/wrapper
           key: ${{ steps.gradle-cache.outputs.cache-primary-key }}
 
+  # イメージの build ステージを実ビルドする。作業ツリーでの Gradle 実行では踏めない、縮小コンテキスト特有の失敗
+  # （buildSrc 未コピーでスクリプト評価が壊れる等）を、マージ前に捕まえる。
+  # runtime ステージは COPY のみで得るものが薄いため --target build に絞る。公開は container-publish で行う。
+  image-build:
+    name: Build image (build stage) 🐳
+    needs: changes
+    if: needs.changes.outputs.backend == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Build the build stage
+        run: docker build --target build --tag spring-modulith-backend:ci-check backend
+
   test:
     name: Test & Coverage ☕
     needs: changes
