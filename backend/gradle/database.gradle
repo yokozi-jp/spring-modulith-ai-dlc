@@ -105,8 +105,8 @@ liquibase {
 }
 
 jooq {
-    // 実行時のjOOQ 3.21.7は、Spring Boot 4.1.1 BOMがdependency-managementを通して選ぶ。
-    // コード生成のプラグインと生成器の3.21.8は、build.gradleのpluginsブロックで指定する。
+    // 実行時のjOOQ 3.21.9は、Spring Boot 4.1.2 BOMがdependency-managementを通して選ぶ。
+    // コード生成のプラグインと生成器の3.21.9は、build.gradleのpluginsブロックで指定する。
     // 生成コードは3.21のマイナー版だけを確かめるため、パッチ版の差は許容する。
     // どちらかの版を変えるときは、docs/database/jooq-usage.mdの「jOOQの版を上げるとき」に従う。
     configuration {

@@ -17,8 +17,8 @@ const salesStatusLabels = {
   DISCONTINUED: "orders.salesStatus.discontinued",
 } as const satisfies Record<"ON_SALE" | "DISCONTINUED", string>;
 
-export function isOrderStatus(value: string | undefined): value is OrderStatus {
-  return value !== undefined && Object.hasOwn(orderStatusLabels, value);
+export function isOrderStatus(value: string | null | undefined): value is OrderStatus {
+  return typeof value === "string" && Object.hasOwn(orderStatusLabels, value);
 }
 
 /** 対応にない値はコード値をそのまま、値がなければ catalog の「なし」を返す。 */
