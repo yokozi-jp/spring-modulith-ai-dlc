@@ -6,7 +6,8 @@
 export type ListOrdersParams = {
 /**
  * 絞り込む注文の状態（DRAFT、CONFIRMED、CANCELLED）。省略するとすべての状態
+ * @nullable
  * @pattern ^(DRAFT|CONFIRMED|CANCELLED)$
  */
-status?: string;
+status?: string | null;
 };
