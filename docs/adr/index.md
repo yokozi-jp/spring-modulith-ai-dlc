@@ -39,7 +39,7 @@
 - [ADR-036: docs/ を OKF v0.2 バンドルとして構成する](ADR-036-adopt-okf-for-docs-knowledge-bundle.md)（Proposed, 2026-09-30）
 - [ADR-037: AI-DLC フレームワークの利用をやめる](ADR-037-remove-aidlc-framework.md)（Proposed, 2026-09-30）
 - [ADR-038: steering をナビゲーションに限定し、規約の正文を docs/ に置く](ADR-038-route-steering-to-docs-knowledge.md)（Accepted, 2026-09-30）
-- [ADR-039: Matt Pocock のスキルフローを導入する](ADR-039-adopt-matt-pocock-skills-workflow.md)（Proposed, 2026-09-30）
+- [ADR-039: Matt Pocock のスキルフローを導入する](ADR-039-adopt-matt-pocock-skills-workflow.md)（Superseded by ADR-084, 2026-09-30）
 - [ADR-040: Future のアーキテクチャ設計ガイドラインを書き直して docs に取り込む](ADR-040-import-future-architecture-guidelines.md)（Proposed, 2026-10-01）
 - [ADR-041: ECS のタスクを Fargate で動かす](ADR-041-run-ecs-tasks-on-fargate.md)（Proposed, 2026-10-01）
 - [ADR-042: 人の利用者の AWS アクセスを IAM Identity Center で管理する](ADR-042-use-iam-identity-center-for-human-access.md)（Proposed, 2026-10-01）
@@ -84,3 +84,4 @@
 - [ADR-081: 一覧 API の sort を domain.model の enum で受け、default のない switch 式で項目名と列に写す](ADR-081-map-list-sort-via-domain-enum-and-exhaustive-switch.md)（Proposed, 2026-10-14）
 - [ADR-082: retro を導入し、タスクがひと段落したら必ず実行する](ADR-082-adopt-retro-and-run-it-at-task-boundaries.md)（Proposed, 2026-10-21）
 - [ADR-083: CodeQL を advanced setup で管理し、build-mode を明示する](ADR-083-manage-codeql-as-advanced-setup-with-explicit-build-mode.md)（Proposed, 2026-10-22）
+- [ADR-084: pstack と thermos を導入し、RGDD の5つのフェーズで開発する](ADR-084-adopt-rgdd-with-pstack-and-thermos.md)（Proposed, 2026-11-16）

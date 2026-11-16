@@ -63,6 +63,35 @@ tree ref-split
 sed -i 's/"bar":{"source":"o\/r","ref":"aaa"/"bar":{"source":"o\/r","ref":"bbb"/' "$tmp/ref-split/skills-lock.json"
 expect ref-split 1 "o/r: ref が複数あります（aaa, bbb）"
 
+# plugin <名前>: 正常な木に、kiro/install.sh が入れた形のスキル baz を足す
+plugin() {
+  local t="$tmp/$1" hash
+  tree "$1"
+  mkdir -p "$t/.kiro/skills/baz"
+  printf -- '---\nname: baz\ndescription: d\n---\n' >"$t/.kiro/skills/baz/SKILL.md"
+  hash="$({ printf SKILL.md; cat "$t/.kiro/skills/baz/SKILL.md"; } | sha256sum | cut -d' ' -f1)"
+  printf 'skills/baz\t%s\n' "$hash" >"$t/.kiro/.kiro-plugins-installed"
+}
+
+plugin plugin-ok
+expect plugin-ok 0 "skills-check OK: 2 スキル、kiro/install.sh で入れた 1 スキル"
+
+plugin plugin-edited
+echo edited >>"$tmp/plugin-edited/.kiro/skills/baz/SKILL.md"
+expect plugin-edited 1 ".kiro/skills/baz: 内容ハッシュが .kiro/.kiro-plugins-installed と一致しません"
+
+plugin plugin-no-hash
+printf 'skills/baz\n' >"$tmp/plugin-no-hash/.kiro/.kiro-plugins-installed"
+expect plugin-no-hash 1 ".kiro/skills/baz: .kiro/.kiro-plugins-installed に内容ハッシュがありません"
+
+plugin plugin-missing
+rm -r "$tmp/plugin-missing/.kiro/skills/baz"
+expect plugin-missing 1 ".kiro/skills/baz: .kiro/.kiro-plugins-installed にありますが、ファイルがありません"
+
+plugin plugin-both
+printf 'skills/foo\tx\n' >>"$tmp/plugin-both/.kiro/.kiro-plugins-installed"
+expect plugin-both 1 "foo: skills-lock.json と .kiro/.kiro-plugins-installed の両方にあります"
+
 if [ "$failures" -gt 0 ]; then
   echo "$failures failure(s)"
   exit 1

@@ -1,7 +1,7 @@
 ---
 type: Runbook
 title: Matt Pocock スキル運用
-description: Matt Pocock のスキルを通常開発と例外的な作業で使い分け、コンテキストを工程間で引き継ぐ手順。
+description: RGDD のフェーズ2と Issue tracker の作業で使う Matt Pocock のスキルの扱い、振り返り、取得元と更新の手順。
 tags: [runbook, workflow, agent-skills, matt-pocock]
 ---
 
@@ -9,11 +9,9 @@ tags: [runbook, workflow, agent-skills, matt-pocock]
 
 ## 要約
 
-- 通常の変更は `/grill-with-docs`、`/to-spec`、`/to-tickets`、`/implement` の順で進める。
-- `/grill-with-docs` から `/to-tickets` までは同じセッションを維持し、チケットごとの `/implement` は新しいセッションで実行する。
+- 開発の全体の流れは [RGDD の開発フロー](../rgdd.md) に従う。この文書は、残している Matt Pocock のスキルの扱いだけを定める。
+- `/grill-with-docs` から `/to-tickets` までは同じセッションを維持する。
 - タスクがひと段落したら、セッションを消去する前に `/retro` を実行し、エージェントの環境の改善候補を受け取る。
-- 実装前の対話だけでは決められない設計は、`/handoff` と `/prototype` を使って別のセッションで検証する。
-- 通常フローに当てはまらない作業は `/ask-matt` に入口を選ばせる。
 - プロジェクトの docs と ADR の規約は、外部スキル内の記述より優先する。
 - 上流とは、スキルの取得元である `mattpocock/skills` リポジトリを指す。
 
@@ -23,50 +21,23 @@ tags: [runbook, workflow, agent-skills, matt-pocock]
 実行前に提案される変更を確認し、このリポジトリの `docs/`、ADR、文書ナビゲーションの規約を維持する。
 上流スキルが `AGENTS.md`、`CLAUDE.md`、独自の ADR 書式を提案しても、自動的には採用しない。
 
-## 通常の開発フロー
+## 設計を詰める
 
-```text
-idea
-  ↓
-/grill-with-docs
-  ↓
-必要なら /handoff → /prototype → /handoff
-  ↓
-/to-spec
-  ↓
-/to-tickets
-  ↓
-チケットごとに新しいセッションで /implement
-  ├─ /tdd
-  └─ /code-review
-  ↓
-/retro（同じセッションで、消去する前に）
-  ↓
-ship
-```
-
-まず、コードベースに対する変更は `/grill-with-docs` から始める。
-このスキルは `/grilling` で未決事項を質問し、`/domain-modeling` で確定した用語と設計判断を記録する。
-作業ディレクトリがなく、記録を残さない対話だけを行う場合は `/grill-me` を使う。
-
-次に、対話だけでは判断できない状態モデル、業務ロジック、画面設計は `/prototype` で検証する。
-元のセッションから `/handoff` を作り、別のセッションと作業場所でプロトタイプを実行し、結果をもう一度 `/handoff` で元の設計へ戻す。
-プロトタイプは一つの設計上の疑問へ答えるために作り、製品コードとして扱わない。
+`/grill-with-docs` は `/grilling` で未決事項を質問し、`/domain-modeling` で確定した用語と設計判断を記録する。
+対話だけでは判断できない状態モデル、業務ロジック、画面設計は、`/prototype` で一つの問いに答える使い捨ての試作を作って確かめる。
+試作は製品コードとして扱わない。
 
 方針が固まったら `/to-spec` で現在の対話を仕様へ変換し、`/to-tickets` で依存関係を持つ実装チケットへ分割する。
 `/grill-with-docs` から `/to-tickets` までは同じセッションで続け、対話で決めた前提を仕様とチケットへ引き継ぐ。
-コンテキストがモデルの処理能力を超えそうな場合だけ、工程の境界で圧縮して続ける。
-
-実装では、チケットごとに新しいセッションを開始して `/implement` を実行する。
-`/implement` は `/tdd` で小さな red、green、refactor の単位を進め、最後に `/code-review` でプロジェクト規約と仕様への適合を別々に確認する。
 チケットは単独で実装できる情報を持たせ、前のチケットの会話へ依存させない。
+実装は [RGDD の開発フロー](../rgdd.md)のフェーズ3から進める。
 
 ## 振り返り
 
 タスクがひと段落したら、対象のセッションを消去する前に、同じセッションで `/retro` を実行する。
 ひと段落とは、次のいずれかが最初に起きたときである。
 
-- チケットの `/implement` が `/code-review` まで終わった。
+- チケットの `/thermos` の指摘を直し終えた。
 - Pull Request を作成した。
 - 利用者が作業の区切りを示した。
 
@@ -85,11 +56,8 @@ ship
 
 ## 例外時の入口
 
-- **入口に迷う場合**：`/ask-matt` に状況を渡し、使うスキル列を選ばせる。
-- **難しい不具合**：`/diagnosing-bugs` で再現可能な確認を作り、原因を絞ってから修正する。
 - **外部から来た Issue**：`/triage` で分類し、実装可能な説明へ整える。
 - **一つのセッションに収まらない仕事**：`/wayfinder` で判断をチケットとして分け、見通しが立ったら `/to-spec` へ戻る。
-- **コードベースの構造を改善する候補探し**：`/improve-codebase-architecture` で候補を調べ、`/codebase-design` で選んだ境界とインターフェースを検討する。
 - **一次資料の調査**：`/research` で出典付きの調査文書を作り、その結果を `/grill-with-docs` へ渡す。
 - **他の担当者だけが答えられる判断**：`/to-questionnaire` で質問票を作り、回答を `/grill-with-docs` または `/to-spec` へ渡す。
 - **エージェント向け文書の執筆**：スキル、`AGENTS.md`、参照先 docs を書くときは `/writing-for-agents` を基準にし、日本語の書き方と docs の作成手順はプロジェクトの規約を優先する。
@@ -132,6 +100,7 @@ task skills-check
 
 導入と更新のあとは `task skills-check` を実行する。
 このタスクは、`skills-lock.json`、`.agents/skills/` の実体、`.kiro/skills/` のシンボリックリンクの整合を検査する。
+pstack と thermos の検査は [RGDD の開発フロー](../rgdd.md)の「検証」にある。
 `SKILL.md` の `name` がディレクトリ名と一致し、`description` があること、内容ハッシュが lock と一致すること、取得元ごとの `ref` が一つであることも確かめる。
 検査の範囲は [Lint・テストのリファレンス](../../tooling/lint-and-test.md) にある。
 

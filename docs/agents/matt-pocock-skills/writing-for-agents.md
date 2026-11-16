@@ -52,7 +52,7 @@ tags: [reference, agent-skills, matt-pocock]
   コンテキスト負荷はゼロだが、利用者がその存在を覚える認知負荷を払う。
   `disable-model-invocation: true` を設定し、description は利用者向けの一行にする。
 - **ルータースキル**：利用者呼び出しのスキルが増えすぎたときに、他のスキルと使う場面を挙げる利用者呼び出しのスキルを一つ置く。
-  案内するだけで、他のスキルを起動はできない。このリポジトリでは `ask-matt` が該当する。
+  案内するだけで、他のスキルを起動はできない。上流では `ask-matt` が該当し、このリポジトリには置いていない。
 
 ## 成果物
 
@@ -62,7 +62,6 @@ tags: [reference, agent-skills, matt-pocock]
 ## 関連スキル
 
 `retro` が最初に呼び出す。
-上流の `ask-matt` は、`AGENTS.md` や skill を書くときの参照先として案内する。
 
 ## 注意点
 

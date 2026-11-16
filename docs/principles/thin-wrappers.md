@@ -16,7 +16,7 @@ tags: [convention, principles, abstraction, future-arch-guidelines]
 - **薄いラッパー**：外部ライブラリや外部 API の呼び出しを、変換や判断をほとんど加えずに独自のインタフェースで包んだモジュール。
 - **浅いモジュール**：提供する機能に比べて、独自のインタフェースを学ぶコストが大きいモジュール。薄いラッパーはこれに当たる。
 
-モジュールの深さの語彙は[深いモジュールを設計するスキルの日本語リファレンス](../agents/matt-pocock-skills/codebase-design.md)にある。
+モジュールの深さの語彙は、上流の [codebase-design](https://github.com/mattpocock/skills/blob/d81f3a183412e71a5b1e84ca21bc1a35eea03a60/skills/engineering/codebase-design/SKILL.md) にある。
 
 ## 対象
 

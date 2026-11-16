@@ -9,7 +9,7 @@ tags: [adr, workflow, agent-skills, matt-pocock]
 
 ## Status
 
-Proposed
+Superseded by [ADR-084](ADR-084-adopt-rgdd-with-pstack-and-thermos.md)
 
 ## Date
 

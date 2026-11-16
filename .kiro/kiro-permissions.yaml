@@ -1,0 +1,29 @@
+# Kiro CLI user permissions for pstack and thermos.
+# kiro/install.sh copies this file to ~/.kiro/settings/permissions.yaml when that file does not exist.
+
+# Read and edit workspace files, run read-only commands, git write commands, and common build tools.
+policies: [edit-workspace, dev-shell]
+
+rules:
+  # Never touch secrets.
+  - capability: filesystem
+    match: ["**/.env", "**/.env.*", "**/*.pem", "**/*.key"]
+    effect: deny
+
+  # Never run destructive commands, even after an "Always allow".
+  - capability: shell
+    match: ["rm -rf *", "sudo *", "git push --force*", "git push -f *", "git reset --hard*"]
+    effect: deny
+
+  # Start the subagents without a prompt.
+  - capability: subagent
+    match: ["poteto-agent", "comment-sicko", "thermo-nuclear-review-subagent", "thermo-nuclear-code-quality-review-subagent", "general-task-execution"]
+    effect: allow
+
+  # Load skills without a prompt...
+  - capability: skill
+    effect: allow
+  # ...except the ones that act on their own.
+  - capability: skill
+    match: ["swarm", "automate-me", "ketchup", "ketchup-video", "make-bot-ui", "figure-it-out"]
+    effect: ask
