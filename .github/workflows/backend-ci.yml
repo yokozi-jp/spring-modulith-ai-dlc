@@ -179,19 +179,19 @@ jobs:
           version: "3.53.1"
           checksum: a54a408f6861ff921f6e87774180db31bacd8c1e7c944ca696db9fea49a82fc7
 
-      # ローカルの task test と同じ隔離スタック（PostgreSQL 5433 / Redis 6380）を使う。
-      # docker/compose-test.yml と .env.test.example を共用し、ローカルと CI の乖離を防ぐ。
+      # rollback の検証はローカルの task test と同じく compose の PostgreSQL 5433 を使う。
+      # テストは fork ごとに Testcontainers の PostgreSQL、Redis と WireMock を起動する（ADR-084）。
       # .env.test は Git 除外のため、.env.test.example からコピーして作る。
       - name: Create test env file
         run: cp .env.test.example .env.test
 
-      - name: Start test dependencies
-        run: docker compose -f docker/compose-test.yml up -d --wait
+      - name: Start PostgreSQL for migration verification
+        run: docker compose -f docker/compose-test.yml up -d --wait postgres
 
       - name: Verify migrations, rollback, reapply, and schema tag
         run: task be-verify-migrations
 
-      - name: Migrate test database and run tests
+      - name: Run tests and verify coverage
         run: task be-test
 
       - name: Lint OpenAPI contract and check drift

@@ -8,5 +8,6 @@
 - [バックエンドの機能追加時の確認](runbook-add-feature.md)：新しい機能モジュールを作る手順と、追加後に実行する検証コマンドを確認するとき
 - [バックエンドのテスト種別](testing-strategy.md)：新しいテストで検証対象に合う最小のテスト種別を選ぶとき
 - [バックエンドのDBテスト](testing-database.md)：DBテストの隔離、ロールバック、コミット時の挙動、テスト専用テーブル、Spring Modulithのイベント検証を決めるとき
-- [バックエンドのテストコードの書き方](testing-code-style.md)：テストの命名、可視性、Springコンテキスト、失敗診断、非同期待機の書き方を確認するとき
+- [バックエンドのテストの実行基盤](testing-infrastructure.md)：テストを実行するとき、テストの依存（PostgreSQL、Redis、WireMock）やforkの並列度を変えるとき、テストで接続先を読むとき
+- [バックエンドのテストコードの書き方](testing-code-style.md)：テストの命名、可視性、Springコンテキスト、並列と実行順、失敗診断、非同期待機の書き方を確認するとき
 - [バックエンドのテストが遅いときの調べ方](runbook-slow-tests.md)：`task test`やpre-pushの`be-test`がCIより遅いとき、遅いクラスと処理を特定するとき

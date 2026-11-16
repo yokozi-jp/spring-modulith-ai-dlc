@@ -14,7 +14,7 @@ ControllerやDTOを変えたら`task api-gen`を実行し、`openapi/openapi.yam
 ## 前提
 
 - Dockerが動き、`frontend`で`pnpm install`を済ませている。
-- `task api-gen`はテスト用のPostgreSQLとRedis（`docker/compose-test.yml`）を起動し、終わると片付ける。
+- `task api-gen`のテストは、テストのJVMが起動するPostgreSQLとRedisを使い、終わると片付ける（[バックエンドのテストの実行基盤](../backend/testing-infrastructure.md)）。
 
 ## 手順
 

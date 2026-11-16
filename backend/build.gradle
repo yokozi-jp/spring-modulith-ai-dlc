@@ -142,6 +142,10 @@ dependencies {
     // 決済代行の結合テストの偽物。standalone は Jetty を shade 済みで Spring Boot の依存と衝突しない。
     // compose の WireMock のイメージと同じ版にそろえる。Spring BOM の管理外のため版を明示する。
     testImplementation 'org.wiremock:wiremock-standalone:3.13.2'
+    // テストの JVM ごとに PostgreSQL と Redis のコンテナを起動する（ADR-084）。版は Spring Boot が管理する。
+    testImplementation 'org.testcontainers:testcontainers-postgresql'
+    // テストの JVM が自分のコンテナへ changeset を適用する（ADR-084）。buildscript の版にそろえる。
+    testImplementation 'org.liquibase:liquibase-core:5.0.4'
     testCompileOnly 'org.projectlombok:lombok'
     testAnnotationProcessor 'org.projectlombok:lombok'
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
@@ -182,21 +186,34 @@ dependencyManagement {
 
 def openApiSpec = layout.projectDirectory.file('../openapi/openapi.yaml').asFile
 
+// テストのコンテナへ適用するスキーマタグ（ADR-084）。-PtestAllChangesets を付けると、作りかけを含む全 changeset を適用する。
+def testLiquibaseTag = providers.gradleProperty('testAllChangesets').isPresent()
+    ? ''
+    : providers.gradleProperty('databaseSchemaTag').get().trim()
+
 /*
  * テストとカバレッジ
- * JUnit Platform で実行し、完了後に JaCoCo でカバレッジレポート（HTML/XML）を生成する。
- * 全体と各クラスの branch と line の coverage が下限を下回るとビルド失敗にする（ADR-076）。
+ * JUnit Platform で実行し、JaCoCo でカバレッジレポート（HTML/XML）を生成する。
+ * 全体と各クラスの branch と line の coverage が下限を下回ると jacocoTestCoverageVerification が失敗する（ADR-076）。
+ * 検証は test ではなく check にぶら下げ、test --tests で一部だけを実行しても下限で失敗させない（ADR-084）。
  */
 tasks.named('test') {
     useJUnitPlatform()
     systemProperty 'user.timezone', 'UTC'
+    // fork ごとに TestInfrastructure がコンテナを起動し、DB を共有しない（ADR-084）。
+    // 既定はコア数の半分。-PtestForks=<n> で変える。
+    maxParallelForks = providers.gradleProperty('testForks').map { it as int }
+        .getOrElse(Math.max(1, Runtime.runtime.availableProcessors().intdiv(2)))
+    systemProperty 'test.liquibase.tag', testLiquibaseTag
     testLogging {
         events 'failed'
         exceptionFormat = 'full'
         showCauses = true
         showStackTraces = true
     }
-    finalizedBy jacocoTestCoverageVerification
+    // テストのコンテナは compose のイメージとコマンド、初期化のスクリプトを読むため、変えたらテストをやり直す。
+    inputs.file(layout.projectDirectory.file('../docker/compose-test.yml')).withPropertyName('testCompose')
+    inputs.dir(layout.projectDirectory.dir('../docker/initdb')).withPropertyName('testInitdb')
     // 決済代行の結合テストは docker/wiremock のスタブを読むため、スタブを変えたらテストをやり直す。
     inputs.dir(layout.projectDirectory.dir('../docker/wiremock')).withPropertyName('wiremockStubs')
     // -PopenapiExport=true のときだけ、全テストの中で OpenApiContractTest に契約を書き出させる（ADR-064）。
@@ -210,7 +227,7 @@ tasks.named('test') {
     }
 }
 
-// 単体の再生成用。test --tests で絞ると jacocoTestCoverageVerification が走り下限を割るため、別タスクにしている。
+// 単体の再生成用（ADR-064）。
 tasks.register('exportOpenApi', Test) {
     group = 'verification'
     description = 'OpenAPI契約テストを実行し、リポジトリのopenapi/openapi.yamlへ書き出す'
@@ -218,6 +235,7 @@ tasks.register('exportOpenApi', Test) {
     classpath = sourceSets.test.runtimeClasspath
     useJUnitPlatform()
     systemProperty 'user.timezone', 'UTC'
+    systemProperty 'test.liquibase.tag', testLiquibaseTag
     // 出力に宣言し、コミット済みの契約を書き換えたか消したときに再実行させる。
     systemProperty 'openapi.output', openApiSpec.absolutePath
     outputs.file(openApiSpec)
@@ -248,6 +266,10 @@ jacocoTestReport {
         html.required = true
         xml.required = true
     }
+}
+
+tasks.named('check') {
+    dependsOn jacocoTestCoverageVerification
 }
 
 jacocoTestCoverageVerification {
@@ -324,7 +346,7 @@ pitest {
     failWhenNoMutations = false
     outputFormats = ['HTML', 'XML']
     timestampedReports = false
-    jvmArgs = ['-Duser.timezone=UTC']
+    jvmArgs = ['-Duser.timezone=UTC', "-Dtest.liquibase.tag=${testLiquibaseTag}"]
 }
 
 /*
