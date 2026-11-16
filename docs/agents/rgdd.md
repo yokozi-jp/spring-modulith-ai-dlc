@@ -68,6 +68,32 @@ ADR は [ADR の運用ルール](../adr/conventions.md)の基準と書式に従�
 `/thermos` はコードを直さないので、指摘を直してからマージする。
 このリポジトリの規約に照らすレビューは、steering `code-review` と [コードレビュー](../code-review/index.md) が担う。
 
+レビューする Pull Request のブランチをチェックアウトし、その中で Kiro CLI を起動して実行する。
+対象から `.kiro/` の中の `kiro/install.sh` で入れたファイル（`.kiro/.kiro-plugins-installed` に載るもの）を外し、重点を置くファイルを伝える。
+
+```text
+/thermos PR #<番号>（<ブランチ> と main の差分）をレビューして。
+.kiro/.kiro-plugins-installed に載るファイルは上流のままなので対象外。
+重点は <ファイル>。
+```
+
+変更の種類によって、次のレビューを足す。
+どちらも指摘を報告するだけで、コードは直さない。
+
+- **検査や境界の仕組みを変えたとき**：`/interrogate` に意図を伝え、サブエージェントに実際に壊させる。実行して失敗を示せた指摘だけが残る。
+
+  ```text
+  /interrogate <ディレクトリ> の変更。意図は「<満たすべき振る舞い>」こと。壊せるか実際に動かして確かめて。
+  ```
+
+- **削除や参照先の変更など、影響が差分の外に及ぶとき**：`/blast-radius` で、差分が触れていない場所で壊れるものを探す。
+
+  ```text
+  /blast-radius PR #<番号>。消したファイルを参照している箇所が残っていないか、検査の範囲が変わって見逃しが出ないか。
+  ```
+
+Kiro では、これらのサブエージェントは呼び出し元のチャットと同じモデルで動く。
+
 ### 5. /create-verification-skill
 
 最初の機能が動いたら、`/create-verification-skill` で検証スキルと Feature Map を作る。
