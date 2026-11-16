@@ -55,6 +55,19 @@ echo edited >>"$tmp/locally-modified/.agents/skills/foo/SKILL.md"
 sed -i 's/"foo":{/"foo":{"note":"modified",/' "$tmp/locally-modified/skills-lock.json"
 expect locally-modified 0 "skills-check OK"
 
+tree frontmatter-split
+printf -- '---\nname: foo\ndescription: d。\n続き。\n---\n' >"$tmp/frontmatter-split/.agents/skills/foo/SKILL.md"
+sed -i 's/"foo":{/"foo":{"note":"modified",/' "$tmp/frontmatter-split/skills-lock.json"
+expect frontmatter-split 1 "foo: SKILL.md のフロントマターを YAML として読めません（4 行目が"
+
+tree local-ok
+sed -i 's/"foo":{"source":"o\/r","ref":"aaa"/"foo":{"source":"local","sourceType":"local","note":"authored"/' "$tmp/local-ok/skills-lock.json"
+expect local-ok 0 "skills-check OK"
+
+tree local-no-note
+sed -i 's/"foo":{"source":"o\/r","ref":"aaa"/"foo":{"source":"local","sourceType":"local"/' "$tmp/local-no-note/skills-lock.json"
+expect local-no-note 1 "foo: 取得元のないスキル（sourceType が local）には note が必要です"
+
 tree unlocked
 mkdir "$tmp/unlocked/.agents/skills/extra"
 expect unlocked 1 ".agents/skills/extra が skills-lock.json にありません"

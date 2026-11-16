@@ -24,9 +24,7 @@
     },
     "java-best-practices": {
       "source": "local",
-      "ref": "local",
       "sourceType": "local",
-      "skillPath": "SKILL.md",
       "note": "Locally authored, no upstream. A pointer to docs/backend/java-type-modeling.md and related docs.",
       "computedHash": "7c252219f7e6d51d7f0a6270b65dd9d0757ad7e91b90b22ce4ebf47030287533"
     },

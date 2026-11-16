@@ -2,7 +2,7 @@
 // skills-check: skills-lock.json と .agents/skills、.kiro/skills の整合を検査する。
 // .kiro/.kiro-plugins-installed に載るファイル（cursor-plugins の kiro/install.sh が入れたもの）は、記録した内容ハッシュと比べる。
 // 実行: node tooling/skills-check/skills-check.mjs [ルート。省略するとカレント]（task skills-check が呼ぶ）
-// 手順の正文は docs/agents/matt-pocock-skills/workflow.md の「取得元と更新」と docs/agents/rgdd.md にある。
+// 手順の正文は docs/agents/skill-sources.md にある。
 import { createHash } from "node:crypto";
 import { existsSync, lstatSync, readdirSync, readFileSync, readlinkSync, statSync } from "node:fs";
 import { join, relative, sep } from "node:path";
@@ -109,6 +109,17 @@ function frontmatterValue(text, key) {
   return line?.slice(key.length + 1).trim().replace(/^(['"])(.*)\1$/, "$2");
 }
 
+// フロントマターの各行は「キー:」、字下げ、「- 」のどれかで始まる。
+// 一文ごとに改行する整形などで description が行頭から続くと、Kiro は YAML として読めない。
+function frontmatterStructureError(text) {
+  const lines = text.replaceAll("\r\n", "\n").split("\n");
+  if (lines[0] !== "---") return "先頭が --- の行ではありません";
+  const end = lines.indexOf("---", 1);
+  if (end < 0) return "フロントマターが --- で閉じていません";
+  const bad = lines.slice(1, end).findIndex((line) => line !== "" && !/^([A-Za-z0-9_-]+:|\s|- )/.test(line));
+  return bad < 0 ? undefined : `${bad + 2} 行目が「キー:」でも字下げでもありません`;
+}
+
 function directories(path) {
   try {
     return readdirSync(path, { withFileTypes: true }).filter((entry) => entry.isDirectory() || entry.isSymbolicLink()).map((entry) => entry.name);
@@ -129,6 +140,9 @@ for (const [name, entry] of Object.entries(lock)) {
   }
   if (frontmatterValue(skillText, "name") !== name) errors.push(`${name}: SKILL.md の name がディレクトリ名と一致しません`);
   if (!frontmatterValue(skillText, "description")) errors.push(`${name}: SKILL.md に description がありません`);
+  const structureError = frontmatterStructureError(skillText);
+  if (structureError) errors.push(`${name}: SKILL.md のフロントマターを YAML として読めません（${structureError}）`);
+  if (entry.sourceType === "local" && !entry.note) errors.push(`${name}: 取得元のないスキル（sourceType が local）には note が必要です`);
 
   const link = join(root, ".kiro/skills", name);
   let isLink = false;
@@ -145,6 +159,7 @@ for (const [name, entry] of Object.entries(lock)) {
   if (!entry.note && folderHash(dir) !== entry.computedHash) {
     errors.push(`${name}: 内容ハッシュが skills-lock.json と一致しません（上流のファイルを編集していないか確認してください）`);
   }
+  if (entry.sourceType === "local") continue;
   refsBySource.set(entry.source, new Set([...(refsBySource.get(entry.source) ?? []), entry.ref]));
 }
 
