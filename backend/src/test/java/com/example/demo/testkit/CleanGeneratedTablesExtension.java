@@ -5,6 +5,7 @@ import static com.example.demo.jooq.modulith.Tables.SHEDLOCK;
 
 import com.example.demo.jooq.DefaultCatalog;
 import java.time.Duration;
+import java.time.Instant;
 import org.awaitility.Awaitility;
 import org.jooq.DSLContext;
 import org.jooq.Schema;
@@ -48,12 +49,11 @@ public final class CleanGeneratedTablesExtension implements AfterEachCallback {
     try {
       Awaitility.await("in-flight event publications")
           .atMost(IN_FLIGHT_TIMEOUT)
-          .until(
-              () ->
-                  dslContext.fetchCount(
-                          EVENT_PUBLICATION,
-                          EVENT_PUBLICATION.STATUS.in("PUBLISHED", "PROCESSING", "RESUBMITTED"))
-                      == 0);
+          .until(() ->
+              dslContext.fetchCount(
+                      EVENT_PUBLICATION,
+                      EVENT_PUBLICATION.STATUS.in("PUBLISHED", "PROCESSING", "RESUBMITTED"))
+                  == 0);
     } catch (final Throwable failure) {
       try {
         deleteAll(dslContext);
@@ -78,8 +78,13 @@ public final class CleanGeneratedTablesExtension implements AfterEachCallback {
     expireLocks(dslContext);
   }
 
-  /** ShedLock のすべてのロックの期限を過去にする。期限は DB の時刻で決まり、固定の時計では進まないため。 */
+  /**
+   * ShedLock のすべてのロックの期限を、DB の時計によらない過去（{@link Instant#EPOCH}）にする。期限は DB の時刻で決まり、固定の時計では進まないため。
+   *
+   * <p>期限を {@code locked_at} にしない。NTP の同期で DB の壁時計が戻ると（WSL2 では数秒戻ることがある）、{@code locked_at} が DB
+   * の今より後に残り、期限を過去にしたはずのロックを取れないためである。
+   */
   public static void expireLocks(final DSLContext dsl) {
-    dsl.update(SHEDLOCK).set(SHEDLOCK.LOCK_UNTIL, SHEDLOCK.LOCKED_AT).execute();
+    dsl.update(SHEDLOCK).set(SHEDLOCK.LOCK_UNTIL, Instant.EPOCH).execute();
   }
 }

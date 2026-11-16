@@ -5,6 +5,7 @@ import static com.example.demo.jooq.modulith.Tables.EVENT_PUBLICATION_ARCHIVE;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import com.example.demo.jooq.modulith.Tables;
 import com.example.demo.shared.events.ResubmissionPolicy;
 import com.example.demo.testkit.CapturedLogRecords;
 import io.micrometer.core.instrument.MeterRegistry;
@@ -19,7 +20,6 @@ import java.time.ZoneOffset;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Objects;
-import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
@@ -63,7 +63,8 @@ import org.springframework.transaction.support.TransactionTemplate;
  * <p>定期の実行は {@code .env.test} で無効なので、テストが直接呼ぶ。本番と同じくトランザクションの外から呼び、{@link Scenario} は完了を待つだけに使う。出版は
  * {@link Scenario} でテストのイベントを発行して作り、時刻は差し替えられる固定の時計で進める。
  *
- * <p>ロックの期限は DB の時刻で決まり、固定の時計では進まない。定期の再投入を続けて呼ぶテストは、呼ぶ前にロックの期限を過去にする（{@link #runJob()}）。
+ * <p>ロックの期限は DB の時刻で決まり、固定の時計では進まない。定期の再投入と手での 1 回の再投入を続けて呼ぶテストは、呼ぶ前にロックの期限を過去にする（{@link
+ * #runJob()}、{@link #runOnce(String)}）。DB の壁時計は NTP の同期で戻ることがあり、ShedLock の解放だけでは期限が残りうるためでもある。
  */
 // 一つの文脈で出版の状態、メトリクス、ログ、ロック、方針を確かめるため、型とメソッドの数が多い。
 @SuppressWarnings({"PMD.CouplingBetweenObjects", "PMD.TooManyMethods"})
@@ -340,10 +341,9 @@ class EventPublicationResubmitterTest {
   void resubmitOnceFailsInsideTransaction(final Scenario scenario) {
     final String id = failedOnce(scenario);
 
-    assertThatThrownBy(
-            () ->
-                new TransactionTemplate(transactionManager)
-                    .executeWithoutResult(status -> resubmitOnce.run(ALL)))
+    assertThatThrownBy(() ->
+            new TransactionTemplate(transactionManager)
+                .executeWithoutResult(status -> resubmitOnce.run(ALL)))
         .isInstanceOf(IllegalStateException.class)
         .hasMessageContaining("transaction");
     assertThat(state(id).attempts()).as(ATTEMPTS, id).isEqualTo(1);
@@ -398,11 +398,11 @@ class EventPublicationResubmitterTest {
     clock.set(T0.plus(WAIT_AGE).plusSeconds(1));
     final double skippedBefore = skippedRuns();
 
-    final SimpleLock held = holdLock();
+    holdLock();
     try {
       resubmitter.resubmitOnce();
     } finally {
-      held.unlock();
+      ResubmissionTestSupport.expireLock(dsl);
     }
 
     assertThat(state(id).attempts()).as(ATTEMPTS, id).isEqualTo(1);
@@ -457,14 +457,14 @@ class EventPublicationResubmitterTest {
   void resubmitOnceSelectsByTarget(final Scenario scenario) {
     final String id = failedOnce(scenario);
 
-    assertThat(resubmitOnce.run("policy:payment").resubmitted()).as("payment の方針").isZero();
-    assertThat(resubmitOnce.run("event-type:java.lang.String").resubmitted()).as("他の型").isZero();
-    assertThat(resubmitOnce.run("event-type:" + EVENT_TYPE).resubmitted()).as("同じ型").isEqualTo(1);
+    assertThat(runOnce("policy:payment").resubmitted()).as("payment の方針").isZero();
+    assertThat(runOnce("event-type:java.lang.String").resubmitted()).as("他の型").isZero();
+    assertThat(runOnce("event-type:" + EVENT_TYPE).resubmitted()).as("同じ型").isEqualTo(1);
     awaitState(scenario.stimulate(() -> {}), id, COMPLETED, s -> s.archived() == 1);
 
     listener.failTimes(1);
     final String other = failedOnce(scenario);
-    assertThat(resubmitOnce.run(ALL).completed()).as("all").isEqualTo(1);
+    assertThat(runOnce(ALL).completed()).as("all").isEqualTo(1);
     assertThat(state(other).archived()).as(ARCHIVED, other).isEqualTo(1);
     assertThatThrownBy(() -> resubmitOnce.run("policy:missing"))
         .isInstanceOf(IllegalArgumentException.class);
@@ -483,27 +483,43 @@ class EventPublicationResubmitterTest {
   void resubmitOnceWaitsForLockAndGivesUp(final Scenario scenario) throws Exception {
     final String id = failedOnce(scenario);
 
-    final SimpleLock held = holdLock();
+    holdLock();
     try {
       assertThatThrownBy(() -> resubmitOnce.run(ALL))
           .isInstanceOf(IllegalStateException.class)
           .hasMessageContaining(EventPublicationResubmitter.LOCK_NAME);
     } finally {
-      held.unlock();
+      ResubmissionTestSupport.expireLock(dsl);
     }
     assertThat(state(id).attempts()).as("id=%s の失敗の後の attempts", id).isEqualTo(1);
 
-    final SimpleLock released = holdLock();
+    holdLock();
     final CompletableFuture<EventPublicationResubmitOnce.Outcome> future =
         ResubmissionTestSupport.onVirtualThread(() -> resubmitOnce.run(ALL));
     Awaitility.await("ロックを持つ間の手での再投入")
         .during(Duration.ofSeconds(1))
         .atMost(Duration.ofSeconds(3))
         .until(() -> !future.isDone());
-    released.unlock();
+    ResubmissionTestSupport.expireLock(dsl);
     assertThat(future.get(JOIN_TIMEOUT_SECONDS, TimeUnit.SECONDS).completed())
         .as("ロックが空いた後")
         .isEqualTo(1);
+  }
+
+  @Test
+  @DisplayName("DB の壁時計が戻って locked_at が DB の今より後に残っても、テストがロックの期限を過去にすれば取れる")
+  // ロックを取れたことは holdLock が確かめる。
+  @SuppressWarnings("PMD.UnitTestShouldIncludeAssert")
+  void expiredLockIsFreeAfterDatabaseClockStepsBack() {
+    holdLock();
+    // 取った後に DB の壁時計が HELD_LOCK だけ戻ったのと同じ行にする。locked_at を、DB の今に HELD_LOCK を足した lock_until にする。
+    dsl.update(Tables.SHEDLOCK)
+        .set(Tables.SHEDLOCK.LOCKED_AT, Tables.SHEDLOCK.LOCK_UNTIL)
+        .execute();
+
+    ResubmissionTestSupport.expireLock(dsl);
+
+    holdLock();
   }
 
   /** ロックの期限を過去にしてから、定期の再投入を呼ぶ。期限は DB の時刻で決まり、固定の時計では進まないため。 */
@@ -512,17 +528,28 @@ class EventPublicationResubmitterTest {
     resubmitter.resubmitOnce();
   }
 
-  /** 他のインスタンスの代わりに、同じロックを {@link #HELD_LOCK} だけ持つ。 */
-  private SimpleLock holdLock() {
-    final Optional<SimpleLock> lock =
-        lockProvider.lock(
-            new LockConfiguration(
-                Instant.now(clock),
-                EventPublicationResubmitter.LOCK_NAME,
-                HELD_LOCK,
-                Duration.ZERO));
-    return lock.orElseThrow(
-        () -> new AssertionError("テストのロック " + EventPublicationResubmitter.LOCK_NAME + " を取れない"));
+  /**
+   * 他のインスタンスの代わりに、同じロックを {@link #HELD_LOCK} だけ持つ。
+   *
+   * <p>放すときは {@link SimpleLock#unlock()} ではなく、ロックの期限を過去にする。lock-at-least-for が 0 の解放は期限を {@code
+   * max(locked_at, DB の今)} にするため、取った後に DB の壁時計が戻ると、{@code locked_at} まで放されないためである。
+   */
+  private void holdLock() {
+    assertThat(
+            lockProvider.lock(
+                new LockConfiguration(
+                    Instant.now(clock),
+                    EventPublicationResubmitter.LOCK_NAME,
+                    HELD_LOCK,
+                    Duration.ZERO)))
+        .as("テストのロック %s", EventPublicationResubmitter.LOCK_NAME)
+        .isPresent();
+  }
+
+  /** ロックの期限を過去にしてから、手での 1 回の再投入を呼ぶ。前の呼び出しの解放は、DB の壁時計が戻ると期限が残るため（{@link #holdLock}）。 */
+  private EventPublicationResubmitOnce.Outcome runOnce(final String target) {
+    ResubmissionTestSupport.expireLock(dsl);
+    return resubmitOnce.run(target);
   }
 
   /** 時刻を進めて定期の再投入を呼び、リスナーが失敗して attempts が増えた FAILED に戻るまで待つ。 */
