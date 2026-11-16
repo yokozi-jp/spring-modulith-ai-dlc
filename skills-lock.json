@@ -22,6 +22,14 @@
       "skillPath": "skills/productivity/grilling/SKILL.md",
       "computedHash": "4dd886b0196bf43729d954ae326016f2bd9f5f79d892500b407c33a753362f14"
     },
+    "java-best-practices": {
+      "source": "local",
+      "ref": "local",
+      "sourceType": "local",
+      "skillPath": "SKILL.md",
+      "note": "Locally authored, no upstream. A pointer to docs/backend/java-type-modeling.md and related docs.",
+      "computedHash": "7c252219f7e6d51d7f0a6270b65dd9d0757ad7e91b90b22ce4ebf47030287533"
+    },
     "prototype": {
       "source": "mattpocock/skills",
       "ref": "d81f3a183412e71a5b1e84ca21bc1a35eea03a60",
