@@ -175,6 +175,8 @@ pre-commit:
         - "Taskfile.yml"
         - "README.md"
         - "tooling/adr-lint/**"
+        - ".github/rulesets/**"
+        - "tooling/ruleset-check/**"
       run: |
         echo "{staged_files}" >/dev/null
         task okf-check

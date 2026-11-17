@@ -11,6 +11,17 @@ tags: [convention, operations, governance, git, github]
 
 GitHub の Rules、Rulesets で branch ruleset を作り、既定ブランチ `main` を対象にする。
 
+ruleset の正本は `.github/rulesets/main.json` である。
+変更するときは、このファイルを直し、次のコマンドで GitHub へ反映する。
+
+```bash
+gh api -X PUT repos/<owner>/<repo>/rulesets/<id> --input .github/rulesets/main.json
+```
+
+必須チェックの名前は、このファイルと下の一覧と workflow の job 名で、絵文字の異体字選択子（U+FE0F）まで一致させる。
+一致しないチェックは、報告されないまま待機になり、merge できなくなる。
+`task okf-check` が、ファイルと一覧の一致を検査する。
+
 ruleset は Active にする。
 bypass できるのは、リポジトリの管理者（RepositoryRole の id `5`）だけで、`bypass_mode` は `pull_request` にする。
 `pull_request` モードの bypass は Pull Request の merge にだけ効くため、`main` への直接 push は管理者でもできない。

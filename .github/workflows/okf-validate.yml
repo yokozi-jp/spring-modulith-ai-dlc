@@ -10,6 +10,8 @@ on:
       - "Taskfile.yml"
       - "README.md"
       - "tooling/adr-lint/**"
+      - ".github/rulesets/**"
+      - "tooling/ruleset-check/**"
   pull_request:
     branches: ["**"]
     paths:
@@ -19,6 +21,8 @@ on:
       - "Taskfile.yml"
       - "README.md"
       - "tooling/adr-lint/**"
+      - ".github/rulesets/**"
+      - "tooling/ruleset-check/**"
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}

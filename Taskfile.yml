@@ -238,6 +238,7 @@ tasks:
       - task: lint-docs-sync
       - task: docs-boundary-check
       - task: adr-lint
+      - task: ruleset-check
       - |
         if ! command -v iwe >/dev/null 2>&1; then
           echo "OKF check: iwe が無いためスキップします（CI で検査されます）。" >&2
@@ -276,6 +277,14 @@ tasks:
     cmds:
       - bash tooling/adr-lint/test.sh
       - node tooling/adr-lint/adr-lint.mjs
+
+  # .github/rulesets/main.json の必須チェックと branch-protection.md の一覧の一致を検査する。
+  ruleset-check:
+    internal: true
+    silent: true
+    cmds:
+      - bash tooling/ruleset-check/test.sh
+      - node tooling/ruleset-check/ruleset-check.mjs
 
   # steering → docs の一方向依存、frontmatter、文書責務の見直し合図を検査する（ADR-038）。
   # 依存方向、frontmatter、パスの実在は失敗、変更した docs の250行超とsteeringの行数超過は警告にとどめる。
