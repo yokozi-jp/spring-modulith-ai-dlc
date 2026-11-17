@@ -99,7 +99,7 @@ Pull Request の本文は [Pull Request テンプレート](.github/PULL_REQUEST
 
 重要な設計判断を含む変更では、実装と同じ Pull Request に Proposed 状態の ADR を追加する。
 
-レビュー会話を解決し、必須チェックと CODEOWNERS のレビューを通してから merge する。
+必須チェックを通してから merge する。承認と会話の解決は要求しない。人が必ず読む Pull Request は [Draftからマージまで](docs/pull-request/review-request-and-merge.md) に従う。
 
 ## リリース
 

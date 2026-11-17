@@ -21,7 +21,9 @@ Proposed
 
 長期間存続する開発ブランチを増やすと、単一のデプロイ単位であるモジュラーモノリスの変更が分岐し、統合時の差分と検証量が増える。
 
-`main` への直接 push を許すと、レビューと既存の CI を通らない変更を防げない。
+`main` への直接 push を許すと、Pull Request と既存の CI を通らない変更を防げない。
+
+承認の数を 0 にしたのは、ruleset の実際の設定に ADR を合わせたためである。承認を要求すると、作成者が自分の変更を承認できず merge できなくなる。
 
 リポジトリのセキュリティ状態を集約スコアで評価しても、個別の変更に含まれる問題を理由としてマージを止めることはできない。
 秘密情報、コード、依存関係、GitHub Actions は、それぞれの問題を直接検出する検査で保護する必要がある。
@@ -34,8 +36,8 @@ CODEOWNERS に利用できることをリポジトリから確認できた所有
 
 変更は最新の `main` から作った短命な作業ブランチで行い、Pull Request を経て squash merge する。
 
-GitHub ruleset で `main` への直接 push、force push、削除を禁止し、一件以上の承認、コード所有者の承認、会話の解決、必須チェックの成功、linear history を要求する。
-このうち承認、コード所有者の承認、会話の解決、linear history の要求は、[ADR-086](ADR-086-align-main-protection-with-solo-and-agent-operation.md) が置き換える。
+GitHub ruleset で `main` への直接 push、force push、削除を禁止し、Pull Request と必須チェックの成功を要求する。
+承認、コード所有者の承認、会話の解決、linear history は要求しない（[ADR-086](ADR-086-align-main-protection-with-solo-and-agent-operation.md)）。
 
 セキュリティは、betterleaks、Semgrep、Trivy、zizmor、CodeQL のように対象の問題を直接検出する検査で担保する。
 外部サービスによるリポジトリの集約スコアは定期実行せず、README に公開スコアのバッジを表示しない。
@@ -52,7 +54,7 @@ CODEOWNERS は backend、frontend、docker と infrastructure、`.kiro` と `aid
 
 ### Positive
 
-- すべての変更がレビューと CI を通り、`main` を常に統合可能な状態へ保ちやすくなる。
+- すべての変更が Pull Request と CI を通り、`main` を常に統合可能な状態へ保ちやすくなる。
 - セキュリティ上の問題を対象別の検査で直接検出し、外部の集約スコアやバッジの可用性へ依存しない。
 - ファイル境界ごとのレビュー責任が CODEOWNERS から判別できる。
 - Pull Request のテンプレートによって変更内容、検証結果、ブロッカーをリリース前に確認できる。

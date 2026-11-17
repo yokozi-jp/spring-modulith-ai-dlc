@@ -16,6 +16,7 @@ bypass できるのは、リポジトリの管理者（RepositoryRole の id `5`
 `pull_request` モードの bypass は Pull Request の merge にだけ効くため、`main` への直接 push は管理者でもできない。
 
 管理者が bypass で merge したときは、理由を Pull Request に残す。
+エージェントは bypass を使わない（[Draftからマージまで](../pull-request/review-request-and-merge.md)）。
 
 ## 必須ルール
 
@@ -26,22 +27,22 @@ bypass できるのは、リポジトリの管理者（RepositoryRole の id `5`
 - Pull Request を必須にする。
 - 必須ステータスチェックの成功を必須にする。
 
-次の設定は、1 人とエージェントの運用に合わせて外している（[ADR-086](../adr/ADR-086-align-main-protection-with-solo-and-agent-operation.md)）。
+次の設定は外している（[ADR-086](../adr/ADR-086-align-main-protection-with-solo-and-agent-operation.md)）。
 
-- 承認の数は 0 にする。承認、コード所有者の承認、古い承認の取り消しは要求しない。
-- merge 前の会話の解決を要求しない。bot のコメントも resolve を要らない。
+- 承認の数は 0 にする。承認とコード所有者の承認は要求しない。
+- merge 前の会話の解決を要求しない。bot のコメントも resolve しなくてよい。
 - merge 前にブランチを最新の `main` へ更新することを要求しない（`strict_required_status_checks_policy` は `false`）。
-- linear history を要求しない。merge の方式を squash だけにしているので、履歴は直線のままになる。
+- linear history を要求しない。
 
 squash merge だけを有効にし、merge commit と rebase merge は無効にする。
 
 squash commit の既定メッセージには Pull Request のタイトルを使う。
 
-承認の数を 0 にしても、人が必ず読む Pull Request は残る（[人が必ず読む Pull Request](../code-review/human-review-required.md)）。
+人が必ず読む Pull Request は[Draftからマージまで](../pull-request/review-request-and-merge.md)に従う。
 
 ## CODEOWNERS
 
-`.github/CODEOWNERS` は、GitHub が所有者へレビューを自動で依頼するために残す。
+`.github/CODEOWNERS` を置く。
 ruleset ではコード所有者の承認を要求しない。
 所有者は `@yokozi-jp` だけであり、存在しないチーム名は指定しない。
 チームを作ったときは、`@owner/team` の実在を確かめてから置き換える。

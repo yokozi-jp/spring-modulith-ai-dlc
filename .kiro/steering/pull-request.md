@@ -1,7 +1,7 @@
 ---
 inclusion: auto
 name: pull-request
-description: PR を作成、分割する、本文を書く、レビューを依頼する、レビュアーとしてコメントを書く、承認やマージを判断する、PR テンプレートを変更するときに使う。Pull Request の手順の規約の入口を示す。
+description: PR を作成、分割する、本文を書く、Ready for review にする、レビュアーとしてコメントを書く、人が読む Pull Request やマージを判断する、PR テンプレートを変更するときに使う。Pull Request の手順の規約の入口を示す。
 ---
 
 # Pull Request の入口
