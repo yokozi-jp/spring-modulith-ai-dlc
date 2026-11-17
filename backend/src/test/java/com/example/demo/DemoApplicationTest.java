@@ -200,7 +200,7 @@ class DemoApplicationTest {
   @DisplayName("決済代行の Client に payment-gateway の circuit breaker と retry が掛かる")
   void paymentGatewayIsGuardedByResilience4j() {
     // YAML の instance は注釈がなくても registry に作られるため、呼び出しの件数の増加で aspect が掛かったことを確かめる。
-    // 請求は compose-test の WireMock（.env.test の PAYMENT_GATEWAY_BASE_URL）の共有のスタブが成功で返す。
+    // 請求は、テストの JVM が起動する WireMock のコンテナ（InfrastructureContainers）のスタブが成功で返す。
     final CircuitBreaker circuitBreaker = circuitBreakerRegistry.circuitBreaker("payment-gateway");
     final Retry retry = retryRegistry.retry("payment-gateway");
     final long callsBefore = circuitBreaker.getMetrics().getNumberOfSuccessfulCalls();
@@ -293,18 +293,17 @@ class DemoApplicationTest {
             "lock_timeout", "DB_LOCK_TIMEOUT_MS",
             "statement_timeout", "DB_STATEMENT_TIMEOUT_MS",
             "idle_in_transaction_session_timeout", "DB_IDLE_IN_TRANSACTION_TIMEOUT_MS");
-    settings.forEach(
-        (name, environmentVariable) -> {
-          final String shown = jdbcTemplate.queryForObject("SHOW " + name, String.class);
-          // SHOW は 1000 を 1s のように単位付きで返すため、interval に変換してミリ秒で比べる。
-          assertEquals(
-              applicationContext.getEnvironment().getRequiredProperty(environmentVariable),
-              jdbcTemplate.queryForObject(
-                  "SELECT (EXTRACT(EPOCH FROM CAST(? AS interval)) * 1000)::bigint::text",
-                  String.class,
-                  shown),
-              () -> "DB セッションの " + name + " (" + shown + ") が " + environmentVariable + " と一致すること");
-        });
+    settings.forEach((name, environmentVariable) -> {
+      final String shown = jdbcTemplate.queryForObject("SHOW " + name, String.class);
+      // SHOW は 1000 を 1s のように単位付きで返すため、interval に変換してミリ秒で比べる。
+      assertEquals(
+          applicationContext.getEnvironment().getRequiredProperty(environmentVariable),
+          jdbcTemplate.queryForObject(
+              "SELECT (EXTRACT(EPOCH FROM CAST(? AS interval)) * 1000)::bigint::text",
+              String.class,
+              shown),
+          () -> "DB セッションの " + name + " (" + shown + ") が " + environmentVariable + " と一致すること");
+    });
     final long lockTimeout =
         applicationContext.getEnvironment().getRequiredProperty("DB_LOCK_TIMEOUT_MS", Long.class);
     final long statementTimeout =

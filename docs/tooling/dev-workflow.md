@@ -60,7 +60,7 @@ task agent-wait -- <実行のディレクトリ>    # agent-push が表示した
 ```
 
 pre-commitの検査とpre-pushの検査は数分かかることがあり、tool callの時間切れや中断ではフックは止まらない。
-たとえば`backend/`のJavaかGradleを変えたpushでは、pre-pushが`be-lint`、`be-test`（全テスト）、`be-image-build`を並列に実行する。
+たとえば`backend/`のJavaかGradleを変えたpushでは、pre-pushが`be-lint`、`be-test`（全テスト）を順番に実行する。
 そのため、どちらのTaskもフックの終わりを待たずに、実行のディレクトリ（`/tmp/agent-git-commit.XXXXXX`など）を表示して戻る。
 
 ### commitを始める

@@ -7,15 +7,14 @@ tags: [convention, backend, testing, database, spring-modulith]
 
 # バックエンドのDBテスト
 
-DBへ書き込むテストは、隔離したテスト用スタックに対して`@DatabaseTest`または`@CommittedDatabaseTest`で実行する。
+DBへ書き込むテストは、テストのJVMごとに起動するPostgreSQLに対して`@DatabaseTest`または`@CommittedDatabaseTest`で実行する。
 開発用DBと本番DBをテストに使わず、各テストへ手書きの後始末を追加しない。
 
 ## 実行環境
 
-DBテストは、`docker/compose-test.yml`のPostgreSQL 5433とRedis 6380を`.env.test`で起動した隔離スタックに対して実行する。
-`.env.test`は、Gitで管理する`.env.test.example`からコピーして作るローカルファイルで、`task test`が無ければ作る。
-`task test`は確定済みchangesetを、`task test-dev`は作りかけを含む全changesetを適用し、テスト後にボリュームを削除する。
-どちらのテストアノテーションも、マイグレーション済みのテストDBを前提にする。
+DBテストは、テストのJVMごとにTestcontainersが起動し、changesetを適用したPostgreSQLに対して実行する（[バックエンドのテストの実行基盤](testing-infrastructure.md)）。
+Gradleのforkごとに別のDBになるため、forkどうしの後始末は衝突しない。
+`task be-test`は確定済みchangesetを、`task test-dev`は作りかけを含む全changesetを適用する。
 
 実行テストに`@JooqTest`を直接付けず、`@DatabaseTest`か`@CommittedDatabaseTest`を使う。
 テスト用DBへの接続、ロールバック、後始末の構成を二つの合成アノテーションにまとめ、テストごとに構成が分かれないようにするためである。
@@ -52,8 +51,8 @@ DBロールの決定は[ADR-011](../adr/ADR-011-use-module-owned-database-schema
 
 業務テーブルがまだないため、`shared`の共通処理（`TableWriter`など）を実PostgreSQLで確かめるテストは、[FixtureTablesExtension](../../backend/src/test/java/com/example/demo/testkit/FixtureTablesExtension.java)を`@ExtendWith`で付ける。
 この拡張は、テストクラスの前に`fixture`スキーマとテーブルを作り、後で消す。
-DDLは本番と同じくマイグレーションロール（`.env.test`の`MIGRATION_DB_*`）で実行し、アプリロールにはDMLだけを付与する。
-テストクラスは順に実行されるため、スキーマ検査はこのスキーマを見ない。
+DDLは本番と同じくマイグレーションロール（`InfrastructureContainers`が渡す`MIGRATION_DB_*`）で実行し、アプリロールにはDMLだけを付与する。
+同じforkの中ではテストクラスを順に実行し、forkごとにDBが分かれるため、スキーマ検査はこのスキーマを見ない（[バックエンドのテストの実行基盤](testing-infrastructure.md)の「並列度」）。
 使ってよいのは`shared`の共通処理のテストだけであり、業務テーブルができたらそのテーブルで確かめる。
 Springの外で共通カラムを登録するテストは、[TestCommonColumns](../../backend/src/test/java/com/example/demo/shared/infrastructure/persistence/TestCommonColumns.java)の`at`で共通処理を作り、`runAs`の中で登録する。
 

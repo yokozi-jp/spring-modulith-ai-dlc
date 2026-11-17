@@ -31,10 +31,10 @@ tags: [runbook, backend, spring-modulith]
 
 ``` bash
 cd backend
-./gradlew test --tests 'com.example.demo.architecture.*' -x jacocoTestCoverageVerification
+./gradlew test --tests 'com.example.demo.architecture.*'
 ```
 
-テストの一部だけを実行するとカバレッジの基準を満たさないため、`jacocoTestCoverageVerification` を除外する。
+`test` はカバレッジの検証を実行しないため、一部だけを実行しても失敗しない（[バックエンドのテストの実行基盤](testing-infrastructure.md)）。
 
 テストの内容は [バックエンドのアーキテクチャテスト](architecture-tests.md) に示す。
 
