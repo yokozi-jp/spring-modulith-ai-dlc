@@ -12,3 +12,4 @@ description: 技術選定、抽象化や共通化の要否、暫定対応の扱�
 
 - 判断の前に `docs/adr/index.md` で既存の決定を確認する。
 - ADR を起こすかは `docs/adr/conventions.md` で判定する。
+- 案を推奨する前に `docs/principles/design-decision-process.md` の「現状の作りを根拠にしない」を読む。
