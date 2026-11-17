@@ -31,19 +31,28 @@ jobs:
           go-version: "1.27"
           cache: false
 
+      - name: Set up Task
+        uses: go-task/setup-task@a00fbb05ce67b35648be3c78cbc9fd85354c757e # v2
+        with:
+          version: "3.53.1"
+          checksum: a54a408f6861ff921f6e87774180db31bacd8c1e7c944ca696db9fea49a82fc7
+
+      # バージョンは versions.env の BETTERLEAKS_VERSION から読み、ローカルと CI を揃える。
       - name: Install betterleaks
-        run: go install github.com/betterleaks/betterleaks@latest
+        run: |
+          . docs/local-env-setup/versions.env
+          go install "github.com/betterleaks/betterleaks@${BETTERLEAKS_VERSION}"
 
       # PR ではベースからの差分だけをスキャンして高速化する。
       - name: Scan PR diff
         if: github.event_name == 'pull_request'
-        run: |
-          betterleaks git . --no-banner --redact \
-            --log-opts="${{ github.event.pull_request.base.sha }}..${{ github.event.pull_request.head.sha }}"
+        env:
+          LOG_OPTS: ${{ github.event.pull_request.base.sha }}..${{ github.event.pull_request.head.sha }}
+        run: task scan-secrets-all
 
       # main への push では main の履歴全体をスキャンする。
-      # fetch-depth: 0 は他のブランチも取得するため、HEAD から辿れるコミットに限る。
+      # fetch-depth: 0 は他のブランチも取得するため、HEAD から辿れるコミットに限る（task の既定値）。
       # 他のブランチのコミットは、その Pull Request の差分スキャンで検査する。
       - name: Scan full history
         if: github.event_name == 'push'
-        run: betterleaks git . --no-banner --redact --git-workers=16 --log-opts=HEAD
+        run: task scan-secrets-all

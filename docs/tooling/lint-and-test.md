@@ -258,7 +258,7 @@ const params = { ...(cursor !== undefined && { cursor }) };
 
 - **`task lint-duplicates`**：生成コードを除く手書きのバックエンドとフロントエンドをjscpdで検査する。
 - **`task scan-secrets`**：ステージ済み変更をbetterleaksでスキャンする。
-- **`task scan-secrets-all`**：リポジトリ全体と、現在のブランチから辿れる履歴をbetterleaksでスキャンする。
+- **`task scan-secrets-all`**：リポジトリ全体と、現在のブランチから辿れる履歴をbetterleaksでスキャンする。`LOG_OPTS`でgit logの範囲を変えられる（既定は`HEAD`）。
 - **`task lint-semgrep`**：Semgrep OSSで静的解析する。
 - **`task be-sbom`**：バックエンドのCycloneDX SBOMを生成する。
 - **`task scan-vulns`**：バックエンドとフロントエンドの依存関係をTrivyで検査する。
@@ -312,7 +312,7 @@ OKF検査の採用理由は[ADR-036](../adr/ADR-036-adopt-okf-for-docs-knowledge
 ## Gitフック対応
 
 - **commit-msg（すべて）**：commitlintを実行する。
-- **pre-commit（すべて）**：`scan-secrets`相当を実行する。
+- **pre-commit（すべて）**：`task scan-secrets`を実行する。
 - **pre-commit（OpenAPI契約、`.spectral.yaml`、Orvalの設定、`frontend/package.json`、生成物の変更）**：`api-lint`（Dockerがなければスキップ）と`api-client-check`を実行する。
 - **pre-commit（フロントエンドの変更）**：`fe-check`を実行する。
   前項と同じgroupで順に実行し、Orvalの再生成と型検査を同時に走らせない。
@@ -322,7 +322,7 @@ OKF検査の採用理由は[ADR-036](../adr/ADR-036-adopt-okf-for-docs-knowledge
 - **pre-commit（docs、steering、Taskfile、README、`tooling/adr-lint/`の変更）**：`okf-check`を実行する。
 - **pre-commit（`.agents/skills/`、`.kiro/`、`skills-lock.json`、`tooling/skills-check/`の変更）**：`skills-check`を実行する。
 - **pre-commit（Taskfileか`tooling/taskfile-cleanup/`の変更）**：`lint-taskfile`を実行する。
-- **pre-push（すべて）**：`adr-check`と`scan-secrets-all`相当を実行する。
+- **pre-push（すべて）**：`adr-check`と`task scan-secrets-all`を実行する。
 - **pre-push（バックエンドのJavaまたはGradle変更）**：`be-lint`相当と`test`を実行する。
 - **pre-push（フロントエンドの変更）**：`fe-test-build`を、Vitestのdot reporterとjson-summaryだけのcoverageで実行する。
 - **pre-push（GitHub Actionsワークフローの変更）**：`lint-actions`相当と`lint-actions-security`相当を実行する。
@@ -357,7 +357,7 @@ pre-pushの「変更」は、push済みかどうかやrebaseの有無によら�
 - **`frontend-ci.yml`**：`fe-verify`、`fe-route-tree-check`、`api-client-check`、`fe-doctor`を実行する。
 - **`api-contract.yml`**：`api-lint`、`api-lint-rules-test`、`api-breaking`、`api-docs`を実行し、設計書をartifactにする。
   mainへのpushでは設計書をGitHub Pagesに公開する。
-- **`betterleaks.yml`**：`scan-secrets-all`相当を実行する。
+- **`betterleaks.yml`**：`task scan-secrets-all`を実行する。pull requestでは`LOG_OPTS`にbaseからheadまでの範囲を渡す。
 - **`static-analysis.yml`**：`lint-semgrep`相当、`lint-duplicates`、`lint-taskfile`を実行する。
   Code ScanningはSARIFの`suppressions`を読まないため、`nosemgrep`で抑止した検出をSARIFから除いてから送る。
 - **`trivy.yml`**：`scan-vulns`相当を実行する。
