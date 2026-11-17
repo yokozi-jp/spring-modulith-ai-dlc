@@ -24,7 +24,7 @@ tags: [convention, principles, ai-assisted-development, future-arch-guidelines]
 
 ## レビューの基準
 
-- エージェントに一次レビューをさせる場合は、セキュリティとテストの観点を含む docs の規約を基準にする（[規約と仕様を分離して確認する code-review リファレンス](../agents/matt-pocock-skills/code-review.md)）。
+- エージェントに一次レビューをさせる場合は、セキュリティとテストの観点を含む docs の規約を基準にする（[コードレビューの観点](../code-review/review-viewpoints.md)）。
 - 機械的に検出できる観点は検査に寄せる（[アーキテクチャの制約の自動検証](architecture-fitness-functions.md)）。
 
 ## 標準に乗らない機能

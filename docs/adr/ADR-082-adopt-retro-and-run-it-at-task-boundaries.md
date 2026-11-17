@@ -29,17 +29,26 @@ Proposed
 
 導入の途中で、スキルの整合を手作業で確かめていたこと、導入手順が文書になかったことが分かった。そこで、最初の `/retro` の実行で挙がった候補として、整合の検査を同じ変更に加える。
 
+Proposed の間に、[ADR-084](ADR-084-adopt-rgdd-with-pstack-and-thermos.md) が開発の流れを RGDD の5つのフェーズへ移し、Matt Pocock スキル運用から振り返りと導入手順を外した。
+そこで、Decision を次の点で書き直した。
+
+- 振り返りの手順の正文を、[RGDD の開発フロー](../agents/rgdd.md)の「振り返り」へ移した。
+- ひと段落の条件は、常に読み込まれる `AGENTS.md` の「学びの還元」に置く。条件が読まれずに `/retro` が飛ばされないようにするためである。
+  条件は RGDD のフェーズに合わせ、`/implement` の完了の代わりに `/thermos` の指摘を直し終えたときを含める。
+- 導入手順を一か所だけ書く文書を、[スキルの取得元と更新](../agents/skill-sources.md)にした。
+
 ## Decision
 
 `retro` と、その依存である `writing-for-agents` を、ADR-039 と同じ固定コミットから導入する。
 取得は `skills` CLI 1.7.0 で行い、実体を `.agents/skills/`、Kiro の検出用リンクを `.kiro/skills/`、内容ハッシュを `skills-lock.json` に置き、上流のファイルは変更しない。
 
 タスクがひと段落したら、対象のセッションを消去する前に `/retro` を実行する。
-この規則は `AGENTS.md` の「学びの還元」に置き、手順と読み替えは [Matt Pocock スキル運用](../agents/matt-pocock-skills/workflow.md)の「振り返り」を正文とする。
+ひと段落の条件は、常に読み込まれる `AGENTS.md` の「学びの還元」に置き、エージェントが自ら実行する根拠にする。
+手順と上流の記述の読み替えは、RGDD の開発フローの「振り返り」を正文とする。
 `/retro` は改善候補を提示するだけで、利用者が選んだ候補だけを ADR-071 の層の優先順位に従って還元する。
 
 スキルの整合（lock、実体、Kiro 用リンク、内容ハッシュ、取得元ごとの固定コミット）は `task skills-check` で検査し、Lefthook の pre-commit と CI の `skills-check.yml` で実行する。
-導入手順は [Matt Pocock スキル運用](../agents/matt-pocock-skills/workflow.md)の「取得元と更新」に一か所だけ書く。
+導入手順は「スキルの取得元と更新」に一か所だけ書く。
 
 上流が `CODING_STANDARDS.md` に置く判断を要する規約は、このリポジトリでは該当する領域の docs に置く。
 
@@ -60,7 +69,7 @@ Proposed
 ### Neutral
 
 - `writing-for-agents` は英語の文書を前提にしており、日本語の書き方は `docs/writing/` に従う。
-- 実行の頻度が過剰と分かった場合は、`AGENTS.md` の規則を見直す。
+- 実行の頻度が過剰と分かった場合は、RGDD の開発フローの「振り返り」の条件を見直す。
 
 ## Alternatives Considered
 
@@ -78,7 +87,9 @@ Proposed
 
 ## References
 
-- [Matt Pocock スキル運用](../agents/matt-pocock-skills/workflow.md)
+- [RGDD の開発フロー](../agents/rgdd.md)
+- [スキルの取得元と更新](../agents/skill-sources.md)
 - [学びを仕組みへ還元し続ける](../principles/continuous-reinforcement.md)
 - [retro リファレンス](../agents/matt-pocock-skills/retro.md)
 - [writing-for-agents リファレンス](../agents/matt-pocock-skills/writing-for-agents.md)
+- [ADR-084: pstack と thermos を導入し、RGDD の5つのフェーズで開発する](ADR-084-adopt-rgdd-with-pstack-and-thermos.md)（開発の流れ）

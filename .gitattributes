@@ -2,3 +2,7 @@
 backend/src/generated/** linguist-generated=true
 frontend/src/api/generated/** linguist-generated=true
 frontend/src/routeTree.gen.ts linguist-generated=true
+
+# task skills-check はスキルと .kiro 以下のファイルを内容ハッシュで比べるため、どの OS でも改行を変換せず書かれたとおりに取り出す。
+.agents/skills/** -text
+.kiro/** -text

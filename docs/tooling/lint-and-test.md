@@ -294,11 +294,10 @@ const params = { ...(cursor !== undefined && { cursor }) };
   リンクの検査は`docs/`、`README.md`、`CONTRIBUTING.md`、`.kiro/steering/`、`backend/src`のJavadocとMarkdownを対象にする。
   既知の限界として、`okf-validate.yml`の`paths`は`backend/src/**`を含まないため、バックエンドのJavadocだけを変えるPull RequestではCIが動かない。
   ADRの番号を振り直す変更はdocsの変更を伴うため、そこで検出する。
-- **`task skills-check`**：`skills-lock.json`、`.agents/skills`の実体、`.kiro/skills`のシンボリックリンクの整合を検査する。
-  `tooling/skills-check/test.sh`が壊れた木で期待の終了コードを確かめてから、`tooling/skills-check/skills-check.mjs`が実際の木を検査する。
-  失敗にするのは、`SKILL.md`の欠落、`name`とディレクトリ名の不一致、`description`の欠落、`.kiro/skills`が`../../.agents/skills/<名前>`へのリンクでない状態、内容ハッシュの不一致、取得元ごとの`ref`が複数ある状態、lockにない実体またはリンクである。
-  `note`を持つlockの項目（`skill-creator`）は、意図して上流から変えているため内容ハッシュを比べない。
-  手順の正文は[Matt Pocock スキル運用](../agents/matt-pocock-skills/workflow.md)の「取得元と更新」である。
+- **`task skills-check`**：`skills-lock.json`と`.kiro/.kiro-plugins-installed`の記録が、`.agents/skills`の実体、`.kiro/skills`のリンク、`kiro/install.sh`が入れたファイルと合っているかを検査する。
+  入れたファイルへの書き込みを止めるフックの自己検査（`.kiro/hooks/block-generated-writes.test.sh`）と`tooling/skills-check/test.sh`を先に実行してから、`tooling/skills-check/skills-check.mjs`が実際の木を検査する。
+  失敗にする状態は`tooling/skills-check/test.sh`のケースが正で、この文書には写さない。
+  手順の正文は[スキルの取得元と更新](../agents/skill-sources.md)である。
 - **`task release-check`**：release-pleaseのmanifest、版ファイル、Gradle版、設定の一致を検証する。
 - **`task agent-git-test`**：`tooling/agent-git/agent-git.sh`（`task agent-commit`、`task agent-push`、`task agent-wait`の本体）を、遅いフックを持つ一時のgitリポジトリで検査する。
   渡したパスの外のstage済みの変更での拒否、フックの間に`git add`したものがcommitに入らないこと、成功と失敗の終わりの印、待ちの途中の終了コード75、前のpre-pushが動いているときのpushの拒否を確かめる。
@@ -318,18 +317,18 @@ OKF検査の採用理由は[ADR-036](../adr/ADR-036-adopt-okf-for-docs-knowledge
 - **commit-msg（すべて）**：commitlintを実行する。
 - **pre-commit（すべて）**：`scan-secrets`相当を実行する。
 - **pre-commit（OpenAPI契約、`.spectral.yaml`、Orvalの設定、`frontend/package.json`、生成物の変更）**：`api-lint`（Dockerがなければスキップ）と`api-client-check`を実行する。
-- **pre-commit（フロントエンドまたはTaskfileの変更）**：`fe-check`を実行する。
+- **pre-commit（フロントエンドの変更）**：`fe-check`を実行する。
   前項と同じgroupで順に実行し、Orvalの再生成と型検査を同時に走らせない。
 - **pre-commit（Dockerfileの変更）**：`lint-docker`相当と`lint-docker-check`相当を実行する。
 - **pre-commit（Composeファイルの変更）**：`lint-compose`相当を実行する。
 - **pre-commit（Markdownの変更）**：変更ファイルへ`lint-md`相当を実行する。
 - **pre-commit（docs、steering、Taskfile、README、`tooling/adr-lint/`の変更）**：`okf-check`を実行する。
-- **pre-commit（`.agents/skills/`、`.kiro/skills/`、`skills-lock.json`、`tooling/skills-check/`の変更）**：`skills-check`を実行する。
+- **pre-commit（`.agents/skills/`、`.kiro/`、`skills-lock.json`、`tooling/skills-check/`の変更）**：`skills-check`を実行する。
 - **pre-commit（Taskfileか`tooling/taskfile-cleanup/`の変更）**：`lint-taskfile`を実行する。
 - **pre-commit（`tooling/agent-git/`の変更）**：`agent-git-test`を実行する。
 - **pre-push（すべて）**：`adr-check`と`scan-secrets-all`相当を実行する。
 - **pre-push（バックエンドのJavaまたはGradle変更）**：`be-lint`相当と`test`を実行する。
-- **pre-push（フロントエンドまたはTaskfileの変更）**：`fe-test-build`を、Vitestのdot reporterとjson-summaryだけのcoverageで実行する。
+- **pre-push（フロントエンドの変更）**：`fe-test-build`を、Vitestのdot reporterとjson-summaryだけのcoverageで実行する。
 - **pre-push（GitHub Actionsワークフローの変更）**：`lint-actions`相当と`lint-actions-security`相当を実行する。
 
 Gitフックの条件とコマンドは[`lefthook.yml`](../../lefthook.yml)を正とする。
