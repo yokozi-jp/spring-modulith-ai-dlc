@@ -75,14 +75,12 @@ LiquibaseとjOOQ生成はHikariCPを通らないため、この上限を受け�
 `docker/compose.yml`と`docker/compose-test.yml`では、PostgreSQLのイメージが作るsuperuser（`postgres`）をコンテナの初期化だけに使います。
 `docker/initdb`は初回起動時に、このsuperuserでマイグレーション用ロール、`liquibase`スキーマ、DML限定のアプリケーション用ロールを作成します。
 マイグレーション用ロールはsuperuserでも`BYPASSRLS`でもなく、DBへの権限は`CREATE`だけを持ち、`liquibase`スキーマと、changesetが作るスキーマと表を所有します。
-superuserや`BYPASSRLS`を持つロールにはRLSが効かないため、表に`FORCE ROW LEVEL SECURITY`を付けたとき、ローカルとCIでも本番と同じく所有者にRLSが効くように分けています。
 アプリケーション、Liquibase、jOOQ生成、テストのDB操作はsuperuserで接続しません。
 superuserのパスワードは、ローカルでは`.env`の`POSTGRES_SUPERUSER_PASSWORD`をComposeのsecretで渡し、テストでは使い捨ての値を使います。
 マイグレーション用ロールがsuperuserでも`BYPASSRLS`でもないことは、カタログのテスト（`SchemaInspectionTest`の規則G2）が確かめます。
-マイグレーション用ロールがsuperuserだった頃のボリュームは`docker/initdb`が再実行されないため、`task compose-reset CONFIRM_RESET=yes`で作り直します。
 001 changesetは`modulith`スキーマを作成し、そのUSAGEとイベント出版テーブルだけのDML権限を`DB_USERNAME`へ付与します。
 Liquibase管理スキーマと管理テーブルへのアプリ権限は付与しません。
-001 changesetを初期状態から書き換えたため、既存DBは移行せず`task compose-reset CONFIRM_RESET=yes`で作り直します。
+001 changesetを初期状態から書き換えたことと、既存のボリュームでは`docker/initdb`が再実行されずマイグレーション用ロールがsuperuserのまま残ることから、既存DBは移行せず`task compose-reset CONFIRM_RESET=yes`で作り直します。
 ステージングと本番も既存DBを再利用せず、`liquibase`スキーマだけをマイグレーション用ロールの所有で作ってから初回マイグレーションを実行します。
 001 changesetがアプリケーションロール（`DB_USERNAME`）へGRANTするため、ステージングと本番では、そのロールを初回マイグレーションより前にRDS側で作成しておきます。
 `docker/initdb`のような自動作成経路がないため、未作成のままマイグレーションを実行するとGRANTで失敗します。

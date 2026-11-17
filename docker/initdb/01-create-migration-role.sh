@@ -17,6 +17,11 @@ if [ -z "$migration_user" ] || [ -z "$migration_password" ]; then
     exit 1
 fi
 
+if [ "$migration_user" = "$POSTGRES_USER" ]; then
+    echo "01-create-migration-role: MIGRATION_DB_USERNAME \"$migration_user\" は superuser の POSTGRES_USER と別の名前にします。" >&2
+    exit 1
+fi
+
 psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" --dbname "$POSTGRES_DB" \
     -v migration_user="$migration_user" -v migration_password="$migration_password" \
     -v db_name="$POSTGRES_DB" <<'EOSQL'
