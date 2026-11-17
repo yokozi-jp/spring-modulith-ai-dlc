@@ -74,7 +74,7 @@ LiquibaseとjOOQ生成はHikariCPを通らないため、この上限を受け�
 ローカルとテストも二ロールで動かします。
 `docker/compose.yml`と`docker/compose-test.yml`では、PostgreSQLのイメージが作るsuperuser（`postgres`）をコンテナの初期化だけに使います。
 `docker/initdb`は初回起動時に、このsuperuserでマイグレーション用ロール、`liquibase`スキーマ、DML限定のアプリケーション用ロールを作成します。
-マイグレーション用ロールはsuperuserでも`BYPASSRLS`でもなく、DBへの権限は`CREATE`だけを持ち、`liquibase`スキーマと、changesetが作るスキーマと表を所有します。
+マイグレーション用ロールはsuperuserでも`BYPASSRLS`でもなく、DBへは`CREATE`だけを追加で与え、`liquibase`スキーマと、changesetが作るスキーマと表を所有します。
 アプリケーション、Liquibase、jOOQ生成、テストのDB操作はsuperuserで接続しません。
 superuserのパスワードは、ローカルでは`.env`の`POSTGRES_SUPERUSER_PASSWORD`をComposeのsecretで渡し、テストでは使い捨ての値を使います。
 マイグレーション用ロールがsuperuserでも`BYPASSRLS`でもないことは、カタログのテスト（`SchemaInspectionTest`の規則G2）が確かめます。
