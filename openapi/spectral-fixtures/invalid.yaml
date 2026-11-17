@@ -53,7 +53,7 @@ paths:
       description: サンプル注文を 1 件取得する。<p>取り消し済みの注文も返す。
       operationId: findSampleOrderById
       parameters:
-        # oas3-parameter-description
+        # oas3-parameter-description と public-id-uuid（format: uuid がない）
         - name: sampleOrderId
           in: path
           required: true
@@ -73,6 +73,24 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ProblemDetail"
+  /api/sample-orders/{code}:
+    delete:
+      tags:
+        - sample-order
+      summary: サンプル注文を取り消す。
+      description: サンプル注文を取り消す。<p>取り消し済みなら何もしない。
+      operationId: cancelSampleOrder
+      parameters:
+        # public-id-uuid（パスの引数が uuid でない）
+        - name: code
+          in: path
+          description: サンプル注文の番号
+          required: true
+          schema:
+            type: string
+      responses:
+        "204":
+          description: サンプル注文を取り消した
   /api/orders:
     get:
       tags:
@@ -147,6 +165,12 @@ components:
           type: string
           description: サンプル注文の ID
           example: SO-0001
+        # public-id-uuid（数値の ID）
+        orderId:
+          type: integer
+          format: int64
+          description: 注文の ID
+          example: 1
       required:
         - sampleOrderId
   responses:

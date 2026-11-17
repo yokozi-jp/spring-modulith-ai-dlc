@@ -6,6 +6,7 @@ import jakarta.validation.constraints.NotNull;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
+import java.util.UUID;
 
 /**
  * 注文の詳細を返す API の本文。
@@ -19,7 +20,7 @@ import java.util.List;
  * @param lines 注文の明細
  */
 public record OrderDetailsResponse(
-    @NotNull @Schema(example = "5f0c2a8e-7d1b-4c3a-9e6f-1a2b3c4d5e6f") String orderId,
+    @NotNull @Schema(example = "5f0c2a8e-7d1b-4c3a-9e6f-1a2b3c4d5e6f") UUID orderId,
     @NotNull @Schema(example = "C-2026-0001") String customerOrderCode,
     @NotNull @Schema(example = "DRAFT") String status,
     @NotNull @Schema(example = "2026-10-05T01:02:03.123456Z") Instant orderedAt,
@@ -35,7 +36,7 @@ public record OrderDetailsResponse(
   /** 参照の結果から作る。 */
   public static OrderDetailsResponse from(final OrderDetails details) {
     return new OrderDetailsResponse(
-        details.orderId(),
+        UUID.fromString(details.orderId()),
         details.customerOrderCode(),
         details.status(),
         details.orderedAt(),
@@ -55,7 +56,7 @@ public record OrderDetailsResponse(
    */
   public record OrderLineResponse(
       @NotNull @Schema(example = "1") int lineNumber,
-      @NotNull @Schema(example = "0b6c8f6e-2f4a-4c1e-9d3b-7a1e5c2d4f60") String productId,
+      @NotNull @Schema(example = "0b6c8f6e-2f4a-4c1e-9d3b-7a1e5c2d4f60") UUID productId,
       @NotNull @Schema(example = "2") int quantity,
       @NotNull @Schema(example = "120.00") BigDecimal unitPrice,
       @NotNull @Schema(example = "240.00") BigDecimal amount) {
@@ -63,7 +64,11 @@ public record OrderDetailsResponse(
     /** 参照の結果の明細から作る。 */
     public static OrderLineResponse from(final OrderDetails.Line line) {
       return new OrderLineResponse(
-          line.lineNumber(), line.productId(), line.quantity(), line.unitPrice(), line.amount());
+          line.lineNumber(),
+          UUID.fromString(line.productId()),
+          line.quantity(),
+          line.unitPrice(),
+          line.amount());
     }
   }
 }

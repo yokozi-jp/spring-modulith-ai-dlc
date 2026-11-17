@@ -123,6 +123,25 @@ rules:
               - required: [example]
               - required: [examples]
 
+  # ponytail: パス以外では ID を名前で見分ける。名前が id や Id で終わらない識別子は検査しない。
+  public-id-uuid:
+    description: パスの引数と、名前が id か Id で終わる引数とプロパティは、public_id の type string、format uuid にする（docs/database/postgresql-primary-keys.md）。
+    severity: error
+    given:
+      - "$..parameters[?(@.in === 'path' || (@.name && @.name.match(/(^id|Id)$/)))].schema"
+      - "$..properties[?(@property.match(/(^id|Id)$/))]"
+    then:
+      function: schema
+      functionOptions:
+        schema:
+          type: object
+          required: [type, format]
+          properties:
+            type:
+              const: string
+            format:
+              const: uuid
+
   tag-name-format:
     description: tag は業務機能のパッケージ名を英小文字の kebab-case にし、Controller の名前を使わない。
     severity: error
