@@ -32,6 +32,8 @@ Response は Domain の型を持たない。
 
 - `public record` にし、Jackson のアノテーションを付けない。
 - component は Java の標準型と、自分にネストした record だけにする。
+- 注文や顧客を指す ID の component は `UUID` にし、OpenAPI に `format: uuid` で出す（`public-id-uuid`、[主キーと公開する ID](../../database/postgresql-primary-keys.md)）。
+  参照の結果の文字列の ID は、`from` で `UUID.fromString(...)` にする。
 - 日時は `Instant` にし、`Z` 付きの RFC 3339 の文字列で出す。
 - 区分値（`status`）は、参照の結果の文字列をそのまま入れ、表示名を返さない。
 - 1行と詳細の Response は、参照の結果の `lockNo` を `long lockNo` に持つ。
@@ -63,6 +65,7 @@ import com.example.demo.ordering.OrderSummary;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.util.UUID;
 
 /**
  * 注文の一覧の1行を返す API の本文。
@@ -74,7 +77,7 @@ import java.time.Instant;
  * @param lockNo 更新の本文で送り返すロック番号
  */
 public record OrderSummaryResponse(
-    @Schema(example = "O-0001") String orderId,
+    @Schema(example = "5f0c2a8e-7d1b-4c3a-9e6f-1a2b3c4d5e6f") UUID orderId,
     @Schema(example = "PLACED") String status,
     @Schema(example = "1900") BigDecimal total,
     @Schema(example = "2026-10-03T00:00:00Z") Instant placedAt,
@@ -83,7 +86,7 @@ public record OrderSummaryResponse(
   /** 参照の結果から作る。 */
   public static OrderSummaryResponse from(final OrderSummary summary) {
     return new OrderSummaryResponse(
-        summary.orderId(),
+        UUID.fromString(summary.orderId()),
         summary.status(),
         summary.total(),
         summary.placedAt(),
@@ -126,8 +129,8 @@ public record OrderSummaryListResponse(List<OrderSummaryResponse> items) {
  * @param lockNo 更新の本文で送り返すロック番号
  */
 public record OrderDetailsResponse(
-    @Schema(example = "O-0001") String orderId,
-    @Schema(example = "C-0001") String customerId,
+    @Schema(example = "5f0c2a8e-7d1b-4c3a-9e6f-1a2b3c4d5e6f") UUID orderId,
+    @Schema(example = "3a9d6e1f-8b2c-4d7e-a5f0-6c1b2e3d4f5a") UUID customerId,
     @Schema(example = "PLACED") String status,
     List<OrderDetailsResponse.OrderLineResponse> lines,
     @Schema(example = "2000") BigDecimal subtotal,
@@ -144,8 +147,8 @@ public record OrderDetailsResponse(
   /** 参照の結果から作る。 */
   public static OrderDetailsResponse from(final OrderDetails details) {
     return new OrderDetailsResponse(
-        details.orderId(),
-        details.customerId(),
+        UUID.fromString(details.orderId()),
+        UUID.fromString(details.customerId()),
         details.status(),
         details.lines().stream().map(OrderLineResponse::from).toList(),
         details.subtotal(),
@@ -198,14 +201,14 @@ class OrderSummaryListResponseTest {
         new OrderSummaryListResponse(
             List.of(
                 new OrderSummaryResponse(
-                    "O-1",
+                    UUID.fromString("5f0c2a8e-7d1b-4c3a-9e6f-1a2b3c4d5e6f"),
                     "PLACED",
                     new BigDecimal("1900"),
                     Instant.parse("2026-10-03T00:00:00Z"),
                     1L)));
 
     assertThat(jsonMapper.writeValueAsString(response))
-        .as("orderId=O-1 の一覧の JSON")
+        .as("1行の注文の一覧の JSON")
         .startsWith("{\"items\":[")
         .contains("\"placedAt\":\"2026-10-03T00:00:00Z\"")
         .contains("\"lockNo\":1");

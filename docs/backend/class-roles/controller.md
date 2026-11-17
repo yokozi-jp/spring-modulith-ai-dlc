@@ -107,7 +107,7 @@ class OrderController {
   @ApiResponse(responseCode = "409", ref = "#/components/responses/ConflictProblem")
   @PostMapping("/{orderId}/cancel")
   /* package */ ResponseEntity<Void> cancel(
-      @PathVariable final String orderId, @Valid @RequestBody final CancelOrderRequest request) {
+      @PathVariable final UUID orderId, @Valid @RequestBody final CancelOrderRequest request) {
     cancelOrder.handle(request.toCommand(orderId));
     return ResponseEntity.noContent().build();
   }
@@ -160,9 +160,9 @@ class OrderController {
 @ApiResponse(responseCode = "200")
 @ApiResponse(responseCode = "404", ref = "#/components/responses/NotFoundProblem")
 @GetMapping("/{orderId}")
-/* package */ OrderDetailsResponse details(@PathVariable final String orderId) {
+/* package */ OrderDetailsResponse details(@PathVariable final UUID orderId) {
   return orderQueries
-      .findDetails(orderId)
+      .findDetails(orderId.toString())
       .map(OrderDetailsResponse::from)
       .orElseThrow(() -> new NotFoundException("order not found: orderId=" + orderId));
 }
@@ -177,9 +177,9 @@ class OrderController {
  */
 @Operation(operationId = "listOrders")
 @GetMapping
-/* package */ OrderSummaryListResponse search(@RequestParam final String customerId) {
+/* package */ OrderSummaryListResponse search(@RequestParam final UUID customerId) {
   return new OrderSummaryListResponse(
-      orderQueries.search(new OrderSearchCriteria(customerId)).stream()
+      orderQueries.search(new OrderSearchCriteria(customerId.toString())).stream()
           .map(OrderSummaryResponse::from)
           .toList());
 }
@@ -217,7 +217,7 @@ class OrderControllerTest {
                 .with(user("test-user"))
                 .with(csrf())
                 .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"customerId\":\"C-1\",\"lines\":[]}"))
+                .content("{\"customerId\":\"3a9d6e1f-8b2c-4d7e-a5f0-6c1b2e3d4f5a\",\"lines\":[]}"))
         .andExpect(status().isBadRequest())
         .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
         .andExpect(jsonPath("$.status").value(400));
