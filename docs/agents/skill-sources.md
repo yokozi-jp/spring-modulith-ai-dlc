@@ -23,6 +23,7 @@ tags: [runbook, agent-skills, pstack, thermos, matt-pocock]
 | -------------------------- | ----------------------------------------------------------------------------------------- | ------------------------------- | ------------------------------------- |
 | `mattpocock/skills`        | Matt Pocock のスキル                                                                      | `skills-lock.json`              | 項目の `ref`                          |
 | `anthropics/skills`        | `skill-creator`                                                                           | `skills-lock.json`              | 項目の `ref`                          |
+| `obra/superpowers`         | `using-git-worktrees`                                                                     | `skills-lock.json`              | 項目の `ref`                          |
 | `yokozi-jp/cursor-plugins` | pstack、thermos、cursor-team-kit の `deslop`、`control-cli`、`control-ui`、`kiro-adapter` | `.kiro/.kiro-plugins-installed` | 1行目の `# cursor-plugins <コミット>` |
 | なし                       | このリポジトリで書くスキル（`java-best-practices`、検証スキルの `verify-<アプリ名>`）     | `skills-lock.json`              | なし                                  |
 

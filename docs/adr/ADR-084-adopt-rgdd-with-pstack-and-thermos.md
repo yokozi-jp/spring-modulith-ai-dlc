@@ -97,7 +97,7 @@ pstack のうち、次のスキルは入れない。
 
 ### Neutral
 
-- 実装とレビューの入口を pstack と thermos にそろえるため、役割が重なる Matt Pocock の `ask-matt`、`code-review`、`diagnosing-bugs`、`grill-me`、`handoff`、`implement`、`using-git-worktrees`、`tdd` を外す。
+- 実装とレビューの入口を pstack と thermos にそろえるため、役割が重なる Matt Pocock の `ask-matt`、`code-review`、`diagnosing-bugs`、`grill-me`、`handoff`、`implement`、`tdd` を外す。`using-git-worktrees` は便利なため残す。
   `tdd` は pstack の同名のスキルに置き換わる。
 - 外したスキルの日本語リファレンスは削除し、上流と git の履歴に残す。
 - `skills-lock.json` の項目と、`.kiro/.kiro-plugins-installed` の項目は重ならない。重なると `task skills-check` が失敗にする。
