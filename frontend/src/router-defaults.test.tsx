@@ -97,15 +97,15 @@ describe("router defaults", () => {
       "/",
     );
 
-    await vi.waitFor(() => {
-      expect(pushError).toHaveBeenCalledWith(error);
-    });
+    await expect.poll(() => pushError).toHaveBeenCalledWith(error);
   });
 
   it("shows the localized pending view while the loader runs", async () => {
     let loaded = false;
     renderRouter(
-      treeWithLoader(() => vi.waitUntil(() => loaded)),
+      treeWithLoader(async () => {
+        await expect.poll(() => loaded).toBe(true);
+      }),
       "/",
       0,
     );

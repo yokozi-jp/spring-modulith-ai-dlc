@@ -29,6 +29,9 @@ const restrictedHtmlProperties = [
 const htmlSinkGlobals = [{ name: "DOMParser", message: "Do not parse arbitrary HTML." }];
 const apiMessage = "Use the generated API client in src/api.";
 const mockMessage = "Use MSW, vi.spyOn or vi.stubGlobal instead of module mocks.";
+// vi.waitFor と vi.waitUntil は既定の 1 秒を一括で変えられない。上限は src/testing/setup.ts が決める。
+const waitMessage =
+  "Use findBy or waitFor from Testing Library, or expect.poll. src/testing/setup.ts sets their timeout.";
 const networkGlobals = ["fetch", "XMLHttpRequest"].map((name) => ({ name, message: apiMessage }));
 const htmlSinkProperties = [
   ...restrictedHtmlProperties,
@@ -281,7 +284,10 @@ export default defineConfig(({ mode }) => {
         "vitest/require-test-timeout": "off",
         "vite-plus/prefer-vite-plus-imports": "error",
         "react/no-danger": "error",
-        "vitest/no-restricted-vi-methods": ["error", { mock: mockMessage, doMock: mockMessage }],
+        "vitest/no-restricted-vi-methods": [
+          "error",
+          { mock: mockMessage, doMock: mockMessage, waitFor: waitMessage, waitUntil: waitMessage },
+        ],
         "no-restricted-imports": [
           "error",
           { patterns: [baseUiImports, testOnlyImports, telemetrySdkImports] },

@@ -30,7 +30,7 @@ function serveItemsHoldingRefetch(status: 204 | 409) {
     http.get(itemsUrl, async () => {
       fetchCount += 1;
       if (fetchCount > 1) {
-        await vi.waitUntil(() => released);
+        await expect.poll(() => released).toBe(true);
       }
       return HttpResponse.json({ fetchCount });
     }),
@@ -53,12 +53,12 @@ async function mutateWhileRefetchIsHeld(status: 204 | 409) {
     queryFn: () => apiFetch<{ data: unknown }>(itemsUrl, {}),
   });
   onTestFinished(query.subscribe(vi.fn<() => void>()));
-  await vi.waitUntil(() => query.getCurrentResult().isSuccess);
+  await expect.poll(() => query.getCurrentResult().isSuccess).toBe(true);
   const mutation = new MutationObserver(queryClient, {
     mutationFn: () => apiFetch<{ status: number }>(itemsUrl, { method: "POST" }),
   });
   const result = mutation.mutate();
-  await vi.waitUntil(() => items.fetchCount() === 2);
+  await expect.poll(() => items.fetchCount()).toBe(2);
   return { query, mutation, result, release: items.release };
 }
 

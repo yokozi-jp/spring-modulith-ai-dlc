@@ -3,7 +3,7 @@
 import { screen, waitFor, within } from "@testing-library/react";
 import type { UserEvent } from "@testing-library/user-event";
 import { http, HttpResponse } from "msw";
-import { beforeEach, describe, expect, it, vi } from "vite-plus/test";
+import { beforeEach, describe, expect, it } from "vite-plus/test";
 
 import {
   getFindOrderByIdMockHandler,
@@ -115,7 +115,7 @@ describe("order new page", () => {
       http.post(
         "*/api/orders",
         async () => {
-          await vi.waitUntil(() => release);
+          await expect.poll(() => release).toBe(true);
         },
         { once: true },
       ),

@@ -211,6 +211,12 @@ describe("project lint config on fixtures", () => {
       ).toBe(2);
     });
 
+    it("rejects waits with a fixed timeout with vi.waitFor and vi.waitUntil", () => {
+      expect(
+        countIn("features/order/implicit-wait.test.ts", "vitest(no-restricted-vi-methods)"),
+      ).toBe(2);
+    });
+
     it("allows replacing globals with vi.stubGlobal and vi.spyOn", () => {
       expect(codesIn("features/order/global-stub.test.ts")).toStrictEqual([]);
     });

@@ -34,7 +34,10 @@ componentの内部state、Hookの呼出回数、CSS classだけを主要な期�
 - **実行環境の指定**：jsdomを使うテストは、ファイルの先頭に`/* @vitest-environment jsdom */`を書く。
 - **クエリ**：role、label、placeholder、text、display valueの順に選び、`data-testid`は他のクエリで取れない場合だけ使い、`container.querySelector`は使わない。
 - **user-event**：renderの前に`userEvent.setup()`を呼び、返ったinstanceで操作する。
-- **非同期の待ち**：`findBy`か`waitFor`で待ち、`setTimeout`などの固定時間で待たない。
+- **非同期の待ち**：DOMの変化はTesting Libraryの`findBy`か`waitFor`で待ち、mockの呼出などDOM以外の値は`expect.poll`で待つ。
+  `setTimeout`などの固定時間で待たない。
+  待つ上限は`src/testing/setup.ts`が5秒に一括で設定するので、各テストに`timeout`を書かない。
+  上限を一括で変えられない`vi.waitFor`と`vi.waitUntil`は、Oxlintの`vitest/no-restricted-vi-methods`が禁止する。
   `waitFor`のcallbackにはassertionを一つだけ置き、clickなどの副作用を置かない。
 - **差し替えてよい境界**：HTTPはMSW、globalは`vi.spyOn`か`vi.stubGlobal`、時刻はfake timerで置き換え、`vi.mock`と`vi.doMock`でmoduleを差し替えない。
   `vi.mock`と`vi.doMock`はOxlintの`vitest/no-restricted-vi-methods`が禁止する。

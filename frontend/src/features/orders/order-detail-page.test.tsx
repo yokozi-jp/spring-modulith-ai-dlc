@@ -2,7 +2,7 @@
 
 import { screen, waitFor, within } from "@testing-library/react";
 import { http } from "msw";
-import { beforeEach, describe, expect, it, vi } from "vite-plus/test";
+import { beforeEach, describe, expect, it } from "vite-plus/test";
 
 import { getListProductsMockHandler } from "@/api/generated/mocks/product/product.msw";
 import { server } from "@/testing/msw";
@@ -161,7 +161,7 @@ describe("order detail page", () => {
       http.post(
         `*/api/orders/:orderId/${path}`,
         async () => {
-          await vi.waitUntil(() => release);
+          await expect.poll(() => release).toBe(true);
         },
         { once: true },
       ),
