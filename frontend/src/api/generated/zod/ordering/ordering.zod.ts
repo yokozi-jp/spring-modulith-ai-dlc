@@ -13,7 +13,7 @@ export const listOrdersQueryStatusRegExp = new RegExp('^(DRAFT|CONFIRMED|CANCELL
 
 
 export const ListOrdersQueryParams = zod.object({
-  "status": zod.string().regex(listOrdersQueryStatusRegExp).optional().describe('絞り込む注文の状態（DRAFT、CONFIRMED、CANCELLED）。省略するとすべての状態')
+  "status": zod.string().regex(listOrdersQueryStatusRegExp).nullish().describe('絞り込む注文の状態（DRAFT、CONFIRMED、CANCELLED）。省略するとすべての状態')
 })
 
 export const ListOrdersResponse = zod.object({
