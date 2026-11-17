@@ -53,7 +53,7 @@ Snyk Codeは必須チェックではないため待たない。
 Dependabotのpatchとminorの更新は、[ADR-021](../adr/ADR-021-group-dependabot-minor-and-patch-updates.md)に従って自動でマージされるため、この条件の対象にしない。
 
 当たらないPull Requestは、必須チェックが通っていれば、変更概要と「CI以外で確認したこと」を確かめてマージしてよい。
-承認は要求されない。
+承認は要求されない（理由は [ADR-086](../adr/ADR-086-align-main-protection-with-solo-and-agent-operation.md)）。
 
 エージェントは、条件に当たるPull Requestをマージしない。
 `gh pr merge --admin`とauto-mergeの有効化は、人だけが行う。

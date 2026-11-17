@@ -22,8 +22,11 @@ expect() {
 }
 
 expect ok 0 "ruleset-check OK"
-expect drift 1 "ruleset にあり、docs の一覧にない: B"
-expect drift 1 "docs の一覧にあり、ruleset にない: C"
+expect drift 1 "ruleset にあり、docs の一覧にありません: B"
+expect drift 1 "docs の一覧にあり、ruleset にありません: C"
+expect noworkflow 1 "workflow に同名の name がなく、報告されません: B"
+expect nosection 1 "節を読めません"
+expect badbullet 1 "一覧の行は"
 
 if [ "$failures" -gt 0 ]; then
   echo "$failures failure(s)"

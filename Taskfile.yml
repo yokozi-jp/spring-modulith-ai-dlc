@@ -278,7 +278,8 @@ tasks:
       - bash tooling/adr-lint/test.sh
       - node tooling/adr-lint/adr-lint.mjs
 
-  # .github/rulesets/main.json の必須チェックと branch-protection.md の一覧の一致を検査する。
+  # .github/rulesets/main.json の必須チェックを、branch-protection.md の一覧と workflow の name に突き合わせる。
+  # ponytail: GitHub 上の ruleset との一致は見ない。反映は手動の gh api で、限界に当たったら CI で API と比べる。
   ruleset-check:
     internal: true
     silent: true

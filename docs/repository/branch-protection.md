@@ -15,12 +15,12 @@ ruleset の正本は `.github/rulesets/main.json` である。
 変更するときは、このファイルを直し、次のコマンドで GitHub へ反映する。
 
 ```bash
-gh api -X PUT repos/<owner>/<repo>/rulesets/<id> --input .github/rulesets/main.json
+gh api -X PUT repos/yokozi-jp/spring-modulith-ai-dlc/rulesets/23297515 --input .github/rulesets/main.json
 ```
 
-必須チェックの名前は、このファイルと下の一覧と workflow の job 名で、絵文字の異体字選択子（U+FE0F）まで一致させる。
+必須チェックの名前は、このファイル、下の一覧、workflow の job 名の 3 か所で、絵文字の異体字選択子（U+FE0F）まで一致させる。
 一致しないチェックは、報告されないまま待機になり、merge できなくなる。
-`task okf-check` が、ファイルと一覧の一致を検査する。
+`task okf-check` が、この 3 か所の一致を検査する。GitHub 上の ruleset との一致は検査しない。理由は [ADR-086](../adr/ADR-086-align-main-protection-with-solo-and-agent-operation.md) にある。
 
 ruleset は Active にする。
 bypass できるのは、リポジトリの管理者（RepositoryRole の id `5`）だけで、`bypass_mode` は `pull_request` にする。
@@ -38,9 +38,9 @@ bypass できるのは、リポジトリの管理者（RepositoryRole の id `5`
 - Pull Request を必須にする。
 - 必須ステータスチェックの成功を必須にする。
 
-次の設定は外している（[ADR-086](../adr/ADR-086-align-main-protection-with-solo-and-agent-operation.md)）。
+次の設定は要求しない（[ADR-086](../adr/ADR-086-align-main-protection-with-solo-and-agent-operation.md)）。
 
-- 承認の数は 0 にする。承認とコード所有者の承認は要求しない。
+- 承認の数を 0 にし、承認とコード所有者の承認を要求しない。
 - merge 前の会話の解決を要求しない。bot のコメントも resolve しなくてよい。
 - merge 前にブランチを最新の `main` へ更新することを要求しない（`strict_required_status_checks_policy` は `false`）。
 - linear history を要求しない。
@@ -111,7 +111,7 @@ Security タブの未解決結果はレビュー時に確認し、受容する�
 
 - GitHub Actions：`actionlint`
 - Markdown：`Run markdownlint-cli2 📝`
-- docs、steering、OKF設定、Taskfile：`Run task okf-check 📚`
+- docs、steering、OKF設定、Taskfile、ruleset、workflow、`tooling/ruleset-check/`：`Run task okf-check 📚`
 - Compose：`Run docker compose config 🐳`
 
 path filter によって workflow 自体が作られない Pull Request では、これらの check run も存在しない。

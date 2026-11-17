@@ -23,7 +23,7 @@ Proposed
 
 ruleset には、運用を止める設定が 3 つあった。
 
-- `strict_required_status_checks_policy` が `true` で、main が進むたびに Update branch と必須チェックのやり直しが要る。Dependabot の Pull Request が溜まると 1 本ずつしか merge できず、#242 は merge まで 5 日かかった。
+- `strict_required_status_checks_policy` が `true` で、main が進むたびに Update branch と必須チェックのやり直しが要る。Dependabot の Pull Request が溜まると 1 本ずつしか merge できない。
 - `required_review_thread_resolution` が `true` で、bot のコメントにも resolve が要る。
 - `bypass_actors` が空で、チェックが壊れたときは ruleset を無効にしないと merge できない。
 
@@ -44,14 +44,15 @@ ruleset `main` を次の設定にする。
 - `required_linear_history` の規則を外す。merge の方式は squash だけなので、履歴は直線のままになる。
 - `bypass_actors` に管理者（RepositoryRole の id `5`）を `bypass_mode: pull_request` で加える。`main` への直接 push は bypass でもできない。
 - 承認の数は 0 のままにする。
+- ruleset の正本を `.github/rulesets/main.json` に置き、必須チェックの名前を docs の一覧と workflow の名前に突き合わせる検査を `task okf-check` に入れる。GitHub への反映は手動の `gh api` で行う。
 
 承認を要求しない代わりに、人が必ず読む Pull Request を条件で決める。
-条件は、戻しにくい変更、ADR と `AGENTS.md` と `.kiro/` の変更、CI と hook のゲートの変更、認証と認可の変更、依存の追加、テストの弱体化である。
+条件は、戻しにくい変更、エージェントの設定の変更、CI と hook のゲートの変更、認証と認可の変更、依存の追加、テストの弱体化である。
 条件に当たる Pull Request は、エージェントが merge せず、`--admin` と auto-merge の有効化も人だけが行う。
 条件の本文は [Draftからマージまで](../pull-request/review-request-and-merge.md) に置く。
 
 ADR-017 の Decision のうち、承認、コード所有者の承認、会話の解決、linear history を要求する部分は、この ADR が置き換える。
-ADR-017 は Proposed なので、Decision をこの内容に書き直した。
+ADR-017 と ADR-021 は Proposed なので、それぞれの Decision と Alternatives Considered を、この ADR を指す形に書き直した。
 
 ## Consequences
 
@@ -59,6 +60,7 @@ ADR-017 は Proposed なので、Decision をこの内容に書き直した。
 
 - main が進んでも、必須チェックが通った Pull Request をそのまま merge できる。
 - bot のコメントを resolve しなくても merge できる。
+- ruleset をファイルで管理するため、変更の履歴と差分のレビューが残る。
 - チェックが壊れたときも、ruleset を無効にせずに管理者が merge できる。
 - docs とエージェントの手順が、実際の ruleset と一致する。
 
@@ -66,6 +68,7 @@ ADR-017 は Proposed なので、Decision をこの内容に書き直した。
 
 - 最新の main と統合した結果を検査せずに merge するため、2 つの Pull Request が個別には通っても、合わせると壊れることがある。`main` への push で動く CI で検知し、赤くなったら管理者が直す。
 - 承認がないので、人が読む Pull Request を守るかは運用に任せる。エージェントが管理者のアカウントで動くため、`--admin` を使わない規約を機械では止められない。条件を機械で検査する仕組みはない。
+- ファイルを直しても GitHub に反映し忘れる、または UI で直接変えると、ファイルと実際の ruleset がずれる。この検査は検出しない。
 - 管理者は bypass で必須チェックを飛ばして merge できる。理由を Pull Request に残す運用で補う。
 
 ### Neutral
@@ -86,6 +89,12 @@ ADR-017 は Proposed なので、Decision をこの内容に書き直した。
 - **Description**：最新化の必須を残し、merge queue で自動に追従させる。
 - **Pros**：統合した結果を検査してから merge できる。
 - **Cons**：merge queue の導入と CI の設定が要り、現在の規模に見合わない。
+
+### CI で GitHub 上の ruleset とファイルを比べる
+
+- **Description**：`gh api` で取得した ruleset とファイルの差を CI で検査する。
+- **Pros**：反映し忘れと UI での変更を検出できる。
+- **Cons**：読み取りの権限と通信が CI に要る。現在の規模では、先にファイルと docs と workflow の名前の一致を守る。
 
 ### ruleset を変えず、docs だけ直す
 

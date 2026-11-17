@@ -12,6 +12,7 @@ on:
       - "tooling/adr-lint/**"
       - ".github/rulesets/**"
       - "tooling/ruleset-check/**"
+      - ".github/workflows/**"
   pull_request:
     branches: ["**"]
     paths:
@@ -23,6 +24,7 @@ on:
       - "tooling/adr-lint/**"
       - ".github/rulesets/**"
       - "tooling/ruleset-check/**"
+      - ".github/workflows/**"
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
