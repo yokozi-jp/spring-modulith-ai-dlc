@@ -1,0 +1,96 @@
+---
+type: ADR
+title: 'ADR-086: main の保護を 1 人とエージェントの運用に合わせ、人が読む Pull Request を条件で決める'
+description: 承認と会話の解決と最新化の必須を外し、管理者に Pull Request の merge だけの bypass を許す。人が必ず読む Pull Request は条件で決める。
+tags: [adr, governance, github, code-review]
+---
+
+# ADR-086: main の保護を 1 人とエージェントの運用に合わせ、人が読む Pull Request を条件で決める
+
+## Status
+
+Proposed
+
+## Date
+
+2026-11-17
+
+## Context
+
+[ADR-017](ADR-017-adopt-trunk-based-repository-governance.md) は、一件以上の承認、コード所有者の承認、会話の解決、linear history を要求する方針だった。
+実際の ruleset `main` は、承認の数が 0 で、コード所有者の承認も要求していない。
+所有者は `@yokozi-jp` の 1 人で、Pull Request の作成者は自分の変更を承認できないため、承認を要求すると merge できなくなる。
+
+ruleset には、運用を止める設定が 3 つあった。
+
+- `strict_required_status_checks_policy` が `true` で、main が進むたびに Update branch と必須チェックのやり直しが要る。Dependabot の Pull Request が溜まると 1 本ずつしか merge できず、#242 は merge まで 5 日かかった。
+- `required_review_thread_resolution` が `true` で、bot のコメントにも resolve が要る。
+- `bypass_actors` が空で、チェックが壊れたときは ruleset を無効にしないと merge できない。
+
+docs は、存在しない承認を前提にしていた。
+エージェントは、その docs を読んで再承認の依頼や Reviewers の設定を踏もうとした。
+agent-software-factory の `protect-main` は、会話の解決を必須にせず、管理者に `bypass_mode: pull_request` だけを許している。
+
+## Decision
+
+ruleset `main` を次の設定にする。
+
+- `strict_required_status_checks_policy` を `false` にする。
+- `required_review_thread_resolution` を `false` にする。
+- `required_linear_history` の規則を外す。merge の方式は squash だけなので、履歴は直線のままになる。
+- `bypass_actors` に管理者（RepositoryRole の id `5`）を `bypass_mode: pull_request` で加える。`main` への直接 push は bypass でもできない。
+- 承認の数は 0 のままにし、docs から承認の記述を消す。
+
+承認を要求しない代わりに、人が必ず読む Pull Request を条件で決める。
+条件は、戻しにくい変更、ADR と `AGENTS.md` と `.kiro/` の変更、CI と hook のゲートの変更、依存の追加、テストの弱体化である。
+条件に当たらない Pull Request は、必須チェックが通っていれば、本文を確かめて merge してよい。
+条件の本文は [人が必ず読む Pull Request](../code-review/human-review-required.md) に置く。
+
+ADR-017 の Decision のうち、承認、コード所有者の承認、会話の解決、linear history を要求する部分は、この ADR が置き換える。
+
+## Consequences
+
+### Positive
+
+- main が進んでも、必須チェックが通った Pull Request をそのまま merge できる。
+- bot のコメントを resolve しなくても merge できる。
+- チェックが壊れたときも、ruleset を無効にせずに管理者が merge できる。
+- docs とエージェントの手順が、実際の ruleset と一致する。
+
+### Negative
+
+- 最新の main と統合した結果を検査せずに merge するため、2 つの Pull Request が個別には通っても、合わせると壊れることがある。main の CI で検知する。
+- 承認がないので、人が読む Pull Request を守るかは運用に任せる。条件を機械で検査する仕組みはない。
+- 管理者は bypass で必須チェックを飛ばして merge できる。理由を Pull Request に残す運用で補う。
+
+### Neutral
+
+- CODEOWNERS は、GitHub がレビューを自動で依頼するために残す。
+- チームが増えたら、承認の数と CODEOWNERS を見直す。
+
+## Alternatives Considered
+
+### 承認の数を 1 にし、エージェントが承認する
+
+- **Description**：エージェントや bot が承認する。
+- **Pros**：ruleset に承認の要件が残る。
+- **Cons**：承認が実質のレビューにならず、ゲートの見かけだけが増える。
+
+### strict を残し、auto-merge と merge queue で解消する
+
+- **Description**：最新化の必須を残し、merge queue で自動に追従させる。
+- **Pros**：統合した結果を検査してから merge できる。
+- **Cons**：merge queue の導入と CI の設定が要り、現在の規模に見合わない。
+
+### ruleset を変えず、docs だけ直す
+
+- **Description**：docs を ruleset に合わせ、strict と会話の解決の必須は残す。
+- **Pros**：設定の変更が要らない。
+- **Cons**：Dependabot の滞留と、チェックが壊れたときの merge 不能が残る。
+
+## References
+
+- [人が必ず読む Pull Request](../code-review/human-review-required.md)
+- [main ブランチの保護設定](../repository/branch-protection.md)
+- [ADR-017](ADR-017-adopt-trunk-based-repository-governance.md)
+- Issue #248、#249、#250

@@ -35,6 +35,7 @@ CODEOWNERS に利用できることをリポジトリから確認できた所有
 変更は最新の `main` から作った短命な作業ブランチで行い、Pull Request を経て squash merge する。
 
 GitHub ruleset で `main` への直接 push、force push、削除を禁止し、一件以上の承認、コード所有者の承認、会話の解決、必須チェックの成功、linear history を要求する。
+このうち承認、コード所有者の承認、会話の解決、linear history の要求は、[ADR-086](ADR-086-align-main-protection-with-solo-and-agent-operation.md) が置き換える。
 
 セキュリティは、betterleaks、Semgrep、Trivy、zizmor、CodeQL のように対象の問題を直接検出する検査で担保する。
 外部サービスによるリポジトリの集約スコアは定期実行せず、README に公開スコアのバッジを表示しない。
