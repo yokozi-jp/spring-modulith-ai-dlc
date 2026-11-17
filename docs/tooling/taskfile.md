@@ -146,6 +146,7 @@ Dockerの`--format`など別のGoテンプレートをコマンドへ渡す場�
 CIとLefthookは処理を複製せず、Taskfileの同じタスクを呼ぶ。
 入口タスクが呼ぶ部品タスクとCIが呼ぶ部品タスクの処理を一致させる。
 Taskfileを変更したら、CIのpaths条件に`Taskfile.yml`が含まれていることも確認する。
+タスクを改名、削除して`lefthook.yml`かワークフローの`task <名前>`を直し忘れると、`task lint-taskfile`が失敗する（[Lintとテストのリファレンス](lint-and-test.md)）。
 
 ## 文書の同期
 

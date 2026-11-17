@@ -194,11 +194,15 @@ pre-commit:
         task skills-check
       fail_text: "スキルの整合の検証に失敗しました。task skills-check で再実行してください。"
 
-    # Taskfile か後片付けの fixture にステージ済み変更があるとき、スキーマ構造と後片付けの終了コードを検証（task lint-taskfile）。
+    # Taskfile、フック、ワークフロー、その検査の fixture にステージ済み変更があるとき、スキーマ構造、後片付けの終了コード、
+    # フックとワークフローが呼ぶタスク名を検証（task lint-taskfile）。
     - name: lint-taskfile
       glob:
         - "Taskfile.yml"
+        - "lefthook.yml"
+        - ".github/workflows/*.{yml,yaml}"
         - "tooling/taskfile-cleanup/**"
+        - "tooling/task-calls/**"
       run: |
         echo "{staged_files}" >/dev/null
         task lint-taskfile

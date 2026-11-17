@@ -301,6 +301,10 @@ const params = { ...(cursor !== undefined && { cursor }) };
 - **`task release-check`**：release-pleaseのmanifest、版ファイル、Gradle版、設定の一致を検証する。
 - **`task lint-taskfile`**：Task本体でTaskfileのYAML構文とスキーマ構造を検証する。
   `tooling/taskfile-cleanup/`のfixtureで、後片付けの定型が本体の終了コードを優先し、前段が失敗しても後段の後片付けを走らせることを検査する。
+  `lefthook.yml`と`.github/workflows/`のYAMLが呼ぶ`task <名前>`が、`task --list-all`のタスクか別名にあることを`tooling/task-calls/task-calls.sh`で検査する。
+  名前は、`task`の後の`-x`などのフラグを飛ばした最初の語である。
+  コメントは除き、`fail_text`や`echo`の文字列の中の`task <名前>`も対象にする。
+  検査の前に、`tooling/task-calls/test.sh`が小さな木で終了コードと出力を確かめる。
 - **`task adr-check`**：判断が絡む変更にADRが伴うかを確認する。
   `frontend/`の変更のうち、テストファイル（`*.test.*`、`*.spec.*`）、`frontend/e2e/`、`frontend/lint/fixtures/`、`frontend/src/testing/`は対象から外す。
   警告は止めず、`ADR_STRICT=1`で失敗にし、`ADR_ACK=1`で抑制する。
@@ -321,7 +325,7 @@ OKF検査の採用理由は[ADR-036](../adr/ADR-036-adopt-okf-for-docs-knowledge
 - **pre-commit（Markdownの変更）**：変更ファイルへ`lint-md`相当を実行する。
 - **pre-commit（docs、steering、Taskfile、README、`tooling/adr-lint/`の変更）**：`okf-check`を実行する。
 - **pre-commit（`.agents/skills/`、`.kiro/`、`skills-lock.json`、`tooling/skills-check/`の変更）**：`skills-check`を実行する。
-- **pre-commit（Taskfileか`tooling/taskfile-cleanup/`の変更）**：`lint-taskfile`を実行する。
+- **pre-commit（Taskfile、`lefthook.yml`、GitHub Actionsワークフロー、`tooling/taskfile-cleanup/`、`tooling/task-calls/`の変更）**：`lint-taskfile`を実行する。
 - **pre-push（すべて）**：`adr-check`と`scan-secrets-all`相当を実行する。
 - **pre-push（バックエンドのJavaまたはGradle変更）**：`be-lint`相当と`test`を実行する。
 - **pre-push（フロントエンドの変更）**：`fe-test-build`を、Vitestのdot reporterとjson-summaryだけのcoverageで実行する。

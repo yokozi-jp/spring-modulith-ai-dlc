@@ -1643,13 +1643,15 @@ tasks:
       - npx --yes markdownlint-cli2 --fix "**/*.md"
 
   lint-taskfile:
-    desc: TaskfileをTask本体で解析しYAML構文とスキーマ構造、後片付けの終了コードを検証
+    desc: TaskfileをTask本体で解析しYAML構文とスキーマ構造、後片付けの終了コード、フックとCIが呼ぶタスク名を検証
     silent: true
     cmds:
       - |
         task --list-all >/dev/null
         echo "Taskfile OK: YAML構文とスキーマ構造の解析に成功しました。"
         bash tooling/taskfile-cleanup/test.sh
+        bash tooling/task-calls/test.sh
+        bash tooling/task-calls/task-calls.sh
 
   lint-semgrep:
     desc: Semgrep OSSで静的解析
