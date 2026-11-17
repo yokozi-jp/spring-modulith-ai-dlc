@@ -128,6 +128,21 @@ class TestConventionsArchTest {
                   + TESTING_CODE_STYLE_DOC)
           .allowEmptyShould(true);
 
+  /** テストのコンテナは {@code testkit} の共有の起動だけが作る。テストクラスごとにコンテナを起動させない。 */
+  @ArchTest
+  /* package */ static final ArchRule containersAreStartedOnlyByTestkit =
+      noClasses()
+          .that()
+          .resideOutsideOfPackage("com.example.demo.testkit..")
+          .should()
+          .dependOnClassesThat()
+          .resideInAnyPackage("org.testcontainers..", "org.springframework.boot.testcontainers..")
+          .because(
+              "テストクラスごとにコンテナを起動すると、Spring のコンテキストのキャッシュが分かれ、起動の時間が増えるため。"
+                  + "直し方：依存は testkit の InfrastructureContainers に足し、テストからは接続先の設定だけを読む。"
+                  + "規約：docs/backend/testing-infrastructure.md")
+          .allowEmptyShould(true);
+
   /** {@code assertTimeoutPreemptively} を禁止する。別スレッド実行で本番経路と文脈が変わるため。 */
   @ArchTest
   /* package */ static final ArchRule assertTimeoutPreemptivelyIsNotUsed =

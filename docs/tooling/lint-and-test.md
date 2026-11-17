@@ -15,9 +15,9 @@ Dockerを使うTaskは、Dockerがないローカル環境ではスキップし�
 
 - **`task check`**：`lint-session-sql`とバックエンドの静的解析を実行する。
 - **`task verify`**：`lint-session-sql`、バックエンドの静的解析、マイグレーション検証、テストを実行する。
-- **`task test`**：隔離した依存を起動し、確定済みマイグレーションの検証、バックエンドテスト、OpenAPI契約検査後に片付ける。
-- **`task test-dev`**：隔離した依存を起動し、作りかけのchangesetを含むバックエンドテスト後に片付ける。
-- **`task mutation-test`**：隔離した依存を使ってバックエンドのPITミューテーションテストを実行する。
+- **`task test`**：確定済みマイグレーションを使い捨てのPostgreSQLで検証し、バックエンドテスト、OpenAPI契約検査の後に片付ける。
+- **`task test-dev`**：`be-test-dev`の別名。
+- **`task mutation-test`**：`be-mutation-test`の別名。
 - **`task fe-verify`**：フロントエンドの静的解析、未使用コード検査、テスト、テレメトリを無効にした本番ビルドを実行する。
 - **`task e2e`**：compose-testでbackendを起動し、Vite previewに対してPlaywrightのE2Eを実行して後片付けする（[E2Eテストの方針と書き方](../e2e/testing-strategy.md)）。
 
@@ -31,28 +31,30 @@ Dockerを使うTaskは、Dockerがないローカル環境ではスキップし�
   検査の本体は`tooling/session-sql-lint/session-sql-lint.sh`で、検出の前に`tooling/session-sql-lint/test.sh`が、検出すべき文と検出しない文のfixtureで終了コードと出力を確かめる。
   `SET`と`RESET`も同じ表でNeverだが、`spring.datasource.hikari.connection-init-sql`がセッションの`SET`を使うため検出しない（[ADR-079](../adr/ADR-079-resubmit-failed-event-publications-periodically-with-shedlock.md)）。
   設計の理由は[設計の作り込みの程度と段階的な再構築](../principles/right-sizing.md)の「テンプレートの利用先で変わる前提」にある。
-- **`task be-openapi-lint`**：起動済みのテスト用依存でOpenAPI 3.1契約を`openapi/openapi.yaml`へ生成し、Spectralで検査する。
+- **`task be-openapi-lint`**：`OpenApiContractTest`だけを実行してOpenAPI 3.1契約を`openapi/openapi.yaml`へ生成し、Spectralで検査する。
 - **`task be-openapi-check`**：直前の`be-test`が書き出した契約をSpectralで検査し、コミット済みの`openapi/openapi.yaml`と差分があれば失敗する。
   テストを実行しないため、`be-test`の後に実行する。
   単体で実行すると、コミット済みの契約を自分自身と比べるので、差分を検出できない。
-- **`task be-verify-migrations`**：使い捨てDBでchangesetの適用、rollback、再適用、現在タグを検証する。
-- **`task be-test`**：起動済みのテスト用依存に確定済みchangesetを適用し、テストとcoverage検証を実行する。
+- **`task be-verify-migrations`**：現在タグが最後のchangelogに宣言されていることと、使い捨てDBでのchangesetの適用、rollback、再適用、現在タグの存在を検証する。
+- **`task be-test`**：確定済みchangesetを適用したテスト用のDBで、テストとcoverage検証を実行する。
   JaCoCoの下限は、全体のbranch 88%とline 95%、クラスごとのbranch 65%とline 70%で、下回ると失敗する（[ADR-076](../adr/ADR-076-run-mutation-tests-per-change-and-tighten-coverage-gates.md)）。
   `-PopenapiExport=true`を渡すので、`OpenApiContractTest`が`openapi/openapi.yaml`を書き出す。
   素の`./gradlew test`は契約に触れない。
-- **`task be-test-dev`**：起動済みのテスト用依存に作りかけのchangesetを含めて適用し、テストを実行する。
-- **`task be-mutation-test`**：起動済みのテスト用依存でPITを実行する。
+- **`task be-test-dev`**：作りかけのchangesetを含めて適用したテスト用のDBで、テストを実行する。
+  カバレッジは検証しない。
+- **`task be-mutation-test`**：PITを実行する。
   `PIT_CHANGED_SINCE`にgitの参照（`origin/main`など）を渡すと、そこからの差分の`src/main/java`のクラスと内部クラスだけを変異させる。
   差分のテスト`FooTest`は、同じパッケージの`Foo`を変異させる対象に加える。
   テストは対象のクラスのパッケージ以下のものだけを使う。
   対象のクラスがないときはPITを実行せず、差分を取れないときは失敗する。
-  minionは共有のテストDBを使うため並列にせず、Springの起動を待てるようにtimeoutを既定より広げる。
-- **`task test`**：テスト用依存の起動、`be-verify-migrations`、`be-test`、`api-lint`、後片付けを実行する。
-- **`task test-dev`**：テスト用依存の起動、`be-test-dev`、後片付けを実行する。
-- **`task mutation-test`**：テスト用依存の起動、マイグレーション検証、`be-mutation-test`、後片付けを実行する。
+  minionは1つにし、Springの起動を待てるようにtimeoutを既定より広げる。
+- **`task test`**：compose-testのPostgreSQLの起動、`be-verify-migrations`、PostgreSQLの停止、`be-test`、`api-lint`を実行する。
+  前の回が残したcompose-testは、起動の前に片付ける。
 
-`task test`と`task mutation-test`は、`docker/compose-test.yml`のPostgreSQL 5433とRedis 6380を`.env.test`で起動する。
+テストが使うPostgreSQL、Redis、WireMockは、テストのJVMごとにTestcontainersが起動して片付け、Gradleのforkを並列にする（[バックエンドのテストの実行基盤](../backend/testing-infrastructure.md)）。
+`docker/compose-test.yml`のPostgreSQL 5433は、`be-verify-migrations`のrollbackの検証だけが使う。
 `.env.test`は、Gitで管理する`.env.test.example`からコピーして作るローカルファイルで、無ければTaskが作る。
+GradleのテストとPITは、接続先以外の設定を`.env.test`から読む。
 PITのHTMLとXMLのレポートは、変異対象がある場合に`backend/build/reports/pitest/`へ出力する。
 プロパティベーステストとミューテーションテストの採用理由は[ADR-012](../adr/ADR-012-adopt-property-based-and-mutation-testing.md)を参照する。
 
@@ -239,7 +241,7 @@ const params = { ...(cursor !== undefined && { cursor }) };
 
 契約と生成物の扱いは[ADR-052](../adr/ADR-052-commit-openapi-contract-and-check-generated-client.md)、手順は[APIを変更する](../web-api/runbook-api-change.md)を参照する。
 
-- **`task api-gen`**：テスト用依存を起動し、契約の生成、Spectralの検査、Orvalの再生成を実行して片付ける。
+- **`task api-gen`**：契約の生成、Spectralの検査、Orvalの再生成を実行する。
 - **`task api-check`**：`api-gen`で再生成した契約と生成物を、コミット済みの内容と比べる。
 - **`task api-lint`**：コミット済みの`openapi/openapi.yaml`を`.spectral.yaml`で検査する（DB不要）。
 - **`task api-lint-rules-test`**：Spectralのルールを`openapi/spectral-fixtures/`の合格例と違反例で検査する。
@@ -292,11 +294,10 @@ const params = { ...(cursor !== undefined && { cursor }) };
   リンクの検査は`docs/`、`README.md`、`CONTRIBUTING.md`、`.kiro/steering/`、`backend/src`のJavadocとMarkdownを対象にする。
   既知の限界として、`okf-validate.yml`の`paths`は`backend/src/**`を含まないため、バックエンドのJavadocだけを変えるPull RequestではCIが動かない。
   ADRの番号を振り直す変更はdocsの変更を伴うため、そこで検出する。
-- **`task skills-check`**：`skills-lock.json`、`.agents/skills`の実体、`.kiro/skills`のシンボリックリンクの整合を検査する。
-  `tooling/skills-check/test.sh`が壊れた木で期待の終了コードを確かめてから、`tooling/skills-check/skills-check.mjs`が実際の木を検査する。
-  失敗にするのは、`SKILL.md`の欠落、`name`とディレクトリ名の不一致、`description`の欠落、`.kiro/skills`が`../../.agents/skills/<名前>`へのリンクでない状態、内容ハッシュの不一致、取得元ごとの`ref`が複数ある状態、lockにない実体またはリンクである。
-  `note`を持つlockの項目（`skill-creator`）は、意図して上流から変えているため内容ハッシュを比べない。
-  手順の正文は[Matt Pocock スキル運用](../agents/matt-pocock-skills/workflow.md)の「取得元と更新」である。
+- **`task skills-check`**：`skills-lock.json`と`.kiro/.kiro-plugins-installed`の記録が、`.agents/skills`の実体、`.kiro/skills`のリンク、`kiro/install.sh`が入れたファイルと合っているかを検査する。
+  入れたファイルへの書き込みを止めるフックの自己検査（`.kiro/hooks/block-generated-writes.test.sh`）と`tooling/skills-check/test.sh`を先に実行してから、`tooling/skills-check/skills-check.mjs`が実際の木を検査する。
+  失敗にする状態は`tooling/skills-check/test.sh`のケースが正で、この文書には写さない。
+  手順の正文は[スキルの取得元と更新](../agents/skill-sources.md)である。
 - **`task release-check`**：release-pleaseのmanifest、版ファイル、Gradle版、設定の一致を検証する。
 - **`task lint-taskfile`**：Task本体でTaskfileのYAML構文とスキーマ構造を検証する。
   `tooling/taskfile-cleanup/`のfixtureで、後片付けの定型が本体の終了コードを優先し、前段が失敗しても後段の後片付けを走らせることを検査する。
@@ -319,11 +320,10 @@ OKF検査の採用理由は[ADR-036](../adr/ADR-036-adopt-okf-for-docs-knowledge
 - **pre-commit（Composeファイルの変更）**：`lint-compose`相当を実行する。
 - **pre-commit（Markdownの変更）**：変更ファイルへ`lint-md`相当を実行する。
 - **pre-commit（docs、steering、Taskfile、README、`tooling/adr-lint/`の変更）**：`okf-check`を実行する。
-- **pre-commit（`.agents/skills/`、`.kiro/skills/`、`skills-lock.json`、`tooling/skills-check/`の変更）**：`skills-check`を実行する。
+- **pre-commit（`.agents/skills/`、`.kiro/`、`skills-lock.json`、`tooling/skills-check/`の変更）**：`skills-check`を実行する。
 - **pre-commit（Taskfileか`tooling/taskfile-cleanup/`の変更）**：`lint-taskfile`を実行する。
 - **pre-push（すべて）**：`adr-check`と`scan-secrets-all`相当を実行する。
 - **pre-push（バックエンドのJavaまたはGradle変更）**：`be-lint`相当と`test`を実行する。
-- **pre-push（バックエンドまたはDockerfileの変更）**：バックエンドイメージのbuild stageをビルドする。
 - **pre-push（フロントエンドの変更）**：`fe-test-build`を、Vitestのdot reporterとjson-summaryだけのcoverageで実行する。
 - **pre-push（GitHub Actionsワークフローの変更）**：`lint-actions`相当と`lint-actions-security`相当を実行する。
 
@@ -334,6 +334,8 @@ Gitフックの条件とコマンドは[`lefthook.yml`](../../lefthook.yml)を�
 Lefthookは版の表示、skipの行、`EXECUTE`の行を省き、jobの出力と要約を出す（`output`）。
 成功したjobの出力も残すのは、`adr-check`の注意喚起が成功の扱いで出るためである。
 すべてを出すときは、`LEFTHOOK_OUTPUT`に`meta,summary,success,failure,execution,execution_out,execution_info,skips`を渡す。
+pre-pushのjobは順番に実行し、失敗した時点で止める。
+バックエンドイメージのビルドはpre-pushでは実行せず、Docker CI（`hadolint.yml`）の`backend-image`がPull Requestごとに実行する。
 pre-pushの「変更」は、push済みかどうかやrebaseの有無によらず、`origin/main`とのmerge-baseからの差分で判定する。
 分岐後にmainへ入った変更では、触っていない領域の検査は走らない。
 2回目以降のpushでも、ブランチ全体の変更に対して検査が走る。

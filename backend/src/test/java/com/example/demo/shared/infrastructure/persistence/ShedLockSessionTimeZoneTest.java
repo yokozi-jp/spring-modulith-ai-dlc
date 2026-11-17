@@ -166,10 +166,15 @@ class ShedLockSessionTimeZoneTest {
     return new LockConfiguration(CREATED_AT, name, HELD_FOR, Duration.ZERO);
   }
 
-  /** ロックの期限を過去にする。期限は DB の時刻で決まり、アプリの時計では進まないため。 */
+  /**
+   * ロックの期限を、DB の時計によらない過去（{@link Instant#EPOCH}）にする。期限は DB の時刻で決まり、アプリの時計では進まないため。
+   *
+   * <p>{@code locked_at} にしないのは、DB の壁時計が戻ると {@code locked_at} が DB の今より後に残るためである（{@link
+   * com.example.demo.testkit.CleanGeneratedTablesExtension#expireLocks}）。
+   */
   private void expire(final String name) {
     dsl.update(Tables.SHEDLOCK)
-        .set(Tables.SHEDLOCK.LOCK_UNTIL, Tables.SHEDLOCK.LOCKED_AT)
+        .set(Tables.SHEDLOCK.LOCK_UNTIL, Instant.EPOCH)
         .where(Tables.SHEDLOCK.NAME.eq(name))
         .execute();
   }

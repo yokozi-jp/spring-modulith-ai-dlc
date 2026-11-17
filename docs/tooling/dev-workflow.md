@@ -58,7 +58,7 @@ NO_COLOR=1 git push -u origin <ブランチ>
 Lefthookの出力は`lefthook.yml`の`output`で絞ってある（[Lintとテストのリファレンス](lint-and-test.md)）。
 `LEFTHOOK_OUTPUT=summary,failure`でさらに絞ると、成功の扱いで出る`adr-check`の注意喚起が消えるため、付けない。
 
-`backend/`のJavaかGradleを変えたpushでは、pre-pushが`be-lint`、`be-test`（全テスト）、`be-image-build`を並列に実行し、数分かかる。
+`backend/`のJavaかGradleを変えたpushでは、pre-pushが`be-lint`、`be-test`（全テスト）を順番に実行し、数分かかる。
 tool callの時間切れや中断でフックは止まらないため、pushはバックグラウンドで実行し、完了の印のファイルを待つ。
 
 ```bash
@@ -205,7 +205,7 @@ ADRを追加または番号を変えたときは、`docs/adr/index.md`の行も�
 task skills-check
 ```
 
-導入と更新の手順は[Matt Pocock スキル運用](../agents/matt-pocock-skills/workflow.md)の「取得元と更新」に従います。
+導入と更新の手順は[スキルの取得元と更新](../agents/skill-sources.md)に従います。
 
 ## リリース設定を変更するとき
 

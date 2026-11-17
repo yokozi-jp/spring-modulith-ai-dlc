@@ -29,9 +29,9 @@ tags: [reference, database, liquibase, jooq, taskfile, gradle]
   対象DBへchangesetを適用し、生成ソースを更新する。
 - **`task be-verify-migrations`**：changesetの適用、rollback、再適用、現在タグを検証する。
   使い捨てDBだけを変更する。
-- **`task test`**：隔離スタックで確定済みマイグレーションを検証してからバックエンドテストを実行する。
-  使い捨てDBだけを変更し、終了時に削除する。
-- **`task test-dev`**：隔離スタックで作りかけを含むchangesetを適用してバックエンドテストを実行する。
+- **`task test`**：compose-testの使い捨てのPostgreSQLで確定済みマイグレーションを検証してから、バックエンドテストを実行する。
+  テストはTestcontainersが起動する使い捨てDBだけを変更し、どちらのDBも終了時に削除する。
+- **`task test-dev`**：Testcontainersが起動する使い捨てDBへ作りかけを含むchangesetを適用し、バックエンドテストを実行する。
   使い捨てDBだけを変更し、終了時に削除する。
 - **`task be-release-migrate`**：リポジトリの現在タグまで本番向けに前進適用する。
   `MIGRATION_DB_*`が示すDBへchangesetを適用する。

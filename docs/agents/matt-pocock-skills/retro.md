@@ -7,7 +7,7 @@ tags: [reference, agent-skills, matt-pocock]
 # エージェント環境の改善を提案する retro リファレンス
 
 この文書は実行用の `SKILL.md` ではなく、固定した上流版の日本語リファレンスである。
-プロジェクトでの運用は [Matt Pocock スキル運用](workflow.md) を優先する。
+プロジェクトでの運用は [RGDD の開発フロー](../rgdd.md)の「振り返り」を優先する。
 
 ## 概要
 
@@ -21,7 +21,7 @@ tags: [reference, agent-skills, matt-pocock]
 `disable-model-invocation: true` を持つため、モデルは自動では起動しない。
 上流は、探し物に時間がかかった、機械で検出できる誤りを出した、必要な情報に届かなかったといった、思うように進まなかったセッションの後を想定している。
 
-コードの良否を判定したい場合は `code-review` を使う。
+コードの良否を判定したい場合は `/thermos` を使う。
 
 ## 入力と前提
 
@@ -75,8 +75,7 @@ tags: [reference, agent-skills, matt-pocock]
 ## 関連スキル
 
 `writing-for-agents` を、手順の最初に必ず呼び出す。
-`code-review` は、`retro` が追加する coding standards の読み手である。
-`ask-matt` は、実装後の最後の工程として `retro` を案内する。
+このリポジトリでは、`retro` が追加する規約を steering `code-review` と `docs/code-review/` が読む。
 
 ## 注意点
 
