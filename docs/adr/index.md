@@ -87,3 +87,4 @@
 - [ADR-084: pstack と thermos を導入し、RGDD の5つのフェーズで開発する](ADR-084-adopt-rgdd-with-pstack-and-thermos.md)（Proposed, 2026-11-16）
 - [ADR-085: バックエンドのテストの依存を Testcontainers で fork ごとに起動し、テストを並列に実行する](ADR-085-start-test-dependencies-per-fork-with-testcontainers.md)（Proposed, 2026-11-16）
 - [ADR-087: 必須チェックを集約ジョブ CI gate を中心にまとめる](ADR-087-gate-required-checks-with-single-aggregate-job.md)（Proposed, 2026-11-17）
+- [ADR-088: フロントエンドで useEffect を禁止し、Oxlint で止める](ADR-088-ban-react-effects-in-frontend.md)（Proposed, 2026-11-17）

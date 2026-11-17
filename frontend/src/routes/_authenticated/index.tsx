@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { Button } from "@/components/ui/button";
@@ -8,12 +8,9 @@ function HomePage() {
   const [count, setCount] = useState(0);
   const { t } = useTranslation();
 
-  useEffect(() => {
-    document.title = t("title");
-  }, [t]);
-
   return (
     <div className="px-6 py-16 sm:px-10">
+      <title>{t("title")}</title>
       <div className="mx-auto flex w-full max-w-4xl flex-col gap-12">
         <section className="flex flex-col items-start gap-6" aria-labelledby="page-heading">
           <div className="rounded-full border bg-muted px-3 py-1 text-sm text-muted-foreground">
