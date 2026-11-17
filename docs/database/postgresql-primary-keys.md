@@ -101,6 +101,12 @@ UUID v7は作成時刻が値に含まれて見えるため、公開用IDに使�
 同じモジュールのテーブルどうしは、主キーの列で参照する（`ordering.t_order_line.order_id`）。
 別のモジュールの行を指す列は、`<対象>_public_id`という名前の`uuid`にする（`payment.t_payment.order_public_id`）。
 スキーマをまたぐ外部キーは作らない。
+外部のシステムが採番した識別子を持つ列は、行を指さないため、名前を`_id`ではなく`_code`で終える（`payment.t_payment.gateway_payment_code`）。
+
+トレースIDとスパンID（`traceId`、`spanId`）は、行を指す識別子ではないため、この使い分けの対象にしない。
+トレースIDは32桁の16進数であり、UUIDではない。
+Problem Detailsの`traceId`拡張は[ADR-013](../adr/ADR-013-standardize-http-api-contracts.md)が、ログの`traceId`と`spanId`は[ADR-015](../adr/ADR-015-structure-and-protect-observability-data.md)が定める。
+ログとトレースに行の識別子を載せるときは、`public_id`を使う。
 
 Javaでは、主キーの値をRepositoryの外に返さない。
 モジュールルートのイベントと公開API、Domain、Application、`infrastructure.client`の型は、`public_id`のUUIDか、それを包む値オブジェクト（`OrderId(UUID value)`）でIDを持つ。
@@ -113,9 +119,11 @@ Javaでは、主キーの値をRepositoryの外に返さない。
 - **カタログの検査**：`SchemaConventionsTest`と`SchemaInspectionTest`が使う`SchemaTableConventions`が、業務スキーマを検査する。
   規則P3は、名前が`_id`で終わる列を、同じスキーマのテーブルの主キーと同じ名前の列か、`uuid`の`public_id`か`<対象>_public_id`に限る。
   共通カラムの`created_tx_id`、`updated_tx_id`、`patched_id`は行を指さないため対象にしない。
+  外部のシステムの識別子を`_id`で終わる列に入れるとP3が拒否するため、`_code`で終わる名前にする。
   規則P4は、別のスキーマのテーブルを参照する外部キーを拒否する。
-- **ArchUnit**：`PublicIdArchTest`の`numericIdsDoNotLeaveModules`が、モジュールルート、`domain`、`application`、`infrastructure.client`の型に、名前が`id`か`Id`で終わる`long`、`Long`、`int`、`Integer`のフィールド、引数、戻り値がないことを確かめる。
-- **Spectral**：`.spectral.yaml`の`public-id-uuid`が、パスの引数と、名前が`id`か`Id`で終わる引数とpropertyを`type: string`、`format: uuid`に限る。
+- **ArchUnit**：`PublicIdArchTest`の`numericIdsDoNotLeaveModules`が、モジュールルート、`domain`、`application`、`infrastructure.client`、`shared`（`shared.infrastructure`を除く）の型に、名前が`id`か`Id`で終わる`long`、`Long`、`int`、`Integer`のフィールド、引数、戻り値がないことを確かめる。
+- **Spectral**：`.spectral.yaml`の`public-id-uuid`が、パスの引数と、名前が`id`か`Id`で終わるクエリの引数とpropertyを`type: string`、`format: uuid`に限る。
+  ヘッダーの引数と、`traceId`と`spanId`のpropertyは対象にしない。
 
 ## 出典
 

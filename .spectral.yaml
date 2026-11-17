@@ -125,11 +125,11 @@ rules:
 
   # ponytail: パス以外では ID を名前で見分ける。名前が id や Id で終わらない識別子は検査しない。
   public-id-uuid:
-    description: パスの引数と、名前が id か Id で終わる引数とプロパティは、public_id の type string、format uuid にする（docs/database/postgresql-primary-keys.md）。
+    description: パスの引数と、名前が id か Id で終わるクエリの引数とプロパティは、public_id の type string、format uuid にする。traceId と spanId は対象にしない（docs/database/postgresql-primary-keys.md）。
     severity: error
     given:
-      - "$..parameters[?(@.in === 'path' || (@.name && @.name.match(/(^id|Id)$/)))].schema"
-      - "$..properties[?(@property.match(/(^id|Id)$/))]"
+      - "$..parameters[?(@.in === 'path' || (@.in === 'query' && @.name && @.name.match(/(^id|Id)$/)))].schema"
+      - "$..properties[?(@property.match(/(^id|Id)$/) && !@property.match(/^(traceId|spanId)$/))]"
     then:
       function: schema
       functionOptions:

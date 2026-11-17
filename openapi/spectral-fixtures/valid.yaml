@@ -51,6 +51,12 @@ paths:
           schema:
             type: string
             format: uuid
+        # public-id-uuid はヘッダーの引数を対象にしない
+        - name: X-Request-Id
+          in: header
+          description: 呼び出し元がリクエストに付けた追跡用の ID
+          schema:
+            type: string
       responses:
         "200":
           description: サンプル注文
@@ -97,6 +103,9 @@ components:
           type: string
           format: uri-reference
           description: 失敗発生を識別する URI
+        traceId:
+          type: string
+          description: 失敗したリクエストのトレース ID。public-id-uuid の対象にしない
       required:
         - type
         - title

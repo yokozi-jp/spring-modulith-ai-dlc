@@ -98,6 +98,13 @@ paths:
       summary: 注文を一覧する。
       description: 注文を一覧する。<p>新しい順に返す。
       operationId: listOrders
+      parameters:
+        # public-id-uuid（クエリの引数に format: uuid がない）
+        - name: customerId
+          in: query
+          description: 注文した顧客の ID
+          schema:
+            type: string
       responses:
         "200":
           description: 注文の一覧

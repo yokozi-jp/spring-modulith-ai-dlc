@@ -43,8 +43,11 @@ Proposed
 
 - カタログの検査（`SchemaTableConventions`）の規則 P3 は、名前が `_id` で終わる列を、同じスキーマのテーブルの主キーと同じ名前の列か、`uuid` の `public_id` か `<対象>_public_id` に限る。
   規則 P4 は、別のスキーマのテーブルを参照する外部キーを拒否する。
-- ArchUnit の `numericIdsDoNotLeaveModules` は、モジュールルート、`domain`、`application`、`infrastructure.client` の型に、名前が `id` か `Id` で終わる `long`、`Long`、`int`、`Integer` のフィールド、引数、戻り値を置かせない。
-- Spectral の `public-id-uuid` は、API のパスの引数と、名前が `id` か `Id` で終わる引数と property を `type: string`、`format: uuid` に限る。
+- ArchUnit の `numericIdsDoNotLeaveModules` は、モジュールルート、`domain`、`application`、`infrastructure.client`、`shared`（`shared.infrastructure` を除く）の型に、名前が `id` か `Id` で終わる `long`、`Long`、`int`、`Integer` のフィールド、引数、戻り値を置かせない。
+- Spectral の `public-id-uuid` は、API のパスの引数と、名前が `id` か `Id` で終わるクエリの引数と property を `type: string`、`format: uuid` に限る。
+  トレース ID とスパン ID は行を指す識別子ではなく、UUID でもないため、`traceId` と `spanId` の property とヘッダーの引数は対象にしない。
+
+外部のシステムが採番した識別子を持つ列は行を指さないため、名前を `_code` で終える（`payment.t_payment.gateway_payment_code`）。
 
 ログとトレース、キャッシュのキーは機械で検査せず、レビューで確かめる。
 

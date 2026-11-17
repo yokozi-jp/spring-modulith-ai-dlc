@@ -975,6 +975,7 @@ tasks:
         public-id-uuid|paths./api/sample-orders/{sampleOrderId}.get.parameters[0].schema
         public-id-uuid|components.schemas.SampleOrderResponse.properties.orderId
         public-id-uuid|paths./api/sample-orders/{code}.delete.parameters[0].schema
+        public-id-uuid|paths./api/orders.get.parameters[0].schema
         EOF
         if [ "$missing" -ne 0 ]; then
           printf '%s\n' "$output"
