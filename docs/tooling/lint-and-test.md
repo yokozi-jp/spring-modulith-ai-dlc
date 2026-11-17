@@ -317,7 +317,7 @@ OKF検査の採用理由は[ADR-036](../adr/ADR-036-adopt-okf-for-docs-knowledge
 - **commit-msg（すべて）**：commitlintを実行する。
 - **pre-commit（すべて）**：`scan-secrets`相当を実行する。
 - **pre-commit（OpenAPI契約、`.spectral.yaml`、Orvalの設定、`frontend/package.json`、生成物の変更）**：`api-lint`（Dockerがなければスキップ）と`api-client-check`を実行する。
-- **pre-commit（フロントエンドまたはTaskfileの変更）**：`fe-check`を実行する。
+- **pre-commit（フロントエンドの変更）**：`fe-check`を実行する。
   前項と同じgroupで順に実行し、Orvalの再生成と型検査を同時に走らせない。
 - **pre-commit（Dockerfileの変更）**：`lint-docker`相当と`lint-docker-check`相当を実行する。
 - **pre-commit（Composeファイルの変更）**：`lint-compose`相当を実行する。
@@ -327,7 +327,7 @@ OKF検査の採用理由は[ADR-036](../adr/ADR-036-adopt-okf-for-docs-knowledge
 - **pre-commit（Taskfileか`tooling/taskfile-cleanup/`の変更）**：`lint-taskfile`を実行する。
 - **pre-push（すべて）**：`adr-check`と`scan-secrets-all`相当を実行する。
 - **pre-push（バックエンドのJavaまたはGradle変更）**：`be-lint`相当と`test`を実行する。
-- **pre-push（フロントエンドまたはTaskfileの変更）**：`fe-test-build`を、Vitestのdot reporterとjson-summaryだけのcoverageで実行する。
+- **pre-push（フロントエンドの変更）**：`fe-test-build`を、Vitestのdot reporterとjson-summaryだけのcoverageで実行する。
 - **pre-push（GitHub Actionsワークフローの変更）**：`lint-actions`相当と`lint-actions-security`相当を実行する。
 
 Gitフックの条件とコマンドは[`lefthook.yml`](../../lefthook.yml)を正とする。
