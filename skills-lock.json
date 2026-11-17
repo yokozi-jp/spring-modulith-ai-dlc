@@ -37,7 +37,7 @@
       "computedHash": "ac2c94885f34ff8492dc12aa4543182f661f32ea1722b8d6b6c2c7045af33ae3"
     },
     "java-best-practices": {
-      "source": "local",
+      "source": "./local",
       "sourceType": "local",
       "note": "Locally authored, no upstream. A pointer to docs/backend/java-type-modeling.md and related docs.",
       "computedHash": "7c252219f7e6d51d7f0a6270b65dd9d0757ad7e91b90b22ce4ebf47030287533"

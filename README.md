@@ -313,10 +313,8 @@ Docker Compose の操作（サービスの起動、停止、状態確認、Keycl
 
 ### スキル
 
-- `task skills-check`は、`skills-lock.json`、`.agents/skills`の実体、`.kiro/skills`のシンボリックリンクの整合と、pstack と thermos の内容ハッシュを検査します。
-  上流のスキルのファイルを編集していないこと（内容ハッシュ）と、取得元ごとに固定コミットが一つであることも確かめます。
-  Lefthookはスキルまたはlockの変更を検出するとpre-commitで、CIの`Validate skills lock`は同じパスの変更で実行します。
-  導入と更新の手順は[スキルの取得元と更新](docs/agents/skill-sources.md)にあります。
+- `task skills-check`はスキルの記録と実体の整合を検査します。
+  検査の範囲と、LefthookとCIで実行する条件は[Lintとテストのリファレンス](docs/tooling/lint-and-test.md)にあります。
 
 <p align="right">(<a href="#top">トップへ</a>)</p>
 

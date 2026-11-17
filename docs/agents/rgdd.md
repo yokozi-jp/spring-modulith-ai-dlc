@@ -11,7 +11,7 @@ tags: [runbook, workflow, agent-skills, pstack, thermos]
 
 - 開発は RGDD（README駆動 with Grill Driven Development）の5つのフェーズで進め、タスクの区切りで `/retro` を実行する（[ADR-084](../adr/ADR-084-adopt-rgdd-with-pstack-and-thermos.md)）。
 - 各フェーズは、前のフェーズが残した README、`GLOSSARY.md`、ADR を読み、書き足すか、確かめて直す。
-- 外部から入れたスキル（`skills-lock.json` と `.kiro/.kiro-plugins-installed` に載るもの）の記述が docs の規約や ADR と食い違うときは、docs の規約と ADR に従う。食い違いの例はフェーズ3にある。
+- 外部から入れたスキル（`skills-lock.json` で取得元を持つものと、`.kiro/.kiro-plugins-installed` に載るもの）の記述が docs の規約や ADR と食い違うときは、docs の規約と ADR に従う。食い違いの例はフェーズ3にある。
 - スキルの導入と更新は [スキルの取得元と更新](skill-sources.md) に従う。
 
 ## 5つのフェーズ
@@ -92,7 +92,7 @@ Kiro では、これらのサブエージェントは呼び出し元のチャッ
 ### 5. /create-verification-skill
 
 フェーズ4を終えた時点で、`.kiro/skills/` にこのリポジトリの検証スキル（`verify-<アプリ名>`）がなければ、`/create-verification-skill` で検証スキルと Feature Map を作る。
-作った検証スキルは、`skills-lock.json` か `.kiro/.kiro-plugins-installed` に載らないと `task skills-check` が失敗するため、[スキルの取得元と更新](skill-sources.md)に従って記録する。
+作った検証スキルは、[スキルの取得元と更新](skill-sources.md)の「このリポジトリで書くスキルを記録する」に従って `skills-lock.json` に記録する。
 以降は、エージェントが毎回のタスクでその検証スキルを使って変更を確かめ、`/maintain-verification-skill` で検証スキルと Feature Map を最新に保つ。
 `/maintain-verification-skill` を実行する頻度は [#366](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/366) で決める。
 
@@ -106,7 +106,6 @@ Kiro では、これらのサブエージェントは呼び出し元のチャッ
 - 利用者が作業の区切りを示した。
 
 消去してしまった場合は、そのセッションのログを指定して実行する。
-`/retro` は `disable-model-invocation: true` の利用者呼び出しのスキルであるため、エージェントが実行する根拠は `AGENTS.md` の「学びの還元」に置く。
 
 `/retro` は改善候補を提示するだけで、何も変更しない。
 利用者が選んだ候補だけを、[学びを仕組みへ還元し続ける](../principles/continuous-reinforcement.md)の5つの層の優先順位に従って還元する。

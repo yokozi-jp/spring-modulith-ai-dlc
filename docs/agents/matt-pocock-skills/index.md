@@ -1,9 +1,11 @@
 # Matt Pocock スキル日本語リファレンス
 
 - [Matt Pocock スキル運用](workflow.md)：Matt Pocock のスキルを使う前に、RGDD のフェーズ2に乗らない作業の入口、初回設定、文書の扱いを確かめるとき
+- [codebase-design](codebase-design.md)：深いモジュールとテスト可能な継ぎ目を設計するとき
 - [domain-modeling](domain-modeling.md)：用語集とADRを設計中に更新するとき
 - [grill-with-docs](grill-with-docs.md)：計画や設計を質問で詰めながら文書へ記録するとき
 - [grilling](grilling.md)：未決事項を依存関係に沿って質問するとき
+- [improve-codebase-architecture](improve-codebase-architecture.md)：コードベースから構造改善の候補を探すとき
 - [prototype](prototype.md)：設計上の問いを使い捨てコードで検証するとき
 - [research](research.md)：一次資料を調査して根拠付き文書を作るとき
 - [retro](retro.md)：セッションを振り返り、エージェントの環境の改善候補を提案するとき

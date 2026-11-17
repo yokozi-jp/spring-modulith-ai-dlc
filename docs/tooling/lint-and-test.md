@@ -292,12 +292,9 @@ const params = { ...(cursor !== undefined && { cursor }) };
   リンクの検査は`docs/`、`README.md`、`CONTRIBUTING.md`、`.kiro/steering/`、`backend/src`のJavadocとMarkdownを対象にする。
   既知の限界として、`okf-validate.yml`の`paths`は`backend/src/**`を含まないため、バックエンドのJavadocだけを変えるPull RequestではCIが動かない。
   ADRの番号を振り直す変更はdocsの変更を伴うため、そこで検出する。
-- **`task skills-check`**：`skills-lock.json`、`.agents/skills`の実体、`.kiro/skills`のシンボリックリンクの整合と、`kiro/install.sh`が入れたファイルの内容ハッシュを検査する。
-  `tooling/skills-check/test.sh`が壊れた木で期待の終了コードを確かめてから、`tooling/skills-check/skills-check.mjs`が実際の木を検査する。
-  失敗にするのは、`SKILL.md`の欠落、`name`とディレクトリ名の不一致、`description`の欠落、フロントマターの行が「キー:」でも字下げでもない状態（YAMLとして読めない）、`.kiro/skills`が`../../.agents/skills/<名前>`へのリンクでない状態、内容ハッシュの不一致、取得元ごとの`ref`が複数ある状態、lockにない実体またはリンクである。
-  `.kiro/.kiro-plugins-installed`に載るファイルは、記録した内容ハッシュとの不一致、ハッシュの欠落、ファイルの欠落、lockとの重複を失敗にし、lockにないことは失敗にしない。
-  `note`を持つlockの項目（`skill-creator`）は、意図して上流から変えているため内容ハッシュを比べない。
-  `sourceType`が`local`の項目（取得元のない自作のスキル）は`note`を必須とし、取得元ごとの`ref`の集計に含めない。
+- **`task skills-check`**：`skills-lock.json`と`.kiro/.kiro-plugins-installed`の記録が、`.agents/skills`の実体、`.kiro/skills`のリンク、`kiro/install.sh`が入れたファイルと合っているかを検査する。
+  入れたファイルへの書き込みを止めるフックの自己検査（`.kiro/hooks/block-generated-writes.test.sh`）と`tooling/skills-check/test.sh`を先に実行してから、`tooling/skills-check/skills-check.mjs`が実際の木を検査する。
+  失敗にする状態は`tooling/skills-check/test.sh`のケースが正で、この文書には写さない。
   手順の正文は[スキルの取得元と更新](../agents/skill-sources.md)である。
 - **`task release-check`**：release-pleaseのmanifest、版ファイル、Gradle版、設定の一致を検証する。
 - **`task lint-taskfile`**：Task本体でTaskfileのYAML構文とスキーマ構造を検証する。

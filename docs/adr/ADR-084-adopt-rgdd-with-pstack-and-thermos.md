@@ -17,7 +17,7 @@ Proposed
 
 ## Context
 
-[ADR-039](ADR-039-adopt-matt-pocock-skills-workflow.md) は、Matt Pocock のスキルで `/grill-with-docs`、`/to-spec`、`/to-tickets`、`/implement`（内部で `/tdd` と `/code-review`）の順に開発すると定め、スキルを固定コミットから `skills` CLI で取得すると定めた。
+[ADR-039](ADR-039-adopt-matt-pocock-skills-workflow.md) は当初、Matt Pocock のスキルで `/grill-with-docs`、`/to-spec`、`/to-tickets`、`/implement`（内部で `/tdd` と `/code-review`）の順に開発すると定め、スキルを固定コミットから `skills` CLI で取得すると定めた。
 
 利用者は、実装、レビュー、検証を pstack と thermos に任せる進め方へ移ることを求めた。
 この進め方を README駆動 with Grill Driven Development（以下 RGDD）と呼ぶ。
@@ -31,14 +31,16 @@ ADR-039 が Matt Pocock のスキルで懸念したとおり、上流の更新�
 
 Matt Pocock のスキルのうち、実装とレビューを担うものは pstack と thermos の役割と重なる。
 `/tdd` は同じ名前で役割が違い、両方は置けない。
-一方、`grilling`、`grill-with-docs`、`domain-modeling` はフェーズ2で、Issue tracker と連携するスキルは pstack にない用途で使う。
+一方、`grilling`、`grill-with-docs`、`domain-modeling` はフェーズ2で使う。
+Issue tracker と連携するスキルと、既存のコードから深くするモジュールの候補を探す `improve-codebase-architecture`（と、それが呼ぶ `codebase-design`）は、pstack にない用途で使う。
 `retro` は [ADR-071](ADR-071-reinforce-learnings-into-five-layers.md) の5つの層へ環境を還元する候補を返す。
 
 Proposed の間に、Pull Request のレビュー（`/thermos`）の指摘を受けて、Decision を次の点で書き直した。
-ADR-039 を置き換えず、開発の流れと導入するスキルの範囲だけを改めるようにした。
+ADR-039 と [ADR-082](ADR-082-adopt-retro-and-run-it-at-task-boundaries.md) を置き換えず、どちらも Proposed であるため、それぞれの Decision を RGDD に合わせて書き直した。
 cursor-plugins の取り込み元を固定コミットにし、更新のレビューを決定に加えた。
 入れないスキルとその理由を決定に加えた。
-[ADR-082](ADR-082-adopt-retro-and-run-it-at-task-boundaries.md) のうち改める箇所を明示した。
+取得元のないスキルの記録の規則を ADR-039 へ移した。
+利用者の判断で、`improve-codebase-architecture` と `codebase-design` を外すスキルから戻した。
 
 ## Decision
 
@@ -59,22 +61,16 @@ pstack のうち、次のスキルは入れない。
 - **`ketchup-video`**：動画を埋め込めるチャットを前提にする。
 - **`reflect`**：採用した学びを入れたスキルの編集として還元し、記録した内容ハッシュと合わなくなる。改善の行き先も ADR-071 の5つの層と合わない。
 
+入れないスキルは cursor-plugins の `kiro/install.sh` の `excluded_skills` に置き、`kiro/install.sh` は同じ名前が `kiro-adapter` の案内にあることを確かめる。
+
 取り込み元は、`.kiro/.kiro-plugins-installed` の1行目に記録する cursor-plugins のコミットに固定する。
 `kiro/install.sh` は、未コミットの変更がある checkout からは入れない。
 更新は固定コミットを変える Pull Request で行い、旧と新のコミットの差分（同梱スクリプト、発火条件、権限、ファイルを書くコマンド）をレビューしてから入れ、Pull Request の説明に旧と新のコミットを書く。
 入れたファイルとその内容ハッシュは `.kiro/.kiro-plugins-installed` に記録し、`task skills-check` が記録と比べる。
 入れたファイルは編集せず、変更は cursor-plugins の `kiro/` か上流で行う。
-このリポジトリで書く取得元のない skill は、規約の正文を docs に置いて入口だけを持たせ、`skills-lock.json` に `sourceType: "local"` と `note` で記録する。
 手順の正文は [スキルの取得元と更新](../agents/skill-sources.md)に置く。
 
-ADR-039 の決定のうち、開発の流れと、導入する Matt Pocock のスキルの範囲だけを改める。
-残す Matt Pocock のスキルの取得元、固定コミット、`skills` CLI での取得、上流のファイルを変えないこと、更新を固定コミットを変える Pull Request でレビューすることは、ADR-039 のまま変えない。
-
-ADR-082 の決定のうち、次の3点だけを改める。
-
-- タスクの区切りの例から `/implement` の完了を外し、`/thermos` の指摘を直し終えたときを加える。
-- 振り返りの手順の正文を、[Matt Pocock スキル運用](../agents/matt-pocock-skills/workflow.md)の「振り返り」から、RGDD の開発フローの「振り返り」へ移す。
-- ADR-082 が Matt Pocock スキル運用の「取得元と更新」に一か所だけ書くとした導入手順は、cursor-plugins の手順を加え、取得元ごとの節を持つ一つの文書（スキルの取得元と更新）へ移す。
+残す Matt Pocock のスキルとその取得は ADR-039、振り返りは ADR-082 に従う。
 
 ## Consequences
 
@@ -89,7 +85,7 @@ ADR-082 の決定のうち、次の3点だけを改める。
 - スキルの取得元が2つになり、`skills-lock.json` と `.kiro/.kiro-plugins-installed` の2つの記録を読む必要がある。
 - Kiro はスキルの名前と description をスキルの一覧として読み込むため、毎回のコンテキストが増える。
   cursor-plugins で入れる61スキルの description は合計12,491文字である。
-  `skills-lock.json` の15スキルを合わせると76スキルで14,823文字になり、この変更の前（24スキル、3,879文字）の約3.8倍になる。
+  `skills-lock.json` の17スキルを合わせると78スキルで15,213文字になり、この変更の前（24スキル、3,879文字）の約3.9倍になる。
   文字数は、各 `SKILL.md` の frontmatter の `description` の値を数えた。
 - 更新のたびに、旧と新のコミットの間の pstack、thermos、`kiro/` の差分を読む手間がかかる。
 - pstack と thermos のエージェントは `claude-opus-5.5` に固定され、呼び出しごとのクレジットが増える。
@@ -101,7 +97,7 @@ ADR-082 の決定のうち、次の3点だけを改める。
 
 ### Neutral
 
-- 実装とレビューの入口を pstack と thermos にそろえるため、役割が重なる Matt Pocock の `ask-matt`、`code-review`、`codebase-design`、`diagnosing-bugs`、`grill-me`、`handoff`、`implement`、`improve-codebase-architecture`、`using-git-worktrees`、`tdd` を外す。
+- 実装とレビューの入口を pstack と thermos にそろえるため、役割が重なる Matt Pocock の `ask-matt`、`code-review`、`diagnosing-bugs`、`grill-me`、`handoff`、`implement`、`using-git-worktrees`、`tdd` を外す。
   `tdd` は pstack の同名のスキルに置き換わる。
 - 外したスキルの日本語リファレンスは削除し、上流と git の履歴に残す。
 - `skills-lock.json` の項目と、`.kiro/.kiro-plugins-installed` の項目は重ならない。重なると `task skills-check` が失敗にする。

@@ -84,13 +84,9 @@ coverageの対象と基準を含むテスト基盤の判断理由は[ADR-027](..
 | `openapi/openapi.yaml`          | ControllerとDTOのJavadoc、`OpenApiConfig`        | `task api-gen`（[APIを変更する](../web-api/runbook-api-change.md)） |
 | `frontend/src/api/generated/**` | `openapi/openapi.yaml` とOrval設定               | `task api-gen`（契約から）、`task api-client-gen`（Orval設定だけ）  |
 
-Kiroのagentが生成物へ書き込もうとすると、PreToolUse hookの `.kiro/hooks/block-generated-writes.json` が `exit 2` で拒否し、STDERRに再生成の手順を示す。
-判定は `.kiro/hooks/block-generated-writes.sh` が行い、生成物のpathはこのscriptだけが持つ。
-hookは`routeTree.gen.ts`、`src/api/generated/**`に加えて`openapi/openapi.yaml`への書き込みも拒否する。
-STDINを読めないときと `jq` が無いときは書き込みを許可する。
-scriptのテストは `bash .kiro/hooks/block-generated-writes.test.sh` で実行する。
+エージェントによる生成物への書き込みを止めるKiroのフックの説明は、[Kiroのフック](../agents/kiro-hooks.md)にある。
 
-shellのredirectなどhookを通らない書き換えは、`task fe-route-tree-check` が最終的に検出する。
+フックを通らない書き換えは、`task fe-route-tree-check` が最終的に検出する。
 このTaskは `vp build` で `routeTree.gen.ts` を再生成し、コミット済みの内容と差分があれば失敗する。
 Frontend CIもこのTaskを実行する。
 契約と生成clientでは、`task be-openapi-check`と`task api-client-check`が同じ役割を持ち、Backend CIとFrontend CIが実行する。

@@ -25,6 +25,7 @@ tags: [runbook, workflow, agent-skills, matt-pocock]
 - **一つのセッションに収まらない仕事**：`/wayfinder` で判断をチケットとして分け、見通しが立ったら `/to-spec` へ戻る。
 - **一次資料の調査**：`/research` で出典付きの調査文書を作り、その結果を `/grill-with-docs` へ渡す。
 - **対話だけでは判断できない状態モデル、業務ロジック、画面設計**：`/prototype` で一つの問いに答える使い捨ての試作を作って確かめる。試作は製品コードとして扱わない。
+- **コードベースの構造を改善する候補探し**：`/improve-codebase-architecture` で深くする候補を HTML レポートにし、選んだ候補のインターフェースを `/codebase-design` の語彙と手順で検討する。
 - **他の担当者だけが答えられる判断**：`/to-questionnaire` で質問票を作り、回答を `/grill-with-docs` または `/to-spec` へ渡す。
 - **エージェント向け文書の執筆**：スキル、`AGENTS.md`、参照先 docs を書くときは `/writing-for-agents` を基準にし、日本語の書き方は `docs/writing/` に従う。
 - **ドメイン用語と設計判断の整理**：`/domain-modeling` で Glossary と ADR を更新する。

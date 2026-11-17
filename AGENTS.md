@@ -5,13 +5,12 @@
 作業で得た学びは、その作業の中で仕組みへ還元し、同じ誤りを次に起こさないようにする。
 還元先はアーキテクチャ、型と静的検査、振る舞いのテスト、エージェント向けのdocs、人のレビューの順に検討し、上の層を優先する。
 不具合を直したとき、レビューで指摘を受けたとき、エージェントが誤った変更をしたときは、`docs/principles/continuous-reinforcement.md` を読む。
-タスクがひと段落したら（`/thermos` の指摘を直し終えた、Pull Request を作成した、利用者が作業の区切りを示した、のいずれかが最初に起きたとき）、セッションを消去する前に必ず `/retro` を実行する。
-`/retro` は改善候補を提示するだけなので、還元するのは利用者が選んだ候補に限る（手順は `docs/agents/rgdd.md` の「振り返り」）。
+タスクがひと段落したら、セッションを消去する前に必ず `/retro` を実行する。
+ひと段落の条件と、還元する候補の扱いは `docs/agents/rgdd.md` の「振り返り」にある。
 
 ## Agent skills
 
-機能を作り始める前に `docs/agents/rgdd.md` を読む。
-外部から入れたスキル（`skills-lock.json` と `.kiro/.kiro-plugins-installed` に載るもの）の記述と docs の規約や ADR が食い違うときは、docs の規約と ADR に従う。
+機能を作り始める前と、外部から入れたスキルの記述が docs の規約や ADR と食い違うときは、`docs/agents/rgdd.md` を読む。
 スキルを導入、更新する前に `docs/agents/skill-sources.md` を読む。
 `.kiro/.kiro-plugins-installed` に載るファイル（pstack と thermos）は編集しない。
 
