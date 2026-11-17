@@ -92,7 +92,8 @@ services:
 ```
 
 - 複数の用途が使う service には profile を付けない。
-  例：compose-test の WireMock は、`task test` の Spring のテストが `.env.test` の `PAYMENT_GATEWAY_BASE_URL` を通して共有のスタブを呼び、`task e2e` も使うため、profile を付けない。
+  例：compose-test の WireMock は、`task e2e` とバックエンドのスモークが使うため、profile を付けない。
+  Spring のテストは、同じスタブ（`docker/wiremock`）をプロセス内の WireMock で読む（[バックエンドのテストの実行基盤](../backend/testing-infrastructure.md)）。
 
 ## 外部システムの偽物
 

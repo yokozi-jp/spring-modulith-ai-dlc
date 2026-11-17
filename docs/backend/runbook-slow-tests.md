@@ -24,18 +24,13 @@ gh run download <run-id> -n backend-test-results -D /tmp/ci-results
 ## 2. 遅いクラスだけを再実行する
 
 Gradleのビルドキャッシュが効くと`test`は実行されないため、`--rerun`を付ける。
-カバレッジの下限は一部のクラスでは満たせないため、検証を外す。
+テストの依存はテストのJVMが起動するため、composeは起動しない（[バックエンドのテストの実行基盤](testing-infrastructure.md)）。
+forkを1つにすると、ほかのクラスの影響を除いて測れる。
 
 ```bash
-docker compose -f docker/compose-test.yml up -d --wait
 cd backend
-set -a; . ../.env.test; set +a
-./gradlew migrateDatabase test --rerun --tests '*<クラス名>' -x jacocoTestCoverageVerification
-cd ..
-docker compose -f docker/compose-test.yml down --volumes --remove-orphans
+./gradlew test --rerun --tests '*<クラス名>' -PtestForks=1
 ```
-
-DBを使わないクラスは、compose-testの起動と`migrateDatabase`を省いてよい。
 
 ## 3. テストのJVMを記録する
 

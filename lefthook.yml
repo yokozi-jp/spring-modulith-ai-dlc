@@ -254,8 +254,8 @@ pre-push:
         cd backend && ./gradlew spotlessCheck pmdMain pmdTest spotbugsMain spotbugsTest
 
     # backend に変更がある push のときだけテスト実行（カバレッジ検証含む）
-    # 開発用 .env / 開発 DB には触れず、隔離したテスト用スタック（compose-test の
-    # PostgreSQL 5433 / Redis 6380）と .env.test を使う task test で実行する。
+    # 開発用 .env / 開発 DB には触れず、task test で実行する。rollback の検証は compose-test の PostgreSQL、
+    # テストはテストの JVM ごとに起動するコンテナを使う（ADR-085）。
     # docker が無い環境ではスキップ（最終担保は CI に任せる）。
     - name: be-test
       # lefthook の既定の照合では ** が 1 階層以上にしか一致しないため、backend 直下の build.gradle と
