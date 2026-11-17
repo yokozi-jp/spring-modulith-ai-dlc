@@ -94,6 +94,7 @@ Spring の AOP プロキシは、Bean の外からの呼び出しだけを横取
 
 `@Aspect` のクラスには `Ordered.LOWEST_PRECEDENCE` より小さい値の `@Order`（`@Order(Ordered.LOWEST_PRECEDENCE - 100)` など）を付け、すべての Aspect をトランザクションより外側で動かす（[ADR-051](../adr/ADR-051-bind-pgm-cd-with-scoped-value-and-aspect.md)）。
 値のない `@Order` は使わない。
+トランザクションの advisor の順序を既定の `Ordered.LOWEST_PRECEDENCE` に保つため、`@EnableTransactionManagement` を宣言しない。
 トランザクションの内側で動く Aspect が必要になったら、先に ADR-051 とこの規則を変える。
 
 いまのコードで使っていないアノテーションの規則も、検査の費用がほぼなく使い始めたときの事故を防げるため残す。

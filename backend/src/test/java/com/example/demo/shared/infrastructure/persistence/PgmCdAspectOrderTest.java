@@ -68,7 +68,7 @@ class PgmCdAspectOrderTest {
 
     @Override
     public TransactionStatus getTransaction(final @Nullable TransactionDefinition definition) {
-      pgmCdsAtBegin.add(PgmCdAspect.PGM_CD.isBound() ? PgmCdAspect.current() : "unbound");
+      pgmCdsAtBegin.add(PgmCdAspect.PGM_CD.orElse("unbound"));
       return new SimpleTransactionStatus();
     }
 

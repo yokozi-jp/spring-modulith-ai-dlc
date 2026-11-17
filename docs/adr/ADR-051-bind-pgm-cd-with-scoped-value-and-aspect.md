@@ -68,6 +68,7 @@ Aspect とトランザクションの順序は、次のように明示する。
 
 - トランザクションの advisor の順序は、Spring の既定の `Ordered.LOWEST_PRECEDENCE` のままにする。
   `@EnableTransactionManagement` を宣言し直すと Spring Boot のトランザクションの自動構成が退くため、宣言しない。
+  ArchUnit の `transactionManagementIsNotRedeclared` で検査する。
 - `PgmCdAspect` に `@Order(Ordered.LOWEST_PRECEDENCE - 100)` を付け、トランザクションより外側で動かす。
   トランザクションの開始の時点で、`*_pgm_cd` の値は束縛済みになる。
 - すべての `@Aspect` のクラスに `Ordered.LOWEST_PRECEDENCE` より小さい値の `@Order` を付け、トランザクションより外側で動かす。
@@ -82,7 +83,7 @@ Aspect とトランザクションの順序は、次のように明示する。
 - Repository のインタフェースと `CommonColumns` の呼び出しに、ユースケースの引数が要らない。
 - `*_pgm_cd` の値の求め方が一か所にまとまり、Repository ごとに食い違わない。
 - `ScopedValue` は束縛の範囲を出ると自動で戻るため、`ThreadLocal` のような後始末の漏れが起きない。
-- CommandHandler と Listener の外から共通カラムを書こうとすると、INSERT と UPDATE が失敗して気付ける。
+- CommandHandler と Listener の呼び出しとそのトランザクションの外から共通カラムを書こうとすると、INSERT と UPDATE が失敗して気付ける。
 - Aspect とトランザクションの前後が Spring の未定義の順序に頼らず、トランザクションの開始の時点で読める値が決まる。
 
 ### Negative
@@ -100,6 +101,8 @@ Aspect とトランザクションの順序は、次のように明示する。
 
 - `@ApplicationModuleListener` の非同期の呼び出しでも、Listener を実行するスレッドで束縛されることをテストで確かめる。
 - CommandHandler と Listener のトランザクションの開始の時点で `*_pgm_cd` が束縛されていることを、`PgmCdAspectOrderTest` で確かめる。
+- トランザクションの commit と rollback、`TransactionSynchronization` の `beforeCommit` と `afterCommit`、同期の `@TransactionalEventListener` も束縛の中で動く。
+  これらの中の書き込みは失敗せず、起点の CommandHandler か Listener の `*_pgm_cd` で登録される。
 
 ## Alternatives Considered
 

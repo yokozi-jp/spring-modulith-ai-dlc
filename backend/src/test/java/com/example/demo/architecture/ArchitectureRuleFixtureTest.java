@@ -370,6 +370,10 @@ class ArchitectureRuleFixtureTest {
             ProxyRulesArchTest.aspectsDeclareOrder,
             "shared.infrastructure.persistence.LowestOrderPgmCdAspect"),
         row(
+            "transactionManagementIsNotRedeclared",
+            ProxyRulesArchTest.transactionManagementIsNotRedeclared,
+            "shared.infrastructure.persistence.TransactionOrderConfiguration"),
+        row(
             "listenersExposeOnlyOnAndCallOneCommandHandler",
             ClassRoleArchTest.listenersExposeOnlyOnAndCallOneCommandHandler,
             "inventory.application.OrderPlacedListener"),
@@ -559,6 +563,7 @@ class ArchitectureRuleFixtureTest {
         ClassRoleArchTest.commandHandlersAndListenersDoNotUseInheritance,
         ProxyRulesArchTest.pointcutsNarrowTargetsWithWithin,
         ProxyRulesArchTest.aspectsDeclareOrder,
+        ProxyRulesArchTest.transactionManagementIsNotRedeclared,
         ClassRoleArchTest.moduleListenersAreApplicationListeners,
         ClassRoleArchTest.listenersExposeOnlyOnAndCallOneCommandHandler,
         ClassRoleArchTest.requestsAndResponsesArePresentationWebRecordsRule(basePackage),

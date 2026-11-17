@@ -2,6 +2,7 @@ package com.example.demo.architecture;
 
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.classes;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.methods;
+import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
 
 import com.example.demo.DemoApplication;
 import com.tngtech.archunit.core.domain.JavaClass;
@@ -42,6 +43,7 @@ import org.springframework.security.access.prepost.PostAuthorize;
 import org.springframework.security.access.prepost.PostFilter;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.access.prepost.PreFilter;
+import org.springframework.transaction.annotation.EnableTransactionManagement;
 import org.springframework.transaction.annotation.Transactional;
 
 /** Spring と Resilience4j のプロキシを迂回する同一クラス内の直接呼び出しを禁止する。 */
@@ -107,6 +109,24 @@ class ProxyRulesArchTest {
               "Spring は別々の Aspect とトランザクションが同じ順序の値で同じメソッドに掛かるときの前後を決めないため。"
                   + "直し方：Aspect のクラスに @Order(Ordered.LOWEST_PRECEDENCE - 100) のように、"
                   + "Ordered.LOWEST_PRECEDENCE より小さい値の @Order を付ける。"
+                  + "規約：docs/backend/java-coding.md、"
+                  + "docs/adr/ADR-051-bind-pgm-cd-with-scoped-value-and-aspect.md");
+
+  /**
+   * {@link EnableTransactionManagement} を宣言せず、トランザクションの advisor の順序を Spring の既定の {@link
+   * Ordered#LOWEST_PRECEDENCE} に保つ。
+   *
+   * <p>{@link #aspectsDeclareOrder} は、トランザクションの advisor がこの順序にあることを前提にする。
+   */
+  @ArchTest
+  /* package */ static final ArchRule transactionManagementIsNotRedeclared =
+      noClasses()
+          .should()
+          .beAnnotatedWith(EnableTransactionManagement.class)
+          .because(
+              "トランザクションの advisor の順序が変わると、Aspect がトランザクションの内側で動いても"
+                  + "aspectsDeclareOrder が検出できないため。"
+                  + "直し方：@EnableTransactionManagement を消し、Spring Boot のトランザクションの自動構成に任せる。"
                   + "規約：docs/backend/java-coding.md、"
                   + "docs/adr/ADR-051-bind-pgm-cd-with-scoped-value-and-aspect.md");
 
@@ -204,15 +224,14 @@ class ProxyRulesArchTest {
     return new ArchCondition<>("be annotated with @Order below Ordered.LOWEST_PRECEDENCE") {
       @Override
       public void check(final JavaClass item, final ConditionEvents events) {
-        final Optional<Order> order = item.tryGetAnnotationOfType(Order.class);
-        if (order.isEmpty() || order.get().value() >= Ordered.LOWEST_PRECEDENCE) {
+        final Optional<Integer> order = item.tryGetAnnotationOfType(Order.class).map(Order::value);
+        if (order.filter(value -> value < Ordered.LOWEST_PRECEDENCE).isEmpty()) {
           events.add(
               SimpleConditionEvent.violated(
                   item,
                   item.getFullName()
-                      + " の @Order が "
-                      + order.map(o -> String.valueOf(o.value())).orElse("ない")
-                      + " で、トランザクションの advisor より外側にない。"));
+                      + order.map(value -> " の @Order が " + value).orElse(" に @Order がない")
+                      + "ため、トランザクションの advisor より外側で動かない。"));
         }
       }
     };
