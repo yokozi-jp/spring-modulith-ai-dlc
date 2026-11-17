@@ -10,18 +10,24 @@ import org.jooq.DSLContext;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 
 /**
  * マイグレーション済みのテストDBを、アプリロールで{@code pg_catalog}から読んで検査する。
  *
  * <p>業務テーブルはまだないため、規約の検査は{@code modulith}と{@code
- * liquibase}の除外が正しいことと、アプリロールがDMLだけを持つことを確かめる。判定の拒否経路は{@link SchemaConventionsTest}が違反を含む行で検証する。
+ * liquibase}の除外が正しいことと、アプリロールがDMLだけを持つこと、マイグレーションロールがsuperuserでもBYPASSRLSでもないことを確かめる。判定の拒否経路は{@link
+ * SchemaConventionsTest}が違反を含む行で検証する。
  */
 @DatabaseTest
 class SchemaInspectionTest {
 
   /** アプリロールで接続したjOOQのコンテキスト。 */
   @Autowired private DSLContext dsl;
+
+  /** changesetを適用したマイグレーションロールの名前。 */
+  @Value("${MIGRATION_DB_USERNAME}")
+  private String migrationRole;
 
   @Test
   @DisplayName("マイグレーション後のスキーマは規約を満たす")
@@ -30,6 +36,15 @@ class SchemaInspectionTest {
         SchemaConventions.check(SchemaCatalog.read(dsl), SchemaConventions.ALLOWLIST);
 
     assertThat(violations).as("スキーマ検査の違反: %s", violations).isEmpty();
+  }
+
+  @Test
+  @DisplayName("マイグレーションロールはsuperuserでもBYPASSRLSでもない")
+  void migrationRoleIsSubjectToRowLevelSecurity() {
+    final List<ConventionViolation> violations =
+        SchemaPrivilegeConventions.migrationRole(SchemaCatalog.role(dsl, migrationRole));
+
+    assertThat(violations).as("マイグレーションロールの違反: %s", violations).isEmpty();
   }
 
   @Test

@@ -58,6 +58,9 @@ class SchemaConventionsTest {
   /** アプリロール。 */
   private static final String ROLE = "demo";
 
+  /** マイグレーションロール。 */
+  private static final String MIGRATION_ROLE = "demo_migration";
+
   @Test
   @DisplayName("規約を満たす行だけなら違反がない")
   void conformingSnapshotHasNoViolations() {
@@ -482,6 +485,23 @@ class SchemaConventionsTest {
               "G1 demo:REPLICATION",
               "G1 demo:BYPASSRLS",
               "G1 demo:CREATE:DATABASE");
+    }
+
+    @Test
+    @DisplayName("G2：マイグレーションロールのsuperuserとBYPASSRLSを拒否する")
+    void rejectsSuperuserAndBypassRlsOnMigrationRole() {
+      final RoleRow role = new RoleRow(MIGRATION_ROLE, true, false, false, false, true, true);
+
+      assertThat(keys(SchemaPrivilegeConventions.migrationRole(role)))
+          .containsExactlyInAnyOrder("G2 demo_migration:SUPERUSER", "G2 demo_migration:BYPASSRLS");
+    }
+
+    @Test
+    @DisplayName("G2：表を作れるマイグレーションロールを受け入れる")
+    void acceptsMigrationRoleThatCanCreate() {
+      final RoleRow role = new RoleRow(MIGRATION_ROLE, false, false, false, false, false, true);
+
+      assertThat(SchemaPrivilegeConventions.migrationRole(role)).isEmpty();
     }
 
     @Test

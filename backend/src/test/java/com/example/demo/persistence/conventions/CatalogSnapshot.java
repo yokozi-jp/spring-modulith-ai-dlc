@@ -149,7 +149,7 @@ record CatalogSnapshot(
       String schema, String view, String referencedSchema, String referencedView) {}
 
   /**
-   * 接続したロールの属性。
+   * ロールの属性。
    *
    * @param name ロール名
    * @param superuser {@code rolsuper}
