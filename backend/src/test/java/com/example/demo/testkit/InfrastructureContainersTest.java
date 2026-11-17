@@ -14,7 +14,7 @@ import org.springframework.context.annotation.Import;
 import org.springframework.core.env.Environment;
 
 /**
- * Spring の設定の接続先が、{@link InfrastructureContainers} の起動したコンテナを指すことを確かめる（ADR-084）。
+ * Spring の設定の接続先が、{@link InfrastructureContainers} の起動したコンテナを指すことを確かめる（ADR-085）。
  *
  * <p>{@code application.yaml} のプレースホルダの名前が変わると、接続先が {@code .env.test} の値に戻り、fork どうしで DB
  * を共有してしまう。その変化をここで検出する。

@@ -33,7 +33,7 @@ import org.testcontainers.utility.MountableFile;
 import org.yaml.snakeyaml.Yaml;
 
 /**
- * テストの JVM ごとに 1 つずつ起動する PostgreSQL、Redis、決済代行の WireMock のコンテナ（ADR-084）。
+ * テストの JVM ごとに 1 つずつ起動する PostgreSQL、Redis、決済代行の WireMock のコンテナ（ADR-085）。
  *
  * <p>Gradle は fork ごとに別の JVM を起動するため、fork どうしは DB を共有しない。 最初の Spring のテストのコンテキストを作るときに起動し、JVM の終了で
  * Testcontainers の Ryuk が片付ける。 イメージと WireMock のコマンドは {@code docker/compose-test.yml} から読み、E2E

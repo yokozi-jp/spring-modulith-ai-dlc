@@ -9,7 +9,7 @@ tags: [convention, backend, testing, testcontainers, gradle]
 
 テストのJVMごとに、PostgreSQL、Redis、WireMockのコンテナを1つずつ起動し、Gradleのforkを並列にする。
 テストの依存のコンテナは[InfrastructureContainers](../../backend/src/test/java/com/example/demo/testkit/InfrastructureContainers.java)だけが起動する。
-起動のしかたと接続先の渡し方はクラスのJavadocに、決定の理由は[ADR-084](../adr/ADR-084-start-test-dependencies-per-fork-with-testcontainers.md)にある。
+起動のしかたと接続先の渡し方はクラスのJavadocに、決定の理由は[ADR-085](../adr/ADR-085-start-test-dependencies-per-fork-with-testcontainers.md)にある。
 
 ## 依存の正本
 

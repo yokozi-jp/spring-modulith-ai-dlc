@@ -1,11 +1,11 @@
 ---
 type: ADR
-title: 'ADR-084: バックエンドのテストの依存を Testcontainers で fork ごとに起動し、テストを並列に実行する'
+title: 'ADR-085: バックエンドのテストの依存を Testcontainers で fork ごとに起動し、テストを並列に実行する'
 description: バックエンドのテストが共有の compose-test に頼るのをやめ、テストの JVM ごとに Testcontainers で PostgreSQL と Redis、プロセス内で WireMock を起動し、Gradle の fork を並列にし、カバレッジの検証を test から check へ移す決定。
 tags: [adr, testing, backend, database, tooling]
 ---
 
-# ADR-084: バックエンドのテストの依存を Testcontainers で fork ごとに起動し、テストを並列に実行する
+# ADR-085: バックエンドのテストの依存を Testcontainers で fork ごとに起動し、テストを並列に実行する
 
 ## Status
 

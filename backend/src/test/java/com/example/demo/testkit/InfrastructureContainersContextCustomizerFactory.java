@@ -9,7 +9,7 @@ import org.springframework.test.context.ContextCustomizerFactory;
 import org.springframework.test.context.MergedContextConfiguration;
 
 /**
- * Spring のテストのコンテキストへ、{@link InfrastructureContainers} の接続先を最も優先する設定として足す（ADR-084）。
+ * Spring のテストのコンテキストへ、{@link InfrastructureContainers} の接続先を最も優先する設定として足す（ADR-085）。
  *
  * <p>{@code META-INF/spring.factories} で全テストに登録する。 接続先は {@code application.yaml}
  * の環境変数の名前で渡すため、{@code spring.datasource.url} などを読むテストも、起動したコンテナを指す。

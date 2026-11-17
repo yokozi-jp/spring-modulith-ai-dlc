@@ -856,7 +856,7 @@ tasks:
     cmds:
       - |
         # 本体と後片付けの終了コードの扱いは docs/tooling/taskfile.md の「後片付けと終了コード」を参照する。
-        # rollback の検証だけが compose の PostgreSQL を使い、テストは Testcontainers の依存を使う（ADR-084）。
+        # rollback の検証だけが compose の PostgreSQL を使い、テストは Testcontainers の依存を使う（ADR-085）。
         # 中断した前の回の DB を残したまま rollback を検証しないよう、起動の前にも片付ける。
         # テストの前に止め、テストが .env.test の接続先（compose の PostgreSQL）へ黙ってつながらないようにする。
         status=0

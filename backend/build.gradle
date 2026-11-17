@@ -142,11 +142,11 @@ dependencies {
     // 決済代行の結合テストの偽物。standalone は Jetty を shade 済みで Spring Boot の依存と衝突しない。
     // compose の WireMock のイメージと同じ版にそろえる。Spring BOM の管理外のため版を明示する。
     testImplementation 'org.wiremock:wiremock-standalone:3.13.2'
-    // テストの JVM ごとに PostgreSQL、Redis、WireMock のコンテナを起動する（ADR-084）。版は Spring Boot が管理する。
+    // テストの JVM ごとに PostgreSQL、Redis、WireMock のコンテナを起動する（ADR-085）。版は Spring Boot が管理する。
     testImplementation 'org.testcontainers:testcontainers-postgresql'
-    // テストのコンテナのイメージとコマンドを docker/compose-test.yml から読む（ADR-084）。版は Spring Boot が管理する。
+    // テストのコンテナのイメージとコマンドを docker/compose-test.yml から読む（ADR-085）。版は Spring Boot が管理する。
     testImplementation 'org.yaml:snakeyaml'
-    // テストの JVM が自分のコンテナへ changeset を適用する（ADR-084）。buildscript の版にそろえる。
+    // テストの JVM が自分のコンテナへ changeset を適用する（ADR-085）。buildscript の版にそろえる。
     testImplementation 'org.liquibase:liquibase-core:5.0.4'
     testCompileOnly 'org.projectlombok:lombok'
     testAnnotationProcessor 'org.projectlombok:lombok'
@@ -188,12 +188,12 @@ dependencyManagement {
 
 def openApiSpec = layout.projectDirectory.file('../openapi/openapi.yaml').asFile
 
-// テストのコンテナへ適用するスキーマタグ（ADR-084）。-PtestAllChangesets を付けると、作りかけを含む全 changeset を適用する。
+// テストのコンテナへ適用するスキーマタグ（ADR-085）。-PtestAllChangesets を付けると、作りかけを含む全 changeset を適用する。
 def testLiquibaseTag = providers.gradleProperty('testAllChangesets').isPresent()
     ? ''
     : providers.gradleProperty('databaseSchemaTag').get().trim()
 
-// テストの設定（接続先以外）。開発用の ../.env でなく、テスト用の値を読ませる（ADR-084）。
+// テストの設定（接続先以外）。開発用の ../.env でなく、テスト用の値を読ませる（ADR-085）。
 // 無ければ task be-test などが .env.test.example から作る。-PtestEnvFile=<backend からの相対パス> で変える。
 def testEnvFile = layout.projectDirectory.file(providers.gradleProperty('testEnvFile').getOrElse('../.env.test')).asFile
 def testSpringConfigImport = "file:${testEnvFile.absolutePath}[.properties]"
@@ -215,10 +215,10 @@ tasks.named('pitest') {
  * テストとカバレッジ
  * JUnit Platform で実行し、JaCoCo でカバレッジレポート（HTML/XML）を生成する。
  * 全体と各クラスの branch と line の coverage が下限を下回ると jacocoTestCoverageVerification が失敗する（ADR-076）。
- * 検証は test ではなく check にぶら下げ、test --tests で一部だけを実行しても下限で失敗させない（ADR-084）。
+ * 検証は test ではなく check にぶら下げ、test --tests で一部だけを実行しても下限で失敗させない（ADR-085）。
  */
 tasks.named('test') {
-    // fork ごとに InfrastructureContainers がコンテナを起動し、DB を共有しない（ADR-084）。
+    // fork ごとに InfrastructureContainers がコンテナを起動し、DB を共有しない（ADR-085）。
     // ponytail: 既定はコア数の半分。fork ごとに JVM、PostgreSQL、Redis、WireMock のメモリを使うため、
     // メモリの少ない環境では -PtestForks=<n> で減らす。
     maxParallelForks = providers.gradleProperty('testForks').map { it as int }
@@ -235,7 +235,7 @@ tasks.named('test') {
     // 決済代行の結合テストは docker/wiremock のスタブを読むため、スタブを変えたらテストをやり直す。
     inputs.dir(layout.projectDirectory.dir('../docker/wiremock')).withPropertyName('wiremockStubs')
     // -PopenapiExport=true のときだけ、OpenApiContractTest に契約を書き出させる（ADR-064）。
-    // 契約だけを再生成するときは --tests com.example.demo.OpenApiContractTest で絞る（ADR-084）。
+    // 契約だけを再生成するときは --tests com.example.demo.OpenApiContractTest で絞る（ADR-085）。
     // 出力に宣言しないと、build cache の復元時に契約が書かれず、drift 検査が素通りになる。
     if (providers.gradleProperty('openapiExport').isPresent()) {
         systemProperty 'openapi.output', openApiSpec.absolutePath
@@ -332,7 +332,7 @@ pitest {
     targetTests = providers.gradleProperty('pitTargetTests')
         .map { it.split(',').toList() }
         .getOrElse(['com.example.demo.*'])
-    // ponytail: minion ごとにコンテナを起動するため並列にできるが、minion ごとの起動の時間とメモリを測ってから上げる（ADR-084）。
+    // ponytail: minion ごとにコンテナを起動するため並列にできるが、minion ごとの起動の時間とメモリを測ってから上げる（ADR-085）。
     threads = 1
     // 新しい minion は Spring のコンテキストを作り直し、coverage の計測時より遅い。
     // 既定の 1.25 倍と 4 秒ではその起動を TIMED_OUT とみなし、minion の再起動を繰り返すため広げる。
