@@ -48,27 +48,53 @@ task fe-install    # フロントエンド
 
 ## エージェントがcommitとpushをするとき
 
-色の制御文字を外す。
+エージェントは`task agent-commit`と`task agent-push`でcommitとpushをバックグラウンドで始め、`task agent-wait`で終わりを待つ。
+`task agent-commit`は、渡したパスの外にstage済みの変更があればstageの前に止まり、渡したパスだけをcommitする。
+`git add -A`、`git commit --amend`、`git push --force`は使わない。
 
 ```bash
-NO_COLOR=1 git commit -F <ファイル>
-NO_COLOR=1 git push -u origin <ブランチ>
+task agent-commit -- <メッセージのファイル> <パス>...
+task agent-wait -- <実行のディレクトリ>    # agent-commit が表示したもの。終わるまで繰り返す
+task agent-push
+task agent-wait -- <実行のディレクトリ>    # agent-push が表示したもの
 ```
 
+pre-commitの検査とpre-pushの検査は数分かかることがあり、tool callの時間切れや中断ではフックは止まらない。
+たとえば`backend/`のJavaかGradleを変えたpushでは、pre-pushが`be-lint`、`be-test`（全テスト）、`be-image-build`を並列に実行する。
+そのため、どちらのTaskもフックの終わりを待たずに、実行のディレクトリ（`/tmp/agent-git-commit.XXXXXX`など）を表示して戻る。
+
+### commitを始める
+
+メッセージは[コミットメッセージの規約](../repository/commit-messages.md)に従ってファイルへ書き、commitするパスと一緒に渡す。
+パスは呼んだディレクトリからの相対で解釈し、空白を含むパスもそのまま渡せる。
+渡したパスの外にstage済みの変更があれば、その一覧を出して止まる。
+自分の変更ならパスに足し、別の作業がstageしたものなら、その作業に確かめてから`git restore --staged -- <パス>`で外す。
+
+止まらなければ、渡したパスだけを`git add`し、その時点のindexの写しから`git commit -F`を始める。
+gitはpre-commitの間indexをロックせず、フックの後にindexを読み直す。
+写しから作るので、フックの間にほかの作業が`git add`したものはこのcommitに入らず、stage済みのまま残る。
+フックが失敗したときは、渡したパスがstage済みのまま残るので、直してから同じパスで`task agent-commit`をやり直す。
+
+### pushを始める
+
+`task agent-push`は、今のブランチを`git push -u origin <ブランチ>`でpushする。
+前のpre-push（`lefthook run pre-push`のプロセス）が動いていれば、`pgrep`で見つけたプロセスを出して止まる。
+pre-pushの`task test`はcompose-testのプロジェクト名とポートが固定なので、別のworktreeのpre-pushとも重ねられない。
+前のフックを止めたときは、`docker compose -f docker/compose-test.yml down --volumes --remove-orphans`でテスト用の依存を片付けてからやり直す。
+
+### 終わりを待つ
+
+`task agent-wait`は、実行のディレクトリの終わりの印（`done`）を1秒ごとに確かめ、1回で最大100秒待つ。
+終わっていれば、Lefthookの要約の行（`✓`と`✗`）、`exit=<終了コード>`、ログのパスを出し、失敗ならログの末尾20行も出す。
+100秒で終わらなければ「まだ実行中です」と出して終了コード75で戻るので、同じコマンドをもう一度実行する。
+Taskは失敗の終了コードを201にまとめるため、元の終了コードは`exit=`の行で読むか、`task -x agent-wait`で確かめる。
+
+どちらのTaskも`NO_COLOR=1`を付けて色の制御文字を外す。
 Lefthookの出力は`lefthook.yml`の`output`で絞ってある（[Lintとテストのリファレンス](lint-and-test.md)）。
 `LEFTHOOK_OUTPUT=summary,failure`でさらに絞ると、成功の扱いで出る`adr-check`の注意喚起が消えるため、付けない。
 
-`backend/`のJavaかGradleを変えたpushでは、pre-pushが`be-lint`、`be-test`（全テスト）、`be-image-build`を並列に実行し、数分かかる。
-tool callの時間切れや中断でフックは止まらないため、pushはバックグラウンドで実行し、完了の印のファイルを待つ。
-
-```bash
-(nohup bash -c 'NO_COLOR=1 git push -u origin <ブランチ> > /tmp/push.log 2>&1; echo "exit=$?" > /tmp/push.done' >/dev/null 2>&1 &)
-cat /tmp/push.done          # 完了するまで間を置いて確かめる
-grep -E '^(✓|✗)' /tmp/push.log
-```
-
-pushをやり直す前に、`pgrep -fa "lefthook run pre-push"`で前のフックが残っていないことを確かめる。
-残っていれば、終えるのを待つか止めてから、`docker compose -f docker/compose-test.yml down --volumes --remove-orphans`でテスト用の依存を片付ける。
+本体は`tooling/agent-git/agent-git.sh`である。
+`task agent-git-test`が、遅いフックを持つ一時のgitリポジトリで、拒否、成功、失敗、待ちの途中、pushの拒否を確かめる。
 
 ## APIを変更するとき
 
