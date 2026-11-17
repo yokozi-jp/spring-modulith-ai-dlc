@@ -323,7 +323,6 @@ OKF検査の採用理由は[ADR-036](../adr/ADR-036-adopt-okf-for-docs-knowledge
 - **pre-commit（Taskfileか`tooling/taskfile-cleanup/`の変更）**：`lint-taskfile`を実行する。
 - **pre-push（すべて）**：`adr-check`と`scan-secrets-all`相当を実行する。
 - **pre-push（バックエンドのJavaまたはGradle変更）**：`be-lint`相当と`test`を実行する。
-- **pre-push（バックエンドまたはDockerfileの変更）**：バックエンドイメージのbuild stageをビルドする。
 - **pre-push（フロントエンドまたはTaskfileの変更）**：`fe-test-build`を、Vitestのdot reporterとjson-summaryだけのcoverageで実行する。
 - **pre-push（GitHub Actionsワークフローの変更）**：`lint-actions`相当と`lint-actions-security`相当を実行する。
 
@@ -331,6 +330,8 @@ Gitフックの条件とコマンドは[`lefthook.yml`](../../lefthook.yml)を�
 Lefthookは版の表示、skipの行、`EXECUTE`の行を省き、jobの出力と要約を出す（`output`）。
 成功したjobの出力も残すのは、`adr-check`の注意喚起が成功の扱いで出るためである。
 すべてを出すときは、`LEFTHOOK_OUTPUT`に`meta,summary,success,failure,execution,execution_out,execution_info,skips`を渡す。
+pre-pushのjobは順番に実行し、失敗した時点で止める。
+バックエンドイメージのビルドはpre-pushでは実行せず、Docker CI（`hadolint.yml`）の`backend-image`がPull Requestごとに実行する。
 pre-pushの「変更」は、push済みかどうかやrebaseの有無によらず、`origin/main`とのmerge-baseからの差分で判定する。
 分岐後にmainへ入った変更では、触っていない領域の検査は走らない。
 2回目以降のpushでも、ブランチ全体の変更に対して検査が走る。
