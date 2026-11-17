@@ -13,7 +13,14 @@ function copyProjectConfig(directory) {
   cpSync(path.join(frontendRoot, "lint/fixtures/src"), path.join(directory, "src"), {
     recursive: true,
   });
-  for (const file of ["vite.config.ts", "tsconfig.json", "package.json", "src/style.css"]) {
+  // vite.config.ts は src/testing/async-wait.ts の待つ上限を import する。
+  for (const file of [
+    "vite.config.ts",
+    "tsconfig.json",
+    "package.json",
+    "src/style.css",
+    "src/testing/async-wait.ts",
+  ]) {
     cpSync(path.join(frontendRoot, file), path.join(directory, file));
   }
   mkdirSync(path.join(directory, "lint"));
@@ -213,8 +220,12 @@ describe("project lint config on fixtures", () => {
 
     it("rejects waits with a fixed timeout with vi.waitFor and vi.waitUntil", () => {
       expect(
-        countIn("features/order/implicit-wait.test.ts", "vitest(no-restricted-vi-methods)"),
+        countIn("features/order/fixed-timeout-wait.test.ts", "vitest(no-restricted-vi-methods)"),
       ).toBe(2);
+    });
+
+    it("allows waits with expect.poll and waitFor from Testing Library", () => {
+      expect(codesIn("features/order/configured-timeout-wait.test.ts")).toStrictEqual([]);
     });
 
     it("allows replacing globals with vi.stubGlobal and vi.spyOn", () => {

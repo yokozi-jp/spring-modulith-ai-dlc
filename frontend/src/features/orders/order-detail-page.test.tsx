@@ -5,6 +5,7 @@ import { http } from "msw";
 import { beforeEach, describe, expect, it } from "vite-plus/test";
 
 import { getListProductsMockHandler } from "@/api/generated/mocks/product/product.msw";
+import { createGate } from "@/testing/async-wait";
 import { server } from "@/testing/msw";
 import {
   draftOrder,
@@ -154,23 +155,15 @@ describe("order detail page", () => {
     { name: "確定する", path: "confirm", message: "注文を確定しました。" },
     { name: "取り消す", path: "cancel", message: "注文を取り消しました。" },
   ] as const)("「$name」の送信中は 2 回目を送らない", async ({ name, path, message }) => {
-    let release = false;
+    const update = createGate();
     serveDetail(draftOrder());
     const bodies = serveUpdate("post", path, noContent);
-    server.use(
-      http.post(
-        `*/api/orders/:orderId/${path}`,
-        async () => {
-          await expect.poll(() => release).toBe(true);
-        },
-        { once: true },
-      ),
-    );
+    server.use(http.post(`*/api/orders/:orderId/${path}`, () => update.promise, { once: true }));
     const { user } = await renderRoute(detailPath);
     await user.click(await screen.findByRole("button", { name }));
 
     await user.click(screen.getByRole("button", { name }));
-    release = true;
+    update.release();
 
     await expect(within(notice()).findByText(message)).resolves.toBeTruthy();
     expect(bodies).toHaveLength(1);

@@ -4,16 +4,12 @@ import "temporal-polyfill/global";
 import { cleanup, configure } from "@testing-library/react";
 import { afterAll, afterEach, beforeAll, vi } from "vite-plus/test";
 
+import { asyncWaitTimeoutMs } from "./async-wait";
 import { server } from "./msw";
 
-// findBy、waitFor、expect.poll が待つ上限を、ここでまとめて決める（docs/frontend/testing.md）。
-// 既定の 1 秒は、負荷の高いマシンで画面の更新が間に合わずに失敗する。testTimeout の 30 秒より短くし、DOM を含むエラーで失敗させる。
-// ponytail: Playwright の assertion と同じ 5 秒にした。これでも足りない負荷が出たら、この値だけを上げる。
-const asyncWaitTimeoutMs = 5000;
+// Vitest の setupFiles。Node と jsdom の全テストで、Testing Library の待つ上限、MSW の server、後片付けをまとめる（docs/frontend/testing.md）。
 configure({ asyncUtilTimeout: asyncWaitTimeoutMs });
-vi.setConfig({ expect: { poll: { timeout: asyncWaitTimeoutMs } } });
 
-// Vitest の setupFiles。Node と jsdom の全テストで、MSW の server と後片付けをまとめる（docs/frontend/testing.md）。
 // oxlint-disable vitest/require-top-level-describe -- setupFiles の hook は全テストに効かせるため、describe の外に置く。
 beforeAll(() => {
   server.listen({ onUnhandledRequest: "error" });

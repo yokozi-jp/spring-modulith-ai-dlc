@@ -1,4 +1,5 @@
 /* @vitest-environment jsdom */
+// oxlint-disable import/max-dependencies -- router と provider を組み立てる import に、loader を止める gate の import が加わる。
 
 import { QueryClient } from "@tanstack/react-query";
 import {
@@ -18,6 +19,7 @@ import { i18n } from "@/i18n";
 import { replaceTelemetryForTesting } from "@/lib/telemetry";
 import { routerDefaults } from "@/router-defaults";
 import { routeTree } from "@/routeTree.gen";
+import { createGate } from "@/testing/async-wait";
 
 type Sink = NonNullable<Parameters<typeof replaceTelemetryForTesting>[0]>;
 
@@ -101,18 +103,16 @@ describe("router defaults", () => {
   });
 
   it("shows the localized pending view while the loader runs", async () => {
-    let loaded = false;
+    const loader = createGate();
     renderRouter(
-      treeWithLoader(async () => {
-        await expect.poll(() => loaded).toBe(true);
-      }),
+      treeWithLoader(() => loader.promise),
       "/",
       0,
     );
 
     await expect(screen.findByRole("status")).resolves.toHaveProperty("textContent", "Loading…");
 
-    loaded = true;
+    loader.release();
     await expect(screen.findByText("loaded")).resolves.toBeTruthy();
   });
 });

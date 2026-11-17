@@ -8,6 +8,8 @@ import react from "@vitejs/plugin-react";
 import { defaultExclude, defineConfig, loadEnv } from "vite-plus";
 import type { ProxyOptions } from "vite-plus";
 
+import { asyncWaitTimeoutMs } from "./src/testing/async-wait";
+
 const contentSecurityPolicy =
   "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; form-action 'self'; script-src 'self'; style-src 'self'; style-src-elem 'self' 'unsafe-inline'; style-src-attr 'none'; img-src 'self' data:; font-src 'self'; connect-src 'self'; report-to csp-endpoint";
 
@@ -29,9 +31,8 @@ const restrictedHtmlProperties = [
 const htmlSinkGlobals = [{ name: "DOMParser", message: "Do not parse arbitrary HTML." }];
 const apiMessage = "Use the generated API client in src/api.";
 const mockMessage = "Use MSW, vi.spyOn or vi.stubGlobal instead of module mocks.";
-// vi.waitFor と vi.waitUntil は既定の 1 秒を一括で変えられない。上限は src/testing/setup.ts が決める。
 const waitMessage =
-  "Use findBy or waitFor from Testing Library, or expect.poll. src/testing/setup.ts sets their timeout.";
+  "Use findBy or waitFor from Testing Library, expect.poll, or createGate from src/testing/async-wait.ts.";
 const networkGlobals = ["fetch", "XMLHttpRequest"].map((name) => ({ name, message: apiMessage }));
 const htmlSinkProperties = [
   ...restrictedHtmlProperties,
@@ -179,6 +180,7 @@ export default defineConfig(({ mode }) => {
       // pre-push では backend のテストやシークレットスキャンと並列に走り、既定の 5 秒を超えることがある。
       // ponytail: タイムアウトは性能の検証ではなくハング検出のためなので、負荷時の実測（5 秒超）に余裕を持たせた 30 秒にする。
       testTimeout: 30_000,
+      expect: { poll: { timeout: asyncWaitTimeoutMs } },
       // MSW の server と後片付けを全テストで共有する（docs/frontend/testing.md）。
       setupFiles: ["./src/testing/setup.ts"],
       coverage: {

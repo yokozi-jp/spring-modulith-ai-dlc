@@ -2,6 +2,7 @@ import { MutationObserver, QueryObserver } from "@tanstack/react-query";
 import { http, HttpResponse } from "msw";
 import { beforeEach, describe, expect, it, onTestFinished, vi } from "vite-plus/test";
 
+import { createGate } from "@/testing/async-wait";
 import { server } from "@/testing/msw";
 import { createTestQueryClient } from "@/testing/query-client";
 
@@ -24,24 +25,19 @@ function respondToUpdate(status: 204 | 409) {
 
 /** 最初の GET はすぐ返し、2 回目以降の GET（再取得）は release を呼ぶまで返さない。 */
 function serveItemsHoldingRefetch(status: 204 | 409) {
-  let released = false;
+  const refetch = createGate();
   let fetchCount = 0;
   server.use(
     http.get(itemsUrl, async () => {
       fetchCount += 1;
       if (fetchCount > 1) {
-        await expect.poll(() => released).toBe(true);
+        await refetch.promise;
       }
       return HttpResponse.json({ fetchCount });
     }),
     http.post(itemsUrl, () => respondToUpdate(status)),
   );
-  return {
-    release: () => {
-      released = true;
-    },
-    fetchCount: () => fetchCount,
-  };
+  return { release: refetch.release, fetchCount: () => fetchCount };
 }
 
 /** 描画中の query を QueryObserver で作り、mutation を送って再取得が始まるまで待つ。 */
