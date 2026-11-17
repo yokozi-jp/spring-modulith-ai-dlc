@@ -230,8 +230,8 @@ class ProxyRulesArchTest {
               SimpleConditionEvent.violated(
                   item,
                   item.getFullName()
-                      + order.map(value -> " の @Order が " + value).orElse(" に @Order がない")
-                      + "ため、トランザクションの advisor より外側で動かない。"));
+                      + order.map(value -> " の @Order が " + value + " で").orElse(" に @Order がなく")
+                      + "、トランザクションの advisor より外側で動かない。"));
         }
       }
     };
