@@ -1,6 +1,7 @@
 #!/bin/sh
 # 初回起動時に、DDLを持たないアプリケーションロールを作成する。
 # スキーマとテーブルの権限は、各Liquibase changesetが所有対象だけに付与する。
+set -e
 
 app_user="${DB_USERNAME:-}"
 if [ -n "${DB_PASSWORD_FILE:-}" ]; then
