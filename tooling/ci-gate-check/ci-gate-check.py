@@ -62,8 +62,8 @@ def main():
     workflows = {p.name: yaml.safe_load(p.read_text(encoding="utf-8")) for p in sorted(directory.glob("*.y*ml"))}
 
     ci = workflows.get("ci.yml")
-    if ci is None:
-        raise SystemExit("ci.yml がありません。")
+    if not ci or not ci.get("jobs"):
+        raise SystemExit("ci.yml がないか、jobs がありません。")
 
     errors = check_gate(ci["jobs"])
     if "pull_request" not in triggers(ci):

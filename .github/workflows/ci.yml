@@ -14,6 +14,7 @@ concurrency:
 
 permissions: {}
 
+# uses は ./ の形で書く。zizmor の self-repository は $/ を勧めるが、actionlint（1.7.12）がまだ受け付けない（rhysd/actionlint#732）。
 jobs:
   backend:
     name: Backend

@@ -78,6 +78,10 @@ check() { python3 "$dir/ci-gate-check.py" "$1" "${2:-$tmp/excluded.tsv}"; }
 
 expect "揃った木は通る" 0 "ci-gate-check OK" check "$base"
 
+d="$(case_dir no-jobs)"
+printf 'name: CI\non:\n  pull_request:\n' > "$d/ci.yml"
+expect "jobs のない ci.yml は traceback ではなくメッセージで失敗" 1 "jobs がありません" check "$d"
+
 d="$(case_dir missing-needs)"
 sed -i 's/needs: \[backend\]/needs: []/' "$d/ci.yml"
 expect "gate の needs にないジョブを見つける" 1 "backend が gate の needs にありません" check "$d"
