@@ -410,6 +410,15 @@ tasks:
       - bash tooling/skills-check/test.sh
       - node tooling/skills-check/skills-check.mjs
 
+  # 検査の本体は tooling/ci-gate-check/ci-gate-check.py に置き、自己検査（test.sh）を先に実行する。
+  # 理由と除外の一覧の扱いは docs/adr/ADR-087 にある。
+  ci-gate-check:
+    desc: ci.yml の CI gate が pull_request の検査を取りこぼしていないか検証
+    silent: true
+    cmds:
+      - bash tooling/ci-gate-check/test.sh
+      - python3 tooling/ci-gate-check/ci-gate-check.py
+
   # Setup
   setup:
     desc: 開発環境のセットアップスクリプトを順次実行

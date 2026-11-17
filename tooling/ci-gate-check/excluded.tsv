@@ -1,0 +1,21 @@
+# ci.yml から呼ばない pull_request の workflow と理由。列はタブ区切り（workflow のファイル名、理由）。
+# 「移行前」は docs/adr/ADR-087 の移行の途中で、呼ぶようになったらこの行を消す。
+conventional-commits.yml	PR タイトルの編集（edited）で再検査するため、単独の必須チェックに残す（ADR-087）
+api-contract.yml	ラベルの付け外し（labeled、unlabeled）で再判定するため、単独の必須チェックに残す（ADR-087）
+e2e.yml	必須にしない（ADR-057）
+mutation-test.yml	必須にしない（ADR-076）
+codeql.yml	PR でも動くが、必須にしない
+release-please.yml	validate は release の設定の検査で、merge の条件にしない
+dependabot-auto-merge.yml	contents と pull-requests の write を持つため、呼ばない
+actionlint.yml	移行前（ADR-087 の 2 つ目の PR）
+betterleaks.yml	移行前（ADR-087 の 2 つ目の PR）
+compose-config.yml	移行前（ADR-087 の 2 つ目の PR）
+dast.yml	移行前（ADR-087 の 2 つ目の PR）
+frontend-ci.yml	移行前（ADR-087 の 2 つ目の PR）
+markdownlint.yml	移行前（ADR-087 の 2 つ目の PR）
+okf-validate.yml	移行前（ADR-087 の 2 つ目の PR）
+otel-collector.yml	移行前（ADR-087 の 2 つ目の PR）
+skills-check.yml	移行前（ADR-087 の 2 つ目の PR）
+static-analysis.yml	移行前（ADR-087 の 2 つ目の PR）
+trivy.yml	移行前（ADR-087 の 2 つ目の PR）
+zizmor.yml	移行前（ADR-087 の 2 つ目の PR）
