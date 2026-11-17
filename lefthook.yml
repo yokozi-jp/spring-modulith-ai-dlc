@@ -202,8 +202,12 @@ pre-commit:
         task lint-taskfile
       fail_text: "Taskfileの検証に失敗しました。task lint-taskfile で再実行してください。"
 
+# すべての job を順番に実行し、失敗した時点で止める。
+# 並列に走らせると、be-lint、be-test、frontend-test-build の Gradle と Vitest が CPU を取り合い、
+# ArchUnit の読み込みや時間待ちのテストが遅くなり、外れる。軽い検査を先に置き、失敗を早く返す。
+# backend のイメージは Docker CI（hadolint.yml）の backend-image が PR ごとに実ビルドする。
 pre-push:
-  parallel: true
+  piped: true
   jobs:
     # push 前に、判断が絡む変更へ ADR が伴うかを確認（ナッジ）
     # 既定は非ブロッキング（気づかせるだけ）。ADR_STRICT=1 でブロック、ADR_ACK=1 で抑制。
@@ -267,28 +271,6 @@ pre-push:
           exit 0
         fi
         task test
-
-    # Dockerfile または backend のビルド/ソースに変更がある push のときだけ、イメージの build ステージを
-    # 実ビルドする。docker build --check や作業ツリーでの Gradle 実行では踏めない「縮小コンテキスト特有」の
-    # 失敗（buildSrc 未コピーでスクリプト評価が壊れる等）を push 前に捕まえるのが目的。
-    # runtime ステージは COPY のみで得るものが薄いため --target build に絞る。
-    # docker が無い環境ではスキップ（最終担保は CI に任せる）。
-    - name: be-image-build
-      glob:
-        - "backend/Dockerfile"
-        - "backend/.dockerignore"
-        - "backend/*.gradle"
-        - "backend/**/*.{java,gradle}"
-        - "backend/gradle.properties"
-        - "backend/gradlew"
-      files: *push-files
-      run: |
-        echo "{files}" >/dev/null
-        if ! command -v docker >/dev/null 2>&1; then
-          echo "docker が無いため docker build --target build をスキップします（CI で検査されます）。" >&2
-          exit 0
-        fi
-        docker build --target build --tag spring-modulith-backend:prepush-check backend
 
     # GitHub Actions ワークフローに変更がある push のときだけ Lint（actionlint）
     # glob を効かせるため run 内で {files} を参照する。
