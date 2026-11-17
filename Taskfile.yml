@@ -1416,15 +1416,17 @@ tasks:
       - '{{.DOCKER}} compose --env-file "{{.COMPOSE_ENV_FILE}}" -f "{{.COMPOSE_FILE}}" --profile backend down --volumes --remove-orphans'
 
   # Security
+  # betterleaks v1.10.0 以降は .betterleaks.toml を自動で読み込まないため、-c で渡す。
   scan-secrets:
     desc: ステージ済みの変更をbetterleaksでスキャン
     cmds:
-      - PATH="$PATH:$HOME/go/bin" betterleaks git --staged --no-banner --redact
+      - PATH="$PATH:$HOME/go/bin" betterleaks git --staged -c .betterleaks.toml --no-banner --redact
 
+  # --log-opts を渡すと betterleaks は Git 履歴を単一ワーカーで読むため、--git-workers は付けない。
   scan-secrets-all:
-    desc: リポジトリ全体と現在のブランチの履歴をbetterleaksでスキャン
+    desc: 現在のブランチから辿れる履歴（BETTERLEAKS_LOG_OPTSで範囲を変更可）をbetterleaksでスキャン
     cmds:
-      - PATH="$PATH:$HOME/go/bin" betterleaks git . --no-banner --redact --git-workers=16 --log-opts=HEAD
+      - PATH="$PATH:$HOME/go/bin" betterleaks git . -c .betterleaks.toml --no-banner --redact --log-opts="${BETTERLEAKS_LOG_OPTS:-HEAD}"
 
   scan-dast:
     desc: 隔離した環境で認証付きのpassive scan（OWASP ZAP）を実行し、レポートをbuild/dastに出力

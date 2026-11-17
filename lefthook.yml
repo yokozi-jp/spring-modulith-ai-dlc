@@ -63,11 +63,8 @@ pre-commit:
   parallel: true
   jobs:
     # ステージ済みの変更をシークレットスキャン（Betterleaks）
-    # betterleaks が PATH に無い場合は go install 先 ($HOME/go/bin) にフォールバック
     - name: betterleaks-secret-scan
-      run: |
-        export PATH="$PATH:$HOME/go/bin"
-        betterleaks git --staged --no-banner --redact
+      run: task scan-secrets
 
     # api-contract-check は src/api/generated を再生成し、frontend-check は src を型検査する。
     # 同時に走ると生成途中のファイルを型検査するため、piped で API の検査を先に順番に実行する。
@@ -217,12 +214,9 @@ pre-push:
     - name: adr-check
       run: task adr-check
 
-    # push 前にリポジトリ全体（履歴含む）をシークレットスキャン（Betterleaks）
-    # betterleaks が PATH に無い場合は go install 先 ($HOME/go/bin) にフォールバック
-    - name: betterleaks-full-scan
-      run: |
-        export PATH="$PATH:$HOME/go/bin"
-        betterleaks git . --no-banner --redact --git-workers=16
+    # push 前に現在のブランチから辿れる履歴をシークレットスキャン（Betterleaks）
+    - name: betterleaks-history-scan
+      run: task scan-secrets-all
 
     # frontend に変更があるpushのとき、テストと本番ビルドを実行する。
     # frontend-check と同じく、Taskfile.yml は glob に入れない。
