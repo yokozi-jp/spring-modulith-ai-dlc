@@ -1,7 +1,7 @@
 ---
 type: Convention
 title: バックエンドのテストコードの書き方
-description: バックエンドテストの命名、可視性、アサーション、Springコンテキスト、失敗診断、非同期待機の書き方を定め、テストコードを書く、または直すときに読む規約。
+description: バックエンドテストの命名、可視性、アサーション、Springコンテキスト、並列と実行順、失敗診断、非同期待機の書き方を定め、テストコードを書く、または直すときに読む規約。
 tags: [convention, backend, testing, spring]
 ---
 
@@ -32,6 +32,19 @@ SpringのTestContextは構成が違うテストごとに別のcontextを起動�
 この決まりの範囲は`@SpringBootTest`に限り、`TestConventionsArchTest`が検査する範囲と同じである。
 `@ApplicationModuleTest`のように元から別のcontextを起動するテストでも、設定の違いで構成を分けるのは、振る舞いを確かめるために必要な場合だけにする。
 OIDCクライアント登録など複数のテストで使う差し替えは、共有構成へ集約する。
+テストの依存のコンテナの決まりは[バックエンドのテストの実行基盤](testing-infrastructure.md)に従う。
+
+## 並列と実行順
+
+テストはGradleの複数のforkで並列に動き、どのクラスがどのforkで動くかは実行ごとに変わる。
+forkと共有するものは[バックエンドのテストの実行基盤](testing-infrastructure.md)の「並列度」にある。
+
+- テストは実行順に依存しない。前のテストが作ったデータやロックを前提にせず、自分で作る。
+- 業務コードやテスト専用テーブルの値は、`UniqueCodes`などで衝突しない値にする。
+- DBの時刻を基準にした期限（ShedLockの`lock_until`など）は、テストで過去にするとき、DBの今や`locked_at`からの相対で決めず、過去の固定の時刻にする。
+  ShedLockのロックは`CleanGeneratedTablesExtension.expireLocks`を使う。
+  理由はそのJavadocにある。
+- 負荷の下で外れるテストは、期限を延ばしたりリトライしたりせず、待つ条件か状態の前提を直す。
 
 ## 失敗時の診断情報
 

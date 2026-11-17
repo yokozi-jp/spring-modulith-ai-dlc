@@ -22,7 +22,7 @@ import org.springframework.test.web.servlet.ResultMatcher;
 /**
  * サンプル Controller から springdoc が作る OpenAPI 文書が、アノテーションと Javadoc の規約どおりになることを検証する（ADR-053）。
  *
- * <p>サンプル Controller は com.example.demo の外にあり、このテストだけが読み込む。exportOpenApi が書き出す契約には含まれない。
+ * <p>サンプル Controller は com.example.demo の外にあり、このテストだけが読み込む。OpenApiContractTest が書き出す契約には含まれない。
  */
 // MockMvc.perform が Exception を宣言するため、補助メソッドも Exception を宣言する。
 @SuppressWarnings({"PMD.SignatureDeclareThrowsException", "PMD.UnitTestShouldIncludeAssert"})

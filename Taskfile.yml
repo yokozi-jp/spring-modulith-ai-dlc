@@ -773,15 +773,11 @@ tasks:
       - ./gradlew spotlessCheck pmdMain pmdTest spotbugsMain spotbugsTest
 
   be-openapi-lint:
-    desc: 依存起動済みのテストDBでOpenAPI 3.1契約をopenapi/openapi.yamlへ生成しSpectralで検査
+    desc: OpenAPI 3.1契約をopenapi/openapi.yamlへ生成しSpectralで検査（テストの依存はTestcontainersが起動する）
     dir: backend
     deps: [_ensure-test-env]
     cmds:
-      - |
-        set -a
-        . "../{{.TEST_ENV_FILE}}"
-        set +a
-        SPRING_CONFIG_IMPORT="optional:file:../{{.TEST_ENV_FILE}}[.properties]" ./gradlew exportOpenApi
+      - ./gradlew test --tests com.example.demo.OpenApiContractTest -PopenapiExport=true -PtestEnvFile="../{{.TEST_ENV_FILE}}"
       - task: api-lint
 
   be-openapi-check:
@@ -792,29 +788,23 @@ tasks:
         vars: { PATHS: openapi/openapi.yaml }
 
   be-test:
-    desc: 依存起動済みのテストDBでマイグレーションとテストを実行し、OpenApiContractTestがopenapi/openapi.yamlを書き出す
+    desc: テストとカバレッジの検証を実行し、OpenApiContractTestがopenapi/openapi.yamlを書き出す（テストの依存はTestcontainersが起動する）
     dir: backend
     deps: [_ensure-test-env]
     cmds:
-      - |
-        set -a
-        . "../{{.TEST_ENV_FILE}}"
-        set +a
-        SPRING_CONFIG_IMPORT="optional:file:../{{.TEST_ENV_FILE}}[.properties]" ./gradlew migrateDatabase test -PopenapiExport=true
+      - ./gradlew test jacocoTestCoverageVerification -PopenapiExport=true -PtestEnvFile="../{{.TEST_ENV_FILE}}"
 
   be-test-dev:
-    desc: 作りかけを含むchangesetを適用してテスト
+    desc: 作りかけを含む全changesetをTestcontainersのDBへ適用してテスト（カバレッジは検証しない）
+    aliases: [test-dev]
     dir: backend
     deps: [_ensure-test-env]
     cmds:
-      - |
-        set -a
-        . "../{{.TEST_ENV_FILE}}"
-        set +a
-        SPRING_CONFIG_IMPORT="optional:file:../{{.TEST_ENV_FILE}}[.properties]" ./gradlew update test
+      - ./gradlew test -PtestAllChangesets -PtestEnvFile="../{{.TEST_ENV_FILE}}"
 
   be-mutation-test:
-    desc: 依存起動済みのテストDBでPITミューテーションテストを実行
+    desc: PITミューテーションテストを実行（テストの依存はTestcontainersが起動する）
+    aliases: [mutation-test]
     dir: backend
     deps: [_ensure-test-env]
     # git の参照をシェルの本文へ展開せず、環境変数で渡す。
@@ -822,9 +812,6 @@ tasks:
       PIT_CHANGED_SINCE: '{{.PIT_CHANGED_SINCE}}'
     cmds:
       - |
-        set -a
-        . "../{{.TEST_ENV_FILE}}"
-        set +a
         # PIT_CHANGED_SINCE があれば、差分の main のクラスと、差分のテスト（FooTest）が名前で対応する main のクラスだけを変異させる（ADR-076）。
         # テストは対象のクラスのパッケージ以下に絞る。対象のクラスがなければ PIT を実行しない。
         target_classes=""
@@ -847,20 +834,8 @@ tasks:
           target_tests="$(printf '%s\n' "$classes" | sed 's/\.[^.]*$/.*/' | sort -u | paste -sd, -)"
           echo "差分の $(printf '%s\n' "$classes" | wc -l | tr -d ' ') クラスを、${target_tests} のテストで変異させます。" >&2
         fi
-        SPRING_CONFIG_IMPORT="optional:file:../{{.TEST_ENV_FILE}}[.properties]" ./gradlew migrateDatabase pitest \
+        ./gradlew pitest -PtestEnvFile="../{{.TEST_ENV_FILE}}" \
           ${target_classes:+"-PpitTargetClasses=$target_classes"} ${target_tests:+"-PpitTargetTests=$target_tests"}
-
-  test-deps-up:
-    desc: テスト専用の依存スタックを起動
-    deps: [_ensure-test-env]
-    cmds:
-      - '{{.DOCKER}} compose -f "{{.TEST_COMPOSE_FILE}}" up -d --wait'
-
-  test-deps-down:
-    desc: テスト専用の依存スタックをボリュームごと停止
-    deps: [_ensure-test-env]
-    cmds:
-      - '{{.DOCKER}} compose -f "{{.TEST_COMPOSE_FILE}}" down --volumes --remove-orphans'
 
   test-deps-leftover-check:
     desc: compose-testのコンテナとvolumeが残っていないか検査
@@ -877,58 +852,24 @@ tasks:
         fi
 
   test:
-    desc: 隔離依存を起動してマイグレーション検証とテスト後に片付け
+    desc: 使い捨てのPostgreSQLでマイグレーションを検証し、テストとカバレッジの検証の後に片付け
     silent: true
     deps: [_ensure-test-env]
     cmds:
       - |
         # 本体と後片付けの終了コードの扱いは docs/tooling/taskfile.md の「後片付けと終了コード」を参照する。
+        # rollback の検証だけが compose の PostgreSQL を使い、テストは Testcontainers の依存を使う（ADR-085）。
+        # 中断した前の回の DB を残したまま rollback を検証しないよう、起動の前にも片付ける。
+        # テストの前に止め、テストが .env.test の接続先（compose の PostgreSQL）へ黙ってつながらないようにする。
         status=0
         (
           set -e
-          {{.DOCKER}} compose -f "{{.TEST_COMPOSE_FILE}}" up -d --wait
+          {{.DOCKER}} compose -f "{{.TEST_COMPOSE_FILE}}" down --volumes --remove-orphans
+          {{.DOCKER}} compose -f "{{.TEST_COMPOSE_FILE}}" up -d --wait postgres
           task be-verify-migrations TEST_ENV_FILE="{{.TEST_ENV_FILE}}"
+          {{.DOCKER}} compose -f "{{.TEST_COMPOSE_FILE}}" down --volumes --remove-orphans
           task be-test TEST_ENV_FILE="{{.TEST_ENV_FILE}}"
           task api-lint
-        ) || status=$?
-        cleanup_status=0
-        {{.DOCKER}} compose -f "{{.TEST_COMPOSE_FILE}}" down --volumes --remove-orphans || cleanup_status=$?
-        if [ "$status" -ne 0 ]; then exit "$status"; fi
-        exit "$cleanup_status"
-
-  test-dev:
-    desc: 隔離依存を起動して作りかけを含むテスト後に片付け
-    silent: true
-    deps: [_ensure-test-env]
-    cmds:
-      - |
-        # 本体と後片付けの終了コードの扱いは docs/tooling/taskfile.md の「後片付けと終了コード」を参照する。
-        status=0
-        (
-          set -e
-          {{.DOCKER}} compose -f "{{.TEST_COMPOSE_FILE}}" up -d --wait
-          task be-test-dev TEST_ENV_FILE="{{.TEST_ENV_FILE}}"
-        ) || status=$?
-        cleanup_status=0
-        {{.DOCKER}} compose -f "{{.TEST_COMPOSE_FILE}}" down --volumes --remove-orphans || cleanup_status=$?
-        if [ "$status" -ne 0 ]; then exit "$status"; fi
-        exit "$cleanup_status"
-
-  mutation-test:
-    desc: 隔離依存を使ってバックエンドのPITミューテーションテストを実行
-    silent: true
-    deps: [_ensure-test-env]
-    env:
-      PIT_CHANGED_SINCE: '{{.PIT_CHANGED_SINCE}}'
-    cmds:
-      - |
-        # 本体と後片付けの終了コードの扱いは docs/tooling/taskfile.md の「後片付けと終了コード」を参照する。
-        status=0
-        (
-          set -e
-          {{.DOCKER}} compose -f "{{.TEST_COMPOSE_FILE}}" up -d --wait
-          task be-verify-migrations TEST_ENV_FILE="{{.TEST_ENV_FILE}}"
-          task be-mutation-test TEST_ENV_FILE="{{.TEST_ENV_FILE}}" PIT_CHANGED_SINCE="$PIT_CHANGED_SINCE"
         ) || status=$?
         cleanup_status=0
         {{.DOCKER}} compose -f "{{.TEST_COMPOSE_FILE}}" down --volumes --remove-orphans || cleanup_status=$?
@@ -1033,23 +974,11 @@ tasks:
         vars: { PATHS: frontend/src/api/generated }
 
   api-gen:
-    desc: テスト用依存を起動し、OpenAPI契約の生成、Spectral検査、Orvalの再生成を実行して片付け
-    silent: true
-    deps: [_ensure-test-env]
+    desc: OpenAPI契約の生成、Spectral検査、Orvalの再生成を実行（テストの依存はTestcontainersが起動して片付ける）
     cmds:
-      - |
-        # 本体と後片付けの終了コードの扱いは docs/tooling/taskfile.md の「後片付けと終了コード」を参照する。
-        status=0
-        (
-          set -e
-          {{.DOCKER}} compose -f "{{.TEST_COMPOSE_FILE}}" up -d --wait
-          task be-openapi-lint TEST_ENV_FILE="{{.TEST_ENV_FILE}}"
-          task api-client-gen
-        ) || status=$?
-        cleanup_status=0
-        {{.DOCKER}} compose -f "{{.TEST_COMPOSE_FILE}}" down --volumes --remove-orphans || cleanup_status=$?
-        if [ "$status" -ne 0 ]; then exit "$status"; fi
-        exit "$cleanup_status"
+      - task: be-openapi-lint
+        vars: { TEST_ENV_FILE: '{{.TEST_ENV_FILE}}' }
+      - task: api-client-gen
 
   api-check:
     desc: api-genで再生成したOpenAPI契約とAPI clientがコミット済みの内容と一致するか検査

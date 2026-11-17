@@ -256,7 +256,7 @@ Docker Compose の操作（サービスの起動、停止、状態確認、Keycl
 
 ### API 契約
 
-- `task api-gen` はテスト用の依存を起動し、`openapi/openapi.yaml` の生成、Spectral の検査、Orval による `frontend/src/api/generated` の再生成を実行します。
+- `task api-gen` は `openapi/openapi.yaml` の生成、Spectral の検査、Orval による `frontend/src/api/generated` の再生成を実行します。
 - `task api-check` は再生成した契約と生成物がコミット済みの内容と一致するかを検査します。
 - `task api-client-check` は DB なしで Orval の生成物だけを再生成して検査し、pre-commit と Frontend CI で実行します。
 - `task be-openapi-check` は直前の `task be-test` が書き出した契約を検査し、Backend CI で実行します。
