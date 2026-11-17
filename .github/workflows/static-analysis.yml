@@ -125,6 +125,24 @@ jobs:
       - name: Check Taskfile
         run: task lint-taskfile
 
-      # agent-commit、agent-push、agent-wait の自己検査を、一時の git リポジトリで実行する。
+  # 振る舞いのテストだが、常に動く workflow に置き、Pull Request ごとに必ず check run を出す（ADR-087）。
+  agent-git-test:
+    name: Run task agent-git-test
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Task
+        uses: go-task/setup-task@a00fbb05ce67b35648be3c78cbc9fd85354c757e # v2
+        with:
+          version: "3.53.1"
+          checksum: a54a408f6861ff921f6e87774180db31bacd8c1e7c944ca696db9fea49a82fc7
+
+      # agent-commit、agent-push、agent-wait の本体を、フックを止めておける一時の git リポジトリで検査する。
       - name: Test agent git tasks
         run: task agent-git-test
