@@ -398,6 +398,35 @@ tasks:
       - bash tooling/skills-check/test.sh
       - node tooling/skills-check/skills-check.mjs
 
+  # エージェントの commit と push。フックは tool call の時間切れより長くかかるので、バックグラウンドで始めて agent-wait で待つ。
+  # 本体は tooling/agent-git/agent-git.sh、手順は docs/tooling/dev-workflow.md の「エージェントがcommitとpushをするとき」にある。
+  # CLI_ARGS は Task が引数ごとにシェルの引用符を付けるので、空白を含むパスもそのまま渡る。
+  # 呼んだディレクトリで動かし、渡したパスをそこからの相対で解釈する。
+  agent-commit:
+    desc: 渡したパスだけを stage して git commit をバックグラウンドで開始（task agent-commit -- <メッセージのファイル> <パス>...）
+    silent: true
+    dir: "{{.USER_WORKING_DIR}}"
+    cmds:
+      - bash {{shellQuote .ROOT_DIR}}/tooling/agent-git/agent-git.sh commit {{.CLI_ARGS}}
+
+  agent-push:
+    desc: 前の pre-push が動いていなければ、今のブランチの git push -u origin をバックグラウンドで開始
+    silent: true
+    cmds:
+      - bash tooling/agent-git/agent-git.sh push
+
+  agent-wait:
+    desc: agent-commit か agent-push の終わりを最大 100 秒待ち、要約と終了コードを表示（task agent-wait -- <実行のディレクトリ>）
+    silent: true
+    cmds:
+      - bash tooling/agent-git/agent-git.sh wait {{.CLI_ARGS}}
+
+  agent-git-test:
+    desc: agent-commit、agent-push、agent-wait を、遅いフックを持つ一時の git リポジトリで自己検査
+    silent: true
+    cmds:
+      - bash tooling/agent-git/test.sh
+
   # Setup
   setup:
     desc: 開発環境のセットアップスクリプトを順次実行

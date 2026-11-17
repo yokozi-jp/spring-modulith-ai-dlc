@@ -124,3 +124,7 @@ jobs:
       # スキーマ構造と、後片付けの終了コードの fixture を検査する。
       - name: Check Taskfile
         run: task lint-taskfile
+
+      # agent-commit、agent-push、agent-wait の自己検査を、一時の git リポジトリで実行する。
+      - name: Test agent git tasks
+        run: task agent-git-test
