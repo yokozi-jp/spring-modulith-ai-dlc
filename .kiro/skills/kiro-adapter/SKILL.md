@@ -54,6 +54,7 @@ The agent files set every model. A role that names `poteto-agent`, `comment-sick
 
 - `create-skill`: use `skill-creator` when it is installed. Otherwise follow the Agent Skills format at agentskills.io.
 - `deslop`, `control-cli`, and `control-ui` from cursor-team-kit are installed. The other cursor-team-kit skills are not.
+- `setup-pstack`, `make-bot-ui`, `ketchup-video`, and `reflect` are not installed (`excluded_skills` in `kiro/install.sh`). When a skill links to one, tell the user it is not installed in Kiro, and don't follow the link.
 
 ## Permissions
 

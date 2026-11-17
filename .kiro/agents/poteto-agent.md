@@ -8,7 +8,7 @@ includeMcpJson: true
 permissions:
   rules:
     - capability: shell
-      match: ["git push *"]
+      match: ["git push *", "git -C * push *"]
       effect: ask
 ---
 

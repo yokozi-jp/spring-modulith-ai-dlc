@@ -12,8 +12,9 @@ rules:
     effect: deny
 
   # Never run destructive commands, even after an "Always allow".
+  # Kiro checks the command line, not the commands inside a script file it runs, so this list is not a sandbox.
   - capability: shell
-    match: ["rm -rf *", "rm -fr *", "rm -r -f *", "rm -f -r *", "sudo *", "git push *--force*", "git push *-f", "git push *-f *", "git push * +*", "git reset --hard*"]
+    match: ["rm -rf *", "rm -fr *", "rm -r -f *", "rm -f -r *", "sudo *", "git push *--force*", "git push *-f", "git push *-f *", "git push * +*", "git reset --hard*", "git -C * push *--force*", "git -C * push *-f", "git -C * push *-f *", "git -C * push * +*", "git -C * reset --hard*"]
     effect: deny
 
   # Start the subagents without a prompt.
