@@ -64,7 +64,7 @@ class PublicIdArchTest {
             "主キーは同じモジュールのスキーマと Repository の中だけで使い、モジュールの外に出る値には public_id を使うため。"
                 + "直し方：イベント、モジュールルートの公開 API、Domain、Application、infrastructure.client、"
                 + "shared の公開パッケージの型では、"
-                + "名前が Id か Ids で終わる項目を public_id の UUID か、それを包む値オブジェクトにする。"
+                + "名前が Id か Ids で終わる項目を主キーの数値ではなく public_id の値（UUID、その文字列の形、それを包む値オブジェクト）にする。"
                 + "規約：docs/database/postgresql-primary-keys.md");
   }
 

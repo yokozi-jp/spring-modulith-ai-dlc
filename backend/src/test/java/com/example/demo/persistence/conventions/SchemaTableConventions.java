@@ -35,10 +35,6 @@ final class SchemaTableConventions {
           "c", Map.entry("K2", "CHECK制約を使わず、値の検証はアプリケーションで行う"),
           "u", Map.entry("K3", "ユニーク制約ではなく、ユニークインデックスで一意性を表す"));
 
-  /** 名前が{@code _id}で終わるが、行を指さない共通カラム。 */
-  private static final Set<String> NON_REFERENCE_ID_COLUMNS =
-      Set.of("created_tx_id", "updated_tx_id", "patched_id");
-
   /** テーブルの{@code relkind}（通常のテーブルとパーティションテーブル）。 */
   private static final Set<String> TABLE_KINDS = Set.of("r", "p");
 
@@ -174,7 +170,8 @@ final class SchemaTableConventions {
   }
 
   /**
-   * 名前が{@code _id}で終わらないか、同じスキーマの主キーを指すか、uuidの{@code public_id}か{@code _public_id}なら{@code true}。
+   * 名前が{@code _id}で終わらないか、行を指さない共通カラムか、同じスキーマの主キーを指すか、uuidの{@code public_id}か{@code
+   * _public_id}なら{@code true}。
    */
   private static boolean isAllowedIdColumn(final ColumnRow row, final Set<String> primaryKeys) {
     final String column = row.column();
@@ -182,7 +179,7 @@ final class SchemaTableConventions {
       return "uuid".equals(row.typeName());
     }
     return !column.endsWith("_id")
-        || NON_REFERENCE_ID_COLUMNS.contains(column)
+        || ChangesetCommonColumnRules.COMMON_COLUMN_NAMES.contains(column)
         || primaryKeys.contains(row.schema() + "." + column);
   }
 
