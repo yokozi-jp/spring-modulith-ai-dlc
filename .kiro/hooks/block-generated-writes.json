@@ -4,8 +4,8 @@
     {
       "name": "block-generated-writes",
       "trigger": "PreToolUse",
-      "description": "Blocks agent writes to generated files (frontend/src/routeTree.gen.ts, frontend/src/api/generated/**, openapi/openapi.yaml) and to files that cursor-plugins kiro/install.sh installed (.kiro/.kiro-plugins-installed), and points to the regeneration or reinstall steps. Fail-open.",
-      "matcher": "fs_write|fsWrite|write|str_replace|strReplace|fs_append|fsAppend|delete_file|deleteFile",
+      "description": "Blocks agent writes, moves, renames, and formatting of generated files in this repository (frontend/src/routeTree.gen.ts, frontend/src/api/generated/**, openapi/openapi.yaml) and of files that cursor-plugins kiro/install.sh installed (.kiro/.kiro-plugins-installed), and points to the regeneration or reinstall steps. Fail-open.",
+      "matcher": "fs_write|fsWrite|write|str_replace|strReplace|fs_append|fsAppend|delete_file|deleteFile|edit_code|editCode|semantic_rename|semanticRename|smart_relocate|smartRelocate|^code$",
       "action": {
         "type": "command",
         "command": "bash .kiro/hooks/block-generated-writes.sh"
