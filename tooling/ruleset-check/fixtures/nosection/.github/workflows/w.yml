@@ -1,0 +1,5 @@
+jobs:
+  a:
+    name: A
+  b:
+    name: "B"

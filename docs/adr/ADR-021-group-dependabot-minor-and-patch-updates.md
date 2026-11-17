@@ -106,6 +106,7 @@ Pull Request #67 を `main` へマージして条件付きチェックを常に�
 - **Pros**：更新の強制がなくなり、rebase cascade が消える。
 - **Cons**：古い `main` に対して通った必須チェックのままマージでき、承認からマージまでに `main` が動いた組み合わせを誰も検証しない。
   ADR-017 のトランクベースと linear history の意図に反する。
+- **Note**：[ADR-086](ADR-086-align-main-protection-with-solo-and-agent-operation.md) が、Dependabot の Pull Request の滞留を理由に、この選択肢を採用した。
 
 ### auto-merge を major にも適用する
 
