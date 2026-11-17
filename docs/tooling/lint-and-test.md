@@ -327,9 +327,6 @@ OKF検査の採用理由は[ADR-036](../adr/ADR-036-adopt-okf-for-docs-knowledge
 - **pre-push（フロントエンドの変更）**：`fe-test-build`を、Vitestのdot reporterとjson-summaryだけのcoverageで実行する。
 - **pre-push（GitHub Actionsワークフローの変更）**：`lint-actions`相当と`lint-actions-security`相当を実行する。
 
-`Taskfile.yml`だけの変更では、pre-commitの`fe-check`とpre-pushの`fe-test-build`を実行しない。
-`fe-*`のタスクの改名や、`dir`とコマンドの誤りは、`Taskfile.yml`の変更で起動するFrontend CIの`fe-verify`が検出する。
-
 Gitフックの条件とコマンドは[`lefthook.yml`](../../lefthook.yml)を正とする。
 Lefthookは版の表示、skipの行、`EXECUTE`の行を省き、jobの出力と要約を出す（`output`）。
 成功したjobの出力も残すのは、`adr-check`の注意喚起が成功の扱いで出るためである。
