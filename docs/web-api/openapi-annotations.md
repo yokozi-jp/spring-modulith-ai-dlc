@@ -204,6 +204,7 @@ springdocやtherapiの版を上げてこのテストが失敗したら、この�
 - [ ] 文字列と数値のpropertyに`@Schema(example = "...")`を付ける。［Spectralで検査：schema-property-example］
 - [ ] `@Tag(name, description)`をクラスに付ける。［Spectralで検査：operation-tags、tag-description、operation-tag-defined］
 - [ ] tagを業務機能のkebab-caseにし、operationに1つだけ付ける。［Spectralで検査：tag-name-format、operation-singular-tag］
+- [ ] パスの引数と、名前が`id`か`Id`で終わる引数とpropertyを`UUID`にし、`format: uuid`で出す。［Spectralで検査：public-id-uuid］
 - [ ] `@Operation(operationId = "...")`を明示する。［Spectralで検査：operation-id-naming（形だけ。明示は自分で点検）］
 - [ ] 404、409、422を起きるoperationにだけ`ref`で書く。［Spectralで検査：error-response-problem-detail（参照の形だけ。付け忘れは自分で点検）］
 - [ ] `@ApiResponse`を書いたハンドラに成功応答（200、201、204）も書く。［Spectralで検査：operation-success-response］

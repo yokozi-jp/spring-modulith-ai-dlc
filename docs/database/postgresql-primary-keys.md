@@ -1,7 +1,7 @@
 ---
 type: Convention
 title: PostgreSQLの主キー
-description: サロゲートキーとナチュラルキーの選び方、複合主キーの扱い、連番とUUID v7の使い分け、UUIDの採番、公開用IDの持ち方を定める規約。テーブルの主キーを決めるとき、IDをURLやAPIに出すときに読む。
+description: サロゲートキーとナチュラルキーの選び方、複合主キーの扱い、連番とUUID v7の使い分け、UUIDの採番、公開用IDの持ち方、主キーと公開用IDの使い分けを定める規約。テーブルの主キーを決めるとき、IDをURLやAPI、イベント、別のモジュールの列に出すときに読む。
 tags: [convention, database, postgresql, primary-key, uuid, future-arch-guidelines]
 ---
 
@@ -10,6 +10,7 @@ tags: [convention, database, postgresql, primary-key, uuid, future-arch-guidelin
 トランの主キーはサロゲートキーにし、マスタは業務キーが変わらないと確信できる場合だけナチュラルキーにする。
 複合主キーは使わない。
 単一DBでは連番を使い、シャーディングを前提にする場合はUUID v7を使う。
+主キーはモジュールのスキーマとRepositoryの中だけで使い、モジュールの外に出る値には例外なく`public_id`を使う。
 
 ## 対象
 
@@ -80,6 +81,41 @@ URLにはUUIDをBase64などで短く変換した値を使ってよい。
 UUID v7は作成時刻が値に含まれて見えるため、公開用IDに使わない（[RFC 9562](https://www.rfc-editor.org/rfc/rfc9562.html)）。
 テストは値を固定せず、nullでないことと`version()`が4であることを確かめる。
 値を外から渡すオーバーロードは作らない。
+
+## 主キーと公開用IDの使い分け
+
+主キーは、同じモジュールのスキーマの中（テーブルどうしの参照、外部キー、JOIN、インデックス）と、そのモジュールのRepositoryの中だけで使う。
+モジュールの外に出る次の値には、`public_id`を使う。
+
+- APIの引数、本文、URL
+- モジュール間のイベント
+- 別のモジュールの行を指す列
+- 外部のシステムに渡す値
+- ログとトレース
+- キャッシュのキー
+
+この使い分けに例外を作らない。
+今後加えるテナントのような横断の概念も、テーブル、イベント、ログ、トレース、キャッシュのキー、APIのすべてで`public_id`を使う。
+理由は[ADR-089](../adr/ADR-089-keep-primary-keys-inside-modules-and-expose-public-ids.md)に示す。
+
+同じモジュールのテーブルどうしは、主キーの列で参照する（`ordering.t_order_line.order_id`）。
+別のモジュールの行を指す列は、`<対象>_public_id`という名前の`uuid`にする（`payment.t_payment.order_public_id`）。
+スキーマをまたぐ外部キーは作らない。
+
+Javaでは、主キーの値をRepositoryの外に返さない。
+モジュールルートのイベントと公開API、Domain、Application、`infrastructure.client`の型は、`public_id`のUUIDか、それを包む値オブジェクト（`OrderId(UUID value)`）でIDを持つ。
+
+### 使い分けの検査
+
+使い分けは次の検査が確かめる。
+ログとトレース、キャッシュのキーは機械で検査せず、レビューで確かめる。
+
+- **カタログの検査**：`SchemaConventionsTest`と`SchemaInspectionTest`が使う`SchemaTableConventions`が、業務スキーマを検査する。
+  規則P3は、名前が`_id`で終わる列を、同じスキーマのテーブルの主キーと同じ名前の列か、`uuid`の`public_id`か`<対象>_public_id`に限る。
+  共通カラムの`created_tx_id`、`updated_tx_id`、`patched_id`は行を指さないため対象にしない。
+  規則P4は、別のスキーマのテーブルを参照する外部キーを拒否する。
+- **ArchUnit**：`PublicIdArchTest`の`numericIdsDoNotLeaveModules`が、モジュールルート、`domain`、`application`、`infrastructure.client`の型に、名前が`id`か`Id`で終わる`long`、`Long`、`int`、`Integer`のフィールド、引数、戻り値がないことを確かめる。
+- **Spectral**：`.spectral.yaml`の`public-id-uuid`が、パスの引数と、名前が`id`か`Id`で終わる引数とpropertyを`type: string`、`format: uuid`に限る。
 
 ## 出典
 

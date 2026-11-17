@@ -27,8 +27,8 @@ DBのテーブル構造をそのまま応答にしない。
 ```json
 {
   "items": [
-    { "id": 1, "name": "Item 1" },
-    { "id": 2, "name": "Item 2" }
+    { "id": "0b6c8f6e-2f4a-4c1e-9d3b-7a1e5c2d4f60", "name": "Item 1" },
+    { "id": "5f0c2a8e-7d1b-4c3a-9e6f-1a2b3c4d5e6f", "name": "Item 2" }
   ],
   "nextCursor": "b3BhcXVl"
 }
