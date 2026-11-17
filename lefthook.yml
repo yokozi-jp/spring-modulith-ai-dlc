@@ -63,7 +63,6 @@ pre-commit:
   parallel: true
   jobs:
     # ステージ済みの変更をシークレットスキャン（Betterleaks）
-    # コマンドと設定ファイルの指定は task scan-secrets に集約している。
     - name: betterleaks-secret-scan
       run: task scan-secrets
 
@@ -216,8 +215,7 @@ pre-push:
       run: task adr-check
 
     # push 前に現在のブランチから辿れる履歴をシークレットスキャン（Betterleaks）
-    # CI と同じ範囲（現在のブランチから辿れる履歴）を task scan-secrets-all に集約している。
-    - name: betterleaks-full-scan
+    - name: betterleaks-history-scan
       run: task scan-secrets-all
 
     # frontend に変更があるpushのとき、テストと本番ビルドを実行する。
