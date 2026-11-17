@@ -185,6 +185,10 @@ linkとbuttonの入れ子は、jsPluginの`ui-composition/no-button-in-link`が�
 要素は名前だけで判定するので、別名でimportしたcomponentは検出しない。
 変数に入れてから返す要素と、条件演算子で返す要素も検出しない。
 
+`useEffect`、`useLayoutEffect`、`useInsertionEffect`、`useEffectEvent`は、jsPluginの`react-rules/no-effect`がすべてのファイルで禁じる（[フロントエンドのルーティングと状態管理](../frontend/routing-and-state.md#effectの禁止)）。
+`react`からの名前付きimportと再export、default importの名前（`React.useEffect`）の参照、分割代入を報告する。
+自前の関数で包んだEffectは検出しない。
+
 組み合わせた結果は、`frontend/lint/lint-config.test.js`が`frontend/lint/fixtures/src/**`の違反例と正しい例を実際の設定でLintして確かめる。
 規則のoptionを追加または変更するときは、optionが許す範囲のすぐ外側の書き方を拒否するfixtureも置く。
 optionの名前から許す範囲を推測せず、規則の文書とfixtureで確かめる。

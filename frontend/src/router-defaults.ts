@@ -1,9 +1,14 @@
 import { RouteError } from "@/components/route-error";
 import { RouteNotFound } from "@/components/route-not-found";
 import { RoutePending } from "@/components/route-pending";
+import { reportCaughtError } from "@/lib/telemetry";
 
 // main.tsx とルートのテストが同じ既定値でルーターを作るよう、ここにまとめる。
 export const routerDefaults = {
+  // loader の失敗も、描画中の例外も、error 表示へ切り替わる前にここで一度報告する。
+  defaultOnCatch: (error: unknown) => {
+    reportCaughtError(error);
+  },
   defaultPendingComponent: RoutePending,
   defaultErrorComponent: RouteError,
   defaultNotFoundComponent: RouteNotFound,

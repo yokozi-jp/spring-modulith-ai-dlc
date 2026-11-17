@@ -176,6 +176,16 @@ describe("project lint config on fixtures", () => {
     });
   });
 
+  describe("Effect", () => {
+    it("rejects named, aliased, member, destructured and re-exported Effect hooks", () => {
+      expect(countIn("features/order/effect.tsx", "react-rules(no-effect)")).toBe(6);
+    });
+
+    it("allows other Hooks and a local object that has a useEffect property", () => {
+      expect(codesIn("features/order/effect-clean.tsx")).toStrictEqual([]);
+    });
+  });
+
   describe("network access", () => {
     it("rejects fetch and XMLHttpRequest outside src/api", () => {
       expect(countIn("lib/network.ts", "eslint(no-restricted-globals)")).toBe(2);

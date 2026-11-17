@@ -204,7 +204,7 @@ feature間の境界は、`frontend/lint/feature-boundaries.js` のOxlint JS plug
 
 jsPluginは、動的な境界規則をこの一本だけと想定している。
 アプリやパッケージに分かれたとき、または動的な境界規則が三本を超えたときは、dependency-cruiserへ移る。
-境界でない規則のjsPlugin（`ui-composition`、`tailwind-classes`、`local-security`）は、この本数に数えない。
+境界でない規則のjsPlugin（`ui-composition`、`tailwind-classes`、`local-security`、`react-rules`）は、この本数に数えない。
 OxlintのJS plugin APIはalphaである。
 
 ## 共有コード
