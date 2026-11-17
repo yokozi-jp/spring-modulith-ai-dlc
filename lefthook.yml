@@ -96,10 +96,10 @@ pre-commit:
             fail_text: "OpenAPI契約またはAPI clientの検査に失敗しました。task api-gen で再生成し、差分をコミットしてください。"
 
           # frontend にステージ済み変更があるとき、作業ツリーを書き換えずformat、lint、型を検査する。
+          # Taskfile.yml は glob に入れない。fe-* の改名や dir、コマンドの誤りは Frontend CI の task fe-verify が検出する。
           - name: frontend-check
             glob:
               - "frontend/**"
-              - "Taskfile.yml"
             run: |
               echo "{staged_files}" >/dev/null
               task fe-check
@@ -219,6 +219,7 @@ pre-push:
         betterleaks git . --no-banner --redact --git-workers=16
 
     # frontend に変更があるpushのとき、テストと本番ビルドを実行する。
+    # frontend-check と同じく、Taskfile.yml は glob に入れない。
     - name: frontend-test-build
       # ブランチが main から変えたファイル。run の {files} で参照し、glob で絞る。
       # 組み込みの {push_files} は @{push} か origin/HEAD との差分を使い、rebase 後や新しいブランチでは
@@ -230,7 +231,6 @@ pre-push:
         (echo "origin/main との merge-base を取れないため、全ファイルを pre-push の検査の対象にします。" >&2 && git ls-files)
       glob:
         - "frontend/**"
-        - "Taskfile.yml"
       run: |
         echo "{files}" >/dev/null
         task fe-test-build FE_TEST_ARGS="--reporter=dot --coverage.reporter=json-summary"
