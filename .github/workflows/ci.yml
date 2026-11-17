@@ -1,0 +1,69 @@
+name: CI
+
+# pull_request で動く検査を reusable workflow として呼び、集約ジョブ gate（check 名 CI gate）が結果を 1 つにまとめる。
+# ruleset の必須チェックは CI gate を中心にする。理由と移行の手順は docs/adr/ADR-087 にある。
+# ここに足したジョブは gate の needs にも足す。足し忘れは check-gate が検出する。
+on:
+  pull_request:
+    branches: ["**"]
+
+# 呼ばれる workflow は concurrency を持たない。呼ばれると github.workflow が CI になり、group が重なって取り消し合うため。
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions: {}
+
+jobs:
+  backend:
+    name: Backend
+    uses: ./.github/workflows/backend-ci.yml
+    permissions:
+      contents: read
+
+  docker:
+    name: Docker
+    uses: ./.github/workflows/hadolint.yml
+    permissions:
+      contents: read
+
+  check-gate:
+    name: Check CI gate coverage
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Task
+        uses: go-task/setup-task@a00fbb05ce67b35648be3c78cbc9fd85354c757e # v2
+        with:
+          version: "3.53.1"
+          checksum: a54a408f6861ff921f6e87774180db31bacd8c1e7c944ca696db9fea49a82fc7
+
+      - name: Check that CI gate covers every pull_request workflow
+        run: task ci-gate-check
+
+  gate:
+    name: CI gate
+    # always() を付けないと、needs のどれかが失敗や skip のときに gate 自体が skip され、GitHub は skip を成功として扱う。
+    if: always()
+    needs: [backend, docker, check-gate]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Require every job to succeed
+        env:
+          NEEDS: ${{ toJSON(needs) }}
+        run: bash tooling/ci-gate-check/gate.sh <<< "$NEEDS"
