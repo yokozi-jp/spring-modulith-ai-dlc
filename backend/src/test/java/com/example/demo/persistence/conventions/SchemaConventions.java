@@ -78,7 +78,7 @@ final class SchemaConventions {
             largeObjects(snapshot.columns(), snapshot.largeObjectCount()),
             userDefinedTypes(snapshot.types(), snapshot.columns()),
             SchemaPrivilegeConventions.appRole(
-                snapshot.role(), snapshot.schemaPrivileges(), snapshot.relationPrivileges()),
+                snapshot.appRole(), snapshot.schemaPrivileges(), snapshot.relationPrivileges()),
             SchemaPrivilegeConventions.migrationRole(snapshot.migrationRole()))
         .forEach(found::addAll);
     return AllowlistEntry.apply(found, allowlist);

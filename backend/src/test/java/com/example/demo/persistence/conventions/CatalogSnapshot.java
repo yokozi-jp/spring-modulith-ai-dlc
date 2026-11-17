@@ -18,7 +18,7 @@ import org.jspecify.annotations.Nullable;
  * @param viewDependencies ビューから別のビューへの依存
  * @param extensions 拡張機能の名前
  * @param largeObjectCount ラージオブジェクトの件数
- * @param role 接続したアプリロール
+ * @param appRole 接続したアプリロール
  * @param migrationRole changesetを適用したマイグレーションロール
  * @param schemaPrivileges アプリロールのスキーマへの権限
  * @param relationPrivileges アプリロールのテーブルとビューへの権限
@@ -34,7 +34,7 @@ record CatalogSnapshot(
     List<ViewDependencyRow> viewDependencies,
     List<String> extensions,
     long largeObjectCount,
-    RoleRow role,
+    RoleRow appRole,
     RoleRow migrationRole,
     List<SchemaPrivilegeRow> schemaPrivileges,
     List<RelationPrivilegeRow> relationPrivileges) {
