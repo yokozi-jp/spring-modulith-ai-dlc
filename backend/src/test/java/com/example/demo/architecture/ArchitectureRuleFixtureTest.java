@@ -133,7 +133,11 @@ class ArchitectureRuleFixtureTest {
           row(
               "numericIdsDoNotLeaveModules: external system",
               PublicIdArchTest.numericIdsDoNotLeaveModulesRule(VIOLATING),
-              "ordering.infrastructure.client.ShippingLabelClient.print(int) の引数 orderId"));
+              "ordering.infrastructure.client.ShippingLabelClient.print(int) の引数 orderId"),
+          row(
+              "numericIdsDoNotLeaveModules: shared",
+              PublicIdArchTest.numericIdsDoNotLeaveModulesRule(VIOLATING),
+              "shared.concurrency.LockRequest.rowId"));
 
   /** 版を比べない入口を使う違反フィクスチャの Repository。 */
   private static final String UNVERSIONED_REPOSITORY =

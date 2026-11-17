@@ -36,7 +36,7 @@ class PublicIdArchTest {
   private static final Set<String> NUMERIC_TYPES =
       Set.of("long", "java.lang.Long", "int", "java.lang.Integer");
 
-  /** イベント、公開 API、Domain、Application、外部のシステムへの送信の型は、数値の {@code *Id} を持たない。 */
+  /** イベント、公開 API、Domain、Application、外部のシステムへの送信、全モジュールが使う shared の型は、数値の {@code *Id} を持たない。 */
   @ArchTest
   /* package */ static final ArchRule numericIdsDoNotLeaveModules =
       numericIdsDoNotLeaveModulesRule(BASE_PACKAGE);
@@ -49,12 +49,16 @@ class PublicIdArchTest {
             basePackage + ".*",
             basePackage + ".*.domain..",
             basePackage + ".*.application..",
-            basePackage + ".*.infrastructure.client..")
+            basePackage + ".*.infrastructure.client..",
+            basePackage + ".shared..")
+        .and()
+        .resideOutsideOfPackage(basePackage + ".shared.infrastructure..")
         .should(notHoldNumericIds())
         .allowEmptyShould(true)
         .because(
             "主キーは同じモジュールのスキーマと Repository の中だけで使い、モジュールの外に出る値には public_id を使うため。"
-                + "直し方：イベント、モジュールルートの公開 API、Domain、Application、infrastructure.client の型では、"
+                + "直し方：イベント、モジュールルートの公開 API、Domain、Application、infrastructure.client、"
+                + "shared の公開パッケージの型では、"
                 + "名前が Id で終わる項目を public_id の UUID か、それを包む値オブジェクトにする。"
                 + "規約：docs/database/postgresql-primary-keys.md");
   }

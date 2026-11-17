@@ -284,9 +284,9 @@ Error Proneの`CheckReturnValue`は既定でerrorであり、`updateWhere`と`de
 
 `PublicIdArchTest`は、主キーをモジュールの外へ出さない規則を検査する（[PostgreSQLの主キー](../database/postgresql-primary-keys.md)）。
 
-- `numericIdsDoNotLeaveModules`：モジュールルート、`domain`、`application`、`infrastructure.client`の型は、名前が`id`か、`Id`で終わり、型が`long`、`Long`、`int`、`Integer`のフィールド、引数、戻り値を持たない。
+- `numericIdsDoNotLeaveModules`：モジュールルート、`domain`、`application`、`infrastructure.client`、`shared`（`shared.infrastructure`を除く）の型は、名前が`id`か、`Id`で終わり、型が`long`、`Long`、`int`、`Integer`のフィールド、引数、戻り値を持たない。
   ArchUnitは引数の名前を読まないため、コンパイラの`-parameters`が残した名前をリフレクションで読む。
-  違反フィクスチャのイベント、`*Queries`の引数と戻り値、Domain、Command、`*Client`の引数で確かめる。
+  違反フィクスチャのイベント、`*Queries`の引数と戻り値、Domain、Command、`*Client`の引数、`shared.concurrency`のrecordで確かめる。
 
 DBの規約のほかの検査は`backend/src/test/java/com/example/demo/persistence/conventions/`に置く。
 
