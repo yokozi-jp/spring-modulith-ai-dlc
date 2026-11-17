@@ -32,9 +32,9 @@ Proposed
 Proposed の間に、[ADR-084](ADR-084-adopt-rgdd-with-pstack-and-thermos.md) が開発の流れを RGDD の5つのフェーズへ移し、Matt Pocock スキル運用から振り返りと導入手順を外した。
 そこで、Decision を次の点で書き直した。
 
-- ひと段落の条件と振り返りの手順の正文を、[RGDD の開発フロー](../agents/rgdd.md)の「振り返り」へ移した。
+- 振り返りの手順の正文を、[RGDD の開発フロー](../agents/rgdd.md)の「振り返り」へ移した。
+- ひと段落の条件は、常に読み込まれる `AGENTS.md` の「学びの還元」に置く。条件が読まれずに `/retro` が飛ばされないようにするためである。
   条件は RGDD のフェーズに合わせ、`/implement` の完了の代わりに `/thermos` の指摘を直し終えたときを含める。
-- `AGENTS.md` には実行の契機と正文の場所だけを置き、条件を書き写さないことにした。
 - 導入手順を一か所だけ書く文書を、[スキルの取得元と更新](../agents/skill-sources.md)にした。
 
 ## Decision
@@ -43,8 +43,8 @@ Proposed の間に、[ADR-084](ADR-084-adopt-rgdd-with-pstack-and-thermos.md) �
 取得は `skills` CLI 1.7.0 で行い、実体を `.agents/skills/`、Kiro の検出用リンクを `.kiro/skills/`、内容ハッシュを `skills-lock.json` に置き、上流のファイルは変更しない。
 
 タスクがひと段落したら、対象のセッションを消去する前に `/retro` を実行する。
-ひと段落の条件、手順、上流の記述の読み替えは、RGDD の開発フローの「振り返り」を正文とする。
-常に読み込まれる `AGENTS.md` の「学びの還元」が、`/retro` を実行することと正文の場所を示し、エージェントが自ら実行する根拠になる。
+ひと段落の条件は、常に読み込まれる `AGENTS.md` の「学びの還元」に置き、エージェントが自ら実行する根拠にする。
+手順と上流の記述の読み替えは、RGDD の開発フローの「振り返り」を正文とする。
 `/retro` は改善候補を提示するだけで、利用者が選んだ候補だけを ADR-071 の層の優先順位に従って還元する。
 
 スキルの整合（lock、実体、Kiro 用リンク、内容ハッシュ、取得元ごとの固定コミット）は `task skills-check` で検査し、Lefthook の pre-commit と CI の `skills-check.yml` で実行する。

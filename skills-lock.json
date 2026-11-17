@@ -76,7 +76,7 @@
       "sourceType": "github",
       "skillPath": "skills/skill-creator/SKILL.md",
       "note": "Locally modified: added project-specific placement rules. ref pins the upstream base commit; computedHash reflects the local content.",
-      "computedHash": "82608df4cbc4ff94be6ef769b1c0eded2379a9061a269bdf2dd781f68dd44693"
+      "computedHash": "d9ec7184c74faa7cf3bbfee3db4b7252ce4a6e4fe21e419f9406189c9e2cf12a"
     },
     "to-questionnaire": {
       "source": "mattpocock/skills",
