@@ -1,0 +1,31 @@
+# Kiro CLI user permissions for pstack and thermos.
+# kiro/install.sh copies this file to ~/.kiro/settings/permissions.yaml when that file does not exist.
+
+# Read and edit workspace files, run read-only commands, git write commands, and common build tools.
+policies: [edit-workspace, dev-shell]
+
+rules:
+  # Never touch secrets.
+  - capability: filesystem
+    # .env.example and .env.*.example stay readable and editable.
+    match: ["**/.env", "**/.env.local", "**/.env.test", "**/.env.development", "**/.env.staging", "**/.env.production", "**/.env.*.local", "**/*.pem", "**/*.key"]
+    effect: deny
+
+  # Never run destructive commands, even after an "Always allow".
+  # Kiro checks the command line, not the commands inside a script file it runs, so this list is not a sandbox.
+  - capability: shell
+    match: ["rm -rf *", "rm -fr *", "rm -r -f *", "rm -f -r *", "sudo *", "git push *--force*", "git push *-f", "git push *-f *", "git push * +*", "git reset --hard*", "git -C * push *--force*", "git -C * push *-f", "git -C * push *-f *", "git -C * push * +*", "git -C * reset --hard*"]
+    effect: deny
+
+  # Start the subagents without a prompt.
+  - capability: subagent
+    match: ["poteto-agent", "comment-sicko", "thermo-nuclear-review-subagent", "thermo-nuclear-code-quality-review-subagent", "general-task-execution"]
+    effect: allow
+
+  # Load skills without a prompt...
+  - capability: skill
+    effect: allow
+  # ...except the ones that act on their own.
+  - capability: skill
+    match: ["swarm", "automate-me", "ketchup", "figure-it-out"]
+    effect: ask

@@ -1,22 +1,15 @@
 # Matt Pocock スキル日本語リファレンス
 
-- [Matt Pocock スキル運用](workflow.md)：Matt Pocock のスキルを使う前に、このプロジェクトでの利用順序、例外時の入口、取得元と更新方法を確かめるとき
-- [ask-matt](ask-matt.md)：現在の状況に合うスキルまたはフローを選ぶとき
-- [code-review](code-review.md)：差分をコーディング規約と仕様の二軸でレビューするとき
+- [Matt Pocock スキル運用](workflow.md)：Matt Pocock のスキルを使う前に、RGDD のフェーズ2に乗らない作業の入口、初回設定、文書の扱いを確かめるとき
 - [codebase-design](codebase-design.md)：深いモジュールとテスト可能な継ぎ目を設計するとき
-- [diagnosing-bugs](diagnosing-bugs.md)：難しい不具合や性能回帰を再現から診断するとき
 - [domain-modeling](domain-modeling.md)：用語集とADRを設計中に更新するとき
-- [grill-me](grill-me.md)：作業ディレクトリを使わず計画や設計を質問で詰めるとき
 - [grill-with-docs](grill-with-docs.md)：計画や設計を質問で詰めながら文書へ記録するとき
 - [grilling](grilling.md)：未決事項を依存関係に沿って質問するとき
-- [handoff](handoff.md)：会話の文脈を次のセッションへ引き継ぐとき
-- [implement](implement.md)：仕様またはチケットに基づいて実装するとき
 - [improve-codebase-architecture](improve-codebase-architecture.md)：コードベースから構造改善の候補を探すとき
 - [prototype](prototype.md)：設計上の問いを使い捨てコードで検証するとき
 - [research](research.md)：一次資料を調査して根拠付き文書を作るとき
 - [retro](retro.md)：セッションを振り返り、エージェントの環境の改善候補を提案するとき
 - [setup-matt-pocock-skills](setup-matt-pocock-skills.md)：スキル群のIssue管理とドメイン文書を初期設定するとき
-- [tdd](tdd.md)：公開インターフェースの振る舞いをテストファーストで実装するとき
 - [to-questionnaire](to-questionnaire.md)：別の人だけが答えられる判断を質問票にするとき
 - [to-spec](to-spec.md)：現在の会話を仕様Issueへ変換するとき
 - [to-tickets](to-tickets.md)：仕様や計画を依存関係付きの縦切りチケットへ分割するとき

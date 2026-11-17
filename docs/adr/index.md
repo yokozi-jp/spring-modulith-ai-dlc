@@ -84,4 +84,5 @@
 - [ADR-081: 一覧 API の sort を domain.model の enum で受け、default のない switch 式で項目名と列に写す](ADR-081-map-list-sort-via-domain-enum-and-exhaustive-switch.md)（Proposed, 2026-10-14）
 - [ADR-082: retro を導入し、タスクがひと段落したら必ず実行する](ADR-082-adopt-retro-and-run-it-at-task-boundaries.md)（Proposed, 2026-10-21）
 - [ADR-083: CodeQL を advanced setup で管理し、build-mode を明示する](ADR-083-manage-codeql-as-advanced-setup-with-explicit-build-mode.md)（Proposed, 2026-10-22）
+- [ADR-084: pstack と thermos を導入し、RGDD の5つのフェーズで開発する](ADR-084-adopt-rgdd-with-pstack-and-thermos.md)（Proposed, 2026-11-16）
 - [ADR-085: バックエンドのテストの依存を Testcontainers で fork ごとに起動し、テストを並列に実行する](ADR-085-start-test-dependencies-per-fork-with-testcontainers.md)（Proposed, 2026-11-16）

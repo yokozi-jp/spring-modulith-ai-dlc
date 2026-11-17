@@ -22,7 +22,7 @@ description: バックエンド（Spring Boot、Spring Modulith、jOOQ）のコ�
 - パッケージ構成、モジュール間の参照、ベースパッケージ直下の設定を扱う：`docs/backend/architecture.md`
 - クラスを Domain、Application、Presentation、Infrastructure のどこに置くか決める：`docs/backend/layers.md`
 - 新しいクラスを作る：`docs/backend/class-roles/index.md` で役割を選び、その役割の文書のチェックリストで点検する
-- Lombok、record、ロギングの書き方を決める：`docs/backend/java-coding.md`
+- Lombok、record、ロギングの書き方、または型の設計（sealed interface、キャスト、`default`、null）を決める：`docs/backend/java-coding.md`、`docs/backend/java-type-modeling.md`
 - ArchUnit、Spring Modulith の検証、PMD が失敗した：`docs/backend/architecture-tests.md`
 - テストを書く、テストの種類を選ぶ：`docs/backend/testing-strategy.md`
 - DB に書き込むテストやイベントのテストを書く：`docs/backend/testing-database.md`

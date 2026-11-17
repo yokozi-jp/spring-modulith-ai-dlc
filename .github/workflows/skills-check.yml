@@ -5,14 +5,14 @@ on:
     branches: ["main"]
     paths:
       - ".agents/skills/**"
-      - ".kiro/skills/**"
+      - ".kiro/**"
       - "skills-lock.json"
       - "tooling/skills-check/**"
   pull_request:
     branches: ["**"]
     paths:
       - ".agents/skills/**"
-      - ".kiro/skills/**"
+      - ".kiro/**"
       - "skills-lock.json"
       - "tooling/skills-check/**"
 

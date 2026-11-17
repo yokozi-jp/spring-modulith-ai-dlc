@@ -7,8 +7,6 @@ description: ワークスペース steering ファイル（.kiro/steering/ 配�
 
 # steering を書くとき
 
-steering の書き方の正文は docs にあり、この steering は読む文書だけを示す。
-
 ## 行動指針
 
 - steering を作る、または直す前に、次の 2 つの文書を読む。

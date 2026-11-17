@@ -7,7 +7,7 @@
 
 1. [プロジェクトについて](#プロジェクトについて)
 2. [AI harnessの構成](#ai-harnessの構成)
-3. [Grill駆動開発](#grill駆動開発)
+3. [RGDD](#rgddreadme駆動-with-grill-driven-development)
 4. [技術スタック](#技術スタック)
 5. [ディレクトリ構成](#ディレクトリ構成)
 6. [開発環境構築](#開発環境構築)
@@ -49,41 +49,14 @@ harness は、変更が通る複数の関門と、規約の置き場で構成し
 
 各ゲートの対応は [Lint・テストのリファレンス](docs/tooling/lint-and-test.md) にまとめています。
 
-## Grill駆動開発
+## RGDD（README駆動 with Grill Driven Development）
 
-[Matt Pocock のスキル](https://github.com/mattpocock/skills)を導入し、**grill 駆動開発**で進められます。
-grill は、エージェントに未決事項を質問させ、答えながら設計を詰めていく対話です。
-実装の前に曖昧さをなくし、確定した用語と判断を docs と ADR に残します。
+エージェントが読む文書（README、`GLOSSARY.md`、ADR）をコードより先に置き、エージェントにそれらを読ませながら開発します。
+README、`/grill-with-docs`、`/poteto-mode`、`/thermos`、`/create-verification-skill` の5つのフェーズで進め、各フェーズが前のフェーズの文書を読み、書き足すか、確かめて直します。
+`/grill-with-docs` は [Matt Pocock のスキル](https://github.com/mattpocock/skills)、`/poteto-mode` は [pstack](https://github.com/cursor/plugins/tree/main/pstack)、`/thermos` は [thermos](https://github.com/cursor/plugins/tree/main/thermos) のスキルです。
 
-```text
-/grill-with-docs
-  ↓  必要なら /handoff → /prototype → /handoff
-/to-spec
-  ↓
-/to-tickets
-  ↓
-チケットごとに新しいセッションで /implement（内部で /tdd と /code-review）
-  ↓
-/retro（同じセッションで、消去する前に）
-```
-
-- `/grill-with-docs`：アイデアや計画について、エージェントが未決事項を一つずつ質問します。
-  答えながら設計を詰め、確定した用語と設計判断を docs と ADR に記録します。
-- `/to-spec`：ここまでの対話を、追加の質問なしで仕様にまとめ、Issue tracker に登録します。
-- `/to-tickets`：仕様や計画を、単独で実装できる小さなチケットに分けます。
-  チケット間の依存関係（どれが先か）も書きます。
-- `/implement`：チケット一つを実装します。
-  `/tdd` でテストから小さく進め、最後に `/code-review` でプロジェクト規約と仕様への適合を確認します。
-- `/retro`：タスクがひと段落したら、セッションを消去する前に実行します。
-  セッションで起きた出来事から、ナビゲーション、機械的な検査、規約、steering、ツールなど、エージェントの環境の改善候補を深刻度順に提示します。
-  提示するだけで何も変更せず、利用者が選んだ候補を学びの還元の優先順位に従って docs や検査に反映します。
-  `AGENTS.md` の「学びの還元」で、タスクの区切りでの実行を定めています。
-
-スキルは `.agents/skills/` にあります。
-どのスキルを使うか迷うときは `/ask-matt` に状況を渡します。
-プロジェクトの docs と ADR の規約は、外部スキル内の記述より優先します。
-
-手順の詳細は [Matt Pocock スキル運用](docs/agents/matt-pocock-skills/workflow.md)、導入の判断は [ADR-039](docs/adr/ADR-039-adopt-matt-pocock-skills-workflow.md)、`/retro` の導入と実行のタイミングは [ADR-082](docs/adr/ADR-082-adopt-retro-and-run-it-at-task-boundaries.md) にあります。
+手順は [RGDD の開発フロー](docs/agents/rgdd.md)、導入の判断は [ADR-084](docs/adr/ADR-084-adopt-rgdd-with-pstack-and-thermos.md) にあります。
+clone したら、[スキルの取得元と更新](docs/agents/skill-sources.md)の「Kiro の権限の雛形を置く」に従い、Kiro の権限の雛形を置いてください。
 
 ## 技術スタック
 
@@ -128,7 +101,7 @@ grill は、エージェントに未決事項を質問させ、答えながら�
 
 ```text
 .
-├── .agents/          # スキル定義（.agents/skills）
+├── .agents/          # skills-lock.json で管理するスキルの実体（Matt Pocock、skill-creator、このリポジトリで書いたもの）
 ├── .github/          # GitHub 設定
 │   ├── ISSUE_TEMPLATE/   # Issue テンプレート
 │   ├── workflows/        # GitHub Actions（Lint・シークレットスキャン等）
@@ -136,9 +109,10 @@ grill は、エージェントに未決事項を質問させ、答えながら�
 │   ├── PULL_REQUEST_TEMPLATE.md # Pull Request テンプレート
 │   └── dependabot.yml    # 依存関係の自動更新設定
 ├── .kiro/            # Kiro 設定
+│   ├── agents/           # カスタムエージェント（pstack と thermos のサブエージェント）
 │   ├── hooks/            # エージェントのフック
 │   ├── settings/         # Kiro CLI と MCP サーバーの設定
-│   ├── skills/           # .agents/skills へのシンボリックリンク（Kiro の検出用）
+│   ├── skills/           # .agents/skills へのリンクと、kiro/install.sh で入れた pstack と thermos
 │   └── steering/         # steering（docs への案内）
 ├── .vscode/          # VSCode 設定
 ├── backend/          # Spring Boot アプリケーション
@@ -339,10 +313,8 @@ Docker Compose の操作（サービスの起動、停止、状態確認、Keycl
 
 ### スキル
 
-- `task skills-check`は、`skills-lock.json`、`.agents/skills`の実体、`.kiro/skills`のシンボリックリンクの整合を検査します。
-  上流のスキルのファイルを編集していないこと（内容ハッシュ）と、取得元ごとに固定コミットが一つであることも確かめます。
-  Lefthookはスキルまたはlockの変更を検出するとpre-commitで、CIの`Validate skills lock`は同じパスの変更で実行します。
-  導入と更新の手順は[Matt Pocock スキル運用](docs/agents/matt-pocock-skills/workflow.md)の「取得元と更新」にあります。
+- `task skills-check`はスキルの記録と実体の整合を検査します。
+  検査の範囲と、LefthookとCIで実行する条件は[Lintとテストのリファレンス](docs/tooling/lint-and-test.md)にあります。
 
 <p align="right">(<a href="#top">トップへ</a>)</p>
 

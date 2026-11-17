@@ -180,11 +180,11 @@ pre-commit:
         task okf-check
       fail_text: "OKF バンドルの検証に失敗しました。task okf-check で再実行してください。"
 
-    # スキルの実体、Kiro 用リンク、lock、検査にステージ済み変更があるとき、lock との整合を検証（task skills-check）。
+    # スキルの実体、.kiro 以下（Kiro 用リンク、kiro/install.sh が入れたファイル）、lock、検査にステージ済み変更があるとき、記録との整合を検証（task skills-check）。
     - name: skills-check
       glob:
         - ".agents/skills/**"
-        - ".kiro/skills/**"
+        - ".kiro/**"
         - "skills-lock.json"
         - "tooling/skills-check/**"
       run: |

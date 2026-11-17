@@ -205,7 +205,7 @@ ADRを追加または番号を変えたときは、`docs/adr/index.md`の行も�
 task skills-check
 ```
 
-導入と更新の手順は[Matt Pocock スキル運用](../agents/matt-pocock-skills/workflow.md)の「取得元と更新」に従います。
+導入と更新の手順は[スキルの取得元と更新](../agents/skill-sources.md)に従います。
 
 ## リリース設定を変更するとき
 
