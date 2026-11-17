@@ -56,51 +56,56 @@ final class SchemaCatalog {
         dsl.resultQuery(
                 query(
                     """
-                SELECT n.nspname AS schema_name, c.relname AS table_name, con.conname AS object_name,
-                       con.contype::text AS kind
-                FROM pg_constraint con
-                JOIN pg_class c ON c.oid = con.conrelid
-                JOIN pg_namespace n ON n.oid = c.relnamespace
-                WHERE /*NOT_SYSTEM*/
-                """))
-            .fetch(
-                r ->
-                    new ConstraintRow(
-                        text(r, SCHEMA), text(r, TABLE), text(r, NAME), text(r, "kind"))),
+                    SELECT n.nspname AS schema_name, c.relname AS table_name, con.conname AS object_name,
+                           con.contype::text AS kind, rn.nspname AS referenced_schema
+                    FROM pg_constraint con
+                    JOIN pg_class c ON c.oid = con.conrelid
+                    JOIN pg_namespace n ON n.oid = c.relnamespace
+                    LEFT JOIN pg_class rc ON rc.oid = con.confrelid
+                    LEFT JOIN pg_namespace rn ON rn.oid = rc.relnamespace
+                    WHERE /*NOT_SYSTEM*/
+                    """))
+            .fetch(r ->
+                new ConstraintRow(
+                    text(r, SCHEMA),
+                    text(r, TABLE),
+                    text(r, NAME),
+                    text(r, "kind"),
+                    r.get("referenced_schema", String.class))),
         indexes(dsl),
         dsl.resultQuery(
                 query(
                     """
-                SELECT n.nspname AS schema_name, c.relname AS table_name, tg.tgname AS object_name
-                FROM pg_trigger tg
-                JOIN pg_class c ON c.oid = tg.tgrelid
-                JOIN pg_namespace n ON n.oid = c.relnamespace
-                WHERE NOT tg.tgisinternal AND /*NOT_SYSTEM*/
-                """))
+                    SELECT n.nspname AS schema_name, c.relname AS table_name, tg.tgname AS object_name
+                    FROM pg_trigger tg
+                    JOIN pg_class c ON c.oid = tg.tgrelid
+                    JOIN pg_namespace n ON n.oid = c.relnamespace
+                    WHERE NOT tg.tgisinternal AND /*NOT_SYSTEM*/
+                    """))
             .fetch(r -> new TriggerRow(text(r, SCHEMA), text(r, TABLE), text(r, NAME))),
         dsl.resultQuery(
                 query(
                     """
-                SELECT n.nspname AS schema_name, t.typname AS object_name, t.typtype::text AS kind
-                FROM pg_type t
-                JOIN pg_namespace n ON n.oid = t.typnamespace
-                WHERE t.typtype IN ('d', 'e') AND /*NOT_SYSTEM*/
-                  AND NOT EXISTS (SELECT 1 FROM pg_depend d
-                                  WHERE d.classid = 'pg_type'::regclass AND d.objid = t.oid
-                                    AND d.deptype = 'e')
-                """))
+                    SELECT n.nspname AS schema_name, t.typname AS object_name, t.typtype::text AS kind
+                    FROM pg_type t
+                    JOIN pg_namespace n ON n.oid = t.typnamespace
+                    WHERE t.typtype IN ('d', 'e') AND /*NOT_SYSTEM*/
+                      AND NOT EXISTS (SELECT 1 FROM pg_depend d
+                                      WHERE d.classid = 'pg_type'::regclass AND d.objid = t.oid
+                                        AND d.deptype = 'e')
+                    """))
             .fetch(r -> new TypeRow(text(r, SCHEMA), text(r, NAME), text(r, "kind"))),
         dsl.resultQuery(
                 query(
                     """
-                SELECT n.nspname AS schema_name, p.oid::regprocedure::text AS object_name
-                FROM pg_proc p
-                JOIN pg_namespace n ON n.oid = p.pronamespace
-                WHERE /*NOT_SYSTEM*/
-                  AND NOT EXISTS (SELECT 1 FROM pg_depend d
-                                  WHERE d.classid = 'pg_proc'::regclass AND d.objid = p.oid
-                                    AND d.deptype = 'e')
-                """))
+                    SELECT n.nspname AS schema_name, p.oid::regprocedure::text AS object_name
+                    FROM pg_proc p
+                    JOIN pg_namespace n ON n.oid = p.pronamespace
+                    WHERE /*NOT_SYSTEM*/
+                      AND NOT EXISTS (SELECT 1 FROM pg_depend d
+                                      WHERE d.classid = 'pg_proc'::regclass AND d.objid = p.oid
+                                        AND d.deptype = 'e')
+                    """))
             .fetch(r -> new FunctionRow(text(r, SCHEMA), text(r, NAME))),
         viewDependencies(dsl),
         dsl.resultQuery("SELECT extname FROM pg_extension ORDER BY extname")
@@ -116,107 +121,104 @@ final class SchemaCatalog {
     return dsl.resultQuery(
             query(
                 """
-            SELECT n.nspname AS schema_name, c.relname AS object_name, c.relkind::text AS kind,
-                   EXISTS (SELECT 1 FROM pg_index i WHERE i.indrelid = c.oid AND i.indisprimary)
-                     AS has_primary_key,
-                   (SELECT p.relname FROM pg_inherits h JOIN pg_class p ON p.oid = h.inhparent
-                    WHERE h.inhrelid = c.oid AND p.relkind <> 'p' LIMIT 1) AS inheritance_parent
-            FROM pg_class c
-            JOIN pg_namespace n ON n.oid = c.relnamespace
-            WHERE c.relkind IN /*RELATION_KINDS*/ AND /*NOT_SYSTEM*/
-            """))
-        .fetch(
-            r ->
-                new RelationRow(
-                    text(r, SCHEMA),
-                    text(r, NAME),
-                    text(r, "kind"),
-                    r.get("has_primary_key", Boolean.class),
-                    r.get("inheritance_parent", String.class)));
+                SELECT n.nspname AS schema_name, c.relname AS object_name, c.relkind::text AS kind,
+                       (SELECT a.attname FROM pg_index i
+                        JOIN pg_attribute a ON a.attrelid = i.indrelid AND a.attnum = i.indkey[0]
+                        WHERE i.indrelid = c.oid AND i.indisprimary) AS primary_key,
+                       (SELECT p.relname FROM pg_inherits h JOIN pg_class p ON p.oid = h.inhparent
+                        WHERE h.inhrelid = c.oid AND p.relkind <> 'p' LIMIT 1) AS inheritance_parent
+                FROM pg_class c
+                JOIN pg_namespace n ON n.oid = c.relnamespace
+                WHERE c.relkind IN /*RELATION_KINDS*/ AND /*NOT_SYSTEM*/
+                """))
+        .fetch(r ->
+            new RelationRow(
+                text(r, SCHEMA),
+                text(r, NAME),
+                text(r, "kind"),
+                r.get("primary_key", String.class),
+                r.get("inheritance_parent", String.class)));
   }
 
   private static List<ColumnRow> columns(final DSLContext dsl) {
     return dsl.resultQuery(
             query(
                 """
-            SELECT n.nspname AS schema_name, c.relname AS table_name, a.attname AS object_name,
-                   format_type(a.atttypid, a.atttypmod) AS type_name, t.typtype::text AS type_kind,
-                   a.attidentity::text AS identity_kind, a.attgenerated::text AS generated_kind,
-                   pg_get_expr(d.adbin, d.adrelid) AS default_expression
-            FROM pg_attribute a
-            JOIN pg_class c ON c.oid = a.attrelid
-            JOIN pg_namespace n ON n.oid = c.relnamespace
-            JOIN pg_type t ON t.oid = a.atttypid
-            LEFT JOIN pg_attrdef d ON d.adrelid = a.attrelid AND d.adnum = a.attnum
-            WHERE c.relkind IN ('r', 'p') AND a.attnum > 0 AND NOT a.attisdropped AND /*NOT_SYSTEM*/
-            """))
-        .fetch(
-            r ->
-                new ColumnRow(
-                    text(r, SCHEMA),
-                    text(r, TABLE),
-                    text(r, NAME),
-                    text(r, "type_name"),
-                    text(r, "type_kind"),
-                    text(r, "identity_kind"),
-                    text(r, "generated_kind"),
-                    r.get("default_expression", String.class)));
+                SELECT n.nspname AS schema_name, c.relname AS table_name, a.attname AS object_name,
+                       format_type(a.atttypid, a.atttypmod) AS type_name, t.typtype::text AS type_kind,
+                       a.attidentity::text AS identity_kind, a.attgenerated::text AS generated_kind,
+                       pg_get_expr(d.adbin, d.adrelid) AS default_expression
+                FROM pg_attribute a
+                JOIN pg_class c ON c.oid = a.attrelid
+                JOIN pg_namespace n ON n.oid = c.relnamespace
+                JOIN pg_type t ON t.oid = a.atttypid
+                LEFT JOIN pg_attrdef d ON d.adrelid = a.attrelid AND d.adnum = a.attnum
+                WHERE c.relkind IN ('r', 'p') AND a.attnum > 0 AND NOT a.attisdropped AND /*NOT_SYSTEM*/
+                """))
+        .fetch(r ->
+            new ColumnRow(
+                text(r, SCHEMA),
+                text(r, TABLE),
+                text(r, NAME),
+                text(r, "type_name"),
+                text(r, "type_kind"),
+                text(r, "identity_kind"),
+                text(r, "generated_kind"),
+                r.get("default_expression", String.class)));
   }
 
   private static List<IndexRow> indexes(final DSLContext dsl) {
     return dsl.resultQuery(
             query(
                 """
-            SELECT n.nspname AS schema_name, t.relname AS table_name, ic.relname AS object_name,
-                   am.amname AS access_method, i.indisprimary AS is_primary,
-                   i.indnkeyatts AS key_count, i.indnatts AS total_count,
-                   i.indexprs IS NOT NULL AS has_expressions, i.indpred IS NOT NULL AS has_predicate,
-                   EXISTS (SELECT 1 FROM pg_constraint x
-                           WHERE x.conindid = i.indexrelid AND x.contype = 'x') AS backs_exclusion
-            FROM pg_index i
-            JOIN pg_class ic ON ic.oid = i.indexrelid
-            JOIN pg_class t ON t.oid = i.indrelid
-            JOIN pg_namespace n ON n.oid = t.relnamespace
-            JOIN pg_am am ON am.oid = ic.relam
-            WHERE /*NOT_SYSTEM*/
-            """))
-        .fetch(
-            r ->
-                new IndexRow(
-                    text(r, SCHEMA),
-                    text(r, TABLE),
-                    text(r, NAME),
-                    text(r, "access_method"),
-                    r.get("is_primary", Boolean.class),
-                    r.get("key_count", Integer.class),
-                    r.get("total_count", Integer.class),
-                    r.get("has_expressions", Boolean.class),
-                    r.get("has_predicate", Boolean.class),
-                    r.get("backs_exclusion", Boolean.class)));
+                SELECT n.nspname AS schema_name, t.relname AS table_name, ic.relname AS object_name,
+                       am.amname AS access_method, i.indisprimary AS is_primary,
+                       i.indnkeyatts AS key_count, i.indnatts AS total_count,
+                       i.indexprs IS NOT NULL AS has_expressions, i.indpred IS NOT NULL AS has_predicate,
+                       EXISTS (SELECT 1 FROM pg_constraint x
+                               WHERE x.conindid = i.indexrelid AND x.contype = 'x') AS backs_exclusion
+                FROM pg_index i
+                JOIN pg_class ic ON ic.oid = i.indexrelid
+                JOIN pg_class t ON t.oid = i.indrelid
+                JOIN pg_namespace n ON n.oid = t.relnamespace
+                JOIN pg_am am ON am.oid = ic.relam
+                WHERE /*NOT_SYSTEM*/
+                """))
+        .fetch(r ->
+            new IndexRow(
+                text(r, SCHEMA),
+                text(r, TABLE),
+                text(r, NAME),
+                text(r, "access_method"),
+                r.get("is_primary", Boolean.class),
+                r.get("key_count", Integer.class),
+                r.get("total_count", Integer.class),
+                r.get("has_expressions", Boolean.class),
+                r.get("has_predicate", Boolean.class),
+                r.get("backs_exclusion", Boolean.class)));
   }
 
   private static List<ViewDependencyRow> viewDependencies(final DSLContext dsl) {
     return dsl.resultQuery(
             query(
                 """
-            SELECT DISTINCT n.nspname AS schema_name, v.relname AS object_name,
-                   rn.nspname AS referenced_schema, r.relname AS referenced_view
-            FROM pg_depend d
-            JOIN pg_rewrite rw ON rw.oid = d.objid
-            JOIN pg_class v ON v.oid = rw.ev_class
-            JOIN pg_namespace n ON n.oid = v.relnamespace
-            JOIN pg_class r ON r.oid = d.refobjid
-            JOIN pg_namespace rn ON rn.oid = r.relnamespace
-            WHERE d.classid = 'pg_rewrite'::regclass AND d.refclassid = 'pg_class'::regclass
-              AND v.relkind IN ('v', 'm') AND r.relkind IN ('v', 'm') AND r.oid <> v.oid AND /*NOT_SYSTEM*/
-            """))
-        .fetch(
-            r ->
-                new ViewDependencyRow(
-                    text(r, SCHEMA),
-                    text(r, NAME),
-                    text(r, "referenced_schema"),
-                    text(r, "referenced_view")));
+                SELECT DISTINCT n.nspname AS schema_name, v.relname AS object_name,
+                       rn.nspname AS referenced_schema, r.relname AS referenced_view
+                FROM pg_depend d
+                JOIN pg_rewrite rw ON rw.oid = d.objid
+                JOIN pg_class v ON v.oid = rw.ev_class
+                JOIN pg_namespace n ON n.oid = v.relnamespace
+                JOIN pg_class r ON r.oid = d.refobjid
+                JOIN pg_namespace rn ON rn.oid = r.relnamespace
+                WHERE d.classid = 'pg_rewrite'::regclass AND d.refclassid = 'pg_class'::regclass
+                  AND v.relkind IN ('v', 'm') AND r.relkind IN ('v', 'm') AND r.oid <> v.oid AND /*NOT_SYSTEM*/
+                """))
+        .fetch(r ->
+            new ViewDependencyRow(
+                text(r, SCHEMA),
+                text(r, NAME),
+                text(r, "referenced_schema"),
+                text(r, "referenced_view")));
   }
 
   private static RoleRow role(final DSLContext dsl) {
@@ -228,69 +230,66 @@ final class SchemaCatalog {
             FROM pg_roles r
             WHERE r.rolname = current_user
             """)
-        .fetchSingle(
-            r ->
-                new RoleRow(
-                    text(r, NAME),
-                    r.get("rolsuper", Boolean.class),
-                    r.get("rolcreatedb", Boolean.class),
-                    r.get("rolcreaterole", Boolean.class),
-                    r.get("rolreplication", Boolean.class),
-                    r.get("rolbypassrls", Boolean.class),
-                    r.get("can_create", Boolean.class)));
+        .fetchSingle(r ->
+            new RoleRow(
+                text(r, NAME),
+                r.get("rolsuper", Boolean.class),
+                r.get("rolcreatedb", Boolean.class),
+                r.get("rolcreaterole", Boolean.class),
+                r.get("rolreplication", Boolean.class),
+                r.get("rolbypassrls", Boolean.class),
+                r.get("can_create", Boolean.class)));
   }
 
   private static List<SchemaPrivilegeRow> schemaPrivileges(final DSLContext dsl) {
     return dsl.resultQuery(
             query(
                 """
-            SELECT n.nspname AS schema_name,
-                   has_schema_privilege(n.oid, 'USAGE') AS usage_granted,
-                   has_schema_privilege(n.oid, 'CREATE') AS create_granted,
-                   pg_get_userbyid(n.nspowner) = current_user AS owned_by_role
-            FROM pg_namespace n
-            WHERE /*NOT_SYSTEM*/
-            """))
-        .fetch(
-            r ->
-                new SchemaPrivilegeRow(
-                    text(r, SCHEMA),
-                    r.get("usage_granted", Boolean.class),
-                    r.get("create_granted", Boolean.class),
-                    r.get("owned_by_role", Boolean.class)));
+                SELECT n.nspname AS schema_name,
+                       has_schema_privilege(n.oid, 'USAGE') AS usage_granted,
+                       has_schema_privilege(n.oid, 'CREATE') AS create_granted,
+                       pg_get_userbyid(n.nspowner) = current_user AS owned_by_role
+                FROM pg_namespace n
+                WHERE /*NOT_SYSTEM*/
+                """))
+        .fetch(r ->
+            new SchemaPrivilegeRow(
+                text(r, SCHEMA),
+                r.get("usage_granted", Boolean.class),
+                r.get("create_granted", Boolean.class),
+                r.get("owned_by_role", Boolean.class)));
   }
 
   private static List<RelationPrivilegeRow> relationPrivileges(final DSLContext dsl) {
     return dsl.resultQuery(
             query(
                 """
-            SELECT n.nspname AS schema_name, c.relname AS object_name,
-                   has_table_privilege(c.oid, 'SELECT') OR has_table_privilege(c.oid, 'INSERT')
-                     OR has_table_privilege(c.oid, 'UPDATE') OR has_table_privilege(c.oid, 'DELETE')
-                     OR has_table_privilege(c.oid, 'TRUNCATE')
-                     OR has_table_privilege(c.oid, 'REFERENCES')
-                     OR has_table_privilege(c.oid, 'TRIGGER')
-                     OR has_table_privilege(c.oid, 'MAINTAIN') AS any_granted,
-                   has_table_privilege(c.oid, 'TRUNCATE') AS truncate_granted,
-                   has_table_privilege(c.oid, 'REFERENCES') AS references_granted,
-                   has_table_privilege(c.oid, 'TRIGGER') AS trigger_granted,
-                   has_table_privilege(c.oid, 'MAINTAIN') AS maintain_granted,
-                   pg_get_userbyid(c.relowner) = current_user AS owned_by_role
-            FROM pg_class c
-            JOIN pg_namespace n ON n.oid = c.relnamespace
-            WHERE c.relkind IN /*RELATION_KINDS*/ AND /*NOT_SYSTEM*/
-            """))
-        .fetch(
-            r ->
-                new RelationPrivilegeRow(
-                    text(r, SCHEMA),
-                    text(r, NAME),
-                    r.get("any_granted", Boolean.class),
-                    r.get("truncate_granted", Boolean.class),
-                    r.get("references_granted", Boolean.class),
-                    r.get("trigger_granted", Boolean.class),
-                    r.get("maintain_granted", Boolean.class),
-                    r.get("owned_by_role", Boolean.class)));
+                SELECT n.nspname AS schema_name, c.relname AS object_name,
+                       has_table_privilege(c.oid, 'SELECT') OR has_table_privilege(c.oid, 'INSERT')
+                         OR has_table_privilege(c.oid, 'UPDATE') OR has_table_privilege(c.oid, 'DELETE')
+                         OR has_table_privilege(c.oid, 'TRUNCATE')
+                         OR has_table_privilege(c.oid, 'REFERENCES')
+                         OR has_table_privilege(c.oid, 'TRIGGER')
+                         OR has_table_privilege(c.oid, 'MAINTAIN') AS any_granted,
+                       has_table_privilege(c.oid, 'TRUNCATE') AS truncate_granted,
+                       has_table_privilege(c.oid, 'REFERENCES') AS references_granted,
+                       has_table_privilege(c.oid, 'TRIGGER') AS trigger_granted,
+                       has_table_privilege(c.oid, 'MAINTAIN') AS maintain_granted,
+                       pg_get_userbyid(c.relowner) = current_user AS owned_by_role
+                FROM pg_class c
+                JOIN pg_namespace n ON n.oid = c.relnamespace
+                WHERE c.relkind IN /*RELATION_KINDS*/ AND /*NOT_SYSTEM*/
+                """))
+        .fetch(r ->
+            new RelationPrivilegeRow(
+                text(r, SCHEMA),
+                text(r, NAME),
+                r.get("any_granted", Boolean.class),
+                r.get("truncate_granted", Boolean.class),
+                r.get("references_granted", Boolean.class),
+                r.get("trigger_granted", Boolean.class),
+                r.get("maintain_granted", Boolean.class),
+                r.get("owned_by_role", Boolean.class)));
   }
 
   /** 問い合わせの雛形の{@code /*NOT_SYSTEM*\/}と{@code /*RELATION_KINDS*\/}を条件に置き換える。 */
