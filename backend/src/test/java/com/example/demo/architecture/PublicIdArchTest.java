@@ -14,7 +14,12 @@ import com.tngtech.archunit.lang.ArchRule;
 import com.tngtech.archunit.lang.ConditionEvents;
 import com.tngtech.archunit.lang.SimpleConditionEvent;
 import java.lang.reflect.Executable;
+import java.lang.reflect.GenericArrayType;
 import java.lang.reflect.Parameter;
+import java.lang.reflect.ParameterizedType;
+import java.lang.reflect.Type;
+import java.lang.reflect.WildcardType;
+import java.util.Arrays;
 import java.util.Set;
 import java.util.stream.Stream;
 
@@ -59,23 +64,23 @@ class PublicIdArchTest {
             "主キーは同じモジュールのスキーマと Repository の中だけで使い、モジュールの外に出る値には public_id を使うため。"
                 + "直し方：イベント、モジュールルートの公開 API、Domain、Application、infrastructure.client、"
                 + "shared の公開パッケージの型では、"
-                + "名前が Id で終わる項目を public_id の UUID か、それを包む値オブジェクトにする。"
+                + "名前が Id か Ids で終わる項目を public_id の UUID か、それを包む値オブジェクトにする。"
                 + "規約：docs/database/postgresql-primary-keys.md");
   }
 
   private static ArchCondition<JavaClass> notHoldNumericIds() {
     return new ArchCondition<>(
-        "not have fields, parameters, or methods named id or *Id of type long, Long, int, or"
-            + " Integer") {
+        "not have fields, parameters, or methods named id, *Id, ids, or *Ids whose type is or"
+            + " contains long, Long, int, or Integer") {
       @Override
       public void check(final JavaClass javaClass, final ConditionEvents events) {
         for (final JavaField field : javaClass.getFields()) {
-          if (isNumericId(field.getName(), field.getRawType().getName())) {
+          if (isNumericId(field.getName(), field.reflect().getGenericType())) {
             events.add(SimpleConditionEvent.violated(field, field.getFullName() + " は数値の ID である"));
           }
         }
         for (final JavaMethod method : javaClass.getMethods()) {
-          if (isNumericId(method.getName(), method.getRawReturnType().getName())) {
+          if (isNumericId(method.getName(), method.reflect().getGenericReturnType())) {
             events.add(
                 SimpleConditionEvent.violated(method, method.getFullName() + " は数値の ID を返す"));
           }
@@ -89,7 +94,7 @@ class PublicIdArchTest {
   /** ArchUnit は引数の名前を読まないため、コンパイラの {@code -parameters} が残した名前をリフレクションで読む。 */
   private static void checkParameters(final JavaCodeUnit codeUnit, final ConditionEvents events) {
     for (final Parameter parameter : ((Executable) codeUnit.reflect()).getParameters()) {
-      if (isNumericId(parameter.getName(), parameter.getType().getName())) {
+      if (isNumericId(parameter.getName(), parameter.getParameterizedType())) {
         events.add(
             SimpleConditionEvent.violated(
                 codeUnit, codeUnit.getFullName() + " の引数 " + parameter.getName() + " は数値の ID である"));
@@ -97,7 +102,25 @@ class PublicIdArchTest {
     }
   }
 
-  private static boolean isNumericId(final String name, final String typeName) {
-    return ("id".equals(name) || name.endsWith("Id")) && NUMERIC_TYPES.contains(typeName);
+  private static boolean isNumericId(final String name, final Type type) {
+    return ("id".equals(name) || "ids".equals(name) || name.endsWith("Id") || name.endsWith("Ids"))
+        && containsNumeric(type);
+  }
+
+  /** {@code List<Long>}、{@code Optional<Long>}、{@code long[]} のように、型引数と配列の要素に数値を含む型も数値の ID とみなす。 */
+  private static boolean containsNumeric(final Type type) {
+    if (type instanceof Class<?> c) {
+      return c.isArray()
+          ? containsNumeric(c.getComponentType())
+          : NUMERIC_TYPES.contains(c.getName());
+    }
+    if (type instanceof ParameterizedType p) {
+      return Arrays.stream(p.getActualTypeArguments()).anyMatch(PublicIdArchTest::containsNumeric);
+    }
+    if (type instanceof GenericArrayType g) {
+      return containsNumeric(g.getGenericComponentType());
+    }
+    return type instanceof WildcardType w
+        && Arrays.stream(w.getUpperBounds()).anyMatch(PublicIdArchTest::containsNumeric);
   }
 }

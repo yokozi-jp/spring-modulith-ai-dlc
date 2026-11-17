@@ -974,6 +974,7 @@ tasks:
         problem-type-uri-reference|components.schemas.ProblemDetail.properties.type.format
         public-id-uuid|paths./api/sample-orders/{sampleOrderId}.get.parameters[0].schema
         public-id-uuid|components.schemas.SampleOrderResponse.properties.orderId
+        public-id-uuid|components.schemas.SampleOrderResponse.properties.productIds.items
         public-id-uuid|paths./api/sample-orders/{code}.delete.parameters[0].schema
         public-id-uuid|paths./api/orders.get.parameters[0].schema
         EOF

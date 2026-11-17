@@ -123,6 +123,18 @@ class ArchitectureRuleFixtureTest {
               PublicIdArchTest.numericIdsDoNotLeaveModulesRule(VIOLATING),
               "ordering.OrderLookupQueries.findOrderId(java.lang.String) は数値の ID を返す"),
           row(
+              "numericIdsDoNotLeaveModules: generic parameter",
+              PublicIdArchTest.numericIdsDoNotLeaveModulesRule(VIOLATING),
+              "ordering.OrderLookupQueries.findByIds(java.util.List) の引数 orderIds"),
+          row(
+              "numericIdsDoNotLeaveModules: generic return type",
+              PublicIdArchTest.numericIdsDoNotLeaveModulesRule(VIOLATING),
+              "ordering.OrderLookupQueries.findLatestOrderId(java.lang.String) は数値の ID を返す"),
+          row(
+              "numericIdsDoNotLeaveModules: array return type",
+              PublicIdArchTest.numericIdsDoNotLeaveModulesRule(VIOLATING),
+              "ordering.OrderLookupQueries.findLineIds(java.lang.String) は数値の ID を返す"),
+          row(
               "numericIdsDoNotLeaveModules: Domain id",
               PublicIdArchTest.numericIdsDoNotLeaveModulesRule(VIOLATING),
               "ordering.domain.model.Shipment.id"),
