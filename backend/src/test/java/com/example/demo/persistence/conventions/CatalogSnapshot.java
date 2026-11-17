@@ -19,6 +19,7 @@ import org.jspecify.annotations.Nullable;
  * @param extensions 拡張機能の名前
  * @param largeObjectCount ラージオブジェクトの件数
  * @param role 接続したアプリロール
+ * @param migrationRole changesetを適用したマイグレーションロール
  * @param schemaPrivileges アプリロールのスキーマへの権限
  * @param relationPrivileges アプリロールのテーブルとビューへの権限
  */
@@ -34,6 +35,7 @@ record CatalogSnapshot(
     List<String> extensions,
     long largeObjectCount,
     RoleRow role,
+    RoleRow migrationRole,
     List<SchemaPrivilegeRow> schemaPrivileges,
     List<RelationPrivilegeRow> relationPrivileges) {
 

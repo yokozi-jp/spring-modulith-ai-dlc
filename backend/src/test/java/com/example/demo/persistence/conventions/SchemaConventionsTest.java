@@ -84,6 +84,7 @@ class SchemaConventionsTest {
             List.of("plpgsql", "btree_gist"),
             0,
             cleanRole(),
+            new RoleRow(MIGRATION_ROLE, false, false, false, false, false, true),
             List.of(
                 new SchemaPrivilegeRow(ITEM, true, false, false),
                 new SchemaPrivilegeRow(MODULITH, true, false, false),
@@ -468,7 +469,7 @@ class SchemaConventionsTest {
     }
   }
 
-  /** アプリロールの権限。 */
+  /** ロールの権限。 */
   /* package */ @Nested
   class PrivilegeRulesTest {
 
@@ -485,23 +486,6 @@ class SchemaConventionsTest {
               "G1 demo:REPLICATION",
               "G1 demo:BYPASSRLS",
               "G1 demo:CREATE:DATABASE");
-    }
-
-    @Test
-    @DisplayName("G2：マイグレーションロールのsuperuserとBYPASSRLSを拒否する")
-    void rejectsSuperuserAndBypassRlsOnMigrationRole() {
-      final RoleRow role = new RoleRow(MIGRATION_ROLE, true, false, false, false, true, true);
-
-      assertThat(keys(SchemaPrivilegeConventions.migrationRole(role)))
-          .containsExactlyInAnyOrder("G2 demo_migration:SUPERUSER", "G2 demo_migration:BYPASSRLS");
-    }
-
-    @Test
-    @DisplayName("G2：表を作れるマイグレーションロールを受け入れる")
-    void acceptsMigrationRoleThatCanCreate() {
-      final RoleRow role = new RoleRow(MIGRATION_ROLE, false, false, false, false, false, true);
-
-      assertThat(SchemaPrivilegeConventions.migrationRole(role)).isEmpty();
     }
 
     @Test
@@ -543,6 +527,23 @@ class SchemaConventionsTest {
               "G1 demo:REFERENCES:item.m_other",
               "G1 demo:TRIGGER:item.m_other",
               "G1 demo:MAINTAIN:item.m_other");
+    }
+
+    @Test
+    @DisplayName("G2：マイグレーションロールのsuperuserとBYPASSRLSを拒否する")
+    void rejectsSuperuserAndBypassRlsOnMigrationRole() {
+      final RoleRow role = new RoleRow(MIGRATION_ROLE, true, false, false, false, true, true);
+
+      assertThat(keys(SchemaPrivilegeConventions.migrationRole(role)))
+          .containsExactlyInAnyOrder("G2 demo_migration:SUPERUSER", "G2 demo_migration:BYPASSRLS");
+    }
+
+    @Test
+    @DisplayName("G2：表を作れるマイグレーションロールを受け入れる")
+    void acceptsMigrationRoleThatCanCreate() {
+      final RoleRow role = new RoleRow(MIGRATION_ROLE, false, false, false, false, false, true);
+
+      assertThat(SchemaPrivilegeConventions.migrationRole(role)).isEmpty();
     }
   }
 

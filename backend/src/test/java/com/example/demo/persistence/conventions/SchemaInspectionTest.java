@@ -33,18 +33,10 @@ class SchemaInspectionTest {
   @DisplayName("マイグレーション後のスキーマは規約を満たす")
   void migratedSchemaConforms() {
     final List<ConventionViolation> violations =
-        SchemaConventions.check(SchemaCatalog.read(dsl), SchemaConventions.ALLOWLIST);
+        SchemaConventions.check(
+            SchemaCatalog.read(dsl, migrationRole), SchemaConventions.ALLOWLIST);
 
     assertThat(violations).as("スキーマ検査の違反: %s", violations).isEmpty();
-  }
-
-  @Test
-  @DisplayName("マイグレーションロールはsuperuserでもBYPASSRLSでもない")
-  void migrationRoleIsSubjectToRowLevelSecurity() {
-    final List<ConventionViolation> violations =
-        SchemaPrivilegeConventions.migrationRole(SchemaCatalog.role(dsl, migrationRole));
-
-    assertThat(violations).as("マイグレーションロールの違反: %s", violations).isEmpty();
   }
 
   @Test

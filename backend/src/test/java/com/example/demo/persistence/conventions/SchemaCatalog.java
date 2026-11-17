@@ -48,9 +48,10 @@ final class SchemaCatalog {
    * カタログを読む。
    *
    * @param dsl アプリロールで接続したjOOQのコンテキスト
+   * @param migrationRole changesetを適用したマイグレーションロールの名前
    * @return 読んだ行
    */
-  /* package */ static CatalogSnapshot read(final DSLContext dsl) {
+  /* package */ static CatalogSnapshot read(final DSLContext dsl, final String migrationRole) {
     return new CatalogSnapshot(
         relations(dsl),
         columns(dsl),
@@ -106,7 +107,8 @@ final class SchemaCatalog {
             .fetch(r -> text(r, "extname")),
         dsl.resultQuery("SELECT count(*) AS object_count FROM pg_largeobject_metadata")
             .fetchSingle(r -> r.get("object_count", Long.class)),
-        role(dsl, dsl.fetchValue(DSL.field("current_user", String.class))),
+        role(dsl, dsl.fetchValue(DSL.currentUser())),
+        role(dsl, migrationRole),
         schemaPrivileges(dsl),
         relationPrivileges(dsl));
   }
@@ -221,7 +223,7 @@ final class SchemaCatalog {
    * @param name ロール名
    * @return ロールの属性
    */
-  /* package */ static RoleRow role(final DSLContext dsl, final String name) {
+  private static RoleRow role(final DSLContext dsl, final String name) {
     return dsl.resultQuery(
             """
             SELECT r.rolname AS object_name, r.rolsuper, r.rolcreatedb, r.rolcreaterole,
