@@ -7,7 +7,7 @@ on:
   pull_request:
     branches: ["**"]
 
-# 呼ばれる workflow は concurrency を持たない。呼ばれると github.workflow が CI になり、group が重なって取り消し合うため。
+# 呼ばれる workflow の group には、ファイル名の stem を付ける。付けないと、呼ばれた workflow どうしの group が重なって取り消し合う（ADR-087）。
 concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true

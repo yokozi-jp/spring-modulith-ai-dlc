@@ -410,7 +410,6 @@ tasks:
       - bash tooling/skills-check/test.sh
       - node tooling/skills-check/skills-check.mjs
 
-  # ci.yml の集約ジョブ CI gate が、pull_request で動く検査を取りこぼしていないかを検査する。
   # 検査の本体は tooling/ci-gate-check/ci-gate-check.py に置き、自己検査（test.sh）を先に実行する。
   # 理由と除外の一覧の扱いは docs/adr/ADR-087 にある。
   ci-gate-check:

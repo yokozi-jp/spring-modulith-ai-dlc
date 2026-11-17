@@ -20,11 +20,10 @@ on:
   # ci.yml から呼ばれる（docs/adr/ADR-087）。移行が終わるまでは pull_request でも単独で動き、二重に走る。
   workflow_call:
 
-# 呼ばれると github.workflow が呼び出し側の名前になり、呼ばれた workflow どうしが取り消し合う。
-# そのため group に github.workflow を使わない。PR の取り消しは ci.yml が行い、ここは main への push だけを取り消す。
+# 呼ばれると github.workflow が CI になる。group の前にファイル名の stem を付けて、呼ばれた workflow どうしが重ならないようにする（ADR-087）。
 concurrency:
-  group: hadolint-${{ github.event_name == 'push' && github.ref || github.run_id }}
-  cancel-in-progress: ${{ github.event_name == 'push' }}
+  group: hadolint-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 permissions:
   contents: read

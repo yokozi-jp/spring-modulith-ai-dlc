@@ -36,6 +36,7 @@ jobs:
   backend:
     uses: ./.github/workflows/backend.yml
   gate:
+    name: CI gate
     if: always()
     needs: [backend]
     runs-on: ubuntu-latest
@@ -49,7 +50,7 @@ on:
   pull_request:
   workflow_call:
 concurrency:
-  group: backend-${{ github.event_name == 'push' && github.ref || github.run_id }}
+  group: backend-${{ github.workflow }}-${{ github.ref }}
 jobs:
   test:
     runs-on: ubuntu-latest
@@ -68,7 +69,7 @@ jobs:
 YAML
 printf '# 理由つきの除外\ne2e.yml\t必須にしない\n' > "$tmp/excluded.tsv"
 
-# case <名前>: base を複製した木のパスを返す
+# case_dir <名前>: base を複製した木のパスを返す
 case_dir() {
   rm -rf "$tmp/$1" && cp -r "$base" "$tmp/$1"
   echo "$tmp/$1"
@@ -95,18 +96,30 @@ expect "呼ばれる側に workflow_call がないと失敗" 1 "backend.yml に 
 
 d="$(case_dir shared-group)"
 sed -i 's/group: .*/group: ${{ github.workflow }}-${{ github.ref }}/' "$d/backend.yml"
-expect "concurrency の group が github.workflow を使うと失敗" 1 "github.workflow を使っています" check "$d"
+expect "concurrency の group に stem がないと失敗" 1 "backend- で始まっていません" check "$d"
+
+d="$(case_dir renamed-gate)"
+sed -i 's/name: CI gate/name: Gate/' "$d/ci.yml"
+expect "gate の name が CI gate でないと失敗" 1 "name が 'CI gate' ではありません" check "$d"
+
+d="$(case_dir no-pull-request)"
+sed -i '/^  pull_request:/d; s/^on:/on: {push: }/' "$d/ci.yml"
+expect "ci.yml が pull_request で動かないと失敗" 1 "ci.yml が pull_request で動きません" check "$d"
 
 printf 'e2e.yml\t必須にしない\nbackend.yml\t呼ばれているのに除外\n' > "$tmp/stale.tsv"
 expect "呼ばれている workflow が除外にあると失敗" 1 "backend.yml は ci.yml から呼ばれている" check "$base" "$tmp/stale.tsv"
 
 printf 'e2e.yml\t必須にしない\ngone.yml\t消えた\n' > "$tmp/gone.tsv"
-expect "存在しない workflow が除外にあると失敗" 1 "gone.yml がありません" check "$base" "$tmp/gone.tsv"
+expect "存在しない workflow が除外にあると失敗" 1 "gone.yml は pull_request で動く workflow ではない" check "$base" "$tmp/gone.tsv"
+
+printf 'e2e.yml\t必須にしない\n' > "$tmp/push-only.tsv"
+d="$(case_dir push-only)"
+printf 'name: Push\non:\n  push:\njobs:\n  p:\n    runs-on: ubuntu-latest\n    steps:\n      - run: "true"\n' > "$d/push.yml"
+printf 'e2e.yml\t必須にしない\npush.yml\tpush だけ\n' > "$tmp/push-only.tsv"
+expect "pull_request で動かない workflow が除外にあると失敗" 1 "push.yml は pull_request で動く workflow ではない" check "$d" "$tmp/push-only.tsv"
 
 printf 'e2e.yml\n' > "$tmp/no-reason.tsv"
 expect "理由のない除外は失敗" 1 "理由のない行" check "$base" "$tmp/no-reason.tsv"
-
-expect "実際の ci.yml が通る" 0 "ci-gate-check OK" python3 "$dir/ci-gate-check.py" "$dir/../../.github/workflows"
 
 gate() { printf '%s' "$1" | bash "$dir/gate.sh"; }
 expect "gate は全部 success なら通る" 0 "2 件" gate '{"a":{"result":"success"},"b":{"result":"success"}}'
