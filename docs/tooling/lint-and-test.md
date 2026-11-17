@@ -343,7 +343,8 @@ pre-pushの「変更」は、push済みかどうかやrebaseの有無によら�
 ## CI対応
 
 - **`backend-ci.yml`**：`be-lint`相当、`lint-session-sql`、`be-verify-migrations`、`be-test`、`be-openapi-check`、手動実行時の`mutation-test`を実行する。
-  compose-testを止めた後に`test-deps-leftover-check`を実行する。
+  `be-verify-migrations`は`migrations`ジョブで、`be-test`と`be-openapi-check`は`test`ジョブで、並列に実行する。
+  `migrations`ジョブは、compose-testを止めた後に`test-deps-leftover-check`を実行する。
   契約は`be-test`が書き出し、`be-openapi-check`は`OpenApiContractTest`を再実行しない（[ADR-064](../adr/ADR-064-write-openapi-contract-from-test-task-in-ci.md)）。
   Gradle User Homeは`setup-gradle`の`cache-provider: external`にして、`actions/cache`のrestoreとsaveで扱う。
   keyはビルドファイルのhashで、restore-keysにより直近のmainのcacheを復元する。

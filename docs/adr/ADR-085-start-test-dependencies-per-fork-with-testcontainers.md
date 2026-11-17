@@ -55,6 +55,7 @@ Pull Request のレビューで Decision を書き直した。
 - **契約の単体の再生成。** `exportOpenApi` を消し、`test --tests com.example.demo.OpenApiContractTest -PopenapiExport=true` で再生成する。[ADR-064](ADR-064-write-openapi-contract-from-test-task-in-ci.md) が `exportOpenApi` を残した理由（`finalizedBy` で一部のテストが失敗すること）がなくなったためである。
 - **compose-test に残すもの。** `be-verify-migrations` の rollback の検証、`task e2e`、バックエンドのスモークは、これまでどおり compose-test を使う。
   `task test` は、起動の前に前の回の compose-test を片付け、rollback の検証の後、テストの前に止める。テストが `.env.test` の接続先へ黙ってつながらないようにするためである。
+  Backend CI は、rollback の検証を `migrations` ジョブに分け、テストのジョブと並列に走らせる。テストのジョブは compose を使わない。
 - **Taskfile の簡素化。** `task test-dev` と `task mutation-test` は `be-test-dev` と `be-mutation-test` の別名にし、`task api-gen` とともに compose を起動しない。使われていない `test-deps-up` と `test-deps-down` を消す。
 - **テストのコンテナの禁止。** `testkit` の外のテストは Testcontainers の型を使わない。`TestConventionsArchTest` が検査する。
 
@@ -79,7 +80,7 @@ Pull Request のレビューで Decision を書き直した。
 
 - rollback の検証（`updateTestingRollback`）は Liquibase の Gradle プラグインで実行し、compose の PostgreSQL を使い続ける。テストの JVM へ移すかは別に判断する。
 - 変更のないモジュールのテストを飛ばす Spring Modulith の `spring-modulith-junit` は、この ADR の範囲外とし、別に判断する。
-- CI の fork の数と、イメージの取得のキャッシュは、測ってから別に判断する。
+- CI の fork の数は、main で複数回の実行の中央値を測ってから別に判断する。イメージは Testcontainers が取得し、`actions/cache` に保存しない（保存と展開が取得より遅くなりやすいため）。
 
 ## Alternatives Considered
 

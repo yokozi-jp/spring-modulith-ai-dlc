@@ -137,6 +137,68 @@ jobs:
             ~/.gradle/wrapper
           key: ${{ steps.gradle-cache.outputs.cache-primary-key }}
 
+  # rollback の検証は compose の PostgreSQL 5433 を使い、テストのジョブと並列に走らせる（ADR-085）。
+  # テストのジョブは compose を使わず、テストの JVM ごとに Testcontainers の依存を起動する。
+  migrations:
+    name: Verify migrations ☕
+    needs: changes
+    if: needs.changes.outputs.backend == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up JDK
+        uses: actions/setup-java@77dd5b2ce225ea11469928ac317850245a74ae78 # v6.2.0
+        with:
+          distribution: corretto
+          java-version: "25"
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@8da46b539cd8fe6ab27ca75128919a18d757604c # v6.4.1
+        with:
+          # cache の扱いは lint ジョブと同じ（ADR-063）。
+          cache-provider: external
+
+      # test ジョブの直近の main の cache を復元する。保存は test ジョブだけが行う（ADR-063）。
+      - name: Restore Gradle cache
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: gradle-${{ runner.os }}-test-${{ hashFiles('backend/**/*.gradle*', 'backend/gradle/wrapper/gradle-wrapper.properties') }}
+          restore-keys: |
+            gradle-${{ runner.os }}-test-
+
+      - name: Set up Task
+        uses: go-task/setup-task@a00fbb05ce67b35648be3c78cbc9fd85354c757e # v2
+        with:
+          version: "3.53.1"
+          checksum: a54a408f6861ff921f6e87774180db31bacd8c1e7c944ca696db9fea49a82fc7
+
+      # .env.test は Git 除外のため、.env.test.example からコピーして作る。
+      - name: Create test env file
+        run: cp .env.test.example .env.test
+
+      - name: Start PostgreSQL for migration verification
+        run: docker compose -f docker/compose-test.yml up -d --wait postgres
+
+      - name: Verify schema tag, migrations, rollback, and reapply
+        run: task be-verify-migrations
+
+      - name: Stop PostgreSQL
+        if: always()
+        run: docker compose -f docker/compose-test.yml down --volumes --remove-orphans
+
+      # task e2e と共有する Compose project のコンテナと volume が、後片付けの後に残っていないことを確かめる。
+      - name: Check no compose-test leftovers
+        if: always()
+        run: task test-deps-leftover-check
+
   test:
     name: Test & Coverage ☕
     needs: changes
@@ -179,17 +241,10 @@ jobs:
           version: "3.53.1"
           checksum: a54a408f6861ff921f6e87774180db31bacd8c1e7c944ca696db9fea49a82fc7
 
-      # rollback の検証はローカルの task test と同じく compose の PostgreSQL 5433 を使う。
       # テストは fork ごとに Testcontainers の PostgreSQL、Redis と WireMock を起動する（ADR-085）。
-      # .env.test は Git 除外のため、.env.test.example からコピーして作る。
+      # 接続先以外の設定を読む .env.test は Git 除外のため、.env.test.example からコピーして作る。
       - name: Create test env file
         run: cp .env.test.example .env.test
-
-      - name: Start PostgreSQL for migration verification
-        run: docker compose -f docker/compose-test.yml up -d --wait postgres
-
-      - name: Verify migrations, rollback, reapply, and schema tag
-        run: task be-verify-migrations
 
       - name: Run tests and verify coverage
         run: task be-test
@@ -206,15 +261,6 @@ jobs:
             ~/.gradle/caches
             ~/.gradle/wrapper
           key: ${{ steps.gradle-cache.outputs.cache-primary-key }}
-
-      - name: Stop test dependencies
-        if: always()
-        run: docker compose -f docker/compose-test.yml down --volumes --remove-orphans
-
-      # task e2e と共有する Compose project のコンテナと volume が、後片付けの後に残っていないことを確かめる。
-      - name: Check no compose-test leftovers
-        if: always()
-        run: task test-deps-leftover-check
 
       - name: Upload test results
         if: always()
