@@ -215,7 +215,6 @@ task <タスク名>
 - **`task be-seed-reset CONFIRM_RESET=yes`**：ローカルの業務データを消して代表データを入れ直す。
 
 エージェントは commit と push を `task agent-commit`、`task agent-push` でバックグラウンドで始め、`task agent-wait` で終わりを待ちます（[開発ワークフロー](docs/tooling/dev-workflow.md) の「エージェントがcommitとpushをするとき」）。
-この三つの自己検査は `task agent-git-test` です。
 
 API の Controller や DTO を変えたときは `task api-gen` で OpenAPI 契約と Orval の生成物を再生成し、同じコミットに含めます（[API を変更する](docs/web-api/runbook-api-change.md)）。
 
@@ -318,6 +317,11 @@ Docker Compose の操作（サービスの起動、停止、状態確認、Keycl
 
 - `task skills-check`はスキルの記録と実体の整合を検査します。
   検査の範囲と、LefthookとCIで実行する条件は[Lintとテストのリファレンス](docs/tooling/lint-and-test.md)にあります。
+
+### エージェントの commit と push
+
+- `task agent-git-test`は、`task agent-commit`、`task agent-push`、`task agent-wait`の本体を、一時のgitリポジトリで検査します。
+  検査するケースは`tooling/agent-git/test.sh`にあり、LefthookとCIで実行する条件は[Lintとテストのリファレンス](docs/tooling/lint-and-test.md)にあります。
 
 <p align="right">(<a href="#top">トップへ</a>)</p>
 

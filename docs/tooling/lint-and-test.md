@@ -299,9 +299,7 @@ const params = { ...(cursor !== undefined && { cursor }) };
   失敗にする状態は`tooling/skills-check/test.sh`のケースが正で、この文書には写さない。
   手順の正文は[スキルの取得元と更新](../agents/skill-sources.md)である。
 - **`task release-check`**：release-pleaseのmanifest、版ファイル、Gradle版、設定の一致を検証する。
-- **`task agent-git-test`**：`tooling/agent-git/agent-git.sh`（`task agent-commit`、`task agent-push`、`task agent-wait`の本体）を、遅いフックを持つ一時のgitリポジトリで検査する。
-  渡したパスの外のstage済みの変更での拒否、フックの間に`git add`したものがcommitに入らないこと、成功と失敗の終わりの印、待ちの途中の終了コード75、前のpre-pushが動いているときのpushの拒否を確かめる。
-  ほかのpre-pushが動いているときは、pushの成功の検査だけを省く。
+- **`task agent-git-test`**：`task agent-commit`、`task agent-push`、`task agent-wait`の本体を、`tooling/agent-git/test.sh`のケースで検査する。
 - **`task lint-taskfile`**：Task本体でTaskfileのYAML構文とスキーマ構造を検証する。
   `tooling/taskfile-cleanup/`のfixtureで、後片付けの定型が本体の終了コードを優先し、前段が失敗しても後段の後片付けを走らせることを検査する。
 - **`task adr-check`**：判断が絡む変更にADRが伴うかを確認する。
