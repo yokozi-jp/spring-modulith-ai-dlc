@@ -1,25 +1,25 @@
 ---
 type: Convention
-title: レビュー依頼からマージまで
-description: Draft Pull Requestの使い方、レビュー依頼前の確認、AssigneesとReviewersの設定、レビューの依頼と再依頼、マージする人と承認後の変更の扱いを定める規約。Pull Requestを作成してからマージするまでの間に読む。
+title: Draftからマージまで
+description: Draft Pull Requestの使い方、Ready for reviewにする前の確認、人が必ず読むPull Requestの条件、マージする人を定める規約。Pull Requestを作成してからマージするまでの間に読む。
 tags: [convention, pull-request, github, future-arch-guidelines]
 ---
 
-# レビュー依頼からマージまで
+# Draftからマージまで
 
-作業途中のPull RequestはDraftで早めに作り、CIの成功と差分の確認を終えてからレビューを依頼する。
-Assigneesは作成者が持ち、マージかクローズかが決まるまで推進する。
-マージは原則としてレビュイーが行い、承認後に変更を加えた場合は再承認を受ける。
+作業途中のPull RequestはDraftで早めに作り、CIの成功と差分の確認を終えてからReady for reviewにする。
+人が必ず読む条件に当たるPull Requestだけ、マージの前に人が差分を読む。
+マージは作成者が、必須チェックが通ってから行う。
 
 ## Draft Pull Request
 
 作業途中のPull Requestは、GitHubのDraftとして作る。
 ローカルでの作業が終わる前でも、作業を見えるようにするためにDraftを早めに作ってよい。
-Draftのままではレビューを依頼せず、レビューを受けられる状態になったらReady for reviewにする。
+Draftのままではマージせず、CIと差分の確認を終えたらReady for reviewにする。
 
-## レビュー依頼前の確認
+## Ready for reviewにする前の確認
 
-レビューを依頼する前に、次を確認する。
+Ready for reviewにする前に、次を確認する。
 
 1. 必須チェックを含むCIが成功している。
 2. Files changedで、意図しないファイルや、誤った分岐元による余計な差分が含まれていない。
@@ -38,26 +38,29 @@ gh pr checks <番号> --required --watch --fail-fast
 エージェントは、このコマンドを長時間の処理としてbackgroundで実行する。
 Snyk Codeは必須チェックではないため待たない。
 
-## AssigneesとReviewers
+## 人が必ず読むPull Request
 
-- **Assignees**：作成者自身を設定する。別の担当者へ引き継ぐときはAssigneesも変更する。Assigneesに設定された人が、マージかクローズかが決まるまで推進する。
-- **Reviewers**：レビュアーが決まっている場合は、依頼時に必要な人数を設定する。決まっていない場合は空にし、候補者を片端から設定しない。
-- **コード所有者**：CODEOWNERSの対象ファイルを変更した場合は、GitHubが所有者へレビューを依頼する。
+次のどれかに当たるPull Requestは、マージの前に人が差分を読む。
+当たるか迷うときは、当たるものとして扱う。
 
-## レビューの依頼と再依頼
+- 戻しにくい変更を含む。データの移行、公開しているAPIの変更、削除が該当する。
+- ADR、`AGENTS.md`、`docs/agents/`、`.kiro/`（steering、skill、hook、settings）、`.agents/`を変える。
+- CIとhookのゲートを変える。`.github/`（workflow、CODEOWNERS、`dependabot.yml`）、`lefthook.yml`、`commitlint.config.mjs`、ruleset、検査の設定と除外（`.betterleaks.toml`、`.snyk`、`docker/zap/`、PMD、SpotBugs、Semgrepのルール）、`Taskfile.yml`の検査Taskが該当する。
+- 認証、認可、CSRF、秘密情報の扱いを変える。
+- 依存を追加する。
+- テストを弱める。テストファイルを消す、テストケースを減らす、coverageやmutationの基準を下げる、検査をskipするなどが該当する。
 
-レビューの依頼には、番号やタイトルだけでなくPull RequestのURLを添え、依頼する相手をメンションで明示する。
-チームへ依頼する場合は、チームのメンバーだけを含むグループへメンションする。
+Dependabotのpatchとminorの更新は、[ADR-021](../adr/ADR-021-group-dependabot-minor-and-patch-updates.md)に従って自動でマージされるため、この条件の対象にしない。
 
-指摘への対応を終えて再確認が必要な場合は、GitHubの再レビュー依頼かメンションで依頼する。
+当たらないPull Requestは、必須チェックが通っていれば、変更概要と「CI以外で確認したこと」を確かめてマージしてよい。
+承認は要求されない（理由は [ADR-086](../adr/ADR-086-align-main-protection-with-solo-and-agent-operation.md)）。
+
+エージェントは、条件に当たるPull Requestをマージしない。
+`gh pr merge --admin`とauto-mergeの有効化は、人だけが行う。
 
 ## マージ
 
-承認と必須チェックがそろったら、レビュイーがマージする。
-レビュアーの関与を増やす必要がある場合は、レビュアーがマージする。
-typoの修正のような軽微な変更は、レビュアーが承認してそのままマージしてよい。
-
-承認後にcommitを追加すると承認が取り消されるため、承認後に指摘を反映した場合は再承認を依頼する。
+必須チェックが通ったら、作成者がマージする。
 マージの方法と条件は[mainブランチの保護設定](../repository/branch-protection.md)に従う。
 
 ## 出典

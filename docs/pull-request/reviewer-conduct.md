@@ -15,7 +15,6 @@ tags: [convention, pull-request, future-arch-guidelines]
 
 - コードレビューを自分の作業より優先する。
 - すぐに見られない場合は、確認する時期をコメントするか、代わりにレビューできる人へ依頼する。
-- レビューするPull RequestではReviewersに自分を設定する。
 
 ## 確認の進め方
 

@@ -93,13 +93,13 @@ Pull Request のタイトルも同じ形式にし、squash merge 時のメッセ
 
 Pull Request の本文は [Pull Request テンプレート](.github/PULL_REQUEST_TEMPLATE.md) の各節を埋める。
 
-レビュー依頼前に、変更範囲に応じた最小の検査を実行する。
+Ready for review にする前に、変更範囲に応じた最小の検査を実行する。
 
 通常は `task verify` を実行し、frontend、文書、workflow を変更した場合は対応する検査を追加する。
 
 重要な設計判断を含む変更では、実装と同じ Pull Request に Proposed 状態の ADR を追加する。
 
-レビュー会話を解決し、必須チェックと CODEOWNERS のレビューを通してから merge する。
+必須チェックを通してから merge する。承認と会話の解決は要求しない。人が必ず読む Pull Request は [Draftからマージまで](docs/pull-request/review-request-and-merge.md) に従う。
 
 ## リリース
 

@@ -1,7 +1,7 @@
 ---
 type: Convention
 title: レビューコメントの書き方と承認
-description: レビューコメントのラベルと承認の条件、指摘の具体性と根拠、指摘を出し切る方法、Suggested changesの使い分け、コメントの投稿とレビュー終了の伝え方を定める規約。レビューコメントを書くとき、承認するか判断するときに読む。
+description: レビューコメントのラベルと承認の条件、指摘の具体性と根拠、指摘を出し切る方法、Suggested changesの使い分け、コメントの投稿とレビュー終了の伝え方を定める規約。レビューコメントを書くときに読む。
 tags: [convention, pull-request, communication, future-arch-guidelines]
 ---
 
@@ -62,7 +62,6 @@ tags: [convention, pull-request, communication, future-arch-guidelines]
 ## 承認の判断
 
 承認の前に解決が必要な指摘がなければ、残りの指摘への対応を待たずに承認する。
-承認後に指摘を反映したcommitを追加すると承認は取り消され、再承認が必要になる。
 先に承認した指摘を検討せずにマージするレビュイーには、対応を確認してから承認してよい。
 
 ## 出典

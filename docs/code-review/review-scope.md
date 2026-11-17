@@ -37,7 +37,6 @@ tags: [convention, code-review, ci, future-arch-guidelines]
 機能上は問題ないが他の実装と方針が揃っていない変更には、既存の方針へ合わせるよう指摘する。
 その方針がdocsにない場合は、レビュアーが規約へ追加する。
 検査ツールのルールとして表せる方針は、規約の文章より検査の追加を優先する。
-規約を追加するPull Requestには、指摘を受けたレビュイーをレビュアーに含める。
 
 文書の追加は[docs文書の作成と変更](../knowledge/documentation-authoring.md)に従う。
 戻しにくい設計上の方針は、[ADRの運用ルール](../adr/conventions.md)に従ってADRを起こす。
