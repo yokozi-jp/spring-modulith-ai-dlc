@@ -373,8 +373,9 @@ tasks.register('migrateAndGenerateJooq') {
 
 def verifyDatabaseMigrations = tasks.register('verifyDatabaseMigrations') {
     group = 'verification'
-    description = '使い捨てDBで全changesetのupdate、rollback、再updateと現在タグの存在を検証します。'
-    dependsOn tasks.named('updateTestingRollback'), assertSchemaTagExists
+    description = '現在タグの宣言と、使い捨てDBで全changesetのupdate、rollback、再update、現在タグの存在を検証します。'
+    // 現在タグが最後の changelog に宣言されているかも確かめる。テストは migrateDatabase を通らないため（ADR-084）。
+    dependsOn validateCurrentSchemaTag, tasks.named('updateTestingRollback'), assertSchemaTagExists
 }
 
 tasks.named('test') {

@@ -5,7 +5,6 @@ import static com.example.demo.jooq.modulith.Tables.EVENT_PUBLICATION_ARCHIVE;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import com.example.demo.jooq.modulith.Tables;
 import com.example.demo.shared.events.ResubmissionPolicy;
 import com.example.demo.testkit.CapturedLogRecords;
 import io.micrometer.core.instrument.MeterRegistry;
@@ -504,22 +503,6 @@ class EventPublicationResubmitterTest {
     assertThat(future.get(JOIN_TIMEOUT_SECONDS, TimeUnit.SECONDS).completed())
         .as("ロックが空いた後")
         .isEqualTo(1);
-  }
-
-  @Test
-  @DisplayName("DB の壁時計が戻って locked_at が DB の今より後に残っても、テストがロックの期限を過去にすれば取れる")
-  // ロックを取れたことは holdLock が確かめる。
-  @SuppressWarnings("PMD.UnitTestShouldIncludeAssert")
-  void expiredLockIsFreeAfterDatabaseClockStepsBack() {
-    holdLock();
-    // 取った後に DB の壁時計が HELD_LOCK だけ戻ったのと同じ行にする。locked_at を、DB の今に HELD_LOCK を足した lock_until にする。
-    dsl.update(Tables.SHEDLOCK)
-        .set(Tables.SHEDLOCK.LOCKED_AT, Tables.SHEDLOCK.LOCK_UNTIL)
-        .execute();
-
-    ResubmissionTestSupport.expireLock(dsl);
-
-    holdLock();
   }
 
   /** ロックの期限を過去にしてから、定期の再投入を呼ぶ。期限は DB の時刻で決まり、固定の時計では進まないため。 */

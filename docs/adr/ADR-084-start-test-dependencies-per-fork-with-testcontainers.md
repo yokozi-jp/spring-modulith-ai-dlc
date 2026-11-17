@@ -32,19 +32,31 @@ Spring Boot 3.1 以降は、テストの依存を Testcontainers でテストの
 このリポジトリのテストは、接続先を `application.yaml` のプレースホルダの名前（`DB_HOST`、`MIGRATION_DB_USERNAME` など）で読む。`FixtureTablesExtension`、`ShedLockSessionTimeZoneTest`、`DemoApplicationTest` は `spring.datasource.url` などを `Environment` から読む。
 テストの設定ファイルは置かず、差分は `.env.test` と環境変数で与える（`ConfigFileLayoutTest`）。
 
+Pull Request のレビューで Decision を書き直した。
+
+- `.env.test` の export が残ると、接続先の名前がずれたときに、テストが compose の PostgreSQL へ黙ってつながった。
+- 必須の CI からスキーマタグの宣言の検証が抜けた。
+- WireMock をプロセス内で起動すると、版とオプションを compose と手で合わせる必要があった。
+
 ## Decision
 
 バックエンドのテストの依存を、テストの JVM ごとに起動し、Gradle の fork を並列にする。
 
-- **起動するもの。** テストの JVM ごとに、Testcontainers で PostgreSQL と Redis のコンテナを 1 つずつ起動し、決済代行の WireMock をプロセス内で起動する（`testkit.InfrastructureContainers`）。
+- **起動するもの。** テストの JVM ごとに、Testcontainers で PostgreSQL、Redis、決済代行の WireMock のコンテナを 1 つずつ起動する（`testkit.InfrastructureContainers`）。
+  ポートは compose と同じく `127.0.0.1` だけで公開する。
 - **起動の契機。** `META-INF/spring.factories` に登録した `ContextCustomizerFactory` が、最初の Spring のテストのコンテキストを作るときに起動する。Spring を使わないテストだけの fork では起動しない。
-- **接続先の渡し方。** 接続先は、`application.yaml` のプレースホルダの名前で、最も優先する property source としてコンテキストへ足す。環境変数から緩い束縛で直接つながる `payment-gateway.base-url` は、束縛先の名前でも渡す。
-- **イメージとコマンド。** `docker/compose-test.yml` から読み、E2E とスモークの依存と版をそろえる。初期化のスクリプトは `docker/initdb` を同じく使う。使い捨ての DB に限り `fsync=off` を足す。
+- **接続先の渡し方。** 接続先は、`application.yaml` のプレースホルダの名前で、最も優先する property source としてコンテキストへ足す。
+- **接続先以外の設定。** Gradle の `test` と PIT は、`.env.test` を `spring.config.import` のシステムプロパティで読ませる。Taskfile は `.env.test` を環境変数として export しない。
+- **イメージとコマンド。** `docker/compose-test.yml` から読み、E2E とスモークの依存と版をそろえる。PostgreSQL の初期化は `docker/initdb` を、WireMock のスタブは `docker/wiremock/mappings` を使う。Ryuk のイメージは digest で固定する。
 - **マイグレーション。** テストの JVM が、Liquibase で `gradle.properties` の `databaseSchemaTag` まで適用する。`-PtestAllChangesets` を付けると、作りかけを含む全 changeset を適用する。
+- **スキーマタグの宣言の検証。** テストは `migrateDatabase` を通らないため、`verifyDatabaseMigrations` が `validateCurrentSchemaTag` も実行する。
 - **並列度。** `maxParallelForks` は既定でコア数の半分にし、`-PtestForks=<n>` で変える。
 - **カバレッジの検証。** `jacocoTestCoverageVerification` を `test` の `finalizedBy` から外し、`check` にぶら下げる。`task be-test` は `test jacocoTestCoverageVerification` を実行する。
-- **compose-test に残すもの。** `be-verify-migrations` の rollback の検証、`task e2e`、バックエンドのスモークは、これまでどおり compose-test を使う。`task test` は rollback の検証のためだけに compose の PostgreSQL を起動する。
-- **Taskfile の簡素化。** `task test-dev`、`task mutation-test`、`task api-gen` は compose を起動しない。
+- **契約の単体の再生成。** `exportOpenApi` を消し、`test --tests com.example.demo.OpenApiContractTest -PopenapiExport=true` で再生成する。[ADR-064](ADR-064-write-openapi-contract-from-test-task-in-ci.md) が `exportOpenApi` を残した理由（`finalizedBy` で一部のテストが失敗すること）がなくなったためである。
+- **compose-test に残すもの。** `be-verify-migrations` の rollback の検証、`task e2e`、バックエンドのスモークは、これまでどおり compose-test を使う。
+  `task test` は、起動の前に前の回の compose-test を片付け、rollback の検証の後、テストの前に止める。テストが `.env.test` の接続先へ黙ってつながらないようにするためである。
+- **Taskfile の簡素化。** `task test-dev` と `task mutation-test` は `be-test-dev` と `be-mutation-test` の別名にし、`task api-gen` とともに compose を起動しない。使われていない `test-deps-up` と `test-deps-down` を消す。
+- **テストのコンテナの禁止。** `testkit` の外のテストは Testcontainers の型を使わない。`TestConventionsArchTest` が検査する。
 
 ## Consequences
 
@@ -52,20 +64,22 @@ Spring Boot 3.1 以降は、テストの依存を Testcontainers でテストの
 
 - fork ごとに DB が分かれ、表を消すテストがあっても並列に実行できる。
   4 コアの WSL で 2 つの fork にすると、全テスト（943 件）の実行は約 400 秒から約 212 秒になった。`task be-test` の全体は約 231 秒で、以前の `task test` は compose の起動とマイグレーションを含めて約 533 秒だった。
-- 依存がテストの JVM とともに起動して片付く（Ryuk）。止めたフックの状態が次の実行に残らない。
-- `./gradlew test --tests <クラス>` が、compose の起動と `-x jacocoTestCoverageVerification` なしで動く。
+- テストの依存がテストの JVM とともに起動して片付く（Ryuk）。`task test` の rollback の検証も、前の回の compose-test を片付けてから始める。
+- `./gradlew test --tests <クラス>` が、compose の起動、`.env.test` の export、`-x jacocoTestCoverageVerification` なしで動く。
 - PIT の minion も自分の依存を起動するため、`threads` を上げる余地ができる。
 
 ### Negative
 
-- fork ごとに PostgreSQL と Redis のコンテナを起動し、changeset を適用するため、fork を増やすほど起動の時間とメモリが増える。
+- fork ごとに 3 つのコンテナを起動し、changeset を適用するため、fork を増やすほど起動の時間とメモリが増える。
+- GitHub Actions の 4 vCPU の runner では 2 つの fork になり、速くならなかった。`:test` は約 103 秒から約 114 秒、テストのジョブ全体は 3 分 53 秒から 4 分 52 秒になった。コンテナの起動とイメージの取得が、並列の分を打ち消している。
 - テストの実行に Docker が必須になる。`docker` が無い環境で pre-push の `be-test` を飛ばす扱いは、これまでと変わらない。
-- 接続先を property source で渡すため、環境変数の緩い束縛で直接つながる設定を足したときは、束縛先の名前も渡す必要がある。
+- `task be-test-dev`（`task test-dev`）は、作りかけの changeset で動かすため、カバレッジを検証しない。
 
 ### Neutral
 
 - rollback の検証（`updateTestingRollback`）は Liquibase の Gradle プラグインで実行し、compose の PostgreSQL を使い続ける。テストの JVM へ移すかは別に判断する。
 - 変更のないモジュールのテストを飛ばす Spring Modulith の `spring-modulith-junit` は、この ADR の範囲外とし、別に判断する。
+- CI の fork の数と、イメージの取得のキャッシュは、測ってから別に判断する。
 
 ## Alternatives Considered
 

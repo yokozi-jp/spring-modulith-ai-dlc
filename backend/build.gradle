@@ -142,8 +142,10 @@ dependencies {
     // 決済代行の結合テストの偽物。standalone は Jetty を shade 済みで Spring Boot の依存と衝突しない。
     // compose の WireMock のイメージと同じ版にそろえる。Spring BOM の管理外のため版を明示する。
     testImplementation 'org.wiremock:wiremock-standalone:3.13.2'
-    // テストの JVM ごとに PostgreSQL と Redis のコンテナを起動する（ADR-084）。版は Spring Boot が管理する。
+    // テストの JVM ごとに PostgreSQL、Redis、WireMock のコンテナを起動する（ADR-084）。版は Spring Boot が管理する。
     testImplementation 'org.testcontainers:testcontainers-postgresql'
+    // テストのコンテナのイメージとコマンドを docker/compose-test.yml から読む（ADR-084）。版は Spring Boot が管理する。
+    testImplementation 'org.yaml:snakeyaml'
     // テストの JVM が自分のコンテナへ changeset を適用する（ADR-084）。buildscript の版にそろえる。
     testImplementation 'org.liquibase:liquibase-core:5.0.4'
     testCompileOnly 'org.projectlombok:lombok'
@@ -191,6 +193,24 @@ def testLiquibaseTag = providers.gradleProperty('testAllChangesets').isPresent()
     ? ''
     : providers.gradleProperty('databaseSchemaTag').get().trim()
 
+// テストの設定（接続先以外）。開発用の ../.env でなく、テスト用の値を読ませる（ADR-084）。
+// 無ければ task be-test などが .env.test.example から作る。-PtestEnvFile=<backend からの相対パス> で変える。
+def testEnvFile = layout.projectDirectory.file(providers.gradleProperty('testEnvFile').getOrElse('../.env.test')).asFile
+def testSpringConfigImport = "file:${testEnvFile.absolutePath}[.properties]"
+def missingTestEnvFile = "${testEnvFile} がありません。.env.test.example をコピーするか、task be-test を実行してください。"
+
+tasks.withType(Test).configureEach {
+    useJUnitPlatform()
+    systemProperty 'user.timezone', 'UTC'
+    systemProperty 'test.liquibase.tag', testLiquibaseTag
+    systemProperty 'spring.config.import', testSpringConfigImport
+    doFirst { if (!testEnvFile.exists()) throw new GradleException(missingTestEnvFile) }
+}
+
+tasks.named('pitest') {
+    doFirst { if (!testEnvFile.exists()) throw new GradleException(missingTestEnvFile) }
+}
+
 /*
  * テストとカバレッジ
  * JUnit Platform で実行し、JaCoCo でカバレッジレポート（HTML/XML）を生成する。
@@ -198,13 +218,11 @@ def testLiquibaseTag = providers.gradleProperty('testAllChangesets').isPresent()
  * 検証は test ではなく check にぶら下げ、test --tests で一部だけを実行しても下限で失敗させない（ADR-084）。
  */
 tasks.named('test') {
-    useJUnitPlatform()
-    systemProperty 'user.timezone', 'UTC'
-    // fork ごとに TestInfrastructure がコンテナを起動し、DB を共有しない（ADR-084）。
-    // 既定はコア数の半分。-PtestForks=<n> で変える。
+    // fork ごとに InfrastructureContainers がコンテナを起動し、DB を共有しない（ADR-084）。
+    // ponytail: 既定はコア数の半分。fork ごとに JVM、PostgreSQL、Redis、WireMock のメモリを使うため、
+    // メモリの少ない環境では -PtestForks=<n> で減らす。
     maxParallelForks = providers.gradleProperty('testForks').map { it as int }
         .getOrElse(Math.max(1, Runtime.runtime.availableProcessors().intdiv(2)))
-    systemProperty 'test.liquibase.tag', testLiquibaseTag
     testLogging {
         events 'failed'
         exceptionFormat = 'full'
@@ -216,7 +234,8 @@ tasks.named('test') {
     inputs.dir(layout.projectDirectory.dir('../docker/initdb')).withPropertyName('testInitdb')
     // 決済代行の結合テストは docker/wiremock のスタブを読むため、スタブを変えたらテストをやり直す。
     inputs.dir(layout.projectDirectory.dir('../docker/wiremock')).withPropertyName('wiremockStubs')
-    // -PopenapiExport=true のときだけ、全テストの中で OpenApiContractTest に契約を書き出させる（ADR-064）。
+    // -PopenapiExport=true のときだけ、OpenApiContractTest に契約を書き出させる（ADR-064）。
+    // 契約だけを再生成するときは --tests com.example.demo.OpenApiContractTest で絞る（ADR-084）。
     // 出力に宣言しないと、build cache の復元時に契約が書かれず、drift 検査が素通りになる。
     if (providers.gradleProperty('openapiExport').isPresent()) {
         systemProperty 'openapi.output', openApiSpec.absolutePath
@@ -224,23 +243,6 @@ tasks.named('test') {
     } else {
         // ApiContractCoverageTest はコミット済みの契約を読むため、契約を変えたらテストをやり直す（ADR-077）。
         inputs.file(openApiSpec).withPropertyName('openApiContract')
-    }
-}
-
-// 単体の再生成用（ADR-064）。
-tasks.register('exportOpenApi', Test) {
-    group = 'verification'
-    description = 'OpenAPI契約テストを実行し、リポジトリのopenapi/openapi.yamlへ書き出す'
-    testClassesDirs = sourceSets.test.output.classesDirs
-    classpath = sourceSets.test.runtimeClasspath
-    useJUnitPlatform()
-    systemProperty 'user.timezone', 'UTC'
-    systemProperty 'test.liquibase.tag', testLiquibaseTag
-    // 出力に宣言し、コミット済みの契約を書き換えたか消したときに再実行させる。
-    systemProperty 'openapi.output', openApiSpec.absolutePath
-    outputs.file(openApiSpec)
-    filter {
-        includeTestsMatching 'com.example.demo.OpenApiContractTest'
     }
 }
 
@@ -330,7 +332,7 @@ pitest {
     targetTests = providers.gradleProperty('pitTargetTests')
         .map { it.split(',').toList() }
         .getOrElse(['com.example.demo.*'])
-    // ponytail: テストが共有のテスト DB の表を消すため、minion を並列にしない。DB を minion ごとに分けたら threads を上げる。
+    // ponytail: minion ごとにコンテナを起動するため並列にできるが、minion ごとの起動の時間とメモリを測ってから上げる（ADR-084）。
     threads = 1
     // 新しい minion は Spring のコンテキストを作り直し、coverage の計測時より遅い。
     // 既定の 1.25 倍と 4 秒ではその起動を TIMED_OUT とみなし、minion の再起動を繰り返すため広げる。
@@ -346,7 +348,7 @@ pitest {
     failWhenNoMutations = false
     outputFormats = ['HTML', 'XML']
     timestampedReports = false
-    jvmArgs = ['-Duser.timezone=UTC', "-Dtest.liquibase.tag=${testLiquibaseTag}"]
+    jvmArgs = ['-Duser.timezone=UTC', "-Dtest.liquibase.tag=${testLiquibaseTag}", "-Dspring.config.import=${testSpringConfigImport}"]
 }
 
 /*

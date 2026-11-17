@@ -1,8 +1,8 @@
 package com.example.demo.testkit;
 
-import static com.github.tomakehurst.wiremock.core.WireMockConfiguration.wireMockConfig;
-
-import com.github.tomakehurst.wiremock.WireMockServer;
+import com.github.dockerjava.api.model.ExposedPort;
+import com.github.dockerjava.api.model.PortBinding;
+import com.github.dockerjava.api.model.Ports;
 import java.io.IOException;
 import java.io.Reader;
 import java.io.UncheckedIOException;
@@ -14,7 +14,6 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.sql.DriverManager;
 import java.sql.SQLException;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -26,6 +25,7 @@ import liquibase.database.jvm.JdbcConnection;
 import liquibase.exception.LiquibaseException;
 import liquibase.resource.ClassLoaderResourceAccessor;
 import org.testcontainers.containers.GenericContainer;
+import org.testcontainers.containers.wait.strategy.Wait;
 import org.testcontainers.lifecycle.Startables;
 import org.testcontainers.postgresql.PostgreSQLContainer;
 import org.testcontainers.utility.DockerImageName;
@@ -33,22 +33,22 @@ import org.testcontainers.utility.MountableFile;
 import org.yaml.snakeyaml.Yaml;
 
 /**
- * テストの JVM ごとに 1 つずつ起動する PostgreSQL、Redis、決済代行の WireMock（ADR-084）。
+ * テストの JVM ごとに 1 つずつ起動する PostgreSQL、Redis、決済代行の WireMock のコンテナ（ADR-084）。
  *
- * <p>Gradle は fork ごとに別の JVM を起動するため、fork どうしは DB を共有せず、表を消すテストが並列でも衝突しない。 最初の Spring
- * のテストのコンテキストを作るときに起動し、JVM の終了で止める。 イメージとコマンドは {@code docker/compose-test.yml} から読み、E2E
- * とスモークの依存と版をそろえる。
+ * <p>Gradle は fork ごとに別の JVM を起動するため、fork どうしは DB を共有しない。 最初の Spring のテストのコンテキストを作るときに起動し、JVM の終了で
+ * Testcontainers の Ryuk が片付ける。 イメージと WireMock のコマンドは {@code docker/compose-test.yml} から読み、E2E
+ * とスモークの依存と版をそろえる。 ポートは compose と同じく {@code 127.0.0.1} だけで待ち受ける。
  */
 final class InfrastructureContainers {
 
-  /** compose のテスト用スタック。イメージとコマンドの正本。 */
+  /** compose のテスト用スタック。イメージとコマンドの正本。作業ディレクトリは {@code backend}。 */
   private static final Path COMPOSE_FILE = Path.of("../docker/compose-test.yml");
 
   /** compose と同じ初期化のスクリプト（liquibase スキーマとアプリロール）。 */
   private static final Path INITDB_DIR = Path.of("../docker/initdb");
 
   /** 決済代行のスタブ。compose の WireMock と同じものを読む。 */
-  private static final String WIREMOCK_ROOT = "../docker/wiremock";
+  private static final Path WIREMOCK_MAPPINGS = Path.of("../docker/wiremock/mappings");
 
   /** changelog のクラスパス上の位置。 */
   private static final String CHANGELOG = "db/changelog/db.changelog-master.yaml";
@@ -58,6 +58,10 @@ final class InfrastructureContainers {
 
   /** 適用するスキーマタグ。Gradle の test が {@code gradle.properties} の版を渡す。空なら全 changeset を適用する。 */
   private static final String TAG_PROPERTY = "test.liquibase.tag";
+
+  /** コンテナのポートを公開するホストのアドレス。compose と同じく loopback に固定し、LAN に公開しない。 */
+  @SuppressWarnings("PMD.AvoidUsingHardCodedIP")
+  private static final String LOOPBACK = "127.0.0.1";
 
   /** 使い捨てのコンテナの DB 名。機密ではない。 */
   private static final String DB_NAME = "demo";
@@ -74,15 +78,27 @@ final class InfrastructureContainers {
   /** compose の PostgreSQL のサービス名。Testcontainers の公式イメージの名前と同じ。 */
   private static final String POSTGRES = "postgres";
 
-  /** 決済代行のスタブが請求に返す status。 */
-  private static final int WARM_UP_STATUS = 201;
+  /** compose の WireMock のサービス名。 */
+  private static final String WIREMOCK = "wiremock";
+
+  /** compose の service の項目のうち、イメージ。 */
+  private static final String IMAGE_KEY = "image";
+
+  /** PostgreSQL の待ち受けポート。 */
+  private static final int POSTGRES_PORT = 5432;
 
   /** Redis の待ち受けポート。 */
   private static final int REDIS_PORT = 6379;
 
+  /** WireMock の待ち受けポート。 */
+  private static final int WIREMOCK_PORT = 8080;
+
+  /** 決済代行のスタブが請求に返す status。 */
+  private static final int CHARGED = 201;
+
   private InfrastructureContainers() {}
 
-  /** 起動した依存の接続先を、{@code application.yaml} の環境変数の名前で返す。初回の呼び出しで起動する。 */
+  /** 起動した依存の接続先を、{@code application.yaml} のプレースホルダの名前で返す。初回の呼び出しで起動する。 */
   /* package */ static Map<String, Object> properties() {
     return Holder.PROPERTIES;
   }
@@ -94,9 +110,8 @@ final class InfrastructureContainers {
     private static final Map<String, Object> PROPERTIES = start();
   }
 
-  // コンテナと WireMock は JVM の終了まで使うため、try-with-resources で閉じない。
-  // WireMock は Ryuk が片付けないため、JVM の終了のフックのスレッドで止める。
-  @SuppressWarnings({"resource", "PMD.CloseResource", "PMD.DoNotUseThreads"})
+  // コンテナは JVM の終了まで使い、Ryuk が片付けるため、try-with-resources で閉じない。
+  @SuppressWarnings({"resource", "PMD.CloseResource"})
   private static Map<String, Object> start() {
     final Map<String, Object> compose = composeServices();
     final PostgreSQLContainer postgres =
@@ -110,52 +125,63 @@ final class InfrastructureContainers {
             .withEnv("DB_USERNAME", APP_USER)
             .withEnv("DB_PASSWORD", PASSWORD)
             .withCopyFileToContainer(
-                MountableFile.forHostPath(INITDB_DIR), "/docker-entrypoint-initdb.d/")
-            .withCommand(postgresCommand(compose));
+                MountableFile.forHostPath(INITDB_DIR), "/docker-entrypoint-initdb.d/");
     final GenericContainer<?> redis =
         new GenericContainer<>(DockerImageName.parse(image(compose, "redis")))
             .withExposedPorts(REDIS_PORT);
-    Startables.deepStart(postgres, redis).join();
+    final GenericContainer<?> wireMock =
+        new GenericContainer<>(DockerImageName.parse(image(compose, WIREMOCK)))
+            .withCommand(command(compose, WIREMOCK))
+            .withCopyFileToContainer(
+                MountableFile.forHostPath(WIREMOCK_MAPPINGS), "/home/wiremock/mappings/")
+            .withExposedPorts(WIREMOCK_PORT)
+            .waitingFor(Wait.forHttp("/__admin/health"));
+    bindToLoopback(postgres, POSTGRES_PORT);
+    bindToLoopback(redis, REDIS_PORT);
+    bindToLoopback(wireMock, WIREMOCK_PORT);
+    Startables.deepStart(postgres, redis, wireMock).join();
 
-    final WireMockServer wireMock =
-        new WireMockServer(
-            wireMockConfig()
-                .dynamicPort()
-                // compose の WireMock と同じく、平文の HTTP/2 への upgrade を止める。
-                .http2PlainDisabled(true)
-                .usingFilesUnderDirectory(WIREMOCK_ROOT));
-    wireMock.start();
-    Runtime.getRuntime().addShutdownHook(new Thread(wireMock::stop, "test-wiremock-stop"));
-    warmUp(wireMock);
-
-    migrate(postgres.getJdbcUrl());
+    final String paymentGateway =
+        "http://" + LOOPBACK + ":" + wireMock.getMappedPort(WIREMOCK_PORT);
+    warmUp(paymentGateway);
+    final String dbPort = String.valueOf(postgres.getMappedPort(POSTGRES_PORT));
+    migrate("jdbc:postgresql://" + LOOPBACK + ":" + dbPort + "/" + DB_NAME);
     return Map.ofEntries(
-        Map.entry("DB_HOST", postgres.getHost()),
-        Map.entry("DB_PORT", String.valueOf(postgres.getFirstMappedPort())),
+        Map.entry("DB_HOST", LOOPBACK),
+        Map.entry("DB_PORT", dbPort),
         Map.entry("DB_NAME", DB_NAME),
         Map.entry("DB_USERNAME", APP_USER),
         Map.entry("DB_PASSWORD", PASSWORD),
         Map.entry("MIGRATION_DB_USERNAME", MIGRATION_USER),
         Map.entry("MIGRATION_DB_PASSWORD", PASSWORD),
-        Map.entry("REDIS_HOST", redis.getHost()),
+        Map.entry("REDIS_HOST", LOOPBACK),
         Map.entry("REDIS_PORT", String.valueOf(redis.getMappedPort(REDIS_PORT))),
-        Map.entry("PAYMENT_GATEWAY_BASE_URL", wireMock.baseUrl()),
-        // 環境変数の PAYMENT_GATEWAY_BASE_URL は緩い束縛で payment-gateway.base-url に直接つながり、
-        // application.yaml のプレースホルダを通らないため、束縛先の名前でも渡す。
-        Map.entry("payment-gateway.base-url", wireMock.baseUrl()));
+        Map.entry("PAYMENT_GATEWAY_BASE_URL", paymentGateway));
+  }
+
+  /** コンテナのポートを、空いているホストのポートへ、{@code 127.0.0.1} だけで公開する。 */
+  private static void bindToLoopback(final GenericContainer<?> container, final int port) {
+    container
+        .withExposedPorts(port)
+        .withCreateContainerCmdModifier(cmd ->
+            cmd.getHostConfig()
+                .withPortBindings(
+                    new PortBinding(Ports.Binding.bindIp(LOOPBACK), ExposedPort.tcp(port))));
   }
 
   /**
-   * 決済代行のスタブを 1 回呼び、記録を消す。
+   * 決済代行のスタブを 1 回呼ぶ。
    *
-   * <p>最初の呼び出しは Jetty、JsonPath、テンプレートのクラスの読み込みで遅く、負荷の下では Client の read-timeout（2 秒）を超えるため、
-   * テストより先に済ませる。
+   * <p>ponytail: WireMock の最初の請求は JsonPath とテンプレートのクラスの読み込みで遅く、負荷の下では {@code
+   * payment-gateway.read-timeout} を超えるため、テストより先に 1 回呼ぶ。温めるのは {@code /v1/charges} だけで、要求の形は {@code
+   * payment-gateway-charge.json} の照合の写しなので、スタブの照合を変えたらここも変える。 スタブが増えたら、各スタブを温めるか、テストの read-timeout
+   * を延ばす。
    */
   // 割り込まれたら、割り込みの状態を戻して失敗させる。
   @SuppressWarnings("PMD.DoNotUseThreads")
-  private static void warmUp(final WireMockServer wireMock) {
+  private static void warmUp(final String baseUrl) {
     final HttpRequest request =
-        HttpRequest.newBuilder(URI.create(wireMock.baseUrl() + "/v1/charges"))
+        HttpRequest.newBuilder(URI.create(baseUrl + "/v1/charges"))
             .header("Idempotency-Key", "warm-up")
             .header("Content-Type", "application/json")
             .POST(
@@ -164,7 +190,7 @@ final class InfrastructureContainers {
             .build();
     try (HttpClient client = HttpClient.newHttpClient()) {
       final int status = client.send(request, HttpResponse.BodyHandlers.discarding()).statusCode();
-      if (status != WARM_UP_STATUS) {
+      if (status != CHARGED) {
         throw new IllegalStateException("決済代行のスタブの準備の呼び出しが失敗した: status=" + status);
       }
     } catch (IOException e) {
@@ -173,7 +199,6 @@ final class InfrastructureContainers {
       Thread.currentThread().interrupt();
       throw new IllegalStateException("決済代行のスタブの準備の途中で割り込まれた", e);
     }
-    wireMock.resetRequests();
   }
 
   /** マイグレーションロールで changeset を適用する。本番と同じく、アプリロールへの GRANT を changeset が付ける。 */
@@ -217,19 +242,18 @@ final class InfrastructureContainers {
   }
 
   private static String image(final Map<String, Object> services, final String service) {
-    return String.valueOf(asMap(services.get(service), service).get("image"));
+    if (asMap(services.get(service), service).get(IMAGE_KEY) instanceof String image) {
+      return image;
+    }
+    throw new IllegalStateException(COMPOSE_FILE + " の " + service + " に image がない");
   }
 
-  /** compose のコマンドに、使い捨ての DB でだけ使う {@code fsync=off} を足す。 */
-  private static String[] postgresCommand(final Map<String, Object> services) {
-    final Object command = asMap(services.get(POSTGRES), POSTGRES).get("command");
-    final List<String> args = new ArrayList<>();
-    if (command instanceof List<?> list) {
-      list.forEach(arg -> args.add(String.valueOf(arg)));
+  /** compose の service のコマンド。配列で書いたものだけを読み、文字列で書いたものは誤りにする。 */
+  private static String[] command(final Map<String, Object> services, final String service) {
+    if (asMap(services.get(service), service).get("command") instanceof List<?> list) {
+      return list.stream().map(String::valueOf).toArray(String[]::new);
     }
-    args.add("-c");
-    args.add("fsync=off");
-    return args.toArray(String[]::new);
+    throw new IllegalStateException(COMPOSE_FILE + " の " + service + " の command が配列でない");
   }
 
   @SuppressWarnings("unchecked")

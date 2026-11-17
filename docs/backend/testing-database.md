@@ -52,7 +52,7 @@ DBロールの決定は[ADR-011](../adr/ADR-011-use-module-owned-database-schema
 業務テーブルがまだないため、`shared`の共通処理（`TableWriter`など）を実PostgreSQLで確かめるテストは、[FixtureTablesExtension](../../backend/src/test/java/com/example/demo/testkit/FixtureTablesExtension.java)を`@ExtendWith`で付ける。
 この拡張は、テストクラスの前に`fixture`スキーマとテーブルを作り、後で消す。
 DDLは本番と同じくマイグレーションロール（`InfrastructureContainers`が渡す`MIGRATION_DB_*`）で実行し、アプリロールにはDMLだけを付与する。
-同じforkの中ではテストクラスを順に実行し、forkごとにDBが分かれるため、スキーマ検査はこのスキーマを見ない。
+同じforkの中ではテストクラスを順に実行し、forkごとにDBが分かれるため、スキーマ検査はこのスキーマを見ない（[バックエンドのテストの実行基盤](testing-infrastructure.md)の「並列度」）。
 使ってよいのは`shared`の共通処理のテストだけであり、業務テーブルができたらそのテーブルで確かめる。
 Springの外で共通カラムを登録するテストは、[TestCommonColumns](../../backend/src/test/java/com/example/demo/shared/infrastructure/persistence/TestCommonColumns.java)の`at`で共通処理を作り、`runAs`の中で登録する。
 

@@ -28,7 +28,7 @@ import org.springframework.test.web.servlet.ResultMatcher;
  *
  * <p>{@code openapi.output} が指定されたときは、springdoc の YAML endpoint の出力をそのパスへ書き出す。
  *
- * <p>指定するのは {@code exportOpenApi} と、{@code -PopenapiExport=true} を付けた {@code test} である。
+ * <p>指定するのは、{@code -PopenapiExport=true} を付けた {@code test} である。
  */
 // MockMvc.perform が Exception を宣言するため、補助メソッドも Exception を宣言する。
 @SuppressWarnings({

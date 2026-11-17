@@ -29,8 +29,7 @@ tags: [convention, backend, testing]
 | アプリケーション全体の起動と横断的な配線、HTTP APIの契約            | フルの`@SpringBootTest`                                                              | アプリケーション全体                     |
 | 既存テストが業務コードの変化を検出できるか                          | PITミューテーションテスト                                                            | テストごとに異なる                       |
 
-- `@SpringBootTest`を既定にしない。
-  モジュールの中で完結する振る舞いは`@ApplicationModuleTest`で検証する。
+- モジュールの中で完結する振る舞いは、`@SpringBootTest`でなく`@ApplicationModuleTest`で検証する。
 - `@ApplicationModuleTest`の`mode`は、検証に要る依存先を満たす最も狭いものを選ぶ。
   既定の`STANDALONE`は対象のモジュールだけを、`DIRECT_DEPENDENCIES`は直接の依存先を、`ALL_DEPENDENCIES`は推移的な依存先までを起動する。
 - 外部システムのClientの検証の分け方は[外部システムのClient](class-roles/external-client.md)と[ADR-072](../adr/ADR-072-fake-external-systems-with-wiremock.md)に従う。

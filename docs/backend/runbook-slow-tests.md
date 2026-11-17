@@ -29,7 +29,6 @@ forkを1つにすると、ほかのクラスの影響を除いて測れる。
 
 ```bash
 cd backend
-set -a; . ../.env.test; set +a
 ./gradlew test --rerun --tests '*<クラス名>' -PtestForks=1
 ```
 
