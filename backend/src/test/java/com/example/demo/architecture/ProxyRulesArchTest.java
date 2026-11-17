@@ -1,5 +1,6 @@
 package com.example.demo.architecture;
 
+import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.classes;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.methods;
 
 import com.example.demo.DemoApplication;
@@ -26,11 +27,13 @@ import org.aspectj.lang.annotation.After;
 import org.aspectj.lang.annotation.AfterReturning;
 import org.aspectj.lang.annotation.AfterThrowing;
 import org.aspectj.lang.annotation.Around;
+import org.aspectj.lang.annotation.Aspect;
 import org.aspectj.lang.annotation.Before;
 import org.aspectj.lang.annotation.Pointcut;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.CachePut;
 import org.springframework.cache.annotation.Cacheable;
+import org.springframework.core.annotation.Order;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.security.access.annotation.Secured;
 import org.springframework.security.access.prepost.PostAuthorize;
@@ -82,6 +85,26 @@ class ProxyRulesArchTest {
                   + "Spring のコンテキストの起動が数倍遅くなるため。"
                   + "直し方：式に within(<パッケージ>..*<役割名>) を書き、"
                   + "execution にはメソッドの名前と修飾子だけを書く。"
+                  + "規約：docs/backend/java-coding.md、"
+                  + "docs/adr/ADR-051-bind-pgm-cd-with-scoped-value-and-aspect.md");
+
+  /**
+   * {@code @Aspect} のクラスに {@code @Order} を付け、トランザクションの advisor との前後を決める。
+   *
+   * <p>Spring は、別々の Aspect が同じメソッドに掛かるときの順序を、指定しなければ決めない。
+   */
+  @ArchTest
+  /* package */ static final ArchRule aspectsDeclareOrder =
+      classes()
+          .that()
+          .areAnnotatedWith(Aspect.class)
+          .should()
+          .beAnnotatedWith(Order.class)
+          .allowEmptyShould(true)
+          .because(
+              "Spring は別々の Aspect とトランザクションが同じメソッドに掛かるときの順序を、指定しなければ決めないため。"
+                  + "直し方：Aspect のクラスに @Order を付け、"
+                  + "トランザクションより外側で動かすなら TransactionOrderConfig.ORDER より小さい値にする。"
                   + "規約：docs/backend/java-coding.md、"
                   + "docs/adr/ADR-051-bind-pgm-cd-with-scoped-value-and-aspect.md");
 

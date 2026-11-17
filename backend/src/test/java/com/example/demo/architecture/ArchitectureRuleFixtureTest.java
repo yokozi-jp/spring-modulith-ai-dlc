@@ -144,12 +144,11 @@ class ArchitectureRuleFixtureTest {
   private static Stream<Arguments> tableWriterRows() {
     return Stream.concat(
         DIRECT_WRITES.stream()
-            .map(
-                method ->
-                    row(
-                        "tableWritesGoThroughTableWriter: " + method,
-                        TableWriterArchTest.tableWritesGoThroughTableWriterRule(VIOLATING),
-                        DIRECT_WRITER + "." + method + "(")),
+            .map(method ->
+                row(
+                    "tableWritesGoThroughTableWriter: " + method,
+                    TableWriterArchTest.tableWritesGoThroughTableWriterRule(VIOLATING),
+                    DIRECT_WRITER + "." + method + "(")),
         Stream.of(
             row(
                 "repositoryUpdateAndDeleteCheckVersion",
@@ -363,6 +362,10 @@ class ArchitectureRuleFixtureTest {
             ProxyRulesArchTest.pointcutsNarrowTargetsWithWithin,
             "shared.infrastructure.persistence.SlowPgmCdAspect.afterListener("),
         row(
+            "aspectsDeclareOrder",
+            ProxyRulesArchTest.aspectsDeclareOrder,
+            "shared.infrastructure.persistence.UnorderedPgmCdAspect"),
+        row(
             "listenersExposeOnlyOnAndCallOneCommandHandler",
             ClassRoleArchTest.listenersExposeOnlyOnAndCallOneCommandHandler,
             "inventory.application.OrderPlacedListener"),
@@ -551,6 +554,7 @@ class ArchitectureRuleFixtureTest {
         ClassRoleArchTest.commandHandlersDoNotDependOnOtherCommandHandlers,
         ClassRoleArchTest.commandHandlersAndListenersDoNotUseInheritance,
         ProxyRulesArchTest.pointcutsNarrowTargetsWithWithin,
+        ProxyRulesArchTest.aspectsDeclareOrder,
         ClassRoleArchTest.moduleListenersAreApplicationListeners,
         ClassRoleArchTest.listenersExposeOnlyOnAndCallOneCommandHandler,
         ClassRoleArchTest.requestsAndResponsesArePresentationWebRecordsRule(basePackage),

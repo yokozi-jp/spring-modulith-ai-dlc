@@ -32,6 +32,13 @@ Repository の実装は、どのユースケースから呼ばれたかを引数
 Spring のコンテキストを起動するたびに、この照合で時間がかかっていた（ローカルの JFR で、`ActuatorHealthSecurityTest` の CPU サンプルの 77.5%）。
 そこで Decision の pointcut の形を、下の `within` の形に書き直した。
 
+Spring は、別々の Aspect と `@Transactional` の advisor が同じメソッドに掛かるときの順序を、指定しなければ決めない。
+トランザクションの advisor の既定の順序は `Ordered.LOWEST_PRECEDENCE` で、`@Order` のない `PgmCdAspect` と同じ値だった。
+`spring-boot-starter-aspectj` の構成で確かめると、トランザクションが外側で始まり、その内側で `PgmCdAspect` が値を束縛していた。
+いまは `*_pgm_cd` を `handle` の中の書き込みだけが読むため、どちらの順序でも結果は変わらない。
+しかし、テナントを束縛する Aspect（[issue #369](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/369)）は、トランザクションの開始の時点で値が束縛されている必要がある。
+そこで、Aspect とトランザクションの順序の決定を Decision に足した。
+
 ## Decision
 
 `org.springframework.boot:spring-boot-starter-aspectj` を依存に加え、`shared.infrastructure.persistence` に `@Aspect` の `PgmCdAspect` を置く。
@@ -57,6 +64,15 @@ Spring のコンテキストを起動するたびに、この照合で時間が�
 
 Aspect は Spring AOP のプロキシで動かし、ロード時やコンパイル時のウィービングは使わない。
 
+Aspect とトランザクションの順序は、次のように明示する。
+
+- `shared.infrastructure.persistence` の `TransactionOrderConfig` に `@EnableTransactionManagement(proxyTargetClass = true, order = TransactionOrderConfig.ORDER)` を付け、トランザクションの advisor の順序を `Ordered.LOWEST_PRECEDENCE` に固定する。
+  値と `proxyTargetClass` は Spring Boot の既定と同じにし、Resilience4j の Aspect などとの前後を変えない。
+- `PgmCdAspect` に `@Order(TransactionOrderConfig.ORDER - 100)` を付け、トランザクションより外側で動かす。
+  トランザクションの開始の時点で、`*_pgm_cd` の値は束縛済みになる。
+- `@Aspect` のクラスには `@Order` を付ける。
+  ArchUnit の `aspectsDeclareOrder` で検査する。
+
 ## Consequences
 
 ### Positive
@@ -65,6 +81,7 @@ Aspect は Spring AOP のプロキシで動かし、ロード時やコンパイ�
 - `*_pgm_cd` の値の求め方が一か所にまとまり、Repository ごとに食い違わない。
 - `ScopedValue` は束縛の範囲を出ると自動で戻るため、`ThreadLocal` のような後始末の漏れが起きない。
 - CommandHandler と Listener の外から共通カラムを書こうとすると、INSERT と UPDATE が失敗して気付ける。
+- Aspect とトランザクションの前後が Spring の未定義の順序に頼らず、トランザクションの開始の時点で読める値が決まる。
 
 ### Negative
 
@@ -74,10 +91,14 @@ Aspect は Spring AOP のプロキシで動かし、ロード時やコンパイ�
 - `*CommandHandler` と `*Listener` は、基底クラスやサブクラスで共通の処理をまとめられない。
 - Spring AOP のプロキシを通らない呼び出し（同じクラスの中からの呼び出し、Bean でないインスタンスの呼び出し）と、別のスレッドへ渡した処理では束縛されない。
 - バッチのように CommandHandler と Listener を通らない書き込みの入口を作るときは、入口の役割と pointcut を決め直す必要がある。
+- `TransactionOrderConfig` が Spring Boot の `@EnableTransactionManagement` の自動構成を置き換える。
+  `spring.aop.proxy-target-class` を変えても、トランザクションのプロキシは CGLIB のままになる。
+- Aspect を足すたびに、トランザクションとの前後を決めて `@Order` の値を選ぶ必要がある。
 
 ### Neutral
 
 - `@ApplicationModuleListener` の非同期の呼び出しでも、Listener を実行するスレッドで束縛されることをテストで確かめる。
+- トランザクションの開始の時点で `*_pgm_cd` が束縛されていることを、`PgmCdAspectOrderTest` で確かめる。
 
 ## Alternatives Considered
 
@@ -113,3 +134,4 @@ Aspect は Spring AOP のプロキシで動かし、ロード時やコンパイ�
 - [JEP 506: Scoped Values](https://openjdk.org/jeps/506)
 - [Spring Framework, Declaring an Aspect](https://docs.spring.io/spring-framework/reference/core/aop/ataspectj/at-aspectj.html)
 - [Spring Framework, Proxying Mechanisms](https://docs.spring.io/spring-framework/reference/core/aop/proxying.html)
+- [Spring Framework, Advice Ordering](https://docs.spring.io/spring-framework/reference/core/aop/ataspectj/advice.html#aop-ataspectj-advice-ordering)
