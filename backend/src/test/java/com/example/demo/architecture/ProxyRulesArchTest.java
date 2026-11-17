@@ -4,6 +4,7 @@ import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.classes;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.methods;
 
 import com.example.demo.DemoApplication;
+import com.tngtech.archunit.core.domain.JavaClass;
 import com.tngtech.archunit.core.domain.JavaMethod;
 import com.tngtech.archunit.junit.AnalyzeClasses;
 import com.tngtech.archunit.junit.ArchTest;
@@ -33,6 +34,7 @@ import org.aspectj.lang.annotation.Pointcut;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.CachePut;
 import org.springframework.cache.annotation.Cacheable;
+import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.security.access.annotation.Secured;
@@ -89,22 +91,22 @@ class ProxyRulesArchTest {
                   + "docs/adr/ADR-051-bind-pgm-cd-with-scoped-value-and-aspect.md");
 
   /**
-   * {@code @Aspect} のクラスに {@code @Order} を付け、トランザクションの advisor との前後を決める。
+   * {@code @Aspect} のクラスに {@link Ordered#LOWEST_PRECEDENCE} より小さい {@code @Order} を付け、トランザクションの
+   * advisor より外側で動かす。
    *
-   * <p>Spring は、別々の Aspect が同じメソッドに掛かるときの順序を、指定しなければ決めない。
+   * <p>値のない {@code @Order} は {@link Ordered#LOWEST_PRECEDENCE} になり、トランザクションの advisor と同じ順序になる。
    */
   @ArchTest
   /* package */ static final ArchRule aspectsDeclareOrder =
       classes()
           .that()
           .areAnnotatedWith(Aspect.class)
-          .should()
-          .beAnnotatedWith(Order.class)
+          .should(declareOrderOutsideTransaction())
           .allowEmptyShould(true)
           .because(
-              "Spring は別々の Aspect とトランザクションが同じメソッドに掛かるときの順序を、指定しなければ決めないため。"
-                  + "直し方：Aspect のクラスに @Order を付け、"
-                  + "トランザクションより外側で動かすなら TransactionOrderConfig.ORDER より小さい値にする。"
+              "Spring は別々の Aspect とトランザクションが同じ順序の値で同じメソッドに掛かるときの前後を決めないため。"
+                  + "直し方：Aspect のクラスに @Order(Ordered.LOWEST_PRECEDENCE - 100) のように、"
+                  + "Ordered.LOWEST_PRECEDENCE より小さい値の @Order を付ける。"
                   + "規約：docs/backend/java-coding.md、"
                   + "docs/adr/ADR-051-bind-pgm-cd-with-scoped-value-and-aspect.md");
 
@@ -196,6 +198,24 @@ class ProxyRulesArchTest {
                 + annotationType.getSimpleName()
                 + " のメソッドを同じクラスの中から呼ばず、別の Bean へ移して、その Bean を注入して呼ぶ。"
                 + "規約：docs/backend/java-coding.md");
+  }
+
+  private static ArchCondition<JavaClass> declareOrderOutsideTransaction() {
+    return new ArchCondition<>("be annotated with @Order below Ordered.LOWEST_PRECEDENCE") {
+      @Override
+      public void check(final JavaClass item, final ConditionEvents events) {
+        final Optional<Order> order = item.tryGetAnnotationOfType(Order.class);
+        if (order.isEmpty() || order.get().value() >= Ordered.LOWEST_PRECEDENCE) {
+          events.add(
+              SimpleConditionEvent.violated(
+                  item,
+                  item.getFullName()
+                      + " の @Order が "
+                      + order.map(o -> String.valueOf(o.value())).orElse("ない")
+                      + " で、トランザクションの advisor より外側にない。"));
+        }
+      }
+    };
   }
 
   private static ArchCondition<JavaMethod> declarePointcutWithWithin() {

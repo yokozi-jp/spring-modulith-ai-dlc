@@ -92,9 +92,9 @@ Spring の AOP プロキシは、Bean の外からの呼び出しだけを横取
 `@Around` などの AspectJ の advice と `@Pointcut` の式には `within(<パッケージ>..*<役割名>)` を書き、`execution` にはメソッドの名前と修飾子だけを書く。
 `execution` の宣言型だけで対象を絞ると、AspectJ がすべての Bean のすべてのメソッドで上位型をたどって照合し、Spring のコンテキストの起動が数倍遅くなる（[ADR-051](../adr/ADR-051-bind-pgm-cd-with-scoped-value-and-aspect.md)）。
 
-`@Aspect` のクラスには `@Order` を付け、トランザクションの advisor との前後を決める。
-Spring は、別々の Aspect とトランザクションが同じメソッドに掛かるときの順序を、指定しなければ決めない（[Spring Framework, Advice Ordering](https://docs.spring.io/spring-framework/reference/core/aop/ataspectj/advice.html#aop-ataspectj-advice-ordering)）。
-トランザクションの順序は `TransactionOrderConfig.ORDER`（`Ordered.LOWEST_PRECEDENCE`）であり、トランザクションより外側で動かす Aspect はこれより小さい値にする（[ADR-051](../adr/ADR-051-bind-pgm-cd-with-scoped-value-and-aspect.md)）。
+`@Aspect` のクラスには `Ordered.LOWEST_PRECEDENCE` より小さい値の `@Order`（`@Order(Ordered.LOWEST_PRECEDENCE - 100)` など）を付け、すべての Aspect をトランザクションより外側で動かす（[ADR-051](../adr/ADR-051-bind-pgm-cd-with-scoped-value-and-aspect.md)）。
+値のない `@Order` は使わない。
+トランザクションの内側で動く Aspect が必要になったら、先に ADR-051 とこの規則を変える。
 
 いまのコードで使っていないアノテーションの規則も、検査の費用がほぼなく使い始めたときの事故を防げるため残す。
 

@@ -17,21 +17,16 @@ import org.springframework.transaction.TransactionStatus;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.SimpleTransactionStatus;
 
-/** {@link PgmCdAspect} の束縛が、トランザクションより外側で効くことを検証する（ADR-051）。 */
+/** {@link PgmCdAspect} の束縛が、CommandHandler と Listener のトランザクションより外側で効くことを検証する（ADR-051）。 */
 // ApplicationContextRunner の run に渡す callback の中で assert するため、PMD はテストメソッドの assert を検出できない。
-// fixture の CommandHandler は、pointcut の対象にするためメソッドを public にする。
+// fixture の CommandHandler と Listener は、pointcut の対象にするためメソッドを public にする。
 @SuppressWarnings({"PMD.UnitTestShouldIncludeAssert", "PMD.PublicMemberInNonPublicType"})
 class PgmCdAspectOrderTest {
 
   @Test
   @DisplayName("CommandHandler のトランザクションが始まる時点で、pgm_cd が束縛されている")
-  void pgmCdIsBoundWhenTransactionBegins() {
-    new ApplicationContextRunner()
-        .withConfiguration(
-            AutoConfigurations.of(AopAutoConfiguration.class, TransactionAutoConfiguration.class))
-        .withUserConfiguration(TransactionOrderConfig.class, PgmCdAspect.class)
-        .withBean(RecordingTransactionManager.class)
-        .withBean(ShipOrderCommandHandler.class)
+  void pgmCdIsBoundWhenCommandHandlerTransactionBegins() {
+    contextRunner()
         .run(context -> {
           context.getBean(ShipOrderCommandHandler.class).handle();
 
@@ -39,6 +34,29 @@ class PgmCdAspectOrderTest {
               .as("getTransaction の時点の pgm_cd")
               .containsExactly("shared.ShipOrder");
         });
+  }
+
+  @Test
+  @DisplayName("Listener のトランザクションが始まる時点で、pgm_cd が束縛されている")
+  void pgmCdIsBoundWhenListenerTransactionBegins() {
+    contextRunner()
+        .run(context -> {
+          context.getBean(OrderShippedListener.class).on();
+
+          assertThat(context.getBean(RecordingTransactionManager.class).pgmCdsAtBegin)
+              .as("getTransaction の時点の pgm_cd")
+              .containsExactly("shared.OrderShipped");
+        });
+  }
+
+  private static ApplicationContextRunner contextRunner() {
+    return new ApplicationContextRunner()
+        .withConfiguration(
+            AutoConfigurations.of(AopAutoConfiguration.class, TransactionAutoConfiguration.class))
+        .withUserConfiguration(PgmCdAspect.class)
+        .withBean(RecordingTransactionManager.class)
+        .withBean(ShipOrderCommandHandler.class)
+        .withBean(OrderShippedListener.class);
   }
 
   /** トランザクションを始めた時点の pgm_cd を記録するトランザクションマネージャー。 */
@@ -72,6 +90,18 @@ class PgmCdAspectOrderTest {
     /** トランザクションの中で何もしない。 */
     @Transactional
     public void handle() {
+      // トランザクションの開始の時点だけを確かめる。
+    }
+  }
+
+  /** pointcut とトランザクションの両方の対象になる Listener。 */
+  // CGLIB のプロキシを作れるよう、final にしない。
+  /* package */ static class OrderShippedListener {
+
+    /** トランザクションの中で何もしない。 */
+    @Transactional
+    @SuppressWarnings("PMD.ShortMethodName") // ADR-050 が Listener のメソッド名を on に決めている。
+    public void on() {
       // トランザクションの開始の時点だけを確かめる。
     }
   }

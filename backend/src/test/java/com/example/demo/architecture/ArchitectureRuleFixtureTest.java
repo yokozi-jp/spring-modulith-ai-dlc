@@ -362,9 +362,13 @@ class ArchitectureRuleFixtureTest {
             ProxyRulesArchTest.pointcutsNarrowTargetsWithWithin,
             "shared.infrastructure.persistence.SlowPgmCdAspect.afterListener("),
         row(
-            "aspectsDeclareOrder",
+            "aspectsDeclareOrder: @Order がない",
             ProxyRulesArchTest.aspectsDeclareOrder,
             "shared.infrastructure.persistence.UnorderedPgmCdAspect"),
+        row(
+            "aspectsDeclareOrder: 値のない @Order",
+            ProxyRulesArchTest.aspectsDeclareOrder,
+            "shared.infrastructure.persistence.LowestOrderPgmCdAspect"),
         row(
             "listenersExposeOnlyOnAndCallOneCommandHandler",
             ClassRoleArchTest.listenersExposeOnlyOnAndCallOneCommandHandler,
