@@ -1799,3 +1799,39 @@ tasks:
           fs . \
             --scanners vuln \
             --ignore-unfixed
+
+  # dep-scan（ADR-094）。Trivyと並べて動かし、VDRとHTMLをbuild/depscan/に出す。
+  # 脆弱性DBは4GB超なので、app-onlyの範囲に絞り、DEPSCAN_VDB_HOMEに残して使い回す。
+  scan-depscan:
+    desc: backendとfrontendの依存関係をdep-scanで検査
+    cmds:
+      - task: scan-depscan-backend
+      - task: scan-depscan-frontend
+
+  scan-depscan-backend:
+    desc: backendのCycloneDX SBOMをdep-scanで検査
+    cmds:
+      - task: be-sbom
+      - |
+        rm -rf build/depscan/backend && mkdir -p build/depscan/backend "${DEPSCAN_VDB_HOME:-$HOME/.cache/depscan-vdb}"
+        docker run --rm -e VDB_HOME=/db \
+          -v "${DEPSCAN_VDB_HOME:-$HOME/.cache/depscan-vdb}":/db \
+          -v "$PWD/backend":/app:ro \
+          -v "$PWD/build/depscan/backend":/reports \
+          ghcr.io/owasp-dep-scan/dep-scan:v6.3.2@sha256:9c69b3b743a95ac7901acc639ffabf4dc80426a948786d1dd10e680e6b6f5623 \
+          depscan --no-banner --vdb-scope app -t java \
+            --bom /app/build/reports/cyclonedx/application.cdx.json \
+            --src /app --reports-dir /reports
+
+  scan-depscan-frontend:
+    desc: frontendのロックファイルをdep-scanで検査
+    cmds:
+      - |
+        rm -rf build/depscan/frontend && mkdir -p build/depscan/frontend "${DEPSCAN_VDB_HOME:-$HOME/.cache/depscan-vdb}"
+        docker run --rm -e VDB_HOME=/db \
+          -v "${DEPSCAN_VDB_HOME:-$HOME/.cache/depscan-vdb}":/db \
+          -v "$PWD/frontend":/app:ro \
+          -v "$PWD/build/depscan/frontend":/reports \
+          ghcr.io/owasp-dep-scan/dep-scan:v6.3.2@sha256:9c69b3b743a95ac7901acc639ffabf4dc80426a948786d1dd10e680e6b6f5623 \
+          depscan --no-banner --vdb-scope app -t js \
+            --src /app --reports-dir /reports

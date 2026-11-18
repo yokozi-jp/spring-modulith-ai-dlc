@@ -291,6 +291,10 @@ const params = { ...(cursor !== undefined && { cursor }) };
 - **`task scan-vulns`**：バックエンドとフロントエンドの依存関係をTrivyで検査する。
 - **`task scan-vulns-backend`**：バックエンドのCycloneDX SBOMをTrivyで検査する。
 - **`task scan-vulns-frontend`**：フロントエンドの解決済み依存関係をTrivyで検査する。
+- **`task scan-depscan`**：バックエンドとフロントエンドの依存関係をdep-scanで検査する。
+- **`task scan-depscan-backend`**：バックエンドのCycloneDX SBOMをdep-scanで検査し、レポートを`build/depscan/backend/`に出す。
+- **`task scan-depscan-frontend`**：フロントエンドのロックファイルをdep-scanで検査し、レポートを`build/depscan/frontend/`に出す。
+  脆弱性DBは展開後に4GB超なので、app-onlyに絞り、環境変数`DEPSCAN_VDB_HOME`（既定は`~/.cache/depscan-vdb`）に残して使い回す（[ADR-094](../adr/ADR-094-scan-dependencies-with-dep-scan-alongside-trivy.md)）。
 - **`task scan-dast`**：隔離した依存、backend、`vp preview`を起動し、OWASP ZAPで認証付きのpassive scanを実行して片付ける。
 - **`task scan-dast-active`**：同じ環境でactive scanを実行する。
 - **`task lint-actions`**：GitHub Actionsワークフローをactionlintで検査する。
@@ -412,6 +416,7 @@ pre-pushの「変更」は、push済みかどうかやrebaseの有無によら�
 - **`static-analysis.yml`**：`lint-semgrep`相当、`lint-duplicates`、`lint-taskfile`、`lint-lefthook`、`agent-git-test`を実行する。
   Code ScanningはSARIFの`suppressions`を読まないため、`nosemgrep`で抑止した検出をSARIFから除いてから送る。
 - **`trivy.yml`**：`scan-vulns`相当を実行する。
+- **`depscan.yml`**：`scan-depscan-backend`と`scan-depscan-frontend`を実行し、レポートをartifactにする。SARIFを出さないのでCode Scanningには送らない。
 - **`dast.yml`**：PRで`scan-dast`、週1回のscheduleと手動実行で`scan-dast-active`を実行し、Informationalを除いたSARIFをCode Scanningに送る。
 - **`actionlint.yml`**：`lint-actions`相当を実行する。
 - **`ci.yml`**：`pull_request`で動く検査を呼び出し、集約ジョブ`CI gate`が全ジョブの`success`を確かめる。`ci-gate-check`も実行する（[ADR-087](../adr/ADR-087-gate-required-checks-with-single-aggregate-job.md)）。

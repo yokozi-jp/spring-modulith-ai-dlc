@@ -1,0 +1,72 @@
+name: Dependency Scan (dep-scan) 🔬
+
+on:
+  push:
+    branches: ["main"]
+  # PR の検査は ci.yml から呼ばれて動く（docs/adr/ADR-087）。
+  workflow_call:
+
+concurrency:
+  group: depscan-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+# dep-scan は SARIF を出さないため、Code Scanning には送らない。
+# 検出はジョブのログと、artifact の VDR（CycloneDX）と HTML で確認する。
+# Trivy と同じく、検出があってもジョブは失敗させない（docs/adr/ADR-094）。
+jobs:
+  backend:
+    name: dep-scan (backend) 🔬
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up JDK
+        uses: actions/setup-java@77dd5b2ce225ea11469928ac317850245a74ae78 # v6.2.0
+        with:
+          distribution: corretto
+          java-version: "25"
+
+      - name: Set up mise tools
+        uses: ./.github/actions/setup-mise
+
+      - name: Run dep-scan
+        run: task scan-depscan-backend
+
+      - name: Upload dep-scan reports
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: depscan-backend
+          path: build/depscan/backend
+          if-no-files-found: ignore
+
+  frontend:
+    name: dep-scan (frontend) 🔬
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up mise tools
+        uses: ./.github/actions/setup-mise
+
+      - name: Run dep-scan
+        run: task scan-depscan-frontend
+
+      - name: Upload dep-scan reports
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: depscan-frontend
+          path: build/depscan/frontend
+          if-no-files-found: ignore

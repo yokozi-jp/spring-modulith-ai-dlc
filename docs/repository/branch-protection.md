@@ -95,6 +95,7 @@ ruleset ではコード所有者の承認を要求しない。
 GitHub Pagesでは通常、APIの設計内容がすべて公開されるため、有効化する前にリポジトリのPages公開範囲を確認する。
 
 Semgrep、Trivy、ZAP は現在、検出結果を SARIF へ送ってもジョブ自体を失敗させない（ZAP は [ADR-056](../adr/ADR-056-run-authenticated-dast-with-zap-in-ci.md)）。
+dep-scan も検出でジョブを失敗させず、結果は SARIF ではなく artifact に残す（[ADR-094](../adr/ADR-094-scan-dependencies-with-dep-scan-alongside-trivy.md)）。
 
 `Run ZAP active scan 🕷️` は schedule と手動実行のときだけ動くので、必須チェックにしない。
 
