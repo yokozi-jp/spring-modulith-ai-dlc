@@ -79,6 +79,14 @@ stop_decoy() {
   decoy=""
   until_ok not decoy_running
 }
+# held_commit <ファイル>: フックを止めたまま新しいファイルの commit を始め、run を実行のディレクトリにし、git の PID を待つ。
+held_commit() {
+  touch "$hold"
+  echo "$1" >"$1"
+  expect "commit of $1 starts" 0 "task agent-wait" bash "$tool" commit "$msg" "$1"
+  run="$(run_dir)"
+  fact "the commit of $1 records its git" until_ok has_pid git "$run"
+}
 
 git init -q --bare -b main "$tmp/origin.git"
 git init -q -b main "$tmp/repo"
@@ -379,11 +387,7 @@ expect "the next commit passes the guard after the printed command" 1 "commit �
 # wrapper と git を止め、commit が終わらない。
 scene "killed commit"
 head="$(git rev-parse HEAD)"
-touch "$hold"
-echo l >lost.txt
-expect "commit to be killed starts" 0 "task agent-wait" bash "$tool" commit "$msg" lost.txt
-run="$(run_dir)"
-fact "the commit records its git" until_ok has_pid git "$run"
+held_commit lost.txt
 kill "$(pid_of wrapper "$run")"
 expect "a commit whose wrapper died still runs while git runs" 75 "まだ実行中です" wait_now "$run"
 kill "$(pid_of git "$run")"
@@ -397,11 +401,7 @@ rm lost.txt
 scene "fully killed commits"
 head="$(git rev-parse HEAD)"
 for undo in copy-matches-head foreign-commit; do
-  touch "$hold"
-  echo k >killed.txt
-  expect "commit to be fully killed starts ($undo)" 0 "task agent-wait" bash "$tool" commit "$msg" killed.txt
-  run="$(run_dir)"
-  fact "the fully killed commit records its git ($undo)" until_ok has_pid git "$run"
+  held_commit "killed-$undo.txt"
   kill "$(pid_of wrapper "$run")" "$(pid_of child "$run")" "$(pid_of git "$run")"
   rm "$hold"
   # copy-matches-head はフックが変更を打ち消した写しを、foreign-commit は同じ HEAD の上にほかの作業が作った commit を真似る。
@@ -412,17 +412,13 @@ for undo in copy-matches-head foreign-commit; do
   fi
   expect "a fully killed commit that did not land is lost ($undo)" 1 "終了コードを記録せずに止まりました" bash "$tool" wait "$run"
   fact "the fully killed commit leaves the index ($undo)" clean
-  rm killed.txt
+  rm "killed-$undo.txt"
 done
 fact "the fully killed commits leave no commit of theirs" [ -z "$(git log --format=%s "$head".. | grep -vx foreign)" ]
 
 # wrapper と _commit を止め、残った git が commit を終える。
 scene "orphaned commit"
-touch "$hold"
-echo o >orphan.txt
-expect "commit to be orphaned starts" 0 "task agent-wait" bash "$tool" commit "$msg" orphan.txt
-run="$(run_dir)"
-fact "the orphaned commit records its git" until_ok has_pid git "$run"
+held_commit orphan.txt
 kill "$(pid_of wrapper "$run")" "$(pid_of child "$run")"
 rm "$hold"
 fact "the orphaned git finishes" until_ok not alive "$(pid_of git "$run")"
@@ -435,11 +431,7 @@ fact "the index matches the orphaned commit" clean
 # wrapper と _commit を止め、残った git が commit を終えた後に、ほかの作業が古い本物の index から commit する。
 scene "orphaned overtaken commit"
 head="$(git rev-parse HEAD)"
-touch "$hold"
-echo o >orphan-overtaken.txt
-expect "commit to be orphaned and overtaken starts" 0 "task agent-wait" bash "$tool" commit "$msg" orphan-overtaken.txt
-run="$(run_dir)"
-fact "the orphaned overtaken commit records its git" until_ok has_pid git "$run"
+held_commit orphan-overtaken.txt
 kill "$(pid_of wrapper "$run")" "$(pid_of child "$run")"
 rm "$hold"
 fact "the orphaned git moves HEAD" until_ok moved "$head"
@@ -452,11 +444,8 @@ rm orphan-overtaken.txt
 # wrapper と _commit を止め、残った git が commit を終えた後に、ほかの作業が作業ツリーをすべて stage してから commit する。
 scene "orphaned commit kept by another commit"
 head="$(git rev-parse HEAD)"
-touch "$hold"
-echo o >orphan-kept.txt && echo f >orphan-foreign.txt
-expect "commit to be orphaned and kept by another commit starts" 0 "task agent-wait" bash "$tool" commit "$msg" orphan-kept.txt
-run="$(run_dir)"
-fact "the orphaned kept commit records its git" until_ok has_pid git "$run"
+echo f >orphan-foreign.txt
+held_commit orphan-kept.txt
 kill "$(pid_of wrapper "$run")" "$(pid_of child "$run")"
 rm "$hold"
 fact "the orphaned kept git moves HEAD" until_ok moved "$head"
@@ -467,11 +456,7 @@ fact "the index matches the commit on top of the orphaned commit" clean
 
 # wrapper と _commit を止め、残った git が commit を終えた後に、agent-wait が本物の index を置き換えられない。
 scene "orphaned unsynced commit"
-touch "$hold"
-echo u >orphan-unsynced.txt
-expect "commit to be orphaned and left unsynced starts" 0 "task agent-wait" bash "$tool" commit "$msg" orphan-unsynced.txt
-run="$(run_dir)"
-fact "the orphaned unsynced commit records its git" until_ok has_pid git "$run"
+held_commit orphan-unsynced.txt
 kill "$(pid_of wrapper "$run")" "$(pid_of child "$run")"
 rm "$hold"
 expect "wait reports that it could not replace the index" 1 "git reset か index の置き換えに失敗した" env PATH="$tmp/failmv:$PATH" bash "$tool" wait "$run"
