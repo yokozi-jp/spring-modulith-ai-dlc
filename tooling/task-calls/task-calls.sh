@@ -58,9 +58,10 @@ for file in "$root/lefthook.yml" "$root"/.github/workflows/*.yml "$root"/.github
   done < <(
     # name: は job と step の表示名なので読まない。
     # 表示名には英語の文（Upload task results）と、branch-protection.md が挙げるチェック名（Run task okf-check）を書く。
+    # tools: は setup-mise に渡す mise の道具の名前（tools: task betterleaks）なので読まない。
     # 行頭か空白の直後の # から後ろは、コメントとして消す。
     # 行を消さずに空けて、grep -n の行番号を元のファイルに合わせる。
-    sed -E '/^[[:space:]]*(-[[:space:]]+)?name:/s/.*//; s/(^|[[:space:]])#.*$//' "$file" |
+    sed -E '/^[[:space:]]*(-[[:space:]]+)?(name|tools):/s/.*//; s/(^|[[:space:]])#.*$//' "$file" |
       grep -noE "$call" |
       # 一致は名前で終わるので、最後の語を名前として取る。
       sed -E 's/^([0-9]+):.*[[:space:]]([^[:space:]]+)$/\1 \2/'

@@ -128,7 +128,7 @@ compose が公開する port は、すべて `127.0.0.1` に限る。
   `task e2e` は開始時に両方を確かめ、使用中なら止めるよう示して失敗する。
   5433、6380、8081、8082 は compose-test だけが使うため、開始時には確かめない。
 - `task test` と同じ Compose project（`spring-modulith-test`）を使うため、同時に実行しない。
-- 前提の道具は `task setup` と同じである。
+- 前提の道具は、[開発環境構築](../local-env-setup/setup.md)の手順 7（`mise install --locked` と `task setup`）で入れたものと同じである。
   Chromium は `task e2e` が導入する。
   OS の依存ライブラリは、初回に `frontend/apps/web` で、`sudo` を付けた `vp exec playwright install-deps chromium` を実行して入れる。
 

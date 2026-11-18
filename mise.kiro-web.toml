@@ -1,0 +1,5 @@
+# Kiro Web のサンドボックスだけで使う道具。kiro-web.sh が MISE_ENV=kiro-web で読む（ADR-093）。
+# 版を変えたら `MISE_ENV=kiro-web mise lock --platform linux-x64 docker-compose` を実行し、mise.kiro-web.lock を同じコミットに含める。
+# Compose 5 以降は buildx を要し、podman の API でイメージを作れないので 2.x に置く。
+[tools]
+docker-compose = "2.40.3"

@@ -294,11 +294,13 @@ pre-push:
         fi
         task test
 
-    # GitHub Actions ワークフローに変更がある push のときだけ Lint（actionlint）
+    # GitHub Actions のワークフローか composite action に変更がある push のときだけ Lint（actionlint）
     # glob を効かせるため run 内で {files} を参照する。
     # docker を使えない（docker info が失敗する）環境ではスキップ（最終担保は CI に任せる）。
     - name: actionlint
-      glob: ".github/workflows/*.{yml,yaml}"
+      glob:
+        - ".github/workflows/*.{yml,yaml}"
+        - ".github/actions/**"
       files: *push-files
       run: |
         echo "{files}" >/dev/null
@@ -306,14 +308,14 @@ pre-push:
           echo "docker を使えないため actionlint をスキップします（CI で検査されます）。" >&2
           exit 0
         fi
-        docker run --rm -v "$PWD":/repo -w /repo \
-          rhysd/actionlint:1.7.12@sha256:9d36088643581e728c969f35141f88139fec77280b2be23c1f66f8e40e1025e7 \
-          -color
+        task lint-actions
 
-    # GitHub Actions ワークフローに変更がある push のときだけセキュリティ解析（zizmor）
+    # GitHub Actions のワークフローか composite action に変更がある push のときだけセキュリティ解析（zizmor）
     # docker を使えない（docker info が失敗する）環境ではスキップ（最終担保は CI に任せる）。
     - name: zizmor
-      glob: ".github/workflows/*.{yml,yaml}"
+      glob:
+        - ".github/workflows/*.{yml,yaml}"
+        - ".github/actions/**"
       files: *push-files
       run: |
         echo "{files}" >/dev/null
@@ -321,5 +323,4 @@ pre-push:
           echo "docker を使えないため zizmor をスキップします（CI で検査されます）。" >&2
           exit 0
         fi
-        docker run --rm -v "$PWD":/repo -w /repo \
-          ghcr.io/zizmorcore/zizmor:latest .github/workflows/
+        task lint-actions-security
