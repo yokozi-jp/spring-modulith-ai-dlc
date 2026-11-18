@@ -47,7 +47,7 @@ bypass できるのは、リポジトリの管理者（RepositoryRole の id `5`
 
 squash merge だけを有効にし、merge commit と rebase merge は無効にする。
 
-squash commit の既定メッセージには Pull Request のタイトルを使う。
+squash commit の既定メッセージには Pull Request のタイトルを使い、本文には Pull Request の本文を使う（`squash_merge_commit_message` は `PR_BODY`）。
 
 人が必ず読む Pull Request は[Draftからマージまで](../pull-request/review-request-and-merge.md)に従う。
 

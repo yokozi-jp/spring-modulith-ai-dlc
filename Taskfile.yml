@@ -417,6 +417,7 @@ tasks:
     silent: true
     cmds:
       - bash tooling/ci-gate-check/test.sh
+      - bash tooling/ci-changes/test.sh
       - python3 tooling/ci-gate-check/ci-gate-check.py
 
   # 本体は tooling/agent-git/agent-git.sh、手順は docs/tooling/dev-workflow.md の「エージェントがcommitとpushをするとき」にある。
