@@ -1,0 +1,12 @@
+databaseChangeLog:
+  - changeSet:
+      id: "012-grant-m-item"
+      author: system
+      changes:
+        - sql:
+            sql: |
+              ALTER DEFAULT PRIVILEGES GRANT SELECT ON TABLES TO item_module;
+      rollback:
+        - sql:
+            sql: |
+              ALTER DEFAULT PRIVILEGES REVOKE ALL ON TABLES FROM item_module;

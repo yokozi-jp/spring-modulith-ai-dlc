@@ -1,11 +1,5 @@
 {
   "ignore": {
-    "files": ["lint/fixtures/**"],
-    "overrides": [
-      {
-        "files": ["src/components/ui/**"],
-        "rules": ["react-doctor/only-export-components"]
-      }
-    ]
+    "files": ["lint/fixtures/**"]
   }
 }

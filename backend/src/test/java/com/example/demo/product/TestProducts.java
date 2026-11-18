@@ -3,12 +3,13 @@ package com.example.demo.product;
 import static com.example.demo.jooq.product.Tables.M_PRODUCT;
 
 import com.example.demo.shared.infrastructure.persistence.TestCommonColumns;
+import com.example.demo.testkit.AsModule;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.UUID;
 import org.jooq.DSLContext;
 
-/** 商品の行をテストで登録する補助。ステップ 1 には商品を作る操作がないため、DSLContext で直接 INSERT する。 */
+/** 商品の行をテストで登録する補助。ステップ 1 には商品を作る操作がないため、product のロールで DSLContext から直接 INSERT する。 */
 // テストの補助であり、テストケースを持たない。
 @SuppressWarnings("PMD.TestClassWithoutTestCases")
 public final class TestProducts {
@@ -36,16 +37,19 @@ public final class TestProducts {
       final String unitPrice,
       final String salesStatus) {
     final UUID productId = UUID.randomUUID();
-    TestCommonColumns.runAs(
-        () ->
-            insert(
-                dsl,
-                productId,
-                productCode,
-                "name of " + productCode,
-                new BigDecimal(unitPrice),
-                salesStatus,
-                REGISTERED_AT));
+    AsModule.run(
+        dsl,
+        "product",
+        tx ->
+            TestCommonColumns.runAs(() ->
+                insert(
+                    tx,
+                    productId,
+                    productCode,
+                    "name of " + productCode,
+                    new BigDecimal(unitPrice),
+                    salesStatus,
+                    REGISTERED_AT)));
     return productId;
   }
 

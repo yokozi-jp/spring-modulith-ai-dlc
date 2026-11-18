@@ -101,6 +101,7 @@ jobs:
           name: frontend-coverage
           path: |
             frontend/apps/web/coverage/
+            frontend/packages/ui/coverage/
             frontend/packages/api/coverage/
           if-no-files-found: warn
           retention-days: 14

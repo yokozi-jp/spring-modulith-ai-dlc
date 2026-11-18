@@ -34,7 +34,7 @@ breakpointはTailwind CSSの既定のprefixを使う。
 - breakpointはlayoutを変える必要がある箇所だけに置く。
 - container queryの入れ子は2段までにする。
 - Tailwind CSSの既定のprefix（media queryの `sm`、`md`、`lg`、`xl`、`2xl` と、container queryの `@sm` など）を使う。
-- 既定の幅を調整する場合は、`style.css` の `@theme` で意味が変わらない範囲の微修正にとどめる（`sm` を1280pxにしない）。
+- 既定の幅を調整する場合は、`packages/ui/src/style.css` の `@theme` で意味が変わらない範囲の微修正にとどめる（`sm` を1280pxにしない）。
 - breakpointを追加する場合は、`3xl` のような既定の延長か、`tablet` のように意味が分かる名前にする。
 - 既定のprefixの値を上書きするのは、開発の初期に対象デバイスが確定した場合だけにする。確定しない場合は別名のprefixを追加する。
 - container queryの割合で指定する場合は、物理方向の `cqw` と `cqh` ではなく、論理方向の `cqi` と `cqb` を使う。

@@ -19,21 +19,28 @@ fail() {
   failures=$((failures + 1))
 }
 
-# フックの中のように GIT_DIR などが別のリポジトリを指し、利用者の設定が commit の署名を求めても、
-# source した後の git init と commit は一時のディレクトリの中で済む。
-git init -q "$tmp/decoy" && git -C "$tmp/decoy" commit -q --allow-empty -m decoy || exit 1
-mkdir "$tmp/home" "$tmp/scratch"
-printf '[commit]\n\tgpgsign = true\n[gpg]\n\tprogram = false\n' >"$tmp/home/.gitconfig"
+# linked worktree のフックのように GIT_DIR と GIT_INDEX_FILE が別のリポジトリの worktree を指し、利用者とシステムの設定が commit の署名を求めても、
+# source した後の git init と commit は一時のディレクトリの中で済む。切り離さないと、git init が別のリポジトリを core.bare=true にする。
+# 内側の bash は env -i で始め、この test.sh が source した値を引き継がない。
+git init -q "$tmp/decoy" && git -C "$tmp/decoy" commit -q --allow-empty -m decoy &&
+  git -C "$tmp/decoy" worktree add -q "$tmp/wt" || exit 1
+mkdir "$tmp/home" "$tmp/scratch" "$tmp/decoy/tmp"
+printf '[commit]\n\tgpgsign = true\n[gpg]\n\tprogram = false\n' | tee "$tmp/home/.gitconfig" >"$tmp/system.gitconfig"
 snapshot() { (cd "$tmp/decoy/.git" && find . -type f -print0 | LC_ALL=C sort -z | xargs -0 sha256sum); }
 before="$(snapshot)"
-env -u GIT_CONFIG_GLOBAL HOME="$tmp/home" \
-  GIT_DIR="$tmp/decoy/.git" GIT_INDEX_FILE="$tmp/decoy/.git/index" GIT_WORK_TREE="$tmp/decoy" \
+gitdir="$tmp/decoy/.git/worktrees/wt"
+env -i PATH="$PATH" HOME="$tmp/home" GIT_CONFIG_SYSTEM="$tmp/system.gitconfig" GIT_DIR="$gitdir" GIT_INDEX_FILE="$gitdir/index" \
   bash -c '. "$1" || exit 1; cd "$2" && git init -q && echo x >f && git add f && git commit -q -m scratch' \
   _ "$dir/scratch-git.sh" "$tmp/scratch" >"$tmp/out" 2>&1 ||
-  fail "git init and commit after sourcing ignore the hook's GIT_DIR and the user's commit.gpgsign"
+  fail "git init and commit after sourcing ignore the hook's GIT_DIR and the commit.gpgsign of the user and the system"
 [ "$(snapshot)" = "$before" ] || fail "the repository that the hook's variables point at is unchanged"
 
-# scene <passes|失敗にする行の番号> <場面> <行>...: 行を test.sh に書いて検査し、成功するか、その行を名指しして失敗するかを確かめる。
+# TMPDIR がリポジトリの中にあっても、source した後の git は、mktemp で作ったディレクトリから上のリポジトリを見つけない。
+env -i PATH="$PATH" HOME="$tmp/home" TMPDIR="$tmp/decoy/tmp" \
+  bash -c '. "$1" || exit 1; cd "$(mktemp -d)" && ! git rev-parse --git-dir' _ "$dir/scratch-git.sh" >"$tmp/out" 2>&1 ||
+  fail "git after sourcing finds no repository above a mktemp directory inside a repository"
+
+# scene <passes|失敗にする行の番号> <ケース> <行>...: 行を test.sh に書いて検査し、成功するか、その行を名指しして失敗するかを確かめる。
 scene() {
   local want="$1" label="$2" got=passes
   shift 2
@@ -43,13 +50,16 @@ scene() {
 }
 
 scene passes "git after the source line" "$src" 'git init -q "$tmp/repo"'
-scene 1 "git before the source line" 'git init -q "$tmp/repo"' "$src"
 scene 1 "git status before the source line" 'git status' "$src"
+scene 1 "git by its path before the source line" '/usr/bin/git status' "$src"
 scene 1 "git in a command substitution" 'top="$(git rev-parse --show-toplevel)"' "$src"
+scene passes "git inside a word or a path" 'cd .git && :' 'task lint-scratch-git' 'echo github' 'echo legit use_git' "$src"
 scene passes "the source keyword" "source ${src#. }" 'git status'
 scene passes "an indented source line" "  $src" 'git status'
+scene 2 "a source line without || exit 1" "${src% || exit 1}" 'git status'
 scene passes "git in a comment line" '# git status' "$src"
 scene passes "git in a trailing comment" 'cd "$tmp" # then git status' "$src"
+scene 1 "git after a # inside a word" 'n=${#x}; git status' "$src"
 scene 2 "a commented-out source line" "# $src" 'git status'
 bash "$dir/scratch-git-check.sh" "$tmp/missing.sh" >"$tmp/out" 2>&1 && fail "a missing file fails the check"
 

@@ -245,7 +245,7 @@ pre-commit:
         task lefthook-install-test
       fail_text: "prepare.mjs の自己検査に失敗しました。task lefthook-install-test で再実行してください。"
 
-    # 自己検査か scratch-git.sh にステージ済み変更があるとき、git を実行する前に scratch-git.sh を source しているか検証（task lint-scratch-git）。
+    # 自己検査か tooling/scratch-git/ にステージ済み変更があるとき、git を実行する前に scratch-git.sh を source しているか検証（task lint-scratch-git）。
     - name: lint-scratch-git
       glob:
         - "tooling/*/test.sh"

@@ -9,6 +9,7 @@
     "packages/api": {
       "includeEntryExports": true,
       "ignore": ["src/generated/**"]
-    }
+    },
+    "packages/ui": { "includeEntryExports": true }
   }
 }

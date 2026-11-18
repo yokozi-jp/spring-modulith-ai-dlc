@@ -44,6 +44,7 @@ jOOQはコードで列挙したモジュールスキーマから生成し、生�
 スキーマ名は環境差を持たないアーキテクチャ上の固定値であるため、`DB_SCHEMA` と `DB_SCHEMAS` は使わない。
 
 アプリケーション用ロールには、各changesetが所有スキーマのUSAGEと所有テーブルのDMLだけを付与する。
+業務のスキーマの権限は、[ADR-094](ADR-094-switch-to-module-database-roles.md)がアプリケーション用ロールからモジュールのロールへ移した。`modulith`スキーマだけが、この規則のままである。
 Liquibase管理スキーマと管理テーブルへの権限は付与しない。
 アプリケーション用とマイグレーション用の二ロール、資格情報の分離、単一DBというADR-009の方針は維持する。
 
@@ -105,6 +106,7 @@ Liquibase管理スキーマと管理テーブルへの権限は付与しない�
 - [ADR-004](ADR-004-commit-jooq-generated-code.md)
 - [ADR-005](ADR-005-decouple-liquibase-from-app-startup.md)
 - [ADR-009](ADR-009-unify-db-connection-target-credentials-only-role-split.md)
+- [ADR-094](ADR-094-switch-to-module-database-roles.md)
 - `backend/gradle/database.gradle`
 - `backend/src/main/resources/db/changelog/`
 - `docker/initdb/`

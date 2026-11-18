@@ -94,3 +94,4 @@
 - [ADR-091: エージェントの commit を本物の index の写しから作る](ADR-091-commit-agent-changes-from-a-copy-of-the-index.md)（Proposed, 2026-11-18）
 - [ADR-092: frontend を Vite+ の workspace に分け、共有を packages/ui と packages/api に置く](ADR-092-split-frontend-into-vite-plus-workspace.md)（Accepted, 2026-11-18）
 - [ADR-093: Kiro Web のサンドボックスを開発環境に加え、道具とコンテナを source するスクリプトで揃える](ADR-093-support-kiro-web-sandbox-as-development-environment.md)（Proposed, 2026-11-18）
+- [ADR-094: トランザクションの初めにモジュールの DB ロールへ切り替え、アプリロールを業務のスキーマから外す](ADR-094-switch-to-module-database-roles.md)（Proposed, 2026-11-18）

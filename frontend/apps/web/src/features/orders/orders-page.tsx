@@ -1,9 +1,8 @@
 import { getListOrdersSuspenseQueryOptions } from "@frontend/api/endpoints/ordering/ordering";
+import { buttonVariants } from "@frontend/ui/button";
 import { useSuspenseQuery } from "@tanstack/react-query";
 import { getRouteApi, Link } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
-
-import { buttonVariants } from "@/components/ui/button";
 
 import { OrderStatusFilter } from "./components/order-status-filter";
 import { OrdersTable } from "./components/orders-table";
