@@ -68,6 +68,9 @@ cat /tmp/push.done          # 完了するまで間を置いて確かめる
 grep -E '^(✓|✗)' /tmp/push.log
 ```
 
+Kiro Web のサンドボックスでは、背景のプロセスが tool call の終了で止まるので、この手順を使わない。
+`timeout` を付けてフォアグラウンドで push する（[Kiro Web の開発環境](../local-env-setup/kiro-web.md)）。
+
 pushをやり直す前に、`pgrep -fa "lefthook run pre-push"`で前のフックが残っていないことを確かめる。
 残っていれば、終えるのを待つか止めてから、`docker compose -f docker/compose-test.yml down --volumes --remove-orphans`でテスト用の依存を片付ける。
 

@@ -52,7 +52,7 @@ services:
       # realm が存在しない初回起動時だけ、ローカル用 client・role・user を投入する。
       - ./keycloak:/opt/keycloak/data/import:ro
     healthcheck:
-      # CMD の引数に空白を含む 1 要素を渡すと、podman の互換 API が空白で分割し、常に成功する検査になるため、CMD-SHELL にする。
+      # シェルの構文を含む検査は CMD-SHELL で書く（docs/container/compose.md の「healthcheck」）。
       test:
         - CMD-SHELL
         - >-

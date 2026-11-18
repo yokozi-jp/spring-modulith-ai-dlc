@@ -32,8 +32,10 @@ Triageでは5種類の標準ラベルを使う。詳細は `docs/agents/triage-l
 
 ## Kiro Web
 
-Kiro Web のサンドボックスで Task、検査、テストを実行する前に、`docs/local-env-setup/kiro-web.md` を読む。
-tool call の最初に `source docs/local-env-setup/kiro-web.sh` を実行して、道具と PATH を揃える。
+この節は Kiro Web のサンドボックスで作業するときだけに適用する。
+WSL では適用しない。
+Task、検査、テストを実行する前に、`docs/local-env-setup/kiro-web.md` を読む。
+Kiro Web では、tool call の最初に `source docs/local-env-setup/kiro-web.sh` を実行して、道具と PATH を揃える。
 
 ## Git
 
