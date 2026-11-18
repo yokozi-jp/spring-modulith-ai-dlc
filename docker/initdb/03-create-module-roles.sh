@@ -11,7 +11,7 @@ if [ -z "$app_user" ]; then
     exit 1
 fi
 
-modules="product ordering payment"
+modules="product ordering payment tenancy"
 
 for module in $modules; do
     psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" --dbname "$POSTGRES_DB" \

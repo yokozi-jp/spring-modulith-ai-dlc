@@ -112,8 +112,8 @@ Taskのテスト系タスクは、`.env.test`に足りない変数を`.env.test.
 この行がないと、`task compose-up`と`task dev`はPostgreSQLのsecretを作れずに止まる。
 既存の`postgres_data`ボリュームでは`docker/initdb`が再実行されず、`demo_migration`はsuperuserのまま残るため、`task compose-reset CONFIRM_RESET=yes`でボリュームを消し（ほかのサービスのデータも消える）、`task compose-up`で起動してから`task be-migrate`を実行する。
 
-モジュールごとのDBロール（`docker/initdb/03-create-module-roles.sh`、012 changeset）を足した変更の後も、既存の`postgres_data`ボリュームでは`docker/initdb`が再実行されず、モジュールのロールがないまま残る。
-`task be-migrate`は012 changesetのGRANTがロールの不在で失敗するため、`task compose-reset CONFIRM_RESET=yes`でボリュームを消し、`task compose-up`で起動してから`task be-migrate`を実行する（[DB接続情報とロール分離](../database/connections.md)）。
+モジュールごとのDBロール（`docker/initdb/03-create-module-roles.sh`、012 changeset）を足した変更と、`tenancy`のロール（014 changeset）を足した変更の後も、既存の`postgres_data`ボリュームでは`docker/initdb`が再実行されず、モジュールのロールがないまま残る。
+`task be-migrate`は012と014のchangesetのGRANTがロールの不在で失敗するため、`task compose-reset CONFIRM_RESET=yes`でボリュームを消し、`task compose-up`で起動してから`task be-migrate`を実行する（[DB接続情報とロール分離](../database/connections.md)）。
 
 公開先は次のとおり。
 

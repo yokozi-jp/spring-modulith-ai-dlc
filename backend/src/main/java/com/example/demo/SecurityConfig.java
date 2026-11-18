@@ -4,6 +4,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.health.actuate.endpoint.HealthEndpoint;
 import org.springframework.boot.security.autoconfigure.actuate.web.servlet.EndpointRequest;
@@ -11,11 +12,14 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+import org.springframework.security.oauth2.client.oidc.userinfo.OidcUserRequest;
 import org.springframework.security.oauth2.client.oidc.web.logout.OidcClientInitiatedLogoutSuccessHandler;
 import org.springframework.security.oauth2.client.registration.ClientRegistrationRepository;
+import org.springframework.security.oauth2.client.userinfo.OAuth2UserService;
 import org.springframework.security.oauth2.client.web.DefaultOAuth2AuthorizationRequestResolver;
 import org.springframework.security.oauth2.client.web.OAuth2AuthorizationRequestCustomizers;
 import org.springframework.security.oauth2.client.web.OAuth2AuthorizationRequestResolver;
+import org.springframework.security.oauth2.core.oidc.user.OidcUser;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
 import org.springframework.security.web.header.writers.ReferrerPolicyHeaderWriter.ReferrerPolicy;
@@ -71,6 +75,7 @@ public class SecurityConfig {
       final HttpSecurity http,
       final ClientRegistrationRepository clientRegistrationRepository,
       final OAuth2AuthorizationRequestResolver authorizationRequestResolver,
+      final ObjectProvider<OAuth2UserService<OidcUserRequest, OidcUser>> oidcUserService,
       @Qualifier("handlerExceptionResolver") final HandlerExceptionResolver handlerExceptionResolver)
       throws Exception {
     final OidcClientInitiatedLogoutSuccessHandler logoutSuccessHandler =
@@ -78,77 +83,75 @@ public class SecurityConfig {
     final RequestMatcher apiRequests = PathPatternRequestMatcher.withDefaults().matcher("/api/**");
     logoutSuccessHandler.setPostLogoutRedirectUri("{baseUrl}/logged-out");
 
-    http.authorizeHttpRequests(
-            auth ->
-                auth
-                    // ALB、ECS、コンテナの healthcheck が未認証で叩く probe だけを許可する。
-                    .requestMatchers("/actuator/health/liveness", "/actuator/health/readiness")
-                    .permitAll()
-                    // ルートの集約やコンポーネント別の health は、ログイン済みでも拒否する。
-                    .requestMatchers(EndpointRequest.to(HealthEndpoint.class))
-                    .denyAll()
-                    // OAuth2 の認可開始・コールバックとエラー表示。
-                    .requestMatchers("/oauth2/**", "/login/**", "/error")
-                    .permitAll()
-                    // API ドキュメント（OpenAPI JSON / Swagger UI）。
-                    // 本番では springdoc.*.enabled=false でエンドポイント自体を無効化する前提。
-                    .requestMatchers(
-                        "/v3/api-docs", "/v3/api-docs/**", "/swagger-ui.html", "/swagger-ui/**")
-                    .permitAll()
-                    // 上記以外はすべて認証必須
-                    .anyRequest()
-                    .authenticated())
+    http.authorizeHttpRequests(auth ->
+            auth
+                // ALB、ECS、コンテナの healthcheck が未認証で叩く probe だけを許可する。
+                .requestMatchers("/actuator/health/liveness", "/actuator/health/readiness")
+                .permitAll()
+                // ルートの集約やコンポーネント別の health は、ログイン済みでも拒否する。
+                .requestMatchers(EndpointRequest.to(HealthEndpoint.class))
+                .denyAll()
+                // OAuth2 の認可開始・コールバックとエラー表示。
+                .requestMatchers("/oauth2/**", "/login/**", "/error")
+                .permitAll()
+                // API ドキュメント（OpenAPI JSON / Swagger UI）。
+                // 本番では springdoc.*.enabled=false でエンドポイント自体を無効化する前提。
+                .requestMatchers(
+                    "/v3/api-docs", "/v3/api-docs/**", "/swagger-ui.html", "/swagger-ui/**")
+                .permitAll()
+                // 上記以外はすべて認証必須
+                .anyRequest()
+                .authenticated())
         // API の認証・認可エラーも MVC と同じ Problem Details 変換へ集約する。
         // ponytail: 登録が 1 つのときは Spring Security が matcher を見ず全ての拒否に使うため、/logout の CSRF 失敗も同じ advice
         // を通る。
         // 2 つ目を足すと /logout は既定の handler（/error 経由の about:blank）に変わる。LogoutContractTest が固定する。
-        .exceptionHandling(
-            exceptions ->
-                exceptions
-                    .defaultAuthenticationEntryPointFor(
-                        (request, response, exception) ->
-                            resolveOrSendError(
-                                handlerExceptionResolver,
-                                request,
-                                response,
-                                exception,
-                                HttpStatus.UNAUTHORIZED),
-                        apiRequests)
-                    .defaultAccessDeniedHandlerFor(
-                        (request, response, exception) ->
-                            resolveOrSendError(
-                                handlerExceptionResolver,
-                                request,
-                                response,
-                                exception,
-                                HttpStatus.FORBIDDEN),
-                        apiRequests))
-        .headers(
-            headers ->
-                headers
-                    .referrerPolicy(
-                        referrer -> referrer.policy(ReferrerPolicy.STRICT_ORIGIN_WHEN_CROSS_ORIGIN))
-                    .permissionsPolicyHeader(
-                        permissions ->
-                            permissions.policy(
-                                "camera=(), microphone=(), geolocation=(), payment=(), usb=()")))
+        .exceptionHandling(exceptions ->
+            exceptions
+                .defaultAuthenticationEntryPointFor(
+                    (request, response, exception) ->
+                        resolveOrSendError(
+                            handlerExceptionResolver,
+                            request,
+                            response,
+                            exception,
+                            HttpStatus.UNAUTHORIZED),
+                    apiRequests)
+                .defaultAccessDeniedHandlerFor(
+                    (request, response, exception) ->
+                        resolveOrSendError(
+                            handlerExceptionResolver,
+                            request,
+                            response,
+                            exception,
+                            HttpStatus.FORBIDDEN),
+                    apiRequests))
+        .headers(headers ->
+            headers
+                .referrerPolicy(
+                    referrer -> referrer.policy(ReferrerPolicy.STRICT_ORIGIN_WHEN_CROSS_ORIGIN))
+                .permissionsPolicyHeader(permissions ->
+                    permissions.policy(
+                        "camera=(), microphone=(), geolocation=(), payment=(), usb=()")))
         // SPA が __Host-XSRF-TOKEN Cookie を読み、更新系リクエストの X-XSRF-TOKEN Header で送り返す。
         // spa() も repository を設定するため、その後で差し替える（逆の順では spa() が上書きする）。
         .csrf(csrf -> csrf.spa().csrfTokenRepository(csrfTokenRepository()))
-        .oauth2Login(
-            oauth2 ->
-                oauth2.authorizationEndpoint(
-                    authorization ->
-                        authorization.authorizationRequestResolver(authorizationRequestResolver)))
+        .oauth2Login(oauth2 ->
+            oauth2
+                .authorizationEndpoint(authorization ->
+                    authorization.authorizationRequestResolver(authorizationRequestResolver))
+                // ログインの後に IdP の (iss, sub) からアプリの利用者を引く。共通カラムの *_by に、利用者の ID を登録するため。
+                // 機能モジュールを絞ったテストの文脈には tenancy がないため、Bean がなければ標準の実装のままにする。
+                .userInfoEndpoint(
+                    userInfo -> oidcUserService.ifAvailable(userInfo::oidcUserService)))
         // アプリケーションセッションを破棄した後、IdP が対応していれば SSO セッションも終了する。
         // Spring Security の既定どおり POST /logout と CSRF トークンを要求する。
-        .logout(
-            logout ->
-                logout
-                    .logoutSuccessHandler(logoutSuccessHandler)
-                    .invalidateHttpSession(true)
-                    .clearAuthentication(true)
-                    .deleteCookies("APP_SESSION"));
+        .logout(logout ->
+            logout
+                .logoutSuccessHandler(logoutSuccessHandler)
+                .invalidateHttpSession(true)
+                .clearAuthentication(true)
+                .deleteCookies("APP_SESSION"));
     return http.build();
   }
 

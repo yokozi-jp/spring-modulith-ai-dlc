@@ -1,0 +1,40 @@
+package com.example.demo.tenancy.application;
+
+import com.example.demo.tenancy.domain.model.ExternalIdentity;
+import com.example.demo.tenancy.domain.model.User;
+import com.example.demo.tenancy.domain.model.UserRepository;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+/** IdP の識別に対応づけた利用者を返す。初めてのログインなら、利用者を作って対応づける。 */
+@Service
+public class SignInUserCommandHandler {
+
+  /** 利用者を保存する Repository。 */
+  private final UserRepository userRepository;
+
+  /** 依存を受け取る。 */
+  public SignInUserCommandHandler(final UserRepository userRepository) {
+    this.userRepository = userRepository;
+  }
+
+  /**
+   * 利用者を引き、なければ作る。
+   *
+   * @throws com.example.demo.shared.concurrency.ConflictException 同じ識別での初めてのログインが同時に 2
+   *     つあり、相手が先に対応づけた場合。呼び直すと相手の利用者を引く
+   */
+  @Transactional
+  public SignInUserResult handle(final SignInUserCommand command) {
+    final ExternalIdentity identity = new ExternalIdentity(command.issuer(), command.subject());
+    final User user =
+        userRepository
+            .findByIdentity(identity)
+            .orElseGet(() -> {
+              final User registered = User.register(identity);
+              userRepository.add(registered);
+              return registered;
+            });
+    return new SignInUserResult(user.id().value().toString());
+  }
+}

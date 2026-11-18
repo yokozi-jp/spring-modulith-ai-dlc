@@ -25,6 +25,7 @@ import org.springframework.security.core.authority.AuthorityUtils;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.oauth2.client.authentication.OAuth2AuthenticationToken;
 import org.springframework.security.oauth2.core.oidc.OidcIdToken;
+import org.springframework.security.oauth2.core.oidc.OidcUserInfo;
 import org.springframework.security.oauth2.core.oidc.user.DefaultOidcUser;
 
 /** 共通カラムへ登録する値の組み立てを検証する。 */
@@ -41,6 +42,9 @@ class CommonColumnsTest {
   /** 現在のスパンの trace ID。 */
   private static final String TRACE_ID = "4bf92f3577b34da6a3ce929d0e0e4736";
 
+  /** ログインのときに引いたアプリの利用者の ID。 */
+  private static final String APP_USER_ID = "app-user-1";
+
   /** 呼び出し中のユースケースとして束縛する pgm_cd。 */
   private static final String PGM_CD = "ordering.PlaceOrder";
 
@@ -54,7 +58,7 @@ class CommonColumnsTest {
   }
 
   @Test
-  @DisplayName("利用者の操作の INSERT では、作成と更新のカラムに sub、pgm_cd、trace ID と lock_no = 1 を登録する")
+  @DisplayName("利用者の操作の INSERT では、作成と更新のカラムに OidcUser の名前、pgm_cd、trace ID と lock_no = 1 を登録する")
   void insertValuesForOidcUser() {
     final OidcIdToken idToken =
         OidcIdToken.withTokenValue("id-token")
@@ -81,6 +85,36 @@ class CommonColumnsTest {
             Map.entry(FIXTURE_ITEM.UPDATED_PGM_CD, PGM_CD),
             Map.entry(FIXTURE_ITEM.UPDATED_TX_ID, TRACE_ID),
             Map.entry(FIXTURE_ITEM.LOCK_NO, 1L));
+  }
+
+  @Test
+  @DisplayName("利用者の操作では、sub ではなく OidcUser の名前（ログインのときに引いたアプリの利用者の ID）を登録する")
+  void insertValuesUseThePrincipalName() {
+    final OidcIdToken idToken =
+        OidcIdToken.withTokenValue("id-token")
+            .subject("idp-sub")
+            .issuedAt(NOW)
+            .expiresAt(NOW.plusSeconds(300))
+            .build();
+    final DefaultOidcUser user =
+        new DefaultOidcUser(
+            AuthorityUtils.createAuthorityList("OIDC_USER"),
+            idToken,
+            new OidcUserInfo(Map.of("sub", "idp-sub", "app_user_id", APP_USER_ID)),
+            "app_user_id");
+    SecurityContextHolder.getContext()
+        .setAuthentication(new OAuth2AuthenticationToken(user, user.getAuthorities(), "web"));
+
+    final Map<Field<?>, Object> insert = inUseCase(() -> commonColumns.forInsert(FIXTURE_ITEM));
+    final Map<Field<?>, Object> update = inUseCase(() -> commonColumns.forUpdate(FIXTURE_ITEM));
+
+    assertThat(insert.get(FIXTURE_ITEM.CREATED_BY)).as("created_by").isEqualTo(APP_USER_ID);
+    assertThat(insert.get(FIXTURE_ITEM.UPDATED_BY))
+        .as("INSERT の updated_by")
+        .isEqualTo(APP_USER_ID);
+    assertThat(update.get(FIXTURE_ITEM.UPDATED_BY))
+        .as("UPDATE の updated_by")
+        .isEqualTo(APP_USER_ID);
   }
 
   @Test

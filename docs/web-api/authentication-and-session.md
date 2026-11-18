@@ -19,6 +19,16 @@ tags: [convention, web-api, security, auth, future-arch-guidelines]
 未認証のAPIリクエストには、401のProblem Detailsに`WWW-Authenticate: Session realm="demo"`を付けて返す。
 `Session`は登録されていない独自のschemeであり、選んだ理由は[ADR-059](../adr/ADR-059-send-a-session-challenge-in-www-authenticate-on-401.md)にある。
 
+## ログインの後の利用者
+
+ログインでは、IDトークンの`iss`と`sub`の組から、`tenancy`モジュールがアプリの利用者を引く。
+組に対応づけた利用者がなければ、利用者を作って対応づける。
+IdPを移るときは、組と利用者の対応づけだけを書き換え、利用者のIDは変えない。
+
+セッションに保存する`OidcUser`の名前（`getName()`）は、IdPの`sub`ではなくアプリの利用者のIDである。
+共通カラムの`*_by`は、この名前を登録する（[PostgreSQLの共通カラム](../database/postgresql-common-columns.md)）。
+`SecurityConfig`が`OAuth2UserService<OidcUserRequest, OidcUser>`をOIDCログインに渡し、`tenancy`の`SignInOidcUserService`が実装する。
+
 ## ログアウト
 
 ログアウトでは、ADR-007に従ってアプリケーションのセッションを破棄し、IdPのSSOセッションを終了する。

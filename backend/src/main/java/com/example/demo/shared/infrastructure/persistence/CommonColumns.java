@@ -30,8 +30,9 @@ import org.springframework.stereotype.Component;
  *
  * <ul>
  *   <li>{@code *_at}：注入した {@link Clock} の現在時刻。
- *   <li>{@code *_by}：利用者の操作では OIDC の ID トークンの {@code sub}。利用者の操作でない処理と、{@code *Listener} の中の処理では
- *       {@code *_pgm_cd} と同じ値。Listener の中では、伝わった利用者の認証を使わない。
+ *   <li>{@code *_by}：利用者の操作では、ログインのときに {@code tenancy} が引いたアプリの利用者の ID（{@code OidcUser#getName()}）。
+ *       {@code sub} は登録しない。利用者の操作でない処理と、{@code *Listener} の中の処理では {@code *_pgm_cd} と同じ値。Listener
+ *       の中では、伝わった利用者の認証を使わない。
  *   <li>{@code *_pgm_cd}：{@link PgmCdAspect} が束縛した、呼び出し中のユースケースの値。
  *   <li>{@code *_tx_id}：現在のスパンの trace ID。trace がなければ例外にする。
  * </ul>
@@ -140,13 +141,11 @@ public class CommonColumns {
     if (authentication == null || authentication instanceof AnonymousAuthenticationToken) {
       return pgmCd;
     }
-    final @Nullable String subject =
-        authentication.getPrincipal() instanceof OidcUser oidcUser ? oidcUser.getSubject() : null;
-    if (subject != null) {
-      return subject;
+    if (authentication.getPrincipal() instanceof OidcUser oidcUser) {
+      return oidcUser.getName();
     }
     throw new IllegalStateException(
-        "authenticated principal is not an OIDC user with a subject: authentication="
+        "authenticated principal is not an OIDC user: authentication="
             + authentication.getClass().getName());
   }
 

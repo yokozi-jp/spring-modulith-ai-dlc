@@ -202,11 +202,12 @@ class LocalDataSeederTest {
   }
 
   @Test
-  @DisplayName("消す対象の表は、modulith 以外の全スキーマの表と一致する")
-  void businessTablesCoverAllNonModulithTables() {
+  @DisplayName("消す対象の表は、modulith と tenancy 以外の全スキーマの表と一致する")
+  void businessTablesCoverAllBusinessTables() {
     final Set<Table<?>> generated = new HashSet<>();
+    // tenancy の利用者は、ログインで作る行で代表データではない。消すと、ログイン中のセッションの利用者 ID が指す行がなくなる。
     DefaultCatalog.DEFAULT_CATALOG.getSchemas().stream()
-        .filter(schema -> !"modulith".equals(schema.getName()))
+        .filter(schema -> !Set.of("modulith", "tenancy").contains(schema.getName()))
         .forEach(schema -> generated.addAll(schema.getTables()));
 
     assertThat(Set.copyOf(LocalDataSeeder.BUSINESS_TABLES)).isEqualTo(generated);

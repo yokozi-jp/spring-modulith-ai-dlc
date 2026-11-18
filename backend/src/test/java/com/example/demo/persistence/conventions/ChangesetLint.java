@@ -44,7 +44,8 @@ final class ChangesetLint {
               moduleSchemaSql("001-create-event-publication-tables", "modulith"),
               moduleSchemaSql("003-create-product-tables", "product"),
               moduleSchemaSql("004-create-order-tables", "ordering"),
-              moduleSchemaSql("006-create-payment-tables", "payment"))
+              moduleSchemaSql("006-create-payment-tables", "payment"),
+              moduleSchemaSql("014-create-tenancy-tables", "tenancy"))
           .flatMap(List::stream)
           .toList();
 
