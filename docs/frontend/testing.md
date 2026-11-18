@@ -18,7 +18,7 @@ APIを使うcomponent testはMSWでHTTP境界を置き換え、`vi.mock`でmodul
 複数のテストで使う準備のコードは、[フロントエンドアーキテクチャ](architecture.md#テストの置き場所)に従い `src/testing/` に置く。
 
 Vitestの`setupFiles`（`src/testing/setup.ts`）は、全テストでTesting Libraryの待つ上限の設定とMSWのserver（`src/testing/msw.ts`）の起動を行い、各テストの後に`cleanup`、handlerの初期化、mockとglobalのstubの復元、localeの`ja`への初期化を行う。
-そのため、テストで`configure`を呼ばず、同じ`afterEach`も書かない。
+テストで`configure`を呼ばず、同じ`afterEach`も書かない。
 HTTPはOrvalが生成したMSW handlerを使い、生成handlerがない境界（`apiFetch`のtransportの検査など）だけ、テストの中で`server.use()`に手書きのhandlerを渡す。
 routeの描画は`src/testing/render-route.tsx`の`renderRoute`を使い、`main.tsx`と同じproviderとrouterの既定値で、最初のloaderを終えてから描画する。
 
