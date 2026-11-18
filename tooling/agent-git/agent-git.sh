@@ -173,7 +173,9 @@ commit() {
   # そこで写しを先に作り、確かめるのも stage するのも commit するのも写しにする。確かめてから写すと、その間の git add が混ざる。
   # git commit --only <パス> は、フックの間ずっと本物の index をロックし、ほかの作業の git add を失敗させるので使わない。
   # base は写す前の本物の index で、commit の後にほかの作業が stage し直したパスを見分ける（sync_index）。
-  { mkdir -- "$run/commit" && cp -- "$(git rev-parse --git-path index)" "$run/commit/base" && cp -- "$run/commit/base" "$run/commit/index"; } || exit 1
+  # 写しは index の更新時刻を保つ（cp -p）。git は更新時刻が index 以降のファイルを中身で確かめ、それより前なら stat だけを信じる。
+  # 写しの時刻が新しいと、index と同じ秒に同じ大きさで書き換えたファイルの変更を見落とす。
+  { mkdir -- "$run/commit" && cp -p -- "$(git rev-parse --git-path index)" "$run/commit/base" && cp -p -- "$run/commit/base" "$run/commit/index"; } || exit 1
   # 最初の commit の前は HEAD が無いので空になり、landed は HEAD^ が無いことと比べる。
   git rev-parse -q --verify HEAD >"$run/commit/head"
   check_paths "$run" "$@"
@@ -240,12 +242,13 @@ split_changes() {
     LC_ALL=C comm -z -12 - <(changed "$3" --cached "$2" --) >"$1/commit/kept"
 }
 
-# lock_index <index>: git と同じく <index>.lock を作って index を写す。ほかの git がロックを持っていれば 3 秒まで待つ。
+# lock_index <index>: git と同じく <index>.lock を作り、index を更新時刻ごと写す（理由は commit の写しと同じ）。
+# ほかの git がロックを持っていれば 3 秒まで待つ。
 lock_index() {
   local _
   for _ in $(seq 30); do
     if (set -C && : >"$1.lock") 2>/dev/null; then
-      cp -- "$1" "$1.lock" && return 0
+      cp -p -- "$1" "$1.lock" && return 0
       rm -f -- "$1.lock"
       return 1
     fi

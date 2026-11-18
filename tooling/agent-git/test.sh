@@ -60,6 +60,7 @@ run_dir() { grep -o '/[^ ]*/agent-git/[a-z]*\.[A-Za-z0-9]*' "$out" | head -n 1; 
 wait_now() { AGENT_GIT_WAIT_SECONDS=0 bash "$tool" wait "$@"; }
 within() { (cd "$1" && "${@:2}"); }
 not() { ! "$@"; }
+untrusted_ctime() { GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=core.trustctime GIT_CONFIG_VALUE_0=false "$@"; }
 pid_of() { awk -v n="$1" '$1 == n { print $2 }' "$2/pid"; }
 has_pid() { [ -n "$(pid_of "$1" "$2")" ]; }
 alive() { kill -0 "$1" 2>/dev/null; }
@@ -161,6 +162,18 @@ expect "commit starts from a subdirectory" 0 "task agent-wait -- " within sub ba
 expect "wait from a subdirectory picks the latest run" 0 "✓ fake-check" within sub bash "$tool" wait
 fact "the commit from a subdirectory holds only the given path" [ "$(committed)" = sub/x ]
 fact "the index matches the commit made from a subdirectory" clean
+
+# index と同じ秒に、同じ大きさで同じ更新時刻のまま書き換えたファイルを、渡したパスと渡さないパスに 1 つずつ置く。
+# git は更新時刻が index 以降のファイルを中身で確かめる。ctime の違いで気付かないよう core.trustctime=false にする。
+scene "racily clean commit"
+echo aaaa >racy.txt && echo oooo >racy-other.txt && touch -d @1700000000 racy.txt racy-other.txt
+git add racy.txt racy-other.txt && git commit -q --no-verify -m racy
+echo bbbb >racy.txt && echo pppp >racy-other.txt && touch -d @1700000000 racy.txt racy-other.txt .git/index
+expect "commit of a path rewritten in the second of the index starts" 0 "task agent-wait" untrusted_ctime bash "$tool" commit "$msg" racy.txt
+expect "wait reports the commit of the rewritten path" 0 "exit=0" untrusted_ctime bash "$tool" wait
+fact "the commit holds the rewritten content" [ "$(git show HEAD:racy.txt)" = bbbb ]
+fact "the index still sees the rewrite of the path not given" [ "$(untrusted_ctime git diff --name-only)" = racy-other.txt ]
+git checkout -- racy-other.txt
 
 # フックを止めている間に、ほかの作業が別のファイルを stage する。
 scene "held commit"
