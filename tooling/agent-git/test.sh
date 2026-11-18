@@ -109,7 +109,8 @@ staged="\$(git diff --cached --name-only --diff-filter=AM)"
 printf '\033[38;2;56;56;56m  ────\033[m\n'
 has() { echo "\$staged" | grep -qx "\$1"; }
 if has fail; then echo "✗ fake-check"; exit 1; fi
-if has selfcommit; then git commit -q --no-verify -m hook-made && echo "✗ fake-check"; exit 1; fi
+if has selfcommit; then git commit -q --no-verify -m hook-made; echo "✗ fake-check"; exit 1; fi
+if has selflock; then git commit -q --no-verify -m hook-made; : >'$tmp/repo/.git/index.lock'; echo "✗ fake-check"; exit 1; fi
 if has fixme; then echo fixed >>fixme && git add fixme; fi
 if has fixout; then echo fixed >>fixed-out.txt && git add fixed-out.txt; fi
 if has lockme; then : >'$tmp/repo/.git/index.lock'; fi
@@ -405,15 +406,28 @@ for check in rev-list parent tree; do
   git reset -q
 done
 
-# フックが写しの index の内容で commit してから失敗しても、agent-wait は失敗を出す。
+# フックが写しの index の内容で commit してから失敗する。
 scene "hook commits then fails"
 head="$(git rev-parse HEAD)"
 echo x >selfcommit
 expect "commit with a hook that commits and fails starts" 0 "task agent-wait" bash "$tool" commit "$msg" selfcommit
 expect "wait reports the failed git commit despite the same commit on HEAD" 1 "git commit は失敗しましたが（終了コード 1）" bash "$tool" wait
-fact "wait keeps the exit code of git commit" grep -qx 'exit=1' "$out"
+fact "the hook's commit is HEAD" [ "$(git log -1 --format=%s)" = hook-made ]
 fact "the index matches the commit the hook made" clean
 git reset -q "$head" && rm selfcommit
+
+# フックが写しの index の内容で commit し、本物の index.lock を作ったまま失敗する。
+scene "hook commits, holds the lock, and fails"
+head="$(git rev-parse HEAD)"
+echo x >selflock
+expect "commit with a hook that commits, holds the lock, and fails starts" 0 "task agent-wait" bash "$tool" commit "$msg" selflock
+expect "wait reports that the index does not follow the hook's commit" 1 "本物の index を commit に合わせられませんでした" bash "$tool" wait
+fact "the failure does not claim the index follows the commit" not grep -qF "合わせました" "$out"
+fix="$(grep -o 'git -C .*' "$out")"
+rm .git/index.lock
+fact "the printed command makes the index follow the hook's commit" eval "$fix"
+fact "the index matches the hook's commit after the printed command" clean
+git reset -q "$head" && rm selflock
 
 # フックが失敗した commit を報告する前に、別の実行（push）を始める。
 scene "failing commit"

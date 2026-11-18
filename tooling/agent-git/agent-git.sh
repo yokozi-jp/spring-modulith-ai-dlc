@@ -253,8 +253,12 @@ landed() {
 # settle_commit <実行のディレクトリ> <終了コードの変数> [<注意>]: commit ができたかを landed で決め、最後に commit/ を消す。
 # HEAD を一度だけ読んで合わせる先にする。
 # 上に載ったほかの commit が commit のパスを戻していれば、それを出して変数を 1 にする。
-# 戻していなければ、注意を出して本物の index を合わせる先に合わせ、変数を sync_index の終了コードにする。
-# ただし変数が 0 でない（git commit が失敗した）ときは、同じ内容の commit がほかの作業のものなので、それを出して変数を変えない。
+# 戻していなければ、注意を出して本物の index を合わせる先に合わせる。
+# 変数が 0 か空（終了コードが分からない。wrapper が done を書く前に止まった実行）なら、git commit が commit したとみなし、変数を sync_index の終了コードにする。
+# 0 でも空でもない（git commit が失敗した）なら、同じ内容の commit はフックなどほかの作業が作ったか、git commit が commit の後に止まったとみなし、
+# 合わせる前にそれを出して、変数を変えない。
+# ponytail: フックが commit して git commit が失敗した実行で、wrapper と _commit が片付ける前に止まると、変数が空なので agent-wait は成功を報告する。
+#   防ぐなら、git commit を、終了コードを commit/ に書くシェルで包み、agent-wait がそれを読む。
 # 決める途中で git が失敗すれば、それを出して変数を 1 にする。
 # commit ができていなければ、変数が 0（git commit は成功した）のときだけ、HEAD の上に commit が無いことを出して変数を 1 にする。
 settle_commit() {
@@ -275,15 +279,11 @@ settle_commit() {
       printf -v "$2" 1
     else
       [ -z "${3:-}" ] || echo "$3"
-      sync_index "$run" "$tip"
-      s=$?
-      if [ "${!2:-0}" != 0 ]; then
-        echo "✗ git commit は失敗しましたが（終了コード ${!2}）、HEAD に写しの index と同じ内容の commit $ours があります。
-  フックなどほかの作業が、この内容で commit したと考えられます。本物の index は HEAD に合わせました。
-  git log -1 $ours で、その commit が意図したものか確かめてください。"
-      else
-        printf -v "$2" %s "$s"
-      fi
+      [ "${!2:-0}" = 0 ] || echo "✗ git commit は失敗しましたが（終了コード ${!2}）、HEAD に commit しようとした内容と同じ commit $ours があります。
+  フックなどほかの作業が commit したか、git commit が commit の後に止まったと考えられるので、本物の index を HEAD に合わせます。
+  git log -1 $ours で、意図した commit か確かめてください。"
+      sync_index "$run" "$tip" || s=$?
+      [ "${!2:-0}" != 0 ] || printf -v "$2" %s "$s"
     fi
   elif [ "$s" != 1 ]; then
     echo "✗ 上の git が失敗したので、commit ができたかを確かめられず、本物の index を合わせていません。
