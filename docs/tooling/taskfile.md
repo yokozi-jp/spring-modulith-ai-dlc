@@ -12,7 +12,7 @@ tags: [convention, tooling, taskfile, ci]
 CI と Lefthook は同じタスクを呼び、公開タスクを変えたら関連文書を同じ変更で更新する。
 
 このプロジェクトは、開発コマンドの共通入口としてTaskを使う。
-実行するTaskのバージョンは`docs/local-env-setup/versions.env`へ固定する。
+実行するTaskのバージョンは`mise.toml`へ固定し、ローカルとCIは`mise.lock`の版とchecksumから入れる（[ADR-090](../adr/ADR-090-pin-cli-tools-with-mise-lock.md)）。
 基準となる定義は[Taskfile.yml](../../Taskfile.yml)を参照する。
 
 ## スキーマとシェル設定
@@ -155,7 +155,7 @@ Taskfileを変更したら、CIのpaths条件に`Taskfile.yml`が含まれてい
 - `docs/tooling/dev-workflow.md`
 - `docs/tooling/lint-and-test.md`
 - DB操作を変えた場合は`docs/database/migrations.md`
-- 導入バージョンを変えた場合は`docs/local-env-setup/versions.env`とCI
+- 導入バージョンを変えた場合は`mise.toml`と、`mise lock --platform linux-x64`で更新した`mise.lock`と`.mise/locks/`
 
 `task okf-check`は`Taskfile.yml`の変更を検出すると、README、`docs/tooling/dev-workflow.md`、`docs/tooling/lint-and-test.md`が同じ差分に含まれるかを警告する。
 内部タスクや実装だけの変更では文書更新を要求しないため、警告を確認して対応不要と判断してよい。

@@ -422,18 +422,16 @@ tasks:
 
   # Setup
   setup:
-    desc: 開発環境のセットアップスクリプトを順次実行
+    desc: 開発環境のセットアップスクリプトを順次実行し、mise.lock の CLI ツールを入れる
     dir: docs/local-env-setup
     cmds:
       - |
-        ./00-setup-task.sh
         ./01-setup-java.sh
         ./02-setup-viteplus.sh
         ./03-setup-kiro.sh
         export PATH="$HOME/.local/bin:$PATH"
         ./04-setup-shell.sh
-        ./05-setup-go-betterleaks.sh
-        ./06-setup-iwe.sh
+        mise install --locked
 
   # Frontend
   fe-install:
@@ -1440,13 +1438,13 @@ tasks:
   scan-secrets:
     desc: ステージ済みの変更をbetterleaksでスキャン
     cmds:
-      - PATH="$PATH:$HOME/go/bin" betterleaks git --staged -c .betterleaks.toml --no-banner --redact
+      - betterleaks git --staged -c .betterleaks.toml --no-banner --redact
 
   # --log-opts を渡すと betterleaks は Git 履歴を単一ワーカーで読むため、--git-workers は付けない。
   scan-secrets-all:
     desc: 現在のブランチから辿れる履歴（BETTERLEAKS_LOG_OPTSで範囲を変更可）をbetterleaksでスキャン
     cmds:
-      - PATH="$PATH:$HOME/go/bin" betterleaks git . -c .betterleaks.toml --no-banner --redact --log-opts="${BETTERLEAKS_LOG_OPTS:-HEAD}"
+      - betterleaks git . -c .betterleaks.toml --no-banner --redact --log-opts="${BETTERLEAKS_LOG_OPTS:-HEAD}"
 
   scan-dast:
     desc: 隔離した環境で認証付きのpassive scan（OWASP ZAP）を実行し、レポートをbuild/dastに出力

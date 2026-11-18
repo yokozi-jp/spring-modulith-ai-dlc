@@ -13,6 +13,9 @@ on:
       - ".github/rulesets/**"
       - "tooling/ruleset-check/**"
       - ".github/workflows/**"
+      - "mise.toml"
+      - "mise.lock"
+      - ".mise/**"
   pull_request:
     branches: ["**"]
   workflow_call:
@@ -53,7 +56,10 @@ jobs:
             'tooling/adr-lint/**' \
             '.github/rulesets/**' \
             'tooling/ruleset-check/**' \
-            '.github/workflows/**'
+            '.github/workflows/**' \
+            'mise.toml' \
+            'mise.lock' \
+            '.mise/**'
 
   okf-validate:
     name: Run task okf-check 📚
@@ -67,25 +73,20 @@ jobs:
           persist-credentials: false
           fetch-depth: 0
 
+      # npm: backend の iwe は Node.js で動く。
       - name: Setup Node.js
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: "22"
 
-      - name: Set up Task
-        uses: go-task/setup-task@a00fbb05ce67b35648be3c78cbc9fd85354c757e # v2
+      - name: Set up mise tools
+        uses: jdx/mise-action@236a21c3b91f5db6d4e174b348674a0f0caac06d # v5.2.9
+        env:
+          MISE_LOCKED: "1"
         with:
-          version: "3.53.1"
-          checksum: a54a408f6861ff921f6e87774180db31bacd8c1e7c944ca696db9fea49a82fc7
-
-      # docs/ を OKF v0.2 バンドルとして検証する（適合と孤立ドキュメント）。
-      # バージョンは versions.env の IWE_VERSION から読み、ローカルと CI を揃える。
-      # iwe はグローバル CLI ツールで pnpm workspace の lockfile 管理にそぐわないため、
-      # adhoc-packages 監査を抑制する。
-      - name: Install iwe
-        run: | # zizmor: ignore[adhoc-packages]
-          IWE_VERSION="$(grep '^IWE_VERSION=' docs/local-env-setup/versions.env | cut -d= -f2 | tr -d '"')"
-          npm install -g "@iwe-org/iwe@${IWE_VERSION}"
+          version: 2026.11.9
+          install_args: task npm:@iwe-org/iwe
+          cache: false
 
       - name: Validate OKF conformance
         env:

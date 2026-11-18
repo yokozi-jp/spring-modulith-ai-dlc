@@ -103,11 +103,14 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Set up Task
-        uses: go-task/setup-task@a00fbb05ce67b35648be3c78cbc9fd85354c757e # v2
+      - name: Set up mise tools
+        uses: jdx/mise-action@236a21c3b91f5db6d4e174b348674a0f0caac06d # v5.2.9
+        env:
+          MISE_LOCKED: "1"
         with:
-          version: "3.53.1"
-          checksum: a54a408f6861ff921f6e87774180db31bacd8c1e7c944ca696db9fea49a82fc7
+          version: 2026.11.9
+          install_args: task
+          cache: false
 
       - name: Check that CI gate covers every pull_request workflow
         run: task ci-gate-check

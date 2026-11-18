@@ -89,7 +89,6 @@ clone したら、[スキルの取得元と更新](docs/agents/skill-sources.md)
 | インフラとツール | Keycloak                   | 26.7.3     | OIDC の認可サーバー                            |
 | インフラとツール | Grafana OpenTelemetry LGTM | 0.32.1     | 可観測性データの集約                           |
 | インフラとツール | OpenTelemetry Collector    | 0.161.0    | ログの属性の絞り込み                           |
-| インフラとツール | Go (betterleaks 実行用)    | 1.27.x     |                                                |
 | インフラとツール | Task                       | 3.53.1     | タスクランナー                                 |
 
 ログ相関、PII、保持は[可観測性データの規約](docs/observability/conventions.md)、フロントエンドの構成は[フロントエンドアーキテクチャ](docs/frontend/architecture.md)を参照してください。
