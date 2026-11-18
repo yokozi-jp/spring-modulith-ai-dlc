@@ -269,7 +269,7 @@ const params = { ...(cursor !== undefined && { cursor }) };
 - **`task scan-vulns`**：バックエンドとフロントエンドの依存関係をTrivyで検査する。
 - **`task scan-vulns-backend`**：バックエンドのCycloneDX SBOMをTrivyで検査する。
 - **`task scan-vulns-frontend`**：フロントエンドの解決済み依存関係をTrivyで検査する。
-- **`task scan-dast`**：隔離した依存、backend、`vp preview`を起動し、OWASP ZAPで認証付きのpassive scanを実行して片付ける。
+- **`task scan-dast`**：隔離した依存を起動してマイグレーションを適用し、backend、`vp preview`を起動して、OWASP ZAPで認証付きのpassive scanを実行して片付ける。
 - **`task scan-dast-active`**：同じ環境でactive scanを実行する。
 - **`task lint-actions`**：GitHub Actionsワークフローをactionlintで検査する。
 - **`task lint-actions-security`**：GitHub Actionsワークフローをzizmorで検査する。

@@ -241,6 +241,7 @@ task scan-dast-active
 
 ポート4173、18081、18082、5433、6380、8081を使うので、開発環境とは同時に実行できるが、`task test`とは同時に実行できない。
 ZAPとbackendは`--network host`で起動するので、Docker Desktopではhost networkingを有効にしておく必要がある。
+backendの起動の前に`task be-migrate`でマイグレーションを適用するため、JDKが要る。
 レポートは`build/dast/`に出力する（[ADR-056](../adr/ADR-056-run-authenticated-dast-with-zap-in-ci.md)）。
 
 ## ローカルサービスを確認するとき

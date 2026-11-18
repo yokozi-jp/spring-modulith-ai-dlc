@@ -34,6 +34,10 @@ backend は SPA を配信しない。
 本番の配信点はまだないので、同一オリジンを再現できるのは Vite の proxy だけである。
 `vp build` のあとの `vp preview` は dev server の proxy を引き継ぎ、本番用の CSP を返す。
 
+アプリの利用者の対応づけ（#374）で、ログインが DB へ利用者を書くようになった。
+DAST の環境は空の DB のままだったため、ログインが失敗し、前提確認が 401 で止まった。
+そこで、この ADR の Decision と Consequences を、DAST の環境でもマイグレーションを実行する形に書き直した。
+
 開発者は dev 環境（5173、8080、18080）を動かしたまま検査したい。
 CI の既存ジョブ（`hadolint.yml` の backend イメージの検査）は、`docker/compose-test.yml` と `.env.test` で依存と backend を起動しており、この手順は流用できる。
 
@@ -106,7 +110,7 @@ active scan は時間がかかり、攻撃の通信を送るので、PR ごと�
 
 - dev の Keycloak は volume に realm を保持しているので、realm.json の変更を反映するには `task keycloak-reimport` が要る。
   DAST は使い捨ての Keycloak を使うので不要である。
-- 業務 API ができるまで、DAST の環境ではマイグレーションを実行しない。
+- ログインがアプリの DB に利用者を作るため、DAST の環境でも backend の起動の前にマイグレーションを実行する。CI の DAST のジョブは JDK と Gradle を準備する。
 - AJAX spider と OpenAPI 定義の取り込みは、業務 API と画面が増えてから検討する。
 - push の trigger は置かない。
   PR の SARIF は PR に表示され、既定ブランチの Security タブは週 1 回の active scan（passive の検査も含む）で更新される。
