@@ -130,7 +130,7 @@ class OrderController {
   @ApiResponse(responseCode = "200")
   @ApiResponse(responseCode = "404", ref = "#/components/responses/NotFoundProblem")
   @GetMapping("/{orderId}")
-  /* package */ OrderDetailsResponse details(@PathVariable final String orderId) {
+  /* package */ OrderDetailsResponse details(@PathVariable final UUID orderId) {
     // OrderQueries を呼び、OrderDetailsResponse.from(...) を返す。
   }
 
@@ -148,7 +148,7 @@ class OrderController {
   @ApiResponse(responseCode = "409", ref = "#/components/responses/ConflictProblem")
   @PostMapping("/{orderId}/cancel")
   /* package */ ResponseEntity<Void> cancel(
-      @PathVariable final String orderId, @Valid @RequestBody final CancelOrderRequest request) {
+      @PathVariable final UUID orderId, @Valid @RequestBody final CancelOrderRequest request) {
     // CommandHandler を呼び、ResponseEntity.noContent().build() を返す。
   }
 }
@@ -165,7 +165,7 @@ class OrderController {
  * @param giftWrap ギフト包装をするかどうか
  */
 public record PlaceOrderRequest(
-    @NotBlank @Schema(example = "C-0001") String customerId,
+    @NotNull @Schema(example = "3a9d6e1f-8b2c-4d7e-a5f0-6c1b2e3d4f5a") UUID customerId,
     @Positive @Schema(example = "2") int quantity,
     boolean giftWrap) {}
 
@@ -177,7 +177,7 @@ public record PlaceOrderRequest(
  * @param lines 注文の明細
  */
 public record OrderDetailsResponse(
-    @Schema(example = "O-0001") String orderId,
+    @Schema(example = "5f0c2a8e-7d1b-4c3a-9e6f-1a2b3c4d5e6f") UUID orderId,
     @Schema(example = "PLACED") String status,
     List<OrderDetailsResponse.OrderLineResponse> lines) {}
 ```

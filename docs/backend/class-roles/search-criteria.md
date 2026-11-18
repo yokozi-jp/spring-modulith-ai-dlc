@@ -69,9 +69,9 @@ public record OrderSearchCriteria(String customerId) {}
  */
 @Operation(operationId = "listOrders")
 @GetMapping
-/* package */ OrderSummaryListResponse search(@RequestParam final String customerId) {
+/* package */ OrderSummaryListResponse search(@RequestParam final UUID customerId) {
   final List<OrderSummaryResponse> items =
-      orderQueries.search(new OrderSearchCriteria(customerId)).stream()
+      orderQueries.search(new OrderSearchCriteria(customerId.toString())).stream()
           .map(OrderSummaryResponse::from)
           .toList();
   return new OrderSummaryListResponse(items);
