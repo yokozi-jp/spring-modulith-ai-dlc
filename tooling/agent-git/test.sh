@@ -142,6 +142,7 @@ expect "refuses an empty message file" 1 "が無いか空です" bash "$tool" co
 echo other >other.txt && git add other.txt
 echo a >"a b.txt"
 expect "refuses when a path outside the given ones is staged" 1 "    other.txt" bash "$tool" commit "$msg" "a b.txt"
+fact "the refusal tells to unstage a change of another task" grep -qF "git restore --staged" "$out"
 fact "the refusal leaves HEAD" [ "$(git rev-parse HEAD)" = "$init" ]
 fact "the refusal does not stage the given path" [ -z "$(git diff --cached --name-only -- "a b.txt")" ]
 echo x >sub/refused
@@ -267,14 +268,24 @@ fact "the commit stops tracking the path" [ -z "$(git ls-tree HEAD ignore.txt)" 
 fact "the untracked file stays in the work tree" [ -f ignore.txt ]
 fact "the index matches the commit of the removal, the rename, and the untracking" clean
 
-# 衝突を解決していない merge と、HEAD から何も変えない merge。
+# 衝突を解決していない merge、merge、cherry-pick、revert の途中のパスの外の stage、HEAD から何も変えない merge。
 scene "merge commits"
-git switch -q -c side && echo side >conflict.txt && git add conflict.txt && git commit -q --no-verify -m side
+git switch -q -c side && echo side >conflict.txt && echo side >side.txt && git add conflict.txt side.txt && git commit -q --no-verify -m side
 git switch -q main && echo main >conflict.txt && git add conflict.txt && git commit -q --no-verify -m main
 git merge -q side >/dev/null 2>&1
 expect "refuses an unresolved conflict" 1 "    conflict.txt" bash "$tool" commit "$msg" conflict.txt
 fact "the refusal tells to resolve the conflict" grep -qF "衝突を解決してから" "$out"
-git merge --abort && git merge -q -s ours --no-commit side >/dev/null 2>&1
+git merge --abort && git checkout -q side -- side.txt
+# 途中の操作の印だけを置き、side.txt を取り込んだ変更とみなす。
+for ref in MERGE_HEAD CHERRY_PICK_HEAD REVERT_HEAD; do
+  git rev-parse side >".git/$ref"
+  expect "refuses a path outside the given ones during $ref" 1 "    side.txt" bash "$tool" commit "$msg" conflict.txt
+  fact "the refusal during $ref says to pass every staged path" grep -qF "stage 済みのパスをすべて渡す" "$out"
+  fact "the refusal during $ref does not tell to unstage" not grep -qF "git restore --staged" "$out"
+  rm ".git/$ref"
+done
+git rm -q --cached side.txt && rm side.txt
+git merge -q -s ours --no-commit side >/dev/null 2>&1
 expect "commit of a merge with no change starts" 0 "task agent-wait" bash "$tool" commit "$msg" .
 expect "wait reports the merge commit" 0 "exit=0" bash "$tool" wait
 fact "the merge commit has both parents" [ "$(git rev-parse HEAD^2)" = "$(git rev-parse side)" ]

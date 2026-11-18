@@ -126,7 +126,7 @@ new_run() {
 # check_paths <実行のディレクトリ> <パス>...: 写しの index で渡したパスを確かめ、写しに git add するパスを pending に書く。
 # 当たらないパス、衝突、パスの外の stage、stage と作業ツリーの食い違いがあれば、理由と直し方を出して止まる。
 check_paths() {
-  local index="$1/commit/index" pending="$1/commit/pending" head
+  local index="$1/commit/index" pending="$1/commit/pending" head ref remedy
   head="$(cat -- "$1/commit/head")"
   shift
   # git commit -- <パス> と同じく、HEAD にだけあるパス（git rm や git mv の元）も当たったとみなし、どこにも当たらないパスで止める。
@@ -134,10 +134,15 @@ check_paths() {
     fail "上のパスは、作業ツリー、index、HEAD のどれにもありません（.gitignore で無視しているファイルも含みます）。"
   refuse_listed "次のパスは衝突が解決されていないので止めます。" <(changed "$index" --diff-filter=U --) \
     "  衝突を解決してから git add -- <パス> で stage し、やり直してください。"
-  refuse_listed "渡したパスの外に stage 済みの変更があり、このまま commit すると混ざるので止めます。" \
-    <(LC_ALL=C comm -z -23 <(changed "$index" --cached --) <(changed "$index" --cached -- "$@")) \
-    "  自分の変更ならパスに足してください。
+  remedy="  自分の変更ならパスに足してください。
   別の作業が stage したものなら、その作業に確かめてから git restore --staged -- <パス> で外してください。"
+  for ref in MERGE_HEAD CHERRY_PICK_HEAD REVERT_HEAD; do
+    git rev-parse -q --verify "$ref" >/dev/null &&
+      remedy="  $ref があるので、stage 済みの変更には途中の merge、cherry-pick、revert の変更が入っています。
+  外さずに、stage 済みのパスをすべて渡すか、リポジトリのルートで . を渡してやり直してください。"
+  done
+  refuse_listed "渡したパスの外に stage 済みの変更があり、このまま commit すると混ざるので止めます。" \
+    <(LC_ALL=C comm -z -23 <(changed "$index" --cached --) <(changed "$index" --cached -- "$@")) "$remedy"
   # git add は index にも作業ツリーにも無いパスで失敗するので、git rm や git mv で消したパスを渡さず、作業ツリーとの違いだけを渡す。
   { changed "$index" -- "$@" && GIT_INDEX_FILE="$index" git --literal-pathspecs ls-files -z -o --exclude-standard --full-name -- "$@"; } |
     LC_ALL=C sort -zu >"$pending" || exit 1
