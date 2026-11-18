@@ -13,6 +13,9 @@ on:
       - "version.txt"
       - "backend/build.gradle"
       - "Taskfile.yml"
+      - "mise.toml"
+      - "mise.lock"
+      - ".github/actions/setup-mise/**"
 
 concurrency:
   group: release-please-main
@@ -34,13 +37,7 @@ jobs:
           persist-credentials: false
 
       - name: Set up mise tools
-        uses: jdx/mise-action@236a21c3b91f5db6d4e174b348674a0f0caac06d # v5.2.9
-        env:
-          MISE_LOCKED: "1"
-        with:
-          version: 2026.11.9
-          install_args: task
-          cache: false
+        uses: ./.github/actions/setup-mise
 
       - name: Validate release configuration and versions
         run: task release-check

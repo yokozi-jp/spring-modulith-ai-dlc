@@ -275,7 +275,9 @@ pre-push:
     # glob を効かせるため run 内で {files} を参照する。
     # docker が無い環境ではスキップ（最終担保は CI に任せる）。
     - name: actionlint
-      glob: ".github/workflows/*.{yml,yaml}"
+      glob:
+        - ".github/workflows/*.{yml,yaml}"
+        - ".github/actions/**"
       files: *push-files
       run: |
         echo "{files}" >/dev/null
@@ -290,7 +292,9 @@ pre-push:
     # GitHub Actions ワークフローに変更がある push のときだけセキュリティ解析（zizmor）
     # docker が無い環境ではスキップ（最終担保は CI に任せる）。
     - name: zizmor
-      glob: ".github/workflows/*.{yml,yaml}"
+      glob:
+        - ".github/workflows/*.{yml,yaml}"
+        - ".github/actions/**"
       files: *push-files
       run: |
         echo "{files}" >/dev/null
@@ -299,4 +303,4 @@ pre-push:
           exit 0
         fi
         docker run --rm -v "$PWD":/repo -w /repo \
-          ghcr.io/zizmorcore/zizmor:latest .github/workflows/
+          ghcr.io/zizmorcore/zizmor:latest .github/workflows/ .github/actions/

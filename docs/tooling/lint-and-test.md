@@ -271,7 +271,7 @@ const params = { ...(cursor !== undefined && { cursor }) };
 - **`task scan-dast`**：隔離した依存、backend、`vp preview`を起動し、OWASP ZAPで認証付きのpassive scanを実行して片付ける。
 - **`task scan-dast-active`**：同じ環境でactive scanを実行する。
 - **`task lint-actions`**：GitHub Actionsワークフローをactionlintで検査する。
-- **`task lint-actions-security`**：GitHub Actionsワークフローをzizmorで検査する。
+- **`task lint-actions-security`**：GitHub Actionsのワークフローとcomposite action（`.github/actions/`）をzizmorで検査する。
 - **`task lint-docker`**：Dockerfileをhadolintで検査する。
 - **`task lint-docker-check`**：Dockerfileを`docker build --check`で検査する。
 - **`task lint-compose`**：Composeファイルの構文、参照、変数展開を検証する。
@@ -338,7 +338,7 @@ OKF検査の採用理由は[ADR-036](../adr/ADR-036-adopt-okf-for-docs-knowledge
 - **pre-push（すべて）**：`adr-check`と`scan-secrets-all`を実行する。
 - **pre-push（バックエンドのJavaまたはGradle変更）**：`be-lint`相当と`test`を実行する。
 - **pre-push（フロントエンドの変更）**：`fe-test-build`を、Vitestのdot reporterとjson-summaryだけのcoverageで実行する。
-- **pre-push（GitHub Actionsワークフローの変更）**：`lint-actions`相当と`lint-actions-security`相当を実行する。
+- **pre-push（GitHub Actionsのワークフローかcomposite actionの変更）**：`lint-actions`相当と`lint-actions-security`相当を実行する。
 
 Gitフックの条件とコマンドは[`lefthook.yml`](../../lefthook.yml)を正とする。
 Lefthookは版の表示、skipの行、`EXECUTE`の行を省き、jobの出力と要約を出す（`output`）。

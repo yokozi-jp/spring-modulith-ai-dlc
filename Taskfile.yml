@@ -422,7 +422,7 @@ tasks:
 
   # Setup
   setup:
-    desc: 開発環境のセットアップスクリプトを順次実行し、mise.lock の CLI ツールを入れる
+    desc: 開発環境のセットアップスクリプトを順次実行
     dir: docs/local-env-setup
     cmds:
       - |
@@ -431,7 +431,6 @@ tasks:
         ./03-setup-kiro.sh
         export PATH="$HOME/.local/bin:$PATH"
         ./04-setup-shell.sh
-        mise install --locked
 
   # Frontend
   fe-install:
@@ -1603,11 +1602,11 @@ tasks:
           -color
 
   lint-actions-security:
-    desc: GitHub Actionsワークフローをzizmorで検査
+    desc: GitHub Actionsのワークフローとcomposite actionをzizmorで検査
     cmds:
       - |
         docker run --rm -v "$PWD":/repo -w /repo \
-          ghcr.io/zizmorcore/zizmor:1.29.0@sha256:863026d54f91271b10b60b67ad8054cb37120167e162482597db102b3026a284 .github/workflows/
+          ghcr.io/zizmorcore/zizmor:1.29.0@sha256:863026d54f91271b10b60b67ad8054cb37120167e162482597db102b3026a284 .github/workflows/ .github/actions/
 
   lint-docker:
     desc: 全Dockerfileをhadolintで検査

@@ -13,6 +13,9 @@ on:
       - "docker/wiremock/**"
       - ".env.test.example"
       - "Taskfile.yml"
+      - "mise.toml"
+      - "mise.lock"
+      - ".github/actions/setup-mise/**"
       - ".github/workflows/mutation-test.yml"
   # 必須チェックにしないため、PR では Backend CI の push と同じ path filter で起動を絞る（ADR-076）。
   pull_request:
@@ -26,6 +29,9 @@ on:
       - "docker/wiremock/**"
       - ".env.test.example"
       - "Taskfile.yml"
+      - "mise.toml"
+      - "mise.lock"
+      - ".github/actions/setup-mise/**"
       - ".github/workflows/mutation-test.yml"
 
 concurrency:
@@ -76,13 +82,7 @@ jobs:
             gradle-${{ runner.os }}-test-
 
       - name: Set up mise tools
-        uses: jdx/mise-action@236a21c3b91f5db6d4e174b348674a0f0caac06d # v5.2.9
-        env:
-          MISE_LOCKED: "1"
-        with:
-          version: 2026.11.9
-          install_args: task
-          cache: false
+        uses: ./.github/actions/setup-mise
 
       # PR では base との差分のクラスだけを、そのパッケージのテストで変異させ、push と手動実行では全体を変異させる。
       # 対象の求め方は Taskfile の be-mutation-test にある。

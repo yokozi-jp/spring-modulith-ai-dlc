@@ -140,25 +140,19 @@ cd spring-modulith-ai-dlc
 
 ``` bash
 cd /home/projects/spring-modulith-ai-dlc
-mise install --locked
+mise install
 eval "$(mise activate bash --shims)"
 task setup
 source ~/.bashrc
 ```
 
-`mise install --locked` は、`mise.toml` の Task、betterleaks、iwe を、`mise.lock` と `.mise/locks/` に記録した版と checksum で検証して入れます（[ADR-090](../adr/ADR-090-pin-cli-tools-with-mise-lock.md)）。
-`task setup` は `04-setup-shell.sh` で mise の shims を `~/.bashrc` から PATH の先頭に通し、最後に `mise install --locked` をもう一度実行します。
-`mise.toml` か `mise.lock` が変わったときは、`mise install --locked` だけを実行します。
+`mise install` は、`mise.toml` の Task、betterleaks、iwe を、`mise.lock` と `.mise/locks/` に記録した版と checksum で検証して入れます（[ADR-090](../adr/ADR-090-pin-cli-tools-with-mise-lock.md)）。
+`mise.toml` が lock を強制するので、lock に無い版は入りません。
+`task setup` は `04-setup-shell.sh` で、mise の shims を PATH の先頭に通す行を `~/.bashrc` に足します。
+`mise.toml` か `mise.lock` が変わったときは、`mise install` だけを実行します。
 
-以前の手順で入れた Task、Go、betterleaks、iwe は使わなくなったので、消してかまいません。
-
-``` bash
-rm -f ~/.local/bin/task ~/go/bin/betterleaks
-sudo rm -rf /usr/local/go
-npm uninstall -g @iwe-org/iwe
-```
-
-`~/.bashrc` に残る `# Go / betterleaks` の PATH の行も消します。
+shims は、今いるディレクトリから上にたどって見つけた `mise.toml` の版を選びます。
+そのため `task`、`betterleaks`、`iwe` は、`mise.toml` のあるチェックアウトの中でだけ動きます。
 
 ### 8. Git hooks のセットアップ
 
@@ -178,12 +172,12 @@ npm install
 
 VSCode が WSL モードで再起動し、左下のステータスバーに `WSL: <インスタンス名>` と表示されれば接続完了です。
 
-### 10. iwe のインストール
+### 10. iwe（ナレッジ管理）
 
 [iwe](https://github.com/iwe-org/iwe) は markdown ベースのナレッジ管理ツールです（CLI、LSP サーバー、MCP サーバー）。
 このプロジェクトでは `docs/` 配下のドキュメント（ADR など）を対象に、リンク補完、バックリンク、定義ジャンプや AI エージェント連携に使い、`task okf-check` で OKF バンドルの適合を検証します。
 
-iwe は手順 7 の `mise install --locked` で導入済みです。
+iwe は手順 7 の `mise install` で導入済みです。
 バージョンは `mise.toml` に固定し、チームと CI で揃えます。
 
 `iwe`（CLI）、`iwes`（LSP サーバー）、`iwec`（MCP サーバー）の 3 コマンドが入ります。
@@ -208,6 +202,7 @@ iwe は手順 7 の `mise install --locked` で導入済みです。
 ### 12. 動作確認
 
 ``` bash
+cd /home/projects/spring-modulith-ai-dlc
 docker info
 java -version
 node -v

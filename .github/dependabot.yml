@@ -44,7 +44,10 @@ updates:
 
   # GitHub Actions のワークフローで使うアクションのバージョン更新。
   - package-ecosystem: "github-actions"
-    directory: "/"
+    # "/" は .github/workflows とルートの action.yml だけを見るため、composite action を足す。
+    directories:
+      - "/"
+      - "/.github/actions/setup-mise"
     schedule:
       interval: "weekly"
     # 新しいリリースを取り込むまで最低 7 日待つ（リリース直後の不正パッケージ対策）

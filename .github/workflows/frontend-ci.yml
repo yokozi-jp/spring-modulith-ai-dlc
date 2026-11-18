@@ -8,6 +8,9 @@ on:
       - "frontend/**"
       - "openapi/**"
       - "Taskfile.yml"
+      - "mise.toml"
+      - "mise.lock"
+      - ".github/actions/setup-mise/**"
       - ".github/workflows/frontend-ci.yml"
   # 必須チェックにしても対象外PRがExpectedのまま残らないよう、PRでは常に起動し、
   # changesジョブでFrontend検証の要否を判定する。
@@ -52,7 +55,7 @@ jobs:
             echo "frontend=true" >> "$GITHUB_OUTPUT"
             exit 0
           fi
-          if grep -Eq '^(frontend/|openapi/|Taskfile\.yml$|\.github/workflows/(frontend-ci|ci)\.yml$)' \
+          if grep -Eq '^(frontend/|openapi/|Taskfile\.yml$|mise\.(toml|lock)$|\.github/actions/setup-mise/|\.github/workflows/(frontend-ci|ci)\.yml$)' \
             <<< "$changed_files"; then
             echo "frontend=true" >> "$GITHUB_OUTPUT"
           else
@@ -84,13 +87,7 @@ jobs:
           cache-dependency-path: frontend/pnpm-lock.yaml
 
       - name: Set up mise tools
-        uses: jdx/mise-action@236a21c3b91f5db6d4e174b348674a0f0caac06d # v5.2.9
-        env:
-          MISE_LOCKED: "1"
-        with:
-          version: 2026.11.9
-          install_args: task
-          cache: false
+        uses: ./.github/actions/setup-mise
 
       - name: Install dependencies
         working-directory: frontend

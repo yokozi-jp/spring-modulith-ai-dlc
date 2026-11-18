@@ -146,6 +146,7 @@ Dockerの`--format`など別のGoテンプレートをコマンドへ渡す場�
 CIとLefthookは処理を複製せず、Taskfileの同じタスクを呼ぶ。
 入口タスクが呼ぶ部品タスクとCIが呼ぶ部品タスクの処理を一致させる。
 Taskfileを変更したら、CIのpaths条件に`Taskfile.yml`が含まれていることも確認する。
+`Taskfile.yml`をpaths条件に入れるworkflowには、Taskの版と入れ方を決める`mise.toml`、`mise.lock`、`.github/actions/setup-mise/`も入れる。
 
 ## 文書の同期
 
@@ -155,7 +156,7 @@ Taskfileを変更したら、CIのpaths条件に`Taskfile.yml`が含まれてい
 - `docs/tooling/dev-workflow.md`
 - `docs/tooling/lint-and-test.md`
 - DB操作を変えた場合は`docs/database/migrations.md`
-- 導入バージョンを変えた場合は`mise.toml`と、`mise lock --platform linux-x64`で更新した`mise.lock`と`.mise/locks/`
+- 導入バージョンを変えた場合は`mise.toml`（手順は同ファイルの冒頭）
 
 `task okf-check`は`Taskfile.yml`の変更を検出すると、README、`docs/tooling/dev-workflow.md`、`docs/tooling/lint-and-test.md`が同じ差分に含まれるかを警告する。
 内部タスクや実装だけの変更では文書更新を要求しないため、警告を確認して対応不要と判断してよい。

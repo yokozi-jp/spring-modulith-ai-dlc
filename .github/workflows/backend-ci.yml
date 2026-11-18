@@ -13,6 +13,9 @@ on:
       - "docker/wiremock/**"
       - ".env.test.example"
       - "Taskfile.yml"
+      - "mise.toml"
+      - "mise.lock"
+      - ".github/actions/setup-mise/**"
       - "tooling/session-sql-lint/**"
       - ".github/workflows/backend-ci.yml"
   # PR ではパスフィルタで workflow 自体をスキップしない。スキップすると
@@ -65,7 +68,7 @@ jobs:
             exit 0
           fi
           # backend-ci.yml の push パスフィルタと同じ集合に、ci.yml を足して判定する。
-          if grep -Eq '^(backend/|openapi/|docker/initdb/|docker/wiremock/|\.spectral\.yaml$|docker/compose-test\.yml$|\.env\.test\.example$|Taskfile\.yml$|tooling/session-sql-lint/|\.github/workflows/(backend-ci|ci)\.yml$)' \
+          if grep -Eq '^(backend/|openapi/|docker/initdb/|docker/wiremock/|\.spectral\.yaml$|docker/compose-test\.yml$|\.env\.test\.example$|Taskfile\.yml$|mise\.(toml|lock)$|\.github/actions/setup-mise/|tooling/session-sql-lint/|\.github/workflows/(backend-ci|ci)\.yml$)' \
             <<< "$changed_files"; then
             echo "backend=true" >> "$GITHUB_OUTPUT"
           else
@@ -118,13 +121,7 @@ jobs:
         run: ./gradlew spotlessCheck pmdMain pmdTest spotbugsMain spotbugsTest
 
       - name: Set up mise tools
-        uses: jdx/mise-action@236a21c3b91f5db6d4e174b348674a0f0caac06d # v5.2.9
-        env:
-          MISE_LOCKED: "1"
-        with:
-          version: 2026.11.9
-          install_args: task
-          cache: false
+        uses: ./.github/actions/setup-mise
 
       # PgBouncer のトランザクションモードや RDS Proxy の後ろで壊れるセッションの SQL を検出する。
       - name: Check session-level SQL
@@ -178,13 +175,7 @@ jobs:
             gradle-${{ runner.os }}-test-
 
       - name: Set up mise tools
-        uses: jdx/mise-action@236a21c3b91f5db6d4e174b348674a0f0caac06d # v5.2.9
-        env:
-          MISE_LOCKED: "1"
-        with:
-          version: 2026.11.9
-          install_args: task
-          cache: false
+        uses: ./.github/actions/setup-mise
 
       # rollback の検証はローカルの task test と同じく compose の PostgreSQL 5433 を使う。
       # テストは fork ごとに Testcontainers の PostgreSQL、Redis と WireMock を起動する（ADR-085）。

@@ -8,6 +8,9 @@ on:
       - "docker/compose.yml"
       - ".env.example"
       - "Taskfile.yml"
+      - "mise.toml"
+      - "mise.lock"
+      - ".github/actions/setup-mise/**"
       - ".github/workflows/otel-collector.yml"
   pull_request:
     branches: ["**"]
@@ -45,6 +48,9 @@ jobs:
             'docker/compose.yml' \
             '.env.example' \
             'Taskfile.yml' \
+            'mise.toml' \
+            'mise.lock' \
+            '.github/actions/setup-mise/**' \
             '.github/workflows/otel-collector.yml'
 
   otel-collector-check:
@@ -59,13 +65,7 @@ jobs:
           persist-credentials: false
 
       - name: Set up mise tools
-        uses: jdx/mise-action@236a21c3b91f5db6d4e174b348674a0f0caac06d # v5.2.9
-        env:
-          MISE_LOCKED: "1"
-        with:
-          version: 2026.11.9
-          install_args: task
-          cache: false
+        uses: ./.github/actions/setup-mise
 
       # 禁止値を含む OTLP データを Collector に流し、出口に残らないことを確かめる。
       - name: Check Collector config

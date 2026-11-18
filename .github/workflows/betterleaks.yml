@@ -27,13 +27,9 @@ jobs:
           persist-credentials: false
 
       - name: Set up mise tools
-        uses: jdx/mise-action@236a21c3b91f5db6d4e174b348674a0f0caac06d # v5.2.9
-        env:
-          MISE_LOCKED: "1"
+        uses: ./.github/actions/setup-mise
         with:
-          version: 2026.11.9
-          install_args: task betterleaks
-          cache: false
+          tools: task betterleaks
 
       # PR ではベースからの差分だけをスキャンして高速化する。
       # main への push では BETTERLEAKS_LOG_OPTS が空になり、HEAD から辿れる履歴全体をスキャンする。
