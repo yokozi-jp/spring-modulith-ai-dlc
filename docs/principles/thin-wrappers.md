@@ -24,7 +24,7 @@ tags: [convention, principles, abstraction, future-arch-guidelines]
 次は対象外とする。
 
 - オニオンアーキテクチャの層の境界にある Infrastructure の Adapter と Application の `port`。置き方は[バックエンドの層の責務](../backend/layers.md)に従う。
-- `components/ui` に置く UI primitive。置き方は[フロントエンドのUIとスタイル](../frontend/ui-and-style.md)に従う。
+- `packages/ui` に置く UI primitive。置き方は[フロントエンドのUIとスタイル](../frontend/ui-and-style.md)に従う。
 - 専門のチームが組織横断で保守し、文書と採用実績がそろった共通フレームワーク。
 
 ## 直接呼ぶもの

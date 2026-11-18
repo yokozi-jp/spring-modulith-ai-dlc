@@ -1,8 +1,7 @@
+import { Button } from "@frontend/ui/button";
 import { useQueryErrorResetBoundary } from "@tanstack/react-query";
 import { useRouter } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
-
-import { Button } from "@/components/ui/button";
 
 // error.message は内部情報を含みうるため表示せず、カタログの文言だけを出す。
 export function RouteError() {

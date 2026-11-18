@@ -64,10 +64,14 @@ PITのHTMLとXMLのレポートは、変異対象がある場合に`backend/buil
 
 - **`task fe-check`**：workspaceのルートの`frontend`で`vp check`を実行し、Oxfmt、Oxlint、TypeScriptの型を非破壊で検査する。
 - **`task fe-knip`**：未参照ファイル、未使用export、未使用依存をKnipで検査する。
-- **`task fe-doctor`**：React Doctorでwarningとerrorを検出し、検出または15分超過で失敗する。
+  `packages/ui`は`includeEntryExports: true`にし、`exports`で公開した部品の未使用exportも報告する。
+- **`task fe-doctor`**：`apps/web`のReact Doctorでwarningとerrorを検出し、検出または15分超過で失敗する。`packages/ui`は対象にしない。
+  `packages/ui`を対象に加えるときは、`react-doctor/only-export-components`の例外が要る。`buttonVariants`のようなvariantをcomponentと同じファイルからexportするためである。
 - **`task fe-coverage`**：React Compilerを有効にして、`vp run --recursive test`でルートのlint設定のテストと各packageのテストを実行する。
   そのあと、Compilerを外した状態で、ルートを除くpackageごとにVitestのV8 providerのcoverageを測り、下限もpackageごとに検証する。
-  `apps/web`の全体の下限はbranch 88%とline 95%、`packages/api`の全体の下限は切り出した時点の実測の少し下のbranch 90%とline 98%である。ファイルごとの下限は全packageで共通のbranch 60%とline 65%である。
+  `apps/web`の全体の下限はbranch 88%とline 95%、`packages/api`の全体の下限は切り出した時点の実測の少し下のbranch 90%とline 98%、`packages/ui`の全体の下限はbranch 95%とline 95%である。ファイルごとの下限は全packageで共通のbranch 60%とline 65%である。
+  `packages/ui`のテストは、jsdomとTesting Libraryを使わず、server renderの出力とresolveだけを確かめる。操作が要る部品を足すときに、DOMの環境を足す。
+  `packages/ui`のテストはReact Compilerなしで走る。`apps/web`のようにCompilerを有効にしたテストは、この package では行わない。
   全体の下限は各packageの`vite.config.ts`の`thresholds`が、ファイルごとの下限はTaskが各packageの`coverage/coverage-summary.json`から検査する（[ADR-076](../adr/ADR-076-run-mutation-tests-per-change-and-tighten-coverage-gates.md)）。
   Compilerを外すのは環境変数`FRONTEND_REACT_COMPILER=false`で、理由は[ADR-078](../adr/ADR-078-measure-frontend-coverage-without-react-compiler.md)にある。
   `FE_TEST_ARGS`に渡した値は、ルートのlint設定のテスト、各packageのテスト、coverageの測定のVitestの実行すべてに足す。ファイルのパスは渡さず、reporterなどのoptionだけを渡す（例：`task fe-verify FE_TEST_ARGS=--reporter=dot`）。
@@ -88,7 +92,9 @@ Oxlintの設定の正本は[`frontend/vite.config.ts`](../../frontend/vite.confi
 
 OxlintとOxfmtの設定は、workspaceのルートのこのファイルの`lint`と`fmt`だけに置き、`apps/web/vite.config.ts`には置かない（[ADR-092](../adr/ADR-092-split-frontend-into-vite-plus-workspace.md)）。
 packageの側に`lint`がないため、`vp lint`はルートと`apps/web`のどちらで実行してもルートの設定を使う。
-`better-tailwindcss/*`が読むアプリのCSSは、アプリごとのoverride（`apps/web/**`）が、設定ファイルの場所から作った`apps/web/src/style.css`の絶対パスで渡すので、実行する場所によらず同じく解決する。
+`better-tailwindcss/*`が読むCSSは、packageごとのoverrideが、設定ファイルの場所から作った絶対パスで渡す。
+`apps/web/**`は`apps/web/src/style.css`を、`packages/ui/**`は`packages/ui/src/style.css`を指すので、実行する場所によらず同じく解決する。
+`apps/web/src/style.css`は`@frontend/ui/style.css`を読み込むため、アプリのCSSからもテーマの変数を解決できる。
 
 ### 例外と調整
 
@@ -135,9 +141,12 @@ packageの側に`lint`がないため、`vp lint`はルートと`apps/web`のど
 - **`lint/**`**：`import/no-nodejs-modules`、`new-cap`、`typescript/no-unsafe-assignment`、`typescript/no-unsafe-call`、`typescript/no-unsafe-member-access`をoffにする。
   Node側のLintツールであり、OxlintのJS plugin APIに型が無いためである。
   `lint/**`はtsconfigの対象外で型検査が未定義の識別子を止めないため、Nodeのglobalを許した`no-undef`を有効にする。
-- **`apps/web/src/components/ui/**`**：shadcnの生成物の書き方に合わせて`shadcn/no-restyle`、`shadcn/no-arbitrary-values`、`shadcn/require-static-classes`をoffにする。
-  `react/only-export-components`もoffにし、React Doctorの同じruleも`frontend/apps/web/doctor.config.json`で外す。
+- **`packages/ui/**`**：shadcnの生成物の書き方に合わせて`shadcn/no-restyle`、`shadcn/no-arbitrary-values`、`shadcn/require-static-classes`をoffにする。
+  `react/only-export-components`もoffにする。
   shadcnの生成物は`buttonVariants`のようなvariantをcomponentと同じファイルからexportするためである。
+  Base UIをimportできるのはこのpackageだけで、`apps/**`では禁止する。
+- **shadcnの部品の認識**：`@shadcn/lint`は、アプリの`components.json`の`aliases.ui`（`@frontend/ui`）と、ルートの`settings.shadcn.componentImports`（`^@frontend/ui(/|$)`）の両方で、`@frontend/ui`からimportした部品を認識する。
+  認識した部品の`className`に、部品が持つ見た目のclass（`p-4`など）を渡すと`shadcn/no-restyle`が報告し、`mt-2`のような配置のclassは許す。
 - **`apps/web/src/routes/**`**：`react/only-export-components`をoffにする。
   TanStack Routerのroute fileは`Route`をexportするためである。
 - **テストファイル**：`react/jsx-no-literals`をoffにし、テストの中の固定文言をcatalogに通さずに書けるようにする。
@@ -161,7 +170,7 @@ packageの側に`lint`がないため、`vp lint`はルートと`apps/web`のど
 | `apps/web/src/lib/**`                   | lib、Base UI、テスト用部品、テレメトリSDK     | top-levelを引き継ぐ                                 |
 | `apps/web/src/lib/telemetry.ts`         | lib、Base UI、テスト用部品                    | top-levelを引き継ぐ                                 |
 | `apps/web/src/features/**`              | feature、Base UI、テスト用部品、テレメトリSDK | top-levelを引き継ぐ                                 |
-| `apps/web/src/components/ui/**`         | ui、テスト用部品、テレメトリSDK               | top-levelを引き継ぐ                                 |
+| `packages/ui/**`                        | テスト用部品、テレメトリSDK                   | top-levelを引き継ぐ                                 |
 | `packages/api/**`                       | Base UI、テスト用部品、テレメトリSDK          | HTML sinkだけ                                       |
 | テストファイルと`src/testing/**`        | Base UI、テレメトリSDK                        | top-levelを引き継ぐ                                 |
 
@@ -170,12 +179,10 @@ packageの側に`lint`がないため、`vp lint`はルートと`apps/web`のど
 - **共有層**：`@/features/**`、`@/routes/**`、`@/routeTree.gen`。
 - **lib**：共有層の禁止に加えて`@/components/**`。
   `lib`は依存の最下層であり、UIを参照しない。
-- **ui**：共有層の禁止に加えて、`@/components/ui/**`以外の`@/components/**`。
-  UI primitiveからアプリシェルやrouterの状態表示を参照しない。
 - **feature**：`@/routes/**`、`@/routeTree.gen`。
   routeの情報は`getRouteApi`で取る。
 - **Base UI**：`@base-ui/**`。
-  `@/components/ui`からimportする。
+  `@frontend/ui`からimportする。`packages/ui/**`のproduction sourceだけが許す。
 - **テスト用部品**：`msw`、`msw/**`、`@frontend/api/mocks/**`、`@/testing/**`、`@testing-library/**`。
 - **テレメトリSDK**：`@grafana/*`。
   `src/lib/telemetry.ts`を通して呼ぶ（[ADR-068](../adr/ADR-068-collect-browser-telemetry-with-faro-via-collector.md)）。
@@ -185,6 +192,7 @@ packageの側に`lint`がないため、`vp lint`はルートと`apps/web`のど
   `@frontend/api`の生成clientを使う。`packages/api/**`だけが許可される。
 
 テストファイルでは層のimport制限も外れる。
+`packages/ui`のテストファイルもこのoverrideに当たるため、Base UIのimportは禁止のままである。
 テストにも層の制限が要るようになったら、dependency-cruiserへ移る。
 
 `apps/web/e2e/**`では、Playwright TestのAPIにvitest pluginの規則が当たるため、`vitest/consistent-test-filename`と`vitest/prefer-importing-vitest-globals`を外す。
@@ -201,9 +209,10 @@ linkとbuttonの入れ子は、jsPluginの`ui-composition/no-button-in-link`が�
 `react`からの名前付きimportと再export、default importの名前（`React.useEffect`）の参照、分割代入を報告する。
 自前の関数で包んだEffectは検出しない。
 
-組み合わせた結果は、`frontend/lint/lint-config.test.js`が`frontend/lint/fixtures/apps/web/src/**`の違反例と正しい例を実際の設定でLintして確かめる。
-このテストは、`frontend/lint/lint-project.js`が、ルートの設定と、`apps/web`の`vite.config.ts`、`tsconfig.json`、`style.css`、fixtureを一時ディレクトリへ複製して`vp lint`を実行した結果を読む。
-`frontend/lint/tailwind-entry-point.test.js`は、ルートと`apps/web`の両方から実行しても、アプリのCSSを解決できることを確かめる。
+組み合わせた結果は、`frontend/lint/lint-config.test.js`が`frontend/lint/fixtures/apps/web/src/**`と`frontend/lint/fixtures/packages/ui/src/**`の違反例と正しい例を実際の設定でLintして確かめる。
+このテストは、`frontend/lint/lint-project.js`が、ルートの設定と、`apps/web`と`packages/ui`の`vite.config.ts`、`tsconfig.json`、`package.json`、`components.json`、`style.css`、fixtureを一時ディレクトリへ複製して`vp lint`を実行した結果を読む。
+fixtureが`@frontend/ui`からimportする部品は、複製せず、実物の`packages/ui`のものを使う。
+`frontend/lint/tailwind-entry-point.test.js`は、ルート、`apps/web`、`packages/ui`のどこから実行しても、そのpackageのCSSを解決できることを確かめる。
 規則のoptionを追加または変更するときは、optionが許す範囲のすぐ外側の書き方を拒否するfixtureも置く。
 optionの名前から許す範囲を推測せず、規則の文書とfixtureで確かめる。
 jsPluginやoverrideの挙動を試すときも、一時ディレクトリへ設定を手で複製せず、fixtureを足して`frontend`で`vp test run --dir lint lint-config`を実行する。

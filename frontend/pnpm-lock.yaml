@@ -236,12 +236,12 @@ importers:
 
   apps/web:
     dependencies:
-      '@base-ui/react':
-        specifier: 1.8.0
-        version: 1.8.0(@types/react@19.3.0)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
       '@frontend/api':
         specifier: workspace:*
         version: link:../../packages/api
+      '@frontend/ui':
+        specifier: workspace:*
+        version: link:../../packages/ui
       '@grafana/faro-web-sdk':
         specifier: 2.12.1
         version: 2.12.1
@@ -260,12 +260,6 @@ importers:
       '@tanstack/react-table':
         specifier: 9.2.4
         version: 9.2.4(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
-      class-variance-authority:
-        specifier: 0.7.1
-        version: 0.7.1
-      cn:
-        specifier: 0.3.2
-        version: 0.3.2
       i18next:
         specifier: 26.4.2
         version: 26.4.2(typescript@7.0.2)
@@ -284,9 +278,6 @@ importers:
       temporal-polyfill:
         specifier: 1.0.5
         version: 1.0.5
-      tw-animate-css:
-        specifier: 1.4.0
-        version: 1.4.0
       zod:
         specifier: 4.6.5
         version: 4.6.5
@@ -333,12 +324,6 @@ importers:
       react-doctor:
         specifier: 0.9.14
         version: 0.9.14(@opentelemetry/core@2.11.0(@opentelemetry/api@1.9.1))(@opentelemetry/exporter-trace-otlp-http@0.222.0(@opentelemetry/api@1.9.1))(eslint@10.11.0(jiti@2.7.0)(supports-color@7.2.0))(oxlint-tsgolint@7.0.2001)(react@19.3.0)(supports-color@7.2.0)(vite-plus@0.3.3(@opentelemetry/api@1.9.1)(@types/node@26.6.2)(@vitest/coverage-v8@4.1.11)(esbuild@0.28.2)(jiti@2.7.0)(jsdom@30.1.1)(msw@2.15.0(@types/node@26.6.2)(typescript@7.0.2))(typescript@7.0.2)(yaml@2.9.1))
-      shadcn:
-        specifier: 4.21.0
-        version: 4.21.0(supports-color@7.2.0)(typescript@7.0.2)
-      tailwindcss:
-        specifier: 4.3.3
-        version: 4.3.3
       typescript:
         specifier: ~7.0.2
         version: 7.0.2
@@ -373,6 +358,49 @@ importers:
       orval:
         specifier: 8.36.0
         version: 8.36.0(@faker-js/faker@10.6.0)(@modelcontextprotocol/sdk@1.30.0(supports-color@7.2.0)(zod@4.6.5))(@tanstack/react-query@5.103.2(react@19.3.0))(msw@2.15.0(@types/node@26.6.2)(typescript@7.0.2))(prettier@3.9.8)(typescript@7.0.2)(zod@4.6.5)
+      typescript:
+        specifier: ~7.0.2
+        version: 7.0.2
+      vite-plus:
+        specifier: 'catalog:'
+        version: 0.3.3(@opentelemetry/api@1.9.1)(@types/node@26.6.2)(@vitest/coverage-v8@4.1.11)(esbuild@0.28.2)(jiti@2.7.0)(jsdom@30.1.1)(msw@2.15.0(@types/node@26.6.2)(typescript@7.0.2))(typescript@7.0.2)(yaml@2.9.1)
+
+  packages/ui:
+    dependencies:
+      '@base-ui/react':
+        specifier: 1.8.0
+        version: 1.8.0(@types/react@19.3.0)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
+      class-variance-authority:
+        specifier: 0.7.1
+        version: 0.7.1
+      cn:
+        specifier: 0.3.2
+        version: 0.3.2
+      shadcn:
+        specifier: 4.21.0
+        version: 4.21.0(supports-color@7.2.0)(typescript@7.0.2)
+      tailwindcss:
+        specifier: 4.3.3
+        version: 4.3.3
+      tw-animate-css:
+        specifier: 1.4.0
+        version: 1.4.0
+    devDependencies:
+      '@types/react':
+        specifier: 19.3.0
+        version: 19.3.0
+      '@types/react-dom':
+        specifier: 19.3.0
+        version: 19.3.0(@types/react@19.3.0)
+      '@vitest/coverage-v8':
+        specifier: 4.1.11
+        version: 4.1.11(@vitest/browser@4.1.11)(vitest@4.1.11)
+      react:
+        specifier: 19.3.0
+        version: 19.3.0
+      react-dom:
+        specifier: 19.3.0
+        version: 19.3.0(react@19.3.0)
       typescript:
         specifier: ~7.0.2
         version: 7.0.2

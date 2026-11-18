@@ -12,7 +12,7 @@ tags: [convention, frontend, ui, theme, accessibility, future-arch-guidelines]
 
 ## 配色の定義
 
-- 明暗の配色は `style.css` のsemantic token（`--background` など）の値として定義し、componentに具体的な色を書かない（[ADR-025](../adr/ADR-025-adopt-shadcn-base-ui-and-tailwind.md)）。
+- 明暗の配色は `packages/ui/src/style.css` のsemantic token（`--background` など）の値として定義し、componentに具体的な色を書かない（[ADR-025](../adr/ADR-025-adopt-shadcn-base-ui-and-tailwind.md)）。
 - 現在はOSの設定に従い、`prefers-color-scheme: dark` のときにtokenの値を切り替える。
 - 明暗の両方で、文字と操作要素の視認性とcontrastを確認する。
 - 画像は明暗のどちらの背景でも見えるよう、背景を透過できる形式（SVG、PNG、WebPなど）にする。
@@ -25,7 +25,7 @@ tags: [convention, frontend, ui, theme, accessibility, future-arch-guidelines]
 - 別のブラウザ、別のデバイス、別のdomainと設定を共有する要件がある場合だけ、設定をサーバーに保存する。
 - サーバーが配色ごとに応答を変える必要がある場合だけ、設定をCookieで送る。
 - 選んだ値はbundleしたscriptで最初の描画より前に適用する。CSPがinline scriptを許可しないため、`index.html` にinline scriptを書かない（[ADR-014](../adr/ADR-014-use-same-origin-spa-security-boundary.md)）。
-- 切替を加える変更で、Tailwind CSSの `dark` variantと `style.css` のtokenの切替を、同じ属性またはclassに基づく指定へ揃えて変える。
+- 切替を加える変更で、Tailwind CSSの `dark` variantと `packages/ui/src/style.css` のtokenの切替を、同じ属性またはclassに基づく指定へ揃えて変える。
 
 ## 出典
 

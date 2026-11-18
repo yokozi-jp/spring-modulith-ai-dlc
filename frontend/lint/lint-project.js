@@ -9,13 +9,28 @@ import { fileURLToPath } from "node:url";
 const frontendRoot = fileURLToPath(new URL("..", import.meta.url));
 
 export const appDirectory = "apps/web";
+export const uiDirectory = "packages/ui";
 
 // lint/fixtures の下に fixture を持つ package と、その設定のために複製するファイル。
 // ponytail: package の一覧と複製するファイルを手で書く。package が増えて手間になったら、lint/fixtures の下を巡る形にする。
+// components.json は、shadcn の規則が @frontend/ui の部品を認識する設定なので、実物を複製する。
 /** @type {Record<string, string[]>} */
 const packageFiles = {
-  [appDirectory]: ["vite.config.ts", "tsconfig.json", "package.json", "src/style.css"],
+  [appDirectory]: [
+    "vite.config.ts",
+    "tsconfig.json",
+    "package.json",
+    "components.json",
+    "src/style.css",
+  ],
   "packages/api": ["tsconfig.json", "package.json"],
+  [uiDirectory]: [
+    "vite.config.ts",
+    "tsconfig.json",
+    "package.json",
+    "components.json",
+    "src/style.css",
+  ],
 };
 
 /** @param {string} directory */

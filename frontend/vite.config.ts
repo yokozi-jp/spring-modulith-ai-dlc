@@ -39,18 +39,13 @@ const libLayerImports = {
   group: [...sharedLayerImports.group, "@/components/**"],
   message: "lib must not depend on components, features or routes.",
 };
-// components/ui は UI primitive の層であり、共有層の禁止に加えてアプリシェルなど ui 以外の components を参照しない。
-const uiLayerImports = {
-  group: [...sharedLayerImports.group, "@/components/**", "!@/components/ui/**"],
-  message: "components/ui must not depend on other components, features or routes.",
-};
 const featureImports = {
   group: ["@/routes/**", "@/routeTree.gen"],
   message: "Use getRouteApi instead of importing a route.",
 };
 const baseUiImports = {
   group: ["@base-ui/**"],
-  message: "Import UI primitives from @/components/ui (ADR-025).",
+  message: "Import UI primitives from @frontend/ui (ADR-025).",
 };
 const testOnlyImports = {
   group: ["msw", "msw/**", "@frontend/api/mocks/**", "@/testing/**", "@testing-library/**"],
@@ -268,16 +263,15 @@ export default defineConfig({
           ],
         },
       },
+      // Base UI を import できる唯一の package（ADR-025、ADR-092）。ui は api とアプリを package.json に書かないので、層の import 制限は要らない。
       {
-        files: ["apps/*/src/components/ui/**"],
+        files: ["packages/ui/**"],
         rules: {
+          ...tailwindRules(`${import.meta.dirname}/packages/ui/src/style.css`),
           "shadcn/no-restyle": "off",
           "shadcn/no-arbitrary-values": "off",
           "shadcn/require-static-classes": "off",
-          "no-restricted-imports": [
-            "error",
-            { patterns: [uiLayerImports, testOnlyImports, telemetrySdkImports] },
-          ],
+          "no-restricted-imports": ["error", { patterns: [testOnlyImports, telemetrySdkImports] }],
           "react/only-export-components": "off",
         },
       },
@@ -327,6 +321,8 @@ export default defineConfig({
         },
       },
     ],
+    // shadcn の部品を別 package の @frontend/ui から import するため、components.json の alias に加えて import 元でも部品と認識させる（ADR-092）。
+    settings: { shadcn: { componentImports: ["^@frontend/ui(/|$)"] } },
     options: {
       denyWarnings: true,
       reportUnusedDisableDirectives: "error",
