@@ -159,7 +159,6 @@ clone したら、[スキルの取得元と更新](docs/agents/skill-sources.md)
 ├── .jscpd.json       # jscpd（重複コード検査）設定
 ├── .markdownlint-cli2.yaml # markdownlint-cli2（Markdown リンタ）設定
 ├── .release-please-manifest.json # release-please が追跡する直近の版
-├── .snyk             # Snyk のスキャン除外ポリシー（プロダクションコード以外を除外）
 ├── .spectral.yaml    # Spectral（OpenAPI 契約リンタ）設定
 ├── AGENTS.md         # エージェント共通の設定（スキルが参照する docs の案内）
 ├── CHANGELOG.md      # リリースノート（release-please が生成）

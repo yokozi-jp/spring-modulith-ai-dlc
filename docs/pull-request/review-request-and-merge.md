@@ -37,7 +37,6 @@ gh pr checks <番号> --required --watch --fail-fast
 `--required`を付けないと、必須でないE2Eなどの完了まで待つ。
 必須の`CI gate`は全検査の終わりを待ってから報告するため、`--fail-fast`でも失敗が分かるのは一番遅い検査の終わりになる。
 エージェントは、このコマンドを長時間の処理としてbackgroundで実行する。
-Snyk Codeは必須チェックではないため待たない。
 
 ## 人が必ず読むPull Request
 
@@ -46,7 +45,7 @@ Snyk Codeは必須チェックではないため待たない。
 
 - 戻しにくい変更を含む。データの移行、公開しているAPIの変更、削除が該当する。
 - ADR、`AGENTS.md`、`docs/agents/`、`.kiro/`（steering、skill、hook、settings）、`.agents/`を変える。
-- CIとhookのゲートを変える。`.github/`（workflow、CODEOWNERS、`dependabot.yml`）、`lefthook.yml`、`commitlint.config.mjs`、ruleset、検査の設定と除外（`.betterleaks.toml`、`.snyk`、`docker/zap/`、PMD、SpotBugs、Semgrepのルール）、`Taskfile.yml`の検査Taskが該当する。
+- CIとhookのゲートを変える。`.github/`（workflow、CODEOWNERS、`dependabot.yml`）、`lefthook.yml`、`commitlint.config.mjs`、ruleset、検査の設定と除外（`.betterleaks.toml`、`docker/zap/`、PMD、SpotBugs、Semgrepのルール）、`Taskfile.yml`の検査Taskが該当する。
 - 認証、認可、CSRF、秘密情報の扱いを変える。
 - 依存を追加する。
 - テストを弱める。テストファイルを消す、テストケースを減らす、coverageやmutationの基準を下げる、検査をskipするなどが該当する。
