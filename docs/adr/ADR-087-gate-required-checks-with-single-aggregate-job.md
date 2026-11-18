@@ -9,7 +9,7 @@ tags: [adr, ci, github-actions, governance]
 
 ## Status
 
-Proposed
+Accepted
 
 ## Date
 
@@ -117,7 +117,7 @@ check 名が変わるため、次の順にする。
 1. `ci.yml` を足す PR を merge する。呼ばれる workflow は `pull_request` を残し、一時的に二重に走る。ruleset は変えない。
 2. 次の PR で、`CI gate` の check が出ることを確認する。
 3. ruleset に `CI gate` を追加し、個別のチェックと併存させる。
-4. ruleset から個別の必須チェックを外し、`Validate PR title` と API contract の 2 つ、`CI gate` だけにする。
+4. ruleset から個別の必須チェックを外し、`Validate PR title` と API contract の 2 つ、`CI gate` だけにする。3 と 4 は `.github/rulesets/main.json` を直し、[ADR-086](ADR-086-align-main-protection-with-solo-and-agent-operation.md) の手順で反映する。
 5. 呼ばれる workflow から `pull_request` を外す PR を merge する。
 6. 開いている PR は、branch を更新して `CI gate` を出す。
 

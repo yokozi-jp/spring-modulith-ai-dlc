@@ -70,7 +70,7 @@ CODEOWNERS は backend、frontend、docker と infrastructure、`.kiro` と `aid
 ### Neutral
 
 - 将来チームを作成した時点で、CODEOWNERS の各規則を実在する `@owner/team` へ置き換える。
-- パス条件付きの CI は変更が該当するときだけ実行されるため、ruleset の常時必須チェックと条件付き品質ゲートを分けて管理する。
+- パス条件付きの CI は、各 workflow の `changes` ジョブが判定してジョブ単位で skip し、集約ジョブ `CI gate` が 1 つにまとめて必須にする（[ADR-087](ADR-087-gate-required-checks-with-single-aggregate-job.md)）。
 
 ## Alternatives Considered
 

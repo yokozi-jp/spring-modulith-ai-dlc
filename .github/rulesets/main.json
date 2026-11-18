@@ -46,49 +46,11 @@
         "do_not_enforce_on_create": false,
         "required_status_checks": [
           {
-            "context": "Run betterleaks 🔐"
-          },
-          {
-            "context": "Run Semgrep 🔎"
-          },
-          {
-            "context": "Trivy scan (frontend) 🛡️"
-          },
-          {
-            "context": "Trivy scan (backend) 🛡️"
-          },
-          {
-            "context": "Run zizmor 🌈"
+            "context": "CI gate",
+            "integration_id": 15368
           },
           {
             "context": "Validate PR title"
-          },
-          {
-            "context": "Detect frontend changes"
-          },
-          {
-            "context": "Verify frontend"
-          },
-          {
-            "context": "Detect backend changes"
-          },
-          {
-            "context": "Detect docker changes"
-          },
-          {
-            "context": "Lint (Spotless + PMD + SpotBugs) ☕"
-          },
-          {
-            "context": "Test & Coverage ☕"
-          },
-          {
-            "context": "Run hadolint 🐳"
-          },
-          {
-            "context": "Run docker build --check 🐳"
-          },
-          {
-            "context": "Build and test backend image 🐳"
           },
           {
             "context": "Check API contract 🔀",
@@ -97,12 +59,6 @@
           {
             "context": "Detect API contract changes",
             "integration_id": 15368
-          },
-          {
-            "context": "Detect DAST changes"
-          },
-          {
-            "context": "Run ZAP passive scan 🕷️"
           }
         ]
       }

@@ -9,10 +9,7 @@ on:
       - "openapi/**"
       - "Taskfile.yml"
       - ".github/workflows/frontend-ci.yml"
-  # 必須チェックにしても対象外PRがExpectedのまま残らないよう、PRでは常に起動し、
-  # changesジョブでFrontend検証の要否を判定する。
-  pull_request:
-    branches: ["**"]
+  # PR の検査は ci.yml から呼ばれて動く（docs/adr/ADR-087）。
   workflow_call:
 
 concurrency:

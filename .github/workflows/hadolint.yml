@@ -12,11 +12,7 @@ on:
       - ".env.test.example"
       - ".hadolint.yaml"
       - ".github/workflows/hadolint.yml"
-  # PR ではパスフィルタで workflow をスキップしない（必須チェックが
-  # "Expected" のまま滞留するため）。全 PR で起動し、changes ジョブで
-  # 判定して各ジョブを条件付き実行する（skipped は必須チェックで success 扱い）。
-  pull_request:
-    branches: ["**"]
+  # PR の検査は ci.yml から呼ばれて動く（docs/adr/ADR-087）。
   workflow_call:
 
 concurrency:

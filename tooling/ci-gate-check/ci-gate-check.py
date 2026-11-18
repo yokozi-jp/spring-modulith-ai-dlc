@@ -51,6 +51,8 @@ def check_called(name, workflow):
     errors = []
     if "workflow_call" not in triggers(workflow):
         errors.append(f"{name} に workflow_call がありません。")
+    if "pull_request" in triggers(workflow):
+        errors.append(f"{name} は ci.yml から呼ばれるのに pull_request でも動きます。PR で二重に走り、check 名も二重になります。")
     group = str(workflow.get("concurrency", {}).get("group", ""))
     if not group.startswith(Path(name).stem + "-"):
         errors.append(f"{name} の concurrency の group が {Path(name).stem}- で始まっていません。呼ばれると github.workflow が CI になり、呼ばれた workflow どうしが取り消し合います。")

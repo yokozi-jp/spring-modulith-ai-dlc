@@ -15,12 +15,7 @@ on:
       - "Taskfile.yml"
       - "tooling/session-sql-lint/**"
       - ".github/workflows/backend-ci.yml"
-  # PR ではパスフィルタで workflow 自体をスキップしない。スキップすると
-  # check run が生成されず、必須チェックが "Expected" のまま PR が永久に
-  # マージ不能になる。代わりに全 PR で起動し、下の changes ジョブで判定して
-  # 重いジョブを条件付き実行する（skipped は必須チェックで success 扱い）。
-  pull_request:
-    branches: ["**"]
+  # PR の検査は ci.yml から呼ばれて動く（docs/adr/ADR-087）。
   workflow_call:
 
 concurrency:
