@@ -33,7 +33,8 @@ import org.springframework.stereotype.Component;
  * </ul>
  *
  * <p>どの UPDATE も {@code lock_no} を進める。集約ルートの INSERT は {@link #insert} で実行する。子の行の INSERT
- * はここを通さず、{@code dsl.batch} と {@link CommonColumns#forInsert} で書く。
+ * はここを通さず、{@code dsl.batch} と {@link CommonColumns#forInsert}
+ * で書く。ただし、業務の一意インデックスを持つ子のテーブルは、一意制約の違反を {@link ConflictException} にするため、1 行ずつ {@link #insert} で書く。
  *
  * <p>例外のメッセージには、テーブル名、主キーの条件のバインド値、期待する版を入れ、SQL は入れない（docs/observability/conventions.md）。
  */
@@ -161,7 +162,8 @@ public class TableWriter {
    *
    * <p>共通カラムは呼び出し側が {@link CommonColumns#forInsert} で設定する。
    *
-   * <p>ponytail: 上限：子の行の dsl.batch の INSERT は変換しない。子のテーブルに業務の一意インデックスを足したら、batch を受ける入口を足す。
+   * <p>ponytail: 上限：子の行の dsl.batch の INSERT は変換しない。業務の一意インデックスを持つ子のテーブルは、ここで 1 行ずつ書く。行が多くなったら、batch
+   * を受ける入口を足す。
    *
    * @param insert {@code dsl.insertInto(...).set(...).set(commonColumns.forInsert(...))} で組み立てた 1
    *     行の INSERT
