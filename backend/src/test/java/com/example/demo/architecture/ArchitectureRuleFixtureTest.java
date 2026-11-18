@@ -107,7 +107,7 @@ class ArchitectureRuleFixtureTest {
           "jdbcStatement",
           "connectionProvider");
 
-  /** 数値の ID の規則が、イベント、公開 API、Domain、Application、外部のシステムへの送信の違反を検出することを確かめる行。 */
+  /** 数値の ID の規則が、違反フィクスチャの各パッケージの違反を検出することを確かめる行。 */
   private static final List<Arguments> PUBLIC_ID_ROWS =
       List.of(
           row(

@@ -284,7 +284,8 @@ Error Proneの`CheckReturnValue`は既定でerrorであり、`updateWhere`と`de
 
 `PublicIdArchTest`は、主キーをモジュールの外へ出さない規則を検査する（[PostgreSQLの主キー](../database/postgresql-primary-keys.md)）。
 
-- `numericIdsDoNotLeaveModules`：モジュールルート、`domain`、`application`、`infrastructure.client`、`shared`（`shared.infrastructure`を除く）の型は、名前が`id`、`ids`か、`Id`、`Ids`で終わり、型が`long`、`Long`、`int`、`Integer`か、それを型引数や配列の要素に含む（`List<Long>`、`Optional<Long>`、`long[]`）フィールド、引数、戻り値を持たない。
+- `numericIdsDoNotLeaveModules`：モジュールの外に出る型は、数値のIDのフィールド、引数、戻り値を持たない。
+  対象の型の範囲と、数値のIDとみなす名前と型は、[PostgreSQLの主キー](../database/postgresql-primary-keys.md#使い分けの検査)の「使い分けの検査」に示す。
   ArchUnitは引数の名前を読まないため、コンパイラの`-parameters`が残した名前をリフレクションで読む。
   違反フィクスチャのイベント、`*Queries`の引数と戻り値（`List<Long>`、`Optional<Long>`、`long[]`を含む）、Domain、Command、`*Client`の引数、`shared.concurrency`のrecordで確かめる。
 

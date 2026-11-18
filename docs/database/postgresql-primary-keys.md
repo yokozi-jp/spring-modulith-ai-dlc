@@ -109,7 +109,8 @@ Problem Detailsの`traceId`拡張は[ADR-013](../adr/ADR-013-standardize-http-ap
 ログとトレースに行の識別子を載せるときは、`public_id`を使う。
 
 Javaでは、主キーの値をRepositoryの外に返さない。
-モジュールルートのイベントと公開API、Domain、Application、`infrastructure.client`、`shared`（`shared.infrastructure`を除く）の型は、IDを`public_id`の値（UUID、その文字列の形、それを包む値オブジェクトの`OrderId(UUID value)`）で持ち、主キーの数値で持たない。
+モジュールの外に出る型は、IDを`public_id`の値（UUID、その文字列の形、それを包む値オブジェクトの`OrderId(UUID value)`）で持ち、主キーの数値で持たない。
+対象の型の範囲は、次の「[使い分けの検査](#使い分けの検査)」のArchUnitの項に示す。
 
 ### 使い分けの検査
 
