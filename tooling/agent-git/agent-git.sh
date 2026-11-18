@@ -86,7 +86,9 @@ changed() {
 }
 
 # rev <リビジョン>: git rev-parse -q --verify と同じく、オブジェクトの名前を出す。
-# rev-parse は名前が無ければ 1、git が失敗すれば 128 で戻るので、無ければ何も出さずに成功し、git が失敗すれば失敗する。
+# rev-parse は名前を解決できなければ 1、リポジトリを開けないなど git が失敗すれば 128 で戻る。
+# 1 には、名前が無いときのほか、ref が壊れているか読めないときや、<commit>^ の commit が無いときも入る。
+# rev は、1 なら何も出さずに成功し、128 なら失敗する。
 rev() {
   git rev-parse -q --verify "$1"
   [ $? -le 1 ]
@@ -146,14 +148,14 @@ new_run() {
 # check_paths <実行のディレクトリ> <パス>...: 写しの index で渡したパスを確かめ、写しに git add するパスを pending に書く。
 # 当たらないパス、衝突、パスの外の stage、stage と作業ツリーの食い違いがあれば、理由と直し方を出して止まる。
 check_paths() {
-  local c="$1/commit" head ref remedy
+  local c="$1/commit" head ref oid remedy
   local -x GIT_INDEX_FILE="$c/index"
   head="$(cat -- "$c/head")"
   shift
   # git commit -- <パス> と同じく、HEAD にだけあるパス（git rm や git mv の元）も当たったとみなし、どこにも当たらないパスで止める。
   # ls-files は、当たらないパスがあれば 1、git が失敗すれば 128 で戻る。
   git --literal-pathspecs ls-files --error-unmatch -c -o --exclude-standard ${head:+--with-tree="$head"} -- "$@" >/dev/null || {
-    [ $? -gt 1 ] || fail "上のパスは、作業ツリー、index、HEAD のどれにもありません（.gitignore で無視しているファイルも含みます）。"
+    [ $? -le 1 ] && fail "上のパスは、作業ツリー、index、HEAD のどれにもありません（.gitignore で無視しているファイルも含みます）。"
     exit 1
   }
   changed "$c/conflicts" --diff-filter=U -- || exit 1
@@ -162,8 +164,8 @@ check_paths() {
   remedy="  自分の変更ならパスに足してください。
   別の作業が stage したものなら、その作業に確かめてから git restore --staged -- <パス> で外してください。"
   for ref in MERGE_HEAD CHERRY_PICK_HEAD REVERT_HEAD; do
-    git rev-parse -q --verify "$ref" >/dev/null &&
-      remedy="  $ref があるので、stage 済みの変更には途中の merge、cherry-pick、revert の変更が入っています。
+    oid="$(rev "$ref")" || exit 1
+    [ -z "$oid" ] || remedy="  $ref があるので、stage 済みの変更には途中の merge、cherry-pick、revert の変更が入っています。
   外さずに上のパスも足して、stage 済みのパスをすべて渡してやり直してください。"
   done
   changed "$c/staged" --cached -- && changed "$c/given" --cached -- "$@" || exit 1
@@ -184,7 +186,7 @@ check_paths() {
 
 commit() {
   [ $# -ge 2 ] || usage
-  local msg="$1" r run
+  local msg="$1" r run merge
   shift
   git rev-parse --is-inside-work-tree >/dev/null || exit 1
   [ -s "$msg" ] || fail "メッセージのファイル $msg が無いか空です。"
@@ -211,7 +213,8 @@ commit() {
     GIT_INDEX_FILE="$run/commit/index" git -C "$(git rev-parse --show-toplevel)" --literal-pathspecs add --pathspec-from-file="$run/commit/pending" --pathspec-file-nul ||
     exit 1
   # merge は HEAD から何も変えなくても（-s ours など）commit するので、MERGE_HEAD があれば止めない。
-  GIT_INDEX_FILE="$run/commit/index" git diff --cached --quiet && ! git rev-parse -q --verify MERGE_HEAD >/dev/null &&
+  merge="$(rev MERGE_HEAD)" || exit 1
+  GIT_INDEX_FILE="$run/commit/index" git diff --cached --quiet && [ -z "$merge" ] &&
     fail "渡したパスに commit する変更がありません。"
   # git はメッセージのファイルを pre-commit の後に読むので、待つ間に元のファイルを消しても困らない写しを渡す。
   cp -- "$msg" "$run/commit/msg" || exit 1
@@ -226,18 +229,15 @@ commit_copy() {
   echo "git $! $(proc_start "$!")" >>"$run/pid"
   wait "$!"
   code=$?
-  settle_commit "$run" code || [ "$code" != 0 ] || {
-    echo "✗ git commit は成功しましたが、HEAD をたどっても始めたときの HEAD の上にその commit が無いので、本物の index を合わせていません。
-  ほかの作業が HEAD を動かしたか作り直しました（git commit --amend、git reset など）。
-  git reflog で commit と HEAD の動きを確かめてください。"
-    code=1
-  }
+  settle_commit "$run" code
   return "$code"
 }
 
 # landed <commit/ のディレクトリ> <始めたときの HEAD> <HEAD>: 始めたときの HEAD から HEAD への最初の first-parent の commit が、
 # 始めたときの HEAD の上に写しの index の内容で作ったものなら、それを出す。
 # そうでなければ 1、git が失敗すれば 1 より大きい値で戻る。
+# rev は、壊れているか読めない ref やオブジェクトを無いとみなすので、HEAD や commit を読めないときも 1 になる。
+# 1 なら本物の index を合わせず、index は HEAD とずれたままなので、次の agent-commit は check_paths で止まる。
 landed() {
   local list ours parent
   [ -n "$3" ] || return 1
@@ -255,7 +255,7 @@ landed() {
 # 上に載ったほかの commit が commit のパスを戻していれば、それを出して変数を 1 にする。
 # 戻していなければ、注意を出して本物の index を合わせる先に合わせ、変数を sync_index の終了コードにする。
 # 決める途中で git が失敗すれば、それを出して変数を 1 にする。
-# commit ができていなければ、変数を変えずに 1 で戻る。
+# commit ができていなければ、変数が 0（git commit は成功した）のときだけ、HEAD の上に commit が無いことを出して変数を 1 にする。
 settle_commit() {
   local run="$1" c="$1/commit" start base tip ours s=0
   start="$(cat -- "$c/head")"
@@ -281,9 +281,13 @@ settle_commit() {
     echo "✗ 上の git が失敗したので、commit ができたかを確かめられず、本物の index を合わせていません。
   commit ができていれば、本物の index は commit を打ち消す内容を stage したままなので、git log と git status で確かめてください。"
     printf -v "$2" 1
+  elif [ "${!2}" = 0 ]; then
+    echo "✗ git commit は成功しましたが、HEAD をたどっても始めたときの HEAD の上にその commit が無いので、本物の index を合わせていません。
+  ほかの作業が HEAD を動かしたか作り直しました（git commit --amend、git reset など）。
+  git reflog で commit と HEAD の動きを確かめてください。"
+    printf -v "$2" 1
   fi
   rm -r -- "$c"
-  [ "$s" != 1 ]
 }
 
 # not_synced: git が失敗したので、本物の index を合わせていないことを出す。

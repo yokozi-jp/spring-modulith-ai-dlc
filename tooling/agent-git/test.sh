@@ -395,6 +395,7 @@ for check in rev-list parent tree; do
     rev-list) pattern='* rev-list *' ;;
     parent) pattern='* rev-parse -q --verify [0-9a-f]*^ ' ;;
     tree) pattern='*/commit/index diff --cached --quiet * -- ' ;;
+    *) echo "no pattern: $check"; exit 1 ;;
   esac
   echo l >"landing-$check.txt"
   expect "commit whose $check check fails starts" 0 "task agent-wait" failing_git "$pattern" bash "$tool" commit "$msg" "landing-$check.txt"
@@ -482,6 +483,7 @@ for undo in copy-matches-head foreign-commit amended-head; do
       fact "the copy is made to match HEAD before the amend" env GIT_INDEX_FILE="$run/commit/index" git read-tree HEAD
       fact "another task amends HEAD with the same tree" git commit --no-verify -q --amend --allow-empty -m foreign
       ;;
+    *) echo "no setup: $undo"; exit 1 ;;
   esac
   expect "a fully killed commit that did not land is lost ($undo)" 1 "終了コードを記録せずに止まりました" bash "$tool" wait "$run"
   fact "the fully killed commit leaves the index ($undo)" clean
@@ -533,6 +535,7 @@ for broken in cp mv; do
   case "$broken" in
     cp) reason="index を index.lock に写せなかった" ;;
     mv) reason="git reset か index の置き換えに失敗した" ;;
+    *) echo "no reason: $broken"; exit 1 ;;
   esac
   held_commit "orphan-unsynced-$broken.txt"
   kill "$(pid_of wrapper "$run")" "$(pid_of child "$run")"
@@ -561,6 +564,7 @@ for check in head commit-diff head-diff entries base now; do
     entries) pattern='* ls-files -s -z *' ;;
     base) pattern='*/commit/base * --name-only * --cached *' ;;
     now) pattern='*/index.lock * --name-only * --cached *' ;;
+    *) echo "no pattern: $check"; exit 1 ;;
   esac
   expect "wait reports that git failed in the $check check" 1 "本物の index を合わせていません" failing_git "$pattern" bash "$tool" wait "$run"
   fact "the failing git ran in the $check check" [ ! -e "$tmp/fail-git" ]
@@ -570,17 +574,21 @@ done
 # 確かめる途中で git が失敗すると、理由を取り違えずに、始める前に止まる。
 # 渡すのは stage したファイル、stage していない変更、新しいファイルで、一覧のどれが欠けても、commit が始まるか別の理由で止まる。
 # check_paths の git は、写しの index を読むことも確かめるため、写しのパスで始まるパターンで失敗させる。
+# MERGE_HEAD を確かめる git は 2 つあり、check_paths の外の git は GIT_INDEX_FILE が空なので、空白で始まるパターンで見分ける。
 scene "git failures before the commit"
 echo s >gitfail-staged.txt && git add gitfail-staged.txt && echo changed >same.txt && echo n >gitfail-new.txt
-for check in head unmatched conflicts staged given pending untracked; do
+for check in head unmatched conflicts in-progress staged given pending untracked merge; do
   case "$check" in
     head) pattern='* rev-parse -q --verify HEAD ' ;;
     unmatched) pattern='*/commit/index * --error-unmatch *' ;;
     conflicts) pattern='*/commit/index *--diff-filter=U*' ;;
+    in-progress) pattern='*/commit/index rev-parse -q --verify MERGE_HEAD ' ;;
     staged) pattern='*/commit/index * --cached -- ' ;;
     given) pattern='*/commit/index * --cached -- ?*' ;;
     pending) pattern='*/commit/index * --ignore-submodules=dirty *' ;;
     untracked) pattern='*/commit/index * ls-files -z -o *' ;;
+    merge) pattern=' rev-parse -q --verify MERGE_HEAD ' ;;
+    *) echo "no pattern: $check"; exit 1 ;;
   esac
   expect "commit stops when git fails in the $check check" 1 "fake git failure" \
     failing_git "$pattern" bash "$tool" commit "$msg" gitfail-staged.txt same.txt gitfail-new.txt
