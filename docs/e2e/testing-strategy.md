@@ -21,12 +21,12 @@ E2E テストは、複数画面にまたがる主要な利用者の流れだけ�
 
 ## 配置と構成
 
-`frontend/e2e/` に、ログインや WireMock の初期化を行う `*.setup.ts` とシナリオの `*.spec.ts` を置く。
-`frontend/e2e/environment.ts` は、ログイン情報をルートの `.env.test` から読み、`storageState` のパスを決める。
+`frontend/apps/web/e2e/` に、ログインや WireMock の初期化を行う `*.setup.ts` とシナリオの `*.spec.ts` を置く。
+`frontend/apps/web/e2e/environment.ts` は、ログイン情報をルートの `.env.test` から読み、`storageState` のパスを決める。
 Keycloak の画面でログインする手順（`signInOnKeycloak`）も持ち、setup とログアウトの spec が共有する。
-`frontend/e2e/payment-gateway.ts` は、決済代行の WireMock の管理 API を呼ぶ補助を持つ。
+`frontend/apps/web/e2e/payment-gateway.ts` は、決済代行の WireMock の管理 API を呼ぶ補助を持つ。
 注文ごとの失敗のスタブ（`failChargesFor`）と、注文 ID を冪等性キーにした請求の回数（`chargeRequestCount`）である。
-`frontend/e2e/orders.ts` は、注文の作成の画面の操作、シーダーの商品の読み取り、決済の欄の文言の確認（`expectPaymentText`）を持つ。
+`frontend/apps/web/e2e/orders.ts` は、注文の作成の画面の操作、シーダーの商品の読み取り、決済の欄の文言の確認（`expectPaymentText`）を持つ。
 決済の欄は、確定した注文に決済記録がない間、確定から 15 秒まで 1 秒ごとに自分で読み直し、その間は処理中を出す。
 期間が過ぎても記録がなければ再投入待ちを出し、読み直しのボタンを出す。
 `expectPaymentText` は画面を読み直さず、欄の文言が変わるのを最大 30 秒待つ。
@@ -37,7 +37,7 @@ Keycloak の画面でログインする手順（`signInOnKeycloak`）も持ち�
 - `order-payment.spec.ts`：注文の作成、確定、Listener の請求、決済の表示と、決済代行の 5xx、タイムアウト、拒否、CSRF、シーダーの代表の状態の表示を確かめる。
 - `order-conflict.spec.ts`：同じ注文を 2 つのタブで開き、楽観的ロックの競合と、画面が示す回復の選択肢ごとの結果を確かめる。
 
-`frontend/playwright.config.ts` の設定は次のとおりである。
+`frontend/apps/web/playwright.config.ts` の設定は次のとおりである。
 
 | 項目              | 値                                                                                  |
 | ----------------- | ----------------------------------------------------------------------------------- |
@@ -78,13 +78,13 @@ backend を再起動せず、シナリオの途中で注文ごとに応答を切
 ## 認証
 
 setup project は、`storageState` を持たない browser context で `/` を開き、`/oauth2/authorization/web` から Keycloak の画面で `test-user` としてログインする。
-戻り先が `http://localhost:5173/` であることと、認証の前後で `APP_SESSION` Cookie の値が変わったことで認証済みと判断し、`frontend/e2e/.auth/user.json` に保存する。
+戻り先が `http://localhost:5173/` であることと、認証の前後で `APP_SESSION` Cookie の値が変わったことで認証済みと判断し、`frontend/apps/web/e2e/.auth/user.json` に保存する。
 `APP_SESSION` は認証の開始時点で発行されるため、Cookie があることだけを認証の証拠にしない。
 
 - spec は保存した `storageState` を共有し、ログインを繰り返さない。
 - 共有の `storageState` を使うテストはログアウトしない。
   ログアウトを確かめるテストは、専用の browser context でログインする。
-- `frontend/e2e/.auth/`、`frontend/playwright-report/`、`frontend/test-results/` はコミットしない（`frontend/.gitignore` が除外する）。
+- `frontend/apps/web/e2e/.auth/`、`frontend/apps/web/playwright-report/`、`frontend/apps/web/test-results/` はコミットしない（`frontend/.gitignore` が除外する）。
 - `storageState` のファイルは CI の artifact に入らない。
   ただし中身の Cookie は失敗時の trace に入る。
   その Cookie は後片付けで破棄した環境のものである。
@@ -95,9 +95,9 @@ setup project は、`storageState` を持たない browser context で `/` を�
   role で取れないもの（`html` の `lang` など）だけ locator を使う。
 - 待ちは web-first assertion（`await expect(locator).toBeVisible()` など）に任せ、固定時間で待たない。
 - `test.only` は CI の `forbidOnly` が失敗させる。
-- Lint は `vite.config.ts` の設定で `vp check` が検査する。
-  Playwright Test の API に当たる vitest plugin の規則だけを `e2e/**` で外している（[Lintとテストのリファレンス](../tooling/lint-and-test.md)）。
-  `e2e/**` からもテレメトリの SDK（`@grafana/*`）を import できない。
+- Lint はルートの `frontend/vite.config.ts` の設定で `vp check` が検査する。
+  Playwright Test の API に当たる vitest plugin の規則だけを `apps/web/e2e/**` で外している（[Lintとテストのリファレンス](../tooling/lint-and-test.md)）。
+  `apps/web/e2e/**` からもテレメトリの SDK（`@grafana/*`）を import できない。
 
 ## 不安定なテスト
 
@@ -130,7 +130,7 @@ compose が公開する port は、すべて `127.0.0.1` に限る。
 - `task test` と同じ Compose project（`spring-modulith-test`）を使うため、同時に実行しない。
 - 前提の道具は、[開発環境構築](../local-env-setup/setup.md)の手順 7（`mise install --locked` と `task setup`）で入れたものと同じである。
   Chromium は `task e2e` が導入する。
-  OS の依存ライブラリは、初回に `sudo` 付きの `vp exec playwright install-deps chromium` で入れる。
+  OS の依存ライブラリは、初回に `frontend/apps/web` で、`sudo` を付けた `vp exec playwright install-deps chromium` を実行して入れる。
 
 ## 実行と後片付け
 
@@ -143,15 +143,15 @@ compose が公開する port は、すべて `127.0.0.1` に限る。
 4. backend を起動し、ホストから readiness を確かめる。
 5. Playwright を実行する。
    Playwright が `webServer` で Vite preview を起動し、終了時に止める。
-6. 成否にかかわらず、backend のログを `frontend/test-results/backend.log` に書き、コンテナと volume を削除する。
+6. 成否にかかわらず、backend のログを `frontend/apps/web/test-results/backend.log` に書き、コンテナと volume を削除する。
    ログに `.env.test` の `OIDC_CLIENT_SECRET` か `E2E_PASSWORD` の値が入っていれば、テストが成功していても失敗にする。
    値の一致で見つからない秘密として、`APP_SESSION=` に続く Cookie の値と、`eyJ` で始まる 3 つの base64url をつないだ JWT の形の文字列も失敗にする。
 
 E2E には Collector を置かず、テストが `/collect` を `page.route` で応答する（[ADR-068](../adr/ADR-068-collect-browser-telemetry-with-faro-via-collector.md)）。
-`frontend/e2e/logout.spec.ts` は、`/collect` が 503 を返してもログインとログアウトのフォームを送信できることを確かめる。
-`frontend/e2e/tracing.spec.ts` は、この stub のもとで要求の `traceparent` を観測し、同一オリジンの `/api/**` にだけ sampled flag が 1 の値が付き、`/api/**` 以外のパス、`/collect`、IdP には付かないことを確かめる。
+`frontend/apps/web/e2e/logout.spec.ts` は、`/collect` が 503 を返してもログインとログアウトのフォームを送信できることを確かめる。
+`frontend/apps/web/e2e/tracing.spec.ts` は、この stub のもとで要求の `traceparent` を観測し、同一オリジンの `/api/**` にだけ sampled flag が 1 の値が付き、`/api/**` 以外のパス、`/collect`、IdP には付かないことを確かめる。
 
-起動済みの環境に対して Playwright だけを実行するときは、`frontend/` で `pnpm e2e`（`vp run e2e` と同じ）を実行する。
+起動済みの環境に対して Playwright だけを実行するときは、`frontend/` で `vp run --filter @frontend/web e2e` を実行する。
 build、コンテナの起動、後片付けは行わない。
 
 - ログイン情報は、ルートの `.env.test` の `E2E_USERNAME` と `E2E_PASSWORD` から読む。
@@ -161,7 +161,7 @@ build、コンテナの起動、後片付けは行わない。
 - `task e2e` は `TEST_ENV_FILE` の上書きに対応せず、`.env.test` を固定で読む。
   compose の backend と Playwright が `.env.test` を固定で読むためである。
 - ローカルで `E2E_KEEP_ENV=1 task e2e` を実行して失敗したときだけ、コンテナと volume を残す。
-  残したときは、backend のログ、`pnpm e2e` での再実行、片付けのコマンドを表示する。
+  残したときは、backend のログ、`vp run --filter @frontend/web e2e` での再実行、片付けのコマンドを表示する。
   片付けは `docker compose -f docker/compose-test.yml --profile e2e down --volumes --remove-orphans` で行う。
 - `CI` が空でなければ、`E2E_KEEP_ENV` にかかわらず片付ける。
 - Ctrl-C で中断すると、後片付けが走らないことがある。
@@ -169,10 +169,10 @@ build、コンテナの起動、後片付けは行わない。
 
 ## 失敗の調べ方
 
-- `frontend/playwright-report/` の HTML report を開く。
-- `frontend/test-results/` の trace を `vp exec playwright show-trace <trace.zip>` で開く。
-- `task e2e` は成否にかかわらず backend のログを `frontend/test-results/backend.log` に書く。
-  `test-results/` は Playwright の出力先のため、`pnpm e2e` を再実行すると `backend.log` も消える。
+- `frontend/apps/web/playwright-report/` の HTML report を開く。
+- `frontend/apps/web/test-results/` の trace を、`frontend/apps/web` で `vp exec playwright show-trace <trace.zip>` を実行して開く。
+- `task e2e` は成否にかかわらず backend のログを `frontend/apps/web/test-results/backend.log` に書く。
+  `test-results/` は Playwright の出力先のため、`vp run --filter @frontend/web e2e` で再実行すると `backend.log` も消える。
   残した環境では `docker compose -f docker/compose-test.yml --profile e2e logs backend` で読む。
 - CI では、失敗時に `e2e-results` artifact に report、trace、`backend.log` を保存する。
 

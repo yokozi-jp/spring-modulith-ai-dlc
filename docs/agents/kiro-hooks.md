@@ -16,7 +16,7 @@ tags: [reference, kiro, hooks, agent-skills]
 
 拒否するパスと、パスの置き場所は次のとおり。
 
-- **生成物**：`frontend/src/routeTree.gen.ts`、`frontend/src/api/generated/**`、`openapi/openapi.yaml`。パスはスクリプトだけが持つ。再生成の手順は [フロントエンドのテストと検証](../frontend/testing.md)の「生成物」にある。
+- **生成物**：`frontend/apps/web/src/routeTree.gen.ts`、`frontend/apps/web/src/api/generated/**`、`openapi/openapi.yaml`。パスはスクリプトだけが持つ。再生成の手順は [フロントエンドのテストと検証](../frontend/testing.md)の「生成物」にある。
 - **cursor-plugins の `kiro/install.sh` が入れたファイル**：`.kiro/.kiro-plugins-installed` に載るすべてのパスと、この記録自身。載るパスは実行のたびに記録から読む。入れ直す手順は [スキルの取得元と更新](skill-sources.md)にある。
 
 判定の範囲は次のとおり。

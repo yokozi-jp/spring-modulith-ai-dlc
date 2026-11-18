@@ -66,7 +66,7 @@ pre-commit:
     - name: betterleaks-secret-scan
       run: task scan-secrets
 
-    # api-contract-check は src/api/generated を再生成し、frontend-check は src を型検査する。
+    # api-contract-check は apps/web/src/api/generated を再生成し、frontend-check は src を型検査する。
     # 同時に走ると生成途中のファイルを型検査するため、piped で API の検査を先に順番に実行する。
     - name: frontend-and-api
       group:
@@ -79,9 +79,9 @@ pre-commit:
             glob:
               - "openapi/**"
               - ".spectral.yaml"
-              - "frontend/orval.config.ts"
-              - "frontend/package.json"
-              - "frontend/src/api/generated/**"
+              - "frontend/apps/web/orval.config.ts"
+              - "frontend/apps/web/package.json"
+              - "frontend/apps/web/src/api/generated/**"
             run: |
               echo "{staged_files}" >/dev/null
               if docker info >/dev/null 2>&1; then
