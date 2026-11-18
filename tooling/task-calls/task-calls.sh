@@ -28,6 +28,7 @@ call="${boundary}task${skip}[[:space:]]+${name}"
 #   見落としは報告しないので、この注記を読まないと気づかない。
 #   - 値を取るフラグの後の名前（task -d . build）。
 #   - 2 つ目から後ろの名前（task build gone の gone）。
+#   - 空白を含む引用符の値の後の名前（task VAR="x build" gone は build を読み、gone を見落とす）。
 #   - 次の行に続く名前（run: > の折り返し、\ の継続）。
 #   - 引用符で囲んだ名前、./bin/task、式や変数で作る名前。
 #   - 空白の後の # から後ろ。引用符の中でも同じ（echo "see #1"; task x）。

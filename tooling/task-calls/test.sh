@@ -57,10 +57,10 @@ pre-commit:
         task ns:x # 数える
         echo it's done >&2 # task gone
         echo "my-task gone と .task gone の task は語とパスの一部です。"
-        my_task gone-under
+        my_task gone-under # _ を境界に含める
         ./bin/task gone-path # 見落とす書き方（task-calls.sh の ponytail: の注記）
         echo "task　gone の全角空白は shell の区切りではありません。"
-        task --list-all 2>&1 >/dev/null
+        task --list-all 2>&1 >/dev/null # 2 を名前と読まない
         echo "失敗したら task check: で再実行してください。" # 数える
       fail_text: "失敗しました。task buildで再実行してください。" # 数える
 EOF
@@ -101,6 +101,22 @@ jobs:
         run: task gone-workflow
 EOF
 
+# broken の木は、閉じない [ で task の解析を失敗させる。
+mkdir -p "$tmp/broken"
+cat >"$tmp/broken/Taskfile.yml" <<'EOF'
+version: "3"
+tasks:
+  build:
+    cmds: [echo build
+EOF
+
+# expect は、task が警告を出すことに頼って、警告を出力に混ぜないことを確かめる。
+# task の版が上がって警告が消えると、混ぜる誤りも通るので、先に止める。
+if [ -z "$(TASK_X_REMOTE_TASKFILES=1 task -d "$tmp/ok" --list-all --silent 2>&1 >/dev/null)" ]; then
+  echo "FAIL: TASK_X_REMOTE_TASKFILES=1 で task が警告を出しません。expect の変数を、警告を出す別の変数に替えてください。"
+  exit 1
+fi
+
 # ok の木で数える呼び出しは、行末に # 数える を置いた行である。
 # task-calls.sh はコメントを消してから読むので、この印は結果を変えない。
 calls="$(cat "$tmp/ok/lefthook.yml" "$tmp/ok/.github/workflows/ci.yml" | grep -c ' # 数える$')"
@@ -121,6 +137,10 @@ lefthook.yml:12: task ns:gone $m
 lefthook.yml:15: task gone-block $m
 lefthook.yml:16: task gone-text $m
 .github/workflows/ci.yaml:5: task gone-workflow $m"
+
+# task が失敗したら、task-calls.sh は task の標準エラー（警告と解析の誤り）をそのまま出し、1 で終わる。
+# task の文言は版で変わるので、期待の文は同じ引数で task を実行して作る。
+expect broken 1 '' "$(TASK_X_REMOTE_TASKFILES=1 task -d "$tmp/broken" --list-all --silent 2>&1 >/dev/null)"
 
 if [ "$failures" -gt 0 ]; then
   echo "$failures failure(s)"

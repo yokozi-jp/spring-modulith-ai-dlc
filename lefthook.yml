@@ -194,7 +194,7 @@ pre-commit:
         task skills-check
       fail_text: "スキルの整合の検証に失敗しました。task skills-check で再実行してください。"
 
-    # Taskfile、フック、ワークフロー、その検査にステージ済み変更があるときに検証（task lint-taskfile）。
+    # Taskfile、フック、ワークフロー、tooling の fixture の変更で、タスク名と Taskfile を検証する（task lint-taskfile）。
     - name: lint-taskfile
       glob:
         - "Taskfile.yml"
