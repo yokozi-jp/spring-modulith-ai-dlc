@@ -304,7 +304,7 @@ const params = { ...(cursor !== undefined && { cursor }) };
 - **`task lint-md-fix`**：markdownlint-cli2で安全に修正できるMarkdownの問題を修正する。
 - **`task ruleset-diff`**：GitHub上のrulesetと`.github/rulesets/main.json`の差分を表示する。認証済みの`gh`が要るため、CIでは動かさず、管理者が手元で使う。
 - **`task ruleset-apply`**：`main.json`をGitHub上のrulesetへ反映する。`CONFIRM_RULESET=yes`が要る。手順は[mainブランチの保護設定](../repository/branch-protection.md)にある。
-- **`task okf-check`**：OKF適合、内部リンク、孤立文書、変更した文書の責務の見直し合図（250行超の警告）、steering境界、ADRの整合（`adr-lint`）、rulesetの必須チェックとdocsの一覧とworkflowの名前の一致（`ruleset-check`）、Taskfile文書同期候補を検査する。
+- **`task okf-check`**：OKF適合、内部リンク、孤立文書、変更した文書の責務の見直し合図（250行超の警告）、steering境界、ADRの整合（`adr-lint`）、rulesetの必須チェックとdocsの一覧とworkflowの名前の一致（`ruleset-check`）、iweのMCPサーバーの起動コマンドが選ぶ`iwe-mcp.sh`（`iwe-mcp-check`）、Taskfile文書同期候補を検査する。
   `adr-lint`は内部タスクで、`okf-check`の中でだけ動く。
   `tooling/adr-lint/test.sh`が壊れたfixtureで期待の終了コードを確かめてから、`tooling/adr-lint/adr-lint.mjs`が実際のツリーを検査する。
   失敗にするのは、ADR番号の重複、ADRファイルごとに索引の行がちょうど1つでない状態、索引と本文の状態と日付の不一致、`[ADR-NNN](…ADR-MMM-….md)`のラベルと宛先の番号の不一致である。
@@ -356,7 +356,7 @@ OKF検査の採用理由は[ADR-036](../adr/ADR-036-adopt-okf-for-docs-knowledge
 - **pre-commit（Dockerfileの変更）**：`lint-docker`相当と`lint-docker-check`相当を実行する。
 - **pre-commit（Composeファイルの変更）**：`lint-compose`相当を実行する。
 - **pre-commit（Markdownの変更）**：変更ファイルへ`lint-md`相当を実行する。
-- **pre-commit（docs、steering、Taskfile、README、`tooling/adr-lint/`、`.github/rulesets/`、`.github/workflows/`、`tooling/ruleset-check/`、`tooling/ruleset-sync/`の変更）**：`okf-check`を実行する。
+- **pre-commit（docs、steering、Taskfile、README、`tooling/adr-lint/`、`.kiro/settings/mcp.json`、`tooling/iwe-mcp/`、`.github/rulesets/`、`.github/workflows/`、`tooling/ruleset-check/`、`tooling/ruleset-sync/`の変更）**：`okf-check`を実行する。
 - **pre-commit（`.agents/skills/`、`.kiro/`、`skills-lock.json`、`tooling/skills-check/`の変更）**：`skills-check`を実行する。
 - **pre-commit（Taskfile、`lefthook.yml`、GitHub Actionsワークフロー、`tooling/taskfile-cleanup/`、`tooling/task-calls/`の変更）**：`lint-taskfile`を実行する。
 - **pre-commit（`tooling/agent-git/`の変更）**：`agent-git-test`を実行する。

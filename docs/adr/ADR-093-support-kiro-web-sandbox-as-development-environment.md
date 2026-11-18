@@ -47,6 +47,11 @@ Proposed
   `/etc`、`/run`、`/var` を書ける overlay にした mount namespace で podman の API サービスを起動し、docker、Compose、Testcontainers をそこへ向ける。
   コンテナは cgroup なしで動かす。
 - systemd が無く podman が healthcheck を定期実行しないので、同じスクリプトが各コンテナの `interval` ごとに `healthcheck run` を実行する。
+- iwe の MCP サーバーは `docs/local-env-setup/iwe-mcp.sh` から起動する。
+  Kiro Web は MCP サーバーを tool call より先に、git の外のワークスペースのルートで起動するので、`.kiro/settings/mcp.json` は子のディレクトリからもこのスクリプトを探す。
+  子のディレクトリは `.git` がディレクトリの本体の checkout だけを候補にし、横に作った git worktree を選ばない。
+  本体の checkout が 2 つあれば、名前順で先のものを選ぶ。
+  サンドボックスでは、このスクリプトが `kiro-web.sh` で道具を揃えてから `iwec` を実行する。
 - ホストの 8080 から 8082 を公開するサービスを起動する Task は、`kiro-web-netns` で作る専用のネットワーク名前空間のなかで実行する。
   外への通信は veth と NAT で通し、名前解決はホスト側の dnsmasq が中継する。
 - Compose の healthcheck のうち、シェルの構文を含む検査は `CMD-SHELL` で書く。
