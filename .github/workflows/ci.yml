@@ -28,6 +28,83 @@ jobs:
     permissions:
       contents: read
 
+  actionlint:
+    name: Actionlint
+    uses: ./.github/workflows/actionlint.yml
+    permissions:
+      contents: read
+
+  betterleaks:
+    name: Betterleaks
+    uses: ./.github/workflows/betterleaks.yml
+    permissions:
+      contents: read
+
+  compose:
+    name: Compose
+    uses: ./.github/workflows/compose-config.yml
+    permissions:
+      contents: read
+
+  dast:
+    name: DAST
+    uses: ./.github/workflows/dast.yml
+    permissions:
+      contents: read
+      security-events: write
+
+  frontend:
+    name: Frontend
+    uses: ./.github/workflows/frontend-ci.yml
+    permissions:
+      contents: read
+
+  markdownlint:
+    name: Markdownlint
+    uses: ./.github/workflows/markdownlint.yml
+    permissions:
+      contents: read
+
+  okf:
+    name: OKF
+    uses: ./.github/workflows/okf-validate.yml
+    permissions:
+      contents: read
+
+  otel:
+    name: OTel Collector
+    uses: ./.github/workflows/otel-collector.yml
+    permissions:
+      contents: read
+
+  skills:
+    name: Skills
+    uses: ./.github/workflows/skills-check.yml
+    permissions:
+      contents: read
+
+  static-analysis:
+    name: Static analysis
+    uses: ./.github/workflows/static-analysis.yml
+    permissions:
+      contents: read
+      security-events: write
+
+  trivy:
+    name: Trivy
+    uses: ./.github/workflows/trivy.yml
+    permissions:
+      contents: read
+      security-events: write
+
+  zizmor:
+    name: zizmor
+    uses: ./.github/workflows/zizmor.yml
+    permissions:
+      contents: read
+      security-events: write
+      actions: read
+
   check-gate:
     name: Check CI gate coverage
     runs-on: ubuntu-latest
@@ -53,7 +130,22 @@ jobs:
     name: CI gate
     # always() を付けないと、needs のどれかが失敗や skip のときに gate 自体が skip され、GitHub は skip を成功として扱う。
     if: always()
-    needs: [backend, docker, check-gate]
+    needs:
+      - backend
+      - docker
+      - actionlint
+      - betterleaks
+      - compose
+      - dast
+      - frontend
+      - markdownlint
+      - okf
+      - otel
+      - skills
+      - static-analysis
+      - trivy
+      - zizmor
+      - check-gate
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:

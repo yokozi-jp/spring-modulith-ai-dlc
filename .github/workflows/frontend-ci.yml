@@ -13,9 +13,12 @@ on:
   # changesジョブでFrontend検証の要否を判定する。
   pull_request:
     branches: ["**"]
+  # ci.yml から呼ばれる（docs/adr/ADR-087）。移行が終わるまでは pull_request でも単独で動き、二重に走る。
+  workflow_call:
 
+# 呼ばれると github.workflow が CI になる。group の前にファイル名の stem を付けて、呼ばれた workflow どうしが重ならないようにする（ADR-087）。
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
+  group: frontend-ci-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 permissions:
@@ -51,7 +54,7 @@ jobs:
             echo "frontend=true" >> "$GITHUB_OUTPUT"
             exit 0
           fi
-          if grep -Eq '^(frontend/|openapi/|Taskfile\.yml$|\.github/workflows/frontend-ci\.yml$)' \
+          if grep -Eq '^(frontend/|openapi/|Taskfile\.yml$|\.github/workflows/(frontend-ci|ci)\.yml$)' \
             <<< "$changed_files"; then
             echo "frontend=true" >> "$GITHUB_OUTPUT"
           else
