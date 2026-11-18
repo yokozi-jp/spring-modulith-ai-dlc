@@ -62,12 +62,11 @@ class ObservabilityContractTest {
     final String message = "observability correlation contract";
 
     Observation.createNotStarted("observability.contract", observationRegistry)
-        .observe(
-            () -> {
-              traceId.set(MDC.get("traceId"));
-              spanId.set(MDC.get("spanId"));
-              log.info(message);
-            });
+        .observe(() -> {
+          traceId.set(MDC.get("traceId"));
+          spanId.set(MDC.get("spanId"));
+          log.info(message);
+        });
 
     assertNotNull(traceId.get(), "active observation の trace ID が MDC に存在すること");
     assertNotNull(spanId.get(), "active observation の span ID が MDC に存在すること");
