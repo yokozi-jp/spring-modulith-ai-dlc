@@ -38,7 +38,7 @@ componentの内部state、Hookの呼出回数、CSS classだけを主要な期�
   mockの呼出などDOM以外の値は、`expect.poll`で待つ。
   `setTimeout`などの固定時間で待たない。
 - **処理の一時停止**：MSWのhandlerとroute loaderをテストが解放するまで止めるときは、`createGate`を使う。
-  `createGate`は`src/testing/async-wait.ts`にある。
+  `createGate`は`src/testing/gate.ts`にある。
   止める側で`promise`を待ち、テストから`release`を呼ぶ。
 - **待つ上限**：`findBy`、`waitFor`、`expect.poll`の呼出に`timeout`を書かない。
   上限は`vite.config.ts`の`asyncWaitTimeoutMs`が一括して決める。

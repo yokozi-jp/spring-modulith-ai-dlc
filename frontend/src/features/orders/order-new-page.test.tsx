@@ -11,7 +11,7 @@ import {
 } from "@/api/generated/mocks/ordering/ordering.msw";
 import { getListPaymentsMockHandler } from "@/api/generated/mocks/payment/payment.msw";
 import { getListProductsMockHandler } from "@/api/generated/mocks/product/product.msw";
-import { createGate } from "@/testing/async-wait";
+import { createGate } from "@/testing/gate";
 import { server } from "@/testing/msw";
 import {
   csrfCookieValue,

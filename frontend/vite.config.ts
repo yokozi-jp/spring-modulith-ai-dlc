@@ -30,7 +30,7 @@ const htmlSinkGlobals = [{ name: "DOMParser", message: "Do not parse arbitrary H
 const apiMessage = "Use the generated API client in src/api.";
 const mockMessage = "Use MSW, vi.spyOn or vi.stubGlobal instead of module mocks.";
 const waitMessage =
-  "Use findBy or waitFor from Testing Library, expect.poll, or createGate from src/testing/async-wait.ts.";
+  "Use findBy or waitFor from Testing Library, expect.poll, or createGate from src/testing/gate.ts.";
 const networkGlobals = ["fetch", "XMLHttpRequest"].map((name) => ({ name, message: apiMessage }));
 const htmlSinkProperties = [
   ...restrictedHtmlProperties,

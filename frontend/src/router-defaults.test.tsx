@@ -18,7 +18,7 @@ import { i18n } from "@/i18n";
 import { replaceTelemetryForTesting } from "@/lib/telemetry";
 import { routerDefaults } from "@/router-defaults";
 import { routeTree } from "@/routeTree.gen";
-import { createGate } from "@/testing/async-wait";
+import { createGate } from "@/testing/gate";
 
 type Sink = NonNullable<Parameters<typeof replaceTelemetryForTesting>[0]>;
 

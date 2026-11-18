@@ -5,7 +5,7 @@ import { http } from "msw";
 import { beforeEach, describe, expect, it } from "vite-plus/test";
 
 import { getListProductsMockHandler } from "@/api/generated/mocks/product/product.msw";
-import { createGate } from "@/testing/async-wait";
+import { createGate } from "@/testing/gate";
 import { server } from "@/testing/msw";
 import {
   draftOrder,
