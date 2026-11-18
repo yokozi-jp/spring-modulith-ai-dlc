@@ -38,7 +38,7 @@ task fe-check
 ## git worktreeで作業するとき
 
 worktreeを作る前に、mainのworktreeで`npm ci`を実行しておく。
-mainのworktreeは最初にcloneした作業ツリーで、`.git`がディレクトリになっている（`git worktree list`の1行目）。
+mainのworktreeは最初にcloneした作業ツリーで、`git worktree list`の1行目に出る。
 実行しておかないと、新しいworktreeでの`npm ci`は、mainのworktreeにlefthookが無いことを知らせる`prepare`のメッセージで失敗する。
 
 worktreeには`node_modules`が無いため、作った直後にルートとフロントエンドの依存を入れる。
