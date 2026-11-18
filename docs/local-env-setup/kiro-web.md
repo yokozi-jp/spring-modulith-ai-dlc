@@ -61,6 +61,7 @@ kiro-web-netns bash -c 'task compose-up && task be-migrate && task oidc-check; t
 ## サンドボックスの制約
 
 - 書けるのは `~/.cache`、`/tmp`、ワークスペースだけである。
+- `/tmp` は tool call ごとに消えるので、後で読むログは `$KIRO_WEB_HOME` に書く。
 - 背景のプロセスも tool call の終了で止まるので、push はフォアグラウンドで実行する（[開発ワークフロー](../tooling/dev-workflow.md)の「エージェントがcommitとpushをするとき」）。
 - 1 回の tool call の上限は 30 分である。
   長い Task には `timeout` を付ける。
