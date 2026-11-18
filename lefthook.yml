@@ -272,7 +272,7 @@ pre-push:
         fi
         task test
 
-    # GitHub Actions ワークフローに変更がある push のときだけ Lint（actionlint）
+    # GitHub Actions のワークフローか composite action に変更がある push のときだけ Lint（actionlint）
     # glob を効かせるため run 内で {files} を参照する。
     # docker を使えない（docker info が失敗する）環境ではスキップ（最終担保は CI に任せる）。
     - name: actionlint
@@ -290,7 +290,7 @@ pre-push:
           rhysd/actionlint:1.7.12@sha256:9d36088643581e728c969f35141f88139fec77280b2be23c1f66f8e40e1025e7 \
           -color
 
-    # GitHub Actions ワークフローに変更がある push のときだけセキュリティ解析（zizmor）
+    # GitHub Actions のワークフローか composite action に変更がある push のときだけセキュリティ解析（zizmor）
     # docker を使えない（docker info が失敗する）環境ではスキップ（最終担保は CI に任せる）。
     - name: zizmor
       glob:

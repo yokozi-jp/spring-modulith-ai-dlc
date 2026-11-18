@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """ci.yml の集約ジョブが、pull_request で動く検査を取りこぼしていないか確かめる（docs/adr/ADR-087）。
+あわせて、workflow の paths 条件の食い違いと、mise を使わない道具の入れ方を止める（docs/adr/ADR-090）。
 
 使い方: ci-gate-check.py [workflows のディレクトリ] [excluded.tsv]
 """
@@ -14,13 +15,25 @@ import yaml
 GATE_JOB = "gate"
 GATE_NAME = "CI gate"
 USES_LOCAL = re.compile(r"^\./\.github/workflows/([^/@]+\.ya?ml)$")
-# Task の版と入れ方を決めるファイル。Taskfile.yml で走る workflow は、これらでも走らせる（docs/adr/ADR-090）。
+SETUP_MISE = "./.github/actions/setup-mise"
+# setup-mise が入れる道具の版と入れ方を決めるファイル。setup-mise を使う workflow は、これらの変更でも走らせる。
 TOOLCHAIN = {"mise.toml", "mise.lock", ".github/actions/setup-mise/**"}
+# mise.lock を通さずに道具を入れる action。
+BANNED_USES = ("go-task/setup-task@", "actions/setup-go@")
 
 
 def triggers(workflow):
-    # YAML 1.1 は、キーの on を真偽値の True として読む。
-    return workflow.get("on", workflow.get(True)) or {}
+    # YAML 1.1 は、キーの on を真偽値の True として読む。on: push や on: [push] も dict にそろえる。
+    on = workflow.get("on", workflow.get(True)) or {}
+    if isinstance(on, str):
+        return {on: None}
+    if isinstance(on, list):
+        return dict.fromkeys(on)
+    return on
+
+
+def step_uses(workflow):
+    return [str(step.get("uses", "")) for job in (workflow.get("jobs") or {}).values() for step in job.get("steps", [])]
 
 
 def read_excluded(path):
@@ -83,12 +96,16 @@ def check_paths(name, workflow):
 
 
 def check_toolchain(name, workflow):
+    uses = step_uses(workflow)
+    errors = [f"{name} が {u} を使っています。道具は {SETUP_MISE} で mise.lock から入れてください。" for u in uses if u.startswith(BANNED_USES)]
+    if SETUP_MISE not in uses:
+        return errors
     lists = {f"{event} の paths:": (triggers(workflow).get(event) or {}).get("paths") for event in ("push", "pull_request")}
     lists["changed.sh の引数"] = changed_sh_globs(workflow)
-    return [
-        f"{name} の {label}に Taskfile.yml があるのに {sorted(TOOLCHAIN - set(globs))} がありません。"
+    return errors + [
+        f"{name} は setup-mise を使うのに、{label}に {sorted(TOOLCHAIN - set(globs))} がありません。"
         for label, globs in lists.items()
-        if globs and "Taskfile.yml" in globs and not TOOLCHAIN <= set(globs)
+        if globs is not None and not TOOLCHAIN <= set(globs)
     ]
 
 

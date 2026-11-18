@@ -8,6 +8,10 @@ on:
       - ".kiro/**"
       - "skills-lock.json"
       - "tooling/skills-check/**"
+      - "Taskfile.yml"
+      - "mise.toml"
+      - "mise.lock"
+      - ".github/actions/setup-mise/**"
   # PR の検査は ci.yml から呼ばれて動く（docs/adr/ADR-087）。
   workflow_call:
 
@@ -42,7 +46,11 @@ jobs:
             '.agents/skills/**' \
             '.kiro/**' \
             'skills-lock.json' \
-            'tooling/skills-check/**'
+            'tooling/skills-check/**' \
+            'Taskfile.yml' \
+            'mise.toml' \
+            'mise.lock' \
+            '.github/actions/setup-mise/**'
 
   skills-check:
     name: Run task skills-check 🧩

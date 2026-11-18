@@ -49,6 +49,9 @@ on:
   push:
     paths:
       - 'a/**'
+      - 'mise.toml'
+      - 'mise.lock'
+      - '.github/actions/setup-mise/**'
       - 'b.yml'
   workflow_call:
 concurrency:
@@ -61,11 +64,15 @@ jobs:
         run: |
           bash tooling/ci-changes/changed.sh \
             'a/**' \
+            'mise.toml' \
+            'mise.lock' \
+            '.github/actions/setup-mise/**' \
             'b.yml'
   test:
     needs: changes
     runs-on: ubuntu-latest
     steps:
+      - uses: ./.github/actions/setup-mise
       - run: "true"
 YAML
 cat > "$base/e2e.yml" <<'YAML'
@@ -114,8 +121,17 @@ sed -i "s|^            'b.yml'\$|            'c.yml'|" "$d/backend.yml"
 expect "push の paths: と changed.sh の引数が違うと失敗" 1 "push の paths: と changed.sh の引数が違います" check "$d"
 
 d="$(case_dir toolchain)"
-sed -i "s|^      - 'b.yml'\$|      - 'b.yml'\n      - 'Taskfile.yml'|; s|^            'b.yml'\$|            'b.yml' \\\\\n            'Taskfile.yml'|" "$d/backend.yml"
-expect "Taskfile.yml で走るのに mise.toml で走らないと失敗" 1 "Taskfile.yml があるのに" check "$d"
+sed -i "/'mise.lock'/d" "$d/backend.yml"
+expect "setup-mise を使うのに mise.lock で走らないと失敗" 1 "push の paths:に ['mise.lock'] がありません" check "$d"
+
+d="$(case_dir banned-uses)"
+sed -i 's|^      - run: "true"$|      - uses: go-task/setup-task@v2\n      - run: "true"|' "$d/backend.yml"
+expect "mise.lock を通さない setup-task を使うと失敗" 1 "go-task/setup-task@v2 を使っています" check "$d"
+
+d="$(case_dir on-list)"
+printf 'name: Push\non: [push]\njobs:\n  a:\n    runs-on: ubuntu-latest\n    steps:\n      - run: "true"\n' > "$d/push.yml"
+expect "on: [push] の workflow でも traceback にならない" 0 "ci-gate-check OK" check "$d"
+
 d="$(case_dir double-run)"
 sed -i 's/^  workflow_call:/  pull_request:\n  workflow_call:/' "$d/backend.yml"
 expect "呼ばれる側が pull_request でも動くと失敗" 1 "backend.yml は ci.yml から呼ばれるのに pull_request でも動きます" check "$d"

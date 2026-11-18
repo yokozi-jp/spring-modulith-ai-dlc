@@ -30,7 +30,7 @@ iwe は `06-setup-iwe.sh` が `npm install -g` で入れ、CI は `versions.env`
 [#254](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/254) の調査で、`yokozi-jp/agent-software-factory` の [ADR 0009](https://github.com/yokozi-jp/agent-software-factory/blob/main/docs/adr/0009-mise-for-pinned-cli-tools.md) と同じく、mise の `mise.toml` と `mise.lock` に寄せると決めた。
 [ADR-010](ADR-010-adopt-task-as-project-task-runner.md) は Task の版を固定してローカルと CI で同じ版を使うと決めており、この ADR はその版を置く場所と入れ方を変える。
 
-Proposed の間に Decision を一度書き直した。
+Proposed の間に Decision を書き直した。
 最初の案は CI の各 step に `jdx/mise-action` と mise の版を書いていたので、Task の版の複製が mise の版の複製に移っただけだった。
 このため、CI の設定を composite action へまとめた。
 lock の強制を `mise.toml` の `[settings] locked = true` へ移す案も試したが、`[tools]` のほかを書いた `mise.toml` は新しいチェックアウトごとに `mise trust` を求め、新しい worktree で shims と Git フックが止まったので採らなかった（選択肢5）。
@@ -45,7 +45,8 @@ lock の強制を `mise.toml` の `[settings] locked = true` へ移す案も試�
 - CI は composite action `.github/actions/setup-mise` を使う。この action だけが `jdx/mise-action` の SHA と mise の版を持ち、入力 `tools` でジョブが使う道具だけを入れる。
 - composite action は `MISE_LOCKED=1` をジョブの環境変数にし、install と後の step の shims に lock に無い版を拒ませる。
 - CI ではキャッシュを使わない。復元したキャッシュは `mise.lock` と照合されないためである。
-- `Taskfile.yml` を paths 条件に入れる workflow には、`mise.toml`、`mise.lock`、`.github/actions/setup-mise/**` も入れ、`task ci-gate-check` で検査する。以前は Task の版を上げると各 workflow 自身が変わって走ったが、今は `mise.toml` と `mise.lock` しか変わらないためである。
+- setup-mise を使う workflow は、paths 条件に `mise.toml`、`mise.lock`、`.github/actions/setup-mise/**` も入れる。以前は Task の版を上げると各 workflow 自身が変わって走ったが、今は `mise.toml` と `mise.lock` しか変わらないためである。
+- `task ci-gate-check` が、この paths 条件と、`go-task/setup-task` や `actions/setup-go` のように `mise.lock` を通さずに道具を入れる action を検査する。
 - 番号付きのセットアップスクリプトのうち `00-setup-task.sh`、`05-setup-go-betterleaks.sh`、`06-setup-iwe.sh` と `versions.env` を削除する。
 
 `mise activate` ではなく shims を選んだ理由は、PATH が作業ディレクトリに左右されないことである。
@@ -70,13 +71,14 @@ shims は決まったディレクトリなので、受け継いだ PATH のま�
 - iwe は実行に Node.js を要するが、mise は Node.js を入れない。ローカルでは Vite+、CI では `actions/setup-node` が入れる。
 - ローカルの shims は lock を強制しない。`mise.toml` の版だけを上げると、shims は初回の実行でその版を入れて `mise.lock` を書き換える。書き換わった `mise.lock` は差分に出て、commit しなければ CI が止める。
 - `.mise/locks/` が欠けると、`mise install --locked` は iwe の install で失敗する（mise のエラーは `mise lock` での修復を案内する）。
-- 版を上げる PR では、Task を使う workflow がすべて走る。betterleaks か iwe だけを上げても backend、frontend、e2e、dast が走り、main への push では mutation test も走る。
+- 版を上げる PR では、setup-mise を使う workflow がすべて走る。betterleaks か iwe だけを上げても backend、frontend、e2e、dast、mutation test が走る。
 - Dependabot は `mise.toml` と composite action の `version` を更新しない。[#389](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/389) で Renovate を入れるまで手で上げる。`jdx/mise-action` の SHA は、`dependabot.yml` の `directories` に composite action を足して Dependabot に更新させる。
 
 ### Neutral
 
 - `mise.lock` は `linux-x64` だけを持つ。開発環境は WSL、CI は `ubuntu-latest` である。ほかの platform で開発する人が来たら `mise lock --platform` に足す。
 - CI の mise の版とローカルの apt の mise の版はずれうる。mise 2026.11.0 と 2026.11.9 で同じ `mise.lock` と `.mise/locks/` が作られ、どちらでも `mise install --locked` が通ることを確かめた。
+- zizmor の `self-repository` は `uses: ./.github/actions/setup-mise` に `$/` の形を勧めるが、`ci.yml` と同じく actionlint（1.7.12）がまだ受け付けない（rhysd/actionlint#732）ので `./` のままにし、alert は won't fix にする。
 - Java（apt の Corretto）、Vite+、Kiro CLI はこの ADR の対象外であり、番号付きのスクリプトに残る。Kiro CLI は [#387](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/387) で扱う。
 - [ADR-010](ADR-010-adopt-task-as-project-task-runner.md) の「ローカル導入スクリプトと CI で同じバージョンを使う」は、この ADR を Accepted にするときに、この ADR を指す記述へ直す。
 
