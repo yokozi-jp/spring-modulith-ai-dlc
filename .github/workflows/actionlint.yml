@@ -3,7 +3,7 @@ on:
   push:
     paths:
       - '.github/workflows/**'
-  pull_request:
+  # PR の検査は ci.yml から呼ばれて動く（docs/adr/ADR-087）。
   workflow_call:
 
 concurrency:

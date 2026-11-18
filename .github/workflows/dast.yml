@@ -1,15 +1,11 @@
 name: DAST (OWASP ZAP) 🕷️
 
 on:
-  # PR ではパスフィルタで workflow をスキップしない（必須チェックが
-  # "Expected" のまま滞留するため）。全 PR で起動し、changes ジョブで
-  # 判定して passive scan を条件付き実行する（skipped は必須チェックで success 扱い）。
-  pull_request:
-    branches: ["**"]
   # 毎週月曜 03:17 UTC に active scan を実行する。リポジトリで初めての schedule（ADR-056）。
   schedule:
     - cron: "17 3 * * 1"
   workflow_dispatch:
+  # PR の検査は ci.yml から呼ばれて動く（docs/adr/ADR-087）。
   workflow_call:
 
 # PR だけ実行中の run を取り消す。schedule の active scan を workflow_dispatch で止めないため（api-contract.yml と同じ）。

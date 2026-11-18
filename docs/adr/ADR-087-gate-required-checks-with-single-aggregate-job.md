@@ -9,7 +9,7 @@ tags: [adr, ci, github-actions, governance]
 
 ## Status
 
-Proposed
+Accepted
 
 ## Date
 
@@ -38,13 +38,15 @@ GitHub Actions の仕様のうち、設計を左右するものが 3 つある�
 - 呼ばれた側のジョブの check 名は `呼び出しジョブ名 / 呼ばれたジョブ名` になる。呼ばれる側の `pull_request` を外すと、旧い名前の check は報告されなくなる。
 - 呼ばれた側が使える `GITHUB_TOKEN` の権限は、呼び出し側のジョブが与えた範囲までである。
 
-[ADR-086](https://github.com/yokozi-jp/spring-modulith-ai-dlc/pull/392) は、ruleset を `.github/rulesets/main.json` に置き、docs の必須チェックの一覧との一致を `tooling/ruleset-check` で検査する（PR #392 で提案中）。
+[ADR-086](ADR-086-align-main-protection-with-solo-and-agent-operation.md) は、ruleset を `.github/rulesets/main.json` に置き、docs の必須チェックの一覧との一致を `tooling/ruleset-check` で検査する。
 この ADR は、その一覧の中身を減らす。
 
 保つ性質は 3 つある。
 docs だけの PR で backend の CI を走らせない。
 並列度を落とさない。
 `main` への push で動く CI を変えない。
+
+実装の 1 つ目の PR で、`ci.yml` の取り消しは呼ばれた側だけに効き、呼ばれる側が `pull_request` でも単独で動く移行の間は、その実行が取り消されなくなることが分かった。そのため、group を `event_name` で分ける案をやめ、ファイル名の stem を前に付ける案に書き直した（2026-11-17）。
 
 ## Decision
 
@@ -65,7 +67,7 @@ docs だけの PR で backend の CI を走らせない。
 - `CI gate` は、`ci.yml` のほかのすべてのジョブを `needs` に並べ、`if: always()` を付ける。
 - 判定は `needs.*.result` がすべて `success` であることだけを求める。`skipped`、`failure`、`cancelled` は失敗にする。`changes` が失敗した workflow は、呼び出しジョブが `failure` になるので、gate を通らない。
 - 判定は third-party の action を使わず、`toJSON(needs)` を `jq` で調べるシェルで書く。
-- skip した検査が `success` になること（呼び出しジョブの結果が、中のジョブがすべて skip でも `success` になること）は、最初の PR で実際の PR を使って確かめる。`skipped` になる場合も、gate は失敗側に倒れるので、見逃しにはならない。
+- skip した検査が `success` になること（呼び出しジョブの結果が、中のジョブがすべて skip でも `success` になること）は、docs だけの PR #406 で確かめた。重い検査は skip され、`CI gate` は通った。`skipped` になる場合も、gate は失敗側に倒れるので、見逃しにはならない。
 
 ### concurrency と権限
 
@@ -95,7 +97,7 @@ ruleset の必須チェックを、次の 4 つにする。
 
 この ADR で新たに必須になる検査は、14 本の workflow のジョブのうち、現在の ruleset にない名前のものである。
 `Check duplicate code`、`Check Taskfile`、`Run task otel-collector-check 🔭`、`Run task skills-check 🧩`、`Run markdownlint-cli2 📝`、`Run task okf-check 📚`、`Run docker compose config 🐳` と actionlint のジョブが該当する。
-実装の PR で、ruleset の取得結果と突き合わせて全量を docs に書く。
+全量は `ci.yml` が正で、docs には写さない。
 [ADR-021](ADR-021-group-dependabot-minor-and-patch-updates.md) が定めるとおり、auto-merge の安全性は必須チェックの集合が決める。この集合の中心が `CI gate` になる。
 
 ### 検査
@@ -117,19 +119,18 @@ check 名が変わるため、次の順にする。
 1. `ci.yml` を足す PR を merge する。呼ばれる workflow は `pull_request` を残し、一時的に二重に走る。ruleset は変えない。
 2. 次の PR で、`CI gate` の check が出ることを確認する。
 3. ruleset に `CI gate` を追加し、個別のチェックと併存させる。
-4. ruleset から個別の必須チェックを外し、`Validate PR title` と API contract の 2 つ、`CI gate` だけにする。
+4. ruleset から個別の必須チェックを外し、`Validate PR title` と API contract の 2 つ、`CI gate` だけにする。3 と 4 は `.github/rulesets/main.json` を直し、[ADR-086](ADR-086-align-main-protection-with-solo-and-agent-operation.md) の手順で反映する。実際には、個別のチェックと `CI gate` を併存させる 3 を省き、一度に 4 つへ差し替えた。呼ばれる workflow が `pull_request` を持つ間は、個別のチェックも報告されるため、ロックアウトは起きない。
 5. 呼ばれる workflow から `pull_request` を外す PR を merge する。
 6. 開いている PR は、branch を更新して `CI gate` を出す。
 
-PR は 3 つに分ける。
-1 つ目は ci.yml の追加と、backend-ci、hadolint の移行（手順 1）。
-2 つ目は残りの workflow の移行。
-3 つ目は ruleset の差し替えと、`pull_request` の削除、docs の更新（手順 3 から 6）。
+PR は 4 つに分けた。
+1 つ目（#398）は ci.yml の追加と、backend-ci、hadolint の移行（手順 1）。
+2 つ目（#407）は残りの workflow の移行。
+3 つ目（#413）は既存の `changes` を `changed.sh` へ寄せる。
+4 つ目（#415）は ruleset の差し替えと、`pull_request` の削除、docs の更新（手順 3 から 6）。
 
 [ADR-017](ADR-017-adopt-trunk-based-repository-governance.md) の「常時必須チェックと条件付き品質ゲートを分けて管理する」方針は、この ADR が置き換える。
 `docs/repository/branch-protection.md` の必須チェックの節と、ADR-086 の `tooling/ruleset-check` が見る一覧は、実装の PR で更新する。
-
-実装の 1 つ目の PR で、`ci.yml` の取り消しは呼ばれた側だけに効き、呼ばれる側が `pull_request` でも単独で動く移行の間は、その実行が取り消されなくなることが分かった。そのため、group を `event_name` で分ける案をやめ、ファイル名の stem を前に付ける案に書き直した（2026-11-17）。
 
 ## Consequences
 
@@ -147,6 +148,8 @@ PR は 3 つに分ける。
 - 移行の間、呼ばれる workflow が二重に走る。
 - check 名が `呼び出しジョブ名 / 呼ばれたジョブ名` の形になり、PR の画面で長く表示される。
 - `CI gate` の判定が壊れると、Dependabot の PR まで auto-merge される。判定のシェルは fixture のテストで守る。
+- `CI gate` は全検査の終わりを待ってから報告する。`gh pr checks --required --watch --fail-fast` では、早く失敗した検査があっても、失敗が分かるのは一番遅い検査（DAST や backend のテスト）の終わりになる。
+- 必須にする検査の集合を、PR の head の `ci.yml` と `excluded.tsv` が決める。ジョブを消したり、呼び出しを外して除外の一覧に足したりしても、`CI gate` は通る。歯止めは、CI のゲートの変更を人が読む運用（ADR-086）である。
 - 必須チェックは 1 つにならず、4 つ残る。タイトルとラベルの再判定は、`ci.yml` に入れると全体が走り直すためである。
 
 ### Neutral
@@ -193,4 +196,5 @@ PR は 3 つに分ける。
 - [Reusing workflow configurations](https://docs.github.com/en/actions/reference/workflows-and-actions/reusable-workflows)
 - [main ブランチの保護設定](../repository/branch-protection.md)
 - [ADR-017](ADR-017-adopt-trunk-based-repository-governance.md)、[ADR-021](ADR-021-group-dependabot-minor-and-patch-updates.md)、[ADR-052](ADR-052-commit-openapi-contract-and-check-generated-client.md)、[ADR-057](ADR-057-adopt-playwright-for-e2e-tests.md)、[ADR-076](ADR-076-run-mutation-tests-per-change-and-tighten-coverage-gates.md)
+- [ADR-086](ADR-086-align-main-protection-with-solo-and-agent-operation.md)
 - Issue #252

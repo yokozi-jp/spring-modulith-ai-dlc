@@ -24,6 +24,7 @@ Proposed
 `main` への直接 push を許すと、Pull Request と既存の CI を通らない変更を防げない。
 
 承認の数は ruleset で 0 にしており、ADR-086 が Decision をその設定に合わせた。
+常時必須のチェックは、ADR-087 が集約ジョブ `CI gate` にまとめ、Decision をその方式に合わせた。
 
 リポジトリのセキュリティ状態を集約スコアで評価しても、個別の変更に含まれる問題を理由としてマージを止めることはできない。
 秘密情報、コード、依存関係、GitHub Actions は、それぞれの問題を直接検出する検査で保護する必要がある。
@@ -70,7 +71,7 @@ CODEOWNERS は backend、frontend、docker と infrastructure、`.kiro` と `aid
 ### Neutral
 
 - 将来チームを作成した時点で、CODEOWNERS の各規則を実在する `@owner/team` へ置き換える。
-- パス条件付きの CI は変更が該当するときだけ実行されるため、ruleset の常時必須チェックと条件付き品質ゲートを分けて管理する。
+- パス条件付きの CI は、各 workflow の `changes` ジョブが判定してジョブ単位で skip し、集約ジョブ `CI gate` が 1 つにまとめて必須にする（[ADR-087](ADR-087-gate-required-checks-with-single-aggregate-job.md)）。
 
 ## Alternatives Considered
 
