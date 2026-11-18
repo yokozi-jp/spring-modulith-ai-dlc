@@ -16,13 +16,13 @@ import java.util.stream.Stream;
  * 権限のSQL（{@code GRANT}、{@code REVOKE}、{@code ALTER DEFAULT PRIVILEGES}）の書き方（G3）を判定する。
  *
  * <p>権限のSQLだけのchangesetは、任意のSQL（M17）の許可リストに載せず、この規則で判定する。権限は、ログインできないモジュールのロール（{@code
- * <module>_module}）に与える。アプリロールに与えてよいのは、モジュールに属さない{@code modulith}スキーマだけである（ADR-090）。
+ * <module>_module}）に与える。アプリロールに与えてよいのは、モジュールに属さない{@code modulith}スキーマだけである（ADR-094）。
  */
 final class ChangesetPrivilegeRules {
 
   /** 規則の根拠の文書。 */
   private static final String DOC =
-      "docs/database/connections.md、docs/adr/ADR-090-switch-to-module-database-roles.md";
+      "docs/database/connections.md、docs/adr/ADR-094-switch-to-module-database-roles.md";
 
   /** この番号以降のchangesetは、業務スキーマの権限をアプリロールに与えない。これより前の付与は、012が取り消す。番号のないファイルは、この番号以降とみなす。 */
   private static final int MODULE_ROLES_SINCE = 12;

@@ -12,7 +12,7 @@ tags: [convention, tooling, taskfile, ci]
 CI と Lefthook は同じタスクを呼び、公開タスクを変えたら関連文書を同じ変更で更新する。
 
 このプロジェクトは、開発コマンドの共通入口としてTaskを使う。
-実行するTaskのバージョンは`docs/local-env-setup/versions.env`へ固定する。
+実行するTaskのバージョンは`mise.toml`へ固定し、ローカルとCIは`mise.lock`の版とchecksumから入れる（[ADR-090](../adr/ADR-090-pin-cli-tools-with-mise-lock.md)）。
 基準となる定義は[Taskfile.yml](../../Taskfile.yml)を参照する。
 
 ## スキーマとシェル設定
@@ -146,6 +146,7 @@ Dockerの`--format`など別のGoテンプレートをコマンドへ渡す場�
 CIとLefthookは処理を複製せず、Taskfileの同じタスクを呼ぶ。
 入口タスクが呼ぶ部品タスクとCIが呼ぶ部品タスクの処理を一致させる。
 Taskfileを変更したら、CIのpaths条件に`Taskfile.yml`が含まれていることも確認する。
+`.github/actions/setup-mise`で道具を入れるworkflowは、paths条件に道具の版と入れ方を決めるファイル（`tooling/ci-gate-check/ci-gate-check.py`の`TOOLCHAIN`）も入れる。`task ci-gate-check`が検査する。
 タスクを改名、削除したら、`lefthook.yml`とワークフローの`task <名前>`も直す。
 直し忘れると`task lint-taskfile`が失敗する（[Lintとテストのリファレンス](lint-and-test.md)）。
 
@@ -157,7 +158,7 @@ Taskfileを変更したら、CIのpaths条件に`Taskfile.yml`が含まれてい
 - `docs/tooling/dev-workflow.md`
 - `docs/tooling/lint-and-test.md`
 - DB操作を変えた場合は`docs/database/migrations.md`
-- 導入バージョンを変えた場合は`docs/local-env-setup/versions.env`とCI
+- 導入バージョンを変えた場合は`mise.toml`（手順は同ファイルの冒頭）
 
 `task okf-check`は`Taskfile.yml`の変更を検出すると、README、`docs/tooling/dev-workflow.md`、`docs/tooling/lint-and-test.md`が同じ差分に含まれるかを警告する。
 内部タスクや実装だけの変更では文書更新を要求しないため、警告を確認して対応不要と判断してよい。

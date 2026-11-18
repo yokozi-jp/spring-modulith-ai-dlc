@@ -1,6 +1,5 @@
 #!/bin/bash
 set -e
-source ./versions.env
 
 # 環境変数設定
 # ~/.local/bin を PATH に通す（kiro-cli のインストール先）。
@@ -13,6 +12,16 @@ if ! grep -qxF "$LOCAL_BIN_LINE" ~/.bashrc; then
     echo ''
     echo '# ~/.local/bin (kiro-cli など)'
     echo "$LOCAL_BIN_LINE"
+  } >> ~/.bashrc
+fi
+
+# PATH を作業ディレクトリに左右させないため、activate を --shims で使う（ADR-090）。
+MISE_SHIMS_LINE='eval "$(mise activate bash --shims)"'
+if ! grep -qxF "$MISE_SHIMS_LINE" ~/.bashrc; then
+  {
+    echo ''
+    echo '# mise の shims'
+    echo "$MISE_SHIMS_LINE"
   } >> ~/.bashrc
 fi
 

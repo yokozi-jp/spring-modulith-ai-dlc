@@ -238,7 +238,7 @@ class LocalDataSeederTest {
         .allSatisfy(id -> assertThat(List.of(id.version(), id.variant())).isEqualTo(List.of(4, 2)));
   }
 
-  /** モジュールのロールで読み書きする。アプリロールは業務のスキーマに権限を持たない（ADR-090）。 */
+  /** モジュールのロールで読み書きする。アプリロールは業務のスキーマに権限を持たない（ADR-094）。 */
   private <T> T inModule(final String module, final Function<DSLContext, T> body) {
     return AsModule.call(dsl, module, body);
   }

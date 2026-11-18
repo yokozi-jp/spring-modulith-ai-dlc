@@ -59,7 +59,7 @@ Safariは`Secure`のCookieをHTTPで受け付けないため、HTTPSの環境で
 
 Baselineの状態は、MDN、Can I use、Web Platform Status（webstatus.dev）で確認する。
 
-`vite.config.ts` に `build.target` を指定せず、Viteの既定のbuild targetを使う。
+`apps/web/vite.config.ts` に `build.target` を指定せず、Viteの既定のbuild targetを使う。
 
 ## 出典
 

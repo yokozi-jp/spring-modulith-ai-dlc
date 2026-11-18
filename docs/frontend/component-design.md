@@ -14,7 +14,7 @@ linkの文言は遷移先を表し、操作要素は十分なtarget sizeを確�
 
 ## 共通componentと業務component
 
-- **共通component**：特定の業務に依存しないUI primitive。`components/ui` に置き、shadcn/uiのBase UI版で実装する。
+- **共通component**：特定の業務に依存しないUI primitive。`packages/ui`（`@frontend/ui`）に置き、shadcn/uiのBase UI版で実装する。
 - **業務component**：特定の業務機能のデータとロジックを持つcomponent。利用するfeatureの `components` に置く。
 
 配置と依存方向は[フロントエンドのUIとスタイル](ui-and-style.md)と[フロントエンドアーキテクチャ](architecture.md)に従う。
@@ -24,7 +24,7 @@ linkの文言は遷移先を表し、操作要素は十分なtarget sizeを確�
 - component名はPascalCaseにし、業務（`UserProfileCard`、`OrderListItem`）または種類と役割（`SearchInput`）を表す。
 - componentのファイル名は、component名をkebab-caseにした名前にする（`OrderListItem` は `order-list-item.tsx`）。
   Oxlintの `unicorn/filename-case` が検査する。
-- `components/ui` のファイル名は、shadcn CLIが生成する名前（`button.tsx`）に従う。
+- `packages/ui/src` のファイル名は、shadcn CLIが生成する名前（`button.tsx`）に従う。
   この名前もkebab-caseである。
 - propsはcamelCaseにし、eventを受けるpropsは `on` で始める（`onSubmit`）。
 - ディレクトリ名と、独自に定義するCSS class名はkebab-caseにする。

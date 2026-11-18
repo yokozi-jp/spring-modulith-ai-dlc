@@ -3,7 +3,7 @@ databaseChangeLog:
       id: 012-switch-privileges-to-module-roles
       author: system
       comment: >-
-        アプリロールから業務スキーマの権限を取り上げ、ログインできないモジュールのロール（<module>_module）へ移す（ADR-090）。
+        アプリロールから業務スキーマの権限を取り上げ、ログインできないモジュールのロール（<module>_module）へ移す（ADR-094）。
         ロールは環境を作る手順で先に作る（ローカルは docker/initdb、本番は docs/database/connections.md）。
         依存の方向（ordering から product、payment から ordering）にだけ、呼び出し元のロールへ依存先のスキーマの SELECT を与える。
         新しい表の権限は、スキーマごとの ALTER DEFAULT PRIVILEGES で決める。

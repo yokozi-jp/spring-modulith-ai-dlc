@@ -3,6 +3,7 @@ on:
   push:
     paths:
       - '.github/workflows/**'
+      - '.github/actions/**'
   # PR の検査は ci.yml から呼ばれて動く（docs/adr/ADR-087）。
   workflow_call:
 
@@ -34,7 +35,8 @@ jobs:
           BASE_REF: ${{ github.event.pull_request.base.ref }}
         run: |
           bash tooling/ci-changes/changed.sh \
-            '.github/workflows/**'
+            '.github/workflows/**' \
+            '.github/actions/**'
 
   actionlint:
     needs: changes

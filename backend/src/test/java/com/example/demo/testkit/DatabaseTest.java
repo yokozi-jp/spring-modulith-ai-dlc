@@ -16,7 +16,7 @@ import org.springframework.context.annotation.Import;
  *
  * <p>{@code @JooqTest} は {@code @Configuration}
  * を読み込まないため、トランザクションの名前からモジュールのロールへ切り替えるトランザクションマネージャーを {@code @Import}
- * する（ADR-090）。テストのトランザクションは、テストクラスの名前（{@code
+ * する（ADR-094）。テストのトランザクションは、テストクラスの名前（{@code
  * com.example.demo.<module>.…}）からモジュールのロールで動く。モジュールの外のテストクラスは、アプリロールのままで、{@link AsModule} で切り替える。
  *
  * <p>{@code replace = NONE} で組み込みDBへの差し替えを止め、生成コードと同じ方言の実 PostgreSQL を使う。

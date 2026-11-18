@@ -8,7 +8,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 
-/** {@code @DatabaseTest} のトランザクションが、テストクラスの名前から ordering のロールで動くことを確かめる（ADR-090）。 */
+/** {@code @DatabaseTest} のトランザクションが、テストクラスの名前から ordering のロールで動くことを確かめる（ADR-094）。 */
 @DatabaseTest
 class OrderModuleRoleTest {
 

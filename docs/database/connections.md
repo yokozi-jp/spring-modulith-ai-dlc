@@ -100,7 +100,7 @@ Liquibase用アカウントには、DDL、Liquibase管理テーブルの更新�
 
 ## モジュールのロール
 
-業務のスキーマは、アプリケーション用ロールではなく、モジュールごとのログインできないロール`<module>_module`（`product_module`、`ordering_module`、`payment_module`）が読み書きする（[ADR-090](../adr/ADR-090-switch-to-module-database-roles.md)）。
+業務のスキーマは、アプリケーション用ロールではなく、モジュールごとのログインできないロール`<module>_module`（`product_module`、`ordering_module`、`payment_module`）が読み書きする（[ADR-094](../adr/ADR-094-switch-to-module-database-roles.md)）。
 別のモジュールの表への書き込みと、依存の方向に逆らう読み取りは、DBの権限エラー（SQLSTATE `42501`）で止まる。
 
 - **切り替え**：`ModuleRoleTransactionManager`が、トランザクションを始めた直後に、トランザクションの名前（クラス名とメソッド名）から引いたモジュールのロールへ`set_config('role', ?, true)`で切り替える。トランザクションの終わりで元に戻るため、プールの接続にロールが残らない。モジュールが分からない名前（Spring Modulithの内部、ShedLock、名前のない`TransactionTemplate`）はアプリケーション用ロールのまま動く。ロールは物理的なトランザクションを始めた外側の名前で決まり、`REQUIRED`で参加した別のモジュールの`<Feature>Queries`は呼び出し元のロールで動く。

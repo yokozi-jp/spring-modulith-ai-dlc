@@ -25,7 +25,7 @@ import org.springframework.test.context.junit.jupiter.SpringExtension;
 /**
  * 各テストの後に、jOOQ が生成したアプリケーションテーブルの行をすべて消す JUnit 拡張。
  *
- * <p>業務のスキーマは、アプリロールに権限がなく、モジュールのロールも別のモジュールの表を消せない（ADR-090）。そのため、表の所有者（マイグレーションロール）の接続で {@code
+ * <p>業務のスキーマは、アプリロールに権限がなく、モジュールのロールも別のモジュールの表を消せない（ADR-094）。そのため、表の所有者（マイグレーションロール）の接続で {@code
  * TRUNCATE} する。{@code TRUNCATE} は RLS の対象外で、モジュールとテナントの境界に左右されない。{@code modulith} スキーマの表は、アプリロールの
  * {@code DELETE} で消す。
  *

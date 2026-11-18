@@ -174,7 +174,7 @@ class DatabaseConventionsArchTest {
             "モジュールのロールは自分のスキーマだけを読み書きでき、別のモジュールのスキーマを使うと実行時に権限エラーになるため。"
                 + "別のモジュールの値は、そのモジュールの公開 API かイベントで受け取る。"
                 + "直し方：自分のモジュールのスキーマ以外の生成クラスを使う処理を、そのスキーマを持つモジュールへ移す。"
-                + "規約：docs/database/connections.md、docs/adr/ADR-090-switch-to-module-database-roles.md");
+                + "規約：docs/database/connections.md、docs/adr/ADR-094-switch-to-module-database-roles.md");
   }
 
   /** 機能モジュールのコードが、{@code JdbcTemplate} と生の JDBC を使わない規則を組み立てる。 */
@@ -190,7 +190,7 @@ class DatabaseConventionsArchTest {
         .because(
             "JdbcTemplate と生の JDBC は、トランザクションの初めに切り替えたモジュールのロールを迂回し、jOOQ の生成クラスで守る境界の外に出るため。"
                 + "直し方：jOOQ の生成クラスとメタモデルで書き、JDBC の型を使わない。"
-                + "規約：docs/database/jooq-usage.md、docs/adr/ADR-090-switch-to-module-database-roles.md");
+                + "規約：docs/database/jooq-usage.md、docs/adr/ADR-094-switch-to-module-database-roles.md");
   }
 
   /** 機能モジュールのコードが、接続の設定を変える {@code DSLContext} と {@code DSL} の API を使わない規則を組み立てる。 */
@@ -212,7 +212,7 @@ class DatabaseConventionsArchTest {
             "SET と SET ROLE を実行すると、トランザクションの初めに切り替えたロールとテナントを書き換えられるため。"
                 + "接続を直接操作する connection も同じ抜け道になる。"
                 + "直し方：DSLContext の set、setLocal、setSchema、setCatalog、connection、connectionResult と、DSL の set、setLocal、setSchema、setCatalog の呼び出しを削除する。"
-                + "規約：docs/database/connections.md、docs/adr/ADR-090-switch-to-module-database-roles.md");
+                + "規約：docs/database/connections.md、docs/adr/ADR-094-switch-to-module-database-roles.md");
   }
 
   private static String[] modulePackages(

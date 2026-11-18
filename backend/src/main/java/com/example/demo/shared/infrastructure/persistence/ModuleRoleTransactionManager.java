@@ -14,7 +14,7 @@ import org.springframework.jdbc.support.JdbcTransactionManager;
 import org.springframework.transaction.TransactionDefinition;
 
 /**
- * トランザクションを始めた直後に、トランザクションの名前から引いたモジュールのロールへ、そのトランザクションの間だけ切り替える（ADR-090）。
+ * トランザクションを始めた直後に、トランザクションの名前から引いたモジュールのロールへ、そのトランザクションの間だけ切り替える（ADR-094）。
  *
  * <p>{@code set_config('role', ?, true)}
  * はトランザクションの終わりで元のロールへ戻るため、プールの接続にロールが残らない。モジュールが分からないトランザクションは、アプリロールのまま動かす。 ロールの値はバインド変数で渡す。

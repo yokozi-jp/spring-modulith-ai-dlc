@@ -16,13 +16,13 @@ import java.util.stream.Collectors;
  * モジュールのロール（{@code <module>_module}）の形と権限の規則（G4、G5）を、カタログの行から判定する。
  *
  * <p>ロールの一覧は、{@link
- * ModuleRoles#MODULES}と一致する。各ロールはログインできず、DDLの権限もなく、アプリロールは切り替えだけができる。権限は、自分のスキーマの表のDML、依存の方向にあるモジュールのスキーマの表のSELECT、イベントの出版の表へのINSERTだけで、期待する集合と完全に一致する（ADR-090）。
+ * ModuleRoles#MODULES}と一致する。各ロールはログインできず、DDLの権限もなく、アプリロールは切り替えだけができる。権限は、自分のスキーマの表のDML、依存の方向にあるモジュールのスキーマの表のSELECT、イベントの出版の表へのINSERTだけで、期待する集合と完全に一致する（ADR-094）。
  */
 final class ModulePrivilegeConventions {
 
   /** 規則の根拠の文書。 */
   private static final String DOC =
-      "docs/database/connections.md、docs/adr/ADR-090-switch-to-module-database-roles.md";
+      "docs/database/connections.md、docs/adr/ADR-094-switch-to-module-database-roles.md";
 
   /** イベントの出版のスキーマ。 */
   private static final String MODULITH = "modulith";

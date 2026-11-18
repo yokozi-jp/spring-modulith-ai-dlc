@@ -14,7 +14,7 @@ import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 
 /**
- * トランザクションマネージャーが、トランザクションの名前からモジュールのロールへ切り替え、commit と rollback の後にプールの接続へロールを残さないことを確かめる（ADR-090）。
+ * トランザクションマネージャーが、トランザクションの名前からモジュールのロールへ切り替え、commit と rollback の後にプールの接続へロールを残さないことを確かめる（ADR-094）。
  *
  * <p>プールの接続は少数を使い回すため、モジュールのロールのトランザクションの後に、名前のないトランザクションを繰り返し、すべてアプリロールで動くことを見る。
  */
