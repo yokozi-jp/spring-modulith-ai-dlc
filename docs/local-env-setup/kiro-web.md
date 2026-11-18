@@ -55,18 +55,28 @@ tool call ごとにシェルは新しくなるので、PATH と環境変数は�
 
 2026-11-18 に、次の Task をこの環境で成功させた。
 
-- `task check`
-- `task fe-verify`
-- `task okf-check`
-- `task be-test`（Testcontainers を使う全テストとカバレッジの検証）
+- バックエンド：`task check`、`task test`（PostgreSQL の rollback 検証、Testcontainers を使う全テスト、カバレッジの検証、`api-lint`）
+- フロントエンド：`task fe-verify`
+- docs と CI の設定：`task okf-check`、`task lint-md`、`task adr-check`、`task skills-check`、`task ci-gate-check`、`task release-check`
+- 静的解析：`task lint-actions`、`task lint-actions-security`、`task lint-docker`、`task api-lint`、`task otel-collector-check`、`task lint-duplicates`
+- 秘密の検査：`task scan-secrets`、`task scan-secrets-all`
+- Git フック：`npm ci` で入る Lefthook の commit-msg と pre-commit
 
-`task test` は、PostgreSQL の rollback 検証までが成功し、続くテストで 1 件が失敗した（次節）。
+## 動かない Task
+
+次の Task は、サンドボックスの別のプロセス（`localhost:8080` が uvicorn として応答する）が 8080 を使っているため、この環境では動かない。
+`docker/compose.yml` の Keycloak と、`docker/compose-test.yml` の E2E 用 backend が、ホストの 8080 に固定で公開するためである。
+
+- `task compose-up`、`task dev`
+- `task e2e`
+
+`task be-mutation-test`、`task scan-dast`、`task scan-dast-active` は試していない。
 
 ## 既知の問題
 
 - `task test` の `ApiExceptionHandlerTest` が 1 回だけ失敗した。
   OpenTelemetry の exporter が、Collector の無い `127.0.0.1:4318` への送信失敗を ERROR で記録し、テストがそのログを拾ったためである。
-  同じ Task の `task be-test` と、そのテストの単体の実行は成功した。
+  `task be-test` の再実行と、そのテストの単体の実行は成功し、その後の `task test` も成功した。
 - Gradle の起動時に、JGit が `~/.config/jgit` に書けないという例外のログが出る。
   実行結果には影響しない。
 - `iwes`（LSP サーバー）は標準入出力で待ち受けるので、`iwes --version` は終了しない。
