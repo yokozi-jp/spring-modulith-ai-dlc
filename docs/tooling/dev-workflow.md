@@ -28,10 +28,12 @@ task fe-dev
 task fe-check
 ```
 
-`frontend/package.json`か`frontend/pnpm-lock.yaml`が変わったとき（ライブラリを追加、更新したときや、それを含む変更をpullしたとき）は、`task fe-dev`の前に`task fe-install`を実行する。
+`frontend/`の下の`package.json`か`frontend/pnpm-lock.yaml`が変わったとき（ライブラリを追加、更新したときや、それを含む変更をpullしたとき）は、`task fe-dev`の前に`task fe-install`を実行する。
 
-`frontend`でパッケージのコマンドを直接実行するときは、`npx`ではなく`vp`（`vp exec <コマンド>`、`vp test run <ファイル>`）を使う。
-`frontend/package.json`の`devEngines`がpnpmを指定しているため、`npx`はnpmとして拒否される。
+パッケージのコマンドを直接実行するときは、`npx`ではなく`vp`を使う。
+アプリのscript（`dev`、`build`、`test`、`e2e`、`orval`など）は、`frontend`で`vp run --filter @frontend/web <script>`として実行する。
+アプリのテストのファイルを1つだけ実行するときと、アプリの依存のコマンドを実行するときは、`frontend/apps/web`で`vp test run <ファイル>`か`vp exec <コマンド>`を実行する。
+`frontend/package.json`と`frontend/apps/web/package.json`の`devEngines`がpnpmを指定しているため、`npx`はnpmとして拒否される。
 
 ## git worktreeで作業するとき
 
@@ -66,6 +68,14 @@ task agent-wait
 commitやpushを始められないときは、Taskが理由と直し方を出して止まるので、それに従う。
 Taskは失敗の終了コードを201にまとめるので、元の終了コードは出力の`exit=`の行かTaskのエラーの`exit status`で読む。
 `task agent-wait`が「まだ実行中です」と出したら（Taskのエラーは`exit status 75`）、同じコマンドをもう一度実行する。
+
+Kiro Web のサンドボックスでは、背景のプロセスが tool call の終了で止まる。
+`task agent-commit`か`task agent-push`と`task agent-wait`を同じ tool call で実行し、`AGENT_GIT_WAIT_SECONDS`で待つ秒数を tool call の上限より短く延ばす（[Kiro Web の開発環境](../local-env-setup/kiro-web.md)）。
+
+```bash
+task agent-push && AGENT_GIT_WAIT_SECONDS=1500 task agent-wait
+```
+
 失敗を報告した実行のディレクトリは、ログを読めるように残る。
 消し方と、indexをcommitに合わせるコマンドは、`task agent-wait`が出す。
 
@@ -168,7 +178,7 @@ task lint-duplicates
 ```
 
 バックエンドだけ、またはフロントエンドだけを変更した場合は、変更していない領域のTaskを省く。
-`frontend/src/routes/`を変更した場合は、`task fe-route-tree-check`で`routeTree.gen.ts`の再生成漏れがないことを確かめる。
+`frontend/apps/web/src/routes/`を変更した場合は、`task fe-route-tree-check`で`routeTree.gen.ts`の再生成漏れがないことを確かめる。
 このTaskは、Collectorのroute allowlistが`routeTree.gen.ts`の`fullPaths`と一致することも確かめる。
 OpenAPI契約かOrvalの設定を変更した場合は、`task api-client-check`で`src/api/generated`の再生成漏れがないことを確かめる。
 React Doctorは実行に時間がかかるためpre-pushでは実行せず、Frontend CIで`task fe-doctor`を実行する。

@@ -15,6 +15,9 @@ on:
       - "docker/keycloak/**"
       - ".env.test.example"
       - "Taskfile.yml"
+      - "mise.toml"
+      - "mise.lock"
+      - ".github/actions/setup-mise/**"
       - ".github/workflows/e2e.yml"
 
 concurrency:
@@ -72,18 +75,15 @@ jobs:
           restore-keys: |
             gradle-${{ runner.os }}-test-
 
-      - name: Set up Task
-        uses: go-task/setup-task@a00fbb05ce67b35648be3c78cbc9fd85354c757e # v2
-        with:
-          version: "3.53.1"
-          checksum: a54a408f6861ff921f6e87774180db31bacd8c1e7c944ca696db9fea49a82fc7
+      - name: Set up mise tools
+        uses: ./.github/actions/setup-mise
 
       - name: Install dependencies
         working-directory: frontend
         run: pnpm install --frozen-lockfile
 
       - name: Install Chromium and system dependencies
-        working-directory: frontend
+        working-directory: frontend/apps/web
         run: pnpm exec playwright install --with-deps chromium
 
       # CI=true のため、task e2e は E2E_KEEP_ENV にかかわらず後片付けする。
@@ -103,21 +103,21 @@ jobs:
         with:
           name: e2e-evidence
           path: |
-            frontend/playwright-report/
-            !frontend/playwright-report/data/*.zip
-            !frontend/e2e/.auth/
+            frontend/apps/web/playwright-report/
+            !frontend/apps/web/playwright-report/data/*.zip
+            !frontend/apps/web/e2e/.auth/
           if-no-files-found: error
           retention-days: 14
 
-      # storageState（frontend/e2e/.auth/）は対象の外にあり、念のため除外も指定する。
+      # storageState（frontend/apps/web/e2e/.auth/）は対象の外にあり、念のため除外も指定する。
       - name: Upload E2E artifacts
         if: failure()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: e2e-results
           path: |
-            frontend/playwright-report/
-            frontend/test-results/
-            !frontend/e2e/.auth/
+            frontend/apps/web/playwright-report/
+            frontend/apps/web/test-results/
+            !frontend/apps/web/e2e/.auth/
           if-no-files-found: ignore
           retention-days: 14

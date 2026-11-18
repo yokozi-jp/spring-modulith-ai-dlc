@@ -1,6 +1,8 @@
 #!/bin/bash
 set -e
-source ./versions.env
+
+JAVA_PACKAGE="java-25-amazon-corretto-jdk"
+JAVA_VERSION="1:25.0.2.10-1"
 
 # Amazon Corretto リポジトリ追加
 wget -O- https://apt.corretto.aws/corretto.key | sudo gpg --dearmor -o /usr/share/keyrings/corretto-keyring.gpg

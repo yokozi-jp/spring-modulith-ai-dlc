@@ -8,6 +8,9 @@ on:
       - "openapi/**"
       - ".spectral.yaml"
       - "Taskfile.yml"
+      - "mise.toml"
+      - "mise.lock"
+      - ".github/actions/setup-mise/**"
       - ".github/workflows/api-contract.yml"
   # 必須チェックにしても対象外 PR が Expected のまま残らないよう、PR では常に起動し、
   # changes ジョブで検査の要否を判定する。
@@ -56,7 +59,7 @@ jobs:
             exit 0
           fi
           # api-contract.yml の push パスフィルタと同じ集合で判定する。
-          if grep -Eq '^(openapi/|\.spectral\.yaml$|Taskfile\.yml$|\.github/workflows/api-contract\.yml$)' \
+          if grep -Eq '^(openapi/|\.spectral\.yaml$|Taskfile\.yml$|mise\.(toml|lock)$|\.github/actions/setup-mise/|\.github/workflows/api-contract\.yml$)' \
             <<< "$changed_files"; then
             echo "api=true" >> "$GITHUB_OUTPUT"
           else
@@ -78,11 +81,8 @@ jobs:
           # oasdiff が比べる base ブランチの契約を origin/<base> から読むため、全ブランチを取得する。
           fetch-depth: 0
 
-      - name: Set up Task
-        uses: go-task/setup-task@a00fbb05ce67b35648be3c78cbc9fd85354c757e # v2
-        with:
-          version: "3.53.1"
-          checksum: a54a408f6861ff921f6e87774180db31bacd8c1e7c944ca696db9fea49a82fc7
+      - name: Set up mise tools
+        uses: ./.github/actions/setup-mise
 
       - name: Lint OpenAPI contract
         run: task api-lint
@@ -110,11 +110,8 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Set up Task
-        uses: go-task/setup-task@a00fbb05ce67b35648be3c78cbc9fd85354c757e # v2
-        with:
-          version: "3.53.1"
-          checksum: a54a408f6861ff921f6e87774180db31bacd8c1e7c944ca696db9fea49a82fc7
+      - name: Set up mise tools
+        uses: ./.github/actions/setup-mise
 
       - name: Build API docs
         run: task api-docs

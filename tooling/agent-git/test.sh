@@ -65,7 +65,9 @@ clean() { [ -z "$(git diff --cached --name-only)" ]; }
 scene() { fact "the $1 starts from a clean index" clean; }
 decoy_running() { pgrep -f "$AGENT_GIT_PREPUSH_PATTERN" >/dev/null; }
 start_decoy() {
-  (cd "$1" && exec -a "agent-git-test-decoy-$$" sleep 30) &
+  # sleep が coreutils を呼ぶ shebang のラッパーの環境（Amazon Linux）では、exec -a の名前が消えるので、bash に名前を付ける。
+  # 末尾の : は、bash が最後のコマンドの sleep を exec して名前を失うのを止める。
+  (cd "$1" && exec -a "agent-git-test-decoy-$$" bash -c 'sleep 30; :') &
   decoy=$!
   until_ok decoy_running
 }
