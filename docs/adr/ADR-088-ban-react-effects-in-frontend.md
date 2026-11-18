@@ -9,7 +9,7 @@ tags: [adr, frontend, react, lint]
 
 ## Status
 
-Proposed
+Accepted
 
 ## Date
 
