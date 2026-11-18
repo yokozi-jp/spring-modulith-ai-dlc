@@ -291,10 +291,9 @@ const params = { ...(cursor !== undefined && { cursor }) };
 - **`task scan-vulns`**：バックエンドとフロントエンドの依存関係をTrivyで検査する。
 - **`task scan-vulns-backend`**：バックエンドのCycloneDX SBOMをTrivyで検査する。
 - **`task scan-vulns-frontend`**：フロントエンドの解決済み依存関係をTrivyで検査する。
-- **`task scan-depscan`**：バックエンドとフロントエンドの依存関係をdep-scanで検査する。
+- **`task scan-depscan`**：バックエンドとフロントエンドの依存関係をdep-scanで検査する。脆弱性DBは環境変数`DEPSCAN_VDB_HOME`（既定は`~/.cache/depscan-vdb`）に残す（[ADR-095](../adr/ADR-095-scan-dependencies-with-dep-scan-alongside-trivy.md)）。
 - **`task scan-depscan-backend`**：バックエンドのCycloneDX SBOMをdep-scanで検査し、レポートを`build/depscan/backend/`に出す。
 - **`task scan-depscan-frontend`**：フロントエンドのロックファイルをdep-scanで検査し、レポートを`build/depscan/frontend/`に出す。
-  脆弱性DBは展開後に4GB超なので、app-onlyに絞り、環境変数`DEPSCAN_VDB_HOME`（既定は`~/.cache/depscan-vdb`）に残して使い回す（[ADR-095](../adr/ADR-095-scan-dependencies-with-dep-scan-alongside-trivy.md)）。
 - **`task scan-dast`**：隔離した依存、backend、`vp preview`を起動し、OWASP ZAPで認証付きのpassive scanを実行して片付ける。
 - **`task scan-dast-active`**：同じ環境でactive scanを実行する。
 - **`task lint-actions`**：GitHub Actionsワークフローをactionlintで検査する。

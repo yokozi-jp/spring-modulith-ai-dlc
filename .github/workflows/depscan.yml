@@ -1,4 +1,4 @@
-name: Dependency Scan (dep-scan) 🔬
+name: Vulnerability Scan (dep-scan) 🔬
 
 on:
   push:
@@ -46,6 +46,7 @@ jobs:
           name: depscan-backend
           path: build/depscan/backend
           if-no-files-found: ignore
+          retention-days: 14
 
   frontend:
     name: dep-scan (frontend) 🔬
@@ -70,3 +71,4 @@ jobs:
           name: depscan-frontend
           path: build/depscan/frontend
           if-no-files-found: ignore
+          retention-days: 14
