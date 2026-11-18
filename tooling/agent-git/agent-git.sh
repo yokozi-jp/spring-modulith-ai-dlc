@@ -85,6 +85,13 @@ changed() {
   git --literal-pathspecs diff --name-only --no-renames --no-relative -z "${@:2}" >"$1" && LC_ALL=C sort -z -o "$1" -- "$1"
 }
 
+# rev <リビジョン>: git rev-parse -q --verify と同じく、オブジェクトの名前を出す。
+# rev-parse は名前が無ければ 1、git が失敗すれば 128 で戻るので、無ければ何も出さずに成功し、git が失敗すれば失敗する。
+rev() {
+  git rev-parse -q --verify "$1"
+  [ $? -le 1 ]
+}
+
 # copy_index <index> <写し>: index を更新時刻ごと写す。index のファイルがまだ無ければ、空の index を作る。
 # 更新時刻を保つ理由は docs/adr/ADR-091-commit-agent-changes-from-a-copy-of-the-index.md にある。
 copy_index() {
@@ -194,8 +201,8 @@ commit() {
   # 写しは、確かめる前に更新時刻ごと作る。
   # 理由は docs/adr/ADR-091-commit-agent-changes-from-a-copy-of-the-index.md にある。
   { mkdir -- "$run/commit" && copy_index "$(git rev-parse --git-path index)" "$run/commit/base" && cp -p -- "$run/commit/base" "$run/commit/index"; } || exit 1
-  # 最初の commit の前は HEAD が無いので空になり、landed は HEAD^ が無いことと比べる。
-  git rev-parse -q --verify HEAD >"$run/commit/head"
+  # 最初の commit の前は HEAD が無いので空になり、landed は親が無いことと比べる。
+  rev HEAD >"$run/commit/head" || exit 1
   check_paths "$run" "$@"
   [ ! -s "$run/commit/pending" ] ||
     GIT_INDEX_FILE="$run/commit/index" git -C "$(git rev-parse --show-toplevel)" --literal-pathspecs add --pathspec-from-file="$run/commit/pending" --pathspec-file-nul ||
@@ -216,30 +223,44 @@ commit_copy() {
   echo "git $! $(proc_start "$!")" >>"$run/pid"
   wait "$!"
   code=$?
-  settle_commit "$run" code
+  settle_commit "$run" code || [ "$code" != 0 ] || {
+    echo "✗ git commit は成功しましたが、HEAD をたどっても始めたときの HEAD の上にその commit が無いので、本物の index を合わせていません。
+  ほかの作業が HEAD を動かしたか作り直しました（git commit --amend、git reset など）。
+  git reflog で commit と HEAD の動きを確かめてください。"
+    code=1
+  }
   return "$code"
 }
 
-# landed <実行のディレクトリ> <commit>: commit が、始めたときの HEAD の上に写しの index の内容で作った commit なら真。
+# landed <commit/ のディレクトリ> <始めたときの HEAD> <HEAD>: 始めたときの HEAD から HEAD への最初の first-parent の commit が、
+# 始めたときの HEAD の上に写しの index の内容で作ったものなら、それを出す。
+# そうでなければ 1、git が失敗すれば 1 より大きい値で戻る。
 landed() {
-  [ "$(git rev-parse -q --verify "$2^")" = "$(cat -- "$1/commit/head")" ] &&
-    GIT_INDEX_FILE="$1/commit/index" git diff --cached --quiet "$2" -- 2>/dev/null
+  local list ours parent
+  [ -n "$3" ] || return 1
+  list="$(git rev-list --first-parent --reverse "${2:+$2..}$3")" || return 2
+  ours="${list%%$'\n'*}"
+  [ -n "$ours" ] || return 1
+  parent="$(rev "$ours^")" || return 2
+  [ "$parent" = "$2" ] || return 1
+  # git diff --quiet は、違えば 1、git が失敗すれば 128 で戻る。
+  GIT_INDEX_FILE="$1/index" git diff --cached --quiet "$ours" -- && echo "$ours"
 }
 
 # settle_commit <実行のディレクトリ> <終了コードの変数> [<注意>]: commit ができたかを landed で決め、最後に commit/ を消す。
-# HEAD を一度だけ読んで合わせる先にする。commit は、始めたときの HEAD から合わせる先への最初の first-parent にある。
+# HEAD を一度だけ読んで合わせる先にする。
 # 上に載ったほかの commit が commit のパスを戻していれば、それを出して変数を 1 にする。
 # 戻していなければ、注意を出して本物の index を合わせる先に合わせ、変数を sync_index の終了コードにする。
-# commit ができていなければ変数を変えない。
+# 決める途中で git が失敗すれば、それを出して変数を 1 にする。
+# commit ができていなければ、変数を変えずに 1 で戻る。
 settle_commit() {
-  local run="$1" c="$1/commit" head tip ours
-  head="$(cat -- "$c/head")"
-  tip="$(git rev-parse -q --verify HEAD)"
-  ours="$([ -z "$tip" ] || git rev-list --first-parent --reverse "${head:+$head..}$tip" | head -n 1)"
-  if [ -n "$ours" ] && landed "$run" "$ours"; then
+  local run="$1" c="$1/commit" start base tip ours s=0
+  start="$(cat -- "$c/head")"
+  if tip="$(rev HEAD)"; then ours="$(landed "$c" "$start" "$tip")" || s=$?; else s=2; fi
+  if [ "$s" = 0 ]; then
     # 最初の commit には親が無いので、空の木と比べる。
-    head="${head:-$(git hash-object -t tree /dev/null)}"
-    if ! changed "$c/ours" "$head" "$ours" -- || ! changed "$c/tip" "$head" "$tip" --; then
+    base="${start:-$(git hash-object -t tree /dev/null)}"
+    if ! changed "$c/ours" "$base" "$ours" -- || ! changed "$c/tip" "$base" "$tip" --; then
       not_synced
       printf -v "$2" 1
     elif list_paths "✗ commit $ours はできましたが、次のパスが commit の前の内容に戻りました。
@@ -253,8 +274,13 @@ settle_commit() {
       sync_index "$run" "$tip"
       printf -v "$2" %s $?
     fi
+  elif [ "$s" != 1 ]; then
+    echo "✗ 上の git が失敗したので、commit ができたかを確かめられず、本物の index を合わせていません。
+  commit ができていれば、本物の index は commit を打ち消す内容を stage したままなので、git log と git status で確かめてください。"
+    printf -v "$2" 1
   fi
   rm -r -- "$c"
+  [ "$s" != 1 ]
 }
 
 # not_synced: git が失敗したので、本物の index を合わせていないことを出す。

@@ -128,6 +128,7 @@ echo "✓ fake-push-check"
 EOF
 # ほかの作業が、合わせる前の本物の index から git commit するのを真似る。
 # keep なら、その前に作業ツリーをすべて stage する。only なら、foreign.txt だけを git commit -- <パス> で commit する。
+# amend なら commit を git commit --amend で作り直し、reparent なら同じ木の commit を親を付け替えて作り、HEAD をそこへ動かす。
 cat >.git/hooks/post-commit <<EOF
 #!/bin/sh
 [ -e '$tmp/overtake' ] || exit 0
@@ -135,6 +136,8 @@ mode="\$(cat '$tmp/overtake')" && rm '$tmp/overtake' && unset GIT_INDEX_FILE
 case "\$mode" in
   keep) git add -A && git commit --no-verify -q -m foreign ;;
   only) git commit --no-verify -q -m foreign -- foreign.txt ;;
+  amend) git commit --no-verify -q --amend --allow-empty -m foreign ;;
+  reparent) git update-ref HEAD "\$(git commit-tree 'HEAD^{tree}' -p HEAD~2 -m foreign)" ;;
   *) git commit --no-verify -q -m foreign ;;
 esac
 EOF
@@ -332,6 +335,7 @@ fact "the fresh repository has no index file" [ ! -e "$tmp/fresh/.git/index" ]
 echo x >"$tmp/fresh/fail"
 expect "a first commit with a failing hook starts" 0 "task agent-wait" within "$tmp/fresh" bash "$tool" commit "$msg" fail
 expect "wait reports git's exit code for the failed first commit" 1 "✗ fake-check" within "$tmp/fresh" bash "$tool" wait
+fact "the failed first commit is not reported as a git failure" not grep -qF "確かめられず" "$out"
 fact "the failed first commit leaves no HEAD" not git -C "$tmp/fresh" rev-parse -q --verify HEAD
 rm "$tmp/fresh/fail" && echo f >"$tmp/fresh/first.txt"
 expect "a first commit starts" 0 "task agent-wait" within "$tmp/fresh" bash "$tool" commit "$msg" first.txt
@@ -372,6 +376,32 @@ expect "commit to be overtaken by a commit of another path starts" 0 "task agent
 expect "wait reports success when the commit on top changes another path" 0 "exit=0" bash "$tool" wait
 fact "the commit of another path is on top of the commit" [ "$(git show --name-only --format=%s HEAD)" = "$(printf 'foreign\n\nforeign.txt')" ]
 fact "the index matches the commit of another path" clean
+
+# commit の直後、本物の index を合わせる前に、ほかの作業が HEAD を作り直すか、親を付け替えて動かす。
+scene "commits moved off HEAD"
+head="$(git rev-parse HEAD)"
+for mode in amend reparent; do
+  echo m >"moved-$mode.txt" && echo "$mode" >"$tmp/overtake"
+  expect "commit to be moved off HEAD by $mode starts" 0 "task agent-wait" bash "$tool" commit "$msg" "moved-$mode.txt"
+  expect "wait says the commit is not on HEAD after $mode" 1 "git reflog で commit と HEAD の動きを確かめてください" bash "$tool" wait
+  git reset -q "$head" && rm "moved-$mode.txt"
+done
+
+# commit の直後、commit ができたかを確かめる git が失敗する。
+# 失敗するのは、始めたときの HEAD からの rev-list、commit の親の rev-parse、写しの index と commit の git diff。
+scene "commits whose landing check fails"
+for check in rev-list parent tree; do
+  case "$check" in
+    rev-list) pattern='* rev-list *' ;;
+    parent) pattern='* rev-parse -q --verify [0-9a-f]*^ ' ;;
+    tree) pattern='*/commit/index diff --cached --quiet * -- ' ;;
+  esac
+  echo l >"landing-$check.txt"
+  expect "commit whose $check check fails starts" 0 "task agent-wait" failing_git "$pattern" bash "$tool" commit "$msg" "landing-$check.txt"
+  expect "wait reports that git failed in the $check check" 1 "commit ができたかを確かめられず" bash "$tool" wait
+  fact "the failing git ran in the $check check" [ ! -e "$tmp/fail-git" ]
+  git reset -q
+done
 
 # フックが失敗した commit を報告する前に、別の実行（push）を始める。
 scene "failing commit"
@@ -507,11 +537,12 @@ expect "a second wait prints the command again" 1 "git -C " bash "$tool" wait "$
 git reset -q && rm -r -- "$run"
 
 # wrapper と _commit を止め、残った git が commit を終えた後に、agent-wait の途中で git が失敗する。
-# 失敗するのは、上の commit が戻したかを確かめる git diff、2 つの index の ls-files、
+# 失敗するのは、HEAD の rev-parse、上の commit が戻したかを確かめる git diff、2 つの index の ls-files、
 # base か本物の index と commit の git diff。
 scene "orphaned commits whose git fails"
-for check in reverted entries base now; do
+for check in head reverted entries base now; do
   case "$check" in
+    head) pattern='* rev-parse -q --verify HEAD ' ;;
     reverted) pattern='* -z [0-9a-f]* [0-9a-f]* -- ' ;;
     entries) pattern='* ls-files -s -z *' ;;
     base) pattern='*/commit/base * --name-only * --cached *' ;;
@@ -530,7 +561,7 @@ done
 # 渡すのは stage したファイル、stage していない変更、新しいファイルで、一覧のどれが欠けても、commit が始まるか別の理由で止まる。
 scene "git failures before the commit"
 echo s >gitfail-staged.txt && git add gitfail-staged.txt && echo changed >same.txt && echo n >gitfail-new.txt
-for pattern in '* --diff-filter=U *' '* --cached -- ' '* --cached -- ?*' '* --ignore-submodules=dirty *' '* ls-files -z -o *'; do
+for pattern in '* rev-parse -q --verify HEAD ' '* --diff-filter=U *' '* --cached -- ' '* --cached -- ?*' '* --ignore-submodules=dirty *' '* ls-files -z -o *'; do
   expect "commit stops when git fails ($pattern)" 1 "fake git failure" \
     failing_git "$pattern" bash "$tool" commit "$msg" gitfail-staged.txt same.txt gitfail-new.txt
   fact "the stop gives no other reason ($pattern)" not grep -qF "✗" "$out"
