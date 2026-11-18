@@ -27,14 +27,13 @@ prepare() {
   status=$?
 }
 
-# fact <説明> <コマンド>...: コマンドが失敗したら、説明と、ログを字下げして出す。
-# ログは最後の prepare の出力（$out）で、prepare を動かさない事実は log=<ファイル> を前に付けて自分のログを渡す。
+# fact <説明> <コマンド>...: コマンドが失敗したら、説明と、最後に動かした手順の出力（$out）を字下げして出す。
 fact() {
   local label="$1"
   shift
   if ! "$@"; then
     echo "FAIL: $label"
-    sed 's/^/    /' "${log:-$out}"
+    sed 's/^/    /' "$out"
     failures=$((failures + 1))
   fi
 }
@@ -49,13 +48,6 @@ no_stack_trace() { ! grep -q '^    at ' "$out"; }
 # prepare.mjs が失敗を知らせるメッセージの末尾。prepare.mjs がメッセージを組み立てる行で落ちると、node はその行のソースを出す。
 # ソースに書いたままの文字列だけでは落ちたことと見分けられないので、組み立てた後にしか出ない部分まで比べる。
 may_point_here="lefthook の postinstall が、hook をこの worktree の lefthook に向けたままの可能性があります。"
-dump_log="$tmp/dump"
-auto_install_off() {
-  local dump
-  dump="$(cd "$root" && node_modules/.bin/lefthook dump --format json 2>"$dump_log")" ||
-    { echo "lefthook dump が終了コード $? で失敗したので、lefthook.yml を読めません。" >>"$dump_log"; return 1; }
-  node -e 'process.exit(JSON.parse(require("fs").readFileSync(0, "utf8")).no_auto_install === true ? 0 : 1)' <<<"$dump"
-}
 
 # store と bx は checkout ではない場所で、git が main の worktree の代わりに出す。そこの lefthook が動けば記録に残る。
 {
@@ -160,8 +152,7 @@ mv "$tmp/repo/node_modules" "$tmp/moved"
 prepare "$tmp/wt"
 fact "without lefthook in the main worktree a linked worktree fails" failed
 fact "without lefthook in the main worktree it installs nothing" nothing_installed
-fact "without lefthook in the main worktree it says to run npm ci" said "npm ci"
-fact "without lefthook in the main worktree it names the main worktree" said "$(real "$tmp/repo")"
+fact "without lefthook in the main worktree it names the main worktree and says to run npm ci there" said "main の worktree（$(real "$tmp/repo")）に lefthook がありません。${may_point_here}main の worktree で npm ci を実行すると直ります。"
 
 stub "$tmp/repo" repo 'echo "lefthook install のおとり" >&2; exit 3'
 prepare "$tmp/wt"
@@ -170,7 +161,12 @@ fact "a failing lefthook install shows lefthook's message" said "lefthook instal
 fact "a failing lefthook install says the hooks may still point at this worktree" said "main の worktree（$(real "$tmp/repo")）で lefthook install が失敗しました。$may_point_here"
 fact "a failing lefthook install shows no stack trace" no_stack_trace
 
-log="$dump_log" fact "lefthook run does not reinstall the hooks (no_auto_install in lefthook.yml)" auto_install_off
+# 開発者の LEFTHOOK_CONFIG は読む設定を替えるので外す。lefthook-local.yml は外せずに dump に混ざるので、そこに no_auto_install を書くと結果が変わる。
+(cd "$root" && unset LEFTHOOK_CONFIG && node_modules/.bin/lefthook dump --format json) >"$tmp/dump.json" 2>"$out"
+status=$?
+fact "lefthook dump reads lefthook.yml" succeeded
+succeeded && fact "lefthook run does not reinstall the hooks (no_auto_install in lefthook.yml)" \
+  node -e 'process.exit(JSON.parse(require("fs").readFileSync(process.argv[1], "utf8")).no_auto_install === true ? 0 : 1)' "$tmp/dump.json"
 
 if [ "$failures" -gt 0 ]; then
   echo "$failures failure(s)"
