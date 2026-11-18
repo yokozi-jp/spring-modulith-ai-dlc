@@ -1,0 +1,138 @@
+---
+type: ADR
+title: 'ADR-090: トランザクションの初めにモジュールの DB ロールへ切り替え、アプリロールを業務のスキーマから外す'
+description: ログインするロールをアプリロール 1 つにしたまま、モジュールごとのログインできないロール <module>_module を作り、トランザクションの初めに切り替える決定。別のモジュールの表への書き込みと、依存の方向に逆らう読み取りを DB の権限エラーで止める。ADR-011 のアプリロールの規則を改める。
+tags: [adr, database, postgresql, security, spring-modulith]
+---
+
+# ADR-090: トランザクションの初めにモジュールの DB ロールへ切り替え、アプリロールを業務のスキーマから外す
+
+## Status
+
+Proposed
+
+## Date
+
+2026-11-18
+
+## Context
+
+[ADR-011](ADR-011-use-module-owned-database-schemas.md) は、モジュールごとに DB のスキーマを持たせ、アプリロールに各スキーマの USAGE と表の DML を与えると定めた。
+この構成では、アプリロールがすべてのモジュールのスキーマを読み書きできる。
+モジュールのコードが別のモジュールの表に書き込んでも、依存の方向に逆らって別のモジュールの表を読んでも、DB は止めない。
+Java の型と ArchUnit は、`JdbcTemplate` や生の JDBC からの抜け道と、型に現れない逆向きの依存を完全には止められない。
+
+[issue #369](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/369) は、テナントで業務のデータを分ける。
+テナントの分離は、DB が行を止める仕組み（RLS）に頼る。
+RLS だけでは、別のモジュールのスキーマを越える読み書きは止まらない。
+モジュールの境界を DB の権限で守る仕組みが先に要る。
+
+[issue #307](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/307) で、別の実装の事例（モジュールごとのロールへ切り替える方式）を調べ、一部を取り込むと決めた。
+この調査は、使い捨ての PostgreSQL 18 のコンテナで次の動作を確かめている。
+
+- `set_config('role', ?, true)` で、トランザクションの間だけロールを切り替えられる。commit と rollback のあとは、接続がアプリロールに戻る。
+- `GRANT <module>_module TO <app> WITH INHERIT FALSE, SET TRUE` で、アプリロールは切り替えたときだけモジュールの表を使える。
+- SELECT の権限なしに、`modulith.event_publication` へ INSERT できる。
+
+## Decision
+
+ログインするロールはアプリロール 1 つのままにする。
+モジュールごとに、ログインできないロール `<module>_module` を作る。
+アプリロールは、継承なしで、切り替えだけを許されたメンバーにする。
+
+アプリロールは業務のスキーマに権限を持たない。
+モジュールのロールに切り替えたときだけ、そのモジュールのスキーマを読み書きできる。
+アプリロールが触れるのは、Spring Modulith のイベントの表、その archive、ShedLock の表（`modulith` スキーマ）だけにする。
+
+モジュールのロールには、次の権限だけを与える。
+
+- 自分のスキーマの USAGE と、表の SELECT、INSERT、UPDATE、DELETE。
+- 依存の方向（ordering から product、payment から ordering）にだけ、呼び出し元のロールへ依存先のスキーマの USAGE と SELECT。
+- イベントの出版の表（`modulith.event_publication`）への INSERT と、`modulith` スキーマの USAGE。
+
+新しい表の権限は、スキーマごとの `ALTER DEFAULT PRIVILEGES` で決める。
+権限の漏れは、カタログのテストが止める。
+
+`JdbcTransactionManager`（`DataSourceTransactionManager` の子クラス）を継承したトランザクションマネージャーの `prepareTransactionalConnection` で、トランザクションを始めた直後に、トランザクションの名前（クラス名とメソッド名）からモジュールを引き、`set_config('role', ?, true)` でロールを切り替える。
+モジュールが分からないトランザクション（Spring Modulith の内部、再投入、ShedLock）は、アプリロールのまま動かす。
+ロールの値はバインド変数で渡し、接続プールの初期化の SQL とセッション単位の設定には書かない。
+
+ロールは環境を作る手順で先に作る。
+ローカルは `docker/initdb`、本番は構築の手順である。
+マイグレーション用のロールに `CREATEROLE` を持たせない。
+ロールの名前は `<module>_module` に固定し、1 つの DB クラスターに 1 つの環境を置く。
+表の所有は、マイグレーション用のロールのままにする。
+
+ADR-011 の次の規則を、この ADR で改める。
+
+- 各 changeset が、所有するスキーマの USAGE と表の DML をアプリロールへ与える規則。業務のスキーマは、アプリロールでなくモジュールのロールへ与える。`modulith` スキーマは、これまでどおりアプリロールへ与える。
+
+ADR-009 の二ロール（アプリ用とマイグレーション用）と資格情報の分離は、維持する。
+
+ArchUnit で、次を検査する。
+
+- モジュールの `infrastructure.persistence` は、自分のモジュールのスキーマの jOOQ の生成クラスだけを使う。
+- モジュールのコードは、`JdbcTemplate`、生の JDBC、接続の設定を変える `DSLContext` の API を使わない。
+
+アプリロールは、どの SQL からでも `SET ROLE` や `RESET ROLE` でロールを切り替えられる。
+DB のロールで止められるのは誤りで、故意の迂回は止められない。
+この限界を、上の ArchUnit の規則で補う。
+
+## Consequences
+
+### Positive
+
+- 別のモジュールの表への書き込みと、依存の方向に逆らう読み取りが、DB の権限エラーで止まる。
+- Java の型で捕まえられない逆向きの依存を、実行時に確かめられる。
+- ロールとテナントの切り替えを、トランザクションマネージャーの 1 か所に集められる。後続の RLS の設定も同じ箇所に足せる。
+- ロールの設定はトランザクションの間だけ効くため、プールの接続に残らない。
+
+### Negative
+
+- 業務のスキーマにアクセスするコードは、名前からモジュールを引けるトランザクションの中で動かす必要がある。トランザクションの外の DB アクセスは、権限エラーになる。
+- 新しい changeset（012）が、既存の changeset がアプリロールへ与えた業務のスキーマの権限を取り上げる。適用済みの DB は `task be-migrate` で追従できるが、モジュールのロールを先に作る必要がある。
+- ステージングと本番は、ロールを先に作る手順が増える。
+- 1 つの DB クラスターに 1 つの環境しか置けない（ロールの名前が固定のため）。
+- アプリロールは `SET ROLE` で切り替えられるため、故意の迂回は DB だけでは止められない。
+
+### Neutral
+
+- テストの掃除と seed は、所有者の接続の `TRUNCATE` と、モジュールごとのロールの切り替えに作り直す。
+- モジュールを足すときは、ロールを作る手順とトランザクションマネージャーの対応表に、同じ名前を足す。足し忘れは、カタログのテストが止める。
+
+## Alternatives Considered
+
+### 選択肢1: モジュールごとにログインするロールを作り、接続プールを分ける
+
+- **Description**：モジュールごとに DB のユーザーと接続プールを持たせる。
+- **Pros**：ロールの切り替えが要らない。
+- **Cons**：モジュールの数だけ接続プールが増え、接続の予算が膨らむ。モジュールをまたぐトランザクションを 1 つの接続で書けない。
+
+### 選択肢2: 表の所有をモジュールごとのロールに分ける
+
+- **Description**：各モジュールのロールが自分のスキーマの表を所有し、DDL も持つ。
+- **Pros**：所有と権限が一致する。
+- **Cons**：DDL をモジュールのロールに持たせ、Liquibase もモジュールごとに流すことになる。ADR-011 で、モジュール別の Liquibase の履歴を退けた形に戻る。
+
+### 選択肢3: 現状のまま、ArchUnit だけで境界を守る
+
+- **Description**：アプリロールがすべてのスキーマを読み書きできる構成を維持する。
+- **Pros**：変更が要らない。
+- **Cons**：`JdbcTemplate` と生の JDBC からの抜け道、型に現れない逆向きの依存を止められない。テナントの分離の前提にならない。
+
+### 選択肢4: セッション単位で `SET ROLE` する
+
+- **Description**：接続を借りたときに `SET ROLE` し、返すときに `RESET ROLE` する。
+- **Pros**：トランザクションの外の読み書きにもロールが効く。
+- **Cons**：戻し忘れた接続にロールが残り、次のリクエストにモジュールの権限が漏れる。トランザクションの間だけ効く設定なら、戻し忘れが起きない。
+
+## References
+
+- [ADR-009](ADR-009-unify-db-connection-target-credentials-only-role-split.md)
+- [ADR-011](ADR-011-use-module-owned-database-schemas.md)
+- [DB接続情報とロール分離](../database/connections.md)
+- [issue #307](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/307)
+- [issue #369](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/369)
+- [PostgreSQL GRANT](https://www.postgresql.org/docs/current/sql-grant.html)
+- [PostgreSQL SET ROLE](https://www.postgresql.org/docs/current/sql-set-role.html)
+- [PostgreSQL ALTER DEFAULT PRIVILEGES](https://www.postgresql.org/docs/current/sql-alterdefaultprivileges.html)

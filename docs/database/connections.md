@@ -1,14 +1,14 @@
 ---
 type: Convention
 title: 'DB接続情報とロール分離'
-description: アプリケーション、Liquibase、jOOQ生成が使う接続先と資格情報の環境変数、スキーマの所有、環境ごとのロール分離、アプリの接続ごとの時間の上限を定める。接続用の環境変数やDBロールを追加、変更するとき、ステージングや本番のDBを準備するときに読む。
+description: アプリケーション、Liquibase、jOOQ生成が使う接続先と資格情報の環境変数、スキーマの所有、環境ごとのロール分離、モジュールのロールへの切り替え、アプリの接続ごとの時間の上限を定める。接続用の環境変数やDBロールを追加、変更するとき、ステージングや本番のDBを準備するときに読む。
 tags: [convention, database, liquibase, security, credentials]
 ---
 
 # DB接続情報とロール分離
 
 接続先（`DB_HOST`、`DB_PORT`、`DB_NAME`）はアプリケーションとマイグレーションで共有し、資格情報だけを役割ごとに分けます。
-アプリケーションは`DB_USERNAME`（DMLのみ）、LiquibaseとjOOQ生成は`MIGRATION_DB_USERNAME`（DDL）で接続し、資格情報にフォールバックはありません。
+アプリケーションは`DB_USERNAME`（DMLのみ。業務のスキーマはモジュールのロールへ切り替えて使う）、LiquibaseとjOOQ生成は`MIGRATION_DB_USERNAME`（DDL）で接続し、資格情報にフォールバックはありません。
 接続情報は`build.gradle`へ保存せず、環境変数またはCIのシークレットから注入します。
 
 ## 接続情報
@@ -73,29 +73,54 @@ LiquibaseとjOOQ生成はHikariCPを通らないため、この上限を受け�
 これにより、ローカルからテスト、ステージング、本番まで、接続の解決経路と権限モデルが一致し、環境ごとに異なる分岐を通りません。
 ローカルとテストも二ロールで動かします。
 `docker/compose.yml`と`docker/compose-test.yml`では、PostgreSQLのイメージが作るsuperuser（`postgres`）をコンテナの初期化だけに使います。
-`docker/initdb`は初回起動時に、このsuperuserでマイグレーション用ロール、`liquibase`スキーマ、DML限定のアプリケーション用ロールを作成します。
+`docker/initdb`は初回起動時に、このsuperuserでマイグレーション用ロール、`liquibase`スキーマ、DML限定のアプリケーション用ロール、モジュールのロール（`03-create-module-roles.sh`）を作成します。
 マイグレーション用ロールはsuperuserでも`BYPASSRLS`でもなく、DBへは`CREATE`だけを追加で与え、`liquibase`スキーマと、changesetが作るスキーマと表を所有します。
 アプリケーション、Liquibase、jOOQ生成、テストのDB操作はsuperuserで接続しません。
 superuserのパスワードは、ローカルでは`.env`の`POSTGRES_SUPERUSER_PASSWORD`をComposeのsecretで渡し、テストでは使い捨ての値を使います。
 マイグレーション用ロールがsuperuserでも`BYPASSRLS`でもないことは、カタログのテスト（`SchemaInspectionTest`の規則G2）が確かめます。
 001 changesetは`modulith`スキーマを作成し、そのUSAGEとイベント出版テーブルだけのDML権限を`DB_USERNAME`へ付与します。
+業務のスキーマ（`product`、`ordering`、`payment`）の権限は、012 changesetがアプリケーション用ロールから取り上げ、モジュールのロールへ移します（次の「モジュールのロール」）。
 Liquibase管理スキーマと管理テーブルへのアプリ権限は付与しません。
 001 changesetを初期状態から書き換えたことと、既存のボリュームでは`docker/initdb`が再実行されずマイグレーション用ロールがsuperuserのまま残ることから、既存DBは移行せず`task compose-reset CONFIRM_RESET=yes`で作り直します。
 ステージングと本番も既存DBを再利用せず、`liquibase`スキーマだけをマイグレーション用ロールの所有で作ってから初回マイグレーションを実行します。
-001 changesetがアプリケーションロール（`DB_USERNAME`）へGRANTするため、ステージングと本番では、そのロールを初回マイグレーションより前にRDS側で作成しておきます。
+001 changesetがアプリケーションロール（`DB_USERNAME`）へGRANTし、012 changesetがモジュールのロールへGRANTするため、ステージングと本番では、アプリケーションロールとモジュールのロールを初回マイグレーションより前にRDS側で作成しておきます。
 `docker/initdb`のような自動作成経路がないため、未作成のままマイグレーションを実行するとGRANTで失敗します。
 `be-release-migrate`とDB切り戻し用Taskfileのタスクはローカルの`.env`を読み込まず、共通の接続先（`DB_URL`、または`DB_HOST`/`DB_PORT`/`DB_NAME`）と権限付与先の`DB_USERNAME`、`MIGRATION_DB_USERNAME`、`MIGRATION_DB_PASSWORD`が注入されていなければGradle実行前に失敗します。
 アプリケーション用アカウントには業務処理に必要なDML権限を与え、`CREATE`、`ALTER`、`DROP`を与えません。
 Liquibase用アカウントには、DDL、Liquibase管理テーブルの更新、データ移行changesetに必要なDMLの権限を与えます。
 
-| 環境         | 接続先       | アプリケーションロール（DML） | マイグレーションロール（DDL、所有）  | jOOQ生成           |
-| ------------ | ------------ | ----------------------------- | ------------------------------------ | ------------------ |
-| ローカル     | 共通の`DB_*` | `demo`（initdbが作成）        | `demo_migration`（initdbが作成）     | 同じ接続で生成     |
-| CIテスト     | 共通の`DB_*` | `demo`（initdbが作成）        | `demo_migration`（initdbが作成）     | 必要な場合だけ生成 |
-| ステージング | 共通の`DB_*` | 専用アカウント                | 専用アカウント                       | 実行しない         |
-| 本番         | 共通の`DB_*` | 専用アカウント                | 専用アカウント                       | 実行しない         |
+| 環境         | 接続先       | アプリケーションロール（DML） | マイグレーションロール（DDL、所有）  | モジュールのロール         | jOOQ生成           |
+| ------------ | ------------ | ----------------------------- | ------------------------------------ | -------------------------- | ------------------ |
+| ローカル     | 共通の`DB_*` | `demo`（initdbが作成）        | `demo_migration`（initdbが作成）     | initdbが作成               | 同じ接続で生成     |
+| CIテスト     | 共通の`DB_*` | `demo`（initdbが作成）        | `demo_migration`（initdbが作成）     | initdbが作成               | 必要な場合だけ生成 |
+| ステージング | 共通の`DB_*` | 専用アカウント                | 専用アカウント                       | 構築の手順で先に作成       | 実行しない         |
+| 本番         | 共通の`DB_*` | 専用アカウント                | 専用アカウント                       | 構築の手順で先に作成       | 実行しない         |
 
 本番でjOOQコードを生成しない理由は[jOOQコード生成と日時型](jooq-codegen.md)にあります。
+
+## モジュールのロール
+
+業務のスキーマは、アプリケーション用ロールではなく、モジュールごとのログインできないロール`<module>_module`（`product_module`、`ordering_module`、`payment_module`）が読み書きする（[ADR-090](../adr/ADR-090-switch-to-module-database-roles.md)）。
+別のモジュールの表への書き込みと、依存の方向に逆らう読み取りは、DBの権限エラー（SQLSTATE `42501`）で止まる。
+
+- **切り替え**：`ModuleRoleTransactionManager`が、トランザクションを始めた直後に、トランザクションの名前（クラス名とメソッド名）から引いたモジュールのロールへ`set_config('role', ?, true)`で切り替える。トランザクションの終わりで元に戻るため、プールの接続にロールが残らない。モジュールが分からない名前（Spring Modulithの内部、ShedLock、名前のない`TransactionTemplate`）はアプリケーション用ロールのまま動く。
+- **アプリケーション用ロール**：業務のスキーマに権限を持たない。`modulith`スキーマ（イベントの出版とShedLockの表）だけを読み書きする。モジュールのロールの継承はなく、`SET ROLE`で切り替えるだけのメンバーである。
+- **モジュールのロールの権限**：自分のスキーマのUSAGEと表のSELECT、INSERT、UPDATE、DELETE。依存の方向（`ordering`から`product`、`payment`から`ordering`）にだけ、依存先のスキーマのUSAGEとSELECT。`modulith`スキーマのUSAGEと`modulith.event_publication`へのINSERT。
+- **新しい表**：権限はスキーマごとの`ALTER DEFAULT PRIVILEGES`で決まるため、新しい表のchangesetは権限を書かない。権限の漏れと余りは、カタログのテスト（`SchemaInspectionTest`の規則G4、G5）が止める。
+- **ロールの作成**：ロールはマイグレーションより先に、環境を作る手順で作る。マイグレーション用ロールに`CREATEROLE`を持たせない。ロールの名前は固定で、1つのDBクラスターに1つの環境を置く。
+- **限界**：アプリケーション用ロールは、どのSQLからでも`SET ROLE`で別のロールへ切り替えられる。DBのロールで止められるのは誤りで、故意の迂回は止められない。ArchUnitの規則（接続の設定を変える`DSLContext`のAPIの禁止、`JdbcTemplate`と生のJDBCの禁止）で補う（[ArchUnitのテスト](../backend/architecture-tests.md)）。
+
+ステージングと本番では、マイグレーションの前に、スーパーユーザー相当のアカウント（RDSでは`rds_superuser`）で、モジュールごとに次を実行する。
+`<app>`は`DB_USERNAME`である。
+モジュールを足すときは、`docker/initdb/03-create-module-roles.sh`の`modules`と`ModuleRoles.MODULES`にも同じ名前を足す。
+
+```sql
+CREATE ROLE product_module NOLOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS;
+GRANT product_module TO <app> WITH INHERIT FALSE, SET TRUE;
+```
+
+`task compose-reset CONFIRM_RESET=yes`で作り直すまで、既存のローカルのDBにはモジュールのロールがない。
+`docker/initdb`は初回起動時にだけ実行されるためである。
 
 ## 参照資料
 
