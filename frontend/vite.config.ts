@@ -140,7 +140,7 @@ function telemetryDefine(mode: string) {
 // ponytail: Playwright の assertion の既定と同じ値にした。これでも足りない負荷が出たら、この値だけを上げる。
 const asyncWaitTimeoutMs = 5000;
 
-// src のファイルを import せず、provide でテストへ渡す。import した先が `@/` を使うと、設定を読み込めなくなる。
+// 設定から src を import せず、provide でテストへ渡す。lint/lint-config.test.js は設定だけを複製して Lint する。
 declare module "vite-plus/test" {
   interface ProvidedContext {
     asyncWaitTimeoutMs: number;
