@@ -66,6 +66,8 @@ pstack のプレイブックには、このリポジトリの規約と食い違�
 レビューする Pull Request のブランチをチェックアウトし、その中で Kiro CLI を起動して実行する。
 対象から `.kiro/.kiro-plugins-installed` に載るファイルを外し、重点を置くファイルを伝える。
 
+指摘への対応と、実行しなかった理由（例：docs の誤字だけ）は、Pull Request の Evidence の Review に書く。
+
 ```text
 /thermos PR #<番号>（<ブランチ> と main の差分）をレビューして。
 .kiro/.kiro-plugins-installed に載るファイルは上流のままなので対象外。

@@ -91,9 +91,9 @@ public interface OrderQueries {
 @ApiResponse(responseCode = "200")
 @ApiResponse(responseCode = "404", ref = "#/components/responses/NotFoundProblem")
 @GetMapping("/{orderId}")
-/* package */ OrderDetailsResponse details(@PathVariable final String orderId) {
+/* package */ OrderDetailsResponse details(@PathVariable final UUID orderId) {
   return orderQueries
-      .findDetails(orderId)
+      .findDetails(orderId.toString())
       .map(OrderDetailsResponse::from)
       .orElseThrow(() -> new NotFoundException("order not found: orderId=" + orderId));
 }

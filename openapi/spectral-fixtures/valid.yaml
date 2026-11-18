@@ -50,6 +50,13 @@ paths:
           required: true
           schema:
             type: string
+            format: uuid
+        # public-id-uuid はヘッダーの引数を対象にしない
+        - name: X-Request-Id
+          in: header
+          description: 呼び出し元がリクエストに付けた追跡用の ID
+          schema:
+            type: string
       responses:
         "200":
           description: サンプル注文
@@ -96,6 +103,9 @@ components:
           type: string
           format: uri-reference
           description: 失敗発生を識別する URI
+        traceId:
+          type: string
+          description: 失敗したリクエストのトレース ID。public-id-uuid の対象にしない
       required:
         - type
         - title
@@ -137,8 +147,9 @@ components:
       properties:
         customerId:
           type: string
+          format: uuid
           description: 顧客の ID
-          example: C-0001
+          example: 3f2a6c1e-8b4d-4e7a-9c5f-2d1b0a9e8f7c
         quantity:
           type: integer
           format: int32
@@ -164,8 +175,9 @@ components:
       properties:
         sampleOrderId:
           type: string
+          format: uuid
           description: サンプル注文の ID
-          example: SO-0001
+          example: 5f0c2a8e-7d1b-4c3a-9e6f-1a2b3c4d5e6f
         status:
           type: string
           description: 注文の状態
@@ -180,6 +192,12 @@ components:
           description: 注文の明細
           items:
             type: string
+        productIds:
+          type: array
+          description: 注文した商品の ID
+          items:
+            type: string
+            format: uuid
       required:
         - sampleOrderId
         - status

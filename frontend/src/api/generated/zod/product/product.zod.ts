@@ -12,7 +12,7 @@ import * as zod from 'zod';
 export const ListProductsResponse = zod.object({
   "items": zod.array(zod.object({
   "productCode": zod.string().describe('商品コード'),
-  "productId": zod.string().describe('商品の ID'),
+  "productId": zod.uuid().describe('商品の ID'),
   "productName": zod.string().describe('商品名'),
   "salesStatus": zod.string().describe('販売の状態のコード値（ON_SALE か DISCONTINUED）'),
   "unitPrice": zod.number().describe('単価')

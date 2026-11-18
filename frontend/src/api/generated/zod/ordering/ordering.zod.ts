@@ -20,7 +20,7 @@ export const ListOrdersResponse = zod.object({
   "items": zod.array(zod.object({
   "customerOrderCode": zod.string().describe('客先注文番号'),
   "lockNo": zod.int().describe('更新の本文で送り返すロック番号'),
-  "orderId": zod.string().describe('注文の ID'),
+  "orderId": zod.uuid().describe('注文の ID'),
   "orderedAt": zod.iso.datetime({"offset":true}).describe('注文を作成した時刻'),
   "status": zod.string().describe('注文の状態のコード値（DRAFT、CONFIRMED、CANCELLED）'),
   "totalAmount": zod.number().describe('明細の金額の合計')
@@ -62,12 +62,12 @@ export const FindOrderByIdResponse = zod.object({
   "lines": zod.array(zod.object({
   "amount": zod.number().describe('単価と数量の積'),
   "lineNumber": zod.int().describe('明細の番号（1 から）'),
-  "productId": zod.string().describe('商品の ID'),
+  "productId": zod.uuid().describe('商品の ID'),
   "quantity": zod.int().describe('注文した数量'),
   "unitPrice": zod.number().describe('作成時に読んだ単価')
 }).describe('注文の明細の1行。')).describe('注文の明細'),
   "lockNo": zod.int().describe('更新の本文で送り返すロック番号'),
-  "orderId": zod.string().describe('注文の ID'),
+  "orderId": zod.uuid().describe('注文の ID'),
   "orderedAt": zod.iso.datetime({"offset":true}).describe('注文を作成した時刻'),
   "status": zod.string().describe('注文の状態のコード値（DRAFT、CONFIRMED、CANCELLED）'),
   "totalAmount": zod.number().describe('明細の金額の合計')
