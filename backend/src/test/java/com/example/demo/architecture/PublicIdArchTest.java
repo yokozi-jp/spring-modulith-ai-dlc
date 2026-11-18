@@ -20,7 +20,7 @@ import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
 import java.lang.reflect.WildcardType;
 import java.util.Arrays;
-import java.util.Set;
+import java.util.List;
 import java.util.stream.Stream;
 
 /**
@@ -37,9 +37,15 @@ class PublicIdArchTest {
   /** プロダクションコードの基底パッケージ。 */
   private static final String BASE_PACKAGE = DemoApplication.class.getPackageName();
 
-  /** 主キーとみなす数値の型。 */
-  private static final Set<String> NUMERIC_TYPES =
-      Set.of("long", "java.lang.Long", "int", "java.lang.Integer");
+  /** 主キーとみなす数値の型。失敗メッセージに並べる順を固定するため List にする。 */
+  private static final List<String> NUMERIC_TYPES =
+      List.of("long", "java.lang.Long", "int", "java.lang.Integer");
+
+  /** 数値の ID とみなす名前。 */
+  private static final List<String> ID_NAMES = List.of("id", "ids");
+
+  /** 数値の ID とみなす名前の末尾。 */
+  private static final List<String> ID_SUFFIXES = List.of("Id", "Ids");
 
   /** モジュールの外に出る型は、数値の {@code *Id} を持たない。 */
   @ArchTest
@@ -69,8 +75,11 @@ class PublicIdArchTest {
 
   private static ArchCondition<JavaClass> notHoldNumericIds() {
     return new ArchCondition<>(
-        "not have fields, parameters, or methods named id, *Id, ids, or *Ids whose type is or"
-            + " contains long, Long, int, or Integer") {
+        "not have fields, parameters, or methods named "
+            + Stream.concat(ID_NAMES.stream(), ID_SUFFIXES.stream().map(suffix -> "*" + suffix))
+                .toList()
+            + " whose type is or contains "
+            + NUMERIC_TYPES) {
       @Override
       public void check(final JavaClass javaClass, final ConditionEvents events) {
         for (final JavaField field : javaClass.getFields()) {
@@ -102,7 +111,7 @@ class PublicIdArchTest {
   }
 
   private static boolean isNumericId(final String name, final Type type) {
-    return ("id".equals(name) || "ids".equals(name) || name.endsWith("Id") || name.endsWith("Ids"))
+    return (ID_NAMES.contains(name) || ID_SUFFIXES.stream().anyMatch(name::endsWith))
         && containsNumeric(type);
   }
 
