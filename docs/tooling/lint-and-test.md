@@ -324,6 +324,11 @@ const params = { ...(cursor !== undefined && { cursor }) };
 - **`task agent-git-test`**：`task agent-commit`、`task agent-push`、`task agent-wait`の本体を、`tooling/agent-git/test.sh`のケースで検査する。
 - **`task lint-taskfile`**：Task本体でTaskfileのYAML構文とスキーマ構造を検証する。
   `tooling/taskfile-cleanup/`のfixtureで、後片付けの定型が本体の終了コードを優先し、前段が失敗しても後段の後片付けを走らせることを検査する。
+  `tooling/task-calls/task-calls.sh`は、フックとワークフローが呼ぶタスク名を検査する。
+  対象は、`lefthook.yml`と`.github/workflows/`のYAMLにある`task <名前>`である。
+  名前が`task --list-all`のタスクにも別名にも無いと失敗する。
+  失敗にする状態は`tooling/task-calls/test.sh`のケースが正で、この文書には写さない。
+  読み違える書き方と見落とす書き方は、`task-calls.sh`の`ponytail:`の注記にある。
 - **`task lint-lefthook`**：`lefthook.yml`の`run`を`echo`に置き換えた設定で本物のlefthookを動かし、glob付きのjobが意図したファイルで選ばれることを検査する。
   `docs/**/*.md`のような`a/**/b`の形の`**`は0階層に一致しないため、ディレクトリ直下のファイル（`docs/index.md`、`backend/build.gradle`）を中心に少数だけ期待を置く。
   見るのはglobだけで、jobの`run`内の`{files}`の参照は見ない。期待は`tooling/lefthook-glob/test.sh`が正で、全jobには広げない。
@@ -347,7 +352,7 @@ OKF検査の採用理由は[ADR-036](../adr/ADR-036-adopt-okf-for-docs-knowledge
 - **pre-commit（Markdownの変更）**：変更ファイルへ`lint-md`相当を実行する。
 - **pre-commit（docs、steering、Taskfile、README、`tooling/adr-lint/`、`.github/rulesets/`、`.github/workflows/`、`tooling/ruleset-check/`、`tooling/ruleset-sync/`の変更）**：`okf-check`を実行する。
 - **pre-commit（`.agents/skills/`、`.kiro/`、`skills-lock.json`、`tooling/skills-check/`の変更）**：`skills-check`を実行する。
-- **pre-commit（Taskfileか`tooling/taskfile-cleanup/`の変更）**：`lint-taskfile`を実行する。
+- **pre-commit（Taskfile、`lefthook.yml`、GitHub Actionsワークフロー、`tooling/taskfile-cleanup/`、`tooling/task-calls/`の変更）**：`lint-taskfile`を実行する。
 - **pre-commit（`tooling/agent-git/`の変更）**：`agent-git-test`を実行する。
 - **pre-commit（`lefthook.yml`か`tooling/lefthook-glob/`の変更）**：`lint-lefthook`を実行する。
 - **pre-push（すべて）**：`adr-check`と`scan-secrets-all`を実行する。

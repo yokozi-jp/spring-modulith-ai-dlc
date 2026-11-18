@@ -1716,13 +1716,15 @@ tasks:
       - npx --yes markdownlint-cli2 --fix "**/*.md"
 
   lint-taskfile:
-    desc: TaskfileをTask本体で解析しYAML構文とスキーマ構造、後片付けの終了コードを検証
+    desc: TaskfileをTask本体で解析しYAML構文とスキーマ構造、後片付けの終了コード、フックとワークフローが呼ぶタスク名を検証
     silent: true
     cmds:
+      # Taskfile 全体の解析は、task がこのタスクを起動する前に済ませている。
       - |
-        task --list-all >/dev/null
         echo "Taskfile OK: YAML構文とスキーマ構造の解析に成功しました。"
         bash tooling/taskfile-cleanup/test.sh
+        bash tooling/task-calls/test.sh
+        bash tooling/task-calls/task-calls.sh
 
   lint-lefthook:
     desc: lefthook.ymlのglobが、ディレクトリ直下のファイルでも意図したjobを選ぶことを本物のlefthookで検証
