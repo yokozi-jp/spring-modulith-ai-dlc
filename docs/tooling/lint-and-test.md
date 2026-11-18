@@ -313,10 +313,9 @@ const params = { ...(cursor !== undefined && { cursor }) };
 - **`task release-check`**：release-pleaseのmanifest、版ファイル、Gradle版、設定の一致を検証する。
 - **`task lint-taskfile`**：Task本体でTaskfileのYAML構文とスキーマ構造を検証する。
   `tooling/taskfile-cleanup/`のfixtureで、後片付けの定型が本体の終了コードを優先し、前段が失敗しても後段の後片付けを走らせることを検査する。
-  `lefthook.yml`と`.github/workflows/`のYAMLが呼ぶ`task <名前>`が、`task --list-all`のタスクか別名にあることを`tooling/task-calls/task-calls.sh`で検査する。
-  名前は、`task`の後の`-x`などのフラグを飛ばした最初の語である。
-  コメントは除き、`fail_text`や`echo`の文字列の中の`task <名前>`も対象にする。
-  検査の前に、`tooling/task-calls/test.sh`が小さな木で終了コードと出力を確かめる。
+  `tooling/task-calls/test.sh`を先に実行してから、`tooling/task-calls/task-calls.sh`で、`lefthook.yml`と`.github/workflows/`のYAMLが呼ぶ`task <名前>`が`task --list-all`のタスクか別名にあることを検査する。
+  失敗にするケースは`tooling/task-calls/test.sh`が正で、この文書には写さない。
+  既知の限界として、値を取るフラグ（`-d <ディレクトリ>`、`--taskfile x`）、名前の前に置いた空白を含む値の変数、引用符の中の英語の文（`echo "the task failed"`）は呼び出しを読み違え、引用符で囲んだ名前、行の継続、式で作る名前は検査しない。
 - **`task adr-check`**：判断が絡む変更にADRが伴うかを確認する。
   `frontend/`の変更のうち、テストファイル（`*.test.*`、`*.spec.*`）、`frontend/e2e/`、`frontend/lint/fixtures/`、`frontend/src/testing/`は対象から外す。
   警告は止めず、`ADR_STRICT=1`で失敗にし、`ADR_ACK=1`で抑制する。

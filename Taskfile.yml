@@ -1664,7 +1664,7 @@ tasks:
       - npx --yes markdownlint-cli2 --fix "**/*.md"
 
   lint-taskfile:
-    desc: TaskfileをTask本体で解析しYAML構文とスキーマ構造、後片付けの終了コード、フックとCIが呼ぶタスク名を検証
+    desc: TaskfileをTask本体で解析しYAML構文とスキーマ構造、後片付けの終了コード、フックとワークフローが呼ぶタスク名を検証
     silent: true
     cmds:
       - |
