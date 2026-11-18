@@ -11,20 +11,24 @@ import java.util.function.Predicate;
 /**
  * ロールの権限の規則（G1、G2）を、カタログの行から判定する。
  *
- * <p>アプリロールはDDLの権限を持たず、自スキーマのUSAGEとテーブルのDMLだけを持ち、{@code liquibase}スキーマに触れない。すべてのスキーマに適用する。
+ * <p>アプリロールはDDLの権限を持たず、{@code modulith}スキーマのUSAGEとテーブルのDMLだけを持ち、業務のスキーマと{@code
+ * liquibase}スキーマに触れない。業務のスキーマは、モジュールのロールに切り替えたときだけ使える（ADR-090）。すべてのスキーマに適用する。
  * マイグレーションロールは表を所有するが、superuserでも{@code BYPASSRLS}でもない。
  */
 final class SchemaPrivilegeConventions {
 
-  /** Liquibaseの管理テーブルのスキーマ。 */
-  private static final String LIQUIBASE_SCHEMA = "liquibase";
+  /** PostgreSQLが既定で作り、PUBLICにUSAGEを与える、表を持たないスキーマ。 */
+  private static final String PUBLIC_SCHEMA = "public";
+
+  /** アプリロールが権限を持つ、モジュールに属さないスキーマ。業務のスキーマの権限は、モジュールのロールに与える（ADR-090）。 */
+  private static final String APP_ROLE_SCHEMA = "modulith";
 
   /** 権限の規則の根拠の文書。 */
   private static final String ROLE_DOC =
-      "docs/database/connections.md、docs/adr/ADR-011-use-module-owned-database-schemas.md";
+      "docs/database/connections.md、docs/adr/ADR-011-use-module-owned-database-schemas.md、docs/adr/ADR-090-switch-to-module-database-roles.md";
 
   /** ロールの属性の名前と、その属性を持つか。 */
-  private static final Map<String, Predicate<RoleRow>> ROLE_ATTRIBUTES =
+  /* package */ static final Map<String, Predicate<RoleRow>> ROLE_ATTRIBUTES =
       Map.of(
           "SUPERUSER", RoleRow::superuser,
           "CREATEDB", RoleRow::createDb,
@@ -101,7 +105,9 @@ final class SchemaPrivilegeConventions {
       if (schema.ownedByRole()) {
         violations.add(violation(role, "OWNER:" + schema.schema()));
       }
-      if (schema.usage() && LIQUIBASE_SCHEMA.equals(schema.schema())) {
+      if (schema.usage()
+          && !APP_ROLE_SCHEMA.equals(schema.schema())
+          && !PUBLIC_SCHEMA.equals(schema.schema())) {
         violations.add(violation(role, "USAGE:" + schema.schema()));
       }
     }
@@ -118,7 +124,7 @@ final class SchemaPrivilegeConventions {
           violations.add(violation(role, name + ":" + object));
         }
       });
-      if (relation.anyPrivilege() && LIQUIBASE_SCHEMA.equals(relation.schema())) {
+      if (relation.anyPrivilege() && !APP_ROLE_SCHEMA.equals(relation.schema())) {
         violations.add(violation(role, "ANY:" + object));
       }
     }
@@ -128,6 +134,8 @@ final class SchemaPrivilegeConventions {
     return new ConventionViolation(
         "G1",
         role.name() + ":" + privilege,
-        "アプリロールにDDLの権限を与えず、自スキーマのUSAGEとテーブルのDMLだけを与える。liquibaseスキーマには権限を与えない（" + ROLE_DOC + "）。");
+        "アプリロールにDDLの権限を与えず、modulithスキーマのUSAGEとテーブルのDMLだけを与える。業務のスキーマとliquibaseスキーマには権限を与えない（"
+            + ROLE_DOC
+            + "）。");
   }
 }

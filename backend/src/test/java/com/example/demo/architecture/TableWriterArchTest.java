@@ -183,7 +183,12 @@ class TableWriterArchTest {
   /** 期待する jOOQ の実行時の版。上げるときは H1 の禁止の一覧を見直す。 */
   private static final String REVIEWED_JOOQ_VERSION = "3.21.9";
 
-  /** 業務テーブルの UPDATE と DELETE は、TableWriter、LockedRoot、DeletedRoot だけが組み立てて実行する（H1）。 */
+  /**
+   * 業務テーブルの UPDATE と DELETE は、TableWriter、LockedRoot、DeletedRoot だけが組み立てて実行する（H1）。
+   *
+   * <p>トランザクションの初めにモジュールのロールへ切り替える ModuleRoleTransactionManager は、業務テーブルに触れず、固定の {@code set_config}
+   * だけを実行するため対象にしない（ADR-090）。
+   */
   @ArchTest
   /* package */ static final ArchRule tableWritesGoThroughTableWriter =
       tableWritesGoThroughTableWriterRule(BASE_PACKAGE);
@@ -277,6 +282,10 @@ class TableWriterArchTest {
         .doNotHaveFullyQualifiedName(writerPackage + "LockedRoot")
         .and()
         .doNotHaveFullyQualifiedName(writerPackage + "DeletedRoot")
+        .and()
+        .doNotHaveFullyQualifiedName(writerPackage + "ModuleRoleTransactionManager")
+        .and()
+        .doNotHaveFullyQualifiedName(writerPackage + "ModuleRoleTransactionManager$Config")
         .should()
         .accessTargetWhere(
             DescribedPredicate.describe(

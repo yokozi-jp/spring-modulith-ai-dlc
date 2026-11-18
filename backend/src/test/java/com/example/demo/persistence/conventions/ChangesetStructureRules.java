@@ -10,7 +10,7 @@ import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 /**
- * changesetのファイル名と構造の規則（M2、M4、M6、M9、M12、M13からM17）を判定する。
+ * changesetのファイル名と構造の規則（M2、M4、M6、M9、M12、M13からM17）と、権限のSQLの規則（G3）を判定する。
  *
  * <p>{@code modulith}スキーマのchangesetを含め、すべてのchangesetに適用する。
  */
@@ -69,10 +69,9 @@ final class ChangesetStructureRules {
         .filter(names -> names.size() > 1)
         .flatMap(List::stream)
         .sorted()
-        .map(
-            name ->
-                new ConventionViolation(
-                    "M16", name, "changesetの番号が他のファイルと重複している。番号を付け直す（" + MIGRATIONS_DOC + "）。"))
+        .map(name ->
+            new ConventionViolation(
+                "M16", name, "changesetの番号が他のファイルと重複している。番号を付け直す（" + MIGRATIONS_DOC + "）。"))
         .forEach(violations::add);
     return violations;
   }
@@ -126,6 +125,7 @@ final class ChangesetStructureRules {
     }
     schemaNames(changeset).ifPresent(violations::add);
     violations.addAll(rawSql(changeset));
+    violations.addAll(ChangesetPrivilegeRules.check(changeset));
     exceptionConstructs(changeset).ifPresent(violations::add);
     return violations;
   }
@@ -137,13 +137,12 @@ final class ChangesetStructureRules {
         .filter(change -> SCHEMA_SCOPED_KEYS.stream().anyMatch(change.attributes()::containsKey))
         .filter(change -> change.schema().isBlank())
         .findFirst()
-        .map(
-            change ->
-                new ConventionViolation(
-                    "M9",
-                    changeset.changesetId(),
-                    change.type()
-                        + "にschemaNameを明示する（docs/adr/ADR-011-use-module-owned-database-schemas.md）。"));
+        .map(change ->
+            new ConventionViolation(
+                "M9",
+                changeset.changesetId(),
+                change.type()
+                    + "にschemaNameを明示する（docs/adr/ADR-011-use-module-owned-database-schemas.md）。"));
   }
 
   /** M4、M6、M17：任意のSQLを使う変更の規則。 */
@@ -154,12 +153,12 @@ final class ChangesetStructureRules {
         .allChanges()
         .map(Change::rawSql)
         .flatMap(Optional::stream)
-        .map(
-            sql ->
-                new ConventionViolation(
-                    "M17",
-                    id + ": " + sql,
-                    "任意のSQLは、Change Typeで書けない理由を付けて許可リスト（ChangesetLint.ALLOWLIST）に載せた場合だけ使う。"))
+        .filter(sql -> !ChangesetPrivilegeRules.isPrivilegeOnly(sql))
+        .map(sql ->
+            new ConventionViolation(
+                "M17",
+                id + ": " + sql,
+                "任意のSQLは、Change Typeで書けない理由を付けて許可リスト（ChangesetLint.ALLOWLIST）に載せた場合だけ使う。"))
         .forEach(violations::add);
     final List<String> changeSql =
         changeset.changes().stream().map(Change::rawSql).flatMap(Optional::stream).toList();

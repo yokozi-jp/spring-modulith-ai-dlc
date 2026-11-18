@@ -1,16 +1,23 @@
 package com.example.demo.testkit;
 
+import com.example.demo.shared.infrastructure.persistence.ModuleRoleTransactionManager;
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 import org.springframework.boot.jdbc.test.autoconfigure.AutoConfigureTestDatabase;
 import org.springframework.boot.jooq.test.autoconfigure.JooqTest;
+import org.springframework.context.annotation.Import;
 
 /**
  * ロールバックで隔離される、jOOQ スライスのDBテスト向け合成アノテーション。
  *
  * <p>{@code @JooqTest} は各テストの後に自動ロールバックするため、書き込んだ行の後始末は不要。 リポジトリ/DAO のような「書いて読む」大多数のDBテストはこれを既定にする。
+ *
+ * <p>{@code @JooqTest} は {@code @Configuration}
+ * を読み込まないため、トランザクションの名前からモジュールのロールへ切り替えるトランザクションマネージャーを {@code @Import}
+ * する（ADR-090）。テストのトランザクションは、テストクラスの名前（{@code
+ * com.example.demo.<module>.…}）からモジュールのロールで動く。モジュールの外のテストクラスは、アプリロールのままで、{@link AsModule} で切り替える。
  *
  * <p>{@code replace = NONE} で組み込みDBへの差し替えを止め、生成コードと同じ方言の実 PostgreSQL を使う。
  *
@@ -19,5 +26,6 @@ import org.springframework.boot.jooq.test.autoconfigure.JooqTest;
 @Target(ElementType.TYPE)
 @Retention(RetentionPolicy.RUNTIME)
 @JooqTest
+@Import(ModuleRoleTransactionManager.Config.class)
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
 public @interface DatabaseTest {}

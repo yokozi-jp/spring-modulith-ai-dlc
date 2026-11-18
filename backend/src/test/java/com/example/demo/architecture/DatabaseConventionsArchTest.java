@@ -6,6 +6,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.example.demo.DemoApplication;
+import com.example.demo.shared.infrastructure.persistence.ModuleRoles;
 import com.tngtech.archunit.core.domain.AccessTarget;
 import com.tngtech.archunit.core.domain.JavaAccess;
 import com.tngtech.archunit.core.domain.JavaAnnotation;
@@ -24,6 +25,7 @@ import java.util.List;
 import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Stream;
+import org.jooq.DSLContext;
 import org.jooq.Field;
 import org.jooq.Name;
 import org.jooq.PlainSQL;
@@ -46,7 +48,15 @@ import org.springframework.transaction.annotation.Transactional;
  * <p>分離レベルの検査は、Springの {@code @Transactional} をクラスかメソッドに直接付けた場合だけを対象にし、それを含む合成アノテーションは対象にしない。
  */
 @AnalyzeClasses(packagesOf = DemoApplication.class, importOptions = ProductionCodeOnly.class)
+// 規則とその組み立てを 1 つのクラスに置くため、メソッドが多い。
+@SuppressWarnings("PMD.TooManyMethods")
 class DatabaseConventionsArchTest {
+
+  /** プロダクションコードの基底パッケージ。 */
+  private static final String BASE_PACKAGE = DemoApplication.class.getPackageName();
+
+  /** jOOQ の生成クラスのパッケージ。 */
+  private static final String JOOQ_PACKAGE = BASE_PACKAGE + ".jooq";
 
   /** 分離レベルの指定を禁止する属性の名前。 */
   private static final String ISOLATION = "isolation";
@@ -76,6 +86,21 @@ class DatabaseConventionsArchTest {
   /** {@code Settings} の {@code statementType} と {@code paramType} を変えるメソッドを呼ばず、メソッド参照もしない。 */
   @ArchTest /* package */
   static final ArchRule statementTypeAndParamTypeAreNotChanged = statementTypeAndParamTypeRule();
+
+  /** 機能モジュールの Persistence Adapter は、自分のスキーマの生成クラスだけを使う。 */
+  @ArchTest /* package */
+  static final ArchRule persistenceAdaptersUseOnlyOwnGeneratedSchema =
+      ownGeneratedSchemaRule(BASE_PACKAGE, JOOQ_PACKAGE, ModuleRoles.MODULES);
+
+  /** 機能モジュールのコードは、{@code JdbcTemplate} と生の JDBC を使わない。 */
+  @ArchTest /* package */
+  static final ArchRule moduleCodeDoesNotUseJdbc =
+      moduleCodeDoesNotUseJdbcRule(BASE_PACKAGE, ModuleRoles.MODULES);
+
+  /** 機能モジュールのコードは、接続の設定を変える {@code DSLContext} の API を使わない。 */
+  @ArchTest /* package */
+  static final ArchRule moduleCodeDoesNotChangeConnectionSettings =
+      moduleCodeDoesNotChangeConnectionSettingsRule(BASE_PACKAGE, ModuleRoles.MODULES);
 
   @Test
   @DisplayName("DB規約に反するコードを拒否する")
@@ -129,6 +154,103 @@ class DatabaseConventionsArchTest {
             "calls method <org.jooq.conf.Settings.withStatementType(org.jooq.conf.StatementType)>")
         .hasMessageContaining(
             "calls method <org.jooq.conf.Settings.withParamType(org.jooq.conf.ParamType)>");
+  }
+
+  /**
+   * 機能モジュールの {@code infrastructure.persistence} が、自分のモジュールのスキーマの生成クラスだけを使う規則を組み立てる。
+   *
+   * @param basePackage 機能モジュールを置く基底パッケージ
+   * @param jooqPackage jOOQ の生成クラスの基底パッケージ
+   * @param modules ロールとスキーマを持つ機能モジュール
+   */
+  /* package */ static ArchRule ownGeneratedSchemaRule(
+      final String basePackage, final String jooqPackage, final Set<String> modules) {
+    return classes()
+        .that()
+        .resideInAnyPackage(modulePackages(basePackage, modules, ".infrastructure.persistence.."))
+        .should(useOnlyOwnGeneratedSchema(basePackage, jooqPackage))
+        .allowEmptyShould(true)
+        .because(
+            "モジュールのロールは自分のスキーマだけを読み書きでき、別のモジュールのスキーマを使うと実行時に権限エラーになるため。"
+                + "別のモジュールの値は、そのモジュールの公開 API かイベントで受け取る。"
+                + "直し方：自分のモジュールのスキーマ以外の生成クラスを使う処理を、そのスキーマを持つモジュールへ移す。"
+                + "規約：docs/database/connections.md、docs/adr/ADR-090-switch-to-module-database-roles.md");
+  }
+
+  /** 機能モジュールのコードが、{@code JdbcTemplate} と生の JDBC を使わない規則を組み立てる。 */
+  /* package */ static ArchRule moduleCodeDoesNotUseJdbcRule(
+      final String basePackage, final Set<String> modules) {
+    return noClasses()
+        .that()
+        .resideInAnyPackage(modulePackages(basePackage, modules, ".."))
+        .should()
+        .dependOnClassesThat()
+        .resideInAnyPackage("org.springframework.jdbc..", "java.sql..", "javax.sql..")
+        .allowEmptyShould(true)
+        .because(
+            "JdbcTemplate と生の JDBC は、トランザクションの初めに切り替えたモジュールのロールを迂回し、jOOQ の生成クラスで守る境界の外に出るため。"
+                + "直し方：jOOQ の生成クラスとメタモデルで書き、JDBC の型を使わない。"
+                + "規約：docs/database/jooq-usage.md、docs/adr/ADR-090-switch-to-module-database-roles.md");
+  }
+
+  /** 機能モジュールのコードが、接続の設定を変える {@code DSLContext} の API を使わない規則を組み立てる。 */
+  /* package */ static ArchRule moduleCodeDoesNotChangeConnectionSettingsRule(
+      final String basePackage, final Set<String> modules) {
+    return noClasses()
+        .that()
+        .resideInAnyPackage(modulePackages(basePackage, modules, ".."))
+        .should()
+        .accessTargetWhere(
+            JavaAccess.Predicates.target(
+                AccessTarget.Predicates.declaredIn(DSLContext.class)
+                    .and(
+                        HasName.Predicates.nameMatching(
+                            "set|setLocal|setSchema|setCatalog|connection|connectionResult"))))
+        .allowEmptyShould(true)
+        .because(
+            "SET と SET ROLE を実行すると、トランザクションの初めに切り替えたロールとテナントを書き換えられるため。"
+                + "接続を直接操作する connection も同じ抜け道になる。"
+                + "直し方：set、setLocal、setSchema、setCatalog、connection、connectionResult の呼び出しを削除する。"
+                + "規約：docs/database/connections.md、docs/adr/ADR-090-switch-to-module-database-roles.md");
+  }
+
+  private static String[] modulePackages(
+      final String basePackage, final Set<String> modules, final String suffix) {
+    return modules.stream()
+        .map(module -> basePackage + "." + module + suffix)
+        .toArray(String[]::new);
+  }
+
+  private static ArchCondition<JavaClass> useOnlyOwnGeneratedSchema(
+      final String basePackage, final String jooqPackage) {
+    return new ArchCondition<>("use only the generated classes of its own schema") {
+      @Override
+      public void check(final JavaClass item, final ConditionEvents events) {
+        final String module =
+            item.getPackageName().substring(basePackage.length() + 1).split("\\.")[0];
+        final String own = jooqPackage + "." + module;
+        item.getDirectDependenciesFromSelf().stream()
+            .map(dependency -> dependency.getTargetClass())
+            .filter(target -> isGenerated(target.getPackageName(), jooqPackage))
+            .filter(target ->
+                !target.getPackageName().equals(own)
+                    && !target.getPackageName().startsWith(own + "."))
+            .forEach(target ->
+                events.add(
+                    SimpleConditionEvent.violated(
+                        item,
+                        item.getName()
+                            + " は "
+                            + module
+                            + " のスキーマ以外の生成クラス "
+                            + target.getName()
+                            + " を使っている")));
+      }
+    };
+  }
+
+  private static boolean isGenerated(final String packageName, final String jooqPackage) {
+    return packageName.equals(jooqPackage) || packageName.startsWith(jooqPackage + ".");
   }
 
   private static ArchRule isolationRule() {
@@ -216,24 +338,22 @@ class DatabaseConventionsArchTest {
                 Stream.of(item).filter(owner -> declaresIsolation(owner.getAnnotations())),
                 item.getMethods().stream()
                     .filter(owner -> declaresIsolation(owner.getAnnotations())))
-            .forEach(
-                owner ->
-                    events.add(
-                        SimpleConditionEvent.violated(
-                            item,
-                            owner.getDescription()
-                                + " の @Transactional が isolation を指定している。"
-                                + "直し方：isolation を削除する。")));
+            .forEach(owner ->
+                events.add(
+                    SimpleConditionEvent.violated(
+                        item,
+                        owner.getDescription()
+                            + " の @Transactional が isolation を指定している。"
+                            + "直し方：isolation を削除する。")));
       }
     };
   }
 
   private static boolean declaresIsolation(final Set<? extends JavaAnnotation<?>> annotations) {
     return annotations.stream()
-        .anyMatch(
-            annotation ->
-                annotation.getRawType().isEquivalentTo(Transactional.class)
-                    && annotation.tryGetExplicitlyDeclaredProperty(ISOLATION).isPresent());
+        .anyMatch(annotation ->
+            annotation.getRawType().isEquivalentTo(Transactional.class)
+                && annotation.tryGetExplicitlyDeclaredProperty(ISOLATION).isPresent());
   }
 
   /** ArchUnit の拒否経路を検証するため、DB規約に反するコードを意図的に含めたフィクスチャ。 */

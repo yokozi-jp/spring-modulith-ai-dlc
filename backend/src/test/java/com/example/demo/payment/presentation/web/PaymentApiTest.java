@@ -8,6 +8,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.example.demo.shared.infrastructure.persistence.TestCommonColumns;
+import com.example.demo.testkit.AsModule;
 import com.example.demo.testkit.CleanGeneratedTablesExtension;
 import com.example.demo.testkit.ContractCase;
 import com.example.demo.testkit.SharedTestConfiguration;
@@ -155,17 +156,20 @@ class PaymentApiTest {
 
   private UUID insertPayment(final UUID orderId, final String status, final String code) {
     final UUID paymentId = UUID.randomUUID();
-    TestCommonColumns.runAs(
-        () ->
-            dsl.insertInto(T_PAYMENT)
-                .set(T_PAYMENT.PUBLIC_ID, paymentId)
-                .set(T_PAYMENT.ORDER_PUBLIC_ID, orderId)
-                .set(T_PAYMENT.CHARGED_AMOUNT_JPY, new BigDecimal("240.00"))
-                .set(T_PAYMENT.PAYMENT_STATUS_TYP, status)
-                .set(T_PAYMENT.GATEWAY_PAYMENT_CODE, code)
-                .set(T_PAYMENT.RECORDED_AT, RECORDED_AT)
-                .set(TestCommonColumns.at(RECORDED_AT).forInsert(T_PAYMENT))
-                .execute());
+    AsModule.run(
+        dsl,
+        "payment",
+        tx ->
+            TestCommonColumns.runAs(() ->
+                tx.insertInto(T_PAYMENT)
+                    .set(T_PAYMENT.PUBLIC_ID, paymentId)
+                    .set(T_PAYMENT.ORDER_PUBLIC_ID, orderId)
+                    .set(T_PAYMENT.CHARGED_AMOUNT_JPY, new BigDecimal("240.00"))
+                    .set(T_PAYMENT.PAYMENT_STATUS_TYP, status)
+                    .set(T_PAYMENT.GATEWAY_PAYMENT_CODE, code)
+                    .set(T_PAYMENT.RECORDED_AT, RECORDED_AT)
+                    .set(TestCommonColumns.at(RECORDED_AT).forInsert(T_PAYMENT))
+                    .execute()));
     return paymentId;
   }
 }

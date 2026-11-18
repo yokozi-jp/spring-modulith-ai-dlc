@@ -1,0 +1,84 @@
+databaseChangeLog:
+  - changeSet:
+      id: 012-switch-privileges-to-module-roles
+      author: system
+      comment: >-
+        アプリロールから業務スキーマの権限を取り上げ、ログインできないモジュールのロール（<module>_module）へ移す（ADR-090）。
+        ロールは環境を作る手順で先に作る（ローカルは docker/initdb、本番は docs/database/connections.md）。
+        依存の方向（ordering から product、payment から ordering）にだけ、呼び出し元のロールへ依存先のスキーマの SELECT を与える。
+        新しい表の権限は、スキーマごとの ALTER DEFAULT PRIVILEGES で決める。
+      preConditions:
+        - dbms:
+            type: postgresql
+      changes:
+        - sql:
+            sql: |
+              REVOKE ALL ON ALL TABLES IN SCHEMA product FROM "${appDatabaseUsername}";
+              REVOKE USAGE ON SCHEMA product FROM "${appDatabaseUsername}";
+              GRANT USAGE ON SCHEMA product TO product_module;
+              GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA product TO product_module;
+              ALTER DEFAULT PRIVILEGES IN SCHEMA product GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO product_module;
+        - sql:
+            sql: |
+              REVOKE ALL ON ALL TABLES IN SCHEMA ordering FROM "${appDatabaseUsername}";
+              REVOKE USAGE ON SCHEMA ordering FROM "${appDatabaseUsername}";
+              GRANT USAGE ON SCHEMA ordering TO ordering_module;
+              GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA ordering TO ordering_module;
+              ALTER DEFAULT PRIVILEGES IN SCHEMA ordering GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO ordering_module;
+        - sql:
+            sql: |
+              REVOKE ALL ON ALL TABLES IN SCHEMA payment FROM "${appDatabaseUsername}";
+              REVOKE USAGE ON SCHEMA payment FROM "${appDatabaseUsername}";
+              GRANT USAGE ON SCHEMA payment TO payment_module;
+              GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA payment TO payment_module;
+              ALTER DEFAULT PRIVILEGES IN SCHEMA payment GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO payment_module;
+        - sql:
+            sql: |
+              GRANT USAGE ON SCHEMA product TO ordering_module;
+              GRANT SELECT ON ALL TABLES IN SCHEMA product TO ordering_module;
+              ALTER DEFAULT PRIVILEGES IN SCHEMA product GRANT SELECT ON TABLES TO ordering_module;
+        - sql:
+            sql: |
+              GRANT USAGE ON SCHEMA ordering TO payment_module;
+              GRANT SELECT ON ALL TABLES IN SCHEMA ordering TO payment_module;
+              ALTER DEFAULT PRIVILEGES IN SCHEMA ordering GRANT SELECT ON TABLES TO payment_module;
+        - sql:
+            sql: |
+              GRANT USAGE ON SCHEMA modulith TO product_module, ordering_module, payment_module;
+              GRANT INSERT ON TABLE modulith.event_publication TO product_module, ordering_module, payment_module;
+      rollback:
+        - sql:
+            sql: |
+              REVOKE INSERT ON TABLE modulith.event_publication FROM product_module, ordering_module, payment_module;
+              REVOKE USAGE ON SCHEMA modulith FROM product_module, ordering_module, payment_module;
+        - sql:
+            sql: |
+              ALTER DEFAULT PRIVILEGES IN SCHEMA ordering REVOKE ALL ON TABLES FROM payment_module;
+              REVOKE ALL ON ALL TABLES IN SCHEMA ordering FROM payment_module;
+              REVOKE USAGE ON SCHEMA ordering FROM payment_module;
+        - sql:
+            sql: |
+              ALTER DEFAULT PRIVILEGES IN SCHEMA product REVOKE ALL ON TABLES FROM ordering_module;
+              REVOKE ALL ON ALL TABLES IN SCHEMA product FROM ordering_module;
+              REVOKE USAGE ON SCHEMA product FROM ordering_module;
+        - sql:
+            sql: |
+              ALTER DEFAULT PRIVILEGES IN SCHEMA payment REVOKE ALL ON TABLES FROM payment_module;
+              REVOKE ALL ON ALL TABLES IN SCHEMA payment FROM payment_module;
+              REVOKE USAGE ON SCHEMA payment FROM payment_module;
+              GRANT USAGE ON SCHEMA payment TO "${appDatabaseUsername}";
+              GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA payment TO "${appDatabaseUsername}";
+        - sql:
+            sql: |
+              ALTER DEFAULT PRIVILEGES IN SCHEMA ordering REVOKE ALL ON TABLES FROM ordering_module;
+              REVOKE ALL ON ALL TABLES IN SCHEMA ordering FROM ordering_module;
+              REVOKE USAGE ON SCHEMA ordering FROM ordering_module;
+              GRANT USAGE ON SCHEMA ordering TO "${appDatabaseUsername}";
+              GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA ordering TO "${appDatabaseUsername}";
+        - sql:
+            sql: |
+              ALTER DEFAULT PRIVILEGES IN SCHEMA product REVOKE ALL ON TABLES FROM product_module;
+              REVOKE ALL ON ALL TABLES IN SCHEMA product FROM product_module;
+              REVOKE USAGE ON SCHEMA product FROM product_module;
+              GRANT USAGE ON SCHEMA product TO "${appDatabaseUsername}";
+              GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA product TO "${appDatabaseUsername}";

@@ -9,6 +9,7 @@ import com.example.demo.ordering.application.ConfirmOrderCommand;
 import com.example.demo.ordering.application.ConfirmOrderCommandHandler;
 import com.example.demo.ordering.application.DraftOrderCommandHandler;
 import com.example.demo.shared.concurrency.ExpectedLockNo;
+import com.example.demo.testkit.AsModule;
 import io.micrometer.observation.Observation;
 import io.micrometer.observation.ObservationRegistry;
 import java.time.Instant;
@@ -62,7 +63,12 @@ final class OrderConfirmedFixture {
 
   /** 作った直後（{@code lockNo} 1）の下書きの注文を確定する。 */
   /* package */ Object confirm(final String orderId) {
-    return confirmOrder.handle(new ConfirmOrderCommand(orderId, new ExpectedLockNo(1)));
+    // Scenario#stimulate は名前のないトランザクションの中で呼ぶため、そのままではアプリロールで動く。
+    // 本番の Controller が名前付きのトランザクションで入るのと同じく、ordering のロールで入る。
+    return AsModule.call(
+        dsl,
+        "ordering",
+        tx -> confirmOrder.handle(new ConfirmOrderCommand(orderId, new ExpectedLockNo(1))));
   }
 
   /** 共通カラムの trace ID を取れるよう、observation の中で処理を呼ぶ。 */
@@ -76,16 +82,15 @@ final class OrderConfirmedFixture {
       final String orderId,
       final String expectation,
       final Predicate<RegistryState> done) {
-    observed(
-        () -> {
-          await(
-              scenario.stimulate(() -> confirm(orderId)),
-              orderId,
-              expectation,
-              () -> registry(orderId),
-              done);
-          return null;
-        });
+    observed(() -> {
+      await(
+          scenario.stimulate(() -> confirm(orderId)),
+          orderId,
+          expectation,
+          () -> registry(orderId),
+          done);
+      return null;
+    });
   }
 
   /** 状態が条件を満たすまで待つ。満たさなければ注文 ID と最後に読んだ状態を出して失敗する。 */

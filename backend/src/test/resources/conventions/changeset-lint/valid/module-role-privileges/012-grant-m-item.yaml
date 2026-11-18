@@ -1,0 +1,19 @@
+databaseChangeLog:
+  - changeSet:
+      id: "012-grant-m-item"
+      author: system
+      changes:
+        - sql:
+            sql: |
+              REVOKE ALL ON ALL TABLES IN SCHEMA item FROM "${appDatabaseUsername}";
+              GRANT USAGE ON SCHEMA item TO item_module;
+              GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA item TO item_module;
+              ALTER DEFAULT PRIVILEGES IN SCHEMA item GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO item_module;
+              GRANT USAGE ON SCHEMA modulith TO item_module, "${appDatabaseUsername}";
+              GRANT INSERT ON TABLE modulith.event_publication TO item_module;
+      rollback:
+        - sql:
+            sql: |
+              ALTER DEFAULT PRIVILEGES IN SCHEMA item REVOKE ALL ON TABLES FROM item_module;
+              REVOKE ALL ON ALL TABLES IN SCHEMA item FROM item_module;
+              GRANT USAGE ON SCHEMA item TO "${appDatabaseUsername}";

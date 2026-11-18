@@ -4,22 +4,29 @@ import static com.example.demo.jooq.modulith.Tables.EVENT_PUBLICATION;
 import static com.example.demo.jooq.modulith.Tables.SHEDLOCK;
 
 import com.example.demo.jooq.DefaultCatalog;
+import com.example.demo.jooq.modulith.Modulith;
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.SQLException;
 import java.time.Duration;
 import java.time.Instant;
 import org.awaitility.Awaitility;
 import org.jooq.DSLContext;
+import org.jooq.SQLDialect;
 import org.jooq.Schema;
 import org.jooq.Table;
+import org.jooq.impl.DSL;
 import org.junit.jupiter.api.extension.AfterEachCallback;
 import org.junit.jupiter.api.extension.ExtensionContext;
+import org.springframework.core.env.Environment;
 import org.springframework.test.context.junit.jupiter.SpringExtension;
 
 /**
- * 各テストの後に、jOOQ が生成したアプリケーションテーブルの行をすべて {@code DELETE} する JUnit 拡張。
+ * 各テストの後に、jOOQ が生成したアプリケーションテーブルの行をすべて消す JUnit 拡張。
  *
- * <p>後始末はアプリケーションと同じ DML 限定ロールで実行するため、{@code TRUNCATE} ではなく {@code DELETE} を使う。本番のアプリケーションロールは
- * {@code CREATE}/{@code ALTER}/{@code DROP} も {@code TRUNCATE}
- * も持たない（ADR-011）。後始末が本番で実行できない権限に依存しないようにし、テストと本番の権限を揃える。
+ * <p>業務のスキーマは、アプリロールに権限がなく、モジュールのロールも別のモジュールの表を消せない（ADR-090）。そのため、表の所有者（マイグレーションロール）の接続で {@code
+ * TRUNCATE} する。{@code TRUNCATE} は RLS の対象外で、モジュールとテナントの境界に左右されない。{@code modulith} スキーマの表は、アプリロールの
+ * {@code DELETE} で消す。
  *
  * <p>生成対象は Liquibase 管理テーブル（{@code DATABASECHANGELOG} など）を codegen で除外済みなので、
  * マイグレーション状態を壊さずアプリのデータだけを消す。テーブルを追加して codegen を再生成すれば、 後始末の対象も自動で増える。コミットを伴う {@link
@@ -35,6 +42,9 @@ import org.springframework.test.context.junit.jupiter.SpringExtension;
  * Error} で失敗したときも消す。消すことも失敗したときは、待ちの失敗を投げ、消すときの例外は {@code addSuppressed} で添える。
  */
 public final class CleanGeneratedTablesExtension implements AfterEachCallback {
+
+  /** イベントの出版の表と ShedLock の表を持つスキーマ。 */
+  private static final Schema MODULITH = Modulith.MODULITH;
 
   /** 未完了の出版がなくなるのを待つ上限。決済代行の最悪の時間（3 秒）より長くする。 */
   private static final Duration IN_FLIGHT_TIMEOUT = Duration.ofSeconds(10);
@@ -56,24 +66,37 @@ public final class CleanGeneratedTablesExtension implements AfterEachCallback {
                   == 0);
     } catch (final Throwable failure) {
       try {
-        deleteAll(dslContext);
+        deleteAll(context, dslContext);
       } catch (final Throwable cleanup) {
         failure.addSuppressed(cleanup);
       }
       throw failure;
     }
-    deleteAll(dslContext);
+    deleteAll(context, dslContext);
   }
 
-  /** ShedLock の表のほかの生成したテーブルの行を消し、ロックの期限を過去にする。 */
-  private static void deleteAll(final DSLContext dslContext) {
-    for (final Schema schema : DefaultCatalog.DEFAULT_CATALOG.getSchemas()) {
-      for (final Table<?> table : schema.getTables()) {
-        if (SHEDLOCK.equals(table)) {
-          continue;
+  /** 業務のスキーマの表を所有者の接続で消し、{@code modulith} の ShedLock 以外の表の行を消し、ロックの期限を過去にする。 */
+  private static void deleteAll(final ExtensionContext context, final DSLContext dslContext) {
+    final Environment environment = SpringExtension.getApplicationContext(context).getEnvironment();
+    try (Connection owner =
+        DriverManager.getConnection(
+            environment.getRequiredProperty("spring.datasource.url"),
+            environment.getRequiredProperty("MIGRATION_DB_USERNAME"),
+            environment.getRequiredProperty("MIGRATION_DB_PASSWORD"))) {
+      final DSLContext ownerDsl = DSL.using(owner, SQLDialect.POSTGRES);
+      for (final Schema schema : DefaultCatalog.DEFAULT_CATALOG.getSchemas()) {
+        for (final Table<?> table : schema.getTables()) {
+          if (MODULITH.equals(schema)) {
+            if (!SHEDLOCK.equals(table)) {
+              dslContext.deleteFrom(table).execute();
+            }
+          } else {
+            ownerDsl.truncate(table).execute();
+          }
         }
-        dslContext.deleteFrom(table).execute();
       }
+    } catch (SQLException e) {
+      throw new IllegalStateException("テストの後始末で所有者の接続を使えない", e);
     }
     expireLocks(dslContext);
   }

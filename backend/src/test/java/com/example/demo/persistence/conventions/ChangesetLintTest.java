@@ -46,6 +46,9 @@ class ChangesetLintTest {
   /** createProcedureで作った関数を消すrollbackのSQL。 */
   private static final String DROP_FUNCTION = "002-create-fn-one: DROP FUNCTION item.fn_one();";
 
+  /** 権限の違反のケースが、規則の判定に使うchangesetのid。 */
+  private static final String GRANT_CHANGESET = "012-grant-m-item";
+
   /** 違反のケースの多くが使うテーブル。 */
   private static final String M_ITEM = "item.m_item";
 
@@ -60,6 +63,7 @@ class ChangesetLintTest {
               sqlAllowlist(CONCURRENT_INDEX, CONCURRENT_DROP)),
           lintCase("replay-add-column", List.of()),
           lintCase("modulith-excluded", List.of()),
+          lintCase("module-role-privileges", List.of()),
           lintCase("allowlisted-sql", sqlAllowlist(COMMENT_SQL, UNCOMMENT_SQL)));
 
   /** 違反のケースと、期待する違反のキー。 */
@@ -87,6 +91,25 @@ class ChangesetLintTest {
               sqlAllowlist(CONCURRENT_INDEX, CONCURRENT_DROP),
               "M6 002-create-idx-1-m-item"),
           lintCase("m12-expression-index-without-comment", "M12 001-create-m-item"),
+          lintCase("g3-public", privilegeViolation("GRANT SELECT ON TABLE item.m_item TO PUBLIC")),
+          lintCase(
+              "g3-wide-privilege",
+              privilegeViolation("GRANT TRUNCATE ON TABLE item.m_item TO item_module")),
+          lintCase(
+              "g3-regrant",
+              privilegeViolation(
+                  "GRANT SELECT ON TABLE item.m_item TO item_module WITH GRANT OPTION")),
+          lintCase(
+              "g3-unknown-role",
+              privilegeViolation("GRANT SELECT ON TABLE item.m_item TO someone")),
+          lintCase(
+              "g3-default-privileges-without-schema",
+              privilegeViolation("ALTER DEFAULT PRIVILEGES GRANT SELECT ON TABLES TO item_module"),
+              privilegeViolation("ALTER DEFAULT PRIVILEGES REVOKE ALL ON TABLES FROM item_module")),
+          lintCase(
+              "g3-app-role-on-business-schema",
+              privilegeViolation(
+                  "GRANT SELECT ON TABLE item.m_item TO \"${appDatabaseUsername}\"")),
           lintCase(
               "m12-enum-without-comment",
               sqlAllowlist(
@@ -221,6 +244,11 @@ class ChangesetLintTest {
     } catch (final IOException e) {
       throw new AssertionError("フィクスチャのディレクトリを読めない: " + FIXTURES.resolve(kind), e);
     }
+  }
+
+  /** 権限のSQLの違反のキー。 */
+  private static String privilegeViolation(final String statement) {
+    return "G3 " + GRANT_CHANGESET + ": " + statement;
   }
 
   private static LintCase lintCase(final String dir, final String... expected) {
