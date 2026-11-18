@@ -43,9 +43,6 @@ class CommonColumnsTest {
   /** 現在のスパンの trace ID。 */
   private static final String TRACE_ID = "4bf92f3577b34da6a3ce929d0e0e4736";
 
-  /** ログインのときに引いたアプリの利用者の ID。 */
-  private static final String APP_USER_ID = AppUsers.USER_ID;
-
   /** 呼び出し中のユースケースとして束縛する pgm_cd。 */
   private static final String PGM_CD = "ordering.PlaceOrder";
 
@@ -70,26 +67,26 @@ class CommonColumnsTest {
         .as("INSERT の共通カラム")
         .containsExactly(
             Map.entry(FIXTURE_ITEM.CREATED_AT, NOW),
-            Map.entry(FIXTURE_ITEM.CREATED_BY, APP_USER_ID),
+            Map.entry(FIXTURE_ITEM.CREATED_BY, AppUsers.USER_ID),
             Map.entry(FIXTURE_ITEM.CREATED_PGM_CD, PGM_CD),
             Map.entry(FIXTURE_ITEM.CREATED_TX_ID, TRACE_ID),
             Map.entry(FIXTURE_ITEM.UPDATED_AT, NOW),
-            Map.entry(FIXTURE_ITEM.UPDATED_BY, APP_USER_ID),
+            Map.entry(FIXTURE_ITEM.UPDATED_BY, AppUsers.USER_ID),
             Map.entry(FIXTURE_ITEM.UPDATED_PGM_CD, PGM_CD),
             Map.entry(FIXTURE_ITEM.UPDATED_TX_ID, TRACE_ID),
             Map.entry(FIXTURE_ITEM.LOCK_NO, 1L));
   }
 
   @Test
-  @DisplayName("利用者の操作の UPDATE では、更新者に sub でなくアプリの利用者の IDを登録する")
-  void updateValuesUseThePrincipalName() {
+  @DisplayName("利用者の操作の UPDATE では、更新者に sub でなくアプリの利用者の ID を登録する")
+  void updateValuesUseTheAppUserId() {
     signInAsAppUser();
 
     final Map<Field<?>, Object> update = inUseCase(() -> commonColumns.forUpdate(FIXTURE_ITEM));
 
     assertThat(update.get(FIXTURE_ITEM.UPDATED_BY))
         .as("UPDATE の updated_by")
-        .isEqualTo(APP_USER_ID);
+        .isEqualTo(AppUsers.USER_ID);
   }
 
   @Test

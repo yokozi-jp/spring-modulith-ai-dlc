@@ -34,6 +34,12 @@ SpringのTestContextは構成が違うテストごとに別のcontextを起動�
 OIDCクライアント登録など複数のテストで使う差し替えは、共有構成へ集約する。
 テストの依存のコンテナの決まりは[バックエンドのテストの実行基盤](testing-infrastructure.md)に従う。
 
+## ログインした利用者
+
+MockMvcでログインした利用者として呼ぶテストは、`testkit`の`AppUsers.oidcLogin()`を使い、Spring Security Testの`oidcLogin()`を直接使わない。
+`oidcLogin()`の既定の利用者は`AppUserPrincipal`でないため、書き込みで共通カラムが例外にする（[ADR-094](../adr/ADR-094-require-app-user-principal-for-audit-columns.md)）。
+`TestConventionsArchTest`が検査する。
+
 ## 並列と実行順
 
 テストはGradleの複数のforkで並列に動き、どのクラスがどのforkで動くかは実行ごとに変わる。

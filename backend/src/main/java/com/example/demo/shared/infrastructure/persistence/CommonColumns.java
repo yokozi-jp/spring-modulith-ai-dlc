@@ -146,7 +146,9 @@ public class CommonColumns {
     }
     throw new IllegalStateException(
         "authenticated principal is not an app user: authentication="
-            + authentication.getClass().getName());
+            + authentication.getClass().getName()
+            + ". The principal must implement AppUserPrincipal (SignInOidcUserService returns one;"
+            + " clear sessions saved before ADR-094; tests use testkit AppUsers)");
   }
 
   private String traceId() {

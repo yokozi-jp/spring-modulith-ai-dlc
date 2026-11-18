@@ -42,13 +42,20 @@ public final class AppUsers {
     return new FixedAppOidcUser(idToken);
   }
 
-  /** 名前は IdP の {@code sub} のまま、{@link AppUserPrincipal#userId()} が {@link #USER_ID} を返す利用者。 */
+  /**
+   * 本番の {@code AppOidcUser} と同じく、名前と {@link AppUserPrincipal#userId()} が {@link #USER_ID} を返す利用者。
+   */
   private static final class FixedAppOidcUser extends DefaultOidcUser implements AppUserPrincipal {
 
     @Serial private static final long serialVersionUID = 1L;
 
     private FixedAppOidcUser(final OidcIdToken idToken) {
       super(AuthorityUtils.createAuthorityList("OIDC_USER"), idToken);
+    }
+
+    @Override
+    public String getName() {
+      return USER_ID;
     }
 
     @Override

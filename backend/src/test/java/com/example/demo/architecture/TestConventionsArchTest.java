@@ -26,6 +26,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Import;
+import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors;
 
 /**
  * バックエンドのテストコード規約（docs/backend/testing-code-style.md）を静的に強制する。
@@ -141,6 +142,21 @@ class TestConventionsArchTest {
               "テストクラスごとにコンテナを起動すると、Spring のコンテキストのキャッシュが分かれ、起動の時間が増えるため。"
                   + "直し方：依存は testkit の InfrastructureContainers に足し、テストからは接続先の設定だけを読む。"
                   + "規約：docs/backend/testing-infrastructure.md")
+          .allowEmptyShould(true);
+
+  /** MockMvc のログインは testkit の {@code AppUsers} を通し、アプリの利用者でない既定の利用者で書き込ませない。 */
+  @ArchTest
+  /* package */ static final ArchRule oidcLoginComesFromTestkit =
+      noClasses()
+          .that()
+          .resideOutsideOfPackage("com.example.demo.testkit..")
+          .should()
+          .callMethod(SecurityMockMvcRequestPostProcessors.class, "oidcLogin")
+          .because(
+              "Spring Security Test の oidcLogin() の既定の利用者は AppUserPrincipal でなく、"
+                  + "書き込みで共通カラムが例外にするため。"
+                  + "直し方：com.example.demo.testkit.AppUsers.oidcLogin() を使う。規約："
+                  + TESTING_CODE_STYLE_DOC)
           .allowEmptyShould(true);
 
   /** {@code assertTimeoutPreemptively} を禁止する。別スレッド実行で本番経路と文脈が変わるため。 */
