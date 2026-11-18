@@ -318,6 +318,9 @@ const params = { ...(cursor !== undefined && { cursor }) };
 - **`task agent-git-test`**：`task agent-commit`、`task agent-push`、`task agent-wait`の本体を、`tooling/agent-git/test.sh`のケースで検査する。
 - **`task lint-taskfile`**：Task本体でTaskfileのYAML構文とスキーマ構造を検証する。
   `tooling/taskfile-cleanup/`のfixtureで、後片付けの定型が本体の終了コードを優先し、前段が失敗しても後段の後片付けを走らせることを検査する。
+- **`task lint-lefthook`**：`lefthook.yml`の`run`を`echo`に置き換えた設定で本物のlefthookを動かし、glob付きのjobが意図したファイルで選ばれることを検査する。
+  `docs/**/*.md`のような`a/**/b`の形の`**`は0階層に一致しないため、ディレクトリ直下のファイル（`docs/index.md`、`backend/build.gradle`）を中心に少数だけ期待を置く。
+  見るのはglobだけで、jobの`run`内の`{files}`の参照は見ない。期待は`tooling/lefthook-glob/test.sh`が正で、全jobには広げない。
 - **`task adr-check`**：判断が絡む変更にADRが伴うかを確認する。
   `frontend/`の変更のうち、テストファイル（`*.test.*`、`*.spec.*`）、`frontend/e2e/`、`frontend/lint/fixtures/`、`frontend/src/testing/`は対象から外す。
   警告は止めず、`ADR_STRICT=1`で失敗にし、`ADR_ACK=1`で抑制する。
@@ -340,6 +343,7 @@ OKF検査の採用理由は[ADR-036](../adr/ADR-036-adopt-okf-for-docs-knowledge
 - **pre-commit（`.agents/skills/`、`.kiro/`、`skills-lock.json`、`tooling/skills-check/`の変更）**：`skills-check`を実行する。
 - **pre-commit（Taskfileか`tooling/taskfile-cleanup/`の変更）**：`lint-taskfile`を実行する。
 - **pre-commit（`tooling/agent-git/`の変更）**：`agent-git-test`を実行する。
+- **pre-commit（`lefthook.yml`か`tooling/lefthook-glob/`の変更）**：`lint-lefthook`を実行する。
 - **pre-push（すべて）**：`adr-check`と`scan-secrets-all`を実行する。
 - **pre-push（バックエンドのJavaまたはGradle変更）**：`be-lint`相当と`test`を実行する。
 - **pre-push（フロントエンドの変更）**：`fe-test-build`を、Vitestのdot reporterとjson-summaryだけのcoverageで実行する。
@@ -378,7 +382,7 @@ pre-pushの「変更」は、push済みかどうかやrebaseの有無によら�
 - **`api-contract.yml`**：`api-lint`、`api-lint-rules-test`、`api-breaking`、`api-docs`を実行し、設計書をartifactにする。
   mainへのpushでは設計書をGitHub Pagesに公開する。
 - **`betterleaks.yml`**：`scan-secrets-all`を実行する。PRでは`BETTERLEAKS_LOG_OPTS`にbaseからheadまでの範囲を渡す。
-- **`static-analysis.yml`**：`lint-semgrep`相当、`lint-duplicates`、`lint-taskfile`、`agent-git-test`を実行する。
+- **`static-analysis.yml`**：`lint-semgrep`相当、`lint-duplicates`、`lint-taskfile`、`lint-lefthook`、`agent-git-test`を実行する。
   Code ScanningはSARIFの`suppressions`を読まないため、`nosemgrep`で抑止した検出をSARIFから除いてから送る。
 - **`trivy.yml`**：`scan-vulns`相当を実行する。
 - **`dast.yml`**：PRで`scan-dast`、週1回のscheduleと手動実行で`scan-dast-active`を実行し、Informationalを除いたSARIFをCode Scanningに送る。

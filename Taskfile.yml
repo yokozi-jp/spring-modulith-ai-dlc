@@ -1724,6 +1724,12 @@ tasks:
         echo "Taskfile OK: YAML構文とスキーマ構造の解析に成功しました。"
         bash tooling/taskfile-cleanup/test.sh
 
+  lint-lefthook:
+    desc: lefthook.ymlのglobが、ディレクトリ直下のファイルでも意図したjobを選ぶことを本物のlefthookで検証
+    silent: true
+    cmds:
+      - bash tooling/lefthook-glob/test.sh
+
   lint-semgrep:
     desc: Semgrep OSSで静的解析
     cmds:
