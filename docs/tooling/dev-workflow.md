@@ -61,13 +61,15 @@ task agent-wait
 commitやpushを始められないときは、Taskが理由と直し方を出して止まるので、それに従う。
 Taskは失敗の終了コードを201にまとめるので、元の終了コードは出力の`exit=`の行かTaskのエラーの`exit status`で読む。
 `task agent-wait`が「まだ実行中です」と出したら（Taskのエラーは`exit status 75`）、同じコマンドをもう一度実行する。
-失敗を報告した実行のディレクトリはログを読めるように残るので、読み終えたら`rm -r -- <実行のディレクトリ>`で消す。
-indexを合わせるコマンドが出たときは、そのコマンドを実行すると実行のディレクトリも消える。
+失敗を報告した実行のディレクトリは、ログを読めるように残る。
+実行のディレクトリに`unsynced`が無いときだけ、ログを読み終えてから`rm -r -- <実行のディレクトリ>`で消してよい。
+`unsynced`があれば、indexがcommitに合っていないので、`task agent-wait`が出すindexを合わせるコマンドを実行する。
+そのコマンドが実行のディレクトリも消す。
 
 前のpre-pushを止めたときは、`docker compose -f docker/compose-test.yml down --volumes --remove-orphans`でテスト用の依存を片付けてからやり直す。
 
 Lefthookの出力は`lefthook.yml`の`output`で絞ってある（[Lintとテストのリファレンス](lint-and-test.md)）。
-`LEFTHOOK_OUTPUT=summary,failure`でさらに絞ると、成功の扱いで出る`adr-check`の注意喚起が消えるため、付けない。
+`LEFTHOOK_OUTPUT=summary,failure`でさらに絞ると、成功の扱いで出る`adr-check`の注意喚起が消えるので、付けない。
 
 ## APIを変更するとき
 
