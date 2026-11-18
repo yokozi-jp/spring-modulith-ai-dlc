@@ -492,6 +492,19 @@ fact "the linked worktree index matches its commit" within "$tmp/wt" clean
 expect "wait in the main worktree picks its own run" 0 "exit=0" bash "$tool" wait
 fact "the main worktree commits its own path" [ "$(committed)" = main.txt ]
 
+# 作業ツリーに変更がある submodule の、stage した gitlink の更新を渡す。
+scene "submodule commit"
+git init -q -b main sm && echo 1 >sm/f && git -C sm add f && git -C sm commit -q -m c1
+git add sm 2>/dev/null && git commit -q --no-verify -m submodule
+echo 2 >sm/f && git -C sm commit -q -am c2 && git add sm && echo dirty >>sm/f
+expect "commit of a gitlink staged with a dirty submodule starts" 0 "task agent-wait" bash "$tool" commit "$msg" sm
+expect "wait reports the gitlink commit" 0 "exit=0" bash "$tool" wait
+fact "the commit holds the staged gitlink" [ "$(git rev-parse HEAD:sm)" = "$(git -C sm rev-parse HEAD)" ]
+fact "the index matches the gitlink commit" clean
+git -C sm commit -q -am c3 && git add sm && git -C sm commit -q --allow-empty -m c4
+expect "refuses a gitlink whose submodule moved after the stage" 1 "    sm" bash "$tool" commit "$msg" sm
+git reset -q sm
+
 # このリポジトリの外で pre-push が動いている間の push。一覧の最後には、親のディレクトリごと消えた worktree がある。
 git switch -q -c topic
 git worktree add -q "$tmp/zz-gone/wt" -b gone && rm -r "$tmp/zz-gone"

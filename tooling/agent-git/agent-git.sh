@@ -144,7 +144,8 @@ check_paths() {
   refuse_listed "渡したパスの外に stage 済みの変更があり、このまま commit すると混ざるので止めます。" \
     <(LC_ALL=C comm -z -23 <(changed "$index" --cached --) <(changed "$index" --cached -- "$@")) "$remedy"
   # git add は index にも作業ツリーにも無いパスで失敗するので、git rm や git mv で消したパスを渡さず、作業ツリーとの違いだけを渡す。
-  { changed "$index" -- "$@" && GIT_INDEX_FILE="$index" git --literal-pathspecs ls-files -z -o --exclude-standard --full-name -- "$@"; } |
+  # submodule は、作業ツリーの変更を git add しても gitlink が変わらないので、checkout した commit の違いだけを見る。
+  { changed "$index" --ignore-submodules=dirty -- "$@" && GIT_INDEX_FILE="$index" git --literal-pathspecs ls-files -z -o --exclude-standard --full-name -- "$@"; } |
     LC_ALL=C sort -zu >"$pending" || exit 1
   # git rm --cached で外したパスは、作業ツリーに無視していないファイルとして残っていれば pending に入り、ここで止まる。
   refuse_listed "次のパスは stage した内容と作業ツリーが違い、このまま git add すると stage した内容が上書きされるので止めます。" \
