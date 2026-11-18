@@ -195,6 +195,15 @@ pre-commit:
         task skills-check
       fail_text: "スキルの整合の検証に失敗しました。task skills-check で再実行してください。"
 
+    # agent-git.sh か自己検査にステージ済み変更があるとき、一時の git リポジトリで自己検査する（task agent-git-test）。
+    - name: agent-git-test
+      glob:
+        - "tooling/agent-git/**"
+      run: |
+        echo "{staged_files}" >/dev/null
+        task agent-git-test
+      fail_text: "agent-git.sh の自己検査に失敗しました。task agent-git-test で再実行してください。"
+
     # Taskfile か後片付けの fixture にステージ済み変更があるとき、スキーマ構造と後片付けの終了コードを検証（task lint-taskfile）。
     - name: lint-taskfile
       glob:
