@@ -139,7 +139,7 @@ check_paths() {
   for ref in MERGE_HEAD CHERRY_PICK_HEAD REVERT_HEAD; do
     git rev-parse -q --verify "$ref" >/dev/null &&
       remedy="  $ref があるので、stage 済みの変更には途中の merge、cherry-pick、revert の変更が入っています。
-  外さずに、stage 済みのパスをすべて渡すか、リポジトリのルートで . を渡してやり直してください。"
+  外さずに上のパスも足して、stage 済みのパスをすべて渡してやり直してください。"
   done
   refuse_listed "渡したパスの外に stage 済みの変更があり、このまま commit すると混ざるので止めます。" \
     <(LC_ALL=C comm -z -23 <(changed "$index" --cached --) <(changed "$index" --cached -- "$@")) "$remedy"

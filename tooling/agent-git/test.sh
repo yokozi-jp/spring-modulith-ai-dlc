@@ -288,7 +288,7 @@ git merge --abort && git checkout -q side -- side.txt
 for ref in MERGE_HEAD CHERRY_PICK_HEAD REVERT_HEAD; do
   git rev-parse side >".git/$ref"
   expect "refuses a path outside the given ones during $ref" 1 "    side.txt" bash "$tool" commit "$msg" conflict.txt
-  fact "the refusal during $ref says to pass every staged path" grep -qF "stage 済みのパスをすべて渡す" "$out"
+  fact "the refusal during $ref says to pass every staged path" grep -qF "stage 済みのパスをすべて渡して" "$out"
   fact "the refusal during $ref does not tell to unstage" not grep -qF "git restore --staged" "$out"
   rm ".git/$ref"
 done
@@ -298,6 +298,19 @@ expect "commit of a merge with no change starts" 0 "task agent-wait" bash "$tool
 expect "wait reports the merge commit" 0 "exit=0" bash "$tool" wait
 fact "the merge commit has both parents" [ "$(git rev-parse HEAD^2)" = "$(git rev-parse side)" ]
 fact "the index matches the merge commit" clean
+
+# merge の途中で、ほかの作業が追跡中のファイルの stage していない変更と、新しいファイルを残す。
+scene "merge commit beside another task's changes"
+git switch -q -c side2 && echo s >merged-a.txt && echo s >merged-b.txt && git add merged-a.txt merged-b.txt && git commit -q --no-verify -m side2
+git switch -q main && git merge -q --no-ff --no-commit side2 >/dev/null 2>&1
+echo theirs >>foreign.txt && echo theirs >merge-untracked.txt
+expect "refuses a part of the staged merge" 1 "    merged-b.txt" bash "$tool" commit "$msg" merged-a.txt
+fact "the refusal during the merge does not offer ." not grep -qF " . " "$out"
+expect "commit of every staged path of the merge starts" 0 "task agent-wait" bash "$tool" commit "$msg" merged-a.txt merged-b.txt
+expect "wait reports the merge commit of the staged paths" 0 "exit=0" bash "$tool" wait
+fact "the merge commit of the staged paths has both parents" [ "$(git rev-parse HEAD^2)" = "$(git rev-parse side2)" ]
+fact "the merge commit leaves out the changes of another task" [ "$(git status --porcelain)" = "$(printf ' M foreign.txt\n?? merge-untracked.txt')" ]
+git checkout -- foreign.txt && rm merge-untracked.txt
 
 # まだ commit の無いリポジトリで、フックが失敗する最初の commit と、成功する最初の commit。
 git init -q -b main "$tmp/fresh" && git -C "$tmp/fresh" read-tree --empty && cp .git/hooks/pre-commit "$tmp/fresh/.git/hooks/"
