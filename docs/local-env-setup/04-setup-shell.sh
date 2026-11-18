@@ -15,12 +15,12 @@ if ! grep -qxF "$LOCAL_BIN_LINE" ~/.bashrc; then
   } >> ~/.bashrc
 fi
 
-# mise の shims を PATH の先頭に通す（activate を使わない理由は ADR-090）。
+# エディタや Git フックから起動したプロセスにも PATH を通すため、activate を --shims で使う（ADR-090）。
 MISE_SHIMS_LINE='eval "$(mise activate bash --shims)"'
 if ! grep -qxF "$MISE_SHIMS_LINE" ~/.bashrc; then
   {
     echo ''
-    echo '# mise の shims（task、betterleaks、iwe）'
+    echo '# mise の shims'
     echo "$MISE_SHIMS_LINE"
   } >> ~/.bashrc
 fi

@@ -1,7 +1,6 @@
-# Taskfile、Git フック、CI が使う CLI ツールの版（ADR-090）。
 # 版を変えたら `mise lock --platform linux-x64` を実行し、mise.lock と .mise/locks/ を同じコミットに含める。
 [tools]
 betterleaks = "1.10.1"
-# 実行には Node.js が要る。Node.js は Vite+ が入れるので、ここには書かない。
+# iwe の実行に要る Node.js は、mise ではなく Vite+ が入れる（ADR-090）。
 "npm:@iwe-org/iwe" = "0.24.2"
 task = "3.53.1"
