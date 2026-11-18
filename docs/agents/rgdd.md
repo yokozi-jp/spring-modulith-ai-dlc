@@ -112,3 +112,4 @@ Kiro では、これらのサブエージェントは呼び出し元のチャッ
 - steering と `AGENTS.md` は案内に限る。規約の本文は docs へ置く（[ADR-038](../adr/ADR-038-route-steering-to-docs-knowledge.md)）。
 - 文書を書く前に、`/writing-for-agents` の基準に加えて、`docs/knowledge/documentation-authoring.md` と `docs/knowledge/steering-authoring.md` を読む。
 - 戻しにくい還元は、`docs/adr/conventions.md` の基準に当たれば ADR を起こす。
+- 規約や検査を追加する候補には、リポジトリに既にある違反の一覧を添える。
