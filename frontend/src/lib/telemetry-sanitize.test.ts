@@ -48,7 +48,7 @@ function measurement(values: object) {
   );
 }
 
-describe("sanitizeTelemetryItem URLs", () => {
+describe("sanitizeTelemetryItem の URL", () => {
   beforeEach(() => {
     vi.stubGlobal("location", { origin });
   });
@@ -76,7 +76,7 @@ describe("sanitizeTelemetryItem URLs", () => {
     ["/one?q=1 /two#f", "[redacted-url] [redacted-url]"],
     [String.raw`https://host/x?q=1\nnext`, String.raw`[redacted-url]\nnext`],
     ["a/b?c", "a/b?c"],
-  ])("replaces the complete URL token in %s", (value, expected) => {
+  ])("%s の URL token 全体を [redacted-url] に置き換える", (value, expected) => {
     const sanitized = sanitizeTelemetryItem(exceptionItem(value, value), root);
 
     expect(sanitized?.payload).toMatchObject({
@@ -94,11 +94,16 @@ describe("sanitizeTelemetryItem URLs", () => {
     ["https://other.test/assets/index-abc.js", "[redacted-url]"],
     ["/assets/../orders/42.js", "[redacted-url]"],
     ["/orders/42/assets/x.js", "[redacted-url]"],
-  ])("keeps only a same-origin build asset path for the frame %s", (filename, expected) => {
-    const sanitized = sanitizeTelemetryItem(exceptionItem("failed", filename), root);
+  ])(
+    "stack frame のファイル名 %s では、同一オリジンのビルドの asset の path だけを残す",
+    (filename, expected) => {
+      const sanitized = sanitizeTelemetryItem(exceptionItem("failed", filename), root);
 
-    expect(sanitized?.payload).toMatchObject({ stacktrace: { frames: [{ filename: expected }] } });
-  });
+      expect(sanitized?.payload).toMatchObject({
+        stacktrace: { frames: [{ filename: expected }] },
+      });
+    },
+  );
 
   it.each([
     [`at r (${origin}/assets/index-abc.js:10:5)`, "at r (/assets/index-abc.js:10:5)"],
@@ -107,13 +112,13 @@ describe("sanitizeTelemetryItem URLs", () => {
     [`${origin}/orders/42?t=/assets/a.js:1:2`, "[redacted-url]"],
     [`at r (${origin}/assets/index-abc.js?v=1:10:5)`, "at r ([redacted-url]"],
     ["at r (https://other.test/assets/index-abc.js:10:5)", "at r ([redacted-url]"],
-  ])("keeps a same-origin build asset position in the text %s", (value, expected) => {
+  ])("文字列 %s では、同一オリジンのビルドの asset の path と行と列を残す", (value, expected) => {
     const sanitized = sanitizeTelemetryItem(exceptionItem(value, "x"), root);
 
     expect(sanitized?.payload).toMatchObject({ value: expected });
   });
 
-  it("redacts every URL when the location is unavailable", () => {
+  it("location が取れないときは、すべての URL を縮約する", () => {
     vi.stubGlobal("location", {});
     const sanitized = sanitizeTelemetryItem(exceptionItem("x", "/assets/index-abc.js"), root);
 
@@ -123,8 +128,8 @@ describe("sanitizeTelemetryItem URLs", () => {
   });
 });
 
-describe("sanitizeTelemetryItem metadata and payloads", () => {
-  it("uses only a trusted route template for page metadata", () => {
+describe("sanitizeTelemetryItem のメタデータと payload", () => {
+  it("page のメタデータには、信頼できる route の template だけを使う", () => {
     expect(sanitizeTelemetryItem(exceptionItem("failed", "app.js"), root)?.meta).toStrictEqual({
       app: { name: "demo-web", namespace: "demo", version: "1.0.0", environment: "local" },
       session: { id: "Abc2345678", attributes: { isSampled: "true" } },
@@ -133,7 +138,7 @@ describe("sanitizeTelemetryItem metadata and payloads", () => {
     });
   });
 
-  it("keeps an initial root view without the unknown source", () => {
+  it("最初の root の view は、unknown の遷移元を除いて残す", () => {
     const event = viewEvent({ fromView: "unknown", toView: "/" });
 
     expect(sanitizeTelemetryItem(event, root)?.payload).toStrictEqual({
@@ -143,7 +148,7 @@ describe("sanitizeTelemetryItem metadata and payloads", () => {
     });
   });
 
-  it("keeps only trusted route templates in a view transition", () => {
+  it("view の遷移には、信頼できる route の template だけを残す", () => {
     const event = viewEvent({ fromView: "/", toView: "/logged-out" });
 
     expect(sanitizeTelemetryItem(event, new Set(["/", "/logged-out"]))?.payload).toStrictEqual({
@@ -153,7 +158,7 @@ describe("sanitizeTelemetryItem metadata and payloads", () => {
     });
   });
 
-  it("drops a view event to an untrusted route", () => {
+  it("信頼できない route への view の event は捨てる", () => {
     expect(sanitizeTelemetryItem(viewEvent({ toView: "/orders/42" }), root)).toBeNull();
   });
 
@@ -161,7 +166,7 @@ describe("sanitizeTelemetryItem metadata and payloads", () => {
     [{ lcp: 120, delta: 3 }, "lcp", 120],
     [{ inp: 18, input_delay: 2 }, "inp", 18],
     [{ cls: 0.12, element: "#secret" }, "cls", 0.12],
-  ])("keeps only one Core Web Vital value", (values, name, expected) => {
+  ])("Core Web Vital の値を 1 つだけ残す", (values, name, expected) => {
     expect(sanitizeTelemetryItem(measurement(values), root)?.payload).toStrictEqual({
       type: "web-vitals",
       timestamp: "2026-10-06T00:00:00Z",
@@ -177,11 +182,11 @@ describe("sanitizeTelemetryItem metadata and payloads", () => {
     { lcp: "1" },
     { lcp: Number.NaN },
     { lcp: Number.POSITIVE_INFINITY },
-  ])("drops an unsupported Web Vital %j", (values) => {
+  ])("対応しない Web Vital %j は捨てる", (values) => {
     expect(sanitizeTelemetryItem(measurement(values), root)).toBeNull();
   });
 
-  it("removes every url.* trace attribute without changing correlation fields", () => {
+  it("traceId などの相関の項目は変えずに、trace の url.* 属性をすべて除く", () => {
     const span = {
       traceId: "trace",
       spanId: "span",
@@ -201,7 +206,7 @@ describe("sanitizeTelemetryItem metadata and payloads", () => {
     });
   });
 
-  it("drops an item that cannot be cloned", () => {
+  it("複製できない item は捨てる", () => {
     const original = exceptionItem("failed", "app.js");
     Reflect.set(original.payload, "symbol", Symbol("not cloneable"));
     expect(sanitizeTelemetryItem(original, root)).toBeNull();

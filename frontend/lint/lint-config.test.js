@@ -72,217 +72,221 @@ function countIn(file, code) {
   return codesIn(file).filter((found) => found === code).length;
 }
 
-describe("project lint config on fixtures", () => {
-  describe("feature boundary", () => {
-    it("rejects static, re-exported and dynamic imports of another feature", () => {
+describe("fixture に適用したプロジェクトの lint 設定", () => {
+  describe("feature 間の境界", () => {
+    it("別の feature の静的 import、再 export、動的 import を禁止する", () => {
       expect(
         countIn("features/order/cross-feature.ts", "feature-boundaries(no-cross-feature-import)"),
       ).toBe(3);
     });
 
-    it("rejects importing routes and the route tree from a feature", () => {
+    it("feature から route と route tree の import を禁止する", () => {
       expect(countIn("features/order/route-import.ts", "eslint(no-restricted-imports)")).toBe(2);
     });
 
-    it("rejects the telemetry SDK from a feature", () => {
+    it("feature からテレメトリ SDK の import を禁止する", () => {
       expect(countIn("features/order/telemetry-sdk.ts", "eslint(no-restricted-imports)")).toBe(2);
     });
 
-    it("allows the own feature and the API client", () => {
+    it("自身の feature と API client の import を許可する", () => {
       expect(codesIn("features/order/own-feature.ts")).toStrictEqual([]);
     });
   });
 
-  describe("routes", () => {
-    it("rejects Base UI and test-only modules from a route", () => {
+  describe("route のファイル", () => {
+    it("route から Base UI とテスト用部品の import を禁止する", () => {
       expect(countIn("routes/restricted.tsx", "eslint(no-restricted-imports)")).toBe(2);
     });
 
-    it("allows a route to compose a feature", () => {
+    it("route から feature の import を許可する", () => {
       expect(codesIn("routes/orders.tsx")).toStrictEqual([]);
     });
   });
 
-  describe("shared layer", () => {
-    it("rejects features and routes from shared code", () => {
+  describe("共有層", () => {
+    it("共有コードから feature と route の import を禁止する", () => {
       expect(countIn("lib/feature-import.ts", "eslint(no-restricted-imports)")).toBe(1);
       expect(countIn("components/route-import.tsx", "eslint(no-restricted-imports)")).toBe(1);
     });
 
-    it("rejects components from lib", () => {
+    it("lib から components の import を禁止する", () => {
       expect(countIn("lib/component-import.ts", "eslint(no-restricted-imports)")).toBe(1);
     });
 
-    it("rejects components from api", () => {
+    it("api から components の import を禁止する", () => {
       expect(countIn("api/component-import.ts", "eslint(no-restricted-imports)")).toBe(1);
     });
 
-    it("rejects other components from components/ui but allows ui primitives", () => {
+    it("components/ui から ui 以外の components の import を禁止し、ui の primitive は許可する", () => {
       expect(
         countIn("components/ui/app-component-import.ts", "eslint(no-restricted-imports)"),
       ).toBe(1);
     });
 
-    it("allows the API client from shared code", () => {
+    it("共有コードから API client の import を許可する", () => {
       expect(codesIn("lib/clean.ts")).toStrictEqual([]);
     });
 
-    it("allows the telemetry SDK only inside lib/telemetry.ts", () => {
+    it("テレメトリ SDK の import を lib/telemetry.ts だけに許可する", () => {
       expect(codesIn("lib/telemetry.ts")).toStrictEqual([]);
     });
   });
 
   describe("UI", () => {
-    describe("Base UI imports", () => {
-      it("rejects Base UI outside components/ui", () => {
+    describe("Base UI の import", () => {
+      it("components/ui の外では Base UI を禁止する", () => {
         expect(countIn("features/order/base-ui.tsx", "eslint(no-restricted-imports)")).toBe(1);
       });
 
-      it("allows Base UI inside components/ui", () => {
+      it("components/ui では Base UI を許可する", () => {
         expect(codesIn("components/ui/primitive.tsx")).toStrictEqual([]);
       });
 
-      it("keeps the shared layer and test-only bans inside components/ui", () => {
+      it("components/ui でも共有層とテスト用部品の import を禁止する", () => {
         expect(countIn("components/ui/shared-layer.tsx", "eslint(no-restricted-imports)")).toBe(2);
       });
 
-      it("keeps Base UI banned in test files", () => {
+      it("テストファイルでも Base UI を禁止する", () => {
         expect(countIn("features/order/base-ui.test.ts", "eslint(no-restricted-imports)")).toBe(1);
       });
     });
 
-    describe("Tailwind classes", () => {
-      it("rejects class names built from a value or picked by a key passed to a function", () => {
+    describe("Tailwind の class", () => {
+      it("値から組み立てた class 名と、関数に渡した key で選んだ class 名を禁止する", () => {
         expect(
           countIn("features/order/dynamic-class.tsx", "tailwind-classes(no-dynamic-class-name)"),
         ).toBe(5);
       });
 
-      it("allows complete classes joined with a value or picked by a built key", () => {
+      it("完全な class 名を値と連結したものと、組み立てた key で選んだ class 名を許可する", () => {
         expect(codesIn("features/order/static-class.tsx")).toStrictEqual([]);
       });
     });
 
-    describe("link and button composition", () => {
-      it("rejects a button inside a link and a link passed to render of Button", () => {
+    describe("link と button の組み合わせ", () => {
+      it("link の中の button と、Button の render に渡した link を禁止する", () => {
         expect(
           countIn("features/order/button-in-link.tsx", "ui-composition(no-button-in-link)"),
         ).toBe(6);
       });
 
-      it("allows a link beside a button", () => {
+      it("button の隣の link を許可する", () => {
         expect(codesIn("features/order/link-beside-button.tsx")).toStrictEqual([]);
       });
     });
   });
 
   describe("Effect", () => {
-    it("rejects named, aliased, member, destructured and re-exported Effect hooks", () => {
+    it("名前付き import、別名の import、member 参照、分割代入、再 export の Effect Hook を禁止する", () => {
       expect(countIn("features/order/effect.tsx", "react-rules(no-effect)")).toBe(6);
     });
 
-    it("allows other Hooks and a local object that has a useEffect property", () => {
+    it("他の Hook と、useEffect プロパティを持つローカルのオブジェクトを許可する", () => {
       expect(codesIn("features/order/effect-clean.tsx")).toStrictEqual([]);
     });
   });
 
-  describe("network access", () => {
-    it("rejects fetch and XMLHttpRequest outside src/api", () => {
+  describe("ネットワークアクセス", () => {
+    it("src/api の外では fetch と XMLHttpRequest を禁止する", () => {
       expect(countIn("lib/network.ts", "eslint(no-restricted-globals)")).toBe(2);
       expect(countIn("lib/network.ts", "eslint(no-restricted-properties)")).toBe(2);
     });
 
-    it("allows fetch inside src/api", () => {
+    it("src/api では fetch を許可する", () => {
       expect(codesIn("api/client.ts")).toStrictEqual([]);
     });
   });
 
-  describe("HTML sink", () => {
-    it("keeps DOMParser banned in every override", () => {
+  describe("HTML sink の制限", () => {
+    it("どの override でも DOMParser を禁止する", () => {
       expect(countIn("api/html-sink.ts", "eslint(no-restricted-globals)")).toBe(1);
       expect(countIn("lib/html-sink.ts", "eslint(no-restricted-globals)")).toBe(1);
     });
   });
 
-  describe("test code", () => {
-    it("rejects test-only modules from production code", () => {
+  describe("テストコード", () => {
+    it("日本語を含まない it、test、describe の title を禁止し、1 語のコードの名前の describe は許可する", () => {
+      expect(countIn("features/order/test-title.test.ts", "vitest(valid-title)")).toBe(5);
+    });
+
+    it("production source からテスト用部品の import を禁止する", () => {
       expect(countIn("components/msw-import.ts", "eslint(no-restricted-imports)")).toBe(4);
     });
 
-    it("allows test-only modules in src/testing and test files", () => {
+    it("src/testing とテストファイルではテスト用部品を許可する", () => {
       expect(codesIn("testing/server.ts")).toStrictEqual([]);
       expect(codesIn("testing/render.ts")).toStrictEqual([]);
       expect(codesIn("features/order/order.test.ts")).toStrictEqual([]);
     });
 
-    it("rejects module mocks with vi.mock and vi.doMock", () => {
+    it("vi.mock と vi.doMock による module の mock を禁止する", () => {
       expect(
         countIn("features/order/module-mock.test.ts", "vitest(no-restricted-vi-methods)"),
       ).toBe(2);
     });
 
-    it("rejects waits with a fixed timeout with vi.waitFor and vi.waitUntil", () => {
+    it("fixed timeout を指定した vi.waitFor と vi.waitUntil を禁止する", () => {
       expect(
         countIn("features/order/fixed-timeout-wait.test.ts", "vitest(no-restricted-vi-methods)"),
       ).toBe(2);
     });
 
-    it("allows waits with expect.poll and waitFor from Testing Library", () => {
+    it("expect.poll と Testing Library の waitFor を許可する", () => {
       expect(codesIn("features/order/configured-timeout-wait.test.ts")).toStrictEqual([]);
     });
 
-    it("allows replacing globals with vi.stubGlobal and vi.spyOn", () => {
+    it("vi.stubGlobal と vi.spyOn による global の差し替えを許可する", () => {
       expect(codesIn("features/order/global-stub.test.ts")).toStrictEqual([]);
     });
 
-    it("rejects more than 10 imports in production code", () => {
+    it("production code では 10 個を超える import を禁止する", () => {
       expect(countIn("features/order/many-imports.ts", "import(max-dependencies)")).toBe(1);
     });
 
-    it("allows more than 10 imports in test files", () => {
+    it("テストファイルでは 10 個を超える import を許可する", () => {
       expect(codesIn("features/order/many-imports.test.ts")).toStrictEqual([]);
     });
   });
 
   // docs/tooling/lint-and-test.md の「Lintを通る書き方」の規則。
-  describe("writing style", () => {
+  describe("書き方", () => {
     describe("void", () => {
-      it("allows void as a statement", () => {
+      it("文としての void を許可する", () => {
         expect(codesIn("features/order/refresh-button.tsx")).toStrictEqual([]);
       });
 
-      it("rejects void inside an expression", () => {
+      it("式の中の void を禁止する", () => {
         expect(countIn("lib/void-expression.ts", "eslint(no-void)")).toBe(1);
       });
     });
 
     describe("undefined", () => {
-      it("allows comparing with undefined", () => {
+      it("undefined との比較を許可する", () => {
         expect(codesIn("lib/is-missing.ts")).toStrictEqual([]);
       });
     });
 
-    describe("function style", () => {
-      it("rejects arrow functions and function expressions assigned to a variable", () => {
+    describe("関数の定義", () => {
+      it("変数に代入した arrow function と関数式を禁止する", () => {
         expect(countIn("lib/arrow-function.ts", "eslint(func-style)")).toBe(2);
       });
 
-      it("rejects type-annotated function expressions", () => {
+      it("型注釈を付けた関数式を禁止する", () => {
         expect(countIn("lib/typed-function-expression.ts", "eslint(func-style)")).toBe(1);
       });
 
-      it("allows a type-annotated arrow function and arrow callbacks", () => {
+      it("型注釈を付けた arrow function と、callback の arrow function を許可する", () => {
         expect(codesIn("lib/typed-arrow-function.ts")).toStrictEqual([]);
       });
     });
   });
 
-  describe("file name", () => {
-    it("rejects PascalCase file names", () => {
+  describe("ファイル名", () => {
+    it("PascalCase のファイル名を禁止する", () => {
       expect(countIn("features/order/OrderSummary.tsx", "unicorn(filename-case)")).toBe(1);
     });
 
-    it("allows kebab-case file names", () => {
+    it("kebab-case のファイル名を許可する", () => {
       expect(codesIn("features/order/order-summary.tsx")).toStrictEqual([]);
     });
   });

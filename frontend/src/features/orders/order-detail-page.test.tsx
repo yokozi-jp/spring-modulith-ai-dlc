@@ -26,7 +26,7 @@ import {
 import { renderRoute } from "@/testing/render-route";
 
 const detailPath = `/orders/${orderId}`;
-describe("order detail page", () => {
+describe("注文の詳細の画面", () => {
   beforeEach(() => {
     stubCsrfCookie();
     server.use(getListProductsMockHandler(products));

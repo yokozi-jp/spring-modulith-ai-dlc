@@ -5,8 +5,8 @@ import { describe, expect, it } from "vite-plus/test";
 
 import { renderRoute } from "@/testing/render-route";
 
-describe("home route", () => {
-  it("renders the home page inside the app shell", async () => {
+describe("ホームの画面", () => {
+  it("アプリシェルの中にホームの画面を出す", async () => {
     await renderRoute("/", { locale: "en" });
 
     const banner = await screen.findByRole("banner");
@@ -14,7 +14,7 @@ describe("home route", () => {
     expect(screen.getByRole("main").contains(screen.getByRole("heading", { level: 1 }))).toBe(true);
   });
 
-  it("reflects the locale and increments the counter", async () => {
+  it("言語を title と lang に反映し、カウンターを押すと数を 1 増やす", async () => {
     const { user } = await renderRoute("/", { locale: "en" });
 
     const counter = await screen.findByRole("button", { name: "Count: 0" });

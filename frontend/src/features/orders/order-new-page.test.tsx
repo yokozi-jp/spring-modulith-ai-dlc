@@ -62,7 +62,7 @@ function notice() {
   return screen.getByRole("status");
 }
 
-describe("order new page", () => {
+describe("注文の作成の画面", () => {
   beforeEach(() => {
     stubCsrfCookie();
     server.use(getListProductsMockHandler(products));

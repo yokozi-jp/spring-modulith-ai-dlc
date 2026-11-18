@@ -48,7 +48,7 @@ function renderRouter(tree: AnyRoute, path: string, defaultPendingMs?: number) {
   );
 }
 
-describe("router defaults", () => {
+describe("router の既定値", () => {
   beforeEach(async () => {
     await i18n.changeLanguage("en");
     vi.spyOn(globalThis, "scrollTo").mockReturnValue();
@@ -58,14 +58,14 @@ describe("router defaults", () => {
     replaceTelemetryForTesting();
   });
 
-  it("shows the localized not-found view with a link back to home", async () => {
+  it("存在しない path では、言語に合わせた not found の表示と、ホームへ戻るリンクを出す", async () => {
     renderRouter(routeTree, "/no-such-page");
 
     await expect(screen.findByRole("heading", { name: "Page not found" })).resolves.toBeTruthy();
     expect(screen.getByRole("link", { name: "Back to home" }).getAttribute("href")).toBe("/");
   });
 
-  it("hides the error message and recovers on retry", async () => {
+  it("loader が失敗したらエラーの詳細を出さず、再試行すると読み込んだ画面を出す", async () => {
     // The router and React report the expected loader error to the console.
     vi.spyOn(console, "warn").mockReturnValue();
     vi.spyOn(console, "error").mockReturnValue();
@@ -87,7 +87,7 @@ describe("router defaults", () => {
     expect(loader).toHaveBeenCalledTimes(2);
   });
 
-  it("reports the caught loader error to telemetry", async () => {
+  it("loader が投げたエラーをテレメトリへ送る", async () => {
     vi.spyOn(console, "warn").mockReturnValue();
     vi.spyOn(console, "error").mockReturnValue();
     const pushError = vi.fn<Sink["api"]["pushError"]>();
@@ -101,7 +101,7 @@ describe("router defaults", () => {
     await expect.poll(() => pushError).toHaveBeenCalledWith(error);
   });
 
-  it("shows the localized pending view while the loader runs", async () => {
+  it("loader の実行中は、言語に合わせた読み込み中の表示を出す", async () => {
     const loader = createGate();
     renderRouter(
       treeWithLoader(() => loader.promise),
