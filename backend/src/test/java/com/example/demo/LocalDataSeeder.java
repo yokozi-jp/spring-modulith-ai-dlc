@@ -108,7 +108,7 @@ public final class LocalDataSeeder {
     final boolean migrated =
         BUSINESS_TABLES.stream()
             .allMatch(table ->
-                asOwner(
+                inModuleOf(
                     dsl,
                     table,
                     tx ->
@@ -122,11 +122,12 @@ public final class LocalDataSeeder {
       throw new IllegalStateException("業務の表がありません。task be-migrate の後に実行してください");
     }
     if (mode == Mode.RESET) {
-      BUSINESS_TABLES.forEach(table -> asOwner(dsl, table, tx -> tx.deleteFrom(table).execute()));
+      BUSINESS_TABLES.forEach(
+          table -> inModuleOf(dsl, table, tx -> tx.deleteFrom(table).execute()));
     }
     final List<String> nonEmpty =
         BUSINESS_TABLES.stream()
-            .filter(table -> asOwner(dsl, table, tx -> tx.fetchExists(table)))
+            .filter(table -> inModuleOf(dsl, table, tx -> tx.fetchExists(table)))
             .map(LocalDataSeeder::name)
             .toList();
     if (!nonEmpty.isEmpty()) {
@@ -161,7 +162,7 @@ public final class LocalDataSeeder {
   }
 
   /** 表を持つモジュール（スキーマ名と同じ）のロールで本体を実行する。本番と同じく、アプリロールには業務のスキーマの権限がない。 */
-  private static <T> T asOwner(
+  private static <T> T inModuleOf(
       final DSLContext dsl, final Table<?> table, final Function<DSLContext, T> body) {
     return AsModule.call(dsl, AsModule.moduleOf(table), body);
   }

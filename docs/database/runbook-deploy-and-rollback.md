@@ -31,6 +31,9 @@ task be-release-migrate
 
 破壊的変更はexpand-and-contractで分割し、旧バージョンと新バージョンが併存する時間帯に必要な列やテーブルを先に削除しない構成にします。
 
+012 changesetは、アプリケーション用ロールの業務のスキーマの権限を取り上げる破壊的変更で、expand-and-contractに分けられません。
+旧版のアプリケーションはモジュールのロールへ切り替えず、新版は012の前のDBでは権限エラーになるため、適用の間は書き込みを止めます（[ADR-090](../adr/ADR-090-switch-to-module-database-roles.md)）。
+
 ## DB切り戻し
 
 DB切り戻しは指定タグより後に適用されたchangesetを新しい順に戻します。

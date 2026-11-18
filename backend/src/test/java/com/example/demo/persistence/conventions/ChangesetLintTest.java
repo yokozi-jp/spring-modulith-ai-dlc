@@ -100,6 +100,9 @@ class ChangesetLintTest {
               privilegeViolation(
                   "GRANT SELECT ON TABLE item.m_item TO item_module WITH GRANT OPTION")),
           lintCase(
+              "g3-role-membership",
+              privilegeViolation("GRANT \"${appDatabaseUsername}\" TO item_module")),
+          lintCase(
               "g3-unknown-role",
               privilegeViolation("GRANT SELECT ON TABLE item.m_item TO someone")),
           lintCase(

@@ -10,6 +10,7 @@ import java.sql.DriverManager;
 import java.sql.SQLException;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.Properties;
 import org.awaitility.Awaitility;
 import org.jooq.DSLContext;
 import org.jooq.SQLDialect;
@@ -46,6 +47,9 @@ public final class CleanGeneratedTablesExtension implements AfterEachCallback {
   /** イベントの出版の表と ShedLock の表を持つスキーマ。 */
   private static final Schema MODULITH = Modulith.MODULITH;
 
+  /** 後始末の TRUNCATE が表のロックを待つ上限。 */
+  private static final Duration LOCK_TIMEOUT = Duration.ofSeconds(10);
+
   /** 未完了の出版がなくなるのを待つ上限。決済代行の最悪の時間（3 秒）より長くする。 */
   private static final Duration IN_FLIGHT_TIMEOUT = Duration.ofSeconds(10);
 
@@ -78,11 +82,14 @@ public final class CleanGeneratedTablesExtension implements AfterEachCallback {
   /** 業務のスキーマの表を所有者の接続で消し、{@code modulith} の ShedLock 以外の表の行を消し、ロックの期限を過去にする。 */
   private static void deleteAll(final ExtensionContext context, final DSLContext dslContext) {
     final Environment environment = SpringExtension.getApplicationContext(context).getEnvironment();
+    final Properties properties = new Properties();
+    properties.setProperty("user", environment.getRequiredProperty("MIGRATION_DB_USERNAME"));
+    properties.setProperty("password", environment.getRequiredProperty("MIGRATION_DB_PASSWORD"));
+    // TRUNCATE は表の排他ロックを取る。残った接続を無期限に待たず、テストを失敗させる。
+    properties.setProperty("options", "-c lock_timeout=" + LOCK_TIMEOUT.toMillis());
     try (Connection owner =
         DriverManager.getConnection(
-            environment.getRequiredProperty("spring.datasource.url"),
-            environment.getRequiredProperty("MIGRATION_DB_USERNAME"),
-            environment.getRequiredProperty("MIGRATION_DB_PASSWORD"))) {
+            environment.getRequiredProperty("spring.datasource.url"), properties)) {
       final DSLContext ownerDsl = DSL.using(owner, SQLDialect.POSTGRES);
       for (final Schema schema : DefaultCatalog.DEFAULT_CATALOG.getSchemas()) {
         for (final Table<?> table : schema.getTables()) {

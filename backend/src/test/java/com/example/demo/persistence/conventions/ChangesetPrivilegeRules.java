@@ -37,6 +37,9 @@ final class ChangesetPrivilegeRules {
       Pattern.compile(
           "^(GRANT|REVOKE|ALTER\\s+DEFAULT\\s+PRIVILEGES)\\b", Pattern.CASE_INSENSITIVE);
 
+  /** 権限の付与の対象を指す{@code ON}。ないものはロールのメンバーシップの付与である。 */
+  private static final Pattern ON_CLAUSE = Pattern.compile("\\sON\\s", Pattern.CASE_INSENSITIVE);
+
   /** {@code PUBLIC}への付与と、権限の再付与。 */
   private static final Pattern PUBLIC_OR_REGRANT =
       Pattern.compile("\\bPUBLIC\\b|\\bWITH\\s+GRANT\\s+OPTION\\b", Pattern.CASE_INSENSITIVE);
@@ -77,6 +80,12 @@ final class ChangesetPrivilegeRules {
           new Rule(
               statement -> PUBLIC_OR_REGRANT.matcher(statement.text()).find(),
               "PUBLICと権限の再付与（WITH GRANT OPTION）を使わない"),
+          new Rule(
+              statement ->
+                  statement.grants()
+                      && !statement.alter()
+                      && !ON_CLAUSE.matcher(statement.text()).find(),
+              "ロールのメンバーシップの付与（GRANT <ロール> TO <ロール>）をchangesetに書かない"),
           new Rule(
               statement -> statement.grants() && widePrivilege(statement.text()),
               "付与する権限はSELECT、INSERT、UPDATE、DELETE、USAGEだけにする"),
