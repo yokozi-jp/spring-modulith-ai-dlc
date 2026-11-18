@@ -390,10 +390,12 @@ fact "the failed commit leaves HEAD" [ "$(git rev-parse HEAD)" = "$head" ]
 fact "the failed commit leaves the index as it was" clean
 fact "the failed run keeps its log" [ -f "$run/log" ]
 fact "the failed run drops the state of the commit" [ ! -e "$run/commit" ]
+fact "wait tells how to remove the failed run" grep -qF "rm -r -- $run で消せます" "$out"
 expect "wait without a run skips the reported failure" 1 "まだ報告していない実行がありません" bash "$tool" wait
 expect "wait with the run reports the failure again" 1 "✗ fake-check" bash "$tool" wait "$run"
 echo exit=oops >"$run/done"
 expect "a malformed done counts as lost" 1 "終了コードを記録せずに止まりました" bash "$tool" wait "$run"
+fact "wait tells how to remove the lost run" grep -qF "rm -r -- $run で消せます" "$out"
 echo "wrapper $$ 1" >"$run/pid"
 expect "a live PID with another start time counts as stopped" 1 "終了コードを記録せずに止まりました" wait_now "$run"
 rm fail
@@ -411,6 +413,7 @@ echo changed >lockme
 expect "commit with a held index lock starts" 0 "task agent-wait" bash "$tool" commit "$msg" lockme
 expect "wait reports that the index does not follow the commit" 1 "本物の index を commit に合わせられませんでした" bash "$tool" wait
 fact "the failure names the held index.lock" grep -qF "index.lock を 3 秒より長く持っていた" "$out"
+fact "wait does not tell to remove a run left unsynced" not grep -qF "で消せます" "$out"
 fix="$(grep -o 'git -C .*' "$out")"
 fact "the commit landed before the lock blocked the index" [ "$(committed)" = lockme ]
 fact "the index still holds the content before the commit" [ "$(git show :lockme)" = base ]

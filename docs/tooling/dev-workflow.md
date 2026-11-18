@@ -63,9 +63,7 @@ commitやpushを始められないときは、Taskが理由と直し方を出し
 Taskは失敗の終了コードを201にまとめるので、元の終了コードは出力の`exit=`の行かTaskのエラーの`exit status`で読む。
 `task agent-wait`が「まだ実行中です」と出したら（Taskのエラーは`exit status 75`）、同じコマンドをもう一度実行する。
 失敗を報告した実行のディレクトリは、ログを読めるように残る。
-実行のディレクトリに`unsynced`が無いときだけ、ログを読み終えてから`rm -r -- <実行のディレクトリ>`で消してよい。
-`unsynced`があれば、indexがcommitに合っていないので、`task agent-wait`が出すindexを合わせるコマンドを実行する。
-そのコマンドが実行のディレクトリも消す。
+消し方と、indexをcommitに合わせるコマンドは、`task agent-wait`が出す。
 
 前のpre-pushを止めたときは、`docker compose -f docker/compose-test.yml down --volumes --remove-orphans`でテスト用の依存を片付けてからやり直す。
 

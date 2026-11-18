@@ -412,7 +412,9 @@ wait_run() {
   # 合わせるコマンドを出したログは、done が無くても、コマンドが実行のディレクトリを消すまで失敗として出し直す。
   [ ! -e "$run/unsynced" ] || code=1
   touch -- "$run/reported"
-  [ -n "$code" ] || fail "終了コードを記録せずに止まりました（done が無いか壊れています）。git status で状態を確かめてから、やり直してください。ログ: $run/log"
+  [ -n "$code" ] || fail "終了コードを記録せずに止まりました（done が無いか壊れています）。git status で状態を確かめてから、やり直してください。
+  ログ: $run/log
+  ログを読み終えたら、rm -r -- $(printf %q "$run") で消せます。"
   # Lefthook の要約の行と、注意（⚠ の行と字下げした続き。adr-check など）を出す。
   plain <"$run/log" | awk '/^(✓|✗)/ { print; next } /^⚠/ { w = 1; print; next } w && /^  / { print; next } { w = 0 }'
   if [ "$code" = 0 ]; then
@@ -424,6 +426,8 @@ wait_run() {
   tail -n 20 "$run/log" | plain | sed 's/^/    /'
   echo "exit=$code"
   echo "ログ: $run/log"
+  # 合わせるコマンドが残っていれば、そのコマンドが実行のディレクトリを消す。
+  [ -e "$run/unsynced" ] || echo "ログを読み終えたら、rm -r -- $(printf %q "$run") で消せます。"
   exit "$code"
 }
 
