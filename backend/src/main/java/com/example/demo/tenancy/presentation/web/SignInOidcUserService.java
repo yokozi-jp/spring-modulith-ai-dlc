@@ -3,8 +3,12 @@ package com.example.demo.tenancy.presentation.web;
 import com.example.demo.shared.concurrency.ConflictException;
 import com.example.demo.tenancy.application.SignInUserCommand;
 import com.example.demo.tenancy.application.SignInUserCommandHandler;
+import java.util.function.Supplier;
 import org.jspecify.annotations.Nullable;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.core.context.SecurityContext;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.core.context.SecurityContextHolderStrategy;
 import org.springframework.security.oauth2.client.oidc.userinfo.OidcUserRequest;
 import org.springframework.security.oauth2.client.oidc.userinfo.OidcUserService;
 import org.springframework.security.oauth2.client.userinfo.OAuth2UserService;
@@ -26,6 +30,9 @@ class SignInOidcUserService implements OAuth2UserService<OidcUserRequest, OidcUs
 
   /** ログインの失敗の種類。 */
   private static final String INVALID_ID_TOKEN = "invalid_id_token";
+
+  /** OIDC Core が定める {@code sub} の長さの上限。{@code iss} も同じ上限で受ける。 */
+  private static final int MAX_CLAIM_LENGTH = 255;
 
   /** IdP の利用者を読む標準の実装。 */
   private final OidcUserService delegate;
@@ -52,19 +59,33 @@ class SignInOidcUserService implements OAuth2UserService<OidcUserRequest, OidcUs
     // URL へ変換せず、claim の文字列をそのまま識別にする。
     final @Nullable String issuer = idpUser.getIdToken().getClaimAsString(IdTokenClaimNames.ISS);
     final @Nullable String subject = idpUser.getSubject();
-    if (issuer == null || subject == null) {
+    if (issuer == null || subject == null || !isValidClaim(issuer) || !isValidClaim(subject)) {
       throw new OAuth2AuthenticationException(
-          new OAuth2Error(INVALID_ID_TOKEN, "the ID token has no iss or sub", null));
+          new OAuth2Error(
+              INVALID_ID_TOKEN, "the ID token has no iss or sub, or one is too long", null));
     }
-    return new AppOidcUser(idpUser, signIn(new SignInUserCommand(issuer, subject)));
+    return new AppOidcUser(idpUser, signInWithoutPreviousSession(issuer, subject));
+  }
+
+  private static boolean isValidClaim(final String value) {
+    return !value.isBlank() && value.length() <= MAX_CLAIM_LENGTH;
   }
 
   /**
-   * 同じ識別での初めてのログインが同時に 2 つあり、相手が先に対応づけたときは、呼び直して相手の利用者を引く。
-   *
-   * <p>ponytail: ログインの途中で呼ぶため、別の利用者のセッションが残ったまま新しい利用者が初めてログインすると、新しい利用者の行の {@code created_by}
-   * にその別の利用者の ID が入る。共通カラムは業務ロジックで参照しない監査用なので許す。直すなら、この書き込みの {@code *_by} を処理の名前に固定する。
+   * ログインのコールバックでは、まだ前のセッションの認証が残っている。共通カラムの {@code *_by} にその利用者を登録しないよう、認証を外して利用者を作り、処理の名前を登録させる。
    */
+  private String signInWithoutPreviousSession(final String issuer, final String subject) {
+    final SecurityContextHolderStrategy holder = SecurityContextHolder.getContextHolderStrategy();
+    final Supplier<SecurityContext> previous = holder.getDeferredContext();
+    holder.clearContext();
+    try {
+      return signIn(new SignInUserCommand(issuer, subject));
+    } finally {
+      holder.setDeferredContext(previous);
+    }
+  }
+
+  /** 同じ識別での初めてのログインが同時に 2 つあり、相手が先に対応づけたときは、呼び直して相手の利用者を引く。 */
   private String signIn(final SignInUserCommand command) {
     try {
       return signInUser.handle(command).userId();
