@@ -1802,6 +1802,7 @@ tasks:
 
   # dep-scan（ADR-095）。Trivyと並べて動かし、VDRとHTMLをbuild/depscan/に出す。
   # 脆弱性DBは4GB超なので、app-onlyの範囲に絞り、DEPSCAN_VDB_HOMEに残して使い回す。
+  # イメージの利用者（uid 1000）とCIの実行ユーザー（uid 1001）が違い、マウントしたディレクトリに書けなくなるため、呼び出したユーザーで動かす。
   scan-depscan:
     desc: backendとfrontendの依存関係をdep-scanで検査
     cmds:
@@ -1814,7 +1815,7 @@ tasks:
       - task: be-sbom
       - |
         rm -rf build/depscan/backend && mkdir -p build/depscan/backend "${DEPSCAN_VDB_HOME:-$HOME/.cache/depscan-vdb}"
-        docker run --rm -e VDB_HOME=/db \
+        docker run --rm --user "$(id -u):$(id -g)" -e HOME=/tmp -e VDB_HOME=/db \
           -v "${DEPSCAN_VDB_HOME:-$HOME/.cache/depscan-vdb}":/db \
           -v "$PWD/backend":/app:ro \
           -v "$PWD/build/depscan/backend":/reports \
@@ -1828,7 +1829,7 @@ tasks:
     cmds:
       - |
         rm -rf build/depscan/frontend && mkdir -p build/depscan/frontend "${DEPSCAN_VDB_HOME:-$HOME/.cache/depscan-vdb}"
-        docker run --rm -e VDB_HOME=/db \
+        docker run --rm --user "$(id -u):$(id -g)" -e HOME=/tmp -e VDB_HOME=/db \
           -v "${DEPSCAN_VDB_HOME:-$HOME/.cache/depscan-vdb}":/db \
           -v "$PWD/frontend":/app:ro \
           -v "$PWD/build/depscan/frontend":/reports \
