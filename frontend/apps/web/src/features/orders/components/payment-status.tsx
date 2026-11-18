@@ -1,9 +1,9 @@
+import { useListPayments } from "@frontend/api/endpoints/payment/payment";
+import type { PaymentSummaryResponse } from "@frontend/api/models";
 import type { TFunction } from "i18next";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
-import { useListPayments } from "@/api/generated/endpoints/payment/payment";
-import type { PaymentSummaryResponse } from "@/api/generated/models";
 import { Button } from "@/components/ui/button";
 
 // 確定の後、Listener が決済記録を作るまで読み直す間隔と期間。

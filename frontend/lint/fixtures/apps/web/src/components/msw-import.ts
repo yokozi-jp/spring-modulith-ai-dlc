@@ -1,7 +1,7 @@
 import { render } from "@testing-library/react";
 import { http } from "msw";
 
-import { orderMock } from "@/api/generated/mocks/order";
+import { getFindOrderByIdMockHandler } from "@frontend/api/mocks/ordering/ordering.msw";
 import { renderPage } from "@/testing/render";
 
-export const testTools = { http, orderMock, render, renderPage };
+export const testTools = { http, getFindOrderByIdMockHandler, render, renderPage };

@@ -1,11 +1,11 @@
 /* @vitest-environment jsdom */
 
+import { getListPaymentsMockHandler } from "@frontend/api/mocks/payment/payment.msw";
+import { getListProductsMockHandler } from "@frontend/api/mocks/product/product.msw";
+import type { PaymentSummaryResponse } from "@frontend/api/models";
 import { screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vite-plus/test";
 
-import { getListPaymentsMockHandler } from "@/api/generated/mocks/payment/payment.msw";
-import { getListProductsMockHandler } from "@/api/generated/mocks/product/product.msw";
-import type { PaymentSummaryResponse } from "@/api/generated/models";
 import { server } from "@/testing/msw";
 import { draftOrder, orderId, products, serveDetail, stubCsrfCookie } from "@/testing/orders";
 import { renderRoute } from "@/testing/render-route";

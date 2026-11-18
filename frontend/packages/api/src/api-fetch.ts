@@ -1,5 +1,5 @@
-import type { ProblemDetail } from "@/api/generated/models";
-import { csrfToken } from "@/lib/csrf";
+import { csrfToken } from "./csrf";
+import type { ProblemDetail } from "./generated/models";
 
 /** API が 2xx 以外を返したことを表す。problem は application/problem+json の本文。 */
 export class ApiProblemError extends Error {

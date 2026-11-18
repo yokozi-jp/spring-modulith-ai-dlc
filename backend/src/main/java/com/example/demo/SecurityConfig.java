@@ -38,7 +38,9 @@ import org.springframework.web.servlet.HandlerExceptionResolver;
 @Configuration
 public class SecurityConfig {
 
-  /** SPA が読む CSRF の Cookie の名前。frontend の src/lib/csrf.ts と ZAP の script と同じ値にする（ADR-066）。 */
+  /**
+   * SPA が読む CSRF の Cookie の名前。frontend の packages/api/src/csrf.ts と ZAP の script と同じ値にする（ADR-066）。
+   */
   private static final String CSRF_COOKIE_NAME = "__Host-XSRF-TOKEN";
 
   /** CSRF の Cookie を __Host- の条件（Secure、Path=/、Domain なし）と SameSite=Lax で発行する。 */
@@ -78,77 +80,70 @@ public class SecurityConfig {
     final RequestMatcher apiRequests = PathPatternRequestMatcher.withDefaults().matcher("/api/**");
     logoutSuccessHandler.setPostLogoutRedirectUri("{baseUrl}/logged-out");
 
-    http.authorizeHttpRequests(
-            auth ->
-                auth
-                    // ALB、ECS、コンテナの healthcheck が未認証で叩く probe だけを許可する。
-                    .requestMatchers("/actuator/health/liveness", "/actuator/health/readiness")
-                    .permitAll()
-                    // ルートの集約やコンポーネント別の health は、ログイン済みでも拒否する。
-                    .requestMatchers(EndpointRequest.to(HealthEndpoint.class))
-                    .denyAll()
-                    // OAuth2 の認可開始・コールバックとエラー表示。
-                    .requestMatchers("/oauth2/**", "/login/**", "/error")
-                    .permitAll()
-                    // API ドキュメント（OpenAPI JSON / Swagger UI）。
-                    // 本番では springdoc.*.enabled=false でエンドポイント自体を無効化する前提。
-                    .requestMatchers(
-                        "/v3/api-docs", "/v3/api-docs/**", "/swagger-ui.html", "/swagger-ui/**")
-                    .permitAll()
-                    // 上記以外はすべて認証必須
-                    .anyRequest()
-                    .authenticated())
+    http.authorizeHttpRequests(auth ->
+            auth
+                // ALB、ECS、コンテナの healthcheck が未認証で叩く probe だけを許可する。
+                .requestMatchers("/actuator/health/liveness", "/actuator/health/readiness")
+                .permitAll()
+                // ルートの集約やコンポーネント別の health は、ログイン済みでも拒否する。
+                .requestMatchers(EndpointRequest.to(HealthEndpoint.class))
+                .denyAll()
+                // OAuth2 の認可開始・コールバックとエラー表示。
+                .requestMatchers("/oauth2/**", "/login/**", "/error")
+                .permitAll()
+                // API ドキュメント（OpenAPI JSON / Swagger UI）。
+                // 本番では springdoc.*.enabled=false でエンドポイント自体を無効化する前提。
+                .requestMatchers(
+                    "/v3/api-docs", "/v3/api-docs/**", "/swagger-ui.html", "/swagger-ui/**")
+                .permitAll()
+                // 上記以外はすべて認証必須
+                .anyRequest()
+                .authenticated())
         // API の認証・認可エラーも MVC と同じ Problem Details 変換へ集約する。
         // ponytail: 登録が 1 つのときは Spring Security が matcher を見ず全ての拒否に使うため、/logout の CSRF 失敗も同じ advice
         // を通る。
         // 2 つ目を足すと /logout は既定の handler（/error 経由の about:blank）に変わる。LogoutContractTest が固定する。
-        .exceptionHandling(
-            exceptions ->
-                exceptions
-                    .defaultAuthenticationEntryPointFor(
-                        (request, response, exception) ->
-                            resolveOrSendError(
-                                handlerExceptionResolver,
-                                request,
-                                response,
-                                exception,
-                                HttpStatus.UNAUTHORIZED),
-                        apiRequests)
-                    .defaultAccessDeniedHandlerFor(
-                        (request, response, exception) ->
-                            resolveOrSendError(
-                                handlerExceptionResolver,
-                                request,
-                                response,
-                                exception,
-                                HttpStatus.FORBIDDEN),
-                        apiRequests))
-        .headers(
-            headers ->
-                headers
-                    .referrerPolicy(
-                        referrer -> referrer.policy(ReferrerPolicy.STRICT_ORIGIN_WHEN_CROSS_ORIGIN))
-                    .permissionsPolicyHeader(
-                        permissions ->
-                            permissions.policy(
-                                "camera=(), microphone=(), geolocation=(), payment=(), usb=()")))
+        .exceptionHandling(exceptions ->
+            exceptions
+                .defaultAuthenticationEntryPointFor(
+                    (request, response, exception) ->
+                        resolveOrSendError(
+                            handlerExceptionResolver,
+                            request,
+                            response,
+                            exception,
+                            HttpStatus.UNAUTHORIZED),
+                    apiRequests)
+                .defaultAccessDeniedHandlerFor(
+                    (request, response, exception) ->
+                        resolveOrSendError(
+                            handlerExceptionResolver,
+                            request,
+                            response,
+                            exception,
+                            HttpStatus.FORBIDDEN),
+                    apiRequests))
+        .headers(headers ->
+            headers
+                .referrerPolicy(
+                    referrer -> referrer.policy(ReferrerPolicy.STRICT_ORIGIN_WHEN_CROSS_ORIGIN))
+                .permissionsPolicyHeader(permissions ->
+                    permissions.policy(
+                        "camera=(), microphone=(), geolocation=(), payment=(), usb=()")))
         // SPA が __Host-XSRF-TOKEN Cookie を読み、更新系リクエストの X-XSRF-TOKEN Header で送り返す。
         // spa() も repository を設定するため、その後で差し替える（逆の順では spa() が上書きする）。
         .csrf(csrf -> csrf.spa().csrfTokenRepository(csrfTokenRepository()))
-        .oauth2Login(
-            oauth2 ->
-                oauth2.authorizationEndpoint(
-                    authorization ->
-                        authorization.authorizationRequestResolver(authorizationRequestResolver)))
+        .oauth2Login(oauth2 ->
+            oauth2.authorizationEndpoint(authorization ->
+                authorization.authorizationRequestResolver(authorizationRequestResolver)))
         // アプリケーションセッションを破棄した後、IdP が対応していれば SSO セッションも終了する。
         // Spring Security の既定どおり POST /logout と CSRF トークンを要求する。
-        .logout(
-            logout ->
-                logout
-                    .logoutSuccessHandler(logoutSuccessHandler)
-                    .invalidateHttpSession(true)
-                    .clearAuthentication(true)
-                    .deleteCookies("APP_SESSION"));
+        .logout(logout ->
+            logout
+                .logoutSuccessHandler(logoutSuccessHandler)
+                .invalidateHttpSession(true)
+                .clearAuthentication(true)
+                .deleteCookies("APP_SESSION"));
     return http.build();
   }
 
