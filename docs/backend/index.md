@@ -11,4 +11,4 @@
 - [バックエンドのDBテスト](testing-database.md)：DBテストの隔離、ロールバック、コミット時の挙動、テスト専用テーブル、Spring Modulithのイベント検証を決めるとき
 - [バックエンドのテストの実行基盤](testing-infrastructure.md)：テストを実行するとき、テストの依存（PostgreSQL、Redis、WireMock）やforkの並列度を変えるとき、テストで接続先を読むとき
 - [バックエンドのテストコードの書き方](testing-code-style.md)：テストの命名、可視性、Springコンテキスト、並列と実行順、失敗診断、非同期待機の書き方を確認するとき
-- [バックエンドのテストが遅いときの調べ方](runbook-slow-tests.md)：`task test`やpre-pushの`be-test`がCIより遅いとき、遅いクラスと処理を特定するとき
+- [バックエンドのテストが遅いときの調べ方](runbook-slow-tests.md)：`task test`やpre-pushの`be-test`がCIより遅いとき、ほかのセッションと同時に流して遅いとき、遅いクラスと処理を特定するとき
