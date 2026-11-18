@@ -417,7 +417,7 @@ wait_run() {
   local run="${1:-}" start s code
   [[ "$wait_seconds" =~ ^[0-9]+$ ]] || fail "AGENT_GIT_WAIT_SECONDS は 0 以上の整数で指定してください: $wait_seconds"
   if [ -z "$run" ]; then
-    # pid は始めた直後に書き足し、その後は書かないので、更新時刻が始めた順になる。
+    # pid は始めてから数ミリ秒のうちに書き終える（commit の git の行が最後）ので、更新時刻が始めた順になる。
     run="$(find "$(runs_dir)" -mindepth 2 -maxdepth 2 -name pid -printf '%T@ %h\n' 2>/dev/null | LC_ALL=C sort -rn |
       while IFS= read -r p; do
         [ -e "${p#* }/reported" ] || { echo "${p#* }" && break; }
