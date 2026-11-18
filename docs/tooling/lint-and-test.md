@@ -115,10 +115,10 @@ Oxlintの設定の正本は[`frontend/vite.config.ts`](../../frontend/vite.confi
 - **module mock**：`vitest/no-restricted-vi-methods`に`mock`と`doMock`を指定し、`vi.mock`と`vi.doMock`を禁止する。
   module mockはテストを実装の詳細に依存させるため、HTTPはMSW、globalは`vi.spyOn`か`vi.stubGlobal`で置き換える（[フロントエンドのテストと検証](../frontend/testing.md#書き方)）。
   この規則はrestrictionカテゴリで有効だが、optionを指定しないと何も禁止しない。
-- **待つ上限が固定のwait**：`vitest/no-restricted-vi-methods`に`waitFor`と`waitUntil`も指定し、`vi.waitFor`と`vi.waitUntil`を禁止する。
+- **上限が固定の待ち**：`vitest/no-restricted-vi-methods`に`waitFor`と`waitUntil`も指定し、`vi.waitFor`と`vi.waitUntil`を禁止する。
   どちらも既定の上限の1秒を一括で変えられず、負荷の高いマシンで失敗するからである。
-  代わりに、Testing Libraryの`findBy`と`waitFor`か、`expect.poll`で待つ。
-  これらの上限は設定で一括して決まる（[フロントエンドのテストと検証](../frontend/testing.md#書き方)）。
+  代わりに、`findBy`か`waitFor`（Testing Library）、`expect.poll`、`createGate`のいずれかを使う。
+  `findBy`、`waitFor`、`expect.poll`の上限は設定で一括して決まり、`createGate`は上限を持たない（[フロントエンドのテストと検証](../frontend/testing.md#書き方)）。
 - **Tailwindのclass**：`better-tailwindcss/enforce-canonical-classes`を有効にし、classを正規形にそろえる（`--fix`で直せる）。
   `better-tailwindcss/enforce-shorthand-classes`は役割が重なるため有効にしない。
   jsPluginの`tailwind-classes/no-dynamic-class-name`は、`className`の中で値からclass名を組み立てるテンプレートリテラル（`` `pl-${depth}` ``、`` `${tone}${depth}` ``）を禁じる（[フロントエンドのUIとスタイル](../frontend/ui-and-style.md#uiの書き方)）。

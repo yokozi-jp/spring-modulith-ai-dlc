@@ -140,7 +140,8 @@ function telemetryDefine(mode: string) {
 // ponytail: Playwright の assertion の既定と同じ値にした。これでも足りない負荷が出たら、この値だけを上げる。
 const asyncWaitTimeoutMs = 5000;
 
-// 設定から src を import せず、provide でテストへ渡す。lint/lint-config.test.js は設定だけを複製して Lint する。
+// 設定から src を import せず、provide でテストへ渡す。lint/lint-config.test.js は設定を一時ディレクトリへ複製し、
+// src に fixture だけを置いて Lint する。設定が src を import すると、その複製の中で import を解決できず、そのテストが失敗する。
 declare module "vite-plus/test" {
   interface ProvidedContext {
     asyncWaitTimeoutMs: number;
