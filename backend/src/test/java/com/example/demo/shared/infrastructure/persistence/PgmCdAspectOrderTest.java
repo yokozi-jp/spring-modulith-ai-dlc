@@ -24,27 +24,37 @@ import org.springframework.transaction.support.SimpleTransactionStatus;
 class PgmCdAspectOrderTest {
 
   @Test
-  @DisplayName("CommandHandler のトランザクションが始まる時点で、pgm_cd が束縛されている")
-  void pgmCdIsBoundWhenCommandHandlerTransactionBegins() {
+  @DisplayName("CommandHandler のトランザクションが始まる時点と確定する時点で、pgm_cd が束縛されている")
+  void pgmCdIsBoundWhileCommandHandlerTransactionBeginsAndCommits() {
     contextRunner()
         .run(context -> {
           context.getBean(ShipOrderCommandHandler.class).handle();
 
-          assertThat(context.getBean(RecordingTransactionManager.class).pgmCdsAtBegin)
+          final RecordingTransactionManager transactionManager =
+              context.getBean(RecordingTransactionManager.class);
+          assertThat(transactionManager.pgmCdsAtBegin)
               .as("getTransaction の時点の pgm_cd")
+              .containsExactly("shared.ShipOrder");
+          assertThat(transactionManager.pgmCdsAtCommit)
+              .as("commit の時点の pgm_cd")
               .containsExactly("shared.ShipOrder");
         });
   }
 
   @Test
-  @DisplayName("Listener のトランザクションが始まる時点で、pgm_cd が束縛されている")
-  void pgmCdIsBoundWhenListenerTransactionBegins() {
+  @DisplayName("Listener のトランザクションが始まる時点と確定する時点で、pgm_cd が束縛されている")
+  void pgmCdIsBoundWhileListenerTransactionBeginsAndCommits() {
     contextRunner()
         .run(context -> {
           context.getBean(OrderShippedListener.class).on();
 
-          assertThat(context.getBean(RecordingTransactionManager.class).pgmCdsAtBegin)
+          final RecordingTransactionManager transactionManager =
+              context.getBean(RecordingTransactionManager.class);
+          assertThat(transactionManager.pgmCdsAtBegin)
               .as("getTransaction の時点の pgm_cd")
+              .containsExactly("shared.OrderShipped");
+          assertThat(transactionManager.pgmCdsAtCommit)
+              .as("commit の時点の pgm_cd")
               .containsExactly("shared.OrderShipped");
         });
   }
@@ -59,12 +69,15 @@ class PgmCdAspectOrderTest {
         .withBean(OrderShippedListener.class);
   }
 
-  /** トランザクションを始めた時点の pgm_cd を記録するトランザクションマネージャー。 */
+  /** トランザクションを始めた時点と確定した時点の pgm_cd を記録するトランザクションマネージャー。 */
   /* package */ static final class RecordingTransactionManager
       implements PlatformTransactionManager {
 
     /** getTransaction のたびに記録した pgm_cd。束縛されていなければ {@code unbound}。 */
     private final List<String> pgmCdsAtBegin = new ArrayList<>();
+
+    /** commit のたびに記録した pgm_cd。束縛されていなければ {@code unbound}。 */
+    private final List<String> pgmCdsAtCommit = new ArrayList<>();
 
     @Override
     public TransactionStatus getTransaction(final @Nullable TransactionDefinition definition) {
@@ -74,7 +87,7 @@ class PgmCdAspectOrderTest {
 
     @Override
     public void commit(final TransactionStatus status) {
-      // 記録だけが目的で、確定するものはない。
+      pgmCdsAtCommit.add(PgmCdAspect.PGM_CD.orElse("unbound"));
     }
 
     @Override
@@ -90,7 +103,7 @@ class PgmCdAspectOrderTest {
     /** トランザクションの中で何もしない。 */
     @Transactional
     public void handle() {
-      // トランザクションの開始の時点だけを確かめる。
+      // トランザクションの開始と確定の時点だけを確かめる。
     }
   }
 
@@ -102,7 +115,7 @@ class PgmCdAspectOrderTest {
     @Transactional
     @SuppressWarnings("PMD.ShortMethodName") // ADR-050 が Listener のメソッド名を on に決めている。
     public void on() {
-      // トランザクションの開始の時点だけを確かめる。
+      // トランザクションの開始と確定の時点だけを確かめる。
     }
   }
 }
