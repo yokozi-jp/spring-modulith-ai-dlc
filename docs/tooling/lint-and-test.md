@@ -66,7 +66,7 @@ PITのHTMLとXMLのレポートは、変異対象がある場合に`backend/buil
 - **`task fe-doctor`**：React Doctorでwarningとerrorを検出し、検出または15分超過で失敗する。
 - **`task fe-coverage`**：React Compilerを有効にして、`vp run --recursive test`でルートのlint設定のテストと各packageのテストを実行する。
   そのあと、Compilerを外した状態で、ルートを除くpackageごとにVitestのV8 providerのcoverageを測り、下限もpackageごとに検証する。
-  `apps/web`の全体の下限はbranch 88%とline 95%である。ファイルごとの下限は全packageで共通のbranch 60%とline 65%である。
+  `apps/web`の全体の下限はbranch 88%とline 95%、`packages/api`の全体の下限は切り出した時点の実測の少し下のbranch 90%とline 98%である。ファイルごとの下限は全packageで共通のbranch 60%とline 65%である。
   全体の下限は各packageの`vite.config.ts`の`thresholds`が、ファイルごとの下限はTaskが各packageの`coverage/coverage-summary.json`から検査する（[ADR-076](../adr/ADR-076-run-mutation-tests-per-change-and-tighten-coverage-gates.md)）。
   Compilerを外すのは環境変数`FRONTEND_REACT_COMPILER=false`で、理由は[ADR-078](../adr/ADR-078-measure-frontend-coverage-without-react-compiler.md)にある。
   `FE_TEST_ARGS`に渡した値は、ルートのlint設定のテスト、各packageのテスト、coverageの測定のVitestの実行すべてに足す。ファイルのパスは渡さず、reporterなどのoptionだけを渡す（例：`task fe-verify FE_TEST_ARGS=--reporter=dot`）。
@@ -77,7 +77,7 @@ PITのHTMLとXMLのレポートは、変異対象がある場合に`backend/buil
   テストのうち`frontend/apps/web/vite-config.test.ts`は、ZAPの10055-6の除外の`evidence`（`docker/zap/passive.yaml`と`active.yaml`）が配信するCSPと一致することも検査する。
 - **`task fe-route-tree-check`**：ビルドで`routeTree.gen.ts`を再生成し、コミット済みの内容と差分があれば失敗する。
   再生成した`fullPaths`がCollectorのroute allowlist（`transform/frontend_validate`の1か所）と一致しなければ、差分の検査より前に失敗する。
-- **`task api-client-check`**：Orvalで`src/api/generated`を再生成し、コミット済みの内容と差分があれば失敗する（後述の「API契約」）。
+- **`task api-client-check`**：Orvalで`packages/api/src/generated`を再生成し、コミット済みの内容と差分があれば失敗する（後述の「API契約」）。
 
 ## フロントエンドのLint設定
 
@@ -143,8 +143,8 @@ packageの側に`lint`がないため、`vp lint`はルートと`apps/web`のど
   `import/max-dependencies`もoffにする。
   テストのimportの数は検証対象に合わせて増え、テスト自身の責務の大きさを表さないからである。
 
-生成物の`apps/*/src/routeTree.gen.ts`と`apps/*/src/api/generated/**`は、Lint、整形、coverageから外す。
-`apps/*/src/api/generated/**`はjscpdの対象から、`apps/web/src/api/generated/**`はKnipの対象からも外す。
+生成物の`apps/*/src/routeTree.gen.ts`と`packages/api/src/generated/**`は、Lint、整形、coverageから外す。
+`packages/api/src/generated/**`はjscpdとKnipの対象からも外す。
 違反を含むfixtureの`lint/fixtures/**`は、Lint、整形、Knipから外し、ルートのテストの`--exclude`でテストの収集からも外す。
 
 ### ファイルの範囲ごとの制限
@@ -153,37 +153,35 @@ packageの側に`lint`がないため、`vp lint`はルートと`apps/web`のど
 そのため禁止の一覧をルートの`vite.config.ts`の定数に分け、overrideごとに組み合わせている。
 同じファイルに複数のoverrideが一致すると、後のoverrideのoptionだけが効くので、overrideの並び順を変えるときは組み合わせ結果を確かめる。
 
-| 対象のファイル                            | `no-restricted-imports`                       | `no-restricted-globals`と`no-restricted-properties` |
-| ----------------------------------------- | --------------------------------------------- | --------------------------------------------------- |
-| すべて（top-level）                       | Base UI、テスト用部品、テレメトリSDK          | HTML sink、network                                  |
-| `apps/web/src/{api,components,i18n}/**`   | 共有層、Base UI、テスト用部品、テレメトリSDK  | top-levelを引き継ぐ                                 |
-| `apps/web/src/lib/**`                     | lib、Base UI、テスト用部品、テレメトリSDK     | top-levelを引き継ぐ                                 |
-| `apps/web/src/lib/telemetry.ts`           | lib、Base UI、テスト用部品                    | top-levelを引き継ぐ                                 |
-| `apps/web/src/features/**`                | feature、Base UI、テスト用部品、テレメトリSDK | top-levelを引き継ぐ                                 |
-| `apps/web/src/components/ui/**`           | ui、テスト用部品、テレメトリSDK               | top-levelを引き継ぐ                                 |
-| `apps/web/src/api/**`                     | api、Base UI、テスト用部品、テレメトリSDK     | HTML sinkだけ                                       |
-| テストファイルと`apps/web/src/testing/**` | Base UI、テレメトリSDK                        | top-levelを引き継ぐ                                 |
+| 対象のファイル                          | `no-restricted-imports`                       | `no-restricted-globals`と`no-restricted-properties` |
+| --------------------------------------- | --------------------------------------------- | --------------------------------------------------- |
+| すべて（top-level）                     | Base UI、テスト用部品、テレメトリSDK          | HTML sink、network                                  |
+| `apps/web/src/{api,components,i18n}/**` | 共有層、Base UI、テスト用部品、テレメトリSDK  | top-levelを引き継ぐ                                 |
+| `apps/web/src/lib/**`                   | lib、Base UI、テスト用部品、テレメトリSDK     | top-levelを引き継ぐ                                 |
+| `apps/web/src/lib/telemetry.ts`         | lib、Base UI、テスト用部品                    | top-levelを引き継ぐ                                 |
+| `apps/web/src/features/**`              | feature、Base UI、テスト用部品、テレメトリSDK | top-levelを引き継ぐ                                 |
+| `apps/web/src/components/ui/**`         | ui、テスト用部品、テレメトリSDK               | top-levelを引き継ぐ                                 |
+| `packages/api/**`                       | Base UI、テスト用部品、テレメトリSDK          | HTML sinkだけ                                       |
+| テストファイルと`src/testing/**`        | Base UI、テレメトリSDK                        | top-levelを引き継ぐ                                 |
 
 各禁止の中身は次のとおりである。
 
 - **共有層**：`@/features/**`、`@/routes/**`、`@/routeTree.gen`。
 - **lib**：共有層の禁止に加えて`@/components/**`。
   `lib`は依存の最下層であり、UIを参照しない。
-- **api**：共有層の禁止に加えて`@/components/**`。
-  通信層からUIを参照しない。
 - **ui**：共有層の禁止に加えて、`@/components/ui/**`以外の`@/components/**`。
   UI primitiveからアプリシェルやrouterの状態表示を参照しない。
 - **feature**：`@/routes/**`、`@/routeTree.gen`。
   routeの情報は`getRouteApi`で取る。
 - **Base UI**：`@base-ui/**`。
   `@/components/ui`からimportする。
-- **テスト用部品**：`msw`、`msw/**`、`@/api/generated/mocks/**`、`@/testing/**`、`@testing-library/**`。
+- **テスト用部品**：`msw`、`msw/**`、`@frontend/api/mocks/**`、`@/testing/**`、`@testing-library/**`。
 - **テレメトリSDK**：`@grafana/*`。
   `src/lib/telemetry.ts`を通して呼ぶ（[ADR-068](../adr/ADR-068-collect-browser-telemetry-with-faro-via-collector.md)）。
   静的importと`import()`の両方を検出する。
 - **HTML sink**：globalの`DOMParser`、`innerHTML`などのHTML系property、`document.write`、`document.writeln`。
 - **network**：globalの`fetch`と`XMLHttpRequest`、`window.fetch`、`globalThis.fetch`。
-  `src/api`の生成clientを使う。
+  `@frontend/api`の生成clientを使う。`packages/api/**`だけが許可される。
 
 テストファイルでは層のimport制限も外れる。
 テストにも層の制限が要るようになったら、dependency-cruiserへ移る。

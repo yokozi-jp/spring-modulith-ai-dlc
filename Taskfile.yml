@@ -10,6 +10,8 @@ vars:
   TEST_COMPOSE_FILE: '{{.TEST_COMPOSE_FILE | default "docker/compose-test.yml"}}'
   # frontend/ で vp run と vp exec が対象にする apps/web。名前が合わないときは、黙って何も実行せず失敗にする。
   FE_WEB: --filter @frontend/web --fail-if-no-match
+  # frontend/ で vp run が対象にする packages/api。Orval の生成物と api-fetch の置き場。
+  FE_API: --filter @frontend/api --fail-if-no-match
   DB_ROLLBACK_TAG: '{{.DB_ROLLBACK_TAG | default ""}}'
   CONFIRM_ROLLBACK: '{{.CONFIRM_ROLLBACK | default ""}}'
   CONFIRM_RESET: '{{.CONFIRM_RESET | default ""}}'
@@ -599,7 +601,7 @@ tasks:
     desc: フロントエンドとバックエンドの手書きコードの重複をjscpdで検査
     cmds:
       # ponytail: 4.0%は参照業務機能（product、ordering、payment）の手書きの重複を除いた後の実測3.93%に合わせた値（ADR-074。ADR-035の3.2%を改めた）。残りは、モジュールごとのクラスの役割とテストの規約が求める import、注釈、フィールドの定型である。業務機能が増えて規約の定型の重複で4.0%を超えたら、上限を上げる前に検出の方式を見直す。
-      - npm exec -- jscpd frontend/apps frontend/lint frontend/vite.config.ts backend/src/main/java backend/src/test/java
+      - npm exec -- jscpd frontend/apps frontend/packages frontend/lint frontend/vite.config.ts backend/src/main/java backend/src/test/java
 
   # PgBouncer のトランザクションモードや RDS Proxy の後ろで壊れる、セッションに状態を残す SQL を本番のコードから検出する。
   # 一覧は https://www.pgbouncer.org/features.html の「SQL feature map for pooling modes」で Transaction pooling が Never の機能である。
@@ -1044,14 +1046,14 @@ tasks:
     desc: コミット済みのOpenAPI契約からOrvalでAPI clientとMSW handlerを再生成（DB不要）
     dir: frontend
     cmds:
-      - vp run {{.FE_WEB}} orval
+      - vp run {{.FE_API}} orval
 
   api-client-check:
     desc: Orvalで再生成したAPI clientがコミット済みの内容と一致するか検査（DB不要）
     cmds:
       - task: api-client-gen
       - task: api-drift-check
-        vars: { PATHS: frontend/apps/web/src/api/generated }
+        vars: { PATHS: frontend/packages/api/src/generated }
 
   api-gen:
     desc: OpenAPI契約の生成、Spectral検査、Orvalの再生成を実行（テストの依存はTestcontainersが起動して片付ける）
@@ -1066,7 +1068,7 @@ tasks:
     cmds:
       - task: api-gen
       - task: api-drift-check
-        vars: { PATHS: openapi/openapi.yaml frontend/apps/web/src/api/generated }
+        vars: { PATHS: openapi/openapi.yaml frontend/packages/api/src/generated }
 
   # api-breaking-approved ラベルの PR では CI が API_BREAKING_APPROVED=true を渡し、結果を記録するだけにする。
   api-breaking:

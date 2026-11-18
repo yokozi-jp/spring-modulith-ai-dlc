@@ -1,10 +1,10 @@
 /* @vitest-environment jsdom */
 
+import { getListOrdersMockHandler } from "@frontend/api/mocks/ordering/ordering.msw";
+import type { OrderSummaryResponse } from "@frontend/api/models";
 import { screen, waitFor, within } from "@testing-library/react";
 import { describe, expect, expectTypeOf, it } from "vite-plus/test";
 
-import { getListOrdersMockHandler } from "@/api/generated/mocks/ordering/ordering.msw";
-import type { OrderSummaryResponse } from "@/api/generated/models";
 import { server } from "@/testing/msw";
 import { orderId, orderSummary } from "@/testing/orders";
 import { renderRoute } from "@/testing/render-route";

@@ -17,7 +17,7 @@ APIを使うcomponent testはMSWでHTTP境界を置き換え、`vi.mock`でmodul
 
 複数のテストで使う準備のコードは、[フロントエンドアーキテクチャ](architecture.md#テストの置き場所)に従い `src/testing/` に置く。
 
-Vitestの`setupFiles`（`src/testing/setup.ts`）は、全テストでTesting Libraryの待つ上限の設定とMSWのserver（`src/testing/msw.ts`）の起動を行い、各テストの後に`cleanup`、handlerの初期化、mockとglobalのstubの復元、localeの`ja`への初期化を行う。
+Vitestの`setupFiles`（`apps/web`は`src/testing/setup.ts`）は、全テストでTesting Libraryの待つ上限の設定とMSWのserver（`src/testing/msw.ts`）の起動を行い、各テストの後に`cleanup`、handlerの初期化、mockとglobalのstubの復元、localeの`ja`への初期化を行う。
 テストで`configure`を呼ばず、同じ`afterEach`も書かない。
 HTTPはOrvalが生成したMSW handlerを使い、生成handlerがない境界（`apiFetch`のtransportの検査など）だけ、テストの中で`server.use()`に手書きのhandlerを渡す。
 routeの描画は`src/testing/render-route.tsx`の`renderRoute`を使い、`main.tsx`と同じproviderとrouterの既定値で、最初のloaderを終えてから描画する。
@@ -94,7 +94,7 @@ coverageの対象と基準を含むテスト基盤の判断理由は[ADR-027](..
 | ---------------------------------------- | -------------------------------------------- | ----------------------------------------------------------------------- |
 | `frontend/apps/web/src/routeTree.gen.ts` | `frontend/apps/web/src/routes/` のroute file | `cd frontend/apps/web && vp build`、または `task fe-dev` を起動しておく |
 | `openapi/openapi.yaml`                   | ControllerとDTOのJavadoc、`OpenApiConfig`    | `task api-gen`（[APIを変更する](../web-api/runbook-api-change.md)）     |
-| `frontend/apps/web/src/api/generated/**` | `openapi/openapi.yaml` とOrval設定           | `task api-gen`（契約から）、`task api-client-gen`（Orval設定だけ）      |
+| `frontend/packages/api/src/generated/**` | `openapi/openapi.yaml` とOrval設定           | `task api-gen`（契約から）、`task api-client-gen`（Orval設定だけ）      |
 
 エージェントによる生成物への書き込みを止めるKiroのフックの説明は、[Kiroのフック](../agents/kiro-hooks.md)にある。
 

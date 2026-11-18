@@ -1,7 +1,7 @@
 import { expect, test } from "./fixtures";
 import { createOrder, onSaleProduct, uniqueCode } from "./orders";
 
-// apiFetch は CSRF の 403 を受けると、Cookie を読み直して 1 回だけ再送する（api-fetch.ts）。
+// apiFetch は CSRF の 403 を受けると、Cookie を読み直して 1 回だけ再送する（packages/api の api-fetch.ts）。
 // ブラウザの Cookie と、403 の Set-Cookie が置く新しい Cookie を実サーバで通して、再送が成功することを確かめる。
 test("CSRF の Cookie を失った状態で注文を作成すると、403 の後に 1 回だけ再送して作成できる", async ({
   page,

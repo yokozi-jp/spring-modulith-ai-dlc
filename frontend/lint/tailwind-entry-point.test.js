@@ -7,10 +7,9 @@ import { appDirectory, lintFixtureProject } from "./lint-project.js";
 // ルートから実行した場合は lint-config.test.js が確かめる。
 describe("アプリの Tailwind CSS の entry point", () => {
   it("アプリの directory から lint しても、アプリの theme を解決する", () => {
-    const messages = lintFixtureProject(
-      appDirectory,
+    const messages = lintFixtureProject(appDirectory, [
       `${appDirectory}/src/features/order/theme-class.tsx`,
-    )
+    ])
       .filter((diagnostic) => diagnostic.code === "better-tailwindcss(enforce-canonical-classes)")
       .map((diagnostic) => diagnostic.message);
 

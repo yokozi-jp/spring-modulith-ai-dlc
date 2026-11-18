@@ -1,6 +1,6 @@
+import { getListProductsSuspenseQueryOptions } from "@frontend/api/endpoints/product/product";
 import { createFileRoute } from "@tanstack/react-router";
 
-import { getListProductsSuspenseQueryOptions } from "@/api/generated/endpoints/product/product";
 import { preloadQuery } from "@/api/preload-query";
 import { OrderNewPage } from "@/features/orders/order-new-page";
 
