@@ -15,7 +15,7 @@ permissions:
 
 # dep-scan は SARIF を出さないため、Code Scanning には送らない。
 # 検出はジョブのログと、artifact の VDR（CycloneDX）と HTML で確認する。
-# Trivy と同じく、検出があってもジョブは失敗させない（docs/adr/ADR-094）。
+# Trivy と同じく、検出があってもジョブは失敗させない（docs/adr/ADR-095）。
 jobs:
   backend:
     name: dep-scan (backend) 🔬

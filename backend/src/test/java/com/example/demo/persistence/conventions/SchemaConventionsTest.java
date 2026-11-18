@@ -6,6 +6,7 @@ import com.example.demo.persistence.conventions.CatalogSnapshot.ColumnRow;
 import com.example.demo.persistence.conventions.CatalogSnapshot.ConstraintRow;
 import com.example.demo.persistence.conventions.CatalogSnapshot.FunctionRow;
 import com.example.demo.persistence.conventions.CatalogSnapshot.IndexRow;
+import com.example.demo.persistence.conventions.CatalogSnapshot.ModuleRoleRow;
 import com.example.demo.persistence.conventions.CatalogSnapshot.RelationPrivilegeRow;
 import com.example.demo.persistence.conventions.CatalogSnapshot.RelationRow;
 import com.example.demo.persistence.conventions.CatalogSnapshot.RoleRow;
@@ -14,6 +15,7 @@ import com.example.demo.persistence.conventions.CatalogSnapshot.TriggerRow;
 import com.example.demo.persistence.conventions.CatalogSnapshot.TypeRow;
 import com.example.demo.persistence.conventions.CatalogSnapshot.ViewDependencyRow;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 import org.junit.jupiter.api.DisplayName;
@@ -55,6 +57,12 @@ class SchemaConventionsTest {
   /** btreeのアクセスメソッド。 */
   private static final String BTREE = "btree";
 
+  /** 商品のモジュールとスキーマの名前。 */
+  private static final String PRODUCT = "product";
+
+  /** 商品のモジュールのロール。 */
+  private static final String PRODUCT_ROLE = "product_module";
+
   /** トリガー名。 */
   private static final String TRIGGER = "trg";
 
@@ -89,12 +97,14 @@ class SchemaConventionsTest {
             cleanRole(),
             new RoleRow(MIGRATION_ROLE, false, false, false, false, false, true),
             List.of(
-                new SchemaPrivilegeRow(ITEM, true, false, false),
+                new SchemaPrivilegeRow(ITEM, false, false, false),
                 new SchemaPrivilegeRow(MODULITH, true, false, false),
                 new SchemaPrivilegeRow(LIQUIBASE, false, false, false)),
             List.of(
-                relationPrivilege(ITEM, true, false, false),
-                relationPrivilege(LIQUIBASE, false, false, false)));
+                relationPrivilege(MODULITH, true, false, false),
+                relationPrivilege(ITEM, false, false, false),
+                relationPrivilege(LIQUIBASE, false, false, false)),
+            List.of());
 
     assertThat(SchemaConventions.check(snapshot, List.of())).as("違反").isEmpty();
   }
@@ -571,24 +581,27 @@ class SchemaConventionsTest {
           List.of(new SchemaPrivilegeRow(ITEM, true, true, true));
 
       assertThat(keys(SchemaPrivilegeConventions.appRole(cleanRole(), schemas, List.of())))
-          .containsExactlyInAnyOrder("G1 demo:CREATE:item", "G1 demo:OWNER:item");
+          .containsExactlyInAnyOrder(
+              "G1 demo:CREATE:item", "G1 demo:OWNER:item", "G1 demo:USAGE:item");
     }
 
     @Test
-    @DisplayName("G1：liquibaseのUSAGEを拒否し、modulithのUSAGEを受け入れる")
-    void rejectsUsageOnLiquibaseOnly() {
+    @DisplayName("G1：modulith以外のスキーマのUSAGEを拒否し、modulithとPostgreSQLの既定のpublicのUSAGEを受け入れる")
+    void rejectsUsageOnSchemasOtherThanModulith() {
       final List<SchemaPrivilegeRow> schemas =
           List.of(
               new SchemaPrivilegeRow(MODULITH, true, false, false),
+              new SchemaPrivilegeRow("public", true, false, false),
+              new SchemaPrivilegeRow(ITEM, true, false, false),
               new SchemaPrivilegeRow(LIQUIBASE, true, false, false));
 
       assertThat(keys(SchemaPrivilegeConventions.appRole(cleanRole(), schemas, List.of())))
-          .containsExactly("G1 demo:USAGE:liquibase");
+          .containsExactlyInAnyOrder("G1 demo:USAGE:item", "G1 demo:USAGE:liquibase");
     }
 
     @Test
-    @DisplayName("G1：liquibaseのテーブルへの権限とDML以外のテーブルの権限を拒否する")
-    void rejectsLiquibaseRelationsAndNonDmlPrivileges() {
+    @DisplayName("G1：modulith以外のテーブルへの権限とDML以外のテーブルの権限を拒否する")
+    void rejectsBusinessRelationsAndNonDmlPrivileges() {
       final List<RelationPrivilegeRow> relations =
           List.of(
               relationPrivilege(LIQUIBASE, true, false, false),
@@ -598,6 +611,8 @@ class SchemaConventionsTest {
       assertThat(keys(SchemaPrivilegeConventions.appRole(cleanRole(), List.of(), relations)))
           .containsExactlyInAnyOrder(
               "G1 demo:ANY:liquibase.m_item",
+              "G1 demo:ANY:item.m_item",
+              "G1 demo:ANY:item.m_other",
               "G1 demo:TRUNCATE:item.m_item",
               "G1 demo:OWNER:item.m_item",
               "G1 demo:REFERENCES:item.m_other",
@@ -620,6 +635,143 @@ class SchemaConventionsTest {
       final RoleRow role = new RoleRow(MIGRATION_ROLE, false, false, false, false, false, true);
 
       assertThat(SchemaPrivilegeConventions.migrationRole(role)).isEmpty();
+    }
+  }
+
+  /** モジュールのロールの形と権限。 */
+  /* package */ @Nested
+  class ModuleRoleRulesTest {
+
+    /** 機能モジュールの直接の依存先。ordering は product を読む。 */
+    private final Map<String, Set<String>> dependencies =
+        Map.of(PRODUCT, Set.of(), "ordering", Set.of(PRODUCT));
+
+    /** 業務のテーブルとイベントの出版の表。 */
+    private final List<RelationRow> relations =
+        List.of(
+            new RelationRow(PRODUCT, "m_product", "r", null, null),
+            new RelationRow("ordering", "t_order", "r", null, null),
+            new RelationRow("modulith", "event_publication", "r", null, null));
+
+    @Test
+    @DisplayName("G4：ログインできる、DDLの属性を持つ、アプリロールが継承するモジュールのロールを拒否する")
+    void rejectsPowerfulModuleRoles() {
+      final ModuleRoleRow bad =
+          new ModuleRoleRow(
+              new RoleRow(PRODUCT_ROLE, true, true, true, true, true, true),
+              true,
+              false,
+              true,
+              Set.of());
+
+      assertThat(keys(ModulePrivilegeConventions.roles(List.of(bad), Set.of(PRODUCT))))
+          .containsExactlyInAnyOrder(
+              "G4 product_module:SUPERUSER",
+              "G4 product_module:CREATEDB",
+              "G4 product_module:CREATEROLE",
+              "G4 product_module:REPLICATION",
+              "G4 product_module:BYPASSRLS",
+              "G4 product_module:CREATE:DATABASE",
+              "G4 product_module:LOGIN",
+              "G4 product_module:APP_ROLE_CANNOT_SET",
+              "G4 product_module:APP_ROLE_INHERITS");
+    }
+
+    @Test
+    @DisplayName("G4：モジュールに対応するロールがない、ロールに対応するモジュールがないことを拒否する")
+    void rejectsMissingAndUnexpectedModuleRoles() {
+      final ModuleRoleRow stray = moduleRole("stray_module", Set.of());
+
+      assertThat(keys(ModulePrivilegeConventions.roles(List.of(stray), Set.of(PRODUCT))))
+          .containsExactlyInAnyOrder("G4 product_module:MISSING", "G4 stray_module:UNEXPECTED");
+    }
+
+    @Test
+    @DisplayName("G4：切り替えだけができるログインできないロールを受け入れる")
+    void acceptsSwitchOnlyRole() {
+      assertThat(
+              ModulePrivilegeConventions.roles(
+                  List.of(moduleRole(PRODUCT_ROLE, Set.of())), Set.of(PRODUCT)))
+          .isEmpty();
+    }
+
+    @Test
+    @DisplayName("G5：自分のスキーマのDML、依存先のSELECT、出版へのINSERTだけを受け入れる")
+    void acceptsExpectedPrivileges() {
+      final ModuleRoleRow product =
+          moduleRole(
+              PRODUCT_ROLE,
+              Set.of(
+                  "USAGE:product",
+                  "SELECT:product.m_product",
+                  "INSERT:product.m_product",
+                  "UPDATE:product.m_product",
+                  "DELETE:product.m_product",
+                  "USAGE:modulith",
+                  "INSERT:modulith.event_publication"));
+
+      assertThat(ModulePrivilegeConventions.privileges(List.of(product), dependencies, relations))
+          .isEmpty();
+    }
+
+    @Test
+    @DisplayName("G5：依存の方向に逆らう読み取りと、余計な権限と、足りない権限を拒否する")
+    void rejectsUnexpectedAndMissingPrivileges() {
+      final ModuleRoleRow product =
+          moduleRole(
+              PRODUCT_ROLE,
+              Set.of(
+                  "USAGE:product",
+                  "SELECT:product.m_product",
+                  "INSERT:product.m_product",
+                  "UPDATE:product.m_product",
+                  "USAGE:ordering",
+                  "SELECT:ordering.t_order",
+                  "TRUNCATE:product.m_product",
+                  "USAGE:modulith",
+                  "INSERT:modulith.event_publication"));
+
+      assertThat(
+              keys(
+                  ModulePrivilegeConventions.privileges(List.of(product), dependencies, relations)))
+          .containsExactlyInAnyOrder(
+              "G5 product_module:unexpected:USAGE:ordering",
+              "G5 product_module:unexpected:SELECT:ordering.t_order",
+              "G5 product_module:unexpected:TRUNCATE:product.m_product",
+              "G5 product_module:missing:DELETE:product.m_product");
+    }
+
+    @Test
+    @DisplayName("G5：依存先のスキーマのSELECTが足りないことを拒否する")
+    void rejectsMissingDependencyPrivileges() {
+      final ModuleRoleRow ordering =
+          moduleRole(
+              "ordering_module",
+              Set.of(
+                  "USAGE:ordering",
+                  "SELECT:ordering.t_order",
+                  "INSERT:ordering.t_order",
+                  "UPDATE:ordering.t_order",
+                  "DELETE:ordering.t_order",
+                  "USAGE:modulith",
+                  "INSERT:modulith.event_publication"));
+
+      assertThat(
+              keys(
+                  ModulePrivilegeConventions.privileges(
+                      List.of(ordering), dependencies, relations)))
+          .containsExactlyInAnyOrder(
+              "G5 ordering_module:missing:USAGE:product",
+              "G5 ordering_module:missing:SELECT:product.m_product");
+    }
+
+    private ModuleRoleRow moduleRole(final String name, final Set<String> privileges) {
+      return new ModuleRoleRow(
+          new RoleRow(name, false, false, false, false, false, false),
+          false,
+          true,
+          false,
+          privileges);
     }
   }
 

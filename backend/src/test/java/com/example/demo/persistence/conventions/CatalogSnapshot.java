@@ -1,6 +1,7 @@
 package com.example.demo.persistence.conventions;
 
 import java.util.List;
+import java.util.Set;
 import org.jspecify.annotations.Nullable;
 
 /**
@@ -22,6 +23,7 @@ import org.jspecify.annotations.Nullable;
  * @param migrationRole changesetを適用したマイグレーションロール
  * @param schemaPrivileges アプリロールのスキーマへの権限
  * @param relationPrivileges アプリロールのテーブルとビューへの権限
+ * @param moduleRoles 名前が {@code _module} で終わるロール（モジュールのロール）
  */
 record CatalogSnapshot(
     List<RelationRow> relations,
@@ -37,7 +39,8 @@ record CatalogSnapshot(
     RoleRow appRole,
     RoleRow migrationRole,
     List<SchemaPrivilegeRow> schemaPrivileges,
-    List<RelationPrivilegeRow> relationPrivileges) {
+    List<RelationPrivilegeRow> relationPrivileges,
+    List<ModuleRoleRow> moduleRoles) {
 
   /**
    * {@code pg_class}の1行。
@@ -204,4 +207,21 @@ record CatalogSnapshot(
       boolean trigger,
       boolean maintain,
       boolean ownedByRole) {}
+
+  /**
+   * モジュールのロール（{@code <module>_module}）の属性と、アプリロールとの関係と、権限。
+   *
+   * @param role ロールの属性
+   * @param login ログインできるか
+   * @param appRoleCanSet アプリロールが{@code SET ROLE}でこのロールへ切り替えられるか
+   * @param appRoleInherits アプリロールがこのロールの権限を継承するか
+   * @param privileges 与えられた権限。スキーマは{@code USAGE:スキーマ}と{@code CREATE:スキーマ}、テーブルとビューは{@code
+   *     権限:スキーマ.名前}
+   */
+  /* package */ record ModuleRoleRow(
+      RoleRow role,
+      boolean login,
+      boolean appRoleCanSet,
+      boolean appRoleInherits,
+      Set<String> privileges) {}
 }

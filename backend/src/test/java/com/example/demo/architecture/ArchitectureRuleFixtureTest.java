@@ -11,6 +11,7 @@ import com.tngtech.archunit.core.importer.ClassFileImporter;
 import com.tngtech.archunit.lang.ArchRule;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.stream.Stream;
 import org.jooq.DSLContext;
 import org.jooq.Field;
@@ -107,6 +108,58 @@ class ArchitectureRuleFixtureTest {
           "jdbcStatement",
           "connectionProvider");
 
+  /** ロールとスキーマを持つ機能モジュールの、フィクスチャでの名前。 */
+  private static final Set<String> FIXTURE_MODULES = Set.of("ordering", "inventory");
+
+  /** jOOQ の生成クラスの基底パッケージ。フィクスチャは本物の生成クラスを使う。 */
+  private static final String JOOQ_PACKAGE = "com.example.demo.jooq";
+
+  /** モジュールのロールを迂回する違反フィクスチャのクラス名。 */
+  private static final String ROLE_BYPASS =
+      "ordering.infrastructure.persistence.RoleBypassingOrderAccess";
+
+  /** モジュールのロールの規則が、違反フィクスチャの各メソッドを検出することを確かめる行。 */
+  private static final List<Arguments> MODULE_ROLE_ROWS =
+      List.of(
+          row(
+              "persistenceAdaptersUseOnlyOwnGeneratedSchema",
+              DatabaseConventionsArchTest.ownGeneratedSchemaRule(
+                  VIOLATING, JOOQ_PACKAGE, FIXTURE_MODULES),
+              ROLE_BYPASS),
+          row(
+              "moduleCodeDoesNotUseJdbc: JdbcTemplate",
+              DatabaseConventionsArchTest.moduleCodeDoesNotUseJdbcRule(VIOLATING, FIXTURE_MODULES),
+              ROLE_BYPASS + ".jdbcTemplateQuery("),
+          row(
+              "moduleCodeDoesNotUseJdbc: DataSource",
+              DatabaseConventionsArchTest.moduleCodeDoesNotUseJdbcRule(VIOLATING, FIXTURE_MODULES),
+              ROLE_BYPASS + ".rawConnection("),
+          row(
+              "moduleCodeDoesNotChangeConnectionSettings: set",
+              DatabaseConventionsArchTest.moduleCodeDoesNotChangeConnectionSettingsRule(
+                  VIOLATING, FIXTURE_MODULES),
+              ROLE_BYPASS + ".dslSet("),
+          row(
+              "moduleCodeDoesNotChangeConnectionSettings: setLocal",
+              DatabaseConventionsArchTest.moduleCodeDoesNotChangeConnectionSettingsRule(
+                  VIOLATING, FIXTURE_MODULES),
+              ROLE_BYPASS + ".dslSetLocal("),
+          row(
+              "moduleCodeDoesNotChangeConnectionSettings: DSL.setLocal",
+              DatabaseConventionsArchTest.moduleCodeDoesNotChangeConnectionSettingsRule(
+                  VIOLATING, FIXTURE_MODULES),
+              ROLE_BYPASS + ".staticSetLocal("),
+          row(
+              "moduleCodeDoesNotChangeConnectionSettings: setSchema",
+              DatabaseConventionsArchTest.moduleCodeDoesNotChangeConnectionSettingsRule(
+                  VIOLATING, FIXTURE_MODULES),
+              ROLE_BYPASS + ".dslSetSchema("),
+          row(
+              "moduleCodeDoesNotChangeConnectionSettings: connectionResult",
+              DatabaseConventionsArchTest.moduleCodeDoesNotChangeConnectionSettingsRule(
+                  VIOLATING, FIXTURE_MODULES),
+              ROLE_BYPASS + ".dslConnectionResult("));
+
   /** 数値の ID の規則が、違反フィクスチャの各パッケージの違反を検出することを確かめる行。 */
   private static final List<Arguments> PUBLIC_ID_ROWS =
       List.of(
@@ -181,7 +234,8 @@ class ArchitectureRuleFixtureTest {
   }
 
   private static Stream<Arguments> eachRuleDetectsItsViolatingFixture() {
-    return Stream.of(classRoleRows(), tableWriterRows(), PUBLIC_ID_ROWS.stream())
+    return Stream.of(
+            classRoleRows(), tableWriterRows(), PUBLIC_ID_ROWS.stream(), MODULE_ROLE_ROWS.stream())
         .flatMap(rows -> rows);
   }
 
@@ -625,6 +679,11 @@ class ArchitectureRuleFixtureTest {
         TableWriterArchTest.expectedLockNoIsCreatedOnlyByRequestsRule(basePackage),
         TableWriterArchTest.aggregateMethodsDoNotUseUnversionedWritesRule(basePackage),
         TableWriterArchTest.aggregateRootInsertsGoThroughTableWriterRule(),
-        PublicIdArchTest.numericIdsDoNotLeaveModulesRule(basePackage));
+        PublicIdArchTest.numericIdsDoNotLeaveModulesRule(basePackage),
+        DatabaseConventionsArchTest.ownGeneratedSchemaRule(
+            basePackage, JOOQ_PACKAGE, FIXTURE_MODULES),
+        DatabaseConventionsArchTest.moduleCodeDoesNotUseJdbcRule(basePackage, FIXTURE_MODULES),
+        DatabaseConventionsArchTest.moduleCodeDoesNotChangeConnectionSettingsRule(
+            basePackage, FIXTURE_MODULES));
   }
 }

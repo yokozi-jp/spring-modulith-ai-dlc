@@ -1,11 +1,11 @@
 ---
 type: ADR
-title: 'ADR-094: 依存関係の脆弱性検査に OWASP dep-scan を Trivy と並べて加える'
+title: 'ADR-095: 依存関係の脆弱性検査に OWASP dep-scan を Trivy と並べて加える'
 description: backend と frontend の依存関係を、Trivy に加えて OWASP dep-scan でも検査する。検出では失敗させず、VDR と HTML を artifact に残す。
 tags: [adr, security, ci, dependencies]
 ---
 
-# ADR-094: 依存関係の脆弱性検査に OWASP dep-scan を Trivy と並べて加える
+# ADR-095: 依存関係の脆弱性検査に OWASP dep-scan を Trivy と並べて加える
 
 ## Status
 
