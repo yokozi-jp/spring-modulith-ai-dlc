@@ -2,7 +2,7 @@
   "mcpServers": {
     "iwe": {
       "command": "bash",
-      "args": ["-c", "cd \"$(git rev-parse --show-toplevel)/docs\" && exec iwec"],
+      "args": ["-c", "for s in \"$(git rev-parse --show-toplevel 2>/dev/null)\" */; do [ -x \"${s%/}/docs/local-env-setup/iwe-mcp.sh\" ] && exec \"${s%/}/docs/local-env-setup/iwe-mcp.sh\"; done; echo 'kiro: docs/local-env-setup/iwe-mcp.sh が見つかりません' >&2; exit 1"],
       "disabled": false
     }
   }

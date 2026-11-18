@@ -82,7 +82,8 @@ sys.exit(any(version(p.split("==")[0]) != p.split("==")[1] for p in sys.argv[1:]
     || python3 -m pip install --quiet --user --root-user-action=ignore --disable-pip-version-check "${python_packages[@]}" >&2
 
   # Gradle のテスト（Testcontainers）は docker の代わりを経由せずサービスへつなぐので、先に起動しておく。
-  "$KIRO_WEB_HOME/bin/docker" info >/dev/null
+  # iwe-mcp.sh は KIRO_WEB_NO_DOCKER=1 で起動しない。
+  [ -n "${KIRO_WEB_NO_DOCKER:-}" ] || "$KIRO_WEB_HOME/bin/docker" info >/dev/null
 )
 
 _kw_setup || echo "kiro-web: セットアップに失敗しました" >&2
