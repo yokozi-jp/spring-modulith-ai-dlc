@@ -1,21 +1,31 @@
 #!/usr/bin/env bash
-# test.sh: 小さな Taskfile、lefthook.yml、ワークフローの木を作って task-calls.sh の終了コードとメッセージを確かめる。
+# test.sh: 小さな Taskfile、lefthook.yml、ワークフローの木を作り、task-calls.sh の終了コードと出力を期待の文と比べる。
 # Run: bash tooling/task-calls/test.sh (task lint-taskfile が本検査の前に実行する)
 
 set -u
 
 dir="$(cd "$(dirname "$0")" && pwd)"
 tmp="$(mktemp -d)"
-out="$(mktemp)"
-trap 'rm -rf "$tmp" "$out"' EXIT
+trap 'rm -rf "$tmp"' EXIT
 failures=0
 
-# tree <名前> <lefthook.yml の jobs の行> <ci.yml の steps の行>
-# Taskfile は build（別名 b）、check、内部タスク secret を持つ。
-tree() {
-  local t="$tmp/$1"
-  mkdir -p "$t/.github/workflows"
-  cat >"$t/Taskfile.yml" <<'EOF'
+# expect <木> <終了コード> <標準出力> <標準エラー>
+expect() {
+  local out err code
+  # 全角空白を [[:space:]] と読むロケールで実行し、task-calls.sh の LC_ALL=C を確かめる。
+  out="$(LC_ALL=C.UTF-8 bash "$dir/task-calls.sh" "$tmp/$1" 2>"$tmp/err")"
+  code=$?
+  err="$(cat "$tmp/err")"
+  if [ "$code" != "$2" ] || [ "$out" != "$3" ] || [ "$err" != "$4" ]; then
+    echo "FAIL: $1 (exit $code, want $2)"
+    diff <(printf '%s\n' "$3" "$4") <(printf '%s\n' "$out" "$err") | sed 's/^/    /'
+    failures=$((failures + 1))
+  fi
+}
+
+for t in ok bad; do
+  mkdir -p "$tmp/$t/.github/workflows"
+  cat >"$tmp/$t/Taskfile.yml" <<'EOF'
 version: "3"
 tasks:
   build:
@@ -27,87 +37,77 @@ tasks:
     internal: true
     cmds: [echo secret]
 EOF
-  printf 'pre-commit:\n  jobs:\n%s\n' "$2" >"$t/lefthook.yml"
-  printf 'jobs:\n  ci:\n    steps:\n%s\n' "$3" >"$t/.github/workflows/ci.yml"
-}
+done
 
-# expect <名前> <終了コード> <メッセージの断片>
-expect() {
-  local code
-  bash "$dir/task-calls.sh" "$tmp/$1" >"$out" 2>&1
-  code=$?
-  if [ "$code" != "$2" ] || ! grep -qF -- "$3" "$out"; then
-    echo "FAIL: $1 (exit $code, want $2; fragment '$3')"
-    sed 's/^/    /' "$out"
-    failures=$((failures + 1))
-  fi
-}
-
-# missing <名前> <ファイル> <呼び出しの行の断片> <タスク名>
-# 期待する行番号は、木のファイルで断片を含む最初の行から取る。
-missing() {
-  local line
-  line="$(grep -nF -m1 -- "$3" "$tmp/$1/$2" | cut -d: -f1)"
-  expect "$1" 1 "$2:$line: task $4 が task --list-all にありません。"
-}
-
-ok_hook='    # task gone はコメントなので数えない。
+# ok の木は、呼び出しと読まない書き方と、ある名前の呼び出しだけを持つ。
+cat >"$tmp/ok/lefthook.yml" <<'EOF'
+pre-commit:
+  jobs:
+    # task gone はコメントなので数えない。
     - name: Run task gone
       run: |
         task -x build
         task --exit-code b VAR="a b"
         task VAR=1 build
         task check -- --flag
-        echo "docker が無いため task check をスキップします。" >&2 # task gone
+        echo it's done >&2 # task gone
         echo "my-task gone と .task gone の task は語とパスの一部です。"
-        task --list-all >/dev/null
-        task --list-all 2>&1
-        task --list-all 2>/dev/null
-        task --list-all 1>&2
-      fail_text: "失敗しました。task buildで再実行してください。"'
-ok_workflow='      - uses: go-task/setup-task@0123 # v2
+        echo "task　gone の全角空白は shell の区切りではありません。"
+        task --list-all 2>&1 >/dev/null
+        echo "失敗したら task check: で再実行してください。"
+      fail_text: "失敗しました。task buildで再実行してください。"
+EOF
+cat >"$tmp/ok/.github/workflows/ci.yml" <<'EOF'
+jobs:
+  ci:
+    steps:
+      - uses: go-task/setup-task@0123 # v2
       - name: Run task gone 📚
-        run: PATH="$PWD/bin:$PATH" task check'
+        run: PATH="$PWD/bin:$PATH" task check
+EOF
 
-tree ok "$ok_hook" "$ok_workflow"
-expect ok 0 "すべて task --list-all にあります。"
-
-tree flag '    - run: task -x gone' "$ok_workflow"
-missing flag lefthook.yml 'task -x gone' gone
-
-tree vars-after '    - run: task gone VAR=1' "$ok_workflow"
-missing vars-after lefthook.yml 'task gone' gone
-
-tree vars-before '    - run: task VAR=1 gone' "$ok_workflow"
-missing vars-before lefthook.yml 'task VAR=1 gone' gone
-
-tree args '    - run: task gone -- --flag' "$ok_workflow"
-missing args lefthook.yml 'task gone' gone
-
-tree multiline '    - run: |
+# bad の木は、呼び出しと読む書き方ごとに、無い名前を一つずつ呼ぶ。
+# 読み落としも余分な報告も、標準エラーを期待の文と食い違わせる。
+cat >"$tmp/bad/lefthook.yml" <<'EOF'
+pre-commit:
+  jobs:
+    - run: task -x gone-flag
+    - run: task VAR=1 gone-vars
+    - run: task gone-redirect 2>&1
+    - run: task gone-args -- --flag VAR=1
+    - run: task build && task gone-second
+    - run: echo a#b; task gone-hash
+    - run: task g
+    - run: task buil
+    - run: task secret
+    - run: |
         echo "{staged_files}" >/dev/null
-        if true; then task gone; fi' "$ok_workflow"
-missing multiline lefthook.yml 'task gone' gone
+        if true; then task gone-block; fi
+      fail_text: "失敗しました。task gone-textで再実行してください。"
+EOF
+cat >"$tmp/bad/.github/workflows/ci.yaml" <<'EOF'
+jobs:
+  ci:
+    steps:
+      - name: Run task gone 📚
+        run: task gone-workflow
+EOF
 
-tree prefix '    - run: task buil' "$ok_workflow"
-missing prefix lefthook.yml 'task buil' buil
+expect ok 0 'task-calls OK: lefthook.yml と .github/workflows の task の呼び出し 7 件が、すべて task --list-all にあります。' ''
 
-tree internal '    - run: task secret' "$ok_workflow"
-missing internal lefthook.yml 'task secret' secret
-
-tree echo '    - run: echo "task goneで再実行してください。"' "$ok_workflow"
-missing echo lefthook.yml 'task gone' gone
-
-tree fail-text '    - run: task build
-      fail_text: "失敗しました。task goneで再実行してください。"' "$ok_workflow"
-missing fail-text lefthook.yml 'task gone' gone
-
-tree hash-in-quotes '    - run: echo "see #1"; task gone' "$ok_workflow"
-missing hash-in-quotes lefthook.yml 'task gone' gone
-
-tree workflow "$ok_hook" '      - name: Run task gone 📚
-        run: task gone'
-missing workflow .github/workflows/ci.yml 'run: task gone' gone
+m='が task --list-all にありません。タスクを改名、削除したときは、この呼び出しも同じ変更で直してください。'
+expect bad 1 '' "lefthook.yml:3: task gone-flag $m
+lefthook.yml:4: task gone-vars $m
+lefthook.yml:5: task gone-redirect $m
+lefthook.yml:6: task gone-args $m
+lefthook.yml:7: task gone-second $m
+lefthook.yml:8: task gone-hash $m
+lefthook.yml:9: task g $m
+lefthook.yml:10: task buil $m
+lefthook.yml:11: task secret $m
+lefthook.yml:14: task gone-block $m
+lefthook.yml:15: task gone-text $m
+.github/workflows/ci.yaml:5: task gone-workflow $m"
 
 if [ "$failures" -gt 0 ]; then
   echo "$failures failure(s)"

@@ -3,7 +3,8 @@
 # 実行: bash tooling/task-calls/task-calls.sh [ルート。省略するとカレント]（task lint-taskfile が呼ぶ）
 
 set -euo pipefail
-# [A-Za-z] を ASCII だけに一致させ、「task fe-checkで再実行」の「で」を名前に入れない。
+# [[:space:]] を ASCII の空白だけに一致させる。
+# UTF-8 のロケールでは、shell が区切らない全角空白（task　gone）も空白と読む。
 export LC_ALL=C
 
 # 直前が英数字か _ . / - の task は、setup-task、lint-taskfile、.task のように語やパスの一部である。
@@ -15,10 +16,13 @@ skip='([[:space:]]+(-[^[:space:]]+|[A-Za-z_][A-Za-z0-9_]*=[^[:space:]]*))*'
 # 末尾の - と : は文の区切りとして名前に入れない。
 name='[A-Za-z_]([A-Za-z0-9_:-]*[A-Za-z0-9_])?'
 call="${boundary}task${skip}[[:space:]]+${name}"
-# ponytail: 次の書き方は読み違える。今の呼び出しには無く、増えたらフラグの一覧か、YAML と shell の解析を持つ。
-#   値を取るフラグ（-d <ディレクトリ>、--taskfile x）と空白を含む値（VAR="a b"）を名前の前に書くと、値を名前と読む。
-#   引用符の中の英語の文（echo "the task failed"）は、task の次の語を名前と読んで失敗する。
-#   引用符で囲んだ名前（task "build"）、行の継続（task \ の次の行の名前）、式で作る名前（task ${{ ... }}）は検査しない。
+# ponytail: task の後のフラグと VAR=値 を飛ばした語を、コメントと name: 以外のどこでも呼び出しと読む。
+#   英語の文は、task の次の語を名前と読む（description: The task to run の to）。
+#   複数行の name: >- は、2 行目から後ろを呼び出しと読む。
+#   値を取るフラグは、値を名前と読む（task --taskfile x build の x）か、呼び出しを見落とす（task -d . build）。
+#   次の行に続く名前（run: > の折り返し、\ の継続）、引用符で囲んだ名前、./bin/task、式や変数で作る名前は見落とす。
+#   引用符の中でも空白の後の # はコメントと読むので、echo "see #1"; task x の x を見落とす。
+#   これらを lefthook.yml かワークフローに書くときは、YAML を解析して run の文字列を shell の規則で分ける node のスクリプトに替える。
 
 root="${1:-.}"
 names="$(task -d "$root" --list-all --silent)"
@@ -34,23 +38,11 @@ for file in "$root/lefthook.yml" "$root"/.github/workflows/*.yml "$root"/.github
       status=1
     fi
   done < <(
-    awk '
-      # name: は job と step の表示名で、英語の文（Upload task results）にも、
-      # branch-protection.md が挙げるチェック名（Run task okf-check）にも使うため読まない。
-      # 行を消さずに空けて、grep -n の行番号を元のファイルに合わせる。
-      /^[[:space:]]*(-[[:space:]]+)?name:/ { print ""; next }
-      # 引用符の外で、行頭か空白の直後の # から後を消す。echo "see #1" の # は残す。
-      {
-        q = ""
-        for (i = 1; i <= length($0); i++) {
-          c = substr($0, i, 1)
-          if (q != "") { if (c == q) q = "" }
-          else if (c == "\"" || c == "\047") q = c
-          else if (c == "#" && (i == 1 || substr($0, i - 1, 1) ~ /[ \t]/)) { $0 = substr($0, 1, i - 1); break }
-        }
-        print
-      }
-    ' "$file" |
+    # name: は job と step の表示名なので読まない。
+    # 表示名には英語の文（Upload task results）と、branch-protection.md が挙げるチェック名（Run task okf-check）を書く。
+    # 行頭か空白の直後の # から後ろは、コメントとして消す。
+    # 行を消さずに空けて、grep -n の行番号を元のファイルに合わせる。
+    sed -E '/^[[:space:]]*(-[[:space:]]+)?name:/s/.*//; s/(^|[[:space:]])#.*$//' "$file" |
       grep -noE "$call" |
       # 一致は名前で終わるので、最後の語を名前として取る。
       sed -E 's/^([0-9]+):.*[[:space:]]([^[:space:]]+)$/\1 \2/'

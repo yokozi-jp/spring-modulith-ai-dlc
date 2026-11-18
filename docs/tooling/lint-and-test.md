@@ -314,9 +314,11 @@ const params = { ...(cursor !== undefined && { cursor }) };
 - **`task release-check`**：release-pleaseのmanifest、版ファイル、Gradle版、設定の一致を検証する。
 - **`task lint-taskfile`**：Task本体でTaskfileのYAML構文とスキーマ構造を検証する。
   `tooling/taskfile-cleanup/`のfixtureで、後片付けの定型が本体の終了コードを優先し、前段が失敗しても後段の後片付けを走らせることを検査する。
-  `tooling/task-calls/test.sh`を先に実行してから、`tooling/task-calls/task-calls.sh`で、`lefthook.yml`と`.github/workflows/`のYAMLが呼ぶ`task <名前>`が`task --list-all`のタスクか別名にあることを検査する。
-  失敗にするケースは`tooling/task-calls/test.sh`が正で、この文書には写さない。
-  既知の限界として、値を取るフラグ（`-d <ディレクトリ>`、`--taskfile x`）、名前の前に置いた空白を含む値の変数、引用符の中の英語の文（`echo "the task failed"`）は呼び出しを読み違え、引用符で囲んだ名前、行の継続、式で作る名前は検査しない。
+  `tooling/task-calls/task-calls.sh`は、フックとワークフローが呼ぶタスク名を検査する。
+  対象は、`lefthook.yml`と`.github/workflows/`のYAMLにある`task <名前>`である。
+  名前が`task --list-all`のタスクにも別名にも無いと失敗する。
+  失敗にする状態は`tooling/task-calls/test.sh`のケースが正で、この文書には写さない。
+  読み違える書き方は、`task-calls.sh`の`ponytail:`の注記にある。
 - **`task adr-check`**：判断が絡む変更にADRが伴うかを確認する。
   `frontend/`の変更のうち、テストファイル（`*.test.*`、`*.spec.*`）、`frontend/e2e/`、`frontend/lint/fixtures/`、`frontend/src/testing/`は対象から外す。
   警告は止めず、`ADR_STRICT=1`で失敗にし、`ADR_ACK=1`で抑制する。
