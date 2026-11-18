@@ -290,8 +290,8 @@ const params = { ...(cursor !== undefined && { cursor }) };
   同じfixtureのtraceは`traces/frontend`の出口を別のファイルに分け、URL属性がなく、許可したHTTP属性とresource属性だけが残り、trace ID、span ID、親span IDが保たれることを確かめる。
 - **`task lint-md`**：`.markdownlint-cli2.yaml`の除外設定に従いMarkdownを検査する。
 - **`task lint-md-fix`**：markdownlint-cli2で安全に修正できるMarkdownの問題を修正する。
-- **`task ruleset-diff`**：GitHub 上の ruleset と`.github/rulesets/main.json`の差分を表示する。認証済みの`gh`が要るため、CIでは動かさず、管理者が手元で使う。
-- **`task ruleset-apply`**：`main.json`をGitHubの ruleset へ反映する。反映前の ruleset を`build/ruleset-backup/`に保存し、反映後に`main.json`と同じになったことを確かめる。`tooling/ruleset-sync/test.sh`が偽の`gh`で、差分の検出と控えの保存を確かめる。
+- **`task ruleset-diff`**：GitHub上のrulesetと`.github/rulesets/main.json`の差分を表示する。認証済みの`gh`が要るため、CIでは動かさず、管理者が手元で使う。
+- **`task ruleset-apply`**：`main.json`をGitHub上のrulesetへ反映する。`CONFIRM_RULESET=yes`が要る。手順は[mainブランチの保護設定](../repository/branch-protection.md)にある。
 - **`task okf-check`**：OKF適合、内部リンク、孤立文書、変更した文書の責務の見直し合図（250行超の警告）、steering境界、ADRの整合（`adr-lint`）、rulesetの必須チェックとdocsの一覧とworkflowの名前の一致（`ruleset-check`）、Taskfile文書同期候補を検査する。
   `adr-lint`は内部タスクで、`okf-check`の中でだけ動く。
   `tooling/adr-lint/test.sh`が壊れたfixtureで期待の終了コードを確かめてから、`tooling/adr-lint/adr-lint.mjs`が実際のツリーを検査する。

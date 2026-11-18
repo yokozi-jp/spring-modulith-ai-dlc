@@ -16,9 +16,11 @@ ruleset の正本は `.github/rulesets/main.json` である。
 
 ```bash
 task ruleset-diff   # GitHub 上の ruleset との差分を見る
-task ruleset-apply  # 反映する。反映前の ruleset を build/ruleset-backup/ に保存し、反映後に main.json と同じになったことを確かめる
+task ruleset-apply CONFIRM_RULESET=yes  # 反映する。反映前の ruleset を build/ruleset-backup/ に保存する
 ```
 
+`CONFIRM_RULESET=yes` を付けないと、`task ruleset-apply` は控えを保存するだけで止まる。
+反映後は、GitHub 上の ruleset が `main.json` と同じになったことを確かめる。
 戻すときは、保存した控えを `gh api -X PUT repos/yokozi-jp/spring-modulith-ai-dlc/rulesets/23297515 --input <控え>` で入れ直す。
 
 必須チェックの名前は、このファイル、下の一覧、workflow の job 名の 3 か所で、絵文字の異体字選択子（U+FE0F）まで一致させる。

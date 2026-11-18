@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # test.sh: 偽の gh を PATH に置いて、ruleset-sync.mjs の diff と apply の終了コードとメッセージを確かめる。
-# Run: bash tooling/ruleset-sync/test.sh (task ruleset-sync-test が実行する)
+# Run: bash tooling/ruleset-sync/test.sh (task ruleset-check が実行する)
 
 set -u
 
@@ -18,10 +18,13 @@ cat > .github/rulesets/main.json <<'JSON'
  "rules":[{"type":"deletion"},{"type":"required_status_checks","parameters":{"required_status_checks":[{"context":"CI gate"}]}}]}
 JSON
 
-# 偽の gh: GET は $FAKE_LIVE を返し、PUT は入力を $FAKE_LIVE に書いて反映したことにする（$FAKE_NOAPPLY があれば書かない）。
+# 偽の gh: GET は $FAKE_LIVE を返す。PUT は、控えがなければ失敗し、あれば呼び出しを $FAKE_LOG に残す。
+# 入力を $FAKE_LIVE に書いて反映したことにする（$FAKE_NOAPPLY なら書かず、$FAKE_PUTFAIL なら失敗する）。
 cat > "$tmp/bin/gh" <<'SH'
 #!/usr/bin/env bash
 if [[ " $* " == *" -X PUT "* ]]; then
+  ls build/ruleset-backup/*.json > /dev/null 2>&1 || { echo "PUT の前に控えがありません" >> "$FAKE_LOG"; exit 1; }
+  [ -z "${FAKE_PUTFAIL:-}" ] || exit 1
   [ -n "${FAKE_NOAPPLY:-}" ] || cp "${@: -1}" "$FAKE_LIVE"
   echo "$*" >> "$FAKE_LOG"
 else
@@ -52,19 +55,25 @@ cat > "$FAKE_LIVE" <<'JSON'
  "rules":[{"type":"required_status_checks","parameters":{"required_status_checks":[{"context":"CI gate"}]}},{"type":"deletion"}],"updated_at":"x"}
 JSON
 expect "同じなら diff は通る（キーの順と id は無視する）" 0 "ruleset-sync OK" node "$dir/ruleset-sync.mjs" diff
+expect "同じなら apply も何もしない" 0 "ruleset-sync OK" env CONFIRM_RULESET=yes node "$dir/ruleset-sync.mjs" apply
+[ ! -s "$FAKE_LOG" ] && echo "ok: 同じなら PUT しない" || { echo "FAIL: 同じなのに PUT した"; failures=$((failures + 1)); }
 
-sed 's/"CI gate"/"Old"/' "$FAKE_LIVE" > "$tmp/live2.json" && cp "$tmp/live2.json" "$FAKE_LIVE"
-expect "必須チェックが違えば diff は rules の種類を示して失敗する" 1 "rules.required_status_checks" node "$dir/ruleset-sync.mjs" diff
+cp "$FAKE_LIVE" "$tmp/same.json"
+sed -i 's/"CI gate"/"Old"/; s/"enforcement":"active"/"enforcement":"disabled"/' "$FAKE_LIVE"
+expect "違えば diff は項目を示して失敗する" 1 "enforcement, rules.required_status_checks" node "$dir/ruleset-sync.mjs" diff
+[ ! -s "$FAKE_LOG" ] && echo "ok: diff は PUT しない" || { echo "FAIL: diff が PUT した"; failures=$((failures + 1)); }
 
-sed -i 's/"enforcement":"active"/"enforcement":"disabled"/' "$FAKE_LIVE"
-expect "enforcement の違いも示す" 1 "enforcement" node "$dir/ruleset-sync.mjs" diff
+expect "確認変数がなければ apply は控えだけ保存して止まる" 1 "CONFIRM_RULESET=yes" node "$dir/ruleset-sync.mjs" apply
+[ ! -s "$FAKE_LOG" ] && echo "ok: 確認がなければ PUT しない" || { echo "FAIL: 確認なしで PUT した"; failures=$((failures + 1)); }
+expect "控えは反映前の内容" 0 ".json" grep -rl '"enforcement": "disabled"' build/ruleset-backup
+grep -rq '"id"\|"updated_at"' build/ruleset-backup && { echo "FAIL: 控えに PUT が受け取らないフィールドがある"; failures=$((failures + 1)); } || echo "ok: 控えは PUT が受け取るフィールドだけを持つ"
 
-expect "apply は控えを保存して反映する" 0 "main.json と同じになった" node "$dir/ruleset-sync.mjs" apply
-[ -n "$(ls build/ruleset-backup/*.json 2>/dev/null)" ] && echo "ok: 反映前の控えが build/ruleset-backup/ にある" || { echo "FAIL: 控えがない"; failures=$((failures + 1)); }
-grep -q '"enforcement": "disabled"' build/ruleset-backup/*.json && echo "ok: 控えは反映前の内容" || { echo "FAIL: 控えが反映前の内容でない"; failures=$((failures + 1)); }
+expect "確認変数があれば apply は反映する" 0 "main.json と同じになった" env CONFIRM_RULESET=yes node "$dir/ruleset-sync.mjs" apply
+expect "PUT は ruleset の endpoint に main.json を送る" 0 "rulesets/23297515 --input .github/rulesets/main.json" cat "$FAKE_LOG"
 
-sed -i 's/"CI gate"/"Old"/' "$FAKE_LIVE"
-expect "反映後も違えば apply は失敗する" 1 "反映後も" env FAKE_NOAPPLY=1 node "$dir/ruleset-sync.mjs" apply
+cp "$tmp/same.json" "$FAKE_LIVE" && sed -i 's/"CI gate"/"Old"/' "$FAKE_LIVE"
+expect "反映後も違えば apply は失敗する" 1 "反映後も" env CONFIRM_RULESET=yes FAKE_NOAPPLY=1 node "$dir/ruleset-sync.mjs" apply
+expect "PUT が失敗すれば apply も失敗する" 1 "" env CONFIRM_RULESET=yes FAKE_PUTFAIL=1 node "$dir/ruleset-sync.mjs" apply
 
 expect "引数がなければ使い方を出す" 2 "使い方" node "$dir/ruleset-sync.mjs"
 
