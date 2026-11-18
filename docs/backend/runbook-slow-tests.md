@@ -1,7 +1,7 @@
 ---
 type: Runbook
 title: バックエンドのテストが遅いときの調べ方
-description: バックエンドのテストがCIより遅いとき、他のセッションが動いていて遅いときに、遅いクラスと処理を特定する手順を示す。load averageの確認、CIの結果との比較、キャッシュを使わない再実行、テストのJVMのJFRでの記録を扱う。task test や pre-push の be-test が想定より長くかかるときに読む。
+description: バックエンドのテストがCIより遅いときや、ほかのセッションが動いていて遅いときに、遅いクラスと処理を特定する手順を示す。load averageの確認、CIの結果との比較、キャッシュを使わない再実行、テストのJVMのJFRでの記録を扱う。task test や pre-push の be-test が想定より長くかかるときに読む。
 tags: [runbook, backend, testing, performance]
 ---
 
@@ -11,10 +11,10 @@ tags: [runbook, backend, testing, performance]
 負荷が低いと確かめてから、CIのテスト結果とクラスごとに比べて遅いクラスを決め、そのクラスだけをキャッシュを使わずに実行し、テストのJVMをJFRで記録する。
 推測で原因を決めず、比較と記録の結果で決める。
 
-## 1. 先に負荷を見る
+## 1. ホストの負荷を見る
 
-他のセッションが同じホストでテストやビルドを流していると、CPUを取り合ってテストが遅くなる。
-負荷が高い間に測った所要時間は、CIの結果や別の回と比べられない。
+ほかのセッションが同じホストでテストやビルドを流していると、CPUを取り合ってテストが遅くなる。
+[#364](https://github.com/yokozi-jp/spring-modulith-ai-dlc/pull/364)では、4コアのWSLで`be-lint`、`be-test`、`be-image-build`を同時に実行したとき、ArchUnitの4クラスが単独の約6秒から約141秒（約23倍）に延びた。
 
 ```bash
 uptime   # 1分のload average
@@ -28,11 +28,8 @@ nproc
 ps -eo pcpu,args --sort=-pcpu | head
 ```
 
-他のセッションの処理が見つかったら、終わるのを待つか、止めてよいか利用者に聞く。
-クラスを分けたり、テストを外したりしない。
-
-負荷だけで、所要時間は桁違いに延びる。
-[#364](https://github.com/yokozi-jp/spring-modulith-ai-dlc/pull/364)では、`be-lint`、`be-test`、`be-image-build`を同時に実行したとき、ArchUnitの4クラスが単独の約6秒から約141秒（約23倍）に延びた。
+ほかのセッションの処理が見つかったら、終わるのを待つか、止めてよいか利用者に聞く。
+遅さの原因はテストの外にあるため、クラスを分けたり、テストを外したりしない。
 
 ## 2. CIと比べて遅いクラスを決める
 
