@@ -185,6 +185,10 @@ linkとbuttonの入れ子は、jsPluginの`ui-composition/no-button-in-link`が�
 要素は名前だけで判定するので、別名でimportしたcomponentは検出しない。
 変数に入れてから返す要素と、条件演算子で返す要素も検出しない。
 
+`useEffect`、`useLayoutEffect`、`useInsertionEffect`、`useEffectEvent`は、jsPluginの`react-rules/no-effect`がすべてのファイルで禁じる（[フロントエンドのルーティングと状態管理](../frontend/routing-and-state.md#effectの禁止)）。
+`react`からの名前付きimportと再export、default importの名前（`React.useEffect`）の参照、分割代入を報告する。
+自前の関数で包んだEffectは検出しない。
+
 組み合わせた結果は、`frontend/lint/lint-config.test.js`が`frontend/lint/fixtures/src/**`の違反例と正しい例を実際の設定でLintして確かめる。
 規則のoptionを追加または変更するときは、optionが許す範囲のすぐ外側の書き方を拒否するfixtureも置く。
 optionの名前から許す範囲を推測せず、規則の文書とfixtureで確かめる。
@@ -297,6 +301,11 @@ const params = { ...(cursor !== undefined && { cursor }) };
   `ruleset-check`も内部タスクで、`tooling/ruleset-check/test.sh`の後に`ruleset-check.mjs`が動く。
   `.github/rulesets/main.json`の必須チェックを、`branch-protection.md`の一覧とworkflowの`name`に突き合わせる。
   GitHub上のrulesetとの一致は検査しない。
+- **`task ci-gate-check`**：`ci.yml`の`CI gate`が、`pull_request`で動く検査を取りこぼしていないかを検査する。
+  `tooling/ci-gate-check/test.sh`を先に実行してから、`ci-gate-check.py`が実際の`.github/workflows/`を検査する。
+  `ci.yml`にジョブを足したときは`CI gate`の`needs`にも足し、`ci.yml`から呼ばない`pull_request`の workflow は`tooling/ci-gate-check/excluded.tsv`に理由を書く。
+  失敗にする状態は`test.sh`のケースが正で、この文書には写さない。
+  Python 3とPyYAMLが要る（GitHubのランナーには入っている。ローカルでは`sudo apt install python3-yaml`）。CIだけで実行し、Lefthookには入れない。
 - **`task skills-check`**：`skills-lock.json`と`.kiro/.kiro-plugins-installed`の記録が、`.agents/skills`の実体、`.kiro/skills`のリンク、`kiro/install.sh`が入れたファイルと合っているかを検査する。
   入れたファイルへの書き込みを止めるフックの自己検査（`.kiro/hooks/block-generated-writes.test.sh`）と`tooling/skills-check/test.sh`を先に実行してから、`tooling/skills-check/skills-check.mjs`が実際の木を検査する。
   失敗にする状態は`tooling/skills-check/test.sh`のケースが正で、この文書には写さない。
@@ -368,6 +377,7 @@ pre-pushの「変更」は、push済みかどうかやrebaseの有無によら�
 - **`trivy.yml`**：`scan-vulns`相当を実行する。
 - **`dast.yml`**：PRで`scan-dast`、週1回のscheduleと手動実行で`scan-dast-active`を実行し、Informationalを除いたSARIFをCode Scanningに送る。
 - **`actionlint.yml`**：`lint-actions`相当を実行する。
+- **`ci.yml`**：`pull_request`で動く検査を呼び出し、集約ジョブ`CI gate`が全ジョブの`success`を確かめる。`ci-gate-check`も実行する（[ADR-087](../adr/ADR-087-gate-required-checks-with-single-aggregate-job.md)）。
 - **`zizmor.yml`**：`lint-actions-security`相当を実行する。
 - **`hadolint.yml`**：`lint-docker`相当、`lint-docker-check`相当、バックエンドイメージのビルドと起動確認を実行する。
 - **`compose-config.yml`**：`lint-compose`相当を実行する。

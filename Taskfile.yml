@@ -410,6 +410,15 @@ tasks:
       - bash tooling/skills-check/test.sh
       - node tooling/skills-check/skills-check.mjs
 
+  # 検査の本体は tooling/ci-gate-check/ci-gate-check.py に置き、自己検査（test.sh）を先に実行する。
+  # 理由と除外の一覧の扱いは docs/adr/ADR-087 にある。
+  ci-gate-check:
+    desc: ci.yml の CI gate が pull_request の検査を取りこぼしていないか検証
+    silent: true
+    cmds:
+      - bash tooling/ci-gate-check/test.sh
+      - python3 tooling/ci-gate-check/ci-gate-check.py
+
   # 本体は tooling/agent-git/agent-git.sh、手順は docs/tooling/dev-workflow.md の「エージェントがcommitとpushをするとき」にある。
   # 呼んだディレクトリで動かし、commit のパスをそこからの相対で解釈する。
   # CLI_ARGS は Task が引数ごとにシェルの引用符を付けるので、空白を含むパスもそのまま渡る。

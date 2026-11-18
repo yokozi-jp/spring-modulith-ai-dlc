@@ -224,6 +224,7 @@ export default defineConfig(({ mode }) => {
         { name: "tailwind-classes", specifier: "./lint/tailwind-classes.js" },
         { name: "feature-boundaries", specifier: "./lint/feature-boundaries.js" },
         { name: "ui-composition", specifier: "./lint/ui-composition.js" },
+        { name: "react-rules", specifier: "./lint/react-rules.js" },
       ],
       rules: {
         // automatic JSX runtime、Vite設定、TanStack Routerの規約と両立しない規則。
@@ -291,6 +292,7 @@ export default defineConfig(({ mode }) => {
         "local-security/no-jsx-srcdoc": "error",
         "feature-boundaries/no-cross-feature-import": "error",
         "ui-composition/no-button-in-link": "error",
+        "react-rules/no-effect": "error",
         "shadcn/no-restyle": ["error", { allow: ["layout"] }],
         "shadcn/no-raw-colors": "error",
         "shadcn/no-arbitrary-values": ["error", { allow: ["layout"] }],
