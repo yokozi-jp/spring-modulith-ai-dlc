@@ -94,7 +94,7 @@ pre-commit:
 
           # frontend にステージ済み変更があるとき、作業ツリーを書き換えずformat、lint、型を検査する。
           # desc だけの変更でも重い fe-check が走るため、Taskfile.yml は glob に入れない。
-          # Taskfile の誤りは Frontend CI の fe-verify が検出する。
+          # fe-check と fe-test-build の定義の誤りは、Frontend CI の fe-verify が検出する。
           - name: frontend-check
             glob:
               - "frontend/**"

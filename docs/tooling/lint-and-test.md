@@ -319,7 +319,7 @@ const params = { ...(cursor !== undefined && { cursor }) };
   対象は、`lefthook.yml`と`.github/workflows/`のYAMLにある`task <名前>`である。
   名前が`task --list-all`のタスクにも別名にも無いと失敗する。
   失敗にする状態は`tooling/task-calls/test.sh`のケースが正で、この文書には写さない。
-  読み違える書き方は、`task-calls.sh`の`ponytail:`の注記にある。
+  読み違える書き方と見落とす書き方は、`task-calls.sh`の`ponytail:`の注記にある。
 - **`task adr-check`**：判断が絡む変更にADRが伴うかを確認する。
   `frontend/`の変更のうち、テストファイル（`*.test.*`、`*.spec.*`）、`frontend/e2e/`、`frontend/lint/fixtures/`、`frontend/src/testing/`は対象から外す。
   警告は止めず、`ADR_STRICT=1`で失敗にし、`ADR_ACK=1`で抑制する。

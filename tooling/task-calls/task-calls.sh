@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # task-calls.sh: lefthook.yml と .github/workflows の YAML が呼ぶ task <名前> が、task --list-all のタスクか別名にあるかを検査する。
-# 実行: bash tooling/task-calls/task-calls.sh [ルート。省略するとカレント]（task lint-taskfile が呼ぶ）
+# Run: bash tooling/task-calls/task-calls.sh [ルート。省略するとカレント] (task lint-taskfile が実行する)
 
 set -euo pipefail
 # [[:space:]] を ASCII の空白だけに一致させる。
@@ -16,16 +16,33 @@ skip='([[:space:]]+(-[^[:space:]]+|[A-Za-z_][A-Za-z0-9_]*=[^[:space:]]*))*'
 # 末尾の - と : は文の区切りとして名前に入れない。
 name='[A-Za-z_]([A-Za-z0-9_:-]*[A-Za-z0-9_])?'
 call="${boundary}task${skip}[[:space:]]+${name}"
-# ponytail: task の後のフラグと VAR=値 を飛ばした語を、コメントと name: 以外のどこでも呼び出しと読む。
-#   英語の文は、task の次の語を名前と読む（description: The task to run の to）。
-#   複数行の name: >- は、2 行目から後ろを呼び出しと読む。
-#   値を取るフラグは、値を名前と読む（task --taskfile x build の x）か、呼び出しを見落とす（task -d . build）。
-#   次の行に続く名前（run: > の折り返し、\ の継続）、引用符で囲んだ名前、./bin/task、式や変数で作る名前は見落とす。
-#   引用符の中でも空白の後の # はコメントと読むので、echo "see #1"; task x の x を見落とす。
-#   これらを lefthook.yml かワークフローに書くときは、YAML を解析して run の文字列を shell の規則で分ける node のスクリプトに替える。
+# ponytail: task の後のフラグと VAR=値 を飛ばした語を呼び出しと読む。
+#   コメントと name: の行は読まない。
+#   次の書き方は別の語を名前と読み、その語が無ければ失敗する。
+#   - 英語の文は、task の次の語を名前と読む（The task to run の to）。
+#   - 複数行の name: >- は、2 行目から後ろを呼び出しと読む。
+#   - 値を取るフラグは、値を名前と読む（task --taskfile x build の x）。
+#   - task -- x は、-- の後の x を名前と読む。
+#   - 点を含む名前は、点の前までを名前と読む（task a.b の a）。
+#   次の書き方は見落とす。
+#   見落としは報告しないので、この注記を読まないと気づかない。
+#   - 値を取るフラグの後の名前（task -d . build）。
+#   - 2 つ目から後ろの名前（task build gone の gone）。
+#   - 次の行に続く名前（run: > の折り返し、\ の継続）。
+#   - 引用符で囲んだ名前、./bin/task、式や変数で作る名前。
+#   - 空白の後の # から後ろ。引用符の中でも同じ（echo "see #1"; task x）。
+#   これらを lefthook.yml かワークフローに書くときは、
+#   YAML を解析し、run を shell の規則で分ける node のスクリプトに替える。
 
 root="${1:-.}"
-names="$(task -d "$root" --list-all --silent)"
+err="$(mktemp)"
+trap 'rm -f "$err"' EXIT
+# task は成功しても、標準エラーに警告を出すことがある（TASK_X_ の実験機能の案内など）。
+# 警告はこの検査の出力に混ぜず、task が失敗したときだけ出す。
+if ! names="$(task -d "$root" --list-all --silent 2>"$err")"; then
+  cat "$err" >&2
+  exit 1
+fi
 calls=0
 status=0
 
