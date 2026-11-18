@@ -48,7 +48,9 @@ componentの内部state、Hookの呼出回数、CSS classだけを主要な期�
 - **Testing Libraryの`waitFor`のcallback**：assertionを一つだけ置き、clickなどの副作用を置かない。
 - **差し替えてよい境界**：HTTPはMSW、globalは`vi.spyOn`か`vi.stubGlobal`、時刻はfake timerで置き換え、`vi.mock`と`vi.doMock`でmoduleを差し替えない。
   `vi.mock`と`vi.doMock`はOxlintの`vitest/no-restricted-vi-methods`が禁止する。
-- **テスト名**：利用者から見える振る舞いを書き、関数名やstate名を書かない。
+- **テスト名**：利用者から見える振る舞いを日本語で書き、関数名やstate名を書かない。
+  `it`、`test`、`describe`のtitleに日本語を1文字は含めることを、Oxlintの`vitest/valid-title`の`mustMatch`が検査する。
+  `describe`だけは、コードの名前をそのまま指す、空白を含まない1語のtitle（`resolveLocale`など）を許す。
 - **不安定なテスト**：Vitestの`retry`で隠さず、同じ変更で直すか削除し、`skip`で残さない。
   `skip`と`only`の残置はOxlintの`vitest/no-disabled-tests`と`vitest/no-focused-tests`が禁止する。
 

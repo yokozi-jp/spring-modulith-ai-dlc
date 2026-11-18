@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vite-plus/test";
 
-describe("order with waits whose timeout is fixed at 1 second", () => {
-  it("waits with vi.waitFor and vi.waitUntil", async () => {
+describe("timeout を 1 秒に固定した待ちを持つ注文", () => {
+  it("vi.waitFor と vi.waitUntil で待つ", async () => {
     const done = vi.fn<() => void>();
     done();
     await vi.waitFor(() => {

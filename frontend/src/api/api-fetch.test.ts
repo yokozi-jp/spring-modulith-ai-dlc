@@ -168,7 +168,7 @@ describe("api-fetch", () => {
     });
   });
 
-  describe("CSRF header", () => {
+  describe("CSRF の header", () => {
     const cookieValue = "0b1e5c1a-4f0e-4c55-9d8e-2f1a3b4c5d6e";
     const received: Headers[] = [];
 

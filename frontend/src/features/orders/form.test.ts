@@ -5,7 +5,7 @@ import { t } from "@/testing/catalog-i18n";
 import { firstErrorMessage, productOptions } from "./form";
 import { orderStatusLabel, salesStatusLabel } from "./order-status";
 
-describe("order form helpers", () => {
+describe("注文のフォームの補助", () => {
   it("errors の最初の issue の message を返し、なければ undefined を返す", () => {
     expect(firstErrorMessage([{ message: "first" }, { message: "second" }])).toBe("first");
     expect(firstErrorMessage([])).toBeUndefined();

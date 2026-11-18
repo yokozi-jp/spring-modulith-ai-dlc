@@ -30,12 +30,12 @@ function router(fullPath: string) {
   return { source, resolve };
 }
 
-describe("router telemetry", () => {
+describe("画面遷移のテレメトリ", () => {
   afterEach(() => {
     replaceTelemetryForTesting();
   });
 
-  it("records resolved transitions in order and ignores invalidation", async () => {
+  it("解決した遷移を順に記録し、URL が変わらない再解決（invalidate）は無視する", async () => {
     const setView = vi.fn<NonNullable<Sink["api"]["setView"]>>();
     const pushEvent = vi.fn<NonNullable<Sink["api"]["pushEvent"]>>();
     replaceTelemetryForTesting({
@@ -57,7 +57,7 @@ describe("router telemetry", () => {
     expect(setView).toHaveBeenCalledExactlyOnceWith({ name: "/" });
   });
 
-  it("does not send an untrusted route", () => {
+  it("信頼できない route は送らない", () => {
     const setView = vi.fn<NonNullable<Sink["api"]["setView"]>>();
     replaceTelemetryForTesting({
       api: { pushError: vi.fn<Sink["api"]["pushError"]>(), setView },
@@ -77,7 +77,7 @@ describe("resetTelemetrySession", () => {
     replaceTelemetryForTesting();
   });
 
-  it("removes the stored session, pauses, sets a new short id and resumes", async () => {
+  it("保存したセッションを消して一時停止し、新しい短い ID を設定してから再開する", async () => {
     const calls: string[] = [];
     vi.stubGlobal("sessionStorage", {
       removeItem: (key: string) => {
@@ -106,32 +106,35 @@ describe("resetTelemetrySession", () => {
     expect(calls).toStrictEqual(["remove:k", "pause", "set:Abc2345678", "unpause"]);
   });
 
-  it.each(["genShortID", "setSession"])("stays paused when %s fails", async (failure) => {
-    const unpause = vi.fn<() => void>();
-    function fail(name: string): void {
-      if (failure === name) {
-        throw new Error(`${name} failed`);
+  it.each(["genShortID", "setSession"])(
+    "%s が失敗すると一時停止したままにする",
+    async (failure) => {
+      const unpause = vi.fn<() => void>();
+      function fail(name: string): void {
+        if (failure === name) {
+          throw new Error(`${name} failed`);
+        }
       }
-    }
-    replaceTelemetryForTesting({
-      api: {
-        pushError: vi.fn<Sink["api"]["pushError"]>(),
-        setSession: () => {
-          fail("setSession");
+      replaceTelemetryForTesting({
+        api: {
+          pushError: vi.fn<Sink["api"]["pushError"]>(),
+          setSession: () => {
+            fail("setSession");
+          },
         },
-      },
-      unpause,
-      genShortID: () => {
-        fail("genShortID");
-        return "Abc2345678";
-      },
-    });
+        unpause,
+        genShortID: () => {
+          fail("genShortID");
+          return "Abc2345678";
+        },
+      });
 
-    await expect(resetTelemetrySession()).resolves.toBeUndefined();
-    expect(unpause).not.toHaveBeenCalled();
-  });
+      await expect(resetTelemetrySession()).resolves.toBeUndefined();
+      expect(unpause).not.toHaveBeenCalled();
+    },
+  );
 
-  it("keeps sending suppressed when unpause fails", async () => {
+  it("unpause が失敗しても送信を止めたままにする", async () => {
     const pushError = vi.fn<Sink["api"]["pushError"]>();
     replaceTelemetryForTesting({
       api: { pushError },
@@ -156,14 +159,14 @@ describe("untracedUrl", () => {
   }
 
   it.each(["http://localhost:5173/api", "/api/x", "/api?x=1", "/api#f"])(
-    "traces the same-origin API URL %s",
+    "同一オリジンの API の URL %s は trace する",
     (url) => {
       expect(untracedUrl(origin).test(absolute(url))).toBeFalsy();
     },
   );
 
   it.each(["/apix", "/collect", "http://localhost:8080/realms/demo", "http://other.test/api"])(
-    "does not trace %s",
+    "%s は trace しない",
     (url) => {
       expect(untracedUrl(origin).test(absolute(url))).toBe(true);
     },
@@ -175,7 +178,7 @@ describe("reportCaughtError", () => {
     replaceTelemetryForTesting();
   });
 
-  it("sends the same Error only once", async () => {
+  it("同じ Error は 1 回だけ送る", async () => {
     const pushError = vi.fn<NonNullable<Sink["api"]>["pushError"]>();
     replaceTelemetryForTesting({ api: { pushError }, trustedRoutes: [] });
     const error = new Error("caught");

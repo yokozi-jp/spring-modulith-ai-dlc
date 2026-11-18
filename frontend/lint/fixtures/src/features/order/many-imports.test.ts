@@ -11,8 +11,8 @@ import { describe, expect, it } from "vite-plus/test";
 
 import { orderPath } from "@/api/generated/order";
 
-describe("order with many imports", () => {
-  it("uses every import", () => {
+describe("import を多く持つ注文", () => {
+  it("すべての import を使う", () => {
     expect([
       useForm,
       useQuery,
