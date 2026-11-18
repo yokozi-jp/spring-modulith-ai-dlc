@@ -303,5 +303,4 @@ pre-push:
           echo "docker を使えないため zizmor をスキップします（CI で検査されます）。" >&2
           exit 0
         fi
-        docker run --rm -v "$PWD":/repo -w /repo \
-          ghcr.io/zizmorcore/zizmor:latest .github/workflows/ .github/actions/
+        task lint-actions-security
