@@ -21,6 +21,7 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.NestedExceptionUtils;
 
 /**
@@ -45,6 +46,10 @@ class ModuleRoleIsolationTest {
 
   /** 権限エラー（insufficient_privilege）の SQLSTATE。 */
   private static final String INSUFFICIENT_PRIVILEGE = "42501";
+
+  /** アプリロール。 */
+  @Value("${spring.datasource.username}")
+  private String appRole;
 
   /** テスト用の DB の jOOQ のコンテキスト。テストごとにロールバックする。 */
   @Autowired private DSLContext dsl;
@@ -148,6 +153,14 @@ class ModuleRoleIsolationTest {
     assertThatCode(() -> AsModule.run(dsl, ORDERING, insert)).doesNotThrowAnyException();
     assertPermissionDenied(() -> AsModule.run(dsl, ORDERING, select));
     assertPermissionDenied(() -> AsModule.run(dsl, ORDERING, update));
+  }
+
+  @Test
+  @DisplayName("モジュールのロールの本体が失敗しても、呼び出し元のトランザクションはアプリロールへ戻る")
+  void roleIsRestoredAfterFailedBody() {
+    assertPermissionDenied(() -> AsModule.run(dsl, ORDERING, tx -> tx.fetchCount(T_PAYMENT)));
+
+    assertThat(dsl.fetchValue("select current_user")).isEqualTo(appRole);
   }
 
   private static void assertPermissionDenied(final Runnable action) {
