@@ -109,7 +109,7 @@ Taskのテスト系タスクは、`.env.test`に足りない変数を`.env.test.
 
 マイグレーション用のロールをsuperuserから分けた変更の後は、既存の`.env`へ`.env.example`の`POSTGRES_SUPERUSER_PASSWORD`の行を足す（[DB接続情報とロール分離](../database/connections.md)）。
 この行がないと、`task compose-up`と`task dev`はPostgreSQLのsecretを作れずに止まる。
-既存の`postgres_data`ボリュームでは`docker/initdb`が再実行されず、`demo_migration`はsuperuserのまま残るため、`task compose-reset CONFIRM_RESET=yes`で作り直してから`task be-migrate`を実行する。
+既存の`postgres_data`ボリュームでは`docker/initdb`が再実行されず、`demo_migration`はsuperuserのまま残るため、`task compose-reset CONFIRM_RESET=yes`でボリュームを消し（ほかのサービスのデータも消える）、`task compose-up`で起動してから`task be-migrate`を実行する。
 
 公開先は次のとおり。
 
