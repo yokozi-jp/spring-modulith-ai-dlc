@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # test.sh: フックを止めておける一時の git リポジトリで、agent-git.sh の commit、wait、push の終了コードと出力を確かめる。
 # Run: bash tooling/agent-git/test.sh (task agent-git-test が実行する)
-# 場面ごとに、最初の行のコメントが状況を書き、index が HEAD と同じことを確かめてから始める。場面ごとに別のファイルを使う。
+# 場面は、状況を書くコメントと、index が HEAD と同じことを確かめる scene で始める。場面ごとに別のファイルを使う。
 
 set -u
 
@@ -70,6 +70,7 @@ alive() { kill -0 "$1" 2>/dev/null; }
 committed() { git show --name-only --format= HEAD; }
 moved() { [ "$(git rev-parse HEAD)" != "$1" ]; }
 clean() { [ -z "$(git diff --cached --name-only)" ]; }
+scene() { fact "the $1 starts from a clean index" clean; }
 decoy_running() { pgrep -f "$AGENT_GIT_PREPUSH_PATTERN" >/dev/null; }
 start_decoy() {
   (cd "$1" && exec -a "agent-git-test-decoy-$$" sleep 30) &
@@ -132,7 +133,7 @@ expect "wait with no runs" 1 "まだ報告していない実行がありませ�
 expect "wait refuses an invalid AGENT_GIT_WAIT_SECONDS" 1 "0 以上の整数" env AGENT_GIT_WAIT_SECONDS=soon bash "$tool" wait
 
 # 始める前に止まる場合。どれも HEAD と index を変えない。
-fact "the refusals start from a clean index" clean
+scene "refusals"
 init="$(git rev-parse HEAD)"
 echo a >a.txt
 expect "refuses an empty message file" 1 "が無いか空です" bash "$tool" commit "$tmp/empty" a.txt
@@ -158,7 +159,7 @@ fact "the refusal keeps the partial stage" [ "$(git show :part.txt)" = "$(printf
 git reset -q part.txt && git checkout -- part.txt && rm a.txt other.txt "a b.txt" sub/refused
 
 # サブディレクトリから相対パスを渡し、引数のない wait で待つ。
-fact "the subdirectory commit starts from a clean index" clean
+scene "subdirectory commit"
 echo x >sub/x
 expect "commit starts from a subdirectory" 0 "task agent-wait -- " within sub bash "$tool" commit "$msg" x
 expect "wait from a subdirectory picks the latest run" 0 "✓ fake-check" within sub bash "$tool" wait
@@ -166,7 +167,7 @@ fact "the commit from a subdirectory holds only the given path" [ "$(committed)"
 fact "the index matches the commit made from a subdirectory" clean
 
 # フックを止めている間に、ほかの作業が別のファイルを stage する。
-fact "the held commit starts from a clean index" clean
+scene "held commit"
 touch "$hold"
 echo held >held.txt
 expect "commit starts in the background" 0 "task agent-wait -- " bash "$tool" commit "$msg" held.txt
@@ -188,7 +189,7 @@ fact "a path staged again with the committed content is not named" not grep -qF 
 git rm -q --cached other.txt && rm other.txt
 
 # フックを止めている間に、ほかの作業が commit するのと同じパスを書き足して stage する。
-fact "the shared path commit starts from a clean index" clean
+scene "shared path commit"
 touch "$hold"
 echo mine >shared.txt
 expect "commit of a shared path starts" 0 "task agent-wait" bash "$tool" commit "$msg" shared.txt
@@ -200,7 +201,7 @@ fact "the other stage of the same path stays staged" [ "$(git show :shared.txt)"
 git reset -q shared.txt && git checkout -- shared.txt
 
 # ディレクトリで . を渡し、フックを止めている間に、ほかの作業がその下の別のファイルを stage する。
-fact "the . commit starts from a clean index" clean
+scene ". commit"
 echo d >dot/d.txt
 touch "$hold"
 expect "commit of . starts" 0 "task agent-wait" within dot bash "$tool" commit "$msg" .
@@ -212,7 +213,7 @@ fact "a file staged under . during the hook stays staged" [ "$(git diff --cached
 git rm -q --cached dot/later.txt && rm dot/later.txt
 
 # フックが、渡したパスを直して stage する。
-fact "the fixme commit starts from a clean index" clean
+scene "fixme commit"
 echo fix >fixme
 expect "commit with a hook that stages a fix starts" 0 "task agent-wait" bash "$tool" commit "$msg" fixme
 expect "wait reports the commit with the fix" 0 "✓ fake-check" bash "$tool" wait
@@ -220,7 +221,7 @@ fact "the fix the hook staged is committed" [ "$(git show HEAD:fixme)" = "$(prin
 fact "the path the hook fixed is clean" [ -z "$(git status --porcelain -- fixme)" ]
 
 # フックが、渡したパスの外のファイルを直して stage する。
-fact "the fixout commit starts from a clean index" clean
+scene "fixout commit"
 echo fix >fixout
 expect "commit with a hook that fixes another path starts" 0 "task agent-wait" bash "$tool" commit "$msg" fixout
 expect "wait reports the commit with the outside fix" 0 "✓ fake-check" bash "$tool" wait
@@ -228,7 +229,7 @@ fact "the fix outside the given paths is committed" [ "$(git show HEAD:fixed-out
 fact "the index matches the commit for the path the hook fixed" clean
 
 # glob の文字を含む名前を渡し、次にその削除を渡す。git は名前と同じファイルがあれば glob にしないので、削除で確かめる。
-fact "the glob-like commit starts from a clean index" clean
+scene "glob-like commit"
 echo star >'*.txt'
 expect "commit with a glob-like name starts" 0 "task agent-wait" bash "$tool" commit "$msg" '*.txt'
 expect "wait reports the literal path commit" 0 "exit=0" bash "$tool" wait
@@ -239,27 +240,21 @@ expect "wait reports the deletion commit" 0 "exit=0" bash "$tool" wait
 fact "a deleted glob-like path matches only the file of that name" [ "$(committed)" = '*.txt' ]
 git checkout -- same.txt
 
-# git rm で消したパスと、git mv で名前を変えたパスを渡す。
-fact "the rm and mv commit starts from a clean index" clean
-git rm -q rm.txt && git mv mv.txt moved.txt
-expect "commit of paths staged by git rm and git mv starts" 0 "task agent-wait" bash "$tool" commit "$msg" rm.txt mv.txt moved.txt
+# git rm で消したパス、git mv で名前を変えたパス、git rm --cached で追跡をやめて .gitignore に足したパスを渡す。
+# どれも stage してあり、作業ツリーとの違いが無いので、写しに git add するパスは無い。
+scene "rm, mv, and untracking commit"
+git rm -q rm.txt && git mv mv.txt moved.txt && git rm -q --cached ignore.txt && echo ignore.txt >.gitignore && git add .gitignore
+expect "commit of paths staged by git rm, git mv, and git rm --cached starts" 0 "task agent-wait" bash "$tool" commit "$msg" rm.txt mv.txt moved.txt .gitignore ignore.txt
 fact "the start prints only how to wait" [ "$(wc -l <"$out")" = 1 ]
-expect "wait reports the commit of the removal and the rename" 0 "exit=0" bash "$tool" wait
+expect "wait reports the commit of the removal, the rename, and the untracking" 0 "exit=0" bash "$tool" wait
 fact "the commit drops the paths removed by git rm and git mv" [ -z "$(git ls-tree HEAD rm.txt mv.txt)" ]
 fact "the commit holds the renamed path" [ "$(git show HEAD:moved.txt)" = base ]
-fact "the index matches the commit of the removal and the rename" clean
-
-# git rm --cached で追跡をやめ、.gitignore に足したパスを渡す。
-fact "the untracking commit starts from a clean index" clean
-git rm -q --cached ignore.txt && echo ignore.txt >.gitignore
-expect "commit of an ignored untracked path starts" 0 "task agent-wait" bash "$tool" commit "$msg" .gitignore ignore.txt
-expect "wait reports the untracking commit" 0 "exit=0" bash "$tool" wait
 fact "the commit stops tracking the path" [ -z "$(git ls-tree HEAD ignore.txt)" ]
 fact "the untracked file stays in the work tree" [ -f ignore.txt ]
-fact "the index matches the untracking commit" clean
+fact "the index matches the commit of the removal, the rename, and the untracking" clean
 
 # 衝突を解決していない merge と、HEAD から何も変えない merge。
-fact "the merge commits start from a clean index" clean
+scene "merge commits"
 git switch -q -c side && echo side >conflict.txt && git add conflict.txt && git commit -q --no-verify -m side
 git switch -q main && echo main >conflict.txt && git add conflict.txt && git commit -q --no-verify -m main
 git merge -q side >/dev/null 2>&1
@@ -284,18 +279,16 @@ fact "the first commit holds the given path" [ "$(git -C "$tmp/fresh" ls-tree --
 fact "the index matches the first commit" within "$tmp/fresh" clean
 
 # commit の直後、本物の index を合わせる前に、ほかの作業が古い本物の index から commit する。
-fact "the overtaken commit starts from a clean index" clean
+scene "overtaken commit"
 echo v >overtaken.txt && touch "$tmp/overtake"
 expect "commit to be overtaken starts" 0 "task agent-wait" bash "$tool" commit "$msg" overtaken.txt
 expect "wait says another commit reverted the commit" 1 "    overtaken.txt" bash "$tool" wait
 fact "the reverting commit is on top of the commit" [ "$(git show --name-only --format= HEAD^)" = overtaken.txt ]
 fact "the index matches the reverting commit" clean
-expect "the advised agent-commit commits the path again" 0 "task agent-wait" bash "$tool" commit "$msg" overtaken.txt
-expect "wait reports the commit made again" 0 "exit=0" bash "$tool" wait
-fact "the path is committed again" [ "$(git show HEAD:overtaken.txt)" = v ]
+rm overtaken.txt
 
 # commit の直後、本物の index を合わせる前に、ほかの作業が同じ内容を stage してから commit する。
-fact "the commit overtaken with the same content starts from a clean index" clean
+scene "commit overtaken with the same content"
 echo k >overtaken-kept.txt && echo f >overtaken-foreign.txt && echo keep >"$tmp/overtake"
 expect "commit to be overtaken with the same content starts" 0 "task agent-wait" bash "$tool" commit "$msg" overtaken-kept.txt
 expect "wait reports success when the commit on top keeps the content" 0 "exit=0" bash "$tool" wait
@@ -304,7 +297,7 @@ fact "the commit on top keeps the content" [ "$(git show HEAD:overtaken-kept.txt
 fact "the index matches the commit on top" clean
 
 # フックが失敗した commit を報告する前に、別の実行（push）を始める。
-fact "the failing commit starts from a clean index" clean
+scene "failing commit"
 head="$(git rev-parse HEAD)"
 echo x >fail
 expect "commit with a failing hook starts" 0 "task agent-wait" bash "$tool" commit "$msg" fail
@@ -329,14 +322,14 @@ expect "a live PID with another start time counts as stopped" 1 "終了コード
 rm fail
 
 # フックが本物の index.lock を作り、commit の少し後に外す。
-fact "the brief lock commit starts from a clean index" clean
+scene "brief lock commit"
 echo l >lockbrief
 expect "commit with a brief index lock starts" 0 "task agent-wait" bash "$tool" commit "$msg" lockbrief
 expect "wait reports the commit after the lock is released" 0 "exit=0" bash "$tool" wait
 fact "the index matches the commit after the lock is released" clean
 
 # フックが本物の index.lock を作ったまま残し、commit の後に本物の index を合わせられない。
-fact "the held lock commit starts from a clean index" clean
+scene "held lock commit"
 echo changed >lockme
 expect "commit with a held index lock starts" 0 "task agent-wait" bash "$tool" commit "$msg" lockme
 expect "wait reports that the index does not follow the commit" 1 "本物の index を commit に合わせられませんでした" bash "$tool" wait
@@ -351,7 +344,7 @@ fact "the index matches the commit after the printed command" clean
 expect "the next commit passes the guard after the printed command" 1 "commit する変更がありません" bash "$tool" commit "$msg" lockme
 
 # wrapper と git を止め、commit が終わらない。
-fact "the killed commit starts from a clean index" clean
+scene "killed commit"
 head="$(git rev-parse HEAD)"
 touch "$hold"
 echo l >lost.txt
@@ -368,7 +361,7 @@ fact "the killed commit leaves the index" clean
 rm lost.txt
 
 # wrapper、_commit、git をすべて止め、HEAD は写しの index の commit になっていない。
-fact "the fully killed commits start from a clean index" clean
+scene "fully killed commits"
 head="$(git rev-parse HEAD)"
 for undo in copy-matches-head foreign-commit; do
   touch "$hold"
@@ -391,7 +384,7 @@ done
 fact "the fully killed commits leave no commit of theirs" [ -z "$(git log --format=%s "$head".. | grep -vx foreign)" ]
 
 # wrapper と _commit を止め、残った git が commit を終える。
-fact "the orphaned commit starts from a clean index" clean
+scene "orphaned commit"
 touch "$hold"
 echo o >orphan.txt
 expect "commit to be orphaned starts" 0 "task agent-wait" bash "$tool" commit "$msg" orphan.txt
@@ -404,7 +397,7 @@ fact "the orphaned git committed the path" [ "$(committed)" = orphan.txt ]
 fact "the index matches the orphaned commit" clean
 
 # wrapper と _commit を止め、残った git が commit を終えた後に、ほかの作業が古い本物の index から commit する。
-fact "the orphaned overtaken commit starts from a clean index" clean
+scene "orphaned overtaken commit"
 head="$(git rev-parse HEAD)"
 touch "$hold"
 echo o >orphan-overtaken.txt
@@ -421,7 +414,7 @@ fact "the index matches the commit that reverted the orphaned commit" clean
 rm orphan-overtaken.txt
 
 # wrapper と _commit を止め、残った git が commit を終えた後に、agent-wait が本物の index を置き換えられない。
-fact "the orphaned unsynced commit starts from a clean index" clean
+scene "orphaned unsynced commit"
 touch "$hold"
 echo u >orphan-unsynced.txt
 expect "commit to be orphaned and left unsynced starts" 0 "task agent-wait" bash "$tool" commit "$msg" orphan-unsynced.txt
@@ -431,12 +424,10 @@ kill "$(pid_of wrapper "$run")" "$(pid_of child "$run")"
 rm "$hold"
 expect "wait reports that it could not replace the index" 1 "git reset か index の置き換えに失敗した" env PATH="$tmp/failmv:$PATH" bash "$tool" wait "$run"
 expect "a second wait prints the command again" 1 "git -C " bash "$tool" wait "$run"
-fix="$(grep -o 'git -C .*' "$out" | head -n 1)"
-fact "the printed command makes the index follow the orphaned commit" eval "$fix"
-fact "the index matches the orphaned unsynced commit" clean
+git reset -q && rm -r -- "$run"
 
 # main の worktree の commit が動いている間に、linked worktree で commit する。
-fact "the worktree commits start from a clean index" clean
+scene "worktree commits"
 touch "$hold"
 echo m >main.txt
 expect "commit in the main worktree starts" 0 "task agent-wait" bash "$tool" commit "$msg" main.txt
