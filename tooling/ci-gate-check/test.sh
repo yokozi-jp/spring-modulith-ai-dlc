@@ -47,12 +47,24 @@ cat > "$base/backend.yml" <<'YAML'
 name: Backend
 on:
   push:
+    paths:
+      - 'a/**'
+      - 'b.yml'
   pull_request:
   workflow_call:
 concurrency:
   group: backend-${{ github.workflow }}-${{ github.ref }}
 jobs:
+  changes:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Detect changed paths
+        run: |
+          bash tooling/ci-changes/changed.sh \
+            'a/**' \
+            'b.yml'
   test:
+    needs: changes
     runs-on: ubuntu-latest
     steps:
       - run: "true"
@@ -97,6 +109,10 @@ expect "gate の if: always() がないと失敗" 1 "if: always() がありま�
 d="$(case_dir uncalled)"
 cp "$d/e2e.yml" "$d/lint.yml"
 expect "呼ばれず除外もない pull_request の workflow を見つける" 1 "lint.yml は pull_request で動きますが" check "$d"
+
+d="$(case_dir paths-drift)"
+sed -i "s|^            'b.yml'\$|            'c.yml'|" "$d/backend.yml"
+expect "push の paths: と changed.sh の引数が違うと失敗" 1 "push の paths: と changed.sh の引数が違います" check "$d"
 
 d="$(case_dir not-callable)"
 sed -i '/workflow_call:/d' "$d/backend.yml"

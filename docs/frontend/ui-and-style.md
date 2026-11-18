@@ -20,6 +20,9 @@ featureに依存しないUI primitiveは `components/ui` に置き、shadcnのBa
 
 共有primitiveを組み合わせた業務componentは、利用するfeatureの `components` に置く。
 
+componentは関数componentだけで書く。
+クラスcomponentはOxlintの `react/prefer-function-component` が検査し、`task fe-check` とCIで失敗にする。
+
 HTMLの意味と標準操作を優先し、button、label、heading、tableなどのnative semanticsを不要な `div` とARIAで置き換えない。
 
 Base UIが提供するkeyboard操作、focus管理、ARIA属性を維持し、見た目のためにアクセシビリティを削らない。
