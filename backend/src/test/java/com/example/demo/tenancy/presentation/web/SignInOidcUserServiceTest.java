@@ -149,6 +149,24 @@ class SignInOidcUserServiceTest {
     verify(handler, times(0)).handle(any());
   }
 
+  @Test
+  @DisplayName("ID トークンの sub が OIDC の上限の 255 文字を超えたら、利用者を引かずにログインを失敗させる")
+  void rejectsSubjectLongerThanOidcLimit() {
+    final OidcIdToken idToken =
+        OidcIdToken.withTokenValue("id-token")
+            .issuer(ISSUER)
+            .subject("s".repeat(256))
+            .issuedAt(Instant.parse("2026-10-01T00:00:00Z"))
+            .expiresAt(Instant.parse("2026-10-01T00:05:00Z"))
+            .build();
+    when(delegate.loadUser(any()))
+        .thenReturn(new DefaultOidcUser(AuthorityUtils.createAuthorityList("OIDC_USER"), idToken));
+
+    assertThatThrownBy(() -> service.loadUser(mock(OidcUserRequest.class)))
+        .isInstanceOf(OAuth2AuthenticationException.class);
+    verify(handler, times(0)).handle(any());
+  }
+
   private static DefaultOidcUser idpUser(final Map<String, Object> extraClaims) {
     final OidcIdToken idToken =
         OidcIdToken.withTokenValue("id-token")

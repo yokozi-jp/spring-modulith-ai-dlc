@@ -148,6 +148,38 @@ class SignInOidcUserLoginTest {
     assertThat(user.getName()).isNotEqualTo(subject);
   }
 
+  @Test
+  @DisplayName("別の利用者のセッションが残ったままの初めてのログインは、作成者と更新者に別の利用者でなく処理の名前を登録する")
+  void firstLoginOverAnotherUsersSessionRegistersTheProcessAsOperator() {
+    final OidcUser previous = login(newSubject());
+    final OAuth2AuthenticationToken previousAuthentication =
+        new OAuth2AuthenticationToken(previous, previous.getAuthorities(), "web");
+    SecurityContextHolder.getContext().setAuthentication(previousAuthentication);
+    final String subject = newSubject();
+
+    login(subject);
+
+    final List<String> operators =
+        AsModule.call(
+            dsl,
+            "tenancy",
+            tx ->
+                List.of(
+                    tx.select(M_USER.CREATED_BY, M_USER.UPDATED_BY)
+                        .from(M_USER)
+                        .join(M_USER_IDENTITY)
+                        .on(M_USER_IDENTITY.USER_ID.eq(M_USER.USER_ID))
+                        .where(M_USER_IDENTITY.SUBJECT_CODE.eq(subject))
+                        .fetchSingle()
+                        .into(String[].class)));
+    assertThat(operators)
+        .as("subject=%s の利用者の作成者と更新者", subject)
+        .containsExactly("tenancy.SignInUser", "tenancy.SignInUser");
+    assertThat(SecurityContextHolder.getContext().getAuthentication())
+        .as("ログインの処理の後の、残っていたセッションの認証")
+        .isSameAs(previousAuthentication);
+  }
+
   /** ID トークンを受けた後の、アプリの利用者を作るサービスを呼ぶ。 */
   private OidcUser login(final String subject) {
     // 共有構成の登録は userinfo の URL を持ち、標準の実装が IdP を呼ぶ。テストでは呼ばせない。
