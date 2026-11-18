@@ -63,7 +63,7 @@ class PublicIdArchTest {
         .because(
             "主キーは同じモジュールのスキーマと Repository の中だけで使い、モジュールの外に出る値には public_id を使うため。"
                 + "直し方：違反した項目を、主キーの数値ではなく public_id の値にする。"
-                + "対象の型と値の形は規約の「使い分けの検査」に示す。"
+                + "対象の型は「使い分けの検査」に、値の形は「主キーと公開用IDの使い分け」に示す。"
                 + "規約：docs/database/postgresql-primary-keys.md");
   }
 

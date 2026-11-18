@@ -34,7 +34,8 @@ ArchUnit と Spectral の初版は型引数と配列の要素を見ず、`List<L
 一度に複数の行を引く引数は、この形をとることが多い。
 そのため、名前が `ids` か `Ids` で終わるものと、型引数と配列の要素の数値も検査の対象にした。
 また、ArchUnit の検査の対象の型の範囲を、この ADR と規約文書と ArchUnit の失敗メッセージに重ねて書いていたため、レビューの間に2回食い違った。
-そのため、範囲は規約文書の「使い分けの検査」にだけ書き、Decision からはそこへリンクする形に書き直した。
+規則 P3 と Spectral の検査の対象の範囲も、この ADR と規約文書と `.spectral.yaml` と OpenAPI の注釈の規約に重ねて書いていた。
+そのため、三つの検査の範囲は規約文書の「使い分けの検査」にだけ書き、Decision からはそこへリンクする形に書き直した。
 
 ## Decision
 
@@ -50,13 +51,12 @@ ArchUnit と Spectral の初版は型引数と配列の要素を見ず、`List<L
 
 使い分けを、次の三つの検査で確かめる。
 
-- カタログの検査（`SchemaTableConventions`）の規則 P3 は、名前が `_id` で終わる列を、同じスキーマのテーブルの主キーと同じ名前の列か、`uuid` の `public_id` か `<対象>_public_id` に限る。
+- カタログの検査（`SchemaTableConventions`）の規則 P3 は、行を指す `_id` の列を、同じスキーマの主キーか `uuid` の公開用 ID に限る。
   規則 P4 は、別のスキーマのテーブルを参照する外部キーを拒否する。
 - ArchUnit の `numericIdsDoNotLeaveModules` は、モジュールの外に出る型に、数値の ID のフィールド、引数、戻り値を置かせない。
-  対象の型の範囲と、数値の ID とみなす名前と型は、[PostgreSQLの主キー](../database/postgresql-primary-keys.md#使い分けの検査)の「使い分けの検査」に示す。
-- Spectral の `public-id-uuid` は、API のパスの引数と、名前が `id` か `Id` で終わるクエリの引数と property を `type: string`、`format: uuid` に限る。
-  名前が `ids` か `Ids` で終わるクエリの引数と property は、配列の要素を同じ型に限る。
-  トレース ID とスパン ID は行を指す識別子ではなく、UUID でもないため、`traceId` と `spanId` の property とヘッダーの引数は対象にしない。
+- Spectral の `public-id-uuid` は、API の ID を `type: string`、`format: uuid` に限る。
+
+三つの検査の対象の範囲（ArchUnit が数値の ID とみなす名前と型を含む）は、[PostgreSQLの主キー](../database/postgresql-primary-keys.md#使い分けの検査)の「使い分けの検査」に示す。
 
 外部のシステムが採番した識別子を持つ列は行を指さないため、名前を `_code` で終える（`payment.t_payment.gateway_payment_code`）。
 
