@@ -358,7 +358,7 @@ pitest {
 
 /*
  * Spotless: コードフォーマット
- * Google Java Format を適用。origin/main からの差分のみチェックする。
+ * Google Java Format を適用。origin/main から変えたファイルを、全体でチェックする。
  */
 spotless {
     ratchetFrom 'origin/main'
