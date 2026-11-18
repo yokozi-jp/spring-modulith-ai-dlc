@@ -91,6 +91,9 @@ sys.exit(any(version(p.split("==")[0]) != p.split("==")[1] for p in sys.argv[1:]
   [ -n "${KIRO_WEB_NO_DOCKER:-}" ] || "$KIRO_WEB_HOME/bin/docker" info >/dev/null
 )
 
-_kw_setup || echo "kiro-web: セットアップに失敗しました" >&2
+# 失敗を呼び出し元へ返す。iwe-mcp.sh の set -e と kiro-web-netns の && は、これで止まる。
+_kw_status=0
+_kw_setup || { _kw_status=$?; echo "kiro-web: セットアップに失敗しました" >&2; }
 unset -f _kw_setup
 unset _kw_repo _kw_mise_version
+eval "unset _kw_status; return $_kw_status"
