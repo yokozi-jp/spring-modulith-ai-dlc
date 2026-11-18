@@ -9,7 +9,7 @@ tags: [adr, frontend, vite-plus, monorepo]
 
 ## Status
 
-Proposed
+Accepted
 
 ## Date
 

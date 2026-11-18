@@ -275,7 +275,10 @@ describe("Vite configuration", { timeout: 60_000 }, () => {
       const contentSecurityPolicy = String(config.preview.headers?.["Content-Security-Policy"]);
 
       for (const file of ["passive.yaml", "active.yaml"]) {
-        const zapPlan = readFileSync(new URL(`../docker/zap/${file}`, import.meta.url), "utf8");
+        const zapPlan = readFileSync(
+          new URL(`../../../docker/zap/${file}`, import.meta.url),
+          "utf8",
+        );
         expect(zapPlan).toContain(`evidence: "${contentSecurityPolicy}"`);
       }
     });
@@ -394,7 +397,7 @@ describe("Vite configuration", { timeout: 60_000 }, () => {
       expect(app).toStrictEqual({
         name: "demo-web",
         namespace: "demo",
-        version: readFileSync(new URL("../version.txt", import.meta.url), "utf8").trim(),
+        version: readFileSync(new URL("../../../version.txt", import.meta.url), "utf8").trim(),
         environment: "test",
       });
     });

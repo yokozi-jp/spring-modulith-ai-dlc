@@ -93,7 +93,7 @@ clone したら、[スキルの取得元と更新](docs/agents/skill-sources.md)
 | インフラとツール | Task                       | 3.53.1     | タスクランナー                                 |
 
 ログ相関、PII、保持は[可観測性データの規約](docs/observability/conventions.md)、フロントエンドの構成は[フロントエンドアーキテクチャ](docs/frontend/architecture.md)を参照してください。
-その他のパッケージのバージョンは `backend/build.gradle` と `frontend/package.json` を参照してください。
+その他のパッケージのバージョンは `backend/build.gradle` と、`frontend/` の下の各 `package.json` を参照してください。
 
 <p align="right">(<a href="#top">トップへ</a>)</p>
 
@@ -147,7 +147,7 @@ clone したら、[スキルの取得元と更新](docs/agents/skill-sources.md)
 │   ├── web-api/          # Web API の設計と契約
 │   ├── writing/          # 日本語の技術文書の書き方
 │   └── index.md          # docs の入口
-├── frontend/         # React + TanStack Router + TypeScript の SPA（VitePlus、pnpm）
+├── frontend/         # Vite+ と pnpm の workspace（apps/web が React + TanStack Router + TypeScript の SPA）
 ├── infrastructure/   # インフラ定義（未整備）
 ├── openapi/          # コミット済みの OpenAPI 契約（openapi.yaml、生成物）と Spectral のルールの fixture
 ├── .betterleaks.toml # betterleaks（シークレットスキャナ）設定
@@ -207,7 +207,7 @@ task <タスク名>
 - **`task fe-verify`**：フロントエンドの静的解析、未使用コード検査、テスト、本番ビルド。
 - **`task lint-duplicates`**：バックエンドとフロントエンドの手書きコードの重複検査。
 
-初めて起動するときと、`frontend/package.json`か`frontend/pnpm-lock.yaml`が変わったときは、`task fe-dev`の前に`task fe-install`でフロントエンドの依存をインストールします。
+初めて起動するときと、`frontend/`の下の`package.json`か`frontend/pnpm-lock.yaml`が変わったときは、`task fe-dev`の前に`task fe-install`でフロントエンドの依存をインストールします。
 
 開発用の代表データは次の二つで入れます。
 
@@ -248,7 +248,7 @@ Docker Compose の操作（サービスの起動、停止、状態確認、Keycl
 
 ### E2E
 
-- `task e2e` は frontend と backend イメージをビルドし、compose-test で依存サービスと backend を起動して migration と代表データを入れ、Vite preview に対して Playwright を実行してから、backend のログを `frontend/test-results/backend.log` に残して後片付けします。
+- `task e2e` は frontend と backend イメージをビルドし、compose-test で依存サービスと backend を起動して migration と代表データを入れ、Vite preview に対して Playwright を実行してから、backend のログを `frontend/apps/web/test-results/backend.log` に残して後片付けします。
 - 開発用の Vite（5173）と Keycloak（8080）を止めてから実行します。
   失敗した環境を調べるときは `E2E_KEEP_ENV=1 task e2e` で残せます（CI では常に片付けます）。
 - CI の `E2E tests 🎭` は対象パスの変更でだけ起動し、必須チェックにはしていません。
@@ -256,7 +256,7 @@ Docker Compose の操作（サービスの起動、停止、状態確認、Keycl
 
 ### API 契約
 
-- `task api-gen` は `openapi/openapi.yaml` の生成、Spectral の検査、Orval による `frontend/src/api/generated` の再生成を実行します。
+- `task api-gen` は `openapi/openapi.yaml` の生成、Spectral の検査、Orval による `frontend/apps/web/src/api/generated` の再生成を実行します。
 - `task api-check` は再生成した契約と生成物がコミット済みの内容と一致するかを検査します。
 - `task api-client-check` は DB なしで Orval の生成物だけを再生成して検査し、pre-commit と Frontend CI で実行します。
 - `task be-openapi-check` は直前の `task be-test` が書き出した契約を検査し、Backend CI で実行します。

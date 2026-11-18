@@ -28,10 +28,15 @@ OpenAPIからOrvalでnative FetchのTanStack Query clientを生成し、手書�
 
 ## 現在の構成
 
-現在の `src` は、アプリケーションの起動、ルーティング、アプリシェル、routerの既定の状態表示、API clientのmutatorと `QueryClient` の生成と生成した型、共通UI、国際化、テレメトリの初期化と送信、小さなutility、テストの準備のコードだけを持つ。
+`frontend/` は Vite+ の workspace のルートであり、アプリを `apps/<アプリ名>/` に置く（[ADR-092](../adr/ADR-092-split-frontend-into-vite-plus-workspace.md)）。
+今のアプリは `apps/web/`（package 名 `@frontend/web`）だけである。
+ルートは、workspace の定義（`pnpm-workspace.yaml`）、lockfile、Oxlint と Oxfmt の設定（`vite.config.ts` の `lint` と `fmt`）、Oxlint の JS plugin（`lint/`）、Knip の設定（`knip.json`）を持つ。
+`apps/web/` は、build、開発サーバー、テストの設定（`vite.config.ts`）、Orval と Playwright の設定、`src/`、`e2e/`、`public/` を持つ。
+
+現在の `apps/web/src` は、アプリケーションの起動、ルーティング、アプリシェル、routerの既定の状態表示、API clientのmutatorと `QueryClient` の生成と生成した型、共通UI、国際化、テレメトリの初期化と送信、小さなutility、テストの準備のコードだけを持つ。
 
 ``` text
-frontend/src/
+frontend/apps/web/src/
 ├── main.tsx
 ├── router-defaults.ts
 ├── router-defaults.test.tsx
@@ -113,7 +118,7 @@ CSP違反の報告はFaroと `lib/telemetry.ts` を通さない。
 最初の業務機能を追加した後は、必要な範囲で次の構成へ拡張する。
 
 ``` text
-frontend/src/
+frontend/apps/web/src/
 ├── main.tsx
 ├── style.css
 ├── i18n/

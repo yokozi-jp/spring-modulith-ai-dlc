@@ -90,4 +90,4 @@
 - [ADR-087: 必須チェックを集約ジョブ CI gate を中心にまとめる](ADR-087-gate-required-checks-with-single-aggregate-job.md)（Accepted, 2026-11-17）
 - [ADR-088: フロントエンドで useEffect を禁止し、Oxlint で止める](ADR-088-ban-react-effects-in-frontend.md)（Accepted, 2026-11-17）
 - [ADR-089: 主キーをモジュールのスキーマと Repository の中に閉じ、外に出る値には例外なく public_id を使う](ADR-089-keep-primary-keys-inside-modules-and-expose-public-ids.md)（Proposed, 2026-11-17）
-- [ADR-092: frontend を Vite+ の workspace に分け、共有を packages/ui と packages/api に置く](ADR-092-split-frontend-into-vite-plus-workspace.md)（Proposed, 2026-11-18）
+- [ADR-092: frontend を Vite+ の workspace に分け、共有を packages/ui と packages/api に置く](ADR-092-split-frontend-into-vite-plus-workspace.md)（Accepted, 2026-11-18）

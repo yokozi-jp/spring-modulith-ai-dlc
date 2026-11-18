@@ -1,0 +1,320 @@
+// oxlint-disable max-lines -- lint と fmt の設定を 1 つの defineConfig に集める正本のため、行数で分割しない。
+import { defineConfig } from "vite-plus";
+
+const restrictedHtmlProperties = [
+  "innerHTML",
+  "outerHTML",
+  "insertAdjacentHTML",
+  "createContextualFragment",
+  "setHTMLUnsafe",
+  "parseHTMLUnsafe",
+  "DOMParser",
+  "srcdoc",
+].map((property) => ({ property, message: "Use React children or textContent instead." }));
+
+// override の option は前の指定とマージされず置き換わるため、禁止の一覧を定数に分けて override ごとに組み合わせる。
+const htmlSinkGlobals = [{ name: "DOMParser", message: "Do not parse arbitrary HTML." }];
+const apiMessage = "Use the generated API client in src/api.";
+const mockMessage = "Use MSW, vi.spyOn or vi.stubGlobal instead of module mocks.";
+const networkGlobals = ["fetch", "XMLHttpRequest"].map((name) => ({ name, message: apiMessage }));
+const htmlSinkProperties = [
+  ...restrictedHtmlProperties,
+  { object: "document", property: "write", message: "Do not write HTML directly." },
+  { object: "document", property: "writeln", message: "Do not write HTML directly." },
+];
+const networkProperties = [
+  { object: "window", property: "fetch", message: apiMessage },
+  { object: "globalThis", property: "fetch", message: apiMessage },
+];
+const sharedLayerImports = {
+  group: ["@/features/**", "@/routes/**", "@/routeTree.gen"],
+  message: "Shared code must not depend on features or routes.",
+};
+// lib は最下層であり、共有層の禁止に加えて components も参照しない。
+const libLayerImports = {
+  group: [...sharedLayerImports.group, "@/components/**"],
+  message: "lib must not depend on components, features or routes.",
+};
+// api は通信層であり、共有層の禁止に加えて UI を参照しない。
+const apiLayerImports = {
+  group: [...sharedLayerImports.group, "@/components/**"],
+  message: "api must not depend on components, features or routes.",
+};
+// components/ui は UI primitive の層であり、共有層の禁止に加えてアプリシェルなど ui 以外の components を参照しない。
+const uiLayerImports = {
+  group: [...sharedLayerImports.group, "@/components/**", "!@/components/ui/**"],
+  message: "components/ui must not depend on other components, features or routes.",
+};
+const featureImports = {
+  group: ["@/routes/**", "@/routeTree.gen"],
+  message: "Use getRouteApi instead of importing a route.",
+};
+const baseUiImports = {
+  group: ["@base-ui/**"],
+  message: "Import UI primitives from @/components/ui (ADR-025).",
+};
+const testOnlyImports = {
+  group: ["msw", "msw/**", "@/api/generated/mocks/**", "@/testing/**", "@testing-library/**"],
+  message: "Use test-only modules only in test files and src/testing.",
+};
+// no-restricted-imports は静的な import に加えて import("@grafana/...") も検出する（lint/fixtures の telemetry-sdk.ts で確かめている）。
+const telemetrySdkImports = {
+  group: ["@grafana/*"],
+  message: "Call the telemetry SDK only through src/lib/telemetry.ts (ADR-068).",
+};
+
+// better-tailwindcss の規則。entryPoint を option で渡すため、規則の一覧をここに持つ。
+const tailwindRuleNames = [
+  "enforce-consistent-class-order",
+  "no-deprecated-classes",
+  "no-duplicate-classes",
+  "no-unnecessary-whitespace",
+  "no-conflicting-classes",
+  "enforce-canonical-classes",
+];
+
+// entryPoint の相対パスは cwd 基準で、vp run -r は package の dir で走るため解決しない。呼び出し側は設定ファイルの場所から作った絶対パスを渡す（ADR-092）。
+function tailwindRules(entryPoint: string) {
+  return Object.fromEntries(
+    tailwindRuleNames.map((name): [string, ["error", { entryPoint: string }]] => [
+      `better-tailwindcss/${name}`,
+      ["error", { entryPoint }],
+    ]),
+  );
+}
+
+// 生成物。整形と静的解析から除外する。
+const generatedFiles = ["apps/*/src/routeTree.gen.ts", "apps/*/src/api/generated/**"];
+// lint 設定のテストが使う、違反を含む fixture。通常の整形、静的解析、テストの収集から外す。
+const lintFixtures = ["lint/fixtures/**"];
+
+export default defineConfig({
+  fmt: { ignorePatterns: [...generatedFiles, ...lintFixtures], sortImports: true },
+  lint: {
+    ignorePatterns: [...generatedFiles, ...lintFixtures],
+    categories: {
+      correctness: "error",
+      suspicious: "error",
+      pedantic: "error",
+      perf: "error",
+      style: "error",
+      restriction: "error",
+    },
+    plugins: [
+      "eslint",
+      "unicorn",
+      "typescript",
+      "oxc",
+      "react",
+      "import",
+      "vitest",
+      "jsx-a11y",
+      "promise",
+    ],
+    jsPlugins: [
+      { name: "vite-plus", specifier: "vite-plus/oxlint-plugin" },
+      { name: "local-security", specifier: "./lint/local-security.js" },
+      { name: "shadcn", specifier: "@shadcn/lint" },
+      { name: "better-tailwindcss", specifier: "eslint-plugin-better-tailwindcss" },
+      { name: "tailwind-classes", specifier: "./lint/tailwind-classes.js" },
+      { name: "feature-boundaries", specifier: "./lint/feature-boundaries.js" },
+      { name: "ui-composition", specifier: "./lint/ui-composition.js" },
+      { name: "react-rules", specifier: "./lint/react-rules.js" },
+    ],
+    rules: {
+      // automatic JSX runtime、Vite設定、TanStack Routerの規約と両立しない規則。
+      "react/react-in-jsx-scope": "off",
+      "react/forbid-component-props": "off",
+      "react/jsx-filename-extension": ["error", { extensions: [".jsx", ".tsx"] }],
+      "react/jsx-max-depth": "off",
+      "react/jsx-props-no-spreading": "off",
+      "import/no-default-export": "off",
+      "import/no-named-export": "off",
+      "import/prefer-default-export": "off",
+      "import/exports-last": "off",
+      "import/group-exports": "off",
+      "import/no-unassigned-import": ["error", { allow: ["**/*.css"] }],
+      // modern TypeScriptとReactで一般的な構文を一律禁止するrestriction規則。
+      "oxc/no-async-await": "off",
+      "oxc/no-optional-chaining": "off",
+      "oxc/no-rest-spread-properties": "off",
+      // event handler で reject しない Promise を捨てる `void` 文と、`x === undefined` の比較は許す。
+      "no-void": ["error", { allowAsStatement: true }],
+      "no-undefined": "off",
+      "typescript/explicit-function-return-type": "off",
+      "typescript/explicit-module-boundary-types": "off",
+      "typescript/prefer-readonly-parameter-types": "off",
+      "typescript/promise-function-async": "off",
+      // Oxfmtや型推論と役割が重複するか、可読性を下げる一律のstyle規則。
+      "capitalized-comments": "off",
+      // 名前付きの関数は関数宣言にそろえる。型注釈付きのアロー関数は理由付きで行単位に許す。
+      "func-style": ["error", "declaration"],
+      // react-i18next の慣用名である翻訳関数 t だけを短い識別子として許可する。
+      "id-length": ["error", { exceptions: ["t"] }],
+      // vite.config.ts の define が置き換えるビルド時の定数だけを、ほかの識別子と衝突しない名前として許す（ADR-068）。
+      "no-underscore-dangle": ["error", { allow: ["__TELEMETRY_ENABLED__", "__TELEMETRY_APP__"] }],
+      "max-lines-per-function": "off",
+      "no-duplicate-imports": ["error", { allowSeparateTypeImports: true }],
+      "no-magic-numbers": "off",
+      "no-ternary": "off",
+      "one-var": "off",
+      "sort-imports": "off",
+      "sort-keys": "off",
+      // Vitestの標準APIと競合するか、相互に矛盾するtest style規則。
+      "vitest/no-conditional-in-test": "off",
+      "vitest/no-hooks": "off",
+      "vitest/no-importing-vitest-globals": "off",
+      "vitest/prefer-called-times": "off",
+      "vitest/prefer-describe-function-title": "off",
+      "vitest/prefer-expect-assertions": "off",
+      "vitest/prefer-lowercase-title": "off",
+      "vitest/prefer-strict-boolean-matchers": "off",
+      "vitest/prefer-to-be-truthy": "off",
+      "vitest/require-hook": "off",
+      "vitest/require-test-timeout": "off",
+      "vite-plus/prefer-vite-plus-imports": "error",
+      "react/no-danger": "error",
+      "vitest/no-restricted-vi-methods": ["error", { mock: mockMessage, doMock: mockMessage }],
+      "no-restricted-imports": [
+        "error",
+        { patterns: [baseUiImports, testOnlyImports, telemetrySdkImports] },
+      ],
+      "no-restricted-globals": ["error", ...htmlSinkGlobals, ...networkGlobals],
+      "no-restricted-properties": ["error", ...htmlSinkProperties, ...networkProperties],
+      "local-security/no-jsx-srcdoc": "error",
+      "feature-boundaries/no-cross-feature-import": "error",
+      "ui-composition/no-button-in-link": "error",
+      "react-rules/no-effect": "error",
+      "shadcn/no-restyle": ["error", { allow: ["layout"] }],
+      "shadcn/no-raw-colors": "error",
+      "shadcn/no-arbitrary-values": ["error", { allow: ["layout"] }],
+      "shadcn/no-inline-styles": "error",
+      "shadcn/require-static-classes": "error",
+      "shadcn/no-unknown-classes": "error",
+      "tailwind-classes/no-dynamic-class-name": "error",
+    },
+    // ponytail: 同じ rule を指定する override は、後に一致したものの option だけが効く。
+    // 正しさは override の並び順と、option が置き換わることに依存する。並べ替えるときは lint/lint-config.test.js で確かめる。
+    overrides: [
+      // アプリごとの CSS を指す（ADR-092）。
+      {
+        files: ["apps/web/**"],
+        rules: tailwindRules(`${import.meta.dirname}/apps/web/src/style.css`),
+      },
+      {
+        files: ["lint/**"],
+        // lint/** は tsconfig の対象外で型検査が効かないため、未定義の識別子を no-undef で止める。
+        env: { node: true },
+        rules: {
+          "no-undef": "error",
+          "import/no-nodejs-modules": "off",
+          "new-cap": "off",
+          "typescript/no-unsafe-assignment": "off",
+          "typescript/no-unsafe-call": "off",
+          "typescript/no-unsafe-member-access": "off",
+        },
+      },
+      {
+        files: ["apps/web/src/{api,components,i18n}/**"],
+        rules: {
+          "no-restricted-imports": [
+            "error",
+            {
+              patterns: [sharedLayerImports, baseUiImports, testOnlyImports, telemetrySdkImports],
+            },
+          ],
+        },
+      },
+      {
+        files: ["apps/web/src/lib/**"],
+        rules: {
+          "no-restricted-imports": [
+            "error",
+            {
+              patterns: [libLayerImports, baseUiImports, testOnlyImports, telemetrySdkImports],
+            },
+          ],
+        },
+      },
+      // テレメトリの SDK を呼ぶ唯一のファイル（ADR-068）。
+      {
+        files: ["apps/web/src/lib/telemetry.ts"],
+        rules: {
+          "no-restricted-imports": [
+            "error",
+            { patterns: [libLayerImports, baseUiImports, testOnlyImports] },
+          ],
+        },
+      },
+      {
+        files: ["apps/web/src/features/**"],
+        rules: {
+          "no-restricted-imports": [
+            "error",
+            { patterns: [featureImports, baseUiImports, testOnlyImports, telemetrySdkImports] },
+          ],
+        },
+      },
+      {
+        files: ["apps/web/src/components/ui/**"],
+        rules: {
+          "shadcn/no-restyle": "off",
+          "shadcn/no-arbitrary-values": "off",
+          "shadcn/require-static-classes": "off",
+          "no-restricted-imports": [
+            "error",
+            { patterns: [uiLayerImports, testOnlyImports, telemetrySdkImports] },
+          ],
+          "react/only-export-components": "off",
+        },
+      },
+      {
+        files: ["apps/web/src/api/**"],
+        rules: {
+          "no-restricted-imports": [
+            "error",
+            {
+              patterns: [apiLayerImports, baseUiImports, testOnlyImports, telemetrySdkImports],
+            },
+          ],
+          "no-restricted-globals": ["error", ...htmlSinkGlobals],
+          "no-restricted-properties": ["error", ...htmlSinkProperties],
+        },
+      },
+      {
+        files: ["apps/web/src/routes/**"],
+        rules: {
+          "react/only-export-components": "off",
+        },
+      },
+      {
+        files: ["**/*.{test,spec}.{ts,tsx,js,jsx}"],
+        rules: {
+          "react/jsx-no-literals": "off",
+        },
+      },
+      // Playwright Test の API に vitest plugin の規則が当たるため。
+      {
+        files: ["apps/web/e2e/**"],
+        rules: {
+          "vitest/consistent-test-filename": "off",
+          "vitest/prefer-importing-vitest-globals": "off",
+        },
+      },
+      // ponytail: option が置き換わるため、テストでは層の import 制限も外れる。
+      // テストにも層の制限が要るようになったら dependency-cruiser へ移る。
+      {
+        files: ["**/*.{test,spec}.{ts,tsx,js,jsx}", "apps/web/src/testing/**"],
+        rules: {
+          "no-restricted-imports": ["error", { patterns: [baseUiImports, telemetrySdkImports] }],
+        },
+      },
+    ],
+    options: {
+      denyWarnings: true,
+      reportUnusedDisableDirectives: "error",
+      typeAware: true,
+      typeCheck: true,
+    },
+  },
+});

@@ -1,3 +1,4 @@
+// oxlint-disable max-lines, max-statements -- 1 つの設定の規則を、fixture ごとの期待を並べて検査する test のため、行数と文の数で分割しない。
 import { spawnSync } from "node:child_process";
 import { cpSync, mkdirSync, mkdtempSync, readdirSync, rmSync, symlinkSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -8,13 +9,20 @@ import { describe, expect, it } from "vite-plus/test";
 
 const frontendRoot = fileURLToPath(new URL("..", import.meta.url));
 
+const appDirectory = "apps/web";
+
 /** @param {string} directory */
 function copyProjectConfig(directory) {
-  cpSync(path.join(frontendRoot, "lint/fixtures/src"), path.join(directory, "src"), {
-    recursive: true,
-  });
-  for (const file of ["vite.config.ts", "tsconfig.json", "package.json", "src/style.css"]) {
+  cpSync(
+    path.join(frontendRoot, "lint/fixtures", appDirectory, "src"),
+    path.join(directory, appDirectory, "src"),
+    { recursive: true },
+  );
+  for (const file of ["vite.config.ts", "package.json"]) {
     cpSync(path.join(frontendRoot, file), path.join(directory, file));
+  }
+  for (const file of ["tsconfig.json", "package.json", "src/style.css"]) {
+    cpSync(path.join(frontendRoot, appDirectory, file), path.join(directory, appDirectory, file));
   }
   mkdirSync(path.join(directory, "lint"));
   /** @type {string[]} */
@@ -23,44 +31,62 @@ function copyProjectConfig(directory) {
     cpSync(path.join(frontendRoot, "lint", file), path.join(directory, "lint", file));
   }
   symlinkSync(path.join(frontendRoot, "node_modules"), path.join(directory, "node_modules"));
+  symlinkSync(
+    path.join(frontendRoot, appDirectory, "node_modules"),
+    path.join(directory, appDirectory, "node_modules"),
+  );
+}
+
+/**
+ * @param {string} directory
+ * @param {string} cwd directory からの相対パス
+ * @returns {{ filename: string, code: string, message: string }[]}
+ */
+function lintFrom(directory, cwd) {
+  // vp lint をプロセスとして起動しプロジェクトの設定と plugin を読み込むため、所要時間は CPU の空きに比例する。
+  // local-security.test.js と同じく、ハング検出として十分な 60 秒で打ち切る。
+  /** @type {{ error?: Error, stdout: string }} */
+  const { error, stdout } = spawnSync(
+    "vp",
+    ["lint", path.join(directory, appDirectory, "src"), "--format", "json"],
+    {
+      cwd: path.join(directory, cwd),
+      encoding: "utf8",
+      timeout: 60_000,
+    },
+  );
+  if (error) {
+    throw error;
+  }
+  /** @type {{ diagnostics: { filename: string, code: string, message: string }[] }} */
+  const report = JSON.parse(stdout);
+  return report.diagnostics;
 }
 
 // overrides の files は設定ファイルの場所からの相対パスで照合される。
-// そのため実際の設定を一時ディレクトリへ複製し、fixture をその src/ に置いて lint する。
-/** @returns {{ filename: string, code: string }[]} */
+// そのため実際の設定を一時ディレクトリへ複製し、fixture をその apps/web/src に置いて lint する。
+// アプリごとの CSS の解決は実行する場所に依存しないことを、ルートと apps/web の両方から実行して確かめる。
+/** @returns {{ fromRoot: { filename: string, code: string, message: string }[], fromApp: { filename: string, code: string, message: string }[] }} */
 function lintFixtures() {
   /** @type {string} */
   const directory = mkdtempSync(path.join(tmpdir(), "frontend-lint-config-"));
 
   try {
     copyProjectConfig(directory);
-    // vp lint をプロセスとして起動しプロジェクトの設定と plugin を読み込むため、所要時間は CPU の空きに比例する。
-    // local-security.test.js と同じく、ハング検出として十分な 60 秒で打ち切る。
-    /** @type {{ error?: Error, stdout: string }} */
-    const { error, stdout } = spawnSync("vp", ["lint", "src", "--format", "json"], {
-      cwd: directory,
-      encoding: "utf8",
-      // 複製先に version.txt はない。シェルで有効にしていても、無効の設定を読ませる。
-      env: { ...process.env, FRONTEND_OTEL_ENABLED: "false" },
-      timeout: 60_000,
-    });
-    if (error) {
-      throw error;
-    }
-    /** @type {{ diagnostics: { filename: string, code: string }[] }} */
-    const report = JSON.parse(stdout);
-    return report.diagnostics;
+    return { fromRoot: lintFrom(directory, "."), fromApp: lintFrom(directory, appDirectory) };
   } finally {
     rmSync(directory, { recursive: true, force: true });
   }
 }
 
-const diagnostics = lintFixtures();
+const { fromRoot, fromApp } = lintFixtures();
+// 実行する場所で filename の基準が変わるため、ルートからの相対パスにそろえる。
+const diagnostics = fromRoot;
 
 /** @param {string} file */
 function codesIn(file) {
   return diagnostics
-    .filter((diagnostic) => diagnostic.filename === `src/${file}`)
+    .filter((diagnostic) => diagnostic.filename === `${appDirectory}/src/${file}`)
     .map((diagnostic) => diagnostic.code);
 }
 
@@ -73,6 +99,23 @@ function countIn(file, code) {
 }
 
 describe("project lint config on fixtures", () => {
+  // CSS を解決できないと、規則は「entry point が見つからない」警告を同じ code で出す。
+  // 警告ではなく、アプリの theme から決まる提案が出ることで、CSS を解決したと確かめる。
+  describe("Tailwind CSS entry point", () => {
+    it.each([
+      ["the workspace root", fromRoot],
+      ["the app directory", fromApp],
+    ])("resolves the app theme when linting from %s", (_name, found) => {
+      const messages = found
+        .filter((diagnostic) => diagnostic.filename.endsWith("features/order/theme-class.tsx"))
+        .filter((diagnostic) => diagnostic.code === "better-tailwindcss(enforce-canonical-classes)")
+        .map((diagnostic) => diagnostic.message);
+
+      expect(messages).toHaveLength(1);
+      expect(messages[0]).toContain('simplified to "bg-primary"');
+    });
+  });
+
   describe("feature boundary", () => {
     it("rejects static, re-exported and dynamic imports of another feature", () => {
       expect(
