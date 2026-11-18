@@ -28,7 +28,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     outputs:
-      frontend: ${{ steps.filter.outputs.frontend }}
+      run: ${{ steps.filter.outputs.run }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -38,31 +38,20 @@ jobs:
 
       - name: Detect changed paths
         id: filter
-        shell: bash
         env:
           EVENT_NAME: ${{ github.event_name }}
           BASE_REF: ${{ github.event.pull_request.base.ref }}
         run: |
-          if [ "$EVENT_NAME" != "pull_request" ]; then
-            echo "frontend=true" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-          if ! changed_files="$(git diff --name-only "origin/${BASE_REF}...HEAD")"; then
-            echo "差分取得に失敗したためFrontend CIを実行します。" >&2
-            echo "frontend=true" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-          if grep -Eq '^(frontend/|openapi/|Taskfile\.yml$|\.github/workflows/(frontend-ci|ci)\.yml$)' \
-            <<< "$changed_files"; then
-            echo "frontend=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "frontend=false" >> "$GITHUB_OUTPUT"
-          fi
+          bash tooling/ci-changes/changed.sh \
+            'frontend/**' \
+            'openapi/**' \
+            'Taskfile.yml' \
+            '.github/workflows/frontend-ci.yml'
 
   verify:
     name: Verify frontend
     needs: changes
-    if: needs.changes.outputs.frontend == 'true'
+    if: needs.changes.outputs.run == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:

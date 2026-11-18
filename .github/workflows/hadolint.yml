@@ -33,7 +33,7 @@ jobs:
     name: Detect docker changes
     runs-on: ubuntu-latest
     outputs:
-      docker: ${{ steps.filter.outputs.docker }}
+      run: ${{ steps.filter.outputs.run }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -43,34 +43,24 @@ jobs:
 
       - name: Detect changed paths
         id: filter
-        shell: bash
         env:
           EVENT_NAME: ${{ github.event_name }}
           BASE_REF: ${{ github.event.pull_request.base.ref }}
         run: |
-          if [ "$EVENT_NAME" != "pull_request" ]; then
-            echo "docker=true" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-          # fetch-depth: 0 で取得済みの base と比較する。差分取得に失敗した場合は
-          # CI を実行する側へ倒し、検出失敗をイメージ検証のスキップとして扱わない。
-          if ! changed_files="$(git diff --name-only "origin/${BASE_REF}...HEAD")"; then
-            echo "差分取得に失敗したため Docker CI を実行します。" >&2
-            echo "docker=true" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-          # hadolint.yml の push パスフィルタと同じ集合に、ci.yml を足して判定する。
-          if grep -Eq '^(backend/|docker/compose-test\.yml$|docker/initdb/|docker/wiremock/|docker/keycloak/|\.env\.test\.example$|\.hadolint\.yaml$|\.github/workflows/(hadolint|ci)\.yml$)' \
-            <<< "$changed_files"; then
-            echo "docker=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "docker=false" >> "$GITHUB_OUTPUT"
-          fi
+          bash tooling/ci-changes/changed.sh \
+            'backend/**' \
+            'docker/compose-test.yml' \
+            'docker/initdb/**' \
+            'docker/wiremock/**' \
+            'docker/keycloak/**' \
+            '.env.test.example' \
+            '.hadolint.yaml' \
+            '.github/workflows/hadolint.yml'
 
   hadolint:
     name: Run hadolint 🐳
     needs: changes
-    if: needs.changes.outputs.docker == 'true'
+    if: needs.changes.outputs.run == 'true'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -96,7 +86,7 @@ jobs:
   docker-build-check:
     name: Run docker build --check 🐳
     needs: changes
-    if: needs.changes.outputs.docker == 'true'
+    if: needs.changes.outputs.run == 'true'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -124,7 +114,7 @@ jobs:
   backend-image:
     name: Build and test backend image 🐳
     needs: [changes, hadolint, docker-build-check]
-    if: needs.changes.outputs.docker == 'true'
+    if: needs.changes.outputs.run == 'true'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
