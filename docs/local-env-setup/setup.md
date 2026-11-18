@@ -146,7 +146,7 @@ source ~/.bashrc
 
 ``` bash
 cd /home/projects/spring-modulith-ai-dlc
-npm install
+npm ci
 ```
 
 これにより Lefthook が有効化されます。
