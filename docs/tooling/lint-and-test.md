@@ -302,13 +302,14 @@ const params = { ...(cursor !== undefined && { cursor }) };
   状態は`Superseded by ...`を先頭の語に揃えて比べる。
   番号の欠けは警告にとどめる。
   リンクの検査は`docs/`、`README.md`、`CONTRIBUTING.md`、`.kiro/steering/`、`backend/src`のJavadocとMarkdownを対象にする。
-  既知の限界として、`okf-validate.yml`の`paths`は`backend/src/**`を含まないため、バックエンドのJavadocだけを変えるPull RequestではCIが動かない。
+  既知の限界として、`okf-validate.yml`が変更を判定する対象は`backend/src/**`を含まないため、バックエンドのJavadocだけを変えるPull Requestでは検査が動かない。
   ADRの番号を振り直す変更はdocsの変更を伴うため、そこで検出する。
   `ruleset-check`も内部タスクで、`tooling/ruleset-check/test.sh`の後に`ruleset-check.mjs`が動く。
   `.github/rulesets/main.json`の必須チェックを、`branch-protection.md`の一覧とworkflowの`name`に突き合わせる。
   GitHub上のrulesetとの一致は検査しない。
 - **`task ci-gate-check`**：`ci.yml`の`CI gate`が、`pull_request`で動く検査を取りこぼしていないかを検査する。
-  `tooling/ci-gate-check/test.sh`を先に実行してから、`ci-gate-check.py`が実際の`.github/workflows/`を検査する。
+  `tooling/ci-gate-check/test.sh`と、PRの変更を判定する`tooling/ci-changes/test.sh`を先に実行してから、`ci-gate-check.py`が実際の`.github/workflows/`を検査する。
+  `changes`ジョブは`tooling/ci-changes/changed.sh`にglobを渡して判定する。globは`paths:`と同じ書き方で、`ci.yml`の変更でも`true`になる。
   `ci.yml`にジョブを足したときは`CI gate`の`needs`にも足し、`ci.yml`から呼ばない`pull_request`の workflow は`tooling/ci-gate-check/excluded.tsv`に理由を書く。
   失敗にする状態は`test.sh`のケースが正で、この文書には写さない。
   Python 3とPyYAMLが要る（GitHubのランナーには入っている。ローカルでは`sudo apt install python3-yaml`）。CIだけで実行し、Lefthookには入れない。

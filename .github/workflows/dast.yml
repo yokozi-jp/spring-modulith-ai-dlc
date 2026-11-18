@@ -10,10 +10,11 @@ on:
   schedule:
     - cron: "17 3 * * 1"
   workflow_dispatch:
+  workflow_call:
 
 # PR だけ実行中の run を取り消す。schedule の active scan を workflow_dispatch で止めないため（api-contract.yml と同じ）。
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
+  group: dast-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 # SARIF を Code Scanning にアップロードする権限はジョブごとに付与する
@@ -54,7 +55,7 @@ jobs:
             exit 0
           fi
           # docker/ は ZAP の plan と script（docker/zap/）と realm（docker/keycloak/）を含む。
-          if grep -Eq '^(backend/|frontend/|docker/|\.env\.test\.example$|Taskfile\.yml$|\.github/workflows/dast\.yml$)' \
+          if grep -Eq '^(backend/|frontend/|docker/|\.env\.test\.example$|Taskfile\.yml$|\.github/workflows/(dast|ci)\.yml$)' \
             <<< "$changed_files"; then
             echo "dast=true" >> "$GITHUB_OUTPUT"
           else
