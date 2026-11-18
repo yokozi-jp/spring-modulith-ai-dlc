@@ -3,7 +3,8 @@
 # Run: bash tooling/scratch-git/scratch-git-check.sh [<ファイル>...] (task lint-scratch-git が引数なしで実行する)
 # 引数は、絶対パスかリポジトリのルートからのパスで渡す。
 # ponytail: 行ごとの正規表現なので、次は見落とす。見落としが問題になったら、bash の構文木を読む検査に替える。
-#   変数を通した git（"$GIT" status）、source の前に呼ぶほかのスクリプトや task の中の git、
+#   変数を通した git（"$GIT" status）、git- で始まるコマンド（git-lfs install）、
+#   source の前に呼ぶほかのスクリプトや task の中の git、
 #   git より前にある引用符の中の「 #」（そこから行末までをコメントとみなす）。
 #   source の形の行は、実行されない分岐、ヒアドキュメント、\ で続く行の中にあっても source したとみなす。
 
@@ -16,7 +17,7 @@ for file in "$@"; do
   if ! line="$(awk '
     { sub(/(^|[[:space:]])#.*/, "") }
     /^[[:space:]]*(\.|source)[[:space:]].*\/scratch-git\/scratch-git\.sh"?[[:space:]]+\|\|[[:space:]]+exit 1[[:space:]]*$/ { exit }
-    /(^|[^[:alnum:]_.-])git([[:space:]]|$)/ { print FNR; exit }
+    /(^|[^[:alnum:]_.-])git([^[:alnum:]_.-]|$)/ { print FNR; exit }
   ' "$file")"; then
     echo "FAIL: $file を読めません。"
     failures=$((failures + 1))
