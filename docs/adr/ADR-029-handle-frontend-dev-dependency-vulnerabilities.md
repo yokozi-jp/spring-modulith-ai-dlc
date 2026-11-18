@@ -17,10 +17,6 @@ Proposed
 
 ## Context
 
-当初は、Snyk Open SourceのPull Request checkを通すために、修正版のない脆弱性を `frontend/.snyk` の期限付きignoreで扱う案だった。
-Snykは必須チェックではなく、無料枠の制限にすぐ達して意味のある検査にならないため、Snykでの検査をやめた。
-ignoreは不要になったので、この決定から外した。
-
 shadcn/ui、Orval、`@shadcn/lint`、`eslint-plugin-better-tailwindcss`、React Doctorの導入により、次の推移的依存が検出されていた。
 
 - **undici 7.24.4、7.29.0**：Orvalが使う `@scalar/json-magic` が完全一致のversionで固定している。
@@ -31,14 +27,20 @@ shadcn/ui、Orval、`@shadcn/lint`、`eslint-plugin-better-tailwindcss`、React 
 
 どれも開発時とビルド時に動くツールの依存であり、ブラウザ向けの実行時バンドルには含まれない。
 
+初版は、Snyk Open SourceのPull Request checkを通すために、修正版のない脆弱性を `frontend/.snyk` の期限付きignoreで扱う決定だった。
+Snykは無料枠の制限にすぐ達し、検査が止まるため、Snykでの検査をやめることにした。
+ignoreは不要になったので、この決定から外した。
+
 ## Decision
 
 修正版がある脆弱性は、pnpmのoverrideで修正版へ引き上げる。
 `frontend/pnpm-workspace.yaml` に `"undici@<7.29.1": 7.29.1` を追加し、8系のundiciには影響させない。
 
-Snykでの検査はやめる。`.snyk` と `frontend/.snyk` を削除する。
+Snykでの検査はやめる。
+`.snyk`（Snyk CodeとSecretsの除外設定）と `frontend/.snyk` を削除する。
+SnykのOrgのprojectとGitHub Appも外す。
+Snyk Code、Secrets、Open Sourceの代わりは、CodeQL、Semgrep、betterleaks、trivyが担う。
 修正版のないbraces、deepmerge、uri-jsは、開発環境にそのまま残す。
-依存の脆弱性検査は、Dependabotとtrivy（`.github/workflows/trivy.yml`）に任せる。
 
 ## Consequences
 
@@ -51,9 +53,16 @@ Snykでの検査はやめる。`.snyk` と `frontend/.snyk` を削除する。
 
 - braces、deepmerge、uri-jsの脆弱なコードは開発環境に残る。
   第三者のshadcnレジストリ定義をマージすると、deepmergeのprototype pollutionを突かれる可能性がある。
-- Snykが見ていた開発依存の検出は、Dependabotとtrivyが同じ範囲を見ない限り失われる。
+- braces、deepmerge、uri-jsの検出は、どこにも残らない。
+  trivyは開発依存を既定で除き（`--include-dev-deps` なし）、修正版のない脆弱性も `ignore-unfixed: true` で出さず、`exit-code: "0"` でPull Requestを止めない。
+  Dependabot alertsはGitHub Advisory Databaseを使い、この3件に該当するadvisoryがない。
 - `@scalar/json-magic` が宣言したundiciのversionを上書きするため、互換性はFrontendの検証（`task fe-verify`）でしか確かめていない。
 - overrideは上流が修正しても自動では消えないため、依存更新時に見直す必要がある。
+
+### Neutral
+
+- SnykのGitHub Appを外すまで、Pull RequestにSnykの検査が走る。
+  `.snyk` を消すため、削除前に除外していたものと、ignoreしていた3件が再び報告される。
 
 ## Alternatives Considered
 
