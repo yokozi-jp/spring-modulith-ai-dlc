@@ -94,11 +94,8 @@ jobs:
           cache: npm
           cache-dependency-path: package-lock.json
 
-      - name: Set up Task
-        uses: go-task/setup-task@a00fbb05ce67b35648be3c78cbc9fd85354c757e # v2
-        with:
-          version: "3.53.1"
-          checksum: a54a408f6861ff921f6e87774180db31bacd8c1e7c944ca696db9fea49a82fc7
+      - name: Set up mise tools
+        uses: ./.github/actions/setup-mise
 
       - name: Install dependencies
         run: npm ci --ignore-scripts
@@ -120,11 +117,8 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Set up Task
-        uses: go-task/setup-task@a00fbb05ce67b35648be3c78cbc9fd85354c757e # v2
-        with:
-          version: "3.53.1"
-          checksum: a54a408f6861ff921f6e87774180db31bacd8c1e7c944ca696db9fea49a82fc7
+      - name: Set up mise tools
+        uses: ./.github/actions/setup-mise
 
       - name: Check Taskfile
         run: task lint-taskfile
@@ -141,11 +135,8 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Set up Task
-        uses: go-task/setup-task@a00fbb05ce67b35648be3c78cbc9fd85354c757e # v2
-        with:
-          version: "3.53.1"
-          checksum: a54a408f6861ff921f6e87774180db31bacd8c1e7c944ca696db9fea49a82fc7
+      - name: Set up mise tools
+        uses: ./.github/actions/setup-mise
 
       # agent-commit、agent-push、agent-wait の本体を、フックを止めておける一時の git リポジトリで検査する。
       - name: Test agent git tasks

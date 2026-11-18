@@ -2,10 +2,12 @@
 type: Runbook
 title: 開発環境構築
 description: WSL2 と Docker Desktop を前提にしたローカル開発環境の構築手順。
-tags: [runbook, setup, wsl, docker]
+tags: [runbook, setup, wsl, docker, mise]
 ---
 
 # 開発環境構築
+
+Kiro Web のサンドボックスで作業する場合は、この文書ではなく [Kiro Web の開発環境](kiro-web.md)を読む。
 
 ## 前提条件
 
@@ -73,7 +75,11 @@ sudo chmod -R 755 /home/projects
 
 # 基本パッケージインストール
 sudo apt update && sudo apt upgrade -y
-sudo apt install -y curl git wget unzip jq vim tree gnupg2 software-properties-common
+sudo apt install -y curl git wget unzip jq vim tree gnupg2 software-properties-common extrepo
+
+# mise（Task、betterleaks、iwe を mise.lock の版で入れる）の apt リポジトリ
+sudo extrepo enable mise
+sudo apt update && sudo apt install -y mise
 
 # Git基本設定（⚠️ 以下2行は自分の名前・メールアドレスに書き換えてから実行してください）
 # git config --global user.name "Your Name"
@@ -132,15 +138,23 @@ cd spring-modulith-ai-dlc
 
 ### 7. セットアップスクリプトの実行
 
-最初にTaskを独立したスクリプトで導入し、その後のセットアップを`task setup`で実行します。
+最初に mise で Task を入れ、その後のセットアップを`task setup`で実行します。
 
 ``` bash
 cd /home/projects/spring-modulith-ai-dlc
-./docs/local-env-setup/00-setup-task.sh
-export PATH="$HOME/.local/bin:$PATH"
+mise install --locked
+eval "$(mise activate bash --shims)"
 task setup
 source ~/.bashrc
 ```
+
+`mise install --locked` は、`mise.toml` の Task、betterleaks、iwe を、`mise.lock` と `.mise/locks/` に記録した版と checksum で検証して入れます（[ADR-090](../adr/ADR-090-pin-cli-tools-with-mise-lock.md)）。
+`--locked` を付けると、lock に無い版を入れずに止まります。
+`task setup` は `04-setup-shell.sh` で、mise の shims を PATH の先頭に通す行を `~/.bashrc` に足します。
+`mise.toml` か `mise.lock` が変わったときは、`mise install --locked` だけを実行します。
+
+shims は、今いるディレクトリから上にたどって見つけた `mise.toml` の版を選びます。
+そのため `task`、`betterleaks`、`iwe` は、`mise.toml` のあるチェックアウトの中でだけ動きます。
 
 ### 8. Git hooks のセットアップ
 
@@ -160,13 +174,13 @@ npm ci
 
 VSCode が WSL モードで再起動し、左下のステータスバーに `WSL: <インスタンス名>` と表示されれば接続完了です。
 
-### 10. iwe のインストール
+### 10. iwe（ナレッジ管理）
 
 [iwe](https://github.com/iwe-org/iwe) は markdown ベースのナレッジ管理ツールです（CLI、LSP サーバー、MCP サーバー）。
 このプロジェクトでは `docs/` 配下のドキュメント（ADR など）を対象に、リンク補完、バックリンク、定義ジャンプや AI エージェント連携に使い、`task okf-check` で OKF バンドルの適合を検証します。
 
-iwe は `task setup`（`06-setup-iwe.sh`）で導入済みです。
-バージョンは `versions.env` の `IWE_VERSION` に固定し、チームで揃えます。
+iwe は手順 7 の `mise install --locked` で導入済みです。
+バージョンは `mise.toml` に固定し、チームと CI で揃えます。
 
 `iwe`（CLI）、`iwes`（LSP サーバー）、`iwec`（MCP サーバー）の 3 コマンドが入ります。
 
@@ -178,7 +192,7 @@ iwe は `task setup`（`06-setup-iwe.sh`）で導入済みです。
 
 エディタ連携（LSP）と AI エージェント連携（MCP）は設定済みで、追加作業は要りません。
 
-- **エディタ連携（LSP）**: 手順 11 の推奨拡張に含まれる `iwe.iwe` 拡張が、ここでグローバルインストールした `iwes` を LSP サーバーとして利用します。
+- **エディタ連携（LSP）**: 手順 11 の推奨拡張に含まれる `iwe.iwe` 拡張が、mise の shims から `iwes` を LSP サーバーとして利用します。
   定義ジャンプ、バックリンク、リンク補完などが markdown で使えます（詳細は [VS Code 向けドキュメント](https://iwe.md/docs/editors/vscode/)）。
 - **AI エージェント連携（MCP）**: MCP サーバー `iwec` の設定は `.kiro/settings/mcp.json` にコミット済みです（作業ディレクトリを `docs/` に固定して起動）。
   Kiro を再起動すれば利用できます。
@@ -190,12 +204,12 @@ iwe は `task setup`（`06-setup-iwe.sh`）で導入済みです。
 ### 12. 動作確認
 
 ``` bash
+cd /home/projects/spring-modulith-ai-dlc
 docker info
 java -version
 node -v
 gh auth status
 task --version
-go version
 betterleaks version
 iwe --version
 ```

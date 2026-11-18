@@ -89,11 +89,9 @@ clone したら、[スキルの取得元と更新](docs/agents/skill-sources.md)
 | インフラとツール | Keycloak                   | 26.7.3     | OIDC の認可サーバー                            |
 | インフラとツール | Grafana OpenTelemetry LGTM | 0.32.1     | 可観測性データの集約                           |
 | インフラとツール | OpenTelemetry Collector    | 0.161.0    | ログの属性の絞り込み                           |
-| インフラとツール | Go (betterleaks 実行用)    | 1.27.x     |                                                |
-| インフラとツール | Task                       | 3.53.1     | タスクランナー                                 |
 
 ログ相関、PII、保持は[可観測性データの規約](docs/observability/conventions.md)、フロントエンドの構成は[フロントエンドアーキテクチャ](docs/frontend/architecture.md)を参照してください。
-その他のパッケージのバージョンは `backend/build.gradle` と、`frontend/` の下の各 `package.json` を参照してください。
+その他のパッケージのバージョンは `backend/build.gradle` と、`frontend/` の下の各 `package.json`、Task と betterleaks と iwe のバージョンは `mise.toml` を参照してください。
 
 <p align="right">(<a href="#top">トップへ</a>)</p>
 
@@ -104,6 +102,7 @@ clone したら、[スキルの取得元と更新](docs/agents/skill-sources.md)
 ├── .agents/          # skills-lock.json で管理するスキルの実体（Matt Pocock、skill-creator、このリポジトリで書いたもの）
 ├── .github/          # GitHub 設定
 │   ├── ISSUE_TEMPLATE/   # Issue テンプレート
+│   ├── actions/          # composite action（setup-mise：mise.lock の道具を CI で入れる）
 │   ├── workflows/        # GitHub Actions（Lint・シークレットスキャン等）
 │   ├── CODEOWNERS        # レビュー担当者の自動割り当て
 │   ├── PULL_REQUEST_TEMPLATE.md # Pull Request テンプレート
@@ -158,6 +157,7 @@ clone したら、[スキルの取得元と更新](docs/agents/skill-sources.md)
 ├── .hadolint.yaml    # hadolint（Dockerfile リンタ）設定
 ├── .jscpd.json       # jscpd（重複コード検査）設定
 ├── .markdownlint-cli2.yaml # markdownlint-cli2（Markdown リンタ）設定
+├── .mise/            # mise.lock の補助ファイル（iwe の依存の integrity）
 ├── .release-please-manifest.json # release-please が追跡する直近の版
 ├── .spectral.yaml    # Spectral（OpenAPI 契約リンタ）設定
 ├── AGENTS.md         # エージェント共通の設定（スキルが参照する docs の案内）
@@ -169,6 +169,8 @@ clone したら、[スキルの取得元と更新](docs/agents/skill-sources.md)
 ├── Taskfile.yml      # 開発コマンド定義
 ├── commitlint.config.mjs # commitlint 設定（Conventional Commits 検証）
 ├── lefthook.yml      # Git フック定義（Lefthook）
+├── mise.lock         # mise.toml の道具の URL と checksum（linux-x64）
+├── mise.toml         # Task、betterleaks、iwe の版
 ├── package.json      # Lefthook・commitlint 導入用（ルート）
 ├── package-lock.json # ルート npm 依存の lockfile
 ├── release-please-config.json # release-please の設定

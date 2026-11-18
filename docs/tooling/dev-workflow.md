@@ -65,6 +65,14 @@ task agent-wait
 commitやpushを始められないときは、Taskが理由と直し方を出して止まるので、それに従う。
 Taskは失敗の終了コードを201にまとめるので、元の終了コードは出力の`exit=`の行かTaskのエラーの`exit status`で読む。
 `task agent-wait`が「まだ実行中です」と出したら（Taskのエラーは`exit status 75`）、同じコマンドをもう一度実行する。
+
+Kiro Web のサンドボックスでは、背景のプロセスが tool call の終了で止まる。
+`task agent-commit`か`task agent-push`と`task agent-wait`を同じ tool call で実行し、`AGENT_GIT_WAIT_SECONDS`で待つ秒数を tool call の上限より短く延ばす（[Kiro Web の開発環境](../local-env-setup/kiro-web.md)）。
+
+```bash
+task agent-push && AGENT_GIT_WAIT_SECONDS=1500 task agent-wait
+```
+
 失敗を報告した実行のディレクトリは、ログを読めるように残る。
 消し方と、indexをcommitに合わせるコマンドは、`task agent-wait`が出す。
 

@@ -1,0 +1,7 @@
+{
+  "name": "mise-npm-install",
+  "private": true,
+  "dependencies": {
+    "@iwe-org/iwe": "0.29.2"
+  }
+}
