@@ -7,6 +7,8 @@ tags: [runbook, setup, wsl, docker, mise]
 
 # 開発環境構築
 
+Kiro Web のサンドボックスで作業する場合は、この文書ではなく [Kiro Web の開発環境](kiro-web.md)を読む。
+
 ## 前提条件
 
 - Windows 11（物理メモリ 32GB を想定）

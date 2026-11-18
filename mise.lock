@@ -14,10 +14,10 @@ url_api = "https://api.github.com/repos/betterleaks/betterleaks/releases/assets/
 provenance = "cosign"
 
 [[tools."npm:@iwe-org/iwe"]]
-version = "0.24.2"
-aube = { path = ".mise/locks/npm-iwe-org-iwe/0.24.2", digest = "sha256:0defa5e69f8e9b8dd2942d3784de7edf9793652b4a24701fd11fcf4b0e7fcce1" }
+version = "0.29.2"
+aube = { path = ".mise/locks/npm-iwe-org-iwe/0.29.2", digest = "sha256:2519bdd35ba6988e775629ddbad774a8a1074b2c2463f6979840587af133bdf9" }
 backend = "npm:@iwe-org/iwe"
-specifiers = ["0.24.2"]
+specifiers = ["0.29.2"]
 
 [[tools.task]]
 version = "3.53.1"

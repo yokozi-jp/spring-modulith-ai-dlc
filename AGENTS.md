@@ -30,6 +30,11 @@ Triageでは5種類の標準ラベルを使う。詳細は `docs/agents/triage-l
 
 ドメイン文書はsingle-context構成で管理する。詳細は `docs/agents/domain.md` を参照する。
 
+## Kiro Web
+
+Kiro Web のサンドボックスで Task、検査、テストを実行する前に、`docs/local-env-setup/kiro-web.md` を読む。
+tool call の最初に `source docs/local-env-setup/kiro-web.sh` を実行して、道具と PATH を揃える。
+
 ## Git
 
 commitとpushの前に、`docs/tooling/dev-workflow.md`の「エージェントがcommitとpushをするとき」を読む。
