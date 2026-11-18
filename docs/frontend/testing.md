@@ -17,7 +17,8 @@ APIを使うcomponent testはMSWでHTTP境界を置き換え、`vi.mock`でmodul
 
 複数のテストで使う準備のコードは、[フロントエンドアーキテクチャ](architecture.md#テストの置き場所)に従い `src/testing/` に置く。
 
-Vitestの`setupFiles`（`src/testing/setup.ts`）は、全テストでMSWのserver（`src/testing/msw.ts`）を起動し、各テストの後に`cleanup`、handlerの初期化、mockとglobalのstubの復元、localeの`ja`への初期化を行うので、テストに同じ`afterEach`を書かない。
+Vitestの`setupFiles`（`src/testing/setup.ts`）は、全テストでTesting Libraryの待つ上限の設定とMSWのserver（`src/testing/msw.ts`）の起動を行い、各テストの後に`cleanup`、handlerの初期化、mockとglobalのstubの復元、localeの`ja`への初期化を行う。
+テストで`configure`を呼ばず、同じ`afterEach`も書かない。
 HTTPはOrvalが生成したMSW handlerを使い、生成handlerがない境界（`apiFetch`のtransportの検査など）だけ、テストの中で`server.use()`に手書きのhandlerを渡す。
 routeの描画は`src/testing/render-route.tsx`の`renderRoute`を使い、`main.tsx`と同じproviderとrouterの既定値で、最初のloaderを終えてから描画する。
 
@@ -34,11 +35,22 @@ componentの内部state、Hookの呼出回数、CSS classだけを主要な期�
 - **実行環境の指定**：jsdomを使うテストは、ファイルの先頭に`/* @vitest-environment jsdom */`を書く。
 - **クエリ**：role、label、placeholder、text、display valueの順に選び、`data-testid`は他のクエリで取れない場合だけ使い、`container.querySelector`は使わない。
 - **user-event**：renderの前に`userEvent.setup()`を呼び、返ったinstanceで操作する。
-- **非同期の待ち**：`findBy`か`waitFor`で待ち、`setTimeout`などの固定時間で待たない。
-  `waitFor`のcallbackにはassertionを一つだけ置き、clickなどの副作用を置かない。
+- **非同期の待ち**：DOMの変化は、Testing Libraryの`findBy`か`waitFor`で待つ。
+  mockの呼出などDOM以外の値は、`expect.poll`で待つ。
+  `setTimeout`などの固定時間、`vi.waitFor`、`vi.waitUntil`では待たない。
+  `vi.waitFor`と`vi.waitUntil`はOxlintの`vitest/no-restricted-vi-methods`が禁止する（[Lintとテストのリファレンス](../tooling/lint-and-test.md#例外と調整)）。
+- **処理の一時停止**：MSWのhandlerかroute loaderをテストが解放するまで止めるときは、`createGate`を使う。
+  `createGate`は`src/testing/gate.ts`にある。
+  止める側で`promise`を待ち、テストから`release`を呼ぶ。
+- **待つ上限**：`findBy`、`waitFor`、`expect.poll`の呼出に`timeout`を書かない。
+  上限は`vite.config.ts`の`asyncWaitTimeoutMs`が一括して決める。
+- **`expect.poll`で扱えないmatcher**：`toThrow`とsnapshotは、対象のPromiseを直接awaitして検証する（例：`await expect(p).rejects.toThrow()`）。
+- **Testing Libraryの`waitFor`のcallback**：assertionを一つだけ置き、clickなどの副作用を置かない。
 - **差し替えてよい境界**：HTTPはMSW、globalは`vi.spyOn`か`vi.stubGlobal`、時刻はfake timerで置き換え、`vi.mock`と`vi.doMock`でmoduleを差し替えない。
   `vi.mock`と`vi.doMock`はOxlintの`vitest/no-restricted-vi-methods`が禁止する。
-- **テスト名**：利用者から見える振る舞いを書き、関数名やstate名を書かない。
+- **テスト名**：利用者から見える振る舞いを日本語で書き、関数名やstate名を書かない。
+  `it`、`test`、`describe`のtitleに日本語を1文字は含めることを、Oxlintの`vitest/valid-title`の`mustMatch`が検査する。
+  `describe`だけは、コードの名前をそのまま指す、空白を含まない1語のtitle（`resolveLocale`など）を許す。
 - **不安定なテスト**：Vitestの`retry`で隠さず、同じ変更で直すか削除し、`skip`で残さない。
   `skip`と`only`の残置はOxlintの`vitest/no-disabled-tests`と`vitest/no-focused-tests`が禁止する。
 

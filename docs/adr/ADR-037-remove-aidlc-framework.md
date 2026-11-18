@@ -49,7 +49,7 @@ ADR の書式は、リポジトリ内の [`docs/adr/adr-template.md`](adr-templa
 
 README の AI-DLC セットアップ節、`aidlc/` ディレクトリ説明、AGENTS.md の「AI-DLC /」表記を除く。
 
-Semgrep と Snyk のスキャン除外から `aidlc` を外し、`.kiro` と `.agents`（ツールやエージェント関連のコード）の除外は残す。
+Semgrep のスキャン除外から `aidlc` を外し、`.kiro` と `.agents`（ツールやエージェント関連のコード）の除外は残す。
 `.gitignore` の `BEGIN AI-DLC:gitignore` マーカーを外し、汎用の無視エントリ（logs、node_modules、エディタ生成物）はそのまま残す。
 CODEOWNERS から `/aidlc/` の割り当てを外す。
 これは [ADR-017](ADR-017-adopt-trunk-based-repository-governance.md) が定めた CODEOWNERS 境界のうち `aidlc` を撤去するものであり、他の境界（backend、frontend、docker と infrastructure、`.kiro`、GitHub 設定）は維持する。

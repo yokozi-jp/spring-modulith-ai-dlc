@@ -53,7 +53,7 @@ async function submitConflictingChange() {
   return { user, bodies };
 }
 
-describe("order detail page failures", () => {
+describe("注文の詳細の画面の失敗", () => {
   beforeEach(() => {
     stubCsrfCookie();
     server.use(getListProductsMockHandler(products));
@@ -184,7 +184,7 @@ describe("order detail page failures", () => {
   });
 });
 
-describe("order detail page payment failures", () => {
+describe("注文の詳細の画面の決済の失敗", () => {
   beforeEach(() => {
     stubCsrfCookie();
     server.use(getListProductsMockHandler(products));

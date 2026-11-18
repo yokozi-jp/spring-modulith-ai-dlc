@@ -24,12 +24,12 @@ async function renderLogoutForm() {
   return button.form;
 }
 
-describe("app shell logout form", () => {
+describe("アプリシェルのログアウトのフォーム", () => {
   afterEach(() => {
     replaceTelemetryForTesting();
   });
 
-  it("switches the telemetry session before one native submit", async () => {
+  it("ログアウトを押すと、テレメトリの session ID を切り替えてから、フォームを 1 回だけ送信する", async () => {
     const user = userEvent.setup();
     const calls: string[] = [];
     const nativeSubmit = vi.spyOn(HTMLFormElement.prototype, "submit").mockImplementation(() => {
@@ -54,13 +54,11 @@ describe("app shell logout form", () => {
     await user.click(screen.getByRole("button", { name: "Log out" }));
     form.dispatchEvent(new SubmitEvent("submit", { bubbles: true, cancelable: true }));
 
-    await vi.waitFor(() => {
-      expect(calls).toStrictEqual(["pause", "set:Abc2345678", "unpause", "submit"]);
-    });
+    await expect.poll(() => calls).toStrictEqual(["pause", "set:Abc2345678", "unpause", "submit"]);
     expect(nativeSubmit.mock.instances).toStrictEqual([form]);
   });
 
-  it("submits even when the telemetry session switch fails", async () => {
+  it("テレメトリの session ID の切り替えが失敗しても、フォームを送信する", async () => {
     const user = userEvent.setup();
     const nativeSubmit = vi.spyOn(HTMLFormElement.prototype, "submit").mockImplementation(noop);
     const unpause = vi.fn<() => void>();
@@ -77,13 +75,11 @@ describe("app shell logout form", () => {
 
     await user.click(screen.getByRole("button", { name: "Log out" }));
 
-    await vi.waitFor(() => {
-      expect(nativeSubmit).toHaveBeenCalledOnce();
-    });
+    await expect.poll(() => nativeSubmit).toHaveBeenCalledOnce();
     expect(unpause).not.toHaveBeenCalled();
   });
 
-  it("allows logout again after the page returns from the back/forward cache", async () => {
+  it("bfcache から戻った画面では、もう一度ログアウトできる", async () => {
     const user = userEvent.setup();
     const nativeSubmit = vi.spyOn(HTMLFormElement.prototype, "submit").mockImplementation(noop);
     replaceTelemetryForTesting({ api: { pushError: vi.fn<Sink["api"]["pushError"]>() } });
@@ -91,18 +87,14 @@ describe("app shell logout form", () => {
     const button = screen.getByRole("button", { name: "Log out" });
 
     await user.click(button);
-    await vi.waitFor(() => {
-      expect(nativeSubmit).toHaveBeenCalledOnce();
-    });
+    await expect.poll(() => nativeSubmit).toHaveBeenCalledOnce();
     globalThis.dispatchEvent(new PageTransitionEvent("pageshow", { persisted: true }));
     await user.click(button);
 
-    await vi.waitFor(() => {
-      expect(nativeSubmit).toHaveBeenCalledTimes(2);
-    });
+    await expect.poll(() => nativeSubmit).toHaveBeenCalledTimes(2);
   });
 
-  it("keeps logout disabled when the page is shown without the back/forward cache", async () => {
+  it("bfcache から戻ったのでない表示では、ログアウトを押し直しても 2 回目を送信しない", async () => {
     const user = userEvent.setup();
     const nativeSubmit = vi.spyOn(HTMLFormElement.prototype, "submit").mockImplementation(noop);
     replaceTelemetryForTesting({ api: { pushError: vi.fn<Sink["api"]["pushError"]>() } });
@@ -110,16 +102,14 @@ describe("app shell logout form", () => {
     const button = screen.getByRole("button", { name: "Log out" });
 
     await user.click(button);
-    await vi.waitFor(() => {
-      expect(nativeSubmit).toHaveBeenCalledOnce();
-    });
+    await expect.poll(() => nativeSubmit).toHaveBeenCalledOnce();
     globalThis.dispatchEvent(new PageTransitionEvent("pageshow", { persisted: false }));
     await user.click(button);
 
     expect(nativeSubmit).toHaveBeenCalledOnce();
   });
 
-  it("posts to /logout with a hidden CSRF token made from __Host-XSRF-TOKEN", async () => {
+  it("__Host-XSRF-TOKEN から作った CSRF の token を hidden の欄に入れ、/logout へ POST する", async () => {
     vi.spyOn(document, "cookie", "get").mockReturnValue(
       `XSRF-TOKEN=old; __Host-XSRF-TOKEN=${cookieValue}`,
     );

@@ -447,6 +447,10 @@ tasks.withType(JavaCompile).configureEach {
         error('UnusedVariable')
         error('JavaTimeDefaultTimeZone')
         error('JavaUtilDate')
+        // docs/web-api/openapi-annotations.md は @Schema(requiredMode) を禁じ、プリミティブの required を @NotNull で出すと定める。
+        // package-info の @SuppressWarnings は効かず、record ごとの抑制は DTO を足すたびに要るため、全体で無効にする。
+        // 代わりにプリミティブへの @Nullable の誤りは検出されない。
+        disable('NullablePrimitive')
         option('NullAway:OnlyNullMarked', 'true')
         option('NullAway:JSpecifyMode', 'true')
     }

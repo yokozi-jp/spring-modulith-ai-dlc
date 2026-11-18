@@ -436,6 +436,36 @@ tasks:
       - bash tooling/ci-changes/test.sh
       - python3 tooling/ci-gate-check/ci-gate-check.py
 
+  # 本体は tooling/agent-git/agent-git.sh、手順は docs/tooling/dev-workflow.md の「エージェントがcommitとpushをするとき」にある。
+  # 呼んだディレクトリで動かし、commit のパスをそこからの相対で解釈する。
+  # CLI_ARGS は Task が引数ごとにシェルの引用符を付けるので、空白を含むパスもそのまま渡る。
+  agent-commit:
+    desc: 渡したパスだけの git commit をバックグラウンドで開始（task agent-commit -- <メッセージのファイル> <パス>...）
+    silent: true
+    dir: "{{.USER_WORKING_DIR}}"
+    cmds:
+      - bash {{shellQuote .ROOT_DIR}}/tooling/agent-git/agent-git.sh commit {{.CLI_ARGS}}
+
+  agent-push:
+    desc: このリポジトリの worktree で pre-push が動いていなければ、今のブランチの git push -u origin をバックグラウンドで開始
+    silent: true
+    dir: "{{.USER_WORKING_DIR}}"
+    cmds:
+      - bash {{shellQuote .ROOT_DIR}}/tooling/agent-git/agent-git.sh push
+
+  agent-wait:
+    desc: agent-commit か agent-push の終わりを待ち、要約と終了コードを表示（task agent-wait [-- <実行のディレクトリ>]）
+    silent: true
+    dir: "{{.USER_WORKING_DIR}}"
+    cmds:
+      - bash {{shellQuote .ROOT_DIR}}/tooling/agent-git/agent-git.sh wait {{.CLI_ARGS}}
+
+  agent-git-test:
+    desc: agent-commit、agent-push、agent-wait を、フックを止めておける一時の git リポジトリで自己検査
+    silent: true
+    cmds:
+      - bash tooling/agent-git/test.sh
+
   # Setup
   setup:
     desc: 開発環境のセットアップスクリプトを順次実行
@@ -1686,13 +1716,21 @@ tasks:
       - npx --yes markdownlint-cli2 --fix "**/*.md"
 
   lint-taskfile:
-    desc: TaskfileをTask本体で解析しYAML構文とスキーマ構造、後片付けの終了コードを検証
+    desc: TaskfileをTask本体で解析しYAML構文とスキーマ構造、後片付けの終了コード、フックとワークフローが呼ぶタスク名を検証
     silent: true
     cmds:
+      # Taskfile 全体の解析は、task がこのタスクを起動する前に済ませている。
       - |
-        task --list-all >/dev/null
         echo "Taskfile OK: YAML構文とスキーマ構造の解析に成功しました。"
         bash tooling/taskfile-cleanup/test.sh
+        bash tooling/task-calls/test.sh
+        bash tooling/task-calls/task-calls.sh
+
+  lint-lefthook:
+    desc: lefthook.ymlのglobが、ディレクトリ直下のファイルでも意図したjobを選ぶことを本物のlefthookで検証
+    silent: true
+    cmds:
+      - bash tooling/lefthook-glob/test.sh
 
   lint-semgrep:
     desc: Semgrep OSSで静的解析
