@@ -13,6 +13,7 @@ import io.opentelemetry.api.common.AttributeKey;
 import io.opentelemetry.api.common.Attributes;
 import io.opentelemetry.instrumentation.logback.appender.v1_0.OpenTelemetryAppender;
 import io.opentelemetry.sdk.logs.data.LogRecordData;
+import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicReference;
 import lombok.extern.slf4j.Slf4j;
@@ -25,6 +26,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.system.CapturedOutput;
 import org.springframework.boot.test.system.OutputCaptureExtension;
+import org.springframework.context.ApplicationContext;
 import org.springframework.context.annotation.Import;
 
 /** 構造化ログ、トレース相関、OTLP 属性の運用契約を検証する。 */
@@ -42,6 +44,9 @@ class ObservabilityContractTest {
 
   /** このコンテキストの OpenTelemetry。 */
   @Autowired private OpenTelemetry openTelemetry;
+
+  /** OTLP の exporter の有無を調べるコンテキスト。 */
+  @Autowired private ApplicationContext context;
 
   @BeforeEach
   void installAppender() {
@@ -109,6 +114,24 @@ class ObservabilityContractTest {
     assertTrue(
         stackTrace != null && stackTrace.contains("ObservabilityContractTest"),
         () -> event + ": " + attributes);
+  }
+
+  @Test
+  @DisplayName("テストは OTLP の送信先へ接続しないので、ログ、トレース、メトリクスの exporter を作らない")
+  // 送信先のない exporter は、背景のスレッドが失敗を ERROR か WARN で標準出力へ出し、OutputCapture の検査を不安定にする。
+  void otlpExportersAreNotCreated() {
+    final List<String> exporters =
+        Arrays.stream(context.getBeanDefinitionNames())
+            .filter(name -> isOtlpExporter(context.getType(name)))
+            .toList();
+
+    assertEquals(List.of(), exporters, "OTLP へ送る exporter の Bean");
+  }
+
+  private static boolean isOtlpExporter(final Class<?> type) {
+    return type != null
+        && (type.getName().startsWith("io.opentelemetry.exporter.otlp.")
+            || type.getName().startsWith("io.micrometer.registry.otlp."));
   }
 
   private Attributes singleRecordAttributes(final String event) {
