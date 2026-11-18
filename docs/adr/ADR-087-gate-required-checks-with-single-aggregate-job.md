@@ -58,7 +58,7 @@ docs だけの PR で backend の CI を走らせない。
 - 差分判定は、各 workflow の中の `changes` ジョブに残す。呼び出し側のジョブに `if` を付けず、skip は呼ばれた側のジョブの `if` で行う。この場合、呼び出しジョブの結果は `success` になる。
 - `on.pull_request.paths` を使う 6 本（actionlint、compose-config、markdownlint、okf-validate、otel-collector、skills-check）は、`paths:` を外し、backend-ci と同じ `changes` ジョブとジョブ単位の `if` に直す。対象パスは現行の `paths:` と同じ glob で、判定は `tooling/ci-changes/changed.sh` が行う。この判定は、`ci.yml` の変更でも `true` にする。呼び出しの配線の誤りを、その PR で検出するためである。
 - `changes` は差分の取得に失敗したとき、検査を実行する側へ倒す現行の挙動を保つ。
-- 差分判定を `ci.yml` の 1 か所に集約することは、この ADR の範囲に含めない。`push` 側の `paths:` が残るため、パスの定義の重複は減らない。判定の仕組みだけを `changed.sh` に共有する。backend-ci、hadolint、frontend-ci、dast の既存の `changes` は、正規表現のまま残し、`changed.sh` へ寄せることは別の Issue で扱う。
+- 差分判定を `ci.yml` の 1 か所に集約することは、この ADR の範囲に含めない。`push` 側の `paths:` が残るため、パスの定義の重複は減らない。判定の仕組みだけを `changed.sh` に共有する。`ci.yml` が呼ぶ 12 本の `changes` はすべて `changed.sh` を使う。`ci.yml` から呼ばない api-contract の `changes` は、ラベルの付け外しでも再判定する別の経路なので、今回は寄せない。
 
 ### 集約ジョブ
 

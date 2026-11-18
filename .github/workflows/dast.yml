@@ -29,7 +29,7 @@ jobs:
     name: Detect DAST changes
     runs-on: ubuntu-latest
     outputs:
-      dast: ${{ steps.filter.outputs.dast }}
+      run: ${{ steps.filter.outputs.run }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -39,33 +39,22 @@ jobs:
 
       - name: Detect changed paths
         id: filter
-        shell: bash
         env:
           EVENT_NAME: ${{ github.event_name }}
           BASE_REF: ${{ github.event.pull_request.base.ref }}
         run: |
-          if [ "$EVENT_NAME" != "pull_request" ]; then
-            echo "dast=true" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-          # 差分取得に失敗した場合は DAST を実行する側へ倒す。
-          if ! changed_files="$(git diff --name-only "origin/${BASE_REF}...HEAD")"; then
-            echo "差分取得に失敗したため DAST を実行します。" >&2
-            echo "dast=true" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-          # docker/ は ZAP の plan と script（docker/zap/）と realm（docker/keycloak/）を含む。
-          if grep -Eq '^(backend/|frontend/|docker/|\.env\.test\.example$|Taskfile\.yml$|\.github/workflows/(dast|ci)\.yml$)' \
-            <<< "$changed_files"; then
-            echo "dast=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "dast=false" >> "$GITHUB_OUTPUT"
-          fi
+          bash tooling/ci-changes/changed.sh \
+            'backend/**' \
+            'frontend/**' \
+            'docker/**' \
+            '.env.test.example' \
+            'Taskfile.yml' \
+            '.github/workflows/dast.yml'
 
   passive:
     name: Run ZAP passive scan 🕷️
     needs: changes
-    if: github.event_name == 'pull_request' && needs.changes.outputs.dast == 'true'
+    if: github.event_name == 'pull_request' && needs.changes.outputs.run == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 30
     permissions:
