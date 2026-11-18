@@ -16,8 +16,13 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.stream.Stream;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.springframework.core.serializer.support.DeserializingConverter;
 import org.springframework.core.serializer.support.SerializingConverter;
 import org.springframework.security.core.authority.AuthorityUtils;
@@ -54,7 +59,7 @@ class SignInOidcUserServiceTest {
   @Test
   @DisplayName("名前をアプリの利用者の ID にし、ID トークンと権限と IdP の subject は変えない")
   void namesTheUserByAppUserId() {
-    final DefaultOidcUser idpUser = idpUser(Map.of());
+    final DefaultOidcUser idpUser = idpUser(ISSUER, SUBJECT, Map.of());
     when(delegate.loadUser(any())).thenReturn(idpUser);
     when(handler.handle(new SignInUserCommand(ISSUER, SUBJECT)))
         .thenReturn(new SignInUserResult(USER_ID));
@@ -70,7 +75,7 @@ class SignInOidcUserServiceTest {
   @Test
   @DisplayName("セッションの Redis に保存するため、直列化して読み戻しても、同じ名前と同じ ID トークンの利用者になる")
   void survivesSessionSerialization() {
-    when(delegate.loadUser(any())).thenReturn(idpUser(Map.of()));
+    when(delegate.loadUser(any())).thenReturn(idpUser(ISSUER, SUBJECT, Map.of()));
     when(handler.handle(any())).thenReturn(new SignInUserResult(USER_ID));
     final OidcUser user = service.loadUser(mock(OidcUserRequest.class));
 
@@ -84,7 +89,7 @@ class SignInOidcUserServiceTest {
   @Test
   @DisplayName("利用者の ID と IdP の利用者が両方同じときだけ、同じ利用者として扱う")
   void equalsNeedsSameUserIdAndSameIdpUser() {
-    final DefaultOidcUser idpUser = idpUser(Map.of());
+    final DefaultOidcUser idpUser = idpUser(ISSUER, SUBJECT, Map.of());
     final OidcUser user = new AppOidcUser(idpUser, USER_ID);
 
     assertThat(user).isEqualTo(new AppOidcUser(idpUser, USER_ID));
@@ -101,7 +106,8 @@ class SignInOidcUserServiceTest {
   @Test
   @DisplayName("IdP が同じ名前の claim を送ってきても、アプリが引いた ID で上書きする")
   void overridesAClaimSentByTheIdp() {
-    when(delegate.loadUser(any())).thenReturn(idpUser(Map.of("app_user_id", "spoofed")));
+    when(delegate.loadUser(any()))
+        .thenReturn(idpUser(ISSUER, SUBJECT, Map.of("app_user_id", "spoofed")));
     when(handler.handle(any())).thenReturn(new SignInUserResult(USER_ID));
 
     assertThat(service.loadUser(mock(OidcUserRequest.class)).getName()).isEqualTo(USER_ID);
@@ -110,7 +116,7 @@ class SignInOidcUserServiceTest {
   @Test
   @DisplayName("初回ログインが同時に 2 つあり UNIQUE で負けたら、呼び直して相手の利用者を引く")
   void retriesOnceAfterUniqueConflict() {
-    when(delegate.loadUser(any())).thenReturn(idpUser(Map.of()));
+    when(delegate.loadUser(any())).thenReturn(idpUser(ISSUER, SUBJECT, Map.of()));
     when(handler.handle(any()))
         .thenThrow(
             new ConflictException(ConflictException.Kind.UNIQUE, "unique key already exists"))
@@ -123,7 +129,7 @@ class SignInOidcUserServiceTest {
   @Test
   @DisplayName("UNIQUE 以外の競合は呼び直さずに投げる")
   void doesNotRetryOtherConflicts() {
-    when(delegate.loadUser(any())).thenReturn(idpUser(Map.of()));
+    when(delegate.loadUser(any())).thenReturn(idpUser(ISSUER, SUBJECT, Map.of()));
     when(handler.handle(any()))
         .thenThrow(new ConflictException(ConflictException.Kind.LOCK, "row is locked"));
 
@@ -132,50 +138,51 @@ class SignInOidcUserServiceTest {
     verify(handler, times(1)).handle(any());
   }
 
-  @Test
-  @DisplayName("ID トークンに iss がなければ、利用者を引かずにログインを失敗させる")
-  void rejectsIdTokenWithoutIssuer() {
-    final OidcIdToken idToken =
-        OidcIdToken.withTokenValue("id-token")
-            .subject(SUBJECT)
-            .issuedAt(Instant.parse("2026-10-01T00:00:00Z"))
-            .expiresAt(Instant.parse("2026-10-01T00:05:00Z"))
-            .build();
-    when(delegate.loadUser(any()))
-        .thenReturn(new DefaultOidcUser(AuthorityUtils.createAuthorityList("OIDC_USER"), idToken));
+  @ParameterizedTest(name = "{0}")
+  @MethodSource("invalidClaims")
+  @DisplayName("ID トークンの iss がないか、iss か sub が空か 255 文字を超えたら、利用者を引かずにログインを失敗させる")
+  void rejectsInvalidClaims(
+      final String label, final @Nullable String issuer, final String subject) {
+    when(delegate.loadUser(any())).thenReturn(idpUser(issuer, subject, Map.of()));
 
     assertThatThrownBy(() -> service.loadUser(mock(OidcUserRequest.class)))
+        .as(label)
         .isInstanceOf(OAuth2AuthenticationException.class);
     verify(handler, times(0)).handle(any());
   }
 
   @Test
-  @DisplayName("ID トークンの sub が OIDC の上限の 255 文字を超えたら、利用者を引かずにログインを失敗させる")
-  void rejectsSubjectLongerThanOidcLimit() {
-    final OidcIdToken idToken =
-        OidcIdToken.withTokenValue("id-token")
-            .issuer(ISSUER)
-            .subject("s".repeat(256))
-            .issuedAt(Instant.parse("2026-10-01T00:00:00Z"))
-            .expiresAt(Instant.parse("2026-10-01T00:05:00Z"))
-            .build();
-    when(delegate.loadUser(any()))
-        .thenReturn(new DefaultOidcUser(AuthorityUtils.createAuthorityList("OIDC_USER"), idToken));
+  @DisplayName("ID トークンの iss と sub がちょうど 255 文字なら、そのまま利用者を引く")
+  void acceptsClaimsAtTheLimit() {
+    final String issuer = "i".repeat(255);
+    final String subject = "s".repeat(255);
+    when(delegate.loadUser(any())).thenReturn(idpUser(issuer, subject, Map.of()));
+    when(handler.handle(any())).thenReturn(new SignInUserResult(USER_ID));
 
-    assertThatThrownBy(() -> service.loadUser(mock(OidcUserRequest.class)))
-        .isInstanceOf(OAuth2AuthenticationException.class);
-    verify(handler, times(0)).handle(any());
+    assertThat(service.loadUser(mock(OidcUserRequest.class)).getName()).isEqualTo(USER_ID);
+    verify(handler).handle(new SignInUserCommand(issuer, subject));
   }
 
-  private static DefaultOidcUser idpUser(final Map<String, Object> extraClaims) {
-    final OidcIdToken idToken =
+  private static Stream<Arguments> invalidClaims() {
+    return Stream.of(
+        Arguments.of("iss がない", null, SUBJECT),
+        Arguments.of("sub が 256 文字", ISSUER, "s".repeat(256)),
+        Arguments.of("iss が 256 文字", "i".repeat(256), SUBJECT),
+        Arguments.of("sub が空白だけ", ISSUER, " "),
+        Arguments.of("iss が空白だけ", " ", SUBJECT));
+  }
+
+  private static DefaultOidcUser idpUser(
+      final @Nullable String issuer, final String subject, final Map<String, Object> extraClaims) {
+    final OidcIdToken.Builder builder =
         OidcIdToken.withTokenValue("id-token")
-            .issuer(ISSUER)
-            .subject(SUBJECT)
+            .subject(subject)
             .claims(claims -> claims.putAll(extraClaims))
             .issuedAt(Instant.parse("2026-10-01T00:00:00Z"))
-            .expiresAt(Instant.parse("2026-10-01T00:05:00Z"))
-            .build();
-    return new DefaultOidcUser(AuthorityUtils.createAuthorityList("OIDC_USER"), idToken);
+            .expiresAt(Instant.parse("2026-10-01T00:05:00Z"));
+    if (issuer != null) {
+      builder.issuer(issuer);
+    }
+    return new DefaultOidcUser(AuthorityUtils.createAuthorityList("OIDC_USER"), builder.build());
   }
 }

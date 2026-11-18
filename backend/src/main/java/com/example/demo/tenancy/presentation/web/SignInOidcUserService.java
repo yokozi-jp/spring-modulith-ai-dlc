@@ -21,9 +21,9 @@ import org.springframework.stereotype.Component;
 /**
  * IdP のログインの後に、ID トークンの {@code (iss, sub)} からアプリの利用者を引き、なければ作る。
  *
- * <p>返す {@link OidcUser} は {@link AppOidcUser} で、IdP のものと同じ ID トークンと権限を持ち、{@link
- * OidcUser#getName()} だけがアプリの利用者の ID になる。共通カラムの {@code *_by} は、この名前を登録する（{@code
- * docs/database/postgresql-common-columns.md}）。
+ * <p>返す {@link OidcUser} は {@link AppOidcUser} で、IdP のものと同じ ID トークンと権限を持ち、名前と {@link
+ * com.example.demo.shared.security.AppUserPrincipal#userId()} がアプリの利用者の ID になる。共通カラムの {@code *_by}
+ * は、{@code userId()} を登録する（{@code docs/database/postgresql-common-columns.md}）。
  */
 @Component
 class SignInOidcUserService implements OAuth2UserService<OidcUserRequest, OidcUser> {
@@ -31,7 +31,7 @@ class SignInOidcUserService implements OAuth2UserService<OidcUserRequest, OidcUs
   /** ログインの失敗の種類。 */
   private static final String INVALID_ID_TOKEN = "invalid_id_token";
 
-  /** OIDC Core が定める {@code sub} の長さの上限。{@code iss} も同じ上限で受ける。 */
+  /** {@code ExternalIdentity} と同じ上限。{@code m_user_identity} の列が {@code varchar(255)} である。 */
   private static final int MAX_CLAIM_LENGTH = 255;
 
   /** IdP の利用者を読む標準の実装。 */
