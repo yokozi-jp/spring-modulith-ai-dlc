@@ -13,9 +13,10 @@ on:
   # changesジョブでFrontend検証の要否を判定する。
   pull_request:
     branches: ["**"]
+  workflow_call:
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
+  group: frontend-ci-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 permissions:
@@ -51,7 +52,7 @@ jobs:
             echo "frontend=true" >> "$GITHUB_OUTPUT"
             exit 0
           fi
-          if grep -Eq '^(frontend/|openapi/|Taskfile\.yml$|\.github/workflows/frontend-ci\.yml$)' \
+          if grep -Eq '^(frontend/|openapi/|Taskfile\.yml$|\.github/workflows/(frontend-ci|ci)\.yml$)' \
             <<< "$changed_files"; then
             echo "frontend=true" >> "$GITHUB_OUTPUT"
           else

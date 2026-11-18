@@ -56,9 +56,9 @@ docs だけの PR で backend の CI を走らせない。
   actionlint、betterleaks、backend-ci、compose-config、dast（passive のみ）、frontend-ci、hadolint、markdownlint、okf-validate、otel-collector、skills-check、static-analysis、trivy、zizmor。
 - 各 workflow は `workflow_call` を足し、`push` などの既存のトリガーは残す。`main` への push で動く CI は変えない。
 - 差分判定は、各 workflow の中の `changes` ジョブに残す。呼び出し側のジョブに `if` を付けず、skip は呼ばれた側のジョブの `if` で行う。この場合、呼び出しジョブの結果は `success` になる。
-- `on.pull_request.paths` を使う 6 本（actionlint、compose-config、markdownlint、okf-validate、otel-collector、skills-check）は、`paths:` を外し、backend-ci と同じ `changes` ジョブとジョブ単位の `if` に直す。対象パスは現行の `paths:` と同じにする。
+- `on.pull_request.paths` を使う 6 本（actionlint、compose-config、markdownlint、okf-validate、otel-collector、skills-check）は、`paths:` を外し、backend-ci と同じ `changes` ジョブとジョブ単位の `if` に直す。対象パスは現行の `paths:` と同じ glob で、判定は `tooling/ci-changes/changed.sh` が行う。この判定は、`ci.yml` の変更でも `true` にする。呼び出しの配線の誤りを、その PR で検出するためである。
 - `changes` は差分の取得に失敗したとき、検査を実行する側へ倒す現行の挙動を保つ。
-- 差分判定を `ci.yml` の 1 か所に集約することは、この ADR の範囲に含めない。`push` 側の `paths:` が残るため、パスの定義の重複は減らない。必要なら別の ADR で扱う。
+- 差分判定を `ci.yml` の 1 か所に集約することは、この ADR の範囲に含めない。`push` 側の `paths:` が残るため、パスの定義の重複は減らない。判定の仕組みだけを `changed.sh` に共有する。backend-ci、hadolint、frontend-ci、dast の既存の `changes` は、正規表現のまま残し、`changed.sh` へ寄せることは別の Issue で扱う。
 
 ### 集約ジョブ
 
@@ -105,6 +105,7 @@ ruleset の必須チェックを、次の 4 つにする。
 スクリプトは `ci.yml` のジョブとして実行し、`CI gate` の `needs` に入れる。
 
 - `ci.yml` に、check 名が `CI gate` の集約ジョブがあり、`if: always()` を持つ。
+- `ci.yml` が workflow を呼ぶジョブの id が、呼ぶ workflow のファイル名の stem と同じである。
 - `ci.yml` の `CI gate` 以外のすべてのジョブが、`CI gate` の `needs` にある。
 - `.github/workflows/*.yml` のうち `on.pull_request` を持つものは、すべて `ci.yml` から呼ばれているか、除外の一覧に理由つきで載っている。
 - 呼ばれる workflow のトップレベルの `concurrency` の group が、ファイル名の stem と `-` で始まる。
