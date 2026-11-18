@@ -543,21 +543,25 @@ for broken in cp mv; do
 done
 
 # wrapper と _commit を止め、残った git が commit を終えた後に、agent-wait の途中で git が失敗する。
-# 失敗するのは、HEAD の rev-parse、上の commit が戻したかを確かめる git diff、2 つの index の ls-files、
-# base か本物の index と commit の git diff。
+# 失敗するのは、HEAD の rev-parse、上の commit が戻したかを確かめる 2 つの git diff（commit と、上に載った commit）、
+# 2 つの index の ls-files、base か本物の index と commit の git diff。
 scene "orphaned commits whose git fails"
-for check in head reverted entries base now; do
-  case "$check" in
-    head) pattern='* rev-parse -q --verify HEAD ' ;;
-    reverted) pattern='* -z [0-9a-f]* [0-9a-f]* -- ' ;;
-    entries) pattern='* ls-files -s -z *' ;;
-    base) pattern='*/commit/base * --name-only * --cached *' ;;
-    now) pattern='*/index.lock * --name-only * --cached *' ;;
-  esac
+for check in head commit-diff head-diff entries base now; do
   held_commit "orphan-$check.txt"
   kill "$(pid_of wrapper "$run")" "$(pid_of child "$run")"
   rm "$hold"
   fact "the orphaned git finishes before the $check check" until_ok not alive "$(pid_of git "$run")"
+  case "$check" in
+    head) pattern='* rev-parse -q --verify HEAD ' ;;
+    commit-diff) pattern='* -z [0-9a-f]* [0-9a-f]* -- ' ;;
+    head-diff)
+      git add "orphan-$check.txt" && git commit --no-verify -q --allow-empty -m foreign
+      pattern="* -z [0-9a-f]* $(git rev-parse HEAD) -- "
+      ;;
+    entries) pattern='* ls-files -s -z *' ;;
+    base) pattern='*/commit/base * --name-only * --cached *' ;;
+    now) pattern='*/index.lock * --name-only * --cached *' ;;
+  esac
   expect "wait reports that git failed in the $check check" 1 "本物の index を合わせていません" failing_git "$pattern" bash "$tool" wait "$run"
   fact "the failing git ran in the $check check" [ ! -e "$tmp/fail-git" ]
   git reset -q
