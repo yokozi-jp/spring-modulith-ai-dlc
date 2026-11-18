@@ -114,6 +114,31 @@ class ChangesetLintTest {
               privilegeViolation(
                   "GRANT SELECT ON TABLE item.m_item TO \"${appDatabaseUsername}\"")),
           lintCase(
+              "g3-app-role-on-second-schema",
+              privilegeViolation(
+                  "GRANT SELECT ON TABLE modulith.event_publication, item.m_item"
+                      + " TO \"${appDatabaseUsername}\"")),
+          lintCase(
+              "g3-app-role-on-unqualified-table",
+              privilegeViolation("GRANT SELECT ON TABLE m_item TO \"${appDatabaseUsername}\"")),
+          lintCase(
+              "g3-function-privilege",
+              privilegeViolation("GRANT EXECUTE ON FUNCTION item.fn_one() TO item_module")),
+          lintCase(
+              "g3-database-privilege",
+              privilegeViolation("GRANT CONNECT ON DATABASE demo TO item_module")),
+          lintCase(
+              "g3-sequence-privilege",
+              privilegeViolation("GRANT USAGE ON ALL SEQUENCES IN SCHEMA item TO item_module")),
+          lintCase(
+              "g3-default-sequence-privilege",
+              privilegeViolation(
+                  "ALTER DEFAULT PRIVILEGES IN SCHEMA item GRANT USAGE ON SEQUENCES TO item_module")),
+          lintCase(
+              "g3-unnumbered-file",
+              "M16 grant-m-item.yaml",
+              "G3 grant-m-item: GRANT SELECT ON TABLE item.m_item TO \"${appDatabaseUsername}\""),
+          lintCase(
               "m12-enum-without-comment",
               sqlAllowlist(
                   "002-create-item-status: CREATE TYPE item.item_status AS ENUM ('active');",
