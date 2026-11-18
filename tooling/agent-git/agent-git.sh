@@ -15,11 +15,15 @@
 #   log       コマンドの標準出力と標準エラー
 #   done      終了コード（exit=<n>）。終わるまで無い
 #   reported  wait が失敗を報告した印。引数のない wait は、この印のない実行だけを選ぶ
-#   commit だけが持つもの:
-#   msg、index、base、head  メッセージの写し、stage と commit に使う index の写し、写す前の本物の index、始めたときの HEAD。
-#             _commit が終わるときに消すので、実行が終わった後に残っていれば、_commit は本物の index を合わせる前に止まった。
-#   unsynced  commit の後に本物の index を合わせられなかったパス（NUL 区切り）。残っている間は次の commit を止める。
-#   touched、kept  sync_index の作業用。
+#   commit だけが持つもの。パスの一覧は NUL 区切り。unsynced 以外は settle_commit が discard_commit_state で消す。
+#   msg       メッセージの写し
+#   index     stage と commit に使う、本物の index の写し（index.lock はその写しのロック）
+#   base      写す前の本物の index
+#   head      始めたときの HEAD。実行が終わった後に残っていれば、_commit は本物の index を合わせる前に止まった
+#   pending   渡したパスのうち、写しに git add するもの（作業ツリーで変わったか消えた追跡中のファイルと、無視していない新しいファイル）
+#   touched   base と合わせる直前の本物の index で、mode、blob、stage のどれかが違うパス
+#   kept      commit が変えたパスのうち、写してからほかの作業が stage し直し、commit とも違うもの。本物の index にその stage を残す
+#   unsynced  commit が変えたパスのうち、本物の index を commit に合わせるもの。合わせられなければ残り、次の commit を止める
 
 set -u
 
@@ -77,6 +81,7 @@ proc_start() {
 
 # state <実行のディレクトリ>: running（pid のどれかが動いている）、finished（done に終了コードがある）、lost のどれかを出す。
 # wrapper は done を書いてから終わるので、生きているかを先に確かめれば、どれも止まって done が無いときだけが lost になる。
+# commit の git を止めた後も動き続けるフックのプロセスは pid に無いので、running に数えない。
 state() {
   local pid start
   while read -r _ pid start; do
@@ -85,7 +90,7 @@ state() {
   if grep -qx 'exit=[0-9]\+' "$1/done" 2>/dev/null; then echo finished; else echo lost; fi
 }
 
-discard_copies() { rm -f -- "$1/msg" "$1/index" "$1/index.lock" "$1/base" "$1/head" "$1/touched" "$1/kept"; }
+discard_commit_state() { rm -f -- "$1/msg" "$1/index" "$1/index.lock" "$1/base" "$1/head" "$1/pending" "$1/touched" "$1/kept"; }
 
 # background <実行のディレクトリ> <コマンド>...: コマンドを子として動かし、終わったら done に終了コードを書く。
 background() {
@@ -114,7 +119,7 @@ new_run() {
 
 commit() {
   [ $# -ge 2 ] || usage
-  local msg="$1" r run outside partial
+  local msg="$1" r run head unmerged outside partial
   shift
   git rev-parse --is-inside-work-tree >/dev/null || exit 1
   [ -s "$msg" ] || fail "メッセージのファイル $msg が無いか空です。"
@@ -136,47 +141,85 @@ commit() {
   # git commit --only <パス> は、フックの間ずっと本物の index をロックし、ほかの作業の git add を失敗させるので使わない。
   # base は写す前の本物の index で、commit の後にほかの作業が stage し直したパスを見分ける（sync_index）。
   { cp -- "$(git rev-parse --git-path index)" "$run/base" && cp -- "$run/base" "$run/index"; } || exit 1
+  # 最初の commit の前は HEAD が無いので空になり、landed は HEAD^ が無いことと比べる。
+  git rev-parse -q --verify HEAD >"$run/head"
+  head="$(cat -- "$run/head")"
+  # git commit -- <パス> と同じく、HEAD にだけあるパス（git rm や git mv の元）も当たったとみなし、どこにも当たらないパスで止める。
+  GIT_INDEX_FILE="$run/index" git --literal-pathspecs ls-files --error-unmatch -c -o --exclude-standard ${head:+--with-tree="$head"} -- "$@" >/dev/null ||
+    fail "上のパスは、作業ツリー、index、HEAD のどれにもありません（.gitignore で無視しているファイルも含みます）。"
+  unmerged="$(changed "$run/index" --diff-filter=U -- | tr '\0' '\n')"
+  refuse_listed "$unmerged" "次のパスは衝突が解決されていないので止めます。" \
+    "  衝突を解決してから git add -- <パス> で stage し、やり直してください。"
   outside="$(LC_ALL=C comm -z -23 <(changed "$run/index" --cached --) <(changed "$run/index" --cached -- "$@") | tr '\0' '\n')"
   refuse_listed "$outside" "渡したパスの外に stage 済みの変更があり、このまま commit すると混ざるので止めます。" \
     "  自分の変更ならパスに足してください。
   別の作業が stage したものなら、その作業に確かめてから git restore --staged -- <パス> で外してください。"
-  partial="$(LC_ALL=C comm -z -12 <(changed "$run/index" --cached -- "$@") <(changed "$run/index" -- "$@") | tr '\0' '\n')"
+  # git add は index にも作業ツリーにも無いパスで失敗するので、git rm や git mv で消したパスを渡さず、作業ツリーとの違いだけを渡す。
+  { changed "$run/index" -- "$@" && GIT_INDEX_FILE="$run/index" git --literal-pathspecs ls-files -z -o --exclude-standard --full-name -- "$@"; } |
+    LC_ALL=C sort -zu >"$run/pending" || exit 1
+  # git rm --cached で外したパスは、作業ツリーに無視していないファイルとして残っていれば pending に入り、ここで止まる。
+  partial="$(LC_ALL=C comm -z -12 <(changed "$run/index" --cached -- "$@") "$run/pending" | tr '\0' '\n')"
   refuse_listed "$partial" "次のパスは stage した内容と作業ツリーが違い、このまま git add すると stage した内容が上書きされるので止めます。" \
     "  自分で stage したもので、作業ツリーの内容ごと commit するなら、git add -- <パス> で stage してからやり直してください。
+  git rm --cached で追跡をやめるなら、そのパスを .gitignore に足し、.gitignore も渡してやり直してください。
   別の作業や利用者が一部だけを stage したものなら、この Task では commit できないので、その作業か利用者に確かめてください。"
-  GIT_INDEX_FILE="$run/index" git --literal-pathspecs add -- "$@" || exit 1
-  GIT_INDEX_FILE="$run/index" git diff --cached --quiet && fail "渡したパスに commit する変更がありません。"
+  [ ! -s "$run/pending" ] ||
+    GIT_INDEX_FILE="$run/index" git -C "$(git rev-parse --show-toplevel)" --literal-pathspecs add --pathspec-from-file="$run/pending" --pathspec-file-nul ||
+    exit 1
+  # merge は HEAD から何も変えなくても（-s ours など）commit するので、MERGE_HEAD があれば止めない。
+  GIT_INDEX_FILE="$run/index" git diff --cached --quiet && ! git rev-parse -q --verify MERGE_HEAD >/dev/null &&
+    fail "渡したパスに commit する変更がありません。"
   # git はメッセージのファイルを pre-commit の後に読むので、待つ間に元のファイルを消しても困らない写しを渡す。
   cp -- "$msg" "$run/msg" || exit 1
-  # 最初の commit の前は HEAD が無いので空になり、landed は HEAD^ が無いことと比べる。
-  git rev-parse -q --verify HEAD >"$run/head"
   trap - EXIT
   launch "$run" bash "$self" _commit "$run"
 }
 
-# commit_copy <実行のディレクトリ>: background の子として、写しの index から commit し、本物の index を合わせる。
+# commit_copy <実行のディレクトリ>: background の子として、写しの index から commit し、settle_commit で片付ける。
 commit_copy() {
   local run="$1" code
   GIT_INDEX_FILE="$run/index" git commit -F "$run/msg" &
   echo "git $! $(proc_start "$!")" >>"$run/pid"
-  wait "$!" && sync_index "$run" "$(git rev-parse HEAD)"
+  wait "$!"
   code=$?
-  discard_copies "$run"
+  settle_commit "$run" code
   return "$code"
 }
 
-# landed <実行のディレクトリ>: HEAD が、始めたときの HEAD の上に写しの index の内容で作った commit なら真。
+# landed <実行のディレクトリ> <commit>: commit が、始めたときの HEAD の上に写しの index の内容で作った commit なら真。
 landed() {
-  [ "$(git rev-parse -q --verify HEAD^)" = "$(cat -- "$1/head")" ] &&
-    GIT_INDEX_FILE="$1/index" git diff --cached --quiet HEAD -- 2>/dev/null
+  [ "$(git rev-parse -q --verify "$2^")" = "$(cat -- "$1/head")" ] &&
+    GIT_INDEX_FILE="$1/index" git diff --cached --quiet "$2" -- 2>/dev/null
+}
+
+# settle_commit <実行のディレクトリ> <終了コードの変数> [<注意>]: commit ができたかを landed だけで決め、最後に commit の状態を消す。
+# HEAD が commit なら、注意を出して本物の index を合わせ、変数を sync_index の終了コードにする。
+# 合わせる前の本物の index からほかの作業が git commit し、commit のパスを戻していれば、それを出して変数を 1 にする。
+# どちらでもなければ変数を変えない。
+settle_commit() {
+  local run="$1" ours reverted
+  if landed "$run" HEAD; then
+    [ -z "${3:-}" ] || echo "$3"
+    sync_index "$run" "$(git rev-parse HEAD)"
+    printf -v "$2" %s $?
+  elif [ -s "$run/head" ] && ours="$(git rev-list --first-parent --reverse "$(cat -- "$run/head")..HEAD" | head -n 1)" &&
+    [ -n "$ours" ] && landed "$run" "$ours"; then
+    reverted="$(LC_ALL=C comm -z -23 <(changed "$run/index" "$ours^" "$ours" --) <(changed "$run/index" "$ours^" HEAD --) | tr '\0' '\n')"
+    if [ -n "$reverted" ]; then
+      echo "✗ commit $ours はできましたが、本物の index を合わせる前に、ほかの作業が古い index から commit したので、次のパスが commit の前の内容に戻りました。
+$(sed 's/^/    /' <<<"$reverted")
+  作業ツリーがまだ commit の内容なら、同じパスをもう一度 task agent-commit で commit してください。戻した commit は git log $ours..HEAD で確かめられます。"
+      printf -v "$2" 1
+    fi
+  fi
+  discard_commit_state "$run"
 }
 
 entries() { GIT_INDEX_FILE="$1" git ls-files -s -z; }
 
-# split_changes <実行のディレクトリ> <commit> <今の index>: commit が base から変えたパスを、NUL 区切りで 2 つに書き分ける。
-#   unsynced  今の index でも base のままのパス。commit に合わせる
-#   kept      写してからほかの作業が stage し直し、commit とも違うパス。その stage を残す
+# split_changes <実行のディレクトリ> <commit> <今の index>: touched、unsynced、kept を書く（ファイルの意味はヘッダー）。
 split_changes() {
+  # 2 つの index の ls-files -s を混ぜて一度だけ現れる行を残すと、base と今の index で mode、blob、stage のどれかが違うパスになる。
   { entries "$1/base"; entries "$3"; } | LC_ALL=C sort -z | uniq -zu | cut -z -f2- | LC_ALL=C sort -zu >"$1/touched" &&
     LC_ALL=C comm -z -23 <(changed "$1/base" --cached "$2" --) "$1/touched" >"$1/unsynced" &&
     LC_ALL=C comm -z -12 <(changed "$1/base" --cached "$2" --) "$1/touched" |
@@ -202,29 +245,31 @@ lock_index() {
 # 合わせられなければ unsynced を残し、合わせるコマンドを出して失敗する。
 # パスはルートからなので、ルートで動くサブシェルにする。
 sync_index() (
-  run="$1" commit="$2"
+  run="$1" commit="$2" locked=false
   cd -- "$(git rev-parse --show-toplevel)" && index="$(git rev-parse --path-format=absolute --git-path index)" || exit
+  # unsynced_exit <理由> <いつ実行するか>: 合わせられなかったことと、合わせるコマンドを出して失敗する。
+  unsynced_exit() {
+    # ponytail: 一覧は止めたときの index から作るので、コマンドを実行するまでにほかの作業が stage し直したパスも commit に戻す。
+    #   合わせられないことはまれなので受け入れる。防ぐなら、このコマンドの代わりに sync_index をもう一度呼ぶ入口を作る。
+    echo "✗ commit はできましたが、$1、本物の index を commit に合わせられませんでした。
+  本物の index は、commit を打ち消す内容を stage したままです。$2、次を実行してください。
+    git -C $(printf %q "$PWD") --literal-pathspecs reset -q $commit --pathspec-from-file=$(printf %q "$run/unsynced") --pathspec-file-nul && rm -r -- $(printf %q "$run")"
+    exit 1
+  }
   now="$index"
   if lock_index "$index"; then
-    now="$index.lock"
+    locked=true now="$index.lock"
     # 置かずに終わるときにロックを外す。置いた後は外さない（ほかの git が新しく作ったロックを消してしまう）。
     trap 'rm -f -- "$now"' EXIT
   fi
   split_changes "$run" "$commit" "$now" || exit
   # 空の pathspec を渡すと git reset は index 全体を戻すので、合わせるパスがあるときだけ呼ぶ。
   if [ -s "$run/unsynced" ]; then
-    if [ "$now" = "$index.lock" ] &&
-      GIT_INDEX_FILE="$now" git --literal-pathspecs reset -q "$commit" --pathspec-from-file="$run/unsynced" --pathspec-file-nul &&
-      mv -- "$now" "$index"; then
-      trap - EXIT
-    else
-      # ponytail: 一覧は止めたときの index から作るので、コマンドを実行するまでにほかの作業が stage し直したパスも commit に戻す。
-      #   index.lock が 3 秒より長く続くことはまれなので受け入れる。防ぐなら、このコマンドの代わりに sync_index をもう一度呼ぶ入口を作る。
-      echo "✗ commit はできましたが、本物の index を commit に合わせられませんでした（index.lock が 3 秒外れないときなど）。
-  本物の index は、commit を打ち消す内容を stage したままです。index.lock を持つ git が終わってから、次を実行してください。
-    git -C $(printf %q "$PWD") --literal-pathspecs reset -q $commit --pathspec-from-file=$(printf %q "$run/unsynced") --pathspec-file-nul && rm -r -- $(printf %q "$run")"
-      exit 1
-    fi
+    $locked || unsynced_exit "ほかの git が index.lock を 3 秒より長く持っていたので" "index.lock を持つ git が終わってから"
+    GIT_INDEX_FILE="$now" git --literal-pathspecs reset -q "$commit" --pathspec-from-file="$run/unsynced" --pathspec-file-nul &&
+      mv -- "$now" "$index" ||
+      unsynced_exit "git reset か index の置き換えに失敗したので" "上の失敗の原因を取り除いてから"
+    trap - EXIT
   fi
   rm -f -- "$run/unsynced"
   [ ! -s "$run/kept" ] || echo "⚠ 次のパスは commit の間にほかの作業が stage し直したので、本物の index にその stage を残しました。
@@ -234,6 +279,8 @@ $(tr '\0' '\n' <"$run/kept" | sed 's/^/    /')
 
 # prepush_here: このリポジトリの worktree の中で動く pre-push を、pgrep -a の形で出す。pgrep が使えなければ失敗する。
 # pre-push は compose-test のプロジェクト名とポートを worktree をまたいで使うので、ほかの worktree の pre-push も数える。
+# ponytail: 同じリポジトリの別の clone の pre-push は worktree の一覧に無いので数えず、compose-test の名前とポートでぶつかる。
+#   防ぐなら、cwd のリポジトリの remote の URL か、compose のプロジェクトの名前で見分ける。
 prepush_here() {
   local found worktrees pid cmd cwd wt
   found="$(pgrep -fa "$prepush_pattern")"
@@ -297,17 +344,11 @@ wait_run() {
     finished) code="$(sed -n 's/^exit=//p' "$run/done")" ;;
     lost) code="" ;;
   esac
-  if [ -e "$run/head" ]; then
-    # _commit が本物の index を合わせる前に止まった。commit ができていれば、ここで合わせる。
-    if landed "$run"; then
-      {
-        echo "⚠ commit はできていましたが、本物の index を合わせる前に止まったので、agent-wait が合わせます。"
-        sync_index "$run" "$(git rev-parse HEAD)"
-      } >>"$run/log" 2>&1
-      code=$?
-    fi
-    discard_copies "$run"
-  fi
+  # _commit が本物の index を合わせる前に止まった。commit ができていれば、ここで合わせる。
+  [ ! -e "$run/head" ] ||
+    settle_commit "$run" code "⚠ commit はできていましたが、本物の index を合わせる前に止まったので、agent-wait が合わせます。" >>"$run/log" 2>&1
+  # 合わせるコマンドを出したログは、done が無くても、コマンドが実行のディレクトリを消すまで失敗として出し直す。
+  [ ! -e "$run/unsynced" ] || code=1
   touch -- "$run/reported"
   [ -n "$code" ] || fail "終了コードを記録せずに止まりました（done が無いか壊れています）。git status で状態を確かめてから、やり直してください。ログ: $run/log"
   # Lefthook の要約の行と、注意（⚠ の行と字下げした続き。adr-check など）を出す。
