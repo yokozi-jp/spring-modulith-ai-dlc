@@ -1,5 +1,4 @@
 /* @vitest-environment jsdom */
-// oxlint-disable import/max-dependencies -- 画面が呼ぶ API の MSW handler とテスト用の helper に、送信を止める gate の import が加わる。
 
 import { screen, waitFor, within } from "@testing-library/react";
 import type { UserEvent } from "@testing-library/user-event";

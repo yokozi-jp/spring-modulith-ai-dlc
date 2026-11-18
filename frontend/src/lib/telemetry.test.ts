@@ -50,10 +50,10 @@ describe("router telemetry", () => {
     fake.resolve();
 
     await expect
-      .poll(() => pushEvent.mock.calls)
-      .toStrictEqual([
-        ["view_changed", { fromView: "/", toView: "/" }, undefined, { skipDedupe: true }],
-      ]);
+      .poll(() => pushEvent)
+      .toHaveBeenCalledExactlyOnceWith("view_changed", { fromView: "/", toView: "/" }, undefined, {
+        skipDedupe: true,
+      });
     expect(setView).toHaveBeenCalledExactlyOnceWith({ name: "/" });
   });
 

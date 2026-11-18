@@ -2,13 +2,12 @@
 // oxlint-disable-next-line import/no-unassigned-import -- グローバルの Temporal を入れる副作用だけの import である。
 import "temporal-polyfill/global";
 import { cleanup, configure } from "@testing-library/react";
-import { afterAll, afterEach, beforeAll, vi } from "vite-plus/test";
+import { afterAll, afterEach, beforeAll, inject, vi } from "vite-plus/test";
 
-import { asyncWaitTimeoutMs } from "./async-wait";
 import { server } from "./msw";
 
 // Vitest の setupFiles。Node と jsdom の全テストで、Testing Library の待つ上限、MSW の server、後片付けをまとめる（docs/frontend/testing.md）。
-configure({ asyncUtilTimeout: asyncWaitTimeoutMs });
+configure({ asyncUtilTimeout: inject("asyncWaitTimeoutMs") });
 
 // oxlint-disable vitest/require-top-level-describe -- setupFiles の hook は全テストに効かせるため、describe の外に置く。
 beforeAll(() => {

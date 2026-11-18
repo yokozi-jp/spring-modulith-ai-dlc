@@ -34,14 +34,19 @@ componentの内部state、Hookの呼出回数、CSS classだけを主要な期�
 - **実行環境の指定**：jsdomを使うテストは、ファイルの先頭に`/* @vitest-environment jsdom */`を書く。
 - **クエリ**：role、label、placeholder、text、display valueの順に選び、`data-testid`は他のクエリで取れない場合だけ使い、`container.querySelector`は使わない。
 - **user-event**：renderの前に`userEvent.setup()`を呼び、返ったinstanceで操作する。
-- **非同期の待ち**：DOMの変化はTesting Libraryの`findBy`か`waitFor`で待ち、mockの呼出などDOM以外の値は`expect.poll`で待つ。
-  MSWのhandlerやroute loaderをテストが解放するまで止めるときは、`src/testing/async-wait.ts`の`createGate`が返す`promise`を待たせ、テストから`release`を呼ぶ。
-  止める側でflagを`expect.poll`で待つと、その待ちにも上限が付き、テストの操作が負荷で遅れたときに先に切れる。
+- **非同期の待ち**：DOMの変化は、Testing Libraryの`findBy`か`waitFor`で待つ。
+  mockの呼出などDOM以外の値は、`expect.poll`で待つ。
   `setTimeout`などの固定時間で待たない。
-  待つ上限は`src/testing/async-wait.ts`の`asyncWaitTimeoutMs`で一括して決まるので、各テストに`timeout`を書かない。
-  `vi.waitFor`と`vi.waitUntil`はOxlintの`vitest/no-restricted-vi-methods`が禁止する。
-  Nodeのテストで、`expect.poll`が扱えない`toThrow`やsnapshotのmatcherを使うときは、対象のPromiseを直接awaitするか、理由を書いてこの規則を抑制する。
-  Testing Libraryの`waitFor`のcallbackにはassertionを一つだけ置き、clickなどの副作用を置かない。
+- **処理の一時停止**：MSWのhandlerとroute loaderをテストが解放するまで止めるときは、`createGate`を使う。
+  `createGate`は`src/testing/async-wait.ts`にある。
+  止める側で`promise`を待ち、テストから`release`を呼ぶ。
+- **待つ上限**：`findBy`、`waitFor`、`expect.poll`の呼出に`timeout`を書かない。
+  上限は`vite.config.ts`の`asyncWaitTimeoutMs`が一括して決める。
+- **使わない待ち**：`vi.waitFor`と`vi.waitUntil`で待たない。
+  Oxlintの`vitest/no-restricted-vi-methods`が禁止する（[Lintとテストのリファレンス](../tooling/lint-and-test.md#例外と調整)）。
+- **`toThrow`とsnapshot**：`expect.poll`はこれらのmatcherを扱えない。
+  Nodeのテストでは、対象のPromiseを直接awaitする（例：`await expect(p).rejects.toThrow()`）。
+- **Testing Libraryの`waitFor`のcallback**：assertionを一つだけ置き、clickなどの副作用を置かない。
 - **差し替えてよい境界**：HTTPはMSW、globalは`vi.spyOn`か`vi.stubGlobal`、時刻はfake timerで置き換え、`vi.mock`と`vi.doMock`でmoduleを差し替えない。
   `vi.mock`と`vi.doMock`はOxlintの`vitest/no-restricted-vi-methods`が禁止する。
 - **テスト名**：利用者から見える振る舞いを書き、関数名やstate名を書かない。

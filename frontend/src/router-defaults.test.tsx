@@ -1,5 +1,4 @@
 /* @vitest-environment jsdom */
-// oxlint-disable import/max-dependencies -- router と provider を組み立てる import に、loader を止める gate の import が加わる。
 
 import { QueryClient } from "@tanstack/react-query";
 import {

@@ -116,7 +116,8 @@ Oxlintの設定の正本は[`frontend/vite.config.ts`](../../frontend/vite.confi
   この規則はrestrictionカテゴリで有効だが、optionを指定しないと何も禁止しない。
 - **待つ上限が固定のwait**：`vitest/no-restricted-vi-methods`に`waitFor`と`waitUntil`も指定し、`vi.waitFor`と`vi.waitUntil`を禁止する。
   どちらも既定の上限の1秒を一括で変えられず、負荷の高いマシンで失敗するためである。
-  上限が`src/testing/async-wait.ts`で一括して決まる、Testing Libraryの`findBy`と`waitFor`か、`expect.poll`で待つ（[フロントエンドのテストと検証](../frontend/testing.md#書き方)）。
+  代わりに、Testing Libraryの`findBy`と`waitFor`か、`expect.poll`で待つ。
+  これらの上限は設定で一括して決まる（[フロントエンドのテストと検証](../frontend/testing.md#書き方)）。
 - **Tailwindのclass**：`better-tailwindcss/enforce-canonical-classes`を有効にし、classを正規形にそろえる（`--fix`で直せる）。
   `better-tailwindcss/enforce-shorthand-classes`は役割が重なるため有効にしない。
   jsPluginの`tailwind-classes/no-dynamic-class-name`は、`className`の中で値からclass名を組み立てるテンプレートリテラル（`` `pl-${depth}` ``、`` `${tone}${depth}` ``）を禁じる（[フロントエンドのUIとスタイル](../frontend/ui-and-style.md#uiの書き方)）。
@@ -132,6 +133,8 @@ Oxlintの設定の正本は[`frontend/vite.config.ts`](../../frontend/vite.confi
 - **`src/routes/**`**：`react/only-export-components`をoffにする。
   TanStack Routerのroute fileは`Route`をexportするためである。
 - **テストファイル**：`react/jsx-no-literals`をoffにし、テストの中の固定文言をcatalogに通さずに書けるようにする。
+  `import/max-dependencies`もoffにする。
+  テストのimportは検証対象が使うAPIのMSW handlerとproviderの数で増え、テストの責務の大きさを表さないためである。
 
 生成物の`src/routeTree.gen.ts`と`src/api/generated/**`は、Lint、整形、coverageから外す。
 `src/api/generated/**`はKnipとjscpdの対象からも外す。

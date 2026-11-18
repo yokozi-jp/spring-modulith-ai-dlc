@@ -13,14 +13,7 @@ function copyProjectConfig(directory) {
   cpSync(path.join(frontendRoot, "lint/fixtures/src"), path.join(directory, "src"), {
     recursive: true,
   });
-  // vite.config.ts は src/testing/async-wait.ts の待つ上限を import する。
-  for (const file of [
-    "vite.config.ts",
-    "tsconfig.json",
-    "package.json",
-    "src/style.css",
-    "src/testing/async-wait.ts",
-  ]) {
+  for (const file of ["vite.config.ts", "tsconfig.json", "package.json", "src/style.css"]) {
     cpSync(path.join(frontendRoot, file), path.join(directory, file));
   }
   mkdirSync(path.join(directory, "lint"));
@@ -240,6 +233,14 @@ describe("project lint config on fixtures", () => {
 
     it("allows replacing globals with vi.stubGlobal and vi.spyOn", () => {
       expect(codesIn("features/order/global-stub.test.ts")).toStrictEqual([]);
+    });
+
+    it("rejects more than 10 imports in production code", () => {
+      expect(countIn("features/order/many-imports.ts", "import(max-dependencies)")).toBe(1);
+    });
+
+    it("allows more than 10 imports in test files", () => {
+      expect(codesIn("features/order/many-imports.test.ts")).toStrictEqual([]);
     });
   });
 

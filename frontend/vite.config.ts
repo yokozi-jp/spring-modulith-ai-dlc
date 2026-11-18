@@ -8,8 +8,6 @@ import react from "@vitejs/plugin-react";
 import { defaultExclude, defineConfig, loadEnv } from "vite-plus";
 import type { ProxyOptions } from "vite-plus";
 
-import { asyncWaitTimeoutMs } from "./src/testing/async-wait";
-
 const contentSecurityPolicy =
   "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; form-action 'self'; script-src 'self'; style-src 'self'; style-src-elem 'self' 'unsafe-inline'; style-src-attr 'none'; img-src 'self' data:; font-src 'self'; connect-src 'self'; report-to csp-endpoint";
 
@@ -138,6 +136,17 @@ function telemetryDefine(mode: string) {
   };
 }
 
+// findBy、waitFor、expect.poll が待つ上限。testTimeout より短くし、待った対象を示すエラーで失敗させる。
+// ponytail: Playwright の assertion の既定と同じ値にした。これでも足りない負荷が出たら、この値だけを上げる。
+const asyncWaitTimeoutMs = 5000;
+
+// src のファイルを import せず、provide でテストへ渡す。import した先が `@/` を使うと、設定を読み込めなくなる。
+declare module "vite-plus/test" {
+  interface ProvidedContext {
+    asyncWaitTimeoutMs: number;
+  }
+}
+
 export default defineConfig(({ mode }) => {
   const serverPort = portFromEnv(mode, "SERVER_PORT", "18080");
   const faroPort = portFromEnv(mode, "OTEL_FARO_HTTP_PORT", "12347");
@@ -181,7 +190,8 @@ export default defineConfig(({ mode }) => {
       // ponytail: タイムアウトは性能の検証ではなくハング検出のためなので、負荷時の実測（5 秒超）に余裕を持たせた 30 秒にする。
       testTimeout: 30_000,
       expect: { poll: { timeout: asyncWaitTimeoutMs } },
-      // MSW の server と後片付けを全テストで共有する（docs/frontend/testing.md）。
+      provide: { asyncWaitTimeoutMs },
+      // Testing Library の待つ上限、MSW の server、後片付けを全テストで共有する（docs/frontend/testing.md）。
       setupFiles: ["./src/testing/setup.ts"],
       coverage: {
         provider: "v8",
@@ -411,6 +421,7 @@ export default defineConfig(({ mode }) => {
           files: ["**/*.{test,spec}.{ts,tsx,js,jsx}"],
           rules: {
             "react/jsx-no-literals": "off",
+            "import/max-dependencies": "off",
           },
         },
         // Playwright Test の API に vitest plugin の規則が当たるため。
