@@ -36,8 +36,16 @@ if (mode !== "diff" && mode !== "apply") {
   process.exit(2);
 }
 
-const file = JSON.parse(readFileSync(FILE, "utf8"));
-const live = JSON.parse(gh("api", endpoint));
+// rules がない ruleset を PUT すると、保護が外れる。読めない形なら、比べる前に止める。
+const checked = (ruleset, source) => {
+  if (!Array.isArray(ruleset.rules) || ruleset.rules.length === 0) {
+    console.error(`✗ ${source} の rules を読めません。`);
+    process.exit(2);
+  }
+  return ruleset;
+};
+const file = checked(JSON.parse(readFileSync(FILE, "utf8")), FILE);
+const live = checked(JSON.parse(gh("api", endpoint)), "GitHub 上の ruleset");
 const diffs = differences(live, file);
 
 if (diffs.length === 0) {
@@ -59,7 +67,7 @@ if (process.env.CONFIRM_RULESET !== "yes") {
 }
 gh("api", "-X", "PUT", endpoint, "--input", FILE);
 
-const after = differences(JSON.parse(gh("api", endpoint)), file);
+const after = differences(checked(JSON.parse(gh("api", endpoint)), "反映後の ruleset"), file);
 if (after.length > 0) {
   console.error(`✗ 反映後も GitHub 上の ruleset が main.json と違います: ${after.join(", ")}`);
   process.exit(1);

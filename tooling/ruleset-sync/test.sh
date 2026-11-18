@@ -75,6 +75,12 @@ cp "$tmp/same.json" "$FAKE_LIVE" && sed -i 's/"CI gate"/"Old"/' "$FAKE_LIVE"
 expect "反映後も違えば apply は失敗する" 1 "反映後も" env CONFIRM_RULESET=yes FAKE_NOAPPLY=1 node "$dir/ruleset-sync.mjs" apply
 expect "PUT が失敗すれば apply も失敗する" 1 "" env CONFIRM_RULESET=yes FAKE_PUTFAIL=1 node "$dir/ruleset-sync.mjs" apply
 
+cp "$FAKE_LIVE" "$tmp/live.bak" && printf '{"name":"main"}' > "$FAKE_LIVE"
+expect "live に rules がなければ止まる" 2 "GitHub 上の ruleset の rules を読めません" node "$dir/ruleset-sync.mjs" diff
+cp "$tmp/live.bak" "$FAKE_LIVE" && cp .github/rulesets/main.json "$tmp/main.bak" && printf '{"name":"main","rules":[]}' > .github/rulesets/main.json
+expect "main.json の rules が空なら止まる（反映すると保護が外れる）" 2 ".github/rulesets/main.json の rules を読めません" env CONFIRM_RULESET=yes node "$dir/ruleset-sync.mjs" apply
+cp "$tmp/main.bak" .github/rulesets/main.json
+
 expect "引数がなければ使い方を出す" 2 "使い方" node "$dir/ruleset-sync.mjs"
 
 [ "$failures" -eq 0 ] || { echo "$failures 件失敗"; exit 1; }
