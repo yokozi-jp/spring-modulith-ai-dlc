@@ -1,8 +1,11 @@
 package com.example.demo.architecture;
 
+import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.classes;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.methods;
+import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
 
 import com.example.demo.DemoApplication;
+import com.tngtech.archunit.core.domain.JavaClass;
 import com.tngtech.archunit.core.domain.JavaMethod;
 import com.tngtech.archunit.junit.AnalyzeClasses;
 import com.tngtech.archunit.junit.ArchTest;
@@ -26,17 +29,21 @@ import org.aspectj.lang.annotation.After;
 import org.aspectj.lang.annotation.AfterReturning;
 import org.aspectj.lang.annotation.AfterThrowing;
 import org.aspectj.lang.annotation.Around;
+import org.aspectj.lang.annotation.Aspect;
 import org.aspectj.lang.annotation.Before;
 import org.aspectj.lang.annotation.Pointcut;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.CachePut;
 import org.springframework.cache.annotation.Cacheable;
+import org.springframework.core.Ordered;
+import org.springframework.core.annotation.Order;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.security.access.annotation.Secured;
 import org.springframework.security.access.prepost.PostAuthorize;
 import org.springframework.security.access.prepost.PostFilter;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.access.prepost.PreFilter;
+import org.springframework.transaction.annotation.EnableTransactionManagement;
 import org.springframework.transaction.annotation.Transactional;
 
 /** Spring と Resilience4j のプロキシを迂回する同一クラス内の直接呼び出しを禁止する。 */
@@ -82,6 +89,44 @@ class ProxyRulesArchTest {
                   + "Spring のコンテキストの起動が数倍遅くなるため。"
                   + "直し方：式に within(<パッケージ>..*<役割名>) を書き、"
                   + "execution にはメソッドの名前と修飾子だけを書く。"
+                  + "規約：docs/backend/java-coding.md、"
+                  + "docs/adr/ADR-051-bind-pgm-cd-with-scoped-value-and-aspect.md");
+
+  /**
+   * {@code @Aspect} のクラスに {@link Ordered#LOWEST_PRECEDENCE} より小さい {@code @Order} を付け、トランザクションの
+   * advisor より外側で動かす。
+   *
+   * <p>値のない {@code @Order} は {@link Ordered#LOWEST_PRECEDENCE} になり、トランザクションの advisor と同じ順序になる。
+   */
+  @ArchTest
+  /* package */ static final ArchRule aspectsDeclareOrder =
+      classes()
+          .that()
+          .areAnnotatedWith(Aspect.class)
+          .should(declareOrderOutsideTransaction())
+          .allowEmptyShould(true)
+          .because(
+              "Spring は別々の Aspect とトランザクションが同じ順序の値で同じメソッドに掛かるときの前後を決めないため。"
+                  + "直し方：Aspect のクラスに @Order(Ordered.LOWEST_PRECEDENCE - 100) のように、"
+                  + "Ordered.LOWEST_PRECEDENCE より小さい値の @Order を付ける。"
+                  + "規約：docs/backend/java-coding.md、"
+                  + "docs/adr/ADR-051-bind-pgm-cd-with-scoped-value-and-aspect.md");
+
+  /**
+   * {@link EnableTransactionManagement} を宣言せず、トランザクションの advisor の順序を Spring の既定の {@link
+   * Ordered#LOWEST_PRECEDENCE} に保つ。
+   *
+   * <p>{@link #aspectsDeclareOrder} は、トランザクションの advisor がこの順序にあることを前提にする。
+   */
+  @ArchTest
+  /* package */ static final ArchRule transactionManagementIsNotRedeclared =
+      noClasses()
+          .should()
+          .beAnnotatedWith(EnableTransactionManagement.class)
+          .because(
+              "トランザクションの advisor の順序が変わると、Aspect がトランザクションの内側で動いても"
+                  + "aspectsDeclareOrder が検出できないため。"
+                  + "直し方：@EnableTransactionManagement を消し、Spring Boot のトランザクションの自動構成に任せる。"
                   + "規約：docs/backend/java-coding.md、"
                   + "docs/adr/ADR-051-bind-pgm-cd-with-scoped-value-and-aspect.md");
 
@@ -173,6 +218,23 @@ class ProxyRulesArchTest {
                 + annotationType.getSimpleName()
                 + " のメソッドを同じクラスの中から呼ばず、別の Bean へ移して、その Bean を注入して呼ぶ。"
                 + "規約：docs/backend/java-coding.md");
+  }
+
+  private static ArchCondition<JavaClass> declareOrderOutsideTransaction() {
+    return new ArchCondition<>("be annotated with @Order below Ordered.LOWEST_PRECEDENCE") {
+      @Override
+      public void check(final JavaClass item, final ConditionEvents events) {
+        final Optional<Integer> order = item.tryGetAnnotationOfType(Order.class).map(Order::value);
+        if (order.filter(value -> value < Ordered.LOWEST_PRECEDENCE).isEmpty()) {
+          events.add(
+              SimpleConditionEvent.violated(
+                  item,
+                  item.getFullName()
+                      + order.map(value -> " の @Order が " + value + " で").orElse(" に @Order がなく")
+                      + "、トランザクションの advisor より外側で動かない。"));
+        }
+      }
+    };
   }
 
   private static ArchCondition<JavaMethod> declarePointcutWithWithin() {

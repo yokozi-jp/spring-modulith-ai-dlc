@@ -74,7 +74,7 @@ pre-commit:
         jobs:
           # OpenAPI 契約か Orval の入力にステージ済み変更があるとき、DB を使わずに検査する（ADR-052）。
           # コミット済み契約の Spectral 検査と、Orval で再生成した API client の差分なしを確かめる。
-          # docker が無い環境では Spectral をスキップする（最終担保は CI に任せる）。
+          # docker を使えない（docker info が失敗する）環境では Spectral をスキップする（最終担保は CI に任せる）。
           - name: api-contract-check
             glob:
               - "openapi/**"
@@ -84,10 +84,10 @@ pre-commit:
               - "frontend/src/api/generated/**"
             run: |
               echo "{staged_files}" >/dev/null
-              if command -v docker >/dev/null 2>&1; then
+              if docker info >/dev/null 2>&1; then
                 task api-lint
               else
-                echo "docker が無いため Spectral をスキップします（CI で検査されます）。" >&2
+                echo "docker を使えないため Spectral をスキップします（CI で検査されます）。" >&2
               fi
               task api-client-check
             fail_text: "OpenAPI契約またはAPI clientの検査に失敗しました。task api-gen で再生成し、差分をコミットしてください。"
@@ -104,15 +104,15 @@ pre-commit:
             fail_text: "Frontendの静的検査に失敗しました。task fe-checkで再実行してください。"
 
     # ステージ済みの Dockerfile をベストプラクティス検査（hadolint）
-    # docker が無い環境ではスキップ（最終担保は CI に任せる）。
+    # docker を使えない（docker info が失敗する）環境ではスキップ（最終担保は CI に任せる）。
     - name: hadolint
       glob:
         - "**/Dockerfile"
         - "**/Dockerfile.*"
         - "**/*.Dockerfile"
       run: |
-        if ! command -v docker >/dev/null 2>&1; then
-          echo "docker が無いため hadolint をスキップします（CI で検査されます）。" >&2
+        if ! docker info >/dev/null 2>&1; then
+          echo "docker を使えないため hadolint をスキップします（CI で検査されます）。" >&2
           exit 0
         fi
         docker run --rm -i -v "$PWD":/repo -w /repo \
@@ -120,15 +120,15 @@ pre-commit:
           hadolint {staged_files}
 
     # ステージ済みの Dockerfile を Docker 公式チェック（BuildKit のベストプラクティス）
-    # ビルドはせず --check のみ。docker が無い環境ではスキップ。
+    # ビルドはせず --check のみ。docker を使えない（docker info が失敗する）環境ではスキップ。
     - name: docker-build-check
       glob:
         - "**/Dockerfile"
         - "**/Dockerfile.*"
         - "**/*.Dockerfile"
       run: |
-        if ! command -v docker >/dev/null 2>&1; then
-          echo "docker が無いため docker build --check をスキップします（CI で検査されます）。" >&2
+        if ! docker info >/dev/null 2>&1; then
+          echo "docker を使えないため docker build --check をスキップします（CI で検査されます）。" >&2
           exit 0
         fi
         for dockerfile in {staged_files}; do
@@ -137,15 +137,15 @@ pre-commit:
         done
 
     # ステージ済みの Compose ファイルの構文・参照・変数展開を検証
-    # docker が無い環境ではスキップ。
+    # docker を使えない（docker info が失敗する）環境ではスキップ。
     - name: compose-config
       glob:
         - "**/compose.{yml,yaml}"
         - "**/compose-test.{yml,yaml}"
         - "**/docker-compose.{yml,yaml}"
       run: |
-        if ! command -v docker >/dev/null 2>&1; then
-          echo "docker が無いため docker compose config をスキップします（CI で検査されます）。" >&2
+        if ! docker info >/dev/null 2>&1; then
+          echo "docker を使えないため docker compose config をスキップします（CI で検査されます）。" >&2
           exit 0
         fi
         # compose-test.yml の env_file が参照する .env.test は Git 除外のため、無ければ .env.test.example からコピーする。
@@ -258,7 +258,7 @@ pre-push:
     # backend に変更がある push のときだけテスト実行（カバレッジ検証含む）
     # 開発用 .env / 開発 DB には触れず、task test で実行する。rollback の検証は compose-test の PostgreSQL、
     # テストはテストの JVM ごとに起動するコンテナを使う（ADR-085）。
-    # docker が無い環境ではスキップ（最終担保は CI に任せる）。
+    # docker を使えない（docker info が失敗する）環境ではスキップ（最終担保は CI に任せる）。
     - name: be-test
       # lefthook の既定の照合では ** が 1 階層以上にしか一致しないため、backend 直下の build.gradle と
       # settings.gradle を別のパターンで拾う。
@@ -268,22 +268,22 @@ pre-push:
       files: *push-files
       run: |
         echo "{files}" >/dev/null
-        if ! command -v docker >/dev/null 2>&1; then
-          echo "docker が無いため task test をスキップします（CI で検査されます）。" >&2
+        if ! docker info >/dev/null 2>&1; then
+          echo "docker を使えないため task test をスキップします（CI で検査されます）。" >&2
           exit 0
         fi
         task test
 
     # GitHub Actions ワークフローに変更がある push のときだけ Lint（actionlint）
     # glob を効かせるため run 内で {files} を参照する。
-    # docker が無い環境ではスキップ（最終担保は CI に任せる）。
+    # docker を使えない（docker info が失敗する）環境ではスキップ（最終担保は CI に任せる）。
     - name: actionlint
       glob: ".github/workflows/*.{yml,yaml}"
       files: *push-files
       run: |
         echo "{files}" >/dev/null
-        if ! command -v docker >/dev/null 2>&1; then
-          echo "docker が無いため actionlint をスキップします（CI で検査されます）。" >&2
+        if ! docker info >/dev/null 2>&1; then
+          echo "docker を使えないため actionlint をスキップします（CI で検査されます）。" >&2
           exit 0
         fi
         docker run --rm -v "$PWD":/repo -w /repo \
@@ -291,14 +291,14 @@ pre-push:
           -color
 
     # GitHub Actions ワークフローに変更がある push のときだけセキュリティ解析（zizmor）
-    # docker が無い環境ではスキップ（最終担保は CI に任せる）。
+    # docker を使えない（docker info が失敗する）環境ではスキップ（最終担保は CI に任せる）。
     - name: zizmor
       glob: ".github/workflows/*.{yml,yaml}"
       files: *push-files
       run: |
         echo "{files}" >/dev/null
-        if ! command -v docker >/dev/null 2>&1; then
-          echo "docker が無いため zizmor をスキップします（CI で検査されます）。" >&2
+        if ! docker info >/dev/null 2>&1; then
+          echo "docker を使えないため zizmor をスキップします（CI で検査されます）。" >&2
           exit 0
         fi
         docker run --rm -v "$PWD":/repo -w /repo \

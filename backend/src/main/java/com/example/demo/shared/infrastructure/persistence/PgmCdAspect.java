@@ -4,6 +4,8 @@ import org.aspectj.lang.ProceedingJoinPoint;
 import org.aspectj.lang.annotation.Around;
 import org.aspectj.lang.annotation.Aspect;
 import org.jspecify.annotations.Nullable;
+import org.springframework.core.Ordered;
+import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
 
 /**
@@ -15,8 +17,12 @@ import org.springframework.stereotype.Component;
  *
  * <p>{@code *Listener} の呼び出しの間は、内側の CommandHandler の呼び出しも含めて、Listener の中であることも束縛する。{@link
  * CommonColumns} は、Listener の中の書き込みの {@code *_by} に、起点の利用者でなく {@code *_pgm_cd} と同じ値を登録する。
+ *
+ * <p>トランザクションの advisor（Spring の既定の {@link Ordered#LOWEST_PRECEDENCE}）より外側で動き、トランザクションの開始から commit と
+ * rollback、その前後のコールバックまで値を束縛済みにする。
  */
 @Aspect
+@Order(Ordered.LOWEST_PRECEDENCE - 100)
 @Component
 public class PgmCdAspect {
 
@@ -60,10 +66,9 @@ public class PgmCdAspect {
    * @throws IllegalStateException CommandHandler と Listener の外で呼ばれた場合
    */
   /* package */ static String current() {
-    return PGM_CD.orElseThrow(
-        () ->
-            new IllegalStateException(
-                "pgm_cd is not bound: call from a *CommandHandler.handle or a *Listener method"));
+    return PGM_CD.orElseThrow(() ->
+        new IllegalStateException(
+            "pgm_cd is not bound: call from a *CommandHandler.handle or a *Listener method"));
   }
 
   /** ユースケースのクラスから {@code *_pgm_cd} を求める。 */
