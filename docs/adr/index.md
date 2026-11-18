@@ -89,3 +89,4 @@
 - [ADR-086: main の保護を 1 人とエージェントの運用に合わせ、人が読む Pull Request を条件で決める](ADR-086-align-main-protection-with-solo-and-agent-operation.md)（Proposed, 2026-11-17）
 - [ADR-087: 必須チェックを集約ジョブ CI gate を中心にまとめる](ADR-087-gate-required-checks-with-single-aggregate-job.md)（Accepted, 2026-11-17）
 - [ADR-088: フロントエンドで useEffect を禁止し、Oxlint で止める](ADR-088-ban-react-effects-in-frontend.md)（Accepted, 2026-11-17）
+- [ADR-091: エージェントの commit を本物の index の写しから作る](ADR-091-commit-agent-changes-from-a-copy-of-the-index.md)（Proposed, 2026-11-18）
