@@ -108,8 +108,8 @@ dependencies {
     // --- 可観測性・メトリクス ---
     implementation 'org.springframework.boot:spring-boot-starter-actuator'
     implementation 'org.springframework.boot:spring-boot-starter-opentelemetry'
-    // Spring Boot 4.1.1 が管理する OpenTelemetry 1.62.0 と整合するバージョン。
-    implementation 'io.opentelemetry.instrumentation:opentelemetry-logback-appender-1.0:2.28.1-alpha'
+    // dependencyManagement の opentelemetry-bom と対応する版（2.33.0 は api 1.67.0 を前提にする）。BOM を上げるときは同時に上げる。
+    implementation 'io.opentelemetry.instrumentation:opentelemetry-logback-appender-1.0:2.33.0-alpha'
 
     // --- 耐障害性 ---
     implementation 'org.springframework.cloud:spring-cloud-starter-circuitbreaker-resilience4j'
@@ -175,10 +175,9 @@ dependencyManagement {
         mavenBom "tools.jackson:jackson-bom:3.2.4"
         // --- 脆弱性対応（OpenTelemetry BOM の推移的バージョン上書き） ---
         // opentelemetry-api の CVE-2026-118259（W3C tracestate の解析で二次の CPU 消費）対応。
-        // Spring Boot BOM 由来の 1.62.0 を、修正版の 1.67.0 へ上げる。api 単体ではなく BOM を上げ、sdk など同系列の版ずれを避ける。
+        // api 単体ではなく BOM を上げ、sdk など同系列の版ずれを避ける。Spring Boot の BOM が 1.67.0 以上になったら、この行を消す。
+        // opentelemetry-logback-appender は api と版を対応させる必要があるため、同時に上げる（.github/dependabot.yml の ignore を参照）。
         mavenBom "io.opentelemetry:opentelemetry-bom:1.67.0"
-        // incubator などの alpha の成果物は別の BOM にあり、api と版がずれると起動時に ClassNotFoundException になる。
-        mavenBom "io.opentelemetry:opentelemetry-bom-alpha:1.67.0-alpha"
     }
     dependencies {
         // --- 脆弱性対応（推移的依存のバージョン強制） ---
