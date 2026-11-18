@@ -1,3 +1,5 @@
 # テストの JVM ごとのコンテナの接続先を、すべての Spring のテストのコンテキストへ足す（ADR-085）。
+# OTLP のログ exporter を、すべての Spring のテストのコンテキストで作らない。
 org.springframework.test.context.ContextCustomizerFactory=\
-com.example.demo.testkit.InfrastructureContainersContextCustomizerFactory
+com.example.demo.testkit.InfrastructureContainersContextCustomizerFactory,\
+com.example.demo.testkit.OtlpLogExportContextCustomizerFactory

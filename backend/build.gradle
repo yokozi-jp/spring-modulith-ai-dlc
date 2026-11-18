@@ -209,10 +209,6 @@ tasks.withType(Test).configureEach {
     systemProperty 'user.timezone', 'UTC'
     systemProperty 'test.liquibase.tag', testLiquibaseTag
     systemProperty 'spring.config.import', testSpringConfigImport
-    // テストは .env.test で OTLP の送信先を 127.0.0.1:4318 にするが、Collector はない。OTLP のログ exporter を作ると、
-    // 背景のスレッドが送信の失敗を ERROR で標準出力へ出し、OutputCapture の検査を不安定にする。
-    // OTEL_SDK_DISABLED は SDK ごと止め、OTLP の LogRecord を観測する検査（ObservabilityContractTest）も使えなくなるので使わない。
-    systemProperty 'management.logging.export.otlp.enabled', 'false'
     doFirst { if (!testEnvFile.exists()) throw new GradleException(missingTestEnvFile) }
 }
 
@@ -357,12 +353,12 @@ pitest {
     failWhenNoMutations = false
     outputFormats = ['HTML', 'XML']
     timestampedReports = false
-    jvmArgs = ['-Duser.timezone=UTC', "-Dtest.liquibase.tag=${testLiquibaseTag}", "-Dspring.config.import=${testSpringConfigImport}", "-Dmanagement.logging.export.otlp.enabled=false"]
+    jvmArgs = ['-Duser.timezone=UTC', "-Dtest.liquibase.tag=${testLiquibaseTag}", "-Dspring.config.import=${testSpringConfigImport}"]
 }
 
 /*
  * Spotless: コードフォーマット
- * Google Java Format を適用。origin/main からの差分のみチェックする。
+ * Google Java Format を適用。origin/main から変えたファイルを、全体でチェックする。
  */
 spotless {
     ratchetFrom 'origin/main'
