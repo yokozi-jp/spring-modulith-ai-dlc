@@ -2,11 +2,17 @@ package com.example.demo.shared.infrastructure.persistence;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.example.demo.DemoApplication;
+import com.example.demo.jooq.DefaultCatalog;
 import java.util.Optional;
+import java.util.Set;
+import java.util.stream.Collectors;
+import org.jooq.Schema;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
+import org.springframework.modulith.core.ApplicationModules;
 
 /** トランザクションの名前から、切り替えるモジュールのロールを引く規則を確かめる。 */
 class ModuleRolesTest {
@@ -42,6 +48,23 @@ class ModuleRolesTest {
   @DisplayName("名前のないトランザクションは、ロールを引かない")
   void doesNotResolveMissingName() {
     assertThat(ModuleRoles.roleFor(null)).isEqualTo(Optional.empty());
+  }
+
+  @Test
+  @DisplayName("モジュールの一覧は、modulith を除く jOOQ のスキーマと同じで、どれも Spring Modulith のモジュールである")
+  void modulesMatchGeneratedSchemas() {
+    final Set<String> schemas =
+        DefaultCatalog.DEFAULT_CATALOG.getSchemas().stream()
+            .map(Schema::getName)
+            .filter(name -> !"modulith".equals(name))
+            .collect(Collectors.toSet());
+    final Set<String> applicationModules =
+        ApplicationModules.of(DemoApplication.class).stream()
+            .map(module -> module.getIdentifier().toString())
+            .collect(Collectors.toSet());
+
+    assertThat(ModuleRoles.MODULES).isEqualTo(schemas);
+    assertThat(applicationModules).containsAll(ModuleRoles.MODULES);
   }
 
   @Test
