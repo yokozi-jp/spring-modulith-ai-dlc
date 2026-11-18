@@ -559,13 +559,23 @@ done
 
 # 確かめる途中で git が失敗すると、理由を取り違えずに、始める前に止まる。
 # 渡すのは stage したファイル、stage していない変更、新しいファイルで、一覧のどれが欠けても、commit が始まるか別の理由で止まる。
+# check_paths の git は、写しの index を読むことも確かめるため、写しのパスで始まるパターンで失敗させる。
 scene "git failures before the commit"
 echo s >gitfail-staged.txt && git add gitfail-staged.txt && echo changed >same.txt && echo n >gitfail-new.txt
-for pattern in '* rev-parse -q --verify HEAD ' '* --diff-filter=U *' '* --cached -- ' '* --cached -- ?*' '* --ignore-submodules=dirty *' '* ls-files -z -o *'; do
-  expect "commit stops when git fails ($pattern)" 1 "fake git failure" \
+for check in head unmatched conflicts staged given pending untracked; do
+  case "$check" in
+    head) pattern='* rev-parse -q --verify HEAD ' ;;
+    unmatched) pattern='*/commit/index * --error-unmatch *' ;;
+    conflicts) pattern='*/commit/index *--diff-filter=U*' ;;
+    staged) pattern='*/commit/index * --cached -- ' ;;
+    given) pattern='*/commit/index * --cached -- ?*' ;;
+    pending) pattern='*/commit/index * --ignore-submodules=dirty *' ;;
+    untracked) pattern='*/commit/index * ls-files -z -o *' ;;
+  esac
+  expect "commit stops when git fails in the $check check" 1 "fake git failure" \
     failing_git "$pattern" bash "$tool" commit "$msg" gitfail-staged.txt same.txt gitfail-new.txt
-  fact "the stop gives no other reason ($pattern)" not grep -qF "✗" "$out"
-  fact "the failing git ran ($pattern)" [ ! -e "$tmp/fail-git" ]
+  fact "the stop gives no other reason in the $check check" not grep -qF "✗" "$out"
+  fact "the failing git ran in the $check check before the commit" [ ! -e "$tmp/fail-git" ]
 done
 git rm -q --cached gitfail-staged.txt && rm gitfail-staged.txt gitfail-new.txt && git checkout -- same.txt
 

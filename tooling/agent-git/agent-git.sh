@@ -151,8 +151,11 @@ check_paths() {
   head="$(cat -- "$c/head")"
   shift
   # git commit -- <パス> と同じく、HEAD にだけあるパス（git rm や git mv の元）も当たったとみなし、どこにも当たらないパスで止める。
-  git --literal-pathspecs ls-files --error-unmatch -c -o --exclude-standard ${head:+--with-tree="$head"} -- "$@" >/dev/null ||
-    fail "上のパスは、作業ツリー、index、HEAD のどれにもありません（.gitignore で無視しているファイルも含みます）。"
+  # ls-files は、当たらないパスがあれば 1、git が失敗すれば 128 で戻る。
+  git --literal-pathspecs ls-files --error-unmatch -c -o --exclude-standard ${head:+--with-tree="$head"} -- "$@" >/dev/null || {
+    [ $? -gt 1 ] || fail "上のパスは、作業ツリー、index、HEAD のどれにもありません（.gitignore で無視しているファイルも含みます）。"
+    exit 1
+  }
   changed "$c/conflicts" --diff-filter=U -- || exit 1
   refuse_listed "次のパスは衝突が解決されていないので止めます。" "$c/conflicts" \
     "  衝突を解決してから git add -- <パス> で stage し、やり直してください。"
