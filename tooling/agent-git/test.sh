@@ -4,7 +4,7 @@
 # 場面は、状況を書くコメントと、index が HEAD と同じことを確かめる scene で始める。場面ごとに別のファイルを使う。
 
 set -u
-. "$(dirname "$0")/../scratch-git/scratch-git.sh"
+. "$(dirname "$0")/../scratch-git/scratch-git.sh" || exit 1
 # 本物の pre-push を数えず、本物の agent-push も止めないよう、この実行だけの名前のプロセスを pre-push とみなす。
 export AGENT_GIT_PREPUSH_PATTERN="^agent-git-test-decoy-$$ "
 unset AGENT_GIT_WAIT_SECONDS

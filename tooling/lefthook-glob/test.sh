@@ -4,7 +4,7 @@
 # Run: bash tooling/lefthook-glob/test.sh (task lint-lefthook が実行する)
 
 set -uo pipefail
-. "$(dirname "$0")/../scratch-git/scratch-git.sh"
+. "$(dirname "$0")/../scratch-git/scratch-git.sh" || exit 1
 
 root="$(cd "$(dirname "$0")/../.." && pwd)"
 cd "$root" || exit 1

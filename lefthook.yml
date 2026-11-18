@@ -228,7 +228,7 @@ pre-commit:
         task lint-lefthook
       fail_text: "lefthook の glob の検証に失敗しました。task lint-lefthook で再実行してください。"
 
-    # 自己検査か scratch-git.sh にステージ済み変更があるとき、一時の git リポジトリを作る前に scratch-git.sh を source しているか検証（task lint-scratch-git）。
+    # 自己検査か scratch-git.sh にステージ済み変更があるとき、git を実行する前に scratch-git.sh を source しているか検証（task lint-scratch-git）。
     - name: lint-scratch-git
       glob:
         - "tooling/*/test.sh"

@@ -5,8 +5,7 @@
 set -u
 # Actions が GITHUB_OUTPUT を設定していても、出力を標準出力で受け取る。
 unset GITHUB_OUTPUT
-# フックからは呼ばれないが、利用者の git の設定（commit.gpgsign など）が一時のリポジトリの commit を変えないよう切り離す。
-. "$(dirname "$0")/../scratch-git/scratch-git.sh"
+. "$(dirname "$0")/../scratch-git/scratch-git.sh" || exit 1
 
 dir="$(cd "$(dirname "$0")" && pwd)"
 tmp="$(mktemp -d)"
