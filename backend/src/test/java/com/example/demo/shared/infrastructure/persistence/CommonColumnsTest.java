@@ -58,18 +58,10 @@ class CommonColumnsTest {
   }
 
   @Test
-  @DisplayName("利用者の操作の INSERT では、作成と更新のカラムに OidcUser の名前、pgm_cd、trace ID と lock_no = 1 を登録する")
+  @DisplayName(
+      "利用者の操作の INSERT では、作成と更新のカラムに sub でなく OidcUser の名前（アプリの利用者の ID）、pgm_cd、trace ID と lock_no = 1 を登録する")
   void insertValuesForOidcUser() {
-    final OidcIdToken idToken =
-        OidcIdToken.withTokenValue("id-token")
-            .subject("user-sub")
-            .issuedAt(NOW)
-            .expiresAt(NOW.plusSeconds(300))
-            .build();
-    final DefaultOidcUser user =
-        new DefaultOidcUser(AuthorityUtils.createAuthorityList("OIDC_USER"), idToken);
-    SecurityContextHolder.getContext()
-        .setAuthentication(new OAuth2AuthenticationToken(user, user.getAuthorities(), "web"));
+    signInAsAppUser();
 
     final Map<Field<?>, Object> values = inUseCase(() -> commonColumns.forInsert(FIXTURE_ITEM));
 
@@ -77,41 +69,23 @@ class CommonColumnsTest {
         .as("INSERT の共通カラム")
         .containsExactly(
             Map.entry(FIXTURE_ITEM.CREATED_AT, NOW),
-            Map.entry(FIXTURE_ITEM.CREATED_BY, "user-sub"),
+            Map.entry(FIXTURE_ITEM.CREATED_BY, APP_USER_ID),
             Map.entry(FIXTURE_ITEM.CREATED_PGM_CD, PGM_CD),
             Map.entry(FIXTURE_ITEM.CREATED_TX_ID, TRACE_ID),
             Map.entry(FIXTURE_ITEM.UPDATED_AT, NOW),
-            Map.entry(FIXTURE_ITEM.UPDATED_BY, "user-sub"),
+            Map.entry(FIXTURE_ITEM.UPDATED_BY, APP_USER_ID),
             Map.entry(FIXTURE_ITEM.UPDATED_PGM_CD, PGM_CD),
             Map.entry(FIXTURE_ITEM.UPDATED_TX_ID, TRACE_ID),
             Map.entry(FIXTURE_ITEM.LOCK_NO, 1L));
   }
 
   @Test
-  @DisplayName("利用者の操作では、sub ではなく OidcUser の名前（ログインのときに引いたアプリの利用者の ID）を登録する")
-  void insertValuesUseThePrincipalName() {
-    final OidcIdToken idToken =
-        OidcIdToken.withTokenValue("id-token")
-            .subject("idp-sub")
-            .issuedAt(NOW)
-            .expiresAt(NOW.plusSeconds(300))
-            .build();
-    final DefaultOidcUser user =
-        new DefaultOidcUser(
-            AuthorityUtils.createAuthorityList("OIDC_USER"),
-            idToken,
-            new OidcUserInfo(Map.of("sub", "idp-sub", "app_user_id", APP_USER_ID)),
-            "app_user_id");
-    SecurityContextHolder.getContext()
-        .setAuthentication(new OAuth2AuthenticationToken(user, user.getAuthorities(), "web"));
+  @DisplayName("利用者の操作の UPDATE では、更新者に sub でなく OidcUser の名前（アプリの利用者の ID）を登録する")
+  void updateValuesUseThePrincipalName() {
+    signInAsAppUser();
 
-    final Map<Field<?>, Object> insert = inUseCase(() -> commonColumns.forInsert(FIXTURE_ITEM));
     final Map<Field<?>, Object> update = inUseCase(() -> commonColumns.forUpdate(FIXTURE_ITEM));
 
-    assertThat(insert.get(FIXTURE_ITEM.CREATED_BY)).as("created_by").isEqualTo(APP_USER_ID);
-    assertThat(insert.get(FIXTURE_ITEM.UPDATED_BY))
-        .as("INSERT の updated_by")
-        .isEqualTo(APP_USER_ID);
     assertThat(update.get(FIXTURE_ITEM.UPDATED_BY))
         .as("UPDATE の updated_by")
         .isEqualTo(APP_USER_ID);
@@ -260,6 +234,24 @@ class CommonColumnsTest {
             changesetRules.stream().map(rule -> String.valueOf(((Map.Entry<?, ?>) rule).getKey())))
         .as("changeset の共通カラムの規則")
         .containsExactlyInAnyOrderElementsOf(written);
+  }
+
+  /** ログインのときに tenancy がするように、名前がアプリの利用者の ID の OidcUser で認証する。 */
+  private static void signInAsAppUser() {
+    final OidcIdToken idToken =
+        OidcIdToken.withTokenValue("id-token")
+            .subject("idp-sub")
+            .issuedAt(NOW)
+            .expiresAt(NOW.plusSeconds(300))
+            .build();
+    final DefaultOidcUser user =
+        new DefaultOidcUser(
+            AuthorityUtils.createAuthorityList("OIDC_USER"),
+            idToken,
+            new OidcUserInfo(Map.of("sub", "idp-sub", "app_user_id", APP_USER_ID)),
+            "app_user_id");
+    SecurityContextHolder.getContext()
+        .setAuthentication(new OAuth2AuthenticationToken(user, user.getAuthorities(), "web"));
   }
 
   // 本番とテストの private 定数を、可視性を広げずに照らすため。
