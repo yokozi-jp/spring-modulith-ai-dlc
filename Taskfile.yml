@@ -421,7 +421,7 @@ tasks:
       - bash {{shellQuote .ROOT_DIR}}/tooling/agent-git/agent-git.sh commit {{.CLI_ARGS}}
 
   agent-push:
-    desc: 前の pre-push が動いていなければ、今のブランチの git push -u origin をバックグラウンドで開始
+    desc: このリポジトリの worktree で pre-push が動いていなければ、今のブランチの git push -u origin をバックグラウンドで開始
     silent: true
     dir: "{{.USER_WORKING_DIR}}"
     cmds:
