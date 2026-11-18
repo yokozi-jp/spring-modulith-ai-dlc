@@ -254,6 +254,7 @@ landed() {
 # HEAD を一度だけ読んで合わせる先にする。
 # 上に載ったほかの commit が commit のパスを戻していれば、それを出して変数を 1 にする。
 # 戻していなければ、注意を出して本物の index を合わせる先に合わせ、変数を sync_index の終了コードにする。
+# ただし変数が 0 でない（git commit が失敗した）ときは、同じ内容の commit がほかの作業のものなので、それを出して変数を変えない。
 # 決める途中で git が失敗すれば、それを出して変数を 1 にする。
 # commit ができていなければ、変数が 0（git commit は成功した）のときだけ、HEAD の上に commit が無いことを出して変数を 1 にする。
 settle_commit() {
@@ -275,7 +276,14 @@ settle_commit() {
     else
       [ -z "${3:-}" ] || echo "$3"
       sync_index "$run" "$tip"
-      printf -v "$2" %s $?
+      s=$?
+      if [ "${!2:-0}" != 0 ]; then
+        echo "✗ git commit は失敗しましたが（終了コード ${!2}）、HEAD に写しの index と同じ内容の commit $ours があります。
+  フックなどほかの作業が、この内容で commit したと考えられます。本物の index は HEAD に合わせました。
+  git log -1 $ours で、その commit が意図したものか確かめてください。"
+      else
+        printf -v "$2" %s "$s"
+      fi
     fi
   elif [ "$s" != 1 ]; then
     echo "✗ 上の git が失敗したので、commit ができたかを確かめられず、本物の index を合わせていません。

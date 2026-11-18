@@ -109,6 +109,7 @@ staged="\$(git diff --cached --name-only --diff-filter=AM)"
 printf '\033[38;2;56;56;56m  ────\033[m\n'
 has() { echo "\$staged" | grep -qx "\$1"; }
 if has fail; then echo "✗ fake-check"; exit 1; fi
+if has selfcommit; then git commit -q --no-verify -m hook-made && echo "✗ fake-check"; exit 1; fi
 if has fixme; then echo fixed >>fixme && git add fixme; fi
 if has fixout; then echo fixed >>fixed-out.txt && git add fixed-out.txt; fi
 if has lockme; then : >'$tmp/repo/.git/index.lock'; fi
@@ -403,6 +404,16 @@ for check in rev-list parent tree; do
   fact "the failing git ran in the $check check" [ ! -e "$tmp/fail-git" ]
   git reset -q
 done
+
+# フックが写しの index の内容で commit してから失敗しても、agent-wait は失敗を出す。
+scene "hook commits then fails"
+head="$(git rev-parse HEAD)"
+echo x >selfcommit
+expect "commit with a hook that commits and fails starts" 0 "task agent-wait" bash "$tool" commit "$msg" selfcommit
+expect "wait reports the failed git commit despite the same commit on HEAD" 1 "git commit は失敗しましたが（終了コード 1）" bash "$tool" wait
+fact "wait keeps the exit code of git commit" grep -qx 'exit=1' "$out"
+fact "the index matches the commit the hook made" clean
+git reset -q "$head" && rm selfcommit
 
 # フックが失敗した commit を報告する前に、別の実行（push）を始める。
 scene "failing commit"
