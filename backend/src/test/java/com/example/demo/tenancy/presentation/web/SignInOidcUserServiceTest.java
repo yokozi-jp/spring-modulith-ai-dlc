@@ -82,6 +82,23 @@ class SignInOidcUserServiceTest {
   }
 
   @Test
+  @DisplayName("利用者の ID と IdP の利用者が両方同じときだけ、同じ利用者として扱う")
+  void equalsNeedsSameUserIdAndSameIdpUser() {
+    final DefaultOidcUser idpUser = idpUser(Map.of());
+    final OidcUser user = new AppOidcUser(idpUser, USER_ID);
+
+    assertThat(user).isEqualTo(new AppOidcUser(idpUser, USER_ID));
+    assertThat(user).hasSameHashCodeAs(new AppOidcUser(idpUser, USER_ID));
+    assertThat(user)
+        .as("利用者の ID が違う")
+        .isNotEqualTo(new AppOidcUser(idpUser, "7a2e4d6f-1c2b-4d7f-8e3a-4b5c6d7e8f90"));
+    final DefaultOidcUser otherIdpUser =
+        new DefaultOidcUser(AuthorityUtils.createAuthorityList("OIDC_ADMIN"), idpUser.getIdToken());
+    assertThat(user).as("IdP の利用者の権限が違う").isNotEqualTo(new AppOidcUser(otherIdpUser, USER_ID));
+    assertThat(user).as("IdP の利用者そのもの").isNotEqualTo(idpUser);
+  }
+
+  @Test
   @DisplayName("IdP が同じ名前の claim を送ってきても、アプリが引いた ID で上書きする")
   void overridesAClaimSentByTheIdp() {
     when(delegate.loadUser(any())).thenReturn(idpUser(Map.of("app_user_id", "spoofed")));
