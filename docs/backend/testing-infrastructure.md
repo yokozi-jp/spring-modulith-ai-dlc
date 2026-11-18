@@ -36,6 +36,9 @@ Gradleの`test`とPITは`.env.test`を`spring.config.import`で読み込み、�
 
 `maxParallelForks`は既定でコア数の半分にし、`-PtestForks=<n>`で変える。
 forkどうしは別のコンテナを使う。
+`maxParallelForks`は、ホストの負荷もほかのセッションの数も見ない。
+複数のセッションが同時にテストを流すと、forkの合計が`nproc`を超えてCPUを取り合い、テストが遅くなる。
+遅いときは[バックエンドのテストが遅いときの調べ方](runbook-slow-tests.md)に従って先にload averageを見て、`-PtestForks=<n>`でforkを絞って実行する。
 同じforkの中ではテストクラスを順に実行し、DB、Springのコンテキストのキャッシュ、固定の時計を共有する。
 テストの書き方の決まりは[バックエンドのテストコードの書き方](testing-code-style.md)の「並列と実行順」に従う。
 
