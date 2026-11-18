@@ -325,11 +325,10 @@ Docker Compose の操作（サービスの起動、停止、状態確認、Keycl
 - `task agent-git-test`は、`task agent-commit`、`task agent-push`、`task agent-wait`の本体を、一時のgitリポジトリで検査します。
   検査するケースは`tooling/agent-git/test.sh`にあり、LefthookとCIで実行する条件は[Lintとテストのリファレンス](docs/tooling/lint-and-test.md)にあります。
 
-### 一時の git リポジトリを作る自己検査
+### 自己検査の git の切り離し
 
-- `task lint-scratch-git`は、一時のgitリポジトリを作る自己検査（`tooling/*/test.sh`など）が、作る前に`tooling/scratch-git/scratch-git.sh`を`source`していることを検査します。
-  `scratch-git.sh`は、フックの中の`GIT_DIR`などと利用者のgitの設定から、一時のリポジトリを切り離します。
-  LefthookとCIで実行する条件は[Lintとテストのリファレンス](docs/tooling/lint-and-test.md)にあります。
+- `task lint-scratch-git`は、自己検査がgitを実行する前に[`tooling/scratch-git/scratch-git.sh`](tooling/scratch-git/scratch-git.sh)を`source`していることを検査します。
+  検査の範囲と、LefthookとCIで実行する条件は[Lintとテストのリファレンス](docs/tooling/lint-and-test.md)にあります。
 
 ### Git フックの入れ方
 

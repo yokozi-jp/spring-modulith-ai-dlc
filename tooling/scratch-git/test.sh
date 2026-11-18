@@ -1,48 +1,57 @@
 #!/usr/bin/env bash
-# test.sh: scratch-git-check.sh を小さな test.sh の写しで動かし、source の前に一時の git リポジトリを作る書き方だけを失敗にすることを確かめる。
+# test.sh: scratch-git.sh を source した git が別のリポジトリと利用者の設定に触れないことと、
+# scratch-git-check.sh が source の前の git だけを失敗にすることを確かめる。
 # Run: bash tooling/scratch-git/test.sh (task lint-scratch-git が実行する)
 
 set -u
-# 下の場面の git init の行も、この検査が数える。
-. "$(dirname "$0")/../scratch-git/scratch-git.sh"
+. "$(dirname "$0")/../scratch-git/scratch-git.sh" || exit 1
 
-check="$(cd "$(dirname "$0")" && pwd)/scratch-git-check.sh"
+dir="$(cd "$(dirname "$0")" && pwd)"
 tmp="$(mktemp -d)"
 trap 'rm -rf "$tmp"' EXIT
 script="$tmp/test.sh"
 failures=0
-src='. "$(dirname "$0")/../scratch-git/scratch-git.sh"'
+src='. "$(dirname "$0")/../scratch-git/scratch-git.sh" || exit 1'
+
+fail() {
+  echo "FAIL: $1"
+  sed 's/^/    /' "$tmp/out"
+  failures=$((failures + 1))
+}
+
+# フックの中のように GIT_DIR などが別のリポジトリを指し、利用者の設定が commit の署名を求めても、
+# source した後の git init と commit は一時のディレクトリの中で済む。
+git init -q "$tmp/decoy" && git -C "$tmp/decoy" commit -q --allow-empty -m decoy || exit 1
+mkdir "$tmp/home" "$tmp/scratch"
+printf '[commit]\n\tgpgsign = true\n[gpg]\n\tprogram = false\n' >"$tmp/home/.gitconfig"
+snapshot() { (cd "$tmp/decoy/.git" && find . -type f -print0 | LC_ALL=C sort -z | xargs -0 sha256sum); }
+before="$(snapshot)"
+env -u GIT_CONFIG_GLOBAL HOME="$tmp/home" \
+  GIT_DIR="$tmp/decoy/.git" GIT_INDEX_FILE="$tmp/decoy/.git/index" GIT_WORK_TREE="$tmp/decoy" \
+  bash -c '. "$1" || exit 1; cd "$2" && git init -q && echo x >f && git add f && git commit -q -m scratch' \
+  _ "$dir/scratch-git.sh" "$tmp/scratch" >"$tmp/out" 2>&1 ||
+  fail "git init and commit after sourcing ignore the hook's GIT_DIR and the user's commit.gpgsign"
+[ "$(snapshot)" = "$before" ] || fail "the repository that the hook's variables point at is unchanged"
 
 # scene <passes|失敗にする行の番号> <場面> <行>...: 行を test.sh に書いて検査し、成功するか、その行を名指しして失敗するかを確かめる。
 scene() {
   local want="$1" label="$2" got=passes
   shift 2
   printf '%s\n' "$@" >"$script"
-  bash "$check" "$script" >"$tmp/out" 2>&1 || got="$(sed -n "s|^FAIL: $script:\([0-9]*\) .*|\1|p" "$tmp/out")"
-  if [ "$got" != "$want" ]; then
-    echo "FAIL: $label (want $want, got $got)"
-    sed 's/^/    /' "$tmp/out"
-    failures=$((failures + 1))
-  fi
+  bash "$dir/scratch-git-check.sh" "$script" >"$tmp/out" 2>&1 || got="$(sed -n "s|^FAIL: $script:\([0-9]*\) .*|\1|p" "$tmp/out")"
+  [ "$got" = "$want" ] || fail "$label (want $want, got $got)"
 }
 
-scene passes "git init after sourcing the helper" "$src" 'git init -q "$tmp/repo"'
-scene 1 "git init before sourcing the helper" 'git init -q "$tmp/repo"' "$src"
-scene 1 "git clone before sourcing the helper" 'git clone -q "$tmp/a" "$tmp/b"' "$src"
-scene 1 "git worktree add with -C before sourcing the helper" 'git -C "$tmp/repo" worktree add -q "$tmp/wt"' "$src"
-scene 1 "git -C with a quoted path that has a space" 'git -C "$tmp/a b" init' "$src"
-scene 1 "git -c before the subcommand" 'git -c user.name=test init -q "$tmp/repo"' "$src"
-scene 1 "git --git-dir= before the subcommand" 'git --git-dir="$tmp/x.git" init' "$src"
-scene 1 "git --git-dir with a separate argument" 'git --git-dir "$tmp/x.git" init' "$src"
-scene 1 "git --work-tree with a separate argument" 'git --work-tree "$tmp/w" init -q "$tmp/x"' "$src"
-scene 1 "git --bare before the subcommand" 'git --bare init -q "$tmp/x.git"' "$src"
-scene 1 "git init right before a closing parenthesis" 'out="$(git init)"' "$src"
-scene passes "an indented source of the helper" "  $src" 'git init -q "$tmp/repo"'
-scene passes "the source keyword" "source ${src#. }" 'git init -q "$tmp/repo"'
-scene passes "git init in a comment line" '# git init -q "$tmp/repo"' "$src"
-scene passes "git init in a trailing comment" 'cd "$tmp" # then git init' "$src"
-scene 2 "a commented-out source does not count" "# $src" 'git init -q "$tmp/repo"'
-scene passes "git status and git commit do not create a repository" 'git status' 'git commit -q -m init' "$src"
+scene passes "git after the source line" "$src" 'git init -q "$tmp/repo"'
+scene 1 "git before the source line" 'git init -q "$tmp/repo"' "$src"
+scene 1 "git status before the source line" 'git status' "$src"
+scene 1 "git in a command substitution" 'top="$(git rev-parse --show-toplevel)"' "$src"
+scene passes "the source keyword" "source ${src#. }" 'git status'
+scene passes "an indented source line" "  $src" 'git status'
+scene passes "git in a comment line" '# git status' "$src"
+scene passes "git in a trailing comment" 'cd "$tmp" # then git status' "$src"
+scene 2 "a commented-out source line" "# $src" 'git status'
+bash "$dir/scratch-git-check.sh" "$tmp/missing.sh" >"$tmp/out" 2>&1 && fail "a missing file fails the check"
 
 if [ "$failures" -gt 0 ]; then
   echo "$failures failure(s)"

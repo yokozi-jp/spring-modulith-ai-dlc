@@ -343,10 +343,8 @@ const params = { ...(cursor !== undefined && { cursor }) };
 - **`task lint-lefthook`**：`lefthook.yml`の`run`を`echo`に置き換えた設定で本物のlefthookを動かし、glob付きのjobが意図したファイルで選ばれることを検査する。
   `docs/**/*.md`のような`a/**/b`の形の`**`は0階層に一致しないため、ディレクトリ直下のファイル（`docs/index.md`、`backend/build.gradle`）を中心に少数だけ期待を置く。
   見るのはglobだけで、jobの`run`内の`{files}`の参照は見ない。期待は`tooling/lefthook-glob/test.sh`が正で、全jobには広げない。
-- **`task lint-scratch-git`**：一時のgitリポジトリを作る自己検査が、作る前に`tooling/scratch-git/scratch-git.sh`を`source`していることを検査する。
-  対象は`tooling/*/test.sh`と`.kiro/hooks/*.test.sh`で、`git init`、`git clone`、`git worktree add`の行をリポジトリを作る操作とみなす。
-  `scratch-git.sh`は、フックが渡す`GIT_DIR`などと利用者のgitの設定から一時のリポジトリを切り離す。
-  失敗にする書き方は`tooling/scratch-git/test.sh`のケースが正で、この文書には写さない。
+- **`task lint-scratch-git`**：自己検査の`tooling/*/test.sh`と`.kiro/hooks/*.test.sh`が、[`tooling/scratch-git/scratch-git.sh`](../../tooling/scratch-git/scratch-git.sh)を`source`する行より前でgitを実行しないことを検査する。
+  失敗にする書き方は`tooling/scratch-git/test.sh`の場面が正で、この文書には写さない。
   見落とす書き方は、`tooling/scratch-git/scratch-git-check.sh`の`ponytail:`の注記にある。
 - **`task adr-check`**：判断が絡む変更にADRが伴うかを確認する。
   `frontend/`の変更のうち、テストファイル（`*.test.*`、`*.spec.*`）、`frontend/apps/*/e2e/`、`frontend/lint/fixtures/`、`frontend/apps/*/src/testing/`は対象から外す。
