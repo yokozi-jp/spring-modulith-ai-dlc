@@ -10,7 +10,16 @@ import { join } from "node:path";
 // git のメッセージの言語を固定し、git のリポジトリの外かどうかをメッセージで見分ける。
 const git = (...args) =>
   execFileSync("git", args, { encoding: "utf8", env: { ...process.env, LC_ALL: "C" }, stdio: ["ignore", "pipe", "pipe"] });
-const hooksPointHere = "lefthook の postinstall が、hook をこの worktree の lefthook に向けたままです。";
+// postinstall は CI では動かず、失敗しても止まらないので、hook がこの worktree を指しているとは限らない。
+const hooksMayPointHere = "lefthook の postinstall が、hook をこの worktree の lefthook に向けたままの可能性があります。";
+const fail = (message) => {
+  console.error(message);
+  process.exit(1);
+};
+const gitFailed = (error) => {
+  process.stderr.write(error.stderr || `${error.message}\n`);
+  fail(`git で worktree を調べられません。${hooksMayPointHere}`);
+};
 
 let dir, common, top;
 try {
@@ -22,25 +31,31 @@ try {
     console.log("git の作業ツリーの外なので、lefthook install を飛ばします。");
     process.exit(0);
   }
-  process.stderr.write(error.stderr || `${error.message}\n`);
-  console.error(`git で worktree を調べられません。${hooksPointHere}`);
-  process.exit(1);
+  gitFailed(error);
 }
 // linked worktree からは、worktree list の最初の項目が main の worktree になる。bare のリポジトリでは、その項目に bare の行が付く。
 let main = top;
 if (dir !== common) {
-  const [first] = git("worktree", "list", "--porcelain").split("\n\n");
-  main = /^bare$/m.test(first) ? undefined : first.match(/^worktree (.*)$/m)[1];
+  let list;
+  try {
+    list = git("worktree", "list", "--porcelain");
+  } catch (error) {
+    gitFailed(error);
+  }
+  const [first] = list.split("\n\n");
+  if (/^bare$/m.test(first)) fail(`bare のリポジトリの worktree なので、main の worktree がありません。${hooksMayPointHere}`);
+  main = first.match(/^worktree (.*)$/m)?.[1];
+  if (main === undefined) fail(`git worktree list の最初の項目に main の worktree の場所がありません。${hooksMayPointHere}`);
 }
 // --separate-git-dir の main の worktree は git に場所が残らず、最初の項目は git のディレクトリか、その末尾の /.git を除いた場所になる。
 // どちらも checkout ではないので lefthook.yml が無い。lefthook install は lefthook.yml が無いと作るので、そこでは動かさない。
-if (main === undefined || !existsSync(join(main, "lefthook.yml"))) {
-  console.error(`git から main の worktree の場所が分かりません（bare のリポジトリか --separate-git-dir）。${hooksPointHere}`);
-  process.exit(1);
+if (!existsSync(join(main, "lefthook.yml"))) {
+  fail(
+    `git が main の worktree として示す ${main} に lefthook.yml がありません。` +
+      `lefthook.yml の無い commit を checkout しているか、--separate-git-dir などで git が checkout ではない場所を示している可能性があります。` +
+      hooksMayPointHere,
+  );
 }
 const bin = join(main, "node_modules", ".bin", "lefthook");
-if (!existsSync(bin)) {
-  console.error(`main の worktree（${main}）に lefthook がありません。${hooksPointHere}main の worktree で npm ci を実行すると直ります。`);
-  process.exit(1);
-}
+if (!existsSync(bin)) fail(`main の worktree（${main}）に lefthook がありません。${hooksMayPointHere}main の worktree で npm ci を実行すると直ります。`);
 execFileSync(bin, ["install"], { cwd: main, stdio: "inherit" });
