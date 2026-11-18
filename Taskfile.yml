@@ -599,7 +599,7 @@ tasks:
     desc: フロントエンドとバックエンドの手書きコードの重複をjscpdで検査
     cmds:
       # ponytail: 4.0%は参照業務機能（product、ordering、payment）の手書きの重複を除いた後の実測3.93%に合わせた値（ADR-074。ADR-035の3.2%を改めた）。残りは、モジュールごとのクラスの役割とテストの規約が求める import、注釈、フィールドの定型である。業務機能が増えて規約の定型の重複で4.0%を超えたら、上限を上げる前に検出の方式を見直す。
-      - npm exec -- jscpd frontend/apps frontend/lint frontend/vite.config.ts backend/src/main/java backend/src/test/java
+      - npm exec -- jscpd frontend/apps frontend/packages frontend/lint frontend/vite.config.ts backend/src/main/java backend/src/test/java
 
   # PgBouncer のトランザクションモードや RDS Proxy の後ろで壊れる、セッションに状態を残す SQL を本番のコードから検出する。
   # 一覧は https://www.pgbouncer.org/features.html の「SQL feature map for pooling modes」で Transaction pooling が Never の機能である。

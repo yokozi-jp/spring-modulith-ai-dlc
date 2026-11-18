@@ -1,3 +1,3 @@
-import { Primitive } from "@/components/ui/primitive";
+import { RoutePath } from "@/components/route-import";
 
-export const apiPrimitive = Primitive;
+export const apiComponent = RoutePath;

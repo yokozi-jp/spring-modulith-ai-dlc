@@ -6,6 +6,7 @@
       "playwright": { "entry": ["e2e/**/*.{setup,spec}.ts"] },
       "ignore": ["src/api/generated/**"],
       "ignoreDependencies": ["@tanstack/react-table", "lucide-react"]
-    }
+    },
+    "packages/ui": { "includeEntryExports": true }
   }
 }

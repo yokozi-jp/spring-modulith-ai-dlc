@@ -1,6 +1,6 @@
 // ponytail: 要素を名前（Link、a、Button、button）だけで判定する。別名で import した component は見逃す。
 // render に渡す関数は、直接返す JSX だけを見る。変数に入れてから返す要素や、条件演算子で返す要素は見逃す。
-// 見逃しが起きたら、import の解決元（@tanstack/react-router、@/components/ui/button）で判定する規則に移す。
+// 見逃しが起きたら、import の解決元（@tanstack/react-router、@frontend/ui/button）で判定する規則に移す。
 // Oxlint の JS plugin API は alpha である。
 const linkNames = new Set(["Link", "a"]);
 const buttonNames = new Set(["Button", "button"]);

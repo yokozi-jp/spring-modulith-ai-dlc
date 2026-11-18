@@ -7,16 +7,20 @@ tags: [convention, frontend, ui, accessibility]
 
 # フロントエンドのUIとスタイル
 
-feature に依存しない UI primitive だけを `components/ui` に置き、shadcn の Base UI 版と Tailwind CSS で実装する。
+feature に依存しない UI primitive だけを `packages/ui`（`@frontend/ui`）に置き、shadcn の Base UI 版と Tailwind CSS で実装する。
 native semantics と Base UI のアクセシビリティを維持する。
 共通の global style と feature 固有 style の配置を分ける。
-button の見た目の link は `buttonVariants` で書き、shadcn の primitive は最初に使う時点で追加する。
+button の見た目の link は `buttonVariants` で書き、shadcn の primitive は最初に使う時点で `packages/ui` へ追加する。
 
 ## UIとスタイル
 
-featureに依存しないUI primitiveは `components/ui` に置き、shadcnのBase UI版とTailwind CSSで実装する。
+featureに依存しないUI primitiveは `packages/ui`（`@frontend/ui`）に置き、shadcnのBase UI版とTailwind CSSで実装する。
+アプリは部品ごとに `import { Button } from "@frontend/ui/button"` と書く。
+barrelの `index.ts` は作らない。
+`@base-ui/**` をimportできるのは `packages/ui` のproduction sourceだけで、アプリのコードはprimitiveを通して使う。
 
-業務データ、API型、feature固有の文言を扱うcomponentは `components/ui` に置かない。
+業務データ、API型、feature固有の文言を扱うcomponentは `packages/ui` に置かない。
+`@frontend/ui` はアプリと `@frontend/api` を参照しない。
 
 共有primitiveを組み合わせた業務componentは、利用するfeatureの `components` に置く。
 
@@ -27,7 +31,10 @@ HTMLの意味と標準操作を優先し、button、label、heading、tableな�
 
 Base UIが提供するkeyboard操作、focus管理、ARIA属性を維持し、見た目のためにアクセシビリティを削らない。
 
-共通のglobal styleとTailwindの読込は `style.css` に置き、feature固有styleは対象componentの近くへ置く。
+Tailwindの読込とテーマの変数（`--background` などのtokenと `@theme`）は `packages/ui/src/style.css` に置く。
+アプリの `style.css` は、これを `@import "@frontend/ui/style.css"` で読み込み、`@source "../../../packages/ui/src"` で `@frontend/ui` のclassを走査させる。
+`@source` を書かないと、`@frontend/ui` の部品のclassがCSSに出ない。
+feature固有styleは対象componentの近くへ置く。
 
 ## UIの書き方
 
@@ -35,13 +42,33 @@ Base UIが提供するkeyboard操作、focus管理、ARIA属性を維持し、�
   `Button` の `render` にlinkを渡すと、Base UIがroleを `button` に上書きするため使わない。
   `<Link><Button /></Link>` のような入れ子も作らない。
   どちらもOxlintの `ui-composition/no-button-in-link` が検査する（[Lintとテストのリファレンス](../tooling/lint-and-test.md#ファイルの範囲ごとの制限)）。
-- **空状態、確認dialog、skeleton**：shadcnの `Empty`、`AlertDialog`、`Skeleton` を、最初に使う時点でregistryから `components/ui` へ追加する。
+- **空状態、確認dialog、skeleton**：shadcnの `Empty`、`AlertDialog`、`Skeleton` を、最初に使う時点でregistryから `packages/ui` へ追加する。
 - **読み込み中の表示**：skeletonの装飾は `aria-hidden` にし、読み込み中の文言を一つだけ支援技術に伝える。
 - **live region**：状態の変化を読み上げる領域にはlintの推奨どおり `<output>` を使う（`components/route-pending.tsx`）。
 - **値で変わるclass**：`` `pl-${depth}` `` のように値からclass名を組み立てない。
   Tailwindはソースに完全な文字列として現れるclassだけを生成するため、組み立てたclassはstyleが当たらない。
   完全なclass名を並べた配列やobjectから選ぶ。
   `className` の中のテンプレートリテラルはOxlintの `tailwind-classes/no-dynamic-class-name` が検査する。
+
+## shadcnの部品の追加
+
+部品は `packages/ui` で、`vp exec shadcn add <部品名>` を実行して追加する。
+`packages/ui/components.json` の `aliases.ui` が `@frontend/ui` なので、出力先は `packages/ui/src/<部品名>.tsx` になる。
+`aliases.ui` が解決できるように、`packages/ui/tsconfig.json` の `paths` に `@frontend/ui` と `@frontend/ui/*` を書いている。
+`exports` の `"./*": "./src/*.tsx"` が追加した部品をそのまま公開するので、`package.json` の `exports` は変えない。
+
+追加したあとは、次を確かめる。
+
+- 生成されたファイルは整形されていないので、`task fe-format` で整形する。
+- registryの部品が使う依存（`dialog` の `lucide-react` など）は、`packages/ui/package.json` に自動では入らない。
+  `task fe-knip` が未宣言の依存として報告するので、`packages/ui/package.json` に足す。
+- `@frontend/ui` は公開した部品の未使用exportもKnipで報告する。
+  アプリが使わない部品は追加しない。
+
+アプリの `components.json` は、`@shadcn/lint` が `@frontend/ui` の部品を認識するための設定で、`aliases.ui` を `@frontend/ui` にしている。
+アプリでは `shadcn add` を実行しない。
+ルートの `settings.shadcn.componentImports` でも、import元が `@frontend/ui` の部品を認識させる。
+認識した部品への `className` は `shadcn/no-restyle` が検査し、部品が持つ見た目のclassを検出する（[Lintとテストのリファレンス](../tooling/lint-and-test.md#フロントエンドのlint設定)）。
 
 ## 関連資料
 

@@ -1,8 +1,7 @@
+import { Button } from "@frontend/ui/button";
 import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
-
-import { Button } from "@/components/ui/button";
 
 function HomePage() {
   const [count, setCount] = useState(0);

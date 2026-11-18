@@ -1,7 +1,7 @@
+import { Button } from "@frontend/ui/button";
 import { useTranslation } from "react-i18next";
 
 import type { ProductSummaryResponse } from "@/api/generated/models";
-import { Button } from "@/components/ui/button";
 import { firstErrorMessage, productOptions, withFieldGroup } from "@/features/orders/form";
 import { newLine, quantityMax, quantityMin } from "@/features/orders/schemas";
 import type { OrderLinesValues } from "@/features/orders/schemas";

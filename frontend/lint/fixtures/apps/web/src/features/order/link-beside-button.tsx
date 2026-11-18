@@ -1,6 +1,6 @@
 import { Link } from "@tanstack/react-router";
 
-import { Primitive as Button } from "@/components/ui/primitive";
+import { Button } from "@frontend/ui/button";
 
 export function LinkBesideButton({ label }: { label: string }) {
   return (

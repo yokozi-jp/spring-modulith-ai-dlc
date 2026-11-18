@@ -28,12 +28,20 @@ OpenAPIからOrvalでnative FetchのTanStack Query clientを生成し、手書�
 
 ## 現在の構成
 
-`frontend/` は Vite+ の workspace のルートであり、アプリを `apps/<アプリ名>/` に置く（[ADR-092](../adr/ADR-092-split-frontend-into-vite-plus-workspace.md)）。
-今のアプリは `apps/web/`（package 名 `@frontend/web`）だけである。
+`frontend/` は Vite+ の workspace のルートであり、アプリを `apps/<アプリ名>/`、アプリが共有する package を `packages/<名前>/` に置く（[ADR-092](../adr/ADR-092-split-frontend-into-vite-plus-workspace.md)）。
+今のアプリは `apps/web/`（package 名 `@frontend/web`）だけで、共有 package は `packages/ui/`（package 名 `@frontend/ui`）だけである。
 ルートは、workspace の定義（`pnpm-workspace.yaml`）、lockfile、Oxlint と Oxfmt の設定（`vite.config.ts` の `lint` と `fmt`）、Oxlint の JS plugin（`lint/`）、Knip の設定（`knip.json`）を持つ。
 `apps/web/` は、build、開発サーバー、テストの設定（`vite.config.ts`）、Orval と Playwright の設定、`src/`、`e2e/`、`public/` を持つ。
 
-現在の `apps/web/src` は、アプリケーションの起動、ルーティング、アプリシェル、routerの既定の状態表示、API clientのmutatorと `QueryClient` の生成と生成した型、共通UI、国際化、テレメトリの初期化と送信、小さなutility、テストの準備のコードだけを持つ。
+`packages/ui/` は、shadcn の部品（`src/<部品名>.tsx`）、`cn`（`src/lib/utils.ts`）、テーマの CSS（`src/style.css`）を持つ。
+`@base-ui/**` を import できる場所は、この package の production source だけである。
+ビルドせず、`package.json` の `exports` で `src` を直接公開する。
+部品は `"./*": "./src/*.tsx"` で一つずつ公開するので、アプリは `import { Button } from "@frontend/ui/button"` のように部品ごとに import する。
+barrel の `index.ts` は作らない。
+`@frontend/ui` はアプリと `@frontend/api` を参照せず、`package.json` にも書かない。
+書かなければ、pnpm の厳格な解決が、それらへの import を失敗にする。
+
+現在の `apps/web/src` は、アプリケーションの起動、ルーティング、アプリシェル、routerの既定の状態表示、API clientのmutatorと `QueryClient` の生成と生成した型、国際化、テレメトリの初期化と送信、小さなutility、テストの準備のコードだけを持つ。
 
 ``` text
 frontend/apps/web/src/
@@ -69,25 +77,40 @@ frontend/apps/web/src/
 │   ├── app-shell.tsx
 │   ├── route-pending.tsx
 │   ├── route-error.tsx
-│   ├── route-not-found.tsx
-│   └── ui/
-│       ├── button.tsx
-│       └── button.test.tsx
+│   └── route-not-found.tsx
 ├── lib/
 │   ├── csrf.ts
 │   ├── csrf.test.ts
 │   ├── telemetry.ts
 │   ├── telemetry.test.ts
 │   ├── telemetry-sanitize.ts
-│   ├── telemetry-sanitize.test.ts
-│   ├── utils.ts
-│   └── utils.test.ts
+│   └── telemetry-sanitize.test.ts
 └── testing/
     ├── msw.ts
     ├── query-client.ts
     ├── render-route.tsx
     └── setup.ts
 ```
+
+``` text
+frontend/packages/ui/
+├── package.json        # exports で部品ごとに src を公開する
+├── components.json     # shadcn add の出力先と alias
+├── tsconfig.json
+├── vite.config.ts      # テストと coverage の設定だけ。lint と fmt は書かない
+└── src/
+    ├── style.css       # Tailwind の読込とテーマの変数
+    ├── button.tsx
+    ├── button.test.tsx
+    └── lib/
+        ├── utils.ts
+        └── utils.test.ts
+```
+
+アプリの `style.css` は、`@import "@frontend/ui/style.css"` でテーマを読み込み、`@source "../../../packages/ui/src"` で `@frontend/ui` を走査させる。
+`@source` を書かないと、`@frontend/ui` の部品の class が CSS に出ない。
+Tailwind の自動検出が、アプリの directory の外にある `packages/ui` を走査しないためである。
+このとき型検査と lint は通ったまま、見た目だけが壊れる。
 
 `main.tsx` はcomposition rootであり、`api/query-client.ts` の `createQueryClient()` で `QueryClient` を作り、TanStack Routerを生成してProviderを接続する。
 `createQueryClient()` は、`api/api-fetch.ts` の401の処理（`QueryCache` と `MutationCache` の `onError`）と再試行の判定（`defaultOptions.queries.retry`）を渡し、mutationの後に全queryを無効化する（[mutationの後のcache](routing-and-state.md#mutationの後のcache)）。
@@ -151,8 +174,7 @@ frontend/apps/web/src/
 │
 ├── components/
 │   ├── app-shell.tsx
-│   ├── route-*.tsx
-│   └── ui/
+│   └── route-*.tsx
 │
 ├── testing/                   # 最初のMSWテストを書くときに追加
 │
@@ -215,7 +237,7 @@ OxlintのJS plugin APIはalphaである。
 ## 共有コード
 
 アプリシェル（header、layout）と、routerの既定のpending、error、not foundの表示は `components/` の直下に置く。
-`components/ui` にはshadcnのprimitiveだけを置く。
+shadcnのprimitiveと `cn` は、アプリの外の `packages/ui`（`@frontend/ui`）に置く。
 
 複数featureから使うという理由だけで、トップレベルに汎用的な `shared` ディレクトリを作らない。
 
@@ -225,7 +247,7 @@ OxlintのJS plugin APIはalphaである。
 
 `shared` を導入する場合は、`shared/ui`、`shared/lib`、`shared/api`、`shared/config` のように下位の責務を限定する。
 
-その場合は既存の `components/ui`、`lib`、`api` と役割を重複させず、どちらか一方へ統一する。
+その場合は既存の `@frontend/ui`、`lib`、`api` と役割を重複させず、どちらか一方へ統一する。
 
 `shared/hooks` と `shared/utils` は責務が広がりやすいため、具体的な用途名を持つfeature非依存コードだけを置く。
 
@@ -249,11 +271,11 @@ main.tsx -> api/query-client.ts -> api/api-fetch.ts -> lib
                                   +-> api/generated
 
 features -> api/generated
-         -> components/ui -> lib
+         -> @frontend/ui
          -> lib
          -> i18n
 
-components -> components/ui
+components -> @frontend/ui
            -> lib
            -> i18n
 ```
@@ -268,7 +290,9 @@ components -> components/ui
 
 `lib` は最下層であり、`components` も参照しない。
 
-`api` から `components` を、`components/ui` から `ui` 以外の `components` を参照しない。
+`api` から `components` を参照しない。
+
+`@frontend/ui` からアプリのコードを参照しない。
 
 `lib` から `api/generated`、`i18n` から `components`、`components` から `api` の向きは、図に定めがないためlintでは止めていない。
 使う場面が出たら、図に向きを書いてから検査を加えるか外す。

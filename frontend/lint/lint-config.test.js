@@ -1,14 +1,27 @@
 import { describe, expect, it } from "vite-plus/test";
 
-import { appDirectory, lintFixtureProject } from "./lint-project.js";
+import { appDirectory, lintFixtureProject, uiDirectory } from "./lint-project.js";
 
 const diagnostics = lintFixtureProject(".");
 
+/**
+ * @param {string} base package の dir
+ * @param {string} file base/src からの相対パス
+ */
+function codesAt(base, file) {
+  return diagnostics
+    .filter((diagnostic) => diagnostic.filename === `${base}/src/${file}`)
+    .map((diagnostic) => diagnostic.code);
+}
+
 /** @param {string} file */
 function codesIn(file) {
-  return diagnostics
-    .filter((diagnostic) => diagnostic.filename === `${appDirectory}/src/${file}`)
-    .map((diagnostic) => diagnostic.code);
+  return codesAt(appDirectory, file);
+}
+
+/** @param {string} file */
+function uiCodesIn(file) {
+  return codesAt(uiDirectory, file);
 }
 
 /**
@@ -17,6 +30,14 @@ function codesIn(file) {
  */
 function countIn(file, code) {
   return codesIn(file).filter((found) => found === code).length;
+}
+
+/** @param {string} file */
+function canonicalMessagesOf(file) {
+  return diagnostics
+    .filter((diagnostic) => diagnostic.filename.endsWith(file))
+    .filter((diagnostic) => diagnostic.code === "better-tailwindcss(enforce-canonical-classes)")
+    .map((diagnostic) => diagnostic.message);
 }
 
 describe("fixture に適用したプロジェクトの lint 設定", () => {
@@ -64,12 +85,6 @@ describe("fixture に適用したプロジェクトの lint 設定", () => {
       expect(countIn("api/component-import.ts", "eslint(no-restricted-imports)")).toBe(1);
     });
 
-    it("components/ui から ui 以外の components の import を禁止し、ui の primitive は許可する", () => {
-      expect(
-        countIn("components/ui/app-component-import.ts", "eslint(no-restricted-imports)"),
-      ).toBe(1);
-    });
-
     it("共有コードから API client の import を許可する", () => {
       expect(codesIn("lib/clean.ts")).toStrictEqual([]);
     });
@@ -81,16 +96,22 @@ describe("fixture に適用したプロジェクトの lint 設定", () => {
 
   describe("UI", () => {
     describe("Base UI の import", () => {
-      it("components/ui の外では Base UI を禁止する", () => {
+      it("@frontend/ui の外では Base UI を禁止する", () => {
         expect(countIn("features/order/base-ui.tsx", "eslint(no-restricted-imports)")).toBe(1);
       });
 
-      it("components/ui では Base UI を許可する", () => {
-        expect(codesIn("components/ui/primitive.tsx")).toStrictEqual([]);
+      it("@frontend/ui の中では Base UI を許可する", () => {
+        expect(uiCodesIn("primitive.tsx")).toStrictEqual([]);
       });
 
-      it("components/ui でも共有層とテスト用部品の import を禁止する", () => {
-        expect(countIn("components/ui/shared-layer.tsx", "eslint(no-restricted-imports)")).toBe(2);
+      it("アプリの components/ui には、Base UI を許可する層の override が残っていない", () => {
+        expect(countIn("components/ui/base-ui.tsx", "eslint(no-restricted-imports)")).toBe(1);
+      });
+
+      it("@frontend/ui でもテスト用部品の import を禁止する", () => {
+        expect(
+          uiCodesIn("msw-import.ts").filter((code) => code === "eslint(no-restricted-imports)"),
+        ).toHaveLength(2);
       });
 
       it("テストファイルでも Base UI を禁止する", () => {
@@ -98,17 +119,21 @@ describe("fixture に適用したプロジェクトの lint 設定", () => {
       });
     });
 
-    describe("Tailwind の class", () => {
-      it("ルートから lint しても、アプリの theme を解決する", () => {
-        const messages = diagnostics
-          .filter((diagnostic) => diagnostic.filename.endsWith("features/order/theme-class.tsx"))
-          .filter(
-            (diagnostic) => diagnostic.code === "better-tailwindcss(enforce-canonical-classes)",
-          )
-          .map((diagnostic) => diagnostic.message);
+    describe("shadcn の部品", () => {
+      it("@frontend/ui の部品に渡した className の、部品が持つ見た目の class を禁止し、配置の class を許可する", () => {
+        expect(countIn("features/order/restyle.tsx", "shadcn(no-restyle)")).toBe(1);
+      });
+    });
 
-        expect(messages).toHaveLength(1);
-        expect(messages[0]).toContain('simplified to "bg-primary"');
+    describe("Tailwind の class", () => {
+      it("ルートから lint しても、アプリと ui のそれぞれの theme を解決する", () => {
+        for (const messages of [
+          canonicalMessagesOf("apps/web/src/features/order/theme-class.tsx"),
+          canonicalMessagesOf("packages/ui/src/theme-class.tsx"),
+        ]) {
+          expect(messages).toHaveLength(1);
+          expect(messages[0]).toContain('simplified to "bg-primary"');
+        }
       });
 
       it("値から組み立てた class 名と、関数に渡した key で選んだ class 名を禁止する", () => {
