@@ -291,6 +291,8 @@ DBの規約のほかの検査は`backend/src/test/java/com/example/demo/persiste
 - `SchemaConventionsTest`は、`pg_catalog`の行から違反を判定する関数を、違反を含む行で検証する。
 - `SchemaInspectionTest`は、マイグレーション後のテストDBの`pg_catalog`をアプリロールで読み、同じ関数で検査する。
 
+スキーマ検査の規則を足すときは、判定に要る行を`CatalogSnapshot`に足して`SchemaCatalog.read`で埋め、判定する関数を`SchemaConventions.check`から呼ぶ。
+
 規約の例外は、理由を付けて`ChangesetLint.ALLOWLIST`と`SchemaConventions.ALLOWLIST`に載せる。
 何も抑止しない項目は違反として報告する。
 changesetの検査は`modulith`スキーマを、スキーマ検査は`modulith`と`liquibase`のスキーマを、業務テーブルの規則から除く。

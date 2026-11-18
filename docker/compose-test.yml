@@ -18,16 +18,19 @@ services:
     command: ["postgres", "-c", "timezone=UTC", "-c", "log_timezone=UTC"]
     environment:
       POSTGRES_DB: demo
-      # ブートストラップは DDL・スキーマ所有のマイグレーションロール（.env.test の MIGRATION_DB_*）。
-      POSTGRES_USER: demo_migration
+      # superuser はコンテナの初期化（initdb）だけに使う。
+      POSTGRES_USER: postgres
       POSTGRES_PASSWORD: demo
+      # initdb が作成する、表を所有するマイグレーションロール（.env.test の MIGRATION_DB_*）。superuser でも BYPASSRLS でもない。
+      MIGRATION_DB_USERNAME: demo_migration
+      MIGRATION_DB_PASSWORD: demo
       # initdb が作成する DML 限定のアプリロール（.env.test の DB_USERNAME/DB_PASSWORD）。
       DB_USERNAME: demo
       DB_PASSWORD: demo
     ports:
       - "127.0.0.1:5433:5432"
     volumes:
-      # Liquibase管理専用スキーマを作り、modulithスキーマはchangesetに任せる。
+      # 2つのロールとLiquibase管理専用スキーマを作り、モジュールのスキーマはchangesetに任せる。
       - ./initdb:/docker-entrypoint-initdb.d:ro
     healthcheck:
       # initdb 中の一時サーバは Unix ソケットだけで待ち受けるため、TCP を明示して除外する。
