@@ -49,14 +49,11 @@ describe("router telemetry", () => {
     fake.resolve(false);
     fake.resolve();
 
-    await vi.waitFor(() => {
-      expect(pushEvent).toHaveBeenCalledExactlyOnceWith(
-        "view_changed",
-        { fromView: "/", toView: "/" },
-        undefined,
-        { skipDedupe: true },
-      );
-    });
+    await expect
+      .poll(() => pushEvent)
+      .toHaveBeenCalledExactlyOnceWith("view_changed", { fromView: "/", toView: "/" }, undefined, {
+        skipDedupe: true,
+      });
     expect(setView).toHaveBeenCalledExactlyOnceWith({ name: "/" });
   });
 
@@ -184,8 +181,6 @@ describe("reportCaughtError", () => {
     const error = new Error("caught");
     reportCaughtError(error);
     reportCaughtError(error);
-    await vi.waitFor(() => {
-      expect(pushError).toHaveBeenCalledOnce();
-    });
+    await expect.poll(() => pushError).toHaveBeenCalledOnce();
   });
 });

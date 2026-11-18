@@ -221,8 +221,26 @@ describe("project lint config on fixtures", () => {
       ).toBe(2);
     });
 
+    it("rejects waits with a fixed timeout with vi.waitFor and vi.waitUntil", () => {
+      expect(
+        countIn("features/order/fixed-timeout-wait.test.ts", "vitest(no-restricted-vi-methods)"),
+      ).toBe(2);
+    });
+
+    it("allows waits with expect.poll and waitFor from Testing Library", () => {
+      expect(codesIn("features/order/configured-timeout-wait.test.ts")).toStrictEqual([]);
+    });
+
     it("allows replacing globals with vi.stubGlobal and vi.spyOn", () => {
       expect(codesIn("features/order/global-stub.test.ts")).toStrictEqual([]);
+    });
+
+    it("rejects more than 10 imports in production code", () => {
+      expect(countIn("features/order/many-imports.ts", "import(max-dependencies)")).toBe(1);
+    });
+
+    it("allows more than 10 imports in test files", () => {
+      expect(codesIn("features/order/many-imports.test.ts")).toStrictEqual([]);
     });
   });
 

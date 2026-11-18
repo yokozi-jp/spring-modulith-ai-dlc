@@ -2,6 +2,7 @@ import { MutationObserver, QueryObserver } from "@tanstack/react-query";
 import { http, HttpResponse } from "msw";
 import { beforeEach, describe, expect, it, onTestFinished, vi } from "vite-plus/test";
 
+import { createGate } from "@/testing/gate";
 import { server } from "@/testing/msw";
 import { createTestQueryClient } from "@/testing/query-client";
 
@@ -24,24 +25,19 @@ function respondToUpdate(status: 204 | 409) {
 
 /** 最初の GET はすぐ返し、2 回目以降の GET（再取得）は release を呼ぶまで返さない。 */
 function serveItemsHoldingRefetch(status: 204 | 409) {
-  let released = false;
+  const refetch = createGate();
   let fetchCount = 0;
   server.use(
     http.get(itemsUrl, async () => {
       fetchCount += 1;
       if (fetchCount > 1) {
-        await vi.waitUntil(() => released);
+        await refetch.promise;
       }
       return HttpResponse.json({ fetchCount });
     }),
     http.post(itemsUrl, () => respondToUpdate(status)),
   );
-  return {
-    release: () => {
-      released = true;
-    },
-    fetchCount: () => fetchCount,
-  };
+  return { release: refetch.release, fetchCount: () => fetchCount };
 }
 
 /** 描画中の query を QueryObserver で作り、mutation を送って再取得が始まるまで待つ。 */
@@ -53,12 +49,12 @@ async function mutateWhileRefetchIsHeld(status: 204 | 409) {
     queryFn: () => apiFetch<{ data: unknown }>(itemsUrl, {}),
   });
   onTestFinished(query.subscribe(vi.fn<() => void>()));
-  await vi.waitUntil(() => query.getCurrentResult().isSuccess);
+  await expect.poll(() => query.getCurrentResult().isSuccess).toBe(true);
   const mutation = new MutationObserver(queryClient, {
     mutationFn: () => apiFetch<{ status: number }>(itemsUrl, { method: "POST" }),
   });
   const result = mutation.mutate();
-  await vi.waitUntil(() => items.fetchCount() === 2);
+  await expect.poll(() => items.fetchCount()).toBe(2);
   return { query, mutation, result, release: items.release };
 }
 

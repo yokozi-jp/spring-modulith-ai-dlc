@@ -54,9 +54,7 @@ describe("app shell logout form", () => {
     await user.click(screen.getByRole("button", { name: "Log out" }));
     form.dispatchEvent(new SubmitEvent("submit", { bubbles: true, cancelable: true }));
 
-    await vi.waitFor(() => {
-      expect(calls).toStrictEqual(["pause", "set:Abc2345678", "unpause", "submit"]);
-    });
+    await expect.poll(() => calls).toStrictEqual(["pause", "set:Abc2345678", "unpause", "submit"]);
     expect(nativeSubmit.mock.instances).toStrictEqual([form]);
   });
 
@@ -77,9 +75,7 @@ describe("app shell logout form", () => {
 
     await user.click(screen.getByRole("button", { name: "Log out" }));
 
-    await vi.waitFor(() => {
-      expect(nativeSubmit).toHaveBeenCalledOnce();
-    });
+    await expect.poll(() => nativeSubmit).toHaveBeenCalledOnce();
     expect(unpause).not.toHaveBeenCalled();
   });
 
@@ -91,15 +87,11 @@ describe("app shell logout form", () => {
     const button = screen.getByRole("button", { name: "Log out" });
 
     await user.click(button);
-    await vi.waitFor(() => {
-      expect(nativeSubmit).toHaveBeenCalledOnce();
-    });
+    await expect.poll(() => nativeSubmit).toHaveBeenCalledOnce();
     globalThis.dispatchEvent(new PageTransitionEvent("pageshow", { persisted: true }));
     await user.click(button);
 
-    await vi.waitFor(() => {
-      expect(nativeSubmit).toHaveBeenCalledTimes(2);
-    });
+    await expect.poll(() => nativeSubmit).toHaveBeenCalledTimes(2);
   });
 
   it("keeps logout disabled when the page is shown without the back/forward cache", async () => {
@@ -110,9 +102,7 @@ describe("app shell logout form", () => {
     const button = screen.getByRole("button", { name: "Log out" });
 
     await user.click(button);
-    await vi.waitFor(() => {
-      expect(nativeSubmit).toHaveBeenCalledOnce();
-    });
+    await expect.poll(() => nativeSubmit).toHaveBeenCalledOnce();
     globalThis.dispatchEvent(new PageTransitionEvent("pageshow", { persisted: false }));
     await user.click(button);
 
