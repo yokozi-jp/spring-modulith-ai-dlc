@@ -50,7 +50,6 @@ on:
     paths:
       - 'a/**'
       - 'b.yml'
-  pull_request:
   workflow_call:
 concurrency:
   group: backend-${{ github.workflow }}-${{ github.ref }}
@@ -113,6 +112,10 @@ expect "呼ばれず除外もない pull_request の workflow を見つける" 1
 d="$(case_dir paths-drift)"
 sed -i "s|^            'b.yml'\$|            'c.yml'|" "$d/backend.yml"
 expect "push の paths: と changed.sh の引数が違うと失敗" 1 "push の paths: と changed.sh の引数が違います" check "$d"
+
+d="$(case_dir double-run)"
+sed -i 's/^  workflow_call:/  pull_request:\n  workflow_call:/' "$d/backend.yml"
+expect "呼ばれる側が pull_request でも動くと失敗" 1 "backend.yml は ci.yml から呼ばれるのに pull_request でも動きます" check "$d"
 
 d="$(case_dir not-callable)"
 sed -i '/workflow_call:/d' "$d/backend.yml"
