@@ -66,7 +66,7 @@ PITのHTMLとXMLのレポートは、変異対象がある場合に`backend/buil
 - **`task fe-doctor`**：React Doctorでwarningとerrorを検出し、検出または15分超過で失敗する。
 - **`task fe-coverage`**：React Compilerを有効にして、`vp run --recursive test`でルートのlint設定のテストと各packageのテストを実行する。
   そのあと、Compilerを外した状態で、ルートを除くpackageごとにVitestのV8 providerのcoverageを測り、下限もpackageごとに検証する。
-  `apps/web`の下限は、全体のbranch 88%とline 95%、ファイルごとのbranch 60%とline 65%である。
+  `apps/web`の全体の下限はbranch 88%とline 95%である。ファイルごとの下限は全packageで共通のbranch 60%とline 65%である。
   全体の下限は各packageの`vite.config.ts`の`thresholds`が、ファイルごとの下限はTaskが各packageの`coverage/coverage-summary.json`から検査する（[ADR-076](../adr/ADR-076-run-mutation-tests-per-change-and-tighten-coverage-gates.md)）。
   Compilerを外すのは環境変数`FRONTEND_REACT_COMPILER=false`で、理由は[ADR-078](../adr/ADR-078-measure-frontend-coverage-without-react-compiler.md)にある。
   `FE_TEST_ARGS`に渡した値は、2回のVitestの実行の両方に足す（例：`task fe-verify FE_TEST_ARGS=--reporter=dot`）。
@@ -197,11 +197,11 @@ linkとbuttonの入れ子は、jsPluginの`ui-composition/no-button-in-link`が�
 自前の関数で包んだEffectは検出しない。
 
 組み合わせた結果は、`frontend/lint/lint-config.test.js`が`frontend/lint/fixtures/apps/web/src/**`の違反例と正しい例を実際の設定でLintして確かめる。
-このテストは、ルートの設定と、`apps/web`の`tsconfig.json`、`style.css`、fixtureを一時ディレクトリへ複製し、ルートと`apps/web`の両方から`vp lint`を実行する。
-どちらから実行しても、アプリのCSSを解決できることも確かめる。
+このテストは、`frontend/lint/lint-project.js`が、ルートの設定と、`apps/web`の`vite.config.ts`、`tsconfig.json`、`style.css`、fixtureを一時ディレクトリへ複製して`vp lint`を実行した結果を読む。
+`frontend/lint/tailwind-entry-point.test.js`は、ルートと`apps/web`の両方から実行しても、アプリのCSSを解決できることを確かめる。
 規則のoptionを追加または変更するときは、optionが許す範囲のすぐ外側の書き方を拒否するfixtureも置く。
 optionの名前から許す範囲を推測せず、規則の文書とfixtureで確かめる。
-jsPluginやoverrideの挙動を試すときも、一時ディレクトリへ設定を手で複製せず、fixtureを足して`frontend`で`vp test run lint/lint-config.test.js`を実行する。
+jsPluginやoverrideの挙動を試すときも、一時ディレクトリへ設定を手で複製せず、fixtureを足して`frontend`で`vp test run --dir lint lint-config`を実行する。
 
 ### Lintを通る書き方
 

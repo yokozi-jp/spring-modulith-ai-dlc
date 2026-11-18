@@ -8,6 +8,8 @@ vars:
   COMPOSE_FILE: '{{.COMPOSE_FILE | default "docker/compose.yml"}}'
   TEST_ENV_FILE: '{{.TEST_ENV_FILE | default ".env.test"}}'
   TEST_COMPOSE_FILE: '{{.TEST_COMPOSE_FILE | default "docker/compose-test.yml"}}'
+  # frontend/ で vp run と vp exec が対象にする apps/web。名前が合わないときは、黙って何も実行せず失敗にする。
+  FE_WEB: --filter @frontend/web --fail-if-no-match
   DB_ROLLBACK_TAG: '{{.DB_ROLLBACK_TAG | default ""}}'
   CONFIRM_ROLLBACK: '{{.CONFIRM_ROLLBACK | default ""}}'
   CONFIRM_RESET: '{{.CONFIRM_RESET | default ""}}'
@@ -128,7 +130,7 @@ tasks:
         status=0
         (
           set -e
-          (cd frontend && vp install --frozen-lockfile && vp exec --filter @frontend/web --fail-if-no-match vp build --mode test && vp exec --filter @frontend/web --fail-if-no-match playwright install chromium)
+          (cd frontend && vp install --frozen-lockfile && vp exec {{.FE_WEB}} vp build --mode test && vp exec {{.FE_WEB}} playwright install chromium)
           compose build backend
           compose up -d --wait postgres redis keycloak wiremock
           task be-migrate COMPOSE_ENV_FILE=.env.test
@@ -140,7 +142,7 @@ tasks:
             echo "ホストから backend（localhost:${SERVER_PORT}）へ接続できません。frontend/apps/web/test-results/backend.log の backend のログを確かめてください。" >&2
             exit 1
           fi
-          (cd frontend && vp run --filter @frontend/web --fail-if-no-match e2e)
+          (cd frontend && vp run {{.FE_WEB}} e2e)
         ) || status=$?
         cleanup_status=0
         keep=""
@@ -462,7 +464,7 @@ tasks:
     desc: フロントエンドの開発サーバーを起動（APIとOIDCを同一オリジンでproxy）
     dir: frontend
     cmds:
-      - vp run --filter @frontend/web --fail-if-no-match dev
+      - vp run {{.FE_WEB}} dev
 
   fe-format:
     desc: フロントエンドをOxfmtで整形
@@ -480,7 +482,7 @@ tasks:
     desc: React固有のwarningとerrorをReact Doctorで検出
     dir: frontend
     cmds:
-      - timeout 900s vp run --filter @frontend/web --fail-if-no-match react-doctor
+      - timeout 900s vp run {{.FE_WEB}} react-doctor
 
   fe-knip:
     desc: フロントエンドの未参照ファイル、未使用export、未使用依存をKnipで検査
@@ -503,11 +505,11 @@ tasks:
       - vp run --recursive test {{.FE_TEST_ARGS}}
       # coverage は Compiler を外して測る。Compiler が足す memo の分岐を分母に入れない。
       # 全体の下限は各 package の vite.config.ts の thresholds が検査する。ルートの package は coverage を測らない。
-      - FRONTEND_REACT_COMPILER=false vp run --filter '!frontend' test --coverage {{.FE_TEST_ARGS}}
+      - FRONTEND_REACT_COMPILER=false vp run --filter '!frontend' --fail-if-no-match test --coverage {{.FE_TEST_ARGS}}
       # ファイルごとの下限は coverage-summary.json で検査する（ADR-076）。
       # ponytail: Vitest 4.1 の perFile は全体の下限をファイルごとに当てるだけで、別の値を持てない。
       # perFile にオブジェクトを渡せる版へ上がったら、この検査を各 package の vite.config.ts の thresholds.perFile へ移す。
-      # apps と packages の下の package を巡り、coverage-summary.json を持たない package は検査しない。
+      # apps と packages の下の package を全て巡る。coverage-summary.json が無い package は読めずに失敗にする。
       - |
         node --input-type=module <<'NODE'
         import { existsSync, readdirSync, readFileSync } from "node:fs";
@@ -515,12 +517,7 @@ tasks:
         const minimum = { branches: 60, lines: 65 };
         const summaries = ["apps", "packages"]
           .filter((group) => existsSync(group))
-          .flatMap((group) => readdirSync(group).map((name) => `${group}/${name}/coverage/coverage-summary.json`))
-          .filter((path) => existsSync(path));
-        if (summaries.length === 0) {
-          console.error("coverage-summary.json が見つかりません。coverage を測った package がありません。");
-          process.exit(1);
-        }
+          .flatMap((group) => readdirSync(group).map((name) => `${group}/${name}/coverage/coverage-summary.json`));
         const failures = summaries.flatMap((path) =>
           Object.entries(JSON.parse(readFileSync(path, "utf8")))
             .filter(([file]) => file !== "total")
@@ -542,7 +539,7 @@ tasks:
       - task: fe-coverage
       # ルートの .env で有効にしていても、既定の無効のビルドを検査する（ADR-068）。
       # vp run の script は cache しないので、環境変数がそのまま渡る。build を run.tasks に移すなら cache.env に FRONTEND_OTEL_* を足す。
-      - FRONTEND_OTEL_ENABLED=false vp run --filter @frontend/web --fail-if-no-match build
+      - FRONTEND_OTEL_ENABLED=false vp run {{.FE_WEB}} build
       - |
         # grep は一致で 0、不一致で 1、対象がないなどの失敗で 2 を返す。1 以外は失敗にする。
         status=0
@@ -563,7 +560,8 @@ tasks:
     desc: ビルドで再生成したrouteTree.gen.tsがコミット済みの内容と一致するか検査
     dir: frontend
     cmds:
-      - vp exec --filter @frontend/web --fail-if-no-match vp build
+      # tsc を挟まず、route plugin が routeTree.gen.ts を再生成するところまでを実行する。
+      - vp exec {{.FE_WEB}} vp build
       - task: _frontend-view-allowlist-check
       - git diff --exit-code -- apps/web/src/routeTree.gen.ts
 
@@ -1016,7 +1014,7 @@ tasks:
     desc: コミット済みのOpenAPI契約からOrvalでAPI clientとMSW handlerを再生成（DB不要）
     dir: frontend
     cmds:
-      - vp run --filter @frontend/web --fail-if-no-match orval
+      - vp run {{.FE_WEB}} orval
 
   api-client-check:
     desc: Orvalで再生成したAPI clientがコミット済みの内容と一致するか検査（DB不要）
@@ -1527,7 +1525,7 @@ tasks:
           set -e
           rm -rf "$report_dir" && mkdir -p "$report_dir" && chmod a+rwx "$report_dir"
           {{.DOCKER}} build --tag spring-modulith-backend:dast backend
-          (cd frontend && vp exec --filter @frontend/web --fail-if-no-match vp build)
+          (cd frontend && vp exec {{.FE_WEB}} vp build)
           compose up -d --wait
 
           {{.DOCKER}} run --detach --name spring-modulith-dast-backend --network host \

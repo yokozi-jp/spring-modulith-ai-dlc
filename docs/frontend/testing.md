@@ -78,11 +78,11 @@ coverageの対象と基準を含むテスト基盤の判断理由は[ADR-027](..
 
 生成物は生成元を変更して再生成し、手で書き換えない。
 
-| 生成物                                   | 生成元                                       | 再生成                                                              |
-| ---------------------------------------- | -------------------------------------------- | ------------------------------------------------------------------- |
-| `frontend/apps/web/src/routeTree.gen.ts` | `frontend/apps/web/src/routes/` のroute file | `task fe-route-tree-check`、または `task fe-dev` を起動しておく     |
-| `openapi/openapi.yaml`                   | ControllerとDTOのJavadoc、`OpenApiConfig`    | `task api-gen`（[APIを変更する](../web-api/runbook-api-change.md)） |
-| `frontend/apps/web/src/api/generated/**` | `openapi/openapi.yaml` とOrval設定           | `task api-gen`（契約から）、`task api-client-gen`（Orval設定だけ）  |
+| 生成物                                   | 生成元                                       | 再生成                                                                  |
+| ---------------------------------------- | -------------------------------------------- | ----------------------------------------------------------------------- |
+| `frontend/apps/web/src/routeTree.gen.ts` | `frontend/apps/web/src/routes/` のroute file | `cd frontend/apps/web && vp build`、または `task fe-dev` を起動しておく |
+| `openapi/openapi.yaml`                   | ControllerとDTOのJavadoc、`OpenApiConfig`    | `task api-gen`（[APIを変更する](../web-api/runbook-api-change.md)）     |
+| `frontend/apps/web/src/api/generated/**` | `openapi/openapi.yaml` とOrval設定           | `task api-gen`（契約から）、`task api-client-gen`（Orval設定だけ）      |
 
 エージェントによる生成物への書き込みを止めるKiroのフックの説明は、[Kiroのフック](../agents/kiro-hooks.md)にある。
 

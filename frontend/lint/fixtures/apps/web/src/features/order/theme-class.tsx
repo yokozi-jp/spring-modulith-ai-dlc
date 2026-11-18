@@ -1,3 +1,3 @@
-export function ClassOrder({ label }: { label: string }) {
+export function ThemeClass({ label }: { label: string }) {
   return <div className="bg-[var(--color-primary)]">{label}</div>;
 }

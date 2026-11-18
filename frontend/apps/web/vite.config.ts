@@ -1,7 +1,5 @@
 // oxlint-disable-next-line import/no-nodejs-modules -- service.version の正本の version.txt を、ビルド時に一度だけ読む。
 import { readFileSync } from "node:fs";
-// oxlint-disable-next-line import/no-nodejs-modules -- リポジトリ直下の絶対パスを、設定ファイルの場所から作る。
-import { fileURLToPath } from "node:url";
 
 import tailwindcss from "@tailwindcss/vite";
 import { tanstackRouter } from "@tanstack/router-plugin/vite";
@@ -16,7 +14,7 @@ const contentSecurityPolicy =
 const developmentCspNonce = crypto.randomUUID().replaceAll("-", "");
 
 // リポジトリ直下。ルートの .env と version.txt の置き場所で、実行する場所によらず同じ場所を指す。
-const repositoryRoot = fileURLToPath(new URL("../../..", import.meta.url));
+const repositoryRoot = `${import.meta.dirname}/../../..`;
 
 // 生成物。カバレッジから除外する。整形と静的解析の除外はルートの vite.config.ts に書く。
 const generatedFiles = ["src/routeTree.gen.ts", "src/api/generated/**"];
@@ -59,9 +57,7 @@ function telemetryDefine(mode: string) {
     name: telemetryEnv.FRONTEND_OTEL_SERVICE_NAME ?? "",
     namespace: telemetryEnv.OTEL_SERVICE_NAMESPACE ?? "",
     // 無効のビルドは版を使わない。
-    version: telemetryEnabled
-      ? readFileSync(new URL("../../../version.txt", import.meta.url), "utf8").trim()
-      : "",
+    version: telemetryEnabled ? readFileSync(`${repositoryRoot}/version.txt`, "utf8").trim() : "",
     environment: telemetryEnv.OTEL_DEPLOYMENT_ENVIRONMENT_NAME ?? "",
   };
   const emptyKey = Object.entries(telemetryApp).find(([, value]) => value === "")?.[0];

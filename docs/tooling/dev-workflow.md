@@ -33,7 +33,7 @@ task fe-check
 パッケージのコマンドを直接実行するときは、`npx`ではなく`vp`を使う。
 アプリのscript（`dev`、`build`、`test`、`e2e`、`orval`など）は、`frontend`で`vp run --filter @frontend/web <script>`として実行する。
 アプリのテストのファイルを1つだけ実行するときと、アプリの依存のコマンドを実行するときは、`frontend/apps/web`で`vp test run <ファイル>`か`vp exec <コマンド>`を実行する。
-ルートの`frontend/package.json`の`devEngines`がpnpmを指定しているため、`frontend`で実行した`npx`はnpmとして拒否される。
+`frontend/package.json`と`frontend/apps/web/package.json`の`devEngines`がpnpmを指定しているため、`npx`はnpmとして拒否される。
 
 ## git worktreeで作業するとき
 

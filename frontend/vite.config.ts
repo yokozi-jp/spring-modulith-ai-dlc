@@ -151,7 +151,7 @@ export default defineConfig({
       "func-style": ["error", "declaration"],
       // react-i18next の慣用名である翻訳関数 t だけを短い識別子として許可する。
       "id-length": ["error", { exceptions: ["t"] }],
-      // vite.config.ts の define が置き換えるビルド時の定数だけを、ほかの識別子と衝突しない名前として許す（ADR-068）。
+      // apps/web/vite.config.ts の define が置き換えるビルド時の定数だけを、ほかの識別子と衝突しない名前として許す（ADR-068）。
       "no-underscore-dangle": ["error", { allow: ["__TELEMETRY_ENABLED__", "__TELEMETRY_APP__"] }],
       "max-lines-per-function": "off",
       "no-duplicate-imports": ["error", { allowSeparateTypeImports: true }],
@@ -215,7 +215,7 @@ export default defineConfig({
         },
       },
       {
-        files: ["apps/web/src/{api,components,i18n}/**"],
+        files: ["apps/*/src/{api,components,i18n}/**"],
         rules: {
           "no-restricted-imports": [
             "error",
@@ -226,7 +226,7 @@ export default defineConfig({
         },
       },
       {
-        files: ["apps/web/src/lib/**"],
+        files: ["apps/*/src/lib/**"],
         rules: {
           "no-restricted-imports": [
             "error",
@@ -238,7 +238,7 @@ export default defineConfig({
       },
       // テレメトリの SDK を呼ぶ唯一のファイル（ADR-068）。
       {
-        files: ["apps/web/src/lib/telemetry.ts"],
+        files: ["apps/*/src/lib/telemetry.ts"],
         rules: {
           "no-restricted-imports": [
             "error",
@@ -247,7 +247,7 @@ export default defineConfig({
         },
       },
       {
-        files: ["apps/web/src/features/**"],
+        files: ["apps/*/src/features/**"],
         rules: {
           "no-restricted-imports": [
             "error",
@@ -256,7 +256,7 @@ export default defineConfig({
         },
       },
       {
-        files: ["apps/web/src/components/ui/**"],
+        files: ["apps/*/src/components/ui/**"],
         rules: {
           "shadcn/no-restyle": "off",
           "shadcn/no-arbitrary-values": "off",
@@ -269,7 +269,7 @@ export default defineConfig({
         },
       },
       {
-        files: ["apps/web/src/api/**"],
+        files: ["apps/*/src/api/**"],
         rules: {
           "no-restricted-imports": [
             "error",
@@ -282,7 +282,7 @@ export default defineConfig({
         },
       },
       {
-        files: ["apps/web/src/routes/**"],
+        files: ["apps/*/src/routes/**"],
         rules: {
           "react/only-export-components": "off",
         },
@@ -295,7 +295,7 @@ export default defineConfig({
       },
       // Playwright Test の API に vitest plugin の規則が当たるため。
       {
-        files: ["apps/web/e2e/**"],
+        files: ["apps/*/e2e/**"],
         rules: {
           "vitest/consistent-test-filename": "off",
           "vitest/prefer-importing-vitest-globals": "off",
@@ -304,7 +304,7 @@ export default defineConfig({
       // ponytail: option が置き換わるため、テストでは層の import 制限も外れる。
       // テストにも層の制限が要るようになったら dependency-cruiser へ移る。
       {
-        files: ["**/*.{test,spec}.{ts,tsx,js,jsx}", "apps/web/src/testing/**"],
+        files: ["**/*.{test,spec}.{ts,tsx,js,jsx}", "apps/*/src/testing/**"],
         rules: {
           "no-restricted-imports": ["error", { patterns: [baseUiImports, telemetrySdkImports] }],
         },

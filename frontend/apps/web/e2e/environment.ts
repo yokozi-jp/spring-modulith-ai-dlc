@@ -6,7 +6,7 @@ function pathFromHere(relative: string): string {
   return decodeURIComponent(new URL(relative, import.meta.url).pathname);
 }
 
-// pnpm e2e を単独で実行しても task e2e と同じ値になるよう、ルートの .env.test（と .env.test.local）から読む。
+// vp run e2e を単独で実行しても task e2e と同じ値になるよう、ルートの .env.test（と .env.test.local）から読む。
 // 同じ名前の環境変数があれば、その値を優先する（Vite の loadEnv の仕様）。
 const env = loadEnv("test", pathFromHere("../../../.."), [
   "E2E_",
