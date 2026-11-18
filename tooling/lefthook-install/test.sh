@@ -13,10 +13,10 @@ out="$tmp/out"
 installed="$tmp/installed"
 failures=0
 
-# stub <ディレクトリ> <名前>: lefthook の代わりに、名前と動いたディレクトリを記録するスクリプトを置く。
+# stub <ディレクトリ> <名前> [<sh のコマンド>]: lefthook の代わりに、名前と動いたディレクトリを記録してから <sh のコマンド> を動かすスクリプトを置く。
 stub() {
   mkdir -p "$1/node_modules/.bin"
-  printf '#!/bin/sh\necho "%s $(pwd -P)" >>"%s"\n' "$2" "$installed" >"$1/node_modules/.bin/lefthook"
+  printf '#!/bin/sh\necho "%s $(pwd -P)" >>"%s"\n%s\n' "$2" "$installed" "${3:-}" >"$1/node_modules/.bin/lefthook"
   chmod +x "$1/node_modules/.bin/lefthook"
 }
 
@@ -45,6 +45,7 @@ failed() { [ "$status" -ne 0 ]; }
 installed_by() { [ "$(cat "$installed")" = "$1 $(real "$2")" ]; }
 nothing_installed() { [ ! -s "$installed" ]; }
 said() { grep -qF -- "$1" "$out"; }
+no_stack_trace() { ! grep -q '^    at ' "$out"; }
 # prepare.mjs が失敗を知らせるメッセージの末尾。prepare.mjs がメッセージを組み立てる行で落ちると、node はその行のソースを出す。
 # ソースに書いたままの文字列だけでは落ちたことと見分けられないので、組み立てた後にしか出ない部分まで比べる。
 may_point_here="lefthook の postinstall が、hook をこの worktree の lefthook に向けたままの可能性があります。"
@@ -161,6 +162,13 @@ fact "without lefthook in the main worktree a linked worktree fails" failed
 fact "without lefthook in the main worktree it installs nothing" nothing_installed
 fact "without lefthook in the main worktree it says to run npm ci" said "npm ci"
 fact "without lefthook in the main worktree it names the main worktree" said "$(real "$tmp/repo")"
+
+stub "$tmp/repo" repo 'echo "lefthook install のおとり" >&2; exit 3'
+prepare "$tmp/wt"
+fact "a failing lefthook install fails" failed
+fact "a failing lefthook install shows lefthook's message" said "lefthook install のおとり"
+fact "a failing lefthook install says the hooks may still point at this worktree" said "main の worktree（$(real "$tmp/repo")）で lefthook install が失敗しました。$may_point_here"
+fact "a failing lefthook install shows no stack trace" no_stack_trace
 
 log="$dump_log" fact "lefthook run does not reinstall the hooks (no_auto_install in lefthook.yml)" auto_install_off
 

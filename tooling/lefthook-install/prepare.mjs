@@ -16,36 +16,27 @@ const fail = (message) => {
   console.error(message);
   process.exit(1);
 };
-const gitFailed = (error) => {
-  process.stderr.write(error.stderr || `${error.message}\n`);
-  fail(`git で worktree を調べられません。${hooksMayPointHere}`);
-};
 
-let dir, common, top;
+let main;
 try {
-  [dir, common, top] = git("rev-parse", "--path-format=absolute", "--git-dir", "--git-common-dir", "--show-toplevel")
+  const [dir, common, top] = git("rev-parse", "--path-format=absolute", "--git-dir", "--git-common-dir", "--show-toplevel")
     .trim()
     .split("\n");
+  main = top;
+  // linked worktree からは、worktree list の最初の項目が main の worktree になる。bare のリポジトリでは、その項目に bare の行が付く。
+  if (dir !== common) {
+    const [first] = git("worktree", "list", "--porcelain").split("\n\n");
+    if (/^bare$/m.test(first)) fail(`bare のリポジトリの worktree なので、main の worktree がありません。${hooksMayPointHere}`);
+    main = first.match(/^worktree (.*)$/m)?.[1];
+    if (main === undefined) fail(`git worktree list の最初の項目に main の worktree の場所がありません。${hooksMayPointHere}`);
+  }
 } catch (error) {
   if (/not a git repository/.test(error.stderr)) {
     console.log("git の作業ツリーの外なので、lefthook install を飛ばします。");
     process.exit(0);
   }
-  gitFailed(error);
-}
-// linked worktree からは、worktree list の最初の項目が main の worktree になる。bare のリポジトリでは、その項目に bare の行が付く。
-let main = top;
-if (dir !== common) {
-  let list;
-  try {
-    list = git("worktree", "list", "--porcelain");
-  } catch (error) {
-    gitFailed(error);
-  }
-  const [first] = list.split("\n\n");
-  if (/^bare$/m.test(first)) fail(`bare のリポジトリの worktree なので、main の worktree がありません。${hooksMayPointHere}`);
-  main = first.match(/^worktree (.*)$/m)?.[1];
-  if (main === undefined) fail(`git worktree list の最初の項目に main の worktree の場所がありません。${hooksMayPointHere}`);
+  process.stderr.write(error.stderr || `${error.message}\n`);
+  fail(`git で worktree を調べられません。${hooksMayPointHere}`);
 }
 // --separate-git-dir の main の worktree は git に場所が残らず、最初の項目は git のディレクトリか、その末尾の /.git を除いた場所になる。
 // どちらも checkout ではないので lefthook.yml が無い。lefthook install は lefthook.yml が無いと作るので、そこでは動かさない。
@@ -58,4 +49,8 @@ if (!existsSync(join(main, "lefthook.yml"))) {
 }
 const bin = join(main, "node_modules", ".bin", "lefthook");
 if (!existsSync(bin)) fail(`main の worktree（${main}）に lefthook がありません。${hooksMayPointHere}main の worktree で npm ci を実行すると直ります。`);
-execFileSync(bin, ["install"], { cwd: main, stdio: "inherit" });
+try {
+  execFileSync(bin, ["install"], { cwd: main, stdio: "inherit" });
+} catch {
+  fail(`main の worktree（${main}）で lefthook install が失敗しました。${hooksMayPointHere}`);
+}
