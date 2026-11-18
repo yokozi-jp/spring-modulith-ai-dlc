@@ -78,6 +78,6 @@ class ModuleRolesTest {
         java.util.regex.Pattern.compile("(?m)^modules=\"([^\"]+)\"$").matcher(script);
 
     assertThat(matcher.find()).as("03-create-module-roles.sh の modules=").isTrue();
-    assertThat(java.util.Set.of(matcher.group(1).split(" "))).isEqualTo(ModuleRoles.MODULES);
+    assertThat(Set.of(matcher.group(1).split(" "))).isEqualTo(ModuleRoles.MODULES);
   }
 }

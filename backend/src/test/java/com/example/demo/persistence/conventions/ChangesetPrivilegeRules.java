@@ -121,7 +121,8 @@ final class ChangesetPrivilegeRules {
               statement ->
                   statement.forbidAppRole()
                       && statement.grants()
-                      && grantsAppRoleOnBusinessSchema(statement.text(), statement.roles()),
+                      && statement.roles().contains(APP_ROLE)
+                      && !schemas(statement.text()).stream().allMatch(FRAMEWORK_SCHEMA::equals),
               "業務スキーマの権限はアプリロールに与えず、モジュールのロールに与える"));
 
   private ChangesetPrivilegeRules() {
@@ -206,12 +207,6 @@ final class ChangesetPrivilegeRules {
    */
   private record Rule(Predicate<Statement> violated, String reason) {}
 
-  private static boolean grantsAppRoleOnBusinessSchema(
-      final String statement, final List<String> roles) {
-    return roles.contains(APP_ROLE)
-        && !schemas(statement).stream().allMatch(FRAMEWORK_SCHEMA::equals);
-  }
-
   private static boolean allowedPrivilege(final String statement) {
     final Matcher privileges = GRANTED_PRIVILEGES.matcher(statement);
     final Matcher target = TARGET.matcher(statement);
@@ -232,7 +227,7 @@ final class ChangesetPrivilegeRules {
   private static List<String> schemas(final String statement) {
     final Matcher defaults = DEFAULT_PRIVILEGES_SCHEMAS.matcher(statement);
     if (defaults.find()) {
-      return split(defaults.group(1)).stream().map(ChangesetPrivilegeRules::unquote).toList();
+      return split(defaults.group(1));
     }
     final Matcher target = TARGET.matcher(statement);
     if (!target.find()) {
@@ -240,21 +235,16 @@ final class ChangesetPrivilegeRules {
     }
     final Matcher schemaList = SCHEMA_LIST_TARGET.matcher(target.group(1));
     if (schemaList.find()) {
-      return split(target.group(1).substring(schemaList.end())).stream()
-          .map(ChangesetPrivilegeRules::unquote)
-          .toList();
+      return split(target.group(1).substring(schemaList.end()));
     }
     return split(TABLE_KEYWORD.matcher(target.group(1)).replaceFirst("")).stream()
-        .map(table -> table.contains(".") ? unquote(table.substring(0, table.indexOf('.'))) : "")
+        .map(table -> table.contains(".") ? table.substring(0, table.indexOf('.')) : "")
         .toList();
   }
 
+  /** {@code ,}で分け、前後の空白と識別子の引用符を外す。 */
   private static List<String> split(final String list) {
-    return Arrays.stream(list.split(",")).map(String::strip).toList();
-  }
-
-  private static String unquote(final String identifier) {
-    return identifier.replaceAll("^\"|\"$", "");
+    return Arrays.stream(list.split(",")).map(item -> item.strip().replace("\"", "")).toList();
   }
 
   private static List<String> roles(final String statement) {
@@ -262,7 +252,7 @@ final class ChangesetPrivilegeRules {
     if (!matcher.find()) {
       return List.of();
     }
-    return split(matcher.group(1)).stream().map(ChangesetPrivilegeRules::unquote).toList();
+    return split(matcher.group(1));
   }
 
   private static boolean isKnownRole(final String role) {

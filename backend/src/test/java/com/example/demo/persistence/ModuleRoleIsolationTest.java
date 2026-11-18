@@ -159,9 +159,7 @@ class ModuleRoleIsolationTest {
                 .set(EVENT_PUBLICATION.LISTENER_ID, "isolation-test")
                 .set(EVENT_PUBLICATION.EVENT_TYPE, "test.event")
                 .set(EVENT_PUBLICATION.SERIALIZED_EVENT, "{}")
-                .set(
-                    EVENT_PUBLICATION.PUBLICATION_DATE,
-                    java.time.Instant.parse("2026-11-18T00:00:00Z"))
+                .set(EVENT_PUBLICATION.PUBLICATION_DATE, Instant.parse("2026-11-18T00:00:00Z"))
                 .execute();
 
     assertThatCode(() -> AsModule.run(dsl, ORDERING, insert)).doesNotThrowAnyException();
