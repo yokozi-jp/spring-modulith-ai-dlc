@@ -4,6 +4,7 @@ import com.example.demo.persistence.conventions.CatalogSnapshot.ColumnRow;
 import com.example.demo.persistence.conventions.CatalogSnapshot.ConstraintRow;
 import com.example.demo.persistence.conventions.CatalogSnapshot.FunctionRow;
 import com.example.demo.persistence.conventions.CatalogSnapshot.IndexRow;
+import com.example.demo.persistence.conventions.CatalogSnapshot.ModuleRoleRow;
 import com.example.demo.persistence.conventions.CatalogSnapshot.RelationPrivilegeRow;
 import com.example.demo.persistence.conventions.CatalogSnapshot.RelationRow;
 import com.example.demo.persistence.conventions.CatalogSnapshot.RoleRow;
@@ -11,7 +12,11 @@ import com.example.demo.persistence.conventions.CatalogSnapshot.SchemaPrivilegeR
 import com.example.demo.persistence.conventions.CatalogSnapshot.TriggerRow;
 import com.example.demo.persistence.conventions.CatalogSnapshot.TypeRow;
 import com.example.demo.persistence.conventions.CatalogSnapshot.ViewDependencyRow;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import org.jooq.DSLContext;
 import org.jooq.Record;
 import org.jooq.impl.DSL;
@@ -22,6 +27,8 @@ import org.jooq.impl.DSL;
  * <p>{@code information_schema}は、ロールに権限のないオブジェクトを見せない。GRANTを忘れたテーブルが検査から漏れないよう、{@code
  * pg_catalog}だけを読む。システムのスキーマを除き、{@code modulith}と{@code liquibase}は含めて読む。業務スキーマへの絞り込みは判定する側が行う。
  */
+// pg_catalog の行ごとに読む問い合わせを 1 つずつ持つため、メソッドが多い。
+@SuppressWarnings("PMD.TooManyMethods")
 final class SchemaCatalog {
 
   /** システムのスキーマ（{@code pg_catalog}、{@code information_schema}、{@code pg_toast}など）を除く条件。 */
@@ -117,7 +124,8 @@ final class SchemaCatalog {
         role(dsl, dsl.fetchValue(DSL.currentUser())),
         role(dsl, migrationRole),
         schemaPrivileges(dsl),
-        relationPrivileges(dsl));
+        relationPrivileges(dsl),
+        moduleRoles(dsl));
   }
 
   private static List<RelationRow> relations(final DSLContext dsl) {
@@ -301,6 +309,78 @@ final class SchemaCatalog {
                 r.get("trigger_granted", Boolean.class),
                 r.get("maintain_granted", Boolean.class),
                 r.get("owned_by_role", Boolean.class)));
+  }
+
+  /**
+   * 名前が{@code _module}で終わるロールを、属性、アプリロールとの関係、権限とともに読む。
+   *
+   * <p>権限は、ロールが{@code has_*_privilege}で使える権限をすべて読む。{@code
+   * PUBLIC}への付与も含むため、モジュールのロールに余計な権限が付く経路を漏らさない。
+   */
+  private static List<ModuleRoleRow> moduleRoles(final DSLContext dsl) {
+    final Map<String, Set<String>> privileges = new ConcurrentHashMap<>();
+    dsl.resultQuery(
+            query(
+                """
+                SELECT r.rolname AS role_name, n.nspname AS schema_name,
+                       has_schema_privilege(r.oid, n.oid, 'USAGE') AS usage_granted,
+                       has_schema_privilege(r.oid, n.oid, 'CREATE') AS create_granted
+                FROM pg_roles r CROSS JOIN pg_namespace n
+                WHERE r.rolname LIKE '%\\_module' AND n.nspname <> 'public' AND /*NOT_SYSTEM*/
+                """))
+        .forEach(r -> {
+          final Set<String> granted =
+              privileges.computeIfAbsent(text(r, "role_name"), k -> new HashSet<>());
+          if (r.get("usage_granted", Boolean.class)) {
+            granted.add("USAGE:" + text(r, SCHEMA));
+          }
+          if (r.get("create_granted", Boolean.class)) {
+            granted.add("CREATE:" + text(r, SCHEMA));
+          }
+        });
+    dsl.resultQuery(
+            query(
+                """
+                SELECT r.rolname AS role_name, n.nspname AS schema_name, c.relname AS object_name, p.privilege
+                FROM pg_roles r
+                CROSS JOIN pg_class c
+                JOIN pg_namespace n ON n.oid = c.relnamespace
+                CROSS JOIN (VALUES ('SELECT'), ('INSERT'), ('UPDATE'), ('DELETE'), ('TRUNCATE'),
+                                   ('REFERENCES'), ('TRIGGER'), ('MAINTAIN')) AS p(privilege)
+                WHERE r.rolname LIKE '%\\_module' AND c.relkind IN /*RELATION_KINDS*/ AND /*NOT_SYSTEM*/
+                  AND has_table_privilege(r.oid, c.oid, p.privilege)
+                """))
+        .forEach(r ->
+            privileges
+                .computeIfAbsent(text(r, "role_name"), k -> new HashSet<>())
+                .add(text(r, "privilege") + ":" + text(r, SCHEMA) + "." + text(r, NAME)));
+    return dsl.resultQuery(
+            """
+            SELECT r.rolname AS object_name, r.rolsuper, r.rolcreatedb, r.rolcreaterole,
+                   r.rolreplication, r.rolbypassrls, r.rolcanlogin,
+                   has_database_privilege(r.oid, current_database(), 'CREATE') AS can_create,
+                   COALESCE(m.set_option, false) AS app_set,
+                   COALESCE(m.inherit_option, false) AS app_inherit
+            FROM pg_roles r
+            LEFT JOIN pg_auth_members m
+              ON m.roleid = r.oid AND m.member = (SELECT oid FROM pg_roles WHERE rolname = current_user)
+            WHERE r.rolname LIKE '%\\_module'
+            ORDER BY r.rolname
+            """)
+        .fetch(r ->
+            new ModuleRoleRow(
+                new RoleRow(
+                    text(r, NAME),
+                    r.get("rolsuper", Boolean.class),
+                    r.get("rolcreatedb", Boolean.class),
+                    r.get("rolcreaterole", Boolean.class),
+                    r.get("rolreplication", Boolean.class),
+                    r.get("rolbypassrls", Boolean.class),
+                    r.get("can_create", Boolean.class)),
+                r.get("rolcanlogin", Boolean.class),
+                r.get("app_set", Boolean.class),
+                r.get("app_inherit", Boolean.class),
+                privileges.getOrDefault(text(r, NAME), Set.of())));
   }
 
   /** 問い合わせの雛形の{@code /*NOT_SYSTEM*\/}と{@code /*RELATION_KINDS*\/}を条件に置き換える。 */

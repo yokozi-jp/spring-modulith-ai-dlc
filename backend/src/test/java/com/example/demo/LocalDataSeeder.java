@@ -12,6 +12,7 @@ import com.example.demo.ordering.domain.model.ProductOffer;
 import com.example.demo.ordering.infrastructure.persistence.OrderSeeds;
 import com.example.demo.payment.infrastructure.persistence.PaymentSeeds;
 import com.example.demo.product.ProductSeeds;
+import com.example.demo.testkit.AsModule;
 import java.net.InetAddress;
 import java.sql.Connection;
 import java.sql.DriverManager;
@@ -26,6 +27,7 @@ import java.util.Map;
 import java.util.Properties;
 import java.util.Random;
 import java.util.UUID;
+import java.util.function.Function;
 import java.util.function.Supplier;
 import lombok.extern.slf4j.Slf4j;
 import net.datafaker.Faker;
@@ -43,7 +45,8 @@ import org.jooq.impl.DSL;
  * を起動せず、Bean にもしないので、ほかのテストのコンテキストでは動かない。環境の確認、「空」の判定、reset の削除を 1 つのトランザクションで行う。
  */
 @Slf4j
-@SuppressWarnings("PMD.TooManyMethods")
+// 表ごとのモジュールのロールへの切り替えで、生成した型とシーダーの型への依存が増える。
+@SuppressWarnings({"PMD.TooManyMethods", "PMD.CouplingBetweenObjects"})
 public final class LocalDataSeeder {
 
   /** 実行のモード。 */
@@ -104,10 +107,13 @@ public final class LocalDataSeeder {
   /* package */ Outcome seed(final DSLContext dsl, final Mode mode) {
     final boolean migrated =
         BUSINESS_TABLES.stream()
-            .allMatch(
-                table ->
-                    dsl.fetchValue("select to_regclass({0})::text", DSL.inline(dsl.render(table)))
-                        != null);
+            .allMatch(table ->
+                inModuleOf(
+                    dsl,
+                    table,
+                    tx ->
+                        tx.fetchValue("select to_regclass({0})::text", DSL.inline(tx.render(table)))
+                            != null));
     if (!migrated) {
       if (mode == Mode.AUTO) {
         log.warn("業務の表がないため、代表データを入れません。task be-migrate の後に実行してください");
@@ -116,10 +122,14 @@ public final class LocalDataSeeder {
       throw new IllegalStateException("業務の表がありません。task be-migrate の後に実行してください");
     }
     if (mode == Mode.RESET) {
-      BUSINESS_TABLES.forEach(table -> dsl.deleteFrom(table).execute());
+      BUSINESS_TABLES.forEach(
+          table -> inModuleOf(dsl, table, tx -> tx.deleteFrom(table).execute()));
     }
     final List<String> nonEmpty =
-        BUSINESS_TABLES.stream().filter(dsl::fetchExists).map(LocalDataSeeder::name).toList();
+        BUSINESS_TABLES.stream()
+            .filter(table -> inModuleOf(dsl, table, tx -> tx.fetchExists(table)))
+            .map(LocalDataSeeder::name)
+            .toList();
     if (!nonEmpty.isEmpty()) {
       log.info("業務データがあるため、代表データを入れません: {}", nonEmpty);
       return Outcome.SKIPPED_NOT_EMPTY;
@@ -130,17 +140,31 @@ public final class LocalDataSeeder {
     final Supplier<UUID> ids = () -> uuidV4(random);
     // faker と ids は同じ random を引く。順（商品 P01〜P05、注文 C01〜C06、決済 C03、C05）を変えると値が変わる。
     final List<ProductOffer> offers =
-        ProductSeeds.insert(dsl, faker, ids, base.minus(Duration.ofDays(1))).stream()
+        AsModule.call(
+                dsl,
+                "product",
+                tx -> ProductSeeds.insert(tx, faker, ids, base.minus(Duration.ofDays(1))))
+            .stream()
             .filter(ProductSeeds.Seeded::onSale)
-            .map(
-                s ->
-                    new ProductOffer(
-                        new ProductId(s.publicId()), new Money(s.unitPrice()), s.onSale()))
+            .map(s ->
+                new ProductOffer(new ProductId(s.publicId()), new Money(s.unitPrice()), s.onSale()))
             .toList();
-    final OrderSeeds.Confirmed confirmed = OrderSeeds.insert(dsl, offers, ids, base);
-    insertPayment(dsl, ids, confirmed.paid(), false);
-    insertPayment(dsl, ids, confirmed.declined(), true);
+    final OrderSeeds.Confirmed confirmed =
+        AsModule.call(dsl, "ordering", tx -> OrderSeeds.insert(tx, offers, ids, base));
+    AsModule.run(
+        dsl,
+        "payment",
+        tx -> {
+          insertPayment(tx, ids, confirmed.paid(), false);
+          insertPayment(tx, ids, confirmed.declined(), true);
+        });
     return Outcome.SEEDED;
+  }
+
+  /** 表を持つモジュール（スキーマ名と同じ）のロールで本体を実行する。本番と同じく、アプリロールには業務のスキーマの権限がない。 */
+  private static <T> T inModuleOf(
+      final DSLContext dsl, final Table<?> table, final Function<DSLContext, T> body) {
+    return AsModule.call(dsl, AsModule.moduleOf(table), body);
   }
 
   /** 注文の合計金額で、確定の 1 分後に決済記録を入れる。 */

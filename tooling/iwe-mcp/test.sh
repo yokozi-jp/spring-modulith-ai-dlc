@@ -4,6 +4,9 @@
 # Run: bash tooling/iwe-mcp/test.sh (task okf-check が実行する)
 
 set -u
+# linked worktree のコミットでは GIT_DIR などが渡り、git init が本物のリポジトリを bare にするため、リポジトリ固有の変数を全部外す。
+# shellcheck disable=SC2046
+unset $(git rev-parse --local-env-vars)
 
 root="$(cd "$(dirname "$0")/../.." && pwd)"
 cmd="$(jq -r '.mcpServers.iwe.args[1]' "$root/.kiro/settings/mcp.json")"

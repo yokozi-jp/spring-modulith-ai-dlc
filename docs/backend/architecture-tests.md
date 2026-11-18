@@ -233,7 +233,8 @@ INSERTの共通カラムは`CommonColumns.forInsert`で、UPDATEとDELETEの共�
 
   `Update`と`Delete`を作る入口をすべて禁じるため、`batch`や`subscribe`のように作った問い合わせを受け取って実行するAPIは禁じない。
 
-  `tableWritesGoThroughTableWriter`が除外するのは、`TableWriter`、`LockedRoot`、`DeletedRoot`の三つの完全修飾型名だけである。
+  `tableWritesGoThroughTableWriter`が除外するのは、`TableWriter`、`LockedRoot`、`DeletedRoot`と、トランザクションの初めにモジュールのロールへ切り替える`ModuleRoleTransactionManager`とその`Config`の完全修飾型名だけである。
+  `ModuleRoleTransactionManager`は業務テーブルに触れず、固定の`set_config`だけを実行する（[ADR-094](../adr/ADR-094-switch-to-module-database-roles.md)）。
   除外を足す、外す、または除外する型を移すときは、先に[ADR-054](../adr/ADR-054-detect-optimistic-lock-conflicts-by-update-count.md)の判断を変える。
   同じ変更で、`tableWritesGoThroughTableWriterRule`の完全修飾型名と、除外する型を置く適合フィクスチャ（`archfixture/conforming/shared/infrastructure/persistence/`）を更新する。
   禁止するAPIの違反フィクスチャ（`DirectOrderWriter`）は、禁止の一覧か`isDirectWrite`の判定を変えるときだけ更新する。
@@ -287,6 +288,13 @@ Error Proneの`CheckReturnValue`は既定でerrorであり、`updateWhere`と`de
 - `nameBuildingApisAreNotUsed`：識別子の`Name`を作る`DSL.name`、`DSL.quotedName`、`DSL.systemName`、`Name.append`を、引数の型によらず呼び出さず、メソッド参照もしない。理由と規則の範囲は[jOOQのSQLの書き方](../database/jooq-usage.md)に示す。
 - `renderSchemaIsNotChanged`：`Settings.withRenderSchema`と`Settings.setRenderSchema`を呼び出さず、メソッド参照もしない。引数の値はバイトコードに残らないため、`withRenderSchema(false)`の禁止を呼び出しの禁止で近似する。
 - `statementTypeAndParamTypeAreNotChanged`：`Settings`の`withStatementType`、`setStatementType`、`withParamType`、`setParamType`を呼び出さず、メソッド参照もしない。
+- `persistenceAdaptersUseOnlyOwnGeneratedSchema`：`<module>.infrastructure.persistence`は、自分のモジュールのスキーマのjOOQの生成クラス（`jooq.<module>..`）だけを使う。別のモジュールのスキーマと`modulith`の生成クラスは使わない。モジュールのロールは自分のスキーマ以外を書けないため、実行時の権限エラーを静的に先取りする。生成クラスを`infrastructure.persistence`の外で使わないことは、`PackageByFeatureOnionArchitectureTest`の`databaseTechnologyApisAreOnlyUsedByPersistenceAdapters`が止める。
+- `moduleCodeDoesNotUseJdbc`：機能モジュールのクラスは、`org.springframework.jdbc..`（`JdbcTemplate`など）、`java.sql..`、`javax.sql..`を使わない。トランザクションの初めに切り替えたロールを迂回する経路を止める。
+- `moduleCodeDoesNotChangeConnectionSettings`：機能モジュールのクラスは、`DSLContext`の`set`、`setLocal`、`setSchema`、`setCatalog`、`connection`、`connectionResult`と、`DSL`の`set`、`setLocal`、`setSchema`、`setCatalog`を呼び出さない。`SET ROLE`で切り替えたロールを書き換えられるためである（[ADR-094](../adr/ADR-094-switch-to-module-database-roles.md)）。
+
+機能モジュールは`ModuleRoles.MODULES`の名前で決まる。
+`ModuleRoles.MODULES`が`modulith`を除くjOOQのスキーマと一致し、どれもSpring Modulithのモジュールであることは、`ModuleRolesTest`が確かめる。
+`DSL.name`での表の指定の禁止は、上の`nameBuildingApisAreNotUsed`が全プロダクションコードに適用する。
 
 `PublicIdArchTest`は、主キーをモジュールの外へ出さない規則を検査する（[PostgreSQLの主キー](../database/postgresql-primary-keys.md)）。
 
@@ -300,6 +308,14 @@ DBの規約のほかの検査は`backend/src/test/java/com/example/demo/persiste
 - `ChangesetLintTest`は、Liquibaseのchangesetを、DBに接続せずに静的に検査する。changesetを順に適用してテーブルの最終形を組み立てる。違反を含むフィクスチャは`backend/src/test/resources/conventions/changeset-lint/`に置く。
 - `SchemaConventionsTest`は、`pg_catalog`の行から違反を判定する関数を、違反を含む行で検証する。
 - `SchemaInspectionTest`は、マイグレーション後のテストDBの`pg_catalog`をアプリロールで読み、同じ関数で検査する。
+  モジュールのロールは、Spring Modulithが見つけた機能モジュールの直接の依存先と照らして検査する。
+
+権限の規則は次のとおりである。根拠は[DB接続情報とロール分離](../database/connections.md)にある。
+
+- G1：アプリロールは、`modulith`以外のスキーマのUSAGEと、`modulith`以外の表への権限を持たない。DDLの属性も持たない。
+- G3：権限のSQL（`GRANT`、`REVOKE`、`ALTER DEFAULT PRIVILEGES`）は、`ChangesetPrivilegeRules`が判定する。`PUBLIC`、`WITH GRANT OPTION`、DML以外の権限、スキーマを指定しない`ALTER DEFAULT PRIVILEGES`、モジュールのロール（`<module>_module`）とアプリロールのプレースホルダ以外の付与先を拒否する。012以降のchangesetは、業務のスキーマの権限をアプリロールに与えない。権限のSQLだけのchangesetは、任意のSQL（M17）の許可リストに載せない。
+- G4：モジュールのロールの一覧が`ModuleRoles.MODULES`と一致し、ログインできず、DDLの属性を持たず、アプリロールが継承なしで切り替えられる。
+- G5：モジュールのロールの権限が、自分のスキーマのDML、依存の方向のSELECT、`modulith.event_publication`へのINSERTだけで、期待する集合と完全に一致する。
 
 スキーマ検査の規則を足すときは、判定に要る行を`CatalogSnapshot`に足して`SchemaCatalog.read`で埋め、判定する関数を`SchemaConventions.check`から呼ぶ。
 
