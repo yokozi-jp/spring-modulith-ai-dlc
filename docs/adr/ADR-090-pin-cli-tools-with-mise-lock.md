@@ -79,7 +79,7 @@ shims は決まったディレクトリなので、受け継いだ PATH のま�
 - `mise.lock` は `linux-x64` だけを持つ。開発環境は WSL、CI は `ubuntu-latest` である。ほかの platform で開発する人が来たら `mise lock --platform` に足す。
 - CI の mise の版とローカルの apt の mise の版はずれうる。mise 2026.11.0 と 2026.11.9 で同じ `mise.lock` と `.mise/locks/` が作られ、どちらでも `mise install --locked` が通ることを確かめた。
 - zizmor の `self-repository` は `uses: ./.github/actions/setup-mise` に `$/` の形を勧めるが、`ci.yml` と同じく actionlint（1.7.12）がまだ受け付けない（rhysd/actionlint#732）ので `./` のままにし、alert は won't fix にする。
-- Kiro Web のサンドボックスも同じ `mise.lock` から入れる（[ADR-091](ADR-091-support-kiro-web-sandbox-as-development-environment.md)）。
+- Kiro Web のサンドボックスも同じ `mise.lock` から入れる（[ADR-093](ADR-093-support-kiro-web-sandbox-as-development-environment.md)）。
   iwe はサンドボックスの glibc 2.34 で動く 0.29.2 へ上げた。
 - Java（apt の Corretto）、Vite+、Kiro CLI はこの ADR の対象外であり、番号付きのスクリプトに残る。Kiro CLI は [#387](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/387) で扱う。
 - [ADR-010](ADR-010-adopt-task-as-project-task-runner.md) の「ローカル導入スクリプトと CI で同じバージョンを使う」は、この ADR を Accepted にするときに、この ADR を指す記述へ直す。

@@ -9,7 +9,7 @@ tags: [runbook, setup, kiro-web, mise, podman]
 
 Kiro Web では、tool call の最初に `kiro-web.sh` を source して、道具と PATH を揃える。
 ホストの 8080 から 8082 を公開するサービスを起動する Task は、`kiro-web-netns` の中で実行する。
-仕組みと理由は [ADR-091](../adr/ADR-091-support-kiro-web-sandbox-as-development-environment.md) にある。
+仕組みと理由は [ADR-093](../adr/ADR-093-support-kiro-web-sandbox-as-development-environment.md) にある。
 
 ## 道具を揃える
 
@@ -62,7 +62,7 @@ kiro-web-netns bash -c 'task compose-up && task be-migrate && task oidc-check; t
 
 - 書けるのは `~/.cache`、`/tmp`、ワークスペースだけである。
 - `/tmp` は tool call ごとに消えるので、後で読むログは `$KIRO_WEB_HOME` に書く。
-- 背景のプロセスも tool call の終了で止まるので、push はフォアグラウンドで実行する（[開発ワークフロー](../tooling/dev-workflow.md)の「エージェントがcommitとpushをするとき」）。
+- 背景のプロセスも tool call の終了で止まるので、`task agent-commit`と`task agent-push`は`task agent-wait`と同じ tool call で実行する（[開発ワークフロー](../tooling/dev-workflow.md)の「エージェントがcommitとpushをするとき」）。
 - 1 回の tool call の上限は 30 分である。
   長い Task には `timeout` を付ける。
 - `task dev` の backend の `/actuator/health` は、認証なしでは 401 を返す。

@@ -41,6 +41,11 @@ forkどうしは別のコンテナを使う。
 
 WSLで実行するときは、`.wslconfig`の`processors`がforkに使えるコアの上限になる。
 
+`maxParallelForks`は、ホストの負荷もほかのセッションの数も見ない。
+複数のセッションが同時にテストを流すと、forkの合計が`nproc`に達し、コンテナやGradleのプロセスと合わせてCPUを取り合う。
+`-PtestForks=<n>`でforkを絞ると、その実行は終えられるが、測った所要時間は負荷が低いときと比べられない。
+遅いときは、先に[バックエンドのテストが遅いときの調べ方](runbook-slow-tests.md)でload averageを見る。
+
 ## テストの実行
 
 テストにはDockerと`.env.test`が必要である。

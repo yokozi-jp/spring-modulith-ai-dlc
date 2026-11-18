@@ -1,5 +1,5 @@
 #!/bin/bash
-# Kiro Web のサンドボックスで docker と docker compose の代わりに呼ぶ（kiro-web.sh が $KIRO_WEB_HOME/bin/docker として置く、ADR-091）。
+# Kiro Web のサンドボックスで docker と docker compose の代わりに呼ぶ（kiro-web.sh が $KIRO_WEB_HOME/bin/docker として置く、ADR-093）。
 # 書ける overlay にした mount namespace のなかで podman の API サービスを起動し、docker と Compose をそこへ向ける。
 # サービスとコンテナは tool call の終了で消える。
 set -euo pipefail

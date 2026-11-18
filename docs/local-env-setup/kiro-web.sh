@@ -1,5 +1,5 @@
 #!/bin/bash
-# Kiro Web のサンドボックスでローカルと同じ道具を使えるようにする。実行せず source する（ADR-091）。
+# Kiro Web のサンドボックスでローカルと同じ道具を使えるようにする。実行せず source する（ADR-093）。
 #   source docs/local-env-setup/kiro-web.sh
 # 道具と状態は KIRO_WEB_HOME（既定は ~/.cache/kiro-web）へ置き、リポジトリには書かない。
 # 入れ済みの道具は、mise の設定と lock が変わるまで入れ直さない。

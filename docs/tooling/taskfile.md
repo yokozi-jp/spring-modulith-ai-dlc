@@ -147,6 +147,8 @@ CIとLefthookは処理を複製せず、Taskfileの同じタスクを呼ぶ。
 入口タスクが呼ぶ部品タスクとCIが呼ぶ部品タスクの処理を一致させる。
 Taskfileを変更したら、CIのpaths条件に`Taskfile.yml`が含まれていることも確認する。
 `.github/actions/setup-mise`で道具を入れるworkflowは、paths条件に道具の版と入れ方を決めるファイル（`tooling/ci-gate-check/ci-gate-check.py`の`TOOLCHAIN`）も入れる。`task ci-gate-check`が検査する。
+タスクを改名、削除したら、`lefthook.yml`とワークフローの`task <名前>`も直す。
+直し忘れると`task lint-taskfile`が失敗する（[Lintとテストのリファレンス](lint-and-test.md)）。
 
 ## 文書の同期
 

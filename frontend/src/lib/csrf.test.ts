@@ -18,7 +18,7 @@ function unmask(value: string) {
 }
 
 describe("csrfToken", () => {
-  it("returns the __Host-XSRF-TOKEN cookie apart from similarly named cookies", () => {
+  it("似た名前の Cookie があっても __Host-XSRF-TOKEN の値を返す", () => {
     vi.stubGlobal("document", {
       cookie: `XSRF-TOKEN=old; other=1; __Host-XSRF-TOKEN=${cookieValue}`,
     });
@@ -26,15 +26,18 @@ describe("csrfToken", () => {
     expect(csrfToken()).toBe(cookieValue);
   });
 
-  it.each(["other=1", "other=1; __Host-XSRF-TOKEN="])("returns undefined for %j", (cookie) => {
-    vi.stubGlobal("document", { cookie });
+  it.each(["other=1", "other=1; __Host-XSRF-TOKEN="])(
+    "Cookie が %j のときは undefined を返す",
+    (cookie) => {
+      vi.stubGlobal("document", { cookie });
 
-    expect(csrfToken()).toBeUndefined();
-  });
+      expect(csrfToken()).toBeUndefined();
+    },
+  );
 });
 
 describe("maskedCsrfToken", () => {
-  it("masks the __Host-XSRF-TOKEN cookie so that Spring Security can unmask it", () => {
+  it("__Host-XSRF-TOKEN の値を、Spring Security がマスクを外せる形でマスクする", () => {
     vi.stubGlobal("document", { cookie: `other=1; __Host-XSRF-TOKEN=${cookieValue}` });
 
     const masked = maskedCsrfToken();

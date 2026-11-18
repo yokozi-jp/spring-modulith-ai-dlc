@@ -49,30 +49,35 @@ task fe-install    # フロントエンド
 
 ## エージェントがcommitとpushをするとき
 
-色の制御文字を外す。
+エージェントはcommitとpushを次のTaskだけで行い、`git commit`と`git push`を直接実行しない。
+フックはtool callの時間切れより長くかかることがあるので、どちらのTaskもフックの終わりを待たずに戻り、`task agent-wait`で待つ。
+`task agent-commit`は本物のindexの写しからcommitする（理由は[ADR-091](../adr/ADR-091-commit-agent-changes-from-a-copy-of-the-index.md)）。
 
 ```bash
-NO_COLOR=1 git commit -F <ファイル>
-NO_COLOR=1 git push -u origin <ブランチ>
+task agent-commit -- <メッセージのファイル> <パス>...
+task agent-wait
+task agent-push
+task agent-wait
 ```
+
+commitやpushを始められないときは、Taskが理由と直し方を出して止まるので、それに従う。
+Taskは失敗の終了コードを201にまとめるので、元の終了コードは出力の`exit=`の行かTaskのエラーの`exit status`で読む。
+`task agent-wait`が「まだ実行中です」と出したら（Taskのエラーは`exit status 75`）、同じコマンドをもう一度実行する。
+
+Kiro Web のサンドボックスでは、背景のプロセスが tool call の終了で止まる。
+`task agent-commit`か`task agent-push`と`task agent-wait`を同じ tool call で実行し、`AGENT_GIT_WAIT_SECONDS`で待つ秒数を tool call の上限より短く延ばす（[Kiro Web の開発環境](../local-env-setup/kiro-web.md)）。
+
+```bash
+task agent-push && AGENT_GIT_WAIT_SECONDS=1500 task agent-wait
+```
+
+失敗を報告した実行のディレクトリは、ログを読めるように残る。
+消し方と、indexをcommitに合わせるコマンドは、`task agent-wait`が出す。
+
+前のpre-pushを止めたときは、`docker compose -f docker/compose-test.yml down --volumes --remove-orphans`でテスト用の依存を片付けてからやり直す。
 
 Lefthookの出力は`lefthook.yml`の`output`で絞ってある（[Lintとテストのリファレンス](lint-and-test.md)）。
-`LEFTHOOK_OUTPUT=summary,failure`でさらに絞ると、成功の扱いで出る`adr-check`の注意喚起が消えるため、付けない。
-
-`backend/`のJavaかGradleを変えたpushでは、pre-pushが`be-lint`、`be-test`（全テスト）を順番に実行し、数分かかる。
-tool callの時間切れや中断でフックは止まらないため、pushはバックグラウンドで実行し、完了の印のファイルを待つ。
-
-```bash
-(nohup bash -c 'NO_COLOR=1 git push -u origin <ブランチ> > /tmp/push.log 2>&1; echo "exit=$?" > /tmp/push.done' >/dev/null 2>&1 &)
-cat /tmp/push.done          # 完了するまで間を置いて確かめる
-grep -E '^(✓|✗)' /tmp/push.log
-```
-
-Kiro Web のサンドボックスでは、背景のプロセスが tool call の終了で止まるので、この手順を使わない。
-`timeout` を付けてフォアグラウンドで push する（[Kiro Web の開発環境](../local-env-setup/kiro-web.md)）。
-
-pushをやり直す前に、`pgrep -fa "lefthook run pre-push"`で前のフックが残っていないことを確かめる。
-残っていれば、終えるのを待つか止めてから、`docker compose -f docker/compose-test.yml down --volumes --remove-orphans`でテスト用の依存を片付ける。
+`LEFTHOOK_OUTPUT=summary,failure`でさらに絞ると、成功の扱いで出る`adr-check`の注意喚起が消えるので、付けない。
 
 ## APIを変更するとき
 

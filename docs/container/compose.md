@@ -48,7 +48,7 @@ depends_on:
 - 各サービスに `healthcheck` を定義し、`interval`、`timeout`、`retries` を設定する。
 - DB なら `pg_isready`、Redis なら `redis-cli ping` のように、実際に応答できるかを見るコマンドにする。
 - シェルの構文を含む検査は `CMD-SHELL` で書き、`CMD` の 1 要素にシェルの文を詰めない。
-  podman の互換 API は、その要素を空白で分割する（[ADR-091](../adr/ADR-091-support-kiro-web-sandbox-as-development-environment.md)）。
+  podman の互換 API は、その要素を空白で分割する（[ADR-093](../adr/ADR-093-support-kiro-web-sandbox-as-development-environment.md)）。
 
 ## restart ポリシー
 

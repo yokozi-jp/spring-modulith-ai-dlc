@@ -1,11 +1,11 @@
 ---
 type: ADR
-title: 'ADR-091: Kiro Web のサンドボックスを開発環境に加え、道具とコンテナを source するスクリプトで揃える'
+title: 'ADR-093: Kiro Web のサンドボックスを開発環境に加え、道具とコンテナを source するスクリプトで揃える'
 description: Kiro Web のサンドボックスで WSL と同じ Task、テスト、E2E、DAST を動かすため、mise、podman の API サービス、専用のネットワーク名前空間を source するスクリプトで用意する判断。Kiro Web の開発環境の仕組みを変えるとき、サンドボックスで道具やコンテナが動かないときに読む。
 tags: [adr, tooling, kiro-web, mise, podman, container]
 ---
 
-# ADR-091: Kiro Web のサンドボックスを開発環境に加え、道具とコンテナを source するスクリプトで揃える
+# ADR-093: Kiro Web のサンドボックスを開発環境に加え、道具とコンテナを source するスクリプトで揃える
 
 ## Status
 
