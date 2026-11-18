@@ -330,7 +330,9 @@ const params = { ...(cursor !== undefined && { cursor }) };
   手順の正文は[スキルの取得元と更新](../agents/skill-sources.md)である。
 - **`task release-check`**：release-pleaseのmanifest、版ファイル、Gradle版、設定の一致を検証する。
 - **`task agent-git-test`**：`task agent-commit`、`task agent-push`、`task agent-wait`の本体を、`tooling/agent-git/test.sh`のケースで検査する。
-- **`task lefthook-install-test`**：`npm ci`の`prepare`（`tooling/lefthook-install/prepare.mjs`）が、worktreeからもmainのworktreeのlefthookでフックを入れ、入れられないときは失敗することを、一時のgitリポジトリと代わりのlefthookで検査する。
+- **`task lefthook-install-test`**：`npm ci`の`prepare`（`tooling/lefthook-install/prepare.mjs`）が、linked worktreeからもmainのworktreeのlefthookでフックを入れることを検査する。
+  mainのworktreeの場所が分からないときと、そこにlefthookが無いときは、`prepare`が失敗することも確かめる。
+  検査には一時のgitリポジトリと、lefthookの代わりのスクリプトを使う。
   `lefthook.yml`の`no_auto_install`も`lefthook dump`で確かめる。
   ケースは`tooling/lefthook-install/test.sh`が正である。
 - **`task lint-taskfile`**：Task本体でTaskfileのYAML構文とスキーマ構造を検証する。

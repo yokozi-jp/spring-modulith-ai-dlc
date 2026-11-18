@@ -47,6 +47,8 @@
 
 # hook は linked worktree も含めてリポジトリで一つなので、worktree での lefthook run が hook をその worktree の lefthook に向け直さないようにする。
 # 入れ直すのは npm ci の prepare（tooling/lefthook-install/prepare.mjs）だけにする。
+# そのため、新しい種類の hook（post-checkout など）を足しても自動では入らない。
+# 足したら main の worktree で npm ci を実行する。
 no_auto_install: true
 
 # lefthook の版の表示、skip の行、EXECUTE の行を省く。
