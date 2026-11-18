@@ -104,14 +104,15 @@ Liquibase用アカウントには、DDL、Liquibase管理テーブルの更新�
 業務のスキーマは、アプリケーション用ロールではなく、モジュールごとのログインできないロール`<module>_module`（`product_module`、`ordering_module`、`payment_module`、`tenancy_module`）が読み書きする（[ADR-090](../adr/ADR-090-switch-to-module-database-roles.md)）。
 別のモジュールの表への書き込みと、依存の方向に逆らう読み取りは、DBの権限エラー（SQLSTATE `42501`）で止まる。
 
-- **切り替え**：`ModuleRoleTransactionManager`が、トランザクションを始めた直後に、トランザクションの名前（クラス名とメソッド名）から引いたモジュールのロールへ`set_config('role', ?, true)`で切り替える。トランザクションの終わりで元に戻るため、プールの接続にロールが残らない。モジュールが分からない名前（Spring Modulithの内部、ShedLock、名前のない`TransactionTemplate`）はアプリケーション用ロールのまま動く。
+- **切り替え**：`ModuleRoleTransactionManager`が、トランザクションを始めた直後に、トランザクションの名前（クラス名とメソッド名）から引いたモジュールのロールへ`set_config('role', ?, true)`で切り替える。トランザクションの終わりで元に戻るため、プールの接続にロールが残らない。モジュールが分からない名前（Spring Modulithの内部、ShedLock、名前のない`TransactionTemplate`）はアプリケーション用ロールのまま動く。ロールは物理的なトランザクションを始めた外側の名前で決まり、`REQUIRED`で参加した別のモジュールの`<Feature>Queries`は呼び出し元のロールで動く。
 - **アプリケーション用ロール**：業務のスキーマに権限を持たない。`modulith`スキーマ（イベントの出版とShedLockの表）だけを読み書きする。モジュールのロールの継承はなく、`SET ROLE`で切り替えるだけのメンバーである。
 - **モジュールのロールの権限**：自分のスキーマのUSAGEと表のSELECT、INSERT、UPDATE、DELETE。依存の方向（`ordering`から`product`、`payment`から`ordering`）にだけ、依存先のスキーマのUSAGEとSELECT。`modulith`スキーマのUSAGEと`modulith.event_publication`へのINSERT。`tenancy`はどのモジュールにも依存せず、どのモジュールも`tenancy`に依存しないため、依存の方向のSELECTを持たない。
-- **新しい表**：権限はスキーマごとの`ALTER DEFAULT PRIVILEGES`で決まるため、既存のスキーマに表を足すchangesetは権限を書かない。新しいモジュールのスキーマを作るchangesetは、そのスキーマのUSAGEと`ALTER DEFAULT PRIVILEGES`をモジュールのロールへ与える。権限のSQLの書き方はchangesetの検査（規則G3）、権限の漏れと余りはカタログのテスト（`SchemaInspectionTest`の規則G4、G5）が止める。
+- **新しい表**：権限はスキーマごとの`ALTER DEFAULT PRIVILEGES`で決まるため、既存のスキーマに表を足すchangesetは権限を書かない。新しいモジュールのスキーマを作るchangesetは、モジュールのロールへ、そのスキーマのUSAGEと`ALTER DEFAULT PRIVILEGES`、`modulith`スキーマのUSAGEと`modulith.event_publication`へのINSERT、依存先のスキーマのUSAGEと表のSELECTを与える。依存先のSELECTは、依存先のスキーマの`ALTER DEFAULT PRIVILEGES`にも足す。イベントを出版しないモジュールにも`modulith`の権限を与える（規則G5が、すべてのモジュールのロールに同じ権限を求めるため）。権限のSQLの書き方はchangesetの検査（規則G3）、権限の漏れと余りはカタログのテスト（`SchemaInspectionTest`の規則G4、G5）が止める。
 - **ロールの作成**：ロールはマイグレーションより先に、環境を作る手順で作る。マイグレーション用ロールに`CREATEROLE`を持たせない。ロールの名前は固定で、1つのDBクラスターに1つの環境を置く。
-- **限界**：アプリケーション用ロールは、どのSQLからでも`SET ROLE`で別のロールへ切り替えられる。DBのロールで止められるのは誤りで、故意の迂回は止められない。ArchUnitの規則（接続の設定を変える`DSLContext`のAPIの禁止、`JdbcTemplate`と生のJDBCの禁止）で補う（[ArchUnitのテスト](../backend/architecture-tests.md)）。
+- **限界**：アプリケーション用ロールは、どのSQLからでも`SET ROLE`で別のロールへ切り替えられる。DBのロールで止められるのは誤りで、故意の迂回は止められない。ArchUnitの規則（接続の設定を変える`DSLContext`と`DSL`のAPIの禁止、`JdbcTemplate`と生のJDBCの禁止）で補う（[ArchUnitのテスト](../backend/architecture-tests.md)）。
 
 ステージングと本番では、マイグレーションの前に、スーパーユーザー相当のアカウント（RDSでは`rds_superuser`）で、モジュールごとに次を実行する。
+`WITH INHERIT FALSE, SET TRUE`はPostgreSQL 16で入った構文なので、PostgreSQL 16以上が要る。
 `<app>`は`DB_USERNAME`である。
 モジュールを足すときは、`docker/initdb/03-create-module-roles.sh`の`modules`と`ModuleRoles.MODULES`にも同じ名前を足す。
 

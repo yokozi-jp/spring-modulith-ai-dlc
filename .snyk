@@ -1,8 +1,0 @@
-# Snyk (https://snyk.io) policy file
-# ツール・エージェント関連コード（.kiro / .agents）はプロダクションコードでは
-# ないため、Snyk Code / Snyk Secrets のスキャン対象から除外する。
-# Semgrep（Taskfile.ymlのtask lint-semgrep）の --exclude .kiro と方針を揃える。
-exclude:
-  global:
-    - .kiro/**
-    - .agents/**

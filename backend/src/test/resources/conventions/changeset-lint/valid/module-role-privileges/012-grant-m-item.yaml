@@ -11,9 +11,11 @@ databaseChangeLog:
               ALTER DEFAULT PRIVILEGES IN SCHEMA item GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO item_module;
               GRANT USAGE ON SCHEMA modulith TO item_module, "${appDatabaseUsername}";
               GRANT INSERT ON TABLE modulith.event_publication TO item_module;
+              GRANT SELECT, DELETE ON TABLE modulith.event_publication, modulith.event_publication_archive TO "${appDatabaseUsername}";
+              ALTER DEFAULT PRIVILEGES IN SCHEMA modulith GRANT SELECT ON TABLES TO "${appDatabaseUsername}";
       rollback:
         - sql:
             sql: |
               ALTER DEFAULT PRIVILEGES IN SCHEMA item REVOKE ALL ON TABLES FROM item_module;
-              REVOKE ALL ON ALL TABLES IN SCHEMA item FROM item_module;
+              REVOKE ALL ON ALL TABLES IN SCHEMA item FROM item_module CASCADE;
               GRANT USAGE ON SCHEMA item TO "${appDatabaseUsername}";

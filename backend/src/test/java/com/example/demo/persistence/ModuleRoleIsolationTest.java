@@ -11,8 +11,12 @@ import static org.assertj.core.api.Assertions.catchThrowable;
 import com.example.demo.testkit.AsModule;
 import com.example.demo.testkit.DatabaseTest;
 import java.sql.SQLException;
+import java.time.Instant;
+import java.util.List;
+import java.util.Objects;
 import java.util.function.Consumer;
 import org.jooq.DSLContext;
+import org.jooq.Field;
 import org.jooq.Table;
 import org.jooq.impl.DSL;
 import org.junit.jupiter.api.DisplayName;
@@ -98,15 +102,25 @@ class ModuleRoleIsolationTest {
 
   @ParameterizedTest(name = "{0} が {1} を書くと、通る: {2}")
   @MethodSource("writes")
-  @DisplayName("モジュールは、自分のスキーマだけに書ける")
+  @DisplayName("モジュールは、自分のスキーマだけに INSERT、UPDATE、DELETE できる")
   void writesStayInOwnSchema(final String module, final Table<?> table, final boolean allowed) {
-    final Consumer<DSLContext> write =
-        tx -> tx.deleteFrom(table).where(DSL.falseCondition()).execute();
+    final Field<Instant> updatedAt =
+        Objects.requireNonNull(table.field("updated_at", Instant.class), "updated_at");
+    final List<Consumer<DSLContext>> writes =
+        List.of(
+            tx ->
+                tx.insertInto(table, updatedAt)
+                    .select(DSL.select(updatedAt).from(table).where(DSL.falseCondition()))
+                    .execute(),
+            tx -> tx.update(table).set(updatedAt, updatedAt).where(DSL.falseCondition()).execute(),
+            tx -> tx.deleteFrom(table).where(DSL.falseCondition()).execute());
 
-    if (allowed) {
-      assertThatCode(() -> AsModule.run(dsl, module, write)).doesNotThrowAnyException();
-    } else {
-      assertPermissionDenied(() -> AsModule.run(dsl, module, write));
+    for (final Consumer<DSLContext> write : writes) {
+      if (allowed) {
+        assertThatCode(() -> AsModule.run(dsl, module, write)).doesNotThrowAnyException();
+      } else {
+        assertPermissionDenied(() -> AsModule.run(dsl, module, write));
+      }
     }
   }
 
@@ -145,9 +159,7 @@ class ModuleRoleIsolationTest {
                 .set(EVENT_PUBLICATION.LISTENER_ID, "isolation-test")
                 .set(EVENT_PUBLICATION.EVENT_TYPE, "test.event")
                 .set(EVENT_PUBLICATION.SERIALIZED_EVENT, "{}")
-                .set(
-                    EVENT_PUBLICATION.PUBLICATION_DATE,
-                    java.time.Instant.parse("2026-11-18T00:00:00Z"))
+                .set(EVENT_PUBLICATION.PUBLICATION_DATE, Instant.parse("2026-11-18T00:00:00Z"))
                 .execute();
 
     assertThatCode(() -> AsModule.run(dsl, ORDERING, insert)).doesNotThrowAnyException();

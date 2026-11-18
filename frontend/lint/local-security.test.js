@@ -18,17 +18,17 @@ function checkAttribute(name) {
 }
 
 describe("local-security/no-jsx-srcdoc", () => {
-  it("rejects srcDoc", () => {
+  it("srcDoc 属性を禁止する", () => {
     expect(checkAttribute("srcDoc")).toHaveBeenCalledOnce();
   });
 
-  it("allows ordinary JSX attributes", () => {
+  it("通常の JSX 属性を許可する", () => {
     expect(checkAttribute("src")).not.toHaveBeenCalled();
   });
 });
 
-describe("HTML sink restrictions", () => {
-  it("rejects qualified DOMParser access through the project lint config", () => {
+describe("HTML sink の制限", () => {
+  it("プロジェクトの lint 設定で window.DOMParser のような修飾した参照を禁止する", () => {
     const directory = mkdtempSync(path.join(tmpdir(), "frontend-security-lint-"));
     const fixture = path.join(directory, "qualified-dom-parser.ts");
 

@@ -31,7 +31,7 @@ function currentOf(name: string) {
   return screen.getByRole("link", { name }).getAttribute("aria-current");
 }
 
-describe("orders page", () => {
+describe("注文の一覧の画面", () => {
   it("一覧の行に客先注文番号、状態、合計金額、詳細へのリンクを出す", async () => {
     const summary = orderSummary({ lockNo: 2 });
     expectTypeOf(summary.lockNo).toEqualTypeOf<number>();

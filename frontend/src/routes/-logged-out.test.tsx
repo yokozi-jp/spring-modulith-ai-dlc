@@ -5,8 +5,8 @@ import { describe, expect, it } from "vite-plus/test";
 
 import { renderRoute } from "@/testing/render-route";
 
-describe("logged-out route", () => {
-  it("renders the logged-out page with a full-navigation login link outside the app shell", async () => {
+describe("ログアウト後の画面", () => {
+  it("アプリシェルの外に、ログアウトしたことと、ページ全体の遷移でログインし直すリンクを出す", async () => {
     await renderRoute("/logged-out", { locale: "en" });
 
     await expect(

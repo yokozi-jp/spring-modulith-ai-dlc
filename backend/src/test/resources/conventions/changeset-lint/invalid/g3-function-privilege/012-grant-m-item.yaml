@@ -1,0 +1,12 @@
+databaseChangeLog:
+  - changeSet:
+      id: "012-grant-m-item"
+      author: system
+      changes:
+        - sql:
+            sql: |
+              GRANT EXECUTE ON FUNCTION item.fn_one() TO item_module;
+      rollback:
+        - sql:
+            sql: |
+              REVOKE ALL ON ALL TABLES IN SCHEMA item FROM item_module;

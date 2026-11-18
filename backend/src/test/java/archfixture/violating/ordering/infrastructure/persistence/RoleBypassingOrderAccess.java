@@ -42,6 +42,11 @@ public final class RoleBypassingOrderAccess {
     return dsl.setLocal("role", DSL.inline("ordering_module"));
   }
 
+  /** {@code DSL.setLocal} で作った文を実行する。 */
+  public static int staticSetLocal(final DSLContext dsl) {
+    return dsl.execute(DSL.setLocal("role", DSL.inline("product_module")));
+  }
+
   /** {@code DSLContext.setSchema} を呼ぶ。 */
   public static Object dslSetSchema(final DSLContext dsl) {
     return dsl.setSchema("product");
