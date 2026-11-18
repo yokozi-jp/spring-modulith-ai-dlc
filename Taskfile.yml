@@ -1727,9 +1727,10 @@ tasks:
         bash tooling/task-calls/task-calls.sh
 
   lint-lefthook:
-    desc: lefthook.ymlのglobが、ディレクトリ直下のファイルでも意図したjobを選ぶことを本物のlefthookで検証
+    desc: lefthook.ymlのglobが意図したjobを選ぶことと、hookをmainの作業ツリーだけが入れることを検証
     silent: true
     cmds:
+      - bash tooling/lefthook-install/test.sh
       - bash tooling/lefthook-glob/test.sh
 
   lint-semgrep:

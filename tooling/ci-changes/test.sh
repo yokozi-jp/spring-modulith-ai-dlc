@@ -5,6 +5,8 @@
 set -u
 # Actions が GITHUB_OUTPUT を設定していても、出力を標準出力で受け取る。
 unset GITHUB_OUTPUT
+# フックの中で実行されると GIT_DIR などが入っている。消さないと、一時のリポジトリの git が本物のリポジトリを書き換える。
+unset $(git rev-parse --local-env-vars)
 
 dir="$(cd "$(dirname "$0")" && pwd)"
 tmp="$(mktemp -d)"

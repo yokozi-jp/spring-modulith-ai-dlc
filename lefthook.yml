@@ -45,6 +45,10 @@
 # 実運用設定
 # ---------------------------------------------------------------------------
 
+# hook はリポジトリで一つなので、lefthook run が hook を書き直さないようにする。
+# 入れ直すのは npm ci の prepare（tooling/lefthook-install/prepare.mjs）だけにする。
+no_auto_install: true
+
 # lefthook の版の表示、skip の行、EXECUTE の行を省く。
 # job の出力は残す。adr-check の注意喚起は成功の扱いで出るため、成功した job の出力も消さない。
 # 全部を出すときは LEFTHOOK_OUTPUT=meta,summary,success,failure,execution,execution_out,execution_info,skips を付ける。
@@ -216,11 +220,13 @@ pre-commit:
         task lint-taskfile
       fail_text: "Taskfileの検証に失敗しました。task lint-taskfile で再実行してください。"
 
-    # lefthook.yml か glob の検査にステージ済み変更があるとき、実際の lefthook で glob が意図した job を選ぶことを検証（task lint-lefthook）。
+    # lefthook.yml、glob と hook の入れ方の検査、package.json の変更で、glob が選ぶ job と hook を入れる作業ツリーを検証する（task lint-lefthook）。
     - name: lint-lefthook
       glob:
         - "lefthook.yml"
         - "tooling/lefthook-glob/**"
+        - "tooling/lefthook-install/**"
+        - "package.json"
       run: |
         echo "{staged_files}" >/dev/null
         task lint-lefthook
