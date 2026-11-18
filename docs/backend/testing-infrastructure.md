@@ -28,6 +28,12 @@ PostgreSQLの初期化は`docker/initdb`を、WireMockのスタブは`docker/wir
 Gradleの`test`とPITは`.env.test`を`spring.config.import`で読み込み、開発用の`.env`を使わない。
 `-PtestEnvFile=<backendからの相対パス>`で読むファイルを変える。
 
+`.env.test`のOTLPの送信先（`OTEL_EXPORTER_OTLP_ENDPOINT`）にCollectorはない。
+Gradleの`test`とPITは`management.logging.export.otlp.enabled=false`を渡し、OTLPのログのexporterを作らない。
+exporterを残すと、キャッシュしたコンテキストの背景のスレッドが送信の失敗をERRORで標準出力へ出し、`OutputCaptureExtension`で出力を調べるテストが不安定になる。
+`OTEL_SDK_DISABLED=true`はSDKごと止め、LogRecordを観測する`ObservabilityContractTest`が使えなくなるので使わない。
+exporterを作らないことは`ObservabilityContractTest`が確かめる。
+
 テストで接続先が要るときは、Springの`Environment`から`spring.datasource.url`などを読む。
 `.env.test`やOSの環境変数から直接読まない。
 接続先がコンテナを指すことは[InfrastructureContainersTest](../../backend/src/test/java/com/example/demo/testkit/InfrastructureContainersTest.java)が確かめる。
