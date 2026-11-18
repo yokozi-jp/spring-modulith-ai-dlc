@@ -95,12 +95,12 @@ function enableTelemetry() {
 // 実際に Vite の設定を読み込み開発サーバーを生成するため、所要時間は CPU の空きに比例する。
 // 開発サーバーの生成はほかのテストより重いので、vite.config.ts の testTimeout（30 秒）より長くする。
 // ponytail: タイムアウトは性能の検証ではなくハング検出のためなので、pre-push の並列実行の負荷にも余裕を持たせた 60 秒にする。
-describe("Vite configuration", { timeout: 60_000 }, () => {
+describe("Vite の設定", { timeout: 60_000 }, () => {
   afterEach(() => {
     vi.unstubAllEnvs();
   });
 
-  it("pins the development origin and uses SERVER_PORT for the proxy", async () => {
+  it("開発サーバーのオリジンを固定し、proxy の転送先に SERVER_PORT を使う", async () => {
     vi.stubEnv("SERVER_PORT", "19090");
     const server = await createDevelopmentServer();
 
@@ -120,7 +120,7 @@ describe("Vite configuration", { timeout: 60_000 }, () => {
     }
   });
 
-  it("uses the HTML nonce for the React Refresh preamble and CSP header", async () => {
+  it("React Refresh の preamble と CSP の header に HTML の nonce を使う", async () => {
     const server = await createDevelopmentServer();
 
     try {
@@ -145,7 +145,7 @@ describe("Vite configuration", { timeout: 60_000 }, () => {
     }
   });
 
-  it("allows the IdP origin in the development form-action for the logout redirect", async () => {
+  it("開発時の form-action で、ログアウトの redirect 先の IdP のオリジンを許可する", async () => {
     vi.stubEnv("OIDC_ISSUER_URI", "http://localhost:18181/realms/x");
     const server = await createDevelopmentServer();
 
@@ -158,7 +158,7 @@ describe("Vite configuration", { timeout: 60_000 }, () => {
     }
   });
 
-  it("does not include development-only CSP allowances in production", async () => {
+  it("本番の CSP に開発時だけの許可を含めない", async () => {
     const config = await resolveConfig({}, "build", "production");
     const contentSecurityPolicy = config.server.headers?.["Content-Security-Policy"];
     if (typeof contentSecurityPolicy !== "string") {
@@ -177,8 +177,8 @@ describe("Vite configuration", { timeout: 60_000 }, () => {
   });
 
   // CSP 違反の報告（ADR-068）。ブラウザが同一オリジンの /csp-report へ送る。
-  describe("CSP reporting", () => {
-    it("reports to the same-origin endpoint in development", async () => {
+  describe("CSP 違反の報告", () => {
+    it("開発時は同一オリジンの endpoint へ報告する", async () => {
       const server = await createDevelopmentServer();
 
       try {
@@ -190,7 +190,7 @@ describe("Vite configuration", { timeout: 60_000 }, () => {
       }
     });
 
-    it("reports to the same-origin endpoint in production and preview", async () => {
+    it("本番と preview では同一オリジンの endpoint へ報告する", async () => {
       const config = await resolveConfig({}, "build", "production");
 
       for (const headers of [config.server.headers, config.preview.headers]) {
@@ -199,7 +199,7 @@ describe("Vite configuration", { timeout: 60_000 }, () => {
       }
     });
 
-    it("proxies only /csp-report to the webhook_event receiver on OTEL_CSP_REPORT_HTTP_PORT", async () => {
+    it("/csp-report だけを OTEL_CSP_REPORT_HTTP_PORT の webhook_event receiver へ転送する", async () => {
       vi.stubEnv("FRONTEND_OTEL_ENABLED", "false");
       vi.stubEnv("OTEL_CSP_REPORT_HTTP_PORT", "19348");
       const server = await createDevelopmentServer();
@@ -214,7 +214,7 @@ describe("Vite configuration", { timeout: 60_000 }, () => {
       }
     });
 
-    it("proxies /csp-report in preview", async () => {
+    it("preview でも /csp-report を転送する", async () => {
       vi.stubEnv("FRONTEND_OTEL_ENABLED", "false");
       vi.stubEnv("OTEL_CSP_REPORT_HTTP_PORT", "19349");
       const config = await resolveConfig(
@@ -233,7 +233,7 @@ describe("Vite configuration", { timeout: 60_000 }, () => {
 
     // 実際の proxy の hop を通し、資格情報の header が Collector へ届かないことを確かめる（ADR-068）。
     it.each(["/csp-report", "/collect"])(
-      "forwards %s to the collector without credentials",
+      "%s は資格情報の header を除いて Collector へ転送する",
       async (path) => {
         const { collector, received } = await startCollector();
         const server = await createServer({
@@ -269,7 +269,7 @@ describe("Vite configuration", { timeout: 60_000 }, () => {
     );
 
     // ZAP の 10055-6 の除外は CSP の完全一致なので、CSP を変えたら evidence も直す（ADR-030）。
-    it("keeps the ZAP alert filter evidence equal to the delivered CSP", async () => {
+    it("ZAP の alert filter の evidence は、配信する CSP と一致する", async () => {
       vi.stubEnv("OIDC_ISSUER_URI", "http://127.0.0.1:8081/realms/spring-modulith");
       const config = await resolveConfig({}, "build", "production");
       const contentSecurityPolicy = String(config.preview.headers?.["Content-Security-Policy"]);
@@ -283,11 +283,11 @@ describe("Vite configuration", { timeout: 60_000 }, () => {
       }
     });
 
-    it("does not send /csp-report to the backend", () => {
+    it("/csp-report はバックエンドへ送らない", () => {
       expect("/csp-report").not.toMatch(new RegExp(proxyPath, "u"));
     });
 
-    it("rejects an OTEL_CSP_REPORT_HTTP_PORT out of range", async () => {
+    it("範囲外の OTEL_CSP_REPORT_HTTP_PORT を拒否する", async () => {
       vi.stubEnv("FRONTEND_OTEL_ENABLED", "false");
       vi.stubEnv("OTEL_CSP_REPORT_HTTP_PORT", "65536");
 
@@ -297,7 +297,7 @@ describe("Vite configuration", { timeout: 60_000 }, () => {
     });
   });
 
-  it("allows only the IdP origin besides self in the production and preview form-action", async () => {
+  it("本番と preview の form-action では、self のほかに IdP のオリジンだけを許可する", async () => {
     vi.stubEnv("OIDC_ISSUER_URI", "http://localhost:18181/realms/x");
     const config = await resolveConfig({}, "build", "production");
     const contentSecurityPolicy = config.server.headers?.["Content-Security-Policy"];
@@ -313,7 +313,7 @@ describe("Vite configuration", { timeout: 60_000 }, () => {
     expect(config.preview.headers?.["Content-Security-Policy"]).toBe(contentSecurityPolicy);
   });
 
-  it("serves preview on the pinned origin with the development proxy", async () => {
+  it("preview を固定したオリジンで、開発時と同じ proxy を付けて提供する", async () => {
     vi.stubEnv("SERVER_PORT", "19091");
     const config = await resolveConfig({ mode: "test" }, "serve", "production", "production", true);
 
@@ -325,7 +325,7 @@ describe("Vite configuration", { timeout: 60_000 }, () => {
     });
   });
 
-  it.each(["invalid", "0x10", "65536"])("rejects invalid SERVER_PORT %s", async (value) => {
+  it.each(["invalid", "0x10", "65536"])("不正な SERVER_PORT %s を拒否する", async (value) => {
     vi.stubEnv("SERVER_PORT", value);
 
     // 設定の読み込み失敗を期待するテストなので、Vite が出す "failed to load config" のログを抑える。
@@ -335,8 +335,8 @@ describe("Vite configuration", { timeout: 60_000 }, () => {
   });
 
   // ローカルの .env と .env.test が結果を変えないよう、FRONTEND_OTEL_ENABLED は各テストで与える。
-  describe("telemetry", () => {
-    it("proxies only /collect to the faro receiver on OTEL_FARO_HTTP_PORT", async () => {
+  describe("テレメトリ", () => {
+    it("/collect だけを OTEL_FARO_HTTP_PORT の faro receiver へ転送する", async () => {
       vi.stubEnv("FRONTEND_OTEL_ENABLED", "false");
       vi.stubEnv("OTEL_FARO_HTTP_PORT", "19347");
       const server = await createDevelopmentServer();
@@ -351,11 +351,11 @@ describe("Vite configuration", { timeout: 60_000 }, () => {
       }
     });
 
-    it("does not send /collect to the backend", () => {
+    it("/collect はバックエンドへ送らない", () => {
       expect("/collect").not.toMatch(new RegExp(proxyPath, "u"));
     });
 
-    it("rejects an OTEL_FARO_HTTP_PORT out of range", async () => {
+    it("範囲外の OTEL_FARO_HTTP_PORT を拒否する", async () => {
       vi.stubEnv("FRONTEND_OTEL_ENABLED", "false");
       vi.stubEnv("OTEL_FARO_HTTP_PORT", "65536");
 
@@ -364,7 +364,7 @@ describe("Vite configuration", { timeout: 60_000 }, () => {
       ).rejects.toThrow("OTEL_FARO_HTTP_PORT must be an integer between 1 and 65535: 65536");
     });
 
-    it("rejects FRONTEND_OTEL_ENABLED other than true or false", async () => {
+    it("true と false 以外の FRONTEND_OTEL_ENABLED を拒否する", async () => {
       vi.stubEnv("FRONTEND_OTEL_ENABLED", "yes");
 
       await expect(
@@ -372,7 +372,7 @@ describe("Vite configuration", { timeout: 60_000 }, () => {
       ).rejects.toThrow("FRONTEND_OTEL_ENABLED must be true or false: yes");
     });
 
-    it("rejects an empty service name when enabled", async () => {
+    it("有効なときは空のサービス名を拒否する", async () => {
       enableTelemetry();
       vi.stubEnv("FRONTEND_OTEL_SERVICE_NAME", "");
 
@@ -381,14 +381,14 @@ describe("Vite configuration", { timeout: 60_000 }, () => {
       ).rejects.toThrow("Telemetry app.name must not be empty when FRONTEND_OTEL_ENABLED=true");
     });
 
-    it("defines telemetry as disabled when FRONTEND_OTEL_ENABLED=false", async () => {
+    it("FRONTEND_OTEL_ENABLED=false のときはテレメトリを無効として define する", async () => {
       vi.stubEnv("FRONTEND_OTEL_ENABLED", "false");
       const config = await resolveConfig({}, "build", "production");
 
       expect(config.define?.__TELEMETRY_ENABLED__).toBe("false");
     });
 
-    it("defines the app version from version.txt when enabled", async () => {
+    it("有効なときは version.txt のアプリのバージョンを define する", async () => {
       enableTelemetry();
       const config = await resolveConfig({}, "build", "production");
       const app: unknown = JSON.parse(String(config.define?.__TELEMETRY_APP__));

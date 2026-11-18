@@ -1,11 +1,11 @@
 ---
 type: ADR
-title: 'ADR-029: Frontend開発依存の既知脆弱性をoverrideと期限付きignoreで扱う'
-description: 修正版のない推移的脆弱性を管理するため、override と期限付き ignore で Frontend 開発依存を扱う決定。
-tags: [adr, frontend, security, dependencies]
+title: 'ADR-029: Frontend開発依存の既知脆弱性をoverrideで扱う'
+description: 修正版のある推移的脆弱性を pnpm の override で引き上げ、Snyk による検査はやめる決定。
+tags: [adr, frontend, security, dependencies, snyk]
 ---
 
-# ADR-029: Frontend開発依存の既知脆弱性をoverrideと期限付きignoreで扱う
+# ADR-029: Frontend開発依存の既知脆弱性をoverrideで扱う
 
 ## Status
 
@@ -17,10 +17,7 @@ Proposed
 
 ## Context
 
-Snyk Open SourceのPull Request checkは、Frontendの `package.json` について新たに持ち込まれた脆弱性があると失敗する。
-この設定は重大度と修正版の有無を問わず、devDependenciesも検査対象に含む。
-
-shadcn/ui、Orval、`@shadcn/lint`、`eslint-plugin-better-tailwindcss`、React Doctorの導入により、次の推移的依存が検出された。
+shadcn/ui、Orval、`@shadcn/lint`、`eslint-plugin-better-tailwindcss`、React Doctorの導入により、次の推移的依存が検出されていた。
 
 - **undici 7.24.4、7.29.0**：Orvalが使う `@scalar/json-magic` が完全一致のversionで固定している。
   修正版は7.29.1である。
@@ -29,49 +26,51 @@ shadcn/ui、Orval、`@shadcn/lint`、`eslint-plugin-better-tailwindcss`、React 
   修正版が公開されておらず、最新のESLintも `ajv@^6` を要求する。
 
 どれも開発時とビルド時に動くツールの依存であり、ブラウザ向けの実行時バンドルには含まれない。
-ただし `shadcn` packageは `shadcn/tailwind.css` を提供するため、devDependenciesから外せない。
+
+初版は、Snyk Open SourceのPull Request checkを通すために、修正版のない脆弱性を `frontend/.snyk` の期限付きignoreで扱う決定だった。
+Snykは無料枠の制限にすぐ達し、検査が止まるため、Snykでの検査をやめることにした。
+ignoreは不要になったので、この決定から外した。
 
 ## Decision
 
 修正版がある脆弱性は、pnpmのoverrideで修正版へ引き上げる。
 `frontend/pnpm-workspace.yaml` に `"undici@<7.29.1": 7.29.1` を追加し、8系のundiciには影響させない。
 
-修正版がない脆弱性は、`frontend/.snyk` で依存経路を限定したignoreにする。
-ignoreには理由と90日の期限を付け、期限切れで再びcheckが失敗するようにする。
-経路を指定するため、同じpackageが別の経路（たとえば実行時依存）から入った場合は検出される。
+Snykでの検査はやめる。
+`.snyk`（Snyk CodeとSecretsの除外設定）と `frontend/.snyk` を削除する。
+SnykのOrgのprojectとGitHub Appも外す。
+Snyk Code、Secrets、Open Sourceの代わりは、CodeQL、Semgrep、betterleaks、trivyが担う。
+修正版のないbraces、deepmerge、uri-jsは、開発環境にそのまま残す。
 
 ## Consequences
 
 ### Positive
 
-- Snyk Open SourceのPull Request checkを、検査範囲を狭めずに通せる。
-- 受け入れたリスクが、脆弱性ID、依存経路、理由、期限の組で記録される。
+- 無料枠の制限でPull Requestのcheckが止まらなくなる。
+- ignoreの期限（2026-12-28）を追う運用が要らなくなる。
 
 ### Negative
 
 - braces、deepmerge、uri-jsの脆弱なコードは開発環境に残る。
   第三者のshadcnレジストリ定義をマージすると、deepmergeのprototype pollutionを突かれる可能性がある。
+- braces、deepmerge、uri-jsの検出は、どこにも残らない。
+  trivyは開発依存を既定で除き（`--include-dev-deps` なし）、修正版のない脆弱性も `ignore-unfixed: true` で出さず、`exit-code: "0"` でPull Requestを止めない。
+  Dependabot alertsはGitHub Advisory Databaseを使い、この3件に該当するadvisoryがない。
 - `@scalar/json-magic` が宣言したundiciのversionを上書きするため、互換性はFrontendの検証（`task fe-verify`）でしか確かめていない。
-- overrideとignoreは上流が修正しても自動では消えないため、期限到来時や依存更新時に見直す必要がある。
+- overrideは上流が修正しても自動では消えないため、依存更新時に見直す必要がある。
 
 ### Neutral
 
-- Snyk SCM連携は、manifestと同じdirectoryの `.snyk` を読む前提で `frontend/.snyk` に置く。
-  リポジトリ直下の `.snyk` はSnyk CodeとSecretsの除外設定として維持する。
+- SnykのGitHub Appを外すまで、Pull RequestにSnykの検査が走る。
+  `.snyk` を消すため、削除前に除外していたものと、ignoreしていた3件が再び報告される。
 
 ## Alternatives Considered
 
-### Snykの組織設定を緩める
+### Snykを続けて期限付きignoreを書く
 
-- **Description**：高重大度のみ、または修正版がある脆弱性のみでcheckを失敗させる。
-- **Pros**：ignoreを書かずに済む。
-- **Cons**：Backendを含む全projectで検出範囲が狭まり、どのリスクを受け入れたかが記録に残らない。
-
-### devDependenciesを検査対象から外す
-
-- **Description**：Snykの組織設定でdevDependenciesの検査を無効にする。
-- **Pros**：開発ツール由来の検出がすべて消える。
-- **Cons**：開発者の端末やCIで動くツールのサプライチェーンリスクが見えなくなる。
+- **Description**：`frontend/.snyk` に依存経路を限定したignoreを置き、90日ごとに更新する。
+- **Pros**：受け入れたリスクが、脆弱性ID、依存経路、理由、期限の組で記録される。
+- **Cons**：無料枠の制限にすぐ達し、ignoreの更新も手作業になる。
 
 ### 該当ツールを導入しない
 
@@ -81,7 +80,5 @@ ignoreには理由と90日の期限を付け、期限切れで再びcheckが失�
 
 ## References
 
-- [Snyk: Ignore vulnerabilities using the Snyk CLI](https://github.com/snyk/user-docs/blob/main/developer-tools/snyk-cli/scan-and-maintain-projects-using-the-cli/ignore-vulnerabilities-using-the-snyk-cli.md)
 - [pnpm Settings: overrides](https://pnpm.io/settings#overrides)
-- [frontend/.snyk](../../frontend/.snyk.md)
 - [frontend/pnpm-workspace.yaml](../../frontend/pnpm-workspace.yaml)

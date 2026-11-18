@@ -15,7 +15,11 @@ const restrictedHtmlProperties = [
 // override の option は前の指定とマージされず置き換わるため、禁止の一覧を定数に分けて override ごとに組み合わせる。
 const htmlSinkGlobals = [{ name: "DOMParser", message: "Do not parse arbitrary HTML." }];
 const apiMessage = "Use the generated API client in src/api.";
+const japaneseTitle = String.raw`[\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Han}]`;
+
 const mockMessage = "Use MSW, vi.spyOn or vi.stubGlobal instead of module mocks.";
+const waitMessage =
+  "Use findBy or waitFor from Testing Library, expect.poll, or createGate from src/testing/gate.ts.";
 const networkGlobals = ["fetch", "XMLHttpRequest"].map((name) => ({ name, message: apiMessage }));
 const htmlSinkProperties = [
   ...restrictedHtmlProperties,
@@ -174,7 +178,10 @@ export default defineConfig({
       "vitest/require-test-timeout": "off",
       "vite-plus/prefer-vite-plus-imports": "error",
       "react/no-danger": "error",
-      "vitest/no-restricted-vi-methods": ["error", { mock: mockMessage, doMock: mockMessage }],
+      "vitest/no-restricted-vi-methods": [
+        "error",
+        { mock: mockMessage, doMock: mockMessage, waitFor: waitMessage, waitUntil: waitMessage },
+      ],
       "no-restricted-imports": [
         "error",
         { patterns: [baseUiImports, testOnlyImports, telemetrySdkImports] },
@@ -185,6 +192,17 @@ export default defineConfig({
       "feature-boundaries/no-cross-feature-import": "error",
       "ui-composition/no-button-in-link": "error",
       "react-rules/no-effect": "error",
+      // テスト名は日本語で書く。describe だけは、空白を含まない 1 語のコードの名前も許す（docs/frontend/testing.md）。
+      "vitest/valid-title": [
+        "error",
+        {
+          mustMatch: {
+            it: japaneseTitle,
+            test: japaneseTitle,
+            describe: `${japaneseTitle}|^\\S+$`,
+          },
+        },
+      ],
       "shadcn/no-restyle": ["error", { allow: ["layout"] }],
       "shadcn/no-raw-colors": "error",
       "shadcn/no-arbitrary-values": ["error", { allow: ["layout"] }],
@@ -291,6 +309,7 @@ export default defineConfig({
         files: ["**/*.{test,spec}.{ts,tsx,js,jsx}"],
         rules: {
           "react/jsx-no-literals": "off",
+          "import/max-dependencies": "off",
         },
       },
       // Playwright Test の API に vitest plugin の規則が当たるため。

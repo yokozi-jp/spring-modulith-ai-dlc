@@ -51,7 +51,7 @@ function servePayments(items: () => PaymentSummaryResponse[]) {
   return counter;
 }
 
-describe("order detail page payment status", () => {
+describe("注文の詳細の画面の決済の状態", () => {
   beforeEach(() => {
     stubCsrfCookie();
     server.use(getListProductsMockHandler(products));

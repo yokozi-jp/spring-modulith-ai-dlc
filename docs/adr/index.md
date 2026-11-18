@@ -29,7 +29,7 @@
 - [ADR-026: OXC で React Compiler を有効化する](ADR-026-enable-react-compiler-with-oxc.md)（Proposed, 2026-09-29）
 - [ADR-027: Frontend のテスト基盤を標準化する](ADR-027-adopt-frontend-testing-stack.md)（Proposed, 2026-09-29）
 - [ADR-028: TanStack Table を採用する](ADR-028-adopt-tanstack-table.md)（Proposed, 2026-09-29）
-- [ADR-029: Frontend 開発依存の既知脆弱性を override と期限付き ignore で扱う](ADR-029-handle-frontend-dev-dependency-vulnerabilities.md)（Proposed, 2026-09-29）
+- [ADR-029: Frontend 開発依存の既知脆弱性を override で扱う](ADR-029-handle-frontend-dev-dependency-vulnerabilities.md)（Proposed, 2026-09-29）
 - [ADR-030: Base UI のインライン style 要素を限定して許可する](ADR-030-allow-base-ui-inline-style-elements.md)（Proposed, 2026-09-29）
 - [ADR-031: Frontend の型検査を厳格化し、tsconfig を正本にする](ADR-031-tighten-frontend-typescript-checks.md)（Proposed, 2026-09-30）
 - [ADR-032: Frontend を業務機能単位で構成する](ADR-032-organize-frontend-by-business-feature.md)（Proposed, 2026-09-30）
@@ -90,4 +90,5 @@
 - [ADR-087: 必須チェックを集約ジョブ CI gate を中心にまとめる](ADR-087-gate-required-checks-with-single-aggregate-job.md)（Accepted, 2026-11-17）
 - [ADR-088: フロントエンドで useEffect を禁止し、Oxlint で止める](ADR-088-ban-react-effects-in-frontend.md)（Accepted, 2026-11-17）
 - [ADR-089: 主キーをモジュールのスキーマと Repository の中に閉じ、外に出る値には例外なく public_id を使う](ADR-089-keep-primary-keys-inside-modules-and-expose-public-ids.md)（Proposed, 2026-11-17）
+- [ADR-091: エージェントの commit を本物の index の写しから作る](ADR-091-commit-agent-changes-from-a-copy-of-the-index.md)（Proposed, 2026-11-18）
 - [ADR-092: frontend を Vite+ の workspace に分け、共有を packages/ui と packages/api に置く](ADR-092-split-frontend-into-vite-plus-workspace.md)（Accepted, 2026-11-18）

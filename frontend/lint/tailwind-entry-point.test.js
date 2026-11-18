@@ -6,12 +6,12 @@ const themeClass = "apps/web/src/features/order/theme-class.tsx";
 
 // CSS を解決できないと、規則は「entry point が見つからない」警告を同じ code で出す。
 // 警告ではなく、アプリの theme から決まる提案が出ることで、CSS を解決したと確かめる。
-describe("Tailwind CSS entry point of the app", () => {
+describe("アプリの Tailwind CSS の entry point", () => {
   it.each([
-    ["the workspace root", "."],
-    ["the app directory", appDirectory],
+    ["workspace のルート", "."],
+    ["アプリの directory", appDirectory],
   ])(
-    "resolves the app theme when linting from %s",
+    "%s から lint しても、アプリの theme を解決する",
     (_name, cwd) => {
       const messages = lintFixtureProject(cwd, themeClass)
         .filter((diagnostic) => diagnostic.code === "better-tailwindcss(enforce-canonical-classes)")

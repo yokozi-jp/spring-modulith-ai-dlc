@@ -70,6 +70,18 @@ function telemetryDefine(mode: string) {
   };
 }
 
+// findBy、waitFor、expect.poll が待つ上限。testTimeout より短くし、待った対象を示すエラーで失敗させる。
+// ponytail: Playwright の assertion の既定と同じ値にした。これでも足りない負荷が出たら、この値だけを上げる。
+const asyncWaitTimeoutMs = 5000;
+
+// 設定から src を import せず、provide でテストへ渡す。lint/lint-project.js は apps/web の設定を一時ディレクトリへ複製し、
+// src に fixture だけを置いて Lint する。設定が src を import すると、その複製の中で import を解決できず、lint 設定のテストが失敗する。
+declare module "vite-plus/test" {
+  interface ProvidedContext {
+    asyncWaitTimeoutMs: number;
+  }
+}
+
 export default defineConfig(({ mode }) => {
   const serverPort = portFromEnv(mode, "SERVER_PORT", "18080");
   const faroPort = portFromEnv(mode, "OTEL_FARO_HTTP_PORT", "12347");
@@ -112,7 +124,9 @@ export default defineConfig(({ mode }) => {
       // pre-push では backend のテストやシークレットスキャンと並列に走り、既定の 5 秒を超えることがある。
       // ponytail: タイムアウトは性能の検証ではなくハング検出のためなので、負荷時の実測（5 秒超）に余裕を持たせた 30 秒にする。
       testTimeout: 30_000,
-      // MSW の server と後片付けを全テストで共有する（docs/frontend/testing.md）。
+      expect: { poll: { timeout: asyncWaitTimeoutMs } },
+      provide: { asyncWaitTimeoutMs },
+      // Testing Library の待つ上限、MSW の server、後片付けを全テストで共有する（docs/frontend/testing.md）。
       setupFiles: ["./src/testing/setup.ts"],
       coverage: {
         provider: "v8",
