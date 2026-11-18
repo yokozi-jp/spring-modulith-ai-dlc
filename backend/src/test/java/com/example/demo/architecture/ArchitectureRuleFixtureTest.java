@@ -145,6 +145,11 @@ class ArchitectureRuleFixtureTest {
                   VIOLATING, FIXTURE_MODULES),
               ROLE_BYPASS + ".dslSetLocal("),
           row(
+              "moduleCodeDoesNotChangeConnectionSettings: DSL.setLocal",
+              DatabaseConventionsArchTest.moduleCodeDoesNotChangeConnectionSettingsRule(
+                  VIOLATING, FIXTURE_MODULES),
+              ROLE_BYPASS + ".staticSetLocal("),
+          row(
               "moduleCodeDoesNotChangeConnectionSettings: setSchema",
               DatabaseConventionsArchTest.moduleCodeDoesNotChangeConnectionSettingsRule(
                   VIOLATING, FIXTURE_MODULES),

@@ -193,7 +193,7 @@ class DatabaseConventionsArchTest {
                 + "規約：docs/database/jooq-usage.md、docs/adr/ADR-090-switch-to-module-database-roles.md");
   }
 
-  /** 機能モジュールのコードが、接続の設定を変える {@code DSLContext} の API を使わない規則を組み立てる。 */
+  /** 機能モジュールのコードが、接続の設定を変える {@code DSLContext} と {@code DSL} の API を使わない規則を組み立てる。 */
   /* package */ static ArchRule moduleCodeDoesNotChangeConnectionSettingsRule(
       final String basePackage, final Set<String> modules) {
     return noClasses()
@@ -203,6 +203,7 @@ class DatabaseConventionsArchTest {
         .accessTargetWhere(
             JavaAccess.Predicates.target(
                 AccessTarget.Predicates.declaredIn(DSLContext.class)
+                    .or(AccessTarget.Predicates.declaredIn(DSL.class))
                     .and(
                         HasName.Predicates.nameMatching(
                             "set|setLocal|setSchema|setCatalog|connection|connectionResult"))))
@@ -210,7 +211,7 @@ class DatabaseConventionsArchTest {
         .because(
             "SET と SET ROLE を実行すると、トランザクションの初めに切り替えたロールとテナントを書き換えられるため。"
                 + "接続を直接操作する connection も同じ抜け道になる。"
-                + "直し方：set、setLocal、setSchema、setCatalog、connection、connectionResult の呼び出しを削除する。"
+                + "直し方：DSLContext の set、setLocal、setSchema、setCatalog、connection、connectionResult と、DSL の set、setLocal、setSchema、setCatalog の呼び出しを削除する。"
                 + "規約：docs/database/connections.md、docs/adr/ADR-090-switch-to-module-database-roles.md");
   }
 
