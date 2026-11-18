@@ -40,11 +40,12 @@ worktreeには`node_modules`が無いため、作った直後にルートとフ�
 ```bash
 git worktree add -b <ブランチ> ../<ディレクトリ> origin/main
 cd ../<ディレクトリ>
-npm ci             # Lefthookとcommitlint。npm installは package-lock.json を書き換える
+npm ci             # Lefthookとcommitlint
 task fe-install    # フロントエンド
 ```
 
 依存を入れないと、commitとpushのフックがcommitlintとフロントエンドの検査の依存を見つけられずに失敗する。
+`npm install`は手元のnpmで`package-lock.json`を書き直し、worktreeに差分を残すことがあるため使わない（npm 11.4.2では`libc`の項目が消えた）。
 
 ## エージェントがcommitとpushをするとき
 

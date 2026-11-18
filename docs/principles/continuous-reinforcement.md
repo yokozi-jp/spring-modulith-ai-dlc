@@ -47,4 +47,5 @@ tags: [convention, principles, continuous-improvement, ai-assisted-development]
 - 上の層で防げる学びを、下の層だけに還元しない。検査で表せる方針を docs の文章だけで済ませない。
 - 一つの学びを複数の層へ還元してよい。検査を追加した場合も、その規約と検査方法は docs に書く。
 - 上の層への還元が元の作業より大きな変更になる場合は、下の層へ先に還元し、上の層への移行を Issue に残す（[暫定対応と運用回避の扱い](temporary-workarounds.md)）。
+- 規約や検査を追加する還元では、同じ変更の中でリポジトリから既存の違反を探し、直す。直しきれない違反は Issue に残す。
 - 戻しにくい還元や複数モジュールに影響する還元は、[ADR の運用ルール](../adr/conventions.md)の基準に当たれば ADR を起こす。
