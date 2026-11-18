@@ -93,4 +93,4 @@
 - [ADR-090: トランザクションの初めにモジュールの DB ロールへ切り替え、アプリロールを業務のスキーマから外す](ADR-090-switch-to-module-database-roles.md)（Proposed, 2026-11-18）
 - [ADR-091: エージェントの commit を本物の index の写しから作る](ADR-091-commit-agent-changes-from-a-copy-of-the-index.md)（Proposed, 2026-11-18）
 - [ADR-092: frontend を Vite+ の workspace に分け、共有を packages/ui と packages/api に置く](ADR-092-split-frontend-into-vite-plus-workspace.md)（Proposed, 2026-11-18）
-- [ADR-093: 共通カラムの作成者と更新者には、AppUserPrincipal の利用者の ID だけを登録する](ADR-093-require-app-user-principal-for-audit-columns.md)（Proposed, 2026-11-18）
+- [ADR-094: 共通カラムの作成者と更新者には、AppUserPrincipal の利用者の ID だけを登録する](ADR-094-require-app-user-principal-for-audit-columns.md)（Proposed, 2026-11-18）

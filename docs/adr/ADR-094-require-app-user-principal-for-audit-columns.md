@@ -1,11 +1,11 @@
 ---
 type: ADR
-title: 'ADR-093: 共通カラムの作成者と更新者には、AppUserPrincipal の利用者の ID だけを登録する'
+title: 'ADR-094: 共通カラムの作成者と更新者には、AppUserPrincipal の利用者の ID だけを登録する'
 description: 共通カラムの *_by に、IdP の sub ではなくアプリの利用者の ID を入れることを、shared.security の AppUserPrincipal の型で守る決定。principal がこの型でない認証の書き込みは失敗させる。
 tags: [adr, security, database, spring-security, spring-modulith]
 ---
 
-# ADR-093: 共通カラムの作成者と更新者には、AppUserPrincipal の利用者の ID だけを登録する
+# ADR-094: 共通カラムの作成者と更新者には、AppUserPrincipal の利用者の ID だけを登録する
 
 ## Status
 
@@ -52,6 +52,8 @@ Issue #374 では、`tenancy` がログインのときに `(iss, sub)` から利
 ### Neutral
 
 - `shared` に、永続化の外の語彙のパッケージが 1 つ増える。ArchUnit の `dependenciesPointInward` と `sharedModuleIsUsedOnlyByPersistenceAdapters` は、`shared.security` を `shared.concurrency` と同じ扱いにする。
+- 今の利用先は `tenancy` の `presentation.web` だけだが、ほかの `shared` の語彙のパッケージにそろえて、どの層からも使えるようにする。
+- `AppUserPrincipal` には、利用者の識別だけを置く。#375 で選ぶテナントは、リクエストごとに選ぶ状態なので principal に足さない。principal に足すと Redis のセッションの形が変わり、デプロイのたびにセッションを消すことになるためである。
 
 ## Alternatives Considered
 

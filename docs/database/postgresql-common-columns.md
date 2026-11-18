@@ -31,7 +31,7 @@ Spring Modulithのイベント出版テーブルのように、フレームワ�
 | `patched_id`                       | `integer`     | NULL可   | なし   |
 
 - **`created_at`**：作成日時。
-- **`created_by`**：作成者。利用者の操作では、ログインのときに`tenancy`モジュールが引いたアプリの利用者のID（`tenancy.m_user.public_id`のUUIDの文字列。`AppUserPrincipal#userId()`）を登録し、IdPの`sub`は登録しない。認証のprincipalが`AppUserPrincipal`でなければ、書き込みを失敗させる（[ADR-093](../adr/ADR-093-require-app-user-principal-for-audit-columns.md)）。利用者の操作でない処理では、`created_pgm_cd`と同じ値を登録する。
+- **`created_by`**：作成者。利用者の操作では、ログインのときに`tenancy`モジュールが引いたアプリの利用者のID（`tenancy.m_user.public_id`のUUIDの文字列。`AppUserPrincipal#userId()`）を登録し、IdPの`sub`は登録しない。認証のprincipalが`AppUserPrincipal`でなければ、書き込みを失敗させる（[ADR-094](../adr/ADR-094-require-app-user-principal-for-audit-columns.md)）。ログインのコールバックで作る利用者の行は、前のセッションの認証が残っていても`created_pgm_cd`と同じ処理の名前を登録する（[APIの認証、セッション、権限](../web-api/authentication-and-session.md)）。利用者の操作でない処理では、`created_pgm_cd`と同じ値を登録する。
   `<Event>Listener`の呼び出しの中（Listenerから呼ぶCommandHandlerを含む）で作る行と更新する行は、利用者の操作を起点とする場合も、`created_pgm_cd`と同じ処理の名前を登録する。
   起点の利用者は、起点の集約の行の`*_by`と、`*_tx_id`のtraceからたどる。
   理由は[ADR-051](../adr/ADR-051-bind-pgm-cd-with-scoped-value-and-aspect.md)にある。
