@@ -112,6 +112,25 @@ class CommonColumnsTest {
   }
 
   @Test
+  @DisplayName("アプリの利用者を引く前の OidcUser（名前が IdP の sub）の認証では、sub を登録せずに例外にする")
+  void idpOidcUserIsRejected() {
+    final OidcIdToken idToken =
+        OidcIdToken.withTokenValue("id-token")
+            .subject("idp-sub")
+            .issuedAt(NOW)
+            .expiresAt(NOW.plusSeconds(300))
+            .build();
+    final DefaultOidcUser user =
+        new DefaultOidcUser(AuthorityUtils.createAuthorityList("OIDC_USER"), idToken);
+    SecurityContextHolder.getContext()
+        .setAuthentication(new OAuth2AuthenticationToken(user, user.getAuthorities(), "web"));
+
+    assertThatThrownBy(() -> inUseCase(() -> commonColumns.forInsert(FIXTURE_ITEM)))
+        .isInstanceOf(IllegalStateException.class)
+        .hasMessageContaining("not an app user");
+  }
+
+  @Test
   @DisplayName("OIDC の利用者でない認証では、作成者を決められないため例外にする")
   void otherAuthenticatedPrincipalIsRejected() {
     SecurityContextHolder.getContext()
