@@ -12,15 +12,18 @@ tags: [convention, operations, governance, git, github]
 GitHub の Rules、Rulesets で branch ruleset を作り、既定ブランチ `main` を対象にする。
 
 ruleset の正本は `.github/rulesets/main.json` である。
-変更するときは、このファイルを直し、次のコマンドで GitHub へ反映する。
+変更するときは、このファイルを直し、管理者が手元で次のコマンドを実行して GitHub へ反映する。
 
 ```bash
-gh api -X PUT repos/yokozi-jp/spring-modulith-ai-dlc/rulesets/23297515 --input .github/rulesets/main.json
+task ruleset-diff   # GitHub 上の ruleset との差分を見る
+task ruleset-apply  # 反映する。反映前の ruleset を build/ruleset-backup/ に保存し、反映後に main.json と同じになったことを確かめる
 ```
+
+戻すときは、保存した控えを `gh api -X PUT repos/yokozi-jp/spring-modulith-ai-dlc/rulesets/23297515 --input <控え>` で入れ直す。
 
 必須チェックの名前は、このファイル、下の一覧、workflow の job 名の 3 か所で、絵文字の異体字選択子（U+FE0F）まで一致させる。
 一致しないチェックは、報告されないまま待機になり、merge できなくなる。
-`task okf-check` が、この 3 か所の一致を検査する。GitHub 上の ruleset との一致は検査しない。理由は [ADR-086](../adr/ADR-086-align-main-protection-with-solo-and-agent-operation.md) にある。
+`task okf-check` が、この 3 か所の一致を検査する。GitHub 上の ruleset との一致は検査しない（認証が要るため CI で動かさず、`task ruleset-diff` で手元で比べる）。理由は [ADR-086](../adr/ADR-086-align-main-protection-with-solo-and-agent-operation.md) にある。
 
 ruleset は Active にする。
 bypass できるのは、リポジトリの管理者（RepositoryRole の id `5`）だけで、`bypass_mode` は `pull_request` にする。

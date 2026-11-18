@@ -279,13 +279,28 @@ tasks:
       - node tooling/adr-lint/adr-lint.mjs
 
   # .github/rulesets/main.json の必須チェックを、branch-protection.md の一覧と workflow の name に突き合わせる。
-  # ponytail: GitHub 上の ruleset との一致は見ない。反映は手動の gh api で、限界に当たったら CI で API と比べる。
+  # GitHub 上の ruleset との一致は見ない。比べるのは task ruleset-diff で、認証が要るため手元で使う。
   ruleset-check:
     internal: true
     silent: true
     cmds:
       - bash tooling/ruleset-check/test.sh
+      - bash tooling/ruleset-sync/test.sh
       - node tooling/ruleset-check/ruleset-check.mjs
+
+  # GitHub 上の ruleset が .github/rulesets/main.json と同じかを比べる。認証済みの gh が要るため、CI では動かさず、管理者が手元で使う。
+  ruleset-diff:
+    desc: GitHub 上の ruleset と .github/rulesets/main.json の差分を表示（認証済みの gh が必要）
+    silent: true
+    cmds:
+      - node tooling/ruleset-sync/ruleset-sync.mjs diff
+
+  # main.json を GitHub の ruleset へ反映する。反映前の ruleset を build/ruleset-backup/ に保存し、反映後に main.json と同じになったことを確かめる。
+  ruleset-apply:
+    desc: .github/rulesets/main.json を GitHub の ruleset へ反映し、反映前の控えを build/ruleset-backup/ に保存（管理者の gh が必要）
+    silent: true
+    cmds:
+      - node tooling/ruleset-sync/ruleset-sync.mjs apply
 
   # steering → docs の一方向依存、frontmatter、文書責務の見直し合図を検査する（ADR-038）。
   # 依存方向、frontmatter、パスの実在は失敗、変更した docs の250行超とsteeringの行数超過は警告にとどめる。
