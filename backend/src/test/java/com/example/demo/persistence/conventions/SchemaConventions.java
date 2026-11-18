@@ -70,6 +70,8 @@ final class SchemaConventions {
             SchemaTableConventions.constraints(snapshot.constraints()),
             SchemaTableConventions.indexes(snapshot.indexes()),
             SchemaTableConventions.primaryKeys(snapshot.relations()),
+            SchemaTableConventions.references(snapshot.relations(), snapshot.columns()),
+            SchemaTableConventions.crossSchemaForeignKeys(snapshot.constraints()),
             SchemaTableConventions.columns(snapshot.columns()),
             functions(snapshot.functions()),
             viewDependencies(snapshot.viewDependencies()),

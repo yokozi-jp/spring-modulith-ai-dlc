@@ -107,6 +107,50 @@ class ArchitectureRuleFixtureTest {
           "jdbcStatement",
           "connectionProvider");
 
+  /** 数値の ID の規則が、違反フィクスチャの各パッケージの違反を検出することを確かめる行。 */
+  private static final List<Arguments> PUBLIC_ID_ROWS =
+      List.of(
+          row(
+              "numericIdsDoNotLeaveModules: event",
+              PublicIdArchTest.numericIdsDoNotLeaveModulesRule(VIOLATING),
+              "ordering.OrderShipped.orderId"),
+          row(
+              "numericIdsDoNotLeaveModules: public API parameter",
+              PublicIdArchTest.numericIdsDoNotLeaveModulesRule(VIOLATING),
+              "ordering.OrderLookupQueries.findById(long) の引数 orderId"),
+          row(
+              "numericIdsDoNotLeaveModules: public API return type",
+              PublicIdArchTest.numericIdsDoNotLeaveModulesRule(VIOLATING),
+              "ordering.OrderLookupQueries.findOrderId(java.lang.String) は数値の ID を返す"),
+          row(
+              "numericIdsDoNotLeaveModules: generic parameter",
+              PublicIdArchTest.numericIdsDoNotLeaveModulesRule(VIOLATING),
+              "ordering.OrderLookupQueries.findByIds(java.util.List) の引数 orderIds"),
+          row(
+              "numericIdsDoNotLeaveModules: generic return type",
+              PublicIdArchTest.numericIdsDoNotLeaveModulesRule(VIOLATING),
+              "ordering.OrderLookupQueries.findLatestOrderId(java.lang.String) は数値の ID を返す"),
+          row(
+              "numericIdsDoNotLeaveModules: array return type",
+              PublicIdArchTest.numericIdsDoNotLeaveModulesRule(VIOLATING),
+              "ordering.OrderLookupQueries.findLineIds(java.lang.String) は数値の ID を返す"),
+          row(
+              "numericIdsDoNotLeaveModules: Domain id",
+              PublicIdArchTest.numericIdsDoNotLeaveModulesRule(VIOLATING),
+              "ordering.domain.model.Shipment.id"),
+          row(
+              "numericIdsDoNotLeaveModules: Application",
+              PublicIdArchTest.numericIdsDoNotLeaveModulesRule(VIOLATING),
+              "ordering.application.RefundOrderCommand.orderId"),
+          row(
+              "numericIdsDoNotLeaveModules: external system",
+              PublicIdArchTest.numericIdsDoNotLeaveModulesRule(VIOLATING),
+              "ordering.infrastructure.client.ShippingLabelClient.print(int) の引数 orderId"),
+          row(
+              "numericIdsDoNotLeaveModules: shared",
+              PublicIdArchTest.numericIdsDoNotLeaveModulesRule(VIOLATING),
+              "shared.concurrency.LockRequest.rowId"));
+
   /** 版を比べない入口を使う違反フィクスチャの Repository。 */
   private static final String UNVERSIONED_REPOSITORY =
       "ordering.infrastructure.persistence.JooqOrderRepository";
@@ -137,7 +181,8 @@ class ArchitectureRuleFixtureTest {
   }
 
   private static Stream<Arguments> eachRuleDetectsItsViolatingFixture() {
-    return Stream.concat(classRoleRows(), tableWriterRows());
+    return Stream.of(classRoleRows(), tableWriterRows(), PUBLIC_ID_ROWS.stream())
+        .flatMap(rows -> rows);
   }
 
   /** TableWriter の規則（H1、H3、H5、H6、H7、R1 から R4）が、対応する違反フィクスチャを検出することを確かめる行を作る。 */
@@ -579,6 +624,7 @@ class ArchitectureRuleFixtureTest {
         TableWriterArchTest.onlyCommandHandlersUpdateOrDeleteAggregatesRule(),
         TableWriterArchTest.expectedLockNoIsCreatedOnlyByRequestsRule(basePackage),
         TableWriterArchTest.aggregateMethodsDoNotUseUnversionedWritesRule(basePackage),
-        TableWriterArchTest.aggregateRootInsertsGoThroughTableWriterRule());
+        TableWriterArchTest.aggregateRootInsertsGoThroughTableWriterRule(),
+        PublicIdArchTest.numericIdsDoNotLeaveModulesRule(basePackage));
   }
 }
