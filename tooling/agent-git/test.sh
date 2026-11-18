@@ -87,6 +87,12 @@ held_commit() {
   run="$(run_dir)"
   fact "the commit of $1 records its git" until_ok has_pid git "$run"
 }
+# failing_git <パターン> <コマンド>...: パターンに当たる最初の git だけが失敗する PATH で、コマンドを動かす。
+# パターンは case の glob で、「<GIT_INDEX_FILE> <引数>... 」に当てる。
+failing_git() {
+  echo "$1" >"$tmp/fail-git"
+  PATH="$tmp/failgit:$PATH" "${@:2}"
+}
 
 git init -q --bare -b main "$tmp/origin.git"
 git init -q -b main "$tmp/repo"
@@ -135,6 +141,14 @@ EOF
 chmod +x .git/hooks/pre-commit .git/hooks/pre-push .git/hooks/post-commit
 git worktree add -q "$tmp/wt" -b wt
 mkdir "$tmp/failmv" && printf '#!/bin/sh\nexit 1\n' >"$tmp/failmv/mv" && chmod +x "$tmp/failmv/mv"
+mkdir "$tmp/failgit" && cat >"$tmp/failgit/git" <<EOF && chmod +x "$tmp/failgit/git"
+#!/bin/sh
+if [ -e '$tmp/fail-git' ]; then
+  pattern="\$(cat '$tmp/fail-git')"
+  case "\${GIT_INDEX_FILE:-} \$* " in \$pattern) rm '$tmp/fail-git' && echo "fake git failure" >&2 && exit 128 ;; esac
+fi
+exec '$(command -v git)' "\$@"
+EOF
 printf 'feat: add a file\n' >"$msg"
 : >"$tmp/empty"
 
@@ -312,8 +326,9 @@ fact "the merge commit of the staged paths has both parents" [ "$(git rev-parse 
 fact "the merge commit leaves out the changes of another task" [ "$(git status --porcelain)" = "$(printf ' M foreign.txt\n?? merge-untracked.txt')" ]
 git checkout -- foreign.txt && rm merge-untracked.txt
 
-# まだ commit の無いリポジトリで、フックが失敗する最初の commit と、成功する最初の commit。
-git init -q -b main "$tmp/fresh" && git -C "$tmp/fresh" read-tree --empty && cp .git/hooks/pre-commit "$tmp/fresh/.git/hooks/"
+# まだ commit も index のファイルも無いリポジトリで、フックが失敗する最初の commit と、成功する最初の commit。
+git init -q -b main "$tmp/fresh" && cp .git/hooks/pre-commit "$tmp/fresh/.git/hooks/"
+fact "the fresh repository has no index file" [ ! -e "$tmp/fresh/.git/index" ]
 echo x >"$tmp/fresh/fail"
 expect "a first commit with a failing hook starts" 0 "task agent-wait" within "$tmp/fresh" bash "$tool" commit "$msg" fail
 expect "wait reports git's exit code for the failed first commit" 1 "✗ fake-check" within "$tmp/fresh" bash "$tool" wait
@@ -323,6 +338,14 @@ expect "a first commit starts" 0 "task agent-wait" within "$tmp/fresh" bash "$to
 expect "wait reports the first commit" 0 "exit=0" within "$tmp/fresh" bash "$tool" wait
 fact "the first commit holds the given path" [ "$(git -C "$tmp/fresh" ls-tree --name-only HEAD)" = first.txt ]
 fact "the index matches the first commit" within "$tmp/fresh" clean
+
+# まだ commit の無いリポジトリで、最初の commit の直後、本物の index を合わせる前に、ほかの作業が古い本物の index から commit する。
+git init -q -b main "$tmp/fresh-overtaken" && cp .git/hooks/post-commit "$tmp/fresh-overtaken/.git/hooks/"
+echo v >"$tmp/fresh-overtaken/first.txt" && touch "$tmp/overtake"
+expect "a first commit to be overtaken starts" 0 "task agent-wait" within "$tmp/fresh-overtaken" bash "$tool" commit "$msg" first.txt
+expect "wait says another commit reverted the first commit" 1 "    first.txt" within "$tmp/fresh-overtaken" bash "$tool" wait
+fact "the reverting commit is on top of the first commit" [ "$(git -C "$tmp/fresh-overtaken" rev-list --count HEAD)" = 2 ]
+fact "the index matches the commit that reverted the first commit" within "$tmp/fresh-overtaken" clean
 
 # commit の直後、本物の index を合わせる前に、ほかの作業が古い本物の index から commit する。
 scene "overtaken commit"
@@ -413,16 +436,20 @@ rm lost.txt
 # wrapper、_commit、git をすべて止め、HEAD は写しの index の commit になっていない。
 scene "fully killed commits"
 head="$(git rev-parse HEAD)"
-for undo in copy-matches-head foreign-commit; do
+for undo in copy-matches-head foreign-commit amended-head; do
   held_commit "killed-$undo.txt"
   kill "$(pid_of wrapper "$run")" "$(pid_of child "$run")" "$(pid_of git "$run")"
   rm "$hold"
   # copy-matches-head はフックが変更を打ち消した写しを、foreign-commit は同じ HEAD の上にほかの作業が作った commit を真似る。
-  if [ "$undo" = copy-matches-head ]; then
-    fact "the copy is made to match HEAD" env GIT_INDEX_FILE="$run/commit/index" git read-tree HEAD
-  else
-    fact "another commit lands on the same HEAD" git commit --no-verify -q --allow-empty -m foreign
-  fi
+  # amended-head は、写しが HEAD と同じ木のときに、ほかの作業が HEAD を git commit --amend で作り直すのを真似る。
+  case "$undo" in
+    copy-matches-head) fact "the copy is made to match HEAD" env GIT_INDEX_FILE="$run/commit/index" git read-tree HEAD ;;
+    foreign-commit) fact "another commit lands on the same HEAD" git commit --no-verify -q --allow-empty -m foreign ;;
+    amended-head)
+      fact "the copy is made to match HEAD before the amend" env GIT_INDEX_FILE="$run/commit/index" git read-tree HEAD
+      fact "another task amends HEAD with the same tree" git commit --no-verify -q --amend --allow-empty -m foreign
+      ;;
+  esac
   expect "a fully killed commit that did not land is lost ($undo)" 1 "終了コードを記録せずに止まりました" bash "$tool" wait "$run"
   fact "the fully killed commit leaves the index ($undo)" clean
   rm "killed-$undo.txt"
@@ -475,6 +502,38 @@ rm "$hold"
 expect "wait reports that it could not replace the index" 1 "git reset か index の置き換えに失敗した" env PATH="$tmp/failmv:$PATH" bash "$tool" wait "$run"
 expect "a second wait prints the command again" 1 "git -C " bash "$tool" wait "$run"
 git reset -q && rm -r -- "$run"
+
+# wrapper と _commit を止め、残った git が commit を終えた後に、agent-wait の途中で git が失敗する。
+# 失敗するのは、上の commit が戻したかを確かめる git diff、2 つの index の ls-files、
+# base か本物の index と commit の git diff。
+scene "orphaned commits whose git fails"
+for check in reverted entries base now; do
+  case "$check" in
+    reverted) pattern='* -z [0-9a-f]* [0-9a-f]* -- ' ;;
+    entries) pattern='* ls-files -s -z *' ;;
+    base) pattern='*/commit/base * --name-only * --cached *' ;;
+    now) pattern='*/index.lock * --name-only * --cached *' ;;
+  esac
+  held_commit "orphan-$check.txt"
+  kill "$(pid_of wrapper "$run")" "$(pid_of child "$run")"
+  rm "$hold"
+  fact "the orphaned git finishes before the $check check" until_ok not alive "$(pid_of git "$run")"
+  expect "wait reports that git failed in the $check check" 1 "本物の index を合わせていません" failing_git "$pattern" bash "$tool" wait "$run"
+  fact "the failing git ran in the $check check" [ ! -e "$tmp/fail-git" ]
+  git reset -q
+done
+
+# 確かめる途中で git が失敗すると、理由を取り違えずに、始める前に止まる。
+# 渡すのは stage したファイル、stage していない変更、新しいファイルで、一覧のどれが欠けても、commit が始まるか別の理由で止まる。
+scene "git failures before the commit"
+echo s >gitfail-staged.txt && git add gitfail-staged.txt && echo changed >same.txt && echo n >gitfail-new.txt
+for pattern in '* --diff-filter=U *' '* --cached -- ' '* --cached -- ?*' '* --ignore-submodules=dirty *' '* ls-files -z -o *'; do
+  expect "commit stops when git fails ($pattern)" 1 "fake git failure" \
+    failing_git "$pattern" bash "$tool" commit "$msg" gitfail-staged.txt same.txt gitfail-new.txt
+  fact "the stop gives no other reason ($pattern)" not grep -qF "✗" "$out"
+  fact "the failing git ran ($pattern)" [ ! -e "$tmp/fail-git" ]
+done
+git rm -q --cached gitfail-staged.txt && rm gitfail-staged.txt gitfail-new.txt && git checkout -- same.txt
 
 # main の worktree の commit が動いている間に、linked worktree で commit する。
 scene "worktree commits"
