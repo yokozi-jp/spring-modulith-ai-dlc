@@ -70,7 +70,7 @@ HTTP からの入力と出力を扱う外側の領域を **Presentation** とす
 - **[`<Aggregate>Controller`](class-roles/controller.md)**：集約ごとの Spring MVC の Controller。Request を Command に変換して CommandHandler を呼び、参照は `<Feature>Queries` を呼ぶ。
 - **[`<UseCase>Request`](class-roles/request.md)**：リクエストボディを受けるユースケースの入力の record。`toCommand()` で Command に変換する。
 - **[`<QueryResult>Response`](class-roles/response.md)**：参照の結果の応答の record。`from(...)` でルートの record から作る。
-- **認証のアダプター**：Spring Security の拡張点を実装するクラスは、その機能モジュールの `presentation.web` に置く（`tenancy` の `SignInOidcUserService`）。Command を作って CommandHandler を呼ぶ。`SecurityConfig` は配線しない。Spring Security が、拡張点の型の Bean が 1 つだけあればそれを使う。
+- **認証のアダプター**：Spring Security の拡張点を実装するクラスは、その機能モジュールの `presentation.web` に置く（`tenancy` の `SignInOidcUserService`）。Command を作って CommandHandler を呼ぶ。OIDC ログインの `OAuth2UserService<OidcUserRequest, OidcUser>` は、Spring Security がこの型の Bean が 1 つだけあればそれを使うため、`SecurityConfig` で配線しない。認証の入口や拒否の handler など、ほかの拡張点は `SecurityConfig` で配線する。
 
 Presentation は Domain と Infrastructure に依存させない。
 

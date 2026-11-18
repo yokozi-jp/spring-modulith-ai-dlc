@@ -162,8 +162,7 @@ public class TableWriter {
    *
    * <p>共通カラムは呼び出し側が {@link CommonColumns#forInsert} で設定する。
    *
-   * <p>ponytail: 上限：子の行の dsl.batch の INSERT は変換しない。業務の一意インデックスを持つ子のテーブルは、ここで 1 行ずつ書く。行が多くなったら、batch
-   * を受ける入口を足す。
+   * <p>ponytail: 上限：子の行の dsl.batch の INSERT は変換しない。一意インデックスを持つ子の行が多くなったら、batch を受ける入口を足す。
    *
    * @param insert {@code dsl.insertInto(...).set(...).set(commonColumns.forInsert(...))} で組み立てた 1
    *     行の INSERT
