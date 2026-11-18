@@ -5,9 +5,11 @@ import org.aspectj.lang.annotation.AfterReturning;
 import org.aspectj.lang.annotation.Around;
 import org.aspectj.lang.annotation.Aspect;
 import org.jspecify.annotations.Nullable;
+import org.springframework.core.annotation.Order;
 
 /** 違反：pointcutsNarrowTargetsWithWithin（{@code execution} の宣言型だけで対象を絞り、{@code within} を書かない）。 */
 @Aspect
+@Order(100)
 public class SlowPgmCdAspect {
 
   /** CommandHandler の handle を囲む。 */
