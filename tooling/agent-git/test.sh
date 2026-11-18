@@ -530,6 +530,17 @@ expect "wait from a subdirectory makes the index follow a commit whose wrapper d
 fact "the orphaned git committed the path" [ "$(committed)" = orphan.txt ]
 fact "the index matches the orphaned commit" clean
 
+# _commit だけを止め、wrapper は done に _commit の終了コードを書き、残った git が commit を終える。
+scene "commit whose _commit died"
+held_commit child-killed.txt
+kill "$(pid_of child "$run")"
+rm "$hold"
+fact "the wrapper records the exit code of the killed _commit" until_ok grep -qx 'exit=143' "$run/done"
+expect "wait makes the index follow a commit whose _commit died" 0 "commit はできていました" bash "$tool" wait "$run"
+fact "wait does not report a failed git commit when only _commit died" not grep -qF "git commit は失敗しました" "$out"
+fact "the git whose _commit died committed the path" [ "$(committed)" = child-killed.txt ]
+fact "the index matches the commit whose _commit died" clean
+
 # wrapper と _commit を止め、残った git が commit を終えた後に、ほかの作業が古い本物の index から commit する。
 scene "orphaned overtaken commit"
 head="$(git rev-parse HEAD)"

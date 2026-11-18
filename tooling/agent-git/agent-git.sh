@@ -251,14 +251,17 @@ landed() {
 }
 
 # settle_commit <実行のディレクトリ> <終了コードの変数> [<注意>]: commit ができたかを landed で決め、最後に commit/ を消す。
+# 変数は git commit の終了コード。分からなければ空にする（_commit が片付ける前に止まり、agent-wait が片付ける実行）。
 # HEAD を一度だけ読んで合わせる先にする。
 # 上に載ったほかの commit が commit のパスを戻していれば、それを出して変数を 1 にする。
 # 戻していなければ、注意を出して本物の index を合わせる先に合わせる。
-# 変数が 0 か空（終了コードが分からない。wrapper が done を書く前に止まった実行）なら、git commit が commit したとみなし、変数を sync_index の終了コードにする。
+# 変数が 0 か空なら、git commit が commit したとみなし、変数を sync_index の終了コードにする。
 # 0 でも空でもない（git commit が失敗した）なら、同じ内容の commit はフックなどほかの作業が作ったか、git commit が commit の後に止まったとみなし、
-# 合わせる前にそれを出して、変数を変えない。
-# ponytail: フックが commit して git commit が失敗した実行で、wrapper と _commit が片付ける前に止まると、変数が空なので agent-wait は成功を報告する。
-#   防ぐなら、git commit を、終了コードを commit/ に書くシェルで包み、agent-wait がそれを読む。
+# 合わせる前にその commit を出して、変数を変えない。
+# ponytail: フックが commit して git commit が失敗した実行で、_commit が片付ける前に止まると、変数が空なので agent-wait は成功を報告する。
+#   wrapper が done を書いていても同じ（done にあるのは _commit の終了コード）。
+#   git commit を、終了コードを commit/ に書くシェルで包み、agent-wait がそれを読めば、この場合は減る。
+#   ただし、そのシェルが git commit の終わりから書くまでの間に止まれば空のままなので、無くならない。
 # 決める途中で git が失敗すれば、それを出して変数を 1 にする。
 # commit ができていなければ、変数が 0（git commit は成功した）のときだけ、HEAD の上に commit が無いことを出して変数を 1 にする。
 settle_commit() {
@@ -280,7 +283,8 @@ settle_commit() {
     else
       [ -z "${3:-}" ] || echo "$3"
       [ "${!2:-0}" = 0 ] || echo "✗ git commit は失敗しましたが（終了コード ${!2}）、HEAD に commit しようとした内容と同じ commit $ours があります。
-  フックなどほかの作業が commit したか、git commit が commit の後に止まったと考えられるので、本物の index を HEAD に合わせます。
+  フックなどほかの作業が commit したか、git commit が commit の後に止まったと考えられます。
+  本物の index を HEAD に合わせます。
   git log -1 $ours で、意図した commit か確かめてください。"
       sync_index "$run" "$tip" || s=$?
       [ "${!2:-0}" != 0 ] || printf -v "$2" %s "$s"
@@ -426,7 +430,7 @@ plain() { LC_ALL=C sed 's/\x1b\[[0-?]*[ -/]*[@-~]//g'; }
 
 wait_run() {
   [ $# -le 1 ] || usage
-  local run="${1:-}" start s code
+  local run="${1:-}" start s code git_code=""
   [[ "$wait_seconds" =~ ^[0-9]+$ ]] || fail "AGENT_GIT_WAIT_SECONDS は 0 以上の整数で指定してください: $wait_seconds"
   if [ -z "$run" ]; then
     # pid は始めてから数ミリ秒のうちに書き終える（commit の git の行が最後）ので、更新時刻が始めた順になる。
@@ -453,8 +457,11 @@ wait_run() {
     lost) code="" ;;
   esac
   # _commit が本物の index を合わせる前に止まった。commit ができていれば、ここで合わせる。
-  [ ! -d "$run/commit" ] ||
-    settle_commit "$run" code "⚠ commit はできていましたが、本物の index を合わせる前に止まったので、agent-wait が合わせます。" >>"$run/log" 2>&1
+  # done にあるのは _commit の終了コードなので、git commit の終了コードは空で渡し、settle_commit が決めなければ done のものを使う。
+  [ ! -d "$run/commit" ] || {
+    settle_commit "$run" git_code "⚠ commit はできていましたが、本物の index を合わせる前に止まったので、agent-wait が合わせます。" >>"$run/log" 2>&1
+    code="${git_code:-$code}"
+  }
   # 合わせるコマンドを出したログは、done が無くても、コマンドが実行のディレクトリを消すまで失敗として出し直す。
   [ ! -e "$run/unsynced" ] || code=1
   touch -- "$run/reported"
