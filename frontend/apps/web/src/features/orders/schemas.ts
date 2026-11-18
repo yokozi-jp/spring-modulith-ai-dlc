@@ -1,6 +1,3 @@
-import type { TFunction } from "i18next";
-import { z as zod } from "zod";
-
 import {
   ChangeOrderLinesBody,
   changeOrderLinesBodyLinesMax,
@@ -8,7 +5,9 @@ import {
   draftOrderBodyCustomerOrderCodeMax,
   draftOrderBodyLinesItemQuantityMax,
   draftOrderBodyLinesMax,
-} from "@/api/generated/zod/ordering/ordering.zod";
+} from "@frontend/api/zod/ordering/ordering.zod";
+import type { TFunction } from "i18next";
+import { z as zod } from "zod";
 
 /** 入力欄の値。数量は input の値のまま文字列で持ち、送信時の検証で数値にする。 */
 export interface OrderLineValues {

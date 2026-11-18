@@ -41,10 +41,10 @@ expect 2 "dot slash path" '{"tool_name":"fs_write","tool_input":{"path":"./front
 expect 2 "double slash" '{"tool_name":"fs_write","tool_input":{"path":"frontend//apps/web/src/routeTree.gen.ts"}}'
 expect 2 "dot segment" '{"tool_name":"fs_write","tool_input":{"path":"frontend/./apps/web/src/routeTree.gen.ts"}}'
 expect 2 "absolute double slash" "{\"tool_name\":\"fs_write\",\"tool_input\":{\"path\":\"$repo//openapi/openapi.yaml\"}}"
-expect 2 "api generated" '{"tool_name":"fs_write","tool_input":{"path":"frontend/apps/web/src/api/generated/endpoints/order/order.ts"}}'
+expect 2 "api generated" '{"tool_name":"fs_write","tool_input":{"path":"frontend/packages/api/src/generated/endpoints/order/order.ts"}}'
 expect 2 "str_replace path" '{"tool_name":"str_replace","tool_input":{"path":"frontend/apps/web/src/routeTree.gen.ts"}}'
 expect 2 "fsWrite filePath" '{"tool_name":"fsWrite","tool_input":{"filePath":"frontend/apps/web/src/routeTree.gen.ts"}}'
-expect 2 "delete_file targetFile" '{"tool_name":"delete_file","tool_input":{"targetFile":"frontend/apps/web/src/api/generated/model/order.ts"}}'
+expect 2 "delete_file targetFile" '{"tool_name":"delete_file","tool_input":{"targetFile":"frontend/packages/api/src/generated/model/order.ts"}}'
 expect 2 "write file_path" '{"tool_name":"write","tool_input":{"file_path":"frontend/apps/web/src/routeTree.gen.ts"}}'
 expect 2 "openapi contract" '{"tool_name":"fs_write","tool_input":{"path":"openapi/openapi.yaml"}}'
 expect 2 "installed skill file" '{"tool_name":"str_replace","tool_input":{"path":".kiro/skills/foo/SKILL.md"}}'
@@ -58,7 +58,7 @@ expect 2 "plugin manifest" '{"tool_name":"str_replace","tool_input":{"path":".ki
 expect 2 "edit_code path" '{"tool_name":"edit_code","tool_input":{"path":"frontend/apps/web/src/routeTree.gen.ts"}}'
 expect 2 "semantic_rename path" '{"tool_name":"semantic_rename","tool_input":{"path":"frontend/apps/web/src/routeTree.gen.ts","line":0,"character":0,"oldName":"a","newName":"b"}}'
 expect 2 "smart_relocate installed source" '{"tool_name":"smart_relocate","tool_input":{"sourcePath":".kiro/skills/foo/SKILL.md","destinationPath":"docs/x.md"}}'
-expect 2 "smartRelocate into generated" '{"tool_name":"smartRelocate","tool_input":{"sourcePath":"frontend/apps/web/src/x.ts","destinationPath":"frontend/apps/web/src/api/generated/x.ts"}}'
+expect 2 "smartRelocate into generated" '{"tool_name":"smartRelocate","tool_input":{"sourcePath":"frontend/apps/web/src/x.ts","destinationPath":"frontend/packages/api/src/generated/x.ts"}}'
 expect 2 "code format_code" '{"tool_name":"code","tool_input":{"operation":"format_code","file_path":".kiro/skills/foo/SKILL.md"}}'
 expect 2 "code rename_symbol" '{"tool_name":"code","tool_input":{"operation":"rename_symbol","file_path":"frontend/apps/web/src/routeTree.gen.ts","row":1,"column":1,"new_name":"x"}}'
 

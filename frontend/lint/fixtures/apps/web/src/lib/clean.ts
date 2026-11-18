@@ -1,3 +1,3 @@
-import { orderPath } from "@/api/generated/order";
+import { ApiProblemError } from "@frontend/api/api-fetch";
 
-export const sharedPath = `${orderPath}/shared`;
+export const sharedMessage = new ApiProblemError(500, undefined).message;

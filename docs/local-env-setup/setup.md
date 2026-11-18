@@ -194,7 +194,7 @@ iwe は手順 7 の `mise install --locked` で導入済みです。
 
 - **エディタ連携（LSP）**: 手順 11 の推奨拡張に含まれる `iwe.iwe` 拡張が、mise の shims から `iwes` を LSP サーバーとして利用します。
   定義ジャンプ、バックリンク、リンク補完などが markdown で使えます（詳細は [VS Code 向けドキュメント](https://iwe.md/docs/editors/vscode/)）。
-- **AI エージェント連携（MCP）**: MCP サーバー `iwec` の設定は `.kiro/settings/mcp.json` にコミット済みです（作業ディレクトリを `docs/` に固定して起動）。
+- **AI エージェント連携（MCP）**: MCP サーバー `iwec` の設定は `.kiro/settings/mcp.json` にコミット済みです（`docs/local-env-setup/iwe-mcp.sh` が作業ディレクトリを `docs/` に固定して起動）。
   Kiro を再起動すれば利用できます。
 
 ### 11. VSCode 拡張機能のインストール

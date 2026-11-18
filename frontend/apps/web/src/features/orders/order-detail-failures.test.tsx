@@ -1,11 +1,11 @@
 /* @vitest-environment jsdom */
 
+import { getListProductsMockHandler } from "@frontend/api/mocks/product/product.msw";
+import type { OrderDetailsResponse } from "@frontend/api/models";
 import { screen, waitFor, within } from "@testing-library/react";
 import { http, HttpResponse } from "msw";
 import { beforeEach, describe, expect, it } from "vite-plus/test";
 
-import { getListProductsMockHandler } from "@/api/generated/mocks/product/product.msw";
-import type { OrderDetailsResponse } from "@/api/generated/models";
 import { server } from "@/testing/msw";
 import {
   draftOrder,

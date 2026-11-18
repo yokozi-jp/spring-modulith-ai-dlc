@@ -1,14 +1,14 @@
+import {
+  getFindOrderByIdQueryKey,
+  useChangeOrderLines,
+} from "@frontend/api/endpoints/ordering/ordering";
+import type { OrderDetailsResponse, OrderLineRequest } from "@frontend/api/models";
 import { useQueryClient } from "@tanstack/react-query";
 import type { QueryClient } from "@tanstack/react-query";
 import type { TFunction } from "i18next";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
-import {
-  getFindOrderByIdQueryKey,
-  useChangeOrderLines,
-} from "@/api/generated/endpoints/ordering/ordering";
-import type { OrderDetailsResponse, OrderLineRequest } from "@/api/generated/models";
 import { useAppForm } from "@/features/orders/form";
 import { formFailure, problemNotice, problemStatus } from "@/features/orders/notice";
 import type { Notice } from "@/features/orders/notice";

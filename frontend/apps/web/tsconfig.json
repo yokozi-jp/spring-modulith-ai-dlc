@@ -1,38 +1,12 @@
 {
+  "extends": "../../tsconfig.base.json",
   "compilerOptions": {
-    "target": "es2023",
-    "module": "esnext",
-    "lib": ["ES2023", "DOM", "ESNext.Temporal"],
-    "types": ["vite-plus/client"],
     "jsx": "react-jsx",
-    "skipLibCheck": true,
     "paths": {
       "@/*": ["./src/*"]
-    },
-
-    /* Bundler mode */
-    "moduleResolution": "bundler",
-    "allowImportingTsExtensions": true,
-    "verbatimModuleSyntax": true,
-    "moduleDetection": "force",
-    "noEmit": true,
-
-    /* Type checking (ADR-031) */
-    // TypeScript 6以降の既定値だが、TypeScript 5系を同梱するエディタでも同じ結果にするため明示する。
-    "strict": true,
-    "noUncheckedSideEffectImports": true,
-    "noUncheckedIndexedAccess": true,
-    "exactOptionalPropertyTypes": true,
-    "noImplicitOverride": true,
-    "noImplicitReturns": true,
-    "noFallthroughCasesInSwitch": true,
-    "allowUnreachableCode": false,
-    "allowUnusedLabels": false,
-    "noUnusedLocals": true,
-    "noUnusedParameters": true,
-    "erasableSyntaxOnly": true
+    }
   },
-  // ponytail: vite.config.ts、orval.config.ts、playwright.config.ts と e2e/ もブラウザ向けの lib と型で検査する。
+  // ponytail: vite.config.ts、playwright.config.ts と e2e/ もブラウザ向けの lib と型で検査する。
   // vite.config.ts は Vite の型が参照する Node の型で node:fs だけを使う。Node API がこれより増えたら tsconfig.app.json と tsconfig.node.json の project references に分ける。
-  "include": ["src", "e2e", "vite.config.ts", "orval.config.ts", "playwright.config.ts"]
+  "include": ["src", "e2e", "vite.config.ts", "playwright.config.ts"]
 }

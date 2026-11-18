@@ -1,6 +1,5 @@
+import type { ListOrdersParams } from "@frontend/api/models";
 import type { TFunction } from "i18next";
-
-import type { ListOrdersParams } from "@/api/generated/models";
 
 export const orderStatuses = ["DRAFT", "CONFIRMED", "CANCELLED"] as const;
 export type OrderStatus = (typeof orderStatuses)[number];

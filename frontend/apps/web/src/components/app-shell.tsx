@@ -1,10 +1,10 @@
+import { maskedCsrfToken } from "@frontend/api/csrf";
 import { Outlet } from "@tanstack/react-router";
 import { useRef } from "react";
 import type { SubmitEvent } from "react";
 import { useTranslation } from "react-i18next";
 
 import { Button } from "@/components/ui/button";
-import { maskedCsrfToken } from "@/lib/csrf";
 import { resetTelemetrySession } from "@/lib/telemetry";
 
 async function submitAfterSessionReset(form: HTMLFormElement): Promise<void> {

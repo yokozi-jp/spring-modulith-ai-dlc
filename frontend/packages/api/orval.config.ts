@@ -6,16 +6,16 @@ function header(info: { title?: string }) {
 }
 
 // コミット済みの OpenAPI 契約から API client と MSW handler を生成する（ADR-052）。
-// 再生成は task api-client-gen で行い、src/api/generated を手で書き換えない。
+// 再生成は task api-client-gen で行い、src/generated を手で書き換えない。
 export default defineConfig({
   api: {
     input: {
       target: "../../../openapi/openapi.yaml",
     },
     output: {
-      target: "./src/api/generated/endpoints",
+      target: "./src/generated/endpoints",
       schemas: {
-        path: "./src/api/generated/models",
+        path: "./src/generated/models",
         splitByTags: true,
       },
       mode: "tags-split",
@@ -23,7 +23,7 @@ export default defineConfig({
       httpClient: "fetch",
       clean: true,
       mock: {
-        path: "./src/api/generated/mocks",
+        path: "./src/generated/mocks",
         indexMockFiles: true,
         generators: [{ type: "msw", useExamples: true }],
       },
@@ -33,7 +33,7 @@ export default defineConfig({
         // apiFetch が 2xx 以外を投げるため、戻り値の型を成功の応答だけにする。
         fetch: { forceSuccessResponse: true },
         // 非 2xx を ApiProblemError として投げる（docs/frontend/api-client-orval.md）。
-        mutator: { path: "./src/api/api-fetch.ts", name: "apiFetch" },
+        mutator: { path: "./src/api-fetch.ts", name: "apiFetch" },
         // 任意の項目にも値を入れた mock にし、exactOptionalPropertyTypes の型検査を通す。
         mock: { required: true },
         header,
@@ -47,7 +47,7 @@ export default defineConfig({
       target: "../../../openapi/openapi.yaml",
     },
     output: {
-      target: "./src/api/generated/zod",
+      target: "./src/generated/zod",
       mode: "tags-split",
       client: "zod",
       fileExtension: ".zod.ts",
