@@ -6,6 +6,7 @@
   "exports": {
     "./style.css": "./src/style.css",
     "./lib/utils": "./src/lib/utils.ts",
+    "./*.test": null,
     "./*": "./src/*.tsx"
   },
   "scripts": {

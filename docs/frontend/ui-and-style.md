@@ -55,7 +55,9 @@ feature固有styleは対象componentの近くへ置く。
 部品は `packages/ui` で、`vp exec shadcn add <部品名>` を実行して追加する。
 `packages/ui/components.json` の `aliases.ui` が `@frontend/ui` なので、出力先は `packages/ui/src/<部品名>.tsx` になる。
 `aliases.ui` が解決できるように、`packages/ui/tsconfig.json` の `paths` に `@frontend/ui` と `@frontend/ui/*` を書いている。
-`exports` の `"./*": "./src/*.tsx"` が追加した部品をそのまま公開するので、`package.json` の `exports` は変えない。
+`exports` の `"./*": "./src/*.tsx"` が、追加した部品（`.tsx`）をそのまま公開する。
+`"./*.test": null` があるので、テストファイルは公開されない。
+`hooks` や `lib` の `.ts` のファイルを追加したときは、`exports` に `"./lib/utils"` と同じ形の行を足す。足さないと、`packages/ui` の中では解決しても、アプリからは import できない。
 
 追加したあとは、次を確かめる。
 

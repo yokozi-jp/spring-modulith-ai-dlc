@@ -108,6 +108,12 @@ describe("fixture に適用したプロジェクトの lint 設定", () => {
         expect(countIn("components/ui/base-ui.tsx", "eslint(no-restricted-imports)")).toBe(1);
       });
 
+      it("@frontend/ui のテストファイルでも Base UI を禁止する", () => {
+        expect(
+          uiCodesIn("base-ui.test.ts").filter((code) => code === "eslint(no-restricted-imports)"),
+        ).toHaveLength(1);
+      });
+
       it("@frontend/ui でもテスト用部品の import を禁止する", () => {
         expect(
           uiCodesIn("msw-import.ts").filter((code) => code === "eslint(no-restricted-imports)"),

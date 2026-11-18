@@ -1,7 +1,7 @@
 import { useForm } from "@tanstack/react-form";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
-import { Plus } from "lucide-react";
+import { flushSync } from "react-dom";
 import { createInstance } from "i18next";
 import { Temporal } from "temporal-polyfill";
 import { useState } from "react";
@@ -15,7 +15,7 @@ export const dependencies = [
   useForm,
   useQuery,
   Link,
-  Plus,
+  flushSync,
   createInstance,
   Temporal,
   useState,
