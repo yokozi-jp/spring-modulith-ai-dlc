@@ -1,0 +1,47 @@
+# Snyk (https://snyk.io) policy file, patches or ignores known vulnerabilities.
+version: v1.25.1
+# ignores vulnerabilities until expiry date; change duration by modifying expiry date
+ignore:
+  SNYK-JS-BRACES-19963945:
+    - shadcn > fast-glob > micromatch > braces:
+        reason: 開発時のみ使うshadcn CLIの推移的依存。入力は開発者管理のglob/設定のみで、本番バンドルに含まれない。修正版なし。
+        expires: 2026-12-28T00:00:00.000Z
+        created: 2026-09-29T06:32:52.803Z
+  SNYK-JS-DEEPMERGE-19964053:
+    - shadcn > deepmerge:
+        reason: 開発時のみ使うshadcn CLIの推移的依存。マージ対象はcomponents.jsonと公式レジストリの定義のみで、本番バンドルに含まれない。修正版なし。
+        expires: 2026-12-28T00:00:00.000Z
+        created: 2026-09-29T06:32:57.253Z
+  SNYK-JS-URIJS-19963963:
+    - '@shadcn/lint > eslint > ajv > uri-js':
+        reason: >-
+          開発時のみ使うESLint（ajv@6）の推移的依存。スキーマ検証対象はリポジトリ内のlint設定のみで、本番バンドルに含まれない。修正版なし。
+        expires: 2026-12-28T00:00:00.000Z
+        created: 2026-09-29T06:32:59.940Z
+    - eslint-plugin-better-tailwindcss > eslint > ajv > uri-js:
+        reason: >-
+          開発時のみ使うESLint（ajv@6）の推移的依存。スキーマ検証対象はリポジトリ内のlint設定のみで、本番バンドルに含まれない。修正版なし。
+        expires: 2026-12-28T00:00:00.000Z
+        created: 2026-09-29T06:33:04.672Z
+    - react-doctor > eslint-plugin-react-hooks > eslint > ajv > uri-js:
+        reason: >-
+          開発時のみ使うESLint（ajv@6）の推移的依存。スキーマ検証対象はリポジトリ内のlint設定のみで、本番バンドルに含まれない。修正版なし。
+        expires: 2026-12-28T00:00:00.000Z
+        created: 2026-09-29T06:33:08.997Z
+  SNYK-JS-URIJS-19963961:
+    - '@shadcn/lint > eslint > ajv > uri-js':
+        reason: >-
+          開発時のみ使うESLint（ajv@6）の推移的依存。スキーマ検証対象はリポジトリ内のlint設定のみで、本番バンドルに含まれない。修正版なし。
+        expires: 2026-12-28T00:00:00.000Z
+        created: 2026-09-29T06:33:13.212Z
+    - eslint-plugin-better-tailwindcss > eslint > ajv > uri-js:
+        reason: >-
+          開発時のみ使うESLint（ajv@6）の推移的依存。スキーマ検証対象はリポジトリ内のlint設定のみで、本番バンドルに含まれない。修正版なし。
+        expires: 2026-12-28T00:00:00.000Z
+        created: 2026-09-29T06:33:17.276Z
+    - react-doctor > eslint-plugin-react-hooks > eslint > ajv > uri-js:
+        reason: >-
+          開発時のみ使うESLint（ajv@6）の推移的依存。スキーマ検証対象はリポジトリ内のlint設定のみで、本番バンドルに含まれない。修正版なし。
+        expires: 2026-12-28T00:00:00.000Z
+        created: 2026-09-29T06:33:21.669Z
+patch: {}
