@@ -17,7 +17,7 @@ const developmentCspNonce = crypto.randomUUID().replaceAll("-", "");
 const repositoryRoot = `${import.meta.dirname}/../../..`;
 
 // 生成物。カバレッジから除外する。整形と静的解析の除外はルートの vite.config.ts に書く。
-const generatedFiles = ["src/routeTree.gen.ts", "src/api/generated/**"];
+const generatedFiles = ["src/routeTree.gen.ts"];
 
 // ルートの.envは秘密情報も含むため、proxyに必要な変数だけを読み込む。
 function portFromEnv(mode: string, name: string, fallback: string): number {
@@ -140,7 +140,7 @@ export default defineConfig(({ mode }) => {
         ],
         // json-summary は task fe-coverage がファイルごとの下限の検査に読む。
         reporter: ["text", "html", "clover", "json", "json-summary"],
-        // 全体の下限。実測（branch 89.55%、line 97%）の少し下に置く（ADR-076）。
+        // 全体の下限。ADR-076 の値を引き継ぐ（ADR-092）。api を切り出した後の実測は branch 94.3%、line 95.17%。
         thresholds: { branches: 88, lines: 95 },
       },
     },

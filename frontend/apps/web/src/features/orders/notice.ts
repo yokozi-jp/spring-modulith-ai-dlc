@@ -1,6 +1,6 @@
+import { ApiProblemError } from "@frontend/api/api-fetch";
 import type { TFunction } from "i18next";
 
-import { ApiProblemError } from "@/api/api-fetch";
 import { noServerErrors, serverFieldErrors } from "@/features/orders/server-errors";
 import type { ServerFieldErrors } from "@/features/orders/server-errors";
 

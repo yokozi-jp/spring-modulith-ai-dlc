@@ -1,6 +1,6 @@
 # 生成コードはPull Requestの差分で既定では折りたたむ（docs/code-review/review-scope.md）。
 backend/src/generated/** linguist-generated=true
-frontend/apps/web/src/api/generated/** linguist-generated=true
+frontend/packages/api/src/generated/** linguist-generated=true
 frontend/apps/web/src/routeTree.gen.ts linguist-generated=true
 
 # task skills-check はスキルと .kiro 以下のファイルを内容ハッシュで比べるため、どの OS でも改行を変換せず書かれたとおりに取り出す。

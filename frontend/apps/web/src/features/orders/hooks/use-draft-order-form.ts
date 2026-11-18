@@ -1,8 +1,8 @@
+import { useDraftOrder } from "@frontend/api/endpoints/ordering/ordering";
 import { useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
-import { useDraftOrder } from "@/api/generated/endpoints/ordering/ordering";
 import { useAppForm } from "@/features/orders/form";
 import { formFailure } from "@/features/orders/notice";
 import type { Notice } from "@/features/orders/notice";

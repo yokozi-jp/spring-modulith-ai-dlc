@@ -7,7 +7,7 @@ tags: [runbook, web-api, openapi, orval]
 
 # APIを変更する
 
-ControllerやDTOを変えたら`task api-gen`を実行し、`openapi/openapi.yaml`と`frontend/apps/web/src/api/generated`を同じコミットに含める。
+ControllerやDTOを変えたら`task api-gen`を実行し、`openapi/openapi.yaml`と`frontend/packages/api/src/generated`を同じコミットに含める。
 生成物は手で書き換えず、差分を読んで意図どおりかを確かめる。
 契約と生成物の管理方針は[ADR-052](../adr/ADR-052-commit-openapi-contract-and-check-generated-client.md)が定める。
 
@@ -32,9 +32,9 @@ ControllerやDTOを変えたら`task api-gen`を実行し、`openapi/openapi.yam
    Spectralの違反があると、このTaskが失敗する。
    違反したルール名を[OpenAPIのアノテーションとJavadoc](openapi-annotations.md#作成時のチェックリスト)のチェックリストで探して直す。
 
-4. `git diff -- openapi/openapi.yaml frontend/apps/web/src/api/generated`で、追加や変更が意図どおりかを読む。
+4. `git diff -- openapi/openapi.yaml frontend/packages/api/src/generated`で、追加や変更が意図どおりかを読む。
    新しいtagを足すと、生成物のファイルが増える（`git status`で未追跡のファイルを確かめる）。
-5. フロントエンドでは生成したquery Hookと型を使い、APIを使うテストは生成したMSW handler（`@/api/generated/mocks`）でHTTP境界を置き換える。
+5. フロントエンドでは生成したquery Hookと型を使い、APIを使うテストは生成したMSW handler（`@frontend/api/mocks`）でHTTP境界を置き換える。
    `vi.mock`で生成関数を差し替えない（[フロントエンドのテストと検証](../frontend/testing.md#api境界)）。
 6. 検査を実行する。
 
@@ -70,7 +70,7 @@ ControllerやDTOを変えたら`task api-gen`を実行し、`openapi/openapi.yam
    [コミットメッセージの規約](../repository/commit-messages.md#破壊的変更)に従うConventional Commitの`!`または`BREAKING CHANGE:`がアプリケーションのmajor releaseを起動する。
    版の判定は[リリース管理](../repository/release-management.md#版の決まり方)に従う。
 
-Orvalの設定（`frontend/apps/web/orval.config.ts`）だけを変えたときは、`task api-gen`の代わりに`task api-client-gen`で生成物だけを再生成する。
+Orvalの設定（`frontend/packages/api/orval.config.ts`）だけを変えたときは、`task api-gen`の代わりに`task api-client-gen`で生成物だけを再生成する。
 このTaskはDBもJavaも使わない。
 
 ## CIが検査すること

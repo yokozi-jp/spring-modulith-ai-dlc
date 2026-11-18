@@ -1,7 +1,7 @@
+import type { ProductSummaryResponse } from "@frontend/api/models";
 import { useId } from "react";
 import { useTranslation } from "react-i18next";
 
-import type { ProductSummaryResponse } from "@/api/generated/models";
 import { Button } from "@/components/ui/button";
 import type { useOrderLinesEditor } from "@/features/orders/hooks/use-order-lines-editor";
 

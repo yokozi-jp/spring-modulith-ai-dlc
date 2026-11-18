@@ -1,7 +1,7 @@
+import { ApiProblemError } from "@frontend/api/api-fetch";
+import type { ValidationProblem } from "@frontend/api/models";
 import { describe, expect, it } from "vite-plus/test";
 
-import { ApiProblemError } from "@/api/api-fetch";
-import type { ValidationProblem } from "@/api/generated/models";
 import { t } from "@/testing/catalog-i18n";
 
 import { failureNotice, formFailure } from "./notice";

@@ -1,6 +1,6 @@
+import type { ProductSummaryResponse } from "@frontend/api/models";
 import { useTranslation } from "react-i18next";
 
-import type { ProductSummaryResponse } from "@/api/generated/models";
 import { Button } from "@/components/ui/button";
 import { firstErrorMessage, productOptions, withFieldGroup } from "@/features/orders/form";
 import { newLine, quantityMax, quantityMin } from "@/features/orders/schemas";

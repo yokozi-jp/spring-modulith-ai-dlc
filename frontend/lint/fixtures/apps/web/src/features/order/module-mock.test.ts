@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vite-plus/test";
 
-vi.mock("@/api/client");
+vi.mock("@/lib/clean");
 
 describe("module を差し替えた注文", () => {
   it("module を差し替える", async () => {

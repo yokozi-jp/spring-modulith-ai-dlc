@@ -1,7 +1,7 @@
+import type { OrderSummaryResponse } from "@frontend/api/models";
 import { Link } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
 
-import type { OrderSummaryResponse } from "@/api/generated/models";
 import { orderStatusLabel } from "@/features/orders/order-status";
 
 // この画面は作成の時刻を出さない。出すときは ADR-047 に従い Temporal.Instant で読む。

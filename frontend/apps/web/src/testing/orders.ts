@@ -1,15 +1,14 @@
-import { screen, within } from "@testing-library/react";
-import type { UserEvent } from "@testing-library/user-event";
-import { http, HttpResponse } from "msw";
-import { vi } from "vite-plus/test";
-
-import { getFindOrderByIdMockHandler } from "@/api/generated/mocks/ordering/ordering.msw";
-import { getListPaymentsMockHandler } from "@/api/generated/mocks/payment/payment.msw";
+import { getFindOrderByIdMockHandler } from "@frontend/api/mocks/ordering/ordering.msw";
+import { getListPaymentsMockHandler } from "@frontend/api/mocks/payment/payment.msw";
 import type {
   OrderDetailsResponse,
   OrderSummaryResponse,
   ProductSummaryListResponse,
-} from "@/api/generated/models";
+} from "@frontend/api/models";
+import { screen, within } from "@testing-library/react";
+import type { UserEvent } from "@testing-library/user-event";
+import { http, HttpResponse } from "msw";
+import { vi } from "vite-plus/test";
 
 import { server } from "./msw";
 

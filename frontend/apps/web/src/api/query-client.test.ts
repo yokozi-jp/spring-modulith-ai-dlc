@@ -1,3 +1,4 @@
+import { ApiProblemError, apiFetch } from "@frontend/api/api-fetch";
 import { MutationObserver, QueryObserver } from "@tanstack/react-query";
 import { http, HttpResponse } from "msw";
 import { beforeEach, describe, expect, it, onTestFinished, vi } from "vite-plus/test";
@@ -5,8 +6,6 @@ import { beforeEach, describe, expect, it, onTestFinished, vi } from "vite-plus/
 import { createGate } from "@/testing/gate";
 import { server } from "@/testing/msw";
 import { createTestQueryClient } from "@/testing/query-client";
-
-import { ApiProblemError, apiFetch } from "./api-fetch";
 
 // Node の fetch は相対 URL を解決しないため、絶対 URL にする。
 const itemsUrl = "http://localhost/api/items";
