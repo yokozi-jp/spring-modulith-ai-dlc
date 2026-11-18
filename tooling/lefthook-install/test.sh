@@ -4,7 +4,7 @@
 # ネイティブの Windows では動かさない（実行環境は WSL 上の Linux、ADR-010）。
 
 set -u
-. "$(dirname "$0")/../scratch-git/scratch-git.sh"
+. "$(dirname "$0")/../scratch-git/scratch-git.sh" || exit 1
 
 root="$(cd "$(dirname "$0")/../.." && pwd)"
 tmp="$(mktemp -d)"
