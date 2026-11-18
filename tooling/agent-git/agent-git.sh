@@ -209,24 +209,27 @@ landed() {
 }
 
 # settle_commit <実行のディレクトリ> <終了コードの変数> [<注意>]: commit ができたかを landed だけで決め、最後に commit の状態を消す。
-# HEAD が commit なら、注意を出して本物の index を合わせ、変数を sync_index の終了コードにする。
-# 合わせる前の本物の index からほかの作業が git commit し、commit のパスを戻していれば、それを出して変数を 1 にする。
-# どちらでもなければ変数を変えない。
+# commit は HEAD にあるか、ほかの作業がその上に commit していれば、始めたときの HEAD の次の first-parent にある。
+# 上の commit が commit のパスを戻していれば、それを出して変数を 1 にする。
+# 戻していなければ、注意を出して本物の index を HEAD に合わせ、変数を sync_index の終了コードにする。
+# commit ができていなければ変数を変えない。
 settle_commit() {
-  local run="$1" ours
-  if landed "$run" HEAD; then
-    [ -z "${3:-}" ] || echo "$3"
-    sync_index "$run" "$(git rev-parse HEAD)"
-    printf -v "$2" %s $?
-  elif [ -s "$run/commit/head" ] && ours="$(git rev-list --first-parent --reverse "$(cat -- "$run/commit/head")..HEAD" | head -n 1)" &&
-    [ -n "$ours" ] && landed "$run" "$ours"; then
+  local run="$1" ours=HEAD
+  landed "$run" HEAD ||
+    ours="$([ ! -s "$run/commit/head" ] || git rev-list --first-parent --reverse "$(cat -- "$run/commit/head")..HEAD" | head -n 1)"
+  if [ -n "$ours" ] && landed "$run" "$ours"; then
     # commit 同士の diff なので、changed に渡す写しの index は使われない。
-    list_paths "✗ commit $ours はできましたが、次のパスが commit の前の内容に戻りました。
+    if [ "$ours" != HEAD ] && list_paths "✗ commit $ours はできましたが、次のパスが commit の前の内容に戻りました。
   本物の index を合わせる前に、ほかの作業が古い index から commit したからです。" \
       <(LC_ALL=C comm -z -23 <(changed "$run/commit/index" "$ours^" "$ours" --) <(changed "$run/commit/index" "$ours^" HEAD --)) \
       "  作業ツリーがまだ commit の内容なら、同じパスをもう一度 task agent-commit で commit してください。
-  戻した commit は git log $ours..HEAD で確かめられます。" &&
+  戻した commit は git log $ours..HEAD で確かめられます。"; then
       printf -v "$2" 1
+    else
+      [ -z "${3:-}" ] || echo "$3"
+      sync_index "$run" "$(git rev-parse HEAD)"
+      printf -v "$2" %s $?
+    fi
   fi
   rm -r -- "$run/commit"
 }

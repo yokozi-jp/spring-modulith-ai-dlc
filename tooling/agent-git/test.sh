@@ -85,7 +85,7 @@ git init -q -b main "$tmp/repo"
 cd "$tmp/repo" || exit 1
 git remote add origin "$tmp/origin.git"
 mkdir sub dot
-for f in same.txt part.txt fixed-out.txt lockme rm.txt mv.txt untrack.txt ignore.txt; do echo base >"$f"; done
+for f in same.txt part.txt fixed-out.txt lockme rm.txt mv.txt untrack.txt ignore.txt foreign.txt; do echo base >"$f"; done
 git add . && git commit -q -m init
 cat >.git/hooks/pre-commit <<EOF
 #!/bin/sh
@@ -112,12 +112,17 @@ while [ -e '$hold' ]; do sleep 0.1; done
 if [ -e '$tmp/daemon' ]; then sleep 30 </dev/null >/dev/null 2>&1 & echo \$! >'$tmp/daemon.pid'; fi
 echo "✓ fake-push-check"
 EOF
-# ほかの作業が、合わせる前の本物の index から git commit するのを真似る。keep なら、その前に作業ツリーをすべて stage する。
+# ほかの作業が、合わせる前の本物の index から git commit するのを真似る。
+# keep なら、その前に作業ツリーをすべて stage する。only なら、foreign.txt だけを git commit -- <パス> で commit する。
 cat >.git/hooks/post-commit <<EOF
 #!/bin/sh
 [ -e '$tmp/overtake' ] || exit 0
-[ "\$(cat '$tmp/overtake')" != keep ] || env -u GIT_INDEX_FILE git add -A
-rm '$tmp/overtake' && env -u GIT_INDEX_FILE git commit --no-verify -q -m foreign
+mode="\$(cat '$tmp/overtake')" && rm '$tmp/overtake' && unset GIT_INDEX_FILE
+case "\$mode" in
+  keep) git add -A && git commit --no-verify -q -m foreign ;;
+  only) git commit --no-verify -q -m foreign -- foreign.txt ;;
+  *) git commit --no-verify -q -m foreign ;;
+esac
 EOF
 chmod +x .git/hooks/pre-commit .git/hooks/pre-push .git/hooks/post-commit
 git worktree add -q "$tmp/wt" -b wt
@@ -305,6 +310,14 @@ fact "another commit is on top of the commit" [ "$(git show --name-only --format
 fact "the commit on top keeps the content" [ "$(git show HEAD:overtaken-kept.txt)" = k ]
 fact "the index matches the commit on top" clean
 
+# commit の直後、本物の index を合わせる前に、ほかの作業が別のパスだけを git commit -- <パス> で commit する。
+scene "commit overtaken by a commit of another path"
+echo n >overtaken-other.txt && echo changed >foreign.txt && echo only >"$tmp/overtake"
+expect "commit to be overtaken by a commit of another path starts" 0 "task agent-wait" bash "$tool" commit "$msg" overtaken-other.txt
+expect "wait reports success when the commit on top changes another path" 0 "exit=0" bash "$tool" wait
+fact "the commit of another path is on top of the commit" [ "$(git show --name-only --format=%s HEAD)" = "$(printf 'foreign\n\nforeign.txt')" ]
+fact "the index matches the commit of another path" clean
+
 # フックが失敗した commit を報告する前に、別の実行（push）を始める。
 scene "failing commit"
 head="$(git rev-parse HEAD)"
@@ -424,6 +437,22 @@ expect "wait says another commit reverted the orphaned commit" 1 "    orphan-ove
 fact "wait does not say it makes the index follow the overtaken commit" not grep -qF "agent-wait が合わせます" "$out"
 fact "the index matches the commit that reverted the orphaned commit" clean
 rm orphan-overtaken.txt
+
+# wrapper と _commit を止め、残った git が commit を終えた後に、ほかの作業が作業ツリーをすべて stage してから commit する。
+scene "orphaned commit kept by another commit"
+head="$(git rev-parse HEAD)"
+touch "$hold"
+echo o >orphan-kept.txt && echo f >orphan-foreign.txt
+expect "commit to be orphaned and kept by another commit starts" 0 "task agent-wait" bash "$tool" commit "$msg" orphan-kept.txt
+run="$(run_dir)"
+fact "the orphaned kept commit records its git" until_ok has_pid git "$run"
+kill "$(pid_of wrapper "$run")" "$(pid_of child "$run")"
+rm "$hold"
+fact "the orphaned kept git moves HEAD" until_ok moved "$head"
+git add -A && git commit --no-verify -q -m foreign
+fact "the commit on top adds only the other path" [ "$(git show --name-only --format= HEAD)" = orphan-foreign.txt ]
+expect "wait makes the index follow an orphaned commit that the commit on top keeps" 0 "commit はできていました" bash "$tool" wait "$run"
+fact "the index matches the commit on top of the orphaned commit" clean
 
 # wrapper と _commit を止め、残った git が commit を終えた後に、agent-wait が本物の index を置き換えられない。
 scene "orphaned unsynced commit"
