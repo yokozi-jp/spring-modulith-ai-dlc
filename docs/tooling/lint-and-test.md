@@ -318,7 +318,8 @@ const params = { ...(cursor !== undefined && { cursor }) };
 - **`task lint-taskfile`**：Task本体でTaskfileのYAML構文とスキーマ構造を検証する。
   `tooling/taskfile-cleanup/`のfixtureで、後片付けの定型が本体の終了コードを優先し、前段が失敗しても後段の後片付けを走らせることを検査する。
 - **`task lint-lefthook`**：`lefthook.yml`の`run`を`echo`に置き換えた設定で本物のlefthookを動かし、glob付きのjobが意図したファイルで選ばれることを検査する。
-  `**`は0階層に一致しないため、ディレクトリ直下のファイル（`docs/index.md`、`backend/build.gradle`、`frontend/package.json`）を中心に少数だけ期待を置く。期待は`tooling/lefthook-glob/test.sh`が正で、全jobには広げない。
+  `docs/**/*.md`のような`a/**/b`の形の`**`は0階層に一致しないため、ディレクトリ直下のファイル（`docs/index.md`、`backend/build.gradle`）を中心に少数だけ期待を置く。
+  見るのはglobだけで、jobの`run`内の`{files}`の参照は見ない。期待は`tooling/lefthook-glob/test.sh`が正で、全jobには広げない。
 - **`task adr-check`**：判断が絡む変更にADRが伴うかを確認する。
   `frontend/`の変更のうち、テストファイル（`*.test.*`、`*.spec.*`）、`frontend/e2e/`、`frontend/lint/fixtures/`、`frontend/src/testing/`は対象から外す。
   警告は止めず、`ADR_STRICT=1`で失敗にし、`ADR_ACK=1`で抑制する。
