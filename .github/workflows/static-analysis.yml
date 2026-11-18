@@ -107,7 +107,7 @@ jobs:
         run: task lint-lefthook
 
   taskfile:
-    name: Check Taskfile
+    name: Check Taskfile and scratch git repositories
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -122,6 +122,9 @@ jobs:
 
       - name: Check Taskfile
         run: task lint-taskfile
+
+      - name: Check scratch git repositories in self-tests
+        run: task lint-scratch-git
 
   # 振る舞いのテストだが、常に動く workflow に置き、Pull Request ごとに必ず check run を出す（ADR-087）。
   agent-git-test:
@@ -171,20 +174,3 @@ jobs:
       # npm の prepare（prepare.mjs）が main の worktree の lefthook で hook を入れることを、一時の git リポジトリで検査する。
       - name: Test lefthook install from worktrees
         run: task lefthook-install-test
-
-  scratch-git:
-    name: Check scratch git repositories in self-tests
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-
-      - name: Set up mise tools
-        uses: ./.github/actions/setup-mise
-
-      - name: Check scratch git repositories in self-tests
-        run: task lint-scratch-git
