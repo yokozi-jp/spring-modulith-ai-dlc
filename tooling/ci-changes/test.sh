@@ -3,6 +3,8 @@
 # Run: bash tooling/ci-changes/test.sh (task ci-gate-check が実行する)
 
 set -u
+# Actions が GITHUB_OUTPUT を設定していても、出力を標準出力で受け取る。
+unset GITHUB_OUTPUT
 
 dir="$(cd "$(dirname "$0")" && pwd)"
 tmp="$(mktemp -d)"
