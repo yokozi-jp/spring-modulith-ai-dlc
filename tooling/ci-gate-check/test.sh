@@ -82,6 +82,10 @@ d="$(case_dir no-jobs)"
 printf 'name: CI\non:\n  pull_request:\n' > "$d/ci.yml"
 expect "jobs のない ci.yml は traceback ではなくメッセージで失敗" 1 "jobs がありません" check "$d"
 
+d="$(case_dir renamed-job)"
+sed -i 's/^  backend:/  api:/; s/needs: \[backend\]/needs: [api]/' "$d/ci.yml"
+expect "呼ぶジョブの id が workflow の stem と違うと失敗" 1 "ジョブ api は、呼ぶ backend.yml" check "$d"
+
 d="$(case_dir missing-needs)"
 sed -i 's/needs: \[backend\]/needs: []/' "$d/ci.yml"
 expect "gate の needs にないジョブを見つける" 1 "backend が gate の needs にありません" check "$d"

@@ -69,7 +69,12 @@ def main():
     if "pull_request" not in triggers(ci):
         errors.append("ci.yml が pull_request で動きません。")
 
-    called = {m.group(1) for job in ci["jobs"].values() if (m := USES_LOCAL.match(str(job.get("uses", ""))))}
+    called = set()
+    for job_id, job in ci["jobs"].items():
+        if m := USES_LOCAL.match(str(job.get("uses", ""))):
+            called.add(m.group(1))
+            if job_id != Path(m.group(1)).stem:
+                errors.append(f"ci.yml のジョブ {job_id} は、呼ぶ {m.group(1)} のファイル名の stem {Path(m.group(1)).stem} に揃えてください。")
     for name in sorted(called):
         errors += check_called(name, workflows[name]) if name in workflows else [f"ci.yml が呼ぶ {name} がありません。"]
 
