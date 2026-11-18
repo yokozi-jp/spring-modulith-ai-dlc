@@ -5,6 +5,7 @@ import static com.example.demo.jooq.tables.FixtureWorkLogTable.FIXTURE_WORK_LOG;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import com.example.demo.testkit.AppUsers;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
@@ -25,8 +26,8 @@ import org.springframework.security.core.authority.AuthorityUtils;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.oauth2.client.authentication.OAuth2AuthenticationToken;
 import org.springframework.security.oauth2.core.oidc.OidcIdToken;
-import org.springframework.security.oauth2.core.oidc.OidcUserInfo;
 import org.springframework.security.oauth2.core.oidc.user.DefaultOidcUser;
+import org.springframework.security.oauth2.core.oidc.user.OidcUser;
 
 /** 共通カラムへ登録する値の組み立てを検証する。 */
 // 共通カラムの規則ごとにテストを分けるため、メソッドの数の上限を外す。
@@ -43,7 +44,7 @@ class CommonColumnsTest {
   private static final String TRACE_ID = "4bf92f3577b34da6a3ce929d0e0e4736";
 
   /** ログインのときに引いたアプリの利用者の ID。 */
-  private static final String APP_USER_ID = "app-user-1";
+  private static final String APP_USER_ID = AppUsers.USER_ID;
 
   /** 呼び出し中のユースケースとして束縛する pgm_cd。 */
   private static final String PGM_CD = "ordering.PlaceOrder";
@@ -59,7 +60,7 @@ class CommonColumnsTest {
 
   @Test
   @DisplayName(
-      "利用者の操作の INSERT では、作成と更新のカラムに sub でなく OidcUser の名前（アプリの利用者の ID）、pgm_cd、trace ID と lock_no = 1 を登録する")
+      "利用者の操作の INSERT では、作成と更新のカラムに sub でなくアプリの利用者の ID、pgm_cd、trace ID と lock_no = 1 を登録する")
   void insertValuesForOidcUser() {
     signInAsAppUser();
 
@@ -80,7 +81,7 @@ class CommonColumnsTest {
   }
 
   @Test
-  @DisplayName("利用者の操作の UPDATE では、更新者に sub でなく OidcUser の名前（アプリの利用者の ID）を登録する")
+  @DisplayName("利用者の操作の UPDATE では、更新者に sub でなくアプリの利用者の IDを登録する")
   void updateValuesUseThePrincipalName() {
     signInAsAppUser();
 
@@ -131,7 +132,7 @@ class CommonColumnsTest {
   }
 
   @Test
-  @DisplayName("OIDC の利用者でない認証では、作成者を決められないため例外にする")
+  @DisplayName("アプリの利用者でない認証では、作成者を決められないため例外にする")
   void otherAuthenticatedPrincipalIsRejected() {
     SecurityContextHolder.getContext()
         .setAuthentication(
@@ -139,7 +140,7 @@ class CommonColumnsTest {
 
     assertThatThrownBy(() -> inUseCase(() -> commonColumns.forInsert(FIXTURE_ITEM)))
         .isInstanceOf(IllegalStateException.class)
-        .hasMessageContaining("not an OIDC user");
+        .hasMessageContaining("not an app user");
   }
 
   @Test
@@ -255,20 +256,9 @@ class CommonColumnsTest {
         .containsExactlyInAnyOrderElementsOf(written);
   }
 
-  /** ログインのときに tenancy がするように、名前がアプリの利用者の ID の OidcUser で認証する。 */
+  /** ログインのときに tenancy がするように、アプリの利用者でもある OidcUser で認証する。 */
   private static void signInAsAppUser() {
-    final OidcIdToken idToken =
-        OidcIdToken.withTokenValue("id-token")
-            .subject("idp-sub")
-            .issuedAt(NOW)
-            .expiresAt(NOW.plusSeconds(300))
-            .build();
-    final DefaultOidcUser user =
-        new DefaultOidcUser(
-            AuthorityUtils.createAuthorityList("OIDC_USER"),
-            idToken,
-            new OidcUserInfo(Map.of("sub", "idp-sub", "app_user_id", APP_USER_ID)),
-            "app_user_id");
+    final OidcUser user = AppUsers.oidcUser();
     SecurityContextHolder.getContext()
         .setAuthentication(new OAuth2AuthenticationToken(user, user.getAuthorities(), "web"));
   }

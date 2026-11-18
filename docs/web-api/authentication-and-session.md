@@ -26,14 +26,14 @@ tags: [convention, web-api, security, auth, future-arch-guidelines]
 IdPを移るときは、組と利用者の対応づけだけを書き換え、利用者のIDは変えない。
 
 セッションに保存する`OidcUser`の名前（`getName()`）は、IdPの`sub`ではなくアプリの利用者のIDである。
-共通カラムの`*_by`は、この名前を登録する（[PostgreSQLの共通カラム](../database/postgresql-common-columns.md)）。
+セッションの`OidcUser`は`shared.security`の`AppUserPrincipal`も実装し、共通カラムの`*_by`は`userId()`の値を登録する（[PostgreSQLの共通カラム](../database/postgresql-common-columns.md)）。
 `tenancy`の`SignInOidcUserService`が`OAuth2UserService<OidcUserRequest, OidcUser>`を実装し、Spring SecurityがこのBeanをOIDCログインに使う。
 ログインのコールバックでは前のセッションの認証がまだ残っているため、利用者を作る間だけ認証を外し、`*_by`には処理の名前を登録する。
 
 セッションはRedisに、`OidcUser`の実装のクラス名ごと直列化して保存する。
 次の2つのときは、デプロイと同時に既存のセッションを消す（`REDIS_SESSION_NAMESPACE`を変える）。
 
-- 名前が`sub`の`OidcUser`を保存していた版から、アプリの利用者のIDにする版へ上げるとき。消さないと、そのセッションが切れるまで`*_by`に`sub`を登録する。
+- `AppUserPrincipal`でない`OidcUser`を保存していた版から上げるとき。消さないと、そのセッションが切れるまで書き込みが失敗する。
 - `SignInOidcUserService`が返す`OidcUser`のクラスを持たない版へ切り戻すとき、またはそのクラスを移動、改名するとき。消さないと、セッションを読めずにリクエストが500になる。
 
 ## ログアウト

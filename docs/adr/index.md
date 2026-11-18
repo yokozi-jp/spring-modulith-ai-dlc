@@ -91,3 +91,4 @@
 - [ADR-088: フロントエンドで useEffect を禁止し、Oxlint で止める](ADR-088-ban-react-effects-in-frontend.md)（Accepted, 2026-11-17）
 - [ADR-089: 主キーをモジュールのスキーマと Repository の中に閉じ、外に出る値には例外なく public_id を使う](ADR-089-keep-primary-keys-inside-modules-and-expose-public-ids.md)（Proposed, 2026-11-17）
 - [ADR-090: トランザクションの初めにモジュールの DB ロールへ切り替え、アプリロールを業務のスキーマから外す](ADR-090-switch-to-module-database-roles.md)（Proposed, 2026-11-18）
+- [ADR-093: 共通カラムの作成者と更新者には、AppUserPrincipal の利用者の ID だけを登録する](ADR-093-require-app-user-principal-for-audit-columns.md)（Proposed, 2026-11-18）

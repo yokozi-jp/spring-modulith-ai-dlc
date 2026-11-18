@@ -163,10 +163,11 @@ Domain の型、Command と Result、Spring MVC の Request と Response、jOOQ 
   `shared` は Spring Web、Spring の HTTP、Servlet の型に依存しない。
   `shared` は Domain と `error` の型、ルートパッケージの型に依存しない。
 - リスナーが失敗した出版の再投入の方針を選ぶ注釈（`ResubmissionPolicy`）を `shared.events` に置き、このパッケージも `@NamedInterface("events")` で公開する（[ADR-079](../adr/ADR-079-resubmit-failed-event-publications-periodically-with-shedlock.md)）。
+- 共通カラムの `*_by` に登録するアプリの利用者を表す認証の principal（`AppUserPrincipal`）を `shared.security` に置き、このパッケージも `@NamedInterface("security")` で公開する（[ADR-093](../adr/ADR-093-require-app-user-principal-for-audit-columns.md)）。
 - 業務の概念を置かない。
   ルートのパッケージには `package-info.java` だけを置く。
 - `shared.infrastructure.persistence` を使ってよいのは、他のモジュールの `infrastructure.persistence` だけである。
-  `shared.concurrency`、`shared.failure`、`shared.events` は、どの層からも使える。
+  `shared.concurrency`、`shared.failure`、`shared.events`、`shared.security` は、どの層からも使える。
 
 使う場所の制限は、`PackageByFeatureOnionArchitectureTest` の `sharedModuleIsUsedOnlyByPersistenceAdapters` が検査する。
 ただし、`shared` の `PgmCdAspect` は、AOP で `<UseCase>CommandHandler` の `handle` と `<Event>Listener` の呼び出しを囲む（[ADR-051](../adr/ADR-051-bind-pgm-cd-with-scoped-value-and-aspect.md)）。
@@ -194,7 +195,7 @@ infrastructure.client ───────────────────�
 - `infrastructure.persistence` と `infrastructure.client` は `domain.model` のインタフェースを実装し、`application`、`domain.service`、モジュールルートに依存しない。
 - `infrastructure.persistence` は `shared.infrastructure.persistence` に依存してよい。
   ほかの層は `shared.infrastructure.persistence` に依存しない。
-- どの層も `shared.concurrency`、`shared.failure`、`shared.events` に依存してよい。`error` の `presentation.web` も、3 つの例外を 404、409、422 にするために依存する。
+- どの層も `shared.concurrency`、`shared.failure`、`shared.events`、`shared.security` に依存してよい。`error` の `presentation.web` も、3 つの例外を 404、409、422 にするために依存する。
 - Domain と Application は、Presentation と Infrastructure に依存しない。
 - Presentation、Persistence、外部 Client は相互に依存しない。
 
