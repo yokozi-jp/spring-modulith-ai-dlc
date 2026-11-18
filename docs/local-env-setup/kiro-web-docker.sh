@@ -7,7 +7,8 @@ set -euo pipefail
 
 K="${KIRO_WEB_HOME:-$HOME/.cache/kiro-web}"
 P="$K/podman"
-sock="/tmp/kiro-web-podman.sock"
+# サービスは名前空間ごとに起動する（kiro-web-netns.py の専用の名前空間では、別のサービスを使う）。
+sock="/tmp/kiro-web-podman-$(stat -L -c %i /proc/self/ns/net).sock"
 podman=/usr/local/bin/podman
 # podman の補助バイナリ（conmon など）は、既定の探索先ではなくこの場所にある。
 helpers=/inner_container/usr/local/lib/podman
@@ -17,13 +18,15 @@ up() { curl -fs --unix-socket "$sock" http://d/_ping >/dev/null 2>&1; }
 if ! up; then
   # 実行状態（runroot、tmp_dir、overlay の上層）は毎回作り直す。前の実行のものを引き継ぐと、消えたコンテナを動作中と誤認する。
   ns="$(mktemp -d /tmp/kiro-web-podman.XXXXXX)"
-  mkdir -p "$P/graph" "$P/static" "$P/volumes" "$ns"/{etc,run,varlib,varcache}/{up,work} "$ns"/{runroot,tmp} "$ns/etc/up/containers"
+  mkdir -p "$P/graph" "$P/static" "$P/volumes" "$ns"/{etc,run,varlib,varcache,vartmp}/{up,work} "$ns"/{runroot,tmp} "$ns/etc/up/containers"
   cat >"$ns/storage.conf" <<EOF
 [storage]
 driver = "overlay"
 graphroot = "$P/graph"
 runroot = "$ns/runroot"
 EOF
+  printf '%s\n' '#!/bin/sh' 'exec /usr/local/bin/crun --cgroup-manager=disabled "$@"' >"$ns/crun"
+  chmod +x "$ns/crun"
   cat >"$ns/containers.conf" <<EOF
 [containers]
 # cgroup のファイルが読み取り専用で、コンテナの cgroup を作れない。
@@ -36,7 +39,11 @@ static_dir = "$P/static"
 tmp_dir = "$ns/tmp"
 volume_path = "$P/volumes"
 cgroup_manager = "cgroupfs"
+# ビルドの RUN は containers.conf の cgroups = "disabled" を見ずに crun を呼ぶので、cgroup を使わない crun を runtime にする。
+runtime = "crun"
 events_logger = "file"
+[engine.runtimes]
+crun = ["$ns/crun"]
 [network]
 network_backend = "netavark"
 EOF
@@ -47,7 +54,7 @@ EOF
   cat >"$ns/enter.sh" <<EOF
 #!/bin/bash
 set -e
-for d in etc:/etc run:/run varlib:/var/lib varcache:/var/cache; do
+for d in etc:/etc run:/run varlib:/var/lib varcache:/var/cache vartmp:/var/tmp; do
   n=\${d%%:*}; p=\${d#*:}
   mount -t overlay overlay -o lowerdir=\$p,upperdir=$ns/\$n/up,workdir=$ns/\$n/work \$p
 done

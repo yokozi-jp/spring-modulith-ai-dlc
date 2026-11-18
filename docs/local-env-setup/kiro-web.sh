@@ -11,7 +11,7 @@ export KIRO_WEB_HOME="${KIRO_WEB_HOME:-$HOME/.cache/kiro-web}"
 # 古い mise（サンドボックスに入っている版）は mise.lock の version 3 を読めず、書き換えもするため、
 # CI の composite action と同じ版を取り直す（ADR-090）。
 _kw_mise_version="$(sed -nE 's/^[[:space:]]+version: ([0-9][0-9.]*)$/\1/p' "$_kw_repo/.github/actions/setup-mise/action.yml")"
-_kw_compose_version=5.8.0
+_kw_compose_version=2.40.3
 
 export MISE_DATA_DIR="$KIRO_WEB_HOME/mise-data"
 export MISE_STATE_DIR="$KIRO_WEB_HOME/mise-state"
@@ -24,9 +24,11 @@ export GRADLE_USER_HOME="$KIRO_WEB_HOME/gradle"
 # ローカルは 01-setup-java.sh が file.encoding を設定する。java.util.prefs の既定の保存先 ~/.java は書けない。
 export JAVA_TOOL_OPTIONS="-Dfile.encoding=UTF-8 -Djava.util.prefs.userRoot=$KIRO_WEB_HOME/java-prefs"
 # Testcontainers は podman のサービスへつなぐ。コンテナ内と誤認してブリッジの gateway を宛先にしないよう、宛先を loopback に固定する。
-export DOCKER_HOST="unix:///tmp/kiro-web-podman.sock"
+export DOCKER_HOST="unix:///tmp/kiro-web-podman-$(stat -L -c %i /proc/self/ns/net).sock"
 export TESTCONTAINERS_HOST_OVERRIDE=127.0.0.1
-# ci-gate-check が PyYAML を使う。ローカルは apt の python3-yaml で入る。
+# podman の API は BuildKit を持たない。Compose 2.40 の組み込みの builder（旧 API）でイメージを作る。Compose 5 以降は buildx を要し、この設定では作れない。
+export COMPOSE_BAKE=false DOCKER_BUILDKIT=0
+# ci-gate-check が PyYAML を使う（ローカルは apt の python3-yaml）。kiro-web-netns.py が pyroute2 を使う。
 export PYTHONUSERBASE="$KIRO_WEB_HOME/python"
 export PATH="$KIRO_WEB_HOME/bin:$MISE_DATA_DIR/shims:$VP_HOME/bin:$PATH"
 
@@ -49,6 +51,7 @@ _kw_setup() (
 
   # docker daemon が無いので、podman の API サービスを起動する docker の代わりを置く（kiro-web-docker.sh）。
   ln -sf "$_kw_repo/docs/local-env-setup/kiro-web-docker.sh" "$KIRO_WEB_HOME/bin/docker"
+  ln -sf "$_kw_repo/docs/local-env-setup/kiro-web-netns.py" "$KIRO_WEB_HOME/bin/kiro-web-netns"
   if [ "$("$KIRO_WEB_HOME/bin/docker-compose" version --short 2>/dev/null)" != "$_kw_compose_version" ]; then
     echo "kiro-web: docker compose $_kw_compose_version を入れます" >&2
     base="https://github.com/docker/compose/releases/download/v${_kw_compose_version}"
@@ -75,7 +78,8 @@ _kw_setup() (
       || { cat "$KIRO_WEB_HOME/vp-install.log" >&2; exit 1; }
   fi
 
-  python3 -c 'import yaml' 2>/dev/null || python3 -m pip install --quiet --user --root-user-action=ignore --disable-pip-version-check pyyaml >&2
+  python3 -c 'import yaml, pyroute2' 2>/dev/null \
+    || python3 -m pip install --quiet --user --root-user-action=ignore --disable-pip-version-check pyyaml pyroute2 >&2
 
   # Gradle のテスト（Testcontainers）は docker の代わりを経由せずサービスへつなぐので、先に起動しておく。
   "$KIRO_WEB_HOME/bin/docker" info >/dev/null
