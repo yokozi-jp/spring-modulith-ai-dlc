@@ -42,7 +42,7 @@ Gradleのforkごとに別のDBになるため、forkどうしの後始末は衝�
 - **名前を付けない`TransactionTemplate`**：名前がなく、アプリロールで動く。
 - **名前を付けた`TransactionTemplate`**：名前がモジュールのパッケージならモジュールのロールで動く。
 - **`dsl.transaction`と`dsl.transactionResult`**：呼び出し元のトランザクションに参加するため、呼び出し元と同じロールで動く。呼び出し元がなければアプリロールで動く。
-- **ShedLockとSpring Modulithの内部**：モジュールの名前を持たず、アプリロールで動く。`modulith`の表だけを使うため、権限エラーにならない。
+- **ShedLockとSpring Modulithの内部**：モジュールの名前を持たず、アプリロールで動く。`modulith`の表だけを使うため、権限エラーにならない。実物の`JooqLockProvider`がアプリロールでロックを取れることは、`ShedLockSessionTimeZoneTest`が確かめる。
 
 ## コミットするテスト
 
@@ -56,7 +56,7 @@ Liquibase管理テーブルはコード生成から除外されているため�
 10秒待っても残るときは、消してからテストを失敗させる。
 終わらない行を残すと、後のすべてのテストが上限まで待ち、後始末も止まるためである。
 消すことも失敗したときは、原因が見えるよう、待ちの失敗に消すときの例外を`addSuppressed`で添える。
-ShedLockのロックの行（`modulith.shedlock`）は消さず、各テスト後に全行の`lock_until`を`locked_at`にして期限切れにする。
+ShedLockのロックの行（`modulith.shedlock`）は消さず、各テスト後に全行の`lock_until`を`1970-01-01T00:00:00Z`（`Instant.EPOCH`）にして期限切れにする。
 行を消すとShedLockが同じcontextで行を作り直さずロックを取れなくなり、期限を残すと`lock-at-least-for`の間、後に動く別のテストクラスがロックを待つためである。
 DBロールの決定は[ADR-011](../adr/ADR-011-use-module-owned-database-schemas.md)と[ADR-090](../adr/ADR-090-switch-to-module-database-roles.md)を参照する。
 

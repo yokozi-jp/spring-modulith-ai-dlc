@@ -9,8 +9,9 @@ import org.jspecify.annotations.Nullable;
  *
  * <p>ロールは {@code <module>_module}、スキーマは {@code <module>} である。ロールは環境を作る手順（{@code
  * docker/initdb/03-create-module-roles.sh}、本番は {@code
- * docs/database/connections.md}）で先に作る。モジュールを足したら、{@link #MODULES} とその手順に同じ名前を足す。{@link #MODULES} の足し忘れは、jOOQ
- * のスキーマとの不一致として {@code ModuleRolesTest} が止める。手順の足し忘れは、{@code ModuleRolesTest} とカタログのテストが止める。
+ * docs/database/connections.md}）で先に作る。モジュールを足したら、{@link #MODULES} とその手順に同じ名前を足す。{@link #MODULES}
+ * の足し忘れは、jOOQ のスキーマとの不一致として {@code ModuleRolesTest} が止める。手順の足し忘れは、{@code ModuleRolesTest}
+ * とカタログのテストが止める。
  */
 public final class ModuleRoles {
 

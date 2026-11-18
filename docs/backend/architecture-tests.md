@@ -290,9 +290,10 @@ Error Proneの`CheckReturnValue`は既定でerrorであり、`updateWhere`と`de
 - `statementTypeAndParamTypeAreNotChanged`：`Settings`の`withStatementType`、`setStatementType`、`withParamType`、`setParamType`を呼び出さず、メソッド参照もしない。
 - `persistenceAdaptersUseOnlyOwnGeneratedSchema`：`<module>.infrastructure.persistence`は、自分のモジュールのスキーマのjOOQの生成クラス（`jooq.<module>..`）だけを使う。別のモジュールのスキーマと`modulith`の生成クラスは使わない。モジュールのロールは自分のスキーマ以外を書けないため、実行時の権限エラーを静的に先取りする。生成クラスを`infrastructure.persistence`の外で使わないことは、`PackageByFeatureOnionArchitectureTest`の`databaseTechnologyApisAreOnlyUsedByPersistenceAdapters`が止める。
 - `moduleCodeDoesNotUseJdbc`：機能モジュールのクラスは、`org.springframework.jdbc..`（`JdbcTemplate`など）、`java.sql..`、`javax.sql..`を使わない。トランザクションの初めに切り替えたロールを迂回する経路を止める。
-- `moduleCodeDoesNotChangeConnectionSettings`：機能モジュールのクラスは、`DSLContext`の`set`、`setLocal`、`setSchema`、`setCatalog`、`connection`、`connectionResult`を呼び出さない。`SET ROLE`で切り替えたロールを書き換えられるためである（[ADR-090](../adr/ADR-090-switch-to-module-database-roles.md)）。
+- `moduleCodeDoesNotChangeConnectionSettings`：機能モジュールのクラスは、`DSLContext`の`set`、`setLocal`、`setSchema`、`setCatalog`、`connection`、`connectionResult`と、`DSL`の`set`、`setLocal`、`setSchema`、`setCatalog`を呼び出さない。`SET ROLE`で切り替えたロールを書き換えられるためである（[ADR-090](../adr/ADR-090-switch-to-module-database-roles.md)）。
 
 機能モジュールは`ModuleRoles.MODULES`の名前で決まる。
+`ModuleRoles.MODULES`が`modulith`を除くjOOQのスキーマと一致し、どれもSpring Modulithのモジュールであることは、`ModuleRolesTest`が確かめる。
 `DSL.name`での表の指定の禁止は、上の`nameBuildingApisAreNotUsed`が全プロダクションコードに適用する。
 
 `PublicIdArchTest`は、主キーをモジュールの外へ出さない規則を検査する（[PostgreSQLの主キー](../database/postgresql-primary-keys.md)）。
