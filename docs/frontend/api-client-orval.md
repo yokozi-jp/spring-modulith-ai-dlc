@@ -9,15 +9,15 @@ tags: [convention, frontend, api, orval, openapi]
 
 API client、型、schemaはOpenAPIからOrvalで生成し、同じものを手書きしない。
 各operationには所有する業務機能のtagを一つと安定した`operationId`を付ける。
-`api/generated`には手書きのコードを置かず、生成元を変更して再生成する。
+`packages/api/src/generated`には手書きのコードを置かず、生成元を変更して再生成する。
 
 ## 生成API境界
 
 **生成API境界**は、OpenAPI契約から生成したHTTP client、型、schema、test用mockを置く領域である。
 
 Orvalの入力は、バックエンドが生成してSpectral検査を通し、リポジトリにコミットした`openapi/openapi.yaml`である。
-設定は`frontend/apps/web/orval.config.ts`にあり、TanStack Query client、native Fetch、tag単位の分割、MSW handlerの生成を使う。
-runtime検証に使うZod schemaは、別のprojectの`apiZod`で`api/generated/zod`へ生成する（[ADR-024](../adr/ADR-024-adopt-orval-for-frontend-api-client.md)）。
+設定は`frontend/packages/api/orval.config.ts`にあり、TanStack Query client、native Fetch、tag単位の分割、MSW handlerの生成を使う。
+runtime検証に使うZod schemaは、別のprojectの`apiZod`で`src/generated/zod`へ生成する（[ADR-024](../adr/ADR-024-adopt-orval-for-frontend-api-client.md)）。
 `apiZod`の`clean`が`api`の生成物を消さないよう、出力先のdirectoryを分ける。
 
 ```typescript
@@ -30,16 +30,16 @@ const header = (info: { title?: string }) => [
 ];
 
 // コミット済みの OpenAPI 契約から API client と MSW handler を生成する（ADR-052）。
-// 再生成は task api-client-gen で行い、src/api/generated を手で書き換えない。
+// 再生成は task api-client-gen で行い、src/generated を手で書き換えない。
 export default defineConfig({
   api: {
     input: {
       target: "../../../openapi/openapi.yaml",
     },
     output: {
-      target: "./src/api/generated/endpoints",
+      target: "./src/generated/endpoints",
       schemas: {
-        path: "./src/api/generated/models",
+        path: "./src/generated/models",
         splitByTags: true,
       },
       mode: "tags-split",
@@ -47,7 +47,7 @@ export default defineConfig({
       httpClient: "fetch",
       clean: true,
       mock: {
-        path: "./src/api/generated/mocks",
+        path: "./src/generated/mocks",
         indexMockFiles: true,
         generators: [{ type: "msw", useExamples: true }],
       },
@@ -57,7 +57,7 @@ export default defineConfig({
         // apiFetch が 2xx 以外を投げるため、戻り値の型を成功の応答だけにする。
         fetch: { forceSuccessResponse: true },
         // 非 2xx を ApiProblemError として投げる（docs/frontend/api-client-orval.md）。
-        mutator: { path: "./src/api/api-fetch.ts", name: "apiFetch" },
+        mutator: { path: "./src/api-fetch.ts", name: "apiFetch" },
         // 任意の項目にも値を入れた mock にし、exactOptionalPropertyTypes の型検査を通す。
         mock: { required: true },
         header,
@@ -71,7 +71,7 @@ export default defineConfig({
       target: "../../../openapi/openapi.yaml",
     },
     output: {
-      target: "./src/api/generated/zod",
+      target: "./src/generated/zod",
       mode: "tags-split",
       client: "zod",
       fileExtension: ".zod.ts",
@@ -90,11 +90,35 @@ export default defineConfig({
 loaderと`useSuspenseQuery`での使い方は[状態表示の分担](routing-and-state.md#状態表示の分担)にある。
 `override.fetch.forceSuccessResponse`は、生成した関数の戻り値の型を成功の応答だけにする。
 `apiFetch`が非2xxを投げるので、失敗の応答の型が戻り値に混ざらない。
-`override.mutator`は、生成したAPI関数が呼ぶFetchを`src/api/api-fetch.ts`の`apiFetch`に置き換える（[transportとruntime検証](#transportとruntime検証)）。
+`override.mutator`は、生成したAPI関数が呼ぶFetchを`src/api-fetch.ts`の`apiFetch`に置き換える（[transportとruntime検証](#transportとruntime検証)）。
 `override.header`は生成物のheaderから`info.version`の行を外し、契約の版を上げても全生成物に差分が出ないようにする。
 `override.zod.version`はZodの出力を版4に固定し、入っているzodの版に生成物が左右されないようにする。
 業務APIがない間、契約の`paths`は空であり、Orvalは`models`だけを生成する。
 Zodの出力はoperationから作るため、`paths`が空の間は何も生成しない。
+
+## `@frontend/api`の公開
+
+生成API境界は、`frontend/packages/api`の`@frontend/api`が持つ（[ADR-092](../adr/ADR-092-split-frontend-into-vite-plus-workspace.md)）。
+アプリは自分の`package.json`に`@frontend/api`を`workspace:*`で宣言して使う。
+`exports`で`src`を直接公開し、ビルドしない。
+barrelの`index.ts`は作らず、次の入口を個別に公開する。
+
+| import                                | 実体                                     |
+| ------------------------------------- | ---------------------------------------- |
+| `@frontend/api/endpoints/<tag>/<tag>` | `src/generated/endpoints/<tag>/<tag>.ts` |
+| `@frontend/api/models`                | `src/generated/models/index.ts`          |
+| `@frontend/api/mocks/<tag>/<tag>.msw` | `src/generated/mocks/<tag>/<tag>.msw.ts` |
+| `@frontend/api/zod/<tag>/<tag>.zod`   | `src/generated/zod/<tag>/<tag>.zod.ts`   |
+| `@frontend/api/api-fetch`             | `src/api-fetch.ts`                       |
+| `@frontend/api/csrf`                  | `src/csrf.ts`                            |
+
+`fetch`と`XMLHttpRequest`を使えるのは、この package の中だけである。
+`frontend/vite.config.ts`の`no-restricted-globals`と`no-restricted-properties`が、`packages/api/**`以外で禁止する。
+`@frontend/api`は`@frontend/ui`に依存せず、`package.json`にも書かない。
+pnpmの厳格な解決により、書いていない依存のimportは失敗する。
+`@frontend/api`が`react`を`peerDependencies`に持つのは、アプリのReact Compilerが生成した hook に`react/compiler-runtime`のimportを足すためである。
+
+`createQueryClient`と`preloadQuery`は、ADR-092が共有を決めていないので、`apps/web/src/api`に残す。
 
 ## 生成物のGit管理と再生成
 
@@ -103,7 +127,7 @@ Zodの出力はoperationから作るため、`paths`が空の間は何も生成�
 - 契約を変えたときは`task api-gen`で契約と生成物をまとめて再生成する。
 - Orval設定だけを変えたときは`task api-client-gen`で生成物だけを再生成する。
 - `task api-client-check`は再生成した生成物とコミット済みの内容を比べ、差分があれば失敗する。
-- 生成物はfmt、lint、knip、jscpd、coverageの対象から外す（`frontend/vite.config.ts`と`frontend/apps/web/vite.config.ts`の`generatedFiles`、`frontend/knip.json`、`.jscpd.json`）。
+- 生成物はfmt、lint、knip、jscpd、coverageの対象から外す（`frontend/vite.config.ts`の`generatedFiles`、`frontend/knip.json`の`packages/api`の`ignore`、`.jscpd.json`、`frontend/packages/api/vite.config.ts`の`coverage.exclude`）。
 
 手順は[APIを変更する](../web-api/runbook-api-change.md)に示す。
 
@@ -120,20 +144,21 @@ Orvalは複数tagがあるoperationを先頭tagへ割り当てるため、一つ
 
 Orvalが生成する`models/shared`は複数tagが参照するschemaの生成先であり、手書きの共有コードを置く`shared`ディレクトリではない。
 
-Orvalの`clean`は生成先を削除して再作成できるため、手書きのmutator、MSW server lifecycle、fixtureを`api/generated`に置かない。
+Orvalの`clean`は生成先を削除して再作成できるため、手書きのmutator、MSW server lifecycle、fixtureを`src/generated`に置かない。
 
-OrvalはMSW handlerを`api/generated/mocks`に生成し、手書きのserver setupは生成対象外の`src/testing/msw.ts`に置く。
-`@/api/generated/mocks/**`はtestと`src/testing`だけがimportでき、production sourceからのimportは`frontend/vite.config.ts`の`testOnlyImports`が禁止する。
+OrvalはMSW handlerを`src/generated/mocks`に生成し、手書きのserver setupは生成対象外の`src/testing/msw.ts`に置く。
+`apps/web`と`packages/api`はそれぞれ自分の`src/testing/msw.ts`を持つ。
+`@frontend/api/mocks/**`はtestと`src/testing`だけがimportでき、production sourceからのimportは`frontend/vite.config.ts`の`testOnlyImports`が禁止する。
 
 ## transportとruntime検証
 
 同一オリジンのsession cookieを使うため、tokenの保存とAuthorization headerの注入は追加しない。
 
-Problem Details、CSRF、timeoutなどの共通transport要件を組み込みFetchだけで表現できないと確認した場合に限り、`api/generated`の外へcustom mutatorを追加する。
+Problem Details、CSRF、timeoutなどの共通transport要件を組み込みFetchだけで表現できないと確認した場合に限り、`src/generated`の外へcustom mutatorを追加する。
 
 Orvalの組み込みFetchは非2xxでもthrowせず`{ data, status, headers }`を返し、throwさせる設定もないと確認した。
 そのままではTanStack Queryが401や500を成功として扱い、`RouteError`も表示されない。
-そこでcustom mutatorを`src/api/api-fetch.ts`に置き、非2xxを`ApiProblemError`として投げる。
+そこでcustom mutatorを`src/api-fetch.ts`に置き、非2xxを`ApiProblemError`として投げる。
 `ApiProblemError`は`status`と、`Content-Type`が`application/problem+json`のときの本文`problem`を持ち、それ以外の本文や壊れたJSONでは`problem`を`undefined`にする。
 `detail`は内部情報を含みうるため、`message`に入れない。
 timeoutと再試行はTanStack Queryが持つため、mutatorは小さなnative Fetchのwrapperにした（[ADR-024](../adr/ADR-024-adopt-orval-for-frontend-api-client.md)の範囲の選択）。

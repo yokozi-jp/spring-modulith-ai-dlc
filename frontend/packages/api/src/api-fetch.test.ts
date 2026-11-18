@@ -5,7 +5,7 @@ import { readFileSync } from "node:fs";
 import { http, HttpResponse } from "msw";
 import { beforeEach, describe, expect, it, vi } from "vite-plus/test";
 
-import { server } from "@/testing/msw";
+import { server } from "./testing/msw";
 
 // Node の fetch は相対 URL を解決しないため、絶対 URL にする。
 const baseUrl = "http://localhost";
@@ -311,7 +311,7 @@ describe("api-fetch", () => {
     it("再送の発火条件の type は、コミット済みの OpenAPI 契約にある", () => {
       // 契約の type と食い違うと再送が静かに止まる。上の再送のテストは、同じ定数で本体の発火を確かめている。
       const contract = readFileSync(
-        new URL("../../../../../openapi/openapi.yaml", import.meta.url),
+        new URL("../../../../openapi/openapi.yaml", import.meta.url),
         "utf8",
       );
 

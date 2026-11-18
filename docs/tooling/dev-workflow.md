@@ -177,7 +177,7 @@ task lint-duplicates
 バックエンドだけ、またはフロントエンドだけを変更した場合は、変更していない領域のTaskを省く。
 `frontend/apps/web/src/routes/`を変更した場合は、`task fe-route-tree-check`で`routeTree.gen.ts`の再生成漏れがないことを確かめる。
 このTaskは、Collectorのroute allowlistが`routeTree.gen.ts`の`fullPaths`と一致することも確かめる。
-OpenAPI契約かOrvalの設定を変更した場合は、`task api-client-check`で`src/api/generated`の再生成漏れがないことを確かめる。
+OpenAPI契約かOrvalの設定を変更した場合は、`task api-client-check`で`packages/api/src/generated`の再生成漏れがないことを確かめる。
 React Doctorは実行に時間がかかるためpre-pushでは実行せず、Frontend CIで`task fe-doctor`を実行する。
 ローカルでReact固有の問題を診断するときは、`task fe-doctor`を手動で実行する。
 

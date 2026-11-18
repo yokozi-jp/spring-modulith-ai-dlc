@@ -1,6 +1,5 @@
+import type { OrderLineResponse, ProductSummaryResponse } from "@frontend/api/models";
 import { useTranslation } from "react-i18next";
-
-import type { OrderLineResponse, ProductSummaryResponse } from "@/api/generated/models";
 
 /** 詳細の明細。常に最新の query の data から描く。商品名が引けなければ productId をそのまま出す。 */
 export function OrderLinesTable({

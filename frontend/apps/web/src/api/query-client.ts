@@ -1,6 +1,5 @@
+import { redirectToLoginOnUnauthorized, retryUnlessClientError } from "@frontend/api/api-fetch";
 import { MutationCache, QueryCache, QueryClient } from "@tanstack/react-query";
-
-import { redirectToLoginOnUnauthorized, retryUnlessClientError } from "./api-fetch";
 
 /** 本番とテストが同じ設定で使う QueryClient を作る。 */
 export function createQueryClient(): QueryClient {

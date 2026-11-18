@@ -8,22 +8,33 @@ import { fileURLToPath } from "node:url";
 
 const frontendRoot = fileURLToPath(new URL("..", import.meta.url));
 
-// ponytail: workspace の package はアプリ 1 つ（apps/web）で、src/style.css を持つ前提で複製する。
-// packages/* と 2 つ目のアプリが fixture を持つ手順 2 から 5 では、lint/fixtures の下の package を巡り、あるファイルだけを複製する形にする。
 export const appDirectory = "apps/web";
+
+// lint/fixtures の下に fixture を持つ package と、その設定のために複製するファイル。
+// ponytail: package の一覧と複製するファイルを手で書く。package が増えて手間になったら、lint/fixtures の下を巡る形にする。
+/** @type {Record<string, string[]>} */
+const packageFiles = {
+  [appDirectory]: ["vite.config.ts", "tsconfig.json", "package.json", "src/style.css"],
+  "packages/api": ["tsconfig.json", "package.json"],
+};
 
 /** @param {string} directory */
 function copyProjectConfig(directory) {
-  cpSync(
-    path.join(frontendRoot, "lint/fixtures", appDirectory, "src"),
-    path.join(directory, appDirectory, "src"),
-    { recursive: true },
-  );
-  for (const file of ["vite.config.ts", "package.json"]) {
+  for (const file of ["vite.config.ts", "package.json", "tsconfig.base.json"]) {
     cpSync(path.join(frontendRoot, file), path.join(directory, file));
   }
-  for (const file of ["vite.config.ts", "tsconfig.json", "package.json", "src/style.css"]) {
-    cpSync(path.join(frontendRoot, appDirectory, file), path.join(directory, appDirectory, file));
+  for (const [packageDirectory, files] of Object.entries(packageFiles)) {
+    cpSync(
+      path.join(frontendRoot, "lint/fixtures", packageDirectory, "src"),
+      path.join(directory, packageDirectory, "src"),
+      { recursive: true },
+    );
+    for (const file of files) {
+      cpSync(
+        path.join(frontendRoot, packageDirectory, file),
+        path.join(directory, packageDirectory, file),
+      );
+    }
   }
   mkdirSync(path.join(directory, "lint"));
   /** @type {string[]} */
@@ -35,7 +46,7 @@ function copyProjectConfig(directory) {
 
 /** @param {string} directory */
 function linkDependencies(directory) {
-  for (const base of [".", appDirectory]) {
+  for (const base of [".", ...Object.keys(packageFiles)]) {
     symlinkSync(
       path.join(frontendRoot, base, "node_modules"),
       path.join(directory, base, "node_modules"),
@@ -46,16 +57,16 @@ function linkDependencies(directory) {
 /**
  * @param {string} directory 複製した frontend/
  * @param {string} cwd directory からの相対パス
- * @param {string} target directory からの相対パス
+ * @param {string[]} targets directory からの相対パス
  * @returns {Diagnostic[]}
  */
-function runLint(directory, cwd, target) {
+function runLint(directory, cwd, targets) {
   // vp lint をプロセスとして起動しプロジェクトの設定と plugin を読み込むため、所要時間は CPU の空きに比例する。
   // local-security.test.js と同じく、ハング検出として十分な 60 秒で打ち切る。
   /** @type {{ error?: Error, status: number | null, stderr: string, stdout: string }} */
   const { error, status, stderr, stdout } = spawnSync(
     "vp",
-    ["lint", path.join(directory, target), "--format", "json"],
+    ["lint", ...targets.map((target) => path.join(directory, target)), "--format", "json"],
     {
       cwd: path.join(directory, cwd),
       encoding: "utf8",
@@ -84,12 +95,15 @@ function runLint(directory, cwd, target) {
 
 /**
  * overrides の files は設定ファイルの場所からの相対パスで照合される。
- * そのため実際の設定と apps/web の設定を一時ディレクトリへ複製し、fixture をその apps/web/src に置いて lint する。
+ * そのため実際の設定と各 package の設定を一時ディレクトリへ複製し、fixture をその package の src に置いて lint する。
  * @param {string} cwd 一時ディレクトリからの相対パス。"." はルート、appDirectory はアプリの dir
- * @param {string} [target] 一時ディレクトリからの相対パス。省略すると fixture の全体を lint する
+ * @param {string[]} [targets] 一時ディレクトリからの相対パス。省略すると全 package の fixture を lint する
  * @returns {Diagnostic[]}
  */
-export function lintFixtureProject(cwd, target = `${appDirectory}/src`) {
+export function lintFixtureProject(
+  cwd,
+  targets = Object.keys(packageFiles).map((packageDirectory) => `${packageDirectory}/src`),
+) {
   const temporary = mkdtempSync(path.join(tmpdir(), "frontend-lint-config-"));
   // アプリの設定は、リポジトリ直下に見立てた 3 つ上の .env を読む。frontend/ の 1 つ上を空の一時ディレクトリにして、/tmp の .env を読ませない。
   const directory = path.join(temporary, "frontend");
@@ -98,7 +112,7 @@ export function lintFixtureProject(cwd, target = `${appDirectory}/src`) {
   try {
     copyProjectConfig(directory);
     linkDependencies(directory);
-    return runLint(directory, cwd, target);
+    return runLint(directory, cwd, targets);
   } finally {
     rmSync(temporary, { recursive: true, force: true });
   }

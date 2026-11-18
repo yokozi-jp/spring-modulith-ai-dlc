@@ -9,7 +9,7 @@ import { createRoot } from "react-dom/client";
 import { useTranslation } from "react-i18next";
 import { describe, expect, it } from "vite-plus/test";
 
-import { orderPath } from "@/api/generated/order";
+import { ApiProblemError } from "@frontend/api/api-fetch";
 
 describe("import を多く持つ注文", () => {
   it("すべての import を使う", () => {
@@ -23,7 +23,7 @@ describe("import を多く持つ注文", () => {
       useState,
       createRoot,
       useTranslation,
-      orderPath,
+      ApiProblemError,
     ]).not.toContain(undefined);
   });
 });

@@ -1,6 +1,6 @@
+import type { OrderDetailsResponse } from "@frontend/api/models";
 import { useTranslation } from "react-i18next";
 
-import type { OrderDetailsResponse } from "@/api/generated/models";
 import { orderStatusLabel } from "@/features/orders/order-status";
 
 import { PaymentStatus } from "./payment-status";
