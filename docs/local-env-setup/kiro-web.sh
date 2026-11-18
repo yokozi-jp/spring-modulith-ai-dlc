@@ -3,6 +3,7 @@
 #   source docs/local-env-setup/kiro-web.sh
 # 道具と状態は KIRO_WEB_HOME（既定は ~/.cache/kiro-web）へ置き、リポジトリには書かない。
 # 入れ済みの道具は、mise の設定と lock が変わるまで入れ直さない。
+# KIRO_WEB_NO_DOCKER=1 なら、docker の代わりの podman のサービスを起動しない。
 
 # サンドボックスの外（WSL など）で読むと docker と DOCKER_HOST を podman へ向けてしまうので、何もしない。
 if [ ! -d /inner_container ]; then
@@ -40,6 +41,9 @@ export PATH="$KIRO_WEB_HOME/bin:$MISE_DATA_DIR/shims:$VP_HOME/bin:$PATH"
 _kw_setup() (
   set -euo pipefail
   mkdir -p "$KIRO_WEB_HOME/bin" "$XDG_DATA_HOME" "$MISE_STATE_DIR"
+  # セッションの開始時の MCP サーバーと最初の tool call が、同時に入れ始めることがある。
+  exec 8>"$KIRO_WEB_HOME/setup.lock"
+  flock 8
   work="$(mktemp -d)"
   trap 'rm -rf "$work"' EXIT
 
@@ -81,8 +85,9 @@ from importlib.metadata import version
 sys.exit(any(version(p.split("==")[0]) != p.split("==")[1] for p in sys.argv[1:]))' "${python_packages[@]}" 2>/dev/null \
     || python3 -m pip install --quiet --user --root-user-action=ignore --disable-pip-version-check "${python_packages[@]}" >&2
 
+  # 背景に残る podman のサービスがロックを受け継がないよう、起動の前に閉じる。
+  exec 8>&-
   # Gradle のテスト（Testcontainers）は docker の代わりを経由せずサービスへつなぐので、先に起動しておく。
-  # iwe-mcp.sh は KIRO_WEB_NO_DOCKER=1 で起動しない。
   [ -n "${KIRO_WEB_NO_DOCKER:-}" ] || "$KIRO_WEB_HOME/bin/docker" info >/dev/null
 )
 

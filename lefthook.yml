@@ -173,6 +173,8 @@ pre-commit:
         - "Taskfile.yml"
         - "README.md"
         - "tooling/adr-lint/**"
+        - ".kiro/settings/mcp.json"
+        - "tooling/iwe-mcp/**"
         - ".github/rulesets/**"
         - "tooling/ruleset-check/**"
         - "tooling/ruleset-sync/**"

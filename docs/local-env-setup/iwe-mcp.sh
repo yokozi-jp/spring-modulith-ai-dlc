@@ -4,6 +4,7 @@
 set -euo pipefail
 
 repo="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+# kiro-web.sh もサンドボックスの外では何もしないが、WSL では読むこと自体を避け、以前と同じ起動にする。
 if [ -d /inner_container ]; then
   # Kiro Web は MCP サーバーを tool call より先に起動し、そのときは iwe が PATH に無い（ADR-093）。
   # docker の代わりのサービスは MCP に要らないので起動しない。
