@@ -16,7 +16,7 @@ API client、型、schemaはOpenAPIからOrvalで生成し、同じものを手�
 **生成API境界**は、OpenAPI契約から生成したHTTP client、型、schema、test用mockを置く領域である。
 
 Orvalの入力は、バックエンドが生成してSpectral検査を通し、リポジトリにコミットした`openapi/openapi.yaml`である。
-設定は`frontend/orval.config.ts`にあり、TanStack Query client、native Fetch、tag単位の分割、MSW handlerの生成を使う。
+設定は`frontend/apps/web/orval.config.ts`にあり、TanStack Query client、native Fetch、tag単位の分割、MSW handlerの生成を使う。
 runtime検証に使うZod schemaは、別のprojectの`apiZod`で`api/generated/zod`へ生成する（[ADR-024](../adr/ADR-024-adopt-orval-for-frontend-api-client.md)）。
 `apiZod`の`clean`が`api`の生成物を消さないよう、出力先のdirectoryを分ける。
 
@@ -34,7 +34,7 @@ const header = (info: { title?: string }) => [
 export default defineConfig({
   api: {
     input: {
-      target: "../openapi/openapi.yaml",
+      target: "../../../openapi/openapi.yaml",
     },
     output: {
       target: "./src/api/generated/endpoints",
@@ -68,7 +68,7 @@ export default defineConfig({
   // clean が api の出力を消さないよう、別の directory に出す。
   apiZod: {
     input: {
-      target: "../openapi/openapi.yaml",
+      target: "../../../openapi/openapi.yaml",
     },
     output: {
       target: "./src/api/generated/zod",
@@ -103,7 +103,7 @@ Zodの出力はoperationから作るため、`paths`が空の間は何も生成�
 - 契約を変えたときは`task api-gen`で契約と生成物をまとめて再生成する。
 - Orval設定だけを変えたときは`task api-client-gen`で生成物だけを再生成する。
 - `task api-client-check`は再生成した生成物とコミット済みの内容を比べ、差分があれば失敗する。
-- 生成物はfmt、lint、knip、jscpd、coverageの対象から外す（`frontend/vite.config.ts`の`generatedFiles`、`frontend/knip.json`、`.jscpd.json`）。
+- 生成物はfmt、lint、knip、jscpd、coverageの対象から外す（`frontend/vite.config.ts`と`frontend/apps/web/vite.config.ts`の`generatedFiles`、`frontend/knip.json`、`.jscpd.json`）。
 
 手順は[APIを変更する](../web-api/runbook-api-change.md)に示す。
 

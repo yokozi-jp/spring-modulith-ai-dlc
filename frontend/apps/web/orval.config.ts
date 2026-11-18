@@ -10,7 +10,7 @@ function header(info: { title?: string }) {
 export default defineConfig({
   api: {
     input: {
-      target: "../openapi/openapi.yaml",
+      target: "../../../openapi/openapi.yaml",
     },
     output: {
       target: "./src/api/generated/endpoints",
@@ -44,7 +44,7 @@ export default defineConfig({
   // clean が api の出力を消さないよう、別の directory に出す。
   apiZod: {
     input: {
-      target: "../openapi/openapi.yaml",
+      target: "../../../openapi/openapi.yaml",
     },
     output: {
       target: "./src/api/generated/zod",

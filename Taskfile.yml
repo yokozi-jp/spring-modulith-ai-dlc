@@ -8,6 +8,8 @@ vars:
   COMPOSE_FILE: '{{.COMPOSE_FILE | default "docker/compose.yml"}}'
   TEST_ENV_FILE: '{{.TEST_ENV_FILE | default ".env.test"}}'
   TEST_COMPOSE_FILE: '{{.TEST_COMPOSE_FILE | default "docker/compose-test.yml"}}'
+  # frontend/ で vp run と vp exec が対象にする apps/web。名前が合わないときは、黙って何も実行せず失敗にする。
+  FE_WEB: --filter @frontend/web --fail-if-no-match
   DB_ROLLBACK_TAG: '{{.DB_ROLLBACK_TAG | default ""}}'
   CONFIRM_ROLLBACK: '{{.CONFIRM_ROLLBACK | default ""}}'
   CONFIRM_RESET: '{{.CONFIRM_RESET | default ""}}'
@@ -128,7 +130,7 @@ tasks:
         status=0
         (
           set -e
-          (cd frontend && vp install --frozen-lockfile && vp build --mode test && vp exec playwright install chromium)
+          (cd frontend && vp install --frozen-lockfile && vp exec {{.FE_WEB}} vp build --mode test && vp exec {{.FE_WEB}} playwright install chromium)
           compose build backend
           compose up -d --wait postgres redis keycloak wiremock
           task be-migrate COMPOSE_ENV_FILE=.env.test
@@ -137,25 +139,25 @@ tasks:
           compose up -d --wait backend
           # healthcheck はコンテナの中から確かめるため、preview の proxy と同じくホストから届くかを別に確かめる。
           if ! curl --fail --silent --show-error --max-time 5 "http://localhost:${SERVER_PORT}/actuator/health/readiness" >/dev/null; then
-            echo "ホストから backend（localhost:${SERVER_PORT}）へ接続できません。frontend/test-results/backend.log の backend のログを確かめてください。" >&2
+            echo "ホストから backend（localhost:${SERVER_PORT}）へ接続できません。frontend/apps/web/test-results/backend.log の backend のログを確かめてください。" >&2
             exit 1
           fi
-          (cd frontend && vp run e2e)
+          (cd frontend && vp run {{.FE_WEB}} e2e)
         ) || status=$?
         cleanup_status=0
         keep=""
         # 成否にかかわらず backend のログを証拠に残し、秘密の値が入っていれば失敗にする。
-        mkdir -p frontend/test-results || cleanup_status=$?
-        compose logs --no-color backend > frontend/test-results/backend.log 2>&1 || true
+        mkdir -p frontend/apps/web/test-results || cleanup_status=$?
+        compose logs --no-color backend > frontend/apps/web/test-results/backend.log 2>&1 || true
         for secret in "$OIDC_CLIENT_SECRET" "$E2E_PASSWORD"; do
-          if [ -n "$secret" ] && grep -F -q -- "$secret" frontend/test-results/backend.log; then
-            echo "frontend/test-results/backend.log に .env.test の OIDC_CLIENT_SECRET か E2E_PASSWORD の値が入っています。ログに出す値を確かめてください。" >&2
+          if [ -n "$secret" ] && grep -F -q -- "$secret" frontend/apps/web/test-results/backend.log; then
+            echo "frontend/apps/web/test-results/backend.log に .env.test の OIDC_CLIENT_SECRET か E2E_PASSWORD の値が入っています。ログに出す値を確かめてください。" >&2
             if [ "$status" -eq 0 ]; then status=1; fi
           fi
         done
         # 値の一致では見つからない、セッションの Cookie の値と JWT の形（eyJ で始まる 3 つの base64url）も失敗にする。
-        if grep -E -q 'APP_SESSION=[^;[:space:]"]+|eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+' frontend/test-results/backend.log; then
-          echo "frontend/test-results/backend.log に APP_SESSION の Cookie の値か JWT の形の文字列が入っています。ログに出す値を確かめてください。" >&2
+        if grep -E -q 'APP_SESSION=[^;[:space:]"]+|eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+' frontend/apps/web/test-results/backend.log; then
+          echo "frontend/apps/web/test-results/backend.log に APP_SESSION の Cookie の値か JWT の形の文字列が入っています。ログに出す値を確かめてください。" >&2
           if [ "$status" -eq 0 ]; then status=1; fi
         fi
         if [ "$status" -ne 0 ]; then
@@ -164,8 +166,8 @@ tasks:
         if [ -n "$keep" ]; then
           echo "E2E_KEEP_ENV=1 のため、compose-test のコンテナと volume を残しました。" >&2
           echo "  backend のログ：{{.DOCKER}} compose -f {{.TEST_COMPOSE_FILE}} --profile e2e logs backend" >&2
-          echo "  （frontend/test-results/backend.log は pnpm e2e の再実行で消える）" >&2
-          echo "  再実行：cd frontend && pnpm e2e" >&2
+          echo "  （frontend/apps/web/test-results/backend.log は vp run e2e の再実行で消える）" >&2
+          echo "  再実行：cd frontend && vp run {{.FE_WEB}} e2e" >&2
           echo "  片付け：{{.DOCKER}} compose -f {{.TEST_COMPOSE_FILE}} --profile e2e down --volumes --remove-orphans" >&2
         else
           compose down --volumes --remove-orphans || cleanup_status=$?
@@ -188,7 +190,7 @@ tasks:
         if [ -z "$changed" ]; then exit 0; fi
         sig="$(printf '%s\n' "$changed" | grep -E '^(frontend/|backend/build\.gradle|backend/buildSrc/|backend/gradle/[^/]+\.gradle|backend/src/main/resources/application(-[^/]+)?\.yaml|backend/src/main/resources/db/changelog/|backend/src/main/java/com/example/demo/SecurityConfig\.java|docker/|infrastructure/|\.github/workflows/)' || true)"
         # テスト、E2E、lint の fixture は判断を含まないので、frontend の変更から外す。
-        sig="$(printf '%s\n' "$sig" | grep -vE '^frontend/((e2e|lint/fixtures|src/testing)/|.*\.(test|spec)\.[cm]?[jt]sx?$)' || true)"
+        sig="$(printf '%s\n' "$sig" | grep -vE '^frontend/(apps/[^/]+/(e2e|src/testing)/|lint/fixtures/|.*\.(test|spec)\.[cm]?[jt]sx?$)' || true)"
         if [ -z "$sig" ]; then exit 0; fi
         adr="$(printf '%s\n' "$changed" | grep -E '^docs/adr/ADR-[0-9]+.*\.md$' || true)"
         if [ -n "$adr" ]; then exit 0; fi
@@ -492,7 +494,7 @@ tasks:
     desc: フロントエンドの開発サーバーを起動（APIとOIDCを同一オリジンでproxy）
     dir: frontend
     cmds:
-      - vp dev
+      - vp run {{.FE_WEB}} dev
 
   fe-format:
     desc: フロントエンドをOxfmtで整形
@@ -510,7 +512,7 @@ tasks:
     desc: React固有のwarningとerrorをReact Doctorで検出
     dir: frontend
     cmds:
-      - timeout 900s vp run react-doctor
+      - timeout 900s vp run {{.FE_WEB}} react-doctor
 
   fe-knip:
     desc: フロントエンドの未参照ファイル、未使用export、未使用依存をKnipで検査
@@ -529,27 +531,36 @@ tasks:
       FE_TEST_ARGS: '{{.FE_TEST_ARGS | default ""}}'
     cmds:
       # 本番ビルドと同じく React Compiler を有効にして、振る舞いを検証する（ADR-078）。
-      - vp test run {{.FE_TEST_ARGS}}
+      # ルートの lint 設定のテストと、各 package のテストを実行する。
+      - vp run --recursive test {{.FE_TEST_ARGS}}
       # coverage は Compiler を外して測る。Compiler が足す memo の分岐を分母に入れない。
-      # 全体の下限は vite.config.ts の thresholds が検査する。
-      - FRONTEND_REACT_COMPILER=false vp test run --coverage {{.FE_TEST_ARGS}}
+      # 全体の下限は各 package の vite.config.ts の thresholds が検査する。ルートの package は coverage を測らない。
+      - FRONTEND_REACT_COMPILER=false vp run --filter '!frontend' --fail-if-no-match test --coverage {{.FE_TEST_ARGS}}
       # ファイルごとの下限は coverage-summary.json で検査する（ADR-076）。
       # ponytail: Vitest 4.1 の perFile は全体の下限をファイルごとに当てるだけで、別の値を持てない。
-      # perFile にオブジェクトを渡せる版へ上がったら、この検査を vite.config.ts の thresholds.perFile へ移す。
+      # perFile にオブジェクトを渡せる版へ上がったら、この検査を各 package の vite.config.ts の thresholds.perFile へ移す。
+      # apps と packages の下の package を全て巡る。coverage-summary.json が無い package は読めずに失敗にする。
       - |
         node --input-type=module <<'NODE'
-        import { readFileSync } from "node:fs";
+        import { existsSync, readdirSync, readFileSync } from "node:fs";
 
         const minimum = { branches: 60, lines: 65 };
-        const summary = JSON.parse(readFileSync("coverage/coverage-summary.json", "utf8"));
-        const failures = Object.entries(summary)
-          .filter(([file]) => file !== "total")
-          .flatMap(([file, metrics]) =>
-            Object.entries(minimum)
-              // 計測する行や分岐のないファイル（re-export だけなど）は、JaCoCo と同じく検査しない。
-              .filter(([key, min]) => metrics[key].total > 0 && metrics[key].pct < min)
-              .map(([key, min]) => `${key} ${metrics[key].pct}% < ${min}%: ${file}`),
-          );
+        const summaries = ["apps", "packages"]
+          .filter((group) => existsSync(group))
+          .flatMap((group) => readdirSync(group).map((name) => `${group}/${name}/coverage/coverage-summary.json`));
+        const missing = summaries.filter((path) => !existsSync(path));
+        for (const path of missing) console.error(`${path} がありません。package の test script が coverage を測り、json-summary を出すか確かめてください。`);
+        if (missing.length > 0) process.exit(1);
+        const failures = summaries.flatMap((path) =>
+          Object.entries(JSON.parse(readFileSync(path, "utf8")))
+            .filter(([file]) => file !== "total")
+            .flatMap(([file, metrics]) =>
+              Object.entries(minimum)
+                // 計測する行や分岐のないファイル（re-export だけなど）は、JaCoCo と同じく検査しない。
+                .filter(([key, min]) => metrics[key].total > 0 && metrics[key].pct < min)
+                .map(([key, min]) => `${key} ${metrics[key].pct}% < ${min}%: ${file}`),
+            ),
+        );
         for (const failure of failures) console.error(`ファイルの coverage が下限を下回りました。${failure}`);
         process.exit(failures.length === 0 ? 0 : 1);
         NODE
@@ -561,13 +572,13 @@ tasks:
       - task: fe-coverage
       # ルートの .env で有効にしていても、既定の無効のビルドを検査する（ADR-068）。
       # vp run の script は cache しないので、環境変数がそのまま渡る。build を run.tasks に移すなら cache.env に FRONTEND_OTEL_* を足す。
-      - FRONTEND_OTEL_ENABLED=false vp run build
+      - FRONTEND_OTEL_ENABLED=false vp run {{.FE_WEB}} build
       - |
         # grep は一致で 0、不一致で 1、対象がないなどの失敗で 2 を返す。1 以外は失敗にする。
         status=0
-        grep -rqiE 'faro|grafana|opentelemetry|web.?vitals' dist/assets || status=$?
+        grep -rqiE 'faro|grafana|opentelemetry|web.?vitals' apps/web/dist/assets || status=$?
         if [ "$status" -ne 1 ]; then
-          echo "無効のビルドの bundle に Faro の SDK か OpenTelemetry JS が入っているか、dist/assets を検査できませんでした（grep の終了コード $status）。" >&2
+          echo "無効のビルドの bundle に Faro の SDK か OpenTelemetry JS が入っているか、apps/web/dist/assets を検査できませんでした（grep の終了コード $status）。" >&2
           exit 1
         fi
 
@@ -582,15 +593,16 @@ tasks:
     desc: ビルドで再生成したrouteTree.gen.tsがコミット済みの内容と一致するか検査
     dir: frontend
     cmds:
-      - vp build
+      # tsc を挟まず、route plugin が routeTree.gen.ts を再生成するところまでを実行する。
+      - vp exec {{.FE_WEB}} vp build
       - task: _frontend-view-allowlist-check
-      - git diff --exit-code -- src/routeTree.gen.ts
+      - git diff --exit-code -- apps/web/src/routeTree.gen.ts
 
   lint-duplicates:
     desc: フロントエンドとバックエンドの手書きコードの重複をjscpdで検査
     cmds:
       # ponytail: 4.0%は参照業務機能（product、ordering、payment）の手書きの重複を除いた後の実測3.93%に合わせた値（ADR-074。ADR-035の3.2%を改めた）。残りは、モジュールごとのクラスの役割とテストの規約が求める import、注釈、フィールドの定型である。業務機能が増えて規約の定型の重複で4.0%を超えたら、上限を上げる前に検出の方式を見直す。
-      - npm exec -- jscpd frontend/src frontend/lint frontend/vite.config.ts frontend/vite-config.test.ts backend/src/main/java backend/src/test/java
+      - npm exec -- jscpd frontend/apps frontend/lint frontend/vite.config.ts backend/src/main/java backend/src/test/java
 
   # PgBouncer のトランザクションモードや RDS Proxy の後ろで壊れる、セッションに状態を残す SQL を本番のコードから検出する。
   # 一覧は https://www.pgbouncer.org/features.html の「SQL feature map for pooling modes」で Transaction pooling が Never の機能である。
@@ -679,7 +691,7 @@ tasks:
       - |
         # Collector の route allowlist（docker/otel-collector/config.yaml）が routeTree.gen.ts の fullPaths と同じ集合かを確かめる。
         # ponytail: 生成物の fullPaths の文字列リテラルと、allowlist のリテラルの選択肢だけを読む。route params の $ は allowlist で [$$] と書き、照合の前に $ へ戻す。
-        routes="$(sed -n "/^  fullPaths:/,/^  fileRoutesByTo:/p" frontend/src/routeTree.gen.ts | grep -o "'[^']*'" | tr -d "'" | sort -u)"
+        routes="$(sed -n "/^  fullPaths:/,/^  fileRoutesByTo:/p" frontend/apps/web/src/routeTree.gen.ts | grep -o "'[^']*'" | tr -d "'" | sort -u)"
         patterns="$(grep -oF 'IsMatch(log.cache["route"], "^(?:' docker/otel-collector/config.yaml | wc -l)"
         allowed="$(grep -o 'IsMatch(log.cache\["route"\], "\^(?:[^)]*)\$\$")' docker/otel-collector/config.yaml \
           | sed -e 's/^IsMatch(log.cache\["route"\], "^(?://' -e 's/)\$\$")$//' -e 's/\[\$\$\]/$/g' | tr '|' '\n' | sort -u)"
@@ -1035,14 +1047,14 @@ tasks:
     desc: コミット済みのOpenAPI契約からOrvalでAPI clientとMSW handlerを再生成（DB不要）
     dir: frontend
     cmds:
-      - vp run orval
+      - vp run {{.FE_WEB}} orval
 
   api-client-check:
     desc: Orvalで再生成したAPI clientがコミット済みの内容と一致するか検査（DB不要）
     cmds:
       - task: api-client-gen
       - task: api-drift-check
-        vars: { PATHS: frontend/src/api/generated }
+        vars: { PATHS: frontend/apps/web/src/api/generated }
 
   api-gen:
     desc: OpenAPI契約の生成、Spectral検査、Orvalの再生成を実行（テストの依存はTestcontainersが起動して片付ける）
@@ -1057,7 +1069,7 @@ tasks:
     cmds:
       - task: api-gen
       - task: api-drift-check
-        vars: { PATHS: openapi/openapi.yaml frontend/src/api/generated }
+        vars: { PATHS: openapi/openapi.yaml frontend/apps/web/src/api/generated }
 
   # api-breaking-approved ラベルの PR では CI が API_BREAKING_APPROVED=true を渡し、結果を記録するだけにする。
   api-breaking:
@@ -1546,7 +1558,7 @@ tasks:
           set -e
           rm -rf "$report_dir" && mkdir -p "$report_dir" && chmod a+rwx "$report_dir"
           {{.DOCKER}} build --tag spring-modulith-backend:dast backend
-          (cd frontend && vp build)
+          (cd frontend && vp exec {{.FE_WEB}} vp build)
           compose up -d --wait
 
           {{.DOCKER}} run --detach --name spring-modulith-dast-backend --network host \
@@ -1566,7 +1578,7 @@ tasks:
           # preview を別セッションで起動し、片付けでプロセスグループごと止める。
           # production mode は .env.test を読まないため、--mode test で .env.test の OIDC_ISSUER_URI を .env より優先させ、
           # CSP の form-action の IdP の origin を backend の issuer と揃える。
-          setsid sh -c 'echo $$ >"$1"; cd frontend && SERVER_PORT=18081 exec vp preview --mode test --host 127.0.0.1 --port 4173' sh "$preview_pid_file" \
+          setsid sh -c 'echo $$ >"$1"; cd frontend/apps/web && SERVER_PORT=18081 exec vp preview --mode test --host 127.0.0.1 --port 4173' sh "$preview_pid_file" \
             >"$report_dir/preview.log" 2>&1 &
           for attempt in $(seq 1 30); do
             if curl --silent --output /dev/null http://127.0.0.1:4173/; then break; fi

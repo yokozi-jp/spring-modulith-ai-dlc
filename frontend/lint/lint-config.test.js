@@ -1,66 +1,13 @@
-import { spawnSync } from "node:child_process";
-import { cpSync, mkdirSync, mkdtempSync, readdirSync, rmSync, symlinkSync } from "node:fs";
-import { tmpdir } from "node:os";
-import path from "node:path";
-import { fileURLToPath } from "node:url";
-
 import { describe, expect, it } from "vite-plus/test";
 
-const frontendRoot = fileURLToPath(new URL("..", import.meta.url));
+import { appDirectory, lintFixtureProject } from "./lint-project.js";
 
-/** @param {string} directory */
-function copyProjectConfig(directory) {
-  cpSync(path.join(frontendRoot, "lint/fixtures/src"), path.join(directory, "src"), {
-    recursive: true,
-  });
-  for (const file of ["vite.config.ts", "tsconfig.json", "package.json", "src/style.css"]) {
-    cpSync(path.join(frontendRoot, file), path.join(directory, file));
-  }
-  mkdirSync(path.join(directory, "lint"));
-  /** @type {string[]} */
-  const lintFiles = readdirSync(path.join(frontendRoot, "lint"));
-  for (const file of lintFiles.filter((name) => /^[^.]+\.js$/u.test(name))) {
-    cpSync(path.join(frontendRoot, "lint", file), path.join(directory, "lint", file));
-  }
-  symlinkSync(path.join(frontendRoot, "node_modules"), path.join(directory, "node_modules"));
-}
-
-// overrides の files は設定ファイルの場所からの相対パスで照合される。
-// そのため実際の設定を一時ディレクトリへ複製し、fixture をその src/ に置いて lint する。
-/** @returns {{ filename: string, code: string }[]} */
-function lintFixtures() {
-  /** @type {string} */
-  const directory = mkdtempSync(path.join(tmpdir(), "frontend-lint-config-"));
-
-  try {
-    copyProjectConfig(directory);
-    // vp lint をプロセスとして起動しプロジェクトの設定と plugin を読み込むため、所要時間は CPU の空きに比例する。
-    // local-security.test.js と同じく、ハング検出として十分な 60 秒で打ち切る。
-    /** @type {{ error?: Error, stdout: string }} */
-    const { error, stdout } = spawnSync("vp", ["lint", "src", "--format", "json"], {
-      cwd: directory,
-      encoding: "utf8",
-      // 複製先に version.txt はない。シェルで有効にしていても、無効の設定を読ませる。
-      env: { ...process.env, FRONTEND_OTEL_ENABLED: "false" },
-      timeout: 60_000,
-    });
-    if (error) {
-      throw error;
-    }
-    /** @type {{ diagnostics: { filename: string, code: string }[] }} */
-    const report = JSON.parse(stdout);
-    return report.diagnostics;
-  } finally {
-    rmSync(directory, { recursive: true, force: true });
-  }
-}
-
-const diagnostics = lintFixtures();
+const diagnostics = lintFixtureProject(".");
 
 /** @param {string} file */
 function codesIn(file) {
   return diagnostics
-    .filter((diagnostic) => diagnostic.filename === `src/${file}`)
+    .filter((diagnostic) => diagnostic.filename === `${appDirectory}/src/${file}`)
     .map((diagnostic) => diagnostic.code);
 }
 
@@ -152,6 +99,18 @@ describe("fixture に適用したプロジェクトの lint 設定", () => {
     });
 
     describe("Tailwind の class", () => {
+      it("ルートから lint しても、アプリの theme を解決する", () => {
+        const messages = diagnostics
+          .filter((diagnostic) => diagnostic.filename.endsWith("features/order/theme-class.tsx"))
+          .filter(
+            (diagnostic) => diagnostic.code === "better-tailwindcss(enforce-canonical-classes)",
+          )
+          .map((diagnostic) => diagnostic.message);
+
+        expect(messages).toHaveLength(1);
+        expect(messages[0]).toContain('simplified to "bg-primary"');
+      });
+
       it("値から組み立てた class 名と、関数に渡した key で選んだ class 名を禁止する", () => {
         expect(
           countIn("features/order/dynamic-class.tsx", "tailwind-classes(no-dynamic-class-name)"),
