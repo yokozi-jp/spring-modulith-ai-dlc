@@ -161,11 +161,8 @@ jobs:
           cache: npm
           cache-dependency-path: package-lock.json
 
-      - name: Set up Task
-        uses: go-task/setup-task@a00fbb05ce67b35648be3c78cbc9fd85354c757e # v2
-        with:
-          version: "3.53.1"
-          checksum: a54a408f6861ff921f6e87774180db31bacd8c1e7c944ca696db9fea49a82fc7
+      - name: Set up mise tools
+        uses: ./.github/actions/setup-mise
 
       # lefthook.yml の no_auto_install を lefthook dump で読むため、lefthook を入れる。prepare は走らせない。
       - name: Install dependencies
@@ -186,11 +183,8 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Set up Task
-        uses: go-task/setup-task@a00fbb05ce67b35648be3c78cbc9fd85354c757e # v2
-        with:
-          version: "3.53.1"
-          checksum: a54a408f6861ff921f6e87774180db31bacd8c1e7c944ca696db9fea49a82fc7
+      - name: Set up mise tools
+        uses: ./.github/actions/setup-mise
 
       - name: Check scratch git repositories in self-tests
         run: task lint-scratch-git
