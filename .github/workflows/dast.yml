@@ -42,6 +42,7 @@ jobs:
         env:
           EVENT_NAME: ${{ github.event_name }}
           BASE_REF: ${{ github.event.pull_request.base.ref }}
+        # docker/ は ZAP の plan と script（docker/zap/）と realm（docker/keycloak/）を含む。
         run: |
           bash tooling/ci-changes/changed.sh \
             'backend/**' \

@@ -5,6 +5,7 @@
 """
 
 import re
+import shlex
 import sys
 from pathlib import Path
 
@@ -56,6 +57,27 @@ def check_called(name, workflow):
     return errors
 
 
+def changed_sh_globs(workflow):
+    # changes ジョブが changed.sh に渡す glob。呼んでいなければ None。
+    for step in (workflow.get("jobs", {}).get("changes") or {}).get("steps", []):
+        run = str(step.get("run", ""))
+        if "changed.sh" in run:
+            return set(shlex.split(run.replace("\\\n", " "))) - {"bash", "tooling/ci-changes/changed.sh"}
+    return None
+
+
+def check_paths(name, workflow):
+    # push の paths: と changed.sh の引数は同じ一覧である。片方だけ直すと、PR と main で検査の対象が食い違う。
+    globs = changed_sh_globs(workflow)
+    push = triggers(workflow).get("push") or {}
+    if globs is None or "paths" not in push:
+        return []
+    if set(push["paths"]) != globs:
+        only_push, only_args = sorted(set(push["paths"]) - globs), sorted(globs - set(push["paths"]))
+        return [f"{name} の push の paths: と changed.sh の引数が違います。push のみ: {only_push}、changed.sh のみ: {only_args}"]
+    return []
+
+
 def main():
     directory = Path(sys.argv[1] if len(sys.argv) > 1 else ".github/workflows")
     excluded = read_excluded(Path(sys.argv[2] if len(sys.argv) > 2 else Path(__file__).with_name("excluded.tsv")))
@@ -76,7 +98,7 @@ def main():
             if job_id != Path(m.group(1)).stem:
                 errors.append(f"ci.yml のジョブ {job_id} は、呼ぶ {m.group(1)} のファイル名の stem {Path(m.group(1)).stem} に揃えてください。")
     for name in sorted(called):
-        errors += check_called(name, workflows[name]) if name in workflows else [f"ci.yml が呼ぶ {name} がありません。"]
+        errors += check_called(name, workflows[name]) + check_paths(name, workflows[name]) if name in workflows else [f"ci.yml が呼ぶ {name} がありません。"]
 
     for name, workflow in workflows.items():
         if name != "ci.yml" and "pull_request" in triggers(workflow) and name not in called | excluded.keys():
