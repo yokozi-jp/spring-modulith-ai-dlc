@@ -314,6 +314,7 @@ Docker Compose の操作（サービスの起動、停止、状態確認、Keycl
 ### スキル
 
 - `task skills-check`はスキルの記録と実体の整合を検査します。
+- `task ruleset-diff`はGitHub上のrulesetと`.github/rulesets/main.json`の差分を表示します。管理者の`gh`で反映する手順は`docs/repository/branch-protection.md`にあります。
   検査の範囲と、LefthookとCIで実行する条件は[Lintとテストのリファレンス](docs/tooling/lint-and-test.md)にあります。
 
 <p align="right">(<a href="#top">トップへ</a>)</p>

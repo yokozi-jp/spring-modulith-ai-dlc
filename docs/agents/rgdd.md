@@ -66,6 +66,8 @@ pstack のプレイブックには、このリポジトリの規約と食い違�
 レビューする Pull Request のブランチをチェックアウトし、その中で Kiro CLI を起動して実行する。
 対象から `.kiro/.kiro-plugins-installed` に載るファイルを外し、重点を置くファイルを伝える。
 
+指摘への対応と、実行しなかった理由（例：docs の誤字だけ）は、Pull Request の Evidence の Review に書く。
+
 ```text
 /thermos PR #<番号>（<ブランチ> と main の差分）をレビューして。
 .kiro/.kiro-plugins-installed に載るファイルは上流のままなので対象外。
@@ -112,3 +114,4 @@ Kiro では、これらのサブエージェントは呼び出し元のチャッ
 - steering と `AGENTS.md` は案内に限る。規約の本文は docs へ置く（[ADR-038](../adr/ADR-038-route-steering-to-docs-knowledge.md)）。
 - 文書を書く前に、`/writing-for-agents` の基準に加えて、`docs/knowledge/documentation-authoring.md` と `docs/knowledge/steering-authoring.md` を読む。
 - 戻しにくい還元は、`docs/adr/conventions.md` の基準に当たれば ADR を起こす。
+- 規約や検査を追加する候補には、リポジトリに既にある違反の一覧を添える。

@@ -419,6 +419,7 @@ components:
           example: 1
         orderId:
           type: string
+          format: uuid
           description: 注文の ID
           example: 5f0c2a8e-7d1b-4c3a-9e6f-1a2b3c4d5e6f
         orderedAt:
@@ -476,6 +477,7 @@ components:
           example: 1
         productId:
           type: string
+          format: uuid
           description: 商品の ID
           example: 0b6c8f6e-2f4a-4c1e-9d3b-7a1e5c2d4f60
         quantity:
@@ -519,6 +521,7 @@ components:
           example: 1
         orderId:
           type: string
+          format: uuid
           description: 注文の ID
           example: 5f0c2a8e-7d1b-4c3a-9e6f-1a2b3c4d5e6f
         orderedAt:
@@ -566,10 +569,12 @@ components:
           example: ch_5f0c2a8e-7d1b-4c3a-9e6f-1a2b3c4d5e6f
         orderId:
           type: string
+          format: uuid
           description: 請求した注文の ID
           example: 5f0c2a8e-7d1b-4c3a-9e6f-1a2b3c4d5e6f
         paymentId:
           type: string
+          format: uuid
           description: 決済記録の ID
           example: 7c1e4b2a-3d5f-4a6b-8c9d-0e1f2a3b4c5d
         recordedAt:
@@ -635,6 +640,7 @@ components:
           example: P-0001
         productId:
           type: string
+          format: uuid
           description: 商品の ID
           example: 0b6c8f6e-2f4a-4c1e-9d3b-7a1e5c2d4f60
         productName:
