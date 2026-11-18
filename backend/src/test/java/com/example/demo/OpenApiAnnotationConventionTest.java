@@ -85,7 +85,7 @@ class OpenApiAnnotationConventionTest {
     }
   }
 
-  // ponytail: springdoc 3.1.1 の Javadoc の扱いを固定する。版を上げて変わったら、規約文書と一緒に直す。
+  // springdoc 3.1.1 の Javadoc の扱いを固定する。版を上げて変わったら、規約文書と一緒に直す。
   @Test
   @DisplayName("package-private のハンドラの Javadoc が summary と重複のない description になる")
   void summaryAndDescriptionComeFromHandlerJavadoc() throws Exception {

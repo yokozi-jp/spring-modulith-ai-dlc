@@ -170,7 +170,7 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
     // コミット前は切断らしく見えても Problem Details を返す。
     // 外部との通信の "connection reset" を空の 200 にしないためである。
     // 本当に切断していれば、書き込みの失敗を Spring が切断として DEBUG で捨てる。
-    // ponytail: コミット前にブラウザが切断すると ERROR が 1 件出る。目立つようになったら見直す。
+    // コミット前にブラウザが切断すると ERROR が 1 件出る。切断を ERROR にしないのは #489 で扱う。
     logFailure(ex, statusCode);
     return super.handleExceptionInternal(ex, body, headers, statusCode, request);
   }

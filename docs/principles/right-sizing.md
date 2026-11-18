@@ -58,6 +58,7 @@ tags: [convention, principles, architecture, future-arch-guidelines]
 `ponytail:` は、正しく動く範囲の上限に付ける。
 既知の誤った振る舞い（誤った値を保存する、別の利用者の値が混ざる、など）を許すためには使わない。
 誤った振る舞いは同じ変更で直すか、[暫定対応と運用回避の扱い](temporary-workarounds.md)に従って Issue に残す。
+Issue に残したときは、コードのコメントに `ponytail:` を付けず、Issue の番号を書く（`取消の前に確認を挟むのは #186 で扱う`）。
 
 ## 出典
 

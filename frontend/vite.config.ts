@@ -342,7 +342,7 @@ export default defineConfig(({ mode }) => {
       settings: {
         "better-tailwindcss": { entryPoint: "src/style.css" },
       },
-      // ponytail: 同じ rule を指定する override は、後に一致したものの option だけが効く。
+      // 同じ rule を指定する override は、後に一致したものの option だけが効く。
       // 正しさは override の並び順と、option が置き換わることに依存する。並べ替えるときは lint/lint-config.test.js で確かめる。
       overrides: [
         {
