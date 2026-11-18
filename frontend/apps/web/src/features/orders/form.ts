@@ -1,7 +1,6 @@
+import type { ProductSummaryResponse } from "@frontend/api/models";
 import { createFormHook, createFormHookContexts } from "@tanstack/react-form";
 import type { TFunction } from "i18next";
-
-import type { ProductSummaryResponse } from "@/api/generated/models";
 
 import { salesStatusLabel } from "./order-status";
 

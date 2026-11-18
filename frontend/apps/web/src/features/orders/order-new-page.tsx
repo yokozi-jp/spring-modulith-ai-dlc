@@ -1,9 +1,8 @@
+import { getListProductsSuspenseQueryOptions } from "@frontend/api/endpoints/product/product";
 import { Button } from "@frontend/ui/button";
 import { useSuspenseQuery } from "@tanstack/react-query";
 import { useId } from "react";
 import { useTranslation } from "react-i18next";
-
-import { getListProductsSuspenseQueryOptions } from "@/api/generated/endpoints/product/product";
 
 import { CustomerOrderCodeField } from "./components/customer-order-code-field";
 import { OrderLinesFields } from "./components/order-lines-fields";

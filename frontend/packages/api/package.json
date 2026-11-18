@@ -1,0 +1,40 @@
+{
+  "name": "@frontend/api",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./api-fetch": "./src/api-fetch.ts",
+    "./csrf": "./src/csrf.ts",
+    "./endpoints/*": "./src/generated/endpoints/*.ts",
+    "./mocks/*": "./src/generated/mocks/*.ts",
+    "./models": "./src/generated/models/index.ts",
+    "./zod/*": "./src/generated/zod/*.ts"
+  },
+  "scripts": {
+    "orval": "orval",
+    "test": "vp test run"
+  },
+  "dependencies": {
+    "@faker-js/faker": "10.6.0",
+    "@tanstack/react-query": "5.103.2",
+    "msw": "2.15.0",
+    "zod": "4.6.5"
+  },
+  "devDependencies": {
+    "@vitest/coverage-v8": "4.1.11",
+    "orval": "8.36.0",
+    "typescript": "~7.0.2",
+    "vite-plus": "catalog:"
+  },
+  "peerDependencies": {
+    "react": "19.3.0"
+  },
+  "devEngines": {
+    "packageManager": {
+      "name": "pnpm",
+      "version": "11.21.0",
+      "onFail": "download"
+    }
+  }
+}

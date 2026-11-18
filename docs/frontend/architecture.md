@@ -28,20 +28,22 @@ OpenAPIからOrvalでnative FetchのTanStack Query clientを生成し、手書�
 
 ## 現在の構成
 
-`frontend/` は Vite+ の workspace のルートであり、アプリを `apps/<アプリ名>/`、アプリが共有する package を `packages/<名前>/` に置く（[ADR-092](../adr/ADR-092-split-frontend-into-vite-plus-workspace.md)）。
-今のアプリは `apps/web/`（package 名 `@frontend/web`）だけで、共有 package は `packages/ui/`（package 名 `@frontend/ui`）だけである。
-ルートは、workspace の定義（`pnpm-workspace.yaml`）、lockfile、Oxlint と Oxfmt の設定（`vite.config.ts` の `lint` と `fmt`）、Oxlint の JS plugin（`lint/`）、Knip の設定（`knip.json`）を持つ。
-`apps/web/` は、build、開発サーバー、テストの設定（`vite.config.ts`）、Orval と Playwright の設定、`src/`、`e2e/`、`public/` を持つ。
+`frontend/` は Vite+ の workspace のルートであり、アプリを `apps/<アプリ名>/` に、共有 package を `packages/<名前>/` に置く（[ADR-092](../adr/ADR-092-split-frontend-into-vite-plus-workspace.md)）。
+今のアプリは `apps/web/`（package 名 `@frontend/web`）だけで、共有 package は `packages/api/`（`@frontend/api`）と `packages/ui/`（`@frontend/ui`）である。
+ルートは、workspace の定義（`pnpm-workspace.yaml`）、lockfile、TypeScript の共通設定（`tsconfig.base.json`）、Oxlint と Oxfmt の設定（`vite.config.ts` の `lint` と `fmt`）、Oxlint の JS plugin（`lint/`）、Knip の設定（`knip.json`）を持つ。
+`apps/web/` は、build、開発サーバー、テストの設定（`vite.config.ts`）、Playwright の設定、`src/`、`e2e/`、`public/` を持つ。
+`packages/api/` は、Orval の設定と生成物、`apiFetch`、CSRF token の読み取り、それらのテスト、テストの設定（`vite.config.ts`）を持つ。
+`@frontend/api` は `exports` で `src` を直接公開し、ビルドしない（[公開する入口](api-client-orval.md#frontendapiの公開)）。
 
 `packages/ui/` は、shadcn の部品（`src/<部品名>.tsx`）、`cn`（`src/lib/utils.ts`）、テーマの CSS（`src/style.css`）を持つ。
 `@base-ui/**` を import できる場所は、この package の production source だけである。
-ビルドせず、`package.json` の `exports` で `src` を直接公開する。
+`@frontend/ui` も `exports` で `src` を直接公開し、ビルドしない。
 部品は `"./*": "./src/*.tsx"` で一つずつ公開するので、アプリは `import { Button } from "@frontend/ui/button"` のように部品ごとに import する。
 barrel の `index.ts` は作らない。
 `@frontend/ui` はアプリと `@frontend/api` を参照せず、`package.json` にも書かない。
 書かなければ、pnpm の厳格な解決が、それらへの import を失敗にする。
 
-現在の `apps/web/src` は、アプリケーションの起動、ルーティング、アプリシェル、routerの既定の状態表示、API clientのmutatorと `QueryClient` の生成と生成した型、国際化、テレメトリの初期化と送信、小さなutility、テストの準備のコードだけを持つ。
+現在の `apps/web/src` は、アプリケーションの起動、ルーティング、アプリシェル、routerの既定の状態表示、`QueryClient` の生成、国際化、テレメトリの初期化と送信、小さなutility、テストの準備のコードだけを持つ。
 
 ``` text
 frontend/apps/web/src/
@@ -50,13 +52,10 @@ frontend/apps/web/src/
 ├── router-defaults.test.tsx
 ├── style.css
 ├── api/
-│   ├── api-fetch.ts
-│   ├── api-fetch.test.ts
 │   ├── preload-query.ts
 │   ├── preload-query.test.ts
 │   ├── query-client.ts
-│   ├── query-client.test.ts
-│   └── generated/models/
+│   └── query-client.test.ts
 ├── i18n/
 │   ├── index.ts
 │   ├── index.test.ts
@@ -79,8 +78,6 @@ frontend/apps/web/src/
 │   ├── route-error.tsx
 │   └── route-not-found.tsx
 ├── lib/
-│   ├── csrf.ts
-│   ├── csrf.test.ts
 │   ├── telemetry.ts
 │   ├── telemetry.test.ts
 │   ├── telemetry-sanitize.ts
@@ -90,6 +87,21 @@ frontend/apps/web/src/
     ├── query-client.ts
     ├── render-route.tsx
     └── setup.ts
+```
+
+``` text
+frontend/packages/api/
+├── orval.config.ts
+├── vite.config.ts
+└── src/
+    ├── api-fetch.ts
+    ├── api-fetch.test.ts
+    ├── csrf.ts
+    ├── csrf.test.ts
+    ├── generated/models/
+    └── testing/
+        ├── msw.ts
+        └── setup.ts
 ```
 
 ``` text
@@ -113,7 +125,7 @@ Tailwind の自動検出が、アプリの directory の外にある `packages/u
 このとき型検査と lint は通ったまま、見た目だけが壊れる。
 
 `main.tsx` はcomposition rootであり、`api/query-client.ts` の `createQueryClient()` で `QueryClient` を作り、TanStack Routerを生成してProviderを接続する。
-`createQueryClient()` は、`api/api-fetch.ts` の401の処理（`QueryCache` と `MutationCache` の `onError`）と再試行の判定（`defaultOptions.queries.retry`）を渡し、mutationの後に全queryを無効化する（[mutationの後のcache](routing-and-state.md#mutationの後のcache)）。
+`createQueryClient()` は、`@frontend/api/api-fetch` の401の処理（`QueryCache` と `MutationCache` の `onError`）と再試行の判定（`defaultOptions.queries.retry`）を渡し、mutationの後に全queryを無効化する（[mutationの後のcache](routing-and-state.md#mutationの後のcache)）。
 本番とテスト（`testing/query-client.ts`）は同じ関数で `QueryClient` を作る。
 `main.tsx` は描画の前に `lib/telemetry.ts` の `initTelemetry()` を呼ぶが、SDKの読み込みを待たずに描画を始める。
 
@@ -163,14 +175,8 @@ frontend/apps/web/src/
 │       └── *.test.tsx
 │
 ├── api/
-│   ├── generated/
-│   │   ├── endpoints/
-│   │   │   └── <tag>/
-│   │   ├── models/
-│   │   │   ├── <tag>/
-│   │   │   └── shared/
-│   │   └── mocks/             # OrvalのMSW生成を使う場合だけ追加
-│   └── <custom-mutator>.ts     # 共通transport要件がある場合だけ追加
+│   ├── query-client.ts
+│   └── preload-query.ts
 │
 ├── components/
 │   ├── app-shell.tsx
@@ -179,6 +185,25 @@ frontend/apps/web/src/
 ├── testing/                   # 最初のMSWテストを書くときに追加
 │
 └── lib/
+```
+
+生成したAPI clientは、アプリではなく `frontend/packages/api` に置く。
+
+``` text
+frontend/packages/api/
+├── orval.config.ts
+└── src/
+    ├── api-fetch.ts           # custom mutator
+    ├── csrf.ts
+    ├── generated/
+    │   ├── endpoints/
+    │   │   └── <tag>/
+    │   ├── models/
+    │   │   ├── <tag>/
+    │   │   └── shared/
+    │   ├── mocks/             # OrvalのMSW生成を使う場合だけ追加
+    │   └── zod/
+    └── testing/
 ```
 
 この構成は完成形の雛形ではなく、ファイルの所属を決めるための上限である。
@@ -205,7 +230,7 @@ featureから別featureのファイルは例外なくimportしない。
 
 他のfeatureのdataや表示が要るときは、次の形で書く。
 
-- **data**：`api/generated` の生成query optionsを直接使い、変換は使う側の `select` で書く。
+- **data**：`@frontend/api/endpoints` の生成query optionsを直接使い、変換は使う側の `select` で書く。
 - **区分値の表示名**：catalogのkeyで引く（[componentの命名と設計](component-design.md#区分値の表示)）。
 - **複数featureをまたぐ画面**：routeで合成する。
 - **他のfeatureのcomponentを自分の画面の内側に置く場合**：routeから `children` かslot propで受け取る。
@@ -241,7 +266,7 @@ shadcnのprimitiveと `cn` は、アプリの外の `packages/ui`（`@frontend/u
 
 複数featureから使うという理由だけで、トップレベルに汎用的な `shared` ディレクトリを作らない。
 
-現在は共有物の責務を `components`、`lib`、`api/generated`、`i18n` で直接表せるため、`shared` を加えても階層が一つ増えるだけである。
+現在は共有物の責務を `components`、`lib`、`@frontend/api`、`i18n` で直接表せるため、`shared` を加えても階層が一つ増えるだけである。
 
 共有候補は、二つ以上のfeatureで同じ責務が確認でき、特定featureの業務語彙へ属さず、featureへ逆依存しない場合にだけ移動する。
 
@@ -258,7 +283,7 @@ shadcnのprimitiveと `cn` は、アプリの外の `packages/ui`（`@frontend/u
 許可する主要な依存方向は次のとおりである。
 
 ``` text
-main.tsx -> api/query-client.ts -> api/api-fetch.ts -> lib
+main.tsx -> api/query-client.ts -> @frontend/api/api-fetch
          -> router-defaults.ts -> components
          -> lib/telemetry.ts -> @grafana/faro-web-sdk、@grafana/faro-web-tracing（動的import）
                              -> lib/telemetry-sanitize.ts
@@ -268,9 +293,9 @@ main.tsx -> api/query-client.ts -> api/api-fetch.ts -> lib
                                   |
                                   +-> components
                                   |
-                                  +-> api/generated
+                                  +-> @frontend/api
 
-features -> api/generated
+features -> @frontend/api
          -> @frontend/ui
          -> lib
          -> i18n
@@ -290,11 +315,11 @@ components -> @frontend/ui
 
 `lib` は最下層であり、`components` も参照しない。
 
-`api` から `components` を参照しない。
-
 `@frontend/ui` からアプリのコードを参照しない。
 
-`lib` から `api/generated`、`i18n` から `components`、`components` から `api` の向きは、図に定めがないためlintでは止めていない。
+`@frontend/api` は `@frontend/ui` を `package.json` に書かないので、UIを参照できない。
+
+`lib` から `@frontend/api`、`i18n` から `components`、`components` から `api` の向きは、図に定めがないためlintでは止めていない。
 使う場面が出たら、図に向きを書いてから検査を加えるか外す。
 
 featureからrouteを参照せず、routeの情報は `getRouteApi` で取る。

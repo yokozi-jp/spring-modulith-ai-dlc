@@ -12,7 +12,7 @@ describe("package の Tailwind CSS の entry point", () => {
   ])(
     "%s の directory から lint しても、その package の theme を解決する",
     (directory, target) => {
-      const messages = lintFixtureProject(directory, target)
+      const messages = lintFixtureProject(directory, [target])
         .filter((diagnostic) => diagnostic.code === "better-tailwindcss(enforce-canonical-classes)")
         .map((diagnostic) => diagnostic.message);
 

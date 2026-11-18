@@ -14,7 +14,7 @@ const restrictedHtmlProperties = [
 
 // override の option は前の指定とマージされず置き換わるため、禁止の一覧を定数に分けて override ごとに組み合わせる。
 const htmlSinkGlobals = [{ name: "DOMParser", message: "Do not parse arbitrary HTML." }];
-const apiMessage = "Use the generated API client in src/api.";
+const apiMessage = "Use the generated API client from @frontend/api.";
 const japaneseTitle = String.raw`[\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Han}]`;
 
 const mockMessage = "Use MSW, vi.spyOn or vi.stubGlobal instead of module mocks.";
@@ -39,11 +39,6 @@ const libLayerImports = {
   group: [...sharedLayerImports.group, "@/components/**"],
   message: "lib must not depend on components, features or routes.",
 };
-// api は通信層であり、共有層の禁止に加えて UI を参照しない。
-const apiLayerImports = {
-  group: [...sharedLayerImports.group, "@/components/**"],
-  message: "api must not depend on components, features or routes.",
-};
 const featureImports = {
   group: ["@/routes/**", "@/routeTree.gen"],
   message: "Use getRouteApi instead of importing a route.",
@@ -53,7 +48,7 @@ const baseUiImports = {
   message: "Import UI primitives from @frontend/ui (ADR-025).",
 };
 const testOnlyImports = {
-  group: ["msw", "msw/**", "@/api/generated/mocks/**", "@/testing/**", "@testing-library/**"],
+  group: ["msw", "msw/**", "@frontend/api/mocks/**", "@/testing/**", "@testing-library/**"],
   message: "Use test-only modules only in test files and src/testing.",
 };
 // no-restricted-imports は静的な import に加えて import("@grafana/...") も検出する（lint/fixtures の telemetry-sdk.ts で確かめている）。
@@ -83,7 +78,7 @@ function tailwindRules(entryPoint: string) {
 }
 
 // 生成物。整形と静的解析から除外する。
-const generatedFiles = ["apps/*/src/routeTree.gen.ts", "apps/*/src/api/generated/**"];
+const generatedFiles = ["apps/*/src/routeTree.gen.ts", "packages/api/src/generated/**"];
 // lint 設定のテストが使う、違反を含む fixture。通常の整形、静的解析から外す。
 const lintFixtures = ["lint/fixtures/**"];
 
@@ -280,14 +275,13 @@ export default defineConfig({
           "react/only-export-components": "off",
         },
       },
+      // fetch と XMLHttpRequest を使える唯一の package（ADR-092）。
       {
-        files: ["apps/*/src/api/**"],
+        files: ["packages/api/**"],
         rules: {
           "no-restricted-imports": [
             "error",
-            {
-              patterns: [apiLayerImports, baseUiImports, testOnlyImports, telemetrySdkImports],
-            },
+            { patterns: [baseUiImports, testOnlyImports, telemetrySdkImports] },
           ],
           "no-restricted-globals": ["error", ...htmlSinkGlobals],
           "no-restricted-properties": ["error", ...htmlSinkProperties],
@@ -317,7 +311,11 @@ export default defineConfig({
       // ponytail: option が置き換わるため、テストでは層の import 制限も外れる。
       // テストにも層の制限が要るようになったら dependency-cruiser へ移る。
       {
-        files: ["**/*.{test,spec}.{ts,tsx,js,jsx}", "apps/*/src/testing/**"],
+        files: [
+          "**/*.{test,spec}.{ts,tsx,js,jsx}",
+          "apps/*/src/testing/**",
+          "packages/*/src/testing/**",
+        ],
         rules: {
           "no-restricted-imports": ["error", { patterns: [baseUiImports, telemetrySdkImports] }],
         },

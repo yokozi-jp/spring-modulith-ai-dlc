@@ -2,34 +2,26 @@ import { describe, expect, it } from "vite-plus/test";
 
 import { appDirectory, lintFixtureProject, uiDirectory } from "./lint-project.js";
 
+const apiDirectory = "packages/api";
 const diagnostics = lintFixtureProject(".");
 
 /**
- * @param {string} base package の dir
- * @param {string} file base/src からの相対パス
+ * @param {string} file package の src からの相対パス
+ * @param {string} [directory] file を置いた package。省略するとアプリ
  */
-function codesAt(base, file) {
+function codesIn(file, directory = appDirectory) {
   return diagnostics
-    .filter((diagnostic) => diagnostic.filename === `${base}/src/${file}`)
+    .filter((diagnostic) => diagnostic.filename === `${directory}/src/${file}`)
     .map((diagnostic) => diagnostic.code);
-}
-
-/** @param {string} file */
-function codesIn(file) {
-  return codesAt(appDirectory, file);
-}
-
-/** @param {string} file */
-function uiCodesIn(file) {
-  return codesAt(uiDirectory, file);
 }
 
 /**
  * @param {string} file
  * @param {string} code
+ * @param {string} [directory]
  */
-function countIn(file, code) {
-  return codesIn(file).filter((found) => found === code).length;
+function countIn(file, code, directory = appDirectory) {
+  return codesIn(file, directory).filter((found) => found === code).length;
 }
 
 /** @param {string} file */
@@ -81,10 +73,6 @@ describe("fixture に適用したプロジェクトの lint 設定", () => {
       expect(countIn("lib/component-import.ts", "eslint(no-restricted-imports)")).toBe(1);
     });
 
-    it("api から components の import を禁止する", () => {
-      expect(countIn("api/component-import.ts", "eslint(no-restricted-imports)")).toBe(1);
-    });
-
     it("共有コードから API client の import を許可する", () => {
       expect(codesIn("lib/clean.ts")).toStrictEqual([]);
     });
@@ -101,7 +89,7 @@ describe("fixture に適用したプロジェクトの lint 設定", () => {
       });
 
       it("@frontend/ui の中では Base UI を許可する", () => {
-        expect(uiCodesIn("primitive.tsx")).toStrictEqual([]);
+        expect(codesIn("primitive.tsx", uiDirectory)).toStrictEqual([]);
       });
 
       it("アプリの components/ui には、Base UI を許可する層の override が残っていない", () => {
@@ -110,13 +98,17 @@ describe("fixture に適用したプロジェクトの lint 設定", () => {
 
       it("@frontend/ui のテストファイルでも Base UI を禁止する", () => {
         expect(
-          uiCodesIn("base-ui.test.ts").filter((code) => code === "eslint(no-restricted-imports)"),
+          codesIn("base-ui.test.ts", uiDirectory).filter(
+            (code) => code === "eslint(no-restricted-imports)",
+          ),
         ).toHaveLength(1);
       });
 
       it("@frontend/ui でもテスト用部品の import を禁止する", () => {
         expect(
-          uiCodesIn("msw-import.ts").filter((code) => code === "eslint(no-restricted-imports)"),
+          codesIn("msw-import.ts", uiDirectory).filter(
+            (code) => code === "eslint(no-restricted-imports)",
+          ),
         ).toHaveLength(2);
       });
 
@@ -177,19 +169,19 @@ describe("fixture に適用したプロジェクトの lint 設定", () => {
   });
 
   describe("ネットワークアクセス", () => {
-    it("src/api の外では fetch と XMLHttpRequest を禁止する", () => {
+    it("@frontend/api の外では fetch と XMLHttpRequest を禁止する", () => {
       expect(countIn("lib/network.ts", "eslint(no-restricted-globals)")).toBe(2);
       expect(countIn("lib/network.ts", "eslint(no-restricted-properties)")).toBe(2);
     });
 
-    it("src/api では fetch を許可する", () => {
-      expect(codesIn("api/client.ts")).toStrictEqual([]);
+    it("@frontend/api の中では fetch と XMLHttpRequest を許可する", () => {
+      expect(codesIn("client.ts", apiDirectory)).toStrictEqual([]);
     });
   });
 
   describe("HTML sink の制限", () => {
     it("どの override でも DOMParser を禁止する", () => {
-      expect(countIn("api/html-sink.ts", "eslint(no-restricted-globals)")).toBe(1);
+      expect(countIn("html-sink.ts", "eslint(no-restricted-globals)", apiDirectory)).toBe(1);
       expect(countIn("lib/html-sink.ts", "eslint(no-restricted-globals)")).toBe(1);
     });
   });

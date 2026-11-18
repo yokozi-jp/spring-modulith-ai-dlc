@@ -146,7 +146,7 @@ clone したら、[スキルの取得元と更新](docs/agents/skill-sources.md)
 │   ├── web-api/          # Web API の設計と契約
 │   ├── writing/          # 日本語の技術文書の書き方
 │   └── index.md          # docs の入口
-├── frontend/         # Vite+ と pnpm の workspace（apps/web が React + TanStack Router + TypeScript の SPA、packages/ui が shadcn の部品とテーマ）
+├── frontend/         # Vite+ と pnpm の workspace（apps/web が React + TanStack Router + TypeScript の SPA、packages/api が Orval の生成物と API 通信、packages/ui が shadcn の部品とテーマ）
 ├── infrastructure/   # インフラ定義（未整備）
 ├── openapi/          # コミット済みの OpenAPI 契約（openapi.yaml、生成物）と Spectral のルールの fixture
 ├── .betterleaks.toml # betterleaks（シークレットスキャナ）設定
@@ -259,7 +259,7 @@ Docker Compose の操作（サービスの起動、停止、状態確認、Keycl
 
 ### API 契約
 
-- `task api-gen` は `openapi/openapi.yaml` の生成、Spectral の検査、Orval による `frontend/apps/web/src/api/generated` の再生成を実行します。
+- `task api-gen` は `openapi/openapi.yaml` の生成、Spectral の検査、Orval による `frontend/packages/api/src/generated` の再生成を実行します。
 - `task api-check` は再生成した契約と生成物がコミット済みの内容と一致するかを検査します。
 - `task api-client-check` は DB なしで Orval の生成物だけを再生成して検査し、pre-commit と Frontend CI で実行します。
 - `task be-openapi-check` は直前の `task be-test` が書き出した契約を検査し、Backend CI で実行します。

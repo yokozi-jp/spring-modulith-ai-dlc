@@ -1,16 +1,16 @@
 /* @vitest-environment jsdom */
 
+import {
+  getFindOrderByIdMockHandler,
+  getListOrdersMockHandler,
+} from "@frontend/api/mocks/ordering/ordering.msw";
+import { getListPaymentsMockHandler } from "@frontend/api/mocks/payment/payment.msw";
+import { getListProductsMockHandler } from "@frontend/api/mocks/product/product.msw";
 import { screen, waitFor, within } from "@testing-library/react";
 import type { UserEvent } from "@testing-library/user-event";
 import { http, HttpResponse } from "msw";
 import { beforeEach, describe, expect, it } from "vite-plus/test";
 
-import {
-  getFindOrderByIdMockHandler,
-  getListOrdersMockHandler,
-} from "@/api/generated/mocks/ordering/ordering.msw";
-import { getListPaymentsMockHandler } from "@/api/generated/mocks/payment/payment.msw";
-import { getListProductsMockHandler } from "@/api/generated/mocks/product/product.msw";
 import { createGate } from "@/testing/gate";
 import { server } from "@/testing/msw";
 import {

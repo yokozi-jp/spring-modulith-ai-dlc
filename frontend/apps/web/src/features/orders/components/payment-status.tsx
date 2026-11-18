@@ -1,10 +1,9 @@
+import { useListPayments } from "@frontend/api/endpoints/payment/payment";
+import type { PaymentSummaryResponse } from "@frontend/api/models";
 import { Button } from "@frontend/ui/button";
 import type { TFunction } from "i18next";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
-
-import { useListPayments } from "@/api/generated/endpoints/payment/payment";
-import type { PaymentSummaryResponse } from "@/api/generated/models";
 
 // 確定の後、Listener が決済記録を作るまで読み直す間隔と期間。
 // 期間に上限を置くのは、再投入を待つ注文で読み直しを続けないためである。決済代行の最悪の時間（3 秒）より十分長くする。

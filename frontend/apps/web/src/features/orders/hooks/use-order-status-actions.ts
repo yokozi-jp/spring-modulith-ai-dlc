@@ -1,6 +1,6 @@
+import { useCancelOrder, useConfirmOrder } from "@frontend/api/endpoints/ordering/ordering";
 import { useTranslation } from "react-i18next";
 
-import { useCancelOrder, useConfirmOrder } from "@/api/generated/endpoints/ordering/ordering";
 import { failureNotice } from "@/features/orders/notice";
 import type { Notice } from "@/features/orders/notice";
 

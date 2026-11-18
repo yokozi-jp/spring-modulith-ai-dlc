@@ -9,7 +9,7 @@ import { createRoot } from "react-dom/client";
 import { useTranslation } from "react-i18next";
 import { z } from "zod";
 
-import { orderPath } from "@/api/generated/order";
+import { ApiProblemError } from "@frontend/api/api-fetch";
 
 export const dependencies = [
   useForm,
@@ -22,5 +22,5 @@ export const dependencies = [
   createRoot,
   useTranslation,
   z,
-  orderPath,
+  ApiProblemError,
 ];

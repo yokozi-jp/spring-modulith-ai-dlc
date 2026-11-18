@@ -1,10 +1,10 @@
 /* @vitest-environment jsdom */
 
+import { getListProductsMockHandler } from "@frontend/api/mocks/product/product.msw";
 import { screen, waitFor, within } from "@testing-library/react";
 import { http } from "msw";
 import { beforeEach, describe, expect, it } from "vite-plus/test";
 
-import { getListProductsMockHandler } from "@/api/generated/mocks/product/product.msw";
 import { createGate } from "@/testing/gate";
 import { server } from "@/testing/msw";
 import {
