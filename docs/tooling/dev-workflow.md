@@ -35,6 +35,8 @@ task fe-check
 
 ## git worktreeで作業するとき
 
+worktreeを作る前に、mainのworktree（`git worktree add`を実行する元のリポジトリ）で`npm ci`を実行しておく。
+
 worktreeには`node_modules`が無いため、作った直後にルートとフロントエンドの依存を入れる。
 
 ```bash
@@ -45,8 +47,7 @@ task fe-install    # フロントエンド
 ```
 
 依存を入れないと、commitとpushのフックがcommitlintとフロントエンドの検査の依存を見つけられずに失敗する。
-git のフックはworktreeも含めてリポジトリで一つで、`npm ci`の`prepare`がmainの作業ツリーのlefthookで入れ直す。
-lefthookの`no_auto_install`で、`lefthook run`はフックを書き直さない。
+`lefthook.yml`に新しい種類のフック（`post-checkout`など）を足したら、mainのworktreeで`npm ci`（または`npx lefthook install`）を実行する。
 `npm install`は手元のnpmで`package-lock.json`を書き直し、worktreeに差分を残すことがあるため使わない（npm 11.4.2では`libc`の項目が消えた）。
 
 ## エージェントがcommitとpushをするとき
