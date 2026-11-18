@@ -1,6 +1,5 @@
+import { Button } from "@frontend/ui/button";
 import { useTranslation } from "react-i18next";
-
-import { Button } from "@/components/ui/button";
 
 /** 下書きの注文の確定と取消。 */
 export function OrderStatusButtons({

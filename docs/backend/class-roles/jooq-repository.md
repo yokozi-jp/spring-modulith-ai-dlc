@@ -444,6 +444,8 @@ Repository のテストは列と集約の往復と削除の範囲だけを確か
 - [ ] 並び順は `domain.model` の enum で受け取り、`default` のない `switch` 式で生成済みの列に写し、主キーを最後に足す。リクエストの値を `Table.field(String)` と `DSL.field(Name)` に渡さない。［自分で点検］
 - [ ] `withRenderSchema(false)` を使わない。［ArchUnit で検査：DatabaseConventionsArchTest.renderSchemaIsNotChanged］
 - [ ] jOOQ の `Settings` の `statementType` と `paramType` を変えない。［ArchUnit で検査：DatabaseConventionsArchTest.statementTypeAndParamTypeAreNotChanged］
+- [ ] 自分のモジュールのスキーマ以外の jOOQ の生成クラスを使わない。［ArchUnit で検査：DatabaseConventionsArchTest.persistenceAdaptersUseOnlyOwnGeneratedSchema］
+- [ ] `JdbcTemplate` と生の JDBC を使わず、`DSLContext` の `set`、`connection` などを呼ばない。［ArchUnit で検査：DatabaseConventionsArchTest.moduleCodeDoesNotUseJdbc、moduleCodeDoesNotChangeConnectionSettings］
 - [ ] 変換で `Order.place`、業務規則、既定値、Mapper のクラス、次の ArchUnit の規則が検査しないリフレクションの対応づけを使わない。［自分で点検］
 - [ ] jOOQ の `into`、`intoMap`、`intoGroups`、`fetchMap`、`fetchGroups`、名前が `Into` で終わるメソッドを `Class` を渡して呼ばず、`Record` の `into(Object)` と `from(Object)`、`DSLContext.newRecord(Table, Object)` を呼ばない。［ArchUnit で検査：ClassRoleArchTest.jooqReflectionMappingIsNotUsed］
 - [ ] MapStruct、ModelMapper、Dozer、`DefaultRecordMapper`、`DefaultRecordUnmapper` に依存しない。［ArchUnit で検査：ClassRoleArchTest.mappingLibrariesAreNotUsed］

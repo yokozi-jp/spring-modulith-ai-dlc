@@ -140,7 +140,7 @@ export default defineConfig(({ mode }) => {
         ],
         // json-summary は task fe-coverage がファイルごとの下限の検査に読む。
         reporter: ["text", "html", "clover", "json", "json-summary"],
-        // 全体の下限。ADR-076 の値を引き継ぐ（ADR-092）。api を切り出した後の実測は branch 94.3%、line 95.17%。
+        // 全体の下限。ADR-076 の値を引き継ぐ（ADR-092）。api と ui を切り出した後の実測は branch 94.27%、line 95.15%。line の下限に近い。
         thresholds: { branches: 88, lines: 95 },
       },
     },

@@ -1,6 +1,5 @@
+import { cn } from "@frontend/ui/lib/utils";
 import { describe, expect, it } from "vite-plus/test";
-
-import { cn } from "./utils";
 
 describe("cn", () => {
   it("競合する Tailwind の utility は最後のものを残す", () => {

@@ -45,6 +45,8 @@ forkと共有するものは[バックエンドのテストの実行基盤](test
   ShedLockのロックは`CleanGeneratedTablesExtension.expireLocks`を使う。
   理由はそのJavadocにある。
 - 負荷の下で外れるテストは、期限を延ばしたりリトライしたりせず、待つ条件か状態の前提を直す。
+- `OutputCaptureExtension`の`CapturedOutput`はJVM全体の標準出力を持ち、前のテストが残した背景のスレッドの出力も重なる。
+  ERRORやWARNがないことは、対象のloggerの行だけに絞って確かめる（`ApiExceptionHandlerTest`の`handlerLog`）。
 
 ## 失敗時の診断情報
 

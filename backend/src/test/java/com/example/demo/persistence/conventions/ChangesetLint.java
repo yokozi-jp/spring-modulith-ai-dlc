@@ -36,25 +36,15 @@ final class ChangesetLint {
   /**
    * 本番のchangesetの許可リスト。
    *
-   * <p>各モジュールのchangesetは、自スキーマの作成、アプリロールへのUSAGEとテーブルのDMLの付与、rollbackのスキーマの削除を任意のSQLで書く。
+   * <p>各モジュールのchangesetは、自スキーマの作成とrollbackのスキーマの削除を任意のSQLで書く。権限のSQLは許可リストに載せず、{@link
+   * ChangesetPrivilegeRules}（G3）が判定する。
    */
   /* package */ static final List<AllowlistEntry> ALLOWLIST =
       Stream.of(
-              moduleSchemaSql(
-                  "001-create-event-publication-tables",
-                  "modulith",
-                  "modulith.event_publication, modulith.event_publication_archive"),
-              moduleSchemaSql("003-create-product-tables", "product", "product.m_product"),
-              moduleSchemaSql(
-                  "004-create-order-tables", "ordering", "ordering.t_order, ordering.t_order_line"),
-              moduleSchemaSql("006-create-payment-tables", "payment", "payment.t_payment"),
-              List.of(
-                  new AllowlistEntry(
-                      ARBITRARY_SQL,
-                      "010-create-shedlock-table: GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE"
-                          + " modulith.shedlock TO \"${appDatabaseUsername}\";",
-                      "Liquibase OSSにはGRANTのChange Typeがない。"
-                          + "既存のmodulithスキーマに足すShedLockの表へ、アプリロールのDMLを与える（ADR-079）。")))
+              moduleSchemaSql("001-create-event-publication-tables", "modulith"),
+              moduleSchemaSql("003-create-product-tables", "product"),
+              moduleSchemaSql("004-create-order-tables", "ordering"),
+              moduleSchemaSql("006-create-payment-tables", "payment"))
           .flatMap(List::stream)
           .toList();
 
@@ -62,26 +52,14 @@ final class ChangesetLint {
     // 静的メソッドだけを持つ。
   }
 
-  /** モジュールのスキーマの作成、権限の付与、削除の任意のSQL（M17）を許可リストに載せる。 */
-  private static List<AllowlistEntry> moduleSchemaSql(
-      final String changeset, final String schema, final String tables) {
-    final String grantee = " TO \"${appDatabaseUsername}\";";
+  /** モジュールのスキーマの作成と削除の任意のSQL（M17）を許可リストに載せる。 */
+  private static List<AllowlistEntry> moduleSchemaSql(final String changeset, final String schema) {
     return List.of(
         new AllowlistEntry(
             ARBITRARY_SQL,
             changeset + ": CREATE SCHEMA " + schema + " AUTHORIZATION CURRENT_USER;",
             "Liquibase OSS 5.0.4にはスキーマを作るChange Typeがない。"
                 + "ADR-011はモジュールのスキーマをchangesetで作ると定めている。"),
-        new AllowlistEntry(
-            ARBITRARY_SQL,
-            changeset + ": GRANT USAGE ON SCHEMA " + schema + grantee,
-            "Liquibase OSSにはGRANTのChange Typeがない。"
-                + "ADR-011は、各changesetが自スキーマのUSAGEをアプリロールに与えると定めている。"),
-        new AllowlistEntry(
-            ARBITRARY_SQL,
-            changeset + ": GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE " + tables + grantee,
-            "Liquibase OSSにはGRANTのChange Typeがない。"
-                + "アプリロールへテーブルごとにDMLを与える（ADR-011、docs/database/connections.md）。"),
         new AllowlistEntry(
             ARBITRARY_SQL,
             changeset + ": DROP SCHEMA " + schema + ";",
