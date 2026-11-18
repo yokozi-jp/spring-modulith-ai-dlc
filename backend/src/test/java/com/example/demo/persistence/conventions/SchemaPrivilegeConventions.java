@@ -9,9 +9,10 @@ import java.util.Map;
 import java.util.function.Predicate;
 
 /**
- * アプリロールの権限の規則（G1）を、カタログの行から判定する。
+ * ロールの権限の規則（G1、G2）を、カタログの行から判定する。
  *
  * <p>アプリロールはDDLの権限を持たず、自スキーマのUSAGEとテーブルのDMLだけを持ち、{@code liquibase}スキーマに触れない。すべてのスキーマに適用する。
+ * マイグレーションロールは表を所有するが、superuserでも{@code BYPASSRLS}でもない。
  */
 final class SchemaPrivilegeConventions {
 
@@ -31,6 +32,10 @@ final class SchemaPrivilegeConventions {
           "REPLICATION", RoleRow::replication,
           "BYPASSRLS", RoleRow::bypassRls,
           "CREATE:DATABASE", RoleRow::canCreateInDatabase);
+
+  /** マイグレーションロールに与えない属性。どちらかを持つと、表の所有者にも{@code FORCE ROW LEVEL SECURITY}が効かない。 */
+  private static final Map<String, Predicate<RoleRow>> MIGRATION_ROLE_ATTRIBUTES =
+      Map.of("SUPERUSER", RoleRow::superuser, "BYPASSRLS", RoleRow::bypassRls);
 
   /** DMLでないテーブルの権限の名前と、その権限を持つか。 */
   private static final Map<String, Predicate<RelationPrivilegeRow>> RELATION_PRIVILEGES =
@@ -58,15 +63,31 @@ final class SchemaPrivilegeConventions {
       final List<SchemaPrivilegeRow> schemas,
       final List<RelationPrivilegeRow> relations) {
     final List<ConventionViolation> violations = new ArrayList<>();
-    ROLE_ATTRIBUTES.forEach(
-        (name, granted) -> {
-          if (granted.test(role)) {
-            violations.add(violation(role, name));
-          }
-        });
+    ROLE_ATTRIBUTES.forEach((name, granted) -> {
+      if (granted.test(role)) {
+        violations.add(violation(role, name));
+      }
+    });
     schemaPrivileges(role, schemas, violations);
     relationPrivileges(role, relations, violations);
     return violations;
+  }
+
+  /**
+   * G2：マイグレーションロールの属性を判定する。
+   *
+   * @param role マイグレーションロールの属性
+   * @return 違反
+   */
+  /* package */ static List<ConventionViolation> migrationRole(final RoleRow role) {
+    return MIGRATION_ROLE_ATTRIBUTES.entrySet().stream()
+        .filter(attribute -> attribute.getValue().test(role))
+        .map(attribute ->
+            new ConventionViolation(
+                "G2",
+                role.name() + ":" + attribute.getKey(),
+                "マイグレーションロールをsuperuserにもBYPASSRLSにもしない。superuserはコンテナの初期化だけに使う（" + ROLE_DOC + "）。"))
+        .toList();
   }
 
   private static void schemaPrivileges(
@@ -92,12 +113,11 @@ final class SchemaPrivilegeConventions {
       final List<ConventionViolation> violations) {
     for (final RelationPrivilegeRow relation : relations) {
       final String object = relation.schema() + "." + relation.relation();
-      RELATION_PRIVILEGES.forEach(
-          (name, granted) -> {
-            if (granted.test(relation)) {
-              violations.add(violation(role, name + ":" + object));
-            }
-          });
+      RELATION_PRIVILEGES.forEach((name, granted) -> {
+        if (granted.test(relation)) {
+          violations.add(violation(role, name + ":" + object));
+        }
+      });
       if (relation.anyPrivilege() && LIQUIBASE_SCHEMA.equals(relation.schema())) {
         violations.add(violation(role, "ANY:" + object));
       }

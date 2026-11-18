@@ -92,6 +92,11 @@ Spring の AOP プロキシは、Bean の外からの呼び出しだけを横取
 `@Around` などの AspectJ の advice と `@Pointcut` の式には `within(<パッケージ>..*<役割名>)` を書き、`execution` にはメソッドの名前と修飾子だけを書く。
 `execution` の宣言型だけで対象を絞ると、AspectJ がすべての Bean のすべてのメソッドで上位型をたどって照合し、Spring のコンテキストの起動が数倍遅くなる（[ADR-051](../adr/ADR-051-bind-pgm-cd-with-scoped-value-and-aspect.md)）。
 
+`@Aspect` のクラスには `Ordered.LOWEST_PRECEDENCE` より小さい値の `@Order`（`@Order(Ordered.LOWEST_PRECEDENCE - 100)` など）を付け、すべての Aspect をトランザクションより外側で動かす（[ADR-051](../adr/ADR-051-bind-pgm-cd-with-scoped-value-and-aspect.md)）。
+値のない `@Order` は使わない。
+トランザクションの advisor の順序を既定の `Ordered.LOWEST_PRECEDENCE` に保つため、`@EnableTransactionManagement` を宣言しない。
+トランザクションの内側で動く Aspect が必要になったら、先に ADR-051 とこの規則を変える。
+
 いまのコードで使っていないアノテーションの規則も、検査の費用がほぼなく使い始めたときの事故を防げるため残す。
 
 ## 警告の抑制

@@ -61,8 +61,14 @@ tags: [reference, code-review]
 
 - [システム連携と非同期処理](../integration/index.md)
 
+## 文書
+
+- [docs文書の作成と変更](../knowledge/documentation-authoring.md#手順とコード例の確かめ方)：差分が文書に`task`の手順を書くとき、各Taskの定義を読み、書いた順に動くかを確かめるとき
+- [docs文書の作成と変更](../knowledge/documentation-authoring.md#手順とコード例の確かめ方)：差分が規約や検査を追加、変更するとき、既存の文書のコード例がそれに反していないかを確かめるとき
+
 ## テスト
 
 - [バックエンドのテスト種別](../backend/testing-strategy.md)
 - [テスト観点の割り当て](../frontend/test-strategy.md)
+- [バックエンドのアーキテクチャテスト](../backend/architecture-tests.md#規則を確かめるフィクスチャ)：注釈の属性の値で判定するArchUnitの規則を足す差分で、違反フィクスチャが値を省いた注釈を含むかを確かめるとき
 - [Lintとテストのリファレンス](../tooling/lint-and-test.md)：Lintの規則やoptionを変える差分で、fixtureがoptionの許す範囲の外側を拒否しているかを確かめるとき

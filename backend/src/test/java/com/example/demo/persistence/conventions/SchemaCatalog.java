@@ -14,6 +14,7 @@ import com.example.demo.persistence.conventions.CatalogSnapshot.ViewDependencyRo
 import java.util.List;
 import org.jooq.DSLContext;
 import org.jooq.Record;
+import org.jooq.impl.DSL;
 
 /**
  * 接続したロールで{@code pg_catalog}を読み、{@link CatalogSnapshot}を作る。
@@ -47,9 +48,10 @@ final class SchemaCatalog {
    * カタログを読む。
    *
    * @param dsl アプリロールで接続したjOOQのコンテキスト
+   * @param migrationRole changesetを適用したマイグレーションロールの名前
    * @return 読んだ行
    */
-  /* package */ static CatalogSnapshot read(final DSLContext dsl) {
+  /* package */ static CatalogSnapshot read(final DSLContext dsl, final String migrationRole) {
     return new CatalogSnapshot(
         relations(dsl),
         columns(dsl),
@@ -112,7 +114,8 @@ final class SchemaCatalog {
             .fetch(r -> text(r, "extname")),
         dsl.resultQuery("SELECT count(*) AS object_count FROM pg_largeobject_metadata")
             .fetchSingle(r -> r.get("object_count", Long.class)),
-        role(dsl),
+        role(dsl, dsl.fetchValue(DSL.currentUser())),
+        role(dsl, migrationRole),
         schemaPrivileges(dsl),
         relationPrivileges(dsl));
   }
@@ -221,15 +224,23 @@ final class SchemaCatalog {
                 text(r, "referenced_view")));
   }
 
-  private static RoleRow role(final DSLContext dsl) {
+  /**
+   * ロールの属性を読む。
+   *
+   * @param dsl jOOQのコンテキスト。{@code pg_roles}は誰でも読めるため、どのロールで接続してもよい
+   * @param name ロール名
+   * @return ロールの属性
+   */
+  private static RoleRow role(final DSLContext dsl, final String name) {
     return dsl.resultQuery(
             """
             SELECT r.rolname AS object_name, r.rolsuper, r.rolcreatedb, r.rolcreaterole,
                    r.rolreplication, r.rolbypassrls,
-                   has_database_privilege(current_database(), 'CREATE') AS can_create
+                   has_database_privilege(r.oid, current_database(), 'CREATE') AS can_create
             FROM pg_roles r
-            WHERE r.rolname = current_user
-            """)
+            WHERE r.rolname = ?
+            """,
+            name)
         .fetchSingle(r ->
             new RoleRow(
                 text(r, NAME),
