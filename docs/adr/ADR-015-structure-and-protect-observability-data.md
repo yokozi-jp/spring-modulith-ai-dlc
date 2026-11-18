@@ -9,7 +9,7 @@ tags: [adr, observability, logging, security]
 
 ## Status
 
-Proposed
+Accepted
 
 ## Date
 
