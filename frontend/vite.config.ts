@@ -89,7 +89,7 @@ function tailwindRules(entryPoint: string) {
 
 // 生成物。整形と静的解析から除外する。
 const generatedFiles = ["apps/*/src/routeTree.gen.ts", "apps/*/src/api/generated/**"];
-// lint 設定のテストが使う、違反を含む fixture。通常の整形、静的解析、テストの収集から外す。
+// lint 設定のテストが使う、違反を含む fixture。通常の整形、静的解析から外す。
 const lintFixtures = ["lint/fixtures/**"];
 
 export default defineConfig({

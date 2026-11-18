@@ -167,7 +167,7 @@ tasks:
           echo "E2E_KEEP_ENV=1 のため、compose-test のコンテナと volume を残しました。" >&2
           echo "  backend のログ：{{.DOCKER}} compose -f {{.TEST_COMPOSE_FILE}} --profile e2e logs backend" >&2
           echo "  （frontend/apps/web/test-results/backend.log は vp run e2e の再実行で消える）" >&2
-          echo "  再実行：cd frontend && vp run --filter @frontend/web e2e" >&2
+          echo "  再実行：cd frontend && vp run {{.FE_WEB}} e2e" >&2
           echo "  片付け：{{.DOCKER}} compose -f {{.TEST_COMPOSE_FILE}} --profile e2e down --volumes --remove-orphans" >&2
         else
           compose down --volumes --remove-orphans || cleanup_status=$?
@@ -548,6 +548,9 @@ tasks:
         const summaries = ["apps", "packages"]
           .filter((group) => existsSync(group))
           .flatMap((group) => readdirSync(group).map((name) => `${group}/${name}/coverage/coverage-summary.json`));
+        const missing = summaries.filter((path) => !existsSync(path));
+        for (const path of missing) console.error(`${path} がありません。package の test script が coverage を測り、json-summary を出すか確かめてください。`);
+        if (missing.length > 0) process.exit(1);
         const failures = summaries.flatMap((path) =>
           Object.entries(JSON.parse(readFileSync(path, "utf8")))
             .filter(([file]) => file !== "total")

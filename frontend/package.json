@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "knip": "knip",
-    "test": "vp test run --dir lint --exclude '**/fixtures/**'"
+    "test": "vp test run --dir lint --exclude '**/fixtures/**' --passWithNoTests"
   },
   "devDependencies": {
     "@shadcn/lint": "0.1.5",

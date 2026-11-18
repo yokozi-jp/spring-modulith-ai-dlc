@@ -5,7 +5,7 @@
     "apps/web": {
       "playwright": { "entry": ["e2e/**/*.{setup,spec}.ts"] },
       "ignore": ["src/api/generated/**"],
-      "ignoreDependencies": ["@faker-js/faker", "@tanstack/react-table", "lucide-react"]
+      "ignoreDependencies": ["@tanstack/react-table", "lucide-react"]
     }
   }
 }

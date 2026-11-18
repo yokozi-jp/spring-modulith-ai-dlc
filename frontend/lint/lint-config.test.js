@@ -99,6 +99,18 @@ describe("fixture に適用したプロジェクトの lint 設定", () => {
     });
 
     describe("Tailwind の class", () => {
+      it("ルートから lint しても、アプリの theme を解決する", () => {
+        const messages = diagnostics
+          .filter((diagnostic) => diagnostic.filename.endsWith("features/order/theme-class.tsx"))
+          .filter(
+            (diagnostic) => diagnostic.code === "better-tailwindcss(enforce-canonical-classes)",
+          )
+          .map((diagnostic) => diagnostic.message);
+
+        expect(messages).toHaveLength(1);
+        expect(messages[0]).toContain('simplified to "bg-primary"');
+      });
+
       it("値から組み立てた class 名と、関数に渡した key で選んだ class 名を禁止する", () => {
         expect(
           countIn("features/order/dynamic-class.tsx", "tailwind-classes(no-dynamic-class-name)"),

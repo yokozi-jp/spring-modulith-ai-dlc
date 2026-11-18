@@ -43,7 +43,7 @@ componentの内部state、Hookの呼出回数、CSS classだけを主要な期�
   `createGate`は`src/testing/gate.ts`にある。
   止める側で`promise`を待ち、テストから`release`を呼ぶ。
 - **待つ上限**：`findBy`、`waitFor`、`expect.poll`の呼出に`timeout`を書かない。
-  上限は`vite.config.ts`の`asyncWaitTimeoutMs`が一括して決める。
+  上限は`apps/web/vite.config.ts`の`asyncWaitTimeoutMs`が一括して決める。
 - **`expect.poll`で扱えないmatcher**：`toThrow`とsnapshotは、対象のPromiseを直接awaitして検証する（例：`await expect(p).rejects.toThrow()`）。
 - **Testing Libraryの`waitFor`のcallback**：assertionを一つだけ置き、clickなどの副作用を置かない。
 - **差し替えてよい境界**：HTTPはMSW、globalは`vi.spyOn`か`vi.stubGlobal`、時刻はfake timerで置き換え、`vi.mock`と`vi.doMock`でmoduleを差し替えない。

@@ -69,7 +69,7 @@ PITのHTMLとXMLのレポートは、変異対象がある場合に`backend/buil
   `apps/web`の全体の下限はbranch 88%とline 95%である。ファイルごとの下限は全packageで共通のbranch 60%とline 65%である。
   全体の下限は各packageの`vite.config.ts`の`thresholds`が、ファイルごとの下限はTaskが各packageの`coverage/coverage-summary.json`から検査する（[ADR-076](../adr/ADR-076-run-mutation-tests-per-change-and-tighten-coverage-gates.md)）。
   Compilerを外すのは環境変数`FRONTEND_REACT_COMPILER=false`で、理由は[ADR-078](../adr/ADR-078-measure-frontend-coverage-without-react-compiler.md)にある。
-  `FE_TEST_ARGS`に渡した値は、2回のVitestの実行の両方に足す（例：`task fe-verify FE_TEST_ARGS=--reporter=dot`）。
+  `FE_TEST_ARGS`に渡した値は、ルートのlint設定のテスト、各packageのテスト、coverageの測定のVitestの実行すべてに足す。ファイルのパスは渡さず、reporterなどのoptionだけを渡す（例：`task fe-verify FE_TEST_ARGS=--reporter=dot`）。
   テストのtimeoutは`apps/web/vite.config.ts`の`testTimeout`で30秒にする。
 - **`task fe-test-build`**：`fe-coverage`と、`FRONTEND_OTEL_ENABLED=false`を強制した本番ビルドを実行する。
   ビルドの後に`apps/web/dist/assets`を`faro|grafana|opentelemetry|web.?vitals`でgrepし、bundleにFaro、OpenTelemetry JS、Web Vitalsのコードが入っていれば失敗する（[ADR-068](../adr/ADR-068-collect-browser-telemetry-with-faro-via-collector.md)）。
@@ -144,8 +144,8 @@ packageの側に`lint`がないため、`vp lint`はルートと`apps/web`のど
   テストのimportの数は検証対象に合わせて増え、テスト自身の責務の大きさを表さないからである。
 
 生成物の`apps/*/src/routeTree.gen.ts`と`apps/*/src/api/generated/**`は、Lint、整形、coverageから外す。
-`apps/*/src/api/generated/**`はKnipとjscpdの対象からも外す。
-違反を含むfixtureの`lint/fixtures/**`は、Lint、整形、テストの収集、Knipから外す。
+`apps/*/src/api/generated/**`はjscpdの対象から、`apps/web/src/api/generated/**`はKnipの対象からも外す。
+違反を含むfixtureの`lint/fixtures/**`は、Lint、整形、Knipから外し、ルートのテストの`--exclude`でテストの収集からも外す。
 
 ### ファイルの範囲ごとの制限
 
