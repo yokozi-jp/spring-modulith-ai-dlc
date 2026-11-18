@@ -55,6 +55,10 @@ tags: [convention, principles, architecture, future-arch-guidelines]
 一方で、利用先に依存しない上限（件数、計算量、全件の走査など）は、上限と作り替えのきっかけを `ponytail:` のコメントで書けば残してよい。
 上限に達したかどうかはどの利用先でも同じ指標で測れ、作り替えの時期を利用先が決められるためである。
 
+`ponytail:` は、正しく動く範囲の上限に付ける。
+既知の誤った振る舞い（誤った値を保存する、別の利用者の値が混ざる、など）を許すためには使わない。
+誤った振る舞いは同じ変更で直すか、[暫定対応と運用回避の扱い](temporary-workarounds.md)に従って Issue に残す。
+
 ## 出典
 
 - フューチャー株式会社「アーキテクチャ原則ガイドライン」（[アーキテクチャ設計ガイドライン](https://future-architect.github.io/arch-guidelines/documents/forPrinciple/principle_guidelines.html)、commit `e309a6d`）、[CC BY 4.0](https://creativecommons.org/licenses/by/4.0/deed.ja)
