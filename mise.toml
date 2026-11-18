@@ -1,7 +1,5 @@
 # 版を変えたら `mise lock --platform linux-x64` を実行し、mise.lock と .mise/locks/ を同じコミットに含める。
-[settings]
-locked = true
-
+# [tools] のほかを書くと、新しいチェックアウトごとに mise trust が要る（ADR-090）。
 [tools]
 betterleaks = "1.10.1"
 # iwe の実行に要る Node.js は mise では入れない（ADR-090）。

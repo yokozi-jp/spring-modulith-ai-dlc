@@ -32,20 +32,20 @@ iwe は `06-setup-iwe.sh` が `npm install -g` で入れ、CI は `versions.env`
 
 Proposed の間に Decision を一度書き直した。
 最初の案は CI の各 step に `jdx/mise-action` と mise の版を書いていたので、Task の版の複製が mise の版の複製に移っただけだった。
-また、lock を強制するのは CI の `MISE_LOCKED=1` だけで、ローカルの shims は lock に無い版を入れて `mise.lock` を書き換えられた。
-このため、CI の設定を composite action へまとめ、lock の強制を `mise.toml` へ移した。
+このため、CI の設定を composite action へまとめた。
+lock の強制を `mise.toml` の `[settings] locked = true` へ移す案も試したが、`[tools]` のほかを書いた `mise.toml` は新しいチェックアウトごとに `mise trust` を求め、新しい worktree で shims と Git フックが止まったので採らなかった（選択肢5）。
 
 ## Decision
 
 - `mise.toml` の `[tools]` に `task`、`betterleaks`、`npm:@iwe-org/iwe` を exact 版で書き、`mise lock --platform linux-x64` で `mise.lock` に URL と checksum を記録する。
 - npm backend の iwe について mise が作る `.mise/locks/npm-iwe-org-iwe/<版>/`（依存の integrity を持つ lockfile）も commit する。
-- `mise.toml` の `[settings]` に `locked = true` を書き、ローカルでも CI でも lock に無い版を入れさせない。
-- `mise.toml` には、この2つのほかに何も書かない。タスク（Task の役割）、環境変数、Node.js と pnpm（Vite+ の役割）、Java は書かない。
-- ローカルでは apt で入れた mise が `mise install` を実行する。
+- `mise.toml` には `[tools]` の版だけを書く。`[tools]` だけのファイルは `mise trust` を要さない。タスク（Task の役割）、環境変数、設定、Node.js と pnpm（Vite+ の役割）、Java は書かない。
+- ローカルでは apt で入れた mise が `mise install --locked` を実行する。
 - PATH は mise の shims で通す。`04-setup-shell.sh` が `~/.bashrc` に `eval "$(mise activate bash --shims)"` を足す。Taskfile と Lefthook は `betterleaks` と `iwe` をそのまま呼ぶ。
 - CI は composite action `.github/actions/setup-mise` を使う。この action だけが `jdx/mise-action` の SHA と mise の版を持ち、入力 `tools` でジョブが使う道具だけを入れる。
+- composite action は `MISE_LOCKED=1` をジョブの環境変数にし、install と後の step の shims に lock に無い版を拒ませる。
 - CI ではキャッシュを使わない。復元したキャッシュは `mise.lock` と照合されないためである。
-- `Taskfile.yml` を paths 条件に入れる workflow には、`mise.toml`、`mise.lock`、`.github/actions/setup-mise/` も入れる。以前は Task の版を上げると各 workflow 自身が変わって走ったが、今は `mise.toml` と `mise.lock` しか変わらないためである。
+- `Taskfile.yml` を paths 条件に入れる workflow には、`mise.toml`、`mise.lock`、`.github/actions/setup-mise/**` も入れ、`task ci-gate-check` で検査する。以前は Task の版を上げると各 workflow 自身が変わって走ったが、今は `mise.toml` と `mise.lock` しか変わらないためである。
 - 番号付きのセットアップスクリプトのうち `00-setup-task.sh`、`05-setup-go-betterleaks.sh`、`06-setup-iwe.sh` と `versions.env` を削除する。
 
 `mise activate` ではなく shims を選んだ理由は、PATH が作業ディレクトリに左右されないことである。
@@ -59,8 +59,8 @@ shims は決まったディレクトリなので、受け継いだ PATH のま�
 ### Positive
 
 - 版を上げる作業は、`mise.toml` を書き換えて `mise lock` を実行し、`mise.lock` と `.mise/locks/` を commit するだけになる。CI の 17 か所にあった Task の版と checksum の複製がなくなり、mise の版と `jdx/mise-action` の SHA は composite action の1か所にまとまる。
-- `mise lock` は betterleaks の配布物を cosign の署名で検証してから sha256 を `mise.lock` に記録する。`mise install` は Task と betterleaks を `mise.lock` の sha256、iwe を `.mise/locks/` の npm の integrity と照合して入れる。`mise.lock` の Task の sha256 は、`versions.env` に書いていた値と同じである。
-- shims が lock に無い版を黙って入れることがなくなる。`mise.toml` の版だけを上げて lock を作り直さないと、`task` は `task@<版> is not in the lockfile` で止まる。
+- `mise lock` は betterleaks の配布物を cosign の署名で検証してから sha256 を `mise.lock` に記録する。`mise install --locked` は Task と betterleaks を `mise.lock` の sha256、iwe を `.mise/locks/` の npm の integrity と照合して入れる。`mise.lock` の Task の sha256 は、`versions.env` に書いていた値と同じである。
+- CI では、`mise.toml` の版だけを上げて lock を作り直さない変更が `is not in the lockfile` で止まる。
 - Go を入れる必要がなくなる。
 
 ### Negative
@@ -68,7 +68,9 @@ shims は決まったディレクトリなので、受け継いだ PATH のま�
 - 開発者は mise を入れ、shims を PATH に通す必要がある。shims が PATH にないと `task` が見つからない。
 - shims は `mise.toml` のあるチェックアウトの中でだけ道具を選べる。この変更より前に切ったブランチや worktree では、古い `task` を消すと Git フックが動かなくなる。
 - iwe は実行に Node.js を要するが、mise は Node.js を入れない。ローカルでは Vite+、CI では `actions/setup-node` が入れる。
-- `.mise/locks/` が欠けると、`mise install` は iwe の install で失敗する（mise のエラーは `mise lock` での修復を案内する）。
+- ローカルの shims は lock を強制しない。`mise.toml` の版だけを上げると、shims は初回の実行でその版を入れて `mise.lock` を書き換える。書き換わった `mise.lock` は差分に出て、commit しなければ CI が止める。
+- `.mise/locks/` が欠けると、`mise install --locked` は iwe の install で失敗する（mise のエラーは `mise lock` での修復を案内する）。
+- 版を上げる PR では、Task を使う workflow がすべて走る。betterleaks か iwe だけを上げても backend、frontend、e2e、dast が走り、main への push では mutation test も走る。
 - Dependabot は `mise.toml` と composite action の `version` を更新しない。[#389](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/389) で Renovate を入れるまで手で上げる。`jdx/mise-action` の SHA は、`dependabot.yml` の `directories` に composite action を足して Dependabot に更新させる。
 
 ### Neutral
@@ -102,7 +104,13 @@ shims は決まったディレクトリなので、受け継いだ PATH のま�
 
 - **Description**：composite action を作らず、17 か所の step にそれぞれ mise の版、`MISE_LOCKED=1`、`cache: false` を書く。
 - **Pros**：composite action のための Dependabot と lint の設定が要らない。
-- **Cons**：mise の版を上げるたびに 17 か所を手で直すことになる。`MISE_LOCKED=1` は書いた step にしか効かず、ローカルでは lock を強制しない。
+- **Cons**：mise の版を上げるたびに 17 か所を手で直すことになる。`MISE_LOCKED=1` は書いた step にしか効かない。
+
+### 選択肢5: mise.toml に `[settings] locked = true` を書く
+
+- **Description**：lock の強制を `mise.toml` に書き、ローカルの shims にも CI にも lock に無い版を拒ませる。
+- **Pros**：ローカルでも lock に無い版が入らない。CI の `MISE_LOCKED=1` も要らない。
+- **Cons**：`[tools]` のほかを書いた `mise.toml` は、チェックアウトごとに `mise trust` を要する。新しい worktree では trust する前に shims が `Config files in … are not trusted` で止まり、`task` を呼ぶ Git フックも止まる。CI は trust を自動で済ませるので、CI では気づけない。グローバルの mise の設定に道具を持つ開発者は、グローバルの lock も要るようになる。
 
 ## References
 

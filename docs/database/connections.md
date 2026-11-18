@@ -72,10 +72,15 @@ LiquibaseとjOOQ生成はHikariCPを通らないため、この上限を受け�
 マイグレーションとjOOQ生成を実行するときは、`MIGRATION_DB_USERNAME`と`MIGRATION_DB_PASSWORD`を全環境で明示します。
 これにより、ローカルからテスト、ステージング、本番まで、接続の解決経路と権限モデルが一致し、環境ごとに異なる分岐を通りません。
 ローカルとテストも二ロールで動かします。
-`docker/compose.yml`と`docker/compose-test.yml`では、DDL権限を持つマイグレーション用ロールがPostgreSQLのブートストラップユーザーになり、`liquibase`スキーマとDML限定のアプリケーション用ロールを`docker/initdb`が初回起動時に作成します。
+`docker/compose.yml`と`docker/compose-test.yml`では、PostgreSQLのイメージが作るsuperuser（`postgres`）をコンテナの初期化だけに使います。
+`docker/initdb`は初回起動時に、このsuperuserでマイグレーション用ロール、`liquibase`スキーマ、DML限定のアプリケーション用ロールを作成します。
+マイグレーション用ロールはsuperuserでも`BYPASSRLS`でもなく、DBへは`CREATE`だけを追加で与え、`liquibase`スキーマと、changesetが作るスキーマと表を所有します。
+アプリケーション、Liquibase、jOOQ生成、テストのDB操作はsuperuserで接続しません。
+superuserのパスワードは、ローカルでは`.env`の`POSTGRES_SUPERUSER_PASSWORD`をComposeのsecretで渡し、テストでは使い捨ての値を使います。
+マイグレーション用ロールがsuperuserでも`BYPASSRLS`でもないことは、カタログのテスト（`SchemaInspectionTest`の規則G2）が確かめます。
 001 changesetは`modulith`スキーマを作成し、そのUSAGEとイベント出版テーブルだけのDML権限を`DB_USERNAME`へ付与します。
 Liquibase管理スキーマと管理テーブルへのアプリ権限は付与しません。
-001 changesetを初期状態から書き換えたため、既存DBは移行せず`task compose-reset CONFIRM_RESET=yes`で作り直します。
+001 changesetを初期状態から書き換えたことと、既存のボリュームでは`docker/initdb`が再実行されずマイグレーション用ロールがsuperuserのまま残ることから、既存DBは移行せず`task compose-reset CONFIRM_RESET=yes`で作り直します。
 ステージングと本番も既存DBを再利用せず、`liquibase`スキーマだけをマイグレーション用ロールの所有で作ってから初回マイグレーションを実行します。
 001 changesetがアプリケーションロール（`DB_USERNAME`）へGRANTするため、ステージングと本番では、そのロールを初回マイグレーションより前にRDS側で作成しておきます。
 `docker/initdb`のような自動作成経路がないため、未作成のままマイグレーションを実行するとGRANTで失敗します。
@@ -85,8 +90,8 @@ Liquibase用アカウントには、DDL、Liquibase管理テーブルの更新�
 
 | 環境         | 接続先       | アプリケーションロール（DML） | マイグレーションロール（DDL、所有）  | jOOQ生成           |
 | ------------ | ------------ | ----------------------------- | ------------------------------------ | ------------------ |
-| ローカル     | 共通の`DB_*` | `demo`（initdbが作成）        | `demo_migration`（ブートストラップ） | 同じ接続で生成     |
-| CIテスト     | 共通の`DB_*` | `demo`（initdbが作成）        | `demo_migration`（ブートストラップ） | 必要な場合だけ生成 |
+| ローカル     | 共通の`DB_*` | `demo`（initdbが作成）        | `demo_migration`（initdbが作成）     | 同じ接続で生成     |
+| CIテスト     | 共通の`DB_*` | `demo`（initdbが作成）        | `demo_migration`（initdbが作成）     | 必要な場合だけ生成 |
 | ステージング | 共通の`DB_*` | 専用アカウント                | 専用アカウント                       | 実行しない         |
 | 本番         | 共通の`DB_*` | 専用アカウント                | 専用アカウント                       | 実行しない         |
 

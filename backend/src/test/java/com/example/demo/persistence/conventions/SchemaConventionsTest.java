@@ -40,6 +40,9 @@ class SchemaConventionsTest {
   /** 業務テーブル。 */
   private static final String TABLE = "m_item";
 
+  /** 業務テーブルの主キー。 */
+  private static final String ITEM_ID = "item_id";
+
   /** uuidの型名。 */
   private static final String UUID = "uuid";
 
@@ -58,6 +61,9 @@ class SchemaConventionsTest {
   /** アプリロール。 */
   private static final String ROLE = "demo";
 
+  /** マイグレーションロール。 */
+  private static final String MIGRATION_ROLE = "demo_migration";
+
   @Test
   @DisplayName("規約を満たす行だけなら違反がない")
   void conformingSnapshotHasNoViolations() {
@@ -68,8 +74,8 @@ class SchemaConventionsTest {
                 column(ITEM, BIGINT, "b", "a", "", null),
                 column(MODULITH, INTEGER, "b", "", "", "nextval('x'::regclass)")),
             List.of(
-                new ConstraintRow(ITEM, TABLE, "pk_m_item", "p"),
-                new ConstraintRow(ITEM, TABLE, "m_item_item_code_not_null", "n")),
+                new ConstraintRow(ITEM, TABLE, "pk_m_item", "p", null),
+                new ConstraintRow(ITEM, TABLE, "m_item_item_code_not_null", "n", null)),
             List.of(
                 index(ITEM, BTREE, true, 1, 1),
                 index(MODULITH, "hash", false, 1, 1),
@@ -81,6 +87,7 @@ class SchemaConventionsTest {
             List.of("plpgsql", "btree_gist"),
             0,
             cleanRole(),
+            new RoleRow(MIGRATION_ROLE, false, false, false, false, false, true),
             List.of(
                 new SchemaPrivilegeRow(ITEM, true, false, false),
                 new SchemaPrivilegeRow(MODULITH, true, false, false),
@@ -132,9 +139,9 @@ class SchemaConventionsTest {
     void rejectsForeignKeyCheckAndUniqueConstraints() {
       final List<ConstraintRow> rows =
           List.of(
-              new ConstraintRow(ITEM, TABLE, "fk_x", "f"),
-              new ConstraintRow(ITEM, TABLE, "chk_x", "c"),
-              new ConstraintRow(ITEM, TABLE, "uq_x", "u"));
+              new ConstraintRow(ITEM, TABLE, "fk_x", "f", ITEM),
+              new ConstraintRow(ITEM, TABLE, "chk_x", "c", null),
+              new ConstraintRow(ITEM, TABLE, "uq_x", "u", null));
 
       assertThat(keys(SchemaTableConventions.constraints(rows)))
           .as("制約: %s", rows)
@@ -146,7 +153,7 @@ class SchemaConventionsTest {
     void ignoresNotNullConstraints() {
       assertThat(
               SchemaTableConventions.constraints(
-                  List.of(new ConstraintRow(ITEM, TABLE, "m_item_x_not_null", "n"))))
+                  List.of(new ConstraintRow(ITEM, TABLE, "m_item_x_not_null", "n", null))))
           .isEmpty();
     }
 
@@ -156,8 +163,8 @@ class SchemaConventionsTest {
       assertThat(
               SchemaTableConventions.constraints(
                   List.of(
-                      new ConstraintRow(MODULITH, TABLE, "fk_x", "f"),
-                      new ConstraintRow(LIQUIBASE, TABLE, "chk_x", "c"))))
+                      new ConstraintRow(MODULITH, TABLE, "fk_x", "f", MODULITH),
+                      new ConstraintRow(LIQUIBASE, TABLE, "chk_x", "c", null))))
           .isEmpty();
       assertThat(
               SchemaTableConventions.triggers(
@@ -409,6 +416,79 @@ class SchemaConventionsTest {
     }
   }
 
+  /** 主キーと外に出す ID。 */
+  /* package */ @Nested
+  class PublicIdRulesTest {
+
+    @Test
+    @DisplayName("P3：別のモジュールの行を指す列は、uuidの<対象>_public_idだけを受け入れる")
+    void rejectsReferencesToOtherModulesExceptUuidPublicIds() {
+      final List<ColumnRow> columns =
+          List.of(
+              column(ITEM, ITEM_ID, BIGINT),
+              column(ITEM, "public_id", UUID),
+              column(ITEM, "order_public_id", UUID),
+              column(ITEM, "created_tx_id", "character varying(32)"),
+              column(ITEM, "patched_id", INTEGER),
+              column(ITEM, "item_code", "character varying(20)"),
+              column(ITEM, "order_id", BIGINT),
+              column(ITEM, "customer_id", UUID),
+              column(ITEM, "product_public_id", BIGINT),
+              column(ITEM, "legacy_public_id", "character varying(36)"));
+
+      assertThat(
+              keys(
+                  SchemaTableConventions.references(
+                      List.of(relation(ITEM, "r", true, null)), columns)))
+          .as("カラム: %s", columns)
+          .containsExactlyInAnyOrder(
+              "P3 item.m_item.order_id",
+              "P3 item.m_item.customer_id",
+              "P3 item.m_item.product_public_id",
+              "P3 item.m_item.legacy_public_id");
+    }
+
+    @Test
+    @DisplayName("P3：別のスキーマの主キーと同じ名前の列を、同じモジュールの参照とみなさない")
+    void rejectsColumnsNamedAfterAnotherSchemasPrimaryKey() {
+      assertThat(
+              keys(
+                  SchemaTableConventions.references(
+                      List.of(relation("other", "r", true, null)),
+                      List.of(column(ITEM, ITEM_ID, BIGINT)))))
+          .containsExactly("P3 item.m_item.item_id");
+    }
+
+    @Test
+    @DisplayName("P4：スキーマをまたぐ外部キーを拒否し、同じスキーマの外部キーは判定しない")
+    void rejectsCrossSchemaForeignKeys() {
+      final List<ConstraintRow> rows =
+          List.of(
+              new ConstraintRow(ITEM, TABLE, "fk_m_item_order", "f", "ordering"),
+              new ConstraintRow(ITEM, TABLE, "fk_m_item_parent", "f", ITEM),
+              new ConstraintRow(ITEM, TABLE, "pk_m_item", "p", null));
+
+      assertThat(keys(SchemaTableConventions.crossSchemaForeignKeys(rows)))
+          .as("制約: %s", rows)
+          .containsExactly("P4 item.fk_m_item_order");
+    }
+
+    @Test
+    @DisplayName("modulithとliquibaseの列と外部キーを判定しない")
+    void ignoresFrameworkSchemas() {
+      assertThat(
+              SchemaTableConventions.references(
+                  List.of(), List.of(column(MODULITH, "listener_id", BIGINT))))
+          .as("列")
+          .isEmpty();
+      assertThat(
+              SchemaTableConventions.crossSchemaForeignKeys(
+                  List.of(new ConstraintRow(LIQUIBASE, TABLE, "fk_x", "f", ITEM))))
+          .as("外部キー")
+          .isEmpty();
+    }
+  }
+
   /** 関数、ビュー、継承、拡張機能。 */
   /* package */ @Nested
   class ObjectRulesTest {
@@ -465,7 +545,7 @@ class SchemaConventionsTest {
     }
   }
 
-  /** アプリロールの権限。 */
+  /** ロールの権限。 */
   /* package */ @Nested
   class PrivilegeRulesTest {
 
@@ -524,6 +604,23 @@ class SchemaConventionsTest {
               "G1 demo:TRIGGER:item.m_other",
               "G1 demo:MAINTAIN:item.m_other");
     }
+
+    @Test
+    @DisplayName("G2：マイグレーションロールのsuperuserとBYPASSRLSを拒否する")
+    void rejectsSuperuserAndBypassRlsOnMigrationRole() {
+      final RoleRow role = new RoleRow(MIGRATION_ROLE, true, false, false, false, true, true);
+
+      assertThat(keys(SchemaPrivilegeConventions.migrationRole(role)))
+          .containsExactlyInAnyOrder("G2 demo_migration:SUPERUSER", "G2 demo_migration:BYPASSRLS");
+    }
+
+    @Test
+    @DisplayName("G2：表を作れるマイグレーションロールを受け入れる")
+    void acceptsMigrationRoleThatCanCreate() {
+      final RoleRow role = new RoleRow(MIGRATION_ROLE, false, false, false, false, false, true);
+
+      assertThat(SchemaPrivilegeConventions.migrationRole(role)).isEmpty();
+    }
   }
 
   private static Set<String> keys(final List<ConventionViolation> violations) {
@@ -532,7 +629,11 @@ class SchemaConventionsTest {
 
   private static RelationRow relation(
       final String schema, final String relkind, final boolean hasPrimaryKey, final String parent) {
-    return new RelationRow(schema, TABLE, relkind, hasPrimaryKey, parent);
+    return new RelationRow(schema, TABLE, relkind, hasPrimaryKey ? ITEM_ID : null, parent);
+  }
+
+  private static ColumnRow column(final String schema, final String name, final String typeName) {
+    return new ColumnRow(schema, TABLE, name, typeName, "b", "", "", null);
   }
 
   private static ColumnRow column(
@@ -543,7 +644,7 @@ class SchemaConventionsTest {
       final String generated,
       final String defaultExpression) {
     return new ColumnRow(
-        schema, TABLE, "item_id", typeName, typeKind, identity, generated, defaultExpression);
+        schema, TABLE, ITEM_ID, typeName, typeKind, identity, generated, defaultExpression);
   }
 
   private static IndexRow index(

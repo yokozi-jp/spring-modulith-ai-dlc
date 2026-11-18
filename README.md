@@ -89,7 +89,6 @@ clone したら、[スキルの取得元と更新](docs/agents/skill-sources.md)
 | インフラとツール | Keycloak                   | 26.7.3     | OIDC の認可サーバー                            |
 | インフラとツール | Grafana OpenTelemetry LGTM | 0.32.1     | 可観測性データの集約                           |
 | インフラとツール | OpenTelemetry Collector    | 0.161.0    | ログの属性の絞り込み                           |
-| インフラとツール | Task                       |            | タスクランナー                                 |
 
 ログ相関、PII、保持は[可観測性データの規約](docs/observability/conventions.md)、フロントエンドの構成は[フロントエンドアーキテクチャ](docs/frontend/architecture.md)を参照してください。
 その他のパッケージのバージョンは `backend/build.gradle` と `frontend/package.json`、Task と betterleaks と iwe のバージョンは `mise.toml` を参照してください。
@@ -313,6 +312,7 @@ Docker Compose の操作（サービスの起動、停止、状態確認、Keycl
 ### スキル
 
 - `task skills-check`はスキルの記録と実体の整合を検査します。
+- `task ruleset-diff`はGitHub上のrulesetと`.github/rulesets/main.json`の差分を表示します。管理者の`gh`で反映する手順は`docs/repository/branch-protection.md`にあります。
   検査の範囲と、LefthookとCIで実行する条件は[Lintとテストのリファレンス](docs/tooling/lint-and-test.md)にあります。
 
 <p align="right">(<a href="#top">トップへ</a>)</p>

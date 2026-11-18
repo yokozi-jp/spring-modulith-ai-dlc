@@ -146,7 +146,7 @@ Dockerの`--format`など別のGoテンプレートをコマンドへ渡す場�
 CIとLefthookは処理を複製せず、Taskfileの同じタスクを呼ぶ。
 入口タスクが呼ぶ部品タスクとCIが呼ぶ部品タスクの処理を一致させる。
 Taskfileを変更したら、CIのpaths条件に`Taskfile.yml`が含まれていることも確認する。
-`Taskfile.yml`をpaths条件に入れるworkflowには、Taskの版と入れ方を決める`mise.toml`、`mise.lock`、`.github/actions/setup-mise/`も入れる。
+`Taskfile.yml`をpaths条件に入れるworkflowには、Taskの版と入れ方を決める`mise.toml`、`mise.lock`、`.github/actions/setup-mise/**`も入れる。`task ci-gate-check`が、`push`と`pull_request`の`paths:`と`changed.sh`の引数を検査する。
 
 ## 文書の同期
 

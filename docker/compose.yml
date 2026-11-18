@@ -6,9 +6,12 @@ services:
     command: ["postgres", "-c", "timezone=UTC", "-c", "log_timezone=UTC"]
     environment:
       POSTGRES_DB: ${DB_NAME:?DB_NAME is required}
-      # ブートストラップは DDL とスキーマ所有を持つマイグレーション用ロール。
-      POSTGRES_USER: ${MIGRATION_DB_USERNAME:?MIGRATION_DB_USERNAME is required}
-      POSTGRES_PASSWORD_FILE: /run/secrets/migration_db_password
+      # superuser はコンテナの初期化（initdb）だけに使う。
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD_FILE: /run/secrets/postgres_superuser_password
+      # initdb が作成する、表を所有するマイグレーションロール（superuser でも BYPASSRLS でもない）。
+      MIGRATION_DB_USERNAME: ${MIGRATION_DB_USERNAME:?MIGRATION_DB_USERNAME is required}
+      MIGRATION_DB_PASSWORD_FILE: /run/secrets/migration_db_password
       # initdb が作成する DML 限定のアプリロール（アプリはこの資格情報で接続する）。
       DB_USERNAME: ${DB_USERNAME:?DB_USERNAME is required}
       DB_PASSWORD_FILE: /run/secrets/db_password
@@ -16,9 +19,10 @@ services:
       - "127.0.0.1:${DB_PORT:?DB_PORT is required}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql
-      # Liquibase管理専用スキーマとアプリロールだけを作る。モジュールスキーマはchangesetが作成する。
+      # 2つのロールとLiquibase管理専用スキーマだけを作る。モジュールスキーマはchangesetが作成する。
       - ./initdb:/docker-entrypoint-initdb.d:ro
     secrets:
+      - postgres_superuser_password
       - migration_db_password
       - db_password
     healthcheck:
@@ -100,7 +104,7 @@ services:
     restart: unless-stopped
 
   otel-lgtm:
-    image: grafana/otel-lgtm:0.39.0@sha256:4c8056c9c05fcb3c8fd93800e85334bfd79b4d0271b47a54a121a64af41fe1fe
+    image: grafana/otel-lgtm:0.40.0@sha256:72e05804790e6e0d8c0b70a6d5ff1f721ef7b203463374631e99aa3429bd0cf6
     entrypoint:
       - /bin/bash
       - -ec
@@ -126,7 +130,7 @@ services:
 
   # 可観測性データの唯一の出口。ログの属性を allowlist で絞ってから LGTM へ送る（本番と同じ設定）。
   otel-collector:
-    image: otel/opentelemetry-collector-contrib:0.164.0@sha256:340c9ca6a36617084c6661bdc4f0fe92b7cda5a805d61673ec8db375fddc522b
+    image: otel/opentelemetry-collector-contrib:0.165.0@sha256:e40d61f10c9a617cca1ffd1be4d7e2b3a4b0f0001798ff07e58cabe82e618cea
     command: ["--config", "/etc/otelcol-contrib/config.yaml"]
     environment:
       # コンテナ間通信とホストからの送信を受けるため、全インターフェースで待ち受ける。
@@ -231,6 +235,8 @@ volumes:
   otel_lgtm_data:
 
 secrets:
+  postgres_superuser_password:
+    environment: POSTGRES_SUPERUSER_PASSWORD
   migration_db_password:
     environment: MIGRATION_DB_PASSWORD
   db_password:

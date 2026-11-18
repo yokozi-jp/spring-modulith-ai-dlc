@@ -7,6 +7,10 @@ inputs:
 runs:
   using: composite
   steps:
+    # 後の step の shims も、lock に無い版を入れずに止める。
+    - name: Refuse versions missing from mise.lock
+      shell: bash
+      run: echo "MISE_LOCKED=1" >> "$GITHUB_ENV"
     - uses: jdx/mise-action@236a21c3b91f5db6d4e174b348674a0f0caac06d # v5.2.9
       with:
         version: 2026.11.9

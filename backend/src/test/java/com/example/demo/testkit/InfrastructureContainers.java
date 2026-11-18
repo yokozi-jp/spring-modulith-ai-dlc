@@ -44,7 +44,7 @@ final class InfrastructureContainers {
   /** compose のテスト用スタック。イメージとコマンドの正本。作業ディレクトリは {@code backend}。 */
   private static final Path COMPOSE_FILE = Path.of("../docker/compose-test.yml");
 
-  /** compose と同じ初期化のスクリプト（liquibase スキーマとアプリロール）。 */
+  /** compose と同じ初期化のスクリプト（マイグレーションロール、liquibase スキーマ、アプリロール）。 */
   private static final Path INITDB_DIR = Path.of("../docker/initdb");
 
   /** 決済代行のスタブ。compose の WireMock と同じものを読む。 */
@@ -69,8 +69,11 @@ final class InfrastructureContainers {
   /** DML だけを持つアプリロール。 */
   private static final String APP_USER = "demo";
 
-  /** DDL とスキーマを持つマイグレーションロール。 */
+  /** DDL とスキーマを持つマイグレーションロール。initdb が superuser でも BYPASSRLS でもないロールとして作る。 */
   private static final String MIGRATION_USER = "demo_migration";
+
+  /** コンテナの初期化だけに使う superuser。テストもマイグレーションもこのロールで接続しない。 */
+  private static final String SUPERUSER = "postgres";
 
   /** 使い捨てのコンテナのパスワード。JVM ごとに作り、固定の値をコードに置かない。 */
   private static final String PASSWORD = UUID.randomUUID().toString();
@@ -120,8 +123,10 @@ final class InfrastructureContainers {
                     // ダイジェスト付きの名前は既定の照合に通らないため、postgres の公式イメージであることを示す。
                     .asCompatibleSubstituteFor(POSTGRES))
             .withDatabaseName(DB_NAME)
-            .withUsername(MIGRATION_USER)
+            .withUsername(SUPERUSER)
             .withPassword(PASSWORD)
+            .withEnv("MIGRATION_DB_USERNAME", MIGRATION_USER)
+            .withEnv("MIGRATION_DB_PASSWORD", PASSWORD)
             .withEnv("DB_USERNAME", APP_USER)
             .withEnv("DB_PASSWORD", PASSWORD)
             .withCopyFileToContainer(

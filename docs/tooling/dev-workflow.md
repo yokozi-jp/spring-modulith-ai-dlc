@@ -40,11 +40,12 @@ worktreeには`node_modules`が無いため、作った直後にルートとフ�
 ```bash
 git worktree add -b <ブランチ> ../<ディレクトリ> origin/main
 cd ../<ディレクトリ>
-npm install        # Lefthookとcommitlint
+npm ci             # Lefthookとcommitlint
 task fe-install    # フロントエンド
 ```
 
 依存を入れないと、commitとpushのフックがcommitlintとフロントエンドの検査の依存を見つけられずに失敗する。
+`npm install`は手元のnpmで`package-lock.json`を書き直し、worktreeに差分を残すことがあるため使わない（npm 11.4.2では`libc`の項目が消えた）。
 
 ## エージェントがcommitとpushをするとき
 
@@ -106,6 +107,10 @@ Taskのテスト系タスクは、`.env.test`に足りない変数を`.env.test.
 
 定期の再投入のロックの表（`010-create-shedlock-table`）を足した変更の後は、既存のローカルのDBに`task be-migrate`を実行する。
 表がないと、定期の再投入は毎回`Event publication resubmission failed`のWARNで失敗する。
+
+マイグレーション用のロールをsuperuserから分けた変更の後は、既存の`.env`へ`.env.example`の`POSTGRES_SUPERUSER_PASSWORD`の行を足す（[DB接続情報とロール分離](../database/connections.md)）。
+この行がないと、`task compose-up`と`task dev`はPostgreSQLのsecretを作れずに止まる。
+既存の`postgres_data`ボリュームでは`docker/initdb`が再実行されず、`demo_migration`はsuperuserのまま残るため、`task compose-reset CONFIRM_RESET=yes`でボリュームを消し（ほかのサービスのデータも消える）、`task compose-up`で起動してから`task be-migrate`を実行する。
 
 公開先は次のとおり。
 

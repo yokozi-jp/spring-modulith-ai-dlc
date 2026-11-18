@@ -1,11 +1,11 @@
 ---
 type: ADR
-title: 'ADR-051: 共通カラムの pgm_cd を Aspect と ScopedValue で渡す'
-description: 共通カラムの *_pgm_cd の値を、shared の Aspect が CommandHandler と Listener の呼び出しの間だけ ScopedValue に束縛し、CommonColumns がそれを読む決定。spring-boot-starter-aspectj を依存に加える。
-tags: [adr, backend, database, aop]
+title: 'ADR-051: 共通カラムの pgm_cd を Aspect と ScopedValue で渡し、Aspect をトランザクションの外側で動かす'
+description: 共通カラムの *_pgm_cd の値を、shared の Aspect が CommandHandler と Listener の呼び出しの間だけ ScopedValue に束縛し、CommonColumns がそれを読む決定。spring-boot-starter-aspectj を依存に加える。すべての @Aspect に @Order を付けて、トランザクションの advisor より外側で動かす（テナントを束縛する Aspect も従う）。
+tags: [adr, backend, database, aop, aspect-order, transaction]
 ---
 
-# ADR-051: 共通カラムの pgm_cd を Aspect と ScopedValue で渡す
+# ADR-051: 共通カラムの pgm_cd を Aspect と ScopedValue で渡し、Aspect をトランザクションの外側で動かす
 
 ## Status
 
@@ -32,6 +32,13 @@ Repository の実装は、どのユースケースから呼ばれたかを引数
 Spring のコンテキストを起動するたびに、この照合で時間がかかっていた（ローカルの JFR で、`ActuatorHealthSecurityTest` の CPU サンプルの 77.5%）。
 そこで Decision の pointcut の形を、下の `within` の形に書き直した。
 
+Spring は、別々の Aspect と `@Transactional` の advisor が同じメソッドに掛かるときの順序を、指定しなければ決めない。
+トランザクションの advisor の既定の順序は `Ordered.LOWEST_PRECEDENCE` で、`@Order` のない `PgmCdAspect` と同じ値だった。
+`spring-boot-starter-aspectj` の構成で確かめると、トランザクションが外側で始まり、その内側で `PgmCdAspect` が値を束縛していた。
+いまは `*_pgm_cd` を `handle` の中の書き込みだけが読むため、どちらの順序でも結果は変わらない。
+しかし、テナントを束縛する Aspect（[issue #369](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/369)）は、トランザクションの開始の時点で値が束縛されている必要がある。
+そこで、Aspect とトランザクションの順序の決定を Decision に足した。
+
 ## Decision
 
 `org.springframework.boot:spring-boot-starter-aspectj` を依存に加え、`shared.infrastructure.persistence` に `@Aspect` の `PgmCdAspect` を置く。
@@ -57,6 +64,18 @@ Spring のコンテキストを起動するたびに、この照合で時間が�
 
 Aspect は Spring AOP のプロキシで動かし、ロード時やコンパイル時のウィービングは使わない。
 
+Aspect とトランザクションの順序は、次のように明示する。
+
+- トランザクションの advisor の順序は、Spring の既定の `Ordered.LOWEST_PRECEDENCE` のままにする。
+  `@EnableTransactionManagement` を宣言し直すと Spring Boot のトランザクションの自動構成が退くため、宣言しない。
+  ArchUnit の `transactionManagementIsNotRedeclared` で検査する。
+- `PgmCdAspect` に `@Order(Ordered.LOWEST_PRECEDENCE - 100)` を付け、トランザクションより外側で動かす。
+  トランザクションの開始の時点で、`*_pgm_cd` の値は束縛済みになる。
+- すべての `@Aspect` のクラスに `Ordered.LOWEST_PRECEDENCE` より小さい値の `@Order` を付け、トランザクションより外側で動かす。
+  値のない `@Order` は `Ordered.LOWEST_PRECEDENCE` になり、トランザクションの advisor と前後が決まらないため認めない。
+  ArchUnit の `aspectsDeclareOrder` で検査する。
+  トランザクションの内側で動く Aspect が必要になったら、この決定を変える。
+
 ## Consequences
 
 ### Positive
@@ -64,7 +83,8 @@ Aspect は Spring AOP のプロキシで動かし、ロード時やコンパイ�
 - Repository のインタフェースと `CommonColumns` の呼び出しに、ユースケースの引数が要らない。
 - `*_pgm_cd` の値の求め方が一か所にまとまり、Repository ごとに食い違わない。
 - `ScopedValue` は束縛の範囲を出ると自動で戻るため、`ThreadLocal` のような後始末の漏れが起きない。
-- CommandHandler と Listener の外から共通カラムを書こうとすると、INSERT と UPDATE が失敗して気付ける。
+- CommandHandler と Listener の呼び出しとそのトランザクションの外から共通カラムを書こうとすると、INSERT と UPDATE が失敗して気付ける。
+- Aspect とトランザクションの前後が Spring の未定義の順序に頼らず、トランザクションの開始の時点で読める値が決まる。
 
 ### Negative
 
@@ -74,10 +94,15 @@ Aspect は Spring AOP のプロキシで動かし、ロード時やコンパイ�
 - `*CommandHandler` と `*Listener` は、基底クラスやサブクラスで共通の処理をまとめられない。
 - Spring AOP のプロキシを通らない呼び出し（同じクラスの中からの呼び出し、Bean でないインスタンスの呼び出し）と、別のスレッドへ渡した処理では束縛されない。
 - バッチのように CommandHandler と Listener を通らない書き込みの入口を作るときは、入口の役割と pointcut を決め直す必要がある。
+- Aspect を足すたびに、`@Order` の値を選び、ほかの Aspect との前後を決める必要がある。
+- トランザクションの内側で動く Aspect は、この決定を変えないと置けない。
 
 ### Neutral
 
 - `@ApplicationModuleListener` の非同期の呼び出しでも、Listener を実行するスレッドで束縛されることをテストで確かめる。
+- CommandHandler と Listener のトランザクションの開始の時点で `*_pgm_cd` が束縛されていることを、`PgmCdAspectOrderTest` で確かめる。
+- トランザクションの commit と rollback、`TransactionSynchronization` の `beforeCommit` と `afterCommit`、同期の `@TransactionalEventListener` も束縛の中で動く。
+  これらの中の書き込みは失敗せず、起点の CommandHandler か Listener の `*_pgm_cd` で登録される。
 
 ## Alternatives Considered
 
@@ -113,3 +138,4 @@ Aspect は Spring AOP のプロキシで動かし、ロード時やコンパイ�
 - [JEP 506: Scoped Values](https://openjdk.org/jeps/506)
 - [Spring Framework, Declaring an Aspect](https://docs.spring.io/spring-framework/reference/core/aop/ataspectj/at-aspectj.html)
 - [Spring Framework, Proxying Mechanisms](https://docs.spring.io/spring-framework/reference/core/aop/proxying.html)
+- [Spring Framework, Advice Ordering](https://docs.spring.io/spring-framework/reference/core/aop/ataspectj/advice.html#aop-ataspectj-advice-ordering)

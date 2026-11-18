@@ -47,12 +47,23 @@ cat > "$base/backend.yml" <<'YAML'
 name: Backend
 on:
   push:
-  pull_request:
+    paths:
+      - 'a/**'
+      - 'b.yml'
   workflow_call:
 concurrency:
   group: backend-${{ github.workflow }}-${{ github.ref }}
 jobs:
+  changes:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Detect changed paths
+        run: |
+          bash tooling/ci-changes/changed.sh \
+            'a/**' \
+            'b.yml'
   test:
+    needs: changes
     runs-on: ubuntu-latest
     steps:
       - run: "true"
@@ -97,6 +108,17 @@ expect "gate の if: always() がないと失敗" 1 "if: always() がありま�
 d="$(case_dir uncalled)"
 cp "$d/e2e.yml" "$d/lint.yml"
 expect "呼ばれず除外もない pull_request の workflow を見つける" 1 "lint.yml は pull_request で動きますが" check "$d"
+
+d="$(case_dir paths-drift)"
+sed -i "s|^            'b.yml'\$|            'c.yml'|" "$d/backend.yml"
+expect "push の paths: と changed.sh の引数が違うと失敗" 1 "push の paths: と changed.sh の引数が違います" check "$d"
+
+d="$(case_dir toolchain)"
+sed -i "s|^      - 'b.yml'\$|      - 'b.yml'\n      - 'Taskfile.yml'|; s|^            'b.yml'\$|            'b.yml' \\\\\n            'Taskfile.yml'|" "$d/backend.yml"
+expect "Taskfile.yml で走るのに mise.toml で走らないと失敗" 1 "Taskfile.yml があるのに" check "$d"
+d="$(case_dir double-run)"
+sed -i 's/^  workflow_call:/  pull_request:\n  workflow_call:/' "$d/backend.yml"
+expect "呼ばれる側が pull_request でも動くと失敗" 1 "backend.yml は ci.yml から呼ばれるのに pull_request でも動きます" check "$d"
 
 d="$(case_dir not-callable)"
 sed -i '/workflow_call:/d' "$d/backend.yml"

@@ -1,7 +1,7 @@
 ---
 type: Convention
 title: Compose の作り方
-description: Docker Compose ファイルのサービス分離、イメージの固定、起動順序と healthcheck、restart、環境変数と Secrets、volumes、ports、networks、profiles、外部システムの偽物（WireMock）、build、検証手段を定める規約。compose.yaml や docker-compose.yml を書く、または直すときに読む。
+description: Docker Compose ファイルのサービス分離、イメージの固定、起動順序と healthcheck、restart、環境変数と Secrets、DB のロール、volumes、ports、networks、profiles、外部システムの偽物（WireMock）、build、検証手段を定める規約。compose.yaml や docker-compose.yml を書く、または直すときに読む。
 tags: [convention, container, docker, compose]
 ---
 
@@ -60,6 +60,15 @@ depends_on:
 - 変数展開（interpolation）の挙動を理解する。一時的な上書きは CLI（`-e` や `docker compose run -e`）で行う。
 
 アンチパターン：パスワードや API キーを `environment:` に平文で書き、リポジトリにコミットする。
+
+## DB のロール
+
+- PostgreSQL のイメージの `POSTGRES_USER` は superuser になるため、コンテナの初期化（`/docker-entrypoint-initdb.d`）だけに使う。
+- アプリやマイグレーションが接続するロールは、初期化のスクリプトで superuser でも `BYPASSRLS` でもないロールとして作る。
+  `docker/compose.yml` と `docker/compose-test.yml` では `docker/initdb` がマイグレーション用ロールとアプリ用ロールを作る（[DB接続情報とロール分離](../database/connections.md)）。
+- superuser のパスワードもほかの機密と同じく `secrets` で渡す。
+
+アンチパターン：マイグレーション用ロールを `POSTGRES_USER` にして superuser のまま使い、表の所有者に RLS が効かない状態にする。
 
 ## volumes
 

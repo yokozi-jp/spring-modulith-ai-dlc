@@ -140,16 +140,16 @@ cd spring-modulith-ai-dlc
 
 ``` bash
 cd /home/projects/spring-modulith-ai-dlc
-mise install
+mise install --locked
 eval "$(mise activate bash --shims)"
 task setup
 source ~/.bashrc
 ```
 
-`mise install` は、`mise.toml` の Task、betterleaks、iwe を、`mise.lock` と `.mise/locks/` に記録した版と checksum で検証して入れます（[ADR-090](../adr/ADR-090-pin-cli-tools-with-mise-lock.md)）。
-`mise.toml` が lock を強制するので、lock に無い版は入りません。
+`mise install --locked` は、`mise.toml` の Task、betterleaks、iwe を、`mise.lock` と `.mise/locks/` に記録した版と checksum で検証して入れます（[ADR-090](../adr/ADR-090-pin-cli-tools-with-mise-lock.md)）。
+`--locked` を付けると、lock に無い版を入れずに止まります。
 `task setup` は `04-setup-shell.sh` で、mise の shims を PATH の先頭に通す行を `~/.bashrc` に足します。
-`mise.toml` か `mise.lock` が変わったときは、`mise install` だけを実行します。
+`mise.toml` か `mise.lock` が変わったときは、`mise install --locked` だけを実行します。
 
 shims は、今いるディレクトリから上にたどって見つけた `mise.toml` の版を選びます。
 そのため `task`、`betterleaks`、`iwe` は、`mise.toml` のあるチェックアウトの中でだけ動きます。
@@ -158,7 +158,7 @@ shims は、今いるディレクトリから上にたどって見つけた `mis
 
 ``` bash
 cd /home/projects/spring-modulith-ai-dlc
-npm install
+npm ci
 ```
 
 これにより Lefthook が有効化されます。
@@ -177,7 +177,7 @@ VSCode が WSL モードで再起動し、左下のステータスバーに `WSL
 [iwe](https://github.com/iwe-org/iwe) は markdown ベースのナレッジ管理ツールです（CLI、LSP サーバー、MCP サーバー）。
 このプロジェクトでは `docs/` 配下のドキュメント（ADR など）を対象に、リンク補完、バックリンク、定義ジャンプや AI エージェント連携に使い、`task okf-check` で OKF バンドルの適合を検証します。
 
-iwe は手順 7 の `mise install` で導入済みです。
+iwe は手順 7 の `mise install --locked` で導入済みです。
 バージョンは `mise.toml` に固定し、チームと CI で揃えます。
 
 `iwe`（CLI）、`iwes`（LSP サーバー）、`iwec`（MCP サーバー）の 3 コマンドが入ります。

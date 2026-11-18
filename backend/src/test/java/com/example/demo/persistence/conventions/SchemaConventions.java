@@ -70,6 +70,8 @@ final class SchemaConventions {
             SchemaTableConventions.constraints(snapshot.constraints()),
             SchemaTableConventions.indexes(snapshot.indexes()),
             SchemaTableConventions.primaryKeys(snapshot.relations()),
+            SchemaTableConventions.references(snapshot.relations(), snapshot.columns()),
+            SchemaTableConventions.crossSchemaForeignKeys(snapshot.constraints()),
             SchemaTableConventions.columns(snapshot.columns()),
             functions(snapshot.functions()),
             viewDependencies(snapshot.viewDependencies()),
@@ -78,7 +80,8 @@ final class SchemaConventions {
             largeObjects(snapshot.columns(), snapshot.largeObjectCount()),
             userDefinedTypes(snapshot.types(), snapshot.columns()),
             SchemaPrivilegeConventions.appRole(
-                snapshot.role(), snapshot.schemaPrivileges(), snapshot.relationPrivileges()))
+                snapshot.appRole(), snapshot.schemaPrivileges(), snapshot.relationPrivileges()),
+            SchemaPrivilegeConventions.migrationRole(snapshot.migrationRole()))
         .forEach(found::addAll);
     return AllowlistEntry.apply(found, allowlist);
   }
@@ -102,12 +105,11 @@ final class SchemaConventions {
   /* package */ static List<ConventionViolation> functions(final List<FunctionRow> rows) {
     return rows.stream()
         .filter(row -> isBusinessSchema(row.schema()))
-        .map(
-            row ->
-                new ConventionViolation(
-                    "O1",
-                    row.schema() + "." + row.signature(),
-                    "テーブルを参照する関数を作らず、処理はアプリケーションに書く（" + OBJECTS_DOC + "）。"))
+        .map(row ->
+            new ConventionViolation(
+                "O1",
+                row.schema() + "." + row.signature(),
+                "テーブルを参照する関数を作らず、処理はアプリケーションに書く（" + OBJECTS_DOC + "）。"))
         .toList();
   }
 
@@ -121,18 +123,17 @@ final class SchemaConventions {
       final List<ViewDependencyRow> rows) {
     return rows.stream()
         .filter(row -> isBusinessSchema(row.schema()))
-        .map(
-            row ->
-                new ConventionViolation(
-                    "O3",
-                    row.schema() + "." + row.view(),
-                    "ビューから別のビュー（"
-                        + row.referencedSchema()
-                        + "."
-                        + row.referencedView()
-                        + "）を参照しない（"
-                        + OBJECTS_DOC
-                        + "）。"))
+        .map(row ->
+            new ConventionViolation(
+                "O3",
+                row.schema() + "." + row.view(),
+                "ビューから別のビュー（"
+                    + row.referencedSchema()
+                    + "."
+                    + row.referencedView()
+                    + "）を参照しない（"
+                    + OBJECTS_DOC
+                    + "）。"))
         .toList();
   }
 
@@ -145,16 +146,15 @@ final class SchemaConventions {
   /* package */ static List<ConventionViolation> inheritance(final List<RelationRow> rows) {
     return rows.stream()
         .filter(row -> isBusinessSchema(row.schema()) && row.inheritanceParent() != null)
-        .map(
-            row ->
-                new ConventionViolation(
-                    "O4",
-                    row.schema() + "." + row.name(),
-                    "テーブル継承（INHERITS "
-                        + row.inheritanceParent()
-                        + "）を使わず、宣言的パーティションを使う（"
-                        + OBJECTS_DOC
-                        + "）。"))
+        .map(row ->
+            new ConventionViolation(
+                "O4",
+                row.schema() + "." + row.name(),
+                "テーブル継承（INHERITS "
+                    + row.inheritanceParent()
+                    + "）を使わず、宣言的パーティションを使う（"
+                    + OBJECTS_DOC
+                    + "）。"))
         .toList();
   }
 
@@ -167,12 +167,9 @@ final class SchemaConventions {
   /* package */ static List<ConventionViolation> extensions(final List<String> names) {
     return names.stream()
         .filter(name -> !PERMITTED_EXTENSIONS.contains(name))
-        .map(
-            name ->
-                new ConventionViolation(
-                    "O7",
-                    name,
-                    "許可していない拡張機能である（docs/database/postgresql-server-configuration.md）。"))
+        .map(name ->
+            new ConventionViolation(
+                "O7", name, "許可していない拡張機能である（docs/database/postgresql-server-configuration.md）。"))
         .toList();
   }
 
@@ -189,12 +186,11 @@ final class SchemaConventions {
     columns.stream()
         .filter(
             row -> isBusinessSchema(row.schema()) && LARGE_OBJECT_TYPES.contains(row.typeName()))
-        .map(
-            row ->
-                new ConventionViolation(
-                    "T10",
-                    row.schema() + "." + row.table() + "." + row.column(),
-                    "ラージオブジェクトを使わず、オブジェクトストレージにパスを持つ（" + DATA_TYPES_DOC + "）。"))
+        .map(row ->
+            new ConventionViolation(
+                "T10",
+                row.schema() + "." + row.table() + "." + row.column(),
+                "ラージオブジェクトを使わず、オブジェクトストレージにパスを持つ（" + DATA_TYPES_DOC + "）。"))
         .forEach(violations::add);
     if (largeObjectCount > 0) {
       violations.add(
@@ -223,14 +219,12 @@ final class SchemaConventions {
                 .map(
                     row -> new ConventionViolation("T12", row.schema() + "." + row.name(), detail)),
             columns.stream()
-                .filter(
-                    row ->
-                        isBusinessSchema(row.schema())
-                            && USER_DEFINED_TYPE_KINDS.contains(row.typeKind()))
-                .map(
-                    row ->
-                        new ConventionViolation(
-                            "T12", row.schema() + "." + row.table() + "." + row.column(), detail)))
+                .filter(row ->
+                    isBusinessSchema(row.schema())
+                        && USER_DEFINED_TYPE_KINDS.contains(row.typeKind()))
+                .map(row ->
+                    new ConventionViolation(
+                        "T12", row.schema() + "." + row.table() + "." + row.column(), detail)))
         .toList();
   }
 }

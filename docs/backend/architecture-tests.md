@@ -26,6 +26,7 @@ backend/src/test/java/com/example/demo/architecture/
 ├── JooqCommonColumnsArchTest.java
 ├── PackageByFeatureOnionArchitectureTest.java
 ├── ProxyRulesArchTest.java
+├── PublicIdArchTest.java
 ├── TableWriterArchTest.java
 └── TestConventionsArchTest.java
 ```
@@ -136,6 +137,8 @@ MapStruct、ModelMapper、Dozerはテストのクラスパスにないため、`
 
 規則を追加するときは、違反フィクスチャのクラスを一つ追加し、`eachRuleDetectsItsViolatingFixture`の行と`rulesFor()`に規則を加える。
 この手順で、新しい規則が違反を検出し、規約どおりのコードを誤検出しないことを確かめる。
+注釈の属性の値で判定する規則では、属性を省いて既定値のままにした注釈も違反フィクスチャに置く。
+たとえば値を省いた`@Order`は`Ordered.LOWEST_PRECEDENCE`になり、明示した値だけを見る規則を通ってしまう。
 
 ## ArchUnitの規則のbecause
 
@@ -186,6 +189,10 @@ Class <archfixture.violating.ordering.application.ShipOrderCommandHandler> is me
 対象のアノテーションの一覧と規則の理由は、[バックエンドのJava実装規約](java-coding.md)の「プロキシで動くアノテーション」に示す。
 同じクラスの`pointcutsNarrowTargetsWithWithin`は、AspectJのadviceと`@Pointcut`の式（`value`と`pointcut`）に`within(`があることを検査する。
 違反フィクスチャの`shared.infrastructure.persistence.SlowPgmCdAspect`で確かめ、規約どおりのフィクスチャの`PgmCdAspect`を誤検出しないことも確かめる。
+同じクラスの`aspectsDeclareOrder`は、`@Aspect`のクラスに`Ordered.LOWEST_PRECEDENCE`より小さい値の`@Order`があることを検査する。
+違反フィクスチャの`shared.infrastructure.persistence.UnorderedPgmCdAspect`（`@Order`がない）と`LowestOrderPgmCdAspect`（値のない`@Order`）で確かめ、規約どおりのフィクスチャの`PgmCdAspect`を誤検出しないことも確かめる。
+同じクラスの`transactionManagementIsNotRedeclared`は、`@EnableTransactionManagement`を宣言するクラスがないことを検査し、`aspectsDeclareOrder`が前提にするトランザクションのadvisorの順序を保つ。
+違反フィクスチャの`shared.infrastructure.persistence.TransactionOrderConfiguration`で確かめる。
 
 ## 日時
 
@@ -281,11 +288,20 @@ Error Proneの`CheckReturnValue`は既定でerrorであり、`updateWhere`と`de
 - `renderSchemaIsNotChanged`：`Settings.withRenderSchema`と`Settings.setRenderSchema`を呼び出さず、メソッド参照もしない。引数の値はバイトコードに残らないため、`withRenderSchema(false)`の禁止を呼び出しの禁止で近似する。
 - `statementTypeAndParamTypeAreNotChanged`：`Settings`の`withStatementType`、`setStatementType`、`withParamType`、`setParamType`を呼び出さず、メソッド参照もしない。
 
+`PublicIdArchTest`は、主キーをモジュールの外へ出さない規則を検査する（[PostgreSQLの主キー](../database/postgresql-primary-keys.md)）。
+
+- `numericIdsDoNotLeaveModules`：モジュールの外に出る型は、数値のIDのフィールド、引数、戻り値を持たない。
+  対象の型の範囲と、数値のIDとみなす名前と型は、[PostgreSQLの主キー](../database/postgresql-primary-keys.md#使い分けの検査)の「使い分けの検査」に示す。
+  ArchUnitは引数の名前を読まないため、コンパイラの`-parameters`が残した名前をリフレクションで読む。
+  違反フィクスチャのイベント、`*Queries`の引数と戻り値（`List<Long>`、`Optional<Long>`、`long[]`を含む）、Domain、Command、`*Client`の引数、`shared.concurrency`のrecordで確かめる。
+
 DBの規約のほかの検査は`backend/src/test/java/com/example/demo/persistence/conventions/`に置く。
 
 - `ChangesetLintTest`は、Liquibaseのchangesetを、DBに接続せずに静的に検査する。changesetを順に適用してテーブルの最終形を組み立てる。違反を含むフィクスチャは`backend/src/test/resources/conventions/changeset-lint/`に置く。
 - `SchemaConventionsTest`は、`pg_catalog`の行から違反を判定する関数を、違反を含む行で検証する。
 - `SchemaInspectionTest`は、マイグレーション後のテストDBの`pg_catalog`をアプリロールで読み、同じ関数で検査する。
+
+スキーマ検査の規則を足すときは、判定に要る行を`CatalogSnapshot`に足して`SchemaCatalog.read`で埋め、判定する関数を`SchemaConventions.check`から呼ぶ。
 
 規約の例外は、理由を付けて`ChangesetLint.ALLOWLIST`と`SchemaConventions.ALLOWLIST`に載せる。
 何も抑止しない項目は違反として報告する。

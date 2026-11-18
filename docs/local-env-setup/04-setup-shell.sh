@@ -15,7 +15,7 @@ if ! grep -qxF "$LOCAL_BIN_LINE" ~/.bashrc; then
   } >> ~/.bashrc
 fi
 
-# エディタや Git フックから起動したプロセスにも PATH を通すため、activate を --shims で使う（ADR-090）。
+# PATH を作業ディレクトリに左右させないため、activate を --shims で使う（ADR-090）。
 MISE_SHIMS_LINE='eval "$(mise activate bash --shims)"'
 if ! grep -qxF "$MISE_SHIMS_LINE" ~/.bashrc; then
   {

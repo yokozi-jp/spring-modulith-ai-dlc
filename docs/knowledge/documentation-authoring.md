@@ -1,7 +1,7 @@
 ---
 type: Convention
 title: docs文書の作成と変更
-description: docs配下のMarkdownを1ファイル1責務で作成、編集、移動、分割するときの責務、手段、配置、index、frontmatter、キー、検査、新しい領域の追加を定める規約。docsの文書へ変更を加える前に読む。
+description: docs配下のMarkdownを1ファイル1責務で作成、編集、移動、分割するときの責務、手段、配置、index、frontmatter、キー、手順とコード例の確かめ方、検査、新しい領域の追加を定める規約。docsの文書へ変更を加える前に読む。
 tags: [convention, documentation, iwe, okf]
 ---
 
@@ -74,6 +74,9 @@ frontmatterの`type`と本文を照合し、異なるtypeの責務を一つの�
 冒頭にルールの要約を1行から4行で置き、詳細はその後に書く。
 規約文書には現行ルールと検査方法を書き、理由はADRへリンクする。
 理由を規約文書へ重複して書かない。
+規則の対象の範囲は一つの規約文書の一か所にだけ書き、ADR、ほかの文書、検査の失敗メッセージからはその箇所へリンクする。
+検査の失敗メッセージが範囲を示すときは、手で書かず、判定に使うコードの定数から組み立てる。
+定数から組み立てたメッセージは判定と食い違わないため、重複とみなさない。
 
 エージェントが繰り返す手順はRunbookを正文にする。
 skillを作る場合は、そのRunbookを参照するだけにする。
@@ -141,6 +144,17 @@ hookの定義`.kiro/hooks/block-iwe-normalize.json`はKiroのCLI、IDE、Webが�
 3. [steeringの書き方](steering-authoring.md)に従い、`.kiro/steering/<領域>.md`を作って対象ファイルへ`fileMatch`させる。ルートの`AGENTS.md`が領域のsteeringを兼ねる場合は省く。
 4. steering`docs-navigation`の「領域ごとの入口」に1行加える。
 5. `task okf-check`を実行する。
+
+## 手順とコード例の確かめ方
+
+文書に`task`の手順を書くときは、各Taskの定義を[`Taskfile.yml`](../../Taskfile.yml)で読み、書いた順に実行して動くことを確かめる。
+前のTaskが、後のTaskの前提になるコンテナの起動、ファイル、ロールの権限を満たすかを見る。
+たとえば`compose-reset`はComposeのサービスを止めて消すだけで、PostgreSQLを起動しない。
+直後に`be-migrate`を書くと、接続先がないため失敗する。
+Taskが付与する権限や作るものを文書に書くときも、Taskの定義とそれが実行するSQLやスクリプトを読んで書く。
+
+規約や検査を追加、変更するときは、既存の文書のコード例がその規約や検査に反していないかを探し、反していれば同じ変更で直す。
+たとえば、IDの型を制限する検査を足したら、他の文書のコード例に残る文字列のIDも直す。
 
 ## 検証
 
