@@ -1,6 +1,12 @@
+// oxlint-disable max-lines -- 実際の設定を fixture に適用した結果を 1 つのファイルに集めるため、行数で分割しない。
 import { describe, expect, it } from "vite-plus/test";
 
-import { appDirectory, lintFixtureProject, uiDirectory } from "./lint-project.js";
+import {
+  appDirectory,
+  lintFixtureProject,
+  secondAppDirectory,
+  uiDirectory,
+} from "./lint-project.js";
 
 const apiDirectory = "packages/api";
 const diagnostics = lintFixtureProject(".");
@@ -51,6 +57,24 @@ describe("fixture に適用したプロジェクトの lint 設定", () => {
     it("自身の feature と API client の import を許可する", () => {
       expect(codesIn("features/order/own-feature.ts")).toStrictEqual([]);
     });
+
+    // 実物のアプリが 1 つの間は、apps/web の設定を複製した fixture のアプリで、規則が apps/* に効くことを確かめる。
+    it("別のアプリでも、別の feature の import と、feature から route の import を禁止する", () => {
+      expect(
+        countIn(
+          "features/order/cross-feature.ts",
+          "feature-boundaries(no-cross-feature-import)",
+          secondAppDirectory,
+        ),
+      ).toBe(3);
+      expect(
+        countIn(
+          "features/order/route-import.ts",
+          "eslint(no-restricted-imports)",
+          secondAppDirectory,
+        ),
+      ).toBe(2);
+    });
   });
 
   describe("route のファイル", () => {
@@ -79,6 +103,19 @@ describe("fixture に適用したプロジェクトの lint 設定", () => {
 
     it("テレメトリ SDK の import を lib/telemetry.ts だけに許可する", () => {
       expect(codesIn("lib/telemetry.ts")).toStrictEqual([]);
+    });
+
+    // 相対パスで package の外へ出る import は pnpm の解決を通らないので、依存の宣言では止まらない。import/no-relative-parent-imports が止める。
+    it("ui からアプリ、api から ui、アプリから別のアプリへの相対パスの import を禁止する", () => {
+      expect(
+        countIn("app-relative-import.ts", "import(no-relative-parent-imports)", uiDirectory),
+      ).toBe(1);
+      expect(
+        countIn("ui-relative-import.ts", "import(no-relative-parent-imports)", apiDirectory),
+      ).toBe(1);
+      expect(
+        countIn("web-relative-import.ts", "import(no-relative-parent-imports)", secondAppDirectory),
+      ).toBe(1);
     });
   });
 

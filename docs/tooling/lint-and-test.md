@@ -92,9 +92,13 @@ Oxlintの設定の正本は[`frontend/vite.config.ts`](../../frontend/vite.confi
 
 OxlintとOxfmtの設定は、workspaceのルートのこのファイルの`lint`と`fmt`だけに置き、`apps/web/vite.config.ts`には置かない（[ADR-092](../adr/ADR-092-split-frontend-into-vite-plus-workspace.md)）。
 packageの側に`lint`がないため、`vp lint`はルートと`apps/web`のどちらで実行してもルートの設定を使う。
+packageの`vite.config.ts`に`lint`か`fmt`があると、`vp lint`をpackageで単体実行したときにルートの規則が黙って外れる。
+そのため`frontend/lint/workspace-layout.test.js`が、`apps/*`と`packages/*`のすべての`vite.config.ts`に`lint`と`fmt`がないことを確かめる。
 `better-tailwindcss/*`が読むCSSは、packageごとのoverrideが、設定ファイルの場所から作った絶対パスで渡す。
 `apps/web/**`は`apps/web/src/style.css`を、`packages/ui/**`は`packages/ui/src/style.css`を指すので、実行する場所によらず同じく解決する。
 `apps/web/src/style.css`は`@frontend/ui/style.css`を読み込むため、アプリのCSSからもテーマの変数を解決できる。
+`@frontend/ui`のclassは、アプリのCSSに`@source "../../../packages/ui/src"`がないとCSSに出ない。
+書き忘れても型検査とLintは通るので、`frontend/lint/workspace-layout.test.js`が`apps/*/src/style.css`のすべてに、`packages/ui/src`を指す`@source`があることを確かめる。
 
 ### 例外と調整
 
@@ -197,7 +201,7 @@ packageの側に`lint`がないため、`vp lint`はルートと`apps/web`のど
 
 `apps/web/e2e/**`では、Playwright TestのAPIにvitest pluginの規則が当たるため、`vitest/consistent-test-filename`と`vitest/prefer-importing-vitest-globals`を外す。
 
-feature間のimportは、これとは別にjsPluginの`feature-boundaries/no-cross-feature-import`が`apps/web/src/features/**`のファイルで禁じる（[フロントエンドアーキテクチャ](../frontend/architecture.md#境界の検査)）。
+feature間のimportは、これとは別にjsPluginの`feature-boundaries/no-cross-feature-import`が`apps/*/src/features/**`のファイルで禁じる（[フロントエンドアーキテクチャ](../frontend/architecture.md#境界の検査)）。
 
 linkとbuttonの入れ子は、jsPluginの`ui-composition/no-button-in-link`がすべてのファイルで禁じる（[フロントエンドのUIとスタイル](../frontend/ui-and-style.md#uiの書き方)）。
 `Link`か`a`の内側の`Button`か`button`と、`Button`の`render`に渡した`Link`か`a`を報告する。
@@ -209,10 +213,21 @@ linkとbuttonの入れ子は、jsPluginの`ui-composition/no-button-in-link`が�
 `react`からの名前付きimportと再export、default importの名前（`React.useEffect`）の参照、分割代入を報告する。
 自前の関数で包んだEffectは検出しない。
 
-組み合わせた結果は、`frontend/lint/lint-config.test.js`が`frontend/lint/fixtures/apps/web/src/**`と`frontend/lint/fixtures/packages/ui/src/**`の違反例と正しい例を実際の設定でLintして確かめる。
+組み合わせた結果は、`frontend/lint/lint-config.test.js`が`frontend/lint/fixtures/apps/*/src/**`と`frontend/lint/fixtures/packages/*/src/**`の違反例と正しい例を実際の設定でLintして確かめる。
 このテストは、`frontend/lint/lint-project.js`が、ルートの設定と、`apps/web`と`packages/ui`の`vite.config.ts`、`tsconfig.json`、`package.json`、`components.json`、`style.css`、fixtureを一時ディレクトリへ複製して`vp lint`を実行した結果を読む。
 fixtureが`@frontend/ui`からimportする部品は、複製せず、実物の`packages/ui`のものを使う。
+実物のアプリは`apps/web`だけなので、`apps/*`のoverrideが別のアプリにも効くことは、`apps/web`の設定を複製した`frontend/lint/fixtures/apps/sample`のfixtureで確かめる。
+実物の2つ目のアプリができたら、このfixtureを実物に置き換える。
 `frontend/lint/tailwind-entry-point.test.js`は、ルート、`apps/web`、`packages/ui`のどこから実行しても、そのpackageのCSSを解決できることを確かめる。
+`frontend/lint/workspace-layout.test.js`は、workspaceの層の規則を実物のpackageで確かめる。
+`packages/ui`と`packages/api`が互いを、アプリが別のアプリを`package.json`に書かないことは、各packageから他のpackageをNodeで解決して`MODULE_NOT_FOUND`になることで示す。
+アプリから`@frontend/ui`と`@frontend/api`が解決できることを、対照として同じテストで確かめる。
+`vp`やpnpmのshimは`NODE_PATH`に`.pnpm/node_modules`を足し、宣言のないworkspace packageも解決できてしまうので、このテストは`NODE_PATH`を空にして解決する。
+
+`../../apps/web/src/...`のように相対パスでpackageの外へ出るimportは、pnpmの解決を通らないので、依存を書かないことでは止まらない。
+このimportは`import/no-relative-parent-imports`が止める。
+`ui`からアプリ、`api`から`ui`、アプリから別のアプリへの相対パスのimportを、`lint-config.test.js`がfixtureで確かめる。
+
 規則のoptionを追加または変更するときは、optionが許す範囲のすぐ外側の書き方を拒否するfixtureも置く。
 optionの名前から許す範囲を推測せず、規則の文書とfixtureで確かめる。
 jsPluginやoverrideの挙動を試すときも、一時ディレクトリへ設定を手で複製せず、fixtureを足して`frontend`で`vp test run --dir lint lint-config`を実行する。

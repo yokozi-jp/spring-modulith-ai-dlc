@@ -10,6 +10,10 @@ const frontendRoot = fileURLToPath(new URL("..", import.meta.url));
 
 export const appDirectory = "apps/web";
 export const uiDirectory = "packages/ui";
+// fixture だけの 2 つ目のアプリ。実物のアプリはまだ 1 つなので、apps/web の設定を複製して apps/* の override が別のアプリにも効くことを確かめる（ADR-092）。
+export const secondAppDirectory = "apps/sample";
+/** @type {Record<string, string>} */
+const configSource = { [secondAppDirectory]: appDirectory };
 
 // lint/fixtures の下に fixture を持つ package と、その設定のために複製するファイル。
 // ponytail: package の一覧と複製するファイルを手で書く。package が増えて手間になったら、lint/fixtures の下を巡る形にする。
@@ -23,6 +27,7 @@ const packageFiles = {
     "components.json",
     "src/style.css",
   ],
+  [secondAppDirectory]: ["tsconfig.json", "package.json"],
   "packages/api": ["tsconfig.json", "package.json"],
   [uiDirectory]: [
     "vite.config.ts",
@@ -46,7 +51,7 @@ function copyProjectConfig(directory) {
     );
     for (const file of files) {
       cpSync(
-        path.join(frontendRoot, packageDirectory, file),
+        path.join(frontendRoot, configSource[packageDirectory] ?? packageDirectory, file),
         path.join(directory, packageDirectory, file),
       );
     }
@@ -63,7 +68,7 @@ function copyProjectConfig(directory) {
 function linkDependencies(directory) {
   for (const base of [".", ...Object.keys(packageFiles)]) {
     symlinkSync(
-      path.join(frontendRoot, base, "node_modules"),
+      path.join(frontendRoot, configSource[base] ?? base, "node_modules"),
       path.join(directory, base, "node_modules"),
     );
   }
