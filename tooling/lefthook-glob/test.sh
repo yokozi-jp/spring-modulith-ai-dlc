@@ -3,7 +3,7 @@
 # ** が 0 階層に一致しないために、ディレクトリ直下のファイルで job が走らなかった不具合（#230）の再発を止める。
 # Run: bash tooling/lefthook-glob/test.sh (task lint-lefthook が実行する)
 
-set -u
+set -uo pipefail
 
 root="$(cd "$(dirname "$0")/../.." && pwd)"
 cd "$root" || exit 1
