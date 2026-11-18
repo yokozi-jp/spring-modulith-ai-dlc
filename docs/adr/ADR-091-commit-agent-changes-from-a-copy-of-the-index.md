@@ -1,7 +1,7 @@
 ---
 type: ADR
 title: 'ADR-091: エージェントの commit を本物の index の写しから作る'
-description: フックの間に同じ worktree のほかの作業が git add しても、commit に混ぜず、その git add も止めないように、agent-commit は本物の index の写しで確かめ、stage し、commit する。
+description: agent-commit が本物の index の写しで確かめ、stage し、commit する決定。フックの間のほかの作業の git add を、commit に混ぜず、失敗もさせない。
 tags: [adr, tooling, git, agents]
 ---
 
@@ -38,7 +38,9 @@ git の動きのうち、設計を左右するものが 2 つある。
 `agent-commit` は、始めるときに本物の index を写し、確かめるのも、stage するのも、commit するのも写しにする。
 `git commit` には `GIT_INDEX_FILE` で写しを渡す。
 
-commit ができたら、本物の index のうち、commit が変えたパスだけを commit に合わせる。
+commit ができたら、本物の index を HEAD に合わせる。
+合わせるのは、写す前の本物の index と HEAD で違うパスである。
+commit の上にほかの作業の commit が載っていれば、その commit が変えたパスも入る。
 写してからほかの作業が stage し直したパスは、その stage を残して知らせる。
 合わせるときは `index.lock` を持ってから本物の index を読み、合わせた内容を名前の変更で置く。
 
@@ -51,6 +53,8 @@ commit ができたら、本物の index のうち、commit が変えたパス�
 
 ### Negative
 
+- 仕組みは bash の `agent-git.sh`（約 440 行）にあり、自己検査の `test.sh`（約 600 行）も保守する。
+  自己検査は 8 コアの開発機で 1 回に約 25 秒かかり、ほかの重い処理と並ぶと約 1 分かかる。
 - commit の後に本物の index を合わせる手順が要る。
 - 合わせる前にほかの作業が古い index から commit すると、commit のパスが戻ることがある。これを見分けて知らせる処理も要る。
 - `index.lock` を取れないか置き換えに失敗すると、本物の index は commit を打ち消す内容を stage したまま残る。`agent-wait` は合わせるコマンドを出し、実行するまで次の `agent-commit` を止める。
