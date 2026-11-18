@@ -6,6 +6,7 @@
 # shellcheck disable=SC2046
 unset $(git rev-parse --local-env-vars)
 # 利用者の設定（commit.gpgsign、core.hooksPath、init.defaultBranch など）で結果が変わらないようにし、commit に要る名前を渡す。
+# 利用者の safe.directory も読まないので、本物の checkout に git を実行する自己検査は、checkout の所有者が違うコンテナで失敗する。
 export GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1
 export GIT_AUTHOR_NAME=test GIT_AUTHOR_EMAIL=test@example.com GIT_COMMITTER_NAME=test GIT_COMMITTER_EMAIL=test@example.com
 # mktemp の置き場所より上でリポジトリを探さない。TMPDIR がリポジトリの中にあっても、一時のディレクトリは git の外になる。
