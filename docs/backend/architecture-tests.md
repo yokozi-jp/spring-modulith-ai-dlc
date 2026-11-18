@@ -136,6 +136,8 @@ MapStruct、ModelMapper、Dozerはテストのクラスパスにないため、`
 
 規則を追加するときは、違反フィクスチャのクラスを一つ追加し、`eachRuleDetectsItsViolatingFixture`の行と`rulesFor()`に規則を加える。
 この手順で、新しい規則が違反を検出し、規約どおりのコードを誤検出しないことを確かめる。
+注釈の属性の値で判定する規則では、属性を省いて既定値のままにした注釈も違反フィクスチャに置く。
+たとえば値を省いた`@Order`は`Ordered.LOWEST_PRECEDENCE`になり、明示した値だけを見る規則を通ってしまう。
 
 ## ArchUnitの規則のbecause
 
