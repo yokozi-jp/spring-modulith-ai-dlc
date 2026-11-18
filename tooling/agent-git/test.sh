@@ -143,7 +143,7 @@ esac
 EOF
 chmod +x .git/hooks/pre-commit .git/hooks/pre-push .git/hooks/post-commit
 git worktree add -q "$tmp/wt" -b wt
-mkdir "$tmp/failmv" && printf '#!/bin/sh\nexit 1\n' >"$tmp/failmv/mv" && chmod +x "$tmp/failmv/mv"
+for broken in cp mv; do mkdir "$tmp/fail$broken" && printf '#!/bin/sh\nexit 1\n' >"$tmp/fail$broken/$broken" && chmod +x "$tmp/fail$broken/$broken"; done
 mkdir "$tmp/failgit" && cat >"$tmp/failgit/git" <<EOF && chmod +x "$tmp/failgit/git"
 #!/bin/sh
 if [ -e '$tmp/fail-git' ]; then
@@ -527,14 +527,20 @@ fact "the commit on top adds only the other path" [ "$(git show --name-only --fo
 expect "wait makes the index follow an orphaned commit that the commit on top keeps" 0 "commit はできていました" bash "$tool" wait "$run"
 fact "the index matches the commit on top of the orphaned commit" clean
 
-# wrapper と _commit を止め、残った git が commit を終えた後に、agent-wait が本物の index を置き換えられない。
-scene "orphaned unsynced commit"
-held_commit orphan-unsynced.txt
-kill "$(pid_of wrapper "$run")" "$(pid_of child "$run")"
-rm "$hold"
-expect "wait reports that it could not replace the index" 1 "git reset か index の置き換えに失敗した" env PATH="$tmp/failmv:$PATH" bash "$tool" wait "$run"
-expect "a second wait prints the command again" 1 "git -C " bash "$tool" wait "$run"
-git reset -q && rm -r -- "$run"
+# wrapper と _commit を止め、残った git が commit を終えた後に、agent-wait が本物の index を写せないか置き換えられない。
+scene "orphaned unsynced commits"
+for broken in cp mv; do
+  case "$broken" in
+    cp) reason="index を index.lock に写せなかった" ;;
+    mv) reason="git reset か index の置き換えに失敗した" ;;
+  esac
+  held_commit "orphan-unsynced-$broken.txt"
+  kill "$(pid_of wrapper "$run")" "$(pid_of child "$run")"
+  rm "$hold"
+  expect "wait reports that $broken failed on the index" 1 "$reason" env PATH="$tmp/fail$broken:$PATH" bash "$tool" wait "$run"
+  expect "a second wait prints the command again after $broken failed" 1 "git -C " bash "$tool" wait "$run"
+  git reset -q && rm -r -- "$run"
+done
 
 # wrapper と _commit を止め、残った git が commit を終えた後に、agent-wait の途中で git が失敗する。
 # 失敗するのは、HEAD の rev-parse、上の commit が戻したかを確かめる git diff、2 つの index の ls-files、

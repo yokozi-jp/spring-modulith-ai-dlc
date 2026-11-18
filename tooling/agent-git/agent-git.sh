@@ -308,14 +308,14 @@ split_changes() {
 }
 
 # lock_index <index>: git と同じく <index>.lock を作り、index を写す（copy_index）。
-# ほかの git がロックを持っていれば 3 秒まで待つ。
+# ほかの git がロックを持っていれば 3 秒まで待つ。ロックを持てなければ 1、写せなければ 2 で戻る。
 lock_index() {
   local _
   for _ in $(seq 30); do
     if (set -C && : >"$1.lock") 2>/dev/null; then
       copy_index "$1" "$1.lock" && return 0
       rm -f -- "$1.lock"
-      return 1
+      return 2
     fi
     sleep 0.1
   done
@@ -328,7 +328,7 @@ lock_index() {
 # 合わせられなければ unsynced を残し、合わせるコマンドを出して失敗する。
 # パスはルートからなので、ルートで動くサブシェルにする。
 sync_index() (
-  run="$1" commit="$2" locked=false
+  run="$1" commit="$2"
   cd -- "$(git rev-parse --show-toplevel)" && index="$(git rev-parse --path-format=absolute --git-path index)" || exit
   # unsynced_exit <理由> <いつ実行するか>: 合わせられなかったことと、合わせるコマンドを出して失敗する。
   unsynced_exit() {
@@ -339,19 +339,25 @@ sync_index() (
     git -C $(printf %q "$PWD") --literal-pathspecs reset -q $commit --pathspec-from-file=$(printf %q "$run/unsynced") --pathspec-file-nul && rm -r -- $(printf %q "$run")"
     exit 1
   }
-  now="$index"
-  if lock_index "$index"; then
-    locked=true now="$index.lock"
-    # 置かずに終わるときにロックを外す。置いた後は外さない（ほかの git が新しく作ったロックを消してしまう）。
-    trap 'rm -f -- "$now"' EXIT
-  fi
+  # unlocked は、ロックを持てなかったときの unsynced_exit の引数。
+  now="$index" unlocked=()
+  lock_index "$index"
+  case $? in
+    0)
+      now="$index.lock"
+      # 置かずに終わるときにロックを外す。置いた後は外さない（ほかの git が新しく作ったロックを消してしまう）。
+      trap 'rm -f -- "$now"' EXIT
+      ;;
+    1) unlocked=("ほかの git が index.lock を 3 秒より長く持っていたので" "index.lock を持つ git が終わってから") ;;
+    *) unlocked=("index を index.lock に写せなかったので" "上の失敗の原因を取り除いてから") ;;
+  esac
   split_changes "$run" "$commit" "$now" || {
     not_synced
     exit 1
   }
   # 空の pathspec を渡すと git reset は index 全体を戻すので、合わせるパスがあるときだけ呼ぶ。
   if [ -s "$run/unsynced" ]; then
-    $locked || unsynced_exit "ほかの git が index.lock を 3 秒より長く持っていたので" "index.lock を持つ git が終わってから"
+    [ ${#unlocked[@]} = 0 ] || unsynced_exit "${unlocked[@]}"
     if GIT_INDEX_FILE="$now" git --literal-pathspecs reset -q "$commit" --pathspec-from-file="$run/unsynced" --pathspec-file-nul &&
       mv -- "$now" "$index"; then
       trap - EXIT
