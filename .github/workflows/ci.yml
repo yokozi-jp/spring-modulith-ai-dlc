@@ -16,17 +16,80 @@ permissions: {}
 
 # uses は ./ の形で書く。zizmor の self-repository は $/ を勧めるが、actionlint（1.7.12）がまだ受け付けない（rhysd/actionlint#732）。
 jobs:
-  backend:
-    name: Backend
+  backend-ci:
     uses: ./.github/workflows/backend-ci.yml
     permissions:
       contents: read
 
-  docker:
-    name: Docker
+  hadolint:
     uses: ./.github/workflows/hadolint.yml
     permissions:
       contents: read
+
+  actionlint:
+    uses: ./.github/workflows/actionlint.yml
+    permissions:
+      contents: read
+
+  betterleaks:
+    uses: ./.github/workflows/betterleaks.yml
+    permissions:
+      contents: read
+
+  compose-config:
+    uses: ./.github/workflows/compose-config.yml
+    permissions:
+      contents: read
+
+  dast:
+    uses: ./.github/workflows/dast.yml
+    permissions:
+      contents: read
+      security-events: write
+
+  frontend-ci:
+    uses: ./.github/workflows/frontend-ci.yml
+    permissions:
+      contents: read
+
+  markdownlint:
+    uses: ./.github/workflows/markdownlint.yml
+    permissions:
+      contents: read
+
+  okf-validate:
+    uses: ./.github/workflows/okf-validate.yml
+    permissions:
+      contents: read
+
+  otel-collector:
+    uses: ./.github/workflows/otel-collector.yml
+    permissions:
+      contents: read
+
+  skills-check:
+    uses: ./.github/workflows/skills-check.yml
+    permissions:
+      contents: read
+
+  static-analysis:
+    uses: ./.github/workflows/static-analysis.yml
+    permissions:
+      contents: read
+      security-events: write
+
+  trivy:
+    uses: ./.github/workflows/trivy.yml
+    permissions:
+      contents: read
+      security-events: write
+
+  zizmor:
+    uses: ./.github/workflows/zizmor.yml
+    permissions:
+      contents: read
+      security-events: write
+      actions: read
 
   check-gate:
     name: Check CI gate coverage
@@ -53,7 +116,22 @@ jobs:
     name: CI gate
     # always() を付けないと、needs のどれかが失敗や skip のときに gate 自体が skip され、GitHub は skip を成功として扱う。
     if: always()
-    needs: [backend, docker, check-gate]
+    needs:
+      - backend-ci
+      - hadolint
+      - actionlint
+      - betterleaks
+      - compose-config
+      - dast
+      - frontend-ci
+      - markdownlint
+      - okf-validate
+      - otel-collector
+      - skills-check
+      - static-analysis
+      - trivy
+      - zizmor
+      - check-gate
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:

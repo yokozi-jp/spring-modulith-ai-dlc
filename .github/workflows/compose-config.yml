@@ -14,26 +14,49 @@ on:
       - ".github/workflows/compose-config.yml"
   pull_request:
     branches: ["**"]
-    paths:
-      - "**/compose.yml"
-      - "**/compose.yaml"
-      - "**/compose-test.yml"
-      - "**/compose-test.yaml"
-      - "**/docker-compose.yml"
-      - "**/docker-compose.yaml"
-      - ".env.example"
-      - ".github/workflows/compose-config.yml"
+  workflow_call:
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
+  group: compose-config-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 permissions:
   contents: read
 
 jobs:
+  changes:
+    name: Detect Compose changes
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      run: ${{ steps.filter.outputs.run }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+
+      - name: Detect changed paths
+        id: filter
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BASE_REF: ${{ github.event.pull_request.base.ref }}
+        run: |
+          bash tooling/ci-changes/changed.sh \
+            '**/compose.yml' \
+            '**/compose.yaml' \
+            '**/compose-test.yml' \
+            '**/compose-test.yaml' \
+            '**/docker-compose.yml' \
+            '**/docker-compose.yaml' \
+            '.env.example' \
+            '.github/workflows/compose-config.yml'
+
   compose-config:
     name: Run docker compose config 🐳
+    needs: changes
+    if: needs.changes.outputs.run == 'true'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository

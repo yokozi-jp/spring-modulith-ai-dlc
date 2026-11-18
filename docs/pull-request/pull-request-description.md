@@ -7,7 +7,7 @@ tags: [convention, pull-request, future-arch-guidelines]
 
 # Pull Requestのタイトル、セルフコメント、チェックリスト
 
-Pull Requestの本文は[Pull Requestテンプレート](../../.github/PULL_REQUEST_TEMPLATE.md)に従い、本文の節とエビデンスの書き方はテンプレートを正とする。
+Pull Requestの本文は[Pull Requestテンプレート](../../.github/PULL_REQUEST_TEMPLATE.md)に従い、本文の節（Summary、Evidence、Merge Danger）とエビデンスの書き方はテンプレートを正とする。
 タイトルはConventional Commits形式にし、複数のtypeに当てはまる場合は`feat`、`fix`、その他の順で選ぶ。
 実装の意図はセルフコメントではなく、コードコメントか設計文書に書く。
 テンプレートのチェックリストは、レビュー依頼前のセルフチェックに必要な最小限の項目にする。
@@ -26,8 +26,8 @@ Pull Requestにラベルを付ける場合も、typeはタイトルに書く。
 
 ## チェックリストの項目
 
-[Pull Requestテンプレート](../../.github/PULL_REQUEST_TEMPLATE.md)のチェックリストは、レビュー依頼前のセルフチェックに使う。
-項目は「関連文書も更新したか」のように確認できる具体的な行動にし、必要最小限に保つ。
+[Pull Requestテンプレート](../../.github/PULL_REQUEST_TEMPLATE.md)のチェックリストは、Merge Dangerの中に置き、レビュー依頼前のセルフチェックに使う。
+項目は「OpenApiConfigの契約の版を上げたか」のように確認できる具体的な行動にし、必要最小限に保つ。
 CIで検査できる項目はチェックリストへ加えず、検査へ移す。
 確認されなくなった項目は削除する。
 
