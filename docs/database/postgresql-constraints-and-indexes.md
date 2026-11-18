@@ -32,7 +32,9 @@ Spring Modulithのイベント出版テーブルのように、フレームワ�
 - 大量データの移行で、制約を一時的に外す手順が要る。
 - `ON DELETE`と`ON UPDATE`の挙動を誤解すると、意図しない削除が起きる。
 
-モジュール間の外部キーを許可するかどうかは、[ADR-011](../adr/ADR-011-use-module-owned-database-schemas.md)のとおり、モジュール間の整合性要件が生じた時点で決める。
+スキーマをまたぐ外部キー（モジュール間の外部キー）は作らない。
+別のモジュールの行は`<対象>_public_id`の`uuid`の列で指し、カタログの検査の規則P4がスキーマをまたぐ外部キーを拒否する（[PostgreSQLの主キー](postgresql-primary-keys.md)）。
+理由は[ADR-089](../adr/ADR-089-keep-primary-keys-inside-modules-and-expose-public-ids.md)に示す。
 
 ## NOT NULL
 

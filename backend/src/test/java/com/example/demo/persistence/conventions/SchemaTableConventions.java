@@ -9,9 +9,10 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 /**
- * 業務テーブルの制約、インデックス、主キー、カラムの規則（O2、K1、K2、K3、K7、K8、K9、P1、P2、T1、T2、T11、T13）を、カタログの行から判定する。
+ * 業務テーブルの制約、インデックス、主キー、カラムの規則（O2、K1、K2、K3、K7、K8、K9、P1、P2、P3、P4、T1、T2、T11、T13）を、カタログの行から判定する。
  *
  * <p>DBに接続しない純粋な関数である。各関数は{@link SchemaConventions#isBusinessSchema(String)}で業務スキーマの行だけを判定する。
  */
@@ -50,12 +51,11 @@ final class SchemaTableConventions {
   /* package */ static List<ConventionViolation> triggers(final List<TriggerRow> rows) {
     return rows.stream()
         .filter(row -> SchemaConventions.isBusinessSchema(row.schema()))
-        .map(
-            row ->
-                new ConventionViolation(
-                    "O2",
-                    row.schema() + "." + row.table() + "." + row.name(),
-                    "トリガーを使わない（docs/database/postgresql-database-objects.md）。"))
+        .map(row ->
+            new ConventionViolation(
+                "O2",
+                row.schema() + "." + row.table() + "." + row.name(),
+                "トリガーを使わない（docs/database/postgresql-database-objects.md）。"))
         .toList();
   }
 
@@ -69,12 +69,11 @@ final class SchemaTableConventions {
     return rows.stream()
         .filter(row -> SchemaConventions.isBusinessSchema(row.schema()))
         .filter(row -> BANNED_CONSTRAINTS.containsKey(row.type()))
-        .map(
-            row ->
-                new ConventionViolation(
-                    BANNED_CONSTRAINTS.get(row.type()).getKey(),
-                    row.schema() + "." + row.name(),
-                    BANNED_CONSTRAINTS.get(row.type()).getValue() + "（" + CONSTRAINTS_DOC + "）。"))
+        .map(row ->
+            new ConventionViolation(
+                BANNED_CONSTRAINTS.get(row.type()).getKey(),
+                row.schema() + "." + row.name(),
+                BANNED_CONSTRAINTS.get(row.type()).getValue() + "（" + CONSTRAINTS_DOC + "）。"))
         .toList();
   }
 
@@ -133,13 +132,77 @@ final class SchemaTableConventions {
   /* package */ static List<ConventionViolation> primaryKeys(final List<RelationRow> rows) {
     return rows.stream()
         .filter(row -> SchemaConventions.isBusinessSchema(row.schema()))
-        .filter(row -> TABLE_KINDS.contains(row.relkind()) && !row.hasPrimaryKey())
-        .map(
-            row ->
-                new ConventionViolation(
-                    "P2",
-                    row.schema() + "." + row.name(),
-                    "業務テーブルには主キーを付ける（" + PRIMARY_KEYS_DOC + "）。"))
+        .filter(row -> TABLE_KINDS.contains(row.relkind()) && row.primaryKey() == null)
+        .map(row ->
+            new ConventionViolation(
+                "P2",
+                row.schema() + "." + row.name(),
+                "業務テーブルには主キーを付ける（" + PRIMARY_KEYS_DOC + "）。"))
+        .toList();
+  }
+
+  /**
+   * P3：別のモジュールの行を指す列は、uuidの{@code <対象>_public_id}にする。
+   *
+   * <p>名前が{@code _id}で終わる列は、同じスキーマのテーブルの主キーと同じ名前のときだけ、同じモジュールの行を指すとみなす。 それ以外の{@code
+   * _id}の列は別のモジュールの行を指すとみなし、{@code _public_id}の名前にさせる。
+   *
+   * @param relations テーブルとビュー
+   * @param columns カラム
+   * @return 違反
+   */
+  /* package */ static List<ConventionViolation> references(
+      final List<RelationRow> relations, final List<ColumnRow> columns) {
+    final Set<String> primaryKeys =
+        relations.stream()
+            .filter(row -> row.primaryKey() != null)
+            .map(row -> row.schema() + "." + row.primaryKey())
+            .collect(Collectors.toSet());
+    return columns.stream()
+        .filter(row -> SchemaConventions.isBusinessSchema(row.schema()))
+        .filter(row -> !isAllowedIdColumn(row, primaryKeys))
+        .map(row ->
+            new ConventionViolation(
+                "P3",
+                row.schema() + "." + row.table() + "." + row.column(),
+                "別のモジュールの行を指す列は、主キーではなくuuidの<対象>_public_idにする（" + PRIMARY_KEYS_DOC + "）。"))
+        .toList();
+  }
+
+  /**
+   * 名前が{@code _id}で終わらないか、行を指さない共通カラムか、同じスキーマの主キーを指すか、uuidの{@code public_id}か{@code
+   * _public_id}なら{@code true}。
+   */
+  private static boolean isAllowedIdColumn(final ColumnRow row, final Set<String> primaryKeys) {
+    final String column = row.column();
+    if ("public_id".equals(column) || column.endsWith("_public_id")) {
+      return "uuid".equals(row.typeName());
+    }
+    return !column.endsWith("_id")
+        || ChangesetCommonColumnRules.COMMON_COLUMN_NAMES.contains(column)
+        || primaryKeys.contains(row.schema() + "." + column);
+  }
+
+  /**
+   * P4：スキーマをまたぐ外部キーを作らない。
+   *
+   * @param rows 制約
+   * @return 違反
+   */
+  /* package */ static List<ConventionViolation> crossSchemaForeignKeys(
+      final List<ConstraintRow> rows) {
+    return rows.stream()
+        .filter(row -> SchemaConventions.isBusinessSchema(row.schema()))
+        .filter(row -> "f".equals(row.type()) && !row.schema().equals(row.referencedSchema()))
+        .map(row ->
+            new ConventionViolation(
+                "P4",
+                row.schema() + "." + row.name(),
+                "別のスキーマ（"
+                    + row.referencedSchema()
+                    + "）のテーブルを外部キーで参照せず、uuidの<対象>_public_idで指す（"
+                    + PRIMARY_KEYS_DOC
+                    + "）。"))
         .toList();
   }
 

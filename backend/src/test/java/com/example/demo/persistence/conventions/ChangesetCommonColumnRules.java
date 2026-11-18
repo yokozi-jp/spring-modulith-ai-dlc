@@ -8,6 +8,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 /** 業務テーブルの最終形について、共通カラムの規則（C1からC3）を判定する。 */
 final class ChangesetCommonColumnRules {
@@ -39,6 +40,10 @@ final class ChangesetCommonColumnRules {
           entry("patched_at", new ColumnShape(TIMESTAMPTZ, true, false)),
           entry("patched_by", new ColumnShape(VARCHAR_64, true, false)),
           entry("patched_id", new ColumnShape("integer", true, false)));
+
+  /** 共通カラムの名前。 */
+  /* package */ static final Set<String> COMMON_COLUMN_NAMES =
+      COMMON_COLUMNS.stream().map(Map.Entry::getKey).collect(Collectors.toUnmodifiableSet());
 
   /**
    * 追記だけのワークテーブル（{@code w_}）が、changesetの{@code comment}に理由を書いて省ける共通カラム。

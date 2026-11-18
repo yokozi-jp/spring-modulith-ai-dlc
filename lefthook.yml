@@ -176,6 +176,7 @@ pre-commit:
         - "tooling/adr-lint/**"
         - ".github/rulesets/**"
         - "tooling/ruleset-check/**"
+        - "tooling/ruleset-sync/**"
         - ".github/workflows/**"
       run: |
         echo "{staged_files}" >/dev/null

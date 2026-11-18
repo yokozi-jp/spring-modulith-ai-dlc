@@ -68,6 +68,7 @@ CommandHandler に Request を渡さず、Request に業務の不変条件を書
 package com.example.demo.ordering.presentation.web;
 
 import com.example.demo.shared.concurrency.ExpectedLockNo;
+import java.util.UUID;
 
 /**
  * 注文を取り消す API の本文。
@@ -77,8 +78,8 @@ import com.example.demo.shared.concurrency.ExpectedLockNo;
 public record CancelOrderRequest(@Min(1) @Schema(example = "1") long lockNo) {
 
   /** パス変数の注文 ID と合わせて Command へ変換する。 */
-  public CancelOrderCommand toCommand(final String orderId) {
-    return new CancelOrderCommand(orderId, new ExpectedLockNo(lockNo));
+  public CancelOrderCommand toCommand(final UUID orderId) {
+    return new CancelOrderCommand(orderId.toString(), new ExpectedLockNo(lockNo));
   }
 }
 ```
@@ -95,7 +96,7 @@ package com.example.demo.ordering.presentation.web;
  * @param lines 注文の明細
  */
 public record PlaceOrderRequest(
-    @NotBlank @Schema(example = "C-0001") String customerId,
+    @NotNull @Schema(example = "3a9d6e1f-8b2c-4d7e-a5f0-6c1b2e3d4f5a") UUID customerId,
     @NotEmpty List<@Valid PlaceOrderLineRequest> lines) {
 
   /** 明細を変更できないリストとして持つ。 */
@@ -106,7 +107,7 @@ public record PlaceOrderRequest(
   /** Command へ変換する。 */
   public PlaceOrderCommand toCommand() {
     return new PlaceOrderCommand(
-        customerId,
+        customerId.toString(),
         lines.stream()
             .map(line -> new PlaceOrderCommand.Line(line.productCode(), line.quantity()))
             .toList());
