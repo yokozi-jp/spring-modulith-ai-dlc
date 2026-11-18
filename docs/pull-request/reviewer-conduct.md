@@ -26,7 +26,7 @@ base branchが`main`以外のPull Requestは、意図した向き先かを最初
 
 レビュアーはローカルでの動作確認を必須にしない。
 テストの成否はCIで確認し、品質の担保は[バックエンドのテスト戦略](../backend/testing-strategy.md)と[フロントエンドのテスト戦略](../frontend/test-strategy.md)に従う。
-CIで確認できない点（画面の見た目など）は、レビュイーに[Pull Requestテンプレート](../../.github/PULL_REQUEST_TEMPLATE.md)の「CI 以外で確認したこと」へエビデンスを貼るよう求める。
+CIで確認できない点（画面の見た目など）は、レビュイーに[Pull Requestテンプレート](../../.github/PULL_REQUEST_TEMPLATE.md)のEvidenceへエビデンスを貼るよう求める。
 
 ## 分からない点
 
