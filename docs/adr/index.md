@@ -29,7 +29,7 @@
 - [ADR-026: OXC で React Compiler を有効化する](ADR-026-enable-react-compiler-with-oxc.md)（Proposed, 2026-09-29）
 - [ADR-027: Frontend のテスト基盤を標準化する](ADR-027-adopt-frontend-testing-stack.md)（Proposed, 2026-09-29）
 - [ADR-028: TanStack Table を採用する](ADR-028-adopt-tanstack-table.md)（Proposed, 2026-09-29）
-- [ADR-029: Frontend 開発依存の既知脆弱性を override と期限付き ignore で扱う](ADR-029-handle-frontend-dev-dependency-vulnerabilities.md)（Proposed, 2026-09-29）
+- [ADR-029: Frontend 開発依存の既知脆弱性を override で扱う](ADR-029-handle-frontend-dev-dependency-vulnerabilities.md)（Proposed, 2026-09-29）
 - [ADR-030: Base UI のインライン style 要素を限定して許可する](ADR-030-allow-base-ui-inline-style-elements.md)（Proposed, 2026-09-29）
 - [ADR-031: Frontend の型検査を厳格化し、tsconfig を正本にする](ADR-031-tighten-frontend-typescript-checks.md)（Proposed, 2026-09-30）
 - [ADR-032: Frontend を業務機能単位で構成する](ADR-032-organize-frontend-by-business-feature.md)（Proposed, 2026-09-30）
