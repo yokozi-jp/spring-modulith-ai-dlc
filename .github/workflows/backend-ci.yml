@@ -21,10 +21,8 @@ on:
   # 重いジョブを条件付き実行する（skipped は必須チェックで success 扱い）。
   pull_request:
     branches: ["**"]
-  # ci.yml から呼ばれる（docs/adr/ADR-087）。移行が終わるまでは pull_request でも単独で動き、二重に走る。
   workflow_call:
 
-# 呼ばれると github.workflow が CI になる。group の前にファイル名の stem を付けて、呼ばれた workflow どうしが重ならないようにする（ADR-087）。
 concurrency:
   group: backend-ci-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true

@@ -10,10 +10,8 @@ on:
   schedule:
     - cron: "17 3 * * 1"
   workflow_dispatch:
-  # ci.yml から呼ばれる（docs/adr/ADR-087）。移行が終わるまでは pull_request でも単独で動き、二重に走る。
   workflow_call:
 
-# 呼ばれると github.workflow が CI になる。group の前にファイル名の stem を付けて、呼ばれた workflow どうしが重ならないようにする（ADR-087）。
 # PR だけ実行中の run を取り消す。schedule の active scan を workflow_dispatch で止めないため（api-contract.yml と同じ）。
 concurrency:
   group: dast-${{ github.workflow }}-${{ github.ref }}

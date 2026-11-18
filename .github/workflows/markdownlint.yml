@@ -8,10 +8,8 @@ on:
       - ".markdownlint-cli2.yaml"
   pull_request:
     branches: ["**"]
-  # ci.yml から呼ばれる（docs/adr/ADR-087）。移行が終わるまでは pull_request でも単独で動き、二重に走る。
   workflow_call:
 
-# 呼ばれると github.workflow が CI になる。group の前にファイル名の stem を付けて、呼ばれた workflow どうしが重ならないようにする（ADR-087）。
 concurrency:
   group: markdownlint-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
@@ -20,8 +18,6 @@ permissions:
   contents: read
 
 jobs:
-  # Markdown 関連パスが変わったかを判定する。PR では base ブランチとの diff で判定し、
-  # 差分の取得に失敗したときは検査を実行する側へ倒す（docs/adr/ADR-087）。
   changes:
     name: Detect Markdown changes
     runs-on: ubuntu-latest
@@ -37,26 +33,13 @@ jobs:
 
       - name: Detect changed paths
         id: filter
-        shell: bash
         env:
           EVENT_NAME: ${{ github.event_name }}
           BASE_REF: ${{ github.event.pull_request.base.ref }}
         run: |
-          if [ "$EVENT_NAME" != "pull_request" ]; then
-            echo "run=true" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-          if ! changed_files="$(git diff --name-only "origin/${BASE_REF}...HEAD")"; then
-            echo "差分取得に失敗したため検査を実行します。" >&2
-            echo "run=true" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-          if grep -Eq '(^(.*/)?[^/]*\.md$|^\.markdownlint-cli2\.yaml$)' \
-            <<< "$changed_files"; then
-            echo "run=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "run=false" >> "$GITHUB_OUTPUT"
-          fi
+          bash tooling/ci-changes/changed.sh \
+            '**/*.md' \
+            '.markdownlint-cli2.yaml'
 
   markdownlint:
     name: Run markdownlint-cli2 📝
