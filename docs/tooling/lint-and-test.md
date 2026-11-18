@@ -9,7 +9,8 @@ tags: [reference, testing, lint, ci]
 
 検査は[`Taskfile.yml`](../../Taskfile.yml)の公開Taskから実行する。
 場面ごとの実行順は[開発ワークフロー](dev-workflow.md)を参照する。
-Dockerを使うTaskは、Dockerがないローカル環境ではスキップし、CIで検査する。
+Gitフックの中でDockerを使う検査は、`docker info`が失敗するローカル環境ではスキップし、CIで検査する。
+`docker`コマンドがあってもデーモンに接続できなければ、Dockerを使えないとみなす。
 
 ## 入口Task
 
@@ -326,7 +327,7 @@ OKF検査の採用理由は[ADR-036](../adr/ADR-036-adopt-okf-for-docs-knowledge
 
 - **commit-msg（すべて）**：commitlintを実行する。
 - **pre-commit（すべて）**：`scan-secrets`を実行する。
-- **pre-commit（OpenAPI契約、`.spectral.yaml`、Orvalの設定、`frontend/package.json`、生成物の変更）**：`api-lint`（Dockerがなければスキップ）と`api-client-check`を実行する。
+- **pre-commit（OpenAPI契約、`.spectral.yaml`、Orvalの設定、`frontend/package.json`、生成物の変更）**：`api-lint`（`docker info`が失敗すればスキップ）と`api-client-check`を実行する。
 - **pre-commit（フロントエンドの変更）**：`fe-check`を実行する。
   前項と同じgroupで順に実行し、Orvalの再生成と型検査を同時に走らせない。
 - **pre-commit（Dockerfileの変更）**：`lint-docker`相当と`lint-docker-check`相当を実行する。
