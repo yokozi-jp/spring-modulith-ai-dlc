@@ -256,3 +256,5 @@ task compose-reset CONFIRM_RESET=yes
 ```
 
 DBの本番適用と切り戻しは[DBのデプロイと切り戻し](../database/runbook-deploy-and-rollback.md)を参照する。
+
+<!-- ci gate の skip 確認用。merge しない。 -->
