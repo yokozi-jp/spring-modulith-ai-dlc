@@ -60,10 +60,6 @@ run_dir() { grep -o '/[^ ]*/agent-git/[a-z]*\.[A-Za-z0-9]*' "$out" | head -n 1; 
 wait_now() { AGENT_GIT_WAIT_SECONDS=0 bash "$tool" wait "$@"; }
 within() { (cd "$1" && "${@:2}"); }
 not() { ! "$@"; }
-none() {
-  local f
-  for f; do [ ! -e "$f" ] || return 1; done
-}
 pid_of() { awk -v n="$1" '$1 == n { print $2 }' "$2/pid"; }
 has_pid() { [ -n "$(pid_of "$1" "$2")" ]; }
 alive() { kill -0 "$1" 2>/dev/null; }
@@ -312,7 +308,7 @@ fact "wait strips color codes from the log tail" not grep -qF $'\e' "$out"
 fact "the failed commit leaves HEAD" [ "$(git rev-parse HEAD)" = "$head" ]
 fact "the failed commit leaves the index as it was" clean
 fact "the failed run keeps its log" [ -f "$run/log" ]
-fact "the failed run drops its copies" none "$run/msg" "$run/index" "$run/base" "$run/head"
+fact "the failed run drops the state of the commit" [ ! -e "$run/commit" ]
 expect "wait without a run skips the reported failure" 1 "まだ報告していない実行がありません" bash "$tool" wait
 expect "wait with the run reports the failure again" 1 "✗ fake-check" bash "$tool" wait "$run"
 echo exit=oops >"$run/done"
@@ -373,7 +369,7 @@ for undo in copy-matches-head foreign-commit; do
   rm "$hold"
   # copy-matches-head はフックが変更を打ち消した写しを、foreign-commit は同じ HEAD の上にほかの作業が作った commit を真似る。
   if [ "$undo" = copy-matches-head ]; then
-    fact "the copy is made to match HEAD" env GIT_INDEX_FILE="$run/index" git read-tree HEAD
+    fact "the copy is made to match HEAD" env GIT_INDEX_FILE="$run/commit/index" git read-tree HEAD
   else
     fact "another commit lands on the same HEAD" git commit --no-verify -q --allow-empty -m foreign
   fi
@@ -392,7 +388,10 @@ run="$(run_dir)"
 fact "the orphaned commit records its git" until_ok has_pid git "$run"
 kill "$(pid_of wrapper "$run")" "$(pid_of child "$run")"
 rm "$hold"
-expect "wait makes the index follow a commit whose wrapper died" 0 "commit はできていました" bash "$tool" wait "$run"
+fact "the orphaned git finishes" until_ok not alive "$(pid_of git "$run")"
+expect "the next commit is refused until wait settles the orphaned commit" 1 "後片付けが済んでいません" bash "$tool" commit "$msg" orphan.txt
+expect "wait from a subdirectory makes the index follow a commit whose wrapper died" 0 "commit はできていました" \
+  within sub bash "$tool" wait "$(realpath --relative-to=sub "$run")"
 fact "the orphaned git committed the path" [ "$(committed)" = orphan.txt ]
 fact "the index matches the orphaned commit" clean
 
