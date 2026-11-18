@@ -84,7 +84,7 @@ superuserのパスワードは、ローカルでは`.env`の`POSTGRES_SUPERUSER_
 Liquibase管理スキーマと管理テーブルへのアプリ権限は付与しません。
 001 changesetを初期状態から書き換えたことと、既存のボリュームでは`docker/initdb`が再実行されずマイグレーション用ロールがsuperuserのまま残ることから、既存DBは移行せず`task compose-reset CONFIRM_RESET=yes`で作り直します。
 ステージングと本番も既存DBを再利用せず、`liquibase`スキーマだけをマイグレーション用ロールの所有で作ってから初回マイグレーションを実行します。
-001 changesetがアプリケーションロール（`DB_USERNAME`）へGRANTし、012 changesetがモジュールのロールへGRANTするため、ステージングと本番では、アプリケーションロールとモジュールのロールを初回マイグレーションより前にRDS側で作成しておきます。
+001 changesetがアプリケーションロール（`DB_USERNAME`）へGRANTし、012と014のchangesetがモジュールのロールへGRANTするため、ステージングと本番では、アプリケーションロールとモジュールのロールを初回マイグレーションより前にRDS側で作成しておきます。
 `docker/initdb`のような自動作成経路がないため、未作成のままマイグレーションを実行するとGRANTで失敗します。
 `be-release-migrate`とDB切り戻し用Taskfileのタスクはローカルの`.env`を読み込まず、共通の接続先（`DB_URL`、または`DB_HOST`/`DB_PORT`/`DB_NAME`）と権限付与先の`DB_USERNAME`、`MIGRATION_DB_USERNAME`、`MIGRATION_DB_PASSWORD`が注入されていなければGradle実行前に失敗します。
 アプリケーション用アカウントには業務処理に必要なDML権限を与え、`CREATE`、`ALTER`、`DROP`を与えません。

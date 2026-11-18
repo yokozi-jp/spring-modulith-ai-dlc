@@ -3,6 +3,7 @@ package com.example.demo.tenancy.application;
 import com.example.demo.tenancy.domain.model.ExternalIdentity;
 import com.example.demo.tenancy.domain.model.User;
 import com.example.demo.tenancy.domain.model.UserRepository;
+import java.util.Optional;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -27,14 +28,12 @@ public class SignInUserCommandHandler {
   @Transactional
   public SignInUserResult handle(final SignInUserCommand command) {
     final ExternalIdentity identity = new ExternalIdentity(command.issuer(), command.subject());
-    final User user =
-        userRepository
-            .findByIdentity(identity)
-            .orElseGet(() -> {
-              final User registered = User.register(identity);
-              userRepository.add(registered);
-              return registered;
-            });
-    return new SignInUserResult(user.id().value().toString());
+    final Optional<User> existing = userRepository.findByIdentity(identity);
+    if (existing.isPresent()) {
+      return new SignInUserResult(existing.get().id().value().toString());
+    }
+    final User registered = User.register(identity);
+    userRepository.add(registered);
+    return new SignInUserResult(registered.id().value().toString());
   }
 }

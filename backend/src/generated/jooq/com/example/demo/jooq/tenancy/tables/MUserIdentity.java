@@ -187,7 +187,7 @@ public class MUserIdentity extends TableImpl<MUserIdentityRecord> {
     @Override
     @NonNull
     public List<Index> getIndexes() {
-        return Arrays.asList(Indexes.UK_M_USER_IDENTITY);
+        return Arrays.asList(Indexes.IDX_1_M_USER_IDENTITY, Indexes.UK_M_USER_IDENTITY);
     }
 
     @Override

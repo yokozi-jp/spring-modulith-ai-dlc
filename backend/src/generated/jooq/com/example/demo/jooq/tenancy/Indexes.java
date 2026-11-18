@@ -32,6 +32,7 @@ public class Indexes {
     // INDEX definitions
     // -------------------------------------------------------------------------
 
+    public static final Index IDX_1_M_USER_IDENTITY = Internal.createIndex(DSL.name("idx_1_m_user_identity"), MUserIdentity.M_USER_IDENTITY, new OrderField[] { MUserIdentity.M_USER_IDENTITY.USER_ID }, false);
     public static final Index UK_M_USER = Internal.createIndex(DSL.name("uk_m_user"), MUser.M_USER, new OrderField[] { MUser.M_USER.PUBLIC_ID }, true);
     public static final Index UK_M_USER_IDENTITY = Internal.createIndex(DSL.name("uk_m_user_identity"), MUserIdentity.M_USER_IDENTITY, new OrderField[] { MUserIdentity.M_USER_IDENTITY.ISSUER_URL, MUserIdentity.M_USER_IDENTITY.SUBJECT_CODE }, true);
 }

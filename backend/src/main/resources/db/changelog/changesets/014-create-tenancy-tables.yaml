@@ -189,6 +189,13 @@ databaseChangeLog:
                   name: issuer_url
               - column:
                   name: subject_code
+        - createIndex:
+            indexName: idx_1_m_user_identity
+            tableName: m_user_identity
+            schemaName: tenancy
+            columns:
+              - column:
+                  name: user_id
         - sql:
             sql: |
               GRANT USAGE ON SCHEMA modulith TO tenancy_module;
