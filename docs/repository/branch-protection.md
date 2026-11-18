@@ -12,15 +12,20 @@ tags: [convention, operations, governance, git, github]
 GitHub の Rules、Rulesets で branch ruleset を作り、既定ブランチ `main` を対象にする。
 
 ruleset の正本は `.github/rulesets/main.json` である。
-変更するときは、このファイルを直し、次のコマンドで GitHub へ反映する。
+変更するときは、このファイルを直し、管理者が手元で次のコマンドを実行して GitHub へ反映する。
 
 ```bash
-gh api -X PUT repos/yokozi-jp/spring-modulith-ai-dlc/rulesets/23297515 --input .github/rulesets/main.json
+task ruleset-diff   # GitHub 上の ruleset との差分を見る
+task ruleset-apply CONFIRM_RULESET=yes  # 反映する。反映前の ruleset を build/ruleset-backup/ に保存する
 ```
+
+`CONFIRM_RULESET=yes` を付けないと、`task ruleset-apply` は控えを保存するだけで止まる。
+反映後は、GitHub 上の ruleset が `main.json` と同じになったことを確かめる。
+戻すときは、保存した控えを `gh api -X PUT repos/yokozi-jp/spring-modulith-ai-dlc/rulesets/23297515 --input <控え>` で入れ直す。
 
 必須チェックの名前は、このファイル、下の一覧、workflow の job 名の 3 か所で、絵文字の異体字選択子（U+FE0F）まで一致させる。
 一致しないチェックは、報告されないまま待機になり、merge できなくなる。
-`task okf-check` が、この 3 か所の一致を検査する。GitHub 上の ruleset との一致は検査しない。理由は [ADR-086](../adr/ADR-086-align-main-protection-with-solo-and-agent-operation.md) にある。
+`task okf-check` が、この 3 か所の一致を検査する。GitHub 上の ruleset との一致は検査しない（認証が要るため CI で動かさず、`task ruleset-diff` で手元で比べる）。理由は [ADR-086](../adr/ADR-086-align-main-protection-with-solo-and-agent-operation.md) にある。
 
 ruleset は Active にする。
 bypass できるのは、リポジトリの管理者（RepositoryRole の id `5`）だけで、`bypass_mode` は `pull_request` にする。
@@ -60,42 +65,34 @@ ruleset ではコード所有者の承認を要求しない。
 
 ## 常時必須にするステータスチェック
 
-次のジョブはすべての Pull Request で check run を報告するため、ruleset の required status checks に正確な名前で登録する。
+次の 4 つを、ruleset の required status checks に正確な名前で登録する（[ADR-087](../adr/ADR-087-gate-required-checks-with-single-aggregate-job.md)）。
 
-- `Run betterleaks 🔐`
-- `Run Semgrep 🔎`
-- `Trivy scan (backend) 🛡️`
-- `Trivy scan (frontend) 🛡️`
-- `Run zizmor 🌈`
+- `CI gate`
 - `Validate PR title`
-- `Detect backend changes`
-- `Lint (Spotless + PMD + SpotBugs) ☕`
-- `Test & Coverage ☕`
-- `Detect frontend changes`
-- `Verify frontend`
-- `Detect docker changes`
-- `Run hadolint 🐳`
-- `Run docker build --check 🐳`
-- `Build and test backend image 🐳`
-- `Detect DAST changes`
-- `Run ZAP passive scan 🕷️`
 - `Detect API contract changes`
 - `Check API contract 🔀`
 
-Backend、frontend、Docker、DAST の workflow は Pull Request ごとに変更対象を検出する。
+`CI gate` は `ci.yml` の集約ジョブで、`ci.yml` が呼ぶすべての検査の結果を 1 つにまとめる。
+検査を足すときは、workflow を足して `ci.yml` から呼び、`CI gate` の `needs` にも足す。ruleset は変えない。
+足し忘れは、`task ci-gate-check` が検出する。
+`CI gate` が待つ検査の一覧は `ci.yml` が正で、この文書に写さない。
 
-関連パスを変更していない場合、重い検査ジョブはジョブ単位で `skipped` を報告し、GitHub は required status check を満たしたものとして扱う。
+`Validate PR title` と API contract の 2 つは、`ci.yml` に入れない。
+`Validate PR title` は PR タイトルの編集で、API contract は `api-breaking-approved` ラベルの付け外しで再判定する（[ADR-052](../adr/ADR-052-commit-openapi-contract-and-check-generated-client.md)）。
+`ci.yml` に入れると、タイトルやラベルを変えるたびに全体が走り直す。
 
-変更検知ジョブ、hadolint、`docker build --check` も必須にする。
+`CI gate` は、呼んだ検査がすべて `success` のときだけ成功にする。
+`failure`、`cancelled`、`skipped` は失敗にする。
+関連パスを変更していない PR では、各 workflow の `changes` ジョブが対象外と判定し、重い検査ジョブをジョブ単位で skip する。
+このとき呼び出しジョブの結果は `success` なので、`CI gate` は通る。
+`changes` が失敗した検査は、呼び出しジョブが失敗するので、`CI gate` を通らない。
 
-`Check API contract 🔀` は、`api-breaking-approved` ラベルの付け外しでも再判定する（[ADR-052](../adr/ADR-052-commit-openapi-contract-and-check-generated-client.md)）。
+対象のパスは `tooling/ci-changes/changed.sh` が判定する。`ci.yml` の変更では、すべての検査を実行する。
 
-稼働中の ruleset への追加はリポジトリの所有者が行い、上の一覧と同じ名前で登録する。
+稼働中の ruleset の変更はリポジトリの所有者が行い、上の一覧と同じ名前で登録する。
 
 `Publish API docs 📘` が設計書を公開するには、所有者が GitHub Pages を有効にし、公開元を GitHub Actions にする。
 GitHub Pagesでは通常、APIの設計内容がすべて公開されるため、有効化する前にリポジトリのPages公開範囲を確認する。
-
-検知ジョブやイメージビルドの前段が失敗した場合、後続ジョブが `skipped` になっても前段の失敗によってマージを止めるためである。
 
 Semgrep、Trivy、ZAP は現在、検出結果を SARIF へ送ってもジョブ自体を失敗させない（ZAP は [ADR-056](../adr/ADR-056-run-authenticated-dast-with-zap-in-ci.md)）。
 
@@ -105,22 +102,9 @@ Semgrep、Trivy、ZAP は現在、検出結果を SARIF へ送ってもジョブ
 
 Security タブの未解決結果はレビュー時に確認し、受容する場合は理由を記録する。
 
-## 変更対象に応じて必須となるチェック
-
-次のジョブは workflow レベルの path filter を持つため、該当ファイルを変更した Pull Request で実行結果を確認する。
-
-- GitHub Actions：`actionlint`
-- Markdown：`Run markdownlint-cli2 📝`
-- docs、steering、OKF設定、Taskfile、ruleset、workflow、`tooling/ruleset-check/`：`Run task okf-check 📚`
-- Compose：`Run docker compose config 🐳`
-
-path filter によって workflow 自体が作られない Pull Request では、これらの check run も存在しない。
-
-そのまま全 Pull Request の required status checks に登録すると、対象外の変更が待機状態のまま merge できなくなるため、常時必須の一覧には加えない。
-
 ## 必須にしないチェック
 
-E2E の `Run E2E tests 🎭` は path filter を持つが、required status checks に登録しない。
+E2E の `Run E2E tests 🎭` は path filter を持つが、`ci.yml` から呼ばず、required status checks に登録しない。
 実ブラウザと複数のコンテナを使うため、変更と関係のない原因でも失敗しうる（[ADR-057](../adr/ADR-057-adopt-playwright-for-e2e-tests.md)）。
 失敗したときは、レビューで trace と backend のログを確かめて merge を判断する。
 

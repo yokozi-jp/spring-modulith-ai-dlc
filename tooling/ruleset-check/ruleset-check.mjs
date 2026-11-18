@@ -2,7 +2,7 @@
 // 使い方: node tooling/ruleset-check/ruleset-check.mjs [リポジトリのルート]（既定は .）。task okf-check が呼ぶ。
 // 失敗: 一覧を読めない、ruleset と一覧の不一致、一覧の行の書式違反、workflow に同名の name がない必須チェック。
 // ponytail: workflow の name は job と step を区別せず、行頭の `name:` を全部集める。job でない name と衝突すると見逃す。
-// ponytail: GitHub 上の ruleset との一致は見ない。反映は手動の gh api のため、ファイルだけ直した変更は検出できない。
+// ponytail: GitHub 上の ruleset との一致は見ない。比べるのは認証が要る手元の task ruleset-diff で、ファイルだけ直した変更は CI で検出できない。
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 

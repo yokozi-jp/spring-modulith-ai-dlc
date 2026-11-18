@@ -12,9 +12,9 @@ on:
       - "tooling/adr-lint/**"
       - ".github/rulesets/**"
       - "tooling/ruleset-check/**"
+      - "tooling/ruleset-sync/**"
       - ".github/workflows/**"
-  pull_request:
-    branches: ["**"]
+  # PR の検査は ci.yml から呼ばれて動く（docs/adr/ADR-087）。
   workflow_call:
 
 concurrency:
@@ -53,6 +53,7 @@ jobs:
             'tooling/adr-lint/**' \
             '.github/rulesets/**' \
             'tooling/ruleset-check/**' \
+            'tooling/ruleset-sync/**' \
             '.github/workflows/**'
 
   okf-validate:

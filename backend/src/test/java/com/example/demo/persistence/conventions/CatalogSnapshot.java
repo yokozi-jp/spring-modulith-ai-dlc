@@ -45,14 +45,14 @@ record CatalogSnapshot(
    * @param schema スキーマ名
    * @param name テーブル名
    * @param relkind {@code relkind}（{@code r}、{@code p}、{@code v}、{@code m}、{@code f}）
-   * @param hasPrimaryKey 主キーがあるか
+   * @param primaryKey 主キーの先頭の列名。主キーがなければ{@code null}
    * @param inheritanceParent パーティションでない継承の親テーブル。なければ{@code null}
    */
   /* package */ record RelationRow(
       String schema,
       String name,
       String relkind,
-      boolean hasPrimaryKey,
+      @Nullable String primaryKey,
       @Nullable String inheritanceParent) {}
 
   /**
@@ -84,8 +84,10 @@ record CatalogSnapshot(
    * @param table テーブル名
    * @param name 制約名
    * @param type {@code contype}
+   * @param referencedSchema 外部キーが参照するテーブルのスキーマ名。外部キーでなければ{@code null}
    */
-  /* package */ record ConstraintRow(String schema, String table, String name, String type) {}
+  /* package */ record ConstraintRow(
+      String schema, String table, String name, String type, @Nullable String referencedSchema) {}
 
   /**
    * {@code pg_index}の1行。

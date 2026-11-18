@@ -103,13 +103,13 @@ dependencies {
     implementation 'org.springframework.modulith:spring-modulith-events-core'
     // 失敗したイベント出版の再投入を、DB の時刻で期限を決めるロックで 1 つのインスタンスに絞る（ADR-079）。
     // Spring BOM の管理外のため版を明示する。jOOQ は Spring Boot が管理する版に解決される。
-    implementation 'net.javacrumbs.shedlock:shedlock-provider-jooq:7.10.1'
+    implementation 'net.javacrumbs.shedlock:shedlock-provider-jooq:7.11.0'
 
     // --- 可観測性・メトリクス ---
     implementation 'org.springframework.boot:spring-boot-starter-actuator'
     implementation 'org.springframework.boot:spring-boot-starter-opentelemetry'
-    // Spring Boot 4.1.1 が管理する OpenTelemetry 1.62.0 と整合するバージョン。
-    implementation 'io.opentelemetry.instrumentation:opentelemetry-logback-appender-1.0:2.28.1-alpha'
+    // dependencyManagement の opentelemetry-bom と対応する版（2.33.0 は api 1.67.0 を前提にする）。BOM を上げるときは同時に上げる。
+    implementation 'io.opentelemetry.instrumentation:opentelemetry-logback-appender-1.0:2.33.0-alpha'
 
     // --- 耐障害性 ---
     implementation 'org.springframework.cloud:spring-cloud-starter-circuitbreaker-resilience4j'
@@ -170,9 +170,14 @@ dependencyManagement {
         // jackson-databind の CVE-2026-68497 / CVE-2026-83557 / CVE-2026-19032 対応。
         // databind 単体ではなく BOM を上げ、core など同系列の版ずれを避ける。
         // Jackson 2.x 系（Spring Boot BOM 由来の 2.21.5）を 2.21.6 へ。
-        mavenBom "com.fasterxml.jackson:jackson-bom:2.22.4"
+        mavenBom "com.fasterxml.jackson:jackson-bom:2.23.0"
         // Jackson 3.x 系（Spring Boot 4 / Modulith 由来の 3.1.5）を 3.1.6 へ。
-        mavenBom "tools.jackson:jackson-bom:3.2.4"
+        mavenBom "tools.jackson:jackson-bom:3.3.0"
+        // --- 脆弱性対応（OpenTelemetry BOM の推移的バージョン上書き） ---
+        // opentelemetry-api の CVE-2026-118259（W3C tracestate の解析で二次の CPU 消費）対応。
+        // api 単体ではなく BOM を上げ、sdk など同系列の版ずれを避ける。Spring Boot の BOM が 1.67.0 以上になったら、この行を消す。
+        // opentelemetry-logback-appender は api と版を対応させる必要があるため、同時に上げる（.github/dependabot.yml の ignore を参照）。
+        mavenBom "io.opentelemetry:opentelemetry-bom:1.68.0"
     }
     dependencies {
         // --- 脆弱性対応（推移的依存のバージョン強制） ---

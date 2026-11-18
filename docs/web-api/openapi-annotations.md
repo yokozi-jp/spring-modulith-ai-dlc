@@ -130,7 +130,7 @@ class OrderController {
   @ApiResponse(responseCode = "200")
   @ApiResponse(responseCode = "404", ref = "#/components/responses/NotFoundProblem")
   @GetMapping("/{orderId}")
-  /* package */ OrderDetailsResponse details(@PathVariable final String orderId) {
+  /* package */ OrderDetailsResponse details(@PathVariable final UUID orderId) {
     // OrderQueries を呼び、OrderDetailsResponse.from(...) を返す。
   }
 
@@ -148,7 +148,7 @@ class OrderController {
   @ApiResponse(responseCode = "409", ref = "#/components/responses/ConflictProblem")
   @PostMapping("/{orderId}/cancel")
   /* package */ ResponseEntity<Void> cancel(
-      @PathVariable final String orderId, @Valid @RequestBody final CancelOrderRequest request) {
+      @PathVariable final UUID orderId, @Valid @RequestBody final CancelOrderRequest request) {
     // CommandHandler を呼び、ResponseEntity.noContent().build() を返す。
   }
 }
@@ -165,7 +165,7 @@ class OrderController {
  * @param giftWrap ギフト包装をするかどうか
  */
 public record PlaceOrderRequest(
-    @NotBlank @Schema(example = "C-0001") String customerId,
+    @NotNull @Schema(example = "3a9d6e1f-8b2c-4d7e-a5f0-6c1b2e3d4f5a") UUID customerId,
     @Positive @Schema(example = "2") int quantity,
     boolean giftWrap) {}
 
@@ -177,7 +177,7 @@ public record PlaceOrderRequest(
  * @param lines 注文の明細
  */
 public record OrderDetailsResponse(
-    @Schema(example = "O-0001") String orderId,
+    @Schema(example = "5f0c2a8e-7d1b-4c3a-9e6f-1a2b3c4d5e6f") UUID orderId,
     @Schema(example = "PLACED") String status,
     List<OrderDetailsResponse.OrderLineResponse> lines) {}
 ```
@@ -204,6 +204,7 @@ springdocやtherapiの版を上げてこのテストが失敗したら、この�
 - [ ] 文字列と数値のpropertyに`@Schema(example = "...")`を付ける。［Spectralで検査：schema-property-example］
 - [ ] `@Tag(name, description)`をクラスに付ける。［Spectralで検査：operation-tags、tag-description、operation-tag-defined］
 - [ ] tagを業務機能のkebab-caseにし、operationに1つだけ付ける。［Spectralで検査：tag-name-format、operation-singular-tag］
+- [ ] APIのIDを`UUID`（配列なら`UUID`の要素）にし、`format: uuid`で出す。対象の範囲は[PostgreSQLの主キー](../database/postgresql-primary-keys.md#使い分けの検査)の「使い分けの検査」に示す。［Spectralで検査：public-id-uuid］
 - [ ] `@Operation(operationId = "...")`を明示する。［Spectralで検査：operation-id-naming（形だけ。明示は自分で点検）］
 - [ ] 404、409、422を起きるoperationにだけ`ref`で書く。［Spectralで検査：error-response-problem-detail（参照の形だけ。付け忘れは自分で点検）］
 - [ ] `@ApiResponse`を書いたハンドラに成功応答（200、201、204）も書く。［Spectralで検査：operation-success-response］

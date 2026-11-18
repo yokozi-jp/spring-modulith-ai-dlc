@@ -59,14 +59,21 @@ final class SchemaCatalog {
                 query(
                     """
                     SELECT n.nspname AS schema_name, c.relname AS table_name, con.conname AS object_name,
-                           con.contype::text AS kind
+                           con.contype::text AS kind, rn.nspname AS referenced_schema
                     FROM pg_constraint con
                     JOIN pg_class c ON c.oid = con.conrelid
                     JOIN pg_namespace n ON n.oid = c.relnamespace
+                    LEFT JOIN pg_class rc ON rc.oid = con.confrelid
+                    LEFT JOIN pg_namespace rn ON rn.oid = rc.relnamespace
                     WHERE /*NOT_SYSTEM*/
                     """))
             .fetch(r ->
-                new ConstraintRow(text(r, SCHEMA), text(r, TABLE), text(r, NAME), text(r, "kind"))),
+                new ConstraintRow(
+                    text(r, SCHEMA),
+                    text(r, TABLE),
+                    text(r, NAME),
+                    text(r, "kind"),
+                    r.get("referenced_schema", String.class))),
         indexes(dsl),
         dsl.resultQuery(
                 query(
@@ -118,8 +125,9 @@ final class SchemaCatalog {
             query(
                 """
                 SELECT n.nspname AS schema_name, c.relname AS object_name, c.relkind::text AS kind,
-                       EXISTS (SELECT 1 FROM pg_index i WHERE i.indrelid = c.oid AND i.indisprimary)
-                         AS has_primary_key,
+                       (SELECT a.attname FROM pg_index i
+                        JOIN pg_attribute a ON a.attrelid = i.indrelid AND a.attnum = i.indkey[0]
+                        WHERE i.indrelid = c.oid AND i.indisprimary) AS primary_key,
                        (SELECT p.relname FROM pg_inherits h JOIN pg_class p ON p.oid = h.inhparent
                         WHERE h.inhrelid = c.oid AND p.relkind <> 'p' LIMIT 1) AS inheritance_parent
                 FROM pg_class c
@@ -131,7 +139,7 @@ final class SchemaCatalog {
                 text(r, SCHEMA),
                 text(r, NAME),
                 text(r, "kind"),
-                r.get("has_primary_key", Boolean.class),
+                r.get("primary_key", String.class),
                 r.get("inheritance_parent", String.class)));
   }
 
