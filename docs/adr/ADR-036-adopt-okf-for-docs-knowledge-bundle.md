@@ -93,7 +93,7 @@ OKF 適合の対象外として扱い、この判断では解消しない。
 
 ## References
 
-- [Open Knowledge Format](https://github.com/google/open-knowledge-format)
+- [Open Knowledge Format](https://github.com/GoogleCloudPlatform/open-knowledge-format)
 - [iwe](https://github.com/iwe-org/iwe)
 - [開発環境構築](../local-env-setup/setup.md)
 - `docs/.iwe/config.toml`
