@@ -186,6 +186,10 @@ Class <archfixture.violating.ordering.application.ShipOrderCommandHandler> is me
 対象のアノテーションの一覧と規則の理由は、[バックエンドのJava実装規約](java-coding.md)の「プロキシで動くアノテーション」に示す。
 同じクラスの`pointcutsNarrowTargetsWithWithin`は、AspectJのadviceと`@Pointcut`の式（`value`と`pointcut`）に`within(`があることを検査する。
 違反フィクスチャの`shared.infrastructure.persistence.SlowPgmCdAspect`で確かめ、規約どおりのフィクスチャの`PgmCdAspect`を誤検出しないことも確かめる。
+同じクラスの`aspectsDeclareOrder`は、`@Aspect`のクラスに`Ordered.LOWEST_PRECEDENCE`より小さい値の`@Order`があることを検査する。
+違反フィクスチャの`shared.infrastructure.persistence.UnorderedPgmCdAspect`（`@Order`がない）と`LowestOrderPgmCdAspect`（値のない`@Order`）で確かめ、規約どおりのフィクスチャの`PgmCdAspect`を誤検出しないことも確かめる。
+同じクラスの`transactionManagementIsNotRedeclared`は、`@EnableTransactionManagement`を宣言するクラスがないことを検査し、`aspectsDeclareOrder`が前提にするトランザクションのadvisorの順序を保つ。
+違反フィクスチャの`shared.infrastructure.persistence.TransactionOrderConfiguration`で確かめる。
 
 ## 日時
 
