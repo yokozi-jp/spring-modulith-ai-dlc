@@ -13,6 +13,9 @@ on:
       - "docker/wiremock/**"
       - ".env.test.example"
       - "Taskfile.yml"
+      - "mise.toml"
+      - "mise.lock"
+      - ".github/actions/setup-mise/**"
       - "tooling/session-sql-lint/**"
       - ".github/workflows/backend-ci.yml"
   # PR の検査は ci.yml から呼ばれて動く（docs/adr/ADR-087）。
@@ -56,6 +59,9 @@ jobs:
             'docker/compose-test.yml' \
             '.env.test.example' \
             'Taskfile.yml' \
+            'mise.toml' \
+            'mise.lock' \
+            '.github/actions/setup-mise/**' \
             'tooling/session-sql-lint/**' \
             '.github/workflows/backend-ci.yml'
 
@@ -104,11 +110,8 @@ jobs:
         working-directory: backend
         run: ./gradlew spotlessCheck pmdMain pmdTest spotbugsMain spotbugsTest
 
-      - name: Set up Task
-        uses: go-task/setup-task@a00fbb05ce67b35648be3c78cbc9fd85354c757e # v2
-        with:
-          version: "3.53.1"
-          checksum: a54a408f6861ff921f6e87774180db31bacd8c1e7c944ca696db9fea49a82fc7
+      - name: Set up mise tools
+        uses: ./.github/actions/setup-mise
 
       # PgBouncer のトランザクションモードや RDS Proxy の後ろで壊れるセッションの SQL を検出する。
       - name: Check session-level SQL
@@ -161,11 +164,8 @@ jobs:
           restore-keys: |
             gradle-${{ runner.os }}-test-
 
-      - name: Set up Task
-        uses: go-task/setup-task@a00fbb05ce67b35648be3c78cbc9fd85354c757e # v2
-        with:
-          version: "3.53.1"
-          checksum: a54a408f6861ff921f6e87774180db31bacd8c1e7c944ca696db9fea49a82fc7
+      - name: Set up mise tools
+        uses: ./.github/actions/setup-mise
 
       # rollback の検証はローカルの task test と同じく compose の PostgreSQL 5433 を使う。
       # テストは fork ごとに Testcontainers の PostgreSQL、Redis と WireMock を起動する（ADR-085）。

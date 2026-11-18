@@ -10,7 +10,7 @@
  * に置き、リスナーが再投入の方針を選ぶ注釈 （{@code ResubmissionPolicy}）は {@code events} に置いてどの層からも使う（ADR-079）。
  *
  * <p>共通カラムの {@code *_by} に登録するアプリの利用者を表す認証の principal（{@code AppUserPrincipal}）は {@code security}
- * に置き、どの層からも使う（ADR-094）。
+ * に置き、どの層からも使う（ADR-095）。
  */
 @NullMarked
 package com.example.demo.shared;

@@ -9,7 +9,7 @@ tags: [adr, frontend, vite-plus, monorepo]
 
 ## Status
 
-Proposed
+Accepted
 
 ## Date
 
@@ -140,9 +140,16 @@ ADR-032 の本文は履歴として直さない。
 
 ### Neutral
 
-- `components.json` と `componentImports` の組み合わせは、別々には実測したが、併用した形は未確認である。
-  `shadcn add` の出力先と `aliases` の値、テーマの変数を `packages/ui` に置く形も未確認である。
-  どちらも手順 3 で確かめる。
+- `components.json` と `componentImports` を併用した形、`shadcn add` の出力先と `aliases` の値、テーマの変数を `packages/ui` に置く形は、手順 3（Issue #446）で次のとおり確かめた。
+  - 併用した形で、`@frontend/ui/button` への `className` を `no-restyle` が検出した。
+    `componentImports` を外し、アプリの `components.json` の `aliases.ui`（`@frontend/ui`）だけにしても検出した。
+  - `packages/ui` の `aliases.ui` を `@frontend/ui` にし、`tsconfig.json` の `paths` に `@frontend/ui` と `@frontend/ui/*` を書くと、`shadcn add` は `packages/ui/src/<部品名>.tsx` を出力した。
+    `paths` に `@frontend/ui` がないと、`aliases` を解決できずに失敗した。
+  - registry（base-nova）の部品は、`cn` を `@frontend/ui/lib/utils` ではなく `cn` パッケージから直接 import する。
+    registry が追加する依存（`dialog` の `lucide-react`）は、`packages/ui/package.json` に自動では入らなかった。
+  - Tailwind の読込とテーマの変数を `packages/ui/src/style.css` に置き、アプリの `style.css` が `@import "@frontend/ui/style.css"` と `@source` を書く形で、ビルドした CSS に `ui` の class が出た。
+    `@source` を外すと、同じ class は出なかった。
+    `@shadcn/lint` と `better-tailwindcss` も、アプリの CSS からこのテーマを解決した。
 - `run.cache` は、環境変数の追跡と、副作用のある script（E2E など）の除外を決めたうえで、別の Issue で検討する。
 - `loadEnv` ではなく `process.env` を直接読む `FRONTEND_REACT_COMPILER` は、cache を有効にする前に `loadEnv` へ寄せるか、`cache.env` に宣言する。
 - 2 つ目のアプリの名前は、手順 5 で決める。

@@ -1,75 +1,35 @@
-import { spawnSync } from "node:child_process";
-import { cpSync, mkdirSync, mkdtempSync, readdirSync, rmSync, symlinkSync } from "node:fs";
-import { tmpdir } from "node:os";
-import path from "node:path";
-import { fileURLToPath } from "node:url";
-
 import { describe, expect, it } from "vite-plus/test";
 
-const frontendRoot = fileURLToPath(new URL("..", import.meta.url));
+import { appDirectory, lintFixtureProject, uiDirectory } from "./lint-project.js";
 
-/** @param {string} directory */
-function copyProjectConfig(directory) {
-  cpSync(path.join(frontendRoot, "lint/fixtures/src"), path.join(directory, "src"), {
-    recursive: true,
-  });
-  for (const file of ["vite.config.ts", "tsconfig.json", "package.json", "src/style.css"]) {
-    cpSync(path.join(frontendRoot, file), path.join(directory, file));
-  }
-  mkdirSync(path.join(directory, "lint"));
-  /** @type {string[]} */
-  const lintFiles = readdirSync(path.join(frontendRoot, "lint"));
-  for (const file of lintFiles.filter((name) => /^[^.]+\.js$/u.test(name))) {
-    cpSync(path.join(frontendRoot, "lint", file), path.join(directory, "lint", file));
-  }
-  symlinkSync(path.join(frontendRoot, "node_modules"), path.join(directory, "node_modules"));
-}
+const apiDirectory = "packages/api";
+const diagnostics = lintFixtureProject(".");
 
-// overrides の files は設定ファイルの場所からの相対パスで照合される。
-// そのため実際の設定を一時ディレクトリへ複製し、fixture をその src/ に置いて lint する。
-/** @returns {{ filename: string, code: string }[]} */
-function lintFixtures() {
-  /** @type {string} */
-  const directory = mkdtempSync(path.join(tmpdir(), "frontend-lint-config-"));
-
-  try {
-    copyProjectConfig(directory);
-    // vp lint をプロセスとして起動しプロジェクトの設定と plugin を読み込むため、所要時間は CPU の空きに比例する。
-    // local-security.test.js と同じく、ハング検出として十分な 60 秒で打ち切る。
-    /** @type {{ error?: Error, stdout: string }} */
-    const { error, stdout } = spawnSync("vp", ["lint", "src", "--format", "json"], {
-      cwd: directory,
-      encoding: "utf8",
-      // 複製先に version.txt はない。シェルで有効にしていても、無効の設定を読ませる。
-      env: { ...process.env, FRONTEND_OTEL_ENABLED: "false" },
-      timeout: 60_000,
-    });
-    if (error) {
-      throw error;
-    }
-    /** @type {{ diagnostics: { filename: string, code: string }[] }} */
-    const report = JSON.parse(stdout);
-    return report.diagnostics;
-  } finally {
-    rmSync(directory, { recursive: true, force: true });
-  }
-}
-
-const diagnostics = lintFixtures();
-
-/** @param {string} file */
-function codesIn(file) {
+/**
+ * @param {string} file package の src からの相対パス
+ * @param {string} [directory] file を置いた package。省略するとアプリ
+ */
+function codesIn(file, directory = appDirectory) {
   return diagnostics
-    .filter((diagnostic) => diagnostic.filename === `src/${file}`)
+    .filter((diagnostic) => diagnostic.filename === `${directory}/src/${file}`)
     .map((diagnostic) => diagnostic.code);
 }
 
 /**
  * @param {string} file
  * @param {string} code
+ * @param {string} [directory]
  */
-function countIn(file, code) {
-  return codesIn(file).filter((found) => found === code).length;
+function countIn(file, code, directory = appDirectory) {
+  return codesIn(file, directory).filter((found) => found === code).length;
+}
+
+/** @param {string} file */
+function canonicalMessagesOf(file) {
+  return diagnostics
+    .filter((diagnostic) => diagnostic.filename.endsWith(file))
+    .filter((diagnostic) => diagnostic.code === "better-tailwindcss(enforce-canonical-classes)")
+    .map((diagnostic) => diagnostic.message);
 }
 
 describe("fixture に適用したプロジェクトの lint 設定", () => {
@@ -113,16 +73,6 @@ describe("fixture に適用したプロジェクトの lint 設定", () => {
       expect(countIn("lib/component-import.ts", "eslint(no-restricted-imports)")).toBe(1);
     });
 
-    it("api から components の import を禁止する", () => {
-      expect(countIn("api/component-import.ts", "eslint(no-restricted-imports)")).toBe(1);
-    });
-
-    it("components/ui から ui 以外の components の import を禁止し、ui の primitive は許可する", () => {
-      expect(
-        countIn("components/ui/app-component-import.ts", "eslint(no-restricted-imports)"),
-      ).toBe(1);
-    });
-
     it("共有コードから API client の import を許可する", () => {
       expect(codesIn("lib/clean.ts")).toStrictEqual([]);
     });
@@ -134,16 +84,32 @@ describe("fixture に適用したプロジェクトの lint 設定", () => {
 
   describe("UI", () => {
     describe("Base UI の import", () => {
-      it("components/ui の外では Base UI を禁止する", () => {
+      it("@frontend/ui の外では Base UI を禁止する", () => {
         expect(countIn("features/order/base-ui.tsx", "eslint(no-restricted-imports)")).toBe(1);
       });
 
-      it("components/ui では Base UI を許可する", () => {
-        expect(codesIn("components/ui/primitive.tsx")).toStrictEqual([]);
+      it("@frontend/ui の中では Base UI を許可する", () => {
+        expect(codesIn("primitive.tsx", uiDirectory)).toStrictEqual([]);
       });
 
-      it("components/ui でも共有層とテスト用部品の import を禁止する", () => {
-        expect(countIn("components/ui/shared-layer.tsx", "eslint(no-restricted-imports)")).toBe(2);
+      it("アプリの components/ui には、Base UI を許可する層の override が残っていない", () => {
+        expect(countIn("components/ui/base-ui.tsx", "eslint(no-restricted-imports)")).toBe(1);
+      });
+
+      it("@frontend/ui のテストファイルでも Base UI を禁止する", () => {
+        expect(
+          codesIn("base-ui.test.ts", uiDirectory).filter(
+            (code) => code === "eslint(no-restricted-imports)",
+          ),
+        ).toHaveLength(1);
+      });
+
+      it("@frontend/ui でもテスト用部品の import を禁止する", () => {
+        expect(
+          codesIn("msw-import.ts", uiDirectory).filter(
+            (code) => code === "eslint(no-restricted-imports)",
+          ),
+        ).toHaveLength(2);
       });
 
       it("テストファイルでも Base UI を禁止する", () => {
@@ -151,7 +117,23 @@ describe("fixture に適用したプロジェクトの lint 設定", () => {
       });
     });
 
+    describe("shadcn の部品", () => {
+      it("@frontend/ui の部品に渡した className の、部品が持つ見た目の class を禁止し、配置の class を許可する", () => {
+        expect(countIn("features/order/restyle.tsx", "shadcn(no-restyle)")).toBe(1);
+      });
+    });
+
     describe("Tailwind の class", () => {
+      it("ルートから lint しても、アプリと ui のそれぞれの theme を解決する", () => {
+        for (const messages of [
+          canonicalMessagesOf("apps/web/src/features/order/theme-class.tsx"),
+          canonicalMessagesOf("packages/ui/src/theme-class.tsx"),
+        ]) {
+          expect(messages).toHaveLength(1);
+          expect(messages[0]).toContain('simplified to "bg-primary"');
+        }
+      });
+
       it("値から組み立てた class 名と、関数に渡した key で選んだ class 名を禁止する", () => {
         expect(
           countIn("features/order/dynamic-class.tsx", "tailwind-classes(no-dynamic-class-name)"),
@@ -187,19 +169,19 @@ describe("fixture に適用したプロジェクトの lint 設定", () => {
   });
 
   describe("ネットワークアクセス", () => {
-    it("src/api の外では fetch と XMLHttpRequest を禁止する", () => {
+    it("@frontend/api の外では fetch と XMLHttpRequest を禁止する", () => {
       expect(countIn("lib/network.ts", "eslint(no-restricted-globals)")).toBe(2);
       expect(countIn("lib/network.ts", "eslint(no-restricted-properties)")).toBe(2);
     });
 
-    it("src/api では fetch を許可する", () => {
-      expect(codesIn("api/client.ts")).toStrictEqual([]);
+    it("@frontend/api の中では fetch と XMLHttpRequest を許可する", () => {
+      expect(codesIn("client.ts", apiDirectory)).toStrictEqual([]);
     });
   });
 
   describe("HTML sink の制限", () => {
     it("どの override でも DOMParser を禁止する", () => {
-      expect(countIn("api/html-sink.ts", "eslint(no-restricted-globals)")).toBe(1);
+      expect(countIn("html-sink.ts", "eslint(no-restricted-globals)", apiDirectory)).toBe(1);
       expect(countIn("lib/html-sink.ts", "eslint(no-restricted-globals)")).toBe(1);
     });
   });

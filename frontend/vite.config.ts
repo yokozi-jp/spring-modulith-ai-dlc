@@ -1,18 +1,5 @@
-// oxlint-disable max-lines -- Vite、Lint、テストの設定を1つのdefineConfigに集める正本のため、行数で分割しない。
-// oxlint-disable-next-line import/no-nodejs-modules -- service.version の正本の version.txt を、ビルド時に一度だけ読む。
-import { readFileSync } from "node:fs";
-
-import tailwindcss from "@tailwindcss/vite";
-import { tanstackRouter } from "@tanstack/router-plugin/vite";
-import react from "@vitejs/plugin-react";
-import { defaultExclude, defineConfig, loadEnv } from "vite-plus";
-import type { ProxyOptions } from "vite-plus";
-
-const contentSecurityPolicy =
-  "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; form-action 'self'; script-src 'self'; style-src 'self'; style-src-elem 'self' 'unsafe-inline'; style-src-attr 'none'; img-src 'self' data:; font-src 'self'; connect-src 'self'; report-to csp-endpoint";
-
-// ponytail: 開発では起動単位でnonceを固定する。本番へ適用するなら配信層でリクエスト単位に生成する。
-const developmentCspNonce = crypto.randomUUID().replaceAll("-", "");
+// oxlint-disable max-lines -- lint と fmt の設定を 1 つの defineConfig に集める正本のため、行数で分割しない。
+import { defineConfig } from "vite-plus";
 
 const restrictedHtmlProperties = [
   "innerHTML",
@@ -27,7 +14,7 @@ const restrictedHtmlProperties = [
 
 // override の option は前の指定とマージされず置き換わるため、禁止の一覧を定数に分けて override ごとに組み合わせる。
 const htmlSinkGlobals = [{ name: "DOMParser", message: "Do not parse arbitrary HTML." }];
-const apiMessage = "Use the generated API client in src/api.";
+const apiMessage = "Use the generated API client from @frontend/api.";
 const japaneseTitle = String.raw`[\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Han}]`;
 
 const mockMessage = "Use MSW, vi.spyOn or vi.stubGlobal instead of module mocks.";
@@ -52,26 +39,16 @@ const libLayerImports = {
   group: [...sharedLayerImports.group, "@/components/**"],
   message: "lib must not depend on components, features or routes.",
 };
-// api は通信層であり、共有層の禁止に加えて UI を参照しない。
-const apiLayerImports = {
-  group: [...sharedLayerImports.group, "@/components/**"],
-  message: "api must not depend on components, features or routes.",
-};
-// components/ui は UI primitive の層であり、共有層の禁止に加えてアプリシェルなど ui 以外の components を参照しない。
-const uiLayerImports = {
-  group: [...sharedLayerImports.group, "@/components/**", "!@/components/ui/**"],
-  message: "components/ui must not depend on other components, features or routes.",
-};
 const featureImports = {
   group: ["@/routes/**", "@/routeTree.gen"],
   message: "Use getRouteApi instead of importing a route.",
 };
 const baseUiImports = {
   group: ["@base-ui/**"],
-  message: "Import UI primitives from @/components/ui (ADR-025).",
+  message: "Import UI primitives from @frontend/ui (ADR-025).",
 };
 const testOnlyImports = {
-  group: ["msw", "msw/**", "@/api/generated/mocks/**", "@/testing/**", "@testing-library/**"],
+  group: ["msw", "msw/**", "@frontend/api/mocks/**", "@/testing/**", "@testing-library/**"],
   message: "Use test-only modules only in test files and src/testing.",
 };
 // no-restricted-imports は静的な import に加えて import("@grafana/...") も検出する（lint/fixtures の telemetry-sdk.ts で確かめている）。
@@ -80,423 +57,277 @@ const telemetrySdkImports = {
   message: "Call the telemetry SDK only through src/lib/telemetry.ts (ADR-068).",
 };
 
-// 生成物。整形・静的解析・カバレッジのいずれからも除外する。
-const generatedFiles = ["src/routeTree.gen.ts", "src/api/generated/**"];
-// lint 設定のテストが使う、違反を含む fixture。通常の整形、静的解析、テストの収集から外す。
+// better-tailwindcss の規則。entryPoint を option で渡すため、規則の一覧をここに持つ。
+const tailwindRuleNames = [
+  "enforce-consistent-class-order",
+  "no-deprecated-classes",
+  "no-duplicate-classes",
+  "no-unnecessary-whitespace",
+  "no-conflicting-classes",
+  "enforce-canonical-classes",
+];
+
+// entryPoint の相対パスは cwd 基準で、vp run -r は package の dir で走るため解決しない。呼び出し側は設定ファイルの場所から作った絶対パスを渡す（ADR-092）。
+function tailwindRules(entryPoint: string) {
+  return Object.fromEntries(
+    tailwindRuleNames.map((name): [string, ["error", { entryPoint: string }]] => [
+      `better-tailwindcss/${name}`,
+      ["error", { entryPoint }],
+    ]),
+  );
+}
+
+// 生成物。整形と静的解析から除外する。
+const generatedFiles = ["apps/*/src/routeTree.gen.ts", "packages/api/src/generated/**"];
+// lint 設定のテストが使う、違反を含む fixture。通常の整形、静的解析から外す。
 const lintFixtures = ["lint/fixtures/**"];
 
-// ルートの.envは秘密情報も含むため、proxyに必要な変数だけを読み込む。
-function portFromEnv(mode: string, name: string, fallback: string): number {
-  const value = loadEnv(mode, "..", name)[name] ?? fallback;
-  const port = Number(value);
-  if (!/^\d+$/u.test(value) || !Number.isInteger(port) || port < 1 || port > 65_535) {
-    throw new Error(`${name} must be an integer between 1 and 65535: ${value}`);
-  }
-  return port;
-}
-
-// Reporting API は同一オリジンの報告に Cookie を付ける。
-// Collector は認証に使わないので、資格情報の header を Collector へ渡さない（ADR-068）。
-// oxlint-disable-next-line func-style -- ProxyOptions の callback 型から proxy の型を推論させる。
-const withoutCredentials: ProxyOptions["configure"] = (proxy) => {
-  proxy.on("proxyReq", (proxyReq) => {
-    for (const name of ["cookie", "authorization", "proxy-authorization"]) {
-      proxyReq.removeHeader(name);
-    }
-  });
-};
-
-// src/lib/telemetry.ts が参照するビルド時の定数（ADR-068）。
-function telemetryDefine(mode: string) {
-  // ルートの.envは秘密情報も含むため、テレメトリに必要な変数だけを読み込む（VITE_接頭辞で公開しない）。
-  const telemetryEnv = loadEnv(mode, "..", [
-    "FRONTEND_OTEL_",
-    "OTEL_SERVICE_NAMESPACE",
-    "OTEL_DEPLOYMENT_ENVIRONMENT_NAME",
-  ]);
-  const telemetryEnabledValue = telemetryEnv.FRONTEND_OTEL_ENABLED ?? "false";
-  if (telemetryEnabledValue !== "true" && telemetryEnabledValue !== "false") {
-    throw new Error(`FRONTEND_OTEL_ENABLED must be true or false: ${telemetryEnabledValue}`);
-  }
-  const telemetryEnabled = telemetryEnabledValue === "true";
-  const telemetryApp = {
-    name: telemetryEnv.FRONTEND_OTEL_SERVICE_NAME ?? "",
-    namespace: telemetryEnv.OTEL_SERVICE_NAMESPACE ?? "",
-    // 無効のビルドは版を使わない。lint 設定のテストは、この設定を version.txt のない一時ディレクトリへ複製して読む。
-    version: telemetryEnabled
-      ? readFileSync(new URL("../version.txt", import.meta.url), "utf8").trim()
-      : "",
-    environment: telemetryEnv.OTEL_DEPLOYMENT_ENVIRONMENT_NAME ?? "",
-  };
-  const emptyKey = Object.entries(telemetryApp).find(([, value]) => value === "")?.[0];
-  if (telemetryEnabled && emptyKey !== undefined) {
-    throw new Error(`Telemetry app.${emptyKey} must not be empty when FRONTEND_OTEL_ENABLED=true`);
-  }
-  return {
-    __TELEMETRY_ENABLED__: JSON.stringify(telemetryEnabled),
-    __TELEMETRY_APP__: JSON.stringify(telemetryApp),
-  };
-}
-
-// findBy、waitFor、expect.poll が待つ上限。testTimeout より短くし、待った対象を示すエラーで失敗させる。
-// ponytail: Playwright の assertion の既定と同じ値にした。これでも足りない負荷が出たら、この値だけを上げる。
-const asyncWaitTimeoutMs = 5000;
-
-// 設定から src を import せず、provide でテストへ渡す。lint/lint-config.test.js は設定を一時ディレクトリへ複製し、
-// src に fixture だけを置いて Lint する。設定が src を import すると、その複製の中で import を解決できず、そのテストが失敗する。
-declare module "vite-plus/test" {
-  interface ProvidedContext {
-    asyncWaitTimeoutMs: number;
-  }
-}
-
-export default defineConfig(({ mode }) => {
-  const serverPort = portFromEnv(mode, "SERVER_PORT", "18080");
-  const faroPort = portFromEnv(mode, "OTEL_FARO_HTTP_PORT", "12347");
-  const cspReportPort = portFromEnv(mode, "OTEL_CSP_REPORT_HTTP_PORT", "12348");
-  const idpOrigin = new URL(
-    loadEnv(mode, "..", "OIDC_ISSUER_URI").OIDC_ISSUER_URI ?? "http://localhost:8080",
-  ).origin;
-  // ログアウトのフォームはIdPへredirectされ、ChromeとSafariはredirect先にもform-actionを適用する。
-  // 開発専用の許可ではないため、本番の見本（production modeとpreview）にも入れる（build-and-delivery.md）。
-  const deliveredContentSecurityPolicy = contentSecurityPolicy.replace(
-    "form-action 'self'",
-    `form-action 'self' ${idpOrigin}`,
-  );
-  const developmentContentSecurityPolicy = deliveredContentSecurityPolicy
-    .replace("script-src 'self'", `script-src 'self' 'nonce-${developmentCspNonce}'`)
-    .replace("connect-src 'self'", "connect-src 'self' ws://localhost:*");
-  const securityHeaders = {
-    "Content-Security-Policy": deliveredContentSecurityPolicy,
-    "Referrer-Policy": "strict-origin-when-cross-origin",
-    "Permissions-Policy": "camera=(), microphone=(), geolocation=(), payment=(), usb=()",
-    "X-Content-Type-Options": "nosniff",
-    "X-Frame-Options": "DENY",
-    // CSP の report-to が参照する endpoint（ADR-068）。default にしないので、CSP 以外の報告は送られない。
-    "Reporting-Endpoints": 'csp-endpoint="/csp-report"',
-  };
-
-  return {
-    ...(mode === "development" ? { html: { cspNonce: developmentCspNonce } } : {}),
-    // coverage の計測だけ React Compiler を外す。Compiler が足す memo の分岐が分母に入るため（ADR-078）。
+export default defineConfig({
+  fmt: { ignorePatterns: [...generatedFiles, ...lintFixtures], sortImports: true },
+  lint: {
+    ignorePatterns: [...generatedFiles, ...lintFixtures],
+    categories: {
+      correctness: "error",
+      suspicious: "error",
+      pedantic: "error",
+      perf: "error",
+      style: "error",
+      restriction: "error",
+    },
     plugins: [
-      tanstackRouter({ target: "react" }),
-      react({ compiler: process.env.FRONTEND_REACT_COMPILER !== "false" }),
-      tailwindcss(),
+      "eslint",
+      "unicorn",
+      "typescript",
+      "oxc",
+      "react",
+      "import",
+      "vitest",
+      "jsx-a11y",
+      "promise",
     ],
-    define: telemetryDefine(mode),
-    // エイリアスの正本は tsconfig.json の paths とする。
-    resolve: { tsconfigPaths: true },
-    test: {
-      exclude: [...defaultExclude, ...lintFixtures, "e2e/**"],
-      // pre-push では backend のテストやシークレットスキャンと並列に走り、既定の 5 秒を超えることがある。
-      // ponytail: タイムアウトは性能の検証ではなくハング検出のためなので、負荷時の実測（5 秒超）に余裕を持たせた 30 秒にする。
-      testTimeout: 30_000,
-      expect: { poll: { timeout: asyncWaitTimeoutMs } },
-      provide: { asyncWaitTimeoutMs },
-      // Testing Library の待つ上限、MSW の server、後片付けを全テストで共有する（docs/frontend/testing.md）。
-      setupFiles: ["./src/testing/setup.ts"],
-      coverage: {
-        provider: "v8",
-        include: ["src/**/*.{ts,tsx}"],
-        exclude: [
-          "src/**/*.{test,spec}.{ts,tsx}",
-          "src/**/*.d.ts",
-          "src/main.tsx",
-          "src/testing/**",
-          ...generatedFiles,
-        ],
-        // json-summary は task fe-coverage がファイルごとの下限の検査に読む。
-        reporter: ["text", "html", "clover", "json", "json-summary"],
-        // 全体の下限。実測（branch 89.55%、line 97%）の少し下に置く（ADR-076）。
-        thresholds: { branches: 88, lines: 95 },
-      },
+    jsPlugins: [
+      { name: "vite-plus", specifier: "vite-plus/oxlint-plugin" },
+      { name: "local-security", specifier: "./lint/local-security.js" },
+      { name: "shadcn", specifier: "@shadcn/lint" },
+      { name: "better-tailwindcss", specifier: "eslint-plugin-better-tailwindcss" },
+      { name: "tailwind-classes", specifier: "./lint/tailwind-classes.js" },
+      { name: "feature-boundaries", specifier: "./lint/feature-boundaries.js" },
+      { name: "ui-composition", specifier: "./lint/ui-composition.js" },
+      { name: "react-rules", specifier: "./lint/react-rules.js" },
+    ],
+    rules: {
+      // automatic JSX runtime、Vite設定、TanStack Routerの規約と両立しない規則。
+      "react/react-in-jsx-scope": "off",
+      "react/forbid-component-props": "off",
+      "react/jsx-filename-extension": ["error", { extensions: [".jsx", ".tsx"] }],
+      "react/jsx-max-depth": "off",
+      "react/jsx-props-no-spreading": "off",
+      "import/no-default-export": "off",
+      "import/no-named-export": "off",
+      "import/prefer-default-export": "off",
+      "import/exports-last": "off",
+      "import/group-exports": "off",
+      "import/no-unassigned-import": ["error", { allow: ["**/*.css"] }],
+      // modern TypeScriptとReactで一般的な構文を一律禁止するrestriction規則。
+      "oxc/no-async-await": "off",
+      "oxc/no-optional-chaining": "off",
+      "oxc/no-rest-spread-properties": "off",
+      // event handler で reject しない Promise を捨てる `void` 文と、`x === undefined` の比較は許す。
+      "no-void": ["error", { allowAsStatement: true }],
+      "no-undefined": "off",
+      "typescript/explicit-function-return-type": "off",
+      "typescript/explicit-module-boundary-types": "off",
+      "typescript/prefer-readonly-parameter-types": "off",
+      "typescript/promise-function-async": "off",
+      // Oxfmtや型推論と役割が重複するか、可読性を下げる一律のstyle規則。
+      "capitalized-comments": "off",
+      // 名前付きの関数は関数宣言にそろえる。型注釈付きのアロー関数は理由付きで行単位に許す。
+      "func-style": ["error", "declaration"],
+      // react-i18next の慣用名である翻訳関数 t だけを短い識別子として許可する。
+      "id-length": ["error", { exceptions: ["t"] }],
+      // apps/web/vite.config.ts の define が置き換えるビルド時の定数だけを、ほかの識別子と衝突しない名前として許す（ADR-068）。
+      "no-underscore-dangle": ["error", { allow: ["__TELEMETRY_ENABLED__", "__TELEMETRY_APP__"] }],
+      "max-lines-per-function": "off",
+      "no-duplicate-imports": ["error", { allowSeparateTypeImports: true }],
+      "no-magic-numbers": "off",
+      "no-ternary": "off",
+      "one-var": "off",
+      "sort-imports": "off",
+      "sort-keys": "off",
+      // Vitestの標準APIと競合するか、相互に矛盾するtest style規則。
+      "vitest/no-conditional-in-test": "off",
+      "vitest/no-hooks": "off",
+      "vitest/no-importing-vitest-globals": "off",
+      "vitest/prefer-called-times": "off",
+      "vitest/prefer-describe-function-title": "off",
+      "vitest/prefer-expect-assertions": "off",
+      "vitest/prefer-lowercase-title": "off",
+      "vitest/prefer-strict-boolean-matchers": "off",
+      "vitest/prefer-to-be-truthy": "off",
+      "vitest/require-hook": "off",
+      "vitest/require-test-timeout": "off",
+      "vite-plus/prefer-vite-plus-imports": "error",
+      "react/no-danger": "error",
+      "vitest/no-restricted-vi-methods": [
+        "error",
+        { mock: mockMessage, doMock: mockMessage, waitFor: waitMessage, waitUntil: waitMessage },
+      ],
+      "no-restricted-imports": [
+        "error",
+        { patterns: [baseUiImports, testOnlyImports, telemetrySdkImports] },
+      ],
+      "no-restricted-globals": ["error", ...htmlSinkGlobals, ...networkGlobals],
+      "no-restricted-properties": ["error", ...htmlSinkProperties, ...networkProperties],
+      "local-security/no-jsx-srcdoc": "error",
+      "feature-boundaries/no-cross-feature-import": "error",
+      "ui-composition/no-button-in-link": "error",
+      "react-rules/no-effect": "error",
+      // テスト名は日本語で書く。describe だけは、空白を含まない 1 語のコードの名前も許す（docs/frontend/testing.md）。
+      "vitest/valid-title": [
+        "error",
+        {
+          mustMatch: {
+            it: japaneseTitle,
+            test: japaneseTitle,
+            describe: `${japaneseTitle}|^\\S+$`,
+          },
+        },
+      ],
+      "shadcn/no-restyle": ["error", { allow: ["layout"] }],
+      "shadcn/no-raw-colors": "error",
+      "shadcn/no-arbitrary-values": ["error", { allow: ["layout"] }],
+      "shadcn/no-inline-styles": "error",
+      "shadcn/require-static-classes": "error",
+      "shadcn/no-unknown-classes": "error",
+      "tailwind-classes/no-dynamic-class-name": "error",
     },
-    fmt: { ignorePatterns: [...generatedFiles, ...lintFixtures], sortImports: true },
-    lint: {
-      ignorePatterns: [...generatedFiles, ...lintFixtures],
-      categories: {
-        correctness: "error",
-        suspicious: "error",
-        pedantic: "error",
-        perf: "error",
-        style: "error",
-        restriction: "error",
+    // 同じ rule を指定する override は、後に一致したものの option だけが効く。
+    // 正しさは override の並び順と、option が置き換わることに依存する。並べ替えるときは lint/lint-config.test.js で確かめる。
+    overrides: [
+      // アプリごとの CSS を指す（ADR-092）。
+      {
+        files: ["apps/web/**"],
+        rules: tailwindRules(`${import.meta.dirname}/apps/web/src/style.css`),
       },
-      plugins: [
-        "eslint",
-        "unicorn",
-        "typescript",
-        "oxc",
-        "react",
-        "import",
-        "vitest",
-        "jsx-a11y",
-        "promise",
-      ],
-      jsPlugins: [
-        { name: "vite-plus", specifier: "vite-plus/oxlint-plugin" },
-        { name: "local-security", specifier: "./lint/local-security.js" },
-        { name: "shadcn", specifier: "@shadcn/lint" },
-        { name: "better-tailwindcss", specifier: "eslint-plugin-better-tailwindcss" },
-        { name: "tailwind-classes", specifier: "./lint/tailwind-classes.js" },
-        { name: "feature-boundaries", specifier: "./lint/feature-boundaries.js" },
-        { name: "ui-composition", specifier: "./lint/ui-composition.js" },
-        { name: "react-rules", specifier: "./lint/react-rules.js" },
-      ],
-      rules: {
-        // automatic JSX runtime、Vite設定、TanStack Routerの規約と両立しない規則。
-        "react/react-in-jsx-scope": "off",
-        "react/forbid-component-props": "off",
-        "react/jsx-filename-extension": ["error", { extensions: [".jsx", ".tsx"] }],
-        "react/jsx-max-depth": "off",
-        "react/jsx-props-no-spreading": "off",
-        "import/no-default-export": "off",
-        "import/no-named-export": "off",
-        "import/prefer-default-export": "off",
-        "import/exports-last": "off",
-        "import/group-exports": "off",
-        "import/no-unassigned-import": ["error", { allow: ["**/*.css"] }],
-        // modern TypeScriptとReactで一般的な構文を一律禁止するrestriction規則。
-        "oxc/no-async-await": "off",
-        "oxc/no-optional-chaining": "off",
-        "oxc/no-rest-spread-properties": "off",
-        // event handler で reject しない Promise を捨てる `void` 文と、`x === undefined` の比較は許す。
-        "no-void": ["error", { allowAsStatement: true }],
-        "no-undefined": "off",
-        "typescript/explicit-function-return-type": "off",
-        "typescript/explicit-module-boundary-types": "off",
-        "typescript/prefer-readonly-parameter-types": "off",
-        "typescript/promise-function-async": "off",
-        // Oxfmtや型推論と役割が重複するか、可読性を下げる一律のstyle規則。
-        "capitalized-comments": "off",
-        // 名前付きの関数は関数宣言にそろえる。型注釈付きのアロー関数は理由付きで行単位に許す。
-        "func-style": ["error", "declaration"],
-        // react-i18next の慣用名である翻訳関数 t だけを短い識別子として許可する。
-        "id-length": ["error", { exceptions: ["t"] }],
-        // vite.config.ts の define が置き換えるビルド時の定数だけを、ほかの識別子と衝突しない名前として許す（ADR-068）。
-        "no-underscore-dangle": [
-          "error",
-          { allow: ["__TELEMETRY_ENABLED__", "__TELEMETRY_APP__"] },
-        ],
-        "max-lines-per-function": "off",
-        "no-duplicate-imports": ["error", { allowSeparateTypeImports: true }],
-        "no-magic-numbers": "off",
-        "no-ternary": "off",
-        "one-var": "off",
-        "sort-imports": "off",
-        "sort-keys": "off",
-        // Vitestの標準APIと競合するか、相互に矛盾するtest style規則。
-        "vitest/no-conditional-in-test": "off",
-        "vitest/no-hooks": "off",
-        "vitest/no-importing-vitest-globals": "off",
-        "vitest/prefer-called-times": "off",
-        "vitest/prefer-describe-function-title": "off",
-        "vitest/prefer-expect-assertions": "off",
-        "vitest/prefer-lowercase-title": "off",
-        "vitest/prefer-strict-boolean-matchers": "off",
-        "vitest/prefer-to-be-truthy": "off",
-        "vitest/require-hook": "off",
-        "vitest/require-test-timeout": "off",
-        "vite-plus/prefer-vite-plus-imports": "error",
-        "react/no-danger": "error",
-        "vitest/no-restricted-vi-methods": [
-          "error",
-          { mock: mockMessage, doMock: mockMessage, waitFor: waitMessage, waitUntil: waitMessage },
-        ],
-        "no-restricted-imports": [
-          "error",
-          { patterns: [baseUiImports, testOnlyImports, telemetrySdkImports] },
-        ],
-        "no-restricted-globals": ["error", ...htmlSinkGlobals, ...networkGlobals],
-        "no-restricted-properties": ["error", ...htmlSinkProperties, ...networkProperties],
-        "local-security/no-jsx-srcdoc": "error",
-        "feature-boundaries/no-cross-feature-import": "error",
-        "ui-composition/no-button-in-link": "error",
-        "react-rules/no-effect": "error",
-        // テスト名は日本語で書く。describe だけは、空白を含まない 1 語のコードの名前も許す（docs/frontend/testing.md）。
-        "vitest/valid-title": [
-          "error",
-          {
-            mustMatch: {
-              it: japaneseTitle,
-              test: japaneseTitle,
-              describe: `${japaneseTitle}|^\\S+$`,
+      {
+        files: ["lint/**"],
+        // lint/** は tsconfig の対象外で型検査が効かないため、未定義の識別子を no-undef で止める。
+        env: { node: true },
+        rules: {
+          "no-undef": "error",
+          "import/no-nodejs-modules": "off",
+          "new-cap": "off",
+          "typescript/no-unsafe-assignment": "off",
+          "typescript/no-unsafe-call": "off",
+          "typescript/no-unsafe-member-access": "off",
+        },
+      },
+      {
+        files: ["apps/*/src/{api,components,i18n}/**"],
+        rules: {
+          "no-restricted-imports": [
+            "error",
+            {
+              patterns: [sharedLayerImports, baseUiImports, testOnlyImports, telemetrySdkImports],
             },
-          },
+          ],
+        },
+      },
+      {
+        files: ["apps/*/src/lib/**"],
+        rules: {
+          "no-restricted-imports": [
+            "error",
+            {
+              patterns: [libLayerImports, baseUiImports, testOnlyImports, telemetrySdkImports],
+            },
+          ],
+        },
+      },
+      // テレメトリの SDK を呼ぶ唯一のファイル（ADR-068）。
+      {
+        files: ["apps/*/src/lib/telemetry.ts"],
+        rules: {
+          "no-restricted-imports": [
+            "error",
+            { patterns: [libLayerImports, baseUiImports, testOnlyImports] },
+          ],
+        },
+      },
+      {
+        files: ["apps/*/src/features/**"],
+        rules: {
+          "no-restricted-imports": [
+            "error",
+            { patterns: [featureImports, baseUiImports, testOnlyImports, telemetrySdkImports] },
+          ],
+        },
+      },
+      // Base UI を import できる唯一の package（ADR-025、ADR-092）。ui は api とアプリを package.json に書かないので、層の import 制限は要らない。
+      {
+        files: ["packages/ui/**"],
+        rules: {
+          ...tailwindRules(`${import.meta.dirname}/packages/ui/src/style.css`),
+          "shadcn/no-restyle": "off",
+          "shadcn/no-arbitrary-values": "off",
+          "shadcn/require-static-classes": "off",
+          "no-restricted-imports": ["error", { patterns: [testOnlyImports, telemetrySdkImports] }],
+          "react/only-export-components": "off",
+        },
+      },
+      // fetch と XMLHttpRequest を使える唯一の package（ADR-092）。
+      {
+        files: ["packages/api/**"],
+        rules: {
+          "no-restricted-imports": [
+            "error",
+            { patterns: [baseUiImports, testOnlyImports, telemetrySdkImports] },
+          ],
+          "no-restricted-globals": ["error", ...htmlSinkGlobals],
+          "no-restricted-properties": ["error", ...htmlSinkProperties],
+        },
+      },
+      {
+        files: ["apps/*/src/routes/**"],
+        rules: {
+          "react/only-export-components": "off",
+        },
+      },
+      {
+        files: ["**/*.{test,spec}.{ts,tsx,js,jsx}"],
+        rules: {
+          "react/jsx-no-literals": "off",
+          "import/max-dependencies": "off",
+        },
+      },
+      // Playwright Test の API に vitest plugin の規則が当たるため。
+      {
+        files: ["apps/*/e2e/**"],
+        rules: {
+          "vitest/consistent-test-filename": "off",
+          "vitest/prefer-importing-vitest-globals": "off",
+        },
+      },
+      // ponytail: option が置き換わるため、テストでは層の import 制限も外れる。
+      // テストにも層の制限が要るようになったら dependency-cruiser へ移る。
+      {
+        files: [
+          "**/*.{test,spec}.{ts,tsx,js,jsx}",
+          "apps/*/src/testing/**",
+          "packages/*/src/testing/**",
         ],
-        "shadcn/no-restyle": ["error", { allow: ["layout"] }],
-        "shadcn/no-raw-colors": "error",
-        "shadcn/no-arbitrary-values": ["error", { allow: ["layout"] }],
-        "shadcn/no-inline-styles": "error",
-        "shadcn/require-static-classes": "error",
-        "shadcn/no-unknown-classes": "error",
-        "better-tailwindcss/enforce-consistent-class-order": "error",
-        "better-tailwindcss/no-deprecated-classes": "error",
-        "better-tailwindcss/no-duplicate-classes": "error",
-        "better-tailwindcss/no-unnecessary-whitespace": "error",
-        "better-tailwindcss/no-conflicting-classes": "error",
-        "better-tailwindcss/enforce-canonical-classes": "error",
-        "tailwind-classes/no-dynamic-class-name": "error",
+        rules: {
+          "no-restricted-imports": ["error", { patterns: [baseUiImports, telemetrySdkImports] }],
+        },
       },
-      settings: {
-        "better-tailwindcss": { entryPoint: "src/style.css" },
-      },
-      // 同じ rule を指定する override は、後に一致したものの option だけが効く。
-      // 正しさは override の並び順と、option が置き換わることに依存する。並べ替えるときは lint/lint-config.test.js で確かめる。
-      overrides: [
-        {
-          files: ["lint/**"],
-          // lint/** は tsconfig の対象外で型検査が効かないため、未定義の識別子を no-undef で止める。
-          env: { node: true },
-          rules: {
-            "no-undef": "error",
-            "import/no-nodejs-modules": "off",
-            "new-cap": "off",
-            "typescript/no-unsafe-assignment": "off",
-            "typescript/no-unsafe-call": "off",
-            "typescript/no-unsafe-member-access": "off",
-          },
-        },
-        {
-          files: ["src/{api,components,i18n}/**"],
-          rules: {
-            "no-restricted-imports": [
-              "error",
-              {
-                patterns: [sharedLayerImports, baseUiImports, testOnlyImports, telemetrySdkImports],
-              },
-            ],
-          },
-        },
-        {
-          files: ["src/lib/**"],
-          rules: {
-            "no-restricted-imports": [
-              "error",
-              {
-                patterns: [libLayerImports, baseUiImports, testOnlyImports, telemetrySdkImports],
-              },
-            ],
-          },
-        },
-        // テレメトリの SDK を呼ぶ唯一のファイル（ADR-068）。
-        {
-          files: ["src/lib/telemetry.ts"],
-          rules: {
-            "no-restricted-imports": [
-              "error",
-              { patterns: [libLayerImports, baseUiImports, testOnlyImports] },
-            ],
-          },
-        },
-        {
-          files: ["src/features/**"],
-          rules: {
-            "no-restricted-imports": [
-              "error",
-              { patterns: [featureImports, baseUiImports, testOnlyImports, telemetrySdkImports] },
-            ],
-          },
-        },
-        {
-          files: ["src/components/ui/**"],
-          rules: {
-            "shadcn/no-restyle": "off",
-            "shadcn/no-arbitrary-values": "off",
-            "shadcn/require-static-classes": "off",
-            "no-restricted-imports": [
-              "error",
-              { patterns: [uiLayerImports, testOnlyImports, telemetrySdkImports] },
-            ],
-            "react/only-export-components": "off",
-          },
-        },
-        {
-          files: ["src/api/**"],
-          rules: {
-            "no-restricted-imports": [
-              "error",
-              {
-                patterns: [apiLayerImports, baseUiImports, testOnlyImports, telemetrySdkImports],
-              },
-            ],
-            "no-restricted-globals": ["error", ...htmlSinkGlobals],
-            "no-restricted-properties": ["error", ...htmlSinkProperties],
-          },
-        },
-        {
-          files: ["src/routes/**"],
-          rules: {
-            "react/only-export-components": "off",
-          },
-        },
-        {
-          files: ["**/*.{test,spec}.{ts,tsx,js,jsx}"],
-          rules: {
-            "react/jsx-no-literals": "off",
-            "import/max-dependencies": "off",
-          },
-        },
-        // Playwright Test の API に vitest plugin の規則が当たるため。
-        {
-          files: ["e2e/**"],
-          rules: {
-            "vitest/consistent-test-filename": "off",
-            "vitest/prefer-importing-vitest-globals": "off",
-          },
-        },
-        // ponytail: option が置き換わるため、テストでは層の import 制限も外れる。
-        // テストにも層の制限が要るようになったら dependency-cruiser へ移る。
-        {
-          files: ["**/*.{test,spec}.{ts,tsx,js,jsx}", "src/testing/**"],
-          rules: {
-            "no-restricted-imports": ["error", { patterns: [baseUiImports, telemetrySdkImports] }],
-          },
-        },
-      ],
-      options: {
-        denyWarnings: true,
-        reportUnusedDisableDirectives: "error",
-        typeAware: true,
-        typeCheck: true,
-      },
+    ],
+    // shadcn の部品を別 package の @frontend/ui から import するため、components.json の alias に加えて import 元でも部品と認識させる（ADR-092）。
+    settings: { shadcn: { componentImports: ["^@frontend/ui(/|$)"] } },
+    options: {
+      denyWarnings: true,
+      reportUnusedDisableDirectives: "error",
+      typeAware: true,
+      typeCheck: true,
     },
-    server: {
-      // Keycloakのredirect URIと同じoriginを維持し、競合時は別ポートへ移動せず失敗させる。
-      port: 5173,
-      strictPort: true,
-      headers: {
-        ...securityHeaders,
-        // ViteのWebSocketとReact Refreshのinline scriptだけをローカル開発で追加許可する。
-        "Content-Security-Policy":
-          mode === "development"
-            ? developmentContentSecurityPolicy
-            : deliveredContentSecurityPolicy,
-      },
-      proxy: {
-        "^/(api|oauth2|login|logout|error|actuator|v3/api-docs|swagger-ui)(/|$)": {
-          // 開発専用の転送先。本番はCloudFront等が振り分けるためこのproxyは効かない。
-          target: `http://localhost:${serverPort}`,
-          changeOrigin: false,
-        },
-        // ブラウザのテレメトリ（ADR-068）。Collector の faro receiver へ転送し、Spring Boot を通さない。
-        // 完全一致にし、将来の /collections のような画面の path を転送しない。
-        "^/collect$": {
-          target: `http://localhost:${faroPort}`,
-          changeOrigin: false,
-          configure: withoutCredentials,
-        },
-        // CSP 違反の報告（ADR-068）。ブラウザが Reporting API で送り、Collector の webhook_event receiver へ転送する。
-        // 完全一致にし、画面の path を転送しない。
-        "^/csp-report$": {
-          target: `http://localhost:${cspReportPort}`,
-          changeOrigin: false,
-          configure: withoutCredentials,
-        },
-      },
-    },
-    // proxy と strictPort は server の値を Vite が引き継ぐ。Keycloak の redirect URI と同じ origin で待ち受ける（ADR-033、ADR-057）。
-    preview: { port: 5173, headers: securityHeaders },
-  };
+  },
 });

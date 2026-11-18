@@ -1,6 +1,15 @@
 {
   "$schema": "https://unpkg.com/knip@6/schema.json",
-  "playwright": { "entry": ["e2e/**/*.{setup,spec}.ts"] },
-  "ignore": ["lint/fixtures/**", "src/api/generated/**"],
-  "ignoreDependencies": ["@faker-js/faker", "@tanstack/react-table", "lucide-react"]
+  "ignore": ["lint/fixtures/**"],
+  "workspaces": {
+    "apps/web": {
+      "playwright": { "entry": ["e2e/**/*.{setup,spec}.ts"] },
+      "ignoreDependencies": ["@tanstack/react-table", "lucide-react"]
+    },
+    "packages/api": {
+      "includeEntryExports": true,
+      "ignore": ["src/generated/**"]
+    },
+    "packages/ui": { "includeEntryExports": true }
+  }
 }

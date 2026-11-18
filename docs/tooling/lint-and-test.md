@@ -25,6 +25,7 @@ Gitフックの中でDockerを使う検査は、`docker info`が失敗するロ�
 ## バックエンド
 
 - **`task be-lint`**：Spotless、PMD、SpotBugsでmainとtestを検査する。
+  Spotlessは`ratchetFrom 'origin/main'`で、mainから変えたファイルを全体で検査する。変えていない既存の行の書式も違反になるので、`task be-format`の出力をその変更に含める。
 - **`task lint-session-sql`**：`backend/src/main/java`のJavaと`backend/src/main/resources/db`のSQLとYAMLから、接続を多重化するプロキシ（PgBouncerのトランザクションモード、RDS Proxy）の後ろで壊れる、セッションに状態を残すSQLを検出し、あれば失敗する。
   対象は、[PgBouncerの機能の表](https://www.pgbouncer.org/features.html)でTransaction poolingがNeverの機能のうち、セッションのadvisory lock（`pg_advisory_lock`、`pg_try_advisory_lock`、`pg_advisory_unlock`、`pg_advisory_unlock_all`と`_shared`の版）、`LISTEN`、`WITH HOLD`のカーソル、`PREPARE`と`DEALLOCATE`の文、`ON COMMIT PRESERVE ROWS`と`ON COMMIT DELETE ROWS`の一時表、`LOAD`である。
   大文字と小文字を区別せず、Javadoc、行コメント、YAMLとSQLのコメントの行は除く。
@@ -61,27 +62,39 @@ PITのHTMLとXMLのレポートは、変異対象がある場合に`backend/buil
 
 ## フロントエンド
 
-- **`task fe-check`**：Oxfmt、Oxlint、TypeScriptの型を非破壊で検査する。
+- **`task fe-check`**：workspaceのルートの`frontend`で`vp check`を実行し、Oxfmt、Oxlint、TypeScriptの型を非破壊で検査する。
 - **`task fe-knip`**：未参照ファイル、未使用export、未使用依存をKnipで検査する。
-- **`task fe-doctor`**：React Doctorでwarningとerrorを検出し、検出または15分超過で失敗する。
-- **`task fe-coverage`**：React Compilerを有効にしてテストを実行したあと、Compilerを外した状態でVitestのV8 providerのcoverageを測り、全体のbranch 88%とline 95%、ファイルごとのbranch 60%とline 65%を検証する。
-  全体の下限は`vite.config.ts`の`thresholds`が、ファイルごとの下限はTaskが`coverage/coverage-summary.json`から検査する（[ADR-076](../adr/ADR-076-run-mutation-tests-per-change-and-tighten-coverage-gates.md)）。
+  `packages/ui`は`includeEntryExports: true`にし、`exports`で公開した部品の未使用exportも報告する。
+- **`task fe-doctor`**：`apps/web`のReact Doctorでwarningとerrorを検出し、検出または15分超過で失敗する。`packages/ui`は対象にしない。
+  `packages/ui`を対象に加えるときは、`react-doctor/only-export-components`の例外が要る。`buttonVariants`のようなvariantをcomponentと同じファイルからexportするためである。
+- **`task fe-coverage`**：React Compilerを有効にして、`vp run --recursive test`でルートのlint設定のテストと各packageのテストを実行する。
+  そのあと、Compilerを外した状態で、ルートを除くpackageごとにVitestのV8 providerのcoverageを測り、下限もpackageごとに検証する。
+  `apps/web`の全体の下限はbranch 88%とline 95%、`packages/api`の全体の下限は切り出した時点の実測の少し下のbranch 90%とline 98%、`packages/ui`の全体の下限はbranch 95%とline 95%である。ファイルごとの下限は全packageで共通のbranch 60%とline 65%である。
+  `packages/ui`のテストは、jsdomとTesting Libraryを使わず、server renderの出力とresolveだけを確かめる。操作が要る部品を足すときに、DOMの環境を足す。
+  `packages/ui`のテストはReact Compilerなしで走る。`apps/web`のようにCompilerを有効にしたテストは、この package では行わない。
+  全体の下限は各packageの`vite.config.ts`の`thresholds`が、ファイルごとの下限はTaskが各packageの`coverage/coverage-summary.json`から検査する（[ADR-076](../adr/ADR-076-run-mutation-tests-per-change-and-tighten-coverage-gates.md)）。
   Compilerを外すのは環境変数`FRONTEND_REACT_COMPILER=false`で、理由は[ADR-078](../adr/ADR-078-measure-frontend-coverage-without-react-compiler.md)にある。
-  `FE_TEST_ARGS`に渡した値は、2回のVitestの実行の両方に足す（例：`task fe-verify FE_TEST_ARGS=--reporter=dot`）。
-  テストのtimeoutは`vite.config.ts`の`testTimeout`で30秒にする。
+  `FE_TEST_ARGS`に渡した値は、ルートのlint設定のテスト、各packageのテスト、coverageの測定のVitestの実行すべてに足す。ファイルのパスは渡さず、reporterなどのoptionだけを渡す（例：`task fe-verify FE_TEST_ARGS=--reporter=dot`）。
+  テストのtimeoutは`apps/web/vite.config.ts`の`testTimeout`で30秒にする。
 - **`task fe-test-build`**：`fe-coverage`と、`FRONTEND_OTEL_ENABLED=false`を強制した本番ビルドを実行する。
-  ビルドの後に`dist/assets`を`faro|grafana|opentelemetry|web.?vitals`でgrepし、bundleにFaro、OpenTelemetry JS、Web Vitalsのコードが入っていれば失敗する（[ADR-068](../adr/ADR-068-collect-browser-telemetry-with-faro-via-collector.md)）。
+  ビルドの後に`apps/web/dist/assets`を`faro|grafana|opentelemetry|web.?vitals`でgrepし、bundleにFaro、OpenTelemetry JS、Web Vitalsのコードが入っていれば失敗する（[ADR-068](../adr/ADR-068-collect-browser-telemetry-with-faro-via-collector.md)）。
 - **`task fe-verify`**：`fe-check`、`fe-knip`、`fe-test-build`（テレメトリを無効にした本番ビルドとgrepを含む）を実行する。
-  テストのうち`frontend/vite-config.test.ts`は、ZAPの10055-6の除外の`evidence`（`docker/zap/passive.yaml`と`active.yaml`）が配信するCSPと一致することも検査する。
+  テストのうち`frontend/apps/web/vite-config.test.ts`は、ZAPの10055-6の除外の`evidence`（`docker/zap/passive.yaml`と`active.yaml`）が配信するCSPと一致することも検査する。
 - **`task fe-route-tree-check`**：ビルドで`routeTree.gen.ts`を再生成し、コミット済みの内容と差分があれば失敗する。
   再生成した`fullPaths`がCollectorのroute allowlist（`transform/frontend_validate`の1か所）と一致しなければ、差分の検査より前に失敗する。
-- **`task api-client-check`**：Orvalで`src/api/generated`を再生成し、コミット済みの内容と差分があれば失敗する（後述の「API契約」）。
+- **`task api-client-check`**：Orvalで`packages/api/src/generated`を再生成し、コミット済みの内容と差分があれば失敗する（後述の「API契約」）。
 
 ## フロントエンドのLint設定
 
 Oxlintの設定の正本は[`frontend/vite.config.ts`](../../frontend/vite.config.ts)の`lint`である。
 カテゴリをすべてエラーにし、次の規則だけを無効化または調整する（[ADR-034](../adr/ADR-034-pin-frontend-runtime-and-enforce-oxlint-categories.md)）。
 `radix`、`no-new-wrappers`、`typescript/consistent-type-definitions`、`import/no-relative-parent-imports`はカテゴリ指定で有効なので、個別に列挙しない。
+
+OxlintとOxfmtの設定は、workspaceのルートのこのファイルの`lint`と`fmt`だけに置き、`apps/web/vite.config.ts`には置かない（[ADR-092](../adr/ADR-092-split-frontend-into-vite-plus-workspace.md)）。
+packageの側に`lint`がないため、`vp lint`はルートと`apps/web`のどちらで実行してもルートの設定を使う。
+`better-tailwindcss/*`が読むCSSは、packageごとのoverrideが、設定ファイルの場所から作った絶対パスで渡す。
+`apps/web/**`は`apps/web/src/style.css`を、`packages/ui/**`は`packages/ui/src/style.css`を指すので、実行する場所によらず同じく解決する。
+`apps/web/src/style.css`は`@frontend/ui/style.css`を読み込むため、アプリのCSSからもテーマの変数を解決できる。
 
 ### 例外と調整
 
@@ -108,7 +121,7 @@ Oxlintの設定の正本は[`frontend/vite.config.ts`](../../frontend/vite.confi
 - **短い識別子**：`id-length`で`t`だけを例外にする。
   react-i18nextの翻訳関数の慣用名であるためである。
 - **ビルド時の定数**：`no-underscore-dangle`で`__TELEMETRY_ENABLED__`と`__TELEMETRY_APP__`だけを許可する。
-  `vite.config.ts`の`define`が置き換える定数を、ほかの識別子と衝突しない名前にするためである（[ADR-068](../adr/ADR-068-collect-browser-telemetry-with-faro-via-collector.md)）。
+  `apps/web/vite.config.ts`の`define`が置き換える定数を、ほかの識別子と衝突しない名前にするためである（[ADR-068](../adr/ADR-068-collect-browser-telemetry-with-faro-via-collector.md)）。
 - **型のimport**：`no-duplicate-imports`を`allowSeparateTypeImports: true`にし、型のimportを分けて書けるようにする。
 - **Vitestの書き方**：`vitest/no-conditional-in-test`、`vitest/no-hooks`、`vitest/no-importing-vitest-globals`、`vitest/prefer-called-times`、`vitest/prefer-describe-function-title`、`vitest/prefer-expect-assertions`、`vitest/prefer-lowercase-title`、`vitest/prefer-strict-boolean-matchers`、`vitest/prefer-to-be-truthy`、`vitest/require-hook`、`vitest/require-test-timeout`をoffにする。
   Vitestの標準APIと競合するか、互いに矛盾するためである。
@@ -128,63 +141,63 @@ Oxlintの設定の正本は[`frontend/vite.config.ts`](../../frontend/vite.confi
 - **`lint/**`**：`import/no-nodejs-modules`、`new-cap`、`typescript/no-unsafe-assignment`、`typescript/no-unsafe-call`、`typescript/no-unsafe-member-access`をoffにする。
   Node側のLintツールであり、OxlintのJS plugin APIに型が無いためである。
   `lint/**`はtsconfigの対象外で型検査が未定義の識別子を止めないため、Nodeのglobalを許した`no-undef`を有効にする。
-- **`src/components/ui/**`**：shadcnの生成物の書き方に合わせて`shadcn/no-restyle`、`shadcn/no-arbitrary-values`、`shadcn/require-static-classes`をoffにする。
-  `react/only-export-components`もoffにし、React Doctorの同じruleも`frontend/doctor.config.json`で外す。
+- **`packages/ui/**`**：shadcnの生成物の書き方に合わせて`shadcn/no-restyle`、`shadcn/no-arbitrary-values`、`shadcn/require-static-classes`をoffにする。
+  `react/only-export-components`もoffにする。
   shadcnの生成物は`buttonVariants`のようなvariantをcomponentと同じファイルからexportするためである。
-- **`src/routes/**`**：`react/only-export-components`をoffにする。
+  Base UIをimportできるのはこのpackageだけで、`apps/**`では禁止する。
+- **shadcnの部品の認識**：`@shadcn/lint`は、アプリの`components.json`の`aliases.ui`（`@frontend/ui`）と、ルートの`settings.shadcn.componentImports`（`^@frontend/ui(/|$)`）の両方で、`@frontend/ui`からimportした部品を認識する。
+  認識した部品の`className`に、部品が持つ見た目のclass（`p-4`など）を渡すと`shadcn/no-restyle`が報告し、`mt-2`のような配置のclassは許す。
+- **`apps/web/src/routes/**`**：`react/only-export-components`をoffにする。
   TanStack Routerのroute fileは`Route`をexportするためである。
 - **テストファイル**：`react/jsx-no-literals`をoffにし、テストの中の固定文言をcatalogに通さずに書けるようにする。
   `import/max-dependencies`もoffにする。
   テストのimportの数は検証対象に合わせて増え、テスト自身の責務の大きさを表さないからである。
 
-生成物の`src/routeTree.gen.ts`と`src/api/generated/**`は、Lint、整形、coverageから外す。
-`src/api/generated/**`はKnipとjscpdの対象からも外す。
-違反を含むfixtureの`lint/fixtures/**`は、Lint、整形、テストの収集、Knipから外す。
+生成物の`apps/*/src/routeTree.gen.ts`と`packages/api/src/generated/**`は、Lint、整形、coverageから外す。
+`packages/api/src/generated/**`はjscpdとKnipの対象からも外す。
+違反を含むfixtureの`lint/fixtures/**`は、Lint、整形、Knipから外し、ルートのテストの`--exclude`でテストの収集からも外す。
 
 ### ファイルの範囲ごとの制限
 
 `no-restricted-imports`、`no-restricted-globals`、`no-restricted-properties`は、overrideごとにoptionが置き換わり、マージされない。
-そのため禁止の一覧を`vite.config.ts`の定数に分け、overrideごとに組み合わせている。
+そのため禁止の一覧をルートの`vite.config.ts`の定数に分け、overrideごとに組み合わせている。
 同じファイルに複数のoverrideが一致すると、後のoverrideのoptionだけが効くので、overrideの並び順を変えるときは組み合わせ結果を確かめる。
 
-| 対象のファイル                     | `no-restricted-imports`                       | `no-restricted-globals`と`no-restricted-properties` |
-| ---------------------------------- | --------------------------------------------- | --------------------------------------------------- |
-| すべて（top-level）                | Base UI、テスト用部品、テレメトリSDK          | HTML sink、network                                  |
-| `src/{api,components,i18n}/**`     | 共有層、Base UI、テスト用部品、テレメトリSDK  | top-levelを引き継ぐ                                 |
-| `src/lib/**`                       | lib、Base UI、テスト用部品、テレメトリSDK     | top-levelを引き継ぐ                                 |
-| `src/lib/telemetry.ts`             | lib、Base UI、テスト用部品                    | top-levelを引き継ぐ                                 |
-| `src/features/**`                  | feature、Base UI、テスト用部品、テレメトリSDK | top-levelを引き継ぐ                                 |
-| `src/components/ui/**`             | ui、テスト用部品、テレメトリSDK               | top-levelを引き継ぐ                                 |
-| `src/api/**`                       | api、Base UI、テスト用部品、テレメトリSDK     | HTML sinkだけ                                       |
-| テストファイルと`src/testing/**`   | Base UI、テレメトリSDK                        | top-levelを引き継ぐ                                 |
+| 対象のファイル                          | `no-restricted-imports`                       | `no-restricted-globals`と`no-restricted-properties` |
+| --------------------------------------- | --------------------------------------------- | --------------------------------------------------- |
+| すべて（top-level）                     | Base UI、テスト用部品、テレメトリSDK          | HTML sink、network                                  |
+| `apps/web/src/{api,components,i18n}/**` | 共有層、Base UI、テスト用部品、テレメトリSDK  | top-levelを引き継ぐ                                 |
+| `apps/web/src/lib/**`                   | lib、Base UI、テスト用部品、テレメトリSDK     | top-levelを引き継ぐ                                 |
+| `apps/web/src/lib/telemetry.ts`         | lib、Base UI、テスト用部品                    | top-levelを引き継ぐ                                 |
+| `apps/web/src/features/**`              | feature、Base UI、テスト用部品、テレメトリSDK | top-levelを引き継ぐ                                 |
+| `packages/ui/**`                        | テスト用部品、テレメトリSDK                   | top-levelを引き継ぐ                                 |
+| `packages/api/**`                       | Base UI、テスト用部品、テレメトリSDK          | HTML sinkだけ                                       |
+| テストファイルと`src/testing/**`        | Base UI、テレメトリSDK                        | top-levelを引き継ぐ                                 |
 
 各禁止の中身は次のとおりである。
 
 - **共有層**：`@/features/**`、`@/routes/**`、`@/routeTree.gen`。
 - **lib**：共有層の禁止に加えて`@/components/**`。
   `lib`は依存の最下層であり、UIを参照しない。
-- **api**：共有層の禁止に加えて`@/components/**`。
-  通信層からUIを参照しない。
-- **ui**：共有層の禁止に加えて、`@/components/ui/**`以外の`@/components/**`。
-  UI primitiveからアプリシェルやrouterの状態表示を参照しない。
 - **feature**：`@/routes/**`、`@/routeTree.gen`。
   routeの情報は`getRouteApi`で取る。
 - **Base UI**：`@base-ui/**`。
-  `@/components/ui`からimportする。
-- **テスト用部品**：`msw`、`msw/**`、`@/api/generated/mocks/**`、`@/testing/**`、`@testing-library/**`。
+  `@frontend/ui`からimportする。`packages/ui/**`のproduction sourceだけが許す。
+- **テスト用部品**：`msw`、`msw/**`、`@frontend/api/mocks/**`、`@/testing/**`、`@testing-library/**`。
 - **テレメトリSDK**：`@grafana/*`。
   `src/lib/telemetry.ts`を通して呼ぶ（[ADR-068](../adr/ADR-068-collect-browser-telemetry-with-faro-via-collector.md)）。
   静的importと`import()`の両方を検出する。
 - **HTML sink**：globalの`DOMParser`、`innerHTML`などのHTML系property、`document.write`、`document.writeln`。
 - **network**：globalの`fetch`と`XMLHttpRequest`、`window.fetch`、`globalThis.fetch`。
-  `src/api`の生成clientを使う。
+  `@frontend/api`の生成clientを使う。`packages/api/**`だけが許可される。
 
 テストファイルでは層のimport制限も外れる。
+`packages/ui`のテストファイルもこのoverrideに当たるため、Base UIのimportは禁止のままである。
 テストにも層の制限が要るようになったら、dependency-cruiserへ移る。
 
-`e2e/**`では、Playwright TestのAPIにvitest pluginの規則が当たるため、`vitest/consistent-test-filename`と`vitest/prefer-importing-vitest-globals`を外す。
+`apps/web/e2e/**`では、Playwright TestのAPIにvitest pluginの規則が当たるため、`vitest/consistent-test-filename`と`vitest/prefer-importing-vitest-globals`を外す。
 
-feature間のimportは、これとは別にjsPluginの`feature-boundaries/no-cross-feature-import`が`src/features/**`のファイルで禁じる（[フロントエンドアーキテクチャ](../frontend/architecture.md#境界の検査)）。
+feature間のimportは、これとは別にjsPluginの`feature-boundaries/no-cross-feature-import`が`apps/web/src/features/**`のファイルで禁じる（[フロントエンドアーキテクチャ](../frontend/architecture.md#境界の検査)）。
 
 linkとbuttonの入れ子は、jsPluginの`ui-composition/no-button-in-link`がすべてのファイルで禁じる（[フロントエンドのUIとスタイル](../frontend/ui-and-style.md#uiの書き方)）。
 `Link`か`a`の内側の`Button`か`button`と、`Button`の`render`に渡した`Link`か`a`を報告する。
@@ -196,10 +209,13 @@ linkとbuttonの入れ子は、jsPluginの`ui-composition/no-button-in-link`が�
 `react`からの名前付きimportと再export、default importの名前（`React.useEffect`）の参照、分割代入を報告する。
 自前の関数で包んだEffectは検出しない。
 
-組み合わせた結果は、`frontend/lint/lint-config.test.js`が`frontend/lint/fixtures/src/**`の違反例と正しい例を実際の設定でLintして確かめる。
+組み合わせた結果は、`frontend/lint/lint-config.test.js`が`frontend/lint/fixtures/apps/web/src/**`と`frontend/lint/fixtures/packages/ui/src/**`の違反例と正しい例を実際の設定でLintして確かめる。
+このテストは、`frontend/lint/lint-project.js`が、ルートの設定と、`apps/web`と`packages/ui`の`vite.config.ts`、`tsconfig.json`、`package.json`、`components.json`、`style.css`、fixtureを一時ディレクトリへ複製して`vp lint`を実行した結果を読む。
+fixtureが`@frontend/ui`からimportする部品は、複製せず、実物の`packages/ui`のものを使う。
+`frontend/lint/tailwind-entry-point.test.js`は、ルート、`apps/web`、`packages/ui`のどこから実行しても、そのpackageのCSSを解決できることを確かめる。
 規則のoptionを追加または変更するときは、optionが許す範囲のすぐ外側の書き方を拒否するfixtureも置く。
 optionの名前から許す範囲を推測せず、規則の文書とfixtureで確かめる。
-jsPluginやoverrideの挙動を試すときも、一時ディレクトリへ設定を手で複製せず、fixtureを足して`frontend`で`vp test run lint/lint-config.test.js`を実行する。
+jsPluginやoverrideの挙動を試すときも、一時ディレクトリへ設定を手で複製せず、fixtureを足して`frontend`で`vp test run --dir lint lint-config`を実行する。
 
 ### Lintを通る書き方
 
@@ -278,7 +294,7 @@ const params = { ...(cursor !== undefined && { cursor }) };
 - **`task scan-dast`**：隔離した依存を起動してマイグレーションを適用し、backend、`vp preview`を起動して、OWASP ZAPで認証付きのpassive scanを実行して片付ける。
 - **`task scan-dast-active`**：同じ環境でactive scanを実行する。
 - **`task lint-actions`**：GitHub Actionsワークフローをactionlintで検査する。
-- **`task lint-actions-security`**：GitHub Actionsワークフローをzizmorで検査する。
+- **`task lint-actions-security`**：GitHub Actionsのワークフローとcomposite action（`.github/actions/`）をzizmorで検査する。
 - **`task lint-docker`**：Dockerfileをhadolintで検査する。
 - **`task lint-docker-check`**：Dockerfileを`docker build --check`で検査する。
 - **`task lint-compose`**：Composeファイルの構文、参照、変数展開を検証する。
@@ -291,14 +307,14 @@ const params = { ...(cursor !== undefined && { cursor }) };
   数値でないportと`@`を重ねたuserinfoの`blockedURL`が`csp.blocked`に残らず、別オリジンの`sourceFile`が`code.file.path`に残らないことも検査する。
   受け口が`application/reports+json`以外の`Content-Type`に401を返し、`text/plain`で送った有効な本文が出口に届かないことも検査する。
   このタスクは`webhook_event`のportを直接叩き、Viteのproxyを通らない。
-  Viteのproxyのhop（`/csp-report`と`/collect`の転送と資格情報のheaderの削除）は、`frontend/vite-config.test.ts`が偽の受け口で検査する。
+  Viteのproxyのhop（`/csp-report`と`/collect`の転送と資格情報のheaderの削除）は、`frontend/apps/web/vite-config.test.ts`が偽の受け口で検査する。
   ブラウザがHTTPSの配信から報告を送り、Grafanaに届くまでの経路全体は手動で実測する。
   同じfixtureのtraceは`traces/frontend`の出口を別のファイルに分け、URL属性がなく、許可したHTTP属性とresource属性だけが残り、trace ID、span ID、親span IDが保たれることを確かめる。
 - **`task lint-md`**：`.markdownlint-cli2.yaml`の除外設定に従いMarkdownを検査する。
 - **`task lint-md-fix`**：markdownlint-cli2で安全に修正できるMarkdownの問題を修正する。
 - **`task ruleset-diff`**：GitHub上のrulesetと`.github/rulesets/main.json`の差分を表示する。認証済みの`gh`が要るため、CIでは動かさず、管理者が手元で使う。
 - **`task ruleset-apply`**：`main.json`をGitHub上のrulesetへ反映する。`CONFIRM_RULESET=yes`が要る。手順は[mainブランチの保護設定](../repository/branch-protection.md)にある。
-- **`task okf-check`**：OKF適合、内部リンク、孤立文書、変更した文書の責務の見直し合図（250行超の警告）、steering境界、ADRの整合（`adr-lint`）、rulesetの必須チェックとdocsの一覧とworkflowの名前の一致（`ruleset-check`）、Taskfile文書同期候補を検査する。
+- **`task okf-check`**：OKF適合、内部リンク、孤立文書、変更した文書の責務の見直し合図（250行超の警告）、steering境界、ADRの整合（`adr-lint`）、rulesetの必須チェックとdocsの一覧とworkflowの名前の一致（`ruleset-check`）、iweのMCPサーバーの起動コマンドが選ぶ`iwe-mcp.sh`（`iwe-mcp-check`）、Taskfile文書同期候補を検査する。
   `adr-lint`は内部タスクで、`okf-check`の中でだけ動く。
   `tooling/adr-lint/test.sh`が壊れたfixtureで期待の終了コードを確かめてから、`tooling/adr-lint/adr-lint.mjs`が実際のツリーを検査する。
   失敗にするのは、ADR番号の重複、ADRファイルごとに索引の行がちょうど1つでない状態、索引と本文の状態と日付の不一致、`[ADR-NNN](…ADR-MMM-….md)`のラベルと宛先の番号の不一致である。
@@ -333,7 +349,7 @@ const params = { ...(cursor !== undefined && { cursor }) };
   `docs/**/*.md`のような`a/**/b`の形の`**`は0階層に一致しないため、ディレクトリ直下のファイル（`docs/index.md`、`backend/build.gradle`）を中心に少数だけ期待を置く。
   見るのはglobだけで、jobの`run`内の`{files}`の参照は見ない。期待は`tooling/lefthook-glob/test.sh`が正で、全jobには広げない。
 - **`task adr-check`**：判断が絡む変更にADRが伴うかを確認する。
-  `frontend/`の変更のうち、テストファイル（`*.test.*`、`*.spec.*`）、`frontend/e2e/`、`frontend/lint/fixtures/`、`frontend/src/testing/`は対象から外す。
+  `frontend/`の変更のうち、テストファイル（`*.test.*`、`*.spec.*`）、`frontend/apps/*/e2e/`、`frontend/lint/fixtures/`、`frontend/apps/*/src/testing/`は対象から外す。
   警告は止めず、`ADR_STRICT=1`で失敗にし、`ADR_ACK=1`で抑制する。
 
 Knipとjscpdの採用理由は[ADR-035](../adr/ADR-035-adopt-jscpd-and-knip-quality-gates.md)を、jscpdの閾値を4.0%にする理由は[ADR-074](../adr/ADR-074-raise-jscpd-threshold-for-class-role-boilerplate.md)を参照する。
@@ -344,13 +360,13 @@ OKF検査の採用理由は[ADR-036](../adr/ADR-036-adopt-okf-for-docs-knowledge
 
 - **commit-msg（すべて）**：commitlintを実行する。
 - **pre-commit（すべて）**：`scan-secrets`を実行する。
-- **pre-commit（OpenAPI契約、`.spectral.yaml`、Orvalの設定、`frontend/package.json`、生成物の変更）**：`api-lint`（`docker info`が失敗すればスキップ）と`api-client-check`を実行する。
+- **pre-commit（OpenAPI契約、`.spectral.yaml`、Orvalの設定、`frontend/apps/web/package.json`、生成物の変更）**：`api-lint`（`docker info`が失敗すればスキップ）と`api-client-check`を実行する。
 - **pre-commit（フロントエンドの変更）**：`fe-check`を実行する。
   前項と同じgroupで順に実行し、Orvalの再生成と型検査を同時に走らせない。
 - **pre-commit（Dockerfileの変更）**：`lint-docker`相当と`lint-docker-check`相当を実行する。
 - **pre-commit（Composeファイルの変更）**：`lint-compose`相当を実行する。
 - **pre-commit（Markdownの変更）**：変更ファイルへ`lint-md`相当を実行する。
-- **pre-commit（docs、steering、Taskfile、README、`tooling/adr-lint/`、`.github/rulesets/`、`.github/workflows/`、`tooling/ruleset-check/`、`tooling/ruleset-sync/`の変更）**：`okf-check`を実行する。
+- **pre-commit（docs、steering、Taskfile、README、`tooling/adr-lint/`、`.kiro/settings/mcp.json`、`tooling/iwe-mcp/`、`.github/rulesets/`、`.github/workflows/`、`tooling/ruleset-check/`、`tooling/ruleset-sync/`の変更）**：`okf-check`を実行する。
 - **pre-commit（`.agents/skills/`、`.kiro/`、`skills-lock.json`、`tooling/skills-check/`の変更）**：`skills-check`を実行する。
 - **pre-commit（Taskfile、`lefthook.yml`、GitHub Actionsワークフロー、`tooling/taskfile-cleanup/`、`tooling/task-calls/`の変更）**：`lint-taskfile`を実行する。
 - **pre-commit（`tooling/agent-git/`の変更）**：`agent-git-test`を実行する。
@@ -358,7 +374,7 @@ OKF検査の採用理由は[ADR-036](../adr/ADR-036-adopt-okf-for-docs-knowledge
 - **pre-push（すべて）**：`adr-check`と`scan-secrets-all`を実行する。
 - **pre-push（バックエンドのJavaまたはGradle変更）**：`be-lint`相当と`test`を実行する。
 - **pre-push（フロントエンドの変更）**：`fe-test-build`を、Vitestのdot reporterとjson-summaryだけのcoverageで実行する。
-- **pre-push（GitHub Actionsワークフローの変更）**：`lint-actions`相当と`lint-actions-security`相当を実行する。
+- **pre-push（GitHub Actionsのワークフローかcomposite actionの変更）**：`lint-actions`相当と`lint-actions-security`相当を実行する。
 
 Gitフックの条件とコマンドは[`lefthook.yml`](../../lefthook.yml)を正とする。
 ブランチがglobに当たるファイルを変えていなくても、`lefthook run <フック> --job <job> --file <globに当たるパス> --force`で一つのjobだけを実行できる。

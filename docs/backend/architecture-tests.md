@@ -47,7 +47,7 @@ jOOQの生成物の`com.example.demo.jooq`はOPENのモジュールであり、`
 - `infrastructureDependsOnlyOnDomainModel`：`infrastructure`は`application`、`domain.service`、モジュールルートの型に依存せず、機能モジュールの型のうち`domain.model`だけを使う。
 - `sharedModuleIsUsedOnlyByPersistenceAdapters`：`shared`の外で`shared.concurrency`、`shared.failure`、`shared.events`、`shared.security`以外の`shared`の型に依存するクラスは、`infrastructure.persistence`に置く。
   `shared`の中の依存は対象にしない。
-  `shared.concurrency`、`shared.failure`、`shared.events`、`shared.security`は、どの層からも使える（[ADR-048](../adr/ADR-048-add-shared-module-for-jooq-common-code.md)、[ADR-062](../adr/ADR-062-map-business-exceptions-to-404-409-422.md)、[ADR-079](../adr/ADR-079-resubmit-failed-event-publications-periodically-with-shedlock.md)、[ADR-094](../adr/ADR-094-require-app-user-principal-for-audit-columns.md)）。
+  `shared.concurrency`、`shared.failure`、`shared.events`、`shared.security`は、どの層からも使える（[ADR-048](../adr/ADR-048-add-shared-module-for-jooq-common-code.md)、[ADR-062](../adr/ADR-062-map-business-exceptions-to-404-409-422.md)、[ADR-079](../adr/ADR-079-resubmit-failed-event-publications-periodically-with-shedlock.md)、[ADR-095](../adr/ADR-095-require-app-user-principal-for-audit-columns.md)）。
 - `sharedModuleDoesNotDependOnHttp`：`shared`の型は、Spring Web、Springの HTTP、Servletの型に依存しない。
 - `moduleApiDoesNotExposeInternalTypes`：モジュールルートの型は、`java..`、`org.jspecify..`、同じルートパッケージの型だけに依存する。
 - `databaseTechnologyApisAreOnlyUsedByPersistenceAdapters`：jOOQ APIと生成型は`infrastructure.persistence`だけで使う。
@@ -234,7 +234,7 @@ INSERTの共通カラムは`CommonColumns.forInsert`で、UPDATEとDELETEの共�
   `Update`と`Delete`を作る入口をすべて禁じるため、`batch`や`subscribe`のように作った問い合わせを受け取って実行するAPIは禁じない。
 
   `tableWritesGoThroughTableWriter`が除外するのは、`TableWriter`、`LockedRoot`、`DeletedRoot`と、トランザクションの初めにモジュールのロールへ切り替える`ModuleRoleTransactionManager`とその`Config`の完全修飾型名だけである。
-  `ModuleRoleTransactionManager`は業務テーブルに触れず、固定の`set_config`だけを実行する（[ADR-090](../adr/ADR-090-switch-to-module-database-roles.md)）。
+  `ModuleRoleTransactionManager`は業務テーブルに触れず、固定の`set_config`だけを実行する（[ADR-094](../adr/ADR-094-switch-to-module-database-roles.md)）。
   除外を足す、外す、または除外する型を移すときは、先に[ADR-054](../adr/ADR-054-detect-optimistic-lock-conflicts-by-update-count.md)の判断を変える。
   同じ変更で、`tableWritesGoThroughTableWriterRule`の完全修飾型名と、除外する型を置く適合フィクスチャ（`archfixture/conforming/shared/infrastructure/persistence/`）を更新する。
   禁止するAPIの違反フィクスチャ（`DirectOrderWriter`）は、禁止の一覧か`isDirectWrite`の判定を変えるときだけ更新する。
@@ -290,7 +290,7 @@ Error Proneの`CheckReturnValue`は既定でerrorであり、`updateWhere`と`de
 - `statementTypeAndParamTypeAreNotChanged`：`Settings`の`withStatementType`、`setStatementType`、`withParamType`、`setParamType`を呼び出さず、メソッド参照もしない。
 - `persistenceAdaptersUseOnlyOwnGeneratedSchema`：`<module>.infrastructure.persistence`は、自分のモジュールのスキーマのjOOQの生成クラス（`jooq.<module>..`）だけを使う。別のモジュールのスキーマと`modulith`の生成クラスは使わない。モジュールのロールは自分のスキーマ以外を書けないため、実行時の権限エラーを静的に先取りする。生成クラスを`infrastructure.persistence`の外で使わないことは、`PackageByFeatureOnionArchitectureTest`の`databaseTechnologyApisAreOnlyUsedByPersistenceAdapters`が止める。
 - `moduleCodeDoesNotUseJdbc`：機能モジュールのクラスは、`org.springframework.jdbc..`（`JdbcTemplate`など）、`java.sql..`、`javax.sql..`を使わない。トランザクションの初めに切り替えたロールを迂回する経路を止める。
-- `moduleCodeDoesNotChangeConnectionSettings`：機能モジュールのクラスは、`DSLContext`の`set`、`setLocal`、`setSchema`、`setCatalog`、`connection`、`connectionResult`と、`DSL`の`set`、`setLocal`、`setSchema`、`setCatalog`を呼び出さない。`SET ROLE`で切り替えたロールを書き換えられるためである（[ADR-090](../adr/ADR-090-switch-to-module-database-roles.md)）。
+- `moduleCodeDoesNotChangeConnectionSettings`：機能モジュールのクラスは、`DSLContext`の`set`、`setLocal`、`setSchema`、`setCatalog`、`connection`、`connectionResult`と、`DSL`の`set`、`setLocal`、`setSchema`、`setCatalog`を呼び出さない。`SET ROLE`で切り替えたロールを書き換えられるためである（[ADR-094](../adr/ADR-094-switch-to-module-database-roles.md)）。
 
 機能モジュールは`ModuleRoles.MODULES`の名前で決まる。
 `ModuleRoles.MODULES`が`modulith`を除くjOOQのスキーマと一致し、どれもSpring Modulithのモジュールであることは、`ModuleRolesTest`が確かめる。

@@ -29,7 +29,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.NestedExceptionUtils;
 
 /**
- * モジュールのロールが、別のモジュールの表への書き込みと、依存の方向に逆らう読み取りを DB の権限エラーで止めることを確かめる（ADR-090）。
+ * モジュールのロールが、別のモジュールの表への書き込みと、依存の方向に逆らう読み取りを DB の権限エラーで止めることを確かめる（ADR-094）。
  *
  * <p>このクラスは機能モジュールの外にあるため、トランザクションの名前からはロールが決まらない。{@link AsModule} で本番と同じ {@code set_config('role',
  * ?, true)} を使って切り替える。

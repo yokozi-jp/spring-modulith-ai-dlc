@@ -391,9 +391,10 @@ class ApiExceptionHandlerTest {
                 new ServletWebRequest(new MockHttpServletRequest(), servletResponse));
 
     assertNull(response, "切断なら本文を書かないこと");
-    final String log = output.getAll();
-    assertFalse(log.contains("ERROR"), () -> "ERROR がないこと: " + log);
-    assertFalse(log.contains("WARN"), () -> "WARN がないこと: " + log);
+    // JVM 全体の出力には、背景のスレッドが出すほかのライブラリの ERROR や WARN が重なるので、このクラスの記録だけを見る。
+    final String handlerLog = handlerLog(output.getAll());
+    assertFalse(handlerLog.contains("ERROR"), () -> "ERROR がないこと: " + handlerLog);
+    assertFalse(handlerLog.contains("WARN"), () -> "WARN がないこと: " + handlerLog);
   }
 
   @Test

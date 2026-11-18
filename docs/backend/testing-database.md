@@ -58,7 +58,7 @@ Liquibase管理テーブルはコード生成から除外されているため�
 消すことも失敗したときは、原因が見えるよう、待ちの失敗に消すときの例外を`addSuppressed`で添える。
 ShedLockのロックの行（`modulith.shedlock`）は消さず、各テスト後に全行の`lock_until`を`1970-01-01T00:00:00Z`（`Instant.EPOCH`）にして期限切れにする。
 行を消すとShedLockが同じcontextで行を作り直さずロックを取れなくなり、期限を残すと`lock-at-least-for`の間、後に動く別のテストクラスがロックを待つためである。
-DBロールの決定は[ADR-011](../adr/ADR-011-use-module-owned-database-schemas.md)と[ADR-090](../adr/ADR-090-switch-to-module-database-roles.md)を参照する。
+DBロールの決定は[ADR-011](../adr/ADR-011-use-module-owned-database-schemas.md)と[ADR-094](../adr/ADR-094-switch-to-module-database-roles.md)を参照する。
 
 次の挙動を検証するときは、テストへロールバック用トランザクションを被せない。
 

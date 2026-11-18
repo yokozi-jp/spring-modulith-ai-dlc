@@ -1,6 +1,6 @@
 ---
 inclusion: fileMatch
-fileMatchPattern: ["frontend/e2e/**", "frontend/playwright.config.ts", "docker/compose-test.yml", ".github/workflows/e2e.yml", "Taskfile.yml", "docs/e2e/**"]
+fileMatchPattern: ["frontend/apps/web/e2e/**", "frontend/apps/web/playwright.config.ts", "docker/compose-test.yml", ".github/workflows/e2e.yml", "Taskfile.yml", "docs/e2e/**"]
 name: e2e
 description: E2E テストのコード、Playwright の設定、compose-test、E2E の CI、Taskfile、docs/e2e/ を追加や変更するときに使う。E2E テストの規約の入口を示す。
 ---

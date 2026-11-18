@@ -12,7 +12,7 @@ import java.util.function.Predicate;
  * ロールの権限の規則（G1、G2）を、カタログの行から判定する。
  *
  * <p>アプリロールはDDLの権限を持たず、{@code modulith}スキーマのUSAGEとテーブルのDMLだけを持ち、業務のスキーマと{@code
- * liquibase}スキーマに触れない。業務のスキーマは、モジュールのロールに切り替えたときだけ使える（ADR-090）。すべてのスキーマに適用する。
+ * liquibase}スキーマに触れない。業務のスキーマは、モジュールのロールに切り替えたときだけ使える（ADR-094）。すべてのスキーマに適用する。
  * マイグレーションロールは表を所有するが、superuserでも{@code BYPASSRLS}でもない。
  */
 final class SchemaPrivilegeConventions {
@@ -20,12 +20,12 @@ final class SchemaPrivilegeConventions {
   /** PostgreSQLが既定で作り、PUBLICにUSAGEを与える、表を持たないスキーマ。 */
   private static final String PUBLIC_SCHEMA = "public";
 
-  /** アプリロールが権限を持つ、モジュールに属さないスキーマ。業務のスキーマの権限は、モジュールのロールに与える（ADR-090）。 */
+  /** アプリロールが権限を持つ、モジュールに属さないスキーマ。業務のスキーマの権限は、モジュールのロールに与える（ADR-094）。 */
   private static final String APP_ROLE_SCHEMA = "modulith";
 
   /** 権限の規則の根拠の文書。 */
   private static final String ROLE_DOC =
-      "docs/database/connections.md、docs/adr/ADR-011-use-module-owned-database-schemas.md、docs/adr/ADR-090-switch-to-module-database-roles.md";
+      "docs/database/connections.md、docs/adr/ADR-011-use-module-owned-database-schemas.md、docs/adr/ADR-094-switch-to-module-database-roles.md";
 
   /** ロールの属性の名前と、その属性を持つか。 */
   /* package */ static final Map<String, Predicate<RoleRow>> ROLE_ATTRIBUTES =

@@ -69,6 +69,9 @@ jobs:
   ci:
     steps:
       - uses: go-task/setup-task@0123 # v2
+      - uses: ./.github/actions/setup-mise
+        with:
+          tools: task gone-tool
       - name: Run task gone 📚
         run: PATH="$PWD/bin:$PATH" task check # 数える
 EOF

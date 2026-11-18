@@ -13,6 +13,6 @@ description: HTTP API の controller、OpenAPI の設定、API の契約テス�
 
 - API の契約を変える前に、`docs/adr/ADR-013-standardize-http-api-contracts.md` と該当する docs を読む。
 - 既存 API の互換性を壊す変更は、`docs/web-api/versioning.md` で判定してから行う。
-- Controller や API の DTO を変えたら `task api-gen` を実行し、`openapi/openapi.yaml` と `frontend/src/api/generated` を同じコミットに含める。
+- Controller や API の DTO を変えたら `task api-gen` を実行し、`openapi/openapi.yaml` と `frontend/packages/api/src/generated` を同じコミットに含める。
 - OpenAPI のアノテーションと Javadoc は `docs/web-api/openapi-annotations.md` に従う。
   手順は `docs/web-api/runbook-api-change.md` にある。

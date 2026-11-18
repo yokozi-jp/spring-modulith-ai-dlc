@@ -37,7 +37,7 @@ OIDCクライアント登録など複数のテストで使う差し替えは、�
 ## ログインした利用者
 
 MockMvcでログインした利用者として呼ぶテストは、`testkit`の`AppUsers.oidcLogin()`を使い、Spring Security Testの`oidcLogin()`を直接使わない。
-`oidcLogin()`の既定の利用者は`AppUserPrincipal`でないため、書き込みで共通カラムが例外にする（[ADR-094](../adr/ADR-094-require-app-user-principal-for-audit-columns.md)）。
+`oidcLogin()`の既定の利用者は`AppUserPrincipal`でないため、書き込みで共通カラムが例外にする（[ADR-095](../adr/ADR-095-require-app-user-principal-for-audit-columns.md)）。
 `TestConventionsArchTest`が検査する。
 
 ## 並列と実行順
@@ -51,6 +51,8 @@ forkと共有するものは[バックエンドのテストの実行基盤](test
   ShedLockのロックは`CleanGeneratedTablesExtension.expireLocks`を使う。
   理由はそのJavadocにある。
 - 負荷の下で外れるテストは、期限を延ばしたりリトライしたりせず、待つ条件か状態の前提を直す。
+- `OutputCaptureExtension`の`CapturedOutput`はJVM全体の標準出力を持ち、前のテストが残した背景のスレッドの出力も重なる。
+  ERRORやWARNがないことは、対象のloggerの行だけに絞って確かめる（`ApiExceptionHandlerTest`の`handlerLog`）。
 
 ## 失敗時の診断情報
 

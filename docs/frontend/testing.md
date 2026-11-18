@@ -17,7 +17,7 @@ APIを使うcomponent testはMSWでHTTP境界を置き換え、`vi.mock`でmodul
 
 複数のテストで使う準備のコードは、[フロントエンドアーキテクチャ](architecture.md#テストの置き場所)に従い `src/testing/` に置く。
 
-Vitestの`setupFiles`（`src/testing/setup.ts`）は、全テストでTesting Libraryの待つ上限の設定とMSWのserver（`src/testing/msw.ts`）の起動を行い、各テストの後に`cleanup`、handlerの初期化、mockとglobalのstubの復元、localeの`ja`への初期化を行う。
+Vitestの`setupFiles`（`apps/web`は`src/testing/setup.ts`）は、全テストでTesting Libraryの待つ上限の設定とMSWのserver（`src/testing/msw.ts`）の起動を行い、各テストの後に`cleanup`、handlerの初期化、mockとglobalのstubの復元、localeの`ja`への初期化を行う。
 テストで`configure`を呼ばず、同じ`afterEach`も書かない。
 HTTPはOrvalが生成したMSW handlerを使い、生成handlerがない境界（`apiFetch`のtransportの検査など）だけ、テストの中で`server.use()`に手書きのhandlerを渡す。
 routeの描画は`src/testing/render-route.tsx`の`renderRoute`を使い、`main.tsx`と同じproviderとrouterの既定値で、最初のloaderを終えてから描画する。
@@ -43,7 +43,7 @@ componentの内部state、Hookの呼出回数、CSS classだけを主要な期�
   `createGate`は`src/testing/gate.ts`にある。
   止める側で`promise`を待ち、テストから`release`を呼ぶ。
 - **待つ上限**：`findBy`、`waitFor`、`expect.poll`の呼出に`timeout`を書かない。
-  上限は`vite.config.ts`の`asyncWaitTimeoutMs`が一括して決める。
+  上限は`apps/web/vite.config.ts`の`asyncWaitTimeoutMs`が一括して決める。
 - **`expect.poll`で扱えないmatcher**：`toThrow`とsnapshotは、対象のPromiseを直接awaitして検証する（例：`await expect(p).rejects.toThrow()`）。
 - **Testing Libraryの`waitFor`のcallback**：assertionを一つだけ置き、clickなどの副作用を置かない。
 - **差し替えてよい境界**：HTTPはMSW、globalは`vi.spyOn`か`vi.stubGlobal`、時刻はfake timerで置き換え、`vi.mock`と`vi.doMock`でmoduleを差し替えない。
@@ -90,16 +90,16 @@ coverageの対象と基準を含むテスト基盤の判断理由は[ADR-027](..
 
 生成物は生成元を変更して再生成し、手で書き換えない。
 
-| 生成物                          | 生成元                                           | 再生成                                                              |
-| ------------------------------- | ------------------------------------------------ | ------------------------------------------------------------------- |
-| `frontend/src/routeTree.gen.ts` | `frontend/src/routes/` のroute file              | `cd frontend && vp build`、または `task fe-dev` を起動しておく      |
-| `openapi/openapi.yaml`          | ControllerとDTOのJavadoc、`OpenApiConfig`        | `task api-gen`（[APIを変更する](../web-api/runbook-api-change.md)） |
-| `frontend/src/api/generated/**` | `openapi/openapi.yaml` とOrval設定               | `task api-gen`（契約から）、`task api-client-gen`（Orval設定だけ）  |
+| 生成物                                   | 生成元                                       | 再生成                                                                  |
+| ---------------------------------------- | -------------------------------------------- | ----------------------------------------------------------------------- |
+| `frontend/apps/web/src/routeTree.gen.ts` | `frontend/apps/web/src/routes/` のroute file | `cd frontend/apps/web && vp build`、または `task fe-dev` を起動しておく |
+| `openapi/openapi.yaml`                   | ControllerとDTOのJavadoc、`OpenApiConfig`    | `task api-gen`（[APIを変更する](../web-api/runbook-api-change.md)）     |
+| `frontend/packages/api/src/generated/**` | `openapi/openapi.yaml` とOrval設定           | `task api-gen`（契約から）、`task api-client-gen`（Orval設定だけ）      |
 
 エージェントによる生成物への書き込みを止めるKiroのフックの説明は、[Kiroのフック](../agents/kiro-hooks.md)にある。
 
 フックを通らない書き換えは、`task fe-route-tree-check` が最終的に検出する。
-このTaskは `vp build` で `routeTree.gen.ts` を再生成し、コミット済みの内容と差分があれば失敗する。
+このTaskは `apps/web` の `vp build` で `routeTree.gen.ts` を再生成し、コミット済みの内容と差分があれば失敗する。
 Frontend CIもこのTaskを実行する。
 契約と生成clientでは、`task be-openapi-check`と`task api-client-check`が同じ役割を持ち、Backend CIとFrontend CIが実行する。
 

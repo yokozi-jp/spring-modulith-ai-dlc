@@ -5,7 +5,7 @@ import java.util.Set;
 import org.jspecify.annotations.Nullable;
 
 /**
- * DB のロールに切り替える機能モジュールと、トランザクションの名前からモジュールのロールを引く規則（ADR-090）。
+ * DB のロールに切り替える機能モジュールと、トランザクションの名前からモジュールのロールを引く規則（ADR-094）。
  *
  * <p>ロールは {@code <module>_module}、スキーマは {@code <module>} である。ロールは環境を作る手順（{@code
  * docker/initdb/03-create-module-roles.sh}、本番は {@code

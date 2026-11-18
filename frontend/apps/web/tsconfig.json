@@ -1,0 +1,12 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "jsx": "react-jsx",
+    "paths": {
+      "@/*": ["./src/*"]
+    }
+  },
+  // ponytail: vite.config.ts、playwright.config.ts と e2e/ もブラウザ向けの lib と型で検査する。
+  // vite.config.ts は Vite の型が参照する Node の型で node:fs だけを使う。Node API がこれより増えたら tsconfig.app.json と tsconfig.node.json の project references に分ける。
+  "include": ["src", "e2e", "vite.config.ts", "playwright.config.ts"]
+}

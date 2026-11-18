@@ -8,6 +8,9 @@ on:
       - "frontend/**"
       - "openapi/**"
       - "Taskfile.yml"
+      - "mise.toml"
+      - "mise.lock"
+      - ".github/actions/setup-mise/**"
       - ".github/workflows/frontend-ci.yml"
   # PR の検査は ci.yml から呼ばれて動く（docs/adr/ADR-087）。
   workflow_call:
@@ -43,6 +46,9 @@ jobs:
             'frontend/**' \
             'openapi/**' \
             'Taskfile.yml' \
+            'mise.toml' \
+            'mise.lock' \
+            '.github/actions/setup-mise/**' \
             '.github/workflows/frontend-ci.yml'
 
   verify:
@@ -69,11 +75,8 @@ jobs:
           cache: pnpm
           cache-dependency-path: frontend/pnpm-lock.yaml
 
-      - name: Set up Task
-        uses: go-task/setup-task@a00fbb05ce67b35648be3c78cbc9fd85354c757e # v2
-        with:
-          version: "3.53.1"
-          checksum: a54a408f6861ff921f6e87774180db31bacd8c1e7c944ca696db9fea49a82fc7
+      - name: Set up mise tools
+        uses: ./.github/actions/setup-mise
 
       - name: Install dependencies
         working-directory: frontend
@@ -96,6 +99,9 @@ jobs:
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: frontend-coverage
-          path: frontend/coverage/
+          path: |
+            frontend/apps/web/coverage/
+            frontend/packages/ui/coverage/
+            frontend/packages/api/coverage/
           if-no-files-found: warn
           retention-days: 14

@@ -13,6 +13,7 @@ task --list
 初回セットアップとローカル起動は次の順で行う。
 
 ```bash
+mise install --locked
 task setup
 cp .env.example .env
 task compose-up

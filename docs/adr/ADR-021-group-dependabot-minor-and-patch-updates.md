@@ -132,6 +132,6 @@ Pull Request #67 を `main` へマージして条件付きチェックを常に�
 - [.github/workflows/dependabot-auto-merge.yml](../../.github/workflows/dependabot-auto-merge.yml)
 - [.github/workflows/backend-ci.yml](../../.github/workflows/backend-ci.yml)
 - [.github/workflows/hadolint.yml](../../.github/workflows/hadolint.yml)
-- [GitHub Docs: Troubleshooting required status checks（skipped は success 扱い）](https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/managing-protected-branches/troubleshooting-required-status-checks)
+- [GitHub Docs: Troubleshooting required status checks（skipped は success 扱い）](https://docs.github.com/en/pull-requests/how-tos/merge-and-close-pull-requests/troubleshooting-required-status-checks)
 - [GitHub Docs: Triggering a workflow（`GITHUB_TOKEN` による再帰実行の抑止）](https://docs.github.com/en/actions/using-workflows/triggering-a-workflow)
 - [dependabot/fetch-metadata](https://github.com/dependabot/fetch-metadata)

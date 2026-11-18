@@ -46,6 +46,9 @@ jobs:
             'docker/**' \
             '.env.test.example' \
             'Taskfile.yml' \
+            'mise.toml' \
+            'mise.lock' \
+            '.github/actions/setup-mise/**' \
             '.github/workflows/dast.yml'
 
   passive:
@@ -99,11 +102,8 @@ jobs:
           restore-keys: |
             gradle-${{ runner.os }}-test-
 
-      - name: Set up Task
-        uses: go-task/setup-task@a00fbb05ce67b35648be3c78cbc9fd85354c757e # v2
-        with:
-          version: "3.53.1"
-          checksum: a54a408f6861ff921f6e87774180db31bacd8c1e7c944ca696db9fea49a82fc7
+      - name: Set up mise tools
+        uses: ./.github/actions/setup-mise
 
       - name: Install dependencies
         working-directory: frontend
@@ -179,11 +179,8 @@ jobs:
           restore-keys: |
             gradle-${{ runner.os }}-test-
 
-      - name: Set up Task
-        uses: go-task/setup-task@a00fbb05ce67b35648be3c78cbc9fd85354c757e # v2
-        with:
-          version: "3.53.1"
-          checksum: a54a408f6861ff921f6e87774180db31bacd8c1e7c944ca696db9fea49a82fc7
+      - name: Set up mise tools
+        uses: ./.github/actions/setup-mise
 
       - name: Install dependencies
         working-directory: frontend

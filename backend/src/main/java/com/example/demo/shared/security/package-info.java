@@ -1,5 +1,5 @@
 /**
- * 認証の principal の語彙を置く（ADR-094）。共通カラムの {@code *_by} に登録するアプリの利用者を表す {@link
+ * 認証の principal の語彙を置く（ADR-095）。共通カラムの {@code *_by} に登録するアプリの利用者を表す {@link
  * com.example.demo.shared.security.AppUserPrincipal} である。
  *
  * <p>Domain、Application、Presentation、Infrastructure のどの層からも使ってよい。業務の概念を置かない。

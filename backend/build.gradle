@@ -187,7 +187,7 @@ dependencyManagement {
         dependency 'org.apache.tomcat.embed:tomcat-embed-el:11.0.27'
         dependency 'org.apache.tomcat.embed:tomcat-embed-websocket:11.0.27'
         // CVE-2026-0636（LDAP インジェクション）対応。
-        dependency 'org.bouncycastle:bcprov-jdk18on:1.86'
+        dependency 'org.bouncycastle:bcprov-jdk18on:1.87'
     }
 }
 
@@ -358,7 +358,7 @@ pitest {
 
 /*
  * Spotless: コードフォーマット
- * Google Java Format を適用。origin/main からの差分のみチェックする。
+ * Google Java Format を適用。origin/main から変えたファイルを、全体でチェックする。
  */
 spotless {
     ratchetFrom 'origin/main'
