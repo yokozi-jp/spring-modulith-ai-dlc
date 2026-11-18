@@ -53,7 +53,7 @@ ADR は [ADR の運用ルール](../adr/conventions.md)の基準と書式に従�
 pstack のプレイブックには、このリポジトリの規約と食い違う指示がある。
 次の場面では、プレイブックではなくリポジトリの規約に従う。
 
-- **Pull Request の作成**：`opening-a-pr.md` と `multi-phase-plan.md` は Draft にせずに開くよう指示する。このリポジトリでは Draft で作り、CI と差分を確かめてから Ready for review にする（[レビュー依頼からマージまで](../pull-request/review-request-and-merge.md)）。
+- **Pull Request の作成**：`opening-a-pr.md` と `multi-phase-plan.md` は Draft にせずに開くよう指示する。このリポジトリでは Draft で作り、`/thermos` を実行して指摘を直し、CI と差分を確かめてから Ready for review にする（[Draftからマージまで](../pull-request/review-request-and-merge.md)）。
 - **rebase した履歴の push**：`babysit.md`、`autopilot-full.md`、`shipping.md` は `git push --force-with-lease` を使う。権限の雛形（`.kiro/kiro-permissions.yaml`）は `git push *--force*` を拒否するため、エージェントは force push をせず、履歴の書き換えが要る場面では止めて利用者に報告する。
 
 ### 4. /thermos

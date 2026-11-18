@@ -17,9 +17,12 @@ on:
   # 判定して各ジョブを条件付き実行する（skipped は必須チェックで success 扱い）。
   pull_request:
     branches: ["**"]
+  # ci.yml から呼ばれる（docs/adr/ADR-087）。移行が終わるまでは pull_request でも単独で動き、二重に走る。
+  workflow_call:
 
+# 呼ばれると github.workflow が CI になる。group の前にファイル名の stem を付けて、呼ばれた workflow どうしが重ならないようにする（ADR-087）。
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
+  group: hadolint-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 permissions:
@@ -58,8 +61,8 @@ jobs:
             echo "docker=true" >> "$GITHUB_OUTPUT"
             exit 0
           fi
-          # hadolint.yml の push パスフィルタと同じ集合で判定する。
-          if grep -Eq '^(backend/|docker/compose-test\.yml$|docker/initdb/|docker/wiremock/|docker/keycloak/|\.env\.test\.example$|\.hadolint\.yaml$|\.github/workflows/hadolint\.yml$)' \
+          # hadolint.yml の push パスフィルタと同じ集合に、ci.yml を足して判定する。
+          if grep -Eq '^(backend/|docker/compose-test\.yml$|docker/initdb/|docker/wiremock/|docker/keycloak/|\.env\.test\.example$|\.hadolint\.yaml$|\.github/workflows/(hadolint|ci)\.yml$)' \
             <<< "$changed_files"; then
             echo "docker=true" >> "$GITHUB_OUTPUT"
           else

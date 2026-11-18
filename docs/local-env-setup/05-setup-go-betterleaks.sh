@@ -46,9 +46,6 @@ go version
 # -X で指すシンボルが将来変わっても Go リンカは黙って無視する（ビルドは失敗せず、
 # 最悪 "dev" 表示に戻るだけ）ので安全。
 BL_VERSION="$BETTERLEAKS_VERSION"
-if [ "$BL_VERSION" = "latest" ]; then
-  BL_VERSION="$(go list -m -f '{{.Version}}' github.com/betterleaks/betterleaks@latest)"
-fi
 echo "=== Installing betterleaks (${BL_VERSION}) ==="
 go install \
   -ldflags "-X github.com/betterleaks/betterleaks/version.Version=${BL_VERSION}" \

@@ -1,7 +1,7 @@
 ---
 type: Convention
 title: フロントエンドのルーティングと状態管理
-description: TanStack Router の route file の責務と形、認証が要る画面の layout、loader による server state の preload、状態表示の分担、mutation の後の cache の無効化、状態の置き場所、custom Hook を作る条件と名前、Effect の使いどころと検査を定める。route、loader、mutation、state、Hook、Effect を追加または変更するときに読む。
+description: TanStack Router の route file の責務と形、認証が要る画面の layout、loader による server state の preload、状態表示の分担、mutation の後の cache の無効化、状態の置き場所、custom Hook を作る条件と名前、Effect の禁止と代わりの書き方を定める。route、loader、mutation、state、Hook、Effect を追加または変更するときに読む。
 tags: [convention, frontend, routing, state, react]
 ---
 
@@ -10,7 +10,7 @@ tags: [convention, frontend, routing, state, react]
 route file は URL と画面の接続だけを担当し、画面の実装は `features` に置く。
 初期描画に必要な server state は loader から TanStack Query へ preload する。
 状態は意味に対応する既存機構（React Hooks、TanStack Query、TanStack Router、TanStack Form）へ置き、global store を先に追加しない。
-custom Hook は具体的な用途名で表せる再利用または外部 system との同期がある場合だけ作り、Effect も外部 system との同期だけに使う。
+custom Hook は具体的な用途名で表せる再利用または外部 system との同期がある場合だけ作り、Effect は使わない（ADR-088）。
 
 ## ルーティング
 
@@ -143,34 +143,30 @@ Hookはcomponentまたは別のcustom Hookのトップレベルから呼び、�
 
 React Compilerを有効にしているため、参照同一性が契約になる場合や計測で効果を確認した場合を除き、`useMemo` と `useCallback` を先回りして追加しない。
 
-### Effectの使いどころ
+### Effectの禁止
 
-Effectは、ブラウザAPI、第三者のwidget、購読など、Reactの外にあるsystemとcomponentを同期するときだけ使う。
+`useEffect`、`useLayoutEffect`、`useInsertionEffect`、`useEffectEvent` は使わない（[ADR-088](../adr/ADR-088-ban-react-effects-in-frontend.md)）。
+Oxlintの `react-rules/no-effect`（`frontend/lint/react-rules.js`）が、`react` からの名前付きimport、再export、default importの名前（`React.useEffect`）の参照、分割代入を検出し、`task fe-check` とCIで失敗にする。
+自前の関数で包んだEffectは検出しないため、reviewで確認する。
 
-Effectはrenderの後に動くため、render中やevent handlerで済む処理をEffectに置くと、余分なrenderと古い値の表示が生じる。
+Effectの代わりに、次の形で書く。
 
-次の処理はEffectに書かない。
-
-- **propsやstateから計算できる値**：stateとEffectで持たず、render中に計算する。
+- **画面のtitle**：componentの中に `<title>` を描画する。
+- **そのcomponentが描画する要素に結び付く処理**：ref callbackを使い、後始末はcleanup関数で返す。
+  ref callbackは関数の同一性が変わるたびに再実行されるため、本体は何度呼んでも同じ結果になる形にする。
+  React Compilerが関数を安定させる前提なので、`useMemo` や `useCallback` を足さない。
+- **要素に結び付かない外部のstoreの購読**：`useSyncExternalStore` を使う。
+- **propsやstateから計算できる値**：stateで持たず、render中に計算する。
 - **利用者の操作に応じた処理**：送信や通知は、その操作のevent handlerで行う。
-- **propが変わったときのstateの初期化**：Effectで戻さない。
-  stateをすべて戻すときは親から `key` を渡してcomponentを作り直し、一部だけを調整するときはrender中に計算する。
-- **Effectの連鎖**：あるEffectで更新したstateを別のEffectで受けて次のstateを更新せず、event handlerで次のstateをまとめて計算する。
+- **propが変わったときのstateの初期化**：stateをすべて戻すときは親から `key` を渡してcomponentを作り直し、一部だけを調整するときはrender中に計算する。
+- **route全体の例外の報告**：routerの `defaultOnCatch` に置く（`router-defaults.ts`）。
 - **server stateの取得**：[ルーティング](#ルーティング)のとおり、loaderとTanStack Queryで取得する。
 
-Effectの中で最新のpropsやstateを読むが、その値の変化で同期をやり直さない場合は、依存配列から値を外さず `useEffectEvent` を使う。
+ref callbackは、Effectに向けた `react/set-state-in-effect` やReact Doctorの `no-fetch-in-effect` などの検査が効かない。
+ref callbackの中でstateを更新したり、serverへ取得したりしない。
 
-### Effectの検査
-
-上の処理の多くは `task fe-check` のOxlintと `task fe-doctor` のReact Doctorが検出し、どちらもCIで失敗する。
-
-- **propsやstateから計算できる値**：Oxlintの `react/no-deriving-state-in-effects` と `react/set-state-in-effect`、React Doctorの `react-doctor/no-derived-state` が検出する。
-- **利用者の操作に応じた処理**：React Doctorの `react-doctor/no-event-handler` が検出し、Effectで親のcallbackを呼ぶ形は `react-doctor/no-prop-callback-in-effect` も検出する。
-- **propが変わったときのstateの初期化**：Oxlintの `react/set-state-in-effect`、React Doctorの `react-doctor/no-reset-all-state-on-prop-change` と `react-doctor/no-adjust-state-on-prop-change` が検出する。
-- **Effectの連鎖**：Oxlintの `react/set-state-in-effect` とReact Doctorの `react-doctor/no-effect-chain` が検出する。
-- **server stateの取得**：`fetch` の直接の呼び出しはOxlintの `no-restricted-globals` が禁止し、React Doctorの `react-doctor/no-fetch-in-effect` も検出する。
-
-生成したAPI client関数をEffectから呼ぶ形はどちらも検出しないため、reviewで確認する。
+どうしてもEffectが要る場面（第三者のwidgetの初期化など）は、行単位の `oxlint-disable` に理由を書く。
+その場面が繰り返し生じるなら、ADR-088を見直す。
 
 ### Hookの名前とファイル
 
@@ -196,12 +192,12 @@ custom Hookのテストは[テスト観点の割り当て](test-strategy.md#観�
 - [ADR-023: TanStack Form と Zod を採用する](../adr/ADR-023-adopt-tanstack-form-and-zod.md)
 - [ADR-026: OXCでReact Compilerを有効化する](../adr/ADR-026-enable-react-compiler-with-oxc.md)
 - [ADR-032: Frontendを業務機能単位で構成する](../adr/ADR-032-organize-frontend-by-business-feature.md)
+- [ADR-088: フロントエンドで useEffect を禁止し、Oxlint で止める](../adr/ADR-088-ban-react-effects-in-frontend.md)
 - [React: Reusing Logic with Custom Hooks](https://react.dev/learn/reusing-logic-with-custom-hooks)
 - [React: Rules of Hooks](https://react.dev/reference/rules/rules-of-hooks)
 - [React: You Might Not Need an Effect](https://react.dev/learn/you-might-not-need-an-effect)
 - [React: Synchronizing with Effects](https://react.dev/learn/synchronizing-with-effects)
 - [React: Separating Events from Effects](https://react.dev/learn/separating-events-from-effects)
-- [React: useEffectEvent](https://react.dev/reference/react/useEffectEvent)
 - [TanStack Router: External Data Loading](https://tanstack.com/router/latest/docs/framework/react/guide/external-data-loading)
 - [TanStack Router: Authenticated Routes](https://tanstack.com/router/latest/docs/framework/react/guide/authenticated-routes)
 - [TanStack Router: Not Found Errors](https://tanstack.com/router/latest/docs/framework/react/guide/not-found-errors)
