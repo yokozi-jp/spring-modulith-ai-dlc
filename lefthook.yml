@@ -194,6 +194,15 @@ pre-commit:
         task skills-check
       fail_text: "スキルの整合の検証に失敗しました。task skills-check で再実行してください。"
 
+    # agent-git.sh か自己検査にステージ済み変更があるとき、一時の git リポジトリで自己検査する（task agent-git-test）。
+    - name: agent-git-test
+      glob:
+        - "tooling/agent-git/**"
+      run: |
+        echo "{staged_files}" >/dev/null
+        task agent-git-test
+      fail_text: "agent-git.sh の自己検査に失敗しました。task agent-git-test で再実行してください。"
+
     # Taskfile、フック、ワークフロー、tooling の fixture の変更で、タスク名と Taskfile を検証する（task lint-taskfile）。
     - name: lint-taskfile
       glob:
@@ -206,6 +215,16 @@ pre-commit:
         echo "{staged_files}" >/dev/null
         task lint-taskfile
       fail_text: "Taskfileの検証に失敗しました。task lint-taskfile で再実行してください。"
+
+    # lefthook.yml か glob の検査にステージ済み変更があるとき、実際の lefthook で glob が意図した job を選ぶことを検証（task lint-lefthook）。
+    - name: lint-lefthook
+      glob:
+        - "lefthook.yml"
+        - "tooling/lefthook-glob/**"
+      run: |
+        echo "{staged_files}" >/dev/null
+        task lint-lefthook
+      fail_text: "lefthook の glob の検証に失敗しました。task lint-lefthook で再実行してください。"
 
 # すべての job を順番に実行し、失敗した時点で止める。
 # 並列に走らせると、be-lint、be-test、frontend-test-build の Gradle と Vitest が CPU を取り合い、

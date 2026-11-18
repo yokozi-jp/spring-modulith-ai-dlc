@@ -18,6 +18,7 @@ import { i18n } from "@/i18n";
 import { replaceTelemetryForTesting } from "@/lib/telemetry";
 import { routerDefaults } from "@/router-defaults";
 import { routeTree } from "@/routeTree.gen";
+import { createGate } from "@/testing/gate";
 
 type Sink = NonNullable<Parameters<typeof replaceTelemetryForTesting>[0]>;
 
@@ -97,22 +98,20 @@ describe("router defaults", () => {
       "/",
     );
 
-    await vi.waitFor(() => {
-      expect(pushError).toHaveBeenCalledWith(error);
-    });
+    await expect.poll(() => pushError).toHaveBeenCalledWith(error);
   });
 
   it("shows the localized pending view while the loader runs", async () => {
-    let loaded = false;
+    const loader = createGate();
     renderRouter(
-      treeWithLoader(() => vi.waitUntil(() => loaded)),
+      treeWithLoader(() => loader.promise),
       "/",
       0,
     );
 
     await expect(screen.findByRole("status")).resolves.toHaveProperty("textContent", "Loading…");
 
-    loaded = true;
+    loader.release();
     await expect(screen.findByText("loaded")).resolves.toBeTruthy();
   });
 });

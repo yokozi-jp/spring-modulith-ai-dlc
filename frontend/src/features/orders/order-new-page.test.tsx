@@ -3,7 +3,7 @@
 import { screen, waitFor, within } from "@testing-library/react";
 import type { UserEvent } from "@testing-library/user-event";
 import { http, HttpResponse } from "msw";
-import { beforeEach, describe, expect, it, vi } from "vite-plus/test";
+import { beforeEach, describe, expect, it } from "vite-plus/test";
 
 import {
   getFindOrderByIdMockHandler,
@@ -11,6 +11,7 @@ import {
 } from "@/api/generated/mocks/ordering/ordering.msw";
 import { getListPaymentsMockHandler } from "@/api/generated/mocks/payment/payment.msw";
 import { getListProductsMockHandler } from "@/api/generated/mocks/product/product.msw";
+import { createGate } from "@/testing/gate";
 import { server } from "@/testing/msw";
 import {
   csrfCookieValue,
@@ -109,22 +110,14 @@ describe("order new page", () => {
   });
 
   it("送信中は 2 回目を送らず、送信中であることを通知する", async () => {
-    let release = false;
+    const create = createGate();
     const sent = serveDraftOrder(() => problemResponse(409, "競合が発生しました"));
-    server.use(
-      http.post(
-        "*/api/orders",
-        async () => {
-          await vi.waitUntil(() => release);
-        },
-        { once: true },
-      ),
-    );
+    server.use(http.post("*/api/orders", () => create.promise, { once: true }));
     const user = await submitFilledForm();
     await expect(within(notice()).findByText("送信しています")).resolves.toBeTruthy();
 
     await user.click(screen.getByRole("button", { name: "作成する" }));
-    release = true;
+    create.release();
 
     await expect(within(notice()).findByText("競合が発生しました")).resolves.toBeTruthy();
     expect(sent).toHaveLength(1);
