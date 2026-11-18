@@ -26,6 +26,7 @@
 
 - **Before:**
 - **After:**
+- **Review:** <!-- /thermos の指摘と対応。実行しなかったときは理由（例：docs の誤字だけ）を書く -->
 
 ## Merge Danger
 

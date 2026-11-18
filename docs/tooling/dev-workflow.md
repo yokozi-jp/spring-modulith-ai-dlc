@@ -40,7 +40,7 @@ worktreeには`node_modules`が無いため、作った直後にルートとフ�
 ```bash
 git worktree add -b <ブランチ> ../<ディレクトリ> origin/main
 cd ../<ディレクトリ>
-npm install        # Lefthookとcommitlint
+npm ci             # Lefthookとcommitlint。npm installは package-lock.json を書き換える
 task fe-install    # フロントエンド
 ```
 
