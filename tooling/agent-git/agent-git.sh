@@ -4,13 +4,16 @@
 # Run: bash tooling/agent-git/agent-git.sh commit <メッセージのファイル> <パス>...
 #      bash tooling/agent-git/agent-git.sh push
 #      bash tooling/agent-git/agent-git.sh wait [<実行のディレクトリ>]
-# task agent-commit、task agent-push、task agent-wait が呼ぶ。手順は docs/tooling/dev-workflow.md にある。
-# GNU/Linux だけで動く（/proc、GNU coreutils の sort -z、comm -z、uniq -z、cut -z、procps の pgrep、util-linux の flock を使う）。
+# task agent-commit、task agent-push、task agent-wait が呼ぶ。
+# 手順は docs/tooling/dev-workflow.md にある。
+# GNU/Linux だけで動く。/proc、procps の pgrep、util-linux の flock、GNU findutils の find -printf と、
+# GNU coreutils の sort -z、comm -z、uniq -z、cut -z を使う。
 #
-# 実行のディレクトリは、worktree ごとの $(git rev-parse --git-path agent-git) の下に <commit か push>.XXXXXX を作る。
-# .git の中なので git の管理の外にあり、wait は成功を報告したら消し、失敗なら log と done を残す。
+# 実行のディレクトリは <commit か push>.XXXXXX で、$(git rev-parse --git-path agent-git) の下に作る。
+# worktree ごとの .git の中なので git の管理の外にあり、wait は成功を報告したら消し、失敗なら log と done を残す。
 #   pid       プロセスを 1 行ずつ: <wrapper か child か git> <PID> <開始時刻>
-#             wrapper は background のシェル、child は wrapper が動かすコマンド（push は git、commit は _commit）、git は commit の git。
+#             wrapper は background のシェル、git は commit の git。
+#             child は wrapper が動かすコマンド（push は git、commit は _commit）。
 #             開始時刻（/proc/<PID>/stat の 22 番目の欄）を比べて、PID が別のプロセスに再利用されたものを見分ける。
 #   log       コマンドの標準出力と標準エラー
 #   done      終了コード（exit=<n>）。終わるまで無い
@@ -63,9 +66,9 @@ fail() {
 # list_paths <理由> <NUL 区切りのパスのファイル> <直し方>: パスがあれば、理由、字下げしたパス、直し方を出す。無ければ何も出さずに失敗する。
 list_paths() {
   local paths
-  paths="$(tr '\0' '\n' <"$2")"
+  paths="$(tr '\0' '\n' <"$2" | sed 's/^/    /')"
   [ -n "$paths" ] || return 1
-  printf '%s\n%s\n%s\n' "$1" "$(sed 's/^/    /' <<<"$paths")" "$3"
+  printf '%s\n%s\n%s\n' "$1" "$paths" "$3"
 }
 
 # refuse_listed <理由> <NUL 区切りのパスのファイル> <直し方>: パスがあれば、list_paths で出して止まる。
@@ -188,13 +191,8 @@ commit() {
   done
   run="$(new_run commit)" || exit 1
   trap 'rm -r -- "$run"' EXIT
-  # git は pre-commit の間 index をロックせず、フックの後に読み直す。
-  # 本物の index から commit すると、フックの間にほかの作業が git add したものが混ざる。
-  # そこで写しを先に作り、確かめるのも stage するのも commit するのも写しにする。確かめてから写すと、その間の git add が混ざる。
-  # git commit --only <パス> は、フックの間ずっと本物の index をロックし、ほかの作業の git add を失敗させるので使わない。
-  # base は写す前の本物の index で、commit の後にほかの作業が stage し直したパスを見分ける（sync_index）。
-  # 写しは index の更新時刻を保つ（cp -p）。git は更新時刻が index 以降のファイルを中身で確かめ、それより前なら stat だけを信じる。
-  # 写しの時刻が新しいと、index と同じ秒に同じ大きさで書き換えたファイルの変更を見落とす。
+  # 写しは、確かめる前に更新時刻ごと作る。
+  # 理由は docs/adr/ADR-091-commit-agent-changes-from-a-copy-of-the-index.md にある。
   { mkdir -- "$run/commit" && copy_index "$(git rev-parse --git-path index)" "$run/commit/base" && cp -p -- "$run/commit/base" "$run/commit/index"; } || exit 1
   # 最初の commit の前は HEAD が無いので空になり、landed は HEAD^ が無いことと比べる。
   git rev-parse -q --verify HEAD >"$run/commit/head"
@@ -385,9 +383,10 @@ wait_run() {
   [[ "$wait_seconds" =~ ^[0-9]+$ ]] || fail "AGENT_GIT_WAIT_SECONDS は 0 以上の整数で指定してください: $wait_seconds"
   if [ -z "$run" ]; then
     # pid は始めた直後に書き足し、その後は書かないので、更新時刻が始めた順になる。
-    run="$(ls -t -- "$(runs_dir)"/*/pid 2>/dev/null | while IFS= read -r p; do
-      [ -e "${p%/pid}/reported" ] || { echo "${p%/pid}" && break; }
-    done)"
+    run="$(find "$(runs_dir)" -mindepth 2 -maxdepth 2 -name pid -printf '%T@ %h\n' 2>/dev/null | LC_ALL=C sort -rn |
+      while IFS= read -r p; do
+        [ -e "${p#* }/reported" ] || { echo "${p#* }" && break; }
+      done)"
     [ -n "$run" ] || fail "この worktree に、まだ報告していない実行がありません。"
   fi
   [ -f "$run/pid" ] || fail "$run は agent-git.sh の実行のディレクトリではありません。"
