@@ -226,6 +226,17 @@ pre-commit:
         task lint-lefthook
       fail_text: "lefthook の glob の検証に失敗しました。task lint-lefthook で再実行してください。"
 
+    # 自己検査か scratch-git.sh にステージ済み変更があるとき、一時の git リポジトリを作る前に scratch-git.sh を source しているか検証（task lint-scratch-git）。
+    - name: lint-scratch-git
+      glob:
+        - "tooling/*/test.sh"
+        - ".kiro/hooks/*.test.sh"
+        - "tooling/scratch-git/**"
+      run: |
+        echo "{staged_files}" >/dev/null
+        task lint-scratch-git
+      fail_text: "scratch-git.sh の source の検証に失敗しました。task lint-scratch-git で再実行してください。"
+
 # すべての job を順番に実行し、失敗した時点で止める。
 # 並列に走らせると、be-lint、be-test、frontend-test-build の Gradle と Vitest が CPU を取り合い、
 # ArchUnit の読み込みや時間待ちのテストが遅くなり、外れる。軽い検査を先に置き、失敗を早く返す。

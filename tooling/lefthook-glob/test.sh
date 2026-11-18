@@ -4,6 +4,7 @@
 # Run: bash tooling/lefthook-glob/test.sh (task lint-lefthook が実行する)
 
 set -uo pipefail
+. "$(dirname "$0")/../scratch-git/scratch-git.sh"
 
 root="$(cd "$(dirname "$0")/../.." && pwd)"
 cd "$root" || exit 1
@@ -13,10 +14,8 @@ failures=0
 
 # lefthook は --file に加えてステージ済みのファイルも照合する。コミット中のフックの中でも結果が変わらないよう、
 # 何もステージされていない空のリポジトリで動かす。
-# linked worktree のコミットでは GIT_DIR などが渡り、git init が本物のリポジトリを bare にするため、リポジトリ固有の変数を全部外す。
 # 開発者の LEFTHOOK_* も結果を変えるため外す。lefthook-local.yml は dump に混ざるので、この検査は手元の上書きなしで読む。
-# shellcheck disable=SC2046
-unset $(git rev-parse --local-env-vars) LEFTHOOK_EXCLUDE LEFTHOOK_ONLY LEFTHOOK_OUTPUT LEFTHOOK_CONFIG
+unset LEFTHOOK_EXCLUDE LEFTHOOK_ONLY LEFTHOOK_OUTPUT LEFTHOOK_CONFIG
 lefthook="$root/node_modules/.bin/lefthook"
 git init -q "$tmp/repo"
 
@@ -58,9 +57,11 @@ expect pre-commit frontend/apps/web/package.json "api-contract-check frontend-ch
 expect pre-commit Taskfile.yml "okf-check lint-taskfile"
 expect pre-commit .github/workflows/ci.yml "okf-check lint-taskfile"
 expect pre-commit lefthook.yml "lint-lefthook lint-taskfile"
-expect pre-commit tooling/task-calls/test.sh "lint-taskfile"
+expect pre-commit tooling/task-calls/test.sh "lint-scratch-git lint-taskfile"
 expect pre-commit tooling/agent-git/agent-git.sh "agent-git-test"
-expect pre-commit tooling/agent-git/test.sh "agent-git-test"
+expect pre-commit tooling/agent-git/test.sh "agent-git-test lint-scratch-git"
+expect pre-commit tooling/scratch-git/scratch-git.sh "lint-scratch-git"
+expect pre-commit .kiro/hooks/block-generated-writes.test.sh "lint-scratch-git skills-check"
 expect pre-push backend/build.gradle "be-lint be-test"
 expect pre-push backend/settings.gradle "be-lint be-test"
 expect pre-push backend/src/main/java/App.java "be-lint be-test"

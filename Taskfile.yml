@@ -1741,6 +1741,13 @@ tasks:
     cmds:
       - bash tooling/lefthook-glob/test.sh
 
+  lint-scratch-git:
+    desc: 一時のgitリポジトリを作る自己検査が、作る前にtooling/scratch-git/scratch-git.shをsourceしているか検証
+    silent: true
+    cmds:
+      - bash tooling/scratch-git/test.sh
+      - bash tooling/scratch-git/scratch-git-check.sh
+
   lint-semgrep:
     desc: Semgrep OSSで静的解析
     cmds:
