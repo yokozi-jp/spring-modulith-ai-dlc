@@ -69,8 +69,8 @@ docs だけの PR で backend の CI を走らせない。
 
 ### concurrency と権限
 
-- `concurrency` は `ci.yml` のトップレベルだけに置き、呼ばれる workflow からは外す。group は `ci-${{ github.ref }}`、`cancel-in-progress` は PR のときだけ `true` にする。
-- `main` への push では、現行の group を保つ。呼ばれる workflow の `concurrency` は、`github.event_name` が `push` のときだけ効く group にする。`workflow_call` 経由の実行は、`ci.yml` の `pull_request` なので、この group を使わない。
+- `ci.yml` の group は `ci-${{ github.ref }}`、`cancel-in-progress` は `true` にする。
+- 呼ばれる workflow は、現行の `concurrency` の group の前に、ファイル名の stem と `-` を付ける（例：`backend-ci-${{ github.workflow }}-${{ github.ref }}`）。呼ばれると `github.workflow` が `CI` になり、単独の実行と `main` への push とは group が別になる。stem が違うので、呼ばれた workflow どうしも重ならない。取り消しの挙動は、3 つの起動のしかたのどれでも現行と同じである。
 - 呼び出しジョブの `permissions` には、呼ばれた側の各ジョブが現在宣言している権限の全量を写す。呼ばれた側は、これを下げることしかできない。
 - `ci.yml` のトップレベルは `permissions: {}` とする。
 
@@ -101,11 +101,13 @@ ruleset の必須チェックを、次の 4 つにする。
 ### 検査
 
 `tooling/ci-gate-check/` に、次のことを確かめるスクリプトと fixture のテストを置く。
+除外する workflow とその理由は `tooling/ci-gate-check/excluded.tsv` が正で、上の一覧はこの判断の時点の写しである。
 スクリプトは `ci.yml` のジョブとして実行し、`CI gate` の `needs` に入れる。
 
+- `ci.yml` に、check 名が `CI gate` の集約ジョブがあり、`if: always()` を持つ。
 - `ci.yml` の `CI gate` 以外のすべてのジョブが、`CI gate` の `needs` にある。
 - `.github/workflows/*.yml` のうち `on.pull_request` を持つものは、すべて `ci.yml` から呼ばれているか、除外の一覧に理由つきで載っている。
-- 呼ばれる workflow のトップレベルの `concurrency` が、`github.workflow` だけで group を作っていない。
+- 呼ばれる workflow のトップレベルの `concurrency` の group が、ファイル名の stem と `-` で始まる。
 
 ### ruleset の差し替え
 
@@ -126,6 +128,8 @@ PR は 3 つに分ける。
 [ADR-017](ADR-017-adopt-trunk-based-repository-governance.md) の「常時必須チェックと条件付き品質ゲートを分けて管理する」方針は、この ADR が置き換える。
 `docs/repository/branch-protection.md` の必須チェックの節と、ADR-086 の `tooling/ruleset-check` が見る一覧は、実装の PR で更新する。
 
+実装の 1 つ目の PR で、`ci.yml` の取り消しは呼ばれた側だけに効き、呼ばれる側が `pull_request` でも単独で動く移行の間は、その実行が取り消されなくなることが分かった。そのため、group を `event_name` で分ける案をやめ、ファイル名の stem を前に付ける案に書き直した（2026-11-17）。
+
 ## Consequences
 
 ### Positive
@@ -138,7 +142,7 @@ PR は 3 つに分ける。
 ### Negative
 
 - reusable workflow を呼ぶジョブには、`runs-on`、`steps`、`env` を書けない。
-- 呼ばれる workflow が、`push` などと `workflow_call` の 2 つのモードを持ち続ける。concurrency の group はモードごとに分けて書く必要がある。
+- 呼ばれる workflow が、`push` などと `workflow_call` の 2 つのモードを持ち続ける。
 - 移行の間、呼ばれる workflow が二重に走る。
 - check 名が `呼び出しジョブ名 / 呼ばれたジョブ名` の形になり、PR の画面で長く表示される。
 - `CI gate` の判定が壊れると、Dependabot の PR まで auto-merge される。判定のシェルは fixture のテストで守る。

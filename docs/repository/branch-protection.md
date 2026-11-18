@@ -11,9 +11,23 @@ tags: [convention, operations, governance, git, github]
 
 GitHub の Rules、Rulesets で branch ruleset を作り、既定ブランチ `main` を対象にする。
 
-ruleset は Active にし、管理者を含む bypass は常設しない。
+ruleset の正本は `.github/rulesets/main.json` である。
+変更するときは、このファイルを直し、次のコマンドで GitHub へ反映する。
 
-緊急時に bypass を使った場合は、理由と後続のレビュー結果を Issue または Pull Request に残す。
+```bash
+gh api -X PUT repos/yokozi-jp/spring-modulith-ai-dlc/rulesets/23297515 --input .github/rulesets/main.json
+```
+
+必須チェックの名前は、このファイル、下の一覧、workflow の job 名の 3 か所で、絵文字の異体字選択子（U+FE0F）まで一致させる。
+一致しないチェックは、報告されないまま待機になり、merge できなくなる。
+`task okf-check` が、この 3 か所の一致を検査する。GitHub 上の ruleset との一致は検査しない。理由は [ADR-086](../adr/ADR-086-align-main-protection-with-solo-and-agent-operation.md) にある。
+
+ruleset は Active にする。
+bypass できるのは、リポジトリの管理者（RepositoryRole の id `5`）だけで、`bypass_mode` は `pull_request` にする。
+`pull_request` モードの bypass は Pull Request の merge にだけ効くため、`main` への直接 push は管理者でもできない。
+
+管理者が bypass で merge したときは、理由を Pull Request に残す。
+エージェントは bypass を使わない（[Draftからマージまで](../pull-request/review-request-and-merge.md)）。
 
 ## 必須ルール
 
@@ -22,26 +36,27 @@ ruleset は Active にし、管理者を含む bypass は常設しない。
 - branch deletion を禁止する。
 - non-fast-forward push を禁止する。
 - Pull Request を必須にする。
-- linear history を必須にする。
-- merge 前にすべての会話の解決を必須にする。
-- merge 前にブランチを最新の `main` へ更新する。
-- 一件以上の承認を必須にする。
-- 新しい commit が追加されたら古い承認を取り消す。
-- CODEOWNERS の承認を必須にする。
+- 必須ステータスチェックの成功を必須にする。
+
+次の設定は要求しない（[ADR-086](../adr/ADR-086-align-main-protection-with-solo-and-agent-operation.md)）。
+
+- 承認の数を 0 にし、承認とコード所有者の承認を要求しない。
+- merge 前の会話の解決を要求しない。bot のコメントも resolve しなくてよい。
+- merge 前にブランチを最新の `main` へ更新することを要求しない（`strict_required_status_checks_policy` は `false`）。
+- linear history を要求しない。
 
 squash merge だけを有効にし、merge commit と rebase merge は無効にする。
 
 squash commit の既定メッセージには Pull Request のタイトルを使う。
 
-## レビュー担当者の前提
+人が必ず読む Pull Request は[Draftからマージまで](../pull-request/review-request-and-merge.md)に従う。
 
-現在リポジトリ内で有効性を確認できる所有者は `@yokozi-jp` だけである。
+## CODEOWNERS
 
-Pull Request の作成者は自分の変更を承認できないため、コード所有者レビューを必須にする前に、各領域へ作成者以外の実在するレビュー担当者を一名以上追加する。
-
-チームを作成した場合は `.github/CODEOWNERS` の backend、frontend、infrastructure、`.kiro` の規則を実在する `@owner/team` へ置き換える。
-
-存在しないチーム名を先に指定するとレビュー要求が機能しないため、仮の team slug は記載しない。
+`.github/CODEOWNERS` を置く。
+ruleset ではコード所有者の承認を要求しない。
+所有者は `@yokozi-jp` だけであり、存在しないチーム名は指定しない。
+チームを作ったときは、`@owner/team` の実在を確かめてから置き換える。
 
 ## 常時必須にするステータスチェック
 
@@ -96,7 +111,7 @@ Security タブの未解決結果はレビュー時に確認し、受容する�
 
 - GitHub Actions：`actionlint`
 - Markdown：`Run markdownlint-cli2 📝`
-- docs、steering、OKF設定、Taskfile：`Run task okf-check 📚`
+- docs、steering、OKF設定、Taskfile、ruleset、workflow、`tooling/ruleset-check/`：`Run task okf-check 📚`
 - Compose：`Run docker compose config 🐳`
 
 path filter によって workflow 自体が作られない Pull Request では、これらの check run も存在しない。
@@ -114,8 +129,7 @@ E2E の `Run E2E tests 🎭` は path filter を持つが、required status chec
 GitHub の General、Pull Requests で次を設定する。
 
 - Automatically delete head branches を有効にする。
-- Always suggest updating pull request branches を有効にする。
-- Allow auto-merge は、必須レビューとチェックを維持できる場合だけ有効にする。
+- Allow auto-merge は、必須チェックを維持できる場合だけ有効にする。
 
 Private Vulnerability Reporting は Security、Code security and analysis で有効にする。
 

@@ -1,5 +1,4 @@
 import { getRouteApi, Link } from "@tanstack/react-router";
-import { useEffect } from "react";
 import { useTranslation } from "react-i18next";
 
 import { ConflictChoices } from "./components/conflict-choices";
@@ -18,15 +17,12 @@ export function OrderDetailPage() {
   const { order, products, editor, actions, notice, editable } = useOrderDetail(orderId);
   const code = order.customerOrderCode ?? t("orders.missingValue");
 
-  useEffect(() => {
-    document.title = t("orders.detail.title", { code });
-  }, [t, code]);
-
   return (
     <section
       className="flex flex-col gap-6 px-6 py-10 sm:px-10"
       aria-labelledby="order-detail-heading"
     >
+      <title>{t("orders.detail.title", { code })}</title>
       <Link to="/orders" className="self-start underline-offset-4 hover:underline">
         {t("orders.detail.backToList")}
       </Link>

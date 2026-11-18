@@ -1,5 +1,5 @@
 import { useSuspenseQuery } from "@tanstack/react-query";
-import { useEffect, useId } from "react";
+import { useId } from "react";
 import { useTranslation } from "react-i18next";
 
 import { getListProductsSuspenseQueryOptions } from "@/api/generated/endpoints/product/product";
@@ -16,15 +16,12 @@ export function OrderNewPage() {
   const { data: products } = useSuspenseQuery(getListProductsSuspenseQueryOptions());
   const { form, notice, serverErrors, handleFieldChange } = useDraftOrderForm();
 
-  useEffect(() => {
-    document.title = t("orders.new.title");
-  }, [t]);
-
   return (
     <section
       className="flex flex-col gap-6 px-6 py-10 sm:px-10"
       aria-labelledby="order-new-heading"
     >
+      <title>{t("orders.new.title")}</title>
       <h1 id="order-new-heading" className="text-2xl font-semibold">
         {t("orders.new.title")}
       </h1>

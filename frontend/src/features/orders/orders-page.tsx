@@ -1,6 +1,5 @@
 import { useSuspenseQuery } from "@tanstack/react-query";
 import { getRouteApi, Link } from "@tanstack/react-router";
-import { useEffect } from "react";
 import { useTranslation } from "react-i18next";
 
 import { getListOrdersSuspenseQueryOptions } from "@/api/generated/endpoints/ordering/ordering";
@@ -18,12 +17,9 @@ export function OrdersPage() {
   const { data } = useSuspenseQuery(getListOrdersSuspenseQueryOptions(listOrdersParams(status)));
   const { items } = data.data;
 
-  useEffect(() => {
-    document.title = t("orders.list.title");
-  }, [t]);
-
   return (
     <section className="flex flex-col gap-6 px-6 py-10 sm:px-10" aria-labelledby="orders-heading">
+      <title>{t("orders.list.title")}</title>
       <div className="flex flex-wrap items-center justify-between gap-4">
         <h1 id="orders-heading" className="text-2xl font-semibold">
           {t("orders.list.title")}

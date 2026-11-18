@@ -1,5 +1,6 @@
 {
   "ignore": {
+    "files": ["lint/fixtures/**"],
     "overrides": [
       {
         "files": ["src/components/ui/**"],

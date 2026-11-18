@@ -1,5 +1,4 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useEffect } from "react";
 import { useTranslation } from "react-i18next";
 
 import { buttonVariants } from "@/components/ui/button";
@@ -7,12 +6,9 @@ import { buttonVariants } from "@/components/ui/button";
 function LoggedOutPage() {
   const { t } = useTranslation();
 
-  useEffect(() => {
-    document.title = t("title");
-  }, [t]);
-
   return (
     <div className="min-h-svh bg-background text-foreground">
+      <title>{t("title")}</title>
       <main>
         <section className="flex flex-col items-start gap-4 px-6 py-16 sm:px-10">
           <h1 className="text-2xl font-semibold">{t("loggedOutHeading")}</h1>

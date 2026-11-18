@@ -1,5 +1,5 @@
 import { Outlet } from "@tanstack/react-router";
-import { useEffect, useRef } from "react";
+import { useRef } from "react";
 import type { SubmitEvent } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -19,8 +19,9 @@ async function submitAfterSessionReset(form: HTMLFormElement): Promise<void> {
 export function AppShell() {
   const { t } = useTranslation();
   const logoutStarted = useRef(false);
-  useEffect(() => {
-    // bfcache から戻った画面は ref が true のままなので、ボタンが効かなくなる。
+  // bfcache から戻った画面は ref が true のままなので、ボタンが効かなくなる。
+  // React Compiler が関数を安定させるので、listener は form の表示から破棄まで一度だけ付く。
+  function watchPageShow(): () => void {
     function reopen(event: PageTransitionEvent): void {
       if (event.persisted) {
         logoutStarted.current = false;
@@ -30,7 +31,7 @@ export function AppShell() {
     return () => {
       globalThis.removeEventListener("pageshow", reopen);
     };
-  }, []);
+  }
   function submitLogout(event: SubmitEvent<HTMLFormElement>): void {
     event.preventDefault();
     if (logoutStarted.current) {
@@ -44,7 +45,7 @@ export function AppShell() {
     <div className="min-h-svh bg-background text-foreground">
       <header className="flex items-center justify-between border-b px-6 py-3 sm:px-10">
         <p className="font-semibold">{t("title")}</p>
-        <form method="post" action="/logout" onSubmit={submitLogout}>
+        <form ref={watchPageShow} method="post" action="/logout" onSubmit={submitLogout}>
           {/* ponytail: render 時に Cookie を読む。token はログインとログアウトの全画面遷移でしか入れ替わらないため。 */}
           <input type="hidden" name="_csrf" value={maskedCsrfToken()} />
           <Button type="submit" variant="outline" size="sm">
