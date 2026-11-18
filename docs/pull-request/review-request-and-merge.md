@@ -23,7 +23,7 @@ Ready for reviewにする前に、次を確認する。
 
 1. 必須チェックを含むCIが成功している。
 2. Files changedで、意図しないファイルや、誤った分岐元による余計な差分が含まれていない。
-3. [Pull Requestテンプレート](../../.github/PULL_REQUEST_TEMPLATE.md)のSummary、Evidence、Merge Dangerを書き、Merge Dangerのチェックリストを確認した。
+3. [Pull Requestテンプレート](../../.github/PULL_REQUEST_TEMPLATE.md)のWhy、Summary、Scope、Evidence、Merge Dangerを書き、Merge Dangerのチェックリストを確認した。
 
 Files changedは、レビュアーの立場で差分を読み直すセルフレビューにも使う。
 必須チェックの一覧とマージ条件は[mainブランチの保護設定](../repository/branch-protection.md)を参照する。

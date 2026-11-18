@@ -54,6 +54,7 @@ pstack のプレイブックには、このリポジトリの規約と食い違�
 次の場面では、プレイブックではなくリポジトリの規約に従う。
 
 - **Pull Request の作成**：`opening-a-pr.md` と `multi-phase-plan.md` は Draft にせずに開くよう指示する。このリポジトリでは Draft で作り、`/thermos` を実行して指摘を直し、CI と差分を確かめてから Ready for review にする（[Draftからマージまで](../pull-request/review-request-and-merge.md)）。
+- **Pull Request の本文**：`opening-a-pr.md` の Descriptions は、Why、What changed、Scope、Tradeoffs、Blast Radius、Verification の見出しで書くよう指示する。このリポジトリでは [Pull Requestテンプレート](../../.github/PULL_REQUEST_TEMPLATE.md)の節（Why、Summary、Scope、Evidence、Merge Danger）で書く（[Pull Requestのタイトル、セルフコメント、チェックリスト](../pull-request/pull-request-description.md)）。
 - **rebase した履歴の push**：`babysit.md`、`autopilot-full.md`、`shipping.md` は `git push --force-with-lease` を使う。権限の雛形（`.kiro/kiro-permissions.yaml`）は `git push *--force*` を拒否するため、エージェントは force push をせず、履歴の書き換えが要る場面では止めて利用者に報告する。
 
 ### 4. /thermos
