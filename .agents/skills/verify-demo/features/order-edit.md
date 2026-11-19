@@ -22,16 +22,36 @@
 Preconditions:
 
 - `stack.sh doctor` がすべて OK である。
-- journey が画面で下書きを作る。代表の下書きの注文（`SEED-C01`、`SEED-C02`）を変更しない。
+- journey が `orders.createOrder` で下書きを作る。
+  代表の下書きの注文（`SEED-C01`、`SEED-C02`）を変更しない。
 
-- **保存（`edit-save`）。** `page.getByRole("form", { name: "明細の変更" }).getByLabel("数量").fill("3")` の後、同じフォームの「明細を保存する」を押す。「明細を変更しました。」が見え、明細の表の 1 行目の数量が `3` になる。`sql("select ordered_count from ordering.t_order_line l join ordering.t_order o using (order_id) where o.public_id = '<注文 ID>'")` が `3` を返す。
-- **競合と破棄（`edit-conflict-discard`）。** `const other = await context.newPage()` で同じ詳細を開き、`other` で数量 `2` を保存する。元のタブで数量 `3` を保存すると「ほかの操作で注文が更新されました。上に最新の内容を表示しています。」と 2 つの選択肢が見える。`step("conflict")` の後に「変更を捨てて最新を表示する」を押すと、数量の欄が `2` になる。続けて `4` を保存できる。
-- **競合と適用し直し（`edit-conflict-reapply`）。** 同じく競合を起こし、「最新の版に変更を適用し直す」を押す。「明細を変更しました。」が見え、表が `3` になる。`other.reload()` の後、`other` の表も `3` になる。
-- **取り消し（`edit-cancel`、`edit-locked`）。** 「取り消す」を押す。「注文を取り消しました。」が見え、状態が「取消済み」になる。`form`「明細の変更」と「確定する」「取り消す」のボタンが 0 件になる。`sql` で `order_status_typ` が `CANCELLED` である。
+`node .kiro/skills/verify-demo/scripts/drive.mjs .kiro/skills/verify-demo/journeys/order-edit.mjs` が、次のすべてを順に実行する。
+
+- **保存（`edit-save`）。**
+  `page.getByRole("form", { name: "明細の変更" }).getByLabel("数量").fill("3")` の後、同じフォームの「明細を保存する」を押す。
+  「明細を変更しました。」が見え、明細の表の 1 行目の数量が `3` になる。
+  `sql("select l.ordered_count from ordering.t_order_line l join ordering.t_order o using (order_id) where o.public_id = :'orderId'", { vars: { orderId } })` が `3` を返す。
+- **競合と破棄（`edit-conflict-discard`）。**
+  `const other = await context.newPage()` で同じ詳細を開き、`other` で数量 `2` を保存する。
+  元のタブで数量 `3` を保存すると、「ほかの操作で注文が更新されました。上に最新の内容を表示しています。」と 2 つの選択肢が見える。
+  `step("conflict")` の後に「変更を捨てて最新を表示する」を押すと、数量の欄が `2` になる。
+  続けて `4` を保存できる。
+- **競合と適用し直し（`edit-conflict-reapply`）。**
+  同じく競合を起こし、「最新の版に変更を適用し直す」を押す。
+  「明細を変更しました。」が見え、表が `3` になる。
+  `other.reload()` の後、`other` の表も `3` になる。
+- **取り消し（`edit-cancel`、`edit-locked`）。**
+  「取り消す」を押す。
+  「注文を取り消しました。」が見え、状態が「取消済み」になる。
+  `form`「明細の変更」と、「確定する」「取り消す」のボタンが 0 件になる。
+  `sql` で `order_status_typ` が `CANCELLED` である。
 
 ## Gotchas
 
-- 競合は、元のタブが作成の直後の版を表示したまま保存したときに起きる。元のタブを読み直すと版が進み、競合にならない。
-- 明細の表の数量は `table` の 2 行目（見出しの行の次）の 3 列目にある（`getByRole("row").nth(1).getByRole("cell").nth(2)`）。
-- `step(label, other)` で、2 つ目のタブの状態も残す。片方のタブの画面だけでは競合の証拠にならない。
-- 取消済みの注文は戻せない。代表の注文を取り消すと、ほかの検証の前提を壊す。
+- 競合は、元のタブが作成の直後の版を表示したまま保存したときに起きる。
+  元のタブを読み直すと版が進み、競合にならない。
+- 明細の表の数量は、`table` の 2 行目（見出しの行の次）の 3 列目にある（`getByRole("row").nth(1).getByRole("cell").nth(2)`）。
+- `step(label, other)` で、2 つ目のタブの状態も残す。
+  片方のタブの画面だけでは競合の証拠にならない。
+- 取消済みの注文は戻せない。
+  代表の注文を取り消すと、ほかの検証の前提を壊す。

@@ -113,55 +113,22 @@ tasks:
     cmds:
       - |
         # compose の backend と Playwright が .env.test を固定で読むため、TEST_ENV_FILE の上書きには対応しない。
-        # export すると Playwright の loadEnv で .env.test.local より優先されるため、SERVER_PORT を読むだけにする。
-        . ./.env.test
         compose() { {{.DOCKER}} compose -f "{{.TEST_COMPOSE_FILE}}" --profile e2e "$@"; }
         keep_env=""
         if [ "${E2E_KEEP_ENV:-}" = "1" ] && [ -z "${CI:-}" ]; then keep_env="1"; fi
         # 前回 E2E_KEEP_ENV=1 で残した環境を破棄し、空の DB から始める。
         compose down --volumes --remove-orphans >/dev/null 2>&1 || true
-        for port in 5173 "$SERVER_PORT"; do
-          rc=0
-          curl --silent --output /dev/null --max-time 2 "http://localhost:${port}/" || rc=$?
-          if [ "$rc" -ne 7 ]; then
-            echo "localhost:${port} は使用中です。開発用の Vite（5173）や Keycloak（${SERVER_PORT}）など、この port を使うプロセスを止めてから実行してください。" >&2
-            exit 1
-          fi
-        done
         # 本体と後片付けの終了コードの扱いは docs/tooling/taskfile.md の「後片付けと終了コード」を参照する。
         status=0
         (
           set -e
-          (cd frontend && vp install --frozen-lockfile && vp exec {{.FE_WEB}} vp build --mode test && vp exec {{.FE_WEB}} playwright install chromium)
-          compose build backend
-          compose up -d --wait postgres redis keycloak wiremock
-          task be-migrate COMPOSE_ENV_FILE=.env.test
-          # spec が読む商品と代表の注文を入れる（ADR-073）。.env.test は test の目印と loopback の DB_HOST を持つ。
-          task be-seed COMPOSE_ENV_FILE=.env.test
-          compose up -d --wait backend
-          # healthcheck はコンテナの中から確かめるため、preview の proxy と同じくホストから届くかを別に確かめる。
-          if ! curl --fail --silent --show-error --max-time 5 "http://localhost:${SERVER_PORT}/actuator/health/readiness" >/dev/null; then
-            echo "ホストから backend（localhost:${SERVER_PORT}）へ接続できません。frontend/apps/web/test-results/backend.log の backend のログを確かめてください。" >&2
-            exit 1
-          fi
+          task e2e-up
           (cd frontend && vp run {{.FE_WEB}} e2e)
         ) || status=$?
         cleanup_status=0
         keep=""
         # 成否にかかわらず backend のログを証拠に残し、秘密の値が入っていれば失敗にする。
-        mkdir -p frontend/apps/web/test-results || cleanup_status=$?
-        compose logs --no-color backend > frontend/apps/web/test-results/backend.log 2>&1 || true
-        for secret in "$OIDC_CLIENT_SECRET" "$E2E_PASSWORD"; do
-          if [ -n "$secret" ] && grep -F -q -- "$secret" frontend/apps/web/test-results/backend.log; then
-            echo "frontend/apps/web/test-results/backend.log に .env.test の OIDC_CLIENT_SECRET か E2E_PASSWORD の値が入っています。ログに出す値を確かめてください。" >&2
-            if [ "$status" -eq 0 ]; then status=1; fi
-          fi
-        done
-        # 値の一致では見つからない、セッションの Cookie の値と JWT の形（eyJ で始まる 3 つの base64url）も失敗にする。
-        if grep -E -q 'APP_SESSION=[^;[:space:]"]+|eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+' frontend/apps/web/test-results/backend.log; then
-          echo "frontend/apps/web/test-results/backend.log に APP_SESSION の Cookie の値か JWT の形の文字列が入っています。ログに出す値を確かめてください。" >&2
-          if [ "$status" -eq 0 ]; then status=1; fi
-        fi
+        task e2e-collect-logs LOG=frontend/apps/web/test-results/backend.log || cleanup_status=$?
         if [ "$status" -ne 0 ]; then
           if [ -n "$keep_env" ] && [ -n "$(compose ps -aq 2>/dev/null)" ]; then keep="1"; fi
         fi
@@ -176,6 +143,62 @@ tasks:
         fi
         if [ "$status" -ne 0 ]; then exit "$status"; fi
         exit "$cleanup_status"
+
+  # task e2e と検証スキル（.agents/skills/verify-demo）が、同じ手順で compose-test を起動する。片付けは呼び出し側が行う。
+  e2e-up:
+    desc: frontendとbackendをビルドし、compose-testの依存とbackendを起動してmigrationと代表データを入れる（片付けない）
+    silent: true
+    deps: [_ensure-test-env]
+    cmds:
+      - |
+        # export すると Playwright の loadEnv で .env.test.local より優先されるため、SERVER_PORT を読むだけにする。
+        . ./.env.test
+        compose() { {{.DOCKER}} compose -f "{{.TEST_COMPOSE_FILE}}" --profile e2e "$@"; }
+        for port in 5173 "$SERVER_PORT"; do
+          rc=0
+          curl --silent --output /dev/null --max-time 2 "http://localhost:${port}/" || rc=$?
+          if [ "$rc" -ne 7 ]; then
+            echo "localhost:${port} は使用中です。開発用の Vite（5173）や Keycloak（${SERVER_PORT}）など、この port を使うプロセスを止めてから実行してください。" >&2
+            exit 1
+          fi
+        done
+        set -e
+        (cd frontend && vp install --frozen-lockfile && vp exec {{.FE_WEB}} vp build --mode test && vp exec {{.FE_WEB}} playwright install chromium)
+        compose build backend
+        compose up -d --wait postgres redis keycloak wiremock
+        task be-migrate COMPOSE_ENV_FILE=.env.test
+        # spec が読む商品と代表の注文を入れる（ADR-073）。.env.test は test の目印と loopback の DB_HOST を持つ。
+        task be-seed COMPOSE_ENV_FILE=.env.test
+        compose up -d --wait backend
+        # healthcheck はコンテナの中から確かめるため、preview の proxy と同じくホストから届くかを別に確かめる。
+        if ! curl --fail --silent --show-error --max-time 5 "http://localhost:${SERVER_PORT}/actuator/health/readiness" >/dev/null; then
+          echo "ホストから backend（localhost:${SERVER_PORT}）へ接続できません。{{.DOCKER}} compose -f {{.TEST_COMPOSE_FILE}} --profile e2e logs backend で backend のログを確かめてください。" >&2
+          exit 1
+        fi
+
+  e2e-collect-logs:
+    desc: compose-testのbackendのログをLOGに書き、秘密の値、セッションのCookieの値、JWTの形の文字列が入っていれば失敗（task e2e-collect-logs LOG=<パス>）
+    silent: true
+    requires:
+      vars: [LOG]
+    cmds:
+      - |
+        . ./.env.test
+        mkdir -p "$(dirname "{{.LOG}}")"
+        {{.DOCKER}} compose -f "{{.TEST_COMPOSE_FILE}}" --profile e2e logs --no-color backend > "{{.LOG}}" 2>&1 || true
+        status=0
+        for secret in "$OIDC_CLIENT_SECRET" "$E2E_PASSWORD"; do
+          if [ -n "$secret" ] && grep -F -q -- "$secret" "{{.LOG}}"; then
+            echo "{{.LOG}} に .env.test の OIDC_CLIENT_SECRET か E2E_PASSWORD の値が入っています。ログに出す値を確かめてください。" >&2
+            status=1
+          fi
+        done
+        # 値の一致では見つからない、セッションの Cookie の値と JWT の形（eyJ で始まる 3 つの base64url）も失敗にする。
+        if grep -E -q 'APP_SESSION=[^;[:space:]"]+|eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+' "{{.LOG}}"; then
+          echo "{{.LOG}} に APP_SESSION の Cookie の値か JWT の形の文字列が入っています。ログに出す値を確かめてください。" >&2
+          status=1
+        fi
+        exit "$status"
 
   # ADR
   adr-check:

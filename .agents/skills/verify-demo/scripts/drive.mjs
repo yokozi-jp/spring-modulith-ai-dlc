@@ -2,7 +2,7 @@
 // 検証スタックに Chromium でログインし、journey を 1 つ実行して証拠を build/verify/runs/<run>/ に残す。
 // 使い方: drive.mjs <journey.mjs> [key=value ...]
 import { execFileSync } from "node:child_process";
-import { appendFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { appendFileSync, mkdirSync, writeFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import { basename, dirname, join, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -11,9 +11,15 @@ const root = execFileSync("git", ["rev-parse", "--show-toplevel"], {
   cwd: dirname(fileURLToPath(import.meta.url)),
   encoding: "utf8",
 }).trim();
-// Playwright はフロントエンドの devDependencies にあるので、そこから解決する。
-const require = createRequire(join(root, "frontend/apps/web/package.json"));
-const { chromium, expect } = require("@playwright/test");
+const web = join(root, "frontend/apps/web");
+// Playwright と E2E の補助は frontend/apps/web にあるので、そこから読む。
+const require = createRequire(join(web, "package.json"));
+const { chromium, expect, request } = require("@playwright/test");
+const e2e = (file) => import(pathToFileURL(join(web, "e2e", file)).href);
+// 資格情報と決済代行の URL は .env.test から e2e/environment.ts が読み、なければ止まる。
+const { signInOnKeycloak } = await e2e("environment.ts");
+const { chargeRequestCount, failChargesFor } = await e2e("payment-gateway.ts");
+const orders = await e2e("orders.ts");
 
 const [journeyArg, ...rest] = process.argv.slice(2);
 if (journeyArg === undefined) {
@@ -21,23 +27,7 @@ if (journeyArg === undefined) {
   process.exit(2);
 }
 const params = Object.fromEntries(rest.map((pair) => pair.split(/=(.*)/su).slice(0, 2)));
-
-// .env.test.local が .env.test より優先する（e2e/environment.ts と同じ）。
-function readEnv() {
-  const env = {};
-  for (const file of [".env.test", ".env.test.local"]) {
-    const path = join(root, file);
-    if (!existsSync(path)) continue;
-    for (const line of readFileSync(path, "utf8").split("\n")) {
-      const match = /^([A-Z0-9_]+)=(.*)$/u.exec(line.trim());
-      if (match) env[match[1]] = match[2].replace(/^"(.*)"$/u, "$1");
-    }
-  }
-  return env;
-}
-const env = readEnv();
 const baseURL = "http://localhost:5173";
-const gatewayURL = env.PAYMENT_GATEWAY_BASE_URL ?? "http://127.0.0.1:8082";
 
 const journeyPath = resolve(journeyArg);
 const name = basename(journeyPath, ".mjs");
@@ -74,64 +64,57 @@ async function step(label, target = page) {
   log("steps.log", `${prefix} ${target.url()}`);
 }
 
-// 決済代行の WireMock の管理 API（e2e/payment-gateway.ts と同じ）。
+// 決済代行の WireMock の管理 API（e2e/payment-gateway.ts）を、この context の request で呼ぶ。
 const gateway = {
-  async chargeCount(orderId) {
-    const response = await context.request.post(`${gatewayURL}/__admin/requests/count`, {
-      data: { method: "POST", url: "/v1/charges", headers: { "Idempotency-Key": { equalTo: orderId } } },
-    });
-    return (await response.json()).count;
-  },
-  async failChargesFor(orderId, response) {
-    const id = crypto.randomUUID();
-    const created = await context.request.post(`${gatewayURL}/__admin/mappings`, {
-      data: { id, priority: 1, request: { method: "POST", url: "/v1/charges", headers: { "Idempotency-Key": { equalTo: orderId } } }, response },
-    });
-    expect(created.status(), "WireMock のスタブの登録").toBe(201);
-    return () => context.request.delete(`${gatewayURL}/__admin/mappings/${id}`);
-  },
+  chargeCount: (orderId) => chargeRequestCount(context.request, orderId),
+  failChargesFor: (orderId, failure) => failChargesFor(context.request, orderId, failure),
 };
 
-// アプリのロール（DML 限定）で、読み取り専用のトランザクションとして SQL を実行する。
-function sql(query) {
-  const out = execFileSync(
-    "docker",
-    ["compose", "-f", "docker/compose-test.yml", "exec", "-T", "postgres", "psql", "-U", "demo", "-d", "demo",
-      "-v", "ON_ERROR_STOP=1", "-qtA", "-c", "SET default_transaction_read_only = on", "-c", query],
-    { cwd: root, encoding: "utf8" },
-  );
-  log("sql.log", `> ${query}\n${out.trim()}`);
-  return out.trim();
+// アプリのロールは業務のスキーマを読めないので、モジュールのロールへ切り替える（ADR-094）。
+// payment_module は payment と ordering、ordering_module は ordering と product を読める。
+const roles = new Set(["payment_module", "ordering_module", "product_module"]);
+// 値は psql の変数で渡し、クエリの中で :'name' と書く。読み取り専用は誤操作の防止で、クエリの中で解除できる。
+function sql(query, { role = "payment_module", vars = {} } = {}) {
+  if (!roles.has(role)) throw new Error(`role は ${[...roles].join("、")} のどれかにする: ${role}`);
+  const args = ["compose", "-f", "docker/compose-test.yml", "exec", "-T", "postgres",
+    "psql", "-U", "demo", "-d", "demo", "-v", "ON_ERROR_STOP=1", "-qtA"];
+  for (const [key, value] of Object.entries(vars)) args.push("-v", `${key}=${value}`);
+  const input = `SET ROLE ${role};\nSET default_transaction_read_only = on;\n${query};\n`;
+  const out = execFileSync("docker", args, { cwd: root, encoding: "utf8", input }).trim();
+  log("sql.log", `> [${role}] ${query} ${JSON.stringify(vars)}\n${out}`);
+  return out;
 }
 
 // 利用者と同じく Keycloak の画面からログインする（e2e/auth.setup.ts と同じ経路）。
 async function login(target = page) {
   await target.goto("/oauth2/authorization/web");
-  await target.getByLabel("Username or email").fill(env.E2E_USERNAME);
-  await target.getByLabel("Password", { exact: true }).fill(env.E2E_PASSWORD);
-  await target.getByRole("button", { name: "Sign In" }).click();
+  await signInOnKeycloak(target);
   await expect(target).toHaveURL(`${baseURL}/`);
 }
 
-const result = { journey: journeyPath, params, startedAt: new Date().toISOString(), status: "passed" };
-let exitCode = 0;
+const result = { journey: journeyPath, params, startedAt: new Date().toISOString(), status: "passed", records: {} };
 try {
   const journey = await import(pathToFileURL(journeyPath).href);
   // ログインそのものを確かめる journey は export const login = false で自分でログインする。
   if (journey.login !== false) await login();
-  await journey.default({ page, context, expect, step, gateway, sql, login, params, record: (k, v) => (result[k] = v) });
+  await journey.default({
+    page, context, expect, step, gateway, sql, login, orders, params,
+    // Cookie を共有しない request の context を作る（例: request.newContext({ baseURL })）。
+    request,
+    record: (key, value) => (result.records[key] = value),
+  });
 } catch (error) {
   result.status = "failed";
   result.error = String(error?.stack ?? error);
-  exitCode = 1;
   await page.screenshot({ path: join(runDir, "failure.png"), fullPage: true }).catch(() => {});
-} finally {
-  result.finishedAt = new Date().toISOString();
-  // trace は Cookie を含む。build/ は Git から除外され、片付けで破棄する環境の Cookie である。
-  await context.tracing.stop({ path: join(runDir, "trace.zip") });
-  await browser.close();
-  writeFileSync(join(runDir, "result.json"), `${JSON.stringify(result, null, 2)}\n`);
 }
+// trace は Cookie を含む。build/ は Git から除外され、片付けで破棄する環境の Cookie である。
+await context.tracing.stop({ path: join(runDir, "trace.zip") }).catch((error) => (result.traceError = String(error)));
+await browser.close().catch(() => {});
+result.finishedAt = new Date().toISOString();
+writeFileSync(join(runDir, "result.json"), `${JSON.stringify(result, null, 2)}\n`);
 console.log(`${result.status}: ${runDir}`);
-if (exitCode !== 0) console.error(result.error);
-process.exit(exitCode);
+if (result.status !== "passed") {
+  console.error(result.error);
+  process.exit(1);
+}

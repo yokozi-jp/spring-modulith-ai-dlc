@@ -1,6 +1,7 @@
+// 検証スキルの drive.mjs が Node から直接 import するため、相対の import に拡張子を付ける。
 import type { APIRequestContext, APIResponse, Locator, Page } from "@playwright/test";
 
-import { expect } from "./fixtures";
+import { expect } from "./fixtures.ts";
 
 // 注文の画面を操作する補助。商品は task e2e のシーダーが入れ、spec は読むだけにする（ADR-073）。
 

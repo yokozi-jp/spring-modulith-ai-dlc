@@ -8,7 +8,7 @@ description: デモアプリケーション（React の SPA と Spring Boot の 
 利用者が触るのは `http://localhost:5173` の SPA である。
 SPA は Vite preview の proxy を通して backend（`/api/**`、`/oauth2/**`、`/logout`）を同一オリジンで呼び、ログインは Keycloak の画面で行う。
 検証は `task e2e` と同じ compose-test の e2e profile を起動したまま残し、Chromium で journey を 1 つずつ実行する。
-E2E の規約の正文は `docs/e2e/testing-strategy.md` にあり、この skill は手順だけを持つ。
+E2E の規約の正文は `docs/e2e/testing-strategy.md` にあり、この skill は検証の手順だけを持つ。
 
 ヘルパーは `.kiro/skills/verify-demo/scripts/` にある。
 コマンドはリポジトリのルートで実行する。
@@ -17,10 +17,10 @@ E2E の規約の正文は `docs/e2e/testing-strategy.md` にあり、この skil
 
 - Java（Corretto 25）、Docker、`task`、`vp` が入っている（`docs/local-env-setup/setup.md`）。
   migration とシーダーはホストの Gradle で動くので、Java がないと起動しない。
-- 開発用の Vite（`task fe-dev`、5173）と開発用の Keycloak（`task compose-up`、8080）を止めてある。
+- 開発用の Vite（`task fe-dev`、5173）と、`.env.test` の `SERVER_PORT`（8080）を使うプロセスを止めてある。
 - `task test`、`task e2e`、`task verify`、pre-push のフックを同時に実行しない。
-  どれも Compose project `spring-modulith-test` と同じ port を使う。
-  並べて 2 つの検証スタックを起動できないので、別の実行のスタックを操作しない。
+  どれも Compose project `spring-modulith-test` と同じ port を使い、worktree が違っても同じ project を共有する。
+  検証スタックは 2 つ並べて起動できないので、別の実行のスタックを操作しない。
 
 ## Launch
 
@@ -28,15 +28,17 @@ E2E の規約の正文は `docs/e2e/testing-strategy.md` にあり、この skil
 .kiro/skills/verify-demo/scripts/stack.sh up
 ```
 
-`task e2e` の手順 2 から 4 と同じことをする。
-frontend の `vp build --mode test`、Chromium の導入、backend のイメージの build、PostgreSQL、Redis、Keycloak、WireMock の起動、`task be-migrate` と `task be-seed`（`.env.test`）、backend の起動である。
+起動の手順は `task e2e-up` に任せ、`task e2e` と同じにする（`docs/e2e/testing-strategy.md` の「実行と後片付け」）。
 その後 Vite preview を自分の process group で起動し、preview の proxy から `/actuator/health/readiness` が 200 を返すまで待つ。
 `検証スタックの準備ができました` が出たら使える。
 初回は build で数分かかる。
 tool call の時間切れに備え、`nohup ... > /tmp/verify-up.log 2>&1 &` で起動してログを待ってよい。
+出力をパイプ（`| tail` など）に渡さない。
+migration とシーダーが残す Gradle の daemon がパイプを開いたままにし、`up` が終わってもパイプの先が戻らない。
 
-起動の前に、残った状態（`build/verify/stack/`）、動いている `spring-modulith-test`、使用中の 5173 と 8080 を見つけたら、理由を出して止まる。
-その場合は自分が残したものなら `stack.sh down` を実行し、ほかの実行のものなら終わるまで待つ。
+残った状態（`build/verify/stack/`）か、動いている `spring-modulith-test` を見つけたら、理由を出して止まる。
+自分が残したものなら `stack.sh down` を実行し、ほかの実行のものなら終わるまで待つ。
+`task e2e-up` が失敗したときも、`stack.sh down` で片付ける。
 
 ## Doctor
 
@@ -45,7 +47,7 @@ tool call の時間切れに備え、`nohup ... > /tmp/verify-up.log 2>&1 &` で
 ```
 
 読み取りだけをする。
-自分の preview が生きていること、SPA の配信、preview の proxy から backend の readiness、Keycloak の issuer、WireMock の管理 API、代表の注文 6 件を確かめる。
+compose-test のコンテナが `up` の記録と同じこと、自分の preview が生きていること、SPA の配信、preview の proxy から backend の readiness、Keycloak の issuer、WireMock の管理 API、代表の注文 6 件を確かめる。
 起動した後に `backend`、`frontend`、`docker`、`openapi` のソースが変わっていれば FAIL にする。
 古いビルドを検証しないよう、そのときは `down` と `up` をやり直す。
 journey の前と、何かがおかしいと感じたときに最初に実行する。
@@ -57,25 +59,36 @@ node .kiro/skills/verify-demo/scripts/drive.mjs .kiro/skills/verify-demo/journey
 ```
 
 `drive.mjs` は Chromium を起動し、Keycloak の画面から `.env.test` の `E2E_USERNAME`（`test-user`）でログインしてから journey を呼ぶ。
-Playwright は `frontend/apps/web` の devDependencies から読むので、追加の導入は要らない。
+Playwright と E2E の補助（`frontend/apps/web/e2e/` の `environment.ts`、`payment-gateway.ts`、`orders.ts`）は、そのまま import する。
 `/collect` は E2E と同じく 202 で返す（compose-test に Collector がない）。
 
 journey は ESM の 1 ファイルで、既定の export の関数が次を受け取る。
 
-| 名前                    | 内容                                                                                                      |
-| ----------------------- | --------------------------------------------------------------------------------------------------------- |
-| `page`、`context`       | ログイン済みの Playwright の page と context（`baseURL` は `http://localhost:5173`）                      |
-| `expect`                | `@playwright/test` の `expect`                                                                            |
-| `step(label, page?)`    | その時点の screenshot と ARIA snapshot を `NN-<label>.png`、`NN-<label>.aria.yml` に残す                  |
-| `sql(query)`            | アプリのロールで読み取り専用の SQL を実行し、結果の文字列を返す（`sql.log` にも残す）                     |
-| `gateway.chargeCount`   | 決済代行の WireMock が、注文 ID を冪等性キーにした請求を受けた回数                                        |
-| `gateway.failChargesFor` | 注文 ID の請求だけに WireMock の応答（`{ status: 503 }` など）を足し、取り除く関数を返す                 |
-| `login(page?)`          | Keycloak の画面からログインする。`export const login = false` の journey は自動のログインを省く            |
-| `params`、`record(k,v)` | コマンドラインの `key=value`、`result.json` に証拠の値を足す                                              |
+- **`page`、`context`**：ログイン済みの Playwright の page と context（`baseURL` は `http://localhost:5173`）
+- **`expect`**：`@playwright/test` の `expect`
+- **`request`**：`@playwright/test` の `request`（`request.newContext({ baseURL })` で Cookie を共有しない要求を作る）
+- **`step(label, page?)`**：その時点の screenshot と ARIA snapshot を `NN-<label>.png`、`NN-<label>.aria.yml` に残す
+- **`orders`**：`e2e/orders.ts`（`onSaleProduct`、`uniqueCode`、`createOrder`、`expectPaymentText`、`listPayments`）
+- **`gateway.chargeCount`**：決済代行の WireMock が、注文 ID を冪等性キーにした請求を受けた回数（`e2e/payment-gateway.ts`）
+- **`gateway.failChargesFor`**：注文 ID の請求だけを `{ kind: "status" | "delay" | "declined" }` で失敗させ、取り除く関数を返す
+- **`sql(query, options?)`**：モジュールのロールで SQL を実行し、結果の文字列を返す（`sql.log` にも残す）
+- **`login(page?)`**：Keycloak の画面からログインする。`export const login = false` の journey は自動のログインを省く
+- **`params`、`record(k, v)`**：コマンドラインの `key=value`、`result.json` の `records` に証拠の値を足す
 
-操作の手順と handle は `features/` の各ファイルにある。
-既存の journey がない機能は、`features/` の手順で `journeys/<機能>.mjs` を書いてから実行する。
-要素は role と accessible name で探し、待ちは web-first assertion に任せる（`docs/e2e/testing-strategy.md` の「書き方」）。
+`sql` の `options` は `{ role, vars }` である。
+
+- `role` の既定は `payment_module` で、`payment` と `ordering` を読める。
+  `product` を読むときは `ordering_module` にする。
+  アプリのロール `demo` は業務のスキーマを読めない（ADR-094）。
+- 値は `vars` で渡し、クエリの中で `:'name'` と書く（例：`sql("select ... where public_id = :'orderId'", { vars: { orderId } })`）。
+  クエリの文字列に値を埋め込まない。
+- 読み取り専用のトランザクションにするのは誤操作の防止で、クエリの中で解除できる。
+  更新の SQL を書かない。
+
+操作の手順と handle は `features/` の各ファイルにあり、各ファイルの手順を実行する journey が `journeys/` にある。
+変更に合わせて journey の確かめる内容を足すときは、`features/` の手順も同じ変更で直す。
+journey がない機能を足すときは、`features/` に手順を書いてから `journeys/<機能>.mjs` を書く。
+要素の探し方と待ち方は `docs/e2e/testing-strategy.md` の「書き方」に従う。
 
 ## Evidence
 
@@ -83,16 +96,22 @@ journey は ESM の 1 ファイルで、既定の export の関数が次を受�
 
 - `NN-<label>.png` と `NN-<label>.aria.yml`：各操作の後の画面と構造
 - `steps.log`、`network.log`（`/api/**` の method、path、status）、`console.log`、`sql.log`
-- `trace.zip`：`cd frontend/apps/web && vp exec playwright show-trace <絶対パス>` で開く。Cookie を含むので外へ出さない
-- `result.json`：`passed` か `failed`、例外、`record` で足した値。失敗時は `failure.png` も残る
+- `trace.zip`：`cd frontend/apps/web && vp exec playwright show-trace <絶対パス>` で開く。
+  Cookie を含むので外へ出さない。
+- `result.json`：`passed` か `failed`、例外、`records`。
+  失敗時は `failure.png` も残る。
 
 証明の基準は次のとおり。
 
-- 画面の操作で行う。`page.request` で API を直接呼ぶのは、前提の読み取り（商品の一覧など）と副作用の確認だけにする。
-- 操作の前と後の状態を `step` で残す。最後の画面だけを証拠にしない。
-- 画面の表示に加えて副作用を確かめる。行は `sql`、決済代行への請求は `gateway.chargeCount`、backend のログは片付けで残るファイルで見る。
-- 偽物は決済代行の WireMock だけにする。本番でも外部システムとの境界なので、ほかを偽らない。
-- 失敗した journey を通すために手順を弱めない。前提が足りないときは失敗として報告し、理由を該当する `features/` の `Gotchas` に書く。
+- 画面の操作で行う。
+  `page.request` で API を直接呼ぶのは、前提の読み取り（商品の一覧など）と副作用の確認だけにする。
+- 操作の前と後の状態を `step` で残す。
+  最後の画面だけを証拠にしない。
+- 画面の表示に加えて副作用を確かめる。
+  行は `sql`、決済代行への請求は `gateway.chargeCount`、backend のログは片付けで残るファイルで見る。
+- 偽物は、E2E と同じく決済代行の WireMock だけにする（`docs/e2e/testing-strategy.md` の「外部システムの偽物」）。
+- 失敗した journey を通すために手順を弱めない。
+  前提が足りないときは失敗として報告し、理由を該当する `features/` の `Gotchas` に書く。
 
 ## Cleanup
 
@@ -100,10 +119,20 @@ journey は ESM の 1 ファイルで、既定の export の関数が次を受�
 .kiro/skills/verify-demo/scripts/stack.sh down
 ```
 
-backend と preview のログを `build/verify/logs/` に書いてから、自分が起動した preview の process group を止め、compose-test を `down --volumes --remove-orphans` で消す。
-`build/verify/stack/` がなければ何も止めない（ほかの実行の compose-test を止めないため）。
+preview のログを `build/verify/logs/` に写し、自分が起動した preview の process group だけを止める。
+PID の記録が今の起動のものでなければ、止めない。
+compose-test のコンテナが `up` の記録と同じときだけ、`task e2e-collect-logs` で backend のログを `build/verify/logs/` に書いてから `down --volumes --remove-orphans` で消す。
+記録と違えば、ほかの実行が立て直したものとみなして止めず、`build/verify/stack/` だけを消す。
+ログに秘密の値かその形の文字列が入っていれば、片付けた後に失敗を返す。
 `build/verify/runs/` と `build/verify/logs/` の証拠は消さない。
 失敗した試行の後も毎回実行する。
+
+`stack.sh` の片付けを変えたら、検証スタックを止めた状態で次を実行する。
+古い PID の記録と、ほかの実行の compose-test を止めないことを確かめる。
+
+```bash
+.kiro/skills/verify-demo/scripts/stack-test.sh
+```
 
 ## 機能の一覧
 
