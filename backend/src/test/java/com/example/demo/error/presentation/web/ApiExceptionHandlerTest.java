@@ -30,6 +30,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
+import org.apache.catalina.connector.ClientAbortException;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -44,7 +45,9 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.http.converter.HttpMessageNotWritableException;
+import org.springframework.http.server.ServletServerHttpRequest;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.security.access.AccessDeniedException;
@@ -415,5 +418,28 @@ class ApiExceptionHandlerTest {
     final String log = output.getAll();
     assertTrue(log.contains("Unhandled API exception"), () -> "event 名が残ること: " + log);
     assertTrue(log.contains("ERROR"), () -> "ERROR で出ること: " + log);
+  }
+
+  @Test
+  @DisplayName("ブラウザの切断で Tomcat が投げる ClientAbortException は、原因に包まれていても ERROR にしない")
+  void wrappedClientAbortIsNotLoggedAsError(final CapturedOutput output) throws Exception {
+    // Tomcat は ClientAbortException を投げる前に応答を中断済み（コミット済み）にする。
+    final MockHttpServletResponse servletResponse = new MockHttpServletResponse();
+    servletResponse.setCommitted(true);
+    final HttpMessageNotReadableException exception =
+        new HttpMessageNotReadableException(
+            "I/O error while reading input message",
+            new ClientAbortException(new IOException("Connection reset by peer")),
+            new ServletServerHttpRequest(new MockHttpServletRequest()));
+
+    final ResponseEntity<Object> response =
+        handler()
+            .handleException(
+                exception, new ServletWebRequest(new MockHttpServletRequest(), servletResponse));
+
+    assertNull(response, "切断なら本文を書かないこと");
+    final String handlerLog = handlerLog(output.getAll());
+    assertFalse(handlerLog.contains("ERROR"), () -> "ERROR がないこと: " + handlerLog);
+    assertFalse(handlerLog.contains("API client error"), () -> "失敗として記録しないこと: " + handlerLog);
   }
 }
