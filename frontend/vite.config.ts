@@ -116,7 +116,6 @@ export default defineConfig({
       { name: "react-rules", specifier: "./lint/react-rules.js" },
     ],
     rules: {
-      // automatic JSX runtime、Vite設定、TanStack Routerの規約と両立しない規則。
       "react/react-in-jsx-scope": "off",
       "react/forbid-component-props": "off",
       "react/jsx-filename-extension": ["error", { extensions: [".jsx", ".tsx"] }],
@@ -128,24 +127,18 @@ export default defineConfig({
       "import/exports-last": "off",
       "import/group-exports": "off",
       "import/no-unassigned-import": ["error", { allow: ["**/*.css"] }],
-      // modern TypeScriptとReactで一般的な構文を一律禁止するrestriction規則。
       "oxc/no-async-await": "off",
       "oxc/no-optional-chaining": "off",
       "oxc/no-rest-spread-properties": "off",
-      // event handler で reject しない Promise を捨てる `void` 文と、`x === undefined` の比較は許す。
       "no-void": ["error", { allowAsStatement: true }],
       "no-undefined": "off",
       "typescript/explicit-function-return-type": "off",
       "typescript/explicit-module-boundary-types": "off",
       "typescript/prefer-readonly-parameter-types": "off",
       "typescript/promise-function-async": "off",
-      // Oxfmtや型推論と役割が重複するか、可読性を下げる一律のstyle規則。
       "capitalized-comments": "off",
-      // 名前付きの関数は関数宣言にそろえる。型注釈付きのアロー関数は理由付きで行単位に許す。
       "func-style": ["error", "declaration"],
-      // react-i18next の慣用名である翻訳関数 t だけを短い識別子として許可する。
       "id-length": ["error", { exceptions: ["t"] }],
-      // apps/web/vite.config.ts の define が置き換えるビルド時の定数だけを、ほかの識別子と衝突しない名前として許す（ADR-068）。
       "no-underscore-dangle": ["error", { allow: ["__TELEMETRY_ENABLED__", "__TELEMETRY_APP__"] }],
       "max-lines-per-function": "off",
       "no-duplicate-imports": ["error", { allowSeparateTypeImports: true }],
@@ -154,7 +147,6 @@ export default defineConfig({
       "one-var": "off",
       "sort-imports": "off",
       "sort-keys": "off",
-      // Vitestの標準APIと競合するか、相互に矛盾するtest style規則。
       "vitest/no-conditional-in-test": "off",
       "vitest/no-hooks": "off",
       "vitest/no-importing-vitest-globals": "off",
@@ -211,8 +203,6 @@ export default defineConfig({
       },
       {
         files: ["lint/**"],
-        // lint/** は tsconfig の対象外で、型の誤りは報告されないため、未定義の識別子を no-undef で止める。
-        // 型を使う rule（no-unsafe-return など）は JSDoc の型で動くので、JSDoc の型の注釈は消さない。
         env: { node: true },
         rules: {
           "no-undef": "error",

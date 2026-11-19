@@ -30,7 +30,7 @@ Gitフックの中でDockerを使う検査は、`docker info`が失敗するロ�
 ## バックエンド
 
 - **`task be-lint`**：Spotless、PMD、SpotBugsでmainとtestを検査する。
-  Spotlessは`ratchetFrom 'origin/main'`で、mainから変えたファイルを全体で検査する。変えていない既存の行の書式も違反になるので、`task be-format`の出力をその変更に含める。
+  Spotlessは`ratchetFrom 'origin/main'`で、mainから変えたファイルを全体で検査する。変えていない既存の行の書式も違反になる。
 - **`task lint-session-sql`**：`backend/src/main/java`のJavaと`backend/src/main/resources/db`のSQLとYAMLから、接続を多重化するプロキシ（PgBouncerのトランザクションモード、RDS Proxy）の後ろで壊れる、セッションに状態を残すSQLを検出し、あれば失敗する。
   対象は、[PgBouncerの機能の表](https://www.pgbouncer.org/features.html)でTransaction poolingがNeverの機能のうち、セッションのadvisory lock（`pg_advisory_lock`、`pg_try_advisory_lock`、`pg_advisory_unlock`、`pg_advisory_unlock_all`と`_shared`の版）、`LISTEN`、`WITH HOLD`のカーソル、`PREPARE`と`DEALLOCATE`の文、`ON COMMIT PRESERVE ROWS`と`ON COMMIT DELETE ROWS`の一時表、`LOAD`である。
   大文字と小文字を区別せず、Javadoc、行コメント、YAMLとSQLのコメントの行は除く。
@@ -125,7 +125,7 @@ PITのHTMLとXMLのレポートは、変異対象がある場合に`backend/buil
 - **`task scan-dast`**：隔離した依存を起動してマイグレーションを適用し、backend、`vp preview`を起動して、OWASP ZAPで認証付きのpassive scanを実行して片付ける。
 - **`task scan-dast-active`**：同じ環境でactive scanを実行する。
 - **`task lint-actions`**：GitHub Actionsワークフローをactionlintで検査する。
-- **`task lint-actions-security`**：GitHub Actionsのワークフローとcomposite action（`.github/actions/`）をzizmorで検査する。zizmorは`mise.toml`の版で動き、Dockerを使わない。`zizmor.yml`の`zizmor-action`の`version`にも同じ版を書く。設定は`.github/zizmor.yml`である。
+- **`task lint-actions-security`**：GitHub Actionsのワークフローとcomposite action（`.github/actions/`）をzizmorで検査する。zizmorは`mise.toml`の版で動き、Dockerを使わない。設定は`.github/zizmor.yml`である。
 - **`task docker-available`**：`docker info`が成功すれば0を、失敗すればスキップの理由を出して0以外を返す。Gitフックの中でDockerを使うジョブが、スキップするかを決めるために呼ぶ。
 - **`task lint-docker`**：Dockerfileをhadolintで検査する。
 - **`task lint-docker-check`**：Dockerfileを`docker build --check`で検査する。
@@ -162,7 +162,6 @@ PITのHTMLとXMLのレポートは、変異対象がある場合に`backend/buil
   あわせて、setup-miseを使うworkflowの`paths:`に`mise.toml`、`mise.lock`、`.github/actions/setup-mise/**`があることと、`mise.lock`を通さずに道具を入れるaction（`ci-gate-check.py`の`BANNED_USES`）を使っていないことを検査する（[ADR-090](../adr/ADR-090-pin-cli-tools-with-mise-lock.md)）。
   `tooling/ci-gate-check/test.sh`と、PRの変更を判定する`tooling/ci-changes/test.sh`を先に実行してから、`ci-gate-check.py`が実際の`.github/workflows/`を検査する。
   `changes`ジョブは`tooling/ci-changes/changed.sh`にglobを渡して判定する。globは`paths:`と同じ書き方で、`ci.yml`の変更でも`true`になる。
-  `ci.yml`にジョブを足したときは`CI gate`の`needs`にも足し、`ci.yml`から呼ばない`pull_request`の workflow は`tooling/ci-gate-check/excluded.tsv`に理由を書く。
   失敗にする状態は`test.sh`のケースが正で、この文書には写さない。
   Python 3とPyYAMLが要る（GitHubのランナーには入っている。ローカルでは`sudo apt install python3-yaml`）。CIだけで実行し、Lefthookには入れない。
 - **`task mise-lock-check`**：`mise.toml`の全ての道具の版が`mise.lock`に載っていることを、`mise install --locked --dry-run`で検査する（[ADR-090](../adr/ADR-090-pin-cli-tools-with-mise-lock.md)）。
@@ -240,16 +239,13 @@ Gitフックの条件とコマンドは[`lefthook.yml`](../../lefthook.yml)を�
 ブランチがglobに当たるファイルを変えていなくても、`lefthook run <フック> --job <job> --file <globに当たるパス> --force`で一つのjobだけを実行できる。
 変更前の設定と比べるときは、`LEFTHOOK_CONFIG=<別のlefthook.yml>`を付けて同じコマンドを実行する。
 Lefthookは版の表示、skipの行、`EXECUTE`の行を省き、jobの出力と要約を出す（`output`）。
-成功したjobの出力も残すのは、`adr-check`の注意喚起が成功の扱いで出るためである。
 すべてを出すときは、`LEFTHOOK_OUTPUT`に`meta,summary,success,failure,execution,execution_out,execution_info,skips`を渡す。
 pre-pushのjobは順番に実行し、失敗した時点で止める。
 バックエンドイメージのビルドはpre-pushでは実行せず、Docker CI（`hadolint.yml`）の`backend-image`がPull Requestごとに実行する。
-pre-pushの「変更」は、push済みかどうかやrebaseの有無によらず、`origin/main`とのmerge-baseからの差分で判定する。
-分岐後にmainへ入った変更では、触っていない領域の検査は走らない。
+pre-pushの「変更」は、`origin/main`とのmerge-baseからの差分で判定する。
 2回目以降のpushでも、ブランチ全体の変更に対して検査が走る。
-一度backendを変えたブランチでは、以降docsだけを直してpushしてもbackendの検査が毎回走る。
-直前のpushからの差分だけを見る方式は、rebase後にmainの変更を含んでしまうため採らず、この重複を受け入れる。
 `origin/main`が無くmerge-baseを取れないときは、全ファイルを対象にして全検査を走らせる。
+判定の理由は`lefthook.yml`の`files`のコメントにある。
 
 ## CI対応
 
@@ -279,7 +275,7 @@ pre-pushの「変更」は、push済みかどうかやrebaseの有無によら�
 - **`dast.yml`**：PRで`scan-dast`、週1回のscheduleと手動実行で`scan-dast-active`を実行し、Informationalを除いたSARIFをCode Scanningに送る。
 - **`actionlint.yml`**：`lint-actions`相当を実行する。
 - **`ci.yml`**：`pull_request`で動く検査を呼び出し、集約ジョブ`CI gate`が全ジョブの`success`を確かめる。`ci-gate-check`も実行する（[ADR-087](../adr/ADR-087-gate-required-checks-with-single-aggregate-job.md)）。
-- **`zizmor.yml`**：`lint-actions-security`相当を実行する。`zizmor-action`の`version`は`mise.toml`のzizmorと同じ版にする。
+- **`zizmor.yml`**：`lint-actions-security`相当を実行する。
 - **`hadolint.yml`**：`lint-docker`相当、`lint-docker-check`相当、バックエンドイメージのビルドと起動確認を実行する。
 - **`compose-config.yml`**：`lint-compose`相当を実行する。
 - **`otel-collector.yml`**：`otel-collector-check`を実行する。

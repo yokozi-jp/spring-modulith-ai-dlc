@@ -18,6 +18,7 @@ Proposed
 ## Context
 
 > 書き直し：React Doctor を外したため（[ADR-098](ADR-098-remove-react-doctor-over-license-restriction.md)）、Decision から React Doctor の記述を除いた。
+> 書き直し：規約文書 `lint-config.md` から理由を除くため（Issue #532）、個別の例外の理由を Decision の 1 つの一覧に集めた。
 
 Frontend は Vite+ をツールチェーンの単一入口とし、Node.js は Vite+ が管理する。
 これまで Node.js の版はプロジェクトに明示されておらず、Vite+ はローカルで LTS を選び、Frontend CI は `actions/setup-node` にメジャー版 `22` だけを渡していた。
@@ -48,8 +49,8 @@ Oxlint の `correctness`、`suspicious`、`pedantic`、`perf`、`style`、`restr
 `typeAware` と `typeCheck` は維持する。
 
 カテゴリ全体を維持したうえで、次のものに限って個別規則を無効化または調整する。
-相互に矛盾する規則（named/default export の強制など）、automatic JSX runtime で不要な規則、Vite の default export や TanStack Router の named export や CSS の副作用 import、React の `className` と props spread、modern な async / optional chaining / rest、Vitest の hook や import に関する標準構文、Oxfmt や型推論と役割が重複する整形系規則である。
-加えて、正しい書き方が通らない規則と、表記や export の形に関わる規則を次のように調整する。
+相互に矛盾する規則（named/default export の強制など）、automatic JSX runtime で不要な規則、Vite の default export や TanStack Router の named export や CSS の副作用 import、React の `className` と props spread、modern な async / optional chaining / rest、Vitest の hook や import に関する標準構文、Oxfmt や型推論と役割が重複するか可読性を下げる規則である。
+加えて、次の規則を調整する。
 
 - `no-void` を `allowAsStatement: true` にする。
   event handler から呼ぶ Promise を捨てる書き方が、`void`、async handler、`.catch` を含めてすべて違反になるためである。
@@ -59,8 +60,27 @@ Oxlint の `correctness`、`suspicious`、`pedantic`、`perf`、`style`、`restr
   有効なままだと型名と比べる形しか通らないためであり、上書きと shadowing は有効なままの `no-global-assign` と `no-shadow-restricted-names` が防ぐ。
 - `better-tailwindcss/enforce-canonical-classes` を有効にし、class の表記を正規形にそろえる。
   `enforce-shorthand-classes` は役割が重なるため有効にしない。
-- `packages/ui/**` では、Oxlint の `react/only-export-components` を無効にする。
-  shadcn の生成物は `buttonVariants` のような variant を component と同じファイルから export するためであり、生成物を手で分けずに registry から更新できる形を保つ。
+- `func-style` は関数宣言にそろえる。
+  関数の型注釈から引数を推論させる必要があるアロー関数だけを、理由付きの行単位の抑制で許す。
+  `allowTypeAnnotation` は型注釈付きの関数式も許し、宣言にそろえる意味が薄れるため使わない。
+- `react/jsx-filename-extension` は、既定が `.jsx` だけを許すため、`.tsx` も許可する。
+- `id-length` は、react-i18next の翻訳関数の慣用名である `t` だけを例外にする。
+- `no-underscore-dangle` は、`apps/web/vite.config.ts` の `define` が置き換える `__TELEMETRY_ENABLED__` と `__TELEMETRY_APP__` だけを許可する。
+  ほかの識別子と衝突しない名前にするためである（[ADR-068](ADR-068-collect-browser-telemetry-with-faro-via-collector.md)）。
+- `no-duplicate-imports` は、型の import を値の import と分けて書けるように `allowSeparateTypeImports` を有効にする。
+- `vitest/no-restricted-vi-methods` は restriction カテゴリで有効だが、option を指定しないと何も禁止しないため、`mock`、`doMock`、`waitFor`、`waitUntil` を指定する。
+  module mock はテストを実装の詳細に依存させる。
+  `vi.waitFor` と `vi.waitUntil` は既定の上限の 1 秒を一括で変えられず、負荷の高いマシンで失敗する。
+- `lint/**` では、型安全の規則（`typescript/no-unsafe-assignment`、`no-unsafe-call`、`no-unsafe-member-access`）と `import/no-nodejs-modules`、`new-cap` を無効にする。
+  Node 側の Lint ツールであり、Oxlint の JS plugin API に型がないためである。
+  `lint/**` は tsconfig の対象外で、未定義の識別子が報告されないため、Node の global を許した `no-undef` を有効にする。
+  型を使う規則（`typescript/no-unsafe-return` など）は JSDoc の型で動くため、JSDoc の型の注釈は消さない。
+- `packages/ui/**` では、`shadcn/no-restyle`、`shadcn/no-arbitrary-values`、`shadcn/require-static-classes` を無効にする。
+  shadcn の生成物の書き方に合わせ、生成物を手で直さずに registry から更新できる形を保つためである。
+- `packages/ui/**` と `apps/*/src/routes/**` では、`react/only-export-components` を無効にする。
+  shadcn の生成物は `buttonVariants` のような variant を component と同じファイルから export し、TanStack Router の route file は `Route` を export するためである。
+- テストファイルでは、`react/jsx-no-literals` と `import/max-dependencies` を無効にする。
+  テストの固定文言は catalog に通さずに書け、import の数は検証対象に合わせて増えてテスト自身の責務の大きさを表さないためである。
 
 `radix`、`no-new-wrappers`、`typescript/consistent-type-definitions`、`import/no-relative-parent-imports` はカテゴリ指定ですでに有効なので、個別に列挙しない。
 
@@ -74,7 +94,7 @@ feature 間の import は、動的な規則が要るため jsPlugin の `feature
 
 ファイル単位で Lint を無効化したり、カテゴリ全体を警告へ戻したりしない。
 範囲を限定する調整は、Node 側 Lint ツール（`lint/**`）、共有層（`src/{api,components,lib,i18n}/**`）、feature（`src/features/**`）、shadcn 由来コンポーネント（`src/components/ui/**`）、API client（`src/api/**`）、ルートモジュール（`src/routes/**`）、テストファイルと `src/testing/**` の override で行う。
-例外と調整の一覧、ファイルの範囲ごとに効く制限、Lint を通る書き方は `docs/frontend/lint-config.md` に理由とともに書く。
+例外と調整の一覧、ファイルの範囲ごとに効く制限、Lint を通る書き方は `docs/frontend/lint-config.md` に規則だけを書き、理由はこの ADR に書く。
 
 ## Consequences
 
