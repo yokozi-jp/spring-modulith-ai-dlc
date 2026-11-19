@@ -97,4 +97,4 @@
 - [ADR-094: トランザクションの初めにモジュールの DB ロールへ切り替え、アプリロールを業務のスキーマから外す](ADR-094-switch-to-module-database-roles.md)（Proposed, 2026-11-18）
 - [ADR-095: 依存関係の脆弱性検査に OWASP dep-scan を Trivy と並べて加える](ADR-095-scan-dependencies-with-dep-scan-alongside-trivy.md)（Proposed, 2026-11-19）
 - [ADR-096: 共通カラムの作成者と更新者には、AppUserPrincipal の利用者の ID だけを登録する](ADR-096-require-app-user-principal-for-audit-columns.md)（Proposed, 2026-11-18）
-- [ADR-097: Trivy を使い続け、本体の版を trivy.yml で明示して固定する](ADR-097-keep-trivy-and-pin-its-version.md)（Proposed, 2026-11-19）
+- [ADR-097: Trivy を使い続け、CI の Trivy 本体の版を明示して Taskfile にそろえる](ADR-097-keep-trivy-and-align-its-version.md)（Proposed, 2026-11-19）
