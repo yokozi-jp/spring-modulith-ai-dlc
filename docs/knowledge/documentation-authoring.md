@@ -132,7 +132,7 @@ iwe 0.29.2には警告を抑える設定がない。
 これらの操作はリンクを追従して複数文書を書き換えるためである。
 
 `iwe normalize`は`docs/`の全文書を機械的に書き換えるため、PreToolUseフック`block-iwe-normalize`で通常実行を拒否する。
-hookの定義`.kiro/hooks/block-iwe-normalize.json`はKiroのCLI、IDE、Webが読み、判定本体の`.kiro/hooks/block-iwe-normalize.sh`がCLI経路とMCP経路を検出して`exit 2`を返す。
+hookの定義`.kiro/hooks/block-iwe-normalize.json`はKiroのCLIとIDEがリポジトリから読み、Webはアップロードした写しを読み、判定本体の`.kiro/hooks/block-iwe-normalize.sh`がCLI経路とMCP経路を検出して`exit 2`を返す。
 
 意図して`iwe normalize`を実行する場合は、先に`docs/`をコミットする。
 その後、環境変数`IWE_ALLOW_NORMALIZE=1`を設定してKiroを再起動する。

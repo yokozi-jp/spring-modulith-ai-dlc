@@ -196,8 +196,6 @@ iwe は手順 7 の `mise install --locked` で導入済みです。
 
 `iwe`（CLI）、`iwes`（LSP サーバー）、`iwec`（MCP サーバー）の 3 コマンドが入ります。
 
-Kiro Web はリポジトリの `.kiro/settings/mcp.json` を読まないので、[Kiro Web の開発環境](kiro-web.md)を読んで Agent Config を設定します。
-
 `docs/` は OKF v0.2 バンドルとして初期化済みで、その設定 `docs/.iwe/` はリポジトリにコミットされています。
 クローンした時点で使える状態なので、`iwe init` を実行する必要はありません。
 
@@ -209,7 +207,8 @@ Kiro Web はリポジトリの `.kiro/settings/mcp.json` を読まないので�
 - **エディタ連携（LSP）**: 手順 11 の推奨拡張に含まれる `iwe.iwe` 拡張が、mise の shims から `iwes` を LSP サーバーとして利用します。
   定義ジャンプ、バックリンク、リンク補完などが markdown で使えます（詳細は [VS Code 向けドキュメント](https://iwe.md/docs/editors/vscode/)）。
 - **AI エージェント連携（MCP）**: MCP サーバー `iwec` の設定は `.kiro/settings/mcp.json` にコミット済みです（`docs/local-env-setup/iwe-mcp.sh` が作業ディレクトリを `docs/` に固定して起動）。
-  Kiro を再起動すれば利用できます。
+  Kiro を再起動すれば利用できます（CLI と IDE の場合）。
+  Kiro Web は `.kiro/settings/mcp.json` を読まないので、[Kiro Web の開発環境](kiro-web.md)で Agent Config を設定します。
 
 ### 11. VSCode 拡張機能のインストール
 
