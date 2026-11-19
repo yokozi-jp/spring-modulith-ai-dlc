@@ -8,6 +8,9 @@ cd "$ROOT"
 STATE=build/verify/stack
 WEB=frontend/apps/web
 APP_PATHS=(backend frontend docker openapi)
+SLOT_SH=tooling/test-slot/test-slot.sh
+# Compose project と各ポートは、up が取った slot（$STATE/slot）から決める。TEST_SLOT があれば acquire は新しく取らずに値だけを返す。
+load_slot() { eval "$(TEST_SLOT="$(cat "$STATE/slot")" bash "$SLOT_SH" acquire .env.test web 2>/dev/null)"; }
 compose() { docker compose -f docker/compose-test.yml --profile e2e "$@"; }
 
 # 起動した時点からアプリのソースが変わったかを見る指紋。Git の管理外のファイルは中身も含める。
@@ -65,14 +68,18 @@ up() {
     echo "前回の検証スタックの状態（$STATE）が残っています。先に stack.sh down を実行してください。" >&2
     exit 1
   fi
-  if [ -n "$(containers)" ]; then
-    echo "Compose project spring-modulith-test が動いています。task test、task e2e、ほかの検証の実行中なら終わるまで待ち、自分が残したものなら stack.sh down を実行してください。" >&2
-    exit 1
-  fi
 
+  # slot の env ファイルは .env.test の写しなので、task e2e-up より前に必要になる。
+  [ -f .env.test ] || cp .env.test.example .env.test
   mkdir -p "$STATE"
   fingerprint > "$STATE/fingerprint"
   cat /proc/sys/kernel/random/boot_id > "$STATE/boot-id"
+  # 空きの slot を取る。空きがなければ待ち、待っている間は slot を持つ worktree を出す。
+  # 取った slot の Compose project は、この起動のものとして up の記録より後に作られる。
+  local slot_env
+  slot_env="$(bash "$SLOT_SH" acquire .env.test web)" || { rm -rf "$STATE"; exit 1; }
+  eval "$slot_env"
+  echo "$TEST_SLOT" > "$STATE/slot"
   # 起動の手順は task e2e と共有する。失敗しても、作りかけのコンテナを down が自分のものと分かるよう記録する。
   local status=0
   task e2e-up || status=$?
@@ -83,12 +90,12 @@ up() {
   fi
 
   # setsid の中の sh が process group の先頭なので、その $$ を記録する。
-  (cd "$WEB" && PIDFILE="$ROOT/$STATE/preview.pid" setsid sh -c 'echo $$ > "$PIDFILE"; exec vp preview --mode test --port 5173 --strictPort' > "$ROOT/$STATE/preview.log" 2>&1 < /dev/null &)
+  (cd "$WEB" && PIDFILE="$ROOT/$STATE/preview.pid" setsid sh -c 'echo $$ > "$PIDFILE"; exec vp preview --mode test --port "$E2E_WEB_PORT" --strictPort' > "$ROOT/$STATE/preview.log" 2>&1 < /dev/null &)
   for _ in $(seq 1 10); do [ -s "$STATE/preview.pid" ] && break; sleep 0.5; done
   start_time "$(cat "$STATE/preview.pid")" > "$STATE/preview.start"
   for _ in $(seq 1 60); do
-    if curl --fail --silent --max-time 2 http://localhost:5173/actuator/health/readiness >/dev/null; then
-      echo "検証スタックの準備ができました: http://localhost:5173"
+    if curl --fail --silent --max-time 2 "http://localhost:$E2E_WEB_PORT/actuator/health/readiness" >/dev/null; then
+      echo "検証スタックの準備ができました（slot $TEST_SLOT）: http://localhost:$E2E_WEB_PORT"
       return 0
     fi
     sleep 1
@@ -97,13 +104,13 @@ up() {
   exit 1
 }
 
-serves_spa() { curl --fail --silent --max-time 3 http://localhost:5173/ | grep -q "<title>デモアプリケーション</title>"; }
-backend_ready() { curl --fail --silent --max-time 3 http://localhost:5173/actuator/health/readiness; }
+serves_spa() { curl --fail --silent --max-time 3 "http://localhost:$E2E_WEB_PORT/" | grep -q "<title>デモアプリケーション</title>"; }
+backend_ready() { curl --fail --silent --max-time 3 "http://localhost:$E2E_WEB_PORT/actuator/health/readiness"; }
 keycloak_issuer() {
-  curl --fail --silent --max-time 3 http://127.0.0.1:8081/realms/spring-modulith/.well-known/openid-configuration \
-    | grep -q '"issuer":"http://127.0.0.1:8081/realms/spring-modulith"'
+  curl --fail --silent --max-time 3 "http://127.0.0.1:$TEST_KEYCLOAK_PORT/realms/spring-modulith/.well-known/openid-configuration" \
+    | grep -q "\"issuer\":\"http://127.0.0.1:$TEST_KEYCLOAK_PORT/realms/spring-modulith\""
 }
-wiremock_admin() { curl --fail --silent --max-time 3 http://127.0.0.1:8082/__admin/mappings; }
+wiremock_admin() { curl --fail --silent --max-time 3 "http://127.0.0.1:$TEST_WIREMOCK_PORT/__admin/mappings"; }
 # アプリのロールは業務のスキーマを読めないので、モジュールのロールへ切り替える（ADR-094）。
 seeded_orders() {
   printf '%s\n' "SET ROLE ordering_module;" "select count(*) from ordering.t_order where customer_order_code like 'SEED-C0%';" \
@@ -122,12 +129,17 @@ doctor() {
     echo "FAIL このスクリプトが起動したスタックの状態がない（$STATE）。stack.sh up を実行する" >&2
     exit 1
   fi
+  if [ ! -s "$STATE/slot" ]; then
+    echo "FAIL $STATE に slot の記録がない。stack.sh down の後に up をやり直す" >&2
+    exit 1
+  fi
+  load_slot
   check "compose-test のコンテナが up の記録と同じ" containers_ours
   check "自分が起動した Vite preview が生きている" preview_ours
-  check "preview が SPA を配信する（localhost:5173）" serves_spa
+  check "preview が SPA を配信する（localhost:$E2E_WEB_PORT）" serves_spa
   check "preview の proxy から backend が ready" backend_ready
-  check "Keycloak の issuer が http://127.0.0.1:8081/realms/spring-modulith" keycloak_issuer
-  check "決済代行の WireMock の管理 API が応答する（127.0.0.1:8082）" wiremock_admin
+  check "Keycloak の issuer が http://127.0.0.1:$TEST_KEYCLOAK_PORT/realms/spring-modulith" keycloak_issuer
+  check "決済代行の WireMock の管理 API が応答する（127.0.0.1:$TEST_WIREMOCK_PORT）" wiremock_admin
   check "代表の注文（SEED-C01 から SEED-C06）が入っている" seeded_orders
   check "起動後に ${APP_PATHS[*]} が変わっていない（変わったら down と up をやり直す）" source_unchanged
   if [ "$failed" -ne 0 ]; then
@@ -142,6 +154,13 @@ down() {
     echo "$STATE がないため、このスクリプトが起動したスタックはありません。ほかの実行の compose-test は止めません。" >&2
     exit 0
   fi
+  # slot を取る前に打ち切られた起動には、止める preview も片付けるコンテナもない。
+  if [ ! -s "$STATE/slot" ]; then
+    echo "$STATE に slot の記録がありません（slot を取る前に打ち切られた起動）。$STATE だけを消します。" >&2
+    rm -rf "$STATE"
+    exit 0
+  fi
+  load_slot
   local status=0 stamp
   stamp="$(date -u +%Y%m%dT%H%M%SZ)"
   mkdir -p build/verify/logs
@@ -149,13 +168,13 @@ down() {
 
   if preview_ours; then
     kill -- "-$(cat "$STATE/preview.pid")"
-    for _ in $(seq 1 20); do port_free 5173 && break; sleep 0.5; done
-    if ! port_free 5173; then
-      echo "自分が起動した preview の process group（$(cat "$STATE/preview.pid")）を止めても 5173 が応答します。$STATE を残すので、ss -ltnp で持ち主を確かめてください。" >&2
+    for _ in $(seq 1 20); do port_free "$E2E_WEB_PORT" && break; sleep 0.5; done
+    if ! port_free "$E2E_WEB_PORT"; then
+      echo "自分が起動した preview の process group（$(cat "$STATE/preview.pid")）を止めても $E2E_WEB_PORT が応答します。$STATE を残すので、ss -ltnp で持ち主を確かめてください。" >&2
       exit 1
     fi
-  elif ! port_free 5173; then
-    echo "自分が起動した preview は動いていませんが、5173 を別のプロセスが使っています。止めずに続けます。" >&2
+  elif ! port_free "$E2E_WEB_PORT"; then
+    echo "自分が起動した preview は動いていませんが、$E2E_WEB_PORT を別のプロセスが使っています。止めずに続けます。" >&2
   fi
 
   if containers_ours || { [ ! -s "$STATE/containers" ] && containers_created_since_up; }; then

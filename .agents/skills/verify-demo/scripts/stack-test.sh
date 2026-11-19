@@ -1,19 +1,20 @@
 #!/usr/bin/env bash
 # stack.sh down が、自分の起動でない preview と compose-test を止めず、打ち切られた起動の残りは片付けることを確かめる。
-# 検証スタックを動かしていないときに実行する。使い方: stack-test.sh
+# 検証スタックを動かしていないときに実行する。slot 3 の Compose project を使うので、slot 3 が使用中なら実行しない。使い方: stack-test.sh
 set -euo pipefail
 
 ROOT="$(git -C "$(dirname "$0")" rev-parse --show-toplevel)"
 cd "$ROOT"
 STATE=build/verify/stack
 STACK="$(dirname "$0")/stack.sh"
-compose() { docker compose -f docker/compose-test.yml "$@"; }
+TEST_SLOT_UNDER_TEST=3
+compose() { COMPOSE_PROJECT_NAME="spring-modulith-test-$TEST_SLOT_UNDER_TEST" docker compose -f docker/compose-test.yml "$@"; }
 if [ -d "$STATE" ]; then
   echo "$STATE があります。検証スタックを stack.sh down で片付けてから実行してください。" >&2
   exit 1
 fi
 if [ -n "$(compose ps -aq 2>/dev/null)" ]; then
-  echo "Compose project spring-modulith-test が動いています。ほかの実行が終わってから実行してください。" >&2
+  echo "Compose project spring-modulith-test-$TEST_SLOT_UNDER_TEST が動いています。ほかの実行が終わってから実行してください。" >&2
   exit 1
 fi
 
@@ -36,6 +37,7 @@ stale_state() {
   echo "$1" > "$STATE/boot-id"
   echo "$2" > "$STATE/preview.start"
   echo "not-a-container-of-this-run" > "$STATE/containers"
+  echo "$TEST_SLOT_UNDER_TEST" > "$STATE/slot"
 }
 
 run_down() { "$STACK" down > /tmp/stack-test-down.log 2>&1; }
@@ -58,6 +60,12 @@ assert "起動時刻の違う PID の記録では、その番号の process grou
 stale_state "$boot" "$start"
 assert "vp preview でない PID の記録で down が成功する" run_down
 assert "vp preview でない process group を止めない" alive
+
+# slot を取る前に打ち切られた起動には slot の記録がなく、片付けるものもない。
+stale_state "$boot" "1"
+rm "$STATE/slot"
+assert "slot の記録がなくても down が成功する" run_down
+assert "slot の記録がなければ状態のディレクトリだけを消す" no_state
 
 # ほかの実行が立て直した compose-test は、記録と違うので消さない。
 compose up -d --wait redis > /dev/null 2>&1
