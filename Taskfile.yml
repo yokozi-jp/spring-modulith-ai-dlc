@@ -1042,6 +1042,14 @@ tasks:
         schema-property-example|components.schemas.SampleOrderRequest.properties.customerId
         schema-property-example|components.schemas.SampleOrderRequest.properties.quantity
         error-response-problem-detail|paths./api/sample-orders/{sampleOrderId}.get.responses[404]
+        error-response-problem-detail|paths./api/sample-orders/{sampleOrderId}.get.responses.4XX
+        path-kebab-case|paths./api/sample_items
+        path-kebab-case-resource|paths./api/sample_items
+        path-kebab-case-resource|paths./api/sampleTags
+        no-top-level-array-response|paths./api/sample_items.get.responses[200].content.application/json.schema
+        created-location-header|paths./api/sample-orders.post.responses[201]
+        query-parameter-get-only|paths./api/sample-notes.post.parameters[0].in
+        query-parameter-get-only|paths./api/sample-orders/{code}.delete.parameters[1].in
         problem-response-content|components.responses.NotFoundProblem.content
         common-problem-detail-schema|components.schemas
         bad-request-validation-problem|components.responses.BadRequestProblem.content.application/problem+json.schema.$ref

@@ -155,10 +155,10 @@ rules:
         notMatch: "-controller$"
 
   error-response-problem-detail:
-    description: 4xx と 5xx の応答は共通の Problem response か ProblemDetail か ValidationProblem の schema を参照する。
+    description: 4xx と 5xx（4XX と 5XX を含む）の応答は共通の Problem response か ProblemDetail か ValidationProblem の schema を参照する。
     severity: error
     resolved: false
-    given: "$.paths[*][get,put,post,delete,options,head,patch,trace].responses[?(@property.match(/^[45][0-9][0-9]$/))]"
+    given: "$.paths[*][get,put,post,delete,options,head,patch,trace].responses[?(@property.match(/^[45]([0-9][0-9]|XX)$/))]"
     then:
       function: schema
       functionOptions:
@@ -181,6 +181,63 @@ rules:
                           properties:
                             $ref:
                               pattern: "^#/components/schemas/(ProblemDetail|ValidationProblem)$"
+
+  # ponytail: 区間は kebab-case かパスパラメータ。パスパラメータの名前は英字で始まる英数字に限る（camelCase を許す）。
+  path-kebab-case:
+    description: パスの各区間を kebab-case かパスパラメータにする。カスタムメソッドの camelCase は末尾に限る（docs/web-api/api-style.md）。
+    severity: error
+    given: "$.paths[*]~"
+    then:
+      function: pattern
+      functionOptions:
+        match: '^(/([a-z0-9]+(-[a-z0-9]+)*|\{[A-Za-z][A-Za-z0-9]*\}))*/([a-z0-9]+(-[a-z0-9]+)*|\{[A-Za-z][A-Za-z0-9]*\}|[a-z][a-zA-Z0-9]*)$'
+
+  # ponytail: カスタムメソッドは POST だけのパスと見なす。GET、PUT、PATCH、DELETE を持つパスは末尾もリソース名にする。
+  path-kebab-case-resource:
+    description: GET、PUT、PATCH、DELETE を持つパスは末尾も kebab-case かパスパラメータにする。
+    severity: error
+    given: "$.paths[?(@.get || @.put || @.patch || @.delete)]~"
+    then:
+      function: pattern
+      functionOptions:
+        match: '^(/([a-z0-9]+(-[a-z0-9]+)*|\{[A-Za-z][A-Za-z0-9]*\}))+$'
+
+  # ponytail: type が文字列 array の schema だけを見る。type に配列を使う 3.1 の書き方は対象外。
+  no-top-level-array-response:
+    description: 2xx の JSON の応答は配列をトップレベルにしない。オブジェクトで包む（docs/web-api/response-body.md）。
+    severity: error
+    given: "$.paths[*][get,put,post,delete,options,head,patch,trace].responses[?(@property.match(/^2([0-9][0-9]|XX)$/))].content[?(@property.match(/json/))].schema"
+    then:
+      function: schema
+      functionOptions:
+        schema:
+          not:
+            required: [type]
+            properties:
+              type:
+                const: array
+
+  # ponytail: ヘッダー名の大文字と小文字を区別する。springdoc は @Header(name = "Location") の表記をそのまま出す。
+  created-location-header:
+    description: 201 は Location ヘッダーを持つ。
+    severity: error
+    given: "$.paths[*][get,put,post,delete,options,head,patch,trace].responses[201]"
+    then:
+      field: headers.Location
+      function: truthy
+
+  # ponytail: operation 直下の parameters だけを見る。パス直下の parameters は対象外。
+  query-parameter-get-only:
+    description: in query は GET と HEAD だけで使う。POST、PUT、PATCH は禁じ、DELETE は楽観ロックの lockNo だけ許す（docs/web-api/query-parameters.md）。
+    severity: error
+    given:
+      - "$.paths[*][post,put,patch].parameters[?(@.in === 'query')]"
+      - "$.paths[*].delete.parameters[?(@.in === 'query' && @.name !== 'lockNo')]"
+    then:
+      field: in
+      function: pattern
+      functionOptions:
+        notMatch: "^query$"
 
   problem-response-content:
     description: 共通の Problem response は application/problem+json で ProblemDetail か ValidationProblem を返す。

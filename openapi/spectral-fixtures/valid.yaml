@@ -26,6 +26,12 @@ paths:
       responses:
         "201":
           description: サンプル注文を受け付けた
+          headers:
+            Location:
+              description: 受け付けたサンプル注文の URI
+              schema:
+                type: string
+                format: uri-reference
         "400":
           $ref: "#/components/responses/BadRequestProblem"
         "401":
@@ -78,6 +84,51 @@ paths:
                 $ref: "#/components/schemas/ProblemDetail"
         "500":
           $ref: "#/components/responses/InternalServerErrorProblem"
+    delete:
+      tags:
+        - sample-order
+      summary: サンプル注文を取り消す。
+      description: サンプル注文を取り消す。<p>取り消し済みなら何もしない。
+      operationId: cancelSampleOrder
+      parameters:
+        - name: sampleOrderId
+          in: path
+          description: サンプル注文の ID
+          required: true
+          schema:
+            type: string
+            format: uuid
+        # query-parameter-get-only は DELETE の lockNo を許す
+        - name: lockNo
+          in: query
+          description: 楽観ロックのバージョン番号
+          schema:
+            type: integer
+            format: int64
+      responses:
+        "204":
+          description: サンプル注文を取り消した
+  # path-kebab-case はカスタムメソッドの camelCase を末尾に許す
+  /api/sample-orders/{sampleOrderId}/markShipped:
+    post:
+      tags:
+        - sample-order
+      summary: サンプル注文を出荷済みにする。
+      description: サンプル注文を出荷済みにする。<p>出荷済みなら何もしない。
+      operationId: markSampleOrderShipped
+      parameters:
+        - name: sampleOrderId
+          in: path
+          description: サンプル注文の ID
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "204":
+          description: サンプル注文を出荷済みにした
+        "4XX":
+          $ref: "#/components/responses/BadRequestProblem"
 components:
   schemas:
     ProblemDetail:
