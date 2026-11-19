@@ -439,7 +439,7 @@ pre-pushの「変更」は、push済みかどうかやrebaseの有無によら�
 - **`betterleaks.yml`**：`scan-secrets-all`を実行する。PRでは`BETTERLEAKS_LOG_OPTS`にbaseからheadまでの範囲を渡す。
 - **`static-analysis.yml`**：`lint-semgrep`相当、`lint-duplicates`、`lint-taskfile`、`lint-lefthook`、`agent-git-test`、`lefthook-install-test`、`lint-scratch-git`を実行する。
   Code ScanningはSARIFの`suppressions`を読まないため、`nosemgrep`で抑止した検出をSARIFから除いてから送る。
-- **`trivy.yml`**：`scan-vulns`相当を実行する。
+- **`trivy.yml`**：`scan-vulns`相当を実行する。Trivy本体の版は`SCAN_TRIVY_VERSION`で明示し、Taskfileの`aquasec/trivy`の版とそろえる（[ADR-097](../adr/ADR-097-keep-trivy-and-align-its-version.md)）。
 - **`depscan.yml`**：`scan-depscan-backend`と`scan-depscan-frontend`を実行し、レポートをartifactにする。SARIFを出さないのでCode Scanningには送らない。
 - **`dast.yml`**：PRで`scan-dast`、週1回のscheduleと手動実行で`scan-dast-active`を実行し、Informationalを除いたSARIFをCode Scanningに送る。
 - **`actionlint.yml`**：`lint-actions`相当を実行する。
