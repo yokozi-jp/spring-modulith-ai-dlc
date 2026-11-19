@@ -1,11 +1,11 @@
 ---
 type: ADR
-title: 'ADR-090: Task、betterleaks、iwe、Java の版を mise.toml と mise.lock に固定し、ローカルと CI で同じ lock から入れる'
-description: Task、betterleaks、iwe、Java の版を mise.toml に書き、ローカルと CI が mise.lock の版と checksum から入れ、PATH を mise の shims で通す判断。版を固定する CLI ツールを足すとき、mise の設定や CI での入れ方を変えるときに読む。
+title: 'ADR-090: Task、betterleaks、iwe、Java、zizmor、Kiro CLI の版を mise.toml と mise.lock に固定し、ローカルと CI で同じ lock から入れる'
+description: Task、betterleaks、iwe、Java、zizmor、Kiro CLI の版を mise.toml に書き、ローカルと CI が mise.lock の版と checksum から入れ、PATH を mise の shims で通す判断。版を固定する CLI ツールを足すとき、mise の設定や CI での入れ方を変えるときに読む。
 tags: [adr, tooling, mise, ci, security]
 ---
 
-# ADR-090: Task、betterleaks、iwe、Java の版を mise.toml と mise.lock に固定し、ローカルと CI で同じ lock から入れる
+# ADR-090: Task、betterleaks、iwe、Java、zizmor、Kiro CLI の版を mise.toml と mise.lock に固定し、ローカルと CI で同じ lock から入れる
 
 ## Status
 
@@ -34,6 +34,7 @@ Proposed の間に Decision を書き直した。
 最初の案は CI の各 step に `jdx/mise-action` と mise の版を書いていたので、Task の版の複製が mise の版の複製に移っただけだった。
 このため、CI の設定を composite action へまとめた。
 lock の強制を `mise.toml` の `[settings] locked = true` へ移す案も試したが、`[tools]` のほかを書いた `mise.toml` は新しいチェックアウトごとに `mise trust` を求め、新しい worktree で shims と Git フックが止まったので採らなかった（選択肢5）。
+Kiro CLI を足した後は `mise.toml` が trust を要するので、この理由は残らない。選択肢5を採らない理由は、グローバルの mise の設定に道具を持つ開発者がグローバルの lock も要る点だけになる。
 
 zizmor も Proposed の間に足した。
 版が Taskfile の `docker run`（1.29.0）と `zizmor-action`（版の指定なし）でずれ、[#424](https://github.com/yokozi-jp/spring-modulith-ai-dlc/pull/424) では CI の 1.32.0 だけが `self-repository` の alert を出した。
@@ -48,7 +49,9 @@ Kiro CLI も Proposed の間に足した。
 `03-setup-kiro.sh` は公式のインストーラー（`https://cli.kiro.dev/install`）を実行するので、版が開発者ごと、実行ごとに変わっていた。
 mise の registry に Kiro CLI はなく（`mise registry` に `kiro` を含む行はない）、mise の http backend で公式の zip を取る。
 この backend の `url` と `bin_path` は、`mise.toml` に trust を要させる。
-そのため、最初の案にあった「`mise.toml` は trust を要さない」を取り下げた（選択肢6）。
+そのため、最初の案にあった「`mise.toml` は trust を要さない」を取り下げた。
+これにより、選択肢5を退けた理由のうち trust の費用は、この案でも払うことになった（選択肢5）。
+trust を避けて Kiro CLI を固定する案は選択肢7、trust の範囲を広げる案は選択肢6で退けた。
 
 ## Decision
 
@@ -56,7 +59,8 @@ mise の registry に Kiro CLI はなく（`mise registry` に `kiro` を含む�
 - npm backend の iwe について mise が作る `.mise/locks/npm-iwe-org-iwe/<版>/`（依存の integrity を持つ lockfile）も commit する。
 - Kiro CLI は `[tools."http:kiro-cli"]` に公式の zip の URL（`https://prod.download.cli.kiro.dev/stable/<版>/kirocli-x86_64-linux.zip`）と `bin_path` を書く。各版の sha256 は公式の `https://prod.download.cli.kiro.dev/stable/index.json` にあり、`checksum_url` と `checksum_expr` で読んで `mise.lock` に記録する。PGP 署名（`<zip>.asc`）は検証しない。信頼の根拠は `index.json` の sha256 と、記録後の `mise.lock` である。
 - `mise.toml` に書くのは `[tools]` だけにする。タスク（Task の役割）、環境変数、設定、Node.js と pnpm（Vite+ の役割）は書かない。
-- `http:kiro-cli` の option は `mise trust` を要する。`/home/projects` のような広い範囲を `trusted_config_paths` で信頼せず、チェックアウトごとに内容を確かめて `mise trust` を実行する。手順は `setup.md` と `dev-workflow.md` の worktree の節に書く。
+- `http:kiro-cli` の option（`url`、`bin_path`、`checksum_url` のどれも）は `mise trust` を要する。`/home/projects` のような広い範囲を `trusted_config_paths` で信頼せず、チェックアウトごとに `mise.toml` を読んで `mise trust` を実行する。mise の trust はパスごとで、中身が変わっても取り消されない。手順は `setup.md` と `dev-workflow.md` の worktree の節に書く。
+- Kiro Web の `kiro-web.sh` は、sandbox の `MISE_STATE_DIR` が空なので `mise trust` を実行する。サンドボックスは自分の `kiro-cli` を持つので、`http:kiro-cli` は入れない。
 - `task lint-actions-security` と Lefthook の zizmor のジョブは、Docker の image でなく mise の zizmor を使う。`zizmor.yml` の `zizmor-action` の `version` には `mise.toml` と同じ版を書く。版を書く場所はこの2か所だけである。action の SHA が持つ版の一覧に無い版は動かないので、zizmor を上げるときは SHA も確かめる。
 - ローカルでは apt で入れた mise が `mise install --locked` を実行する。
 - PATH は mise の shims で通す。`04-setup-shell.sh` が `~/.bashrc` に `eval "$(mise activate bash --shims)"` を足す。Taskfile と Lefthook は `betterleaks` と `iwe` をそのまま呼ぶ。
@@ -68,7 +72,7 @@ mise の registry に Kiro CLI はなく（`mise registry` に `kiro` を含む�
 - CI ではキャッシュを使わない。復元したキャッシュは `mise.lock` と照合されないためである。
 - setup-mise を使う workflow は、paths 条件に `mise.toml`、`mise.lock`、`.github/actions/setup-mise/**` も入れる。以前は Task の版を上げると各 workflow 自身が変わって走ったが、今は `mise.toml` と `mise.lock` しか変わらないためである。
 - `task ci-gate-check` が、この paths 条件と、`mise.lock` を通さずに道具を入れる action（`ci-gate-check.py` の `BANNED_USES`）を検査する。
-- 番号付きのセットアップスクリプトのうち `00-setup-task.sh`、`03-setup-kiro.sh`、`01-setup-java.sh`、`05-setup-go-betterleaks.sh`、`06-setup-iwe.sh` と `versions.env` を削除する。
+- 番号付きのセットアップスクリプトのうち `00-setup-task.sh`、`01-setup-java.sh`、`03-setup-kiro.sh`、`05-setup-go-betterleaks.sh`、`06-setup-iwe.sh` と `versions.env` を削除する。
 
 `mise activate` ではなく shims を選んだ理由は、PATH が作業ディレクトリに左右されないことである。
 `mise activate` はプロンプトのたびに、そのときのディレクトリの `mise.toml` に合わせて PATH を書き換える。
@@ -89,9 +93,9 @@ shims は決まったディレクトリなので、受け継いだ PATH のま�
 ### Negative
 
 - `mise.toml` が trust を要するので、clone と新しい worktree のたびに `mise trust` を実行する。忘れると shims が `Config files in … are not trusted` で止まり、`task` を呼ぶ Git フックも止まる。mise のエラーが直し方を示す。CI の `jdx/mise-action` は trust を自動で済ませる。
-- Kiro CLI の zip（3.5.0 は 139,487,134 byte）は、`jdx/mise-action` が引数なしで入れるので、setup-mise を使う CI の job の数だけ増える。使わない job は `tools` で外す。
-- Kiro CLI は `~/.local/bin` に公式のインストーラーが入れたものが残りうる。shims は PATH でそれより前にあるので、`task setup` の後は mise の版が使われる。
-- `kiro-cli update` が mise の install 先の `kiro-cli` に何を書き換えるかは確かめていない。版は `mise.toml` を書き換えて上げ、`update` は使わない。
+- CI は `tools` で名指しした道具だけを入れるので、Kiro CLI（3.5.0 の zip は 139,487,134 byte）を入れない。Kiro CLI を動かす job を足すときは、`tools` に `http:kiro-cli` を書く。
+- 公式のインストーラーが `~/.local/bin` に入れた `kiro-cli` が残ると、Ubuntu のログインシェルでは `~/.profile` が `~/.bashrc` の後に `~/.local/bin` を先頭へ足すので、shims より先に使われる。`setup.md` の手順で消す。
+- Kiro CLI は起動時に自己更新を確かめる（設定 `app.disableAutoupdates` が `kiro-cli settings list` に出る）。自己更新が mise の install 先の `kiro-cli` を書き換えるかは確かめていない。書き換えると、`mise install --locked` は checksum を見直さず、固定が崩れる。`setup.md` に自己更新を止める設定を書いたが、これで止まるかは未確認である。
 - 開発者は mise を入れ、shims を PATH に通す必要がある。shims が PATH にないと `task` が見つからない。
 - `~/.bashrc` に apt の Corretto の `JAVA_HOME` が残る環境では、Gradle が mise の Java でなく apt の Java を使う。これを見つける検査はなく、`docs/local-env-setup/setup.md` の手順で消す。
 - shims は `mise.toml` のあるチェックアウトの中でだけ道具を選べる。
@@ -149,13 +153,19 @@ shims は決まったディレクトリなので、受け継いだ PATH のま�
 
 - **Description**：lock の強制を `mise.toml` に書き、ローカルの shims にも CI にも lock に無い版を拒ませる。
 - **Pros**：ローカルでも lock に無い版が入らない。CI の `MISE_LOCKED=1` も要らない。
-- **Cons**：`[tools]` のほかを書いた `mise.toml` は、チェックアウトごとに `mise trust` を要する。新しい worktree では trust する前に shims が `Config files in … are not trusted` で止まり、`task` を呼ぶ Git フックも止まる。CI の `jdx/mise-action` は trust を自動で済ませる。`http:kiro-cli` を足したあとは、この Cons が `mise.toml` の trust にも当てはまる。グローバルの mise の設定に道具を持つ開発者は、グローバルの lock も要るようになる。
+- **Cons**：`[tools]` のほかを書いた `mise.toml` は、チェックアウトごとに `mise trust` を要する。新しい worktree では trust する前に shims が `Config files in … are not trusted` で止まり、`task` を呼ぶ Git フックも止まる。CI の `jdx/mise-action` は trust を自動で済ませる。Kiro CLI を足した後は、trust の費用はどの案でも払うので、この案を採らない理由はグローバルの lock の費用だけになる。グローバルの mise の設定に道具を持つ開発者は、グローバルの lock も要るようになる。
 
 ### 選択肢6: `/home/projects` を `trusted_config_paths` に入れる
 
 - **Description**：`04-setup-shell.sh` が mise のグローバル設定に `/home/projects` を足し、その下の `mise.toml` をすべて信頼する。
 - **Pros**：新しい worktree でも `mise trust` が要らない。
 - **Cons**：同じディレクトリの別のリポジトリや取り込んだ第三者のコードの `mise.toml` も、確かめずに信頼する。`mise.toml` は URL やタスクを書けるので、信頼の範囲は最小にする。
+
+### 選択肢7: trust を避けるため、Kiro CLI を `mise.toml` に書かない
+
+- **Description**：`03-setup-kiro.sh` を残し、版を決めた zip を取って `index.json` の sha256 と照合する。または #389 の Renovate か mise の registry への追加を待つ。
+- **Pros**：`mise.toml` が trust を要さず、`mise-trust-check` と新しい worktree の手順が変わらない。
+- **Cons**：版と checksum の置き場所がまた分かれ、`mise.lock` に記録されない。Kiro CLI だけ `mise install --locked` の外に残り、一本化できない。
 
 ## References
 

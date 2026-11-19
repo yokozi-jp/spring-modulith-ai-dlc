@@ -91,7 +91,7 @@
 - [ADR-087: 必須チェックを集約ジョブ CI gate を中心にまとめる](ADR-087-gate-required-checks-with-single-aggregate-job.md)（Accepted, 2026-11-17）
 - [ADR-088: フロントエンドで useEffect を禁止し、Oxlint で止める](ADR-088-ban-react-effects-in-frontend.md)（Accepted, 2026-11-17）
 - [ADR-089: 主キーをモジュールのスキーマと Repository の中に閉じ、外に出る値には例外なく public_id を使う](ADR-089-keep-primary-keys-inside-modules-and-expose-public-ids.md)（Proposed, 2026-11-17）
-- [ADR-090: Task、betterleaks、iwe、Java の版を mise.toml と mise.lock に固定し、ローカルと CI で同じ lock から入れる](ADR-090-pin-cli-tools-with-mise-lock.md)（Proposed, 2026-11-18）
+- [ADR-090: Task、betterleaks、iwe、Java、zizmor、Kiro CLI の版を mise.toml と mise.lock に固定し、ローカルと CI で同じ lock から入れる](ADR-090-pin-cli-tools-with-mise-lock.md)（Proposed, 2026-11-18）
 - [ADR-091: エージェントの commit を本物の index の写しから作る](ADR-091-commit-agent-changes-from-a-copy-of-the-index.md)（Proposed, 2026-11-18）
 - [ADR-092: frontend を Vite+ の workspace に分け、共有を packages/ui と packages/api に置く](ADR-092-split-frontend-into-vite-plus-workspace.md)（Accepted, 2026-11-18）
 - [ADR-093: Kiro Web のサンドボックスを開発環境に加え、道具とコンテナを source するスクリプトで揃える](ADR-093-support-kiro-web-sandbox-as-development-environment.md)（Proposed, 2026-11-18）

@@ -149,14 +149,18 @@ task setup
 source ~/.bashrc
 ```
 
-`mise trust` は、この `mise.toml` を読んでよいと mise に伝える。
-`mise.toml` の `http:kiro-cli` が URL を持つので、trust するまで mise は設定を読まない。
-worktree を作ったときも、そこで `mise trust` を実行する。
+`mise trust` は、この `mise.toml` を読んでよいと mise に伝えます。
+`mise.toml` の `http:kiro-cli` が option を持つので、trust するまで mise は設定を読みません。
+trust はパスごとに記録され、中身が変わっても取り消されません。
+実行する前に `mise.toml` を読んで確かめてください。
+worktree を作ったときも、そこで `mise trust` を実行します。
 
 `mise install --locked` は、`mise.toml` の Task、betterleaks、iwe、Java（Amazon Corretto）、zizmor、Kiro CLI を、`mise.lock` と `.mise/locks/` に記録した版と checksum で検証して入れます（[ADR-090](../adr/ADR-090-pin-cli-tools-with-mise-lock.md)）。
 `--locked` を付けると、lock に無い版を入れずに止まります。
 `task setup` は `04-setup-shell.sh` で、mise の shims を PATH の先頭に通す行を `~/.bashrc` に足します。
 `mise.toml` か `mise.lock` が変わったときは、`mise install --locked` だけを実行します。
+Kiro CLI の固定を入れる前から使っているチェックアウトでは、pull の後に一度だけ `mise trust` を実行します。
+実行しないと、shims と、`task` を呼ぶ Git フックが `not trusted` で止まります。
 
 shims は、今いるディレクトリから上にたどって見つけた `mise.toml` の版を選びます。
 そのため `task`、`betterleaks`、`iwe`、`java` は、`mise.toml` のあるチェックアウトの中でだけ動きます。
@@ -165,10 +169,14 @@ VS Code の Java 拡張も、`JAVA_HOME` か PATH の `java` を使います。
 
 #### 公式のインストーラーの Kiro CLI から移るとき
 
-以前は `curl -fsSL https://cli.kiro.dev/install | bash` で `~/.local/bin/kiro-cli` を入れていた。
-shims は `~/.local/bin` より前にあるので、`task setup` の後は mise の版が使われる。
-`type -a kiro-cli` で shims の `kiro-cli` が先に出ることを確かめたら、`~/.local/bin/kiro-cli` は消してよい。
-`kiro-cli update` は使わず、版は `mise.toml` を書き換えて上げる。
+以前は `curl -fsSL https://cli.kiro.dev/install | bash` で `~/.local/bin/kiro-cli` を入れていました。
+Ubuntu の `~/.profile` は `~/.bashrc` の後で `~/.local/bin` を PATH の先頭へ足すので、ログインシェルでは公式のインストーラーの版が shims より先に使われます。
+`~/.local/bin/kiro-cli` を消します（`kiro-cli-chat` があればそれも消します）。
+`type -a kiro-cli` の先頭が mise の shims になることを確かめてください。
+
+Kiro CLI は起動時に自己更新を確かめます。
+`kiro-cli settings app.disableAutoupdates true` で止めます。
+版は `mise.toml` を書き換えて上げます。
 
 #### apt の Corretto から移るとき
 
