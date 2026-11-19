@@ -15,6 +15,7 @@ concurrency:
 permissions:
   contents: read
 
+# Trivy 本体の版は各ステップの version で固定する。Dependabot は追わないので、trivy-action を上げるときに手で見直す（docs/adr/ADR-097）。
 # Trivy の脆弱性 DB は Trivy 公式のミラーレジストリから取得する。
 env:
   TRIVY_DB_REPOSITORY: mirror.gcr.io/aquasec/trivy-db:2
@@ -55,6 +56,7 @@ jobs:
       - name: Run Trivy filesystem scan
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
+          version: v0.70.0
           scan-type: fs
           scan-ref: frontend
           scanners: vuln
@@ -99,6 +101,7 @@ jobs:
       - name: Run Trivy SBOM scan
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
+          version: v0.70.0
           scan-type: sbom
           scan-ref: backend/build/reports/cyclonedx/application.cdx.json
           format: sarif
