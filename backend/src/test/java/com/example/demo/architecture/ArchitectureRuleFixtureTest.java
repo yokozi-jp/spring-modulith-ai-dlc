@@ -546,6 +546,29 @@ class ArchitectureRuleFixtureTest {
             ClassRoleArchTest.commandHandlersDoNotDependOnOtherCommandHandlers,
             "ordering.application.ConfirmOrderCommandHandler"),
         row(
+            "externalSystemCommandHandlersAreCalledOnlyByListeners: 外部システムのインタフェース",
+            ClassRoleArchTest.externalSystemCommandHandlersAreCalledOnlyByListeners,
+            "ordering.application.ChargeOrderCommandHandler"),
+        row(
+            "externalSystemCommandHandlersAreCalledOnlyByListeners: Domain Service を通す",
+            ClassRoleArchTest.externalSystemCommandHandlersAreCalledOnlyByListeners,
+            "ordering.application.SettleOrderCommandHandler"),
+        row(
+            "eventPublisherIsUsedOnlyByCommandHandlers: Controller",
+            ClassRoleArchTest.eventPublisherIsUsedOnlyByCommandHandlersRule(
+                VIOLATING, FIXTURE_MODULES),
+            "ordering.presentation.web.OrderEventController"),
+        row(
+            "eventPublisherIsUsedOnlyByCommandHandlers: ApplicationContext",
+            ClassRoleArchTest.eventPublisherIsUsedOnlyByCommandHandlersRule(
+                VIOLATING, FIXTURE_MODULES),
+            "ordering.application.OrderBeanLookup"),
+        row(
+            "eventPublisherIsUsedOnlyByCommandHandlers: Domain Service",
+            ClassRoleArchTest.eventPublisherIsUsedOnlyByCommandHandlersRule(
+                VIOLATING, FIXTURE_MODULES),
+            "ordering.domain.service.DiscountPolicy"),
+        row(
             "commandHandlersAndListenersDoNotUseInheritance: 役割名でないサブクラス",
             ClassRoleArchTest.commandHandlersAndListenersDoNotUseInheritance,
             "ordering.application.ReopenOrderHandler"),
@@ -835,6 +858,9 @@ class ArchitectureRuleFixtureTest {
         ClassRoleArchTest.commandsAndResultsAreApplicationRecordsRule(basePackage),
         ClassRoleArchTest.commandHandlersDoNotDependOnOtherCommandHandlers,
         ClassRoleArchTest.commandHandlersAndListenersDoNotUseInheritance,
+        ClassRoleArchTest.externalSystemCommandHandlersAreCalledOnlyByListeners,
+        ClassRoleArchTest.eventPublisherIsUsedOnlyByCommandHandlersRule(
+            basePackage, FIXTURE_MODULES),
         ProxyRulesArchTest.pointcutsNarrowTargetsWithWithin,
         ProxyRulesArchTest.aspectsDeclareOrder,
         ProxyRulesArchTest.transactionManagementIsNotRedeclared,

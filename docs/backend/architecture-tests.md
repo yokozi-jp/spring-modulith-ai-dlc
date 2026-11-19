@@ -83,6 +83,12 @@ jOOQの生成物の`com.example.demo.jooq`はOPENのモジュールであり、`
 - `commandHandlersExposeOnlyTransactionalHandle`：`*CommandHandler`のpublicメソッドは、`@Transactional`を付けた`handle`一つだけにし、`*Command`を一つ受け取り`*Result`を返す。
 - `commandsAndResultsAreApplicationRecords`：`*Command`と`*Result`は`application`のrecordにする。
 - `commandHandlersDoNotDependOnOtherCommandHandlers`：`*CommandHandler`は別の`*CommandHandler`に依存しない。
+- `externalSystemCommandHandlersAreCalledOnlyByListeners`：`infrastructure.client`の`*Client`が実装する`domain.model`のインタフェースに、直接か`domain.service`を通して依存する`*CommandHandler`は、`*Listener`からだけ依存される。
+  `domain.service`を通す依存は一段だけたどり、その先は追わない。
+  守らせる規約は[CommandHandler](class-roles/command-handler.md)のアンチパターンに示し、理由は[ADR-050](../adr/ADR-050-define-backend-class-roles-and-naming.md)に示す。
+- `eventPublisherIsUsedOnlyByCommandHandlers`：`ModuleRoles.MODULES`の機能モジュールのクラスのうち、`application`の`*CommandHandler`以外は`ApplicationEventPublisher`に依存しない。
+  `ApplicationContext`と`ConfigurableApplicationContext`は`ApplicationEventPublisher`を継承するため、同じ判定で検出する。
+  `shared`は機能モジュールではないので対象にしない。
 - `commandHandlersAndListenersDoNotUseInheritance`：`*CommandHandler`と`*Listener`は、Java標準の型以外のクラスを継承せず、継承も実装もさせない（[ADR-051](../adr/ADR-051-bind-pgm-cd-with-scoped-value-and-aspect.md)）。
   違反フィクスチャの`ReopenOrderHandler`（サブクラス）、`RestoreOrderCommandHandler`（基底クラスの`OrderHandlerSupport`）、`OrderShippedReceiver`（インタフェースの実装）で確かめる。
 - `moduleListenersAreApplicationListeners`：`@ApplicationModuleListener`を付けたメソッドは、`application`の`*Listener`の`on`にする。
@@ -116,6 +122,12 @@ jOOQの生成物の`com.example.demo.jooq`はOPENのモジュールであり、`
 `ArchitectureRuleFixtureTest`は`ClassFileImporter`でフィクスチャを読み込み、ベースパッケージを引数に取る`<規則名>Rule(basePackage)`のファクトリか、規則のフィールドをそのまま使う。
 
 `sharedModuleIsUsedOnlyByPersistenceAdapters`は、違反フィクスチャの`application`の`OrderAuditColumns`が`shared.infrastructure.persistence`の型を使うことを検出し、規約どおりのフィクスチャの`JooqOrderRepository`を誤検出しないことを確かめる。
+
+`externalSystemCommandHandlersAreCalledOnlyByListeners`は、違反フィクスチャの`ChargeOrderController`が呼ぶ`ChargeOrderCommandHandler`（`PaymentGateway`に直接依存する）と`SettleOrderCommandHandler`（`PaymentChargePolicy`を通して依存する）を検出する。
+規約どおりのフィクスチャでは、`PaymentGateway`に依存する`CapturePaymentCommandHandler`を`OrderPlacedPaymentListener`だけが呼び、規則が通ることを確かめる。
+
+`eventPublisherIsUsedOnlyByCommandHandlers`は、違反フィクスチャの`OrderEventController`（`ApplicationEventPublisher`）、`OrderBeanLookup`（`ApplicationContext`）、`DiscountPolicy`（Domain Service）を検出する。
+規約どおりのフィクスチャでは、`PlaceOrderCommandHandler`が`ApplicationEventPublisher`で発行しても規則が通ることを確かめる。
 
 `queryResultStatusIsNotReadByOtherModules`は、違反フィクスチャの`inventory.application.OrderStatusGuard`が`ordering`の`OrderSummary`の`status()`を呼ぶことと、`paymentStatus`をメソッド参照することを検出する。
 規約どおりのフィクスチャでは、`ordering`の`OrderController`が自モジュールの`OrderSummary::status`を読み、除外する`payment.application.ChargeOrderCommandHandler`が他モジュールの`OrderSummary::status`を読んでも、規則が通ることを確かめる。
