@@ -39,6 +39,10 @@ coverage の下限は、バックエンドが JaCoCo の全体の branch 85%、�
 バックエンドの最小の値は、`OrderLine` と payment の `Money` のテストを足した後の値である。
 同じ日に、エラー応答を直す 2 つの PR（#192、#193）が業務コードとテストを加えている。
 
+最初の Decision では、フロントエンドのファイルごとの下限を `task fe-coverage` の Node のスクリプトが `coverage-summary.json` から検査した。
+Vite+ 0.3.3 の Vitest 4.1 の `perFile` は全体の下限をそのままファイルごとに当てるだけで、ファイルごとに別の値を持てなかったためである。
+Vite+ 1.6.0 の Vitest 5.1.0 は `perFile` に `{ branches: 60, lines: 65 }` の形で値を渡せるので（#290、#463）、検査を `vite.config.ts` へ移すように Decision を書き直した。
+
 ## Decision
 
 PIT を Backend CI から外し、必須チェックにしない `mutation-test.yml` のワークフローで実行する。
@@ -74,8 +78,7 @@ coverage の下限を次の値にする。
 対象から外すのは、これまでどおり生成コードと起動の処理だけとし、低いクラスやファイルを個別に外さない。
 下限を割ったときは、ローカルと CI の `be-test` と `fe-coverage` が失敗する。
 
-フロントエンドの全体の下限は `vite.config.ts` の `thresholds` で、ファイルごとの下限は `task fe-coverage` が `coverage-summary.json` から検査する。
-Vite+ 0.3.3 の Vitest 4.1 の `perFile` は全体の下限をそのままファイルごとに当てるだけで、ファイルごとに別の値を持てないためである。
+フロントエンドの全体の下限は `vite.config.ts` の `thresholds` で、ファイルごとの下限は同じ `thresholds` の `perFile` で検査する。
 
 ## Consequences
 
@@ -96,14 +99,12 @@ Vite+ 0.3.3 の Vitest 4.1 の `perFile` は全体の下限をそのままファ
 - `com.example.demo` の直下のクラスを変えると全テストを使い、PR の実行が全体の実行に近づく。
 - minion が 1 つのため、全体の実行は変異の数に比例して長い。
 - 下限の余裕が小さく、低いクラスやファイルを触る変更で、テストを足す作業が生じることがある。
-- フロントエンドのファイルごとの下限が Vitest の設定でなく Task にあり、下限の置き場所が 2 つに分かれる。
 
 ### Neutral
 
 - PIT のジョブは必須チェックでないため、失敗しても merge を止めない。
   失敗はレビューで確かめる。
 - 下限は実測に合わせた値であり、テストが増えたら上げる。
-- Vitest の `perFile` にファイルごとの値を渡せる版へ上がったら、フロントエンドのファイルごとの下限を `vite.config.ts` へ移す。
 
 ## Alternatives Considered
 

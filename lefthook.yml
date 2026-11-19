@@ -299,7 +299,7 @@ pre-push:
         - "frontend/**"
       run: |
         echo "{files}" >/dev/null
-        task fe-test-build FE_TEST_ARGS="--reporter=dot --coverage.reporter=json-summary"
+        task fe-test-build FE_TEST_ARGS="--reporter=dot --coverage.reporter=none"
       fail_text: "Frontendのテストまたはビルドに失敗しました。task fe-test-buildで再実行してください。"
 
     # backend に変更がある push のときだけ Lint（Spotless + PMD + SpotBugs）

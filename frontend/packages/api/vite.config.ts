@@ -10,10 +10,9 @@ export default defineConfig({
       include: ["src/**/*.ts"],
       // 生成物は Orval が作る。src/testing はテスト用の部品である。
       exclude: ["src/**/*.test.ts", "src/testing/**", "src/generated/**"],
-      // json-summary は task fe-coverage がファイルごとの下限の検査に読む。
-      reporter: ["text", "html", "clover", "json", "json-summary"],
+      reporter: ["text", "html", "clover", "json"],
       // 全体の下限。切り出した時点の実測（branch 93.18%、line 100%）の少し下に置く（ADR-092）。
-      thresholds: { branches: 90, lines: 98 },
+      thresholds: { branches: 90, lines: 98, perFile: { branches: 60, lines: 65 } },
     },
   },
 });
