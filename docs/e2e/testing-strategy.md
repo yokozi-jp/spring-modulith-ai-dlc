@@ -23,6 +23,7 @@ E2E テストは、複数画面にまたがる主要な利用者の流れだけ�
 
 `frontend/apps/web/e2e/` に、ログインや WireMock の初期化を行う `*.setup.ts` とシナリオの `*.spec.ts` を置く。
 `frontend/apps/web/e2e/environment.ts` は、ログイン情報をルートの `.env.test` から読み、`storageState` のパスを決める。
+web の origin（`webOrigin`）と IdP の origin（`idpOrigin`）は、slot が渡す `E2E_WEB_PORT` と `OIDC_ISSUER_URI` から決め、無ければ slot 0 の値を使う。
 Keycloak の画面でログインする手順（`signInOnKeycloak`）も持ち、setup とログアウトの spec が共有する。
 `frontend/apps/web/e2e/payment-gateway.ts` は、決済代行の WireMock の管理 API を呼ぶ補助を持つ。
 注文ごとの失敗のスタブ（`failChargesFor`）と、注文 ID を冪等性キーにした請求の回数（`chargeRequestCount`）である。
@@ -48,7 +49,7 @@ Keycloak の画面でログインする手順（`signInOnKeycloak`）も持ち�
 | retry             | ローカル 0 回、CI 2 回                                                              |
 | trace、screenshot | 失敗時だけ保存する                                                                  |
 | video             | 保存しない                                                                          |
-| `webServer`       | `vp preview --mode test` を `localhost:5173` で起動し、既存の server を再利用しない |
+| `webServer`       | `vp preview --mode test` を `webOrigin` で起動し、既存の server を再利用しない      |
 | `fullyParallel`   | 有効（実行順への依存を早く見つけるため）                                            |
 | workers           | 指定しない（Playwright の既定値）                                                   |
 
@@ -81,9 +82,9 @@ backend を再起動せず、シナリオの途中で注文ごとに応答を切
 
 setup project は、`storageState` を持たない browser context で `/oauth2/authorization/web` を開き、Keycloak の画面で `test-user` としてログインする。
 `/` から始めると、SPA が API の 401 を受けて自分でログインへ遷移し、setup project の遷移と競合する。
-`test-user` は代表データで 2 つのテナントに属するため、戻り先はテナントを選ぶ画面（`http://localhost:5173/tenants`）になる。
+`test-user` は代表データで 2 つのテナントに属するため、戻り先はテナントを選ぶ画面（web の origin の `/tenants`）になる。
 認証の前後で `APP_SESSION` Cookie の値が変わったことで認証済みと判断し、サンプル商事を選ぶ。
-選んだ後に `http://localhost:5173/` へ移り、`APP_SESSION` の値がもう一度変わったことを確かめてから、`frontend/apps/web/e2e/.auth/user.json` に保存する。
+選んだ後に web の origin の `/` へ移り、`APP_SESSION` の値がもう一度変わったことを確かめてから、`frontend/apps/web/e2e/.auth/user.json` に保存する。
 `APP_SESSION` は認証の開始時点で発行されるため、Cookie があることだけを認証の証拠にしない。
 自分でログインする spec も、ログインの後に `environment.ts` の `chooseSeededTenant` でテナントを選ぶ。
 
@@ -117,9 +118,14 @@ retry の回数を増やして隠さない。
 WireMock には profile を付けず、`task test` と共有する。
 backend は compose の network に置き、PostgreSQL、Redis、Keycloak、WireMock へ service 名で接続する。
 compose の `environment` が `.env.test` の接続先を service 名に上書きする。
-Keycloak は hostname v2 で issuer をブラウザと同じ `http://127.0.0.1:8081` に固定し、backend は discovery を `OIDC_DISCOVERY_URI`（`keycloak:8080`）から読む。
+Keycloak は hostname v2 で issuer をブラウザと同じ `http://127.0.0.1:<slot の Keycloak の port>` に固定し、backend は discovery を `OIDC_DISCOVERY_URI`（`keycloak:8080`）から読む。
 backend は discovery の `issuer` が `OIDC_ISSUER_URI` と一致しなければ起動しない（理由は [ADR-057](../adr/ADR-057-adopt-playwright-for-e2e-tests.md)）。
 compose が公開する port は、すべて `127.0.0.1` に限る。
+
+`task e2e` は実行ごとに slot を取り、slot の Compose project（`spring-modulith-test-<n>`）と port で起動する。
+複数の worktree で同時に実行してよく、`task test` とも同時に実行できる。
+slot の割り当て、slot 1 から 3 の port、空きがないときの待ちは、[compose-test の slot](../tooling/test-slots.md) にある。
+slot 0 の port は次のとおりである。
 
 | port | 用途                                                   |
 | ---- | ------------------------------------------------------ |
@@ -130,10 +136,9 @@ compose が公開する port は、すべて `127.0.0.1` に限る。
 | 8081 | Keycloak                                               |
 | 8082 | 決済代行の WireMock（Playwright が管理 API を呼ぶ）    |
 
-- 5173 と 8080 は開発用の Vite と Keycloak と同じ port である。
-  `task e2e` は開始時に両方を確かめ、使用中なら止めるよう示して失敗する。
-  5433、6380、8081、8082 は compose-test だけが使うため、開始時には確かめない。
-- `task test` と同じ Compose project（`spring-modulith-test`）を使うため、同時に実行しない。
+- slot 0 の 5173 と 8080 は、開発用の Vite と Keycloak と同じ port である。
+  slot を取るときに、port が `127.0.0.1` で応答する slot は飛ばす。
+  slot を取った後も、`task e2e-up` が web と backend の port を確かめ、使用中なら止めるよう示して失敗する。
 - 前提の道具は、[開発環境構築](../local-env-setup/setup.md)の手順 7（`mise install --locked` と `task setup`）で入れたものと同じである。
   Chromium は `task e2e` が導入する。
   OS の依存ライブラリは、初回に `frontend/apps/web` で、`sudo` を付けた `vp exec playwright install-deps chromium` を実行して入れる。
@@ -142,15 +147,15 @@ compose が公開する port は、すべて `127.0.0.1` に限る。
 
 `task e2e` は次の順に実行する。
 
-1. 前回残した環境を破棄する。
+1. slot を取り、slot の番号、web、backend、Keycloak、WireMock の URL、Compose project を出す。
 2. `task e2e-up` を実行する。
-   5173 と `.env.test` の `SERVER_PORT`（8080）が空いていることを確かめ、frontend の依存の導入と build、Chromium の導入、backend イメージの build を行う。
+   slot の web と backend の port（slot 0 は 5173 と 8080）が空いていることを確かめ、frontend の依存の導入と build、Chromium の導入、backend イメージの build を行う。
    frontend は `vp build --mode test` で build し、`.env.test` の `FRONTEND_OTEL_ENABLED=true` で Faro を有効にする。
 3. PostgreSQL、Redis、Keycloak、WireMock を起動し、`task be-migrate` で migration を適用し、`task be-seed` で代表データを入れる。
 4. backend を起動し、ホストから readiness を確かめる。
 5. Playwright を実行する。
    Playwright が `webServer` で Vite preview を起動し、終了時に止める。
-6. 成否にかかわらず、`task e2e-collect-logs` で backend のログを `frontend/apps/web/test-results/backend.log` に書き、コンテナと volume を削除する。
+6. 成否にかかわらず、`task e2e-collect-logs` で backend のログを `frontend/apps/web/test-results/backend.log` に書き、slot の project のコンテナと volume を削除して slot を返す。
    ログに `.env.test` の `OIDC_CLIENT_SECRET` か `E2E_PASSWORD` の値が入っていれば、テストが成功していても失敗にする。
    値の一致で見つからない秘密として、`APP_SESSION=` に続く Cookie の値と、`eyJ` で始まる 3 つの base64url をつないだ JWT の形の文字列も失敗にする。
 
@@ -171,11 +176,12 @@ build、コンテナの起動、後片付けは行わない。
 - `task e2e` は `TEST_ENV_FILE` の上書きに対応せず、`.env.test` を固定で読む。
   compose の backend と Playwright が `.env.test` を固定で読むためである。
 - ローカルで `E2E_KEEP_ENV=1 task e2e` を実行して失敗したときだけ、コンテナと volume を残す。
-  残したときは、backend のログ、`vp run --filter @frontend/web e2e` での再実行、片付けのコマンドを表示する。
-  片付けは `docker compose -f docker/compose-test.yml --profile e2e down --volumes --remove-orphans` で行う。
+  残したときは、slot の番号と Compose project、backend のログ、`vp run --filter @frontend/web e2e` での再実行、片付けのコマンドを表示する。
+  残した環境は、表示した `down` のコマンドで片付けるまで slot を持つ。
 - `CI` が空でなければ、`E2E_KEEP_ENV` にかかわらず片付ける。
-- Ctrl-C で中断すると、後片付けが走らないことがある。
-  次の `task e2e` が開始時に破棄するが、すぐに片付けるときは上の `down` のコマンドを実行する。
+- Ctrl-C で中断すると、後片付けが走らず、コンテナが slot を持ったまま残ることがある。
+  次の `task e2e` は残った環境を消さず、別の slot を取る。
+  片付け方は [compose-test の slot](../tooling/test-slots.md#中断した実行が残した-slot) にある。
 
 ## 失敗の調べ方
 
@@ -183,7 +189,7 @@ build、コンテナの起動、後片付けは行わない。
 - `frontend/apps/web/test-results/` の trace を、`frontend/apps/web` で `vp exec playwright show-trace <trace.zip>` を実行して開く。
 - `task e2e` は成否にかかわらず backend のログを `frontend/apps/web/test-results/backend.log` に書く。
   `test-results/` は Playwright の出力先のため、`vp run --filter @frontend/web e2e` で再実行すると `backend.log` も消える。
-  残した環境では `docker compose -f docker/compose-test.yml --profile e2e logs backend` で読む。
+  残した環境では、`task e2e` が表示する `docker compose -p spring-modulith-test-<n> -f docker/compose-test.yml --profile e2e logs backend` で読む。
 - CI では、失敗時に `e2e-results` artifact に report、trace、`backend.log` を保存する。
 
 ## 証拠
@@ -213,6 +219,7 @@ build、コンテナの起動、後片付けは行わない。
 
 `.github/workflows/e2e.yml` は、Pull Request で backend（DB の changeset を含む）、frontend、Keycloak の設定、compose-test とその入力（`docker/initdb/`、`docker/wiremock/`、`.env.test.example`）、Taskfile、この workflow 自体を変えたときだけ `task e2e` を実行する。
 retry は 2 回で、失敗時に Playwright の成果物と backend のログを、成功時に HTML report だけを保存する。
-`task e2e` の後に、`task test-deps-leftover-check` で Compose project `spring-modulith-test` のコンテナと volume を調べ、残っていれば失敗にする。
+CI の `task e2e` は slot 0 を使う。
+`task e2e` の後に、`task test-deps-leftover-check` で名前に `spring-modulith-test` を含むコンテナと volume を調べ、残っていれば失敗にする。
 Backend CI も、compose-test を止めた後に同じ task で確かめる。
 この check は required status checks に登録しない（[ブランチ保護](../repository/branch-protection.md)）。
