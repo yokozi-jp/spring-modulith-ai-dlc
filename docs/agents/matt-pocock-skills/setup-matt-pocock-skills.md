@@ -33,7 +33,7 @@ Issue管理先を切り替える場合、または設定を最初からやり直
 
 - `git remote -v`と`.git/config`で、GitHubリポジトリか、対象リポジトリはどれかを確認する。
 - ルートの`AGENTS.md`と`CLAUDE.md`の有無、および既存の`## Agent skills`節を確認する。
-- ルートの`GLOSSARY.md`と`GLOSSARY-MAP.md`を確認する。
+- ルートの`GLOSSARY.md`と`GLOSSARY-MAP.md`、および旧名の`CONTEXT.md`と`CONTEXT-MAP.md`を確認する。旧名のファイルがあれば、`git mv`で新名へ改め、`docs/agents/domain.md`の名前も直すことを提案する。
 - `docs/adr/`と`src/*/docs/adr/`を確認する。
 - `docs/agents/`に以前の出力があるかを確認する。
 - `.scratch/`がローカルMarkdown方式の既存慣例を示すか確認する。
@@ -60,6 +60,8 @@ GitLabまたはセルフホストGitLabのremoteがあればGitLabを推奨す�
 それ以外の場合、または利用者が望む場合は、GitHub、GitLab、`.scratch/<feature>/`のローカルMarkdown、その他の管理先を提示する。
 その他を選ぶ場合は、利用者に作業方法を一段落で説明してもらい、その文章を自由形式で記録する。
 選択結果は`docs/agents/issue-tracker.md`へ記録する。
+GitHubまたはGitLabを選んだのに、そのホストを指す`git remote`がなければ、リポジトリのURLを利用者から得て、必要なら`git init`をしてから`git remote add origin <url>`で設定する。
+`gh repo view`または`glab repo view`が、作業ディレクトリの中でプロジェクトを表示すれば完了とする。表示できなければ、足りないものを利用者へ伝えて止まる。
 GitHubとGitLabのテンプレートでは、外部PRまたはMRを依頼の入口として扱う設定を既定で無効にする。
 この設定を話題にしてはならず、必要な利用者が後でファイルを変更できる状態にする。
 
@@ -93,6 +95,7 @@ GitHubとGitLabのテンプレートでは、外部PRまたはMRを依頼の入�
 
 `## Agent skills`ブロックには、Issue管理先、triageラベル、ドメイン文書の要約と対応する`docs/agents/*.md`への参照を置く。
 `triage`がない場合は、triageラベルの小節と`docs/agents/triage-labels.md`を省く。
+GitHubまたはGitLabでラベルの項目を実行したときは、設定したラベルのうち課題管理先にないものを`gh label create`または`glab label create`で作る。
 
 同梱テンプレートを出発点として、次を書く。
 
@@ -107,11 +110,18 @@ GitHubとGitLabのテンプレートでは、外部PRまたはMRを依頼の入�
 ## 同梱テンプレートの規則
 
 GitHubではIssueと仕様をGitHub Issuesへ置き、作成、参照、一覧、コメント、ラベル操作、終了に`gh issue`を使う。
+参照は`gh issue view <番号> --json number,title,body,labels,comments`で行う。
+sub-issueは`gh issue create --parent`または`gh issue edit <親> --add-sub-issue <子>`で作り、blockingはGitHubのネイティブな依存（`--blocked-by`、`--add-blocked-by`）で結ぶ。未解決のblockerの数は`gh api`の`issue_dependencies_summary.blocked_by`で数える（いずれも`gh` 2.94以上）。
+終了は、`gh issue comment`で説明を投稿してから`gh issue close`を実行する。閉じ済みのIssueへの`gh issue close --comment`は、コメントを捨てても終了コード0で終わる。
+Issueは利用者自身のリポジトリにだけ作る。forkでは`gh`が上流の親リポジトリを既定にすることがあるため、セッションで最初に`gh issue create`をする前に`gh repo view --json nameWithOwner`で対象を確認する。
 PRを依頼の入口にする場合は`gh pr`を使い、外部PRだけを発見対象とし、明示されたPRは作者に関係なく扱う。
+PRの参照は、TTYでない出力では`--comments`がコメントだけを出すため、`gh pr view <番号>`と`gh pr view <番号> --comments`を分けて実行する。
 GitHubではIssueとPRが番号空間を共有するため、裸の番号がどちらかを解決する。
 
 GitLabではIssueと仕様をGitLab Issuesへ置き、対応する`glab issue`操作を使う。
 終了時の説明は`glab issue close`の前にnoteとして投稿する。
+一覧のJSON出力は`glab issue list -O json`で得る。
+wayfinderの子チケットは、`Part of #<地図>`を本文の先頭に置き、`glab issue create --linked-issues <地図> --link-type relates_to`で地図へ結ぶ。
 MRを依頼の入口にする場合は`glab mr`を使う。
 GitLabではIssueとMRの番号空間が別である。
 
@@ -156,6 +166,6 @@ claimは作業前の最初の書き込みとし、解決では回答を記録し
 ## 翻訳元
 
 リポジトリは`mattpocock/skills`である。
-コミットは`d81f3a183412e71a5b1e84ca21bc1a35eea03a60`である。
+コミットは`5863806dd4e15c63174bee4e7515a4256792ecfa`である。
 原文のskillPathは`.agents/skills/setup-matt-pocock-skills/SKILL.md`である。
 同梱資料の`issue-tracker-github.md`、`issue-tracker-gitlab.md`、`issue-tracker-local.md`、`triage-labels.md`、`domain.md`も参照した。

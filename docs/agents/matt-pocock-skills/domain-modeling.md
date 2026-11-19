@@ -108,6 +108,6 @@ ADRを定型節で膨らませず、必要な情報だけを残す。
 ## 翻訳元
 
 リポジトリは`mattpocock/skills`である。
-コミットは`d81f3a183412e71a5b1e84ca21bc1a35eea03a60`である。
+コミットは`5863806dd4e15c63174bee4e7515a4256792ecfa`である。
 原文のskillPathは`.agents/skills/domain-modeling/SKILL.md`である。
 同梱資料の`GLOSSARY-FORMAT.md`と`ADR-FORMAT.md`も参照した。

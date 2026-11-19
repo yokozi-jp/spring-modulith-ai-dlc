@@ -39,7 +39,7 @@ codebaseを調べる前に`GLOSSARY.md`と対象領域のADRを読む。
 
 ### 摩擦の探索
 
-sub-agentを起動してcodebaseを歩かせる。
+新しい文脈ウィンドウを持つsub-agentを起動してcodebaseを歩かせる。
 固定したheuristicへ機械的に当てはめず、次の摩擦が生じる箇所を調べる。
 
 - 一つのconceptを理解するために、多数の小さなmoduleを往復する箇所を調べる。
@@ -134,6 +134,6 @@ HTML reportをrepositoryへ置かない。
 ## 翻訳元
 
 リポジトリは`mattpocock/skills`である。
-固定コミットは`d81f3a183412e71a5b1e84ca21bc1a35eea03a60`である。
+固定コミットは`5863806dd4e15c63174bee4e7515a4256792ecfa`である。
 原文のskillPathは`skills/engineering/improve-codebase-architecture/SKILL.md`である。
 同梱資料は`skills/engineering/improve-codebase-architecture/HTML-REPORT.md`である。
