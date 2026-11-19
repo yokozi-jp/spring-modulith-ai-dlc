@@ -189,6 +189,7 @@ Class <archfixture.violating.ordering.application.ShipOrderCommandHandler> is me
 - `assertionsShouldHaveDetailMessage`：`assert`文と`new AssertionError()`に失敗の詳細を書く。
 - `deprecatedApiShouldNotBeUsed`：`@Deprecated`のAPIを使わない。
 - `oldDateAndTimeClassesShouldNotBeUsed`：`java.util.Date`などの旧日時APIを使わない。
+- `restClientIsBuiltFromInjectedBuilder`：`RestClient.builder()`、`RestClient.create()`、`ClientHttpRequestFactoryBuilder.jdk()`などの生成を呼ばず、メソッド参照にもしない。Bootの自動構成の`RestClient.Builder`、`ClientHttpRequestFactoryBuilder`、`HttpClientSettings`を注入して使う（[外部システムのClient](class-roles/external-client.md)）。
 
 `ProxyRulesArchTest`は、プロキシ、非同期の実行、スケジューラが黙って働かなくなる書き方を検査する。
 規則が守らせる規約と理由は、[バックエンドのJava実装規約](java-coding.md)の「プロキシで動くアノテーション」に示す。

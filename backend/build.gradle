@@ -71,6 +71,8 @@ ext {
 dependencies {
     // --- Web・API ---
     implementation 'org.springframework.boot:spring-boot-starter-webmvc'
+    // RestClient.Builder の自動構成（計測と共通設定）。webmvc の starter には含まれない。
+    implementation 'org.springframework.boot:spring-boot-starter-restclient'
     implementation 'org.springframework.boot:spring-boot-starter-validation'
 
     // --- API ドキュメント（OpenAPI / Swagger UI）---
@@ -181,11 +183,6 @@ dependencyManagement {
     }
     dependencies {
         // --- 脆弱性対応（推移的依存のバージョン強制） ---
-        // Spring Boot 4.1.1 BOM が引く Tomcat に認証バイパス等の CVE が判明したため上書き。
-        // CVE-2026-65182 / CVE-2026-65905 / CVE-2026-68525 対応。
-        dependency 'org.apache.tomcat.embed:tomcat-embed-core:11.0.27'
-        dependency 'org.apache.tomcat.embed:tomcat-embed-el:11.0.27'
-        dependency 'org.apache.tomcat.embed:tomcat-embed-websocket:11.0.27'
         // CVE-2026-0636（LDAP インジェクション）対応。
         dependency 'org.bouncycastle:bcprov-jdk18on:1.87'
     }
