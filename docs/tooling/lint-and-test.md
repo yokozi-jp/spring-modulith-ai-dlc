@@ -286,7 +286,7 @@ const params = { ...(cursor !== undefined && { cursor }) };
 - **`task api-gen`**：契約の生成、Spectralの検査、Orvalの再生成を実行する。
 - **`task api-check`**：`api-gen`で再生成した契約と生成物を、コミット済みの内容と比べる。
 - **`task api-lint`**：コミット済みの`openapi/openapi.yaml`を`.spectral.yaml`で検査する（DB不要）。
-- **`task api-lint-rules-test`**：Spectralのルールを`openapi/spectral-fixtures/`の合格例と違反例で検査する。
+- **`task api-lint-rules-test`**：Spectralのルールを`openapi/spectral-fixtures/`の合格例と違反例で検査する。違反例の期待値は`invalid.expected`に「ルール名|JSONパス」で書き、過不足があれば落とす。
 - **`task api-client-gen`**：コミット済みの契約からOrvalでAPI clientとMSW handlerを再生成する（DB不要）。
 - **`task api-client-check`**：`api-client-gen`で再生成した生成物を、コミット済みの内容と比べる（DB不要）。
 - **`task api-breaking`**：`origin/<BASE_REF>`（既定は`main`）の契約とoasdiffで比べ、破壊的変更があれば失敗する。

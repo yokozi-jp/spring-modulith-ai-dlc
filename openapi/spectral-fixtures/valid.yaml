@@ -27,7 +27,7 @@ paths:
         "201":
           description: サンプル注文を受け付けた
           headers:
-            Location:
+            location:
               description: 受け付けたサンプル注文の URI
               schema:
                 type: string
