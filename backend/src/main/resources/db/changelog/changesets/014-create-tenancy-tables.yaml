@@ -1,0 +1,219 @@
+databaseChangeLog:
+  - changeSet:
+      id: 014-create-tenancy-tables
+      author: system
+      comment: >-
+        tenancy モジュールのスキーマと、利用者（m_user）、IdP の (issuer, subject) を利用者に対応づける ID 連携（m_user_identity）を作る（#374）。
+        スキーマの権限は、ログインできないモジュールのロール tenancy_module に与える（ADR-090）。
+        ロールは環境を作る手順で先に作る（ローカルは docker/initdb、本番は docs/database/connections.md）。
+        tenancy の表はテナントが決まる前に引くため、後続の RLS（#377）の外に置く。
+      preConditions:
+        - dbms:
+            type: postgresql
+      changes:
+        - sql:
+            sql: CREATE SCHEMA tenancy AUTHORIZATION CURRENT_USER;
+        - sql:
+            sql: |
+              GRANT USAGE ON SCHEMA tenancy TO tenancy_module;
+              ALTER DEFAULT PRIVILEGES IN SCHEMA tenancy GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO tenancy_module;
+        - createTable:
+            tableName: m_user
+            schemaName: tenancy
+            columns:
+              - column:
+                  name: user_id
+                  type: bigint
+                  autoIncrement: true
+                  generationType: ALWAYS
+                  constraints:
+                    primaryKey: true
+                    primaryKeyName: pk_m_user
+              - column:
+                  name: public_id
+                  type: uuid
+                  constraints:
+                    nullable: false
+              - column:
+                  name: created_at
+                  type: timestamptz
+                  constraints:
+                    nullable: false
+              - column:
+                  name: created_by
+                  type: varchar(64)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: created_pgm_cd
+                  type: varchar(64)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: created_tx_id
+                  type: varchar(32)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: updated_at
+                  type: timestamptz
+                  constraints:
+                    nullable: false
+              - column:
+                  name: updated_by
+                  type: varchar(64)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: updated_pgm_cd
+                  type: varchar(64)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: updated_tx_id
+                  type: varchar(32)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: lock_no
+                  type: bigint
+                  constraints:
+                    nullable: false
+              - column:
+                  name: patched_at
+                  type: timestamptz
+              - column:
+                  name: patched_by
+                  type: varchar(64)
+              - column:
+                  name: patched_id
+                  type: integer
+        - createIndex:
+            indexName: uk_m_user
+            tableName: m_user
+            schemaName: tenancy
+            unique: true
+            columns:
+              - column:
+                  name: public_id
+        - createTable:
+            tableName: m_user_identity
+            schemaName: tenancy
+            columns:
+              - column:
+                  name: user_identity_id
+                  type: bigint
+                  autoIncrement: true
+                  generationType: ALWAYS
+                  constraints:
+                    primaryKey: true
+                    primaryKeyName: pk_m_user_identity
+              - column:
+                  name: user_id
+                  type: bigint
+                  constraints:
+                    nullable: false
+              - column:
+                  name: issuer_url
+                  type: varchar(255)
+                  defaultValue: ""
+                  constraints:
+                    nullable: false
+              - column:
+                  name: subject_code
+                  type: varchar(255)
+                  defaultValue: ""
+                  constraints:
+                    nullable: false
+              - column:
+                  name: created_at
+                  type: timestamptz
+                  constraints:
+                    nullable: false
+              - column:
+                  name: created_by
+                  type: varchar(64)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: created_pgm_cd
+                  type: varchar(64)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: created_tx_id
+                  type: varchar(32)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: updated_at
+                  type: timestamptz
+                  constraints:
+                    nullable: false
+              - column:
+                  name: updated_by
+                  type: varchar(64)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: updated_pgm_cd
+                  type: varchar(64)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: updated_tx_id
+                  type: varchar(32)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: lock_no
+                  type: bigint
+                  constraints:
+                    nullable: false
+              - column:
+                  name: patched_at
+                  type: timestamptz
+              - column:
+                  name: patched_by
+                  type: varchar(64)
+              - column:
+                  name: patched_id
+                  type: integer
+        - createIndex:
+            indexName: uk_m_user_identity
+            tableName: m_user_identity
+            schemaName: tenancy
+            unique: true
+            columns:
+              - column:
+                  name: issuer_url
+              - column:
+                  name: subject_code
+        - createIndex:
+            indexName: idx_1_m_user_identity
+            tableName: m_user_identity
+            schemaName: tenancy
+            columns:
+              - column:
+                  name: user_id
+        - sql:
+            sql: |
+              GRANT USAGE ON SCHEMA modulith TO tenancy_module;
+              GRANT INSERT ON TABLE modulith.event_publication TO tenancy_module;
+      rollback:
+        - sql:
+            sql: |
+              REVOKE INSERT ON TABLE modulith.event_publication FROM tenancy_module;
+              REVOKE USAGE ON SCHEMA modulith FROM tenancy_module;
+        - dropTable:
+            tableName: m_user_identity
+            schemaName: tenancy
+        - dropTable:
+            tableName: m_user
+            schemaName: tenancy
+        - sql:
+            sql: |
+              ALTER DEFAULT PRIVILEGES IN SCHEMA tenancy REVOKE ALL ON TABLES FROM tenancy_module;
+              REVOKE USAGE ON SCHEMA tenancy FROM tenancy_module;
+        - sql:
+            sql: DROP SCHEMA tenancy;

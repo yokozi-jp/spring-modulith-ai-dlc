@@ -15,6 +15,7 @@ import com.example.demo.payment.domain.model.Money;
 import com.example.demo.payment.domain.model.OrderId;
 import com.example.demo.payment.domain.model.PaymentGateway;
 import com.example.demo.shared.concurrency.ExpectedLockNo;
+import com.example.demo.testkit.AppUsers;
 import com.example.demo.testkit.AsModule;
 import com.example.demo.testkit.CapturedLogRecords;
 import com.example.demo.testkit.CleanGeneratedTablesExtension;
@@ -53,11 +54,9 @@ import org.springframework.modulith.events.ResubmissionOptions;
 import org.springframework.modulith.test.ApplicationModuleTest;
 import org.springframework.modulith.test.ApplicationModuleTest.BootstrapMode;
 import org.springframework.modulith.test.Scenario;
-import org.springframework.security.core.authority.AuthorityUtils;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.oauth2.client.authentication.OAuth2AuthenticationToken;
-import org.springframework.security.oauth2.core.oidc.OidcIdToken;
-import org.springframework.security.oauth2.core.oidc.user.DefaultOidcUser;
+import org.springframework.security.oauth2.core.oidc.user.OidcUser;
 import org.springframework.web.client.ResourceAccessException;
 
 /**
@@ -80,9 +79,6 @@ class OrderConfirmedListenerTest {
 
   /** 固定した現在時刻。決済した時刻と、イベント出版の時刻になる。 */
   private static final Instant NOW = Instant.parse("2026-10-06T01:02:03.123456Z");
-
-  /** 確定する利用者の OIDC の {@code sub}。Listener に伝わっても {@code *_by} に使われない。 */
-  private static final String USER_SUB = "listener-test-user";
 
   /** 決済の CommandHandler の {@code *_pgm_cd}。Listener の中の書き込みの {@code *_by} も同じ値になる。 */
   private static final String PGM_CD = "payment.ChargeOrder";
@@ -312,14 +308,7 @@ class OrderConfirmedListenerTest {
 
   /** 確定した利用者の認証を置いて処理を呼び、最後に外す。 */
   private static void runAsUser(final Runnable action) {
-    final OidcIdToken idToken =
-        OidcIdToken.withTokenValue("id-token")
-            .subject(USER_SUB)
-            .issuedAt(NOW)
-            .expiresAt(NOW.plusSeconds(300))
-            .build();
-    final DefaultOidcUser user =
-        new DefaultOidcUser(AuthorityUtils.createAuthorityList("OIDC_USER"), idToken);
+    final OidcUser user = AppUsers.oidcUser();
     SecurityContextHolder.getContext()
         .setAuthentication(new OAuth2AuthenticationToken(user, user.getAuthorities(), "web"));
     try {

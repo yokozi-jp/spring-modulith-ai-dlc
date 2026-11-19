@@ -80,10 +80,11 @@ superuserのパスワードは、ローカルでは`.env`の`POSTGRES_SUPERUSER_
 マイグレーション用ロールがsuperuserでも`BYPASSRLS`でもないことは、カタログのテスト（`SchemaInspectionTest`の規則G2）が確かめます。
 001 changesetは`modulith`スキーマを作成し、そのUSAGEとイベント出版テーブルだけのDML権限を`DB_USERNAME`へ付与します。
 業務のスキーマ（`product`、`ordering`、`payment`）の権限は、012 changesetがアプリケーション用ロールから取り上げ、モジュールのロールへ移します（次の「モジュールのロール」）。
+`tenancy`スキーマの権限は、014 changesetが作成のときからモジュールのロールだけに与えます。
 Liquibase管理スキーマと管理テーブルへのアプリ権限は付与しません。
 001 changesetを初期状態から書き換えたことと、既存のボリュームでは`docker/initdb`が再実行されずマイグレーション用ロールがsuperuserのまま残ることから、既存DBは移行せず`task compose-reset CONFIRM_RESET=yes`で作り直します。
 ステージングと本番も既存DBを再利用せず、`liquibase`スキーマだけをマイグレーション用ロールの所有で作ってから初回マイグレーションを実行します。
-001 changesetがアプリケーションロール（`DB_USERNAME`）へGRANTし、012 changesetがモジュールのロールへGRANTするため、ステージングと本番では、アプリケーションロールとモジュールのロールを初回マイグレーションより前にRDS側で作成しておきます。
+001 changesetがアプリケーションロール（`DB_USERNAME`）へGRANTし、012と014のchangesetがモジュールのロールへGRANTするため、ステージングと本番では、アプリケーションロールとモジュールのロールを初回マイグレーションより前にRDS側で作成しておきます。
 `docker/initdb`のような自動作成経路がないため、未作成のままマイグレーションを実行するとGRANTで失敗します。
 `be-release-migrate`とDB切り戻し用Taskfileのタスクはローカルの`.env`を読み込まず、共通の接続先（`DB_URL`、または`DB_HOST`/`DB_PORT`/`DB_NAME`）と権限付与先の`DB_USERNAME`、`MIGRATION_DB_USERNAME`、`MIGRATION_DB_PASSWORD`が注入されていなければGradle実行前に失敗します。
 アプリケーション用アカウントには業務処理に必要なDML権限を与え、`CREATE`、`ALTER`、`DROP`を与えません。
@@ -100,12 +101,12 @@ Liquibase用アカウントには、DDL、Liquibase管理テーブルの更新�
 
 ## モジュールのロール
 
-業務のスキーマは、アプリケーション用ロールではなく、モジュールごとのログインできないロール`<module>_module`（`product_module`、`ordering_module`、`payment_module`）が読み書きする（[ADR-094](../adr/ADR-094-switch-to-module-database-roles.md)）。
+業務のスキーマは、アプリケーション用ロールではなく、モジュールごとのログインできないロール`<module>_module`（`product_module`、`ordering_module`、`payment_module`、`tenancy_module`）が読み書きする（[ADR-094](../adr/ADR-094-switch-to-module-database-roles.md)）。
 別のモジュールの表への書き込みと、依存の方向に逆らう読み取りは、DBの権限エラー（SQLSTATE `42501`）で止まる。
 
 - **切り替え**：`ModuleRoleTransactionManager`が、トランザクションを始めた直後に、トランザクションの名前（クラス名とメソッド名）から引いたモジュールのロールへ`set_config('role', ?, true)`で切り替える。トランザクションの終わりで元に戻るため、プールの接続にロールが残らない。モジュールが分からない名前（Spring Modulithの内部、ShedLock、名前のない`TransactionTemplate`）はアプリケーション用ロールのまま動く。ロールは物理的なトランザクションを始めた外側の名前で決まり、`REQUIRED`で参加した別のモジュールの`<Feature>Queries`は呼び出し元のロールで動く。
 - **アプリケーション用ロール**：業務のスキーマに権限を持たない。`modulith`スキーマ（イベントの出版とShedLockの表）だけを読み書きする。モジュールのロールの継承はなく、`SET ROLE`で切り替えるだけのメンバーである。
-- **モジュールのロールの権限**：自分のスキーマのUSAGEと表のSELECT、INSERT、UPDATE、DELETE。依存の方向（`ordering`から`product`、`payment`から`ordering`）にだけ、依存先のスキーマのUSAGEとSELECT。`modulith`スキーマのUSAGEと`modulith.event_publication`へのINSERT。
+- **モジュールのロールの権限**：自分のスキーマのUSAGEと表のSELECT、INSERT、UPDATE、DELETE。依存の方向（`ordering`から`product`、`payment`から`ordering`）にだけ、依存先のスキーマのUSAGEとSELECT。`modulith`スキーマのUSAGEと`modulith.event_publication`へのINSERT。`tenancy`はどのモジュールにも依存せず、どのモジュールも`tenancy`に依存しないため、依存の方向のSELECTを持たない。
 - **新しい表**：権限はスキーマごとの`ALTER DEFAULT PRIVILEGES`で決まるため、既存のスキーマに表を足すchangesetは権限を書かない。新しいモジュールのスキーマを作るchangesetは、モジュールのロールへ、そのスキーマのUSAGEと`ALTER DEFAULT PRIVILEGES`、`modulith`スキーマのUSAGEと`modulith.event_publication`へのINSERT、依存先のスキーマのUSAGEと表のSELECTを与える。依存先のSELECTは、依存先のスキーマの`ALTER DEFAULT PRIVILEGES`にも足す。イベントを出版しないモジュールにも`modulith`の権限を与える（規則G5が、すべてのモジュールのロールに同じ権限を求めるため）。権限のSQLの書き方はchangesetの検査（規則G3）、権限の漏れと余りはカタログのテスト（`SchemaInspectionTest`の規則G4、G5）が止める。
 - **ロールの作成**：ロールはマイグレーションより先に、環境を作る手順で作る。マイグレーション用ロールに`CREATEROLE`を持たせない。ロールの名前は固定で、1つのDBクラスターに1つの環境を置く。
 - **限界**：アプリケーション用ロールは、どのSQLからでも`SET ROLE`で別のロールへ切り替えられる。DBのロールで止められるのは誤りで、故意の迂回は止められない。ArchUnitの規則（接続の設定を変える`DSLContext`と`DSL`のAPIの禁止、`JdbcTemplate`と生のJDBCの禁止）で補う（[ArchUnitのテスト](../backend/architecture-tests.md)）。

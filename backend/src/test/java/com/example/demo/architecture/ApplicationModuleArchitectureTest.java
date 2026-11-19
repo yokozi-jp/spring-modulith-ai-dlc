@@ -18,7 +18,7 @@ import org.springframework.modulith.core.ApplicationModules;
 class ApplicationModuleArchitectureTest {
 
   /** 依存の向きを確かめる機能モジュール。shared、jooq、error は基盤のモジュールなので含めない。 */
-  private static final Set<String> FEATURES = Set.of("product", "ordering", "payment");
+  private static final Set<String> FEATURES = Set.of("product", "ordering", "payment", "tenancy");
 
   /** モジュール間の循環、内部パッケージ参照、明示した許可依存への違反がないことを検証する。 */
   @Test
@@ -29,7 +29,7 @@ class ApplicationModuleArchitectureTest {
 
   /** 循環にならない依存（payment から product など）は verify で検出できないため、機能モジュールの間の直接の依存を比べる。 */
   @Test
-  @DisplayName("機能モジュールの間の直接の依存は ordering から product と payment から ordering だけである")
+  @DisplayName("機能モジュールの間の直接の依存は ordering から product と payment から ordering だけで、tenancy はどこにも依存しない")
   void featureModulesDependOnlyInDeclaredDirections() {
     final ApplicationModules modules = ApplicationModules.of(DemoApplication.class);
 
@@ -52,7 +52,14 @@ class ApplicationModuleArchitectureTest {
         .as("機能モジュールごとの直接の依存先")
         .isEqualTo(
             Map.of(
-                "product", Set.of(), "ordering", Set.of("product"), "payment", Set.of("ordering")));
+                "product",
+                Set.of(),
+                "ordering",
+                Set.of("product"),
+                "payment",
+                Set.of("ordering"),
+                "tenancy",
+                Set.of()));
   }
 
   @Test

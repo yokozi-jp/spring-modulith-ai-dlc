@@ -16,7 +16,7 @@ import org.jspecify.annotations.Nullable;
 public final class ModuleRoles {
 
   /** ロールとスキーマを持つ機能モジュール。 */
-  public static final Set<String> MODULES = Set.of("product", "ordering", "payment");
+  public static final Set<String> MODULES = Set.of("product", "ordering", "payment", "tenancy");
 
   /** ロール名の接尾辞。 */
   private static final String ROLE_SUFFIX = "_module";

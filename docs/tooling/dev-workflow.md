@@ -127,8 +127,11 @@ Taskのテスト系タスクは、`.env.test`に足りない変数を`.env.test.
 この行がないと、`task compose-up`と`task dev`はPostgreSQLのsecretを作れずに止まる。
 既存の`postgres_data`ボリュームでは`docker/initdb`が再実行されず、`demo_migration`はsuperuserのまま残るため、`task compose-reset CONFIRM_RESET=yes`でボリュームを消し（ほかのサービスのデータも消える）、`task compose-up`で起動してから`task be-migrate`を実行する。
 
-モジュールごとのDBロール（`docker/initdb/03-create-module-roles.sh`、012 changeset）を足した変更の後も、既存の`postgres_data`ボリュームでは`docker/initdb`が再実行されず、モジュールのロールがないまま残る。
-`task be-migrate`は012 changesetのGRANTがロールの不在で失敗するため、`task compose-reset CONFIRM_RESET=yes`でボリュームを消し、`task compose-up`で起動してから`task be-migrate`を実行する（[DB接続情報とロール分離](../database/connections.md)）。
+モジュールごとのDBロール（`docker/initdb/03-create-module-roles.sh`、012 changeset）を足した変更と、`tenancy`のロール（014 changeset）を足した変更の後も、既存の`postgres_data`ボリュームでは`docker/initdb`が再実行されず、モジュールのロールがないまま残る。
+`task be-migrate`は012と014のchangesetのGRANTがロールの不在で失敗するため、`task compose-reset CONFIRM_RESET=yes`でボリュームを消し、`task compose-up`で起動してから`task be-migrate`を実行する（[DB接続情報とロール分離](../database/connections.md)）。
+
+セッションの利用者を`AppUserPrincipal`にした変更（[ADR-096](../adr/ADR-096-require-app-user-principal-for-audit-columns.md)）の後は、ブラウザでログアウトしてログインし直す。
+ローカルのRedisはセッションを残すため、変更の前のセッションのままでは書き込みが500になる（[APIの認証、セッション、権限](../web-api/authentication-and-session.md)）。
 
 公開先は次のとおり。
 
@@ -256,6 +259,7 @@ task scan-dast-active
 
 ポート4173、18081、18082、5433、6380、8081を使うので、開発環境とは同時に実行できるが、`task test`とは同時に実行できない。
 ZAPとbackendは`--network host`で起動するので、Docker Desktopではhost networkingを有効にしておく必要がある。
+backendの起動の前に`task be-migrate`でマイグレーションを適用するため、JDKが要る。
 レポートは`build/dast/`に出力する（[ADR-056](../adr/ADR-056-run-authenticated-dast-with-zap-in-ci.md)）。
 
 ## ローカルサービスを確認するとき

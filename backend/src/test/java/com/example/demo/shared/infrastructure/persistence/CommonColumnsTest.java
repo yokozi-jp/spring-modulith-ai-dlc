@@ -5,6 +5,7 @@ import static com.example.demo.jooq.tables.FixtureWorkLogTable.FIXTURE_WORK_LOG;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import com.example.demo.testkit.AppUsers;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
@@ -26,6 +27,7 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.oauth2.client.authentication.OAuth2AuthenticationToken;
 import org.springframework.security.oauth2.core.oidc.OidcIdToken;
 import org.springframework.security.oauth2.core.oidc.user.DefaultOidcUser;
+import org.springframework.security.oauth2.core.oidc.user.OidcUser;
 
 /** 共通カラムへ登録する値の組み立てを検証する。 */
 // 共通カラムの規則ごとにテストを分けるため、メソッドの数の上限を外す。
@@ -54,18 +56,10 @@ class CommonColumnsTest {
   }
 
   @Test
-  @DisplayName("利用者の操作の INSERT では、作成と更新のカラムに sub、pgm_cd、trace ID と lock_no = 1 を登録する")
+  @DisplayName(
+      "利用者の操作の INSERT では、作成と更新のカラムに sub でなくアプリの利用者の ID、pgm_cd、trace ID と lock_no = 1 を登録する")
   void insertValuesForOidcUser() {
-    final OidcIdToken idToken =
-        OidcIdToken.withTokenValue("id-token")
-            .subject("user-sub")
-            .issuedAt(NOW)
-            .expiresAt(NOW.plusSeconds(300))
-            .build();
-    final DefaultOidcUser user =
-        new DefaultOidcUser(AuthorityUtils.createAuthorityList("OIDC_USER"), idToken);
-    SecurityContextHolder.getContext()
-        .setAuthentication(new OAuth2AuthenticationToken(user, user.getAuthorities(), "web"));
+    signInAsAppUser();
 
     final Map<Field<?>, Object> values = inUseCase(() -> commonColumns.forInsert(FIXTURE_ITEM));
 
@@ -73,14 +67,26 @@ class CommonColumnsTest {
         .as("INSERT の共通カラム")
         .containsExactly(
             Map.entry(FIXTURE_ITEM.CREATED_AT, NOW),
-            Map.entry(FIXTURE_ITEM.CREATED_BY, "user-sub"),
+            Map.entry(FIXTURE_ITEM.CREATED_BY, AppUsers.USER_ID),
             Map.entry(FIXTURE_ITEM.CREATED_PGM_CD, PGM_CD),
             Map.entry(FIXTURE_ITEM.CREATED_TX_ID, TRACE_ID),
             Map.entry(FIXTURE_ITEM.UPDATED_AT, NOW),
-            Map.entry(FIXTURE_ITEM.UPDATED_BY, "user-sub"),
+            Map.entry(FIXTURE_ITEM.UPDATED_BY, AppUsers.USER_ID),
             Map.entry(FIXTURE_ITEM.UPDATED_PGM_CD, PGM_CD),
             Map.entry(FIXTURE_ITEM.UPDATED_TX_ID, TRACE_ID),
             Map.entry(FIXTURE_ITEM.LOCK_NO, 1L));
+  }
+
+  @Test
+  @DisplayName("利用者の操作の UPDATE では、更新者に sub でなくアプリの利用者の ID を登録する")
+  void updateValuesUseTheAppUserId() {
+    signInAsAppUser();
+
+    final Map<Field<?>, Object> update = inUseCase(() -> commonColumns.forUpdate(FIXTURE_ITEM));
+
+    assertThat(update.get(FIXTURE_ITEM.UPDATED_BY))
+        .as("UPDATE の updated_by")
+        .isEqualTo(AppUsers.USER_ID);
   }
 
   @Test
@@ -104,7 +110,26 @@ class CommonColumnsTest {
   }
 
   @Test
-  @DisplayName("OIDC の利用者でない認証では、作成者を決められないため例外にする")
+  @DisplayName("アプリの利用者を引く前の OidcUser（名前が IdP の sub）の認証では、sub を登録せずに例外にする")
+  void idpOidcUserIsRejected() {
+    final OidcIdToken idToken =
+        OidcIdToken.withTokenValue("id-token")
+            .subject("idp-sub")
+            .issuedAt(NOW)
+            .expiresAt(NOW.plusSeconds(300))
+            .build();
+    final DefaultOidcUser user =
+        new DefaultOidcUser(AuthorityUtils.createAuthorityList("OIDC_USER"), idToken);
+    SecurityContextHolder.getContext()
+        .setAuthentication(new OAuth2AuthenticationToken(user, user.getAuthorities(), "web"));
+
+    assertThatThrownBy(() -> inUseCase(() -> commonColumns.forInsert(FIXTURE_ITEM)))
+        .isInstanceOf(IllegalStateException.class)
+        .hasMessageContaining("not an app user");
+  }
+
+  @Test
+  @DisplayName("アプリの利用者でない認証では、作成者を決められないため例外にする")
   void otherAuthenticatedPrincipalIsRejected() {
     SecurityContextHolder.getContext()
         .setAuthentication(
@@ -112,7 +137,7 @@ class CommonColumnsTest {
 
     assertThatThrownBy(() -> inUseCase(() -> commonColumns.forInsert(FIXTURE_ITEM)))
         .isInstanceOf(IllegalStateException.class)
-        .hasMessageContaining("not an OIDC user");
+        .hasMessageContaining("not an app user");
   }
 
   @Test
@@ -226,6 +251,13 @@ class CommonColumnsTest {
             changesetRules.stream().map(rule -> String.valueOf(((Map.Entry<?, ?>) rule).getKey())))
         .as("changeset の共通カラムの規則")
         .containsExactlyInAnyOrderElementsOf(written);
+  }
+
+  /** ログインのときに tenancy がするように、アプリの利用者でもある OidcUser で認証する。 */
+  private static void signInAsAppUser() {
+    final OidcUser user = AppUsers.oidcUser();
+    SecurityContextHolder.getContext()
+        .setAuthentication(new OAuth2AuthenticationToken(user, user.getAuthorities(), "web"));
   }
 
   // 本番とテストの private 定数を、可視性を広げずに照らすため。

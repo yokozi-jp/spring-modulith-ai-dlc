@@ -69,7 +69,7 @@ public final class LocalDataSeeder {
     SKIPPED_NOT_MIGRATED
   }
 
-  /** 業務データの表。子から順に並べ、reset はこの順に DELETE する。modulith と Liquibase の表は含めない。 */
+  /** 業務データの表。子から順に並べ、reset はこの順に DELETE する。modulith と tenancy と Liquibase の表は含めない。 */
   /* package */ static final List<Table<?>> BUSINESS_TABLES =
       List.of(T_PAYMENT, T_ORDER_LINE, T_ORDER, M_PRODUCT);
 

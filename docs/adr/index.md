@@ -96,3 +96,4 @@
 - [ADR-093: Kiro Web のサンドボックスを開発環境に加え、道具とコンテナを source するスクリプトで揃える](ADR-093-support-kiro-web-sandbox-as-development-environment.md)（Proposed, 2026-11-18）
 - [ADR-094: トランザクションの初めにモジュールの DB ロールへ切り替え、アプリロールを業務のスキーマから外す](ADR-094-switch-to-module-database-roles.md)（Proposed, 2026-11-18）
 - [ADR-095: 依存関係の脆弱性検査に OWASP dep-scan を Trivy と並べて加える](ADR-095-scan-dependencies-with-dep-scan-alongside-trivy.md)（Proposed, 2026-11-19）
+- [ADR-096: 共通カラムの作成者と更新者には、AppUserPrincipal の利用者の ID だけを登録する](ADR-096-require-app-user-principal-for-audit-columns.md)（Proposed, 2026-11-18）

@@ -19,6 +19,23 @@ tags: [convention, web-api, security, auth, future-arch-guidelines]
 未認証のAPIリクエストには、401のProblem Detailsに`WWW-Authenticate: Session realm="demo"`を付けて返す。
 `Session`は登録されていない独自のschemeであり、選んだ理由は[ADR-059](../adr/ADR-059-send-a-session-challenge-in-www-authenticate-on-401.md)にある。
 
+## ログインの後の利用者
+
+ログインでは、IDトークンの`iss`と`sub`の組から、`tenancy`モジュールがアプリの利用者を引く。
+組に対応づけた利用者がなければ、利用者を作って対応づける。
+IdPを移るときは、組と利用者の対応づけだけを書き換え、利用者のIDは変えない。
+
+セッションに保存する`OidcUser`の名前（`getName()`）は、IdPの`sub`ではなくアプリの利用者のIDである。
+セッションの`OidcUser`は`shared.security`の`AppUserPrincipal`も実装し、共通カラムの`*_by`は`userId()`の値を登録する（[PostgreSQLの共通カラム](../database/postgresql-common-columns.md)）。
+`tenancy`の`SignInOidcUserService`が`OAuth2UserService<OidcUserRequest, OidcUser>`を実装し、Spring SecurityがこのBeanをOIDCログインに使う。
+ログインのコールバックでは前のセッションの認証がまだ残っているため、利用者を作る間だけ認証を外し、`*_by`には処理の名前を登録する。
+
+セッションはRedisに、`OidcUser`の実装のクラス名ごと直列化して保存する。
+次の2つのときは、デプロイと同時に既存のセッションを消す（`REDIS_SESSION_NAMESPACE`を変える）。
+
+- `AppUserPrincipal`でない`OidcUser`を保存していた版から上げるとき。消さないと、そのセッションが切れるまで書き込みが失敗する。
+- `SignInOidcUserService`が返す`OidcUser`のクラスを持たない版へ切り戻すとき、またはそのクラスを移動、改名するとき。消さないと、セッションを読めずにリクエストが500になる。
+
 ## ログアウト
 
 ログアウトでは、ADR-007に従ってアプリケーションのセッションを破棄し、IdPのSSOセッションを終了する。

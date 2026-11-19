@@ -8,6 +8,7 @@ import com.example.demo.jooq.modulith.Modulith;
 import com.example.demo.jooq.ordering.Ordering;
 import com.example.demo.jooq.payment.Payment;
 import com.example.demo.jooq.product.Product;
+import com.example.demo.jooq.tenancy.Tenancy;
 
 import java.util.Arrays;
 import java.util.List;
@@ -61,6 +62,11 @@ public class DefaultCatalog extends CatalogImpl {
     public final Product PRODUCT = Product.PRODUCT;
 
     /**
+     * The schema <code>tenancy</code>.
+     */
+    public final Tenancy TENANCY = Tenancy.TENANCY;
+
+    /**
      * No further instances allowed
      */
     private DefaultCatalog() {
@@ -74,7 +80,8 @@ public class DefaultCatalog extends CatalogImpl {
             Modulith.MODULITH,
             Ordering.ORDERING,
             Payment.PAYMENT,
-            Product.PRODUCT
+            Product.PRODUCT,
+            Tenancy.TENANCY
         );
     }
 

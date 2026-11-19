@@ -131,7 +131,7 @@ export function replaceTelemetryForTesting(sink?: TelemetryTestSink): void {
 export function initTelemetry(): void {
   if (__TELEMETRY_ENABLED__) {
     telemetryEnabled = true;
-    // ponytail: SDK の STORAGE_KEY と同じ値。SDK が 500 ms 以内に読み込まれなくても消せるよう直書きし、切り替えは e2e で確かめる。
+    // SDK の STORAGE_KEY と同じ値。SDK が 500 ms 以内に読み込まれなくても消せるよう直書きし、切り替えは e2e で確かめる。
     storedSessionKey = "com.grafana.faro.session";
     faroReady = (async (): Promise<TelemetrySink | undefined> => {
       try {

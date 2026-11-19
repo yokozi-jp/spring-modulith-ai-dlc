@@ -1,8 +1,8 @@
 package com.example.demo.payment.presentation.web;
 
 import static com.example.demo.jooq.payment.Tables.T_PAYMENT;
+import static com.example.demo.testkit.AppUsers.oidcLogin;
 import static org.hamcrest.Matchers.endsWith;
-import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.oidcLogin;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;

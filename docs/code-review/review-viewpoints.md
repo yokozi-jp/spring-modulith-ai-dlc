@@ -21,6 +21,7 @@ tags: [reference, code-review]
 - [バックエンドの層の責務](../backend/layers.md)
 - [フロントエンドアーキテクチャ](../frontend/architecture.md)
 - [Architecture Decision Records](../adr/index.md)
+- [設計の作り込みの程度と段階的な再構築](../principles/right-sizing.md)：`ponytail:` のコメントが、上限ではなく既知の誤りを許していないか
 
 ## セキュリティ
 
