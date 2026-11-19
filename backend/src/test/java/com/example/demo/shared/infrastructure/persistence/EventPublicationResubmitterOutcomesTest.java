@@ -160,11 +160,10 @@ class EventPublicationResubmitterOutcomesTest {
     final EventPublicationResubmitter resubmitter =
         new EventPublicationResubmitter(
             dsl,
-            failedPublications(
-                () -> {
-                  move(id, RESUBMITTED);
-                  complete(id);
-                }),
+            failedPublications(() -> {
+              move(id, RESUBMITTED);
+              complete(id);
+            }),
             lockingTaskExecutor,
             policies,
             clock,
@@ -268,7 +267,7 @@ class EventPublicationResubmitterOutcomesTest {
     final Duration lifetime = ResubmissionTracker.lifetimeOf(properties);
     assertThat(lifetime)
         .as("in-flight-staleness + interval が lock-at-most-for × 3 より長い")
-        .isEqualTo(Duration.ofHours(4).plusSeconds(2));
+        .isEqualTo(Duration.ofMinutes(15).plusSeconds(2));
     final UUID kept = insert(FAILED, 0);
     final EventPublicationResubmitter keeping = newResubmitter(properties);
     final Instant resubmittedAt = clock.instant();

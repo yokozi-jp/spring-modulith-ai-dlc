@@ -35,7 +35,7 @@ client adapter の短期の再試行と、イベント出版の持続的な再�
 外部ブローカーを導入するまでは、リスナーが失敗したイベント出版がレジストリに `FAILED` の状態で残り、これが DLQ の役割を兼ねる。
 失敗した出版の再投入は `FailedEventPublications` を使い、落ちたまま残った出版は Staleness Monitor で `FAILED` に戻してから同じ再投入で扱う。
 
-Spring Modulith 2.1.1 のイベント出版は、次の状態を持つ（[Spring Modulith: Event Publication Lifecycle](https://docs.spring.io/spring-modulith/reference/events.html)）。
+Spring Modulith 2.1.2 のイベント出版は、次の状態を持つ（[Spring Modulith: Event Publication Lifecycle](https://docs.spring.io/spring-modulith/reference/events.html)）。
 
 - **`PUBLISHED`**：記録され、リスナーの実行を待っている。
 - **`PROCESSING`**：リスナーが実行している。
@@ -44,10 +44,10 @@ Spring Modulith 2.1.1 のイベント出版は、次の状態を持つ（[Spring
 - **`RESUBMITTED`**：失敗した出版を再投入し、実行を待っている。
 
 出版は試行の回数（`completion_attempts`）も持つ。
-公式のリファレンスは `PROCESSING` に移るときに増えると書くが、2.1.1 の JDBC の実装は、出版を作るときに 1 を入れ、再投入で `RESUBMITTED` にするたびに 1 増やし、`PROCESSING` に移るときには増やさない。
+公式のリファレンスは `PROCESSING` に移るときに増えると書くが、2.1.2 の JDBC の実装は、出版を作るときに 1 を入れ、再投入で `RESUBMITTED` にするたびに 1 増やし、`PROCESSING` に移るときには増やさない。
 このため値は、リスナーを呼んだ回数ではなく、作成と再投入の予約の回数であり、1 を引くと再投入の回数になる。
 再投入したかどうかは `completion_attempts` で見る。
-2.1.1 の JDBC の実装は、作成時の `last_resubmission_date` に `publication_date` と同じ値を入れるためである（[issue #108 の確認結果](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/108#issuecomment-6032559650)）。
+2.1.2 の JDBC の実装は、作成時の `last_resubmission_date` に `publication_date` と同じ値を入れるためである（[issue #108 の確認結果](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/108#issuecomment-6032559650)）。
 
 再投入と回復は次のように扱う。
 
@@ -57,14 +57,12 @@ Spring Modulith 2.1.1 のイベント出版は、次の状態を持つ（[Spring
   `resubmit` は再投入した件数を返さない。
   条件の関数は `RESUBMITTED` への更新より前に呼ばれ、更新できなかった出版でも呼ばれるため、そこで数えた値は再投入の候補の件数であり、再投入した件数ではない。
   定期の再投入は、再投入のあとに `event_publication` と archive の表を読み戻し、実際に `RESUBMITTED` へ進んだ出版の件数を `event.publication.resubmissions` に記録する（[ADR-079](../adr/ADR-079-resubmit-failed-event-publications-periodically-with-shedlock.md)）。
-- Staleness Monitor（`spring.modulith.events.staleness.*`）は、状態が `PUBLISHED`、`PROCESSING`、`RESUBMITTED` の出版のうち、最初に出版した日時（`publication_date`）から状態ごとに設定した時間を過ぎたものを `FAILED` にする。
-  その状態に入ってからの時間や、`last_resubmission_date` からの時間では測らない（2.1.1 の `DefaultEventPublicationRegistry`）。
-  このため、`RESUBMITTED` や `PROCESSING` の時間より古い出版を再投入すると、リスナーが終わる前の次の判定で `FAILED` に戻る。
-  状態ごとの時間の 0 はその状態を止めず、その状態の出版をすべて `FAILED` にする。
-  三つの時間がすべて 0 のときだけ Staleness Monitor は動かない。
+- Staleness Monitor（`spring.modulith.events.staleness.*`）は、状態が `PUBLISHED`、`PROCESSING`、`RESUBMITTED` の出版のうち、最後の出版か再投入の時刻（`last_resubmission_date`、なければ `publication_date`）から状態ごとに設定した時間を過ぎたものを `FAILED` にする（2.1.2 の `DefaultEventPublicationRegistry`）。
+  その状態に入ってからの時間では測らないため、`PROCESSING` の時間は executor の空きを待つ時間も含む。
+  状態ごとの時間を設定しなければその状態は監視せず、0 以下の時間は起動に失敗する。
   main は `PUBLISHED` の時間を定期の再投入の最初の待ち時間（`wait-age`）と同じにし、判定の間隔を定期の再投入の間隔と同じにして有効にする。
-  `PROCESSING` と `RESUBMITTED` の時間は `in-flight-staleness` にし、方針の最後の再投入とリスナーの処理が終わるまでの最長の時間より長いことを起動時に検証する（[ADR-079](../adr/ADR-079-resubmit-failed-event-publications-periodically-with-shedlock.md)）。
-  その代わり、落ちたまま `PROCESSING` や `RESUBMITTED` に残った出版の回復は `in-flight-staleness` まで遅れる。
+  `PROCESSING` と `RESUBMITTED` の時間は `in-flight-staleness` にし、1 回の配信の上限として置く `lock-at-most-for` より長いことを起動時に検証する（[ADR-079](../adr/ADR-079-resubmit-failed-event-publications-periodically-with-shedlock.md)）。
+  その代わり、落ちたまま `PROCESSING` や `RESUBMITTED` に残った出版の回復は、最後の出版か再投入から `in-flight-staleness` を過ぎるまで遅れる。
   ただし、最初の配信が `concurrency-limit` の空きを待つ間に待ち時間を過ぎた出版は、`FAILED` に戻った次の回で重ねて再投入しうる。
   その場合はリスナーの冪等性で結果を保つ。
   Staleness Monitor は定期の再投入を無効にすると一緒に止まる。

@@ -91,7 +91,7 @@ final class ResubmissionTracker {
   /**
    * 覚えておく期間。{@code max(3 × lock-at-most-for, in-flight-staleness + interval)}。
    *
-   * <p>落ちたまま残った再投入の出版は、Staleness Monitor が publication_date から {@code in-flight-staleness}
+   * <p>落ちたまま残った再投入の出版は、Staleness Monitor が last_resubmission_date から {@code in-flight-staleness}
    * を過ぎたら FAILED に戻し、その検出は {@code interval} ごとに動く。 その後の回で数えるまでの余裕として、ロックの上限の 3 倍とも比べて長い方を取る。
    */
   /* package */ static Duration lifetimeOf(

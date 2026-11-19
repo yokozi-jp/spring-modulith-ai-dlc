@@ -99,11 +99,10 @@ class EventPublicationResubmissionConfigTest {
   void disabledDoesNotRegisterScheduling() {
     runner
         .withPropertyValues(ENABLED + "=false")
-        .run(
-            context ->
-                assertThat(context)
-                    .hasNotFailed()
-                    .doesNotHaveBean(EventPublicationResubmissionConfig.Scheduling.class));
+        .run(context ->
+            assertThat(context)
+                .hasNotFailed()
+                .doesNotHaveBean(EventPublicationResubmissionConfig.Scheduling.class));
   }
 
   @Test
@@ -111,11 +110,10 @@ class EventPublicationResubmissionConfigTest {
   void enabledRegistersScheduling() {
     runner
         .withPropertyValues(ENABLED + "=true")
-        .run(
-            context ->
-                assertThat(context)
-                    .hasNotFailed()
-                    .hasSingleBean(EventPublicationResubmissionConfig.Scheduling.class));
+        .run(context ->
+            assertThat(context)
+                .hasNotFailed()
+                .hasSingleBean(EventPublicationResubmissionConfig.Scheduling.class));
   }
 
   @Test
@@ -131,20 +129,18 @@ class EventPublicationResubmissionConfigTest {
             () -> Clock.fixed(Instant.parse("2026-01-01T00:00:00.000000Z"), ZoneOffset.UTC))
         .withBean(MeterRegistry.class, SimpleMeterRegistry::new)
         .withPropertyValues(ENABLED + "=true")
-        .run(
-            context -> {
-              final List<FixedDelayTask> tasks =
-                  context.getBean(ScheduledTaskHolder.class).getScheduledTasks().stream()
-                      .map(ScheduledTask::getTask)
-                      .filter(FixedDelayTask.class::isInstance)
-                      .map(FixedDelayTask.class::cast)
-                      .toList();
-              assertThat(tasks).as("固定の遅延のタスク").hasSize(1);
-              assertThat(tasks.getFirst().getIntervalDuration()).isEqualTo(Duration.ofMinutes(1));
-              assertThat(tasks.getFirst().getInitialDelayDuration())
-                  .isEqualTo(Duration.ofMinutes(1));
-              assertThat(tasks.getFirst().getRunnable().toString()).contains("resubmitOnce");
-            });
+        .run(context -> {
+          final List<FixedDelayTask> tasks =
+              context.getBean(ScheduledTaskHolder.class).getScheduledTasks().stream()
+                  .map(ScheduledTask::getTask)
+                  .filter(FixedDelayTask.class::isInstance)
+                  .map(FixedDelayTask.class::cast)
+                  .toList();
+          assertThat(tasks).as("固定の遅延のタスク").hasSize(1);
+          assertThat(tasks.getFirst().getIntervalDuration()).isEqualTo(Duration.ofMinutes(1));
+          assertThat(tasks.getFirst().getInitialDelayDuration()).isEqualTo(Duration.ofMinutes(1));
+          assertThat(tasks.getFirst().getRunnable().toString()).contains("resubmitOnce");
+        });
   }
 
   @Test
@@ -185,13 +181,12 @@ class EventPublicationResubmissionConfigTest {
             "event-publication.resubmission.policies.other.multiplier=2",
             "event-publication.resubmission.policies.other.max-wait=PT1H",
             "event-publication.resubmit-once.completion-timeout=PT10M")
-        .run(
-            context ->
-                assertThat(context)
-                    .getFailure()
-                    .hasRootCauseInstanceOf(BindValidationException.class)
-                    .rootCause()
-                    .hasMessageContaining("policies.default is required"));
+        .run(context ->
+            assertThat(context)
+                .getFailure()
+                .hasRootCauseInstanceOf(BindValidationException.class)
+                .rootCause()
+                .hasMessageContaining("policies.default is required"));
   }
 
   @Test
@@ -207,27 +202,13 @@ class EventPublicationResubmissionConfigTest {
   }
 
   @Test
-  @DisplayName("処理中の出版の閾値が、方針の再投入とリスナーの処理が終わるまでの最長の時間以下だと起動に失敗する")
-  void inFlightStalenessShorterThanResubmissionsFailsStartup() {
-    assertBindFailure("event-publication.resubmission.in-flight-staleness=PT3H");
-  }
-
-  @Test
-  @DisplayName("処理中の出版の最長の時間は、待ち時間の和、各回の間隔とロックの上限、リスナーの上限の和である")
-  void maxInFlightAgeSumsWaitsDelaysAndListenerBound() {
-    final EventPublicationResubmissionConfig.Policy policy =
-        new EventPublicationResubmissionConfig.Policy(5, 2, Duration.ofHours(1));
-    final EventPublicationResubmissionConfig.Properties properties =
-        new EventPublicationResubmissionConfig.Properties(
-            Duration.ofMinutes(5),
-            Duration.ofHours(4),
-            Duration.ofMinutes(1),
-            100,
-            Duration.ofMinutes(10),
-            Map.of(EventPublicationResubmissionConfig.DEFAULT_POLICY, policy));
-
-    // 5 + 10 + 20 + 40 + 60 分の待ち、5 回の (1 + 10) 分、リスナーの 10 分。
-    assertThat(properties.maxInFlightAge(policy)).isEqualTo(Duration.ofMinutes(200));
+  @DisplayName("処理中の出版の閾値が lock-at-most-for（PT10M）以下だと起動に失敗し、1 秒長ければ起動する")
+  void inFlightStalenessNotLongerThanLockAtMostForFailsStartup() {
+    assertBindFailure("event-publication.resubmission.in-flight-staleness=PT10M");
+    runner
+        .withPropertyValues(
+            ENABLED + "=false", "event-publication.resubmission.in-flight-staleness=PT10M1S")
+        .run(context -> assertThat(context).hasNotFailed());
   }
 
   @Test
@@ -236,13 +217,12 @@ class EventPublicationResubmissionConfigTest {
     runner
         .withUserConfiguration(ResubmissionPolicies.class)
         .withBean(UnknownPolicyListener.class)
-        .run(
-            context ->
-                assertThat(context)
-                    .getFailure()
-                    .rootCause()
-                    .hasMessageContaining("@ResubmissionPolicy(\"missing\")")
-                    .hasMessageContaining("UnknownPolicyListener.on"));
+        .run(context ->
+            assertThat(context)
+                .getFailure()
+                .rootCause()
+                .hasMessageContaining("@ResubmissionPolicy(\"missing\")")
+                .hasMessageContaining("UnknownPolicyListener.on"));
   }
 
   @Test
@@ -311,26 +291,22 @@ class EventPublicationResubmissionConfigTest {
             "spring.threads.virtual.enabled=true",
             "spring.task.execution.shutdown.await-termination=true",
             "spring.task.execution.shutdown.await-termination-period=20s")
-        .run(
-            context -> {
-              // 終了を始めてから終わるタスクで、処理中のリスナーを表す。
-              context
-                  .getBean("applicationTaskExecutor", TaskExecutor.class)
-                  .execute(
-                      () -> {
-                        running.set(true);
-                        Awaitility.await("終了を始める")
-                            .atMost(Duration.ofSeconds(10))
-                            .untilTrue(exiting);
-                        done.set(true);
-                      });
+        .run(context -> {
+          // 終了を始めてから終わるタスクで、処理中のリスナーを表す。
+          context
+              .getBean("applicationTaskExecutor", TaskExecutor.class)
+              .execute(() -> {
+                running.set(true);
+                Awaitility.await("終了を始める").atMost(Duration.ofSeconds(10)).untilTrue(exiting);
+                done.set(true);
+              });
 
-              Awaitility.await("リスナーが動き始める").atMost(Duration.ofSeconds(10)).untilTrue(running);
-              exiting.set(true);
-              EventPublicationResubmissionConfig.awaitRunningListeners(context);
+          Awaitility.await("リスナーが動き始める").atMost(Duration.ofSeconds(10)).untilTrue(running);
+          exiting.set(true);
+          EventPublicationResubmissionConfig.awaitRunningListeners(context);
 
-              assertThat(done).as("文脈を閉じる前のリスナーの完了").isTrue();
-            });
+          assertThat(done).as("文脈を閉じる前のリスナーの完了").isTrue();
+        });
   }
 
   @Test
@@ -377,23 +353,18 @@ class EventPublicationResubmissionConfigTest {
         .withBean(
             EventPublicationResubmitOnce.class,
             () -> Mockito.mock(EventPublicationResubmitOnce.class))
-        .withInitializer(
-            context ->
-                context
-                    .getEnvironment()
-                    .getPropertySources()
-                    .addFirst(
-                        new MapPropertySource("target", Map.of(RESUBMIT_ONCE_TARGET, target))))
-        .run(
-            context -> {
-              assertThat(context).hasNotFailed();
-              assertThat(
-                      context
-                          .getBeansOfType(ApplicationRunner.class)
-                          .containsKey("resubmitOnceRunner"))
-                  .as("runner の bean")
-                  .isEqualTo(!normalStartup);
-            });
+        .withInitializer(context ->
+            context
+                .getEnvironment()
+                .getPropertySources()
+                .addFirst(new MapPropertySource("target", Map.of(RESUBMIT_ONCE_TARGET, target))))
+        .run(context -> {
+          assertThat(context).hasNotFailed();
+          assertThat(
+                  context.getBeansOfType(ApplicationRunner.class).containsKey("resubmitOnceRunner"))
+              .as("runner の bean")
+              .isEqualTo(!normalStartup);
+        });
   }
 
   @Test
@@ -433,28 +404,26 @@ class EventPublicationResubmissionConfigTest {
             ENABLED + "=true",
             "spring.threads.virtual.enabled=true",
             "spring.task.execution.simple.concurrency-limit=2")
-        .run(
-            context -> {
-              assertThat(context).hasSingleBean(TaskScheduler.class);
-              // Spring Boot 4.1 は taskExecutor の別名を作らず、@Async の executor を AsyncConfigurer で渡す。
-              assertThat(context.getBean(AsyncConfigurer.class).getAsyncExecutor())
-                  .isSameAs(context.getBean("applicationTaskExecutor"));
-              assertThat(
-                      ((SimpleAsyncTaskExecutor) context.getBean("applicationTaskExecutor"))
-                          .getConcurrencyLimit())
-                  .isEqualTo(2);
-            });
+        .run(context -> {
+          assertThat(context).hasSingleBean(TaskScheduler.class);
+          // Spring Boot 4.1 は taskExecutor の別名を作らず、@Async の executor を AsyncConfigurer で渡す。
+          assertThat(context.getBean(AsyncConfigurer.class).getAsyncExecutor())
+              .isSameAs(context.getBean("applicationTaskExecutor"));
+          assertThat(
+                  ((SimpleAsyncTaskExecutor) context.getBean("applicationTaskExecutor"))
+                      .getConcurrencyLimit())
+              .isEqualTo(2);
+        });
   }
 
   private void assertBindFailure(final String property) {
     runner
         .withPropertyValues(ENABLED + "=false", property)
-        .run(
-            context ->
-                assertThat(context)
-                    .getFailure()
-                    .as("%s の起動の失敗", property)
-                    .hasRootCauseInstanceOf(BindValidationException.class));
+        .run(context ->
+            assertThat(context)
+                .getFailure()
+                .as("%s の起動の失敗", property)
+                .hasRootCauseInstanceOf(BindValidationException.class));
   }
 
   /** 設定にない方針の名前を指定したリスナー。 */

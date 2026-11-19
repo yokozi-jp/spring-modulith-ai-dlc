@@ -25,7 +25,7 @@ tags: [architecture, integration, async, spring-modulith, resilience]
 - **ShedLock**：ロックの行で、定期のジョブを同時に 1 つのインスタンスへ絞る。
 - **手での 1 回の再投入のジョブ**（`EventPublicationResubmitOnce`）：運用者が 1 回だけ起動し、同じロックを取って再投入する。
 - **Staleness Monitor**：落ちたまま残った出版を `FAILED` に戻す。
-- **`in-flight-staleness`**：`PROCESSING` と `RESUBMITTED` の出版を `FAILED` に戻すまでの時間である。
+- **`in-flight-staleness`**：`PROCESSING` と `RESUBMITTED` の出版を、最後の出版か再投入の時刻から数えて `FAILED` に戻すまでの時間である。
 
 ## Resilience4j との関係
 
