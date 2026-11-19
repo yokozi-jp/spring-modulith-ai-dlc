@@ -30,6 +30,10 @@ jobs:
         with:
           tools: task betterleaks
 
+      # .betterleaks.toml の除外が、除外したファイルの秘密情報を見逃さないことを検査する（#473）。
+      - name: Check allowlist
+        run: task lint-betterleaks
+
       # PR ではベースからの差分だけをスキャンして高速化する。
       # main への push では BETTERLEAKS_LOG_OPTS が空になり、HEAD から辿れる履歴全体をスキャンする。
       # fetch-depth: 0 は他のブランチも取得するため、全 ref ではなく HEAD に限る。

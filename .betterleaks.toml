@@ -7,12 +7,21 @@
 useDefault = true
 
 # 誤検知の許可（allowlist）
-# .env.example はダミー値を並べるサンプルファイルであり、実際のシークレットは含まない。
-# そのためファイル全体をスキャン対象から除外する。
+# paths と regexes を併記するときは、condition = "AND" と regexTarget を必ず書く。
+# 既定の condition は OR で、paths に一致したファイルが丸ごと走査から外れる（#473）。
+# 既定の regexTarget は secret で値しか照合しないため、キー名を含む行や match を照合する対象を選ぶ。
+
+# .env.example のプレースホルダ（replace-with- か local-only- で始まる値）の行だけを除外する。
+# ほかの行は検出対象のまま。
 [[allowlists]]
-description = ".env.example はプレースホルダ専用のサンプルファイルのため除外"
+description = ".env.example のプレースホルダ（PASSWORD と SECRET の値が replace-with- か local-only- で始まる行）を除外"
+condition = "AND"
+regexTarget = "line"
 paths = [
   '''(^|/)\.env\.example$''',
+]
+regexes = [
+  '''(PASSWORD|SECRET)=(replace-with-|local-only-)''',
 ]
 
 # Compose の secret 読み込みは実値ではなく /run/secrets からの読み出しであり、
@@ -20,6 +29,8 @@ paths = [
 # compose-test.yml の Keycloak は backend-smoke profile 限定の使い捨てスモーク用で、同じ admin/admin を直書きする。
 [[allowlists]]
 description = "docker/compose.yml と compose-test.yml の Compose secret 読み出しおよびローカル専用 Keycloak 開発用資格情報を除外"
+condition = "AND"
+regexTarget = "line"
 paths = [
   '''(^|/)docker/compose\.yml$''',
   '''(^|/)docker/compose-test\.yml$''',
@@ -35,6 +46,8 @@ regexes = [
 # タスク定義は build.gradle から gradle/database.gradle へ切り出したため、両方を対象にする。
 [[allowlists]]
 description = "backend の Liquibase / jOOQ 設定（build.gradle・gradle/database.gradle）で password に変数参照を代入する行を除外（リテラル直書きは検出対象のまま）"
+condition = "AND"
+regexTarget = "match"
 paths = [
   '''(^|/)backend/build\.gradle$''',
   '''(^|/)backend/gradle/database\.gradle$''',
@@ -47,6 +60,8 @@ regexes = [
 # 実値を直書きしない。psql 変数参照の行だけを除外し、引用符付きリテラルの直書きは検出対象のまま。
 [[allowlists]]
 description = "docker/initdb のロールを作るスクリプトの psql 変数によるパスワード受け渡し（:'app_password' など）を除外（リテラル直書きは検出対象のまま）"
+condition = "AND"
+regexTarget = "line"
 paths = [
   '''(^|/)docker/initdb/01-create-migration-role\.sh$''',
   '''(^|/)docker/initdb/02-create-app-role\.sh$''',

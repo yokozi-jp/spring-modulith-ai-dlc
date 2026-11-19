@@ -305,6 +305,9 @@ const params = { ...(cursor !== undefined && { cursor }) };
 - **`task lint-duplicates`**：生成コードを除く手書きのバックエンドとフロントエンドをjscpdで検査する。
 - **`task scan-secrets`**：ステージ済み変更をbetterleaksでスキャンする。
 - **`task scan-secrets-all`**：現在のブランチから辿れる履歴をbetterleaksでスキャンする。環境変数`BETTERLEAKS_LOG_OPTS`でgit logの範囲を変えられる（既定は`HEAD`）。
+  merge commitの差分も走査するため、範囲の前に`--diff-merges=first-parent`を常に付ける。betterleaksの既定ではmerge commitを走査せず、コンフリクトの解消だけで入ったtokenを見逃す。
+- **`task lint-betterleaks`**：`.betterleaks.toml`の除外に一致するファイルへ、乱数のtokenと`password = '<乱数>'`をstageして本物のbetterleaksで走査し、検出されることを検査する。
+  現在のファイルが検出されないことも確かめる。対象のファイルは`tooling/betterleaks/test.sh`の`files`が正で、除外を足したら同じ変更で足す。
 - **`task lint-semgrep`**：Semgrep OSSで静的解析する。
 - **`task be-sbom`**：バックエンドのCycloneDX SBOMを生成する。
 - **`task scan-vulns`**：バックエンドとフロントエンドの依存関係をTrivyで検査する。
@@ -398,6 +401,15 @@ Knipとjscpdの採用理由は[ADR-035](../adr/ADR-035-adopt-jscpd-and-knip-qual
 DASTの検出ではタスクを失敗させず、起動、ログイン、CSRFの前提確認の失敗だけで失敗させる（[ADR-056](../adr/ADR-056-run-authenticated-dast-with-zap-in-ci.md)）。
 OKF検査の採用理由は[ADR-036](../adr/ADR-036-adopt-okf-for-docs-knowledge-bundle.md)と[ADR-038](../adr/ADR-038-route-steering-to-docs-knowledge.md)を参照する。
 
+### betterleaksの誤検知を除外する
+
+- 除外は行単位にする。`.betterleaks.toml`の`paths`と`regexes`を併記するときは、`condition = "AND"`と`regexTarget`を必ず書く。
+  既定の`condition`は`OR`で、`paths`に一致したファイルが丸ごと走査から外れる。
+  既定の`regexTarget`は`secret`で値しか照合しないため、キー名を含む行は`line`、`match`を使うときは`match`を選ぶ。
+- 除外を足したら、除外した場所にtokenを置くと検出されることを`lint-betterleaks`で確かめる。
+- 履歴にだけ残る誤検知は、`.betterleaksignore`にfingerprint（`commit:file:rule:line`）を1行足して除外する。
+- betterleaksが止めたとき、本物の秘密情報なら除外しない。pushしていれば無効化（rotate）する。
+
 ## Gitフック対応
 
 - **commit-msg（すべて）**：commitlintを実行する。
@@ -413,6 +425,7 @@ OKF検査の採用理由は[ADR-036](../adr/ADR-036-adopt-okf-for-docs-knowledge
 - **pre-commit（Taskfile、`lefthook.yml`、GitHub Actionsワークフロー、`tooling/taskfile-cleanup/`、`tooling/task-calls/`の変更）**：`lint-taskfile`を実行する。
 - **pre-commit（`tooling/agent-git/`の変更）**：`agent-git-test`を実行する。
 - **pre-commit（`lefthook.yml`か`tooling/lefthook-glob/`の変更）**：`lint-lefthook`を実行する。
+- **pre-commit（`.betterleaks.toml`、`.betterleaksignore`、`tooling/betterleaks/`の変更）**：`lint-betterleaks`を実行する。
 - **pre-commit（`package.json`、`lefthook.yml`、`tooling/lefthook-install/`の変更）**：`lefthook-install-test`を実行する。
 - **pre-commit（`tooling/formal-verify/`の変更）**：`formal-verify-test`を実行する。
 - **pre-commit（`tooling/*/test.sh`、`.kiro/hooks/*.test.sh`、`tooling/scratch-git/`の変更）**：`lint-scratch-git`を実行する。
@@ -453,7 +466,7 @@ pre-pushの「変更」は、push済みかどうかやrebaseの有無によら�
 - **`frontend-ci.yml`**：`fe-verify`、`fe-route-tree-check`、`api-client-check`を実行する。
 - **`api-contract.yml`**：`api-lint`、`api-lint-rules-test`、`api-breaking`、`api-docs`を実行し、設計書をartifactにする。
   mainへのpushでは設計書をGitHub Pagesに公開する。
-- **`betterleaks.yml`**：`scan-secrets-all`を実行する。PRでは`BETTERLEAKS_LOG_OPTS`にbaseからheadまでの範囲を渡す。
+- **`betterleaks.yml`**：`lint-betterleaks`と`scan-secrets-all`を実行する。PRでは`BETTERLEAKS_LOG_OPTS`にbaseからheadまでの範囲を渡す。
 - **`static-analysis.yml`**：`lint-semgrep`相当、`lint-duplicates`、`lint-taskfile`、`lint-lefthook`、`agent-git-test`、`lefthook-install-test`、`lint-scratch-git`を実行する。
   Code ScanningはSARIFの`suppressions`を読まないため、`nosemgrep`で抑止した検出をSARIFから除いてから送る。
 - **`trivy.yml`**：`scan-vulns`相当を実行する。Trivy本体の版は`SCAN_TRIVY_VERSION`で明示し、Taskfileの`aquasec/trivy`の版とそろえる（[ADR-097](../adr/ADR-097-keep-trivy-and-align-its-version.md)）。

@@ -246,6 +246,17 @@ pre-commit:
         task lefthook-install-test
       fail_text: "prepare.mjs の自己検査に失敗しました。task lefthook-install-test で再実行してください。"
 
+    # .betterleaks.toml か検査にステージ済み変更があるとき、除外したファイルに置いた秘密情報が検出されることを本物の betterleaks で検証（task lint-betterleaks）。
+    - name: lint-betterleaks
+      glob:
+        - ".betterleaks.toml"
+        - ".betterleaksignore"
+        - "tooling/betterleaks/**"
+      run: |
+        echo "{staged_files}" >/dev/null
+        task lint-betterleaks
+      fail_text: "betterleaks の allowlist の検証に失敗しました。task lint-betterleaks で再実行してください。"
+
     # 検証スキルの check.sh、mutants.py か自己検査にステージ済み変更があるとき、小さな TLA+ のモデルで自己検査する（task formal-verify-test）。
     - name: formal-verify-test
       glob:
