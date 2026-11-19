@@ -1,0 +1,20 @@
+{
+  "languages": {
+    "typescript": {
+      "name": "tsc",
+      "command": "frontend/apps/web/node_modules/.bin/tsc",
+      "args": ["--lsp", "--stdio"],
+      "file_extensions": ["ts", "tsx", "js", "jsx"],
+      "project_patterns": ["package.json", "tsconfig.json"],
+      "exclude_patterns": ["**/node_modules/**", "**/dist/**"]
+    },
+    "java": {
+      "name": "jdtls",
+      "command": "mise",
+      "args": ["-E", "lsp", "exec", "--", "sh", "-c", "exec jdtls --jvm-arg=-javaagent:\"$(command -v lombok.jar)\""],
+      "file_extensions": ["java"],
+      "project_patterns": ["settings.gradle"],
+      "exclude_patterns": ["**/build/**", "**/.gradle/**"]
+    }
+  }
+}

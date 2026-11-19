@@ -19,6 +19,7 @@
   "editor.codeActionsOnSave": {
     "source.fixAll.oxc": "explicit"
   },
+  "css.lint.unknownAtRules": "ignore",
   "java.compile.nullAnalysis.mode": "disabled",
   "java.configuration.updateBuildConfiguration": "automatic",
   "java.jdt.ls.vmargs": "-Xms256m -Xmx4G -XX:+HeapDumpOnOutOfMemoryError",

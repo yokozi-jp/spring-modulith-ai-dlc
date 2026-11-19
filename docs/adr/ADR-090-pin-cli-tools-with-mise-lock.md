@@ -60,7 +60,8 @@ trust を避けて Kiro CLI を固定する案は選択肢7、trust の範囲を
 - Kiro CLI は `[tools."http:kiro-cli"]` に公式の zip の URL（`https://prod.download.cli.kiro.dev/stable/<版>/kirocli-x86_64-linux.zip`）と `bin_path` を書く。各版の sha256 は公式の `https://prod.download.cli.kiro.dev/stable/index.json` にあり、`checksum_url` と `checksum_expr` で読んで `mise.lock` に記録する。PGP 署名（`<zip>.asc`）は検証しない。信頼の根拠は `index.json` の sha256 と、記録後の `mise.lock` である。
 - `mise.toml` に書くのは `[tools]` だけにする。タスク（Task の役割）、環境変数、設定、Node.js と pnpm（Vite+ の役割）は書かない。
 - `http:kiro-cli` の option（`url`、`bin_path`、`checksum_url` のどれも）は `mise trust` を要する。`/home/projects` のような広い範囲を `trusted_config_paths` で信頼せず、チェックアウトごとに `mise.toml` を読んで `mise trust` を実行する。mise の trust はパスごとで、中身が変わっても取り消されない。手順は `setup.md` と `dev-workflow.md` の worktree の節に書く。
-- Kiro Web の `kiro-web.sh` は、sandbox の `MISE_STATE_DIR` が空なので `mise trust` を実行する。サンドボックスは自分の `kiro-cli` を持つので、`http:kiro-cli` は入れない。
+- Kiro CLI の Java の LSP（`.kiro/settings/lsp.json`）が使う jdtls と、jdtls に `@Slf4j` を解釈させる Lombok の jar も、`http:jdtls` と `http:lombok` として Eclipse と Maven Central の URL を書く（[#455](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/455)）。
+- Kiro Web の `kiro-web.sh` は、sandbox の `MISE_STATE_DIR` が空なので `mise trust` を実行する。サンドボックスは自分の `kiro-cli` を持ち、LSP の機能も無いので、`http:kiro-cli`、`http:jdtls`、`http:lombok` は入れない。
 - `task lint-actions-security` と Lefthook の zizmor のジョブは、Docker の image でなく mise の zizmor を使う。`zizmor.yml` の `zizmor-action` の `version` には `mise.toml` と同じ版を書く。版を書く場所はこの2か所だけである。action の SHA が持つ版の一覧に無い版は動かないので、zizmor を上げるときは SHA も確かめる。
 - ローカルでは apt で入れた mise が `mise install --locked` を実行する。
 - PATH は mise の shims で通す。`04-setup-shell.sh` が `~/.bashrc` に `eval "$(mise activate bash --shims)"` を足す。Taskfile と Lefthook は `betterleaks` と `iwe` をそのまま呼ぶ。
@@ -71,6 +72,7 @@ trust を避けて Kiro CLI を固定する案は選択肢7、trust の範囲を
   ローカルは `JAVA_HOME` を設定せず、Gradle は PATH の shims の `java` を使う。
 - CI ではキャッシュを使わない。復元したキャッシュは `mise.lock` と照合されないためである。
 - setup-mise を使う workflow は、paths 条件に `mise.toml`、`mise.lock`、`.github/actions/setup-mise/**` も入れる。以前は Task の版を上げると各 workflow 自身が変わって走ったが、今は `mise.toml` と `mise.lock` しか変わらないためである。
+- CI の job は使う道具だけを入れるので、`task mise-lock-check` が `mise install --locked --dry-run` で全ての道具の版が `mise.lock` に載ることを検査する。
 - `task ci-gate-check` が、この paths 条件と、`mise.lock` を通さずに道具を入れる action（`ci-gate-check.py` の `BANNED_USES`）を検査する。
 - 番号付きのセットアップスクリプトのうち `00-setup-task.sh`、`01-setup-java.sh`、`03-setup-kiro.sh`、`05-setup-go-betterleaks.sh`、`06-setup-iwe.sh` と `versions.env` を削除する。
 

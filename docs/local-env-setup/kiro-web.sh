@@ -70,8 +70,9 @@ _kw_setup() (
   if [ ! -e "$stamp" ]; then
     # サンドボックスのグローバル設定にも道具があり、--locked だと lock に無いとして止まる。リポジトリの道具だけを名指しする。
     # サンドボックスは自分の kiro-cli を持つので、139MB の zip を取る http:kiro-cli は入れない。
+    # Kiro Web には LSP の機能が無いので、jdtls と Lombok も入れない。
     # shellcheck disable=SC2046
-    mise install --locked $(mise ls --local --json | jq -r 'keys[] | select(. != "http:kiro-cli")') >&2
+    mise install --locked $(mise ls --local --json | jq -r 'keys[] | select(. != "http:kiro-cli" and . != "http:jdtls" and . != "http:lombok")') >&2
     mise reshim
     touch "$stamp"
   fi
