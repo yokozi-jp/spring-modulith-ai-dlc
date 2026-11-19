@@ -30,6 +30,11 @@ fi
 status=0
 for cfg in "${configs[@]}"; do
   expected="${EXPECT:-$(sed -n '1s/^\\\* expect: //p' "$model/$cfg.cfg")}"
+  if [ -z "$expected" ]; then
+    echo "FAIL $cfg: the first line of $model/$cfg.cfg is not '\\* expect: <pass or invariant>'"
+    status=1
+    continue
+  fi
   mkdir -p "$cache/runs"
   out="$(mktemp -d "$cache/runs/$cfg.XXXXXX")"
   set +e
