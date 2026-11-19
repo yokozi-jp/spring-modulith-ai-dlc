@@ -3,7 +3,7 @@
 - [ADR の運用ルール](conventions.md)
 - [ADR テンプレート](adr-template.md)
 - [ADR-001: Spring Modulith によるモジュラーモノリス](ADR-001-adopt-spring-modulith-modular-monolith.md)（Accepted, 2026-09-11）
-- [ADR-002: package by feature とオニオンアーキテクチャ](ADR-002-package-by-feature-onion-architecture.md)（Accepted, 2026-09-11）
+- [ADR-002: package by feature とオニオンアーキテクチャ](ADR-002-package-by-feature-onion-architecture.md)（Accepted, Amended by ADR-050, 2026-09-11）
 - [ADR-003: データアクセスに jOOQ を採用](ADR-003-adopt-jooq-for-data-access.md)（Accepted, 2026-09-11）
 - [ADR-004: jOOQ 生成コードを Git 管理する](ADR-004-commit-jooq-generated-code.md)（Accepted, 2026-09-11）
 - [ADR-005: Liquibase をアプリケーション起動から分離する](ADR-005-decouple-liquibase-from-app-startup.md)（Accepted, 2026-09-11）
@@ -17,7 +17,7 @@
 - [ADR-013: HTTP API 契約を標準化する](ADR-013-standardize-http-api-contracts.md)（Accepted, 2026-09-14）
 - [ADR-014: SPA とバックエンドを同一オリジンで公開する](ADR-014-use-same-origin-spa-security-boundary.md)（Accepted, 2026-09-14）
 - [ADR-015: 可観測性データを構造化し保護する](ADR-015-structure-and-protect-observability-data.md)（Accepted, 2026-09-15）
-- [ADR-016: API と SPA のメッセージをローカライズする](ADR-016-localize-api-and-spa-messages.md)（Accepted, 2026-09-15）
+- [ADR-016: API と SPA のメッセージをローカライズする](ADR-016-localize-api-and-spa-messages.md)（Accepted, Amended by ADR-047, 2026-09-15）
 - [ADR-017: トランクベース開発とリポジトリ保護を採用する](ADR-017-adopt-trunk-based-repository-governance.md)（Proposed, 2026-09-15）
 - [ADR-018: release-please でセマンティックリリースを自動化する](ADR-018-automate-semantic-releases.md)（Proposed, 2026-09-15）
 - [ADR-019: 外部連携の耐障害性と容量制御を標準化する](ADR-019-define-resilience-and-capacity-guardrails.md)（Proposed, 2026-09-15）
