@@ -8,15 +8,17 @@ import com.example.demo.payment.domain.model.PaymentGateway;
 import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
 import io.github.resilience4j.retry.annotation.Retry;
 import java.math.BigDecimal;
-import java.net.http.HttpClient;
 import java.time.Duration;
 import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.Nullable;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.http.client.ClientHttpRequestFactoryBuilder;
+import org.springframework.boot.http.client.HttpClientSettings;
+import org.springframework.boot.http.client.HttpRedirects;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
-import org.springframework.http.client.JdkClientHttpRequestFactory;
+import org.springframework.http.client.ClientHttpRequestFactory;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.HttpClientErrorException;
@@ -71,10 +73,12 @@ class PaymentGatewayClient implements PaymentGateway {
       @Value("${payment-gateway.base-url}") final String baseUrl,
       @Value("${payment-gateway.connect-timeout}") final Duration connectTimeout,
       @Value("${payment-gateway.read-timeout}") final Duration readTimeout) {
-    final JdkClientHttpRequestFactory requestFactory =
-        new JdkClientHttpRequestFactory(
-            HttpClient.newBuilder().connectTimeout(connectTimeout).build());
-    requestFactory.setReadTimeout(readTimeout);
+    final ClientHttpRequestFactory requestFactory =
+        ClientHttpRequestFactoryBuilder.jdk()
+            .build(
+                HttpClientSettings.defaults()
+                    .withRedirects(HttpRedirects.DONT_FOLLOW)
+                    .withTimeouts(connectTimeout, readTimeout));
     this.restClient = builder.baseUrl(baseUrl).requestFactory(requestFactory).build();
   }
 

@@ -5,6 +5,9 @@ import java.util.Objects;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
+import org.springframework.boot.http.client.ClientHttpRequestFactoryBuilder;
+import org.springframework.boot.http.client.HttpClientSettings;
+import org.springframework.boot.http.client.HttpRedirects;
 import org.springframework.boot.security.oauth2.client.autoconfigure.OAuth2ClientProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -43,6 +46,10 @@ public class OidcDiscoveryLocationConfig {
     final Map<String, Object> configuration =
         Objects.requireNonNull(
             restClientBuilder
+                .requestFactory(
+                    ClientHttpRequestFactoryBuilder.jdk()
+                        .build(
+                            HttpClientSettings.defaults().withRedirects(HttpRedirects.DONT_FOLLOW)))
                 .build()
                 .get()
                 .uri(discoveryUri)

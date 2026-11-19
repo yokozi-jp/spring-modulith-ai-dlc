@@ -20,6 +20,8 @@ import java.time.Duration;
 import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.AfterEach;
@@ -160,6 +162,29 @@ class PaymentGatewayClientTest {
     assertThat(client.charge(ORDER_ID, AMOUNT))
         .as("orderId=%s の %d %s の請求の結果", ORDER_ID.value(), status, body)
         .isEqualTo(ChargeOutcome.failed());
+  }
+
+  @Test
+  @DisplayName("リダイレクトの応答は辿らず、契約の不備なので、例外を投げずに失敗を返す")
+  void redirectIsNotFollowed() throws IOException {
+    final AtomicInteger requests = new AtomicInteger();
+    final AtomicBoolean redirected = new AtomicBoolean();
+    final PaymentGatewayClient client =
+        start(exchange -> {
+          requests.incrementAndGet();
+          if (redirected.compareAndSet(false, true)) {
+            exchange.getResponseHeaders().add("Location", "/v1/charges");
+            exchange.sendResponseHeaders(302, -1);
+            exchange.close();
+          } else {
+            reply(exchange, 201, SUCCEEDED_REPLY);
+          }
+        });
+
+    assertThat(client.charge(ORDER_ID, AMOUNT))
+        .as("orderId=%s の 302 の請求の結果", ORDER_ID.value())
+        .isEqualTo(ChargeOutcome.failed());
+    assertThat(requests).as("orderId=%s の請求のリクエストの数", ORDER_ID.value()).hasValue(1);
   }
 
   @Test

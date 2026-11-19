@@ -41,7 +41,8 @@ Client はユースケースの進行役でもない。
 - コンストラクタは一つにし、Boot の自動構成の `RestClient.Builder` と、`@Value("${payment-gateway.base-url}") final String baseUrl` と、`@Value` の `Duration` の `connect-timeout` と `read-timeout` を受け取る。
   `application.yaml` の `base-url` は既定値のない環境変数（`${PAYMENT_GATEWAY_BASE_URL}`）にし、未設定なら起動に失敗させる。
   WireMock の URL は env の例と compose ファイルにだけ書く。
-- コンストラクタで、注入された `RestClient.Builder` に `baseUrl` と、接続のタイムアウト（1 秒）と呼び出しのタイムアウト（2 秒）を設定した `JdkClientHttpRequestFactory` を渡し、`build()` で `RestClient` を作る。
+- コンストラクタで、注入された `RestClient.Builder` に `baseUrl` と、接続のタイムアウト（1 秒）と呼び出しのタイムアウト（2 秒）を `ClientHttpRequestFactoryBuilder.jdk()` と `HttpClientSettings` で設定した `ClientHttpRequestFactory` を渡し、`build()` で `RestClient` を作る。
+  リダイレクトは辿らない（`HttpRedirects.DONT_FOLLOW`）。請求の POST を、設定にない URL へ送り直さないためである。
   builder から入るのは計測と `spring.jackson.*` などの Boot の設定で、通信の設定は `requestFactory` の上書きで Client が持つため、`spring.http.clients.*` は効かない。
   `RestClient.builder()` と `RestClient.create()` は Boot の自動構成を通らず、計測（トレースのヘッダーとクライアントのメトリクス）が付かない。
   値は `application.yaml` の `payment-gateway` に固定値で書き、テストが同じ値を読めるようにする。
@@ -121,7 +122,7 @@ Client は、外部システムの呼び出しの結果を次の四つに分け�
 
 ## 依存してよい型、してはいけない型
 
-- **依存してよい型**：`java..` の標準型、`org.jspecify..`、同じモジュールの `domain.model` の外部システムのインタフェースと値オブジェクト、Spring の `RestClient`、`RestClient.Builder`、`JdkClientHttpRequestFactory`、`HttpClientErrorException`、`HttpStatus`、`@Component`、`@Value`、Resilience4j の `@CircuitBreaker` と `@Retry`、Lombok の `@Slf4j`。
+- **依存してよい型**：`java..` の標準型、`org.jspecify..`、同じモジュールの `domain.model` の外部システムのインタフェースと値オブジェクト、Spring の `RestClient`、`RestClient.Builder`、`ClientHttpRequestFactory`、`ClientHttpRequestFactoryBuilder`、`HttpClientSettings`、`HttpRedirects`、`HttpClientErrorException`、`HttpStatus`、`@Component`、`@Value`、Resilience4j の `@CircuitBreaker` と `@Retry`、Lombok の `@Slf4j`。
 - **依存してはいけない型**：`application`、`domain.service`、`presentation.web`、`infrastructure.persistence` の型、jOOQ の API と生成型、モジュールルートの型、他モジュールの型、`@Service`、`@Transactional`。
 
 ## 最小の例と典型的な例
@@ -149,9 +150,12 @@ class PaymentGatewayClient implements PaymentGateway {
       @Value("${payment-gateway.base-url}") final String baseUrl,
       @Value("${payment-gateway.connect-timeout}") final Duration connectTimeout,
       @Value("${payment-gateway.read-timeout}") final Duration readTimeout) {
-    final JdkClientHttpRequestFactory requestFactory =
-        new JdkClientHttpRequestFactory(HttpClient.newBuilder().connectTimeout(connectTimeout).build());
-    requestFactory.setReadTimeout(readTimeout);
+    final ClientHttpRequestFactory requestFactory =
+        ClientHttpRequestFactoryBuilder.jdk()
+            .build(
+                HttpClientSettings.defaults()
+                    .withRedirects(HttpRedirects.DONT_FOLLOW)
+                    .withTimeouts(connectTimeout, readTimeout));
     this.restClient = builder.baseUrl(baseUrl).requestFactory(requestFactory).build();
   }
 

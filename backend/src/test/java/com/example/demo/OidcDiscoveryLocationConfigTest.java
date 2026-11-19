@@ -28,6 +28,9 @@ class OidcDiscoveryLocationConfigTest {
   /** ブラウザ向けの公開用の issuer。名前解決できないため、接続を試みると起動に失敗する。 */
   private static final String PUBLIC_ISSUER = "http://issuer.example.test/realms/demo";
 
+  /** discovery を返すスタブのパス。 */
+  private static final String DISCOVERY_PATH = "/discovery";
+
   /** discovery を返すローカルの HTTP スタブ。 */
   private static HttpServer server;
 
@@ -55,11 +58,19 @@ class OidcDiscoveryLocationConfigTest {
     server = HttpServer.create(new InetSocketAddress(InetAddress.getLoopbackAddress(), 0), 0);
     baseUrl = "http://127.0.0.1:" + server.getAddress().getPort();
     // 内部の URL の discovery。issuer は公開用の URL を返す（Keycloak の hostname v2 と同じ）。
-    server.createContext("/discovery", exchange -> respond(exchange, discovery(PUBLIC_ISSUER)));
+    server.createContext(DISCOVERY_PATH, exchange -> respond(exchange, discovery(PUBLIC_ISSUER)));
     // issuer がスタブ自身の URL である discovery。Boot の自動構成が issuer-uri から読む。
     server.createContext(
         "/realms/demo/.well-known/openid-configuration",
         exchange -> respond(exchange, discovery(baseUrl + "/realms/demo")));
+    // discovery の URL への 302。辿ると discovery が読めてしまう。
+    server.createContext(
+        "/redirect",
+        exchange -> {
+          exchange.getResponseHeaders().add("Location", baseUrl + DISCOVERY_PATH);
+          exchange.sendResponseHeaders(302, -1);
+          exchange.close();
+        });
     server.start();
   }
 
@@ -73,7 +84,7 @@ class OidcDiscoveryLocationConfigTest {
   void failsWhenDiscoveryIssuerDiffersFromIssuerUri() {
     runner
         .withPropertyValues(
-            "oidc.discovery-uri=" + baseUrl + "/discovery",
+            "oidc.discovery-uri=" + baseUrl + DISCOVERY_PATH,
             "spring.security.oauth2.client.provider.oidc.issuer-uri=http://other.example.test/realms/demo")
         .run(context ->
             assertThat(context)
@@ -86,11 +97,22 @@ class OidcDiscoveryLocationConfigTest {
   }
 
   @Test
+  @DisplayName("discovery がリダイレクトを返しても辿らず、起動しない")
+  void doesNotFollowRedirects() {
+    runner
+        .withPropertyValues(
+            "oidc.discovery-uri=" + baseUrl + "/redirect",
+            "spring.security.oauth2.client.provider.oidc.issuer-uri=" + PUBLIC_ISSUER)
+        .run(context ->
+            assertThat(context).as("discovery-uri=%s/redirect の起動", baseUrl).hasFailed());
+  }
+
+  @Test
   @DisplayName("registration に discovery の issuer と end_session_endpoint が入る")
   void registrationKeepsIssuerAndEndSessionEndpoint() {
     runner
         .withPropertyValues(
-            "oidc.discovery-uri=" + baseUrl + "/discovery",
+            "oidc.discovery-uri=" + baseUrl + DISCOVERY_PATH,
             "spring.security.oauth2.client.provider.oidc.issuer-uri=" + PUBLIC_ISSUER)
         .run(context -> {
           final ClientRegistration registration =
