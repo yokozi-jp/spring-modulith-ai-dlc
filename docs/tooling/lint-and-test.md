@@ -144,7 +144,8 @@ packageの`vite.config.ts`に`lint`か`fmt`があると、`vp lint`をpackageで
   `className`の外で組み立てた文字列と、`cn()`に渡す変数は検出しない。
 - **`lint/**`**：`import/no-nodejs-modules`、`new-cap`、`typescript/no-unsafe-assignment`、`typescript/no-unsafe-call`、`typescript/no-unsafe-member-access`をoffにする。
   Node側のLintツールであり、OxlintのJS plugin APIに型が無いためである。
-  `lint/**`はtsconfigの対象外で型検査が未定義の識別子を止めないため、Nodeのglobalを許した`no-undef`を有効にする。
+  `lint/**`はtsconfigの対象外で型の誤りが報告されず、未定義の識別子も止まらないため、Nodeのglobalを許した`no-undef`を有効にする。
+  型を使うrule（`typescript/no-unsafe-return`など）はJSDocの型で動くので、`lint/**`のJSDocの型の注釈は消さない。
 - **`packages/ui/**`**：shadcnの生成物の書き方に合わせて`shadcn/no-restyle`、`shadcn/no-arbitrary-values`、`shadcn/require-static-classes`をoffにする。
   `react/only-export-components`もoffにする。
   shadcnの生成物は`buttonVariants`のようなvariantをcomponentと同じファイルからexportするためである。
