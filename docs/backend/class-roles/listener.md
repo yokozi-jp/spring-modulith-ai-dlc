@@ -40,6 +40,9 @@ Listener は Infrastructure の Adapter でもない。
 - クラスを継承せず、継承も実装もさせない。
   `PgmCdAspect` は名前で対象を決め、継承した `on` には `*_pgm_cd` を束縛しない（[ADR-051](../../adr/ADR-051-bind-pgm-cd-with-scoped-value-and-aspect.md)）。
 - public メソッドは `@ApplicationModuleListener public void on(final <Event> event)` の一つだけにする。
+- イベントは `@ApplicationModuleListener` だけで受け、Listener 以外のクラスでも `@EventListener` と `@TransactionalEventListener` を直接付けず、`ApplicationListener` を実装しない。
+  理由は[アンチパターン](#アンチパターン)に示す。
+  Spring Boot の起動の完了のようなフレームワークのイベントを受ける必要が出たら、先にこの規則と、`ClassRoleArchTest` の `eventListenersAreApplicationModuleListeners` と `applicationListenerIsNotImplemented` を変える。
 - `on` はイベントの値で [Command](command.md) を作り（`new ReserveStockCommand(event.orderId())`）、CommandHandler の `handle` を一回呼ぶ。
 - `@Transactional` を付けない。
   `@ApplicationModuleListener` がトランザクションを開く。
@@ -204,8 +207,19 @@ private ResponseEntity<ChargeReply> post(final String key, final Money amount) {
 - Listener に業務処理を書く、または Repository を直接使う。
 - 一つの `on` から複数の CommandHandler を呼ぶ。
   一つが失敗するとイベントが再配信され、成功した処理も繰り返される。
-- `@ApplicationModuleListener` の代わりに `@EventListener` を付ける。
-  発行側のトランザクションの中で同期に動き、受信側の失敗が発行側の更新を巻き戻す。
+- `@ApplicationModuleListener` の代わりに `@EventListener` を付ける、または `ApplicationListener` を実装する。
+  イベントを発行した呼び出しの中で、発行側のトランザクションに加わって同期に動き、受信側の失敗が発行側の更新を巻き戻す。
+  イベント出版レジストリにも残らないため、失敗したイベントを再投入できない。
+- `@ApplicationModuleListener` の代わりに `@TransactionalEventListener` を付ける。
+  既定の `AFTER_COMMIT` の受信は、発行側のスレッドで、コミットを終えた発行側のトランザクションの `afterCompletion` の中で同期に動く。
+  Spring は、このときのデータアクセスがまだ元のトランザクションに加わり、後にコミットが続かないと説明している（[Spring Framework, TransactionSynchronization.afterCompletion](https://docs.spring.io/spring-framework/docs/current/javadoc-api/org/springframework/transaction/support/TransactionSynchronization.html#afterCompletion(int))）。
+  受信側の CommandHandler の `@Transactional` は新しいトランザクションを開かず、まだ解放されていない発行側の接続に加わる。
+  ただし、その後に `ModuleRoleTransactionManager` が継承する `DataSourceTransactionManager` が接続の auto-commit を `true` へ戻し、PostgreSQL の JDBC ドライバがそれまでの受信側の書き込みをコミットする。
+  失敗した受信が途中まで書いた行も、このコミットで残る。
+  受信の例外はログに出るだけで、発行側には届かない。
+  受信が失敗するとイベント出版は完了にならず、再投入で受信が繰り返されるため、途中まで書いた行の上で同じ処理がもう一度動く。
+  `ModuleRoleTransactionManager` はトランザクションを始めるときだけモジュールのロールへ切り替え、そのロールは発行側のコミットで接続のロールへ戻るため、加わった受信側はモジュールのロールで動かない。
+  `BEFORE_COMMIT` の受信は、`@EventListener` と同じく発行側のトランザクションの中で動いて受信側の失敗が発行側の更新を巻き戻し、イベント出版レジストリにも残らない。
 - 受信するクラスを `infrastructure` に置く。
 - 同じイベントを二回受けると、在庫を二重に引き当てる、または代金を二重に請求する。
 - Listener から別のイベントを発行し、他モジュールへ中継する。
@@ -213,6 +227,8 @@ private ResponseEntity<ChargeReply> post(final String key, final Money amount) {
 ## 作成時のチェックリスト
 
 - [ ] `@ApplicationModuleListener` を付けたメソッドは、`application` の `<Event>Listener` の `on` にする。［ArchUnit で検査：ClassRoleArchTest.moduleListenersAreApplicationListeners］
+- [ ] イベントを `@EventListener` と `@TransactionalEventListener` で受けない。［ArchUnit で検査：ClassRoleArchTest.eventListenersAreApplicationModuleListeners］
+- [ ] イベントを `ApplicationListener` の実装で受けない。［ArchUnit で検査：ClassRoleArchTest.applicationListenerIsNotImplemented］
 - [ ] public メソッドは `void on(<Event> event)` 一つにし、CommandHandler をちょうど一つ呼ぶ。［ArchUnit で検査：ClassRoleArchTest.listenersExposeOnlyOnAndCallOneCommandHandler］
 - [ ] `application` の `@Service` の名前を `Listener` で終える。［ArchUnit で検査：ClassRoleArchTest.applicationServicesHaveRoleNames］
 - [ ] `on` を public にする。［ArchUnit で検査：PackageByFeatureOnionArchitectureTest.transactionalMethodsArePublicApplicationMethods］

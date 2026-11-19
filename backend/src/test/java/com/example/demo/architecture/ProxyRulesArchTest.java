@@ -3,10 +3,15 @@ package com.example.demo.architecture;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.classes;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.methods;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
+import static org.assertj.core.api.Assertions.assertThat;
 
 import com.example.demo.DemoApplication;
+import com.tngtech.archunit.base.DescribedPredicate;
+import com.tngtech.archunit.core.domain.JavaAnnotation;
 import com.tngtech.archunit.core.domain.JavaClass;
 import com.tngtech.archunit.core.domain.JavaMethod;
+import com.tngtech.archunit.core.domain.JavaModifier;
+import com.tngtech.archunit.core.domain.properties.CanBeAnnotated;
 import com.tngtech.archunit.junit.AnalyzeClasses;
 import com.tngtech.archunit.junit.ArchTest;
 import com.tngtech.archunit.lang.ArchCondition;
@@ -19,10 +24,16 @@ import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
 import io.github.resilience4j.ratelimiter.annotation.RateLimiter;
 import io.github.resilience4j.retry.annotation.Retry;
 import io.github.resilience4j.timelimiter.annotation.TimeLimiter;
+import java.io.IOException;
 import java.lang.annotation.Annotation;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.List;
+import java.util.Locale;
 import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.Future;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import org.aspectj.lang.annotation.After;
@@ -32,12 +43,18 @@ import org.aspectj.lang.annotation.Around;
 import org.aspectj.lang.annotation.Aspect;
 import org.aspectj.lang.annotation.Before;
 import org.aspectj.lang.annotation.Pointcut;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.CachePut;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
+import org.springframework.resilience.annotation.ConcurrencyLimit;
+import org.springframework.resilience.annotation.Retryable;
 import org.springframework.scheduling.annotation.Async;
+import org.springframework.scheduling.annotation.Scheduled;
+import org.springframework.scheduling.annotation.Schedules;
 import org.springframework.security.access.annotation.Secured;
 import org.springframework.security.access.prepost.PostAuthorize;
 import org.springframework.security.access.prepost.PostFilter;
@@ -46,10 +63,28 @@ import org.springframework.security.access.prepost.PreFilter;
 import org.springframework.transaction.annotation.EnableTransactionManagement;
 import org.springframework.transaction.annotation.Transactional;
 
-/** Spring と Resilience4j のプロキシを迂回する同一クラス内の直接呼び出しを禁止する。 */
-@SuppressWarnings("PMD.TestClassWithoutTestCases")
+/** Spring と Resilience4j がアノテーションと Aspect で足す振る舞いが、黙って効かなくなる書き方を禁止する。 */
 @AnalyzeClasses(packagesOf = DemoApplication.class, importOptions = ProductionCodeOnly.class)
 class ProxyRulesArchTest {
+
+  /** リポジトリのルート。Gradle はテストを backend で実行する。 */
+  private static final Path REPOSITORY_ROOT = Path.of("..");
+
+  /** Java の実装規約の、リポジトリのルートからのパス。 */
+  private static final String JAVA_CODING_PATH = "docs/backend/java-coding.md";
+
+  /** because の最後に置く、Java の実装規約への参照。 */
+  private static final String JAVA_CODING_DOC = "規約：" + JAVA_CODING_PATH;
+
+  /** {@link #INTERCEPTED_ANNOTATIONS} と同じアノテーションを箇条書きにする、Java の実装規約の見出し。 */
+  private static final String INTERCEPTED_HEADING = "## プロキシで動くアノテーション";
+
+  /** 箇条書きに書いたアノテーションの名前。 */
+  private static final Pattern ANNOTATION_NAME = Pattern.compile("`@(\\w+)`");
+
+  /** pgm_cd を Aspect で渡すと決めた ADR のパス。 */
+  private static final String ADR_051 =
+      "docs/adr/ADR-051-bind-pgm-cd-with-scoped-value-and-aspect.md";
 
   /** pointcut の式を持つ AspectJ のアノテーション。 */
   private static final Set<Class<? extends Annotation>> POINTCUT_ANNOTATIONS =
@@ -60,6 +95,44 @@ class ProxyRulesArchTest {
           AfterReturning.class,
           AfterThrowing.class,
           Pointcut.class);
+
+  /**
+   * Spring と Resilience4j のプロキシが呼び出しを横取りして動かすアノテーション。
+   *
+   * <p>{@code @ApplicationModuleListener} のように、これらをメタアノテーションに持つ合成アノテーションも対象にする。
+   */
+  private static final List<Class<? extends Annotation>> INTERCEPTED_ANNOTATIONS =
+      List.of(
+          Transactional.class,
+          Async.class,
+          Cacheable.class,
+          CachePut.class,
+          CacheEvict.class,
+          Retryable.class,
+          ConcurrencyLimit.class,
+          PreAuthorize.class,
+          PostAuthorize.class,
+          PreFilter.class,
+          PostFilter.class,
+          Secured.class,
+          CircuitBreaker.class,
+          Retry.class,
+          RateLimiter.class,
+          Bulkhead.class,
+          TimeLimiter.class);
+
+  /** {@link #INTERCEPTED_ANNOTATIONS} のどれかを、直接かメタアノテーションとして持つメソッドと呼び出し先。 */
+  private static final DescribedPredicate<CanBeAnnotated> INTERCEPTED =
+      DescribedPredicate.describe(
+          "are meta-annotated with one of "
+              + INTERCEPTED_ANNOTATIONS.stream()
+                  .map(type -> "@" + type.getSimpleName())
+                  .collect(Collectors.joining(", ")),
+          annotated -> INTERCEPTED_ANNOTATIONS.stream().anyMatch(annotated::isMetaAnnotatedWith));
+
+  /** プロキシがメソッドを上書きできなくなる修飾子。 */
+  private static final List<JavaModifier> NOT_OVERRIDABLE =
+      List.of(JavaModifier.PRIVATE, JavaModifier.FINAL, JavaModifier.STATIC);
 
   /**
    * AspectJ の advice と {@code @Pointcut} の式に {@code within} を書き、対象のクラスを型の名前で絞る。
@@ -89,8 +162,9 @@ class ProxyRulesArchTest {
                   + "Spring のコンテキストの起動が数倍遅くなるため。"
                   + "直し方：式に within(<パッケージ>..*<役割名>) を書き、"
                   + "execution にはメソッドの名前と修飾子だけを書く。"
-                  + "規約：docs/backend/java-coding.md、"
-                  + "docs/adr/ADR-051-bind-pgm-cd-with-scoped-value-and-aspect.md");
+                  + JAVA_CODING_DOC
+                  + "、"
+                  + ADR_051);
 
   /**
    * {@code @Aspect} のクラスに {@link Ordered#LOWEST_PRECEDENCE} より小さい {@code @Order} を付け、トランザクションの
@@ -109,8 +183,9 @@ class ProxyRulesArchTest {
               "Spring は別々の Aspect とトランザクションが同じ順序の値で同じメソッドに掛かるときの前後を決めないため。"
                   + "直し方：Aspect のクラスに @Order(Ordered.LOWEST_PRECEDENCE - 100) のように、"
                   + "Ordered.LOWEST_PRECEDENCE より小さい値の @Order を付ける。"
-                  + "規約：docs/backend/java-coding.md、"
-                  + "docs/adr/ADR-051-bind-pgm-cd-with-scoped-value-and-aspect.md");
+                  + JAVA_CODING_DOC
+                  + "、"
+                  + ADR_051);
 
   /**
    * {@link EnableTransactionManagement} を宣言せず、トランザクションの advisor の順序を Spring の既定の {@link
@@ -127,97 +202,141 @@ class ProxyRulesArchTest {
               "トランザクションの advisor の順序が変わると、Aspect がトランザクションの内側で動いても"
                   + "aspectsDeclareOrder が検出できないため。"
                   + "直し方：@EnableTransactionManagement を消し、Spring Boot のトランザクションの自動構成に任せる。"
-                  + "規約：docs/backend/java-coding.md、"
-                  + "docs/adr/ADR-051-bind-pgm-cd-with-scoped-value-and-aspect.md");
+                  + JAVA_CODING_DOC
+                  + "、"
+                  + ADR_051);
 
-  /** {@link Transactional} メソッドの自己呼び出しを禁止する。 */
+  /**
+   * プロキシで動くアノテーションを付けたメソッドを、同じクラスの中から直接呼ばない。
+   *
+   * <p>呼び出し先のメソッドのアノテーションを、メタアノテーションまでたどって見る。継承したメソッドは、宣言したクラスのアノテーションで判定する。
+   */
   @ArchTest
-  /* package */ static final ArchRule transactionalMethodsAreNotCalledFromSameClass =
-      prohibitSelfInvocationOf(Transactional.class);
+  /* package */ static final ArchRule proxiedMethodsAreNotCalledFromSameClass =
+      ProxyRules.no_classes_should_directly_call_other_methods_declared_in_the_same_class_that(
+              INTERCEPTED)
+          .because(
+              "Spring の AOP プロキシは Bean の外からの呼び出しだけを横取りし、"
+                  + "同じクラスの中からの呼び出しではアノテーションが黙って効かないため。"
+                  + "直し方：アノテーションを付けたメソッドを同じクラスの中から呼ばず、別の Bean へ移して、その Bean を注入して呼ぶ。"
+                  + JAVA_CODING_DOC);
 
-  /** {@link Async} メソッドの自己呼び出しを禁止する。 */
+  /** プロキシで動くアノテーションを付けたメソッドを、プロキシが上書きできる private、final、static でないメソッドにする。 */
   @ArchTest
-  /* package */ static final ArchRule asyncMethodsAreNotCalledFromSameClass =
-      prohibitSelfInvocationOf(Async.class);
+  /* package */ static final ArchRule proxiedMethodsAreNotPrivateFinalOrStatic =
+      methods()
+          .that(INTERCEPTED)
+          .should(beOverridableByProxies())
+          .allowEmptyShould(true)
+          .because(
+              "Spring の AOP プロキシはサブクラスでメソッドを上書きして呼び出しを横取りし、"
+                  + "上書きできない private、final、static のメソッドではアノテーションが黙って効かないため。"
+                  + "直し方：アノテーションを付けたメソッドから private、final、static を外し、別の Bean から注入して呼ぶ。"
+                  + JAVA_CODING_DOC);
 
-  /** {@link Cacheable} メソッドの自己呼び出しを禁止する。 */
+  /** {@link Async} のメソッドは、Spring が受け付ける void か {@link Future} を返す。 */
   @ArchTest
-  /* package */ static final ArchRule cacheableMethodsAreNotCalledFromSameClass =
-      prohibitSelfInvocationOf(Cacheable.class);
+  /* package */ static final ArchRule asyncMethodsReturnVoidOrFuture =
+      methods()
+          .that()
+          .areMetaAnnotatedWith(Async.class)
+          .should()
+          .haveRawReturnType(void.class)
+          .orShould()
+          .haveRawReturnType(JavaClass.Predicates.assignableTo(Future.class))
+          .allowEmptyShould(true)
+          .because(
+              "Spring は戻り値が void と Future 以外の @Async のメソッドを呼ぶたびに IllegalArgumentException を投げ、"
+                  + "void の @Async が投げた例外は呼び出し元に届かないため。"
+                  + "直し方：結果か失敗を呼び出し元で扱うなら CompletableFuture を返し、扱わないなら void にする。"
+                  + JAVA_CODING_DOC);
 
-  /** {@link CachePut} メソッドの自己呼び出しを禁止する。 */
+  /**
+   * {@link Scheduled} のメソッドは、引数のない void のメソッドにし、private と final にしない。
+   *
+   * <p>static は禁じない。Spring はプロキシの Bean でも static の {@code @Scheduled} を呼べる（{@code
+   * AopUtils.selectInvocableMethod}）。
+   */
   @ArchTest
-  /* package */ static final ArchRule cachePutMethodsAreNotCalledFromSameClass =
-      prohibitSelfInvocationOf(CachePut.class);
+  /* package */ static final ArchRule scheduledMethodsAreNoArgVoidAndNotPrivateOrFinal =
+      methods()
+          .that()
+          .areMetaAnnotatedWith(Scheduled.class)
+          .or()
+          .areMetaAnnotatedWith(Schedules.class)
+          .should()
+          .haveRawReturnType(void.class)
+          .andShould()
+          .haveRawParameterTypes(new Class<?>[0])
+          .andShould()
+          .notHaveModifier(JavaModifier.PRIVATE)
+          .andShould()
+          .notHaveModifier(JavaModifier.FINAL)
+          .allowEmptyShould(true)
+          .because(
+              "スケジューラは @Scheduled のメソッドの戻り値を呼び出し元に返す値として使わず、"
+                  + "Reactor があると、Mono などの Publisher を返すメソッドを一度だけ呼んで、返した Publisher を実行のたびに購読するため。"
+                  + "引数のあるメソッドでは起動に失敗し、Bean が AOP のプロキシになると private のメソッドも起動に失敗し、"
+                  + "final のメソッドはフィールドが空のプロキシの上で動くため。"
+                  + "直し方：@Scheduled のメソッドを、引数のない void の、private と final でないメソッドにし、"
+                  + "結果はログかメトリクスに出す。"
+                  + JAVA_CODING_DOC);
 
-  /** {@link CacheEvict} メソッドの自己呼び出しを禁止する。 */
-  @ArchTest
-  /* package */ static final ArchRule cacheEvictMethodsAreNotCalledFromSameClass =
-      prohibitSelfInvocationOf(CacheEvict.class);
+  @Test
+  @DisplayName("プロキシの規則が見るアノテーションは、Java の実装規約の一覧と一致する")
+  void interceptedAnnotationsMatchJavaCodingList() throws IOException {
+    final List<String> listed =
+        Files.readAllLines(REPOSITORY_ROOT.resolve(JAVA_CODING_PATH)).stream()
+            .dropWhile(line -> !INTERCEPTED_HEADING.equals(line))
+            .dropWhile(line -> !line.startsWith("- "))
+            .takeWhile(line -> line.startsWith("- "))
+            .flatMap(line -> ANNOTATION_NAME.matcher(line).results().map(result -> result.group(1)))
+            .toList();
 
-  /** {@link PreAuthorize} メソッドの自己呼び出しを禁止する。 */
-  @ArchTest
-  /* package */ static final ArchRule preAuthorizeMethodsAreNotCalledFromSameClass =
-      prohibitSelfInvocationOf(PreAuthorize.class);
+    assertThat(listed)
+        .as(
+            "%s の「%s」の最初の箇条書きが、INTERCEPTED_ANNOTATIONS と食い違う。"
+                + "規則が見るアノテーションを規約の文書が示すようにするため。箇条書きと定数を同じ変更で直す",
+            JAVA_CODING_PATH, INTERCEPTED_HEADING.substring("## ".length()))
+        .containsExactlyInAnyOrderElementsOf(
+            INTERCEPTED_ANNOTATIONS.stream().map(Class::getSimpleName).toList());
+  }
 
-  /** {@link PostAuthorize} メソッドの自己呼び出しを禁止する。 */
-  @ArchTest
-  /* package */ static final ArchRule postAuthorizeMethodsAreNotCalledFromSameClass =
-      prohibitSelfInvocationOf(PostAuthorize.class);
+  private static ArchCondition<JavaMethod> beOverridableByProxies() {
+    return new ArchCondition<>("not be private, final or static") {
+      @Override
+      public void check(final JavaMethod item, final ConditionEvents events) {
+        final List<String> modifiers =
+            NOT_OVERRIDABLE.stream()
+                .filter(item.getModifiers()::contains)
+                .map(modifier -> modifier.name().toLowerCase(Locale.ROOT))
+                .toList();
+        if (!modifiers.isEmpty()) {
+          events.add(
+              SimpleConditionEvent.violated(
+                  item,
+                  item.getFullName()
+                      + " は "
+                      + String.join("、", modifiers)
+                      + " で、プロキシが "
+                      + String.join("、", interceptedAnnotationsOf(item))
+                      + " を横取りできない。 "
+                      + item.getSourceCodeLocation()));
+        }
+      }
+    };
+  }
 
-  /** {@link PreFilter} メソッドの自己呼び出しを禁止する。 */
-  @ArchTest
-  /* package */ static final ArchRule preFilterMethodsAreNotCalledFromSameClass =
-      prohibitSelfInvocationOf(PreFilter.class);
-
-  /** {@link PostFilter} メソッドの自己呼び出しを禁止する。 */
-  @ArchTest
-  /* package */ static final ArchRule postFilterMethodsAreNotCalledFromSameClass =
-      prohibitSelfInvocationOf(PostFilter.class);
-
-  /** {@link Secured} メソッドの自己呼び出しを禁止する。 */
-  @ArchTest
-  /* package */ static final ArchRule securedMethodsAreNotCalledFromSameClass =
-      prohibitSelfInvocationOf(Secured.class);
-
-  /** Resilience4j の {@link CircuitBreaker} メソッドの自己呼び出しを禁止する。 */
-  @ArchTest
-  /* package */ static final ArchRule circuitBreakerMethodsAreNotCalledFromSameClass =
-      prohibitSelfInvocationOf(CircuitBreaker.class);
-
-  /** Resilience4j の {@link Retry} メソッドの自己呼び出しを禁止する。 */
-  @ArchTest
-  /* package */ static final ArchRule retryMethodsAreNotCalledFromSameClass =
-      prohibitSelfInvocationOf(Retry.class);
-
-  /** Resilience4j の {@link RateLimiter} メソッドの自己呼び出しを禁止する。 */
-  @ArchTest
-  /* package */ static final ArchRule rateLimiterMethodsAreNotCalledFromSameClass =
-      prohibitSelfInvocationOf(RateLimiter.class);
-
-  /** Resilience4j の {@link Bulkhead} メソッドの自己呼び出しを禁止する。 */
-  @ArchTest
-  /* package */ static final ArchRule bulkheadMethodsAreNotCalledFromSameClass =
-      prohibitSelfInvocationOf(Bulkhead.class);
-
-  /** Resilience4j の {@link TimeLimiter} メソッドの自己呼び出しを禁止する。 */
-  @ArchTest
-  /* package */ static final ArchRule timeLimiterMethodsAreNotCalledFromSameClass =
-      prohibitSelfInvocationOf(TimeLimiter.class);
-
-  private static ArchRule prohibitSelfInvocationOf(
-      final Class<? extends Annotation> annotationType) {
-    return ProxyRules
-        .no_classes_should_directly_call_other_methods_declared_in_the_same_class_that_are_annotated_with(
-            annotationType)
-        .because(
-            "Spring の AOP プロキシは Bean の外からの呼び出しだけを横取りし、同じクラスの中からの呼び出しでは @"
-                + annotationType.getSimpleName()
-                + " が黙って効かないため。"
-                + "直し方：@"
-                + annotationType.getSimpleName()
-                + " のメソッドを同じクラスの中から呼ばず、別の Bean へ移して、その Bean を注入して呼ぶ。"
-                + "規約：docs/backend/java-coding.md");
+  /** メソッドに付けたアノテーションのうち、プロキシで動くものと、それをメタアノテーションに持つものの名前を返す。 */
+  private static List<String> interceptedAnnotationsOf(final JavaMethod method) {
+    return method.getAnnotations().stream()
+        .map(JavaAnnotation::getRawType)
+        .filter(type ->
+            INTERCEPTED_ANNOTATIONS.stream()
+                .anyMatch(intercepted ->
+                    type.isEquivalentTo(intercepted) || type.isMetaAnnotatedWith(intercepted)))
+        .map(type -> "@" + type.getSimpleName())
+        .toList();
   }
 
   private static ArchCondition<JavaClass> declareOrderOutsideTransaction() {
