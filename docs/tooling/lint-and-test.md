@@ -468,6 +468,8 @@ pre-pushの「変更」は、push済みかどうかやrebaseの有無によら�
   スコアの閾値を持たず、PITが完走しないときだけ失敗する。
   Backend CIのtestと同じGradle cacheをread-onlyで復元する。
   必須チェックにしない（[ADR-076](../adr/ADR-076-run-mutation-tests-per-change-and-tighten-coverage-gates.md)）。
+- **`codeql.yml`**：actions、java-kotlin（autobuild）、javascript-typescriptを解析する（[ADR-083](../adr/ADR-083-manage-codeql-as-advanced-setup-with-explicit-build-mode.md)）。
+  java-kotlinはBackend CIのtestと同じGradle cacheをread-onlyで復元し、Plugin Portalからのプラグイン取得で落ちないようにする。
 - **`frontend-ci.yml`**：`fe-verify`、`fe-route-tree-check`、`api-client-check`を実行する。
 - **`api-contract.yml`**：`api-lint`、`api-lint-rules-test`、`api-breaking`、`api-docs`を実行し、設計書をartifactにする。
   mainへのpushでは設計書をGitHub Pagesに公開する。

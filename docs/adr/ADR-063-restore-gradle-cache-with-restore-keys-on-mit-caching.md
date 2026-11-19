@@ -74,7 +74,7 @@ hash が変わっても、同じジョブ名の直近の main のキャッシュ
 保存の key は、復元ステップが返す `cache-primary-key` を使い、hash を再計算しない。
 PR は復元だけを行い、キャッシュを書かない。
 
-ジョブ名の部分は、Lint と Test が自分の値（`lint` と `test`）を持ち、Mutation と E2E は Test の値を読み取り専用で借りる。
+ジョブ名の部分は、Lint と Test が自分の値（`lint` と `test`）を持ち、Mutation、E2E、CodeQL は Test の値を読み取り専用で借りる。
 理由は次の 3 つである。
 
 - 既存の key は上書きされない。
@@ -83,6 +83,9 @@ PR は復元だけを行い、キャッシュを書かない。
   main の key を自分では作れない。
 - Mutation は `workflow_dispatch` でだけ動く。
   main の key を安定して作れない。
+- CodeQL は autobuild が Gradle を実行し、cache がないと Plugin Portal からプラグインを毎回取得する。
+  取得に失敗すると解析ジョブが落ちる（2026-11-19 に 3 回）。
+  専用の key を作ると、上限を超えた cache の保存量がさらに増える。
 
 `setup-gradle` の公式 docs は、`external` のとき Job Summary にキャッシュを外部で処理したと表示すると説明している。
 v6.4.0 は、Gradle のバージョンの対応状況を Job Summary に注記する（警告または通知で、ビルドの動作は変えない）。
