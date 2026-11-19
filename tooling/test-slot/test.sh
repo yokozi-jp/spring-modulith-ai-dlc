@@ -61,7 +61,6 @@ out="$(acquire)"
 check "空なら slot 0" 0 "$(slot_of "$out")"
 check "slot 0 は従来の PostgreSQL のポート" 5433 "$(value_of "$out" TEST_PG_PORT)"
 check "slot 0 は従来の web のポート" 5173 "$(value_of "$out" E2E_WEB_PORT)"
-check "取った slot は使用中に見える" 1 "$(grep -c '^spring-modulith-test-0	' "$state")"
 
 out="$(acquire)"
 check "slot 0 が使用中なら slot 1" 1 "$(slot_of "$out")"
@@ -78,12 +77,16 @@ env_file="$work/build/test-slot/slot-1.env"
 check "env ファイルの DB_PORT" "DB_PORT=21433" "$(grep '^DB_PORT=' "$env_file")"
 check "env ファイルの REDIS_PORT" "REDIS_PORT=21380" "$(grep '^REDIS_PORT=' "$env_file")"
 check "env ファイルの決済代行" "PAYMENT_GATEWAY_BASE_URL=http://127.0.0.1:21082" "$(grep '^PAYMENT_GATEWAY_BASE_URL=' "$env_file")"
-check "env ファイルの SERVER_PORT" "SERVER_PORT=21080" "$(grep '^SERVER_PORT=' "$env_file")"
+check "web 用の SERVER_PORT は slot の backend のポート" "21080" "$(value_of "$out" SERVER_PORT)"
 check "ポート以外の変数は基の値のまま" "$(grep '^OIDC_CLIENT_ID=' "$work/.env.test")" "$(grep '^OIDC_CLIENT_ID=' "$env_file")"
 check "基のファイルは書き換えない" "$(grep '^DB_PORT=' "$repo_root/.env.test.example")" "$(grep '^DB_PORT=' "$work/.env.test")"
 
 no_web="$(cd "$work" && TEST_SLOT=1 bash "$here/test-slot.sh" acquire .env.test 2>/dev/null)"
 check "web を指定しなければ接続先の変数を渡さない" 0 "$(printf '%s\n' "$no_web" | grep -cE 'OIDC_ISSUER_URI|PAYMENT_GATEWAY_BASE_URL|SERVER_PORT')"
+
+status=0
+(cd "$work" && TEST_SLOT=7 bash "$here/test-slot.sh" acquire .env.test >/dev/null 2>&1) || status=$?
+check "範囲外の TEST_SLOT は失敗する" 1 "$status"
 
 out="$(acquire TEST_SLOT=3)"
 check "TEST_SLOT があればその slot を使う" 3 "$(slot_of "$out")"
@@ -96,7 +99,7 @@ check "CI はいつも slot 0" 0 "$(slot_of "$out")"
 hold 0 "$tmp/gone"
 out="$(acquire)"
 check "持ち主の worktree が無ければ回収して slot 0" 0 "$(slot_of "$out")"
-check "回収したコンテナを消した" 1 "$(grep -c 'rm --force' "$state.log")"
+check "回収した持ち主のコンテナは残らない" no "$(contains "$state" "$tmp/gone")"
 
 : >"$state"
 for n in 0 1 2 3; do hold "$n"; done
@@ -122,6 +125,11 @@ done
 wait
 check "同時の 5 本のうち 4 本が別々の slot を取る" "0 1 2 3" "$(cat "$tmp"/par-* | grep . | sort | tr '\n' ' ' | sed 's/ $//')"
 check "5 本目は取れない" 1 "$(grep -L . "$tmp"/par-* | wc -l | tr -d ' ')"
+
+# compose-test.yml が読むポートの変数名と、slot が渡す名前がずれると、既定値の slot 0 へ黙って戻って衝突する。
+check "compose-test.yml のポートの変数は slot が渡す名前と同じ" \
+  "$(bash "$here/test-slot.sh" ports 0 | sed -n 's/^\(TEST_[A-Z]*_PORT\)=.*/\1/p' | sort | tr '\n' ' ')" \
+  "$(grep -o '\${TEST_[A-Z]*_PORT' "$repo_root/docker/compose-test.yml" | sed 's/^\${//' | sort -u | tr '\n' ' ')"
 
 # realm の origin の数が slot の数と一致する（Keycloak はポートのワイルドカードを扱えないので、全ての slot の origin を並べる）。
 slots="$(sed -n 's/^SLOTS=//p' "$here/test-slot.sh")"

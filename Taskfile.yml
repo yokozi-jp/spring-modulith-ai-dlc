@@ -139,7 +139,7 @@ tasks:
           echo "E2E_KEEP_ENV=1 のため、compose-test のコンテナと volume を残しました（slot $TEST_SLOT、Compose project $COMPOSE_PROJECT_NAME）。この slot は片付けるまで使えません。" >&2
           echo "  backend のログ：{{.DOCKER}} compose -p $COMPOSE_PROJECT_NAME -f {{.TEST_COMPOSE_FILE}} --profile e2e logs backend" >&2
           echo "  （frontend/apps/web/test-results/backend.log は vp run e2e の再実行で消える）" >&2
-          echo "  再実行：eval \"\$(TEST_SLOT=$TEST_SLOT bash tooling/test-slot/test-slot.sh acquire .env.test web 2>/dev/null)\" && cd frontend && vp run {{.FE_WEB}} e2e" >&2
+          echo "  再実行（この shell の環境を汚さないよう subshell で）：( eval \"\$(TEST_SLOT=$TEST_SLOT bash tooling/test-slot/test-slot.sh acquire .env.test web 2>/dev/null)\" && cd frontend && vp run {{.FE_WEB}} e2e )" >&2
           echo "  片付け：{{.DOCKER}} compose -p $COMPOSE_PROJECT_NAME -f {{.TEST_COMPOSE_FILE}} --profile e2e down --volumes --remove-orphans" >&2
         else
           compose down --volumes --remove-orphans || cleanup_status=$?
@@ -989,7 +989,6 @@ tasks:
       - |
         # 本体と後片付けの終了コードの扱いは docs/tooling/taskfile.md の「後片付けと終了コード」を参照する。
         # rollback の検証だけが compose の PostgreSQL を使い、テストは Testcontainers の依存を使う（ADR-085）。
-        # 中断した前の回の DB を残したまま rollback を検証しないよう、起動の前にも片付ける。
         # テストの前に PostgreSQL を止め、テストが接続先（compose の PostgreSQL）へ黙ってつながらないようにする。
         # slot の取得は、中断した前の回の DB を使わないことも兼ねる。
         export DOCKER="{{.DOCKER}}" TEST_COMPOSE_FILE="{{.TEST_COMPOSE_FILE}}"

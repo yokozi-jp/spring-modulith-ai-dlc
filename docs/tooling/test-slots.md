@@ -67,26 +67,25 @@ slot 1: web http://localhost:21173、backend http://localhost:21080、Keycloak h
 
 - `TEST_SLOT`、`COMPOSE_PROJECT_NAME`、表の 6 つのポート。
 - `TEST_ENV_FILE`：slot の env ファイル（`build/test-slot/slot-<n>.env`）。
-- `SERVER_PORT`、`OIDC_ISSUER_URI`、`PAYMENT_GATEWAY_BASE_URL`：slot の env ファイルと同じ値。
+- `SERVER_PORT`（`TEST_BACKEND_PORT` と同じ値）、`OIDC_ISSUER_URI`、`PAYMENT_GATEWAY_BASE_URL`（後の 2 つは slot の env ファイルと同じ値）。
   `task e2e`、`task e2e-up`、`task scan-dast` だけが渡す（`acquire` の第 2 引数 `web`）。
-  `task test` は渡さない。環境変数は Spring の env ファイルの import より優先され、Gradle のテストが起動したコンテナの接続先を上書きしてしまうため。
+  `task test` は渡さない。環境変数は Spring の env ファイルの import より優先され、`PAYMENT_GATEWAY_BASE_URL` などが slot の WireMock を指して、Gradle のテストが起動したコンテナの接続先とずれるため。
   `vp preview` と Playwright は、ルートの `.env.test` よりこれらの環境変数を優先して読む。
 
 slot の env ファイルは、基にする env ファイル（Task の `TEST_ENV_FILE`、既定は `.env.test`）の写しである。
-ホストから見たポートを持つ次の 5 つの変数だけを、slot の値に置き換える。
+ホストから見たポートを持つ次の 4 つの変数だけを、slot の値に置き換える。
 基にする env ファイルは書き換えない。
 
 | 変数                       | slot の値                                                      |
 | -------------------------- | -------------------------------------------------------------- |
 | `DB_PORT`                  | `TEST_PG_PORT`                                                 |
 | `REDIS_PORT`               | `TEST_REDIS_PORT`                                              |
-| `SERVER_PORT`              | `TEST_BACKEND_PORT`                                            |
 | `OIDC_ISSUER_URI`          | `http://127.0.0.1:<TEST_KEYCLOAK_PORT>/realms/spring-modulith` |
 | `PAYMENT_GATEWAY_BASE_URL` | `http://127.0.0.1:<TEST_WIREMOCK_PORT>`                        |
 
 `task be-migrate` と `task be-seed` は `COMPOSE_ENV_FILE` で、`task be-verify-migrations` と `task be-test` は `TEST_ENV_FILE` で、slot の env ファイルを受け取る。
 compose-test の backend（`e2e` profile）は `.env.test` を `env_file` で読み、`SERVER_PORT` をコンテナの待ち受けのポート 8080 に、`OIDC_ISSUER_URI` を slot の Keycloak の URL に上書きする。
-そのため、`.env.test` の `SERVER_PORT` は、ホストから見た backend のポートだけを表す。
+そのため、`.env.test` の `SERVER_PORT` は、`vp preview` の proxy が向ける、ホストから見た backend のポートだけを表す（slot の値は `acquire` が環境変数で渡す）。
 
 ## 空きがないとき
 

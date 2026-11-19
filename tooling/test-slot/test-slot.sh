@@ -35,9 +35,8 @@ write_env_file() {
   kc="$(port_of "$n" $BASE_KEYCLOAK)" wm="$(port_of "$n" $BASE_WIREMOCK)"
   mkdir -p "$(dirname "$out")"
   awk -F= -v db="$(port_of "$n" $BASE_PG)" -v redis="$(port_of "$n" $BASE_REDIS)" \
-    -v server="$(port_of "$n" $BASE_BACKEND)" \
     -v issuer="http://127.0.0.1:$kc/realms/spring-modulith" -v payment="http://127.0.0.1:$wm" '
-    BEGIN { v["DB_PORT"] = db; v["REDIS_PORT"] = redis; v["SERVER_PORT"] = server; v["OIDC_ISSUER_URI"] = issuer; v["PAYMENT_GATEWAY_BASE_URL"] = payment }
+    BEGIN { v["DB_PORT"] = db; v["REDIS_PORT"] = redis; v["OIDC_ISSUER_URI"] = issuer; v["PAYMENT_GATEWAY_BASE_URL"] = payment }
     $1 in v { print $1 "=" v[$1]; seen[$1] = 1; next }
     { print }
     END { for (k in v) if (!(k in seen)) print k "=" v[k] }
@@ -51,9 +50,10 @@ emit() {
   while IFS= read -r line; do echo "export $line"; done < <(ports "$n")
   echo "export TEST_ENV_FILE=$file"
   # vp preview と Playwright は、ルートの .env.test より環境変数を優先して読む。ホストから見たポートを持つ変数だけを渡す。
-  # Gradle のテストへは渡さない。環境変数は Spring の env ファイルの import より優先され、テストのコンテナの接続先を上書きしてしまう。
+  # Gradle のテストへは渡さない。環境変数は Spring の env ファイルの import より優先され、PAYMENT_GATEWAY_BASE_URL などが slot の WireMock を指して、テストのコンテナの接続先とずれる。
   if [ -n "$web" ]; then
-    for key in SERVER_PORT OIDC_ISSUER_URI PAYMENT_GATEWAY_BASE_URL; do
+    echo "export SERVER_PORT=$(port_of "$n" $BASE_BACKEND)"
+    for key in OIDC_ISSUER_URI PAYMENT_GATEWAY_BASE_URL; do
       echo "export $(grep "^$key=" "$file")"
     done
   fi
@@ -119,6 +119,7 @@ acquire() {
   local base="${1:?基にする env ファイルを指定してください。}" web="${2:-}" n deadline last_report=-999999 busy_reason lock
   cd "$(git rev-parse --show-toplevel)"
   if [ -n "${TEST_SLOT:-}" ]; then
+    case "$TEST_SLOT" in [0-9]) [ "$TEST_SLOT" -lt "$SLOTS" ] || { echo "TEST_SLOT は 0 以上 $((SLOTS - 1)) 以下にしてください: $TEST_SLOT" >&2; return 1; } ;; *) echo "TEST_SLOT は 0 以上 $((SLOTS - 1)) 以下にしてください: $TEST_SLOT" >&2; return 1 ;; esac
     emit "$TEST_SLOT" "$base" "$web" reuse
     return
   fi
@@ -132,7 +133,7 @@ acquire() {
   while :; do
     local reasons=""
     exec 9>>"$lock"
-    flock 9
+    flock -w "$WAIT_SECONDS" 9 || { echo "ロック $lock を $WAIT_SECONDS 秒で取れませんでした。" >&2; return 1; }
     for ((n = 0; n < SLOTS; n++)); do
       if slot_free "$n"; then
         claim "$n"

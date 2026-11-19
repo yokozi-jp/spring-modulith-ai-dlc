@@ -61,7 +61,7 @@ Issue #418 で決めたことは次のとおりである。
   ADR-033 は変えず、preview の `strictPort` も slot ごとの固定のポートで残す。
 
 slot の値は、環境変数と slot の env ファイル（`build/test-slot/slot-<n>.env`）で渡す。
-slot の env ファイルは `.env.test` の写しで、ホストから見たポートを持つ変数（`DB_PORT`、`REDIS_PORT`、`SERVER_PORT`、`OIDC_ISSUER_URI`、`PAYMENT_GATEWAY_BASE_URL`）だけを置き換える。
+slot の env ファイルは `.env.test` の写しで、ホストから見たポートを持つ変数（`DB_PORT`、`REDIS_PORT`、`OIDC_ISSUER_URI`、`PAYMENT_GATEWAY_BASE_URL`）だけを置き換える。
 compose-test の backend はコンテナの待ち受けのポートを `SERVER_PORT: "8080"` に固定し、`.env.test` の `SERVER_PORT` は、ホストから見た backend のポートだけを表すようにする。
 
 `task test` は、`be-verify-migrations` と `be-test` の間で PostgreSQL のコンテナを消さずに止め、最後の `down` まで slot を持つ。
