@@ -1,6 +1,7 @@
 # Architecture Decision Records
 
 - [ADR の運用ルール](conventions.md)
+- [ADR テンプレート](adr-template.md)
 - [ADR-001: Spring Modulith によるモジュラーモノリス](ADR-001-adopt-spring-modulith-modular-monolith.md)（Accepted, 2026-09-11）
 - [ADR-002: package by feature とオニオンアーキテクチャ](ADR-002-package-by-feature-onion-architecture.md)（Accepted, 2026-09-11）
 - [ADR-003: データアクセスに jOOQ を採用](ADR-003-adopt-jooq-for-data-access.md)（Accepted, 2026-09-11）
