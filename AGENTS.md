@@ -14,6 +14,10 @@
 スキルを導入、更新する前に `docs/agents/skill-sources.md` を読む。
 `.kiro/.kiro-plugins-installed` に載るファイル（pstack と thermos）は編集しない。
 
+### 検証スキル
+
+画面、API、注文、決済、ログインに関わる変更を確かめるとき、不具合を再現するとき、Pull Request の Evidence を作るときは `/verify-demo` を使う。
+
 ### Matt Pocock skills
 
 Matt Pocock のスキルを使う前に `docs/agents/matt-pocock-skills/workflow.md` を読む。
