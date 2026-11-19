@@ -1029,7 +1029,7 @@ tasks:
       - |
         {{.DOCKER}} run --rm -v "$PWD:/repo" -w /repo \
           stoplight/spectral:6.16.3@sha256:a07aa4455367b9501b574423b684ab0ef3ee42556089013583318ec015249050 \
-          lint openapi/openapi.yaml --ruleset .spectral.yaml
+          lint openapi/openapi.yaml --ruleset .spectral.yaml --fail-severity=warn
 
   # 作業ツリーを index と比べるため、pre-commit で再生成した結果がステージ済みの内容と同じなら通る。
   # 新しく生成された未追跡のファイルも差分として扱う。
@@ -1061,7 +1061,7 @@ tasks:
         spectral() {
           {{.DOCKER}} run --rm -v "$PWD:/repo" -w /repo \
             stoplight/spectral:6.16.3@sha256:a07aa4455367b9501b574423b684ab0ef3ee42556089013583318ec015249050 \
-            lint "$@" --ruleset .spectral.yaml
+            lint "$@" --ruleset .spectral.yaml --fail-severity=warn
         }
         spectral openapi/spectral-fixtures/valid.yaml
         status=0

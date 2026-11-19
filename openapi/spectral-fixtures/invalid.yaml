@@ -185,6 +185,25 @@ paths:
               schema:
                 type: string
                 format: uri-reference
+  /api/sample-labels:
+    get:
+      # operation-tags（tags がない）と operation-operationId（operationId がない）
+      summary: サンプルラベルを一覧する。
+      description: サンプルラベルを一覧する。<p>新しい順に返す。
+      responses:
+        "200":
+          description: サンプルラベルの一覧
+  /api/sample-memos:
+    get:
+      tags:
+        - sample-order
+      summary: サンプルメモを一覧する。
+      description: サンプルメモを一覧する。<p>新しい順に返す。
+      operationId: listSampleMemos
+      # operation-success-response（2xx がない）
+      responses:
+        default:
+          description: サンプルメモの一覧
 components:
   # common-problem-detail-schema（ValidationProblem を定義しない）
   schemas:
