@@ -204,6 +204,7 @@ task e2e
 ```
 
 失敗した環境を調べるときは`E2E_KEEP_ENV=1 task e2e`で残す。
+`task e2e-up`は起動だけで片付けないので、直接実行したときは、`docker compose -f docker/compose-test.yml --profile e2e down --volumes --remove-orphans`で自分で片付ける。
 前提と調べ方は[E2Eテストの方針と書き方](../e2e/testing-strategy.md)を参照する。
 
 ## ミューテーションテストを実行するとき

@@ -7,7 +7,9 @@ import {
   listPayments,
   listProducts,
   onSaleProduct,
+  paymentNotYetText,
   readJson,
+  seededOrderCodesByStatusLabel,
   uniqueCode,
 } from "./orders";
 import { chargeRequestCount, failChargesFor } from "./payment-gateway";
@@ -17,8 +19,6 @@ import type { ChargeFailure } from "./payment-gateway";
 // 決済代行の応答は、WireMock の管理 API で注文ごとに実行中に切り替える（ADR-072）。
 // 出版の状態、試行の回数、再投入の後の決済記録は、読む公開の入口も再投入の公開の入口も無いため、
 // backend の PaymentGatewayClientIntegrationTest が本番の Client と既存の再投入の入口で確かめる。
-
-const notYet = "決済をまだ受け付けていません。処理中か、失敗して再投入を待っています。";
 
 async function attachScreenshot(page: Page, testInfo: TestInfo, name: string): Promise<void> {
   await testInfo.attach(name, { body: await page.screenshot(), contentType: "image/png" });
@@ -63,7 +63,7 @@ test("注文を作成し確定すると、Listener が決済代行へ請求し�
 // 戻した直後の読み直しの期間だけを確かめる。
 async function expectNotResubmitted(page: Page, orderId: string): Promise<void> {
   await page.getByRole("button", { name: "決済の状態を読み直す" }).click();
-  await expectPaymentText(page, notYet);
+  await expectPaymentText(page, paymentNotYetText);
   expect(await chargeRequestCount(page.request, orderId), `orderId=${orderId} の請求`).toBe(1);
 }
 
@@ -83,7 +83,7 @@ async function expectTransientFailure(
     // backend の本番の Client が、切り替えた WireMock を呼んだ。
     await expect.poll(() => chargeRequestCount(page.request, orderId)).toBeGreaterThanOrEqual(1);
     // 欄は読み直しの期間が過ぎるまで処理中を出し、その後に再投入待ちを出す。
-    await expectPaymentText(page, notYet);
+    await expectPaymentText(page, paymentNotYetText);
     expect(await listPayments(page.request, orderId), `orderId=${orderId}`).toEqual([]);
     await attachScreenshot(page, testInfo, `${failure.kind}-not-yet`);
   } finally {
@@ -162,9 +162,13 @@ async function expectDetail(page: Page, code: string, text: string): Promise<voi
 }
 
 test.describe("シーダーの代表の状態を、一覧と詳細と作成の画面で表示する（読むだけ）", () => {
-  const allCodes = ["SEED-C01", "SEED-C02", "SEED-C03", "SEED-C04", "SEED-C05", "SEED-C06"];
+  const allCodes = Object.values(seededOrderCodesByStatusLabel).flat();
 
-  async function expectBucket(page: Page, label: string, codes: string[]): Promise<void> {
+  async function expectBucket(
+    page: Page,
+    label: keyof typeof seededOrderCodesByStatusLabel,
+  ): Promise<void> {
+    const codes: readonly string[] = seededOrderCodesByStatusLabel[label];
     await page
       .getByRole("navigation", { name: "状態で絞り込む" })
       .getByRole("link", { name: label })
@@ -182,9 +186,9 @@ test.describe("シーダーの代表の状態を、一覧と詳細と作成の�
   test("一覧の状態の絞り込みは、代表の注文を状態ごとに分ける", async ({ page }) => {
     await page.goto("/orders");
 
-    await expectBucket(page, "下書き", ["SEED-C01", "SEED-C02"]);
-    await expectBucket(page, "確定済み", ["SEED-C03", "SEED-C05", "SEED-C06"]);
-    await expectBucket(page, "取消済み", ["SEED-C04"]);
+    await expectBucket(page, "下書き");
+    await expectBucket(page, "確定済み");
+    await expectBucket(page, "取消済み");
   });
 
   test("SEED-C03 の詳細は決済済みを表示する", async ({ page }) => {
@@ -196,7 +200,7 @@ test.describe("シーダーの代表の状態を、一覧と詳細と作成の�
   });
 
   test("SEED-C06 の詳細は、決済記録の無い再投入待ちを表示する", async ({ page }) => {
-    await expectDetail(page, "SEED-C06", notYet);
+    await expectDetail(page, "SEED-C06", paymentNotYetText);
   });
 
   test("SEED-C04 の詳細は、決済の対象でないことを表示する", async ({ page }) => {

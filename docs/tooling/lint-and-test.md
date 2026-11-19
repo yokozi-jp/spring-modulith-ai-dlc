@@ -21,6 +21,10 @@ Gitフックの中でDockerを使う検査は、`docker info`が失敗するロ�
 - **`task mutation-test`**：`be-mutation-test`の別名。
 - **`task fe-verify`**：フロントエンドの静的解析、未使用コード検査、テスト、テレメトリを無効にした本番ビルドを実行する。
 - **`task e2e`**：compose-testでbackendを起動し、Vite previewに対してPlaywrightのE2Eを実行して後片付けする（[E2Eテストの方針と書き方](../e2e/testing-strategy.md)）。
+- **`task e2e-up`**：`task e2e`の起動の手順（build、依存の起動、migration、代表データ、backend）だけを実行し、片付けない。
+  `task e2e`の外で起動して残すときにも使い、その呼び出し側が片付ける。
+- **`task e2e-collect-logs LOG=<パス>`**：compose-testのbackendのログを書き、秘密の値、セッションのCookieの値、JWTの形の文字列が入っていれば失敗する。
+  `task e2e`が片付けの前に呼ぶ。`task e2e-up`で残したスタックを片付けるときも、その前に呼ぶ。
 
 ## バックエンド
 
@@ -62,7 +66,7 @@ PITのHTMLとXMLのレポートは、変異対象がある場合に`backend/buil
 
 ## フロントエンド
 
-- **`task fe-check`**：workspaceのルートの`frontend`で`vp check`を実行し、Oxfmt、Oxlint、TypeScriptの型を非破壊で検査する。
+- **`task fe-check`**：workspaceのルートの`frontend`で`vp check`を実行し、Oxfmt、Oxlint、TypeScriptの型を非破壊で検査する。続けて、`e2e/`の`environment.ts`、`fixtures.ts`、`orders.ts`、`payment-gateway.ts`をNodeで直接importでき（相対のimportに拡張子`.ts`がある）、Playwrightの外から使えることを確かめる。
 - **`task fe-knip`**：未参照ファイル、未使用export、未使用依存をKnipで検査する。
   `packages/ui`は`includeEntryExports: true`にし、`exports`で公開した部品の未使用exportも報告する。
 - **`task fe-doctor`**：`apps/web`のReact Doctorでwarningとerrorを検出し、検出または15分超過で失敗する。`packages/ui`は対象にしない。
