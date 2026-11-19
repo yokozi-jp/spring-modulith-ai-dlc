@@ -103,4 +103,3 @@
 - [ADR-100: 2 つ以上の package が使う frontend の依存は pnpm の catalog で版を 1 つにする](ADR-100-pin-shared-frontend-dependencies-in-pnpm-catalog.md)（Proposed, 2026-11-19）
 - [ADR-101: テナント、所属、役割をアプリの DB に持ち、テナントを選んだ時点で役割の権限を組み立てる](ADR-101-keep-tenants-and-roles-in-app-database.md)（Proposed, 2026-11-19）
 - [ADR-102: 本番の IdP に Amazon Cognito を使い、ローカルとテストでは Keycloak で代える](ADR-102-use-amazon-cognito-as-production-idp.md)（Proposed, 2026-11-19）
-- [ADR-103: pre-push は origin/main との merge-base からの差分で検査を選び、成功した job の出力も残す](ADR-103-judge-pre-push-changes-from-merge-base.md)（Proposed, 2026-11-19）

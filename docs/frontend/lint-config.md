@@ -34,8 +34,7 @@ packageの`vite.config.ts`に`lint`か`fmt`があると、`vp lint`をpackageで
 - **`void`**：`no-void`を`allowAsStatement: true`にする（後述）。
 - **`undefined`**：`no-undefined`をoffにし、`x === undefined`で比較する。
 - **一律のstyle規則**：`capitalized-comments`、`max-lines-per-function`、`no-magic-numbers`、`no-ternary`、`one-var`、`sort-imports`、`sort-keys`をoffにする。
-- **関数の書き方**：`func-style`を`"declaration"`にする。
-  名前付き関数は関数宣言にし、関数の型注釈から引数を推論させるアロー関数だけを理由付きの行単位の抑制で許す。
+- **関数の書き方**：`func-style`を`"declaration"`にする（後述）。
 - **短い識別子**：`id-length`で`t`だけを例外にする。
 - **ビルド時の定数**：`no-underscore-dangle`で`__TELEMETRY_ENABLED__`と`__TELEMETRY_APP__`だけを許可する。
 - **型のimport**：`no-duplicate-imports`を`allowSeparateTypeImports: true`にする。
@@ -56,7 +55,7 @@ packageの`vite.config.ts`に`lint`か`fmt`があると、`vp lint`をpackageで
   Base UIをimportできるのはこのpackageだけで、`apps/**`では禁止する。
 - **shadcnの部品の認識**：`@shadcn/lint`は、アプリの`components.json`の`aliases.ui`（`@frontend/ui`）と、ルートの`settings.shadcn.componentImports`（`^@frontend/ui(/|$)`）の両方で、`@frontend/ui`からimportした部品を認識する。
   認識した部品の`className`に、部品が持つ見た目のclass（`p-4`など）を渡すと`shadcn/no-restyle`が報告し、`mt-2`のような配置のclassは許す。
-- **`apps/web/src/routes/**`**：`react/only-export-components`をoffにする。
+- **`apps/*/src/routes/**`**：`react/only-export-components`をoffにする。
 - **テストファイル**：`react/jsx-no-literals`と`import/max-dependencies`をoffにする。
 
 生成物の`apps/*/src/routeTree.gen.ts`と`packages/api/src/generated/**`は、Lint、整形、coverageから外す。
@@ -116,8 +115,6 @@ linkとbuttonの入れ子は、jsPluginの`ui-composition/no-button-in-link`が�
 自前の関数で包んだEffectは検出しない。
 
 組み合わせた結果は、`frontend/lint/lint-config.test.js`が`frontend/lint/fixtures/`の違反例と正しい例を実際の設定でLintして確かめる。
-実物のアプリは`apps/web`だけなので、`apps/*`のoverrideが別のアプリにも効くことは`frontend/lint/fixtures/apps/sample`で確かめ、実物の2つ目のアプリができたら置き換える。
-`frontend/lint/tailwind-entry-point.test.js`は、どこから実行してもそのpackageのCSSを解決できることを確かめる。
 
 `../../apps/web/src/...`のように相対パスでpackageの外へ出るimportは、pnpmの解決を通らないので、`package.json`に依存を書かないことでは止まらない（[フロントエンドアーキテクチャ](architecture.md#現在の構成)）。
 このimportは`import/no-relative-parent-imports`が止める。
@@ -132,7 +129,7 @@ jsPluginやoverrideの挙動を試すときも、一時ディレクトリへ設�
 名前を付ける関数は、トップレベルでもcomponentやHookの中でも関数宣言で書く。
 その場で渡すコールバックはアロー関数で書く（`prefer-arrow-callback`）。
 関数の型注釈から引数を推論させる必要がある場合だけ、理由を付けて`func-style`を行単位で抑制し、アロー関数を変数に代入してよい。
-`allowTypeAnnotation`は型注釈付きの関数式も許すため、使わない。
+`allowTypeAnnotation`は使わない。
 
 ```tsx
 function OrderRow({ order }: OrderRowProps) {

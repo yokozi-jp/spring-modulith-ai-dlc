@@ -21,7 +21,7 @@ task check
 `task check`は、バックエンドの静的解析の前に`task lint-session-sql`でセッションに状態を残すSQLがないことを確かめる。
 
 `task be-lint`のSpotlessは、mainから変えたファイルを全体で検査するため、変えていない既存の行の書式も違反になる。
-その行は`task be-format`の出力を、同じ変更に含める。
+`task be-format`を実行し、その出力を同じ変更に含める。
 
 ## フロントエンドを開発するとき
 
@@ -262,6 +262,7 @@ task lint-actions-security
 task ci-gate-check
 ```
 
+`task ci-gate-check`にはPython 3とPyYAMLが要る（ローカルでは`sudo apt install python3-yaml`）。
 `ci.yml`にジョブを足したときは、`CI gate`の`needs`にも足す。
 `ci.yml`から呼ばない`pull_request`のworkflowは、`tooling/ci-gate-check/excluded.tsv`に理由を書く。
 `zizmor.yml`の`zizmor-action`の`version`は、`mise.toml`のzizmorと同じ版にする。

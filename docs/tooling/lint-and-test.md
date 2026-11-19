@@ -30,7 +30,7 @@ Gitフックの中でDockerを使う検査は、`docker info`が失敗するロ�
 ## バックエンド
 
 - **`task be-lint`**：Spotless、PMD、SpotBugsでmainとtestを検査する。
-  Spotlessは`ratchetFrom 'origin/main'`で、mainから変えたファイルを全体で検査する。
+  Spotlessは`ratchetFrom 'origin/main'`で、mainから変えたファイルを全体で検査する。変えていない既存の行の書式も違反になる。
 - **`task lint-session-sql`**：`backend/src/main/java`のJavaと`backend/src/main/resources/db`のSQLとYAMLから、接続を多重化するプロキシ（PgBouncerのトランザクションモード、RDS Proxy）の後ろで壊れる、セッションに状態を残すSQLを検出し、あれば失敗する。
   対象は、[PgBouncerの機能の表](https://www.pgbouncer.org/features.html)でTransaction poolingがNeverの機能のうち、セッションのadvisory lock（`pg_advisory_lock`、`pg_try_advisory_lock`、`pg_advisory_unlock`、`pg_advisory_unlock_all`と`_shared`の版）、`LISTEN`、`WITH HOLD`のカーソル、`PREPARE`と`DEALLOCATE`の文、`ON COMMIT PRESERVE ROWS`と`ON COMMIT DELETE ROWS`の一時表、`LOAD`である。
   大文字と小文字を区別せず、Javadoc、行コメント、YAMLとSQLのコメントの行は除く。
@@ -245,7 +245,7 @@ pre-pushのjobは順番に実行し、失敗した時点で止める。
 pre-pushの「変更」は、`origin/main`とのmerge-baseからの差分で判定する。
 2回目以降のpushでも、ブランチ全体の変更に対して検査が走る。
 `origin/main`が無くmerge-baseを取れないときは、全ファイルを対象にして全検査を走らせる。
-判定の理由は[ADR-103](../adr/ADR-103-judge-pre-push-changes-from-merge-base.md)にある。
+判定の理由は`lefthook.yml`の`files`のコメントにある。
 
 ## CI対応
 
