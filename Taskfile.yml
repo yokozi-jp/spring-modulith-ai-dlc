@@ -478,6 +478,12 @@ tasks:
     cmds:
       - bash tooling/agent-git/test.sh
 
+  lefthook-install-test:
+    desc: npmのprepare（prepare.mjs）がmainのworktreeのlefthookでhookを入れ、入れられなければ失敗することを、一時のgitリポジトリで検証
+    silent: true
+    cmds:
+      - bash tooling/lefthook-install/test.sh
+
   # Setup
   setup:
     desc: 開発環境のセットアップスクリプトを順次実行
