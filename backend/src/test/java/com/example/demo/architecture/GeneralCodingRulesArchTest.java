@@ -24,6 +24,7 @@ import java.util.function.Supplier;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.http.client.ClientHttpRequestFactoryBuilder;
 import org.springframework.web.client.RestClient;
 
 /** ArchUnit が提供する汎用コーディング規則をプロダクションコードへ適用する。 */
@@ -42,7 +43,11 @@ class GeneralCodingRulesArchTest {
       "規約：docs/datetime/timezone-conventions.md、docs/adr/ADR-006-utc-instant-absolute-time-policy.md";
 
   /** 自動構成を迂回する {@code RestClient} の生成メソッド。 */
-  private static final Set<String> FACTORY_METHODS = Set.of("builder", "create");
+  private static final Set<String> REST_CLIENT_FACTORY_METHODS = Set.of("builder", "create");
+
+  /** Boot の設定（{@code spring.http.clients.*}）を迂回する、request factory の builder の生成メソッド。 */
+  private static final Set<String> REQUEST_FACTORY_BUILDER_METHODS =
+      Set.of("jdk", "simple", "httpComponents", "jetty", "reactor", "detect");
 
   /** 標準出力と標準エラー出力への直接アクセスを禁止する。 */
   @ArchTest
@@ -178,17 +183,18 @@ class GeneralCodingRulesArchTest {
   @DisplayName("RestClient.builder() と RestClient.create() を、呼び出しとメソッド参照のどちらでも拒否する")
   void restClientFactoriesAreRejected() {
     // フィクスチャを実際に呼び出してIDEにも使用済みと認識させる。拒否判定は続くArchUnitの検査が担う。
-    assertThat(RestClientBypass.createForbiddenValues()).hasSize(3);
+    assertThat(RestClientBypass.createForbiddenValues()).hasSize(4);
 
     assertThatThrownBy(() ->
             restClientIsBuiltFromInjectedBuilderRule()
                 .check(new ClassFileImporter().importClasses(RestClientBypass.class)))
         .isInstanceOf(AssertionError.class)
-        .hasMessageContaining("(3 times)")
         .hasMessageContaining("calls method <org.springframework.web.client.RestClient.builder()>")
         .hasMessageContaining("calls method <org.springframework.web.client.RestClient.create()>")
         .hasMessageContaining(
-            "references method <org.springframework.web.client.RestClient.builder()>");
+            "references method <org.springframework.web.client.RestClient.builder()>")
+        .hasMessageContaining(
+            "calls method <org.springframework.boot.http.client.ClientHttpRequestFactoryBuilder.jdk()>");
   }
 
   /** {@code RestClient.builder()} と {@code RestClient.create(...)} へのアクセスを禁止する規則を組み立てる。 */
@@ -197,15 +203,20 @@ class GeneralCodingRulesArchTest {
         .should()
         .accessTargetWhere(
             DescribedPredicate.describe(
-                "RestClient.builder() or RestClient.create()",
-                (JavaAccess<?> access) ->
-                    access.getTargetOwner().isEquivalentTo(RestClient.class)
-                        && FACTORY_METHODS.contains(access.getName())))
+                "RestClient.builder(), RestClient.create() or a ClientHttpRequestFactoryBuilder factory",
+                (JavaAccess<?> access) -> bypassesBoot(access.getTargetOwner(), access.getName())))
         .because(
             "Boot の自動構成を通らない RestClient には、計測（トレースのヘッダーとクライアントのメトリクス）と"
-                + "spring.jackson.* などの Boot の設定が入らないため。"
-                + "直し方：RestClient.Builder を注入する（@Bean のメソッドなら引数で受け取る）。"
+                + "spring.jackson.* や spring.http.clients.* などの Boot の設定が入らないため。"
+                + "直し方：RestClient.Builder を注入する（@Bean のメソッドなら引数で受け取る）。request factory が要るときは、ClientHttpRequestFactoryBuilder と HttpClientSettings を注入する。"
                 + "規約：docs/backend/class-roles/external-client.md");
+  }
+
+  /** アクセスが、Boot の自動構成か {@code spring.http.clients.*} を迂回する生成かを返す。 */
+  private static boolean bypassesBoot(final JavaClass owner, final String name) {
+    return (owner.isEquivalentTo(RestClient.class) && REST_CLIENT_FACTORY_METHODS.contains(name))
+        || (owner.isEquivalentTo(ClientHttpRequestFactoryBuilder.class)
+            && REQUEST_FACTORY_BUILDER_METHODS.contains(name));
   }
 
   /** 規則が拒否することを確かめるための、禁止された生成の例。 */
@@ -213,7 +224,11 @@ class GeneralCodingRulesArchTest {
     /** 呼び出し二つとメソッド参照一つで、自動構成を迂回した生成を返す。 */
     /* package */ static List<Object> createForbiddenValues() {
       final Supplier<RestClient.Builder> reference = RestClient::builder;
-      return List.of(RestClient.builder(), RestClient.create(), reference.get());
+      return List.of(
+          RestClient.builder(),
+          RestClient.create(),
+          reference.get(),
+          ClientHttpRequestFactoryBuilder.jdk());
     }
   }
 }

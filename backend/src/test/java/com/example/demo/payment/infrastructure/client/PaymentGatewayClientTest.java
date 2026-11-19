@@ -33,6 +33,11 @@ import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.boot.autoconfigure.AutoConfigurations;
 import org.springframework.boot.autoconfigure.context.PropertyPlaceholderAutoConfiguration;
 import org.springframework.boot.convert.ApplicationConversionService;
+import org.springframework.boot.http.client.ClientHttpRequestFactoryBuilder;
+import org.springframework.boot.http.client.HttpClientSettings;
+import org.springframework.boot.http.client.HttpRedirects;
+import org.springframework.boot.http.client.autoconfigure.HttpClientAutoConfiguration;
+import org.springframework.boot.http.client.autoconfigure.imperative.ImperativeHttpClientAutoConfiguration;
 import org.springframework.boot.restclient.autoconfigure.RestClientAutoConfiguration;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 import org.springframework.core.NestedExceptionUtils;
@@ -78,7 +83,8 @@ class PaymentGatewayClientTest {
                   .setConversionService(ApplicationConversionService.getSharedInstance()))
           .withConfiguration(
               AutoConfigurations.of(
-                  PropertyPlaceholderAutoConfiguration.class, RestClientAutoConfiguration.class))
+                  PropertyPlaceholderAutoConfiguration.class, RestClientAutoConfiguration.class,
+                  HttpClientAutoConfiguration.class, ImperativeHttpClientAutoConfiguration.class))
           .withPropertyValues(
               "payment-gateway.connect-timeout=1s", "payment-gateway.read-timeout=2s")
           .withBean(PaymentGatewayClient.class);
@@ -287,6 +293,8 @@ class PaymentGatewayClientTest {
     server = started;
     return new PaymentGatewayClient(
         RestClient.builder(),
+        ClientHttpRequestFactoryBuilder.jdk(),
+        HttpClientSettings.defaults().withRedirects(HttpRedirects.DONT_FOLLOW),
         "http://"
             + InetAddress.getLoopbackAddress().getHostAddress()
             + ":"

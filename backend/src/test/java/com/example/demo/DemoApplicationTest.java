@@ -38,6 +38,8 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.boot.http.client.HttpClientSettings;
+import org.springframework.boot.http.client.HttpRedirects;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.ApplicationContext;
 import org.springframework.context.annotation.Import;
@@ -240,8 +242,21 @@ class DemoApplicationTest {
   /** 請求の API の {@code http.client.requests} の件数を返す。まだ記録がなければ 0 を返す。 */
   private long chargeRequestCount() {
     final Timer timer =
-        meterRegistry.find("http.client.requests").tag("uri", "/v1/charges").timer();
+        meterRegistry
+            .find("http.client.requests")
+            .tag("uri", "/v1/charges")
+            .tag("status", "201")
+            .timer();
     return timer == null ? 0 : timer.count();
+  }
+
+  @Test
+  @DisplayName("送信 HTTP クライアントの共通設定が、リダイレクトを辿らない")
+  void httpClientsDoNotFollowRedirects() {
+    assertEquals(
+        HttpRedirects.DONT_FOLLOW,
+        applicationContext.getBean(HttpClientSettings.class).redirects(),
+        "spring.http.clients.redirects が dont-follow であること");
   }
 
   @Test

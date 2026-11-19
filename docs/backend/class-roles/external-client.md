@@ -38,13 +38,13 @@ Client はユースケースの進行役でもない。
 ## 必須の記述
 
 - `@Component` を付けた package-private の `class` にし、`final` を付けず、外部システムのインタフェースを実装する。
-- コンストラクタは一つにし、Boot の自動構成の `RestClient.Builder` と、`@Value("${payment-gateway.base-url}") final String baseUrl` と、`@Value` の `Duration` の `connect-timeout` と `read-timeout` を受け取る。
+- コンストラクタは一つにし、Boot の自動構成の `RestClient.Builder`、`ClientHttpRequestFactoryBuilder<?>`、`HttpClientSettings` と、`@Value("${payment-gateway.base-url}") final String baseUrl` と、`@Value` の `Duration` の `connect-timeout` と `read-timeout` を受け取る。
   `application.yaml` の `base-url` は既定値のない環境変数（`${PAYMENT_GATEWAY_BASE_URL}`）にし、未設定なら起動に失敗させる。
   WireMock の URL は env の例と compose ファイルにだけ書く。
-- コンストラクタで、注入された `RestClient.Builder` に `baseUrl` と、接続のタイムアウト（1 秒）と呼び出しのタイムアウト（2 秒）を `ClientHttpRequestFactoryBuilder.jdk()` と `HttpClientSettings` で設定した `ClientHttpRequestFactory` を渡し、`build()` で `RestClient` を作る。
-  リダイレクトは辿らない（`HttpRedirects.DONT_FOLLOW`）。請求の POST を、設定にない URL へ送り直さないためである。
-  builder から入るのは計測と `spring.jackson.*` などの Boot の設定で、通信の設定は `requestFactory` の上書きで Client が持つため、`spring.http.clients.*` は効かない。
-  `RestClient.builder()` と `RestClient.create()` は Boot の自動構成を通らず、計測（トレースのヘッダーとクライアントのメトリクス）が付かない。
+- コンストラクタで、注入された `ClientHttpRequestFactoryBuilder` に、`HttpClientSettings` へ接続のタイムアウト（1 秒）と呼び出しのタイムアウト（2 秒）を足した値（`settings.withTimeouts(...)`）を渡して request factory を作る。
+  それを `RestClient.Builder` の `baseUrl` と `requestFactory` に渡し、`build()` で `RestClient` を作る。
+  request factory の種類とリダイレクトなどの共通設定は `application.yaml` の `spring.http.clients` が持つ。今は JDK の `HttpClient` に固定し、リダイレクトは辿らない（請求の POST を設定にない URL へ送り直さない）。
+  `RestClient.builder()`、`RestClient.create()`、`ClientHttpRequestFactoryBuilder.jdk()` などは、Boot の計測と `spring.http.clients.*` を通らないため使わない。
   値は `application.yaml` の `payment-gateway` に固定値で書き、テストが同じ値を読めるようにする。
 - トランザクションの中で呼ぶ Client は、最悪の時間を `idle_in_transaction_session_timeout` より短くする。
   [ADR-050](../../adr/ADR-050-define-backend-class-roles-and-naming.md) により、Listener は CommandHandler のトランザクションの中で外部システムを呼ぶ。
@@ -122,7 +122,7 @@ Client は、外部システムの呼び出しの結果を次の四つに分け�
 
 ## 依存してよい型、してはいけない型
 
-- **依存してよい型**：`java..` の標準型、`org.jspecify..`、同じモジュールの `domain.model` の外部システムのインタフェースと値オブジェクト、Spring の `RestClient`、`RestClient.Builder`、`ClientHttpRequestFactory`、`ClientHttpRequestFactoryBuilder`、`HttpClientSettings`、`HttpRedirects`、`HttpClientErrorException`、`HttpStatus`、`@Component`、`@Value`、Resilience4j の `@CircuitBreaker` と `@Retry`、Lombok の `@Slf4j`。
+- **依存してよい型**：`java..` の標準型、`org.jspecify..`、同じモジュールの `domain.model` の外部システムのインタフェースと値オブジェクト、Spring の `RestClient`、`RestClient.Builder`、`ClientHttpRequestFactory`、`ClientHttpRequestFactoryBuilder`、`HttpClientSettings`、`HttpClientErrorException`、`HttpStatus`、`@Component`、`@Value`、Resilience4j の `@CircuitBreaker` と `@Retry`、Lombok の `@Slf4j`。
 - **依存してはいけない型**：`application`、`domain.service`、`presentation.web`、`infrastructure.persistence` の型、jOOQ の API と生成型、モジュールルートの型、他モジュールの型、`@Service`、`@Transactional`。
 
 ## 最小の例と典型的な例
@@ -147,15 +147,13 @@ class PaymentGatewayClient implements PaymentGateway {
   /** 自動構成の builder から、決済システムの URL とタイムアウトを持つ HTTP クライアントを作る。 */
   /* package */ PaymentGatewayClient(
       final RestClient.Builder builder,
+      final ClientHttpRequestFactoryBuilder<?> factoryBuilder,
+      final HttpClientSettings settings,
       @Value("${payment-gateway.base-url}") final String baseUrl,
       @Value("${payment-gateway.connect-timeout}") final Duration connectTimeout,
       @Value("${payment-gateway.read-timeout}") final Duration readTimeout) {
     final ClientHttpRequestFactory requestFactory =
-        ClientHttpRequestFactoryBuilder.jdk()
-            .build(
-                HttpClientSettings.defaults()
-                    .withRedirects(HttpRedirects.DONT_FOLLOW)
-                    .withTimeouts(connectTimeout, readTimeout));
+        factoryBuilder.build(settings.withTimeouts(connectTimeout, readTimeout));
     this.restClient = builder.baseUrl(baseUrl).requestFactory(requestFactory).build();
   }
 
@@ -270,6 +268,8 @@ class PaymentGatewayClientTest {
       final PaymentGatewayClient client =
           new PaymentGatewayClient(
               RestClient.builder(),
+              ClientHttpRequestFactoryBuilder.jdk(),
+              HttpClientSettings.defaults(),
               "http://localhost:" + server.getAddress().getPort(),
               Duration.ofSeconds(1),
               Duration.ofSeconds(2));
@@ -336,7 +336,7 @@ class PaymentGatewayClientTest {
 - [ ] jOOQ の API と生成型を使わない。［ArchUnit で検査：PackageByFeatureOnionArchitectureTest.databaseTechnologyApisAreOnlyUsedByPersistenceAdapters］
 - [ ] `@Transactional` を付けない。［ArchUnit で検査：PackageByFeatureOnionArchitectureTest.transactionalMethodsArePublicApplicationMethods］
 - [ ] `@Component` を付けた package-private の class にし、URL を `@Value` で受け取る。［自分で点検］
-- [ ] `RestClient` を、注入された `RestClient.Builder` から作る（`RestClient.builder()` と `RestClient.create()` を使わない）。［ArchUnit で検査：GeneralCodingRulesArchTest.restClientIsBuiltFromInjectedBuilder］
+- [ ] `RestClient` を、注入された `RestClient.Builder` から作る（`RestClient.builder()`、`RestClient.create()`、`ClientHttpRequestFactoryBuilder.jdk()` などを使わない）。［ArchUnit で検査：GeneralCodingRulesArchTest.restClientIsBuiltFromInjectedBuilder］
 - [ ] 呼び出しに Boot の計測が付く。［結合テストで検査：DemoApplicationTest.paymentGatewayCallIsObserved］
 - [ ] 接続 1 秒、呼び出し 2 秒のタイムアウトを `application.yaml` に書き、コンストラクタで受け取る。［自分で点検］
 - [ ] トランザクションの中で呼ぶなら、最悪の時間を `DB_IDLE_IN_TRANSACTION_TIMEOUT_MS` より短くする。［結合テストで検査：DemoApplicationTest.paymentGatewayWorstCaseFitsIdleInTransactionTimeout］

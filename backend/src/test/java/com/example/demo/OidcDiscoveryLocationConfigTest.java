@@ -14,6 +14,8 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.autoconfigure.AutoConfigurations;
+import org.springframework.boot.http.client.autoconfigure.HttpClientAutoConfiguration;
+import org.springframework.boot.http.client.autoconfigure.imperative.ImperativeHttpClientAutoConfiguration;
 import org.springframework.boot.restclient.autoconfigure.RestClientAutoConfiguration;
 import org.springframework.boot.security.oauth2.client.autoconfigure.OAuth2ClientAutoConfiguration;
 import org.springframework.boot.test.context.runner.WebApplicationContextRunner;
@@ -42,9 +44,14 @@ class OidcDiscoveryLocationConfigTest {
       new WebApplicationContextRunner()
           .withConfiguration(
               AutoConfigurations.of(
-                  OAuth2ClientAutoConfiguration.class, RestClientAutoConfiguration.class))
+                  OAuth2ClientAutoConfiguration.class,
+                  RestClientAutoConfiguration.class,
+                  HttpClientAutoConfiguration.class,
+                  ImperativeHttpClientAutoConfiguration.class))
           .withUserConfiguration(OidcDiscoveryLocationConfig.class)
           .withPropertyValues(
+              "spring.http.clients.imperative.factory=jdk",
+              "spring.http.clients.redirects=dont-follow",
               "spring.security.oauth2.client.registration.web.provider=oidc",
               "spring.security.oauth2.client.registration.web.client-id=test-client",
               "spring.security.oauth2.client.registration.web.client-secret=test-secret",
@@ -104,7 +111,11 @@ class OidcDiscoveryLocationConfigTest {
             "oidc.discovery-uri=" + baseUrl + "/redirect",
             "spring.security.oauth2.client.provider.oidc.issuer-uri=" + PUBLIC_ISSUER)
         .run(context ->
-            assertThat(context).as("discovery-uri=%s/redirect の起動", baseUrl).hasFailed());
+            assertThat(context)
+                .getFailure()
+                .rootCause()
+                .as("discovery-uri=%s/redirect の起動失敗", baseUrl)
+                .hasMessageContaining("OIDC discovery の応答が空である"));
   }
 
   @Test

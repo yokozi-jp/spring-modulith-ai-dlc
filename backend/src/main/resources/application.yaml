@@ -117,6 +117,14 @@ spring:
           oidc:
             issuer-uri: ${OIDC_ISSUER_URI}
 
+  # 送信 HTTP クライアントの共通設定。Boot の RestClient.Builder を使う Client すべてに効く。
+  http:
+    clients:
+      # request factory を JDK の HttpClient に固定する（classpath にほかのクライアントがあっても変わらない）
+      imperative:
+        factory: jdk
+      # リダイレクトを辿らない。設定にない URL へ請求や discovery を送り直さない
+      redirects: dont-follow
   # Jackson（JSON シリアライズ/デシリアライズ）: Spring Boot 4 のデフォルトである Jackson 3 を使う。
   # 自動構成された JsonMapper をプロパティで調整する（独自 Bean で丸ごと差し替えない）。
   jackson:
