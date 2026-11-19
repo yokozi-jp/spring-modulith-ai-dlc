@@ -26,6 +26,7 @@ import org.springframework.modulith.events.EventPublication;
 import org.springframework.modulith.events.FailedEventPublications;
 import org.springframework.modulith.events.ResubmissionOptions;
 import org.springframework.modulith.events.core.EventPublicationRegistry;
+import org.springframework.modulith.events.core.EventPublicationRepository;
 import org.springframework.modulith.test.EnableScenarios;
 import org.springframework.modulith.test.Scenario;
 
@@ -66,6 +67,9 @@ class ResubmissionOptionsLearningTest {
 
   /** Staleness Monitor が呼ぶ、古い出版を FAILED に戻す処理。 */
   @Autowired private EventPublicationRegistry registry;
+
+  /** Staleness Monitor が読んだ出版を FAILED にするときに呼ぶ Repository。 */
+  @Autowired private EventPublicationRepository repository;
 
   /** 出版の時刻を決める時計。 */
   @Autowired private EventPublicationResubmitterTest.MutableClock clock;
@@ -149,6 +153,22 @@ class ResubmissionOptionsLearningTest {
     registry.markStalePublicationsFailed(status -> STALENESS);
 
     assertThat(status(publication)).as("再投入から閾値を過ぎた出版の状態").isEqualTo(FAILED_STATUS);
+  }
+
+  @Test
+  @DisplayName("学習テスト：Staleness Monitor の markFailed は、読んだ後に再投入された出版も状態を確かめずに FAILED にする")
+  void staleMarkDoesNotRecheckStatusRead() {
+    // Staleness Monitor は findByStatus で古い出版を読み、その後 ID だけで markFailed を呼ぶ。
+    // その間に別のインスタンスが再投入すると、処理中の出版を FAILED に戻す（formal-verify-event-resubmission の既知の発見）。
+    final UUID publication = insert(EventPublication.Status.RESUBMITTED);
+    dsl.update(EVENT_PUBLICATION)
+        .set(EVENT_PUBLICATION.LAST_RESUBMISSION_DATE, T0)
+        .where(EVENT_PUBLICATION.ID.eq(publication))
+        .execute();
+
+    repository.markFailed(publication);
+
+    assertThat(status(publication)).as("再投入した直後に遅れて届いた markFailed の後の状態").isEqualTo(FAILED_STATUS);
   }
 
   /**

@@ -161,6 +161,7 @@ spring:
       # Spring Modulith 2.1.2 は、最後の出版か再投入の時刻（last_resubmission_date、なければ publication_date）から測る。
       # published は wait-age にする。processing と resubmitted は、再投入して処理中の出版を FAILED に戻さないよう in-flight-staleness にする。
       # 最初の配信が concurrency-limit の空きを待つ間に published を過ぎた出版は重ねて再投入しうる。リスナーの冪等性に頼る。
+      # ponytail: Staleness Monitor は古い出版を読んだ後に ID だけで markFailed を呼ぶため、その間に別のインスタンスが再投入した出版も FAILED に戻しうる（ResubmissionOptionsLearningTest の staleMarkDoesNotRecheckStatusRead）。窓は読み取りと更新の間だけで、リスナーの冪等性に頼る。Spring Modulith が markFailed に期待する状態を渡すようになったら、この注記と学習テストを見直す。
       staleness:
         published: ${event-publication.resubmission.wait-age}
         processing: ${event-publication.resubmission.in-flight-staleness}
