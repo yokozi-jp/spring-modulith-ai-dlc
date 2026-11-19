@@ -2,18 +2,87 @@ openapi: 3.1.0
 info:
   description: Demo アプリケーションの HTTP API
   title: Demo API
-  version: 0.4.0
+  version: 0.5.0
 servers:
 - description: 現在のオリジン
   url: /
 tags:
 - description: 注文の API
   name: ordering
+- description: テナントと所属の API
+  name: tenancy
 - description: 決済の API
   name: payment
 - description: 商品の API
   name: product
 paths:
+  /api/current-tenant:
+    get:
+      description: テナントを選ぶ前は、type が /problems/tenant-not-selected の 403 を返す。
+      operationId: findCurrentTenant
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MembershipResponse"
+          description: 選んだテナントへの所属
+        "401":
+          $ref: "#/components/responses/UnauthorizedProblem"
+        "403":
+          $ref: "#/components/responses/ForbiddenProblem"
+        "500":
+          $ref: "#/components/responses/InternalServerErrorProblem"
+      summary: セッションで選んだテナントを返す。
+      tags:
+      - tenancy
+    put:
+      description: 成功するとセッションの ID が変わる。所属していないテナントを指定したとき、またはすでにテナントを選んでいるときは 422
+        を返す。テナントを切り替えるには、ログインし直す。
+      operationId: selectTenant
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SelectTenantRequest"
+        description: 選ぶテナント
+        required: true
+      responses:
+        "204":
+          description: 本文のない 204 の応答
+        "400":
+          $ref: "#/components/responses/BadRequestProblem"
+        "401":
+          $ref: "#/components/responses/UnauthorizedProblem"
+        "403":
+          $ref: "#/components/responses/ForbiddenProblem"
+        "422":
+          $ref: "#/components/responses/UnprocessableContentProblem"
+        "500":
+          $ref: "#/components/responses/InternalServerErrorProblem"
+      summary: 所属するテナントを選び、そのテナントで業務の API を使えるようにする。
+      tags:
+      - tenancy
+  /api/memberships:
+    get:
+      description: 一覧はテナントの名前の順に items で包んで返す。テナントを選ぶ前にも呼べる。所属がなければ空の items を返す。
+      operationId: listMemberships
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MembershipListResponse"
+          description: 所属の一覧
+        "401":
+          $ref: "#/components/responses/UnauthorizedProblem"
+        "403":
+          $ref: "#/components/responses/ForbiddenProblem"
+        "500":
+          $ref: "#/components/responses/InternalServerErrorProblem"
+      summary: ログインした利用者の所属の一覧を返す。
+      tags:
+      - tenancy
   /api/orders:
     get:
       description: 一覧は作成した時刻の新しい順に items で包んで返す。状態を指定すると、その状態の注文だけを返す。
@@ -302,7 +371,8 @@ components:
         application/problem+json:
           schema:
             $ref: "#/components/schemas/ProblemDetail"
-      description: 操作の権限がない。CSRF トークンの検証に失敗したときの type は /problems/csrf-token-invalid
+      description: 操作の権限がない。CSRF トークンの検証に失敗したときの type は /problems/csrf-token-invalid、テナントを選ぶ前に業務の
+        API を呼んだときの type は /problems/tenant-not-selected
     InternalServerErrorProblem:
       content:
         application/problem+json:
@@ -399,6 +469,33 @@ components:
       required:
       - customerOrderCode
       - lines
+    MembershipListResponse:
+      type: object
+      description: 利用者の所属の一覧を items で包んで返す API の本文。
+      properties:
+        items:
+          type: array
+          description: 所属の一覧の行
+          items:
+            $ref: "#/components/schemas/MembershipResponse"
+      required:
+      - items
+    MembershipResponse:
+      type: object
+      description: 利用者のテナントへの所属を返す API の本文。
+      properties:
+        tenantId:
+          type: string
+          format: uuid
+          description: 所属するテナントの ID
+          example: 6f1c2b3a-4d5e-4f60-8a7b-9c0d1e2f3a4b
+        tenantName:
+          type: string
+          description: 所属するテナントの名前
+          example: 株式会社サンプル
+      required:
+      - tenantId
+      - tenantName
     OrderDetailsResponse:
       type: object
       description: 注文の詳細を返す API の本文。
@@ -661,6 +758,17 @@ components:
       - productName
       - salesStatus
       - unitPrice
+    SelectTenantRequest:
+      type: object
+      description: テナントを選ぶ API の本文。
+      properties:
+        tenantId:
+          type: string
+          format: uuid
+          description: 選ぶテナントの ID
+          example: 6f1c2b3a-4d5e-4f60-8a7b-9c0d1e2f3a4b
+      required:
+      - tenantId
     ValidationError:
       type: object
       description: 入力検証の誤り

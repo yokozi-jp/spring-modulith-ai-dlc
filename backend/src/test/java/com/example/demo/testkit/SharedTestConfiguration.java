@@ -36,7 +36,7 @@ public class SharedTestConfiguration {
             .authorizationUri("https://issuer.example.test/oauth2/authorize")
             .tokenUri("https://issuer.example.test/oauth2/token")
             .jwkSetUri("https://issuer.example.test/oauth2/jwks")
-            .userInfoUri("https://issuer.example.test/oauth2/userinfo")
+            // userinfo の URL を持つと、OidcUserService がログインのたびに届かない IdP を呼ぶため、登録しない。
             .userNameAttributeName("sub")
             .clientName("Test Web Client")
             // OidcClientInitiatedLogoutSuccessHandler は、この metadata がないと IdP へ redirect しない。

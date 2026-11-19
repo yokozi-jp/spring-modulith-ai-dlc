@@ -45,7 +45,8 @@ class ApiContractCoverageTest {
   private static final Set<Integer> ERROR_ENDPOINT_STATUSES = errorEndpointStatuses();
 
   /**
-   * operation ごとの契約テストを求めない組と理由。キーは「HTTP メソッド status」で、メソッドの {@code *} はすべてのメソッドを表す。
+   * operation ごとの契約テストを求めない組と理由。キーは「HTTP メソッド status」か「HTTP メソッド path status」で、メソッドの {@code *}
+   * はすべてのメソッドを表す。
    *
    * <p>どちらも {@code OpenApiConfig} の customizer が全 operation に付ける共通の応答である。
    */
@@ -54,8 +55,8 @@ class ApiContractCoverageTest {
           "* 500",
           "operation に依らない ApiExceptionHandler の catch-all が返す。"
               + "ApiErrorContractTest の未処理例外と JDK の例外の case で確かめる。",
-          "GET 403",
-          "GET は CSRF の検査の対象外で、/api/** に権限の規則もないため、403 を起こす経路がない。"
+          "GET /api/memberships 403",
+          "所属の一覧はテナントを選ぶ前にも呼べ、GET は CSRF の検査の対象外なので、403 を起こす経路がない。"
               + "権限の規則を加えたら、この除外を消して case を足す。");
 
   private static Set<Integer> errorEndpointStatuses() {
@@ -83,11 +84,10 @@ class ApiContractCoverageTest {
     assertThat(unknown).as("契約にない組を宣言した @ContractCase。path の形と status を直す").isEmpty();
 
     final Set<String> unusedExemptions = new TreeSet<>(EXEMPTIONS.keySet());
-    unusedExemptions.removeIf(
-        exemption ->
-            declared.stream()
-                .filter(response -> !covered.contains(response))
-                .anyMatch(response -> matches(exemption, response)));
+    unusedExemptions.removeIf(exemption ->
+        declared.stream()
+            .filter(response -> !covered.contains(response))
+            .anyMatch(response -> matches(exemption, response)));
     assertThat(unusedExemptions).as("どの組にも当たらなくなった除外。EXEMPTIONS から消す").isEmpty();
   }
 
@@ -97,16 +97,13 @@ class ApiContractCoverageTest {
     final Set<String> responses = new TreeSet<>();
     openApi
         .getPaths()
-        .forEach(
-            (path, item) ->
-                item.readOperationsMap()
-                    .forEach(
-                        (method, operation) ->
-                            operation
-                                .getResponses()
-                                .keySet()
-                                .forEach(
-                                    status -> responses.add(key(method.name(), path, status)))));
+        .forEach((path, item) ->
+            item.readOperationsMap()
+                .forEach((method, operation) ->
+                    operation
+                        .getResponses()
+                        .keySet()
+                        .forEach(status -> responses.add(key(method.name(), path, status)))));
     ERROR_ENDPOINT_STATUSES.forEach(
         status -> responses.add(key("GET", "/error", String.valueOf(status))));
     return responses;
@@ -122,15 +119,13 @@ class ApiContractCoverageTest {
             .map(JavaMethod::reflect)
             .filter(ApiContractCoverageTest::isEnabledTest)
             .flatMap(method -> Arrays.stream(method.getAnnotationsByType(ContractCase.class)))
-            .flatMap(
-                contractCase ->
-                    IntStream.of(contractCase.status())
-                        .mapToObj(
-                            status ->
-                                key(
-                                    contractCase.method().name(),
-                                    contractCase.path(),
-                                    String.valueOf(status))))
+            .flatMap(contractCase ->
+                IntStream.of(contractCase.status())
+                    .mapToObj(status ->
+                        key(
+                            contractCase.method().name(),
+                            contractCase.path(),
+                            String.valueOf(status))))
             .collect(Collectors.toCollection(TreeSet::new));
   }
 
@@ -147,7 +142,7 @@ class ApiContractCoverageTest {
   }
 
   /**
-   * 除外のキー「メソッド status」が、組「メソッド path status」に当たるかを返す。
+   * 除外のキー「メソッド status」か「メソッド path status」が、組「メソッド path status」に当たるかを返す。
    *
    * <p>除外の理由は OpenAPI の operation にだけ当てはまるため、{@code /error} の組には当てない。
    */
@@ -157,7 +152,11 @@ class ApiContractCoverageTest {
     }
     final int space = exemption.indexOf(' ');
     if (space < 0) {
-      throw new IllegalArgumentException("除外のキーは「HTTP メソッド status」の形で書く: " + exemption);
+      throw new IllegalArgumentException(
+          "除外のキーは「HTTP メソッド status」か「HTTP メソッド path status」の形で書く: " + exemption);
+    }
+    if (exemption.indexOf(' ', space + 1) >= 0) {
+      return exemption.equals(response);
     }
     final String method = exemption.substring(0, space);
     final String status = exemption.substring(space);

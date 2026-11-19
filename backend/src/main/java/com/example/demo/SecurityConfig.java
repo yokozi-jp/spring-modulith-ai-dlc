@@ -19,6 +19,7 @@ import org.springframework.security.oauth2.client.web.OAuth2AuthorizationRequest
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
 import org.springframework.security.web.header.writers.ReferrerPolicyHeaderWriter.ReferrerPolicy;
+import org.springframework.security.web.savedrequest.NullRequestCache;
 import org.springframework.security.web.servlet.util.matcher.PathPatternRequestMatcher;
 import org.springframework.security.web.util.matcher.RequestMatcher;
 import org.springframework.web.servlet.HandlerExceptionResolver;
@@ -96,7 +97,8 @@ public class SecurityConfig {
                 .requestMatchers(
                     "/v3/api-docs", "/v3/api-docs/**", "/swagger-ui.html", "/swagger-ui/**")
                 .permitAll()
-                // 上記以外はすべて認証必須
+                // 上記以外はすべて認証必須。テナントを選ぶ前の業務の API は、tenancy の TenantSecurityCustomizer
+                // が足す filter が 403 にする。
                 .anyRequest()
                 .authenticated())
         // API の認証・認可エラーも MVC と同じ Problem Details 変換へ集約する。
@@ -130,6 +132,9 @@ public class SecurityConfig {
                 .permissionsPolicyHeader(permissions ->
                     permissions.policy(
                         "camera=(), microphone=(), geolocation=(), payment=(), usb=()")))
+        // 認証が要る要求は SPA の API だけで、SPA が 401 を受けて自分でログインへ遷移する。
+        // 既定の要求の保存は Accept のない API の GET を保存し、ログインの後にその JSON へ戻すため、保存しない。
+        .requestCache(cache -> cache.requestCache(new NullRequestCache()))
         // SPA が __Host-XSRF-TOKEN Cookie を読み、更新系リクエストの X-XSRF-TOKEN Header で送り返す。
         // spa() も repository を設定するため、その後で差し替える（逆の順では spa() が上書きする）。
         .csrf(csrf -> csrf.spa().csrfTokenRepository(csrfTokenRepository()))

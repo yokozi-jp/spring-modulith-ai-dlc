@@ -15,4 +15,3 @@ export * from './orderLineRequest.ts';
 export * from './orderLineResponse.ts';
 export * from './orderSummaryListResponse.ts';
 export * from './orderSummaryResponse.ts';
-export * from './unprocessableContentProblemResponse.ts';

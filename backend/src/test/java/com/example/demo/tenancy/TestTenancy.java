@@ -15,7 +15,8 @@ import org.jooq.impl.DSL;
 /**
  * テナントと所属の行をテストで登録する補助。テナントと所属を作る操作はまだないため、tenancy のロールで DSLContext から直接書く。
  *
- * <p>利用者は、ログイン（{@code SignInOidcUserService}）か {@link TenancySeeds} が作る。
+ * <p>利用者は、ログイン（{@code SignInOidcUserService}）か {@link TenancySeeds} が作る。ID を決めた利用者は {@link #member}
+ * が作る。
  */
 // テストの補助であり、テストケースを持たない。
 @SuppressWarnings("PMD.TestClassWithoutTestCases")
@@ -44,6 +45,40 @@ public final class TestTenancy {
         dsl,
         TENANCY,
         tx -> TestCommonColumns.runAs(() -> insertMembership(tx, userId, tenantId, role)));
+  }
+
+  /** ID を決めた利用者を、テナントに役割で所属させる。利用者、テナント、所属のどれも、既にあれば作り直さず、所属の役割だけを {@code role} に合わせる。 */
+  public static void member(
+      final DSLContext dsl, final String userId, final UUID tenantId, final String role) {
+    AsModule.run(
+        dsl,
+        TENANCY,
+        tx ->
+            TestCommonColumns.runAs(() -> {
+              tx.insertInto(M_USER)
+                  .set(M_USER.PUBLIC_ID, UUID.fromString(userId))
+                  .set(TestCommonColumns.at(REGISTERED_AT).forInsert(M_USER))
+                  .onConflict(M_USER.PUBLIC_ID)
+                  .doNothing()
+                  .execute();
+              insertTenant(tx, tenantId, "テストのテナント");
+              insertMembership(tx, userId, tenantId, role);
+            }));
+    changeRole(dsl, userId, tenantId, role);
+  }
+
+  /** 利用者の、テナントでの役割を変える。 */
+  public static void changeRole(
+      final DSLContext dsl, final String userId, final UUID tenantId, final String role) {
+    AsModule.run(
+        dsl,
+        TENANCY,
+        tx ->
+            tx.update(M_MEMBERSHIP)
+                .set(M_MEMBERSHIP.ROLE_TYP, role)
+                .where(M_MEMBERSHIP.USER_ID.eq(userPk(tx, userId)))
+                .and(M_MEMBERSHIP.TENANT_ID.eq(tenantPk(tx, tenantId)))
+                .execute());
   }
 
   /** 利用者の、テナントへの所属を消す。 */

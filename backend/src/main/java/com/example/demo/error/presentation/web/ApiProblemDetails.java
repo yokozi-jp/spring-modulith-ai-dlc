@@ -110,6 +110,12 @@ final class ApiProblemDetails {
         HttpStatus.FORBIDDEN, "csrf-token-invalid", "Invalid or missing CSRF token", locale);
   }
 
+  /** テナントを選ぶ前の 403 を作る。title は problem.title.tenant-not-selected を解決し、detail は付けない。 */
+  /* package */ ProblemDetail tenantNotSelectedProblem(final Locale locale) {
+    return businessProblem(
+        HttpStatus.FORBIDDEN, "tenant-not-selected", "No tenant selected", locale);
+  }
+
   /**
    * 業務固有の problem type の Problem Details を作る。
    *
@@ -143,17 +149,15 @@ final class ApiProblemDetails {
       final HandlerMethodValidationException ex, final Locale locale) {
     final Stream<ValidationError> parameters =
         ex.getParameterValidationResults().stream()
-            .flatMap(
-                result -> {
-                  final String origin = JsonPointers.origin(result);
-                  if (result instanceof ParameterErrors parameterErrors) {
-                    return errorsOf(origin, parameterErrors, locale);
-                  }
-                  return result.getResolvableErrors().stream()
-                      .map(
-                          error ->
-                              new ValidationError(origin, messageSource.getMessage(error, locale)));
-                });
+            .flatMap(result -> {
+              final String origin = JsonPointers.origin(result);
+              if (result instanceof ParameterErrors parameterErrors) {
+                return errorsOf(origin, parameterErrors, locale);
+              }
+              return result.getResolvableErrors().stream()
+                  .map(error ->
+                      new ValidationError(origin, messageSource.getMessage(error, locale)));
+            });
     final Stream<ValidationError> crossParameters =
         ex.getCrossParameterValidationResults().stream()
             .map(error -> new ValidationError("", messageSource.getMessage(error, locale)));
@@ -164,10 +168,9 @@ final class ApiProblemDetails {
   /* package */ static List<ValidationError> validationErrors(
       final ConstraintViolationException ex) {
     return violations(ex).stream()
-        .map(
-            violation ->
-                new ValidationError(
-                    JsonPointers.fromPath(violation.getPropertyPath()), violation.getMessage()))
+        .map(violation ->
+            new ValidationError(
+                JsonPointers.fromPath(violation.getPropertyPath()), violation.getMessage()))
         .sorted(ERROR_ORDER)
         .toList();
   }
@@ -175,10 +178,9 @@ final class ApiProblemDetails {
   /** 戻り値の違反を含むか。 */
   /* package */ static boolean hasReturnValueViolation(final ConstraintViolationException ex) {
     return violations(ex).stream()
-        .anyMatch(
-            violation ->
-                StreamSupport.stream(violation.getPropertyPath().spliterator(), false)
-                    .anyMatch(node -> node.getKind() == ElementKind.RETURN_VALUE));
+        .anyMatch(violation ->
+            StreamSupport.stream(violation.getPropertyPath().spliterator(), false)
+                .anyMatch(node -> node.getKind() == ElementKind.RETURN_VALUE));
   }
 
   /** 入力検証の誤り 1 件。pointer は RFC 6901 の JSON Pointer、detail は入力値を含まない説明。 */
@@ -189,11 +191,10 @@ final class ApiProblemDetails {
       final String origin, final Errors source, final Locale locale) {
     return Stream.concat(
         source.getFieldErrors().stream()
-            .map(
-                error ->
-                    new ValidationError(
-                        JsonPointers.fromPropertyPath(origin, error.getField()),
-                        messageSource.getMessage(error, locale))),
+            .map(error ->
+                new ValidationError(
+                    JsonPointers.fromPropertyPath(origin, error.getField()),
+                    messageSource.getMessage(error, locale))),
         source.getGlobalErrors().stream()
             .map(error -> new ValidationError(origin, messageSource.getMessage(error, locale))));
   }

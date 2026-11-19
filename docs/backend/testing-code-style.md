@@ -40,6 +40,11 @@ MockMvcでログインした利用者として呼ぶテストは、`testkit`の`
 `oidcLogin()`の既定の利用者は`AppUserPrincipal`でないため、書き込みで共通カラムが例外にする（[ADR-096](../adr/ADR-096-require-app-user-principal-for-audit-columns.md)）。
 `TestConventionsArchTest`が検査する。
 
+`AppUsers.oidcLogin()`は、テストのテナント（`AppUsers.TENANT_ID`）を選んだMEMBERの利用者にする。
+別のテナントや役割で呼ぶときは、`AppUsers.inTenant(<テナントのID>, <役割>)`を使う。
+バックエンドはリクエストのたびに所属を引き直し、所属のない権限を外すため、どちらもリクエストを送る前にDBへ利用者、テナント、所属の行を入れる（[ADR-098](../adr/ADR-098-keep-tenants-and-roles-in-app-database.md)）。
+`Authentication`の権限に`ROLE_MEMBER`などを手で足しても、テナントを選んだ状態にはならず、業務のAPIは403になる。
+
 ## 並列と実行順
 
 テストはGradleの複数のforkで並列に動き、どのクラスがどのforkで動くかは実行ごとに変わる。

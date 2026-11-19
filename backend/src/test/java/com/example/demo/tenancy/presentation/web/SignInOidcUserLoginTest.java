@@ -182,11 +182,7 @@ class SignInOidcUserLoginTest {
 
   /** ID トークンを受けた後の、アプリの利用者を作るサービスを呼ぶ。 */
   private OidcUser login(final String subject) {
-    // 共有構成の登録は userinfo の URL を持ち、標準の実装が IdP を呼ぶ。テストでは呼ばせない。
-    final ClientRegistration registration =
-        ClientRegistration.withClientRegistration(registrations.findByRegistrationId("web"))
-            .userInfoUri(null)
-            .build();
+    final ClientRegistration registration = registrations.findByRegistrationId("web");
     final OidcIdToken idToken =
         OidcIdToken.withTokenValue("id-token")
             .issuer("https://issuer.example.test")
