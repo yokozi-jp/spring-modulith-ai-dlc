@@ -89,11 +89,10 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Set up JDK
-        uses: actions/setup-java@77dd5b2ce225ea11469928ac317850245a74ae78 # v6.2.0
+      - name: Set up mise tools
+        uses: ./.github/actions/setup-mise
         with:
-          distribution: corretto
-          java-version: "25"
+          tools: java
 
       # 依存を解決して CycloneDX SBOM を生成する。
       - name: Generate CycloneDX SBOM

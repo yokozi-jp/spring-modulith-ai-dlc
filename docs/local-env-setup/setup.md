@@ -77,7 +77,7 @@ sudo chmod -R 755 /home/projects
 sudo apt update && sudo apt upgrade -y
 sudo apt install -y curl git wget unzip jq vim tree gnupg2 software-properties-common extrepo
 
-# mise（Task、betterleaks、iwe を mise.lock の版で入れる）の apt リポジトリ
+# mise（Task、betterleaks、iwe、Java を mise.lock の版で入れる）の apt リポジトリ
 sudo extrepo enable mise
 sudo apt update && sudo apt install -y mise
 
@@ -148,13 +148,25 @@ task setup
 source ~/.bashrc
 ```
 
-`mise install --locked` は、`mise.toml` の Task、betterleaks、iwe を、`mise.lock` と `.mise/locks/` に記録した版と checksum で検証して入れます（[ADR-090](../adr/ADR-090-pin-cli-tools-with-mise-lock.md)）。
+`mise install --locked` は、`mise.toml` の Task、betterleaks、iwe、Java（Amazon Corretto）を、`mise.lock` と `.mise/locks/` に記録した版と checksum で検証して入れます（[ADR-090](../adr/ADR-090-pin-cli-tools-with-mise-lock.md)）。
 `--locked` を付けると、lock に無い版を入れずに止まります。
 `task setup` は `04-setup-shell.sh` で、mise の shims を PATH の先頭に通す行を `~/.bashrc` に足します。
 `mise.toml` か `mise.lock` が変わったときは、`mise install --locked` だけを実行します。
 
 shims は、今いるディレクトリから上にたどって見つけた `mise.toml` の版を選びます。
-そのため `task`、`betterleaks`、`iwe` は、`mise.toml` のあるチェックアウトの中でだけ動きます。
+そのため `task`、`betterleaks`、`iwe`、`java` は、`mise.toml` のあるチェックアウトの中でだけ動きます。
+Gradle は `JAVA_HOME` が無ければ PATH の `java` を使うので、`JAVA_HOME` は設定しません。
+VS Code の Java 拡張も、`JAVA_HOME` か PATH の `java` を使います。
+
+#### apt の Corretto から移るとき
+
+`~/.bashrc` に `export JAVA_HOME=/usr/lib/jvm/java-25-amazon-corretto` がある環境では、その行と `export JAVA_TOOL_OPTIONS="-Dfile.encoding=UTF-8"` の行を消し、`source ~/.bashrc` を実行します。
+`JAVA_HOME` が残ると、Gradle は mise の Java でなく apt の Java を使います。
+`file.encoding` は Java 18 から既定で UTF-8 なので、設定は要りません。
+
+`mise.toml` に Java がないブランチや worktree（この変更より前に切ったもの）では、shims の `java` が版を選べず、`./gradlew` が失敗します。
+そうしたブランチを使い終えるまでは、apt の `java-25-amazon-corretto-jdk` を残します。
+使い終えたら、`sudo apt remove java-25-amazon-corretto-jdk` で消せます。
 
 ### 8. Git hooks のセットアップ
 

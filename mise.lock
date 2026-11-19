@@ -13,6 +13,15 @@ url = "https://github.com/betterleaks/betterleaks/releases/download/v1.10.1/bett
 url_api = "https://api.github.com/repos/betterleaks/betterleaks/releases/assets/740237681"
 provenance = "cosign"
 
+[[tools.java]]
+version = "corretto-25.0.5.0.10"
+backend = "core:java"
+specifiers = ["corretto-25.0.5.0.10"]
+
+[tools.java."platforms.linux-x64"]
+checksum = "sha256:1d89b4194f20ee513f4dd9fc2aadd038de3c713c37fd444d77566b3da7b0ee65"
+url = "https://corretto.aws/downloads/resources/25.0.5.0.10/amazon-corretto-25.0.5.0.10-linux-x64.tar.gz"
+
 [[tools."npm:@iwe-org/iwe"]]
 version = "0.29.2"
 aube = { path = ".mise/locks/npm-iwe-org-iwe/0.29.2", digest = "sha256:2519bdd35ba6988e775629ddbad774a8a1074b2c2463f6979840587af133bdf9" }

@@ -57,11 +57,10 @@ jobs:
           # PR では origin/<base> との差分から変異させるクラスを求めるため、全履歴を取得する。
           fetch-depth: 0
 
-      - name: Set up JDK
-        uses: actions/setup-java@77dd5b2ce225ea11469928ac317850245a74ae78 # v6.2.0
+      - name: Set up mise tools
+        uses: ./.github/actions/setup-mise
         with:
-          distribution: corretto
-          java-version: "25"
+          tools: task java
 
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@8da46b539cd8fe6ab27ca75128919a18d757604c # v6.4.1
@@ -80,9 +79,6 @@ jobs:
           key: gradle-${{ runner.os }}-test-${{ hashFiles('backend/**/*.gradle*', 'backend/gradle/wrapper/gradle-wrapper.properties') }}
           restore-keys: |
             gradle-${{ runner.os }}-test-
-
-      - name: Set up mise tools
-        uses: ./.github/actions/setup-mise
 
       # PR では base との差分のクラスだけを、そのパッケージのテストで変異させ、push と手動実行では全体を変異させる。
       # 対象の求め方は Taskfile の be-mutation-test にある。
