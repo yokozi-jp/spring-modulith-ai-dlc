@@ -558,6 +558,10 @@ class ArchitectureRuleFixtureTest {
             ClassRoleArchTest.commandHandlersAndListenersDoNotUseInheritance,
             "ordering.application.OrderShippedReceiver"),
         row(
+            "moduleListenerEventsAreTenantScoped",
+            ClassRoleArchTest.moduleListenerEventsAreTenantScopedRule(VIOLATING),
+            "inventory.application.OrderPlacedWithoutTenantListener.on("),
+        row(
             "eventListenersAreApplicationModuleListeners: @EventListener",
             ClassRoleArchTest.eventListenersAreApplicationModuleListeners,
             "inventory.application.StockEventReceiver.onPlaced("),
@@ -843,6 +847,7 @@ class ArchitectureRuleFixtureTest {
         ProxyRulesArchTest.asyncMethodsReturnVoidOrFuture,
         ProxyRulesArchTest.scheduledMethodsAreNoArgVoidAndNotPrivateOrFinal,
         ClassRoleArchTest.moduleListenersAreApplicationListeners,
+        ClassRoleArchTest.moduleListenerEventsAreTenantScopedRule(basePackage),
         ClassRoleArchTest.eventListenersAreApplicationModuleListeners,
         ClassRoleArchTest.applicationListenerIsNotImplemented,
         ClassRoleArchTest.listenersExposeOnlyOnAndCallOneCommandHandler,

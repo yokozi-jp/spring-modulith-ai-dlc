@@ -16,8 +16,10 @@ import com.example.demo.payment.domain.model.Money;
 import com.example.demo.payment.domain.model.OrderId;
 import com.example.demo.payment.domain.model.PaymentGateway;
 import com.example.demo.shared.concurrency.ExpectedLockNo;
+import com.example.demo.shared.tenant.TenantContext;
 import com.example.demo.testkit.AppUsers;
 import com.example.demo.testkit.AsModule;
+import com.example.demo.testkit.AsTenant;
 import com.example.demo.testkit.CapturedLogRecords;
 import com.example.demo.testkit.CleanGeneratedTablesExtension;
 import com.example.demo.testkit.SharedTestConfiguration;
@@ -32,6 +34,7 @@ import java.time.ZoneOffset;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
 import java.util.concurrent.CopyOnWriteArrayList;
@@ -59,6 +62,8 @@ import org.springframework.modulith.test.Scenario;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.oauth2.client.authentication.OAuth2AuthenticationToken;
 import org.springframework.security.oauth2.core.oidc.user.OidcUser;
+import org.springframework.transaction.TransactionExecution;
+import org.springframework.transaction.TransactionExecutionListener;
 import org.springframework.web.client.ResourceAccessException;
 
 /**
@@ -89,6 +94,9 @@ class OrderConfirmedListenerTest {
   private static final String ASYNC_ERROR_SCOPE =
       "org.springframework.aop.interceptor.SimpleAsyncUncaughtExceptionHandler";
 
+  /** Listener のトランザクションの名前。 */
+  private static final String LISTENER_TRANSACTION = OrderConfirmedListener.class.getName() + ".on";
+
   /** 確定していない注文の請求を見送ったことを記録する CommandHandler。 */
   private static final String HANDLER_SCOPE = ChargeOrderCommandHandler.class.getName();
 
@@ -103,6 +111,9 @@ class OrderConfirmedListenerTest {
 
   /** 切り替えられる決済代行。 */
   @Autowired private ControllablePaymentGateway gateway;
+
+  /** トランザクションを始めた時点のテナントを記録する。 */
+  @Autowired private TenantAtBeginRecorder tenantAtBegin;
 
   /** 失敗した出版の再投入。 */
   @Autowired private FailedEventPublications failedEventPublications;
@@ -119,6 +130,7 @@ class OrderConfirmedListenerTest {
   @BeforeEach
   void resetGateway() {
     gateway.reset();
+    tenantAtBegin.reset();
   }
 
   @Test
@@ -157,13 +169,30 @@ class OrderConfirmedListenerTest {
   }
 
   @Test
+  @DisplayName("Listener のトランザクションが始まる時点で、イベントのテナントが束縛されている")
+  void listenerTransactionBeginsInEventTenant(final Scenario scenario) {
+    final String orderId = fixture.draftedOrderId();
+
+    OrderConfirmedFixture.await(
+        scenario.publish(new OrderConfirmed(orderId, NOW, AsTenant.TENANT)),
+        orderId,
+        "完了した出版",
+        () -> fixture.registry(orderId),
+        state -> state.archived() == 1);
+
+    assertThat(tenantAtBegin.tenantsOf(LISTENER_TRANSACTION))
+        .as("orderId=%s の Listener のトランザクションを始めた時点のテナント", orderId)
+        .containsExactly(AsTenant.TENANT.toString());
+  }
+
+  @Test
   @DisplayName("同じ注文の OrderConfirmed を二度受けても、決済記録は 1 件のままで二度目は請求しない")
   void secondDeliveryDoesNotChargeAgain(final Scenario scenario) {
     final String orderId = fixture.draftedOrderId();
     fixture.confirmAndAwait(scenario, orderId, "1 件目の完了した出版", state -> state.archived() == 1);
 
     OrderConfirmedFixture.await(
-        scenario.publish(new OrderConfirmed(orderId, NOW)),
+        scenario.publish(new OrderConfirmed(orderId, NOW, AsTenant.TENANT)),
         orderId,
         "2 件目の完了した出版",
         () -> fixture.registry(orderId),
@@ -256,7 +285,7 @@ class OrderConfirmedListenerTest {
         () -> cancelOrder.handle(new CancelOrderCommand(orderId, new ExpectedLockNo(1))));
 
     OrderConfirmedFixture.await(
-        scenario.publish(new OrderConfirmed(orderId, NOW)),
+        scenario.publish(new OrderConfirmed(orderId, NOW, AsTenant.TENANT)),
         orderId,
         "完了した出版",
         () -> fixture.registry(orderId),
@@ -285,7 +314,7 @@ class OrderConfirmedListenerTest {
     final String orderId = UUID.randomUUID().toString();
 
     OrderConfirmedFixture.await(
-        scenario.publish(new OrderConfirmed(orderId, NOW)),
+        scenario.publish(new OrderConfirmed(orderId, NOW, AsTenant.TENANT)),
         orderId,
         "FAILED の出版",
         () -> fixture.registry(orderId),
@@ -432,6 +461,42 @@ class OrderConfirmedListenerTest {
     }
   }
 
+  /**
+   * トランザクションを始める直前の、トランザクションの名前と束縛中のテナントを記録する。
+   *
+   * <p>Spring Boot は {@link TransactionExecutionListener} の Bean をトランザクションマネージャーに登録する。
+   */
+  /* package */ static final class TenantAtBeginRecorder implements TransactionExecutionListener {
+
+    /** 記録したトランザクションの名前とテナント。束縛されていなければテナントは {@code unbound}。 */
+    private final List<Map.Entry<String, String>> begun = new CopyOnWriteArrayList<>();
+
+    @Override
+    public void beforeBegin(final TransactionExecution transaction) {
+      begun.add(Map.entry(String.valueOf(transaction.getTransactionName()), currentTenant()));
+    }
+
+    /* package */ void reset() {
+      begun.clear();
+    }
+
+    /** 名前のトランザクションを始めた時点のテナント。 */
+    /* package */ List<String> tenantsOf(final String transactionName) {
+      return begun.stream()
+          .filter(entry -> entry.getKey().equals(transactionName))
+          .map(Map.Entry::getValue)
+          .toList();
+    }
+
+    private static String currentTenant() {
+      try {
+        return TenantContext.current().toString();
+      } catch (IllegalStateException unbound) {
+        return "unbound";
+      }
+    }
+  }
+
   /** 決済代行と時計を差し替える。 */
   @TestConfiguration(proxyBeanMethods = false)
   /* package */ static class GatewayConfiguration {
@@ -440,6 +505,11 @@ class OrderConfirmedListenerTest {
     @Primary
     /* package */ ControllablePaymentGateway controllablePaymentGateway(final Tracer tracer) {
       return new ControllablePaymentGateway(tracer);
+    }
+
+    @Bean
+    /* package */ TenantAtBeginRecorder tenantAtBeginRecorder() {
+      return new TenantAtBeginRecorder();
     }
 
     @Bean

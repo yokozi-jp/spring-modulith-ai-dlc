@@ -328,7 +328,8 @@ class PackageByFeatureOnionArchitectureTest {
             basePackage + ".shared.concurrency..",
             basePackage + ".shared.failure..",
             basePackage + ".shared.events..",
-            basePackage + ".shared.security..")
+            basePackage + ".shared.security..",
+            basePackage + ".shared.tenant..")
         .withOptionalLayers(true)
         .because(
             "Domain と Application を Web、DB、外部 API の技術詳細から独立させ、テストと変更をしやすくするため。"
@@ -372,7 +373,7 @@ class PackageByFeatureOnionArchitectureTest {
    *
    * <p>shared 自身の中の依存は対象にしない。楽観的ロックの語彙を置く {@code shared.concurrency}、業務上の失敗の例外を置く {@code
    * shared.failure}、イベントの再投入の語彙を置く {@code shared.events}、認証の principal の語彙を置く {@code
-   * shared.security} は、どの層からも使えるため対象にしない。
+   * shared.security}、テナントの語彙を置く {@code shared.tenant} は、どの層からも使えるため対象にしない。
    */
   /* package */ static ArchRule sharedModuleIsUsedOnlyByPersistenceAdaptersRule(
       final String basePackage) {
@@ -381,6 +382,7 @@ class PackageByFeatureOnionArchitectureTest {
     final String failurePackage = basePackage + ".shared.failure..";
     final String eventsPackage = basePackage + ".shared.events..";
     final String securityPackage = basePackage + ".shared.security..";
+    final String tenantPackage = basePackage + ".shared.tenant..";
     return noClasses()
         .that()
         .resideOutsideOfPackages(sharedPackage, PERSISTENCE_PACKAGE)
@@ -390,14 +392,19 @@ class PackageByFeatureOnionArchitectureTest {
                 .and(
                     not(
                         resideInAnyPackage(
-                            concurrencyPackage, failurePackage, eventsPackage, securityPackage))))
+                            concurrencyPackage,
+                            failurePackage,
+                            eventsPackage,
+                            securityPackage,
+                            tenantPackage))))
         .because(
             "shared は永続化の技術的な共通処理を置くモジュールであり、"
                 + "使う場所を他のモジュールの infrastructure.persistence に限って、"
                 + "業務の処理が共通処理と共通カラムに依存しないようにするため。"
                 + "どの層からも使ってよいのは、楽観的ロックの語彙を置く shared.concurrency、"
                 + "業務上の失敗の例外を置く shared.failure、イベントの再投入の語彙を置く shared.events、"
-                + "認証の principal の語彙を置く shared.security だけである。"
+                + "認証の principal の語彙を置く shared.security、"
+                + "テナントの語彙を置く shared.tenant だけである。"
                 + "直し方：shared の型を使う処理を <モジュール>.infrastructure.persistence の "
                 + "Jooq<Aggregate>Repository へ移し、Application と Domain からは Repository を通して使う。"
                 + "規約：docs/backend/architecture.md、"
@@ -426,12 +433,13 @@ class PackageByFeatureOnionArchitectureTest {
     return classes()
         .that()
         .resideInAPackage(basePackage + ".*")
-        .should(dependOnlyOnStandardTypesOrOwnPackage())
+        .should(dependOnlyOnStandardTypesOrOwnPackage(basePackage))
         .allowEmptyShould(true)
         .because(
             "モジュールルートの型は他モジュールが読む公開契約であり、内部の型を持たせると他モジュールがその型に依存するため。"
                 + "直し方：項目を String、Instant、BigDecimal などの標準型か、"
                 + "同じルートパッケージの record と enum に置き換える。"
+                + "例外は、イベントが運ぶテナントの shared.tenant の型だけである。"
                 + "規約：docs/backend/architecture.md、"
                 + ADR_050);
   }
@@ -479,8 +487,10 @@ class PackageByFeatureOnionArchitectureTest {
                 + LAYERS_DOCS);
   }
 
-  private static ArchCondition<JavaClass> dependOnlyOnStandardTypesOrOwnPackage() {
-    return new ArchCondition<>("depend only on java, org.jspecify, or the same package") {
+  private static ArchCondition<JavaClass> dependOnlyOnStandardTypesOrOwnPackage(
+      final String basePackage) {
+    return new ArchCondition<>(
+        "depend only on java, org.jspecify, shared.tenant, or the same package") {
       @Override
       public void check(final JavaClass item, final ConditionEvents events) {
         for (final Dependency dependency : item.getDirectDependenciesFromSelf()) {
@@ -490,6 +500,7 @@ class PackageByFeatureOnionArchitectureTest {
               target.isPrimitive()
                   || targetPackage.startsWith("java.")
                   || targetPackage.startsWith("org.jspecify.")
+                  || targetPackage.equals(basePackage + ".shared.tenant")
                   || targetPackage.equals(item.getPackageName());
           if (!allowed) {
             events.add(SimpleConditionEvent.violated(item, dependency.getDescription()));

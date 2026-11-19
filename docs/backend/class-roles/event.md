@@ -38,6 +38,10 @@ tags: [convention, backend, class-role]
 
 - `public record` にし、アノテーションを付けない。
 - component は Java の標準型と、同じルートの record と enum だけにする。
+  例外は、イベントが運ぶテナント（`shared.tenant.TenantId`）である。
+- テナントを持つイベントは `shared.tenant.TenantScoped` を実装し、`TenantId tenantId` を持つ。
+  発行する CommandHandler は `TenantContext.current()` を詰める。
+  `@ApplicationModuleListener` が受けるイベントは `TenantScoped` を実装する必要がある（[ADR-104](../../adr/ADR-104-bind-tenant-to-request-and-event-context.md)）。
 - 集約の識別子と、出来事の時刻（`placedAt`、`cancelledAt`）を持つ。
   時刻は `Instant` にし、CommandHandler が `Instant.now(clock)` で取った値か、集約が持つ値を入れる。
 - 発行は `<UseCase>CommandHandler` の `handle` の中で、`ApplicationEventPublisher.publishEvent` を呼んで行う。
@@ -48,7 +52,7 @@ tags: [convention, backend, class-role]
 
 ## 依存してよい型、してはいけない型
 
-- **依存してよい型**：`java..` の標準型、`org.jspecify..`、同じルートパッケージの record と enum。
+- **依存してよい型**：`java..` の標準型、`org.jspecify..`、同じルートパッケージの record と enum、`shared.tenant` の `TenantId` と `TenantScoped`。
 - **依存してはいけない型**：Domain の型（`OrderId`、`Order`）、`application` の Command と Result、`presentation.web` の Request と Response、jOOQ の生成型、Spring と Jackson の型、他モジュールのルートの型。
 
 ## 最小の例と典型的な例
@@ -124,7 +128,8 @@ ArchUnit が形を検査し、この record を使う側のテストが中身を
 ## 作成時のチェックリスト
 
 - [ ] 発行するモジュールのルートの record にする。［ArchUnit で検査：ClassRoleArchTest.moduleRootTypesAreRecordsEnumsOrQueries］
-- [ ] component は Java の標準型と同じルートの型だけにする。［ArchUnit で検査：PackageByFeatureOnionArchitectureTest.moduleApiDoesNotExposeInternalTypes］
+- [ ] component は Java の標準型と同じルートの型だけにする（テナントの `TenantId` を除く）。［ArchUnit で検査：PackageByFeatureOnionArchitectureTest.moduleApiDoesNotExposeInternalTypes］
+- [ ] `@ApplicationModuleListener` で受けるイベントは `TenantScoped` を実装する。［ArchUnit で検査：ClassRoleArchTest.moduleListenerEventsAreTenantScoped］
 - [ ] 名前を集約の名前と過去分詞にする。［自分で点検］
 - [ ] 集約の識別子と出来事の時刻を持つ。［自分で点検］
 - [ ] `<UseCase>CommandHandler` の `handle` の中で `ApplicationEventPublisher` を使って発行する。［自分で点検］

@@ -73,6 +73,10 @@ class ClassRoleArchTest {
   private static final String ADR_051 =
       "docs/adr/ADR-051-bind-pgm-cd-with-scoped-value-and-aspect.md";
 
+  /** テナントをリクエストとイベントの文脈に束縛すると決めた ADR のパス。 */
+  private static final String ADR_104 =
+      "docs/adr/ADR-104-bind-tenant-to-request-and-event-context.md";
+
   /** because の最後に置く、Listener の規約への参照。 */
   private static final String LISTENER_DOC = "規約：docs/backend/class-roles/listener.md";
 
@@ -170,6 +174,11 @@ class ClassRoleArchTest {
                   + LISTENER_DOC
                   + "、"
                   + ADR_050);
+
+  /** {@code @ApplicationModuleListener} の引数のイベントは {@code TenantScoped} を実装する。 */
+  @ArchTest
+  /* package */ static final ArchRule moduleListenerEventsAreTenantScoped =
+      moduleListenerEventsAreTenantScopedRule(BASE_PACKAGE);
 
   /**
    * イベントは {@code @ApplicationModuleListener} だけで受け、{@code @EventListener} と
@@ -370,6 +379,23 @@ class ClassRoleArchTest {
         && !callerPackage.startsWith(ownerPackage + ".");
   }
 
+  /** {@code @ApplicationModuleListener} の引数のイベントが {@code TenantScoped} を実装する規則を組み立てる。 */
+  /* package */ static ArchRule moduleListenerEventsAreTenantScopedRule(final String basePackage) {
+    return methods()
+        .that()
+        .areAnnotatedWith(ApplicationModuleListener.class)
+        .should(takeTenantScopedEvent(basePackage + ".shared.tenant.TenantScoped"))
+        .allowEmptyShould(true)
+        .because(
+            "TenantListenerAspect がイベントのテナントを、リスナーのトランザクションが始まる時点で束縛するため。"
+                + "イベントがテナントを持たないと、非同期の処理でテナントが失われる。"
+                + "直し方：イベントの record に shared.tenant.TenantScoped を実装させ、"
+                + "イベントを発行する CommandHandler が TenantContext.current() のテナントを詰める。"
+                + LISTENER_DOC
+                + "、"
+                + ADR_104);
+  }
+
   /** モジュールルートの型を record、enum、{@code *Queries} interface に限る規則を組み立てる。 */
   /* package */ static ArchRule moduleRootTypesAreRecordsEnumsOrQueriesRule(
       final String basePackage) {
@@ -504,6 +530,24 @@ class ClassRoleArchTest {
                       + "、呼び出す CommandHandler が "
                       + handlers
                       + " である。"));
+        }
+      }
+    };
+  }
+
+  private static ArchCondition<JavaMethod> takeTenantScopedEvent(final String tenantScopedType) {
+    return new ArchCondition<>("take one event parameter that implements " + tenantScopedType) {
+      @Override
+      public void check(final JavaMethod item, final ConditionEvents events) {
+        final List<JavaClass> parameters = item.getRawParameterTypes();
+        if (parameters.size() != 1 || !parameters.getFirst().isAssignableTo(tenantScopedType)) {
+          events.add(
+              SimpleConditionEvent.violated(
+                  item,
+                  item.getFullName()
+                      + " の引数 "
+                      + parameters
+                      + " は、TenantScoped を実装する 1 つのイベントではない。"));
         }
       }
     };

@@ -6,6 +6,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.example.demo.shared.events.ResubmissionPolicy;
+import com.example.demo.shared.tenant.TenantId;
+import com.example.demo.shared.tenant.TenantScoped;
+import com.example.demo.testkit.AsTenant;
 import com.example.demo.testkit.CapturedLogRecords;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.opentelemetry.api.common.AttributeKey;
@@ -363,7 +366,11 @@ class EventPublicationResubmitterTest {
   @DisplayName("完了して archive に移った出版は、時刻を進めても再投入しない")
   void archivedPublicationIsNotResubmitted(final Scenario scenario) {
     final String id = UUID.randomUUID().toString();
-    awaitState(scenario.publish(new ResubmissionProbe(id)), id, COMPLETED, s -> s.archived() == 1);
+    awaitState(
+        scenario.publish(new ResubmissionProbe(id, AsTenant.TENANT)),
+        id,
+        COMPLETED,
+        s -> s.archived() == 1);
 
     clock.set(T0.plus(Duration.ofDays(1)));
     runJob();
@@ -563,7 +570,7 @@ class EventPublicationResubmitterTest {
     }
     final String id = UUID.randomUUID().toString();
     awaitState(
-        scenario.publish(new ResubmissionProbe(id)),
+        scenario.publish(new ResubmissionProbe(id, AsTenant.TENANT)),
         id,
         "FAILED の出版",
         s -> FAILED.equals(s.status()));
@@ -724,8 +731,13 @@ class EventPublicationResubmitterTest {
   /* package */ record State(
       int incomplete, int archived, @Nullable String status, @Nullable Integer attempts) {}
 
-  /** テストのイベント。 */
-  /* package */ record ResubmissionProbe(String id) {}
+  /**
+   * テストのイベント。
+   *
+   * @param id 出版を見分ける ID
+   * @param tenantId イベントのテナント
+   */
+  /* package */ record ResubmissionProbe(String id, TenantId tenantId) implements TenantScoped {}
 
   /** 呼び出しの回数を数え、決めた回数だけ失敗し、門が閉じていれば開くまで待つリスナー。 */
   // @ApplicationModuleListener のトランザクションの proxy を作るため final にしない。受信メソッドは on と命名する規約のため。
