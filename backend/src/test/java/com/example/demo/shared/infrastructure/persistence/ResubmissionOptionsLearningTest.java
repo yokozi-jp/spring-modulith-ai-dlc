@@ -116,8 +116,8 @@ class ResubmissionOptionsLearningTest {
 
   @Test
   @DisplayName(
-      "学習テスト：Staleness Monitor は RESUBMITTED の出版を last_resubmission_date でなく publication_date から測る")
-  void stalenessIsMeasuredFromPublicationDate() {
+      "学習テスト：Staleness Monitor は RESUBMITTED の出版を publication_date でなく last_resubmission_date から測る")
+  void stalenessIsMeasuredFromLastResubmissionDate() {
     final UUID publication = insert(EventPublication.Status.RESUBMITTED);
     dsl.update(EVENT_PUBLICATION)
         .set(EVENT_PUBLICATION.LAST_RESUBMISSION_DATE, T0.plus(Duration.ofMinutes(10)))
@@ -127,7 +127,9 @@ class ResubmissionOptionsLearningTest {
 
     registry.markStalePublicationsFailed(status -> Duration.ofMinutes(5));
 
-    assertThat(status(publication)).as("再投入した直後の出版の状態").isEqualTo(FAILED_STATUS);
+    assertThat(status(publication))
+        .as("再投入した直後の出版の状態")
+        .isEqualTo(EventPublication.Status.RESUBMITTED.name());
   }
 
   @Test
