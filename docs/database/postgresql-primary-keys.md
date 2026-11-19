@@ -77,8 +77,8 @@ UUID v7を主キーにする最初のテーブルを作るときに決める。
 URLにはUUIDをBase64などで短く変換した値を使ってよい。
 
 `public_id`はUUID v4とし、集約を作るDomainのファクトリで`UUID.randomUUID()`により採番して、値オブジェクト（たとえば[値オブジェクト](../backend/class-roles/value-object.md)の`OrderId(UUID value)`）で包む。
-`public_id`は主キーではないカラムなので、v4でよい。
 UUID v7は作成時刻が値に含まれて見えるため、公開用IDに使わない（[RFC 9562](https://www.rfc-editor.org/rfc/rfc9562.html)）。
+`public_id`のユニークインデックスもB-treeなので、v4では挿入効率が下がるが、作成時刻を外に見せないことを優先する。
 テストは値を固定せず、nullでないことと`version()`が4であることを確かめる。
 値を外から渡すオーバーロードは作らない。
 
