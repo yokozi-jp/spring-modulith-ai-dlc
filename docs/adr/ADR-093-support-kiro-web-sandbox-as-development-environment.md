@@ -33,6 +33,9 @@ Proposed
 - サンドボックスの別のプロセスが、ホストの 8080、8081、8082 を使っている。
   `docker/compose.yml` と `docker/compose-test.yml` は Keycloak、E2E の backend、WireMock をこれらのポートに固定で公開する。
 - tool call が終わると、`/tmp`、起動したプロセス、コンテナが消える。
+- ワークスペースのルートは git の外の `/projects/sandbox` で、リポジトリはその子にある。
+  Kiro Web が読む MCP の設定は Agent Config の値であり、リポジトリの `.kiro/settings/mcp.json` ではない。
+  Decision は、Kiro Web がこのファイルを読むと想定して書いていたので、Proposed のまま書き直した。
 
 ## Decision
 
@@ -48,7 +51,10 @@ Proposed
   コンテナは cgroup なしで動かす。
 - systemd が無く podman が healthcheck を定期実行しないので、同じスクリプトが各コンテナの `interval` ごとに `healthcheck run` を実行する。
 - iwe の MCP サーバーは `docs/local-env-setup/iwe-mcp.sh` から起動する。
-  Kiro Web は MCP サーバーを tool call より先に、git の外のワークスペースのルートで起動するので、`.kiro/settings/mcp.json` は子のディレクトリからもこのスクリプトを探す。
+  `.kiro/settings/mcp.json` の `iwe` のコマンドは、リポジトリのルートでも、git の外のワークスペースのルートでも、このスクリプトを見つけて起動する。
+  Kiro Web は MCP サーバーを tool call より先に、git の外のワークスペースのルートで起動し、このファイルを読まない。
+  そのため Kiro Web では、このコマンドを Agent Config > Powers & MCP の `iwe` に入れて使う。
+  コマンドは子のディレクトリからもこのスクリプトを探す。
   子のディレクトリは `.git` がディレクトリの本体の checkout だけを候補にし、横に作った git worktree を選ばない。
   本体の checkout が 2 つあれば、名前順で先のものを選ぶ。
   サンドボックスでは、このスクリプトが `kiro-web.sh` で道具を揃えてから `iwec` を実行する。

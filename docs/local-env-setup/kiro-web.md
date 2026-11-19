@@ -1,7 +1,7 @@
 ---
 type: Runbook
 title: Kiro Web の開発環境
-description: Kiro Web のサンドボックスで、ローカルと同じ Task、検査、テスト、開発用の依存、E2E、DAST を実行する手順と、サンドボックス固有の制約。Kiro Web でタスクやテストを実行する前、サンドボックスで道具やコンテナが動かないときに読む。
+description: Kiro Web のサンドボックスで、ローカルと同じ Task、検査、テスト、開発用の依存、E2E、DAST を実行する手順と、Agent Config の iwe の設定、サンドボックス固有の制約。Kiro Web でタスクやテストを実行する前、サンドボックスで道具やコンテナが動かないとき、iwe の MCP サーバーが接続しないときに読む。
 tags: [runbook, setup, kiro-web, mise, podman]
 ---
 
@@ -23,7 +23,7 @@ tool call ごとにシェルは新しくなるので、呼び出しごとに実�
 入れ済みの道具は入れ直さないので、2 回目以降は 1 秒かからない。
 道具と状態は `~/.cache/kiro-web` に置かれ、置き場所は環境変数 `KIRO_WEB_HOME` で変えられる。
 
-iwe の MCP サーバーは、セッションの開始時に `iwe-mcp.sh` が道具を揃えてから起動するので、source しなくても使える。
+[iwe の MCP サーバーを Agent Config に設定する](#iwe-の-mcp-サーバーを-agent-config-に設定する)と、セッションの開始時に `iwe-mcp.sh` が道具を揃えてから iwe を起動するので、source しなくても使える。
 `iwe-mcp.sh` は podman のサービスを起動しないので、コンテナを使う前には tool call で `kiro-web.sh` を source する。
 
 初めて使うときは、続けてルートの依存とフロントエンドの依存を入れる。
@@ -61,8 +61,35 @@ kiro-web-netns bash -c 'task compose-up && task be-migrate && task oidc-check; t
 
 `kiro-web-netns` は同時に 1 つしか動かせず、2 つ目は `別の kiro-web-netns が動いています` で止まる。
 
+## iwe の MCP サーバーを Agent Config に設定する
+
+この節は、人が Kiro Web の画面で行う。
+エージェントは実行できないので、iwe の MCP サーバーが接続しないときは、利用者にこの設定を依頼する。
+
+Kiro Web はリポジトリの `.kiro/settings/mcp.json` を読まない（[サンドボックスの制約](#サンドボックスの制約)）。
+Agent Config > Powers & MCP の `iwe` を、次の手順で `.kiro/settings/mcp.json` の `iwe` に揃える。
+
+1. リポジトリの `.kiro/settings/mcp.json` を開き、`mcpServers.iwe` の値を読む。
+2. Agent Config > Powers & MCP の `iwe` を、1 の値と同じにする。
+   `command` と `args` に加えて、`disabledTools` などの他のキーも写す。
+3. 新しいセッションを始め、最初の tool call の前に `iwe` の MCP サーバーが接続していて、`iwe_find` が使えることを確かめる。
+
+値の正本は `.kiro/settings/mcp.json` であり、この Runbook には写さない。
+`.kiro/settings/mcp.json` の `iwe` を変えたら、Agent Config の値にも同じ変更を入れる。
+
+接続しないときの症状は `MCP server "iwe" failed to connect: Connection closed` である。
+原因は、Agent Config の `iwe` が `.kiro/settings/mcp.json` と違うことである。
+たとえば #482 より前のコマンド `cd "$(git rev-parse --show-toplevel)/docs" && exec iwec` は、git の外の `/projects/sandbox` で `cd` が失敗する。
+
 ## サンドボックスの制約
 
+- ワークスペースのルートは `/projects/sandbox` で、リポジトリはその子のディレクトリにある。
+- Kiro Web は、リポジトリの `.kiro/settings`、`.kiro/steering`、`.kiro/skills`、`.kiro/hooks` を読まない。
+  読むのは、Agent Config の値と、Agent Config > Cloud Config にアップロードした写しである。
+  MCP の設定は Agent Config > Powers & MCP の値で、サンドボックスでは `/projects/.kiro/settings/mcp.json` に置かれる。
+  steering、skills、hooks の写しは、リポジトリと食い違うことがある。
+  hooks の写しが古いと、`block-generated-writes` のようにリポジトリにある hook が動かない。
+  写しを最新にする手順は、まだ決めていない（[#351](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/351)）。
 - 書けるのは `~/.cache`、`/tmp`、ワークスペースだけである。
 - `/tmp` は tool call ごとに消えるので、後で読むログは `$KIRO_WEB_HOME` に書く。
 - 背景のプロセスも tool call の終了で止まるので、`task agent-commit`と`task agent-push`は`task agent-wait`と同じ tool call で実行する（[開発ワークフロー](../tooling/dev-workflow.md)の「エージェントがcommitとpushをするとき」）。

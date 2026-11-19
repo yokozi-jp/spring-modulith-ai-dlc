@@ -26,4 +26,4 @@ okf_version: '0.2'
 - [エージェント設定](agents/index.md)：Agent skillsのIssue tracker、triageラベル、ドメイン文書の設定を確認、変更するとき、Matt Pocock のスキルを使うとき
 - [Architecture Decision Records](adr/index.md)：設計上の判断をする前に既存の決定を確かめるとき、ADR を起こすとき
 - [開発環境構築](local-env-setup/setup.md)：WSL、Java、Kiro、iwe などの開発環境を用意するとき
-- [Kiro Web の開発環境](local-env-setup/kiro-web.md)：Kiro Web のサンドボックスで Task、検査、テストを実行するとき、サンドボックスで道具が動かないとき
+- [Kiro Web の開発環境](local-env-setup/kiro-web.md)：Kiro Web のサンドボックスで Task、検査、テストを実行するとき、サンドボックスで道具が動かないとき、iwe の MCP サーバーが接続しないとき
