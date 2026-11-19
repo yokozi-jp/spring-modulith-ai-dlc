@@ -1,7 +1,8 @@
 # テスト専用の依存スタック（PostgreSQL + Redis + 決済代行の WireMock、バックエンドスモーク時のみ Keycloak）。
 # 目的: 開発用スタック（docker/compose.yml）と隔離し、開発を止めずにテストを回す。
-#   - プロジェクト名を分け（name: spring-modulith-test）、ネットワーク/コンテナを別空間にする。
-#   - ホストポートを開発用とずらす（PostgreSQL 5433 / Redis 6380 / Keycloak 8081 / WireMock 8082）。開発の 5432/6379/8080/8090 と衝突しない。
+#   - プロジェクト名を分け（name: spring-modulith-test。task は slot ごとに COMPOSE_PROJECT_NAME=spring-modulith-test-<n> で上書きする）、ネットワーク/コンテナを別空間にする。
+#   - ホストポートを開発用とずらす（slot 0 は PostgreSQL 5433 / Redis 6380 / Keycloak 8081 / WireMock 8082 / backend 8080）。開発の 5432/6379/8090 と衝突しない。
+#     slot 1 以降のポートは tooling/test-slot/test-slot.sh が決め、TEST_*_PORT で渡す（ADR-104）。
 #   - 名前付きボリュームを持たず使い捨て（down -v で毎回クリーン）。テストは常にまっさらな DB で走らせる。
 #   - Keycloak は backend-smoke profile に限定する。
 #   - Gradle のテストは、postgres、redis、wiremock のイメージとコマンドを読み、テストの JVM ごとにコンテナを起動する（ADR-085）。
@@ -28,7 +29,7 @@ services:
       DB_USERNAME: demo
       DB_PASSWORD: demo
     ports:
-      - "127.0.0.1:5433:5432"
+      - "127.0.0.1:${TEST_PG_PORT:-5433}:5432"
     volumes:
       # 2つのロールとLiquibase管理専用スキーマを作り、モジュールのスキーマはchangesetに任せる。
       - ./initdb:/docker-entrypoint-initdb.d:ro
@@ -53,10 +54,10 @@ services:
       KC_METRICS_ENABLED: "true"
       # hostname v2：ブラウザ向けの URL と issuer を公開用の URL に固定する。
       # backend が service 名（keycloak:8080）で呼ぶ backchannel の endpoint だけを要求の Host から決める（ADR-057）。
-      KC_HOSTNAME: http://127.0.0.1:8081
+      KC_HOSTNAME: http://127.0.0.1:${TEST_KEYCLOAK_PORT:-8081}
       KC_HOSTNAME_BACKCHANNEL_DYNAMIC: "true"
     ports:
-      - "127.0.0.1:8081:8080"
+      - "127.0.0.1:${TEST_KEYCLOAK_PORT:-8081}:8080"
     volumes:
       # 開発用と同じ realm を使い、実際の OIDC discovery をスモークテストする。
       - ./keycloak:/opt/keycloak/data/import:ro
@@ -78,7 +79,7 @@ services:
     environment:
       TZ: UTC
     ports:
-      - "127.0.0.1:6380:6379"
+      - "127.0.0.1:${TEST_REDIS_PORT:-6380}:6379"
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 3s
@@ -96,7 +97,7 @@ services:
     environment:
       TZ: UTC
     ports:
-      - "127.0.0.1:8082:8080"
+      - "127.0.0.1:${TEST_WIREMOCK_PORT:-8082}:8080"
     volumes:
       - ./wiremock/mappings:/home/wiremock/mappings:ro
     healthcheck:
@@ -108,7 +109,7 @@ services:
 
   # E2E 用の backend（e2e profile 限定、ADR-057）。既存の backend/Dockerfile でビルドする。
   # compose の network に置き、PostgreSQL、Redis、Keycloak へ service 名で接続する（.env.test の接続先を environment で上書きする）。
-  # issuer は .env.test の公開用の URL（127.0.0.1:8081）のまま検査し、discovery だけを keycloak:8080 から読む（OIDC_DISCOVERY_URI）。
+  # issuer は Keycloak の公開用の URL（127.0.0.1:${TEST_KEYCLOAK_PORT}）のまま検査し、discovery だけを keycloak:8080 から読む（OIDC_DISCOVERY_URI）。
   # migration は task e2e が backend の起動前に be-migrate で適用する（ADR-005）。
   backend:
     profiles: ["e2e"]
@@ -118,14 +119,17 @@ services:
       dockerfile: Dockerfile
     env_file: ../.env.test
     environment:
+      # SERVER_PORT は .env.test の値（ホストから見た backend のポート）ではなく、コンテナの待ち受けのポートに固定する。
+      SERVER_PORT: "8080"
       DB_HOST: postgres
       DB_PORT: "5432"
       REDIS_HOST: redis
       REDIS_PORT: "6379"
+      OIDC_ISSUER_URI: http://127.0.0.1:${TEST_KEYCLOAK_PORT:-8081}/realms/spring-modulith
       OIDC_DISCOVERY_URI: http://keycloak:8080/realms/spring-modulith/.well-known/openid-configuration
       PAYMENT_GATEWAY_BASE_URL: http://wiremock:8080
     ports:
-      - "127.0.0.1:8080:8080"
+      - "127.0.0.1:${TEST_BACKEND_PORT:-8080}:8080"
     depends_on:
       postgres:
         condition: service_healthy
