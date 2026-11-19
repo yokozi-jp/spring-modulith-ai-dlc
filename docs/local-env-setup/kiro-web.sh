@@ -63,11 +63,15 @@ _kw_setup() (
   rm -f "$KIRO_WEB_HOME/bin/docker-compose"
 
   cd "$_kw_repo"
+  # MISE_STATE_DIR は新しい sandbox では空で、http:kiro-cli を持つ mise.toml は trust を要する（ADR-090）。
+  mise trust "$_kw_repo/mise.toml" >&2
+  mise trust "$_kw_repo/mise.kiro-web.toml" >&2
   stamp="$MISE_DATA_DIR/.locked-$(cat mise.toml mise.lock mise.kiro-web.toml mise.kiro-web.lock | sha256sum | cut -c1-16)"
   if [ ! -e "$stamp" ]; then
     # サンドボックスのグローバル設定にも道具があり、--locked だと lock に無いとして止まる。リポジトリの道具だけを名指しする。
+    # サンドボックスは自分の kiro-cli を持つので、139MB の zip を取る http:kiro-cli は入れない。
     # shellcheck disable=SC2046
-    mise install --locked $(mise ls --local --json | jq -r 'keys[]') >&2
+    mise install --locked $(mise ls --local --json | jq -r 'keys[] | select(. != "http:kiro-cli")') >&2
     mise reshim
     touch "$stamp"
   fi

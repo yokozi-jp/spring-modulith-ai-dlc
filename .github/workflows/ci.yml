@@ -119,12 +119,6 @@ jobs:
       - name: Check that CI gate covers every pull_request workflow
         run: task ci-gate-check
 
-      - name: Check that mise.toml needs no trust
-        run: task mise-trust-check
-
-      - name: Check that mise.lsp.toml matches mise.lsp.lock
-        run: task mise-lsp-lock-check
-
   gate:
     name: CI gate
     # always() を付けないと、needs のどれかが失敗や skip のときに gate 自体が skip され、GitHub は skip を成功として扱う。

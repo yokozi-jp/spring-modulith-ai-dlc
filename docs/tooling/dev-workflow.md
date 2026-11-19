@@ -49,10 +49,13 @@ worktreeには`node_modules`が無いため、作った直後にルートとフ�
 ```bash
 git worktree add -b <ブランチ> ../<ディレクトリ> origin/main
 cd ../<ディレクトリ>
+mise trust         # mise.tomlのhttp:kiro-cliがtrustを要する（ADR-090）
+mise install --locked  # 未導入の版だけ入れる
 npm ci             # Lefthookとcommitlint
 task fe-install    # フロントエンド
 ```
 
+`mise trust`を実行しないと、shimsが`Config files in … are not trusted`で止まり、`task`を呼ぶフックも失敗する。
 依存を入れないと、commitとpushのフックがcommitlintとフロントエンドの検査の依存を見つけられずに失敗する。
 `npm install`は手元のnpmで`package-lock.json`を書き直し、worktreeに差分を残すことがあるため使わない（npm 11.4.2では`libc`の項目が消えた）。
 
