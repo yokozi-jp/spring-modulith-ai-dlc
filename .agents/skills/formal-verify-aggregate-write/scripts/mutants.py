@@ -84,7 +84,8 @@ def main() -> int:
         )
         verdict = "caught" if result.returncode == 0 else "MISSED"
         print(f"{verdict:6} {name} -> {invariant}: {change}")
-        print("       " + result.stdout.strip().replace("\n", "\n       "))
+        output = (result.stdout + result.stderr).strip()
+        print("       " + output.replace("\n", "\n       "))
         if result.returncode != 0:
             failed += 1
         else:
