@@ -12,7 +12,6 @@ import java.util.function.ToIntFunction;
 import java.util.function.UnaryOperator;
 import javax.sql.DataSource;
 import org.jooq.Batch;
-import org.jooq.Condition;
 import org.jooq.ConnectionProvider;
 import org.jooq.DAO;
 import org.jooq.DSLContext;
@@ -52,9 +51,6 @@ public final class DirectOrderWriter {
 
   /** 注文 ID の列。 */
   private static final Field<String> ORDER_ID = DSL.field(DSL.name("order_id"), String.class);
-
-  /** 条件。 */
-  private static final Condition CONDITION = DSL.noCondition();
 
   /** 書き込みの SQL。 */
   private static final String DELETE_SQL = "delete from orders";
@@ -165,7 +161,7 @@ public final class DirectOrderWriter {
 
   /** {@code InsertQuery.onConflictWhere} を呼ぶ。 */
   public static InsertQuery<Record> insertQueryOnConflictWhere(final InsertQuery<Record> insert) {
-    insert.onConflictWhere(CONDITION);
+    insert.onConflictWhere(DSL.noCondition());
     return insert;
   }
 
