@@ -72,6 +72,11 @@ jobs:
     permissions:
       contents: read
 
+  formal-verify:
+    uses: ./.github/workflows/formal-verify.yml
+    permissions:
+      contents: read
+
   skills-check:
     uses: ./.github/workflows/skills-check.yml
     permissions:
@@ -126,6 +131,7 @@ jobs:
       - compose-config
       - dast
       - depscan
+      - formal-verify
       - frontend-ci
       - markdownlint
       - okf-validate

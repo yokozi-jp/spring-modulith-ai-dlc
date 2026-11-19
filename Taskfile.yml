@@ -516,6 +516,26 @@ tasks:
     cmds:
       - bash tooling/lefthook-install/test.sh
 
+  # 検証スキルの check.sh と mutants.py の自己検査。手順の正文は docs/agents/formal-verification.md にある。
+  formal-verify-test:
+    desc: 検証スキルの check.sh と mutants.py を、小さな TLA+ のモデルで自己検査
+    silent: true
+    cmds:
+      - bash tooling/formal-verify/test.sh
+
+  formal-verify:
+    desc: 検証スキル（.agents/skills/formal-verify-*）の全設定と全変異を検査（数分かかる）
+    silent: true
+    cmds:
+      - |
+        status=0
+        for skill in .agents/skills/formal-verify-*/; do
+          echo "== $skill"
+          tooling/formal-verify/check.sh "$skill" || status=1
+          tooling/formal-verify/mutants.py "$skill" || status=1
+        done
+        exit "$status"
+
   # Setup
   setup:
     desc: 開発環境のセットアップスクリプトを順次実行

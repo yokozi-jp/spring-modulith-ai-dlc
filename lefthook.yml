@@ -246,6 +246,15 @@ pre-commit:
         task lefthook-install-test
       fail_text: "prepare.mjs の自己検査に失敗しました。task lefthook-install-test で再実行してください。"
 
+    # 検証スキルの check.sh、mutants.py か自己検査にステージ済み変更があるとき、小さな TLA+ のモデルで自己検査する（task formal-verify-test）。
+    - name: formal-verify-test
+      glob:
+        - "tooling/formal-verify/**"
+      run: |
+        echo "{staged_files}" >/dev/null
+        task formal-verify-test
+      fail_text: "検証スキルの check.sh と mutants.py の自己検査に失敗しました。task formal-verify-test で再実行してください。"
+
     # 自己検査か tooling/scratch-git/ にステージ済み変更があるとき、git を実行する前に scratch-git.sh を source しているか検証（task lint-scratch-git）。
     - name: lint-scratch-git
       glob:

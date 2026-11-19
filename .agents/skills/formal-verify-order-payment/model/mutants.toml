@@ -1,0 +1,66 @@
+# Code regressions for tooling/formal-verify/mutants.py (docs/agents/formal-verification.md).
+# Each edit's old text must occur exactly once in OrderPayment.tla when the edit is applied.
+
+[[mutant]]
+name = "no-unique-index"
+change = "drop uk_2_t_payment (order_public_id) from 006-create-payment-tables.yaml"
+config = "contract"
+invariants = ["AtMostOnePaymentRecord"]
+
+[[mutant.edits]]
+old = '''
+  /\ IF Len(payments) = 0
+       THEN /\ payments' = Append'''
+new = '''
+  /\ IF TRUE
+       THEN /\ payments' = Append'''
+
+[[mutant]]
+name = "timeout-recorded-as-failed"
+change = "PaymentGatewayClient.charge returns ChargeOutcome.failed() for every RestClientException"
+config = "contract"
+invariants = ["RecordMatchesGateway"]
+
+[[mutant.edits]]
+old = '''
+        /\ dpc' = [dpc EXCEPT ![d] = "insert"]
+     \/ dpc' = [dpc EXCEPT ![d] = "markFailed"]'''
+new = '''
+        /\ dpc' = [dpc EXCEPT ![d] = "insert"]
+        /\ UNCHANGED dres
+     \/ /\ dpc' = [dpc EXCEPT ![d] = "insert"]
+        /\ dres' = [dres EXCEPT ![d] = "REJECTED"]'''
+
+[[mutant.edits]]
+old = '''
+                 gateway, dres, launched, rpc>>
+
+RecordOf'''
+new = '''
+                 gateway, launched, rpc>>
+
+RecordOf'''
+
+[[mutant]]
+name = "cancel-confirmed-order"
+change = "Order.cancel drops ensureDraft()"
+config = "contract"
+invariants = ["ChargedOnlyIfConfirmed"]
+
+[[mutant.edits]]
+old = '''IF orderStatus = "DRAFT" /\ orderLock = cmdLock[c]'''
+new = '''IF (orderStatus = "DRAFT" \/ c = "cancel") /\ orderLock = cmdLock[c]'''
+
+[[mutant]]
+name = "listener-swallows-gateway-error"
+change = "OrderConfirmedListener.on catches the exception from chargeOrder.handle and returns"
+config = "contract"
+invariants = ["CompletedOnlyWithRecord", "ChargeNeverSilentlyLost"]
+
+[[mutant.edits]]
+old = '''
+        /\ dpc' = [dpc EXCEPT ![d] = "insert"]
+     \/ dpc' = [dpc EXCEPT ![d] = "markFailed"]'''
+new = '''
+        /\ dpc' = [dpc EXCEPT ![d] = "insert"]
+     \/ dpc' = [dpc EXCEPT ![d] = "markCompleted"]'''

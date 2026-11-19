@@ -1,0 +1,48 @@
+# Code regressions for tooling/formal-verify/mutants.py (docs/agents/formal-verification.md).
+# Each edit's old text must occur exactly once in AggregateWrite.tla when the edit is applied.
+
+[[mutant]]
+name = "children-before-root"
+change = "JooqOrderRepository.update writes the lines before tableWriter.updateCheckingVersion"
+config = "two-saves"
+invariants = ["OnlyConflictErrors"]
+
+[[mutant.edits]]
+old = '''       THEN /\ w' = [w EXCEPT ![i].pc = "root"]'''
+new = '''       THEN /\ w' = [w EXCEPT ![i].pc = "saved"]'''
+
+[[mutant.edits]]
+old = '''
+  /\ w' = [w EXCEPT ![i].pc = "commit"]
+  /\ UNCHANGED <<root, rootPend, child, childPend>>'''
+new = '''
+  /\ w' = [w EXCEPT ![i].pc = "root"]
+  /\ UNCHANGED <<root, rootPend, child, childPend>>'''
+
+[[mutant.edits]]
+old = '''            /\ w' = [w EXCEPT ![i].pc = "saved"]'''
+new = '''            /\ w' = [w EXCEPT ![i].pc = "commit"]'''
+
+[[mutant]]
+name = "unversioned-root"
+change = "JooqOrderRepository.update uses tableWriter.updateWhere (lock_no = lock_no + 1) for the root"
+config = "two-saves"
+invariants = ["NoLostUpdate"]
+
+[[mutant.edits]]
+old = '''
+  /\ IF root.lock = w[i].expected
+       THEN /\ rootPend' = [holder |-> i, lock |-> w[i].expected + 1, tag |-> i]'''
+new = '''
+  /\ IF TRUE
+       THEN /\ rootPend' = [holder |-> i, lock |-> root.lock + 1, tag |-> i]'''
+
+[[mutant]]
+name = "no-delete-of-removed-lines"
+change = "JooqOrderRepository.update drops root.deleteChildren for lines not in the aggregate"
+config = "two-saves"
+invariants = ["AggregateWhole"]
+
+[[mutant.edits]]
+old = '''![i].ops = <<DeleteOp>> \o keep'''
+new = '''![i].ops = keep'''

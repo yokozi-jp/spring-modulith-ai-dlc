@@ -1,0 +1,64 @@
+# Code regressions for tooling/formal-verify/mutants.py (docs/agents/formal-verification.md).
+# Each edit's old text must occur exactly once in EventResubmission.tla when the edit is applied.
+
+[[mutant]]
+name = "no-time-budget"
+change = "EventPublicationResubmitter.resubmit drops the lock-at-most-for / 2 budget from withFilter"
+config = "run-overruns-lock"
+invariants = ["ResubmissionsCapped", "OneDeliveryAtATime"]
+
+[[mutant.edits]]
+old = '''
+                /\ now - inst[i].runStart <= Budget
+'''
+new = ''
+
+[[mutant]]
+name = "is-due-ignores-cap"
+change = "ResubmissionPolicies.isDue drops attempts <= maxResubmissions"
+config = "documented"
+invariants = ["ResubmissionsCapped"]
+
+[[mutant.edits]]
+old = '''
+                /\ inst[i].snapAttempts <= MaxResubmissions
+'''
+new = ''
+
+[[mutant]]
+name = "lock-ignores-expiry"
+change = "the lock provider takes the lock without lock_until <= now (or a second LockProvider bean)"
+config = "documented"
+invariants = ["OneLockedRun"]
+
+[[mutant.edits]]
+old = '''  /\ IF lock.until <= now'''
+new = '''  /\ IF TRUE'''
+
+[[mutant]]
+name = "staleness-from-publication-date"
+change = "Spring Modulith back to 2.1.1: the staleness monitor measures from publication_date"
+config = "in-flight-slow-runs"
+invariants = ["InFlightNeverMarkedStale"]
+
+[[mutant.edits]]
+old = '''  /\ now > row.lastAttempt + Threshold(row.status)'''
+new = '''  /\ now > Threshold(row.status)'''
+
+[[mutant.edits]]
+old = '''  Max(row.since, row.lastAttempt + Threshold(row.status) + 1) + Interval + RunMax'''
+new = '''  Max(row.since, Threshold(row.status) + 1) + Interval + RunMax'''
+
+# The real startup check rejects in-flight-staleness = 5, so the control keeps the base config's 7,
+# the smallest value the check accepts. Only that constant differs between the control and the mutant.
+[[mutant]]
+name = "startup-check-too-weak"
+change = "the startup check accepts in-flight-staleness shorter than a thread wait plus a listener run"
+config = "delivery-up-to-twice-lock"
+overrides = { InFlightStaleness = 5 }
+control_overrides = {}
+invariants = ["InFlightNeverMarkedStale"]
+
+[[mutant.edits]]
+old = '''       /\ InFlightStaleness > 2 * LockAtMostFor \* isInFlightStalenessLongerThanTwiceLockAtMostFor'''
+new = '''       /\ InFlightStaleness > LockAtMostFor'''
