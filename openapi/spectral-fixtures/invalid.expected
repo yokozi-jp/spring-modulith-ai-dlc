@@ -13,6 +13,16 @@ openapi-version-3-1|openapi
 operation-description|paths./api/sample-orders.post
 operation-id-naming|paths./api/sampleTags.get.operationId
 operation-operationId|paths./api/sample-labels.get
+operation-security|paths./api/orders.get
+operation-security|paths./api/sample-labels.get
+operation-security|paths./api/sample-memos.get
+operation-security|paths./api/sample-notes.post
+operation-security|paths./api/sample-orders.get
+operation-security|paths./api/sample-orders.post
+operation-security|paths./api/sample-orders/{code}.delete
+operation-security|paths./api/sample-orders/{sampleOrderId}.get
+operation-security|paths./api/sampleTags.get
+operation-security|paths./api/sample_items.get
 operation-singular-tag|paths./api/sample-orders.get.tags
 operation-success-response|paths./api/sample-memos.get.responses
 operation-tag-defined|paths./api/sample-payments.get.tags[0]

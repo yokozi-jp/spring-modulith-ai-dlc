@@ -17,6 +17,8 @@ tags:
     description: 注文の API
   # tag-description
   - name: sample-invoice
+# operation-security（文書の既定の security がない。全 operation が違反になるので、operation を足したら invalid.expected にも足す。
+# security を自分で持つ operation は違反にならない）
 paths:
   /api/sample-orders:
     get:
@@ -131,6 +133,7 @@ paths:
       summary: サンプル支払いを一覧する。
       description: サンプル支払いを一覧する。<p>新しい順に返す。
       operationId: listSamplePayments
+      security: []
       responses:
         "200":
           description: サンプル支払いの一覧
