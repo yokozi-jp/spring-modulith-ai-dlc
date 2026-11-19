@@ -8,6 +8,7 @@ import com.example.demo.ordering.TestOrders;
 import com.example.demo.shared.concurrency.ConflictException;
 import com.example.demo.shared.concurrency.ExpectedLockNo;
 import com.example.demo.shared.failure.BusinessRuleViolationException;
+import com.example.demo.testkit.AsModule;
 import com.example.demo.testkit.CleanGeneratedTablesExtension;
 import com.example.demo.testkit.SharedTestConfiguration;
 import io.micrometer.observation.Observation;
@@ -57,20 +58,23 @@ class ConfirmOrderCommandHandlerTest {
     final String orderId = draftedOrderId();
 
     Observation.createNotStarted("order-test", observationRegistry)
-        .observe(
-            () ->
-                scenario
-                    .stimulate(
-                        () ->
-                            confirmOrder.handle(
-                                new ConfirmOrderCommand(orderId, new ExpectedLockNo(1))))
-                    .andWaitForEventOfType(OrderConfirmed.class)
-                    .matching(event -> event.orderId().equals(orderId))
-                    .toArriveAndVerify(
-                        event ->
-                            assertThat(event.confirmedAt())
-                                .as("orderId=%s の confirmedAt", orderId)
-                                .isNotNull()));
+        .observe(() ->
+            scenario
+                .stimulate(
+                    // Scenario#stimulate は名前のないトランザクションで呼ぶため、本番の入口と同じく ordering のロールで入る。
+                    () ->
+                        AsModule.call(
+                            dsl,
+                            "ordering",
+                            tx ->
+                                confirmOrder.handle(
+                                    new ConfirmOrderCommand(orderId, new ExpectedLockNo(1)))))
+                .andWaitForEventOfType(OrderConfirmed.class)
+                .matching(event -> event.orderId().equals(orderId))
+                .toArriveAndVerify(event ->
+                    assertThat(event.confirmedAt())
+                        .as("orderId=%s の confirmedAt", orderId)
+                        .isNotNull()));
   }
 
   @Test
@@ -78,12 +82,9 @@ class ConfirmOrderCommandHandlerTest {
   void staleLockNoPublishesNothing(final AssertablePublishedEvents events) {
     final String orderId = draftedOrderId();
 
-    assertThatThrownBy(
-            () ->
-                observed(
-                    () ->
-                        confirmOrder.handle(
-                            new ConfirmOrderCommand(orderId, new ExpectedLockNo(2)))))
+    assertThatThrownBy(() ->
+            observed(
+                () -> confirmOrder.handle(new ConfirmOrderCommand(orderId, new ExpectedLockNo(2)))))
         .isInstanceOf(ConflictException.class);
 
     assertThat(events.ofType(OrderConfirmed.class)).as("orderId=%s の発行", orderId).isEmpty();
@@ -95,12 +96,9 @@ class ConfirmOrderCommandHandlerTest {
     final String orderId = draftedOrderId();
     observed(() -> cancelOrder.handle(new CancelOrderCommand(orderId, new ExpectedLockNo(1))));
 
-    assertThatThrownBy(
-            () ->
-                observed(
-                    () ->
-                        confirmOrder.handle(
-                            new ConfirmOrderCommand(orderId, new ExpectedLockNo(2)))))
+    assertThatThrownBy(() ->
+            observed(
+                () -> confirmOrder.handle(new ConfirmOrderCommand(orderId, new ExpectedLockNo(2)))))
         .isInstanceOf(BusinessRuleViolationException.class);
 
     assertThat(events.ofType(OrderConfirmed.class)).as("orderId=%s の発行", orderId).isEmpty();

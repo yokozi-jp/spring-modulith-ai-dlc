@@ -4,6 +4,7 @@
 # Run: bash tooling/iwe-mcp/test.sh (task okf-check が実行する)
 
 set -u
+. "$(dirname "$0")/../scratch-git/scratch-git.sh" || exit 1
 
 root="$(cd "$(dirname "$0")/../.." && pwd)"
 cmd="$(jq -r '.mcpServers.iwe.args[1]' "$root/.kiro/settings/mcp.json")"

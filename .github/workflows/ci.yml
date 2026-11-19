@@ -47,6 +47,11 @@ jobs:
       contents: read
       security-events: write
 
+  depscan:
+    uses: ./.github/workflows/depscan.yml
+    permissions:
+      contents: read
+
   frontend-ci:
     uses: ./.github/workflows/frontend-ci.yml
     permissions:
@@ -120,6 +125,7 @@ jobs:
       - betterleaks
       - compose-config
       - dast
+      - depscan
       - frontend-ci
       - markdownlint
       - okf-validate

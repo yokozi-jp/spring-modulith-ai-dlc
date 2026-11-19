@@ -77,7 +77,7 @@ jobs:
           category: .github/workflows/static-analysis.yml:semgrep
 
   duplicates:
-    name: Check duplicate code and lefthook globs
+    name: Check duplicate code, lefthook globs and lefthook install
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -106,8 +106,12 @@ jobs:
       - name: Check lefthook globs
         run: task lint-lefthook
 
+      # npm の prepare（prepare.mjs）が main の worktree の lefthook で hook を入れることを、一時の git リポジトリで検査する。
+      - name: Test lefthook install from worktrees
+        run: task lefthook-install-test
+
   taskfile:
-    name: Check Taskfile
+    name: Check Taskfile and scratch-git sourcing
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -122,6 +126,9 @@ jobs:
 
       - name: Check Taskfile
         run: task lint-taskfile
+
+      - name: Check scratch-git sourcing in self-tests
+        run: task lint-scratch-git
 
   # 振る舞いのテストだが、常に動く workflow に置き、Pull Request ごとに必ず check run を出す（ADR-087）。
   agent-git-test:

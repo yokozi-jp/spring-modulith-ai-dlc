@@ -37,6 +37,10 @@ task fe-check
 
 ## git worktreeで作業するとき
 
+worktreeを作る前に、mainのworktreeで`npm ci`を実行しておく。
+mainのworktreeは最初にcloneした作業ツリーで、`git worktree list`の1行目に出る。
+実行しておかないと、新しいworktreeでの`npm ci`は、mainのworktreeにlefthookが無いことを知らせる`prepare`のメッセージで失敗する。
+
 worktreeには`node_modules`が無いため、作った直後にルートとフロントエンドの依存を入れる。
 
 ```bash
@@ -122,6 +126,9 @@ Taskのテスト系タスクは、`.env.test`に足りない変数を`.env.test.
 マイグレーション用のロールをsuperuserから分けた変更の後は、既存の`.env`へ`.env.example`の`POSTGRES_SUPERUSER_PASSWORD`の行を足す（[DB接続情報とロール分離](../database/connections.md)）。
 この行がないと、`task compose-up`と`task dev`はPostgreSQLのsecretを作れずに止まる。
 既存の`postgres_data`ボリュームでは`docker/initdb`が再実行されず、`demo_migration`はsuperuserのまま残るため、`task compose-reset CONFIRM_RESET=yes`でボリュームを消し（ほかのサービスのデータも消える）、`task compose-up`で起動してから`task be-migrate`を実行する。
+
+モジュールごとのDBロール（`docker/initdb/03-create-module-roles.sh`、012 changeset）を足した変更の後も、既存の`postgres_data`ボリュームでは`docker/initdb`が再実行されず、モジュールのロールがないまま残る。
+`task be-migrate`は012 changesetのGRANTがロールの不在で失敗するため、`task compose-reset CONFIRM_RESET=yes`でボリュームを消し、`task compose-up`で起動してから`task be-migrate`を実行する（[DB接続情報とロール分離](../database/connections.md)）。
 
 公開先は次のとおり。
 

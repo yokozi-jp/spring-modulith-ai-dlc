@@ -45,6 +45,12 @@
 # 実運用設定
 # ---------------------------------------------------------------------------
 
+# hook は linked worktree も含めてリポジトリで一つなので、worktree での lefthook run が hook をその worktree の lefthook に向け直さないようにする。
+# 入れ直すのは npm ci の prepare（tooling/lefthook-install/prepare.mjs）だけにする。
+# そのため、新しい種類の hook（post-checkout など）を足しても自動では入らない。
+# 足したら main の worktree で npm ci を実行する。
+no_auto_install: true
+
 # lefthook の版の表示、skip の行、EXECUTE の行を省く。
 # job の出力は残す。adr-check の注意喚起は成功の扱いで出るため、成功した job の出力も消さない。
 # 全部を出すときは LEFTHOOK_OUTPUT=meta,summary,success,failure,execution,execution_out,execution_info,skips を付ける。
@@ -227,6 +233,28 @@ pre-commit:
         echo "{staged_files}" >/dev/null
         task lint-lefthook
       fail_text: "lefthook の glob の検証に失敗しました。task lint-lefthook で再実行してください。"
+
+    # package.json、lefthook.yml、prepare.mjs か自己検査にステージ済み変更があるとき、一時の git リポジトリで hook の入れ方を自己検査する（task lefthook-install-test）。
+    - name: lefthook-install-test
+      glob:
+        - "package.json"
+        - "lefthook.yml"
+        - "tooling/lefthook-install/**"
+      run: |
+        echo "{staged_files}" >/dev/null
+        task lefthook-install-test
+      fail_text: "prepare.mjs の自己検査に失敗しました。task lefthook-install-test で再実行してください。"
+
+    # 自己検査か tooling/scratch-git/ にステージ済み変更があるとき、git を実行する前に scratch-git.sh を source しているか検証（task lint-scratch-git）。
+    - name: lint-scratch-git
+      glob:
+        - "tooling/*/test.sh"
+        - ".kiro/hooks/*.test.sh"
+        - "tooling/scratch-git/**"
+      run: |
+        echo "{staged_files}" >/dev/null
+        task lint-scratch-git
+      fail_text: "scratch-git.sh の source の検証に失敗しました。task lint-scratch-git で再実行してください。"
 
 # すべての job を順番に実行し、失敗した時点で止める。
 # 並列に走らせると、be-lint、be-test、frontend-test-build の Gradle と Vitest が CPU を取り合い、

@@ -1,0 +1,7 @@
+databaseChangeLog:
+  - changeSet:
+      id: 013-tag-schema-v6
+      author: system
+      changes:
+        - tagDatabase:
+            tag: schema-v6

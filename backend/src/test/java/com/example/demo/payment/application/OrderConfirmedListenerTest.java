@@ -15,6 +15,7 @@ import com.example.demo.payment.domain.model.Money;
 import com.example.demo.payment.domain.model.OrderId;
 import com.example.demo.payment.domain.model.PaymentGateway;
 import com.example.demo.shared.concurrency.ExpectedLockNo;
+import com.example.demo.testkit.AsModule;
 import com.example.demo.testkit.CapturedLogRecords;
 import com.example.demo.testkit.CleanGeneratedTablesExtension;
 import com.example.demo.testkit.SharedTestConfiguration;
@@ -128,19 +129,17 @@ class OrderConfirmedListenerTest {
     final String orderId = fixture.draftedOrderId();
     final AtomicReference<String> confirmTraceId = new AtomicReference<>();
 
-    runAsUser(
-        () ->
-            fixture.observed(
-                () -> {
-                  confirmTraceId.set(currentTraceId());
-                  OrderConfirmedFixture.await(
-                      scenario.stimulate(() -> fixture.confirm(orderId)),
-                      orderId,
-                      "完了した出版",
-                      () -> fixture.registry(orderId),
-                      state -> state.archived() == 1);
-                  return null;
-                }));
+    runAsUser(() ->
+        fixture.observed(() -> {
+          confirmTraceId.set(currentTraceId());
+          OrderConfirmedFixture.await(
+              scenario.stimulate(() -> fixture.confirm(orderId)),
+              orderId,
+              "完了した出版",
+              () -> fixture.registry(orderId),
+              state -> state.archived() == 1);
+          return null;
+        }));
 
     final List<PaymentSummary> payments = payments(orderId);
     assertThat(payments).as("orderId=%s の決済記録", orderId).hasSize(1);
@@ -183,22 +182,20 @@ class OrderConfirmedListenerTest {
     gateway.setFailing(true);
 
     // 1. 失敗：出版は FAILED、attempts 1、決済記録はなく、Spring が ERROR を記録する。
-    runAsUser(
-        () ->
-            fixture.confirmAndAwait(
-                scenario, orderId, "FAILED の出版", state -> "FAILED".equals(state.status())));
+    runAsUser(() ->
+        fixture.confirmAndAwait(
+            scenario, orderId, "FAILED の出版", state -> "FAILED".equals(state.status())));
     final OrderConfirmedFixture.RegistryState failed = fixture.registry(orderId);
     assertThat(failed.attempts()).as("orderId=%s の FAILED の attempts", orderId).isEqualTo(1);
     assertThat(failed.completionDate()).as("orderId=%s の completion_date", orderId).isNull();
     assertThat(payments(orderId)).as("orderId=%s の失敗後の決済記録", orderId).isEmpty();
     assertThat(capturedLogRecords.withScope(ASYNC_ERROR_SCOPE))
         .as("orderId=%s の失敗の ERROR のログ", orderId)
-        .anySatisfy(
-            log -> {
-              assertThat(log.getSeverity()).isEqualTo(Severity.ERROR);
-              assertThat(log.getAttributes().get(AttributeKey.stringKey("exception.message")))
-                  .contains("orderId=" + orderId);
-            });
+        .anySatisfy(log -> {
+          assertThat(log.getSeverity()).isEqualTo(Severity.ERROR);
+          assertThat(log.getAttributes().get(AttributeKey.stringKey("exception.message")))
+              .contains("orderId=" + orderId);
+        });
 
     // 2. 決済代行を成功に戻し、請求の手前で止める。
     gateway.setFailing(false);
@@ -207,10 +204,9 @@ class OrderConfirmedListenerTest {
       // 3. 認証も observation もないテストのスレッドから再投入する。
       failedEventPublications.resubmit(
           ResubmissionOptions.defaults()
-              .withFilter(
-                  publication ->
-                      publication.getEvent() instanceof OrderConfirmed event
-                          && event.orderId().equals(orderId)));
+              .withFilter(publication ->
+                  publication.getEvent() instanceof OrderConfirmed event
+                      && event.orderId().equals(orderId)));
 
       // 4. 請求の手前で止まっている間、出版は PROCESSING、attempts 2。
       OrderConfirmedFixture.await(
@@ -266,19 +262,17 @@ class OrderConfirmedListenerTest {
     assertThat(payments(orderId)).as("orderId=%s の取消後の決済記録", orderId).isEmpty();
     assertThat(capturedLogRecords.withScope(HANDLER_SCOPE))
         .as("orderId=%s の確定していない注文の INFO のログ", orderId)
-        .anySatisfy(
-            log -> {
-              assertThat(log.getSeverity()).isEqualTo(Severity.INFO);
-              assertThat(log.getBodyValue()).isNotNull();
-              assertThat(log.getBodyValue().asString())
-                  .contains("orderId=" + orderId + ", status=CANCELLED");
-            });
+        .anySatisfy(log -> {
+          assertThat(log.getSeverity()).isEqualTo(Severity.INFO);
+          assertThat(log.getBodyValue()).isNotNull();
+          assertThat(log.getBodyValue().asString())
+              .contains("orderId=" + orderId + ", status=CANCELLED");
+        });
     assertThat(capturedLogRecords.withScope(ASYNC_ERROR_SCOPE))
         .as("orderId=%s の確定していない注文の ERROR のログ", orderId)
-        .noneSatisfy(
-            log ->
-                assertThat(log.getAttributes().get(AttributeKey.stringKey("exception.message")))
-                    .contains("orderId=" + orderId));
+        .noneSatisfy(log ->
+            assertThat(log.getAttributes().get(AttributeKey.stringKey("exception.message")))
+                .contains("orderId=" + orderId));
   }
 
   @Test
@@ -300,12 +294,11 @@ class OrderConfirmedListenerTest {
         .isEqualTo(1);
     assertThat(capturedLogRecords.withScope(ASYNC_ERROR_SCOPE))
         .as("orderId=%s の存在しない注文の ERROR のログ", orderId)
-        .anySatisfy(
-            log -> {
-              assertThat(log.getSeverity()).isEqualTo(Severity.ERROR);
-              assertThat(log.getAttributes().get(AttributeKey.stringKey("exception.message")))
-                  .contains("order not found: orderId=" + orderId);
-            });
+        .anySatisfy(log -> {
+          assertThat(log.getSeverity()).isEqualTo(Severity.ERROR);
+          assertThat(log.getAttributes().get(AttributeKey.stringKey("exception.message")))
+              .contains("order not found: orderId=" + orderId);
+        });
   }
 
   private List<PaymentSummary> payments(final String orderId) {
@@ -338,10 +331,14 @@ class OrderConfirmedListenerTest {
 
   /** 決済記録の created_by と created_pgm_cd を読む。 */
   private List<String> createdByAndPgmCd(final String orderId) {
-    return dsl.select(T_PAYMENT.CREATED_BY, T_PAYMENT.CREATED_PGM_CD)
-        .from(T_PAYMENT)
-        .where(T_PAYMENT.ORDER_PUBLIC_ID.eq(UUID.fromString(orderId)))
-        .fetchSingle(row -> List.of(row.value1(), row.value2()));
+    return AsModule.call(
+        dsl,
+        "payment",
+        tx ->
+            tx.select(T_PAYMENT.CREATED_BY, T_PAYMENT.CREATED_PGM_CD)
+                .from(T_PAYMENT)
+                .where(T_PAYMENT.ORDER_PUBLIC_ID.eq(UUID.fromString(orderId)))
+                .fetchSingle(row -> List.of(row.value1(), row.value2())));
   }
 
   private static OrderId orderId(final String orderId) {
