@@ -2,7 +2,7 @@
 // 検証スタックに Chromium でログインし、journey を 1 つ実行して証拠を build/verify/runs/<run>/ に残す。
 // 使い方: drive.mjs <journey.mjs> [key=value ...]
 import { execFileSync } from "node:child_process";
-import { appendFileSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { appendFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import { basename, dirname, join, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -13,14 +13,12 @@ const root = execFileSync("git", ["rev-parse", "--show-toplevel"], {
 }).trim();
 const web = join(root, "frontend/apps/web");
 // up が取った slot のポートと Compose project を環境変数へ入れる。e2e/environment.ts と docker compose がそれを読む。
-const slot = readFileSync(join(root, "build/verify/stack/slot"), "utf8").trim();
-const slotEnv = execFileSync("bash", [join(root, "tooling/test-slot/test-slot.sh"), "acquire", ".env.test", "web"], {
-  cwd: root,
-  encoding: "utf8",
-  env: { ...process.env, TEST_SLOT: slot },
-  stdio: ["ignore", "pipe", "ignore"],
-});
-for (const [, key, value] of slotEnv.matchAll(/^export ([A-Z_0-9]+)=(.*)$/gmu)) process.env[key] = value;
+const slotFile = join(root, "build/verify/stack/slot.env");
+if (!existsSync(slotFile)) {
+  console.error("build/verify/stack/slot.env がありません。stack.sh up を実行してください。");
+  process.exit(2);
+}
+for (const [, key, value] of readFileSync(slotFile, "utf8").matchAll(/^export ([A-Z_0-9]+)=(.*)$/gmu)) process.env[key] = value;
 const require = createRequire(join(web, "package.json"));
 const { chromium, expect, request } = require("@playwright/test");
 const e2e = (file) => import(pathToFileURL(join(web, "e2e", file)).href);

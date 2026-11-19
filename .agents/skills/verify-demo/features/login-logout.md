@@ -5,7 +5,7 @@
 
 ## Sub-features
 
-- `auth-login`：`/oauth2/authorization/web` から Keycloak の画面へ移り、資格情報を送ると `webOrigin`（slot 0 は `http://localhost:5173`）の `/` へ戻る。
+- `auth-login`：`/oauth2/authorization/web` から Keycloak の画面へ移り、資格情報を送り、テナント選択でサンプル商事を選ぶと `webOrigin`（slot 0 は `http://localhost:5173`）の `/` へ戻る。
 - `auth-session`：ログインの前後で `APP_SESSION` の Cookie の値が変わり、`/api/missing` が 401 でなく 404 を返す。
 - `auth-logout`：「ログアウト」で「ログアウトしました」の画面に着き、古い `APP_SESSION` で `/api/**` を呼ぶと 401 になる。
 - `auth-login-again`：ログアウト後の「もう一度ログイン」から、再び Keycloak の画面へ移る。

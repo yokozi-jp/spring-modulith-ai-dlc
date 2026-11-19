@@ -9,8 +9,8 @@ STATE=build/verify/stack
 WEB=frontend/apps/web
 APP_PATHS=(backend frontend docker openapi)
 SLOT_SH=tooling/test-slot/test-slot.sh
-# Compose project と各ポートは、up が取った slot（$STATE/slot）から決める。TEST_SLOT があれば acquire は新しく取らずに値だけを返す。
-load_slot() { eval "$(TEST_SLOT="$(cat "$STATE/slot")" bash "$SLOT_SH" acquire .env.test web 2>/dev/null)"; }
+# Compose project と各ポートは、up が取った slot の環境変数（$STATE/slot.env、acquire の出力そのもの）から決める。
+load_slot() { . "$STATE/slot.env"; }
 compose() { docker compose -f docker/compose-test.yml --profile e2e "$@"; }
 
 # 起動した時点からアプリのソースが変わったかを見る指紋。Git の管理外のファイルは中身も含める。
@@ -69,17 +69,20 @@ up() {
     exit 1
   fi
 
-  # slot の env ファイルは .env.test の写しなので、task e2e-up より前に必要になる。
+  # task e2e-up の _ensure-test-env と同じ。slot の env ファイルが .env.test の写しなので、その前に必要になる。
   [ -f .env.test ] || cp .env.test.example .env.test
   mkdir -p "$STATE"
   fingerprint > "$STATE/fingerprint"
   cat /proc/sys/kernel/random/boot_id > "$STATE/boot-id"
   # 空きの slot を取る。空きがなければ待ち、待っている間は slot を持つ worktree を出す。
   # 取った slot の Compose project は、この起動のものとして up の記録より後に作られる。
+  # 環境に TEST_SLOT があると acquire は空きの確認なしにその slot を使うので、必ず新しく取る。
+  # ponytail: 取った直後から slot.env を書くまでの間に打ち切られると、取った slot のコンテナが残り、down では片付かない。
+  unset TEST_SLOT
   local slot_env
   slot_env="$(bash "$SLOT_SH" acquire .env.test web)" || { rm -rf "$STATE"; exit 1; }
-  eval "$slot_env"
-  echo "$TEST_SLOT" > "$STATE/slot"
+  printf '%s\n' "$slot_env" > "$STATE/slot.env"
+  load_slot
   # 起動の手順は task e2e と共有する。失敗しても、作りかけのコンテナを down が自分のものと分かるよう記録する。
   local status=0
   task e2e-up || status=$?
@@ -129,8 +132,8 @@ doctor() {
     echo "FAIL このスクリプトが起動したスタックの状態がない（$STATE）。stack.sh up を実行する" >&2
     exit 1
   fi
-  if [ ! -s "$STATE/slot" ]; then
-    echo "FAIL $STATE に slot の記録がない。stack.sh down の後に up をやり直す" >&2
+  if [ ! -s "$STATE/slot.env" ]; then
+    echo "FAIL $STATE に slot の記録（slot.env）がない。stack.sh down の後に up をやり直す" >&2
     exit 1
   fi
   load_slot
@@ -155,8 +158,8 @@ down() {
     exit 0
   fi
   # slot を取る前に打ち切られた起動には、止める preview も片付けるコンテナもない。
-  if [ ! -s "$STATE/slot" ]; then
-    echo "$STATE に slot の記録がありません（slot を取る前に打ち切られた起動）。$STATE だけを消します。" >&2
+  if [ ! -s "$STATE/slot.env" ]; then
+    echo "$STATE に slot の記録（slot.env）がありません（slot を取る前に打ち切られた起動）。$STATE だけを消します。" >&2
     rm -rf "$STATE"
     exit 0
   fi
@@ -177,7 +180,7 @@ down() {
     echo "自分が起動した preview は動いていませんが、$E2E_WEB_PORT を別のプロセスが使っています。止めずに続けます。" >&2
   fi
 
-  if containers_ours || { [ ! -s "$STATE/containers" ] && containers_created_since_up; }; then
+  if containers_ours || { [ ! -e "$STATE/containers" ] && containers_created_since_up; }; then
     task e2e-collect-logs LOG="build/verify/logs/backend-$stamp.log" || status=$?
     compose down --volumes --remove-orphans
   elif [ -n "$(containers)" ]; then

@@ -6,7 +6,7 @@ description: デモアプリケーション（React の SPA と Spring Boot の 
 # デモアプリケーションの検証
 
 利用者が触るのは `http://localhost:<web のポート>` の SPA である。
-web のポートは、`stack.sh up` が取った slot で決まる（slot 0 は 5173、slot 1 は 21173。`docs/tooling/test-slots.md`）。
+web のポートは、`stack.sh up` が取った slot で決まり、`up` の出力に出る（slot 0 は 5173。`docs/tooling/test-slots.md`）。
 SPA は Vite preview の proxy を通して backend（`/api/**`、`/oauth2/**`、`/logout`）を同一オリジンで呼び、ログインは Keycloak の画面で行う。
 検証は `task e2e` と同じ compose-test の e2e profile を起動したまま残し、Chromium で journey を 1 つずつ実行する。
 E2E の規約の正文は `docs/e2e/testing-strategy.md` にあり、この skill は検証の手順だけを持つ。
@@ -18,10 +18,12 @@ E2E の規約の正文は `docs/e2e/testing-strategy.md` にあり、この skil
 
 - Java（Corretto 25）、Docker、`task`、`vp` が入っている（`docs/local-env-setup/setup.md`）。
   migration とシーダーはホストの Gradle で動くので、Java がないと起動しない。
-- `task test`、`task e2e`、`task scan-dast`、pre-push のフックと同時に実行してよい。
+- `task test` と pre-push のフックは、同じ worktree でも同時に実行してよい。
+  別の worktree の `task e2e`、`task scan-dast` とも同時に実行してよい。
+  同じ worktree では `task e2e` と `task scan-dast` を同時に実行しない。どちらも `frontend/apps/web/dist` を作り直し、preview が配信中のビルドを壊す。
   実行ごとに空きの slot を取り、slot ごとに Compose project（`spring-modulith-test-<n>`）とポートが分かれる。
   空きがなければ待ち、待っている間は slot を持つ worktree を出力する。
-- 別の worktree の検証スタックは操作しない。自分の slot は `build/verify/stack/slot` にあり、URL は `up` の出力に出る。
+- 別の worktree の検証スタックは操作しない。自分の slot は `build/verify/stack/slot.env` にあり、URL は `up` の出力に出る。
 
 ## Launch
 
@@ -29,16 +31,16 @@ E2E の規約の正文は `docs/e2e/testing-strategy.md` にあり、この skil
 .kiro/skills/verify-demo/scripts/stack.sh up
 ```
 
-空きの slot を取り、`TEST_SLOT` を渡して起動の手順を `task e2e-up` に任せ、`task e2e` と同じにする（`docs/e2e/testing-strategy.md` の「実行と後片付け」）。
+空きの slot を取って `build/verify/stack/slot.env` に残し、起動の手順を `task e2e-up` に任せ、`task e2e` と同じにする（`docs/e2e/testing-strategy.md` の「実行と後片付け」）。
 その後 Vite preview を自分の process group で起動し、preview の proxy から `/actuator/health/readiness` が 200 を返すまで待つ。
 `検証スタックの準備ができました` が出たら使える。
 初回は build で数分かかる。
-tool call の時間切れに備え、`nohup ... > /tmp/verify-up.log 2>&1 &` で起動してログを待ってよい。
+tool call の時間切れに備え、`mkdir -p build/verify && nohup ... > build/verify/up.log 2>&1 &` で起動してログを待ってよい。
 出力をパイプ（`| tail` など）に渡さない。
 migration とシーダーが残す Gradle の daemon がパイプを開いたままにし、`up` が終わってもパイプの先が戻らない。
 
 残った状態（`build/verify/stack/`）を見つけたら、理由を出して止まる。
-自分が残したものなら `stack.sh down` を実行する。
+`stack.sh down` を実行してから `up` をやり直す。
 `task e2e-up` が失敗したときと、`up` が打ち切られたときも、`stack.sh down` で片付ける。
 
 ## Doctor
@@ -47,7 +49,7 @@ migration とシーダーが残す Gradle の daemon がパイプを開いたま
 .kiro/skills/verify-demo/scripts/stack.sh doctor
 ```
 
-読み取りだけをする。
+読み取りだけをする（`build/verify/stack/slot.env` を読む）。
 slot の Compose project のコンテナが `up` の記録と同じこと、自分の preview が生きていること、SPA の配信、preview の proxy から backend の readiness、Keycloak の issuer、WireMock の管理 API、代表の注文 6 件を確かめる。
 起動した後に `backend`、`frontend`、`docker`、`openapi` のソースが変わっていれば FAIL にする。
 古いビルドを検証しないよう、そのときは `down` と `up` をやり直す。
@@ -74,7 +76,7 @@ journey は ESM の 1 ファイルで、既定の export の関数が次を受�
 - **`gateway.chargeCount`**：決済代行の WireMock が、注文 ID を冪等性キーにした請求を受けた回数（`e2e/payment-gateway.ts`）
 - **`gateway.failChargesFor`**：注文 ID の請求だけを `{ kind: "status" | "delay" | "declined" }` で失敗させ、取り除く関数を返す
 - **`sql(query, options?)`**：モジュールのロールで SQL を実行し、結果の文字列を返す（`sql.log` にも残す）
-- **`login(page?)`**：Keycloak の画面からログインする。`export const login = false` の journey は自動のログインを省く
+- **`login(page?)`**：Keycloak の画面からログインし、テナント選択でサンプル商事を選んでトップページへ戻る。`export const login = false` の journey は自動のログインを省く
 - **`params`、`record(k, v)`**：コマンドラインの `key=value`、`result.json` の `records` に証拠の値を足す
 
 `sql` は次のように使う。
@@ -132,7 +134,7 @@ slot の Compose project のコンテナが `up` の記録と同じときだけ�
 失敗した試行の後も毎回実行する。
 
 `stack.sh` の片付けを変えたら、検証スタックを止めた状態で次を実行する。
-古い PID の記録と、ほかの実行の compose-test（別の slot を含む）を止めないことを確かめる。
+古い PID の記録と、ほかの実行の compose-test を止めないことを確かめる。
 
 ```bash
 .kiro/skills/verify-demo/scripts/stack-test.sh
