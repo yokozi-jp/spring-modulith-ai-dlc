@@ -65,7 +65,7 @@ repositories {
 
 ext {
     set('springCloudVersion', "2025.1.2")
-    set('springModulithVersion', "2.1.1")
+    set('springModulithVersion', "2.1.2")
 }
 
 dependencies {

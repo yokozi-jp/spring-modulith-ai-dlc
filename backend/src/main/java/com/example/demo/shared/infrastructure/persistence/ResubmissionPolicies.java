@@ -29,7 +29,7 @@ import org.springframework.util.ClassUtils;
  * イベント出版を、リスナーの {@code on} に付けた {@link ResubmissionPolicy} の方針に対応づける（ADR-079）。
  *
  * <p>出版はリスナーの ID（{@code listener_id}、{@link TargetEventPublication#getTargetIdentifier()}）で区別する。
- * Spring Modulith 2.1.1 は、{@code TransactionalApplicationListener.getListenerId()} を ID にし、Spring
+ * Spring Modulith 2.1.2 は、{@code TransactionalApplicationListener.getListenerId()} を ID にし、Spring
  * Framework は、注釈の {@code id} が空ならメソッドの完全修飾名と引数の型（{@code <クラス>.<メソッド>(<型>,...)}）を ID にする。 起動のときに
  * bean のメソッドを走査して同じ ID を作る。
  */
@@ -72,19 +72,18 @@ class ResubmissionPolicies {
               (MethodIntrospector.MetadataLookup<ResubmissionPolicy>)
                   method ->
                       AnnotatedElementUtils.findMergedAnnotation(method, ResubmissionPolicy.class));
-      methods.forEach(
-          (method, policy) -> {
-            if (!properties.policies().containsKey(policy.value())) {
-              throw new IllegalStateException(
-                  "@ResubmissionPolicy(\""
-                      + policy.value()
-                      + "\") on "
-                      + method
-                      + " is not defined in event-publication.resubmission.policies "
-                      + properties.policies().keySet());
-            }
-            names.put(listenerId(method), policy.value());
-          });
+      methods.forEach((method, policy) -> {
+        if (!properties.policies().containsKey(policy.value())) {
+          throw new IllegalStateException(
+              "@ResubmissionPolicy(\""
+                  + policy.value()
+                  + "\") on "
+                  + method
+                  + " is not defined in event-publication.resubmission.policies "
+                  + properties.policies().keySet());
+        }
+        names.put(listenerId(method), policy.value());
+      });
     }
     return names;
   }
@@ -140,7 +139,7 @@ class ResubmissionPolicies {
     return Objects.requireNonNull(properties.policies().get(nameOf(listenerId)), "policy");
   }
 
-  /** 出版のリスナーの ID。Spring Modulith 2.1.1 の再投入は {@link TargetEventPublication} を渡す。 */
+  /** 出版のリスナーの ID。Spring Modulith 2.1.2 の再投入は {@link TargetEventPublication} を渡す。 */
   /* package */ static String listenerIdOf(final EventPublication publication) {
     return publication instanceof TargetEventPublication target
         ? target.getTargetIdentifier().getValue()

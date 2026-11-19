@@ -547,7 +547,11 @@ class EventPublicationResubmitterTest {
         s -> FAILED.equals(s.status()) && Integer.valueOf(attempts).equals(s.attempts()));
   }
 
-  /** リスナーを 1 回失敗させ、T0 に FAILED の出版を作り、イベントの ID を返す。 */
+  /**
+   * リスナーを 1 回失敗させ、今の時計の時刻に FAILED の出版を作り、時計を 1 マイクロ秒進めて、イベントの ID を返す。
+   *
+   * <p>Spring Modulith の再投入は {@code publication_date} が今より前の出版だけを読むため、進めないと手での再投入の対象にならない。
+   */
   private String failedOnce(final Scenario scenario) {
     if (listener.failuresLeft() == 0) {
       listener.failTimes(1);
@@ -559,6 +563,7 @@ class EventPublicationResubmitterTest {
         "FAILED の出版",
         s -> FAILED.equals(s.status()));
     assertThat(state(id).attempts()).as("id=%s の最初の attempts", id).isEqualTo(1);
+    clock.set(clock.instant().plus(1, ChronoUnit.MICROS));
     return id;
   }
 

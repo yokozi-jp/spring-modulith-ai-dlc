@@ -1,5 +1,6 @@
 package com.example.demo.payment.application;
 
+import static com.example.demo.jooq.modulith.Tables.EVENT_PUBLICATION;
 import static com.example.demo.jooq.payment.Tables.T_PAYMENT;
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -27,6 +28,7 @@ import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
@@ -202,6 +204,11 @@ class OrderConfirmedListenerTest {
     gateway.hold();
     try {
       // 3. 認証も observation もないテストのスレッドから再投入する。
+      // 再投入は publication_date が今より前の出版だけを読み、時計は NOW で止まっているため、出版の時刻を 1 マイクロ秒前にする。
+      dsl.update(EVENT_PUBLICATION)
+          .set(EVENT_PUBLICATION.PUBLICATION_DATE, NOW.minus(1, ChronoUnit.MICROS))
+          .where(EVENT_PUBLICATION.SERIALIZED_EVENT.contains(orderId))
+          .execute();
       failedEventPublications.resubmit(
           ResubmissionOptions.defaults()
               .withFilter(publication ->

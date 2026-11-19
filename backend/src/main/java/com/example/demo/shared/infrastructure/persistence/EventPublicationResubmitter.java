@@ -214,10 +214,9 @@ class EventPublicationResubmitter {
   private int resubmit(final Instant now) {
     // 候補にした出版の ID と、再投入の前の completion_attempts。
     final Map<UUID, Integer> candidates = new ConcurrentHashMap<>();
-    // ponytail: 2.1.1 では LIMIT が条件の関数より先に掛かり、withMinAge も FAILED に効かないため、withMinAge は呼ばず、毎回 FAILED
-    // の行をすべて読む。
-    // 根拠は ResubmissionOptionsLearningTest の minAgeDoesNotFilterFailedPublications と
-    // batchSizeLimitIsAppliedBeforeFilter である。
+    // ponytail: LIMIT が条件の関数より先に掛かるため（ResubmissionOptionsLearningTest の
+    // batchSizeLimitIsAppliedBeforeFilter）、毎回 FAILED の行をすべて読む。
+    // withMinAge は publication_date から測り、最後の試行からの待ち時間を表せないため呼ばない。
     // withBatchSize(Integer.MAX_VALUE) で全件をヒープへ読むため、メモリの上限は FAILED の出版の数に比例し、行が大量に溜まると毎回の読み込みも重くなる。
     // 上限に達した出版は Runbook で片付ける。Spring Modulith が回数の条件を SQL へ渡せるようになったら LIMIT にする。
     // ponytail: 読んだ一覧は古くなる。実行が長引くと、その間に再び FAILED に戻った行を、一覧が古いまま方針の上限を超えて再投入しうる。
@@ -228,14 +227,13 @@ class EventPublicationResubmitter {
     failedEventPublications.resubmit(
         ResubmissionOptions.defaults()
             .withBatchSize(Integer.MAX_VALUE)
-            .withFilter(
-                publication ->
-                    Duration.between(now, Instant.now(clock)).compareTo(budget) <= 0
-                        && policies.isDue(publication, now)
-                        && candidates.size() < properties.maxPerRun()
-                        && candidates.put(
-                                publication.getIdentifier(), publication.getCompletionAttempts())
-                            == null));
+            .withFilter(publication ->
+                Duration.between(now, Instant.now(clock)).compareTo(budget) <= 0
+                    && policies.isDue(publication, now)
+                    && candidates.size() < properties.maxPerRun()
+                    && candidates.put(
+                            publication.getIdentifier(), publication.getCompletionAttempts())
+                        == null));
     return tracker.track(candidates, now);
   }
 

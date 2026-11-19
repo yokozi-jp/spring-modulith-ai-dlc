@@ -1,13 +1,13 @@
 package com.example.demo.shared.infrastructure.persistence;
 
 import static com.example.demo.jooq.modulith.Tables.EVENT_PUBLICATION;
-import static com.example.demo.jooq.modulith.Tables.EVENT_PUBLICATION_ARCHIVE;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.example.demo.shared.infrastructure.persistence.EventPublicationResubmitterTest.ProbeListener;
 import com.example.demo.shared.infrastructure.persistence.EventPublicationResubmitterTest.ResubmissionProbe;
 import java.time.Duration;
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
@@ -27,16 +27,16 @@ import org.springframework.modulith.test.EnableScenarios;
 import org.springframework.modulith.test.Scenario;
 
 /**
- * Spring Modulith 2.1.1 の {@link FailedEventPublications#resubmit(ResubmissionOptions)} と Staleness
- * Monitor（{@link EventPublicationRegistry#markStalePublicationsFailed}）の癖を固定する学習テスト（ADR-079）。
+ * Spring Modulith 2.1.2 の {@link FailedEventPublications#resubmit(ResubmissionOptions)} と Staleness
+ * Monitor（{@link
+ * EventPublicationRegistry#markStalePublicationsFailed}）の、このアプリが頼る振る舞いを固定する学習テスト（ADR-079）。
  *
- * <p>{@link EventPublicationResubmitter} と {@link EventPublicationResubmitOnce} は、この癖を前提に、{@code
- * withMinAge} に頼らず条件の関数で待ち時間を判定し、{@code withBatchSize} を {@link Integer#MAX_VALUE} にして FAILED
- * の行をすべて読む。 Spring Modulith の版を上げてこのテストが失敗したら、癖が直ったので、ADR-079 と両方のクラスの読み方（{@code LIMIT} と待ち時間）を見直す。
+ * <p>{@link EventPublicationResubmitter} と {@link EventPublicationResubmitOnce} は、{@code LIMIT}
+ * が条件の関数より先に掛かるため、{@code withBatchSize} を {@link Integer#MAX_VALUE} にして FAILED の行をすべて読む。 Spring
+ * Modulith の版を上げて {@code LIMIT} のテストが失敗したら、ADR-079 と両方のクラスの読み方を見直す。
  *
- * <p>Staleness Monitor の 2 つの学習テストが失敗したら（2.1.2 の GH-1837 と GH-1918 で直る）、{@code
- * event-publication.resubmission.in-flight-staleness} と ADR-079 を見直す。 どちらの行も FAILED で終わるため、{@code
- * CleanGeneratedTablesExtension} の処理中の出版の待ちを止めない。
+ * <p>Staleness Monitor のテストが失敗したら、{@code event-publication.resubmission.in-flight-staleness}
+ * の起動時の検証と ADR-079 を見直す。 どの行も FAILED で終わるため、{@code CleanGeneratedTablesExtension} の処理中の出版の待ちを止めない。
  */
 @ResubmissionTestSupport.SharedContext
 @EnableScenarios
@@ -47,6 +47,9 @@ class ResubmissionOptionsLearningTest {
 
   /** 最初の出版の時刻。マイクロ秒の精度にする。 */
   private static final Instant T0 = Instant.parse("2026-10-10T01:02:03.123456Z");
+
+  /** Staleness Monitor のテストの閾値。 */
+  private static final Duration STALENESS = Duration.ofMinutes(5);
 
   /** Spring Modulith の失敗した出版の再投入。 */
   @Autowired private FailedEventPublications failedEventPublications;
@@ -69,23 +72,6 @@ class ResubmissionOptionsLearningTest {
   }
 
   @Test
-  @DisplayName("学習テスト：withMinAge は FAILED の出版を絞らず、作ったばかりの出版も再投入する")
-  void minAgeDoesNotFilterFailedPublications(final Scenario scenario) {
-    final UUID publication = failed(scenario);
-
-    // 2.1.1 の SQL は「STATUS = 'FAILED' OR (STATUS IS NULL AND ...) AND PUBLICATION_DATE < ?」で、AND が
-    // OR より先に結びつく。
-    failedEventPublications.resubmit(
-        ResubmissionOptions.defaults().withMinAge(Duration.ofDays(36_500)));
-
-    scenario
-        .stimulate(() -> {})
-        .andWaitForStateChange(() -> archived(publication), Boolean.TRUE::equals)
-        .andVerify(done -> {});
-    assertThat(archived(publication)).as("100 年の最小の経過時間でも再投入して完了した").isTrue();
-  }
-
-  @Test
   @DisplayName("学習テスト：withBatchSize の LIMIT は条件の関数より先に掛かり、古い出版が枠を占めると新しい出版に届かない")
   void batchSizeLimitIsAppliedBeforeFilter(final Scenario scenario) {
     // ORDER BY publication_date の順を決めるため、出版の時刻をずらす。
@@ -93,16 +79,17 @@ class ResubmissionOptionsLearningTest {
     final UUID older = failed(scenario);
     clock.set(T0.plusSeconds(1));
     final UUID newer = failed(scenario);
+    // 再投入は publication_date が今より前の出版だけを読むため、新しい出版も読める時刻に進める。
+    clock.set(T0.plusSeconds(2));
     final List<UUID> seen = new CopyOnWriteArrayList<>();
 
     failedEventPublications.resubmit(
         ResubmissionOptions.defaults()
             .withBatchSize(1)
-            .withFilter(
-                publication -> {
-                  seen.add(publication.getIdentifier());
-                  return newer.equals(publication.getIdentifier());
-                }));
+            .withFilter(publication -> {
+              seen.add(publication.getIdentifier());
+              return newer.equals(publication.getIdentifier());
+            }));
 
     assertThat(seen).as("条件の関数が受け取った出版").containsExactly(older);
     assertThat(
@@ -119,30 +106,24 @@ class ResubmissionOptionsLearningTest {
       "学習テスト：Staleness Monitor は RESUBMITTED の出版を publication_date でなく last_resubmission_date から測る")
   void stalenessIsMeasuredFromLastResubmissionDate() {
     final UUID publication = insert(EventPublication.Status.RESUBMITTED);
+    final Instant resubmittedAt = T0.plus(Duration.ofMinutes(10));
     dsl.update(EVENT_PUBLICATION)
-        .set(EVENT_PUBLICATION.LAST_RESUBMISSION_DATE, T0.plus(Duration.ofMinutes(10)))
+        .set(EVENT_PUBLICATION.LAST_RESUBMISSION_DATE, resubmittedAt)
         .where(EVENT_PUBLICATION.ID.eq(publication))
         .execute();
-    clock.set(T0.plus(Duration.ofMinutes(10)));
+    clock.set(resubmittedAt);
 
-    registry.markStalePublicationsFailed(status -> Duration.ofMinutes(5));
+    registry.markStalePublicationsFailed(status -> STALENESS);
 
     assertThat(status(publication))
         .as("再投入した直後の出版の状態")
         .isEqualTo(EventPublication.Status.RESUBMITTED.name());
-  }
 
-  @Test
-  @DisplayName("学習テスト：状態ごとの Duration.ZERO はその状態を止めず、その状態の出版をすべて FAILED にする")
-  void zeroStalenessMarksAllPublicationsOfThatStateFailed() {
-    final UUID publication = insert(EventPublication.Status.PROCESSING);
-    clock.set(T0.plusSeconds(1));
+    clock.set(resubmittedAt.plus(STALENESS).plus(1, ChronoUnit.MICROS));
 
-    registry.markStalePublicationsFailed(
-        status ->
-            status == EventPublication.Status.PROCESSING ? Duration.ZERO : Duration.ofHours(1));
+    registry.markStalePublicationsFailed(status -> STALENESS);
 
-    assertThat(status(publication)).as("1 秒前の PROCESSING の出版の状態").isEqualTo(FAILED_STATUS);
+    assertThat(status(publication)).as("再投入から閾値を過ぎた出版の状態").isEqualTo(FAILED_STATUS);
   }
 
   /**
@@ -176,22 +157,17 @@ class ResubmissionOptionsLearningTest {
     final AtomicReference<@Nullable UUID> publication = new AtomicReference<>();
     scenario
         .publish(new ResubmissionProbe(id))
-        .andWaitForStateChange(
-            () ->
-                dsl.select(EVENT_PUBLICATION.ID)
-                    .from(EVENT_PUBLICATION)
-                    .where(
-                        EVENT_PUBLICATION
-                            .SERIALIZED_EVENT
-                            .contains(id)
-                            .and(EVENT_PUBLICATION.STATUS.eq(FAILED_STATUS)))
-                    .fetchOptional(EVENT_PUBLICATION.ID)
-                    .orElse(null))
+        .andWaitForStateChange(() ->
+            dsl.select(EVENT_PUBLICATION.ID)
+                .from(EVENT_PUBLICATION)
+                .where(
+                    EVENT_PUBLICATION
+                        .SERIALIZED_EVENT
+                        .contains(id)
+                        .and(EVENT_PUBLICATION.STATUS.eq(FAILED_STATUS)))
+                .fetchOptional(EVENT_PUBLICATION.ID)
+                .orElse(null))
         .andVerify(publication::set);
     return Objects.requireNonNull(publication.get(), "FAILED の出版の ID");
-  }
-
-  private boolean archived(final UUID publication) {
-    return dsl.fetchExists(EVENT_PUBLICATION_ARCHIVE, EVENT_PUBLICATION_ARCHIVE.ID.eq(publication));
   }
 }
