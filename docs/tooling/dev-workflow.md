@@ -136,6 +136,19 @@ Taskのテスト系タスクは、`.env.test`に足りない変数を`.env.test.
 セッションの利用者を`AppUserPrincipal`にした変更（[ADR-096](../adr/ADR-096-require-app-user-principal-for-audit-columns.md)）の後は、ブラウザでログアウトしてログインし直す。
 ローカルのRedisはセッションを残すため、変更の前のセッションのままでは書き込みが500になる（[APIの認証、セッション、権限](../web-api/authentication-and-session.md)）。
 
+テナントと所属の表（016 changeset）を足した変更（[ADR-098](../adr/ADR-098-keep-tenants-and-roles-in-app-database.md)）の後は、既存のローカルの環境で次の順に実行し、ブラウザでログアウトしてログインし直す。
+
+```bash
+task keycloak-reimport   # 利用者の ID を固定し、レルムの役割を消した realm.json を読み直す
+task be-migrate          # テナントと所属の表を作る
+task be-seed             # 2 つのテナントと、test-user と test-admin の所属を入れる
+```
+
+`task keycloak-reimport`はKeycloakのデータだけを消して読み直すため、Keycloakのログインのセッションも消える。
+読み直さないと、Keycloakのtest-userとtest-adminのIDがseedの所属の利用者と食い違い、ログインしても所属がなく、招待を待つ画面になる。
+`task be-seed`は、業務データがあっても、足りないテナントと所属だけを入れる。
+test-userは2つのテナント（サンプル商事、サンプル物産）に属するのでログインの後にテナントを選ぶ画面が出て、test-adminはサンプル商事だけに属するので選ばずに業務の画面に入る。
+
 公開先は次のとおり。
 
 - フロントエンド：<http://localhost:5173>（ブラウザで開く入口）

@@ -40,13 +40,16 @@ routeはdirectory形式で書く。
 src/routes/
 ├── __root.tsx
 └── _authenticated/
-    ├── route.tsx          # beforeLoadとアプリシェル
-    └── orders/
-        ├── index.tsx      # /orders
-        ├── new.tsx        # /orders/new
-        └── $orderId/
-            ├── index.tsx  # /orders/$orderId
-            └── edit.tsx   # /orders/$orderId/edit
+    ├── route.tsx          # アプリシェル
+    ├── tenants.tsx        # /tenants（テナントを選ぶ画面）
+    └── _tenant/
+        ├── route.tsx      # 選んだテナントを確かめるbeforeLoad
+        └── orders/
+            ├── index.tsx      # /orders
+            ├── new.tsx        # /orders/new
+            └── $orderId/
+                ├── index.tsx  # /orders/$orderId
+                └── edit.tsx   # /orders/$orderId/edit
 ```
 
 `route.tsx` は、子が共有する `beforeLoad`、`loader`、`validateSearch`、layoutがあるときだけ作る。
@@ -65,7 +68,12 @@ URLのpathとparameterの命名は[フロントエンドのURL設計](url-design
 
 layout routeにcomponentを持たせるなら、そのcomponentで `<Outlet />` を描画する。
 
-現在の `_authenticated/route.tsx` は `components/app-shell.tsx` を描画するだけであり、`beforeLoad` は最初の権限APIと同時に足す。
+テナントを選んだ後だけ出す業務の画面は、pathless layoutの `_authenticated/_tenant` の下に置く。
+`_tenant/route.tsx` の `beforeLoad` が選んだテナント（`GET /api/current-tenant`）を読み、typeが `/problems/tenant-not-selected` の403なら `/tenants` へ移す。
+テナントを選ぶ画面の `_authenticated/tenants.tsx` は、ログインが要り、テナントが要らないため、`_tenant` の外に置く。
+テナントを選んだ後は、routerで遷移せず、文書を `/` で読み直す。
+選ぶ前に読んだ状態を持ち越さず、focusを文書の先頭に戻すためである。
+業務の画面のloaderが同じ403を受けたときは、`RouteError` がテナントを選ぶ画面へのリンクを出す（[APIの認証、セッション、権限](../web-api/authentication-and-session.md#テナントを選ぶ)）。
 
 ## 状態表示の分担
 

@@ -74,8 +74,11 @@ frontend/apps/web/src/
 │   ├── __root.tsx
 │   └── _authenticated/
 │       ├── route.tsx
-│       ├── index.tsx
-│       └── -index.test.tsx
+│       ├── tenants.tsx
+│       └── _tenant/
+│           ├── route.tsx
+│           ├── index.tsx
+│           └── -index.test.tsx
 ├── components/
 │   ├── app-shell.tsx
 │   ├── route-pending.tsx
@@ -146,6 +149,7 @@ CSP違反の報告はFaroと `lib/telemetry.ts` を通さない。
 `router-defaults.ts` はrouterの既定値（pending、error、not foundのcomponentとpreloadの設定）を一つのobjectにまとめ、`main.tsx` とrouteのテストが同じ値でrouterを作る。
 
 `routes/_authenticated/route.tsx` は認証が要る画面のpathless layoutであり、アプリシェルを描画する。
+`routes/_authenticated/_tenant/route.tsx` はテナントを選んだ後だけ出す画面のpathless layoutであり、選んだテナントの名前を描画する（[フロントエンドのルーティングと状態管理](routing-and-state.md#認証が要る画面とアプリシェル)）。
 
 `routeTree.gen.ts` はTanStack Router pluginの生成物なので、生成元のroute fileを変更して再生成し、生成物を手で編集しない。
 再生成の手順と検査は[フロントエンドのテストと検証](testing.md#生成物)にある。
