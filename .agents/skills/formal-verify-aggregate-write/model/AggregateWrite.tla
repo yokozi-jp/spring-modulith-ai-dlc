@@ -20,6 +20,13 @@
 (*  - A wait can end with lock_timeout (55P03), and a wait cycle ends with *)
 (*    the deadlock detector aborting one transaction (40P01).              *)
 (*  - Row locks are held until commit or rollback.                         *)
+(* The root row lock orders the two requests' child statements, so they   *)
+(* never wait for each other. When it does not (the children-before-root  *)
+(* mutant), the model is coarser than PostgreSQL: an UPDATE waits for a    *)
+(* row the other request inserted and has not committed, and a statement   *)
+(* that waited sees the rows the other request committed meanwhile.        *)
+(* PostgreSQL's UPDATE and DELETE do neither, because their snapshot is    *)
+(* taken when the statement starts.                                        *)
 (***************************************************************************)
 EXTENDS Naturals, Sequences, FiniteSets
 
@@ -38,7 +45,8 @@ VARIABLES
 vars == <<root, rootPend, child, childPend, w>>
 
 Outcomes == {"none", "committed", "conflict", "lock-conflict",
-             "child-not-found", "unique-violation", "deadlock"}
+             "child-not-found", "unique-violation", "insert-lock-timeout",
+             "deadlock"}
 
 TypeOK ==
   /\ \A i \in Writers: w[i].outcome \in Outcomes
@@ -56,7 +64,7 @@ Init ==
   /\ \E plan \in [Writers -> NonEmpty]:
        w = [i \in Writers |->
               [pc |-> "screen", plan |-> plan[i], expected |-> 0,
-               saved |-> {}, ops |-> <<>>, idx |-> 1, outcome |-> "none"]]
+               ops |-> <<>>, idx |-> 1, outcome |-> "none"]]
 
 \* What a statement of request i sees: its own uncommitted write, or the
 \* committed row.
@@ -65,14 +73,20 @@ ChildSees(i, k) == IF childPend[k].holder = i THEN childPend[k].exists
 
 HeldByOther(i, holder) == holder \notin {None, i}
 
-\* The row that request i's next statement must lock, and who holds it.
-WaitsOn(i) ==
-  CASE w[i].pc = "root" -> rootPend.holder
-    [] w[i].pc = "ops" /\ w[i].idx <= Len(w[i].ops) ->
-         childPend[w[i].ops[w[i].idx].key].holder
-    [] OTHER -> None
+\* The child rows that LockedRoot.deleteChildren (line_no NOT IN the
+\* aggregate's lines) matches when it runs.
+DeleteTargets(i) == {k \in Keys \ w[i].plan: ChildSees(i, k)}
 
-Blocked(i) == HeldByOther(i, WaitsOn(i))
+NextOp(i) == w[i].ops[w[i].idx]
+
+\* Request i's next statement waits for a row lock the other request holds.
+Blocked(i) ==
+  CASE w[i].pc = "root" -> HeldByOther(i, rootPend.holder)
+    [] w[i].pc = "ops" /\ w[i].idx <= Len(w[i].ops) ->
+         IF NextOp(i).op = "delete"
+           THEN \E k \in DeleteTargets(i): HeldByOther(i, childPend[k].holder)
+           ELSE HeldByOther(i, childPend[NextOp(i).key].holder)
+    [] OTHER -> FALSE
 
 \* Rollback: drop the request's uncommitted writes and release its locks.
 Release(i) ==
@@ -119,40 +133,41 @@ UpdateRoot(i) ==
        ELSE Fail(i, "conflict")
 
 \* JooqOrderRepository.update: SELECT line_no FROM t_order_line WHERE
-\* order_id = ?, then the statements in its order: one DELETE of the lines
-\* not in the aggregate (LockedRoot.deleteChildren), then for each line in
-\* ascending line_no an UPDATE (LockedRoot.updateChild) if it was saved, or
-\* an INSERT (insertLine) if not.
+\* order_id = ? (the saved set), then the statements in its order: one
+\* DELETE ... WHERE order_id = ? AND line_no NOT IN (the aggregate's lines)
+\* (LockedRoot.deleteChildren), then for each line in ascending line_no an
+\* UPDATE (LockedRoot.updateChild) if the saved set has it, or an INSERT
+\* (insertLine) if not.
+DeleteOp == [op |-> "delete", key |-> None]
+
 ReadSaved(i) ==
   /\ w[i].pc = "saved"
   /\ LET saved == {k \in Keys: ChildSees(i, k)}
          plan == w[i].plan
-         dels == [n \in 1..Cardinality(saved \ plan) |->
-                    [op |-> "delete", key |-> CHOOSE k \in saved \ plan:
-                       Cardinality({j \in saved \ plan: j < k}) = n - 1]]
          keep == [n \in 1..Cardinality(plan) |->
                     LET k == CHOOSE k \in plan:
                                Cardinality({j \in plan: j < k}) = n - 1
                     IN [op |-> IF k \in saved THEN "update" ELSE "insert", key |-> k]]
-     IN w' = [w EXCEPT ![i].pc = "ops", ![i].saved = saved, ![i].ops = dels \o keep,
+     IN w' = [w EXCEPT ![i].pc = "ops", ![i].ops = <<DeleteOp>> \o keep,
                        ![i].idx = 1]
   /\ UNCHANGED <<root, rootPend, child, childPend>>
 
-\* One child statement, once its row is free.
-\*  delete: deletes the row if this statement still sees it.
+\* One child statement, once the rows it locks are free.
+\*  delete: deletes every row it matches when it runs.
 \*  update: 0 rows is BusinessRuleViolationException (422) from updateChild.
 \*  insert: an existing key is 23505; insertLine does not go through
 \*          TableWriter, so it is not converted (a 500).
 ChildOp(i) ==
   /\ w[i].pc = "ops" /\ w[i].idx <= Len(w[i].ops) /\ ~Blocked(i)
-  /\ LET op == w[i].ops[w[i].idx]
+  /\ LET op == NextOp(i)
          k == op.key
          sees == ChildSees(i, k)
          next == [w EXCEPT ![i].idx = w[i].idx + 1]
      IN CASE op.op = "delete" ->
-               /\ childPend' = IF sees
-                                 THEN [childPend EXCEPT ![k] = [holder |-> i, exists |-> FALSE, tag |-> i]]
-                                 ELSE childPend
+               /\ childPend' = [j \in Keys |->
+                                 IF j \in DeleteTargets(i)
+                                   THEN [holder |-> i, exists |-> FALSE, tag |-> i]
+                                   ELSE childPend[j]]
                /\ w' = next
                /\ UNCHANGED <<root, rootPend, child>>
           [] op.op = "update" ->
@@ -186,11 +201,13 @@ Commit(i) ==
   /\ w' = [w EXCEPT ![i].pc = "done", ![i].outcome = "committed"]
 
 \* lock_timeout ends a wait: TableWriter turns 55P03 into ConflictException
-\* (LOCK) for the root, updateChild, and deleteChildren. insertLine does not
-\* convert it, but it is still a lock wait, so it is reported the same way.
+\* (LOCK, a 409) for the root, updateChild, and deleteChildren. insertLine
+\* does not go through TableWriter, so its CannotAcquireLockException
+\* reaches ApiExceptionHandler.handleException (a 500).
 LockTimeout(i) ==
   /\ Blocked(i)
-  /\ Fail(i, "lock-conflict")
+  /\ Fail(i, IF w[i].pc = "ops" /\ NextOp(i).op = "insert"
+               THEN "insert-lock-timeout" ELSE "lock-conflict")
 
 \* Each request waits for the other: the deadlock detector aborts one with
 \* 40P01, which nothing converts (a 500).

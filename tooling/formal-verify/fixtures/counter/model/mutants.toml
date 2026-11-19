@@ -1,0 +1,22 @@
+# A mutant that the control passes and TLC catches, and one whose control already fails.
+
+[[mutant]]
+name = "off-by-one"
+change = "the guard lets the counter pass Limit"
+config = "holds"
+invariants = ["AtMostLimit"]
+
+[[mutant.edits]]
+old = '''Next == n < Limit'''
+new = '''Next == n <= Limit'''
+
+[[mutant]]
+name = "vacuous"
+change = "Limit = 3 breaks BelowThree with or without the edit"
+config = "holds"
+overrides = { Limit = 3 }
+invariants = ["BelowThree"]
+
+[[mutant.edits]]
+old = '''Next == n < Limit'''
+new = '''Next == n <= Limit'''

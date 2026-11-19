@@ -9,7 +9,7 @@
 (* Each action is one indivisible step in the code: one SQL statement, or  *)
 (* one transaction whose effects other transactions see only at commit.    *)
 (***************************************************************************)
-EXTENDS Naturals, Sequences, FiniteSets
+EXTENDS Naturals, Sequences
 
 CONSTANTS
   \* Listener invocations of the one publication: the original async
@@ -228,8 +228,7 @@ DInsert(d) ==
                  launched, rpc>>
 
 \* DefaultEventPublicationRegistry.markCompleted (REQUIRES_NEW): archive
-\* mode copies the row to the archive and deletes it. When the in-progress
-\* entry is gone it still completes by event and listener id.
+\* mode copies the row to the archive and deletes it.
 DMarkCompleted(d) ==
   /\ dpc[d] = "markCompleted"
   /\ pub' = IF RowExists THEN Archived ELSE pub
@@ -237,14 +236,17 @@ DMarkCompleted(d) ==
   /\ UNCHANGED <<orderStatus, orderLock, cmdPc, cmdLock, payments, gateway,
                  dres, launched, rpc>>
 
-\* DefaultEventPublicationRegistry.markFailed:
-\* UPDATE ... SET status = 'FAILED' WHERE id = ? AND status != 'FAILED'.
-\* It does nothing when this instance's in-progress entry was already
-\* removed by another delivery of the same publication, so either outcome.
+\* DefaultEventPublicationRegistry.markFailed finds this delivery's entry in
+\* PublicationsInProgress and runs JdbcEventPublicationRepositoryV2
+\* .markFailed: UPDATE ... SET status = 'FAILED' WHERE id = ? AND
+\* completion_date IS NULL AND status != 'FAILED'. The entry is always
+\* there: PublicationsInProgress.Key compares events by identity, the first
+\* delivery uses the event that store registered, and each resubmission
+\* registers the event it has just deserialized, so one delivery never
+\* removes another delivery's entry.
 DMarkFailed(d) ==
   /\ dpc[d] = "markFailed"
-  /\ \/ pub' = IF RowExists THEN "FAILED" ELSE pub
-     \/ UNCHANGED pub
+  /\ pub' = IF RowExists THEN "FAILED" ELSE pub
   /\ dpc' = [dpc EXCEPT ![d] = "done"]
   /\ UNCHANGED <<orderStatus, orderLock, cmdPc, cmdLock, payments, gateway,
                  dres, launched, rpc>>
@@ -263,11 +265,13 @@ DCrash(d) ==
 (* Recovery: Spring Modulith's staleness monitor and                       *)
 (* shared/infrastructure/persistence/EventPublicationResubmitter.          *)
 
-\* DefaultEventPublicationRegistry.markStalePublicationsFailed: finds
-\* PUBLISHED, PROCESSING, RESUBMITTED rows older than spring.modulith.events
-\* .staleness.* by publication_date, then markFailed by id. Time is not
-\* modeled, and the row can change between the find and the update, so any
-\* existing row that is not FAILED may become FAILED at any time.
+\* DefaultEventPublicationRegistry.markStalePublicationsFailed: findByStatus
+\* for PUBLISHED, PROCESSING, RESUBMITTED, keeps the rows whose
+\* last_resubmission_date (getLastPublicationDate) is older than
+\* spring.modulith.events.staleness.*, then markFailed by id without
+\* checking the status again. The model has no time, and the row can change
+\* between the find and the update, so any existing row that is not FAILED
+\* may become FAILED at any time.
 Stale ==
   /\ pub \in {"PUBLISHED", "PROCESSING", "RESUBMITTED"}
   /\ pub' = "FAILED"

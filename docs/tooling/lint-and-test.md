@@ -361,6 +361,11 @@ const params = { ...(cursor !== undefined && { cursor }) };
   検査には一時のgitリポジトリと、lefthookの代わりのスクリプトを使う。
   `lefthook.yml`の`no_auto_install`も`lefthook dump`で確かめる。
   ケースは`tooling/lefthook-install/test.sh`が正である。
+- **`task formal-verify-test`**：検証スキルが使う`tooling/formal-verify/check.sh`と`tooling/formal-verify/mutants.py`を、`tooling/formal-verify/fixtures/counter/`の小さなTLA+のモデルで検査する。
+  ケースは`tooling/formal-verify/test.sh`が正で、この文書には写さない。
+  初回は、TLCの取得とmiseでのJavaの導入にネットワークが要る。
+  CIでは実行しない。CIのmiseは`mise.lock`にない版を入れず（`MISE_LOCKED=1`）、`mise.lock`はJavaを持たないためである。
+  検証スキルの手順の正文は[形式検証スキルの使い方](../agents/formal-verification.md)である。
 - **`task lint-taskfile`**：Task本体でTaskfileのYAML構文とスキーマ構造を検証する。
   `tooling/taskfile-cleanup/`のfixtureで、後片付けの定型が本体の終了コードを優先し、前段が失敗しても後段の後片付けを走らせることを検査する。
   `tooling/task-calls/task-calls.sh`は、フックとワークフローが呼ぶタスク名を検査する。
@@ -398,6 +403,7 @@ OKF検査の採用理由は[ADR-036](../adr/ADR-036-adopt-okf-for-docs-knowledge
 - **pre-commit（`tooling/agent-git/`の変更）**：`agent-git-test`を実行する。
 - **pre-commit（`lefthook.yml`か`tooling/lefthook-glob/`の変更）**：`lint-lefthook`を実行する。
 - **pre-commit（`package.json`、`lefthook.yml`、`tooling/lefthook-install/`の変更）**：`lefthook-install-test`を実行する。
+- **pre-commit（`tooling/formal-verify/`の変更）**：`formal-verify-test`を実行する。
 - **pre-commit（`tooling/*/test.sh`、`.kiro/hooks/*.test.sh`、`tooling/scratch-git/`の変更）**：`lint-scratch-git`を実行する。
 - **pre-push（すべて）**：`adr-check`と`scan-secrets-all`を実行する。
 - **pre-push（バックエンドのJavaまたはGradle変更）**：`be-lint`相当と`test`を実行する。

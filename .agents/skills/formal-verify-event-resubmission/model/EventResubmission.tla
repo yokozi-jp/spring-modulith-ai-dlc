@@ -68,11 +68,14 @@ VARIABLES
   lock,   \* modulith.shedlock: lock_until, locked_at, locked_by
   inst,   \* each instance: alive, and the state of its resubmission run
   exec,   \* each listener delivery: state, instance, time queued or started
+  mon,    \* each instance's staleness monitor: whether its last find
+          \* listed the row and the mark is still to come, when, and the
+          \* status the find saw
   crashes,
   staleHitInFlight  \* the staleness monitor marked the row FAILED while a
                     \* delivery was queued or running
 
-vars == <<now, row, lock, inst, exec, crashes, staleHitInFlight>>
+vars == <<now, row, lock, inst, exec, mon, crashes, staleHitInFlight>>
 
 Statuses == {"PUBLISHED", "PROCESSING", "FAILED", "RESUBMITTED", "ARCHIVED"}
 
@@ -82,10 +85,13 @@ TypeOK ==
   /\ row.attempts \in 1..(MaxResubmissions + 3)
   /\ \A i \in Instances: inst[i].phase \in {"idle", "locked", "read"}
   /\ \A k \in Slots: exec[k].st \in {"none", "queued", "running", "done"}
+  /\ \A i \in Instances: mon[i].found \in BOOLEAN
 
 \* The resubmitter's first run is after initialDelay = interval.
 IdleRun(t) == [up |-> TRUE, next |-> t, phase |-> "idle", runStart |-> 0,
                snap |-> FALSE, snapAttempts |-> 0, snapLast |-> 0]
+
+NoFind == [found |-> FALSE, at |-> 0, st |-> "PUBLISHED"]
 
 Init ==
   /\ now = 0
@@ -99,6 +105,7 @@ Init ==
   /\ exec = [k \in Slots |->
                IF k = 1 THEN [st |-> "queued", on |-> 1, t |-> 0]
                         ELSE [st |-> "none", on |-> None, t |-> 0]]
+  /\ mon = [i \in Instances |-> NoFind]
   /\ crashes = 0
   /\ staleHitInFlight = FALSE
 
@@ -109,6 +116,12 @@ SetStatus(s) == IF row.status = s THEN row
 
 -----------------------------------------------------------------------------
 (* EventPublicationResubmitter.resubmitOnce: one run of one instance.       *)
+(* The job and the staleness monitor are fixed-delay tasks, which          *)
+(* SimpleAsyncTaskScheduler (spring.threads.virtual.enabled) runs one at a *)
+(* time on its single scheduler thread. So an instance's run and its       *)
+(* monitor never overlap, and a run that is due waits for the monitor.     *)
+
+ThreadFree(i) == inst[i].phase = "idle" /\ ~mon[i].found
 
 \* resubmitOnce captures now, then DefaultLockingTaskExecutor.executeWithLock
 \* -> JooqStorageAccessor.updateRecord: UPDATE shedlock SET lock_until =
@@ -116,13 +129,13 @@ SetStatus(s) == IF row.status = s THEN row
 \* lock_until <= now. The lock uses DB time; the model has one clock.
 \* Not acquired: the run is skipped and the next run is interval later.
 RunStart(i) ==
-  /\ inst[i].up /\ inst[i].phase = "idle" /\ inst[i].next = now
+  /\ inst[i].up /\ ThreadFree(i) /\ inst[i].next <= now
   /\ IF lock.until <= now
        THEN /\ lock' = [until |-> now + LockAtMostFor, at |-> now, by |-> i]
             /\ inst' = [inst EXCEPT ![i].phase = "locked", ![i].runStart = now]
        ELSE /\ inst' = [inst EXCEPT ![i].next = now + Interval]
             /\ UNCHANGED lock
-  /\ UNCHANGED <<now, row, exec, crashes, staleHitInFlight>>
+  /\ UNCHANGED <<now, row, exec, mon, crashes, staleHitInFlight>>
 
 \* FailedEventPublications.resubmit -> DefaultEventPublicationRegistry
 \* .processFailedPublications -> findFailedPublications:
@@ -135,7 +148,7 @@ RunRead(i) ==
                           ![i].snap = (row.status = "FAILED"),
                           ![i].snapAttempts = row.attempts,
                           ![i].snapLast = row.lastAttempt]
-  /\ UNCHANGED <<now, row, lock, exec, crashes, staleHitInFlight>>
+  /\ UNCHANGED <<now, row, lock, exec, mon, crashes, staleHitInFlight>>
 
 \* For the snapshot: the withFilter predicate (the time budget from the
 \* captured now, then ResubmissionPolicies.isDue: attempts <=
@@ -166,19 +179,20 @@ RunFinish(i) ==
                THEN [lock EXCEPT !.until = Max(lock.at + LockAtLeastFor, now)]
                ELSE lock
   /\ inst' = [inst EXCEPT ![i] = IdleRun(now + Interval)]
-  /\ UNCHANGED <<now, crashes, staleHitInFlight>>
+  /\ UNCHANGED <<now, mon, crashes, staleHitInFlight>>
 
 -----------------------------------------------------------------------------
-(* Spring Modulith's staleness monitor: DefaultEventPublicationRegistry     *)
-(* .markStalePublicationsFailed on every instance, fixed delay             *)
-(* check-interval (= interval). Spring Modulith 2.1.2 finds rows by status *)
-(* whose getLastPublicationDate() (last_resubmission_date, which the       *)
-(* insert sets to publication_date) is before now - staleness, then marks  *)
-(* each one by id with JdbcEventPublicationRepositoryV2.markFailed, without*)
-(* rechecking. Modeled as one step that may happen at any time while the   *)
-(* row is stale, and must happen within interval + RunMax of the row      *)
-(* becoming stale while an instance is up. This covers every schedule of  *)
-(* the monitors on both instances, including a find and a later mark.      *)
+(* Spring Modulith's staleness monitor on every instance:                  *)
+(* StalenessMonitorConfiguration runs DefaultEventPublicationRegistry      *)
+(* .markStalePublicationsFailed with fixed delay check-interval            *)
+(* (= interval). For each of PUBLISHED, PROCESSING, RESUBMITTED,           *)
+(* markFailed(Status, Staleness) runs findByStatus, keeps the rows whose   *)
+(* getLastPublicationDate() (last_resubmission_date, which the insert sets *)
+(* to publication_date) is before now - staleness, then calls              *)
+(* JdbcEventPublicationRepositoryV2.markFailed(id) for each of them:       *)
+(* UPDATE SET status = 'FAILED' WHERE id = ? AND completion_date IS NULL   *)
+(* AND status != 'FAILED'. The UPDATE does not check the status or the     *)
+(* date again, so the row can change between the find and the mark.       *)
 
 Threshold(st) == IF st = "PUBLISHED" THEN WaitAge ELSE InFlightStaleness
 
@@ -186,13 +200,28 @@ StaleNow ==
   /\ row.status \in {"PUBLISHED", "PROCESSING", "RESUBMITTED"}
   /\ now > row.lastAttempt + Threshold(row.status)
 
+\* A find must list a stale row within interval + RunMax of the row
+\* becoming stale (the fixed delay plus one run), or as soon as an
+\* instance's scheduler thread is free after that.
 StaleDeadline ==
   Max(row.since, row.lastAttempt + Threshold(row.status) + 1) + Interval + RunMax
 
-Stale ==
-  /\ StaleNow /\ \E i \in Instances: inst[i].up
-  /\ row' = SetStatus("FAILED")
-  /\ staleHitInFlight' = (staleHitInFlight \/ \E k \in Slots: InFlight(k))
+\* findByStatus and the date filter list the row. One row, so the find
+\* keeps a flag and the status it saw. A run does its finds and marks one
+\* after another, so an instance has at most one mark to come.
+StaleFind(i) ==
+  /\ inst[i].up /\ ThreadFree(i) /\ StaleNow
+  /\ mon' = [mon EXCEPT ![i] = [found |-> TRUE, at |-> now, st |-> row.status]]
+  /\ UNCHANGED <<now, row, lock, inst, exec, crashes, staleHitInFlight>>
+
+\* markFailed(id) for the listed row, whatever its status is now.
+StaleMark(i) ==
+  /\ inst[i].up /\ mon[i].found
+  /\ mon' = [mon EXCEPT ![i] = NoFind]
+  /\ IF RowExists /\ row.status # "FAILED"
+       THEN /\ row' = SetStatus("FAILED")
+            /\ staleHitInFlight' = (staleHitInFlight \/ \E k \in Slots: InFlight(k))
+       ELSE UNCHANGED <<row, staleHitInFlight>>
   /\ UNCHANGED <<now, lock, inst, exec, crashes>>
 
 -----------------------------------------------------------------------------
@@ -205,7 +234,7 @@ ExecStart(k) ==
   /\ exec[k].st = "queued" /\ inst[exec[k].on].up
   /\ exec' = [exec EXCEPT ![k].st = "running", ![k].t = now]
   /\ row' = IF RowExists THEN SetStatus("PROCESSING") ELSE row
-  /\ UNCHANGED <<now, lock, inst, crashes, staleHitInFlight>>
+  /\ UNCHANGED <<now, lock, inst, mon, crashes, staleHitInFlight>>
 
 \* markCompleted, completion-mode archive: copy to event_publication_archive
 \* and delete the row.
@@ -213,18 +242,19 @@ ExecSucceed(k) ==
   /\ exec[k].st = "running"
   /\ exec' = [exec EXCEPT ![k] = [st |-> "done", on |-> None, t |-> 0]]
   /\ row' = SetStatus("ARCHIVED")
-  /\ UNCHANGED <<now, lock, inst, crashes, staleHitInFlight>>
+  /\ UNCHANGED <<now, lock, inst, mon, crashes, staleHitInFlight>>
 
 \* markFailed: UPDATE SET status = 'FAILED' WHERE id = ? AND status != 'FAILED'.
 ExecFail(k) ==
   /\ exec[k].st = "running"
   /\ exec' = [exec EXCEPT ![k] = [st |-> "done", on |-> None, t |-> 0]]
   /\ row' = IF RowExists /\ row.status # "FAILED" THEN SetStatus("FAILED") ELSE row
-  /\ UNCHANGED <<now, lock, inst, crashes, staleHitInFlight>>
+  /\ UNCHANGED <<now, lock, inst, mon, crashes, staleHitInFlight>>
 
 -----------------------------------------------------------------------------
 (* Crash and restart. A crash keeps the lock row until lock_until, and     *)
-(* kills the deliveries on that instance without any mark.                 *)
+(* kills the deliveries and the staleness monitor run on that instance     *)
+(* without any mark.                                                       *)
 
 Crash(i) ==
   /\ inst[i].up /\ crashes < MaxCrashes
@@ -232,13 +262,14 @@ Crash(i) ==
   /\ exec' = [k \in Slots |-> IF InFlight(k) /\ exec[k].on = i
                                 THEN [st |-> "done", on |-> None, t |-> 0]
                                 ELSE exec[k]]
+  /\ mon' = [mon EXCEPT ![i] = NoFind]
   /\ crashes' = crashes + 1
   /\ UNCHANGED <<now, row, lock, staleHitInFlight>>
 
 Restart(i) ==
   /\ ~inst[i].up
   /\ inst' = [inst EXCEPT ![i] = IdleRun(now + Interval)]
-  /\ UNCHANGED <<now, row, lock, exec, crashes, staleHitInFlight>>
+  /\ UNCHANGED <<now, row, lock, exec, mon, crashes, staleHitInFlight>>
 
 -----------------------------------------------------------------------------
 (* Time. A step that is due now must happen before time moves on.          *)
@@ -246,9 +277,13 @@ Restart(i) ==
 MustActNow ==
   \/ \E i \in Instances:
        /\ inst[i].up
-       /\ \/ inst[i].phase = "idle" /\ inst[i].next = now
+       /\ \/ ThreadFree(i) /\ inst[i].next <= now
           \/ inst[i].phase # "idle" /\ inst[i].runStart + RunMax = now
-  \/ StaleNow /\ StaleDeadline = now /\ \E i \in Instances: inst[i].up
+  \/ \E i \in Instances: inst[i].up /\ mon[i].found /\ mon[i].at + RunMax = now
+  \* A mark to come discharges the find: it marks the row within RunMax.
+  \/ /\ StaleNow /\ StaleDeadline <= now
+     /\ \E i \in Instances: inst[i].up /\ ThreadFree(i)
+     /\ ~\E i \in Instances: mon[i].found
   \/ \E k \in Slots:
        \/ exec[k].st = "queued" /\ exec[k].t + QueueMax = now
        \/ exec[k].st = "running" /\ exec[k].t + ListenerMax = now
@@ -256,15 +291,16 @@ MustActNow ==
 Tick ==
   /\ now < Horizon /\ ~MustActNow
   /\ now' = now + 1
-  /\ UNCHANGED <<row, lock, inst, exec, crashes, staleHitInFlight>>
+  /\ UNCHANGED <<row, lock, inst, exec, mon, crashes, staleHitInFlight>>
 
 AtHorizon == now = Horizon /\ ~MustActNow /\ UNCHANGED vars
 
 Next ==
   \/ \E i \in Instances:
        \/ RunStart(i) \/ RunRead(i) \/ RunFinish(i) \/ Crash(i) \/ Restart(i)
+       \/ StaleFind(i) \/ StaleMark(i)
   \/ \E k \in Slots: ExecStart(k) \/ ExecSucceed(k) \/ ExecFail(k)
-  \/ Stale \/ Tick \/ AtHorizon
+  \/ Tick \/ AtHorizon
 
 Spec == Init /\ [][Next]_vars
 
