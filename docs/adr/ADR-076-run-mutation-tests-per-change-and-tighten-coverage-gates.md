@@ -41,7 +41,7 @@ coverage の下限は、バックエンドが JaCoCo の全体の branch 85%、�
 
 最初の Decision では、フロントエンドのファイルごとの下限を `task fe-coverage` の Node のスクリプトが `coverage-summary.json` から検査した。
 Vite+ 0.3.3 の Vitest 4.1 の `perFile` は全体の下限をそのままファイルごとに当てるだけで、ファイルごとに別の値を持てなかったためである。
-Vite+ 1.6.0 の Vitest 5.1.0 は `perFile` に `{ branches: 60, lines: 65 }` の形で値を渡せるので（#290、#463）、検査を `vite.config.ts` へ移すように Decision を書き直した。
+Vite+ 1.6.0 の Vitest 5.1.0 は `perFile` に `{ branches: 60, lines: 65 }` の形で値を渡せるので（#290 で確かめ、#499 で上げた）、検査を `vite.config.ts` へ移すように Decision を書き直した。
 
 ## Decision
 
@@ -74,11 +74,11 @@ coverage の下限を次の値にする。
 | フロントエンドの全体                        | 88%    | 95%  |
 | フロントエンドのファイルごと                | 60%    | 65%  |
 
-計測する分岐や行がないクラスとファイルは、クラスやファイルごとの下限を検査しない。
+計測する分岐や行がないクラスとファイルは、クラスやファイルごとの下限で落とさない（Vitest は 100% と数える）。
 対象から外すのは、これまでどおり生成コードと起動の処理だけとし、低いクラスやファイルを個別に外さない。
 下限を割ったときは、ローカルと CI の `be-test` と `fe-coverage` が失敗する。
 
-フロントエンドの全体の下限は `vite.config.ts` の `thresholds` で、ファイルごとの下限は同じ `thresholds` の `perFile` で検査する。
+フロントエンドの全体の下限は各 package の `vite.config.ts` の `thresholds` で、ファイルごとの下限は同じ `thresholds` の `perFile` で検査する。
 
 ## Consequences
 
@@ -141,5 +141,8 @@ coverage の下限を次の値にする。
 - [Vitest: coverage.thresholds](https://vitest.dev/config/coverage)
 - `.github/workflows/mutation-test.yml`
 - `backend/build.gradle`
-- `frontend/vite.config.ts`
+- `frontend/apps/web/vite.config.ts`
+- `frontend/packages/api/vite.config.ts`
+- `frontend/packages/ui/vite.config.ts`
+- `frontend/lint/workspace-layout.test.js`
 - `Taskfile.yml`
