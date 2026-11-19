@@ -38,6 +38,9 @@ OpenAPIからOrvalでnative FetchのTanStack Query clientを生成し、手書�
 2 つ以上の `package.json` が使う依存は、版を `pnpm-workspace.yaml` の `catalog:` に置き、各 `package.json` には `"catalog:"` と書く（[ADR-100](../adr/ADR-100-pin-shared-frontend-dependencies-in-pnpm-catalog.md)）。
 1 つの package だけが使う依存は、その `package.json` に版を書く。
 `frontend/lint/workspace-layout.test.js` が、2 つ以上の `package.json` に `"catalog:"` 以外で書いた依存を見つけて失敗する。
+同じテストが、`packages/ui` と `packages/api` が互いを、アプリが別のアプリを `package.json` に書かないことを、各 package から他の package を Node で解決して `MODULE_NOT_FOUND` になることで示す。
+アプリから `@frontend/ui` と `@frontend/api` が解決できることを、対照として確かめる。
+`vp` や pnpm の shim は `NODE_PATH` に `.pnpm/node_modules` を足し、宣言のない workspace package も解決できてしまうので、このテストは `NODE_PATH` を空にして解決する。
 
 `packages/ui/` は、shadcn の部品（`src/<部品名>.tsx`）、`cn`（`src/lib/utils.ts`）、テーマの CSS（`src/style.css`）を持つ。
 `@base-ui/**` を import できる場所は、この package の production source だけである。
@@ -130,6 +133,7 @@ frontend/packages/ui/
 `@source` を書かないと、`@frontend/ui` の部品の class が CSS に出ない。
 Tailwind の自動検出が、アプリの directory の外にある `packages/ui` を走査しないためである。
 このとき型検査と lint は通ったまま、見た目だけが壊れる。
+`frontend/lint/workspace-layout.test.js` が、`apps/*/src/style.css` のすべてに `packages/ui/src` を指す `@source` があることを確かめる。
 
 `main.tsx` はcomposition rootであり、`api/query-client.ts` の `createQueryClient()` で `QueryClient` を作り、TanStack Routerを生成してProviderを接続する。
 `createQueryClient()` は、`@frontend/api/api-fetch` の401の処理（`QueryCache` と `MutationCache` の `onError`）と再試行の判定（`defaultOptions.queries.retry`）を渡し、mutationの後に全queryを無効化する（[mutationの後のcache](routing-and-state.md#mutationの後のcache)）。
@@ -256,7 +260,7 @@ feature間の境界は、`frontend/lint/feature-boundaries.js` のOxlint JS plug
 `../` によるimportは `import/no-relative-parent-imports` が禁じているため、この規則はaliasだけを見る。
 
 共有層、route、Base UI、`fetch`、テスト用部品のimportの制限は、`no-restricted-imports`、`no-restricted-globals`、`no-restricted-properties` のoverrideで書いている。
-ファイルの範囲ごとに効く制限は[Lintとテストのリファレンス](../tooling/lint-and-test.md#フロントエンドのlint設定)にある。
+ファイルの範囲ごとに効く制限は[フロントエンドのLint設定](lint-config.md#ファイルの範囲ごとの制限)にある。
 
 `@grafana/*` のimportは、`no-restricted-imports` のすべての禁止の一覧に加え、`src/lib/telemetry.ts` のoverrideだけで外している。
 テストファイルもSDKをimportできない。

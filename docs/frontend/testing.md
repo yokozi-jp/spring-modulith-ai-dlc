@@ -38,7 +38,7 @@ componentの内部state、Hookの呼出回数、CSS classだけを主要な期�
 - **非同期の待ち**：DOMの変化は、Testing Libraryの`findBy`か`waitFor`で待つ。
   mockの呼出などDOM以外の値は、`expect.poll`で待つ。
   `setTimeout`などの固定時間、`vi.waitFor`、`vi.waitUntil`では待たない。
-  `vi.waitFor`と`vi.waitUntil`はOxlintの`vitest/no-restricted-vi-methods`が禁止する（[Lintとテストのリファレンス](../tooling/lint-and-test.md#例外と調整)）。
+  `vi.waitFor`と`vi.waitUntil`はOxlintの`vitest/no-restricted-vi-methods`が禁止する（[フロントエンドのLint設定](lint-config.md#例外と調整)）。
 - **処理の一時停止**：MSWのhandlerかroute loaderをテストが解放するまで止めるときは、`createGate`を使う。
   `createGate`は`src/testing/gate.ts`にある。
   止める側で`promise`を待ち、テストから`release`を呼ぶ。
@@ -71,6 +71,10 @@ route loaderとTanStack Queryを組み合わせた画面では、loading、succe
 全体でbranch 88%とline 95%、ファイルごとにbranch 60%とline 65%を維持する。
 計測する分岐や行がないファイルは、Vitestが100%と数えるので、ファイルごとの下限で落ちない。
 下限の値の根拠は[ADR-076](../adr/ADR-076-run-mutation-tests-per-change-and-tighten-coverage-gates.md)を参照する。
+
+`packages/ui`のテストは、jsdomとTesting Libraryを使わず、server renderの出力とresolveだけを確かめる。
+操作が要る部品を足すときに、DOMの環境を足す。
+`packages/ui`のテストはReact Compilerなしで走り、`apps/web`のようにCompilerを有効にしたテストは行わない。
 
 coverageはReact Compilerを外して測る。
 Compilerが足すmemoの分岐を分母に入れないためである。

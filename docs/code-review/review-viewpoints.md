@@ -72,4 +72,4 @@ tags: [reference, code-review]
 - [バックエンドのテスト種別](../backend/testing-strategy.md)
 - [テスト観点の割り当て](../frontend/test-strategy.md)
 - [バックエンドのアーキテクチャテスト](../backend/architecture-tests.md#規則を確かめるフィクスチャ)：注釈の属性の値で判定するArchUnitの規則を足す差分で、違反フィクスチャが値を省いた注釈を含むかを確かめるとき
-- [Lintとテストのリファレンス](../tooling/lint-and-test.md)：Lintの規則やoptionを変える差分で、fixtureがoptionの許す範囲の外側を拒否しているかを確かめるとき
+- [フロントエンドのLint設定](../frontend/lint-config.md#lintを通る書き方)：Lintの規則やoptionを変える差分で、fixtureがoptionの許す範囲の外側を拒否しているかを確かめるとき

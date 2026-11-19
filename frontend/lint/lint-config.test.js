@@ -267,7 +267,7 @@ describe("fixture に適用したプロジェクトの lint 設定", () => {
     });
   });
 
-  // docs/tooling/lint-and-test.md の「Lintを通る書き方」の規則。
+  // docs/frontend/lint-config.md の「Lintを通る書き方」の規則。
   describe("書き方", () => {
     describe("void", () => {
       it("文としての void を許可する", () => {

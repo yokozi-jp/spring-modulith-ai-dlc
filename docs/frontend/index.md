@@ -5,6 +5,7 @@
 - [OrvalとAPI境界](api-client-orval.md)：業務 API を追加するとき、Orval の生成設定や OpenAPI の tag と operationId、API の呼び出し方を変えるとき
 - [フロントエンドのUIとスタイル](ui-and-style.md)：component、style、アクセシビリティを追加または変更するとき
 - [フロントエンドの国際化](i18n.md)：表示文言、locale、数値表示を追加または変更するとき
+- [フロントエンドのLint設定](lint-config.md)：Lintの規則の例外や調整、ファイルの範囲ごとの制限を確かめるとき、Lintの規則を緩めるか判断するとき、Lintを通る書き方を確認するとき
 - [フロントエンドのテストと検証](testing.md)：テストを書くとき、クエリや待ち方や mock の範囲を決めるとき、生成物を更新するとき、変更を `task fe-verify` で検証するとき
 - [フロントエンドに利用者向け機能を追加する](runbook-add-feature.md)：新しい画面や業務機能を追加する手順を確認するとき
 - [フロントエンドのURL設計](url-design.md)：route を追加するとき、画面間で値を受け渡す方法を決めるとき
