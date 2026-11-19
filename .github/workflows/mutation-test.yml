@@ -36,8 +36,8 @@ on:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
-  # 実行中の main の実行はスコアの基準値になるため、取り消すのは PR の実行だけにする。
-  # 待ちの main の実行は同じ group の 1 つ分しか持てず、後の push に置き換えられる（ADR-076）。
+  # 実行中の main の実行はスコアの基準値になるので、取り消すのは PR の実行だけにする。
+  # 同じ group が持てる待ちの実行は 1 つなので、後の push が待ちの main の実行を置き換える（ADR-076）。
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 permissions:

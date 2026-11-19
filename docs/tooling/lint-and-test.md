@@ -464,9 +464,7 @@ pre-pushの「変更」は、push済みかどうかやrebaseの有無によら�
 - **`mutation-test.yml`**：Backend CIと同じパスの変更を含むPR、mainへのpush、手動実行で`mutation-test`を実行し、PITのレポートをartifactにする。
   PRでは`PIT_CHANGED_SINCE=origin/<base>`を渡して差分のクラスだけを、pushと手動実行では全体を変異させる。
   ジョブのtimeoutはPRで60分、pushと手動実行で180分とする。
-  `concurrency`の`cancel-in-progress`はPRだけでtrueにするので、PRの実行は後のpushで取り消し、実行中のmainの実行は取り消さない。
-  ただし同じgroupが持つ待ちの実行は1つだけなので、待ちのmainの実行は後のpushに置き換えられる。
-  mainの全体の実行はcommitごとではなく、待つあいだに来たcommitをまとめた単位になる。
+  PRの実行は後のpushが取り消す。mainの実行は、実行中なら取り消さず、待ちのものを後のpushや手動実行が置き換える。
   スコアの閾値を持たず、PITが完走しないときだけ失敗する。
   Backend CIのtestと同じGradle cacheをread-onlyで復元する。
   必須チェックにしない（[ADR-076](../adr/ADR-076-run-mutation-tests-per-change-and-tighten-coverage-gates.md)）。
