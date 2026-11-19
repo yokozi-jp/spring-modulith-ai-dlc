@@ -11,7 +11,7 @@ tags: [reference, testing, lint, ci]
 場面ごとの実行順は[開発ワークフロー](dev-workflow.md)を参照する。
 Gitフックの中でDockerを使う検査は、`docker info`が失敗するローカル環境ではスキップし、CIで検査する。
 `docker`コマンドがあってもデーモンに接続できなければ、Dockerを使えないとみなす。
-判定の本体は`task docker-available`だけにあり、`lefthook.yml`の`api-contract-check`、`hadolint`、`docker-build-check`、`compose-config`、`be-test`、`actionlint`が呼ぶ。
+判定の本体は`task docker-available`だけにあり、Dockerを使う`lefthook.yml`のジョブが呼ぶ。
 
 ## 入口Task
 
