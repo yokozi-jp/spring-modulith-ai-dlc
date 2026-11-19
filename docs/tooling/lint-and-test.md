@@ -305,9 +305,10 @@ const params = { ...(cursor !== undefined && { cursor }) };
 - **`task lint-duplicates`**：生成コードを除く手書きのバックエンドとフロントエンドをjscpdで検査する。
 - **`task scan-secrets`**：ステージ済み変更をbetterleaksでスキャンする。
 - **`task scan-secrets-all`**：現在のブランチから辿れる履歴をbetterleaksでスキャンする。環境変数`BETTERLEAKS_LOG_OPTS`でgit logの範囲を変えられる（既定は`HEAD`）。
-  merge commitの差分も走査するため、範囲の前に`--diff-merges=first-parent`を常に付ける。betterleaksの既定ではmerge commitを走査せず、コンフリクトの解消だけで入ったtokenを見逃す。
+  merge commitの差分も走査するため、タスクが`--diff-merges=first-parent`を常に付ける。betterleaksの既定ではmerge commitを走査せず、コンフリクトの解消だけで入ったtokenを見逃す。
 - **`task lint-betterleaks`**：`.betterleaks.toml`の除外に一致するファイルへ、乱数のtokenと`password = '<乱数>'`をstageして本物のbetterleaksで走査し、検出されることを検査する。
-  現在のファイルが検出されないことも確かめる。対象のファイルは`tooling/betterleaks/test.sh`の`files`が正で、除外を足したら同じ変更で足す。
+  現在のファイルが検出されないことも確かめる。対象は`.betterleaks.toml`の`paths`に一致する追跡ファイルで、設定から求める。
+  確かめるのはファイル全体が除外されていないことで、除外した行の厳しさは見ない。
 - **`task lint-semgrep`**：Semgrep OSSで静的解析する。
 - **`task be-sbom`**：バックエンドのCycloneDX SBOMを生成する。
 - **`task scan-vulns`**：バックエンドとフロントエンドの依存関係をTrivyで検査する。
@@ -405,9 +406,10 @@ OKF検査の採用理由は[ADR-036](../adr/ADR-036-adopt-okf-for-docs-knowledge
 
 - 除外は行単位にする。`.betterleaks.toml`の`paths`と`regexes`を併記するときは、`condition = "AND"`と`regexTarget`を必ず書く。
   既定の`condition`は`OR`で、`paths`に一致したファイルが丸ごと走査から外れる。
-  既定の`regexTarget`は`secret`で値しか照合しないため、キー名を含む行は`line`、`match`を使うときは`match`を選ぶ。
-- 除外を足したら、除外した場所にtokenを置くと検出されることを`lint-betterleaks`で確かめる。
-- 履歴にだけ残る誤検知は、`.betterleaksignore`にfingerprint（`commit:file:rule:line`）を1行足して除外する。
+  既定の`regexTarget`は`secret`で値しか照合しない。
+  キー名を含めて照合するときは`match`を選び、正規表現を`^`と`$`で固定する。`line`は一致した行の全規則の検出を消すため、同じ行の別のtokenも見逃す。
+- 除外を足したら、`lint-betterleaks`で、そのファイルに置いたtokenが検出されることを確かめる。
+- 履歴にだけ残る誤検知は、`.betterleaksignore`にfingerprint（`commit:file:rule:line`）を1行足して除外する。mainを取り込むmerge commitを含むPull Requestでは、同じ検出が別のcommitの指紋で再び出ることがある。
 - betterleaksが止めたとき、本物の秘密情報なら除外しない。pushしていれば無効化（rotate）する。
 
 ## Gitフック対応

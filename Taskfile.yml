@@ -1559,7 +1559,6 @@ tasks:
 
   # --log-opts を渡すと betterleaks は Git 履歴を単一ワーカーで読むため、--git-workers は付けない。
   # --diff-merges=first-parent は merge commit の差分も走査する（既定では走査しない）。コンフリクトの解消だけで入った token を見逃さない。
-  # BETTERLEAKS_LOG_OPTS を渡すときも、範囲に続けてこの引数を付ける。
   scan-secrets-all:
     desc: 現在のブランチから辿れる履歴（BETTERLEAKS_LOG_OPTSで範囲を変更可）をbetterleaksでスキャン
     cmds:
