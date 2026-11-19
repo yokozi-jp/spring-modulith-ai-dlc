@@ -58,8 +58,8 @@ class PaymentGatewayClient implements PaymentGateway {
   private final RestClient restClient;
 
   /**
-   * Boot の自動構成の {@code RestClient.Builder} から、決済代行の URL とタイムアウトを持つ HTTP クライアントを作る。
-   * 通信の設定の扱いは docs/backend/class-roles/external-client.md に従う。
+   * Boot の自動構成の {@code RestClient.Builder} から、決済代行の URL とタイムアウトを持つ HTTP クライアントを作る。 通信の設定の扱いは
+   * docs/backend/class-roles/external-client.md に従う。
    *
    * @param builder 計測（トレースとメトリクス）が入った、Boot の自動構成の builder
    * @param baseUrl 決済代行の URL

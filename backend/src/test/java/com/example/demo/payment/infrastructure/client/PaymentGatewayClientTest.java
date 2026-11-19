@@ -64,19 +64,18 @@ class PaymentGatewayClientTest {
    */
   private final ApplicationContextRunner contextRunner =
       new ApplicationContextRunner()
-          .withInitializer(
-              context ->
-                  context
-                      .getEnvironment()
-                      .getPropertySources()
-                      .remove(StandardEnvironment.SYSTEM_ENVIRONMENT_PROPERTY_SOURCE_NAME))
+          .withInitializer(context ->
+              context
+                  .getEnvironment()
+                  .getPropertySources()
+                  .remove(StandardEnvironment.SYSTEM_ENVIRONMENT_PROPERTY_SOURCE_NAME))
           // SpringApplication と同じく、1s のような Duration の値を変換できるようにする。
-          .withInitializer(
-              context ->
-                  context
-                      .getBeanFactory()
-                      .setConversionService(ApplicationConversionService.getSharedInstance()))
-          .withConfiguration(AutoConfigurations.of(
+          .withInitializer(context ->
+              context
+                  .getBeanFactory()
+                  .setConversionService(ApplicationConversionService.getSharedInstance()))
+          .withConfiguration(
+              AutoConfigurations.of(
                   PropertyPlaceholderAutoConfiguration.class, RestClientAutoConfiguration.class))
           .withPropertyValues(
               "payment-gateway.connect-timeout=1s", "payment-gateway.read-timeout=2s")
@@ -101,15 +100,13 @@ class PaymentGatewayClientTest {
     final AtomicReference<String> idempotencyKey = new AtomicReference<>();
     final AtomicReference<String> body = new AtomicReference<>();
     final PaymentGatewayClient client =
-        start(
-            exchange -> {
-              method.set(exchange.getRequestMethod());
-              path.set(exchange.getRequestURI().getPath());
-              idempotencyKey.set(exchange.getRequestHeaders().getFirst("Idempotency-Key"));
-              body.set(
-                  new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8));
-              reply(exchange, 201, SUCCEEDED_REPLY);
-            });
+        start(exchange -> {
+          method.set(exchange.getRequestMethod());
+          path.set(exchange.getRequestURI().getPath());
+          idempotencyKey.set(exchange.getRequestHeaders().getFirst("Idempotency-Key"));
+          body.set(new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8));
+          reply(exchange, 201, SUCCEEDED_REPLY);
+        });
 
     final ChargeOutcome outcome = client.charge(ORDER_ID, AMOUNT);
 
@@ -169,15 +166,14 @@ class PaymentGatewayClientTest {
   @DisplayName("本文が JSON でなければ、契約の不備なので、例外を投げずに失敗を返す")
   void nonJsonReplyReturnsFailed() throws IOException {
     final PaymentGatewayClient client =
-        start(
-            exchange -> {
-              final byte[] bytes = "ok".getBytes(StandardCharsets.UTF_8);
-              exchange.getResponseHeaders().add("Content-Type", "text/plain");
-              exchange.sendResponseHeaders(201, bytes.length);
-              try (OutputStream out = exchange.getResponseBody()) {
-                out.write(bytes);
-              }
-            });
+        start(exchange -> {
+          final byte[] bytes = "ok".getBytes(StandardCharsets.UTF_8);
+          exchange.getResponseHeaders().add("Content-Type", "text/plain");
+          exchange.sendResponseHeaders(201, bytes.length);
+          try (OutputStream out = exchange.getResponseBody()) {
+            out.write(bytes);
+          }
+        });
 
     assertThat(client.charge(ORDER_ID, AMOUNT))
         .as("orderId=%s の text/plain の請求の結果", ORDER_ID.value())
@@ -221,15 +217,14 @@ class PaymentGatewayClientTest {
   void slowReplyTimesOut() throws IOException {
     final CountDownLatch release = new CountDownLatch(1);
     final PaymentGatewayClient client =
-        start(
-            exchange -> {
-              try {
-                release.await(5, TimeUnit.SECONDS);
-              } catch (InterruptedException exception) {
-                Thread.currentThread().interrupt();
-              }
-              reply(exchange, 201, SUCCEEDED_REPLY);
-            });
+        start(exchange -> {
+          try {
+            release.await(5, TimeUnit.SECONDS);
+          } catch (InterruptedException exception) {
+            Thread.currentThread().interrupt();
+          }
+          reply(exchange, 201, SUCCEEDED_REPLY);
+        });
     try {
       final long started = System.nanoTime();
       assertThatThrownBy(() -> client.charge(ORDER_ID, AMOUNT))
@@ -245,10 +240,9 @@ class PaymentGatewayClientTest {
   @Test
   @DisplayName("URL の設定がなければ、placeholder の解決の失敗で起動に失敗する")
   void missingBaseUrlFailsStartup() {
-    contextRunner.run(
-        context ->
-            assertThat(NestedExceptionUtils.getMostSpecificCause(context.getStartupFailure()))
-                .hasMessageContaining("Could not resolve placeholder 'payment-gateway.base-url'"));
+    contextRunner.run(context ->
+        assertThat(NestedExceptionUtils.getMostSpecificCause(context.getStartupFailure()))
+            .hasMessageContaining("Could not resolve placeholder 'payment-gateway.base-url'"));
   }
 
   @Test

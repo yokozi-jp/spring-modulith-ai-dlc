@@ -234,14 +234,13 @@ class DemoApplicationTest {
     paymentGateway.charge(new OrderId(UUID.randomUUID()), new Money(new BigDecimal("1.00")));
 
     assertEquals(
-        before + 1,
-        chargeRequestCount(),
-        "決済代行の請求の呼び出しが http.client.requests に 1 件記録されること");
+        before + 1, chargeRequestCount(), "決済代行の請求の呼び出しが http.client.requests に 1 件記録されること");
   }
 
   /** 請求の API の {@code http.client.requests} の件数を返す。まだ記録がなければ 0 を返す。 */
   private long chargeRequestCount() {
-    final Timer timer = meterRegistry.find("http.client.requests").tag("uri", "/v1/charges").timer();
+    final Timer timer =
+        meterRegistry.find("http.client.requests").tag("uri", "/v1/charges").timer();
     return timer == null ? 0 : timer.count();
   }
 

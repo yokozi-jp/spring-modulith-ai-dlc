@@ -75,15 +75,14 @@ class OidcDiscoveryLocationConfigTest {
         .withPropertyValues(
             "oidc.discovery-uri=" + baseUrl + "/discovery",
             "spring.security.oauth2.client.provider.oidc.issuer-uri=http://other.example.test/realms/demo")
-        .run(
-            context ->
-                assertThat(context)
-                    .getFailure()
-                    .rootCause()
-                    .as("discovery-uri=%s/discovery の起動失敗", baseUrl)
-                    .isInstanceOf(IllegalStateException.class)
-                    .hasMessageContaining(PUBLIC_ISSUER)
-                    .hasMessageContaining("http://other.example.test/realms/demo"));
+        .run(context ->
+            assertThat(context)
+                .getFailure()
+                .rootCause()
+                .as("discovery-uri=%s/discovery の起動失敗", baseUrl)
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining(PUBLIC_ISSUER)
+                .hasMessageContaining("http://other.example.test/realms/demo"));
   }
 
   @Test
@@ -93,26 +92,23 @@ class OidcDiscoveryLocationConfigTest {
         .withPropertyValues(
             "oidc.discovery-uri=" + baseUrl + "/discovery",
             "spring.security.oauth2.client.provider.oidc.issuer-uri=" + PUBLIC_ISSUER)
-        .run(
-            context -> {
-              final ClientRegistration registration =
-                  context.getBean(ClientRegistrationRepository.class).findByRegistrationId("web");
-              assertThat(registration.getProviderDetails().getIssuerUri())
-                  .as("registration=web の issuerUri")
-                  .isEqualTo(PUBLIC_ISSUER);
-              assertThat(registration.getProviderDetails().getConfigurationMetadata())
-                  .as("registration=web の discovery の metadata")
-                  .containsEntry("end_session_endpoint", PUBLIC_ISSUER + "/logout");
-              assertThat(registration.getProviderDetails().getTokenUri())
-                  .as("registration=web の token endpoint")
-                  .isEqualTo("http://keycloak:8080/realms/demo/token");
-              assertThat(registration.getClientId())
-                  .as("registration=web")
-                  .isEqualTo("test-client");
-              assertThat(registration.getScopes())
-                  .as("registration=web")
-                  .containsExactlyInAnyOrder("openid", "profile");
-            });
+        .run(context -> {
+          final ClientRegistration registration =
+              context.getBean(ClientRegistrationRepository.class).findByRegistrationId("web");
+          assertThat(registration.getProviderDetails().getIssuerUri())
+              .as("registration=web の issuerUri")
+              .isEqualTo(PUBLIC_ISSUER);
+          assertThat(registration.getProviderDetails().getConfigurationMetadata())
+              .as("registration=web の discovery の metadata")
+              .containsEntry("end_session_endpoint", PUBLIC_ISSUER + "/logout");
+          assertThat(registration.getProviderDetails().getTokenUri())
+              .as("registration=web の token endpoint")
+              .isEqualTo("http://keycloak:8080/realms/demo/token");
+          assertThat(registration.getClientId()).as("registration=web").isEqualTo("test-client");
+          assertThat(registration.getScopes())
+              .as("registration=web")
+              .containsExactlyInAnyOrder("openid", "profile");
+        });
   }
 
   @Test
@@ -121,38 +117,37 @@ class OidcDiscoveryLocationConfigTest {
     runner
         .withPropertyValues(
             "spring.security.oauth2.client.provider.oidc.issuer-uri=" + baseUrl + "/realms/demo")
-        .run(
-            context -> {
-              assertThat(context)
-                  .doesNotHaveBean(OidcDiscoveryLocationConfig.class)
-                  .hasSingleBean(ClientRegistrationRepository.class);
-              assertThat(
-                      context
-                          .getBean(ClientRegistrationRepository.class)
-                          .findByRegistrationId("web")
-                          .getProviderDetails()
-                          .getIssuerUri())
-                  .as("Boot の自動構成が issuer-uri から読んだ registration=web の issuerUri")
-                  .isEqualTo(baseUrl + "/realms/demo");
-            });
+        .run(context -> {
+          assertThat(context)
+              .doesNotHaveBean(OidcDiscoveryLocationConfig.class)
+              .hasSingleBean(ClientRegistrationRepository.class);
+          assertThat(
+                  context
+                      .getBean(ClientRegistrationRepository.class)
+                      .findByRegistrationId("web")
+                      .getProviderDetails()
+                      .getIssuerUri())
+              .as("Boot の自動構成が issuer-uri から読んだ registration=web の issuerUri")
+              .isEqualTo(baseUrl + "/realms/demo");
+        });
   }
 
   private static String discovery(final String issuer) {
     return """
-        {
-          "issuer": "ISSUER",
-          "authorization_endpoint": "ISSUER/auth",
-          "token_endpoint": "http://keycloak:8080/realms/demo/token",
-          "jwks_uri": "http://keycloak:8080/realms/demo/certs",
-          "userinfo_endpoint": "http://keycloak:8080/realms/demo/userinfo",
-          "end_session_endpoint": "ISSUER/logout",
-          "response_types_supported": ["code"],
-          "subject_types_supported": ["public"],
-          "id_token_signing_alg_values_supported": ["RS256"],
-          "grant_types_supported": ["authorization_code"],
-          "token_endpoint_auth_methods_supported": ["client_secret_basic"]
-        }
-        """
+    {
+      "issuer": "ISSUER",
+      "authorization_endpoint": "ISSUER/auth",
+      "token_endpoint": "http://keycloak:8080/realms/demo/token",
+      "jwks_uri": "http://keycloak:8080/realms/demo/certs",
+      "userinfo_endpoint": "http://keycloak:8080/realms/demo/userinfo",
+      "end_session_endpoint": "ISSUER/logout",
+      "response_types_supported": ["code"],
+      "subject_types_supported": ["public"],
+      "id_token_signing_alg_values_supported": ["RS256"],
+      "grant_types_supported": ["authorization_code"],
+      "token_endpoint_auth_methods_supported": ["client_secret_basic"]
+    }
+    """
         .replace("ISSUER", issuer);
   }
 

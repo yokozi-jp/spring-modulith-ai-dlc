@@ -51,9 +51,8 @@ public class OidcDiscoveryLocationConfig {
             () -> "OIDC discovery の応答が空である: " + discoveryUri);
     final ClientRegistration[] registrations =
         properties.getRegistration().entrySet().stream()
-            .map(
-                entry ->
-                    toRegistration(entry.getKey(), entry.getValue(), properties, configuration))
+            .map(entry ->
+                toRegistration(entry.getKey(), entry.getValue(), properties, configuration))
             .toArray(ClientRegistration[]::new);
     return new InMemoryClientRegistrationRepository(registrations);
   }

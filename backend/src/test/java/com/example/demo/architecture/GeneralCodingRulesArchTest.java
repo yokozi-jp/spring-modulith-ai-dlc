@@ -16,8 +16,8 @@ import com.tngtech.archunit.junit.AnalyzeClasses;
 import com.tngtech.archunit.junit.ArchTest;
 import com.tngtech.archunit.lang.ArchRule;
 import com.tngtech.archunit.library.GeneralCodingRules;
-import java.util.NoSuchElementException;
 import java.util.List;
+import java.util.NoSuchElementException;
 import java.util.Optional;
 import java.util.Set;
 import java.util.function.Supplier;
@@ -180,10 +180,9 @@ class GeneralCodingRulesArchTest {
     // フィクスチャを実際に呼び出してIDEにも使用済みと認識させる。拒否判定は続くArchUnitの検査が担う。
     assertThat(RestClientBypass.createForbiddenValues()).hasSize(3);
 
-    assertThatThrownBy(
-            () ->
-                restClientIsBuiltFromInjectedBuilderRule()
-                    .check(new ClassFileImporter().importClasses(RestClientBypass.class)))
+    assertThatThrownBy(() ->
+            restClientIsBuiltFromInjectedBuilderRule()
+                .check(new ClassFileImporter().importClasses(RestClientBypass.class)))
         .isInstanceOf(AssertionError.class)
         .hasMessageContaining("(3 times)")
         .hasMessageContaining("calls method <org.springframework.web.client.RestClient.builder()>")
