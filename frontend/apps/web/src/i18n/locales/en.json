@@ -128,6 +128,31 @@
     "waitingDescription": "You do not belong to any tenant yet. When a tenant administrator invites you, you can choose the tenant here.",
     "selectFailed": "The tenant could not be selected.",
     "notSelectedDescription": "No tenant is selected, or you no longer belong to the tenant. Choose a tenant again.",
-    "chooseTenant": "Choose a tenant"
+    "chooseTenant": "Choose a tenant",
+    "members": {
+      "title": "Manage members",
+      "description": "Change the role of a user in this tenant, or remove the user from it. A change takes effect on the user's next action.",
+      "userId": "User ID",
+      "roleColumn": "Role",
+      "actionColumn": "Action",
+      "roleOf": "Role of user {{userId}}",
+      "remove": "Remove {{userId}}",
+      "role": {
+        "admin": "Administrator",
+        "member": "Member"
+      },
+      "forbiddenHeading": "Only administrators can use this page",
+      "forbiddenDescription": "Only a tenant administrator can manage members.",
+      "notice": {
+        "generalTitle": "The operation could not be completed",
+        "generalFailure": "Try again after a while.",
+        "roleChanged": "The role was changed.",
+        "removed": "The user was removed.",
+        "notFound": "The user no longer belongs to the tenant. The latest list is shown.",
+        "conflict": "Another operation updated the members. The latest list is shown. Try again.",
+        "lastAdmin": "A tenant needs at least one administrator. Make another user an administrator first."
+      }
+    },
+    "manageMembers": "Manage members"
   }
 }

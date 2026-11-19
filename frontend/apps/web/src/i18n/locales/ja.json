@@ -128,6 +128,31 @@
     "waitingDescription": "まだどのテナントにも所属していません。テナントの管理者に招待されると、ここでテナントを選べます。",
     "selectFailed": "テナントを選べませんでした。",
     "notSelectedDescription": "テナントを選んでいないか、テナントへの所属が外れました。テナントを選び直してください。",
-    "chooseTenant": "テナントを選ぶ"
+    "chooseTenant": "テナントを選ぶ",
+    "members": {
+      "title": "所属の管理",
+      "description": "このテナントに所属している利用者の役割を変えたり、所属を外したりします。変更は、その利用者の次の操作から効きます。",
+      "userId": "利用者 ID",
+      "roleColumn": "役割",
+      "actionColumn": "操作",
+      "roleOf": "利用者 {{userId}} の役割",
+      "remove": "{{userId}} の所属を外す",
+      "role": {
+        "admin": "管理者",
+        "member": "一般"
+      },
+      "forbiddenHeading": "管理者だけが使える画面です",
+      "forbiddenDescription": "所属の管理は、テナントの管理者だけができます。",
+      "notice": {
+        "generalTitle": "操作を完了できませんでした",
+        "generalFailure": "時間をおいてもう一度お試しください。",
+        "roleChanged": "役割を変更しました。",
+        "removed": "所属を外しました。",
+        "notFound": "この利用者はすでにテナントに所属していません。最新の一覧を表示しています。",
+        "conflict": "ほかの操作で所属が更新されました。最新の一覧を表示しています。もう一度操作してください。",
+        "lastAdmin": "テナントには管理者を 1 人以上残す必要があります。ほかの利用者を管理者にしてから操作してください。"
+      }
+    },
+    "manageMembers": "所属を管理する"
   }
 }
