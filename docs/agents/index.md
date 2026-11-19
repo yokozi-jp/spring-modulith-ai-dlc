@@ -2,6 +2,7 @@
 
 - [RGDD の開発フロー](rgdd.md)：機能を作り始めるとき、pstack と thermos を使うとき、タスクの区切りで振り返るとき
 - [スキルの取得元と更新](skill-sources.md)：外部スキルを導入、更新するとき、clone して Kiro の権限の雛形を置くとき、`task skills-check` が失敗したとき
+- [grilling の推奨に添える根拠](grilling-recommendations.md)：/grill-with-docs や /grilling で推奨の答え（➡）を書くとき、推奨の根拠を点検するとき
 - [形式検証スキルの使い方](formal-verification.md)：`formal-verify-*` のスキルで変更を検査するとき、そのモデル、設定、変異、同期コミットを変えるとき、`tooling/formal-verify/` を変えるとき
 - [Kiro のフック](kiro-hooks.md)：エージェントの書き込みが Kiro のフックに拒否されたとき、フックや守るパスを変えるとき
 - [Issue tracker](issue-tracker.md)：Issueの作成、取得、更新、またはスキルの成果を公開するとき
