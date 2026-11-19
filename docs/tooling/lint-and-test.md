@@ -455,7 +455,7 @@ pre-pushの「変更」は、push済みかどうかやrebaseの有無によら�
 
 ## CI対応
 
-- **`backend-ci.yml`**：`be-lint`相当、`lint-session-sql`、`be-verify-migrations`、`be-test`、`be-openapi-check`、手動実行時の`mutation-test`を実行する。
+- **`backend-ci.yml`**：`be-lint`相当、`lint-session-sql`、`be-verify-migrations`、`be-test`、`be-openapi-check`を実行する。
   compose-testを止めた後に`test-deps-leftover-check`を実行する。
   契約は`be-test`が書き出し、`be-openapi-check`は`OpenApiContractTest`を再実行しない（[ADR-064](../adr/ADR-064-write-openapi-contract-from-test-task-in-ci.md)）。
   Gradle User Homeは`setup-gradle`の`cache-provider: external`にして、`actions/cache`のrestoreとsaveで扱う。
@@ -463,7 +463,8 @@ pre-pushの「変更」は、push済みかどうかやrebaseの有無によら�
   saveはmainのpushで、restoreが完全一致でなかったときだけ行う（[ADR-063](../adr/ADR-063-restore-gradle-cache-with-restore-keys-on-mit-caching.md)）。
 - **`mutation-test.yml`**：Backend CIと同じパスの変更を含むPR、mainへのpush、手動実行で`mutation-test`を実行し、PITのレポートをartifactにする。
   PRでは`PIT_CHANGED_SINCE=origin/<base>`を渡して差分のクラスだけを、pushと手動実行では全体を変異させる。
-  ジョブのtimeoutはPRで60分、pushと手動実行で180分とし、mainの実行は後のpushで取り消さない。
+  ジョブのtimeoutはPRで60分、pushと手動実行で180分とする。
+  PRの実行は後のpushが取り消す。mainの実行は、実行中なら取り消さず、待ちのものを後のpushや手動実行が置き換える。
   スコアの閾値を持たず、PITが完走しないときだけ失敗する。
   Backend CIのtestと同じGradle cacheをread-onlyで復元する。
   必須チェックにしない（[ADR-076](../adr/ADR-076-run-mutation-tests-per-change-and-tighten-coverage-gates.md)）。
