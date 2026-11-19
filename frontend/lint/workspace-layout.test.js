@@ -24,9 +24,17 @@ function configOf(directory) {
   return path.join(frontendRoot, directory, "vite.config.ts");
 }
 
+/** @type {Array<"dependencies" | "devDependencies" | "peerDependencies" | "optionalDependencies">} */
+const dependencyFields = [
+  "dependencies",
+  "devDependencies",
+  "peerDependencies",
+  "optionalDependencies",
+];
+
 /** @param {string} directory */
 function manifestOf(directory) {
-  /** @type {{ name: string, exports?: Record<string, unknown> }} */
+  /** @type {{ name: string, exports?: Record<string, unknown> } & Partial<Record<(typeof dependencyFields)[number], Record<string, string>>>} */
   const manifest = JSON.parse(
     readFileSync(path.join(frontendRoot, directory, "package.json"), "utf8"),
   );
@@ -113,5 +121,36 @@ describe("workspace の層の規則", () => {
     it.each(forbiddenImports)("%s は package.json に書かない %s を解決できない", (from, to) => {
       expect(resolutionOf(from, to)).toBe("MODULE_NOT_FOUND");
     });
+  });
+});
+
+describe("依存の版", () => {
+  // 版を package ごとに書くと、Dependabot のセキュリティ更新が片方の package だけを上げて版が割れる（ADR-100）。
+  it("2 つ以上の package.json にある依存は catalog: で版を 1 つにする", () => {
+    const declarations = [".", ...everyPackage].flatMap((directory) => {
+      const manifest = manifestOf(directory);
+      const file = path.join(directory, "package.json");
+      return dependencyFields.flatMap((field) =>
+        Object.entries(manifest[field] ?? {}).map(([name, spec]) => ({ file, name, spec })),
+      );
+    });
+    /** @type {Map<string, Set<string>>} */
+    const filesByName = new Map();
+    for (const { file, name } of declarations) {
+      filesByName.set(name, (filesByName.get(name) ?? new Set()).add(file));
+    }
+    const pinned = declarations
+      .filter(
+        ({ name, spec }) =>
+          (filesByName.get(name)?.size ?? 0) > 1 &&
+          spec !== "catalog:" &&
+          !spec.startsWith("workspace:"),
+      )
+      .map(({ file, name, spec }) => `${file}: ${name}@${spec}`);
+
+    expect(
+      pinned,
+      '版を pnpm-workspace.yaml の catalog に移し、package.json には "catalog:" と書く',
+    ).toStrictEqual([]);
   });
 });

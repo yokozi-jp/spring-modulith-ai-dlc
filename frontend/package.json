@@ -11,7 +11,7 @@
     "@shadcn/lint": "0.1.5",
     "eslint-plugin-better-tailwindcss": "4.7.0",
     "knip": "6.37.0",
-    "tailwindcss": "4.3.3",
+    "tailwindcss": "catalog:",
     "vite-plus": "catalog:"
   },
   "devEngines": {

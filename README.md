@@ -91,7 +91,7 @@ clone したら、[スキルの取得元と更新](docs/agents/skill-sources.md)
 | インフラとツール | OpenTelemetry Collector    | 0.161.0    | ログの属性の絞り込み                           |
 
 ログ相関、PII、保持は[可観測性データの規約](docs/observability/conventions.md)、フロントエンドの構成は[フロントエンドアーキテクチャ](docs/frontend/architecture.md)を参照してください。
-その他のパッケージのバージョンは `backend/build.gradle` と、`frontend/` の下の各 `package.json`、Task、betterleaks、iwe、Java のバージョンは `mise.toml` を参照してください。
+その他のパッケージのバージョンは `backend/build.gradle` と、`frontend/` の下の各 `package.json` と `frontend/pnpm-workspace.yaml` の `catalog:`、Task、betterleaks、iwe、Java のバージョンは `mise.toml` を参照してください。
 
 <p align="right">(<a href="#top">トップへ</a>)</p>
 

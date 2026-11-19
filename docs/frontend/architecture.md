@@ -35,6 +35,10 @@ OpenAPIからOrvalでnative FetchのTanStack Query clientを生成し、手書�
 `packages/api/` は、Orval の設定と生成物、`apiFetch`、CSRF token の読み取り、それらのテスト、テストの設定（`vite.config.ts`）を持つ。
 `@frontend/api` は `exports` で `src` を直接公開し、ビルドしない（[公開する入口](api-client-orval.md#frontendapiの公開)）。
 
+2 つ以上の `package.json` が使う依存は、版を `pnpm-workspace.yaml` の `catalog:` に置き、各 `package.json` には `"catalog:"` と書く（[ADR-100](../adr/ADR-100-pin-shared-frontend-dependencies-in-pnpm-catalog.md)）。
+1 つの package だけが使う依存は、その `package.json` に版を書く。
+`frontend/lint/workspace-layout.test.js` が、2 つ以上の `package.json` に `"catalog:"` 以外で書いた依存を見つけて失敗する。
+
 `packages/ui/` は、shadcn の部品（`src/<部品名>.tsx`）、`cn`（`src/lib/utils.ts`）、テーマの CSS（`src/style.css`）を持つ。
 `@base-ui/**` を import できる場所は、この package の production source だけである。
 `@frontend/ui` も `exports` で `src` を直接公開し、ビルドしない。

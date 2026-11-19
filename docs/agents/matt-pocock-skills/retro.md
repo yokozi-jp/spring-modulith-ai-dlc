@@ -87,6 +87,6 @@ tags: [reference, agent-skills, matt-pocock]
 ## 翻訳元
 
 リポジトリは `mattpocock/skills` である。
-コミットは `d81f3a183412e71a5b1e84ca21bc1a35eea03a60` である。
+コミットは `5863806dd4e15c63174bee4e7515a4256792ecfa` である。
 原文の `skillPath` は `skills/engineering/retro/SKILL.md` である。
 明示参照される同梱 Markdown はない。

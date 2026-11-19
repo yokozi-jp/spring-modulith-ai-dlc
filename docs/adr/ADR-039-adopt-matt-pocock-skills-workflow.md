@@ -47,7 +47,7 @@ Matt Pocock のスキルを、RGDD のフェーズ2と、pstack にない用途�
 
 `retro` と、それが呼ぶ `writing-for-agents` は [ADR-082](ADR-082-adopt-retro-and-run-it-at-task-boundaries.md) で導入する。
 
-上流は `mattpocock/skills` のコミット `d81f3a183412e71a5b1e84ca21bc1a35eea03a60` に固定する。
+上流は `mattpocock/skills` のコミット `5863806dd4e15c63174bee4e7515a4256792ecfa` に固定する。
 取得には `skills` CLI 1.7.0 を使い、実体を `.agents/skills/`、Kiro の検出用の相対シンボリックリンクを `.kiro/skills/`、取得元、固定コミット、内容ハッシュを `skills-lock.json` に置く。
 
 上流の `SKILL.md` と同梱リソースは、更新差分を追跡できるよう無変更で保持する。
@@ -109,6 +109,6 @@ Matt Pocock のスキルを、RGDD のフェーズ2と、pstack にない用途�
 - [スキルの取得元と更新](../agents/skill-sources.md)
 - [ADR-037: AI-DLC フレームワークの利用をやめる](ADR-037-remove-aidlc-framework.md)
 - [ADR-038: steering をナビゲーションに限定し、規約の正文を docs/ に置く](ADR-038-route-steering-to-docs-knowledge.md)
-- [Matt Pocock skills](https://github.com/mattpocock/skills/tree/d81f3a183412e71a5b1e84ca21bc1a35eea03a60)
+- [Matt Pocock skills](https://github.com/mattpocock/skills/tree/5863806dd4e15c63174bee4e7515a4256792ecfa)
 - [ADR-082: retro を導入し、タスクがひと段落したら必ず実行する](ADR-082-adopt-retro-and-run-it-at-task-boundaries.md)（`retro` と `writing-for-agents` を導入する）
 - [ADR-084: pstack と thermos を導入し、RGDD の5つのフェーズで開発する](ADR-084-adopt-rgdd-with-pstack-and-thermos.md)（開発の流れと、外す Matt Pocock のスキル）

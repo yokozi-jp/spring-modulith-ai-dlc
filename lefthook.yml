@@ -87,6 +87,7 @@ pre-commit:
               - ".spectral.yaml"
               - "frontend/packages/api/orval.config.ts"
               - "frontend/packages/api/package.json"
+              - "frontend/pnpm-workspace.yaml"
               - "frontend/packages/api/src/generated/**"
             run: |
               echo "{staged_files}" >/dev/null
