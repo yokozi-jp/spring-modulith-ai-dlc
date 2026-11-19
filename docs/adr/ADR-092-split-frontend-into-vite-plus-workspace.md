@@ -28,6 +28,8 @@ package ごとの規則は、ルートの `lint.overrides` に書く。
 
 Issue #419 と #390 の問いのうち、次の 5 点は、Vite+ 0.3.3 の scratch workspace（アプリ 2、ui 1）で実測して確かめた。
 
+この ADR は Proposed の間に、決定の「Vite+ の版」を 0.3.3 から 1.6.0 へ書き直した。移行の後に版を上げる Issue #462 が、無修正の `vite.config.ts` で検査が通ることを確かめた。下の実測は 0.3.3 のときの結果である。
+
 - **設定の優先**：package の `vite.config.ts` に `lint` があっても、`vp check` はルートの設定を使う。
   `vp lint` を package で単体実行すると、package の設定が使われ、ルートの規則が黙って外れる。
   package に `lint` がなければ、ルートの設定が使われる。
@@ -64,7 +66,7 @@ frontend を次の Vite+ workspace に分ける。
 | Tailwind の走査             | 各アプリの `style.css` に `@source "../../../packages/ui/src"` を書く。テーマの変数と `@theme` は `packages/ui` の CSS に置き、アプリが import する。後者は手順 3 で確かめる                    |
 | shadcn の `components.json` | `packages/ui` と各アプリに置く。`shadcn add` は `packages/ui` で実行する。`aliases` の値と出力先は、手順 3 で実機で確かめて決める                                                               |
 | Knip                        | ルートの `knip.json` に package ごとの `workspaces` を書き、`ui` と `api` は `includeEntryExports: true` にする                                                                                 |
-| Vite+ の版                  | 0.3.3 のまま catalog で固定し、移行と同時に上げない。`catalogMode: prefer` を採用する                                                                                                           |
+| Vite+ の版                  | 1.6.0 で catalog に固定する。`catalogMode: prefer` を採用する                                                                                                                                   |
 
 `cn` は `ui` に、`csrf` は `api` に置く。
 `i18n`、`telemetry`、`router-defaults`、`testing` はアプリに残す。

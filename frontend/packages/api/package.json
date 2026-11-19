@@ -22,7 +22,7 @@
     "zod": "4.6.5"
   },
   "devDependencies": {
-    "@vitest/coverage-v8": "4.1.11",
+    "@vitest/coverage-v8": "5.1.0",
     "orval": "8.36.0",
     "typescript": "~7.0.2",
     "vite-plus": "catalog:"

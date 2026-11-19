@@ -78,7 +78,7 @@ clone したら、[スキルの取得元と更新](docs/agents/skill-sources.md)
 | Frontend         | i18next                    | 26.4.2     | 多言語対応                                     |
 | Frontend         | Orval                      | 8.36.0     | OpenAPI から API client と MSW handler を生成  |
 | Frontend         | Tailwind CSS               | 4.3.3      | スタイリング                                   |
-| Frontend         | VitePlus                   | 0.3.3      | ビルド、開発サーバー、Oxlint（`vp`）           |
+| Frontend         | VitePlus                   | 1.6.0      | ビルド、開発サーバー、Oxlint（`vp`）           |
 | Frontend         | Vitest                     | 4.1.11     | 単体テスト                                     |
 | Frontend         | MSW                        | 2.15.0     | API のモック                                   |
 | Frontend         | Playwright                 | 1.63.0     | E2E テスト                                     |
