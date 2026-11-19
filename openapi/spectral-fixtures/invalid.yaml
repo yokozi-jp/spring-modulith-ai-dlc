@@ -73,6 +73,13 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ProblemDetail"
+        # error-response-problem-detail（4XX も対象）
+        4XX:
+          description: 入力が正しくない
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
   /api/sample-orders/{code}:
     delete:
       tags:
@@ -88,6 +95,12 @@ paths:
           required: true
           schema:
             type: string
+        # query-parameter-get-only（DELETE の lockNo 以外）
+        - name: force
+          in: query
+          description: 強制するか
+          schema:
+            type: boolean
       responses:
         "204":
           description: サンプル注文を取り消した
@@ -119,6 +132,57 @@ paths:
       responses:
         "200":
           description: サンプル支払いの一覧
+  # path-kebab-case と path-kebab-case-resource（snake_case）、no-top-level-array-response
+  /api/sample_items:
+    get:
+      tags:
+        - sample-order
+      summary: サンプル品目を一覧する。
+      description: サンプル品目を一覧する。<p>配列をそのまま返す。
+      operationId: listSampleItems
+      responses:
+        "200":
+          description: サンプル品目の一覧
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: string
+  # path-kebab-case-resource（末尾が camelCase の GET）
+  /api/sampleTags:
+    get:
+      tags:
+        - sample-order
+      summary: サンプルタグを一覧する。
+      description: サンプルタグを一覧する。<p>新しい順に返す。
+      operationId: listSampleTags
+      responses:
+        "200":
+          description: サンプルタグの一覧
+  /api/sample-notes:
+    post:
+      tags:
+        - sample-order
+      summary: サンプル備考を追加する。
+      description: サンプル備考を追加する。<p>在庫は変えない。
+      operationId: addSampleNote
+      parameters:
+        # query-parameter-get-only（POST）
+        - name: draft
+          in: query
+          description: 下書きにするか
+          schema:
+            type: boolean
+      responses:
+        "201":
+          description: サンプル備考を追加した
+          headers:
+            Location:
+              description: 追加したサンプル備考の URI
+              schema:
+                type: string
+                format: uri-reference
 components:
   # common-problem-detail-schema（ValidationProblem を定義しない）
   schemas:

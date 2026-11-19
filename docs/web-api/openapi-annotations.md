@@ -210,6 +210,7 @@ springdocやtherapiの版を上げてこのテストが失敗したら、この�
 - [ ] `@Operation(operationId = "...")`を明示する。［Spectralで検査：operation-id-naming（形だけ。明示は自分で点検）］
 - [ ] 404、409、422を起きるoperationにだけ`ref`で書く。［Spectralで検査：error-response-problem-detail（参照の形だけ。付け忘れは自分で点検）］
 - [ ] `@ApiResponse`を書いたハンドラに成功応答（200、201、204）も書く。［Spectralで検査：operation-success-response］
-- [ ] 201は`Location`ヘッダー、204は本文なしにし、200を残さない。［自分で点検］
+- [ ] 201は`Location`ヘッダー、204は本文なしにし、200を残さない。［Spectralで検査：created-location-header（204の本文と200の残りは自分で点検）］
 - [ ] `@Operation(summary, description)`、`@Schema(description)`、`///`を使わない。［自分で点検］
-- [ ] クエリパラメータを`@ParameterObject`や`@ModelAttribute`でまとめて受けない。［自分で点検］
+- [ ] クエリパラメータを`@ParameterObject`や`@ModelAttribute`でまとめて受けない。GET以外（DELETEは`lockNo`を除く）は`in: query`を使わない。［Spectralで検査：query-parameter-get-only（まとめて受けないことは自分で点検）］
+- [ ] パスをkebab-caseにし、200の応答の配列をトップレベルにしない。［Spectralで検査：path-kebab-case、path-kebab-case-resource、no-top-level-array-response］
