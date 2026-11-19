@@ -1,6 +1,10 @@
 extends:
   - spectral:oas
 
+aliases:
+  Operation:
+    - "$.paths[*][get,put,post,delete,options,head,patch,trace]"
+
 rules:
   openapi-version-3-1:
     description: OpenAPI 3.1 を使用する。
@@ -73,7 +77,7 @@ rules:
   operation-id-naming:
     description: operationId は小文字の動詞で始まるlowerCamelCaseにし、数字と_を含めない。
     severity: error
-    given: "$.paths[*][get,put,post,delete,options,head,patch,trace]"
+    given: "#Operation"
     then:
       field: operationId
       function: pattern
@@ -147,7 +151,7 @@ rules:
   tag-name-format:
     description: tag は業務機能のパッケージ名を英小文字の kebab-case にし、Controller の名前を使わない。
     severity: error
-    given: "$.paths[*][get,put,post,delete,options,head,patch,trace].tags[*]"
+    given: "#Operation.tags[*]"
     then:
       function: pattern
       functionOptions:
@@ -158,7 +162,7 @@ rules:
     description: 4xx と 5xx（4XX と 5XX を含む）の応答は共通の Problem response か ProblemDetail か ValidationProblem の schema を参照する。
     severity: error
     resolved: false
-    given: "$.paths[*][get,put,post,delete,options,head,patch,trace].responses[?(@property.match(/^[45]([0-9][0-9]|XX)$/))]"
+    given: "#Operation.responses[?(@property.match(/^[45]([0-9][0-9]|XX)$/))]"
     then:
       function: schema
       functionOptions:
@@ -193,20 +197,21 @@ rules:
         match: '^(/([a-z0-9]+(-[a-z0-9]+)*|\{[A-Za-z][A-Za-z0-9]*\}))*/([a-z0-9]+(-[a-z0-9]+)*|\{[A-Za-z][A-Za-z0-9]*\}|[a-z][a-zA-Z0-9]*)$'
 
   # ponytail: カスタムメソッドは POST だけのパスと見なす。GET、PUT、PATCH、DELETE を持つパスは末尾もリソース名にする。
+  # 末尾が camelCase のパスだけを見る。それ以外の違反は path-kebab-case が報告する。
   path-kebab-case-resource:
-    description: GET、PUT、PATCH、DELETE を持つパスは末尾も kebab-case かパスパラメータにする。
+    description: GET、PUT、PATCH、DELETE を持つパスは末尾を camelCase にしない。
     severity: error
     given: "$.paths[?(@.get || @.put || @.patch || @.delete)]~"
     then:
       function: pattern
       functionOptions:
-        match: '^(/([a-z0-9]+(-[a-z0-9]+)*|\{[A-Za-z][A-Za-z0-9]*\}))+$'
+        notMatch: "/[a-z][a-zA-Z0-9]*[A-Z][a-zA-Z0-9]*$"
 
   # ponytail: type が文字列 array の schema だけを見る。type に配列を使う 3.1 の書き方は対象外。
   no-top-level-array-response:
     description: 2xx の JSON の応答は配列をトップレベルにしない。オブジェクトで包む（docs/web-api/response-body.md）。
     severity: error
-    given: "$.paths[*][get,put,post,delete,options,head,patch,trace].responses[?(@property.match(/^2([0-9][0-9]|XX)$/))].content[?(@property.match(/json/))].schema"
+    given: "#Operation.responses[?(@property.match(/^2([0-9][0-9]|XX)$/))].content[?(@property.match(/json/))].schema"
     then:
       function: schema
       functionOptions:
@@ -217,14 +222,21 @@ rules:
               type:
                 const: array
 
-  # ponytail: ヘッダー名の大文字と小文字を区別する。springdoc は @Header(name = "Location") の表記をそのまま出す。
+  # ponytail: ヘッダー名は Location と location だけを受け入れる。LOCATION など他の表記は検出する。
   created-location-header:
-    description: 201 は Location ヘッダーを持つ。
+    description: 201 は Location ヘッダーを持つ。ヘッダー名は大文字と小文字を区別しないので location も受け入れる。
     severity: error
-    given: "$.paths[*][get,put,post,delete,options,head,patch,trace].responses[201]"
+    given: "#Operation.responses[201]"
     then:
-      field: headers.Location
-      function: truthy
+      function: schema
+      functionOptions:
+        schema:
+          required: [headers]
+          properties:
+            headers:
+              anyOf:
+                - required: [Location]
+                - required: [location]
 
   # ponytail: operation 直下の parameters だけを見る。パス直下の parameters は対象外。
   query-parameter-get-only:

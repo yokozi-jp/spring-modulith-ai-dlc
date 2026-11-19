@@ -1004,7 +1004,7 @@ tasks:
           exit 1
         fi
 
-  # 違反例は、違反ごとの「ルール名|JSON パス」が stylish 出力の同じ行に出ることを確かめる。
+  # 違反例は、違反ごとの「ルール名|JSON パス」の組が invalid.expected と過不足なく一致することを確かめる。
   # text 形式は JSON パスを出さないため、既定の stylish 形式を使う。
   api-lint-rules-test:
     desc: SpectralのルールをOpenAPIのfixture（合格例と違反例）で検査
@@ -1024,47 +1024,15 @@ tasks:
           echo "違反例 invalid.yaml が Spectral の検査を通りました。" >&2
           exit 1
         fi
-        missing=0
-        while IFS='|' read -r rule path; do
-          if ! printf '%s\n' "$output" | grep -F -- " $rule " | grep -qF -- " $path"; then
-            echo "検出されなかった違反: $rule|$path" >&2
-            missing=1
-          fi
-        done <<'EOF'
-        operation-description|paths./api/sample-orders.post
-        oas3-parameter-description|paths./api/sample-orders/{sampleOrderId}.get.parameters[0]
-        tag-description|tags[3]
-        operation-singular-tag|paths./api/sample-orders.get.tags
-        tag-name-format|paths./api/sample-orders.get.tags[1]
-        tag-name-format|paths./api/orders.get.tags[0]
-        operation-tag-defined|paths./api/sample-payments.get.tags[0]
-        schema-property-description|components.schemas.SampleOrderRequest.properties.giftWrap
-        schema-property-example|components.schemas.SampleOrderRequest.properties.customerId
-        schema-property-example|components.schemas.SampleOrderRequest.properties.quantity
-        error-response-problem-detail|paths./api/sample-orders/{sampleOrderId}.get.responses[404]
-        error-response-problem-detail|paths./api/sample-orders/{sampleOrderId}.get.responses.4XX
-        path-kebab-case|paths./api/sample_items
-        path-kebab-case-resource|paths./api/sample_items
-        path-kebab-case-resource|paths./api/sampleTags
-        no-top-level-array-response|paths./api/sample_items.get.responses[200].content.application/json.schema
-        created-location-header|paths./api/sample-orders.post.responses[201]
-        query-parameter-get-only|paths./api/sample-notes.post.parameters[0].in
-        query-parameter-get-only|paths./api/sample-orders/{code}.delete.parameters[1].in
-        problem-response-content|components.responses.NotFoundProblem.content
-        common-problem-detail-schema|components.schemas
-        bad-request-validation-problem|components.responses.BadRequestProblem.content.application/problem+json.schema.$ref
-        problem-type-uri-reference|components.schemas.ProblemDetail.properties.type.format
-        public-id-uuid|paths./api/sample-orders/{sampleOrderId}.get.parameters[0].schema
-        public-id-uuid|components.schemas.SampleOrderResponse.properties.orderId
-        public-id-uuid|components.schemas.SampleOrderResponse.properties.productIds.items
-        public-id-uuid|paths./api/sample-orders/{code}.delete.parameters[0].schema
-        public-id-uuid|paths./api/orders.get.parameters[0].schema
-        EOF
-        if [ "$missing" -ne 0 ]; then
+        expected="$(sort openapi/spectral-fixtures/invalid.expected)"
+        actual="$(printf '%s\n' "$output" | awk '$2 == "error" { print $3 "|" $NF }' | sort)"
+        if [ "$expected" != "$actual" ]; then
           printf '%s\n' "$output"
+          echo "違反例の検出が openapi/spectral-fixtures/invalid.expected と違います（< 期待、> 実際）。" >&2
+          diff <(printf '%s\n' "$expected") <(printf '%s\n' "$actual") >&2
           exit 1
         fi
-        echo "Spectral のルールは合格例を通し、違反例の全件を検出しました。"
+        echo "Spectral のルールは合格例を通し、違反例の全件を過不足なく検出しました。"
 
   api-client-gen:
     desc: コミット済みのOpenAPI契約からOrvalでAPI clientとMSW handlerを再生成（DB不要）

@@ -1,6 +1,7 @@
 # .spectral.yaml の違反例。各ルールの違反を一つずつ含み、それ以外は合格例と同じ形にする。
-# task api-lint-rules-test が、違反ごとのルール名と JSON パスの組を出力から探す。
-openapi: 3.1.0
+# task api-lint-rules-test が、違反ごとのルール名と JSON パスの組を invalid.expected と過不足なく突き合わせる。
+# openapi-version-3-1（パッチ版がない。oas3-schema も同じ場所を報告する）
+openapi: "3.1"
 info:
   title: Demo API
   description: Demo アプリケーションの HTTP API
@@ -156,7 +157,7 @@ paths:
         - sample-order
       summary: サンプルタグを一覧する。
       description: サンプルタグを一覧する。<p>新しい順に返す。
-      operationId: listSampleTags
+      operationId: list_sample_tags # operation-id-naming
       responses:
         "200":
           description: サンプルタグの一覧
@@ -178,7 +179,7 @@ paths:
         "201":
           description: サンプル備考を追加した
           headers:
-            Location:
+            location:
               description: 追加したサンプル備考の URI
               schema:
                 type: string
@@ -203,10 +204,10 @@ components:
           type: integer
           format: int32
           description: 実際の HTTP status code
+      # problem-detail-required-fields（status がない）
       required:
         - type
         - title
-        - status
     SampleOrderRequest:
       type: object
       description: サンプル注文の受け付けの要求
