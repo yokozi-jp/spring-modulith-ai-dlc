@@ -6,10 +6,13 @@ import java.sql.PreparedStatement;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.List;
+import java.util.Map;
+import java.util.concurrent.CompletionStage;
 import java.util.function.ToIntFunction;
 import java.util.function.UnaryOperator;
 import javax.sql.DataSource;
 import org.jooq.Batch;
+import org.jooq.Condition;
 import org.jooq.ConnectionProvider;
 import org.jooq.DAO;
 import org.jooq.DSLContext;
@@ -49,6 +52,9 @@ public final class DirectOrderWriter {
 
   /** 注文 ID の列。 */
   private static final Field<String> ORDER_ID = DSL.field(DSL.name("order_id"), String.class);
+
+  /** 条件。 */
+  private static final Condition CONDITION = DSL.noCondition();
 
   /** 書き込みの SQL。 */
   private static final String DELETE_SQL = "delete from orders";
@@ -107,9 +113,13 @@ public final class DirectOrderWriter {
     return dsl.executeDelete(row);
   }
 
-  /** {@code DSLContext.connection} を呼ぶ。 */
+  /**
+   * {@code DSLContext.connection} を呼ぶ。
+   *
+   * <p>ラムダの本体で {@code Connection} を使うと、その呼び出しも禁止の対象として検出され、{@code connection} の禁止を外しても行が通る。本体は空にする。
+   */
   public static DSLContext dslConnection(final DSLContext dsl) {
-    dsl.connection(connection -> connection.setReadOnly(false));
+    dsl.connection(connection -> {});
     return dsl;
   }
 
@@ -143,6 +153,19 @@ public final class DirectOrderWriter {
   /** {@code InsertQuery.addValueForUpdate} を呼ぶ。 */
   public static InsertQuery<Record> insertQueryAddValueForUpdate(final InsertQuery<Record> insert) {
     insert.addValueForUpdate(ORDER_ID, "O-1");
+    return insert;
+  }
+
+  /** {@code InsertQuery.addValuesForUpdate} を呼ぶ。 */
+  public static InsertQuery<Record> insertQueryAddValuesForUpdate(
+      final InsertQuery<Record> insert) {
+    insert.addValuesForUpdate(Map.of(ORDER_ID, "O-1"));
+    return insert;
+  }
+
+  /** {@code InsertQuery.onConflictWhere} を呼ぶ。 */
+  public static InsertQuery<Record> insertQueryOnConflictWhere(final InsertQuery<Record> insert) {
+    insert.onConflictWhere(CONDITION);
     return insert;
   }
 
@@ -205,6 +228,16 @@ public final class DirectOrderWriter {
   /** {@code UpdateSetMoreStep.returning} を呼ぶ。 */
   public static Object updateReturning(final UpdateSetMoreStep<Record> update) {
     return update.returning();
+  }
+
+  /** {@code UpdateSetMoreStep.returningResult} を呼ぶ。 */
+  public static Object updateReturningResult(final UpdateSetMoreStep<Record> update) {
+    return update.returningResult(ORDER_ID);
+  }
+
+  /** {@code Update.executeAsync} を呼ぶ。 */
+  public static CompletionStage<Integer> updateExecuteAsync(final Update<?> update) {
+    return update.executeAsync();
   }
 
   /** {@code Delete.execute} を呼ぶ。 */
