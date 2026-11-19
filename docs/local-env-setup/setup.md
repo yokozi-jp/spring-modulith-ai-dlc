@@ -158,8 +158,12 @@ worktree を作ったときも、そこで `mise trust` を実行します。
 `mise install --locked` は、`mise.toml` の Task、betterleaks、iwe、Java（Amazon Corretto）、zizmor、Kiro CLI、手順 11 の jdtls と Lombok を、`mise.lock` と `.mise/locks/` に記録した版と checksum で検証して入れます（[ADR-090](../adr/ADR-090-pin-cli-tools-with-mise-lock.md)）。
 `--locked` を付けると、lock に無い版を入れずに止まります。
 `task setup` は `04-setup-shell.sh` で、mise の shims を PATH の先頭に通す行を `~/.bashrc` と `~/.profile` に足します。
-VS Code Server と、そこから起動する Kiro とエージェントのシェルは、`~/.profile` で作った PATH を受け継ぎます。
-`~/.profile` に行が無い環境では、`bash docs/local-env-setup/04-setup-shell.sh` を実行し、Windows で `wsl --shutdown` を実行してから VS Code で WSL に接続し直します。
+ログインシェルでは `~/.profile` が `~/.bashrc` の後で `~/.local/bin` を先頭へ足すので、`~/.profile` の末尾でも shims を先頭へ足し直します。
+VS Code Server は、ログインシェルで作った PATH を拡張とターミナルに渡します。
+
+以前の手順で作った環境は、`bash -lic 'type -a task kiro-cli'` を実行し、どちらも先頭が `~/.local/share/mise/shims` になることを確かめます。
+ならなければ、`bash docs/local-env-setup/04-setup-shell.sh` を実行し、新しいターミナルで Kiro CLI を起動し直します。
+VS Code の拡張にも新しい PATH を渡すには、VS Code を閉じ、Windows で `wsl --shutdown` を実行してから接続し直します（Docker Desktop の WSL も止まります）。
 `mise.toml` か `mise.lock` が変わったときは、`mise install --locked` だけを実行します。
 Kiro CLI の固定を入れる前から使っているチェックアウトでは、pull の後に一度だけ `mise trust` を実行します。
 実行しないと、shims と、`task` を呼ぶ Git フックが `not trusted` で止まります。

@@ -53,6 +53,10 @@ mise の registry に Kiro CLI はなく（`mise registry` に `kiro` を含む�
 これにより、選択肢5を退けた理由のうち trust の費用は、この案でも払うことになった（選択肢5）。
 trust を避けて Kiro CLI を固定する案は選択肢7、trust の範囲を広げる案は選択肢6で退けた。
 
+最初の案は shims の行を `~/.bashrc` にだけ書いていた。
+Ubuntu のログインシェルでは、`~/.profile` が `~/.bashrc` を読んだ後に `~/.local/bin` を先頭へ足す。
+VS Code Server は環境を `bash -i -l -c` で作るので、公式のインストーラーが `~/.local/bin` に残した `task` と `kiro-cli` が、拡張とターミナルで shims より先に使われた（[#523](https://github.com/yokozi-jp/spring-modulith-ai-dlc/pull/523)）。
+
 ## Decision
 
 - `mise.toml` の `[tools]` に `task`、`betterleaks`、`npm:@iwe-org/iwe`、`java`、`zizmor`、`http:kiro-cli` を exact 版で書き、`mise lock --platform linux-x64` で `mise.lock` に URL と checksum を記録する。
@@ -64,7 +68,7 @@ trust を避けて Kiro CLI を固定する案は選択肢7、trust の範囲を
 - Kiro Web の `kiro-web.sh` は、sandbox の `MISE_STATE_DIR` が空なので `mise trust` を実行する。サンドボックスは自分の `kiro-cli` を持ち、LSP の機能も無いので、`http:kiro-cli`、`http:jdtls`、`http:lombok` は入れない。
 - `task lint-actions-security` と Lefthook の zizmor のジョブは、Docker の image でなく mise の zizmor を使う。`zizmor.yml` の `zizmor-action` の `version` には `mise.toml` と同じ版を書く。版を書く場所はこの2か所だけである。action の SHA が持つ版の一覧に無い版は動かないので、zizmor を上げるときは SHA も確かめる。
 - ローカルでは apt で入れた mise が `mise install --locked` を実行する。
-- PATH は mise の shims で通す。`04-setup-shell.sh` が `~/.bashrc` と `~/.profile` に `eval "$(mise activate bash --shims)"` を足す。VS Code Server と、そこから起動する Kiro とエージェントのシェルは、対話なしのログインシェルの PATH を受け継ぎ、Ubuntu の `~/.bashrc` は対話シェルでなければ途中で読むのをやめるので、`~/.profile` にも要る。Taskfile と Lefthook は `betterleaks` と `iwe` をそのまま呼ぶ。
+- PATH は mise の shims で通す。`04-setup-shell.sh` が `~/.bashrc` と `~/.profile` に `eval "$(mise activate bash --shims)"` を足す。`~/.profile` の末尾の行は、`~/.profile` が先頭へ足した `~/.local/bin` の前へ shims を戻す。Taskfile と Lefthook は `betterleaks` と `iwe` をそのまま呼ぶ。
 - CI は composite action `.github/actions/setup-mise` を使う。この action だけが `jdx/mise-action` の SHA と mise の版を持ち、入力 `tools` でジョブが使う道具だけを入れる。
 - composite action は `MISE_LOCKED=1` をジョブの環境変数にし、install と後の step の shims に lock に無い版を拒ませる。
 - Java は実行用のイメージ（`backend/Dockerfile` の `amazoncorretto:25-*`）と同じ Corretto の 25 系にする。
@@ -80,7 +84,7 @@ trust を避けて Kiro CLI を固定する案は選択肢7、trust の範囲を
 `mise activate` はプロンプトのたびに、そのときのディレクトリの `mise.toml` に合わせて PATH を書き換える。
 そのため、リポジトリの外のシェルから起動したエディタや Kiro は、リポジトリの道具の PATH を受け継がない。
 shims は決まったディレクトリなので、受け継いだ PATH のまま、実行するときのディレクトリの `mise.toml` から版を選ぶ。
-どちらも `~/.bashrc` だけから通すと、対話シェルを経ずに起動したプロセスに PATH が通らない。そのため shims の行は `~/.profile` にも書く。
+どちらもシェルの起動ファイルから通すので、起動ファイルを読むシェルを経ずに起動したプロセスに PATH が通らない点は同じである。
 
 ## Consequences
 
@@ -96,7 +100,7 @@ shims は決まったディレクトリなので、受け継いだ PATH のま�
 
 - `mise.toml` が trust を要するので、clone と新しい worktree のたびに `mise trust` を実行する。忘れると shims が `Config files in … are not trusted` で止まり、`task` を呼ぶ Git フックも止まる。mise のエラーが直し方を示す。CI の `jdx/mise-action` は trust を自動で済ませる。
 - CI は `tools` で名指しした道具だけを入れるので、Kiro CLI（3.5.0 の zip は 139,487,134 byte）を入れない。Kiro CLI を動かす job を足すときは、`tools` に `http:kiro-cli` を書く。
-- 公式のインストーラーが `~/.local/bin` に入れた `kiro-cli` が残ると、`~/.profile` に shims の行が無い環境のログインシェルでは、`~/.profile` が `~/.bashrc` の後に `~/.local/bin` を先頭へ足すので、shims より先に使われる。`setup.md` の手順で消す。
+- 公式のインストーラーが `~/.local/bin` に入れた `kiro-cli` が残ると、`~/.profile` に shims の行が無い環境のログインシェルでは、shims より先に使われる。`setup.md` の手順で消す。
 - Kiro CLI は起動時に自己更新を確かめる（設定 `app.disableAutoupdates` が `kiro-cli settings list` に出る）。自己更新が mise の install 先の `kiro-cli` を書き換えるかは確かめていない。書き換えると、`mise install --locked` は checksum を見直さず、固定が崩れる。`setup.md` に自己更新を止める設定を書いたが、これで止まるかは未確認である。
 - 開発者は mise を入れ、shims を PATH に通す必要がある。shims が PATH にないと `task` が見つからない。
 - `~/.bashrc` に apt の Corretto の `JAVA_HOME` が残る環境では、Gradle が mise の Java でなく apt の Java を使う。これを見つける検査はなく、`docs/local-env-setup/setup.md` の手順で消す。
