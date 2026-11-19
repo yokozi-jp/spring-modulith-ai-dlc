@@ -1,7 +1,7 @@
 ---
 type: Convention
 title: バックエンドの Java 実装規約
-description: 手書きのバックエンドコードで使う Lombok、record、Domain Model の状態変更、ロギング、依存の注入、例外、assert、非推奨の API、プロキシで動くアノテーション、警告の抑制の規約と理由を定める。データキャリアやログ出力を書くとき、Bean の依存や例外を書くとき、@SuppressWarnings を書くとき、これらの PMD や ArchUnit の規則で失敗したときに読む。
+description: 手書きのバックエンドコードで使う Lombok、record、Domain Model の状態変更、ロギング、依存の注入、例外、assert、非推奨の API、プロキシで動くアノテーション（自己呼び出し、private、final、static、@Async と @Scheduled のメソッドの形、ArchUnit が検出しない誤り）、警告の抑制の規約と理由を定める。データキャリアやログ出力を書くとき、Bean の依存や例外を書くとき、@Transactional、@Async、@Scheduled などを付けるとき、@SuppressWarnings を書くとき、これらの PMD や ArchUnit の規則で失敗したときに読む。
 tags: [convention, backend, java, logging]
 ---
 
@@ -9,7 +9,8 @@ tags: [convention, backend, java, logging]
 
 Lombok の `@Data` と `@Setter` を使わず、データキャリアは record にし、Domain Model の状態は業務上の操作を表すメソッドで変更する。
 ロギングは SLF4J facade と Lombok の `@Slf4j` に統一し、依存はコンストラクタで受け取り、具体的な例外を投げ、`assert` に詳細を書き、非推奨の API を使わない。
-プロキシで動くアノテーションを付けたメソッドは、同じクラスの中から呼ばない。
+プロキシで動くアノテーションを付けたメソッドは、同じクラスの中から呼ばず、`private`、`final`、`static` にしない。
+`@Async` のメソッドは `void` か `CompletableFuture` を返し、`@Scheduled` のメソッドは引数のない `void` のメソッドにする。
 `@SuppressWarnings` には、警告を出すツールごとのトークンを書く。
 これらの規則の検査方法は [バックエンドのアーキテクチャテスト](architecture-tests.md) に示す。
 
@@ -77,17 +78,35 @@ Dependabot の minor と patch の更新はまとめて取り込む（[ADR-021](
 
 ## プロキシで動くアノテーション
 
-次のアノテーションを付けたメソッドは、同じクラスの中から呼ばない。
+次のアノテーションを付けたメソッドは、同じクラスの中から呼ばず、`private`、`final`、`static` にしない。
+これらをメタアノテーションに持つ `@ApplicationModuleListener` のような合成アノテーションも、同じに扱う。
 
 - Spring の `@Transactional`、`@Async`、`@Cacheable`、`@CachePut`、`@CacheEvict`。
+- Spring Framework の `@Retryable`、`@ConcurrencyLimit`（`org.springframework.resilience.annotation`）。
 - Spring Security の `@PreAuthorize`、`@PostAuthorize`、`@PreFilter`、`@PostFilter`、`@Secured`。
 - Resilience4j の `@CircuitBreaker`、`@Retry`、`@RateLimiter`、`@Bulkhead`、`@TimeLimiter`。
 
 Spring の AOP プロキシは、Bean の外からの呼び出しだけを横取りする。
 同じクラスの中からの呼び出しはプロキシを通らないため、アノテーションは黙って効かない（[Spring Framework, Understanding AOP Proxies](https://docs.spring.io/spring-framework/reference/core/aop/proxying.html#aop-understanding-aop-proxies)）。
-トランザクションが始まらず、非同期にならず、キャッシュを通らず、認可を確かめず、Resilience4j のサーキットブレーカーやリトライが働かない。
+トランザクションが始まらず、非同期にならず、キャッシュを通らず、認可を確かめず、リトライ、同時実行数の制限、Resilience4j のサーキットブレーカーが働かない。
+
+Bean の外から呼んでも、`private`、`final`、`static` のメソッドではアノテーションが効かない。
+Spring Boot は既定で CGLIB のプロキシを使い、Bean のクラスのサブクラスでメソッドを上書きして横取りするが、これらのメソッドは上書きできないためである（[Spring Framework, Proxying Mechanisms](https://docs.spring.io/spring-framework/reference/core/aop/proxying.html)）。
+`final` のメソッドはプロキシのインスタンスの上でそのまま動き、注入したフィールドが `null` のまま使われる。
+package-private と `protected` のメソッドは CGLIB のプロキシが上書きできるため、この規則では禁じない（`@Transactional` は、別の規則で Application の public メソッドに限る）。
 
 アノテーションを付けたメソッドは別の Bean へ移し、その Bean を注入して外から呼ぶ。
+
+`@Async` のメソッドは `void` か `CompletableFuture` を返す。
+Spring は、戻り値の型が `void` と `Future` 以外の `@Async` のメソッドを、呼ぶたびに `IllegalArgumentException` で拒否する。
+`void` の `@Async` が投げた例外は呼び出し元に届かず、既定の `AsyncUncaughtExceptionHandler` が ERROR のログに出すだけである。
+結果や失敗を呼び出し元で扱うときは、`CompletableFuture` を返す。
+
+`@Scheduled` のメソッドは、引数のない `void` のメソッドにし、`private` と `final` にしない。
+スケジューラは戻り値を捨て、引数のある `@Scheduled` のメソッドがあると起動に失敗する。
+Bean が AOP のプロキシになると、`private` の `@Scheduled` のメソッドも起動に失敗し、`final` のメソッドは注入したフィールドが `null` のプロキシの上で動く。
+Spring はプロキシの Bean でも `static` の `@Scheduled` を呼べるため、`static` は禁じない。
+実行の結果はログかメトリクスに出す（`EventPublicationResubmitter.resubmitOnce`）。
 
 `@Around` などの AspectJ の advice と `@Pointcut` の式には `within(<パッケージ>..*<役割名>)` を書き、`execution` にはメソッドの名前と修飾子だけを書く。
 `execution` の宣言型だけで対象を絞ると、AspectJ がすべての Bean のすべてのメソッドで上位型をたどって照合し、Spring のコンテキストの起動が数倍遅くなる（[ADR-051](../adr/ADR-051-bind-pgm-cd-with-scoped-value-and-aspect.md)）。
@@ -98,6 +117,23 @@ Spring の AOP プロキシは、Bean の外からの呼び出しだけを横取
 トランザクションの内側で動く Aspect が必要になったら、先に ADR-051 とこの規則を変える。
 
 いまのコードで使っていないアノテーションの規則も、検査の費用がほぼなく使い始めたときの事故を防げるため残す。
+
+### ArchUnit が検出しない誤り
+
+この節の規則は、ArchUnit が `task test` で検査する（規則名と違反フィクスチャは[バックエンドのアーキテクチャテスト](architecture-tests.md)の「共通実装とプロキシ」に示す）。
+自己呼び出しの規則は、ラムダの中の呼び出しと継承したメソッドの呼び出しも検出し、同じクラスの別のインスタンスの呼び出しも、そのインスタンスがプロキシの Bean かを問わず拒否する。
+次の誤りは ArchUnit の規則では検出しないため、レビューで見る。
+
+- メソッド参照（`this::archive`）と、内部クラスから外側のクラスのメソッドを呼ぶ自己呼び出し。
+  ArchUnit はメソッド参照を呼び出しとして数えず、内部クラスを別のクラスとして扱う。
+- クラスに付けた `@Async`、`@Cacheable`、Spring Security、Resilience4j のアノテーション。
+  規則はメソッドに付けたアノテーションだけを見るため、そのクラスのメソッドの自己呼び出し、`final` のメソッド、`@Async` の戻り値を検出しない。
+- `void` の `@Async` が投げる例外の扱い。
+  メソッドの中で例外を受けて記録するか、`AsyncUncaughtExceptionHandler` で回復するかは、メソッドの形からは分からない。
+- 複数のプロキシの順序（`@Retryable` や `@CircuitBreaker` が、トランザクションの内側と外側のどちらで動くか）。
+  `aspectsDeclareOrder` は、`@Aspect` のクラスとトランザクションの順序だけを見る。
+- `@Transactional` の伝播（`propagation`）とロールバックの条件。
+  検査例外では、既定でロールバックしない。
 
 ## 警告の抑制
 

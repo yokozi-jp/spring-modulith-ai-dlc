@@ -9,6 +9,7 @@ import static com.tngtech.archunit.lang.conditions.ArchConditions.be;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.classes;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.methods;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
+import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noMethods;
 
 import com.example.demo.DemoApplication;
 import com.tngtech.archunit.base.DescribedPredicate;
@@ -30,6 +31,7 @@ import org.jooq.DSLContext;
 import org.jooq.Record;
 import org.jooq.impl.DefaultRecordMapper;
 import org.jooq.impl.DefaultRecordUnmapper;
+import org.springframework.context.event.EventListener;
 import org.springframework.modulith.events.ApplicationModuleListener;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -161,6 +163,30 @@ class ClassRoleArchTest {
               "@ApplicationModuleListener は新しいトランザクションを開き、受信のメソッドがトランザクション境界になるため、"
                   + "境界を Application に置く。"
                   + "直し方：イベントの受信は受信側モジュールの application に置く <Event>Listener の on メソッドへ移す。"
+                  + "規約：docs/backend/class-roles/listener.md、"
+                  + ADR_050);
+
+  /**
+   * イベントは {@code @ApplicationModuleListener} だけで受け、{@code @EventListener} と
+   * {@code @TransactionalEventListener} を直接付けない。
+   *
+   * <p>{@code @ApplicationModuleListener} は {@code @TransactionalEventListener}
+   * をメタアノテーションに持つため、対象から除く。
+   */
+  @ArchTest
+  /* package */ static final ArchRule eventListenersAreApplicationModuleListeners =
+      noMethods()
+          .that()
+          .areNotAnnotatedWith(ApplicationModuleListener.class)
+          .should()
+          .beMetaAnnotatedWith(EventListener.class)
+          .because(
+              "@EventListener は発行側のトランザクションの中で同期に動き、受信側の失敗が発行側の更新を巻き戻し、"
+                  + "イベント出版レジストリにも残らないため。"
+                  + "@TransactionalEventListener はコミットの後に発行側のスレッドで動き、"
+                  + "受信側の更新が、コミットを終えた発行側のトランザクションに加わるため。"
+                  + "直し方：イベントは受信側モジュールの application に置く <Event>Listener の on で、"
+                  + "@ApplicationModuleListener を付けて受ける。"
                   + "規約：docs/backend/class-roles/listener.md、"
                   + ADR_050);
 
@@ -394,12 +420,11 @@ class ClassRoleArchTest {
       public void check(final JavaClass item, final ConditionEvents events) {
         item.getRawSuperclass()
             .filter(superclass -> !superclass.getPackageName().startsWith("java."))
-            .ifPresent(
-                superclass ->
-                    events.add(
-                        SimpleConditionEvent.violated(
-                            item,
-                            item.getFullName() + " が " + superclass.getFullName() + " を継承している。")));
+            .ifPresent(superclass ->
+                events.add(
+                    SimpleConditionEvent.violated(
+                        item,
+                        item.getFullName() + " が " + superclass.getFullName() + " を継承している。")));
         for (final JavaClass subclass : item.getSubclasses()) {
           events.add(
               SimpleConditionEvent.violated(
@@ -479,10 +504,9 @@ class ClassRoleArchTest {
         final boolean implementsQueries =
             packageName.endsWith(".application")
                 && item.getAllRawInterfaces().stream()
-                    .anyMatch(
-                        queries ->
-                            queries.getSimpleName().endsWith("Queries")
-                                && queries.getPackageName().equals(modulePackage));
+                    .anyMatch(queries ->
+                        queries.getSimpleName().endsWith("Queries")
+                            && queries.getPackageName().equals(modulePackage));
         final List<JavaMethod> writableMethods =
             publicMethodsOf(item).stream()
                 .filter(method -> !isReadOnlyTransactional(method))

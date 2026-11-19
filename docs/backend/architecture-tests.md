@@ -86,6 +86,10 @@ jOOQの生成物の`com.example.demo.jooq`はOPENのモジュールであり、`
 - `commandHandlersAndListenersDoNotUseInheritance`：`*CommandHandler`と`*Listener`は、Java標準の型以外のクラスを継承せず、継承も実装もさせない（[ADR-051](../adr/ADR-051-bind-pgm-cd-with-scoped-value-and-aspect.md)）。
   違反フィクスチャの`ReopenOrderHandler`（サブクラス）、`RestoreOrderCommandHandler`（基底クラスの`OrderHandlerSupport`）、`OrderShippedReceiver`（インタフェースの実装）で確かめる。
 - `moduleListenersAreApplicationListeners`：`@ApplicationModuleListener`を付けたメソッドは、`application`の`*Listener`の`on`にする。
+- `eventListenersAreApplicationModuleListeners`：`@ApplicationModuleListener`を付けていないメソッドは、`@EventListener`をメタアノテーションに持たない。
+  `@EventListener`と`@TransactionalEventListener`を直接付けた受信を拒否し、`@TransactionalEventListener`をメタアノテーションに持つ`@ApplicationModuleListener`は対象から除く。
+  直し方は、受信を受信側モジュールの`application`の`<Event>Listener`の`on`へ移し、`@ApplicationModuleListener`を付けることである（[Listener](class-roles/listener.md)）。
+  違反フィクスチャの`inventory.application.StockEventReceiver`（`@EventListener`と`@TransactionalEventListener`）で確かめる。
 - `listenersExposeOnlyOnAndCallOneCommandHandler`：`*Listener`のpublicメソッドは`@ApplicationModuleListener`を付けた`void on(...)`一つだけにし、呼ぶ`*CommandHandler`はちょうど一つにする。
 - `requestsAndResponsesArePresentationWebRecords`：`*Request`と`*Response`は`presentation.web`のrecordにする。
 - `queryServicesImplementModuleQueries`：`*QueryService`は`application`に置いて自モジュールのルートの`*Queries`を実装し、すべてのpublicメソッドに`@Transactional(readOnly = true)`を付ける。
@@ -187,6 +191,23 @@ Class <archfixture.violating.ordering.application.ShipOrderCommandHandler> is me
 
 `ProxyRulesArchTest`は、プロキシで動くアノテーションを付けたメソッドへの同一クラス内の直接呼び出しを検査する。
 対象のアノテーションの一覧と規則の理由は、[バックエンドのJava実装規約](java-coding.md)の「プロキシで動くアノテーション」に示す。
+同じクラスの次の規則は、プロキシ、非同期の実行、スケジューラが黙って働かなくなるメソッドの形を検査する。
+
+- `proxiedMethodsAreNotPrivateFinalOrStatic`：一覧のアノテーションと、それをメタアノテーションに持つ`@ApplicationModuleListener`のような合成アノテーションを付けたメソッドを、`private`、`final`、`static`にしない。
+  失敗の文は、メソッド、修飾子、メソッドに付けたアノテーションの名前を示す。
+  直し方は、修飾子を外し、メソッドを別のBeanから注入して呼ぶことである。
+  違反フィクスチャの`ordering.application.OrderArchiver`（`final`の`@Transactional`、`static`の`@PreAuthorize`、`private`の`@Retryable`、`final`の`@ApplicationModuleListener`）で確かめる。
+- `asyncMethodsReturnVoidOrFuture`：`@Async`をメタアノテーションに持つメソッドは、`void`か`Future`に代入できる型を返す。
+  直し方は、結果か失敗を呼び出し元で扱うなら`CompletableFuture`を、扱わないなら`void`を返すことである。
+  違反フィクスチャの`ordering.application.OrderNotifier`（`String`を返す）で確かめる。
+- `scheduledMethodsAreOverridableNoArgVoidMethods`：`@Scheduled`と、繰り返した`@Scheduled`をまとめる`@Schedules`を付けたメソッドは、引数のない`void`のメソッドにし、`private`と`final`にしない。
+  直し方は、引数を設定値かフィールドに移し、結果をログかメトリクスに出すことである。
+  違反フィクスチャの`shared.infrastructure.persistence.StaleLockSweeper`で、戻り値、引数、`private`、`final`、繰り返した`@Scheduled`の戻り値をそれぞれ確かめる。
+
+規約どおりのフィクスチャの`@Transactional`の`handle`と`@ApplicationModuleListener`の`on`は、この3つの規則を満たす。
+`interceptableMethodShapesAreAllowed`は、package-privateの`@Transactional`、`void`、`CompletableFuture`、`Future`を返す`@Async`、package-privateと`static`の`@Scheduled`、アノテーションのない`static`と`final`のメソッドを、3つの規則が誤検出しないことを確かめる。
+自己呼び出しの規則とこれらの規則が検出しない誤りは、[バックエンドのJava実装規約](java-coding.md)の「ArchUnit が検出しない誤り」に示す。
+
 同じクラスの`pointcutsNarrowTargetsWithWithin`は、AspectJのadviceと`@Pointcut`の式（`value`と`pointcut`）に`within(`があることを検査する。
 違反フィクスチャの`shared.infrastructure.persistence.SlowPgmCdAspect`で確かめ、規約どおりのフィクスチャの`PgmCdAspect`を誤検出しないことも確かめる。
 同じクラスの`aspectsDeclareOrder`は、`@Aspect`のクラスに`Ordered.LOWEST_PRECEDENCE`より小さい値の`@Order`があることを検査する。

@@ -40,6 +40,9 @@ Listener は Infrastructure の Adapter でもない。
 - クラスを継承せず、継承も実装もさせない。
   `PgmCdAspect` は名前で対象を決め、継承した `on` には `*_pgm_cd` を束縛しない（[ADR-051](../../adr/ADR-051-bind-pgm-cd-with-scoped-value-and-aspect.md)）。
 - public メソッドは `@ApplicationModuleListener public void on(final <Event> event)` の一つだけにする。
+- イベントは `@ApplicationModuleListener` だけで受け、Listener 以外のクラスでも `@EventListener` と `@TransactionalEventListener` を直接付けない。
+  理由は[アンチパターン](#アンチパターン)に示す。
+  Spring Boot の起動の完了のようなフレームワークのイベントを受ける必要が出たら、先にこの規則と `ClassRoleArchTest.eventListenersAreApplicationModuleListeners` を変える。
 - `on` はイベントの値で [Command](command.md) を作り（`new ReserveStockCommand(event.orderId())`）、CommandHandler の `handle` を一回呼ぶ。
 - `@Transactional` を付けない。
   `@ApplicationModuleListener` がトランザクションを開く。
@@ -206,6 +209,11 @@ private ResponseEntity<ChargeReply> post(final String key, final Money amount) {
   一つが失敗するとイベントが再配信され、成功した処理も繰り返される。
 - `@ApplicationModuleListener` の代わりに `@EventListener` を付ける。
   発行側のトランザクションの中で同期に動き、受信側の失敗が発行側の更新を巻き戻す。
+  イベント出版レジストリにも残らないため、失敗したイベントを再投入できない。
+- `@ApplicationModuleListener` の代わりに `@TransactionalEventListener` を付ける。
+  発行側のコミットの後に発行側のスレッドで同期に動き、受信側の CommandHandler の `@Transactional` は新しいトランザクションを開かず、コミットを終えた発行側のトランザクションに加わる。
+  Spring は、このときのデータアクセスにはコミットが続かないと説明している（[Spring Framework, TransactionSynchronization.afterCommit](https://docs.spring.io/spring-framework/docs/current/javadoc-api/org/springframework/transaction/support/TransactionSynchronization.html#afterCommit())）。
+  `ModuleRoleTransactionManager` もトランザクションを開くときだけモジュールのロールへ切り替えるため、受信側のモジュールのロールに切り替わらない。
 - 受信するクラスを `infrastructure` に置く。
 - 同じイベントを二回受けると、在庫を二重に引き当てる、または代金を二重に請求する。
 - Listener から別のイベントを発行し、他モジュールへ中継する。
@@ -213,6 +221,8 @@ private ResponseEntity<ChargeReply> post(final String key, final Money amount) {
 ## 作成時のチェックリスト
 
 - [ ] `@ApplicationModuleListener` を付けたメソッドは、`application` の `<Event>Listener` の `on` にする。［ArchUnit で検査：ClassRoleArchTest.moduleListenersAreApplicationListeners］
+- [ ] イベントを `@EventListener` と `@TransactionalEventListener` で受けない。［ArchUnit で検査：ClassRoleArchTest.eventListenersAreApplicationModuleListeners］
+- [ ] イベントを `ApplicationListener` の実装で受けない。［自分で点検］
 - [ ] public メソッドは `void on(<Event> event)` 一つにし、CommandHandler をちょうど一つ呼ぶ。［ArchUnit で検査：ClassRoleArchTest.listenersExposeOnlyOnAndCallOneCommandHandler］
 - [ ] `application` の `@Service` の名前を `Listener` で終える。［ArchUnit で検査：ClassRoleArchTest.applicationServicesHaveRoleNames］
 - [ ] `on` を public にする。［ArchUnit で検査：PackageByFeatureOnionArchitectureTest.transactionalMethodsArePublicApplicationMethods］
