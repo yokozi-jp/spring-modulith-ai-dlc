@@ -7,12 +7,21 @@
 useDefault = true
 
 # 誤検知の許可（allowlist）
-# .env.example はダミー値を並べるサンプルファイルであり、実際のシークレットは含まない。
-# そのためファイル全体をスキャン対象から除外する。
+# paths と regexes を併記するときは、condition = "AND" と regexTarget を必ず書く。
+# 既定の condition は OR で、paths に一致したファイルが丸ごと走査から外れる（#473）。
+# regexTarget の選び方は docs/tooling/lint-and-test.md の「betterleaksの誤検知を除外する」にある。
+
+# .env.example のプレースホルダ（replace-with- か local-only- で始まる値）の行だけを除外する。
+# ほかの行は検出対象のまま。
 [[allowlists]]
-description = ".env.example はプレースホルダ専用のサンプルファイルのため除外"
+description = ".env.example のプレースホルダ（PASSWORD と SECRET の値が replace-with- か local-only- で始まる行）を除外"
+condition = "AND"
+regexTarget = "match"
 paths = [
   '''(^|/)\.env\.example$''',
+]
+regexes = [
+  '''^(PASSWORD|SECRET)=(replace-with-|local-only-)[a-z0-9-]+$''',
 ]
 
 # Compose の secret 読み込みは実値ではなく /run/secrets からの読み出しであり、
@@ -20,13 +29,15 @@ paths = [
 # compose-test.yml の Keycloak は backend-smoke profile 限定の使い捨てスモーク用で、同じ admin/admin を直書きする。
 [[allowlists]]
 description = "docker/compose.yml と compose-test.yml の Compose secret 読み出しおよびローカル専用 Keycloak 開発用資格情報を除外"
+condition = "AND"
+regexTarget = "match"
 paths = [
   '''(^|/)docker/compose\.yml$''',
   '''(^|/)docker/compose-test\.yml$''',
 ]
 regexes = [
-  '''\$\$\(cat /run/secrets/[a-z_]+\)''',
-  '''KC_BOOTSTRAP_ADMIN_PASSWORD:\s*admin''',
+  '''^PASSWORD="\$\$\(cat /run/secrets/[a-z_]+\)"$''',
+  '''^PASSWORD:\s*admin$''',
 ]
 
 # backend の Liquibase / jOOQ 設定は、パスワードを環境変数由来の変数へ束ねて
@@ -35,6 +46,8 @@ regexes = [
 # タスク定義は build.gradle から gradle/database.gradle へ切り出したため、両方を対象にする。
 [[allowlists]]
 description = "backend の Liquibase / jOOQ 設定（build.gradle・gradle/database.gradle）で password に変数参照を代入する行を除外（リテラル直書きは検出対象のまま）"
+condition = "AND"
+regexTarget = "match"
 paths = [
   '''(^|/)backend/build\.gradle$''',
   '''(^|/)backend/gradle/database\.gradle$''',
@@ -47,12 +60,14 @@ regexes = [
 # 実値を直書きしない。psql 変数参照の行だけを除外し、引用符付きリテラルの直書きは検出対象のまま。
 [[allowlists]]
 description = "docker/initdb のロールを作るスクリプトの psql 変数によるパスワード受け渡し（:'app_password' など）を除外（リテラル直書きは検出対象のまま）"
+condition = "AND"
+regexTarget = "match"
 paths = [
   '''(^|/)docker/initdb/01-create-migration-role\.sh$''',
   '''(^|/)docker/initdb/02-create-app-role\.sh$''',
 ]
 regexes = [
-  '''PASSWORD :'[a-zA-Z_][a-zA-Z0-9_]*';''',
+  '''^PASSWORD :'[a-zA-Z_][a-zA-Z0-9_]*';$''',
 ]
 
 # .env.test.example の E2E_PASSWORD は docker/keycloak/realm.json の test-user と同じ使い捨てダミー（ADR-057）。
@@ -60,7 +75,6 @@ regexes = [
 # この 1 行だけを除外し、ほかの行は検出対象のまま。
 [[allowlists]]
 description = ".env.test.example（と過去履歴の .env.test）の E2E 用 test-user のダミーパスワード（E2E_PASSWORD=test-password）を除外"
-# paths と regexes の両方に一致した行だけを除外する（既定の OR ではファイル全体が除外される）。
 condition = "AND"
 regexTarget = "line"
 paths = [
@@ -73,8 +87,6 @@ regexes = [
 # docker/zap の各 plan は、docker/keycloak/realm.json のデモ用 realm のテストユーザー test-admin でログインする。
 # test-password は使い捨てのローカル realm 専用の値で、本番の資格情報ではない。
 # この値の行だけを除外し、同じファイルの他のリテラルは検出対象のまま。
-# 既定の condition は OR で、paths だけでファイル全体が除外されるため AND にする。
-# 既定の regexTarget は secret で値しか照合しないため、キー名を含む match を照合する。
 [[allowlists]]
 description = "docker/zap の plan に書くデモ用 realm のテストユーザーのパスワード（test-password）を除外（他のリテラルは検出対象のまま）"
 condition = "AND"

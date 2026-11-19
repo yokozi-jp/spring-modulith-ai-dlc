@@ -1,0 +1,3 @@
+# 履歴にだけ残る誤検知の fingerprint（commit:file:rule:line）。
+# 8d16d56 が .env.example に置いた初期のダミーの DB 接続値。
+8d16d56efbf03a6db903c9e781116aaa45461c74:.env.example:generic-password:3
