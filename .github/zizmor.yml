@@ -1,0 +1,4 @@
+rules:
+  # actionlint（1.7.12）が $/ の形をまだ受け付けないので ./ のままにする（ADR-090）。
+  self-repository:
+    disable: true

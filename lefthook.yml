@@ -351,7 +351,6 @@ pre-push:
         task lint-actions
 
     # GitHub Actions のワークフローか composite action に変更がある push のときだけセキュリティ解析（zizmor）
-    # docker を使えない（docker info が失敗する）環境ではスキップ（最終担保は CI に任せる）。
     - name: zizmor
       glob:
         - ".github/workflows/*.{yml,yaml}"
@@ -359,8 +358,4 @@ pre-push:
       files: *push-files
       run: |
         echo "{files}" >/dev/null
-        if ! docker info >/dev/null 2>&1; then
-          echo "docker を使えないため zizmor をスキップします（CI で検査されます）。" >&2
-          exit 0
-        fi
         task lint-actions-security

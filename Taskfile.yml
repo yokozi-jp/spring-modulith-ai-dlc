@@ -480,6 +480,14 @@ tasks:
       - bash tooling/ci-changes/test.sh
       - python3 tooling/ci-gate-check/ci-gate-check.py
 
+  # CI の mise-action は trust を済ませ、MISE_YES=1 も渡すので、CI の環境変数を外した新しい state dir で確かめる。
+  # [tools] のほかを書いた mise.toml は trust を要し、ここで止まる（ADR-090）。
+  mise-trust-check:
+    desc: mise.toml が mise trust を要さないことを検証
+    silent: true
+    cmds:
+      - env -u CI -u GITHUB_ACTIONS -u MISE_YES -u MISE_TRUSTED_CONFIG_PATHS MISE_STATE_DIR="$(mktemp -d)" mise ls --current >/dev/null
+
   # 本体は tooling/agent-git/agent-git.sh、手順は docs/tooling/dev-workflow.md の「エージェントがcommitとpushをするとき」にある。
   # 呼んだディレクトリで動かし、commit のパスをそこからの相対で解釈する。
   # CLI_ARGS は Task が引数ごとにシェルの引用符を付けるので、空白を含むパスもそのまま渡る。
@@ -1029,7 +1037,7 @@ tasks:
       - |
         {{.DOCKER}} run --rm -v "$PWD:/repo" -w /repo \
           stoplight/spectral:6.16.3@sha256:a07aa4455367b9501b574423b684ab0ef3ee42556089013583318ec015249050 \
-          lint openapi/openapi.yaml --ruleset .spectral.yaml
+          lint openapi/openapi.yaml --ruleset .spectral.yaml --fail-severity=warn
 
   # 作業ツリーを index と比べるため、pre-commit で再生成した結果がステージ済みの内容と同じなら通る。
   # 新しく生成された未追跡のファイルも差分として扱う。
@@ -1061,7 +1069,7 @@ tasks:
         spectral() {
           {{.DOCKER}} run --rm -v "$PWD:/repo" -w /repo \
             stoplight/spectral:6.16.3@sha256:a07aa4455367b9501b574423b684ab0ef3ee42556089013583318ec015249050 \
-            lint "$@" --ruleset .spectral.yaml
+            lint "$@" --ruleset .spectral.yaml --fail-severity=warn
         }
         spectral openapi/spectral-fixtures/valid.yaml
         status=0
@@ -1713,9 +1721,7 @@ tasks:
   lint-actions-security:
     desc: GitHub Actionsのワークフローとcomposite actionをzizmorで検査
     cmds:
-      - |
-        docker run --rm -v "$PWD":/repo -w /repo \
-          ghcr.io/zizmorcore/zizmor:1.29.0@sha256:863026d54f91271b10b60b67ad8054cb37120167e162482597db102b3026a284 .github/workflows/ .github/actions/
+      - zizmor .github/workflows/ .github/actions/
 
   lint-docker:
     desc: 全Dockerfileをhadolintで検査

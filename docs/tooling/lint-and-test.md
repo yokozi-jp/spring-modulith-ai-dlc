@@ -316,7 +316,8 @@ const params = { ...(cursor !== undefined && { cursor }) };
 - **`task scan-dast`**：隔離した依存を起動してマイグレーションを適用し、backend、`vp preview`を起動して、OWASP ZAPで認証付きのpassive scanを実行して片付ける。
 - **`task scan-dast-active`**：同じ環境でactive scanを実行する。
 - **`task lint-actions`**：GitHub Actionsワークフローをactionlintで検査する。
-- **`task lint-actions-security`**：GitHub Actionsのワークフローとcomposite action（`.github/actions/`）をzizmorで検査する。
+- **`task lint-actions-security`**：GitHub Actionsのワークフローとcomposite action（`.github/actions/`）をzizmorで検査する。zizmorは`mise.toml`の版で動き、Dockerを使わない。`zizmor.yml`の`zizmor-action`の`version`にも同じ版を書く。設定は`.github/zizmor.yml`である。
+- **`task mise-trust-check`**：`mise.toml`が`mise trust`を要さないことを、CIの環境変数を外した新しいstate dirで検証する。
 - **`task lint-docker`**：Dockerfileをhadolintで検査する。
 - **`task lint-docker-check`**：Dockerfileを`docker build --check`で検査する。
 - **`task lint-compose`**：Composeファイルの構文、参照、変数展開を検証する。
@@ -460,7 +461,7 @@ pre-pushの「変更」は、push済みかどうかやrebaseの有無によら�
 - **`dast.yml`**：PRで`scan-dast`、週1回のscheduleと手動実行で`scan-dast-active`を実行し、Informationalを除いたSARIFをCode Scanningに送る。
 - **`actionlint.yml`**：`lint-actions`相当を実行する。
 - **`ci.yml`**：`pull_request`で動く検査を呼び出し、集約ジョブ`CI gate`が全ジョブの`success`を確かめる。`ci-gate-check`も実行する（[ADR-087](../adr/ADR-087-gate-required-checks-with-single-aggregate-job.md)）。
-- **`zizmor.yml`**：`lint-actions-security`相当を実行する。
+- **`zizmor.yml`**：`lint-actions-security`相当を実行する。`zizmor-action`の`version`は`mise.toml`のzizmorと同じ版にする。
 - **`hadolint.yml`**：`lint-docker`相当、`lint-docker-check`相当、バックエンドイメージのビルドと起動確認を実行する。
 - **`compose-config.yml`**：`lint-compose`相当を実行する。
 - **`otel-collector.yml`**：`otel-collector-check`を実行する。
