@@ -102,6 +102,18 @@ describe("workspace の層の規則", () => {
       },
     );
 
+    // 新しい package が vite.config.ts に perFile を書き忘れても、coverage は黙って通る（ADR-076）。
+    it.each(everyPackage)("%s の coverage にファイルごとの下限がある", async (directory) => {
+      const loaded = await loadConfigFromFile(
+        { command: "serve", mode: "test" },
+        configOf(directory),
+      );
+
+      expect(loaded?.config.test?.coverage).toMatchObject({
+        thresholds: { perFile: { branches: 60, lines: 65 } },
+      });
+    });
+
     it.each(apps)("%s の style.css が packages/ui/src を @source で走査する", (directory) => {
       const css = readFileSync(path.join(frontendRoot, directory, "src/style.css"), "utf8");
       const sources = [...css.matchAll(/^@source\s+["'](?<source>[^"']+)["']/gmu)].map((match) =>

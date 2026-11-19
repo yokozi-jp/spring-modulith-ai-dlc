@@ -594,36 +594,8 @@ tasks:
       # ルートの lint 設定のテストと、各 package のテストを実行する。
       - vp run --recursive test {{.FE_TEST_ARGS}}
       # coverage は Compiler を外して測る。Compiler が足す memo の分岐を分母に入れない。
-      # 全体の下限は各 package の vite.config.ts の thresholds が検査する。ルートの package は coverage を測らない。
+      # 全体とファイルごとの下限は各 package の vite.config.ts の thresholds が検査する（ADR-076）。ルートの package は coverage を測らない。
       - FRONTEND_REACT_COMPILER=false vp run --filter '!frontend' --fail-if-no-match test --coverage {{.FE_TEST_ARGS}}
-      # ファイルごとの下限は coverage-summary.json で検査する（ADR-076）。
-      # ponytail: Vitest 4.1 の perFile は全体の下限をファイルごとに当てるだけで、別の値を持てない。
-      # perFile にオブジェクトを渡せる版へ上がったら、この検査を各 package の vite.config.ts の thresholds.perFile へ移す。
-      # apps と packages の下の package を全て巡る。coverage-summary.json が無い package は読めずに失敗にする。
-      - |
-        node --input-type=module <<'NODE'
-        import { existsSync, readdirSync, readFileSync } from "node:fs";
-
-        const minimum = { branches: 60, lines: 65 };
-        const summaries = ["apps", "packages"]
-          .filter((group) => existsSync(group))
-          .flatMap((group) => readdirSync(group).map((name) => `${group}/${name}/coverage/coverage-summary.json`));
-        const missing = summaries.filter((path) => !existsSync(path));
-        for (const path of missing) console.error(`${path} がありません。package の test script が coverage を測り、json-summary を出すか確かめてください。`);
-        if (missing.length > 0) process.exit(1);
-        const failures = summaries.flatMap((path) =>
-          Object.entries(JSON.parse(readFileSync(path, "utf8")))
-            .filter(([file]) => file !== "total")
-            .flatMap(([file, metrics]) =>
-              Object.entries(minimum)
-                // 計測する行や分岐のないファイル（re-export だけなど）は、JaCoCo と同じく検査しない。
-                .filter(([key, min]) => metrics[key].total > 0 && metrics[key].pct < min)
-                .map(([key, min]) => `${key} ${metrics[key].pct}% < ${min}%: ${file}`),
-            ),
-        );
-        for (const failure of failures) console.error(`ファイルの coverage が下限を下回りました。${failure}`);
-        process.exit(failures.length === 0 ? 0 : 1);
-        NODE
 
   fe-test-build:
     desc: フロントエンドのcoverage検証付きテストと本番ビルドを実行

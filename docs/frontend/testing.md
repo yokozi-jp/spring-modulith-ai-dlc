@@ -69,7 +69,7 @@ route loaderとTanStack Queryを組み合わせた画面では、loading、succe
 起動処理、test、型宣言、自動生成されたroute tree、Orval生成物を除く手書きproduction source全体をcoverage対象にする。
 
 全体でbranch 88%とline 95%、ファイルごとにbranch 60%とline 65%を維持する。
-計測する分岐や行がないファイルは、ファイルごとの下限を検査しない。
+計測する分岐や行がないファイルは、Vitestが100%と数えるので、ファイルごとの下限で落ちない。
 下限の値の根拠は[ADR-076](../adr/ADR-076-run-mutation-tests-per-change-and-tighten-coverage-gates.md)を参照する。
 
 coverageはReact Compilerを外して測る。
