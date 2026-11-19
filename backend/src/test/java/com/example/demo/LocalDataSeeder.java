@@ -4,6 +4,8 @@ import static com.example.demo.jooq.ordering.Tables.T_ORDER;
 import static com.example.demo.jooq.ordering.Tables.T_ORDER_LINE;
 import static com.example.demo.jooq.payment.Tables.T_PAYMENT;
 import static com.example.demo.jooq.product.Tables.M_PRODUCT;
+import static com.example.demo.jooq.tenancy.Tables.M_MEMBERSHIP;
+import static com.example.demo.jooq.tenancy.Tables.M_TENANT;
 
 import com.example.demo.ordering.domain.model.Money;
 import com.example.demo.ordering.domain.model.Order;
@@ -12,6 +14,7 @@ import com.example.demo.ordering.domain.model.ProductOffer;
 import com.example.demo.ordering.infrastructure.persistence.OrderSeeds;
 import com.example.demo.payment.infrastructure.persistence.PaymentSeeds;
 import com.example.demo.product.ProductSeeds;
+import com.example.demo.tenancy.TenancySeeds;
 import com.example.demo.testkit.AsModule;
 import java.net.InetAddress;
 import java.sql.Connection;
@@ -29,6 +32,7 @@ import java.util.Random;
 import java.util.UUID;
 import java.util.function.Function;
 import java.util.function.Supplier;
+import java.util.stream.Stream;
 import lombok.extern.slf4j.Slf4j;
 import net.datafaker.Faker;
 import org.jooq.DSLContext;
@@ -39,14 +43,15 @@ import org.jooq.conf.Settings;
 import org.jooq.impl.DSL;
 
 /**
- * 開発用の代表データ（#114）を、業務データが空のローカルかテストの DB に入れる。
+ * 開発用の代表データ（#114）を、業務データが空のローカルかテストの DB に入れる。テナントと所属（{@link
+ * TenancySeeds}）は、業務データの有無によらず、足りない行だけを毎回入れる。
  *
  * <p>Gradle の {@code seedLocalData}（JavaExec、テストの runtime classpath）が {@link #main} を呼ぶ。Spring
  * を起動せず、Bean にもしないので、ほかのテストのコンテキストでは動かない。環境の確認、「空」の判定、reset の削除を 1 つのトランザクションで行う。
  */
 @Slf4j
-// 表ごとのモジュールのロールへの切り替えで、生成した型とシーダーの型への依存が増える。
-@SuppressWarnings({"PMD.TooManyMethods", "PMD.CouplingBetweenObjects"})
+// 表ごとのモジュールのロールへの切り替えで、生成した型とシーダーの型への依存と、表の static import が増える。
+@SuppressWarnings({"PMD.TooManyMethods", "PMD.CouplingBetweenObjects", "PMD.TooManyStaticImports"})
 public final class LocalDataSeeder {
 
   /** 実行のモード。 */
@@ -73,6 +78,9 @@ public final class LocalDataSeeder {
   /* package */ static final List<Table<?>> BUSINESS_TABLES =
       List.of(T_PAYMENT, T_ORDER_LINE, T_ORDER, M_PRODUCT);
 
+  /** テナントと所属の表。業務データの有無によらず、毎回 {@link TenancySeeds} が足りない行だけを入れる。reset でも消さない。 */
+  private static final List<Table<?>> TENANCY_TABLES = List.of(M_TENANT, M_MEMBERSHIP);
+
   /** Datafaker と UUID の乱数の seed。 */
   private static final long RANDOM_SEED = 114L;
 
@@ -95,18 +103,25 @@ public final class LocalDataSeeder {
   /** 実行の SQL をログに出さない jOOQ の設定。 */
   private static final Settings SETTINGS = new Settings().withExecuteLogging(false);
 
+  /** IdP の発行者の URL の変数名。 */
+  private static final String OIDC_ISSUER_URI = "OIDC_ISSUER_URI";
+
   /** 日時の基準を取る時計。 */
   private final Clock clock;
 
-  /** 日時の基準を取る時計を受け取る。 */
-  /* package */ LocalDataSeeder(final Clock clock) {
+  /** test-user と test-admin を所属させる、ローカルの Keycloak の発行者の URL（ID トークンの {@code iss}）。 */
+  private final String issuer;
+
+  /** 日時の基準を取る時計と、IdP の発行者の URL を受け取る。 */
+  /* package */ LocalDataSeeder(final Clock clock, final String issuer) {
     this.clock = clock;
+    this.issuer = issuer;
   }
 
   /** 呼ぶ側のトランザクションの中で、モードに従って代表データを入れる。 */
   /* package */ Outcome seed(final DSLContext dsl, final Mode mode) {
     final boolean migrated =
-        BUSINESS_TABLES.stream()
+        Stream.concat(BUSINESS_TABLES.stream(), TENANCY_TABLES.stream())
             .allMatch(table ->
                 inModuleOf(
                     dsl,
@@ -121,6 +136,7 @@ public final class LocalDataSeeder {
       }
       throw new IllegalStateException("業務の表がありません。task be-migrate の後に実行してください");
     }
+    AsModule.run(dsl, "tenancy", tx -> TenancySeeds.insert(tx, issuer));
     if (mode == Mode.RESET) {
       BUSINESS_TABLES.forEach(
           table -> inModuleOf(dsl, table, tx -> tx.deleteFrom(table).execute()));
@@ -225,6 +241,7 @@ public final class LocalDataSeeder {
       return;
     }
     requireLocalEnvironment(env);
+    final String issuer = required(env, OIDC_ISSUER_URI);
     final String url = jdbcUrl(env);
     final Connection connection;
     try {
@@ -242,7 +259,8 @@ public final class LocalDataSeeder {
     try (connection) {
       final Outcome outcome =
           DSL.using(connection, SQLDialect.POSTGRES, SETTINGS)
-              .transactionResult(cfg -> new LocalDataSeeder(SEED_CLOCK).seed(cfg.dsl(), mode));
+              .transactionResult(
+                  cfg -> new LocalDataSeeder(SEED_CLOCK, issuer).seed(cfg.dsl(), mode));
       log.info("代表データの投入の結果: {}", outcome);
     }
   }

@@ -5,6 +5,8 @@ package com.example.demo.jooq.tenancy;
 
 
 import com.example.demo.jooq.DefaultCatalog;
+import com.example.demo.jooq.tenancy.tables.MMembership;
+import com.example.demo.jooq.tenancy.tables.MTenant;
 import com.example.demo.jooq.tenancy.tables.MUser;
 import com.example.demo.jooq.tenancy.tables.MUserIdentity;
 
@@ -41,6 +43,16 @@ public class Tenancy extends SchemaImpl {
     public static final Tenancy TENANCY = new Tenancy();
 
     /**
+     * The table <code>tenancy.m_membership</code>.
+     */
+    public final MMembership M_MEMBERSHIP = MMembership.M_MEMBERSHIP;
+
+    /**
+     * The table <code>tenancy.m_tenant</code>.
+     */
+    public final MTenant M_TENANT = MTenant.M_TENANT;
+
+    /**
      * The table <code>tenancy.m_user</code>.
      */
     public final MUser M_USER = MUser.M_USER;
@@ -68,6 +80,8 @@ public class Tenancy extends SchemaImpl {
     @NonNull
     public final List<Table<?>> getTables() {
         return Arrays.asList(
+            MMembership.M_MEMBERSHIP,
+            MTenant.M_TENANT,
             MUser.M_USER,
             MUserIdentity.M_USER_IDENTITY
         );

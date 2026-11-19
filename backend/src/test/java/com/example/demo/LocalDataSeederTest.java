@@ -6,6 +6,9 @@ import static com.example.demo.jooq.ordering.Tables.T_ORDER;
 import static com.example.demo.jooq.ordering.Tables.T_ORDER_LINE;
 import static com.example.demo.jooq.payment.Tables.T_PAYMENT;
 import static com.example.demo.jooq.product.Tables.M_PRODUCT;
+import static com.example.demo.jooq.tenancy.Tables.M_MEMBERSHIP;
+import static com.example.demo.jooq.tenancy.Tables.M_TENANT;
+import static com.example.demo.jooq.tenancy.Tables.M_USER_IDENTITY;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
@@ -13,6 +16,7 @@ import com.example.demo.LocalDataSeeder.Mode;
 import com.example.demo.LocalDataSeeder.Outcome;
 import com.example.demo.jooq.DefaultCatalog;
 import com.example.demo.product.TestProducts;
+import com.example.demo.tenancy.TenancySeeds;
 import com.example.demo.testkit.AsModule;
 import com.example.demo.testkit.DatabaseTest;
 import java.math.BigDecimal;
@@ -44,15 +48,22 @@ import org.springframework.beans.factory.annotation.Autowired;
 @SuppressWarnings({"PMD.TooManyStaticImports", "PMD.TooManyMethods"})
 class LocalDataSeederTest {
 
+  /** test-user と test-admin を所属させる発行者。 */
+  private static final String ISSUER = "http://127.0.0.1:8081/realms/spring-modulith";
+
   /** 固定の時計のシーダー。main と同じ基準の時刻にする。 */
   private static final LocalDataSeeder SEEDER =
-      new LocalDataSeeder(Clock.fixed(Instant.parse("2026-10-01T00:00:00Z"), ZoneOffset.UTC));
+      new LocalDataSeeder(
+          Clock.fixed(Instant.parse("2026-10-01T00:00:00Z"), ZoneOffset.UTC), ISSUER);
 
   /** 商品のモジュール。 */
   private static final String PRODUCT = "product";
 
   /** 注文のモジュール。 */
   private static final String ORDERING = "ordering";
+
+  /** テナントと所属のモジュール。 */
+  private static final String TENANCY = "tenancy";
 
   /** 決済のモジュール。決済のロールは、依存の方向に沿って注文のスキーマも読める。 */
   private static final String PAYMENT = "payment";
@@ -144,6 +155,25 @@ class LocalDataSeederTest {
     final List<List<Map<String, Object>>> before = snapshot();
     assertThat(SEEDER.seed(dsl, Mode.SEED)).isEqualTo(Outcome.SKIPPED_NOT_EMPTY);
     assertThat(snapshot()).isEqualTo(before);
+  }
+
+  @Test
+  @DisplayName("業務データがあっても、2 つのテナントと test-user と test-admin の所属を入れ、何度入れても増やさない")
+  void seedsTenantsAndMembershipsIdempotently() {
+    TestProducts.onSale(dsl, "NOT-SEED-2", "100");
+
+    assertThat(SEEDER.seed(dsl, Mode.SEED)).isEqualTo(Outcome.SKIPPED_NOT_EMPTY);
+    final Map<String, List<String>> first = memberships();
+    SEEDER.seed(dsl, Mode.SEED);
+
+    assertThat(first)
+        .isEqualTo(
+            Map.of(
+                TenancySeeds.TEST_USER_SUBJECT,
+                List.of("サンプル商事:MEMBER", "サンプル物産:MEMBER"),
+                TenancySeeds.TEST_ADMIN_SUBJECT,
+                List.of("サンプル商事:ADMIN")));
+    assertThat(memberships()).as("2 回目の seed の後の所属").isEqualTo(first);
   }
 
   @Test
@@ -254,6 +284,27 @@ class LocalDataSeederTest {
           values.addAll(tx.selectDistinct(createdBy).from(table).fetch(createdBy));
           return values;
         });
+  }
+
+  /** 発行者 {@link #ISSUER} の subject ごとの、「テナントの名前:役割」の一覧。 */
+  private Map<String, List<String>> memberships() {
+    return inModule(
+        TENANCY,
+        tx ->
+            tx.select(
+                    M_USER_IDENTITY.SUBJECT_CODE,
+                    DSL.arrayAgg(
+                            DSL.concat(
+                                M_TENANT.TENANT_NAME, DSL.inline(":"), M_MEMBERSHIP.ROLE_TYP))
+                        .orderBy(M_TENANT.TENANT_NAME))
+                .from(M_MEMBERSHIP)
+                .join(M_USER_IDENTITY)
+                .on(M_USER_IDENTITY.USER_ID.eq(M_MEMBERSHIP.USER_ID))
+                .join(M_TENANT)
+                .on(M_TENANT.TENANT_ID.eq(M_MEMBERSHIP.TENANT_ID))
+                .where(M_USER_IDENTITY.ISSUER_URL.eq(ISSUER))
+                .groupBy(M_USER_IDENTITY.SUBJECT_CODE)
+                .fetchMap(Record2::value1, row -> List.of(row.value2())));
   }
 
   /** reset の後に比べる値。IDENTITY の主キーとそれを指す列を除き、public_id（明細は注文の public_id と番号）で並べる。 */

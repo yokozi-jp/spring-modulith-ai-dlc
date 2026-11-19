@@ -4,6 +4,8 @@
 package com.example.demo.jooq.tenancy;
 
 
+import com.example.demo.jooq.tenancy.tables.MMembership;
+import com.example.demo.jooq.tenancy.tables.MTenant;
 import com.example.demo.jooq.tenancy.tables.MUser;
 import com.example.demo.jooq.tenancy.tables.MUserIdentity;
 
@@ -22,6 +24,16 @@ import javax.annotation.processing.Generated;
 )
 @SuppressWarnings({ "all", "unchecked", "rawtypes", "this-escape" })
 public class Tables {
+
+    /**
+     * The table <code>tenancy.m_membership</code>.
+     */
+    public static final MMembership M_MEMBERSHIP = MMembership.M_MEMBERSHIP;
+
+    /**
+     * The table <code>tenancy.m_tenant</code>.
+     */
+    public static final MTenant M_TENANT = MTenant.M_TENANT;
 
     /**
      * The table <code>tenancy.m_user</code>.
