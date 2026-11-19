@@ -488,6 +488,14 @@ tasks:
     cmds:
       - env -u CI -u GITHUB_ACTIONS -u MISE_YES -u MISE_TRUSTED_CONFIG_PATHS MISE_STATE_DIR="$(mktemp -d)" mise ls --current >/dev/null
 
+  # lsp.json の mise -E lsp exec は lock に無い版も入れるので、mise.lsp.toml だけを上げた変更をここで止める。
+  # mise.lsp.toml は trust を要するが、mise install は trust なしで読む。
+  mise-lsp-lock-check:
+    desc: mise.lsp.toml の版が mise.lsp.lock に載ることを検証
+    silent: true
+    cmds:
+      - env -u CI -u GITHUB_ACTIONS -u MISE_YES -u MISE_TRUSTED_CONFIG_PATHS MISE_STATE_DIR="$(mktemp -d)" MISE_DATA_DIR="$(mktemp -d)" mise -E lsp install --locked --dry-run http:jdtls http:lombok >/dev/null
+
   # 本体は tooling/agent-git/agent-git.sh、手順は docs/tooling/dev-workflow.md の「エージェントがcommitとpushをするとき」にある。
   # 呼んだディレクトリで動かし、commit のパスをそこからの相対で解釈する。
   # CLI_ARGS は Task が引数ごとにシェルの引用符を付けるので、空白を含むパスもそのまま渡る。
