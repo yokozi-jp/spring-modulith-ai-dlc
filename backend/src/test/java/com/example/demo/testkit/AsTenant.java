@@ -17,6 +17,15 @@ public final class AsTenant {
 
   private AsTenant() {}
 
+  /** 束縛中のテナントの文字列を返す。束縛していなければ {@code unbound} を返す。 */
+  public static String currentOrUnbound() {
+    try {
+      return TenantContext.current().toString();
+    } catch (IllegalStateException unbound) {
+      return "unbound";
+    }
+  }
+
   /** テナントを束縛して本体を実行し、結果を返す。 */
   public static <T> T call(final Supplier<T> body) {
     return TenantContext.call(TENANT, body::get);

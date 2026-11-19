@@ -1,5 +1,6 @@
 package com.example.demo.shared.tenant;
 
+import java.util.Objects;
 import java.util.UUID;
 
 /**
@@ -10,6 +11,11 @@ import java.util.UUID;
  * @param value テナントの {@code public_id}
  */
 public record TenantId(UUID value) {
+
+  /** 型の上は null でないが、JSON から読んだ値には null が入りうるため、境界で拒否する。 */
+  public TenantId {
+    Objects.requireNonNull(value, "value");
+  }
 
   @Override
   public String toString() {

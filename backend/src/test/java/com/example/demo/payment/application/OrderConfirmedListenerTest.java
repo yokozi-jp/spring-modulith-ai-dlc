@@ -16,7 +16,6 @@ import com.example.demo.payment.domain.model.Money;
 import com.example.demo.payment.domain.model.OrderId;
 import com.example.demo.payment.domain.model.PaymentGateway;
 import com.example.demo.shared.concurrency.ExpectedLockNo;
-import com.example.demo.shared.tenant.TenantContext;
 import com.example.demo.testkit.AppUsers;
 import com.example.demo.testkit.AsModule;
 import com.example.demo.testkit.AsTenant;
@@ -34,7 +33,6 @@ import java.time.ZoneOffset;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
 import java.util.concurrent.CopyOnWriteArrayList;
@@ -468,33 +466,34 @@ class OrderConfirmedListenerTest {
    */
   /* package */ static final class TenantAtBeginRecorder implements TransactionExecutionListener {
 
-    /** 記録したトランザクションの名前とテナント。束縛されていなければテナントは {@code unbound}。 */
-    private final List<Map.Entry<String, String>> begun = new CopyOnWriteArrayList<>();
+    /** 記録したトランザクションの名前とテナント。 */
+    private final List<Begun> begun = new CopyOnWriteArrayList<>();
 
     @Override
     public void beforeBegin(final TransactionExecution transaction) {
-      begun.add(Map.entry(String.valueOf(transaction.getTransactionName()), currentTenant()));
+      begun.add(
+          new Begun(String.valueOf(transaction.getTransactionName()), AsTenant.currentOrUnbound()));
     }
 
     /* package */ void reset() {
       begun.clear();
     }
 
-    /** 名前のトランザクションを始めた時点のテナント。 */
+    /** 名前のトランザクションを始めた時点のテナント。束縛されていなければ {@code unbound}。 */
     /* package */ List<String> tenantsOf(final String transactionName) {
       return begun.stream()
-          .filter(entry -> entry.getKey().equals(transactionName))
-          .map(Map.Entry::getValue)
+          .filter(entry -> entry.transaction().equals(transactionName))
+          .map(Begun::tenant)
           .toList();
     }
 
-    private static String currentTenant() {
-      try {
-        return TenantContext.current().toString();
-      } catch (IllegalStateException unbound) {
-        return "unbound";
-      }
-    }
+    /**
+     * 始めたトランザクションの記録。
+     *
+     * @param transaction トランザクションの名前
+     * @param tenant 始めた時点のテナント
+     */
+    private record Begun(String transaction, String tenant) {}
   }
 
   /** 決済代行と時計を差し替える。 */

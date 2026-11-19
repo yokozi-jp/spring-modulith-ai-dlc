@@ -3,6 +3,7 @@ package com.example.demo.shared.tenant;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import com.example.demo.testkit.AsTenant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -19,7 +20,7 @@ import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.TransactionStatus;
 import org.springframework.transaction.support.SimpleTransactionStatus;
 
-/** {@link TenantListenerAspect} の束縛が、リスナーのトランザクションより外側で効き、呼び出しの後に残らないことを検証する（ADR-103）。 */
+/** {@link TenantListenerAspect} の束縛が、リスナーのトランザクションより外側で効き、呼び出しの後に残らないことを検証する（ADR-104）。 */
 // ApplicationContextRunner の run に渡す callback の中で assert するため、PMD はテストメソッドの assert を検出できない。
 // fixture の Listener は、pointcut の対象にするためメソッドを public にする。
 @SuppressWarnings({"PMD.UnitTestShouldIncludeAssert", "PMD.PublicMemberInNonPublicType"})
@@ -73,6 +74,19 @@ class TenantListenerAspectTest {
                 .hasMessageContaining("must implement TenantScoped"));
   }
 
+  @Test
+  // 型の上は null でない値を、JSON から読んだ値を模して null にする。
+  @SuppressWarnings("NullAway")
+  @DisplayName("イベントのテナントが null（項目のない古い出版を読んだ場合）なら、束縛せず NullPointerException で拒否する")
+  void eventWithNullTenantIsRejected() {
+    contextRunner()
+        .run(context ->
+            assertThatThrownBy(
+                    () -> context.getBean(OrderShippedListener.class).on(new OrderShipped(null)))
+                .isInstanceOf(NullPointerException.class)
+                .hasMessageContaining("tenantId"));
+  }
+
   private static ApplicationContextRunner contextRunner() {
     return new ApplicationContextRunner()
         .withConfiguration(
@@ -102,26 +116,18 @@ class TenantListenerAspectTest {
 
     @Override
     public TransactionStatus getTransaction(final @Nullable TransactionDefinition definition) {
-      tenantsAtBegin.add(currentTenant());
+      tenantsAtBegin.add(AsTenant.currentOrUnbound());
       return new SimpleTransactionStatus();
     }
 
     @Override
     public void commit(final TransactionStatus status) {
-      tenantsAtCommit.add(currentTenant());
+      tenantsAtCommit.add(AsTenant.currentOrUnbound());
     }
 
     @Override
     public void rollback(final TransactionStatus status) {
       // 記録だけが目的で、戻すものはない。
-    }
-
-    private static String currentTenant() {
-      try {
-        return TenantContext.current().toString();
-      } catch (IllegalStateException unbound) {
-        return "unbound";
-      }
     }
   }
 

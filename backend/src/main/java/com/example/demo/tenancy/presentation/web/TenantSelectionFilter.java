@@ -80,22 +80,34 @@ final class TenantSelectionFilter extends OncePerRequestFilter {
       final HttpServletResponse response,
       final FilterChain filterChain)
       throws ServletException, IOException {
-    final @Nullable Authentication authentication = holder.getContext().getAuthentication();
-    if (authentication != null && trustResolver.isAuthenticated(authentication)) {
-      final Optional<TenantMembershipAuthority> tenant =
-          TenantSession.selectedTenant(authentication);
-      final boolean tenantSelected =
-          tenant.isPresent() && recheck(request, response, authentication, tenant.get());
-      if (REQUIRES_TENANT.matches(request) && !tenantSelected) {
-        throw new TenantNotSelectedException("tenant not selected");
-      }
-      if (tenantSelected) {
-        doFilterInTenant(
-            new TenantId(UUID.fromString(tenant.get().tenantId())), request, response, filterChain);
-        return;
-      }
+    final Optional<TenantId> tenantId = selectedTenant(request, response);
+    if (tenantId.isPresent()) {
+      doFilterInTenant(tenantId.get(), request, response, filterChain);
+    } else {
+      filterChain.doFilter(request, response);
     }
-    filterChain.doFilter(request, response);
+  }
+
+  /**
+   * 認証したリクエストの、選んだテナントを返す。選んでいなければ空を返す。
+   *
+   * @throws TenantNotSelectedException テナントの決まっている必要がある API を、テナントを選ぶ前に呼んだ場合
+   */
+  private Optional<TenantId> selectedTenant(
+      final HttpServletRequest request, final HttpServletResponse response) {
+    final @Nullable Authentication authentication = holder.getContext().getAuthentication();
+    if (authentication == null || !trustResolver.isAuthenticated(authentication)) {
+      return Optional.empty();
+    }
+    final Optional<TenantMembershipAuthority> tenant = TenantSession.selectedTenant(authentication);
+    final boolean tenantSelected =
+        tenant.isPresent() && recheck(request, response, authentication, tenant.get());
+    if (REQUIRES_TENANT.matches(request) && !tenantSelected) {
+      throw new TenantNotSelectedException("tenant not selected");
+    }
+    return tenantSelected
+        ? tenant.map(selected -> new TenantId(UUID.fromString(selected.tenantId())))
+        : Optional.empty();
   }
 
   /** 選んだテナントを束縛して、リクエストの残りの処理を呼ぶ。束縛はリクエストの処理が終わると外れる。 */

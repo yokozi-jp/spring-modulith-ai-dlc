@@ -151,7 +151,9 @@ class OrderPlacedListenerTest {
     final String orderId = savePlacedOrder();
 
     scenario
-        .publish(new OrderPlaced(orderId, "C-1", Instant.parse("2026-10-03T00:00:00Z")))
+        .publish(
+            new OrderPlaced(
+                orderId, "C-1", Instant.parse("2026-10-03T00:00:00Z"), AsTenant.TENANT))
         .andWaitForStateChange(() -> isReserved(orderId))
         .andVerify(reserved -> assertThat(reserved).as("orderId=%s の引き当て", orderId).isTrue());
   }

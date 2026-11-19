@@ -65,11 +65,12 @@ DB のロールとテナントの設定は #377 で、トランザクション�
 - テナントを持つイベントは、`TenantId` の項目と `TenantScoped` の実装が必要になる。イベントの JSON が、テナントの項目の分だけ大きくなる。
 - モジュールルートの型が、標準型と同じルートの型のほかに、`shared.tenant` の型へ依存する。依存を許す例外が 1 つ増える。
 - リクエストでもリスナーでもない入口（バッチ、起動時の処理）は、テナントを自分で束縛する必要がある。
+- `OncePerRequestFilter` は非同期ディスパッチでは動かないため、`Callable` や `DeferredResult` を返す Controller の非同期の処理には束縛されない。現時点で該当する Controller はない。
 - Spring AOP のプロキシを通らない呼び出しと、別のスレッドへ渡した処理では束縛されない。
 
 ### Neutral
 
-- 発行済みで未完了のイベントの出版は、テナントの項目を持たず、再投入できない。本番にデータはまだないため、移行の手順は作らない。
+- 発行済みで未完了のイベントの出版は、テナントの項目を持たず、再投入すると `NullPointerException` で失敗して `FAILED` に残る。`TenantContext.call` と `TenantId` が null を拒否するため、テナントなしで動くことはない。本番にデータはまだないため、移行の手順は作らない。
 - `TenantListenerAspect` の `@Order` の値は `PgmCdAspect` と同じ向きで選び、ほかの Aspect を足すときに前後を決め直す。
 
 ## Alternatives Considered

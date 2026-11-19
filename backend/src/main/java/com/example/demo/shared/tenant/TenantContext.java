@@ -1,6 +1,7 @@
 package com.example.demo.shared.tenant;
 
 import java.lang.ScopedValue.CallableOp;
+import java.util.Objects;
 import org.jspecify.annotations.Nullable;
 
 /**
@@ -22,11 +23,12 @@ public final class TenantContext {
    * @param tenantId 束縛するテナント
    * @param operation 束縛の中で呼ぶ処理
    * @return 処理の結果
+   * @throws NullPointerException テナントが null の場合。項目のない古いイベントを JSON から読むと null が入る
    * @throws X 処理が投げた例外
    */
   public static <R extends @Nullable Object, X extends Throwable> R call(
       final TenantId tenantId, final CallableOp<? extends R, X> operation) throws X {
-    return ScopedValue.where(BOUND, tenantId).call(operation);
+    return ScopedValue.where(BOUND, Objects.requireNonNull(tenantId, "tenantId")).call(operation);
   }
 
   /**

@@ -68,17 +68,21 @@ import java.time.Instant;
 public record OrderCancelled(String orderId, Instant cancelledAt) {}
 ```
 
-注文を確定したことを表す `OrderConfirmed(String orderId, Instant confirmedAt)` も同じ形である。
+注文を確定したことを表す `OrderConfirmed(String orderId, Instant confirmedAt, TenantId tenantId)` も同じ形である。
+`@ApplicationModuleListener` で受けるイベントなので、`TenantScoped` を実装し、テナントを持つ。
 
 典型的な例は、`OrderPlaced` の定義、発行、受信の三つである。
 
 ```java
 package com.example.demo.ordering;
 
+import com.example.demo.shared.tenant.TenantId;
+import com.example.demo.shared.tenant.TenantScoped;
 import java.time.Instant;
 
 /** 注文を受け付けたことを他モジュールへ知らせる。 */
-public record OrderPlaced(String orderId, String customerId, Instant placedAt) {}
+public record OrderPlaced(String orderId, String customerId, Instant placedAt, TenantId tenantId)
+    implements TenantScoped {}
 ```
 
 発行は、注文を保存した直後に `PlaceOrderCommandHandler` の `handle` の中で行う。
@@ -87,7 +91,11 @@ public record OrderPlaced(String orderId, String customerId, Instant placedAt) {
 // com.example.demo.ordering.application.PlaceOrderCommandHandler（抜粋）
 orderRepository.add(order);
 events.publishEvent(
-    new OrderPlaced(order.id().value().toString(), order.customerId().value(), order.placedAt()));
+    new OrderPlaced(
+        order.id().value().toString(),
+        order.customerId().value(),
+        order.placedAt(),
+        TenantContext.current()));
 return new PlaceOrderResult(order.id().value().toString());
 ```
 
