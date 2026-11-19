@@ -21,16 +21,16 @@ Proposed
 ライセンスは Modified MIT で、次の 2 つの利用に、著作権者の書面の許可を求める（[LICENSE](https://unpkg.com/react-doctor@0.9.14/LICENSE)）。
 
 1. ソフトウェアやその派生物を、機械学習のモデルや AI のシステムの学習、fine-tuning、評価のデータとして使うこと、またはそれらを学習や改善する自動のパイプラインの入力にすること。
-2. ソフトウェアの価値に主に頼る有償のホスト型のサービスとして提供すること。
+2. ソフトウェアを売ること、またはその価値の全部か大部分に頼る有償のホスト型のサービスとして提供すること。
 
 このリポジトリではエージェントが出力を読んでコードを直すため、1 に当たるかを確かめる必要があった（#356）。
-別のリポジトリ（yokozi-jp/agent-software-factory）は、用途を制限するライセンスの道具は代替があれば採らないとして、react-doctor を入れないと決めている（同リポジトリの #225）。
+別のリポジトリ（yokozi-jp/agent-software-factory）は、用途を制限するライセンスの道具は代替があれば採らないとして、react-doctor を入れないと決めている（[#225](https://github.com/yokozi-jp/agent-software-factory/issues/225)）。
 
 確かめた事実は次のとおり。
 
 - 条項 2 は、このリポジトリの使い方には当たらない。
 - 条項 1 に当たるかは法務の解釈になり、リポジトリの中の事実では決められない。
-- Oxlint は `react` と `jsx-a11y` を含む全カテゴリを `error` で動かしている。
+- Oxlint は `react` と `jsx-a11y` の plugin を有効にし、nursery を除く 6 カテゴリを `error` で動かしている。
 - 外す前の `task fe-doctor` は指摘ゼロだった。
 
 ## Decision
@@ -47,13 +47,13 @@ react-doctor を外す。許可は求めない。
 ### Positive
 
 - 用途を制限するライセンスの疑いが、依存から消える。
-- Frontend CI から、実行に最大 15 分かかるジョブが消える。
+- Frontend CI の `Diagnose React` ステップと、Taskfile の `fe-doctor` が一つずつ減る。
 - lockfile から react-doctor と、それだけが使う推移的依存が消える。
 
 ### Negative
 
-- react-doctor 固有の規則（Oxlint に同等の規則がないもの）による検出を失う。外す前の指摘はゼロで、今の検出の低下は確認していない。
-- ADR-088 の Effect 禁止は、Oxlint のローカル規則（`react-rules/no-effect`）が担う。React Doctor の Effect 向けの検査は補助を失う。
+- react-doctor 固有の規則のうち、Oxlint に同等の規則がないものによる検出を失う。docs が挙げていた `no-fetch-in-effect` は、`react-rules/no-effect` が Effect ごと禁止するので覆われる。外す前の指摘はゼロで、今のコードで見逃す検出は観測していない。
+- ADR-088 の Effect 禁止は、補助だった React Doctor の Effect 向けの検査を失い、`react-rules/no-effect` だけが担う。
 
 ### Neutral
 
@@ -78,6 +78,6 @@ react-doctor を外す。許可は求めない。
 
 - Issue #356
 - [react-doctor LICENSE](https://unpkg.com/react-doctor@0.9.14/LICENSE)
-- yokozi-jp/agent-software-factory #225
+- [yokozi-jp/agent-software-factory #225](https://github.com/yokozi-jp/agent-software-factory/issues/225)
 - [ADR-034](ADR-034-pin-frontend-runtime-and-enforce-oxlint-categories.md)
 - [ADR-088](ADR-088-ban-react-effects-in-frontend.md)

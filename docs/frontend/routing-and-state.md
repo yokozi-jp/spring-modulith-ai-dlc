@@ -176,7 +176,7 @@ Hookを呼ばない関数に `use` を付けると、Rules of Hooksの制約が�
 
 Hookを呼ぶのに `use` で始まらない関数は、Oxlintの `react/rules-of-hooks` が検出する。
 
-Hookを呼ばない関数に `use` を付ける形はどちらも検出しないため、reviewで確認する。
+Hookを呼ばない関数に `use` を付ける形はOxlintが検出しないため、reviewで確認する。
 
 Hookのファイル名は `use-media-query.ts` のようにHook名をkebab-caseにし、Oxlintの `unicorn/filename-case` が検査する。
 

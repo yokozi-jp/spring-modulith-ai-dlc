@@ -17,6 +17,8 @@ Proposed
 
 ## Context
 
+> 書き直し：React Doctor を外したため（[ADR-098](ADR-098-remove-react-doctor-over-license-restriction.md)）、Decision から React Doctor の記述を除いた。
+
 FrontendはReact 19とVite+を使い、`@vitejs/plugin-react` 6.1.1でJSXを変換している。
 React componentの再描画を抑えるために手作業で `memo`、`useMemo`、`useCallback` を追加すると、依存配列とmemoizationの要否を開発者が継続して判断する必要がある。
 
