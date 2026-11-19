@@ -31,6 +31,7 @@ import org.jooq.DSLContext;
 import org.jooq.Record;
 import org.jooq.impl.DefaultRecordMapper;
 import org.jooq.impl.DefaultRecordUnmapper;
+import org.springframework.context.ApplicationListener;
 import org.springframework.context.event.EventListener;
 import org.springframework.modulith.events.ApplicationModuleListener;
 import org.springframework.stereotype.Service;
@@ -71,6 +72,9 @@ class ClassRoleArchTest {
   /** pgm_cd を Aspect で渡すと決めた ADR のパス。 */
   private static final String ADR_051 =
       "docs/adr/ADR-051-bind-pgm-cd-with-scoped-value-and-aspect.md";
+
+  /** because の最後に置く、Listener の規約への参照。 */
+  private static final String LISTENER_DOC = "規約：docs/backend/class-roles/listener.md";
 
   /** jOOQ の Repository の規約のパス。 */
   private static final String JOOQ_REPOSITORY_DOC = "docs/backend/class-roles/jooq-repository.md";
@@ -163,7 +167,8 @@ class ClassRoleArchTest {
               "@ApplicationModuleListener は新しいトランザクションを開き、受信のメソッドがトランザクション境界になるため、"
                   + "境界を Application に置く。"
                   + "直し方：イベントの受信は受信側モジュールの application に置く <Event>Listener の on メソッドへ移す。"
-                  + "規約：docs/backend/class-roles/listener.md、"
+                  + LISTENER_DOC
+                  + "、"
                   + ADR_050);
 
   /**
@@ -183,11 +188,28 @@ class ClassRoleArchTest {
           .because(
               "@EventListener は発行側のトランザクションの中で同期に動き、受信側の失敗が発行側の更新を巻き戻し、"
                   + "イベント出版レジストリにも残らないため。"
-                  + "@TransactionalEventListener はコミットの後に発行側のスレッドで動き、"
-                  + "受信側の更新が、コミットを終えた発行側のトランザクションに加わるため。"
+                  + "@TransactionalEventListener の既定の AFTER_COMMIT は、コミットを終えた発行側のトランザクションの "
+                  + "afterCompletion の中で動き、失敗した受信が途中まで書いた行も暗黙にコミットされ、"
+                  + "受信の例外はログに出るだけになるため。"
                   + "直し方：イベントは受信側モジュールの application に置く <Event>Listener の on で、"
                   + "@ApplicationModuleListener を付けて受ける。"
-                  + "規約：docs/backend/class-roles/listener.md、"
+                  + LISTENER_DOC
+                  + "、"
+                  + ADR_050);
+
+  /** イベントを {@link ApplicationListener} の実装で受けない。 */
+  @ArchTest
+  /* package */ static final ArchRule applicationListenerIsNotImplemented =
+      noClasses()
+          .should()
+          .implement(ApplicationListener.class)
+          .because(
+              "ApplicationListener の実装は、イベントを発行した呼び出しの中で、発行側のトランザクションに加わって同期に動き、"
+                  + "受信側の失敗が発行側の更新を巻き戻し、イベント出版レジストリにも残らないため。"
+                  + "直し方：イベントは受信側モジュールの application に置く <Event>Listener の on で、"
+                  + "@ApplicationModuleListener を付けて受ける。"
+                  + LISTENER_DOC
+                  + "、"
                   + ADR_050);
 
   /** Listener は {@code on} だけを公開し、1 つの CommandHandler だけを呼ぶ。 */
@@ -205,7 +227,8 @@ class ClassRoleArchTest {
                   + "成功した処理も繰り返されるため。"
                   + "直し方：public メソッドを @ApplicationModuleListener を付けた void on(<Event> event) の一つにし、"
                   + "イベントから Command を作って一つの CommandHandler の handle を呼ぶ。"
-                  + "規約：docs/backend/class-roles/listener.md、"
+                  + LISTENER_DOC
+                  + "、"
                   + ADR_050);
 
   /** CommandHandler と Listener は、Java 標準の型以外のクラスを継承せず、継承も実装もさせない。 */

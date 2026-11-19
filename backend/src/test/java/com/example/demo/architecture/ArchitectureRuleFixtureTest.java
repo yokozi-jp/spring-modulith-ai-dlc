@@ -29,6 +29,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.transaction.annotation.Transactional;
@@ -41,8 +42,7 @@ import org.springframework.transaction.annotation.Transactional;
  * がすべての規則を満たすこと、{@code archfixture.violating} の各クラスが対応する規則で検出されることを確かめる。
  */
 // JavaClasses は ArchUnit の import 結果を表す公開 API 型であり、インタフェースへ置き換えられない。
-// 誤検出しないことを規則の組ごとに別のテストで確かめるため、メソッドの数は確かめる組の数に比例する。
-@SuppressWarnings({"PMD.LooseCoupling", "PMD.TooManyMethods"})
+@SuppressWarnings("PMD.LooseCoupling")
 class ArchitectureRuleFixtureTest {
 
   /** 規約どおりのフィクスチャの基底パッケージ。 */
@@ -219,12 +219,99 @@ class ArchitectureRuleFixtureTest {
   private static final String REFLECTIVE_READER =
       "ordering.infrastructure.persistence.ReflectiveOrderReader";
 
+  /** プロキシで動くアノテーションを付けたメソッドを同じクラスから呼ぶ違反フィクスチャのクラス名。 */
+  private static final String ORDER_REPROCESSOR = "ordering.application.OrderReprocessor";
+
   /** プロキシが上書きできないメソッドにアノテーションを付けた違反フィクスチャのクラス名。 */
   private static final String ORDER_ARCHIVER = "ordering.application.OrderArchiver";
 
   /** {@code @Scheduled} のメソッドの形に違反するフィクスチャのクラス名。 */
   private static final String STALE_LOCK_SWEEPER =
       "shared.infrastructure.persistence.StaleLockSweeper";
+
+  /** {@link ProxyRulesArchTest} の規則が、違反フィクスチャの各メソッドを検出することを確かめる行。 */
+  private static final List<Arguments> PROXY_ROWS =
+      List.of(
+          row(
+              "proxiedMethodsAreNotCalledFromSameClass: 直接の呼び出し",
+              ProxyRulesArchTest.proxiedMethodsAreNotCalledFromSameClass,
+              ORDER_REPROCESSOR + ".archive("),
+          row(
+              "proxiedMethodsAreNotCalledFromSameClass: ラムダの中の @Retryable",
+              ProxyRulesArchTest.proxiedMethodsAreNotCalledFromSameClass,
+              ORDER_REPROCESSOR + ".retryArchive("),
+          row(
+              "proxiedMethodsAreNotCalledFromSameClass: @ConcurrencyLimit",
+              ProxyRulesArchTest.proxiedMethodsAreNotCalledFromSameClass,
+              ORDER_REPROCESSOR + ".archiveWithLimit("),
+          row(
+              "proxiedMethodsAreNotCalledFromSameClass: 継承したメソッド",
+              ProxyRulesArchTest.proxiedMethodsAreNotCalledFromSameClass,
+              ORDER_REPROCESSOR + ".cachedStatus("),
+          row(
+              "proxiedMethodsAreNotCalledFromSameClass: 合成アノテーション",
+              ProxyRulesArchTest.proxiedMethodsAreNotCalledFromSameClass,
+              ORDER_REPROCESSOR + ".on("),
+          row(
+              "proxiedMethodsAreNotPrivateFinalOrStatic: final",
+              ProxyRulesArchTest.proxiedMethodsAreNotPrivateFinalOrStatic,
+              ORDER_ARCHIVER + ".archive("),
+          row(
+              "proxiedMethodsAreNotPrivateFinalOrStatic: static",
+              ProxyRulesArchTest.proxiedMethodsAreNotPrivateFinalOrStatic,
+              ORDER_ARCHIVER + ".normalize("),
+          row(
+              "proxiedMethodsAreNotPrivateFinalOrStatic: private",
+              ProxyRulesArchTest.proxiedMethodsAreNotPrivateFinalOrStatic,
+              ORDER_ARCHIVER + ".retryArchive("),
+          row(
+              "proxiedMethodsAreNotPrivateFinalOrStatic: 合成アノテーション",
+              ProxyRulesArchTest.proxiedMethodsAreNotPrivateFinalOrStatic,
+              ORDER_ARCHIVER + ".on("),
+          row(
+              "asyncMethodsReturnVoidOrFuture",
+              ProxyRulesArchTest.asyncMethodsReturnVoidOrFuture,
+              "ordering.application.OrderNotifier.notifyShipped("),
+          row(
+              "scheduledMethodsAreNoArgVoidAndNotPrivateOrFinal: 戻り値",
+              ProxyRulesArchTest.scheduledMethodsAreNoArgVoidAndNotPrivateOrFinal,
+              STALE_LOCK_SWEEPER + ".sweep("),
+          row(
+              "scheduledMethodsAreNoArgVoidAndNotPrivateOrFinal: 引数",
+              ProxyRulesArchTest.scheduledMethodsAreNoArgVoidAndNotPrivateOrFinal,
+              STALE_LOCK_SWEEPER + ".sweepOlderThan("),
+          row(
+              "scheduledMethodsAreNoArgVoidAndNotPrivateOrFinal: private",
+              ProxyRulesArchTest.scheduledMethodsAreNoArgVoidAndNotPrivateOrFinal,
+              STALE_LOCK_SWEEPER + ".sweepPrivately("),
+          row(
+              "scheduledMethodsAreNoArgVoidAndNotPrivateOrFinal: final",
+              ProxyRulesArchTest.scheduledMethodsAreNoArgVoidAndNotPrivateOrFinal,
+              STALE_LOCK_SWEEPER + ".sweepFinally("),
+          row(
+              "scheduledMethodsAreNoArgVoidAndNotPrivateOrFinal: 繰り返した @Scheduled",
+              ProxyRulesArchTest.scheduledMethodsAreNoArgVoidAndNotPrivateOrFinal,
+              STALE_LOCK_SWEEPER + ".sweepTwice("),
+          row(
+              "pointcutsNarrowTargetsWithWithin: value",
+              ProxyRulesArchTest.pointcutsNarrowTargetsWithWithin,
+              "shared.infrastructure.persistence.SlowPgmCdAspect.bind("),
+          row(
+              "pointcutsNarrowTargetsWithWithin: pointcut",
+              ProxyRulesArchTest.pointcutsNarrowTargetsWithWithin,
+              "shared.infrastructure.persistence.SlowPgmCdAspect.afterListener("),
+          row(
+              "aspectsDeclareOrder: @Order がない",
+              ProxyRulesArchTest.aspectsDeclareOrder,
+              "shared.infrastructure.persistence.UnorderedPgmCdAspect"),
+          row(
+              "aspectsDeclareOrder: 値のない @Order",
+              ProxyRulesArchTest.aspectsDeclareOrder,
+              "shared.infrastructure.persistence.LowestOrderPgmCdAspect"),
+          row(
+              "transactionManagementIsNotRedeclared",
+              ProxyRulesArchTest.transactionManagementIsNotRedeclared,
+              "shared.infrastructure.persistence.TransactionOrderConfiguration"));
 
   @Test
   @DisplayName("規約どおりのフィクスチャはすべてのクラス役割規則を満たす")
@@ -249,7 +336,11 @@ class ArchitectureRuleFixtureTest {
 
   private static Stream<Arguments> eachRuleDetectsItsViolatingFixture() {
     return Stream.of(
-            classRoleRows(), tableWriterRows(), PUBLIC_ID_ROWS.stream(), MODULE_ROLE_ROWS.stream())
+            classRoleRows(),
+            tableWriterRows(),
+            PROXY_ROWS.stream(),
+            PUBLIC_ID_ROWS.stream(),
+            MODULE_ROLE_ROWS.stream())
         .flatMap(rows -> rows);
   }
 
@@ -467,68 +558,6 @@ class ArchitectureRuleFixtureTest {
             ClassRoleArchTest.commandHandlersAndListenersDoNotUseInheritance,
             "ordering.application.OrderShippedReceiver"),
         row(
-            "pointcutsNarrowTargetsWithWithin: value",
-            ProxyRulesArchTest.pointcutsNarrowTargetsWithWithin,
-            "shared.infrastructure.persistence.SlowPgmCdAspect.bind("),
-        row(
-            "pointcutsNarrowTargetsWithWithin: pointcut",
-            ProxyRulesArchTest.pointcutsNarrowTargetsWithWithin,
-            "shared.infrastructure.persistence.SlowPgmCdAspect.afterListener("),
-        row(
-            "aspectsDeclareOrder: @Order がない",
-            ProxyRulesArchTest.aspectsDeclareOrder,
-            "shared.infrastructure.persistence.UnorderedPgmCdAspect"),
-        row(
-            "aspectsDeclareOrder: 値のない @Order",
-            ProxyRulesArchTest.aspectsDeclareOrder,
-            "shared.infrastructure.persistence.LowestOrderPgmCdAspect"),
-        row(
-            "transactionManagementIsNotRedeclared",
-            ProxyRulesArchTest.transactionManagementIsNotRedeclared,
-            "shared.infrastructure.persistence.TransactionOrderConfiguration"),
-        row(
-            "proxiedMethodsAreNotPrivateFinalOrStatic: final",
-            ProxyRulesArchTest.proxiedMethodsAreNotPrivateFinalOrStatic,
-            ORDER_ARCHIVER + ".archive(java.lang.String) は final で、プロキシが @Transactional"),
-        row(
-            "proxiedMethodsAreNotPrivateFinalOrStatic: static",
-            ProxyRulesArchTest.proxiedMethodsAreNotPrivateFinalOrStatic,
-            ORDER_ARCHIVER + ".normalize(java.lang.String) は static で、プロキシが @PreAuthorize"),
-        row(
-            "proxiedMethodsAreNotPrivateFinalOrStatic: private",
-            ProxyRulesArchTest.proxiedMethodsAreNotPrivateFinalOrStatic,
-            ORDER_ARCHIVER + ".retryArchive() は private で、プロキシが @Retryable"),
-        row(
-            "proxiedMethodsAreNotPrivateFinalOrStatic: 合成アノテーション",
-            ProxyRulesArchTest.proxiedMethodsAreNotPrivateFinalOrStatic,
-            ORDER_ARCHIVER
-                + ".on(archfixture.violating.ordering.OrderPlaced) は final で、"
-                + "プロキシが @ApplicationModuleListener"),
-        row(
-            "asyncMethodsReturnVoidOrFuture",
-            ProxyRulesArchTest.asyncMethodsReturnVoidOrFuture,
-            "ordering.application.OrderNotifier.notifyShipped("),
-        row(
-            "scheduledMethodsAreOverridableNoArgVoidMethods: 戻り値",
-            ProxyRulesArchTest.scheduledMethodsAreOverridableNoArgVoidMethods,
-            STALE_LOCK_SWEEPER + ".sweep("),
-        row(
-            "scheduledMethodsAreOverridableNoArgVoidMethods: 引数",
-            ProxyRulesArchTest.scheduledMethodsAreOverridableNoArgVoidMethods,
-            STALE_LOCK_SWEEPER + ".sweepOlderThan("),
-        row(
-            "scheduledMethodsAreOverridableNoArgVoidMethods: private",
-            ProxyRulesArchTest.scheduledMethodsAreOverridableNoArgVoidMethods,
-            STALE_LOCK_SWEEPER + ".sweepPrivately("),
-        row(
-            "scheduledMethodsAreOverridableNoArgVoidMethods: final",
-            ProxyRulesArchTest.scheduledMethodsAreOverridableNoArgVoidMethods,
-            STALE_LOCK_SWEEPER + ".sweepFinally("),
-        row(
-            "scheduledMethodsAreOverridableNoArgVoidMethods: 繰り返した @Scheduled",
-            ProxyRulesArchTest.scheduledMethodsAreOverridableNoArgVoidMethods,
-            STALE_LOCK_SWEEPER + ".sweepTwice("),
-        row(
             "eventListenersAreApplicationModuleListeners: @EventListener",
             ClassRoleArchTest.eventListenersAreApplicationModuleListeners,
             "inventory.application.StockEventReceiver.onPlaced("),
@@ -536,6 +565,10 @@ class ArchitectureRuleFixtureTest {
             "eventListenersAreApplicationModuleListeners: @TransactionalEventListener",
             ClassRoleArchTest.eventListenersAreApplicationModuleListeners,
             "inventory.application.StockEventReceiver.afterPlaced("),
+        row(
+            "applicationListenerIsNotImplemented",
+            ClassRoleArchTest.applicationListenerIsNotImplemented,
+            "inventory.application.StockLevelWatcher"),
         row(
             "listenersExposeOnlyOnAndCallOneCommandHandler",
             ClassRoleArchTest.listenersExposeOnlyOnAndCallOneCommandHandler,
@@ -587,15 +620,38 @@ class ArchitectureRuleFixtureTest {
         REFLECTIVE_READER + "." + method + "(");
   }
 
-  @Test
-  @DisplayName("型安全な jOOQ の対応づけは対応づけの禁止規則に検出されない")
-  void typeSafeJooqMappingIsAllowed() {
-    final JavaClasses usage = new ClassFileImporter().importClasses(TypeSafeJooqMapping.class);
+  @ParameterizedTest(name = "{0}")
+  @MethodSource
+  @DisplayName("規則が許す書き方は、対応する規則に検出されない")
+  void allowedUsagesAreNotDetected(
+      final String usage, final Class<?> fixture, final List<ArchRule> rules) {
+    final JavaClasses classes = new ClassFileImporter().importClasses(fixture);
 
-    assertThatCode(() -> ClassRoleArchTest.jooqReflectionMappingIsNotUsed.check(usage))
-        .doesNotThrowAnyException();
-    assertThatCode(() -> ClassRoleArchTest.mappingLibrariesAreNotUsed.check(usage))
-        .doesNotThrowAnyException();
+    for (final ArchRule rule : rules) {
+      assertThatCode(() -> rule.check(classes)).as(usage).doesNotThrowAnyException();
+    }
+  }
+
+  private static Stream<Arguments> allowedUsagesAreNotDetected() {
+    return Stream.of(
+        Arguments.of(
+            "型安全な jOOQ の対応づけ",
+            TypeSafeJooqMapping.class,
+            List.of(
+                ClassRoleArchTest.jooqReflectionMappingIsNotUsed,
+                ClassRoleArchTest.mappingLibrariesAreNotUsed)),
+        Arguments.of(
+            "プログラムの誤りの例外と業務上の失敗の例外",
+            ProgrammingErrors.class,
+            List.of(GeneralCodingRulesArchTest.noSuchElementExceptionIsNotThrown)),
+        Arguments.of(
+            "プロキシが上書きできるメソッドと、Spring が受け付ける @Async と @Scheduled の形",
+            InterceptableMethods.class,
+            List.of(
+                ProxyRulesArchTest.proxiedMethodsAreNotCalledFromSameClass,
+                ProxyRulesArchTest.proxiedMethodsAreNotPrivateFinalOrStatic,
+                ProxyRulesArchTest.asyncMethodsReturnVoidOrFuture,
+                ProxyRulesArchTest.scheduledMethodsAreNoArgVoidAndNotPrivateOrFinal)));
   }
 
   /**
@@ -632,15 +688,6 @@ class ArchitectureRuleFixtureTest {
           dsl.selectFrom(ORDERS).fetch(ORDER_ID, String.class),
           dsl.newRecord(ORDERS));
     }
-  }
-
-  @Test
-  @DisplayName("プログラムの誤りの例外と業務上の失敗の例外は NoSuchElementException の禁止規則に検出されない")
-  void programmingErrorsAreAllowed() {
-    final JavaClasses usage = new ClassFileImporter().importClasses(ProgrammingErrors.class);
-
-    assertThatCode(() -> GeneralCodingRulesArchTest.noSuchElementExceptionIsNotThrown.check(usage))
-        .doesNotThrowAnyException();
   }
 
   /** NoSuchElementException の禁止規則が許す例外の送出と {@code orElseThrow(Supplier)} を持つフィクスチャ。 */
@@ -683,35 +730,27 @@ class ArchitectureRuleFixtureTest {
     }
   }
 
-  @Test
-  @DisplayName("プロキシが上書きできるメソッドと、Spring が受け付ける @Async と @Scheduled の形は、規則に検出されない")
-  void interceptableMethodShapesAreAllowed() {
-    final JavaClasses usage = new ClassFileImporter().importClasses(InterceptableMethods.class);
-
-    for (final ArchRule rule :
-        List.of(
-            ProxyRulesArchTest.proxiedMethodsAreNotPrivateFinalOrStatic,
-            ProxyRulesArchTest.asyncMethodsReturnVoidOrFuture,
-            ProxyRulesArchTest.scheduledMethodsAreOverridableNoArgVoidMethods)) {
-      assertThatCode(() -> rule.check(usage)).doesNotThrowAnyException();
-    }
-  }
-
   /**
    * プロキシの規則が許すメソッドを持つフィクスチャ。
    *
-   * <p>CGLIB のプロキシは package-private のメソッドも上書きし、Spring は static の {@code @Scheduled} をプロキシの Bean
-   * でも呼べる。
+   * <p>CGLIB のプロキシは package-private と protected のメソッドも上書きし、Spring は static の {@code @Scheduled}
+   * をプロキシの Bean でも呼べる。アノテーションを付けたメソッドから、同じクラスのアノテーションのないメソッドを呼んでよい。
    */
   /* package */ static class InterceptableMethods {
 
     /** 書き込んだ注文 ID。 */
     private final List<String> written = new CopyOnWriteArrayList<>();
 
-    /** package-private の {@code @Transactional} で注文 ID を書き込む。 */
+    /** package-private の {@code @Transactional} で、正規化した注文 ID を書き込む。 */
     @Transactional
     /* package */ void archive(final String orderId) {
-      written.add(orderId);
+      written.add(normalize(orderId));
+    }
+
+    /** protected の {@code @Cacheable} で注文の状態を読む。 */
+    @Cacheable("orderStatus")
+    protected String status(final String orderId) {
+      return "PLACED:" + orderId;
     }
 
     /** void の {@code @Async} で出荷を通知する。 */
@@ -799,11 +838,13 @@ class ArchitectureRuleFixtureTest {
         ProxyRulesArchTest.pointcutsNarrowTargetsWithWithin,
         ProxyRulesArchTest.aspectsDeclareOrder,
         ProxyRulesArchTest.transactionManagementIsNotRedeclared,
+        ProxyRulesArchTest.proxiedMethodsAreNotCalledFromSameClass,
         ProxyRulesArchTest.proxiedMethodsAreNotPrivateFinalOrStatic,
         ProxyRulesArchTest.asyncMethodsReturnVoidOrFuture,
-        ProxyRulesArchTest.scheduledMethodsAreOverridableNoArgVoidMethods,
+        ProxyRulesArchTest.scheduledMethodsAreNoArgVoidAndNotPrivateOrFinal,
         ClassRoleArchTest.moduleListenersAreApplicationListeners,
         ClassRoleArchTest.eventListenersAreApplicationModuleListeners,
+        ClassRoleArchTest.applicationListenerIsNotImplemented,
         ClassRoleArchTest.listenersExposeOnlyOnAndCallOneCommandHandler,
         ClassRoleArchTest.requestsAndResponsesArePresentationWebRecordsRule(basePackage),
         ClassRoleArchTest.queryServicesImplementModuleQueries,

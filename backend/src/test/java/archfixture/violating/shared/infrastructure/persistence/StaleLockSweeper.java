@@ -5,7 +5,7 @@ import java.util.concurrent.atomic.AtomicLong;
 import org.springframework.scheduling.annotation.Scheduled;
 
 /**
- * 違反：scheduledMethodsAreOverridableNoArgVoidMethods（@Scheduled のメソッドが値を返す、引数を取る、private、final
+ * 違反：scheduledMethodsAreNoArgVoidAndNotPrivateOrFinal（@Scheduled のメソッドが値を返す、引数を取る、private、final
  * である。繰り返した @Scheduled のメソッドが値を返す）。
  */
 public class StaleLockSweeper {

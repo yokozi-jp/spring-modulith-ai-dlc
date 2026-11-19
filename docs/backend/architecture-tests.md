@@ -1,7 +1,7 @@
 ---
 type: Reference
 title: バックエンドのアーキテクチャテスト
-description: Spring Modulith、ArchUnit、PMD、Error Proneでバックエンド規約を検査する実装、規則名、規則を確かめるフィクスチャ、失敗メッセージの形、解析対象を示し、規約違反の検出方法を確認するとき、ArchUnitの規則を追加するとき、検査の失敗を直すときに読むリファレンス。
+description: Spring Modulith、ArchUnit、PMD、Error Proneでバックエンド規約を検査する実装、規則名、規則を確かめるフィクスチャ、失敗メッセージの形、解析対象、プロキシの規則が検出しない書き方を示し、規約違反の検出方法を確認するとき、ArchUnitの規則を追加するとき、検査の失敗を直すときに読むリファレンス。
 tags: [reference, backend, testing, archunit, spring-modulith]
 ---
 
@@ -88,8 +88,9 @@ jOOQの生成物の`com.example.demo.jooq`はOPENのモジュールであり、`
 - `moduleListenersAreApplicationListeners`：`@ApplicationModuleListener`を付けたメソッドは、`application`の`*Listener`の`on`にする。
 - `eventListenersAreApplicationModuleListeners`：`@ApplicationModuleListener`を付けていないメソッドは、`@EventListener`をメタアノテーションに持たない。
   `@EventListener`と`@TransactionalEventListener`を直接付けた受信を拒否し、`@TransactionalEventListener`をメタアノテーションに持つ`@ApplicationModuleListener`は対象から除く。
-  直し方は、受信を受信側モジュールの`application`の`<Event>Listener`の`on`へ移し、`@ApplicationModuleListener`を付けることである（[Listener](class-roles/listener.md)）。
-  違反フィクスチャの`inventory.application.StockEventReceiver`（`@EventListener`と`@TransactionalEventListener`）で確かめる。
+  守らせる規約と理由は[Listener](class-roles/listener.md)に示す。
+- `applicationListenerIsNotImplemented`：`ApplicationListener`を直接か間接に実装するクラスを拒否する。
+  ラムダで作った`ApplicationListener`はクラスファイルにならないため、検出しない。
 - `listenersExposeOnlyOnAndCallOneCommandHandler`：`*Listener`のpublicメソッドは`@ApplicationModuleListener`を付けた`void on(...)`一つだけにし、呼ぶ`*CommandHandler`はちょうど一つにする。
 - `requestsAndResponsesArePresentationWebRecords`：`*Request`と`*Response`は`presentation.web`のrecordにする。
 - `queryServicesImplementModuleQueries`：`*QueryService`は`application`に置いて自モジュールのルートの`*Queries`を実装し、すべてのpublicメソッドに`@Transactional(readOnly = true)`を付ける。
@@ -132,10 +133,10 @@ R4は`ApproveOrderCommandHandler`（`handle`から呼ばないprivateメソッ�
 `commandsAndResultsAreApplicationRecords`の型単位の除外は、`shared.concurrency`のrecordではない`ForceUnlockCommand`で確かめる。
 規約どおりのフィクスチャには、`shared.concurrency`と`shared.failure`の型と、Requestが`ExpectedLockNo`を作る`CancelOrderRequest`、Listenerが版のないCommandを作る`OrderPlacedExpiryListener`を置く。
 `archfixture.conforming`と`archfixture.violating`の`shared.infrastructure.persistence`には、規則が名前で見る`TableWriter`のスタブを置く。
-`typeSafeJooqMappingIsAllowed`は、対応づけの二つの規則が`convertFrom`、`Records.mapping`、`into(Table)`、`fetch(RecordMapper)`、`intoArray(Field, Class)`、`intoSet(Field, Class)`、`fetch(Field, Class)`、`newRecord(Table)`を誤検出しないことを確かめる。
+`allowedUsagesAreNotDetected`の一行は、対応づけの二つの規則が`convertFrom`、`Records.mapping`、`into(Table)`、`fetch(RecordMapper)`、`intoArray(Field, Class)`、`intoSet(Field, Class)`、`fetch(Field, Class)`、`newRecord(Table)`を誤検出しないことを確かめる。
 `noSuchElementExceptionIsNotThrown`は、違反フィクスチャの`LegacyOrderFinder`の`notFound`（`NoSuchElementException`の生成）と`firstOrFail`（引数なしの`orElseThrow()`）で確かめる。
 規約どおりのフィクスチャの`CancelOrderCommandHandler`、`CancelExpiredOrderCommandHandler`、`ReserveStockCommandHandler`、`OrderController`は`NotFoundException`を、`Order`と`OrderLimitPolicy`は`BusinessRuleViolationException`を投げ、Domain、Application、Presentationから`shared.failure`を使っても規則が通ることを確かめる。
-`programmingErrorsAreAllowed`は、`IllegalStateException`、`IllegalArgumentException`、3つの業務上の失敗の例外の送出と`orElseThrow(Supplier)`を、`noSuchElementExceptionIsNotThrown`が誤検出しないことを確かめる。
+`allowedUsagesAreNotDetected`の別の一行は、`IllegalStateException`、`IllegalArgumentException`、3つの業務上の失敗の例外の送出と`orElseThrow(Supplier)`を、`noSuchElementExceptionIsNotThrown`が誤検出しないことを確かめる。
 `sharedModuleDoesNotDependOnHttp`は、違反フィクスチャの`shared.infrastructure.persistence`の`ChildRowWriter`が`ResponseStatusException`を投げることを検出する。
 MapStruct、ModelMapper、Dozerはテストのクラスパスにないため、`mappingLibrariesAreNotUsed`のフィクスチャは`DefaultRecordMapper`と`DefaultRecordUnmapper`への依存だけで確かめる。
 
@@ -189,24 +190,19 @@ Class <archfixture.violating.ordering.application.ShipOrderCommandHandler> is me
 - `deprecatedApiShouldNotBeUsed`：`@Deprecated`のAPIを使わない。
 - `oldDateAndTimeClassesShouldNotBeUsed`：`java.util.Date`などの旧日時APIを使わない。
 
-`ProxyRulesArchTest`は、プロキシで動くアノテーションを付けたメソッドへの同一クラス内の直接呼び出しを検査する。
-対象のアノテーションの一覧と規則の理由は、[バックエンドのJava実装規約](java-coding.md)の「プロキシで動くアノテーション」に示す。
-同じクラスの次の規則は、プロキシ、非同期の実行、スケジューラが黙って働かなくなるメソッドの形を検査する。
+`ProxyRulesArchTest`は、プロキシ、非同期の実行、スケジューラが黙って働かなくなる書き方を検査する。
+規則が守らせる規約と理由は、[バックエンドのJava実装規約](java-coding.md)の「プロキシで動くアノテーション」に示す。
+対象のアノテーションは`INTERCEPTED_ANNOTATIONS`が持ち、同じクラスの`interceptedAnnotationsMatchJavaCodingList`が、その規約の一覧と一致することを確かめる。
 
-- `proxiedMethodsAreNotPrivateFinalOrStatic`：一覧のアノテーションと、それをメタアノテーションに持つ`@ApplicationModuleListener`のような合成アノテーションを付けたメソッドを、`private`、`final`、`static`にしない。
+- `proxiedMethodsAreNotCalledFromSameClass`：`INTERCEPTED_ANNOTATIONS`のアノテーションを、直接かメタアノテーションとして持つメソッドを、同じクラスの中から呼ぶ箇所を拒否する。
+  `@ApplicationModuleListener`のような合成アノテーションを付けたメソッドも対象になる。
+  ラムダの中の呼び出しと、継承したメソッドの呼び出しも検出する。
+  同じクラスの別のインスタンスの呼び出しも、そのインスタンスがプロキシのBeanかを問わず拒否する。
+- `proxiedMethodsAreNotPrivateFinalOrStatic`：同じアノテーションを持つメソッドの`private`、`final`、`static`を拒否する。
   失敗の文は、メソッド、修飾子、メソッドに付けたアノテーションの名前を示す。
-  直し方は、修飾子を外し、メソッドを別のBeanから注入して呼ぶことである。
-  違反フィクスチャの`ordering.application.OrderArchiver`（`final`の`@Transactional`、`static`の`@PreAuthorize`、`private`の`@Retryable`、`final`の`@ApplicationModuleListener`）で確かめる。
-- `asyncMethodsReturnVoidOrFuture`：`@Async`をメタアノテーションに持つメソッドは、`void`か`Future`に代入できる型を返す。
-  直し方は、結果か失敗を呼び出し元で扱うなら`CompletableFuture`を、扱わないなら`void`を返すことである。
-  違反フィクスチャの`ordering.application.OrderNotifier`（`String`を返す）で確かめる。
-- `scheduledMethodsAreOverridableNoArgVoidMethods`：`@Scheduled`と、繰り返した`@Scheduled`をまとめる`@Schedules`を付けたメソッドは、引数のない`void`のメソッドにし、`private`と`final`にしない。
-  直し方は、引数を設定値かフィールドに移し、結果をログかメトリクスに出すことである。
-  違反フィクスチャの`shared.infrastructure.persistence.StaleLockSweeper`で、戻り値、引数、`private`、`final`、繰り返した`@Scheduled`の戻り値をそれぞれ確かめる。
-
-規約どおりのフィクスチャの`@Transactional`の`handle`と`@ApplicationModuleListener`の`on`は、この3つの規則を満たす。
-`interceptableMethodShapesAreAllowed`は、package-privateの`@Transactional`、`void`、`CompletableFuture`、`Future`を返す`@Async`、package-privateと`static`の`@Scheduled`、アノテーションのない`static`と`final`のメソッドを、3つの規則が誤検出しないことを確かめる。
-自己呼び出しの規則とこれらの規則が検出しない誤りは、[バックエンドのJava実装規約](java-coding.md)の「ArchUnit が検出しない誤り」に示す。
+- `asyncMethodsReturnVoidOrFuture`：`@Async`をメタアノテーションに持つメソッドの戻り値の型を検査する。
+- `scheduledMethodsAreNoArgVoidAndNotPrivateOrFinal`：`@Scheduled`と、繰り返した`@Scheduled`をまとめる`@Schedules`を付けたメソッドの、戻り値の型、引数、`private`、`final`を検査する。
+  `static`は拒否しない。
 
 同じクラスの`pointcutsNarrowTargetsWithWithin`は、AspectJのadviceと`@Pointcut`の式（`value`と`pointcut`）に`within(`があることを検査する。
 違反フィクスチャの`shared.infrastructure.persistence.SlowPgmCdAspect`で確かめ、規約どおりのフィクスチャの`PgmCdAspect`を誤検出しないことも確かめる。
@@ -214,6 +210,25 @@ Class <archfixture.violating.ordering.application.ShipOrderCommandHandler> is me
 違反フィクスチャの`shared.infrastructure.persistence.UnorderedPgmCdAspect`（`@Order`がない）と`LowestOrderPgmCdAspect`（値のない`@Order`）で確かめ、規約どおりのフィクスチャの`PgmCdAspect`を誤検出しないことも確かめる。
 同じクラスの`transactionManagementIsNotRedeclared`は、`@EnableTransactionManagement`を宣言するクラスがないことを検査し、`aspectsDeclareOrder`が前提にするトランザクションのadvisorの順序を保つ。
 違反フィクスチャの`shared.infrastructure.persistence.TransactionOrderConfiguration`で確かめる。
+
+### プロキシの規則が検出しない書き方
+
+`ProxyRulesArchTest`の規則は、次の書き方を検出しない。
+レビューで見る点は、[バックエンドのJava実装規約](java-coding.md)の「レビューで見る点」に示す。
+
+- メソッド参照（`this::archive`）による自己呼び出し。
+  `proxiedMethodsAreNotCalledFromSameClass`はArchUnitの`ProxyRules`を使い、メソッドの呼び出しだけを見て、メソッド参照を見ない。
+- 内部クラスから外側のクラスのメソッドを呼ぶ自己呼び出し。
+  ArchUnitは内部クラスを別のクラスとして扱う。
+- クラスに付けた`@Async`、`@Cacheable`、`@CachePut`、`@CacheEvict`、`@Retryable`、`@ConcurrencyLimit`、Spring Security、Resilience4jのアノテーション。
+  規則はメソッドに付けたアノテーションだけを見るため、そのクラスのメソッドの自己呼び出し、`private`、`final`、`static`、`@Async`の戻り値を検出しない。
+  クラスに付けた`@Transactional`は、`PackageByFeatureOnionArchitectureTest`の`transactionalIsNotDeclaredAtClassLevel`が拒否する。
+- `void`の`@Async`が投げる例外の扱い。
+  メソッドの中で例外を受けて記録するか、`AsyncUncaughtExceptionHandler`で回復するかは、メソッドの形から分からない。
+- 複数のプロキシの順序（`@Retryable`や`@CircuitBreaker`が、トランザクションの内側と外側のどちらで動くか）。
+  `aspectsDeclareOrder`は、`@Aspect`のクラスとトランザクションの順序だけを見る。
+- `@Transactional`の伝播（`propagation`）とロールバックの条件。
+  属性の値が意図どおりかは、メソッドの形から分からない。
 
 ## 日時
 
