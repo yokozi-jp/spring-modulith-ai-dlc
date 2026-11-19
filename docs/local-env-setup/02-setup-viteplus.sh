@@ -14,4 +14,4 @@ echo "インストール後、以下を実行してシェルを再読み込み�
 echo "  source ~/.bashrc"
 echo ""
 echo "次のステップ："
-echo "  ./03-setup-kiro.sh を実行"
+echo "  ./04-setup-shell.sh を実行"

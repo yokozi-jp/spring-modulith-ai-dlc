@@ -77,7 +77,7 @@ sudo chmod -R 755 /home/projects
 sudo apt update && sudo apt upgrade -y
 sudo apt install -y curl git wget unzip jq vim tree gnupg2 software-properties-common extrepo
 
-# mise（Task、betterleaks、iwe、Java、zizmor を mise.lock の版で入れる）の apt リポジトリ
+# mise（Task、betterleaks、iwe、Java、zizmor、Kiro CLI を mise.lock の版で入れる）の apt リポジトリ
 sudo extrepo enable mise
 sudo apt update && sudo apt install -y mise
 
@@ -142,13 +142,18 @@ cd spring-modulith-ai-dlc
 
 ``` bash
 cd /home/projects/spring-modulith-ai-dlc
+mise trust
 mise install --locked
 eval "$(mise activate bash --shims)"
 task setup
 source ~/.bashrc
 ```
 
-`mise install --locked` は、`mise.toml` の Task、betterleaks、iwe、Java（Amazon Corretto）、zizmor を、`mise.lock` と `.mise/locks/` に記録した版と checksum で検証して入れます（[ADR-090](../adr/ADR-090-pin-cli-tools-with-mise-lock.md)）。
+`mise trust` は、この `mise.toml` を読んでよいと mise に伝える。
+`mise.toml` の `http:kiro-cli` が URL を持つので、trust するまで mise は設定を読まない。
+worktree を作ったときも、そこで `mise trust` を実行する。
+
+`mise install --locked` は、`mise.toml` の Task、betterleaks、iwe、Java（Amazon Corretto）、zizmor、Kiro CLI を、`mise.lock` と `.mise/locks/` に記録した版と checksum で検証して入れます（[ADR-090](../adr/ADR-090-pin-cli-tools-with-mise-lock.md)）。
 `--locked` を付けると、lock に無い版を入れずに止まります。
 `task setup` は `04-setup-shell.sh` で、mise の shims を PATH の先頭に通す行を `~/.bashrc` に足します。
 `mise.toml` か `mise.lock` が変わったときは、`mise install --locked` だけを実行します。
@@ -157,6 +162,13 @@ shims は、今いるディレクトリから上にたどって見つけた `mis
 そのため `task`、`betterleaks`、`iwe`、`java` は、`mise.toml` のあるチェックアウトの中でだけ動きます。
 Gradle は `JAVA_HOME` が無ければ PATH の `java` を使うので、`JAVA_HOME` は設定しません。
 VS Code の Java 拡張も、`JAVA_HOME` か PATH の `java` を使います。
+
+#### 公式のインストーラーの Kiro CLI から移るとき
+
+以前は `curl -fsSL https://cli.kiro.dev/install | bash` で `~/.local/bin/kiro-cli` を入れていた。
+shims は `~/.local/bin` より前にあるので、`task setup` の後は mise の版が使われる。
+`type -a kiro-cli` で shims の `kiro-cli` が先に出ることを確かめたら、`~/.local/bin/kiro-cli` は消してよい。
+`kiro-cli update` は使わず、版は `mise.toml` を書き換えて上げる。
 
 #### apt の Corretto から移るとき
 
@@ -222,6 +234,7 @@ java -version
 node -v
 gh auth status
 task --version
+kiro-cli --version
 betterleaks version
 iwe --version
 ```

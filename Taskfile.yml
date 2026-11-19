@@ -480,14 +480,6 @@ tasks:
       - bash tooling/ci-changes/test.sh
       - python3 tooling/ci-gate-check/ci-gate-check.py
 
-  # CI の mise-action は trust を済ませ、MISE_YES=1 も渡すので、CI の環境変数を外した新しい state dir で確かめる。
-  # [tools] のほかを書いた mise.toml は trust を要し、ここで止まる（ADR-090）。
-  mise-trust-check:
-    desc: mise.toml が mise trust を要さないことを検証
-    silent: true
-    cmds:
-      - env -u CI -u GITHUB_ACTIONS -u MISE_YES -u MISE_TRUSTED_CONFIG_PATHS MISE_STATE_DIR="$(mktemp -d)" mise ls --current >/dev/null
-
   # 本体は tooling/agent-git/agent-git.sh、手順は docs/tooling/dev-workflow.md の「エージェントがcommitとpushをするとき」にある。
   # 呼んだディレクトリで動かし、commit のパスをそこからの相対で解釈する。
   # CLI_ARGS は Task が引数ごとにシェルの引用符を付けるので、空白を含むパスもそのまま渡る。
@@ -551,8 +543,6 @@ tasks:
     cmds:
       - |
         ./02-setup-viteplus.sh
-        ./03-setup-kiro.sh
-        export PATH="$HOME/.local/bin:$PATH"
         ./04-setup-shell.sh
 
   # Frontend

@@ -317,7 +317,6 @@ const params = { ...(cursor !== undefined && { cursor }) };
 - **`task scan-dast-active`**：同じ環境でactive scanを実行する。
 - **`task lint-actions`**：GitHub Actionsワークフローをactionlintで検査する。
 - **`task lint-actions-security`**：GitHub Actionsのワークフローとcomposite action（`.github/actions/`）をzizmorで検査する。zizmorは`mise.toml`の版で動き、Dockerを使わない。`zizmor.yml`の`zizmor-action`の`version`にも同じ版を書く。設定は`.github/zizmor.yml`である。
-- **`task mise-trust-check`**：`mise.toml`が`mise trust`を要さないことを、CIの環境変数を外した新しいstate dirで検証する。
 - **`task lint-docker`**：Dockerfileをhadolintで検査する。
 - **`task lint-docker-check`**：Dockerfileを`docker build --check`で検査する。
 - **`task lint-compose`**：Composeファイルの構文、参照、変数展開を検証する。
