@@ -47,7 +47,7 @@ jOOQの生成物の`com.example.demo.jooq`はOPENのモジュールであり、`
 - `infrastructureDependsOnlyOnDomainModel`：`infrastructure`は`application`、`domain.service`、モジュールルートの型に依存せず、機能モジュールの型のうち`domain.model`だけを使う。
 - `sharedModuleIsUsedOnlyByPersistenceAdapters`：`shared`の外で`shared.concurrency`、`shared.failure`、`shared.events`、`shared.security`以外の`shared`の型に依存するクラスは、`infrastructure.persistence`に置く。
   `shared`の中の依存は対象にしない。
-  `shared.concurrency`、`shared.failure`、`shared.events`、`shared.security`は、どの層からも使える（[ADR-048](../adr/ADR-048-add-shared-module-for-jooq-common-code.md)、[ADR-062](../adr/ADR-062-map-business-exceptions-to-404-409-422.md)、[ADR-079](../adr/ADR-079-resubmit-failed-event-publications-periodically-with-shedlock.md)、[ADR-095](../adr/ADR-095-require-app-user-principal-for-audit-columns.md)）。
+  `shared.concurrency`、`shared.failure`、`shared.events`、`shared.security`は、どの層からも使える（[ADR-048](../adr/ADR-048-add-shared-module-for-jooq-common-code.md)、[ADR-062](../adr/ADR-062-map-business-exceptions-to-404-409-422.md)、[ADR-079](../adr/ADR-079-resubmit-failed-event-publications-periodically-with-shedlock.md)、[ADR-096](../adr/ADR-096-require-app-user-principal-for-audit-columns.md)）。
 - `sharedModuleDoesNotDependOnHttp`：`shared`の型は、Spring Web、Springの HTTP、Servletの型に依存しない。
 - `moduleApiDoesNotExposeInternalTypes`：モジュールルートの型は、`java..`、`org.jspecify..`、同じルートパッケージの型だけに依存する。
 - `databaseTechnologyApisAreOnlyUsedByPersistenceAdapters`：jOOQ APIと生成型は`infrastructure.persistence`だけで使う。

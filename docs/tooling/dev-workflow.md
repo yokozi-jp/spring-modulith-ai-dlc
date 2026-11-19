@@ -37,6 +37,10 @@ task fe-check
 
 ## git worktreeで作業するとき
 
+worktreeを作る前に、mainのworktreeで`npm ci`を実行しておく。
+mainのworktreeは最初にcloneした作業ツリーで、`git worktree list`の1行目に出る。
+実行しておかないと、新しいworktreeでの`npm ci`は、mainのworktreeにlefthookが無いことを知らせる`prepare`のメッセージで失敗する。
+
 worktreeには`node_modules`が無いため、作った直後にルートとフロントエンドの依存を入れる。
 
 ```bash
@@ -125,7 +129,7 @@ Taskのテスト系タスクは、`.env.test`に足りない変数を`.env.test.
 モジュールごとのDBロール（`docker/initdb/03-create-module-roles.sh`、012 changeset）を足した変更と、`tenancy`のロール（014 changeset）を足した変更の後も、既存の`postgres_data`ボリュームでは`docker/initdb`が再実行されず、モジュールのロールがないまま残る。
 `task be-migrate`は012と014のchangesetのGRANTがロールの不在で失敗するため、`task compose-reset CONFIRM_RESET=yes`でボリュームを消し、`task compose-up`で起動してから`task be-migrate`を実行する（[DB接続情報とロール分離](../database/connections.md)）。
 
-セッションの利用者を`AppUserPrincipal`にした変更（[ADR-095](../adr/ADR-095-require-app-user-principal-for-audit-columns.md)）の後は、ブラウザでログアウトしてログインし直す。
+セッションの利用者を`AppUserPrincipal`にした変更（[ADR-096](../adr/ADR-096-require-app-user-principal-for-audit-columns.md)）の後は、ブラウザでログアウトしてログインし直す。
 ローカルのRedisはセッションを残すため、変更の前のセッションのままでは書き込みが500になる（[APIの認証、セッション、権限](../web-api/authentication-and-session.md)）。
 
 公開先は次のとおり。

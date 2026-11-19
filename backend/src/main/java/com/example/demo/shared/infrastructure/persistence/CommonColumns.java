@@ -148,7 +148,7 @@ public class CommonColumns {
         "authenticated principal is not an app user: authentication="
             + authentication.getClass().getName()
             + ". The principal must implement AppUserPrincipal (SignInOidcUserService returns one;"
-            + " clear sessions saved before ADR-095; tests use testkit AppUsers)");
+            + " clear sessions saved before ADR-096; tests use testkit AppUsers)");
   }
 
   private String traceId() {

@@ -37,7 +37,7 @@ OIDCクライアント登録など複数のテストで使う差し替えは、�
 ## ログインした利用者
 
 MockMvcでログインした利用者として呼ぶテストは、`testkit`の`AppUsers.oidcLogin()`を使い、Spring Security Testの`oidcLogin()`を直接使わない。
-`oidcLogin()`の既定の利用者は`AppUserPrincipal`でないため、書き込みで共通カラムが例外にする（[ADR-095](../adr/ADR-095-require-app-user-principal-for-audit-columns.md)）。
+`oidcLogin()`の既定の利用者は`AppUserPrincipal`でないため、書き込みで共通カラムが例外にする（[ADR-096](../adr/ADR-096-require-app-user-principal-for-audit-columns.md)）。
 `TestConventionsArchTest`が検査する。
 
 ## 並列と実行順

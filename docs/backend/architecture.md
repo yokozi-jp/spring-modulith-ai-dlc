@@ -163,7 +163,7 @@ Domain の型、Command と Result、Spring MVC の Request と Response、jOOQ 
   `shared` は Spring Web、Spring の HTTP、Servlet の型に依存しない。
   `shared` は Domain と `error` の型、ルートパッケージの型に依存しない。
 - リスナーが失敗した出版の再投入の方針を選ぶ注釈（`ResubmissionPolicy`）を `shared.events` に置き、このパッケージも `@NamedInterface("events")` で公開する（[ADR-079](../adr/ADR-079-resubmit-failed-event-publications-periodically-with-shedlock.md)）。
-- 共通カラムの `*_by` に登録するアプリの利用者を表す認証の principal（`AppUserPrincipal`）を `shared.security` に置き、このパッケージも `@NamedInterface("security")` で公開する（[ADR-095](../adr/ADR-095-require-app-user-principal-for-audit-columns.md)）。
+- 共通カラムの `*_by` に登録するアプリの利用者を表す認証の principal（`AppUserPrincipal`）を `shared.security` に置き、このパッケージも `@NamedInterface("security")` で公開する（[ADR-096](../adr/ADR-096-require-app-user-principal-for-audit-columns.md)）。
 - 業務の概念を置かない。
   ルートのパッケージには `package-info.java` だけを置く。
 - `shared.infrastructure.persistence` を使ってよいのは、他のモジュールの `infrastructure.persistence` だけである。

@@ -291,6 +291,9 @@ const params = { ...(cursor !== undefined && { cursor }) };
 - **`task scan-vulns`**：バックエンドとフロントエンドの依存関係をTrivyで検査する。
 - **`task scan-vulns-backend`**：バックエンドのCycloneDX SBOMをTrivyで検査する。
 - **`task scan-vulns-frontend`**：フロントエンドの解決済み依存関係をTrivyで検査する。
+- **`task scan-depscan`**：バックエンドとフロントエンドの依存関係をdep-scanで検査する。脆弱性DBは環境変数`DEPSCAN_VDB_HOME`（既定は`~/.cache/depscan-vdb`）に残す（[ADR-095](../adr/ADR-095-scan-dependencies-with-dep-scan-alongside-trivy.md)）。
+- **`task scan-depscan-backend`**：バックエンドのCycloneDX SBOMをdep-scanで検査し、レポートを`build/depscan/backend/`に出す。
+- **`task scan-depscan-frontend`**：フロントエンドのロックファイルをdep-scanで検査し、レポートを`build/depscan/frontend/`に出す。
 - **`task scan-dast`**：隔離した依存を起動してマイグレーションを適用し、backend、`vp preview`を起動して、OWASP ZAPで認証付きのpassive scanを実行して片付ける。
 - **`task scan-dast-active`**：同じ環境でactive scanを実行する。
 - **`task lint-actions`**：GitHub Actionsワークフローをactionlintで検査する。
@@ -338,6 +341,11 @@ const params = { ...(cursor !== undefined && { cursor }) };
   手順の正文は[スキルの取得元と更新](../agents/skill-sources.md)である。
 - **`task release-check`**：release-pleaseのmanifest、版ファイル、Gradle版、設定の一致を検証する。
 - **`task agent-git-test`**：`task agent-commit`、`task agent-push`、`task agent-wait`の本体を、`tooling/agent-git/test.sh`のケースで検査する。
+- **`task lefthook-install-test`**：`npm ci`の`prepare`（`tooling/lefthook-install/prepare.mjs`）が、linked worktreeからもmainのworktreeのlefthookでフックを入れることを検査する。
+  mainのworktreeの場所が分からないときと、そこにlefthookが無いときは、`prepare`が失敗することも確かめる。
+  検査には一時のgitリポジトリと、lefthookの代わりのスクリプトを使う。
+  `lefthook.yml`の`no_auto_install`も`lefthook dump`で確かめる。
+  ケースは`tooling/lefthook-install/test.sh`が正である。
 - **`task lint-taskfile`**：Task本体でTaskfileのYAML構文とスキーマ構造を検証する。
   `tooling/taskfile-cleanup/`のfixtureで、後片付けの定型が本体の終了コードを優先し、前段が失敗しても後段の後片付けを走らせることを検査する。
   `tooling/task-calls/task-calls.sh`は、フックとワークフローが呼ぶタスク名を検査する。
@@ -348,6 +356,9 @@ const params = { ...(cursor !== undefined && { cursor }) };
 - **`task lint-lefthook`**：`lefthook.yml`の`run`を`echo`に置き換えた設定で本物のlefthookを動かし、glob付きのjobが意図したファイルで選ばれることを検査する。
   `docs/**/*.md`のような`a/**/b`の形の`**`は0階層に一致しないため、ディレクトリ直下のファイル（`docs/index.md`、`backend/build.gradle`）を中心に少数だけ期待を置く。
   見るのはglobだけで、jobの`run`内の`{files}`の参照は見ない。期待は`tooling/lefthook-glob/test.sh`が正で、全jobには広げない。
+- **`task lint-scratch-git`**：自己検査の`tooling/*/test.sh`と`.kiro/hooks/*.test.sh`が、gitを実行する前に[`tooling/scratch-git/scratch-git.sh`](../../tooling/scratch-git/scratch-git.sh)を`source`しているかを検査する（`source`しないファイルでは、どの行のgitも失敗にする）。
+  失敗にする書き方は`tooling/scratch-git/test.sh`のケースが正で、この文書には写さない。
+  見落とす書き方は、`tooling/scratch-git/scratch-git-check.sh`の`ponytail:`の注記にある。
 - **`task adr-check`**：判断が絡む変更にADRが伴うかを確認する。
   `frontend/`の変更のうち、テストファイル（`*.test.*`、`*.spec.*`）、`frontend/apps/*/e2e/`、`frontend/lint/fixtures/`、`frontend/apps/*/src/testing/`は対象から外す。
   警告は止めず、`ADR_STRICT=1`で失敗にし、`ADR_ACK=1`で抑制する。
@@ -371,6 +382,8 @@ OKF検査の採用理由は[ADR-036](../adr/ADR-036-adopt-okf-for-docs-knowledge
 - **pre-commit（Taskfile、`lefthook.yml`、GitHub Actionsワークフロー、`tooling/taskfile-cleanup/`、`tooling/task-calls/`の変更）**：`lint-taskfile`を実行する。
 - **pre-commit（`tooling/agent-git/`の変更）**：`agent-git-test`を実行する。
 - **pre-commit（`lefthook.yml`か`tooling/lefthook-glob/`の変更）**：`lint-lefthook`を実行する。
+- **pre-commit（`package.json`、`lefthook.yml`、`tooling/lefthook-install/`の変更）**：`lefthook-install-test`を実行する。
+- **pre-commit（`tooling/*/test.sh`、`.kiro/hooks/*.test.sh`、`tooling/scratch-git/`の変更）**：`lint-scratch-git`を実行する。
 - **pre-push（すべて）**：`adr-check`と`scan-secrets-all`を実行する。
 - **pre-push（バックエンドのJavaまたはGradle変更）**：`be-lint`相当と`test`を実行する。
 - **pre-push（フロントエンドの変更）**：`fe-test-build`を、Vitestのdot reporterとjson-summaryだけのcoverageで実行する。
@@ -409,9 +422,10 @@ pre-pushの「変更」は、push済みかどうかやrebaseの有無によら�
 - **`api-contract.yml`**：`api-lint`、`api-lint-rules-test`、`api-breaking`、`api-docs`を実行し、設計書をartifactにする。
   mainへのpushでは設計書をGitHub Pagesに公開する。
 - **`betterleaks.yml`**：`scan-secrets-all`を実行する。PRでは`BETTERLEAKS_LOG_OPTS`にbaseからheadまでの範囲を渡す。
-- **`static-analysis.yml`**：`lint-semgrep`相当、`lint-duplicates`、`lint-taskfile`、`lint-lefthook`、`agent-git-test`を実行する。
+- **`static-analysis.yml`**：`lint-semgrep`相当、`lint-duplicates`、`lint-taskfile`、`lint-lefthook`、`agent-git-test`、`lefthook-install-test`、`lint-scratch-git`を実行する。
   Code ScanningはSARIFの`suppressions`を読まないため、`nosemgrep`で抑止した検出をSARIFから除いてから送る。
 - **`trivy.yml`**：`scan-vulns`相当を実行する。
+- **`depscan.yml`**：`scan-depscan-backend`と`scan-depscan-frontend`を実行し、レポートをartifactにする。SARIFを出さないのでCode Scanningには送らない。
 - **`dast.yml`**：PRで`scan-dast`、週1回のscheduleと手動実行で`scan-dast-active`を実行し、Informationalを除いたSARIFをCode Scanningに送る。
 - **`actionlint.yml`**：`lint-actions`相当を実行する。
 - **`ci.yml`**：`pull_request`で動く検査を呼び出し、集約ジョブ`CI gate`が全ジョブの`success`を確かめる。`ci-gate-check`も実行する（[ADR-087](../adr/ADR-087-gate-required-checks-with-single-aggregate-job.md)）。

@@ -1,11 +1,11 @@
 ---
 type: ADR
-title: 'ADR-095: 共通カラムの作成者と更新者には、AppUserPrincipal の利用者の ID だけを登録する'
+title: 'ADR-096: 共通カラムの作成者と更新者には、AppUserPrincipal の利用者の ID だけを登録する'
 description: 共通カラムの *_by に、IdP の sub ではなくアプリの利用者の ID を入れることを、shared.security の AppUserPrincipal の型で守る決定。principal がこの型でない認証の書き込みは失敗させる。
 tags: [adr, security, database, spring-security, spring-modulith]
 ---
 
-# ADR-095: 共通カラムの作成者と更新者には、AppUserPrincipal の利用者の ID だけを登録する
+# ADR-096: 共通カラムの作成者と更新者には、AppUserPrincipal の利用者の ID だけを登録する
 
 ## Status
 
