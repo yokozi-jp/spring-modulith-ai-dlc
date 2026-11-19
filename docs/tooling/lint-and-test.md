@@ -348,7 +348,7 @@ const params = { ...(cursor !== undefined && { cursor }) };
   失敗にする状態は`test.sh`のケースが正で、この文書には写さない。
   Python 3とPyYAMLが要る（GitHubのランナーには入っている。ローカルでは`sudo apt install python3-yaml`）。CIだけで実行し、Lefthookには入れない。
 - **`task skills-check`**：`skills-lock.json`と`.kiro/.kiro-plugins-installed`の記録が、`.agents/skills`の実体、`.kiro/skills`のリンク、`kiro/install.sh`が入れたファイルと合っているかを検査する。
-  入れたファイルへの書き込みを止めるフックの自己検査（`.kiro/hooks/block-generated-writes.test.sh`）と`tooling/skills-check/test.sh`を先に実行してから、`tooling/skills-check/skills-check.mjs`が実際の木を検査する。
+  入れたファイルへの書き込みを止めるフックの自己検査（`.kiro/hooks/block-generated-writes.test.sh`）、エージェントの`git commit`と`git push`の直接実行を止めるフックの自己検査（`.kiro/hooks/block-agent-git.test.sh`）、`tooling/skills-check/test.sh`を先に実行してから、`tooling/skills-check/skills-check.mjs`が実際の木を検査する。
   失敗にする状態は`tooling/skills-check/test.sh`のケースが正で、この文書には写さない。
   手順の正文は[スキルの取得元と更新](../agents/skill-sources.md)である。
 - **`task release-check`**：release-pleaseのmanifest、版ファイル、Gradle版、設定の一致を検証する。

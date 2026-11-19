@@ -52,6 +52,7 @@ task fe-install    # フロントエンド
 ## エージェントがcommitとpushをするとき
 
 エージェントはcommitとpushを次のTaskだけで行い、`git commit`と`git push`を直接実行しない。
+shellのツールで`git commit`か`git push`を直接実行すると、PreToolUseフック`block-agent-git`が拒否する（[Kiroのフック](../agents/kiro-hooks.md#block-agent-git)）。
 フックはtool callの時間切れより長くかかることがあるので、どちらのTaskもフックの終わりを待たずに戻り、`task agent-wait`で待つ。
 `task agent-commit`は本物のindexの写しからcommitする（理由は[ADR-091](../adr/ADR-091-commit-agent-changes-from-a-copy-of-the-index.md)）。
 

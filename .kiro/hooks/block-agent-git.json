@@ -1,0 +1,16 @@
+{
+  "version": "v1",
+  "hooks": [
+    {
+      "name": "block-agent-git",
+      "trigger": "PreToolUse",
+      "description": "Blocks the agent's direct `git commit` and `git push` in a shell tool and points to `task agent-commit`, `task agent-push`, and `task agent-wait` (docs/tooling/dev-workflow.md). Fail-open.",
+      "matcher": "execute_bash|executeBash|shell|bash",
+      "action": {
+        "type": "command",
+        "command": "bash .kiro/hooks/block-agent-git.sh"
+      },
+      "timeout": 5
+    }
+  ]
+}
