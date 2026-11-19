@@ -57,6 +57,14 @@ function forbidden(problem: object) {
   });
 }
 
+async function post(): Promise<unknown> {
+  try {
+    return await api.apiFetch(`${baseUrl}/api/items`, { method: "POST", body: "{}" });
+  } catch (error) {
+    return error;
+  }
+}
+
 describe("api-fetch", () => {
   beforeEach(async () => {
     vi.resetModules();
@@ -257,14 +265,6 @@ describe("api-fetch", () => {
           return respond === undefined ? new HttpResponse(undefined, { status: 500 }) : respond();
         }),
       );
-    }
-
-    async function post(): Promise<unknown> {
-      try {
-        return await api.apiFetch(`${baseUrl}/api/items`, { method: "POST", body: "{}" });
-      } catch (error) {
-        return error;
-      }
     }
 
     beforeEach(() => {

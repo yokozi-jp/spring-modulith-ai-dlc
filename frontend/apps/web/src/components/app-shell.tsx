@@ -21,12 +21,12 @@ export function AppShell() {
   const logoutStarted = useRef(false);
   // bfcache から戻った画面は ref が true のままなので、ボタンが効かなくなる。
   // React Compiler が関数を安定させるので、listener は form の表示から破棄まで一度だけ付く。
-  function watchPageShow(): () => void {
-    function reopen(event: PageTransitionEvent): void {
-      if (event.persisted) {
-        logoutStarted.current = false;
-      }
+  function reopen(event: PageTransitionEvent): void {
+    if (event.persisted) {
+      logoutStarted.current = false;
     }
+  }
+  function watchPageShow(): () => void {
     globalThis.addEventListener("pageshow", reopen);
     return () => {
       globalThis.removeEventListener("pageshow", reopen);
