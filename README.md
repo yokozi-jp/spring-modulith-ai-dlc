@@ -325,6 +325,11 @@ Docker Compose の操作（サービスの起動、停止、状態確認、Keycl
 - `task agent-git-test`は、`task agent-commit`、`task agent-push`、`task agent-wait`の本体を、一時のgitリポジトリで検査します。
   検査するケースは`tooling/agent-git/test.sh`にあり、LefthookとCIで実行する条件は[Lintとテストのリファレンス](docs/tooling/lint-and-test.md)にあります。
 
+### 自己検査の git の切り離し
+
+- `task lint-scratch-git`は、自己検査がgitを実行する前に[`tooling/scratch-git/scratch-git.sh`](tooling/scratch-git/scratch-git.sh)を`source`していることを検査します。
+  検査の範囲と、LefthookとCIで実行する条件は[Lintとテストのリファレンス](docs/tooling/lint-and-test.md)にあります。
+
 <p align="right">(<a href="#top">トップへ</a>)</p>
 
 ## 設計判断の記録（ADR）

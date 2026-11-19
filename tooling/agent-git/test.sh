@@ -4,12 +4,7 @@
 # 場面は、状況を書くコメントと、index が HEAD と同じことを確かめる scene で始める。場面ごとに別のファイルを使う。
 
 set -u
-
-# pre-commit の中で動くと GIT_INDEX_FILE などが本物のリポジトリを指すので外し、利用者の git の設定も読まない。
-# shellcheck disable=SC2046
-unset $(git rev-parse --local-env-vars)
-export GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1
-export GIT_AUTHOR_NAME=test GIT_AUTHOR_EMAIL=test@example.com GIT_COMMITTER_NAME=test GIT_COMMITTER_EMAIL=test@example.com
+. "$(dirname "$0")/../scratch-git/scratch-git.sh" || exit 1
 # 本物の pre-push を数えず、本物の agent-push も止めないよう、この実行だけの名前のプロセスを pre-push とみなす。
 export AGENT_GIT_PREPUSH_PATTERN="^agent-git-test-decoy-$$ "
 unset AGENT_GIT_WAIT_SECONDS
