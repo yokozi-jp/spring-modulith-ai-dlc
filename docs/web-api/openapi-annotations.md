@@ -212,5 +212,5 @@ springdocやtherapiの版を上げてこのテストが失敗したら、この�
 - [ ] `@ApiResponse`を書いたハンドラに成功応答（200、201、204）も書く。［Spectralで検査：operation-success-response］
 - [ ] 201は`Location`ヘッダー、204は本文なしにし、200を残さない。［Spectralで検査：created-location-header（204の本文と200の残りは自分で点検）］
 - [ ] `@Operation(summary, description)`、`@Schema(description)`、`///`を使わない。［自分で点検］
-- [ ] クエリパラメータを`@ParameterObject`や`@ModelAttribute`でまとめて受けない。GET以外（DELETEは`lockNo`を除く）は`in: query`を使わない。［Spectralで検査：query-parameter-get-only（まとめて受けないことは自分で点検）］
-- [ ] パスをkebab-caseにし、200の応答の配列をトップレベルにしない。［Spectralで検査：path-kebab-case、path-kebab-case-resource、no-top-level-array-response］
+- [ ] クエリパラメータを`@ParameterObject`や`@ModelAttribute`でまとめて受けない。POST、PUT、PATCH、`lockNo`以外のDELETEは`in: query`を使わない（GETとHEADだけで使う）。［Spectralで検査：query-parameter-get-only（まとめて受けないことは自分で点検）］
+- [ ] パスをkebab-caseにし、2xxの応答の配列をトップレベルにしない。［Spectralで検査：path-kebab-case、path-kebab-case-resource、no-top-level-array-response］

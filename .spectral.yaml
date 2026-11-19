@@ -182,7 +182,7 @@ rules:
                             $ref:
                               pattern: "^#/components/schemas/(ProblemDetail|ValidationProblem)$"
 
-  # ponytail: 区間は小文字の英数字と kebab-case を許す。パスパラメータの名前は camelCase を許し、検査しない。
+  # ponytail: 区間は kebab-case かパスパラメータ。パスパラメータの名前は英字で始まる英数字に限る（camelCase を許す）。
   path-kebab-case:
     description: パスの各区間を kebab-case かパスパラメータにする。カスタムメソッドの camelCase は末尾に限る（docs/web-api/api-style.md）。
     severity: error
@@ -204,7 +204,7 @@ rules:
 
   # ponytail: type が文字列 array の schema だけを見る。type に配列を使う 3.1 の書き方は対象外。
   no-top-level-array-response:
-    description: 2xx の JSON の応答は配列をトップレベルにしない。オブジェクトで包む（docs/web-api/）。
+    description: 2xx の JSON の応答は配列をトップレベルにしない。オブジェクトで包む（docs/web-api/response-body.md）。
     severity: error
     given: "$.paths[*][get,put,post,delete,options,head,patch,trace].responses[?(@property.match(/^2([0-9][0-9]|XX)$/))].content[?(@property.match(/json/))].schema"
     then:
@@ -217,6 +217,7 @@ rules:
               type:
                 const: array
 
+  # ponytail: ヘッダー名の大文字と小文字を区別する。springdoc は @Header(name = "Location") の表記をそのまま出す。
   created-location-header:
     description: 201 は Location ヘッダーを持つ。
     severity: error
@@ -227,7 +228,7 @@ rules:
 
   # ponytail: operation 直下の parameters だけを見る。パス直下の parameters は対象外。
   query-parameter-get-only:
-    description: in query は GET に限る。DELETE は楽観ロックの lockNo だけ許す（docs/web-api/query-parameters.md）。
+    description: in query は GET と HEAD だけで使う。POST、PUT、PATCH は禁じ、DELETE は楽観ロックの lockNo だけ許す（docs/web-api/query-parameters.md）。
     severity: error
     given:
       - "$.paths[*][post,put,patch].parameters[?(@.in === 'query')]"
