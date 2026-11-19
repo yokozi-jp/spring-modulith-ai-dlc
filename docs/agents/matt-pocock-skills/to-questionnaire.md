@@ -122,5 +122,5 @@ _Why this matters: it decides whether we provision for burst traffic now or defe
 ## 翻訳元
 
 取得元は `mattpocock/skills` である。
-コミットは `d81f3a183412e71a5b1e84ca21bc1a35eea03a60` である。
+コミットは `5863806dd4e15c63174bee4e7515a4256792ecfa` である。
 原文の `skillPath` は `skills/productivity/to-questionnaire/SKILL.md` である。

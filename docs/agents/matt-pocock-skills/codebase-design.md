@@ -133,7 +133,7 @@ sketchは提案ではなく、constraintを具体化する例にとどめる。
 
 ### 三つ以上の並行設計
 
-三つ以上のsub-agentを並行して起動し、それぞれに根本的に異なるinterfaceを作らせる。
+三つ以上のsub-agentを、それぞれ新しいコンテキストウィンドウで並行して起動し、それぞれに根本的に異なるinterfaceを作らせる。
 各agentへfile path、coupling、依存分類、seamの背後へ置く内容を含む独立したtechnical briefを渡す。
 codebase-designの語彙と`GLOSSARY.md`のdomain languageをbriefへ含める。
 
@@ -173,6 +173,6 @@ depth、locality、seam placementによって文章で比較する。
 ## 翻訳元
 
 リポジトリは`mattpocock/skills`である。
-固定コミットは`d81f3a183412e71a5b1e84ca21bc1a35eea03a60`である。
+固定コミットは`5863806dd4e15c63174bee4e7515a4256792ecfa`である。
 原文のskillPathは`skills/engineering/codebase-design/SKILL.md`である。
 同梱資料は`skills/engineering/codebase-design/DEEPENING.md`と`skills/engineering/codebase-design/DESIGN-IT-TWICE.md`である。

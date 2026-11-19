@@ -144,6 +144,6 @@ prototype codeはtestと十分なerror handlingを持たないため、そのま
 ## 翻訳元
 
 リポジトリは`mattpocock/skills`である。
-固定コミットは`d81f3a183412e71a5b1e84ca21bc1a35eea03a60`である。
+固定コミットは`5863806dd4e15c63174bee4e7515a4256792ecfa`である。
 原文のskillPathは`skills/engineering/prototype/SKILL.md`である。
 同梱資料は`skills/engineering/prototype/LOGIC.md`と`skills/engineering/prototype/UI.md`である。
