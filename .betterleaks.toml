@@ -9,7 +9,7 @@ useDefault = true
 # 誤検知の許可（allowlist）
 # paths と regexes を併記するときは、condition = "AND" と regexTarget を必ず書く。
 # 既定の condition は OR で、paths に一致したファイルが丸ごと走査から外れる（#473）。
-# regexTarget の選び方は docs/tooling/lint-and-test.md の「betterleaksの誤検知を除外する」にある。
+# regexTarget の選び方は docs/tooling/betterleaks-exclusions.md にある。
 
 # .env.example のプレースホルダ（replace-with- か local-only- で始まる値）の行だけを除外する。
 # ほかの行は検出対象のまま。

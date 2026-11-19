@@ -23,6 +23,8 @@ HTTPはOrvalが生成したMSW handlerを使い、生成handlerがない境界�
 routeの描画は`src/testing/render-route.tsx`の`renderRoute`を使い、`main.tsx`と同じproviderとrouterの既定値で、最初のloaderを終えてから描画する。
 
 純粋関数はNode環境で検証し、DOMを必要とするcomponent testだけにjsdomを使う。
+`packages/ui`のテストは、jsdomとTesting Libraryを使わず、server renderの出力とresolveだけを確かめる。操作が要る部品を足すときに、DOMの環境を足す。
+`packages/ui`のテストはReact Compilerなしで走り、`apps/web`のようにCompilerを有効にしたテストは行わない。
 
 ## 利用者視点の期待
 
@@ -38,7 +40,7 @@ componentの内部state、Hookの呼出回数、CSS classだけを主要な期�
 - **非同期の待ち**：DOMの変化は、Testing Libraryの`findBy`か`waitFor`で待つ。
   mockの呼出などDOM以外の値は、`expect.poll`で待つ。
   `setTimeout`などの固定時間、`vi.waitFor`、`vi.waitUntil`では待たない。
-  `vi.waitFor`と`vi.waitUntil`はOxlintの`vitest/no-restricted-vi-methods`が禁止する（[Lintとテストのリファレンス](../tooling/lint-and-test.md#例外と調整)）。
+  `vi.waitFor`と`vi.waitUntil`はOxlintの`vitest/no-restricted-vi-methods`が禁止する（[フロントエンドのLint設定](lint-config.md#例外と調整)）。
 - **処理の一時停止**：MSWのhandlerかroute loaderをテストが解放するまで止めるときは、`createGate`を使う。
   `createGate`は`src/testing/gate.ts`にある。
   止める側で`promise`を待ち、テストから`release`を呼ぶ。

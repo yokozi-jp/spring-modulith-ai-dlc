@@ -74,7 +74,7 @@ feature 間の import は、動的な規則が要るため jsPlugin の `feature
 
 ファイル単位で Lint を無効化したり、カテゴリ全体を警告へ戻したりしない。
 範囲を限定する調整は、Node 側 Lint ツール（`lint/**`）、共有層（`src/{api,components,lib,i18n}/**`）、feature（`src/features/**`）、shadcn 由来コンポーネント（`src/components/ui/**`）、API client（`src/api/**`）、ルートモジュール（`src/routes/**`）、テストファイルと `src/testing/**` の override で行う。
-例外と調整の一覧、ファイルの範囲ごとに効く制限、Lint を通る書き方は `docs/tooling/lint-and-test.md` に理由とともに書く。
+例外と調整の一覧、ファイルの範囲ごとに効く制限、Lint を通る書き方は `docs/frontend/lint-config.md` に理由とともに書く。
 
 ## Consequences
 
@@ -97,7 +97,7 @@ feature 間の import は、動的な規則が要るため jsPlugin の `feature
 
 - eslint core は Vite+ が常に有効化するため、`plugins` の正規化表示には現れない。
 - 型なしの ESLint 互換 JS プラグイン API はアルファであり、`lint/**` の型安全規則は当該ディレクトリに限って無効化している。
-- Lint 設定と例外の一覧は `docs/tooling/lint-and-test.md` に記述し、実装と一致させる。
+- Lint 設定と例外の一覧は `docs/frontend/lint-config.md` に記述し、実装と一致させる。
 
 ## Alternatives Considered
 
@@ -135,4 +135,4 @@ feature 間の import は、動的な規則が要るため jsPlugin の `feature
 - `frontend/vite.config.ts`
 - `frontend/.node-version`
 - `.github/workflows/frontend-ci.yml`
-- `docs/tooling/lint-and-test.md`
+- `docs/frontend/lint-config.md`

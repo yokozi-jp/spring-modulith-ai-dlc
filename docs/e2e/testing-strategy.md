@@ -102,7 +102,7 @@ setup project は、`storageState` を持たない browser context で `/oauth2/
 - 待ちは web-first assertion（`await expect(locator).toBeVisible()` など）に任せ、固定時間で待たない。
 - `test.only` は CI の `forbidOnly` が失敗させる。
 - Lint はルートの `frontend/vite.config.ts` の設定で `vp check` が検査する。
-  Playwright Test の API に当たる vitest plugin の規則だけを `apps/web/e2e/**` で外している（[Lintとテストのリファレンス](../tooling/lint-and-test.md)）。
+  Playwright Test の API に当たる vitest plugin の規則だけを `apps/web/e2e/**` で外している（[フロントエンドのLint設定](../frontend/lint-config.md#ファイルの範囲ごとの制限)）。
   `apps/web/e2e/**` からもテレメトリの SDK（`@grafana/*`）を import できない。
 
 ## 不安定なテスト

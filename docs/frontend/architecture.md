@@ -45,6 +45,7 @@ OpenAPIからOrvalでnative FetchのTanStack Query clientを生成し、手書�
 部品は `"./*": "./src/*.tsx"` で一つずつ公開するので、アプリは `import { Button } from "@frontend/ui/button"` のように部品ごとに import する。
 barrel の `index.ts` は作らない。
 `@frontend/ui` はアプリと `@frontend/api` を参照せず、`package.json` にも書かない。
+`frontend/lint/workspace-layout.test.js` が、`package.json` に書かない package を Node で解決できないことを確かめる。`NODE_PATH` を空にして解決するのは、`vp` や pnpm の shim が `NODE_PATH` に足す `.pnpm/node_modules` から、宣言のない package も解決できてしまうためである。
 書かなければ、pnpm の厳格な解決が、それらへの import を失敗にする。
 
 現在の `apps/web/src` は、アプリケーションの起動、ルーティング、アプリシェル、routerの既定の状態表示、`QueryClient` の生成、国際化、テレメトリの初期化と送信、小さなutility、テストの準備のコードだけを持つ。
@@ -130,6 +131,7 @@ frontend/packages/ui/
 `@source` を書かないと、`@frontend/ui` の部品の class が CSS に出ない。
 Tailwind の自動検出が、アプリの directory の外にある `packages/ui` を走査しないためである。
 このとき型検査と lint は通ったまま、見た目だけが壊れる。
+`frontend/lint/workspace-layout.test.js` が、`apps/*/src/style.css` のすべてに `packages/ui/src` を指す `@source` があることを確かめる。
 
 `main.tsx` はcomposition rootであり、`api/query-client.ts` の `createQueryClient()` で `QueryClient` を作り、TanStack Routerを生成してProviderを接続する。
 `createQueryClient()` は、`@frontend/api/api-fetch` の401の処理（`QueryCache` と `MutationCache` の `onError`）と再試行の判定（`defaultOptions.queries.retry`）を渡し、mutationの後に全queryを無効化する（[mutationの後のcache](routing-and-state.md#mutationの後のcache)）。
@@ -256,7 +258,7 @@ feature間の境界は、`frontend/lint/feature-boundaries.js` のOxlint JS plug
 `../` によるimportは `import/no-relative-parent-imports` が禁じているため、この規則はaliasだけを見る。
 
 共有層、route、Base UI、`fetch`、テスト用部品のimportの制限は、`no-restricted-imports`、`no-restricted-globals`、`no-restricted-properties` のoverrideで書いている。
-ファイルの範囲ごとに効く制限は[Lintとテストのリファレンス](../tooling/lint-and-test.md#フロントエンドのlint設定)にある。
+ファイルの範囲ごとに効く制限は[フロントエンドのLint設定](lint-config.md#ファイルの範囲ごとの制限)にある。
 
 `@grafana/*` のimportは、`no-restricted-imports` のすべての禁止の一覧に加え、`src/lib/telemetry.ts` のoverrideだけで外している。
 テストファイルもSDKをimportできない。

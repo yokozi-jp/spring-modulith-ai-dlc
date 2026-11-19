@@ -41,7 +41,7 @@ feature固有styleは対象componentの近くへ置く。
 - **buttonの見た目のlink**：`<Link className={buttonVariants(...)}>` で書く。
   `Button` の `render` にlinkを渡すと、Base UIがroleを `button` に上書きするため使わない。
   `<Link><Button /></Link>` のような入れ子も作らない。
-  どちらもOxlintの `ui-composition/no-button-in-link` が検査する（[Lintとテストのリファレンス](../tooling/lint-and-test.md#ファイルの範囲ごとの制限)）。
+  どちらもOxlintの `ui-composition/no-button-in-link` が検査する（[フロントエンドのLint設定](lint-config.md#ファイルの範囲ごとの制限)）。
 - **空状態、確認dialog、skeleton**：shadcnの `Empty`、`AlertDialog`、`Skeleton` を、最初に使う時点でregistryから `packages/ui` へ追加する。
 - **読み込み中の表示**：skeletonの装飾は `aria-hidden` にし、読み込み中の文言を一つだけ支援技術に伝える。
 - **live region**：状態の変化を読み上げる領域にはlintの推奨どおり `<output>` を使う（`components/route-pending.tsx`）。
@@ -71,7 +71,7 @@ feature固有styleは対象componentの近くへ置く。
 アプリの `components.json` は、`@shadcn/lint` が `@frontend/ui` の部品を認識するための設定で、`aliases.ui` を `@frontend/ui` にしている。
 アプリでは `shadcn add` を実行しない。
 ルートの `settings.shadcn.componentImports` でも、import元が `@frontend/ui` の部品を認識させる。
-認識した部品への `className` は `shadcn/no-restyle` が検査し、部品が持つ見た目のclassを検出する（[Lintとテストのリファレンス](../tooling/lint-and-test.md#フロントエンドのlint設定)）。
+認識した部品への `className` は `shadcn/no-restyle` が検査し、部品が持つ見た目のclassを検出する（[フロントエンドのLint設定](lint-config.md#例外と調整)）。
 
 ## 関連資料
 
