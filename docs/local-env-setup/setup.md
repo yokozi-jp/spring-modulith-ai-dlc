@@ -214,6 +214,7 @@ iwe は手順 7 の `mise install --locked` で導入済みです。
 Kiro CLI の `code` ツール（diagnostics、hover、参照の検索）が使う LSP サーバーの設定は、`.kiro/settings/lsp.json` にコミット済みです。
 TypeScript は、`task fe-install` で入る `frontend/apps/web/node_modules` の `tsc` を使います。
 `task fe-install` の前は、TypeScript の LSP が起動しません。
+TypeScript の diagnostics は、型の誤りがあっても `No diagnostics` を返すので、型は `task fe-check` で確かめます（Kiro CLI 3.4.0 は push の通知を待ち、TypeScript 7 の `tsc --lsp` は pull の要求にだけ答える）。
 Java は、`mise.lsp.toml` の jdtls と、jdtls に `@Slf4j` を解釈させる Lombok を使います。
 jdtls と Lombok は次のコマンドで入れます。
 
@@ -221,7 +222,8 @@ jdtls と Lombok は次のコマンドで入れます。
 mise -E lsp install --locked
 ```
 
-リポジトリのルートで Kiro CLI を起動し直し、`/code status` で TypeScript と Java が使えることを確かめます。
+リポジトリのルートで Kiro CLI を起動し直すと使えます。
+`/code status` は Kiro の既定の LSP サーバーを一覧するだけで、この設定で動くサーバーも `not_installed` と出ます。
 jdtls は起動のたびに Gradle のプロジェクトを読み込むため、使えるまで数秒から数十秒かかります。
 
 版の上げ方は `mise.lsp.toml` の冒頭にあります。
