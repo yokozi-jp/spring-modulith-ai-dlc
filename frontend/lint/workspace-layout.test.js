@@ -60,11 +60,14 @@ function entryOf(directory) {
  * @param {string} to
  */
 function resolutionOf(from, to) {
-  const { stdout } = spawnSync(
+  const { error, stdout } = spawnSync(
     process.execPath,
     ["-e", resolveScript, path.join(frontendRoot, from, "package.json"), entryOf(to)],
-    { encoding: "utf8", env: { ...process.env, NODE_PATH: "" } },
+    { encoding: "utf8", env: { ...process.env, NODE_PATH: "" }, timeout: 60_000 },
   );
+  if (error) {
+    throw error;
+  }
   return stdout;
 }
 
