@@ -43,6 +43,10 @@ coverage の下限は、バックエンドが JaCoCo の全体の branch 85%、�
 Vite+ 0.3.3 の Vitest 4.1 の `perFile` は全体の下限をそのままファイルごとに当てるだけで、ファイルごとに別の値を持てなかったためである。
 Vite+ 1.6.0 の Vitest 5.1.0 は `perFile` に `{ branches: 60, lines: 65 }` の形で値を渡せるので（#290 で確かめ、#499 で上げた）、検査を `vite.config.ts` へ移すように Decision を書き直した。
 
+main の実行は取り消さないと書いたが、待ちの main の実行は後の push に置き換えられる。
+2026-10-11 から 11-18 までの main の 35 件のうち 7 件が、job が 1 つも始まらないまま取り消された。
+この実測を受けて、Decision に待ちの実行の置き換えを書き足した（#459）。
+
 ## Decision
 
 PIT を Backend CI から外し、必須チェックにしない `mutation-test.yml` のワークフローで実行する。
@@ -58,7 +62,9 @@ PIT の minion は 1 つにし、timeout を既定の 1.25 倍と 4 秒から 2 
 テストが共有のテスト DB の表を消すため、minion を並列にできない。
 また、新しい minion は Spring のコンテキストを作り直すため、既定の timeout ではその起動を TIMED_OUT とみなしやすい。
 ジョブの timeout は PR で 60 分、main への push と手動実行で 180 分とする。
-PR の実行は後の push で取り消し、main の実行は取り消さない。
+PR の実行は後の push で取り消し、実行中の main の実行は取り消さない。
+ただし GitHub Actions の concurrency は同じ group で待ちの実行を 1 つしか持たないので、待ちの main の実行は後の push に置き換えられる。
+main の全体の実行は commit ごとではなく、待つあいだに来た commit をまとめた単位になる。
 
 PIT にはスコアの閾値を置かない。
 ジョブは、テストの失敗などで PIT が完走しないときだけ失敗し、結果は HTML と XML のレポートを artifact で確かめる。
