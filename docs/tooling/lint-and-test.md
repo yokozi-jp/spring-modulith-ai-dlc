@@ -11,6 +11,7 @@ tags: [reference, testing, lint, ci]
 場面ごとの実行順は[開発ワークフロー](dev-workflow.md)を参照する。
 Gitフックの中でDockerを使う検査は、`docker info`が失敗するローカル環境ではスキップし、CIで検査する。
 `docker`コマンドがあってもデーモンに接続できなければ、Dockerを使えないとみなす。
+判定の本体は`task docker-available`だけにあり、Dockerを使う`lefthook.yml`のジョブが呼ぶ。
 
 ## 入口Task
 
@@ -125,6 +126,7 @@ PITのHTMLとXMLのレポートは、変異対象がある場合に`backend/buil
 - **`task scan-dast-active`**：同じ環境でactive scanを実行する。
 - **`task lint-actions`**：GitHub Actionsワークフローをactionlintで検査する。
 - **`task lint-actions-security`**：GitHub Actionsのワークフローとcomposite action（`.github/actions/`）をzizmorで検査する。zizmorは`mise.toml`の版で動き、Dockerを使わない。`zizmor.yml`の`zizmor-action`の`version`にも同じ版を書く。設定は`.github/zizmor.yml`である。
+- **`task docker-available`**：`docker info`が成功すれば0を、失敗すればスキップの理由を出して0以外を返す。Gitフックの中でDockerを使うジョブが、スキップするかを決めるために呼ぶ。
 - **`task lint-docker`**：Dockerfileをhadolintで検査する。
 - **`task lint-docker-check`**：Dockerfileを`docker build --check`で検査する。
 - **`task lint-compose`**：Composeファイルの構文、参照、変数展開を検証する。

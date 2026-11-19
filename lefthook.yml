@@ -80,7 +80,7 @@ pre-commit:
         jobs:
           # OpenAPI 契約か Orval の入力にステージ済み変更があるとき、DB を使わずに検査する（ADR-052）。
           # コミット済み契約の Spectral 検査と、Orval で再生成した API client の差分なしを確かめる。
-          # docker を使えない（docker info が失敗する）環境では Spectral をスキップする（最終担保は CI に任せる）。
+          # Docker を使えない環境では Spectral をスキップする（最終担保は CI に任せる）。
           - name: api-contract-check
             glob:
               - "openapi/**"
@@ -91,10 +91,8 @@ pre-commit:
               - "frontend/packages/api/src/generated/**"
             run: |
               echo "{staged_files}" >/dev/null
-              if docker info >/dev/null 2>&1; then
+              if task docker-available; then
                 task api-lint
-              else
-                echo "docker を使えないため Spectral をスキップします（CI で検査されます）。" >&2
               fi
               task api-client-check
             fail_text: "OpenAPI契約またはAPI clientの検査に失敗しました。task api-gen で再生成し、差分をコミットしてください。"
@@ -111,50 +109,41 @@ pre-commit:
             fail_text: "Frontendの静的検査に失敗しました。task fe-checkで再実行してください。"
 
     # ステージ済みの Dockerfile をベストプラクティス検査（hadolint）
-    # docker を使えない（docker info が失敗する）環境ではスキップ（最終担保は CI に任せる）。
+    # Docker を使えない環境ではスキップ（最終担保は CI に任せる）。
     - name: hadolint
       glob:
         - "**/Dockerfile"
         - "**/Dockerfile.*"
         - "**/*.Dockerfile"
       run: |
-        if ! docker info >/dev/null 2>&1; then
-          echo "docker を使えないため hadolint をスキップします（CI で検査されます）。" >&2
-          exit 0
-        fi
+        task docker-available || exit 0
         docker run --rm -i -v "$PWD":/repo -w /repo \
           hadolint/hadolint:v2.12.0@sha256:30a8fd2e785ab6176eed53f74769e04f125afb2f74a6c52aef7d463583b6d45e \
           hadolint {staged_files}
 
     # ステージ済みの Dockerfile を Docker 公式チェック（BuildKit のベストプラクティス）
-    # ビルドはせず --check のみ。docker を使えない（docker info が失敗する）環境ではスキップ。
+    # ビルドはせず --check のみ。Docker を使えない環境ではスキップ。
     - name: docker-build-check
       glob:
         - "**/Dockerfile"
         - "**/Dockerfile.*"
         - "**/*.Dockerfile"
       run: |
-        if ! docker info >/dev/null 2>&1; then
-          echo "docker を使えないため docker build --check をスキップします（CI で検査されます）。" >&2
-          exit 0
-        fi
+        task docker-available || exit 0
         for dockerfile in {staged_files}; do
           echo "checking: $dockerfile"
           docker build --check -f "$dockerfile" "$(dirname "$dockerfile")" || exit 1
         done
 
     # ステージ済みの Compose ファイルの構文・参照・変数展開を検証
-    # docker を使えない（docker info が失敗する）環境ではスキップ。
+    # Docker を使えない環境ではスキップ。
     - name: compose-config
       glob:
         - "**/compose.{yml,yaml}"
         - "**/compose-test.{yml,yaml}"
         - "**/docker-compose.{yml,yaml}"
       run: |
-        if ! docker info >/dev/null 2>&1; then
-          echo "docker を使えないため docker compose config をスキップします（CI で検査されます）。" >&2
-          exit 0
-        fi
+        task docker-available || exit 0
         # compose-test.yml の env_file が参照する .env.test は Git 除外のため、無ければ .env.test.example からコピーする。
         [ -f .env.test ] || cp .env.test.example .env.test
         for composefile in {staged_files}; do
@@ -329,7 +318,7 @@ pre-push:
     # backend に変更がある push のときだけテスト実行（カバレッジ検証含む）
     # 開発用 .env / 開発 DB には触れず、task test で実行する。rollback の検証は compose-test の PostgreSQL、
     # テストはテストの JVM ごとに起動するコンテナを使う（ADR-085）。
-    # docker を使えない（docker info が失敗する）環境ではスキップ（最終担保は CI に任せる）。
+    # Docker を使えない環境ではスキップ（最終担保は CI に任せる）。
     - name: be-test
       # lefthook の既定の照合では ** が 1 階層以上にしか一致しないため、backend 直下の build.gradle と
       # settings.gradle を別のパターンで拾う。
@@ -338,27 +327,21 @@ pre-push:
         - "backend/**/*.{java,gradle}"
       files: *push-files
       run: |
+        task docker-available || exit 0
         echo "{files}" >/dev/null
-        if ! docker info >/dev/null 2>&1; then
-          echo "docker を使えないため task test をスキップします（CI で検査されます）。" >&2
-          exit 0
-        fi
         task test
 
     # GitHub Actions のワークフローか composite action に変更がある push のときだけ Lint（actionlint）
     # glob を効かせるため run 内で {files} を参照する。
-    # docker を使えない（docker info が失敗する）環境ではスキップ（最終担保は CI に任せる）。
+    # Docker を使えない環境ではスキップ（最終担保は CI に任せる）。
     - name: actionlint
       glob:
         - ".github/workflows/*.{yml,yaml}"
         - ".github/actions/**"
       files: *push-files
       run: |
+        task docker-available || exit 0
         echo "{files}" >/dev/null
-        if ! docker info >/dev/null 2>&1; then
-          echo "docker を使えないため actionlint をスキップします（CI で検査されます）。" >&2
-          exit 0
-        fi
         task lint-actions
 
     # GitHub Actions のワークフローか composite action に変更がある push のときだけセキュリティ解析（zizmor）

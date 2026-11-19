@@ -999,6 +999,14 @@ tasks:
     cmds:
       - ./gradlew cyclonedxBom
 
+  # Docker を使う検査が、使えない環境でスキップするかを決める判定の本体（Docker を使う lefthook のジョブが呼ぶ）。
+  # docker コマンドがあってもデーモンに接続できなければ、使えないとみなす。使えないときは 0 以外を返す。
+  docker-available:
+    desc: Dockerのデーモンに接続できるかを判定（使えなければ0以外）
+    silent: true
+    cmds:
+      - '{{.DOCKER}} info >/dev/null 2>&1 || { echo "docker を使えないため、Docker を使う検査をスキップします（CI で検査されます）。" >&2; exit 1; }'
+
   # API contract（ADR-052）
   api-lint:
     desc: コミット済みのOpenAPI契約をSpectralで検査（DB不要）
