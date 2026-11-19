@@ -151,6 +151,8 @@ compose が公開する port は、すべて `127.0.0.1` に限る。
 
 手順 2 から 4 の `task e2e-up` は片付けを行わない。
 検証スキル `verify-demo` が同じ手順でスタックを起動して残し、片付けの前に `task e2e-collect-logs LOG=<パス>` で同じ検査をする。
+`task e2e-up E2E_SEED=0` は代表データを入れない。
+検証スキルが、業務データが空の画面を確かめるために使い、`task e2e` は使わない。
 
 E2E には Collector を置かず、テストが `/collect` を `page.route` で応答する（[ADR-068](../adr/ADR-068-collect-browser-telemetry-with-faro-via-collector.md)）。
 `frontend/apps/web/e2e/logout.spec.ts` は、`/collect` が 503 を返してもログインとログアウトのフォームを送信できることを確かめる。

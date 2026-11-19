@@ -25,8 +25,11 @@ E2E の規約の正文は `docs/e2e/testing-strategy.md` にあり、この skil
 ## Launch
 
 ```bash
-.kiro/skills/verify-demo/scripts/stack.sh up
+.kiro/skills/verify-demo/scripts/stack.sh up [--empty]
 ```
+
+`--empty` を付けると、代表データを入れずに起動する。
+業務データが空の画面を確かめる journey（`order-list-empty.mjs`）だけに使う。
 
 起動の手順は `task e2e-up` に任せ、`task e2e` と同じにする（`docs/e2e/testing-strategy.md` の「実行と後片付け」）。
 その後 Vite preview を自分の process group で起動し、preview の proxy から `/actuator/health/readiness` が 200 を返すまで待つ。
@@ -47,7 +50,8 @@ migration とシーダーが残す Gradle の daemon がパイプを開いたま
 ```
 
 読み取りだけをする。
-compose-test のコンテナが `up` の記録と同じこと、自分の preview が生きていること、SPA の配信、preview の proxy から backend の readiness、Keycloak の issuer、WireMock の管理 API、代表の注文 6 件を確かめる。
+compose-test のコンテナが `up` の記録と同じこと、自分の preview が生きていること、SPA の配信、preview の proxy から backend の readiness、Keycloak の issuer、WireMock の管理 API を確かめる。
+代表の注文 6 件があること（`--empty` で起動したときは、注文が 0 件であること）も確かめる。
 起動した後に `backend`、`frontend`、`docker`、`openapi` のソースが変わっていれば FAIL にする。
 古いビルドを検証しないよう、そのときは `down` と `up` をやり直す。
 journey の前と、何かがおかしいと感じたときに最初に実行する。

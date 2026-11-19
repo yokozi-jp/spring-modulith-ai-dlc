@@ -146,14 +146,20 @@ tasks:
 
   # task e2e と検証スキル（.agents/skills/verify-demo）が、同じ手順で compose-test を起動する。片付けは呼び出し側が行う。
   e2e-up:
-    desc: frontendとbackendをビルドし、compose-testの依存とbackendを起動してmigrationと代表データを入れる（片付けない）
+    desc: frontendとbackendをビルドし、compose-testの依存とbackendを起動してmigrationと代表データを入れる（片付けない。E2E_SEED=0で代表データを省く）
     silent: true
     deps: [_ensure-test-env]
+    vars:
+      E2E_SEED: '{{.E2E_SEED | default "1"}}'
     cmds:
       - |
         # export すると Playwright の loadEnv で .env.test.local より優先されるため、SERVER_PORT を読むだけにする。
         . ./.env.test
         compose() { {{.DOCKER}} compose -f "{{.TEST_COMPOSE_FILE}}" --profile e2e "$@"; }
+        case "{{.E2E_SEED}}" in
+          0|1) ;;
+          *) echo "E2E_SEED は 1 か 0 にしてください: {{.E2E_SEED}}" >&2; exit 1 ;;
+        esac
         for port in 5173 "$SERVER_PORT"; do
           rc=0
           curl --silent --output /dev/null --max-time 2 "http://localhost:${port}/" || rc=$?
@@ -168,7 +174,8 @@ tasks:
         compose up -d --wait postgres redis keycloak wiremock
         task be-migrate COMPOSE_ENV_FILE=.env.test
         # spec が読む商品と代表の注文を入れる（ADR-073）。.env.test は test の目印と loopback の DB_HOST を持つ。
-        task be-seed COMPOSE_ENV_FILE=.env.test
+        # E2E_SEED=0 は、業務データが空の画面を確かめる検証のため（.agents/skills/verify-demo の list-empty）。
+        if [ "{{.E2E_SEED}}" = "1" ]; then task be-seed COMPOSE_ENV_FILE=.env.test; fi
         compose up -d --wait backend
         # healthcheck はコンテナの中から確かめるため、preview の proxy と同じくホストから届くかを別に確かめる。
         if ! curl --fail --silent --show-error --max-time 5 "http://localhost:${SERVER_PORT}/actuator/health/readiness" >/dev/null; then

@@ -60,7 +60,7 @@ async function step(label, target = page) {
   stepNo += 1;
   const prefix = `${String(stepNo).padStart(2, "0")}-${label}`;
   await target.screenshot({ path: join(runDir, `${prefix}.png`), fullPage: true });
-  writeFileSync(join(runDir, `${prefix}.aria.yml`), await target.locator("body").ariaSnapshot());
+  writeFileSync(join(runDir, `${prefix}.aria.yml`), `${await target.locator("body").ariaSnapshot()}\n`);
   log("steps.log", `${prefix} ${target.url()}`);
 }
 

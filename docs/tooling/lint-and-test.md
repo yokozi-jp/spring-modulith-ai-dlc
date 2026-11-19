@@ -22,6 +22,7 @@ Gitフックの中でDockerを使う検査は、`docker info`が失敗するロ�
 - **`task fe-verify`**：フロントエンドの静的解析、未使用コード検査、テスト、テレメトリを無効にした本番ビルドを実行する。
 - **`task e2e`**：compose-testでbackendを起動し、Vite previewに対してPlaywrightのE2Eを実行して後片付けする（[E2Eテストの方針と書き方](../e2e/testing-strategy.md)）。
 - **`task e2e-up`**：`task e2e`の起動の手順（build、依存の起動、migration、代表データ、backend）だけを実行し、片付けない。
+  `E2E_SEED=0`を付けると代表データを入れない。
   `task e2e`と検証スキル`verify-demo`が呼ぶ。
 - **`task e2e-collect-logs LOG=<パス>`**：compose-testのbackendのログを書き、秘密の値、セッションのCookieの値、JWTの形の文字列が入っていれば失敗する。
   `task e2e`と検証スキル`verify-demo`が片付けの前に呼ぶ。

@@ -22,6 +22,7 @@ Preconditions:
 - `stack.sh doctor` がすべて OK である（代表の注文 6 件）。
 
 `node .kiro/skills/verify-demo/scripts/drive.mjs .kiro/skills/verify-demo/journeys/order-list.mjs` が、`list-empty` を除く次の手順を実行する。
+`list-empty` は、`stack.sh up --empty` で起動した別のスタックで `journeys/order-list-empty.mjs` が実行する。
 
 - **一覧（`list-all`）。**
   `page.goto("/orders")` で開く。
@@ -38,13 +39,17 @@ Preconditions:
   `heading`「注文 SEED-C03」が見える。
   「注文の一覧へ戻る」で `/orders` に戻る。
 - **空の一覧（`list-empty`）。**
-  代表データの状態では、どの絞り込みにも 1 件以上の注文がある。
-  空の状態を作れないため、`list-empty` はこの検証スタックでは確かめられない（`Gotchas`）。
+  `stack.sh down` の後、`stack.sh up --empty` で代表データを入れずに起動し、`stack.sh doctor` で注文が 0 件であることを確かめる。
+  `node .kiro/skills/verify-demo/scripts/drive.mjs .kiro/skills/verify-demo/journeys/order-list-empty.mjs` を実行する。
+  「すべて」「下書き」「確定済み」「取消済み」のどれを選んでも、「該当する注文はありません。」が見え、表がない。
+  空の一覧の「注文を作成する」から、作成の画面へ進める。
 
 ## Gotchas
 
-- 代表データはどの状態にも注文を持つため、`list-empty` は検証スタックで届かない。
-  届かない入口として報告し、ほかの入口で確かめたことにしない。
+- 代表データはどの状態にも注文を持つため、`list-empty` は代表データを入れたスタックでは届かない。
+  `order-list-empty.mjs` は、注文が 1 件でもあれば前提の確認で失敗する。
+- `--empty` のスタックには商品も代表の注文もないので、ほかの journey は失敗する。
+  `list-empty` を確かめたら `stack.sh down` で片付け、ほかの journey は `stack.sh up` で起動し直したスタックで実行する。
 - 同じスタックの journey が作った注文も一覧に出る。
   代表の注文以外の行があるのは正しい。
   行数で確かめるときは、同じ時点の `sql` の件数と比べる。
