@@ -27,14 +27,10 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Set up JDK
-        uses: actions/setup-java@77dd5b2ce225ea11469928ac317850245a74ae78 # v6.2.0
-        with:
-          distribution: corretto
-          java-version: "25"
-
       - name: Set up mise tools
         uses: ./.github/actions/setup-mise
+        with:
+          tools: task java
 
       - name: Run dep-scan
         run: task scan-depscan-backend

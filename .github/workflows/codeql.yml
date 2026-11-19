@@ -52,13 +52,12 @@ jobs:
           persist-credentials: false
 
       # Java の autobuild が Corretto 25 を使うよう、init の前に JDK を用意する
-      # （Backend CI と同じ版）。
-      - name: Set up JDK
+      # （mise.lock の版で、Backend CI と同じ）。
+      - name: Set up mise tools
         if: matrix.language == 'java-kotlin'
-        uses: actions/setup-java@77dd5b2ce225ea11469928ac317850245a74ae78 # v6.2.0
+        uses: ./.github/actions/setup-mise
         with:
-          distribution: corretto
-          java-version: "25"
+          tools: java
 
       - name: Initialize CodeQL
         uses: github/codeql-action/init@33d7b85da1a04171e211befe2c739303b9a4c066 # v4.39.3

@@ -2,7 +2,7 @@ name: Set up mise tools
 description: mise.toml の道具を mise.lock の版と checksum で入れ、mise の shims を PATH に通す（ADR-090）。
 inputs:
   tools:
-    description: mise install に渡す道具。ジョブが使う道具だけを入れる。
+    description: mise install に渡す道具。ジョブが使う道具だけを入れる。java を入れると JAVA_HOME も設定する。
     default: task
 runs:
   using: composite
@@ -17,3 +17,8 @@ runs:
         install_args: ${{ inputs.tools }}
         # 復元したキャッシュは mise.lock と照合されないため使わない。
         cache: false
+    # Gradle、CodeQL、CycloneDX は JAVA_HOME で JDK を探す。
+    - name: Export JAVA_HOME
+      if: contains(format(' {0} ', inputs.tools), ' java ')
+      shell: bash
+      run: echo "JAVA_HOME=$(mise where java)" >> "$GITHUB_ENV"

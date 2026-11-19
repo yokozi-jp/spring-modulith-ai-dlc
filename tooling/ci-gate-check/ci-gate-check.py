@@ -19,7 +19,7 @@ SETUP_MISE = "./.github/actions/setup-mise"
 # setup-mise が入れる道具の版と入れ方を決めるファイル。setup-mise を使う workflow は、これらの変更でも走らせる。
 TOOLCHAIN = {"mise.toml", "mise.lock", ".github/actions/setup-mise/**"}
 # mise.lock を通さずに道具を入れる action。
-BANNED_USES = ("go-task/setup-task@", "actions/setup-go@")
+BANNED_USES = ("go-task/setup-task@", "actions/setup-go@", "actions/setup-java@")
 
 
 def triggers(workflow):

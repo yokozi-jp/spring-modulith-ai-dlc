@@ -128,6 +128,10 @@ d="$(case_dir banned-uses)"
 sed -i 's|^      - run: "true"$|      - uses: go-task/setup-task@v2\n      - run: "true"|' "$d/backend.yml"
 expect "mise.lock を通さない setup-task を使うと失敗" 1 "go-task/setup-task@v2 を使っています" check "$d"
 
+d="$(case_dir banned-java)"
+sed -i 's|^      - run: "true"$|      - uses: actions/setup-java@v5\n      - run: "true"|' "$d/backend.yml"
+expect "mise.lock を通さない setup-java を使うと失敗" 1 "actions/setup-java@v5 を使っています" check "$d"
+
 d="$(case_dir on-list)"
 printf 'name: Push\non: [push]\njobs:\n  a:\n    runs-on: ubuntu-latest\n    steps:\n      - run: "true"\n' > "$d/push.yml"
 expect "on: [push] の workflow でも traceback にならない" 0 "ci-gate-check OK" check "$d"

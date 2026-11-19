@@ -492,7 +492,6 @@ tasks:
     dir: docs/local-env-setup
     cmds:
       - |
-        ./01-setup-java.sh
         ./02-setup-viteplus.sh
         ./03-setup-kiro.sh
         export PATH="$HOME/.local/bin:$PATH"
