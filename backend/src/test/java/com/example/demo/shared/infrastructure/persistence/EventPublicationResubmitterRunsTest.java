@@ -4,8 +4,10 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.example.demo.testkit.CapturedLogRecords;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
+import io.opentelemetry.api.OpenTelemetry;
 import io.opentelemetry.api.common.AttributeKey;
 import io.opentelemetry.api.logs.Severity;
+import io.opentelemetry.instrumentation.logback.appender.v1_0.OpenTelemetryAppender;
 import io.opentelemetry.sdk.logs.data.LogRecordData;
 import java.time.Duration;
 import java.time.Instant;
@@ -74,11 +76,16 @@ class EventPublicationResubmitterRunsTest {
   /** OTLP へ送る LogRecord。 */
   @Autowired private CapturedLogRecords capturedLogRecords;
 
+  /** この文脈の OpenTelemetry。 */
+  @Autowired private OpenTelemetry openTelemetry;
+
   /** 回の数を読むための、このテストだけのレジストリ。 */
   private SimpleMeterRegistry meterRegistry;
 
   @BeforeEach
   void reset() {
+    // 別のコンテキストが appender の送り先を差し替えていても、このコンテキストの記録を読む。
+    OpenTelemetryAppender.install(openTelemetry);
     meterRegistry = new SimpleMeterRegistry();
     clock.set(Instant.parse("2026-10-10T01:02:03.123456Z"));
     expireLock();
