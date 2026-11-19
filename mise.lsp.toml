@@ -1,9 +1,0 @@
-# Kiro CLI の Java の LSP（jdtls）と、jdtls に @Slf4j を解釈させる Lombok の javaagent。.kiro/settings/lsp.json が `mise -E lsp exec` で読む。
-# url を持つ http: の道具は mise trust を要するので、mise.toml に置かない（ADR-090）。mise exec と mise install は trust なしで読み、mise lock と mise ls は trust を要する。
-# registry と aqua に無く Renovate も追わないので、版は手で上げる。Lombok は Spring Boot が管理する版に揃える。
-# 管理する版は backend/ の `./gradlew -q dependencyInsight --dependency org.projectlombok:lombok --configuration compileClasspath` で確かめる。
-# 版を変えたら `MISE_TRUSTED_CONFIG_PATHS="$PWD/mise.lsp.toml" MISE_ENV=lsp mise lock --platform linux-x64 http:jdtls http:lombok` を実行し、mise.lsp.lock を同じコミットに含める。
-# lock に無い版は task mise-lsp-lock-check（CI）が止める。
-[tools]
-"http:jdtls" = { version = "1.63.0", url = "https://download.eclipse.org/jdtls/milestones/1.63.0/jdt-language-server-1.63.0-202610191322.tar.gz", bin_path = "bin" }
-"http:lombok" = { version = "1.18.48", url = "https://repo1.maven.org/maven2/org/projectlombok/lombok/{{ version }}/lombok-{{ version }}.jar", bin = "lombok.jar" }

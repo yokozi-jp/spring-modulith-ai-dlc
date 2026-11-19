@@ -19,4 +19,3 @@ Docs are local at `node_modules/vite-plus/docs` or online at <https://viteplus.d
 
 `frontend/` は workspace のルートで、ルートの `vite.config.ts` は `lint` と `fmt` だけを持つ。
 ルートで `vp test` と `vp dev` を実行しない。`vp run --recursive test` と `task fe-dev` を使う（`docs/tooling/dev-workflow.md`）。
-Kiro の `code` ツールの `diagnostics` は、TypeScript では型の誤りがあっても `No diagnostics` を返す。型は `task fe-check` で確かめる（`docs/local-env-setup/setup.md` の「Kiro の code intelligence（LSP）」）。

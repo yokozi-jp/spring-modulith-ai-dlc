@@ -480,6 +480,13 @@ tasks:
       - bash tooling/ci-changes/test.sh
       - python3 tooling/ci-gate-check/ci-gate-check.py
 
+  # CI の job は使う道具だけを入れるので、ほかの道具の版を上げて lock を作り直さない変更はここで止める（ADR-090）。
+  mise-lock-check:
+    desc: mise.toml の全ての道具の版が mise.lock に載ることを検証
+    silent: true
+    cmds:
+      - MISE_DATA_DIR="$(mktemp -d)" mise install --locked --dry-run
+
   # 本体は tooling/agent-git/agent-git.sh、手順は docs/tooling/dev-workflow.md の「エージェントがcommitとpushをするとき」にある。
   # 呼んだディレクトリで動かし、commit のパスをそこからの相対で解釈する。
   # CLI_ARGS は Task が引数ごとにシェルの引用符を付けるので、空白を含むパスもそのまま渡る。
