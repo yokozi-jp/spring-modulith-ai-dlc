@@ -1,6 +1,6 @@
 import type { Page } from "@playwright/test";
 
-import { signInOnKeycloak } from "./environment";
+import { logIn } from "./environment";
 import { expect, test } from "./fixtures";
 
 // ログアウトで共有の storageState のセッションを終わらせないよう、専用の context でログインする。
@@ -31,12 +31,6 @@ function traceparentsOf(path: string): (string | undefined)[] {
   return requests
     .filter(({ url }) => url.origin === origin && url.pathname === path)
     .map(({ traceparent }) => traceparent);
-}
-
-async function logIn(page: Page): Promise<void> {
-  await page.goto("/oauth2/authorization/web");
-  await signInOnKeycloak(page);
-  await expect(page).toHaveURL(`${origin}/`);
 }
 
 // 画面に /api/** を呼ぶ処理がまだないので、ページの中から直接呼ぶ。

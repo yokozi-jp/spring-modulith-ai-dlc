@@ -1,6 +1,6 @@
 import type { APIRequestContext, BrowserContext, Cookie, Locator, Page } from "@playwright/test";
 
-import { signInOnKeycloak } from "./environment";
+import { logIn, signInAndChooseTenant } from "./environment";
 import { expect, test } from "./fixtures";
 import {
   collectTelemetry,
@@ -28,12 +28,6 @@ function csrfInput(page: Page): Locator {
   return page.locator('input[name="_csrf"]');
 }
 
-async function logIn(page: Page): Promise<void> {
-  await page.goto("/oauth2/authorization/web");
-  await signInOnKeycloak(page);
-  await expect(page).toHaveURL("http://localhost:5173/");
-}
-
 async function apiStatus(page: Page): Promise<number> {
   const response = await page.request.get("/api/missing");
   return response.status();
@@ -46,8 +40,7 @@ async function expectAuthenticatedHome(page: Page): Promise<void> {
   expect(await apiStatus(page)).toBe(404);
 }
 
-// 未認証の /api/** を browser の context で呼ぶと、Spring Security がその要求を新しいセッションに保存し、
-// 次のログイン後に /api/missing?continue へ戻してしまう。そのため 401 は Cookie を共有しない request で確かめる。
+// ログアウトの前の APP_SESSION を送り直すため、browser の Cookie を共有しない request で確かめる。
 async function replayedApiStatus(request: APIRequestContext, session: string): Promise<number> {
   const response = await request.get("/api/missing", {
     headers: { Cookie: `APP_SESSION=${session}` },
@@ -127,7 +120,7 @@ async function logOutToNewSession(
 async function logInAgain(page: Page, payloads: string[]): Promise<number> {
   const startIndex = payloads.length;
   await page.getByRole("link", { name: "もう一度ログイン" }).click();
-  await signInOnKeycloak(page);
+  await signInAndChooseTenant(page);
   await expectAuthenticatedHome(page);
   return startIndex;
 }
@@ -202,7 +195,7 @@ test("ログアウト後はアプリと SSO のセッションが終わり、も
   // Keycloak の SSO セッションが終わっていれば、資格情報の入力を求められる。
   await page.getByRole("link", { name: "もう一度ログイン" }).click();
   await expect(page.getByLabel("Username or email")).toBeVisible();
-  await signInOnKeycloak(page);
+  await signInAndChooseTenant(page);
 
   await expectAuthenticatedHome(page);
 });
