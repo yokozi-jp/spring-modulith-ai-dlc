@@ -29,6 +29,10 @@ UUID v7 はミリ秒の時刻を含むため、値から作成の順序と時刻
 このリポジトリの PostgreSQL は 18.6 であり（`docker/compose.yml`）、[`uuidv7()`](https://www.postgresql.org/docs/18/functions-uuid.html) が使える。
 Java は 25 で、UUID v7 を作る標準の API がない。
 
+RFC 9562 の 6.13 節は、単一の DB では、DB で生成した UUID のほうがアプリケーションで生成したものより単調に並ぶとする。
+このリポジトリでは、単一の DB の主キーに bigint の IDENTITY を使い、UUID v7 はシャーディングを前提にする主キーに限る。
+UUID v7 を使うのは単一の DB でない場合だけなので、この節の助言は採番の場所を決める理由にならない。
+
 ## Decision
 
 UUID の採番はアプリケーションで行い、DB では行わない。
@@ -76,6 +80,8 @@ UUID v7 を主キーにする最初のテーブルを作るときに決める。
 
 - 集約ごとに Repository が `nextId()` を実装する。
 - `uuid` カラムの `DEFAULT` を使う手軽さを失う。
+- `public_id` のユニークインデックスも B-tree なので、乱数の v4 では主キーと同じく挿入の局所性が下がる。
+  作成の順序と時刻を外に見せないため、この効率の低下を受け入れる。
 - 境界の `String` を `UUID.fromString` で変換するため、不正な値は 500 になる。
   400 への対応づけは [ADR-062](ADR-062-map-business-exceptions-to-404-409-422.md) の範囲外とし、別に決める。
 - UUID v7 の生成の実装が決まるまで、v7 の主キーの `nextId()` は実装できない。
