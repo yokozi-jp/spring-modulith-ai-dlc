@@ -523,12 +523,6 @@ tasks:
     cmds:
       - vp check
 
-  fe-doctor:
-    desc: React固有のwarningとerrorをReact Doctorで検出
-    dir: frontend
-    cmds:
-      - timeout 900s vp run {{.FE_WEB}} react-doctor
-
   fe-knip:
     desc: フロントエンドの未参照ファイル、未使用export、未使用依存をKnipで検査
     dir: frontend

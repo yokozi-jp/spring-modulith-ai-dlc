@@ -18,7 +18,7 @@ Accepted
 ## Context
 
 [フロントエンドのルーティングと状態管理](../frontend/routing-and-state.md)は、Effect を「Reactの外にあるsystemとcomponentを同期するときだけ」使うと定めていた。
-派生 state、event handler で済む処理、state の初期化、Effect の連鎖、server state の取得は、Oxlint と React Doctor が部分的に検出する。
+派生 state、event handler で済む処理、state の初期化、Effect の連鎖、server state の取得は、Oxlint が部分的に検出する。
 一方、この規約は書き手の判断に頼る。生成した API client 関数を Effect から呼ぶ形などは検出できず、review で確認していた。
 
 実際の Effect 7 箇所のうち、`document.title` の設定が5箇所、エラーの報告が1箇所、`pageshow` の購読が1箇所だった。
@@ -51,7 +51,7 @@ Accepted
 
 ### Neutral
 
-- React Doctor の Effect 向けの検査は残す。
+- React Doctor は外した（[ADR-098](ADR-098-remove-react-doctor-over-license-restriction.md)）。
 
 ## Alternatives Considered
 

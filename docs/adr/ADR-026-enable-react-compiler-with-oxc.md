@@ -32,7 +32,7 @@ Babel実装を使う場合は `@rolldown/plugin-babel`、`@babel/core`、`babel-
 React 19を対象にするため、`react-compiler-runtime` は追加しない。
 
 Compilerの診断ログは常時有効にしない。
-React規則の静的診断は既存のOxlint、React Doctor、TypeScript検査で行い、必要な調査時だけCompiler診断を有効化する。
+React規則の静的診断は既存のOxlintとTypeScript検査で行い、必要な調査時だけCompiler診断を有効化する。
 
 ## Consequences
 

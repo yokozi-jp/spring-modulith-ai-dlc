@@ -162,7 +162,7 @@ Effectの代わりに、次の形で書く。
 - **route全体の例外の報告**：routerの `defaultOnCatch` に置く（`router-defaults.ts`）。
 - **server stateの取得**：[ルーティング](#ルーティング)のとおり、loaderとTanStack Queryで取得する。
 
-ref callbackは、Effectに向けた `react/set-state-in-effect` やReact Doctorの `no-fetch-in-effect` などの検査が効かない。
+ref callbackは、Effectに向けた `react/set-state-in-effect` などの検査が効かない。
 ref callbackの中でstateを更新したり、serverへ取得したりしない。
 
 どうしてもEffectが要る場面（第三者のwidgetの初期化など）は、行単位の `oxlint-disable` に理由を書く。
@@ -174,7 +174,7 @@ ref callbackの中でstateを更新したり、serverへ取得したりしない
 
 Hookを呼ばない関数に `use` を付けると、Rules of Hooksの制約が呼び出し側にかかり、条件分岐の中から呼べなくなるためである。
 
-Hookを呼ぶのに `use` で始まらない関数は、Oxlintの `react/rules-of-hooks` とReact Doctorの `react-doctor/rules-of-hooks` が検出する。
+Hookを呼ぶのに `use` で始まらない関数は、Oxlintの `react/rules-of-hooks` が検出する。
 
 Hookを呼ばない関数に `use` を付ける形はどちらも検出しないため、reviewで確認する。
 

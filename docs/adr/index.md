@@ -99,3 +99,4 @@
 - [ADR-095: 依存関係の脆弱性検査に OWASP dep-scan を Trivy と並べて加える](ADR-095-scan-dependencies-with-dep-scan-alongside-trivy.md)（Proposed, 2026-11-19）
 - [ADR-096: 共通カラムの作成者と更新者には、AppUserPrincipal の利用者の ID だけを登録する](ADR-096-require-app-user-principal-for-audit-columns.md)（Proposed, 2026-11-18）
 - [ADR-097: Trivy を使い続け、CI の Trivy 本体の版を明示して Taskfile にそろえる](ADR-097-keep-trivy-and-align-its-version.md)（Proposed, 2026-11-19）
+- [ADR-098: 用途を制限するライセンスを理由に React Doctor を外す](ADR-098-remove-react-doctor-over-license-restriction.md)（Proposed, 2026-11-19）
