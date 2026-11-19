@@ -47,7 +47,7 @@ lock の強制を `mise.toml` の `[settings] locked = true` へ移す案も試�
 - PATH は mise の shims で通す。`04-setup-shell.sh` が `~/.bashrc` に `eval "$(mise activate bash --shims)"` を足す。Taskfile と Lefthook は `betterleaks` と `iwe` をそのまま呼ぶ。
 - CI は composite action `.github/actions/setup-mise` を使う。この action だけが `jdx/mise-action` の SHA と mise の版を持ち、入力 `tools` でジョブが使う道具だけを入れる。
 - composite action は `MISE_LOCKED=1` をジョブの環境変数にし、install と後の step の shims に lock に無い版を拒ませる。
-- Java は実行用のイメージ（`backend/Dockerfile` の `amazoncorretto:25`）と同じ Corretto の 25 系にする。CI は `tools` に `java` を渡し、composite action が `JAVA_HOME` を `mise where java` にする。ローカルは `JAVA_HOME` を設定せず、Gradle は PATH の shims の `java` を使う。
+- Java は実行用のイメージ（`backend/Dockerfile` の `amazoncorretto:25`）と同じ Corretto の 25 系にする。CI は `tools` に `java` を渡し、`jdx/mise-action` が mise の環境変数（`env` の既定）として `JAVA_HOME` を後の step に渡す。ローカルは `JAVA_HOME` を設定せず、Gradle は PATH の shims の `java` を使う。
 - CI ではキャッシュを使わない。復元したキャッシュは `mise.lock` と照合されないためである。
 - setup-mise を使う workflow は、paths 条件に `mise.toml`、`mise.lock`、`.github/actions/setup-mise/**` も入れる。以前は Task の版を上げると各 workflow 自身が変わって走ったが、今は `mise.toml` と `mise.lock` しか変わらないためである。
 - `task ci-gate-check` が、この paths 条件と、`go-task/setup-task`、`actions/setup-go`、`actions/setup-java` のように `mise.lock` を通さずに道具を入れる action を検査する。
