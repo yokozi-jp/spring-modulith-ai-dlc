@@ -20,13 +20,14 @@ lefthook="$root/node_modules/.bin/lefthook"
 git init -q "$tmp/repo"
 
 # run の本体を捨て、job 名を出すだけにする。files は、実行中のブランチに依らないよう消す（--file が代わりに渡す）。
+# skip は task docker-available を呼ぶが、空のリポジトリには Taskfile が無く常に飛ばされるため消す。
 # glob を持たない job は常に走るため、何もしない run にして一致の比較から外す。出力は production の output 設定に依らないよう固定する。
 # この検査が見るのは glob だけで、run 内の {files} や {staged_files} の参照は見ない。
 "$lefthook" dump --format json | node -e '
   const config = JSON.parse(require("fs").readFileSync(0, "utf8"));
   const stub = (job) => {
     if (job.group) job.group.jobs.forEach(stub);
-    else { job.run = job.glob ? `echo MATCHED ${job.name}` : "true"; delete job.files; }
+    else { job.run = job.glob ? `echo MATCHED ${job.name}` : "true"; delete job.files; delete job.skip; }
   };
   config.output = ["execution_out"];
   for (const hook of ["pre-commit", "pre-push"]) config[hook].jobs.forEach(stub);
