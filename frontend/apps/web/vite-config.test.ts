@@ -313,15 +313,61 @@ describe("Vite の設定", { timeout: 60_000 }, () => {
     expect(config.preview.headers?.["Content-Security-Policy"]).toBe(contentSecurityPolicy);
   });
 
-  it("preview を固定したオリジンで、開発時と同じ proxy を付けて提供する", async () => {
-    vi.stubEnv("SERVER_PORT", "19091");
-    const config = await resolveConfig({ mode: "test" }, "serve", "production", "production", true);
+  // task e2e は並行する実行ごとに E2E_WEB_PORT で preview の port をずらす（#418）。
+  describe("E2E の preview", () => {
+    it("preview を固定したオリジンで、開発時と同じ proxy を付けて提供する", async () => {
+      vi.stubEnv("SERVER_PORT", "19091");
+      const config = await resolveConfig(
+        { mode: "test" },
+        "serve",
+        "production",
+        "production",
+        true,
+      );
 
-    expect(config.preview.port).toBe(5173);
-    expect(config.preview.strictPort).toBe(true);
-    expect(config.preview.proxy?.[proxyPath]).toMatchObject({
-      target: "http://localhost:19091",
-      changeOrigin: false,
+      expect(config.preview.port).toBe(5173);
+      expect(config.preview.strictPort).toBe(true);
+      expect(config.preview.proxy?.[proxyPath]).toMatchObject({
+        target: "http://localhost:19091",
+        changeOrigin: false,
+      });
+    });
+
+    it("E2E_WEB_PORT は preview の port だけを変え、開発サーバーは 5173 のままにする", async () => {
+      vi.stubEnv("E2E_WEB_PORT", "21173");
+      const config = await resolveConfig(
+        { mode: "test" },
+        "serve",
+        "production",
+        "production",
+        true,
+      );
+
+      expect({
+        previewPort: config.preview.port,
+        previewStrictPort: config.preview.strictPort,
+        serverPort: config.server.port,
+        serverStrictPort: config.server.strictPort,
+      }).toStrictEqual({
+        previewPort: 21_173,
+        previewStrictPort: true,
+        serverPort: 5173,
+        serverStrictPort: true,
+      });
+    });
+
+    it.each(["invalid", "0", "65536"])("不正な E2E_WEB_PORT %s を拒否する", async (value) => {
+      vi.stubEnv("E2E_WEB_PORT", value);
+
+      await expect(
+        resolveConfig(
+          { mode: "test", logLevel: "silent" },
+          "serve",
+          "production",
+          "production",
+          true,
+        ),
+      ).rejects.toThrow(`E2E_WEB_PORT must be an integer between 1 and 65535: ${value}`);
     });
   });
 
