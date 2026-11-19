@@ -37,7 +37,7 @@ tags: [runbook, workflow, agent-skills, pstack, thermos]
 開発者が `/grill-with-docs` を名前で呼ぶ。
 `/grilling` が未決事項を前提の順に質問し、`/domain-modeling` が用語を `GLOSSARY.md` に書き、ADR にすべき判断を提案する。
 ADR は [ADR の運用ルール](../adr/conventions.md)の基準と書式に従う。
-質問に推奨の答え（➡）を付けるときは、[grilling の推奨に添える根拠](grilling-recommendations.md)の4行を添える。
+`/grilling` の各推奨（➡）には、[grilling の推奨に添える根拠](grilling-recommendations.md)の4行を添える。
 
 仕様と実装チケットに分けるときは、同じセッションで `/to-spec`、`/to-tickets` を続け、対話で決めた前提を仕様とチケットへ引き継ぐ。
 チケットには単独で実装できる情報を持たせ、前のチケットの会話へ依存させない。
