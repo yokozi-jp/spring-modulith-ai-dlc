@@ -61,7 +61,7 @@ Spring Modulith 2.1.2 のイベント出版は、次の状態を持つ（[Spring
   その状態に入ってからの時間では測らないため、`PROCESSING` の時間は executor の空きを待つ時間も含む。
   状態ごとの時間を設定しなければその状態は監視せず、0 以下の時間は起動に失敗する。
   main は `PUBLISHED` の時間を定期の再投入の最初の待ち時間（`wait-age`）と同じにし、判定の間隔を定期の再投入の間隔と同じにして有効にする。
-  `PROCESSING` と `RESUBMITTED` の時間は `in-flight-staleness` にし、1 回の配信の上限として置く `lock-at-most-for` より長いことを起動時に検証する（[ADR-079](../adr/ADR-079-resubmit-failed-event-publications-periodically-with-shedlock.md)）。
+  `PROCESSING` と `RESUBMITTED` の時間は `in-flight-staleness` にし、`lock-at-most-for` の 2 倍より長いことを起動時に検証する（[ADR-079](../adr/ADR-079-resubmit-failed-event-publications-periodically-with-shedlock.md)）。
   その代わり、落ちたまま `PROCESSING` や `RESUBMITTED` に残った出版の回復は、最後の出版か再投入から `in-flight-staleness` を過ぎるまで遅れる。
   ただし、最初の配信が `concurrency-limit` の空きを待つ間に待ち時間を過ぎた出版は、`FAILED` に戻った次の回で重ねて再投入しうる。
   その場合はリスナーの冪等性で結果を保つ。

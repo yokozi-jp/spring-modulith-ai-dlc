@@ -37,6 +37,7 @@ Spring Modulith 2.1.2 の JDBC の V2 のスキーマは、状態、試行の回
 `FailedEventPublications.resubmit(ResubmissionOptions)` は、`FAILED` の出版を最小の経過時間と条件の関数で絞って再投入できる。
 ただし、件数の上限は条件の関数より先に SQL の `LIMIT` で掛かり、`resubmit` は再投入した件数を返さない。
 最小の経過時間は `publication_date` から測るため、最後の試行からの待ち時間を表せない。
+最小の経過時間が既定の 0 でも、`publication_date` が今より前の `FAILED` の出版だけを読む。
 
 リスナーごとに、外部システムの回復にかかる時間も、何度まで自動で試してよいかも違う。
 一律の待ち時間と回数では、長い障害の間に短い間隔で再投入を繰り返すか、短い障害の回復を待たせすぎる。
@@ -54,12 +55,11 @@ Staleness Monitor の `PROCESSING` と `RESUBMITTED` の閾値を `wait-age` か
 手での 1 回の再投入が、終了の前に処理中のリスナーの完了を待つようにした。
 Spring Modulith 2.1.2 には、再投入の結果を知らせる公開の hook がなく、`FailedEventPublications.resubmit` は件数を返さないため、結果は公開された表の列を読み戻して知る。
 
-Proposed の間に、Spring Modulith を 2.1.1 から 2.1.2 に上げ、`in-flight-staleness` の起動時の検証を書き直した。
-2.1.1 の Staleness Monitor は、再投入した出版も `publication_date` から測った（[GH-1836](https://github.com/spring-projects/spring-modulith/issues/1836)）。
-そのため `in-flight-staleness` を、方針の最後の再投入とリスナーの処理が終わるまでの最長の時間（本番の値で 200 分）より長くし、本番を `PT4H` にしていた。
-2.1.2 は `last_resubmission_date` から測る（[GH-1837](https://github.com/spring-projects/spring-modulith/issues/1837)）ため、検証を `lock-at-most-for` より長いことだけにし、本番を `PT15M` にした。
-`wait-age`（本番 5 分）まで縮めないのは、1 回の配信の上限として置く `lock-at-most-for`（10 分）より短いためである。
-状態ごとの閾値の 0 がその状態の出版をすべて `FAILED` にする 2.1.1 の癖（[GH-1917](https://github.com/spring-projects/spring-modulith/issues/1917)）も 2.1.2 で直り（[GH-1918](https://github.com/spring-projects/spring-modulith/issues/1918)）、0 以下の閾値は起動に失敗する。
+Proposed の間に、Spring Modulith を 2.1.1 から 2.1.2 に上げ、本番の `in-flight-staleness` を `PT4H` から `PT25M` に縮めた。
+2.1.1 の Staleness Monitor は再投入した出版も `publication_date` から測った（[GH-1836](https://github.com/spring-projects/spring-modulith/issues/1836)）ため、`PT4H` は方針の再投入がすべて終わるまでを覆う長さだった。
+2.1.2 は [GH-1837](https://github.com/spring-projects/spring-modulith/issues/1837) でこれを直した。
+`wait-age`（本番 5 分）まで縮めないのは、再投入してから executor の空きを待つ間やリスナーの処理の間に、処理中の出版を `FAILED` に戻しうるためである。
+状態ごとの閾値の 0 がその状態の出版をすべて `FAILED` にする 2.1.1 の癖（[GH-1917](https://github.com/spring-projects/spring-modulith/issues/1917)）も、2.1.2 で直った（[GH-1918](https://github.com/spring-projects/spring-modulith/issues/1918)）。
 
 ## Decision
 
@@ -100,7 +100,7 @@ Proposed の間に、Spring Modulith を 2.1.1 から 2.1.2 に上げ、`in-flig
   条件の関数で、方針の上限未満で、待ち時間を過ぎた出版だけを選ぶ。
   待ち時間は条件の関数だけで強制し、Spring Modulith の最小の経過時間には頼らない。
   `LIMIT` は掛けず、1 回の件数の上限は条件の関数で数える。
-- `LIMIT` が条件の関数より先に掛かることと、Staleness Monitor が再投入した出版を `last_resubmission_date` から測ることは、学習テスト（`ResubmissionOptionsLearningTest`）で固定する。
+- `LIMIT` が条件の関数より先に掛かること、既定の最小の経過時間でも `publication_date` が今と同じ出版を読まないこと、Staleness Monitor が処理中の出版を `last_resubmission_date` から測ることは、学習テスト（`ResubmissionOptionsLearningTest`）で固定する。
   Spring Modulith の版を上げて振る舞いが変わると、このテストが失敗して、読み方を見直す合図になる。
 - 試行の回数は Spring Modulith の `completion_attempts` で持ち、表を足さない。
 - 上限に達した出版は自動の対象から外し、出版ごとの ERROR のログで知らせる。
@@ -123,7 +123,7 @@ Proposed の間に、Spring Modulith を 2.1.1 から 2.1.2 に上げ、`in-flig
   `outcomes{outcome=completed}` は archive に移った出版（`completion-mode: archive` が前提）、`outcomes{outcome=failed}` は `FAILED` に戻った出版（Staleness Monitor が戻した場合を含む）を、再投入ごとに 1 回だけ数える。
   処理中（`PUBLISHED`、`PROCESSING`、`RESUBMITTED`）は次の回に回し、どちらの表にもない出版（運用者が消した）は数えずに忘れる。
   `exhausted` は、`FAILED` に戻った出版の `completion_attempts` がリスナーの方針の `max-resubmissions` を超えた遷移の数で、同時に ERROR を 1 回記録する。
-  覚えておく期間は `max(3 × lock-at-most-for, in-flight-staleness + interval)` で、未完了の状態の出版だけに適用する。
+  覚えておく期間は `max(3 × lock-at-most-for, in-flight-staleness + lock-at-most-for + 2 × interval)` で、未完了の状態の出版だけに適用する。
   期限を超えた未完了の出版は数えずに捨て、`FAILED` と archive の終端の状態は期限によらず数える。
 - 結果の Counter は再投入したインスタンスだけが数えるため、インスタンスの間で二重に数えず、ダッシュボードは合計（`sum`）で集める。
   Gauge は逆に最大値（`max`）で集める。
@@ -144,10 +144,10 @@ Proposed の間に、Spring Modulith を 2.1.1 から 2.1.2 に上げ、`in-flig
 - Staleness Monitor を有効にし、落ちたまま残った `PUBLISHED`、`PROCESSING`、`RESUBMITTED` を `FAILED` に戻す。
   `published` は `wait-age` にする。
   `processing` と `resubmitted` は `event-publication.resubmission.in-flight-staleness` にし、再投入して処理中の出版を `FAILED` に戻さないようにする。
-  `in-flight-staleness` は `lock-at-most-for` より長くし、短いと起動に失敗する。
-  閾値は最後の出版か再投入の時刻から測るため、1 回の配信（executor の空きを待つ時間とリスナーの処理）の最長より長ければ足りる。
-  配信の上限は別に持たず、1 回の実行の上限としてすでに concurrency-limit の空きを待つ時間を含めている `lock-at-most-for` で代える。
-  本番は `PT15M` にする。
+  `in-flight-staleness` は `lock-at-most-for` の 2 倍より長くし、短いと起動に失敗する。
+  再投入の時刻を書いてから、executor の空きの待ち（1 回の実行の中なので `lock-at-most-for` まで）とリスナーの処理が続くためである。
+  リスナーの処理の上限は別に持たず、1 回の実行の上限としてすでに concurrency-limit の空きを待つ時間を含めている `lock-at-most-for` で代える。
+  本番は、`lock-at-most-for`（10 分）の 2 倍に 5 分の余裕を足した `PT25M` にする。
 - `wait-age` はリスナーの処理時間より十分に長くする。
 - 有効と無効、`wait-age`、`in-flight-staleness`、間隔は環境変数で注入し、方針、1 回の件数、ロックを持つ上限、手での再投入の完了を待つ上限は `application.yaml` の固定値にする（ADR-008）。
 - 本番のコードがセッションに状態を残す SQL を使わないことを、`task lint-session-sql` で検査する。
@@ -198,12 +198,12 @@ shared の範囲は、ADR-048 の jOOQ の共通処理に加えて、Spring Modu
 - イベントの型の名前を変えた出版は Spring Modulith が読み出しで落とすため、上限に達せず ERROR も出ない。WARN と最古の経過時間の警報で見つける。
 - 上限に達した通知の重複を避ける記録はインスタンスのメモリにあり、同じ出版の ERROR がロックを取ったインスタンスの数と再起動の回数だけ重なりうる。
 - ジョブは失敗の原因を見分けないため、内部の不変条件の違反のデッドレター（ADR-072）も上限まで再投入し、そのたびにリスナーの ERROR が出る。
-- 落ちたまま `PROCESSING` や `RESUBMITTED` に残った出版の回復は、最後の出版か再投入から `in-flight-staleness`（本番 15 分）まで遅れる。
+- 落ちたまま `PROCESSING` や `RESUBMITTED` に残った出版の回復は、最後の出版か再投入から `in-flight-staleness`（本番 25 分）まで遅れる。
   その間、`FAILED` の出版の Gauge と最古の経過時間の警報はその出版を数えない。
 - 終了の前の 20 秒の待ちは、手での再投入が自分で終わるときだけ効く。
   完了の待ちの間に ECS が SIGTERM で止めると、文脈は既定の順で閉じ、`DataSource` を閉じた後に executor を待つため、処理中のリスナーは DB に触れずに失敗する。
   リスナーのトランザクションは戻るため出版は失われず、次の再投入の対象に残る。
-- 1 回の配信が `lock-at-most-for` の前提を破って `in-flight-staleness` を超えると、Staleness Monitor が処理中の出版を `FAILED` に戻し、結果の Counter がその出版を `failed` と数えうる。
+- executor の空きの待ちかリスナーの処理が `lock-at-most-for` の前提を破り、再投入から `in-flight-staleness` を超えると、Staleness Monitor が処理中の出版を `FAILED` に戻し、結果の Counter がその出版を `failed` と数えうる。
 - 最初の配信が `concurrency-limit` の空きを待つ間に `wait-age` を過ぎた出版は、Staleness Monitor が `FAILED` に戻し、ジョブが重ねて再投入しうる。その場合はリスナーの冪等性に頼る。その間、`FAILED` の出版の Gauge は処理中の出版も数える。
 - 決済の circuit breaker（`payment-gateway`）が open の間の再投入は、外部を呼ばずに `CallNotPermittedException` で `FAILED` になり、`completion_attempts` を 1 消費する。
   コードで確認したのは次の 3 点である。

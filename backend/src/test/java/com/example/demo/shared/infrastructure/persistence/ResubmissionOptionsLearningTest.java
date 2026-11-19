@@ -1,6 +1,7 @@
 package com.example.demo.shared.infrastructure.persistence;
 
 import static com.example.demo.jooq.modulith.Tables.EVENT_PUBLICATION;
+import static com.example.demo.jooq.modulith.Tables.EVENT_PUBLICATION_ARCHIVE;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.example.demo.shared.infrastructure.persistence.EventPublicationResubmitterTest.ProbeListener;
@@ -18,6 +19,8 @@ import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.modulith.events.EventPublication;
 import org.springframework.modulith.events.FailedEventPublications;
@@ -33,7 +36,8 @@ import org.springframework.modulith.test.Scenario;
  *
  * <p>{@link EventPublicationResubmitter} と {@link EventPublicationResubmitOnce} は、{@code LIMIT}
  * が条件の関数より先に掛かるため、{@code withBatchSize} を {@link Integer#MAX_VALUE} にして FAILED の行をすべて読む。 Spring
- * Modulith の版を上げて {@code LIMIT} のテストが失敗したら、ADR-079 と両方のクラスの読み方を見直す。
+ * Modulith の版を上げて {@code LIMIT} のテストが失敗したら、ADR-079 と両方のクラスの読み方を見直す。 再投入が {@code publication_date}
+ * が今より前の出版だけを読むことには、時計を止めて出版を作るテストが頼る。
  *
  * <p>Staleness Monitor のテストが失敗したら、{@code event-publication.resubmission.in-flight-staleness}
  * の起動時の検証と ADR-079 を見直す。 どの行も FAILED で終わるため、{@code CleanGeneratedTablesExtension} の処理中の出版の待ちを止めない。
@@ -79,7 +83,7 @@ class ResubmissionOptionsLearningTest {
     final UUID older = failed(scenario);
     clock.set(T0.plusSeconds(1));
     final UUID newer = failed(scenario);
-    // 再投入は publication_date が今より前の出版だけを読むため、新しい出版も読める時刻に進める。
+    // 新しい出版も読める時刻に進める（defaultsResubmitOnlyPublicationsOlderThanNow）。
     clock.set(T0.plusSeconds(2));
     final List<UUID> seen = new CopyOnWriteArrayList<>();
 
@@ -103,9 +107,32 @@ class ResubmissionOptionsLearningTest {
 
   @Test
   @DisplayName(
-      "学習テスト：Staleness Monitor は RESUBMITTED の出版を publication_date でなく last_resubmission_date から測る")
-  void stalenessIsMeasuredFromLastResubmissionDate() {
-    final UUID publication = insert(EventPublication.Status.RESUBMITTED);
+      "学習テスト：ResubmissionOptions.defaults() は publication_date が今と同じ FAILED の出版を再投入せず、1 マイクロ秒後には再投入する")
+  void defaultsResubmitOnlyPublicationsOlderThanNow(final Scenario scenario) {
+    clock.set(T0);
+    final UUID publication = failed(scenario);
+
+    failedEventPublications.resubmit(ResubmissionOptions.defaults());
+
+    assertThat(status(publication)).as("publication_date が今と同じ出版の状態").isEqualTo(FAILED_STATUS);
+
+    clock.set(T0.plus(1, ChronoUnit.MICROS));
+    failedEventPublications.resubmit(ResubmissionOptions.defaults());
+
+    scenario
+        .stimulate(() -> {})
+        .andWaitForStateChange(() -> archived(publication), Boolean.TRUE::equals)
+        .andVerify(done -> {});
+    assertThat(archived(publication)).as("1 マイクロ秒後に再投入して完了した").isTrue();
+  }
+
+  @ParameterizedTest
+  @EnumSource(
+      value = EventPublication.Status.class,
+      names = {"PROCESSING", "RESUBMITTED"})
+  @DisplayName("学習テスト：Staleness Monitor は処理中の出版を publication_date でなく last_resubmission_date から測る")
+  void stalenessIsMeasuredFromLastResubmissionDate(final EventPublication.Status inFlight) {
+    final UUID publication = insert(inFlight);
     final Instant resubmittedAt = T0.plus(Duration.ofMinutes(10));
     dsl.update(EVENT_PUBLICATION)
         .set(EVENT_PUBLICATION.LAST_RESUBMISSION_DATE, resubmittedAt)
@@ -115,9 +142,7 @@ class ResubmissionOptionsLearningTest {
 
     registry.markStalePublicationsFailed(status -> STALENESS);
 
-    assertThat(status(publication))
-        .as("再投入した直後の出版の状態")
-        .isEqualTo(EventPublication.Status.RESUBMITTED.name());
+    assertThat(status(publication)).as("再投入した直後の出版の状態").isEqualTo(inFlight.name());
 
     clock.set(resubmittedAt.plus(STALENESS).plus(1, ChronoUnit.MICROS));
 
@@ -141,6 +166,10 @@ class ResubmissionOptionsLearningTest {
         .where(EVENT_PUBLICATION.ID.eq(publication))
         .execute();
     return publication;
+  }
+
+  private boolean archived(final UUID publication) {
+    return dsl.fetchExists(EVENT_PUBLICATION_ARCHIVE, EVENT_PUBLICATION_ARCHIVE.ID.eq(publication));
   }
 
   private @Nullable String status(final UUID publication) {

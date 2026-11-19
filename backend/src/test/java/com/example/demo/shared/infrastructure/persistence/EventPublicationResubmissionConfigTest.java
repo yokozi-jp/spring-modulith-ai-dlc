@@ -71,7 +71,7 @@ class EventPublicationResubmissionConfigTest {
   /** 妥当な設定値。 */
   private static final String[] VALID = {
     "event-publication.resubmission.wait-age=PT5M",
-    "event-publication.resubmission.in-flight-staleness=PT4H",
+    "event-publication.resubmission.in-flight-staleness=PT25M",
     "event-publication.resubmission.interval=PT1M",
     "event-publication.resubmission.max-per-run=100",
     "event-publication.resubmission.lock-at-most-for=PT10M",
@@ -173,7 +173,7 @@ class EventPublicationResubmissionConfigTest {
             PlatformTransactionManager.class, () -> Mockito.mock(PlatformTransactionManager.class))
         .withPropertyValues(
             "event-publication.resubmission.wait-age=PT5M",
-            "event-publication.resubmission.in-flight-staleness=PT4H",
+            "event-publication.resubmission.in-flight-staleness=PT25M",
             "event-publication.resubmission.interval=PT1M",
             "event-publication.resubmission.max-per-run=100",
             "event-publication.resubmission.lock-at-most-for=PT10M",
@@ -202,12 +202,12 @@ class EventPublicationResubmissionConfigTest {
   }
 
   @Test
-  @DisplayName("処理中の出版の閾値が lock-at-most-for（PT10M）以下だと起動に失敗し、1 秒長ければ起動する")
-  void inFlightStalenessNotLongerThanLockAtMostForFailsStartup() {
-    assertBindFailure("event-publication.resubmission.in-flight-staleness=PT10M");
+  @DisplayName("処理中の出版の閾値が lock-at-most-for（PT10M）の 2 倍以下だと起動に失敗し、1 秒長ければ起動する")
+  void inFlightStalenessNotLongerThanTwiceLockAtMostForFailsStartup() {
+    assertBindFailure("event-publication.resubmission.in-flight-staleness=PT20M");
     runner
         .withPropertyValues(
-            ENABLED + "=false", "event-publication.resubmission.in-flight-staleness=PT10M1S")
+            ENABLED + "=false", "event-publication.resubmission.in-flight-staleness=PT20M1S")
         .run(context -> assertThat(context).hasNotFailed());
   }
 

@@ -204,7 +204,8 @@ class OrderConfirmedListenerTest {
     gateway.hold();
     try {
       // 3. 認証も observation もないテストのスレッドから再投入する。
-      // 再投入は publication_date が今より前の出版だけを読み、時計は NOW で止まっているため、出版の時刻を 1 マイクロ秒前にする。
+      // 時計は NOW で止まっているため、再投入できるよう出版の時刻を 1 マイクロ秒前にする（ResubmissionOptionsLearningTest の
+      // defaultsResubmitOnlyPublicationsOlderThanNow）。
       dsl.update(EVENT_PUBLICATION)
           .set(EVENT_PUBLICATION.PUBLICATION_DATE, NOW.minus(1, ChronoUnit.MICROS))
           .where(EVENT_PUBLICATION.SERIALIZED_EVENT.contains(orderId))

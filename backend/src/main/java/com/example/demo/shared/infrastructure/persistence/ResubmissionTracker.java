@@ -89,15 +89,21 @@ final class ResubmissionTracker {
   }
 
   /**
-   * 覚えておく期間。{@code max(3 × lock-at-most-for, in-flight-staleness + interval)}。
+   * 覚えておく期間。{@code max(3 × lock-at-most-for, in-flight-staleness + lock-at-most-for + 2 ×
+   * interval)}。
    *
-   * <p>落ちたまま残った再投入の出版は、Staleness Monitor が last_resubmission_date から {@code in-flight-staleness}
-   * を過ぎたら FAILED に戻し、その検出は {@code interval} ごとに動く。 その後の回で数えるまでの余裕として、ロックの上限の 3 倍とも比べて長い方を取る。
+   * <p>落ちたまま残った再投入の出版の last_resubmission_date は、この回の時刻から最大で {@code lock-at-most-for} 遅れる。 Staleness
+   * Monitor はそこから {@code in-flight-staleness} を過ぎた出版を {@code interval} ごとに FAILED に戻し、次の回はさらに最大で
+   * {@code interval} 後に数える。 その後の回で数えるまでの余裕として、ロックの上限の 3 倍とも比べて長い方を取る。
    */
   /* package */ static Duration lifetimeOf(
       final EventPublicationResubmissionConfig.Properties properties) {
     final Duration byLock = properties.lockAtMostFor().multipliedBy(3);
-    final Duration byStaleness = properties.inFlightStaleness().plus(properties.interval());
+    final Duration byStaleness =
+        properties
+            .inFlightStaleness()
+            .plus(properties.lockAtMostFor())
+            .plus(properties.interval().multipliedBy(2));
     return byLock.compareTo(byStaleness) > 0 ? byLock : byStaleness;
   }
 

@@ -227,7 +227,7 @@ class EventPublicationResubmissionConfig {
    * @param waitAge 最初の失敗から 1 回目の再投入までの待ち時間で、2 回目からの待ち時間の基準。PUBLISHED の Staleness Monitor
    *     の閾値にも使う。リスナーの処理時間より十分に長くする
    * @param inFlightStaleness PROCESSING と RESUBMITTED の Staleness Monitor
-   *     の閾値。最後の出版か再投入の時刻から測る。{@code lock-at-most-for} より長くする
+   *     の閾値。最後の出版か再投入の時刻から測る。{@code lock-at-most-for} の 2 倍より長くする
    * @param interval 前の回の終わりから次の回までの間隔
    * @param maxPerRun 1 回の実行で再投入する件数と、新しく記録する ERROR の件数の上限
    * @param lockAtMostFor ロックを持つ上限。実行が落ちて解放できなかったとき、この時間を過ぎると他のインスタンスが取れる。1 回の実行の最長の時間より十分に長くする
@@ -281,19 +281,18 @@ class EventPublicationResubmissionConfig {
     }
 
     /**
-     * PROCESSING と RESUBMITTED の Staleness Monitor の閾値が、ロックを持つ上限より長いか。
+     * PROCESSING と RESUBMITTED の Staleness Monitor の閾値が、ロックを持つ上限の 2 倍より長いか（ADR-079）。
      *
-     * <p>閾値が 1 回の配信（executor の空きを待つ時間とリスナーの処理）の最長以下だと、処理中の出版を FAILED に戻す。 配信の上限は別に持たず、{@code
-     * lock-at-most-for} で代える。 {@code lock-at-most-for} は concurrency-limit の空きを待つ時間を含めて 1
-     * 回の実行より長くするため、他のリスナーの処理もこの中に収まる前提をすでに置いているからである。
+     * <p>再投入の時刻から、executor の空きの待ちとリスナーの処理が、それぞれ {@code lock-at-most-for} まで続きうる。
      */
     @AssertTrue(
         message =
-            "event-publication.resubmission.in-flight-staleness must be longer than lock-at-most-for")
-    /* package */ boolean isInFlightStalenessLongerThanLockAtMostFor() {
+            "event-publication.resubmission.in-flight-staleness must be longer than twice"
+                + " lock-at-most-for")
+    /* package */ boolean isInFlightStalenessLongerThanTwiceLockAtMostFor() {
       return inFlightStaleness == null
           || lockAtMostFor == null
-          || inFlightStaleness.compareTo(lockAtMostFor) > 0;
+          || inFlightStaleness.compareTo(lockAtMostFor.multipliedBy(2)) > 0;
     }
   }
 

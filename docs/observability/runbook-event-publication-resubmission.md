@@ -21,8 +21,8 @@ main では `payment.application.OrderConfirmedListener` が `payment` を使い
 
 n 回目の再投入の前に、最後の試行から `min(wait-age × multiplier^(n-1), max-wait)` を待つ。
 `wait-age` は環境変数 `EVENT_PUBLICATION_RESUBMISSION_WAIT_AGE` である。
-Staleness Monitor が処理中の出版を `FAILED` に戻すまでの `in-flight-staleness` は環境変数 `EVENT_PUBLICATION_RESUBMISSION_IN_FLIGHT_STALENESS` で、本番は `PT15M` である。
-`in-flight-staleness` は最後の出版か再投入の時刻から測り、`lock-at-most-for`（10 分）より長くしないと起動に失敗する。
+Staleness Monitor が処理中の出版を `FAILED` に戻すまでの `in-flight-staleness` は環境変数 `EVENT_PUBLICATION_RESUBMISSION_IN_FLIGHT_STALENESS` で、本番は `PT25M` である。
+`in-flight-staleness` は最後の出版か再投入の時刻から測り、`lock-at-most-for`（10 分）の 2 倍より長くしないと起動に失敗する。
 
 出版の `listener_id` は、リスナーのメソッドの完全修飾名と引数の型である（例：`com.example.demo.payment.application.OrderConfirmedListener.on(com.example.demo.ordering.OrderConfirmed)`）。
 次の節の SQL は、`policy` の行にリスナーの ID と方針の上限を並べ、並べないリスナーを `default` の上限で扱う。
@@ -214,7 +214,7 @@ DELETE FROM modulith.event_publication
 - `outcomes` は再投入した次の回の先頭で数えるため、結果の判定は最大で間隔と処理時間だけ遅れる。
   `outcome=completed` は `completion-mode: archive` が前提で、`update` の `COMPLETED` の行は数えない。
   処理中の出版は次の回に回し、運用者が消した出版は数えずに忘れる。
-  未完了のまま `max(3 × lock-at-most-for, in-flight-staleness + interval)` を過ぎた出版も数えずに捨てる。
+  未完了のまま `max(3 × lock-at-most-for, in-flight-staleness + lock-at-most-for + 2 × interval)` を過ぎた出版も数えずに捨てる。
 - 再投入した直後にそのインスタンスが落ちると、その回の結果は数えない。
   `failed` と `exhausted` の Gauge と、最古の経過時間の警報が補う。
 - Gauge は、ロックを取ったかどうかによらず、すべてのインスタンスが毎回同じ値を集計して出す。
