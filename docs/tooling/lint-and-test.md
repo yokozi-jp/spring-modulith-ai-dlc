@@ -355,6 +355,8 @@ const params = { ...(cursor !== undefined && { cursor }) };
   `ci.yml`にジョブを足したときは`CI gate`の`needs`にも足し、`ci.yml`から呼ばない`pull_request`の workflow は`tooling/ci-gate-check/excluded.tsv`に理由を書く。
   失敗にする状態は`test.sh`のケースが正で、この文書には写さない。
   Python 3とPyYAMLが要る（GitHubのランナーには入っている。ローカルでは`sudo apt install python3-yaml`）。CIだけで実行し、Lefthookには入れない。
+- **`task mise-lock-check`**：`mise.toml`の全ての道具の版が`mise.lock`に載っていることを、`mise install --locked --dry-run`で検査する（[ADR-090](../adr/ADR-090-pin-cli-tools-with-mise-lock.md)）。
+  CIのjobは使う道具だけを入れるので、ほかの道具の版だけを上げてlockを作り直さない変更をここで止める。CIだけで実行する。
 - **`task skills-check`**：`skills-lock.json`と`.kiro/.kiro-plugins-installed`の記録が、`.agents/skills`の実体、`.kiro/skills`のリンク、`kiro/install.sh`が入れたファイルと合っているかを検査する。
   入れたファイルへの書き込みを止めるフックの自己検査（`.kiro/hooks/block-generated-writes.test.sh`）、エージェントの`git commit`と`git push`の直接実行を止めるフックの自己検査（`.kiro/hooks/block-agent-git.test.sh`）、`tooling/skills-check/test.sh`を先に実行してから、`tooling/skills-check/skills-check.mjs`が実際の木を検査する。
   失敗にする状態は`tooling/skills-check/test.sh`のケースが正で、この文書には写さない。
