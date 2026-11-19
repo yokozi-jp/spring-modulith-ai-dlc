@@ -51,7 +51,7 @@ Accepted
 
 ### Neutral
 
-- React Doctor の Effect 向けの検査は残す。
+- React Doctor は外した（[ADR-098](ADR-098-remove-react-doctor-over-license-restriction.md)）。
 
 ## Alternatives Considered
 

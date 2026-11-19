@@ -15,7 +15,7 @@ tags: [convention, frontend, testing, accessibility, future-arch-guidelines]
 **Testing Trophy**：利用者の視点で動作を確かめるcomponent testとintegration testを最も厚くし、実装の詳細に依存するunit testと費用の高いE2E testに偏らないテストの配分。
 
 フロントエンドのテストはTesting Trophyに従う。
-Trophyの土台は静的解析であり、Oxlintの全カテゴリ、TypeScriptの型検査、Knip、React Doctorがこれにあたる。
+Trophyの土台は静的解析であり、Oxlintの全カテゴリ、TypeScriptの型検査、Knipがこれにあたる。
 
 テストの種類ごとの件数の比率は数値で決めない。
 既定はcomponent testとし、unit testは純粋関数だけに書き、E2E testは数本にとどめる。

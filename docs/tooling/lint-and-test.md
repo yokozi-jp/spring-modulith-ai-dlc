@@ -69,8 +69,6 @@ PITのHTMLとXMLのレポートは、変異対象がある場合に`backend/buil
 - **`task fe-check`**：workspaceのルートの`frontend`で`vp check`を実行し、Oxfmt、Oxlint、TypeScriptの型を非破壊で検査する。続けて、`e2e/`の`environment.ts`、`fixtures.ts`、`orders.ts`、`payment-gateway.ts`をNodeで直接importでき（相対のimportに拡張子`.ts`がある）、Playwrightの外から使えることを確かめる。
 - **`task fe-knip`**：未参照ファイル、未使用export、未使用依存をKnipで検査する。
   `packages/ui`は`includeEntryExports: true`にし、`exports`で公開した部品の未使用exportも報告する。
-- **`task fe-doctor`**：`apps/web`のReact Doctorでwarningとerrorを検出し、検出または15分超過で失敗する。`packages/ui`は対象にしない。
-  `packages/ui`を対象に加えるときは、`react-doctor/only-export-components`の例外が要る。`buttonVariants`のようなvariantをcomponentと同じファイルからexportするためである。
 - **`task fe-coverage`**：React Compilerを有効にして、`vp run --recursive test`でルートのlint設定のテストと各packageのテストを実行する。
   そのあと、Compilerを外した状態で、ルートを除くpackageごとにVitestのV8 providerのcoverageを測り、下限もpackageごとに検証する。
   `apps/web`の全体の下限はbranch 88%とline 95%、`packages/api`の全体の下限は切り出した時点の実測の少し下のbranch 90%とline 98%、`packages/ui`の全体の下限はbranch 95%とline 95%である。ファイルごとの下限は全packageで共通のbranch 60%とline 65%である。
@@ -440,7 +438,7 @@ pre-pushの「変更」は、push済みかどうかやrebaseの有無によら�
   スコアの閾値を持たず、PITが完走しないときだけ失敗する。
   Backend CIのtestと同じGradle cacheをread-onlyで復元する。
   必須チェックにしない（[ADR-076](../adr/ADR-076-run-mutation-tests-per-change-and-tighten-coverage-gates.md)）。
-- **`frontend-ci.yml`**：`fe-verify`、`fe-route-tree-check`、`api-client-check`、`fe-doctor`を実行する。
+- **`frontend-ci.yml`**：`fe-verify`、`fe-route-tree-check`、`api-client-check`を実行する。
 - **`api-contract.yml`**：`api-lint`、`api-lint-rules-test`、`api-breaking`、`api-docs`を実行し、設計書をartifactにする。
   mainへのpushでは設計書をGitHub Pagesに公開する。
 - **`betterleaks.yml`**：`scan-secrets-all`を実行する。PRでは`BETTERLEAKS_LOG_OPTS`にbaseからheadまでの範囲を渡す。

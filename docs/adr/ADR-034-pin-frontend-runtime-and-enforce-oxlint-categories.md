@@ -17,6 +17,8 @@ Proposed
 
 ## Context
 
+> 書き直し：React Doctor を外したため（[ADR-098](ADR-098-remove-react-doctor-over-license-restriction.md)）、Decision から React Doctor の記述を除いた。
+
 Frontend は Vite+ をツールチェーンの単一入口とし、Node.js は Vite+ が管理する。
 これまで Node.js の版はプロジェクトに明示されておらず、Vite+ はローカルで LTS を選び、Frontend CI は `actions/setup-node` にメジャー版 `22` だけを渡していた。
 ローカルと CI で解決される Node.js の版が食い違い、片方でだけ再現する不具合を招きうる。
@@ -57,7 +59,7 @@ Oxlint の `correctness`、`suspicious`、`pedantic`、`perf`、`style`、`restr
   有効なままだと型名と比べる形しか通らないためであり、上書きと shadowing は有効なままの `no-global-assign` と `no-shadow-restricted-names` が防ぐ。
 - `better-tailwindcss/enforce-canonical-classes` を有効にし、class の表記を正規形にそろえる。
   `enforce-shorthand-classes` は役割が重なるため有効にしない。
-- `src/components/ui/**` では、Oxlint の `react/only-export-components` と React Doctor の `react-doctor/only-export-components` を無効にする。
+- `packages/ui/**` では、Oxlint の `react/only-export-components` を無効にする。
   shadcn の生成物は `buttonVariants` のような variant を component と同じファイルから export するためであり、生成物を手で分けずに registry から更新できる形を保つ。
 
 `radix`、`no-new-wrappers`、`typescript/consistent-type-definitions`、`import/no-relative-parent-imports` はカテゴリ指定ですでに有効なので、個別に列挙しない。

@@ -17,6 +17,8 @@ Proposed
 
 ## Context
 
+> 書き直し：React Doctor を外したため（[ADR-098](ADR-098-remove-react-doctor-over-license-restriction.md)）、Decision から React Doctor の記述を除いた。
+
 FrontendはReact 19とVite+を使い、`@vitejs/plugin-react` 6.1.1でJSXを変換している。
 React componentの再描画を抑えるために手作業で `memo`、`useMemo`、`useCallback` を追加すると、依存配列とmemoizationの要否を開発者が継続して判断する必要がある。
 
@@ -32,7 +34,7 @@ Babel実装を使う場合は `@rolldown/plugin-babel`、`@babel/core`、`babel-
 React 19を対象にするため、`react-compiler-runtime` は追加しない。
 
 Compilerの診断ログは常時有効にしない。
-React規則の静的診断は既存のOxlint、React Doctor、TypeScript検査で行い、必要な調査時だけCompiler診断を有効化する。
+React規則の静的診断は既存のOxlintとTypeScript検査で行い、必要な調査時だけCompiler診断を有効化する。
 
 ## Consequences
 

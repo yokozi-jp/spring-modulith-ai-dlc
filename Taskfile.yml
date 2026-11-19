@@ -556,12 +556,6 @@ tasks:
         E2E_USERNAME=check E2E_PASSWORD=check PAYMENT_GATEWAY_BASE_URL=http://127.0.0.1:1 \
           node --input-type=module -e 'for (const file of ["environment", "fixtures", "orders", "payment-gateway"]) await import(`./apps/web/e2e/${file}.ts`)'
 
-  fe-doctor:
-    desc: React固有のwarningとerrorをReact Doctorで検出
-    dir: frontend
-    cmds:
-      - timeout 900s vp run {{.FE_WEB}} react-doctor
-
   fe-knip:
     desc: フロントエンドの未参照ファイル、未使用export、未使用依存をKnipで検査
     dir: frontend
