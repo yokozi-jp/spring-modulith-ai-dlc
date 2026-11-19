@@ -39,11 +39,8 @@ OpenAPIからOrvalでnative FetchのTanStack Query clientを生成し、手書�
 1 つの package だけが使う依存は、その `package.json` に版を書く。
 `frontend/lint/workspace-layout.test.js` が、2 つ以上の `package.json` に `"catalog:"` 以外で書いた依存を見つけて失敗する。
 
-`packages/ui/` は、shadcn の部品（`src/<部品名>.tsx`）、`cn`（`src/lib/utils.ts`）、テーマの CSS（`src/style.css`）を持つ。
-`@base-ui/**` を import できる場所は、この package の production source だけである。
-`@frontend/ui` も `exports` で `src` を直接公開し、ビルドしない。
-部品は `"./*": "./src/*.tsx"` で一つずつ公開するので、アプリは `import { Button } from "@frontend/ui/button"` のように部品ごとに import する。
-barrel の `index.ts` は作らない。
+`packages/ui/` は、shadcn の部品、`cn`、テーマの CSS を持つ。
+公開の形、Base UI を import できる場所、テーマの読み込みは [フロントエンドのUIとスタイル](ui-and-style.md#uiとスタイル) に従う。
 `@frontend/ui` はアプリと `@frontend/api` を参照せず、`package.json` にも書かない。
 `frontend/lint/workspace-layout.test.js` が、`package.json` に書かない package を Node で解決できないことを確かめる。`NODE_PATH` を空にして解決するのは、`vp` や pnpm の shim が `NODE_PATH` に足す `.pnpm/node_modules` から、宣言のない package も解決できてしまうためである。
 書かなければ、pnpm の厳格な解決が、それらへの import を失敗にする。
@@ -126,12 +123,6 @@ frontend/packages/ui/
         ├── utils.ts
         └── utils.test.ts
 ```
-
-アプリの `style.css` は、`@import "@frontend/ui/style.css"` でテーマを読み込み、`@source "../../../packages/ui/src"` で `@frontend/ui` を走査させる。
-`@source` を書かないと、`@frontend/ui` の部品の class が CSS に出ない。
-Tailwind の自動検出が、アプリの directory の外にある `packages/ui` を走査しないためである。
-このとき型検査と lint は通ったまま、見た目だけが壊れる。
-`frontend/lint/workspace-layout.test.js` が、`apps/*/src/style.css` のすべてに `packages/ui/src` を指す `@source` があることを確かめる。
 
 `main.tsx` はcomposition rootであり、`api/query-client.ts` の `createQueryClient()` で `QueryClient` を作り、TanStack Routerを生成してProviderを接続する。
 `createQueryClient()` は、`@frontend/api/api-fetch` の401の処理（`QueryCache` と `MutationCache` の `onError`）と再試行の判定（`defaultOptions.queries.retry`）を渡し、mutationの後に全queryを無効化する（[mutationの後のcache](routing-and-state.md#mutationの後のcache)）。
