@@ -73,6 +73,17 @@ rules:
       - field: InternalServerErrorProblem
         function: truthy
 
+  # given が拾う operation（security が直接にも文書の既定にもない）を違反にする。
+  # @root は operation ごとの filter の中に置く。filter の外に出すと解決先が変わり、合格例も落ちる。
+  # 対象の method は Operation alias と同じ。filter で operation を直接選ぶため alias を使えない。
+  # ponytail: security の中身は見ない。空配列（認証なし）も通す。scheme 名の実在は spectral:oas の oas3-operation-security-defined に任せる。
+  operation-security:
+    description: operation は security を直接か文書の既定で持つ（ADR-013）。
+    severity: error
+    given: "$.paths[*][?(@property.match(/^(get|put|post|delete|options|head|patch|trace)$/) && !@.security && !@root.security)]"
+    then:
+      function: falsy
+
   # ponytail: 形だけを検査し、先頭の動詞の語彙は検査しない。
   operation-id-naming:
     description: operationId は小文字の動詞で始まるlowerCamelCaseにし、数字と_を含めない。

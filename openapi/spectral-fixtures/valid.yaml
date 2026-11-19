@@ -8,6 +8,8 @@ info:
 tags:
   - name: sample-order
     description: サンプル注文の API
+security:
+  - sessionCookie: []
 paths:
   /api/sample-orders:
     post:
@@ -130,6 +132,11 @@ paths:
         "4XX":
           $ref: "#/components/responses/BadRequestProblem"
 components:
+  securitySchemes:
+    sessionCookie:
+      type: apiKey
+      in: cookie
+      name: APP_SESSION
   schemas:
     ProblemDetail:
       type: object
