@@ -8,7 +8,8 @@
 - `pay-confirm`：「確定する」で注文を確定済みにし、「注文を確定しました。」を出す。
 - `pay-success`：決済代行が成功すると、欄が「決済済み」と請求した金額を出し、決済記録が 1 行でき、請求は 1 回である。
 - `pay-declined`：決済代行が拒否すると、欄が「決済代行が決済を拒否しました。」を出す。
-- `pay-transient`：決済代行が 5xx かタイムアウトのとき、欄は確定から 15 秒まで「決済の結果を確かめています。」を出し、その後に再投入待ちの文言と「決済の状態を読み直す」ボタンを出す。決済記録はできない。
+- `pay-transient`：決済代行が 5xx かタイムアウトのとき、欄は確定から 15 秒まで「決済の結果を確かめています。」を出し、その後に再投入待ちの文言と「決済の状態を読み直す」ボタンを出す。
+  決済記録はできない。
 - `pay-seeded`：代表の注文 `SEED-C03`（決済済み）、`SEED-C05`（拒否）、`SEED-C06`（決済記録なし）が、それぞれの文言を出す。
 
 ## How to get to it (user POV)
@@ -31,7 +32,7 @@ Preconditions:
   `node .kiro/skills/verify-demo/scripts/drive.mjs .kiro/skills/verify-demo/journeys/order-payment.mjs quantity=2` を実行する。
   `passed` が出る。
   `03-confirmed.png` に「注文を確定しました。」が、`04-paid.png` に「決済済み」と `単価 × 2` の円の金額が写る。
-  `result.json` の `records.proof.row` が `PAID,<金額>,CONFIRMED`、`records.proof.charges` が `1` である。
+  `result.json` の `records.proof.row` が `PAID|<金額>|CONFIRMED`、`records.proof.charges` が `1` である。
 - **一覧からの入口。**
   同じ journey の最後の `05-listed.png` に、作った注文の「`<客先注文番号>` の詳細」リンクがある。
   一覧から開いて確定する入口は、`payment-failures.mjs` の各ケースが通る。
@@ -44,7 +45,7 @@ Preconditions:
   確定の前に `gateway.failChargesFor(orderId, { kind: "status", status: 503 })` を足す。
   タイムアウトは `{ kind: "delay", milliseconds: 3000 }` で作る。
   `expect.poll(() => gateway.chargeCount(orderId)).toBeGreaterThanOrEqual(1)` の後、`orders.expectPaymentText` で再投入待ちの文言（「決済をまだ受け付けていません。処理中か、失敗して再投入を待っています。」）を待つ。
-  `orders.listPayments(page.request, orderId)` が空で、`sql("select count(*) from payment.t_payment where order_public_id = :'orderId'", { vars: { orderId } })` が `0` である。
+  `orders.listPayments(page.request, orderId)` が空で、`sql("select count(*) from payment.t_payment where order_public_id = :'orderId'", { orderId })` が `0` である。
   スタブを取り除いてから「決済の状態を読み直す」を押すと、欄は 15 秒ほど「決済の結果を確かめています。」に戻り、ボタンが消える。
   その後に再投入待ちの文言に戻り、請求は 1 回のままである。
 - **代表の注文（`pay-seeded`）。**

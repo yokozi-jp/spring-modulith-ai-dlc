@@ -1,8 +1,6 @@
 // 決済代行の拒否と一時障害（5xx、タイムアウト）の表示と、代表の注文の決済の欄を確かめる。
 // features/order-payment.md の `pay-declined`、`pay-transient`、`pay-seeded`。
 // params: cases=declined,status,delay,seeded（既定はすべて）
-const notYet = "決済をまだ受け付けていません。処理中か、失敗して再投入を待っています。";
-
 async function createAndConfirm({ page, expect, gateway, orders }, failure) {
   const product = await orders.onSaleProduct(page.request);
   const code = orders.uniqueCode("VERIFY");
@@ -37,10 +35,10 @@ async function transient(tools, failure) {
       "決済の結果を確かめています。",
     );
     await step(`${failure.kind}-processing`);
-    await orders.expectPaymentText(page, notYet);
+    await orders.expectPaymentText(page, orders.paymentNotYetText);
     await step(`${failure.kind}-not-yet`);
     expect(await orders.listPayments(page.request, orderId)).toEqual([]);
-    expect(sql("select count(*) from payment.t_payment where order_public_id = :'orderId'", { vars: { orderId } })).toBe("0");
+    expect(sql("select count(*) from payment.t_payment where order_public_id = :'orderId'", { orderId })).toBe("0");
   } finally {
     await restore();
   }
@@ -51,14 +49,14 @@ async function transient(tools, failure) {
   );
   await expect(reload).toHaveCount(0);
   await step(`${failure.kind}-reloading`);
-  await orders.expectPaymentText(page, notYet);
+  await orders.expectPaymentText(page, orders.paymentNotYetText);
   const charges = await gateway.chargeCount(orderId);
   record(failure.kind, { orderId, charges });
   expect(charges, "成功に戻した後も請求は 1 回").toBe(1);
 }
 
 async function seeded({ page, expect, orders, step }) {
-  const expected = { "SEED-C03": "決済済み", "SEED-C05": "決済代行が決済を拒否しました。", "SEED-C06": notYet };
+  const expected = { "SEED-C03": "決済済み", "SEED-C05": "決済代行が決済を拒否しました。", "SEED-C06": orders.paymentNotYetText };
   for (const [code, text] of Object.entries(expected)) {
     await page.goto("/orders?status=CONFIRMED");
     await page.getByRole("link", { name: `${code} の詳細` }).click();

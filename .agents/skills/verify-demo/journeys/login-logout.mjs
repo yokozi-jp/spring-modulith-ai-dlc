@@ -32,7 +32,7 @@ export default async function ({ page, context, expect, step, login: signIn, req
     await fresh.dispose();
   }
 
-  await page.getByRole("link", { name: "もう一度ログイン" }).or(page.getByRole("button", { name: "もう一度ログイン" })).click();
+  await page.getByRole("link", { name: "もう一度ログイン" }).click();
   await expect(page).toHaveURL(/^http:\/\/127\.0\.0\.1:8081\//u);
   await expect(page.getByLabel("Username or email")).toBeVisible();
   await step("login-again");

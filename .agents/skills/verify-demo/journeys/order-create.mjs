@@ -33,7 +33,8 @@ export default async function ({ page, expect, step, sql, orders, record }) {
   await page.getByRole("button", { name: "作成する" }).click();
   await expect(page.getByText(/^数量は .* 以上 .* 以下の整数にしてください。$/u)).toBeVisible();
   await expect(page).toHaveURL(/\/orders\/new$/u);
-  expect(posts, "入力の誤りでは POST /api/orders を送らない").toEqual([]);
+  const validationPosts = [...posts];
+  expect(validationPosts, "入力の誤りでは POST /api/orders を送らない").toEqual([]);
   await step("validation");
 
   // create-duplicate
@@ -66,7 +67,7 @@ export default async function ({ page, expect, step, sql, orders, record }) {
   await expect(page.getByRole("heading", { level: 1, name: `注文 ${code}` })).toBeVisible();
   await expect(page.getByRole("table").getByRole("row")).toHaveCount(3);
   await step("draft");
-  const status = sql("select order_status_typ from ordering.t_order where public_id = :'orderId'", { vars: { orderId } });
+  const status = sql("select order_status_typ from ordering.t_order where public_id = :'orderId'", { orderId });
   expect(status).toBe("DRAFT");
 
   // create-csrf
@@ -75,7 +76,7 @@ export default async function ({ page, expect, step, sql, orders, record }) {
     data: { customerOrderCode: csrfCode, lines: [{ productId: onSale[0].productId, quantity: 1 }] },
   });
   expect(rejected.status(), "token のない POST /api/orders").toBe(403);
-  const stored = sql("select count(*) from ordering.t_order where customer_order_code = :'code'", { vars: { code: csrfCode } });
+  const stored = sql("select count(*) from ordering.t_order where customer_order_code = :'code'", { code: csrfCode });
   expect(stored).toBe("0");
-  record("proof", { orderId, code, status, csrfStatus: rejected.status(), posts });
+  record("proof", { orderId, code, status, csrfStatus: rejected.status(), validationPosts });
 }

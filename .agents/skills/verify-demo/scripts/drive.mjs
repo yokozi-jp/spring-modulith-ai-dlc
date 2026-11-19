@@ -12,7 +12,6 @@ const root = execFileSync("git", ["rev-parse", "--show-toplevel"], {
   encoding: "utf8",
 }).trim();
 const web = join(root, "frontend/apps/web");
-// Playwright と E2E の補助は frontend/apps/web にあるので、そこから読む。
 const require = createRequire(join(web, "package.json"));
 const { chromium, expect, request } = require("@playwright/test");
 const e2e = (file) => import(pathToFileURL(join(web, "e2e", file)).href);
@@ -55,7 +54,6 @@ function watch(page) {
 const page = await context.newPage();
 
 let stepNo = 0;
-// 操作の後の状態を、screenshot と ARIA snapshot の対で残す。
 async function step(label, target = page) {
   stepNo += 1;
   const prefix = `${String(stepNo).padStart(2, "0")}-${label}`;
@@ -64,28 +62,23 @@ async function step(label, target = page) {
   log("steps.log", `${prefix} ${target.url()}`);
 }
 
-// 決済代行の WireMock の管理 API（e2e/payment-gateway.ts）を、この context の request で呼ぶ。
 const gateway = {
   chargeCount: (orderId) => chargeRequestCount(context.request, orderId),
   failChargesFor: (orderId, failure) => failChargesFor(context.request, orderId, failure),
 };
 
-// アプリのロールは業務のスキーマを読めないので、モジュールのロールへ切り替える（ADR-094）。
-// payment_module は payment と ordering、ordering_module は ordering と product を読める。
-const roles = new Set(["payment_module", "ordering_module", "product_module"]);
-// 値は psql の変数で渡し、クエリの中で :'name' と書く。読み取り専用は誤操作の防止で、クエリの中で解除できる。
-function sql(query, { role = "payment_module", vars = {} } = {}) {
-  if (!roles.has(role)) throw new Error(`role は ${[...roles].join("、")} のどれかにする: ${role}`);
+// アプリのロール demo は業務のスキーマを読めない（ADR-094）。payment_module は payment と ordering を読める。
+// 値は psql の変数（vars）で渡し、クエリの中で :'name' と書く。読み取り専用は誤操作の防止で、クエリの中で解除できる。
+function sql(query, vars = {}) {
   const args = ["compose", "-f", "docker/compose-test.yml", "exec", "-T", "postgres",
     "psql", "-U", "demo", "-d", "demo", "-v", "ON_ERROR_STOP=1", "-qtA"];
   for (const [key, value] of Object.entries(vars)) args.push("-v", `${key}=${value}`);
-  const input = `SET ROLE ${role};\nSET default_transaction_read_only = on;\n${query};\n`;
+  const input = `SET ROLE payment_module;\nSET default_transaction_read_only = on;\n${query};\n`;
   const out = execFileSync("docker", args, { cwd: root, encoding: "utf8", input }).trim();
-  log("sql.log", `> [${role}] ${query} ${JSON.stringify(vars)}\n${out}`);
+  log("sql.log", `> ${query} ${JSON.stringify(vars)}\n${out}`);
   return out;
 }
 
-// 利用者と同じく Keycloak の画面からログインする（e2e/auth.setup.ts と同じ経路）。
 async function login(target = page) {
   await target.goto("/oauth2/authorization/web");
   await signInOnKeycloak(target);
@@ -99,7 +92,6 @@ try {
   if (journey.login !== false) await login();
   await journey.default({
     page, context, expect, step, gateway, sql, login, orders, params,
-    // Cookie を共有しない request の context を作る（例: request.newContext({ baseURL })）。
     request,
     record: (key, value) => (result.records[key] = value),
   });

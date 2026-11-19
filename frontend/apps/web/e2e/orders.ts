@@ -1,9 +1,22 @@
-// 検証スキルの drive.mjs が Node から直接 import するため、相対の import に拡張子を付ける。
 import type { APIRequestContext, APIResponse, Locator, Page } from "@playwright/test";
 
 import { expect } from "./fixtures.ts";
 
 // 注文の画面を操作する補助。商品は task e2e のシーダーが入れ、spec は読むだけにする（ADR-073）。
+// 画面の文言と、シーダーの代表の注文は、spec と検証スキルの journey が同じ値を使うようここに置く。
+
+export const paymentNotYetText =
+  "決済をまだ受け付けていません。処理中か、失敗して再投入を待っています。";
+export const linesConflictText =
+  "ほかの操作で注文が更新されました。上に最新の内容を表示しています。";
+export const linesChangedText = "明細を変更しました。";
+
+// 一覧の状態の絞り込みのリンクの名前ごとの、シーダーの代表の注文（SEED-C01 から SEED-C06）。
+export const seededOrderCodesByStatusLabel = {
+  下書き: ["SEED-C01", "SEED-C02"],
+  確定済み: ["SEED-C03", "SEED-C05", "SEED-C06"],
+  取消済み: ["SEED-C04"],
+} as const;
 
 interface Product {
   productId: string;
@@ -33,6 +46,16 @@ export async function onSaleProduct(request: APIRequestContext): Promise<Product
     throw new Error("販売中の商品がありません。task e2e がシーダーを実行したか確かめてください。");
   }
   return product;
+}
+
+// 詳細の画面の「明細の変更」のフォーム。
+export function orderLinesEditor(page: Page): Locator {
+  return page.getByRole("form", { name: "明細の変更" });
+}
+
+// 詳細の明細の表の、1 行目の数量。
+export function firstLineQuantity(page: Page): Locator {
+  return page.getByRole("table").getByRole("row").nth(1).getByRole("cell").nth(2);
 }
 
 // 並列のテストと衝突しない客先注文番号。上限の 30 文字に収める。

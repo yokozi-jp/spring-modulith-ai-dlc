@@ -1,4 +1,3 @@
-// 検証スキルの drive.mjs が Node から直接 import するため、相対の import に拡張子を付ける。
 import type { APIRequestContext } from "@playwright/test";
 
 import { paymentGatewayUrl } from "./environment.ts";

@@ -26,7 +26,8 @@ E2E テストは、複数画面にまたがる主要な利用者の流れだけ�
 Keycloak の画面でログインする手順（`signInOnKeycloak`）も持ち、setup とログアウトの spec が共有する。
 `frontend/apps/web/e2e/payment-gateway.ts` は、決済代行の WireMock の管理 API を呼ぶ補助を持つ。
 注文ごとの失敗のスタブ（`failChargesFor`）と、注文 ID を冪等性キーにした請求の回数（`chargeRequestCount`）である。
-`orders.ts` と `payment-gateway.ts` は、検証スキル `verify-demo` の `drive.mjs` が Node から直接 import するため、相対の import に拡張子 `.ts` を付ける。
+`environment.ts`、`fixtures.ts`、`orders.ts`、`payment-gateway.ts` は、Playwright の外から Node が直接 import できるよう、相対の import に拡張子 `.ts` を付ける。
+`task fe-check` が、この 4 つを Node で import できることを確かめる。
 `frontend/apps/web/e2e/orders.ts` は、注文の作成の画面の操作、シーダーの商品の読み取り、決済の欄の文言の確認（`expectPaymentText`）を持つ。
 決済の欄は、確定した注文に決済記録がない間、確定から 15 秒まで 1 秒ごとに自分で読み直し、その間は処理中を出す。
 期間が過ぎても記録がなければ再投入待ちを出し、読み直しのボタンを出す。
@@ -150,9 +151,7 @@ compose が公開する port は、すべて `127.0.0.1` に限る。
    値の一致で見つからない秘密として、`APP_SESSION=` に続く Cookie の値と、`eyJ` で始まる 3 つの base64url をつないだ JWT の形の文字列も失敗にする。
 
 手順 2 から 4 の `task e2e-up` は片付けを行わない。
-検証スキル `verify-demo` が同じ手順でスタックを起動して残し、片付けの前に `task e2e-collect-logs LOG=<パス>` で同じ検査をする。
-`task e2e-up E2E_SEED=0` は代表データを入れない。
-検証スキルが、業務データが空の画面を確かめるために使い、`task e2e` は使わない。
+`task e2e` の外で起動して残す呼び出し側は、片付けの前に `task e2e-collect-logs LOG=<パス>` で同じ検査をし、自分で片付ける。
 
 E2E には Collector を置かず、テストが `/collect` を `page.route` で応答する（[ADR-068](../adr/ADR-068-collect-browser-telemetry-with-faro-via-collector.md)）。
 `frontend/apps/web/e2e/logout.spec.ts` は、`/collect` が 503 を返してもログインとログアウトのフォームを送信できることを確かめる。

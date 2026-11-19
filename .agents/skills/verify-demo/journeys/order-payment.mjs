@@ -25,16 +25,15 @@ export default async function ({ page, expect, step, gateway, sql, orders, param
   await expect(page.getByRole("region", { name: "決済" })).toContainText(yen);
   await step("paid");
 
-  // 副作用: 決済記録の行、注文の状態、決済代行が受けた請求の回数。
   const row = sql(
-    "select p.payment_status_typ || ',' || p.charged_amount_jpy::bigint || ',' || o.order_status_typ " +
+    "select p.payment_status_typ, p.charged_amount_jpy::bigint, o.order_status_typ " +
       "from payment.t_payment p join ordering.t_order o on o.public_id = p.order_public_id " +
       "where p.order_public_id = :'orderId'",
-    { vars: { orderId } },
+    { orderId },
   );
   const charges = await gateway.chargeCount(orderId);
   record("proof", { orderId, code, total, row, charges });
-  expect(row, "決済記録の状態、金額、注文の状態").toBe(`PAID,${total},CONFIRMED`);
+  expect(row, "決済記録の状態、金額、注文の状態").toBe(`PAID|${total}|CONFIRMED`);
   expect(charges, "決済代行への請求の回数").toBe(1);
 
   await page.getByRole("link", { name: "注文の一覧へ戻る" }).click();

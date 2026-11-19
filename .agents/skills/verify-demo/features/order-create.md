@@ -27,16 +27,16 @@ Preconditions:
 `node .kiro/skills/verify-demo/scripts/drive.mjs .kiro/skills/verify-demo/journeys/order-create.mjs` が、次のすべてを順に実行する。
 
 - **下書きの作成（`create-draft`）。**
-  `journeys/order-payment.mjs` の確定の前までと同じ手順で作る。
-  `02-draft.png` で見出し「注文 `<客先注文番号>`」と状態「下書き」を確かめる。
-  `sql("select order_status_typ from ordering.t_order where public_id = :'orderId'", { vars: { orderId } })` が `DRAFT` を返す。
+  明細 2 行で作ると、詳細の画面へ移る。
+  `draft` の screenshot で見出し「注文 `<客先注文番号>`」と状態「下書き」を確かめる。
+  `sql("select order_status_typ from ordering.t_order where public_id = :'orderId'", { orderId })` が `DRAFT` を返す。
 - **明細の追加と削除（`create-lines`）。**
   「明細を追加する」を押すと、`group`「明細 2」が増える。
   「明細 2 を削除する」を押すと消える。
   2 行で作ると、詳細の明細の表に 2 行出る。
 - **入力の誤り（`create-validation`）。**
   何も入力せず「作成する」を押す。
-  「客先注文番号を入力してください。」と「商品を選んでください。」が見え、URL は `/orders/new` のままで、`network.log` に `POST /api/orders` がない。
+  「客先注文番号を入力してください。」と「商品を選んでください。」が見え、URL は `/orders/new` のままで、`records.proof.validationPosts` が空である。
   `/orders/new` を開き直し、客先注文番号と商品を正しく入れ、数量に `0` を入れて「作成する」を押すと、「数量は … 以上 … 以下の整数にしてください。」が見える。
 - **重複（`create-duplicate`）。**
   客先注文番号に `SEED-C01` を入れて作る。

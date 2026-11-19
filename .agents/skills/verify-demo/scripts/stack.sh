@@ -1,7 +1,6 @@
 #!/usr/bin/env bash
 # 検証用の隔離スタック（compose-test の e2e profile と Vite preview）を起動、診断、片付けする。
-# 使い方: stack.sh up [--empty] | doctor | down
-# --empty は代表データを入れずに起動する（業務データが空の画面を確かめる journey だけに使う）。
+# 使い方: stack.sh up | doctor | down
 set -euo pipefail
 
 ROOT="$(git -C "$(dirname "$0")" rev-parse --show-toplevel)"
@@ -21,6 +20,18 @@ fingerprint() {
 }
 
 containers() { compose ps -aq 2>/dev/null | sort; }
+
+# 起動が途中で打ち切られ、コンテナの記録がないときの判定。
+# up は空の project を確かめてから状態を作るので、状態の後に作られたコンテナは、この起動のものとみなす。
+containers_created_since_up() {
+  local started id created
+  started="$(stat -c %Y "$STATE/boot-id")"
+  [ -n "$(containers)" ] || return 1
+  for id in $(containers); do
+    created="$(date -d "$(docker inspect -f '{{.Created}}' "$id")" +%s)"
+    [ "$created" -ge "$started" ] || return 1
+  done
+}
 
 port_free() {
   local rc=0
@@ -50,18 +61,8 @@ containers_ours() {
 }
 
 up() {
-  local seed=1
-  case "${1:-}" in
-    "") ;;
-    --empty) seed=0 ;;
-    *) echo "使い方: $0 up [--empty]" >&2; exit 2 ;;
-  esac
   if [ -d "$STATE" ]; then
     echo "前回の検証スタックの状態（$STATE）が残っています。先に stack.sh down を実行してください。" >&2
-    exit 1
-  fi
-  if ! command -v java >/dev/null 2>&1 && [ -z "${JAVA_HOME:-}" ]; then
-    echo "Java がありません。docs/local-env-setup/setup.md の手順で Corretto 25 を入れてください（migration とシーダーは Gradle をホストで動かす）。" >&2
     exit 1
   fi
   if [ -n "$(containers)" ]; then
@@ -72,10 +73,9 @@ up() {
   mkdir -p "$STATE"
   fingerprint > "$STATE/fingerprint"
   cat /proc/sys/kernel/random/boot_id > "$STATE/boot-id"
-  echo "$seed" > "$STATE/seed"
   # 起動の手順は task e2e と共有する。失敗しても、作りかけのコンテナを down が自分のものと分かるよう記録する。
   local status=0
-  task e2e-up E2E_SEED="$seed" || status=$?
+  task e2e-up || status=$?
   containers > "$STATE/containers"
   if [ "$status" -ne 0 ]; then
     echo "task e2e-up が失敗しました。ログを読んだら stack.sh down で片付けてください。" >&2
@@ -105,11 +105,10 @@ keycloak_issuer() {
 }
 wiremock_admin() { curl --fail --silent --max-time 3 http://127.0.0.1:8082/__admin/mappings; }
 # アプリのロールは業務のスキーマを読めないので、モジュールのロールへ切り替える（ADR-094）。
-count_sql() {
-  printf '%s\n' "SET ROLE ordering_module;" "$1" | compose exec -T postgres psql -U demo -d demo -v ON_ERROR_STOP=1 -qtA
+seeded_orders() {
+  printf '%s\n' "SET ROLE ordering_module;" "select count(*) from ordering.t_order where customer_order_code like 'SEED-C0%';" \
+    | compose exec -T postgres psql -U demo -d demo -v ON_ERROR_STOP=1 -qtA | grep -qx 6
 }
-seeded_orders() { [ "$(count_sql "select count(*) from ordering.t_order where customer_order_code like 'SEED-C0%';")" = 6 ]; }
-no_orders() { [ "$(count_sql "select count(*) from ordering.t_order;")" = 0 ]; }
 source_unchanged() { [ "$(cat "$STATE/fingerprint")" = "$(fingerprint)" ]; }
 
 check() {
@@ -129,11 +128,7 @@ doctor() {
   check "preview の proxy から backend が ready" backend_ready
   check "Keycloak の issuer が http://127.0.0.1:8081/realms/spring-modulith" keycloak_issuer
   check "決済代行の WireMock の管理 API が応答する（127.0.0.1:8082）" wiremock_admin
-  if [ "$(cat "$STATE/seed")" = 1 ]; then
-    check "代表の注文（SEED-C01 から SEED-C06）が入っている" seeded_orders
-  else
-    check "--empty で起動し、注文が 1 件もない" no_orders
-  fi
+  check "代表の注文（SEED-C01 から SEED-C06）が入っている" seeded_orders
   check "起動後に ${APP_PATHS[*]} が変わっていない（変わったら down と up をやり直す）" source_unchanged
   if [ "$failed" -ne 0 ]; then
     echo "doctor: 検証できる状態ではありません。" >&2
@@ -163,7 +158,7 @@ down() {
     echo "自分が起動した preview は動いていませんが、5173 を別のプロセスが使っています。止めずに続けます。" >&2
   fi
 
-  if containers_ours; then
+  if containers_ours || { [ ! -s "$STATE/containers" ] && containers_created_since_up; }; then
     task e2e-collect-logs LOG="build/verify/logs/backend-$stamp.log" || status=$?
     compose down --volumes --remove-orphans
   elif [ -n "$(containers)" ]; then
@@ -171,15 +166,12 @@ down() {
   fi
   rm -rf "$STATE"
   echo "片付けました。ログは build/verify/logs/、証拠は build/verify/runs/ に残っています。"
-  if [ "$status" -ne 0 ]; then
-    echo "backend のログに秘密の値かその形の文字列が入っていました。build/verify/logs/backend-$stamp.log を外へ出さず、ログに出す値を確かめてください。" >&2
-  fi
   exit "$status"
 }
 
 case "${1:-}" in
-  up) up "${2:-}" ;;
+  up) up ;;
   doctor) doctor ;;
   down) down ;;
-  *) echo "使い方: $0 up [--empty] | doctor | down" >&2; exit 2 ;;
+  *) echo "使い方: $0 up | doctor | down" >&2; exit 2 ;;
 esac

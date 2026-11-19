@@ -30,7 +30,7 @@ Preconditions:
 - **保存（`edit-save`）。**
   `page.getByRole("form", { name: "明細の変更" }).getByLabel("数量").fill("3")` の後、同じフォームの「明細を保存する」を押す。
   「明細を変更しました。」が見え、明細の表の 1 行目の数量が `3` になる。
-  `sql("select l.ordered_count from ordering.t_order_line l join ordering.t_order o using (order_id) where o.public_id = :'orderId'", { vars: { orderId } })` が `3` を返す。
+  `sql("select l.ordered_count from ordering.t_order_line l join ordering.t_order o using (order_id) where o.public_id = :'orderId'", { orderId })` が `3` を返す。
 - **競合と破棄（`edit-conflict-discard`）。**
   `const other = await context.newPage()` で同じ詳細を開き、`other` で数量 `2` を保存する。
   元のタブで数量 `3` を保存すると、「ほかの操作で注文が更新されました。上に最新の内容を表示しています。」と 2 つの選択肢が見える。
@@ -45,6 +45,7 @@ Preconditions:
   「注文を取り消しました。」が見え、状態が「取消済み」になる。
   `form`「明細の変更」と、「確定する」「取り消す」のボタンが 0 件になる。
   `sql` で `order_status_typ` が `CANCELLED` である。
+  別の下書きを「確定する」で確定しても、同じ 3 つが 0 件になる。
 
 ## Gotchas
 

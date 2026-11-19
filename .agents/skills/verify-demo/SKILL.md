@@ -25,11 +25,8 @@ E2E の規約の正文は `docs/e2e/testing-strategy.md` にあり、この skil
 ## Launch
 
 ```bash
-.kiro/skills/verify-demo/scripts/stack.sh up [--empty]
+.kiro/skills/verify-demo/scripts/stack.sh up
 ```
-
-`--empty` を付けると、代表データを入れずに起動する。
-業務データが空の画面を確かめる journey（`order-list-empty.mjs`）だけに使う。
 
 起動の手順は `task e2e-up` に任せ、`task e2e` と同じにする（`docs/e2e/testing-strategy.md` の「実行と後片付け」）。
 その後 Vite preview を自分の process group で起動し、preview の proxy から `/actuator/health/readiness` が 200 を返すまで待つ。
@@ -41,7 +38,7 @@ migration とシーダーが残す Gradle の daemon がパイプを開いたま
 
 残った状態（`build/verify/stack/`）か、動いている `spring-modulith-test` を見つけたら、理由を出して止まる。
 自分が残したものなら `stack.sh down` を実行し、ほかの実行のものなら終わるまで待つ。
-`task e2e-up` が失敗したときも、`stack.sh down` で片付ける。
+`task e2e-up` が失敗したときと、`up` が打ち切られたときも、`stack.sh down` で片付ける。
 
 ## Doctor
 
@@ -50,8 +47,7 @@ migration とシーダーが残す Gradle の daemon がパイプを開いたま
 ```
 
 読み取りだけをする。
-compose-test のコンテナが `up` の記録と同じこと、自分の preview が生きていること、SPA の配信、preview の proxy から backend の readiness、Keycloak の issuer、WireMock の管理 API を確かめる。
-代表の注文 6 件があること（`--empty` で起動したときは、注文が 0 件であること）も確かめる。
+compose-test のコンテナが `up` の記録と同じこと、自分の preview が生きていること、SPA の配信、preview の proxy から backend の readiness、Keycloak の issuer、WireMock の管理 API、代表の注文 6 件を確かめる。
 起動した後に `backend`、`frontend`、`docker`、`openapi` のソースが変わっていれば FAIL にする。
 古いビルドを検証しないよう、そのときは `down` と `up` をやり直す。
 journey の前と、何かがおかしいと感じたときに最初に実行する。
@@ -72,20 +68,21 @@ journey は ESM の 1 ファイルで、既定の export の関数が次を受�
 - **`expect`**：`@playwright/test` の `expect`
 - **`request`**：`@playwright/test` の `request`（`request.newContext({ baseURL })` で Cookie を共有しない要求を作る）
 - **`step(label, page?)`**：その時点の screenshot と ARIA snapshot を `NN-<label>.png`、`NN-<label>.aria.yml` に残す
-- **`orders`**：`e2e/orders.ts`（`onSaleProduct`、`uniqueCode`、`createOrder`、`expectPaymentText`、`listPayments`）
+- **`orders`**：`e2e/orders.ts` の export すべて（操作の補助、画面の文言、代表の注文の表）
 - **`gateway.chargeCount`**：決済代行の WireMock が、注文 ID を冪等性キーにした請求を受けた回数（`e2e/payment-gateway.ts`）
 - **`gateway.failChargesFor`**：注文 ID の請求だけを `{ kind: "status" | "delay" | "declined" }` で失敗させ、取り除く関数を返す
 - **`sql(query, options?)`**：モジュールのロールで SQL を実行し、結果の文字列を返す（`sql.log` にも残す）
 - **`login(page?)`**：Keycloak の画面からログインする。`export const login = false` の journey は自動のログインを省く
 - **`params`、`record(k, v)`**：コマンドラインの `key=value`、`result.json` の `records` に証拠の値を足す
 
-`sql` の `options` は `{ role, vars }` である。
+`sql` は次のように使う。
 
-- `role` の既定は `payment_module` で、`payment` と `ordering` を読める。
-  `product` を読むときは `ordering_module` にする。
+- 接続はモジュールのロール `payment_module` で、`payment` と `ordering` を読める。
   アプリのロール `demo` は業務のスキーマを読めない（ADR-094）。
-- 値は `vars` で渡し、クエリの中で `:'name'` と書く（例：`sql("select ... where public_id = :'orderId'", { vars: { orderId } })`）。
+  `product` は読めない。
+- 値は第 2 引数のオブジェクトで渡し、クエリの中で `:'name'` と書く（例：`sql("select ... where public_id = :'orderId'", { orderId })`）。
   クエリの文字列に値を埋め込まない。
+- 複数の列は `|` で区切った 1 つの文字列で返る（例：`PAID|1200|CONFIRMED`）。
 - 読み取り専用のトランザクションにするのは誤操作の防止で、クエリの中で解除できる。
   更新の SQL を書かない。
 
@@ -126,7 +123,8 @@ journey がない機能を足すときは、`features/` に手順を書いてか
 preview のログを `build/verify/logs/` に写し、自分が起動した preview の process group だけを止める。
 PID の記録が今の起動のものでなければ、止めない。
 compose-test のコンテナが `up` の記録と同じときだけ、`task e2e-collect-logs` で backend のログを `build/verify/logs/` に書いてから `down --volumes --remove-orphans` で消す。
-記録と違えば、ほかの実行が立て直したものとみなして止めず、`build/verify/stack/` だけを消す。
+`up` が途中で打ち切られて記録がないときは、`build/verify/stack/` を作った後に作られたコンテナだけを、その起動のものとして消す。
+記録と違うコンテナは、ほかの実行が立て直したものとみなして止めず、`build/verify/stack/` だけを消す。
 ログに秘密の値かその形の文字列が入っていれば、片付けた後に失敗を返す。
 `build/verify/runs/` と `build/verify/logs/` の証拠は消さない。
 失敗した試行の後も毎回実行する。

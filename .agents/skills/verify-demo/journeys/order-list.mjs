@@ -1,33 +1,29 @@
 // 注文の一覧、状態の絞り込み、詳細への移動と一覧への戻りを確かめる。
 // features/order-list.md の `list-all`、`list-filter`、`list-detail`。`list-empty` は代表データでは届かない。
-const statuses = { DRAFT: "下書き", CONFIRMED: "確定済み", CANCELLED: "取消済み" };
-const seededByStatus = {
-  DRAFT: ["SEED-C01", "SEED-C02"],
-  CONFIRMED: ["SEED-C03", "SEED-C05", "SEED-C06"],
-  CANCELLED: ["SEED-C04"],
-};
+const statusByLabel = { 下書き: "DRAFT", 確定済み: "CONFIRMED", 取消済み: "CANCELLED" };
 
-export default async function ({ page, expect, step, sql, record }) {
+export default async function ({ page, expect, step, sql, record, orders }) {
+  const seededByLabel = orders.seededOrderCodesByStatusLabel;
   await page.goto("/orders");
   await expect(page.getByRole("heading", { level: 1, name: "注文" })).toBeVisible();
-  for (const code of Object.values(seededByStatus).flat()) {
+  for (const code of Object.values(seededByLabel).flat()) {
     await expect(page.getByRole("link", { name: `${code} の詳細` })).toBeVisible();
   }
   await step("all");
 
   const filter = page.getByRole("navigation", { name: "状態で絞り込む" });
   const counts = {};
-  for (const [status, label] of Object.entries(statuses)) {
+  for (const [label, status] of Object.entries(statusByLabel)) {
     await filter.getByRole("link", { name: label }).click();
     await expect(page).toHaveURL(new RegExp(`\\?status=${status}$`, "u"));
     await expect(filter.getByRole("link", { name: label })).toHaveAttribute("aria-current", "page");
-    for (const [other, codes] of Object.entries(seededByStatus)) {
+    for (const [otherLabel, codes] of Object.entries(seededByLabel)) {
       for (const code of codes) {
-        await expect(page.getByRole("link", { name: `${code} の詳細` })).toHaveCount(other === status ? 1 : 0);
+        await expect(page.getByRole("link", { name: `${code} の詳細` })).toHaveCount(otherLabel === label ? 1 : 0);
       }
     }
     const rows = await page.getByRole("table").getByRole("row").count();
-    const stored = sql("select count(*) from ordering.t_order where order_status_typ = :'status'", { vars: { status } });
+    const stored = sql("select count(*) from ordering.t_order where order_status_typ = :'status'", { status });
     counts[status] = { rows: rows - 1, stored: Number(stored) };
     expect(rows - 1, `${status} の行数`).toBe(Number(stored));
     await step(`filter-${status}`);

@@ -9,22 +9,17 @@
 
 - `stack.sh up` で起動した検証スタック（`http://localhost:5173`）だけを操作する。
 - journey の前に `stack.sh doctor` を実行し、すべて OK であることを確かめる。
-- ログインの利用者は `.env.test` の `test-user` である。
-  `drive.mjs` が Keycloak の画面からログインする。
 - 代表データと、journey が作るデータの扱いは `docs/e2e/testing-strategy.md` の「テストデータ」に従う。
   客先注文番号は `orders.uniqueCode("VERIFY")` で作る。
 
 ## 操作の決まり
 
-- 要素の探し方と待ち方は `docs/e2e/testing-strategy.md` の「書き方」に従う。
 - 文言は `frontend/apps/web/src/i18n/locales/ja.json` から取る。
 - 決済代行の応答の切り替えは `docs/e2e/testing-strategy.md` の「外部システムの偽物」に従い、`gateway.failChargesFor` で注文ごとに足す。
   journey の終わりに、返された関数で取り除く。
 
 ## 証明と省いた入口の報告
 
-- 操作と、その後の状態を `step` で残す。
-  最後の画面だけを証拠にしない。
 - 更新の証明には、画面とは別の見え方（`sql` の行、`gateway.chargeCount`、一覧の画面）を添える。
 - 証拠には、確かめた機能の ID と使った入口を書く。
 - 届かなかった入口は、試したコマンドと満たせなかった前提を報告する。
