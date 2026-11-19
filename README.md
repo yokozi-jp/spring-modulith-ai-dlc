@@ -338,6 +338,7 @@ Docker Compose の操作（サービスの起動、停止、状態確認、Keycl
 ### 検証スキルの TLA+ の検査
 
 - `task formal-verify-test`は、検証スキルが使う`tooling/formal-verify/check.sh`と`tooling/formal-verify/mutants.py`を、小さなTLA+のモデルで検査します。
+- `task formal-verify`は、全スキルの全設定と全変異を検査します。CIの`formal-verify.yml`が実行します。
   Lefthookで実行する条件は[Lintとテストのリファレンス](docs/tooling/lint-and-test.md)にあり、検証スキルの手順は[形式検証スキルの使い方](docs/agents/formal-verification.md)にあります。
 
 <p align="right">(<a href="#top">トップへ</a>)</p>

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # test.sh: runs check.sh and mutants.py on the counter fixture and checks the exit codes and output lines.
-# Run: bash tooling/formal-verify/test.sh (task formal-verify-test runs it). TLC and Java come as check.sh fetches them.
+# Run: bash tooling/formal-verify/test.sh (task formal-verify-test runs it). TLC comes as check.sh fetches it, and Java from JAVA_HOME or PATH.
 
 set -u
 

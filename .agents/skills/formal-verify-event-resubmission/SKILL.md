@@ -57,10 +57,12 @@ tooling/formal-verify/mutants.py .agents/skills/formal-verify-event-resubmission
 次のコマンドが差分を出せば関わる。
 
 ```bash
-git diff --stat a99d855a9e7830988e3bd312609c65cb20fe38cd -- \
+skill=.agents/skills/formal-verify-event-resubmission/SKILL.md
+git diff --stat "$(sed -n 's/^同期コミット：`\([0-9a-f]*\)`.*/\1/p' "$skill")" -- \
   backend/src/main/java/com/example/demo/shared/infrastructure/persistence/EventPublicationResubmitter.java \
   backend/src/main/java/com/example/demo/shared/infrastructure/persistence/EventPublicationResubmissionConfig.java \
   backend/src/main/java/com/example/demo/shared/infrastructure/persistence/ResubmissionPolicies.java \
+  backend/src/test/java/com/example/demo/shared/infrastructure/persistence/ResubmissionOptionsLearningTest.java \
   backend/src/main/resources/application.yaml \
   backend/build.gradle
 ```
@@ -127,7 +129,7 @@ git diff --stat a99d855a9e7830988e3bd312609c65cb20fe38cd -- \
    4. インスタンス 1 のスケジューラのスレッドが空き、`EventPublicationResubmitter` がロックを取り、`findFailedPublications` でこの行を読み、`markResubmitted` で `RESUBMITTED` にして、配信を executor に積む。
    5. インスタンス 2 の Staleness Monitor が、手順 2 で読んだ一覧のまま `markFailed(id)` を実行し、待ちの列にある配信の出版を `FAILED` に戻す。
 
-   `ResubmissionOptionsLearningTest` の `stalenessMarksPublicationResubmittedAfterRead` が、この振る舞いを registry の経路で固定している（[#511](https://github.com/yokozi-jp/spring-modulith-ai-dlc/pull/511)）。
+   `ResubmissionOptionsLearningTest` の `stalenessMarksPublicationResubmittedAfterRead` が、この振る舞いを `DefaultEventPublicationRegistry` を通る経路で固定している。
    上流が直すと、そのテストが失敗する。
 
    害は、処理中の出版が再投入の対象に戻ることである。

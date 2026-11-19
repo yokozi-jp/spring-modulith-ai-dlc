@@ -39,9 +39,10 @@ tooling/formal-verify/mutants.py .agents/skills/<スキル名>
 `check.sh` は、渡した設定か `model/*.cfg` のすべてを TLC で検査し、結果が 1 行目の `expect:` と一致すれば `OK`、違えば `FAIL` を出す。
 すべて一致すれば 0 で終わる。
 TLC の出力は `FAIL` の設定の分だけ `~/.cache/formal-verify-tla/runs/` に残し、その場所を出す。
-TLC と Java の版は `check.sh` の先頭で固定している。
-初回は TLC を取得して SHA-256 で確かめるため、ネットワークが要る。
-Java は `mise.lock` の版を、`JAVA_HOME` か PATH の `java` から使う。
+TLC の版は `check.sh` の先頭で固定している。
+TLC は `mise.lock` に入れず、版と SHA-256 を固定した jar を初回に取得するため、ネットワークが要る。
+Java は `JAVA_HOME` か、なければ PATH の `java`（通常は `mise.lock` の版を選ぶ shims）を使う。
+`mutants.py` は `tomllib` を使うため、Python 3.11 以上が要る。
 Kiro Web では先に `source docs/local-env-setup/kiro-web.sh` を実行する。
 
 TLC は最初に見つけた違反で止まる。
@@ -108,9 +109,13 @@ TLC の結果は `/statechart` スキルで読む。
 1. 差分の各箇所を読み、対応表のアクションとモデルの行がその振る舞いを写すかを確かめる。
 2. ライブラリの版が変わったら、同期の記録にあるクラスを新しい版のソースで読み直す。
 3. 違いがあれば「意図した変更でモデルを直す」に従う。
-4. 確かめたコミットの完全なハッシュを、同期の記録と、関わるかのコマンドに書く。
+4. 確かめたコミットの完全なハッシュを、同期の記録に書く。
+   関わるかのコマンドは、同期の記録のハッシュを読むため、直さなくてよい。
    確かめていないコミットへ進めない。
 5. スキルを直したら、[スキルの取得元と更新](skill-sources.md)の「このリポジトリで書くスキルを記録する」に従って `skills-lock.json` の `computedHash` を直す。
+
+CI の `formal-verify.yml` はモデルを自分の期待に照らして検査するだけで、コードとモデルのずれは検出しない。
+ずれの検出は、この手順の「関わるか」のコマンドによる手作業である。
 
 読み直しの作業は `/maintain-formal-verification-skill` で行ってよい。
 

@@ -47,7 +47,8 @@ tooling/formal-verify/mutants.py .agents/skills/formal-verify-aggregate-write
 次のコマンドが差分を出せば関わる。
 
 ```bash
-git diff --stat a99d855a9e7830988e3bd312609c65cb20fe38cd -- \
+skill=.agents/skills/formal-verify-aggregate-write/SKILL.md
+git diff --stat "$(sed -n 's/^同期コミット：`\([0-9a-f]*\)`.*/\1/p' "$skill")" -- \
   backend/src/main/java/com/example/demo/shared/infrastructure/persistence/TableWriter.java \
   backend/src/main/java/com/example/demo/shared/infrastructure/persistence/LockedRoot.java \
   backend/src/main/java/com/example/demo/ordering/infrastructure/persistence/JooqOrderRepository.java \

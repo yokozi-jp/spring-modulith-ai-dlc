@@ -31,12 +31,8 @@ if ! { [ -f "$jar" ] && echo "$tla_sha256  $jar" | sha256sum -c --status; }; the
   curl -fsSL -o "$jar" "https://github.com/tlaplus/tlaplus/releases/download/$tla_version/tla2tools.jar"
   echo "$tla_sha256  $jar" | sha256sum -c --status
 fi
-# Java は mise.lock の版（ADR-090）。JAVA_HOME があればそれを、なければ PATH の shims の java を使う。
-if [ -n "${JAVA_HOME:-}" ] && [ -x "$JAVA_HOME/bin/java" ]; then
-  java="$JAVA_HOME/bin/java"
-elif java="$(command -v java)"; then
-  :
-else
+# Java は JAVA_HOME か、なければ PATH の java（通常は mise.lock の版を選ぶ shims、ADR-090）を使う。
+if ! java="$(command -v "${JAVA_HOME:+$JAVA_HOME/bin/}java")"; then
   echo "FAIL java が見つかりません。mise install --locked を実行してください（docs/local-env-setup/setup.md）。" >&2
   exit 2
 fi

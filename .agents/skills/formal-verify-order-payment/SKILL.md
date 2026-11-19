@@ -50,7 +50,8 @@ TLC は最初に見つけた違反で止まるため、この設定はほかの�
 次のコマンドが差分を出せば関わる。
 
 ```bash
-git diff --stat a99d855a9e7830988e3bd312609c65cb20fe38cd -- \
+skill=.agents/skills/formal-verify-order-payment/SKILL.md
+git diff --stat "$(sed -n 's/^同期コミット：`\([0-9a-f]*\)`.*/\1/p' "$skill")" -- \
   backend/src/main/java/com/example/demo/ordering/application/ConfirmOrderCommandHandler.java \
   backend/src/main/java/com/example/demo/ordering/application/CancelOrderCommandHandler.java \
   backend/src/main/java/com/example/demo/ordering/domain/model/Order.java \
