@@ -27,7 +27,8 @@ class ChargeOrderController {
 
   /** 注文の代金を請求する。 */
   @PostMapping("/{orderId}")
-  /* package */ String charge(@PathVariable final String orderId) {
-    return chargeOrder.handle(orderId) + settleOrder.handle(orderId);
+  /* package */ void charge(@PathVariable final String orderId) {
+    chargeOrder.handle(orderId);
+    settleOrder.handle(orderId);
   }
 }

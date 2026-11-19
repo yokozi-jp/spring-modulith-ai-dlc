@@ -554,6 +554,10 @@ class ArchitectureRuleFixtureTest {
             ClassRoleArchTest.externalSystemCommandHandlersAreCalledOnlyByListeners,
             "ordering.application.SettleOrderCommandHandler"),
         row(
+            "externalSystemCommandHandlersAreCalledOnlyByListeners: application の外の Listener",
+            ClassRoleArchTest.externalSystemCommandHandlersAreCalledOnlyByListeners,
+            "ordering.presentation.web.ChargeOrderListener が"),
+        row(
             "eventPublisherIsUsedOnlyByCommandHandlers: Controller",
             ClassRoleArchTest.eventPublisherIsUsedOnlyByCommandHandlersRule(
                 VIOLATING, FIXTURE_MODULES),

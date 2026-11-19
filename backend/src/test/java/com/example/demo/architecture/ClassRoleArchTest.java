@@ -504,41 +504,50 @@ class ClassRoleArchTest {
 
   private static ArchCondition<JavaClass> beCalledOnlyByListenersWhenUsingExternalSystem() {
     return new ArchCondition<>(
-        "be depended on only by a *Listener when it uses an external system") {
+        "be depended on only by an application *Listener when it uses an external system") {
       @Override
       public void check(final JavaClass item, final ConditionEvents events) {
-        externalSystemOf(item)
-            .ifPresent(externalSystem ->
-                item.getDirectDependenciesToSelf().stream()
-                    .map(Dependency::getOriginClass)
-                    .filter(origin -> !origin.getSimpleName().endsWith(LISTENER))
-                    .distinct()
-                    .forEach(origin ->
-                        events.add(
-                            SimpleConditionEvent.violated(
-                                item,
-                                origin.getFullName()
-                                    + " が、外部システムの "
-                                    + externalSystem.getFullName()
-                                    + " に依存する "
-                                    + item.getFullName()
-                                    + " を呼んでいる。"))));
+        final Optional<JavaClass> externalSystem = externalSystemOf(item);
+        if (externalSystem.isEmpty()) {
+          return;
+        }
+        item.getDirectDependenciesToSelf().stream()
+            .map(Dependency::getOriginClass)
+            .filter(origin -> !isApplicationListener(origin))
+            .distinct()
+            .forEach(origin ->
+                events.add(
+                    SimpleConditionEvent.violated(
+                        item,
+                        origin.getFullName()
+                            + " が、外部システムの "
+                            + externalSystem.get().getFullName()
+                            + " に依存する "
+                            + item.getFullName()
+                            + " を呼んでいる。")));
       }
     };
   }
 
+  /** クラスが {@code application} の {@code *Listener} かを返す。 */
+  private static boolean isApplicationListener(final JavaClass type) {
+    return resideInAPackage(APPLICATION_PACKAGE).test(type)
+        && type.getSimpleName().endsWith(LISTENER);
+  }
+
   /** CommandHandler が直接か Domain Service を通して依存する、外部システムのインタフェースを返す。 */
   private static Optional<JavaClass> externalSystemOf(final JavaClass commandHandler) {
-    return commandHandler.getDirectDependenciesFromSelf().stream()
-        .map(Dependency::getTargetClass)
+    return dependencyTargetsOf(commandHandler)
         .flatMap(target ->
             resideInAPackage("..domain.service..").test(target)
-                ? Stream.concat(
-                    Stream.of(target),
-                    target.getDirectDependenciesFromSelf().stream().map(Dependency::getTargetClass))
+                ? Stream.concat(Stream.of(target), dependencyTargetsOf(target))
                 : Stream.of(target))
         .filter(ClassRoleArchTest::isExternalSystemInterface)
         .findFirst();
+  }
+
+  private static Stream<JavaClass> dependencyTargetsOf(final JavaClass type) {
+    return type.getDirectDependenciesFromSelf().stream().map(Dependency::getTargetClass);
   }
 
   /** {@code infrastructure.client} の {@code *Client} が実装する {@code domain.model} のインタフェースかを返す。 */
