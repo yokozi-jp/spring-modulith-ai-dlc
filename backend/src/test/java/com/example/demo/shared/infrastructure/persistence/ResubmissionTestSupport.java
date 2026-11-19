@@ -33,6 +33,7 @@ final class ResubmissionTestSupport {
   @TestPropertySource(
       properties = {
         "event-publication.resubmission.wait-age=PT5M",
+        "event-publication.resubmission.in-flight-staleness=PT15M",
         "event-publication.resubmission.interval=PT2S",
         "event-publication.resubmission.lock-at-most-for=PT3S",
         "event-publication.resubmission.max-per-run=100",
@@ -81,10 +82,9 @@ final class ResubmissionTestSupport {
   /* package */ static List<LogRecordData> exhaustedErrors(
       final CapturedLogRecords capturedLogRecords, final String publicationId) {
     return capturedLogRecords.withBody("Event publication resubmission exhausted").stream()
-        .filter(
-            record ->
-                publicationId.equals(
-                    record.getAttributes().get(AttributeKey.stringKey("event_publication.id"))))
+        .filter(record ->
+            publicationId.equals(
+                record.getAttributes().get(AttributeKey.stringKey("event_publication.id"))))
         .toList();
   }
 }

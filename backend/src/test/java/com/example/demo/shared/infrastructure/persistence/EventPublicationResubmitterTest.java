@@ -46,6 +46,7 @@ import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Primary;
 import org.springframework.modulith.events.ApplicationModuleListener;
+import org.springframework.modulith.events.EventPublication;
 import org.springframework.modulith.events.config.StalenessProperties;
 import org.springframework.modulith.events.core.EventPublicationRegistry;
 import org.springframework.modulith.test.EnableScenarios;
@@ -431,12 +432,15 @@ class EventPublicationResubmitterTest {
   }
 
   @Test
-  @DisplayName("Staleness Monitor は、wait-age より古い出版を再投入して処理している間も FAILED に戻さず、手での 1 回の再投入は完了まで待つ")
+  @DisplayName(
+      "Staleness Monitor は、in-flight-staleness より古い出版を再投入して処理している間も FAILED に戻さず、手での 1 回の再投入は完了まで待つ")
   void resubmitOnceKeepsInFlightPublicationAgainstStalenessMonitor(final Scenario scenario)
       throws Exception {
     final String id = failedOnce(scenario);
-    // publication_date（T0）からの経過が published の閾値（wait-age）を超える。
-    clock.set(T0.plus(WAIT_AGE).plus(Duration.ofMinutes(1)));
+    // publication_date（T0）からの経過が processing と resubmitted の閾値（in-flight-staleness）を超える。
+    clock.set(
+        T0.plus(staleness.getStaleness(EventPublication.Status.PROCESSING))
+            .plus(Duration.ofMinutes(1)));
     final CountDownLatch gate = listener.close();
     final CompletableFuture<EventPublicationResubmitOnce.Outcome> future =
         ResubmissionTestSupport.onVirtualThread(() -> resubmitOnce.run("policy:probe"));
@@ -547,7 +551,12 @@ class EventPublicationResubmitterTest {
         s -> FAILED.equals(s.status()) && Integer.valueOf(attempts).equals(s.attempts()));
   }
 
-  /** リスナーを 1 回失敗させ、T0 に FAILED の出版を作り、イベントの ID を返す。 */
+  /**
+   * リスナーを 1 回失敗させ、今の時計の時刻に FAILED の出版を作り、時計を 1 マイクロ秒進めて、イベントの ID を返す。
+   *
+   * <p>進めないと再投入の対象にならない（ResubmissionOptionsLearningTest の
+   * defaultsResubmitOnlyPublicationsOlderThanNow）。
+   */
   private String failedOnce(final Scenario scenario) {
     if (listener.failuresLeft() == 0) {
       listener.failTimes(1);
@@ -559,6 +568,7 @@ class EventPublicationResubmitterTest {
         "FAILED の出版",
         s -> FAILED.equals(s.status()));
     assertThat(state(id).attempts()).as("id=%s の最初の attempts", id).isEqualTo(1);
+    clock.set(clock.instant().plus(1, ChronoUnit.MICROS));
     return id;
   }
 

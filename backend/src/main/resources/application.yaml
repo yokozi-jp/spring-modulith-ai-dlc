@@ -158,11 +158,9 @@ spring:
       # 複数インスタンスでの競合を避けるため、起動時には自動再配信しない。
       republish-outstanding-events-on-restart: false
       # 落ちたまま PUBLISHED、PROCESSING、RESUBMITTED に残った出版を FAILED に戻し、再投入の対象にする（ADR-079）。
-      # Spring Modulith 2.1.1 はどの状態も last_resubmission_date でなく publication_date から測る。
-      # 状態ごとの 0 はその状態を止めず、その状態の出版をすべて FAILED にする。3 つとも 0 のときだけ監視が止まる。
-      # published は wait-age にする。processing と resubmitted は、再投入して処理中の出版を FAILED に戻さないよう in-flight-staleness にし、長さは起動時に検証する。
+      # Spring Modulith 2.1.2 は、最後の出版か再投入の時刻（last_resubmission_date、なければ publication_date）から測る。
+      # published は wait-age にする。processing と resubmitted は、再投入して処理中の出版を FAILED に戻さないよう in-flight-staleness にする。
       # 最初の配信が concurrency-limit の空きを待つ間に published を過ぎた出版は重ねて再投入しうる。リスナーの冪等性に頼る。
-      # ponytail: 落ちたまま PROCESSING に残った出版の回復は最大 in-flight-staleness（本番 PT4H）遅れる。Spring Modulith 2.1.2（GH-1837）で last_resubmission_date から測るようになったら、in-flight-staleness を wait-age 程度に戻す。
       staleness:
         published: ${event-publication.resubmission.wait-age}
         processing: ${event-publication.resubmission.in-flight-staleness}
@@ -185,14 +183,15 @@ event-publication:
     enabled: ${EVENT_PUBLICATION_RESUBMISSION_ENABLED}
     # 最初の失敗から 1 回目の再投入までの待ち時間で、2 回目からの待ち時間の基準。リスナーの処理時間より十分に長くする。
     wait-age: ${EVENT_PUBLICATION_RESUBMISSION_WAIT_AGE}
-    # Staleness Monitor が PROCESSING と RESUBMITTED の出版を FAILED に戻すまでの、publication_date からの時間。
-    # どの方針でも Σ_{n=1..max-resubmissions} min(wait-age × multiplier^(n-1), max-wait) + max-resubmissions × (interval + lock-at-most-for) + lock-at-most-for より長くする。短いと起動に失敗する。
+    # Staleness Monitor が PROCESSING と RESUBMITTED の出版を FAILED に戻すまでの、最後の出版か再投入の時刻からの時間。
+    # 再投入の時刻から、executor の空きの待ちとリスナーの処理がそれぞれ lock-at-most-for まで続きうるため、lock-at-most-for の 2 倍より長くする。短いと起動に失敗する。
     in-flight-staleness: ${EVENT_PUBLICATION_RESUBMISSION_IN_FLIGHT_STALENESS}
     # 前の回の終わりから次の回までの間隔。ロックを持つ下限はこの半分にする。
     interval: ${EVENT_PUBLICATION_RESUBMISSION_INTERVAL}
     # 以下は環境で変えないため固定値にする。
     max-per-run: 100
     # ロックを持つ上限。1 回の実行（max-per-run 件の再投入。concurrency-limit の空きを待つ間も含む）の最長より十分に長くし、interval より長くする。
+    # in-flight-staleness はこの 2 倍より長くするため、変えたら in-flight-staleness も見直す。
     lock-at-most-for: PT10M
     # リスナーの再投入の方針。リスナーの on に @ResubmissionPolicy("<名前>") を付けて選び、付けなければ default にする。
     # n 回目の再投入の前に、最後の試行から min(wait-age × multiplier^(n-1), max-wait) だけ待つ。

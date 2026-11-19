@@ -22,7 +22,7 @@ import org.jspecify.annotations.Nullable;
 /**
  * 定期のジョブが再投入した出版を覚え、次の回以降に結果を DB から読み戻して数える（ADR-079）。
  *
- * <p>Spring Modulith 2.1.1 の {@code FailedEventPublications.resubmit} は件数を返さず、成功と再失敗を知らせる hook もない。
+ * <p>Spring Modulith 2.1.2 の {@code FailedEventPublications.resubmit} は件数を返さず、成功と再失敗を知らせる hook もない。
  * そのため、公開された表（{@code event_publication} と {@code event_publication_archive}）の列だけで判定する。
  *
  * <p>覚えるのは、このインスタンスが {@code RESUBMITTED} へ進めた出版の ID だけである。 結果の Counter
@@ -89,15 +89,21 @@ final class ResubmissionTracker {
   }
 
   /**
-   * 覚えておく期間。{@code max(3 × lock-at-most-for, in-flight-staleness + interval)}。
+   * 覚えておく期間。{@code max(3 × lock-at-most-for, in-flight-staleness + lock-at-most-for + 2 ×
+   * interval)}。
    *
-   * <p>落ちたまま残った再投入の出版は、Staleness Monitor が publication_date から {@code in-flight-staleness} を過ぎたら
-   * FAILED に戻し、その検出は {@code interval} ごとに動く。 その後の回で数えるまでの余裕として、ロックの上限の 3 倍とも比べて長い方を取る。
+   * <p>落ちたまま残った再投入の出版の last_resubmission_date は、この回の時刻から最大で {@code lock-at-most-for} 遅れる。 Staleness
+   * Monitor はそこから {@code in-flight-staleness} を過ぎた出版を {@code interval} ごとに FAILED に戻し、次の回はさらに最大で
+   * {@code interval} 後に数える。 その後の回で数えるまでの余裕として、ロックの上限の 3 倍とも比べて長い方を取る。
    */
   /* package */ static Duration lifetimeOf(
       final EventPublicationResubmissionConfig.Properties properties) {
     final Duration byLock = properties.lockAtMostFor().multipliedBy(3);
-    final Duration byStaleness = properties.inFlightStaleness().plus(properties.interval());
+    final Duration byStaleness =
+        properties
+            .inFlightStaleness()
+            .plus(properties.lockAtMostFor())
+            .plus(properties.interval().multipliedBy(2));
     return byLock.compareTo(byStaleness) > 0 ? byLock : byStaleness;
   }
 
@@ -181,9 +187,9 @@ final class ResubmissionTracker {
    * 候補のうち、実際に {@code RESUBMITTED} へ進んだ出版の ID を返す。
    *
    * <p>{@code FailedEventPublications.resubmit} は件数を返さず、{@code markResubmitted} は他の更新で偽になりうる（{@code
-   * STATUS != 'RESUBMITTED'} の行だけを更新する）。 そのため、再投入のあとに読み戻し、{@code completion_attempts}
-   * が増えた行と、すでに完了して archive に移った行を「進んだ」とする。 進んだ行は {@code markResubmitted} が必ず {@code
-   * completion_attempts} を 1 増やす。
+   * completion_date} が空で {@code RESUBMITTED} でない行だけを更新する）。 そのため、再投入のあとに読み戻し、{@code
+   * completion_attempts} が増えた行と、すでに完了して archive に移った行を「進んだ」とする。 進んだ行は {@code markResubmitted} が必ず
+   * {@code completion_attempts} を 1 増やす。
    */
   /* package */ Set<UUID> advancedAmong(final Map<UUID, Integer> candidates) {
     if (candidates.isEmpty()) {
@@ -196,15 +202,14 @@ final class ResubmissionTracker {
             .fetchMap(EVENT_PUBLICATION.ID, EVENT_PUBLICATION.COMPLETION_ATTEMPTS);
     final Set<UUID> advanced = new HashSet<>();
     final Set<UUID> missing = new HashSet<>();
-    candidates.forEach(
-        (id, before) -> {
-          final @Nullable Integer after = attempts.get(id);
-          if (after == null) {
-            missing.add(id);
-          } else if (after > before) {
-            advanced.add(id);
-          }
-        });
+    candidates.forEach((id, before) -> {
+      final @Nullable Integer after = attempts.get(id);
+      if (after == null) {
+        missing.add(id);
+      } else if (after > before) {
+        advanced.add(id);
+      }
+    });
     advanced.addAll(archivedAmong(missing));
     return advanced;
   }
