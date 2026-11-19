@@ -9,11 +9,11 @@ tags: [adr, database, postgresql, backend]
 
 ## Status
 
-Proposed
+Accepted
 
 ## Date
 
-2026-10-05
+2026-11-19
 
 ## Context
 
