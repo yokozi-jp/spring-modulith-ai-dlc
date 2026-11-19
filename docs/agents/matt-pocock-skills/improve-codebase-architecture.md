@@ -39,7 +39,7 @@ codebaseを調べる前に`GLOSSARY.md`と対象領域のADRを読む。
 
 ### 摩擦の探索
 
-新しい文脈ウィンドウを持つsub-agentを起動してcodebaseを歩かせる。
+新しいコンテキストウィンドウを持つsub-agentを起動してcodebaseを歩かせる。
 固定したheuristicへ機械的に当てはめず、次の摩擦が生じる箇所を調べる。
 
 - 一つのconceptを理解するために、多数の小さなmoduleを往復する箇所を調べる。

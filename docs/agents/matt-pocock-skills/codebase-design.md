@@ -133,7 +133,7 @@ sketchは提案ではなく、constraintを具体化する例にとどめる。
 
 ### 三つ以上の並行設計
 
-三つ以上のsub-agentを、それぞれ新しい文脈ウィンドウで並行して起動し、それぞれに根本的に異なるinterfaceを作らせる。
+三つ以上のsub-agentを、それぞれ新しいコンテキストウィンドウで並行して起動し、それぞれに根本的に異なるinterfaceを作らせる。
 各agentへfile path、coupling、依存分類、seamの背後へ置く内容を含む独立したtechnical briefを渡す。
 codebase-designの語彙と`GLOSSARY.md`のdomain languageをbriefへ含める。
 
