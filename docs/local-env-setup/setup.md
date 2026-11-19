@@ -204,16 +204,33 @@ iwe は手順 7 の `mise install --locked` で導入済みです。
 
 エディタ連携（LSP）と AI エージェント連携（MCP）は設定済みで、追加作業は要りません。
 
-- **エディタ連携（LSP）**: 手順 11 の推奨拡張に含まれる `iwe.iwe` 拡張が、mise の shims から `iwes` を LSP サーバーとして利用します。
+- **エディタ連携（LSP）**: 手順 12 の推奨拡張に含まれる `iwe.iwe` 拡張が、mise の shims から `iwes` を LSP サーバーとして利用します。
   定義ジャンプ、バックリンク、リンク補完などが markdown で使えます（詳細は [VS Code 向けドキュメント](https://iwe.md/docs/editors/vscode/)）。
 - **AI エージェント連携（MCP）**: MCP サーバー `iwec` の設定は `.kiro/settings/mcp.json` にコミット済みです（`docs/local-env-setup/iwe-mcp.sh` が作業ディレクトリを `docs/` に固定して起動）。
   Kiro を再起動すれば利用できます。
 
-### 11. VSCode 拡張機能のインストール
+### 11. Kiro の code intelligence（LSP）
+
+Kiro CLI の `code` ツール（diagnostics、hover、参照の検索）が使う LSP サーバーの設定は、`.kiro/settings/lsp.json` にコミット済みです。
+TypeScript は、`task fe-install` で入る `frontend/apps/web/node_modules` の `tsc` を使います。
+`task fe-install` の前は、TypeScript の LSP が起動しません。
+Java は、`mise.lsp.toml` の jdtls と、jdtls に `@Slf4j` を解釈させる Lombok を使います。
+jdtls と Lombok は次のコマンドで入れます。
+
+``` bash
+mise -E lsp install --locked
+```
+
+リポジトリのルートで Kiro CLI を起動し直し、`/code status` で TypeScript と Java が使えることを確かめます。
+jdtls は起動のたびに Gradle のプロジェクトを読み込むため、使えるまで数秒から数十秒かかります。
+
+版の上げ方は `mise.lsp.toml` の冒頭にあります。
+
+### 12. VSCode 拡張機能のインストール
 
 `.vscode/extensions.json` に記載されている推奨拡張機能をインストールしてください。
 
-### 12. 動作確認
+### 13. 動作確認
 
 ``` bash
 cd /home/projects/spring-modulith-ai-dlc
