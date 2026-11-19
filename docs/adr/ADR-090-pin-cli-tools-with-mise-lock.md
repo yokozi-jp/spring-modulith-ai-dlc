@@ -35,6 +35,9 @@ Proposed の間に Decision を書き直した。
 このため、CI の設定を composite action へまとめた。
 lock の強制を `mise.toml` の `[settings] locked = true` へ移す案も試したが、`[tools]` のほかを書いた `mise.toml` は新しいチェックアウトごとに `mise trust` を求め、新しい worktree で shims と Git フックが止まったので採らなかった（選択肢5）。
 
+zizmor も Proposed の間に足した。
+版が Taskfile の `docker run`（1.29.0）と `zizmor-action`（版の指定なし）でずれ、[#424](https://github.com/yokozi-jp/spring-modulith-ai-dlc/pull/424) では CI の 1.32.0 だけが `self-repository` の alert を出した。
+
 Java も Proposed の間に足した。
 最初の案は Java を対象外にしていた。
 そのときローカルは `01-setup-java.sh` が apt で `25.0.2` を入れ、CI は 9 か所の `actions/setup-java` が Corretto の `25` の最新を入れていたので、パッチの版がずれていた。
@@ -42,9 +45,11 @@ Java も Proposed の間に足した。
 
 ## Decision
 
-- `mise.toml` の `[tools]` に `task`、`betterleaks`、`npm:@iwe-org/iwe`、`java` を exact 版で書き、`mise lock --platform linux-x64` で `mise.lock` に URL と checksum を記録する。
+- `mise.toml` の `[tools]` に `task`、`betterleaks`、`npm:@iwe-org/iwe`、`java`、`zizmor` を exact 版で書き、`mise lock --platform linux-x64` で `mise.lock` に URL と checksum を記録する。
 - npm backend の iwe について mise が作る `.mise/locks/npm-iwe-org-iwe/<版>/`（依存の integrity を持つ lockfile）も commit する。
 - `mise.toml` には `[tools]` の版だけを書く。`[tools]` だけのファイルは `mise trust` を要さない。タスク（Task の役割）、環境変数、設定、Node.js と pnpm（Vite+ の役割）は書かない。
+- `task lint-actions-security` と Lefthook の zizmor のジョブは、Docker の image でなく mise の zizmor を使う。`zizmor.yml` の `zizmor-action` の `version` には `mise.toml` と同じ版を書く。版を書く場所はこの2か所だけである。action の SHA が持つ版の一覧に無い版は動かないので、zizmor を上げるときは SHA も確かめる。
+- CI の `check-gate` ジョブが `task mise-trust-check` を実行する。このタスクは `CI`、`GITHUB_ACTIONS`、`MISE_YES`、`MISE_TRUSTED_CONFIG_PATHS` を外し、新しい `MISE_STATE_DIR` で `mise ls --current` が通ることを確かめる。`[tools]` だけかを文面で見る lint にはしない。trust を要さない設定まで止めないためである。
 - ローカルでは apt で入れた mise が `mise install --locked` を実行する。
 - PATH は mise の shims で通す。`04-setup-shell.sh` が `~/.bashrc` に `eval "$(mise activate bash --shims)"` を足す。Taskfile と Lefthook は `betterleaks` と `iwe` をそのまま呼ぶ。
 - CI は composite action `.github/actions/setup-mise` を使う。この action だけが `jdx/mise-action` の SHA と mise の版を持ち、入力 `tools` でジョブが使う道具だけを入れる。
@@ -94,7 +99,7 @@ shims は決まったディレクトリなので、受け継いだ PATH のま�
 
 - `mise.lock` は `linux-x64` だけを持つ。開発環境は WSL、CI は `ubuntu-latest` である。ほかの platform で開発する人が来たら `mise lock --platform` に足す。
 - CI の mise の版とローカルの apt の mise の版はずれうる。mise 2026.11.0 と 2026.11.9 で同じ `mise.lock` と `.mise/locks/` が作られ、どちらでも `mise install --locked` が通ることを確かめた。
-- zizmor の `self-repository` は `uses: ./.github/actions/setup-mise` に `$/` の形を勧めるが、`ci.yml` と同じく actionlint（1.7.12）がまだ受け付けない（rhysd/actionlint#732）ので `./` のままにし、alert は won't fix にする。
+- zizmor の `self-repository` は `uses: ./.github/actions/setup-mise` に `$/` の形を勧めるが、`ci.yml` と同じく actionlint（1.7.12）がまだ受け付けない（rhysd/actionlint#732）ので `./` のままにする。`.github/zizmor.yml` でこの rule を無効にし、ローカルと CI で同じ版と同じ設定にする。GitHub の API を使う audit は、token のあるCIでだけ動く。
 - Kiro Web のサンドボックスも同じ `mise.lock` から入れる（[ADR-093](ADR-093-support-kiro-web-sandbox-as-development-environment.md)）。
   iwe はサンドボックスの glibc 2.34 で動く 0.29.2 へ上げた。
 - Vite+、Kiro CLI はこの ADR の対象外であり、番号付きのスクリプトに残る。Kiro CLI は [#387](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/387) で扱う。
@@ -130,7 +135,7 @@ shims は決まったディレクトリなので、受け継いだ PATH のま�
 
 - **Description**：lock の強制を `mise.toml` に書き、ローカルの shims にも CI にも lock に無い版を拒ませる。
 - **Pros**：ローカルでも lock に無い版が入らない。CI の `MISE_LOCKED=1` も要らない。
-- **Cons**：`[tools]` のほかを書いた `mise.toml` は、チェックアウトごとに `mise trust` を要する。新しい worktree では trust する前に shims が `Config files in … are not trusted` で止まり、`task` を呼ぶ Git フックも止まる。CI は trust を自動で済ませるので、CI では気づけない。グローバルの mise の設定に道具を持つ開発者は、グローバルの lock も要るようになる。
+- **Cons**：`[tools]` のほかを書いた `mise.toml` は、チェックアウトごとに `mise trust` を要する。新しい worktree では trust する前に shims が `Config files in … are not trusted` で止まり、`task` を呼ぶ Git フックも止まる。CI の `jdx/mise-action` は trust を自動で済ませるので、`task mise-trust-check` で別に確かめる。グローバルの mise の設定に道具を持つ開発者は、グローバルの lock も要るようになる。
 
 ## References
 
