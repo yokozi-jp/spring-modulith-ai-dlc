@@ -27,11 +27,16 @@ import type {
 
 import type {
   BadRequestProblemResponse,
+  ChangeMemberRoleRequest,
+  ConflictProblemResponse,
   ForbiddenProblemResponse,
   InternalServerErrorProblemResponse,
   MembershipListResponse,
   MembershipResponse,
+  NotFoundProblemResponse,
+  RemoveTenantMemberParams,
   SelectTenantRequest,
+  TenantMembersResponse,
   UnauthorizedProblemResponse,
   UnprocessableContentProblemResponse
 } from '../../models';
@@ -366,6 +371,455 @@ export const useSelectTenant = <TError = ErrorType<BadRequestProblemResponse | U
         TContext
       > => {
       return useMutation(getSelectTenantMutationOptions(options), queryClient);
+    }
+    export type listTenantMembersResponse200 = {
+  data: TenantMembersResponse
+  status: 200
+}
+
+export type listTenantMembersResponse401 = {
+  data: UnauthorizedProblemResponse
+  status: 401
+}
+
+export type listTenantMembersResponse403 = {
+  data: ForbiddenProblemResponse
+  status: 403
+}
+
+export type listTenantMembersResponse500 = {
+  data: InternalServerErrorProblemResponse
+  status: 500
+}
+
+export type listTenantMembersResponseSuccess = (listTenantMembersResponse200) & {
+  headers: Headers;
+};
+export type listTenantMembersResponseError = (listTenantMembersResponse401 | listTenantMembersResponse403 | listTenantMembersResponse500) & {
+  headers: Headers;
+};
+
+export const getListTenantMembersUrl = () => {
+
+
+
+
+  return `/api/current-tenant/members`
+}
+
+/**
+ * 一覧は所属した順に items で包んで返す。lockNo は変更の操作で送り返す。管理者以外には 403 を返す。
+ * @summary 選んだテナントに所属している利用者の一覧を返す。
+ */
+export const listTenantMembers = async ( options?: Parameters<typeof apiFetch>[1]): Promise<listTenantMembersResponseSuccess> => {
+
+  return apiFetch<listTenantMembersResponseSuccess>(getListTenantMembersUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListTenantMembersQueryKey = () => {
+    return [
+    `/api/current-tenant/members`
+    ] as const;
+    }
+
+
+export const getListTenantMembersQueryOptions = <TData = Awaited<ReturnType<typeof listTenantMembers>>, TError = ErrorType<UnauthorizedProblemResponse | ForbiddenProblemResponse | InternalServerErrorProblemResponse>>( options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listTenantMembers>>, TError, TData>>, request?: SecondParameter<typeof apiFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListTenantMembersQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listTenantMembers>>> = ({ signal }) => listTenantMembers({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listTenantMembers>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type ListTenantMembersQueryResult = NonNullable<Awaited<ReturnType<typeof listTenantMembers>>>
+export type ListTenantMembersQueryError = ErrorType<UnauthorizedProblemResponse | ForbiddenProblemResponse | InternalServerErrorProblemResponse>
+
+
+export function useListTenantMembers<TData = Awaited<ReturnType<typeof listTenantMembers>>, TError = ErrorType<UnauthorizedProblemResponse | ForbiddenProblemResponse | InternalServerErrorProblemResponse>>(
+  options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof listTenantMembers>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof listTenantMembers>>,
+          TError,
+          Awaited<ReturnType<typeof listTenantMembers>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof apiFetch>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useListTenantMembers<TData = Awaited<ReturnType<typeof listTenantMembers>>, TError = ErrorType<UnauthorizedProblemResponse | ForbiddenProblemResponse | InternalServerErrorProblemResponse>>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listTenantMembers>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof listTenantMembers>>,
+          TError,
+          Awaited<ReturnType<typeof listTenantMembers>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof apiFetch>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useListTenantMembers<TData = Awaited<ReturnType<typeof listTenantMembers>>, TError = ErrorType<UnauthorizedProblemResponse | ForbiddenProblemResponse | InternalServerErrorProblemResponse>>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listTenantMembers>>, TError, TData>>, request?: SecondParameter<typeof apiFetch>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary 選んだテナントに所属している利用者の一覧を返す。
+ */
+
+export function useListTenantMembers<TData = Awaited<ReturnType<typeof listTenantMembers>>, TError = ErrorType<UnauthorizedProblemResponse | ForbiddenProblemResponse | InternalServerErrorProblemResponse>>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listTenantMembers>>, TError, TData>>, request?: SecondParameter<typeof apiFetch>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getListTenantMembersQueryOptions(options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+export const getListTenantMembersSuspenseQueryOptions = <TData = Awaited<ReturnType<typeof listTenantMembers>>, TError = ErrorType<UnauthorizedProblemResponse | ForbiddenProblemResponse | InternalServerErrorProblemResponse>>( options?: { query?:Partial<UseSuspenseQueryOptions<Awaited<ReturnType<typeof listTenantMembers>>, TError, TData>>, request?: SecondParameter<typeof apiFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListTenantMembersQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listTenantMembers>>> = ({ signal }) => listTenantMembers({ signal, ...requestOptions });
+
+
+
+
+
+   return  queryOptionsBuilder({ queryKey, ...queryOptions, queryFn: queryOptions?.queryFn ?? queryFn}) as UseSuspenseQueryOptions<Awaited<ReturnType<typeof listTenantMembers>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> } & { throwOnError?: ((this: never, error: TError) => boolean) & { readonly __inferenceOnly: never } }
+}
+
+export type ListTenantMembersSuspenseQueryResult = NonNullable<Awaited<ReturnType<typeof listTenantMembers>>>
+export type ListTenantMembersSuspenseQueryError = ErrorType<UnauthorizedProblemResponse | ForbiddenProblemResponse | InternalServerErrorProblemResponse>
+
+
+export function useListTenantMembersSuspense<TData = Awaited<ReturnType<typeof listTenantMembers>>, TError = ErrorType<UnauthorizedProblemResponse | ForbiddenProblemResponse | InternalServerErrorProblemResponse>>(
+  options: { query:Partial<UseSuspenseQueryOptions<Awaited<ReturnType<typeof listTenantMembers>>, TError, TData>>, request?: SecondParameter<typeof apiFetch>}
+ , queryClient?: QueryClient
+  ):  UseSuspenseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useListTenantMembersSuspense<TData = Awaited<ReturnType<typeof listTenantMembers>>, TError = ErrorType<UnauthorizedProblemResponse | ForbiddenProblemResponse | InternalServerErrorProblemResponse>>(
+  options?: { query?:Partial<UseSuspenseQueryOptions<Awaited<ReturnType<typeof listTenantMembers>>, TError, TData>>, request?: SecondParameter<typeof apiFetch>}
+ , queryClient?: QueryClient
+  ):  UseSuspenseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useListTenantMembersSuspense<TData = Awaited<ReturnType<typeof listTenantMembers>>, TError = ErrorType<UnauthorizedProblemResponse | ForbiddenProblemResponse | InternalServerErrorProblemResponse>>(
+  options?: { query?:Partial<UseSuspenseQueryOptions<Awaited<ReturnType<typeof listTenantMembers>>, TError, TData>>, request?: SecondParameter<typeof apiFetch>}
+ , queryClient?: QueryClient
+  ):  UseSuspenseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary 選んだテナントに所属している利用者の一覧を返す。
+ */
+
+export function useListTenantMembersSuspense<TData = Awaited<ReturnType<typeof listTenantMembers>>, TError = ErrorType<UnauthorizedProblemResponse | ForbiddenProblemResponse | InternalServerErrorProblemResponse>>(
+  options?: { query?:Partial<UseSuspenseQueryOptions<Awaited<ReturnType<typeof listTenantMembers>>, TError, TData>>, request?: SecondParameter<typeof apiFetch>}
+ , queryClient?: QueryClient
+ ):  UseSuspenseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getListTenantMembersSuspenseQueryOptions(options)
+
+  const query = useSuspenseQuery(queryOptions, queryClient) as  UseSuspenseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+export type removeTenantMemberResponse204 = {
+  data: void
+  status: 204
+}
+
+export type removeTenantMemberResponse400 = {
+  data: BadRequestProblemResponse
+  status: 400
+}
+
+export type removeTenantMemberResponse401 = {
+  data: UnauthorizedProblemResponse
+  status: 401
+}
+
+export type removeTenantMemberResponse403 = {
+  data: ForbiddenProblemResponse
+  status: 403
+}
+
+export type removeTenantMemberResponse404 = {
+  data: NotFoundProblemResponse
+  status: 404
+}
+
+export type removeTenantMemberResponse409 = {
+  data: ConflictProblemResponse
+  status: 409
+}
+
+export type removeTenantMemberResponse422 = {
+  data: UnprocessableContentProblemResponse
+  status: 422
+}
+
+export type removeTenantMemberResponse500 = {
+  data: InternalServerErrorProblemResponse
+  status: 500
+}
+
+export type removeTenantMemberResponseSuccess = (removeTenantMemberResponse204) & {
+  headers: Headers;
+};
+export type removeTenantMemberResponseError = (removeTenantMemberResponse400 | removeTenantMemberResponse401 | removeTenantMemberResponse403 | removeTenantMemberResponse404 | removeTenantMemberResponse409 | removeTenantMemberResponse422 | removeTenantMemberResponse500) & {
+  headers: Headers;
+};
+
+export const getRemoveTenantMemberUrl = (userId: string,
+    params: RemoveTenantMemberParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/current-tenant/members/${userId}?${stringifiedParams}` : `/api/current-tenant/members/${userId}`
+}
+
+/**
+ * 外した利用者は、次のリクエストから業務の API を呼べない。管理者以外には 403、最後の管理者を外すと 422 を返す。
+ * @summary 所属している利用者を外す。
+ */
+export const removeTenantMember = async (userId: string,
+    params: RemoveTenantMemberParams, options?: Parameters<typeof apiFetch>[1]): Promise<removeTenantMemberResponseSuccess> => {
+
+  return apiFetch<removeTenantMemberResponseSuccess>(getRemoveTenantMemberUrl(userId,params),
+  {
+    ...options,
+    method: 'DELETE'
+
+
+  }
+);}
+
+
+
+
+
+export const getRemoveTenantMemberMutationKey = () => ['removeTenantMember'] as const;
+
+export const getRemoveTenantMemberMutationOptions = <TError = ErrorType<BadRequestProblemResponse | UnauthorizedProblemResponse | ForbiddenProblemResponse | NotFoundProblemResponse | ConflictProblemResponse | UnprocessableContentProblemResponse | InternalServerErrorProblemResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof removeTenantMember>>, TError,RemoveTenantMemberMutationVariables, TContext>, request?: SecondParameter<typeof apiFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof removeTenantMember>>, TError,RemoveTenantMemberMutationVariables, TContext> => {
+
+const mutationKey = getRemoveTenantMemberMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof removeTenantMember>>, RemoveTenantMemberMutationVariables> = (props) => {
+          const {userId,params} = props ?? {};
+
+          return  removeTenantMember(userId,params,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type RemoveTenantMemberMutationResult = NonNullable<Awaited<ReturnType<typeof removeTenantMember>>>
+
+    export type RemoveTenantMemberMutationError = ErrorType<BadRequestProblemResponse | UnauthorizedProblemResponse | ForbiddenProblemResponse | NotFoundProblemResponse | ConflictProblemResponse | UnprocessableContentProblemResponse | InternalServerErrorProblemResponse>
+    export type RemoveTenantMemberMutationVariables = {userId: string;params: RemoveTenantMemberParams}
+
+    /**
+ * @summary 所属している利用者を外す。
+ */
+export const useRemoveTenantMember = <TError = ErrorType<BadRequestProblemResponse | UnauthorizedProblemResponse | ForbiddenProblemResponse | NotFoundProblemResponse | ConflictProblemResponse | UnprocessableContentProblemResponse | InternalServerErrorProblemResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof removeTenantMember>>, TError,RemoveTenantMemberMutationVariables, TContext>, request?: SecondParameter<typeof apiFetch>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof removeTenantMember>>,
+        TError,
+        RemoveTenantMemberMutationVariables,
+        TContext
+      > => {
+      return useMutation(getRemoveTenantMemberMutationOptions(options), queryClient);
+    }
+    export type changeTenantMemberRoleResponse204 = {
+  data: void
+  status: 204
+}
+
+export type changeTenantMemberRoleResponse400 = {
+  data: BadRequestProblemResponse
+  status: 400
+}
+
+export type changeTenantMemberRoleResponse401 = {
+  data: UnauthorizedProblemResponse
+  status: 401
+}
+
+export type changeTenantMemberRoleResponse403 = {
+  data: ForbiddenProblemResponse
+  status: 403
+}
+
+export type changeTenantMemberRoleResponse404 = {
+  data: NotFoundProblemResponse
+  status: 404
+}
+
+export type changeTenantMemberRoleResponse409 = {
+  data: ConflictProblemResponse
+  status: 409
+}
+
+export type changeTenantMemberRoleResponse422 = {
+  data: UnprocessableContentProblemResponse
+  status: 422
+}
+
+export type changeTenantMemberRoleResponse500 = {
+  data: InternalServerErrorProblemResponse
+  status: 500
+}
+
+export type changeTenantMemberRoleResponseSuccess = (changeTenantMemberRoleResponse204) & {
+  headers: Headers;
+};
+export type changeTenantMemberRoleResponseError = (changeTenantMemberRoleResponse400 | changeTenantMemberRoleResponse401 | changeTenantMemberRoleResponse403 | changeTenantMemberRoleResponse404 | changeTenantMemberRoleResponse409 | changeTenantMemberRoleResponse422 | changeTenantMemberRoleResponse500) & {
+  headers: Headers;
+};
+
+export const getChangeTenantMemberRoleUrl = (userId: string,) => {
+
+
+
+
+  return `/api/current-tenant/members/${userId}`
+}
+
+/**
+ * 変更は、その利用者の次のリクエストから効く。管理者以外には 403、最後の管理者を下げると 422 を返す。
+ * @summary 所属している利用者の役割を変える。
+ */
+export const changeTenantMemberRole = async (userId: string,
+    changeMemberRoleRequest: ChangeMemberRoleRequest, options?: Parameters<typeof apiFetch>[1]): Promise<changeTenantMemberRoleResponseSuccess> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return apiFetch<changeTenantMemberRoleResponseSuccess>(getChangeTenantMemberRoleUrl(userId),
+  {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(changeMemberRoleRequest)
+  }
+);}
+
+
+
+
+
+export const getChangeTenantMemberRoleMutationKey = () => ['changeTenantMemberRole'] as const;
+
+export const getChangeTenantMemberRoleMutationOptions = <TError = ErrorType<BadRequestProblemResponse | UnauthorizedProblemResponse | ForbiddenProblemResponse | NotFoundProblemResponse | ConflictProblemResponse | UnprocessableContentProblemResponse | InternalServerErrorProblemResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof changeTenantMemberRole>>, TError,ChangeTenantMemberRoleMutationVariables, TContext>, request?: SecondParameter<typeof apiFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof changeTenantMemberRole>>, TError,ChangeTenantMemberRoleMutationVariables, TContext> => {
+
+const mutationKey = getChangeTenantMemberRoleMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof changeTenantMemberRole>>, ChangeTenantMemberRoleMutationVariables> = (props) => {
+          const {userId,data} = props ?? {};
+
+          return  changeTenantMemberRole(userId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ChangeTenantMemberRoleMutationResult = NonNullable<Awaited<ReturnType<typeof changeTenantMemberRole>>>
+    export type ChangeTenantMemberRoleMutationBody = ChangeMemberRoleRequest
+    export type ChangeTenantMemberRoleMutationError = ErrorType<BadRequestProblemResponse | UnauthorizedProblemResponse | ForbiddenProblemResponse | NotFoundProblemResponse | ConflictProblemResponse | UnprocessableContentProblemResponse | InternalServerErrorProblemResponse>
+    export type ChangeTenantMemberRoleMutationVariables = {userId: string;data: ChangeMemberRoleRequest}
+
+    /**
+ * @summary 所属している利用者の役割を変える。
+ */
+export const useChangeTenantMemberRole = <TError = ErrorType<BadRequestProblemResponse | UnauthorizedProblemResponse | ForbiddenProblemResponse | NotFoundProblemResponse | ConflictProblemResponse | UnprocessableContentProblemResponse | InternalServerErrorProblemResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof changeTenantMemberRole>>, TError,ChangeTenantMemberRoleMutationVariables, TContext>, request?: SecondParameter<typeof apiFetch>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof changeTenantMemberRole>>,
+        TError,
+        ChangeTenantMemberRoleMutationVariables,
+        TContext
+      > => {
+      return useMutation(getChangeTenantMemberRoleMutationOptions(options), queryClient);
     }
     export type listMembershipsResponse200 = {
   data: MembershipListResponse

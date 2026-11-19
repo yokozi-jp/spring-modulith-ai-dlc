@@ -142,6 +142,20 @@ IdPのレルムの役割とグループは使わない。
 
 権限がない場合のステータスコードは[HTTPステータスコードの選択](status-codes.md)に従う。
 
+## テナントの所属の管理
+
+選んだテナントの所属の一覧、役割の変更、所属の取り外しは、`/api/current-tenant/members`の配下にあり、テナントの管理者だけが呼べる。
+`tenancy`の`TenantSecurityCustomizer`が、このパスに`hasRole("ADMIN")`を課す。
+`ROLE_ADMIN`は`TenantSelectionFilter`が引き直した所属の役割から来るため、役割の変更と取り外しは、その利用者の次のリクエストから効く。
+管理者でない利用者には、`about:blank`の403を返す。
+
+対象のテナントは、パスにもリクエストの値にも持たず、セッションで選んだテナントから取る。
+そのため、別のテナントの所属は一覧に出ず、パスに別のテナントだけに所属する利用者のIDを指定しても404になる。
+
+各テナントに管理者を1人以上残す規則は、`tenancy`の`Tenant`集約が持つ。
+最後の管理者の役割を下げる操作と、最後の管理者を外す操作は、422になる。
+所属の変更はテナントの`lock_no`で競合を検出するため、一覧の応答の`lockNo`を、役割の変更の本文と所属を外すクエリパラメータで送り返す（[更新の競合制御](optimistic-locking.md)）。
+
 ## 出典
 
 - フューチャー株式会社「Web API設計ガイドライン」（[アーキテクチャ設計ガイドライン](https://future-architect.github.io/arch-guidelines/documents/forWebAPI/web_api_guidelines.html)、commit `e309a6d`）、[CC BY 4.0](https://creativecommons.org/licenses/by/4.0/deed.ja)

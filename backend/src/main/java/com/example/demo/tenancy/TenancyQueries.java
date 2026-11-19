@@ -20,4 +20,11 @@ public interface TenancyQueries {
    * @param tenantId テナントの ID
    */
   Optional<MembershipSummary> membership(String userId, String tenantId);
+
+  /**
+   * テナントに所属している利用者と、テナントのロック番号を返す。テナントがなければ空を返す。
+   *
+   * @param tenantId テナントの ID
+   */
+  Optional<TenantMembersDetails> findMembers(String tenantId);
 }
