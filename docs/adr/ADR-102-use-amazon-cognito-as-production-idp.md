@@ -1,11 +1,11 @@
 ---
 type: ADR
-title: 'ADR-099: 本番の IdP に Amazon Cognito を使い、ローカルとテストでは Keycloak で代える'
+title: 'ADR-102: 本番の IdP に Amazon Cognito を使い、ローカルとテストでは Keycloak で代える'
 description: 本番の IdP を Amazon Cognito のユーザープールにし、ローカルと CI では docker/keycloak/realm.json の Keycloak で代える決定。アプリは標準の OIDC の claim だけを読み、どちらの IdP の独自の機能にも依存しない。
 tags: [adr, security, auth, oidc, idp]
 ---
 
-# ADR-099: 本番の IdP に Amazon Cognito を使い、ローカルとテストでは Keycloak で代える
+# ADR-102: 本番の IdP に Amazon Cognito を使い、ローカルとテストでは Keycloak で代える
 
 ## Status
 
@@ -21,7 +21,7 @@ Proposed
 ADR-007 は IdP を Keycloak と書いているが、本番の IdP をどれにするかは ADR に残していなかった。
 `docker/compose.yml` の Keycloak の注記と [APIの認証、セッション、権限](../web-api/authentication-and-session.md)のログアウトの節は、本番を Cognito と想定して書かれている。
 
-[issue #369](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/369) は、テナントと役割をアプリの DB に持つと決めた（[ADR-098](ADR-098-keep-tenants-and-roles-in-app-database.md)）。
+[issue #369](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/369) は、テナントと役割をアプリの DB に持つと決めた（[ADR-101](ADR-101-keep-tenants-and-roles-in-app-database.md)）。
 このとき、本番の IdP が Cognito であることを前提に、Keycloak の Organizations と Cognito のカスタム属性とグループを使わないと決めた（#363 の Q10）。
 IdP の前提を ADR にしておかないと、ローカルの Keycloak だけにある機能に頼った変更を、レビューで止める根拠がない。
 
@@ -34,7 +34,7 @@ IdP の前提を ADR にしておかないと、ローカルの Keycloak だけ�
 
 - ログインは ADR-007 の Authorization Code Flow with PKCE にし、IdP の discovery の文書から endpoint を読む。
 - 利用者は ID トークンの `iss` と `sub` の組で識別する。IdP を移るときは、`tenancy` の ID 連携の表だけを書き換える（#374）。
-- テナント、所属、役割を IdP に持たせない（ADR-098）。Cognito のカスタム属性とグループ、Keycloak の Organizations とレルムの役割を使わない。
+- テナント、所属、役割を IdP に持たせない（ADR-101）。Cognito のカスタム属性とグループ、Keycloak の Organizations とレルムの役割を使わない。
 - ローカルの realm には、ローカルの利用者と、アプリの client だけを置く。
 
 ## Consequences
@@ -72,7 +72,7 @@ IdP の前提を ADR にしておかないと、ローカルの Keycloak だけ�
 ## References
 
 - [ADR-007: セッションベース認証と OIDC Authorization Code + PKCE](ADR-007-session-based-auth-with-oidc-pkce.md)
-- [ADR-098: テナント、所属、役割をアプリの DB に持ち、テナントを選んだ時点で役割の権限を組み立てる](ADR-098-keep-tenants-and-roles-in-app-database.md)
+- [ADR-101: テナント、所属、役割をアプリの DB に持ち、テナントを選んだ時点で役割の権限を組み立てる](ADR-101-keep-tenants-and-roles-in-app-database.md)
 - [issue #316](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/316)
 - [issue #363](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/363)
 - [issue #369](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/369)

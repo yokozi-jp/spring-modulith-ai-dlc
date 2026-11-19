@@ -11,7 +11,7 @@
  *
  * <p>共通カラムの {@code *_by} に登録するアプリの利用者を表す認証の principal（{@code AppUserPrincipal}）は {@code security}
  * に置き、どの層からも使う（ADR-096）。テナントを選ぶ前の拒否（{@code TenantNotSelectedException}）は、テナントの ID
- * も役割も持たずログインの状態だけを表すので、認証の語彙として {@code security} に置く（ADR-098）。
+ * も役割も持たずログインの状態だけを表すので、認証の語彙として {@code security} に置く（ADR-101）。
  */
 @NullMarked
 package com.example.demo.shared;

@@ -164,7 +164,7 @@ Domain の型、Command と Result、Spring MVC の Request と Response、jOOQ 
   `shared` は Domain と `error` の型、ルートパッケージの型に依存しない。
 - リスナーが失敗した出版の再投入の方針を選ぶ注釈（`ResubmissionPolicy`）を `shared.events` に置き、このパッケージも `@NamedInterface("events")` で公開する（[ADR-079](../adr/ADR-079-resubmit-failed-event-publications-periodically-with-shedlock.md)）。
 - 共通カラムの `*_by` に登録するアプリの利用者を表す認証の principal（`AppUserPrincipal`）を `shared.security` に置き、このパッケージも `@NamedInterface("security")` で公開する（[ADR-096](../adr/ADR-096-require-app-user-principal-for-audit-columns.md)）。
-  テナントを選ぶ前の拒否を表す `TenantNotSelectedException` もここに置き、`tenancy` が投げて `error` が専用の type の 403 にする（[ADR-098](../adr/ADR-098-keep-tenants-and-roles-in-app-database.md)）。
+  テナントを選ぶ前の拒否を表す `TenantNotSelectedException` もここに置き、`tenancy` が投げて `error` が専用の type の 403 にする（[ADR-101](../adr/ADR-101-keep-tenants-and-roles-in-app-database.md)）。
   この例外はテナントの ID も役割も持たず、ログインの状態（テナントをまだ選んでいないこと）だけを表すため、`AppUserPrincipal` と同じく認証の語彙として扱い、次の項目の業務の概念に含めない。
   テナント、所属、役割の値と規則は `tenancy` に置く。
 - 業務の概念を置かない。

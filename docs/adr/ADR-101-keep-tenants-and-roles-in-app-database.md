@@ -1,11 +1,11 @@
 ---
 type: ADR
-title: 'ADR-098: テナント、所属、役割をアプリの DB に持ち、テナントを選んだ時点で役割の権限を組み立てる'
+title: 'ADR-101: テナント、所属、役割をアプリの DB に持ち、テナントを選んだ時点で役割の権限を組み立てる'
 description: IdP には認証だけを任せ、テナント、所属、役割を tenancy モジュールの表に持つ決定。ログインの後にテナントを 1 つ選んだ時点でセッションの ID を作り直し、テナントと役割を持つ 1 つの権限（ROLE_ADMIN か ROLE_MEMBER）を組み立て、リクエストのたびに所属を引き直す。
 tags: [adr, security, auth, tenancy, session]
 ---
 
-# ADR-098: テナント、所属、役割をアプリの DB に持ち、テナントを選んだ時点で役割の権限を組み立てる
+# ADR-101: テナント、所属、役割をアプリの DB に持ち、テナントを選んだ時点で役割の権限を組み立てる
 
 ## Status
 
@@ -20,7 +20,7 @@ Proposed
 [issue #369](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/369) は、業務のデータを**テナント**（サービスを契約する単位の組織）ごとに分ける。
 1 人の利用者は複数のテナントに属せ、テナントごとに役割（管理者か、そうでない利用者か）を持つ。
 利用者は IdP でログインし、アプリは ID トークンの `iss` と `sub` の組から利用者を引く（[ADR-096](ADR-096-require-app-user-principal-for-audit-columns.md)、#374）。
-IdP は、ローカルとテストでは Keycloak、本番では Amazon Cognito である（[ADR-099](ADR-099-use-amazon-cognito-as-production-idp.md)）。
+IdP は、ローカルとテストでは Keycloak、本番では Amazon Cognito である（[ADR-102](ADR-102-use-amazon-cognito-as-production-idp.md)）。
 
 役割を IdP に持たせると、次のことが起きる。
 
@@ -150,7 +150,7 @@ IdP は、ローカルとテストでは Keycloak、本番では Amazon Cognito 
 - [ADR-058: problem type にパスを全部書いた相対 URI を使う](ADR-058-use-path-absolute-relative-uri-for-problem-types.md)
 - [ADR-089: 主キーをモジュールのスキーマと Repository の中に閉じ、外に出る値には例外なく public_id を使う](ADR-089-keep-primary-keys-inside-modules-and-expose-public-ids.md)
 - [ADR-096: 共通カラムの作成者と更新者には、AppUserPrincipal の利用者の ID だけを登録する](ADR-096-require-app-user-principal-for-audit-columns.md)
-- [ADR-099: 本番の IdP に Amazon Cognito を使い、ローカルとテストでは Keycloak で代える](ADR-099-use-amazon-cognito-as-production-idp.md)
+- [ADR-102: 本番の IdP に Amazon Cognito を使い、ローカルとテストでは Keycloak で代える](ADR-102-use-amazon-cognito-as-production-idp.md)
 - [APIの認証、セッション、権限](../web-api/authentication-and-session.md)
 - [Spring Security: Session Management](https://docs.spring.io/spring-security/reference/servlet/authentication/session-management.html)
 - [OWASP Session Management Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Session_Management_Cheat_Sheet.html)

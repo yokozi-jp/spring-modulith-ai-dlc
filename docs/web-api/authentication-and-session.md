@@ -44,7 +44,7 @@ IdPを移るときは、組と利用者の対応づけだけを書き換え、�
 
 ログインした利用者は、所属するテナントを1つ選んでから業務のAPIを使う。
 テナント、所属、役割は`tenancy`の`m_tenant`と`m_membership`に持ち、IdPには持たせない。
-理由は[ADR-098](../adr/ADR-098-keep-tenants-and-roles-in-app-database.md)にある。
+理由は[ADR-101](../adr/ADR-101-keep-tenants-and-roles-in-app-database.md)にある。
 
 - ログインの成功の処理（`TenantSelectionSuccessHandler`）は、所属が1つならそのテナントを選ぶ。所属がないか2つ以上なら選ばない。
 - SPAは`GET /api/memberships`で所属の一覧を読み、`PUT /api/current-tenant`の本文でテナントのIDを送って選ぶ。所属がなければ、招待を待つ画面を出す。
@@ -138,7 +138,7 @@ ADR-007は未認証で許可する経路をヘルスチェックに限り、セ�
 IdPはユーザーの認証だけを担い、テナントの中の役割は所属の行に持つ（[テナントを選ぶ](#テナントを選ぶ)）。
 IdPのレルムの役割とグループは使わない。
 ローカルのKeycloakのrealm（`docker/keycloak/realm.json`）にもレルムの役割を置かず、管理者の権限は開発用の代表データの所属で作る。
-本番のIdPはAmazon Cognitoで、カスタム属性とグループを使わない（[ADR-099](../adr/ADR-099-use-amazon-cognito-as-production-idp.md)）。
+本番のIdPはAmazon Cognitoで、カスタム属性とグループを使わない（[ADR-102](../adr/ADR-102-use-amazon-cognito-as-production-idp.md)）。
 
 権限がない場合のステータスコードは[HTTPステータスコードの選択](status-codes.md)に従う。
 

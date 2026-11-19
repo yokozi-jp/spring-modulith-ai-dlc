@@ -42,7 +42,7 @@ MockMvcでログインした利用者として呼ぶテストは、`testkit`の`
 
 `AppUsers.oidcLogin()`は、テストのテナント（`AppUsers.TENANT_ID`）を選んだMEMBERの利用者にする。
 別のテナントや役割で呼ぶときは、`AppUsers.inTenant(<テナントのID>, <役割>)`を使う。
-バックエンドはリクエストのたびに所属を引き直し、所属のない権限を外すため、どちらもリクエストを送る前にDBへ利用者、テナント、所属の行を入れる（[ADR-098](../adr/ADR-098-keep-tenants-and-roles-in-app-database.md)）。
+バックエンドはリクエストのたびに所属を引き直し、所属のない権限を外すため、どちらもリクエストを送る前にDBへ利用者、テナント、所属の行を入れる（[ADR-101](../adr/ADR-101-keep-tenants-and-roles-in-app-database.md)）。
 `Authentication`の権限に`ROLE_MEMBER`などを手で足しても、テナントを選んだ状態にはならず、業務のAPIは403になる。
 
 ## 並列と実行順
