@@ -23,7 +23,8 @@ tool call ごとにシェルは新しくなるので、呼び出しごとに実�
 入れ済みの道具は入れ直さないので、2 回目以降は 1 秒かからない。
 道具と状態は `~/.cache/kiro-web` に置かれ、置き場所は環境変数 `KIRO_WEB_HOME` で変えられる。
 
-iwe の MCP サーバーは、セッションの開始時に `iwe-mcp.sh` が道具を揃えてから起動するので、source しなくても使える。
+[iwe の MCP サーバーを Agent Config に設定する](#iwe-の-mcp-サーバーを-agent-config-に設定する)と、セッションの開始時に `iwe-mcp.sh` が道具を揃えてから iwe を起動するので、source しなくても使える。
+設定していないと、iwe の MCP サーバーは起動しない。
 `iwe-mcp.sh` は podman のサービスを起動しないので、コンテナを使う前には tool call で `kiro-web.sh` を source する。
 
 初めて使うときは、続けてルートの依存とフロントエンドの依存を入れる。
@@ -61,8 +62,28 @@ kiro-web-netns bash -c 'task compose-up && task be-migrate && task oidc-check; t
 
 `kiro-web-netns` は同時に 1 つしか動かせず、2 つ目は `別の kiro-web-netns が動いています` で止まる。
 
+## iwe の MCP サーバーを Agent Config に設定する
+
+Kiro Web は、リポジトリの `.kiro/settings/mcp.json` を読まない（[サンドボックスの制約](#サンドボックスの制約)）。
+Agent Config > Powers & MCP の `iwe` を、次の手順で `.kiro/settings/mcp.json` の `iwe` に揃える。
+
+1. リポジトリの `.kiro/settings/mcp.json` を開き、`mcpServers.iwe` の `command` と `args` を読む。
+2. Agent Config > Powers & MCP の `iwe` の `command` と `args` を、1 の値と同じにする。
+3. 新しいセッションを始め、最初の tool call の前に `iwe` の MCP サーバーが接続していて、`iwe_find` が使えることを確かめる。
+
+値の正本は `.kiro/settings/mcp.json` であり、この Runbook には写さない。
+`.kiro/settings/mcp.json` の `iwe` を変えたら（たとえば `disabledTools` を足したら）、Agent Config の値にも同じ変更を入れる。
+
+Agent Config の `iwe` が `cd "$(git rev-parse --show-toplevel)/docs" && exec iwec` のような古いコマンドのままだと、git の外の `/projects/sandbox` で起動する `cd` が失敗し、`iwec` も PATH に無いので、`MCP server "iwe" failed to connect: Connection closed` で止まる。
+
 ## サンドボックスの制約
 
+- ワークスペースのルートは `/projects/sandbox` で、リポジトリはその子のディレクトリ（`/projects/sandbox/spring-modulith-ai-dlc`）にある。
+- Kiro Web は、リポジトリの `.kiro/settings`、`.kiro/steering`、`.kiro/skills`、`.kiro/hooks` を読まない。
+  読むのは、Agent Config の値と、Agent Config > Cloud Config にアップロードした写しである。
+  MCP の設定は Agent Config > Powers & MCP の値で、サンドボックスでは `/projects/.kiro/settings/mcp.json` に置かれる。
+  steering、skills、hooks の写しは、リポジトリと食い違うことがある。
+  写しを最新にする手順は、まだ決めていない（[#351](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/351)）。
 - 書けるのは `~/.cache`、`/tmp`、ワークスペースだけである。
 - `/tmp` は tool call ごとに消えるので、後で読むログは `$KIRO_WEB_HOME` に書く。
 - 背景のプロセスも tool call の終了で止まるので、`task agent-commit`と`task agent-push`は`task agent-wait`と同じ tool call で実行する（[開発ワークフロー](../tooling/dev-workflow.md)の「エージェントがcommitとpushをするとき」）。

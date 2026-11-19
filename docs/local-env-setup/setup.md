@@ -196,6 +196,8 @@ iwe は手順 7 の `mise install --locked` で導入済みです。
 
 `iwe`（CLI）、`iwes`（LSP サーバー）、`iwec`（MCP サーバー）の 3 コマンドが入ります。
 
+Kiro Web はリポジトリの `.kiro/settings/mcp.json` を読まないので、[Kiro Web の開発環境](kiro-web.md)を読んで Agent Config を設定します。
+
 `docs/` は OKF v0.2 バンドルとして初期化済みで、その設定 `docs/.iwe/` はリポジトリにコミットされています。
 クローンした時点で使える状態なので、`iwe init` を実行する必要はありません。
 
