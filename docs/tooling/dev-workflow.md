@@ -28,7 +28,10 @@ task fe-dev
 task fe-check
 ```
 
-`frontend/`の下の`package.json`か`frontend/pnpm-lock.yaml`が変わったとき（ライブラリを追加、更新したときや、それを含む変更をpullしたとき）は、`task fe-dev`の前に`task fe-install`を実行する。
+`frontend/`の下の`package.json`、`frontend/pnpm-workspace.yaml`、`frontend/pnpm-lock.yaml`のどれかが変わったとき（ライブラリを追加、更新したときや、それを含む変更をpullしたとき）は、`task fe-dev`の前に`task fe-install`を実行する。
+
+Dependabotの更新が`frontend/pnpm-lock.yaml`を変えずに来ると、CIの`pnpm install --frozen-lockfile`が`ERR_PNPM_OUTDATED_LOCKFILE`で落ちる。
+そのbranchで`task fe-install`を実行し、`frontend/pnpm-lock.yaml`の差分をcommitしてpushする（[ADR-100](../adr/ADR-100-pin-shared-frontend-dependencies-in-pnpm-catalog.md)）。
 
 パッケージのコマンドを直接実行するときは、`npx`ではなく`vp`を使う。
 アプリのscript（`dev`、`build`、`test`、`e2e`、`orval`など）は、`frontend`で`vp run --filter @frontend/web <script>`として実行する。

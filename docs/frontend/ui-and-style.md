@@ -64,6 +64,7 @@ feature固有styleは対象componentの近くへ置く。
 - 生成されたファイルは整形されていないので、`task fe-format` で整形する。
 - registryの部品が使う依存（`dialog` の `lucide-react` など）は、`packages/ui/package.json` に自動では入らない。
   `task fe-knip` が未宣言の依存として報告するので、`packages/ui/package.json` に足す。
+  アプリもその依存を使っているときは、版を `pnpm-workspace.yaml` の `catalog:` に移し、両方の `package.json` に `"catalog:"` と書く（[フロントエンドアーキテクチャ](architecture.md#現在の構成)）。
 - `@frontend/ui` は公開した部品の未使用exportもKnipで報告する。
   アプリが使わない部品は追加しない。
 

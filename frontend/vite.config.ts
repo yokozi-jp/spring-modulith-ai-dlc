@@ -211,7 +211,8 @@ export default defineConfig({
       },
       {
         files: ["lint/**"],
-        // lint/** は tsconfig の対象外で型検査が効かないため、未定義の識別子を no-undef で止める。
+        // lint/** は tsconfig の対象外で、型の誤りは報告されないため、未定義の識別子を no-undef で止める。
+        // 型を使う rule（no-unsafe-return など）は JSDoc の型で動くので、JSDoc の型の注釈は消さない。
         env: { node: true },
         rules: {
           "no-undef": "error",

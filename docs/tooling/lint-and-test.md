@@ -142,7 +142,8 @@ packageの`vite.config.ts`に`lint`か`fmt`があると、`vp lint`をpackageで
   `className`の外で組み立てた文字列と、`cn()`に渡す変数は検出しない。
 - **`lint/**`**：`import/no-nodejs-modules`、`new-cap`、`typescript/no-unsafe-assignment`、`typescript/no-unsafe-call`、`typescript/no-unsafe-member-access`をoffにする。
   Node側のLintツールであり、OxlintのJS plugin APIに型が無いためである。
-  `lint/**`はtsconfigの対象外で型検査が未定義の識別子を止めないため、Nodeのglobalを許した`no-undef`を有効にする。
+  `lint/**`はtsconfigの対象外で型の誤りが報告されず、未定義の識別子も止まらないため、Nodeのglobalを許した`no-undef`を有効にする。
+  型を使うrule（`typescript/no-unsafe-return`など）はJSDocの型で動くので、`lint/**`のJSDocの型の注釈は消さない。
 - **`packages/ui/**`**：shadcnの生成物の書き方に合わせて`shadcn/no-restyle`、`shadcn/no-arbitrary-values`、`shadcn/require-static-classes`をoffにする。
   `react/only-export-components`もoffにする。
   shadcnの生成物は`buttonVariants`のようなvariantをcomponentと同じファイルからexportするためである。
@@ -217,7 +218,8 @@ fixtureが`@frontend/ui`からimportする部品は、複製せず、実物の`p
 実物のアプリは`apps/web`だけなので、`apps/*`のoverrideが別のアプリにも効くことは、`apps/web`の設定を複製した`frontend/lint/fixtures/apps/sample`のfixtureで確かめる。
 実物の2つ目のアプリができたら、このfixtureを実物に置き換える。
 `frontend/lint/tailwind-entry-point.test.js`は、ルート、`apps/web`、`packages/ui`のどこから実行しても、そのpackageのCSSを解決できることを確かめる。
-`frontend/lint/workspace-layout.test.js`は、workspaceの層の規則を実物のpackageで確かめる。
+`frontend/lint/workspace-layout.test.js`は、workspaceの層の規則と依存の版の置き場を実物のpackageで確かめる。
+2つ以上の`package.json`にある依存を`"catalog:"`以外で書くと失敗する（[ADR-100](../adr/ADR-100-pin-shared-frontend-dependencies-in-pnpm-catalog.md)）。
 `packages/ui`と`packages/api`が互いを、アプリが別のアプリを`package.json`に書かないことは、各packageから他のpackageをNodeで解決して`MODULE_NOT_FOUND`になることで示す。
 アプリから`@frontend/ui`と`@frontend/api`が解決できることを、対照として同じテストで確かめる。
 `vp`やpnpmのshimは`NODE_PATH`に`.pnpm/node_modules`を足し、宣言のないworkspace packageも解決できてしまうので、このテストは`NODE_PATH`を空にして解決する。

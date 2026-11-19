@@ -100,3 +100,4 @@
 - [ADR-096: 共通カラムの作成者と更新者には、AppUserPrincipal の利用者の ID だけを登録する](ADR-096-require-app-user-principal-for-audit-columns.md)（Proposed, 2026-11-18）
 - [ADR-097: Trivy を使い続け、CI の Trivy 本体の版を明示して Taskfile にそろえる](ADR-097-keep-trivy-and-align-its-version.md)（Proposed, 2026-11-19）
 - [ADR-098: 用途を制限するライセンスを理由に React Doctor を外す](ADR-098-remove-react-doctor-over-license-restriction.md)（Proposed, 2026-11-19）
+- [ADR-100: 2 つ以上の package が使う frontend の依存は pnpm の catalog で版を 1 つにする](ADR-100-pin-shared-frontend-dependencies-in-pnpm-catalog.md)（Proposed, 2026-11-19）
