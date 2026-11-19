@@ -39,8 +39,7 @@ rename や move のツールが他のファイルに加える編集と、shell �
 ## block-agent-git
 
 shell のツールが `git commit` か `git push` を直接実行しようとすると拒否し、`task agent-commit`、`task agent-push`、`task agent-wait` を使うよう示す。
-これらの Task はフックの終わりを待たずに戻り、`task agent-commit` は本物の index の写しから commit する。
-直接の `git commit` はこの 2 つを飛ばすので、[エージェントが commit と push をするとき](../tooling/dev-workflow.md)の規約を、フックで守らせる。
+この規約の正文と理由は、[エージェントが commit と push をするとき](../tooling/dev-workflow.md)にある。
 
 `.kiro/hooks/block-agent-git.json` が shell のツールの呼び出しを `.kiro/hooks/block-agent-git.sh` に渡し、スクリプトがコマンドの文字列を判定する。
 拒否するのは、コマンドの先頭にある `git commit` と `git push` である。
@@ -50,6 +49,7 @@ shell のツールが `git commit` か `git push` を直接実行しようとす
 判定の範囲は次のとおり。
 
 - `task agent-commit` と `task agent-push` が内部で呼ぶ git は、ツールの呼び出しではないので、フックは見ない。
+- ツールの呼び出しが動くディレクトリは見ない。このリポジトリの外の checkout で `git commit` をしても拒否する。
 - STDIN がない、JSON として読めない、`jq` がない、コマンドの項目がない、のいずれかのときは許可する。
 - コマンドを文字列として読むだけで、shell の構文は解析しない。heredoc の本文の行頭にある `git push` は拒否し、`bash -c "git push"` やスクリプトのファイルの中の git は通す。意図した回避は止めず、docs に従うエージェントを正しい手順へ導くためのフックである。
 - `task agent-push` が行うのは通常の push だけで、force push の手順はない。`.kiro/kiro-permissions.yaml` も `git push *--force*` を拒否する。外から入れたスキルの playbook に `git push --force-with-lease` を指示する記述（`.kiro/skills/poteto-mode/playbooks/babysit.md` など）があるが、履歴の書き換えが要る場面では止めて利用者に報告する（[RGDD の開発フロー](rgdd.md)）。
