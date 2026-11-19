@@ -11,7 +11,7 @@ tags: [adr, architecture, onion-architecture, package-by-feature]
 
 Accepted
 
-インタフェースの置き場所、Messaging Adapter の扱い、Domain Service に Spring の `@Service` だけを許すことは [ADR-050](ADR-050-define-backend-class-roles-and-naming.md) で改める。
+Amended by [ADR-050](ADR-050-define-backend-class-roles-and-naming.md)：インタフェースの置き場所、Messaging Adapter の扱い、Domain Service に Spring の `@Service` だけを許すこと。
 
 ## Date
 

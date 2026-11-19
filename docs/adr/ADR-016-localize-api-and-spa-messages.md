@@ -11,7 +11,7 @@ tags: [adr, i18n, api, frontend]
 
 Accepted
 
-日時の表示の方式（「日時は表示境界で `Intl.DateTimeFormat` を使う」）は [ADR-047](ADR-047-parse-api-datetimes-with-temporal.md) で改める。
+Amended by [ADR-047](ADR-047-parse-api-datetimes-with-temporal.md)：日時の表示の方式（「日時は表示境界で `Intl.DateTimeFormat` を使う」）。
 
 ## Date
 

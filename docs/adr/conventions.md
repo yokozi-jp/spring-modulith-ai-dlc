@@ -47,7 +47,7 @@ tags: [adr, convention, governance]
 - 番号は連番（ADR-001、ADR-002、…）で、廃止しても再利用しない。
 - ファイル名は `ADR-NNN-<kebab-case-title>.md` とする。
 - 追加したら [ADR インデックス](index.md) に、状態と日付を添えて 1 行加える。
-- 番号の重複、索引の欠落、索引と本文の状態と日付の不一致、リンクのラベルと宛先の番号の不一致は、`task okf-check`（`adr-lint`）が失敗にする。
+- 番号の重複、索引の欠落、索引と本文の状態と日付の不一致、リンクのラベルと宛先の番号の不一致、`Amended by` の相互リンクと索引の表示の欠落は、`task okf-check`（`adr-lint`）が失敗にする。
 - 番号の欠けは警告にとどめる。
 
 ## ライフサイクル
@@ -56,6 +56,14 @@ tags: [adr, convention, governance]
 - 新しい決定は実装前に Proposed として起こし、Pull Request でコードと一緒にレビューする。
 - Proposed の間は、同じ版のまま Decision を書き直してよく、書き直した理由を Context に残す。
 - 置き換えるときは、新旧の ADR を `Superseded by ADR-NNN` で相互リンクする。
+- Accepted の ADR の一部だけを後の ADR で改めるときは、次のとおり書く。
+  - 旧 ADR の Status の下に `Amended by [ADR-NNN](ADR-NNN-....md)：改める内容` を書く。複数あるときは1行に1件書く。
+  - 新 ADR の本文から旧 ADR へリンクする。
+  - 索引の行は `（Accepted, Amended by ADR-NNN, 日付）` とし、複数あるときは `Amended by` を件ごとに繰り返す。
+  - 旧 ADR の状態は Accepted のままにし、Decision を書き換えない。
+  - 新 ADR が Proposed の間から書いてよい。
+- 全面的に改めるときは `Amended by` ではなく `Superseded by ADR-NNN` を使う。
+- Proposed の ADR を改めるときは、`Amended by` を使わず Decision を直接書き直す。
 
 ## 規約文書との同期
 

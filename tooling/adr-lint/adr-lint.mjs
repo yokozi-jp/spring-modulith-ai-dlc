@@ -1,6 +1,7 @@
-// adr-lint.mjs: ADR の番号、索引、状態と日付、リンクのラベルと宛先の整合を検査する（docs/adr/conventions.md）。
+// adr-lint.mjs: ADR の番号、索引、状態と日付、リンクのラベルと宛先、Amended by の相互リンクの整合を検査する（docs/adr/conventions.md）。
 // 使い方: node tooling/adr-lint/adr-lint.mjs [リポジトリのルート]（既定は .）。task okf-check が呼ぶ。
-// 失敗: 番号の重複、索引の欠落と宛先の不一致、索引と本文の状態と日付の不一致、リンクのラベルと宛先の番号の不一致。
+// 失敗: 番号の重複、索引の欠落と宛先の不一致、索引と本文の状態と日付の不一致、リンクのラベルと宛先の番号の不一致、
+// Amended by の書式、本文と索引の不一致、新 ADR から旧 ADR への戻りリンクの欠落。
 // 警告: 番号の欠け（終了コードは 0）。
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join, relative } from "node:path";
@@ -26,6 +27,12 @@ const sectionValue = (text, heading) => {
 };
 // 状態は先頭の語に正規化する（Superseded by ... は Superseded）。
 const firstWord = (value) => value?.split(/\s+/)[0];
+const adrId = (n) => `ADR-${String(n).padStart(3, "0")}`;
+// リンクのラベルと宛先の番号の検査（4）と Amended by の相互リンクの検査（6）で使う。
+const link = /\[ADR-(\d+)[^\]\n]*\]\([^)\s]*?ADR-(\d+)-[^)\s]*?\.md[^)]*\)/g;
+const amendedLink = new RegExp(`Amended by ${link.source}`, "g");
+// 索引の状態の末尾にある ", Amended by ADR-NNN" を切り離す。
+const indexAmendment = /(?:, Amended by ADR-(\d+))+$/;
 
 // 1. 番号の重複
 const files = readdirSync(adrDir)
@@ -55,7 +62,11 @@ for (const line of indexLines) {
   const [, number, target, status, date] = m;
   if (!target.startsWith(`ADR-${number}-`)) errors.push(`index.md の ADR-${number} の行が別の番号のファイルを指しています: ${target}`);
   if (!files.some((file) => file.name === target)) errors.push(`index.md の ADR-${number} の行が存在しないファイルを指しています: ${target}`);
-  rows.set(target, [...(rows.get(target) ?? []), { status: firstWord(status), date }]);
+  const amendment = indexAmendment.exec(status)?.[0] ?? "";
+  rows.set(target, [
+    ...(rows.get(target) ?? []),
+    { status: firstWord(status.slice(0, status.length - amendment.length)), amenders: [...amendment.matchAll(/ADR-(\d+)/g)].map((a) => Number(a[1])), date },
+  ]);
 }
 for (const { name } of files) {
   const found = rows.get(name) ?? [];
@@ -68,6 +79,22 @@ for (const { name } of files) {
   const date = sectionValue(text, "Date");
   if (found[0].status !== status) errors.push(`${name}: 状態が索引（${found[0].status}）と本文（${status}）で違います`);
   if (found[0].date !== date) errors.push(`${name}: 日付が索引（${found[0].date}）と本文（${date}）で違います`);
+
+  // 6. Amended by の書式、索引の表示、新 ADR から旧 ADR への戻りリンク
+  const statusBody = text.split("\n## Status\n")[1]?.split("\n## ")[0] ?? "";
+  const written = [...statusBody.matchAll(amendedLink)].map((m) => Number(m[1]));
+  if (written.length !== statusBody.split("Amended by").length - 1) errors.push(`${name}: Amended by は「Amended by [ADR-NNN](ファイル名)：内容」の形で1行に1件書いてください`);
+  const shown = found[0].amenders;
+  for (const n of written.filter((n) => !shown.includes(n))) errors.push(`${name}: Amended by ${adrId(n)} が索引にありません`);
+  for (const n of shown.filter((n) => !written.includes(n))) errors.push(`${name}: 索引の Amended by ${adrId(n)} が本文にありません`);
+  const own = Number(files.find((file) => file.name === name).number);
+  for (const n of written) {
+    const amender = byNumber.get(n)?.[0];
+    if (!amender) errors.push(`${name}: Amended by ${adrId(n)} の ADR がありません`);
+    else if (![...read(join(adrDir, amender.name)).matchAll(link)].some((m) => Number(m[2]) === own)) {
+      errors.push(`${name}: Amended by ${adrId(n)} の本文に、この ADR へのリンクがありません`);
+    }
+  }
 }
 
 // 4. リンクのラベルと宛先の番号
@@ -79,7 +106,6 @@ const targets = [
   ...walk(join(root, ".kiro", "steering"), /\.md$/),
   ...walk(join(root, "backend", "src"), /\.(java|md)$/),
 ];
-const link = /\[ADR-(\d+)[^\]\n]*\]\([^)\s]*?ADR-(\d+)-[^)\s]*?\.md[^)]*\)/g;
 for (const path of targets) {
   const text = read(path);
   for (const m of text.matchAll(link)) {
