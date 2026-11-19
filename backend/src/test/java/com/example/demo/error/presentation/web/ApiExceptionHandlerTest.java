@@ -30,6 +30,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
+import org.apache.catalina.connector.ClientAbortException;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -415,5 +416,28 @@ class ApiExceptionHandlerTest {
     final String log = output.getAll();
     assertTrue(log.contains("Unhandled API exception"), () -> "event 名が残ること: " + log);
     assertTrue(log.contains("ERROR"), () -> "ERROR で出ること: " + log);
+  }
+
+  @Test
+  @DisplayName("ブラウザの切断で Tomcat が投げる ClientAbortException は、原因に包まれていても ERROR にしない")
+  void wrappedClientAbortIsNotLoggedAsError(final CapturedOutput output) {
+    // Tomcat は ClientAbortException を投げる前に応答を中断済み（コミット済み）にする。
+    final MockHttpServletResponse servletResponse = new MockHttpServletResponse();
+    servletResponse.setCommitted(true);
+    final IllegalStateException exception =
+        new IllegalStateException(
+            "I/O error while reading input message",
+            new ClientAbortException(new IOException("Connection reset by peer")));
+
+    final ResponseEntity<Object> response =
+        handler()
+            .handleUnexpectedException(
+                exception, new ServletWebRequest(new MockHttpServletRequest(), servletResponse));
+
+    assertNull(response, "切断なら本文を書かないこと");
+    final String handlerLog = handlerLog(output.getAll());
+    assertFalse(handlerLog.contains("ERROR"), () -> "ERROR がないこと: " + handlerLog);
+    assertFalse(
+        handlerLog.contains("Unhandled API exception"), () -> "失敗として記録しないこと: " + handlerLog);
   }
 }
