@@ -5,6 +5,7 @@
 set -u
 
 here="$(cd "$(dirname "$0")" && pwd)"
+. "$here/../../tooling/scratch-git/scratch-git.sh" || exit 1
 matcher="$(jq -r '.hooks[0].matcher' "$here/block-agent-git.json")"
 nojq="$(mktemp -d)"
 trap 'rm -rf "$nojq"' EXIT
