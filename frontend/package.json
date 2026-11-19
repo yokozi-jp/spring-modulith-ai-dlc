@@ -9,6 +9,7 @@
   },
   "devDependencies": {
     "@shadcn/lint": "0.1.5",
+    "@vitest/coverage-v8": "catalog:",
     "eslint-plugin-better-tailwindcss": "4.7.0",
     "knip": "6.37.0",
     "tailwindcss": "catalog:",

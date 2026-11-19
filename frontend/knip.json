@@ -2,6 +2,7 @@
   "$schema": "https://unpkg.com/knip@6/schema.json",
   "ignore": ["lint/fixtures/**"],
   "workspaces": {
+    ".": { "ignoreDependencies": ["@vitest/coverage-v8"] },
     "apps/web": {
       "playwright": { "entry": ["e2e/**/*.{setup,spec}.ts"] },
       "ignoreDependencies": ["@tanstack/react-table", "lucide-react"]

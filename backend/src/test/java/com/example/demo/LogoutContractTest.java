@@ -12,12 +12,10 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.example.demo.testkit.AppUsers;
 import com.example.demo.testkit.SharedTestConfiguration;
 import jakarta.servlet.http.Cookie;
-import java.time.Instant;
 import java.util.Base64;
-import java.util.List;
-import java.util.Map;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -28,13 +26,10 @@ import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
-import org.springframework.security.core.GrantedAuthority;
-import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContext;
 import org.springframework.security.core.context.SecurityContextImpl;
 import org.springframework.security.oauth2.client.authentication.OAuth2AuthenticationToken;
-import org.springframework.security.oauth2.core.oidc.OidcIdToken;
-import org.springframework.security.oauth2.core.oidc.user.DefaultOidcUser;
+import org.springframework.security.oauth2.core.oidc.user.OidcUser;
 import org.springframework.security.web.context.HttpSessionSecurityContextRepository;
 import org.springframework.session.Session;
 import org.springframework.session.SessionRepository;
@@ -70,19 +65,12 @@ class LogoutContractTest {
   @BeforeEach
   @SuppressWarnings("PMD.SignatureDeclareThrowsException") // MockMvc#perform が Exception を投げるため。
   void createSession() throws Exception {
-    final List<GrantedAuthority> authorities = List.of(new SimpleGrantedAuthority("OIDC_USER"));
-    final OidcIdToken idToken =
-        new OidcIdToken(
-            "id-token",
-            Instant.parse("2026-01-01T00:00:00Z"),
-            Instant.parse("2026-01-01T01:00:00Z"),
-            Map.of("sub", "test-user"));
+    final OidcUser user = AppUsers.oidcUser();
     sessionId =
         saveSession(
             sessionRepository,
             new SecurityContextImpl(
-                new OAuth2AuthenticationToken(
-                    new DefaultOidcUser(authorities, idToken), authorities, "web")));
+                new OAuth2AuthenticationToken(user, user.getAuthorities(), "web")));
     // DefaultCookieSerializer の既定どおり、Cookie の値は session ID の Base64 にする。
     // 埋め込みサーバのない MockMvc では server.servlet.session.cookie.name（APP_SESSION）が適用されず、
     // Spring Session の既定名 SESSION になる。APP_SESSION の名前は E2E が実際のサーバで確かめる。
@@ -90,7 +78,8 @@ class LogoutContractTest {
         new Cookie("SESSION", Base64.getEncoder().encodeToString(sessionId.getBytes(UTF_8)));
 
     // 準備したセッションで認証済みになることを先に示す。Base64 の前提が崩れると、ここで 401 になる。
-    mockMvc.perform(get("/api/missing").cookie(sessionCookie)).andExpect(status().isNotFound());
+    // ログアウトはテナントによらないので、テナントを選ぶ前にも呼べる所属の一覧で確かめる。
+    mockMvc.perform(get("/api/memberships").cookie(sessionCookie)).andExpect(status().isOk());
   }
 
   // RedisSessionRepository のセッションの型は公開されていないため、型変数で受けて Session として扱う。
@@ -116,7 +105,7 @@ class LogoutContractTest {
     assertNotNull(
         sessionRepository.findById(sessionId),
         () -> "POST /logout（CSRF トークンなし）の後にセッションが消えた: sessionId=" + sessionId);
-    mockMvc.perform(get("/api/missing").cookie(sessionCookie)).andExpect(status().isNotFound());
+    mockMvc.perform(get("/api/memberships").cookie(sessionCookie)).andExpect(status().isOk());
   }
 
   @Test
@@ -142,7 +131,7 @@ class LogoutContractTest {
     assertNotNull(
         sessionRepository.findById(sessionId),
         () -> "POST /logout（誤った CSRF トークン）の後にセッションが消えた: sessionId=" + sessionId);
-    mockMvc.perform(get("/api/missing").cookie(sessionCookie)).andExpect(status().isNotFound());
+    mockMvc.perform(get("/api/memberships").cookie(sessionCookie)).andExpect(status().isOk());
   }
 
   @Test
@@ -183,7 +172,7 @@ class LogoutContractTest {
     assertNotNull(
         sessionRepository.findById(sessionId),
         () -> "GET /logout の後にセッションが消えた: sessionId=" + sessionId);
-    mockMvc.perform(get("/api/missing").cookie(sessionCookie)).andExpect(status().isNotFound());
+    mockMvc.perform(get("/api/memberships").cookie(sessionCookie)).andExpect(status().isOk());
   }
 
   @Test

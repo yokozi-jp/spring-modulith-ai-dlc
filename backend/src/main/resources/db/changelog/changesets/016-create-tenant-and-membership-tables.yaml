@@ -1,0 +1,195 @@
+databaseChangeLog:
+  - changeSet:
+      id: 016-create-tenant-and-membership-tables
+      author: system
+      comment: >-
+        tenancy モジュールに、テナント（m_tenant）と、利用者のテナントへの所属と役割（m_membership）を作る（#375）。
+        権限は 014 の既定の権限（ALTER DEFAULT PRIVILEGES）で tenancy_module に付く。
+        tenancy の表はテナントが決まる前に引くため、後続の RLS（#377）の外に置く。
+      preConditions:
+        - dbms:
+            type: postgresql
+      changes:
+        - createTable:
+            tableName: m_tenant
+            schemaName: tenancy
+            columns:
+              - column:
+                  name: tenant_id
+                  type: bigint
+                  autoIncrement: true
+                  generationType: ALWAYS
+                  constraints:
+                    primaryKey: true
+                    primaryKeyName: pk_m_tenant
+              - column:
+                  name: public_id
+                  type: uuid
+                  constraints:
+                    nullable: false
+              - column:
+                  name: tenant_name
+                  type: varchar(100)
+                  defaultValue: ""
+                  constraints:
+                    nullable: false
+              - column:
+                  name: created_at
+                  type: timestamptz
+                  constraints:
+                    nullable: false
+              - column:
+                  name: created_by
+                  type: varchar(64)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: created_pgm_cd
+                  type: varchar(64)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: created_tx_id
+                  type: varchar(32)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: updated_at
+                  type: timestamptz
+                  constraints:
+                    nullable: false
+              - column:
+                  name: updated_by
+                  type: varchar(64)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: updated_pgm_cd
+                  type: varchar(64)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: updated_tx_id
+                  type: varchar(32)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: lock_no
+                  type: bigint
+                  constraints:
+                    nullable: false
+              - column:
+                  name: patched_at
+                  type: timestamptz
+              - column:
+                  name: patched_by
+                  type: varchar(64)
+              - column:
+                  name: patched_id
+                  type: integer
+        - createIndex:
+            indexName: uk_m_tenant
+            tableName: m_tenant
+            schemaName: tenancy
+            unique: true
+            columns:
+              - column:
+                  name: public_id
+        - createTable:
+            tableName: m_membership
+            schemaName: tenancy
+            columns:
+              - column:
+                  name: membership_id
+                  type: bigint
+                  autoIncrement: true
+                  generationType: ALWAYS
+                  constraints:
+                    primaryKey: true
+                    primaryKeyName: pk_m_membership
+              - column:
+                  name: user_id
+                  type: bigint
+                  constraints:
+                    nullable: false
+              - column:
+                  name: tenant_id
+                  type: bigint
+                  constraints:
+                    nullable: false
+              - column:
+                  name: role_typ
+                  type: varchar(10)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: created_at
+                  type: timestamptz
+                  constraints:
+                    nullable: false
+              - column:
+                  name: created_by
+                  type: varchar(64)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: created_pgm_cd
+                  type: varchar(64)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: created_tx_id
+                  type: varchar(32)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: updated_at
+                  type: timestamptz
+                  constraints:
+                    nullable: false
+              - column:
+                  name: updated_by
+                  type: varchar(64)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: updated_pgm_cd
+                  type: varchar(64)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: updated_tx_id
+                  type: varchar(32)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: lock_no
+                  type: bigint
+                  constraints:
+                    nullable: false
+              - column:
+                  name: patched_at
+                  type: timestamptz
+              - column:
+                  name: patched_by
+                  type: varchar(64)
+              - column:
+                  name: patched_id
+                  type: integer
+        - createIndex:
+            indexName: uk_m_membership
+            tableName: m_membership
+            schemaName: tenancy
+            unique: true
+            columns:
+              - column:
+                  name: user_id
+              - column:
+                  name: tenant_id
+      rollback:
+        - dropTable:
+            tableName: m_membership
+            schemaName: tenancy
+        - dropTable:
+            tableName: m_tenant
+            schemaName: tenancy

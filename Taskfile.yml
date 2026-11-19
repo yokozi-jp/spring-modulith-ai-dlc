@@ -1600,6 +1600,9 @@ tasks:
           compose up -d --wait
           # ログインがアプリの DB に利用者を作るため、backend の起動の前にマイグレーションを適用する（ADR-056）。
           task be-migrate COMPOSE_ENV_FILE=.env.test
+          # test-admin を 1 つのテナントだけに所属させ、ログインの後に選ばずにテナントへ入れる。
+          # テナントを選ぶ前は業務の API と認証の確認の /api/missing が 403 になり、scan が業務の API に届かない。
+          task be-seed COMPOSE_ENV_FILE=.env.test
 
           {{.DOCKER}} run --detach --name spring-modulith-dast-backend --network host \
             --env-file "{{.TEST_ENV_FILE}}" --env SERVER_PORT=18081 \

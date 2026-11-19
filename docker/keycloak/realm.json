@@ -7,18 +7,6 @@
   "rememberMe": true,
   "loginWithEmailAllowed": true,
   "duplicateEmailsAllowed": false,
-  "roles": {
-    "realm": [
-      {
-        "name": "user",
-        "description": "Application user"
-      },
-      {
-        "name": "admin",
-        "description": "Application administrator"
-      }
-    ]
-  },
   "clients": [
     {
       "clientId": "spring-modulith-web",
@@ -54,6 +42,7 @@
   ],
   "users": [
     {
+      "id": "d0037ab6-002f-4e5e-bcd1-c443fc748b82",
       "username": "test-user",
       "enabled": true,
       "emailVerified": true,
@@ -66,12 +55,10 @@
           "value": "test-password",
           "temporary": false
         }
-      ],
-      "realmRoles": [
-        "user"
       ]
     },
     {
+      "id": "44d59939-e22a-45c4-be1d-6b96a96d86fc",
       "username": "test-admin",
       "enabled": true,
       "emailVerified": true,
@@ -84,10 +71,6 @@
           "value": "test-password",
           "temporary": false
         }
-      ],
-      "realmRoles": [
-        "user",
-        "admin"
       ]
     }
   ]

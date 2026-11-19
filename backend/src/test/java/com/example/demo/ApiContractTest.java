@@ -1,5 +1,6 @@
 package com.example.demo;
 
+import static com.example.demo.testkit.AppUsers.oidcLogin;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.nullValue;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
@@ -81,6 +82,9 @@ class ApiContractTest {
   @ContractCase(method = RequestMethod.POST, path = "/api/orders/{orderId}/cancel", status = 401)
   @ContractCase(method = RequestMethod.GET, path = "/api/payments", status = 401)
   @ContractCase(method = RequestMethod.GET, path = "/api/products", status = 401)
+  @ContractCase(method = RequestMethod.GET, path = "/api/memberships", status = 401)
+  @ContractCase(method = RequestMethod.GET, path = "/api/current-tenant", status = 401)
+  @ContractCase(method = RequestMethod.PUT, path = "/api/current-tenant", status = 401)
   void unauthenticatedOperationReturnsUnauthorized(final String method, final String path)
       throws Exception {
     mockMvc
@@ -98,6 +102,7 @@ class ApiContractTest {
   @ContractCase(method = RequestMethod.PUT, path = "/api/orders/{orderId}/lines", status = 403)
   @ContractCase(method = RequestMethod.POST, path = "/api/orders/{orderId}/confirm", status = 403)
   @ContractCase(method = RequestMethod.POST, path = "/api/orders/{orderId}/cancel", status = 403)
+  @ContractCase(method = RequestMethod.PUT, path = "/api/current-tenant", status = 403)
   void updateWithoutCsrfTokenReturnsForbidden(final String method, final String path)
       throws Exception {
     mockMvc
@@ -106,6 +111,35 @@ class ApiContractTest {
         .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
         .andExpect(jsonPath("$.type").value(CSRF_TOKEN_INVALID))
         .andExpect(jsonPath("$.status").value(403));
+  }
+
+  @ParameterizedTest(name = "{0} {1}")
+  @ArgumentsSource(ContractCaseArguments.class)
+  @DisplayName("テナントを選ぶ前の利用者が業務の operation を呼ぶと、専用の type の 403 Problem Details を返す")
+  @ContractCase(method = RequestMethod.GET, path = "/api/orders", status = 403)
+  @ContractCase(method = RequestMethod.POST, path = "/api/orders", status = 403)
+  @ContractCase(method = RequestMethod.GET, path = "/api/orders/{orderId}", status = 403)
+  @ContractCase(method = RequestMethod.PUT, path = "/api/orders/{orderId}/lines", status = 403)
+  @ContractCase(method = RequestMethod.POST, path = "/api/orders/{orderId}/confirm", status = 403)
+  @ContractCase(method = RequestMethod.POST, path = "/api/orders/{orderId}/cancel", status = 403)
+  @ContractCase(method = RequestMethod.GET, path = "/api/payments", status = 403)
+  @ContractCase(method = RequestMethod.GET, path = "/api/products", status = 403)
+  @ContractCase(method = RequestMethod.GET, path = "/api/current-tenant", status = 403)
+  void operationBeforeTenantSelectionReturnsTenantNotSelected(
+      final String method, final String path) throws Exception {
+    // 役割の権限だけを持つ認証は、テナントを選んだことにならない。
+    mockMvc
+        .perform(
+            request(HttpMethod.valueOf(method), path)
+                .with(user("test-user").roles("MEMBER"))
+                .with(csrf())
+                .header(HttpHeaders.ACCEPT_LANGUAGE, "ja"))
+        .andExpect(status().isForbidden())
+        .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
+        .andExpect(jsonPath("$.type").value("/problems/tenant-not-selected"))
+        .andExpect(jsonPath("$.title").value("テナントが選ばれていません"))
+        .andExpect(jsonPath("$.status").value(403))
+        .andExpect(jsonPath("$.detail").doesNotExist());
   }
 
   @Test
@@ -187,7 +221,7 @@ class ApiContractTest {
     mockMvc
         .perform(
             get("/api/missing")
-                .with(user("test-user"))
+                .with(oidcLogin())
                 .header(HttpHeaders.ACCEPT_LANGUAGE, "fr-FR, en;q=0.9"))
         .andExpect(status().isNotFound())
         .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
@@ -232,7 +266,7 @@ class ApiContractTest {
   void conflictExceptionReturnsProblemDetailsWithoutImplementationDetails() throws Exception {
     final String body =
         mockMvc
-            .perform(get("/api/conflict-fixture/stale").with(user("test-user")))
+            .perform(get("/api/conflict-fixture/stale").with(oidcLogin()))
             .andExpect(status().isConflict())
             .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
             .andExpect(header().string(HttpHeaders.CONTENT_LANGUAGE, "ja"))
@@ -258,7 +292,7 @@ class ApiContractTest {
         mockMvc
             .perform(
                 get("/api/conflict-fixture/locked")
-                    .with(user("test-user"))
+                    .with(oidcLogin())
                     .header(HttpHeaders.ACCEPT_LANGUAGE, "en-US"))
             .andExpect(status().isConflict())
             .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
@@ -280,7 +314,7 @@ class ApiContractTest {
   @DisplayName("ConflictException ではない IllegalStateException は 409 にならず 500 のままである")
   void illegalStateExceptionStaysInternalServerError() throws Exception {
     mockMvc
-        .perform(get("/api/conflict-fixture/illegal-state").with(user("test-user")))
+        .perform(get("/api/conflict-fixture/illegal-state").with(oidcLogin()))
         .andExpect(status().isInternalServerError())
         .andExpect(jsonPath("$.status").value(500));
   }

@@ -6,7 +6,7 @@ import { createFileRoute, notFound } from "@tanstack/react-router";
 import { preloadQuery } from "@/api/preload-query";
 import { OrderDetailPage } from "@/features/orders/order-detail-page";
 
-export const Route = createFileRoute("/_authenticated/orders/$orderId/")({
+export const Route = createFileRoute("/_authenticated/_tenant/orders/$orderId/")({
   loader: async ({ context, params }) => {
     try {
       await Promise.all([

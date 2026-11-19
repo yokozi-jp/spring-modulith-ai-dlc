@@ -92,4 +92,4 @@ function HomePage() {
   );
 }
 
-export const Route = createFileRoute("/_authenticated/")({ component: HomePage });
+export const Route = createFileRoute("/_authenticated/_tenant/")({ component: HomePage });

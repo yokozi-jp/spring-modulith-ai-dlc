@@ -47,8 +47,10 @@ async function fetchError(path: string): Promise<unknown> {
 }
 
 const csrfTokenInvalidType = "/problems/csrf-token-invalid";
+const tenantNotSelectedType = "/problems/tenant-not-selected";
 const csrfProblem = { type: csrfTokenInvalidType, title: "Invalid", status: 403 };
 const permissionProblem = { type: "about:blank", title: "Forbidden", status: 403 };
+const tenantProblem = { type: tenantNotSelectedType, title: "No tenant selected", status: 403 };
 
 function forbidden(problem: object) {
   return HttpResponse.json(problem, {
@@ -246,6 +248,31 @@ describe("api-fetch", () => {
 
       expect(headers?.get("Content-Type")).toBe("application/json");
       expect(headers?.get("X-XSRF-TOKEN")).toBe(cookieValue);
+    });
+  });
+
+  describe("isTenantNotSelected", () => {
+    it("テナントを選ぶ前の type の 403 を、テナントを選ぶ前の拒否とみなす", () => {
+      expect(api.isTenantNotSelected(new api.ApiProblemError(403, tenantProblem))).toBe(true);
+    });
+
+    it.each([
+      ["権限不足の 403", () => new api.ApiProblemError(403, permissionProblem)],
+      ["CSRF の 403", () => new api.ApiProblemError(403, csrfProblem)],
+      ["problem のない 403", () => new api.ApiProblemError(403, undefined)],
+      ["同じ type の 400", () => new api.ApiProblemError(400, { ...tenantProblem, status: 400 })],
+      ["通信の失敗", () => new Error("network")],
+    ])("%s は、テナントを選ぶ前の拒否とみなさない", (_name, error) => {
+      expect(api.isTenantNotSelected(error())).toBeFalsy();
+    });
+
+    it("判定に使う type は、コミット済みの OpenAPI 契約にある", () => {
+      const contract = readFileSync(
+        new URL("../../../../openapi/openapi.yaml", import.meta.url),
+        "utf8",
+      );
+
+      expect(contract).toContain(tenantNotSelectedType);
     });
   });
 

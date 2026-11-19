@@ -1,3 +1,4 @@
+import { expect } from "@playwright/test";
 import type { Page } from "@playwright/test";
 import { loadEnv } from "vite-plus";
 
@@ -39,4 +40,23 @@ export async function signInOnKeycloak(page: Page): Promise<void> {
   await page.getByLabel("Username or email").fill(credentials.username);
   await page.getByLabel("Password", { exact: true }).fill(credentials.password);
   await page.getByRole("button", { name: "Sign In" }).click();
+}
+
+// test-user は seed（backend の TenancySeeds）で 2 つのテナントに属するため、ログインの後にテナントを選ぶ画面が出る。
+export async function chooseSeededTenant(page: Page): Promise<void> {
+  await expect(page).toHaveURL("http://localhost:5173/tenants");
+  await page.getByRole("button", { name: "サンプル商事" }).click();
+  await expect(page).toHaveURL("http://localhost:5173/");
+}
+
+// Keycloak の資格情報の入力画面でログインし、テナントを選んでトップページへ戻る。
+export async function signInAndChooseTenant(page: Page): Promise<void> {
+  await signInOnKeycloak(page);
+  await chooseSeededTenant(page);
+}
+
+// 認証の開始から Keycloak でログインし、テナントを選んでトップページへ戻る。
+export async function logIn(page: Page): Promise<void> {
+  await page.goto("/oauth2/authorization/web");
+  await signInAndChooseTenant(page);
 }

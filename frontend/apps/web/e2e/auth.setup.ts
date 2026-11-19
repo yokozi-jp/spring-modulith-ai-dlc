@@ -1,6 +1,6 @@
-import type { BrowserContext } from "@playwright/test";
+import type { BrowserContext, Page } from "@playwright/test";
 
-import { authFile, signInOnKeycloak } from "./environment";
+import { authFile, chooseSeededTenant, signInOnKeycloak } from "./environment";
 import { expect, test as setup } from "./fixtures";
 
 async function sessionCookie(context: BrowserContext): Promise<string | undefined> {
@@ -8,24 +8,35 @@ async function sessionCookie(context: BrowserContext): Promise<string | undefine
   return cookies.find(({ name }) => name === "APP_SESSION")?.value;
 }
 
+// 戻り先がテナントを選ぶ画面であることと、認証の前後で APP_SESSION の値が変わったことで、ログインの成立を確かめる。
+async function logIn(page: Page, context: BrowserContext): Promise<string | undefined> {
+  // storageState を持たない context で、認証の開始から始める。
+  await page.goto("/oauth2/authorization/web");
+  await expect(page).toHaveURL(/^http:\/\/127\.0\.0\.1:8081\//u);
+  // 認証開始の時点で authorization request を保存する session が作られ、APP_SESSION が発行される。
+  const sessionBeforeLogin = await sessionCookie(context);
+
+  await signInOnKeycloak(page);
+
+  // 認証の成立時に Spring Security が session ID を変える。
+  await expect(page).toHaveURL("http://localhost:5173/tenants");
+  const sessionAfterLogin = await sessionCookie(context);
+  expect(sessionAfterLogin).toBeDefined();
+  expect(sessionAfterLogin).not.toBe(sessionBeforeLogin);
+  return sessionAfterLogin;
+}
+
 setup(
-  "Keycloak の画面から test-user でログインして認証済みのトップページへ戻る",
+  "Keycloak の画面から test-user でログインし、テナントを選んでトップページへ戻る",
   async ({ page, context }) => {
-    // storageState を持たない context で開く。/ は preview が配信するため、ここでは認証を確かめない。
-    await page.goto("/");
+    const sessionAfterLogin = await logIn(page, context);
 
-    await page.goto("/oauth2/authorization/web");
-    await expect(page).toHaveURL(/^http:\/\/127\.0\.0\.1:8081\//u);
-    // 認証開始の時点で authorization request を保存する session が作られ、APP_SESSION が発行される。
-    const sessionBeforeLogin = await sessionCookie(context);
+    await chooseSeededTenant(page);
 
-    await signInOnKeycloak(page);
-
-    // 認証の成立時に Spring Security が session ID を変えるため、値の変化で認証済みを確かめる。
-    await expect(page).toHaveURL("http://localhost:5173/");
-    const sessionAfterLogin = await sessionCookie(context);
-    expect(sessionAfterLogin).toBeDefined();
-    expect(sessionAfterLogin).not.toBe(sessionBeforeLogin);
+    await expect(page.getByText("テナント：サンプル商事")).toBeVisible();
+    const sessionAfterSelection = await sessionCookie(context);
+    expect(sessionAfterSelection).toBeDefined();
+    expect(sessionAfterSelection).not.toBe(sessionAfterLogin);
     await context.storageState({ path: authFile });
   },
 );

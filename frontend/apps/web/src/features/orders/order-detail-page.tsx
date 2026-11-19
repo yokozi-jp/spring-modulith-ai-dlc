@@ -9,7 +9,7 @@ import { OrderSummary } from "./components/order-summary";
 import { ProblemNotice } from "./components/problem-notice";
 import { useOrderDetail } from "./hooks/use-order-detail";
 
-const routeApi = getRouteApi("/_authenticated/orders/$orderId/");
+const routeApi = getRouteApi("/_authenticated/_tenant/orders/$orderId/");
 
 export function OrderDetailPage() {
   const { t } = useTranslation();

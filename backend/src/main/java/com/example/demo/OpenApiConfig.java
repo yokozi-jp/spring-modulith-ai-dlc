@@ -34,7 +34,7 @@ public class OpenApiConfig {
    *
    * <p>互換な追加で MINOR、破壊的変更で MAJOR を上げ、アプリのリリース版と連動させない（docs/web-api/versioning.md）。
    */
-  /* package */ static final String CONTRACT_VERSION = "0.4.0";
+  /* package */ static final String CONTRACT_VERSION = "0.5.0";
 
   /** 共通の Problem response を参照する接頭辞。 */
   private static final String PROBLEM_RESPONSE_REF = "#/components/responses/";
@@ -67,7 +67,8 @@ public class OpenApiConfig {
             .addResponses(
                 "ForbiddenProblem",
                 problemResponse(
-                    "操作の権限がない。CSRF トークンの検証に失敗したときの type は /problems/csrf-token-invalid",
+                    "操作の権限がない。CSRF トークンの検証に失敗したときの type は /problems/csrf-token-invalid、"
+                        + "テナントを選ぶ前に業務の API を呼んだときの type は /problems/tenant-not-selected",
                     PROBLEM_DETAIL))
             .addResponses("NotFoundProblem", problemResponse("対象のリソースが存在しない", PROBLEM_DETAIL))
             .addResponses("ConflictProblem", problemResponse("リソースの現在の状態と競合する", PROBLEM_DETAIL))

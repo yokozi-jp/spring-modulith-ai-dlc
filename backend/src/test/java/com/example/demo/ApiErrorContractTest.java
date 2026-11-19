@@ -1,11 +1,11 @@
 package com.example.demo;
 
+import static com.example.demo.testkit.AppUsers.oidcLogin;
 import static org.hamcrest.Matchers.not;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
-import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -93,7 +93,7 @@ class ApiErrorContractTest {
       final String title)
       throws Exception {
     mockMvc
-        .perform(request.with(user("test-user")).header(HttpHeaders.ACCEPT_LANGUAGE, "ja"))
+        .perform(request.with(oidcLogin()).header(HttpHeaders.ACCEPT_LANGUAGE, "ja"))
         .andExpect(status().is(status))
         .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
         .andExpect(jsonPath("$.type").value(type))
@@ -153,7 +153,7 @@ class ApiErrorContractTest {
   @DisplayName("入力検証エラーの title は英語でも返る")
   void validationProblemTitleIsEnglish() throws Exception {
     mockMvc
-        .perform(invalidBody().with(user("test-user")).header(HttpHeaders.ACCEPT_LANGUAGE, "en"))
+        .perform(invalidBody().with(oidcLogin()).header(HttpHeaders.ACCEPT_LANGUAGE, "en"))
         .andExpect(status().isBadRequest())
         .andExpect(jsonPath("$.type").value(VALIDATION_ERROR))
         .andExpect(jsonPath("$.title").value("Invalid request content"));
@@ -163,7 +163,7 @@ class ApiErrorContractTest {
   @DisplayName("本文の入力検証エラーは本文の root を起点にした pointer と文言を返し、入力値を含まない")
   void bodyValidationErrorsHavePointers() throws Exception {
     mockMvc
-        .perform(invalidBody().with(user("test-user")).header(HttpHeaders.ACCEPT_LANGUAGE, "ja"))
+        .perform(invalidBody().with(oidcLogin()).header(HttpHeaders.ACCEPT_LANGUAGE, "ja"))
         .andExpect(status().isBadRequest())
         .andExpect(jsonPath("$.errors.length()").value(2))
         .andExpect(jsonPath("$.errors[0].pointer").value("/items/0/code"))
@@ -180,7 +180,7 @@ class ApiErrorContractTest {
       final String name, final MockHttpServletRequestBuilder request, final List<String> pointers)
       throws Exception {
     mockMvc
-        .perform(request.with(user("test-user")).header(HttpHeaders.ACCEPT_LANGUAGE, "ja"))
+        .perform(request.with(oidcLogin()).header(HttpHeaders.ACCEPT_LANGUAGE, "ja"))
         .andExpect(status().isBadRequest())
         .andExpect(jsonPath("$.type").value(VALIDATION_ERROR))
         .andExpect(jsonPath("$.errors[*].pointer").value(Matchers.contains(pointers.toArray())))
@@ -212,7 +212,7 @@ class ApiErrorContractTest {
     mockMvc
         .perform(
             get("/api/error-fixture/constraint-violation")
-                .with(user("test-user"))
+                .with(oidcLogin())
                 .header(HttpHeaders.ACCEPT_LANGUAGE, "ja"))
         .andExpect(status().isBadRequest())
         .andExpect(jsonPath("$.errors.length()").value(1))
@@ -227,7 +227,7 @@ class ApiErrorContractTest {
   void businessFailureTitlesAreEnglish(final String path, final int status, final String title)
       throws Exception {
     mockMvc
-        .perform(get(path).with(user("test-user")).header(HttpHeaders.ACCEPT_LANGUAGE, "en"))
+        .perform(get(path).with(oidcLogin()).header(HttpHeaders.ACCEPT_LANGUAGE, "en"))
         .andExpect(status().is(status))
         .andExpect(jsonPath("$.title").value(title));
   }
@@ -248,7 +248,7 @@ class ApiErrorContractTest {
   @DisplayName("404、409、422 の本文は例外のメッセージとクラス名を含まない")
   void businessFailuresHideExceptionMessages(final String path) throws Exception {
     mockMvc
-        .perform(get(path).with(user("test-user")).header(HttpHeaders.ACCEPT_LANGUAGE, "ja"))
+        .perform(get(path).with(oidcLogin()).header(HttpHeaders.ACCEPT_LANGUAGE, "ja"))
         .andExpect(status().is4xxClientError())
         .andExpect(content().string(not(Matchers.containsString("secret-key"))))
         .andExpect(content().string(not(Matchers.containsString("orderId"))))
@@ -266,7 +266,7 @@ class ApiErrorContractTest {
               .perform(
                   get("/api/error-fixture/not-found")
                       .queryParam("id", id)
-                      .with(user("test-user"))
+                      .with(oidcLogin())
                       .header(HttpHeaders.ACCEPT_LANGUAGE, "ja"))
               .andExpect(status().isNotFound())
               .andReturn()
@@ -293,7 +293,7 @@ class ApiErrorContractTest {
   @DisplayName("JDK の例外は 500 になり、本文に例外のメッセージ、クラス名、スタックトレースを含まない")
   void jdkExceptionsAreInternalServerErrors(final String path) throws Exception {
     mockMvc
-        .perform(get(path).with(user("test-user")).header(HttpHeaders.ACCEPT_LANGUAGE, "ja"))
+        .perform(get(path).with(oidcLogin()).header(HttpHeaders.ACCEPT_LANGUAGE, "ja"))
         .andExpect(status().isInternalServerError())
         .andExpect(content().string(not(Matchers.containsString("fixture failure"))))
         .andExpect(content().string(not(Matchers.containsString("Exception"))))
@@ -304,15 +304,11 @@ class ApiErrorContractTest {
   @DisplayName("JSON の構文エラーと型の不一致は errors を持たない")
   void malformedRequestsHaveNoErrors() throws Exception {
     mockMvc
-        .perform(
-            postItems()
-                .with(user("test-user"))
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("{"))
+        .perform(postItems().with(oidcLogin()).contentType(MediaType.APPLICATION_JSON).content("{"))
         .andExpect(status().isBadRequest())
         .andExpect(jsonPath("$.errors").doesNotExist());
     mockMvc
-        .perform(get("/api/error-fixture/items?limit=abc").with(user("test-user")))
+        .perform(get("/api/error-fixture/items?limit=abc").with(oidcLogin()))
         .andExpect(status().isBadRequest())
         .andExpect(jsonPath("$.errors").doesNotExist());
   }
@@ -320,17 +316,17 @@ class ApiErrorContractTest {
   @Test
   @DisplayName("入力検証は WARN、その他の 4xx は INFO、未処理例外は ERROR で記録し、業務上の失敗と未処理例外だけが例外を持つ")
   void failuresAreLoggedWithStatusOnly() throws Exception {
-    mockMvc.perform(invalidBody().with(user("test-user"))).andExpect(status().isBadRequest());
+    mockMvc.perform(invalidBody().with(oidcLogin())).andExpect(status().isBadRequest());
     assertLogged("API validation failed", Severity.WARN, 400, Set.of());
 
     mockMvc
-        .perform(postItems().with(user("test-user")).contentType(MediaType.TEXT_PLAIN).content("x"))
+        .perform(postItems().with(oidcLogin()).contentType(MediaType.TEXT_PLAIN).content("x"))
         .andExpect(status().isUnsupportedMediaType());
     assertLogged("API client error", Severity.INFO, 415, Set.of());
 
     final int errorsBefore = capturedLogRecords.withBody("Unhandled API exception").size();
     mockMvc
-        .perform(get("/api/error-fixture/unhandled").with(user("test-user")))
+        .perform(get("/api/error-fixture/unhandled").with(oidcLogin()))
         .andExpect(status().isInternalServerError());
     assertEquals(
         errorsBefore + 1,
@@ -350,16 +346,16 @@ class ApiErrorContractTest {
     final Set<String> exceptionAttributes =
         Set.of("exception.type", "exception.message", "exception.stacktrace");
     mockMvc
-        .perform(get("/api/error-fixture/not-found?id=a").with(user("test-user")))
+        .perform(get("/api/error-fixture/not-found?id=a").with(oidcLogin()))
         .andExpect(status().isNotFound());
     assertLogged("API business failure", Severity.INFO, 404, exceptionAttributes);
     mockMvc
-        .perform(get("/api/error-fixture/unprocessable").with(user("test-user")))
+        .perform(get("/api/error-fixture/unprocessable").with(oidcLogin()))
         .andExpect(status().isUnprocessableContent());
     assertLogged("API business failure", Severity.INFO, 422, exceptionAttributes);
 
     mockMvc
-        .perform(get("/api/error-fixture/conflict").with(user("test-user")))
+        .perform(get("/api/error-fixture/conflict").with(oidcLogin()))
         .andExpect(status().isConflict());
     final LogRecordData conflict =
         assertLogged(
@@ -381,7 +377,7 @@ class ApiErrorContractTest {
   @DisplayName("405 で PageNotFound の WARN を記録しない")
   void methodNotAllowedDoesNotLogPageNotFound() throws Exception {
     mockMvc
-        .perform(delete("/api/error-fixture/items").with(user("test-user")).with(csrf()))
+        .perform(delete("/api/error-fixture/items").with(oidcLogin()).with(csrf()))
         .andExpect(status().isMethodNotAllowed());
 
     assertTrue(

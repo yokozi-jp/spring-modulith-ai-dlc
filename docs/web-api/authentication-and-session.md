@@ -1,15 +1,16 @@
 ---
 type: Convention
 title: APIの認証、セッション、権限
-description: ブラウザとシステム間連携のAPI認証、ログアウト、セッションとCSRFのCookieの属性、ロールの管理場所を定める規約。APIの認証方式、セッション設定、CSRFのCookieを変更するとき、対向システムへAPIを公開するとき、権限の判定を実装するときに読む。
+description: ブラウザとシステム間連携のAPI認証、ログインの後のテナントの選択、ログアウト、セッションとCSRFのCookieの属性、ロールの管理場所を定める規約。APIの認証方式、セッション設定、CSRFのCookieを変更するとき、テナントを選ぶ前に呼ぶAPIを足すとき、対向システムへAPIを公開するとき、権限の判定を実装するときに読む。
 tags: [convention, web-api, security, auth, future-arch-guidelines]
 ---
 
 # APIの認証、セッション、権限
 
 ブラウザからのAPIは、サーバー側セッションのCookieで認証する。
+ログインした利用者は所属するテナントを1つ選んでから業務のAPIを使い、役割の権限はテナントを選んだ時点で所属から組み立てる。
 システム間連携でAPIを公開するときは、OAuth 2.0のClient Credentials Flowで発行したアクセストークンで認証し、可能なら送信元のネットワークも制限する。
-ロールとユーザーの紐づけはIdPではなくアプリケーションで管理する。
+テナント、所属、役割はIdPではなくアプリケーションのDBで管理する。
 
 ## ブラウザからの認証
 
@@ -17,6 +18,9 @@ tags: [convention, web-api, security, auth, future-arch-guidelines]
 アクセストークンはブラウザに渡さない。
 
 未認証のAPIリクエストには、401のProblem Detailsに`WWW-Authenticate: Session realm="demo"`を付けて返す。
+SPAは401を受けてログインへ遷移し、ログインの後は`/`に戻る。
+バックエンドは、401にした要求をログインの後の戻り先として保存しない（`NullRequestCache`）。
+Spring Securityの既定の保存は、`Accept`のないAPIのGETを保存し、ログインの後にそのJSONへ戻すためである。
 `Session`は登録されていない独自のschemeであり、選んだ理由は[ADR-059](../adr/ADR-059-send-a-session-challenge-in-www-authenticate-on-401.md)にある。
 
 ## ログインの後の利用者
@@ -34,7 +38,47 @@ IdPを移るときは、組と利用者の対応づけだけを書き換え、�
 次の2つのときは、デプロイと同時に既存のセッションを消す（`REDIS_SESSION_NAMESPACE`を変える）。
 
 - `AppUserPrincipal`でない`OidcUser`を保存していた版から上げるとき。消さないと、そのセッションが切れるまで書き込みが失敗する。
-- `SignInOidcUserService`が返す`OidcUser`のクラスを持たない版へ切り戻すとき、またはそのクラスを移動、改名するとき。消さないと、セッションを読めずにリクエストが500になる。
+- `SignInOidcUserService`が返す`OidcUser`のクラスか、選んだテナントの権限のクラス（`TenantMembershipAuthority`）を持たない版へ切り戻すとき、またはそれらのクラスを移動、改名するとき。消さないと、セッションを読めずにリクエストが500になる。
+
+## テナントを選ぶ
+
+ログインした利用者は、所属するテナントを1つ選んでから業務のAPIを使う。
+テナント、所属、役割は`tenancy`の`m_tenant`と`m_membership`に持ち、IdPには持たせない。
+理由は[ADR-101](../adr/ADR-101-keep-tenants-and-roles-in-app-database.md)にある。
+
+- ログインの成功の処理（`TenantSelectionSuccessHandler`）は、所属が1つならそのテナントを選ぶ。所属がないか2つ以上なら選ばない。
+- SPAは`GET /api/memberships`で所属の一覧を読み、`PUT /api/current-tenant`の本文でテナントのIDを送って選ぶ。所属がなければ、招待を待つ画面を出す。
+- バックエンドは、送られたテナントのIDを所属の表で確かめる。所属にないテナントと、テナントを選んだ後にもう一度選ぶ要求は422にする。テナントを切り替えるには、ログインし直す。
+- テナントを選ぶと、セッションのIDを作り直してから、テナントの`public_id`と所属の役割を持つ権限（`TenantMembershipAuthority`）を足した認証をセッションに保存する。権限の名前は、役割から`ROLE_ADMIN`か`ROLE_MEMBER`にする。
+- テナントを選んだかどうかは、認証がこの権限を持つかどうかだけで表し、セッションの属性に別の値を持たない。書き換えは`TenantSession`だけが行う。
+- リクエストのたびに、`TenantSelectionFilter`が認証の利用者と権限のテナントの組で所属を引き直す。所属が消えていれば権限を外し、役割が変わっていれば新しい役割で権限を作り直す。作り直すときはセッションのIDを変えない。変えると、同時に送られたほかのリクエストが前のIDのCookieで401になるためである。
+- テナントを選ぶ前の業務のAPIは、typeが`/problems/tenant-not-selected`の403になる。所属の一覧とテナントを選ぶAPIだけは、選ぶ前にも呼べる。
+- テナントのIDは、テナントを選ぶAPIの本文からだけ受け取る。ほかのAPIは、テナントをリクエストの値から取らない。
+
+`/api/**`に、テナントを選ぶ前に呼ぶAPIを足すときは、`TenantSelectionFilter`の除外に加える。
+`tenancy`の`TenantSecurityCustomizer`が、このfilterとログインの成功の処理をSecurity filter chainに足すため、`SecurityConfig`には現れない。
+`TenantSecurityCustomizer`は`Customizer<HttpSecurity>`のBeanなので、Spring Securityはアプリが作るすべての`HttpSecurity`に適用する。
+システム間連携のClient Credentialsのchainのように、ブラウザのセッションを使わないchainを足すときは、そのchainをこの処理から外す。
+外さないと、そのchainの業務のAPIも、テナントを選んでいない認証として403になる。
+
+`TenantSession`は、chainと同じ構成（リクエストの属性とセッション）の`SecurityContextRepository`を自分で作る。
+chainの`SecurityContextRepository`は`HttpSecurity`のbuildで作られ、`TenantSecurityCustomizer`が呼ばれる時点ではまだないためである。
+`SecurityConfig`でchainの`SecurityContextRepository`を差し替えるときは、`TenantSession`も同じものに合わせる。
+
+### テナントを選んだ後のセッション
+
+テナントを選ぶ処理が認証とセッションのIDを作り直したときの、ほかの状態への影響を`TenantSelectionTest`で確かめた。
+テストは、本物の`OAuth2LoginAuthenticationFilter`のログインのコールバックとRedisのセッションを通し、IdPのトークンのendpointだけを差し替える。
+確かめた版は、Spring Boot 4.1.2、Spring Security 7.1.2、Spring Session 4.1.1である。
+
+- **OAuth2の認可済みのクライアント**：ログインが保存したクライアントを、作り直した認証でも引ける。Spring Bootが構成する`AuthenticatedPrincipalOAuth2AuthorizedClientRepository`は、クライアントを登録のIDと認証の名前（`getName()`、アプリの利用者のID）で引き、作り直した認証は同じprincipalを持つためである。
+- **CSRFのトークン**：セッションのIDを作り直しても`__Host-XSRF-TOKEN`のCookieは変わらず、選ぶ前に受け取ったトークンで更新できる。トークンはセッションではなくCookieにあり、テナントを選ぶ処理はログインの`CsrfAuthenticationStrategy`を通らないためである。
+- **前のセッションのID**：Redisから消え、そのCookieでの要求は401になる。
+
+認可済みのクライアントの保存先は、既定の`InMemoryOAuth2AuthorizedClientService`で、Redisのセッションには入らない。
+アプリを再起動したときと別のインスタンスでは引けない。
+今の`backend/src/main`には認可済みのクライアントを読むコードがないため、影響はない。
+ログアウトでトークンを失効させるなど、認可済みのクライアントを読む処理を足すときは、保存先をセッションかDBに移す。
 
 ## ログアウト
 
@@ -91,8 +135,10 @@ ADR-007は未認証で許可する経路をヘルスチェックに限り、セ�
 
 ## ロールの管理
 
-IdPはユーザーの認証だけを担い、ユーザーとロールの紐づけはアプリケーションで管理する。
-部署異動の反映時期のように、ロールの変更にはIdPとは別の業務固有の要件があるためである。
+IdPはユーザーの認証だけを担い、テナントの中の役割は所属の行に持つ（[テナントを選ぶ](#テナントを選ぶ)）。
+IdPのレルムの役割とグループは使わない。
+ローカルのKeycloakのrealm（`docker/keycloak/realm.json`）にもレルムの役割を置かず、管理者の権限は開発用の代表データの所属で作る。
+本番のIdPはAmazon Cognitoで、カスタム属性とグループを使わない（[ADR-102](../adr/ADR-102-use-amazon-cognito-as-production-idp.md)）。
 
 権限がない場合のステータスコードは[HTTPステータスコードの選択](status-codes.md)に従う。
 

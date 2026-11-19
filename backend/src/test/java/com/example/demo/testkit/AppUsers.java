@@ -1,14 +1,22 @@
 package com.example.demo.testkit;
 
 import com.example.demo.shared.security.AppUserPrincipal;
+import com.example.demo.tenancy.TestTenancy;
+import com.example.demo.tenancy.presentation.web.TenantMembershipAuthority;
 import java.io.Serial;
 import java.time.Instant;
-import org.springframework.security.core.authority.AuthorityUtils;
+import java.util.Collection;
+import java.util.List;
+import java.util.UUID;
+import org.jooq.DSLContext;
+import org.springframework.security.core.GrantedAuthority;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.oauth2.core.oidc.OidcIdToken;
 import org.springframework.security.oauth2.core.oidc.user.DefaultOidcUser;
 import org.springframework.security.oauth2.core.oidc.user.OidcUser;
 import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors;
-import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.OidcLoginRequestPostProcessor;
+import org.springframework.test.web.servlet.request.RequestPostProcessor;
+import org.springframework.web.context.support.WebApplicationContextUtils;
 
 /**
  * ログインのときに {@code tenancy} が返すのと同じく、{@link AppUserPrincipal} でもある {@link OidcUser} で認証する補助。
@@ -21,25 +29,52 @@ public final class AppUsers {
   /** テストの利用者の、アプリの利用者の ID。 */
   public static final String USER_ID = "0b6f2c1e-4d3a-4e5f-8a7b-9c0d1e2f3a4b";
 
+  /** テストの利用者が {@link #oidcLogin()} で選んだテナントの ID。 */
+  public static final String TENANT_ID = "5d2e8f4a-1b3c-4d6e-9f70-8a1b2c3d4e5f";
+
   /** ID トークンの時刻。 */
   private static final Instant ISSUED_AT = Instant.parse("2026-10-01T00:00:00Z");
 
+  /** OIDC のログインが付ける権限。 */
+  private static final GrantedAuthority OIDC_USER = new SimpleGrantedAuthority("OIDC_USER");
+
   private AppUsers() {}
 
-  /** {@link #oidcUser()} でログインした MockMvc のリクエストにする。 */
-  public static OidcLoginRequestPostProcessor oidcLogin() {
-    return SecurityMockMvcRequestPostProcessors.oidcLogin().oidcUser(oidcUser());
+  /** {@link #TENANT_ID} の MEMBER として、テナントを選んだ後の MockMvc のリクエストにする（{@link #inTenant}）。 */
+  public static RequestPostProcessor oidcLogin() {
+    return inTenant(TENANT_ID, "MEMBER");
   }
 
-  /** IdP の {@code sub} とは別に、アプリの利用者の ID {@link #USER_ID} を持つ利用者を返す。 */
+  /**
+   * {@link #USER_ID} の利用者をテナントに役割で所属させ、そのテナントを選んだ後の MockMvc のリクエストにする。
+   *
+   * <p>バックエンドはリクエストのたびに所属を引き直し、所属のない権限を外すため、リクエストを送る前に DB に所属を入れる。
+   */
+  public static RequestPostProcessor inTenant(final String tenantId, final String role) {
+    return request -> {
+      final DSLContext dsl =
+          WebApplicationContextUtils.getRequiredWebApplicationContext(request.getServletContext())
+              .getBean(DSLContext.class);
+      TestTenancy.member(dsl, USER_ID, UUID.fromString(tenantId), role);
+      return SecurityMockMvcRequestPostProcessors.oidcLogin()
+          .oidcUser(oidcUser(List.of(OIDC_USER, new TenantMembershipAuthority(tenantId, role))))
+          .postProcessRequest(request);
+    };
+  }
+
+  /** IdP の {@code sub} とは別に、アプリの利用者の ID {@link #USER_ID} を持ち、テナントを選ぶ前の利用者を返す。 */
   public static OidcUser oidcUser() {
+    return oidcUser(List.of(OIDC_USER));
+  }
+
+  private static OidcUser oidcUser(final Collection<GrantedAuthority> authorities) {
     final OidcIdToken idToken =
         OidcIdToken.withTokenValue("id-token")
             .subject("idp-sub")
             .issuedAt(ISSUED_AT)
             .expiresAt(ISSUED_AT.plusSeconds(300))
             .build();
-    return new FixedAppOidcUser(idToken);
+    return new FixedAppOidcUser(authorities, idToken);
   }
 
   /**
@@ -49,8 +84,9 @@ public final class AppUsers {
 
     @Serial private static final long serialVersionUID = 1L;
 
-    private FixedAppOidcUser(final OidcIdToken idToken) {
-      super(AuthorityUtils.createAuthorityList("OIDC_USER"), idToken);
+    private FixedAppOidcUser(
+        final Collection<GrantedAuthority> authorities, final OidcIdToken idToken) {
+      super(authorities, idToken);
     }
 
     @Override

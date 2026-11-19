@@ -8,7 +8,7 @@ import { OrderStatusFilter } from "./components/order-status-filter";
 import { OrdersTable } from "./components/orders-table";
 import { listOrdersParams } from "./order-status";
 
-const routeApi = getRouteApi("/_authenticated/orders/");
+const routeApi = getRouteApi("/_authenticated/_tenant/orders/");
 
 export function OrdersPage() {
   const { t } = useTranslation();

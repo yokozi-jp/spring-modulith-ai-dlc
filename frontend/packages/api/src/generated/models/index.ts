@@ -10,6 +10,8 @@ export * from './badRequestProblemResponse.ts';
 export * from './forbiddenProblemResponse.ts';
 export * from './internalServerErrorProblemResponse.ts';
 export * from './unauthorizedProblemResponse.ts';
+export * from './unprocessableContentProblemResponse.ts';
 export * from './ordering/index.ts';
 export * from './payment/index.ts';
 export * from './product/index.ts';
+export * from './tenancy/index.ts';

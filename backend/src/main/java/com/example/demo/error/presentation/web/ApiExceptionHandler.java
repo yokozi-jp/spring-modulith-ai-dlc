@@ -4,6 +4,7 @@ import com.example.demo.LocaleSupport;
 import com.example.demo.shared.concurrency.ConflictException;
 import com.example.demo.shared.failure.BusinessRuleViolationException;
 import com.example.demo.shared.failure.NotFoundException;
+import com.example.demo.shared.security.TenantNotSelectedException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.ConstraintViolationException;
@@ -59,20 +60,22 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
     return problem(exception, HttpStatus.UNAUTHORIZED, request);
   }
 
-  /** 権限が不足する API リクエストを 403 の about:blank に、CSRF token の失敗を専用の type に変換する。 */
+  /** 権限が不足する API リクエストを 403 の about:blank に、CSRF token の失敗とテナントを選ぶ前の拒否をそれぞれ専用の type に変換する。 */
   @ExceptionHandler(AccessDeniedException.class)
   /* package */ @Nullable ResponseEntity<Object> handleAccessDeniedException(
       final AccessDeniedException exception, final WebRequest request) {
+    final Locale locale = resolveLocale(request);
+    final ProblemDetail body;
     // Invalid と Missing の親にあたる CsrfException で受け、subtype が増えても専用の type にする。
     if (exception instanceof CsrfException) {
-      return handleExceptionInternal(
-          exception,
-          problemDetails.csrfTokenProblem(resolveLocale(request)),
-          new HttpHeaders(),
-          HttpStatus.FORBIDDEN,
-          request);
+      body = problemDetails.csrfTokenProblem(locale);
+    } else if (exception instanceof TenantNotSelectedException) {
+      body = problemDetails.tenantNotSelectedProblem(locale);
+    } else {
+      body = ProblemDetail.forStatus(HttpStatus.FORBIDDEN);
     }
-    return problem(exception, HttpStatus.FORBIDDEN, request);
+    return handleExceptionInternal(
+        exception, body, new HttpHeaders(), HttpStatus.FORBIDDEN, request);
   }
 
   /** メソッド検証の違反を 400 にする。戻り値の違反は実装の不備なので 500 にする。 */
