@@ -10,17 +10,16 @@ tags: [convention, frontend, lint]
 Oxlintの設定の正本は[`frontend/vite.config.ts`](../../frontend/vite.config.ts)の`lint`である。
 カテゴリをすべてエラーにし、次の規則だけを無効化または調整する（[ADR-034](../adr/ADR-034-pin-frontend-runtime-and-enforce-oxlint-categories.md)）。
 ファイルの範囲ごとの制限はoverrideで効かせ、規則のoptionを変えるときは許す範囲のすぐ外側を拒否するfixtureも置く。
-検査Taskの仕様は[Lintとテストのリファレンス](../tooling/lint-and-test.md#フロントエンド)にある。
 
 `radix`、`no-new-wrappers`、`typescript/consistent-type-definitions`、`import/no-relative-parent-imports`はカテゴリ指定で有効なので、個別に列挙しない。
 
-OxlintとOxfmtの設定は、workspaceのルートのこのファイルの`lint`と`fmt`だけに置き、`apps/web/vite.config.ts`には置かない（[ADR-092](../adr/ADR-092-split-frontend-into-vite-plus-workspace.md)）。
+OxlintとOxfmtの設定は、workspaceのルートの`frontend/vite.config.ts`の`lint`と`fmt`だけに置き、`apps/web/vite.config.ts`には置かない（[ADR-092](../adr/ADR-092-split-frontend-into-vite-plus-workspace.md)）。
 packageの側に`lint`がないため、`vp lint`はルートと`apps/web`のどちらで実行してもルートの設定を使う。
 packageの`vite.config.ts`に`lint`か`fmt`があると、`vp lint`をpackageで単体実行したときにルートの規則が黙って外れる。
 そのため`frontend/lint/workspace-layout.test.js`が、`apps/*`と`packages/*`のすべての`vite.config.ts`に`lint`と`fmt`がないことを確かめる。
 `better-tailwindcss/*`が読むCSSは、packageごとのoverrideが、設定ファイルの場所から作った絶対パスで渡す。
 `apps/web/**`は`apps/web/src/style.css`を、`packages/ui/**`は`packages/ui/src/style.css`を指すので、実行する場所によらず同じく解決する。
-アプリのCSSの`@source`は型検査とLintで見つからないので、`frontend/lint/workspace-layout.test.js`が確かめる（[フロントエンドアーキテクチャ](architecture.md)）。
+`apps/web/src/style.css`は`@frontend/ui/style.css`を読み込むため、アプリのCSSからもテーマの変数を解決できる。
 
 ## 例外と調整
 
@@ -142,7 +141,8 @@ fixtureが`@frontend/ui`からimportする部品は、複製せず、実物の`p
 実物のアプリは`apps/web`だけなので、`apps/*`のoverrideが別のアプリにも効くことは、`apps/web`の設定を複製した`frontend/lint/fixtures/apps/sample`のfixtureで確かめる。
 実物の2つ目のアプリができたら、このfixtureを実物に置き換える。
 `frontend/lint/tailwind-entry-point.test.js`は、ルート、`apps/web`、`packages/ui`のどこから実行しても、そのpackageのCSSを解決できることを確かめる。
-`../../apps/web/src/...`のように相対パスでpackageの外へ出るimportは、pnpmの解決を通らないので、依存を書かないことでは止まらない。
+
+`../../apps/web/src/...`のように相対パスでpackageの外へ出るimportは、pnpmの解決を通らないので、`package.json`に依存を書かないことでは止まらない（[フロントエンドアーキテクチャ](architecture.md#現在の構成)）。
 このimportは`import/no-relative-parent-imports`が止める。
 `ui`からアプリ、`api`から`ui`、アプリから別のアプリへの相対パスのimportを、`lint-config.test.js`がfixtureで確かめる。
 
@@ -196,3 +196,5 @@ event handlerからPromiseを返す関数を呼ぶときは、handlerの中で`v
 ```ts
 const params = { ...(cursor !== undefined && { cursor }) };
 ```
+
+検査Taskの仕様は[Lintとテストのリファレンス](../tooling/lint-and-test.md#フロントエンド)にある。

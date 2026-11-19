@@ -38,9 +38,6 @@ OpenAPIからOrvalでnative FetchのTanStack Query clientを生成し、手書�
 2 つ以上の `package.json` が使う依存は、版を `pnpm-workspace.yaml` の `catalog:` に置き、各 `package.json` には `"catalog:"` と書く（[ADR-100](../adr/ADR-100-pin-shared-frontend-dependencies-in-pnpm-catalog.md)）。
 1 つの package だけが使う依存は、その `package.json` に版を書く。
 `frontend/lint/workspace-layout.test.js` が、2 つ以上の `package.json` に `"catalog:"` 以外で書いた依存を見つけて失敗する。
-同じテストが、`packages/ui` と `packages/api` が互いを、アプリが別のアプリを `package.json` に書かないことを、各 package から他の package を Node で解決して `MODULE_NOT_FOUND` になることで示す。
-アプリから `@frontend/ui` と `@frontend/api` が解決できることを、対照として確かめる。
-`vp` や pnpm の shim は `NODE_PATH` に `.pnpm/node_modules` を足し、宣言のない workspace package も解決できてしまうので、このテストは `NODE_PATH` を空にして解決する。
 
 `packages/ui/` は、shadcn の部品（`src/<部品名>.tsx`）、`cn`（`src/lib/utils.ts`）、テーマの CSS（`src/style.css`）を持つ。
 `@base-ui/**` を import できる場所は、この package の production source だけである。
@@ -48,6 +45,7 @@ OpenAPIからOrvalでnative FetchのTanStack Query clientを生成し、手書�
 部品は `"./*": "./src/*.tsx"` で一つずつ公開するので、アプリは `import { Button } from "@frontend/ui/button"` のように部品ごとに import する。
 barrel の `index.ts` は作らない。
 `@frontend/ui` はアプリと `@frontend/api` を参照せず、`package.json` にも書かない。
+`frontend/lint/workspace-layout.test.js` が、`package.json` に書かない package を Node で解決できないことを確かめる。`NODE_PATH` を空にして解決するのは、`vp` や pnpm の shim が `NODE_PATH` に足す `.pnpm/node_modules` から、宣言のない package も解決できてしまうためである。
 書かなければ、pnpm の厳格な解決が、それらへの import を失敗にする。
 
 現在の `apps/web/src` は、アプリケーションの起動、ルーティング、アプリシェル、routerの既定の状態表示、`QueryClient` の生成、国際化、テレメトリの初期化と送信、小さなutility、テストの準備のコードだけを持つ。

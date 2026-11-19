@@ -23,6 +23,8 @@ HTTPはOrvalが生成したMSW handlerを使い、生成handlerがない境界�
 routeの描画は`src/testing/render-route.tsx`の`renderRoute`を使い、`main.tsx`と同じproviderとrouterの既定値で、最初のloaderを終えてから描画する。
 
 純粋関数はNode環境で検証し、DOMを必要とするcomponent testだけにjsdomを使う。
+`packages/ui`のテストは、jsdomとTesting Libraryを使わず、server renderの出力とresolveだけを確かめる。操作が要る部品を足すときに、DOMの環境を足す。
+`packages/ui`のテストはReact Compilerなしで走り、`apps/web`のようにCompilerを有効にしたテストは行わない。
 
 ## 利用者視点の期待
 
@@ -71,10 +73,6 @@ route loaderとTanStack Queryを組み合わせた画面では、loading、succe
 全体でbranch 88%とline 95%、ファイルごとにbranch 60%とline 65%を維持する。
 計測する分岐や行がないファイルは、Vitestが100%と数えるので、ファイルごとの下限で落ちない。
 下限の値の根拠は[ADR-076](../adr/ADR-076-run-mutation-tests-per-change-and-tighten-coverage-gates.md)を参照する。
-
-`packages/ui`のテストは、jsdomとTesting Libraryを使わず、server renderの出力とresolveだけを確かめる。
-操作が要る部品を足すときに、DOMの環境を足す。
-`packages/ui`のテストはReact Compilerなしで走り、`apps/web`のようにCompilerを有効にしたテストは行わない。
 
 coverageはReact Compilerを外して測る。
 Compilerが足すmemoの分岐を分母に入れないためである。

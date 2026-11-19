@@ -72,7 +72,7 @@ PITのHTMLとXMLのレポートは、変異対象がある場合に`backend/buil
 - **`task fe-coverage`**：React Compilerを有効にして、`vp run --recursive test`でルートのlint設定のテストと各packageのテストを実行する。
   そのあと、Compilerを外した状態で、ルートを除くpackageごとにVitestのV8 providerのcoverageを測り、下限もpackageごとに検証する。
   `apps/web`の全体の下限はbranch 88%とline 95%、`packages/api`の全体の下限は切り出した時点の実測の少し下のbranch 90%とline 98%、`packages/ui`の全体の下限はbranch 95%とline 95%である。ファイルごとの下限は全packageで共通のbranch 60%とline 65%である。
-  `packages/ui`のテストの方針は[フロントエンドのテストと検証](../frontend/testing.md#coverage)にある。
+  `packages/ui`のテストはReact Compilerなしで走る。方針は[フロントエンドのテストと検証](../frontend/testing.md#配置と実行環境)にある。
   全体の下限は各packageの`vite.config.ts`の`thresholds`が、ファイルごとの下限は同じ`thresholds.perFile`が検査する（[ADR-076](../adr/ADR-076-run-mutation-tests-per-change-and-tighten-coverage-gates.md)）。
   Compilerを外すのは環境変数`FRONTEND_REACT_COMPILER=false`で、理由は[ADR-078](../adr/ADR-078-measure-frontend-coverage-without-react-compiler.md)にある。
   `FE_TEST_ARGS`に渡した値は、ルートのlint設定のテスト、各packageのテスト、coverageの測定のVitestの実行すべてに足す。ファイルのパスは渡さず、reporterなどのoptionだけを渡す（例：`task fe-verify FE_TEST_ARGS=--reporter=dot`）。
