@@ -194,7 +194,9 @@ spring-modulith-ai-harnessの方式は次の理由で採らない。
 ## 検査
 
 `task api-lint`は、コミット済みの`openapi/openapi.yaml`を`.spectral.yaml`のルールで検査する。
+`task api-lint`と`task api-lint-rules-test`は、warnも失敗にする（`--fail-severity=warn`）。
 ルール自体は`task api-lint-rules-test`が合格例と違反例のfixtureで検査する。
+`.spectral.yaml`の有効な全ルールは違反例を持ち、どれかを無効にすると`api-lint-rules-test`が落ちる。
 springdocの出力の形（Javadocの反映、descriptionからのsummaryと`<p>`の除去、customizer、tag、201と204、example）は、`OpenApiAnnotationConventionTest`がサンプルのControllerで固定する。
 springdocやtherapiの版を上げてこのテストが失敗したら、この文書も直す。
 

@@ -12,8 +12,11 @@ oas3-schema|openapi
 openapi-version-3-1|openapi
 operation-description|paths./api/sample-orders.post
 operation-id-naming|paths./api/sampleTags.get.operationId
+operation-operationId|paths./api/sample-labels.get
 operation-singular-tag|paths./api/sample-orders.get.tags
+operation-success-response|paths./api/sample-memos.get.responses
 operation-tag-defined|paths./api/sample-payments.get.tags[0]
+operation-tags|paths./api/sample-labels.get
 path-kebab-case-resource|paths./api/sampleTags
 path-kebab-case|paths./api/sample_items
 path-params|paths./api/sample-orders/{code}
