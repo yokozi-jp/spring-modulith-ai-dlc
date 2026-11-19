@@ -138,7 +138,7 @@ cd spring-modulith-ai-dlc
 
 ### 7. セットアップスクリプトの実行
 
-最初に mise で Task と Java を入れ、その後のセットアップを`task setup`で実行します。
+最初に mise で Task を入れ、その後のセットアップを`task setup`で実行します。
 
 ``` bash
 cd /home/projects/spring-modulith-ai-dlc
@@ -156,11 +156,17 @@ source ~/.bashrc
 shims は、今いるディレクトリから上にたどって見つけた `mise.toml` の版を選びます。
 そのため `task`、`betterleaks`、`iwe`、`java` は、`mise.toml` のあるチェックアウトの中でだけ動きます。
 Gradle は `JAVA_HOME` が無ければ PATH の `java` を使うので、`JAVA_HOME` は設定しません。
+VS Code の Java 拡張も、`JAVA_HOME` か PATH の `java` を使います。
 
-以前の手順で apt の Corretto を入れた環境では、`~/.bashrc` の `export JAVA_HOME=/usr/lib/jvm/java-25-amazon-corretto` と `export JAVA_TOOL_OPTIONS="-Dfile.encoding=UTF-8"` の行を消し、`source ~/.bashrc` を実行します。
+#### apt の Corretto から移るとき
+
+`~/.bashrc` に `export JAVA_HOME=/usr/lib/jvm/java-25-amazon-corretto` がある環境では、その行と `export JAVA_TOOL_OPTIONS="-Dfile.encoding=UTF-8"` の行を消し、`source ~/.bashrc` を実行します。
 `JAVA_HOME` が残ると、Gradle は mise の Java でなく apt の Java を使います。
 `file.encoding` は Java 18 から既定で UTF-8 なので、設定は要りません。
-apt の `java-25-amazon-corretto-jdk` は、ほかで使っていなければ `sudo apt remove java-25-amazon-corretto-jdk` で消せます。
+
+`mise.toml` に Java がないブランチや worktree（この変更より前に切ったもの）では、shims の `java` が版を選べず、`./gradlew` が失敗します。
+そうしたブランチを使い終えるまでは、apt の `java-25-amazon-corretto-jdk` を残します。
+使い終えたら、`sudo apt remove java-25-amazon-corretto-jdk` で消せます。
 
 ### 8. Git hooks のセットアップ
 

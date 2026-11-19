@@ -124,11 +124,11 @@ d="$(case_dir toolchain)"
 sed -i "/'mise.lock'/d" "$d/backend.yml"
 expect "setup-mise を使うのに mise.lock で走らないと失敗" 1 "push の paths:に ['mise.lock'] がありません" check "$d"
 
-d="$(case_dir banned-uses)"
+d="$(case_dir banned-setup-task)"
 sed -i 's|^      - run: "true"$|      - uses: go-task/setup-task@v2\n      - run: "true"|' "$d/backend.yml"
 expect "mise.lock を通さない setup-task を使うと失敗" 1 "go-task/setup-task@v2 を使っています" check "$d"
 
-d="$(case_dir banned-java)"
+d="$(case_dir banned-setup-java)"
 sed -i 's|^      - run: "true"$|      - uses: actions/setup-java@v5\n      - run: "true"|' "$d/backend.yml"
 expect "mise.lock を通さない setup-java を使うと失敗" 1 "actions/setup-java@v5 を使っています" check "$d"
 

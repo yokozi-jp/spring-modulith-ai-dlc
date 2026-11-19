@@ -22,13 +22,13 @@ export MISE_DATA_DIR="$KIRO_WEB_HOME/mise-data"
 export MISE_STATE_DIR="$KIRO_WEB_HOME/mise-state"
 # mise.kiro-web.toml（サンドボックスだけで使う Compose）も読ませる。
 export MISE_ENV=kiro-web
-# サンドボックスに入っている Java、Gradle、gh などを、書き込める MISE_DATA_DIR からも見つけさせる。
+# サンドボックスに入っている Gradle、gh などを、書き込める MISE_DATA_DIR からも見つけさせる。Java は mise.lock の版を入れる。
 export MISE_SHARED_INSTALL_DIRS="${MISE_SHARED_INSTALL_DIRS:-$HOME/.local/share/mise/installs}"
 # vp と pnpm の保存先。XDG_CONFIG_HOME は git の設定が読めなくなるため動かさない。
 export XDG_DATA_HOME="$KIRO_WEB_HOME/xdg/data"
 export VP_HOME="$KIRO_WEB_HOME/vite-plus"
 export GRADLE_USER_HOME="$KIRO_WEB_HOME/gradle"
-# java.util.prefs の既定の保存先 ~/.java は書けない。file.encoding は Java 18 から既定で UTF-8 である。
+# java.util.prefs の既定の保存先 ~/.java は書けない。
 export JAVA_TOOL_OPTIONS="-Djava.util.prefs.userRoot=$KIRO_WEB_HOME/java-prefs"
 # Testcontainers は podman のサービスへつなぐ。コンテナ内と誤認してブリッジの gateway を宛先にしないよう、宛先を loopback に固定する。
 export DOCKER_HOST="unix:///tmp/kiro-web-podman-$(stat -L -c %i /proc/self/ns/net).sock"

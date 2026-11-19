@@ -39,7 +39,7 @@ Proposed
 - `docs/local-env-setup/kiro-web.sh` を、Kiro Web の tool call の最初に source する。
   道具と状態は `~/.cache/kiro-web` に置き、リポジトリには書かない。
   `/inner_container`（podman の補助バイナリの置き場所）が無い環境では、何もせずに戻る。
-- mise は CI の composite action と同じ版を取り直し、Task、betterleaks、iwe は WSL と CI と同じ `mise.lock` から `mise install --locked` で入れる。
+- mise は CI の composite action と同じ版を取り直し、Task、betterleaks、iwe、Java は WSL と CI と同じ `mise.lock` から `mise install --locked` で入れる。
 - iwe を、静的リンクの musl 版を配る 0.29.2 へ上げる。
 - サンドボックスだけで使う Compose は、`mise.kiro-web.toml` と `mise.kiro-web.lock` に固定し、`MISE_ENV=kiro-web` で入れる。
   版は 2.x に置く。
@@ -62,7 +62,7 @@ Proposed
 ### Positive
 
 - Kiro Web のエージェントが、`task test`、`task e2e`、`task scan-dast` などを WSL と同じ Task で実行し、push の前に Lefthook のフックを通せる。
-- Task、betterleaks、iwe は WSL と CI と同じ lock から入るので、版がずれない。
+- Task、betterleaks、iwe、Java は WSL と CI と同じ lock から入るので、版がずれない。
 - WSL で `kiro-web.sh` を source しても、環境を変えない。
 
 ### Negative
@@ -111,6 +111,6 @@ Proposed
 ## References
 
 - [Kiro Web の開発環境](../local-env-setup/kiro-web.md)：使い方と制約
-- [ADR-090](ADR-090-pin-cli-tools-with-mise-lock.md)：Task、betterleaks、iwe を mise.lock に固定する判断
+- [ADR-090](ADR-090-pin-cli-tools-with-mise-lock.md)：Task、betterleaks、iwe、Java を mise.lock に固定する判断
 - [iwe の Issue への回答](https://github.com/yokozi-jp/agent-software-factory/issues/243#issuecomment-6482095083)：iwe 0.29.2 で npm パッケージを静的リンクの musl 版にした
 - [#424](https://github.com/yokozi-jp/spring-modulith-ai-dlc/pull/424)：この判断を実装する Pull Request

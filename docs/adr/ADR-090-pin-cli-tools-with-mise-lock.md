@@ -33,10 +33,12 @@ iwe は `06-setup-iwe.sh` が `npm install -g` で入れ、CI は `versions.env`
 Proposed の間に Decision を書き直した。
 最初の案は CI の各 step に `jdx/mise-action` と mise の版を書いていたので、Task の版の複製が mise の版の複製に移っただけだった。
 このため、CI の設定を composite action へまとめた。
-Java も Proposed の間に足した。
-最初の案は Java を対象外にし、ローカルは `01-setup-java.sh` が apt で `25.0.2`、CI は 9 か所の `actions/setup-java` が Corretto の `25` の最新を入れていた。
-ローカルと CI でパッチの版がずれ、TLA+ の検査の道具（`tooling/formal-verify/check.sh`）が CI で Java を入れられなかったため、Java も `mise.lock` から入れる。
 lock の強制を `mise.toml` の `[settings] locked = true` へ移す案も試したが、`[tools]` のほかを書いた `mise.toml` は新しいチェックアウトごとに `mise trust` を求め、新しい worktree で shims と Git フックが止まったので採らなかった（選択肢5）。
+
+Java も Proposed の間に足した。
+最初の案は Java を対象外にしていた。
+そのときローカルは `01-setup-java.sh` が apt で `25.0.2` を入れ、CI は 9 か所の `actions/setup-java` が Corretto の `25` の最新を入れていたので、パッチの版がずれていた。
+また、TLA+ の検査の道具（[#502](https://github.com/yokozi-jp/spring-modulith-ai-dlc/pull/502)）を CI で動かすのに、`mise.lock` から入る Java が要った。
 
 ## Decision
 
@@ -47,10 +49,12 @@ lock の強制を `mise.toml` の `[settings] locked = true` へ移す案も試�
 - PATH は mise の shims で通す。`04-setup-shell.sh` が `~/.bashrc` に `eval "$(mise activate bash --shims)"` を足す。Taskfile と Lefthook は `betterleaks` と `iwe` をそのまま呼ぶ。
 - CI は composite action `.github/actions/setup-mise` を使う。この action だけが `jdx/mise-action` の SHA と mise の版を持ち、入力 `tools` でジョブが使う道具だけを入れる。
 - composite action は `MISE_LOCKED=1` をジョブの環境変数にし、install と後の step の shims に lock に無い版を拒ませる。
-- Java は実行用のイメージ（`backend/Dockerfile` の `amazoncorretto:25`）と同じ Corretto の 25 系にする。CI は `tools` に `java` を渡し、`jdx/mise-action` が mise の環境変数（`env` の既定）として `JAVA_HOME` を後の step に渡す。ローカルは `JAVA_HOME` を設定せず、Gradle は PATH の shims の `java` を使う。
+- Java は実行用のイメージ（`backend/Dockerfile` の `amazoncorretto:25-*`）と同じ Corretto の 25 系にする。
+  CI は `tools` に `java` を渡し、`jdx/mise-action` が mise の環境変数（`env` の既定）として `JAVA_HOME` を後の step に渡す。
+  ローカルは `JAVA_HOME` を設定せず、Gradle は PATH の shims の `java` を使う。
 - CI ではキャッシュを使わない。復元したキャッシュは `mise.lock` と照合されないためである。
 - setup-mise を使う workflow は、paths 条件に `mise.toml`、`mise.lock`、`.github/actions/setup-mise/**` も入れる。以前は Task の版を上げると各 workflow 自身が変わって走ったが、今は `mise.toml` と `mise.lock` しか変わらないためである。
-- `task ci-gate-check` が、この paths 条件と、`go-task/setup-task`、`actions/setup-go`、`actions/setup-java` のように `mise.lock` を通さずに道具を入れる action を検査する。
+- `task ci-gate-check` が、この paths 条件と、`mise.lock` を通さずに道具を入れる action（`ci-gate-check.py` の `BANNED_USES`）を検査する。
 - 番号付きのセットアップスクリプトのうち `00-setup-task.sh`、`01-setup-java.sh`、`05-setup-go-betterleaks.sh`、`06-setup-iwe.sh` と `versions.env` を削除する。
 
 `mise activate` ではなく shims を選んだ理由は、PATH が作業ディレクトリに左右されないことである。
@@ -71,16 +75,20 @@ shims は決まったディレクトリなので、受け継いだ PATH のま�
 
 ### Negative
 
-- 開発者は mise を入れ、shims を PATH に通す必要がある。
-- 以前の手順で apt の Corretto を入れた環境では、`~/.bashrc` の `JAVA_HOME` を消す必要がある。残すと Gradle が apt の Java を使う。
-- `java` も `mise.toml` のあるチェックアウトの中でだけ動く。リポジトリの外で Java を使うときは、別に入れる。
-- 実行用のイメージの Java は Dockerfile で決まり、Dependabot が別に上げる。`mise.toml` の版とずれすぎないかは、その PR で見る。shims が PATH にないと `task` が見つからない。
-- shims は `mise.toml` のあるチェックアウトの中でだけ道具を選べる。この変更より前に切ったブランチや worktree では、古い `task` を消すと Git フックが動かなくなる。
+- 開発者は mise を入れ、shims を PATH に通す必要がある。shims が PATH にないと `task` が見つからない。
+- `~/.bashrc` に apt の Corretto の `JAVA_HOME` が残る環境では、Gradle が mise の Java でなく apt の Java を使う。これを見つける検査はなく、`docs/local-env-setup/setup.md` の手順で消す。
+- shims は `mise.toml` のあるチェックアウトの中でだけ道具を選べる。
+  `task` も `java` も、リポジトリの外では動かない。
+  この変更より前に切ったブランチや worktree では、古い `task` や apt の Java を消すと、Git フックや Gradle が動かなくなる。
+- 実行用のイメージの Java は Dockerfile の digest で決まり、Dependabot が上げる。
+  `mise.toml` の Java は Dependabot が上げないため、イメージのパッチの版が先へ進み、ローカルと CI は手で上げるまで元の版に残る。
+  以前の `actions/setup-java` の `25` は Corretto の最新のパッチを追っていたので、CI はイメージに近かった。
+  この変更の時点で `actions/setup-java` は `25.0.5.1.2` を入れていたが、mise がまだその版を持たないため `25.0.5.0.10` に固定した。
 - iwe は実行に Node.js を要するが、mise は Node.js を入れない。ローカルでは Vite+、CI では `actions/setup-node` が入れる。
 - ローカルの shims は lock を強制しない。`mise.toml` の版だけを上げると、shims は初回の実行でその版を入れて `mise.lock` を書き換える。書き換わった `mise.lock` は差分に出て、commit しなければ CI が止める。
 - `.mise/locks/` が欠けると、`mise install --locked` は iwe の install で失敗する（mise のエラーは `mise lock` での修復を案内する）。
 - 版を上げる PR では、setup-mise を使う workflow がすべて走る。betterleaks か iwe だけを上げても backend、frontend、e2e、dast、mutation test が走る。
-- Dependabot は `mise.toml` と composite action の `version` を更新しない。[#389](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/389) で Renovate を入れるまで手で上げる。`jdx/mise-action` の SHA は、`dependabot.yml` の `directories` に composite action を足して Dependabot に更新させる。
+- Dependabot は `mise.toml`（Java を含む）と composite action の `version` を更新しない。[#389](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/389) で Renovate を入れるまで手で上げる。`jdx/mise-action` の SHA は、`dependabot.yml` の `directories` に composite action を足して Dependabot に更新させる。
 
 ### Neutral
 

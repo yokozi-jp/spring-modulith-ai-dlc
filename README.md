@@ -62,7 +62,7 @@ clone したら、[スキルの取得元と更新](docs/agents/skill-sources.md)
 
 | 分類             | 技術                       | バージョン | 用途                                           |
 | ---------------- | -------------------------- | ---------- | ---------------------------------------------- |
-| Backend          | Java (Amazon Corretto)     | 25.0.5     |                                                |
+| Backend          | Java (Amazon Corretto)     | 25         |                                                |
 | Backend          | Spring Boot                | 4.1.1      | Web、Security（OIDC Client）、Session（Redis） |
 | Backend          | Spring Modulith            | 2.1.2      | モジュール境界の検証                           |
 | Backend          | jOOQ                       | 3.21.8     | スキーマから生成する型安全な SQL               |
@@ -170,7 +170,7 @@ clone したら、[スキルの取得元と更新](docs/agents/skill-sources.md)
 ├── commitlint.config.mjs # commitlint 設定（Conventional Commits 検証）
 ├── lefthook.yml      # Git フック定義（Lefthook）
 ├── mise.lock         # mise.toml の道具の URL と checksum（linux-x64）
-├── mise.toml         # Task、betterleaks、iwe の版
+├── mise.toml         # Task、betterleaks、iwe、Java の版
 ├── package.json      # Lefthook・commitlint 導入用（ルート）
 ├── package-lock.json # ルート npm 依存の lockfile
 ├── release-please-config.json # release-please の設定

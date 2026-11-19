@@ -345,6 +345,7 @@ const params = { ...(cursor !== undefined && { cursor }) };
   `.github/rulesets/main.json`の必須チェックを、`branch-protection.md`の一覧とworkflowの`name`に突き合わせる。
   GitHub上のrulesetとの一致は検査しない。
 - **`task ci-gate-check`**：`ci.yml`の`CI gate`が、`pull_request`で動く検査を取りこぼしていないかを検査する。
+  あわせて、setup-miseを使うworkflowの`paths:`に`mise.toml`、`mise.lock`、`.github/actions/setup-mise/**`があることと、`mise.lock`を通さずに道具を入れるaction（`ci-gate-check.py`の`BANNED_USES`）を使っていないことを検査する（[ADR-090](../adr/ADR-090-pin-cli-tools-with-mise-lock.md)）。
   `tooling/ci-gate-check/test.sh`と、PRの変更を判定する`tooling/ci-changes/test.sh`を先に実行してから、`ci-gate-check.py`が実際の`.github/workflows/`を検査する。
   `changes`ジョブは`tooling/ci-changes/changed.sh`にglobを渡して判定する。globは`paths:`と同じ書き方で、`ci.yml`の変更でも`true`になる。
   `ci.yml`にジョブを足したときは`CI gate`の`needs`にも足し、`ci.yml`から呼ばない`pull_request`の workflow は`tooling/ci-gate-check/excluded.tsv`に理由を書く。
