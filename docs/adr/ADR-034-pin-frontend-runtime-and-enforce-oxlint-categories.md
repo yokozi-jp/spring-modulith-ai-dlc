@@ -21,7 +21,7 @@ Frontend は Vite+ をツールチェーンの単一入口とし、Node.js は V
 これまで Node.js の版はプロジェクトに明示されておらず、Vite+ はローカルで LTS を選び、Frontend CI は `actions/setup-node` にメジャー版 `22` だけを渡していた。
 ローカルと CI で解決される Node.js の版が食い違い、片方でだけ再現する不具合を招きうる。
 Vite+ とその Vite 互換コアも、`pnpm-workspace.yaml` の catalog でキャレット範囲（`^0.3.3`）を指定していた。
-この ADR は Proposed の間に、固定する版を 0.3.3 から 1.6.0 へ書き直した。1.0 以降は Vitest 5、Oxlint 1.93、Oxfmt 0.78 を同梱し、無修正の `vite.config.ts` のまま Frontend の検査が通ることを確かめたためである（Issue #462）。
+この ADR は Proposed の間に、固定する版を 0.3.3 から 1.6.0 へ書き直した。1.6.0 は Vitest 5.1、Oxlint 1.93、Oxfmt 0.78 を同梱し、`vite.config.ts` を変えずに済む。Oxlint 1.93 の `unicorn/consistent-function-scoping` が報告した 2 件の関数を移すだけで、Frontend の検査が通る（Issue #462）。
 
 Lint は `vp check` へ集約し、型認識 Lint と型検査、React、Tailwind、shadcn、任意 HTML sink の禁止まで有効化していた。
 一方で Oxlint のカテゴリは明示しておらず、既定では correctness 系の多くが警告のままで、警告だけでは `vp check` が失敗しなかった。

@@ -79,7 +79,7 @@ clone したら、[スキルの取得元と更新](docs/agents/skill-sources.md)
 | Frontend         | Orval                      | 8.36.0     | OpenAPI から API client と MSW handler を生成  |
 | Frontend         | Tailwind CSS               | 4.3.3      | スタイリング                                   |
 | Frontend         | VitePlus                   | 1.6.0      | ビルド、開発サーバー、Oxlint（`vp`）           |
-| Frontend         | Vitest                     | 4.1.11     | 単体テスト                                     |
+| Frontend         | Vitest                     | 5.1.0      | 単体テスト                                     |
 | Frontend         | MSW                        | 2.15.0     | API のモック                                   |
 | Frontend         | Playwright                 | 1.63.0     | E2E テスト                                     |
 | Frontend         | Node.js                    | 24.21.0    |                                                |
