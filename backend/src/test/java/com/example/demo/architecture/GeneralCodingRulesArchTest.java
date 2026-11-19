@@ -2,21 +2,31 @@ package com.example.demo.architecture;
 
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noMethods;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.example.demo.DemoApplication;
+import com.tngtech.archunit.base.DescribedPredicate;
+import com.tngtech.archunit.core.domain.JavaAccess;
 import com.tngtech.archunit.core.domain.JavaCall;
 import com.tngtech.archunit.core.domain.JavaClass;
 import com.tngtech.archunit.core.domain.properties.HasOwner;
+import com.tngtech.archunit.core.importer.ClassFileImporter;
 import com.tngtech.archunit.junit.AnalyzeClasses;
 import com.tngtech.archunit.junit.ArchTest;
 import com.tngtech.archunit.lang.ArchRule;
 import com.tngtech.archunit.library.GeneralCodingRules;
 import java.util.NoSuchElementException;
+import java.util.List;
 import java.util.Optional;
+import java.util.Set;
+import java.util.function.Supplier;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.web.client.RestClient;
 
 /** ArchUnit が提供する汎用コーディング規則をプロダクションコードへ適用する。 */
-@SuppressWarnings("PMD.TestClassWithoutTestCases")
 @AnalyzeClasses(packagesOf = DemoApplication.class, importOptions = ProductionCodeOnly.class)
 class GeneralCodingRulesArchTest {
 
@@ -30,6 +40,9 @@ class GeneralCodingRulesArchTest {
   /** 日時の規約と ADR のパス。 */
   private static final String DATE_TIME_DOCS =
       "規約：docs/datetime/timezone-conventions.md、docs/adr/ADR-006-utc-instant-absolute-time-policy.md";
+
+  /** 自動構成を迂回する {@code RestClient} の生成メソッド。 */
+  private static final Set<String> FACTORY_METHODS = Set.of("builder", "create");
 
   /** 標準出力と標準エラー出力への直接アクセスを禁止する。 */
   @ArchTest
@@ -155,4 +168,53 @@ class GeneralCodingRulesArchTest {
               + "直し方：java.util.Date、Calendar、java.sql.Timestamp などを、"
               + "絶対時刻は Instant、日付だけは LocalDate、時刻だけは LocalTime に置き換える。"
               + DATE_TIME_DOCS);
+
+  /** {@code RestClient} は Boot の自動構成の {@code RestClient.Builder} から作る。 */
+  @ArchTest
+  /* package */ static final ArchRule restClientIsBuiltFromInjectedBuilder =
+      restClientIsBuiltFromInjectedBuilderRule();
+
+  @Test
+  @DisplayName("RestClient.builder() と RestClient.create() を、呼び出しとメソッド参照のどちらでも拒否する")
+  void restClientFactoriesAreRejected() {
+    // フィクスチャを実際に呼び出してIDEにも使用済みと認識させる。拒否判定は続くArchUnitの検査が担う。
+    assertThat(RestClientBypass.createForbiddenValues()).hasSize(3);
+
+    assertThatThrownBy(
+            () ->
+                restClientIsBuiltFromInjectedBuilderRule()
+                    .check(new ClassFileImporter().importClasses(RestClientBypass.class)))
+        .isInstanceOf(AssertionError.class)
+        .hasMessageContaining("(3 times)")
+        .hasMessageContaining("calls method <org.springframework.web.client.RestClient.builder()>")
+        .hasMessageContaining("calls method <org.springframework.web.client.RestClient.create()>")
+        .hasMessageContaining(
+            "references method <org.springframework.web.client.RestClient.builder()>");
+  }
+
+  /** {@code RestClient.builder()} と {@code RestClient.create(...)} へのアクセスを禁止する規則を組み立てる。 */
+  private static ArchRule restClientIsBuiltFromInjectedBuilderRule() {
+    return noClasses()
+        .should()
+        .accessTargetWhere(
+            DescribedPredicate.describe(
+                "RestClient.builder() or RestClient.create()",
+                (JavaAccess<?> access) ->
+                    access.getTargetOwner().isEquivalentTo(RestClient.class)
+                        && FACTORY_METHODS.contains(access.getName())))
+        .because(
+            "Boot の自動構成を通らない RestClient には、計測（トレースのヘッダーとクライアントのメトリクス）と"
+                + "spring.jackson.* などの Boot の設定が入らないため。"
+                + "直し方：RestClient.Builder を注入する（@Bean のメソッドなら引数で受け取る）。"
+                + "規約：docs/backend/class-roles/external-client.md");
+  }
+
+  /** 規則が拒否することを確かめるための、禁止された生成の例。 */
+  private static final class RestClientBypass {
+    /** 呼び出し二つとメソッド参照一つで、自動構成を迂回した生成を返す。 */
+    /* package */ static List<Object> createForbiddenValues() {
+      final Supplier<RestClient.Builder> reference = RestClient::builder;
+      return List.of(RestClient.builder(), RestClient.create(), reference.get());
+    }
+  }
 }

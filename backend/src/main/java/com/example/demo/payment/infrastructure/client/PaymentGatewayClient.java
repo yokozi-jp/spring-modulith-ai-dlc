@@ -58,13 +58,16 @@ class PaymentGatewayClient implements PaymentGateway {
   private final RestClient restClient;
 
   /**
-   * 決済代行の URL とタイムアウトを受け取り、HTTP クライアントを作る。
+   * Boot の自動構成の {@code RestClient.Builder} から、決済代行の URL とタイムアウトを持つ HTTP クライアントを作る。
+   * 通信の設定の扱いは docs/backend/class-roles/external-client.md に従う。
    *
+   * @param builder 計測（トレースとメトリクス）が入った、Boot の自動構成の builder
    * @param baseUrl 決済代行の URL
    * @param connectTimeout 接続の確立を待つ上限
    * @param readTimeout 一回の呼び出しの応答を待つ上限
    */
   /* package */ PaymentGatewayClient(
+      final RestClient.Builder builder,
       @Value("${payment-gateway.base-url}") final String baseUrl,
       @Value("${payment-gateway.connect-timeout}") final Duration connectTimeout,
       @Value("${payment-gateway.read-timeout}") final Duration readTimeout) {
@@ -72,7 +75,7 @@ class PaymentGatewayClient implements PaymentGateway {
         new JdkClientHttpRequestFactory(
             HttpClient.newBuilder().connectTimeout(connectTimeout).build());
     requestFactory.setReadTimeout(readTimeout);
-    this.restClient = RestClient.builder().baseUrl(baseUrl).requestFactory(requestFactory).build();
+    this.restClient = builder.baseUrl(baseUrl).requestFactory(requestFactory).build();
   }
 
   /**

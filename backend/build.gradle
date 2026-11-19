@@ -71,6 +71,8 @@ ext {
 dependencies {
     // --- Web・API ---
     implementation 'org.springframework.boot:spring-boot-starter-webmvc'
+    // RestClient.Builder の自動構成（計測と共通設定）。webmvc の starter には含まれない。
+    implementation 'org.springframework.boot:spring-boot-starter-restclient'
     implementation 'org.springframework.boot:spring-boot-starter-validation'
 
     // --- API ドキュメント（OpenAPI / Swagger UI）---

@@ -31,12 +31,14 @@ import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.boot.autoconfigure.AutoConfigurations;
 import org.springframework.boot.autoconfigure.context.PropertyPlaceholderAutoConfiguration;
 import org.springframework.boot.convert.ApplicationConversionService;
+import org.springframework.boot.restclient.autoconfigure.RestClientAutoConfiguration;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 import org.springframework.core.NestedExceptionUtils;
 import org.springframework.core.env.StandardEnvironment;
 import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.HttpServerErrorException;
 import org.springframework.web.client.ResourceAccessException;
+import org.springframework.web.client.RestClient;
 
 /** 決済代行の Client の HTTP の呼び出しと、URL の設定の検査を検証する。 */
 // 起動の確認は ApplicationContextRunner の run の中の AssertJ で書く。
@@ -74,7 +76,8 @@ class PaymentGatewayClientTest {
                   context
                       .getBeanFactory()
                       .setConversionService(ApplicationConversionService.getSharedInstance()))
-          .withConfiguration(AutoConfigurations.of(PropertyPlaceholderAutoConfiguration.class))
+          .withConfiguration(AutoConfigurations.of(
+                  PropertyPlaceholderAutoConfiguration.class, RestClientAutoConfiguration.class))
           .withPropertyValues(
               "payment-gateway.connect-timeout=1s", "payment-gateway.read-timeout=2s")
           .withBean(PaymentGatewayClient.class);
@@ -264,6 +267,7 @@ class PaymentGatewayClientTest {
     started.start();
     server = started;
     return new PaymentGatewayClient(
+        RestClient.builder(),
         "http://"
             + InetAddress.getLoopbackAddress().getHostAddress()
             + ":"

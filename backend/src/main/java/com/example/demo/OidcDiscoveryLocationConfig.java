@@ -37,11 +37,13 @@ public class OidcDiscoveryLocationConfig {
   /** discovery を {@code oidc.discovery-uri} から読み、Boot の registration のプロパティを重ねる。 */
   @Bean
   public ClientRegistrationRepository clientRegistrationRepository(
+      final RestClient.Builder restClientBuilder,
       final OAuth2ClientProperties properties,
       @Value("${oidc.discovery-uri}") final String discoveryUri) {
     final Map<String, Object> configuration =
         Objects.requireNonNull(
-            RestClient.create()
+            restClientBuilder
+                .build()
                 .get()
                 .uri(discoveryUri)
                 .retrieve()

@@ -14,6 +14,7 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.autoconfigure.AutoConfigurations;
+import org.springframework.boot.restclient.autoconfigure.RestClientAutoConfiguration;
 import org.springframework.boot.security.oauth2.client.autoconfigure.OAuth2ClientAutoConfiguration;
 import org.springframework.boot.test.context.runner.WebApplicationContextRunner;
 import org.springframework.security.oauth2.client.registration.ClientRegistration;
@@ -36,7 +37,9 @@ class OidcDiscoveryLocationConfigTest {
   /** Boot の OAuth2 client の自動構成と、検証対象の設定を読み込む runner。 */
   private final WebApplicationContextRunner runner =
       new WebApplicationContextRunner()
-          .withConfiguration(AutoConfigurations.of(OAuth2ClientAutoConfiguration.class))
+          .withConfiguration(
+              AutoConfigurations.of(
+                  OAuth2ClientAutoConfiguration.class, RestClientAutoConfiguration.class))
           .withUserConfiguration(OidcDiscoveryLocationConfig.class)
           .withPropertyValues(
               "spring.security.oauth2.client.registration.web.provider=oidc",
