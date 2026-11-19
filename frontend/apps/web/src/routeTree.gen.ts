@@ -11,10 +11,12 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
 import { Route as LoggedOutRouteImport } from './routes/logged-out'
-import { Route as AuthenticatedIndexRouteImport } from './routes/_authenticated/index'
-import { Route as AuthenticatedOrdersIndexRouteImport } from './routes/_authenticated/orders/index'
-import { Route as AuthenticatedOrdersNewRouteImport } from './routes/_authenticated/orders/new'
-import { Route as AuthenticatedOrdersOrderIdIndexRouteImport } from './routes/_authenticated/orders/$orderId/index'
+import { Route as AuthenticatedTenantRouteRouteImport } from './routes/_authenticated/_tenant/route'
+import { Route as AuthenticatedTenantsRouteImport } from './routes/_authenticated/tenants'
+import { Route as AuthenticatedTenantIndexRouteImport } from './routes/_authenticated/_tenant/index'
+import { Route as AuthenticatedTenantOrdersIndexRouteImport } from './routes/_authenticated/_tenant/orders/index'
+import { Route as AuthenticatedTenantOrdersNewRouteImport } from './routes/_authenticated/_tenant/orders/new'
+import { Route as AuthenticatedTenantOrdersOrderIdIndexRouteImport } from './routes/_authenticated/_tenant/orders/$orderId/index'
 
 const AuthenticatedRouteRoute = AuthenticatedRouteRouteImport.update({
   id: '/_authenticated',
@@ -25,66 +27,95 @@ const LoggedOutRoute = LoggedOutRouteImport.update({
   path: '/logged-out',
   getParentRoute: () => rootRouteImport,
 } as any)
-const AuthenticatedIndexRoute = AuthenticatedIndexRouteImport.update({
-  id: '/',
-  path: '/',
-  getParentRoute: () => AuthenticatedRouteRoute,
-} as any)
-const AuthenticatedOrdersIndexRoute =
-  AuthenticatedOrdersIndexRouteImport.update({
-    id: '/orders/',
-    path: '/orders/',
+const AuthenticatedTenantRouteRoute =
+  AuthenticatedTenantRouteRouteImport.update({
+    id: '/_tenant',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
-const AuthenticatedOrdersNewRoute = AuthenticatedOrdersNewRouteImport.update({
-  id: '/orders/new',
-  path: '/orders/new',
+const AuthenticatedTenantsRoute = AuthenticatedTenantsRouteImport.update({
+  id: '/tenants',
+  path: '/tenants',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
-const AuthenticatedOrdersOrderIdIndexRoute =
-  AuthenticatedOrdersOrderIdIndexRouteImport.update({
+const AuthenticatedTenantIndexRoute =
+  AuthenticatedTenantIndexRouteImport.update({
+    id: '/',
+    path: '/',
+    getParentRoute: () => AuthenticatedTenantRouteRoute,
+  } as any)
+const AuthenticatedTenantOrdersIndexRoute =
+  AuthenticatedTenantOrdersIndexRouteImport.update({
+    id: '/orders/',
+    path: '/orders/',
+    getParentRoute: () => AuthenticatedTenantRouteRoute,
+  } as any)
+const AuthenticatedTenantOrdersNewRoute =
+  AuthenticatedTenantOrdersNewRouteImport.update({
+    id: '/orders/new',
+    path: '/orders/new',
+    getParentRoute: () => AuthenticatedTenantRouteRoute,
+  } as any)
+const AuthenticatedTenantOrdersOrderIdIndexRoute =
+  AuthenticatedTenantOrdersOrderIdIndexRouteImport.update({
     id: '/orders/$orderId/',
     path: '/orders/$orderId/',
-    getParentRoute: () => AuthenticatedRouteRoute,
+    getParentRoute: () => AuthenticatedTenantRouteRoute,
   } as any)
 
 export interface FileRoutesByFullPath {
-  '/': typeof AuthenticatedIndexRoute
+  '/': typeof AuthenticatedTenantIndexRoute
   '/logged-out': typeof LoggedOutRoute
-  '/orders/new': typeof AuthenticatedOrdersNewRoute
-  '/orders/': typeof AuthenticatedOrdersIndexRoute
-  '/orders/$orderId/': typeof AuthenticatedOrdersOrderIdIndexRoute
+  '/tenants': typeof AuthenticatedTenantsRoute
+  '/orders/new': typeof AuthenticatedTenantOrdersNewRoute
+  '/orders/': typeof AuthenticatedTenantOrdersIndexRoute
+  '/orders/$orderId/': typeof AuthenticatedTenantOrdersOrderIdIndexRoute
 }
 export interface FileRoutesByTo {
+  '/': typeof AuthenticatedTenantIndexRoute
   '/logged-out': typeof LoggedOutRoute
-  '/': typeof AuthenticatedIndexRoute
-  '/orders/new': typeof AuthenticatedOrdersNewRoute
-  '/orders': typeof AuthenticatedOrdersIndexRoute
-  '/orders/$orderId': typeof AuthenticatedOrdersOrderIdIndexRoute
+  '/tenants': typeof AuthenticatedTenantsRoute
+  '/orders/new': typeof AuthenticatedTenantOrdersNewRoute
+  '/orders': typeof AuthenticatedTenantOrdersIndexRoute
+  '/orders/$orderId': typeof AuthenticatedTenantOrdersOrderIdIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/_authenticated': typeof AuthenticatedRouteRouteWithChildren
   '/logged-out': typeof LoggedOutRoute
-  '/_authenticated/': typeof AuthenticatedIndexRoute
-  '/_authenticated/orders/new': typeof AuthenticatedOrdersNewRoute
-  '/_authenticated/orders/': typeof AuthenticatedOrdersIndexRoute
-  '/_authenticated/orders/$orderId/': typeof AuthenticatedOrdersOrderIdIndexRoute
+  '/_authenticated/_tenant': typeof AuthenticatedTenantRouteRouteWithChildren
+  '/_authenticated/tenants': typeof AuthenticatedTenantsRoute
+  '/_authenticated/_tenant/': typeof AuthenticatedTenantIndexRoute
+  '/_authenticated/_tenant/orders/new': typeof AuthenticatedTenantOrdersNewRoute
+  '/_authenticated/_tenant/orders/': typeof AuthenticatedTenantOrdersIndexRoute
+  '/_authenticated/_tenant/orders/$orderId/': typeof AuthenticatedTenantOrdersOrderIdIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
-    '/' | '/logged-out' | '/orders/new' | '/orders/' | '/orders/$orderId/'
+    | '/'
+    | '/logged-out'
+    | '/tenants'
+    | '/orders/new'
+    | '/orders/'
+    | '/orders/$orderId/'
   fileRoutesByTo: FileRoutesByTo
-  to: '/logged-out' | '/' | '/orders/new' | '/orders' | '/orders/$orderId'
+  to:
+    | '/'
+    | '/logged-out'
+    | '/tenants'
+    | '/orders/new'
+    | '/orders'
+    | '/orders/$orderId'
   id:
     | '__root__'
     | '/_authenticated'
     | '/logged-out'
-    | '/_authenticated/'
-    | '/_authenticated/orders/new'
-    | '/_authenticated/orders/'
-    | '/_authenticated/orders/$orderId/'
+    | '/_authenticated/_tenant'
+    | '/_authenticated/tenants'
+    | '/_authenticated/_tenant/'
+    | '/_authenticated/_tenant/orders/new'
+    | '/_authenticated/_tenant/orders/'
+    | '/_authenticated/_tenant/orders/$orderId/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -108,49 +139,80 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof LoggedOutRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/_authenticated/': {
-      id: '/_authenticated/'
+    '/_authenticated/_tenant': {
+      id: '/_authenticated/_tenant'
+      path: ''
+      fullPath: '/'
+      preLoaderRoute: typeof AuthenticatedTenantRouteRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/tenants': {
+      id: '/_authenticated/tenants'
+      path: '/tenants'
+      fullPath: '/tenants'
+      preLoaderRoute: typeof AuthenticatedTenantsRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/_tenant/': {
+      id: '/_authenticated/_tenant/'
       path: '/'
       fullPath: '/'
-      preLoaderRoute: typeof AuthenticatedIndexRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
+      preLoaderRoute: typeof AuthenticatedTenantIndexRouteImport
+      parentRoute: typeof AuthenticatedTenantRouteRoute
     }
-    '/_authenticated/orders/': {
-      id: '/_authenticated/orders/'
+    '/_authenticated/_tenant/orders/': {
+      id: '/_authenticated/_tenant/orders/'
       path: '/orders'
       fullPath: '/orders/'
-      preLoaderRoute: typeof AuthenticatedOrdersIndexRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
+      preLoaderRoute: typeof AuthenticatedTenantOrdersIndexRouteImport
+      parentRoute: typeof AuthenticatedTenantRouteRoute
     }
-    '/_authenticated/orders/new': {
-      id: '/_authenticated/orders/new'
+    '/_authenticated/_tenant/orders/new': {
+      id: '/_authenticated/_tenant/orders/new'
       path: '/orders/new'
       fullPath: '/orders/new'
-      preLoaderRoute: typeof AuthenticatedOrdersNewRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
+      preLoaderRoute: typeof AuthenticatedTenantOrdersNewRouteImport
+      parentRoute: typeof AuthenticatedTenantRouteRoute
     }
-    '/_authenticated/orders/$orderId/': {
-      id: '/_authenticated/orders/$orderId/'
+    '/_authenticated/_tenant/orders/$orderId/': {
+      id: '/_authenticated/_tenant/orders/$orderId/'
       path: '/orders/$orderId'
       fullPath: '/orders/$orderId/'
-      preLoaderRoute: typeof AuthenticatedOrdersOrderIdIndexRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
+      preLoaderRoute: typeof AuthenticatedTenantOrdersOrderIdIndexRouteImport
+      parentRoute: typeof AuthenticatedTenantRouteRoute
     }
   }
 }
 
+interface AuthenticatedTenantRouteRouteChildren {
+  AuthenticatedTenantIndexRoute: typeof AuthenticatedTenantIndexRoute
+  AuthenticatedTenantOrdersNewRoute: typeof AuthenticatedTenantOrdersNewRoute
+  AuthenticatedTenantOrdersIndexRoute: typeof AuthenticatedTenantOrdersIndexRoute
+  AuthenticatedTenantOrdersOrderIdIndexRoute: typeof AuthenticatedTenantOrdersOrderIdIndexRoute
+}
+
+const AuthenticatedTenantRouteRouteChildren: AuthenticatedTenantRouteRouteChildren =
+  {
+    AuthenticatedTenantIndexRoute: AuthenticatedTenantIndexRoute,
+    AuthenticatedTenantOrdersNewRoute: AuthenticatedTenantOrdersNewRoute,
+    AuthenticatedTenantOrdersIndexRoute: AuthenticatedTenantOrdersIndexRoute,
+    AuthenticatedTenantOrdersOrderIdIndexRoute:
+      AuthenticatedTenantOrdersOrderIdIndexRoute,
+  }
+
+const AuthenticatedTenantRouteRouteWithChildren =
+  AuthenticatedTenantRouteRoute._addFileChildren(
+    AuthenticatedTenantRouteRouteChildren,
+  )
+
 interface AuthenticatedRouteRouteChildren {
-  AuthenticatedIndexRoute: typeof AuthenticatedIndexRoute
-  AuthenticatedOrdersNewRoute: typeof AuthenticatedOrdersNewRoute
-  AuthenticatedOrdersIndexRoute: typeof AuthenticatedOrdersIndexRoute
-  AuthenticatedOrdersOrderIdIndexRoute: typeof AuthenticatedOrdersOrderIdIndexRoute
+  AuthenticatedTenantRouteRoute: typeof AuthenticatedTenantRouteRouteWithChildren
+  AuthenticatedTenantsRoute: typeof AuthenticatedTenantsRoute
 }
 
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
-  AuthenticatedIndexRoute: AuthenticatedIndexRoute,
-  AuthenticatedOrdersNewRoute: AuthenticatedOrdersNewRoute,
-  AuthenticatedOrdersIndexRoute: AuthenticatedOrdersIndexRoute,
-  AuthenticatedOrdersOrderIdIndexRoute: AuthenticatedOrdersOrderIdIndexRoute,
+  AuthenticatedTenantRouteRoute: AuthenticatedTenantRouteRouteWithChildren,
+  AuthenticatedTenantsRoute: AuthenticatedTenantsRoute,
 }
 
 const AuthenticatedRouteRouteWithChildren =

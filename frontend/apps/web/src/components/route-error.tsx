@@ -1,13 +1,28 @@
-import { Button } from "@frontend/ui/button";
+import { isTenantNotSelected } from "@frontend/api/api-fetch";
+import { Button, buttonVariants } from "@frontend/ui/button";
 import { useQueryErrorResetBoundary } from "@tanstack/react-query";
-import { useRouter } from "@tanstack/react-router";
+import { Link, useRouter } from "@tanstack/react-router";
+import type { ErrorComponentProps } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
 
 // error.message は内部情報を含みうるため表示せず、カタログの文言だけを出す。
-export function RouteError() {
+export function RouteError({ error }: ErrorComponentProps) {
   const { t } = useTranslation();
   const { reset } = useQueryErrorResetBoundary();
   const router = useRouter();
+
+  // 所属を外されたときなどは、再試行しても同じ 403 になるため、テナントを選び直す画面へ案内する。
+  if (isTenantNotSelected(error)) {
+    return (
+      <section className="flex flex-col items-start gap-4 px-6 py-16 sm:px-10" role="alert">
+        <h1 className="text-2xl font-semibold">{error.problem?.title ?? t("errorHeading")}</h1>
+        <p className="text-muted-foreground">{t("tenancy.notSelectedDescription")}</p>
+        <Link to="/tenants" className={buttonVariants()}>
+          {t("tenancy.chooseTenant")}
+        </Link>
+      </section>
+    );
+  }
 
   return (
     <section className="flex flex-col items-start gap-4 px-6 py-16 sm:px-10" role="alert">

@@ -33,6 +33,21 @@ const csrfExemptMethods = new Set(["GET", "HEAD", "OPTIONS"]);
 /** CSRF token の検証に失敗した 403 の problem type。再送の対象はこの type の 403 だけにする（契約と合っているかは api-fetch.test.ts が確かめる）。 */
 const csrfTokenInvalidType = "/problems/csrf-token-invalid";
 
+/** テナントを選ぶ前に業務の API を呼んだ 403 の problem type（契約と合っているかは api-fetch.test.ts が確かめる）。 */
+const tenantNotSelectedType = "/problems/tenant-not-selected";
+
+/**
+ * テナントを選ぶ前に業務の API を呼んだ 403 なら true を返す。権限不足の 403（about:blank）と CSRF の 403 は false にする。
+ * @public
+ */
+export function isTenantNotSelected(error: unknown): error is ApiProblemError {
+  return (
+    error instanceof ApiProblemError &&
+    error.status === 403 &&
+    error.problem?.type === tenantNotSelectedType
+  );
+}
+
 /** 更新系の要求にだけ、CSRF の Cookie の値を X-XSRF-TOKEN で付けた header を返す。 */
 function requestHeaders(url: string, options: RequestInit): Headers {
   const headers = new Headers(options.headers);

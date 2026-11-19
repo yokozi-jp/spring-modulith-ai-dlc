@@ -119,5 +119,15 @@
       "notYet": "決済をまだ受け付けていません。処理中か、失敗して再投入を待っています。",
       "notApplicable": "この注文は決済の対象ではありません。"
     }
+  },
+  "tenancy": {
+    "currentTenant": "テナント：{{tenantName}}",
+    "chooseHeading": "テナントを選んでください",
+    "chooseDescription": "操作するテナントを 1 つ選びます。別のテナントに切り替えるときは、ログアウトしてからログインし直します。",
+    "waitingHeading": "招待を待っています",
+    "waitingDescription": "まだどのテナントにも所属していません。テナントの管理者に招待されると、ここでテナントを選べます。",
+    "selectFailed": "テナントを選べませんでした。",
+    "notSelectedDescription": "テナントを選んでいないか、テナントへの所属が外れました。テナントを選び直してください。",
+    "chooseTenant": "テナントを選ぶ"
   }
 }
