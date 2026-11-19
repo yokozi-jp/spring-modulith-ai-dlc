@@ -40,7 +40,8 @@ tooling/formal-verify/mutants.py .agents/skills/<スキル名>
 すべて一致すれば 0 で終わる。
 TLC の出力は `FAIL` の設定の分だけ `~/.cache/formal-verify-tla/runs/` に残し、その場所を出す。
 TLC と Java の版は `check.sh` の先頭で固定している。
-初回は TLC を取得して SHA-256 で確かめ、Java を mise で入れるため、ネットワークが要る。
+初回は TLC を取得して SHA-256 で確かめるため、ネットワークが要る。
+Java は `mise.lock` の版を、`JAVA_HOME` か PATH の `java` から使う。
 Kiro Web では先に `source docs/local-env-setup/kiro-web.sh` を実行する。
 
 TLC は最初に見つけた違反で止まる。

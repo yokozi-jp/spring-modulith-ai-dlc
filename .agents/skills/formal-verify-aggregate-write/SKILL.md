@@ -47,7 +47,7 @@ tooling/formal-verify/mutants.py .agents/skills/formal-verify-aggregate-write
 次のコマンドが差分を出せば関わる。
 
 ```bash
-git diff --stat 56e0bf91076ccef87bfe464266a438ca2b5e501f -- \
+git diff --stat a99d855a9e7830988e3bd312609c65cb20fe38cd -- \
   backend/src/main/java/com/example/demo/shared/infrastructure/persistence/TableWriter.java \
   backend/src/main/java/com/example/demo/shared/infrastructure/persistence/LockedRoot.java \
   backend/src/main/java/com/example/demo/ordering/infrastructure/persistence/JooqOrderRepository.java \
@@ -109,7 +109,7 @@ grep -rn "updateCheckingVersion\|deleteCheckingVersion" backend/src/main/java --
 
 ## 同期の記録
 
-同期コミット：`56e0bf91076ccef87bfe464266a438ca2b5e501f`（main）
+同期コミット：`a99d855a9e7830988e3bd312609c65cb20fe38cd`（main）
 
 このコミットで、「変更がこの検証に関わるか」のファイルと対応表がモデルと一致することを確かめた。
 読んだのはこのリポジトリのコードで、PostgreSQL の振る舞いはモデルの冒頭の注記に並べた前提である。

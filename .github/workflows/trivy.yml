@@ -16,7 +16,11 @@ permissions:
   contents: read
 
 # Trivy の脆弱性 DB は Trivy 公式のミラーレジストリから取得する。
+# Trivy 本体の版は SCAN_TRIVY_VERSION で明示する（docs/adr/ADR-097）。
+# Taskfile の scan-vulns の aquasec/trivy と同じ版にそろえ、どちらも手で上げる。
+# TRIVY_ で始めない（trivy-action が TRIVY_* を CLI の環境変数に渡す）。
 env:
+  SCAN_TRIVY_VERSION: v0.74.0
   TRIVY_DB_REPOSITORY: mirror.gcr.io/aquasec/trivy-db:2
   TRIVY_JAVA_DB_REPOSITORY: mirror.gcr.io/aquasec/trivy-java-db:1
 
@@ -55,6 +59,7 @@ jobs:
       - name: Run Trivy filesystem scan
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
+          version: ${{ env.SCAN_TRIVY_VERSION }}
           scan-type: fs
           scan-ref: frontend
           scanners: vuln
@@ -84,11 +89,10 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Set up JDK
-        uses: actions/setup-java@77dd5b2ce225ea11469928ac317850245a74ae78 # v6.2.0
+      - name: Set up mise tools
+        uses: ./.github/actions/setup-mise
         with:
-          distribution: corretto
-          java-version: "25"
+          tools: java
 
       # 依存を解決して CycloneDX SBOM を生成する。
       - name: Generate CycloneDX SBOM
@@ -99,6 +103,7 @@ jobs:
       - name: Run Trivy SBOM scan
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
+          version: ${{ env.SCAN_TRIVY_VERSION }}
           scan-type: sbom
           scan-ref: backend/build/reports/cyclonedx/application.cdx.json
           format: sarif

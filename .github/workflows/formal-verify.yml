@@ -1,0 +1,75 @@
+name: Verify formal models 📐
+
+on:
+  push:
+    branches: ["main"]
+    paths:
+      - ".agents/skills/formal-verify-*/**"
+      - "tooling/formal-verify/**"
+      - "Taskfile.yml"
+      - "mise.toml"
+      - "mise.lock"
+      - ".github/actions/setup-mise/**"
+      - ".github/workflows/formal-verify.yml"
+  # PR の検査は ci.yml から呼ばれて動く（docs/adr/ADR-087）。
+  workflow_call:
+
+concurrency:
+  group: formal-verify-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  changes:
+    name: Detect formal model changes
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      run: ${{ steps.filter.outputs.run }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+
+      - name: Detect changed paths
+        id: filter
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BASE_REF: ${{ github.event.pull_request.base.ref }}
+        run: |
+          bash tooling/ci-changes/changed.sh \
+            '.agents/skills/formal-verify-*/**' \
+            'tooling/formal-verify/**' \
+            'Taskfile.yml' \
+            'mise.toml' \
+            'mise.lock' \
+            '.github/actions/setup-mise/**' \
+            '.github/workflows/formal-verify.yml'
+
+  formal-verify:
+    name: Run task formal-verify 📐
+    needs: changes
+    if: needs.changes.outputs.run == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up mise tools
+        uses: ./.github/actions/setup-mise
+        with:
+          tools: task java
+
+      # TLC は check.sh が版と SHA-256 を固定して取得する。
+      - name: Self-test the check tooling
+        run: task formal-verify-test
+
+      - name: Check every formal model
+        run: task formal-verify

@@ -21,14 +21,6 @@
   },
   "java.compile.nullAnalysis.mode": "disabled",
   "java.configuration.updateBuildConfiguration": "automatic",
-  "java.jdt.ls.java.home": "/usr/lib/jvm/java-25-amazon-corretto",
-  "java.configuration.runtimes": [
-    {
-      "name": "JavaSE-25",
-      "path": "/usr/lib/jvm/java-25-amazon-corretto",
-      "default": true
-    }
-  ],
   "java.jdt.ls.vmargs": "-Xms256m -Xmx4G -XX:+HeapDumpOnOutOfMemoryError",
   "java.server.launchMode": "Standard"
 }

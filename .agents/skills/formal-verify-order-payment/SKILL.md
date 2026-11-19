@@ -50,7 +50,7 @@ TLC は最初に見つけた違反で止まるため、この設定はほかの�
 次のコマンドが差分を出せば関わる。
 
 ```bash
-git diff --stat 56e0bf91076ccef87bfe464266a438ca2b5e501f -- \
+git diff --stat a99d855a9e7830988e3bd312609c65cb20fe38cd -- \
   backend/src/main/java/com/example/demo/ordering/application/ConfirmOrderCommandHandler.java \
   backend/src/main/java/com/example/demo/ordering/application/CancelOrderCommandHandler.java \
   backend/src/main/java/com/example/demo/ordering/domain/model/Order.java \
@@ -138,7 +138,7 @@ git diff --stat 56e0bf91076ccef87bfe464266a438ca2b5e501f -- \
 
 ## 同期の記録
 
-同期コミット：`56e0bf91076ccef87bfe464266a438ca2b5e501f`（main）
+同期コミット：`a99d855a9e7830988e3bd312609c65cb20fe38cd`（main）
 
 このコミットで、「変更がこの検証に関わるか」のファイルと対応表がモデルと一致することを確かめた。
 読んだライブラリは、Spring Modulith 2.1.2 の `DefaultEventPublicationRegistry`（`PublicationsInProgress`）、`JdbcEventPublicationRepositoryV2`、`CompletionRegisteringAdvisor`（`CompletionRegisteringMethodInterceptor`）、`PersistentApplicationEventMulticaster` である。

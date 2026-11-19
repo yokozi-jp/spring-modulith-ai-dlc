@@ -57,7 +57,7 @@ tooling/formal-verify/mutants.py .agents/skills/formal-verify-event-resubmission
 次のコマンドが差分を出せば関わる。
 
 ```bash
-git diff --stat 56e0bf91076ccef87bfe464266a438ca2b5e501f -- \
+git diff --stat a99d855a9e7830988e3bd312609c65cb20fe38cd -- \
   backend/src/main/java/com/example/demo/shared/infrastructure/persistence/EventPublicationResubmitter.java \
   backend/src/main/java/com/example/demo/shared/infrastructure/persistence/EventPublicationResubmissionConfig.java \
   backend/src/main/java/com/example/demo/shared/infrastructure/persistence/ResubmissionPolicies.java \
@@ -127,6 +127,9 @@ git diff --stat 56e0bf91076ccef87bfe464266a438ca2b5e501f -- \
    4. インスタンス 1 のスケジューラのスレッドが空き、`EventPublicationResubmitter` がロックを取り、`findFailedPublications` でこの行を読み、`markResubmitted` で `RESUBMITTED` にして、配信を executor に積む。
    5. インスタンス 2 の Staleness Monitor が、手順 2 で読んだ一覧のまま `markFailed(id)` を実行し、待ちの列にある配信の出版を `FAILED` に戻す。
 
+   `ResubmissionOptionsLearningTest` の `stalenessMarksPublicationResubmittedAfterRead` が、この振る舞いを registry の経路で固定している（[#511](https://github.com/yokozi-jp/spring-modulith-ai-dlc/pull/511)）。
+   上流が直すと、そのテストが失敗する。
+
    害は、処理中の出版が再投入の対象に戻ることである。
    次の回の再投入が配信より先に来れば、リスナーが二重に動く（既知の発見 2）。
    `documented.cfg` の値では、方針の待ち時間（`wait-age` × `multiplier`）が配信より長いため、二重には動かない。
@@ -152,7 +155,7 @@ git diff --stat 56e0bf91076ccef87bfe464266a438ca2b5e501f -- \
 
 ## 同期の記録
 
-同期コミット：`56e0bf91076ccef87bfe464266a438ca2b5e501f`（main）
+同期コミット：`a99d855a9e7830988e3bd312609c65cb20fe38cd`（main）
 
 このコミットで、「変更がこの検証に関わるか」のファイルと対応表がモデルと一致することを確かめた。
 読んだライブラリは、Spring Modulith 2.1.2 の `DefaultEventPublicationRegistry`、`JdbcEventPublicationRepositoryV2`、`CompletionRegisteringAdvisor`（`CompletionRegisteringMethodInterceptor`）、`PersistentApplicationEventMulticaster`、`StalenessMonitorConfiguration`、`ResubmissionOptions`、ShedLock 7.11.0 の `JooqStorageAccessor`、Spring Framework 7.0.10 の `SimpleAsyncTaskScheduler`、Spring Boot 4.1.2 の `DefaultTaskSchedulerConfiguration` である。

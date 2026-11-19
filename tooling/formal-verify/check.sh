@@ -8,7 +8,6 @@ set -euo pipefail
 
 tla_version="v1.7.4"
 tla_sha256="936a262061c914694dfd669a543be24573c45d5aa0ff20a8b96b23d01e050e88"
-java_version="temurin-25.0.5+8.0.LTS"
 
 if [ $# -lt 1 ]; then
   echo "usage: $0 <skill-dir> [cfg...]" >&2
@@ -32,8 +31,15 @@ if ! { [ -f "$jar" ] && echo "$tla_sha256  $jar" | sha256sum -c --status; }; the
   curl -fsSL -o "$jar" "https://github.com/tlaplus/tlaplus/releases/download/$tla_version/tla2tools.jar"
   echo "$tla_sha256  $jar" | sha256sum -c --status
 fi
-mise install --quiet "java@$java_version" >/dev/null
-java="$(mise where "java@$java_version")/bin/java"
+# Java は mise.lock の版（ADR-090）。JAVA_HOME があればそれを、なければ PATH の shims の java を使う。
+if [ -n "${JAVA_HOME:-}" ] && [ -x "$JAVA_HOME/bin/java" ]; then
+  java="$JAVA_HOME/bin/java"
+elif java="$(command -v java)"; then
+  :
+else
+  echo "FAIL java が見つかりません。mise install --locked を実行してください（docs/local-env-setup/setup.md）。" >&2
+  exit 2
+fi
 
 configs=("$@")
 if [ ${#configs[@]} -eq 0 ]; then

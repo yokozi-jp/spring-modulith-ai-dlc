@@ -144,7 +144,8 @@ packageの`vite.config.ts`に`lint`か`fmt`があると、`vp lint`をpackageで
   `className`の外で組み立てた文字列と、`cn()`に渡す変数は検出しない。
 - **`lint/**`**：`import/no-nodejs-modules`、`new-cap`、`typescript/no-unsafe-assignment`、`typescript/no-unsafe-call`、`typescript/no-unsafe-member-access`をoffにする。
   Node側のLintツールであり、OxlintのJS plugin APIに型が無いためである。
-  `lint/**`はtsconfigの対象外で型検査が未定義の識別子を止めないため、Nodeのglobalを許した`no-undef`を有効にする。
+  `lint/**`はtsconfigの対象外で型の誤りが報告されず、未定義の識別子も止まらないため、Nodeのglobalを許した`no-undef`を有効にする。
+  型を使うrule（`typescript/no-unsafe-return`など）はJSDocの型で動くので、`lint/**`のJSDocの型の注釈は消さない。
 - **`packages/ui/**`**：shadcnの生成物の書き方に合わせて`shadcn/no-restyle`、`shadcn/no-arbitrary-values`、`shadcn/require-static-classes`をoffにする。
   `react/only-export-components`もoffにする。
   shadcnの生成物は`buttonVariants`のようなvariantをcomponentと同じファイルからexportするためである。
@@ -219,7 +220,8 @@ fixtureが`@frontend/ui`からimportする部品は、複製せず、実物の`p
 実物のアプリは`apps/web`だけなので、`apps/*`のoverrideが別のアプリにも効くことは、`apps/web`の設定を複製した`frontend/lint/fixtures/apps/sample`のfixtureで確かめる。
 実物の2つ目のアプリができたら、このfixtureを実物に置き換える。
 `frontend/lint/tailwind-entry-point.test.js`は、ルート、`apps/web`、`packages/ui`のどこから実行しても、そのpackageのCSSを解決できることを確かめる。
-`frontend/lint/workspace-layout.test.js`は、workspaceの層の規則を実物のpackageで確かめる。
+`frontend/lint/workspace-layout.test.js`は、workspaceの層の規則と依存の版の置き場を実物のpackageで確かめる。
+2つ以上の`package.json`にある依存を`"catalog:"`以外で書くと失敗する（[ADR-100](../adr/ADR-100-pin-shared-frontend-dependencies-in-pnpm-catalog.md)）。
 `packages/ui`と`packages/api`が互いを、アプリが別のアプリを`package.json`に書かないことは、各packageから他のpackageをNodeで解決して`MODULE_NOT_FOUND`になることで示す。
 アプリから`@frontend/ui`と`@frontend/api`が解決できることを、対照として同じテストで確かめる。
 `vp`やpnpmのshimは`NODE_PATH`に`.pnpm/node_modules`を足し、宣言のないworkspace packageも解決できてしまうので、このテストは`NODE_PATH`を空にして解決する。
@@ -286,7 +288,7 @@ const params = { ...(cursor !== undefined && { cursor }) };
 - **`task api-gen`**：契約の生成、Spectralの検査、Orvalの再生成を実行する。
 - **`task api-check`**：`api-gen`で再生成した契約と生成物を、コミット済みの内容と比べる。
 - **`task api-lint`**：コミット済みの`openapi/openapi.yaml`を`.spectral.yaml`で検査する（DB不要）。
-- **`task api-lint-rules-test`**：Spectralのルールを`openapi/spectral-fixtures/`の合格例と違反例で検査する。
+- **`task api-lint-rules-test`**：Spectralのルールを`openapi/spectral-fixtures/`の合格例と違反例で検査する。違反例の期待値は`invalid.expected`に「ルール名|JSONパス」で書き、過不足があれば落とす。
 - **`task api-client-gen`**：コミット済みの契約からOrvalでAPI clientとMSW handlerを再生成する（DB不要）。
 - **`task api-client-check`**：`api-client-gen`で再生成した生成物を、コミット済みの内容と比べる（DB不要）。
 - **`task api-breaking`**：`origin/<BASE_REF>`（既定は`main`）の契約とoasdiffで比べ、破壊的変更があれば失敗する。
@@ -345,6 +347,7 @@ const params = { ...(cursor !== undefined && { cursor }) };
   `.github/rulesets/main.json`の必須チェックを、`branch-protection.md`の一覧とworkflowの`name`に突き合わせる。
   GitHub上のrulesetとの一致は検査しない。
 - **`task ci-gate-check`**：`ci.yml`の`CI gate`が、`pull_request`で動く検査を取りこぼしていないかを検査する。
+  あわせて、setup-miseを使うworkflowの`paths:`に`mise.toml`、`mise.lock`、`.github/actions/setup-mise/**`があることと、`mise.lock`を通さずに道具を入れるaction（`ci-gate-check.py`の`BANNED_USES`）を使っていないことを検査する（[ADR-090](../adr/ADR-090-pin-cli-tools-with-mise-lock.md)）。
   `tooling/ci-gate-check/test.sh`と、PRの変更を判定する`tooling/ci-changes/test.sh`を先に実行してから、`ci-gate-check.py`が実際の`.github/workflows/`を検査する。
   `changes`ジョブは`tooling/ci-changes/changed.sh`にglobを渡して判定する。globは`paths:`と同じ書き方で、`ci.yml`の変更でも`true`になる。
   `ci.yml`にジョブを足したときは`CI gate`の`needs`にも足し、`ci.yml`から呼ばない`pull_request`の workflow は`tooling/ci-gate-check/excluded.tsv`に理由を書く。
@@ -363,8 +366,9 @@ const params = { ...(cursor !== undefined && { cursor }) };
   ケースは`tooling/lefthook-install/test.sh`が正である。
 - **`task formal-verify-test`**：検証スキルが使う`tooling/formal-verify/check.sh`と`tooling/formal-verify/mutants.py`を、`tooling/formal-verify/fixtures/counter/`の小さなTLA+のモデルで検査する。
   ケースは`tooling/formal-verify/test.sh`が正で、この文書には写さない。
-  初回は、TLCの取得とmiseでのJavaの導入にネットワークが要る。
-  CIでは実行しない。CIのmiseは`mise.lock`にない版を入れず（`MISE_LOCKED=1`）、`mise.lock`はJavaを持たないためである。
+  初回は、TLCの取得にネットワークが要る。Javaは`mise.lock`の版を使う（[ADR-090](../adr/ADR-090-pin-cli-tools-with-mise-lock.md)）。
+- **`task formal-verify`**：`.agents/skills/formal-verify-*`の全スキルについて、`check.sh`で全設定を、`mutants.py`で全変異を検査する。
+  数分かかる。CIの`formal-verify.yml`が、スキル、`tooling/formal-verify/`、`Taskfile.yml`、`mise.toml`、`mise.lock`の変更で`formal-verify-test`とともに実行する。
   検証スキルの手順の正文は[形式検証スキルの使い方](../agents/formal-verification.md)である。
 - **`task lint-taskfile`**：Task本体でTaskfileのYAML構文とスキーマ構造を検証する。
   `tooling/taskfile-cleanup/`のfixtureで、後片付けの定型が本体の終了コードを優先し、前段が失敗しても後段の後片付けを走らせることを検査する。
@@ -445,7 +449,7 @@ pre-pushの「変更」は、push済みかどうかやrebaseの有無によら�
 - **`betterleaks.yml`**：`scan-secrets-all`を実行する。PRでは`BETTERLEAKS_LOG_OPTS`にbaseからheadまでの範囲を渡す。
 - **`static-analysis.yml`**：`lint-semgrep`相当、`lint-duplicates`、`lint-taskfile`、`lint-lefthook`、`agent-git-test`、`lefthook-install-test`、`lint-scratch-git`を実行する。
   Code ScanningはSARIFの`suppressions`を読まないため、`nosemgrep`で抑止した検出をSARIFから除いてから送る。
-- **`trivy.yml`**：`scan-vulns`相当を実行する。
+- **`trivy.yml`**：`scan-vulns`相当を実行する。Trivy本体の版は`SCAN_TRIVY_VERSION`で明示し、Taskfileの`aquasec/trivy`の版とそろえる（[ADR-097](../adr/ADR-097-keep-trivy-and-align-its-version.md)）。
 - **`depscan.yml`**：`scan-depscan-backend`と`scan-depscan-frontend`を実行し、レポートをartifactにする。SARIFを出さないのでCode Scanningには送らない。
 - **`dast.yml`**：PRで`scan-dast`、週1回のscheduleと手動実行で`scan-dast-active`を実行し、Informationalを除いたSARIFをCode Scanningに送る。
 - **`actionlint.yml`**：`lint-actions`相当を実行する。

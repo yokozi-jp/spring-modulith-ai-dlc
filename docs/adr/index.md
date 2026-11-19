@@ -1,6 +1,7 @@
 # Architecture Decision Records
 
 - [ADR の運用ルール](conventions.md)
+- [ADR テンプレート](adr-template.md)
 - [ADR-001: Spring Modulith によるモジュラーモノリス](ADR-001-adopt-spring-modulith-modular-monolith.md)（Accepted, 2026-09-11）
 - [ADR-002: package by feature とオニオンアーキテクチャ](ADR-002-package-by-feature-onion-architecture.md)（Accepted, 2026-09-11）
 - [ADR-003: データアクセスに jOOQ を採用](ADR-003-adopt-jooq-for-data-access.md)（Accepted, 2026-09-11）
@@ -90,10 +91,12 @@
 - [ADR-087: 必須チェックを集約ジョブ CI gate を中心にまとめる](ADR-087-gate-required-checks-with-single-aggregate-job.md)（Accepted, 2026-11-17）
 - [ADR-088: フロントエンドで useEffect を禁止し、Oxlint で止める](ADR-088-ban-react-effects-in-frontend.md)（Accepted, 2026-11-17）
 - [ADR-089: 主キーをモジュールのスキーマと Repository の中に閉じ、外に出る値には例外なく public_id を使う](ADR-089-keep-primary-keys-inside-modules-and-expose-public-ids.md)（Proposed, 2026-11-17）
-- [ADR-090: Task、betterleaks、iwe の版を mise.toml と mise.lock に固定し、ローカルと CI で同じ lock から入れる](ADR-090-pin-cli-tools-with-mise-lock.md)（Proposed, 2026-11-18）
+- [ADR-090: Task、betterleaks、iwe、Java の版を mise.toml と mise.lock に固定し、ローカルと CI で同じ lock から入れる](ADR-090-pin-cli-tools-with-mise-lock.md)（Proposed, 2026-11-18）
 - [ADR-091: エージェントの commit を本物の index の写しから作る](ADR-091-commit-agent-changes-from-a-copy-of-the-index.md)（Proposed, 2026-11-18）
 - [ADR-092: frontend を Vite+ の workspace に分け、共有を packages/ui と packages/api に置く](ADR-092-split-frontend-into-vite-plus-workspace.md)（Accepted, 2026-11-18）
 - [ADR-093: Kiro Web のサンドボックスを開発環境に加え、道具とコンテナを source するスクリプトで揃える](ADR-093-support-kiro-web-sandbox-as-development-environment.md)（Proposed, 2026-11-18）
 - [ADR-094: トランザクションの初めにモジュールの DB ロールへ切り替え、アプリロールを業務のスキーマから外す](ADR-094-switch-to-module-database-roles.md)（Proposed, 2026-11-18）
 - [ADR-095: 依存関係の脆弱性検査に OWASP dep-scan を Trivy と並べて加える](ADR-095-scan-dependencies-with-dep-scan-alongside-trivy.md)（Proposed, 2026-11-19）
 - [ADR-096: 共通カラムの作成者と更新者には、AppUserPrincipal の利用者の ID だけを登録する](ADR-096-require-app-user-principal-for-audit-columns.md)（Proposed, 2026-11-18）
+- [ADR-097: Trivy を使い続け、CI の Trivy 本体の版を明示して Taskfile にそろえる](ADR-097-keep-trivy-and-align-its-version.md)（Proposed, 2026-11-19）
+- [ADR-100: 2 つ以上の package が使う frontend の依存は pnpm の catalog で版を 1 つにする](ADR-100-pin-shared-frontend-dependencies-in-pnpm-catalog.md)（Proposed, 2026-11-19）

@@ -78,8 +78,8 @@ clone したら、[スキルの取得元と更新](docs/agents/skill-sources.md)
 | Frontend         | i18next                    | 26.4.2     | 多言語対応                                     |
 | Frontend         | Orval                      | 8.36.0     | OpenAPI から API client と MSW handler を生成  |
 | Frontend         | Tailwind CSS               | 4.3.3      | スタイリング                                   |
-| Frontend         | VitePlus                   | 0.3.3      | ビルド、開発サーバー、Oxlint（`vp`）           |
-| Frontend         | Vitest                     | 4.1.11     | 単体テスト                                     |
+| Frontend         | VitePlus                   | 1.6.0      | ビルド、開発サーバー、Oxlint（`vp`）           |
+| Frontend         | Vitest                     | 5.1.0      | 単体テスト                                     |
 | Frontend         | MSW                        | 2.15.0     | API のモック                                   |
 | Frontend         | Playwright                 | 1.63.0     | E2E テスト                                     |
 | Frontend         | Node.js                    | 24.21.0    |                                                |
@@ -91,7 +91,7 @@ clone したら、[スキルの取得元と更新](docs/agents/skill-sources.md)
 | インフラとツール | OpenTelemetry Collector    | 0.161.0    | ログの属性の絞り込み                           |
 
 ログ相関、PII、保持は[可観測性データの規約](docs/observability/conventions.md)、フロントエンドの構成は[フロントエンドアーキテクチャ](docs/frontend/architecture.md)を参照してください。
-その他のパッケージのバージョンは `backend/build.gradle` と、`frontend/` の下の各 `package.json`、Task と betterleaks と iwe のバージョンは `mise.toml` を参照してください。
+その他のパッケージのバージョンは `backend/build.gradle` と、`frontend/` の下の各 `package.json` と `frontend/pnpm-workspace.yaml` の `catalog:`、Task、betterleaks、iwe、Java のバージョンは `mise.toml` を参照してください。
 
 <p align="right">(<a href="#top">トップへ</a>)</p>
 
@@ -170,7 +170,7 @@ clone したら、[スキルの取得元と更新](docs/agents/skill-sources.md)
 ├── commitlint.config.mjs # commitlint 設定（Conventional Commits 検証）
 ├── lefthook.yml      # Git フック定義（Lefthook）
 ├── mise.lock         # mise.toml の道具の URL と checksum（linux-x64）
-├── mise.toml         # Task、betterleaks、iwe の版
+├── mise.toml         # Task、betterleaks、iwe、Java の版
 ├── package.json      # Lefthook・commitlint 導入用（ルート）
 ├── package-lock.json # ルート npm 依存の lockfile
 ├── release-please-config.json # release-please の設定

@@ -13,6 +13,7 @@ tags: [reference, agent-skills, matt-pocock]
 
 調査をbackground agentへ委譲し、高い信頼性を持つ一次資料に基づく結果を一つのMarkdownへ残すスキルである。
 調査中も呼び出し元の作業を続けられるよう、background agentを使う。
+background agentは新しいコンテキストウィンドウで起動する。
 
 ## 使う場面
 
@@ -49,5 +50,5 @@ tags: [reference, agent-skills, matt-pocock]
 ## 翻訳元
 
 リポジトリは`mattpocock/skills`である。
-固定コミットは`d81f3a183412e71a5b1e84ca21bc1a35eea03a60`である。
+固定コミットは`5863806dd4e15c63174bee4e7515a4256792ecfa`である。
 原文のskillPathは`skills/engineering/research/SKILL.md`である。

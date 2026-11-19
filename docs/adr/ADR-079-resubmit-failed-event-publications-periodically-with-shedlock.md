@@ -100,7 +100,7 @@ Proposed の間に、Spring Modulith を 2.1.1 から 2.1.2 に上げ、本番�
   条件の関数で、方針の上限未満で、待ち時間を過ぎた出版だけを選ぶ。
   待ち時間は条件の関数だけで強制し、Spring Modulith の最小の経過時間には頼らない。
   `LIMIT` は掛けず、1 回の件数の上限は条件の関数で数える。
-- `LIMIT` が条件の関数より先に掛かること、既定の最小の経過時間でも `publication_date` が今と同じ出版を読まないこと、Staleness Monitor が処理中の出版を `last_resubmission_date` から測ることは、学習テスト（`ResubmissionOptionsLearningTest`）で固定する。
+- `LIMIT` が条件の関数より先に掛かること、既定の最小の経過時間でも `publication_date` が今と同じ出版を読まないこと、Staleness Monitor が処理中の出版を `last_resubmission_date` から測ること、読んだ後に再投入された出版も `FAILED` にすることは、学習テスト（`ResubmissionOptionsLearningTest`）で固定する。
   Spring Modulith の版を上げて振る舞いが変わると、このテストが失敗して、読み方を見直す合図になる。
 - 試行の回数は Spring Modulith の `completion_attempts` で持ち、表を足さない。
 - 上限に達した出版は自動の対象から外し、出版ごとの ERROR のログで知らせる。
@@ -205,6 +205,14 @@ shared の範囲は、ADR-048 の jOOQ の共通処理に加えて、Spring Modu
   リスナーのトランザクションは戻るため出版は失われず、次の再投入の対象に残る。
 - executor の空きの待ちかリスナーの処理が `lock-at-most-for` の前提を破り、再投入から `in-flight-staleness` を超えると、Staleness Monitor が処理中の出版を `FAILED` に戻し、結果の Counter がその出版を `failed` と数えうる。
 - 最初の配信が `concurrency-limit` の空きを待つ間に `wait-age` を過ぎた出版は、Staleness Monitor が `FAILED` に戻し、ジョブが重ねて再投入しうる。その場合はリスナーの冪等性に頼る。その間、`FAILED` の出版の Gauge は処理中の出版も数える。
+- Staleness Monitor は、古い出版を `findByStatus` で読み、その後に ID だけで `markFailed` を呼ぶ。
+  更新の条件は `COMPLETION_DATE IS NULL AND (STATUS IS NULL OR STATUS != 'FAILED')` で、読んだときの状態も `last_resubmission_date` も確かめず、トランザクションにも入らない。
+  別のインスタンスが読んだ後に `FAILED` にして再投入した出版は、処理中のまま `FAILED` に戻る。
+  別のインスタンスの定期の実行が `FAILED` を読めば、リスナーが動く間に、同じ出版の次の再投入が始まり、リスナーが同時に二つ動きうる。
+  同じインスタンスでは、定期の再投入と Staleness Monitor は同じ 1 つのスレッドで動くため、重ならない。
+  窓は読み取りと更新の間だけで、リスナーの冪等性に頼る。
+  戻った出版も、動いていたリスナーが成功すれば、`markCompleted` が状態を見ずに完了にする。
+  同じ型の競合は上流でも扱われている（[#1971](https://github.com/spring-projects/spring-modulith/issues/1971)、`markAbandoned` の [#1764](https://github.com/spring-projects/spring-modulith/issues/1764)）。
 - 決済の circuit breaker（`payment-gateway`）が open の間の再投入は、外部を呼ばずに `CallNotPermittedException` で `FAILED` になり、`completion_attempts` を 1 消費する。
   コードで確認したのは次の 3 点である。
   `OrderConfirmedListener.on` と `ChargeOrderCommandHandler` はこの例外を捕まえず（main に捕まえる箇所はない）、`PaymentGatewayClientIntegrationTest.consecutiveFailuresOpenCircuitBreaker` が open のときにこの例外が出て決済代行を呼ばないことを確かめている。
