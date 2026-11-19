@@ -1,4 +1,4 @@
-# .spectral.yaml の違反例。各ルールの違反を一つずつ含み、それ以外は合格例と同じ形にする。
+# .spectral.yaml の違反例。各ルールの違反を含み、それ以外は合格例と同じ形にする。期待する違反は invalid.expected が全件を持つ。
 # task api-lint-rules-test が、違反ごとのルール名と JSON パスの組を invalid.expected と過不足なく突き合わせる。
 # openapi-version-3-1（パッチ版がない。oas3-schema も同じ場所を報告する）
 openapi: "3.1"
@@ -81,6 +81,7 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ProblemDetail"
+  # path-params（{sampleOrderId} と同じ形のパス。spectral:oas の検出で、固有の規則ではない）
   /api/sample-orders/{code}:
     delete:
       tags:
@@ -133,7 +134,7 @@ paths:
       responses:
         "200":
           description: サンプル支払いの一覧
-  # path-kebab-case と path-kebab-case-resource（snake_case）、no-top-level-array-response
+  # path-kebab-case（snake_case）、no-top-level-array-response
   /api/sample_items:
     get:
       tags:
@@ -179,7 +180,7 @@ paths:
         "201":
           description: サンプル備考を追加した
           headers:
-            location:
+            Location:
               description: 追加したサンプル備考の URI
               schema:
                 type: string
@@ -212,7 +213,7 @@ components:
       type: object
       description: サンプル注文の受け付けの要求
       properties:
-        # schema-property-example（文字列）
+        # schema-property-example（文字列）と public-id-uuid（ID の名前で format がない）
         customerId:
           type: string
           description: 顧客の ID
@@ -233,6 +234,7 @@ components:
       type: object
       description: サンプル注文
       properties:
+        # public-id-uuid（format がない）
         sampleOrderId:
           type: string
           description: サンプル注文の ID
@@ -252,6 +254,7 @@ components:
             format: int64
       required:
         - sampleOrderId
+  # common-problem-responses（ConflictProblem などの共通 response がない）
   responses:
     # bad-request-validation-problem（ValidationProblem を参照しない）
     BadRequestProblem:

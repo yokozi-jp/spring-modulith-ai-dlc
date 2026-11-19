@@ -224,7 +224,7 @@ rules:
 
   # ponytail: ヘッダー名は Location と location だけを受け入れる。LOCATION など他の表記は検出する。
   created-location-header:
-    description: 201 は Location ヘッダーを持つ。ヘッダー名は大文字と小文字を区別しないので location も受け入れる。
+    description: 201 は Location ヘッダー（location も可）を持つ。
     severity: error
     given: "#Operation.responses[201]"
     then:

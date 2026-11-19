@@ -1004,7 +1004,7 @@ tasks:
           exit 1
         fi
 
-  # 違反例は、違反ごとの「ルール名|JSON パス」の組が invalid.expected と過不足なく一致することを確かめる。
+  # 違反例は、全 severity の違反ごとの「ルール名|JSON パス」の組が invalid.expected と過不足なく一致することを確かめる。
   # text 形式は JSON パスを出さないため、既定の stylish 形式を使う。
   api-lint-rules-test:
     desc: SpectralのルールをOpenAPIのfixture（合格例と違反例）で検査
@@ -1025,7 +1025,7 @@ tasks:
           exit 1
         fi
         expected="$(sort openapi/spectral-fixtures/invalid.expected)"
-        actual="$(printf '%s\n' "$output" | awk '$2 == "error" { print $3 "|" $NF }' | sort)"
+        actual="$(printf '%s\n' "$output" | awk '$2 ~ /^(error|warning|information|hint)$/ { print $3 "|" $NF }' | sort)"
         if [ "$expected" != "$actual" ]; then
           printf '%s\n' "$output"
           echo "違反例の検出が openapi/spectral-fixtures/invalid.expected と違います（< 期待、> 実際）。" >&2
