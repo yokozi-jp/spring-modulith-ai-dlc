@@ -219,7 +219,8 @@ fixtureが`@frontend/ui`からimportする部品は、複製せず、実物の`p
 実物のアプリは`apps/web`だけなので、`apps/*`のoverrideが別のアプリにも効くことは、`apps/web`の設定を複製した`frontend/lint/fixtures/apps/sample`のfixtureで確かめる。
 実物の2つ目のアプリができたら、このfixtureを実物に置き換える。
 `frontend/lint/tailwind-entry-point.test.js`は、ルート、`apps/web`、`packages/ui`のどこから実行しても、そのpackageのCSSを解決できることを確かめる。
-`frontend/lint/workspace-layout.test.js`は、workspaceの層の規則を実物のpackageで確かめる。
+`frontend/lint/workspace-layout.test.js`は、workspaceの層の規則と依存の版の置き場を実物のpackageで確かめる。
+2つ以上の`package.json`にある依存を`"catalog:"`以外で書くと失敗する（[ADR-100](../adr/ADR-100-pin-shared-frontend-dependencies-in-pnpm-catalog.md)）。
 `packages/ui`と`packages/api`が互いを、アプリが別のアプリを`package.json`に書かないことは、各packageから他のpackageをNodeで解決して`MODULE_NOT_FOUND`になることで示す。
 アプリから`@frontend/ui`と`@frontend/api`が解決できることを、対照として同じテストで確かめる。
 `vp`やpnpmのshimは`NODE_PATH`に`.pnpm/node_modules`を足し、宣言のないworkspace packageも解決できてしまうので、このテストは`NODE_PATH`を空にして解決する。
