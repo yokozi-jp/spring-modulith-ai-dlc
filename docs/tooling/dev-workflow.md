@@ -20,6 +20,9 @@ task check
 
 `task check`は、バックエンドの静的解析の前に`task lint-session-sql`でセッションに状態を残すSQLがないことを確かめる。
 
+`task be-lint`のSpotlessは、mainから変えたファイルを全体で検査するため、変えていない既存の行の書式も違反になる。
+その行は`task be-format`の出力を、同じ変更に含める。
+
 ## フロントエンドを開発するとき
 
 ```bash
@@ -250,6 +253,18 @@ task skills-check
 ```
 
 導入と更新の手順は[スキルの取得元と更新](../agents/skill-sources.md)に従います。
+
+## GitHub Actionsのworkflowを変更するとき
+
+```bash
+task lint-actions
+task lint-actions-security
+task ci-gate-check
+```
+
+`ci.yml`にジョブを足したときは、`CI gate`の`needs`にも足す。
+`ci.yml`から呼ばない`pull_request`のworkflowは、`tooling/ci-gate-check/excluded.tsv`に理由を書く。
+`zizmor.yml`の`zizmor-action`の`version`は、`mise.toml`のzizmorと同じ版にする。
 
 ## リリース設定を変更するとき
 

@@ -23,61 +23,41 @@ packageの`vite.config.ts`に`lint`か`fmt`があると、`vp lint`をpackageで
 
 ## 例外と調整
 
+理由は[ADR-034](../adr/ADR-034-pin-frontend-runtime-and-enforce-oxlint-categories.md)にある。
+
 - **automatic JSX runtimeとReactの書き方**：`react/react-in-jsx-scope`、`react/forbid-component-props`、`react/jsx-max-depth`、`react/jsx-props-no-spreading`をoffにする。
-  automatic JSX runtimeと、`className`とprops spreadの書き方と両立しないためである。
 - **JSXのファイル**：`react/jsx-filename-extension`で`.jsx`と`.tsx`を許可する。
-  既定は`.jsx`だけを許すためである。
 - **exportの形**：`import/no-default-export`、`import/no-named-export`、`import/prefer-default-export`、`import/exports-last`、`import/group-exports`をoffにする。
-  互いに矛盾し、Vite設定のdefault exportとTanStack Routerのnamed exportを禁じるためである。
 - **CSSの読込**：`import/no-unassigned-import`で`**/*.css`を許可する。
-  CSSは副作用importで読むためである。
 - **modernな構文**：`oxc/no-async-await`、`oxc/no-optional-chaining`、`oxc/no-rest-spread-properties`をoffにする。
-  modernなTypeScriptの構文を一律に禁じるためである。
 - **型の明示**：`typescript/explicit-function-return-type`、`typescript/explicit-module-boundary-types`、`typescript/prefer-readonly-parameter-types`、`typescript/promise-function-async`をoffにする。
-  型推論と役割が重複するためである。
-- **`void`**：`no-void`を`allowAsStatement: true`にする。
-  event handlerでrejectしないPromiseを捨てる文を書けるようにするためである（後述）。
+- **`void`**：`no-void`を`allowAsStatement: true`にする（後述）。
 - **`undefined`**：`no-undefined`をoffにし、`x === undefined`で比較する。
-  上書きとshadowingは、有効なままの`no-global-assign`と`no-shadow-restricted-names`が防ぐ。
 - **一律のstyle規則**：`capitalized-comments`、`max-lines-per-function`、`no-magic-numbers`、`no-ternary`、`one-var`、`sort-imports`、`sort-keys`をoffにする。
-  Oxfmtと役割が重複するか、可読性を下げるためである。
 - **関数の書き方**：`func-style`を`"declaration"`にする。
   名前付き関数は関数宣言にし、関数の型注釈から引数を推論させるアロー関数だけを理由付きの行単位の抑制で許す。
 - **短い識別子**：`id-length`で`t`だけを例外にする。
-  react-i18nextの翻訳関数の慣用名であるためである。
 - **ビルド時の定数**：`no-underscore-dangle`で`__TELEMETRY_ENABLED__`と`__TELEMETRY_APP__`だけを許可する。
-  `apps/web/vite.config.ts`の`define`が置き換える定数を、ほかの識別子と衝突しない名前にするためである（[ADR-068](../adr/ADR-068-collect-browser-telemetry-with-faro-via-collector.md)）。
-- **型のimport**：`no-duplicate-imports`を`allowSeparateTypeImports: true`にし、型のimportを分けて書けるようにする。
+- **型のimport**：`no-duplicate-imports`を`allowSeparateTypeImports: true`にする。
 - **Vitestの書き方**：`vitest/no-conditional-in-test`、`vitest/no-hooks`、`vitest/no-importing-vitest-globals`、`vitest/prefer-called-times`、`vitest/prefer-describe-function-title`、`vitest/prefer-expect-assertions`、`vitest/prefer-lowercase-title`、`vitest/prefer-strict-boolean-matchers`、`vitest/prefer-to-be-truthy`、`vitest/require-hook`、`vitest/require-test-timeout`をoffにする。
-  Vitestの標準APIと競合するか、互いに矛盾するためである。
 - **module mock**：`vitest/no-restricted-vi-methods`に`mock`と`doMock`を指定し、`vi.mock`と`vi.doMock`を禁止する。
-  module mockはテストを実装の詳細に依存させるため、HTTPはMSW、globalは`vi.spyOn`か`vi.stubGlobal`で置き換える（[フロントエンドのテストと検証](testing.md#書き方)）。
-  この規則はrestrictionカテゴリで有効だが、optionを指定しないと何も禁止しない。
+  HTTPはMSW、globalは`vi.spyOn`か`vi.stubGlobal`で置き換える（[フロントエンドのテストと検証](testing.md#書き方)）。
 - **上限が固定の待ち**：`vitest/no-restricted-vi-methods`に`waitFor`と`waitUntil`も指定し、`vi.waitFor`と`vi.waitUntil`を禁止する。
-  どちらも既定の上限の1秒を一括で変えられず、負荷の高いマシンで失敗するからである。
-  代わりに、`findBy`か`waitFor`（Testing Library）、`expect.poll`、`createGate`のいずれかを使う。
-  `findBy`、`waitFor`、`expect.poll`の上限は設定で一括して決まり、`createGate`は上限を持たない（[フロントエンドのテストと検証](testing.md#書き方)）。
+  代わりに、`findBy`か`waitFor`（Testing Library）、`expect.poll`、`createGate`のいずれかを使う（[フロントエンドのテストと検証](testing.md#書き方)）。
 - **Tailwindのclass**：`better-tailwindcss/enforce-canonical-classes`を有効にし、classを正規形にそろえる（`--fix`で直せる）。
-  `better-tailwindcss/enforce-shorthand-classes`は役割が重なるため有効にしない。
+  `better-tailwindcss/enforce-shorthand-classes`は有効にしない。
   jsPluginの`tailwind-classes/no-dynamic-class-name`は、`className`の中で値からclass名を組み立てるテンプレートリテラル（`` `pl-${depth}` ``、`` `${tone}${depth}` ``）を禁じる（[フロントエンドのUIとスタイル](ui-and-style.md#uiの書き方)）。
   objectや配列からclassを選ぶkey（`` tones[`${tone}-strong`] ``）は対象にしない。
   関数の引数に渡すkey（`` tones.get(`${tone}-strong`) ``）は報告するため、classはobjectか配列に並べて選ぶ。
   `className`の外で組み立てた文字列と、`cn()`に渡す変数は検出しない。
-- **`lint/**`**：`import/no-nodejs-modules`、`new-cap`、`typescript/no-unsafe-assignment`、`typescript/no-unsafe-call`、`typescript/no-unsafe-member-access`をoffにする。
-  Node側のLintツールであり、OxlintのJS plugin APIに型が無いためである。
-  `lint/**`はtsconfigの対象外で型の誤りが報告されず、未定義の識別子も止まらないため、Nodeのglobalを許した`no-undef`を有効にする。
-  型を使うrule（`typescript/no-unsafe-return`など）はJSDocの型で動くので、`lint/**`のJSDocの型の注釈は消さない。
-- **`packages/ui/**`**：shadcnの生成物の書き方に合わせて`shadcn/no-restyle`、`shadcn/no-arbitrary-values`、`shadcn/require-static-classes`をoffにする。
-  `react/only-export-components`もoffにする。
-  shadcnの生成物は`buttonVariants`のようなvariantをcomponentと同じファイルからexportするためである。
+- **`lint/**`**：`import/no-nodejs-modules`、`new-cap`、`typescript/no-unsafe-assignment`、`typescript/no-unsafe-call`、`typescript/no-unsafe-member-access`をoffにし、Nodeのglobalを許した`no-undef`を有効にする。
+  `lint/**`のJSDocの型の注釈は消さない。
+- **`packages/ui/**`**：`shadcn/no-restyle`、`shadcn/no-arbitrary-values`、`shadcn/require-static-classes`、`react/only-export-components`をoffにする。
   Base UIをimportできるのはこのpackageだけで、`apps/**`では禁止する。
 - **shadcnの部品の認識**：`@shadcn/lint`は、アプリの`components.json`の`aliases.ui`（`@frontend/ui`）と、ルートの`settings.shadcn.componentImports`（`^@frontend/ui(/|$)`）の両方で、`@frontend/ui`からimportした部品を認識する。
   認識した部品の`className`に、部品が持つ見た目のclass（`p-4`など）を渡すと`shadcn/no-restyle`が報告し、`mt-2`のような配置のclassは許す。
 - **`apps/web/src/routes/**`**：`react/only-export-components`をoffにする。
-  TanStack Routerのroute fileは`Route`をexportするためである。
-- **テストファイル**：`react/jsx-no-literals`をoffにし、テストの中の固定文言をcatalogに通さずに書けるようにする。
-  `import/max-dependencies`もoffにする。
-  テストのimportの数は検証対象に合わせて増え、テスト自身の責務の大きさを表さないからである。
+- **テストファイル**：`react/jsx-no-literals`と`import/max-dependencies`をoffにする。
 
 生成物の`apps/*/src/routeTree.gen.ts`と`packages/api/src/generated/**`は、Lint、整形、coverageから外す。
 `packages/api/src/generated/**`はjscpdとKnipの対象からも外す。
@@ -135,12 +115,9 @@ linkとbuttonの入れ子は、jsPluginの`ui-composition/no-button-in-link`が�
 `react`からの名前付きimportと再export、default importの名前（`React.useEffect`）の参照、分割代入を報告する。
 自前の関数で包んだEffectは検出しない。
 
-組み合わせた結果は、`frontend/lint/lint-config.test.js`が`frontend/lint/fixtures/apps/*/src/**`と`frontend/lint/fixtures/packages/*/src/**`の違反例と正しい例を実際の設定でLintして確かめる。
-このテストは、`frontend/lint/lint-project.js`が、ルートの設定と、`apps/web`と`packages/ui`の`vite.config.ts`、`tsconfig.json`、`package.json`、`components.json`、`style.css`、fixtureを一時ディレクトリへ複製して`vp lint`を実行した結果を読む。
-fixtureが`@frontend/ui`からimportする部品は、複製せず、実物の`packages/ui`のものを使う。
-実物のアプリは`apps/web`だけなので、`apps/*`のoverrideが別のアプリにも効くことは、`apps/web`の設定を複製した`frontend/lint/fixtures/apps/sample`のfixtureで確かめる。
-実物の2つ目のアプリができたら、このfixtureを実物に置き換える。
-`frontend/lint/tailwind-entry-point.test.js`は、ルート、`apps/web`、`packages/ui`のどこから実行しても、そのpackageのCSSを解決できることを確かめる。
+組み合わせた結果は、`frontend/lint/lint-config.test.js`が`frontend/lint/fixtures/`の違反例と正しい例を実際の設定でLintして確かめる。
+実物のアプリは`apps/web`だけなので、`apps/*`のoverrideが別のアプリにも効くことは`frontend/lint/fixtures/apps/sample`で確かめ、実物の2つ目のアプリができたら置き換える。
+`frontend/lint/tailwind-entry-point.test.js`は、どこから実行してもそのpackageのCSSを解決できることを確かめる。
 
 `../../apps/web/src/...`のように相対パスでpackageの外へ出るimportは、pnpmの解決を通らないので、`package.json`に依存を書かないことでは止まらない（[フロントエンドアーキテクチャ](architecture.md#現在の構成)）。
 このimportは`import/no-relative-parent-imports`が止める。

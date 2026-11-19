@@ -18,6 +18,7 @@ Proposed
 ## Context
 
 > 書き直し：React Doctor を外したため（[ADR-098](ADR-098-remove-react-doctor-over-license-restriction.md)）、Decision から React Doctor の記述を除いた。
+> 書き直し：規約文書 `lint-config.md` から理由を除くため（Issue #532）、個別の例外の理由を Decision に集めた。
 
 Frontend は Vite+ をツールチェーンの単一入口とし、Node.js は Vite+ が管理する。
 これまで Node.js の版はプロジェクトに明示されておらず、Vite+ はローカルで LTS を選び、Frontend CI は `actions/setup-node` にメジャー版 `22` だけを渡していた。
@@ -62,6 +63,31 @@ Oxlint の `correctness`、`suspicious`、`pedantic`、`perf`、`style`、`restr
 - `packages/ui/**` では、Oxlint の `react/only-export-components` を無効にする。
   shadcn の生成物は `buttonVariants` のような variant を component と同じファイルから export するためであり、生成物を手で分けずに registry から更新できる形を保つ。
 
+- `react/jsx-filename-extension` は `.jsx` と `.tsx` を許可する。
+  既定は `.jsx` だけを許すためである。
+- `func-style` を `"declaration"` にする。
+  名前付き関数を関数宣言にそろえ、関数の型注釈から引数を推論させる必要があるアロー関数だけを、理由付きの行単位の抑制で許す。
+  `allowTypeAnnotation` は型注釈付きの関数式も許すため使わない。
+- `id-length` は `t` だけを例外にする。
+  react-i18next の翻訳関数の慣用名であるためである。
+- `no-underscore-dangle` は `__TELEMETRY_ENABLED__` と `__TELEMETRY_APP__` だけを許可する。
+  `apps/web/vite.config.ts` の `define` が置き換える定数を、ほかの識別子と衝突しない名前にするためである（[ADR-068](ADR-068-collect-browser-telemetry-with-faro-via-collector.md)）。
+- `no-duplicate-imports` を `allowSeparateTypeImports: true` にする。
+  型の import を値の import と分けて書けるようにするためである。
+- `vitest/no-restricted-vi-methods` に `mock`、`doMock`、`waitFor`、`waitUntil` を指定する。
+  この規則は restriction カテゴリで有効だが、option を指定しないと何も禁止しない。
+  module mock はテストを実装の詳細に依存させるため、HTTP は MSW、global は `vi.spyOn` か `vi.stubGlobal` で置き換える。
+  `vi.waitFor` と `vi.waitUntil` は既定の上限の 1 秒を一括で変えられず、負荷の高いマシンで失敗するため、上限を設定で一括して決める `findBy`、`waitFor`（Testing Library）、`expect.poll` か、上限を持たない `createGate` を使う。
+- `lint/**` では `import/no-nodejs-modules`、`new-cap`、`typescript/no-unsafe-*` を無効にし、`no-undef` を有効にする。
+  Node 側の Lint ツールであり、Oxlint の JS plugin API に型がないためである。
+  `lint/**` は tsconfig の対象外で、型の誤りも未定義の識別子も報告されないので、Node の global を許した `no-undef` で止める。
+  型を使う規則は JSDoc の型で動くため、JSDoc の型の注釈は消さない。
+- `apps/web/src/routes/**` では `react/only-export-components` を無効にする。
+  TanStack Router の route file は `Route` を export するためである。
+- テストファイルでは `react/jsx-no-literals` と `import/max-dependencies` を無効にする。
+  テストの固定文言を catalog に通さずに書けるようにするためである。
+  テストの import の数は検証対象に合わせて増え、テスト自身の責務の大きさを表さない。
+
 `radix`、`no-new-wrappers`、`typescript/consistent-type-definitions`、`import/no-relative-parent-imports` はカテゴリ指定ですでに有効なので、個別に列挙しない。
 
 import と global の静的な制限は、組み込みの `no-restricted-imports`、`no-restricted-globals`、`no-restricted-properties` の override で書く。
@@ -74,7 +100,7 @@ feature 間の import は、動的な規則が要るため jsPlugin の `feature
 
 ファイル単位で Lint を無効化したり、カテゴリ全体を警告へ戻したりしない。
 範囲を限定する調整は、Node 側 Lint ツール（`lint/**`）、共有層（`src/{api,components,lib,i18n}/**`）、feature（`src/features/**`）、shadcn 由来コンポーネント（`src/components/ui/**`）、API client（`src/api/**`）、ルートモジュール（`src/routes/**`）、テストファイルと `src/testing/**` の override で行う。
-例外と調整の一覧、ファイルの範囲ごとに効く制限、Lint を通る書き方は `docs/frontend/lint-config.md` に理由とともに書く。
+例外と調整の一覧、ファイルの範囲ごとに効く制限、Lint を通る書き方は `docs/frontend/lint-config.md` に規則だけを書き、理由はこの ADR に書く。
 
 ## Consequences
 
