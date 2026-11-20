@@ -10,8 +10,8 @@ import org.jooq.TableField;
 /**
  * 集約の形の宣言。Repository がクラスの定数として一度だけ書く（ADR-054）。
  *
- * <p>集約ルートのテーブル、ルートを一つに決める一意の列（{@code public_id} など）、ルートの内部の主キー、子のテーブルを持つ。{@link TableWriter}
- * は、この宣言から版の条件と子の外部キーの条件を作るため、Repository は {@code Condition} を渡さない。
+ * <p>集約ルートのテーブル、ルートを一つに決める一意の列（{@code public_id} など）と集約ルートからその値を取る関数、ルートの内部の主キー、子のテーブルを持つ。{@link
+ * TableWriter} は、この宣言から版の条件と子の外部キーの条件を作るため、Repository は {@code Condition} を渡さない。
  *
  * <p>宣言は構造だけを持つ。業務の値から列への変換は、保存のたびの呼び出しのラムダが持つ。
  *
@@ -20,12 +20,7 @@ import org.jooq.TableField;
  * @param <A> 集約ルートのクラス。{@link TableWriter#update} が受け取る版の持ち主で、このクラスを指定すると、版の数値を返すラムダを渡せない
  */
 // 宣言を読むアクセサ（table()、key() など）はフィールドと同名にし、宣言の static factory の名前を of にする。
-// A は実行時に使わない。update が集約ルートのクラスを受け取るため、版の数値を返すラムダは渡せない。
-@SuppressWarnings({
-  "UnusedTypeParameter",
-  "PMD.AvoidFieldNameMatchingMethodName",
-  "PMD.ShortMethodName"
-})
+@SuppressWarnings({"PMD.AvoidFieldNameMatchingMethodName", "PMD.ShortMethodName"})
 public final class AggregateTable<R extends Record, K, A extends Versioned> {
 
   /** 集約ルートのテーブル。 */

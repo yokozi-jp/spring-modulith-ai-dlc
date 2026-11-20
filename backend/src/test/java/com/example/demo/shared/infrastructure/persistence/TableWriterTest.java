@@ -193,7 +193,7 @@ class TableWriterTest {
 
   @Test
   @DisplayName("自然キーに、保存済みの値と equals で比べられない型の列は使えない")
-  void naturalKeyOfIncomparableTypeIsRejected() {
+  void incomparableNaturalKeyTypeIsRejected() {
     assertThatThrownBy(() ->
             ChildTable.<Record, Record>of(
                 FIXTURE_ITEM_DETAIL, FIXTURE_ITEM_DETAIL.ITEM_ID, FIXTURE_ITEM_DETAIL.CREATED_AT))
@@ -289,7 +289,7 @@ class TableWriterTest {
   }
 
   @Test
-  @DisplayName("子を渡さない、同じ子を二度渡す、自然キーが重複する、自然キーが null の呼び出しは IllegalArgumentException にする")
+  @DisplayName("子を渡さない、同じ子を二度渡す、自然キーが重複か null、行ごとに書く列が違う呼び出しは IllegalArgumentException にする")
   void invalidChildRowsAreRejected() {
     insertItem(1L, "root");
 

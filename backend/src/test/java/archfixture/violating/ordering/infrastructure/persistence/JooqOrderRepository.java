@@ -42,6 +42,11 @@ public final class JooqOrderRepository implements OrderRepository {
     return tableWriter.update(order.id().value());
   }
 
+  /** TableWriter に入口がない delete を、版を比べない入口で書く。 */
+  public String delete(final Order order) {
+    return tableWriter.execute(order.id().value());
+  }
+
   /** update と別の名前でも、版を比べない入口で注文を保存する。 */
   public String save(final Order order) {
     return tableWriter.execute(order.id().value());

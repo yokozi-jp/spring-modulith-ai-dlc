@@ -149,7 +149,7 @@ class ArchitectureRuleFixtureTest {
               "shared.concurrency.LockRequest.rowId"));
 
   /** 版を比べない入口を使う違反フィクスチャの Repository。 */
-  private static final String UNVERSIONED_REPOSITORY =
+  private static final String VIOLATING_JOOQ_REPOSITORY =
       "ordering.infrastructure.persistence.JooqOrderRepository";
 
   /** プロキシで動くアノテーションを付けたメソッドを同じクラスから呼ぶ違反フィクスチャのクラス名。 */
@@ -277,21 +277,25 @@ class ArchitectureRuleFixtureTest {
         .flatMap(rows -> rows);
   }
 
-  /** TableWriter の規則（H3、H5、H6、H7、R1 から R4）が、対応する違反フィクスチャを検出することを確かめる行を作る。 */
+  /** TableWriter の規則（H3、H6、R1 から R4）が、対応する違反フィクスチャを検出することを確かめる行を作る。 */
   private static Stream<Arguments> tableWriterRows() {
     return Stream.of(
         row(
             "repositoryUpdateAndDeleteCheckVersion",
             TableWriterArchTest.repositoryUpdateAndDeleteCheckVersionRule(VIOLATING),
-            UNVERSIONED_REPOSITORY + ".update("),
+            VIOLATING_JOOQ_REPOSITORY + ".update("),
         row(
             "repositoryUpdateAndDeleteCheckVersion: update call under another name",
             TableWriterArchTest.repositoryUpdateAndDeleteCheckVersionRule(VIOLATING),
-            UNVERSIONED_REPOSITORY + ".store("),
+            VIOLATING_JOOQ_REPOSITORY + ".store("),
+        row(
+            "repositoryUpdateAndDeleteCheckVersion: delete has no TableWriter entry point",
+            TableWriterArchTest.repositoryUpdateAndDeleteCheckVersionRule(VIOLATING),
+            VIOLATING_JOOQ_REPOSITORY + ".delete("),
         row(
             "repositoryUpdateAndDeleteCheckVersion: save",
             TableWriterArchTest.repositoryUpdateAndDeleteCheckVersionRule(VIOLATING),
-            UNVERSIONED_REPOSITORY + ".save("),
+            VIOLATING_JOOQ_REPOSITORY + ".save("),
         row(
             "repositoryWritesTakeVersionedAggregates",
             TableWriterArchTest.repositoryWritesTakeVersionedAggregatesRule(),
@@ -331,7 +335,8 @@ class ArchitectureRuleFixtureTest {
         row(
             "onlyCommandHandlersUpdateOrDeleteAggregates: Repository implementation",
             TableWriterArchTest.onlyCommandHandlersUpdateOrDeleteAggregatesRule(),
-            UNVERSIONED_REPOSITORY + ".save(archfixture.violating.ordering.domain.model.OrderId)"),
+            VIOLATING_JOOQ_REPOSITORY
+                + ".save(archfixture.violating.ordering.domain.model.OrderId)"),
         row(
             "onlyCommandHandlersUpdateOrDeleteAggregates: Domain Service",
             TableWriterArchTest.onlyCommandHandlersUpdateOrDeleteAggregatesRule(),
