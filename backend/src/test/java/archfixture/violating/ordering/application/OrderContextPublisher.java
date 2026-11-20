@@ -4,7 +4,7 @@ import org.springframework.context.ApplicationContext;
 
 /**
  * 違反：eventPublisherIsUsedOnlyByCommandHandlers（application の CommandHandler 以外が ApplicationContext
- * に依存する）。
+ * 越しに publishEvent を呼ぶ）。
  */
 public class OrderContextPublisher {
 

@@ -88,8 +88,8 @@ jOOQの生成物の`com.example.demo.jooq`はOPENのモジュールであり、`
   守らせる規約は[CommandHandler](class-roles/command-handler.md)のアンチパターンに示し、理由は[ADR-050](../adr/ADR-050-define-backend-class-roles-and-naming.md)に示す。
 - `externalSystemInterfacesAreUsedOnlyByCommandHandlersAndClients`：外部システムのインタフェースに依存してよいのは、`application`の`*CommandHandler`と、それを実装する`infrastructure.client`のクラスだけである。
   集約、Domain Service、QueryService、補助のクラスを通して外部システムを呼ぶ経路をなくすため、前の規則は`*CommandHandler`の直接の依存だけを見れば足りる。
-- `commandHandlersDoNotImplementInterfaces`：`application`の`*CommandHandler`は、Java標準の型以外のinterfaceを実装しない。
-  実装を認めると、呼び出し側がinterfaceだけに依存して`externalSystemCommandHandlersAreDependedOnlyByListeners`を迂回できる。
+- `commandHandlersAndListenersDoNotImplementInterfaces`：`application`の`*CommandHandler`と`*Listener`は、Java標準の型以外のinterfaceを実装しない。
+  実装を認めると、呼び出し側がinterfaceだけに依存して`externalSystemCommandHandlersAreDependedOnlyByListeners`と`listenersAreNotCalled`を迂回できる。
 - `listenersAreNotCalled`：`application`の`*Listener`に、ほかのクラスは依存しない。
   CommandHandlerやControllerがListenerの`on`を直接呼ぶと、イベント出版レジストリを通らず、失敗しても再投入されず、`externalSystemCommandHandlersAreDependedOnlyByListeners`も迂回できる。
 - `eventPublisherIsUsedOnlyByCommandHandlers`：`application`の`*CommandHandler`以外のクラスは、`ApplicationEventPublisher`の`publishEvent`と`ApplicationEventMulticaster`の`multicastEvent`を呼ばない。
@@ -134,7 +134,7 @@ jOOQの生成物の`com.example.demo.jooq`はOPENのモジュールであり、`
 `externalSystemInterfacesAreUsedOnlyByCommandHandlersAndClients`は、違反フィクスチャの`PaymentChargePolicy`（Domain Service）、`PaymentCharger`（`domain.model`）、`PaymentChargerConfig`（`infrastructure.client`に置いた、interfaceを実装しない設定クラス）、`OrderPaymentCharger`（補助のクラス）が`PaymentGateway`に依存することを検出する。
 規約どおりのフィクスチャでは、`PaymentGateway`に依存する`CapturePaymentCommandHandler`を`OrderPlacedPaymentListener`だけが呼び、`PaymentGatewayClient`が`PaymentGateway`を実装しても、二つの規則が通ることを確かめる。
 
-`commandHandlersDoNotImplementInterfaces`は、違反フィクスチャの`ShelveOrderCommandHandler`が`ShelveOrderUseCase`を実装することを検出する。
+`commandHandlersAndListenersDoNotImplementInterfaces`は、違反フィクスチャの`ShelveOrderCommandHandler`が`ShelveOrderUseCase`を、`ChargeTriggerListener`が`ChargeTrigger`を実装することを検出する。
 `listenersAreNotCalled`は、違反フィクスチャの`OrderPaidController`が`OrderPaidListener`の`on`を呼ぶことを検出する。
 
 `eventPublisherIsUsedOnlyByCommandHandlers`は、違反フィクスチャの`OrderEventController`（`ApplicationEventPublisher`）、`OrderEventMulticasterController`（`ApplicationEventMulticaster`）、`OrderContextPublisher`（`ApplicationContext`）、`shared.events.OrderEventForwarder`（`shared`に置いた発行を包むクラス）を検出する。

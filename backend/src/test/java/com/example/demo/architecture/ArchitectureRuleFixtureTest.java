@@ -642,7 +642,7 @@ class ArchitectureRuleFixtureTest {
         ClassRoleArchTest.externalSystemCommandHandlersAreDependedOnlyByListeners,
         ClassRoleArchTest.externalSystemInterfacesAreUsedOnlyByCommandHandlersAndClients,
         ClassRoleArchTest.eventPublisherIsUsedOnlyByCommandHandlers,
-        ClassRoleArchTest.commandHandlersDoNotImplementInterfaces,
+        ClassRoleArchTest.commandHandlersAndListenersDoNotImplementInterfaces,
         ClassRoleArchTest.listenersAreNotCalled,
         ProxyRulesArchTest.pointcutsNarrowTargetsWithWithin,
         ProxyRulesArchTest.aspectsDeclareOrder,

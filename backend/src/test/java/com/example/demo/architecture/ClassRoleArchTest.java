@@ -343,19 +343,20 @@ class ClassRoleArchTest {
                   + "またはコンストラクタで受け取るクラスへ移す。"
                   + conventions(COMMAND_HANDLER_DOC, LISTENER_DOC, ADR_051));
 
-  /** application の CommandHandler は、Java 標準の型以外の interface を実装しない。 */
+  /** application の CommandHandler と Listener は、Java 標準の型以外の interface を実装しない。 */
   @ArchTest
-  /* package */ static final ArchRule commandHandlersDoNotImplementInterfaces =
+  /* package */ static final ArchRule commandHandlersAndListenersDoNotImplementInterfaces =
       classes()
-          .that(APPLICATION_COMMAND_HANDLER)
+          .that(APPLICATION_COMMAND_HANDLER.or(APPLICATION_LISTENER))
           .should()
           .notImplement(not(resideInAPackage("java..")))
           .allowEmptyShould(true)
           .because(
-              "CommandHandler を interface 越しに呼ぶと、externalSystemCommandHandlersAreDependedOnlyByListeners の"
-                  + "CommandHandler への依存の検査を迂回できるため。"
-                  + "直し方：interface の実装をやめ、呼び出し側は CommandHandler の具象クラスを受け取る。"
-                  + conventions(COMMAND_HANDLER_DOC, ADR_050));
+              "CommandHandler と Listener を interface 越しに呼ぶと、"
+                  + "externalSystemCommandHandlersAreDependedOnlyByListeners と listenersAreNotCalled の"
+                  + "依存の検査を迂回できるため。"
+                  + "直し方：interface の実装をやめ、呼び出し側は CommandHandler か Listener の具象クラスを受け取る。"
+                  + conventions(COMMAND_HANDLER_DOC, LISTENER_DOC, ADR_050));
 
   /** Request と Response は {@code presentation.web} の record にする。 */
   @ArchTest

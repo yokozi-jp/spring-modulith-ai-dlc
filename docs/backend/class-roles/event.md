@@ -128,7 +128,7 @@ ArchUnit が形を検査し、この record を使う側のテストが中身を
 - [ ] 名前を集約の名前と過去分詞にする。［自分で点検］
 - [ ] 集約の識別子と出来事の時刻を持つ。［自分で点検］
 - [ ] `<UseCase>CommandHandler` の `handle` の中で `ApplicationEventPublisher` を使って発行する。［自分で点検］
-- [ ] 発行を包むクラスを作らず、`ApplicationEventPublisher` に依存するのは `application` の CommandHandler だけにする。［ArchUnit で検査：ClassRoleArchTest.eventPublisherIsUsedOnlyByCommandHandlers］
+- [ ] 発行を包むクラスを作らず、`publishEvent` と `multicastEvent` を呼ぶのは `application` の CommandHandler だけにする。［ArchUnit で検査：ClassRoleArchTest.eventPublisherIsUsedOnlyByCommandHandlers］
 - [ ] `domain.model` のイベントのクラスを作らない。［自分で点検］
 - [ ] `infrastructure` の下には `persistence` と `client` 以外のパッケージを作らない。［ArchUnit で検査：PackageByFeatureOnionArchitectureTest.dependenciesPointInward］
 - [ ] 受信側は `application` の `<Event>Listener` の `on` に `@ApplicationModuleListener` を付けて受ける。［ArchUnit で検査：ClassRoleArchTest.moduleListenersAreApplicationListeners］

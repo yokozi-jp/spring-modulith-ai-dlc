@@ -3,7 +3,7 @@ package archfixture.violating.ordering.application;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-/** 違反：commandHandlersDoNotImplementInterfaces（{@link ShelveOrderUseCase} を実装する）。 */
+/** 違反：commandHandlersAndListenersDoNotImplementInterfaces（{@link ShelveOrderUseCase} を実装する）。 */
 @Service
 public class ShelveOrderCommandHandler implements ShelveOrderUseCase {
 

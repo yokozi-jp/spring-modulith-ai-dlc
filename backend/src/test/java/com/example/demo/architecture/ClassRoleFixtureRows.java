@@ -170,17 +170,21 @@ final class ClassRoleFixtureRows {
             ClassRoleArchTest.commandHandlersAndListenersDoNotUseInheritance,
             "ordering.application.OrderHandlerSupport"),
         row(
-            "commandHandlersDoNotImplementInterfaces",
-            ClassRoleArchTest.commandHandlersDoNotImplementInterfaces,
+            "commandHandlersAndListenersDoNotUseInheritance: インタフェースの実装",
+            ClassRoleArchTest.commandHandlersAndListenersDoNotUseInheritance,
+            "ordering.application.OrderShippedReceiver"),
+        row(
+            "commandHandlersAndListenersDoNotImplementInterfaces: CommandHandler",
+            ClassRoleArchTest.commandHandlersAndListenersDoNotImplementInterfaces,
             "ordering.application.ShelveOrderCommandHandler"),
+        row(
+            "commandHandlersAndListenersDoNotImplementInterfaces: Listener",
+            ClassRoleArchTest.commandHandlersAndListenersDoNotImplementInterfaces,
+            "ordering.application.ChargeTriggerListener"),
         row(
             "listenersAreNotCalled",
             ClassRoleArchTest.listenersAreNotCalled,
             "ordering.presentation.web.OrderPaidController"),
-        row(
-            "commandHandlersAndListenersDoNotUseInheritance: Listener の interface を実装させる",
-            ClassRoleArchTest.commandHandlersAndListenersDoNotUseInheritance,
-            "ordering.application.OrderShippedReceiver"),
         row(
             "eventListenersAreApplicationModuleListeners: @EventListener",
             ClassRoleArchTest.eventListenersAreApplicationModuleListeners,
