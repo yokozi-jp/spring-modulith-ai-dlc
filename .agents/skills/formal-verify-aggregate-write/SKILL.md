@@ -1,6 +1,6 @@
 ---
 name: formal-verify-aggregate-write
-description: 集約の保存を、PostgreSQL の READ COMMITTED と行ロックのモデルで、二つの保存の全順序について TLA+ で検査する。TableWriter、LockedRoot、Repository の update、子のテーブルの一意制約、分離レベル、docs/database/postgresql-concurrency-control.md の保存の順序を変えるときと、更新の消失、集約の混ざり、デッドロック、422 や 500 の競合を疑うときに使う。
+description: 集約の保存を、PostgreSQL の READ COMMITTED と行ロックのモデルで、二つの保存の全順序について TLA+ で検査する。TableWriter、ChildWriter、Repository の update、子のテーブルの一意制約、分離レベル、docs/database/postgresql-concurrency-control.md の保存の順序を変えるときと、更新の消失、集約の混ざり、デッドロック、422 や 500 の競合を疑うときに使う。
 ---
 
 # 集約の保存の形式検証
@@ -22,11 +22,11 @@ tooling/formal-verify/mutants.py .agents/skills/formal-verify-aggregate-write
 
 ## 約束（不変条件）
 
-| 名前                 | 約束                                                                                                     | 破れたときの害                                 |
-| -------------------- | -------------------------------------------------------------------------------------------------------- | ---------------------------------------------- |
-| `NoLostUpdate`       | コミットした二つの保存が、同じ版（`lock_no`）から始まらない。                                            | 先の保存の変更が、後の保存で黙って消える。     |
-| `AggregateWhole`     | コミットした集約の子の行は、最後にコミットした一つの保存の子の行と一致する。                             | 二つの保存の明細が混ざった注文が残る。         |
-| `OnlyConflictErrors` | 競合に負けた保存は、再読み込みを促す 409（`ConflictException` の `VERSION` か `LOCK`）だけで失敗する。 | 利用者に 422 や 500 が返り、原因が分からない。 |
+| 名前                 | 約束                                                                                                                                                                                | 破れたときの害                                 |
+| -------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------- |
+| `NoLostUpdate`       | コミットした二つの保存が、同じ版（`lock_no`）から始まらない。                                                                                                                       | 先の保存の変更が、後の保存で黙って消える。     |
+| `AggregateWhole`     | コミットした集約の子の行は、最後にコミットした一つの保存の子の行と一致する。                                                                                                        | 二つの保存の明細が混ざった注文が残る。         |
+| `OnlyConflictErrors` | 競合に負けた保存は、再読み込みを促す 409（`ConflictException` の `VERSION` か `LOCK`）だけで失敗する。子の `UNIQUE` の 409 も、ルートの行ロックが防ぐため到達しないことを確かめる。 | 利用者に 422 や 500 が返り、原因が分からない。 |
 
 ## 設定と期待する結果
 
@@ -50,7 +50,8 @@ tooling/formal-verify/mutants.py .agents/skills/formal-verify-aggregate-write
 skill=.agents/skills/formal-verify-aggregate-write/SKILL.md
 git diff --stat "$(sed -n 's/^同期コミット：`\([0-9a-f]*\)`.*/\1/p' "$skill")" -- \
   backend/src/main/java/com/example/demo/shared/infrastructure/persistence/TableWriter.java \
-  backend/src/main/java/com/example/demo/shared/infrastructure/persistence/LockedRoot.java \
+  backend/src/main/java/com/example/demo/shared/infrastructure/persistence/ChildWriter.java \
+  backend/src/main/java/com/example/demo/shared/infrastructure/persistence/ConflictTranslator.java \
   backend/src/main/java/com/example/demo/ordering/infrastructure/persistence/JooqOrderRepository.java \
   backend/src/main/java/com/example/demo/ordering/domain/model/Order.java \
   backend/src/main/java/com/example/demo/ordering/application/ChangeOrderLinesCommandHandler.java \
@@ -64,11 +65,11 @@ git diff --stat "$(sed -n 's/^同期コミット：`\([0-9a-f]*\)`.*/\1/p' "$ski
 
 `application.yaml` は `connection-init-sql`（`lock_timeout` など）だけが関わる。
 `ApiExceptionHandler` は、例外から HTTP のステータスへの対応だけが関わる。
-`updateCheckingVersion` か `deleteCheckingVersion` の新しい呼び出し元（ほかの集約の Repository）ができたら、その保存の順序が `JooqOrderRepository.update` と同じかを確かめる。
+`TableWriter.update` の新しい呼び出し元（ほかの集約の Repository）ができたら、その保存の順序が `JooqOrderRepository.update` と同じかを確かめる。
 違うなら、その経路をモデルに足す。
 
 ```bash
-grep -rn "updateCheckingVersion\|deleteCheckingVersion" backend/src/main/java --include=*.java
+grep -rn "tableWriter.update(" backend/src/main/java --include=*.java
 ```
 
 ## 対応表
@@ -76,16 +77,16 @@ grep -rn "updateCheckingVersion\|deleteCheckingVersion" backend/src/main/java --
 モデルは `model/AggregateWrite.tla` にある。
 各アクションは一つの SQL の文か、トランザクションの終わりである。
 
-| アクション          | コード                                                                                                                                                                                              |
-| ------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `ScreenRead`        | 画面が注文を読んで `lock_no` を持つ（前の要求）。それを `expectedLockNo` として送り返す                                                                                                            |
-| `Find`              | CommandHandler の `JooqOrderRepository.findById`（multiset の一つの SELECT）と `Order.ensureLockNo`                                                                                                 |
-| `UpdateRoot`        | `TableWriter.updateCheckingVersion`（`lock_no = expected` の UPDATE。0 件なら `requireOneRow` が `ConflictException`）                                                                            |
-| `ReadSaved`         | `JooqOrderRepository.update` の保存済みの `line_no` の SELECT と、それに続く文の順序の決定                                                                                                         |
-| `ChildOp`           | `LockedRoot.deleteChildren`（`line_no NOT IN (集約の明細)` の一つの DELETE）、`LockedRoot.updateChild`（0 件は `BusinessRuleViolationException`）、`insertLine(...).execute()`（`uk_t_order_line` の違反は変換されない） |
-| `OpsDone`、`Commit` | `@Transactional` のコミット                                                                                                                                                                         |
-| `LockTimeout`       | `lock_timeout`（55P03）。`TableWriter` を通る文は `ConflictException`（`LOCK`）の 409、`insertLine` は `CannotAcquireLockException` のまま `ApiExceptionHandler.handleException` の 500           |
-| `Deadlock`          | PostgreSQL のデッドロックの検出（40P01）。どこも変換しない                                                                                                                                          |
+| アクション          | コード                                                                                                                                                                                      |
+| ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `ScreenRead`        | 画面が注文を読んで `lock_no` を持つ（前の要求）。それを `expectedLockNo` として送り返す                                                                                                     |
+| `Find`              | CommandHandler の `JooqOrderRepository.findById`（multiset の一つの SELECT）と `Order.ensureLockNo`                                                                                         |
+| `UpdateRoot`        | `TableWriter.update`（`lock_no = expected` の `UPDATE ... RETURNING`。0 件なら `requireOneRow` が `ConflictException`）                                                                     |
+| `ReadSaved`         | `ChildWriter.replace` の保存済みの `line_no` の SELECT と、それに続く文の順序の決定（保存後にない行の DELETE、残る行ごとの UPDATE、新しい行の複数行の INSERT）                              |
+| `ChildOp`           | `ChildWriter` の DELETE（保存済みの `line_no` のうち集約にない行）、UPDATE（0 件は `IllegalStateException`）、複数行の INSERT（`uk_t_order_line` の違反は `ConflictException`（`UNIQUE`）） |
+| `OpsDone`、`Commit` | `@Transactional` のコミット                                                                                                                                                                 |
+| `LockTimeout`       | `lock_timeout`（55P03）。`TableWriter` と `ChildWriter` のすべての文は `ConflictException`（`LOCK`）の 409                                                                                  |
+| `Deadlock`          | PostgreSQL のデッドロックの検出（40P01）。どこも変換しない                                                                                                                                  |
 
 ## 変異
 
@@ -97,8 +98,8 @@ grep -rn "updateCheckingVersion\|deleteCheckingVersion" backend/src/main/java --
 
 - 集約は一つ、保存する要求は二つ、子の行の鍵は 2 個（`line_no` の 1 と 2）。
 - 保存は `update` だけを扱う。
-  `deleteCheckingVersion` と `DeletedRoot` は今は呼び出し元がないため扱わない。
-- 集約の INSERT（`add`）、版を持たない書き込み（`updateWhere`、`deleteWhere`）と、ルートを書かずに子の行を書く処理（ADR-054 の Negative）は扱わない。
+  集約の物理削除と版を比べない書き込みは、`TableWriter` に入口がないため扱わない。
+- 集約の INSERT（`add`）と、ルートを書かずに子の行を書く処理（ADR-054 の Negative）は扱わない。
 - 読み取りは一つの文（multiset）なので、文の時点のコミット済みの状態を見る。
   読み取りが二つの文に分かれる変更は扱わない。
 - 分離レベルは READ COMMITTED だけを扱う。
@@ -110,7 +111,7 @@ grep -rn "updateCheckingVersion\|deleteCheckingVersion" backend/src/main/java --
 
 ## 同期の記録
 
-同期コミット：`a99d855a9e7830988e3bd312609c65cb20fe38cd`（main）
+同期コミット：`c3ff0b8a63ca98ca9f14a544d24c3aa5053d6c6e`（Pull Request #599 の最後のコード変更。squash merge の後に、main のコミットで確かめ直して進める）
 
 このコミットで、「変更がこの検証に関わるか」のファイルと対応表がモデルと一致することを確かめた。
 読んだのはこのリポジトリのコードで、PostgreSQL の振る舞いはモデルの冒頭の注記に並べた前提である。

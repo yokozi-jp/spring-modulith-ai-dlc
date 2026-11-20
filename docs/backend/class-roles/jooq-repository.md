@@ -73,12 +73,13 @@ jOOQ の Repository は業務規則を持たない。
 - 集約は `fetchOptional(Records.mapping(Order::restore))` か `fetch(Records.mapping(Order::restore))` で作り、`Order.place` を使わない。
 - 集約の形は、クラスの定数として一度だけ宣言する。
   `AggregateTable.of(T_ORDER, T_ORDER.PUBLIC_ID, T_ORDER.ORDER_ID, LINES)` は、ルートのテーブル、ルートを一つに決める一意の列、内部の主キー、子を渡す。
+  定数の型は `AggregateTable<TOrderRecord, UUID, Order>` のように、第 3 型引数に集約ルートのクラスを指定する。`update` が版の持ち主をこの型で受け取るため、版の数値を返すラムダは渡せない。
   `ChildTable.of(T_ORDER_LINE, T_ORDER_LINE.ORDER_ID, T_ORDER_LINE.LINE_NO)` は、子のテーブル、親の内部の主キーを持つ外部キーの列、親の中で行を同定する自然キーの列を渡す。
   外部キーの列は、親の内部の主キーと同じ型（`Long`）であることしかコンパイルで確かめられない。正しい列を渡したことは、`@DatabaseTest` の往復で確かめる。
 - `add` は、`tableWriter.insert(ORDER, 公開 ID, ルートの列の値, 子の全行)` を呼ぶ。
   ルートの列の値は、ラムダで `ColumnValues` に `set(列, 値)` で渡す。一意の列、内部の主キー、共通カラムは書かない（渡すと `IllegalArgumentException` になる）。
   子の全行は、ラムダで `rows.put(LINES, order.lines(), (line, set) -> ...)` として渡す。子の自然キーの列も `set` で書く。
-  子を宣言していない集約は、子の行を渡さない `insert` を使う。
+  子を宣言していない集約は、`rows -> {}` を渡す。
   内部の主キーは `TableWriter` が `RETURNING` で受けて子の外部キーに書くため、読み直さない。
   一意制約の違反（`23505`）は `Kind.UNIQUE` の、`lock_timeout` までに行のロックを取れないこと（`55P03`）は `Kind.LOCK` の `ConflictException` に、`TableWriter` が変える。
   値オブジェクトと enum は、アクセサ（`value()`、`amount()`、`name()`）で列の値に直す。
@@ -220,7 +221,7 @@ class JooqOrderRepository implements OrderRepository {
       ChildTable.of(T_ORDER_LINE, T_ORDER_LINE.ORDER_ID, T_ORDER_LINE.LINE_NO);
 
   /** 注文の集約。ルートは公開 ID で一つに決める。 */
-  private static final AggregateTable<TOrderRecord, UUID> ORDER =
+  private static final AggregateTable<TOrderRecord, UUID, Order> ORDER =
       AggregateTable.of(T_ORDER, T_ORDER.PUBLIC_ID, T_ORDER.ORDER_ID, LINES);
 
   /** SQL を組み立てて実行する jOOQ のコンテキスト。 */
@@ -402,9 +403,9 @@ Repository のテストは列と集約の往復と削除の範囲だけを確か
 - [ ] `add` は `tableWriter.insert(...)` を呼び、ルートの列と子の全行を `ColumnValues` で渡す。`insertInto` を呼ばない。［ArchUnit で検査：TableWriterArchTest.tableWritesGoThroughTableWriter］
 - [ ] Spring の例外（`CannotAcquireLockException`、`DuplicateKeyException`）を Repository の外へ出さず、出すときは原因を付けずに種類を付けた `ConflictException` に変える。［自分で点検］
 - [ ] 集約ルートを受け取る `add` 以外の public メソッドは、`TableWriter.update` を、そのメソッドの中で直接呼ぶ。［ArchUnit で検査：TableWriterArchTest.repositoryUpdateAndDeleteCheckVersion］
-- [ ] 集約ルートを `Versioned` にし、`update` はその集約ルートを `TableWriter.update` に渡す（テーブルから読み直した版は渡せない）。［型で検査］
+- [ ] 集約ルートを `Versioned` にし、`AggregateTable` の第 3 型引数にそのクラスを指定して、`update` はその集約ルートを `TableWriter.update` に渡す（テーブルから読み直した版は渡せない）。［型で検査］
 - [ ] 集約ルートを受け取る public メソッドは、`add`、`update`、`delete` だけにする（`save` のような名前でも `TableWriter.update` を呼べば規則は通るため、名前は規則が検査しない）。［自分で点検］
-- [ ] 子の行は `ChildRows` で保存後の全行を渡し、子を宣言しない集約は子の行を渡さない `insert` を使う。［自分で点検］
+- [ ] 子の行は `ChildRows` で保存後の全行を渡し、子を宣言しない集約は `rows -> {}` を渡す。［自分で点検］
 - [ ] jOOQ の INSERT、UPDATE、DELETE、UPSERT（`INSERT ... ON CONFLICT`）、MERGE、`UpdatableRecord` と `DAO` の書き込み、Spring JDBC と JDBC の直接の利用を、`TableWriter` の外で使わない（一覧は[アーキテクチャテスト](../architecture-tests.md)の「書き込みの入口」）。［ArchUnit で検査：TableWriterArchTest.tableWritesGoThroughTableWriter］
 - [ ] jOOQ の `Settings` の `executeWithOptimisticLocking` と、コード生成の `recordVersionFields` を使わない。［自分で点検］
 - [ ] 生成クラスの `CREATED_*`、`UPDATED_*`、`PATCHED_*` の列を参照しない。［ArchUnit で検査：JooqCommonColumnsArchTest.commonColumnsAreReferencedOnlyBySharedPersistence］

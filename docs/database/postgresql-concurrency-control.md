@@ -1,7 +1,7 @@
 ---
 type: Convention
 title: PostgreSQLの排他制御
-description: トランザクション分離レベル、楽観的ロック、悲観的ロック、DBの行ロックの使い分けと、業務テーブルのINSERTとUPDATEをTableWriterで書く規則、ロック待ちとデッドロックの扱いを定める規約。業務テーブルのUPDATEかDELETEを書くとき（集約の保存と削除、在庫の引き当て、保存期間を過ぎた行の削除、ワークテーブルの後始末）、分離レベルを変えたくなったときに読む。
+description: トランザクション分離レベル、楽観的ロック、悲観的ロック、DBの行ロックの使い分けと、業務テーブルのINSERTとUPDATEをTableWriterで書く規則、ロック待ちとデッドロックの扱いを定める規約。業務テーブルのINSERTかUPDATEを書くとき、ロックの方式を選ぶとき、ロック待ちの失敗とデッドロックを扱うとき。
 tags: [convention, database, postgresql, concurrency, locking, future-arch-guidelines]
 ---
 
@@ -57,8 +57,8 @@ Repositoryは集約の形を、クラスの定数として一度だけ宣言す�
 `update`は、期待する版が6の行に対して次のSQLを実行する。
 
 ```sql
-UPDATE t_order SET status = 'PAID', updated_at = ..., updated_by = ..., updated_pgm_cd = ..., updated_tx_id = ..., lock_no = 7
-WHERE order_id_public = ? AND lock_no = 6
+UPDATE t_order SET order_status_typ = 'PAID', updated_at = ..., updated_by = ..., updated_pgm_cd = ..., updated_tx_id = ..., lock_no = 7
+WHERE public_id = ? AND lock_no = 6
 RETURNING order_id;
 ```
 
@@ -114,7 +114,8 @@ jOOQの機能の動作は[jOOQのマニュアル](https://www.jooq.org/doc/lates
 
 `SELECT ... FOR UPDATE`で複数の行やテーブルをロックする場合は、ロックするテーブルの順序と、行の並び順（主キーの順など）を決め、すべての処理がそれに従う。
 UPDATEも更新する行のロックを取るため、同じ順序に従う。
-楽観的ロックでは、親の行を先に更新し、子の行は主キーの順に更新する。
+楽観的ロックでは、親の行を先に更新し、子の行は後で書く。
+親の行ロックが同じ集約を書く`TableWriter`の処理を直列にするため、子の行の更新の順序は規則にしない。
 
 ## ロック待ち
 

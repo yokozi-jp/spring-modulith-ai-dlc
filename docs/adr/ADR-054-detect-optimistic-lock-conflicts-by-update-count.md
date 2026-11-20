@@ -47,18 +47,21 @@ PostgreSQL の READ COMMITTED では、後の UPDATE は先の UPDATE のコミ�
 
 - 業務テーブルの INSERT と UPDATE は、`shared.infrastructure.persistence` の `TableWriter` だけが組み立てて実行する。
   Repository は集約の形を、クラスの定数として一度だけ宣言する。
-  `AggregateTable<R, K>` は、ルートのテーブル、ルートを一つに決める一意の列（`public_id` など）、内部の主キー、子のテーブルを持つ。
+  `AggregateTable<R, K, A>` は、ルートのテーブル、ルートを一つに決める一意の列（`public_id` など）、内部の主キー、子のテーブルを持つ。
+  `A` は集約ルートのクラス（`Versioned` を実装する）で、`update` が受け取る版の持ち主の型になる。
   `ChildTable<R, C>` は、子のテーブル、親の内部の主キーを持つ外部キーの列、親の中で行を同定する自然キーの列（一つ以上）を持つ。
-  `ChildTable` の `R` はルートのテーブルの型で、`AggregateTable<R, K>` は同じ `R` の子だけを受け取るため、別の集約の子は宣言できない。
+  `ChildTable` の `R` はルートのテーブルの型で、`AggregateTable<R, K, A>` は同じ `R` の子だけを受け取るため、別の集約の子は宣言できない。
+  子の自然キーの列は、保存済みの値と `equals` で比べるため、`Integer`、`Long`、`Short`、`String`、`UUID` に限る。
   宣言は構造だけを持ち、業務の値から列への変換は、保存のたびに渡すラムダが持つ。
   Repository は、保存のたびにルートの列の値と、保存後にあるべき子の全行（`ChildRows`）を渡す。
   `Condition`、`Insert`、`Update` は渡さない。ルートの条件、版の条件、子の外部キーの条件は、`TableWriter` が宣言から作る。
 - `TableWriter.insert` は、ルートを `INSERT ... RETURNING 内部の主キー` で書き、続けて子を 1 文の複数行の INSERT で書く。
   `lock_no = 1` と共通カラムは `TableWriter` が書く。
   内部の主キーは `RETURNING` で受けるため、Repository は読み直さない。
-  子を宣言していない集約は、子の行を渡さない `insert` で書く。
-- `TableWriter.update` は、以前に読んだ集約ルート（`shared.concurrency` の `Versioned`、`long lockNo()`）を受け取り、その `lockNo()` を期待する版にする。
-  呼び出し側が版の数値を渡す入口はないため、テーブルから読み直した版を期待する版に渡す誤りは書けない。
+  子を宣言していない集約は、`rows -> {}` を渡す。
+- `TableWriter.update` は、以前に読んだ集約ルート（`AggregateTable` の `A`、`shared.concurrency` の `Versioned`、`long lockNo()`）を受け取り、その `lockNo()` を期待する版にする。
+  版の数値を渡す入口はなく、`A` に集約ルートのクラスを指定すれば、版を返すラムダも渡せないため、テーブルから読み直した版を期待する版に渡す誤りは書けない。
+  `A` に `Versioned` そのものを指定すると、ラムダを渡せる。集約ルートのクラスを指定することはレビューで見る。
   ルートは `SET 業務の列, updated_*, lock_no = 期待値 + 1` と `WHERE 一意の列 AND lock_no = 期待値` の UPDATE で書き、`RETURNING 内部の主キー` で受ける。
   件数が 1 なら成功、0 なら一意の列で行の有無を確かめて `ConflictException`（種類は `VERSION`）か `NotFoundException` に分け、2 以上なら `IllegalStateException` にする。
   期待する版が 1 未満なら、SQL を実行する前に `IllegalArgumentException` にする。
@@ -97,8 +100,9 @@ PostgreSQL の READ COMMITTED では、後の UPDATE は先の UPDATE のコミ�
     除外はクラスの場所で判定し、そのパッケージに置いた手書きのクラスもすべての検査を外れるため、そのパッケージには jOOQ のコード生成の出力だけを置く。
     `ProductionCodeOnlyTest` は、そのパッケージの本番のクラスのソースファイルがすべて `src/generated/jooq` にあることを確かめる。
     `Insert`、`Update`、`Delete` を作る入口（`DSLContext`、`DSL`、`WithStep` の `insertInto`、`insertQuery`、`batchInsert`、`update`、`delete`、`deleteFrom`、`updateQuery`、`deleteQuery`）をすべて禁じるため、`batch` のように作った問い合わせを受け取って実行する API は禁じなくてよい。
-  - `Jooq<Aggregate>Repository` の、集約ルートを受け取る `add` 以外の public メソッドは、`TableWriter.update` を直接呼ぶ。
-    名前で対象を選ばないため、`save` のような名前でも検査を外れない。
+  - `Jooq<Aggregate>Repository` の、集約ルートを受け取る `add` 以外の public メソッドは、`update` という名前で、`TableWriter.update` を直接呼ぶ。
+    名前で対象を選ばないため、`save` のような名前のメソッドも検出する。
+    `TableWriter` には `delete` の入口がないため、`delete` も検出する。必要になったら、この ADR を更新して入口を足す。
     版は `Versioned` の集約ルートから `TableWriter` が読むため、`lockNo()` の呼び出しは求めない。
   - `domain.model` の `<Aggregate>Repository` の `add`、`update`、`delete` は、引数のない `long lockNo()` を宣言する集約ルートを一つだけ受け取る。
     集約ルートが `lockNo()` を持たないと、版を比べる規則が集約ルートを見つけられず、空のまま通るためである。
@@ -149,11 +153,11 @@ PostgreSQL の READ COMMITTED では、後の UPDATE は先の UPDATE のコミ�
 - 書き込みの入口は `insert` と `update` の二つで、Repository が調整する手順は 1 回の呼び出しになる。
   内部の主キーの読み直し、保存済みの子の読み取り、子の削除と更新と追加の振り分けは、Repository から消える。
 - 親の外部キーの条件は `TableWriter` が付けるため、子の書き込みに親の条件を書き忘れて、他の集約の行を書く誤りは書けない。
-- 期待する版は `Versioned` の集約ルートから読むため、テーブルから読み直した版を渡す誤りは書けない。
+- 期待する版は集約ルートのクラス（`AggregateTable` の `A`）から読むため、テーブルから読み直した版や、版を返すラムダを渡す誤りは書けない。
 - jOOQ の INSERT と UPDATE を含む書き込みの API、Spring JDBC、JDBC と、接続の元を受け取るライブラリを `TableWriter` の外で使うと、テスト（ArchUnit）で失敗する。
   禁止の一覧は、テストで固定した jOOQ の版の API で見直してある。
   別のテーブルの列、型の違う値、別の集約の子の宣言は、コンパイルで失敗する。
-- 競合と行なしの判定は `TableWriter` の実 PostgreSQL のテストに集まり、Repository のテストは列と集約の往復と削除の範囲だけを確かめる。
+- 競合と行なしの判定は `TableWriter` の実 PostgreSQL のテストに集まり、Repository のテストは列と集約の往復と子の行の差分だけを確かめる。
 - 更新と削除の Command に `VersionedCommand` の実装忘れ、`ensureLockNo` の呼び忘れ、`ExpectedLockNo` の偽造があると、ArchUnit で失敗する。
 - 競合の例外が一つになり、集約ごとに例外を作らなくてよい。
   409 への対応づけも一か所で済む。
@@ -188,10 +192,13 @@ PostgreSQL の READ COMMITTED では、後の UPDATE は先の UPDATE のコミ�
   子の一部だけを渡すと、残りを削除する。宣言した子を渡さない呼び出しは `IllegalArgumentException` にするが、遅延して読んだ子の一部を渡す誤りは検出できない。
   変わっていない子の行も UPDATE して版と `updated_*` を進める。
 - 子の行の更新は、差分のために自然キーを毎回読み、1 行ずつ UPDATE する。
+  子が多い集約が出たら、`ChildWriter` の中で batch にする。
 - 同じトランザクションで同じ集約を二度保存すると、二度目は期待する版が古く競合になる。
   CommandHandler は集約を一度だけ保存する規約のままにする。
 - `ColumnValues` の値に別のテーブルの列の式を渡すことは、型で止まらない。
   PostgreSQL が `42P01`（FROM 句にないテーブル）で拒否するため、Repository の往復のテストで失敗する。
+- 追記だけのワークテーブル（`w_` の接頭辞、更新のカラムを持たない）は、`AggregateTable` と `ChildTable` が `updated_*` を求め、`insertInto` を `TableWriter` の外で呼べないため、書く入口がない。
+  今は `w_` のテーブルがなく、必要になったとき、この ADR を更新して入口を足す。
 - 取り込んだガイドラインの方式から外れ、出典の節に改変を記す必要がある。
 - 集約ルートの業務の列が変わらない更新でも集約ルートの行を書くため、WAL が増える。
 - 件数が 0 の UPDATE と主キーの確認の間に他の人が行を消すと、競合ではなく「行がない」として返る。
@@ -199,8 +206,6 @@ PostgreSQL の READ COMMITTED では、後の UPDATE は先の UPDATE のコミ�
 
 ### Neutral
 
-- 子の行は 1 行ずつ更新する。
-  子の行が多い集約が出たら、`ChildWriter` の中で batch にする。
 - `shared` が公開する書き込みの型は、`TableWriter`、`ColumnValues`、`AggregateTable`、`ChildTable`、`ChildRows` の五つで、集約ルートの印の `Versioned` は `shared.concurrency` に置く。
 - `error` は `shared.concurrency` に内側向きに依存する。
   `shared` は `error` と Domain の型に依存しない。

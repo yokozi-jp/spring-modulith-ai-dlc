@@ -101,14 +101,13 @@ ADR は Proposed のままであるため、新しい ADR を起こさず、こ�
 - `shared.failure` の 2 つの型が public になり、アーキテクチャ指標の全体の相対可視性の上限を、外部可視型数 20、全型数 33 の実測値に書き直した。
 - `ConflictException` の意味を一意制約の違反へ広げ、楽観的ロックの語彙を置く `shared.concurrency` に置いたままにする。
   パッケージの名前は、3 つの型の一部を表さない。
-- `TableWriter.insert` の 409 のメッセージは、テーブル名と制約名を持たない。
-  テーブル名は jOOQ の `Insert` の公開 API で取れず、制約名を取るには PostgreSQL の JDBC ドライバへのコンパイル時の依存が要る。
-  必要になったら、`insert` にテーブルを渡す入口を足す。
+- `TableWriter` の 409 のメッセージは、テーブル名とルートの一意の列の値を持ち、制約名を持たない。
+  制約名を取るには PostgreSQL の JDBC ドライバへのコンパイル時の依存が要る。
 - 原因がないため、PostgreSQL のエラーの詳細（`detail`、`hint`）をログで見られない。
 - `ConflictException.Kind` で public の型が 1 つ増え、アーキテクチャ指標の全体の相対可視性の上限を書き直した。
-- `TableWriter.executeOrConflict` は catch した例外を原因に渡さないため、PMD の `PreserveStackTrace` と Error Prone の `UnusedException` を、そのメソッドに限って抑止する。
-- `TableWriter.insert` を通さない INSERT と、子の行の `dsl.batch` の INSERT の `23505` は 500 のまま残る。
-  ArchUnit では強制しない。
+- `ConflictTranslator.executeOrConflict` は catch した例外を原因に渡さないため、PMD の `PreserveStackTrace` と Error Prone の `UnusedException` を、そのメソッドに限って抑止する。
+- `TableWriter` を通さない INSERT の `23505` は 500 のまま残る。
+  H1 が `TableWriter` の外の `insertInto` などを禁じる（ADR-054）。
 - `Optional.get()`、`Iterator.next()`、`Optional::orElseThrow` のメソッド参照などが中で投げる `NoSuchElementException` は検出しない。
 - 業務固有の `type` がないため、画面は 404 と 422 の理由を本文から区別できない。
 

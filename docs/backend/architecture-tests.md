@@ -287,12 +287,12 @@ INSERTとUPDATEの共通カラムは`TableWriter`が書く。Repositoryは`Commo
 - `tableWritesGoThroughTableWriter`：`TableWriter`と、その子の行の書き込み（`ChildWriter`）の外の本番のコードは、次のAPIを呼ばず、メソッド参照もしない。
   呼び出し先の型が、挙げた型に代入できるかで判定する。
   - `DSLContext`、`DSL`、`WithStep`の`insertInto`、`insertQuery`、`update`、`delete`、`deleteFrom`、`mergeInto`、`updateQuery`、`deleteQuery`
-  - `DSLContext`の`batchInsert`、`batchUpdate`、`batchStore`、`batchDelete`、`batchMerge`、`executeUpdate`、`executeDelete`、`connection`、`connectionResult`
+  - `DSLContext`の`batchInsert`、`executeInsert`、`loadInto`、`batchUpdate`、`batchStore`、`batchDelete`、`batchMerge`、`executeUpdate`、`executeDelete`、`connection`、`connectionResult`
   - `Update`と`Delete`の`execute`、`executeAsync`、`returning`、`returningResult`と、名前が`fetch`で始まるメソッド
   - `Query`、`RowCountQuery`、`DMLQuery`の同じ実行（メソッド参照のバイトコードには`execute`を宣言した`Query`が残るため）
   - `Merge`のすべてのメソッド
   - `InsertOnDuplicateStep`と`InsertQuery`の`onConflict`、`onConflictOnConstraint`、`onConflictWhere`、`onDuplicateKeyUpdate`、`addValueForUpdate`、`addValuesForUpdate`と、`LoaderOptionsStep`の`onDuplicateKeyUpdate`
-  - `UpdatableRecord`の`store`、`update`、`delete`、`merge`と、`DAO`の`update`、`delete`、`deleteById`、`merge`
+  - `TableRecord`と`UpdatableRecord`の`insert`、`store`、`update`、`delete`、`merge`と、`DAO`の`insert`、`update`、`delete`、`deleteById`、`merge`
   - `DataSource.getConnection`、`ConnectionProvider.acquire`、`Connection`と`Statement`のすべてのメソッド
   - `org.jooq`のパッケージの型の、名前が`$`で始まるメソッド（`QOM`の問い合わせのモデルのAPIは、`$onDuplicateKeyUpdate`でINSERTをUPSERTに組み替えられるため）
   - Spring JDBCの`org.springframework.jdbc`とそのサブパッケージの型（`ResourceDatabasePopulator`と`ScriptUtils`も任意のSQLを流せるため）
@@ -305,10 +305,11 @@ INSERTとUPDATEの共通カラムは`TableWriter`が書く。Repositoryは`Commo
   除外を足す、外す、または除外する型を移すときは、先に[ADR-054](../adr/ADR-054-detect-optimistic-lock-conflicts-by-update-count.md)の判断を変える。
   同じ変更で、`tableWritesGoThroughTableWriterRule`の完全修飾型名と、除外する型を置く適合フィクスチャ（`archfixture/conforming/shared/infrastructure/persistence/`）を更新する。
   禁止するAPIの違反フィクスチャ（`DirectOrderWriter`）は、禁止の一覧か`isDirectWrite`の判定を変えるときだけ更新する。
-- `repositoryUpdateAndDeleteCheckVersion`：`Jooq*Repository`の、集約ルートを受け取る`add`以外のpublicメソッドは、`TableWriter.update`をそのメソッドの中で直接呼ぶ。
-  名前で対象を選ばないため、`save`のような名前でも検査を外れない。
+- `repositoryUpdateAndDeleteCheckVersion`：`Jooq*Repository`の、集約ルートを受け取る`add`以外のpublicメソッドは、`update`という名前で、`TableWriter.update`をそのメソッドの中で直接呼ぶ。
+  名前で対象を選ばないため、`save`のような名前のメソッドも検出する。
+  `TableWriter`には`delete`の入口がないため、`delete`も検出する。必要になったら[ADR-054](../adr/ADR-054-detect-optimistic-lock-conflicts-by-update-count.md)を更新して入口を足す。
   期待する版は`TableWriter.update`が、受け取った集約ルート（`Versioned`）の`lockNo()`から読むため、`lockNo()`の呼び出しは求めない。
-  テーブルから読み直した版を期待する版に渡す書き方は、型で書けない。
+  テーブルから読み直した版を期待する版に渡す書き方は、`AggregateTable`の型引数`A`に集約ルートのクラスを指定すれば、型で書けない（`Versioned`そのものを指定してラムダを渡す書き方は、レビューで見る）。
 - `repositoryWritesTakeVersionedAggregates`：`domain.model`の`*Repository`インタフェースの`add`、`update`、`delete`は、集約ルートを一つだけ受け取る。
   集約ルートが`long lockNo()`を持たないと、ほかの規則が集約ルートを見つけられず空のまま通るため、この規則で形を確かめる。
   必須の`add`を対象に含めるため、`save`のような名前で保存するRepositoryでも、`lockNo()`を持たない集約は`add`で検出される。

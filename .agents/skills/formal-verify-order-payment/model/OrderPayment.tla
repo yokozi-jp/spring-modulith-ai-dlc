@@ -96,7 +96,7 @@ CmdRead(c) ==
                  launched, rpc>>
 
 \* Order.confirm / Order.cancel (ensureDraft on the state read), then
-\* JooqOrderRepository.update -> TableWriter.updateCheckingVersion
+\* JooqOrderRepository.update -> TableWriter.update
 \* (UPDATE ... WHERE lock_no = <read lock_no>). Confirm also publishes
 \* OrderConfirmed, which Spring Modulith stores in event_publication inside
 \* the same transaction. After commit the AFTER_COMMIT listener is queued

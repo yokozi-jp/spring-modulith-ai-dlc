@@ -1,7 +1,7 @@
 ---
 type: Convention
 title: クラスの役割：Repository
-description: domain.model に置く集約の Repository インタフェースの定義、置き場所と命名、必須の記述（新規の add、更新の update、物理削除の delete、件数を返すメソッドの @CheckReturnValue）、依存、例、テスト、アンチパターン、作成時のチェックリストを定める。集約を保存し取り出すインタフェースを作るとき、Repository にメソッドを足すときに読む。
+description: domain.model に置く集約の Repository インタフェースの定義、置き場所と命名、必須の記述（新規の add、更新の update、物理削除の delete）、依存、例、テスト、アンチパターン、作成時のチェックリストを定める。集約を保存し取り出すインタフェースを作るとき、Repository にメソッドを足すときに読む。
 tags: [convention, backend, class-role]
 ---
 
@@ -49,22 +49,23 @@ Presentation は Repository を使わない。
   集約の行がなければ `shared.failure` の `NotFoundException` を、更新の時点の行の `lock_no` が集約の `lockNo()` と違うか `lock_timeout` までに行のロックを取れなければ `shared.concurrency` の `ConflictException` を投げる。
   この二つの例外は、実装が使う `shared` の `TableWriter` が投げる（[jOOQ の Repository](jooq-repository.md)）。
   この二つの例外を、インタフェースの Javadoc に書く。
-- 集約の物理削除が要るときは `void delete(集約ルート)` を置き、`update` と同じ二つの例外を Javadoc に書く。
+- 集約の物理削除が要るときは、先に [ADR-054](../../adr/ADR-054-detect-optimistic-lock-conflicts-by-update-count.md) を更新して `TableWriter` に入口を足し、そのうえで `void delete(集約ルート)` を置き、`update` と同じ二つの例外を Javadoc に書く。
+  今の `TableWriter` には `delete` の入口がないため、`Jooq*Repository` の `delete` は H3 が検出する。
   期待する版を持つ書き込みは、集約ルートを受け取る `update` と `delete` に限り、識別子と版を受け取るメソッドを作らない。
-- `add`、`update`、`delete` の引数の集約ルートは、引数のない `long lockNo()` を持つ（[集約](aggregate.md)）。
+- `add`、`update`、`delete` の引数の集約ルートは、引数のない `long lockNo()` を持ち、`shared.concurrency` の `Versioned` を実装する（[集約](aggregate.md)）。
+  `TableWriter.update` は `Versioned` の集約ルートを受け取り、`lockNo()` を期待する版にする。
 - 書き込み（`add`、`update`、`delete` と、`save` のような別名で集約ルートを受け取るメソッド）を呼べるのは CommandHandler だけである。
   Domain Service、QueryService、別の Repository の実装は、Repository を読み取りにだけ使う。
   保存を、トランザクションとイベントの発行を担う CommandHandler に集めるためである。
   `add` 以外の書き込みには、CommandHandler が集約の `ensureLockNo` で画面の版を比べてから保存する流れを、迂回させない目的もある。
   ArchUnit が呼び出し元を検査するのは `add` 以外の書き込みだけであり、`add` の呼び出し元は自分で点検する。
-- 版を比べない UPDATE か DELETE の件数を返すメソッド（在庫を引き当てて件数を返す、など）には、Error Prone の `@CheckReturnValue` を付ける。
   呼び出し側が件数を捨てると、コンパイルが失敗する。
 - インタフェースと各メソッドに Javadoc を書く。
 - パッケージの `package-info.java` は集約と共有する。
 
 ## 依存してよい型、してはいけない型
 
-- **依存してよい型**：`java..` の標準型、`org.jspecify..`、`com.google.errorprone.annotations.CheckReturnValue`、同じ `domain.model` の集約ルート、値オブジェクト、enum、`shared.concurrency` の `ConflictException` と `shared.failure` の `NotFoundException`（Javadoc の `@throws` のため）。
+- **依存してよい型**：`java..` の標準型、`org.jspecify..`、同じ `domain.model` の集約ルート、値オブジェクト、enum、`shared.concurrency` の `ConflictException` と `shared.failure` の `NotFoundException`（Javadoc の `@throws` のため）。
 - **依存してはいけない型**：jOOQ の API と生成型（`DSLContext`、`Condition`、説明用の仮の生成型 `TOrderRecord`）、Spring の型（`Pageable`、`@Repository`）、JPA と Jackson の型、`application`、モジュールルートの型（参照の結果、検索条件）。
 
 ## 最小の例と典型的な例
@@ -206,7 +207,6 @@ class JooqOrderRepositoryTest {
 - [ ] `add`、`update`、`delete` は、引数のない `long lockNo()` を持つ集約ルートを一つだけ受け取る。［ArchUnit で検査：TableWriterArchTest.repositoryWritesTakeVersionedAggregates］
 - [ ] `add` を CommandHandler だけが呼ぶ。［自分で点検］
 - [ ] `add` 以外の書き込みを CommandHandler だけが呼ぶ。［ArchUnit で検査：TableWriterArchTest.onlyCommandHandlersUpdateOrDeleteAggregates］
-- [ ] 版を比べない UPDATE か DELETE の件数を返すメソッドに `@CheckReturnValue` を付ける。［自分で点検］
 - [ ] 実装は `infrastructure.persistence` の `Jooq<Aggregate>Repository` にする。［ArchUnit で検査：PackageByFeatureOnionArchitectureTest.repositoryImplementationsAreJooqRepositories］
 - [ ] Domain の外の実装は `infrastructure` に置く。［ArchUnit で検査：PackageByFeatureOnionArchitectureTest.domainInterfacesAreImplementedInInfrastructure］
 - [ ] Controller から Repository を使わない。［ArchUnit で検査：PackageByFeatureOnionArchitectureTest.presentationDoesNotDependOnDomain］
