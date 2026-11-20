@@ -4,7 +4,7 @@ import archfixture.violating.ordering.domain.model.OrderId;
 import archfixture.violating.ordering.domain.model.PaymentGateway;
 import org.springframework.stereotype.Service;
 
-/** 外部システムのインタフェースに依存する Domain Service。これ自体は規約どおり。 */
+/** 違反：domainServicesDependOnlyOnDomainAndJava（Domain Service が外部システムのインタフェースに依存する）。 */
 @Service
 public class PaymentChargePolicy {
 

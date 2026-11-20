@@ -52,7 +52,7 @@ jOOQの生成物の`com.example.demo.jooq`はOPENのモジュールであり、`
 - `moduleApiDoesNotExposeInternalTypes`：モジュールルートの型は、`java..`、`org.jspecify..`、同じルートパッケージの型だけに依存する。
 - `databaseTechnologyApisAreOnlyUsedByPersistenceAdapters`：jOOQ APIと生成型は`infrastructure.persistence`だけで使う。
 - `domainModelDoesNotDependOnFrameworks`：`domain.model`はSpring、jOOQ、jOOQの生成型、JPA、Jacksonに依存しない。
-- `domainServicesDependOnlyOnDomainAndJava`：`domain.service`は`java..`、`org.jspecify..`、`lombok..`、Domainの型、`shared.failure`の例外、`@Service`だけに依存する。
+- `domainServicesDependOnlyOnDomainAndJava`：`domain.service`は`java..`、`org.jspecify..`、`lombok..`、Domainの型、`shared.failure`の例外、`@Service`だけに依存し、外部システムのインタフェース（`domain.model`のinterfaceのうちRepositoryでないもの）には依存しない。
 - `domainServicesAreAnnotatedWithService`：`domain.service`のトップレベルのクラスに`@Service`を付ける。
 - `servicesResideInApplicationOrDomainService`：`@Service`を付けた型は`application`か`domain.service`に置く。
 - `controllersResideInPresentationWeb`：`@Controller`と`@RestController`を付けた型は`presentation.web`に置き、名前を`Controller`で終える。
@@ -83,15 +83,16 @@ jOOQの生成物の`com.example.demo.jooq`はOPENのモジュールであり、`
 - `commandHandlersExposeOnlyTransactionalHandle`：`*CommandHandler`のpublicメソッドは、`@Transactional`を付けた`handle`一つだけにし、`*Command`を一つ受け取り`*Result`を返す。
 - `commandsAndResultsAreApplicationRecords`：`*Command`と`*Result`は`application`のrecordにする。
 - `commandHandlersDoNotDependOnOtherCommandHandlers`：`*CommandHandler`は別の`*CommandHandler`に依存しない。
-- `externalSystemCommandHandlersAreCalledOnlyByListeners`：`infrastructure.client`の`*Client`が実装する`domain.model`のインタフェースに、直接か`domain.service`を通して依存する`*CommandHandler`は、`application`の`*Listener`からだけ依存される。
-  `domain.service`を通す依存は一段だけたどり、その先は追わない。
+- `externalSystemCommandHandlersAreDependedOnlyByListeners`：外部システムのインタフェース（`domain.model`のinterfaceのうちRepositoryでないもの）に直接依存する`application`の`*CommandHandler`は、`application`の`*Listener`からだけ依存される。
+  `domain.service`は外部システムのインタフェースに依存できない（`domainServicesDependOnlyOnDomainAndJava`）ので、直接の依存だけを見れば足りる。
   守らせる規約は[CommandHandler](class-roles/command-handler.md)のアンチパターンに示し、理由は[ADR-050](../adr/ADR-050-define-backend-class-roles-and-naming.md)に示す。
-- `eventPublisherIsUsedOnlyByCommandHandlers`：`ModuleRoles.MODULES`の機能モジュールのクラスのうち、`application`の`*CommandHandler`以外は`ApplicationEventPublisher`に依存しない。
+- `eventPublisherIsUsedOnlyByCommandHandlers`：`application`の`*CommandHandler`と`shared.infrastructure.persistence`以外のクラスは、`ApplicationEventPublisher`と`ApplicationEventMulticaster`に依存しない。
   `ApplicationContext`と`ConfigurableApplicationContext`は`ApplicationEventPublisher`を継承するため、同じ判定で検出する。
   `application`の`*CommandHandler`は、`ApplicationContext`への依存も含めて検査しない。
-  `shared`は機能モジュールではないので対象にしない。
-- `commandHandlersAndListenersDoNotUseInheritance`：`*CommandHandler`と`*Listener`は、Java標準の型以外のクラスを継承せず、継承も実装もさせない（[ADR-051](../adr/ADR-051-bind-pgm-cd-with-scoped-value-and-aspect.md)）。
-  違反フィクスチャの`ReopenOrderHandler`（サブクラス）、`RestoreOrderCommandHandler`（基底クラスの`OrderHandlerSupport`）、`OrderShippedReceiver`（インタフェースの実装）で確かめる。
+  `shared.infrastructure.persistence`はイベント出版レジストリを再投入する`EventPublicationResubmissionConfig`を置くので対象にしない。
+- `commandHandlersAndListenersDoNotUseInheritance`：`application`の`*CommandHandler`と`*Listener`は、Java標準の型以外のクラスを継承せず、interfaceを実装せず、継承も実装もさせない（[ADR-051](../adr/ADR-051-bind-pgm-cd-with-scoped-value-and-aspect.md)）。
+  interfaceの実装を認めると、呼び出し側がinterfaceだけに依存して`externalSystemCommandHandlersAreDependedOnlyByListeners`を迂回できる。
+  違反フィクスチャの`ReopenOrderHandler`（サブクラス）、`RestoreOrderCommandHandler`（基底クラスの`OrderHandlerSupport`）、`OrderShippedReceiver`（インタフェースの実装）、`ShelveOrderCommandHandler`（interfaceの実装）で確かめる。
 - `moduleListenersAreApplicationListeners`：`@ApplicationModuleListener`を付けたメソッドは、`application`の`*Listener`の`on`にする。
 - `eventListenersAreApplicationModuleListeners`：`@ApplicationModuleListener`を付けていないメソッドは、`@EventListener`をメタアノテーションに持たない。
   `@EventListener`と`@TransactionalEventListener`を直接付けた受信を拒否し、`@TransactionalEventListener`をメタアノテーションに持つ`@ApplicationModuleListener`は対象から除く。
@@ -124,11 +125,12 @@ jOOQの生成物の`com.example.demo.jooq`はOPENのモジュールであり、`
 
 `sharedModuleIsUsedOnlyByPersistenceAdapters`は、違反フィクスチャの`application`の`OrderAuditColumns`が`shared.infrastructure.persistence`の型を使うことを検出し、規約どおりのフィクスチャの`JooqOrderRepository`を誤検出しないことを確かめる。
 
-`externalSystemCommandHandlersAreCalledOnlyByListeners`は、違反フィクスチャの`ChargeOrderController`が呼ぶ`ChargeOrderCommandHandler`（`PaymentGateway`に直接依存する）と`SettleOrderCommandHandler`（`PaymentChargePolicy`を通して依存する）を検出する。
+`externalSystemCommandHandlersAreDependedOnlyByListeners`は、違反フィクスチャの`ChargeOrderController`が呼ぶ`ChargeOrderCommandHandler`（`PaymentGateway`に直接依存する）を検出する。
 `presentation.web`に置いた名前だけの`ChargeOrderListener`が呼ぶ場合も検出する。
+`domainServicesDependOnlyOnDomainAndJava`は、違反フィクスチャの`PaymentChargePolicy`が`PaymentGateway`に依存することを検出する。
 規約どおりのフィクスチャでは、`PaymentGateway`に依存する`CapturePaymentCommandHandler`を`OrderPlacedPaymentListener`だけが呼び、規則が通ることを確かめる。
 
-`eventPublisherIsUsedOnlyByCommandHandlers`は、違反フィクスチャの`OrderEventController`（`ApplicationEventPublisher`）、`OrderBeanLookup`（`ApplicationContext`）、`DiscountPolicy`（Domain Service）を検出する。
+`eventPublisherIsUsedOnlyByCommandHandlers`は、違反フィクスチャの`OrderEventController`（`ApplicationEventPublisher`）、`OrderEventMulticasterController`（`ApplicationEventMulticaster`）、`OrderContextPublisher`（`ApplicationContext`）、`shared.events.OrderEventForwarder`（`shared`に置いた発行を包むクラス）を検出する。
 規約どおりのフィクスチャでは、`PlaceOrderCommandHandler`が`ApplicationEventPublisher`で発行しても規則が通ることを確かめる。
 
 `queryResultStatusIsNotReadByOtherModules`は、違反フィクスチャの`inventory.application.OrderStatusGuard`が`ordering`の`OrderSummary`の`status()`を呼ぶことと、`paymentStatus`をメソッド参照することを検出する。

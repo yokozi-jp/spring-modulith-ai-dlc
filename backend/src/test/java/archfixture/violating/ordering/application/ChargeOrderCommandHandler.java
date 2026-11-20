@@ -6,7 +6,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * 違反：externalSystemCommandHandlersAreCalledOnlyByListeners（外部システムのインタフェースに依存し、Controller から呼ばれる）。
+ * 違反：externalSystemCommandHandlersAreDependedOnlyByListeners（外部システムのインタフェースに依存し、Controller から呼ばれる）。
  */
 @Service
 public class ChargeOrderCommandHandler {
@@ -21,7 +21,7 @@ public class ChargeOrderCommandHandler {
 
   /** 注文の代金を請求し、決済 ID を返す。 */
   @Transactional
-  public String handle(final String orderId) {
-    return paymentGateway.charge(new OrderId(orderId));
+  public ChargeOrderResult handle(final ChargeOrderCommand command) {
+    return new ChargeOrderResult(paymentGateway.charge(new OrderId(command.orderId())));
   }
 }

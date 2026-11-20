@@ -49,7 +49,7 @@ class ArchitectureRuleFixtureTest {
   private static final String CONFORMING = "archfixture.conforming";
 
   /** 違反フィクスチャの基底パッケージ。 */
-  private static final String VIOLATING = "archfixture.violating";
+  /* package */ static final String VIOLATING = "archfixture.violating";
 
   /** 違反フィクスチャのクラス名の接頭辞。 */
   private static final String VIOLATING_PREFIX = VIOLATING + ".";
@@ -215,10 +215,6 @@ class ArchitectureRuleFixtureTest {
   private static final String UNVERSIONED_REPOSITORY =
       "ordering.infrastructure.persistence.JooqOrderRepository";
 
-  /** リフレクションで対応づける違反フィクスチャのクラス名。 */
-  private static final String REFLECTIVE_READER =
-      "ordering.infrastructure.persistence.ReflectiveOrderReader";
-
   /** プロキシで動くアノテーションを付けたメソッドを同じクラスから呼ぶ違反フィクスチャのクラス名。 */
   private static final String ORDER_REPROCESSOR = "ordering.application.OrderReprocessor";
 
@@ -336,7 +332,7 @@ class ArchitectureRuleFixtureTest {
 
   private static Stream<Arguments> eachRuleDetectsItsViolatingFixture() {
     return Stream.of(
-            classRoleRows(),
+            ClassRoleFixtureRows.rows(),
             tableWriterRows(),
             PROXY_ROWS.stream(),
             PUBLIC_ID_ROWS.stream(),
@@ -435,216 +431,6 @@ class ArchitectureRuleFixtureTest {
                 "aggregateRootInsertsGoThroughTableWriter",
                 TableWriterArchTest.aggregateRootInsertsGoThroughTableWriterRule(),
                 "ordering.infrastructure.persistence.JooqOrderDraftRepository.add(")));
-  }
-
-  /** クラスの役割と配置の規則が、対応する違反フィクスチャを検出することを確かめる行を作る。 */
-  private static Stream<Arguments> classRoleRows() {
-    return Stream.of(
-        row(
-            "dependenciesPointInward",
-            PackageByFeatureOnionArchitectureTest.dependenciesPointInwardRule(VIOLATING),
-            "ordering.infrastructure.messaging.OrderPlacedPublisher"),
-        row(
-            "infrastructureDependsOnlyOnDomainModel",
-            PackageByFeatureOnionArchitectureTest.infrastructureDependsOnlyOnDomainModelRule(
-                VIOLATING),
-            "ordering.infrastructure.persistence.ExpiredOrderSweeper"),
-        row(
-            "sharedModuleIsUsedOnlyByPersistenceAdapters",
-            PackageByFeatureOnionArchitectureTest.sharedModuleIsUsedOnlyByPersistenceAdaptersRule(
-                VIOLATING),
-            "ordering.application.OrderAuditColumns"),
-        row(
-            "sharedModuleDoesNotDependOnHttp",
-            PackageByFeatureOnionArchitectureTest.sharedModuleDoesNotDependOnHttpRule(VIOLATING),
-            "shared.infrastructure.persistence.ChildRowWriter"),
-        row(
-            "noSuchElementExceptionIsNotThrown",
-            GeneralCodingRulesArchTest.noSuchElementExceptionIsNotThrown,
-            "ordering.application.LegacyOrderFinder.notFound("),
-        row(
-            "noSuchElementExceptionIsNotThrown: orElseThrow",
-            GeneralCodingRulesArchTest.noSuchElementExceptionIsNotThrown,
-            "ordering.application.LegacyOrderFinder.firstOrFail("),
-        row(
-            "moduleApiDoesNotExposeInternalTypes",
-            PackageByFeatureOnionArchitectureTest.moduleApiDoesNotExposeInternalTypesRule(
-                VIOLATING),
-            "ordering.OrderPlacedWithModel"),
-        row(
-            "domainModelDoesNotDependOnFrameworks",
-            PackageByFeatureOnionArchitectureTest.domainModelDoesNotDependOnFrameworks,
-            "ordering.domain.model.OrderFactory"),
-        row(
-            "domainServicesDependOnlyOnDomainAndJava",
-            PackageByFeatureOnionArchitectureTest.domainServicesDependOnlyOnDomainAndJavaRule(
-                VIOLATING),
-            "ordering.domain.service.DiscountPolicy"),
-        row(
-            "domainServicesAreAnnotatedWithService",
-            PackageByFeatureOnionArchitectureTest.domainServicesAreAnnotatedWithService,
-            "ordering.domain.service.ShippingFeeCalculator"),
-        row(
-            "servicesResideInApplicationOrDomainService",
-            PackageByFeatureOnionArchitectureTest.servicesResideInApplicationOrDomainService,
-            "ordering.infrastructure.client.PaymentService"),
-        row(
-            "controllersResideInPresentationWeb",
-            PackageByFeatureOnionArchitectureTest.controllersResideInPresentationWeb,
-            "ordering.presentation.OrderResource"),
-        row(
-            "presentationDoesNotDependOnDomain",
-            PackageByFeatureOnionArchitectureTest.presentationDoesNotDependOnDomain,
-            "ordering.presentation.web.OrderDetailsResponse"),
-        row(
-            "domainInterfacesAreImplementedInInfrastructure",
-            PackageByFeatureOnionArchitectureTest
-                .domainInterfacesAreImplementedInInfrastructureRule(VIOLATING),
-            "ordering.application.InMemoryOrderRepository"),
-        row(
-            "repositoryImplementationsAreJooqRepositories",
-            PackageByFeatureOnionArchitectureTest.repositoryImplementationsAreJooqRepositories,
-            "ordering.application.InMemoryOrderRepository"),
-        row(
-            "externalSystemImplementationsAreClients",
-            PackageByFeatureOnionArchitectureTest.externalSystemImplementationsAreClients,
-            "ordering.infrastructure.client.PaymentGatewayAdapter"),
-        row(
-            "transactionalIsNotDeclaredAtClassLevel",
-            PackageByFeatureOnionArchitectureTest.transactionalIsNotDeclaredAtClassLevel,
-            "ordering.application.ShipOrderCommandHandler"),
-        row(
-            "transactionalMethodsArePublicApplicationMethods",
-            PackageByFeatureOnionArchitectureTest.transactionalMethodsArePublicApplicationMethods,
-            "ordering.infrastructure.persistence.OrderAuditRecorder"),
-        row(
-            "moduleListenersAreApplicationListeners",
-            ClassRoleArchTest.moduleListenersAreApplicationListeners,
-            "ordering.infrastructure.persistence.OrderAuditRecorder"),
-        row(
-            "moduleRootTypesAreRecordsEnumsOrQueries",
-            ClassRoleArchTest.moduleRootTypesAreRecordsEnumsOrQueriesRule(VIOLATING),
-            "ordering.OrderOperations"),
-        row(
-            "applicationServicesHaveRoleNames",
-            ClassRoleArchTest.applicationServicesHaveRoleNames,
-            "ordering.application.PlaceOrderService"),
-        row(
-            "commandHandlersExposeOnlyTransactionalHandle",
-            ClassRoleArchTest.commandHandlersExposeOnlyTransactionalHandle,
-            "ordering.application.CancelOrderCommandHandler"),
-        row(
-            "commandsAndResultsAreApplicationRecords",
-            ClassRoleArchTest.commandsAndResultsAreApplicationRecordsRule(VIOLATING),
-            "ordering.application.ConfirmOrderCommand"),
-        row(
-            "commandsAndResultsAreApplicationRecords: shared.concurrency",
-            ClassRoleArchTest.commandsAndResultsAreApplicationRecordsRule(VIOLATING),
-            "shared.concurrency.ForceUnlockCommand"),
-        row(
-            "commandHandlersDoNotDependOnOtherCommandHandlers",
-            ClassRoleArchTest.commandHandlersDoNotDependOnOtherCommandHandlers,
-            "ordering.application.ConfirmOrderCommandHandler"),
-        row(
-            "externalSystemCommandHandlersAreCalledOnlyByListeners: 外部システムのインタフェース",
-            ClassRoleArchTest.externalSystemCommandHandlersAreCalledOnlyByListeners,
-            "ordering.application.ChargeOrderCommandHandler"),
-        row(
-            "externalSystemCommandHandlersAreCalledOnlyByListeners: Domain Service を通す",
-            ClassRoleArchTest.externalSystemCommandHandlersAreCalledOnlyByListeners,
-            "ordering.application.SettleOrderCommandHandler"),
-        row(
-            "externalSystemCommandHandlersAreCalledOnlyByListeners: application の外の Listener",
-            ClassRoleArchTest.externalSystemCommandHandlersAreCalledOnlyByListeners,
-            "ordering.presentation.web.ChargeOrderListener が"),
-        row(
-            "eventPublisherIsUsedOnlyByCommandHandlers: Controller",
-            ClassRoleArchTest.eventPublisherIsUsedOnlyByCommandHandlersRule(
-                VIOLATING, FIXTURE_MODULES),
-            "ordering.presentation.web.OrderEventController"),
-        row(
-            "eventPublisherIsUsedOnlyByCommandHandlers: ApplicationContext",
-            ClassRoleArchTest.eventPublisherIsUsedOnlyByCommandHandlersRule(
-                VIOLATING, FIXTURE_MODULES),
-            "ordering.application.OrderBeanLookup"),
-        row(
-            "eventPublisherIsUsedOnlyByCommandHandlers: Domain Service",
-            ClassRoleArchTest.eventPublisherIsUsedOnlyByCommandHandlersRule(
-                VIOLATING, FIXTURE_MODULES),
-            "ordering.domain.service.DiscountPolicy"),
-        row(
-            "commandHandlersAndListenersDoNotUseInheritance: 役割名でないサブクラス",
-            ClassRoleArchTest.commandHandlersAndListenersDoNotUseInheritance,
-            "ordering.application.ReopenOrderHandler"),
-        row(
-            "commandHandlersAndListenersDoNotUseInheritance: 基底クラス",
-            ClassRoleArchTest.commandHandlersAndListenersDoNotUseInheritance,
-            "ordering.application.OrderHandlerSupport"),
-        row(
-            "commandHandlersAndListenersDoNotUseInheritance: インタフェースの実装",
-            ClassRoleArchTest.commandHandlersAndListenersDoNotUseInheritance,
-            "ordering.application.OrderShippedReceiver"),
-        row(
-            "eventListenersAreApplicationModuleListeners: @EventListener",
-            ClassRoleArchTest.eventListenersAreApplicationModuleListeners,
-            "inventory.application.StockEventReceiver.onPlaced("),
-        row(
-            "eventListenersAreApplicationModuleListeners: @TransactionalEventListener",
-            ClassRoleArchTest.eventListenersAreApplicationModuleListeners,
-            "inventory.application.StockEventReceiver.afterPlaced("),
-        row(
-            "applicationListenerIsNotImplemented",
-            ClassRoleArchTest.applicationListenerIsNotImplemented,
-            "inventory.application.StockLevelWatcher"),
-        row(
-            "listenersExposeOnlyOnAndCallOneCommandHandler",
-            ClassRoleArchTest.listenersExposeOnlyOnAndCallOneCommandHandler,
-            "inventory.application.OrderPlacedListener"),
-        row(
-            "requestsAndResponsesArePresentationWebRecords",
-            ClassRoleArchTest.requestsAndResponsesArePresentationWebRecordsRule(VIOLATING),
-            "ordering.presentation.web.PlaceOrderRequest"),
-        row(
-            "queryServicesImplementModuleQueries",
-            ClassRoleArchTest.queryServicesImplementModuleQueries,
-            "ordering.application.OrderQueryService"),
-        row(
-            "queryResultStatusIsNotReadByOtherModules: status()",
-            ClassRoleArchTest.queryResultStatusIsNotReadByOtherModulesRule(VIOLATING),
-            "inventory.application.OrderStatusGuard.isConfirmed("),
-        row(
-            "queryResultStatusIsNotReadByOtherModules: *Status method reference",
-            ClassRoleArchTest.queryResultStatusIsNotReadByOtherModulesRule(VIOLATING),
-            "inventory.application.OrderStatusGuard.paidStatuses("),
-        row(
-            "mappingLibrariesAreNotUsed",
-            ClassRoleArchTest.mappingLibrariesAreNotUsed,
-            REFLECTIVE_READER + ".defaultRecordMapper("),
-        row(
-            "mappingLibrariesAreNotUsed: DefaultRecordUnmapper",
-            ClassRoleArchTest.mappingLibrariesAreNotUsed,
-            REFLECTIVE_READER + ".defaultRecordUnmapper("),
-        reflectionRow("recordInto"),
-        reflectionRow("resultInto"),
-        reflectionRow("fetchInto"),
-        reflectionRow("fetchOneInto"),
-        reflectionRow("fetchOptionalInto"),
-        reflectionRow("fetchSingleInto"),
-        reflectionRow("intoMap"),
-        reflectionRow("intoGroups"),
-        reflectionRow("fetchMap"),
-        reflectionRow("fetchGroups"),
-        reflectionRow("recordIntoObject"),
-        reflectionRow("recordFrom"),
-        reflectionRow("newRecordFromObject"));
-  }
-
-  /** {@code jooqReflectionMappingIsNotUsed} が、違反フィクスチャの同名のメソッドの呼び出しを検出することを確かめる行を作る。 */
-  private static Arguments reflectionRow(final String method) {
-    return row(
-        "jooqReflectionMappingIsNotUsed: " + method,
-        ClassRoleArchTest.jooqReflectionMappingIsNotUsed,
-        REFLECTIVE_READER + "." + method + "(");
   }
 
   @ParameterizedTest(name = "{0}")
@@ -824,7 +610,7 @@ class ArchitectureRuleFixtureTest {
   /** フィクスチャが列を変換する先の値オブジェクト。 */
   private record OrderNumber(String value) {}
 
-  private static Arguments row(
+  /* package */ static Arguments row(
       final String ruleName, final ArchRule rule, final String violatingClass) {
     return Arguments.of(ruleName, rule, VIOLATING_PREFIX + violatingClass);
   }
@@ -862,9 +648,8 @@ class ArchitectureRuleFixtureTest {
         ClassRoleArchTest.commandsAndResultsAreApplicationRecordsRule(basePackage),
         ClassRoleArchTest.commandHandlersDoNotDependOnOtherCommandHandlers,
         ClassRoleArchTest.commandHandlersAndListenersDoNotUseInheritance,
-        ClassRoleArchTest.externalSystemCommandHandlersAreCalledOnlyByListeners,
-        ClassRoleArchTest.eventPublisherIsUsedOnlyByCommandHandlersRule(
-            basePackage, FIXTURE_MODULES),
+        ClassRoleArchTest.externalSystemCommandHandlersAreDependedOnlyByListeners,
+        ClassRoleArchTest.eventPublisherIsUsedOnlyByCommandHandlersRule(basePackage),
         ProxyRulesArchTest.pointcutsNarrowTargetsWithWithin,
         ProxyRulesArchTest.aspectsDeclareOrder,
         ProxyRulesArchTest.transactionManagementIsNotRedeclared,

@@ -1,6 +1,7 @@
 package com.example.demo.architecture;
 
 import static com.tngtech.archunit.base.DescribedPredicate.not;
+import static com.tngtech.archunit.core.domain.JavaClass.Predicates.INTERFACES;
 import static com.tngtech.archunit.core.domain.JavaClass.Predicates.resideInAPackage;
 import static com.tngtech.archunit.core.domain.JavaClass.Predicates.resideInAnyPackage;
 import static com.tngtech.archunit.core.domain.JavaClass.Predicates.simpleNameEndingWith;
@@ -10,6 +11,7 @@ import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.methods;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
 
 import com.example.demo.DemoApplication;
+import com.tngtech.archunit.base.DescribedPredicate;
 import com.tngtech.archunit.core.domain.Dependency;
 import com.tngtech.archunit.core.domain.JavaClass;
 import com.tngtech.archunit.junit.AnalyzeClasses;
@@ -42,6 +44,12 @@ class PackageByFeatureOnionArchitectureTest {
 
   /** プロダクションコードの基底パッケージ。 */
   private static final String BASE_PACKAGE = DemoApplication.class.getPackageName();
+
+  /** Domain の外部システムのインタフェース。{@code domain.model} の interface のうち、Repository ではないもの。 */
+  /* package */ static final DescribedPredicate<JavaClass> EXTERNAL_SYSTEM_INTERFACE =
+      INTERFACES
+          .and(resideInAPackage("..domain.model.."))
+          .and(not(simpleNameEndingWith("Repository")));
 
   /** パッケージ構造を決めた ADR のパス。 */
   private static final String ADR_002 = "docs/adr/ADR-002-package-by-feature-onion-architecture.md";
@@ -271,8 +279,7 @@ class PackageByFeatureOnionArchitectureTest {
           .that()
           .resideOutsideOfPackage("..domain..")
           .and()
-          .implement(
-              resideInAPackage("..domain.model..").and(not(simpleNameEndingWith("Repository"))))
+          .implement(EXTERNAL_SYSTEM_INTERFACE)
           .should()
           .haveSimpleNameEndingWith("Client")
           .andShould()
@@ -450,10 +457,12 @@ class PackageByFeatureOnionArchitectureTest {
                     "lombok..",
                     basePackage + ".*.domain..",
                     basePackage + ".shared.failure..")
-                .or(type(Service.class)))
+                .or(type(Service.class))
+                .and(not(EXTERNAL_SYSTEM_INTERFACE)))
         .allowEmptyShould(true)
         .because(
-            "Domain Service には業務規則だけを置き、イベント発行、外部呼び出し、ログ出力は CommandHandler の役割とするため。"
+            "Domain Service には業務規則だけを置き、イベント発行、外部呼び出し、ログ出力は CommandHandler の役割とし、"
+                + "外部システムのインタフェースも持たせないため。"
                 + "直し方：Domain の型と標準型だけで業務規則を書き、"
                 + "イベント発行、外部呼び出し、ログ出力は Application の CommandHandler へ移す。"
                 + "規約：docs/backend/class-roles/domain-service.md、"

@@ -34,7 +34,7 @@ CommandHandler は他モジュールから呼ばれない。
 ## 必須の記述
 
 - `public class` にし、`final` を付けず、`@Service` を付ける。
-- クラスを継承せず、継承もさせない。
+- クラスを継承せず、継承もさせない。interface も実装しない（呼び出し側が interface だけに依存して、CommandHandler への依存の検査を迂回するため）。
   `PgmCdAspect` は名前で対象を決め、継承した `handle` には `*_pgm_cd` を束縛しない（[ADR-051](../../adr/ADR-051-bind-pgm-cd-with-scoped-value-and-aspect.md)）。
 - public メソッドは `public <UseCase>Result handle(final <UseCase>Command command)` の一つだけにする。
   `handle` に `@Transactional` を付け、クラスには付けない。
@@ -272,7 +272,7 @@ class CancelOrderCommandHandlerTest {
 - 画面から呼ばれる CommandHandler のトランザクションの中で外部システムを呼ぶ。
   遅い外部の呼び出しの間、トランザクションと行のロックを持ち続ける。
   ロールバックしても外部の副作用は戻らず、同じ `lockNo` の確定が二つ同時に届くと両方が `ensureLockNo` を通って請求まで進み、後の一方が `update` の競合で取り消されても請求は残る（[ADR-050](../../adr/ADR-050-define-backend-class-roles-and-naming.md)）。
-  `ClassRoleArchTest.externalSystemCommandHandlersAreCalledOnlyByListeners` が検出する。
+  `ClassRoleArchTest.externalSystemCommandHandlersAreDependedOnlyByListeners` が検出する。
 - 外部システムを呼ぶ CommandHandler を冪等にしない（支払い済みでも請求する、冪等性キーを渡さない）。
   イベント出版の再投入で、二重に請求する。
 - 他モジュールの CommandHandler を呼ぶ。
@@ -294,7 +294,7 @@ class CancelOrderCommandHandlerTest {
 - [ ] `ApplicationEventPublisher`（`ApplicationContext` を含む）に依存するのは `application` の CommandHandler だけにする。［ArchUnit で検査：ClassRoleArchTest.eventPublisherIsUsedOnlyByCommandHandlers］
 - [ ] Command が `VersionedCommand` のときは、`handle` の中で直接、集約の `ensureLockNo(ExpectedLockNo)` を呼ぶ。［ArchUnit で検査：TableWriterArchTest.commandHandlersEnsureScreenLockNo］
 - [ ] `ensureLockNo` は `findById` の直後、状態を変える操作より前に呼び、`command.expectedLockNo()` を渡す。型はコンパイルで、呼ぶ位置と渡す値はレビューで確かめる。［自分で点検］
-- [ ] 外部システムのインタフェースに依存する CommandHandler は、イベントを受けた `application` の Listener からだけ呼び、画面から呼ばれる CommandHandler は外部システムを呼ばない。［ArchUnit で検査：ClassRoleArchTest.externalSystemCommandHandlersAreCalledOnlyByListeners］
+- [ ] 外部システムのインタフェースに依存する CommandHandler は、イベントを受けた `application` の Listener からだけ呼び、画面から呼ばれる CommandHandler は外部システムを呼ばない。［ArchUnit で検査：ClassRoleArchTest.externalSystemCommandHandlersAreDependedOnlyByListeners］
 - [ ] 外部システムを呼ぶ CommandHandler は、集約がその操作を終えていれば何もせずに Result を返し、外部システムに冪等性キーを渡す。［自分で点検］
 - [ ] 現在時刻は `Instant.now(clock)` で取る。［自分で点検］
 - [ ] 業務上の失敗は[業務上の失敗の例外](business-exception.md)の型で投げる。［ArchUnit で検査：GeneralCodingRulesArchTest.noSuchElementExceptionIsNotThrown］

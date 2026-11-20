@@ -215,7 +215,7 @@ class DatabaseConventionsArchTest {
                 + "規約：docs/database/connections.md、docs/adr/ADR-094-switch-to-module-database-roles.md");
   }
 
-  /* package */ static String[] modulePackages(
+  private static String[] modulePackages(
       final String basePackage, final Set<String> modules, final String suffix) {
     return modules.stream()
         .map(module -> basePackage + "." + module + suffix)

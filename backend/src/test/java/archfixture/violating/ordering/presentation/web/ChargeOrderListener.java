@@ -1,9 +1,11 @@
 package archfixture.violating.ordering.presentation.web;
 
+import archfixture.violating.ordering.application.ChargeOrderCommand;
 import archfixture.violating.ordering.application.ChargeOrderCommandHandler;
 
 /**
- * 違反：externalSystemCommandHandlersAreCalledOnlyByListeners（application の外に置いた、名前だけの Listener が呼ぶ）。
+ * 違反：externalSystemCommandHandlersAreDependedOnlyByListeners（application の外に置いた、名前だけの Listener
+ * が呼ぶ）。
  */
 class ChargeOrderListener {
 
@@ -17,6 +19,6 @@ class ChargeOrderListener {
 
   /** 注文の代金を請求する。 */
   /* package */ void charge(final String orderId) {
-    chargeOrder.handle(orderId);
+    chargeOrder.handle(new ChargeOrderCommand(orderId));
   }
 }

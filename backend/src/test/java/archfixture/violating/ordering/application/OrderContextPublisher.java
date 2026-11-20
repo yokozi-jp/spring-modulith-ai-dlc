@@ -6,13 +6,13 @@ import org.springframework.context.ApplicationContext;
  * 違反：eventPublisherIsUsedOnlyByCommandHandlers（application の CommandHandler 以外が ApplicationContext
  * に依存する）。
  */
-public class OrderBeanLookup {
+public class OrderContextPublisher {
 
   /** Bean とイベントの発行口を持つコンテキスト。 */
   private final ApplicationContext context;
 
   /** コンテキストを受け取る。 */
-  public OrderBeanLookup(final ApplicationContext context) {
+  public OrderContextPublisher(final ApplicationContext context) {
     this.context = context;
   }
 
