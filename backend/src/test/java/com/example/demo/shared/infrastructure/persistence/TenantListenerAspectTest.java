@@ -1,8 +1,11 @@
-package com.example.demo.shared.tenant;
+package com.example.demo.shared.infrastructure.persistence;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import com.example.demo.shared.tenant.TenantContext;
+import com.example.demo.shared.tenant.TenantId;
+import com.example.demo.shared.tenant.TenantScoped;
 import com.example.demo.testkit.AsTenant;
 import java.util.ArrayList;
 import java.util.List;

@@ -38,7 +38,7 @@ tags: [convention, backend, class-role]
 
 - `public record` にし、アノテーションを付けない。
 - component は Java の標準型と、同じルートの record と enum だけにする。
-  例外は、イベントが運ぶテナント（`shared.tenant.TenantId`）である。
+  例外は、イベントが運ぶテナント（`shared.tenant.TenantId`）と、イベントの型 `shared.tenant.TenantScoped` である。
 - テナントを持つイベントは `shared.tenant.TenantScoped` を実装し、`TenantId tenantId` を持つ。
   発行する CommandHandler は `TenantContext.current()` を詰める。
   `@ApplicationModuleListener` が受けるイベントは `TenantScoped` を実装する必要がある（[ADR-104](../../adr/ADR-104-bind-tenant-to-request-and-event-context.md)）。
@@ -136,7 +136,7 @@ ArchUnit が形を検査し、この record を使う側のテストが中身を
 ## 作成時のチェックリスト
 
 - [ ] 発行するモジュールのルートの record にする。［ArchUnit で検査：ClassRoleArchTest.moduleRootTypesAreRecordsEnumsOrQueries］
-- [ ] component は Java の標準型と同じルートの型だけにする（テナントの `TenantId` を除く）。［ArchUnit で検査：PackageByFeatureOnionArchitectureTest.moduleApiDoesNotExposeInternalTypes］
+- [ ] component は Java の標準型と同じルートの型だけにする（テナントの `TenantId` と `TenantScoped` を除く）。［ArchUnit で検査：PackageByFeatureOnionArchitectureTest.moduleApiDoesNotExposeInternalTypes］
 - [ ] `@ApplicationModuleListener` で受けるイベントは `TenantScoped` を実装する。［ArchUnit で検査：ClassRoleArchTest.moduleListenerEventsAreTenantScoped］
 - [ ] 名前を集約の名前と過去分詞にする。［自分で点検］
 - [ ] 集約の識別子と出来事の時刻を持つ。［自分で点検］

@@ -1,5 +1,7 @@
-package com.example.demo.shared.tenant;
+package com.example.demo.shared.infrastructure.persistence;
 
+import com.example.demo.shared.tenant.TenantContext;
+import com.example.demo.shared.tenant.TenantScoped;
 import org.aspectj.lang.ProceedingJoinPoint;
 import org.aspectj.lang.annotation.Around;
 import org.aspectj.lang.annotation.Aspect;
@@ -13,6 +15,9 @@ import org.springframework.stereotype.Component;
  *
  * <p>トランザクションの advisor（Spring の既定の {@link Ordered#LOWEST_PRECEDENCE}）より外側で動き、リスナーのトランザクションが始まる時点で
  * テナントを束縛済みにする。{@code PgmCdAspect} より外側に置く。
+ *
+ * <p>束縛した値は、トランザクションの開始時にロールと RLS を決める永続化の処理が読むため、{@code PgmCdAspect} と同じ {@code
+ * infrastructure.persistence} に置く。
  */
 @Aspect
 @Order(Ordered.LOWEST_PRECEDENCE - 200)
@@ -27,6 +32,8 @@ public class TenantListenerAspect {
    *
    * @throws IllegalStateException 引数のイベントが {@link TenantScoped} でない場合。ArchUnit の {@code
    *     moduleListenerEventsAreTenantScoped} が先に止める
+   * @throws NullPointerException イベントのテナントが null の場合。{@code tenantId} の項目がない古い出版を JSON から読むと null
+   *     になる
    */
   @Around(
       "within(com.example.demo.*..*Listener)"

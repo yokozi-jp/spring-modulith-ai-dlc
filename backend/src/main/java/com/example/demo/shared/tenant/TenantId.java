@@ -12,7 +12,7 @@ import java.util.UUID;
  */
 public record TenantId(UUID value) {
 
-  /** 型の上は null でないが、JSON から読んだ値には null が入りうるため、境界で拒否する。 */
+  /** JSON の {@code {"value": null}} のように、型の上は null でない値に null が入りうるため、境界で拒否する。 */
   public TenantId {
     Objects.requireNonNull(value, "value");
   }

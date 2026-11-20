@@ -36,6 +36,7 @@ import org.springframework.context.event.EventListener;
 import org.springframework.modulith.events.ApplicationModuleListener;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.filter.OncePerRequestFilter;
 
 /**
  * クラスの役割（docs/backend/class-roles/）ごとの形と命名をプロダクションコードへ強制する。
@@ -179,6 +180,11 @@ class ClassRoleArchTest {
   @ArchTest
   /* package */ static final ArchRule moduleListenerEventsAreTenantScoped =
       moduleListenerEventsAreTenantScopedRule(BASE_PACKAGE);
+
+  /** {@code TenantContext.call} を呼ぶクラスを、リクエストの filter とリスナーの Aspect に限る。 */
+  @ArchTest
+  /* package */ static final ArchRule tenantIsBoundOnlyByRequestFiltersAndListenerAspect =
+      tenantIsBoundOnlyByRequestFiltersAndListenerAspectRule(BASE_PACKAGE);
 
   /**
    * イベントは {@code @ApplicationModuleListener} だけで受け、{@code @EventListener} と
@@ -396,6 +402,44 @@ class ClassRoleArchTest {
                 + ADR_104);
   }
 
+  /**
+   * {@code TenantContext.call} を呼べるクラスを、{@code presentation.web} のリクエストの filter と {@code
+   * TenantListenerAspect} に限る規則を組み立てる。
+   *
+   * <p>{@code call} は呼び出しの間のテナントを切り替える。リクエストのセッションとイベントのテナントだけを元にする入口から呼ばないと、ほかのテナントの行へ触れる。
+   */
+  /* package */ static ArchRule tenantIsBoundOnlyByRequestFiltersAndListenerAspectRule(
+      final String basePackage) {
+    final String tenantContext = basePackage + ".shared.tenant.TenantContext";
+    final String listenerAspect =
+        basePackage + ".shared.infrastructure.persistence.TenantListenerAspect";
+    final DescribedPredicate<JavaClass> allowedCaller =
+        DescribedPredicate.describe(
+            "TenantListenerAspect or a presentation.web OncePerRequestFilter",
+            (JavaClass javaClass) ->
+                javaClass.getName().equals(listenerAspect)
+                    || (javaClass.getPackageName().contains(".presentation.web")
+                        && javaClass.isAssignableTo(OncePerRequestFilter.class)));
+    return noClasses()
+        .that(DescribedPredicate.not(allowedCaller))
+        .should()
+        .callMethodWhere(
+            DescribedPredicate.describe(
+                "TenantContext.call",
+                (JavaMethodCall call) ->
+                    call.getTargetOwner().getName().equals(tenantContext)
+                        && "call".equals(call.getName())))
+        .because(
+            "束縛を切り替える入口が増えると、リクエストのセッションやイベントに無関係なテナントへ切り替えられ、"
+                + "別のテナントの行を読み書きできるため。"
+                + "直し方：リクエストでは presentation.web の OncePerRequestFilter が選んだテナントを束縛し、"
+                + "リスナーでは TenantListenerAspect がイベントのテナントを束縛する。"
+                + "業務の処理は TenantContext.current() で読むだけにする。"
+                + LISTENER_DOC
+                + "、"
+                + ADR_104);
+  }
+
   /** モジュールルートの型を record、enum、{@code *Queries} interface に限る規則を組み立てる。 */
   /* package */ static ArchRule moduleRootTypesAreRecordsEnumsOrQueriesRule(
       final String basePackage) {
@@ -536,18 +580,19 @@ class ClassRoleArchTest {
   }
 
   private static ArchCondition<JavaMethod> takeTenantScopedEvent(final String tenantScopedType) {
-    return new ArchCondition<>("take one event parameter that implements " + tenantScopedType) {
+    return new ArchCondition<>("take only events that implement " + tenantScopedType) {
       @Override
       public void check(final JavaMethod item, final ConditionEvents events) {
-        final List<JavaClass> parameters = item.getRawParameterTypes();
-        if (parameters.size() != 1 || !parameters.getFirst().isAssignableTo(tenantScopedType)) {
-          events.add(
-              SimpleConditionEvent.violated(
-                  item,
-                  item.getFullName()
-                      + " の引数 "
-                      + parameters
-                      + " は、TenantScoped を実装する 1 つのイベントではない。"));
+        for (final JavaClass parameter : item.getRawParameterTypes()) {
+          if (!parameter.isAssignableTo(tenantScopedType)) {
+            events.add(
+                SimpleConditionEvent.violated(
+                    item,
+                    item.getFullName()
+                        + " の引数 "
+                        + parameter.getName()
+                        + " は、TenantScoped を実装しない。"));
+          }
         }
       }
     };

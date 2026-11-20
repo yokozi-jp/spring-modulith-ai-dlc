@@ -7,8 +7,12 @@ import org.jspecify.annotations.Nullable;
 /**
  * 呼び出しの間だけ、操作しているテナントを {@link ScopedValue} に束縛する。
  *
- * <p>リクエストの間は、セッションで選んだテナントを入口の filter が束縛する。リスナーの間は、イベントのテナントを {@link TenantListenerAspect}
+ * <p>リクエストの間は、セッションで選んだテナントを入口の filter が束縛する。リスナーの間は、イベントのテナントを {@code TenantListenerAspect}
  * が束縛する。束縛は呼び出しの終わりで外れ、スレッドにもプールの接続にも残らない。
+ *
+ * <p>{@link #call} を呼んでよいのは、その filter と Aspect
+ * だけである。ほかの層が呼ぶと、リクエストやイベントに無関係なテナントへ切り替えられるため、ArchUnit の {@code
+ * tenantIsBoundOnlyByRequestFiltersAndListenerAspect} が止める。
  */
 public final class TenantContext {
 
@@ -23,7 +27,7 @@ public final class TenantContext {
    * @param tenantId 束縛するテナント
    * @param operation 束縛の中で呼ぶ処理
    * @return 処理の結果
-   * @throws NullPointerException テナントが null の場合。項目のない古いイベントを JSON から読むと null が入る
+   * @throws NullPointerException テナントが null の場合
    * @throws X 処理が投げた例外
    */
   public static <R extends @Nullable Object, X extends Throwable> R call(

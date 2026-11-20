@@ -472,6 +472,11 @@ class ArchitectureRuleFixtureTest {
                 VIOLATING),
             "ordering.OrderPlacedWithModel"),
         row(
+            "moduleApiDoesNotExposeInternalTypes: shared.tenant の TenantContext",
+            PackageByFeatureOnionArchitectureTest.moduleApiDoesNotExposeInternalTypesRule(
+                VIOLATING),
+            "ordering.OrderPlacedReadingTenantContext"),
+        row(
             "domainModelDoesNotDependOnFrameworks",
             PackageByFeatureOnionArchitectureTest.domainModelDoesNotDependOnFrameworks,
             "ordering.domain.model.OrderFactory"),
@@ -561,6 +566,10 @@ class ArchitectureRuleFixtureTest {
             "moduleListenerEventsAreTenantScoped",
             ClassRoleArchTest.moduleListenerEventsAreTenantScopedRule(VIOLATING),
             "inventory.application.OrderPlacedWithoutTenantListener.on("),
+        row(
+            "tenantIsBoundOnlyByRequestFiltersAndListenerAspect",
+            ClassRoleArchTest.tenantIsBoundOnlyByRequestFiltersAndListenerAspectRule(VIOLATING),
+            "ordering.application.TenantSwitchingCommandHandler"),
         row(
             "eventListenersAreApplicationModuleListeners: @EventListener",
             ClassRoleArchTest.eventListenersAreApplicationModuleListeners,
@@ -848,6 +857,7 @@ class ArchitectureRuleFixtureTest {
         ProxyRulesArchTest.scheduledMethodsAreNoArgVoidAndNotPrivateOrFinal,
         ClassRoleArchTest.moduleListenersAreApplicationListeners,
         ClassRoleArchTest.moduleListenerEventsAreTenantScopedRule(basePackage),
+        ClassRoleArchTest.tenantIsBoundOnlyByRequestFiltersAndListenerAspectRule(basePackage),
         ClassRoleArchTest.eventListenersAreApplicationModuleListeners,
         ClassRoleArchTest.applicationListenerIsNotImplemented,
         ClassRoleArchTest.listenersExposeOnlyOnAndCallOneCommandHandler,

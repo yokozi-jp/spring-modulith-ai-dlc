@@ -11,7 +11,6 @@ import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
-import java.io.UncheckedIOException;
 import java.util.Optional;
 import java.util.UUID;
 import org.jspecify.annotations.Nullable;
@@ -81,11 +80,11 @@ final class TenantSelectionFilter extends OncePerRequestFilter {
       final FilterChain filterChain)
       throws ServletException, IOException {
     final Optional<TenantId> tenantId = selectedTenant(request, response);
-    if (tenantId.isPresent()) {
-      doFilterInTenant(tenantId.get(), request, response, filterChain);
-    } else {
+    if (tenantId.isEmpty()) {
       filterChain.doFilter(request, response);
+      return;
     }
+    doFilterInTenant(tenantId.get(), request, response, filterChain);
   }
 
   /**
@@ -99,20 +98,18 @@ final class TenantSelectionFilter extends OncePerRequestFilter {
     if (authentication == null || !trustResolver.isAuthenticated(authentication)) {
       return Optional.empty();
     }
-    final Optional<TenantMembershipAuthority> tenant = TenantSession.selectedTenant(authentication);
-    final boolean tenantSelected =
-        tenant.isPresent() && recheck(request, response, authentication, tenant.get());
-    if (REQUIRES_TENANT.matches(request) && !tenantSelected) {
+    final Optional<TenantMembershipAuthority> tenant =
+        TenantSession.selectedTenant(authentication)
+            .filter(selected -> recheck(request, response, authentication, selected));
+    if (tenant.isEmpty() && REQUIRES_TENANT.matches(request)) {
       throw new TenantNotSelectedException("tenant not selected");
     }
-    return tenantSelected
-        ? tenant.map(selected -> new TenantId(UUID.fromString(selected.tenantId())))
-        : Optional.empty();
+    return tenant.map(selected -> new TenantId(UUID.fromString(selected.tenantId())));
   }
 
   /** 選んだテナントを束縛して、リクエストの残りの処理を呼ぶ。束縛はリクエストの処理が終わると外れる。 */
   // ScopedValue の処理が投げられる検査例外は 1 種類だけなので、IOException は包んで同じメソッドの外で戻す。
-  // 戻す例外は包んだ IOException そのもので、スタックトレースは残る。
+  // 戻すのは包んだ IOException そのもので、スタックトレースは残る。
   @SuppressWarnings({"PMD.ExceptionAsFlowControl", "PMD.PreserveStackTrace"})
   private static void doFilterInTenant(
       final TenantId tenantId,
@@ -127,12 +124,12 @@ final class TenantSelectionFilter extends OncePerRequestFilter {
             try {
               filterChain.doFilter(request, response);
             } catch (IOException exception) {
-              throw new UncheckedIOException(exception);
+              throw new CarriedIOException(exception);
             }
             return null;
           });
-    } catch (UncheckedIOException exception) {
-      throw exception.getCause();
+    } catch (CarriedIOException carried) {
+      throw carried.ioException;
     }
   }
 
@@ -154,5 +151,23 @@ final class TenantSelectionFilter extends OncePerRequestFilter {
       tenantSession.update(request, response, authentication, membership.get());
     }
     return true;
+  }
+
+  /**
+   * {@link TenantContext#call} の処理から {@link IOException} を出すための包み。下流が投げる {@link
+   * java.io.UncheckedIOException} とは区別する。
+   */
+  private static final class CarriedIOException extends RuntimeException {
+
+    private static final long serialVersionUID = 1L;
+
+    /** 包んだ例外。 */
+    private final IOException ioException;
+
+    /** 例外を包む。 */
+    /* package */ CarriedIOException(final IOException ioException) {
+      super(ioException);
+      this.ioException = ioException;
+    }
   }
 }

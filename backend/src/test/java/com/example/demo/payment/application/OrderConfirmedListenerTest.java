@@ -60,8 +60,6 @@ import org.springframework.modulith.test.Scenario;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.oauth2.client.authentication.OAuth2AuthenticationToken;
 import org.springframework.security.oauth2.core.oidc.user.OidcUser;
-import org.springframework.transaction.TransactionExecution;
-import org.springframework.transaction.TransactionExecutionListener;
 import org.springframework.web.client.ResourceAccessException;
 
 /**
@@ -92,9 +90,6 @@ class OrderConfirmedListenerTest {
   private static final String ASYNC_ERROR_SCOPE =
       "org.springframework.aop.interceptor.SimpleAsyncUncaughtExceptionHandler";
 
-  /** Listener のトランザクションの名前。 */
-  private static final String LISTENER_TRANSACTION = OrderConfirmedListener.class.getName() + ".on";
-
   /** 確定していない注文の請求を見送ったことを記録する CommandHandler。 */
   private static final String HANDLER_SCOPE = ChargeOrderCommandHandler.class.getName();
 
@@ -109,9 +104,6 @@ class OrderConfirmedListenerTest {
 
   /** 切り替えられる決済代行。 */
   @Autowired private ControllablePaymentGateway gateway;
-
-  /** トランザクションを始めた時点のテナントを記録する。 */
-  @Autowired private TenantAtBeginRecorder tenantAtBegin;
 
   /** 失敗した出版の再投入。 */
   @Autowired private FailedEventPublications failedEventPublications;
@@ -128,7 +120,6 @@ class OrderConfirmedListenerTest {
   @BeforeEach
   void resetGateway() {
     gateway.reset();
-    tenantAtBegin.reset();
   }
 
   @Test
@@ -167,19 +158,13 @@ class OrderConfirmedListenerTest {
   }
 
   @Test
-  @DisplayName("Listener のトランザクションが始まる時点で、イベントのテナントが束縛されている")
-  void listenerTransactionBeginsInEventTenant(final Scenario scenario) {
+  @DisplayName("Listener が呼ぶ決済代行の時点で、イベントのテナントが束縛されている")
+  void gatewayIsChargedInEventTenant(final Scenario scenario) {
     final String orderId = fixture.draftedOrderId();
+    fixture.confirmAndAwait(scenario, orderId, "完了した出版", state -> state.archived() == 1);
 
-    OrderConfirmedFixture.await(
-        scenario.publish(new OrderConfirmed(orderId, NOW, AsTenant.TENANT)),
-        orderId,
-        "完了した出版",
-        () -> fixture.registry(orderId),
-        state -> state.archived() == 1);
-
-    assertThat(tenantAtBegin.tenantsOf(LISTENER_TRANSACTION))
-        .as("orderId=%s の Listener のトランザクションを始めた時点のテナント", orderId)
+    assertThat(gateway.recordedTenants())
+        .as("orderId=%s の請求の時点のテナント", orderId)
         .containsExactly(AsTenant.TENANT.toString());
   }
 
@@ -387,6 +372,9 @@ class OrderConfirmedListenerTest {
     /** 請求の中の trace ID。span がなければ空文字。 */
     private final List<String> traceIds = new CopyOnWriteArrayList<>();
 
+    /** 請求の中で束縛されていたテナント。束縛されていなければ {@code unbound}。 */
+    private final List<String> tenants = new CopyOnWriteArrayList<>();
+
     /** 請求の手前で止める門。開いていれば null。 */
     private final AtomicReference<@Nullable CountDownLatch> gate = new AtomicReference<>();
 
@@ -403,6 +391,7 @@ class OrderConfirmedListenerTest {
     public ChargeOutcome charge(final OrderId orderId, final Money amount) {
       final @Nullable Span span = tracer.currentSpan();
       traceIds.add(span == null ? "" : span.context().traceId());
+      tenants.add(AsTenant.currentOrUnbound());
       final @Nullable CountDownLatch latch = gate.get();
       if (latch != null) {
         waiting.incrementAndGet();
@@ -427,6 +416,7 @@ class OrderConfirmedListenerTest {
       failing.set(false);
       charged.clear();
       traceIds.clear();
+      tenants.clear();
       gate.set(null);
       waiting.set(0);
     }
@@ -457,43 +447,10 @@ class OrderConfirmedListenerTest {
     /* package */ List<String> recordedTraceIds() {
       return new ArrayList<>(traceIds);
     }
-  }
 
-  /**
-   * トランザクションを始める直前の、トランザクションの名前と束縛中のテナントを記録する。
-   *
-   * <p>Spring Boot は {@link TransactionExecutionListener} の Bean をトランザクションマネージャーに登録する。
-   */
-  /* package */ static final class TenantAtBeginRecorder implements TransactionExecutionListener {
-
-    /** 記録したトランザクションの名前とテナント。 */
-    private final List<Begun> begun = new CopyOnWriteArrayList<>();
-
-    @Override
-    public void beforeBegin(final TransactionExecution transaction) {
-      begun.add(
-          new Begun(String.valueOf(transaction.getTransactionName()), AsTenant.currentOrUnbound()));
+    /* package */ List<String> recordedTenants() {
+      return new ArrayList<>(tenants);
     }
-
-    /* package */ void reset() {
-      begun.clear();
-    }
-
-    /** 名前のトランザクションを始めた時点のテナント。束縛されていなければ {@code unbound}。 */
-    /* package */ List<String> tenantsOf(final String transactionName) {
-      return begun.stream()
-          .filter(entry -> entry.transaction().equals(transactionName))
-          .map(Begun::tenant)
-          .toList();
-    }
-
-    /**
-     * 始めたトランザクションの記録。
-     *
-     * @param transaction トランザクションの名前
-     * @param tenant 始めた時点のテナント
-     */
-    private record Begun(String transaction, String tenant) {}
   }
 
   /** 決済代行と時計を差し替える。 */
@@ -504,11 +461,6 @@ class OrderConfirmedListenerTest {
     @Primary
     /* package */ ControllablePaymentGateway controllablePaymentGateway(final Tracer tracer) {
       return new ControllablePaymentGateway(tracer);
-    }
-
-    @Bean
-    /* package */ TenantAtBeginRecorder tenantAtBeginRecorder() {
-      return new TenantAtBeginRecorder();
     }
 
     @Bean
