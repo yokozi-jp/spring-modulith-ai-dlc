@@ -84,6 +84,7 @@ depends_on:
 
 - 必要なポートだけ公開する。外部に晒したくないサービスは `ports` を張らず、ネットワーク内通信だけにする。
 - ローカル限定で使うなら `127.0.0.1:5432:5432` のようにループバックへバインドする。
+- compose-test（`docker/compose-test.yml`）のホストのポートは、`127.0.0.1:${TEST_PG_PORT:-5433}:5432` のように slot が渡す変数で書き、slot 0 の値を既定値にする（[compose-test の slot](../tooling/test-slots.md)）。
 
 アンチパターン：内部依存（DB やキャッシュ）のポートまで無条件に `0.0.0.0` へ公開する。
 
@@ -117,7 +118,7 @@ services:
 - 成功のスタブは `docker/wiremock/mappings/` に置き、`/home/wiremock/mappings` へ `:ro` でマウントする。
   2 つの compose ファイルと JVM の中の結合テストが同じファイルを読む。
 - healthcheck は `/__admin/health` を `curl` で確かめる。
-- ポートは `127.0.0.1` に限って公開する（開発用 8090、compose-test 8082）。
+- ポートは `127.0.0.1` に限って公開する（開発用 8090、compose-test は slot 0 で 8082）。
   backend は compose の network の中から service 名（`http://wiremock:8080`）で呼ぶ。
 - 失敗と拒否は、マッピングファイルに置かず、テストが管理 API で実行中に足す。
 - WireMock は本番の構成に置かない。

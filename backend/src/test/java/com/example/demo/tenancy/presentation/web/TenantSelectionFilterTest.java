@@ -25,7 +25,7 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 
-/** {@link TenantSelectionFilter} が、選んだテナントを残りの処理の間だけ束縛し、下流の例外をそのまま戻すことを検証する（ADR-104）。 */
+/** {@link TenantSelectionFilter} が、選んだテナントを残りの処理の間だけ束縛し、下流の例外をそのまま戻すことを検証する（ADR-105）。 */
 class TenantSelectionFilterTest {
 
   /** 選ぶテナントの ID。 */

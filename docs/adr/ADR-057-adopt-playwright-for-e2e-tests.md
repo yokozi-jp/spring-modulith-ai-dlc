@@ -27,6 +27,9 @@ SPA は同じ origin の proxy で backend の API と認証の URL へ到達す
 Liquibase の migration はアプリケーションの起動から切り離されている（[ADR-005](ADR-005-decouple-liquibase-from-app-startup.md)）。
 ローカルの開発用には Datafaker のシーダーがあり、E2E のデータと混ざると結果が実行環境に依存する。
 
+[ADR-104](ADR-104-allocate-test-stack-slots-per-run.md) が compose-test を使う実行ごとに slot を割り当てたため、preview の port を「`localhost:5173` に固定」から「slot ごとの固定の port」に書き直した。
+この ADR のホストの port（5173、8080、8081）は、slot 0 の値である。
+
 ## Decision
 
 E2E テストに Playwright を使い、ブラウザは Chromium だけにする。
@@ -48,7 +51,8 @@ backend は PostgreSQL、Redis、Keycloak へ service 名で接続し、compose 
   discovery の `issuer` が `OIDC_ISSUER_URI` と一致しなければ起動を止め、`ClientRegistrations.fromOidcConfiguration` で issuer と discovery の全体を registration に残す。
   これにより、ID トークンの `iss` の検査と、`end_session_endpoint` を使う OIDC のログアウトが、discovery を issuer から読む場合と同じに動く。
 
-frontend は build した dist を Vite preview で配信し、ADR-033 と同じ `localhost:5173` と `strictPort` を preview にも適用する。
+frontend は build した dist を Vite preview で配信し、ADR-033 と同じ `strictPort` を preview にも適用する。
+preview の port は slot ごとに固定し、slot 0 は ADR-033 と同じ `localhost:5173` にする（ADR-104）。
 proxy は開発サーバーの定義を preview が引き継ぐ。
 
 retry はローカルで 0 回、CI で 2 回とし、trace と screenshot は失敗時だけ保存し、video は保存しない。
@@ -65,7 +69,8 @@ E2E の CI は path filter 付きの非必須の check とする。
 
 ### Negative
 
-- E2E は 5173 と 8080 を使うため、開発用の Vite と Keycloak と同時に実行できない。
+- slot 0 の E2E は、開発用の Vite と Keycloak と同じ 5173 と 8080 を使う。
+  ADR-104 の割り当ては、ポートが `127.0.0.1` で応答する slot を飛ばす。
 - CI の実行時間と backend イメージのビルドが増える。
 - 失敗時の trace には、ダミーのパスワードと、片付けで破棄した環境のセッション Cookie が入りうる。
 - backend の本番コードに、`OIDC_DISCOVERY_URI` を設定したときだけ有効になる認証の設定（`OidcDiscoveryLocationConfig`）が増える。
@@ -136,6 +141,7 @@ E2E の CI は path filter 付きの非必須の check とする。
 - [ADR-005](ADR-005-decouple-liquibase-from-app-startup.md)、[ADR-014](ADR-014-use-same-origin-spa-security-boundary.md)、[ADR-027](ADR-027-adopt-frontend-testing-stack.md)、[ADR-033](ADR-033-pin-vite-dev-origin-and-source-proxy-port.md)
 - [E2E テストの方針と書き方](../e2e/testing-strategy.md)
 - [ADR-073: E2E はシーダーの代表データを読むだけにし、変更するデータは各テストが作る](ADR-073-read-seeded-data-in-e2e.md)（テストデータの「シーダーと共有しない」を、読むだけの共有に改める）
+- [ADR-104: compose-test を使う実行ごとに slot を割り当て、worktree をまたいで同時に流す](ADR-104-allocate-test-stack-slots-per-run.md)（preview の port を slot ごとの固定の port に改める）
 - [Playwright, Authentication](https://playwright.dev/docs/auth)
 - [Playwright, Test configuration](https://playwright.dev/docs/test-configuration)
 - [Playwright, Web server](https://playwright.dev/docs/test-webserver)

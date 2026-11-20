@@ -1,8 +1,11 @@
 package com.example.demo.architecture;
 
 import static com.tngtech.archunit.base.DescribedPredicate.not;
+import static com.tngtech.archunit.core.domain.JavaClass.Predicates.ANNOTATIONS;
+import static com.tngtech.archunit.core.domain.JavaClass.Predicates.INTERFACES;
 import static com.tngtech.archunit.core.domain.JavaClass.Predicates.resideInAPackage;
 import static com.tngtech.archunit.core.domain.JavaClass.Predicates.resideInAnyPackage;
+import static com.tngtech.archunit.core.domain.JavaClass.Predicates.simpleName;
 import static com.tngtech.archunit.core.domain.JavaClass.Predicates.simpleNameEndingWith;
 import static com.tngtech.archunit.core.domain.JavaClass.Predicates.type;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.classes;
@@ -10,6 +13,7 @@ import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.methods;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
 
 import com.example.demo.DemoApplication;
+import com.tngtech.archunit.base.DescribedPredicate;
 import com.tngtech.archunit.core.domain.Dependency;
 import com.tngtech.archunit.core.domain.JavaClass;
 import com.tngtech.archunit.junit.AnalyzeClasses;
@@ -46,6 +50,20 @@ class PackageByFeatureOnionArchitectureTest {
 
   /** プロダクションコードの基底パッケージ。 */
   private static final String BASE_PACKAGE = DemoApplication.class.getPackageName();
+
+  /** Domain のパッケージのパターン。 */
+  private static final String DOMAIN_PACKAGE = "..domain..";
+
+  /**
+   * Domain の外部システムのインタフェース。{@code domain.model} の interface のうち、Repository、アノテーション、{@code
+   * package-info} 以外。
+   */
+  /* package */ static final DescribedPredicate<JavaClass> EXTERNAL_SYSTEM_INTERFACE =
+      INTERFACES
+          .and(resideInAPackage("..domain.model.."))
+          .and(not(simpleNameEndingWith("Repository")))
+          .and(not(ANNOTATIONS))
+          .and(not(simpleName("package-info")));
 
   /** パッケージ構造を決めた ADR のパス。 */
   private static final String ADR_002 = "docs/adr/ADR-002-package-by-feature-onion-architecture.md";
@@ -234,7 +252,7 @@ class PackageByFeatureOnionArchitectureTest {
           .resideInAPackage("..presentation..")
           .should()
           .dependOnClassesThat()
-          .resideInAPackage("..domain..")
+          .resideInAPackage(DOMAIN_PACKAGE)
           .allowEmptyShould(true)
           .because(
               "Domain の型を Application の外へ出さず、HTTP API の形と Domain を独立に変えられるようにするため。"
@@ -277,10 +295,9 @@ class PackageByFeatureOnionArchitectureTest {
   /* package */ static final ArchRule externalSystemImplementationsAreClients =
       classes()
           .that()
-          .resideOutsideOfPackage("..domain..")
+          .resideOutsideOfPackage(DOMAIN_PACKAGE)
           .and()
-          .implement(
-              resideInAPackage("..domain.model..").and(not(simpleNameEndingWith("Repository"))))
+          .implement(EXTERNAL_SYSTEM_INTERFACE)
           .should()
           .haveSimpleNameEndingWith("Client")
           .andShould()
@@ -464,7 +481,7 @@ class PackageByFeatureOnionArchitectureTest {
       final String basePackage) {
     return classes()
         .that()
-        .resideOutsideOfPackage("..domain..")
+        .resideOutsideOfPackage(DOMAIN_PACKAGE)
         .and()
         .implement(resideInAPackage(basePackage + ".*.domain.model.."))
         .should()

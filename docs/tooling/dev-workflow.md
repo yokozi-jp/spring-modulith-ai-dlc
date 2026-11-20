@@ -20,6 +20,9 @@ task check
 
 `task check`は、バックエンドの静的解析の前に`task lint-session-sql`でセッションに状態を残すSQLがないことを確かめる。
 
+`task be-lint`のSpotlessは、mainから変えたファイルを全体で検査するため、変えていない既存の行の書式も違反になる。
+`task be-format`を実行し、その出力を同じ変更に含める。
+
 ## フロントエンドを開発するとき
 
 ```bash
@@ -59,6 +62,18 @@ task fe-install    # フロントエンド
 依存を入れないと、commitとpushのフックがcommitlintとフロントエンドの検査の依存を見つけられずに失敗する。
 `npm install`は手元のnpmで`package-lock.json`を書き直し、worktreeに差分を残すことがあるため使わない（npm 11.4.2では`libc`の項目が消えた）。
 
+compose-testを使うTask（`task test`や`task e2e`など、対象は[compose-testのslot](test-slots.md#対象の-task)）は、複数のworktreeで同時に実行してよく、引数もファイルも足さない。
+Taskが実行ごとに空いているslotを取り、開始時に次の1行を出す。
+
+```text
+slot 1: web http://localhost:21173、backend http://localhost:21080、Keycloak http://127.0.0.1:21081、WireMock http://127.0.0.1:21082（Compose project spring-modulith-test-1）
+```
+
+自分のstackには、この行のURLで接続する。
+4つのslotがすべて使用中なら、Taskは最大15分待ち、30秒ごとに待っていることとslotを持つworktreeを出すので、止めずに待つ。
+出力に自分のworktreeが出ていて、そのworktreeで動いている実行が無ければ、中断した前の実行がslotを持ったまま残っている。
+[compose-testのslot](test-slots.md#中断した実行が残した-slot)の手順で片付ける。
+
 ## エージェントがcommitとpushをするとき
 
 エージェントはcommitとpushを次のTaskだけで行い、`git commit`と`git push`を直接実行しない。
@@ -87,7 +102,8 @@ task agent-push && AGENT_GIT_WAIT_SECONDS=1500 task agent-wait
 失敗を報告した実行のディレクトリは、ログを読めるように残る。
 消し方と、indexをcommitに合わせるコマンドは、`task agent-wait`が出す。
 
-前のpre-pushを止めたときは、`docker compose -f docker/compose-test.yml down --volumes --remove-orphans`でテスト用の依存を片付けてからやり直す。
+前のpre-pushを止めたときは、止めた`task test`のコンテナがslotを持ったまま残ることがある。
+そのままやり直しても次の`task test`は別のslotを取るが、片付けるまでslotを1つ使い続けるので、[compose-testのslot](test-slots.md#中断した実行が残した-slot)の手順で片付ける。
 
 Lefthookの出力は`lefthook.yml`の`output`で絞ってある（[Lintとテストのリファレンス](lint-and-test.md)）。
 `LEFTHOOK_OUTPUT=summary,failure`でさらに絞ると、成功の扱いで出る`adr-check`の注意喚起が消えるので、付けない。
@@ -157,7 +173,7 @@ test-userは2つのテナント（サンプル商事、サンプル物産）に�
 - フロントエンド：<http://localhost:5173>（ブラウザで開く入口）
 - バックエンド：<http://localhost:18080>
 - Keycloak：<http://localhost:8080>
-- Grafana：<http://localhost:3000>
+- Grafana：<http://localhost:3000>（`.env.example`の値。ポートは`.env`の`GRAFANA_HOST_PORT`。トレースの見方は[ローカルでトレースを見る](../observability/runbook-local-traces.md)）
 
 ツールの導入は[開発環境構築ガイド](../local-env-setup/setup.md)を参照する。
 
@@ -211,14 +227,16 @@ OpenAPI契約かOrvalの設定を変更した場合は、`task api-client-check`
 
 ## E2Eテストを実行するとき
 
-開発用のViteとKeycloakを止めてから実行する。
-
 ```bash
 task e2e
 ```
 
+開発用のKeycloak（`127.0.0.1:8080`）が動いていれば、slot 0を飛ばしてslot 1以降を使う。
+`task e2e-up`がwebかbackendのポートを使用中と報告して止まったときは、そのポートを使うプロセスを止める。
+
 失敗した環境を調べるときは`E2E_KEEP_ENV=1 task e2e`で残す。
-`task e2e-up`は起動だけで片付けないので、直接実行したときは、`docker compose -f docker/compose-test.yml --profile e2e down --volumes --remove-orphans`で自分で片付ける。
+`task e2e-up`は起動だけで片付けないので、直接実行したときは、出力のComposeプロジェクトを`-p`に渡し、`docker compose -p spring-modulith-test-<n> -f docker/compose-test.yml --profile e2e down --volumes --remove-orphans`で自分で片付ける。
+片付けるまで、そのslotを持ち続ける。
 前提と調べ方は[E2Eテストの方針と書き方](../e2e/testing-strategy.md)を参照する。
 
 ## ミューテーションテストを実行するとき
@@ -251,6 +269,19 @@ task skills-check
 
 導入と更新の手順は[スキルの取得元と更新](../agents/skill-sources.md)に従います。
 
+## GitHub Actionsのworkflowを変更するとき
+
+```bash
+task lint-actions
+task lint-actions-security
+task ci-gate-check
+```
+
+`task ci-gate-check`にはPython 3とPyYAMLが要る（ローカルでは`sudo apt install python3-yaml`）。
+`ci.yml`にジョブを足したときは、`CI gate`の`needs`にも足す。
+`ci.yml`から呼ばない`pull_request`のworkflowは、`tooling/ci-gate-check/excluded.tsv`に理由を書く。
+`zizmor.yml`の`zizmor-action`の`version`は、`mise.toml`のzizmorと同じ版にする。
+
 ## リリース設定を変更するとき
 
 ```bash
@@ -275,7 +306,8 @@ task scan-dast
 task scan-dast-active
 ```
 
-ポート4173、18081、18082、5433、6380、8081を使うので、開発環境とは同時に実行できるが、`task test`とは同時に実行できない。
+slotを取り、slotのPostgreSQL、Redis、Keycloak、WireMockと、slotによらず固定のポート4173、18081、18082を使う。
+開発環境、`task test`、`task e2e`とは同時に実行できるが、2つの`task scan-dast`は同時に実行できず、2本目はポートの確認で失敗する。
 ZAPとbackendは`--network host`で起動するので、Docker Desktopではhost networkingを有効にしておく必要がある。
 backendの起動の前に`task be-migrate`でマイグレーションを適用するため、JDKが要る。
 レポートは`build/dast/`に出力する（[ADR-056](../adr/ADR-056-run-authenticated-dast-with-zap-in-ci.md)）。

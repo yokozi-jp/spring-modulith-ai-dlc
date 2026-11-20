@@ -1,11 +1,11 @@
 ---
 type: ADR
-title: 'ADR-104: 操作しているテナントを ScopedValue で束縛し、リクエストはセッションから、リスナーはイベントから取る'
+title: 'ADR-105: 操作しているテナントを ScopedValue で束縛し、リクエストはセッションから、リスナーはイベントから取る'
 description: 操作しているテナントの public_id を shared.tenant の ScopedValue に束縛する決定。リクエストの間は入口の filter がセッションで選んだテナントを、リスナーの間は Aspect がイベントの TenantScoped からテナントを、トランザクションより外側で束縛する。テナントを持つイベントは TenantScoped を実装し、束縛を切り替えられる呼び出し元も filter と Aspect だけに、ArchUnit で守る。
 tags: [adr, backend, tenancy, aop, scoped-value, event]
 ---
 
-# ADR-104: 操作しているテナントを ScopedValue で束縛し、リクエストはセッションから、リスナーはイベントから取る
+# ADR-105: 操作しているテナントを ScopedValue で束縛し、リクエストはセッションから、リスナーはイベントから取る
 
 ## Status
 

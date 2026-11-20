@@ -167,7 +167,7 @@ Domain の型、Command と Result、Spring MVC の Request と Response、jOOQ 
   テナントを選ぶ前の拒否を表す `TenantNotSelectedException` もここに置き、`tenancy` が投げて `error` が専用の type の 403 にする（[ADR-101](../adr/ADR-101-keep-tenants-and-roles-in-app-database.md)）。
   この例外はテナントの ID も役割も持たず、ログインの状態（テナントをまだ選んでいないこと）だけを表すため、`AppUserPrincipal` と同じく認証の語彙として扱い、次の項目の業務の概念に含めない。
   テナント、所属、役割の値と規則は `tenancy` に置く。
-- 操作しているテナントの語彙を `shared.tenant` に置き、このパッケージも `@NamedInterface("tenant")` で公開する（[ADR-104](../adr/ADR-104-bind-tenant-to-request-and-event-context.md)）。
+- 操作しているテナントの語彙を `shared.tenant` に置き、このパッケージも `@NamedInterface("tenant")` で公開する（[ADR-105](../adr/ADR-105-bind-tenant-to-request-and-event-context.md)）。
   置く型は、テナントの `public_id` を包む `TenantId`、テナントを運ぶイベントの型 `TenantScoped`、呼び出しの間だけテナントを `ScopedValue` に束縛する `TenantContext` である。
   `TenantId` は `tenancy` の `domain.model` も使い、テナントの ID を表す型を 1 つにする。
   `TenantContext.call` で束縛を切り替えてよいのは、リクエストの filter（`tenancy` の `TenantSelectionFilter`）と `TenantListenerAspect` だけである。
@@ -179,7 +179,7 @@ Domain の型、Command と Result、Spring MVC の Request と Response、jOOQ 
 
 使う場所の制限は、`PackageByFeatureOnionArchitectureTest` の `sharedModuleIsUsedOnlyByPersistenceAdapters` が検査する。
 ただし、`shared` の `PgmCdAspect` は、AOP で `<UseCase>CommandHandler` の `handle` と `<Event>Listener` の呼び出しを囲む（[ADR-051](../adr/ADR-051-bind-pgm-cd-with-scoped-value-and-aspect.md)）。
-`shared.infrastructure.persistence` の `TenantListenerAspect` も、`@ApplicationModuleListener` の呼び出しを囲み、イベントのテナントを束縛する（[ADR-104](../adr/ADR-104-bind-tenant-to-request-and-event-context.md)）。
+`shared.infrastructure.persistence` の `TenantListenerAspect` も、`@ApplicationModuleListener` の呼び出しを囲み、イベントのテナントを束縛する（[ADR-105](../adr/ADR-105-bind-tenant-to-request-and-event-context.md)）。
 この呼び出しはクラスの依存にならないため、ArchUnit では検査できない。
 
 `shared` は機能モジュールではないため、「モジュール間の連携」の対象にならない。

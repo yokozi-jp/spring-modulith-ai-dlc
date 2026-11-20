@@ -23,7 +23,7 @@ tags: [reference, kiro, hooks, agent-skills]
 
 - このリポジトリの中のパスだけを判定し、`~/.kiro` や別の checkout のパスは通す。
 - パスの `//` と `/./` は詰めてから判定し、`..` は解決しない。
-- STDIN がない、JSON として読めない、`jq` がない、パスの項目がない、のいずれかのときは書き込みを許可する。
+- STDIN がない、JSON として読めない、`jq` がない（`mise install --locked` で入る）、パスの項目がない、のいずれかのときは書き込みを許可する。
 
 rename や move のツールが他のファイルに加える編集と、shell のリダイレクトはフックを通らない。
 これらの書き換えは、CI で動く `task fe-route-tree-check`、`task api-client-check`、`task be-openapi-check`、`task skills-check` が検出する。
@@ -50,7 +50,7 @@ shell のツールが `git commit` か `git push` を直接実行しようとす
 
 - `task agent-commit` と `task agent-push` が内部で呼ぶ git は、ツールの呼び出しではないので、フックは見ない。
 - ツールの呼び出しが動くディレクトリは見ない。このリポジトリの外の checkout で `git commit` をしても拒否する。
-- STDIN がない、JSON として読めない、`jq` がない、コマンドの項目がない、のいずれかのときは許可する。
+- STDIN がない、JSON として読めない、`jq` がない（`mise install --locked` で入る）、コマンドの項目がない、のいずれかのときは許可する。
 - コマンドを文字列として読むだけで、shell の構文は解析しない。heredoc の本文の行頭にある `git push` は拒否し、`bash -c "git push"` やスクリプトのファイルの中の git は通す。意図した回避は止めず、docs に従うエージェントを正しい手順へ導くためのフックである。
 - `task agent-push` が行うのは通常の push だけで、force push の手順はない。`.kiro/kiro-permissions.yaml` も `git push *--force*` を拒否する。外から入れたスキルの playbook に `git push --force-with-lease` を指示する記述（`.kiro/skills/poteto-mode/playbooks/babysit.md` など）があるが、履歴の書き換えが要る場面では止めて利用者に報告する（[RGDD の開発フロー](rgdd.md)）。
 

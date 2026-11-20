@@ -23,7 +23,7 @@ import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.TransactionStatus;
 import org.springframework.transaction.support.SimpleTransactionStatus;
 
-/** {@link TenantListenerAspect} の束縛が、リスナーのトランザクションより外側で効き、呼び出しの後に残らないことを検証する（ADR-104）。 */
+/** {@link TenantListenerAspect} の束縛が、リスナーのトランザクションより外側で効き、呼び出しの後に残らないことを検証する（ADR-105）。 */
 // ApplicationContextRunner の run に渡す callback の中で assert するため、PMD はテストメソッドの assert を検出できない。
 // fixture の Listener は、pointcut の対象にするためメソッドを public にする。
 @SuppressWarnings({"PMD.UnitTestShouldIncludeAssert", "PMD.PublicMemberInNonPublicType"})

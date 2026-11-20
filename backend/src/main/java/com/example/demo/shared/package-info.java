@@ -14,7 +14,7 @@
  * も役割も持たずログインの状態だけを表すので、認証の語彙として {@code security} に置く（ADR-101）。
  *
  * <p>操作しているテナントの語彙（{@code TenantId}、{@code TenantScoped}、{@code TenantContext}）は {@code tenant}
- * に置き、どの層からも使う（ADR-104）。リスナーでテナントを束縛する {@code TenantListenerAspect} は {@code
+ * に置き、どの層からも使う（ADR-105）。リスナーでテナントを束縛する {@code TenantListenerAspect} は {@code
  * infrastructure.persistence} に置く。
  */
 @NullMarked

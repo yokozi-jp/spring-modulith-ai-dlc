@@ -46,7 +46,7 @@ MockMvcでログインした利用者として呼ぶテストは、`testkit`の`
 `Authentication`の権限に`ROLE_MEMBER`などを手で足しても、テナントを選んだ状態にはならず、業務のAPIは403になる。
 
 リクエストもリスナーも通らずに、テナントを持つイベントを発行するCommandHandlerを直接呼ぶテストは、`testkit`の`AsTenant.call`で`AsTenant.TENANT`を束縛して呼ぶ。
-束縛がないと、`TenantContext.current()`が`IllegalStateException`を投げる（[ADR-104](../adr/ADR-104-bind-tenant-to-request-and-event-context.md)）。
+束縛がないと、`TenantContext.current()`が`IllegalStateException`を投げる（[ADR-105](../adr/ADR-105-bind-tenant-to-request-and-event-context.md)）。
 `Scenario`の`publish`で発行するイベントのテナントには、`AsTenant.TENANT`を使う。
 
 ## 並列と実行順

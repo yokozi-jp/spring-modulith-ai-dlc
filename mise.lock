@@ -49,6 +49,17 @@ specifiers = ["corretto-25.0.5.0.10"]
 checksum = "sha256:1d89b4194f20ee513f4dd9fc2aadd038de3c713c37fd444d77566b3da7b0ee65"
 url = "https://corretto.aws/downloads/resources/25.0.5.0.10/amazon-corretto-25.0.5.0.10-linux-x64.tar.gz"
 
+[[tools.jq]]
+version = "1.8.2"
+backend = "aqua:jqlang/jq"
+specifiers = ["1.8.2"]
+
+[tools.jq."platforms.linux-x64"]
+checksum = "sha256:b1c22172dd303f3be49e935aa56aa48a8b7a46e0bc838b4997d3bb451495870f"
+url = "https://github.com/jqlang/jq/releases/download/jq-1.8.2/jq-linux-amd64"
+url_api = "https://api.github.com/repos/jqlang/jq/releases/assets/453012752"
+provenance = "github-attestations"
+
 [[tools."npm:@iwe-org/iwe"]]
 version = "0.29.2"
 aube = { path = ".mise/locks/npm-iwe-org-iwe/0.29.2", digest = "sha256:2519bdd35ba6988e775629ddbad774a8a1074b2c2463f6979840587af133bdf9" }

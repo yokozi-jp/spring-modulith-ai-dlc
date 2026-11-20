@@ -1,19 +1,24 @@
 #!/usr/bin/env bash
 # stack.sh down が、自分の起動でない preview と compose-test を止めず、打ち切られた起動の残りは片付けることを確かめる。
-# 検証スタックを動かしていないときに実行する。使い方: stack-test.sh
+# 検証スタックを動かしていないときに実行する。slot 3 の Compose project を使うので、slot 3 が使用中なら実行しない。使い方: stack-test.sh
 set -euo pipefail
 
 ROOT="$(git -C "$(dirname "$0")" rev-parse --show-toplevel)"
 cd "$ROOT"
 STATE=build/verify/stack
 STACK="$(dirname "$0")/stack.sh"
-compose() { docker compose -f docker/compose-test.yml "$@"; }
+LOG="$ROOT/build/verify/stack-test-down.log"
+mkdir -p "$(dirname "$LOG")"
+TEST_SLOT_UNDER_TEST=3
+# slot 3 の project とポートを、本物の割り当てと同じ値にする。
+slot_exports() { bash tooling/test-slot/test-slot.sh ports "$TEST_SLOT_UNDER_TEST" | sed 's/^/export /'; }
+compose() { (eval "$(slot_exports)"; docker compose -f docker/compose-test.yml "$@"); }
 if [ -d "$STATE" ]; then
   echo "$STATE があります。検証スタックを stack.sh down で片付けてから実行してください。" >&2
   exit 1
 fi
 if [ -n "$(compose ps -aq 2>/dev/null)" ]; then
-  echo "Compose project spring-modulith-test が動いています。ほかの実行が終わってから実行してください。" >&2
+  echo "Compose project spring-modulith-test-$TEST_SLOT_UNDER_TEST が動いています。ほかの実行が終わってから実行してください。" >&2
   exit 1
 fi
 
@@ -22,6 +27,8 @@ setsid sleep 300 < /dev/null > /dev/null 2>&1 &
 foreign=$!
 cleanup() { kill -- "-$foreign" 2>/dev/null || true; rm -rf "$STATE"; compose down --volumes --remove-orphans >/dev/null 2>&1 || true; }
 trap cleanup EXIT
+# 確かめた直後に、slot 3 を使用中にする。以降、ほかの実行がこの slot を取らない（テストの途中で project を空にしない）。
+compose up -d --wait redis > /dev/null
 sleep 0.5
 
 failures=0
@@ -36,9 +43,10 @@ stale_state() {
   echo "$1" > "$STATE/boot-id"
   echo "$2" > "$STATE/preview.start"
   echo "not-a-container-of-this-run" > "$STATE/containers"
+  slot_exports > "$STATE/slot.env"
 }
 
-run_down() { "$STACK" down > /tmp/stack-test-down.log 2>&1; }
+run_down() { "$STACK" down > "$LOG" 2>&1; }
 alive() { kill -0 "$foreign" 2>/dev/null; }
 no_state() { [ ! -d "$STATE" ]; }
 no_containers() { [ -z "$(compose ps -aq)" ]; }
@@ -59,19 +67,23 @@ stale_state "$boot" "$start"
 assert "vp preview でない PID の記録で down が成功する" run_down
 assert "vp preview でない process group を止めない" alive
 
+# slot を取る前に打ち切られた起動には slot の記録がなく、片付けるものもない。
+stale_state "$boot" "1"
+rm "$STATE/slot.env"
+assert "slot の記録がなくても down が成功する" run_down
+assert "slot の記録がなければ状態のディレクトリだけを消す" no_state
+
 # ほかの実行が立て直した compose-test は、記録と違うので消さない。
-compose up -d --wait redis > /dev/null 2>&1
 other="$(compose ps -aq)"
 stale_state "$boot" "1"
 others_kept() { [ "$(compose ps -aq)" = "$other" ]; }
 assert "記録と違う compose-test があっても down が成功する" run_down
 assert "記録と違う compose-test を止めない" others_kept
-compose down --volumes --remove-orphans > /dev/null 2>&1
 
 # 起動が打ち切られ、コンテナの記録がないとき。状態の後に作られたコンテナは、その起動のものとして片付ける。
 stale_state "$boot" "1"
 rm "$STATE/containers"
-compose up -d --wait redis > /dev/null 2>&1
+compose up -d --force-recreate --wait redis > /dev/null 2>&1
 assert "コンテナの記録がなくても down が成功する" run_down
 assert "打ち切られた起動のコンテナを片付ける" no_containers
 
@@ -85,7 +97,7 @@ assert "状態より前のコンテナがあっても down が成功する" run_
 assert "状態より前のコンテナを止めない" others_kept
 
 if [ "$failures" -ne 0 ]; then
-  echo "$failures 件が失敗しました。/tmp/stack-test-down.log を確かめてください。" >&2
+  echo "$failures 件が失敗しました。$LOG を確かめてください。" >&2
   exit 1
 fi
 echo "all passed"

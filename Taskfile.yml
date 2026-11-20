@@ -112,11 +112,13 @@ tasks:
     deps: [_ensure-test-env]
     cmds:
       - |
+        export DOCKER="{{.DOCKER}}" TEST_COMPOSE_FILE="{{.TEST_COMPOSE_FILE}}"
+        # slot の取得に失敗したら、$(...) の失敗を eval に隠さず止める。
+        slot_env="$(bash tooling/test-slot/test-slot.sh acquire "{{.TEST_ENV_FILE}}" web)"
+        eval "$slot_env"
         compose() { {{.DOCKER}} compose -f "{{.TEST_COMPOSE_FILE}}" --profile e2e "$@"; }
         keep_env=""
         if [ "${E2E_KEEP_ENV:-}" = "1" ] && [ -z "${CI:-}" ]; then keep_env="1"; fi
-        # 前回 E2E_KEEP_ENV=1 で残した環境を破棄し、空の DB から始める。
-        compose down --volumes --remove-orphans >/dev/null 2>&1 || true
         # 本体と後片付けの終了コードの扱いは docs/tooling/taskfile.md の「後片付けと終了コード」を参照する。
         status=0
         (
@@ -134,11 +136,11 @@ tasks:
           if [ -n "$keep_env" ] && [ -n "$(compose ps -aq 2>/dev/null)" ]; then keep="1"; fi
         fi
         if [ -n "$keep" ]; then
-          echo "E2E_KEEP_ENV=1 のため、compose-test のコンテナと volume を残しました。" >&2
-          echo "  backend のログ：{{.DOCKER}} compose -f {{.TEST_COMPOSE_FILE}} --profile e2e logs backend" >&2
+          echo "E2E_KEEP_ENV=1 のため、compose-test のコンテナと volume を残しました（slot $TEST_SLOT、Compose project $COMPOSE_PROJECT_NAME）。この slot は片付けるまで使えません。" >&2
+          echo "  backend のログ：{{.DOCKER}} compose -p $COMPOSE_PROJECT_NAME -f {{.TEST_COMPOSE_FILE}} --profile e2e logs backend" >&2
           echo "  （frontend/apps/web/test-results/backend.log は vp run e2e の再実行で消える）" >&2
-          echo "  再実行：cd frontend && vp run {{.FE_WEB}} e2e" >&2
-          echo "  片付け：{{.DOCKER}} compose -f {{.TEST_COMPOSE_FILE}} --profile e2e down --volumes --remove-orphans" >&2
+          echo "  再実行（この shell の環境を汚さないよう subshell で）：( eval \"\$(TEST_SLOT=$TEST_SLOT bash tooling/test-slot/test-slot.sh acquire .env.test web 2>/dev/null)\" && cd frontend && vp run {{.FE_WEB}} e2e )" >&2
+          echo "  片付け：{{.DOCKER}} compose -p $COMPOSE_PROJECT_NAME -f {{.TEST_COMPOSE_FILE}} --profile e2e down --volumes --remove-orphans" >&2
         else
           compose down --volumes --remove-orphans || cleanup_status=$?
         fi
@@ -158,27 +160,32 @@ tasks:
           exit 1
         fi
         # compose の backend と Playwright が .env.test を固定で読むため、TEST_ENV_FILE の上書きには対応しない。
-        # export すると Playwright の loadEnv で .env.test.local より優先されるため、SERVER_PORT を読むだけにする。
-        . ./.env.test
+        # slot が空きを確かめた後に、別のプロセスが取ったときのために、web と backend のポートをもう一度確かめる。
+        export DOCKER="{{.DOCKER}}" TEST_COMPOSE_FILE="{{.TEST_COMPOSE_FILE}}"
+        # slot の取得に失敗したら、$(...) の失敗を eval に隠さず止める。
+        slot_env="$(bash tooling/test-slot/test-slot.sh acquire "{{.TEST_ENV_FILE}}" web)"
+        eval "$slot_env"
         compose() { {{.DOCKER}} compose -f "{{.TEST_COMPOSE_FILE}}" --profile e2e "$@"; }
-        for port in 5173 "$SERVER_PORT"; do
+        for port in "$E2E_WEB_PORT" "$TEST_BACKEND_PORT"; do
           rc=0
           curl --silent --output /dev/null --max-time 2 "http://localhost:${port}/" || rc=$?
           if [ "$rc" -ne 7 ]; then
-            echo "localhost:${port} は使用中です。開発用の Vite（5173）や Keycloak（${SERVER_PORT}）など、この port を使うプロセスを止めてから実行してください。" >&2
+            echo "localhost:${port} は使用中です。この port を使うプロセスを止めてから実行してください。" >&2
+            # 取った slot を返す。
+            compose down --volumes --remove-orphans >/dev/null 2>&1 || true
             exit 1
           fi
         done
         (cd frontend && vp install --frozen-lockfile && vp exec {{.FE_WEB}} vp build --mode test && vp exec {{.FE_WEB}} playwright install chromium)
         compose build backend
         compose up -d --wait postgres redis keycloak wiremock
-        task be-migrate COMPOSE_ENV_FILE=.env.test
-        # spec が読む商品と代表の注文を入れる（ADR-073）。.env.test は test の目印と loopback の DB_HOST を持つ。
-        task be-seed COMPOSE_ENV_FILE=.env.test
+        task be-migrate COMPOSE_ENV_FILE="$TEST_ENV_FILE"
+        # spec が読む商品と代表の注文を入れる（ADR-073）。slot の env ファイルは test の目印と loopback の DB_HOST と slot の DB_PORT を持つ。
+        task be-seed COMPOSE_ENV_FILE="$TEST_ENV_FILE"
         compose up -d --wait backend
         # healthcheck はコンテナの中から確かめるため、preview の proxy と同じくホストから届くかを別に確かめる。
-        if ! curl --fail --silent --show-error --max-time 5 "http://localhost:${SERVER_PORT}/actuator/health/readiness" >/dev/null; then
-          echo "ホストから backend（localhost:${SERVER_PORT}）へ接続できません。{{.DOCKER}} compose -f {{.TEST_COMPOSE_FILE}} --profile e2e logs backend で backend のログを確かめてください。" >&2
+        if ! curl --fail --silent --show-error --max-time 5 "http://localhost:${TEST_BACKEND_PORT}/actuator/health/readiness" >/dev/null; then
+          echo "ホストから backend（localhost:${TEST_BACKEND_PORT}）へ接続できません。{{.DOCKER}} compose -p $COMPOSE_PROJECT_NAME -f {{.TEST_COMPOSE_FILE}} --profile e2e logs backend で backend のログを確かめてください。" >&2
           exit 1
         fi
 
@@ -269,6 +276,11 @@ tasks:
     desc: docs の OKF 適合、内部リンク、孤立ドキュメント、責務混在の見直し合図、steering との境界を検証
     silent: true
     dir: docs
+    preconditions:
+      - sh: command -v iwe
+        msg: iwe が無い。mise install --locked を実行する。
+      - sh: command -v jq
+        msg: jq が無い。mise install --locked を実行する。
     cmds:
       - task: lint-docs-sync
       - task: docs-boundary-check
@@ -276,15 +288,6 @@ tasks:
       - task: ruleset-check
       - task: iwe-mcp-check
       - |
-        if ! command -v iwe >/dev/null 2>&1; then
-          echo "OKF check: iwe が無いためスキップします（CI で検査されます）。" >&2
-          exit 0
-        fi
-        if ! command -v jq >/dev/null 2>&1; then
-          echo "OKF check: jq が無いためリンクと孤立の検査をスキップします（CI で検査されます）。" >&2
-          iwe schema validate
-          exit 0
-        fi
         iwe schema validate
         stats="$(iwe stats -f json)"
         broken="$(printf '%s' "$stats" | jq '[.brokenLinks[]? | select((.targetKey | startswith("../")) | not)] | length')"
@@ -517,6 +520,12 @@ tasks:
     cmds:
       - bash tooling/agent-git/test.sh
 
+  test-slot-test:
+    desc: test-slot.sh の slot の割り当て、待ち、回収を、偽の docker で自己検査し、realm の origin の数が slot の数と一致することを確認
+    silent: true
+    cmds:
+      - bash tooling/test-slot/test.sh
+
   lefthook-install-test:
     desc: npmのprepare（prepare.mjs）がmainのworktreeのlefthookでhookを入れ、入れられなければ失敗することを、一時のgitリポジトリで検証
     silent: true
@@ -551,6 +560,13 @@ tasks:
       - |
         ./02-setup-viteplus.sh
         ./04-setup-shell.sh
+        # エージェントは ~/.kiro/settings/ に書けないので、人が実行するこの Task で置く（docs/agents/skill-sources.md）。
+        mkdir -p ~/.kiro/settings
+        if [ ! -e ~/.kiro/settings/permissions.yaml ] && [ ! -e ~/.kiro/settings/permissions.json ]; then
+          cp {{shellQuote .ROOT_DIR}}/.kiro/kiro-permissions.yaml ~/.kiro/settings/permissions.yaml
+          echo "wrote ~/.kiro/settings/permissions.yaml"
+        fi
+        [ ! -e ~/.kiro/settings/permissions.yaml ] || diff {{shellQuote .ROOT_DIR}}/.kiro/kiro-permissions.yaml ~/.kiro/settings/permissions.yaml || true
 
   # Frontend
   fe-install:
@@ -959,11 +975,11 @@ tasks:
     silent: true
     cmds:
       - |
-        label=com.docker.compose.project=spring-modulith-test
-        left="$({{.DOCKER}} ps -aq --filter "label=$label")$({{.DOCKER}} volume ls -q --filter "label=$label")"
+        # project 名は slot ごとに spring-modulith-test-<n> になる。CI の直接の compose の呼び出しは spring-modulith-test のまま。
+        left="$({{.DOCKER}} ps -aq --filter name=spring-modulith-test)$({{.DOCKER}} volume ls -q --filter name=spring-modulith-test)"
         if [ -n "$left" ]; then
-          {{.DOCKER}} ps -a --filter "label=$label"
-          {{.DOCKER}} volume ls --filter "label=$label"
+          {{.DOCKER}} ps -a --filter name=spring-modulith-test
+          {{.DOCKER}} volume ls --filter name=spring-modulith-test
           echo "compose-test のコンテナか volume が残っています。" >&2
           exit 1
         fi
@@ -976,16 +992,20 @@ tasks:
       - |
         # 本体と後片付けの終了コードの扱いは docs/tooling/taskfile.md の「後片付けと終了コード」を参照する。
         # rollback の検証だけが compose の PostgreSQL を使い、テストは Testcontainers の依存を使う（ADR-085）。
-        # 中断した前の回の DB を残したまま rollback を検証しないよう、起動の前にも片付ける。
-        # テストの前に止め、テストが .env.test の接続先（compose の PostgreSQL）へ黙ってつながらないようにする。
+        # テストの前に PostgreSQL を止め、テストが接続先（compose の PostgreSQL）へ黙ってつながらないようにする。
+        # slot の取得は、中断した前の回の DB を使わないことも兼ねる。
+        export DOCKER="{{.DOCKER}}" TEST_COMPOSE_FILE="{{.TEST_COMPOSE_FILE}}"
+        # slot の取得に失敗したら、$(...) の失敗を eval に隠さず止める。
+        slot_env="$(bash tooling/test-slot/test-slot.sh acquire "{{.TEST_ENV_FILE}}")"
+        eval "$slot_env"
         status=0
         (
           set -e
-          {{.DOCKER}} compose -f "{{.TEST_COMPOSE_FILE}}" down --volumes --remove-orphans
           {{.DOCKER}} compose -f "{{.TEST_COMPOSE_FILE}}" up -d --wait postgres
-          task be-verify-migrations TEST_ENV_FILE="{{.TEST_ENV_FILE}}"
-          {{.DOCKER}} compose -f "{{.TEST_COMPOSE_FILE}}" down --volumes --remove-orphans
-          task be-test TEST_ENV_FILE="{{.TEST_ENV_FILE}}"
+          task be-verify-migrations TEST_ENV_FILE="$TEST_ENV_FILE"
+          # コンテナは消さず止める。消すと slot が空き、ほかの実行が取った project を最後の down が消してしまう。
+          {{.DOCKER}} compose -f "{{.TEST_COMPOSE_FILE}}" stop postgres
+          task be-test TEST_ENV_FILE="$TEST_ENV_FILE"
           task api-lint
         ) || status=$?
         cleanup_status=0
@@ -1565,19 +1585,24 @@ tasks:
         zap_image="zaproxy/zap-stable:2.17.0@sha256:781a2bdaea47324e7bab583e2263f21d257b0aee61ed51521a5be45f5f5081ef"
         report_dir="$PWD/build/dast"
         preview_pid_file="$report_dir/preview.pid"
-        compose() { {{.DOCKER}} compose -p spring-modulith-dast -f "{{.TEST_COMPOSE_FILE}}" --profile backend-smoke "$@"; }
+        export DOCKER="{{.DOCKER}}" TEST_COMPOSE_FILE="{{.TEST_COMPOSE_FILE}}"
+        # slot の取得に失敗したら、$(...) の失敗を eval に隠さず止める。
+        slot_env="$(bash tooling/test-slot/test-slot.sh acquire "{{.TEST_ENV_FILE}}" web)"
+        eval "$slot_env"
+        compose() { {{.DOCKER}} compose -f "{{.TEST_COMPOSE_FILE}}" --profile backend-smoke "$@"; }
         fail() { echo "✗ $1" >&2; exit 1; }
-        # 中断で後片付けが走らなかった前回のコンテナと compose を破棄し、名前とポートの衝突を避ける。
-        {{.DOCKER}} rm --force spring-modulith-dast-zap spring-modulith-dast-backend >/dev/null 2>&1 || true
-        compose down --volumes --remove-orphans >/dev/null 2>&1 || true
+        backend_name="spring-modulith-dast-$TEST_SLOT-backend"
+        zap_name="spring-modulith-dast-$TEST_SLOT-zap"
 
-        # 4173 は preview、18081 は backend、18082 は ZAP の proxy、5433、6380、8081、8082 は compose-test が使う。
-        for port in 4173 18081 18082 5433 6380 8081 8082; do
+        # 4173 は preview、18081 は backend、18082 は ZAP の proxy。slot を取れても、ほかの scan-dast がこの 3 つを使っていれば、同時には流せない。
+        for port in 4173 18081 18082; do
           rc=0
           curl --silent --output /dev/null --connect-timeout 1 "http://127.0.0.1:$port/" || rc=$?
           if [ "$rc" -ne 7 ]; then
             echo "✗ ポート $port が使用中のため DAST を開始できません。" >&2
-            echo "  task test や前回の DAST が残っていないか確認してください（開発環境はこれらのポートを使いません）。" >&2
+            echo "  ほかの scan-dast が動いていないか、前回の DAST が残っていないか確認してください（開発環境はこれらのポートを使いません）。" >&2
+            # 取った slot を返す。
+            compose down --volumes --remove-orphans >/dev/null 2>&1 || true
             exit 1
           fi
         done
@@ -1587,26 +1612,29 @@ tasks:
         (
           set -e
           rm -rf "$report_dir" && mkdir -p "$report_dir" && chmod a+rwx "$report_dir"
+          # plan が Keycloak の origin を直に書くため、slot の Keycloak のポートへ置き換えた写しを ZAP に渡す。
+          cp -r docker/zap "$report_dir/plans"
+          sed -i "s/:8081/:$TEST_KEYCLOAK_PORT/g" "$report_dir"/plans/*.yaml
           {{.DOCKER}} build --tag spring-modulith-backend:dast backend
           (cd frontend && vp exec {{.FE_WEB}} vp build)
           compose up -d --wait
           # ログインがアプリの DB に利用者を作るため、backend の起動の前にマイグレーションを適用する（ADR-056）。
-          task be-migrate COMPOSE_ENV_FILE=.env.test
+          task be-migrate COMPOSE_ENV_FILE="$TEST_ENV_FILE"
           # test-admin を 1 つのテナントだけに所属させ、ログインの後に選ばずにテナントへ入れる。
           # テナントを選ぶ前は業務の API と認証の確認の /api/missing が 403 になり、scan が業務の API に届かない。
-          task be-seed COMPOSE_ENV_FILE=.env.test
+          task be-seed COMPOSE_ENV_FILE="$TEST_ENV_FILE"
 
-          {{.DOCKER}} run --detach --name spring-modulith-dast-backend --network host \
-            --env-file "{{.TEST_ENV_FILE}}" --env SERVER_PORT=18081 \
+          {{.DOCKER}} run --detach --name "$backend_name" --network host \
+            --env-file "$TEST_ENV_FILE" --env SERVER_PORT=18081 \
             spring-modulith-backend:dast >/dev/null
           ready=0
           for attempt in $(seq 1 60); do
             if curl --fail --silent --output /dev/null http://127.0.0.1:18081/actuator/health/readiness; then ready=1; break; fi
-            if [ -z "$({{.DOCKER}} ps --quiet --filter name=spring-modulith-dast-backend --filter status=running)" ]; then break; fi
+            if [ -z "$({{.DOCKER}} ps --quiet --filter name="$backend_name" --filter status=running)" ]; then break; fi
             sleep 2
           done
           if [ "$ready" -ne 1 ]; then
-            {{.DOCKER}} logs spring-modulith-dast-backend >&2 || true
+            {{.DOCKER}} logs "$backend_name" >&2 || true
             fail "backend が 18081 で ready になりませんでした。"
           fi
 
@@ -1627,8 +1655,8 @@ tasks:
           fi
 
           zap() {
-            {{.DOCKER}} run --rm --name spring-modulith-dast-zap --network host \
-              -v "$PWD/docker/zap:/zap/plans:ro" -v "$report_dir:/zap/wrk:rw" \
+            {{.DOCKER}} run --rm --name "$zap_name" --network host \
+              -v "$report_dir/plans:/zap/plans:ro" -v "$report_dir:/zap/wrk:rw" \
               "$zap_image" zap.sh -cmd -port 18082 -autorun "/zap/plans/$1.yaml"
           }
           if ! zap preflight; then
@@ -1687,8 +1715,8 @@ tasks:
           if [ -n "${preview_pid:-}" ]; then env kill -TERM -- "-$preview_pid" 2>/dev/null || true; fi
           rm -f "$preview_pid_file" || cleanup_status=$?
         fi
-        {{.DOCKER}} logs spring-modulith-dast-backend >"$report_dir/backend.log" 2>&1 || true
-        {{.DOCKER}} rm --force spring-modulith-dast-zap spring-modulith-dast-backend >/dev/null 2>&1 || true
+        {{.DOCKER}} logs "$backend_name" >"$report_dir/backend.log" 2>&1 || true
+        {{.DOCKER}} rm --force "$zap_name" "$backend_name" >/dev/null 2>&1 || true
         compose down --volumes --remove-orphans || cleanup_status=$?
         if [ "$status" -ne 0 ]; then exit "$status"; fi
         exit "$cleanup_status"
