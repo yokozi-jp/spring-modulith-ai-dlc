@@ -173,6 +173,7 @@ PostgreSQL の READ COMMITTED では、後の UPDATE は先の UPDATE のコミ�
     手順書で `WHERE lock_no = ?` を求めることは、将来の緩和策の候補にとどめる。
   - **別の集約のインスタンスへの `ensureLockNo`**：R4 は `handle` の中で `ensureLockNo(ExpectedLockNo)` を直接呼んだかしか見ない。
     保存する集約と別のインスタンスに呼んでも通る。
+  - **実行されないラムダの中の `ensureLockNo`**：ArchUnit はラムダの本体の呼び出しを `handle` の呼び出しとして数えるため、`Optional.ifPresent(o -> o.ensureLockNo(...))` のように実行されないことがあるラムダの中の呼び出しでも、R4 を満たす。
   - **`ensureLockNo` の位置と引数**：業務の検査や外部の呼び出しの後に呼ぶ書き方と、`command.expectedLockNo()` 以外の値を渡す書き方は検出しない。
     `ExpectedLockNo` を作れるのは Request だけなので、渡せる値は別の Command か別の Request の値に限られる。
   - **R1 が見ない Command の作り方**：R1 が画面から作られた Command とみなすのは、コンストラクタの呼び出しと、Command 自身が宣言する static factory の呼び出しだけである。

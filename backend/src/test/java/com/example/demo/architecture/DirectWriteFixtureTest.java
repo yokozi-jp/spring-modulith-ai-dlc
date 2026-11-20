@@ -1,11 +1,11 @@
 package com.example.demo.architecture;
 
+import static com.example.demo.architecture.ViolatingFixtures.VIOLATING;
+import static com.example.demo.architecture.ViolatingFixtures.VIOLATING_CLASSES;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.catchThrowable;
 
 import archfixture.violating.ordering.infrastructure.persistence.DirectOrderWriter;
-import com.tngtech.archunit.core.domain.JavaClasses;
-import com.tngtech.archunit.core.importer.ClassFileImporter;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.sql.Connection;
@@ -50,16 +50,7 @@ import org.springframework.jdbc.object.SqlUpdate;
  *
  * <p>行ごとに検出される呼び出しを確かめるため、メソッドが禁止の呼び出しを二つ持つと、片方の禁止を外しても行が通る状態を防ぐ。
  */
-// JavaClasses は ArchUnit の import 結果を表す公開 API 型であり、インタフェースへ置き換えられない。
-@SuppressWarnings("PMD.LooseCoupling")
 class DirectWriteFixtureTest {
-
-  /** 違反フィクスチャの基底パッケージ。 */
-  private static final String VIOLATING = "archfixture.violating";
-
-  /** 違反フィクスチャの import 結果。 */
-  private static final JavaClasses VIOLATING_CLASSES =
-      new ClassFileImporter().importPackages(VIOLATING);
 
   /** 禁止の呼び出しの名前 update。 */
   private static final String UPDATE = "update";

@@ -25,11 +25,13 @@ backend/src/test/java/com/example/demo/architecture/
 ├── DirectWriteFixtureTest.java
 ├── GeneralCodingRulesArchTest.java
 ├── JooqCommonColumnsArchTest.java
+├── LambdaFixtureTest.java
 ├── PackageByFeatureOnionArchitectureTest.java
 ├── ProxyRulesArchTest.java
 ├── PublicIdArchTest.java
 ├── TableWriterArchTest.java
-└── TestConventionsArchTest.java
+├── TestConventionsArchTest.java
+└── ViolatingFixtures.java
 ```
 
 ## モジュールとパッケージ
@@ -106,7 +108,7 @@ jOOQの生成物の`com.example.demo.jooq`はOPENのモジュールであり、`
 ## 規則を確かめるフィクスチャ
 
 プロダクションの規則は`.allowEmptyShould(true)`を付けるため、対象のクラスがなくても成功する。
-`ArchitectureRuleFixtureTest`と`DirectWriteFixtureTest`は、テスト専用のフィクスチャで各規則が働くことを確かめる。
+`ArchitectureRuleFixtureTest`、`DirectWriteFixtureTest`、`LambdaFixtureTest`は、テスト専用のフィクスチャで各規則が働くことを確かめる。違反フィクスチャの読み込みは`ViolatingFixtures`で共有する。
 
 - `backend/src/test/java/archfixture/conforming/`：規約どおりの`ordering`モジュール、`inventory`モジュール、`payment`モジュール、`shared`モジュールの最小の例。すべての規則が誤検出しないことを確かめる。
   `ordering`の`JooqOrderRepository`が`shared.infrastructure.persistence`の型を使い、`shared`のルートは`package-info.java`だけを持つ。
@@ -308,7 +310,8 @@ INSERTの共通カラムは`CommonColumns.forInsert`で、UPDATEとDELETEの共�
   Repository、`TableWriter`、CommandHandler、Controllerが読んだ版から作ることを止める。
 - `commandHandlersEnsureScreenLockNo`（R4）：`*CommandHandler`の、引数のCommandが`VersionedCommand`である`handle`は、その中で直接`domain.model`の型の`ensureLockNo`で、引数に`ExpectedLockNo`を持つものを呼ぶ。
   別のメソッドの中の呼び出しと、`ensureLockNo(long)`のオーバーロードでは満たせない。
-  ラムダの本体の呼び出しは`handle`の呼び出しとして数えるため、満たす。
+  ラムダの本体の呼び出しは`handle`の呼び出しとして数えるため、実行されないことがあるラムダの中でも満たす。
+  この扱いは`LambdaFixtureTest`が固定する。
   別の集約のインスタンスに呼ぶ、業務の検査の後に呼ぶ、`command.expectedLockNo()`以外の値を渡す書き方は検査しない（値の流れは追わない）。
 - `jooqVersionIsReviewed`：実行時のjOOQの版が、禁止の一覧を見直した版と一致する。
   版が変わったら[jOOQのSQLの書き方](../database/jooq-usage.md)の「jOOQの版を上げるとき」に従う。

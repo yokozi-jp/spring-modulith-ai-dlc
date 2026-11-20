@@ -1,5 +1,7 @@
 package com.example.demo.architecture;
 
+import static com.example.demo.architecture.ViolatingFixtures.VIOLATING;
+import static com.example.demo.architecture.ViolatingFixtures.VIOLATING_CLASSES;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
@@ -48,19 +50,8 @@ class ArchitectureRuleFixtureTest {
   /** 規約どおりのフィクスチャの基底パッケージ。 */
   private static final String CONFORMING = "archfixture.conforming";
 
-  /** 違反フィクスチャの基底パッケージ。 */
-  private static final String VIOLATING = "archfixture.violating";
-
   /** 違反フィクスチャのクラス名の接頭辞。 */
   private static final String VIOLATING_PREFIX = VIOLATING + ".";
-
-  /**
-   * 違反フィクスチャの import 結果。
-   *
-   * <p>import はクラスパス全体を走査して遅く、パラメータごとに繰り返すと全体の大半を占める。規則の検査は import 結果を読むだけなので、全パラメータで共有する。
-   */
-  private static final JavaClasses VIOLATING_CLASSES =
-      new ClassFileImporter().importPackages(VIOLATING);
 
   /** ロールとスキーマを持つ機能モジュールの、フィクスチャでの名前。 */
   private static final Set<String> FIXTURE_MODULES = Set.of("ordering", "inventory");
