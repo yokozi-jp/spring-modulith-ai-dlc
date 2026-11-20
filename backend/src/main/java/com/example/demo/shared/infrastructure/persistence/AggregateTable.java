@@ -2,6 +2,7 @@ package com.example.demo.shared.infrastructure.persistence;
 
 import com.example.demo.shared.concurrency.Versioned;
 import java.util.List;
+import java.util.function.Function;
 import org.jooq.Record;
 import org.jooq.Table;
 import org.jooq.TableField;
@@ -22,7 +23,6 @@ import org.jooq.TableField;
 // A は実行時に使わない。update が集約ルートのクラスを受け取るため、版の数値を返すラムダは渡せない。
 @SuppressWarnings({
   "UnusedTypeParameter",
-  "PMD.DataClass",
   "PMD.AvoidFieldNameMatchingMethodName",
   "PMD.ShortMethodName"
 })
@@ -34,6 +34,9 @@ public final class AggregateTable<R extends Record, K, A extends Versioned> {
   /** ルートを一つに決める一意の列。 */
   private final TableField<R, K> key;
 
+  /** 集約ルートから、ルートを一つに決める一意の列の値を取る。 */
+  private final Function<A, K> keyOf;
+
   /** ルートの内部の主キー。子の外部キーが参照する。 */
   private final TableField<R, Long> id;
 
@@ -43,10 +46,12 @@ public final class AggregateTable<R extends Record, K, A extends Versioned> {
   private AggregateTable(
       final Table<R> table,
       final TableField<R, K> key,
+      final Function<A, K> keyOf,
       final TableField<R, Long> id,
       final List<ChildTable<R, ?>> children) {
     this.table = table;
     this.key = key;
+    this.keyOf = keyOf;
     this.id = id;
     this.children = List.copyOf(children);
   }
@@ -56,6 +61,8 @@ public final class AggregateTable<R extends Record, K, A extends Versioned> {
    *
    * @param table 集約ルートのテーブル
    * @param key ルートを一つに決める一意の列。{@code public_id} など
+   * @param keyOf 集約ルートから {@code key} の値を取る。{@link TableWriter}
+   *     は、渡された集約ルートの値でルートの行を引くため、別の集約ルートの値と組にして渡す誤りが書けない
    * @param id ルートの内部の主キー
    * @param children 子のテーブル。なければ省く
    * @throws IllegalArgumentException テーブルに共通カラムがない場合
@@ -64,10 +71,11 @@ public final class AggregateTable<R extends Record, K, A extends Versioned> {
   public static <R extends Record, K, A extends Versioned> AggregateTable<R, K, A> of(
       final Table<R> table,
       final TableField<R, K> key,
+      final Function<A, K> keyOf,
       final TableField<R, Long> id,
       final ChildTable<R, ?>... children) {
     CommonColumns.requireAuditColumns(table);
-    return new AggregateTable<>(table, key, id, List.of(children));
+    return new AggregateTable<>(table, key, keyOf, id, List.of(children));
   }
 
   /* package */ Table<R> table() {
@@ -76,6 +84,10 @@ public final class AggregateTable<R extends Record, K, A extends Versioned> {
 
   /* package */ TableField<R, K> key() {
     return key;
+  }
+
+  /* package */ K keyOf(final A root) {
+    return keyOf.apply(root);
   }
 
   /* package */ TableField<R, Long> id() {

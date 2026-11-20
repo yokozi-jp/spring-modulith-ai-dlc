@@ -39,7 +39,8 @@ class JooqOrderRepository implements OrderRepository {
 
   /** 注文の集約。ルートは公開 ID で一つに決める。 */
   private static final AggregateTable<TOrderRecord, UUID, Order> ORDER =
-      AggregateTable.of(T_ORDER, T_ORDER.PUBLIC_ID, T_ORDER.ORDER_ID, LINES);
+      AggregateTable.of(
+          T_ORDER, T_ORDER.PUBLIC_ID, order -> order.id().value(), T_ORDER.ORDER_ID, LINES);
 
   /** SQL を組み立てて実行する jOOQ のコンテキスト。 */
   private final DSLContext dsl;
@@ -80,7 +81,7 @@ class JooqOrderRepository implements OrderRepository {
     // ユニークインデックスは public_id（UUID v4 で衝突しない）と customer_order_code だけなので、409 は客先注文番号の重複である。
     tableWriter.insert(
         ORDER,
-        order.id().value(),
+        order,
         set -> rootColumns(order, set),
         rows -> rows.put(LINES, order.lines(), JooqOrderRepository::lineColumns));
   }
@@ -89,7 +90,6 @@ class JooqOrderRepository implements OrderRepository {
   public void update(final Order order) {
     tableWriter.update(
         ORDER,
-        order.id().value(),
         order,
         set -> rootColumns(order, set),
         rows -> rows.put(LINES, order.lines(), JooqOrderRepository::lineColumns));

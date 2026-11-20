@@ -7,8 +7,9 @@ import archfixture.violating.ordering.domain.model.UnversionedOrderRepository;
 import archfixture.violating.shared.infrastructure.persistence.TableWriter;
 
 /**
- * 違反：repositoryUpdateAndDeleteCheckVersion（update と save が TableWriter の update を呼ばない）と
- * onlyCommandHandlersUpdateOrDeleteAggregates（Repository の実装が別の Repository の delete を呼ぶ）。
+ * 違反：repositoryUpdateAndDeleteCheckVersion（update と save が TableWriter の update を呼ばず、store が update
+ * という名前ではない）と onlyCommandHandlersUpdateOrDeleteAggregates（Repository の実装が別の Repository の delete
+ * を呼ぶ）。
  */
 public final class JooqOrderRepository implements OrderRepository {
 
@@ -34,6 +35,11 @@ public final class JooqOrderRepository implements OrderRepository {
   /** TableWriter の update ではなく、版を比べない入口で注文を保存する。 */
   public String update(final Order order) {
     return tableWriter.execute(order.id().value());
+  }
+
+  /** TableWriter の update を呼ぶが、update という名前ではない。 */
+  public String store(final Order order) {
+    return tableWriter.update(order.id().value());
   }
 
   /** update と別の名前でも、版を比べない入口で注文を保存する。 */

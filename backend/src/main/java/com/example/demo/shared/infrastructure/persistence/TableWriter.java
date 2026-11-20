@@ -29,8 +29,6 @@ import org.springframework.stereotype.Component;
  * ConflictException} への変換は、すべてここで行う。変換は例外の型ではなく SQLSTATE で決める。どの入口も、読み取り専用ではない、開いているトランザクションの中で呼ぶ。
  *
  * <p>例外のメッセージには、テーブル名、ルートの一意の列の値、期待する版を入れ、SQL は入れない（docs/observability/conventions.md）。
- *
- * <p>ponytail: 上限：子の行の UPDATE は 1 行ずつ実行する。子が多い集約が出たら、バッチにして件数の配列で 1 件ずつを確かめる。
  */
 // jOOQ の型を使って集約のルートの文を組み立てるため、結合するクラスの数の上限を外す。
 @SuppressWarnings("PMD.CouplingBetweenObjects")
@@ -65,7 +63,7 @@ public class TableWriter {
    * <p>子を宣言していない集約は、{@code rows -> {}} を渡す。
    *
    * @param aggregate 集約の宣言
-   * @param key ルートの一意の列の値
+   * @param root 新しい集約ルート。ルートの一意の列の値は、宣言の {@code keyOf} で集約ルートから取る
    * @param rootColumns ルートの業務の列の値。ルートの一意の列と内部の主キーは書けない
    * @param childRows 宣言した子すべての行。空の子は空の一覧で渡す
    * @throws IllegalArgumentException 宣言した子を渡していない場合、宣言していない子を渡した場合、書けない列を渡した場合
@@ -73,14 +71,14 @@ public class TableWriter {
    * @throws ConflictException 一意制約に違反した場合（種類は {@code UNIQUE}）、行ロックを {@code lock_timeout}
    *     までに取れない場合（種類は {@code LOCK}）。原因は持たない
    */
-  public <R extends Record, K> void insert(
-      final AggregateTable<R, K, ?> aggregate,
-      final K key,
+  public <R extends Record, K, A extends Versioned> void insert(
+      final AggregateTable<R, K, A> aggregate,
+      final A root,
       final Consumer<ColumnValues<R>> rootColumns,
       final Consumer<ChildRows<R>> childRows) {
     requireTransaction();
     final ChildRows<R> rows = collectChildRows(aggregate, childRows);
-    final long id = insertRoot(aggregate, key, rootColumns);
+    final long id = insertRoot(aggregate, aggregate.keyOf(root), rootColumns);
     for (final ChildTable<R, ?> child : aggregate.children()) {
       children.insertAll(child, id, rows);
     }
@@ -94,8 +92,8 @@ public class TableWriter {
    * になる。業務の列が一つもなくても、版と更新のカラムを進める。子は、ルートの行ロックを取った後に、保存済みの自然キーを読み、なくなった子の削除、残る子の更新、新しい子の追加の順で書く。
    *
    * @param aggregate 集約の宣言
-   * @param key ルートの一意の列の値
-   * @param root 以前に読んだ集約ルート。{@link Versioned#lockNo} が期待する版になる
+   * @param root 以前に読んだ集約ルート。ルートの一意の列の値は宣言の {@code keyOf} で、期待する版は {@link Versioned#lockNo}
+   *     で、この集約ルートから取る
    * @param rootColumns ルートの業務の列の値
    * @param childRows 宣言した子すべての、保存後にあるべき行。渡した子の自然キーにない保存済みの子は削除する
    * @throws IllegalArgumentException 期待する版が 1 未満の場合、宣言した子を渡していない場合、宣言していない子を渡した場合、自然キーが null
@@ -107,11 +105,11 @@ public class TableWriter {
    */
   public <R extends Record, K, A extends Versioned> void update(
       final AggregateTable<R, K, A> aggregate,
-      final K key,
       final A root,
       final Consumer<ColumnValues<R>> rootColumns,
       final Consumer<ChildRows<R>> childRows) {
     requireTransaction();
+    final K key = aggregate.keyOf(root);
     final long expectedLockNo = root.lockNo();
     final Table<R> table = aggregate.table();
     if (expectedLockNo < FIRST_LOCK_NO) {
@@ -196,12 +194,9 @@ public class TableWriter {
   /** 呼び出し側のラムダから子の行を集め、宣言した子と過不足がないことを SQL の前に確かめる。 */
   private static <R extends Record, K> ChildRows<R> collectChildRows(
       final AggregateTable<R, K, ?> aggregate, final Consumer<ChildRows<R>> childRows) {
-    final ChildRows<R> rows = new ChildRows<>();
+    final ChildRows<R> rows = new ChildRows<>(aggregate.children());
     childRows.accept(rows);
-    if (rows.size() != aggregate.children().size()) {
-      throw new IllegalArgumentException(
-          "child rows must match the declared children: table=" + aggregate.table().getName());
-    }
+    rows.requireAllPut();
     return rows;
   }
 

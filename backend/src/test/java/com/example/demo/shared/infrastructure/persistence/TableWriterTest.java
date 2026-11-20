@@ -5,14 +5,14 @@ import static com.example.demo.jooq.tables.FixtureItemTable.FIXTURE_ITEM;
 import static com.example.demo.shared.infrastructure.persistence.FixtureAggregates.DETAILS;
 import static com.example.demo.shared.infrastructure.persistence.FixtureAggregates.ITEM;
 import static com.example.demo.shared.infrastructure.persistence.FixtureAggregates.ITEM_ONLY;
-import static com.example.demo.shared.infrastructure.persistence.FixtureAggregates.version;
+import static com.example.demo.shared.infrastructure.persistence.FixtureAggregates.itemRoot;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.example.demo.shared.concurrency.ConflictException;
-import com.example.demo.shared.concurrency.Versioned;
 import com.example.demo.shared.failure.NotFoundException;
+import com.example.demo.shared.infrastructure.persistence.FixtureAggregates.Item;
 import com.example.demo.testkit.DatabaseTest;
 import com.example.demo.testkit.FixtureTablesExtension;
 import java.io.PrintWriter;
@@ -29,7 +29,6 @@ import org.jooq.DSLContext;
 import org.jooq.Record;
 import org.jooq.Table;
 import org.jooq.impl.DSL;
-import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -53,6 +52,9 @@ class TableWriterTest {
 
   /** lock_no を持たないテーブル。 */
   private static final Table<Record> NO_LOCK_TABLE = DSL.table(DSL.name("t_no_lock"));
+
+  /** 列を書く子の明細番号。 */
+  private static final int FIRST_DETAIL = 1;
 
   /** 更新の時刻。 */
   private static final Instant NOW = Instant.parse("2026-10-04T01:02:03.123456Z");
@@ -151,11 +153,12 @@ class TableWriterTest {
   void updateMatchingTwoRowsIsRejected() {
     insertItem(1L, "same");
     insertItem(2L, "same");
-    final AggregateTable<Record, String, Versioned> byName =
-        AggregateTable.of(FIXTURE_ITEM, FIXTURE_ITEM.ITEM_NAME, FIXTURE_ITEM.ITEM_ID);
+    final AggregateTable<Record, String, Item> byName =
+        AggregateTable.of(FIXTURE_ITEM, FIXTURE_ITEM.ITEM_NAME, Item::name, FIXTURE_ITEM.ITEM_ID);
 
     assertThatThrownBy(() ->
-            runInUseCase(() -> writer.update(byName, "same", version(1L), set -> {}, rows -> {})))
+            runInUseCase(
+                () -> writer.update(byName, new Item(1L, "same", 1L), set -> {}, rows -> {})))
         .isInstanceOf(IllegalStateException.class)
         .hasMessageContaining("matched 2 rows");
   }
@@ -174,8 +177,9 @@ class TableWriterTest {
   @Test
   @DisplayName("共通カラムのないテーブルは、集約の宣言で IllegalArgumentException にする")
   void tableWithoutCommonColumnsIsRejected() {
-    assertThatThrownBy(
-            () -> AggregateTable.of(NO_LOCK_TABLE, FIXTURE_ITEM.ITEM_ID, FIXTURE_ITEM.ITEM_ID))
+    assertThatThrownBy(() ->
+            AggregateTable.<Record, Long, Item>of(
+                NO_LOCK_TABLE, FIXTURE_ITEM.ITEM_ID, Item::id, FIXTURE_ITEM.ITEM_ID))
         .as("集約")
         .isInstanceOf(IllegalArgumentException.class)
         .hasMessageContaining("column=lock_no");
@@ -227,7 +231,7 @@ class TableWriterTest {
   }
 
   @Test
-  @DisplayName("子の差分は、ルートの更新、集約にない子の削除、両方にある子の更新、新しい子の追加で保存する")
+  @DisplayName("子は差分で保存し、集約にない子を削除し、両方にある子を更新し、新しい子を追加する")
   void childrenAreSavedAsDifference() {
     insertItem(1L, "root");
     insertDetail(1L, 1, "one");
@@ -289,16 +293,16 @@ class TableWriterTest {
   void invalidChildRowsAreRejected() {
     insertItem(1L, "root");
 
-    assertThatThrownBy(() -> runInUseCase(() -> save(1L, 1L, set -> {}, null)))
+    assertThatThrownBy(
+            () -> runInUseCase(() -> writer.update(ITEM, itemRoot(1L, 1L), set -> {}, rows -> {})))
         .as("子を渡さない")
         .isInstanceOf(IllegalArgumentException.class)
-        .hasMessageContaining("child rows must match the declared children");
+        .hasMessageContaining("child rows were not put");
     assertThatThrownBy(() ->
             runInUseCase(() ->
                 writer.update(
                     ITEM,
-                    1L,
-                    version(1L),
+                    itemRoot(1L, 1L),
                     set -> {},
                     rows ->
                         rows.put(DETAILS, List.of(), (n, set) -> {})
@@ -315,8 +319,26 @@ class TableWriterTest {
             runInUseCase(() ->
                 writer.update(
                     ITEM,
-                    1L,
-                    version(1L),
+                    itemRoot(1L, 1L),
+                    set -> {},
+                    rows ->
+                        rows.put(
+                            DETAILS,
+                            List.of(detail(1, "a"), detail(2, "b")),
+                            (d, set) -> {
+                              set.set(FIXTURE_ITEM_DETAIL.DETAIL_NO, d.number());
+                              if (d.number() == FIRST_DETAIL) {
+                                set.set(FIXTURE_ITEM_DETAIL.DETAIL_TEXT, d.text());
+                              }
+                            }))))
+        .as("行ごとに書く列が違う")
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessageContaining("child rows must set the same columns");
+    assertThatThrownBy(() ->
+            runInUseCase(() ->
+                writer.update(
+                    ITEM,
+                    itemRoot(1L, 1L),
                     set -> {},
                     rows ->
                         rows.put(
@@ -334,7 +356,7 @@ class TableWriterTest {
     runInUseCase(() ->
         writer.insert(
             ITEM,
-            1L,
+            itemRoot(1L, 1L),
             set -> set.set(FIXTURE_ITEM.ITEM_NAME, "new"),
             rows ->
                 rows.put(
@@ -359,25 +381,33 @@ class TableWriterTest {
             runInUseCase(() ->
                 writer.insert(
                     ITEM_ONLY,
-                    1L,
+                    itemRoot(1L, 1L),
                     set -> set.set(FIXTURE_ITEM.ITEM_NAME, "x"),
                     rows -> rows.put(DETAILS, List.of(), (d, set) -> {}))))
         .as("子を宣言していない集約に子")
         .isInstanceOf(IllegalArgumentException.class)
-        .hasMessageContaining("child rows must match the declared children");
+        .hasMessageContaining("child is not declared by the aggregate");
     assertThatThrownBy(() ->
             runInUseCase(() ->
-                writer.insert(ITEM, 1L, set -> set.set(FIXTURE_ITEM.ITEM_NAME, "x"), rows -> {})))
+                writer.insert(
+                    ITEM,
+                    itemRoot(1L, 1L),
+                    set -> set.set(FIXTURE_ITEM.ITEM_NAME, "x"),
+                    rows -> {})))
         .as("子を宣言した集約に子を渡さない")
         .isInstanceOf(IllegalArgumentException.class)
-        .hasMessageContaining("child rows must match the declared children");
+        .hasMessageContaining("child rows were not put");
   }
 
   @Test
   @DisplayName("insert は子を宣言していない集約を、空の子で書く")
   void insertWritesRootOnlyAggregate() {
     runInUseCase(() ->
-        writer.insert(ITEM_ONLY, 1L, set -> set.set(FIXTURE_ITEM.ITEM_NAME, "only"), rows -> {}));
+        writer.insert(
+            ITEM_ONLY,
+            itemRoot(1L, 1L),
+            set -> set.set(FIXTURE_ITEM.ITEM_NAME, "only"),
+            rows -> {}));
 
     assertThat(item(1L).get(FIXTURE_ITEM.ITEM_NAME)).isEqualTo("only");
   }
@@ -392,7 +422,7 @@ class TableWriterTest {
             runInUseCase(() ->
                 writer.insert(
                     ITEM_ONLY,
-                    1L,
+                    itemRoot(1L, 1L),
                     set -> set.set(FIXTURE_ITEM.ITEM_NAME, "duplicate"),
                     rows -> {})))
         .isInstanceOf(ConflictException.class)
@@ -412,8 +442,7 @@ class TableWriterTest {
             runInUseCase(() ->
                 writer.update(
                     ITEM_ONLY,
-                    1L,
-                    version(1L),
+                    itemRoot(1L, 1L),
                     set ->
                         set.set(
                             FIXTURE_ITEM.ITEM_NAME,
@@ -440,7 +469,10 @@ class TableWriterTest {
               template.executeWithoutResult(status ->
                   runInUseCase(() ->
                       writer.insert(
-                          ITEM_ONLY, 1L, set -> set.set(FIXTURE_ITEM.ITEM_NAME, "x"), rows -> {}))))
+                          ITEM_ONLY,
+                          itemRoot(1L, 1L),
+                          set -> set.set(FIXTURE_ITEM.ITEM_NAME, "x"),
+                          rows -> {}))))
           .as("insert")
           .isInstanceOf(IllegalStateException.class)
           .hasMessageContaining("read-write transaction");
@@ -449,8 +481,7 @@ class TableWriterTest {
                   runInUseCase(() ->
                       writer.update(
                           ITEM_ONLY,
-                          1L,
-                          version(1L),
+                          itemRoot(1L, 1L),
                           set -> set.set(FIXTURE_ITEM.ITEM_NAME, "x"),
                           rows -> {}))))
           .as("update")
@@ -488,27 +519,23 @@ class TableWriterTest {
         children.entrySet().stream().map(e -> detail(e.getKey(), e.getValue())).toList());
   }
 
-  /** 子の行を渡して、ルートを更新する。{@code details} が null なら、子を渡さない。 */
+  /** 子の行を渡して、ルートを更新する。 */
   private void save(
       final long itemId,
       final long expectedLockNo,
       final Consumer<ColumnValues<Record>> rootColumns,
-      final @Nullable List<Detail> details) {
+      final List<Detail> details) {
     writer.update(
         ITEM,
-        itemId,
-        version(expectedLockNo),
+        itemRoot(itemId, expectedLockNo),
         rootColumns,
-        rows -> {
-          if (details != null) {
+        rows ->
             rows.put(
                 DETAILS,
                 details,
                 (detail, set) ->
                     set.set(FIXTURE_ITEM_DETAIL.DETAIL_NO, detail.number())
-                        .set(FIXTURE_ITEM_DETAIL.DETAIL_TEXT, detail.text()));
-          }
-        });
+                        .set(FIXTURE_ITEM_DETAIL.DETAIL_TEXT, detail.text())));
   }
 
   /** 集約ルートの行を、版を比べて更新する。 */

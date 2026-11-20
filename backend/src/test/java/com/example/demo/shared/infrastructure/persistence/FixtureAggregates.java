@@ -15,17 +15,21 @@ final class FixtureAggregates {
           FIXTURE_ITEM_DETAIL, FIXTURE_ITEM_DETAIL.ITEM_ID, FIXTURE_ITEM_DETAIL.DETAIL_NO);
 
   /** 子を持つ集約。ルートの一意の列と内部の主キーは、同じ item_id にする。 */
-  /* package */ static final AggregateTable<Record, Long, Versioned> ITEM =
-      AggregateTable.of(FIXTURE_ITEM, FIXTURE_ITEM.ITEM_ID, FIXTURE_ITEM.ITEM_ID, DETAILS);
+  /* package */ static final AggregateTable<Record, Long, Item> ITEM =
+      AggregateTable.of(
+          FIXTURE_ITEM, FIXTURE_ITEM.ITEM_ID, Item::id, FIXTURE_ITEM.ITEM_ID, DETAILS);
 
   /** 子を持たない集約。 */
-  /* package */ static final AggregateTable<Record, Long, Versioned> ITEM_ONLY =
-      AggregateTable.of(FIXTURE_ITEM, FIXTURE_ITEM.ITEM_ID, FIXTURE_ITEM.ITEM_ID);
+  /* package */ static final AggregateTable<Record, Long, Item> ITEM_ONLY =
+      AggregateTable.of(FIXTURE_ITEM, FIXTURE_ITEM.ITEM_ID, Item::id, FIXTURE_ITEM.ITEM_ID);
 
   private FixtureAggregates() {}
 
-  /** 読み込んだ版が {@code lockNo} の集約ルートを表す。 */
-  /* package */ static Versioned version(final long lockNo) {
-    return () -> lockNo;
+  /** テスト用の集約ルート。ルートの一意の列は {@code id}、読み込んだ版は {@code lockNo} である。 */
+  /* package */ record Item(long id, String name, long lockNo) implements Versioned {}
+
+  /** 版が {@code lockNo} で、名前が {@code x} の集約ルートを表す。 */
+  /* package */ static Item itemRoot(final long id, final long lockNo) {
+    return new Item(id, "x", lockNo);
   }
 }

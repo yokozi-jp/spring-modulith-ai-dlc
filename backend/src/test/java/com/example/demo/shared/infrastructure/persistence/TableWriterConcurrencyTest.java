@@ -4,7 +4,7 @@ import static com.example.demo.jooq.tables.FixtureItemDetailTable.FIXTURE_ITEM_D
 import static com.example.demo.jooq.tables.FixtureItemTable.FIXTURE_ITEM;
 import static com.example.demo.shared.infrastructure.persistence.FixtureAggregates.DETAILS;
 import static com.example.demo.shared.infrastructure.persistence.FixtureAggregates.ITEM;
-import static com.example.demo.shared.infrastructure.persistence.FixtureAggregates.version;
+import static com.example.demo.shared.infrastructure.persistence.FixtureAggregates.itemRoot;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
@@ -287,8 +287,7 @@ class TableWriterConcurrencyTest {
   private void updateItem(final long expectedLockNo, final List<String> detailTexts) {
     writer.update(
         ITEM,
-        ITEM_ID,
-        version(expectedLockNo),
+        itemRoot(ITEM_ID, expectedLockNo),
         set -> set.set(FIXTURE_ITEM.ITEM_NAME, "A"),
         rows ->
             rows.put(

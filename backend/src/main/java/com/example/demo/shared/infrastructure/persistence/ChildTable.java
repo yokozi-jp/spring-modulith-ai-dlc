@@ -12,13 +12,15 @@ import org.jooq.TableField;
 /**
  * 集約の子のテーブルの宣言。Repository がクラスの定数として一度だけ書く（ADR-054）。
  *
+ * <p>自然キーは、子のテーブルの一意制約で裏づける。裏づけがないと、保存済みの子を自然キーで引いた更新が 2 行に合い、{@link IllegalStateException} になる。
+ *
  * <p>親の中で行を同定する自然キー（{@code line_no} など）と、親の内部の主キーを持つ外部キーの列を持つ。{@link TableWriter}
  * は、子の書き込みのたびに外部キーの列の条件を自分で付けるため、親の条件を書き忘れた子の書き込みは書けない。
  *
  * @param <R> 親（集約ルート）のテーブルの Record の型。{@link AggregateTable} が同じ型の子だけを受け取る
  * @param <C> 子のテーブルの Record の型
  */
-// R は実行時に使わない。AggregateTable が同じ型 R の子だけを受け取るため、別の集約の子を渡すとコンパイルで失敗する。
+// R は実行時に使わない。AggregateTable が同じ型 R の子だけを受け取るため、別の集約のために型を付けた定数を、そのまま使い回すとコンパイルで失敗する。
 @SuppressWarnings({
   "UnusedTypeParameter",
   "PMD.AvoidFieldNameMatchingMethodName",

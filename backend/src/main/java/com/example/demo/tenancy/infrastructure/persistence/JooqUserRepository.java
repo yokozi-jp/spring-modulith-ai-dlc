@@ -33,7 +33,8 @@ class JooqUserRepository implements UserRepository {
 
   /** 利用者の集約。ルートは公開 ID で一つに決める。 */
   private static final AggregateTable<MUserRecord, UUID, User> USER =
-      AggregateTable.of(M_USER, M_USER.PUBLIC_ID, M_USER.USER_ID, IDENTITIES);
+      AggregateTable.of(
+          M_USER, M_USER.PUBLIC_ID, user -> user.id().value(), M_USER.USER_ID, IDENTITIES);
 
   /** SQL を組み立てて実行する jOOQ のコンテキスト。 */
   private final DSLContext dsl;
@@ -73,7 +74,7 @@ class JooqUserRepository implements UserRepository {
   public void add(final User user) {
     tableWriter.insert(
         USER,
-        user.id().value(),
+        user,
         set -> {},
         rows ->
             rows.put(

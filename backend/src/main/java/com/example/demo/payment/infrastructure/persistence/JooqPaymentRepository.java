@@ -29,7 +29,8 @@ class JooqPaymentRepository implements PaymentRepository {
 
   /** 決済記録の集約。ルートは公開 ID で一つに決める。 */
   private static final AggregateTable<TPaymentRecord, UUID, Payment> PAYMENT =
-      AggregateTable.of(T_PAYMENT, T_PAYMENT.PUBLIC_ID, T_PAYMENT.PAYMENT_ID);
+      AggregateTable.of(
+          T_PAYMENT, T_PAYMENT.PUBLIC_ID, payment -> payment.id().value(), T_PAYMENT.PAYMENT_ID);
 
   /** SQL を組み立てて実行する jOOQ のコンテキスト。 */
   private final DSLContext dsl;
@@ -55,7 +56,7 @@ class JooqPaymentRepository implements PaymentRepository {
     // ユニークインデックスは public_id（UUID v4 で衝突しない）と order_public_id だけなので、409 は注文の決済記録の重複である。
     tableWriter.insert(
         PAYMENT,
-        payment.id().value(),
+        payment,
         set ->
             set.set(T_PAYMENT.ORDER_PUBLIC_ID, payment.orderId().value())
                 .set(T_PAYMENT.CHARGED_AMOUNT_JPY, payment.amount().amount())

@@ -82,11 +82,6 @@ public final class ColumnValues<R extends Record> {
     return Collections.unmodifiableMap(assignments);
   }
 
-  /** 一つも値を登録していなければ {@code true} を返す。 */
-  /* package */ boolean isEmpty() {
-    return assignments.isEmpty();
-  }
-
   private ColumnValues<R> put(final TableField<R, ?> field, final @Nullable Object value) {
     if (COMMON_COLUMNS.contains(field.getName()) || reserved.contains(field)) {
       throw new IllegalArgumentException(

@@ -51,7 +51,7 @@ import org.junit.jupiter.api.Test;
  * <p>基底パッケージを含む規則は {@code xxxRule(basePackage)} のファクトリで組み立て、{@link ArchitectureRuleFixtureTest}
  * がフィクスチャのパッケージで同じ規則を再利用する。
  *
- * <p>集約ルートは、{@code domain.model} にあり、引数のない {@code long lockNo()} を宣言する型とする。
+ * <p>集約ルートは、{@code domain.model} にあり、{@code shared.concurrency} の {@code Versioned} を実装する型とする。
  *
  * <p>画面の版は {@code ExpectedLockNo} と {@code VersionedCommand} で運ぶ。次の規則が、版の比べ忘れを止める。
  *
@@ -86,6 +86,9 @@ class TableWriterArchTest {
 
   /** 集約と Repository を置くパッケージ。 */
   private static final String DOMAIN_MODEL = ".domain.model";
+
+  /** 集約ルートの印の名前。 */
+  private static final String VERSIONED = "Versioned";
 
   /** CommandHandler の名前の接尾辞。 */
   private static final String COMMAND_HANDLER = "CommandHandler";
@@ -157,7 +160,11 @@ class TableWriterArchTest {
   private static final Set<String> GENERIC_QUERY_TYPES =
       Set.of(Query.class.getName(), RowCountQuery.class.getName(), DMLQuery.class.getName());
 
-  /** {@code InsertOnDuplicateStep} と {@code InsertQuery} の UPSERT。 */
+  /**
+   * {@code InsertOnDuplicateStep} と {@code InsertQuery} の UPSERT。
+   *
+   * <p>{@code insertInto} と {@code insertQuery} を禁じるため、本番のコードはこれらの型を作れない。入口の禁止を外したときに備える二重の防御である。
+   */
   private static final Set<String> UPSERTS =
       Set.of(
           "onConflict",
@@ -211,8 +218,7 @@ class TableWriterArchTest {
       repositoryUpdateAndDeleteCheckVersionRule(BASE_PACKAGE);
 
   /**
-   * Repository の {@code add}、{@code update}、{@code delete} は、{@code long lockNo()}
-   * を持つ集約ルートを受け取る（H6）。
+   * Repository の {@code add}、{@code update}、{@code delete} は、{@code Versioned} を持つ集約ルートを受け取る（H6）。
    */
   @ArchTest
   /* package */ static final ArchRule repositoryWritesTakeVersionedAggregates =
@@ -316,9 +322,9 @@ class TableWriterArchTest {
         .should(takeOneAggregateRootWithLockNo())
         .allowEmptyShould(true)
         .because(
-            "集約ルートが long lockNo() を持たないと、版を比べる規則がその集約を見つけられず、版を比べない保存が検出されないため。"
-                + "直し方：add、update、delete は集約ルートを一つだけ受け取り、集約ルートは private final long lockNo と"
-                + "引数のない long lockNo() を持つ。"
+            "集約ルートが Versioned を実装しないと、版を比べる規則がその集約を見つけられず、TableWriter.update にも渡せないため。"
+                + "直し方：add、update、delete は集約ルートを一つだけ受け取り、集約ルートは private final long lockNo を持ち、"
+                + "shared.concurrency の Versioned を実装する。"
                 + "規約：docs/backend/class-roles/repository.md、docs/backend/class-roles/aggregate.md、"
                 + DOCS);
   }
@@ -501,8 +507,8 @@ class TableWriterArchTest {
    * {@code domain.model} の {@code *Repository} インタフェースの {@code add}、{@code update}、{@code delete}
    * かを返す。
    *
-   * <p>必須の {@code add} を含めるため、{@code save(Order)} のような名前で保存する Repository でも、{@code lockNo()}
-   * を持たない集約は {@code add} で検出される。
+   * <p>必須の {@code add} を含めるため、{@code save(Order)} のような名前で保存する Repository でも、{@code Versioned}
+   * を実装しない集約は {@code add} で検出される。
    */
   private static boolean isRepositoryInterfaceWrite(final JavaMethod method) {
     final JavaClass owner = method.getOwner();
@@ -513,14 +519,15 @@ class TableWriterArchTest {
   }
 
   private static ArchCondition<JavaMethod> takeOneAggregateRootWithLockNo() {
-    return new ArchCondition<>("take exactly one domain.model type declaring long lockNo()") {
+    return new ArchCondition<>("take exactly one domain.model type implementing Versioned") {
       @Override
       public void check(final JavaMethod item, final ConditionEvents events) {
         final List<JavaClass> parameters = item.getRawParameterTypes();
         if (parameters.size() != 1 || !isAggregateRoot(parameters.getFirst())) {
           events.add(
               SimpleConditionEvent.violated(
-                  item, item.getFullName() + " の引数が、引数のない long lockNo() を宣言する集約ルート一つではない。"));
+                  item,
+                  item.getFullName() + " の引数が、shared.concurrency の Versioned を実装する集約ルート一つではない。"));
         }
       }
     };
@@ -638,13 +645,11 @@ class TableWriterArchTest {
     };
   }
 
-  /** {@code domain.model} にあり、引数のない {@code long lockNo()} を宣言する型かを返す。 */
+  /** {@code domain.model} にあり、{@code shared.concurrency} の {@code Versioned} を実装する型かを返す。 */
   private static boolean isAggregateRoot(final JavaClass type) {
     return type.getPackageName().contains(DOMAIN_MODEL)
-        && type.getMethods().stream()
-            .anyMatch(method ->
-                "lockNo".equals(method.getName())
-                    && method.getRawParameterTypes().isEmpty()
-                    && method.getRawReturnType().isEquivalentTo(long.class));
+        && type.getAllRawInterfaces().stream()
+            .anyMatch(
+                implemented -> implemented.getName().endsWith(CONCURRENCY_PACKAGE + VERSIONED));
   }
 }

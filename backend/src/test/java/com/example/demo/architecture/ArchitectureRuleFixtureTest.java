@@ -285,6 +285,10 @@ class ArchitectureRuleFixtureTest {
             TableWriterArchTest.repositoryUpdateAndDeleteCheckVersionRule(VIOLATING),
             UNVERSIONED_REPOSITORY + ".update("),
         row(
+            "repositoryUpdateAndDeleteCheckVersion: update call under another name",
+            TableWriterArchTest.repositoryUpdateAndDeleteCheckVersionRule(VIOLATING),
+            UNVERSIONED_REPOSITORY + ".store("),
+        row(
             "repositoryUpdateAndDeleteCheckVersion: save",
             TableWriterArchTest.repositoryUpdateAndDeleteCheckVersionRule(VIOLATING),
             UNVERSIONED_REPOSITORY + ".save("),

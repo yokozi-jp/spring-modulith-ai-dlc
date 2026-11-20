@@ -86,7 +86,11 @@ import org.jspecify.annotations.Nullable;
         () -> childTarget(table, rootId));
   }
 
-  /** 残る子を 1 行更新し、その行の版を 1 進める。 */
+  /**
+   * 残る子を 1 行更新し、その行の版を 1 進める。
+   *
+   * <p>ponytail: 上限：子の行の UPDATE は 1 行ずつ実行する。子が多い集約が出たら、バッチにして件数の配列で 1 件ずつを確かめる。
+   */
   private <R extends Record, C extends Record> void updateChild(
       final ChildTable<R, C> child,
       final long rootId,
@@ -148,7 +152,7 @@ import org.jspecify.annotations.Nullable;
     final List<@Nullable Object> values = new ArrayList<>();
     values.add(rootId);
     businessFields.forEach(field -> values.add(row.values().get(field)));
-    common.keySet().forEach(field -> values.add(common.get(field)));
+    values.addAll(common.values());
     return values;
   }
 
