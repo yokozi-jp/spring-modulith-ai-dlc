@@ -14,6 +14,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -134,9 +135,11 @@ class DirectWriteFixtureTest {
 
   /** 規則が違反として報告した行。 */
   private static final List<String> VIOLATION_LINES =
-      catchThrowable(() ->
-              TableWriterArchTest.tableWritesGoThroughTableWriterRule(VIOLATING)
-                  .check(VIOLATING_CLASSES))
+      Objects.requireNonNull(
+              catchThrowable(() ->
+                  TableWriterArchTest.tableWritesGoThroughTableWriterRule(VIOLATING)
+                      .check(VIOLATING_CLASSES)),
+              "tableWritesGoThroughTableWriter が違反フィクスチャを検出しない")
           .getMessage()
           .lines()
           .toList();

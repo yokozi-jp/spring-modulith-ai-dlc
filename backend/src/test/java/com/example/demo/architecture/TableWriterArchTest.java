@@ -151,7 +151,10 @@ class TableWriterArchTest {
           "connection",
           "connectionResult");
 
-  /** {@code Update} と {@code Delete} に代入できる型の実行。名前が {@code fetch} で始まるものも含める。 */
+  /**
+   * {@code Update} と {@code Delete} に代入できる型の実行。名前が {@code fetch} で始まるものは、この一覧に持たず {@code
+   * isDirectWrite} で見る。
+   */
   /* package */ static final Set<String> QUERY_EXECUTIONS =
       Set.of("execute", "executeAsync", "returning", "returningResult");
 
