@@ -6,6 +6,8 @@ import java.sql.PreparedStatement;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.List;
+import java.util.Map;
+import java.util.concurrent.CompletionStage;
 import java.util.function.ToIntFunction;
 import java.util.function.UnaryOperator;
 import javax.sql.DataSource;
@@ -36,7 +38,7 @@ import org.springframework.jdbc.datasource.init.ResourceDatabasePopulator;
 import org.springframework.jdbc.object.SqlUpdate;
 
 /**
- * 違反：tableWritesGoThroughTableWriter（メソッドごとに、TableWriter を通さない書き込みの API を一つ使う）。
+ * 違反：tableWritesGoThroughTableWriter（メソッドごとに、TableWriter を通さない書き込みの API を使う）。
  *
  * <p>規則がバイトコードを読むだけで、実行しない。
  */
@@ -109,7 +111,7 @@ public final class DirectOrderWriter {
 
   /** {@code DSLContext.connection} を呼ぶ。 */
   public static DSLContext dslConnection(final DSLContext dsl) {
-    dsl.connection(connection -> connection.setReadOnly(false));
+    dsl.connection(connection -> {});
     return dsl;
   }
 
@@ -143,6 +145,19 @@ public final class DirectOrderWriter {
   /** {@code InsertQuery.addValueForUpdate} を呼ぶ。 */
   public static InsertQuery<Record> insertQueryAddValueForUpdate(final InsertQuery<Record> insert) {
     insert.addValueForUpdate(ORDER_ID, "O-1");
+    return insert;
+  }
+
+  /** {@code InsertQuery.addValuesForUpdate} を呼ぶ。 */
+  public static InsertQuery<Record> insertQueryAddValuesForUpdate(
+      final InsertQuery<Record> insert) {
+    insert.addValuesForUpdate(Map.of(ORDER_ID, "O-1"));
+    return insert;
+  }
+
+  /** {@code InsertQuery.onConflictWhere} を呼ぶ。 */
+  public static InsertQuery<Record> insertQueryOnConflictWhere(final InsertQuery<Record> insert) {
+    insert.onConflictWhere(DSL.noCondition());
     return insert;
   }
 
@@ -205,6 +220,16 @@ public final class DirectOrderWriter {
   /** {@code UpdateSetMoreStep.returning} を呼ぶ。 */
   public static Object updateReturning(final UpdateSetMoreStep<Record> update) {
     return update.returning();
+  }
+
+  /** {@code UpdateSetMoreStep.returningResult} を呼ぶ。 */
+  public static Object updateReturningResult(final UpdateSetMoreStep<Record> update) {
+    return update.returningResult(ORDER_ID);
+  }
+
+  /** {@code Update.executeAsync} を呼ぶ。 */
+  public static CompletionStage<Integer> updateExecuteAsync(final Update<?> update) {
+    return update.executeAsync();
   }
 
   /** {@code Delete.execute} を呼ぶ。 */

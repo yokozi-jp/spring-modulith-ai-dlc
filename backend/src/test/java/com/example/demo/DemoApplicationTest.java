@@ -20,6 +20,8 @@ import io.github.resilience4j.retry.RetryConfig;
 import io.github.resilience4j.retry.RetryRegistry;
 import io.github.resilience4j.timelimiter.TimeLimiterConfig;
 import io.github.resilience4j.timelimiter.TimeLimiterRegistry;
+import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.Timer;
 import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.Duration;
@@ -36,6 +38,8 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.boot.http.client.HttpClientSettings;
+import org.springframework.boot.http.client.HttpRedirects;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.ApplicationContext;
 import org.springframework.context.annotation.Import;
@@ -75,6 +79,9 @@ class DemoApplicationTest {
 
   /** time limiter の実効既定値を検証する registry。 */
   @Autowired private TimeLimiterRegistry timeLimiterRegistry;
+
+  /** 計測の記録先。 */
+  @Autowired private MeterRegistry meterRegistry;
 
   /** 仮想スレッドを使うアプリケーション共通 executor。 */
   @Autowired
@@ -218,6 +225,38 @@ class DemoApplicationTest {
         "payment-gateway の retry が再試行なしの成功を 1 件数えること");
     assertEquals(
         1, retry.getRetryConfig().getMaxAttempts(), "payment-gateway の retry の試行が 1 回であること");
+  }
+
+  @Test
+  @DisplayName("決済代行の呼び出しに、Boot の計測（http.client.requests のメトリクス）が付く")
+  void paymentGatewayCallIsObserved() {
+    // 請求は、paymentGatewayIsGuardedByResilience4j と同じく、WireMock のスタブが成功で返す。
+    final long before = chargeRequestCount();
+
+    paymentGateway.charge(new OrderId(UUID.randomUUID()), new Money(new BigDecimal("1.00")));
+
+    assertEquals(
+        before + 1, chargeRequestCount(), "決済代行の請求の呼び出しが http.client.requests に 1 件記録されること");
+  }
+
+  /** 請求の API の {@code http.client.requests} の件数を返す。まだ記録がなければ 0 を返す。 */
+  private long chargeRequestCount() {
+    final Timer timer =
+        meterRegistry
+            .find("http.client.requests")
+            .tag("uri", "/v1/charges")
+            .tag("status", "201")
+            .timer();
+    return timer == null ? 0 : timer.count();
+  }
+
+  @Test
+  @DisplayName("送信 HTTP クライアントの共通設定が、リダイレクトを辿らない")
+  void httpClientsDoNotFollowRedirects() {
+    assertEquals(
+        HttpRedirects.DONT_FOLLOW,
+        applicationContext.getBean(HttpClientSettings.class).redirects(),
+        "spring.http.clients.redirects が dont-follow であること");
   }
 
   @Test

@@ -276,6 +276,11 @@ tasks:
     desc: docs の OKF 適合、内部リンク、孤立ドキュメント、責務混在の見直し合図、steering との境界を検証
     silent: true
     dir: docs
+    preconditions:
+      - sh: command -v iwe
+        msg: iwe が無い。mise install --locked を実行する。
+      - sh: command -v jq
+        msg: jq が無い。mise install --locked を実行する。
     cmds:
       - task: lint-docs-sync
       - task: docs-boundary-check
@@ -283,15 +288,6 @@ tasks:
       - task: ruleset-check
       - task: iwe-mcp-check
       - |
-        if ! command -v iwe >/dev/null 2>&1; then
-          echo "OKF check: iwe が無いためスキップします（CI で検査されます）。" >&2
-          exit 0
-        fi
-        if ! command -v jq >/dev/null 2>&1; then
-          echo "OKF check: jq が無いためリンクと孤立の検査をスキップします（CI で検査されます）。" >&2
-          iwe schema validate
-          exit 0
-        fi
         iwe schema validate
         stats="$(iwe stats -f json)"
         broken="$(printf '%s' "$stats" | jq '[.brokenLinks[]? | select((.targetKey | startswith("../")) | not)] | length')"
@@ -564,6 +560,13 @@ tasks:
       - |
         ./02-setup-viteplus.sh
         ./04-setup-shell.sh
+        # エージェントは ~/.kiro/settings/ に書けないので、人が実行するこの Task で置く（docs/agents/skill-sources.md）。
+        mkdir -p ~/.kiro/settings
+        if [ ! -e ~/.kiro/settings/permissions.yaml ] && [ ! -e ~/.kiro/settings/permissions.json ]; then
+          cp {{shellQuote .ROOT_DIR}}/.kiro/kiro-permissions.yaml ~/.kiro/settings/permissions.yaml
+          echo "wrote ~/.kiro/settings/permissions.yaml"
+        fi
+        [ ! -e ~/.kiro/settings/permissions.yaml ] || diff {{shellQuote .ROOT_DIR}}/.kiro/kiro-permissions.yaml ~/.kiro/settings/permissions.yaml || true
 
   # Frontend
   fe-install:
@@ -1015,6 +1018,14 @@ tasks:
     dir: backend
     cmds:
       - ./gradlew cyclonedxBom
+
+  # Docker を使う検査が、使えない環境でスキップするかを決める判定の本体（Docker を使う lefthook のジョブが呼ぶ）。
+  # docker コマンドがあってもデーモンに接続できなければ、使えないとみなす。使えないときは 0 以外を返す。
+  docker-available:
+    desc: Dockerのデーモンに接続できるかを判定（使えなければ0以外）
+    silent: true
+    cmds:
+      - '{{.DOCKER}} info >/dev/null 2>&1 || { echo "docker を使えないため、Docker を使う検査をスキップします（CI で検査されます）。" >&2; exit 1; }'
 
   # API contract（ADR-052）
   api-lint:

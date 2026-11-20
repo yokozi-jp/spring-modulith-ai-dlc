@@ -13,17 +13,20 @@ import io.swagger.v3.oas.models.media.ObjectSchema;
 import io.swagger.v3.oas.models.media.Schema;
 import io.swagger.v3.oas.models.media.StringSchema;
 import io.swagger.v3.oas.models.responses.ApiResponse;
+import io.swagger.v3.oas.models.security.SecurityRequirement;
+import io.swagger.v3.oas.models.security.SecurityScheme;
 import io.swagger.v3.oas.models.servers.Server;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Consumer;
 import org.springdoc.core.customizers.OpenApiCustomizer;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 
-/** OpenAPI 3.1 文書へ全 API が共有する schema と response を登録する。 */
+/** OpenAPI 3.1 文書へ全 API が共有する schema と response、認証の securityScheme と既定の security を登録する。 */
 // 全 API が共有する components の組み立てを 1 か所に置くため、schema ごとの小さなメソッドが増える。
 @SuppressWarnings("PMD.TooManyMethods")
 @Configuration(proxyBeanMethods = false)
@@ -34,7 +37,7 @@ public class OpenApiConfig {
    *
    * <p>互換な追加で MINOR、破壊的変更で MAJOR を上げ、アプリのリリース版と連動させない（docs/web-api/versioning.md）。
    */
-  /* package */ static final String CONTRACT_VERSION = "0.5.0";
+  /* package */ static final String CONTRACT_VERSION = "0.6.0";
 
   /** 共通の Problem response を参照する接頭辞。 */
   private static final String PROBLEM_RESPONSE_REF = "#/components/responses/";
@@ -42,14 +45,29 @@ public class OpenApiConfig {
   /** components の schema を参照する接頭辞。 */
   private static final String SCHEMA_REF = "#/components/schemas/";
 
+  /** 認証の Cookie セッションを表す securityScheme の名前。 */
+  private static final String SESSION_COOKIE_SCHEME = "sessionCookie";
+
   /** RFC 9457 の共通 schema の名前。 */
   private static final String PROBLEM_DETAIL = "ProblemDetail";
 
-  /** API の基本情報と RFC 9457 共通 components を定義する。 */
+  /**
+   * API の基本情報と RFC 9457 共通 components、認証の securityScheme と既定の security を定義する。
+   *
+   * @param sessionCookieName セッション Cookie の名前（{@code server.servlet.session.cookie.name}）
+   */
   @Bean
-  public OpenAPI openApi() {
+  public OpenAPI openApi(
+      @Value("${server.servlet.session.cookie.name}") final String sessionCookieName) {
     final Components components =
         new Components()
+            .addSecuritySchemes(
+                SESSION_COOKIE_SCHEME,
+                new SecurityScheme()
+                    .type(SecurityScheme.Type.APIKEY)
+                    .in(SecurityScheme.In.COOKIE)
+                    .name(sessionCookieName)
+                    .description("ブラウザの Cookie セッション（ADR-007、ADR-059）"))
             .addSchemas(PROBLEM_DETAIL, problemDetailSchema())
             .addSchemas("ValidationError", validationErrorSchema())
             .addSchemas("ValidationProblem", validationProblemSchema())
@@ -83,6 +101,7 @@ public class OpenApiConfig {
                 .description("Demo アプリケーションの HTTP API")
                 .version(CONTRACT_VERSION))
         .servers(List.of(new Server().url("/").description("現在のオリジン")))
+        .addSecurityItem(new SecurityRequirement().addList(SESSION_COOKIE_SCHEME))
         .components(components);
   }
 

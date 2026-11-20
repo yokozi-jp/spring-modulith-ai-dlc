@@ -22,13 +22,16 @@ backend/src/test/java/com/example/demo/architecture/
 ├── ClassRoleArchTest.java
 ├── DatabaseConventionsArchTest.java
 ├── DateTimeConventionsArchTest.java
+├── DirectWriteFixtureTest.java
 ├── GeneralCodingRulesArchTest.java
 ├── JooqCommonColumnsArchTest.java
+├── LambdaFixtureTest.java
 ├── PackageByFeatureOnionArchitectureTest.java
 ├── ProxyRulesArchTest.java
 ├── PublicIdArchTest.java
 ├── TableWriterArchTest.java
-└── TestConventionsArchTest.java
+├── TestConventionsArchTest.java
+└── ViolatingFixtures.java
 ```
 
 ## モジュールとパッケージ
@@ -83,6 +86,18 @@ jOOQの生成物の`com.example.demo.jooq`はOPENのモジュールであり、`
 - `commandHandlersExposeOnlyTransactionalHandle`：`*CommandHandler`のpublicメソッドは、`@Transactional`を付けた`handle`一つだけにし、`*Command`を一つ受け取り`*Result`を返す。
 - `commandsAndResultsAreApplicationRecords`：`*Command`と`*Result`は`application`のrecordにする。
 - `commandHandlersDoNotDependOnOtherCommandHandlers`：`*CommandHandler`は別の`*CommandHandler`に依存しない。
+- `externalSystemCommandHandlersAreDependedOnlyByListeners`：外部システムのインタフェースに直接依存する`application`の`*CommandHandler`は、`application`の`*Listener`からだけ依存される。
+  外部システムのインタフェースは、`domain.model`のinterfaceのうち、Repository、アノテーション、`package-info`でないものとする。
+  守らせる規約は[CommandHandler](class-roles/command-handler.md)のアンチパターンに示し、理由は[ADR-050](../adr/ADR-050-define-backend-class-roles-and-naming.md)に示す。
+- `externalSystemInterfacesAreUsedOnlyByCommandHandlersAndClients`：外部システムのインタフェースに依存してよいのは、`application`の`*CommandHandler`と、それを実装する`infrastructure.client`のクラスだけである。
+  集約、Domain Service、QueryService、補助のクラスを通して外部システムを呼ぶ経路をなくすため、前の規則は`*CommandHandler`の直接の依存だけを見れば足りる。
+- `commandHandlersAndListenersDoNotImplementInterfaces`：`application`の`*CommandHandler`と`*Listener`は、Java標準の型以外のinterfaceを実装しない。
+  実装を認めると、呼び出し側がinterfaceだけに依存して`externalSystemCommandHandlersAreDependedOnlyByListeners`と`listenersAreNotCalled`を迂回できる。
+- `listenersAreNotCalled`：`application`の`*Listener`に、ほかのクラスは依存しない。
+  CommandHandlerやControllerがListenerの`on`を直接呼ぶと、イベント出版レジストリを通らず、失敗しても再投入されず、`externalSystemCommandHandlersAreDependedOnlyByListeners`も迂回できる。
+- `eventPublisherIsUsedOnlyByCommandHandlers`：`application`の`*CommandHandler`以外のクラスは、`ApplicationEventPublisher`の`publishEvent`と`ApplicationEventMulticaster`の`multicastEvent`を呼ばない。
+  `ApplicationContext`と`ConfigurableApplicationContext`は`ApplicationEventPublisher`を継承するため、同じ判定で検出する。
+  `application`の`*CommandHandler`は、`ApplicationContext`越しの発行も含めて検査しない。
 - `commandHandlersAndListenersDoNotUseInheritance`：`*CommandHandler`と`*Listener`は、Java標準の型以外のクラスを継承せず、継承も実装もさせない（[ADR-051](../adr/ADR-051-bind-pgm-cd-with-scoped-value-and-aspect.md)）。
   違反フィクスチャの`ReopenOrderHandler`（サブクラス）、`RestoreOrderCommandHandler`（基底クラスの`OrderHandlerSupport`）、`OrderShippedReceiver`（インタフェースの実装）で確かめる。
 - `moduleListenersAreApplicationListeners`：`@ApplicationModuleListener`を付けたメソッドは、`application`の`*Listener`の`on`にする。
@@ -105,7 +120,7 @@ jOOQの生成物の`com.example.demo.jooq`はOPENのモジュールであり、`
 ## 規則を確かめるフィクスチャ
 
 プロダクションの規則は`.allowEmptyShould(true)`を付けるため、対象のクラスがなくても成功する。
-`ArchitectureRuleFixtureTest`は、テスト専用のフィクスチャで各規則が働くことを確かめる。
+`ArchitectureRuleFixtureTest`、`DirectWriteFixtureTest`、`LambdaFixtureTest`は、テスト専用のフィクスチャで各規則が働くことを確かめる。違反フィクスチャの読み込みは`ViolatingFixtures`で共有する。
 
 - `backend/src/test/java/archfixture/conforming/`：規約どおりの`ordering`モジュール、`inventory`モジュール、`payment`モジュール、`shared`モジュールの最小の例。すべての規則が誤検出しないことを確かめる。
   `ordering`の`JooqOrderRepository`が`shared.infrastructure.persistence`の型を使い、`shared`のルートは`package-info.java`だけを持つ。
@@ -117,19 +132,35 @@ jOOQの生成物の`com.example.demo.jooq`はOPENのモジュールであり、`
 
 `sharedModuleIsUsedOnlyByPersistenceAdapters`は、違反フィクスチャの`application`の`OrderAuditColumns`が`shared.infrastructure.persistence`の型を使うことを検出し、規約どおりのフィクスチャの`JooqOrderRepository`を誤検出しないことを確かめる。
 
+`externalSystemCommandHandlersAreDependedOnlyByListeners`は、違反フィクスチャの`ChargeOrderController`が呼ぶ`ChargeOrderCommandHandler`（`PaymentGateway`に直接依存する）を検出する。
+`presentation.web`に置いた名前だけの`ChargeOrderListener`が呼ぶ場合も検出する。
+`externalSystemInterfacesAreUsedOnlyByCommandHandlersAndClients`は、違反フィクスチャの`PaymentChargePolicy`（Domain Service）、`PaymentCharger`（`domain.model`）、`PaymentChargerConfig`（`infrastructure.client`に置いた、interfaceを実装しない設定クラス）、`OrderPaymentCharger`（補助のクラス）が`PaymentGateway`に依存することを検出する。
+規約どおりのフィクスチャでは、`PaymentGateway`に依存する`CapturePaymentCommandHandler`を`OrderPlacedPaymentListener`だけが呼び、`PaymentGatewayClient`が`PaymentGateway`を実装しても、二つの規則が通ることを確かめる。
+
+`commandHandlersAndListenersDoNotImplementInterfaces`は、違反フィクスチャの`ShelveOrderCommandHandler`が`ShelveOrderUseCase`を、`ChargeTriggerListener`が`ChargeTrigger`を実装することを検出する。
+`listenersAreNotCalled`は、違反フィクスチャの`OrderPaidController`が`OrderPaidListener`の`on`を呼ぶことを検出する。
+
+`eventPublisherIsUsedOnlyByCommandHandlers`は、違反フィクスチャの`OrderEventController`（`ApplicationEventPublisher`）、`OrderEventMulticasterController`（`ApplicationEventMulticaster`）、`OrderContextPublisher`（`ApplicationContext`）、`shared.events.OrderEventForwarder`（`shared`に置いた発行を包むクラス）を検出する。
+規約どおりのフィクスチャでは、`PlaceOrderCommandHandler`が`ApplicationEventPublisher`で発行しても規則が通ることを確かめる。
+
 `queryResultStatusIsNotReadByOtherModules`は、違反フィクスチャの`inventory.application.OrderStatusGuard`が`ordering`の`OrderSummary`の`status()`を呼ぶことと、`paymentStatus`をメソッド参照することを検出する。
 規約どおりのフィクスチャでは、`ordering`の`OrderController`が自モジュールの`OrderSummary::status`を読み、除外する`payment.application.ChargeOrderCommandHandler`が他モジュールの`OrderSummary::status`を読んでも、規則が通ることを確かめる。
 
 `jooqReflectionMappingIsNotUsed`は、違反フィクスチャの`ReflectiveOrderReader`で禁止するメソッドごとに一行を持ち、それぞれの呼び出しを検出することを確かめる。
 
-`tableWritesGoThroughTableWriter`は、違反フィクスチャの`DirectOrderWriter`で禁止するAPIごとに一行を持つ。
+`tableWritesGoThroughTableWriter`は、違反フィクスチャの`DirectOrderWriter`のメソッドごとに一行を持つ。
+`DirectWriteFixtureTest`の`DIRECT_WRITES`が、メソッドと、そのメソッドが検出される禁止の呼び出しを対にして確かめる。
+禁止の名前を足したときは、その呼び出しを持つメソッドを`DirectOrderWriter`に足し、`DIRECT_WRITES`に行を足す。
+名前が`fetch`で始まる実行は、jOOQ 3.21.9の`Update`と`Delete`に該当するメソッドがなく、行を持たない。
 `DirectOrderWriter`は、ラムダの中の`execute()`、`Update`の変数からの`execute()`、`Update::execute`のメソッド参照も含む。
 `TableWriterArchTest`の残りの規則は、違反フィクスチャの`JooqOrderRepository`、`UnversionedOrderRepository`、`ApproveOrderCommandHandler`で確かめる。
 R1は`ReleaseOrderCommandHandler`（`ReleaseOrderCommand`と`ReleaseOrderRequest`）、`SuspendOrderCommandHandler`（static factoryの呼び出し）、`ResumeOrderCommandHandler`（static factoryのメソッド参照）、`ArchiveOrderCommandHandler`（`save`という別名の書き込み）で確かめる。
 R2は`ReopenPolicy`（Domain Serviceの`update`と`save`）、`PurgeOrderQueryService`、`JooqOrderRepository.save(OrderId)`（Repositoryの実装から別のRepositoryの`delete`）で確かめる。
 R3は`ForgedLockNoCommandHandler`（コンストラクタと`ExpectedLockNo::new`）と`OrderLockController`で確かめる。
 R4は`ApproveOrderCommandHandler`（`handle`から呼ばないprivateメソッドだけが`ensureLockNo`を呼ぶ）と`OverloadedEnsureCommandHandler`で確かめる。
+`LambdaEnsureCommandHandler`は、`Optional.ifPresent`のラムダの中の`ensureLockNo`をR4が満たすものとして数えることを`LambdaFixtureTest`で固定する（違反フィクスチャのパッケージにあるが、R4は検出しない）。
 `aggregateRootInsertsGoThroughTableWriter`は、違反フィクスチャの`JooqOrderDraftRepository`の`add`（`Insert`の`execute()`の直接の呼び出し）で確かめる。
+`JooqOrderLambdaDraftRepository`の`add`（ラムダの中の`execute()`）と`JooqOrderRepository`の`updateLater`（ラムダの中の`updateWhere`）は、`LambdaFixtureTest`で確かめる。
 `commandsAndResultsAreApplicationRecords`の型単位の除外は、`shared.concurrency`のrecordではない`ForceUnlockCommand`で確かめる。
 規約どおりのフィクスチャには、`shared.concurrency`と`shared.failure`の型と、Requestが`ExpectedLockNo`を作る`CancelOrderRequest`、Listenerが版のないCommandを作る`OrderPlacedExpiryListener`を置く。
 `archfixture.conforming`と`archfixture.violating`の`shared.infrastructure.persistence`には、規則が名前で見る`TableWriter`のスタブを置く。
@@ -189,6 +220,7 @@ Class <archfixture.violating.ordering.application.ShipOrderCommandHandler> is me
 - `assertionsShouldHaveDetailMessage`：`assert`文と`new AssertionError()`に失敗の詳細を書く。
 - `deprecatedApiShouldNotBeUsed`：`@Deprecated`のAPIを使わない。
 - `oldDateAndTimeClassesShouldNotBeUsed`：`java.util.Date`などの旧日時APIを使わない。
+- `restClientIsBuiltFromInjectedBuilder`：`RestClient.builder()`、`RestClient.create()`、`ClientHttpRequestFactoryBuilder.jdk()`などの生成を呼ばず、メソッド参照にもしない。Bootの自動構成の`RestClient.Builder`、`ClientHttpRequestFactoryBuilder`、`HttpClientSettings`を注入して使う（[外部システムのClient](class-roles/external-client.md)）。
 
 `ProxyRulesArchTest`は、プロキシ、非同期の実行、スケジューラが黙って働かなくなる書き方を検査する。
 規則が守らせる規約と理由は、[バックエンドのJava実装規約](java-coding.md)の「プロキシで動くアノテーション」に示す。
@@ -283,9 +315,9 @@ INSERTの共通カラムは`CommonColumns.forInsert`で、UPDATEとDELETEの共�
 - `repositoryWritesTakeVersionedAggregates`：`domain.model`の`*Repository`インタフェースの`add`、`update`、`delete`は、集約ルートを一つだけ受け取る。
   集約ルートが`long lockNo()`を持たないと、ほかの規則が集約ルートを見つけられず空のまま通るため、この規則で形を確かめる。
   必須の`add`を対象に含めるため、`save`のような名前で保存するRepositoryでも、`lockNo()`を持たない集約は`add`で検出される。
-- `aggregateMethodsDoNotUseUnversionedWrites`：集約ルートを引数に取るメソッドとラムダは、`updateWhere`と`deleteWhere`を呼ばない。
-  ラムダは捕捉した変数を引数に持つ合成メソッドになるため、同じ判定で見る。
-- `aggregateRootInsertsGoThroughTableWriter`：`Jooq*Repository`の`add`とその中のラムダは、`Insert`に代入できる型の`execute`、`executeAsync`、`returning`、`returningResult`と、名前が`fetch`で始まるメソッドを呼ばない。
+- `aggregateMethodsDoNotUseUnversionedWrites`：集約ルートを引数に取るメソッドは、`updateWhere`と`deleteWhere`を呼ばない。
+  ArchUnitはラムダの本体の呼び出しを外側のメソッドの呼び出しとして数えるため、ラムダの中の呼び出しも同じ判定で見る。
+- `aggregateRootInsertsGoThroughTableWriter`：`Jooq*Repository`の`add`（ラムダの中を含む）は、`Insert`に代入できる型の`execute`、`executeAsync`、`returning`、`returningResult`と、名前が`fetch`で始まるメソッドを呼ばない。
   集約ルートのINSERTは`TableWriter.insert`に渡し、子の行のINSERTは`dsl.batch`で実行する。
   `update`で子の行のINSERTを直接実行するため、対象を`add`に限る。
   検出しない書き方は[ADR-054](../adr/ADR-054-detect-optimistic-lock-conflicts-by-update-count.md)のNegativeに示す。
@@ -302,7 +334,9 @@ INSERTの共通カラムは`CommonColumns.forInsert`で、UPDATEとDELETEの共�
 - `expectedLockNoIsCreatedOnlyByRequests`（R3）：`presentation.web`の`*Request`以外のクラスは、`ExpectedLockNo`のコンストラクタを呼ばず、`ExpectedLockNo::new`も使わない。
   Repository、`TableWriter`、CommandHandler、Controllerが読んだ版から作ることを止める。
 - `commandHandlersEnsureScreenLockNo`（R4）：`*CommandHandler`の、引数のCommandが`VersionedCommand`である`handle`は、その中で直接`domain.model`の型の`ensureLockNo`で、引数に`ExpectedLockNo`を持つものを呼ぶ。
-  別のメソッドやラムダの中の呼び出しと、`ensureLockNo(long)`のオーバーロードでは満たせない。
+  別のメソッドの中の呼び出しと、`ensureLockNo(long)`のオーバーロードでは満たせない。
+  ラムダの本体の呼び出しは`handle`の呼び出しとして数えるため、実行されないことがあるラムダの中でも満たす。
+  この扱いは`LambdaFixtureTest`が固定する。
   別の集約のインスタンスに呼ぶ、業務の検査の後に呼ぶ、`command.expectedLockNo()`以外の値を渡す書き方は検査しない（値の流れは追わない）。
 - `jooqVersionIsReviewed`：実行時のjOOQの版が、禁止の一覧を見直した版と一致する。
   版が変わったら[jOOQのSQLの書き方](../database/jooq-usage.md)の「jOOQの版を上げるとき」に従う。

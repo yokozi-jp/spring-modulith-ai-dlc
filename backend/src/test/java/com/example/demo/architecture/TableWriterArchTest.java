@@ -151,8 +151,11 @@ class TableWriterArchTest {
           "connection",
           "connectionResult");
 
-  /** {@code Update} と {@code Delete} に代入できる型の実行。名前が {@code fetch} で始まるものも含める。 */
-  private static final Set<String> QUERY_EXECUTIONS =
+  /**
+   * {@code Update} と {@code Delete} に代入できる型の実行。名前が {@code fetch} で始まるものは、この一覧に持たず {@code
+   * isDirectWrite} で見る。
+   */
+  /* package */ static final Set<String> QUERY_EXECUTIONS =
       Set.of("execute", "executeAsync", "returning", "returningResult");
 
   /**
@@ -179,6 +182,20 @@ class TableWriterArchTest {
 
   /** {@code DAO} の書き込み。INSERT は対象にしない。 */
   private static final Set<String> DAO_WRITES = Set.of(UPDATE, DELETE, "deleteById", "merge");
+
+  /** 型ごとの、禁じるメソッドの名前。型の下位の型も対象にする。 */
+  /* package */ static final Map<Class<?>, Set<String>> NAMED_WRITES =
+      Map.of(
+          DSLContext.class, DSL_WRITES,
+          DSL.class, DSL_WRITES,
+          WithStep.class, DSL_WRITES,
+          InsertOnDuplicateStep.class, UPSERTS,
+          InsertQuery.class, UPSERTS,
+          LoaderOptionsStep.class, Set.of("onDuplicateKeyUpdate"),
+          UpdatableRecord.class, RECORD_WRITES,
+          DAO.class, DAO_WRITES,
+          DataSource.class, Set.of("getConnection"),
+          ConnectionProvider.class, Set.of("acquire"));
 
   /** 期待する jOOQ の実行時の版。上げるときは H1 の禁止の一覧を見直す。 */
   private static final String REVIEWED_JOOQ_VERSION = "3.21.9";
@@ -317,7 +334,7 @@ class TableWriterArchTest {
             "集約ルートの保存と削除で版を比べないと、古い画面や古い集約の保存が他の人の更新を上書きするため。"
                 + "直し方：集約ルートを受け取るメソッドは add、update、delete だけにし、"
                 + "update は TableWriter.updateCheckingVersion を、delete は deleteCheckingVersion を、"
-                + "そのメソッドの中で直接呼ぶ（別のメソッドやラムダを経由しない）。"
+                + "そのメソッドの中で直接呼ぶ（別のメソッドを経由しない）。"
                 + "期待する版には、テーブルから読み直した値ではなく、引数の集約ルートの lockNo() を渡す。"
                 + "規約：docs/backend/class-roles/jooq-repository.md、"
                 + DOCS);
@@ -356,7 +373,7 @@ class TableWriterArchTest {
         .because(
             "画面の版を比べないと、別の人が先に更新した集約に対して業務の検査や外部の呼び出しを始めてしまうため。"
                 + "直し方：handle で集約を取り出した直後に、handle の中で直接、集約の ensureLockNo(command.expectedLockNo()) を呼ぶ。"
-                + "別のメソッドやラムダの中の呼び出しと、引数が long の ensureLockNo では規則を満たさない。"
+                + "別のメソッドの中の呼び出しと、引数が long の ensureLockNo では規則を満たさない。"
                 + "規約：docs/backend/class-roles/command-handler.md、"
                 + DOCS);
   }
@@ -447,13 +464,13 @@ class TableWriterArchTest {
   /**
    * H7 の規則を組み立てる。
    *
-   * <p>子の行の INSERT は {@code update} で直接実行してよいため、{@code add} とその中のラムダだけを対象にする。
+   * <p>子の行の INSERT は {@code update} で直接実行してよいため、{@code add}（ラムダの中を含む）だけを対象にする。
    */
   /* package */ static ArchRule aggregateRootInsertsGoThroughTableWriterRule() {
     return methods()
         .that(
             DescribedPredicate.describe(
-                "infrastructure.persistence の Jooq*Repository の add とその中のラムダ",
+                "infrastructure.persistence の Jooq*Repository の add（ラムダの中を含む）",
                 TableWriterArchTest::isRepositoryAdd))
         .should(notExecuteInsertDirectly())
         .allowEmptyShould(true)
@@ -466,10 +483,10 @@ class TableWriterArchTest {
                 + DOCS);
   }
 
-  /** {@code Jooq*Repository} の {@code add} か、その中のラムダの合成メソッドかを返す。 */
+  /** {@code Jooq*Repository} の {@code add} かを返す。ラムダの中の呼び出しは {@code add} の呼び出しとして数えられる。 */
   private static boolean isRepositoryAdd(final JavaMethod method) {
     final JavaClass owner = method.getOwner();
-    return (ADD.equals(method.getName()) || method.getName().startsWith("lambda$add$"))
+    return ADD.equals(method.getName())
         && owner.getSimpleName().startsWith("Jooq")
         && owner.getSimpleName().endsWith(REPOSITORY)
         && owner.getPackageName().contains(".infrastructure.persistence");
@@ -499,20 +516,8 @@ class TableWriterArchTest {
   private static boolean isDirectWrite(final JavaAccess<?> access) {
     final JavaClass owner = access.getTargetOwner();
     final String name = access.getName();
-    final Map<Class<?>, Set<String>> namedWrites =
-        Map.of(
-            DSLContext.class, DSL_WRITES,
-            DSL.class, DSL_WRITES,
-            WithStep.class, DSL_WRITES,
-            InsertOnDuplicateStep.class, UPSERTS,
-            InsertQuery.class, UPSERTS,
-            LoaderOptionsStep.class, Set.of("onDuplicateKeyUpdate"),
-            UpdatableRecord.class, RECORD_WRITES,
-            DAO.class, DAO_WRITES,
-            DataSource.class, Set.of("getConnection"),
-            ConnectionProvider.class, Set.of("acquire"));
     final boolean namedWrite =
-        namedWrites.entrySet().stream()
+        NAMED_WRITES.entrySet().stream()
             .anyMatch(
                 entry -> owner.isAssignableTo(entry.getKey()) && entry.getValue().contains(name));
     final boolean execution =
@@ -724,7 +729,7 @@ class TableWriterArchTest {
         "call ensureLockNo(ExpectedLockNo) on a domain.model type in handle") {
       @Override
       public void check(final JavaClass item, final ConditionEvents events) {
-        // handle 自身の呼び出しだけを見るため、別のメソッドやラムダの本体の呼び出しでは満たせない。
+        // handle 自身の呼び出しだけを見るため、別のメソッドの本体の呼び出しでは満たせない。ラムダの本体の呼び出しは handle の呼び出しとして数えられる。
         // 引数の型まで見るため、ensureLockNo(long) のオーバーロードでも満たせない。
         item.getMethods().stream()
             .filter(method -> HANDLE.equals(method.getName()))
@@ -754,7 +759,7 @@ class TableWriterArchTest {
         "not call TableWriter.updateWhere or deleteWhere from code units taking an aggregate root") {
       @Override
       public void check(final JavaClass item, final ConditionEvents events) {
-        // ラムダは捕捉した変数を引数に持つ合成メソッドになるため、ラムダの中の呼び出しも同じ判定で見る。
+        // ArchUnit はラムダの本体の呼び出しを外側のメソッドの呼び出しとして数えるため、ラムダの中の呼び出しも同じ判定で見る。
         for (final JavaCodeUnit codeUnit : item.getCodeUnits()) {
           final boolean callsUnversioned =
               codeUnit.getAccessesFromSelf().stream()

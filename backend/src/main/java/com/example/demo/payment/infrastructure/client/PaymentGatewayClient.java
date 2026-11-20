@@ -8,15 +8,16 @@ import com.example.demo.payment.domain.model.PaymentGateway;
 import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
 import io.github.resilience4j.retry.annotation.Retry;
 import java.math.BigDecimal;
-import java.net.http.HttpClient;
 import java.time.Duration;
 import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.Nullable;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.http.client.ClientHttpRequestFactoryBuilder;
+import org.springframework.boot.http.client.HttpClientSettings;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
-import org.springframework.http.client.JdkClientHttpRequestFactory;
+import org.springframework.http.client.ClientHttpRequestFactory;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.HttpClientErrorException;
@@ -58,21 +59,25 @@ class PaymentGatewayClient implements PaymentGateway {
   private final RestClient restClient;
 
   /**
-   * 決済代行の URL とタイムアウトを受け取り、HTTP クライアントを作る。
+   * Boot の自動構成の {@code RestClient.Builder} から、決済代行の URL とタイムアウトを持つ HTTP クライアントを作る。
    *
+   * @param builder 計測（トレースとメトリクス）が入った、Boot の自動構成の builder
+   * @param factoryBuilder {@code spring.http.clients.imperative.*} で選んだ request factory の builder
+   * @param settings {@code spring.http.clients.*} の共通設定。タイムアウトだけをこの Client の値で上書きする
    * @param baseUrl 決済代行の URL
    * @param connectTimeout 接続の確立を待つ上限
    * @param readTimeout 一回の呼び出しの応答を待つ上限
    */
   /* package */ PaymentGatewayClient(
+      final RestClient.Builder builder,
+      final ClientHttpRequestFactoryBuilder<?> factoryBuilder,
+      final HttpClientSettings settings,
       @Value("${payment-gateway.base-url}") final String baseUrl,
       @Value("${payment-gateway.connect-timeout}") final Duration connectTimeout,
       @Value("${payment-gateway.read-timeout}") final Duration readTimeout) {
-    final JdkClientHttpRequestFactory requestFactory =
-        new JdkClientHttpRequestFactory(
-            HttpClient.newBuilder().connectTimeout(connectTimeout).build());
-    requestFactory.setReadTimeout(readTimeout);
-    this.restClient = RestClient.builder().baseUrl(baseUrl).requestFactory(requestFactory).build();
+    final ClientHttpRequestFactory requestFactory =
+        factoryBuilder.build(settings.withTimeouts(connectTimeout, readTimeout));
+    this.restClient = builder.baseUrl(baseUrl).requestFactory(requestFactory).build();
   }
 
   /**

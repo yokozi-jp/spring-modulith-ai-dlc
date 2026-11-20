@@ -75,7 +75,7 @@ Spring Bootの版、`backend/build.gradle`のjOOQのコード生成のプラグ�
    コード生成のプラグインの版だけを変えたときは失敗しないため、2から4の手順で見直す。
 2. jOOQのリリースノートと、`javap`で`DSLContext`、`DSL`、`WithStep`、`Update*`、`Delete*`、`Merge*`、`Insert*Step`、`InsertQuery`、`Loader*Step`、`UpdatableRecord`、`DAO`、`QOM`の公開メソッドを確かめ、UPDATE、DELETE、UPSERT、MERGEを作るか実行する新しいAPIを探す。
    `Update`か`Delete`を戻り値の型に持つメソッドは、作る入口である。
-3. 新しい書き込みの入口があれば、`tableWritesGoThroughTableWriter`の禁止の一覧、違反のフィクスチャ`DirectOrderWriter`、[アーキテクチャテスト](../backend/architecture-tests.md)の「書き込みの入口」に足す。
+3. 新しい書き込みの入口があれば、`tableWritesGoThroughTableWriter`の禁止の一覧、違反のフィクスチャ`DirectOrderWriter`とその行（`DirectWriteFixtureTest`の`DIRECT_WRITES`）、[アーキテクチャテスト](../backend/architecture-tests.md)の「書き込みの入口」に足す。
 4. コード生成のプラグインと実行時のjOOQのマイナー版をそろえ、[jOOQコード生成物の管理](jooq-codegen.md)に従って生成し直す。
 5. `TableWriterArchTest`の`REVIEWED_JOOQ_VERSION`を新しい版に更新する。
 

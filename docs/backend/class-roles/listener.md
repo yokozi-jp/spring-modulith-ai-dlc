@@ -37,7 +37,7 @@ Listener は Infrastructure の Adapter でもない。
 ## 必須の記述
 
 - `@Service` を付けた package-private の `class` にし、`final` を付けない。
-- クラスを継承せず、継承も実装もさせない。
+- クラスを継承せず、継承もさせない。Java 標準の型以外の interface も実装しない。
   `PgmCdAspect` は名前で対象を決め、継承した `on` には `*_pgm_cd` を束縛しない（[ADR-051](../../adr/ADR-051-bind-pgm-cd-with-scoped-value-and-aspect.md)）。
 - public メソッドは `@ApplicationModuleListener public void on(final <Event> event)` の一つだけにする。
 - イベントは `@ApplicationModuleListener` だけで受け、Listener 以外のクラスでも `@EventListener` と `@TransactionalEventListener` を直接付けず、`ApplicationListener` を実装しない。
@@ -235,6 +235,7 @@ private ResponseEntity<ChargeReply> post(final String key, final Money amount) {
 - [ ] クラスに `@Transactional` を付けない。［ArchUnit で検査：PackageByFeatureOnionArchitectureTest.transactionalIsNotDeclaredAtClassLevel］
 - [ ] 発行側のモジュールのルートのイベントだけを使い、内部パッケージの型を使わない。［Spring Modulith で検査：ApplicationModuleArchitectureTest］
 - [ ] 名前をイベントの名前に `Listener` を付けた形にし、イベントごとに一つ作る。［自分で点検］
+- [ ] 他のクラスから呼ばず、interface も実装しない。［ArchUnit で検査：ClassRoleArchTest.listenersAreNotCalled、ClassRoleArchTest.commandHandlersAndListenersDoNotImplementInterfaces］
 - [ ] 呼ぶ CommandHandler を冪等にする。［自分で点検］
 - [ ] 同じイベントを二回処理しても結果が変わらないことを確かめるテストがある。［自分で点検］
 - [ ] PMD の抑止を理由のコメントと一緒に付ける。［自分で点検］

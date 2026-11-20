@@ -2,10 +2,12 @@ openapi: 3.1.0
 info:
   description: Demo アプリケーションの HTTP API
   title: Demo API
-  version: 0.5.0
+  version: 0.6.0
 servers:
 - description: 現在のオリジン
   url: /
+security:
+- sessionCookie: []
 tags:
 - description: 注文の API
   name: ordering
@@ -801,3 +803,9 @@ components:
             example: /problems/validation-error
       description: 400 の Problem Details。type が /problems/validation-error なら入力検証エラーで、errors
         に誤りのある入力の位置と説明を持つ
+  securitySchemes:
+    sessionCookie:
+      description: ブラウザの Cookie セッション（ADR-007、ADR-059）
+      in: cookie
+      name: APP_SESSION
+      type: apiKey

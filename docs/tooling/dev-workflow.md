@@ -20,6 +20,9 @@ task check
 
 `task check`は、バックエンドの静的解析の前に`task lint-session-sql`でセッションに状態を残すSQLがないことを確かめる。
 
+`task be-lint`のSpotlessは、mainから変えたファイルを全体で検査するため、変えていない既存の行の書式も違反になる。
+`task be-format`を実行し、その出力を同じ変更に含める。
+
 ## フロントエンドを開発するとき
 
 ```bash
@@ -170,7 +173,7 @@ test-userは2つのテナント（サンプル商事、サンプル物産）に�
 - フロントエンド：<http://localhost:5173>（ブラウザで開く入口）
 - バックエンド：<http://localhost:18080>
 - Keycloak：<http://localhost:8080>
-- Grafana：<http://localhost:3000>
+- Grafana：<http://localhost:3000>（`.env.example`の値。ポートは`.env`の`GRAFANA_HOST_PORT`。トレースの見方は[ローカルでトレースを見る](../observability/runbook-local-traces.md)）
 
 ツールの導入は[開発環境構築ガイド](../local-env-setup/setup.md)を参照する。
 
@@ -265,6 +268,19 @@ task skills-check
 ```
 
 導入と更新の手順は[スキルの取得元と更新](../agents/skill-sources.md)に従います。
+
+## GitHub Actionsのworkflowを変更するとき
+
+```bash
+task lint-actions
+task lint-actions-security
+task ci-gate-check
+```
+
+`task ci-gate-check`にはPython 3とPyYAMLが要る（ローカルでは`sudo apt install python3-yaml`）。
+`ci.yml`にジョブを足したときは、`CI gate`の`needs`にも足す。
+`ci.yml`から呼ばない`pull_request`のworkflowは、`tooling/ci-gate-check/excluded.tsv`に理由を書く。
+`zizmor.yml`の`zizmor-action`の`version`は、`mise.toml`のzizmorと同じ版にする。
 
 ## リリース設定を変更するとき
 

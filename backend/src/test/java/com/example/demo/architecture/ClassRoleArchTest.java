@@ -1,5 +1,8 @@
 package com.example.demo.architecture;
 
+import static com.example.demo.architecture.PackageByFeatureOnionArchitectureTest.EXTERNAL_SYSTEM_INTERFACE;
+import static com.tngtech.archunit.base.DescribedPredicate.not;
+import static com.tngtech.archunit.core.domain.JavaClass.Predicates.assignableTo;
 import static com.tngtech.archunit.core.domain.JavaClass.Predicates.resideInAPackage;
 import static com.tngtech.archunit.core.domain.JavaClass.Predicates.resideInAnyPackage;
 import static com.tngtech.archunit.core.domain.JavaClass.Predicates.simpleNameEndingWith;
@@ -13,6 +16,7 @@ import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noMethods;
 
 import com.example.demo.DemoApplication;
 import com.tngtech.archunit.base.DescribedPredicate;
+import com.tngtech.archunit.core.domain.Dependency;
 import com.tngtech.archunit.core.domain.JavaAccess;
 import com.tngtech.archunit.core.domain.JavaClass;
 import com.tngtech.archunit.core.domain.JavaMethod;
@@ -31,7 +35,9 @@ import org.jooq.DSLContext;
 import org.jooq.Record;
 import org.jooq.impl.DefaultRecordMapper;
 import org.jooq.impl.DefaultRecordUnmapper;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.context.ApplicationListener;
+import org.springframework.context.event.ApplicationEventMulticaster;
 import org.springframework.context.event.EventListener;
 import org.springframework.modulith.events.ApplicationModuleListener;
 import org.springframework.stereotype.Service;
@@ -73,8 +79,39 @@ class ClassRoleArchTest {
   private static final String ADR_051 =
       "docs/adr/ADR-051-bind-pgm-cd-with-scoped-value-and-aspect.md";
 
-  /** because の最後に置く、Listener の規約への参照。 */
-  private static final String LISTENER_DOC = "規約：docs/backend/class-roles/listener.md";
+  /** Application のパッケージのパターン。 */
+  private static final String APPLICATION_PACKAGE = "..application..";
+
+  /** Application の {@code *Listener}。 */
+  private static final DescribedPredicate<JavaClass> APPLICATION_LISTENER =
+      resideInAPackage(APPLICATION_PACKAGE).and(simpleNameEndingWith(LISTENER));
+
+  /** Application の {@code *CommandHandler}。 */
+  private static final DescribedPredicate<JavaClass> APPLICATION_COMMAND_HANDLER =
+      resideInAPackage(APPLICATION_PACKAGE).and(simpleNameEndingWith(COMMAND_HANDLER));
+
+  /** 外部システムのインタフェースを実装する、{@code infrastructure.client} のクラス。 */
+  private static final DescribedPredicate<JavaClass> EXTERNAL_SYSTEM_CLIENT =
+      resideInAPackage("..infrastructure.client..").and(assignableTo(EXTERNAL_SYSTEM_INTERFACE));
+
+  /** 外部システムのインタフェースを直接の依存に持つ、Application の {@code *CommandHandler}。 */
+  private static final DescribedPredicate<JavaClass> COMMAND_HANDLER_USING_EXTERNAL_SYSTEM =
+      APPLICATION_COMMAND_HANDLER.and(
+          DescribedPredicate.describe(
+              "depend on an external system interface",
+              commandHandler ->
+                  commandHandler.getDirectDependenciesFromSelf().stream()
+                      .map(Dependency::getTargetClass)
+                      .anyMatch(EXTERNAL_SYSTEM_INTERFACE)));
+
+  /** CommandHandler の規約のパス。 */
+  private static final String COMMAND_HANDLER_DOC = "docs/backend/class-roles/command-handler.md";
+
+  /** Listener の規約のパス。 */
+  private static final String LISTENER_DOC = "docs/backend/class-roles/listener.md";
+
+  /** Event の規約のパス。 */
+  private static final String EVENT_DOC = "docs/backend/class-roles/event.md";
 
   /** jOOQ の Repository の規約のパス。 */
   private static final String JOOQ_REPOSITORY_DOC = "docs/backend/class-roles/jooq-repository.md";
@@ -91,7 +128,7 @@ class ClassRoleArchTest {
           .that()
           .areAnnotatedWith(Service.class)
           .and()
-          .resideInAPackage("..application..")
+          .resideInAPackage(APPLICATION_PACKAGE)
           .should()
           .haveSimpleNameEndingWith(COMMAND_HANDLER)
           .orShould()
@@ -103,8 +140,7 @@ class ClassRoleArchTest {
               "クラス名の接尾辞だけで、更新、参照、イベントの受信のどれかが分かるようにするため。"
                   + "直し方：状態を変えるユースケースは <UseCase>CommandHandler、"
                   + "参照は <Feature>QueryService、イベントの受信は <Event>Listener と命名する。"
-                  + "規約：docs/backend/layers.md、"
-                  + ADR_050);
+                  + conventions("docs/backend/layers.md", ADR_050));
 
   /**
    * CommandHandler の public メソッドは {@code @Transactional} の {@code handle(<UseCase>Command)} だけにする。
@@ -122,8 +158,7 @@ class ClassRoleArchTest {
                   + "直し方：public メソッドを @Transactional を付けた "
                   + "<UseCase>Result handle(<UseCase>Command command) の一つにし、"
                   + "別のユースケースは別の CommandHandler に分ける。"
-                  + "規約：docs/backend/class-roles/command-handler.md、"
-                  + ADR_050);
+                  + conventions(COMMAND_HANDLER_DOC, ADR_050));
 
   /** Command と Result は Application の record にする。 */
   @ArchTest
@@ -145,8 +180,80 @@ class ClassRoleArchTest {
                   + "ユースケースが別のユースケースを呼んで連鎖する形を防ぐため。"
                   + "直し方：共通の業務規則は集約か Domain Service へ移し、"
                   + "後続の処理はイベントを発行して Listener から別の CommandHandler を呼ぶ。"
-                  + "規約：docs/backend/class-roles/command-handler.md、"
-                  + ADR_050);
+                  + conventions(COMMAND_HANDLER_DOC, ADR_050));
+
+  /** 外部システムのインタフェースに依存する CommandHandler は、application の Listener からだけ依存される。 */
+  @ArchTest
+  /* package */ static final ArchRule externalSystemCommandHandlersAreDependedOnlyByListeners =
+      noClasses()
+          .that(not(APPLICATION_LISTENER))
+          .should()
+          .dependOnClassesThat(COMMAND_HANDLER_USING_EXTERNAL_SYSTEM)
+          .allowEmptyShould(true)
+          .because(
+              "画面から呼ばれる CommandHandler のトランザクションの中で外部システムを呼ぶと、"
+                  + "遅い外部の呼び出しの間トランザクションと行のロックを持ち続け、"
+                  + "ロールバックしても外部の副作用が戻らないため。"
+                  + "直し方：画面から呼ばれる CommandHandler は状態を保存してイベントを発行して終え、"
+                  + "外部システムは、そのイベントを受けた <Event>Listener が呼ぶ CommandHandler から呼ぶ。"
+                  + conventions(COMMAND_HANDLER_DOC, LISTENER_DOC, ADR_050));
+
+  /** Listener は、イベントの配信以外の呼び出しを受けない。 */
+  @ArchTest
+  /* package */ static final ArchRule listenersAreNotCalled =
+      noClasses()
+          .should()
+          .dependOnClassesThat(APPLICATION_LISTENER)
+          .allowEmptyShould(true)
+          .because(
+              "Listener の on を CommandHandler や Controller が直接呼ぶと、"
+                  + "イベント出版レジストリを通らずに呼ばれ、失敗しても再投入されず、"
+                  + "externalSystemCommandHandlersAreDependedOnlyByListeners の検査も迂回できるため。"
+                  + "直し方：Listener を呼ぶ代わりに、呼び出し元の CommandHandler でイベントを発行する。"
+                  + conventions(LISTENER_DOC, ADR_050));
+
+  /**
+   * 外部システムのインタフェースに依存してよいのは、application の CommandHandler と、それを実装する {@code infrastructure.client}
+   * のクラスだけにする。
+   */
+  @ArchTest
+  /* package */ static final ArchRule
+      externalSystemInterfacesAreUsedOnlyByCommandHandlersAndClients =
+          noClasses()
+              .that(not(APPLICATION_COMMAND_HANDLER).and(not(EXTERNAL_SYSTEM_CLIENT)))
+              .should()
+              .dependOnClassesThat(EXTERNAL_SYSTEM_INTERFACE)
+              .allowEmptyShould(true)
+              .because(
+                  "外部システムの呼び出しを、Domain Service、QueryService、補助のクラスに散らすと、"
+                      + "externalSystemCommandHandlersAreDependedOnlyByListeners が見る CommandHandler の外から、"
+                      + "画面のトランザクションの中で外部システムを呼べてしまうため。"
+                      + "直し方：外部システムの呼び出しを application の <UseCase>CommandHandler へ移し、Listener から呼ぶ。"
+                      + conventions(
+                          COMMAND_HANDLER_DOC,
+                          "docs/backend/class-roles/external-system-interface.md",
+                          ADR_050));
+
+  /**
+   * イベントの発行は、application の CommandHandler だけが行う。
+   *
+   * <p>{@code ApplicationContext} は {@link ApplicationEventPublisher} を継承するため、{@code
+   * ApplicationContext} 越しの {@code publishEvent} も同じ判定で検出する。
+   */
+  @ArchTest
+  /* package */ static final ArchRule eventPublisherIsUsedOnlyByCommandHandlers =
+      noClasses()
+          .that(not(APPLICATION_COMMAND_HANDLER))
+          .should()
+          .accessTargetWhere(
+              DescribedPredicate.describe(
+                  "publish an application event", ClassRoleArchTest::publishesEvent))
+          .allowEmptyShould(true)
+          .because(
+              "イベントの発行は、保存と同じトランザクションの内側にある CommandHandler の handle に置くと決めており、"
+                  + "発行を包むクラスなどの別の入口を作らないため。"
+                  + "直し方：イベントの発行を application の <UseCase>CommandHandler の handle に移す。"
+                  + conventions(COMMAND_HANDLER_DOC, EVENT_DOC, ADR_050));
 
   /** {@code @ApplicationModuleListener} は Application の {@code <Event>Listener.on} にだけ付ける。 */
   @ArchTest
@@ -158,7 +265,7 @@ class ClassRoleArchTest {
           .haveName("on")
           .andShould()
           .beDeclaredInClassesThat()
-          .resideInAPackage("..application..")
+          .resideInAPackage(APPLICATION_PACKAGE)
           .andShould()
           .beDeclaredInClassesThat()
           .haveSimpleNameEndingWith(LISTENER)
@@ -167,9 +274,7 @@ class ClassRoleArchTest {
               "@ApplicationModuleListener は新しいトランザクションを開き、受信のメソッドがトランザクション境界になるため、"
                   + "境界を Application に置く。"
                   + "直し方：イベントの受信は受信側モジュールの application に置く <Event>Listener の on メソッドへ移す。"
-                  + LISTENER_DOC
-                  + "、"
-                  + ADR_050);
+                  + conventions(LISTENER_DOC, ADR_050));
 
   /**
    * イベントは {@code @ApplicationModuleListener} だけで受け、{@code @EventListener} と
@@ -193,9 +298,7 @@ class ClassRoleArchTest {
                   + "受信の例外はログに出るだけになるため。"
                   + "直し方：イベントは受信側モジュールの application に置く <Event>Listener の on で、"
                   + "@ApplicationModuleListener を付けて受ける。"
-                  + LISTENER_DOC
-                  + "、"
-                  + ADR_050);
+                  + conventions(LISTENER_DOC, ADR_050));
 
   /** イベントを {@link ApplicationListener} の実装で受けない。 */
   @ArchTest
@@ -208,18 +311,13 @@ class ClassRoleArchTest {
                   + "受信側の失敗が発行側の更新を巻き戻し、イベント出版レジストリにも残らないため。"
                   + "直し方：イベントは受信側モジュールの application に置く <Event>Listener の on で、"
                   + "@ApplicationModuleListener を付けて受ける。"
-                  + LISTENER_DOC
-                  + "、"
-                  + ADR_050);
+                  + conventions(LISTENER_DOC, ADR_050));
 
   /** Listener は {@code on} だけを公開し、1 つの CommandHandler だけを呼ぶ。 */
   @ArchTest
   /* package */ static final ArchRule listenersExposeOnlyOnAndCallOneCommandHandler =
       classes()
-          .that()
-          .haveSimpleNameEndingWith(LISTENER)
-          .and()
-          .resideInAPackage("..application..")
+          .that(APPLICATION_LISTENER)
           .should(exposeOnlyOnAndCallOneCommandHandler())
           .allowEmptyShould(true)
           .because(
@@ -227,9 +325,7 @@ class ClassRoleArchTest {
                   + "成功した処理も繰り返されるため。"
                   + "直し方：public メソッドを @ApplicationModuleListener を付けた void on(<Event> event) の一つにし、"
                   + "イベントから Command を作って一つの CommandHandler の handle を呼ぶ。"
-                  + LISTENER_DOC
-                  + "、"
-                  + ADR_050);
+                  + conventions(LISTENER_DOC, ADR_050));
 
   /** CommandHandler と Listener は、Java 標準の型以外のクラスを継承せず、継承も実装もさせない。 */
   @ArchTest
@@ -245,9 +341,22 @@ class ClassRoleArchTest {
               "PgmCdAspect の pointcut はクラスの名前で対象を決め、継承した handle と on には *_pgm_cd を束縛しないため。"
                   + "直し方：基底クラスとサブクラスをやめ、共通の処理は集約、Domain Service、"
                   + "またはコンストラクタで受け取るクラスへ移す。"
-                  + "規約：docs/backend/class-roles/command-handler.md、"
-                  + "docs/backend/class-roles/listener.md、"
-                  + ADR_051);
+                  + conventions(COMMAND_HANDLER_DOC, LISTENER_DOC, ADR_051));
+
+  /** application の CommandHandler と Listener は、Java 標準の型以外の interface を実装しない。 */
+  @ArchTest
+  /* package */ static final ArchRule commandHandlersAndListenersDoNotImplementInterfaces =
+      classes()
+          .that(APPLICATION_COMMAND_HANDLER.or(APPLICATION_LISTENER))
+          .should()
+          .notImplement(not(resideInAPackage("java..")))
+          .allowEmptyShould(true)
+          .because(
+              "CommandHandler と Listener を interface 越しに呼ぶと、"
+                  + "externalSystemCommandHandlersAreDependedOnlyByListeners と listenersAreNotCalled の"
+                  + "依存の検査を迂回できるため。"
+                  + "直し方：interface の実装をやめ、呼び出し側は CommandHandler か Listener の具象クラスを受け取る。"
+                  + conventions(COMMAND_HANDLER_DOC, LISTENER_DOC, ADR_050));
 
   /** Request と Response は {@code presentation.web} の record にする。 */
   @ArchTest
@@ -267,8 +376,7 @@ class ClassRoleArchTest {
                   + "直し方：QueryService を <モジュール>.application に置き、"
                   + "同じモジュールのルートにある <Feature>Queries を実装し、"
                   + "public メソッドすべてに @Transactional(readOnly = true) を付ける。"
-                  + "規約：docs/backend/class-roles/query-service.md、"
-                  + ADR_050);
+                  + conventions("docs/backend/class-roles/query-service.md", ADR_050));
 
   /** 列と項目を対応づけるライブラリと jOOQ の {@code DefaultRecordMapper} を使わない。 */
   @ArchTest
@@ -287,10 +395,7 @@ class ClassRoleArchTest {
               "jOOQ と集約の変換を Jooq<Aggregate>Repository の select の列に収め、"
                   + "列と引数の数や型の食い違いをコンパイルで見つけるため。"
                   + "直し方：変換を Jooq<Aggregate>Repository に convertFrom、multiset、Records.mapping で書く。"
-                  + "規約："
-                  + JOOQ_REPOSITORY_DOC
-                  + "、"
-                  + ADR_050);
+                  + conventions(JOOQ_REPOSITORY_DOC, ADR_050));
 
   /**
    * 名前のリフレクションで対応づける jOOQ のメソッドの名前のうち、{@code Class} を受け取るときだけ禁止するもの（ほかに名前が {@code Into}
@@ -318,10 +423,7 @@ class ClassRoleArchTest {
                   + "集約が restore と値オブジェクトの検証を通らないため。"
                   + "直し方：into(Class)、fetchInto(Class)、fetchMap(Field, Class)、from(Object) などを、"
                   + "convertFrom、fetch(Records.mapping(<Aggregate>::restore))、set(列, 値) に置き換える。"
-                  + "規約："
-                  + JOOQ_REPOSITORY_DOC
-                  + "、"
-                  + ADR_050);
+                  + conventions(JOOQ_REPOSITORY_DOC, ADR_050));
 
   /** 参照の結果の状態の名前は、状態を持つモジュールの中だけで読む。 */
   @ArchTest
@@ -339,7 +441,7 @@ class ClassRoleArchTest {
       final String basePackage) {
     final String loggingException = basePackage + ".payment.application.ChargeOrderCommandHandler";
     return noClasses()
-        .that(DescribedPredicate.not(name(loggingException)))
+        .that(not(name(loggingException)))
         .should()
         .accessTargetWhere(
             DescribedPredicate.describe(
@@ -349,8 +451,7 @@ class ClassRoleArchTest {
             "状態の名前を文字列で比べて分岐すると、持ち主が enum の定数の名前を変えたり定数を足したりしてもコンパイルが通り、分岐だけが黙って壊れるため。"
                 + "直し方：状態を持つモジュールの参照の結果に意味の項目（boolean confirmed、boolean onSale）を足し、"
                 + "読む側はその項目で分岐する。"
-                + "規約：docs/backend/class-roles/query-result.md、"
-                + ADR_075);
+                + conventions("docs/backend/class-roles/query-result.md", ADR_075));
   }
 
   /** アクセスが、別のモジュールのルートの record の状態の名前を読むかを返す。 */
@@ -368,6 +469,18 @@ class ClassRoleArchTest {
     return statusOfModuleRootRecord
         && !callerPackage.equals(ownerPackage)
         && !callerPackage.startsWith(ownerPackage + ".");
+  }
+
+  /** アクセスが、イベントを発行するメソッドの呼び出しかを返す。 */
+  private static boolean publishesEvent(final JavaAccess<?> access) {
+    final JavaClass owner = access.getTarget().getOwner();
+    final boolean publishes =
+        "publishEvent".equals(access.getName())
+            && owner.isAssignableTo(ApplicationEventPublisher.class);
+    final boolean multicasts =
+        "multicastEvent".equals(access.getName())
+            && owner.isAssignableTo(ApplicationEventMulticaster.class);
+    return publishes || multicasts;
   }
 
   /** モジュールルートの型を record、enum、{@code *Queries} interface に限る規則を組み立てる。 */
@@ -392,8 +505,7 @@ class ClassRoleArchTest {
             "モジュールルートは他モジュールへ公開する契約であり、他モジュールの状態は同期で変えずイベントで伝えるため。"
                 + "直し方：ルートには <Feature>Queries と、参照の結果、検索条件、イベントの record と enum だけを置き、"
                 + "Command と CommandHandler は application へ移す。"
-                + "規約：docs/backend/architecture.md、"
-                + ADR_050);
+                + conventions("docs/backend/architecture.md", ADR_050));
   }
 
   /** {@code *Command} と {@code *Result} を {@code <module>.application} の record に限る規則を組み立てる。 */
@@ -402,9 +514,7 @@ class ClassRoleArchTest {
     return classes()
         .that(
             resideInAPackage(basePackage + ".*..")
-                .and(
-                    DescribedPredicate.not(
-                        name(basePackage + ".shared.concurrency.VersionedCommand")))
+                .and(not(name(basePackage + ".shared.concurrency.VersionedCommand")))
                 .and(simpleNameEndingWith("Command").or(simpleNameEndingWith("Result"))))
         .should()
         .beRecords()
@@ -414,8 +524,10 @@ class ClassRoleArchTest {
         .because(
             "Command と Result はユースケースの入出力であり、モジュールルートに置いて他モジュールから同期で呼ばせないため。"
                 + "直し方：<UseCase>Command と <UseCase>Result を <モジュール>.application の record にする。"
-                + "規約：docs/backend/class-roles/command.md、docs/backend/class-roles/result.md、"
-                + ADR_050);
+                + conventions(
+                    "docs/backend/class-roles/command.md",
+                    "docs/backend/class-roles/result.md",
+                    ADR_050));
   }
 
   /** {@code *Request} と {@code *Response} を {@code presentation.web} の record に限る規則を組み立てる。 */
@@ -433,8 +545,10 @@ class ClassRoleArchTest {
         .because(
             "リクエストボディと応答は HTTP の利用者との契約であり、ユースケースの入力や参照の結果とは別に変わるため。"
                 + "直し方：<UseCase>Request と <QueryResult>Response を <モジュール>.presentation.web の record にする。"
-                + "規約：docs/backend/class-roles/request.md、docs/backend/class-roles/response.md、"
-                + ADR_050);
+                + conventions(
+                    "docs/backend/class-roles/request.md",
+                    "docs/backend/class-roles/response.md",
+                    ADR_050));
   }
 
   private static ArchCondition<JavaClass> notExtendOrBeExtended() {
@@ -572,6 +686,11 @@ class ClassRoleArchTest {
         || takesObject
             && JOOQ_OBJECT_MAPPING_METHODS.contains(name)
             && (owner.isAssignableTo(Record.class) || owner.isAssignableTo(DSLContext.class));
+  }
+
+  /** because の最後に置く、規約への参照を作る。 */
+  private static String conventions(final String... paths) {
+    return "規約：" + String.join("、", paths);
   }
 
   /** 合成メソッドとブリッジメソッドを除いた、クラス自身が宣言する public メソッドを返す。 */

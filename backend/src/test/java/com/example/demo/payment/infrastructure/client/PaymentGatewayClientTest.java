@@ -20,6 +20,8 @@ import java.time.Duration;
 import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.AfterEach;
@@ -31,12 +33,19 @@ import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.boot.autoconfigure.AutoConfigurations;
 import org.springframework.boot.autoconfigure.context.PropertyPlaceholderAutoConfiguration;
 import org.springframework.boot.convert.ApplicationConversionService;
+import org.springframework.boot.http.client.ClientHttpRequestFactoryBuilder;
+import org.springframework.boot.http.client.HttpClientSettings;
+import org.springframework.boot.http.client.HttpRedirects;
+import org.springframework.boot.http.client.autoconfigure.HttpClientAutoConfiguration;
+import org.springframework.boot.http.client.autoconfigure.imperative.ImperativeHttpClientAutoConfiguration;
+import org.springframework.boot.restclient.autoconfigure.RestClientAutoConfiguration;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 import org.springframework.core.NestedExceptionUtils;
 import org.springframework.core.env.StandardEnvironment;
 import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.HttpServerErrorException;
 import org.springframework.web.client.ResourceAccessException;
+import org.springframework.web.client.RestClient;
 
 /** 決済代行の Client の HTTP の呼び出しと、URL の設定の検査を検証する。 */
 // 起動の確認は ApplicationContextRunner の run の中の AssertJ で書く。
@@ -62,19 +71,20 @@ class PaymentGatewayClientTest {
    */
   private final ApplicationContextRunner contextRunner =
       new ApplicationContextRunner()
-          .withInitializer(
-              context ->
-                  context
-                      .getEnvironment()
-                      .getPropertySources()
-                      .remove(StandardEnvironment.SYSTEM_ENVIRONMENT_PROPERTY_SOURCE_NAME))
+          .withInitializer(context ->
+              context
+                  .getEnvironment()
+                  .getPropertySources()
+                  .remove(StandardEnvironment.SYSTEM_ENVIRONMENT_PROPERTY_SOURCE_NAME))
           // SpringApplication と同じく、1s のような Duration の値を変換できるようにする。
-          .withInitializer(
-              context ->
-                  context
-                      .getBeanFactory()
-                      .setConversionService(ApplicationConversionService.getSharedInstance()))
-          .withConfiguration(AutoConfigurations.of(PropertyPlaceholderAutoConfiguration.class))
+          .withInitializer(context ->
+              context
+                  .getBeanFactory()
+                  .setConversionService(ApplicationConversionService.getSharedInstance()))
+          .withConfiguration(
+              AutoConfigurations.of(
+                  PropertyPlaceholderAutoConfiguration.class, RestClientAutoConfiguration.class,
+                  HttpClientAutoConfiguration.class, ImperativeHttpClientAutoConfiguration.class))
           .withPropertyValues(
               "payment-gateway.connect-timeout=1s", "payment-gateway.read-timeout=2s")
           .withBean(PaymentGatewayClient.class);
@@ -98,15 +108,13 @@ class PaymentGatewayClientTest {
     final AtomicReference<String> idempotencyKey = new AtomicReference<>();
     final AtomicReference<String> body = new AtomicReference<>();
     final PaymentGatewayClient client =
-        start(
-            exchange -> {
-              method.set(exchange.getRequestMethod());
-              path.set(exchange.getRequestURI().getPath());
-              idempotencyKey.set(exchange.getRequestHeaders().getFirst("Idempotency-Key"));
-              body.set(
-                  new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8));
-              reply(exchange, 201, SUCCEEDED_REPLY);
-            });
+        start(exchange -> {
+          method.set(exchange.getRequestMethod());
+          path.set(exchange.getRequestURI().getPath());
+          idempotencyKey.set(exchange.getRequestHeaders().getFirst("Idempotency-Key"));
+          body.set(new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8));
+          reply(exchange, 201, SUCCEEDED_REPLY);
+        });
 
     final ChargeOutcome outcome = client.charge(ORDER_ID, AMOUNT);
 
@@ -163,18 +171,40 @@ class PaymentGatewayClientTest {
   }
 
   @Test
+  @DisplayName("リダイレクトの応答は辿らず、契約の不備なので、例外を投げずに失敗を返す")
+  void redirectIsNotFollowed() throws IOException {
+    final AtomicInteger requests = new AtomicInteger();
+    final AtomicBoolean redirected = new AtomicBoolean();
+    final PaymentGatewayClient client =
+        start(exchange -> {
+          requests.incrementAndGet();
+          if (redirected.compareAndSet(false, true)) {
+            exchange.getResponseHeaders().add("Location", "/v1/charges");
+            exchange.sendResponseHeaders(302, -1);
+            exchange.close();
+          } else {
+            reply(exchange, 201, SUCCEEDED_REPLY);
+          }
+        });
+
+    assertThat(client.charge(ORDER_ID, AMOUNT))
+        .as("orderId=%s の 302 の請求の結果", ORDER_ID.value())
+        .isEqualTo(ChargeOutcome.failed());
+    assertThat(requests).as("orderId=%s の請求のリクエストの数", ORDER_ID.value()).hasValue(1);
+  }
+
+  @Test
   @DisplayName("本文が JSON でなければ、契約の不備なので、例外を投げずに失敗を返す")
   void nonJsonReplyReturnsFailed() throws IOException {
     final PaymentGatewayClient client =
-        start(
-            exchange -> {
-              final byte[] bytes = "ok".getBytes(StandardCharsets.UTF_8);
-              exchange.getResponseHeaders().add("Content-Type", "text/plain");
-              exchange.sendResponseHeaders(201, bytes.length);
-              try (OutputStream out = exchange.getResponseBody()) {
-                out.write(bytes);
-              }
-            });
+        start(exchange -> {
+          final byte[] bytes = "ok".getBytes(StandardCharsets.UTF_8);
+          exchange.getResponseHeaders().add("Content-Type", "text/plain");
+          exchange.sendResponseHeaders(201, bytes.length);
+          try (OutputStream out = exchange.getResponseBody()) {
+            out.write(bytes);
+          }
+        });
 
     assertThat(client.charge(ORDER_ID, AMOUNT))
         .as("orderId=%s の text/plain の請求の結果", ORDER_ID.value())
@@ -218,15 +248,14 @@ class PaymentGatewayClientTest {
   void slowReplyTimesOut() throws IOException {
     final CountDownLatch release = new CountDownLatch(1);
     final PaymentGatewayClient client =
-        start(
-            exchange -> {
-              try {
-                release.await(5, TimeUnit.SECONDS);
-              } catch (InterruptedException exception) {
-                Thread.currentThread().interrupt();
-              }
-              reply(exchange, 201, SUCCEEDED_REPLY);
-            });
+        start(exchange -> {
+          try {
+            release.await(5, TimeUnit.SECONDS);
+          } catch (InterruptedException exception) {
+            Thread.currentThread().interrupt();
+          }
+          reply(exchange, 201, SUCCEEDED_REPLY);
+        });
     try {
       final long started = System.nanoTime();
       assertThatThrownBy(() -> client.charge(ORDER_ID, AMOUNT))
@@ -242,10 +271,9 @@ class PaymentGatewayClientTest {
   @Test
   @DisplayName("URL の設定がなければ、placeholder の解決の失敗で起動に失敗する")
   void missingBaseUrlFailsStartup() {
-    contextRunner.run(
-        context ->
-            assertThat(NestedExceptionUtils.getMostSpecificCause(context.getStartupFailure()))
-                .hasMessageContaining("Could not resolve placeholder 'payment-gateway.base-url'"));
+    contextRunner.run(context ->
+        assertThat(NestedExceptionUtils.getMostSpecificCause(context.getStartupFailure()))
+            .hasMessageContaining("Could not resolve placeholder 'payment-gateway.base-url'"));
   }
 
   @Test
@@ -264,6 +292,9 @@ class PaymentGatewayClientTest {
     started.start();
     server = started;
     return new PaymentGatewayClient(
+        RestClient.builder(),
+        ClientHttpRequestFactoryBuilder.jdk(),
+        HttpClientSettings.defaults().withRedirects(HttpRedirects.DONT_FOLLOW),
         "http://"
             + InetAddress.getLoopbackAddress().getHostAddress()
             + ":"
