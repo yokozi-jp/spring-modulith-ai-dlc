@@ -228,6 +228,20 @@ describe("fixture に適用したプロジェクトの lint 設定", () => {
       expect(countIn("features/order/test-title.test.ts", "vitest(valid-title)")).toBe(5);
     });
 
+    // vite.config.ts の vitest/* を off にする行が増えても、テストを弱める 5 つの規則は外れないことを確かめる。
+    // .ts と .tsx、アプリと package の両方に fixture を置き、拡張子や package で絞った override による除外も捉える。
+    it.each([
+      "no-focused-tests",
+      "no-disabled-tests",
+      "expect-expect",
+      "no-conditional-expect",
+      "valid-expect",
+    ])("テストを弱める記述を vitest(%s) が 1 件ずつ報告する", (rule) => {
+      const code = `vitest(${rule})`;
+      expect(countIn("features/order/weak-tests.test.ts", code)).toBe(1);
+      expect(countIn("weak-tests.test.tsx", code, uiDirectory)).toBe(1);
+    });
+
     it("production source からテスト用部品の import を禁止する", () => {
       expect(countIn("components/msw-import.ts", "eslint(no-restricted-imports)")).toBe(4);
     });
