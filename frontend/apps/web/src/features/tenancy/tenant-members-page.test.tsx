@@ -82,7 +82,9 @@ describe("所属の管理の画面", () => {
     await expect(screen.findByText("所属を外しました。")).resolves.toBeTruthy();
     expect(lockNos).toStrictEqual(["3"]);
   });
+});
 
+describe("所属の管理の画面の失敗", () => {
   it("409 は backend の title と競合の説明を出し、自動で再送しない", async () => {
     let requests = 0;
     server.use(
@@ -102,6 +104,19 @@ describe("所属の管理の画面", () => {
     await expect(screen.findByText("競合が発生しました")).resolves.toBeTruthy();
     expect(screen.getByText(/ほかの操作で所属が更新されました/u)).toBeTruthy();
     expect(requests).toBe(1);
+  });
+
+  it("すでに所属していない利用者への操作の 404 は、最新の一覧を表示していることを伝える", async () => {
+    server.use(
+      getListTenantMembersMockHandler(members),
+      http.delete(memberPath, () => problemResponse(404, "見つかりません")),
+    );
+    const { user } = await renderRoute("/members");
+
+    await user.click(await screen.findByRole("button", { name: `${memberId} の所属を外す` }));
+
+    await expect(screen.findByText("見つかりません")).resolves.toBeTruthy();
+    expect(screen.getByText(/すでにテナントに所属していません/u)).toBeTruthy();
   });
 
   it("最後の管理者を下げる操作の 422 は、管理者を残す必要があることを伝える", async () => {

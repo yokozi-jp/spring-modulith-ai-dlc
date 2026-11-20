@@ -5,13 +5,18 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { ProblemNotice } from "@/components/problem-notice";
-import { MembersTable } from "@/features/tenancy/members-table";
+import { MembersTable } from "@/features/tenancy/components/members-table";
+import { useMemberActions } from "@/features/tenancy/hooks/use-member-actions";
 import type { Notice } from "@/lib/notice";
 
 export function TenantMembersPage() {
   const { t } = useTranslation();
   const { data, error } = useSuspenseQuery(getListTenantMembersSuspenseQueryOptions());
   const [notice, setNotice] = useState<Notice | undefined>();
+  const { isPending, handleChangeRole, handleRemove } = useMemberActions(
+    data.data.lockNo,
+    setNotice,
+  );
 
   // 自分の役割を下げる、自分の所属を外すと、操作の後の一覧の再取得が 403 になる。
   // 取得済みの一覧があると useSuspenseQuery は投げないため、ここで投げて route の errorComponent に渡す。
@@ -28,7 +33,12 @@ export function TenantMembersPage() {
         </h1>
         <p className="text-muted-foreground">{t("tenancy.members.description")}</p>
       </div>
-      <MembersTable lockNo={data.data.lockNo} items={data.data.items} onNotice={setNotice} />
+      <MembersTable
+        items={data.data.items}
+        isPending={isPending}
+        onChangeRole={handleChangeRole}
+        onRemove={handleRemove}
+      />
       <ProblemNotice notice={notice} />
     </section>
   );

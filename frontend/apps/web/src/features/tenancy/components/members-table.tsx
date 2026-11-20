@@ -1,13 +1,6 @@
-import {
-  useChangeTenantMemberRole,
-  useRemoveTenantMember,
-} from "@frontend/api/endpoints/tenancy/tenancy";
 import type { TenantMemberResponse } from "@frontend/api/models";
 import { Button } from "@frontend/ui/button";
 import { useTranslation } from "react-i18next";
-
-import { failureNotice } from "@/lib/notice";
-import type { Notice } from "@/lib/notice";
 
 const roles = ["ADMIN", "MEMBER"] as const;
 
@@ -17,37 +10,17 @@ const roleLabels = {
 } as const satisfies Record<(typeof roles)[number], string>;
 
 export function MembersTable({
-  lockNo,
   items,
-  onNotice,
+  isPending,
+  onChangeRole,
+  onRemove,
 }: {
-  lockNo: number;
   items: readonly TenantMemberResponse[];
-  onNotice: (notice?: Notice) => void;
+  isPending: boolean;
+  onChangeRole: (userId: string, role: string) => void;
+  onRemove: (userId: string) => void;
 }) {
   const { t } = useTranslation();
-  // 毎回作り直される mutation の結果ではなく、安定した mutate を取り出して React Compiler の memo を効かせる。
-  const { mutate: changeRole, isPending: isChanging } = useChangeTenantMemberRole();
-  const { mutate: removeMember, isPending: isRemoving } = useRemoveTenantMember();
-  const isPending = isChanging || isRemoving;
-
-  // 409 は最新の一覧を取り直して通知するだけにし、自動で再送せず、新しい lockNo も黙って差し込まない。
-  function callbacks(success: string) {
-    return {
-      onSuccess: () => {
-        onNotice({ heading: success });
-      },
-      onError: (failure: unknown) => {
-        onNotice(
-          failureNotice(t, failure, {
-            notFound: t("tenancy.members.notice.notFound"),
-            conflict: t("tenancy.members.notice.conflict"),
-            unprocessable: t("tenancy.members.notice.lastAdmin"),
-          }),
-        );
-      },
-    };
-  }
 
   return (
     <table className="w-full text-left text-sm">
@@ -75,11 +48,7 @@ export function MembersTable({
                 value={role}
                 disabled={isPending}
                 onChange={(event) => {
-                  onNotice();
-                  changeRole(
-                    { userId, data: { role: event.currentTarget.value, lockNo } },
-                    callbacks(t("tenancy.members.notice.roleChanged")),
-                  );
+                  onChangeRole(userId, event.currentTarget.value);
                 }}
               >
                 {roles.map((value) => (
@@ -96,11 +65,7 @@ export function MembersTable({
                 size="sm"
                 disabled={isPending}
                 onClick={() => {
-                  onNotice();
-                  removeMember(
-                    { userId, params: { lockNo } },
-                    callbacks(t("tenancy.members.notice.removed")),
-                  );
+                  onRemove(userId);
                 }}
               >
                 {t("tenancy.members.remove", { userId })}

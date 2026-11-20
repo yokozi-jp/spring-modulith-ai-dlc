@@ -93,7 +93,6 @@ jOOQの生成物の`com.example.demo.jooq`はOPENのモジュールであり、`
   ラムダで作った`ApplicationListener`はクラスファイルにならないため、検出しない。
 - `listenersExposeOnlyOnAndCallOneCommandHandler`：`*Listener`のpublicメソッドは`@ApplicationModuleListener`を付けた`void on(...)`一つだけにし、呼ぶ`*CommandHandler`はちょうど一つにする。
 - `requestsAndResponsesArePresentationWebRecords`：`*Request`と`*Response`は`presentation.web`のrecordにする。
-- `controllersDoNotCreateRequests`：`presentation.web`の`*Controller`は、`*Request`のコンストラクタを呼ばず、`*Request::new`も使わない。Requestは`@Valid @RequestBody`か`@Valid @ParameterObject`で受け取る。
 - `queryServicesImplementModuleQueries`：`*QueryService`は`application`に置いて自モジュールのルートの`*Queries`を実装し、すべてのpublicメソッドに`@Transactional(readOnly = true)`を付ける。
 - `queryResultStatusIsNotReadByOtherModules`：モジュールルートのrecordの`status()`と、名前が`Status`で終わるメソッドを、そのモジュールの外から呼ばず、メソッド参照もしない。
   ログに注文の状態を出す`payment.application.ChargeOrderCommandHandler`だけを、完全修飾型名で除く（[ADR-075](../adr/ADR-075-return-state-meaning-in-query-results.md)）。

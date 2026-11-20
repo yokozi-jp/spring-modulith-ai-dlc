@@ -98,14 +98,12 @@ paths:
           type: string
           format: uuid
       - description: 画面が読んだテナントのロック番号
-        example: 1
         in: query
         name: lockNo
         required: true
         schema:
           type: integer
           format: int64
-          example: 1
           minimum: 1
       responses:
         "204":

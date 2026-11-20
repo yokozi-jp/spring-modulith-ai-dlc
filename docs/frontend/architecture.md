@@ -82,10 +82,13 @@ frontend/apps/web/src/
 │           └── -index.test.tsx
 ├── components/
 │   ├── app-shell.tsx
+│   ├── problem-notice.tsx
 │   ├── route-pending.tsx
 │   ├── route-error.tsx
 │   └── route-not-found.tsx
 ├── lib/
+│   ├── notice.ts
+│   ├── notice.test.ts
 │   ├── telemetry.ts
 │   ├── telemetry.test.ts
 │   ├── telemetry-sanitize.ts
@@ -271,7 +274,7 @@ OxlintのJS plugin APIはalphaである。
 
 ## 共有コード
 
-アプリシェル（header、layout）と、routerの既定のpending、error、not foundの表示は `components/` の直下に置く。
+アプリシェル（header、layout）と、routerの既定のpending、error、not foundの表示と、複数のfeatureが使う操作の結果の通知（`problem-notice.tsx`と、通知を作る `lib/notice.ts`）は `components/` と `lib/` の直下に置く。
 shadcnのprimitiveと `cn` は、アプリの外の `packages/ui`（`@frontend/ui`）に置く。
 
 複数featureから使うという理由だけで、トップレベルに汎用的な `shared` ディレクトリを作らない。

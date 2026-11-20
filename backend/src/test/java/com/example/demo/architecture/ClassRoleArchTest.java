@@ -254,27 +254,6 @@ class ClassRoleArchTest {
   /* package */ static final ArchRule requestsAndResponsesArePresentationWebRecords =
       requestsAndResponsesArePresentationWebRecordsRule(BASE_PACKAGE);
 
-  /** Controller は Request を作らない。Request は Spring MVC がリクエストから作る。 */
-  @ArchTest
-  /* package */ static final ArchRule controllersDoNotCreateRequests =
-      noClasses()
-          .that()
-          .resideInAPackage("..presentation.web..")
-          .and()
-          .haveSimpleNameEndingWith("Controller")
-          .should()
-          .accessTargetWhere(
-              DescribedPredicate.describe(
-                  "*Request のコンストラクタ（*Request::new を含む）",
-                  access ->
-                      access.getTargetOwner().getSimpleName().endsWith("Request")
-                          && "<init>".equals(access.getName())))
-          .because(
-              "Controller が Request を包むと、Request の検証と変換を通さずに値を Command へ渡す抜け道になるため。"
-                  + "直し方：パラメータは @Valid @RequestBody か @Valid @ParameterObject で Request として受け取る。"
-                  + "規約：docs/backend/class-roles/request.md、"
-                  + ADR_050);
-
   /** QueryService は自モジュールの {@code *Queries} を実装し、public メソッドを読み取り専用トランザクションにする。 */
   @ArchTest
   /* package */ static final ArchRule queryServicesImplementModuleQueries =

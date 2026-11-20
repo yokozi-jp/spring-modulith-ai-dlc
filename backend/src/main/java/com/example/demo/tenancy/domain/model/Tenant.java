@@ -107,7 +107,7 @@ public final class Tenant {
     }
   }
 
-  /** 管理者がいる所属を、管理者のいない所属に置き換える操作を拒否し、置き換える。target は拒否のメッセージに入れる操作の対象。 */
+  /** 置き換えると管理者がいなくなる場合は拒否する。target は例外のメッセージに入れる操作の対象。 */
   private void replaceMembers(final UserId target, final List<TenantMember> next) {
     if (hasAdmin(members) && !hasAdmin(next)) {
       throw new BusinessRuleViolationException(

@@ -8,8 +8,8 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.Min;
 import java.util.UUID;
-import org.springdoc.core.annotations.ParameterObject;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -18,6 +18,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
@@ -102,7 +103,7 @@ class CurrentTenantMemberController {
    * <p>外した利用者は、次のリクエストから業務の API を呼べない。管理者以外には 403、最後の管理者を外すと 422 を返す。
    *
    * @param userId 所属を外す利用者の ID
-   * @param request 画面が読んだテナントのロック番号（クエリパラメータ）
+   * @param lockNo 画面が読んだテナントのロック番号
    * @param authentication ログインした利用者の認証
    * @return 本文のない 204 の応答
    */
@@ -114,9 +115,10 @@ class CurrentTenantMemberController {
   @DeleteMapping("/{userId}")
   /* package */ ResponseEntity<Void> remove(
       @PathVariable final UUID userId,
-      @Valid @ParameterObject final RemoveMemberRequest request,
+      @RequestParam @Min(1) final long lockNo,
       final Authentication authentication) {
-    removeMember.handle(request.toCommand(selectedTenantId(authentication), userId));
+    removeMember.handle(
+        new RemoveMemberRequest(lockNo).toCommand(selectedTenantId(authentication), userId));
     return ResponseEntity.noContent().build();
   }
 

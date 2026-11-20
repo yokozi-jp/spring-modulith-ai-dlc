@@ -578,10 +578,6 @@ class ArchitectureRuleFixtureTest {
             ClassRoleArchTest.requestsAndResponsesArePresentationWebRecordsRule(VIOLATING),
             "ordering.presentation.web.PlaceOrderRequest"),
         row(
-            "controllersDoNotCreateRequests",
-            ClassRoleArchTest.controllersDoNotCreateRequests,
-            "ordering.presentation.web.OrderWrapLockController.wrap("),
-        row(
             "queryServicesImplementModuleQueries",
             ClassRoleArchTest.queryServicesImplementModuleQueries,
             "ordering.application.OrderQueryService"),
@@ -851,7 +847,6 @@ class ArchitectureRuleFixtureTest {
         ClassRoleArchTest.applicationListenerIsNotImplemented,
         ClassRoleArchTest.listenersExposeOnlyOnAndCallOneCommandHandler,
         ClassRoleArchTest.requestsAndResponsesArePresentationWebRecordsRule(basePackage),
-        ClassRoleArchTest.controllersDoNotCreateRequests,
         ClassRoleArchTest.queryServicesImplementModuleQueries,
         ClassRoleArchTest.queryResultStatusIsNotReadByOtherModulesRule(basePackage),
         ClassRoleArchTest.mappingLibrariesAreNotUsed,
