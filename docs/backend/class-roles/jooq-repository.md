@@ -76,6 +76,7 @@ jOOQ の Repository は業務規則を持たない。
   関数を宣言に持つため、`insert` と `update` に一意の列の値を別に渡さず、別の集約ルートの値と組にして渡す誤りが書けない。
   定数の型は `AggregateTable<TOrderRecord, UUID, Order>` のように、第 3 型引数に集約ルートのクラスを指定する。`update` が版の持ち主をこの型で受け取るため、版の数値を返すラムダは渡せない。
   `ChildTable.of(T_ORDER_LINE, T_ORDER_LINE.ORDER_ID, T_ORDER_LINE.LINE_NO)` は、子のテーブル、親の内部の主キーを持つ外部キーの列、親の中で行を同定する自然キーの列を渡す。
+  自然キーの列の型は `Integer`、`Long`、`Short`、`String`、`UUID` に限り、その列の組を子のテーブルの一意制約で裏づける。
   外部キーの列は、親の内部の主キーと同じ型（`Long`）であることしかコンパイルで確かめられない。正しい列を渡したことは、`@DatabaseTest` の往復で確かめる。
 - `add` は、`tableWriter.insert(ORDER, order, ルートの列の値, 子の全行)` を呼ぶ。
   ルートの列の値は、ラムダで `ColumnValues` に `set(列, 値)` で渡す。一意の列、内部の主キー、共通カラムは書かない（渡すと `IllegalArgumentException` になる）。
@@ -96,7 +97,7 @@ jOOQ の Repository は業務規則を持たない。
   渡した子の全行が保存後の姿になるため、子の一部だけを渡さない。保存後に子が空なら、空の一覧を渡す。
 - `update` は、`TableWriter.update` を、そのメソッドの中で直接呼ぶ。
   別のメソッドを経由すると、ArchUnit の検査が呼び出しを見つけられない。
-- 集約ルートを受け取る public メソッドは `add`、`update`、`delete` だけにする。
+- 集約ルートを受け取る public メソッドは `add` と `update` だけにする。
   期待する版を持つ書き込みは、集約ルートを受け取る `update` に限る。識別子と版を受け取るメソッドを作らない。
   `delete` と、版を比べない更新（在庫の引き当てなど）は、`TableWriter` に入口がない。必要になったときに [ADR-054](../../adr/ADR-054-detect-optimistic-lock-conflicts-by-update-count.md) を更新して入口を足す。
 - jOOQ の `executeWithOptimisticLocking` と `recordVersionFields` を使わない。
@@ -336,7 +337,7 @@ public long countUnshippedByCustomer(final CustomerId customerId) {
 ## 対応するテスト
 
 `@DatabaseTest` で、`add` してから読み戻す往復と、`update` してから読み戻す往復を確かめる。
-子の行を持つ集約は、`update` で子の行が差分（削除、更新、追加）のとおりに変わることと、別の集約ルートの子の行が変わらないことも確かめる。
+子の行を持つ集約は、`update` で子の行が差分（削除、更新、追加）のとおりに変わることも確かめる。
 子の宣言の外部キーの列の誤りは、コンパイルでも `TableWriter` のテストでも見つからないため、このテストで確かめる。
 Repository のテストは列と集約の往復と子の行の差分だけを確かめ、競合と行がない場合のテストを Repository ごとには書かない。
 版の条件、件数の判定、競合と行なしの区別、ロック待ちの変換は、`shared` の `TableWriterTest` と `TableWriterConcurrencyTest` が実 PostgreSQL で確かめる。
@@ -403,9 +404,9 @@ Repository のテストは列と集約の往復と子の行の差分だけを確
 - [ ] 集約の形を `AggregateTable` と `ChildTable` のクラスの定数として一度だけ宣言し、子の外部キーの列に親の内部の主キーを指す列を渡す。［自分で点検（往復のテストで確かめる）］
 - [ ] `add` は `tableWriter.insert(...)` を呼び、ルートの列と子の全行を `ColumnValues` で渡す。`insertInto` を呼ばない。［ArchUnit で検査：TableWriterArchTest.tableWritesGoThroughTableWriter］
 - [ ] Spring の例外（`CannotAcquireLockException`、`DuplicateKeyException`）を Repository の外へ出さず、出すときは原因を付けずに種類を付けた `ConflictException` に変える。［自分で点検］
-- [ ] 集約ルートを受け取る `add` 以外の public メソッドは、`TableWriter.update` を、そのメソッドの中で直接呼ぶ。［ArchUnit で検査：TableWriterArchTest.repositoryUpdateAndDeleteCheckVersion］
-- [ ] 集約ルートを `Versioned` にし、`AggregateTable` の第 3 型引数にそのクラスを指定して、`update` はその集約ルートを `TableWriter.update` に渡す（テーブルから読み直した版は渡せない）。［型で検査］
-- [ ] 集約ルートを受け取る public メソッドは、`add`、`update`、`delete` だけにする（`save` のような名前でも `TableWriter.update` を呼べば規則は通るため、名前は規則が検査しない）。［自分で点検］
+- [ ] 集約ルートを受け取る `add` 以外の public メソッドは、`update` という名前で、`TableWriter.update` を、そのメソッドの中で直接呼ぶ。［ArchUnit で検査：TableWriterArchTest.repositoryUpdateAndDeleteCheckVersion］
+- [ ] 集約ルートを `Versioned` にし、`AggregateTable` の第 3 型引数にそのクラスを指定して、`update` はその集約ルートを `TableWriter.update` に渡す（テーブルから読み直した版は渡せない）。［型で検査 + 自分で点検（`Versioned` そのものを指定しない）］
+- [ ] 集約ルートを受け取る public メソッドは、`add` と `update` だけにする（`save` や `delete` のような名前は、`TableWriter.update` を呼んでも H3 が検出する）。［ArchUnit で検査：TableWriterArchTest.repositoryUpdateAndDeleteCheckVersion］
 - [ ] 子の行は `ChildRows` で保存後の全行を渡し、子を宣言しない集約は `rows -> {}` を渡す。［自分で点検］
 - [ ] jOOQ の INSERT、UPDATE、DELETE、UPSERT（`INSERT ... ON CONFLICT`）、MERGE、`TableRecord`、`UpdatableRecord`、`DAO` の書き込み、Spring JDBC と JDBC の直接の利用を、`TableWriter` の外で使わない（一覧は[アーキテクチャテスト](../architecture-tests.md)の「書き込みの入口」）。［ArchUnit で検査：TableWriterArchTest.tableWritesGoThroughTableWriter］
 - [ ] jOOQ の `Settings` の `executeWithOptimisticLocking` と、コード生成の `recordVersionFields` を使わない。［自分で点検］

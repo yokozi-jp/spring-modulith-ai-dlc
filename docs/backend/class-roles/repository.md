@@ -51,7 +51,7 @@ Presentation は Repository を使わない。
   この二つの例外を、インタフェースの Javadoc に書く。
 - 集約の物理削除が要るときは、先に [ADR-054](../../adr/ADR-054-detect-optimistic-lock-conflicts-by-update-count.md) を更新して `TableWriter` に入口を足し、そのうえで `void delete(集約ルート)` を置き、`update` と同じ二つの例外を Javadoc に書く。
   今の `TableWriter` には `delete` の入口がないため、`Jooq*Repository` の `delete` は H3 が検出する。
-  期待する版を持つ書き込みは、集約ルートを受け取る `update` と `delete` に限り、識別子と版を受け取るメソッドを作らない。
+  期待する版を持つ書き込みは、集約ルートを受け取る `update`（と、入口を足した後の `delete`）に限り、識別子と版を受け取るメソッドを作らない。
 - `add`、`update`、`delete` の引数の集約ルートは、`shared.concurrency` の `Versioned` を実装し、引数のない `long lockNo()` を持つ（[集約](aggregate.md)）。
   `TableWriter.update` は `Versioned` の集約ルートを受け取り、`lockNo()` を期待する版にする。
 - 書き込み（`add`、`update`、`delete` と、`save` のような別名で集約ルートを受け取るメソッド）を呼べるのは CommandHandler だけである。
