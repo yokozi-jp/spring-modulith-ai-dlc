@@ -2,6 +2,9 @@ package com.example.demo.shared.infrastructure.persistence;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
+import java.util.UUID;
+import org.jooq.Field;
 import org.jooq.Record;
 import org.jooq.Table;
 import org.jooq.TableField;
@@ -22,6 +25,10 @@ import org.jooq.TableField;
   "PMD.ShortMethodName"
 })
 public final class ChildTable<R extends Record, C extends Record> {
+
+  /** 自然キーに使える型。{@code BigDecimal} の桁数や {@code Instant} の精度の違いで、保存済みの値と一致しなくなる型は使えない。 */
+  private static final Set<Class<?>> COMPARABLE_TYPES =
+      Set.of(Integer.class, Long.class, Short.class, String.class, UUID.class);
 
   /** 子のテーブル。 */
   private final Table<C> table;
@@ -60,7 +67,40 @@ public final class ChildTable<R extends Record, C extends Record> {
     final List<TableField<C, ?>> naturalKey = new ArrayList<>();
     naturalKey.add(firstKey);
     naturalKey.addAll(List.of(moreKeys));
+    naturalKey.forEach(ChildTable::requireComparableType);
     return new ChildTable<>(table, parentKey, naturalKey);
+  }
+
+  /**
+   * 子の行の自然キーの値の組を返す。
+   *
+   * @throws IllegalArgumentException 自然キーの列を書いていない、または式を書いた場合
+   */
+  /* package */ List<Object> naturalKeyOf(final ColumnValues<C> row) {
+    return naturalKey.stream().map(field -> naturalKeyValue(row, field)).toList();
+  }
+
+  private Object naturalKeyValue(final ColumnValues<C> row, final TableField<C, ?> field) {
+    final Object value = row.values().get(field);
+    if (value == null || value instanceof Field<?>) {
+      throw new IllegalArgumentException(
+          "natural key must be a non-null value: table="
+              + table.getName()
+              + ", column="
+              + field.getName());
+    }
+    return value;
+  }
+
+  /** 自然キーの値は、保存済みの値と {@code equals} で比べるため、比べられる型に限る。 */
+  private static void requireComparableType(final TableField<?, ?> field) {
+    if (!COMPARABLE_TYPES.contains(field.getType())) {
+      throw new IllegalArgumentException(
+          "natural key column must be Integer, Long, Short, String or UUID: column="
+              + field.getName()
+              + ", type="
+              + field.getType().getSimpleName());
+    }
   }
 
   /* package */ Table<C> table() {

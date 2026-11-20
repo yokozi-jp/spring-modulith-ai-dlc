@@ -13,7 +13,6 @@ import org.jooq.Record1;
 import org.jooq.Result;
 import org.jooq.Table;
 import org.springframework.stereotype.Component;
-import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 /**
  * 集約の INSERT と UPDATE を組み立てて実行する唯一の入口（ADR-054、docs/database/postgresql-concurrency-control.md）。
@@ -38,16 +37,13 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
 @Component
 public class TableWriter {
 
-  /** 楽観的ロックの版のカラム名。 */
-  private static final String LOCK_NO = "lock_no";
-
   /** 一つの文で変える行数。 */
   private static final int ONE_ROW = 1;
 
   /** 版の最小値。INSERT が {@code lock_no = 1} で書く。 */
   private static final long FIRST_LOCK_NO = 1L;
 
-  /** UPDATE と DELETE を実行する jOOQ のコンテキスト。 */
+  /** INSERT と UPDATE を実行する jOOQ のコンテキスト。 */
   private final DSLContext dsl;
 
   /** 共通カラムの値を作る共通処理。 */
@@ -64,29 +60,9 @@ public class TableWriter {
   }
 
   /**
-   * 子のない集約を INSERT する。共通カラムを書き、{@code lock_no = 1} にする。
-   *
-   * @param aggregate 子を宣言していない集約
-   * @param key ルートの一意の列の値
-   * @param rootColumns ルートの業務の列の値。ルートの一意の列と内部の主キーは書けない
-   * @throws IllegalArgumentException 集約が子を宣言している場合、共通カラムなどの書けない列を渡した場合
-   * @throws IllegalStateException トランザクションが開いていない、または読み取り専用の場合
-   * @throws ConflictException 一意制約に違反した場合（種類は {@code UNIQUE}）、行ロックを {@code lock_timeout}
-   *     までに取れない場合（種類は {@code LOCK}）。原因は持たない
-   */
-  public <R extends Record, K> void insert(
-      final AggregateTable<R, K> aggregate,
-      final K key,
-      final Consumer<ColumnValues<R>> rootColumns) {
-    if (!aggregate.children().isEmpty()) {
-      throw new IllegalArgumentException(
-          "children must be put: table=" + aggregate.table().getName());
-    }
-    insertRoot(aggregate, key, rootColumns);
-  }
-
-  /**
    * 集約を INSERT する。ルートを書き、子を複数行の INSERT で書く。
+   *
+   * <p>子を宣言していない集約は、{@code rows -> {}} を渡す。
    *
    * @param aggregate 集約の宣言
    * @param key ルートの一意の列の値
@@ -98,14 +74,15 @@ public class TableWriter {
    *     までに取れない場合（種類は {@code LOCK}）。原因は持たない
    */
   public <R extends Record, K> void insert(
-      final AggregateTable<R, K> aggregate,
+      final AggregateTable<R, K, ?> aggregate,
       final K key,
       final Consumer<ColumnValues<R>> rootColumns,
       final Consumer<ChildRows<R>> childRows) {
+    requireTransaction();
     final ChildRows<R> rows = collectChildRows(aggregate, childRows);
     final long id = insertRoot(aggregate, key, rootColumns);
     for (final ChildTable<R, ?> child : aggregate.children()) {
-      children.saveChild(child, id, rows, false);
+      children.insertAll(child, id, rows);
     }
   }
 
@@ -128,10 +105,10 @@ public class TableWriter {
    * @throws ConflictException 更新件数が 0 で一意の列の行がある場合（種類は {@code VERSION}）、一意制約に違反した場合（種類は {@code
    *     UNIQUE}）、行ロックを {@code lock_timeout} までに取れない場合（種類は {@code LOCK}）。原因は持たない
    */
-  public <R extends Record, K> void update(
-      final AggregateTable<R, K> aggregate,
+  public <R extends Record, K, A extends Versioned> void update(
+      final AggregateTable<R, K, A> aggregate,
       final K key,
-      final Versioned root,
+      final A root,
       final Consumer<ColumnValues<R>> rootColumns,
       final Consumer<ChildRows<R>> childRows) {
     requireTransaction();
@@ -146,7 +123,8 @@ public class TableWriter {
     }
     final ChildRows<R> rows = collectChildRows(aggregate, childRows);
     final ColumnValues<R> values = collect(aggregate, rootColumns);
-    final Field<Long> lockNo = CommonColumns.requiredField(table, LOCK_NO, Long.class);
+    final Field<Long> lockNo =
+        CommonColumns.requiredField(table, CommonColumns.LOCK_NO, Long.class);
     final Supplier<String> target = () -> target(table, aggregate.key(), key, expectedLockNo);
     final Result<Record1<Long>> updated =
         ConflictTranslator.executeOrConflict(
@@ -162,14 +140,14 @@ public class TableWriter {
     requireOneRow(updated, aggregate, key, expectedLockNo);
     final long id = updated.getFirst().value1();
     for (final ChildTable<R, ?> child : aggregate.children()) {
-      children.saveChild(child, id, rows, true);
+      children.replace(child, id, rows);
     }
   }
 
   /** 更新したルートがちょうど 1 行であることを確かめ、そうでなければ NotFound か Conflict にする。 */
   private <R extends Record, K> void requireOneRow(
       final Result<Record1<Long>> updated,
-      final AggregateTable<R, K> aggregate,
+      final AggregateTable<R, K, ?> aggregate,
       final K key,
       final long expectedLockNo) {
     final Table<R> table = aggregate.table();
@@ -189,10 +167,9 @@ public class TableWriter {
 
   /** ルートを INSERT し、RETURNING で受けた内部の主キーを返す。 */
   private <R extends Record, K> long insertRoot(
-      final AggregateTable<R, K> aggregate,
+      final AggregateTable<R, K, ?> aggregate,
       final K key,
       final Consumer<ColumnValues<R>> rootColumns) {
-    requireTransaction();
     final Table<R> table = aggregate.table();
     final ColumnValues<R> values = collect(aggregate, rootColumns);
     return ConflictTranslator.executeOrConflict(
@@ -209,32 +186,35 @@ public class TableWriter {
 
   /** 呼び出し側のラムダから、ルートの業務の列の値を集める。 */
   private static <R extends Record, K> ColumnValues<R> collect(
-      final AggregateTable<R, K> aggregate, final Consumer<ColumnValues<R>> rootColumns) {
+      final AggregateTable<R, K, ?> aggregate, final Consumer<ColumnValues<R>> rootColumns) {
     final ColumnValues<R> values =
         new ColumnValues<>(aggregate.table(), Arrays.asList(aggregate.key(), aggregate.id()));
     rootColumns.accept(values);
     return values;
   }
 
-  /** 呼び出し側のラムダから子の行を集め、宣言した子と過不足がなく、行に不備がないことを SQL の前に確かめる。 */
+  /** 呼び出し側のラムダから子の行を集め、宣言した子と過不足がないことを SQL の前に確かめる。 */
   private static <R extends Record, K> ChildRows<R> collectChildRows(
-      final AggregateTable<R, K> aggregate, final Consumer<ChildRows<R>> childRows) {
+      final AggregateTable<R, K, ?> aggregate, final Consumer<ChildRows<R>> childRows) {
     final ChildRows<R> rows = new ChildRows<>();
     childRows.accept(rows);
     if (rows.size() != aggregate.children().size()) {
       throw new IllegalArgumentException(
           "child rows must match the declared children: table=" + aggregate.table().getName());
     }
-    for (final ChildTable<R, ?> child : aggregate.children()) {
-      ChildWriter.desiredByKey(child, rows);
-    }
     return rows;
   }
 
-  /** 書き込みは、開いていて読み取り専用でないトランザクションの中でだけ行う。 */
-  private static void requireTransaction() {
-    if (!TransactionSynchronizationManager.isActualTransactionActive()
-        || TransactionSynchronizationManager.isCurrentTransactionReadOnly()) {
+  /**
+   * 書き込みは、開いていて読み取り専用でないトランザクションの中でだけ行う。
+   *
+   * <p>Spring の {@code @Transactional} と、jOOQ の {@code transactionResult}
+   * のどちらで開いたトランザクションも、接続が自動コミットではないことで見分ける。
+   */
+  private void requireTransaction() {
+    final boolean writable =
+        dsl.connectionResult(connection -> !connection.getAutoCommit() && !connection.isReadOnly());
+    if (!writable) {
       throw new IllegalStateException("a read-write transaction is required to write");
     }
   }

@@ -1,5 +1,6 @@
 package com.example.demo.shared.infrastructure.persistence;
 
+import com.example.demo.shared.concurrency.Versioned;
 import java.util.List;
 import org.jooq.Record;
 import org.jooq.Table;
@@ -15,10 +16,17 @@ import org.jooq.TableField;
  *
  * @param <R> 集約ルートのテーブルの Record の型
  * @param <K> ルートを一つに決める一意の列の値の型
+ * @param <A> 集約ルートのクラス。{@link TableWriter#update} が受け取る版の持ち主で、このクラスを指定すると、版の数値を返すラムダを渡せない
  */
 // 宣言を読むアクセサ（table()、key() など）はフィールドと同名にし、宣言の static factory の名前を of にする。
-@SuppressWarnings({"PMD.DataClass", "PMD.AvoidFieldNameMatchingMethodName", "PMD.ShortMethodName"})
-public final class AggregateTable<R extends Record, K> {
+// A は実行時に使わない。update が集約ルートのクラスを受け取るため、版の数値を返すラムダは渡せない。
+@SuppressWarnings({
+  "UnusedTypeParameter",
+  "PMD.DataClass",
+  "PMD.AvoidFieldNameMatchingMethodName",
+  "PMD.ShortMethodName"
+})
+public final class AggregateTable<R extends Record, K, A extends Versioned> {
 
   /** 集約ルートのテーブル。 */
   private final Table<R> table;
@@ -53,7 +61,7 @@ public final class AggregateTable<R extends Record, K> {
    * @throws IllegalArgumentException テーブルに共通カラムがない場合
    */
   @SafeVarargs
-  public static <R extends Record, K> AggregateTable<R, K> of(
+  public static <R extends Record, K, A extends Versioned> AggregateTable<R, K, A> of(
       final Table<R> table,
       final TableField<R, K> key,
       final TableField<R, Long> id,

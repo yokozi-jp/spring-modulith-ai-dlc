@@ -38,7 +38,7 @@ class JooqOrderRepository implements OrderRepository {
       ChildTable.of(T_ORDER_LINE, T_ORDER_LINE.ORDER_ID, T_ORDER_LINE.LINE_NO);
 
   /** 注文の集約。ルートは公開 ID で一つに決める。 */
-  private static final AggregateTable<TOrderRecord, UUID> ORDER =
+  private static final AggregateTable<TOrderRecord, UUID, Order> ORDER =
       AggregateTable.of(T_ORDER, T_ORDER.PUBLIC_ID, T_ORDER.ORDER_ID, LINES);
 
   /** SQL を組み立てて実行する jOOQ のコンテキスト。 */

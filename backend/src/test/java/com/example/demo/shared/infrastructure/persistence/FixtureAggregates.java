@@ -15,11 +15,11 @@ final class FixtureAggregates {
           FIXTURE_ITEM_DETAIL, FIXTURE_ITEM_DETAIL.ITEM_ID, FIXTURE_ITEM_DETAIL.DETAIL_NO);
 
   /** 子を持つ集約。ルートの一意の列と内部の主キーは、同じ item_id にする。 */
-  /* package */ static final AggregateTable<Record, Long> ITEM =
+  /* package */ static final AggregateTable<Record, Long, Versioned> ITEM =
       AggregateTable.of(FIXTURE_ITEM, FIXTURE_ITEM.ITEM_ID, FIXTURE_ITEM.ITEM_ID, DETAILS);
 
   /** 子を持たない集約。 */
-  /* package */ static final AggregateTable<Record, Long> ITEM_ONLY =
+  /* package */ static final AggregateTable<Record, Long, Versioned> ITEM_ONLY =
       AggregateTable.of(FIXTURE_ITEM, FIXTURE_ITEM.ITEM_ID, FIXTURE_ITEM.ITEM_ID);
 
   private FixtureAggregates() {}

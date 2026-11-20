@@ -9,9 +9,9 @@ import static com.example.demo.shared.infrastructure.persistence.FixtureAggregat
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.mockito.Mockito.mock;
 
 import com.example.demo.shared.concurrency.ConflictException;
+import com.example.demo.shared.concurrency.Versioned;
 import com.example.demo.shared.failure.NotFoundException;
 import com.example.demo.testkit.DatabaseTest;
 import com.example.demo.testkit.FixtureTablesExtension;
@@ -24,12 +24,10 @@ import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Consumer;
-import java.util.function.Supplier;
 import java.util.regex.Pattern;
 import org.jooq.DSLContext;
 import org.jooq.Record;
 import org.jooq.Table;
-import org.jooq.TableField;
 import org.jooq.impl.DSL;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.BeforeEach;
@@ -55,10 +53,6 @@ class TableWriterTest {
 
   /** lock_no を持たないテーブル。 */
   private static final Table<Record> NO_LOCK_TABLE = DSL.table(DSL.name("t_no_lock"));
-
-  /** lock_no を持たないテーブルの主キーに見立てた列。宣言はテーブルの検査で失敗するため、列の中身は使わない。 */
-  @SuppressWarnings("unchecked")
-  private static final TableField<Record, Long> NO_LOCK_ID = mock(TableField.class);
 
   /** 更新の時刻。 */
   private static final Instant NOW = Instant.parse("2026-10-04T01:02:03.123456Z");
@@ -106,7 +100,7 @@ class TableWriterTest {
   void updateWritesRootColumnsAndAdvancesVersion() {
     insertItem(1L, "before");
 
-    inUseCase(() -> updateItem(1L, 1L, "after"));
+    runInUseCase(() -> updateItem(1L, 1L, "after"));
 
     final Record row = item(1L);
     assertThat(row.get(FIXTURE_ITEM.ITEM_NAME)).as("業務の列").isEqualTo("after");
@@ -122,7 +116,7 @@ class TableWriterTest {
   void updateWithoutBusinessColumnsAdvancesVersion() {
     insertItem(1L, "before");
 
-    inUseCase(() -> save(1L, 1L, set -> {}, List.of()));
+    runInUseCase(() -> save(1L, 1L, set -> {}, List.of()));
 
     assertThat(item(1L).get(FIXTURE_ITEM.LOCK_NO)).isEqualTo(2L);
     assertThat(item(1L).get(FIXTURE_ITEM.UPDATED_AT)).isEqualTo(NOW);
@@ -134,7 +128,7 @@ class TableWriterTest {
     insertItem(1L, "before");
     makeStale(1L);
 
-    assertThatThrownBy(() -> inUseCase(() -> updateItem(1L, 1L, "after")))
+    assertThatThrownBy(() -> runInUseCase(() -> updateItem(1L, 1L, "after")))
         .isInstanceOf(ConflictException.class)
         .hasMessageContaining("table=t_fixture_item")
         .hasMessageContaining("item_id=1")
@@ -147,7 +141,7 @@ class TableWriterTest {
   @Test
   @DisplayName("update は一意の列の行がなければ NotFoundException を投げる")
   void updateWithoutRowIsNotFound() {
-    assertThatThrownBy(() -> inUseCase(() -> updateItem(1L, 1L, "after")))
+    assertThatThrownBy(() -> runInUseCase(() -> updateItem(1L, 1L, "after")))
         .isInstanceOf(NotFoundException.class)
         .hasMessageContaining("table=t_fixture_item");
   }
@@ -157,7 +151,7 @@ class TableWriterTest {
   void updateMatchingTwoRowsIsRejected() {
     insertItem(1L, "same");
     insertItem(2L, "same");
-    final AggregateTable<Record, String> byName =
+    final AggregateTable<Record, String, Versioned> byName =
         AggregateTable.of(FIXTURE_ITEM, FIXTURE_ITEM.ITEM_NAME, FIXTURE_ITEM.ITEM_ID);
 
     assertThatThrownBy(() ->
@@ -172,7 +166,7 @@ class TableWriterTest {
   void expectedLockNoBelowOneIsRejected(final long expectedLockNo) {
     insertItem(1L, "before");
 
-    assertThatThrownBy(() -> inUseCase(() -> updateItem(1L, expectedLockNo, "after")))
+    assertThatThrownBy(() -> runInUseCase(() -> updateItem(1L, expectedLockNo, "after")))
         .isInstanceOf(IllegalArgumentException.class)
         .hasMessageContaining("expectedLockNo=" + expectedLockNo);
   }
@@ -180,14 +174,27 @@ class TableWriterTest {
   @Test
   @DisplayName("共通カラムのないテーブルは、集約の宣言で IllegalArgumentException にする")
   void tableWithoutCommonColumnsIsRejected() {
-    assertThatThrownBy(() -> AggregateTable.of(NO_LOCK_TABLE, NO_LOCK_ID, NO_LOCK_ID))
+    assertThatThrownBy(
+            () -> AggregateTable.of(NO_LOCK_TABLE, FIXTURE_ITEM.ITEM_ID, FIXTURE_ITEM.ITEM_ID))
         .as("集約")
         .isInstanceOf(IllegalArgumentException.class)
         .hasMessageContaining("column=lock_no");
-    assertThatThrownBy(() -> ChildTable.<Record, Record>of(NO_LOCK_TABLE, NO_LOCK_ID, NO_LOCK_ID))
+    assertThatThrownBy(() ->
+            ChildTable.<Record, Record>of(
+                NO_LOCK_TABLE, FIXTURE_ITEM.ITEM_ID, FIXTURE_ITEM.ITEM_ID))
         .as("子")
         .isInstanceOf(IllegalArgumentException.class)
         .hasMessageContaining("column=lock_no");
+  }
+
+  @Test
+  @DisplayName("自然キーに、保存済みの値と equals で比べられない型の列は使えない")
+  void naturalKeyOfIncomparableTypeIsRejected() {
+    assertThatThrownBy(() ->
+            ChildTable.<Record, Record>of(
+                FIXTURE_ITEM_DETAIL, FIXTURE_ITEM_DETAIL.ITEM_ID, FIXTURE_ITEM_DETAIL.CREATED_AT))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessageContaining("natural key column must be");
   }
 
   @Test
@@ -228,7 +235,7 @@ class TableWriterTest {
     insertDetail(1L, 3, "three");
     final Map<Integer, String> aggregateChildren = Map.of(2, "two'", 4, "four");
 
-    inUseCase(() -> saveChildren(1L, aggregateChildren));
+    runInUseCase(() -> saveChildren(1L, aggregateChildren));
 
     assertThat(details(1L)).isEqualTo(aggregateChildren);
     assertThat(
@@ -258,7 +265,7 @@ class TableWriterTest {
     insertDetail(1L, 1, "one");
     insertDetail(1L, 2, "two");
 
-    inUseCase(() -> saveChildren(1L, Map.of()));
+    runInUseCase(() -> saveChildren(1L, Map.of()));
 
     assertThat(details(1L)).isEmpty();
   }
@@ -271,7 +278,7 @@ class TableWriterTest {
     insertDetail(1L, 1, "mine");
     insertDetail(2L, 1, "other");
 
-    inUseCase(() -> saveChildren(1L, Map.of()));
+    runInUseCase(() -> saveChildren(1L, Map.of()));
 
     assertThat(details(1L)).isEmpty();
     assertThat(details(2L)).as("他のルートの子").isEqualTo(Map.of(1, "other"));
@@ -282,7 +289,7 @@ class TableWriterTest {
   void invalidChildRowsAreRejected() {
     insertItem(1L, "root");
 
-    assertThatThrownBy(() -> inUseCase(() -> save(1L, 1L, set -> {}, null)))
+    assertThatThrownBy(() -> runInUseCase(() -> save(1L, 1L, set -> {}, null)))
         .as("子を渡さない")
         .isInstanceOf(IllegalArgumentException.class)
         .hasMessageContaining("child rows must match the declared children");
@@ -299,8 +306,8 @@ class TableWriterTest {
         .as("二度渡す")
         .isInstanceOf(IllegalArgumentException.class)
         .hasMessageContaining("put twice");
-    assertThatThrownBy(
-            () -> inUseCase(() -> save(1L, 1L, set -> {}, List.of(detail(5, "a"), detail(5, "b")))))
+    assertThatThrownBy(() ->
+            runInUseCase(() -> save(1L, 1L, set -> {}, List.of(detail(5, "a"), detail(5, "b")))))
         .as("自然キーの重複")
         .isInstanceOf(IllegalArgumentException.class)
         .hasMessageContaining("natural key is duplicated");
@@ -346,14 +353,8 @@ class TableWriterTest {
   }
 
   @Test
-  @DisplayName("insert は子を宣言した集約に子を渡さない呼び出しと、子のない集約に子を渡す呼び出しを拒否する")
-  void insertRequiresChildrenOnlyForDeclaredChildren() {
-    assertThatThrownBy(() ->
-            runInUseCase(
-                () -> writer.insert(ITEM, 1L, set -> set.set(FIXTURE_ITEM.ITEM_NAME, "x"))))
-        .as("子を宣言した集約の 3 引数")
-        .isInstanceOf(IllegalArgumentException.class)
-        .hasMessageContaining("children must be put");
+  @DisplayName("insert は子を宣言していない集約に子を渡す呼び出しと、子を宣言した集約に子を渡さない呼び出しを拒否する")
+  void insertRequiresChildrenToMatchDeclaredChildren() {
     assertThatThrownBy(() ->
             runInUseCase(() ->
                 writer.insert(
@@ -361,16 +362,22 @@ class TableWriterTest {
                     1L,
                     set -> set.set(FIXTURE_ITEM.ITEM_NAME, "x"),
                     rows -> rows.put(DETAILS, List.of(), (d, set) -> {}))))
-        .as("子のない集約に子")
+        .as("子を宣言していない集約に子")
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessageContaining("child rows must match the declared children");
+    assertThatThrownBy(() ->
+            runInUseCase(() ->
+                writer.insert(ITEM, 1L, set -> set.set(FIXTURE_ITEM.ITEM_NAME, "x"), rows -> {})))
+        .as("子を宣言した集約に子を渡さない")
         .isInstanceOf(IllegalArgumentException.class)
         .hasMessageContaining("child rows must match the declared children");
   }
 
   @Test
-  @DisplayName("insert は子のない集約を、3 引数で書く")
+  @DisplayName("insert は子を宣言していない集約を、空の子で書く")
   void insertWritesRootOnlyAggregate() {
-    runInUseCase(
-        () -> writer.insert(ITEM_ONLY, 1L, set -> set.set(FIXTURE_ITEM.ITEM_NAME, "only")));
+    runInUseCase(() ->
+        writer.insert(ITEM_ONLY, 1L, set -> set.set(FIXTURE_ITEM.ITEM_NAME, "only"), rows -> {}));
 
     assertThat(item(1L).get(FIXTURE_ITEM.ITEM_NAME)).isEqualTo("only");
   }
@@ -383,7 +390,11 @@ class TableWriterTest {
     // 23505 の後のトランザクションは中断状態になるため、この後に SQL を実行しない。
     assertThatThrownBy(() ->
             runInUseCase(() ->
-                writer.insert(ITEM_ONLY, 1L, set -> set.set(FIXTURE_ITEM.ITEM_NAME, "duplicate"))))
+                writer.insert(
+                    ITEM_ONLY,
+                    1L,
+                    set -> set.set(FIXTURE_ITEM.ITEM_NAME, "duplicate"),
+                    rows -> {})))
         .isInstanceOf(ConflictException.class)
         .hasMessageContaining("unique key already exists")
         .hasMessageContaining("table=t_fixture_item")
@@ -428,7 +439,21 @@ class TableWriterTest {
       assertThatThrownBy(() ->
               template.executeWithoutResult(status ->
                   runInUseCase(() ->
-                      writer.insert(ITEM_ONLY, 1L, set -> set.set(FIXTURE_ITEM.ITEM_NAME, "x")))))
+                      writer.insert(
+                          ITEM_ONLY, 1L, set -> set.set(FIXTURE_ITEM.ITEM_NAME, "x"), rows -> {}))))
+          .as("insert")
+          .isInstanceOf(IllegalStateException.class)
+          .hasMessageContaining("read-write transaction");
+      assertThatThrownBy(() ->
+              template.executeWithoutResult(status ->
+                  runInUseCase(() ->
+                      writer.update(
+                          ITEM_ONLY,
+                          1L,
+                          version(1L),
+                          set -> set.set(FIXTURE_ITEM.ITEM_NAME, "x"),
+                          rows -> {}))))
+          .as("update")
           .isInstanceOf(IllegalStateException.class)
           .hasMessageContaining("read-write transaction");
     }
@@ -455,8 +480,8 @@ class TableWriterTest {
   }
 
   /** 子の集合の差分を、ルートの更新と一緒に保存する。 */
-  private Object saveChildren(final long itemId, final Map<Integer, String> children) {
-    return save(
+  private void saveChildren(final long itemId, final Map<Integer, String> children) {
+    save(
         itemId,
         1L,
         set -> set.set(FIXTURE_ITEM.ITEM_NAME, "root"),
@@ -464,7 +489,7 @@ class TableWriterTest {
   }
 
   /** 子の行を渡して、ルートを更新する。{@code details} が null なら、子を渡さない。 */
-  private Object save(
+  private void save(
       final long itemId,
       final long expectedLockNo,
       final Consumer<ColumnValues<Record>> rootColumns,
@@ -484,12 +509,11 @@ class TableWriterTest {
                         .set(FIXTURE_ITEM_DETAIL.DETAIL_TEXT, detail.text()));
           }
         });
-    return itemId;
   }
 
   /** 集約ルートの行を、版を比べて更新する。 */
-  private Object updateItem(final long itemId, final long expectedLockNo, final String name) {
-    return save(itemId, expectedLockNo, set -> set.set(FIXTURE_ITEM.ITEM_NAME, name), List.of());
+  private void updateItem(final long itemId, final long expectedLockNo, final String name) {
+    save(itemId, expectedLockNo, set -> set.set(FIXTURE_ITEM.ITEM_NAME, name), List.of());
   }
 
   /** 子の行にする値。 */
@@ -539,11 +563,6 @@ class TableWriterTest {
         .from(FIXTURE_ITEM_DETAIL)
         .where(FIXTURE_ITEM_DETAIL.ITEM_ID.eq(itemId))
         .fetchMap(FIXTURE_ITEM_DETAIL.DETAIL_NO, FIXTURE_ITEM_DETAIL.DETAIL_TEXT);
-  }
-
-  /** ユースケースの呼び出しの中として、pgm_cd を束縛して実行する。 */
-  private static <T> T inUseCase(final Supplier<T> call) {
-    return ScopedValue.where(PgmCdAspect.PGM_CD, PGM_CD).call(call::get);
   }
 
   /** ユースケースの呼び出しの中として、pgm_cd を束縛して戻り値のない処理を実行する。 */

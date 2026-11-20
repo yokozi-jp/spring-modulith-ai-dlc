@@ -28,7 +28,7 @@ import org.springframework.stereotype.Repository;
 class JooqPaymentRepository implements PaymentRepository {
 
   /** 決済記録の集約。ルートは公開 ID で一つに決める。 */
-  private static final AggregateTable<TPaymentRecord, UUID> PAYMENT =
+  private static final AggregateTable<TPaymentRecord, UUID, Payment> PAYMENT =
       AggregateTable.of(T_PAYMENT, T_PAYMENT.PUBLIC_ID, T_PAYMENT.PAYMENT_ID);
 
   /** SQL を組み立てて実行する jOOQ のコンテキスト。 */
@@ -61,7 +61,8 @@ class JooqPaymentRepository implements PaymentRepository {
                 .set(T_PAYMENT.CHARGED_AMOUNT_JPY, payment.amount().amount())
                 .set(T_PAYMENT.PAYMENT_STATUS_TYP, payment.status().name())
                 .set(T_PAYMENT.GATEWAY_PAYMENT_CODE, codeValue(payment.gatewayPaymentCode()))
-                .set(T_PAYMENT.RECORDED_AT, payment.recordedAt()));
+                .set(T_PAYMENT.RECORDED_AT, payment.recordedAt()),
+        rows -> {});
   }
 
   /** 決済記録の列を、restore の引数の型と順に選ぶ。 */

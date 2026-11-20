@@ -103,6 +103,16 @@ public final class DirectOrderWriter {
     return dsl.executeUpdate(row);
   }
 
+  /** {@code DSLContext.executeInsert} を呼ぶ。 */
+  public static <R extends TableRecord<R>> int dslExecuteInsert(final DSLContext dsl, final R row) {
+    return dsl.executeInsert(row);
+  }
+
+  /** {@code DSLContext.loadInto} を呼ぶ。 */
+  public static Object dslLoadInto(final DSLContext dsl) {
+    return dsl.loadInto(ORDERS);
+  }
+
   /** {@code DSLContext.executeDelete} を呼ぶ。 */
   public static <R extends UpdatableRecord<R>> int dslExecuteDelete(
       final DSLContext dsl, final R row) {
@@ -295,6 +305,18 @@ public final class DirectOrderWriter {
   /** {@code UpdatableRecord.merge} を呼ぶ。 */
   public static int recordMerge(final UpdatableRecord<?> row) {
     return row.merge();
+  }
+
+  /** {@code TableRecord.insert} を呼ぶ。 */
+  public static int recordInsert(final TableRecord<?> row) {
+    return row.insert();
+  }
+
+  /** {@code DAO.insert} を呼ぶ。 */
+  public static <R extends TableRecord<R>> String daoInsert(
+      final DAO<R, String, String> dao, final String order) {
+    dao.insert(order);
+    return order;
   }
 
   /** {@code DAO.update} を呼ぶ。 */

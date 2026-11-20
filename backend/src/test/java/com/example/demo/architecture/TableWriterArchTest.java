@@ -37,7 +37,7 @@ import org.jooq.LoaderOptionsStep;
 import org.jooq.Merge;
 import org.jooq.Query;
 import org.jooq.RowCountQuery;
-import org.jooq.UpdatableRecord;
+import org.jooq.TableRecord;
 import org.jooq.Update;
 import org.jooq.WithStep;
 import org.jooq.impl.DSL;
@@ -131,8 +131,10 @@ class TableWriterArchTest {
           "batchStore",
           "batchDelete",
           "batchMerge",
+          "executeInsert",
           "executeUpdate",
           "executeDelete",
+          "loadInto",
           "insertInto",
           "insertQuery",
           "batchInsert",
@@ -165,11 +167,13 @@ class TableWriterArchTest {
           "addValueForUpdate",
           "addValuesForUpdate");
 
-  /** {@code UpdatableRecord} の書き込み。 */
-  private static final Set<String> RECORD_WRITES = Set.of("store", UPDATE, DELETE, "merge");
+  /** {@code TableRecord} と {@code UpdatableRecord} の書き込み。 */
+  private static final Set<String> RECORD_WRITES =
+      Set.of("insert", "store", UPDATE, DELETE, "merge");
 
-  /** {@code DAO} の書き込み。INSERT は対象にしない。 */
-  private static final Set<String> DAO_WRITES = Set.of(UPDATE, DELETE, "deleteById", "merge");
+  /** {@code DAO} の書き込み。 */
+  private static final Set<String> DAO_WRITES =
+      Set.of("insert", UPDATE, DELETE, "deleteById", "merge");
 
   /** 型ごとの、禁じるメソッドの名前。型の下位の型も対象にする。 */
   /* package */ static final Map<Class<?>, Set<String>> NAMED_WRITES =
@@ -180,7 +184,7 @@ class TableWriterArchTest {
           InsertOnDuplicateStep.class, UPSERTS,
           InsertQuery.class, UPSERTS,
           LoaderOptionsStep.class, Set.of("onDuplicateKeyUpdate"),
-          UpdatableRecord.class, RECORD_WRITES,
+          TableRecord.class, RECORD_WRITES,
           DAO.class, DAO_WRITES,
           DataSource.class, Set.of("getConnection"),
           ConnectionProvider.class, Set.of("acquire"));
@@ -269,7 +273,7 @@ class TableWriterArchTest {
         .accessTargetWhere(
             DescribedPredicate.describe(
                 "jOOQ の INSERT、UPDATE、DELETE、UPSERT、MERGE、Query 型の実行、問い合わせのモデルの $ で始まる API、"
-                    + "UpdatableRecord と DAO の書き込み、Spring JDBC と JDBC の直接の利用、"
+                    + "TableRecord、UpdatableRecord、DAO の書き込み、Spring JDBC と JDBC の直接の利用、"
                     + "DataSource、Connection、ConnectionProvider を引数に取る呼び出し",
                 TableWriterArchTest::isDirectWrite))
         .because(
@@ -294,8 +298,9 @@ class TableWriterArchTest {
         .allowEmptyShould(true)
         .because(
             "集約ルートの保存と削除で版を比べないと、古い画面や古い集約の保存が他の人の更新を上書きするため。"
-                + "直し方：集約ルートを受け取るメソッドは add、update、delete だけにし、"
+                + "直し方：集約ルートを受け取る public メソッドは add と update だけにし、"
                 + "update は TableWriter.update を、そのメソッドの中で直接呼ぶ（別のメソッドを経由しない）。"
+                + "delete と版を比べない更新の入口は TableWriter にないため、ADR-054 を更新して足す。"
                 + "TableWriter.update は集約ルート（Versioned）を受け取り、その lockNo() を期待する版にする。"
                 + "規約：docs/backend/class-roles/jooq-repository.md、"
                 + DOCS);
@@ -403,7 +408,7 @@ class TableWriterArchTest {
         .because(
             "期待する版をコードで作ると、読んだ版を自分で渡して比較が常に成り立つため。"
                 + "直し方：ExpectedLockNo は presentation.web の Request の toCommand だけで作り、"
-                + "Repository と TableWriter には集約ルートの lockNo() を渡す。"
+                + "TableWriter には集約ルートを渡す。"
                 + "規約：docs/backend/class-roles/request.md、docs/backend/class-roles/command.md、"
                 + DOCS);
   }
@@ -465,10 +470,19 @@ class TableWriterArchTest {
 
   private static ArchCondition<JavaMethod> callTheVersionedEntryPoint(final String writer) {
     return new ArchCondition<>(
-        "call TableWriter.update, the entry point that compares the version") {
+        "be update and call TableWriter.update, the entry point that compares the version") {
       @Override
       public void check(final JavaMethod item, final ConditionEvents events) {
-        // 版は TableWriter.update の Versioned の引数から読むため、呼び出しの有無だけを見る。delete と別の名前の書き込みも update を呼ぶ。
+        if (!UPDATE.equals(item.getName())) {
+          events.add(
+              SimpleConditionEvent.violated(
+                  item,
+                  item.getFullName()
+                      + " は集約ルートを受け取る add 以外のメソッドだが、update ではない。"
+                      + "TableWriter には update の入口しかない。別の書き込みが要るなら、ADR-054 を更新して入口を足す。"));
+          return;
+        }
+        // 版は TableWriter.update の集約ルートの引数から読むため、呼び出しの有無だけを見る。
         final boolean calls =
             item.getMethodCallsFromSelf().stream()
                 .anyMatch(call ->

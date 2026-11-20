@@ -24,7 +24,6 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
-import java.util.function.Supplier;
 import java.util.regex.Pattern;
 import javax.sql.DataSource;
 import org.jooq.Condition;
@@ -121,7 +120,7 @@ class TableWriterConcurrencyTest {
       final Future<Boolean> committed =
           watcher.submit(() -> commitWhenAnotherSessionWaits(sessionB));
 
-      assertThatThrownBy(() -> inUseCase(() -> updateItem(1L, List.of())))
+      assertThatThrownBy(() -> runInUseCase(() -> updateItem(1L, List.of())))
           .isInstanceOf(ConflictException.class)
           .hasMessageContaining("row was updated by another request")
           .satisfies(thrown -> assertConflictWithoutSql(thrown, ConflictException.Kind.VERSION));
@@ -144,7 +143,7 @@ class TableWriterConcurrencyTest {
     try (Connection sessionB = openSessionB()) {
       updateInSessionB(sessionB);
 
-      assertThatThrownBy(() -> inUseCase(() -> updateItem(1L, List.of())))
+      assertThatThrownBy(() -> runInUseCase(() -> updateItem(1L, List.of())))
           .isInstanceOf(ConflictException.class)
           .hasMessageContaining("row is locked by another request")
           .satisfies(thrown -> assertConflictWithoutSql(thrown, ConflictException.Kind.LOCK));
@@ -284,8 +283,8 @@ class TableWriterConcurrencyTest {
     }
   }
 
-  /** A の接続で、版 1 の行を更新し、子を {@code detailTexts} の明細番号 {@value #DETAIL_NO} の 1 行にする。 */
-  private Object updateItem(final long expectedLockNo, final List<String> detailTexts) {
+  /** A の接続で、期待する版の行を更新し、子を {@code detailTexts} の明細番号 {@value #DETAIL_NO} の 1 行にする。 */
+  private void updateItem(final long expectedLockNo, final List<String> detailTexts) {
     writer.update(
         ITEM,
         ITEM_ID,
@@ -298,11 +297,10 @@ class TableWriterConcurrencyTest {
                 (text, set) ->
                     set.set(FIXTURE_ITEM_DETAIL.DETAIL_NO, DETAIL_NO)
                         .set(FIXTURE_ITEM_DETAIL.DETAIL_TEXT, text)));
-    return expectedLockNo;
   }
 
   /** ユースケースの呼び出しの中として、pgm_cd を束縛して実行する。 */
-  private static <T> T inUseCase(final Supplier<T> call) {
-    return ScopedValue.where(PgmCdAspect.PGM_CD, PGM_CD).call(call::get);
+  private static void runInUseCase(final Runnable call) {
+    ScopedValue.where(PgmCdAspect.PGM_CD, PGM_CD).run(call);
   }
 }

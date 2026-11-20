@@ -12,7 +12,6 @@ import org.jooq.Field;
 import org.jooq.InsertValuesStepN;
 import org.jooq.Record;
 import org.jooq.Table;
-import org.jooq.TableField;
 import org.jooq.impl.DSL;
 import org.jspecify.annotations.Nullable;
 
@@ -26,11 +25,8 @@ import org.jspecify.annotations.Nullable;
 @SuppressWarnings({"PMD.CouplingBetweenObjects", "PMD.UseConcurrentHashMap"})
 /* package */ final class ChildWriter {
 
-  /** 版の最小値ではなく、一つの文で変える行数。 */
+  /** 子の主キーの条件で更新できる行数。 */
   private static final int ONE_ROW = 1;
-
-  /** 楽観的ロックの版のカラム名。 */
-  private static final String LOCK_NO = "lock_no";
 
   /** 子の行の文を実行する jOOQ のコンテキスト。 */
   private final DSLContext dsl;
@@ -43,33 +39,33 @@ import org.jspecify.annotations.Nullable;
     this.commonColumns = commonColumns;
   }
 
+  /** 新しい集約の子の全行を、1 文の複数行の INSERT で書く。 */
+  /* package */ <R extends Record, C extends Record> void insertAll(
+      final ChildTable<R, C> child, final long rootId, final ChildRows<R> rows) {
+    insertChildren(child, rootId, List.copyOf(rows.rowsOf(child).values()));
+  }
+
   /**
-   * 子の行を書く。{@code replace} なら、保存済みの子との差分で書く。
+   * 既存の集約の子を、保存済みの子との差分で書く。保存後にない子の削除、残る子の更新、新しい子の追加の順に実行する。
    *
-   * @throws IllegalArgumentException 子の行の列が揃っていない場合、自然キーが null か重複する場合
+   * @throws IllegalStateException 残る子の更新が 1 行でない場合
    */
-  /* package */ <R extends Record, C extends Record> void saveChild(
-      final ChildTable<R, C> child,
-      final long rootId,
-      final ChildRows<R> rows,
-      final boolean replace) {
-    final Table<C> table = child.table();
-    final Map<List<Object>, ColumnValues<C>> desiredByKey = desiredByKey(child, rows);
+  /* package */ <R extends Record, C extends Record> void replace(
+      final ChildTable<R, C> child, final long rootId, final ChildRows<R> rows) {
+    final Map<List<Object>, ColumnValues<C>> desired = rows.rowsOf(child);
     final Set<List<Object>> stored =
-        replace
-            ? new LinkedHashSet<>(
-                dsl.select(child.naturalKey())
-                    .from(table)
-                    .where(child.parentKey().eq(rootId))
-                    .fetch(record -> List.of(record.intoArray())))
-            : Set.of();
+        new LinkedHashSet<>(
+            dsl.select(child.naturalKey())
+                .from(child.table())
+                .where(child.parentKey().eq(rootId))
+                .fetch(record -> List.of(record.intoArray())));
     final List<List<Object>> removed =
-        stored.stream().filter(naturalKey -> !desiredByKey.containsKey(naturalKey)).toList();
+        stored.stream().filter(naturalKey -> !desired.containsKey(naturalKey)).toList();
     if (!removed.isEmpty()) {
       deleteChildren(child, rootId, removed);
     }
     final List<ColumnValues<C>> added = new ArrayList<>();
-    desiredByKey.forEach((naturalKey, row) -> {
+    desired.forEach((naturalKey, row) -> {
       if (stored.contains(naturalKey)) {
         updateChild(child, rootId, naturalKey, row);
       } else {
@@ -97,7 +93,8 @@ import org.jspecify.annotations.Nullable;
       final List<Object> naturalKey,
       final ColumnValues<C> row) {
     final Table<C> table = child.table();
-    final Field<Long> lockNo = CommonColumns.requiredField(table, LOCK_NO, Long.class);
+    final Field<Long> lockNo =
+        CommonColumns.requiredField(table, CommonColumns.LOCK_NO, Long.class);
     final Map<Field<?>, @Nullable Object> changes = new LinkedHashMap<>(row.values());
     child.naturalKey().forEach(changes::remove);
     final int updated =
@@ -155,62 +152,14 @@ import org.jspecify.annotations.Nullable;
     return values;
   }
 
-  /**
-   * 子の行を自然キーで引く。SQL を実行する前に、行の不備を {@link IllegalArgumentException} にするために使う。
-   *
-   * @throws IllegalArgumentException 子の行を渡していない場合、自然キーが null か重複する場合、行ごとに書く列が違う場合
-   */
-  /* package */ static <R extends Record, C extends Record>
-      Map<List<Object>, ColumnValues<C>> desiredByKey(
-          final ChildTable<R, C> child, final ChildRows<R> rows) {
-    final Table<C> table = child.table();
-    final Map<List<Object>, ColumnValues<C>> byKey = new LinkedHashMap<>();
-    List<Field<?>> columns = List.of();
-    for (final ColumnValues<C> row : rows.rowsOf(child)) {
-      final List<Field<?>> rowColumns = List.copyOf(row.values().keySet());
-      if (byKey.isEmpty()) {
-        columns = rowColumns;
-      } else if (!rowColumns.equals(columns)) {
-        throw new IllegalArgumentException(
-            "child rows must set the same columns: table=" + table.getName());
-      }
-      final List<Object> naturalKey = naturalKeyOf(child, row);
-      if (byKey.put(naturalKey, row) != null) {
-        throw new IllegalArgumentException(
-            "natural key is duplicated: table=" + table.getName() + ", key=" + naturalKey);
-      }
-    }
-    return byKey;
-  }
-
-  /** 子の行の自然キーの値の組を返す。 */
-  private static <R extends Record, C extends Record> List<Object> naturalKeyOf(
-      final ChildTable<R, C> child, final ColumnValues<C> row) {
-    return child.naturalKey().stream()
-        .map(field -> {
-          final Object value = row.values().get(field);
-          if (value == null || value instanceof Field<?>) {
-            throw new IllegalArgumentException(
-                "natural key must be a non-null value: table="
-                    + child.table().getName()
-                    + ", column="
-                    + field.getName());
-          }
-          return value;
-        })
-        .toList();
-  }
-
   /** 自然キーの値の組に合う行の条件。 */
-  @SuppressWarnings({"unchecked", "rawtypes"})
   private static <R extends Record, C extends Record> Condition naturalKeyCondition(
       final ChildTable<R, C> child, final List<Object> naturalKey) {
-    final List<TableField<C, ?>> fields = child.naturalKey();
-    final List<Condition> conditions = new ArrayList<>();
-    for (int i = 0; i < fields.size(); i++) {
-      conditions.add(((Field) fields.get(i)).eq(naturalKey.get(i)));
+    final Map<Field<?>, Object> equalities = new LinkedHashMap<>();
+    for (int i = 0; i < naturalKey.size(); i++) {
+      equalities.put(child.naturalKey().get(i), naturalKey.get(i));
     }
-    return DSL.and(conditions);
+    return DSL.condition(equalities);
   }
 
   /** 例外のメッセージに入れる、子のテーブル名と親の内部の主キー。 */

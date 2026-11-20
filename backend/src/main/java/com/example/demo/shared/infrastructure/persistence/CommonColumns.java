@@ -26,8 +26,8 @@ import org.springframework.stereotype.Component;
  *
  * <p>戻り値の Map は jOOQ の {@code set(Map)} にそのまま渡す。{@code patched_*} はデータパッチだけが更新するため扱わない。
  *
- * <p>{@link #forInsert} は Repository が INSERT で使う。{@link #forUpdate} は {@link TableWriter}
- * だけが使い、UPDATE の {@code lock_no} は {@link TableWriter} だけが書く（ADR-054）。
+ * <p>{@link #forInsert} は {@link TableWriter} とテストのデータ作成が INSERT で使う。{@link #forUpdate} は {@link
+ * TableWriter} だけが使い、UPDATE の {@code lock_no} は {@link TableWriter} だけが書く（ADR-054）。
  *
  * <ul>
  *   <li>{@code *_at}：注入した {@link Clock} の現在時刻。
@@ -44,6 +44,9 @@ import org.springframework.stereotype.Component;
  */
 @Component
 public class CommonColumns {
+
+  /** 楽観的ロックの版のカラム名。 */
+  /* package */ static final String LOCK_NO = "lock_no";
 
   /** 更新のカラムを省いてよい、追記だけのワークテーブルの接頭辞。 */
   private static final String WORK_TABLE_PREFIX = "w_";
@@ -81,7 +84,7 @@ public class CommonColumns {
                     ? audit.entries(table, "updated_")
                     : Stream.<Entry<Field<?>, Object>>empty(),
                 Stream.of(
-                    Map.<Field<?>, Object>entry(requiredField(table, "lock_no", Long.class), 1L)))
+                    Map.<Field<?>, Object>entry(requiredField(table, LOCK_NO, Long.class), 1L)))
             .flatMap(Function.identity()));
   }
 
@@ -91,7 +94,7 @@ public class CommonColumns {
    * @throws IllegalArgumentException カラムがない、または型が異なる場合
    */
   /* package */ static void requireAuditColumns(final Table<?> table) {
-    requiredField(table, "lock_no", Long.class);
+    requiredField(table, LOCK_NO, Long.class);
     for (final String prefix : List.of("created_", "updated_")) {
       requiredField(table, prefix + "at", Instant.class);
       requiredField(table, prefix + "by", String.class);
