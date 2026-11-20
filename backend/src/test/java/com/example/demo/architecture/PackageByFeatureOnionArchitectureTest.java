@@ -1,6 +1,7 @@
 package com.example.demo.architecture;
 
 import static com.tngtech.archunit.base.DescribedPredicate.not;
+import static com.tngtech.archunit.core.domain.JavaClass.Predicates.ANNOTATIONS;
 import static com.tngtech.archunit.core.domain.JavaClass.Predicates.INTERFACES;
 import static com.tngtech.archunit.core.domain.JavaClass.Predicates.resideInAPackage;
 import static com.tngtech.archunit.core.domain.JavaClass.Predicates.resideInAnyPackage;
@@ -49,23 +50,15 @@ class PackageByFeatureOnionArchitectureTest {
   /** Domain のパッケージのパターン。 */
   private static final String DOMAIN_PACKAGE = "..domain..";
 
-  /** Domain の中に実装を持たない。値の閉じた集合を表す sealed interface などを、外部システムのインタフェースから除く。 */
-  private static final DescribedPredicate<JavaClass> NOT_IMPLEMENTED_IN_DOMAIN =
-      DescribedPredicate.describe(
-          "not implemented in domain",
-          type ->
-              type.getAllSubclasses().stream()
-                  .noneMatch(subclass -> resideInAPackage(DOMAIN_PACKAGE).test(subclass)));
-
   /**
-   * Domain の外部システムのインタフェース。{@code domain.model} の interface のうち、Repository、{@code
-   * package-info}、Domain の中に実装を持つもの以外。
+   * Domain の外部システムのインタフェース。{@code domain.model} の interface のうち、Repository、アノテーション、{@code
+   * package-info} 以外。
    */
   /* package */ static final DescribedPredicate<JavaClass> EXTERNAL_SYSTEM_INTERFACE =
       INTERFACES
           .and(resideInAPackage("..domain.model.."))
           .and(not(simpleNameEndingWith("Repository")))
-          .and(NOT_IMPLEMENTED_IN_DOMAIN)
+          .and(not(ANNOTATIONS))
           .and(not(simpleName("package-info")));
 
   /** パッケージ構造を決めた ADR のパス。 */

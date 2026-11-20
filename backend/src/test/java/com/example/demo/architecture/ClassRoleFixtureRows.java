@@ -147,19 +147,19 @@ final class ClassRoleFixtureRows {
             "ordering.application.OrderPaymentCharger"),
         row(
             "eventPublisherIsUsedOnlyByCommandHandlers: Controller",
-            ClassRoleArchTest.eventPublisherIsUsedOnlyByCommandHandlersRule(VIOLATING),
+            ClassRoleArchTest.eventPublisherIsUsedOnlyByCommandHandlers,
             "ordering.presentation.web.OrderEventController"),
         row(
             "eventPublisherIsUsedOnlyByCommandHandlers: ApplicationEventMulticaster",
-            ClassRoleArchTest.eventPublisherIsUsedOnlyByCommandHandlersRule(VIOLATING),
+            ClassRoleArchTest.eventPublisherIsUsedOnlyByCommandHandlers,
             "ordering.presentation.web.OrderEventMulticasterController"),
         row(
             "eventPublisherIsUsedOnlyByCommandHandlers: ApplicationContext",
-            ClassRoleArchTest.eventPublisherIsUsedOnlyByCommandHandlersRule(VIOLATING),
+            ClassRoleArchTest.eventPublisherIsUsedOnlyByCommandHandlers,
             "ordering.application.OrderContextPublisher"),
         row(
             "eventPublisherIsUsedOnlyByCommandHandlers: shared",
-            ClassRoleArchTest.eventPublisherIsUsedOnlyByCommandHandlersRule(VIOLATING),
+            ClassRoleArchTest.eventPublisherIsUsedOnlyByCommandHandlers,
             "shared.events.OrderEventForwarder"),
         row(
             "commandHandlersAndListenersDoNotUseInheritance: 役割名でないサブクラス",
@@ -170,9 +170,13 @@ final class ClassRoleFixtureRows {
             ClassRoleArchTest.commandHandlersAndListenersDoNotUseInheritance,
             "ordering.application.OrderHandlerSupport"),
         row(
-            "commandHandlersAndListenersDoNotUseInheritance: CommandHandler が interface を実装",
-            ClassRoleArchTest.commandHandlersAndListenersDoNotUseInheritance,
+            "commandHandlersDoNotImplementInterfaces",
+            ClassRoleArchTest.commandHandlersDoNotImplementInterfaces,
             "ordering.application.ShelveOrderCommandHandler"),
+        row(
+            "listenersAreNotCalled",
+            ClassRoleArchTest.listenersAreNotCalled,
+            "ordering.presentation.web.OrderPaidController"),
         row(
             "commandHandlersAndListenersDoNotUseInheritance: Listener の interface を実装させる",
             ClassRoleArchTest.commandHandlersAndListenersDoNotUseInheritance,

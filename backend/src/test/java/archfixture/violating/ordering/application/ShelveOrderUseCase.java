@@ -1,7 +1,7 @@
 package archfixture.violating.ordering.application;
 
 /**
- * 違反：commandHandlersAndListenersDoNotUseInheritance（CommandHandler に実装させ、呼び出し側にこの interface だけを見せて
+ * 違反：commandHandlersDoNotImplementInterfaces（CommandHandler に実装させ、呼び出し側にこの interface だけを見せて
  * CommandHandler への依存の検査を迂回する）。
  */
 @FunctionalInterface
