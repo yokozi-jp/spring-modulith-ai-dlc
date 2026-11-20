@@ -17,8 +17,6 @@ export function useMemberActions(lockNo: number, setNotice: (notice: Notice | un
   const { mutate: changeRole, isPending: isChanging } = useChangeTenantMemberRole();
   const { mutate: removeMember, isPending: isRemoving } = useRemoveTenantMember();
 
-  const isPending = isChanging || isRemoving;
-
   function callbacks(success: string) {
     return {
       onSuccess: () => {
@@ -37,11 +35,8 @@ export function useMemberActions(lockNo: number, setNotice: (notice: Notice | un
   }
 
   return {
-    isPending,
+    isPending: isChanging || isRemoving,
     handleChangeRole: (userId: string, role: string) => {
-      if (isPending) {
-        return;
-      }
       setNotice(undefined);
       changeRole(
         { userId, data: { role, lockNo } },
@@ -49,9 +44,6 @@ export function useMemberActions(lockNo: number, setNotice: (notice: Notice | un
       );
     },
     handleRemove: (userId: string) => {
-      if (isPending) {
-        return;
-      }
       setNotice(undefined);
       removeMember({ userId, params: { lockNo } }, callbacks(t("tenancy.members.notice.removed")));
     },
