@@ -36,7 +36,6 @@ import org.springframework.context.event.EventListener;
 import org.springframework.modulith.events.ApplicationModuleListener;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.filter.OncePerRequestFilter;
 
 /**
  * クラスの役割（docs/backend/class-roles/）ごとの形と命名をプロダクションコードへ強制する。
@@ -181,10 +180,10 @@ class ClassRoleArchTest {
   /* package */ static final ArchRule moduleListenerEventsAreTenantScoped =
       moduleListenerEventsAreTenantScopedRule(BASE_PACKAGE);
 
-  /** {@code TenantContext.call} を呼ぶクラスを、リクエストの filter とリスナーの Aspect に限る。 */
+  /** {@code TenantContext.call} を呼ぶクラスを、{@code TenantSelectionFilter} とリスナーの Aspect に限る。 */
   @ArchTest
-  /* package */ static final ArchRule tenantIsBoundOnlyByRequestFiltersAndListenerAspect =
-      tenantIsBoundOnlyByRequestFiltersAndListenerAspectRule(BASE_PACKAGE);
+  /* package */ static final ArchRule tenantIsBoundOnlyByTenantSelectionFilterAndListenerAspect =
+      tenantIsBoundOnlyByTenantSelectionFilterAndListenerAspectRule(BASE_PACKAGE);
 
   /**
    * イベントは {@code @ApplicationModuleListener} だけで受け、{@code @EventListener} と
@@ -403,40 +402,39 @@ class ClassRoleArchTest {
   }
 
   /**
-   * {@code TenantContext.call} を呼べるクラスを、{@code presentation.web} のリクエストの filter と {@code
-   * TenantListenerAspect} に限る規則を組み立てる。
+   * {@code TenantContext.call} を呼べるクラスを、{@code TenantSelectionFilter} と {@code
+   * TenantListenerAspect} の 2 つに限る規則を組み立てる。
    *
-   * <p>{@code call} は呼び出しの間のテナントを切り替える。リクエストのセッションとイベントのテナントだけを元にする入口から呼ばないと、ほかのテナントの行へ触れる。
+   * <p>{@code call} は呼び出しの間のテナントを切り替える。認証の権限だけを元にする filter と、イベントのテナントだけを元にする Aspect
+   * 以外から呼ぶと、ほかのテナントの行へ触れる。メソッド参照も検出する。
    */
-  /* package */ static ArchRule tenantIsBoundOnlyByRequestFiltersAndListenerAspectRule(
+  /* package */ static ArchRule tenantIsBoundOnlyByTenantSelectionFilterAndListenerAspectRule(
       final String basePackage) {
     final String tenantContext = basePackage + ".shared.tenant.TenantContext";
-    final String listenerAspect =
-        basePackage + ".shared.infrastructure.persistence.TenantListenerAspect";
-    final DescribedPredicate<JavaClass> allowedCaller =
-        DescribedPredicate.describe(
-            "TenantListenerAspect or a presentation.web OncePerRequestFilter",
-            (JavaClass javaClass) ->
-                javaClass.getName().equals(listenerAspect)
-                    || (javaClass.getPackageName().contains(".presentation.web")
-                        && javaClass.isAssignableTo(OncePerRequestFilter.class)));
+    final Set<String> allowedCallers =
+        Set.of(
+            basePackage + ".tenancy.presentation.web.TenantSelectionFilter",
+            basePackage + ".shared.infrastructure.persistence.TenantListenerAspect");
     return noClasses()
-        .that(DescribedPredicate.not(allowedCaller))
+        .that(
+            DescribedPredicate.describe(
+                "are not the tenant selection filter or the listener aspect",
+                (JavaClass javaClass) -> !allowedCallers.contains(javaClass.getName())))
         .should()
-        .callMethodWhere(
+        .accessTargetWhere(
             DescribedPredicate.describe(
                 "TenantContext.call",
-                (JavaMethodCall call) ->
-                    call.getTargetOwner().getName().equals(tenantContext)
-                        && "call".equals(call.getName())))
+                (JavaAccess<?> access) ->
+                    access.getTargetOwner().getName().equals(tenantContext)
+                        && "call".equals(access.getName())))
         .because(
-            "束縛を切り替える入口が増えると、リクエストのセッションやイベントに無関係なテナントへ切り替えられ、"
+            "束縛を切り替える入口が増えると、認証の権限やイベントに無関係なテナントへ切り替えられ、"
                 + "別のテナントの行を読み書きできるため。"
-                + "直し方：リクエストでは presentation.web の OncePerRequestFilter が選んだテナントを束縛し、"
-                + "リスナーでは TenantListenerAspect がイベントのテナントを束縛する。"
-                + "業務の処理は TenantContext.current() で読むだけにする。"
-                + LISTENER_DOC
-                + "、"
+                + "直し方：業務の処理は TenantContext.current() で読むだけにする。"
+                + "束縛は tenancy の TenantSelectionFilter がセッションで選んだテナントを、"
+                + "TenantListenerAspect がイベントのテナントを行う。"
+                + "新しい入口が要るときは、この規則の許可先と ADR-104 を先に変える。"
+                + "規約：docs/backend/architecture.md、"
                 + ADR_104);
   }
 

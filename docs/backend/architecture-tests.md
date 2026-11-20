@@ -47,7 +47,7 @@ jOOQの生成物の`com.example.demo.jooq`はOPENのモジュールであり、`
 - `infrastructureDependsOnlyOnDomainModel`：`infrastructure`は`application`、`domain.service`、モジュールルートの型に依存せず、機能モジュールの型のうち`domain.model`だけを使う。
 - `sharedModuleIsUsedOnlyByPersistenceAdapters`：`shared`の外で、どの層からも使える`shared`のパッケージ以外の`shared`の型に依存するクラスは、`infrastructure.persistence`に置く。
   `shared`の中の依存は対象にしない。
-  どの層からも使えるのは`shared.concurrency`、`shared.failure`、`shared.events`、`shared.security`、`shared.tenant`で、一覧は`PackageByFeatureOnionArchitectureTest`の`ANY_LAYER_SHARED_PACKAGES`の1か所だけに持ち、この規則と`dependenciesPointInward`の所属検査の除外がそこから組み立てる（[ADR-048](../adr/ADR-048-add-shared-module-for-jooq-common-code.md)、[ADR-062](../adr/ADR-062-map-business-exceptions-to-404-409-422.md)、[ADR-079](../adr/ADR-079-resubmit-failed-event-publications-periodically-with-shedlock.md)、[ADR-096](../adr/ADR-096-require-app-user-principal-for-audit-columns.md)、[ADR-104](../adr/ADR-104-bind-tenant-to-request-and-event-context.md)）。
+  どの層からも使えるパッケージの一覧は、`PackageByFeatureOnionArchitectureTest`の`ANY_LAYER_SHARED_PACKAGES`が持つ。この規則と`dependenciesPointInward`の所属検査の除外が、そこから組み立てる（[ADR-048](../adr/ADR-048-add-shared-module-for-jooq-common-code.md)、[ADR-062](../adr/ADR-062-map-business-exceptions-to-404-409-422.md)、[ADR-079](../adr/ADR-079-resubmit-failed-event-publications-periodically-with-shedlock.md)、[ADR-096](../adr/ADR-096-require-app-user-principal-for-audit-columns.md)、[ADR-104](../adr/ADR-104-bind-tenant-to-request-and-event-context.md)）。
 - `sharedModuleDoesNotDependOnHttp`：`shared`の型は、Spring Web、Springの HTTP、Servletの型に依存しない。
 - `moduleApiDoesNotExposeInternalTypes`：モジュールルートの型は、`java..`、`org.jspecify..`、同じルートパッケージの型、イベントが運ぶテナントの`shared.tenant.TenantId`と`shared.tenant.TenantScoped`だけに依存する。
   違反フィクスチャの`OrderPlacedReadingTenantContext`（`TenantContext`への依存）で確かめる。
@@ -87,12 +87,13 @@ jOOQの生成物の`com.example.demo.jooq`はOPENのモジュールであり、`
 - `commandHandlersAndListenersDoNotUseInheritance`：`*CommandHandler`と`*Listener`は、Java標準の型以外のクラスを継承せず、継承も実装もさせない（[ADR-051](../adr/ADR-051-bind-pgm-cd-with-scoped-value-and-aspect.md)）。
   違反フィクスチャの`ReopenOrderHandler`（サブクラス）、`RestoreOrderCommandHandler`（基底クラスの`OrderHandlerSupport`）、`OrderShippedReceiver`（インタフェースの実装）で確かめる。
 - `moduleListenersAreApplicationListeners`：`@ApplicationModuleListener`を付けたメソッドは、`application`の`*Listener`の`on`にする。
-- `moduleListenerEventsAreTenantScoped`：`@ApplicationModuleListener`を付けたメソッドの引数は、`shared.tenant.TenantScoped`を実装するイベント1つにする。
+- `moduleListenerEventsAreTenantScoped`：`@ApplicationModuleListener`を付けたメソッドの引数は、すべて`shared.tenant.TenantScoped`を実装するイベントにする。
+  引数が1つであることは、`listenersExposeOnlyOnAndCallOneCommandHandler`と`moduleListenersAreApplicationListeners`が見る。
   `TenantListenerAspect`がイベントのテナントを、リスナーのトランザクションが始まる時点で束縛するためである（[ADR-104](../adr/ADR-104-bind-tenant-to-request-and-event-context.md)）。
   違反フィクスチャの`OrderPlacedWithoutTenantListener`で確かめる。
-- `tenantIsBoundOnlyByRequestFiltersAndListenerAspect`：`TenantContext.call`を呼べるクラスは、`presentation.web`の`OncePerRequestFilter`と`TenantListenerAspect`だけにする。
-  CommandHandlerやControllerが束縛を切り替えて、リクエストやイベントに無関係なテナントを操作することを防ぐ（[ADR-104](../adr/ADR-104-bind-tenant-to-request-and-event-context.md)）。
-  違反フィクスチャの`TenantSwitchingCommandHandler`で確かめる。
+- `tenantIsBoundOnlyByTenantSelectionFilterAndListenerAspect`：`TenantContext.call`を呼べるクラスは、`tenancy.presentation.web.TenantSelectionFilter`と`shared.infrastructure.persistence.TenantListenerAspect`の2つだけにする。
+  CommandHandlerやControllerや別のfilterが束縛を切り替えて、認証の権限やイベントに無関係なテナントを操作することを防ぐ。メソッド参照も検出する（[ADR-104](../adr/ADR-104-bind-tenant-to-request-and-event-context.md)）。
+  違反フィクスチャの`TenantSwitchingCommandHandler`（直接の呼び出し）と`HeaderTenantFilter`（別のモジュールのfilterのメソッド参照）で確かめ、規約どおりのフィクスチャの`TenantSelectionFilter`が通ることを確かめる。
 - `eventListenersAreApplicationModuleListeners`：`@ApplicationModuleListener`を付けていないメソッドは、`@EventListener`をメタアノテーションに持たない。
   `@EventListener`と`@TransactionalEventListener`を直接付けた受信を拒否し、`@TransactionalEventListener`をメタアノテーションに持つ`@ApplicationModuleListener`は対象から除く。
   守らせる規約と理由は[Listener](class-roles/listener.md)に示す。

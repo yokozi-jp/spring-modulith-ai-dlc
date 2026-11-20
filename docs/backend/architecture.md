@@ -204,7 +204,7 @@ infrastructure.client ───────────────────�
 - `infrastructure.persistence` と `infrastructure.client` は `domain.model` のインタフェースを実装し、`application`、`domain.service`、モジュールルートに依存しない。
 - `infrastructure.persistence` は `shared.infrastructure.persistence` に依存してよい。
   ほかの層は `shared.infrastructure.persistence` に依存しない。
-- どの層も、上の「どの層からも使える」パッケージ（`shared.concurrency`、`shared.failure`、`shared.events`、`shared.security`、`shared.tenant`）に依存してよい。`error` の `presentation.web` も、4 つの例外を 403、404、409、422 にするために依存する。
+- どの層も、上の「どの層からも使える」パッケージに依存してよい。`error` の `presentation.web` も、4 つの例外を 403、404、409、422 にするために依存する。
 - モジュールルートの型は、標準型と同じルートの型のほかに、イベントが運ぶテナントの `shared.tenant.TenantId` と `shared.tenant.TenantScoped` だけに依存してよい。`TenantContext` には依存できない。
 - Domain と Application は、Presentation と Infrastructure に依存しない。
 - Presentation、Persistence、外部 Client は相互に依存しない。

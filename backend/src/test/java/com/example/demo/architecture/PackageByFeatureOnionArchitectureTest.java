@@ -58,13 +58,8 @@ class PackageByFeatureOnionArchitectureTest {
       "docs/adr/ADR-048-add-shared-module-for-jooq-common-code.md";
 
   /** どの層からも使ってよい shared のパッケージの一覧。層の除外と shared の利用の規則は、ここから組み立てる。 */
-  private static final List<AnyLayerSharedPackage> ANY_LAYER_SHARED_PACKAGES =
-      List.of(
-          new AnyLayerSharedPackage("concurrency", "楽観的ロックの語彙"),
-          new AnyLayerSharedPackage("failure", "業務上の失敗の例外"),
-          new AnyLayerSharedPackage("events", "イベントの再投入の語彙"),
-          new AnyLayerSharedPackage("security", "認証の principal の語彙"),
-          new AnyLayerSharedPackage("tenant", "テナントの語彙"));
+  private static final List<String> ANY_LAYER_SHARED_PACKAGES =
+      List.of("concurrency", "failure", "events", "security", "tenant");
 
   /** Persistence Adapter のパッケージ。 */
   private static final String PERSISTENCE_PACKAGE = "..infrastructure.persistence..";
@@ -398,7 +393,7 @@ class PackageByFeatureOnionArchitectureTest {
                 + "業務の処理が共通処理と共通カラムに依存しないようにするため。"
                 + "どの層からも使ってよいのは、"
                 + ANY_LAYER_SHARED_PACKAGES.stream()
-                    .map(shared -> shared.vocabulary() + "を置く shared." + shared.name())
+                    .map(name -> "shared." + name)
                     .collect(Collectors.joining("、"))
                 + "だけである。"
                 + "直し方：shared の型を使う処理を <モジュール>.infrastructure.persistence の "
@@ -486,7 +481,7 @@ class PackageByFeatureOnionArchitectureTest {
   /** どの層からも使ってよい shared のパッケージを、{@code resideInAnyPackage} に渡す形で返す。 */
   private static String[] anyLayerSharedPackages(final String basePackage) {
     return ANY_LAYER_SHARED_PACKAGES.stream()
-        .map(shared -> basePackage + ".shared." + shared.name() + "..")
+        .map(name -> basePackage + ".shared." + name + "..")
         .toArray(String[]::new);
   }
 
@@ -516,12 +511,4 @@ class PackageByFeatureOnionArchitectureTest {
       }
     };
   }
-
-  /**
-   * どの層からも使ってよい shared のパッケージ。名前は {@code shared} の直下のパッケージ名、語彙は規則の理由に出す説明である。
-   *
-   * @param name {@code shared} の直下のパッケージ名
-   * @param vocabulary パッケージが置く語彙の説明
-   */
-  private record AnyLayerSharedPackage(String name, String vocabulary) {}
 }

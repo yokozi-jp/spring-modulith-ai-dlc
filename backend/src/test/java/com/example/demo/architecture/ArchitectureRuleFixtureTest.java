@@ -567,9 +567,15 @@ class ArchitectureRuleFixtureTest {
             ClassRoleArchTest.moduleListenerEventsAreTenantScopedRule(VIOLATING),
             "inventory.application.OrderPlacedWithoutTenantListener.on("),
         row(
-            "tenantIsBoundOnlyByRequestFiltersAndListenerAspect",
-            ClassRoleArchTest.tenantIsBoundOnlyByRequestFiltersAndListenerAspectRule(VIOLATING),
+            "tenantIsBoundOnlyByTenantSelectionFilterAndListenerAspect",
+            ClassRoleArchTest.tenantIsBoundOnlyByTenantSelectionFilterAndListenerAspectRule(
+                VIOLATING),
             "ordering.application.TenantSwitchingCommandHandler"),
+        row(
+            "tenantIsBoundOnlyByTenantSelectionFilterAndListenerAspect: 別のモジュールの filter のメソッド参照",
+            ClassRoleArchTest.tenantIsBoundOnlyByTenantSelectionFilterAndListenerAspectRule(
+                VIOLATING),
+            "ordering.presentation.web.HeaderTenantFilter"),
         row(
             "eventListenersAreApplicationModuleListeners: @EventListener",
             ClassRoleArchTest.eventListenersAreApplicationModuleListeners,
@@ -857,7 +863,8 @@ class ArchitectureRuleFixtureTest {
         ProxyRulesArchTest.scheduledMethodsAreNoArgVoidAndNotPrivateOrFinal,
         ClassRoleArchTest.moduleListenersAreApplicationListeners,
         ClassRoleArchTest.moduleListenerEventsAreTenantScopedRule(basePackage),
-        ClassRoleArchTest.tenantIsBoundOnlyByRequestFiltersAndListenerAspectRule(basePackage),
+        ClassRoleArchTest.tenantIsBoundOnlyByTenantSelectionFilterAndListenerAspectRule(
+            basePackage),
         ClassRoleArchTest.eventListenersAreApplicationModuleListeners,
         ClassRoleArchTest.applicationListenerIsNotImplemented,
         ClassRoleArchTest.listenersExposeOnlyOnAndCallOneCommandHandler,

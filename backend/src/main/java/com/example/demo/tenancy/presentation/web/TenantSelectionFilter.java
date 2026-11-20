@@ -79,7 +79,7 @@ final class TenantSelectionFilter extends OncePerRequestFilter {
       final HttpServletResponse response,
       final FilterChain filterChain)
       throws ServletException, IOException {
-    final Optional<TenantId> tenantId = selectedTenant(request, response);
+    final Optional<TenantId> tenantId = recheckedTenant(request, response);
     if (tenantId.isEmpty()) {
       filterChain.doFilter(request, response);
       return;
@@ -88,23 +88,25 @@ final class TenantSelectionFilter extends OncePerRequestFilter {
   }
 
   /**
-   * 認証したリクエストの、選んだテナントを返す。選んでいなければ空を返す。
+   * 認証したリクエストの、選んだテナントの所属を引き直して、残っているテナントを返す。選んでいないか所属が消えていれば空を返す。
+   *
+   * <p>引き直しは、所属が消えていればセッションの選択を外し、役割が変わっていれば権限を作り直す。
    *
    * @throws TenantNotSelectedException テナントの決まっている必要がある API を、テナントを選ぶ前に呼んだ場合
    */
-  private Optional<TenantId> selectedTenant(
+  private Optional<TenantId> recheckedTenant(
       final HttpServletRequest request, final HttpServletResponse response) {
     final @Nullable Authentication authentication = holder.getContext().getAuthentication();
     if (authentication == null || !trustResolver.isAuthenticated(authentication)) {
       return Optional.empty();
     }
-    final Optional<TenantMembershipAuthority> tenant =
+    final Optional<TenantId> tenant =
         TenantSession.selectedTenant(authentication)
-            .filter(selected -> recheck(request, response, authentication, selected));
+            .flatMap(selected -> recheck(request, response, authentication, selected));
     if (tenant.isEmpty() && REQUIRES_TENANT.matches(request)) {
       throw new TenantNotSelectedException("tenant not selected");
     }
-    return tenant.map(selected -> new TenantId(UUID.fromString(selected.tenantId())));
+    return tenant;
   }
 
   /** 選んだテナントを束縛して、リクエストの残りの処理を呼ぶ。束縛はリクエストの処理が終わると外れる。 */
@@ -133,8 +135,8 @@ final class TenantSelectionFilter extends OncePerRequestFilter {
     }
   }
 
-  /** 選んだテナントの所属を引き直し、消えていれば選択を外し、役割が変わっていれば権限を作り直す。所属が残っていれば true を返す。 */
-  private boolean recheck(
+  /** 選んだテナントの所属を引き直し、消えていれば選択を外し、役割が変わっていれば権限を作り直す。所属が残っていればそのテナントを返す。 */
+  private Optional<TenantId> recheck(
       final HttpServletRequest request,
       final HttpServletResponse response,
       final Authentication authentication,
@@ -145,12 +147,12 @@ final class TenantSelectionFilter extends OncePerRequestFilter {
             : Optional.empty();
     if (membership.isEmpty()) {
       tenantSession.clear(request, response, authentication);
-      return false;
+      return Optional.empty();
     }
     if (!membership.get().role().equals(tenant.role())) {
       tenantSession.update(request, response, authentication, membership.get());
     }
-    return true;
+    return Optional.of(new TenantId(UUID.fromString(tenant.tenantId())));
   }
 
   /**

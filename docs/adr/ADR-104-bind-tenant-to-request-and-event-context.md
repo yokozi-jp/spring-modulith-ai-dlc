@@ -48,8 +48,9 @@ RLS のポリシーは、トランザクションに設定したテナントの�
   引数が `TenantScoped` でなければ、`IllegalStateException` で拒否する。
 - テナントを持つイベントは、`TenantScoped` を実装し、`TenantId` の項目を持つ。イベントを発行する CommandHandler は `TenantContext.current()` を詰める。
   `@ApplicationModuleListener` の引数のイベントが `TenantScoped` を実装することを、ArchUnit の `moduleListenerEventsAreTenantScoped` で検査する。
-- `TenantContext.call` を呼んでよいのは、`presentation.web` の `OncePerRequestFilter` と `TenantListenerAspect` だけである。
-  ほかの層が呼ぶと、リクエストやイベントに無関係なテナントへ切り替えられるため、ArchUnit の `tenantIsBoundOnlyByRequestFiltersAndListenerAspect` で検査する。
+- `TenantContext.call` を呼んでよいのは、`tenancy` の `TenantSelectionFilter` と `TenantListenerAspect` の 2 つだけである。
+  ほかのクラスが呼ぶと、認証の権限やイベントに無関係なテナントへ切り替えられるため、ArchUnit の `tenantIsBoundOnlyByTenantSelectionFilterAndListenerAspect` で検査する。
+  メソッド参照も検出する。filter を別のモジュールに足すときも、この規則の許可先とこの ADR を先に変える。
 - ArchUnit の `moduleApiDoesNotExposeInternalTypes` は、モジュールルートの型が依存してよい型に、`shared.tenant.TenantId` と `shared.tenant.TenantScoped` の 2 つだけを足す。イベントがこの 2 つを使うためで、`TenantContext` には依存させない。
 
 束縛はこの決定の範囲では DB に使わない。
@@ -68,9 +69,10 @@ DB のロールとテナントの設定は #377 で、トランザクション�
 
 - テナントを持つイベントは、`TenantId` の項目と `TenantScoped` の実装が必要になる。イベントの JSON が、テナントの項目の分だけ大きくなる。
 - モジュールルートの型が、標準型と同じルートの型のほかに、`TenantId` と `TenantScoped` へ依存する。依存を許す例外が 2 つ増える。
-- リクエストでもリスナーでもない入口（バッチ、起動時の処理）は、テナントを自分で束縛する必要がある。
+- リクエストでもリスナーでもない入口（バッチ、起動時の処理）は、この決定の範囲では束縛できない。足すときは、ArchUnit の許可先とこの ADR を先に変える。
 - `OncePerRequestFilter` は非同期ディスパッチでは動かないため、`Callable` や `DeferredResult` を返す Controller の非同期の処理には束縛されない。現時点で該当する Controller はない。
 - Spring AOP のプロキシを通らない呼び出しと、別のスレッドへ渡した処理では束縛されない。
+- 「リスナーのトランザクションが始まる時点で束縛済み」という性質は、`TenantListenerAspectTest` が偽のトランザクションマネージャーで確かめる。本物の流れでの確認は、トランザクションの開始時にテナントを読む #377 で足す。
 
 ### Neutral
 

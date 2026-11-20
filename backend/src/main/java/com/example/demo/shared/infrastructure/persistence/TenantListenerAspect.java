@@ -16,7 +16,7 @@ import org.springframework.stereotype.Component;
  * <p>トランザクションの advisor（Spring の既定の {@link Ordered#LOWEST_PRECEDENCE}）より外側で動き、リスナーのトランザクションが始まる時点で
  * テナントを束縛済みにする。{@code PgmCdAspect} より外側に置く。
  *
- * <p>束縛した値は、トランザクションの開始時にロールと RLS を決める永続化の処理が読むため、{@code PgmCdAspect} と同じ {@code
+ * <p>束縛した値は、#377 で、トランザクションの開始時にロールと RLS を決める永続化の処理が読む。その処理に合わせて、{@code PgmCdAspect} と同じ {@code
  * infrastructure.persistence} に置く。
  */
 @Aspect
