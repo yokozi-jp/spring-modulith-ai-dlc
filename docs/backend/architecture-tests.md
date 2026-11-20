@@ -135,7 +135,9 @@ R1は`ReleaseOrderCommandHandler`（`ReleaseOrderCommand`と`ReleaseOrderRequest
 R2は`ReopenPolicy`（Domain Serviceの`update`と`save`）、`PurgeOrderQueryService`、`JooqOrderRepository.save(OrderId)`（Repositoryの実装から別のRepositoryの`delete`）で確かめる。
 R3は`ForgedLockNoCommandHandler`（コンストラクタと`ExpectedLockNo::new`）と`OrderLockController`で確かめる。
 R4は`ApproveOrderCommandHandler`（`handle`から呼ばないprivateメソッドだけが`ensureLockNo`を呼ぶ）と`OverloadedEnsureCommandHandler`で確かめる。
+`LambdaEnsureCommandHandler`は、`Optional.ifPresent`のラムダの中の`ensureLockNo`をR4が満たすものとして数えることを`LambdaFixtureTest`で固定する（違反フィクスチャのパッケージにあるが、R4は検出しない）。
 `aggregateRootInsertsGoThroughTableWriter`は、違反フィクスチャの`JooqOrderDraftRepository`の`add`（`Insert`の`execute()`の直接の呼び出し）で確かめる。
+`JooqOrderLambdaDraftRepository`の`add`（ラムダの中の`execute()`）と`JooqOrderRepository`の`updateLater`（ラムダの中の`updateWhere`）は、`LambdaFixtureTest`で確かめる。
 `commandsAndResultsAreApplicationRecords`の型単位の除外は、`shared.concurrency`のrecordではない`ForceUnlockCommand`で確かめる。
 規約どおりのフィクスチャには、`shared.concurrency`と`shared.failure`の型と、Requestが`ExpectedLockNo`を作る`CancelOrderRequest`、Listenerが版のないCommandを作る`OrderPlacedExpiryListener`を置く。
 `archfixture.conforming`と`archfixture.violating`の`shared.infrastructure.persistence`には、規則が名前で見る`TableWriter`のスタブを置く。
