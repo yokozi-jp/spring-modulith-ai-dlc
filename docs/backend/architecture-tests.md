@@ -123,12 +123,10 @@ jOOQの生成物の`com.example.demo.jooq`はOPENのモジュールであり、`
 
 `jooqReflectionMappingIsNotUsed`は、違反フィクスチャの`ReflectiveOrderReader`で禁止するメソッドごとに一行を持ち、それぞれの呼び出しを検出することを確かめる。
 
-`tableWritesGoThroughTableWriter`は、違反フィクスチャの`DirectOrderWriter`で禁止するAPIごとに一行を持つ。
-`DirectWriteFixtureTest`の`DIRECT_WRITES`が、メソッドと、そのメソッドが検出される禁止の呼び出しを対にし、その呼び出しの違反が出ることを確かめる。
-同じメソッドが別の禁止の呼び出しも持つと、片方の禁止を外しても行が通るため、行は呼び出しまで指定する。
-`DirectOrderWriter`の公開メソッドは、すべて`DIRECT_WRITES`に載せる。
-禁止の名前（`NAMED_WRITES`の値と`QUERY_EXECUTIONS`）は、すべていずれかの行の呼び出しになっていることも確かめる。
-禁止の名前を足したときは、`DirectOrderWriter`にその呼び出しを持つメソッドと、`DIRECT_WRITES`の行を足す。
+`tableWritesGoThroughTableWriter`は、違反フィクスチャの`DirectOrderWriter`のメソッドごとに一行を持つ。
+`DirectWriteFixtureTest`の`DIRECT_WRITES`が、メソッドと、そのメソッドが検出される禁止の呼び出しを対にして確かめる。
+禁止の名前を足したときは、その呼び出しを持つメソッドを`DirectOrderWriter`に足し、`DIRECT_WRITES`に行を足す。
+名前が`fetch`で始まる実行は、jOOQ 3.21.9の`Update`と`Delete`に該当するメソッドがなく、行を持たない。
 `DirectOrderWriter`は、ラムダの中の`execute()`、`Update`の変数からの`execute()`、`Update::execute`のメソッド参照も含む。
 `TableWriterArchTest`の残りの規則は、違反フィクスチャの`JooqOrderRepository`、`UnversionedOrderRepository`、`ApproveOrderCommandHandler`で確かめる。
 R1は`ReleaseOrderCommandHandler`（`ReleaseOrderCommand`と`ReleaseOrderRequest`）、`SuspendOrderCommandHandler`（static factoryの呼び出し）、`ResumeOrderCommandHandler`（static factoryのメソッド参照）、`ArchiveOrderCommandHandler`（`save`という別名の書き込み）で確かめる。

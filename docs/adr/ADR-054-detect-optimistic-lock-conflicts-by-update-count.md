@@ -26,6 +26,7 @@ Proposed
 `requireUpdated` を呼ぶ production のコードはまだなく、ADR も Proposed のままであるため、この版で決定を書き直す。
 その後、[ADR-062](ADR-062-map-business-exceptions-to-404-409-422.md) の改訂（[issue #145](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/145)）に合わせ、`55P03` の変換で原因を付けないよう、この版で決定を書き直す。
 また、ADR-062 が集約ルートの INSERT の入口 `TableWriter.insert` を足したため、INSERT は `TableWriter` を通さないとしていた決定を、この版で書き直す。
+その後、ArchUnit がラムダの本体の呼び出しを外側のメソッドの呼び出しとして数えると分かったため、R4 の記述を、この版で書き直す。
 
 利用者は、共通基盤に次の順で重みを置く。
 AI と開発者が迷わないこと（どこに何を書き、どの API を使うかの答えが一つ）、間違えると機械で失敗すること、システムとして安全であること（古い値の上書き、無期限の待ち、気付けない設定の誤りがない）である。
