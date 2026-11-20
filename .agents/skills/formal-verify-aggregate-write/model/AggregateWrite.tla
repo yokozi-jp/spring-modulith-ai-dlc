@@ -2,7 +2,7 @@
 (***************************************************************************)
 (* Two requests save the same aggregate (a root row and its child rows) at *)
 (* the same time, under PostgreSQL READ COMMITTED with row locks.          *)
-(* The write path is JooqOrderRepository.update through TableWriter       *)
+(* The write path is JooqOrderRepository.update through TableWriter        *)
 (* .update and ChildWriter.replace, in the order that                      *)
 (* docs/database/postgresql-concurrency-control.md ("親子のテーブルの保存の *)
 (* 順序") prescribes. The root is ordering.t_order and the children are    *)
@@ -137,7 +137,8 @@ UpdateRoot(i) ==
 \* ChildWriter.replace: SELECT line_no FROM t_order_line WHERE order_id = ?
 \* (the saved set), then, in this order: one DELETE of the saved rows the
 \* aggregate no longer has (removed = saved \ plan; skipped when empty), one
-\* UPDATE per remaining row in ascending line_no (kept = saved \cap plan),
+\* UPDATE per remaining row (kept = saved \cap plan; the code updates them in
+\* the order the lines were passed, the model in ascending line_no),
 \* and one multi-row INSERT of the new rows (added = plan \ saved; skipped
 \* when empty).
 Ascending(S) ==

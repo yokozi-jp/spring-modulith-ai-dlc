@@ -185,7 +185,7 @@ ADR は Proposed のままであるため、新しい ADR を起こさず、こ�
 - [ADR-016: API と SPA のメッセージをローカライズする](ADR-016-localize-api-and-spa-messages.md)
 - [ADR-048: jOOQ の共通処理を共有モジュール shared に置く](ADR-048-add-shared-module-for-jooq-common-code.md)
 - [ADR-050: バックエンドのクラスの役割と命名を定める](ADR-050-define-backend-class-roles-and-naming.md)
-- [ADR-054: 楽観的ロックの競合を lock_no の条件と更新件数で判定し、業務テーブルの UPDATE と DELETE を TableWriter に集める](ADR-054-detect-optimistic-lock-conflicts-by-update-count.md)
+- [ADR-054: 楽観的ロックの競合を lock_no の条件と更新件数で判定し、業務テーブルの INSERT と UPDATE を集約の宣言から TableWriter が書く](ADR-054-detect-optimistic-lock-conflicts-by-update-count.md)
 - [ADR-058: problem type にパスを全部書いた相対 URI を使う](ADR-058-use-path-absolute-relative-uri-for-problem-types.md)
 - [ADR-060: UUID の採番をアプリケーションで行い、DB の DEFAULT で採番しない](ADR-060-generate-uuid-primary-keys-in-application.md)
 - [RFC 9457: Problem Details for HTTP APIs](https://www.rfc-editor.org/rfc/rfc9457)

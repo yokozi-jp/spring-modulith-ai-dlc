@@ -52,14 +52,13 @@ Presentation は Repository を使わない。
 - 集約の物理削除が要るときは、先に [ADR-054](../../adr/ADR-054-detect-optimistic-lock-conflicts-by-update-count.md) を更新して `TableWriter` に入口を足し、そのうえで `void delete(集約ルート)` を置き、`update` と同じ二つの例外を Javadoc に書く。
   今の `TableWriter` には `delete` の入口がないため、`Jooq*Repository` の `delete` は H3 が検出する。
   期待する版を持つ書き込みは、集約ルートを受け取る `update` と `delete` に限り、識別子と版を受け取るメソッドを作らない。
-- `add`、`update`、`delete` の引数の集約ルートは、引数のない `long lockNo()` を持ち、`shared.concurrency` の `Versioned` を実装する（[集約](aggregate.md)）。
+- `add`、`update`、`delete` の引数の集約ルートは、`shared.concurrency` の `Versioned` を実装し、引数のない `long lockNo()` を持つ（[集約](aggregate.md)）。
   `TableWriter.update` は `Versioned` の集約ルートを受け取り、`lockNo()` を期待する版にする。
 - 書き込み（`add`、`update`、`delete` と、`save` のような別名で集約ルートを受け取るメソッド）を呼べるのは CommandHandler だけである。
   Domain Service、QueryService、別の Repository の実装は、Repository を読み取りにだけ使う。
   保存を、トランザクションとイベントの発行を担う CommandHandler に集めるためである。
   `add` 以外の書き込みには、CommandHandler が集約の `ensureLockNo` で画面の版を比べてから保存する流れを、迂回させない目的もある。
   ArchUnit が呼び出し元を検査するのは `add` 以外の書き込みだけであり、`add` の呼び出し元は自分で点検する。
-  呼び出し側が件数を捨てると、コンパイルが失敗する。
 - インタフェースと各メソッドに Javadoc を書く。
 - パッケージの `package-info.java` は集約と共有する。
 
@@ -204,7 +203,7 @@ class JooqOrderRepositoryTest {
 - [ ] 主キーが UUID のテーブルの集約では、`nextId()` を持つ。［自分で点検］
 - [ ] メソッドはドメインの語彙で名付け、`findById` は `Optional`、複数は `List` を返し、保存は新しい集約の `add` と既存の集約の `update` に分ける。［自分で点検］
 - [ ] `update` の Javadoc に、行がないときの `NotFoundException` と、競合したときの `ConflictException` を書く。［自分で点検］
-- [ ] `add`、`update`、`delete` は、引数のない `long lockNo()` を持つ集約ルートを一つだけ受け取る。［ArchUnit で検査：TableWriterArchTest.repositoryWritesTakeVersionedAggregates］
+- [ ] `add`、`update`、`delete` は、`Versioned` を実装する集約ルートを一つだけ受け取る。［ArchUnit で検査：TableWriterArchTest.repositoryWritesTakeVersionedAggregates］
 - [ ] `add` を CommandHandler だけが呼ぶ。［自分で点検］
 - [ ] `add` 以外の書き込みを CommandHandler だけが呼ぶ。［ArchUnit で検査：TableWriterArchTest.onlyCommandHandlersUpdateOrDeleteAggregates］
 - [ ] 実装は `infrastructure.persistence` の `Jooq<Aggregate>Repository` にする。［ArchUnit で検査：PackageByFeatureOnionArchitectureTest.repositoryImplementationsAreJooqRepositories］

@@ -139,7 +139,7 @@ git diff --stat "$(sed -n 's/^同期コミット：`\([0-9a-f]*\)`.*/\1/p' "$ski
 
 ## 同期の記録
 
-同期コミット：`a99d855a9e7830988e3bd312609c65cb20fe38cd`（main）
+同期コミット：`e919e2a29180081a4b37d74dab5a0cec5f8c2e55`（Pull Request #599 の最後のコード変更。squash merge の後に、main のコミットで確かめ直して進める）
 
 このコミットで、「変更がこの検証に関わるか」のファイルと対応表がモデルと一致することを確かめた。
 読んだライブラリは、Spring Modulith 2.1.2 の `DefaultEventPublicationRegistry`（`PublicationsInProgress`）、`JdbcEventPublicationRepositoryV2`、`CompletionRegisteringAdvisor`（`CompletionRegisteringMethodInterceptor`）、`PersistentApplicationEventMulticaster` である。

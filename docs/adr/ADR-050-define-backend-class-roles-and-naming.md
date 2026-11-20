@@ -309,7 +309,7 @@ Proposed
 - [ADR-013: HTTP API 契約を標準化する](ADR-013-standardize-http-api-contracts.md)
 - [ADR-019: 外部連携の耐障害性と容量制御を標準化する](ADR-019-define-resilience-and-capacity-guardrails.md)
 - [ADR-048: jOOQ の共通処理を共有モジュール shared に置く](ADR-048-add-shared-module-for-jooq-common-code.md)
-- [ADR-054: 楽観的ロックの競合を lock_no の条件と更新件数で判定し、業務テーブルの UPDATE と DELETE を TableWriter に集める](ADR-054-detect-optimistic-lock-conflicts-by-update-count.md)
+- [ADR-054: 楽観的ロックの競合を lock_no の条件と更新件数で判定し、業務テーブルの INSERT と UPDATE を集約の宣言から TableWriter が書く](ADR-054-detect-optimistic-lock-conflicts-by-update-count.md)
 - [PostgreSQL の排他制御](../database/postgresql-concurrency-control.md)
 - [PostgreSQL の共通カラム](../database/postgresql-common-columns.md)
 - [メッセージングの設計](../integration/async-messaging-design.md)

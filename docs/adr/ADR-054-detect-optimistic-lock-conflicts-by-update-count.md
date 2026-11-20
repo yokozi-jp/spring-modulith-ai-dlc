@@ -47,15 +47,16 @@ PostgreSQL の READ COMMITTED では、後の UPDATE は先の UPDATE のコミ�
 
 - 業務テーブルの INSERT と UPDATE は、`shared.infrastructure.persistence` の `TableWriter` だけが組み立てて実行する。
   Repository は集約の形を、クラスの定数として一度だけ宣言する。
-  `AggregateTable<R, K, A>` は、ルートのテーブル、ルートを一つに決める一意の列（`public_id` など）、内部の主キー、子のテーブルを持つ。
-  `A` は集約ルートのクラス（`Versioned` を実装する）で、`update` が受け取る版の持ち主の型になる。
+  `AggregateTable<R, K, A>` は、ルートのテーブル、ルートを一つに決める一意の列（`public_id` など）、集約ルートからその列の値を取る関数、内部の主キー、子のテーブルを持つ。
+  `A` は集約ルートのクラス（`Versioned` を実装する）で、`insert` と `update` が受け取る集約ルートの型になる。
+  一意の列の値は関数で集約ルートから取るため、呼び出し側が別の集約ルートの値と組にして渡す誤りは書けない。
   `ChildTable<R, C>` は、子のテーブル、親の内部の主キーを持つ外部キーの列、親の中で行を同定する自然キーの列（一つ以上）を持つ。
-  `ChildTable` の `R` はルートのテーブルの型で、`AggregateTable<R, K, A>` は同じ `R` の子だけを受け取るため、別の集約の子は宣言できない。
+  `ChildTable` の `R` はルートのテーブルの型で、`AggregateTable<R, K, A>` は同じ `R` の子だけを受け取るため、別の集約のために型を付けた子の定数を使い回すとコンパイルで失敗する。
   子の自然キーの列は、保存済みの値と `equals` で比べるため、`Integer`、`Long`、`Short`、`String`、`UUID` に限る。
   宣言は構造だけを持ち、業務の値から列への変換は、保存のたびに渡すラムダが持つ。
   Repository は、保存のたびにルートの列の値と、保存後にあるべき子の全行（`ChildRows`）を渡す。
   `Condition`、`Insert`、`Update` は渡さない。ルートの条件、版の条件、子の外部キーの条件は、`TableWriter` が宣言から作る。
-- `TableWriter.insert` は、ルートを `INSERT ... RETURNING 内部の主キー` で書き、続けて子を 1 文の複数行の INSERT で書く。
+- `TableWriter.insert` は、新しい集約ルートを受け取り、ルートを `INSERT ... RETURNING 内部の主キー` で書き、続けて子を 1 文の複数行の INSERT で書く。
   `lock_no = 1` と共通カラムは `TableWriter` が書く。
   内部の主キーは `RETURNING` で受けるため、Repository は読み直さない。
   子を宣言していない集約は、`rows -> {}` を渡す。
@@ -92,7 +93,7 @@ PostgreSQL の READ COMMITTED では、後の UPDATE は先の UPDATE のコミ�
   UPDATE の `lock_no` を書くのは `TableWriter` だけになる。
   `CommonColumns.forInsert` は、テストのデータ作成のために public のままにするが、本番の Repository は `insertInto` を呼べないため使えない（H1）。
 - ArchUnit の `TableWriterArchTest` で次を検査する。
-  - `TableWriter` と、その子の行の書き込み（`ChildWriter`）の外の本番のコードは、jOOQ の INSERT、UPDATE、DELETE、UPSERT、MERGE の入口、`Update` と `Delete` に代入できる型の実行、`org.jooq` の型の、名前が `$` で始まるメソッド（問い合わせのモデルの API）、`UpdatableRecord` と `DAO` の書き込み、Spring JDBC と JDBC の直接の利用を呼ばない。
+  - `TableWriter` と、その子の行の書き込み（`ChildWriter`）の外の本番のコードは、jOOQ の INSERT、UPDATE、DELETE、UPSERT、MERGE の入口、`Update` と `Delete` に代入できる型の実行、`org.jooq` の型の、名前が `$` で始まるメソッド（問い合わせのモデルの API）、`TableRecord`、`UpdatableRecord`、`DAO` の書き込み、Spring JDBC と JDBC の直接の利用を呼ばない。
     判定は、呼び出し先の型が禁じる型に代入できるかで行う。
     `DataSource`、`Connection`、`ConnectionProvider` を引数に取るメソッドとコンストラクタも呼ばない。
     接続の元を受け取るライブラリ（Spring Boot の `DataSourceScriptDatabaseInitializer` など）は、パッケージを選ばずに任意の SQL を流せるため、パッケージの一覧ではなく引数の型で禁じる。
@@ -104,8 +105,8 @@ PostgreSQL の READ COMMITTED では、後の UPDATE は先の UPDATE のコミ�
     名前で対象を選ばないため、`save` のような名前のメソッドも検出する。
     `TableWriter` には `delete` の入口がないため、`delete` も検出する。必要になったら、この ADR を更新して入口を足す。
     版は `Versioned` の集約ルートから `TableWriter` が読むため、`lockNo()` の呼び出しは求めない。
-  - `domain.model` の `<Aggregate>Repository` の `add`、`update`、`delete` は、引数のない `long lockNo()` を宣言する集約ルートを一つだけ受け取る。
-    集約ルートが `lockNo()` を持たないと、版を比べる規則が集約ルートを見つけられず、空のまま通るためである。
+  - `domain.model` の `<Aggregate>Repository` の `add`、`update`、`delete` は、`Versioned` を実装する集約ルートを一つだけ受け取る。
+    集約ルートが `Versioned` を実装しないと、版を比べる規則が集約ルートを見つけられず、`TableWriter.update` にも渡せないためである。
     必須の `add` を含めるため、`save` のような名前で保存する Repository でも、形を外れた集約は `add` で検出される。
   - R1 と R2 は、`domain.model` の Repository の `add` 以外の書き込み（`update`、`delete`、集約ルートを受け取るメソッド）を同じ判定で見つける。
     `Jooq<Aggregate>Repository` の検査と同じく集約ルートの引数で選ぶため、`save` のような別名でも規則を外れない。
@@ -156,7 +157,7 @@ PostgreSQL の READ COMMITTED では、後の UPDATE は先の UPDATE のコミ�
 - 期待する版は集約ルートのクラス（`AggregateTable` の `A`）から読むため、テーブルから読み直した版や、版を返すラムダを渡す誤りは書けない。
 - jOOQ の INSERT と UPDATE を含む書き込みの API、Spring JDBC、JDBC と、接続の元を受け取るライブラリを `TableWriter` の外で使うと、テスト（ArchUnit）で失敗する。
   禁止の一覧は、テストで固定した jOOQ の版の API で見直してある。
-  別のテーブルの列、型の違う値、別の集約の子の宣言は、コンパイルで失敗する。
+  別のテーブルの列、型の違う値、別の集約の型を付けた子の定数の使い回しは、コンパイルで失敗する。
 - 競合と行なしの判定は `TableWriter` の実 PostgreSQL のテストに集まり、Repository のテストは列と集約の往復と子の行の差分だけを確かめる。
 - 更新と削除の Command に `VersionedCommand` の実装忘れ、`ensureLockNo` の呼び忘れ、`ExpectedLockNo` の偽造があると、ArchUnit で失敗する。
 - 競合の例外が一つになり、集約ごとに例外を作らなくてよい。
@@ -171,10 +172,14 @@ PostgreSQL の READ COMMITTED では、後の UPDATE は先の UPDATE のコミ�
     これは規約が受け入れているリスクとする。
   - **jOOQ の新しい書き込みの API**：jOOQ の版を上げると、ArchUnit の禁止の一覧にない書き込みの API が増えうる。
     実行時の版を固定したテストが失敗するため、「jOOQの版を上げるとき」の手順で一覧を見直す。
+  - **書き込みの検査の前提**：`TableWriter` は、接続が自動コミットではなく読み取り専用でないことでトランザクションを見分ける。
+    接続 pool の既定の自動コミットを `false` にすると、トランザクションなしの書き込みが通る。この設定を変えるときは、この検査を見直す。
+  - **`A` に `Versioned` を指定する誤り**：`AggregateTable` の第 3 型引数に集約ルートのクラスでなく `Versioned` を指定すると、版を返すラムダを渡せる。
+    ArchUnit は型引数を検査しないため、レビューで見る。
   - **子の宣言の外部キーの列の誤り**：`ChildTable.of` は、親の外部キーの列の型が `Long` であることしか確かめない。
     生成された jOOQ のコードには FOREIGN KEY の情報がなく（制約を張らない設計）、別の集約の列を渡してもコンパイルは通る。
     各集約の `AggregateTable` を通した保存、更新の往復のテストで確かめる。
-  - **集約ルートの形を外れた集約**：規則は、`domain.model` にあり引数のない `long lockNo()` を宣言する型を集約ルートとみなす。
+  - **集約ルートの形を外れた集約**：規則は、`domain.model` にあり `Versioned` を実装する型を集約ルートとみなす。
     Repository の `add`、`update`、`delete` の引数はこの形を検査する。
     `add` を持たずに `save` のような名前だけで保存する Repository と、Repository のインタフェースを経由せずに保存する集約は、形を外れても規則が空のまま通る。
   - **psql による古い版での物理削除**：psql で古い版の行を削除しても、何も検出しない。

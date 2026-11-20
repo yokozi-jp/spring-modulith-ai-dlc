@@ -162,7 +162,8 @@ R4は`ApproveOrderCommandHandler`（`handle`から呼ばないprivateメソッ�
 `commandsAndResultsAreApplicationRecords`の型単位の除外は、`shared.concurrency`のrecordではない`ForceUnlockCommand`で確かめる。
 規約どおりのフィクスチャには、`shared.concurrency`と`shared.failure`の型と、Requestが`ExpectedLockNo`を作る`CancelOrderRequest`、Listenerが版のないCommandを作る`OrderPlacedExpiryListener`を置く。
 `archfixture.conforming`と`archfixture.violating`の`shared.infrastructure.persistence`には、規則が名前で見る`TableWriter`のスタブを置く。
-H3は、違反フィクスチャの`JooqOrderRepository`の`update`と`save`（`TableWriter.update`を呼ばない）と、`UnversionedOrderRepository`で確かめる。
+H3は、違反フィクスチャの`JooqOrderRepository`の`update`と`save`（`TableWriter.update`を呼ばない）と`store`（`TableWriter.update`を呼ぶが`update`という名前ではない）で確かめる。
+H6は、`UnversionedOrderRepository`（集約ルートではなく識別子を受け取る）で確かめる。
 `allowedUsagesAreNotDetected`の一行は、対応づけの二つの規則が`convertFrom`、`Records.mapping`、`into(Table)`、`fetch(RecordMapper)`、`intoArray(Field, Class)`、`intoSet(Field, Class)`、`fetch(Field, Class)`、`newRecord(Table)`を誤検出しないことを確かめる。
 `noSuchElementExceptionIsNotThrown`は、違反フィクスチャの`LegacyOrderFinder`の`notFound`（`NoSuchElementException`の生成）と`firstOrFail`（引数なしの`orElseThrow()`）で確かめる。
 規約どおりのフィクスチャの`CancelOrderCommandHandler`、`CancelExpiredOrderCommandHandler`、`ReserveStockCommandHandler`、`OrderController`は`NotFoundException`を、`Order`と`OrderLimitPolicy`は`BusinessRuleViolationException`を投げ、Domain、Application、Presentationから`shared.failure`を使っても規則が通ることを確かめる。
@@ -282,7 +283,7 @@ INSERTとUPDATEの共通カラムは`TableWriter`が書く。Repositoryは`Commo
 ## 書き込みの入口
 
 `TableWriterArchTest`は、業務テーブルのINSERTとUPDATEを`shared`の`TableWriter`に集める規則を検査する（[PostgreSQLの排他制御](../database/postgresql-concurrency-control.md)、[ADR-054](../adr/ADR-054-detect-optimistic-lock-conflicts-by-update-count.md)）。
-集約ルートは、`domain.model`にあり、引数のない`long lockNo()`を宣言する型とする。
+集約ルートは、`domain.model`にあり、`shared.concurrency`の`Versioned`を実装する型とする。
 
 - `tableWritesGoThroughTableWriter`：`TableWriter`と、その子の行の書き込み（`ChildWriter`）の外の本番のコードは、次のAPIを呼ばず、メソッド参照もしない。
   呼び出し先の型が、挙げた型に代入できるかで判定する。
@@ -311,8 +312,8 @@ INSERTとUPDATEの共通カラムは`TableWriter`が書く。Repositoryは`Commo
   期待する版は`TableWriter.update`が、受け取った集約ルート（`Versioned`）の`lockNo()`から読むため、`lockNo()`の呼び出しは求めない。
   テーブルから読み直した版を期待する版に渡す書き方は、`AggregateTable`の型引数`A`に集約ルートのクラスを指定すれば、型で書けない（`Versioned`そのものを指定してラムダを渡す書き方は、レビューで見る）。
 - `repositoryWritesTakeVersionedAggregates`：`domain.model`の`*Repository`インタフェースの`add`、`update`、`delete`は、集約ルートを一つだけ受け取る。
-  集約ルートが`long lockNo()`を持たないと、ほかの規則が集約ルートを見つけられず空のまま通るため、この規則で形を確かめる。
-  必須の`add`を対象に含めるため、`save`のような名前で保存するRepositoryでも、`lockNo()`を持たない集約は`add`で検出される。
+  集約ルートが`Versioned`を実装しないと、ほかの規則が集約ルートを見つけられず空のまま通るため、この規則で形を確かめる。
+  必須の`add`を対象に含めるため、`save`のような名前で保存するRepositoryでも、`Versioned`を実装しない集約は`add`で検出される。
 - R1とR2は、`domain.model`の`*Repository`の`add`以外の書き込みを同じ判定で見つける。
   書き込みは、`update`、`delete`と、集約ルートを受け取るメソッドである。
   `repositoryUpdateAndDeleteCheckVersion`と同じく集約ルートの引数で選ぶため、`save`のような別名でも規則を外れない。

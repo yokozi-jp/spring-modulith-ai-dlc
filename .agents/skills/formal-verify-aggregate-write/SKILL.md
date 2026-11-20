@@ -50,6 +50,9 @@ tooling/formal-verify/mutants.py .agents/skills/formal-verify-aggregate-write
 skill=.agents/skills/formal-verify-aggregate-write/SKILL.md
 git diff --stat "$(sed -n 's/^同期コミット：`\([0-9a-f]*\)`.*/\1/p' "$skill")" -- \
   backend/src/main/java/com/example/demo/shared/infrastructure/persistence/TableWriter.java \
+  backend/src/main/java/com/example/demo/shared/infrastructure/persistence/AggregateTable.java \
+  backend/src/main/java/com/example/demo/shared/infrastructure/persistence/ChildTable.java \
+  backend/src/main/java/com/example/demo/shared/infrastructure/persistence/ChildRows.java \
   backend/src/main/java/com/example/demo/shared/infrastructure/persistence/ChildWriter.java \
   backend/src/main/java/com/example/demo/shared/infrastructure/persistence/ConflictTranslator.java \
   backend/src/main/java/com/example/demo/ordering/infrastructure/persistence/JooqOrderRepository.java \
@@ -111,7 +114,7 @@ grep -rn "tableWriter.update(" backend/src/main/java --include=*.java
 
 ## 同期の記録
 
-同期コミット：`c3ff0b8a63ca98ca9f14a544d24c3aa5053d6c6e`（Pull Request #599 の最後のコード変更。squash merge の後に、main のコミットで確かめ直して進める）
+同期コミット：`e919e2a29180081a4b37d74dab5a0cec5f8c2e55`（Pull Request #599 の最後のコード変更。squash merge の後に、main のコミットで確かめ直して進める）
 
 このコミットで、「変更がこの検証に関わるか」のファイルと対応表がモデルと一致することを確かめた。
 読んだのはこのリポジトリのコードで、PostgreSQL の振る舞いはモデルの冒頭の注記に並べた前提である。

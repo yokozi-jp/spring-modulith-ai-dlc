@@ -9,7 +9,7 @@ tags: [convention, database, jooq]
 
 SQLは生成されたメタモデルのクラスから組み立てる。
 Plain SQLのAPIと`withRenderSchema(false)`は使わない。
-業務テーブルのUPDATEとDELETEは、sharedモジュールの`TableWriter`で書く。
+業務テーブルのINSERTとUPDATEは、sharedモジュールの`TableWriter`で書く。
 
 ## 対象
 
