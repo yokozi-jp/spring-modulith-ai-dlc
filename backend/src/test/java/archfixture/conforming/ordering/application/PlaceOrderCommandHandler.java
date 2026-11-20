@@ -5,6 +5,7 @@ import archfixture.conforming.ordering.domain.model.CustomerId;
 import archfixture.conforming.ordering.domain.model.Order;
 import archfixture.conforming.ordering.domain.model.OrderRepository;
 import archfixture.conforming.ordering.domain.service.OrderLimitPolicy;
+import archfixture.conforming.shared.tenant.TenantContext;
 import java.time.Clock;
 import java.time.Instant;
 import org.springframework.context.ApplicationEventPublisher;
@@ -47,7 +48,11 @@ public class PlaceOrderCommandHandler {
     final Order order = Order.place(orderRepository.nextId(), customerId, Instant.now(clock));
     orderRepository.add(order);
     events.publishEvent(
-        new OrderPlaced(order.id().value().toString(), customerId.value(), order.placedAt()));
+        new OrderPlaced(
+            order.id().value().toString(),
+            customerId.value(),
+            order.placedAt(),
+            TenantContext.current()));
     return new PlaceOrderResult(order.id().value().toString());
   }
 }

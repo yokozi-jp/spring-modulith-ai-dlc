@@ -40,6 +40,8 @@ Listener は Infrastructure の Adapter でもない。
 - クラスを継承せず、継承もさせない。Java 標準の型以外の interface も実装しない。
   `PgmCdAspect` は名前で対象を決め、継承した `on` には `*_pgm_cd` を束縛しない（[ADR-051](../../adr/ADR-051-bind-pgm-cd-with-scoped-value-and-aspect.md)）。
 - public メソッドは `@ApplicationModuleListener public void on(final <Event> event)` の一つだけにする。
+- 引数のイベントは `shared.tenant.TenantScoped` を実装する。
+  `TenantListenerAspect` がイベントのテナントを、`on` のトランザクションが始まる時点で `TenantContext` に束縛する（[ADR-105](../../adr/ADR-105-bind-tenant-to-request-and-event-context.md)）。
 - イベントは `@ApplicationModuleListener` だけで受け、Listener 以外のクラスでも `@EventListener` と `@TransactionalEventListener` を直接付けず、`ApplicationListener` を実装しない。
   理由は[アンチパターン](#アンチパターン)に示す。
   Spring Boot の起動の完了のようなフレームワークのイベントを受ける必要が出たら、先にこの規則と、`ClassRoleArchTest` の `eventListenersAreApplicationModuleListeners` と `applicationListenerIsNotImplemented` を変える。
@@ -129,6 +131,7 @@ public void on(final OrderConfirmed event) {
 ## 対応するテスト
 
 `@ApplicationModuleTest` で受信する側のモジュールを起動し、`Scenario` の `publish` でイベントを発行して、CommandHandler が変えた状態を `andWaitForStateChange` で待つ。
+`publish` するイベントのテナントには、`AsTenant.TENANT` を使う。
 `ReserveStockCommandHandler` は注文モジュールの `OrderQueries` を使い、注文モジュールは顧客モジュールの `CustomerQueries` と商品モジュールの `ProductQueries` を使う（[CommandHandler](command-handler.md)）。
 `BootstrapMode.DIRECT_DEPENDENCIES` は直接依存するモジュールだけを起動するため、注文モジュールの Bean が使う顧客と商品のモジュールの Bean がなく、文脈が起動しない。
 依存するモジュールがさらに別のモジュールに依存するときは、`BootstrapMode.ALL_DEPENDENCIES` で間接の依存まで起動する。
@@ -148,7 +151,9 @@ class OrderPlacedListenerTest {
     final String orderId = savePlacedOrder();
 
     scenario
-        .publish(new OrderPlaced(orderId, "C-1", Instant.parse("2026-10-03T00:00:00Z")))
+        .publish(
+            new OrderPlaced(
+                orderId, "C-1", Instant.parse("2026-10-03T00:00:00Z"), AsTenant.TENANT))
         .andWaitForStateChange(() -> isReserved(orderId))
         .andVerify(reserved -> assertThat(reserved).as("orderId=%s の引き当て", orderId).isTrue());
   }
@@ -227,6 +232,7 @@ private ResponseEntity<ChargeReply> post(final String key, final Money amount) {
 ## 作成時のチェックリスト
 
 - [ ] `@ApplicationModuleListener` を付けたメソッドは、`application` の `<Event>Listener` の `on` にする。［ArchUnit で検査：ClassRoleArchTest.moduleListenersAreApplicationListeners］
+- [ ] `@ApplicationModuleListener` の引数のイベントは `TenantScoped` を実装する。［ArchUnit で検査：ClassRoleArchTest.moduleListenerEventsAreTenantScoped］
 - [ ] イベントを `@EventListener` と `@TransactionalEventListener` で受けない。［ArchUnit で検査：ClassRoleArchTest.eventListenersAreApplicationModuleListeners］
 - [ ] イベントを `ApplicationListener` の実装で受けない。［ArchUnit で検査：ClassRoleArchTest.applicationListenerIsNotImplemented］
 - [ ] public メソッドは `void on(<Event> event)` 一つにし、CommandHandler をちょうど一つ呼ぶ。［ArchUnit で検査：ClassRoleArchTest.listenersExposeOnlyOnAndCallOneCommandHandler］

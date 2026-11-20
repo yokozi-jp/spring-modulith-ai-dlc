@@ -12,6 +12,10 @@
  * <p>共通カラムの {@code *_by} に登録するアプリの利用者を表す認証の principal（{@code AppUserPrincipal}）は {@code security}
  * に置き、どの層からも使う（ADR-096）。テナントを選ぶ前の拒否（{@code TenantNotSelectedException}）は、テナントの ID
  * も役割も持たずログインの状態だけを表すので、認証の語彙として {@code security} に置く（ADR-101）。
+ *
+ * <p>操作しているテナントの語彙（{@code TenantId}、{@code TenantScoped}、{@code TenantContext}）は {@code tenant}
+ * に置き、どの層からも使う（ADR-105）。リスナーでテナントを束縛する {@code TenantListenerAspect} は {@code
+ * infrastructure.persistence} に置く。
  */
 @NullMarked
 package com.example.demo.shared;

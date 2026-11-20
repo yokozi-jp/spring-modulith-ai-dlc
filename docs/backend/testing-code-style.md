@@ -45,6 +45,10 @@ MockMvcでログインした利用者として呼ぶテストは、`testkit`の`
 バックエンドはリクエストのたびに所属を引き直し、所属のない権限を外すため、どちらもリクエストを送る前にDBへ利用者、テナント、所属の行を入れる（[ADR-101](../adr/ADR-101-keep-tenants-and-roles-in-app-database.md)）。
 `Authentication`の権限に`ROLE_MEMBER`などを手で足しても、テナントを選んだ状態にはならず、業務のAPIは403になる。
 
+リクエストもリスナーも通らずに、テナントを持つイベントを発行するCommandHandlerを直接呼ぶテストは、`testkit`の`AsTenant.call`で`AsTenant.TENANT`を束縛して呼ぶ。
+束縛がないと、`TenantContext.current()`が`IllegalStateException`を投げる（[ADR-105](../adr/ADR-105-bind-tenant-to-request-and-event-context.md)）。
+`Scenario`の`publish`で発行するイベントのテナントには、`AsTenant.TENANT`を使う。
+
 ## 並列と実行順
 
 テストはGradleの複数のforkで並列に動き、どのクラスがどのforkで動くかは実行ごとに変わる。
