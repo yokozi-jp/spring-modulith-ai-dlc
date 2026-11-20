@@ -1,11 +1,11 @@
 ---
 type: ADR
-title: 'ADR-054: 楽観的ロックの競合を lock_no の条件と更新件数で判定し、業務テーブルの UPDATE と DELETE を TableWriter に集める'
-description: 楽観的ロックの版の条件、版の設定、件数の判定、55P03 の変換を shared の TableWriter に集め、集約ルートの INSERT も TableWriter.insert で実行して 23505 と 55P03 を ConflictException に変え、競合を shared.concurrency の ConflictException で 409 にし、期待する版を ExpectedLockNo と VersionedCommand で運び、ArchUnit で迂回と検査の抜けを禁じる決定。取り込んだ PostgreSQL 設計ガイドラインの、先に SELECT ... FOR UPDATE でロックする方式を改変する。
+title: 'ADR-054: 楽観的ロックの競合を lock_no の条件と更新件数で判定し、業務テーブルの INSERT と UPDATE を集約の宣言から TableWriter が書く'
+description: 楽観的ロックの版の条件、版の設定、件数の判定、55P03 と 23505 の変換を shared の TableWriter に集め、Repository が宣言する集約（AggregateTable と ChildTable）と保存後の子の全行から、ルートの INSERT と UPDATE、子の差分の書き込みを TableWriter が行い、期待する版を Versioned の集約ルートから読み、競合を shared.concurrency の ConflictException で 409 にし、画面の版を ExpectedLockNo と VersionedCommand で運び、ArchUnit で迂回と検査の抜けを禁じる決定。取り込んだ PostgreSQL 設計ガイドラインの、先に SELECT ... FOR UPDATE でロックする方式を改変する。
 tags: [adr, backend, database, jooq, concurrency, http]
 ---
 
-# ADR-054: 楽観的ロックの競合を lock_no の条件と更新件数で判定し、業務テーブルの UPDATE と DELETE を TableWriter に集める
+# ADR-054: 楽観的ロックの競合を lock_no の条件と更新件数で判定し、業務テーブルの INSERT と UPDATE を集約の宣言から TableWriter が書く
 
 ## Status
 
@@ -27,6 +27,7 @@ Proposed
 その後、[ADR-062](ADR-062-map-business-exceptions-to-404-409-422.md) の改訂（[issue #145](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/145)）に合わせ、`55P03` の変換で原因を付けないよう、この版で決定を書き直す。
 また、ADR-062 が集約ルートの INSERT の入口 `TableWriter.insert` を足したため、INSERT は `TableWriter` を通さないとしていた決定を、この版で書き直す。
 その後、ArchUnit がラムダの本体の呼び出しを外側のメソッドの呼び出しとして数えると分かったため、R4 の記述を、この版で書き直す。
+さらに、Repository が 5 つの手順（ルートの更新、内部の主キーの読み直し、保存済みの子の読み取り、子の削除、子ごとの更新か追加）を並べ、子の書き込みが任意の `Condition` を受け取り、INSERT が別の弱い入口になっていたため、入口を集約の宣言と `insert`、`update` の二つにまとめる決定を、この版で書き直す。
 
 利用者は、共通基盤に次の順で重みを置く。
 AI と開発者が迷わないこと（どこに何を書き、どの API を使うかの答えが一つ）、間違えると機械で失敗すること、システムとして安全であること（古い値の上書き、無期限の待ち、気付けない設定の誤りがない）である。
@@ -44,53 +45,64 @@ PostgreSQL の READ COMMITTED では、後の UPDATE は先の UPDATE のコミ�
 
 ## Decision
 
-- 業務テーブルの UPDATE と DELETE は、`shared.infrastructure.persistence` の `TableWriter` だけが組み立てて実行する。
-  期待する版（以前に読んだ集約ルートの `lock_no`）を持つ書き込みは `updateCheckingVersion` と `deleteCheckingVersion` で、持たない書き込みは `updateWhere` と `deleteWhere` で行う。
-  集約の子の行の更新と削除は、ルートの書き込みが返す `LockedRoot`（削除では `DeletedRoot`）で書き、子の集合の変化は差分（削除、追加、更新）で書く。
-- 集約ルートの INSERT は、Repository が `dsl.insertInto(...)` で組み立て、`TableWriter.insert` が実行する（[ADR-062](ADR-062-map-business-exceptions-to-404-409-422.md)）。
-  `TableWriter.insert` は、一意制約の違反（`23505`）を `Kind.UNIQUE` の、`55P03` の `CannotAcquireLockException` を `Kind.LOCK` の `ConflictException` に、原因を付けずに変える。
-  INSERT の共通カラムは、集約ルートでも子の行でも `CommonColumns.forInsert` で書く。
-  子の行の INSERT は `TableWriter` を通さずに実行し（`add` では `dsl.batch`）、`23505` を変換しない（ADR-062 の Negative）。
+- 業務テーブルの INSERT と UPDATE は、`shared.infrastructure.persistence` の `TableWriter` だけが組み立てて実行する。
+  Repository は集約の形を、クラスの定数として一度だけ宣言する。
+  `AggregateTable<R, K>` は、ルートのテーブル、ルートを一つに決める一意の列（`public_id` など）、内部の主キー、子のテーブルを持つ。
+  `ChildTable<R, C>` は、子のテーブル、親の内部の主キーを持つ外部キーの列、親の中で行を同定する自然キーの列（一つ以上）を持つ。
+  `ChildTable` の `R` はルートのテーブルの型で、`AggregateTable<R, K>` は同じ `R` の子だけを受け取るため、別の集約の子は宣言できない。
+  宣言は構造だけを持ち、業務の値から列への変換は、保存のたびに渡すラムダが持つ。
+  Repository は、保存のたびにルートの列の値と、保存後にあるべき子の全行（`ChildRows`）を渡す。
+  `Condition`、`Insert`、`Update` は渡さない。ルートの条件、版の条件、子の外部キーの条件は、`TableWriter` が宣言から作る。
+- `TableWriter.insert` は、ルートを `INSERT ... RETURNING 内部の主キー` で書き、続けて子を 1 文の複数行の INSERT で書く。
+  `lock_no = 1` と共通カラムは `TableWriter` が書く。
+  内部の主キーは `RETURNING` で受けるため、Repository は読み直さない。
+  子を宣言していない集約は、子の行を渡さない `insert` で書く。
+- `TableWriter.update` は、以前に読んだ集約ルート（`shared.concurrency` の `Versioned`、`long lockNo()`）を受け取り、その `lockNo()` を期待する版にする。
+  呼び出し側が版の数値を渡す入口はないため、テーブルから読み直した版を期待する版に渡す誤りは書けない。
+  ルートは `SET 業務の列, updated_*, lock_no = 期待値 + 1` と `WHERE 一意の列 AND lock_no = 期待値` の UPDATE で書き、`RETURNING 内部の主キー` で受ける。
+  件数が 1 なら成功、0 なら一意の列で行の有無を確かめて `ConflictException`（種類は `VERSION`）か `NotFoundException` に分け、2 以上なら `IllegalStateException` にする。
+  期待する版が 1 未満なら、SQL を実行する前に `IllegalArgumentException` にする。
+  業務の列が一つもなくても、版と `updated_*` を進める。
+- `update` は、ルートの行ロックを取った後に、子を差分で書く。
+  保存済みの子の自然キーを読み、保存後にない子の削除、残る子の更新（その行の `lock_no` を 1 進める）、新しい子の追加の順に実行する。
+  `ChildRows` に宣言した子すべてを渡さないと、`IllegalArgumentException` にする。
+  渡さないことを「変更なし」と読むと、消えるべき子が残るためである。
+  自然キーが `null` か重複する、行ごとに書く列が違う、宣言していない子を渡すといった不備も、SQL を実行する前に `IllegalArgumentException` にする。
+  残る子の更新が 1 行でなければ `IllegalStateException` にする。ルートの行ロックの下で読んだ自然キーに対する更新なので、0 件や 2 件以上は起こらない状態である。
 - 業務の列の値は `ColumnValues<R>` で受け取る。
   `ColumnValues<R>` は `TableField<R, T>` を受け取る二つの `set` だけを持ち、`where` と `execute` を持たない。
-  [PostgreSQL の共通カラム](../database/postgresql-common-columns.md)の 12 列を名前で照らし、渡すと `IllegalArgumentException` にする。
+  [PostgreSQL の共通カラム](../database/postgresql-common-columns.md)の 12 列と、宣言から `TableWriter` が書く列（ルートの一意の列、内部の主キー、子の親の外部キー）を渡すと、`IllegalArgumentException` にする。
+  子の自然キーの列は、行の同定に使うため渡す。
   規約にない `updated_reason` のような業務の列は拒否しない。
-- `updateCheckingVersion` は `SET lock_no = 期待値 + 1` と `WHERE 主キー AND lock_no = 期待値` を書く。
-  件数が 1 なら成功、0 なら主キーで行の有無を確かめて競合か `NotFoundException` に分け、2 以上なら `IllegalStateException` にする。
-  `55P03` の `CannotAcquireLockException` は、原因を付けずに `Kind.LOCK` の `ConflictException` に変える（ADR-062）。
+- 例外は、Spring の例外の型ではなく SQLSTATE で `ConflictException` に変える。
+  `55P03`（行ロックを `lock_timeout` までに取れない）は `Kind.LOCK` に、`23505`（一意制約の違反）は `Kind.UNIQUE` に、原因を付けずに変える（ADR-062）。
+  ルート、子の UPDATE、DELETE、INSERT のすべての文に同じ変換を使う。
+  Spring は PostgreSQL の `21000`（サブクエリが 2 行以上を返した）も重複キーの例外にまとめるため、型で変換すると、コードの誤りが 409 になる。
+  それ以外の SQLSTATE は変換せずに投げる。
   競合の例外は `shared.concurrency` の `ConflictException` で、`TableWriter` が自分で投げる。
-  競合の例外を作る関数は引数に取らない。
-  期待する版が 1 未満なら、SQL を実行する前に `IllegalArgumentException` にする。
-- `updateWhere` と子の更新は `SET lock_no = lock_no + 1` を書き、版を比べない更新でも版を進める。
-  `updateWhere` と `deleteWhere` は件数を返し、Error Prone の `@CheckReturnValue` を付けて、戻り値の無視をコンパイルの失敗にする。
-  その件数を返す Repository のメソッドにも、インタフェースで `@CheckReturnValue` を付ける。
-  `updateWhere` は、業務の列が一つもなければ `IllegalArgumentException` にする。
-- `LockedRoot.updateChild`、`LockedRoot.deleteChildren`、`DeletedRoot.deleteChildren` も、`55P03` の `CannotAcquireLockException` を、原因を付けずに `Kind.LOCK` の `ConflictException`（409）に変える（ADR-062）。
-  ルートの書き込みの後に子の行のロック待ちで失敗しても、ルートと同じ競合として返すためである。
-- `updateChild` の更新件数が 0 なら、要求された子の変更を今の永続化の状態へ適用できないため、`shared.failure` の `BusinessRuleViolationException` で 422 にする。
-  `ApiExceptionHandler` が 422 の Problem Details にする（[ADR-062](ADR-062-map-business-exceptions-to-404-409-422.md)）。
-  `ApiExceptionHandler` が上書きした `createResponseEntity` から呼ぶ `ApiProblemDetails.normalize` が `about:blank` の detail を消すため、件数、テーブル名、キーは応答に出ない。
-  2 件以上は主キーの条件の誤りなので、`IllegalStateException`（500）のままにする。
+- 書き込みは、開いていて読み取り専用ではないトランザクションの中でだけ行う。そうでなければ、SQL を実行する前に `IllegalStateException` にする。
+  ルートの行ロックが子の書き込みを守るのは、同じトランザクションの中だけだからである。
+- 版を比べない UPDATE と DELETE の入口と、集約ルートの物理削除の入口は、今は持たない。
+  本番の呼び出しがなく、`Condition` を受け取る入口は、版の比べ忘れと子の絞り込み忘れの抜け道になるためである。
+  在庫の引き当てのように版を比べない更新が必要になったとき、この ADR を更新して、集約と一意の列で行を指し、件数の意味を結果の型で返す入口を足す。
 - `CommonColumns.forUpdate` は `updated_*` だけを返し、package-private にする。
   UPDATE の `lock_no` を書くのは `TableWriter` だけになる。
+  `CommonColumns.forInsert` は、テストのデータ作成のために public のままにするが、本番の Repository は `insertInto` を呼べないため使えない（H1）。
 - ArchUnit の `TableWriterArchTest` で次を検査する。
-  - `TableWriter`、`LockedRoot`、`DeletedRoot` の外の本番のコードは、jOOQ の UPDATE、DELETE、UPSERT、MERGE の入口、`Update` と `Delete` に代入できる型の実行、`org.jooq` の型の、名前が `$` で始まるメソッド（問い合わせのモデルの API）、`UpdatableRecord` と `DAO` の書き込み、Spring JDBC と JDBC の直接の利用を呼ばない。
+  - `TableWriter` と、その子の行の書き込み（`ChildWriter`）の外の本番のコードは、jOOQ の INSERT、UPDATE、DELETE、UPSERT、MERGE の入口、`Update` と `Delete` に代入できる型の実行、`org.jooq` の型の、名前が `$` で始まるメソッド（問い合わせのモデルの API）、`UpdatableRecord` と `DAO` の書き込み、Spring JDBC と JDBC の直接の利用を呼ばない。
     判定は、呼び出し先の型が禁じる型に代入できるかで行う。
     `DataSource`、`Connection`、`ConnectionProvider` を引数に取るメソッドとコンストラクタも呼ばない。
     接続の元を受け取るライブラリ（Spring Boot の `DataSourceScriptDatabaseInitializer` など）は、パッケージを選ばずに任意の SQL を流せるため、パッケージの一覧ではなく引数の型で禁じる。
     検査の対象から外す生成コードは、jOOQ の生成先である基底パッケージ直下の `jooq` パッケージだけとし、名前に `jooq` を含む手書きのパッケージは外さない。
     除外はクラスの場所で判定し、そのパッケージに置いた手書きのクラスもすべての検査を外れるため、そのパッケージには jOOQ のコード生成の出力だけを置く。
     `ProductionCodeOnlyTest` は、そのパッケージの本番のクラスのソースファイルがすべて `src/generated/jooq` にあることを確かめる。
-    `Update` と `Delete` を作る入口（`DSLContext`、`DSL`、`WithStep` の `update`、`delete`、`deleteFrom`、`updateQuery`、`deleteQuery`）をすべて禁じるため、`batch` のように作った問い合わせを受け取って実行する API は禁じなくてよい。
-  - `Jooq<Aggregate>Repository` の、集約ルートを受け取る `add` 以外の public メソッドは、版を比べる入口と、引数の集約ルートの `lockNo()` を直接呼ぶ。
+    `Insert`、`Update`、`Delete` を作る入口（`DSLContext`、`DSL`、`WithStep` の `insertInto`、`insertQuery`、`batchInsert`、`update`、`delete`、`deleteFrom`、`updateQuery`、`deleteQuery`）をすべて禁じるため、`batch` のように作った問い合わせを受け取って実行する API は禁じなくてよい。
+  - `Jooq<Aggregate>Repository` の、集約ルートを受け取る `add` 以外の public メソッドは、`TableWriter.update` を直接呼ぶ。
     名前で対象を選ばないため、`save` のような名前でも検査を外れない。
-    `lockNo()` の呼び出しを求めるのは、テーブルから読み直した版を期待する版に渡すと競合を検出しないためである。
+    版は `Versioned` の集約ルートから `TableWriter` が読むため、`lockNo()` の呼び出しは求めない。
   - `domain.model` の `<Aggregate>Repository` の `add`、`update`、`delete` は、引数のない `long lockNo()` を宣言する集約ルートを一つだけ受け取る。
     集約ルートが `lockNo()` を持たないと、版を比べる規則が集約ルートを見つけられず、空のまま通るためである。
     必須の `add` を含めるため、`save` のような名前で保存する Repository でも、形を外れた集約は `add` で検出される。
-  - 集約ルートを引数に取るメソッドは、版を比べない入口を呼ばない。
-  - `aggregateRootInsertsGoThroughTableWriter`：`Jooq<Aggregate>Repository` の `add` とその中のラムダは、`Insert` に代入できる型の実行（`execute`、`executeAsync`、`returning`、`returningResult`、名前が `fetch` で始まるメソッド）を呼ばない。
-    子の行の INSERT は `update` で直接実行するため、対象を `add` に限る。
   - R1 と R2 は、`domain.model` の Repository の `add` 以外の書き込み（`update`、`delete`、集約ルートを受け取るメソッド）を同じ判定で見つける。
     `Jooq<Aggregate>Repository` の検査と同じく集約ルートの引数で選ぶため、`save` のような別名でも規則を外れない。
   - `commandsBuiltByPresentationForWritesAreVersioned`（R1）：presentation が作った Command を受け取り、Repository の `add` 以外の書き込みを呼ぶ CommandHandler の Command は、`VersionedCommand` を実装する。
@@ -110,7 +122,7 @@ PostgreSQL の READ COMMITTED では、後の UPDATE は先の UPDATE のコミ�
   既存の集約を変える Command は `VersionedCommand`（`ExpectedLockNo expectedLockNo()`）を実装する。
   HTTP の Request と OpenAPI は数値の `@Min(1) long lockNo` のままにし、Request の `toCommand` で `ExpectedLockNo` に変換する。
   `ExpectedLockNo` は `shared.infrastructure.persistence` に置かない。
-  `TableWriter` の `updateCheckingVersion` と `deleteCheckingVersion` は、Repository が集約の `lockNo()` を渡すため `long` のままにする。
+  `TableWriter.update` は `ExpectedLockNo` を受け取らず、集約ルートの `Versioned.lockNo()` から版を読む。画面の版は CommandHandler の `ensureLockNo` で比べる。
 - CommandHandler は `order.ensureLockNo(command.expectedLockNo())` を残す。
   画面の版が古いとき、業務の検査や外部の呼び出しより先に競合として失敗させるためである。
   集約の `ensureLockNo(ExpectedLockNo)` は、違えば `ConflictException` を投げる。
@@ -134,11 +146,13 @@ PostgreSQL の READ COMMITTED では、後の UPDATE は先の UPDATE のコミ�
 ### Positive
 
 - Repository が書くのは業務の列の値だけになり、版の条件、版の設定、件数の判定、`55P03` の変換を書く場所がなくなる。
-- 入口の選び分けは、期待する版を持っているかだけで決まる。
-- jOOQ、Spring JDBC、JDBC の書き込みの API と、接続の元を受け取るライブラリを `TableWriter` の外で使うと、テスト（ArchUnit）で失敗する。
+- 書き込みの入口は `insert` と `update` の二つで、Repository が調整する手順は 1 回の呼び出しになる。
+  内部の主キーの読み直し、保存済みの子の読み取り、子の削除と更新と追加の振り分けは、Repository から消える。
+- 親の外部キーの条件は `TableWriter` が付けるため、子の書き込みに親の条件を書き忘れて、他の集約の行を書く誤りは書けない。
+- 期待する版は `Versioned` の集約ルートから読むため、テーブルから読み直した版を渡す誤りは書けない。
+- jOOQ の INSERT と UPDATE を含む書き込みの API、Spring JDBC、JDBC と、接続の元を受け取るライブラリを `TableWriter` の外で使うと、テスト（ArchUnit）で失敗する。
   禁止の一覧は、テストで固定した jOOQ の版の API で見直してある。
-  別のテーブルの列、型の違う値、版を比べない入口の件数の無視は、コンパイルで失敗する。
-- 版を比べない更新も版を進めるため、在庫の引き当てのような Java の更新が先に走れば、その前に読んだ画面の保存は上書きせずに競合として返る。
+  別のテーブルの列、型の違う値、別の集約の子の宣言は、コンパイルで失敗する。
 - 競合と行なしの判定は `TableWriter` の実 PostgreSQL のテストに集まり、Repository のテストは列と集約の往復と削除の範囲だけを確かめる。
 - 更新と削除の Command に `VersionedCommand` の実装忘れ、`ensureLockNo` の呼び忘れ、`ExpectedLockNo` の偽造があると、ArchUnit で失敗する。
 - 競合の例外が一つになり、集約ごとに例外を作らなくてよい。
@@ -153,35 +167,27 @@ PostgreSQL の READ COMMITTED では、後の UPDATE は先の UPDATE のコミ�
     これは規約が受け入れているリスクとする。
   - **jOOQ の新しい書き込みの API**：jOOQ の版を上げると、ArchUnit の禁止の一覧にない書き込みの API が増えうる。
     実行時の版を固定したテストが失敗するため、「jOOQの版を上げるとき」の手順で一覧を見直す。
-  - **`add` の外の集約ルートの INSERT**：`aggregateRootInsertsGoThroughTableWriter` は `Jooq<Aggregate>Repository` の `add` とその中のラムダだけを見る。
-    `add` から呼ぶ private メソッドの中の実行、`add` 以外の名前のメソッドと `Jooq<Aggregate>Repository` 以外のクラスからの集約ルートの INSERT、`dsl.batch` に渡した集約ルートの INSERT は検出しない。
-    INSERT の先のテーブルはバイトコードから区別できないため、`update` の子の行の INSERT と集約ルートの INSERT も区別しない。
-  - **ルートを通さない子の書き込み**：`updateWhere` と `deleteWhere` に子のテーブルを渡すことと、ルートを書かずに子を INSERT することは止められない。
-    集約ルートを引数に取るメソッドからの `updateWhere` は止まるため、残るのは識別子だけを受け取るメソッドである。
-  - **`long lockNo` を引数に取るメソッド**：期待する版を `long` の引数で受け取るメソッドが `updateWhere` を使う誤りは検出できない。
-    ArchUnit は引数の名前を確実には読めず、`long` の引数を一律に禁じると正当な数量の引数も止まる。
-    そこで規約は、期待する版を持つ書き込みを、集約ルートを受け取る `update` と `delete` に限る。
-  - **別の集約ルートのテーブルへの子の書き込み**：`LockedRoot.updateChild` と `deleteChildren` は任意のテーブルを受け取る。
-    別の集約ルートのテーブルを渡すと、その行を版を比べずに書く。
-    子のテーブルとルートのテーブルはコードから区別できないため、レビューで見る。
+  - **子の宣言の外部キーの列の誤り**：`ChildTable.of` は、親の外部キーの列の型が `Long` であることしか確かめない。
+    生成された jOOQ のコードには FOREIGN KEY の情報がなく（制約を張らない設計）、別の集約の列を渡してもコンパイルは通る。
+    各集約の `AggregateTable` を通した保存、更新の往復のテストで確かめる。
   - **集約ルートの形を外れた集約**：規則は、`domain.model` にあり引数のない `long lockNo()` を宣言する型を集約ルートとみなす。
     Repository の `add`、`update`、`delete` の引数はこの形を検査する。
     `add` を持たずに `save` のような名前だけで保存する Repository と、Repository のインタフェースを経由せずに保存する集約は、形を外れても規則が空のまま通る。
-  - **件数を返す Repository のメソッドの注釈**：`@CheckReturnValue` の付け忘れは検出せず、呼び出し側で件数を捨てても通る。
   - **psql による古い版での物理削除**：psql で古い版の行を削除しても、何も検出しない。
     これも規約が受け入れているリスクとする。
     手順書で `WHERE lock_no = ?` を求めることは、将来の緩和策の候補にとどめる。
   - **別の集約のインスタンスへの `ensureLockNo`**：R4 は `handle` の中で `ensureLockNo(ExpectedLockNo)` を直接呼んだかしか見ない。
     保存する集約と別のインスタンスに呼んでも通る。
-  - **実行されないラムダの中の呼び出し**：ArchUnit はラムダの本体の呼び出しを外側のメソッドの呼び出しとして数えるため、`Optional.ifPresent(o -> o.ensureLockNo(...))` のように実行されないことがあるラムダの中の呼び出しでも、R4 と、版を比べる入口を求める規則（H3）を満たす。
-  - **集約ルートを引数に取るラムダ**：`aggregateMethodsDoNotUseUnversionedWrites`（H5）は外側のメソッドの引数だけを見る。集約ルートを受け取らないメソッドの中で、集約ルートを引数に取るラムダが `updateWhere` を呼んでも検出しない。
+  - **実行されないラムダの中の呼び出し**：ArchUnit はラムダの本体の呼び出しを外側のメソッドの呼び出しとして数えるため、`Optional.ifPresent(o -> o.ensureLockNo(...))` のように実行されないことがあるラムダの中の呼び出しでも、R4 と、`TableWriter.update` の呼び出しを求める規則（H3）を満たす。
   - **`ensureLockNo` の位置と引数**：業務の検査や外部の呼び出しの後に呼ぶ書き方と、`command.expectedLockNo()` 以外の値を渡す書き方は検出しない。
     `ExpectedLockNo` を作れるのは Request だけなので、渡せる値は別の Command か別の Request の値に限られる。
   - **R1 が見ない Command の作り方**：R1 が画面から作られた Command とみなすのは、コンストラクタの呼び出しと、Command 自身が宣言する static factory の呼び出しだけである。
     `XxxCommand.builder()...build()` のような builder と、Request が呼ぶ `application` の static な helper や mapper で作る Command は検出しないため、レビューで見る。
-  - **期待する版に渡す値**：ArchUnit は Repository が集約ルートの `lockNo()` を呼んだかしか見ず、その値を `updateCheckingVersion` と `deleteCheckingVersion` に渡したかは見ない。
-    `lockNo()` を呼んだうえでテーブルから読み直した版を渡すと、競合を検出しない。
 - `VersionedCommand` と `ExpectedLockNo` が `shared.concurrency` の公開型になり、Modulith の公開型の数と、アーキテクチャ指標の全体の相対可視性（7/12 から 17/26）が上がる。
+- 子の行は、保存後にあるべき全行を渡す置き換えとして書く。
+  子の一部だけを渡すと、残りを削除する。宣言した子を渡さない呼び出しは `IllegalArgumentException` にするが、遅延して読んだ子の一部を渡す誤りは検出できない。
+  変わっていない子の行も UPDATE して版と `updated_*` を進める。
+- 子の行の更新は、差分のために自然キーを毎回読み、1 行ずつ UPDATE する。
 - 同じトランザクションで同じ集約を二度保存すると、二度目は期待する版が古く競合になる。
   CommandHandler は集約を一度だけ保存する規約のままにする。
 - `ColumnValues` の値に別のテーブルの列の式を渡すことは、型で止まらない。
@@ -194,8 +200,8 @@ PostgreSQL の READ COMMITTED では、後の UPDATE は先の UPDATE のコミ�
 ### Neutral
 
 - 子の行は 1 行ずつ更新する。
-  子の行が多い集約が出たら、`LockedRoot` の中で batch にする。
-- `shared` が公開する書き込みの型は、`TableWriter`、`ColumnValues`、`LockedRoot`、`DeletedRoot` の四つになる。
+  子の行が多い集約が出たら、`ChildWriter` の中で batch にする。
+- `shared` が公開する書き込みの型は、`TableWriter`、`ColumnValues`、`AggregateTable`、`ChildTable`、`ChildRows` の五つで、集約ルートの印の `Versioned` は `shared.concurrency` に置く。
 - `error` は `shared.concurrency` に内側向きに依存する。
   `shared` は `error` と Domain の型に依存しない。
   `error` から `shared` への依存が増えるため、`shared` はルートパッケージの型に依存しない（[ADR-048](ADR-048-add-shared-module-for-jooq-common-code.md)）。
@@ -280,6 +286,23 @@ PostgreSQL の READ COMMITTED では、後の UPDATE は先の UPDATE のコミ�
 - **Cons**：名前で判定するため、名前を変えた Command と `ensureLockNo` に読んだ版を渡す書き方が通る。
   `ExpectedLockNo` の型なら、生成を Request に限る規則（R3）で、読んだ版を渡す偽造を止められる。
 
+### 選択肢12: ルートの更新と子の書き込みを手順として呼ぶ入口
+
+- **Description**：この ADR の前の版で、`updateCheckingVersion` がルートを更新して `LockedRoot` を返し、Repository が `updateChild`、`deleteChildren` と自分の INSERT で子を書く。
+  期待する版は `long` の引数で渡し、版を比べない書き込みは `updateWhere` と `deleteWhere` で行う。
+- **Pros**：子の書き込みの順序と範囲を Repository が自由に決められる。
+- **Cons**：Repository が手順を 5 つ並べ、子の条件に親の外部キーを自分で書く。書き忘れると他の集約の行を書き、ArchUnit では検出できない。
+  INSERT が別の入口（`Insert` を受け取る）で、件数を捨てる、ignore-on-conflict の形を使える。
+  版の引数に、テーブルから読み直した版を渡せる。
+  呼び出しのない `updateWhere` と `deleteWhere` が、版を比べずに書ける抜け道として残り、それを守る規則（H5）、`@CheckReturnValue` の検査、INSERT の規則（H7）が要った。
+
+### 選択肢13: 集約全体を写像する汎用の保存
+
+- **Description**：集約の値から列への変換を、宣言に登録する（`Function<Aggregate, Row>` やリフレクション）。
+- **Pros**：Repository が `save(aggregate)` の一行になる。
+- **Cons**：宣言が小さな ORM になり、並び順、論理削除、入れ子の子と、宣言が増え続ける。
+  値の変換は呼び出しごとのラムダに置き、宣言は構造だけにする。
+
 ## References
 
 - [ADR-040: Future のアーキテクチャ設計ガイドラインを書き直して docs に取り込む](ADR-040-import-future-architecture-guidelines.md)
@@ -297,4 +320,3 @@ PostgreSQL の READ COMMITTED では、後の UPDATE は先の UPDATE のコミ�
 - [PostgreSQL 18, Read Committed Isolation Level](https://www.postgresql.org/docs/18/transaction-iso.html#XACT-READ-COMMITTED)
 - [PostgreSQL 18, Explicit Locking](https://www.postgresql.org/docs/18/explicit-locking.html)
 - [jOOQ, Optimistic locking](https://www.jooq.org/doc/latest/manual/sql-execution/crud-with-updatablerecords/optimistic-locking/)
-- [Error Prone, CheckReturnValue](https://errorprone.info/bugpattern/CheckReturnValue)

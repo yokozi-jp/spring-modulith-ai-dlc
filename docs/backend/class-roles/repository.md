@@ -130,7 +130,7 @@ public interface OrderRepository {
 // com.example.demo.ordering.infrastructure.persistence.JooqOrderRepository（宣言だけ）
 @Repository
 class JooqOrderRepository implements OrderRepository {
-  // DSLContext と shared の CommonColumns、TableWriter を受け取り、jOOQ の列と Order の変換もこのクラスに書く。
+  // DSLContext と shared の TableWriter を受け取り、jOOQ の列と Order の変換もこのクラスに書く。
 }
 ```
 
@@ -158,7 +158,7 @@ class JooqOrderRepositoryTest {
   void savesAndFindsOrder() {
     final CommonColumns commonColumns = TestCommonColumns.at(Instant.parse("2026-10-03T00:00:00Z"));
     final OrderRepository repository =
-        new JooqOrderRepository(dsl, commonColumns, new TableWriter(dsl, commonColumns));
+        new JooqOrderRepository(dsl, new TableWriter(dsl, commonColumns));
     final Order order =
         Order.place(
             repository.nextId(),

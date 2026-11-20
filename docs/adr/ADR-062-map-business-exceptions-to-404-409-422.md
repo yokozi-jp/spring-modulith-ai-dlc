@@ -69,11 +69,12 @@ ADR は Proposed のままであるため、新しい ADR を起こさず、こ�
 - `IllegalStateException`、`IllegalArgumentException`、`NoSuchElementException` などの JDK の例外は、4xx に対応づけず 500 のままにする。
   これらはプログラムの誤りにも使われ、まとめて 4xx にすると誤りが 4xx に化けて隠れるためである。
 - `TableWriter` は、主キーの行がないときに `NotFoundException` を投げる。
-  `LockedRoot.updateChild` の 0 件は `BusinessRuleViolationException` にし、`shared.infrastructure.persistence` から Spring Web への依存をなくす。
-- `23505` は、`TableWriter` の既存の変換の入口 `executeOrConflict` で、原因を付けずに `Kind.UNIQUE` の `ConflictException` に変える。
+  子の行の更新が 1 行でないことは、ルートの行ロックの下で読んだ自然キーに対する更新で起こらない状態のため、`IllegalStateException` にする（ADR-054）。
+  `shared.infrastructure.persistence` は Spring Web に依存しない。
+- `23505` は、`TableWriter` の変換の入口で、原因を付けずに `Kind.UNIQUE` の `ConflictException` に変える。
   集約ルートの INSERT の入口 `TableWriter.insert` を足し、同じ変換を通す。
   `DataIntegrityViolationException` の他の違反（外部キー、NOT NULL、CHECK、排他制約）は、入力の検証か実装の誤りであるため 500 のままにする。
-- Repository の実装は、`updateWhere`、`deleteWhere`、`NOWAIT` が投げる Spring の例外（`CannotAcquireLockException`、`DuplicateKeyException`）を Repository の外へ出さない。
+- Repository の実装は、`NOWAIT` が投げる Spring の例外（`CannotAcquireLockException`、`DuplicateKeyException`）を Repository の外へ出さない。
   外へ出すときは、原因を付けずに、種類（`Kind.LOCK` か `Kind.UNIQUE`）を付けた `ConflictException` に変えて投げる。
 - ArchUnit に 2 つの規則を足す。
   `noSuchElementExceptionIsNotThrown` は、`NoSuchElementException` の生成と引数なしの `Optional.orElseThrow()` を禁じる。
@@ -138,7 +139,7 @@ ADR は Proposed のままであるため、新しい ADR を起こさず、こ�
 
 - **Description**：3 つの型を `shared.failure` にそろえる。
 - **Pros**：3 つの型が 1 か所にそろう。
-- **Cons**：`ConflictException` は `TableWriter`、`LockedRoot`、`DeletedRoot`、`ApiExceptionHandler`、テスト、フィクスチャ、十数の文書が参照している。
+- **Cons**：`ConflictException` は `TableWriter`、`ApiExceptionHandler`、テスト、フィクスチャ、十数の文書が参照している。
   移しても振る舞いは変わらず、差分だけが増える。
 
 ### 選択肢4: JDK の例外を 404 と 422 に対応づける

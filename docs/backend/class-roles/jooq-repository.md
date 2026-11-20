@@ -9,26 +9,25 @@ tags: [convention, backend, class-role]
 
 `Jooq<Aggregate>Repository` は、`domain.model` の `<Aggregate>Repository` を jOOQ で実装するクラスであり、`infrastructure.persistence` に package-private で置いて `@Repository` を付ける。
 jOOQ と集約の変換もこのクラスに書き、読み取りは `convertFrom`、`multiset`、`Records.mapping` で列の数と型をコンパイルで検査しながら集約にする。
-書き込みは `add`、`update`、`delete` に分け、UPDATE と DELETE は `shared` の `TableWriter` で書く。
-INSERT の共通カラムは `shared` の `CommonColumns.forInsert` で書く。
-集約ルートの INSERT は `TableWriter.insert` で実行し、`23505` と `55P03` を `ConflictException` に変える。
-子の行の INSERT は `TableWriter` を通さずに実行する（`add` では `dsl.batch`）。
-`update` と `delete` は `TableWriter` の版を比べる入口を呼び、Repository は業務の列の値だけを渡す。
+書き込みは `add` と `update` に分け、INSERT と UPDATE は `shared` の `TableWriter` で書く。
+集約の形を `AggregateTable` と `ChildTable` で一度だけ宣言し、保存のたびにルートの列の値と子の全行を渡す。
+共通カラム、内部の主キーの受け取り、版の比較、子の差分、`23505` と `55P03` の `ConflictException` への変換は `TableWriter` が持ち、Repository は業務の列の値だけを渡す。
 役割の決定理由は [ADR-050](../../adr/ADR-050-define-backend-class-roles-and-naming.md) に示す。
 
 ## 定義
 
 Domain の [Repository](repository.md) のインタフェースには、DB の技術による実装が要る。
 **jOOQ の Repository**（`Jooq<Aggregate>Repository`）は、集約の保存と取り出しを、jOOQ の SQL で実装するクラスである。
-新しい集約の `add`、既存の集約の `update` と `delete`、取り出しの SQL で、集約ルートと子の [Entity](entity.md) を一緒に読み書きする。
+新しい集約の `add`、既存の集約の `update`、取り出しの SQL で、集約ルートと子の [Entity](entity.md) を一緒に読み書きする。
 
 テーブルの行の形と集約の形は一致しないため、jOOQ の Repository はその変換も持つ。
 読み取りでは、`select` に並べた列を `Field.convertFrom` で[値オブジェクト](value-object.md)に変え、`Records.mapping` で集約の static メソッドと Entity のコンストラクタに渡す。
 列の数や型が引数と合わないと、コンパイルが失敗する。
 変換のための別のクラスは作らない。
 
-`update` と `delete` は、[PostgreSQL の排他制御](../../database/postgresql-concurrency-control.md)の楽観的ロックに従う。
-集約の `lockNo()` を期待する版として `TableWriter.updateCheckingVersion` と `deleteCheckingVersion` に渡し、版の条件、版の設定、件数の判定は `TableWriter` に任せる。
+`update` は、[PostgreSQL の排他制御](../../database/postgresql-concurrency-control.md)の楽観的ロックに従う。
+集約ルート（`shared.concurrency` の `Versioned`）を `TableWriter.update` に渡し、版の条件、版の設定、件数の判定は `TableWriter` に任せる。
+`TableWriter` が集約ルートの `lockNo()` を期待する版にするため、Repository は版の数値を取り出さない。
 集約の `lockNo()` は、CommandHandler が画面から受け取った値と比べ済みである（[CommandHandler](command-handler.md)）。
 CommandHandler は画面の値と読んだ値を比べ、UPDATE の条件は読んだ値と更新の時点の行の値を比べる。
 この二つの比較で、更新の時点の行の `lock_no` と画面から受け取った値が一致することを確かめる。
@@ -52,15 +51,15 @@ jOOQ の Repository は業務規則を持たない。
 `PLACED_AT` の生成型は、[日時とタイムゾーンの規約](../../datetime/timezone-conventions.md)のとおり `Instant` である。
 生成型の扱いは[jOOQコード生成物の管理](../../database/jooq-codegen.md)に従う。
 
-`CommonColumns` は `shared.infrastructure.persistence` の共通処理であり（[ADR-048](../../adr/ADR-048-add-shared-module-for-jooq-common-code.md)）、`forInsert(テーブル)` は `LOCK_NO = 1` を含む共通カラムの列と値の `Map` を返す。
+`CommonColumns` は `shared.infrastructure.persistence` の共通処理であり（[ADR-048](../../adr/ADR-048-add-shared-module-for-jooq-common-code.md)）、共通カラムの値を作って `TableWriter` に渡す。Repository は使わない。
 `*_PGM_CD` の値の求め方は [PostgreSQL の共通カラム](../../database/postgresql-common-columns.md)に従う。
-`TableWriter` も `shared.infrastructure.persistence` の共通処理であり、業務テーブルの UPDATE と DELETE を組み立てて実行する唯一の入口で、集約ルートの INSERT の入口である（[ADR-054](../../adr/ADR-054-detect-optimistic-lock-conflicts-by-update-count.md)）。
-業務の列の値は `ColumnValues` のラムダで渡し、UPDATE の共通カラムと `LOCK_NO` は `TableWriter` が書く。
+`TableWriter` も `shared.infrastructure.persistence` の共通処理であり、業務テーブルの INSERT と UPDATE を組み立てて実行する唯一の入口である（[ADR-054](../../adr/ADR-054-detect-optimistic-lock-conflicts-by-update-count.md)）。
 
 ## 必須の記述
 
 - `@Repository` を付けた package-private の `class` にし、`final` を付けず、`<Aggregate>Repository` を実装する。
-- `DSLContext` と `shared` の `CommonColumns`、`TableWriter` を package-private のコンストラクタで受け取り、`private final` のフィールドに持つ。
+- `DSLContext` と `shared` の `TableWriter` を package-private のコンストラクタで受け取り、`private final` のフィールドに持つ。
+  `CommonColumns` は受け取らない。共通カラムは `TableWriter` が書く。
 - メソッドは、Repository のインタフェースのメソッドを `@Override` で実装し、共通の処理だけを private メソッドにする。
 - SQL は生成されたテーブルと列で組み立て、Plain SQL と `withRenderSchema(false)` を使わない（[jOOQのSQLの書き方](../../database/jooq-usage.md)）。
 - 集約を読む SQL の列の選択と変換は、private メソッド `select<Aggregate>s()` 一つに置く。
@@ -72,41 +71,37 @@ jOOQ の Repository は業務規則を持たない。
 - `select` に並べる列の順は、`Order.restore` と Entity のコンストラクタの引数の順に合わせる。
   集約ルートの `LOCK_NO` も選び、`restore` の `lockNo` に渡す。
 - 集約は `fetchOptional(Records.mapping(Order::restore))` か `fetch(Records.mapping(Order::restore))` で作り、`Order.place` を使わない。
-- `add` は、`insertInto(T_ORDER)` の `set(列, 値)` で業務の全列を書き、`LOCK_NO` を含む共通カラムを `set(commonColumns.forInsert(T_ORDER))` で書く。
-  集約ルートの INSERT は `tableWriter.insert(...)` で実行し、一意制約の違反（`23505`）を `Kind.UNIQUE` の、`lock_timeout` までに行のロックを取れないこと（`55P03`）を `Kind.LOCK` の `ConflictException` に変える。
+- 集約の形は、クラスの定数として一度だけ宣言する。
+  `AggregateTable.of(T_ORDER, T_ORDER.PUBLIC_ID, T_ORDER.ORDER_ID, LINES)` は、ルートのテーブル、ルートを一つに決める一意の列、内部の主キー、子を渡す。
+  `ChildTable.of(T_ORDER_LINE, T_ORDER_LINE.ORDER_ID, T_ORDER_LINE.LINE_NO)` は、子のテーブル、親の内部の主キーを持つ外部キーの列、親の中で行を同定する自然キーの列を渡す。
+  外部キーの列は、親の内部の主キーと同じ型（`Long`）であることしかコンパイルで確かめられない。正しい列を渡したことは、`@DatabaseTest` の往復で確かめる。
+- `add` は、`tableWriter.insert(ORDER, 公開 ID, ルートの列の値, 子の全行)` を呼ぶ。
+  ルートの列の値は、ラムダで `ColumnValues` に `set(列, 値)` で渡す。一意の列、内部の主キー、共通カラムは書かない（渡すと `IllegalArgumentException` になる）。
+  子の全行は、ラムダで `rows.put(LINES, order.lines(), (line, set) -> ...)` として渡す。子の自然キーの列も `set` で書く。
+  子を宣言していない集約は、子の行を渡さない `insert` を使う。
+  内部の主キーは `TableWriter` が `RETURNING` で受けて子の外部キーに書くため、読み直さない。
+  一意制約の違反（`23505`）は `Kind.UNIQUE` の、`lock_timeout` までに行のロックを取れないこと（`55P03`）は `Kind.LOCK` の `ConflictException` に、`TableWriter` が変える。
   値オブジェクトと enum は、アクセサ（`value()`、`amount()`、`name()`）で列の値に直す。
-- `update` は、`tableWriter.updateCheckingVersion(T_ORDER, 主キーの条件, order.lockNo(), 業務の列)` で集約ルートの行を先に更新する。
-  業務の列は、ラムダで `ColumnValues` に `set(列, 値)` で渡し、主キー以外の業務の列をすべて書く。
+- `update` は、`tableWriter.update(ORDER, 公開 ID, order, ルートの列の値, 子の全行)` を呼ぶ。
+  `order` は `Versioned` を実装する集約ルートで、`TableWriter` がその `lockNo()` を期待する版にする。
+  ルートの列の値と子の全行は、`add` と同じラムダと変換を共有する。
   集約ルートの業務の列が変わらなくても、集約ルートの行を更新して版を進める。
   0 件のとき、行がなければ `shared.failure` の `NotFoundException` が、行があれば `shared.concurrency` の `ConflictException` が投げられる。
-  `lock_timeout` までに行のロックを取れないときも、`TableWriter` が `ConflictException` に変える。
   Repository は例外を作らず、関数も渡さない。
-- 子の行は、戻り値の `LockedRoot` の `updateChild` と `deleteChildren` で、集約ルートの後に書く。
-  子の行は主キーの順に更新する（[PostgreSQL の排他制御](../../database/postgresql-concurrency-control.md)）。
-  集約が持つ子の Entity のリストは `multiset` の `orderBy` の順に並ぶため、その順に `updateChild` を呼ぶ。
-  注文の明細は受付の後に増えも減りもしないため、`update` は明細の行を `updateChild` だけで書く。
-- 子の集合が増減する集約の `update` は、全置換ではなく差分で書く。
-  1. 集約ルートを `updateCheckingVersion` で更新する。
-  2. 保存済みの子のキーを `select` で読む。
-  3. 集約にない子を `root.deleteChildren(子のテーブル, 親の条件.and(キー.notIn(集約の子のキー)))` で削除する。
-     集約の子が空なら、すべての子を削除する。
-  4. 保存済みにない子を `insertInto(子のテーブル).set(commonColumns.forInsert(子のテーブル))` で追加する。
-  5. 両方にある子を `root.updateChild` で更新する。
-- `delete` は、`tableWriter.deleteCheckingVersion(T_ORDER, 主キーの条件, order.lockNo())` で集約ルートの行を削除し、子の行は戻り値の `DeletedRoot.deleteChildren` で削除する。
-- `update` と `delete` は、`TableWriter` の版を比べる入口と、引数の集約ルートの `lockNo()` を、そのメソッドの中で直接呼ぶ。
+- 子の行は、`TableWriter.update` が、ルートの行ロックを取った後に差分で書く。
+  保存済みの子の自然キーを読み、保存後にない子を削除し、残る子を更新し、新しい子を追加する。
+  Repository は子の読み取り、削除、更新、追加の振り分けを書かない。
+  渡した子の全行が保存後の姿になるため、子の一部だけを渡さない。保存後に子が空なら、空の一覧を渡す。
+- `update` は、`TableWriter.update` を、そのメソッドの中で直接呼ぶ。
   別のメソッドを経由すると、ArchUnit の検査が呼び出しを見つけられない。
-- 期待する版を持つ書き込みは、集約ルートを受け取る `update` と `delete` に限る。
-  識別子と版を受け取るメソッドを作らず、集約ルートを受け取るメソッドから `updateWhere` と `deleteWhere` を呼ばない。
-  集約ルートを受け取る public メソッドは `add`、`update`、`delete` だけにする。
-- `updateWhere` か `deleteWhere` の件数を返すメソッドには、Error Prone の `@CheckReturnValue` を付ける。
-  Repository のインタフェースのメソッドなら、インタフェースの側に付ける。
-  呼び出し側が件数（在庫の引き当てで 0 件なら在庫不足、など）を捨てると、コンパイルが失敗する。
+- 集約ルートを受け取る public メソッドは `add`、`update`、`delete` だけにする。
+  期待する版を持つ書き込みは、集約ルートを受け取る `update` に限る。識別子と版を受け取るメソッドを作らない。
+  `delete` と、版を比べない更新（在庫の引き当てなど）は、`TableWriter` に入口がない。必要になったときに [ADR-054](../../adr/ADR-054-detect-optimistic-lock-conflicts-by-update-count.md) を更新して入口を足す。
 - jOOQ の `executeWithOptimisticLocking` と `recordVersionFields` を使わない。
   これらは `UpdatableRecord.store()` でしか働かず、この役割は UPDATE を `TableWriter` で書く（[PostgreSQL の排他制御](../../database/postgresql-concurrency-control.md)）。
-- 子の Entity の行は、`add` では行ごとの INSERT を `dsl.batch` 一つで実行する。
 - 共通カラムのうち、このクラスが参照するのは、集約の復元のために読む `LOCK_NO` だけにし、`LOCK_NO` を書かず、`CREATED_*`、`UPDATED_*`、`PATCHED_*` の列を参照しない（[ADR-048](../../adr/ADR-048-add-shared-module-for-jooq-common-code.md)）。
   `ColumnValues` に共通カラムを渡すと `IllegalArgumentException` になる。
-- `updateWhere`、`deleteWhere`、`NOWAIT` が投げる Spring の例外（`CannotAcquireLockException`、`DuplicateKeyException`）を Repository の外へ出さない。
+- `NOWAIT` が投げる Spring の例外（`CannotAcquireLockException`、`DuplicateKeyException`）を Repository の外へ出さない。
   外へ出すときは、原因を付けずに、種類（`ConflictException.Kind.LOCK` か `Kind.UNIQUE`）を付けた `ConflictException` に変えて投げる。
   原因の例外のメッセージには SQL と入力値が入り、ログに出るためである（[ADR-062](../../adr/ADR-062-map-business-exceptions-to-404-409-422.md)）。
   catch した例外を原因に渡さないと PMD の `PreserveStackTrace` と Error Prone の `UnusedException` が警告するため、そのメソッドに `@SuppressWarnings({"PMD.PreserveStackTrace", "UnusedException"})` を付け、直前に理由のコメントを書く。
@@ -196,12 +191,12 @@ private static Field<?> columnOf(final OrderSortKey key) {
 
 ## 依存してよい型、してはいけない型
 
-- **依存してよい型**：`java..` の標準型、`org.jspecify..`、jOOQ の API（`org.jooq..`）、jOOQ の生成型（`com.example.demo.jooq..`）、`shared.infrastructure.persistence` の共通処理（`CommonColumns`、`TableWriter`、`ColumnValues`、`LockedRoot`、`DeletedRoot`）、同じモジュールの `domain.model` の集約、Entity、値オブジェクト、enum、Repository、`@Repository`。
+- **依存してよい型**：`java..` の標準型、`org.jspecify..`、jOOQ の API（`org.jooq..`）、jOOQ の生成型（`com.example.demo.jooq..`）、`shared.infrastructure.persistence` の共通処理（`TableWriter`、`ColumnValues`、`AggregateTable`、`ChildTable`、`ChildRows`）、`shared.concurrency` の `Versioned`、同じモジュールの `domain.model` の集約、Entity、値オブジェクト、enum、Repository、`@Repository`。
 - **依存してはいけない型**：`application`、`domain.service`、`presentation.web`、`infrastructure.client` の型、モジュールルートの型、他の機能モジュールの型とテーブル、`@Transactional`、対応づけのライブラリ（MapStruct、ModelMapper、Dozer）。
 
 ## 最小の例と典型的な例
 
-最小の例は、`findById`、`add`、`update`、`delete` を実装した `JooqOrderRepository` である。
+最小の例は、`findById`、`add`、`update` を実装した `JooqOrderRepository` である。
 
 ```java
 package com.example.demo.ordering.infrastructure.persistence;
@@ -211,97 +206,75 @@ import static com.example.demo.jooq.ordering.Tables.T_ORDER_LINE;
 import static org.jooq.impl.DSL.multiset;
 import static org.jooq.impl.DSL.select;
 
-import com.example.demo.shared.infrastructure.persistence.CommonColumns;
-import com.example.demo.shared.infrastructure.persistence.LockedRoot;
+import com.example.demo.shared.infrastructure.persistence.AggregateTable;
+import com.example.demo.shared.infrastructure.persistence.ChildTable;
+import com.example.demo.shared.infrastructure.persistence.ColumnValues;
 import com.example.demo.shared.infrastructure.persistence.TableWriter;
 
 /** 注文の集約を jOOQ で保存し、取り出す。 */
 @Repository
 class JooqOrderRepository implements OrderRepository {
 
+  /** 注文の明細。親の中の行は、明細番号で同定する。 */
+  private static final ChildTable<TOrderRecord, TOrderLineRecord> LINES =
+      ChildTable.of(T_ORDER_LINE, T_ORDER_LINE.ORDER_ID, T_ORDER_LINE.LINE_NO);
+
+  /** 注文の集約。ルートは公開 ID で一つに決める。 */
+  private static final AggregateTable<TOrderRecord, UUID> ORDER =
+      AggregateTable.of(T_ORDER, T_ORDER.PUBLIC_ID, T_ORDER.ORDER_ID, LINES);
+
   /** SQL を組み立てて実行する jOOQ のコンテキスト。 */
   private final DSLContext dsl;
 
-  /** 共通カラムの値を作る shared の共通処理。 */
-  private final CommonColumns commonColumns;
-
-  /** 業務テーブルの UPDATE と DELETE を書く shared の入口。 */
+  /** 注文の集約を INSERT と UPDATE で書く shared の入口。 */
   private final TableWriter tableWriter;
 
-  /** jOOQ のコンテキストと shared の共通処理を受け取る。 */
-  /* package */ JooqOrderRepository(
-      final DSLContext dsl, final CommonColumns commonColumns, final TableWriter tableWriter) {
+  /** jOOQ のコンテキストと shared の入口を受け取る。 */
+  /* package */ JooqOrderRepository(final DSLContext dsl, final TableWriter tableWriter) {
     this.dsl = dsl;
-    this.commonColumns = commonColumns;
     this.tableWriter = tableWriter;
   }
 
   @Override
   public Optional<Order> findById(final OrderId id) {
     return selectOrders()
-        .where(T_ORDER.ORDER_ID.eq(id.value()))
+        .where(T_ORDER.PUBLIC_ID.eq(id.value()))
         .fetchOptional(Records.mapping(Order::restore));
   }
 
   @Override
   public void add(final Order order) {
     tableWriter.insert(
-        dsl.insertInto(T_ORDER)
-            .set(T_ORDER.ORDER_ID, order.id().value())
-            .set(T_ORDER.CUSTOMER_ID, order.customerId().value())
-            .set(T_ORDER.ORDER_STATUS_TYP, order.status().name())
-            .set(T_ORDER.DISCOUNT_JPY, order.discount().amount())
-            .set(T_ORDER.PLACED_AT, order.placedAt())
-            .set(commonColumns.forInsert(T_ORDER)));
-    dsl.batch(
-            order.lines().stream()
-                .map(
-                    line ->
-                        dsl.insertInto(T_ORDER_LINE)
-                            .set(T_ORDER_LINE.ORDER_ID, order.id().value())
-                            .set(T_ORDER_LINE.LINE_NO, line.lineNumber())
-                            .set(T_ORDER_LINE.PRODUCT_CODE, line.productCode().value())
-                            .set(T_ORDER_LINE.ORDERED_COUNT, line.quantity().value())
-                            .set(T_ORDER_LINE.UNIT_PRICE_JPY, line.unitPrice().amount())
-                            .set(commonColumns.forInsert(T_ORDER_LINE)))
-                .toList())
-        .execute();
+        ORDER,
+        order.id().value(),
+        set -> rootColumns(order, set),
+        rows -> rows.put(LINES, order.lines(), JooqOrderRepository::lineColumns));
   }
 
   @Override
   public void update(final Order order) {
-    final LockedRoot root =
-        tableWriter.updateCheckingVersion(
-            T_ORDER,
-            T_ORDER.ORDER_ID.eq(order.id().value()),
-            order.lockNo(),
-            set ->
-                set.set(T_ORDER.CUSTOMER_ID, order.customerId().value())
-                    .set(T_ORDER.ORDER_STATUS_TYP, order.status().name())
-                    .set(T_ORDER.DISCOUNT_JPY, order.discount().amount())
-                    .set(T_ORDER.PLACED_AT, order.placedAt()));
-    for (final OrderLine line : order.lines()) {
-      root.updateChild(
-          T_ORDER_LINE,
-          T_ORDER_LINE
-              .ORDER_ID
-              .eq(order.id().value())
-              .and(T_ORDER_LINE.LINE_NO.eq(line.lineNumber())),
-          set ->
-              set.set(T_ORDER_LINE.PRODUCT_CODE, line.productCode().value())
-                  .set(T_ORDER_LINE.ORDERED_COUNT, line.quantity().value())
-                  .set(T_ORDER_LINE.UNIT_PRICE_JPY, line.unitPrice().amount()));
-    }
+    tableWriter.update(
+        ORDER,
+        order.id().value(),
+        order,
+        set -> rootColumns(order, set),
+        rows -> rows.put(LINES, order.lines(), JooqOrderRepository::lineColumns));
   }
 
-  @Override
-  public void delete(final Order order) {
-    tableWriter
-        .deleteCheckingVersion(
-            T_ORDER,
-            T_ORDER.ORDER_ID.eq(order.id().value()),
-            order.lockNo())
-        .deleteChildren(T_ORDER_LINE, T_ORDER_LINE.ORDER_ID.eq(order.id().value()));
+  /** 注文の列の値。公開 ID と内部の主キー、共通カラムは TableWriter が書く。 */
+  private static void rootColumns(final Order order, final ColumnValues<TOrderRecord> set) {
+    set.set(T_ORDER.CUSTOMER_ID, order.customerId().value())
+        .set(T_ORDER.ORDER_STATUS_TYP, order.status().name())
+        .set(T_ORDER.DISCOUNT_JPY, order.discount().amount())
+        .set(T_ORDER.PLACED_AT, order.placedAt());
+  }
+
+  /** 明細の列の値。自然キーの明細番号は書き、親の外部キーは TableWriter が書く。 */
+  private static void lineColumns(final OrderLine line, final ColumnValues<TOrderLineRecord> set) {
+    set.set(T_ORDER_LINE.LINE_NO, line.lineNumber())
+        .set(T_ORDER_LINE.PRODUCT_CODE, line.productCode().value())
+        .set(T_ORDER_LINE.ORDERED_COUNT, line.quantity().value())
+        .set(T_ORDER_LINE.UNIT_PRICE_JPY, line.unitPrice().amount());
   }
 
   // findByCustomer と countUnshippedByCustomer は典型的な例に示す。
@@ -378,12 +351,12 @@ Repository のテストは列と集約の往復と削除の範囲だけを確か
   集約の不変条件を保ったまま保存できない。
 - `INSERT ... ON CONFLICT` の UPSERT で、`add` と `update` を一つの SQL で兼ねる。
   `lock_no` の比較を通らずに上書きし、他の人が消した注文を作り直す。
-- `dsl.update`、`dsl.deleteFrom`、`UpdatableRecord.store()` などで、`TableWriter` を通さずに UPDATE と DELETE を書く。
-  版の条件か件数の判定を忘れると、他の人の更新を黙って上書きする。
-- `update` で `updateWhere` を使う、または `OrderId` と `long lockNo` を受け取るメソッドを作って版を比べない入口を使う。
+- `dsl.insertInto`、`dsl.update`、`dsl.deleteFrom`、`UpdatableRecord.store()` などで、`TableWriter` を通さずに INSERT、UPDATE、DELETE を書く。
+  版の条件か件数の判定を忘れると、他の人の更新を黙って上書きし、一意制約の違反が 409 ではなく 500 になる。
+- `update` で、`TableWriter.update` を呼ばずに保存する、または `OrderId` と `long lockNo` を受け取るメソッドを作って版を比べない保存をする。
   版は進むが、古い集約の保存を止めない。
-- `update` で、子の行を集約ルートより先に書く、またはルートを書かずに子の行を `updateWhere` で書く。
-  子の行が集約ルートの行ロックで守られず、集約ルートの `lock_no` も進まない。
+- 子の一部だけを `ChildRows` に渡して、残りを残そうとする。
+  渡した子の全行が保存後の姿になるため、渡さなかった子は削除される。
 - 子の集合が増減する集約を、全部の子を消して入れ直す全置換で保存する。
   子の `CREATED_*` が保存のたびに変わる。
 - `CREATED_*`、`UPDATED_*`、`PATCHED_*` の列に、`Clock` やトレースの値を直接書く。
@@ -420,24 +393,22 @@ Repository のテストは列と集約の往復と削除の範囲だけを確か
 - [ ] `application`、`domain.service`、モジュールルートの型に依存しない。［ArchUnit で検査：PackageByFeatureOnionArchitectureTest.infrastructureDependsOnlyOnDomainModel］
 - [ ] `shared` の型は `infrastructure.persistence` の中だけで使う。［ArchUnit で検査：PackageByFeatureOnionArchitectureTest.sharedModuleIsUsedOnlyByPersistenceAdapters］
 - [ ] `@Transactional` を付けない。［ArchUnit で検査：PackageByFeatureOnionArchitectureTest.transactionalMethodsArePublicApplicationMethods］
-- [ ] package-private の class にし、`DSLContext` と `shared` の `CommonColumns`、`TableWriter` をコンストラクタで受け取る。［自分で点検］
+- [ ] package-private の class にし、`DSLContext` と `shared` の `TableWriter` をコンストラクタで受け取る。［自分で点検］
 - [ ] 列の選択と変換を `select<Aggregate>s()` 一つに置き、列を `convertFrom` で値オブジェクトと enum に変える。［自分で点検］
 - [ ] 子の Entity を `multiset` で集約ルートと同じ SQL で読み、集約を `Records.mapping(Order::restore)` で作る。［自分で点検］
 - [ ] `multiset` の副問い合わせに、子を識別する列の `orderBy` を付ける（`orderBy(T_ORDER_LINE.LINE_NO)`）。［自分で点検］
 - [ ] 集約ルートの `LOCK_NO` を選び、`restore` の `lockNo` に渡す。［自分で点検］
-- [ ] `add` は `set(列, 値)` で業務の全列を書き、子の行を行ごとの INSERT の `dsl.batch` 一つで書く。［自分で点検］
-- [ ] `add` は集約ルートの INSERT を `tableWriter.insert(...)` で実行し、`Insert` の `execute` を直接呼ばない。［ArchUnit で検査：TableWriterArchTest.aggregateRootInsertsGoThroughTableWriter］
+- [ ] 集約の形を `AggregateTable` と `ChildTable` のクラスの定数として一度だけ宣言し、子の外部キーの列に親の内部の主キーを指す列を渡す。［自分で点検（往復のテストで確かめる）］
+- [ ] `add` は `tableWriter.insert(...)` を呼び、ルートの列と子の全行を `ColumnValues` で渡す。`insertInto` を呼ばない。［ArchUnit で検査：TableWriterArchTest.tableWritesGoThroughTableWriter］
 - [ ] Spring の例外（`CannotAcquireLockException`、`DuplicateKeyException`）を Repository の外へ出さず、出すときは原因を付けずに種類を付けた `ConflictException` に変える。［自分で点検］
-- [ ] 集約ルートを受け取る `add` 以外の public メソッドは、版を比べる入口（`update` は `TableWriter.updateCheckingVersion`、`delete` は `deleteCheckingVersion`、ほかの名前ならどちらか）と引数の集約ルートの `lockNo()` を、そのメソッドの中で直接呼ぶ。［ArchUnit で検査：TableWriterArchTest.repositoryUpdateAndDeleteCheckVersion］
-- [ ] 期待する版には集約ルートの `lockNo()` の値を渡し、テーブルから読み直した版を渡さない。［自分で点検］
-- [ ] 集約ルートを受け取る public メソッドは、`add`、`update`、`delete` だけにする（`save` のような名前でも版を比べれば規則は通るため、名前は規則が検査しない）。［自分で点検］
-- [ ] 集約ルートを受け取るメソッドから `updateWhere` と `deleteWhere` を呼ばない。［ArchUnit で検査：TableWriterArchTest.aggregateMethodsDoNotUseUnversionedWrites］
-- [ ] 子の行は、集約ルートの書き込みが返す `LockedRoot` か `DeletedRoot` で主キーの順に書き、子の集合が増減するなら差分で書く。［自分で点検］
-- [ ] jOOQ の UPDATE、DELETE、UPSERT（`INSERT ... ON CONFLICT`）、MERGE、`UpdatableRecord` と `DAO` の書き込み、Spring JDBC と JDBC の直接の利用を、`TableWriter` の外で使わない（一覧は[アーキテクチャテスト](../architecture-tests.md)の「書き込みの入口」）。［ArchUnit で検査：TableWriterArchTest.tableWritesGoThroughTableWriter］
+- [ ] 集約ルートを受け取る `add` 以外の public メソッドは、`TableWriter.update` を、そのメソッドの中で直接呼ぶ。［ArchUnit で検査：TableWriterArchTest.repositoryUpdateAndDeleteCheckVersion］
+- [ ] 集約ルートを `Versioned` にし、`update` はその集約ルートを `TableWriter.update` に渡す（テーブルから読み直した版は渡せない）。［型で検査］
+- [ ] 集約ルートを受け取る public メソッドは、`add`、`update`、`delete` だけにする（`save` のような名前でも `TableWriter.update` を呼べば規則は通るため、名前は規則が検査しない）。［自分で点検］
+- [ ] 子の行は `ChildRows` で保存後の全行を渡し、子を宣言しない集約は子の行を渡さない `insert` を使う。［自分で点検］
+- [ ] jOOQ の INSERT、UPDATE、DELETE、UPSERT（`INSERT ... ON CONFLICT`）、MERGE、`UpdatableRecord` と `DAO` の書き込み、Spring JDBC と JDBC の直接の利用を、`TableWriter` の外で使わない（一覧は[アーキテクチャテスト](../architecture-tests.md)の「書き込みの入口」）。［ArchUnit で検査：TableWriterArchTest.tableWritesGoThroughTableWriter］
 - [ ] jOOQ の `Settings` の `executeWithOptimisticLocking` と、コード生成の `recordVersionFields` を使わない。［自分で点検］
-- [ ] `updateWhere` か `deleteWhere` の件数を返すメソッドに `@CheckReturnValue` を付ける。［自分で点検］
 - [ ] 生成クラスの `CREATED_*`、`UPDATED_*`、`PATCHED_*` の列を参照しない。［ArchUnit で検査：JooqCommonColumnsArchTest.commonColumnsAreReferencedOnlyBySharedPersistence］
-- [ ] INSERT の共通カラムは `CommonColumns.forInsert` で書き、`LOCK_NO` は読むだけにする（UPDATE で渡した `LOCK_NO` は `ColumnValues` が実行時に拒否する）。［自分で点検］
+- [ ] 共通カラムは `TableWriter` が書く。`LOCK_NO` は読むだけにする（`ColumnValues` に渡すと実行時に拒否する）。［自分で点検］
 - [ ] `@PlainSQL` の付いた jOOQ の API を使わない。［ArchUnit で検査：DatabaseConventionsArchTest.plainSqlApisAreNotUsed］
 - [ ] `DSL.unquotedName` と `DSL.keyword` を使わない。［ArchUnit で検査：DatabaseConventionsArchTest.verbatimSqlApisAreNotUsed］
 - [ ] `DSL.name`、`DSL.quotedName`、`DSL.systemName`、`Name.append` を使わない。［ArchUnit で検査：DatabaseConventionsArchTest.nameBuildingApisAreNotUsed］
@@ -450,5 +421,5 @@ Repository のテストは列と集約の往復と削除の範囲だけを確か
 - [ ] jOOQ の `into`、`intoMap`、`intoGroups`、`fetchMap`、`fetchGroups`、名前が `Into` で終わるメソッドを `Class` を渡して呼ばず、`Record` の `into(Object)` と `from(Object)`、`DSLContext.newRecord(Table, Object)` を呼ばない。［ArchUnit で検査：ClassRoleArchTest.jooqReflectionMappingIsNotUsed］
 - [ ] MapStruct、ModelMapper、Dozer、`DefaultRecordMapper`、`DefaultRecordUnmapper` に依存しない。［ArchUnit で検査：ClassRoleArchTest.mappingLibrariesAreNotUsed］
 - [ ] クラス、フィールド、コンストラクタに Javadoc を書く。［自分で点検］
-- [ ] `@DatabaseTest` で `add` と `update` の往復と、`delete` を持つなら子の行を含む削除の範囲を確かめ、競合と行なしの判定は `TableWriterTest` に任せる。［自分で点検］
+- [ ] `@DatabaseTest` で `add` と `update` の往復と、子の行の差分（削除、更新、追加）を確かめ、競合と行なしの判定は `TableWriterTest` に任せる。［自分で点検］
 - [ ] `infrastructure.persistence` のパッケージに `@NullMarked` の `package-info.java` を置く。［Error Prone で検査：RequireExplicitNullMarking］
