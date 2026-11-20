@@ -89,7 +89,7 @@ jobs:
       - name: Set up mise tools
         uses: ./.github/actions/setup-mise
         with:
-          tools: task npm:@iwe-org/iwe
+          tools: task npm:@iwe-org/iwe jq
 
       - name: Validate OKF conformance
         env:

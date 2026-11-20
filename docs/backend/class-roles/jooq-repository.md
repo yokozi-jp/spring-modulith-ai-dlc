@@ -94,7 +94,7 @@ jOOQ の Repository は業務規則を持たない。
   5. 両方にある子を `root.updateChild` で更新する。
 - `delete` は、`tableWriter.deleteCheckingVersion(T_ORDER, 主キーの条件, order.lockNo())` で集約ルートの行を削除し、子の行は戻り値の `DeletedRoot.deleteChildren` で削除する。
 - `update` と `delete` は、`TableWriter` の版を比べる入口と、引数の集約ルートの `lockNo()` を、そのメソッドの中で直接呼ぶ。
-  別のメソッドやラムダを経由すると、ArchUnit の検査が呼び出しを見つけられない。
+  別のメソッドを経由すると、ArchUnit の検査が呼び出しを見つけられない。
 - 期待する版を持つ書き込みは、集約ルートを受け取る `update` と `delete` に限る。
   識別子と版を受け取るメソッドを作らず、集約ルートを受け取るメソッドから `updateWhere` と `deleteWhere` を呼ばない。
   集約ルートを受け取る public メソッドは `add`、`update`、`delete` だけにする。

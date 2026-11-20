@@ -12,6 +12,7 @@ tags: [runbook, workflow, agent-skills, matt-pocock]
 - この文書は、残している Matt Pocock のスキルに固有の扱いだけを定める。開発の流れ、同じセッションを保つ範囲、振り返りは [RGDD の開発フロー](../rgdd.md) にある。
 - 用語は `GLOSSARY.md` に記録し、ADR は `docs/adr/conventions.md` の書式で書く。
 - 上流とは、スキルの取得元である `mattpocock/skills` リポジトリを指す。取得元と更新の手順は [スキルの取得元と更新](../skill-sources.md) にある。
+- `/grilling` の各推奨（➡）には、[grilling の推奨に添える根拠](../grilling-recommendations.md)の4行を添える。呼び出し元が `/grill-with-docs`、`/triage`、`/wayfinder` のどれでも同じである。
 
 ## 初回設定
 

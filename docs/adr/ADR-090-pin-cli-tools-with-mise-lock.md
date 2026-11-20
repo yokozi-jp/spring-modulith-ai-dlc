@@ -1,11 +1,11 @@
 ---
 type: ADR
-title: 'ADR-090: Task、betterleaks、iwe、Java、zizmor、Kiro CLI の版を mise.toml と mise.lock に固定し、ローカルと CI で同じ lock から入れる'
-description: Task、betterleaks、iwe、Java、zizmor、Kiro CLI の版を mise.toml に書き、ローカルと CI が mise.lock の版と checksum から入れ、PATH を mise の shims で通す判断。版を固定する CLI ツールを足すとき、mise の設定や CI での入れ方を変えるときに読む。
+title: 'ADR-090: Task、betterleaks、iwe、jq、Java、zizmor、Kiro CLI の版を mise.toml と mise.lock に固定し、ローカルと CI で同じ lock から入れる'
+description: Task、betterleaks、iwe、jq、Java、zizmor、Kiro CLI の版を mise.toml に書き、ローカルと CI が mise.lock の版と checksum から入れ、PATH を mise の shims で通す判断。版を固定する CLI ツールを足すとき、mise の設定や CI での入れ方を変えるときに読む。
 tags: [adr, tooling, mise, ci, security]
 ---
 
-# ADR-090: Task、betterleaks、iwe、Java、zizmor、Kiro CLI の版を mise.toml と mise.lock に固定し、ローカルと CI で同じ lock から入れる
+# ADR-090: Task、betterleaks、iwe、jq、Java、zizmor、Kiro CLI の版を mise.toml と mise.lock に固定し、ローカルと CI で同じ lock から入れる
 
 ## Status
 
@@ -44,6 +44,10 @@ Java も Proposed の間に足した。
 そのときローカルは `01-setup-java.sh` が apt で `25.0.2` を入れ、CI は 9 か所の `actions/setup-java` が Corretto の `25` の最新を入れていたので、パッチの版がずれていた。
 また、TLA+ の検査の道具（[#502](https://github.com/yokozi-jp/spring-modulith-ai-dlc/pull/502)）を CI で動かすのに、`mise.lock` から入る Java が要った。
 
+jq も Proposed の間に足した。
+[#432](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/432) で、jq が無い端末では `task okf-check` が OKF の検査を黙って飛ばし、Kiro のフック `block-generated-writes.sh` が何もせず許可していたと分かった。
+`okf-check` は iwe か jq が無ければ失敗させ、jq は `task setup` の前の apt でなく mise.lock の版で入れる。
+
 Kiro CLI も Proposed の間に足した。
 [#255](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/255) の調査で採用と決め、作業は [#387](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/387) で行った。
 `03-setup-kiro.sh` は公式のインストーラー（`https://cli.kiro.dev/install`）を実行するので、版が開発者ごと、実行ごとに変わっていた。
@@ -59,7 +63,7 @@ VS Code Server は環境を `bash -i -l -c` で作るので、公式のインス
 
 ## Decision
 
-- `mise.toml` の `[tools]` に `task`、`betterleaks`、`npm:@iwe-org/iwe`、`java`、`zizmor`、`http:kiro-cli` を exact 版で書き、`mise lock --platform linux-x64` で `mise.lock` に URL と checksum を記録する。
+- `mise.toml` の `[tools]` に `task`、`betterleaks`、`npm:@iwe-org/iwe`、`jq`、`java`、`zizmor`、`http:kiro-cli` を exact 版で書き、`mise lock --platform linux-x64` で `mise.lock` に URL と checksum を記録する。
 - npm backend の iwe について mise が作る `.mise/locks/npm-iwe-org-iwe/<版>/`（依存の integrity を持つ lockfile）も commit する。
 - Kiro CLI は `[tools."http:kiro-cli"]` に公式の zip の URL（`https://prod.download.cli.kiro.dev/stable/<版>/kirocli-x86_64-linux.zip`）と `bin_path` を書く。各版の sha256 は公式の `https://prod.download.cli.kiro.dev/stable/index.json` にあり、`checksum_url` と `checksum_expr` で読んで `mise.lock` に記録する。PGP 署名（`<zip>.asc`）は検証しない。信頼の根拠は `index.json` の sha256 と、記録後の `mise.lock` である。
 - `mise.toml` に書くのは `[tools]` だけにする。タスク（Task の役割）、環境変数、設定、Node.js と pnpm（Vite+ の役割）は書かない。

@@ -50,16 +50,17 @@ lock の項目の `note` がそれを示し、`computedHash` は足したあと�
 あるときは書かず、`permissions.yaml` が雛形と違えば `skip: kept your ... Merge in the rules from ...` と出す。
 `.kiro/kiro-permissions.yaml` の2行目のコメント（`kiro/install.sh copies this file ...`）は上流の記述で、この動作を指す。
 
-clone しただけで `kiro/install.sh` を実行していない開発者は、リポジトリの中で次を実行する。
+clone しただけで `kiro/install.sh` を実行していない開発者は、`task setup` を実行する。
+`task setup` は、`permissions.json` もないときだけ書く点も含め、次の3行と同じことをする。
 Kiro はエージェントによる `~/.kiro/settings/` への書き込みを拒否するため、エージェントには任せられない。
 
 ```bash
 mkdir -p ~/.kiro/settings
-[ -e ~/.kiro/settings/permissions.yaml ] || cp .kiro/kiro-permissions.yaml ~/.kiro/settings/permissions.yaml
+[ -e ~/.kiro/settings/permissions.yaml ] || [ -e ~/.kiro/settings/permissions.json ] || cp .kiro/kiro-permissions.yaml ~/.kiro/settings/permissions.yaml
 diff .kiro/kiro-permissions.yaml ~/.kiro/settings/permissions.yaml
 ```
 
-`cp` の行は、`~/.kiro/settings/permissions.yaml` がすでにあると何もせず、何も出力しない。
+`cp` の行は、`~/.kiro/settings/permissions.yaml` か `permissions.json` がすでにあると何もせず、何も出力しない。
 `diff` が差分を出したら、雛形の `rules` のうち手元のファイルにないものを手で足す。
 更新で `.kiro/kiro-permissions.yaml` が変わったときも、同じ `diff` で確かめる。
 
