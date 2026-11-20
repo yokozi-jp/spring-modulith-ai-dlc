@@ -1,7 +1,7 @@
 /* @vitest-environment jsdom */
 
 import { getListTenantMembersMockHandler } from "@frontend/api/mocks/tenancy/tenancy.msw";
-import type { TenantMembersResponse } from "@frontend/api/models";
+import type { TenantMembersDetailsResponse } from "@frontend/api/models";
 import { screen } from "@testing-library/react";
 import { http, HttpResponse } from "msw";
 import { describe, expect, it } from "vite-plus/test";
@@ -9,11 +9,12 @@ import { describe, expect, it } from "vite-plus/test";
 import { server } from "@/testing/msw";
 import { problemResponse } from "@/testing/orders";
 import { renderRoute } from "@/testing/render-route";
+import { tenantNotSelected } from "@/testing/tenancy";
 
 const adminId = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
 const memberId = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
 
-const members: TenantMembersResponse = {
+const members: TenantMembersDetailsResponse = {
   lockNo: 3,
   items: [
     { userId: adminId, role: "ADMIN" },
@@ -158,5 +159,38 @@ describe("所属の管理の画面", () => {
 
     await expect(screen.findByRole("button", { name: "再試行" })).resolves.toBeTruthy();
     expect(screen.queryByText("管理者だけが使える画面です")).toBeNull();
+  });
+
+  it("テナントを選んでいない 403 は、管理者だけの画面ではなく、テナントを選び直す画面へ案内する", async () => {
+    server.use(http.get("*/api/current-tenant/members", () => tenantNotSelected()));
+    await renderRoute("/members");
+
+    await expect(screen.findByRole("link", { name: "テナントを選ぶ" })).resolves.toBeTruthy();
+    expect(screen.queryByText("管理者だけが使える画面です")).toBeNull();
+  });
+
+  it("自分の役割を下げて、その後の一覧の再取得が 403 になったら、操作を残さず管理者だけの画面を出す", async () => {
+    let reads = 0;
+    server.use(
+      http.get("*/api/current-tenant/members", () => {
+        reads += 1;
+        return reads === 1
+          ? HttpResponse.json(members)
+          : problemResponse(403, "アクセス権限がありません");
+      }),
+      http.put(
+        `*/api/current-tenant/members/${adminId}`,
+        () => new HttpResponse(undefined, { status: 204 }),
+      ),
+    );
+    const { user } = await renderRoute("/members");
+
+    await user.selectOptions(
+      await screen.findByRole("combobox", { name: `利用者 ${adminId} の役割` }),
+      "MEMBER",
+    );
+
+    await expect(screen.findByText("管理者だけが使える画面です")).resolves.toBeTruthy();
+    expect(screen.queryByRole("combobox")).toBeNull();
   });
 });

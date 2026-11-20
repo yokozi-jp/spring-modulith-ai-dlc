@@ -37,9 +37,7 @@ class TenantSecurityCustomizer implements Customizer<HttpSecurity> {
     // SecurityConfig の anyRequest より先に登録され、先に一致する。ROLE_ADMIN は TenantSelectionFilter
     // が引き直した所属の役割から来る。
     http.authorizeHttpRequests(auth ->
-            auth.requestMatchers(
-                    CurrentTenantMemberController.PATH, CurrentTenantMemberController.PATH + "/**")
-                .hasRole("ADMIN"))
+            auth.requestMatchers(CurrentTenantMemberController.PATH + "/**").hasRole("ADMIN"))
         .addFilterBefore(
             new TenantSelectionFilter(tenancyQueries, tenantSession), AuthorizationFilter.class)
         .oauth2Login(login ->

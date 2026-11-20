@@ -32,7 +32,7 @@ export const ListTenantMembersResponse = zod.object({
   "items": zod.array(zod.object({
   "role": zod.string().describe('テナントの中の役割のコード値（ADMIN、MEMBER）'),
   "userId": zod.uuid().describe('利用者の ID')
-}).describe('テナントに所属している利用者を返す API の本文。')).describe('所属している利用者。所属した順に並ぶ'),
+}).describe('テナントに所属している利用者。')).describe('所属している利用者。所属した順に並ぶ'),
   "lockNo": zod.int().describe('所属を変える操作の本文で送り返す、テナントのロック番号')
 }).describe('テナントの所属の一覧を items で包んで返す API の本文。')
 

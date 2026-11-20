@@ -32,6 +32,6 @@ public class RemoveMemberCommandHandler {
     tenant.ensureLockNo(command.expectedLockNo());
     tenant.removeMember(new UserId(UUID.fromString(command.userId())));
     tenantRepository.update(tenant);
-    return new RemoveMemberResult(command.userId());
+    return new RemoveMemberResult(command.tenantId(), command.userId());
   }
 }

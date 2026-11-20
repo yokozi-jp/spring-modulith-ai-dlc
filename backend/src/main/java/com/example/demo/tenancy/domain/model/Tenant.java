@@ -46,14 +46,12 @@ public final class Tenant {
    * @throws BusinessRuleViolationException 最後の管理者の役割を下げる場合
    */
   public void changeRole(final UserId userId, final Role role) {
-    final TenantMember target = find(userId);
-    if (target.role() == Role.ADMIN && role != Role.ADMIN) {
-      requireAnotherAdmin(userId);
-    }
-    members =
+    requireMember(userId);
+    replaceMembers(
+        userId,
         members.stream()
             .map(member -> member.userId().equals(userId) ? new TenantMember(userId, role) : member)
-            .toList();
+            .toList());
   }
 
   /**
@@ -64,11 +62,9 @@ public final class Tenant {
    * @throws BusinessRuleViolationException 最後の管理者を外す場合
    */
   public void removeMember(final UserId userId) {
-    final TenantMember target = find(userId);
-    if (target.role() == Role.ADMIN) {
-      requireAnotherAdmin(userId);
-    }
-    members = members.stream().filter(member -> !member.userId().equals(userId)).toList();
+    requireMember(userId);
+    replaceMembers(
+        userId, members.stream().filter(member -> !member.userId().equals(userId)).toList());
   }
 
   /** テナント ID を返す。 */
@@ -104,23 +100,23 @@ public final class Tenant {
     }
   }
 
-  private TenantMember find(final UserId userId) {
-    return members.stream()
-        .filter(member -> member.userId().equals(userId))
-        .findFirst()
-        .orElseThrow(() ->
-            new NotFoundException(
-                "member not found: tenantId=" + id.value() + ", userId=" + userId.value()));
+  private void requireMember(final UserId userId) {
+    if (members.stream().noneMatch(member -> member.userId().equals(userId))) {
+      throw new NotFoundException(
+          "member not found: tenantId=" + id.value() + ", userId=" + userId.value());
+    }
   }
 
-  /** 対象のほかに管理者がいなければ、操作を拒否する。 */
-  private void requireAnotherAdmin(final UserId target) {
-    final boolean another =
-        members.stream()
-            .anyMatch(member -> member.role() == Role.ADMIN && !member.userId().equals(target));
-    if (!another) {
+  /** 管理者がいる所属を、管理者のいない所属に置き換える操作を拒否し、置き換える。target は拒否のメッセージに入れる操作の対象。 */
+  private void replaceMembers(final UserId target, final List<TenantMember> next) {
+    if (hasAdmin(members) && !hasAdmin(next)) {
       throw new BusinessRuleViolationException(
           "tenant must keep an admin: tenantId=" + id.value() + ", userId=" + target.value());
     }
+    members = List.copyOf(next);
+  }
+
+  private static boolean hasAdmin(final List<TenantMember> members) {
+    return members.stream().anyMatch(member -> member.role() == Role.ADMIN);
   }
 }

@@ -33,6 +33,6 @@ public class ChangeMemberRoleCommandHandler {
     tenant.ensureLockNo(command.expectedLockNo());
     tenant.changeRole(new UserId(UUID.fromString(command.userId())), Role.valueOf(command.role()));
     tenantRepository.update(tenant);
-    return new ChangeMemberRoleResult(command.userId());
+    return new ChangeMemberRoleResult(command.tenantId(), command.userId());
   }
 }

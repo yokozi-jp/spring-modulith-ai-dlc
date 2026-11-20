@@ -22,6 +22,10 @@
   "logout": "Log out",
   "loggedOutHeading": "You have been logged out",
   "loginAgain": "Log in again",
+  "notice": {
+    "generalTitle": "The operation could not be completed",
+    "generalFailure": "Try again later."
+  },
   "orders": {
     "missingValue": "(none)",
     "amount": "{{value, currency(currency: JPY)}}",
@@ -88,8 +92,6 @@
       "reapplyChanges": "Apply my changes to the latest version"
     },
     "notice": {
-      "generalTitle": "The operation could not be completed",
-      "generalFailure": "Try again later.",
       "validation": "Check your input.",
       "createConflict": "This customer order code may already be in use. Change the code or send again later.",
       "createUnprocessable": "Check the products you entered.",
@@ -144,8 +146,6 @@
       "forbiddenHeading": "Only administrators can use this page",
       "forbiddenDescription": "Only a tenant administrator can manage members.",
       "notice": {
-        "generalTitle": "The operation could not be completed",
-        "generalFailure": "Try again after a while.",
         "roleChanged": "The role was changed.",
         "removed": "The user was removed.",
         "notFound": "The user no longer belongs to the tenant. The latest list is shown.",

@@ -17,13 +17,13 @@ import type {
 import type {
   MembershipListResponse,
   MembershipResponse,
-  TenantMembersResponse
+  TenantMembersDetailsResponse
 } from '../../models';
 
 
 export const getFindCurrentTenantResponseMock = (overrideResponse: Partial<Extract<MembershipResponse, object>> = {}): MembershipResponse => ({tenantId: "6f1c2b3a-4d5e-4f60-8a7b-9c0d1e2f3a4b", tenantName: "株式会社サンプル", ...overrideResponse})
 
-export const getListTenantMembersResponseMock = (overrideResponse: Partial<Extract<TenantMembersResponse, object>> = {}): TenantMembersResponse => ({items: Array.from({ length: faker.number.int({min: 1, max: 10}) }, (_, i) => i + 1).map(() => ({role: "MEMBER", userId: "0b6f2c1e-4d3a-4e5f-8a7b-9c0d1e2f3a4b"})), lockNo: 1, ...overrideResponse})
+export const getListTenantMembersResponseMock = (overrideResponse: Partial<Extract<TenantMembersDetailsResponse, object>> = {}): TenantMembersDetailsResponse => ({items: Array.from({ length: faker.number.int({min: 1, max: 10}) }, (_, i) => i + 1).map(() => ({role: "MEMBER", userId: "0b6f2c1e-4d3a-4e5f-8a7b-9c0d1e2f3a4b"})), lockNo: 1, ...overrideResponse})
 
 export const getListMembershipsResponseMock = (overrideResponse: Partial<Extract<MembershipListResponse, object>> = {}): MembershipListResponse => ({items: Array.from({ length: faker.number.int({min: 1, max: 10}) }, (_, i) => i + 1).map(() => ({tenantId: "6f1c2b3a-4d5e-4f60-8a7b-9c0d1e2f3a4b", tenantName: "株式会社サンプル"})), ...overrideResponse})
 
@@ -50,7 +50,7 @@ export const getSelectTenantMockHandler = (overrideResponse?: void | ((info: Par
   }, options)
 }
 
-export const getListTenantMembersMockHandler = (overrideResponse?: TenantMembersResponse | ((info: Parameters<Parameters<typeof http.get>[1]>[0]) => Promise<TenantMembersResponse> | TenantMembersResponse), options?: RequestHandlerOptions) => {
+export const getListTenantMembersMockHandler = (overrideResponse?: TenantMembersDetailsResponse | ((info: Parameters<Parameters<typeof http.get>[1]>[0]) => Promise<TenantMembersDetailsResponse> | TenantMembersDetailsResponse), options?: RequestHandlerOptions) => {
   return http.get('*/api/current-tenant/members', async (info: Parameters<Parameters<typeof http.get>[1]>[0]) => {
 
 

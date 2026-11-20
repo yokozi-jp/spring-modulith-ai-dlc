@@ -22,6 +22,10 @@
   "logout": "ログアウト",
   "loggedOutHeading": "ログアウトしました",
   "loginAgain": "もう一度ログイン",
+  "notice": {
+    "generalTitle": "操作を完了できませんでした",
+    "generalFailure": "時間をおいてもう一度お試しください。"
+  },
   "orders": {
     "missingValue": "（なし）",
     "amount": "{{value, currency(currency: JPY)}}",
@@ -88,8 +92,6 @@
       "reapplyChanges": "最新の版に変更を適用し直す"
     },
     "notice": {
-      "generalTitle": "操作を完了できませんでした",
-      "generalFailure": "時間をおいてもう一度お試しください。",
       "validation": "入力を確かめてください。",
       "createConflict": "この客先注文番号は既に使われている可能性があります。客先注文番号を変えるか、時間をおいてもう一度送信してください。",
       "createUnprocessable": "入力した商品を確かめてください。",
@@ -144,8 +146,6 @@
       "forbiddenHeading": "管理者だけが使える画面です",
       "forbiddenDescription": "所属の管理は、テナントの管理者だけができます。",
       "notice": {
-        "generalTitle": "操作を完了できませんでした",
-        "generalFailure": "時間をおいてもう一度お試しください。",
         "roleChanged": "役割を変更しました。",
         "removed": "所属を外しました。",
         "notFound": "この利用者はすでにテナントに所属していません。最新の一覧を表示しています。",

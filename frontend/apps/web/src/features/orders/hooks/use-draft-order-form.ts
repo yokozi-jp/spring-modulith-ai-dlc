@@ -5,10 +5,10 @@ import { useTranslation } from "react-i18next";
 
 import { useAppForm } from "@/features/orders/form";
 import { formFailure } from "@/features/orders/notice";
-import type { Notice } from "@/features/orders/notice";
 import { draftOrderFormSchema, newLine } from "@/features/orders/schemas";
 import type { DraftOrderValues } from "@/features/orders/schemas";
 import { noServerErrors, withoutField } from "@/features/orders/server-errors";
+import type { Notice } from "@/lib/notice";
 
 // Location は絶対 URI（ServletUriComponentsBuilder）で返るため、URL として解決し、同じ origin のときだけ path から読む。
 function createdOrderId(location: string | null): string | undefined {

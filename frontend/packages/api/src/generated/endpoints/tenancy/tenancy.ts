@@ -36,7 +36,7 @@ import type {
   NotFoundProblemResponse,
   RemoveTenantMemberParams,
   SelectTenantRequest,
-  TenantMembersResponse,
+  TenantMembersDetailsResponse,
   UnauthorizedProblemResponse,
   UnprocessableContentProblemResponse
 } from '../../models';
@@ -373,7 +373,7 @@ export const useSelectTenant = <TError = ErrorType<BadRequestProblemResponse | U
       return useMutation(getSelectTenantMutationOptions(options), queryClient);
     }
     export type listTenantMembersResponse200 = {
-  data: TenantMembersResponse
+  data: TenantMembersDetailsResponse
   status: 200
 }
 

@@ -9,4 +9,4 @@ export * from './membershipResponse.ts';
 export * from './removeTenantMemberParams.ts';
 export * from './selectTenantRequest.ts';
 export * from './tenantMemberResponse.ts';
-export * from './tenantMembersResponse.ts';
+export * from './tenantMembersDetailsResponse.ts';

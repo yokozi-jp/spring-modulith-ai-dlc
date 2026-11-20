@@ -1,4 +1,4 @@
-/** 利用者の集約、所属、値オブジェクト。 */
+/** 利用者の集約、テナントの集約、所属、値オブジェクト。 */
 @NullMarked
 package com.example.demo.tenancy.domain.model;
 

@@ -29,6 +29,7 @@ import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.ResultActions;
 import org.springframework.test.web.servlet.request.RequestPostProcessor;
+import org.springframework.test.web.servlet.result.JsonPathResultMatchers;
 import org.springframework.web.bind.annotation.RequestMethod;
 
 /**
@@ -91,9 +92,8 @@ class CurrentTenantMemberApiTest {
         .andExpect(jsonPath("$.lockNo").value(1))
         .andExpect(jsonPath("$.items.length()").value(2))
         .andExpect(jsonPath("$.items[*].userId", containsInAnyOrder(member, AppUsers.USER_ID)))
-        .andExpect(jsonPath("$.items[?(@.userId == '" + member + "')].role").value("MEMBER"))
-        .andExpect(
-            jsonPath("$.items[?(@.userId == '" + AppUsers.USER_ID + "')].role").value("ADMIN"));
+        .andExpect(roleOf(member).value("MEMBER"))
+        .andExpect(roleOf(AppUsers.USER_ID).value("ADMIN"));
   }
 
   @Test
@@ -115,7 +115,7 @@ class CurrentTenantMemberApiTest {
     mockMvc
         .perform(get(MEMBERS).with(inTenant(tenant, "ADMIN")))
         .andExpect(jsonPath("$.lockNo").value(1))
-        .andExpect(jsonPath("$.items[?(@.userId == '" + member + "')].role").value("MEMBER"));
+        .andExpect(roleOf(member).value("MEMBER"));
   }
 
   @Test
@@ -128,7 +128,7 @@ class CurrentTenantMemberApiTest {
         .perform(get(MEMBERS).with(selectedTenant(tenant, "ADMIN")))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.lockNo").value(2))
-        .andExpect(jsonPath("$.items[?(@.userId == '" + member + "')].role").value("ADMIN"));
+        .andExpect(roleOf(member).value("ADMIN"));
   }
 
   @Test
@@ -184,8 +184,7 @@ class CurrentTenantMemberApiTest {
     mockMvc
         .perform(get(MEMBERS).with(selectedTenant(tenant, "ADMIN")))
         .andExpect(jsonPath("$.lockNo").value(1))
-        .andExpect(
-            jsonPath("$.items[?(@.userId == '" + AppUsers.USER_ID + "')].role").value("ADMIN"));
+        .andExpect(roleOf(AppUsers.USER_ID).value("ADMIN"));
   }
 
   @Test
@@ -205,8 +204,7 @@ class CurrentTenantMemberApiTest {
 
     mockMvc
         .perform(get(MEMBERS).with(inTenant(otherTenant, "ADMIN")))
-        .andExpect(
-            jsonPath("$.items[?(@.userId == '" + otherTenantUser + "')].role").value("ADMIN"));
+        .andExpect(roleOf(otherTenantUser).value("ADMIN"));
   }
 
   @Test
@@ -222,7 +220,7 @@ class CurrentTenantMemberApiTest {
     mockMvc
         .perform(get(MEMBERS).with(asAdmin))
         .andExpect(jsonPath("$.lockNo").value(1))
-        .andExpect(jsonPath("$.items[?(@.userId == '" + member + "')].role").value("MEMBER"));
+        .andExpect(roleOf(member).value("MEMBER"));
   }
 
   @Test
@@ -242,6 +240,11 @@ class CurrentTenantMemberApiTest {
     remove(member, 0, asAdmin)
         .andExpect(status().isBadRequest())
         .andExpect(jsonPath("$.type").value("/problems/validation-error"));
+  }
+
+  /** 一覧の items から、指定した利用者の役割を指す期待値。 */
+  private static JsonPathResultMatchers roleOf(final String userId) {
+    return jsonPath("$.items[?(@.userId == '" + userId + "')].role");
   }
 
   private ResultActions changeRole(

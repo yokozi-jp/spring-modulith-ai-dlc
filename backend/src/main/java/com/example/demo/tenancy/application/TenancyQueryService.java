@@ -5,6 +5,7 @@ import com.example.demo.tenancy.TenancyQueries;
 import com.example.demo.tenancy.TenantMembersDetails;
 import com.example.demo.tenancy.domain.model.Membership;
 import com.example.demo.tenancy.domain.model.MembershipRepository;
+import com.example.demo.tenancy.domain.model.Tenant;
 import com.example.demo.tenancy.domain.model.TenantId;
 import com.example.demo.tenancy.domain.model.TenantRepository;
 import com.example.demo.tenancy.domain.model.UserId;
@@ -53,14 +54,17 @@ class TenancyQueryService implements TenancyQueries {
   public Optional<TenantMembersDetails> findMembers(final String tenantId) {
     return tenantRepository
         .findById(new TenantId(UUID.fromString(tenantId)))
-        .map(tenant ->
-            new TenantMembersDetails(
-                tenant.lockNo(),
-                tenant.members().stream()
-                    .map(member ->
-                        new TenantMembersDetails.Member(
-                            member.userId().value().toString(), member.role().name()))
-                    .toList()));
+        .map(TenancyQueryService::toMembersDetails);
+  }
+
+  private static TenantMembersDetails toMembersDetails(final Tenant tenant) {
+    return new TenantMembersDetails(
+        tenant.lockNo(),
+        tenant.members().stream()
+            .map(member ->
+                new TenantMembersDetails.Member(
+                    member.userId().value().toString(), member.role().name()))
+            .toList());
   }
 
   private static MembershipSummary toSummary(final Membership membership) {

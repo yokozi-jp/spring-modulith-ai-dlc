@@ -74,7 +74,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/TenantMembersResponse"
+                $ref: "#/components/schemas/TenantMembersDetailsResponse"
           description: 所属の一覧
         "401":
           $ref: "#/components/responses/UnauthorizedProblem"
@@ -98,12 +98,14 @@ paths:
           type: string
           format: uuid
       - description: 画面が読んだテナントのロック番号
+        example: 1
         in: query
         name: lockNo
         required: true
         schema:
           type: integer
           format: int64
+          example: 1
           minimum: 1
       responses:
         "204":
@@ -889,7 +891,7 @@ components:
       - tenantId
     TenantMemberResponse:
       type: object
-      description: テナントに所属している利用者を返す API の本文。
+      description: テナントに所属している利用者。
       properties:
         role:
           type: string
@@ -903,7 +905,7 @@ components:
       required:
       - role
       - userId
-    TenantMembersResponse:
+    TenantMembersDetailsResponse:
       type: object
       description: テナントの所属の一覧を items で包んで返す API の本文。
       properties:

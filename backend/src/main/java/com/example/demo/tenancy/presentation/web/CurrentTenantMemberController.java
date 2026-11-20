@@ -1,6 +1,5 @@
 package com.example.demo.tenancy.presentation.web;
 
-import com.example.demo.shared.failure.NotFoundException;
 import com.example.demo.shared.security.TenantNotSelectedException;
 import com.example.demo.tenancy.TenancyQueries;
 import com.example.demo.tenancy.application.ChangeMemberRoleCommandHandler;
@@ -9,8 +8,8 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
-import jakarta.validation.constraints.Min;
 import java.util.UUID;
+import org.springdoc.core.annotations.ParameterObject;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -19,7 +18,6 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
@@ -64,12 +62,14 @@ class CurrentTenantMemberController {
    */
   @Operation(operationId = "listTenantMembers")
   @GetMapping
-  /* package */ TenantMembersResponse search(final Authentication authentication) {
+  /* package */ TenantMembersDetailsResponse search(final Authentication authentication) {
     final String tenantId = selectedTenantId(authentication);
+    // TenantSelectionFilter が所属を確かめた後なので、選んだテナントは必ずある。なければ実装の不備として 500 にする。
     return tenancyQueries
         .findMembers(tenantId)
-        .map(TenantMembersResponse::from)
-        .orElseThrow(() -> new NotFoundException("tenant not found: tenantId=" + tenantId));
+        .map(TenantMembersDetailsResponse::from)
+        .orElseThrow(
+            () -> new IllegalStateException("selected tenant not found: tenantId=" + tenantId));
   }
 
   /**
@@ -102,7 +102,7 @@ class CurrentTenantMemberController {
    * <p>外した利用者は、次のリクエストから業務の API を呼べない。管理者以外には 403、最後の管理者を外すと 422 を返す。
    *
    * @param userId 所属を外す利用者の ID
-   * @param lockNo 画面が読んだテナントのロック番号
+   * @param request 画面が読んだテナントのロック番号（クエリパラメータ）
    * @param authentication ログインした利用者の認証
    * @return 本文のない 204 の応答
    */
@@ -114,10 +114,9 @@ class CurrentTenantMemberController {
   @DeleteMapping("/{userId}")
   /* package */ ResponseEntity<Void> remove(
       @PathVariable final UUID userId,
-      @RequestParam @Min(1) final long lockNo,
+      @Valid @ParameterObject final RemoveMemberRequest request,
       final Authentication authentication) {
-    removeMember.handle(
-        new RemoveMemberRequest(lockNo).toCommand(selectedTenantId(authentication), userId));
+    removeMember.handle(request.toCommand(selectedTenantId(authentication), userId));
     return ResponseEntity.noContent().build();
   }
 

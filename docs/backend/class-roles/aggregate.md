@@ -72,7 +72,7 @@ tags: [convention, backend, class-role]
 
 ## 依存してよい型、してはいけない型
 
-- **依存してよい型**：`java..` の標準型、`org.jspecify..`、同じ `domain.model` の Entity、値オブジェクト、enum、`shared.concurrency` の `ConflictException` と `ExpectedLockNo`、`shared.failure` の `BusinessRuleViolationException`。
+- **依存してよい型**：`java..` の標準型、`org.jspecify..`、同じ `domain.model` の Entity、値オブジェクト、enum、`shared.concurrency` の `ConflictException` と `ExpectedLockNo`、`shared.failure` の `BusinessRuleViolationException` と `NotFoundException`。
 - **依存してはいけない型**：Spring、jOOQ、jOOQ の生成型、JPA、Jackson の型、`domain.service`、`application`、モジュールルートの型、他モジュールの型、Repository と外部システムのインタフェース、`Clock`。
 
 ## 最小の例と典型的な例

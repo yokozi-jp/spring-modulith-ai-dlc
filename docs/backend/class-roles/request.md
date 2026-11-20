@@ -50,6 +50,10 @@ CommandHandler に Request を渡さず、Request に業務の不変条件を書
   enum、boolean、ネストした record、`List` には付けない（[OpenAPIのアノテーションとJavadoc](../../web-api/openapi-annotations.md#example)）。
 - `presentation.web` のパッケージの `package-info.java` は Controller と共有する。
 
+DELETE は本文を持たず、ロック番号をクエリパラメータで受ける（[更新の競合制御](../../web-api/optimistic-locking.md#delete)）。
+この場合も `<UseCase>Request`（`RemoveMemberRequest`）を作り、`@Min(1) long lockNo` を持たせ、Controller は `@Valid @ParameterObject` で受ける。
+Controller が `@RequestParam` の値から Request を作ることはしない。
+
 形式の違反は `MethodArgumentNotValidException` になり、`ApiExceptionHandler` が処理して、type が `/problems/validation-error` の 400 になる。
 `errors` 拡張に、誤りのある項目の JSON Pointer と説明が入る（[ADR-058](../../adr/ADR-058-use-path-absolute-relative-uri-for-problem-types.md)）。
 複数の項目の組み合わせ、マスタの存在、業務の状態に依存する検証は Request に書かず、[APIの入力検証の配置](../../web-api/validation.md)に従ってアプリケーションで行う。
@@ -150,6 +154,8 @@ Controller の MockMvc のテストで、制約に違反する本文が 400 の 
 - マスタの存在や在庫を、DB を読む Bean Validation の独自の制約で確かめる。
 - 確定や取消で、ロック番号をクエリパラメータやヘッダで受ける。
   [更新の競合制御](../../web-api/optimistic-locking.md)は、DELETE 以外ではロック番号をリクエストボディで受け渡すと定めている。
+- Controller が `@RequestParam` の値から Request を作る。
+  `@Valid @ParameterObject` で受ける。［ArchUnit で検査：ClassRoleArchTest.controllersDoNotCreateRequests］
 - Request に Domain の型（`Quantity`）を持たせる。
   Domain の型が Application の外へ出て、HTTP API の形と Domain を独立に変えられなくなる。
 - 変換を Controller の private メソッドや Mapper のクラスに書く。
@@ -163,7 +169,7 @@ Controller の MockMvc のテストで、制約に違反する本文が 400 の 
 - [ ] 既存の集約を変える操作の Request に `@Min(1) long lockNo` を持たせる。［自分で点検］
 - [ ] `ExpectedLockNo` は Request の `toCommand` だけで作る。［ArchUnit で検査：TableWriterArchTest.expectedLockNoIsCreatedOnlyByRequests］
 - [ ] 単項目の形式の検証を Bean Validation の制約で書き、ネストした record のリストは `List<@Valid ...>` にする。［自分で点検］
-- [ ] Controller で `@Valid @RequestBody` で受ける。［自分で点検］
+- [ ] Controller で `@Valid @RequestBody`（DELETE は `@Valid @ParameterObject`）で受け、Controller は Request を作らない。［ArchUnit で検査：ClassRoleArchTest.controllersDoNotCreateRequests］
 - [ ] `toCommand(...)` で Command に変換し、パス変数の値は引数で受け取る。［自分で点検］
 - [ ] `List` の component をコンパクトコンストラクタで `List.copyOf` に置き換える。［自分で点検］
 - [ ] record、ネストした record、`toCommand` に Javadoc を書く。［自分で点検］

@@ -5,17 +5,17 @@ import {
 import type { OrderDetailsResponse, OrderLineRequest } from "@frontend/api/models";
 import { useQueryClient } from "@tanstack/react-query";
 import type { QueryClient } from "@tanstack/react-query";
-import type { TFunction } from "i18next";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { useAppForm } from "@/features/orders/form";
-import { formFailure, problemNotice, problemStatus } from "@/features/orders/notice";
-import type { Notice } from "@/features/orders/notice";
+import { formFailure, linesConflictOutcome } from "@/features/orders/notice";
 import { changeOrderLinesFormSchema } from "@/features/orders/schemas";
 import type { OrderLinesValues } from "@/features/orders/schemas";
 import { noServerErrors, withoutField } from "@/features/orders/server-errors";
 import type { ServerFieldErrors } from "@/features/orders/server-errors";
+import { problemStatus } from "@/lib/notice";
+import type { Notice } from "@/lib/notice";
 
 function linesValues(order: OrderDetailsResponse): OrderLinesValues {
   return {
@@ -36,24 +36,6 @@ function reloadedOrder(
   return queryClient.getQueryState(queryKey)?.status === "success"
     ? queryClient.getQueryData<{ data: OrderDetailsResponse }>(queryKey)?.data
     : undefined;
-}
-
-/** 明細の変更の 409 の後の通知と、2 つの選択肢を出すか。 */
-function conflictOutcome(
-  t: TFunction,
-  error: unknown,
-  latest: OrderDetailsResponse | undefined,
-): { notice: Notice; conflict: boolean } {
-  if (latest === undefined) {
-    return {
-      notice: problemNotice(t, error, t("orders.notice.conflictReloadFailed")),
-      conflict: false,
-    };
-  }
-  if (latest.status !== "DRAFT") {
-    return { notice: problemNotice(t, error, t("orders.notice.notEditable")), conflict: false };
-  }
-  return { notice: problemNotice(t, error, t("orders.notice.linesConflict")), conflict: true };
 }
 
 interface Base {
@@ -118,13 +100,13 @@ export function useOrderLinesEditor(
         },
         onError: (error) => {
           if (problemStatus(error) === 409) {
-            const outcome = conflictOutcome(t, error, reloadedOrder(queryClient, orderId));
+            const outcome = linesConflictOutcome(t, error, reloadedOrder(queryClient, orderId));
             setNotice(outcome.notice);
             setFeedback({ conflict: outcome.conflict, serverErrors: noServerErrors });
             return;
           }
           const failure = formFailure(t, error, {
-            // 409 は上の conflictOutcome で扱ったので、ここには届かない。
+            // 409 は上の linesConflictOutcome で扱ったので、ここには届かない。
             conflict: undefined,
             unprocessable: t("orders.notice.linesUnprocessable"),
           });

@@ -4,7 +4,7 @@
  */
 
 /**
- * テナントに所属している利用者を返す API の本文。
+ * テナントに所属している利用者。
  */
 export interface TenantMemberResponse {
   /** テナントの中の役割のコード値（ADMIN、MEMBER） */
