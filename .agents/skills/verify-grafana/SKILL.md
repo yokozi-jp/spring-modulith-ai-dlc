@@ -47,7 +47,7 @@ bash .kiro/skills/verify-grafana/scripts/check.sh all
 
 `metrics` は、RED（Rate、Errors、Duration）、JVM（ヒープ、Metaspace、GC、スレッド、CPU）、Hikari（active、pending、acquire）、jOOQ、Logback の PromQL を実行し、系列が 1 本以上あれば OK とする。
 `dashboards` は、`/api/search` で見つけた全ダッシュボードの各パネルの `expr` を実行する。
-変数 `$job` は `demo/demo-api`、それ以外は `.*` に置き換える。
+変数 `$job` は `demo/demo-api`、それ以外は `.+` に置き換える（All は `.+` に展開されるため。`.*` にすると属性の無い系列が通り、画面の No data を見逃す）。
 指標の名前と属性は Micrometer のもの（`http_server_requests_milliseconds_*`、属性は `status`、`uri`、`method`、`outcome`、JVM は `area` と `id`）で、OpenTelemetry の semantic conventions の名前ではない。
 
 ## Evidence
@@ -55,7 +55,7 @@ bash .kiro/skills/verify-grafana/scripts/check.sh all
 - 実行ごとに `build/verify-grafana/check-<UTC>.txt` へ全出力が残る（`build/` は git の対象外で、`EVIDENCE_DIR` で変えられる）。
 - 証拠には、使ったコマンド、バックエンドを起動した worktree と commit、送った request の種類と件数を添える。
 - FAIL を OK に変える編集をしない。FAIL は [features/](features/README.md) の Gotchas の既知の失敗と照らし、新しいものだけを報告する。
-- 画面の確認（Explore、ダッシュボードの描画）は、このスキルでは確かめていない。確かめたと書かない。
+- 画面の確認は、`check.sh` では行わない。Explore とダッシュボードの描画は Playwright で開いてスクリーンショットを撮り、`build/verify-grafana/screenshots/` に残す（2026-11 に手で実施した記録は PR #548）。
 
 ## Cleanup
 

@@ -22,6 +22,7 @@ Explore の Prometheus で上の PromQL を実行してもよい。
 ## Gotchas
 
 - **RED Metrics の 2 つのダッシュボードは、全パネルが空である**（2026-11 の `otel-lgtm` 0.40.0 で確認）。クエリが OpenTelemetry の名前（`http_server_request_duration_seconds_*` など）を探すが、この backend は Micrometer の名前 `http_server_requests_milliseconds_*` を出す。直すなら、名前を揃える側を決める Issue が要る。
-- **JVM Overview の Error % も空である。** クエリが OpenTelemetry の名前と属性 `http_response_status_code` に限られ、Micrometer は `status` を出す。
+- **JVM Overview は、Error % 以外も全パネルが No data である**（スクリーンショットで確認）。バックエンドの指標に `instance` 属性が無く（`service.instance.id` を設定していない）、変数 instance の All（`.+`）が一致しない。
+- **JVM Overview の Error % は、さらに名前でも空である。** クエリが OpenTelemetry の名前と属性 `http_response_status_code` に限られ、Micrometer は `status` を出す。
 - `rate(...[5m])` は、送信を始めて 1〜2 分は空になる。待ってから見る。
 - 5xx の指標は、5xx を起こさないと出ない。無いことを失敗と読まない（4xx は出る）。

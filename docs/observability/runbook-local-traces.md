@@ -22,7 +22,7 @@ tags: [runbook, observability, tracing, grafana, tempo, local]
 Problem Details に `traceId` は含まれない。
 trace ID は、ログに出ているかどうかで探し方を分ける。
 
-- **ログに出ている**：trace ID の名前は、コンソールの ECS JSON では `traceId`（[可観測性データの規約](conventions.md)）、Grafana の Loki では `trace_id` である。Explore の Loki で `{service_name="demo-api"} | trace_id != ""` を検索し、ログ行を開いて詳細の `Trace: <trace ID>` のリンクを押すと、Tempo でトレースが開く。バックエンドは失敗をログに残す。
+- **ログに出ている**：trace ID の名前は、コンソールの ECS JSON では `traceId`（[可観測性データの規約](conventions.md)）、Grafana の Loki では `trace_id` である。Explore の Loki で `{service_name="demo-api"} | trace_id != ""` を検索し、ログ行を開いて詳細の Links の `Trace: <trace ID>` を押すと、右の分割ペインで Tempo のトレースが開く。バックエンドは失敗をログに残す。
 - **ログに出ていない**：次の「ブラウザを使わずに検索する」か、Explore の Tempo で TraceQL `{ resource.service.name = "demo-api" }` を実行し、一覧から開く。
 
 trace ID が分かっているときは、次の順に開く。

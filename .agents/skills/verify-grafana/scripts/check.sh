@@ -53,7 +53,7 @@ metrics() {
 }
 
 dashboards() {
-  echo "== dashboards（パネルの PromQL を実行し、変数を demo/demo-api と .* に置き換える）"
+  echo "== dashboards（パネルの PromQL を実行し、変数 job を demo/demo-api、それ以外を .+ に置き換える）"
   python3 - "$B" <<'PY' || fail=1
 import json, re, sys, urllib.parse, urllib.request
 B = sys.argv[1]
@@ -73,7 +73,7 @@ for d in get(B + "/api/search?type=dash-db"):
                 continue
             e = re.sub(r"\$__rate_interval|\$__interval|\$\{__rate_interval\}", "5m", e)
             e = re.sub(r"\$\{?job\}?", "demo/demo-api", e)
-            e = re.sub(r"\$\{?\w+\}?", ".*", e)
+            e = re.sub(r"\$\{?\w+\}?", ".+", e)  # All は .+ に展開される。.* だと属性の無い系列が通り、画面の No data を見逃す
             try:
                 n = len(get(prom + urllib.parse.quote(e))["data"]["result"])
             except Exception as ex:
