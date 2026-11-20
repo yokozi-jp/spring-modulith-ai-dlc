@@ -20,4 +20,5 @@ SQL を発行する `/api/**` を呼ぶと、`jooq_query_*` の件数が増え�
 ## Gotchas
 
 - `hikaricp_connections_active` と `pending` は、静止していると 0 である。系列があることだけを確かめ、負荷下の値は性能テストで見る。
-- 起動時のシーダーや Spring Modulith のスケジューラーも SQL を発行するので、`jooq_query_*` の件数は request を送らなくても 0 にならない。request で増えたことを示すには、前後の差を取る。
+- リポジトリの `EventPublicationResubmitter` と ShedLock も定期的に SQL を発行するので、`jooq_query_*` の件数は request を送らなくても 0 にならない。
+  request で増えたことを示すには、前後の差を取る。

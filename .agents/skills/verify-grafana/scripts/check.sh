@@ -1,13 +1,15 @@
 #!/usr/bin/env bash
 # ローカルの Grafana の proxy 経由で、Prometheus の主要な指標と同梱ダッシュボードのパネルを調べる。読み取りだけを行う。
 # 使い方: bash .kiro/skills/verify-grafana/scripts/check.sh [doctor|metrics|dashboards|all]
-# 環境変数: GRAFANA_HOST_PORT（無ければ .env から読む）、EVIDENCE_DIR（既定 build/verify-grafana）
+# 環境変数: GRAFANA_HOST_PORT、OTEL_SERVICE_NAME、OTEL_SERVICE_NAMESPACE（無ければ .env から読む）、EVIDENCE_DIR（既定 build/verify-grafana）
 set -euo pipefail
 mode="${1:-all}"
-if [ -z "${GRAFANA_HOST_PORT:-}" ] && [ -f .env ]; then
-  GRAFANA_HOST_PORT="$(sed -n 's/^GRAFANA_HOST_PORT=//p' .env)"
-fi
+envval() { [ -f .env ] && sed -n "s/^$1=//p" .env | tail -1 || true; }
+GRAFANA_HOST_PORT="${GRAFANA_HOST_PORT:-$(envval GRAFANA_HOST_PORT)}"
+SVC="${OTEL_SERVICE_NAME:-$(envval OTEL_SERVICE_NAME)}"
+NS="${OTEL_SERVICE_NAMESPACE:-$(envval OTEL_SERVICE_NAMESPACE)}"
 B="http://localhost:${GRAFANA_HOST_PORT:?GRAFANA_HOST_PORT が未設定で、.env にも無い}"
+: "${SVC:?OTEL_SERVICE_NAME が未設定で、.env にも無い}" "${NS:?OTEL_SERVICE_NAMESPACE が未設定で、.env にも無い}"
 PROM="$B/api/datasources/proxy/uid/prometheus/api/v1/query"
 OUT="${EVIDENCE_DIR:-build/verify-grafana}"
 mkdir -p "$OUT"
@@ -15,7 +17,7 @@ LOG="$OUT/check-$(date -u +%Y%m%dT%H%M%SZ).txt"
 exec > >(tee "$LOG") 2>&1
 fail=0
 
-# 名前、PromQL。値のある系列が 1 本以上あれば OK。
+# 名前|PromQL。NaN でない値の系列が 1 本以上あれば OK。
 metrics=(
   "RED Rate|sum(http_server_requests_milliseconds_count)"
   "RED Errors (4xx/5xx)|sum(http_server_requests_milliseconds_count{status=~\"[45]..\"})"
@@ -32,18 +34,21 @@ metrics=(
   "Logback events|sum(logback_events_total)"
 )
 
-q() { curl -sfG "$PROM" --data-urlencode "query=$1"; }
-count() { python3 -c 'import json,sys; print(len(json.load(sys.stdin)["data"]["result"]))'; }
+q() { curl -sfG --max-time 20 "$PROM" --data-urlencode "query=$1"; }
+count() { python3 -c 'import json,sys; print(sum(1 for r in json.load(sys.stdin)["data"]["result"] if r["value"][1] not in ("NaN", "+Inf", "-Inf")))'; }
 
 doctor() {
   echo "== doctor ($B)"
-  curl -sf -o /dev/null "$B/api/health" && echo "OK   Grafana が応答する" || { echo "FAIL Grafana が応答しない"; fail=1; return; }
-  q 'up' >/dev/null && echo "OK   proxy 経由で Prometheus に届く" || { echo "FAIL Prometheus の proxy が失敗"; fail=1; }
-  n="$(q 'jvm_threads_live{service_name="demo-api"}' | count)"
-  if [ "$n" -ge 1 ]; then echo "OK   demo-api の指標が届いている"; else echo "FAIL demo-api の指標が無い（バックエンド未起動、または起動から 1〜2 分以内）"; fail=1; fi
+  curl -sf --max-time 10 -o /dev/null "$B/api/health" || { echo "FAIL Grafana が応答しない"; return 1; }
+  echo "OK   Grafana が応答する"
+  q 'up' >/dev/null || { echo "FAIL proxy 経由で Prometheus に届かない"; return 1; }
+  echo "OK   proxy 経由で Prometheus に届く"
+  n="$(q "jvm_threads_live{service_name=\"$SVC\"}" | count || echo 0)"
+  [ "$n" -ge 1 ] || { echo "FAIL $SVC の指標が無い（バックエンド未起動、または起動から 1〜2 分以内）"; return 1; }
+  echo "OK   $SVC の指標が届いている（別の worktree のバックエンドの指標でないことは、起動した PID で確かめる）"
 }
 
-metrics() {
+check_metrics() {
   echo "== metrics"
   for m in "${metrics[@]}"; do
     name="${m%%|*}"; expr="${m#*|}"
@@ -52,12 +57,12 @@ metrics() {
   done
 }
 
-dashboards() {
-  echo "== dashboards（パネルの PromQL を実行し、変数 job を demo/demo-api、それ以外を .+ に置き換える）"
-  python3 - "$B" <<'PY' || fail=1
+check_dashboards() {
+  echo "== dashboards（Prometheus のパネルの PromQL を実行する。変数 job は $NS/$SVC、それ以外は All と同じ .+ に置き換える）"
+  python3 - "$B" "$NS/$SVC" <<'PY' || fail=1
 import json, re, sys, urllib.parse, urllib.request
-B = sys.argv[1]
-get = lambda u: json.load(urllib.request.urlopen(u))
+B, JOB = sys.argv[1], sys.argv[2]
+get = lambda u: json.load(urllib.request.urlopen(u, timeout=20))
 prom = B + "/api/datasources/proxy/uid/prometheus/api/v1/query?query="
 bad = 0
 def walk(ps):
@@ -69,13 +74,15 @@ for d in get(B + "/api/search?type=dash-db"):
     for p in walk(dash.get("panels", [])):
         for t in p.get("targets", []):
             e = t.get("expr")
-            if not e:
+            ds = t.get("datasource") or p.get("datasource")
+            if not e or (isinstance(ds, dict) and ds.get("type") not in (None, "prometheus")):
                 continue
-            e = re.sub(r"\$__rate_interval|\$__interval|\$\{__rate_interval\}", "5m", e)
-            e = re.sub(r"\$\{?job\}?", "demo/demo-api", e)
-            e = re.sub(r"\$\{?\w+\}?", ".+", e)  # All は .+ に展開される。.* だと属性の無い系列が通り、画面の No data を見逃す
+            e = re.sub(r"\$\{?__\w+\}?", "5m", e)
+            e = re.sub(r"\$\{?job\}?", JOB, e)
+            e = re.sub(r"\$\{?\w+\}?", ".+", e)
             try:
-                n = len(get(prom + urllib.parse.quote(e))["data"]["result"])
+                r = get(prom + urllib.parse.quote(e))["data"]["result"]
+                n = sum(1 for x in r if x["value"][1] not in ("NaN", "+Inf", "-Inf"))
             except Exception as ex:
                 n = "ERR " + str(ex)[:40]
             ok = isinstance(n, int) and n > 0
@@ -86,11 +93,14 @@ PY
 }
 
 case "$mode" in
-  doctor) doctor ;;
-  metrics) doctor; metrics ;;
-  dashboards) doctor; dashboards ;;
-  all) doctor; metrics; dashboards ;;
+  doctor|metrics|dashboards|all) ;;
   *) echo "使い方: $0 [doctor|metrics|dashboards|all]"; exit 2 ;;
+esac
+doctor || { echo "doctor が FAIL のため、先に進まない"; echo "証拠: $LOG"; exit 1; }
+case "$mode" in
+  metrics) check_metrics ;;
+  dashboards) check_dashboards ;;
+  all) check_metrics; check_dashboards ;;
 esac
 echo "証拠: $LOG"
 exit "$fail"

@@ -18,6 +18,8 @@
 
 画面、API、注文、決済、ログインに関わる変更を確かめるとき、不具合を再現するとき、Pull Request の Evidence を作るときは `/verify-demo` を使う。
 
+ローカルの Grafana で指標（RED、JVM、Hikari、jOOQ）が届くか、同梱ダッシュボードが出るかを確かめるときは `/verify-grafana` を使う。
+
 ### Matt Pocock skills
 
 Matt Pocock のスキルを使う前に `docs/agents/matt-pocock-skills/workflow.md` を読む。
