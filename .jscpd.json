@@ -3,5 +3,6 @@
   "minLines": 5,
   "ignore": ["**/routeTree.gen.ts", "**/generated/**"],
   "reporters": ["console"],
-  "threshold": 4.0
+  "ignorePattern": ["\\nimport [^;]*;"],
+  "threshold": 2.0
 }

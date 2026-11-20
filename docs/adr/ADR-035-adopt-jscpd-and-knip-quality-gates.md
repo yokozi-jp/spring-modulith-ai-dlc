@@ -11,7 +11,7 @@ tags: [adr, quality, ci, lint]
 
 Proposed
 
-jscpd の閾値の値（3.2%）は [ADR-074](ADR-074-raise-jscpd-threshold-for-class-role-boilerplate.md) で 4.0% に改める。
+jscpd の閾値の値（3.2%）は [ADR-074](ADR-074-raise-jscpd-threshold-for-class-role-boilerplate.md) で 4.0% に改め、[ADR-106](ADR-106-ignore-import-statements-in-jscpd.md) が import 文を比べない方式に置き換えて 2.0% にする。
 
 ## Date
 

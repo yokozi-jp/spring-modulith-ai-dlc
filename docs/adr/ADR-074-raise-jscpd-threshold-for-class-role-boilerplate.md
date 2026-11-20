@@ -9,7 +9,7 @@ tags: [adr, quality, ci, lint]
 
 ## Status
 
-Proposed
+Superseded by [ADR-106](ADR-106-ignore-import-statements-in-jscpd.md)
 
 ## Date
 
