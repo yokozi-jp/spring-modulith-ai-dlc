@@ -1,7 +1,7 @@
 # モジュールの中の構成と、外に見せる入口（#340 の調査）
 
 この文書は #340 の調査の記録で、merge しない。
-結論は #340 のコメントと同じで、作業は「作業の Issue」の 2 件で行う。
+結論は #340 のコメントと同じで、作業は #565 と #566 で行う。
 向こうは `yokozi-jp/agent-software-factory`（`origin/main`、commit `29ba897`）、こちらは `yokozi-jp/spring-modulith-ai-dlc`（main、commit `e29ab2a3`）である。
 
 ## 結論
@@ -28,7 +28,7 @@ route（こちらの Controller）をモジュールが持つことと、モジ�
 Spring Modulith 2.2.0 の `:: **`（spring-projects/spring-modulith#1924）と、名前付きインタフェースを型に登録する API（spring-projects/spring-modulith#1839）は、この決定を変えない。
 2.2 へ上げることは #562 のままでよく、この作業は 2.1.2 で進められる。
 
-作業の Issue を 2 つ起こす（下の「作業の Issue」）。
+作業の Issue を 2 つ起こした（#565、#566）。
 
 ## 比べたもの
 
@@ -256,6 +256,11 @@ Spring Modulith のソースで、次を確かめた。
 - `org.springframework.web`、`org.springframework.http`、`jakarta.servlet` を import するのは、ベースパッケージ直下の設定 5 つ、`error.presentation.web`、各モジュールの `presentation.web`、`payment.infrastructure.client` だけである。
 - `domain.model` の import は、`java.util`、`java.math`、`java.time`、`org.jspecify.annotations`、自モジュールの `domain.model`、`shared.concurrency`、`shared.failure` だけである。`domain.service` のクラスはない。
 - 機能モジュールの依存先：`product` は `jooq`、`ordering` は `product`、`shared`、`jooq`、`payment` は `ordering`、`shared`、`jooq`、`tenancy` は `shared`、`jooq`、`error` は `shared`、`shared` は `jooq`（`jooq.modulith`）。
+
+## 作業の Issue
+
+- #565：モジュールの依存先を `allowedDependencies` で宣言し、手書きの依存の向きのテストを消す。
+- #566：HTTP の型を使える層を絞り、domain の依存を許可リストにする。
 
 ## 出典
 
