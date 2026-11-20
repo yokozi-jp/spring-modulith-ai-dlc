@@ -2,30 +2,36 @@ package com.example.demo.shared.infrastructure.persistence;
 
 import static com.example.demo.jooq.tables.FixtureItemDetailTable.FIXTURE_ITEM_DETAIL;
 import static com.example.demo.jooq.tables.FixtureItemTable.FIXTURE_ITEM;
+import static com.example.demo.shared.infrastructure.persistence.FixtureAggregates.DETAILS;
+import static com.example.demo.shared.infrastructure.persistence.FixtureAggregates.ITEM;
+import static com.example.demo.shared.infrastructure.persistence.FixtureAggregates.ITEM_ONLY;
+import static com.example.demo.shared.infrastructure.persistence.FixtureAggregates.version;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.Mockito.mock;
 
 import com.example.demo.shared.concurrency.ConflictException;
-import com.example.demo.shared.failure.BusinessRuleViolationException;
 import com.example.demo.shared.failure.NotFoundException;
 import com.example.demo.testkit.DatabaseTest;
 import com.example.demo.testkit.FixtureTablesExtension;
 import java.io.PrintWriter;
 import java.io.StringWriter;
+import java.sql.SQLException;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
+import java.util.function.Consumer;
 import java.util.function.Supplier;
 import java.util.regex.Pattern;
-import org.jooq.Condition;
 import org.jooq.DSLContext;
 import org.jooq.Record;
 import org.jooq.Table;
+import org.jooq.TableField;
 import org.jooq.impl.DSL;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -33,14 +39,26 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.dao.DataAccessException;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.TransactionDefinition;
+import org.springframework.transaction.support.TransactionTemplate;
 
 /** {@link TableWriter} の SQL と件数の判定を、テスト専用のテーブルと実 PostgreSQL で確かめる。各テストはロールバックする。 */
 // 入口ごとの成功と失敗の条件をテストに分けるため、メソッドの数の上限を外す。
 // 行の値はテストごとに読み下せるよう、定数にせず文字列のまま書く。
-@SuppressWarnings({"PMD.TooManyMethods", "PMD.AvoidDuplicateLiterals"})
+// 共有の集約の宣言と版の作成を static import するため、static import の数の上限を外す。
+@SuppressWarnings({"PMD.TooManyMethods", "PMD.AvoidDuplicateLiterals", "PMD.TooManyStaticImports"})
 @DatabaseTest
 @ExtendWith(FixtureTablesExtension.class)
 class TableWriterTest {
+
+  /** lock_no を持たないテーブル。 */
+  private static final Table<Record> NO_LOCK_TABLE = DSL.table(DSL.name("t_no_lock"));
+
+  /** lock_no を持たないテーブルの主キーに見立てた列。宣言はテーブルの検査で失敗するため、列の中身は使わない。 */
+  @SuppressWarnings("unchecked")
+  private static final TableField<Record, Long> NO_LOCK_ID = mock(TableField.class);
 
   /** 更新の時刻。 */
   private static final Instant NOW = Instant.parse("2026-10-04T01:02:03.123456Z");
@@ -61,14 +79,14 @@ class TableWriterTest {
   private static final Pattern SQL_STATEMENT =
       Pattern.compile("(?i)\\b(insert into|update|select|delete from)\\s+\"");
 
-  /** lock_no を持たないテーブル。 */
-  private static final Table<Record> NO_LOCK_TABLE = DSL.table(DSL.name("t_no_lock"));
-
   /** アプリロールで接続した jOOQ のコンテキスト。 */
   @Autowired private DSLContext dsl;
 
   /** 行を作るときの共通カラムの値。 */
   private CommonColumns seedColumns;
+
+  /** トランザクションの有無と読み取り専用を切り替えて呼ぶ。 */
+  @Autowired private PlatformTransactionManager transactionManager;
 
   /** 検証対象。 */
   private TableWriter writer;
@@ -84,8 +102,8 @@ class TableWriterTest {
   }
 
   @Test
-  @DisplayName("updateCheckingVersion は業務の列と updated_* を書き、版を期待値 + 1 にし、created_* を変えない")
-  void updateCheckingVersionUpdatesOneRow() {
+  @DisplayName("update は業務の列と updated_* を書き、版を期待値 + 1 にし、created_* を変えない")
+  void updateWritesRootColumnsAndAdvancesVersion() {
     insertItem(1L, "before");
 
     inUseCase(() -> updateItem(1L, 1L, "after"));
@@ -100,28 +118,26 @@ class TableWriterTest {
   }
 
   @Test
-  @DisplayName("updateCheckingVersion は業務の列がなくても、版と updated_* を進める")
-  void updateCheckingVersionWithoutBusinessColumnsAdvancesVersion() {
+  @DisplayName("update は業務の列がなくても、版と updated_* を進める")
+  void updateWithoutBusinessColumnsAdvancesVersion() {
     insertItem(1L, "before");
 
-    inUseCase(
-        () ->
-            writer.updateCheckingVersion(FIXTURE_ITEM, FIXTURE_ITEM.ITEM_ID.eq(1L), 1L, set -> {}));
+    inUseCase(() -> save(1L, 1L, set -> {}, List.of()));
 
     assertThat(item(1L).get(FIXTURE_ITEM.LOCK_NO)).isEqualTo(2L);
     assertThat(item(1L).get(FIXTURE_ITEM.UPDATED_AT)).isEqualTo(NOW);
   }
 
   @Test
-  @DisplayName("updateCheckingVersion は版が違えば、原因なしの競合の例外を投げ、行を変えない")
-  void updateCheckingVersionWithStaleVersionConflicts() {
+  @DisplayName("update は版が違えば、原因なしの競合の例外を投げ、行を変えない")
+  void updateWithStaleVersionConflicts() {
     insertItem(1L, "before");
     makeStale(1L);
 
     assertThatThrownBy(() -> inUseCase(() -> updateItem(1L, 1L, "after")))
         .isInstanceOf(ConflictException.class)
         .hasMessageContaining("table=t_fixture_item")
-        .hasMessageContaining("key=[1]")
+        .hasMessageContaining("item_id=1")
         .hasMessageContaining("expectedLockNo=1")
         .hasNoCause()
         .satisfies(thrown -> assertConflictWithoutSql(thrown, ConflictException.Kind.VERSION));
@@ -129,157 +145,56 @@ class TableWriterTest {
   }
 
   @Test
-  @DisplayName("updateCheckingVersion は主キーの行がなければ NotFoundException を投げる")
-  void updateCheckingVersionWithoutRowIsNotFound() {
+  @DisplayName("update は一意の列の行がなければ NotFoundException を投げる")
+  void updateWithoutRowIsNotFound() {
     assertThatThrownBy(() -> inUseCase(() -> updateItem(1L, 1L, "after")))
         .isInstanceOf(NotFoundException.class)
         .hasMessageContaining("table=t_fixture_item");
   }
 
   @Test
-  @DisplayName("updateCheckingVersion は主キーの条件が 2 行に合えば IllegalStateException を投げる")
-  void updateCheckingVersionMatchingTwoRowsIsRejected() {
-    insertItem(1L, "one");
-    insertItem(2L, "two");
+  @DisplayName("update は一意の列が 2 行に合えば IllegalStateException を投げる")
+  void updateMatchingTwoRowsIsRejected() {
+    insertItem(1L, "same");
+    insertItem(2L, "same");
+    final AggregateTable<Record, String> byName =
+        AggregateTable.of(FIXTURE_ITEM, FIXTURE_ITEM.ITEM_NAME, FIXTURE_ITEM.ITEM_ID);
 
-    assertThatThrownBy(
-            () ->
-                inUseCase(
-                    () ->
-                        writer.updateCheckingVersion(
-                            FIXTURE_ITEM,
-                            FIXTURE_ITEM.ITEM_ID.in(1L, 2L),
-                            1L,
-                            set -> set.set(FIXTURE_ITEM.ITEM_NAME, "x"))))
+    assertThatThrownBy(() ->
+            runInUseCase(() -> writer.update(byName, "same", version(1L), set -> {}, rows -> {})))
         .isInstanceOf(IllegalStateException.class)
         .hasMessageContaining("matched 2 rows");
   }
 
-  @Test
-  @DisplayName("updateChild は子の行がなければ BusinessRuleViolationException を投げる")
-  void updateChildMatchingNoRowIsUnprocessable() {
-    insertItem(1L, "root");
-
-    assertThatThrownBy(
-            () ->
-                runInUseCase(
-                    () ->
-                        updateItem(1L, 1L, "root")
-                            .updateChild(
-                                FIXTURE_ITEM_DETAIL,
-                                FIXTURE_ITEM_DETAIL
-                                    .ITEM_ID
-                                    .eq(1L)
-                                    .and(FIXTURE_ITEM_DETAIL.DETAIL_NO.eq(9)),
-                                set -> set.set(FIXTURE_ITEM_DETAIL.DETAIL_TEXT, "x"))))
-        .isInstanceOf(BusinessRuleViolationException.class)
-        .hasMessageContaining("table=t_fixture_item_detail");
-  }
-
-  @Test
-  @DisplayName("updateChild は子の主キーの条件が 2 行に合えば IllegalStateException を投げる")
-  void updateChildMatchingTwoRowsIsRejected() {
-    insertItem(1L, "root");
-    insertDetail(1L, 1, "one");
-    insertDetail(1L, 2, "two");
-
-    assertThatThrownBy(
-            () ->
-                runInUseCase(
-                    () ->
-                        updateItem(1L, 1L, "root")
-                            .updateChild(
-                                FIXTURE_ITEM_DETAIL,
-                                FIXTURE_ITEM_DETAIL.ITEM_ID.eq(1L),
-                                set -> set.set(FIXTURE_ITEM_DETAIL.DETAIL_TEXT, "x"))))
-        .isInstanceOf(IllegalStateException.class)
-        .hasMessageContaining("matched 2 rows")
-        .hasMessageContaining("table=t_fixture_item_detail");
-  }
-
-  @Test
-  @DisplayName("lock_no のないテーブルは、SQL を実行する前に IllegalArgumentException にする")
-  void tableWithoutLockNoIsRejected() {
-    final Condition anyRow = DSL.trueCondition();
-
-    assertThatThrownBy(() -> writer.updateCheckingVersion(NO_LOCK_TABLE, anyRow, 1L, set -> {}))
-        .as("updateCheckingVersion")
-        .isInstanceOf(IllegalArgumentException.class)
-        .hasMessageContaining("column=lock_no");
-    assertThatThrownBy(() -> writer.deleteCheckingVersion(NO_LOCK_TABLE, anyRow, 1L))
-        .as("deleteCheckingVersion")
-        .isInstanceOf(IllegalArgumentException.class)
-        .hasMessageContaining("column=lock_no");
-    assertThatThrownBy(() -> inUseCase(() -> writer.updateWhere(NO_LOCK_TABLE, anyRow, set -> {})))
-        .as("updateWhere")
-        .isInstanceOf(IllegalArgumentException.class)
-        .hasMessageContaining("column=lock_no");
-  }
-
   @ParameterizedTest(name = "expectedLockNo={0}")
   @ValueSource(longs = {0L, -1L})
-  @DisplayName("期待する版が 1 未満なら、更新でも削除でも IllegalArgumentException にする")
+  @DisplayName("期待する版が 1 未満なら、SQL を実行する前に IllegalArgumentException にする")
   void expectedLockNoBelowOneIsRejected(final long expectedLockNo) {
     insertItem(1L, "before");
 
     assertThatThrownBy(() -> inUseCase(() -> updateItem(1L, expectedLockNo, "after")))
-        .as("updateCheckingVersion")
-        .isInstanceOf(IllegalArgumentException.class)
-        .hasMessageContaining("expectedLockNo=" + expectedLockNo);
-    assertThatThrownBy(
-            () ->
-                writer.deleteCheckingVersion(
-                    FIXTURE_ITEM, FIXTURE_ITEM.ITEM_ID.eq(1L), expectedLockNo))
-        .as("deleteCheckingVersion")
         .isInstanceOf(IllegalArgumentException.class)
         .hasMessageContaining("expectedLockNo=" + expectedLockNo);
   }
 
   @Test
-  @DisplayName("updateWhere は条件に合うすべての行の版を 1 進め、件数を返す")
-  void updateWhereAdvancesEveryMatchedVersion() {
-    insertItem(1L, "one");
-    insertItem(2L, "two");
-    makeStale(2L);
-
-    final int updated =
-        inUseCase(
-            () ->
-                writer.updateWhere(
-                    FIXTURE_ITEM,
-                    FIXTURE_ITEM.ITEM_ID.in(1L, 2L),
-                    set -> set.set(FIXTURE_ITEM.ITEM_NAME, "bulk")));
-    final int none =
-        inUseCase(
-            () ->
-                writer.updateWhere(
-                    FIXTURE_ITEM,
-                    FIXTURE_ITEM.ITEM_ID.eq(3L),
-                    set -> set.set(FIXTURE_ITEM.ITEM_NAME, "none")));
-
-    assertThat(updated).as("件数").isEqualTo(2);
-    assertThat(none).as("合う行がない").isZero();
-    assertThat(item(1L).get(FIXTURE_ITEM.LOCK_NO)).as("1 の版").isEqualTo(2L);
-    assertThat(item(2L).get(FIXTURE_ITEM.LOCK_NO)).as("2 の版").isEqualTo(3L);
-    assertThat(item(2L).get(FIXTURE_ITEM.ITEM_NAME)).as("業務の列").isEqualTo("bulk");
+  @DisplayName("共通カラムのないテーブルは、集約の宣言で IllegalArgumentException にする")
+  void tableWithoutCommonColumnsIsRejected() {
+    assertThatThrownBy(() -> AggregateTable.of(NO_LOCK_TABLE, NO_LOCK_ID, NO_LOCK_ID))
+        .as("集約")
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessageContaining("column=lock_no");
+    assertThatThrownBy(() -> ChildTable.<Record, Record>of(NO_LOCK_TABLE, NO_LOCK_ID, NO_LOCK_ID))
+        .as("子")
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessageContaining("column=lock_no");
   }
 
   @Test
-  @DisplayName("deleteWhere は条件に合う行を削除し、件数を返す")
-  void deleteWhereReturnsCount() {
-    insertItem(1L, "one");
-    insertItem(2L, "two");
-
-    final int deleted = writer.deleteWhere(FIXTURE_ITEM, FIXTURE_ITEM.ITEM_ID.in(1L, 2L, 3L));
-
-    assertThat(deleted).isEqualTo(2);
-    assertThat(dsl.fetchCount(FIXTURE_ITEM)).isZero();
-  }
-
-  @Test
-  @DisplayName("ColumnValues は共通カラムを拒否し、updateWhere は業務の列がなければ拒否する")
-  void commonColumnsAndEmptyValuesAreRejected() {
-    final ColumnValues<Record> values = new ColumnValues<>(FIXTURE_ITEM);
+  @DisplayName("ColumnValues は共通カラムと、集約の宣言から書く列を拒否する")
+  void commonColumnsAndDeclaredColumnsAreRejected() {
+    final ColumnValues<Record> values =
+        new ColumnValues<>(FIXTURE_ITEM, List.of(FIXTURE_ITEM.ITEM_ID));
 
     assertThatThrownBy(() -> values.set(FIXTURE_ITEM.LOCK_NO, 5L))
         .as("lock_no")
@@ -297,15 +212,15 @@ class TableWriterTest {
         .as("patched_at")
         .isInstanceOf(IllegalArgumentException.class)
         .hasMessageContaining("column=patched_at");
-    assertThatThrownBy(
-            () -> inUseCase(() -> writer.updateWhere(FIXTURE_ITEM, DSL.trueCondition(), set -> {})))
-        .as("業務の列がない updateWhere")
+    assertThatThrownBy(() -> values.set(FIXTURE_ITEM.ITEM_ID, 9L))
+        .as("宣言から書く列")
         .isInstanceOf(IllegalArgumentException.class)
-        .hasMessageContaining("no business column");
+        .hasMessageContaining("column=item_id");
+    assertThatCode(() -> values.set(FIXTURE_ITEM.ITEM_NAME, "業務の列")).doesNotThrowAnyException();
   }
 
   @Test
-  @DisplayName("子の差分は、ルートの更新、集約にない子の削除、新しい子の追加、両方にある子の更新の順で保存する")
+  @DisplayName("子の差分は、ルートの更新、集約にない子の削除、両方にある子の更新、新しい子の追加で保存する")
   void childrenAreSavedAsDifference() {
     insertItem(1L, "root");
     insertDetail(1L, 1, "one");
@@ -323,11 +238,21 @@ class TableWriterTest {
                 .fetchSingle(FIXTURE_ITEM_DETAIL.LOCK_NO))
         .as("更新した子の版")
         .isEqualTo(2L);
+    assertThat(
+            dsl.select(FIXTURE_ITEM_DETAIL.LOCK_NO, FIXTURE_ITEM_DETAIL.CREATED_PGM_CD)
+                .from(FIXTURE_ITEM_DETAIL)
+                .where(FIXTURE_ITEM_DETAIL.DETAIL_NO.eq(4))
+                .fetchSingle())
+        .as("追加した子の版と作成者")
+        .satisfies(added -> {
+          assertThat(added.value1()).isEqualTo(1L);
+          assertThat(added.value2()).isEqualTo(PGM_CD);
+        });
     assertThat(item(1L).get(FIXTURE_ITEM.LOCK_NO)).as("ルートの版").isEqualTo(2L);
   }
 
   @Test
-  @DisplayName("集約の子が空なら、子の差分の削除はすべての子を消す")
+  @DisplayName("集約の子が空なら、保存済みのすべての子を消す")
   void emptyChildrenDeleteEveryStoredChild() {
     insertItem(1L, "root");
     insertDetail(1L, 1, "one");
@@ -339,50 +264,115 @@ class TableWriterTest {
   }
 
   @Test
-  @DisplayName("deleteCheckingVersion は期待する版の行を削除し、DeletedRoot で子を削除する")
-  void deleteCheckingVersionDeletesRootAndChildren() {
-    insertItem(1L, "root");
-    insertDetail(1L, 1, "one");
+  @DisplayName("他のルートの子は、差分の削除と更新の対象にならない")
+  void childrenOfOtherRootsAreUntouched() {
+    insertItem(1L, "one");
+    insertItem(2L, "two");
+    insertDetail(1L, 1, "mine");
+    insertDetail(2L, 1, "other");
 
-    writer
-        .deleteCheckingVersion(FIXTURE_ITEM, FIXTURE_ITEM.ITEM_ID.eq(1L), 1L)
-        .deleteChildren(FIXTURE_ITEM_DETAIL, FIXTURE_ITEM_DETAIL.ITEM_ID.eq(1L));
+    inUseCase(() -> saveChildren(1L, Map.of()));
 
-    assertThat(dsl.fetchCount(FIXTURE_ITEM)).as("ルート").isZero();
-    assertThat(dsl.fetchCount(FIXTURE_ITEM_DETAIL)).as("子").isZero();
+    assertThat(details(1L)).isEmpty();
+    assertThat(details(2L)).as("他のルートの子").isEqualTo(Map.of(1, "other"));
   }
 
   @Test
-  @DisplayName("deleteCheckingVersion は版が違えば競合の例外を、行がなければ NotFoundException を投げる")
-  void deleteCheckingVersionRejectsStaleOrMissingRow() {
+  @DisplayName("子を渡さない、同じ子を二度渡す、自然キーが重複する、自然キーが null の呼び出しは IllegalArgumentException にする")
+  void invalidChildRowsAreRejected() {
     insertItem(1L, "root");
-    makeStale(1L);
 
+    assertThatThrownBy(() -> inUseCase(() -> save(1L, 1L, set -> {}, null)))
+        .as("子を渡さない")
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessageContaining("child rows must match the declared children");
+    assertThatThrownBy(() ->
+            runInUseCase(() ->
+                writer.update(
+                    ITEM,
+                    1L,
+                    version(1L),
+                    set -> {},
+                    rows ->
+                        rows.put(DETAILS, List.of(), (n, set) -> {})
+                            .put(DETAILS, List.of(), (n, set) -> {}))))
+        .as("二度渡す")
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessageContaining("put twice");
     assertThatThrownBy(
-            () -> writer.deleteCheckingVersion(FIXTURE_ITEM, FIXTURE_ITEM.ITEM_ID.eq(1L), 1L))
-        .as("版の違い")
-        .isInstanceOf(ConflictException.class)
-        .hasMessageContaining("table=t_fixture_item")
-        .satisfies(thrown -> assertConflictWithoutSql(thrown, ConflictException.Kind.VERSION));
-    assertThatThrownBy(
-            () -> writer.deleteCheckingVersion(FIXTURE_ITEM, FIXTURE_ITEM.ITEM_ID.eq(9L), 1L))
-        .as("行がない")
-        .isInstanceOf(NotFoundException.class);
-    assertThat(dsl.fetchCount(FIXTURE_ITEM)).as("行は残る").isOne();
+            () -> inUseCase(() -> save(1L, 1L, set -> {}, List.of(detail(5, "a"), detail(5, "b")))))
+        .as("自然キーの重複")
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessageContaining("natural key is duplicated");
+    assertThatThrownBy(() ->
+            runInUseCase(() ->
+                writer.update(
+                    ITEM,
+                    1L,
+                    version(1L),
+                    set -> {},
+                    rows ->
+                        rows.put(
+                            DETAILS,
+                            List.of("x"),
+                            (text, set) -> set.set(FIXTURE_ITEM_DETAIL.DETAIL_TEXT, text)))))
+        .as("自然キーを書かない")
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessageContaining("natural key must be a non-null value");
   }
 
   @Test
-  @DisplayName("insert は Repository が組み立てた INSERT を実行する")
-  void insertWritesRow() {
+  @DisplayName("insert は子を持つ集約のルートと子を書き、lock_no を 1 にして共通カラムを書く")
+  void insertWritesRootAndChildren() {
+    runInUseCase(() ->
+        writer.insert(
+            ITEM,
+            1L,
+            set -> set.set(FIXTURE_ITEM.ITEM_NAME, "new"),
+            rows ->
+                rows.put(
+                    DETAILS,
+                    List.of(detail(1, "one"), detail(2, "two")),
+                    (d, set) ->
+                        set.set(FIXTURE_ITEM_DETAIL.DETAIL_NO, d.number())
+                            .set(FIXTURE_ITEM_DETAIL.DETAIL_TEXT, d.text()))));
+
+    final Record row = item(1L);
+    assertThat(row.get(FIXTURE_ITEM.ITEM_NAME)).isEqualTo("new");
+    assertThat(row.get(FIXTURE_ITEM.LOCK_NO)).isEqualTo(1L);
+    assertThat(row.get(FIXTURE_ITEM.CREATED_AT)).isEqualTo(NOW);
+    assertThat(row.get(FIXTURE_ITEM.CREATED_PGM_CD)).isEqualTo(PGM_CD);
+    assertThat(details(1L)).isEqualTo(Map.of(1, "one", 2, "two"));
+  }
+
+  @Test
+  @DisplayName("insert は子を宣言した集約に子を渡さない呼び出しと、子のない集約に子を渡す呼び出しを拒否する")
+  void insertRequiresChildrenOnlyForDeclaredChildren() {
+    assertThatThrownBy(() ->
+            runInUseCase(
+                () -> writer.insert(ITEM, 1L, set -> set.set(FIXTURE_ITEM.ITEM_NAME, "x"))))
+        .as("子を宣言した集約の 3 引数")
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessageContaining("children must be put");
+    assertThatThrownBy(() ->
+            runInUseCase(() ->
+                writer.insert(
+                    ITEM_ONLY,
+                    1L,
+                    set -> set.set(FIXTURE_ITEM.ITEM_NAME, "x"),
+                    rows -> rows.put(DETAILS, List.of(), (d, set) -> {}))))
+        .as("子のない集約に子")
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessageContaining("child rows must match the declared children");
+  }
+
+  @Test
+  @DisplayName("insert は子のない集約を、3 引数で書く")
+  void insertWritesRootOnlyAggregate() {
     runInUseCase(
-        () ->
-            writer.insert(
-                dsl.insertInto(FIXTURE_ITEM)
-                    .set(FIXTURE_ITEM.ITEM_ID, 1L)
-                    .set(FIXTURE_ITEM.ITEM_NAME, "new")
-                    .set(seedColumns.forInsert(FIXTURE_ITEM))));
+        () -> writer.insert(ITEM_ONLY, 1L, set -> set.set(FIXTURE_ITEM.ITEM_NAME, "only")));
 
-    assertThat(item(1L).get(FIXTURE_ITEM.ITEM_NAME)).isEqualTo("new");
+    assertThat(item(1L).get(FIXTURE_ITEM.ITEM_NAME)).isEqualTo("only");
   }
 
   @Test
@@ -391,18 +381,57 @@ class TableWriterTest {
     insertItem(1L, "one");
 
     // 23505 の後のトランザクションは中断状態になるため、この後に SQL を実行しない。
-    assertThatThrownBy(
-            () ->
-                runInUseCase(
-                    () ->
-                        writer.insert(
-                            dsl.insertInto(FIXTURE_ITEM)
-                                .set(FIXTURE_ITEM.ITEM_ID, 1L)
-                                .set(FIXTURE_ITEM.ITEM_NAME, "duplicate")
-                                .set(seedColumns.forInsert(FIXTURE_ITEM)))))
+    assertThatThrownBy(() ->
+            runInUseCase(() ->
+                writer.insert(ITEM_ONLY, 1L, set -> set.set(FIXTURE_ITEM.ITEM_NAME, "duplicate"))))
         .isInstanceOf(ConflictException.class)
-        .hasMessage("unique key already exists: insert")
+        .hasMessageContaining("unique key already exists")
+        .hasMessageContaining("table=t_fixture_item")
         .satisfies(thrown -> assertConflictWithoutSql(thrown, ConflictException.Kind.UNIQUE));
+  }
+
+  @Test
+  @DisplayName("一意制約の違反ではない SQLSTATE（サブクエリが複数行を返す 21000）は、競合の例外にせずそのまま投げる")
+  void cardinalityViolationIsNotConflict() {
+    insertItem(1L, "one");
+    insertItem(2L, "two");
+
+    // 21000 の後のトランザクションは中断状態になるため、この後に SQL を実行しない。
+    assertThatThrownBy(() ->
+            runInUseCase(() ->
+                writer.update(
+                    ITEM_ONLY,
+                    1L,
+                    version(1L),
+                    set ->
+                        set.set(
+                            FIXTURE_ITEM.ITEM_NAME,
+                            DSL.field(DSL.select(FIXTURE_ITEM.ITEM_NAME).from(FIXTURE_ITEM))),
+                    rows -> {})))
+        .isInstanceOf(DataAccessException.class)
+        .isNotInstanceOf(ConflictException.class)
+        .rootCause()
+        .isInstanceOfSatisfying(
+            SQLException.class, sql -> assertThat(sql.getSQLState()).isEqualTo("21000"));
+  }
+
+  @Test
+  @DisplayName("トランザクションの外と、読み取り専用のトランザクションでは、書き込みを SQL の前に拒否する")
+  void writesRequireReadWriteTransaction() {
+    final TransactionTemplate outside = new TransactionTemplate(transactionManager);
+    outside.setPropagationBehavior(TransactionDefinition.PROPAGATION_NOT_SUPPORTED);
+    final TransactionTemplate readOnly = new TransactionTemplate(transactionManager);
+    readOnly.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
+    readOnly.setReadOnly(true);
+
+    for (final TransactionTemplate template : List.of(outside, readOnly)) {
+      assertThatThrownBy(() ->
+              template.executeWithoutResult(status ->
+                  runInUseCase(() ->
+                      writer.insert(ITEM_ONLY, 1L, set -> set.set(FIXTURE_ITEM.ITEM_NAME, "x")))))
+          .isInstanceOf(IllegalStateException.class)
+          .hasMessageContaining("read-write transaction");
+    }
   }
 
   /**
@@ -425,68 +454,72 @@ class TableWriterTest {
         .doesNotContainPattern(SQL_STATEMENT);
   }
 
-  /** 子の集合の差分を、規約の手順の順で保存する。 */
-  private LockedRoot saveChildren(final long itemId, final Map<Integer, String> children) {
-    final LockedRoot root = updateItem(itemId, 1L, "root");
-    final Set<Integer> stored =
-        new HashSet<>(
-            dsl.select(FIXTURE_ITEM_DETAIL.DETAIL_NO)
-                .from(FIXTURE_ITEM_DETAIL)
-                .where(FIXTURE_ITEM_DETAIL.ITEM_ID.eq(itemId))
-                .fetch(FIXTURE_ITEM_DETAIL.DETAIL_NO));
-    final List<Integer> kept = List.copyOf(children.keySet());
-    root.deleteChildren(
-        FIXTURE_ITEM_DETAIL,
-        FIXTURE_ITEM_DETAIL.ITEM_ID.eq(itemId).and(FIXTURE_ITEM_DETAIL.DETAIL_NO.notIn(kept)));
-    children.forEach(
-        (detailNo, text) -> {
-          if (stored.contains(detailNo)) {
-            root.updateChild(
-                FIXTURE_ITEM_DETAIL,
-                FIXTURE_ITEM_DETAIL
-                    .ITEM_ID
-                    .eq(itemId)
-                    .and(FIXTURE_ITEM_DETAIL.DETAIL_NO.eq(detailNo)),
-                set -> set.set(FIXTURE_ITEM_DETAIL.DETAIL_TEXT, text));
-          } else {
-            insertDetail(itemId, detailNo, text);
-          }
-        });
-    return root;
+  /** 子の集合の差分を、ルートの更新と一緒に保存する。 */
+  private Object saveChildren(final long itemId, final Map<Integer, String> children) {
+    return save(
+        itemId,
+        1L,
+        set -> set.set(FIXTURE_ITEM.ITEM_NAME, "root"),
+        children.entrySet().stream().map(e -> detail(e.getKey(), e.getValue())).toList());
   }
 
-  /** 集約ルートの行を版を比べて更新する。 */
-  private LockedRoot updateItem(final long itemId, final long expectedLockNo, final String name) {
-    return writer.updateCheckingVersion(
-        FIXTURE_ITEM,
-        FIXTURE_ITEM.ITEM_ID.eq(itemId),
-        expectedLockNo,
-        set -> set.set(FIXTURE_ITEM.ITEM_NAME, name));
+  /** 子の行を渡して、ルートを更新する。{@code details} が null なら、子を渡さない。 */
+  private Object save(
+      final long itemId,
+      final long expectedLockNo,
+      final Consumer<ColumnValues<Record>> rootColumns,
+      final @Nullable List<Detail> details) {
+    writer.update(
+        ITEM,
+        itemId,
+        version(expectedLockNo),
+        rootColumns,
+        rows -> {
+          if (details != null) {
+            rows.put(
+                DETAILS,
+                details,
+                (detail, set) ->
+                    set.set(FIXTURE_ITEM_DETAIL.DETAIL_NO, detail.number())
+                        .set(FIXTURE_ITEM_DETAIL.DETAIL_TEXT, detail.text()));
+          }
+        });
+    return itemId;
+  }
+
+  /** 集約ルートの行を、版を比べて更新する。 */
+  private Object updateItem(final long itemId, final long expectedLockNo, final String name) {
+    return save(itemId, expectedLockNo, set -> set.set(FIXTURE_ITEM.ITEM_NAME, name), List.of());
+  }
+
+  /** 子の行にする値。 */
+  private record Detail(int number, String text) {}
+
+  private static Detail detail(final int number, final String text) {
+    return new Detail(number, text);
   }
 
   /** {@code lock_no = 1} の行を作る。 */
   private void insertItem(final long itemId, final String name) {
     ScopedValue.where(PgmCdAspect.PGM_CD, SEED_PGM_CD)
-        .run(
-            () ->
-                dsl.insertInto(FIXTURE_ITEM)
-                    .set(seedColumns.forInsert(FIXTURE_ITEM))
-                    .set(FIXTURE_ITEM.ITEM_ID, itemId)
-                    .set(FIXTURE_ITEM.ITEM_NAME, name)
-                    .execute());
+        .run(() ->
+            dsl.insertInto(FIXTURE_ITEM)
+                .set(seedColumns.forInsert(FIXTURE_ITEM))
+                .set(FIXTURE_ITEM.ITEM_ID, itemId)
+                .set(FIXTURE_ITEM.ITEM_NAME, name)
+                .execute());
   }
 
   /** {@code lock_no = 1} の子の行を作る。 */
   private void insertDetail(final long itemId, final int detailNo, final String text) {
     ScopedValue.where(PgmCdAspect.PGM_CD, SEED_PGM_CD)
-        .run(
-            () ->
-                dsl.insertInto(FIXTURE_ITEM_DETAIL)
-                    .set(seedColumns.forInsert(FIXTURE_ITEM_DETAIL))
-                    .set(FIXTURE_ITEM_DETAIL.ITEM_ID, itemId)
-                    .set(FIXTURE_ITEM_DETAIL.DETAIL_NO, detailNo)
-                    .set(FIXTURE_ITEM_DETAIL.DETAIL_TEXT, text)
-                    .execute());
+        .run(() ->
+            dsl.insertInto(FIXTURE_ITEM_DETAIL)
+                .set(seedColumns.forInsert(FIXTURE_ITEM_DETAIL))
+                .set(FIXTURE_ITEM_DETAIL.ITEM_ID, itemId)
+                .set(FIXTURE_ITEM_DETAIL.DETAIL_NO, detailNo)
+                .set(FIXTURE_ITEM_DETAIL.DETAIL_TEXT, text)
+                .execute());
   }
 
   /** 別の人が先に更新した状態にする（版を 2 にする）。 */

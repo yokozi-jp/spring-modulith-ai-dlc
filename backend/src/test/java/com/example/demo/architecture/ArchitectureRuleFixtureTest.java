@@ -289,10 +289,6 @@ class ArchitectureRuleFixtureTest {
             TableWriterArchTest.repositoryUpdateAndDeleteCheckVersionRule(VIOLATING),
             UNVERSIONED_REPOSITORY + ".save("),
         row(
-            "repositoryUpdateAndDeleteCheckVersion: re-read lockNo",
-            TableWriterArchTest.repositoryUpdateAndDeleteCheckVersionRule(VIOLATING),
-            UNVERSIONED_REPOSITORY + ".updateStatus("),
-        row(
             "repositoryWritesTakeVersionedAggregates",
             TableWriterArchTest.repositoryWritesTakeVersionedAggregatesRule(),
             "ordering.domain.model.UnversionedOrderRepository.update("),
@@ -351,15 +347,7 @@ class ArchitectureRuleFixtureTest {
         row(
             "expectedLockNoIsCreatedOnlyByRequests: Controller",
             TableWriterArchTest.expectedLockNoIsCreatedOnlyByRequestsRule(VIOLATING),
-            "ordering.presentation.web.OrderLockController.lockNo("),
-        row(
-            "aggregateMethodsDoNotUseUnversionedWrites",
-            TableWriterArchTest.aggregateMethodsDoNotUseUnversionedWritesRule(VIOLATING),
-            UNVERSIONED_REPOSITORY + ".update("),
-        row(
-            "aggregateRootInsertsGoThroughTableWriter",
-            TableWriterArchTest.aggregateRootInsertsGoThroughTableWriterRule(),
-            "ordering.infrastructure.persistence.JooqOrderDraftRepository.add("));
+            "ordering.presentation.web.OrderLockController.lockNo("));
   }
 
   @ParameterizedTest(name = "{0}")
@@ -600,8 +588,6 @@ class ArchitectureRuleFixtureTest {
         TableWriterArchTest.commandsBuiltByPresentationForWritesAreVersionedRule(basePackage),
         TableWriterArchTest.onlyCommandHandlersUpdateOrDeleteAggregatesRule(),
         TableWriterArchTest.expectedLockNoIsCreatedOnlyByRequestsRule(basePackage),
-        TableWriterArchTest.aggregateMethodsDoNotUseUnversionedWritesRule(basePackage),
-        TableWriterArchTest.aggregateRootInsertsGoThroughTableWriterRule(),
         PublicIdArchTest.numericIdsDoNotLeaveModulesRule(basePackage),
         DatabaseConventionsArchTest.ownGeneratedSchemaRule(
             basePackage, JOOQ_PACKAGE, FIXTURE_MODULES),

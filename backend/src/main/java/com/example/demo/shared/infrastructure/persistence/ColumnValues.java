@@ -1,5 +1,6 @@
 package com.example.demo.shared.infrastructure.persistence;
 
+import java.util.Collection;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -11,14 +12,14 @@ import org.jooq.TableField;
 import org.jspecify.annotations.Nullable;
 
 /**
- * {@link TableWriter} の UPDATE で SET する業務の列の値だけを受け取る（ADR-054）。
+ * {@link TableWriter} の INSERT と UPDATE で書く業務の列の値だけを受け取る（ADR-054）。
  *
  * <p>{@code where} も {@code execute} も持たないため、Repository のラムダからは列の値しか書けない。列は更新するテーブルの型 {@code R}
  * に結び付いた {@link TableField} に限るため、別のテーブルの列と型の違う値はコンパイルで失敗する。
  *
- * <p>共通カラム（{@code lock_no}、{@code created_*}、{@code updated_*}、{@code patched_*} の規約の 12 列）は {@link
- * TableWriter} が書くため、渡すと {@link IllegalArgumentException} を投げる。{@code updated_reason}
- * のような、規約にない業務の列は拒否しない。
+ * <p>共通カラム（{@code lock_no}、{@code created_*}、{@code updated_*}、{@code patched_*} の規約の 12
+ * 列）と、集約の宣言から {@link TableWriter} が書く列（ルートの一意の列、内部の主キー、子の外部キー）は、渡すと {@link
+ * IllegalArgumentException} を投げる。{@code updated_reason} のような、規約にない業務の列は拒否しない。
  *
  * @param <R> 更新するテーブルの Record の型
  */
@@ -43,13 +44,17 @@ public final class ColumnValues<R extends Record> {
   /** 更新するテーブル。メッセージに名前を入れるために持つ。 */
   private final Table<R> table;
 
+  /** {@link TableWriter} が宣言から書く列（ルートの一意の列、内部の主キー、子の外部キー）。渡すと拒否する。 */
+  private final Set<Field<?>> reserved;
+
   /** SET する列と値。SQL を決定的にするため、登録の順を保つ。 */
   // 一つの UPDATE を組み立てる間だけ一つのスレッドで使い、登録の順が要るため LinkedHashMap にする。
   @SuppressWarnings("PMD.UseConcurrentHashMap")
   private final Map<Field<?>, @Nullable Object> assignments = new LinkedHashMap<>();
 
-  /* package */ ColumnValues(final Table<R> table) {
+  /* package */ ColumnValues(final Table<R> table, final Collection<? extends Field<?>> reserved) {
     this.table = table;
+    this.reserved = Set.copyOf(reserved);
   }
 
   /**
@@ -83,12 +88,9 @@ public final class ColumnValues<R extends Record> {
   }
 
   private ColumnValues<R> put(final TableField<R, ?> field, final @Nullable Object value) {
-    if (COMMON_COLUMNS.contains(field.getName())) {
+    if (COMMON_COLUMNS.contains(field.getName()) || reserved.contains(field)) {
       throw new IllegalArgumentException(
-          "common column is set by TableWriter: table="
-              + table.getName()
-              + ", column="
-              + field.getName());
+          "column is set by TableWriter: table=" + table.getName() + ", column=" + field.getName());
     }
     assignments.put(field, value);
     return this;

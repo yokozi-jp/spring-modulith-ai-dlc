@@ -2,6 +2,9 @@ package com.example.demo.shared.infrastructure.persistence;
 
 import static com.example.demo.jooq.tables.FixtureItemDetailTable.FIXTURE_ITEM_DETAIL;
 import static com.example.demo.jooq.tables.FixtureItemTable.FIXTURE_ITEM;
+import static com.example.demo.shared.infrastructure.persistence.FixtureAggregates.DETAILS;
+import static com.example.demo.shared.infrastructure.persistence.FixtureAggregates.ITEM;
+import static com.example.demo.shared.infrastructure.persistence.FixtureAggregates.version;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
@@ -16,6 +19,7 @@ import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneOffset;
+import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
@@ -33,7 +37,6 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.dao.CannotAcquireLockException;
 import org.springframework.test.context.transaction.AfterTransaction;
 
 /**
@@ -45,7 +48,8 @@ import org.springframework.test.context.transaction.AfterTransaction;
  * <p>子の行のテストでは、B が子の行だけをロックし、A がルートを更新した後の子の行の書き込みで {@code lock_timeout} を待つ。
  */
 // 入口ごとのロック待ちの変換をテストに分けるため、メソッドの数の上限を外す。
-@SuppressWarnings("PMD.TooManyMethods")
+// 共有の集約の宣言と版の作成を static import するため、static import の数の上限を外す。
+@SuppressWarnings({"PMD.TooManyMethods", "PMD.TooManyStaticImports"})
 @DatabaseTest
 @ExtendWith(FixtureTablesExtension.class)
 class TableWriterConcurrencyTest {
@@ -117,7 +121,7 @@ class TableWriterConcurrencyTest {
       final Future<Boolean> committed =
           watcher.submit(() -> commitWhenAnotherSessionWaits(sessionB));
 
-      assertThatThrownBy(() -> inUseCase(() -> updateItem(1L)))
+      assertThatThrownBy(() -> inUseCase(() -> updateItem(1L, List.of())))
           .isInstanceOf(ConflictException.class)
           .hasMessageContaining("row was updated by another request")
           .satisfies(thrown -> assertConflictWithoutSql(thrown, ConflictException.Kind.VERSION));
@@ -135,12 +139,12 @@ class TableWriterConcurrencyTest {
   }
 
   @Test
-  @DisplayName("B が行ロックを持ち続けると、A の updateCheckingVersion は lock_timeout で競合の例外になる")
+  @DisplayName("B が行ロックを持ち続けると、A の update は lock_timeout で競合の例外になる")
   void lockTimeoutBecomesConflict() throws SQLException {
     try (Connection sessionB = openSessionB()) {
       updateInSessionB(sessionB);
 
-      assertThatThrownBy(() -> inUseCase(() -> updateItem(1L)))
+      assertThatThrownBy(() -> inUseCase(() -> updateItem(1L, List.of())))
           .isInstanceOf(ConflictException.class)
           .hasMessageContaining("row is locked by another request")
           .satisfies(thrown -> assertConflictWithoutSql(thrown, ConflictException.Kind.LOCK));
@@ -149,63 +153,23 @@ class TableWriterConcurrencyTest {
   }
 
   @Test
-  @DisplayName("B が行ロックを持ち続けると、A の updateWhere は CannotAcquireLockException をそのまま投げる")
-  void lockTimeoutPropagatesFromUpdateWhere() throws SQLException {
-    try (Connection sessionB = openSessionB()) {
-      updateInSessionB(sessionB);
-
-      assertThatThrownBy(
-              () ->
-                  inUseCase(
-                      () ->
-                          writer.updateWhere(
-                              FIXTURE_ITEM,
-                              FIXTURE_ITEM.ITEM_ID.eq(ITEM_ID),
-                              set -> set.set(FIXTURE_ITEM.ITEM_NAME, "A"))))
-          .isInstanceOf(CannotAcquireLockException.class);
-      sessionB.rollback();
-    }
-  }
-
-  @Test
-  @DisplayName("B が子の行のロックを持ち続けると、A の LockedRoot.updateChild は lock_timeout で競合の例外になる")
+  @DisplayName("B が子の行のロックを持ち続けると、A の子の更新は lock_timeout で競合の例外になる")
   void childUpdateLockTimeoutBecomesConflict() throws SQLException {
     try (Connection sessionB = openSessionB()) {
       lockChildInSessionB(sessionB);
 
-      assertChildLockConflict(
-          () ->
-              updateItem(1L)
-                  .updateChild(
-                      FIXTURE_ITEM_DETAIL,
-                      childKey(),
-                      set -> set.set(FIXTURE_ITEM_DETAIL.DETAIL_TEXT, "A")));
+      assertChildLockConflict(() -> updateItem(1L, List.of("A")));
       sessionB.rollback();
     }
   }
 
   @Test
-  @DisplayName("B が子の行のロックを持ち続けると、A の LockedRoot.deleteChildren は lock_timeout で競合の例外になる")
-  void lockedRootChildDeleteLockTimeoutBecomesConflict() throws SQLException {
+  @DisplayName("B が子の行のロックを持ち続けると、A の子の削除は lock_timeout で競合の例外になる")
+  void childDeleteLockTimeoutBecomesConflict() throws SQLException {
     try (Connection sessionB = openSessionB()) {
       lockChildInSessionB(sessionB);
 
-      assertChildLockConflict(() -> updateItem(1L).deleteChildren(FIXTURE_ITEM_DETAIL, childKey()));
-      sessionB.rollback();
-    }
-  }
-
-  @Test
-  @DisplayName("B が子の行のロックを持ち続けると、A の DeletedRoot.deleteChildren は lock_timeout で競合の例外になる")
-  void deletedRootChildDeleteLockTimeoutBecomesConflict() throws SQLException {
-    try (Connection sessionB = openSessionB()) {
-      lockChildInSessionB(sessionB);
-
-      assertChildLockConflict(
-          () ->
-              writer
-                  .deleteCheckingVersion(FIXTURE_ITEM, FIXTURE_ITEM.ITEM_ID.eq(ITEM_ID), 1L)
-                  .deleteChildren(FIXTURE_ITEM_DETAIL, childKey()));
+      assertChildLockConflict(() -> updateItem(1L, List.of()));
       sessionB.rollback();
     }
   }
@@ -248,15 +212,14 @@ class TableWriterConcurrencyTest {
   private void lockChildInSessionB(final Connection sessionB) throws SQLException {
     final DSLContext sessionDsl = DSL.using(sessionB, SQLDialect.POSTGRES);
     ScopedValue.where(PgmCdAspect.PGM_CD, PGM_CD)
-        .run(
-            () ->
-                sessionDsl
-                    .insertInto(FIXTURE_ITEM_DETAIL)
-                    .set(commonColumns.forInsert(FIXTURE_ITEM_DETAIL))
-                    .set(FIXTURE_ITEM_DETAIL.ITEM_ID, ITEM_ID)
-                    .set(FIXTURE_ITEM_DETAIL.DETAIL_NO, DETAIL_NO)
-                    .set(FIXTURE_ITEM_DETAIL.DETAIL_TEXT, "seed")
-                    .execute());
+        .run(() ->
+            sessionDsl
+                .insertInto(FIXTURE_ITEM_DETAIL)
+                .set(commonColumns.forInsert(FIXTURE_ITEM_DETAIL))
+                .set(FIXTURE_ITEM_DETAIL.ITEM_ID, ITEM_ID)
+                .set(FIXTURE_ITEM_DETAIL.DETAIL_NO, DETAIL_NO)
+                .set(FIXTURE_ITEM_DETAIL.DETAIL_TEXT, "seed")
+                .execute());
     sessionB.commit();
     sessionDsl
         .update(FIXTURE_ITEM_DETAIL)
@@ -270,14 +233,13 @@ class TableWriterConcurrencyTest {
     final Connection sessionB = dataSource.getConnection();
     sessionB.setAutoCommit(false);
     ScopedValue.where(PgmCdAspect.PGM_CD, PGM_CD)
-        .run(
-            () ->
-                DSL.using(sessionB, SQLDialect.POSTGRES)
-                    .insertInto(FIXTURE_ITEM)
-                    .set(commonColumns.forInsert(FIXTURE_ITEM))
-                    .set(FIXTURE_ITEM.ITEM_ID, ITEM_ID)
-                    .set(FIXTURE_ITEM.ITEM_NAME, "seed")
-                    .execute());
+        .run(() ->
+            DSL.using(sessionB, SQLDialect.POSTGRES)
+                .insertInto(FIXTURE_ITEM)
+                .set(commonColumns.forInsert(FIXTURE_ITEM))
+                .set(FIXTURE_ITEM.ITEM_ID, ITEM_ID)
+                .set(FIXTURE_ITEM.ITEM_NAME, "seed")
+                .execute());
     sessionB.commit();
     return sessionB;
   }
@@ -322,13 +284,21 @@ class TableWriterConcurrencyTest {
     }
   }
 
-  /** A の接続で、期待する版の行を更新する。 */
-  private LockedRoot updateItem(final long expectedLockNo) {
-    return writer.updateCheckingVersion(
-        FIXTURE_ITEM,
-        FIXTURE_ITEM.ITEM_ID.eq(ITEM_ID),
-        expectedLockNo,
-        set -> set.set(FIXTURE_ITEM.ITEM_NAME, "A"));
+  /** A の接続で、版 1 の行を更新し、子を {@code detailTexts} の明細番号 {@value #DETAIL_NO} の 1 行にする。 */
+  private Object updateItem(final long expectedLockNo, final List<String> detailTexts) {
+    writer.update(
+        ITEM,
+        ITEM_ID,
+        version(expectedLockNo),
+        set -> set.set(FIXTURE_ITEM.ITEM_NAME, "A"),
+        rows ->
+            rows.put(
+                DETAILS,
+                detailTexts,
+                (text, set) ->
+                    set.set(FIXTURE_ITEM_DETAIL.DETAIL_NO, DETAIL_NO)
+                        .set(FIXTURE_ITEM_DETAIL.DETAIL_TEXT, text)));
+    return expectedLockNo;
   }
 
   /** ユースケースの呼び出しの中として、pgm_cd を束縛して実行する。 */

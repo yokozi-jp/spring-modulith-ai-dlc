@@ -90,7 +90,7 @@ public final class OrderSeeds {
             new OrderId(ids.get()), "SEED-C0" + number, status, orderLines, orderedAt, 1L);
     // JooqOrderRepository は CommonColumns の Clock から時刻を取るので、注文ごとに作る。
     final CommonColumns commonColumns = TestCommonColumns.at(orderedAt);
-    new JooqOrderRepository(dsl, commonColumns, new TableWriter(dsl, commonColumns)).add(order);
+    new JooqOrderRepository(dsl, new TableWriter(dsl, commonColumns)).add(order);
     return order;
   }
 

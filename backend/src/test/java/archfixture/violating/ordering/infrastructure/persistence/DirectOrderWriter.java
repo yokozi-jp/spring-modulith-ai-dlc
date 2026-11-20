@@ -194,6 +194,26 @@ public final class DirectOrderWriter {
     return new SqlUpdate(dataSource, DELETE_SQL).update();
   }
 
+  /** {@code DSLContext.insertInto} を呼ぶ。 */
+  public static Object dslInsertInto(final DSLContext dsl) {
+    return dsl.insertInto(ORDERS);
+  }
+
+  /** {@code DSLContext.insertQuery} を呼ぶ。 */
+  public static Object dslInsertQuery(final DSLContext dsl) {
+    return dsl.insertQuery(ORDERS);
+  }
+
+  /** {@code DSLContext.batchInsert} を呼ぶ。 */
+  public static Batch dslBatchInsert(final DSLContext dsl, final UpdatableRecord<?> row) {
+    return dsl.batchInsert(row);
+  }
+
+  /** {@code DSL.insertInto} で接続のない INSERT を作る。 */
+  public static Object staticDslInsertInto() {
+    return DSL.insertInto(ORDERS);
+  }
+
   /** {@code DSL.update} で接続のない UPDATE を作る。 */
   public static Object staticDslUpdate() {
     return DSL.update(ORDERS);

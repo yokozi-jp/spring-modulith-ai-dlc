@@ -106,7 +106,7 @@ class JooqUserRepositoryTest {
 
   private UserRepository repository() {
     final CommonColumns commonColumns = TestCommonColumns.at(ADDED_AT);
-    return new JooqUserRepository(dsl, commonColumns, new TableWriter(dsl, commonColumns));
+    return new JooqUserRepository(dsl, new TableWriter(dsl, commonColumns));
   }
 
   private static ExternalIdentity identity() {

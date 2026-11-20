@@ -72,18 +72,16 @@ class JooqPaymentRepositoryTest {
 
     assertThat(repository.findByOrderId(failedOrder))
         .as("orderId=%s の契約の不備の決済記録", failedOrder.value())
-        .hasValueSatisfying(
-            found -> {
-              assertThat(found.status()).isEqualTo(PaymentStatus.FAILED);
-              assertThat(found.gatewayPaymentCode()).isNull();
-            });
+        .hasValueSatisfying(found -> {
+          assertThat(found.status()).isEqualTo(PaymentStatus.FAILED);
+          assertThat(found.gatewayPaymentCode()).isNull();
+        });
     assertThat(repository.findByOrderId(declinedOrder))
         .as("orderId=%s の拒否の決済記録", declinedOrder.value())
-        .hasValueSatisfying(
-            found -> {
-              assertThat(found.status()).isEqualTo(PaymentStatus.DECLINED);
-              assertThat(found.gatewayPaymentCode()).isEqualTo(declinedCode);
-            });
+        .hasValueSatisfying(found -> {
+          assertThat(found.status()).isEqualTo(PaymentStatus.DECLINED);
+          assertThat(found.gatewayPaymentCode()).isEqualTo(declinedCode);
+        });
   }
 
   @Test
@@ -105,7 +103,7 @@ class JooqPaymentRepositoryTest {
 
   private PaymentRepository repository() {
     final CommonColumns commonColumns = TestCommonColumns.at(RECORDED_AT);
-    return new JooqPaymentRepository(dsl, commonColumns, new TableWriter(dsl, commonColumns));
+    return new JooqPaymentRepository(dsl, new TableWriter(dsl, commonColumns));
   }
 
   private static Payment payment(final OrderId orderId, final String amount) {

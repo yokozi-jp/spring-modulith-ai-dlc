@@ -6,15 +6,12 @@ import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.example.demo.DemoApplication;
-import com.example.demo.shared.infrastructure.persistence.TableWriter;
 import com.tngtech.archunit.base.DescribedPredicate;
 import com.tngtech.archunit.core.domain.AccessTarget;
 import com.tngtech.archunit.core.domain.JavaAccess;
 import com.tngtech.archunit.core.domain.JavaClass;
-import com.tngtech.archunit.core.domain.JavaCodeUnit;
 import com.tngtech.archunit.core.domain.JavaMethod;
 import com.tngtech.archunit.core.domain.JavaModifier;
-import com.tngtech.archunit.core.importer.ClassFileImporter;
 import com.tngtech.archunit.junit.AnalyzeClasses;
 import com.tngtech.archunit.junit.ArchTest;
 import com.tngtech.archunit.lang.ArchCondition;
@@ -26,8 +23,6 @@ import java.sql.Statement;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.TreeSet;
-import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import javax.sql.DataSource;
 import org.jooq.ConnectionProvider;
@@ -36,7 +31,6 @@ import org.jooq.DAO;
 import org.jooq.DMLQuery;
 import org.jooq.DSLContext;
 import org.jooq.Delete;
-import org.jooq.Insert;
 import org.jooq.InsertOnDuplicateStep;
 import org.jooq.InsertQuery;
 import org.jooq.LoaderOptionsStep;
@@ -114,25 +108,16 @@ class TableWriterArchTest {
   /** 集約ルートを削除する Repository のメソッドの名前。 */
   private static final String DELETE = "delete";
 
-  /** 版を比べて書く入口の名前。 */
-  private static final String UPDATE_CHECKING_VERSION = "updateCheckingVersion";
-
-  /** 版を比べて削除する入口の名前。 */
-  private static final String DELETE_CHECKING_VERSION = "deleteCheckingVersion";
-
-  /** 版を比べない入口の名前。 */
-  private static final Set<String> UNVERSIONED_WRITES = Set.of("updateWhere", "deleteWhere");
-
   /** 楽観的ロックの規約と、この決定の ADR。 */
   private static final String DOCS =
       "docs/database/postgresql-concurrency-control.md、"
           + "docs/adr/ADR-054-detect-optimistic-lock-conflicts-by-update-count.md";
 
   /**
-   * {@code DSLContext}、{@code DSL}、{@code WithStep} の、UPDATE、DELETE、MERGE の入口と接続の直接の利用。
+   * {@code DSLContext}、{@code DSL}、{@code WithStep} の、INSERT、UPDATE、DELETE、MERGE の入口と接続の直接の利用。
    *
-   * <p>{@code Update} と {@code Delete} を作る入口をすべて禁じるため、{@code batch} や {@code subscribe}
-   * のような問い合わせを受け取る実行の API は禁じなくてよい。
+   * <p>{@code Insert}、{@code Update}、{@code Delete} を作る入口をすべて禁じるため、{@code batch} や {@code
+   * subscribe} のような問い合わせを受け取る実行の API は禁じなくてよい。
    */
   private static final Set<String> DSL_WRITES =
       Set.of(
@@ -148,6 +133,9 @@ class TableWriterArchTest {
           "batchMerge",
           "executeUpdate",
           "executeDelete",
+          "insertInto",
+          "insertQuery",
+          "batchInsert",
           "connection",
           "connectionResult");
 
@@ -201,7 +189,7 @@ class TableWriterArchTest {
   private static final String REVIEWED_JOOQ_VERSION = "3.21.9";
 
   /**
-   * 業務テーブルの UPDATE と DELETE は、TableWriter、LockedRoot、DeletedRoot だけが組み立てて実行する（H1）。
+   * 業務テーブルの INSERT、UPDATE、DELETE は、TableWriter とその子の行の書き込み（ChildWriter）だけが組み立てて実行する（H1）。
    *
    * <p>トランザクションの初めにモジュールのロールへ切り替える ModuleRoleTransactionManager は、業務テーブルに触れず、固定の {@code set_config}
    * だけを実行するため対象にしない（ADR-094）。
@@ -211,8 +199,8 @@ class TableWriterArchTest {
       tableWritesGoThroughTableWriterRule(BASE_PACKAGE);
 
   /**
-   * {@code Jooq<Aggregate>Repository} の、集約ルートを受け取る {@code add} 以外のメソッドは、版を比べる入口と集約ルートの {@code
-   * lockNo()} を呼ぶ（H3）。
+   * {@code Jooq<Aggregate>Repository} の、集約ルートを受け取る {@code add} 以外のメソッドは、版を比べる入口 {@code
+   * TableWriter.update} を呼ぶ（H3）。版は {@code Versioned} の集約ルートから {@code TableWriter} が読む。
    */
   @ArchTest
   /* package */ static final ArchRule repositoryUpdateAndDeleteCheckVersion =
@@ -252,16 +240,6 @@ class TableWriterArchTest {
   /* package */ static final ArchRule expectedLockNoIsCreatedOnlyByRequests =
       expectedLockNoIsCreatedOnlyByRequestsRule(BASE_PACKAGE);
 
-  /** 集約ルートを受け取るメソッドは、版を比べない入口を呼ばない（H5）。 */
-  @ArchTest
-  /* package */ static final ArchRule aggregateMethodsDoNotUseUnversionedWrites =
-      aggregateMethodsDoNotUseUnversionedWritesRule(BASE_PACKAGE);
-
-  /** {@code Jooq*Repository} の {@code add} は、{@code Insert} を直接実行しない（H7）。 */
-  @ArchTest
-  /* package */ static final ArchRule aggregateRootInsertsGoThroughTableWriter =
-      aggregateRootInsertsGoThroughTableWriterRule();
-
   @Test
   @DisplayName("jOOQ の実行時の版は、書き込みの禁止の一覧を見直した版である")
   void jooqVersionIsReviewed() {
@@ -273,32 +251,16 @@ class TableWriterArchTest {
         .isEqualTo(REVIEWED_JOOQ_VERSION);
   }
 
-  @Test
-  @DisplayName("版を比べない入口は @CheckReturnValue を持ち、件数を捨てるとコンパイルで失敗する")
-  void unversionedWritesRequireUsingTheCount() {
-    // 注釈の型はテストの実行時のクラスパスにないため、リフレクションではなくバイトコードから読む。
-    final List<String> annotated =
-        new ClassFileImporter()
-            .importClasses(TableWriter.class).get(TableWriter.class).getMethods().stream()
-                .filter(method -> UNVERSIONED_WRITES.contains(method.getName()))
-                .filter(method ->
-                    method.isAnnotatedWith("com.google.errorprone.annotations.CheckReturnValue"))
-                .map(JavaMethod::getName)
-                .toList();
-
-    assertThat(annotated).containsExactlyInAnyOrderElementsOf(UNVERSIONED_WRITES);
-  }
-
-  /** H1 の規則を組み立てる。例外は基底パッケージの shared にある 3 クラスだけにする。 */
+  /**
+   * H1 の規則を組み立てる。例外は基底パッケージの shared にある TableWriter、ChildWriter、ModuleRoleTransactionManager だけにする。
+   */
   /* package */ static ArchRule tableWritesGoThroughTableWriterRule(final String basePackage) {
     final String writerPackage = basePackage + WRITER_PACKAGE;
     return noClasses()
         .that()
         .doNotHaveFullyQualifiedName(writerPackage + "TableWriter")
         .and()
-        .doNotHaveFullyQualifiedName(writerPackage + "LockedRoot")
-        .and()
-        .doNotHaveFullyQualifiedName(writerPackage + "DeletedRoot")
+        .doNotHaveFullyQualifiedName(writerPackage + "ChildWriter")
         .and()
         .doNotHaveFullyQualifiedName(writerPackage + "ModuleRoleTransactionManager")
         .and()
@@ -306,15 +268,15 @@ class TableWriterArchTest {
         .should()
         .accessTargetWhere(
             DescribedPredicate.describe(
-                "jOOQ の UPDATE、DELETE、UPSERT、MERGE、Query 型の実行、問い合わせのモデルの $ で始まる API、"
+                "jOOQ の INSERT、UPDATE、DELETE、UPSERT、MERGE、Query 型の実行、問い合わせのモデルの $ で始まる API、"
                     + "UpdatableRecord と DAO の書き込み、Spring JDBC と JDBC の直接の利用、"
                     + "DataSource、Connection、ConnectionProvider を引数に取る呼び出し",
                 TableWriterArchTest::isDirectWrite))
         .because(
-            "版の条件、版の設定、件数の判定を書き忘れた UPDATE と DELETE は成功して、他の人の更新を黙って上書きするため。"
-                + "直し方：業務テーブルの UPDATE と DELETE は shared の TableWriter で書く。"
-                + "期待する版を持つなら updateCheckingVersion と deleteCheckingVersion、"
-                + "持たないなら updateWhere と deleteWhere、子の行は戻り値の LockedRoot と DeletedRoot を使う。"
+            "版の条件、版の設定、件数の判定を書き忘れた UPDATE は成功して、他の人の更新を黙って上書きし、"
+                + "TableWriter を通さない INSERT は一意制約の違反（23505）を ConflictException に変えず 500 を返すため。"
+                + "直し方：業務テーブルの INSERT と UPDATE は shared の TableWriter の insert と update で書く。"
+                + "集約の形は AggregateTable と ChildTable で宣言し、子の行は ChildRows で渡す。"
                 + "規約："
                 + DOCS);
   }
@@ -333,9 +295,8 @@ class TableWriterArchTest {
         .because(
             "集約ルートの保存と削除で版を比べないと、古い画面や古い集約の保存が他の人の更新を上書きするため。"
                 + "直し方：集約ルートを受け取るメソッドは add、update、delete だけにし、"
-                + "update は TableWriter.updateCheckingVersion を、delete は deleteCheckingVersion を、"
-                + "そのメソッドの中で直接呼ぶ（別のメソッドを経由しない）。"
-                + "期待する版には、テーブルから読み直した値ではなく、引数の集約ルートの lockNo() を渡す。"
+                + "update は TableWriter.update を、そのメソッドの中で直接呼ぶ（別のメソッドを経由しない）。"
+                + "TableWriter.update は集約ルート（Versioned）を受け取り、その lockNo() を期待する版にする。"
                 + "規約：docs/backend/class-roles/jooq-repository.md、"
                 + DOCS);
   }
@@ -447,71 +408,6 @@ class TableWriterArchTest {
                 + DOCS);
   }
 
-  /** H5 の規則を組み立てる。 */
-  /* package */ static ArchRule aggregateMethodsDoNotUseUnversionedWritesRule(
-      final String basePackage) {
-    final String writer = basePackage + WRITER_PACKAGE + "TableWriter";
-    return classes()
-        .should(notUseUnversionedWritesWithAggregateRoots(writer))
-        .because(
-            "集約ルートを持つ書き込みに版を比べない入口を使うと、版は進むが古い集約の保存を止めないため。"
-                + "直し方：集約ルートを受け取るメソッドでは updateCheckingVersion か deleteCheckingVersion を使う。"
-                + "updateWhere と deleteWhere は、識別子や条件だけを受け取るメソッドで使う。"
-                + "規約："
-                + DOCS);
-  }
-
-  /**
-   * H7 の規則を組み立てる。
-   *
-   * <p>子の行の INSERT は {@code update} で直接実行してよいため、{@code add}（ラムダの中を含む）だけを対象にする。
-   */
-  /* package */ static ArchRule aggregateRootInsertsGoThroughTableWriterRule() {
-    return methods()
-        .that(
-            DescribedPredicate.describe(
-                "infrastructure.persistence の Jooq*Repository の add（ラムダの中を含む）",
-                TableWriterArchTest::isRepositoryAdd))
-        .should(notExecuteInsertDirectly())
-        .allowEmptyShould(true)
-        .because(
-            "TableWriter.insert を通さない集約ルートの INSERT は、一意制約の違反（23505）とロック待ち（55P03）を"
-                + "ConflictException に変えず、409 ではなく 500 を返すため。"
-                + "直し方：add では dsl.insertInto(...) で組み立てた INSERT を TableWriter.insert に渡す。"
-                + "子の行の INSERT は dsl.batch で実行する。"
-                + "規約：docs/backend/class-roles/jooq-repository.md、"
-                + DOCS);
-  }
-
-  /** {@code Jooq*Repository} の {@code add} かを返す。ラムダの中の呼び出しは {@code add} の呼び出しとして数えられる。 */
-  private static boolean isRepositoryAdd(final JavaMethod method) {
-    final JavaClass owner = method.getOwner();
-    return ADD.equals(method.getName())
-        && owner.getSimpleName().startsWith("Jooq")
-        && owner.getSimpleName().endsWith(REPOSITORY)
-        && owner.getPackageName().contains(".infrastructure.persistence");
-  }
-
-  private static ArchCondition<JavaMethod> notExecuteInsertDirectly() {
-    return new ArchCondition<>("not execute a jOOQ Insert directly") {
-      @Override
-      public void check(final JavaMethod item, final ConditionEvents events) {
-        item.getAccessesFromSelf().stream()
-            .filter(access -> access.getTargetOwner().isAssignableTo(Insert.class))
-            .filter(access ->
-                QUERY_EXECUTIONS.contains(access.getName()) || access.getName().startsWith("fetch"))
-            .forEach(access ->
-                events.add(
-                    SimpleConditionEvent.violated(
-                        item,
-                        item.getFullName()
-                            + " が "
-                            + access.getTarget().getFullName()
-                            + " で INSERT を直接実行する。")));
-      }
-    };
-  }
-
   /** 呼び出し先が、TableWriter を通さない業務テーブルの書き込みかを返す。 */
   private static boolean isDirectWrite(final JavaAccess<?> access) {
     final JavaClass owner = access.getTargetOwner();
@@ -569,44 +465,19 @@ class TableWriterArchTest {
 
   private static ArchCondition<JavaMethod> callTheVersionedEntryPoint(final String writer) {
     return new ArchCondition<>(
-        "call TableWriter.updateCheckingVersion or deleteCheckingVersion and the aggregate's lockNo()") {
+        "call TableWriter.update, the entry point that compares the version") {
       @Override
       public void check(final JavaMethod item, final ConditionEvents events) {
-        final Set<String> expected =
-            switch (item.getName()) {
-              case UPDATE -> Set.of(UPDATE_CHECKING_VERSION);
-              case DELETE -> Set.of(DELETE_CHECKING_VERSION);
-              default -> Set.of(UPDATE_CHECKING_VERSION, DELETE_CHECKING_VERSION);
-            };
+        // 版は TableWriter.update の Versioned の引数から読むため、呼び出しの有無だけを見る。delete と別の名前の書き込みも update を呼ぶ。
         final boolean calls =
             item.getMethodCallsFromSelf().stream()
                 .anyMatch(call ->
                     call.getTargetOwner().getFullName().equals(writer)
-                        && expected.contains(call.getName()));
+                        && UPDATE.equals(call.getName()));
         if (!calls) {
           events.add(
               SimpleConditionEvent.violated(
-                  item,
-                  item.getFullName()
-                      + " が TableWriter の "
-                      + String.join(" か ", new TreeSet<>(expected))
-                      + " を直接呼んでいない。"));
-        }
-        // ponytail: 値の流れは追わず、lockNo() の呼び出しの有無だけを見る。読み直した版を渡しつつ lockNo() も呼ぶ実装は通る。
-        final Set<String> aggregateRoots =
-            item.getRawParameterTypes().stream()
-                .filter(TableWriterArchTest::isAggregateRoot)
-                .map(JavaClass::getFullName)
-                .collect(Collectors.toSet());
-        final boolean readsLockNo =
-            item.getMethodCallsFromSelf().stream()
-                .anyMatch(call ->
-                    "lockNo".equals(call.getName())
-                        && aggregateRoots.contains(call.getTargetOwner().getFullName()));
-        if (!readsLockNo) {
-          events.add(
-              SimpleConditionEvent.violated(
-                  item, item.getFullName() + " が引数の集約ルートの lockNo() を呼んでいない。"));
+                  item, item.getFullName() + " が TableWriter の update を直接呼んでいない。"));
         }
       }
     };
@@ -749,31 +620,6 @@ class TableWriterArchTest {
                         item,
                         method.getFullName()
                             + " が集約の ensureLockNo(ExpectedLockNo) を handle の中で直接呼んでいない。")));
-      }
-    };
-  }
-
-  private static ArchCondition<JavaClass> notUseUnversionedWritesWithAggregateRoots(
-      final String writer) {
-    return new ArchCondition<>(
-        "not call TableWriter.updateWhere or deleteWhere from code units taking an aggregate root") {
-      @Override
-      public void check(final JavaClass item, final ConditionEvents events) {
-        // ArchUnit はラムダの本体の呼び出しを外側のメソッドの呼び出しとして数えるため、ラムダの中の呼び出しも同じ判定で見る。
-        for (final JavaCodeUnit codeUnit : item.getCodeUnits()) {
-          final boolean callsUnversioned =
-              codeUnit.getAccessesFromSelf().stream()
-                  .anyMatch(access ->
-                      access.getTargetOwner().getFullName().equals(writer)
-                          && UNVERSIONED_WRITES.contains(access.getName()));
-          if (callsUnversioned
-              && codeUnit.getRawParameterTypes().stream()
-                  .anyMatch(TableWriterArchTest::isAggregateRoot)) {
-            events.add(
-                SimpleConditionEvent.violated(
-                    item, codeUnit.getFullName() + " は集約ルートを受け取り、TableWriter の版を比べない入口を呼ぶ。"));
-          }
-        }
       }
     };
   }

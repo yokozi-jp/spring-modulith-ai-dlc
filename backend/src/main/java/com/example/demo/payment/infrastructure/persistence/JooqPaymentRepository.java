@@ -2,6 +2,7 @@ package com.example.demo.payment.infrastructure.persistence;
 
 import static com.example.demo.jooq.payment.Tables.T_PAYMENT;
 
+import com.example.demo.jooq.payment.tables.records.TPaymentRecord;
 import com.example.demo.payment.domain.model.ChargeOutcome;
 import com.example.demo.payment.domain.model.GatewayPaymentCode;
 import com.example.demo.payment.domain.model.Money;
@@ -10,10 +11,11 @@ import com.example.demo.payment.domain.model.Payment;
 import com.example.demo.payment.domain.model.PaymentId;
 import com.example.demo.payment.domain.model.PaymentRepository;
 import com.example.demo.payment.domain.model.PaymentStatus;
-import com.example.demo.shared.infrastructure.persistence.CommonColumns;
+import com.example.demo.shared.infrastructure.persistence.AggregateTable;
 import com.example.demo.shared.infrastructure.persistence.TableWriter;
 import java.time.Instant;
 import java.util.Optional;
+import java.util.UUID;
 import org.jooq.DSLContext;
 import org.jooq.Record7;
 import org.jooq.Records;
@@ -25,20 +27,19 @@ import org.springframework.stereotype.Repository;
 @Repository
 class JooqPaymentRepository implements PaymentRepository {
 
+  /** 決済記録の集約。ルートは公開 ID で一つに決める。 */
+  private static final AggregateTable<TPaymentRecord, UUID> PAYMENT =
+      AggregateTable.of(T_PAYMENT, T_PAYMENT.PUBLIC_ID, T_PAYMENT.PAYMENT_ID);
+
   /** SQL を組み立てて実行する jOOQ のコンテキスト。 */
   private final DSLContext dsl;
 
-  /** 共通カラムの値を作る shared の共通処理。 */
-  private final CommonColumns commonColumns;
-
-  /** 集約ルートの INSERT を実行し、一意制約の違反を ConflictException に変える shared の入口。 */
+  /** 集約を INSERT し、一意制約の違反を ConflictException に変える shared の入口。 */
   private final TableWriter tableWriter;
 
-  /** jOOQ のコンテキストと shared の共通処理を受け取る。 */
-  /* package */ JooqPaymentRepository(
-      final DSLContext dsl, final CommonColumns commonColumns, final TableWriter tableWriter) {
+  /** jOOQ のコンテキストと shared の入口を受け取る。 */
+  /* package */ JooqPaymentRepository(final DSLContext dsl, final TableWriter tableWriter) {
     this.dsl = dsl;
-    this.commonColumns = commonColumns;
     this.tableWriter = tableWriter;
   }
 
@@ -53,14 +54,14 @@ class JooqPaymentRepository implements PaymentRepository {
   public void add(final Payment payment) {
     // ユニークインデックスは public_id（UUID v4 で衝突しない）と order_public_id だけなので、409 は注文の決済記録の重複である。
     tableWriter.insert(
-        dsl.insertInto(T_PAYMENT)
-            .set(T_PAYMENT.PUBLIC_ID, payment.id().value())
-            .set(T_PAYMENT.ORDER_PUBLIC_ID, payment.orderId().value())
-            .set(T_PAYMENT.CHARGED_AMOUNT_JPY, payment.amount().amount())
-            .set(T_PAYMENT.PAYMENT_STATUS_TYP, payment.status().name())
-            .set(T_PAYMENT.GATEWAY_PAYMENT_CODE, codeValue(payment.gatewayPaymentCode()))
-            .set(T_PAYMENT.RECORDED_AT, payment.recordedAt())
-            .set(commonColumns.forInsert(T_PAYMENT)));
+        PAYMENT,
+        payment.id().value(),
+        set ->
+            set.set(T_PAYMENT.ORDER_PUBLIC_ID, payment.orderId().value())
+                .set(T_PAYMENT.CHARGED_AMOUNT_JPY, payment.amount().amount())
+                .set(T_PAYMENT.PAYMENT_STATUS_TYP, payment.status().name())
+                .set(T_PAYMENT.GATEWAY_PAYMENT_CODE, codeValue(payment.gatewayPaymentCode()))
+                .set(T_PAYMENT.RECORDED_AT, payment.recordedAt()));
   }
 
   /** 決済記録の列を、restore の引数の型と順に選ぶ。 */

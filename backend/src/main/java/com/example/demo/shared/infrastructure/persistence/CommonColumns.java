@@ -7,6 +7,7 @@ import java.time.Clock;
 import java.time.Instant;
 import java.util.Collections;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.function.Function;
@@ -82,6 +83,21 @@ public class CommonColumns {
                 Stream.of(
                     Map.<Field<?>, Object>entry(requiredField(table, "lock_no", Long.class), 1L)))
             .flatMap(Function.identity()));
+  }
+
+  /**
+   * 集約のテーブルが、{@link TableWriter} の書く共通カラムをすべて持つことを確かめる。
+   *
+   * @throws IllegalArgumentException カラムがない、または型が異なる場合
+   */
+  /* package */ static void requireAuditColumns(final Table<?> table) {
+    requiredField(table, "lock_no", Long.class);
+    for (final String prefix : List.of("created_", "updated_")) {
+      requiredField(table, prefix + "at", Instant.class);
+      requiredField(table, prefix + "by", String.class);
+      requiredField(table, prefix + "pgm_cd", String.class);
+      requiredField(table, prefix + "tx_id", String.class);
+    }
   }
 
   /**

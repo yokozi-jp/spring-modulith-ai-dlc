@@ -1,52 +1,47 @@
 package com.example.demo.shared.infrastructure.persistence;
 
 import com.example.demo.shared.concurrency.ConflictException;
+import com.example.demo.shared.concurrency.Versioned;
 import com.example.demo.shared.failure.NotFoundException;
-import com.google.errorprone.annotations.CheckReturnValue;
+import java.util.Arrays;
 import java.util.function.Consumer;
-import java.util.function.IntSupplier;
 import java.util.function.Supplier;
-import org.jooq.Condition;
 import org.jooq.DSLContext;
 import org.jooq.Field;
-import org.jooq.Insert;
-import org.jooq.Query;
 import org.jooq.Record;
+import org.jooq.Record1;
+import org.jooq.Result;
 import org.jooq.Table;
-import org.springframework.dao.CannotAcquireLockException;
-import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 /**
- * 業務テーブルの UPDATE と DELETE を組み立てて実行する唯一の入口で、集約ルートの INSERT
- * の入口（ADR-054、docs/database/postgresql-concurrency-control.md）。
+ * 集約の INSERT と UPDATE を組み立てて実行する唯一の入口（ADR-054、docs/database/postgresql-concurrency-control.md）。
  *
- * <p>版の条件、{@code lock_no} の設定、更新のカラム、実行、件数の判定、{@code 55P03} と {@code 23505} の変換をここに集める。Repository
- * が書くのは、{@link ColumnValues} に渡す業務の列の値だけである。
+ * <p>集約の形は、Repository が {@link AggregateTable} と {@link ChildTable}
+ * で一度だけ宣言する。保存のたびに、ルートの列の値と、保存後にあるべき子の全行（{@link ChildRows}）を渡す。{@code Condition} も {@code Insert}
+ * も受け取らず、ルートの条件、版の条件、子の外部キーの条件は、宣言から {@code TableWriter} が作る。
  *
- * <p>入口の選び分けは、呼び出し側が期待する版（以前に読んだ集約ルートの {@code lock_no}）を持っているかだけで決まる。
+ * <p>{@link #update} は、ルートの行を {@code 一意の列 AND lock_no = 期待値}
+ * で更新して版を進める。ルートの行ロックの下で、子を差分（削除、更新、追加）で書く。{@link #insert} は、ルートを書いてから子を複数行の INSERT で書く。ルートの内部の主キーは
+ * {@code RETURNING} で受けるため、Repository は読み直さない。
  *
- * <ul>
- *   <li>持っている：{@link #updateCheckingVersion} と {@link #deleteCheckingVersion}。子の行は戻り値の {@link
- *       LockedRoot} と {@link DeletedRoot} で書く。
- *   <li>持っていない：{@link #updateWhere} と {@link #deleteWhere}。件数の意味は呼び出し側が決める。
- * </ul>
+ * <p>共通カラム、版の加算、件数の判定、{@code 55P03}（種類 {@code LOCK}）と {@code 23505}（種類 {@code UNIQUE}）の {@link
+ * ConflictException} への変換は、すべてここで行う。変換は例外の型ではなく SQLSTATE で決める。どの入口も、読み取り専用ではない、開いているトランザクションの中で呼ぶ。
  *
- * <p>どの UPDATE も {@code lock_no} を進める。集約ルートの INSERT は {@link #insert} で実行する。子の行の INSERT
- * はここを通さず、{@code dsl.batch} と {@link CommonColumns#forInsert}
- * で書く。ただし、業務の一意インデックスを持つ子のテーブルは、一意制約の違反を {@link ConflictException} にするため、1 行ずつ {@link #insert} で書く。
+ * <p>例外のメッセージには、テーブル名、ルートの一意の列の値、期待する版を入れ、SQL は入れない（docs/observability/conventions.md）。
  *
- * <p>例外のメッセージには、テーブル名、主キーの条件のバインド値、期待する版を入れ、SQL は入れない（docs/observability/conventions.md）。
+ * <p>ponytail: 上限：子の行の UPDATE は 1 行ずつ実行する。子が多い集約が出たら、バッチにして件数の配列で 1 件ずつを確かめる。
  */
-// 業務テーブルの UPDATE と DELETE の入口、件数の判定、ロック待ちの変換を一つのクラスに集めるため（ADR-054）、メソッドと依存する型の数の上限を外す。
-@SuppressWarnings({"PMD.TooManyMethods", "PMD.CouplingBetweenObjects"})
+// jOOQ の型を使って集約のルートの文を組み立てるため、結合するクラスの数の上限を外す。
+@SuppressWarnings("PMD.CouplingBetweenObjects")
 @Component
 public class TableWriter {
 
   /** 楽観的ロックの版のカラム名。 */
   private static final String LOCK_NO = "lock_no";
 
-  /** 主キーの条件で更新、削除できる行数。 */
+  /** 一つの文で変える行数。 */
   private static final int ONE_ROW = 1;
 
   /** 版の最小値。INSERT が {@code lock_no = 1} で書く。 */
@@ -55,167 +50,93 @@ public class TableWriter {
   /** UPDATE と DELETE を実行する jOOQ のコンテキスト。 */
   private final DSLContext dsl;
 
-  /** 更新のカラムの値を作る共通処理。 */
+  /** 共通カラムの値を作る共通処理。 */
   private final CommonColumns commonColumns;
 
-  /** jOOQ のコンテキストと、更新のカラムの値を作る共通処理を受け取る。 */
+  /** 集約の子の行を書く。 */
+  private final ChildWriter children;
+
+  /** jOOQ のコンテキストと、共通カラムの値を作る共通処理を受け取る。 */
   public TableWriter(final DSLContext dsl, final CommonColumns commonColumns) {
     this.dsl = dsl;
     this.commonColumns = commonColumns;
+    this.children = new ChildWriter(dsl, commonColumns);
   }
 
   /**
-   * 期待する版の行を 1 行更新し、版を期待値 + 1 にする。
+   * 子のない集約を INSERT する。共通カラムを書き、{@code lock_no = 1} にする。
    *
-   * <p>SET は業務の列、{@code updated_*}、{@code lock_no = 期待値 + 1}、WHERE は {@code 主キーの条件 AND lock_no =
-   * 期待値} になる。業務の列が一つもなくても、ルートの行の版と更新のカラムを進める。
-   *
-   * @param table 集約ルートのテーブル
-   * @param byPrimaryKey 主キーで 1 行を特定する条件。{@code lock_no} の条件は含めない
-   * @param expectedLockNo 以前に読んだ集約ルートの版
-   * @param businessColumns 業務の列の値を {@link ColumnValues} に登録する
-   * @return 子の行を更新、削除する {@link LockedRoot}
-   * @throws IllegalArgumentException {@code expectedLockNo} が 1 未満の場合、テーブルに {@code lock_no}（{@code
-   *     Long}）がない場合、業務の列に共通カラムを渡した場合
-   * @throws NotFoundException 更新件数が 0 で、主キーの行がない場合
-   * @throws ConflictException 更新件数が 0 で主キーの行がある場合、一意制約に違反した場合（種類は {@code UNIQUE}）、行ロックを {@code
-   *     lock_timeout} までに取れない場合（種類は {@code LOCK}）。原因は持たない
-   * @throws IllegalStateException 更新件数が 2 以上の場合。主キーの条件が 1 行を特定していない
+   * @param aggregate 子を宣言していない集約
+   * @param key ルートの一意の列の値
+   * @param rootColumns ルートの業務の列の値。ルートの一意の列と内部の主キーは書けない
+   * @throws IllegalArgumentException 集約が子を宣言している場合、共通カラムなどの書けない列を渡した場合
+   * @throws IllegalStateException トランザクションが開いていない、または読み取り専用の場合
+   * @throws ConflictException 一意制約に違反した場合（種類は {@code UNIQUE}）、行ロックを {@code lock_timeout}
+   *     までに取れない場合（種類は {@code LOCK}）。原因は持たない
    */
-  public <R extends Record> LockedRoot updateCheckingVersion(
-      final Table<R> table,
-      final Condition byPrimaryKey,
-      final long expectedLockNo,
-      final Consumer<ColumnValues<R>> businessColumns) {
-    final Field<Long> lockNo = versionOf(table, expectedLockNo);
-    final Query update =
-        dsl.update(table)
-            .set(collect(table, businessColumns).values())
-            .set(commonColumns.forUpdate(table))
-            .set(lockNo, Math.addExact(expectedLockNo, 1))
-            .where(byPrimaryKey.and(lockNo.eq(expectedLockNo)));
-    requireOneRow(update, table, byPrimaryKey, expectedLockNo);
-    return new LockedRoot(this);
-  }
-
-  /**
-   * 期待する版の行を 1 行削除する。
-   *
-   * <p>WHERE は {@code 主キーの条件 AND lock_no = 期待値} になる。子の行は戻り値から削除する。
-   *
-   * @param table 集約ルートのテーブル
-   * @param byPrimaryKey 主キーで 1 行を特定する条件。{@code lock_no} の条件は含めない
-   * @param expectedLockNo 以前に読んだ集約ルートの版
-   * @return 子の行を削除する {@link DeletedRoot}
-   * @throws IllegalArgumentException {@code expectedLockNo} が 1 未満の場合、テーブルに {@code lock_no}（{@code
-   *     Long}）がない場合
-   * @throws NotFoundException 削除件数が 0 で、主キーの行がない場合
-   * @throws ConflictException 削除件数が 0 で主キーの行がある場合、一意制約に違反した場合（種類は {@code UNIQUE}）、行ロックを {@code
-   *     lock_timeout} までに取れない場合（種類は {@code LOCK}）。原因は持たない
-   * @throws IllegalStateException 削除件数が 2 以上の場合。主キーの条件が 1 行を特定していない
-   */
-  public <R extends Record> DeletedRoot deleteCheckingVersion(
-      final Table<R> table, final Condition byPrimaryKey, final long expectedLockNo) {
-    final Field<Long> lockNo = versionOf(table, expectedLockNo);
-    requireOneRow(
-        dsl.deleteFrom(table).where(byPrimaryKey.and(lockNo.eq(expectedLockNo))),
-        table,
-        byPrimaryKey,
-        expectedLockNo);
-    return new DeletedRoot(this);
-  }
-
-  /**
-   * 版を比べずに条件に合う行を更新し、版を 1 進めて件数を返す。
-   *
-   * <p>SET は業務の列、{@code updated_*}、{@code lock_no = lock_no + 1} になる。期待する版を持つ書き込みには使わない。
-   *
-   * @param table 更新するテーブル
-   * @param where 更新する行の条件
-   * @param businessColumns 業務の列の値を {@link ColumnValues} に登録する。一つ以上必要
-   * @return 更新件数。0 件の意味（在庫不足など）は呼び出し側が決める
-   * @throws IllegalArgumentException テーブルに {@code lock_no}（{@code
-   *     Long}）がない場合、業務の列が一つもない場合、業務の列に共通カラムを渡した場合
-   * @throws CannotAcquireLockException 行ロックを {@code lock_timeout} までに取れない場合。変換せずに投げる
-   * @throws DuplicateKeyException 一意制約に違反した場合（{@code 23505}）。変換せずに投げる
-   */
-  @CheckReturnValue
-  public <R extends Record> int updateWhere(
-      final Table<R> table,
-      final Condition where,
-      final Consumer<ColumnValues<R>> businessColumns) {
-    final Field<Long> lockNo = CommonColumns.requiredField(table, LOCK_NO, Long.class);
-    final ColumnValues<R> values = collect(table, businessColumns);
-    if (values.isEmpty()) {
-      throw new IllegalArgumentException("no business column to update: table=" + table.getName());
+  public <R extends Record, K> void insert(
+      final AggregateTable<R, K> aggregate,
+      final K key,
+      final Consumer<ColumnValues<R>> rootColumns) {
+    if (!aggregate.children().isEmpty()) {
+      throw new IllegalArgumentException(
+          "children must be put: table=" + aggregate.table().getName());
     }
-    return dsl.update(table)
-        .set(values.values())
-        .set(commonColumns.forUpdate(table))
-        .set(lockNo, lockNo.plus(1))
-        .where(where)
-        .execute();
+    insertRoot(aggregate, key, rootColumns);
   }
 
   /**
-   * Repository が組み立てた INSERT を実行する。
+   * 集約を INSERT する。ルートを書き、子を複数行の INSERT で書く。
    *
-   * <p>共通カラムは呼び出し側が {@link CommonColumns#forInsert} で設定する。
-   *
-   * <p>ponytail: 上限：子の行の dsl.batch の INSERT は変換しない。一意インデックスを持つ子の行が多くなったら、batch を受ける入口を足す。
-   *
-   * @param insert {@code dsl.insertInto(...).set(...).set(commonColumns.forInsert(...))} で組み立てた 1
-   *     行の INSERT
-   * @throws ConflictException 一意制約に違反した場合（種類は {@code UNIQUE}）と、行ロックを {@code lock_timeout}
+   * @param aggregate 集約の宣言
+   * @param key ルートの一意の列の値
+   * @param rootColumns ルートの業務の列の値。ルートの一意の列と内部の主キーは書けない
+   * @param childRows 宣言した子すべての行。空の子は空の一覧で渡す
+   * @throws IllegalArgumentException 宣言した子を渡していない場合、宣言していない子を渡した場合、書けない列を渡した場合
+   * @throws IllegalStateException トランザクションが開いていない、または読み取り専用の場合
+   * @throws ConflictException 一意制約に違反した場合（種類は {@code UNIQUE}）、行ロックを {@code lock_timeout}
    *     までに取れない場合（種類は {@code LOCK}）。原因は持たない
    */
-  public void insert(final Insert<?> insert) {
-    // テーブル名は Insert の公開 API で取れないため入れない。原因の例外は SQL と値を持つため付けない（ADR-062）。
-    executeOrConflict(insert::execute, () -> "insert");
+  public <R extends Record, K> void insert(
+      final AggregateTable<R, K> aggregate,
+      final K key,
+      final Consumer<ColumnValues<R>> rootColumns,
+      final Consumer<ChildRows<R>> childRows) {
+    final ChildRows<R> rows = collectChildRows(aggregate, childRows);
+    final long id = insertRoot(aggregate, key, rootColumns);
+    for (final ChildTable<R, ?> child : aggregate.children()) {
+      children.saveChild(child, id, rows, false);
+    }
   }
 
   /**
-   * 子の行を条件で更新し、版を 1 進めて件数を返す。{@link LockedRoot#updateChild} が使う。
+   * 期待する版のルートを 1 行更新して版を期待値 + 1 にし、子を差分で書く。
    *
-   * @throws ConflictException 一意制約に違反した場合（種類は {@code UNIQUE}）と、行ロックを {@code lock_timeout}
-   *     までに取れない場合（種類は {@code LOCK}）。原因は持たない
-   */
-  @CheckReturnValue
-  /* package */ <R extends Record> int updateChildRows(
-      final Table<R> table,
-      final Condition byPrimaryKey,
-      final Consumer<ColumnValues<R>> businessColumns) {
-    return executeOrConflict(
-        () -> updateWhere(table, byPrimaryKey, businessColumns),
-        () -> childTarget(table, byPrimaryKey));
-  }
-
-  /**
-   * 版を比べずに条件に合う行を削除し、件数を返す。
+   * <p>ルートの SET は業務の列、{@code updated_*}、{@code lock_no = 期待値 + 1}、WHERE は {@code 一意の列 AND lock_no =
+   * 期待値}
+   * になる。業務の列が一つもなくても、版と更新のカラムを進める。子は、ルートの行ロックを取った後に、保存済みの自然キーを読み、なくなった子の削除、残る子の更新、新しい子の追加の順で書く。
    *
-   * @param table 削除するテーブル
-   * @param where 削除する行の条件
-   * @return 削除件数。件数の意味は呼び出し側が決める
-   * @throws CannotAcquireLockException 行ロックを {@code lock_timeout} までに取れない場合。変換せずに投げる
+   * @param aggregate 集約の宣言
+   * @param key ルートの一意の列の値
+   * @param root 以前に読んだ集約ルート。{@link Versioned#lockNo} が期待する版になる
+   * @param rootColumns ルートの業務の列の値
+   * @param childRows 宣言した子すべての、保存後にあるべき行。渡した子の自然キーにない保存済みの子は削除する
+   * @throws IllegalArgumentException 期待する版が 1 未満の場合、宣言した子を渡していない場合、宣言していない子を渡した場合、自然キーが null
+   *     か重複する場合、書けない列を渡した場合
+   * @throws IllegalStateException トランザクションが開いていない、または読み取り専用の場合、更新件数が 2 以上の場合
+   * @throws NotFoundException 更新件数が 0 で、一意の列の行がない場合
+   * @throws ConflictException 更新件数が 0 で一意の列の行がある場合（種類は {@code VERSION}）、一意制約に違反した場合（種類は {@code
+   *     UNIQUE}）、行ロックを {@code lock_timeout} までに取れない場合（種類は {@code LOCK}）。原因は持たない
    */
-  @CheckReturnValue
-  public int deleteWhere(final Table<?> table, final Condition where) {
-    return dsl.deleteFrom(table).where(where).execute();
-  }
-
-  /**
-   * 子の行を条件で削除する。{@link LockedRoot} と {@link DeletedRoot} が使う。
-   *
-   * @throws ConflictException 一意制約に違反した場合（種類は {@code UNIQUE}）と、行ロックを {@code lock_timeout}
-   *     までに取れない場合（種類は {@code LOCK}）。原因は持たない
-   */
-  /* package */ void deleteRows(final Table<?> table, final Condition where) {
-    executeOrConflict(
-        () -> dsl.deleteFrom(table).where(where).execute(), () -> childTarget(table, where));
-  }
-
-  /** 期待する版を確かめ、テーブルの {@code lock_no} を返す。SQL を実行する前に失敗させる。 */
-  private static Field<Long> versionOf(final Table<?> table, final long expectedLockNo) {
+  public <R extends Record, K> void update(
+      final AggregateTable<R, K> aggregate,
+      final K key,
+      final Versioned root,
+      final Consumer<ColumnValues<R>> rootColumns,
+      final Consumer<ChildRows<R>> childRows) {
+    requireTransaction();
+    final long expectedLockNo = root.lockNo();
+    final Table<R> table = aggregate.table();
     if (expectedLockNo < FIRST_LOCK_NO) {
       throw new IllegalArgumentException(
           "expectedLockNo must be 1 or greater: table="
@@ -223,68 +144,111 @@ public class TableWriter {
               + ", expectedLockNo="
               + expectedLockNo);
     }
-    return CommonColumns.requiredField(table, LOCK_NO, Long.class);
+    final ChildRows<R> rows = collectChildRows(aggregate, childRows);
+    final ColumnValues<R> values = collect(aggregate, rootColumns);
+    final Field<Long> lockNo = CommonColumns.requiredField(table, LOCK_NO, Long.class);
+    final Supplier<String> target = () -> target(table, aggregate.key(), key, expectedLockNo);
+    final Result<Record1<Long>> updated =
+        ConflictTranslator.executeOrConflict(
+            () ->
+                dsl.update(table)
+                    .set(values.values())
+                    .set(commonColumns.forUpdate(table))
+                    .set(lockNo, Math.addExact(expectedLockNo, 1))
+                    .where(aggregate.key().eq(key).and(lockNo.eq(expectedLockNo)))
+                    .returningResult(aggregate.id())
+                    .fetch(),
+            target);
+    requireOneRow(updated, aggregate, key, expectedLockNo);
+    final long id = updated.getFirst().value1();
+    for (final ChildTable<R, ?> child : aggregate.children()) {
+      children.saveChild(child, id, rows, true);
+    }
   }
 
-  /** 呼び出し側のラムダから業務の列の値を集める。 */
-  private static <R extends Record> ColumnValues<R> collect(
-      final Table<R> table, final Consumer<ColumnValues<R>> businessColumns) {
-    final ColumnValues<R> values = new ColumnValues<>(table);
-    businessColumns.accept(values);
+  /** 更新したルートがちょうど 1 行であることを確かめ、そうでなければ NotFound か Conflict にする。 */
+  private <R extends Record, K> void requireOneRow(
+      final Result<Record1<Long>> updated,
+      final AggregateTable<R, K> aggregate,
+      final K key,
+      final long expectedLockNo) {
+    final Table<R> table = aggregate.table();
+    final String target = target(table, aggregate.key(), key, expectedLockNo);
+    if (updated.size() > ONE_ROW) {
+      throw new IllegalStateException(
+          "key condition matched " + updated.size() + " rows: " + target);
+    }
+    if (updated.isEmpty()) {
+      if (!dsl.fetchExists(table, aggregate.key().eq(key))) {
+        throw new NotFoundException("row not found: " + target);
+      }
+      throw new ConflictException(
+          ConflictException.Kind.VERSION, "row was updated by another request: " + target);
+    }
+  }
+
+  /** ルートを INSERT し、RETURNING で受けた内部の主キーを返す。 */
+  private <R extends Record, K> long insertRoot(
+      final AggregateTable<R, K> aggregate,
+      final K key,
+      final Consumer<ColumnValues<R>> rootColumns) {
+    requireTransaction();
+    final Table<R> table = aggregate.table();
+    final ColumnValues<R> values = collect(aggregate, rootColumns);
+    return ConflictTranslator.executeOrConflict(
+        () ->
+            dsl.insertInto(table)
+                .set(aggregate.key(), key)
+                .set(values.values())
+                .set(commonColumns.forInsert(table))
+                .returningResult(aggregate.id())
+                .fetchSingle()
+                .value1(),
+        () -> "table=" + table.getName() + ", key=" + key);
+  }
+
+  /** 呼び出し側のラムダから、ルートの業務の列の値を集める。 */
+  private static <R extends Record, K> ColumnValues<R> collect(
+      final AggregateTable<R, K> aggregate, final Consumer<ColumnValues<R>> rootColumns) {
+    final ColumnValues<R> values =
+        new ColumnValues<>(aggregate.table(), Arrays.asList(aggregate.key(), aggregate.id()));
+    rootColumns.accept(values);
     return values;
   }
 
-  /** 主キーと版を条件にした文を実行し、ちょうど 1 行を変えたことを確かめる。 */
-  private void requireOneRow(
-      final Query query,
-      final Table<?> table,
-      final Condition byPrimaryKey,
-      final long expectedLockNo) {
-    final int changed =
-        executeOrConflict(query::execute, () -> target(table, byPrimaryKey, expectedLockNo));
-    if (changed == ONE_ROW) {
-      return;
+  /** 呼び出し側のラムダから子の行を集め、宣言した子と過不足がなく、行に不備がないことを SQL の前に確かめる。 */
+  private static <R extends Record, K> ChildRows<R> collectChildRows(
+      final AggregateTable<R, K> aggregate, final Consumer<ChildRows<R>> childRows) {
+    final ChildRows<R> rows = new ChildRows<>();
+    childRows.accept(rows);
+    if (rows.size() != aggregate.children().size()) {
+      throw new IllegalArgumentException(
+          "child rows must match the declared children: table=" + aggregate.table().getName());
     }
-    final String target = target(table, byPrimaryKey, expectedLockNo);
-    if (changed > ONE_ROW) {
-      throw new IllegalStateException(
-          "primary key condition matched " + changed + " rows: " + target);
+    for (final ChildTable<R, ?> child : aggregate.children()) {
+      ChildWriter.desiredByKey(child, rows);
     }
-    if (!dsl.fetchExists(table, byPrimaryKey)) {
-      throw new NotFoundException("row not found: " + target);
-    }
-    throw new ConflictException(
-        ConflictException.Kind.VERSION, "row was updated by another request: " + target);
+    return rows;
   }
 
-  /**
-   * 文を実行して件数を返し、{@code 55P03} の {@link CannotAcquireLockException} を種類 {@code LOCK}、{@code 23505} の
-   * {@link DuplicateKeyException} を種類 {@code UNIQUE} の {@link ConflictException} に変える。原因は付けない。
-   *
-   * <p>ponytail: 上限：{@link #insert} の 409 のメッセージはテーブル名と制約名を持たない。必要になったら、{@code insert}
-   * にテーブルを渡す入口を足す。
-   */
-  // 原因の例外のメッセージに SQL と重複したキーの値が入るため、原因を付けない（ADR-062、docs/observability/conventions.md）。
-  @SuppressWarnings({"PMD.PreserveStackTrace", "UnusedException"})
-  private static int executeOrConflict(final IntSupplier statement, final Supplier<String> target) {
-    try {
-      return statement.getAsInt();
-    } catch (final CannotAcquireLockException e) {
-      throw new ConflictException(
-          ConflictException.Kind.LOCK, "row is locked by another request: " + target.get());
-    } catch (final DuplicateKeyException e) {
-      throw new ConflictException(
-          ConflictException.Kind.UNIQUE, "unique key already exists: " + target.get());
+  /** 書き込みは、開いていて読み取り専用でないトランザクションの中でだけ行う。 */
+  private static void requireTransaction() {
+    if (!TransactionSynchronizationManager.isActualTransactionActive()
+        || TransactionSynchronizationManager.isCurrentTransactionReadOnly()) {
+      throw new IllegalStateException("a read-write transaction is required to write");
     }
   }
 
-  /** 例外のメッセージに入れる、テーブル名と条件のバインド値。SQL を入れず、キーの値だけを入れる。{@link LockedRoot} も使う。 */
-  /* package */ String childTarget(final Table<?> table, final Condition condition) {
-    return "table=" + table.getName() + ", key=" + dsl.extractBindValues(condition);
-  }
-
-  /** 例外のメッセージに入れる、テーブル名、主キーの条件のバインド値、期待する版。 */
-  private String target(final Table<?> table, final Condition byPrimaryKey, final long expected) {
-    return childTarget(table, byPrimaryKey) + ", expectedLockNo=" + expected;
+  /** 例外のメッセージに入れる、テーブル名、ルートの一意の列の値、期待する版。 */
+  private static String target(
+      final Table<?> table, final Field<?> keyField, final Object key, final long expected) {
+    return "table="
+        + table.getName()
+        + ", "
+        + keyField.getName()
+        + "="
+        + key
+        + ", expectedLockNo="
+        + expected;
   }
 }

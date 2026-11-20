@@ -1,5 +1,6 @@
 package com.example.demo.tenancy.domain.model;
 
+import com.example.demo.shared.concurrency.Versioned;
 import java.util.List;
 import java.util.UUID;
 
@@ -10,7 +11,7 @@ import java.util.UUID;
  */
 // record と同じ形のアクセサ（id() など）にそろえるため、フィールド名と同名の短いメソッドを許す。
 @SuppressWarnings({"PMD.AvoidFieldNameMatchingMethodName", "PMD.ShortMethodName"})
-public final class User {
+public final class User implements Versioned {
 
   /** 利用者 ID。 */
   private final UserId id;
@@ -53,6 +54,7 @@ public final class User {
   }
 
   /** ロック番号を返す。 */
+  @Override
   public long lockNo() {
     return lockNo;
   }
