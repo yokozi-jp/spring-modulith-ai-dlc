@@ -9,4 +9,4 @@
 - [運用者が対応するログイベントの管理](log-operational-events.md)：WARN 以上のログを追加または変更するとき、ログの通知を設計するとき
 - [イベント出版の再投入のログイベント](runbook-event-publication-resubmission.md)：失敗したイベント出版の定期の再投入が出す ERROR と WARN に対応するとき、上限に達した出版を調べて手で再投入するか片付けるとき、自動の再投入を止めるとき
 - [ログの出力コストと量の抑制](log-performance-and-cost.md)：Logback の appender を変更するとき、性能問題やログ費用を調べるとき
-- [ローカルでトレースを見る](runbook-local-traces.md)：ローカルの Grafana で、Problem Details の traceId やログの trace_id からトレースを開くとき、ブラウザを使わずに Tempo を検索するとき、otel-lgtm の版を上げるとき
+- [ローカルでトレースを見る](runbook-local-traces.md)：ローカルの Grafana で、バックエンドのログの trace ID からトレースを開くとき、ブラウザを使わずに Tempo を検索するとき
