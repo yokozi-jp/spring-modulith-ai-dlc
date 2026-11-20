@@ -26,6 +26,7 @@ Proposed
 `requireUpdated` を呼ぶ production のコードはまだなく、ADR も Proposed のままであるため、この版で決定を書き直す。
 その後、[ADR-062](ADR-062-map-business-exceptions-to-404-409-422.md) の改訂（[issue #145](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/145)）に合わせ、`55P03` の変換で原因を付けないよう、この版で決定を書き直す。
 また、ADR-062 が集約ルートの INSERT の入口 `TableWriter.insert` を足したため、INSERT は `TableWriter` を通さないとしていた決定を、この版で書き直す。
+その後、ArchUnit がラムダの本体の呼び出しを外側のメソッドの呼び出しとして数えると分かったため、R4 の記述を、この版で書き直す。
 
 利用者は、共通基盤に次の順で重みを置く。
 AI と開発者が迷わないこと（どこに何を書き、どの API を使うかの答えが一つ）、間違えると機械で失敗すること、システムとして安全であること（古い値の上書き、無期限の待ち、気付けない設定の誤りがない）である。
@@ -102,7 +103,7 @@ PostgreSQL の READ COMMITTED では、後の UPDATE は先の UPDATE のコミ�
   - `expectedLockNoIsCreatedOnlyByRequests`（R3）：`ExpectedLockNo` のコンストラクタ（`ExpectedLockNo::new` を含む）は、`presentation.web` の `*Request` だけが呼ぶ。
     Repository、`TableWriter`、CommandHandler、Controller が読んだ版から作って、比較を常に成り立たせることを止める。
   - `commandHandlersEnsureScreenLockNo`（R4）：CommandHandler の、引数が `VersionedCommand` である `handle` は、その中で直接 `domain.model` の型の `ensureLockNo(ExpectedLockNo)` を呼ぶ。
-    別のメソッドやラムダの中の呼び出しと、`ensureLockNo(long)` のオーバーロードでは満たせない。
+    別のメソッドの中の呼び出しと、`ensureLockNo(long)` のオーバーロードでは満たせない。ラムダの本体の呼び出しは `handle` の呼び出しとして数えるため、満たす。
 - jOOQ の実行時の版をテストで固定する。
   版が変わったら、[jOOQ の SQL の書き方](../database/jooq-usage.md)の「jOOQの版を上げるとき」に従って禁止の一覧を見直す。
 - 期待する版は `shared.concurrency` の `ExpectedLockNo`（`long value`、1 未満は `IllegalArgumentException`）で運ぶ。
@@ -172,6 +173,8 @@ PostgreSQL の READ COMMITTED では、後の UPDATE は先の UPDATE のコミ�
     手順書で `WHERE lock_no = ?` を求めることは、将来の緩和策の候補にとどめる。
   - **別の集約のインスタンスへの `ensureLockNo`**：R4 は `handle` の中で `ensureLockNo(ExpectedLockNo)` を直接呼んだかしか見ない。
     保存する集約と別のインスタンスに呼んでも通る。
+  - **実行されないラムダの中の呼び出し**：ArchUnit はラムダの本体の呼び出しを外側のメソッドの呼び出しとして数えるため、`Optional.ifPresent(o -> o.ensureLockNo(...))` のように実行されないことがあるラムダの中の呼び出しでも、R4 と、版を比べる入口を求める規則（H3）を満たす。
+  - **集約ルートを引数に取るラムダ**：`aggregateMethodsDoNotUseUnversionedWrites`（H5）は外側のメソッドの引数だけを見る。集約ルートを受け取らないメソッドの中で、集約ルートを引数に取るラムダが `updateWhere` を呼んでも検出しない。
   - **`ensureLockNo` の位置と引数**：業務の検査や外部の呼び出しの後に呼ぶ書き方と、`command.expectedLockNo()` 以外の値を渡す書き方は検出しない。
     `ExpectedLockNo` を作れるのは Request だけなので、渡せる値は別の Command か別の Request の値に限られる。
   - **R1 が見ない Command の作り方**：R1 が画面から作られた Command とみなすのは、コンストラクタの呼び出しと、Command 自身が宣言する static factory の呼び出しだけである。

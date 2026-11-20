@@ -5,6 +5,7 @@ import archfixture.violating.ordering.domain.model.OrderId;
 import archfixture.violating.ordering.domain.model.OrderRepository;
 import archfixture.violating.ordering.domain.model.UnversionedOrderRepository;
 import archfixture.violating.shared.infrastructure.persistence.TableWriter;
+import java.util.function.IntSupplier;
 
 /**
  * 違反：repositoryUpdateAndDeleteCheckVersion（update と save が updateCheckingVersion を呼ばず、updateStatus
@@ -45,6 +46,11 @@ public final class JooqOrderRepository implements OrderRepository {
   /** 集約ルートの版ではなく、テーブルから読み直した版を期待する版に渡す。 */
   public String updateStatus(final Order order) {
     return tableWriter.updateCheckingVersion("orders", currentLockNo(order.id().value()));
+  }
+
+  /** ラムダの中で、版を比べない入口を呼ぶ。 */
+  public IntSupplier updateLater(final Order order) {
+    return () -> tableWriter.updateWhere(order.id().value());
   }
 
   private int writeColumns(final String orderId) {

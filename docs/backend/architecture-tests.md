@@ -22,13 +22,16 @@ backend/src/test/java/com/example/demo/architecture/
 ├── ClassRoleArchTest.java
 ├── DatabaseConventionsArchTest.java
 ├── DateTimeConventionsArchTest.java
+├── DirectWriteFixtureTest.java
 ├── GeneralCodingRulesArchTest.java
 ├── JooqCommonColumnsArchTest.java
+├── LambdaFixtureTest.java
 ├── PackageByFeatureOnionArchitectureTest.java
 ├── ProxyRulesArchTest.java
 ├── PublicIdArchTest.java
 ├── TableWriterArchTest.java
-└── TestConventionsArchTest.java
+├── TestConventionsArchTest.java
+└── ViolatingFixtures.java
 ```
 
 ## モジュールとパッケージ
@@ -105,7 +108,7 @@ jOOQの生成物の`com.example.demo.jooq`はOPENのモジュールであり、`
 ## 規則を確かめるフィクスチャ
 
 プロダクションの規則は`.allowEmptyShould(true)`を付けるため、対象のクラスがなくても成功する。
-`ArchitectureRuleFixtureTest`は、テスト専用のフィクスチャで各規則が働くことを確かめる。
+`ArchitectureRuleFixtureTest`、`DirectWriteFixtureTest`、`LambdaFixtureTest`は、テスト専用のフィクスチャで各規則が働くことを確かめる。違反フィクスチャの読み込みは`ViolatingFixtures`で共有する。
 
 - `backend/src/test/java/archfixture/conforming/`：規約どおりの`ordering`モジュール、`inventory`モジュール、`payment`モジュール、`shared`モジュールの最小の例。すべての規則が誤検出しないことを確かめる。
   `ordering`の`JooqOrderRepository`が`shared.infrastructure.persistence`の型を使い、`shared`のルートは`package-info.java`だけを持つ。
@@ -122,14 +125,19 @@ jOOQの生成物の`com.example.demo.jooq`はOPENのモジュールであり、`
 
 `jooqReflectionMappingIsNotUsed`は、違反フィクスチャの`ReflectiveOrderReader`で禁止するメソッドごとに一行を持ち、それぞれの呼び出しを検出することを確かめる。
 
-`tableWritesGoThroughTableWriter`は、違反フィクスチャの`DirectOrderWriter`で禁止するAPIごとに一行を持つ。
+`tableWritesGoThroughTableWriter`は、違反フィクスチャの`DirectOrderWriter`のメソッドごとに一行を持つ。
+`DirectWriteFixtureTest`の`DIRECT_WRITES`が、メソッドと、そのメソッドが検出される禁止の呼び出しを対にして確かめる。
+禁止の名前を足したときは、その呼び出しを持つメソッドを`DirectOrderWriter`に足し、`DIRECT_WRITES`に行を足す。
+名前が`fetch`で始まる実行は、jOOQ 3.21.9の`Update`と`Delete`に該当するメソッドがなく、行を持たない。
 `DirectOrderWriter`は、ラムダの中の`execute()`、`Update`の変数からの`execute()`、`Update::execute`のメソッド参照も含む。
 `TableWriterArchTest`の残りの規則は、違反フィクスチャの`JooqOrderRepository`、`UnversionedOrderRepository`、`ApproveOrderCommandHandler`で確かめる。
 R1は`ReleaseOrderCommandHandler`（`ReleaseOrderCommand`と`ReleaseOrderRequest`）、`SuspendOrderCommandHandler`（static factoryの呼び出し）、`ResumeOrderCommandHandler`（static factoryのメソッド参照）、`ArchiveOrderCommandHandler`（`save`という別名の書き込み）で確かめる。
 R2は`ReopenPolicy`（Domain Serviceの`update`と`save`）、`PurgeOrderQueryService`、`JooqOrderRepository.save(OrderId)`（Repositoryの実装から別のRepositoryの`delete`）で確かめる。
 R3は`ForgedLockNoCommandHandler`（コンストラクタと`ExpectedLockNo::new`）と`OrderLockController`で確かめる。
 R4は`ApproveOrderCommandHandler`（`handle`から呼ばないprivateメソッドだけが`ensureLockNo`を呼ぶ）と`OverloadedEnsureCommandHandler`で確かめる。
+`LambdaEnsureCommandHandler`は、`Optional.ifPresent`のラムダの中の`ensureLockNo`をR4が満たすものとして数えることを`LambdaFixtureTest`で固定する（違反フィクスチャのパッケージにあるが、R4は検出しない）。
 `aggregateRootInsertsGoThroughTableWriter`は、違反フィクスチャの`JooqOrderDraftRepository`の`add`（`Insert`の`execute()`の直接の呼び出し）で確かめる。
+`JooqOrderLambdaDraftRepository`の`add`（ラムダの中の`execute()`）と`JooqOrderRepository`の`updateLater`（ラムダの中の`updateWhere`）は、`LambdaFixtureTest`で確かめる。
 `commandsAndResultsAreApplicationRecords`の型単位の除外は、`shared.concurrency`のrecordではない`ForceUnlockCommand`で確かめる。
 規約どおりのフィクスチャには、`shared.concurrency`と`shared.failure`の型と、Requestが`ExpectedLockNo`を作る`CancelOrderRequest`、Listenerが版のないCommandを作る`OrderPlacedExpiryListener`を置く。
 `archfixture.conforming`と`archfixture.violating`の`shared.infrastructure.persistence`には、規則が名前で見る`TableWriter`のスタブを置く。
@@ -284,9 +292,9 @@ INSERTの共通カラムは`CommonColumns.forInsert`で、UPDATEとDELETEの共�
 - `repositoryWritesTakeVersionedAggregates`：`domain.model`の`*Repository`インタフェースの`add`、`update`、`delete`は、集約ルートを一つだけ受け取る。
   集約ルートが`long lockNo()`を持たないと、ほかの規則が集約ルートを見つけられず空のまま通るため、この規則で形を確かめる。
   必須の`add`を対象に含めるため、`save`のような名前で保存するRepositoryでも、`lockNo()`を持たない集約は`add`で検出される。
-- `aggregateMethodsDoNotUseUnversionedWrites`：集約ルートを引数に取るメソッドとラムダは、`updateWhere`と`deleteWhere`を呼ばない。
-  ラムダは捕捉した変数を引数に持つ合成メソッドになるため、同じ判定で見る。
-- `aggregateRootInsertsGoThroughTableWriter`：`Jooq*Repository`の`add`とその中のラムダは、`Insert`に代入できる型の`execute`、`executeAsync`、`returning`、`returningResult`と、名前が`fetch`で始まるメソッドを呼ばない。
+- `aggregateMethodsDoNotUseUnversionedWrites`：集約ルートを引数に取るメソッドは、`updateWhere`と`deleteWhere`を呼ばない。
+  ArchUnitはラムダの本体の呼び出しを外側のメソッドの呼び出しとして数えるため、ラムダの中の呼び出しも同じ判定で見る。
+- `aggregateRootInsertsGoThroughTableWriter`：`Jooq*Repository`の`add`（ラムダの中を含む）は、`Insert`に代入できる型の`execute`、`executeAsync`、`returning`、`returningResult`と、名前が`fetch`で始まるメソッドを呼ばない。
   集約ルートのINSERTは`TableWriter.insert`に渡し、子の行のINSERTは`dsl.batch`で実行する。
   `update`で子の行のINSERTを直接実行するため、対象を`add`に限る。
   検出しない書き方は[ADR-054](../adr/ADR-054-detect-optimistic-lock-conflicts-by-update-count.md)のNegativeに示す。
@@ -303,7 +311,9 @@ INSERTの共通カラムは`CommonColumns.forInsert`で、UPDATEとDELETEの共�
 - `expectedLockNoIsCreatedOnlyByRequests`（R3）：`presentation.web`の`*Request`以外のクラスは、`ExpectedLockNo`のコンストラクタを呼ばず、`ExpectedLockNo::new`も使わない。
   Repository、`TableWriter`、CommandHandler、Controllerが読んだ版から作ることを止める。
 - `commandHandlersEnsureScreenLockNo`（R4）：`*CommandHandler`の、引数のCommandが`VersionedCommand`である`handle`は、その中で直接`domain.model`の型の`ensureLockNo`で、引数に`ExpectedLockNo`を持つものを呼ぶ。
-  別のメソッドやラムダの中の呼び出しと、`ensureLockNo(long)`のオーバーロードでは満たせない。
+  別のメソッドの中の呼び出しと、`ensureLockNo(long)`のオーバーロードでは満たせない。
+  ラムダの本体の呼び出しは`handle`の呼び出しとして数えるため、実行されないことがあるラムダの中でも満たす。
+  この扱いは`LambdaFixtureTest`が固定する。
   別の集約のインスタンスに呼ぶ、業務の検査の後に呼ぶ、`command.expectedLockNo()`以外の値を渡す書き方は検査しない（値の流れは追わない）。
 - `jooqVersionIsReviewed`：実行時のjOOQの版が、禁止の一覧を見直した版と一致する。
   版が変わったら[jOOQのSQLの書き方](../database/jooq-usage.md)の「jOOQの版を上げるとき」に従う。
