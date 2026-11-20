@@ -102,7 +102,7 @@ PostgreSQL の READ COMMITTED では、後の UPDATE は先の UPDATE のコミ�
   - `expectedLockNoIsCreatedOnlyByRequests`（R3）：`ExpectedLockNo` のコンストラクタ（`ExpectedLockNo::new` を含む）は、`presentation.web` の `*Request` だけが呼ぶ。
     Repository、`TableWriter`、CommandHandler、Controller が読んだ版から作って、比較を常に成り立たせることを止める。
   - `commandHandlersEnsureScreenLockNo`（R4）：CommandHandler の、引数が `VersionedCommand` である `handle` は、その中で直接 `domain.model` の型の `ensureLockNo(ExpectedLockNo)` を呼ぶ。
-    別のメソッドやラムダの中の呼び出しと、`ensureLockNo(long)` のオーバーロードでは満たせない。
+    別のメソッドの中の呼び出しと、`ensureLockNo(long)` のオーバーロードでは満たせない。ラムダの本体の呼び出しは `handle` の呼び出しとして数えるため、満たす。
 - jOOQ の実行時の版をテストで固定する。
   版が変わったら、[jOOQ の SQL の書き方](../database/jooq-usage.md)の「jOOQの版を上げるとき」に従って禁止の一覧を見直す。
 - 期待する版は `shared.concurrency` の `ExpectedLockNo`（`long value`、1 未満は `IllegalArgumentException`）で運ぶ。

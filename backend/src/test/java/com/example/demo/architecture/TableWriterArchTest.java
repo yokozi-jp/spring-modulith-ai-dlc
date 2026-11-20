@@ -134,7 +134,7 @@ class TableWriterArchTest {
    * <p>{@code Update} と {@code Delete} を作る入口をすべて禁じるため、{@code batch} や {@code subscribe}
    * のような問い合わせを受け取る実行の API は禁じなくてよい。
    */
-  /* package */ static final Set<String> DSL_WRITES =
+  private static final Set<String> DSL_WRITES =
       Set.of(
           UPDATE,
           DELETE,
@@ -165,7 +165,7 @@ class TableWriterArchTest {
       Set.of(Query.class.getName(), RowCountQuery.class.getName(), DMLQuery.class.getName());
 
   /** {@code InsertOnDuplicateStep} と {@code InsertQuery} の UPSERT。 */
-  /* package */ static final Set<String> UPSERTS =
+  private static final Set<String> UPSERTS =
       Set.of(
           "onConflict",
           "onConflictOnConstraint",
@@ -175,10 +175,24 @@ class TableWriterArchTest {
           "addValuesForUpdate");
 
   /** {@code UpdatableRecord} の書き込み。 */
-  /* package */ static final Set<String> RECORD_WRITES = Set.of("store", UPDATE, DELETE, "merge");
+  private static final Set<String> RECORD_WRITES = Set.of("store", UPDATE, DELETE, "merge");
 
   /** {@code DAO} の書き込み。INSERT は対象にしない。 */
-  /* package */ static final Set<String> DAO_WRITES = Set.of(UPDATE, DELETE, "deleteById", "merge");
+  private static final Set<String> DAO_WRITES = Set.of(UPDATE, DELETE, "deleteById", "merge");
+
+  /** 型ごとの、禁じるメソッドの名前。型の下位の型も対象にする。 */
+  /* package */ static final Map<Class<?>, Set<String>> NAMED_WRITES =
+      Map.of(
+          DSLContext.class, DSL_WRITES,
+          DSL.class, DSL_WRITES,
+          WithStep.class, DSL_WRITES,
+          InsertOnDuplicateStep.class, UPSERTS,
+          InsertQuery.class, UPSERTS,
+          LoaderOptionsStep.class, Set.of("onDuplicateKeyUpdate"),
+          UpdatableRecord.class, RECORD_WRITES,
+          DAO.class, DAO_WRITES,
+          DataSource.class, Set.of("getConnection"),
+          ConnectionProvider.class, Set.of("acquire"));
 
   /** 期待する jOOQ の実行時の版。上げるときは H1 の禁止の一覧を見直す。 */
   private static final String REVIEWED_JOOQ_VERSION = "3.21.9";
@@ -499,20 +513,8 @@ class TableWriterArchTest {
   private static boolean isDirectWrite(final JavaAccess<?> access) {
     final JavaClass owner = access.getTargetOwner();
     final String name = access.getName();
-    final Map<Class<?>, Set<String>> namedWrites =
-        Map.of(
-            DSLContext.class, DSL_WRITES,
-            DSL.class, DSL_WRITES,
-            WithStep.class, DSL_WRITES,
-            InsertOnDuplicateStep.class, UPSERTS,
-            InsertQuery.class, UPSERTS,
-            LoaderOptionsStep.class, Set.of("onDuplicateKeyUpdate"),
-            UpdatableRecord.class, RECORD_WRITES,
-            DAO.class, DAO_WRITES,
-            DataSource.class, Set.of("getConnection"),
-            ConnectionProvider.class, Set.of("acquire"));
     final boolean namedWrite =
-        namedWrites.entrySet().stream()
+        NAMED_WRITES.entrySet().stream()
             .anyMatch(
                 entry -> owner.isAssignableTo(entry.getKey()) && entry.getValue().contains(name));
     final boolean execution =

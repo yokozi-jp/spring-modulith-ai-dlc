@@ -22,6 +22,7 @@ backend/src/test/java/com/example/demo/architecture/
 ├── ClassRoleArchTest.java
 ├── DatabaseConventionsArchTest.java
 ├── DateTimeConventionsArchTest.java
+├── DirectWriteFixtureTest.java
 ├── GeneralCodingRulesArchTest.java
 ├── JooqCommonColumnsArchTest.java
 ├── PackageByFeatureOnionArchitectureTest.java
@@ -105,7 +106,7 @@ jOOQの生成物の`com.example.demo.jooq`はOPENのモジュールであり、`
 ## 規則を確かめるフィクスチャ
 
 プロダクションの規則は`.allowEmptyShould(true)`を付けるため、対象のクラスがなくても成功する。
-`ArchitectureRuleFixtureTest`は、テスト専用のフィクスチャで各規則が働くことを確かめる。
+`ArchitectureRuleFixtureTest`と`DirectWriteFixtureTest`は、テスト専用のフィクスチャで各規則が働くことを確かめる。
 
 - `backend/src/test/java/archfixture/conforming/`：規約どおりの`ordering`モジュール、`inventory`モジュール、`payment`モジュール、`shared`モジュールの最小の例。すべての規則が誤検出しないことを確かめる。
   `ordering`の`JooqOrderRepository`が`shared.infrastructure.persistence`の型を使い、`shared`のルートは`package-info.java`だけを持つ。
@@ -123,9 +124,11 @@ jOOQの生成物の`com.example.demo.jooq`はOPENのモジュールであり、`
 `jooqReflectionMappingIsNotUsed`は、違反フィクスチャの`ReflectiveOrderReader`で禁止するメソッドごとに一行を持ち、それぞれの呼び出しを検出することを確かめる。
 
 `tableWritesGoThroughTableWriter`は、違反フィクスチャの`DirectOrderWriter`で禁止するAPIごとに一行を持つ。
-各行は、メソッドと、そのメソッドが検出される禁止の呼び出し（`ArchitectureRuleFixtureTest`の`DIRECT_WRITES`）を対にし、その呼び出しの違反が出ることを確かめる。
-禁止の名前の一覧（`DSL_WRITES`、`QUERY_EXECUTIONS`、`UPSERTS`、`RECORD_WRITES`、`DAO_WRITES`）の値は、すべていずれかの行の呼び出しである。
-一覧に値を足したときは、その呼び出しを一つだけ持つメソッドを`DirectOrderWriter`に足す。
+`DirectWriteFixtureTest`の`DIRECT_WRITES`が、メソッドと、そのメソッドが検出される禁止の呼び出しを対にし、その呼び出しの違反が出ることを確かめる。
+同じメソッドが別の禁止の呼び出しも持つと、片方の禁止を外しても行が通るため、行は呼び出しまで指定する。
+`DirectOrderWriter`の公開メソッドは、すべて`DIRECT_WRITES`に載せる。
+禁止の名前（`NAMED_WRITES`の値と`QUERY_EXECUTIONS`）は、すべていずれかの行の呼び出しになっていることも確かめる。
+禁止の名前を足したときは、`DirectOrderWriter`にその呼び出しを持つメソッドと、`DIRECT_WRITES`の行を足す。
 `DirectOrderWriter`は、ラムダの中の`execute()`、`Update`の変数からの`execute()`、`Update::execute`のメソッド参照も含む。
 `TableWriterArchTest`の残りの規則は、違反フィクスチャの`JooqOrderRepository`、`UnversionedOrderRepository`、`ApproveOrderCommandHandler`で確かめる。
 R1は`ReleaseOrderCommandHandler`（`ReleaseOrderCommand`と`ReleaseOrderRequest`）、`SuspendOrderCommandHandler`（static factoryの呼び出し）、`ResumeOrderCommandHandler`（static factoryのメソッド参照）、`ArchiveOrderCommandHandler`（`save`という別名の書き込み）で確かめる。

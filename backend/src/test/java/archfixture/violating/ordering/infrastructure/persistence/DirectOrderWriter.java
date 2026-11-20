@@ -38,11 +38,7 @@ import org.springframework.jdbc.datasource.init.ResourceDatabasePopulator;
 import org.springframework.jdbc.object.SqlUpdate;
 
 /**
- * 違反：tableWritesGoThroughTableWriter（メソッドごとに、TableWriter を通さない書き込みの API を一つ使う）。
- *
- * <p>禁止の名前の一覧の値を確かめるメソッドは、その値の呼び出しのほかに、規則が検出する呼び出しを持たない。{@code ArchitectureRuleFixtureTest} の
- * {@code DIRECT_WRITES}
- * が、メソッドごとに検出される呼び出しを確かめる。ラムダの本体の呼び出しも外側のメソッドの呼び出しとして数えられるため、ラムダの本体は空にするか、禁止の呼び出しだけにする。
+ * 違反：tableWritesGoThroughTableWriter（メソッドごとに、TableWriter を通さない書き込みの API を使う）。
  *
  * <p>規則がバイトコードを読むだけで、実行しない。
  */
