@@ -164,7 +164,7 @@ class DiscountPolicyTest {
 - [ ] `@Service` を付けた型は `application` か `domain.service` にだけ置く。［ArchUnit で検査：PackageByFeatureOnionArchitectureTest.servicesResideInApplicationOrDomainService］
 - [ ] 依存は Java の標準型、Domain の型、`shared.failure` の例外、`@Service` だけにし、`@Transactional`、`ApplicationEventPublisher`、ロガー、モジュールルートの型を使わない。［ArchUnit で検査：PackageByFeatureOnionArchitectureTest.domainServicesDependOnlyOnDomainAndJava］
 - [ ] `application` と Infrastructure に依存しない。［ArchUnit で検査：PackageByFeatureOnionArchitectureTest.dependenciesPointInward］
-- [ ] 外部システムのインタフェースに依存しない。［ArchUnit で検査：PackageByFeatureOnionArchitectureTest.domainServicesDependOnlyOnDomainAndJava］
+- [ ] 外部システムのインタフェースに依存しない。［ArchUnit で検査：ClassRoleArchTest.externalSystemInterfacesAreUsedOnlyByCommandHandlersAndClients］
 - [ ] Repository は読み取り（`count*`、`find*`）にだけ使い、`add` を呼ばない。［自分で点検］
 - [ ] Repository の `add` 以外の書き込み（`update`、`delete`、集約ルートを受け取るメソッド）を呼ばない。［ArchUnit で検査：TableWriterArchTest.onlyCommandHandlersUpdateOrDeleteAggregates］
 - [ ] 名前は業務規則を表す名詞にする。［自分で点検］

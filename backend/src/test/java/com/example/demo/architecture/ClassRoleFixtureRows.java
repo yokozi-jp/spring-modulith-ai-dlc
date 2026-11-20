@@ -1,7 +1,7 @@
 package com.example.demo.architecture;
 
-import static com.example.demo.architecture.ArchitectureRuleFixtureTest.VIOLATING;
-import static com.example.demo.architecture.ArchitectureRuleFixtureTest.row;
+import static com.example.demo.architecture.ViolatingFixtures.VIOLATING;
+import static com.example.demo.architecture.ViolatingFixtures.row;
 
 import java.util.stream.Stream;
 import org.junit.jupiter.params.provider.Arguments;
@@ -130,10 +130,13 @@ final class ClassRoleFixtureRows {
             ClassRoleArchTest.externalSystemCommandHandlersAreDependedOnlyByListeners,
             "ordering.presentation.web.ChargeOrderListener"),
         row(
-            "domainServicesDependOnlyOnDomainAndJava: 外部システムのインタフェース",
-            PackageByFeatureOnionArchitectureTest.domainServicesDependOnlyOnDomainAndJavaRule(
-                VIOLATING),
+            "externalSystemInterfacesAreUsedOnlyByCommandHandlersAndClients: Domain Service",
+            ClassRoleArchTest.externalSystemInterfacesAreUsedOnlyByCommandHandlersAndClients,
             "ordering.domain.service.PaymentChargePolicy"),
+        row(
+            "externalSystemInterfacesAreUsedOnlyByCommandHandlersAndClients: 補助のクラス",
+            ClassRoleArchTest.externalSystemInterfacesAreUsedOnlyByCommandHandlersAndClients,
+            "ordering.application.OrderPaymentCharger"),
         row(
             "eventPublisherIsUsedOnlyByCommandHandlers: Controller",
             ClassRoleArchTest.eventPublisherIsUsedOnlyByCommandHandlersRule(VIOLATING),
@@ -163,7 +166,7 @@ final class ClassRoleFixtureRows {
             ClassRoleArchTest.commandHandlersAndListenersDoNotUseInheritance,
             "ordering.application.ShelveOrderCommandHandler"),
         row(
-            "commandHandlersAndListenersDoNotUseInheritance: インタフェースの実装",
+            "commandHandlersAndListenersDoNotUseInheritance: Listener の interface を実装させる",
             ClassRoleArchTest.commandHandlersAndListenersDoNotUseInheritance,
             "ordering.application.OrderShippedReceiver"),
         row(

@@ -294,6 +294,7 @@ class CancelOrderCommandHandlerTest {
 - [ ] `ApplicationEventPublisher`（`ApplicationContext` を含む）に依存するのは `application` の CommandHandler だけにする。［ArchUnit で検査：ClassRoleArchTest.eventPublisherIsUsedOnlyByCommandHandlers］
 - [ ] Command が `VersionedCommand` のときは、`handle` の中で直接、集約の `ensureLockNo(ExpectedLockNo)` を呼ぶ。［ArchUnit で検査：TableWriterArchTest.commandHandlersEnsureScreenLockNo］
 - [ ] `ensureLockNo` は `findById` の直後、状態を変える操作より前に呼び、`command.expectedLockNo()` を渡す。型はコンパイルで、呼ぶ位置と渡す値はレビューで確かめる。［自分で点検］
+- [ ] 外部システムのインタフェースに依存するのは CommandHandler と Client だけにする。［ArchUnit で検査：ClassRoleArchTest.externalSystemInterfacesAreUsedOnlyByCommandHandlersAndClients］
 - [ ] 外部システムのインタフェースに依存する CommandHandler は、イベントを受けた `application` の Listener からだけ呼び、画面から呼ばれる CommandHandler は外部システムを呼ばない。［ArchUnit で検査：ClassRoleArchTest.externalSystemCommandHandlersAreDependedOnlyByListeners］
 - [ ] 外部システムを呼ぶ CommandHandler は、集約がその操作を終えていれば何もせずに Result を返し、外部システムに冪等性キーを渡す。［自分で点検］
 - [ ] 現在時刻は `Instant.now(clock)` で取る。［自分で点検］

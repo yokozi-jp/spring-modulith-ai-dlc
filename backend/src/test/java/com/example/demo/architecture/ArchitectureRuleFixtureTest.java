@@ -1,5 +1,7 @@
 package com.example.demo.architecture;
 
+import static com.example.demo.architecture.ViolatingFixtures.VIOLATING;
+import static com.example.demo.architecture.ViolatingFixtures.row;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
@@ -47,12 +49,6 @@ class ArchitectureRuleFixtureTest {
 
   /** 規約どおりのフィクスチャの基底パッケージ。 */
   private static final String CONFORMING = "archfixture.conforming";
-
-  /** 違反フィクスチャの基底パッケージ。 */
-  /* package */ static final String VIOLATING = "archfixture.violating";
-
-  /** 違反フィクスチャのクラス名の接頭辞。 */
-  private static final String VIOLATING_PREFIX = VIOLATING + ".";
 
   /**
    * 違反フィクスチャの import 結果。
@@ -610,11 +606,6 @@ class ArchitectureRuleFixtureTest {
   /** フィクスチャが列を変換する先の値オブジェクト。 */
   private record OrderNumber(String value) {}
 
-  /* package */ static Arguments row(
-      final String ruleName, final ArchRule rule, final String violatingClass) {
-    return Arguments.of(ruleName, rule, VIOLATING_PREFIX + violatingClass);
-  }
-
   /** 検査クラスの全規則を、指定した基底パッケージで組み立てて返す。 */
   private static List<ArchRule> rulesFor(final String basePackage) {
     return List.of(
@@ -649,6 +640,7 @@ class ArchitectureRuleFixtureTest {
         ClassRoleArchTest.commandHandlersDoNotDependOnOtherCommandHandlers,
         ClassRoleArchTest.commandHandlersAndListenersDoNotUseInheritance,
         ClassRoleArchTest.externalSystemCommandHandlersAreDependedOnlyByListeners,
+        ClassRoleArchTest.externalSystemInterfacesAreUsedOnlyByCommandHandlersAndClients,
         ClassRoleArchTest.eventPublisherIsUsedOnlyByCommandHandlersRule(basePackage),
         ProxyRulesArchTest.pointcutsNarrowTargetsWithWithin,
         ProxyRulesArchTest.aspectsDeclareOrder,

@@ -457,12 +457,10 @@ class PackageByFeatureOnionArchitectureTest {
                     "lombok..",
                     basePackage + ".*.domain..",
                     basePackage + ".shared.failure..")
-                .or(type(Service.class))
-                .and(not(EXTERNAL_SYSTEM_INTERFACE)))
+                .or(type(Service.class)))
         .allowEmptyShould(true)
         .because(
-            "Domain Service には業務規則だけを置き、イベント発行、外部呼び出し、ログ出力は CommandHandler の役割とし、"
-                + "外部システムのインタフェースも持たせないため。"
+            "Domain Service には業務規則だけを置き、イベント発行、外部呼び出し、ログ出力は CommandHandler の役割とするため。"
                 + "直し方：Domain の型と標準型だけで業務規則を書き、"
                 + "イベント発行、外部呼び出し、ログ出力は Application の CommandHandler へ移す。"
                 + "規約：docs/backend/class-roles/domain-service.md、"

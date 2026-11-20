@@ -6,7 +6,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * 違反：externalSystemCommandHandlersAreDependedOnlyByListeners（外部システムのインタフェースに依存し、Controller から呼ばれる）。
+ * 外部システムのインタフェースに依存する CommandHandler。externalSystemCommandHandlersAreDependedOnlyByListeners が、 この
+ * CommandHandler を呼ぶ {@code ChargeOrderController} と {@code ChargeOrderListener} を検出する。これ自体は規約どおり。
  */
 @Service
 public class ChargeOrderCommandHandler {
