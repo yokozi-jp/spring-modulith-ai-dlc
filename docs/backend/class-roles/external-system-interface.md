@@ -131,7 +131,7 @@ class PaymentGatewayClient implements PaymentGateway {
 - [ ] 引数と戻り値は値オブジェクトと Java の標準型にする。［自分で点検］
 - [ ] 実装は `infrastructure.client` の `<ExternalSystem>Client` にする。［ArchUnit で検査：PackageByFeatureOnionArchitectureTest.externalSystemImplementationsAreClients］
 - [ ] Domain の外の実装は `infrastructure` に置く。［ArchUnit で検査：PackageByFeatureOnionArchitectureTest.domainInterfacesAreImplementedInInfrastructure］
-- [ ] 呼び出しは、イベントを受けた Listener から呼ばれる `<UseCase>CommandHandler` から行い、画面から呼ばれる CommandHandler、集約、Domain Service から呼ばない。［自分で点検］
+- [ ] 呼び出しは、イベントを受けた Listener から呼ばれる `<UseCase>CommandHandler` から行い、画面から呼ばれる CommandHandler、集約、Domain Service から呼ばない。［ArchUnit で検査：ClassRoleArchTest.externalSystemInterfacesAreUsedOnlyByCommandHandlersAndClients、ClassRoleArchTest.externalSystemCommandHandlersAreDependedOnlyByListeners］
 - [ ] 副作用のある操作は冪等性キーを引数に持ち、Javadoc に書く。［自分で点検］
 - [ ] `@SuppressWarnings("PMD.ImplicitFunctionalInterface")` に理由のコメントを付け、インタフェースと各メソッドに Javadoc を書く。［自分で点検］
 - [ ] `domain.model` のパッケージに `@NullMarked` の `package-info.java` がある。［Error Prone で検査：RequireExplicitNullMarking］

@@ -83,16 +83,17 @@ jOOQの生成物の`com.example.demo.jooq`はOPENのモジュールであり、`
 - `commandHandlersExposeOnlyTransactionalHandle`：`*CommandHandler`のpublicメソッドは、`@Transactional`を付けた`handle`一つだけにし、`*Command`を一つ受け取り`*Result`を返す。
 - `commandsAndResultsAreApplicationRecords`：`*Command`と`*Result`は`application`のrecordにする。
 - `commandHandlersDoNotDependOnOtherCommandHandlers`：`*CommandHandler`は別の`*CommandHandler`に依存しない。
-- `externalSystemInterfacesAreUsedOnlyByCommandHandlersAndClients`：外部システムのインタフェース（`domain.model`のinterfaceのうちRepositoryでないもの）に依存してよいのは、`application`の`*CommandHandler`、`infrastructure.client`、`domain.model`だけである。
-  Domain Service、QueryService、補助のクラスを通して外部システムを呼ぶ経路をなくすため、次の規則は`*CommandHandler`の直接の依存だけを見れば足りる。
 - `externalSystemCommandHandlersAreDependedOnlyByListeners`：外部システムのインタフェースに直接依存する`application`の`*CommandHandler`は、`application`の`*Listener`からだけ依存される。
+  外部システムのインタフェースは、`domain.model`のinterfaceのうち、Repository、`package-info`、Domainの中に実装を持つもの（sealed interfaceなど）でないものとする。
+- `externalSystemInterfacesAreUsedOnlyByCommandHandlersAndClients`：外部システムのインタフェースに依存してよいのは、`application`の`*CommandHandler`と、それを実装する`infrastructure.client`のクラスだけである。
+  集約、Domain Service、QueryService、補助のクラスを通して外部システムを呼ぶ経路をなくすため、前の規則は`*CommandHandler`の直接の依存だけを見れば足りる。
   守らせる規約は[CommandHandler](class-roles/command-handler.md)のアンチパターンに示し、理由は[ADR-050](../adr/ADR-050-define-backend-class-roles-and-naming.md)に示す。
 - `eventPublisherIsUsedOnlyByCommandHandlers`：`application`の`*CommandHandler`と`EventPublicationResubmissionConfig`以外のクラスは、`ApplicationEventPublisher`と`ApplicationEventMulticaster`に依存しない。
   `ApplicationContext`と`ConfigurableApplicationContext`は`ApplicationEventPublisher`を継承するため、同じ判定で検出する。
   `application`の`*CommandHandler`は、`ApplicationContext`への依存も含めて検査しない。
   `EventPublicationResubmissionConfig`はイベント出版レジストリを再投入するため、クラス名で対象から外す。
 - `commandHandlersAndListenersDoNotUseInheritance`：`*CommandHandler`と`*Listener`は、Java標準の型以外のクラスを継承せず、継承も実装もさせない（[ADR-051](../adr/ADR-051-bind-pgm-cd-with-scoped-value-and-aspect.md)）。
-  `application`のものは、Java標準の型以外のinterfaceも実装しない。実装を認めると、呼び出し側がinterfaceだけに依存して`externalSystemCommandHandlersAreDependedOnlyByListeners`を迂回できる。
+  `application`の`*CommandHandler`は、Java標準の型以外のinterfaceも実装しない。実装を認めると、呼び出し側がinterfaceだけに依存して`externalSystemCommandHandlersAreDependedOnlyByListeners`を迂回できる。
   違反フィクスチャの`ReopenOrderHandler`（サブクラス）、`RestoreOrderCommandHandler`（基底クラスの`OrderHandlerSupport`）、`OrderShippedReceiver`（Listenerのinterfaceを実装させる）、`ShelveOrderCommandHandler`（interfaceの実装）で確かめる。
 - `moduleListenersAreApplicationListeners`：`@ApplicationModuleListener`を付けたメソッドは、`application`の`*Listener`の`on`にする。
 - `eventListenersAreApplicationModuleListeners`：`@ApplicationModuleListener`を付けていないメソッドは、`@EventListener`をメタアノテーションに持たない。
@@ -128,9 +129,8 @@ jOOQの生成物の`com.example.demo.jooq`はOPENのモジュールであり、`
 
 `externalSystemCommandHandlersAreDependedOnlyByListeners`は、違反フィクスチャの`ChargeOrderController`が呼ぶ`ChargeOrderCommandHandler`（`PaymentGateway`に直接依存する）を検出する。
 `presentation.web`に置いた名前だけの`ChargeOrderListener`が呼ぶ場合も検出する。
-`externalSystemInterfacesAreUsedOnlyByCommandHandlersAndClients`は、違反フィクスチャの`PaymentChargePolicy`（Domain Service）と`OrderPaymentCharger`（補助のクラス）が`PaymentGateway`に依存することを検出する。
-規約どおりのフィクスチャでは、`CapturePaymentCommandHandler`と`PaymentGatewayClient`が`PaymentGateway`に依存しても規則が通ることを確かめる。
-規約どおりのフィクスチャでは、`PaymentGateway`に依存する`CapturePaymentCommandHandler`を`OrderPlacedPaymentListener`だけが呼び、規則が通ることを確かめる。
+`externalSystemInterfacesAreUsedOnlyByCommandHandlersAndClients`は、違反フィクスチャの`PaymentChargePolicy`（Domain Service）、`PaymentCharger`（`domain.model`）、`PaymentChargerConfig`（`infrastructure.client`に置いた、interfaceを実装しない設定クラス）、`OrderPaymentCharger`（補助のクラス）が`PaymentGateway`に依存することを検出する。
+規約どおりのフィクスチャでは、`PaymentGateway`に依存する`CapturePaymentCommandHandler`を`OrderPlacedPaymentListener`だけが呼び、`PaymentGatewayClient`が`PaymentGateway`を実装しても、二つの規則が通ることを確かめる。
 
 `eventPublisherIsUsedOnlyByCommandHandlers`は、違反フィクスチャの`OrderEventController`（`ApplicationEventPublisher`）、`OrderEventMulticasterController`（`ApplicationEventMulticaster`）、`OrderContextPublisher`（`ApplicationContext`）、`shared.events.OrderEventForwarder`（`shared`に置いた発行を包むクラス）を検出する。
 規約どおりのフィクスチャでは、`PlaceOrderCommandHandler`が`ApplicationEventPublisher`で発行しても規則が通ることを確かめる。

@@ -134,6 +134,14 @@ final class ClassRoleFixtureRows {
             ClassRoleArchTest.externalSystemInterfacesAreUsedOnlyByCommandHandlersAndClients,
             "ordering.domain.service.PaymentChargePolicy"),
         row(
+            "externalSystemInterfacesAreUsedOnlyByCommandHandlersAndClients: domain.model",
+            ClassRoleArchTest.externalSystemInterfacesAreUsedOnlyByCommandHandlersAndClients,
+            "ordering.domain.model.PaymentCharger"),
+        row(
+            "externalSystemInterfacesAreUsedOnlyByCommandHandlersAndClients: Client ではない設定クラス",
+            ClassRoleArchTest.externalSystemInterfacesAreUsedOnlyByCommandHandlersAndClients,
+            "ordering.infrastructure.client.PaymentChargerConfig"),
+        row(
             "externalSystemInterfacesAreUsedOnlyByCommandHandlersAndClients: 補助のクラス",
             ClassRoleArchTest.externalSystemInterfacesAreUsedOnlyByCommandHandlersAndClients,
             "ordering.application.OrderPaymentCharger"),
