@@ -160,7 +160,7 @@ test-userは2つのテナント（サンプル商事、サンプル物産）に�
 - フロントエンド：<http://localhost:5173>（ブラウザで開く入口）
 - バックエンド：<http://localhost:18080>
 - Keycloak：<http://localhost:8080>
-- Grafana：<http://localhost:3000>
+- Grafana：<http://localhost:3000>（`.env.example`の値。ポートは`.env`の`GRAFANA_HOST_PORT`。トレースの見方は[ローカルでトレースを見る](../observability/runbook-local-traces.md)）
 
 ツールの導入は[開発環境構築ガイド](../local-env-setup/setup.md)を参照する。
 
