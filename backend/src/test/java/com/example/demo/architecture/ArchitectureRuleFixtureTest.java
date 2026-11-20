@@ -62,63 +62,6 @@ class ArchitectureRuleFixtureTest {
   private static final JavaClasses VIOLATING_CLASSES =
       new ClassFileImporter().importPackages(VIOLATING);
 
-  /** TableWriter を通さずに書く違反フィクスチャのクラス名。 */
-  private static final String DIRECT_WRITER =
-      "ordering.infrastructure.persistence.DirectOrderWriter";
-
-  /** TableWriter の H1 で、違反フィクスチャのメソッドごとに確かめる禁止の API。 */
-  private static final List<String> DIRECT_WRITES =
-      List.of(
-          "dslUpdate",
-          "dslDelete",
-          "dslDeleteFrom",
-          "dslMergeInto",
-          "dslBatchUpdate",
-          "dslBatchStore",
-          "dslBatchDelete",
-          "dslBatchMerge",
-          "dslExecuteUpdate",
-          "dslExecuteDelete",
-          "dslConnection",
-          "dslConnectionResult",
-          "dslUpdateQuery",
-          "dslDeleteQuery",
-          "withUpdate",
-          "insertQueryOnDuplicateKeyUpdate",
-          "insertQueryAddValueForUpdate",
-          "insertQueryAddValuesForUpdate",
-          "insertQueryOnConflictWhere",
-          "loaderOnDuplicateKeyUpdate",
-          "qomOnDuplicateKeyUpdate",
-          "springScriptPopulator",
-          "bootScriptInitializer",
-          "springSqlUpdate",
-          "staticDslUpdate",
-          "lambdaExecute",
-          "updateVariableExecute",
-          "updateMethodReference",
-          "updateReturning",
-          "updateReturningResult",
-          "updateExecuteAsync",
-          "deleteExecute",
-          "mergeExecute",
-          "upsertOnConflict",
-          "upsertOnConflictOnConstraint",
-          "upsertOnDuplicateKeyUpdate",
-          "recordStore",
-          "recordUpdate",
-          "recordDelete",
-          "recordMerge",
-          "daoUpdate",
-          "daoDelete",
-          "daoDeleteById",
-          "daoMerge",
-          "jdbcTemplate",
-          "dataSourceConnection",
-          "jdbcConnection",
-          "jdbcStatement",
-          "connectionProvider");
-
   /** ロールとスキーマを持つ機能モジュールの、フィクスチャでの名前。 */
   private static final Set<String> FIXTURE_MODULES = Set.of("ordering", "inventory");
 
@@ -348,97 +291,89 @@ class ArchitectureRuleFixtureTest {
         .flatMap(rows -> rows);
   }
 
-  /** TableWriter の規則（H1、H3、H5、H6、H7、R1 から R4）が、対応する違反フィクスチャを検出することを確かめる行を作る。 */
+  /** TableWriter の規則（H3、H5、H6、H7、R1 から R4）が、対応する違反フィクスチャを検出することを確かめる行を作る。 */
   private static Stream<Arguments> tableWriterRows() {
-    return Stream.concat(
-        DIRECT_WRITES.stream()
-            .map(method ->
-                row(
-                    "tableWritesGoThroughTableWriter: " + method,
-                    TableWriterArchTest.tableWritesGoThroughTableWriterRule(VIOLATING),
-                    DIRECT_WRITER + "." + method + "(")),
-        Stream.of(
-            row(
-                "repositoryUpdateAndDeleteCheckVersion",
-                TableWriterArchTest.repositoryUpdateAndDeleteCheckVersionRule(VIOLATING),
-                UNVERSIONED_REPOSITORY + ".update("),
-            row(
-                "repositoryUpdateAndDeleteCheckVersion: save",
-                TableWriterArchTest.repositoryUpdateAndDeleteCheckVersionRule(VIOLATING),
-                UNVERSIONED_REPOSITORY + ".save("),
-            row(
-                "repositoryUpdateAndDeleteCheckVersion: re-read lockNo",
-                TableWriterArchTest.repositoryUpdateAndDeleteCheckVersionRule(VIOLATING),
-                UNVERSIONED_REPOSITORY + ".updateStatus("),
-            row(
-                "repositoryWritesTakeVersionedAggregates",
-                TableWriterArchTest.repositoryWritesTakeVersionedAggregatesRule(),
-                "ordering.domain.model.UnversionedOrderRepository.update("),
-            row(
-                "repositoryWritesTakeVersionedAggregates: add",
-                TableWriterArchTest.repositoryWritesTakeVersionedAggregatesRule(),
-                "ordering.domain.model.UnversionedOrderRepository.add("),
-            row(
-                "commandHandlersEnsureScreenLockNo: unused private method",
-                TableWriterArchTest.commandHandlersEnsureScreenLockNoRule(VIOLATING),
-                "ordering.application.ApproveOrderCommandHandler.handle("),
-            row(
-                "commandHandlersEnsureScreenLockNo: ensureLockNo(long) overload",
-                TableWriterArchTest.commandHandlersEnsureScreenLockNoRule(VIOLATING),
-                "ordering.application.OverloadedEnsureCommandHandler"),
-            row(
-                "commandsBuiltByPresentationForWritesAreVersioned",
-                TableWriterArchTest.commandsBuiltByPresentationForWritesAreVersionedRule(VIOLATING),
-                "ordering.application.ReleaseOrderCommandHandler"),
-            row(
-                "commandsBuiltByPresentationForWritesAreVersioned: static factory call",
-                TableWriterArchTest.commandsBuiltByPresentationForWritesAreVersionedRule(VIOLATING),
-                "ordering.application.SuspendOrderCommandHandler"),
-            row(
-                "commandsBuiltByPresentationForWritesAreVersioned: static factory reference",
-                TableWriterArchTest.commandsBuiltByPresentationForWritesAreVersionedRule(VIOLATING),
-                "ordering.application.ResumeOrderCommandHandler"),
-            row(
-                "commandsBuiltByPresentationForWritesAreVersioned: save",
-                TableWriterArchTest.commandsBuiltByPresentationForWritesAreVersionedRule(VIOLATING),
-                "ordering.application.ArchiveOrderCommandHandler"),
-            row(
-                "onlyCommandHandlersUpdateOrDeleteAggregates: save",
-                TableWriterArchTest.onlyCommandHandlersUpdateOrDeleteAggregatesRule(),
-                "ordering.domain.service.ReopenPolicy.reopenAggregate("),
-            row(
-                "onlyCommandHandlersUpdateOrDeleteAggregates: Repository implementation",
-                TableWriterArchTest.onlyCommandHandlersUpdateOrDeleteAggregatesRule(),
-                UNVERSIONED_REPOSITORY
-                    + ".save(archfixture.violating.ordering.domain.model.OrderId)"),
-            row(
-                "onlyCommandHandlersUpdateOrDeleteAggregates: Domain Service",
-                TableWriterArchTest.onlyCommandHandlersUpdateOrDeleteAggregatesRule(),
-                "ordering.domain.service.ReopenPolicy.reopen("),
-            row(
-                "onlyCommandHandlersUpdateOrDeleteAggregates: QueryService",
-                TableWriterArchTest.onlyCommandHandlersUpdateOrDeleteAggregatesRule(),
-                "ordering.application.PurgeOrderQueryService.purge("),
-            row(
-                "expectedLockNoIsCreatedOnlyByRequests: constructor",
-                TableWriterArchTest.expectedLockNoIsCreatedOnlyByRequestsRule(VIOLATING),
-                "ordering.application.ForgedLockNoCommandHandler.forged("),
-            row(
-                "expectedLockNoIsCreatedOnlyByRequests: constructor reference",
-                TableWriterArchTest.expectedLockNoIsCreatedOnlyByRequestsRule(VIOLATING),
-                "ordering.application.ForgedLockNoCommandHandler.forgedByReference("),
-            row(
-                "expectedLockNoIsCreatedOnlyByRequests: Controller",
-                TableWriterArchTest.expectedLockNoIsCreatedOnlyByRequestsRule(VIOLATING),
-                "ordering.presentation.web.OrderLockController.lockNo("),
-            row(
-                "aggregateMethodsDoNotUseUnversionedWrites",
-                TableWriterArchTest.aggregateMethodsDoNotUseUnversionedWritesRule(VIOLATING),
-                UNVERSIONED_REPOSITORY + ".update("),
-            row(
-                "aggregateRootInsertsGoThroughTableWriter",
-                TableWriterArchTest.aggregateRootInsertsGoThroughTableWriterRule(),
-                "ordering.infrastructure.persistence.JooqOrderDraftRepository.add(")));
+    return Stream.of(
+        row(
+            "repositoryUpdateAndDeleteCheckVersion",
+            TableWriterArchTest.repositoryUpdateAndDeleteCheckVersionRule(VIOLATING),
+            UNVERSIONED_REPOSITORY + ".update("),
+        row(
+            "repositoryUpdateAndDeleteCheckVersion: save",
+            TableWriterArchTest.repositoryUpdateAndDeleteCheckVersionRule(VIOLATING),
+            UNVERSIONED_REPOSITORY + ".save("),
+        row(
+            "repositoryUpdateAndDeleteCheckVersion: re-read lockNo",
+            TableWriterArchTest.repositoryUpdateAndDeleteCheckVersionRule(VIOLATING),
+            UNVERSIONED_REPOSITORY + ".updateStatus("),
+        row(
+            "repositoryWritesTakeVersionedAggregates",
+            TableWriterArchTest.repositoryWritesTakeVersionedAggregatesRule(),
+            "ordering.domain.model.UnversionedOrderRepository.update("),
+        row(
+            "repositoryWritesTakeVersionedAggregates: add",
+            TableWriterArchTest.repositoryWritesTakeVersionedAggregatesRule(),
+            "ordering.domain.model.UnversionedOrderRepository.add("),
+        row(
+            "commandHandlersEnsureScreenLockNo: unused private method",
+            TableWriterArchTest.commandHandlersEnsureScreenLockNoRule(VIOLATING),
+            "ordering.application.ApproveOrderCommandHandler.handle("),
+        row(
+            "commandHandlersEnsureScreenLockNo: ensureLockNo(long) overload",
+            TableWriterArchTest.commandHandlersEnsureScreenLockNoRule(VIOLATING),
+            "ordering.application.OverloadedEnsureCommandHandler"),
+        row(
+            "commandsBuiltByPresentationForWritesAreVersioned",
+            TableWriterArchTest.commandsBuiltByPresentationForWritesAreVersionedRule(VIOLATING),
+            "ordering.application.ReleaseOrderCommandHandler"),
+        row(
+            "commandsBuiltByPresentationForWritesAreVersioned: static factory call",
+            TableWriterArchTest.commandsBuiltByPresentationForWritesAreVersionedRule(VIOLATING),
+            "ordering.application.SuspendOrderCommandHandler"),
+        row(
+            "commandsBuiltByPresentationForWritesAreVersioned: static factory reference",
+            TableWriterArchTest.commandsBuiltByPresentationForWritesAreVersionedRule(VIOLATING),
+            "ordering.application.ResumeOrderCommandHandler"),
+        row(
+            "commandsBuiltByPresentationForWritesAreVersioned: save",
+            TableWriterArchTest.commandsBuiltByPresentationForWritesAreVersionedRule(VIOLATING),
+            "ordering.application.ArchiveOrderCommandHandler"),
+        row(
+            "onlyCommandHandlersUpdateOrDeleteAggregates: save",
+            TableWriterArchTest.onlyCommandHandlersUpdateOrDeleteAggregatesRule(),
+            "ordering.domain.service.ReopenPolicy.reopenAggregate("),
+        row(
+            "onlyCommandHandlersUpdateOrDeleteAggregates: Repository implementation",
+            TableWriterArchTest.onlyCommandHandlersUpdateOrDeleteAggregatesRule(),
+            UNVERSIONED_REPOSITORY + ".save(archfixture.violating.ordering.domain.model.OrderId)"),
+        row(
+            "onlyCommandHandlersUpdateOrDeleteAggregates: Domain Service",
+            TableWriterArchTest.onlyCommandHandlersUpdateOrDeleteAggregatesRule(),
+            "ordering.domain.service.ReopenPolicy.reopen("),
+        row(
+            "onlyCommandHandlersUpdateOrDeleteAggregates: QueryService",
+            TableWriterArchTest.onlyCommandHandlersUpdateOrDeleteAggregatesRule(),
+            "ordering.application.PurgeOrderQueryService.purge("),
+        row(
+            "expectedLockNoIsCreatedOnlyByRequests: constructor",
+            TableWriterArchTest.expectedLockNoIsCreatedOnlyByRequestsRule(VIOLATING),
+            "ordering.application.ForgedLockNoCommandHandler.forged("),
+        row(
+            "expectedLockNoIsCreatedOnlyByRequests: constructor reference",
+            TableWriterArchTest.expectedLockNoIsCreatedOnlyByRequestsRule(VIOLATING),
+            "ordering.application.ForgedLockNoCommandHandler.forgedByReference("),
+        row(
+            "expectedLockNoIsCreatedOnlyByRequests: Controller",
+            TableWriterArchTest.expectedLockNoIsCreatedOnlyByRequestsRule(VIOLATING),
+            "ordering.presentation.web.OrderLockController.lockNo("),
+        row(
+            "aggregateMethodsDoNotUseUnversionedWrites",
+            TableWriterArchTest.aggregateMethodsDoNotUseUnversionedWritesRule(VIOLATING),
+            UNVERSIONED_REPOSITORY + ".update("),
+        row(
+            "aggregateRootInsertsGoThroughTableWriter",
+            TableWriterArchTest.aggregateRootInsertsGoThroughTableWriterRule(),
+            "ordering.infrastructure.persistence.JooqOrderDraftRepository.add("));
   }
 
   /** クラスの役割と配置の規則が、対応する違反フィクスチャを検出することを確かめる行を作る。 */

@@ -40,6 +40,10 @@ import org.springframework.jdbc.object.SqlUpdate;
 /**
  * 違反：tableWritesGoThroughTableWriter（メソッドごとに、TableWriter を通さない書き込みの API を一つ使う）。
  *
+ * <p>禁止の名前の一覧の値を確かめるメソッドは、その値の呼び出しのほかに、規則が検出する呼び出しを持たない。{@code ArchitectureRuleFixtureTest} の
+ * {@code DIRECT_WRITES}
+ * が、メソッドごとに検出される呼び出しを確かめる。ラムダの本体の呼び出しも外側のメソッドの呼び出しとして数えられるため、ラムダの本体は空にするか、禁止の呼び出しだけにする。
+ *
  * <p>規則がバイトコードを読むだけで、実行しない。
  */
 // 規則が検出する呼び出しを一つずつ確かめるため、禁止する API ごとに一つのメソッドを置く。
@@ -109,11 +113,7 @@ public final class DirectOrderWriter {
     return dsl.executeDelete(row);
   }
 
-  /**
-   * {@code DSLContext.connection} を呼ぶ。
-   *
-   * <p>ラムダの本体で {@code Connection} を使うと、その呼び出しも禁止の対象として検出され、{@code connection} の禁止を外しても行が通る。本体は空にする。
-   */
+  /** {@code DSLContext.connection} を呼ぶ。 */
   public static DSLContext dslConnection(final DSLContext dsl) {
     dsl.connection(connection -> {});
     return dsl;

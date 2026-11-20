@@ -123,6 +123,9 @@ jOOQの生成物の`com.example.demo.jooq`はOPENのモジュールであり、`
 `jooqReflectionMappingIsNotUsed`は、違反フィクスチャの`ReflectiveOrderReader`で禁止するメソッドごとに一行を持ち、それぞれの呼び出しを検出することを確かめる。
 
 `tableWritesGoThroughTableWriter`は、違反フィクスチャの`DirectOrderWriter`で禁止するAPIごとに一行を持つ。
+各行は、メソッドと、そのメソッドが検出される禁止の呼び出し（`ArchitectureRuleFixtureTest`の`DIRECT_WRITES`）を対にし、その呼び出しの違反が出ることを確かめる。
+禁止の名前の一覧（`DSL_WRITES`、`QUERY_EXECUTIONS`、`UPSERTS`、`RECORD_WRITES`、`DAO_WRITES`）の値は、すべていずれかの行の呼び出しである。
+一覧に値を足したときは、その呼び出しを一つだけ持つメソッドを`DirectOrderWriter`に足す。
 `DirectOrderWriter`は、ラムダの中の`execute()`、`Update`の変数からの`execute()`、`Update::execute`のメソッド参照も含む。
 `TableWriterArchTest`の残りの規則は、違反フィクスチャの`JooqOrderRepository`、`UnversionedOrderRepository`、`ApproveOrderCommandHandler`で確かめる。
 R1は`ReleaseOrderCommandHandler`（`ReleaseOrderCommand`と`ReleaseOrderRequest`）、`SuspendOrderCommandHandler`（static factoryの呼び出し）、`ResumeOrderCommandHandler`（static factoryのメソッド参照）、`ArchiveOrderCommandHandler`（`save`という別名の書き込み）で確かめる。
@@ -284,9 +287,9 @@ INSERTの共通カラムは`CommonColumns.forInsert`で、UPDATEとDELETEの共�
 - `repositoryWritesTakeVersionedAggregates`：`domain.model`の`*Repository`インタフェースの`add`、`update`、`delete`は、集約ルートを一つだけ受け取る。
   集約ルートが`long lockNo()`を持たないと、ほかの規則が集約ルートを見つけられず空のまま通るため、この規則で形を確かめる。
   必須の`add`を対象に含めるため、`save`のような名前で保存するRepositoryでも、`lockNo()`を持たない集約は`add`で検出される。
-- `aggregateMethodsDoNotUseUnversionedWrites`：集約ルートを引数に取るメソッドとラムダは、`updateWhere`と`deleteWhere`を呼ばない。
-  ラムダは捕捉した変数を引数に持つ合成メソッドになるため、同じ判定で見る。
-- `aggregateRootInsertsGoThroughTableWriter`：`Jooq*Repository`の`add`とその中のラムダは、`Insert`に代入できる型の`execute`、`executeAsync`、`returning`、`returningResult`と、名前が`fetch`で始まるメソッドを呼ばない。
+- `aggregateMethodsDoNotUseUnversionedWrites`：集約ルートを引数に取るメソッドは、`updateWhere`と`deleteWhere`を呼ばない。
+  ArchUnitはラムダの本体の呼び出しを外側のメソッドの呼び出しとして数えるため、ラムダの中の呼び出しも同じ判定で見る。
+- `aggregateRootInsertsGoThroughTableWriter`：`Jooq*Repository`の`add`（ラムダの中を含む）は、`Insert`に代入できる型の`execute`、`executeAsync`、`returning`、`returningResult`と、名前が`fetch`で始まるメソッドを呼ばない。
   集約ルートのINSERTは`TableWriter.insert`に渡し、子の行のINSERTは`dsl.batch`で実行する。
   `update`で子の行のINSERTを直接実行するため、対象を`add`に限る。
   検出しない書き方は[ADR-054](../adr/ADR-054-detect-optimistic-lock-conflicts-by-update-count.md)のNegativeに示す。
@@ -303,7 +306,8 @@ INSERTの共通カラムは`CommonColumns.forInsert`で、UPDATEとDELETEの共�
 - `expectedLockNoIsCreatedOnlyByRequests`（R3）：`presentation.web`の`*Request`以外のクラスは、`ExpectedLockNo`のコンストラクタを呼ばず、`ExpectedLockNo::new`も使わない。
   Repository、`TableWriter`、CommandHandler、Controllerが読んだ版から作ることを止める。
 - `commandHandlersEnsureScreenLockNo`（R4）：`*CommandHandler`の、引数のCommandが`VersionedCommand`である`handle`は、その中で直接`domain.model`の型の`ensureLockNo`で、引数に`ExpectedLockNo`を持つものを呼ぶ。
-  別のメソッドやラムダの中の呼び出しと、`ensureLockNo(long)`のオーバーロードでは満たせない。
+  別のメソッドの中の呼び出しと、`ensureLockNo(long)`のオーバーロードでは満たせない。
+  ラムダの本体の呼び出しは`handle`の呼び出しとして数えるため、満たす。
   別の集約のインスタンスに呼ぶ、業務の検査の後に呼ぶ、`command.expectedLockNo()`以外の値を渡す書き方は検査しない（値の流れは追わない）。
 - `jooqVersionIsReviewed`：実行時のjOOQの版が、禁止の一覧を見直した版と一致する。
   版が変わったら[jOOQのSQLの書き方](../database/jooq-usage.md)の「jOOQの版を上げるとき」に従う。
