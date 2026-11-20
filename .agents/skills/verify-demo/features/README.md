@@ -7,7 +7,7 @@
 
 ## 共通の前提
 
-- `stack.sh up` で起動した検証スタック（`http://localhost:5173`）だけを操作する。
+- `stack.sh up` で起動した検証スタック（`http://localhost:<web のポート>`、slot 0 は 5173）だけを操作する。
 - journey の前に `stack.sh doctor` を実行し、すべて OK であることを確かめる。
 - 代表データと、journey が作るデータの扱いは `docs/e2e/testing-strategy.md` の「テストデータ」に従う。
   客先注文番号は `orders.uniqueCode("VERIFY")` で作る。

@@ -132,8 +132,8 @@ docker compose -p spring-modulith-test-<n> -f docker/compose-test.yml --profile 
   slot を取れても、2 本目は 4173、18081、18082 の確認で失敗する。
 - `task e2e-collect-logs` を単独で実行すると、Compose の既定の project（`spring-modulith-test`）のログを読む。
   `task e2e` の中では、`task e2e` が export した `COMPOSE_PROJECT_NAME` を受け継ぎ、slot の project のログを読む。
-- `/verify-demo` の `stack.sh` は、まだ project `spring-modulith-test` と slot 0 のポートを前提にする。
-  `task e2e-collect-logs` と `stack.sh` を slot に合わせる変更は、[#418](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/418) の 2 つ目の Pull Request で行う。
+- `/verify-demo` の `stack.sh` は、`up` が取った slot を `build/verify/stack/slot` に記録し、`doctor`、`down`、`drive.mjs` がその slot の project とポートを使う。
+  journey は `webOrigin` と `idpOrigin` を受け取り、5173 や 8081 を書かない。
 
 ## 検査
 

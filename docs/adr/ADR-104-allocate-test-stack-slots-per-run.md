@@ -94,8 +94,8 @@ ZAP の plan は、Keycloak のポートを slot の値に置き換えた写し�
 - 2 つの `task scan-dast` は同時に流せない。
   自分で使う 4173、18081、18082 が固定のためである。
 - ロックは clone ごとの git の共通ディレクトリにあるため、同じホストの別の clone とは排他しない。
-- `task e2e-collect-logs` の単独の実行と `/verify-demo` の `stack.sh` は、まだ従来の project の名前と slot 0 のポートを前提にする。
-  Issue #418 の 2 つ目の Pull Request で slot に合わせる。
+- `task e2e-collect-logs` を単独で実行すると、環境に `COMPOSE_PROJECT_NAME` がなければ従来の project のログを読む。
+  `/verify-demo` の `stack.sh` は slot の記録を持ち、そこから環境を復元して呼ぶ。
 
 ### Neutral
 
