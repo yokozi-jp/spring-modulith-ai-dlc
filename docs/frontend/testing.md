@@ -54,7 +54,16 @@ componentの内部state、Hookの呼出回数、CSS classだけを主要な期�
   `it`、`test`、`describe`のtitleに日本語を1文字は含めることを、Oxlintの`vitest/valid-title`の`mustMatch`が検査する。
   `describe`だけは、コードの名前をそのまま指す、空白を含まない1語のtitle（`resolveLocale`など）を許す。
 - **不安定なテスト**：Vitestの`retry`で隠さず、同じ変更で直すか削除し、`skip`で残さない。
-  `skip`と`only`の残置はOxlintの`vitest/no-disabled-tests`と`vitest/no-focused-tests`が禁止する。
+- **テストを弱める記述**：次の5規則がerrorで禁止する。
+  - `vitest/no-focused-tests`：`.only`を禁止する。
+  - `vitest/no-disabled-tests`：`.skip`を禁止する。
+  - `vitest/expect-expect`：`expect`のないテストを禁止する。
+  - `vitest/no-conditional-expect`：分岐や`catch`の中の`expect`を禁止する。
+  - `vitest/valid-expect`：matcherのない`expect`を禁止する。
+
+  `frontend/vite.config.ts`の`lint.rules`、`.test.ts`と`.test.tsx`のoverride、`packages/ui`のoverrideで5規則を`off`にすると、`frontend/lint/lint-config.test.js`が落ちる。
+  `apps/*/e2e/**`はfixtureの対象外で、そのoverrideで5規則を外しても検出しない。
+  `assertFunctionNames`のようなoptionで効果を弱める変更も検出しない。
 
 ## API境界
 
