@@ -84,6 +84,7 @@ declare module "vite-plus/test" {
 
 export default defineConfig(({ mode }) => {
   const serverPort = portFromEnv(mode, "SERVER_PORT", "18080");
+  const previewPort = portFromEnv(mode, "E2E_WEB_PORT", "5173");
   const faroPort = portFromEnv(mode, "OTEL_FARO_HTTP_PORT", "12347");
   const cspReportPort = portFromEnv(mode, "OTEL_CSP_REPORT_HTTP_PORT", "12348");
   const idpOrigin = new URL(
@@ -178,7 +179,9 @@ export default defineConfig(({ mode }) => {
         },
       },
     },
-    // proxy と strictPort は server の値を Vite が引き継ぐ。Keycloak の redirect URI と同じ origin で待ち受ける（ADR-033、ADR-057）。
-    preview: { port: 5173, headers: securityHeaders },
+    // proxy は server の値を Vite が引き継ぐ。
+    // 並行する task e2e が衝突しないよう、preview の port だけを E2E_WEB_PORT でずらし、開発サーバーは 5173 に固定したままにする。
+    // 使用中なら別の port へ移らず失敗させ、Keycloak の redirect URI と同じ origin で待ち受ける（ADR-033、ADR-057）。
+    preview: { port: previewPort, strictPort: true, headers: securityHeaders },
   };
 });

@@ -201,6 +201,17 @@ pre-commit:
         task agent-git-test
       fail_text: "agent-git.sh の自己検査に失敗しました。task agent-git-test で再実行してください。"
 
+    # test-slot.sh、自己検査、Keycloak の realm、compose-test の変更で、slot の割り当てを自己検査する（task test-slot-test）。
+    - name: test-slot-test
+      glob:
+        - "tooling/test-slot/**"
+        - "docker/keycloak/realm.json"
+        - "docker/compose-test.yml"
+      run: |
+        echo "{staged_files}" >/dev/null
+        task test-slot-test
+      fail_text: "test-slot の自己検査に失敗しました。task test-slot-test で再実行してください。"
+
     # Taskfile、フック、ワークフロー、tooling の fixture の変更で、タスク名と Taskfile を検証する（task lint-taskfile）。
     - name: lint-taskfile
       glob:

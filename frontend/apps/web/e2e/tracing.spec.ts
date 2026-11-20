@@ -1,14 +1,11 @@
 import type { Page } from "@playwright/test";
 
-import { logIn } from "./environment";
+import { idpOrigin, logIn, webOrigin } from "./environment";
 import { expect, test } from "./fixtures";
 
 // ログアウトで共有の storageState のセッションを終わらせないよう、専用の context でログインする。
 test.use({ storageState: { cookies: [], origins: [] } });
 
-const origin = "http://localhost:5173";
-// compose-test が Keycloak の issuer を固定している（logout.spec.ts と同じ）。
-const idpOrigin = "http://127.0.0.1:8081";
 const endSessionEndpoint = `${idpOrigin}/realms/spring-modulith/protocol/openid-connect/logout?`;
 // W3C Trace Context の version 00 で、sampled flag が 1 のもの（ADR-068、ブラウザで sampling しない）。
 const sampledTraceparent = /^00-[0-9a-f]{32}-[0-9a-f]{16}-01$/u;
@@ -29,7 +26,7 @@ test.beforeEach(({ page }) => {
 
 function traceparentsOf(path: string): (string | undefined)[] {
   return requests
-    .filter(({ url }) => url.origin === origin && url.pathname === path)
+    .filter(({ url }) => url.origin === webOrigin && url.pathname === path)
     .map(({ traceparent }) => traceparent);
 }
 
@@ -55,7 +52,7 @@ function expectOnlyApiTraced(): void {
   expect(traced.length).toBeGreaterThan(0);
   expect(
     traced
-      .filter(({ url }) => url.origin !== origin || !/^\/api(?:\/|$)/u.test(url.pathname))
+      .filter(({ url }) => url.origin !== webOrigin || !/^\/api(?:\/|$)/u.test(url.pathname))
       .map(({ url }) => url.href),
   ).toEqual([]);
 }

@@ -1,6 +1,6 @@
 import type { APIRequestContext, BrowserContext, Cookie, Locator, Page } from "@playwright/test";
 
-import { logIn, signInAndChooseTenant } from "./environment";
+import { idpOrigin, logIn, signInAndChooseTenant, webOrigin } from "./environment";
 import { expect, test } from "./fixtures";
 import {
   collectTelemetry,
@@ -13,9 +13,7 @@ import {
 // 共有の storageState のセッションを終わらせないよう、各テストは専用の context でログインする。
 test.use({ storageState: { cookies: [], origins: [] } });
 
-// compose-test が Keycloak の issuer を固定している（auth.setup.ts と同じ）。
-const endSessionEndpoint =
-  "http://127.0.0.1:8081/realms/spring-modulith/protocol/openid-connect/logout?";
+const endSessionEndpoint = `${idpOrigin}/realms/spring-modulith/protocol/openid-connect/logout?`;
 
 function logoutButton(page: Page): Locator {
   return page.getByRole("button", { name: "ログアウト" });
@@ -35,7 +33,7 @@ async function apiStatus(page: Page): Promise<number> {
 
 // / は SPA が認証を確かめずに表示するため、/api/missing が 404（401 でない）であることで認証済みを確かめる。
 async function expectAuthenticatedHome(page: Page): Promise<void> {
-  await expect(page).toHaveURL("http://localhost:5173/");
+  await expect(page).toHaveURL(`${webOrigin}/`);
   await expect(homeHeading(page)).toBeVisible();
   expect(await apiStatus(page)).toBe(404);
 }
@@ -61,7 +59,7 @@ async function expectApplicationSessionEnded(
 }
 
 async function expectLoggedOutPage(page: Page): Promise<void> {
-  await expect(page).toHaveURL("http://localhost:5173/logged-out");
+  await expect(page).toHaveURL(`${webOrigin}/logged-out`);
   await expect(page.getByRole("heading", { level: 1, name: "ログアウトしました" })).toBeVisible();
 }
 
@@ -150,7 +148,7 @@ test("ログイン直後に、ほかの操作をせずにログアウトする�
   const request = await endSession;
 
   expect(new URL(request.url()).searchParams.get("post_logout_redirect_uri")).toBe(
-    "http://localhost:5173/logged-out",
+    `${webOrigin}/logged-out`,
   );
   await expectLoggedOutPage(page);
   await expect(page).toHaveTitle("デモアプリケーション");

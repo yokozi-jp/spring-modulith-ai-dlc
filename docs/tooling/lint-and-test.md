@@ -12,6 +12,7 @@ tags: [reference, testing, lint, ci]
 Gitフックの中でDockerを使う検査は、`docker info`が失敗するローカル環境ではスキップし、CIで検査する。
 `docker`コマンドがあってもデーモンに接続できなければ、Dockerを使えないとみなす。
 判定の本体は`task docker-available`だけにあり、Dockerを使う`lefthook.yml`のジョブが呼ぶ。
+compose-testを使うTaskは、実行ごとにslotを取り、slotのComposeプロジェクトとポートで動く（[compose-testのslot](test-slots.md)）。
 
 ## 入口Task
 
@@ -22,10 +23,11 @@ Gitフックの中でDockerを使う検査は、`docker info`が失敗するロ�
 - **`task mutation-test`**：`be-mutation-test`の別名。
 - **`task fe-verify`**：フロントエンドの静的解析、未使用コード検査、テスト、テレメトリを無効にした本番ビルドを実行する。
 - **`task e2e`**：compose-testでbackendを起動し、Vite previewに対してPlaywrightのE2Eを実行して後片付けする（[E2Eテストの方針と書き方](../e2e/testing-strategy.md)）。
-- **`task e2e-up`**：`task e2e`の起動の手順（build、依存の起動、migration、代表データ、backend）だけを実行し、片付けない。
+- **`task e2e-up`**：`task e2e`の起動の手順（slotの取得、build、依存の起動、migration、代表データ、backend）だけを実行し、片付けない。
   `task e2e`の外で起動して残すときにも使い、その呼び出し側が片付ける。
 - **`task e2e-collect-logs LOG=<パス>`**：compose-testのbackendのログを書き、秘密の値、セッションのCookieの値、JWTの形の文字列が入っていれば失敗する。
   `task e2e`が片付けの前に呼ぶ。`task e2e-up`で残したスタックを片付けるときも、その前に呼ぶ。
+  単独で実行すると、slotのプロジェクトではなく、Composeの既定のプロジェクト（`spring-modulith-test`）のログを読む。
 
 ## バックエンド
 
@@ -55,11 +57,13 @@ Gitフックの中でDockerを使う検査は、`docker info`が失敗するロ�
   テストは対象のクラスのパッケージ以下のものだけを使う。
   対象のクラスがないときはPITを実行せず、差分を取れないときは失敗する。
   minionは1つにし、Springの起動を待てるようにtimeoutを既定より広げる。
-- **`task test`**：compose-testのPostgreSQLの起動、`be-verify-migrations`、PostgreSQLの停止、`be-test`、`api-lint`を実行する。
-  前の回が残したcompose-testは、起動の前に片付ける。
+- **`task test`**：slotの取得、compose-testのPostgreSQLの起動、`be-verify-migrations`、PostgreSQLの停止、`be-test`、`api-lint`を実行し、最後にslotのプロジェクトを片付ける。
+  PostgreSQLの停止はコンテナを消さないので、最後の片付けまでslotを持つ。
+- **`task test-deps-leftover-check`**：名前に`spring-modulith-test`を含むコンテナかvolumeが残っていれば失敗する。
+  slotのプロジェクト（`spring-modulith-test-<n>`）と、CIが`docker compose`を直接呼ぶときの既定のプロジェクト（`spring-modulith-test`）の両方を検出する。
 
 テストが使うPostgreSQL、Redis、WireMockは、テストのJVMごとにTestcontainersが起動して片付け、Gradleのforkを並列にする（[バックエンドのテストの実行基盤](../backend/testing-infrastructure.md)）。
-`docker/compose-test.yml`のPostgreSQL 5433は、`be-verify-migrations`のrollbackの検証だけが使う。
+`docker/compose-test.yml`のPostgreSQL（slot 0では5433）は、`be-verify-migrations`のrollbackの検証だけが使う。
 `.env.test`は、Gitで管理する`.env.test.example`からコピーして作るローカルファイルで、無ければTaskが作る。
 GradleのテストとPITは、接続先以外の設定を`.env.test`から読む。
 PITのHTMLとXMLのレポートは、変異対象がある場合に`backend/build/reports/pitest/`へ出力する。
@@ -122,7 +126,7 @@ PITのHTMLとXMLのレポートは、変異対象がある場合に`backend/buil
 - **`task scan-depscan`**：バックエンドとフロントエンドの依存関係をdep-scanで検査する。脆弱性DBは環境変数`DEPSCAN_VDB_HOME`（既定は`~/.cache/depscan-vdb`）に残す（[ADR-095](../adr/ADR-095-scan-dependencies-with-dep-scan-alongside-trivy.md)）。
 - **`task scan-depscan-backend`**：バックエンドのCycloneDX SBOMをdep-scanで検査し、レポートを`build/depscan/backend/`に出す。
 - **`task scan-depscan-frontend`**：フロントエンドのロックファイルをdep-scanで検査し、レポートを`build/depscan/frontend/`に出す。
-- **`task scan-dast`**：隔離した依存を起動してマイグレーションを適用し、backend、`vp preview`を起動して、OWASP ZAPで認証付きのpassive scanを実行して片付ける。
+- **`task scan-dast`**：slotを取り、隔離した依存を起動してマイグレーションを適用し、backend、`vp preview`を起動して、OWASP ZAPで認証付きのpassive scanを実行して片付ける。
 - **`task scan-dast-active`**：同じ環境でactive scanを実行する。
 - **`task lint-actions`**：GitHub Actionsワークフローをactionlintで検査する。
 - **`task lint-actions-security`**：GitHub Actionsのワークフローとcomposite action（`.github/actions/`）をzizmorで検査する。zizmorは`mise.toml`の版で動き、Dockerを使わない。設定は`.github/zizmor.yml`である。
@@ -172,6 +176,8 @@ PITのHTMLとXMLのレポートは、変異対象がある場合に`backend/buil
   手順の正文は[スキルの取得元と更新](../agents/skill-sources.md)である。
 - **`task release-check`**：release-pleaseのmanifest、版ファイル、Gradle版、設定の一致を検証する。
 - **`task agent-git-test`**：`task agent-commit`、`task agent-push`、`task agent-wait`の本体を、`tooling/agent-git/test.sh`のケースで検査する。
+- **`task test-slot-test`**：`tooling/test-slot/test-slot.sh`のslotの割り当て、待ち、回収、環境変数とenvファイルの値を、偽のdockerで検査し、`docker/keycloak/realm.json`のwebのoriginの数がslotの数と一致することを確かめる。
+  ケースは`tooling/test-slot/test.sh`が正で、この文書には写さない。
 - **`task lefthook-install-test`**：`npm ci`の`prepare`（`tooling/lefthook-install/prepare.mjs`）が、linked worktreeからもmainのworktreeのlefthookでフックを入れることを検査する。
   mainのworktreeの場所が分からないときと、そこにlefthookが無いときは、`prepare`が失敗することも確かめる。
   検査には一時のgitリポジトリと、lefthookの代わりのスクリプトを使う。
@@ -224,6 +230,7 @@ betterleaksの誤検知の除外の書き方は[betterleaksの誤検知の除外
 - **pre-commit（`.agents/skills/`、`.kiro/`、`skills-lock.json`、`tooling/skills-check/`の変更）**：`skills-check`を実行する。
 - **pre-commit（Taskfile、`lefthook.yml`、GitHub Actionsワークフロー、`tooling/taskfile-cleanup/`、`tooling/task-calls/`の変更）**：`lint-taskfile`を実行する。
 - **pre-commit（`tooling/agent-git/`の変更）**：`agent-git-test`を実行する。
+- **pre-commit（`tooling/test-slot/`、`docker/keycloak/realm.json`、`docker/compose-test.yml`の変更）**：`test-slot-test`を実行する。
 - **pre-commit（`lefthook.yml`か`tooling/lefthook-glob/`の変更）**：`lint-lefthook`を実行する。
 - **pre-commit（`.betterleaks.toml`、`.betterleaksignore`、`tooling/betterleaks/`の変更）**：`lint-betterleaks`を実行する。
 - **pre-commit（`package.json`、`lefthook.yml`、`tooling/lefthook-install/`の変更）**：`lefthook-install-test`を実行する。
@@ -268,7 +275,8 @@ pre-pushの「変更」は、`origin/main`とのmerge-baseからの差分で判�
 - **`api-contract.yml`**：`api-lint`、`api-lint-rules-test`、`api-breaking`、`api-docs`を実行し、設計書をartifactにする。
   mainへのpushでは設計書をGitHub Pagesに公開する。
 - **`betterleaks.yml`**：`lint-betterleaks`と`scan-secrets-all`を実行する。PRでは`BETTERLEAKS_LOG_OPTS`にbaseからheadまでの範囲を渡す。
-- **`static-analysis.yml`**：`lint-semgrep`相当、`lint-duplicates`、`lint-taskfile`、`lint-lefthook`、`agent-git-test`、`lefthook-install-test`、`lint-scratch-git`を実行する。
+- **`static-analysis.yml`**：`lint-semgrep`相当、`lint-duplicates`、`lint-taskfile`、`lint-lefthook`、`agent-git-test`、`lefthook-install-test`、`lint-scratch-git`、`test-slot-test`を実行する。
+  `test-slot-test`は振る舞いのテストだが、常に動くこのworkflowに置く（[ADR-087](../adr/ADR-087-gate-required-checks-with-single-aggregate-job.md)）。
   Code ScanningはSARIFの`suppressions`を読まないため、`nosemgrep`で抑止した検出をSARIFから除いてから送る。
 - **`trivy.yml`**：`scan-vulns`相当を実行する。Trivy本体の版は`SCAN_TRIVY_VERSION`で明示し、Taskfileの`aquasec/trivy`の版とそろえる（[ADR-097](../adr/ADR-097-keep-trivy-and-align-its-version.md)）。
 - **`depscan.yml`**：`scan-depscan-backend`と`scan-depscan-frontend`を実行し、レポートをartifactにする。SARIFを出さないのでCode Scanningには送らない。
