@@ -1,13 +1,10 @@
 package com.example.demo.testkit;
 
-import static com.example.demo.shared.infrastructure.persistence.ModuleRoleTransactionManager.ROLE_SETTING;
 import static com.example.demo.shared.infrastructure.persistence.ModuleRoleTransactionManager.TENANT_SETTING;
 
 import com.example.demo.shared.infrastructure.persistence.ModuleRoleTransactionManager;
 import com.example.demo.shared.infrastructure.persistence.ModuleRoles;
 import com.example.demo.shared.tenant.TenantContext;
-import java.util.List;
-import java.util.Map;
 import java.util.Objects;
 import java.util.function.Consumer;
 import java.util.function.Function;
@@ -72,8 +69,6 @@ public final class AsModule {
   }
 
   private static void setLocal(final DSLContext tx, final String role, final String tenant) {
-    tx.connection(connection ->
-        ModuleRoleTransactionManager.setLocal(
-            connection, List.of(Map.entry(ROLE_SETTING, role), Map.entry(TENANT_SETTING, tenant))));
+    tx.connection(connection -> ModuleRoleTransactionManager.setLocal(connection, role, tenant));
   }
 }

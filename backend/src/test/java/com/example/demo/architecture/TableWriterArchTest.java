@@ -203,8 +203,8 @@ class TableWriterArchTest {
   /**
    * 業務テーブルの UPDATE と DELETE は、TableWriter、LockedRoot、DeletedRoot だけが組み立てて実行する（H1）。
    *
-   * <p>トランザクションの初めにモジュールのロールへ切り替える ModuleRoleTransactionManager は、業務テーブルに触れず、固定の {@code set_config}
-   * だけを実行するため対象にしない（ADR-094）。
+   * <p>トランザクションの初めにモジュールのロールとテナントを設定する ModuleRoleTransactionManager は、業務テーブルに触れず、設定の名前を固定した 1 つの
+   * {@code set_config} の文だけを実行するため対象にしない（ADR-094、ADR-107）。
    */
   @ArchTest
   /* package */ static final ArchRule tableWritesGoThroughTableWriter =

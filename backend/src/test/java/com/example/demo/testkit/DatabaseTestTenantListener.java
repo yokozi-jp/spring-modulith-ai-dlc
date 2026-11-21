@@ -1,8 +1,6 @@
 package com.example.demo.testkit;
 
 import com.example.demo.shared.infrastructure.persistence.ModuleRoleTransactionManager;
-import java.util.List;
-import java.util.Map;
 import org.jooq.DSLContext;
 import org.springframework.core.Ordered;
 import org.springframework.test.context.TestContext;
@@ -33,10 +31,6 @@ public final class DatabaseTestTenantListener implements TestExecutionListener, 
         .getApplicationContext()
         .getBean(DSLContext.class)
         .connection(connection ->
-            ModuleRoleTransactionManager.setLocal(
-                connection,
-                List.of(
-                    Map.entry(
-                        ModuleRoleTransactionManager.TENANT_SETTING, AsTenant.TENANT.toString()))));
+            ModuleRoleTransactionManager.setLocal(connection, null, AsTenant.TENANT.toString()));
   }
 }

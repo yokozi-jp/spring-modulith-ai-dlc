@@ -1,15 +1,13 @@
 package com.example.demo.shared.infrastructure.persistence;
 
 import com.example.demo.shared.tenant.TenantContext;
+import com.example.demo.shared.tenant.TenantId;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
-import java.util.Collections;
 import java.util.List;
-import java.util.Map;
-import java.util.Optional;
-import java.util.stream.Stream;
 import javax.sql.DataSource;
+import org.jspecify.annotations.Nullable;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.config.BeanDefinition;
 import org.springframework.boot.transaction.autoconfigure.TransactionManagerCustomizers;
@@ -32,8 +30,15 @@ public class ModuleRoleTransactionManager extends JdbcTransactionManager {
   /** 業務の表の RLS のポリシーと {@code tenant_public_id} の既定値が読む、トランザクションのテナントの設定。 */
   public static final String TENANT_SETTING = "app.current_tenant";
 
-  /** セッションのロールの設定。 */
-  public static final String ROLE_SETTING = "role";
+  /** ロールだけを設定する SQL。 */
+  private static final String SET_ROLE = "SELECT set_config('role', ?, true)";
+
+  /** テナントだけを設定する SQL。 */
+  private static final String SET_TENANT = "SELECT set_config('" + TENANT_SETTING + "', ?, true)";
+
+  /** ロールとテナントを設定する SQL。 */
+  private static final String SET_ROLE_AND_TENANT =
+      "SELECT set_config('role', ?, true), set_config('" + TENANT_SETTING + "', ?, true)";
 
   /** トランザクションマネージャーは {@code Serializable} だが、直列化しない。 */
   private static final long serialVersionUID = 1L;
@@ -49,37 +54,42 @@ public class ModuleRoleTransactionManager extends JdbcTransactionManager {
     super.prepareTransactionalConnection(connection, definition);
     setLocal(
         connection,
-        Stream.of(
-                ModuleRoles.roleFor(definition.getName())
-                    .map(role -> Map.entry(ROLE_SETTING, role)),
-                TenantContext.findCurrent()
-                    .map(tenant -> Map.entry(TENANT_SETTING, tenant.toString())))
-            .flatMap(Optional::stream)
-            .toList());
+        ModuleRoles.roleFor(definition.getName()).orElse(null),
+        TenantContext.findCurrent().map(TenantId::toString).orElse(null));
   }
 
   /**
-   * 設定を、呼び出し中のトランザクションの間だけ、1 つの SQL で変える。名前と値はバインド変数で渡す。
+   * ロールとテナントを、呼び出し中のトランザクションの間だけ、1 つの SQL で変える。設定の名前は SQL に固定し、値はバインド変数で渡す。どちらも {@code null} なら SQL
+   * を流さない。
    *
    * <p>Spring のトランザクションの外でロールとテナントを切り替えるテストの補助とシーダーも、本番と同じ SQL を通すためにこれを呼ぶ。
    *
    * @param connection トランザクション中の接続
-   * @param settings 設定の名前と値。並びの順に設定する。空なら何もしない
+   * @param role 設定するロール。{@code null} ならロールを変えない
+   * @param tenant 設定するテナント。{@code null} ならテナントを変えない
    * @throws SQLException SQL が失敗した場合
    */
   public static void setLocal(
-      final Connection connection, final List<Map.Entry<String, String>> settings)
+      final Connection connection, final @Nullable String role, final @Nullable String tenant)
       throws SQLException {
-    if (settings.isEmpty()) {
-      return;
+    final String sql;
+    final List<String> values;
+    if (role == null) {
+      if (tenant == null) {
+        return;
+      }
+      sql = SET_TENANT;
+      values = List.of(tenant);
+    } else if (tenant == null) {
+      sql = SET_ROLE;
+      values = List.of(role);
+    } else {
+      sql = SET_ROLE_AND_TENANT;
+      values = List.of(role, tenant);
     }
-    final String sql =
-        "SELECT "
-            + String.join(", ", Collections.nCopies(settings.size(), "set_config(?, ?, true)"));
     try (PreparedStatement statement = connection.prepareStatement(sql)) {
-      for (int i = 0; i < settings.size(); i++) {
-        statement.setString(2 * i + 1, settings.get(i).getKey());
-        statement.setString(2 * i + 2, settings.get(i).getValue());
+      for (int i = 0; i < values.size(); i++) {
+        statement.setString(i + 1, values.get(i));
       }
       statement.execute();
     }
