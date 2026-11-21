@@ -1,5 +1,17 @@
 package com.example.demo.persistence.conventions;
 
+import static com.example.demo.persistence.conventions.CatalogRows.BIGINT;
+import static com.example.demo.persistence.conventions.CatalogRows.BTREE;
+import static com.example.demo.persistence.conventions.CatalogRows.ITEM;
+import static com.example.demo.persistence.conventions.CatalogRows.ITEM_ID;
+import static com.example.demo.persistence.conventions.CatalogRows.MODULITH;
+import static com.example.demo.persistence.conventions.CatalogRows.TABLE;
+import static com.example.demo.persistence.conventions.CatalogRows.UUID;
+import static com.example.demo.persistence.conventions.CatalogRows.index;
+import static com.example.demo.persistence.conventions.CatalogRows.keys;
+import static com.example.demo.persistence.conventions.CatalogRows.tenantColumn;
+import static com.example.demo.persistence.conventions.CatalogRows.tenantPolicy;
+import static com.example.demo.persistence.conventions.CatalogRows.tenantTable;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.example.demo.persistence.conventions.CatalogSnapshot.ColumnRow;
@@ -8,8 +20,6 @@ import com.example.demo.persistence.conventions.CatalogSnapshot.IndexRow;
 import com.example.demo.persistence.conventions.CatalogSnapshot.PolicyRow;
 import com.example.demo.persistence.conventions.CatalogSnapshot.RelationRow;
 import java.util.List;
-import java.util.Set;
-import java.util.stream.Collectors;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -19,31 +29,12 @@ import org.junit.jupiter.api.Test;
  *
  * <p>DBに接続しない。各テストは違反の規則の記号と対象を、{@code 規則 対象}のキーの集合で確かめる。
  */
+// 共有の行と定数（CatalogRows）を static import で読む。
+@SuppressWarnings("PMD.TooManyStaticImports")
 class SchemaTenantConventionsTest {
-
-  /** テナントで分ける業務スキーマ。 */
-  private static final String ITEM = "item";
 
   /** RLSの外に置くスキーマ。 */
   private static final String TENANCY = "tenancy";
-
-  /** Spring Modulithのスキーマ。 */
-  private static final String MODULITH = "modulith";
-
-  /** 業務テーブル。 */
-  private static final String TABLE = "m_item";
-
-  /** 業務テーブルの主キー。 */
-  private static final String ITEM_ID = "item_id";
-
-  /** uuidの型名。 */
-  private static final String UUID = "uuid";
-
-  /** bigintの型名。 */
-  private static final String BIGINT = "bigint";
-
-  /** btreeのアクセスメソッド。 */
-  private static final String BTREE = "btree";
 
   /** 外に出すID。 */
   private static final String PUBLIC_ID = "public_id";
@@ -159,19 +150,7 @@ class SchemaTenantConventionsTest {
               uniqueIndex(ITEM, "pk_m_item", ITEM_ID, true),
               uniqueIndex(ITEM, "uk_3_m_item", null, false),
               uniqueIndex(TENANCY, "uk_m_tenant", PUBLIC_ID, false),
-              new IndexRow(
-                  ITEM,
-                  TABLE,
-                  "idx_1_m_item",
-                  BTREE,
-                  false,
-                  1,
-                  1,
-                  false,
-                  false,
-                  false,
-                  false,
-                  null));
+              index(ITEM, BTREE, false, 1, 1));
 
       assertThat(keys(SchemaTenantConventions.uniqueIndexes(rows)))
           .as("インデックス: %s", rows)
@@ -316,34 +295,5 @@ class SchemaTenantConventionsTest {
       return new ConstraintRow(
           schema, table, name, "f", schema, foreignKeyColumns, referencedTable, referencedColumns);
     }
-  }
-
-  /** RLSのENABLEとFORCEを付けたテーブル。 */
-  private static RelationRow tenantTable(
-      final String schema, final String table, final String primaryKey) {
-    return new RelationRow(schema, table, "r", primaryKey, null, true, true);
-  }
-
-  /** トランザクションのテナントを既定値にした、uuidのNOT NULLのテナントの列。 */
-  private static ColumnRow tenantColumn(final String schema, final String table) {
-    return new ColumnRow(
-        schema, table, TENANT, UUID, "b", "", "", TenantIsolation.CATALOG_TENANT_DEFAULT, true);
-  }
-
-  /** テナントの設定と行のテナントを比べる、PUBLICへの許可のポリシー。 */
-  private static PolicyRow tenantPolicy(final String schema, final String table) {
-    return new PolicyRow(
-        schema,
-        table,
-        TenantIsolation.POLICY_NAME,
-        PERMISSIVE,
-        PUBLIC,
-        ALL,
-        TenantIsolation.CATALOG_POLICY_USING,
-        null);
-  }
-
-  private static Set<String> keys(final List<ConventionViolation> violations) {
-    return violations.stream().map(ConventionViolation::key).collect(Collectors.toSet());
   }
 }

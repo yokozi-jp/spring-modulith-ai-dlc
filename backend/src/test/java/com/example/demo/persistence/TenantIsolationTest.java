@@ -16,15 +16,14 @@ import com.example.demo.testkit.AsModule;
 import com.example.demo.testkit.AsTenant;
 import com.example.demo.testkit.BusinessSeeds;
 import com.example.demo.testkit.DatabaseTest;
+import com.example.demo.testkit.MigrationRoleConnections;
 import java.math.BigDecimal;
 import java.sql.Connection;
-import java.sql.DriverManager;
 import java.sql.SQLException;
 import java.time.Instant;
 import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
-import java.util.Properties;
 import java.util.Random;
 import java.util.UUID;
 import java.util.function.Function;
@@ -50,7 +49,7 @@ import org.springframework.transaction.annotation.Transactional;
 /**
  * 業務の表の RLS が、別のテナントの行の読み書きと、テナントを設定し忘れた読み書きを DB で止めることと、汎用の実行計画では DB の防御だけに頼れないことを確かめる（ADR-107）。
  */
-@SuppressWarnings({"PMD.TooManyStaticImports", "PMD.TooManyMethods"})
+@SuppressWarnings("PMD.TooManyStaticImports")
 @DatabaseTest
 class TenantIsolationTest {
 
@@ -283,7 +282,7 @@ class TenantIsolationTest {
   @Test
   @DisplayName("表の所有者のマイグレーションロールも、テナントを設定しないと業務の表を読めない")
   void ownerCannotReadWithoutTenant() throws SQLException {
-    try (Connection connection = ownerConnection()) {
+    try (Connection connection = MigrationRoleConnections.open(environment)) {
       final DSLContext owner = DSL.using(connection, SQLDialect.POSTGRES);
 
       assertSqlState(() -> owner.fetchCount(M_PRODUCT), UNSET);
@@ -297,7 +296,7 @@ class TenantIsolationTest {
   @Test
   @DisplayName("表の所有者のマイグレーションロールは、設定したテナントの行だけを読む")
   void ownerReadsOnlyTheTenantItSets() throws SQLException {
-    try (Connection connection = ownerConnection()) {
+    try (Connection connection = MigrationRoleConnections.open(environment)) {
       connection.setAutoCommit(false);
       final DSLContext owner = DSL.using(connection, SQLDialect.POSTGRES);
       try {
@@ -327,14 +326,6 @@ class TenantIsolationTest {
         connection.rollback();
       }
     }
-  }
-
-  private Connection ownerConnection() throws SQLException {
-    final Properties properties = new Properties();
-    properties.setProperty("user", environment.getRequiredProperty("MIGRATION_DB_USERNAME"));
-    properties.setProperty("password", environment.getRequiredProperty("MIGRATION_DB_PASSWORD"));
-    return DriverManager.getConnection(
-        environment.getRequiredProperty("spring.datasource.url"), properties);
   }
 
   /** トランザクションマネージャーの検査を通らずに、DB の防御だけを確かめる。 */

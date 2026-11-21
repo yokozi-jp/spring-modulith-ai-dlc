@@ -1,5 +1,17 @@
 package com.example.demo.persistence.conventions;
 
+import static com.example.demo.persistence.conventions.CatalogRows.BIGINT;
+import static com.example.demo.persistence.conventions.CatalogRows.BTREE;
+import static com.example.demo.persistence.conventions.CatalogRows.ITEM;
+import static com.example.demo.persistence.conventions.CatalogRows.ITEM_ID;
+import static com.example.demo.persistence.conventions.CatalogRows.MODULITH;
+import static com.example.demo.persistence.conventions.CatalogRows.TABLE;
+import static com.example.demo.persistence.conventions.CatalogRows.UUID;
+import static com.example.demo.persistence.conventions.CatalogRows.index;
+import static com.example.demo.persistence.conventions.CatalogRows.keys;
+import static com.example.demo.persistence.conventions.CatalogRows.tenantColumn;
+import static com.example.demo.persistence.conventions.CatalogRows.tenantPolicy;
+import static com.example.demo.persistence.conventions.CatalogRows.tenantTable;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.example.demo.persistence.conventions.CatalogSnapshot.ColumnRow;
@@ -7,7 +19,6 @@ import com.example.demo.persistence.conventions.CatalogSnapshot.ConstraintRow;
 import com.example.demo.persistence.conventions.CatalogSnapshot.FunctionRow;
 import com.example.demo.persistence.conventions.CatalogSnapshot.IndexRow;
 import com.example.demo.persistence.conventions.CatalogSnapshot.ModuleRoleRow;
-import com.example.demo.persistence.conventions.CatalogSnapshot.PolicyRow;
 import com.example.demo.persistence.conventions.CatalogSnapshot.RelationPrivilegeRow;
 import com.example.demo.persistence.conventions.CatalogSnapshot.RelationRow;
 import com.example.demo.persistence.conventions.CatalogSnapshot.RoleRow;
@@ -18,7 +29,6 @@ import com.example.demo.persistence.conventions.CatalogSnapshot.ViewDependencyRo
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.stream.Collectors;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -29,34 +39,15 @@ import org.junit.jupiter.api.Test;
  *
  * <p>DBに接続しない。各テストは違反の規則の記号と対象を、{@code 規則 対象}のキーの集合で確かめる。
  */
+// 共有の行と定数（CatalogRows）を static import で読む。
+@SuppressWarnings("PMD.TooManyStaticImports")
 class SchemaConventionsTest {
-
-  /** 業務スキーマ。 */
-  private static final String ITEM = "item";
-
-  /** Spring Modulithのスキーマ。 */
-  private static final String MODULITH = "modulith";
 
   /** Liquibaseの管理テーブルのスキーマ。 */
   private static final String LIQUIBASE = "liquibase";
 
-  /** 業務テーブル。 */
-  private static final String TABLE = "m_item";
-
-  /** 業務テーブルの主キー。 */
-  private static final String ITEM_ID = "item_id";
-
-  /** uuidの型名。 */
-  private static final String UUID = "uuid";
-
-  /** bigintの型名。 */
-  private static final String BIGINT = "bigint";
-
   /** integerの型名。 */
   private static final String INTEGER = "integer";
-
-  /** btreeのアクセスメソッド。 */
-  private static final String BTREE = "btree";
 
   /** 商品のモジュールとスキーマの名前。 */
   private static final String PRODUCT = "product";
@@ -78,21 +69,10 @@ class SchemaConventionsTest {
   void conformingSnapshotHasNoViolations() {
     final CatalogSnapshot snapshot =
         new CatalogSnapshot(
-            List.of(
-                new RelationRow(ITEM, TABLE, "r", ITEM_ID, null, true, true),
-                relation(MODULITH, "r", false, null)),
+            List.of(tenantTable(ITEM, TABLE, ITEM_ID), relation(MODULITH, "r", false, null)),
             List.of(
                 column(ITEM, BIGINT, "b", "a", "", null),
-                new ColumnRow(
-                    ITEM,
-                    TABLE,
-                    TenantIsolation.TENANT_COLUMN,
-                    UUID,
-                    "b",
-                    "",
-                    "",
-                    TenantIsolation.CATALOG_TENANT_DEFAULT,
-                    true),
+                tenantColumn(ITEM, TABLE),
                 column(MODULITH, INTEGER, "b", "", "", "nextval('x'::regclass)")),
             List.of(
                 new ConstraintRow(ITEM, TABLE, "pk_m_item", "p", null),
@@ -118,16 +98,7 @@ class SchemaConventionsTest {
                 relationPrivilege(ITEM, false, false, false),
                 relationPrivilege(LIQUIBASE, false, false, false)),
             List.of(),
-            List.of(
-                new PolicyRow(
-                    ITEM,
-                    TABLE,
-                    TenantIsolation.POLICY_NAME,
-                    "PERMISSIVE",
-                    List.of("public"),
-                    "ALL",
-                    TenantIsolation.CATALOG_POLICY_USING,
-                    null)));
+            List.of(tenantPolicy(ITEM, TABLE)));
 
     assertThat(SchemaConventions.check(snapshot, List.of())).as("違反").isEmpty();
   }
@@ -827,10 +798,6 @@ class SchemaConventionsTest {
     }
   }
 
-  private static Set<String> keys(final List<ConventionViolation> violations) {
-    return violations.stream().map(ConventionViolation::key).collect(Collectors.toSet());
-  }
-
   private static RelationRow relation(
       final String schema, final String relkind, final boolean hasPrimaryKey, final String parent) {
     return new RelationRow(schema, TABLE, relkind, hasPrimaryKey ? ITEM_ID : null, parent);
@@ -849,27 +816,6 @@ class SchemaConventionsTest {
       final String defaultExpression) {
     return new ColumnRow(
         schema, TABLE, ITEM_ID, typeName, typeKind, identity, generated, defaultExpression);
-  }
-
-  private static IndexRow index(
-      final String schema,
-      final String accessMethod,
-      final boolean primary,
-      final int keyColumnCount,
-      final int totalColumnCount) {
-    return new IndexRow(
-        schema,
-        TABLE,
-        "idx_1_m_item",
-        accessMethod,
-        primary,
-        keyColumnCount,
-        totalColumnCount,
-        false,
-        false,
-        false,
-        false,
-        null);
   }
 
   private static RoleRow cleanRole() {
