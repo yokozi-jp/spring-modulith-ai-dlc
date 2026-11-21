@@ -21,9 +21,6 @@
 (*  - A wait can end with lock_timeout (55P03), and a wait cycle ends with *)
 (*    the deadlock detector aborting one transaction (40P01).              *)
 (*  - Row locks are held until commit or rollback.                         *)
-(*  - A child INSERT checks fk_t_order_line with FOR KEY SHARE on the      *)
-(*    parent row. The request already holds the root row lock from its     *)
-(*    UPDATE, so the check never waits.                                    *)
 (* The root row lock orders the two requests' child statements, so they   *)
 (* never wait for each other. When it does not (the children-before-root  *)
 (* mutant), the model is coarser than PostgreSQL: an UPDATE waits for a    *)
@@ -31,6 +28,12 @@
 (* that waited sees the rows the other request committed meanwhile.        *)
 (* PostgreSQL's UPDATE and DELETE do neither, because their snapshot is    *)
 (* taken when the statement starts.                                        *)
+(*                                                                         *)
+(* The model leaves out the foreign key check of a child INSERT            *)
+(* (fk_t_order_line). It locks the parent row FOR KEY SHARE, which only    *)
+(* FOR UPDATE (a DELETE, or an UPDATE of a unique-key column) conflicts    *)
+(* with. In the order checked here the request already holds the root row  *)
+(* lock, so the check never waits.                                         *)
 (***************************************************************************)
 EXTENDS Naturals, Sequences, FiniteSets
 
