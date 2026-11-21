@@ -61,6 +61,8 @@ git diff --stat "$(sed -n 's/^同期コミット：`\([0-9a-f]*\)`.*/\1/p' "$ski
   backend/src/main/java/com/example/demo/ordering/application/ConfirmOrderCommandHandler.java \
   backend/src/main/java/com/example/demo/ordering/application/CancelOrderCommandHandler.java \
   backend/src/main/java/com/example/demo/error/presentation/web/ApiExceptionHandler.java \
+  backend/src/main/java/com/example/demo/shared/infrastructure/persistence/ModuleRoleTransactionManager.java \
+  backend/src/main/java/com/example/demo/shared/infrastructure/persistence/ModuleRoles.java \
   backend/src/main/resources/db/changelog/changesets/004-create-order-tables.yaml \
   backend/src/main/resources/db/changelog/changesets/019-rebuild-order-tables-for-tenants.yaml \
   backend/src/main/resources/application.yaml \
@@ -69,11 +71,23 @@ git diff --stat "$(sed -n 's/^同期コミット：`\([0-9a-f]*\)`.*/\1/p' "$ski
 
 `application.yaml` は `connection-init-sql`（`lock_timeout` など）だけが関わる。
 `ApiExceptionHandler` は、例外から HTTP のステータスへの対応だけが関わる。
+`ModuleRoleTransactionManager` は、開始直後の `set_config` の一文と、開始前の拒否だけが関わる。
+`ModuleRoles` は、どのトランザクションがテナントを要するか（その拒否の対象）だけが関わる。
+両方とも、範囲と前提の `ModuleRoleTransactionManager` の項目に結びつく。
 `TableWriter.update` の新しい呼び出し元（ほかの集約の Repository）ができたら、その保存の順序が `JooqOrderRepository.update` と同じかを確かめる。
 違うなら、その経路をモデルに足す。
 
 ```bash
 grep -rn "tableWriter.update(" backend/src/main/java --include=*.java
+```
+
+changeset は `includeAll` で読み込まれるため、新しい changeset は上の差分に出ない。
+同期コミット以降に足した changeset が `t_order` か `t_order_line` を変えていないかを、次のコマンドで確かめる。
+出たら、その changeset の索引、外部キー、ポリシーが保存の順序の前提を変えないかを読む。
+
+```bash
+git diff --name-only --diff-filter=A "$(sed -n 's/^同期コミット：`\([0-9a-f]*\)`.*/\1/p' .agents/skills/formal-verify-aggregate-write/SKILL.md)" -- \
+  backend/src/main/resources/db/changelog/changesets | xargs -r grep -l "t_order"
 ```
 
 ## 対応表
@@ -107,7 +121,17 @@ grep -rn "tableWriter.update(" backend/src/main/java --include=*.java
 - 読み取りは一つの文（multiset）なので、文の時点のコミット済みの状態を見る。
   読み取りが二つの文に分かれる変更は扱わない。
 - 分離レベルは READ COMMITTED だけを扱う。
-- `ModuleRoleTransactionManager` のトランザクションごとのロールの切り替えは、ロックと文の順序を変えないため扱わない。
+- `ModuleRoleTransactionManager` のロールとテナントの設定は、トランザクションを始めた直後の `set_config` の一文で、ロックと文の順序を変えないため扱わない。
+  テナントを束縛していない業務のトランザクションは、この一文の前に `IllegalStateException` で失敗し、呼び出し側は `CannotCreateTransactionException`（原因が `IllegalStateException`）を受ける。
+  業務の SQL は一つも実行されない。
+  リクエストはテナントを選ぶ前の業務の API を 403 にするため、保存の経路にはこの拒否が来ず、`OnlyConflictErrors` の対象にならない。
+- テナントは一つとし、行のセキュリティ（RLS）のポリシーは扱わない。
+  ポリシーは各文に `tenant_public_id` の条件を足すだけで、一つの保存の間テナントは変わらないため、ロックを待つ行と再評価（EvalPlanQual）の結果を変えない。
+- `fk_t_order_line`（`tenant_public_id`, `order_id`。019 で足した）を扱わない。
+  子の INSERT は親の行を `FOR KEY SHARE` で確かめる。
+  `FOR KEY SHARE` は `FOR UPDATE`（DELETE か、一意索引の列を変える UPDATE）だけと衝突する。
+  その要求はルートの UPDATE で親の行のロックをすでに持ち、ルートを書く別の要求はそのロックを先に待つため、検査が待ちを増やさない。
+  子の行をルートより先に書く順序にしたら、この前提は成り立たない（上の「切り分けの手がかり」の注記と同じ）。
 
 ## 既知の発見
 
@@ -115,7 +139,7 @@ grep -rn "tableWriter.update(" backend/src/main/java --include=*.java
 
 ## 同期の記録
 
-同期コミット：`c376b928c97af0b661d88b2160992a500fa4aeb4`（main。Pull Request #599 の土台。この Pull Request の変更はこのコミットとの差分に出るが、モデルは確かめ済みで、merge の後に main のコミットへ進めてよい）
+同期コミット：`f3f0b7ec5493ba506a2368a42fe98c3caa21fe1e`（main）
 
 このコミットで、「変更がこの検証に関わるか」のファイルと対応表がモデルと一致することを確かめた。
 読んだのはこのリポジトリのコードで、PostgreSQL の振る舞いはモデルの冒頭の注記に並べた前提である。
