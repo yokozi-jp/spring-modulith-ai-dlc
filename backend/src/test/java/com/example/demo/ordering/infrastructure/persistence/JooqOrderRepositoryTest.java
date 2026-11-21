@@ -16,7 +16,6 @@ import com.example.demo.ordering.domain.model.ProductId;
 import com.example.demo.ordering.domain.model.ProductOffer;
 import com.example.demo.ordering.domain.model.Quantity;
 import com.example.demo.shared.concurrency.ConflictException;
-import com.example.demo.shared.infrastructure.persistence.CommonColumns;
 import com.example.demo.shared.infrastructure.persistence.TableWriter;
 import com.example.demo.shared.infrastructure.persistence.TestCommonColumns;
 import com.example.demo.testkit.DatabaseTest;
@@ -78,7 +77,7 @@ class JooqOrderRepositoryTest {
   @DisplayName("保存した注文を、明細、単価、状態、ロック番号ごと読み戻せる")
   void savesAndFindsOrder() {
     final Order order = draft(CUSTOMER_ORDER_CODE, item(PEN, 2), item(ERASER, 1));
-    TestCommonColumns.runAs(() -> repository(ADDED_AT).add(order));
+    TestCommonColumns.runAs(ADDED_AT, () -> repository().add(order));
 
     final Order found = find(order);
 
@@ -102,12 +101,12 @@ class JooqOrderRepositoryTest {
   @Test
   @DisplayName("客先注文番号が重複する保存は、種類が UNIQUE の ConflictException になる")
   void duplicateCustomerOrderCodeBecomesConflict() {
-    final OrderRepository repository = repository(ADDED_AT);
+    final OrderRepository repository = repository();
     final String customerOrderCode = UniqueCodes.next("C");
-    TestCommonColumns.runAs(() -> repository.add(draft(customerOrderCode, item(PEN, 1))));
+    TestCommonColumns.runAs(ADDED_AT, () -> repository.add(draft(customerOrderCode, item(PEN, 1))));
     final Order duplicate = draft(customerOrderCode, item(ERASER, 1));
 
-    assertThatThrownBy(() -> TestCommonColumns.runAs(() -> repository.add(duplicate)))
+    assertThatThrownBy(() -> TestCommonColumns.runAs(ADDED_AT, () -> repository.add(duplicate)))
         .isInstanceOfSatisfying(
             ConflictException.class,
             conflict ->
@@ -120,11 +119,11 @@ class JooqOrderRepositoryTest {
   @DisplayName("明細を減らすと消えた明細を削除し、残る明細は作成の記録を保って版を進め、増やすと新しい明細を版 1 で足す")
   void updatesLinesByDifference() {
     final Order order = draft(CUSTOMER_ORDER_CODE, item(PEN, 1), item(ERASER, 1), item(NOTE, 1));
-    TestCommonColumns.runAs(() -> repository(ADDED_AT).add(order));
+    TestCommonColumns.runAs(ADDED_AT, () -> repository().add(order));
 
     final Order shrunk = find(order);
     shrunk.changeLines(List.of(item(NOTE, 2), item(PEN, 3)), OFFERS);
-    TestCommonColumns.runAs(() -> repository(UPDATED_AT).update(shrunk));
+    TestCommonColumns.runAs(UPDATED_AT, () -> repository().update(shrunk));
 
     assertThat(lineRows(order))
         .as("orderId=%s の 2 件に減らした明細（番号、版、作成、更新）", order.id().value())
@@ -135,7 +134,7 @@ class JooqOrderRepositoryTest {
 
     final Order grown = find(order);
     grown.changeLines(List.of(item(NOTE, 2), item(PEN, 3), item(ERASER, 4)), OFFERS);
-    TestCommonColumns.runAs(() -> repository(UPDATED_AGAIN_AT).update(grown));
+    TestCommonColumns.runAs(UPDATED_AGAIN_AT, () -> repository().update(grown));
 
     assertThat(lineRows(order))
         .as("orderId=%s の 3 件に増やした明細", order.id().value())
@@ -150,11 +149,11 @@ class JooqOrderRepositoryTest {
   @DisplayName("確定の保存でも明細の作成の記録は変わらない")
   void confirmKeepsLineCreation() {
     final Order order = draft(CUSTOMER_ORDER_CODE, item(PEN, 1));
-    TestCommonColumns.runAs(() -> repository(ADDED_AT).add(order));
+    TestCommonColumns.runAs(ADDED_AT, () -> repository().add(order));
 
     final Order confirmed = find(order);
     confirmed.confirm();
-    TestCommonColumns.runAs(() -> repository(UPDATED_AT).update(confirmed));
+    TestCommonColumns.runAs(UPDATED_AT, () -> repository().update(confirmed));
 
     assertThat(find(order).status()).isEqualTo(OrderStatus.CONFIRMED);
     assertThat(lineRows(order))
@@ -162,13 +161,12 @@ class JooqOrderRepositoryTest {
         .containsExactly(tuple(1, 2L, ADDED_AT, UPDATED_AT));
   }
 
-  private OrderRepository repository(final Instant at) {
-    final CommonColumns commonColumns = TestCommonColumns.at(at);
-    return new JooqOrderRepository(dsl, new TableWriter(dsl, commonColumns));
+  private OrderRepository repository() {
+    return new JooqOrderRepository(dsl, new TableWriter(dsl, TestCommonColumns.create()));
   }
 
   private Order find(final Order order) {
-    return repository(ADDED_AT)
+    return repository()
         .findById(order.id())
         .orElseThrow(() -> new AssertionError("order が見つからない: orderId=" + order.id().value()));
   }

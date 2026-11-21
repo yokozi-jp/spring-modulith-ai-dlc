@@ -6,7 +6,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.example.demo.shared.concurrency.ConflictException;
-import com.example.demo.shared.infrastructure.persistence.CommonColumns;
 import com.example.demo.shared.infrastructure.persistence.TableWriter;
 import com.example.demo.shared.infrastructure.persistence.TestCommonColumns;
 import com.example.demo.tenancy.domain.model.ExternalIdentity;
@@ -38,7 +37,7 @@ class JooqUserRepositoryTest {
   void savesAndFindsByIdentity() {
     final ExternalIdentity identity = identity();
     final User user = User.register(identity);
-    TestCommonColumns.runAs(() -> repository().add(user));
+    TestCommonColumns.runAs(ADDED_AT, () -> repository().add(user));
 
     final User found =
         repository()
@@ -54,7 +53,7 @@ class JooqUserRepositoryTest {
   @DisplayName("対応づけていない識別では、空を返す。発行者だけが同じ識別も別の識別として扱う")
   void unknownIdentityIsEmpty() {
     final ExternalIdentity identity = identity();
-    TestCommonColumns.runAs(() -> repository().add(User.register(identity)));
+    TestCommonColumns.runAs(ADDED_AT, () -> repository().add(User.register(identity)));
 
     assertThat(repository().findByIdentity(identity("another-sub"))).isEmpty();
     assertThat(
@@ -68,10 +67,10 @@ class JooqUserRepositoryTest {
   @DisplayName("同じ識別を別の利用者に対応づける保存は、種類が UNIQUE の ConflictException になる")
   void duplicateIdentityBecomesConflict() {
     final ExternalIdentity identity = identity();
-    TestCommonColumns.runAs(() -> repository().add(User.register(identity)));
+    TestCommonColumns.runAs(ADDED_AT, () -> repository().add(User.register(identity)));
     final User duplicate = User.register(identity);
 
-    assertThatThrownBy(() -> TestCommonColumns.runAs(() -> repository().add(duplicate)))
+    assertThatThrownBy(() -> TestCommonColumns.runAs(ADDED_AT, () -> repository().add(duplicate)))
         .isInstanceOfSatisfying(
             ConflictException.class,
             conflict ->
@@ -85,7 +84,7 @@ class JooqUserRepositoryTest {
   void registersCommonColumns() {
     final ExternalIdentity identity = identity();
     final User user = User.register(identity);
-    TestCommonColumns.runAs(() -> repository().add(user));
+    TestCommonColumns.runAs(ADDED_AT, () -> repository().add(user));
 
     assertThat(dsl.fetchSingle(M_USER, M_USER.PUBLIC_ID.eq(user.id().value())))
         .as("利用者の行 userId=%s", user.id().value())
@@ -105,8 +104,7 @@ class JooqUserRepositoryTest {
   }
 
   private UserRepository repository() {
-    final CommonColumns commonColumns = TestCommonColumns.at(ADDED_AT);
-    return new JooqUserRepository(dsl, new TableWriter(dsl, commonColumns));
+    return new JooqUserRepository(dsl, new TableWriter(dsl, TestCommonColumns.create()));
   }
 
   private static ExternalIdentity identity() {

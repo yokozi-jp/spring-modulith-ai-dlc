@@ -77,7 +77,7 @@ class PackageByFeatureOnionArchitectureTest {
 
   /** どの層からも使ってよい shared のパッケージの一覧。層の除外と shared の利用の規則は、ここから組み立てる。 */
   private static final List<String> ANY_LAYER_SHARED_PACKAGES =
-      List.of("concurrency", "failure", "events", "security", "tenant");
+      List.of("concurrency", "failure", "events", "security", "tenant", "time");
 
   /** Persistence Adapter のパッケージ。 */
   private static final String PERSISTENCE_PACKAGE = "..infrastructure.persistence..";

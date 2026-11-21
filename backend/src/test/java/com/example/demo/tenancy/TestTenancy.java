@@ -34,7 +34,9 @@ public final class TestTenancy {
   public static UUID tenant(final DSLContext dsl, final String tenantName) {
     final UUID tenantId = UUID.randomUUID();
     AsModule.run(
-        dsl, TENANCY, tx -> TestCommonColumns.runAs(() -> insertTenant(tx, tenantId, tenantName)));
+        dsl,
+        TENANCY,
+        tx -> TestCommonColumns.runAs(REGISTERED_AT, () -> insertTenant(tx, tenantId, tenantName)));
     return tenantId;
   }
 
@@ -44,7 +46,9 @@ public final class TestTenancy {
     AsModule.run(
         dsl,
         TENANCY,
-        tx -> TestCommonColumns.runAs(() -> insertMembership(tx, userId, tenantId, role)));
+        tx ->
+            TestCommonColumns.runAs(
+                REGISTERED_AT, () -> insertMembership(tx, userId, tenantId, role)));
   }
 
   /** ID を決めた利用者を、テナントに役割で所属させる。利用者、テナント、所属のどれも、既にあれば作り直さず、所属の役割だけを {@code role} に合わせる。 */
@@ -54,16 +58,18 @@ public final class TestTenancy {
         dsl,
         TENANCY,
         tx ->
-            TestCommonColumns.runAs(() -> {
-              tx.insertInto(M_USER)
-                  .set(M_USER.PUBLIC_ID, UUID.fromString(userId))
-                  .set(TestCommonColumns.at(REGISTERED_AT).forInsert(M_USER))
-                  .onConflict(M_USER.PUBLIC_ID)
-                  .doNothing()
-                  .execute();
-              insertTenant(tx, tenantId, "テストのテナント");
-              insertMembership(tx, userId, tenantId, role);
-            }));
+            TestCommonColumns.runAs(
+                REGISTERED_AT,
+                () -> {
+                  tx.insertInto(M_USER)
+                      .set(M_USER.PUBLIC_ID, UUID.fromString(userId))
+                      .set(TestCommonColumns.create().forInsert(M_USER))
+                      .onConflict(M_USER.PUBLIC_ID)
+                      .doNothing()
+                      .execute();
+                  insertTenant(tx, tenantId, "テストのテナント");
+                  insertMembership(tx, userId, tenantId, role);
+                }));
     changeRole(dsl, userId, tenantId, role);
   }
 
@@ -94,7 +100,7 @@ public final class TestTenancy {
   }
 
   /**
-   * テナントの行を 1 件登録する。既に同じ ID の行があれば何もしない。{@code *_pgm_cd} は束縛しないので、呼ぶ側が {@link
+   * テナントの行を 1 件登録する。既に同じ ID の行があれば何もしない。{@code *_pgm_cd} と現在時刻は束縛しないので、呼ぶ側が {@link
    * TestCommonColumns#runAs} の中で、tenancy のロールで呼ぶ。
    */
   /* package */ static void insertTenant(
@@ -102,14 +108,14 @@ public final class TestTenancy {
     dsl.insertInto(M_TENANT)
         .set(M_TENANT.PUBLIC_ID, tenantId)
         .set(M_TENANT.TENANT_NAME, tenantName)
-        .set(TestCommonColumns.at(REGISTERED_AT).forInsert(M_TENANT))
+        .set(TestCommonColumns.create().forInsert(M_TENANT))
         .onConflict(M_TENANT.PUBLIC_ID)
         .doNothing()
         .execute();
   }
 
   /**
-   * 所属の行を 1 件登録する。既に同じ利用者とテナントの行があれば何もしない。{@code *_pgm_cd} は束縛しないので、呼ぶ側が {@link
+   * 所属の行を 1 件登録する。既に同じ利用者とテナントの行があれば何もしない。{@code *_pgm_cd} と現在時刻は束縛しないので、呼ぶ側が {@link
    * TestCommonColumns#runAs} の中で、tenancy のロールで呼ぶ。
    */
   /* package */ static void insertMembership(
@@ -118,7 +124,7 @@ public final class TestTenancy {
         .set(M_MEMBERSHIP.USER_ID, userPk(dsl, userId))
         .set(M_MEMBERSHIP.TENANT_ID, tenantPk(dsl, tenantId))
         .set(M_MEMBERSHIP.ROLE_TYP, role)
-        .set(TestCommonColumns.at(REGISTERED_AT).forInsert(M_MEMBERSHIP))
+        .set(TestCommonColumns.create().forInsert(M_MEMBERSHIP))
         .onConflict(M_MEMBERSHIP.USER_ID, M_MEMBERSHIP.TENANT_ID)
         .doNothing()
         .execute();

@@ -7,7 +7,7 @@
 - [ADR-003: データアクセスに jOOQ を採用](ADR-003-adopt-jooq-for-data-access.md)（Accepted, 2026-09-11）
 - [ADR-004: jOOQ 生成コードを Git 管理する](ADR-004-commit-jooq-generated-code.md)（Accepted, 2026-09-11）
 - [ADR-005: Liquibase をアプリケーション起動から分離する](ADR-005-decouple-liquibase-from-app-startup.md)（Accepted, 2026-09-11）
-- [ADR-006: 絶対時刻を UTC / Instant / timestamptz に統一する](ADR-006-utc-instant-absolute-time-policy.md)（Accepted, 2026-09-11）
+- [ADR-006: 絶対時刻を UTC / Instant / timestamptz に統一する](ADR-006-utc-instant-absolute-time-policy.md)（Accepted, Amended by ADR-109, 2026-09-11）
 - [ADR-007: セッションベース認証と OIDC Authorization Code + PKCE](ADR-007-session-based-auth-with-oidc-pkce.md)（Accepted, 2026-09-11）
 - [ADR-008: application.yaml を単一にし設定を外部注入する](ADR-008-single-application-yaml-external-config.md)（Accepted, 2026-09-11）
 - [ADR-009: DB 接続を単一アカウントから二つの役割へ分ける](ADR-009-unify-db-connection-target-credentials-only-role-split.md)（Superseded by ADR-011, 2026-09-13）
@@ -108,3 +108,4 @@
 - [ADR-106: jscpd は import 文を比べず、閾値を実測の 1.90% に合わせて 2.0% にする](ADR-106-ignore-import-statements-in-jscpd.md)（Proposed, 2026-11-21）
 - [ADR-107: 業務テーブルを RLS でテナントごとに分け、テナントをロールと同じ SQL でトランザクションごとに設定する](ADR-107-isolate-tenants-with-rls-set-per-transaction.md)（Proposed, 2026-11-21）
 - [ADR-108: 同じモジュールの表どうしの参照に、テナントを含む複合の外部キーを作る](ADR-108-add-tenant-composite-foreign-keys-within-modules.md)（Proposed, 2026-11-21）
+- [ADR-109: ユースケースの現在時刻を 1 回だけ読み、PgmCdAspect が ScopedValue で渡す](ADR-109-read-use-case-time-once.md)（Proposed, 2026-11-21）

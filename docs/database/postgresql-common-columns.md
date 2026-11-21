@@ -56,7 +56,8 @@ changesetの静的検査は、この`comment`があるかを確認する。
 
 ## 値の登録
 
-- すべての共通カラムは、DBの既定値や`CURRENT_TIMESTAMP`に頼らず、アプリケーションがプレースホルダーでバインドする。`*_at`の現在時刻は[日時とタイムゾーンの規約](../datetime/timezone-conventions.md)のとおり`Clock`から取る。
+- すべての共通カラムは、DBの既定値や`CURRENT_TIMESTAMP`に頼らず、アプリケーションがプレースホルダーでバインドする。
+- `*_at`には、ユースケースの現在時刻（`UseCaseTime`）を登録する。1つのユースケースで書くすべての行の`*_at`は、業務の時刻（`ordered_at`、イベントの時刻など）と同じ値になる。ユースケースの現在時刻は[日時とタイムゾーンの規約](../datetime/timezone-conventions.md)の「バックエンド」のとおり、`Clock`から1回だけ読む。束縛されていなければ、`CommonColumns`は時計を読み直さずに例外にし、登録を失敗させる（[ADR-109](../adr/ADR-109-read-use-case-time-once.md)）。
 - INSERTでは作成のカラムと更新のカラムの両方を登録する。
 - 共通カラムの値はテストの検証対象にする。
 - トリガーで共通カラムを登録しない。

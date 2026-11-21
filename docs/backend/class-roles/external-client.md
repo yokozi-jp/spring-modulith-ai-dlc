@@ -225,7 +225,7 @@ return contractViolation(key, httpStatus, reply.status());
 ```java
 // com.example.demo.payment.application.ChargeOrderCommandHandler（抜粋）
 final ChargeOutcome outcome = paymentGateway.charge(orderId, amount);
-final Payment payment = Payment.record(orderId, amount, outcome, Instant.now(clock));
+final Payment payment = Payment.record(orderId, amount, outcome, UseCaseTime.now());
 paymentRepository.add(payment);
 ```
 

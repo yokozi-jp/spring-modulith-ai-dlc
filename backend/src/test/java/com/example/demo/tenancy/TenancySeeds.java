@@ -46,6 +46,7 @@ public final class TenancySeeds {
   public static void insert(final DSLContext dsl, final String issuer) {
     TestCommonColumns.runAs(
         PGM_CD,
+        REGISTERED_AT,
         () -> {
           TestTenancy.insertTenant(dsl, TRADING_TENANT, "サンプル商事");
           TestTenancy.insertTenant(dsl, GOODS_TENANT, "サンプル物産");
@@ -74,14 +75,14 @@ public final class TenancySeeds {
     final Long userPk =
         dsl.insertInto(M_USER)
             .set(M_USER.PUBLIC_ID, userId)
-            .set(TestCommonColumns.at(REGISTERED_AT).forInsert(M_USER))
+            .set(TestCommonColumns.create().forInsert(M_USER))
             .returning(M_USER.USER_ID)
             .fetchSingle(M_USER.USER_ID);
     dsl.insertInto(M_USER_IDENTITY)
         .set(M_USER_IDENTITY.USER_ID, userPk)
         .set(M_USER_IDENTITY.ISSUER_URL, issuer)
         .set(M_USER_IDENTITY.SUBJECT_CODE, subject)
-        .set(TestCommonColumns.at(REGISTERED_AT).forInsert(M_USER_IDENTITY))
+        .set(TestCommonColumns.create().forInsert(M_USER_IDENTITY))
         .execute();
     return userId.toString();
   }

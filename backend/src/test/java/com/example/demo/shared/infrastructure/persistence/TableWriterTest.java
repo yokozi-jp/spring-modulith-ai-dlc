@@ -21,9 +21,7 @@ import com.example.demo.testkit.FixtureTablesExtension;
 import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.sql.SQLException;
-import java.time.Clock;
 import java.time.Instant;
-import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Consumer;
@@ -93,12 +91,8 @@ class TableWriterTest {
 
   @BeforeEach
   void setUp() {
-    seedColumns =
-        new CommonColumns(Clock.fixed(CREATED, ZoneOffset.UTC), TracerStubs.withTraceId(TRACE_ID));
-    writer =
-        new TableWriter(
-            dsl,
-            new CommonColumns(Clock.fixed(NOW, ZoneOffset.UTC), TracerStubs.withTraceId(TRACE_ID)));
+    seedColumns = new CommonColumns(TracerStubs.withTraceId(TRACE_ID));
+    writer = new TableWriter(dsl, new CommonColumns(TracerStubs.withTraceId(TRACE_ID)));
   }
 
   @Test
@@ -524,8 +518,10 @@ class TableWriterTest {
 
   /** {@code lock_no = 1} の行を作る。 */
   private void insertItem(final long itemId, final String name) {
-    ScopedValue.where(PgmCdAspect.PGM_CD, SEED_PGM_CD)
-        .run(() ->
+    TestCommonColumns.runAs(
+        SEED_PGM_CD,
+        CREATED,
+        () ->
             dsl.insertInto(FIXTURE_ITEM)
                 .set(seedColumns.forInsert(FIXTURE_ITEM))
                 .set(FIXTURE_ITEM.ITEM_ID, itemId)
@@ -535,8 +531,10 @@ class TableWriterTest {
 
   /** {@code lock_no = 1} の子の行を作る。 */
   private void insertDetail(final long itemId, final int detailNo, final String text) {
-    ScopedValue.where(PgmCdAspect.PGM_CD, SEED_PGM_CD)
-        .run(() ->
+    TestCommonColumns.runAs(
+        SEED_PGM_CD,
+        CREATED,
+        () ->
             dsl.insertInto(FIXTURE_ITEM_DETAIL)
                 .set(seedColumns.forInsert(FIXTURE_ITEM_DETAIL))
                 .set(FIXTURE_ITEM_DETAIL.ITEM_ID, itemId)
@@ -564,8 +562,8 @@ class TableWriterTest {
         .fetchMap(FIXTURE_ITEM_DETAIL.DETAIL_NO, FIXTURE_ITEM_DETAIL.DETAIL_TEXT);
   }
 
-  /** ユースケースの呼び出しの中として、pgm_cd を束縛して戻り値のない処理を実行する。 */
+  /** ユースケースの呼び出しの中として、pgm_cd と更新の時刻を束縛して戻り値のない処理を実行する。 */
   private static void runInUseCase(final Runnable call) {
-    ScopedValue.where(PgmCdAspect.PGM_CD, PGM_CD).run(call);
+    TestCommonColumns.runAs(PGM_CD, NOW, call);
   }
 }

@@ -54,34 +54,34 @@ public final class TestProducts {
         "product",
         tenant,
         tx ->
-            TestCommonColumns.runAs(() ->
-                insert(
-                    tx,
-                    productId,
-                    productCode,
-                    "name of " + productCode,
-                    new BigDecimal(unitPrice),
-                    salesStatus,
-                    REGISTERED_AT)));
+            TestCommonColumns.runAs(
+                REGISTERED_AT,
+                () ->
+                    insert(
+                        tx,
+                        productId,
+                        productCode,
+                        "name of " + productCode,
+                        new BigDecimal(unitPrice),
+                        salesStatus)));
     return productId;
   }
 
-  /** 商品の行を 1 件登録する。{@code *_pgm_cd} は束縛しないので、呼ぶ側が {@link TestCommonColumns#runAs} の中で呼ぶ。 */
+  /** 商品の行を 1 件登録する。{@code *_pgm_cd} と現在時刻は束縛しないので、呼ぶ側が {@link TestCommonColumns#runAs} の中で呼ぶ。 */
   public static void insert(
       final DSLContext dsl,
       final UUID publicId,
       final String productCode,
       final String productName,
       final BigDecimal unitPrice,
-      final String salesStatus,
-      final Instant registeredAt) {
+      final String salesStatus) {
     dsl.insertInto(M_PRODUCT)
         .set(M_PRODUCT.PUBLIC_ID, publicId)
         .set(M_PRODUCT.PRODUCT_CODE, productCode)
         .set(M_PRODUCT.PRODUCT_NAME, productName)
         .set(M_PRODUCT.UNIT_PRICE_JPY, unitPrice)
         .set(M_PRODUCT.SALES_STATUS_TYP, salesStatus)
-        .set(TestCommonColumns.at(registeredAt).forInsert(M_PRODUCT))
+        .set(TestCommonColumns.create().forInsert(M_PRODUCT))
         .execute();
   }
 }

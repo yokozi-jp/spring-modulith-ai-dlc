@@ -19,7 +19,7 @@ export const ListPaymentsResponse = zod.object({
   "gatewayPaymentCode": zod.string().optional().describe('決済代行が採番した決済の識別子。採番されなかったときは省く'),
   "orderId": zod.uuid().describe('請求した注文の ID'),
   "paymentId": zod.uuid().describe('決済記録の ID'),
-  "recordedAt": zod.iso.datetime({"offset":true}).describe('請求の結果を記録した時刻。status が意味を決める'),
+  "recordedAt": zod.iso.datetime({"offset":true}).describe('請求の結果を記録した処理の開始時刻。status が意味を決める'),
   "status": zod.string().describe('請求の結果のコード値（PAID、DECLINED、FAILED）')
 }).describe('決済記録の一覧の 1 行を返す API の本文。')).describe('決済記録の一覧の行。1 注文につき 0 件か 1 件')
 }).describe('決済記録の一覧を items で包んで返す API の本文。')

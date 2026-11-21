@@ -180,7 +180,7 @@ public ChargeOrderResult handle(final ChargeOrderCommand command) {
   }
   // ...
   final ChargeOutcome outcome = paymentGateway.charge(orderId, amount);
-  final Payment payment = Payment.record(orderId, amount, outcome, Instant.now(clock));
+  final Payment payment = Payment.record(orderId, amount, outcome, UseCaseTime.now());
   paymentRepository.add(payment);
   return new ChargeOrderResult(payment.id().value().toString());
 }

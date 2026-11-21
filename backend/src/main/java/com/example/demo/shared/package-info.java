@@ -16,6 +16,9 @@
  * <p>操作しているテナントの語彙（{@code TenantId}、{@code TenantScoped}、{@code TenantContext}）は {@code tenant}
  * に置き、どの層からも使う（ADR-105）。リスナーでテナントを束縛する {@code TenantListenerAspect} は {@code
  * infrastructure.persistence} に置く。
+ *
+ * <p>ユースケースの現在時刻（{@code UseCaseTime}）は {@code time} に置き、どの層からも使う（ADR-109）。束縛する {@code PgmCdAspect}
+ * は {@code infrastructure.persistence} に置く。
  */
 @NullMarked
 package com.example.demo.shared;

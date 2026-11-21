@@ -4,15 +4,21 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.example.demo.DemoApplication;
+import com.example.demo.shared.time.UseCaseTime;
+import com.example.demo.testkit.AdvancingClock;
+import java.time.Instant;
 import java.util.List;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.aop.aspectj.annotation.AspectJProxyFactory;
 
-/** CommandHandler と Listener の呼び出しの間だけ、pgm_cd が束縛されることを検証する。 */
+/** CommandHandler と Listener の呼び出しの間だけ、pgm_cd とユースケースの現在時刻が束縛されることを検証する。 */
 // fixture の CommandHandler と Listener は、pointcut の対象にするためメソッドを public にする。
 @SuppressWarnings("PMD.PublicMemberInNonPublicType")
 class PgmCdAspectTest {
+
+  /** 時計が最初に返す時刻。 */
+  private static final Instant START = Instant.parse("2026-10-03T01:02:03.123456Z");
 
   @Test
   @DisplayName("CommandHandler の handle の中では、モジュール名と CommandHandler を除いた単純名の pgm_cd が束縛される")
@@ -51,6 +57,18 @@ class PgmCdAspectTest {
   }
 
   @Test
+  @DisplayName("Listener の中で呼ぶ CommandHandler は、時計を読み直さず Listener の現在時刻を引き継ぐ")
+  void nestedCommandHandlerInheritsListenerTime() {
+    final AdvancingClock clock = new AdvancingClock(START);
+    final TimeCommandHandler handler = proxy(new TimeCommandHandler(), clock);
+
+    assertThat(proxy(new TimeListener(handler), clock).on())
+        .as("Listener と、その中の CommandHandler の現在時刻")
+        .containsExactly(START, START);
+    assertThat(handler.handle()).as("次のユースケースは時計を読み直す").isEqualTo(START.plusNanos(1_000));
+  }
+
+  @Test
   @DisplayName("CommandHandler の handle 以外のメソッドと、役割名でないクラスでは pgm_cd を束縛しない")
   void otherMethodsAreNotBound() {
     assertThatThrownBy(proxy(new ChargeOrderCommandHandler())::describe)
@@ -79,9 +97,13 @@ class PgmCdAspectTest {
   }
 
   private static <T> T proxy(final T target) {
+    return proxy(target, new AdvancingClock(START));
+  }
+
+  private static <T> T proxy(final T target, final AdvancingClock clock) {
     final AspectJProxyFactory factory = new AspectJProxyFactory(target);
     factory.setProxyTargetClass(true);
-    factory.addAspect(new PgmCdAspect());
+    factory.addAspect(new PgmCdAspect(clock));
     return factory.getProxy();
   }
 
@@ -142,6 +164,32 @@ class PgmCdAspectTest {
     /** 内側の CommandHandler が Listener の中とみなされたかを返す。 */
     public boolean on() {
       return handler.handle();
+    }
+  }
+
+  /** 束縛された現在時刻を返す CommandHandler。 */
+  /* package */ static class TimeCommandHandler {
+
+    /** 束縛された現在時刻を返す。 */
+    public Instant handle() {
+      return UseCaseTime.now();
+    }
+  }
+
+  /** on から {@link TimeCommandHandler} を呼ぶ Listener。 */
+  @SuppressWarnings("PMD.ShortMethodName")
+  /* package */ static class TimeListener {
+
+    /** on の中で呼ぶ CommandHandler。 */
+    private final TimeCommandHandler handler;
+
+    /* package */ TimeListener(final TimeCommandHandler handler) {
+      this.handler = handler;
+    }
+
+    /** Listener の現在時刻と、内側の CommandHandler の現在時刻を返す。 */
+    public List<Instant> on() {
+      return List.of(UseCaseTime.now(), handler.handle());
     }
   }
 

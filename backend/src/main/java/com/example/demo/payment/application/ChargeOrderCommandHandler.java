@@ -9,8 +9,7 @@ import com.example.demo.payment.domain.model.Payment;
 import com.example.demo.payment.domain.model.PaymentGateway;
 import com.example.demo.payment.domain.model.PaymentRepository;
 import com.example.demo.shared.failure.NotFoundException;
-import java.time.Clock;
-import java.time.Instant;
+import com.example.demo.shared.time.UseCaseTime;
 import java.util.Optional;
 import java.util.UUID;
 import lombok.extern.slf4j.Slf4j;
@@ -38,19 +37,14 @@ public class ChargeOrderCommandHandler {
   /** 請求する金額を読む注文の参照。 */
   private final OrderQueries orderQueries;
 
-  /** 決済した時刻を取る時計。 */
-  private final Clock clock;
-
   /** 依存を受け取る。 */
   public ChargeOrderCommandHandler(
       final PaymentRepository paymentRepository,
       final PaymentGateway paymentGateway,
-      final OrderQueries orderQueries,
-      final Clock clock) {
+      final OrderQueries orderQueries) {
     this.paymentRepository = paymentRepository;
     this.paymentGateway = paymentGateway;
     this.orderQueries = orderQueries;
-    this.clock = clock;
   }
 
   /**
@@ -86,7 +80,8 @@ public class ChargeOrderCommandHandler {
     }
     final Money amount = new Money(details.totalAmount());
     final ChargeOutcome outcome = paymentGateway.charge(orderId, amount);
-    final Payment payment = Payment.record(orderId, amount, outcome, Instant.now(clock));
+    // 決済代行の応答の後に時計を読み直さず、処理の開始時刻を記録の時刻にする（ADR-109）。
+    final Payment payment = Payment.record(orderId, amount, outcome, UseCaseTime.now());
     paymentRepository.add(payment);
     return new ChargeOrderResult(payment.id().value().toString());
   }

@@ -127,6 +127,10 @@ final class ClassRoleFixtureRows {
             ClassRoleArchTest.commandHandlersDoNotDependOnOtherCommandHandlers,
             "ordering.application.ConfirmOrderCommandHandler"),
         row(
+            "commandHandlersAndListenersDoNotReadClock",
+            ClassRoleArchTest.commandHandlersAndListenersDoNotReadClock,
+            "ordering.application.StampOrderCommandHandler"),
+        row(
             "externalSystemCommandHandlersAreDependedOnlyByListeners: Controller",
             ClassRoleArchTest.externalSystemCommandHandlersAreDependedOnlyByListeners,
             "ordering.presentation.web.ChargeOrderController"),
