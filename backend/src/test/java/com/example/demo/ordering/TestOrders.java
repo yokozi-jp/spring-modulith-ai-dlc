@@ -3,6 +3,8 @@ package com.example.demo.ordering;
 import com.example.demo.ordering.application.DraftOrderCommand;
 import com.example.demo.ordering.application.DraftOrderCommandHandler;
 import com.example.demo.product.TestProducts;
+import com.example.demo.shared.tenant.TenantId;
+import com.example.demo.testkit.AsTenant;
 import com.example.demo.testkit.UniqueCodes;
 import io.micrometer.observation.Observation;
 import io.micrometer.observation.ObservationRegistry;
@@ -26,15 +28,27 @@ public final class TestOrders {
       final DSLContext dsl,
       final DraftOrderCommandHandler draftOrder,
       final ObservationRegistry observationRegistry) {
-    final UUID productId = TestProducts.onSale(dsl, UniqueCodes.next("P"), "120.00");
+    return drafted(dsl, AsTenant.TENANT, draftOrder, observationRegistry);
+  }
+
+  /**
+   * テナントに単価 120 円の販売中の商品を登録し、それを 2 個注文する下書きを作り、注文 ID を返す。
+   *
+   * <p>下書きの CommandHandler は、呼ぶ側が束縛したテナントで動く。束縛は {@code tenant} と揃える。
+   */
+  public static String drafted(
+      final DSLContext dsl,
+      final TenantId tenant,
+      final DraftOrderCommandHandler draftOrder,
+      final ObservationRegistry observationRegistry) {
+    final UUID productId = TestProducts.onSale(dsl, tenant, UniqueCodes.next("P"), "120.00");
     return Observation.createNotStarted("order-test", observationRegistry)
-        .observe(
-            () ->
-                draftOrder
-                    .handle(
-                        new DraftOrderCommand(
-                            UniqueCodes.next("C"),
-                            List.of(new DraftOrderCommand.Line(productId.toString(), 2))))
-                    .orderId());
+        .observe(() ->
+            draftOrder
+                .handle(
+                    new DraftOrderCommand(
+                        UniqueCodes.next("C"),
+                        List.of(new DraftOrderCommand.Line(productId.toString(), 2))))
+                .orderId());
   }
 }
