@@ -18,6 +18,8 @@ import org.jooq.Field;
 import org.jooq.impl.DSL;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.NestedExceptionUtils;
@@ -26,11 +28,13 @@ import org.springframework.transaction.support.TransactionTemplate;
 
 /**
  * トランザクションマネージャーが、トランザクションの名前からモジュールのロールへ、束縛したテナントへ切り替え、commit と rollback
- * の後にプールの接続へロールとテナントを残さないことを確かめる（ADR-094、ADR-107）。
+ * の後にプールの接続へロールとテナントを残さないことと、業務のモジュールのトランザクションをテナントなしでは始めないことを確かめる（ADR-094、ADR-107）。
  *
  * <p>プールの接続は少数を使い回すため、モジュールのロールのトランザクションの後に、名前のないトランザクションを繰り返し、すべてアプリロールで動くことを見る。
  */
 @CommittedDatabaseTest
+// ロールとテナントの切り替え、戻し、テナントのない業務のトランザクションの拒否を、本番のマネージャーで 1 つずつ確かめる。
+@SuppressWarnings("PMD.TooManyMethods")
 class ModuleRoleTransactionTest {
 
   /** 試す回数。プールの上限（テストは 4）より多くして、すべての接続を通す。 */
@@ -69,7 +73,8 @@ class ModuleRoleTransactionTest {
   @DisplayName("モジュールの名前のトランザクションは、モジュールのロールで動き、commit の後にアプリロールへ戻る")
   void commitRestoresAppRole() {
     for (int round = 0; round < ROUNDS; round++) {
-      assertThat(currentUserIn(ORDERING)).isEqualTo("ordering_module");
+      assertThat(TenantContext.call(TENANT, () -> currentUserIn(ORDERING)))
+          .isEqualTo("ordering_module");
       assertThat(currentUserIn(null)).isEqualTo(appRole);
     }
   }
@@ -79,11 +84,15 @@ class ModuleRoleTransactionTest {
   void rollbackRestoresAppRole() {
     for (int round = 0; round < ROUNDS; round++) {
       assertThatThrownBy(() ->
-              template(ORDERING)
-                  .executeWithoutResult(status -> {
-                    throw new IllegalStateException("rollback");
-                  }))
-          .isInstanceOf(IllegalStateException.class);
+              TenantContext.call(
+                  TENANT,
+                  () ->
+                      template(ORDERING)
+                          .execute(status -> {
+                            throw new IllegalStateException("rollback");
+                          })))
+          .isInstanceOf(IllegalStateException.class)
+          .hasMessage("rollback");
       assertThat(currentUserIn(null)).isEqualTo(appRole);
     }
   }
@@ -97,13 +106,39 @@ class ModuleRoleTransactionTest {
     assertThat(dsl.fetchValue("select current_user")).isEqualTo(appRole);
   }
 
+  @ParameterizedTest(name = "{0}")
+  @ValueSource(strings = {"product", "ordering", "payment"})
+  @DisplayName("業務の表を持つモジュールのトランザクションは、テナントを束縛していなければ、SQL を流す前に失敗する")
+  void businessModuleTransactionWithoutTenantIsRejected(final String module) {
+    final String name = "com.example.demo." + module + ".application.Probe.handle";
+    final List<Object> users = new ArrayList<>();
+
+    final Throwable thrown = catchThrowable(() -> users.add(currentUserIn(name)));
+
+    assertThat(users).as("始まったトランザクションの利用者").isEmpty();
+    assertThat(NestedExceptionUtils.getMostSpecificCause(thrown))
+        .as("例外: %s", thrown)
+        .isInstanceOf(IllegalStateException.class)
+        .hasMessageContaining(name);
+  }
+
+  @Test
+  @DisplayName("tenancy のトランザクションは、テナントを束縛していなくても tenancy のロールで動く")
+  void tenancyTransactionRunsWithoutTenant() {
+    assertThat(currentUserIn("com.example.demo.tenancy.application.Probe.handle"))
+        .isEqualTo("tenancy_module");
+  }
+
   @Test
   @DisplayName("jOOQ の transaction は、呼び出し元のトランザクションの名前のロールで動く")
   void jooqTransactionJoinsNamedTransaction() {
     final Object user =
-        template(ORDERING)
-            .execute(status ->
-                dsl.transactionResult(cfg -> cfg.dsl().fetchValue("select current_user")));
+        TenantContext.call(
+            TENANT,
+            () ->
+                template(ORDERING)
+                    .execute(status ->
+                        dsl.transactionResult(cfg -> cfg.dsl().fetchValue("select current_user"))));
 
     assertThat(user).isEqualTo("ordering_module");
     assertThat(IntStream.range(0, ROUNDS).mapToObj(round -> currentUserIn(null)))
@@ -117,7 +152,7 @@ class ModuleRoleTransactionTest {
       assertThat(TenantContext.call(TENANT, () -> currentTenantIn(ORDERING)))
           .as("束縛したトランザクションのテナント")
           .isEqualTo(TENANT.toString());
-      assertThat(currentTenantIn(ORDERING)).as("commit の後のテナント").isIn("", null);
+      assertThat(currentTenantIn(null)).as("commit の後のテナント").isIn("", null);
       assertThatThrownBy(() ->
               TenantContext.call(
                   TENANT,
@@ -132,16 +167,20 @@ class ModuleRoleTransactionTest {
   }
 
   @Test
-  @DisplayName("テナントの設定が空文字列で残った接続でも、テナントのないトランザクションの業務の表の読み取りはエラーになる")
+  @DisplayName("テナントの設定が空文字列で残った接続でも、テナントを設定しないモジュールのロールの業務の表の読み取りはエラーになる")
   void emptyTenantLeftOnPooledConnectionFailsClosed() {
     final List<String> leftovers = new ArrayList<>();
     for (int round = 0; round < ROUNDS; round++) {
       TenantContext.call(TENANT, () -> currentTenantIn(ORDERING));
       final Throwable thrown =
           catchThrowable(() ->
-              template(ORDERING)
+              template(null)
                   .executeWithoutResult(status -> {
                     leftovers.add(dsl.fetchValue(CURRENT_TENANT));
+                    // マネージャーはテナントのない ordering のトランザクションを始めないため、DB の 2 段目の防御をロールだけで確かめる。
+                    dsl.connection(connection ->
+                        ModuleRoleTransactionManager.setLocal(
+                            connection, ModuleRoles.roleOf("ordering"), null));
                     dsl.fetchCount(T_ORDER);
                   }));
 

@@ -7,6 +7,7 @@ import com.example.demo.persistence.conventions.CatalogSnapshot.ConstraintRow;
 import com.example.demo.persistence.conventions.CatalogSnapshot.IndexRow;
 import com.example.demo.persistence.conventions.CatalogSnapshot.PolicyRow;
 import com.example.demo.persistence.conventions.CatalogSnapshot.RelationRow;
+import com.example.demo.shared.infrastructure.persistence.ModuleRoles;
 import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -63,6 +64,16 @@ class SchemaTenantConventionsTest {
   /** テナントで分ける表の行レベルセキュリティ、テナントの列、ポリシー、ユニークインデックス。 */
   /* package */ @Nested
   class TenantIsolationRulesTest {
+
+    @Test
+    @DisplayName("テナントの束縛がないとトランザクションを始めないモジュールは、RLSの外に置くスキーマ以外のモジュールと同じである")
+    void tenantScopedModulesAreModulesOutsideRlsExemptSchemas() {
+      assertThat(ModuleRoles.TENANT_SCOPED_MODULES)
+          .isEqualTo(
+              ModuleRoles.MODULES.stream()
+                  .filter(module -> !TenantIsolation.RLS_EXEMPT_SCHEMAS.contains(module))
+                  .collect(Collectors.toSet()));
+    }
 
     @Test
     @DisplayName("S3：ENABLEかFORCEのない業務の表を拒否し、modulithとtenancyの表は判定しない")

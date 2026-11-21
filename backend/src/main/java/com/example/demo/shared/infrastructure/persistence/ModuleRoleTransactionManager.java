@@ -6,6 +6,7 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
 import java.util.List;
+import java.util.Optional;
 import javax.sql.DataSource;
 import org.jspecify.annotations.Nullable;
 import org.springframework.beans.factory.ObjectProvider;
@@ -22,8 +23,11 @@ import org.springframework.transaction.TransactionDefinition;
  * に束縛したテナントを、そのトランザクションの間だけ設定する（ADR-094、ADR-107）。
  *
  * <p>どちらも {@code set_config(..., true)} で設定し、トランザクションの終わりで元に戻るため、プールの接続に残らない。モジュールが分からないトランザクションは
- * アプリロールのまま、テナントを束縛していないトランザクションはテナントを設定せずに動かす。業務の表の RLS
- * のポリシーは設定のないテナントを読むとエラーにするため、テナントの設定を忘れた読み書きは 0 件にならず失敗する。
+ * アプリロールのまま、テナントを束縛していないトランザクションはテナントを設定せずに動かす。
+ *
+ * <p>業務の表を持つモジュール（{@link ModuleRoles#TENANT_SCOPED_MODULES}）のトランザクションを、テナントを束縛せずに始めると、SQL を流す前に
+ * {@link IllegalStateException} で失敗させる。業務の表の RLS のポリシーも設定のないテナントをエラーにするが、それは 2
+ * 段目の防御である。汎用の実行計画では、RLS の式より先に別の条件が全行を落とすと、エラーにならず 0 件を返すことがある。
  */
 public class ModuleRoleTransactionManager extends JdbcTransactionManager {
 
@@ -51,11 +55,19 @@ public class ModuleRoleTransactionManager extends JdbcTransactionManager {
   @Override
   protected void prepareTransactionalConnection(
       final Connection connection, final TransactionDefinition definition) throws SQLException {
+    final @Nullable String name = definition.getName();
+    final Optional<TenantId> tenant = TenantContext.findCurrent();
+    if (tenant.isEmpty() && ModuleRoles.requiresTenant(name)) {
+      throw new IllegalStateException(
+          "tenant is not bound for the transaction "
+              + name
+              + ": start it from a request with a selected tenant or an @ApplicationModuleListener");
+    }
     super.prepareTransactionalConnection(connection, definition);
     setLocal(
         connection,
-        ModuleRoles.roleFor(definition.getName()).orElse(null),
-        TenantContext.findCurrent().map(TenantId::toString).orElse(null));
+        ModuleRoles.roleFor(name).orElse(null),
+        tenant.map(TenantId::toString).orElse(null));
   }
 
   /**

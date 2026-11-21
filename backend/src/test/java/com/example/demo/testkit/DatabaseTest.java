@@ -1,6 +1,5 @@
 package com.example.demo.testkit;
 
-import com.example.demo.shared.infrastructure.persistence.ModuleRoleTransactionManager;
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
@@ -8,7 +7,7 @@ import java.lang.annotation.Target;
 import org.springframework.boot.jdbc.test.autoconfigure.AutoConfigureTestDatabase;
 import org.springframework.boot.jooq.test.autoconfigure.JooqTest;
 import org.springframework.context.annotation.Import;
-import org.springframework.test.context.TestExecutionListeners;
+import org.springframework.transaction.annotation.Transactional;
 
 /**
  * ロールバックで隔離される、jOOQ スライスのDBテスト向け合成アノテーション。
@@ -20,8 +19,8 @@ import org.springframework.test.context.TestExecutionListeners;
  * する（ADR-094）。テストのトランザクションは、テストクラスの名前（{@code
  * com.example.demo.<module>.…}）からモジュールのロールで動く。モジュールの外のテストクラスは、アプリロールのままで、{@link AsModule} で切り替える。
  *
- * <p>テストのトランザクションには、{@link DatabaseTestTenantListener} がテストの利用者のテナント（{@link
- * AsTenant#TENANT}）を設定する。別のテナントの読み書きは {@link AsModule} を別のテナントの束縛の中で呼ぶ。
+ * <p>テストのトランザクションは、{@link DatabaseTestTransactionManager} がテストの利用者のテナント（{@link
+ * AsTenant#TENANT}）を束縛して始める。別のテナントの読み書きは {@link AsModule} にそのテナントを渡す。
  *
  * <p>{@code replace = NONE} で組み込みDBへの差し替えを止め、生成コードと同じ方言の実 PostgreSQL を使う。
  *
@@ -30,9 +29,7 @@ import org.springframework.test.context.TestExecutionListeners;
 @Target(ElementType.TYPE)
 @Retention(RetentionPolicy.RUNTIME)
 @JooqTest
-@Import(ModuleRoleTransactionManager.Config.class)
+@Transactional(label = DatabaseTestTransactionManager.LABEL)
+@Import(DatabaseTestTransactionManager.Config.class)
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
-@TestExecutionListeners(
-    listeners = DatabaseTestTenantListener.class,
-    mergeMode = TestExecutionListeners.MergeMode.MERGE_WITH_DEFAULTS)
 public @interface DatabaseTest {}

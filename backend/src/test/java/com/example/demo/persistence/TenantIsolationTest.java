@@ -14,6 +14,8 @@ import com.example.demo.ordering.infrastructure.persistence.OrderSeeds;
 import com.example.demo.payment.infrastructure.persistence.PaymentSeeds;
 import com.example.demo.product.ProductSeeds;
 import com.example.demo.product.TestProducts;
+import com.example.demo.shared.infrastructure.persistence.ModuleRoleTransactionManager;
+import com.example.demo.shared.infrastructure.persistence.ModuleRoles;
 import com.example.demo.shared.infrastructure.persistence.TestCommonColumns;
 import com.example.demo.shared.tenant.TenantContext;
 import com.example.demo.shared.tenant.TenantId;
@@ -23,12 +25,14 @@ import com.example.demo.testkit.DatabaseTest;
 import java.math.BigDecimal;
 import java.sql.SQLException;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
 import java.util.Random;
 import java.util.UUID;
 import java.util.function.Function;
+import java.util.stream.IntStream;
 import net.datafaker.Faker;
 import org.jooq.DSLContext;
 import org.jooq.Field;
@@ -42,16 +46,19 @@ import org.springframework.core.NestedExceptionUtils;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionCallback;
 import org.springframework.transaction.support.TransactionTemplate;
 
 /**
- * 業務の表の RLS が、別のテナントの行の読み書きと、テナントを設定し忘れた読み書きを DB で止めることを確かめる（ADR-107）。
+ * 業務の表の RLS が、別のテナントの行の読み書きと、テナントを設定し忘れた読み書きを DB で止めることと、テナントを束縛し忘れた業務のトランザクションを トランザクションマネージャーが DB
+ * より先に止めることを確かめる（ADR-107）。
  *
  * <p>テストのトランザクションは {@link AsTenant#TENANT} のテナントで動く。別のテナントの商品、注文、明細、決済は、そのテナントを束縛した {@link
  * AsModule} で入れる。業務の表は、{@code tenant_public_id} を持つ生成した表から導く。
  */
 // 生成したテーブルと AssertJ を static import で読みやすくする。
-@SuppressWarnings("PMD.TooManyStaticImports")
+// 読み、書き、外部キー、テナントの設定忘れの経路ごとにテストと補助を分ける。
+@SuppressWarnings({"PMD.TooManyStaticImports", "PMD.TooManyMethods"})
 @DatabaseTest
 class TenantIsolationTest {
 
@@ -85,6 +92,9 @@ class TenantIsolationTest {
 
   /** 前のトランザクションの設定が空文字列で残った接続の SQLSTATE（invalid_text_representation）。 */
   private static final String EMPTY = "22P02";
+
+  /** プールの接続に汎用の計画を残すために、同じ問い合わせを流す回数。 */
+  private static final int GENERIC_PLAN_ROUNDS = 8;
 
   /** テスト用の DB の jOOQ のコンテキスト。テストごとにロールバックする。 */
   @Autowired private DSLContext dsl;
@@ -242,18 +252,61 @@ class TenantIsolationTest {
         FOREIGN_KEY_VIOLATION);
   }
 
-  @ParameterizedTest(name = "{0}")
-  @MethodSource("businessTables")
-  // テナントを設定しないトランザクションを、テストのトランザクションの外で本番のトランザクションマネージャーから始める。
+  @Test
+  // テナントを束縛しないトランザクションを、テストのトランザクションの外で本番のトランザクションマネージャーから始める。
   @Transactional(propagation = Propagation.NOT_SUPPORTED)
-  @DisplayName("テナントを設定し忘れたトランザクションは、業務の表を 0 件で読まずにエラーになる")
-  void readingWithoutTenantFails(final Table<?> table) {
+  @DisplayName("テナントを束縛し忘れた業務のトランザクションは、汎用の実行計画で 0 件を返しうる読み取りの前に失敗する")
+  void transactionWithoutTenantFailsBeforeGenericPlanReturnsNoRows() {
     final TransactionTemplate module = new TransactionTemplate(transactionManager);
     // ModuleRoles はトランザクションの名前のベースパッケージの直下からモジュールを引く。
-    module.setName("com.example.demo." + AsModule.moduleOf(table) + ".TenantProbe.read");
+    final String name = "com.example.demo.ordering.TenantProbe.read";
+    module.setName(name);
+    final TransactionCallback<Integer> countUnknownStatus =
+        status -> {
+          // 索引で RLS の式を引く計画は走査の初めにエラーになるため、順に走査する汎用の計画にする。
+          dsl.execute(
+              "select set_config('enable_indexscan', 'off', true),"
+                  + " set_config('enable_bitmapscan', 'off', true),"
+                  + " set_config('plan_cache_mode', 'force_generic_plan', true)");
+          return dsl.fetchCount(T_ORDER, T_ORDER.ORDER_STATUS_TYP.eq("NO_SUCH_STATUS"));
+        };
+    // テナントのある間に、プールの接続へ汎用の計画を残す。pgjdbc は 5 回目からサーバーの prepared statement にする。
+    TenantContext.call(
+        AsTenant.TENANT,
+        () ->
+            IntStream.range(0, GENERIC_PLAN_ROUNDS)
+                .map(round -> module.execute(countUnknownStatus))
+                .sum());
+    final List<Integer> counts = new ArrayList<>();
 
-    assertThat(TenantContext.findCurrent()).as("テストのスレッドのテナントの束縛").isEmpty();
-    assertSqlState(() -> module.execute(status -> dsl.fetchCount(table)), UNSET, EMPTY);
+    // 残った計画は、漏洩のない比較で全行を落とし、RLS の式を評価しないまま 0 件を返す。
+    final Throwable thrown = catchThrowable(() -> counts.add(module.execute(countUnknownStatus)));
+
+    assertThat(counts).as("テナントのないトランザクションで数えた件数").isEmpty();
+    assertThat(NestedExceptionUtils.getMostSpecificCause(thrown))
+        .as("例外: %s", thrown)
+        .isInstanceOf(IllegalStateException.class)
+        .hasMessageContaining(name);
+  }
+
+  @ParameterizedTest(name = "{0}")
+  @MethodSource("businessTables")
+  // テナントを設定しない接続を、テストのトランザクションの外で作る。
+  @Transactional(propagation = Propagation.NOT_SUPPORTED)
+  @DisplayName("テナントを設定しないモジュールのロールは、業務の表を 0 件で読まずにエラーになる")
+  void readingWithoutTenantFails(final Table<?> table) {
+    assertSqlState(
+        () -> withoutTenant(AsModule.moduleOf(table), tx -> tx.fetchCount(table)), UNSET, EMPTY);
+  }
+
+  /** テナントを設定せず、モジュールのロールだけで本体を実行する。トランザクションマネージャーより後ろの、DB の防御を確かめる。 */
+  private <T> T withoutTenant(final String module, final Function<DSLContext, T> body) {
+    return dsl.transactionResult(configuration -> {
+      final DSLContext tx = configuration.dsl();
+      tx.connection(connection ->
+          ModuleRoleTransactionManager.setLocal(connection, ModuleRoles.roleOf(module), null));
+      return body.apply(tx);
+    });
   }
 
   /** 別のテナントを束縛し、モジュールのロールで本体を実行する。 */
