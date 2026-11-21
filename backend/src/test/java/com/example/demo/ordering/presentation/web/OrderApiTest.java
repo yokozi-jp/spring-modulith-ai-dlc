@@ -10,7 +10,9 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.example.demo.ordering.OrderConfirmed;
 import com.example.demo.product.TestProducts;
+import com.example.demo.testkit.AppUsers;
 import com.example.demo.testkit.CleanGeneratedTablesExtension;
 import com.example.demo.testkit.ContractCase;
 import com.example.demo.testkit.SharedTestConfiguration;
@@ -33,6 +35,8 @@ import org.springframework.context.annotation.Import;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
+import org.springframework.test.context.event.ApplicationEvents;
+import org.springframework.test.context.event.RecordApplicationEvents;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.ResultActions;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
@@ -51,6 +55,7 @@ import org.springframework.web.bind.annotation.RequestMethod;
 })
 @SpringBootTest
 @AutoConfigureMockMvc
+@RecordApplicationEvents
 @Import(SharedTestConfiguration.class)
 @ExtendWith(CleanGeneratedTablesExtension.class)
 class OrderApiTest {
@@ -282,9 +287,9 @@ class OrderApiTest {
   }
 
   @Test
-  @DisplayName("下書きの注文を確定すると 204 を返し、状態を CONFIRMED にする")
+  @DisplayName("下書きの注文を確定すると 204 を返し、状態を CONFIRMED にして、選んだテナントの OrderConfirmed を発行する")
   @ContractCase(method = RequestMethod.POST, path = "/api/orders/{orderId}/confirm", status = 204)
-  void confirmMakesOrderConfirmed() throws Exception {
+  void confirmMakesOrderConfirmed(final ApplicationEvents events) throws Exception {
     final String orderId = draftAndGetId(UniqueCodes.next("C"), pen, 1);
 
     operate("POST", orderId, "/confirm", 1).andExpect(status().isNoContent());
@@ -292,6 +297,12 @@ class OrderApiTest {
     details(orderId)
         .andExpect(jsonPath("$.status").value("CONFIRMED"))
         .andExpect(jsonPath("$.lockNo").value(2));
+    assertThat(
+            events.stream(OrderConfirmed.class)
+                .filter(event -> event.orderId().equals(orderId))
+                .map(event -> event.tenantId().toString()))
+        .as("orderId=%s の OrderConfirmed のテナント", orderId)
+        .containsExactly(AppUsers.TENANT_ID);
   }
 
   @ParameterizedTest(name = "{0} {1}")

@@ -1,5 +1,6 @@
 package com.example.demo.tenancy.domain.model;
 
+import com.example.demo.shared.tenant.TenantId;
 import java.util.List;
 import java.util.Optional;
 

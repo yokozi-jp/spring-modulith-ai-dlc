@@ -54,6 +54,8 @@ IdPを移るときは、組と利用者の対応づけだけを書き換え、�
 - リクエストのたびに、`TenantSelectionFilter`が認証の利用者と権限のテナントの組で所属を引き直す。所属が消えていれば権限を外し、役割が変わっていれば新しい役割で権限を作り直す。作り直すときはセッションのIDを変えない。変えると、同時に送られたほかのリクエストが前のIDのCookieで401になるためである。
 - テナントを選ぶ前の業務のAPIは、typeが`/problems/tenant-not-selected`の403になる。所属の一覧とテナントを選ぶAPIだけは、選ぶ前にも呼べる。
 - テナントのIDは、テナントを選ぶAPIの本文からだけ受け取る。ほかのAPIは、テナントをリクエストの値から取らない。
+- テナントを選んだ後のリクエストは、`TenantSelectionFilter`が所属を引き直した後、リクエストの残りの処理の間だけ、選んだテナントを`shared.tenant`の`TenantContext`に束縛する。CommandHandlerが発行するイベントは、このテナントを運ぶ（[ADR-105](../adr/ADR-105-bind-tenant-to-request-and-event-context.md)）。
+  `OncePerRequestFilter`は非同期ディスパッチでは動かないため、`Callable`や`DeferredResult`を返すControllerでは、非同期の処理の中でテナントが束縛されない。そのようなControllerを足すときは、束縛の方法を先に決める。
 
 `/api/**`に、テナントを選ぶ前に呼ぶAPIを足すときは、`TenantSelectionFilter`の除外に加える。
 `tenancy`の`TenantSecurityCustomizer`が、このfilterとログインの成功の処理をSecurity filter chainに足すため、`SecurityConfig`には現れない。
@@ -141,6 +143,20 @@ IdPのレルムの役割とグループは使わない。
 本番のIdPはAmazon Cognitoで、カスタム属性とグループを使わない（[ADR-102](../adr/ADR-102-use-amazon-cognito-as-production-idp.md)）。
 
 権限がない場合のステータスコードは[HTTPステータスコードの選択](status-codes.md)に従う。
+
+## テナントの所属の管理
+
+選んだテナントの所属の一覧、役割の変更、所属の取り外しは、`/api/current-tenant/members`の配下にあり、テナントの管理者だけが呼べる。
+`tenancy`の`TenantSecurityCustomizer`が、このパスに`hasRole("ADMIN")`を課す。
+`ROLE_ADMIN`は`TenantSelectionFilter`が引き直した所属の役割から来るため、役割の変更と取り外しは、その利用者の次のリクエストから効く。
+管理者でない利用者には、`about:blank`の403を返す。
+
+対象のテナントは、パスにもリクエストの値にも持たず、セッションで選んだテナントから取る。
+そのため、別のテナントの所属は一覧に出ず、パスに別のテナントだけに所属する利用者のIDを指定しても404になる。
+
+各テナントに管理者を1人以上残す規則は、`tenancy`の`Tenant`集約が持つ。
+最後の管理者の役割を下げる操作と、最後の管理者を外す操作は、422になる。
+所属の変更はテナントの`lock_no`で競合を検出するため、一覧の応答の`lockNo`を、役割の変更の本文と所属を外すクエリパラメータで送り返す（[更新の競合制御](optimistic-locking.md)）。
 
 ## 出典
 

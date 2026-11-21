@@ -11,7 +11,7 @@ import org.springframework.stereotype.Component;
  *
  * <p>Spring Security は、{@code Customizer<HttpSecurity>} の Bean を {@code SecurityConfig} が受け取る前の
  * {@link HttpSecurity} に適用する。認可の {@link AuthorizationFilter} の前で所属を引き直し、テナントを選ぶ前の業務の API を拒否する。
- * OIDC のログインの後には、所属が 1 つだけならそのテナントを選ぶ。
+ * OIDC のログインの後には、所属が 1 つだけならそのテナントを選ぶ。選んだテナントの所属の API は、管理者だけに許す。
  *
  * <p>この Bean は、アプリが作るすべての {@link HttpSecurity} に適用される。ブラウザのセッションでない chain（Client Credentials
  * など）を足すときは、その chain をこの処理から外す。
@@ -34,7 +34,11 @@ class TenantSecurityCustomizer implements Customizer<HttpSecurity> {
 
   @Override
   public void customize(final HttpSecurity http) {
-    http.addFilterBefore(
+    // SecurityConfig の anyRequest より先に登録され、先に一致する。ROLE_ADMIN は TenantSelectionFilter
+    // が引き直した所属の役割から来る。
+    http.authorizeHttpRequests(auth ->
+            auth.requestMatchers(CurrentTenantMemberController.PATH + "/**").hasRole("ADMIN"))
+        .addFilterBefore(
             new TenantSelectionFilter(tenancyQueries, tenantSession), AuthorizationFilter.class)
         .oauth2Login(login ->
             login.successHandler(new TenantSelectionSuccessHandler(tenancyQueries, tenantSession)));

@@ -111,7 +111,7 @@ PITのHTMLとXMLのレポートは、変異対象がある場合に`backend/buil
 
 ## リポジトリ全体
 
-- **`task lint-duplicates`**：生成コードを除く手書きのバックエンドとフロントエンドをjscpdで検査する。
+- **`task lint-duplicates`**：生成コードを除く手書きのバックエンドとフロントエンドを、`import`文を除いてjscpdで検査する。
 - **`task scan-secrets`**：ステージ済み変更をbetterleaksでスキャンする。
 - **`task scan-secrets-all`**：現在のブランチから辿れる履歴をbetterleaksでスキャンする。環境変数`BETTERLEAKS_LOG_OPTS`でgit logの範囲を変えられる（既定は`HEAD`）。
   merge commitの差分も走査するため、タスクが`--diff-merges=first-parent`を常に付ける。betterleaksの既定ではmerge commitを走査せず、コンフリクトの解消だけで入ったtokenを見逃す。
@@ -212,7 +212,7 @@ PITのHTMLとXMLのレポートは、変異対象がある場合に`backend/buil
   `frontend/`の変更のうち、テストファイル（`*.test.*`、`*.spec.*`）、`frontend/apps/*/e2e/`、`frontend/lint/fixtures/`、`frontend/apps/*/src/testing/`は対象から外す。
   警告は止めず、`ADR_STRICT=1`で失敗にし、`ADR_ACK=1`で抑制する。
 
-Knipとjscpdの採用理由は[ADR-035](../adr/ADR-035-adopt-jscpd-and-knip-quality-gates.md)を、jscpdの閾値を4.0%にする理由は[ADR-074](../adr/ADR-074-raise-jscpd-threshold-for-class-role-boilerplate.md)を参照する。
+Knipとjscpdの採用理由は[ADR-035](../adr/ADR-035-adopt-jscpd-and-knip-quality-gates.md)を、jscpdがimport文を比べず、閾値を2.0%にする理由は[ADR-106](../adr/ADR-106-ignore-import-statements-in-jscpd.md)を参照する。
 DASTの検出ではタスクを失敗させず、起動、ログイン、CSRFの前提確認の失敗だけで失敗させる（[ADR-056](../adr/ADR-056-run-authenticated-dast-with-zap-in-ci.md)）。
 OKF検査の採用理由は[ADR-036](../adr/ADR-036-adopt-okf-for-docs-knowledge-bundle.md)と[ADR-038](../adr/ADR-038-route-steering-to-docs-knowledge.md)を参照する。
 

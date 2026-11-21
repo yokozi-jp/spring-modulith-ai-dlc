@@ -4,9 +4,10 @@ import { useSuspenseQuery } from "@tanstack/react-query";
 import { useId } from "react";
 import { useTranslation } from "react-i18next";
 
+import { ProblemNotice } from "@/components/problem-notice";
+
 import { CustomerOrderCodeField } from "./components/customer-order-code-field";
 import { OrderLinesFields } from "./components/order-lines-fields";
-import { ProblemNotice } from "./components/problem-notice";
 import { useDraftOrderForm } from "./hooks/use-draft-order-form";
 
 export function OrderNewPage() {

@@ -56,10 +56,18 @@ public final class AppUsers {
           WebApplicationContextUtils.getRequiredWebApplicationContext(request.getServletContext())
               .getBean(DSLContext.class);
       TestTenancy.member(dsl, USER_ID, UUID.fromString(tenantId), role);
-      return SecurityMockMvcRequestPostProcessors.oidcLogin()
-          .oidcUser(oidcUser(List.of(OIDC_USER, new TenantMembershipAuthority(tenantId, role))))
-          .postProcessRequest(request);
+      return selectedTenant(tenantId, role).postProcessRequest(request);
     };
+  }
+
+  /**
+   * {@link #USER_ID} の利用者が、役割の権限でテナントを選んだ後の MockMvc のリクエストにする。DB の所属は書かない。
+   *
+   * <p>リクエストの権限と、DB の所属の役割が食い違う状態を作るために使う。バックエンドは、リクエストのたびに所属を引き直し、食い違いを DB に合わせる。
+   */
+  public static RequestPostProcessor selectedTenant(final String tenantId, final String role) {
+    return SecurityMockMvcRequestPostProcessors.oidcLogin()
+        .oidcUser(oidcUser(List.of(OIDC_USER, new TenantMembershipAuthority(tenantId, role))));
   }
 
   /** IdP の {@code sub} とは別に、アプリの利用者の ID {@link #USER_ID} を持ち、テナントを選ぶ前の利用者を返す。 */

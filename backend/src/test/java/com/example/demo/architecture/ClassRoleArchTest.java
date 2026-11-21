@@ -79,6 +79,10 @@ class ClassRoleArchTest {
   private static final String ADR_051 =
       "docs/adr/ADR-051-bind-pgm-cd-with-scoped-value-and-aspect.md";
 
+  /** テナントをリクエストとイベントの文脈に束縛すると決めた ADR のパス。 */
+  private static final String ADR_105 =
+      "docs/adr/ADR-105-bind-tenant-to-request-and-event-context.md";
+
   /** Application のパッケージのパターン。 */
   private static final String APPLICATION_PACKAGE = "..application..";
 
@@ -275,6 +279,16 @@ class ClassRoleArchTest {
                   + "境界を Application に置く。"
                   + "直し方：イベントの受信は受信側モジュールの application に置く <Event>Listener の on メソッドへ移す。"
                   + conventions(LISTENER_DOC, ADR_050));
+
+  /** {@code @ApplicationModuleListener} の引数のイベントは {@code TenantScoped} を実装する。 */
+  @ArchTest
+  /* package */ static final ArchRule moduleListenerEventsAreTenantScoped =
+      moduleListenerEventsAreTenantScopedRule(BASE_PACKAGE);
+
+  /** {@code TenantContext.call} を呼ぶクラスを、{@code TenantSelectionFilter} とリスナーの Aspect に限る。 */
+  @ArchTest
+  /* package */ static final ArchRule tenantIsBoundOnlyByTenantSelectionFilterAndListenerAspect =
+      tenantIsBoundOnlyByTenantSelectionFilterAndListenerAspectRule(BASE_PACKAGE);
 
   /**
    * イベントは {@code @ApplicationModuleListener} だけで受け、{@code @EventListener} と
@@ -483,6 +497,61 @@ class ClassRoleArchTest {
     return publishes || multicasts;
   }
 
+  /** {@code @ApplicationModuleListener} の引数のイベントが {@code TenantScoped} を実装する規則を組み立てる。 */
+  /* package */ static ArchRule moduleListenerEventsAreTenantScopedRule(final String basePackage) {
+    return methods()
+        .that()
+        .areAnnotatedWith(ApplicationModuleListener.class)
+        .should(takeTenantScopedEvent(basePackage + ".shared.tenant.TenantScoped"))
+        .allowEmptyShould(true)
+        .because(
+            "TenantListenerAspect がイベントのテナントを、リスナーのトランザクションが始まる時点で束縛するため。"
+                + "イベントがテナントを持たないと、非同期の処理でテナントが失われる。"
+                + "直し方：イベントの record に shared.tenant.TenantScoped を実装させ、"
+                + "イベントを発行する CommandHandler が TenantContext.current() のテナントを詰める。"
+                + "規約："
+                + LISTENER_DOC
+                + "、"
+                + ADR_105);
+  }
+
+  /**
+   * {@code TenantContext.call} を呼べるクラスを、{@code TenantSelectionFilter} と {@code
+   * TenantListenerAspect} の 2 つに限る規則を組み立てる。
+   *
+   * <p>{@code call} は呼び出しの間のテナントを切り替える。認証の権限だけを元にする filter と、イベントのテナントだけを元にする Aspect
+   * 以外から呼ぶと、ほかのテナントの行へ触れる。メソッド参照も検出する。
+   */
+  /* package */ static ArchRule tenantIsBoundOnlyByTenantSelectionFilterAndListenerAspectRule(
+      final String basePackage) {
+    final String tenantContext = basePackage + ".shared.tenant.TenantContext";
+    final Set<String> allowedCallers =
+        Set.of(
+            basePackage + ".tenancy.presentation.web.TenantSelectionFilter",
+            basePackage + ".shared.infrastructure.persistence.TenantListenerAspect");
+    return noClasses()
+        .that(
+            DescribedPredicate.describe(
+                "are not the tenant selection filter or the listener aspect",
+                (JavaClass javaClass) -> !allowedCallers.contains(javaClass.getName())))
+        .should()
+        .accessTargetWhere(
+            DescribedPredicate.describe(
+                "TenantContext.call",
+                (JavaAccess<?> access) ->
+                    access.getTargetOwner().getName().equals(tenantContext)
+                        && "call".equals(access.getName())))
+        .because(
+            "束縛を切り替える入口が増えると、認証の権限やイベントに無関係なテナントへ切り替えられ、"
+                + "別のテナントの行を読み書きできるため。"
+                + "直し方：業務の処理は TenantContext.current() で読むだけにする。"
+                + "束縛は tenancy の TenantSelectionFilter がセッションで選んだテナントを、"
+                + "TenantListenerAspect がイベントのテナントを行う。"
+                + "新しい入口が要るときは、この規則の許可先と ADR-105 を先に変える。"
+                + "規約：docs/backend/architecture.md、"
+                + ADR_105);
+  }
+
   /** モジュールルートの型を record、enum、{@code *Queries} interface に限る規則を組み立てる。 */
   /* package */ static ArchRule moduleRootTypesAreRecordsEnumsOrQueriesRule(
       final String basePackage) {
@@ -618,6 +687,25 @@ class ClassRoleArchTest {
                       + "、呼び出す CommandHandler が "
                       + handlers
                       + " である。"));
+        }
+      }
+    };
+  }
+
+  private static ArchCondition<JavaMethod> takeTenantScopedEvent(final String tenantScopedType) {
+    return new ArchCondition<>("take only events that implement " + tenantScopedType) {
+      @Override
+      public void check(final JavaMethod item, final ConditionEvents events) {
+        for (final JavaClass parameter : item.getRawParameterTypes()) {
+          if (!parameter.isAssignableTo(tenantScopedType)) {
+            events.add(
+                SimpleConditionEvent.violated(
+                    item,
+                    item.getFullName()
+                        + " の引数 "
+                        + parameter.getName()
+                        + " は、TenantScoped を実装しない。"));
+          }
         }
       }
     };

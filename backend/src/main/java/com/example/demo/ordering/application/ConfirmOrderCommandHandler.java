@@ -5,6 +5,7 @@ import com.example.demo.ordering.domain.model.Order;
 import com.example.demo.ordering.domain.model.OrderId;
 import com.example.demo.ordering.domain.model.OrderRepository;
 import com.example.demo.shared.failure.NotFoundException;
+import com.example.demo.shared.tenant.TenantContext;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.UUID;
@@ -46,7 +47,9 @@ public class ConfirmOrderCommandHandler {
     order.ensureLockNo(command.expectedLockNo());
     order.confirm();
     orderRepository.update(order);
-    events.publishEvent(new OrderConfirmed(order.id().value().toString(), Instant.now(clock)));
+    events.publishEvent(
+        new OrderConfirmed(
+            order.id().value().toString(), Instant.now(clock), TenantContext.current()));
     return new ConfirmOrderResult(order.id().value().toString());
   }
 }

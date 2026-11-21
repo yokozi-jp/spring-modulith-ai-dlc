@@ -56,6 +56,7 @@ Domain の型を Application の外へ出さず、HTTP API の形と Domain を�
 - ハンドラメソッドは、マッピングのアノテーションの次の行に `/* package */` を書いた package-private のメソッドにする。
 - 状態を変える操作は `@Valid @RequestBody` で Request を受け、`request.toCommand(...)` で Command にする。
   パス変数の値は `toCommand` の引数で渡す（`request.toCommand(orderId)`）。
+  DELETE は本文を持たないため、`@RequestParam @Min(1) long lockNo` で受けた値を Request に渡す（[Request](request.md#delete-の入力)）。
 - 作成は `ServletUriComponentsBuilder.fromCurrentRequest()` で `Location` の URI を作り、`ResponseEntity.created(location).build()` を返す。
 - 本文のない更新は `ResponseEntity.noContent().build()` を返す。
 - 参照は `<Feature>Queries` を呼び、`XxxResponse.from(...)` で応答にする。
@@ -252,7 +253,7 @@ class OrderControllerTest {
 - [ ] [OpenAPIのアノテーションとJavadoc](../../web-api/openapi-annotations.md) のチェックリストを満たす。［自分で点検］
 - [ ] 集約ごとに一つ作り、`@RequestMapping("/api/<resources>")` を付けた package-private の class にする。［自分で点検］
 - [ ] 状態を変える操作は `@Valid` の Request を `toCommand(...)` で Command にし、パス変数の値は引数で渡す。［自分で点検］
-- [ ] 既存の集約を変える操作は、ロック番号を本文の Request で受ける。［自分で点検］
+- [ ] 既存の集約を変える操作は、ロック番号を本文の Request で受ける。DELETE はクエリパラメータで受け、Request に渡す。［自分で点検］
 - [ ] 作成は 201 と `Location`、本文のない更新は 204、見つからない参照は 404 を返す。［自分で点検］
 - [ ] 参照は `<Feature>Queries` を呼んで `from(...)` で Response にし、一覧は `items` で包む。［自分で点検］
 - [ ] 例外を catch せず、try と catch を書かずに `ApiExceptionHandler` に任せる。［自分で点検］

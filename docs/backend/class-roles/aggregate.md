@@ -67,13 +67,13 @@ tags: [convention, backend, class-role]
 - クラス、フィールド、public メソッドに Javadoc を書く。
 - `domain.model` のパッケージに `@NullMarked` を宣言する `package-info.java` を置く。
 
-業務上の失敗は[業務上の失敗の例外](business-exception.md)の型で投げ、`ApiExceptionHandler` が `BusinessRuleViolationException` を 422 に、`ConflictException` を 409 にする（[ADR-062](../../adr/ADR-062-map-business-exceptions-to-404-409-422.md)）。
+業務上の失敗は[業務上の失敗の例外](business-exception.md)の型で投げ、`ApiExceptionHandler` が `NotFoundException` を 404 に、`BusinessRuleViolationException` を 422 に、`ConflictException` を 409 にする（[ADR-062](../../adr/ADR-062-map-business-exceptions-to-404-409-422.md)）。
 不正な引数の `IllegalArgumentException` はプログラムの誤りとして 500 になる。
 ステータスコードの使い分けは[HTTPステータスコードの選択](../../web-api/status-codes.md)に、API のエラー契約は [ADR-013](../../adr/ADR-013-standardize-http-api-contracts.md) に従う。
 
 ## 依存してよい型、してはいけない型
 
-- **依存してよい型**：`java..` の標準型、`org.jspecify..`、同じ `domain.model` の Entity、値オブジェクト、enum、`shared.concurrency` の `ConflictException` と `ExpectedLockNo`、`shared.failure` の `BusinessRuleViolationException`。
+- **依存してよい型**：`java..` の標準型、`org.jspecify..`、同じ `domain.model` の Entity、値オブジェクト、enum、`shared.concurrency` の `ConflictException` と `ExpectedLockNo`、`shared.failure` の `BusinessRuleViolationException` と `NotFoundException`。
 - **依存してはいけない型**：Spring、jOOQ、jOOQ の生成型、JPA、Jackson の型、`domain.service`、`application`、モジュールルートの型、他モジュールの型、Repository と外部システムのインタフェース、`Clock`。
 
 ## 最小の例と典型的な例

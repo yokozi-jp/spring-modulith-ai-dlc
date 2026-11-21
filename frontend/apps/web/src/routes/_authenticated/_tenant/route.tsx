@@ -1,7 +1,7 @@
 import { isTenantNotSelected } from "@frontend/api/api-fetch";
 import { getFindCurrentTenantSuspenseQueryOptions } from "@frontend/api/endpoints/tenancy/tenancy";
 import { useSuspenseQuery } from "@tanstack/react-query";
-import { createFileRoute, Outlet, redirect } from "@tanstack/react-router";
+import { createFileRoute, Link, Outlet, redirect } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
 
 import { preloadQuery } from "@/api/preload-query";
@@ -12,9 +12,14 @@ function TenantLayout() {
 
   return (
     <>
-      <p className="border-b px-6 py-2 text-sm text-muted-foreground sm:px-10">
-        {t("tenancy.currentTenant", { tenantName: data.data.tenantName })}
-      </p>
+      <div className="flex items-center justify-between gap-4 border-b px-6 py-2 text-sm sm:px-10">
+        <p className="text-muted-foreground">
+          {t("tenancy.currentTenant", { tenantName: data.data.tenantName })}
+        </p>
+        <Link to="/members" className="underline-offset-4 hover:underline">
+          {t("tenancy.manageMembers")}
+        </Link>
+      </div>
       <Outlet />
     </>
   );

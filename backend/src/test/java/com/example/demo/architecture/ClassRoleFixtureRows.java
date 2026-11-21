@@ -48,6 +48,11 @@ final class ClassRoleFixtureRows {
                 VIOLATING),
             "ordering.OrderPlacedWithModel"),
         row(
+            "moduleApiDoesNotExposeInternalTypes: shared.tenant の TenantContext",
+            PackageByFeatureOnionArchitectureTest.moduleApiDoesNotExposeInternalTypesRule(
+                VIOLATING),
+            "ordering.OrderPlacedReadingTenantContext"),
+        row(
             "domainModelDoesNotDependOnFrameworks",
             PackageByFeatureOnionArchitectureTest.domainModelDoesNotDependOnFrameworks,
             "ordering.domain.model.OrderFactory"),
@@ -185,6 +190,20 @@ final class ClassRoleFixtureRows {
             "listenersAreNotCalled",
             ClassRoleArchTest.listenersAreNotCalled,
             "ordering.presentation.web.OrderPaidController"),
+        row(
+            "moduleListenerEventsAreTenantScoped",
+            ClassRoleArchTest.moduleListenerEventsAreTenantScopedRule(VIOLATING),
+            "inventory.application.OrderPlacedWithoutTenantListener.on("),
+        row(
+            "tenantIsBoundOnlyByTenantSelectionFilterAndListenerAspect",
+            ClassRoleArchTest.tenantIsBoundOnlyByTenantSelectionFilterAndListenerAspectRule(
+                VIOLATING),
+            "ordering.application.TenantSwitchingCommandHandler"),
+        row(
+            "tenantIsBoundOnlyByTenantSelectionFilterAndListenerAspect: 別のモジュールの filter のメソッド参照",
+            ClassRoleArchTest.tenantIsBoundOnlyByTenantSelectionFilterAndListenerAspectRule(
+                VIOLATING),
+            "ordering.presentation.web.HeaderTenantFilter"),
         row(
             "eventListenersAreApplicationModuleListeners: @EventListener",
             ClassRoleArchTest.eventListenersAreApplicationModuleListeners,

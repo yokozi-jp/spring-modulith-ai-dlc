@@ -3,6 +3,8 @@
  * Aspect（ADR-051）と、業務テーブルの INSERT と UPDATE を組み立てて実行する唯一の入口である {@link
  * com.example.demo.shared.infrastructure.persistence.TableWriter}（ADR-054）を含む。
  *
+ * <p>リスナーの呼び出しの間だけ、イベントのテナントを束縛する Aspect（{@code TenantListenerAspect}、ADR-105）も置く。
+ *
  * <p>Spring Modulith のイベント出版のレジストリの、失敗した出版の定期の再投入と手での 1
  * 回の再投入（ADR-079）も置く。レジストリは全モジュールが共有する基盤で、業務の概念を持たない。
  *

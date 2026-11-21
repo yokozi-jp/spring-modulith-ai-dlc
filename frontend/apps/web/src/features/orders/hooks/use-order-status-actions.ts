@@ -1,8 +1,8 @@
 import { useCancelOrder, useConfirmOrder } from "@frontend/api/endpoints/ordering/ordering";
 import { useTranslation } from "react-i18next";
 
-import { failureNotice } from "@/features/orders/notice";
-import type { Notice } from "@/features/orders/notice";
+import { failureNotice } from "@/lib/notice";
+import type { Notice } from "@/lib/notice";
 
 /**
  * 確定と取消。押した時点の表示中の lockNo を本文で送る（表示している版と送る版が同じなので、黙って差し込まない）。

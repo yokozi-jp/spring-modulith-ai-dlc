@@ -2,7 +2,7 @@ openapi: 3.1.0
 info:
   description: Demo アプリケーションの HTTP API
   title: Demo API
-  version: 0.6.0
+  version: 0.7.0
 servers:
 - description: 現在のオリジン
   url: /
@@ -63,6 +63,104 @@ paths:
         "500":
           $ref: "#/components/responses/InternalServerErrorProblem"
       summary: 所属するテナントを選び、そのテナントで業務の API を使えるようにする。
+      tags:
+      - tenancy
+  /api/current-tenant/members:
+    get:
+      description: 一覧は所属した順に items で包んで返す。lockNo は変更の操作で送り返す。管理者以外には 403 を返す。
+      operationId: listTenantMembers
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TenantMembersDetailsResponse"
+          description: 所属の一覧
+        "401":
+          $ref: "#/components/responses/UnauthorizedProblem"
+        "403":
+          $ref: "#/components/responses/ForbiddenProblem"
+        "500":
+          $ref: "#/components/responses/InternalServerErrorProblem"
+      summary: 選んだテナントに所属している利用者の一覧を返す。
+      tags:
+      - tenancy
+  /api/current-tenant/members/{userId}:
+    delete:
+      description: 外した利用者は、次のリクエストから業務の API を呼べない。管理者以外には 403、最後の管理者を外すと 422 を返す。
+      operationId: removeTenantMember
+      parameters:
+      - description: 所属を外す利用者の ID
+        in: path
+        name: userId
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - description: 画面が読んだテナントのロック番号
+        in: query
+        name: lockNo
+        required: true
+        schema:
+          type: integer
+          format: int64
+          minimum: 1
+      responses:
+        "204":
+          description: 本文のない 204 の応答
+        "400":
+          $ref: "#/components/responses/BadRequestProblem"
+        "401":
+          $ref: "#/components/responses/UnauthorizedProblem"
+        "403":
+          $ref: "#/components/responses/ForbiddenProblem"
+        "404":
+          $ref: "#/components/responses/NotFoundProblem"
+        "409":
+          $ref: "#/components/responses/ConflictProblem"
+        "422":
+          $ref: "#/components/responses/UnprocessableContentProblem"
+        "500":
+          $ref: "#/components/responses/InternalServerErrorProblem"
+      summary: 所属している利用者を外す。
+      tags:
+      - tenancy
+    put:
+      description: 変更は、その利用者の次のリクエストから効く。管理者以外には 403、最後の管理者を下げると 422 を返す。
+      operationId: changeTenantMemberRole
+      parameters:
+      - description: 役割を変える利用者の ID
+        in: path
+        name: userId
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ChangeMemberRoleRequest"
+        description: 新しい役割と、画面が読んだテナントのロック番号
+        required: true
+      responses:
+        "204":
+          description: 本文のない 204 の応答
+        "400":
+          $ref: "#/components/responses/BadRequestProblem"
+        "401":
+          $ref: "#/components/responses/UnauthorizedProblem"
+        "403":
+          $ref: "#/components/responses/ForbiddenProblem"
+        "404":
+          $ref: "#/components/responses/NotFoundProblem"
+        "409":
+          $ref: "#/components/responses/ConflictProblem"
+        "422":
+          $ref: "#/components/responses/UnprocessableContentProblem"
+        "500":
+          $ref: "#/components/responses/InternalServerErrorProblem"
+      summary: 所属している利用者の役割を変える。
       tags:
       - tenancy
   /api/memberships:
@@ -419,6 +517,24 @@ components:
           minimum: 1
       required:
       - lockNo
+    ChangeMemberRoleRequest:
+      type: object
+      description: テナントに所属している利用者の役割を変える API の本文。
+      properties:
+        lockNo:
+          type: integer
+          format: int64
+          description: 画面が読んだテナントのロック番号
+          example: 1
+          minimum: 1
+        role:
+          type: string
+          description: 新しい役割のコード値（ADMIN、MEMBER）
+          example: MEMBER
+          pattern: ^(ADMIN|MEMBER)$
+      required:
+      - lockNo
+      - role
     ChangeOrderLinesRequest:
       type: object
       description: 下書きの注文の明細を置き換える API の本文。
@@ -771,6 +887,39 @@ components:
           example: 6f1c2b3a-4d5e-4f60-8a7b-9c0d1e2f3a4b
       required:
       - tenantId
+    TenantMemberResponse:
+      type: object
+      description: テナントに所属している利用者。
+      properties:
+        role:
+          type: string
+          description: テナントの中の役割のコード値（ADMIN、MEMBER）
+          example: MEMBER
+        userId:
+          type: string
+          format: uuid
+          description: 利用者の ID
+          example: 0b6f2c1e-4d3a-4e5f-8a7b-9c0d1e2f3a4b
+      required:
+      - role
+      - userId
+    TenantMembersDetailsResponse:
+      type: object
+      description: テナントの所属の一覧を items で包んで返す API の本文。
+      properties:
+        items:
+          type: array
+          description: 所属している利用者。所属した順に並ぶ
+          items:
+            $ref: "#/components/schemas/TenantMemberResponse"
+        lockNo:
+          type: integer
+          format: int64
+          description: 所属を変える操作の本文で送り返す、テナントのロック番号
+          example: 1
+      required:
+      - items
+      - lockNo
     ValidationError:
       type: object
       description: 入力検証の誤り
