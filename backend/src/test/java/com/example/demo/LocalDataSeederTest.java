@@ -16,6 +16,8 @@ import com.example.demo.LocalDataSeeder.Mode;
 import com.example.demo.LocalDataSeeder.Outcome;
 import com.example.demo.jooq.DefaultCatalog;
 import com.example.demo.product.TestProducts;
+import com.example.demo.shared.tenant.TenantContext;
+import com.example.demo.shared.tenant.TenantId;
 import com.example.demo.tenancy.TenancySeeds;
 import com.example.demo.testkit.AsModule;
 import com.example.demo.testkit.DatabaseTest;
@@ -29,6 +31,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.function.Function;
+import java.util.function.Supplier;
 import java.util.stream.Stream;
 import org.jooq.DSLContext;
 import org.jooq.Field;
@@ -45,7 +48,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 @DatabaseTest
 // 生成したテーブルと AssertJ を static import で読みやすくする。
 // 読み取りの補助メソッドが増えるため、メソッド数の上限も外す。
-@SuppressWarnings({"PMD.TooManyStaticImports", "PMD.TooManyMethods"})
+// 4 つのモジュールの表を 2 つのテナントで読むため、型への依存の上限も外す。
+@SuppressWarnings({"PMD.TooManyStaticImports", "PMD.TooManyMethods", "PMD.CouplingBetweenObjects"})
 class LocalDataSeederTest {
 
   /** test-user と test-admin を所属させる発行者。 */
@@ -68,17 +72,177 @@ class LocalDataSeederTest {
   /** 決済のモジュール。決済のロールは、依存の方向に沿って注文のスキーマも読める。 */
   private static final String PAYMENT = "payment";
 
+  /** 代表データを入れる 2 つのテナント。 */
+  private static final List<TenantId> TENANTS =
+      TenancySeeds.TENANTS.stream().map(TenantId::new).toList();
+
+  /** test-user と test-admin が属するテナント。 */
+  private static final TenantId TRADING = new TenantId(TenancySeeds.TRADING_TENANT);
+
   /** テスト用の DB の jOOQ のコンテキスト。テストごとにロールバックする。 */
   @Autowired private DSLContext dsl;
 
   @Test
-  @DisplayName("空の DB に商品 5 件、注文 6 件、決済 2 件を入れ、2 回目は何も入れない")
+  @DisplayName("空の DB の 2 つのテナントのそれぞれに商品 5 件、注文 6 件、決済 2 件を入れ、2 回目は何も入れない")
   void seedsRepresentativeDataOnlyWhenEmpty() {
-    LocalDataSeeder.BUSINESS_TABLES.forEach(
-        table -> inModule(AsModule.moduleOf(table), tx -> tx.deleteFrom(table).execute()));
+    for (final TenantId tenant : TENANTS) {
+      inTenant(
+          tenant,
+          () ->
+              LocalDataSeeder.BUSINESS_TABLES.forEach(table ->
+                  inModule(AsModule.moduleOf(table), tx -> tx.deleteFrom(table).execute())));
+    }
     final int publications = dsl.fetchCount(EVENT_PUBLICATION);
 
     assertThat(SEEDER.seed(dsl, Mode.SEED)).isEqualTo(Outcome.SEEDED);
+
+    for (final TenantId tenant : TENANTS) {
+      inTenant(tenant, this::assertRepresentativeData);
+    }
+    assertThat(dsl.fetchCount(EVENT_PUBLICATION)).isEqualTo(publications);
+
+    final List<List<List<Map<String, Object>>>> before = snapshot();
+    assertThat(SEEDER.seed(dsl, Mode.SEED)).isEqualTo(Outcome.SKIPPED_NOT_EMPTY);
+    assertThat(snapshot()).isEqualTo(before);
+  }
+
+  @Test
+  @DisplayName("BUSINESS_TABLES の表ごとに、2 つのテナントのそれぞれで 1 行以上を入れる")
+  void seedsEveryBusinessTableInEachTenant() {
+    SEEDER.seed(dsl, Mode.RESET);
+
+    for (final TenantId tenant : TENANTS) {
+      for (final Table<?> table : LocalDataSeeder.BUSINESS_TABLES) {
+        assertThat(
+                this.<Integer>inTenant(
+                    tenant, () -> inModule(AsModule.moduleOf(table), tx -> tx.fetchCount(table))))
+            .as("テナント %s の %s の行数", tenant, table)
+            .isPositive();
+      }
+    }
+  }
+
+  @Test
+  @DisplayName("業務データがあっても、2 つのテナントと test-user と test-admin の所属を入れ、何度入れても増やさない")
+  void seedsTenantsAndMembershipsIdempotently() {
+    inTenant(TRADING, () -> TestProducts.onSale(dsl, "NOT-SEED-2", "100"));
+
+    assertThat(SEEDER.seed(dsl, Mode.SEED)).isEqualTo(Outcome.SKIPPED_NOT_EMPTY);
+    final Map<String, List<String>> first = memberships();
+    SEEDER.seed(dsl, Mode.SEED);
+
+    assertThat(first)
+        .isEqualTo(
+            Map.of(
+                TenancySeeds.TEST_USER_SUBJECT,
+                List.of("サンプル商事:MEMBER", "サンプル物産:MEMBER"),
+                TenancySeeds.TEST_ADMIN_SUBJECT,
+                List.of("サンプル商事:ADMIN")));
+    assertThat(memberships()).as("2 回目の seed の後の所属").isEqualTo(first);
+  }
+
+  @Test
+  @DisplayName("reset は業務データだけを消して同じ代表データを入れ直し、出版の行を残す")
+  void resetReplacesOnlyBusinessDataWithSameValues() {
+    final UUID publication = UUID.fromString("11111111-1111-4111-8111-111111111111");
+    final Instant publishedAt = Instant.parse("2026-09-30T00:00:00Z");
+    dsl.insertInto(EVENT_PUBLICATION)
+        .set(EVENT_PUBLICATION.ID, publication)
+        .set(EVENT_PUBLICATION.LISTENER_ID, "seeder-test")
+        .set(EVENT_PUBLICATION.EVENT_TYPE, "test.event")
+        .set(EVENT_PUBLICATION.SERIALIZED_EVENT, "{}")
+        .set(EVENT_PUBLICATION.PUBLICATION_DATE, publishedAt)
+        .execute();
+    dsl.insertInto(EVENT_PUBLICATION_ARCHIVE)
+        .set(EVENT_PUBLICATION_ARCHIVE.ID, publication)
+        .set(EVENT_PUBLICATION_ARCHIVE.LISTENER_ID, "seeder-test")
+        .set(EVENT_PUBLICATION_ARCHIVE.EVENT_TYPE, "test.event")
+        .set(EVENT_PUBLICATION_ARCHIVE.SERIALIZED_EVENT, "{}")
+        .set(EVENT_PUBLICATION_ARCHIVE.PUBLICATION_DATE, publishedAt)
+        .execute();
+    inTenant(TRADING, () -> TestProducts.onSale(dsl, "NOT-SEED-1", "100"));
+
+    assertThat(SEEDER.seed(dsl, Mode.RESET)).isEqualTo(Outcome.SEEDED);
+    final List<List<List<Map<String, Object>>>> first = snapshot();
+    assertThat(SEEDER.seed(dsl, Mode.RESET)).isEqualTo(Outcome.SEEDED);
+
+    assertThat(snapshot()).isEqualTo(first);
+    assertThat(
+            this.<Boolean>inTenant(
+                TRADING,
+                () ->
+                    inModule(
+                        PRODUCT,
+                        tx -> tx.fetchExists(M_PRODUCT, M_PRODUCT.PRODUCT_CODE.eq("NOT-SEED-1")))))
+        .isFalse();
+    assertThat(dsl.fetchExists(EVENT_PUBLICATION, EVENT_PUBLICATION.ID.eq(publication))).isTrue();
+    assertThat(
+            dsl.fetchExists(
+                EVENT_PUBLICATION_ARCHIVE, EVENT_PUBLICATION_ARCHIVE.ID.eq(publication)))
+        .isTrue();
+  }
+
+  @Test
+  @DisplayName("目印が local か test で DB_HOST が loopback のときだけ、ローカルの環境とみなす")
+  // loopback の判定を確かめるテストのデータであり、接続先の設定ではない。
+  @SuppressWarnings("PMD.AvoidUsingHardCodedIP")
+  void acceptsOnlyLocalEnvironment() {
+    assertThat(LocalDataSeeder.isLocalEnvironment(env("local", "localhost"))).isTrue();
+    assertThat(LocalDataSeeder.isLocalEnvironment(env("test", "127.0.0.1"))).isTrue();
+    for (final Map<String, String> rejected :
+        List.of(
+            env("stg", "localhost"),
+            env("local", "db.example.com"),
+            Map.of("DB_HOST", "localhost"))) {
+      assertThat(LocalDataSeeder.isLocalEnvironment(rejected)).isFalse();
+      assertThatThrownBy(() -> LocalDataSeeder.requireLocalEnvironment(rejected))
+          .isInstanceOf(IllegalStateException.class);
+    }
+  }
+
+  @Test
+  @DisplayName("消す対象の表は、modulith と tenancy 以外の全スキーマの表と一致する")
+  void businessTablesCoverAllBusinessTables() {
+    final Set<Table<?>> generated = new HashSet<>();
+    // tenancy の利用者は、ログインで作る行で代表データではない。消すと、ログイン中のセッションの利用者 ID が指す行がなくなる。
+    DefaultCatalog.DEFAULT_CATALOG.getSchemas().stream()
+        .filter(schema -> !Set.of("modulith", "tenancy").contains(schema.getName()))
+        .forEach(schema -> generated.addAll(schema.getTables()));
+
+    assertThat(Set.copyOf(LocalDataSeeder.BUSINESS_TABLES)).isEqualTo(generated);
+  }
+
+  @Test
+  @DisplayName("入れた public_id は UUID v4 の形である")
+  void publicIdsAreVersion4() {
+    SEEDER.seed(dsl, Mode.RESET);
+
+    final List<UUID> ids =
+        TENANTS.stream().flatMap(tenant -> inTenant(tenant, this::publicIds).stream()).toList();
+
+    assertThat(ids).hasSize(26).doesNotHaveDuplicates();
+    assertThat(ids)
+        .allSatisfy(id -> assertThat(List.of(id.version(), id.variant())).isEqualTo(List.of(4, 2)));
+  }
+
+  /** 束縛したテナントの商品、注文、決済の public_id。 */
+  private List<UUID> publicIds() {
+    return Stream.of(
+            inModule(
+                PRODUCT,
+                tx -> tx.select(M_PRODUCT.PUBLIC_ID).from(M_PRODUCT).fetch(M_PRODUCT.PUBLIC_ID)),
+            inModule(
+                ORDERING,
+                tx -> tx.select(T_ORDER.PUBLIC_ID).from(T_ORDER).fetch(T_ORDER.PUBLIC_ID)),
+            inModule(
+                PAYMENT,
+                tx -> tx.select(T_PAYMENT.PUBLIC_ID).from(T_PAYMENT).fetch(T_PAYMENT.PUBLIC_ID)))
+        .flatMap(List::stream)
+        .toList();
+  }
+
+  /** 束縛したテナントに、代表データの商品、注文、決済があることを確かめる。 */
+  private void assertRepresentativeData() {
 
     assertThat(this.<Integer>inModule(PRODUCT, tx -> tx.fetchCount(M_PRODUCT))).isEqualTo(5);
     assertThat(
@@ -150,123 +314,21 @@ class LocalDataSeederTest {
         .containsOnly("ordering.SeedLocalData");
     assertThat(createdPgmCds(T_PAYMENT, T_PAYMENT.CREATED_PGM_CD, T_PAYMENT.CREATED_BY))
         .containsOnly("payment.SeedLocalData");
-    assertThat(dsl.fetchCount(EVENT_PUBLICATION)).isEqualTo(publications);
-
-    final List<List<Map<String, Object>>> before = snapshot();
-    assertThat(SEEDER.seed(dsl, Mode.SEED)).isEqualTo(Outcome.SKIPPED_NOT_EMPTY);
-    assertThat(snapshot()).isEqualTo(before);
   }
 
-  @Test
-  @DisplayName("業務データがあっても、2 つのテナントと test-user と test-admin の所属を入れ、何度入れても増やさない")
-  void seedsTenantsAndMembershipsIdempotently() {
-    TestProducts.onSale(dsl, "NOT-SEED-2", "100");
-
-    assertThat(SEEDER.seed(dsl, Mode.SEED)).isEqualTo(Outcome.SKIPPED_NOT_EMPTY);
-    final Map<String, List<String>> first = memberships();
-    SEEDER.seed(dsl, Mode.SEED);
-
-    assertThat(first)
-        .isEqualTo(
-            Map.of(
-                TenancySeeds.TEST_USER_SUBJECT,
-                List.of("サンプル商事:MEMBER", "サンプル物産:MEMBER"),
-                TenancySeeds.TEST_ADMIN_SUBJECT,
-                List.of("サンプル商事:ADMIN")));
-    assertThat(memberships()).as("2 回目の seed の後の所属").isEqualTo(first);
+  /** テナントを束縛して本体を実行し、結果を返す。業務の表は束縛したテナントの行だけを読み書きできる（ADR-107）。 */
+  private <T> T inTenant(final TenantId tenant, final Supplier<T> body) {
+    return TenantContext.call(tenant, body::get);
   }
 
-  @Test
-  @DisplayName("reset は業務データだけを消して同じ代表データを入れ直し、出版の行を残す")
-  void resetReplacesOnlyBusinessDataWithSameValues() {
-    final UUID publication = UUID.fromString("11111111-1111-4111-8111-111111111111");
-    final Instant publishedAt = Instant.parse("2026-09-30T00:00:00Z");
-    dsl.insertInto(EVENT_PUBLICATION)
-        .set(EVENT_PUBLICATION.ID, publication)
-        .set(EVENT_PUBLICATION.LISTENER_ID, "seeder-test")
-        .set(EVENT_PUBLICATION.EVENT_TYPE, "test.event")
-        .set(EVENT_PUBLICATION.SERIALIZED_EVENT, "{}")
-        .set(EVENT_PUBLICATION.PUBLICATION_DATE, publishedAt)
-        .execute();
-    dsl.insertInto(EVENT_PUBLICATION_ARCHIVE)
-        .set(EVENT_PUBLICATION_ARCHIVE.ID, publication)
-        .set(EVENT_PUBLICATION_ARCHIVE.LISTENER_ID, "seeder-test")
-        .set(EVENT_PUBLICATION_ARCHIVE.EVENT_TYPE, "test.event")
-        .set(EVENT_PUBLICATION_ARCHIVE.SERIALIZED_EVENT, "{}")
-        .set(EVENT_PUBLICATION_ARCHIVE.PUBLICATION_DATE, publishedAt)
-        .execute();
-    TestProducts.onSale(dsl, "NOT-SEED-1", "100");
-
-    assertThat(SEEDER.seed(dsl, Mode.RESET)).isEqualTo(Outcome.SEEDED);
-    final List<List<Map<String, Object>>> first = snapshot();
-    assertThat(SEEDER.seed(dsl, Mode.RESET)).isEqualTo(Outcome.SEEDED);
-
-    assertThat(snapshot()).isEqualTo(first);
-    assertThat(
-            this.<Boolean>inModule(
-                PRODUCT, tx -> tx.fetchExists(M_PRODUCT, M_PRODUCT.PRODUCT_CODE.eq("NOT-SEED-1"))))
-        .isFalse();
-    assertThat(dsl.fetchExists(EVENT_PUBLICATION, EVENT_PUBLICATION.ID.eq(publication))).isTrue();
-    assertThat(
-            dsl.fetchExists(
-                EVENT_PUBLICATION_ARCHIVE, EVENT_PUBLICATION_ARCHIVE.ID.eq(publication)))
-        .isTrue();
-  }
-
-  @Test
-  @DisplayName("目印が local か test で DB_HOST が loopback のときだけ、ローカルの環境とみなす")
-  // loopback の判定を確かめるテストのデータであり、接続先の設定ではない。
-  @SuppressWarnings("PMD.AvoidUsingHardCodedIP")
-  void acceptsOnlyLocalEnvironment() {
-    assertThat(LocalDataSeeder.isLocalEnvironment(env("local", "localhost"))).isTrue();
-    assertThat(LocalDataSeeder.isLocalEnvironment(env("test", "127.0.0.1"))).isTrue();
-    for (final Map<String, String> rejected :
-        List.of(
-            env("stg", "localhost"),
-            env("local", "db.example.com"),
-            Map.of("DB_HOST", "localhost"))) {
-      assertThat(LocalDataSeeder.isLocalEnvironment(rejected)).isFalse();
-      assertThatThrownBy(() -> LocalDataSeeder.requireLocalEnvironment(rejected))
-          .isInstanceOf(IllegalStateException.class);
-    }
-  }
-
-  @Test
-  @DisplayName("消す対象の表は、modulith と tenancy 以外の全スキーマの表と一致する")
-  void businessTablesCoverAllBusinessTables() {
-    final Set<Table<?>> generated = new HashSet<>();
-    // tenancy の利用者は、ログインで作る行で代表データではない。消すと、ログイン中のセッションの利用者 ID が指す行がなくなる。
-    DefaultCatalog.DEFAULT_CATALOG.getSchemas().stream()
-        .filter(schema -> !Set.of("modulith", "tenancy").contains(schema.getName()))
-        .forEach(schema -> generated.addAll(schema.getTables()));
-
-    assertThat(Set.copyOf(LocalDataSeeder.BUSINESS_TABLES)).isEqualTo(generated);
-  }
-
-  @Test
-  @DisplayName("入れた public_id は UUID v4 の形である")
-  void publicIdsAreVersion4() {
-    SEEDER.seed(dsl, Mode.RESET);
-
-    final List<UUID> ids =
-        Stream.of(
-                inModule(
-                    PRODUCT,
-                    tx ->
-                        tx.select(M_PRODUCT.PUBLIC_ID).from(M_PRODUCT).fetch(M_PRODUCT.PUBLIC_ID)),
-                inModule(
-                    ORDERING,
-                    tx -> tx.select(T_ORDER.PUBLIC_ID).from(T_ORDER).fetch(T_ORDER.PUBLIC_ID)),
-                inModule(
-                    PAYMENT,
-                    tx ->
-                        tx.select(T_PAYMENT.PUBLIC_ID).from(T_PAYMENT).fetch(T_PAYMENT.PUBLIC_ID)))
-            .flatMap(List::stream)
-            .toList();
-
-    assertThat(ids).hasSize(13);
-    assertThat(ids)
-        .allSatisfy(id -> assertThat(List.of(id.version(), id.variant())).isEqualTo(List.of(4, 2)));
+  /** テナントを束縛して本体を実行する。 */
+  private void inTenant(final TenantId tenant, final Runnable body) {
+    TenantContext.call(
+        tenant,
+        () -> {
+          body.run();
+          return null;
+        });
   }
 
   /** モジュールのロールで読み書きする。アプリロールは業務のスキーマに権限を持たない（ADR-094）。 */
@@ -307,8 +369,13 @@ class LocalDataSeederTest {
                 .fetchMap(Record2::value1, row -> List.of(row.value2())));
   }
 
-  /** reset の後に比べる値。IDENTITY の主キーとそれを指す列を除き、public_id（明細は注文の public_id と番号）で並べる。 */
-  private List<List<Map<String, Object>>> snapshot() {
+  /** reset の後に比べる、テナントごとの値。 */
+  private List<List<List<Map<String, Object>>>> snapshot() {
+    return TENANTS.stream().map(tenant -> inTenant(tenant, this::tenantSnapshot)).toList();
+  }
+
+  /** 束縛したテナントの値。IDENTITY の主キーとそれを指す列を除き、public_id（明細は注文の public_id と番号）で並べる。 */
+  private List<List<Map<String, Object>>> tenantSnapshot() {
     return List.of(
         rows(M_PRODUCT, M_PRODUCT.PRODUCT_ID, M_PRODUCT.PUBLIC_ID),
         rows(T_ORDER, T_ORDER.ORDER_ID, T_ORDER.PUBLIC_ID),

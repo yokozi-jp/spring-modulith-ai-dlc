@@ -14,6 +14,8 @@ import com.example.demo.ordering.domain.model.ProductOffer;
 import com.example.demo.ordering.infrastructure.persistence.OrderSeeds;
 import com.example.demo.payment.infrastructure.persistence.PaymentSeeds;
 import com.example.demo.product.ProductSeeds;
+import com.example.demo.shared.tenant.TenantContext;
+import com.example.demo.shared.tenant.TenantId;
 import com.example.demo.tenancy.TenancySeeds;
 import com.example.demo.testkit.AsModule;
 import java.net.InetAddress;
@@ -43,8 +45,11 @@ import org.jooq.conf.Settings;
 import org.jooq.impl.DSL;
 
 /**
- * 開発用の代表データ（#114）を、業務データが空のローカルかテストの DB に入れる。テナントと所属（{@link
+ * 開発用の代表データ（#114）を、業務データが空のローカルかテストの DB の、{@link TenancySeeds#TENANTS} の各テナントに入れる。テナントと所属（{@link
  * TenancySeeds}）は、業務データの有無によらず、足りない行だけを毎回入れる。
+ *
+ * <p>業務の表は RLS でテナントごとに分かれる（ADR-107）。「空」の判定と reset の削除は {@code tenancy.m_tenant}
+ * のテナントごとに、そのテナントを設定して行い、テナントを設定しないまま業務の表を読まない。
  *
  * <p>Gradle の {@code seedLocalData}（JavaExec、テストの runtime classpath）が {@link #main} を呼ぶ。Spring
  * を起動せず、Bean にもしないので、ほかのテストのコンテキストでは動かない。環境の確認、「空」の判定、reset の削除を 1 つのトランザクションで行う。
@@ -137,14 +142,32 @@ public final class LocalDataSeeder {
       throw new IllegalStateException("業務の表がありません。task be-migrate の後に実行してください");
     }
     AsModule.run(dsl, "tenancy", tx -> TenancySeeds.insert(tx, issuer));
+    final List<TenantId> tenants =
+        AsModule.call(
+                dsl,
+                "tenancy",
+                tx ->
+                    tx.select(M_TENANT.PUBLIC_ID)
+                        .from(M_TENANT)
+                        .orderBy(M_TENANT.TENANT_ID)
+                        .fetch())
+            .map(row -> new TenantId(row.value1()));
     if (mode == Mode.RESET) {
-      BUSINESS_TABLES.forEach(
-          table -> inModuleOf(dsl, table, tx -> tx.deleteFrom(table).execute()));
+      tenants.forEach(tenant ->
+          runInTenant(
+              tenant,
+              () ->
+                  BUSINESS_TABLES.forEach(
+                      table -> inModuleOf(dsl, table, tx -> tx.deleteFrom(table).execute()))));
     }
     final List<String> nonEmpty =
-        BUSINESS_TABLES.stream()
-            .filter(table -> inModuleOf(dsl, table, tx -> tx.fetchExists(table)))
-            .map(LocalDataSeeder::name)
+        tenants.stream()
+            .flatMap(tenant ->
+                BUSINESS_TABLES.stream()
+                    .filter(table ->
+                        callInTenant(
+                            tenant, () -> inModuleOf(dsl, table, tx -> tx.fetchExists(table))))
+                    .map(table -> tenant + ":" + name(table)))
             .toList();
     if (!nonEmpty.isEmpty()) {
       log.info("業務データがあるため、代表データを入れません: {}", nonEmpty);
@@ -154,7 +177,15 @@ public final class LocalDataSeeder {
     final Random random = new Random(RANDOM_SEED);
     final Faker faker = new Faker(Locale.ENGLISH, random);
     final Supplier<UUID> ids = () -> uuidV4(random);
-    // faker と ids は同じ random を引く。順（商品 P01〜P05、注文 C01〜C06、決済 C03、C05）を変えると値が変わる。
+    // faker と ids は同じ random を引く。テナントの順（TenancySeeds.TENANTS）と、テナントの中の順を変えると値が変わる。
+    TenancySeeds.TENANTS.forEach(
+        tenant -> runInTenant(new TenantId(tenant), () -> seedTenant(dsl, faker, ids, base)));
+    return Outcome.SEEDED;
+  }
+
+  /** 束縛したテナントに、商品 P01〜P05、注文 C01〜C06、決済 C03 と C05 をこの順に入れる。 */
+  private static void seedTenant(
+      final DSLContext dsl, final Faker faker, final Supplier<UUID> ids, final Instant base) {
     final List<ProductOffer> offers =
         AsModule.call(
                 dsl,
@@ -174,7 +205,21 @@ public final class LocalDataSeeder {
           insertPayment(tx, ids, confirmed.paid(), false);
           insertPayment(tx, ids, confirmed.declined(), true);
         });
-    return Outcome.SEEDED;
+  }
+
+  /** テナントを束縛して本体を実行し、結果を返す。{@link AsModule} が、本番と同じ SQL でそのテナントを設定する。 */
+  private static <T> T callInTenant(final TenantId tenant, final Supplier<T> body) {
+    return TenantContext.call(tenant, body::get);
+  }
+
+  /** テナントを束縛して本体を実行する。 */
+  private static void runInTenant(final TenantId tenant, final Runnable body) {
+    callInTenant(
+        tenant,
+        () -> {
+          body.run();
+          return null;
+        });
   }
 
   /** 表を持つモジュール（スキーマ名と同じ）のロールで本体を実行する。本番と同じく、アプリロールには業務のスキーマの権限がない。 */
