@@ -2,13 +2,20 @@ package com.example.demo.persistence.conventions;
 
 import static com.example.demo.shared.infrastructure.persistence.ModuleRoleTransactionManager.TENANT_SETTING;
 
+import java.util.List;
 import java.util.Set;
+import java.util.TreeSet;
+import java.util.stream.Stream;
 
 /** 業務の表をテナントで分ける RLS の決まった形。changeset の検査とカタログの検査が同じ形を使う。 */
 final class TenantIsolation {
 
   /** RLS の外に置くスキーマ。{@code modulith} はフレームワークの表、{@code tenancy} はテナントが決まる前に引く表を持つ。 */
   /* package */ static final Set<String> RLS_EXEMPT_SCHEMAS = Set.of("modulith", "tenancy");
+
+  /** 違反のメッセージに書く、RLS の外に置くスキーマの名前。 */
+  /* package */ static final String RLS_EXEMPT_SCHEMA_NAMES =
+      String.join(" と ", new TreeSet<>(RLS_EXEMPT_SCHEMAS));
 
   /** 業務の表が持つテナントの列。 */
   /* package */ static final String TENANT_COLUMN = "tenant_public_id";
@@ -29,6 +36,34 @@ final class TenantIsolation {
       "(current_setting('" + TENANT_SETTING + "'::text))::uuid";
 
   private TenantIsolation() {
-    // 定数だけを持つ。
+    // 定数と静的メソッドだけを持つ。
+  }
+
+  /**
+   * テナントで分ける表を置くスキーマか。
+   *
+   * @param schema スキーマ名。changeset の {@code schemaName} がなければ空文字
+   * @return 業務スキーマで、RLS の外に置くスキーマでなければ {@code true}
+   */
+  /* package */ static boolean isTenantScoped(final String schema) {
+    return SchemaConventions.isBusinessSchema(schema) && !RLS_EXEMPT_SCHEMAS.contains(schema);
+  }
+
+  /**
+   * 同じモジュールの表を指す外部キーの列。テナントで分ける表は {@code (tenant_public_id, 参照先の主キー)}、RLS の外の表は参照先の主キーだけにする。
+   *
+   * @param schema 外部キーを持つ表のスキーマ
+   * @param key 参照先の主キーの列
+   * @return 外部キーの列と、参照先の列の並び
+   */
+  /* package */ static List<String> foreignKeyColumns(final String schema, final String key) {
+    return Stream.concat(
+            isTenantScoped(schema) ? Stream.of(TENANT_COLUMN) : Stream.empty(), Stream.of(key))
+        .toList();
+  }
+
+  /** 違反のメッセージに書く、{@link #foreignKeyColumns} の形。 */
+  /* package */ static String foreignKeyShape(final String schema) {
+    return isTenantScoped(schema) ? "(" + TENANT_COLUMN + ", 参照先の主キー)" : "参照先の主キーだけ";
   }
 }

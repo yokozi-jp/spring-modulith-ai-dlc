@@ -2,12 +2,12 @@ package com.example.demo.persistence.conventions;
 
 import com.example.demo.persistence.conventions.Changeset.Change;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Stream;
@@ -73,10 +73,12 @@ final class ChangesetRowSecurityRules {
    * @param changeset 判定する changeset
    * @return 違反
    */
+  // S2 の違反を表の出てくる順に並べる、1 回の検査の中だけで使う単一スレッドの状態である。
+  @SuppressWarnings("PMD.UseConcurrentHashMap")
   /* package */ static List<ConventionViolation> check(final Changeset changeset) {
     final String id = changeset.changesetId();
     final List<ConventionViolation> violations = new ArrayList<>();
-    final Map<String, Set<String>> written = new ConcurrentHashMap<>();
+    final Map<String, Set<String>> written = new LinkedHashMap<>();
     rowSecurityStatements(changeset.allChanges())
         .forEach(statement -> {
           final Optional<String> table = canonicalTarget(statement);
@@ -85,7 +87,9 @@ final class ChangesetRowSecurityRules {
                 new ConventionViolation(
                     "S1",
                     id + ": " + statement,
-                    "RLS は、tenancy と modulith 以外のスキーマの表に、"
+                    "RLS は、"
+                        + TenantIsolation.RLS_EXEMPT_SCHEMA_NAMES
+                        + " 以外のスキーマの表に、"
                         + String.join("; ", statementsFor("<スキーマ>.<表>"))
                         + " の 3 文だけで書く。ポリシーの対象を PUBLIC にし、current_setting の missing_ok を使わない（"
                         + DOC
@@ -119,7 +123,7 @@ final class ChangesetRowSecurityRules {
   /** 決まった RLS の文なら、その対象の表を返す。 */
   private static Optional<String> canonicalTarget(final String statement) {
     final Matcher matcher = TARGET.matcher(statement);
-    if (!matcher.find() || TenantIsolation.RLS_EXEMPT_SCHEMAS.contains(matcher.group(1))) {
+    if (!matcher.find() || !TenantIsolation.isTenantScoped(matcher.group(1))) {
       return Optional.empty();
     }
     final String table = matcher.group(1) + "." + matcher.group(2);

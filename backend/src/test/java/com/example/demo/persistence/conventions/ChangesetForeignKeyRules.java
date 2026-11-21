@@ -81,35 +81,36 @@ final class ChangesetForeignKeyRules {
       return;
     }
     final String table = change.text("baseTableName");
-    final boolean tenantScoped = !TenantIsolation.RLS_EXEMPT_SCHEMAS.contains(schema);
-    final List<String> columns = columnList(change.text("baseColumnNames"));
-    final List<String> referenced = columnList(change.text("referencedColumnNames"));
-    final int width = tenantScoped ? 2 : 1;
-    final boolean conforms =
-        Pattern.matches("^fk_(\\d+_)?" + Pattern.quote(table) + "$", change.text("constraintName"))
-            && !schema.isEmpty()
+    final String target = ChangesetReplay.qualify(schema, change.text("constraintName"));
+    if (!Pattern.matches(
+        "^fk_(\\d+_)?" + Pattern.quote(table) + "$", change.text("constraintName"))) {
+      out.add(
+          new ConventionViolation(
+              RULE, target, "外部キーの名前を fk_" + table + " か fk_{連番}_" + table + " にする（" + DOC + "）。"));
+    }
+    final boolean shaped =
+        !schema.isEmpty()
             && schema.equals(change.text("referencedTableSchemaName"))
             && REFERENTIAL_ACTION_KEYS.stream().noneMatch(change.attributes()::containsKey)
-            && columns.size() == width
-            && referenced.size() == width
-            && (!tenantScoped
-                || (TenantIsolation.TENANT_COLUMN.equals(columns.get(0))
-                    && TenantIsolation.TENANT_COLUMN.equals(referenced.get(0))));
-    if (!conforms) {
+            && hasForeignKeyColumns(schema, columnList(change.text("baseColumnNames")))
+            && hasForeignKeyColumns(schema, columnList(change.text("referencedColumnNames")));
+    if (!shaped) {
       out.add(
           new ConventionViolation(
               RULE,
-              ChangesetReplay.qualify(schema, change.text("constraintName")),
-              "外部キーは名前を fk_"
-                  + table
-                  + " か fk_{連番}_"
-                  + table
-                  + " にし、同じスキーマの表を、"
-                  + (tenantScoped ? "(tenant_public_id, 参照先の主キー) の 2 列" : "参照先の主キーの 1 列")
+              target,
+              "外部キーは同じスキーマの表を、"
+                  + TenantIsolation.foreignKeyShape(schema)
                   + "で参照し、onDelete と onUpdate を付けない（"
                   + DOC
                   + "）。"));
     }
+  }
+
+  /** 列の並びが、最後の列を参照先の主キーとみなした {@link TenantIsolation#foreignKeyColumns} の形か。 */
+  private static boolean hasForeignKeyColumns(final String schema, final List<String> columns) {
+    return !columns.isEmpty()
+        && columns.equals(TenantIsolation.foreignKeyColumns(schema, columns.getLast()));
   }
 
   private static List<String> columnList(final String columns) {

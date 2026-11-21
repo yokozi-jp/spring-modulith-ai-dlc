@@ -64,6 +64,9 @@ record CatalogSnapshot(
       boolean rowSecurity,
       boolean forceRowSecurity) {
 
+    /** テーブルの{@code relkind}（通常のテーブルとパーティションテーブル）。 */
+    private static final Set<String> TABLE_KINDS = Set.of("r", "p");
+
     /** 行レベルセキュリティのないテーブルかビュー。 */
     /* package */ RelationRow(
         final String schema,
@@ -72,6 +75,11 @@ record CatalogSnapshot(
         final @Nullable String primaryKey,
         final @Nullable String inheritanceParent) {
       this(schema, name, relkind, primaryKey, inheritanceParent, false, false);
+    }
+
+    /** ビューでなく、テーブルか。 */
+    /* package */ boolean isTable() {
+      return TABLE_KINDS.contains(relkind);
     }
   }
 

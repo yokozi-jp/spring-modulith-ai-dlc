@@ -16,6 +16,8 @@ import java.util.stream.Collectors;
  *
  * <p>DBに接続しない純粋な関数である。各関数は{@link SchemaConventions#isBusinessSchema(String)}で業務スキーマの行だけを判定する。
  */
+// 規則ごとに関数を分けるため、メソッドの数は規則の数に比例する。
+@SuppressWarnings("PMD.TooManyMethods")
 final class SchemaTableConventions {
 
   /** 制約とインデックスの規約の文書。 */
@@ -33,9 +35,6 @@ final class SchemaTableConventions {
       Map.of(
           "c", Map.entry("K2", "CHECK制約を使わず、値の検証はアプリケーションで行う"),
           "u", Map.entry("K3", "ユニーク制約ではなく、ユニークインデックスで一意性を表す"));
-
-  /** テーブルの{@code relkind}（通常のテーブルとパーティションテーブル）。 */
-  private static final Set<String> TABLE_KINDS = Set.of("r", "p");
 
   private SchemaTableConventions() {
     // 静的メソッドだけを持つ。
@@ -131,7 +130,7 @@ final class SchemaTableConventions {
   /* package */ static List<ConventionViolation> primaryKeys(final List<RelationRow> rows) {
     return rows.stream()
         .filter(row -> SchemaConventions.isBusinessSchema(row.schema()))
-        .filter(row -> TABLE_KINDS.contains(row.relkind()) && row.primaryKey() == null)
+        .filter(row -> row.isTable() && row.primaryKey() == null)
         .map(row ->
             new ConventionViolation(
                 "P2",
@@ -152,11 +151,7 @@ final class SchemaTableConventions {
    */
   /* package */ static List<ConventionViolation> references(
       final List<RelationRow> relations, final List<ColumnRow> columns) {
-    final Set<String> primaryKeys =
-        relations.stream()
-            .filter(row -> row.primaryKey() != null)
-            .map(row -> row.schema() + "." + row.primaryKey())
-            .collect(Collectors.toSet());
+    final Set<String> primaryKeys = primaryKeyColumns(relations);
     return columns.stream()
         .filter(row -> SchemaConventions.isBusinessSchema(row.schema()))
         .filter(row -> !isAllowedIdColumn(row, primaryKeys))
@@ -166,6 +161,19 @@ final class SchemaTableConventions {
                 row.schema() + "." + row.table() + "." + row.column(),
                 "別のモジュールの行を指す列は、主キーではなくuuidの<対象>_public_idにする（" + PRIMARY_KEYS_DOC + "）。"))
         .toList();
+  }
+
+  /**
+   * 主キーの列を、{@code スキーマ.列}の集合で返す。P3とK1が、同じスキーマの行を指す列を見分けるのに使う。
+   *
+   * @param relations テーブルとビュー
+   * @return 主キーを持つテーブルの、{@code スキーマ.主キーの列}
+   */
+  /* package */ static Set<String> primaryKeyColumns(final List<RelationRow> relations) {
+    return relations.stream()
+        .filter(row -> row.primaryKey() != null)
+        .map(row -> row.schema() + "." + row.primaryKey())
+        .collect(Collectors.toSet());
   }
 
   /**

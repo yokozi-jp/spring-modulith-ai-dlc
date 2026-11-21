@@ -29,25 +29,11 @@ final class SchemaTenantConventions {
   private static final String CONSTRAINTS_DOC =
       "docs/database/postgresql-constraints-and-indexes.md";
 
-  /** テーブルの{@code relkind}（通常のテーブルとパーティションテーブル）。 */
-  private static final Set<String> TABLE_KINDS = Set.of("r", "p");
-
   /** ポリシーの対象の{@code PUBLIC}。 */
   private static final List<String> PUBLIC_ROLE = List.of("public");
 
   private SchemaTenantConventions() {
     // 静的メソッドだけを持つ。
-  }
-
-  /**
-   * テナントで分ける表を置くスキーマか。
-   *
-   * @param schema スキーマ名
-   * @return 業務スキーマで、RLSの外に置くスキーマでなければ{@code true}
-   */
-  /* package */ static boolean isTenantScoped(final String schema) {
-    return SchemaConventions.isBusinessSchema(schema)
-        && !TenantIsolation.RLS_EXEMPT_SCHEMAS.contains(schema);
   }
 
   /**
@@ -64,7 +50,7 @@ final class SchemaTenantConventions {
                 "S3",
                 row.schema() + "." + row.name(),
                 "ENABLE ROW LEVEL SECURITYとFORCE ROW LEVEL SECURITYを付ける。RLSの外に置けるのは"
-                    + TenantIsolation.RLS_EXEMPT_SCHEMAS
+                    + TenantIsolation.RLS_EXEMPT_SCHEMA_NAMES
                     + "の表だけである（"
                     + MULTITENANCY_DOC
                     + "）。"))
@@ -149,7 +135,8 @@ final class SchemaTenantConventions {
    */
   /* package */ static List<ConventionViolation> uniqueIndexes(final List<IndexRow> indexes) {
     return indexes.stream()
-        .filter(row -> isTenantScoped(row.schema()) && row.unique() && !row.primary())
+        .filter(
+            row -> TenantIsolation.isTenantScoped(row.schema()) && row.unique() && !row.primary())
         .filter(row -> !TenantIsolation.TENANT_COLUMN.equals(row.firstColumn()))
         .map(row ->
             new ConventionViolation(
@@ -185,11 +172,7 @@ final class SchemaTenantConventions {
                 Collectors.toMap(
                     row -> row.schema() + "." + row.name(),
                     row -> Objects.requireNonNull(row.primaryKey())));
-    final Set<String> primaryKeyColumns =
-        primaryKeys.entrySet().stream()
-            .map(entry ->
-                entry.getKey().substring(0, entry.getKey().indexOf('.') + 1) + entry.getValue())
-            .collect(Collectors.toSet());
+    final Set<String> primaryKeyColumns = SchemaTableConventions.primaryKeyColumns(relations);
     final List<ConstraintRow> foreignKeys =
         constraints.stream()
             .filter(
@@ -203,7 +186,7 @@ final class SchemaTenantConventions {
             new ConventionViolation(
                 "K1",
                 row.schema() + "." + row.name(),
-                expectedShape(row.schema())
+                TenantIsolation.foreignKeyShape(row.schema())
                     + "の外部キーにし、参照先に同じ組のユニークインデックスを作る（"
                     + CONSTRAINTS_DOC
                     + "）。"))
@@ -223,7 +206,7 @@ final class SchemaTenantConventions {
                 "K1",
                 row.schema() + "." + row.table() + "." + row.column(),
                 "同じモジュールの表を指す列に、"
-                    + expectedShape(row.schema())
+                    + TenantIsolation.foreignKeyShape(row.schema())
                     + "の外部キーを作る（"
                     + CONSTRAINTS_DOC
                     + "）。"))
@@ -240,21 +223,12 @@ final class SchemaTenantConventions {
       return false;
     }
     final List<String> expected =
-        Stream.concat(
-                isTenantScoped(row.schema())
-                    ? Stream.of(TenantIsolation.TENANT_COLUMN)
-                    : Stream.empty(),
-                Stream.of(referencedKey.get()))
-            .toList();
+        TenantIsolation.foreignKeyColumns(row.schema(), referencedKey.get());
     return expected.equals(row.columns()) && expected.equals(row.referencedColumns());
-  }
-
-  private static String expectedShape(final String schema) {
-    return isTenantScoped(schema) ? "(tenant_public_id, 参照先の主キー)" : "参照先の主キーだけ";
   }
 
   private static Stream<RelationRow> tenantTables(final List<RelationRow> relations) {
     return relations.stream()
-        .filter(row -> isTenantScoped(row.schema()) && TABLE_KINDS.contains(row.relkind()));
+        .filter(row -> TenantIsolation.isTenantScoped(row.schema()) && row.isTable());
   }
 }
