@@ -67,12 +67,15 @@ git diff --stat "$(sed -n 's/^同期コミット：`\([0-9a-f]*\)`.*/\1/p' "$ski
   backend/src/main/java/com/example/demo/shared/infrastructure/persistence/EventPublicationResubmitter.java \
   backend/src/main/java/com/example/demo/shared/infrastructure/persistence/EventPublicationResubmitOnce.java \
   backend/src/main/java/com/example/demo/shared/infrastructure/persistence/TableWriter.java \
+  backend/src/main/java/com/example/demo/shared/infrastructure/persistence/TenantListenerAspect.java \
+  backend/src/main/java/com/example/demo/shared/infrastructure/persistence/ModuleRoleTransactionManager.java \
   backend/src/main/resources/db/changelog/changesets/006-create-payment-tables.yaml \
   backend/src/main/resources/db/changelog/changesets/020-rebuild-payment-tables-for-tenants.yaml \
   backend/src/main/resources/application.yaml \
   backend/build.gradle
 ```
 
+`TenantListenerAspect` と `ModuleRoleTransactionManager` は、リスナーのトランザクションの開始前の拒否（範囲と前提の「テナントは一つ」の項目）だけが関わる。
 `application.yaml` は `spring.modulith.events`（`completion-mode`、`staleness`）、`event-publication.resubmission`、`resilience4j.retry.instances.payment-gateway` の節だけ、`build.gradle` は `springModulithVersion` だけが関わる。
 モデルは 1 回の配信で決済代行に 1 回だけ請求する。
 `resilience4j.retry.instances.payment-gateway` が `default`（`max-attempts: 1`）を継承しているためで、再試行を足したら、1 回の配信が同じ冪等性キーで重ねて請求する経路をモデルに足す。
@@ -116,6 +119,14 @@ git diff --stat "$(sed -n 's/^同期コミット：`\([0-9a-f]*\)`.*/\1/p' "$ski
 - 手での再投入（`EventPublicationResubmitOnce`）は、定期の再投入と同じ `markResubmitted` を通るため、`RPick` と `RClaim` に含まれる。
   配信の数の上限は `MaxDeliveries` で、方針の回数の上限は扱わない。
 - `ResubmissionTracker` の上限到達の記録とメトリクスは扱わない。
+- テナントは一つとし、行のセキュリティ（RLS）のポリシーは扱わない。
+  リスナーは `TenantListenerAspect` がイベントの `tenantId` を束縛してから動く。
+  `ConfirmOrderCommandHandler` が発行する `OrderConfirmed` は必ず `tenantId` を持ち、配信は同じテナントで `t_order` を読み、`t_payment` に書く。
+  `ModuleRoleTransactionManager` は、束縛のない payment のトランザクションを SQL の前に拒否するが、この経路では起きない。
+  Spring Modulith の出版の更新と再投入はモジュールの外の名前なので、テナントなしでも始まる。
+- `tenantId` のない古い出版（`#547` より前に書いた行）は扱わない。
+  `TenantListenerAspect` が `IllegalStateException` を投げ、書き込みも決済代行への請求もなしに配信が失敗する。
+  出版が `FAILED` で、決済記録も請求もない状態は、`DStart` の後の `DCrash` と `Stale` でモデルに入っている。
 
 ## 既知の発見
 
@@ -140,7 +151,7 @@ git diff --stat "$(sed -n 's/^同期コミット：`\([0-9a-f]*\)`.*/\1/p' "$ski
 
 ## 同期の記録
 
-同期コミット：`a99d855a9e7830988e3bd312609c65cb20fe38cd`（main）
+同期コミット：`f3f0b7ec5493ba506a2368a42fe98c3caa21fe1e`（main）
 
 このコミットで、「変更がこの検証に関わるか」のファイルと対応表がモデルと一致することを確かめた。
 読んだライブラリは、Spring Modulith 2.1.2 の `DefaultEventPublicationRegistry`（`PublicationsInProgress`）、`JdbcEventPublicationRepositoryV2`、`CompletionRegisteringAdvisor`（`CompletionRegisteringMethodInterceptor`）、`PersistentApplicationEventMulticaster` である。

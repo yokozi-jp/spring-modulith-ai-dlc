@@ -57,6 +57,7 @@ git diff --stat "$(sed -n 's/^同期コミット：`\([0-9a-f]*\)`.*/\1/p' "$ski
   backend/src/main/java/com/example/demo/ordering/application/ConfirmOrderCommandHandler.java \
   backend/src/main/java/com/example/demo/ordering/application/CancelOrderCommandHandler.java \
   backend/src/main/java/com/example/demo/error/presentation/web/ApiExceptionHandler.java \
+  backend/src/main/java/com/example/demo/shared/infrastructure/persistence/ModuleRoleTransactionManager.java \
   backend/src/main/resources/db/changelog/changesets/004-create-order-tables.yaml \
   backend/src/main/resources/db/changelog/changesets/019-rebuild-order-tables-for-tenants.yaml \
   backend/src/main/resources/application.yaml \
@@ -65,6 +66,7 @@ git diff --stat "$(sed -n 's/^同期コミット：`\([0-9a-f]*\)`.*/\1/p' "$ski
 
 `application.yaml` は `connection-init-sql`（`lock_timeout` など）だけが関わる。
 `ApiExceptionHandler` は、例外から HTTP のステータスへの対応だけが関わる。
+`ModuleRoleTransactionManager` は、トランザクションの開始前の拒否（範囲と前提の `ModuleRoleTransactionManager` の項目）だけが関わる。
 `updateCheckingVersion` か `deleteCheckingVersion` の新しい呼び出し元（ほかの集約の Repository）ができたら、その保存の順序が `JooqOrderRepository.update` と同じかを確かめる。
 違うなら、その経路をモデルに足す。
 
@@ -103,7 +105,15 @@ grep -rn "updateCheckingVersion\|deleteCheckingVersion" backend/src/main/java --
 - 読み取りは一つの文（multiset）なので、文の時点のコミット済みの状態を見る。
   読み取りが二つの文に分かれる変更は扱わない。
 - 分離レベルは READ COMMITTED だけを扱う。
-- `ModuleRoleTransactionManager` のトランザクションごとのロールの切り替えは、ロックと文の順序を変えないため扱わない。
+- `ModuleRoleTransactionManager` のロールとテナントの設定は、トランザクションを始めた直後の `set_config` の一文で、ロックと文の順序を変えないため扱わない。
+  テナントを束縛していない業務のトランザクションは、この一文の前に `IllegalStateException` で始まらずに終わる。
+  SQL を一つも実行せず、競合に負けた失敗ではないので、`OnlyConflictErrors` の対象に入らない。
+  リクエストはテナントを選ぶ前の業務の API を 403 にするため、保存の経路にはこの拒否が来ない。
+- テナントは一つとし、行のセキュリティ（RLS）のポリシーは扱わない。
+  ポリシーは各文に `tenant_public_id` の条件を足すだけで、一つの保存の間テナントは変わらないため、ロックを待つ行と再評価（EvalPlanQual）の結果を変えない。
+- `fk_t_order_line`（`tenant_public_id`, `order_id`。019 で足した）を扱わない。
+  子の INSERT は親の行を `FOR KEY SHARE` で確かめるが、その要求はルートの UPDATE で親の行のロックを持っている。
+  ルートを書く別の要求は、そのロックを先に待つため、子の行の文が待ちを増やさない。
 
 ## 既知の発見
 
@@ -111,7 +121,7 @@ grep -rn "updateCheckingVersion\|deleteCheckingVersion" backend/src/main/java --
 
 ## 同期の記録
 
-同期コミット：`a99d855a9e7830988e3bd312609c65cb20fe38cd`（main）
+同期コミット：`f3f0b7ec5493ba506a2368a42fe98c3caa21fe1e`（main）
 
 このコミットで、「変更がこの検証に関わるか」のファイルと対応表がモデルと一致することを確かめた。
 読んだのはこのリポジトリのコードで、PostgreSQL の振る舞いはモデルの冒頭の注記に並べた前提である。
