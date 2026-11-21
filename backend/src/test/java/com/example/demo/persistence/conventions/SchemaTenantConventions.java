@@ -15,7 +15,7 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 /**
- * 業務の表をテナントで分ける規則（R3、R4、R5、R6）と、同じモジュールの表どうしの参照の外部キーの規則（K1）を、カタログの行から判定する。
+ * 業務の表をテナントで分ける規則（S3、S4、S5、S6）と、同じモジュールの表どうしの参照の外部キーの規則（K1）を、カタログの行から判定する。
  *
  * <p>DBに接続しない純粋な関数である。テナントで分ける表は、業務スキーマのうち {@link TenantIsolation#RLS_EXEMPT_SCHEMAS}
  * 以外のスキーマのテーブルとする。表の一覧は持たず、カタログから導く。
@@ -51,7 +51,7 @@ final class SchemaTenantConventions {
   }
 
   /**
-   * R3：テナントで分ける表に、ENABLEとFORCEの行レベルセキュリティを付ける。RLSの外に置けるのは{@code modulith}と{@code tenancy}の表だけである。
+   * S3：テナントで分ける表に、ENABLEとFORCEの行レベルセキュリティを付ける。RLSの外に置けるのは{@code modulith}と{@code tenancy}の表だけである。
    *
    * @param relations テーブルとビュー
    * @return 違反
@@ -61,7 +61,7 @@ final class SchemaTenantConventions {
         .filter(row -> !row.rowSecurity() || !row.forceRowSecurity())
         .map(row ->
             new ConventionViolation(
-                "R3",
+                "S3",
                 row.schema() + "." + row.name(),
                 "ENABLE ROW LEVEL SECURITYとFORCE ROW LEVEL SECURITYを付ける。RLSの外に置けるのは"
                     + TenantIsolation.RLS_EXEMPT_SCHEMAS
@@ -72,7 +72,7 @@ final class SchemaTenantConventions {
   }
 
   /**
-   * R4：テナントで分ける表に、トランザクションのテナントを既定値にした、uuidのNOT NULLの{@code tenant_public_id}を持たせる。
+   * S4：テナントで分ける表に、トランザクションのテナントを既定値にした、uuidのNOT NULLの{@code tenant_public_id}を持たせる。
    *
    * @param relations テーブルとビュー
    * @param columns カラム
@@ -94,7 +94,7 @@ final class SchemaTenantConventions {
         })
         .map(row ->
             new ConventionViolation(
-                "R4",
+                "S4",
                 row.schema() + "." + row.name() + "." + TenantIsolation.TENANT_COLUMN,
                 "uuidのNOT NULLで、既定値を"
                     + TenantIsolation.CATALOG_TENANT_DEFAULT
@@ -105,7 +105,7 @@ final class SchemaTenantConventions {
   }
 
   /**
-   * R5：テナントで分ける表のポリシーを、{@code PUBLIC}への許可のポリシー1つにし、{@code missing_ok}を使わずにテナントの設定と比べる。
+   * S5：テナントで分ける表のポリシーを、{@code PUBLIC}への許可のポリシー1つにし、{@code missing_ok}を使わずにテナントの設定と比べる。
    *
    * @param relations テーブルとビュー
    * @param policies ポリシー
@@ -123,7 +123,7 @@ final class SchemaTenantConventions {
         })
         .map(row ->
             new ConventionViolation(
-                "R5",
+                "S5",
                 row.schema() + "." + row.name(),
                 "ポリシーは、PERMISSIVE、FOR ALL、TO PUBLIC、USING "
                     + TenantIsolation.CATALOG_POLICY_USING
@@ -142,7 +142,7 @@ final class SchemaTenantConventions {
   }
 
   /**
-   * R6：テナントで分ける表の、主キー以外のユニークインデックスを{@code tenant_public_id}から始める。
+   * S6：テナントで分ける表の、主キー以外のユニークインデックスを{@code tenant_public_id}から始める。
    *
    * @param indexes インデックス
    * @return 違反
@@ -153,7 +153,7 @@ final class SchemaTenantConventions {
         .filter(row -> !TenantIsolation.TENANT_COLUMN.equals(row.firstColumn()))
         .map(row ->
             new ConventionViolation(
-                "R6",
+                "S6",
                 row.schema() + "." + row.name(),
                 "ユニークインデックスをtenant_public_idから始め、一意性をテナントごとにする。"
                     + "先頭にないと、別のテナントの値の有無がINSERTの失敗から分かる（"

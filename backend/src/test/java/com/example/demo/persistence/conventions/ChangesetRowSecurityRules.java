@@ -13,7 +13,7 @@ import java.util.regex.Pattern;
 import java.util.stream.Stream;
 
 /**
- * 業務の表の行レベルセキュリティの SQL の書き方（R1、R2）を判定する。
+ * 業務の表の行レベルセキュリティの SQL の書き方（S1、S2）を判定する。
  *
  * <p>RLS の SQL は Liquibase OSS の Change Type で書けないため任意の SQL になる。決まった 3 文だけを書かせ、その SQL だけの変更は任意の
  * SQL（M17）の許可リストに載せずにこの規則で判定する。業務の表に RLS とポリシーが揃っていることは、カタログの検査（{@link
@@ -83,7 +83,7 @@ final class ChangesetRowSecurityRules {
           if (table.isEmpty()) {
             violations.add(
                 new ConventionViolation(
-                    "R1",
+                    "S1",
                     id + ": " + statement,
                     "RLS は、tenancy と modulith 以外のスキーマの表に、"
                         + String.join("; ", statementsFor("<スキーマ>.<表>"))
@@ -98,7 +98,7 @@ final class ChangesetRowSecurityRules {
       if (!statements.containsAll(statementsFor(table))) {
         violations.add(
             new ConventionViolation(
-                "R2",
+                "S2",
                 id + ": " + table,
                 "RLS の ENABLE、FORCE、ポリシーの作成の 3 文を同じ changeset に揃える。"
                     + "FORCE がないと表の所有者に RLS が効かず、ポリシーがないと行が見えない（"

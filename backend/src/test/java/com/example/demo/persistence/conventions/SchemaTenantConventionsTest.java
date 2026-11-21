@@ -65,7 +65,7 @@ class SchemaTenantConventionsTest {
   class TenantIsolationRulesTest {
 
     @Test
-    @DisplayName("R3：ENABLEかFORCEのない業務の表を拒否し、modulithとtenancyの表は判定しない")
+    @DisplayName("S3：ENABLEかFORCEのない業務の表を拒否し、modulithとtenancyの表は判定しない")
     void rejectsBusinessTablesWithoutEnabledAndForcedRowSecurity() {
       final List<RelationRow> rows =
           List.of(
@@ -78,11 +78,11 @@ class SchemaTenantConventionsTest {
 
       assertThat(keys(SchemaTenantConventions.rowSecurity(rows)))
           .as("テーブル: %s", rows)
-          .containsExactlyInAnyOrder("R3 item.m_none", "R3 item.m_enabled");
+          .containsExactlyInAnyOrder("S3 item.m_none", "S3 item.m_enabled");
     }
 
     @Test
-    @DisplayName("R4：テナントの列がない、uuidでない、NULLを許す、既定値が違う業務の表を拒否する")
+    @DisplayName("S4：テナントの列がない、uuidでない、NULLを許す、既定値が違う業務の表を拒否する")
     void rejectsBusinessTablesWithoutConformingTenantColumn() {
       final List<RelationRow> relations =
           List.of(
@@ -103,14 +103,14 @@ class SchemaTenantConventionsTest {
 
       assertThat(keys(SchemaTenantConventions.tenantColumns(relations, columns)))
           .containsExactlyInAnyOrder(
-              "R4 item.m_missing.tenant_public_id",
-              "R4 item.m_text.tenant_public_id",
-              "R4 item.m_nullable.tenant_public_id",
-              "R4 item.m_no_default.tenant_public_id");
+              "S4 item.m_missing.tenant_public_id",
+              "S4 item.m_text.tenant_public_id",
+              "S4 item.m_nullable.tenant_public_id",
+              "S4 item.m_no_default.tenant_public_id");
     }
 
     @Test
-    @DisplayName("R5：ポリシーがない、PUBLICでない、missing_okを使う、RESTRICTIVE、2つある業務の表を拒否する")
+    @DisplayName("S5：ポリシーがない、PUBLICでない、missing_okを使う、RESTRICTIVE、2つある業務の表を拒否する")
     void rejectsBusinessTablesWithoutSingleTenantPolicy() {
       final List<RelationRow> relations =
           List.of(
@@ -142,15 +142,15 @@ class SchemaTenantConventionsTest {
 
       assertThat(keys(SchemaTenantConventions.policies(relations, policies)))
           .containsExactlyInAnyOrder(
-              "R5 item.m_none",
-              "R5 item.m_role",
-              "R5 item.m_missing_ok",
-              "R5 item.m_restrictive",
-              "R5 item.m_two");
+              "S5 item.m_none",
+              "S5 item.m_role",
+              "S5 item.m_missing_ok",
+              "S5 item.m_restrictive",
+              "S5 item.m_two");
     }
 
     @Test
-    @DisplayName("R6：tenant_public_idから始まらない業務の表のユニークインデックスを拒否し、主キーとtenancyは判定しない")
+    @DisplayName("S6：tenant_public_idから始まらない業務の表のユニークインデックスを拒否し、主キーとtenancyは判定しない")
     void rejectsUniqueIndexesNotLedByTenant() {
       final List<IndexRow> rows =
           List.of(
@@ -175,7 +175,7 @@ class SchemaTenantConventionsTest {
 
       assertThat(keys(SchemaTenantConventions.uniqueIndexes(rows)))
           .as("インデックス: %s", rows)
-          .containsExactlyInAnyOrder("R6 item.uk_m_item", "R6 item.uk_3_m_item");
+          .containsExactlyInAnyOrder("S6 item.uk_m_item", "S6 item.uk_3_m_item");
     }
 
     private IndexRow uniqueIndex(

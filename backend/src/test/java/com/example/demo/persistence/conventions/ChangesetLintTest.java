@@ -52,14 +52,14 @@ class ChangesetLintTest {
   /** 違反のケースの多くが使うテーブル。 */
   private static final String M_ITEM = "item.m_item";
 
-  /** テーブルとRLSを作るchangesetの、RLSの書き方（R1）の違反のキーの先頭。 */
-  private static final String ROW_SECURITY = "R1 001-create-m-item: ";
+  /** テーブルとRLSを作るchangesetの、RLSの書き方（S1）の違反のキーの先頭。 */
+  private static final String ROW_SECURITY = "S1 001-create-m-item: ";
 
   /** テーブルとRLSを作るchangesetの、任意のSQL（M17）の違反のキーの先頭。 */
   private static final String ARBITRARY_SQL = "M17 001-create-m-item: ";
 
-  /** {@code item.m_item}のRLSの3文が揃わない（R2）違反のキー。 */
-  private static final String INCOMPLETE_ROW_SECURITY = "R2 001-create-m-item: item.m_item";
+  /** {@code item.m_item}のRLSの3文が揃わない（S2）違反のキー。 */
+  private static final String INCOMPLETE_ROW_SECURITY = "S2 001-create-m-item: item.m_item";
 
   /** 明細から{@code item.m_item}への外部キーの書き方（K4）の違反のキー。 */
   private static final String ITEM_LINE_FOREIGN_KEY = "K4 item.fk_t_item_line";
@@ -201,22 +201,22 @@ class ChangesetLintTest {
               sqlAllowlist("999-unused: SELECT 1;"),
               "ALLOWLIST M17 999-unused: SELECT 1;"),
           lintCase(
-              "r1-policy-missing-ok",
+              "s1-policy-missing-ok",
               ROW_SECURITY + MISSING_OK_POLICY,
               ARBITRARY_SQL + MISSING_OK_POLICY + ";",
               INCOMPLETE_ROW_SECURITY),
           lintCase(
-              "r1-policy-to-role",
+              "s1-policy-to-role",
               ROW_SECURITY + ROLE_POLICY,
               ARBITRARY_SQL + ROLE_POLICY + ";",
               INCOMPLETE_ROW_SECURITY),
           lintCase(
-              "r1-exempt-schema",
+              "s1-exempt-schema",
               ROW_SECURITY + EXEMPT_ENABLE,
               ROW_SECURITY + EXEMPT_FORCE,
               ROW_SECURITY + EXEMPT_POLICY,
               ARBITRARY_SQL + String.join(";\n", EXEMPT_ENABLE, EXEMPT_FORCE, EXEMPT_POLICY) + ";"),
-          lintCase("r2-without-force", INCOMPLETE_ROW_SECURITY),
+          lintCase("s2-without-force", INCOMPLETE_ROW_SECURITY),
           lintCase("k4-single-column-in-tenant-schema", ITEM_LINE_FOREIGN_KEY),
           lintCase("k4-column-constraint", "K4 item.t_item_line.item_id"),
           lintCase("k4-on-delete-cascade", ITEM_LINE_FOREIGN_KEY),
