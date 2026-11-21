@@ -23,12 +23,15 @@ import com.example.demo.testkit.AsModule;
 import com.example.demo.testkit.AsTenant;
 import com.example.demo.testkit.DatabaseTest;
 import java.math.BigDecimal;
+import java.sql.Connection;
+import java.sql.DriverManager;
 import java.sql.SQLException;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
+import java.util.Properties;
 import java.util.Random;
 import java.util.UUID;
 import java.util.function.Function;
@@ -36,13 +39,16 @@ import java.util.stream.IntStream;
 import net.datafaker.Faker;
 import org.jooq.DSLContext;
 import org.jooq.Field;
+import org.jooq.SQLDialect;
 import org.jooq.Table;
+import org.jooq.impl.DSL;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.NestedExceptionUtils;
+import org.springframework.core.env.Environment;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
@@ -57,8 +63,14 @@ import org.springframework.transaction.support.TransactionTemplate;
  * にそのテナントを渡して入れる。業務の表は、{@code tenant_public_id} を持つ生成した表から導く。
  */
 // 生成したテーブルと AssertJ を static import で読みやすくする。
-// 読み、書き、外部キー、テナントの設定忘れの経路ごとにテストと補助を分ける。
-@SuppressWarnings({"PMD.TooManyStaticImports", "PMD.TooManyMethods"})
+// 読み、書き、外部キー、表の所有者、テナントの設定忘れの経路ごとにテストと補助を分け、3 つのモジュールの表と JDBC を使う。
+// 業務の表ごとのパラメータ化テストは、同じ表の一覧と表示名を使う。
+@SuppressWarnings({
+  "PMD.TooManyStaticImports",
+  "PMD.TooManyMethods",
+  "PMD.CouplingBetweenObjects",
+  "PMD.AvoidDuplicateLiterals"
+})
 @DatabaseTest
 class TenantIsolationTest {
 
@@ -101,6 +113,9 @@ class TenantIsolationTest {
 
   /** 名前のあるトランザクションを、本番と同じトランザクションマネージャーで始める。 */
   @Autowired private PlatformTransactionManager transactionManager;
+
+  /** 表の所有者の接続先と資格情報。 */
+  @Autowired private Environment environment;
 
   /** テナントの列を持つ、生成した業務の表。 */
   private static List<Table<?>> businessTables() {
@@ -313,6 +328,65 @@ class TenantIsolationTest {
   void readingWithoutTenantFails(final Table<?> table) {
     assertSqlState(
         () -> withoutTenant(AsModule.moduleOf(table), tx -> tx.fetchCount(table)), UNSET, EMPTY);
+  }
+
+  @ParameterizedTest(name = "{0}")
+  @MethodSource("businessTables")
+  @DisplayName("表の所有者のマイグレーションロールも、テナントを設定しないと業務の表を読めない")
+  void ownerCannotReadWithoutTenant(final Table<?> table) throws SQLException {
+    try (Connection connection = ownerConnection()) {
+      final DSLContext owner = DSL.using(connection, SQLDialect.POSTGRES);
+
+      assertSqlState(() -> owner.fetchCount(table), UNSET);
+      connection.setAutoCommit(false);
+      ModuleRoleTransactionManager.setLocal(connection, null, OTHER.toString());
+      connection.commit();
+      assertSqlState(() -> owner.fetchCount(table), EMPTY);
+    }
+  }
+
+  @Test
+  @DisplayName("表の所有者のマイグレーションロールは、設定したテナントの行だけを読む")
+  void ownerReadsOnlyTheTenantItSets() throws SQLException {
+    try (Connection connection = ownerConnection()) {
+      connection.setAutoCommit(false);
+      final DSLContext owner = DSL.using(connection, SQLDialect.POSTGRES);
+      try {
+        for (final TenantId tenant : List.of(AsTenant.TENANT, OTHER)) {
+          ModuleRoleTransactionManager.setLocal(connection, null, tenant.toString());
+          TestCommonColumns.runAs(() ->
+              TestProducts.insert(
+                  owner,
+                  UUID.randomUUID(),
+                  "OWNER-" + tenant.value().toString().substring(0, 8),
+                  "owner",
+                  BigDecimal.TEN,
+                  "ON_SALE",
+                  SEEDED_AT));
+        }
+        ModuleRoleTransactionManager.setLocal(connection, null, OTHER.toString());
+
+        assertThat(
+                owner
+                    .select(M_PRODUCT.TENANT_PUBLIC_ID)
+                    .from(M_PRODUCT)
+                    .where(M_PRODUCT.PRODUCT_CODE.startsWith("OWNER-"))
+                    .fetch(M_PRODUCT.TENANT_PUBLIC_ID))
+            .as("所有者が別のテナントを設定して読んだ商品のテナント")
+            .containsExactly(OTHER.value());
+      } finally {
+        connection.rollback();
+      }
+    }
+  }
+
+  /** 表の所有者（マイグレーションロール）の接続。テストのトランザクションの外にあり、FORCE ROW LEVEL SECURITY の効き目を見る。 */
+  private Connection ownerConnection() throws SQLException {
+    final Properties properties = new Properties();
+    properties.setProperty("user", environment.getRequiredProperty("MIGRATION_DB_USERNAME"));
+    properties.setProperty("password", environment.getRequiredProperty("MIGRATION_DB_PASSWORD"));
+    return DriverManager.getConnection(
+        environment.getRequiredProperty("spring.datasource.url"), properties);
   }
 
   /** テナントを設定せず、モジュールのロールだけで本体を実行する。トランザクションマネージャーより後ろの、DB の防御を確かめる。 */
