@@ -1,7 +1,7 @@
 ---
 type: ADR
 title: 'ADR-107: 業務の表を RLS でテナントごとに分け、テナントをロールと同じ SQL でトランザクションごとに設定する'
-description: 業務の表に tenant_public_id を持たせ、既定値をトランザクションのテナントにし、ENABLE と FORCE の RLS と、missing_ok を使わない TO PUBLIC のポリシーでテナントを分ける決定。テナントはトランザクションマネージャーが TenantContext から読み、モジュールのロールと同じ SQL でトランザクションの間だけ設定する。RLS の外に置くのは modulith と tenancy のスキーマの表だけにし、業務の一意索引は tenant_public_id から始め、全テナントの行はテナントを 1 つずつ設定して書き換える。
+description: 業務の表に tenant_public_id を持たせ、既定値をトランザクションのテナントにし、ENABLE と FORCE の RLS と、missing_ok を使わない TO PUBLIC のポリシーでテナントを分ける決定。テナントはトランザクションマネージャーが TenantContext から読み、モジュールのロールと同じ SQL でトランザクションの間だけ設定し、テナントを束縛しない業務のモジュールのトランザクションは始めない。RLS の外に置くのは modulith と tenancy のスキーマの表だけにし、業務の一意索引は tenant_public_id から始め、全テナントの行はテナントを 1 つずつ設定して書き換える。
 tags: [adr, database, postgresql, security, tenancy, rls]
 ---
 
@@ -47,8 +47,15 @@ PostgreSQL の RLS と設定の関数には、次の性質がある。
 
 実装（#377）で、Decision に `tenant_public_id` の既定値を足した。
 Repository と seed の INSERT がテナントの列を書かずに済み、書き忘れる余地がなくなるためである。
-設定の SQL も、名前をバインド変数で渡し、設定するものの `set_config` だけを並べる形に改めた。
+設定の SQL も、設定するものの `set_config` だけを並べる形に改めた。
 ロールとテナントは、トランザクションによってはどちらか、または両方がなく（Spring Modulith の内部、再投入、ShedLock）、テストの補助とシーダーは片方だけを本番と同じ SQL で設定するためである。
+設定の名前は SQL に固定し、値だけをバインド変数で渡す。
+任意の設定の名前を受ける入口を、アプリにもテストにも作らないためである。
+
+実装の後の監査で、テナントを束縛し忘れたトランザクションが、エラーにならず 0 件を返す経路が見つかった。
+テナントがある間に作った汎用の実行計画は、接続の prepared statement に残り、テナントのない実行でも計画し直されない。
+その計画が表を順に走査し、漏洩のない比較（`order_status_typ = $1` など）で全行を落とすと、RLS の式は一度も評価されない。
+そこで Decision に、トランザクションマネージャーがテナントのない業務のトランザクションを始めないことを足し、ポリシーのエラーを 2 段目の防御に改めた。
 
 ## Decision
 
@@ -60,7 +67,7 @@ Repository と seed の INSERT がテナントの列を書かずに済み、書�
 - `tenant_public_id` の既定値は `current_setting('app.current_tenant')::uuid` にし、Repository と seed の INSERT はこの列を書かない。Repository のコードが列を書き忘れる余地がなく、テナントを設定しないトランザクションの INSERT は `current_setting` のエラーで失敗する。値を書いた INSERT も、別のテナントの値ならポリシーが拒否する。
 - uuid の列に DEFAULT を付けない規則（[ADR-060](ADR-060-generate-uuid-primary-keys-in-application.md)）の例外は、この既定値だけにする。この既定値は ID を採番せず、トランザクションに設定したテナントを入れるだけだからである。例外の範囲は[PostgreSQLの主キー](../database/postgresql-primary-keys.md#uuidの採番)に示す。
 - 業務の表に `ENABLE ROW LEVEL SECURITY` と `FORCE ROW LEVEL SECURITY` を付ける。`FORCE` で、表の所有者のマイグレーション用のロールにもポリシーを効かせる。
-- ポリシーは `USING (tenant_public_id = current_setting('app.current_tenant')::uuid)` にし、`missing_ok` を使わない。テナントを設定しないトランザクションは、業務の表に触れた時点でエラーになり、0 件を返さない。
+- ポリシーは `USING (tenant_public_id = current_setting('app.current_tenant')::uuid)` にし、`missing_ok` を使わない。テナントを設定しない読み書きは、RLS の式を評価した時点でエラーになる。ただし、式を評価するかは実行計画で決まるため、これは 2 段目の防御である。
 - ポリシーの対象は `PUBLIC` にする。ポリシーは行だけを絞り、どのロールが表に触れるかは表の権限（ADR-094 のモジュールのロール）で絞る。
 - 業務の一意索引は、すべて `tenant_public_id` から始める。先頭にテナントがない索引では、RLS を受けない一意性の検査が別のテナントの値と衝突し、INSERT の失敗からその値の有無が分かるためである。
 - 同じモジュールの表どうしの参照の外部キーは、[ADR-108](ADR-108-add-tenant-composite-foreign-keys-within-modules.md) で決める。
@@ -68,14 +75,15 @@ Repository と seed の INSERT がテナントの列を書かずに済み、書�
 テナントは、トランザクションごとに設定する。
 
 - トランザクションマネージャーの、トランザクションを始めた直後に接続を準備する箇所（`prepareTransactionalConnection`）で、ロールとテナントを 1 つの SQL で設定する。
-- どちらも `is_local` を真にして、トランザクションの間だけ効かせる。設定の名前（`role` と `app.current_tenant`）と値は、どちらもバインド変数で渡す。
+- どちらも `is_local` を真にして、トランザクションの間だけ効かせる。設定の名前（`role` と `app.current_tenant`）は SQL に固定し、値をバインド変数で渡す。
 - テナントは `TenantContext.findCurrent()` で束縛から読む。束縛がないトランザクションでは、`app.current_tenant` を設定しない。モジュールが分からないトランザクションでは、ロールを設定しない（ADR-094）。SQL には、設定するものの `set_config` だけを並べ、どちらもなければ SQL を流さない。
+- 業務の表を持つモジュール（`product`、`ordering`、`payment`）のトランザクションを、テナントを束縛せずに始めたら、SQL を流す前に `IllegalStateException` で失敗させる。テナントの設定忘れを確実に止めるのは、この検査である。モジュールの一覧は `ModuleRoles.TENANT_SCOPED_MODULES` に置き、RLS の外に置くスキーマを除いたモジュールと一致することをテストで確かめる。`tenancy` のトランザクションと、モジュールが分からないトランザクションは、テナントなしで始められる。
 - 接続プールの初期化の SQL とセッション単位の設定には、テナントを書かない。
 
 ロールとテナントの両方を設定するときの SQL は、次のとおりである。
 
 ```sql
-SELECT set_config(?, ?, true), set_config(?, ?, true)
+SELECT set_config('role', ?, true), set_config('app.current_tenant', ?, true)
 ```
 
 RLS の外に置く表は、`modulith` と `tenancy` のスキーマの表だけにする。
@@ -103,14 +111,15 @@ RLS の外に置く表は、`modulith` と `tenancy` のスキーマの表だけ
 ### Positive
 
 - アプリのコードが問い合わせでテナントの条件を書き忘れても、別のテナントの行は読めず、書けない。
-- テナントを設定し忘れたトランザクションは、業務の表に触れた時点でエラーになる。設定の漏れを「データがない」と取り違えない。
+- テナントを束縛し忘れた業務のトランザクションは、SQL を流す前に失敗する。設定の漏れを「データがない」と取り違えない。ポリシーのエラーは、モジュールのロールへ直接切り替えたテストの補助やシーダーの誤りを止める 2 段目の防御になる。
 - ロールとテナントを 1 か所の 1 つの SQL で、トランザクションの間だけ設定するため、プールの接続に残らない。
 - 一意索引の先頭がテナントなので、別のテナントの値と衝突せず、INSERT の失敗から別のテナントの値が分からない。客先注文番号のような業務の値を、テナントごとに同じ値で持てる。
 - Repository と seed の INSERT は `tenant_public_id` を書かず、列の書き忘れが起きない。
 
 ### Negative
 
-- 業務の表を読み書きするトランザクションは、`TenantContext` の束縛の中で始める必要がある。束縛のない入口（バッチ、起動時の処理）から業務の表に触れるとエラーになる。入口を足すときは、ADR-105 の束縛の許可先を先に変える。
+- 業務の表を読み書きするトランザクションは、`TenantContext` の束縛の中で始める必要がある。束縛のない入口（バッチ、起動時の処理）から業務のモジュールのトランザクションを始めると、トランザクションマネージャーが拒否する。入口を足すときは、ADR-105 の束縛の許可先を先に変える。
+- テストのフレームワークが始めるトランザクション（`@DatabaseTest` のロールバック用）は、テナントを束縛する前に始まる。テストの側に、そのトランザクションだけテナントを束縛して始めるトランザクションマネージャーの子クラスを置く。
 - 全テナントの行を扱う処理は、テナントの設定を切り替えながら、同じ処理をテナントの数だけ繰り返す。
 - PostgreSQL は、RLS を受けるロールの `COPY FROM` を受け付けない。`FORCE` で表の所有者もポリシーを受けるため、アプリ、モジュール、マイグレーション用のどのロールからも、業務の表へ `COPY FROM` で取り込めない。大量の行も INSERT で入れることになる。
 - 業務の一意索引の 1 件ごとに、`tenant_public_id` の 16 バイトが増える。テナントの主キー（bigint）を持つ場合より 8 バイト多い（#363 の Q24）。

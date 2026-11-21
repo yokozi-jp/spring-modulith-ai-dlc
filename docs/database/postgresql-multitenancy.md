@@ -8,7 +8,7 @@ tags: [convention, database, postgresql, multi-tenancy, rls, future-arch-guideli
 # PostgreSQLのマルチテナント設計
 
 業務の表はRow Level Security（RLS）でテナントごとに分け、`tenant_public_id`とトランザクションに設定したテナントを比べるポリシーで、別のテナントの行を読めず書けなくする。
-テナントはモジュールのロールと同じSQLでトランザクションの間だけ設定し、設定しないトランザクションが業務の表に触れるとエラーになる。
+テナントはモジュールのロールと同じSQLでトランザクションの間だけ設定し、テナントを束縛しない業務のトランザクションはトランザクションマネージャーが始めない。
 全テナントの行を書き換える処理はテナントを1つずつ設定して流し、テナントごとにスキーマの差を作らない。
 
 ## 対象
@@ -72,13 +72,19 @@ RLSの外に置く表は、`modulith`と`tenancy`のスキーマの表だけに�
 トランザクションマネージャーは、トランザクションを始めた直後に接続を準備する箇所で、モジュールのロールとテナントを1つのSQLで設定する。
 
 ```sql
-SELECT set_config(?, ?, true), set_config(?, ?, true)
+SELECT set_config('role', ?, true), set_config('app.current_tenant', ?, true)
 ```
 
-- どちらも`is_local`を`true`にし、トランザクションの間だけ効かせる。設定の名前（`role`と`app.current_tenant`）と値は、どちらもバインド変数で渡す。
-- テナントは`TenantContext.findCurrent()`で束縛から読む（[ADR-105](../adr/ADR-105-bind-tenant-to-request-and-event-context.md)）。束縛がないトランザクションでは`app.current_tenant`を設定しないため、そのトランザクションが業務の表に触れるとエラーになる。
+- どちらも`is_local`を`true`にし、トランザクションの間だけ効かせる。設定の名前（`role`と`app.current_tenant`）はSQLに固定し、値をバインド変数で渡す。
+- テナントは`TenantContext.findCurrent()`で束縛から読む（[ADR-105](../adr/ADR-105-bind-tenant-to-request-and-event-context.md)）。束縛がないトランザクションでは`app.current_tenant`を設定しない。
+- 業務の表を持つモジュール（`product`、`ordering`、`payment`）のトランザクションを、テナントを束縛せずに始めたら、SQLを流す前に`IllegalStateException`で失敗させる。モジュールの一覧は`ModuleRoles.TENANT_SCOPED_MODULES`にある。`tenancy`のトランザクションと、モジュールが分からないトランザクションは、テナントなしで始められる。
 - モジュールが分からないトランザクションでは、ロールを設定しない（[DB接続情報とロール分離](connections.md#モジュールのロール)）。SQLには設定するものの`set_config`だけを並べ、どちらもなければSQLを流さない。上のSQLは、両方を設定するときの形である。
 - 接続プールの初期化のSQL（HikariCPの`connection-init-sql`）とセッション単位の`SET`には、テナントを書かない。
+
+テナントを設定しない読み書きをポリシーのエラーで止めるのは、2段目の防御である。
+ポリシーの式は、実行計画が評価したときにだけエラーになる。
+テナントがある間に作った汎用の実行計画が接続に残り、表を順に走査して、ほかの条件で全行を落とすと、式は評価されず0件を返す。
+テナントの設定忘れを確実に止めるのは、上のトランザクションマネージャーの検査である。
 
 ## 全テナントの行を書き換える処理
 
@@ -96,8 +102,8 @@ RLSの規則は次の検査で確かめる。
 
 - **カタログのテスト**：`SchemaConventionsTest`と`SchemaInspectionTest`が、業務の表に`ENABLE`と`FORCE`があること（規則S3）、`tenant_public_id`の型、NOT NULL、既定値（規則S4）、ポリシーが`PUBLIC`を対象にする1つだけで`missing_ok`を使わないこと（規則S5）を確かめる。表の一覧を持たずにカタログから導くため、「RLSでテナントを分ける表」の範囲に表を足すと、その表も検査の対象になる。
 - **changesetのlint**：`ChangesetLintTest`が、RLSとポリシーのSQLが上の3文の形だけであること（規則S1）と、3文が同じchangesetに揃うこと（規則S2）を確かめる。
-- **`@DatabaseTest`**：`TenantIsolationTest`が、別のテナントの行を読めず書けないこと、明細が別のテナントの注文を指せないこと、テナントを設定し忘れるとエラーになることを確かめる。業務の表は、`tenant_public_id`を持つjOOQの生成した表から導く。
-- **`@CommittedDatabaseTest`**：`ModuleRoleTransactionTest`が、commitとrollbackの後、プールの接続にテナントが残らないことを確かめる。設定の後に空文字列が残る場合も、ポリシーが失敗する側に倒れることを確かめる。
+- **`@DatabaseTest`**：`TenantIsolationTest`が、別のテナントの行を読めず書けないこと、明細が別のテナントの注文を指せないこと、テナントを設定しないモジュールのロールの読み取りがエラーになることを確かめる。テナントを束縛しない業務のトランザクションを、汎用の実行計画が0件を返す接続でも、トランザクションマネージャーが拒否することも確かめる。業務の表は、`tenant_public_id`を持つjOOQの生成した表から導く。
+- **`@CommittedDatabaseTest`**：`ModuleRoleTransactionTest`が、commitとrollbackの後、プールの接続にテナントが残らないことと、テナントを束縛しない`product`、`ordering`、`payment`のトランザクションを始めないことを確かめる。設定の後に空文字列が残る場合も、ポリシーが失敗する側に倒れることを確かめる。
 
 ## ノイジーネイバーへの対策
 

@@ -49,11 +49,11 @@ Gradleのforkごとに別のDBになるため、forkどうしの後始末は衝�
 業務の表は、テナントを設定しないトランザクションでは読み書きできない（[PostgreSQLのマルチテナント設計](../database/postgresql-multitenancy.md#テナントの設定)）。
 テストのトランザクションには、次のとおりテナントを設定する。
 
-- **`@DatabaseTest`のロールバック用トランザクション**：テストのメソッドの前に、テストの利用者のテナント（`AsTenant.TENANT`）を、本番と同じSQLで設定する。テストのトランザクションはテナントを束縛する前に始まるため、トランザクションマネージャーは設定しない。テストのトランザクションのないメソッド（`Propagation.NOT_SUPPORTED`）には設定しない。
+- **`@DatabaseTest`のロールバック用トランザクション**：[DatabaseTestTransactionManager](../../backend/src/test/java/com/example/demo/testkit/DatabaseTestTransactionManager.java)が、テストの利用者のテナント（`AsTenant.TENANT`）を束縛してテストのトランザクションを始め、本番のトランザクションマネージャーの処理がロールとテナントを設定する。テストのトランザクションはテストのメソッドより前に始まり、本番のトランザクションマネージャーはテナントの束縛のない業務のモジュールのトランザクションを始めないためである。対象は`@DatabaseTest`の`@Transactional`のラベルで見分け、ほかのトランザクションは本番と同じに動く。テストのトランザクションのないメソッド（`Propagation.NOT_SUPPORTED`）には関わらない。
 - **`@ApplicationModuleTest`や`@SpringBootTest`で、CommandHandlerやQueryServiceをテストのスレッドから直接呼ぶとき**：テストクラスに`@ExtendWith`で[BindTestTenantExtension](../../backend/src/test/java/com/example/demo/testkit/BindTestTenantExtension.java)を付ける。`@BeforeEach`とテストのメソッドが`AsTenant.TENANT`の束縛の中で動き、トランザクションマネージャーがそのテナントを設定する。呼び出しごとに束縛するときは`AsTenant.call`を使う。
 - **別のテナントの行を読み書きするとき**：そのテナントを`TenantContext.call`で束縛し、その中で`AsModule`を呼ぶ。
 
-別のテナントの行を読めず書けないこととテナントの設定忘れのエラーは`TenantIsolationTest`、プールの接続にテナントが残らないことは`ModuleRoleTransactionTest`が確かめる。
+別のテナントの行を読めず書けないこととテナントの設定忘れのエラーは`TenantIsolationTest`、プールの接続にテナントが残らないことと、テナントの束縛のない業務のトランザクションを始めないことは`ModuleRoleTransactionTest`が確かめる。
 
 ## コミットするテスト
 
