@@ -67,11 +67,12 @@ RLSの外に置く表は、`modulith`と`tenancy`のスキーマの表だけに�
 トランザクションマネージャーは、トランザクションを始めた直後に接続を準備する箇所で、モジュールのロールとテナントを1つのSQLで設定する。
 
 ```sql
-SELECT set_config('role', ?, true), set_config('app.current_tenant', ?, true)
+SELECT set_config(?, ?, true), set_config(?, ?, true)
 ```
 
-- どちらも`is_local`を`true`にし、トランザクションの間だけ効かせる。値はバインド変数で渡す。
-- テナントは`TenantContext`の束縛から読む（[ADR-105](../adr/ADR-105-bind-tenant-to-request-and-event-context.md)）。束縛がないトランザクションでは`app.current_tenant`を設定しないため、そのトランザクションが業務の表に触れるとエラーになる。
+- どちらも`is_local`を`true`にし、トランザクションの間だけ効かせる。設定の名前（`role`と`app.current_tenant`）と値は、どちらもバインド変数で渡す。
+- テナントは`TenantContext.findCurrent()`で束縛から読む（[ADR-105](../adr/ADR-105-bind-tenant-to-request-and-event-context.md)）。束縛がないトランザクションでは`app.current_tenant`を設定しないため、そのトランザクションが業務の表に触れるとエラーになる。
+- モジュールが分からないトランザクションでは、ロールを設定しない（[DB接続情報とロール分離](connections.md#モジュールのロール)）。SQLには設定するものの`set_config`だけを並べ、どちらもなければSQLを流さない。上のSQLは、両方を設定するときの形である。
 - 接続プールの初期化のSQL（HikariCPの`connection-init-sql`）とセッション単位の`SET`には、テナントを書かない。
 
 ## 全テナントの行を書き換える処理

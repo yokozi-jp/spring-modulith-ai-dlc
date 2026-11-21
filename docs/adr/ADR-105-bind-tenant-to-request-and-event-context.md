@@ -31,6 +31,9 @@ RLS のポリシーは、トランザクションに設定したテナントの�
 `PgmCdAspect` が `ScopedValue` に値を束縛し、すべての `@Aspect` はトランザクションの advisor より外側で動く（[ADR-051](ADR-051-bind-pgm-cd-with-scoped-value-and-aspect.md)）。
 テナントの値の渡し方も、この形に揃えられるかを決める。
 
+実装（#377）で、Decision に `TenantContext.findCurrent()` を足した。
+トランザクションマネージャーは、テナントのないトランザクションでも例外を投げずに、束縛の有無を知る必要があるためである。
+
 ## Decision
 
 操作しているテナントの `public_id` を、`shared.tenant` の `ScopedValue` に束縛する。
@@ -39,6 +42,7 @@ RLS のポリシーは、トランザクションに設定したテナントの�
   置く型は、`public_id` の UUID を包む値オブジェクト `TenantId`、テナントを運ぶイベントの型 `TenantScoped`、束縛と読み出しの入口 `TenantContext` である。
   `tenancy` の `domain.model` も、テナントの ID に同じ `TenantId` を使う。テナントの ID を表す型を 2 つ持たない。
 - `TenantContext.current()` は、束縛された `TenantId` を返す。束縛がなければ `IllegalStateException` を投げ、テナントがない状態を「データがない」と取り違えさせない。
+- `TenantContext.findCurrent()` は、束縛がなければ空を返す。テナントのない呼び出し（Spring Modulith の内部、再投入、ShedLock）も通るトランザクションマネージャー（[ADR-107](ADR-107-isolate-tenants-with-rls-set-per-transaction.md)）のためにあり、業務の処理は `current()` を使う。
 - リクエストでは、`tenancy` の `TenantSelectionFilter` が、所属を引き直して残っているテナントを、リクエストの残りの処理の間だけ束縛する。
   テナントは認証の権限だけから取る。リクエストの header、パス、本文から取らない。
 - リスナーでは、`shared.infrastructure.persistence` の `TenantListenerAspect` が引数のイベントの `TenantScoped.tenantId()` を、呼び出しの間だけ束縛する。
@@ -103,5 +107,6 @@ DB のロールとテナントの設定は #377 で、トランザクション�
 
 - [ADR-051: 共通カラムの pgm_cd を Aspect と ScopedValue で渡し、Aspect をトランザクションの外側で動かす](ADR-051-bind-pgm-cd-with-scoped-value-and-aspect.md)
 - [ADR-101: テナント、所属、役割をアプリの DB に持ち、テナントを選んだ時点で役割の権限を組み立てる](ADR-101-keep-tenants-and-roles-in-app-database.md)
+- [ADR-107: 業務の表を RLS でテナントごとに分け、テナントをロールと同じ SQL でトランザクションごとに設定する](ADR-107-isolate-tenants-with-rls-set-per-transaction.md)
 - [issue #369: テナントでデータを分ける](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/369)
 - [JEP 506: Scoped Values](https://openjdk.org/jeps/506)

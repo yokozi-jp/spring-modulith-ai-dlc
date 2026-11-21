@@ -47,6 +47,8 @@ PostgreSQL の RLS と設定の関数には、次の性質がある。
 
 実装（#377）で、Decision に `tenant_public_id` の既定値を足した。
 Repository と seed の INSERT がテナントの列を書かずに済み、書き忘れる余地がなくなるためである。
+設定の SQL も、名前をバインド変数で渡し、設定するものの `set_config` だけを並べる形に改めた。
+ロールとテナントは、トランザクションによってはどちらか、または両方がなく（Spring Modulith の内部、再投入、ShedLock）、テストの補助とシーダーは片方だけを本番と同じ SQL で設定するためである。
 
 ## Decision
 
@@ -66,12 +68,14 @@ Repository と seed の INSERT がテナントの列を書かずに済み、書�
 テナントは、トランザクションごとに設定する。
 
 - トランザクションマネージャーの、トランザクションを始めた直後に接続を準備する箇所（`prepareTransactionalConnection`）で、ロールとテナントを 1 つの SQL で設定する。
-- どちらも `is_local` を真にして、トランザクションの間だけ効かせる。値はバインド変数で渡す。
-- テナントは `TenantContext` の束縛から読む。束縛がないトランザクションでは、`app.current_tenant` を設定しない。
+- どちらも `is_local` を真にして、トランザクションの間だけ効かせる。設定の名前（`role` と `app.current_tenant`）と値は、どちらもバインド変数で渡す。
+- テナントは `TenantContext.findCurrent()` で束縛から読む。束縛がないトランザクションでは、`app.current_tenant` を設定しない。モジュールが分からないトランザクションでは、ロールを設定しない（ADR-094）。SQL には、設定するものの `set_config` だけを並べ、どちらもなければ SQL を流さない。
 - 接続プールの初期化の SQL とセッション単位の設定には、テナントを書かない。
 
+ロールとテナントの両方を設定するときの SQL は、次のとおりである。
+
 ```sql
-SELECT set_config('role', ?, true), set_config('app.current_tenant', ?, true)
+SELECT set_config(?, ?, true), set_config(?, ?, true)
 ```
 
 RLS の外に置く表は、`modulith` と `tenancy` のスキーマの表だけにする。

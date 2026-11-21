@@ -310,7 +310,7 @@ INSERTの共通カラムは`CommonColumns.forInsert`で、UPDATEとDELETEの共�
   `Update`と`Delete`を作る入口をすべて禁じるため、`batch`や`subscribe`のように作った問い合わせを受け取って実行するAPIは禁じない。
 
   `tableWritesGoThroughTableWriter`が除外するのは、`TableWriter`、`LockedRoot`、`DeletedRoot`と、トランザクションの初めにモジュールのロールへ切り替える`ModuleRoleTransactionManager`とその`Config`の完全修飾型名だけである。
-  `ModuleRoleTransactionManager`は業務テーブルに触れず、固定の`set_config`だけを実行する（[ADR-094](../adr/ADR-094-switch-to-module-database-roles.md)）。
+  `ModuleRoleTransactionManager`は業務テーブルに触れず、ロールとテナントを設定する`set_config`だけを実行する（[ADR-094](../adr/ADR-094-switch-to-module-database-roles.md)、[ADR-107](../adr/ADR-107-isolate-tenants-with-rls-set-per-transaction.md)）。
   除外を足す、外す、または除外する型を移すときは、先に[ADR-054](../adr/ADR-054-detect-optimistic-lock-conflicts-by-update-count.md)の判断を変える。
   同じ変更で、`tableWritesGoThroughTableWriterRule`の完全修飾型名と、除外する型を置く適合フィクスチャ（`archfixture/conforming/shared/infrastructure/persistence/`）を更新する。
   禁止するAPIの違反フィクスチャ（`DirectOrderWriter`）は、禁止の一覧か`isDirectWrite`の判定を変えるときだけ更新する。
