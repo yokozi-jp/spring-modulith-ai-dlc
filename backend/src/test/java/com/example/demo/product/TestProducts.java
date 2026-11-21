@@ -3,7 +3,9 @@ package com.example.demo.product;
 import static com.example.demo.jooq.product.Tables.M_PRODUCT;
 
 import com.example.demo.shared.infrastructure.persistence.TestCommonColumns;
+import com.example.demo.shared.tenant.TenantId;
 import com.example.demo.testkit.AsModule;
+import com.example.demo.testkit.AsTenant;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.UUID;
@@ -19,20 +21,30 @@ public final class TestProducts {
 
   private TestProducts() {}
 
-  /** 販売中の商品を登録し、商品 ID を返す。 */
+  /** テストの利用者のテナントに販売中の商品を登録し、商品 ID を返す。 */
   public static UUID onSale(
       final DSLContext dsl, final String productCode, final String unitPrice) {
-    return insert(dsl, productCode, unitPrice, "ON_SALE");
+    return onSale(dsl, AsTenant.TENANT, productCode, unitPrice);
   }
 
-  /** 販売終了の商品を登録し、商品 ID を返す。 */
+  /** テナントに販売中の商品を登録し、商品 ID を返す。 */
+  public static UUID onSale(
+      final DSLContext dsl,
+      final TenantId tenant,
+      final String productCode,
+      final String unitPrice) {
+    return insert(dsl, tenant, productCode, unitPrice, "ON_SALE");
+  }
+
+  /** テストの利用者のテナントに販売終了の商品を登録し、商品 ID を返す。 */
   public static UUID discontinued(
       final DSLContext dsl, final String productCode, final String unitPrice) {
-    return insert(dsl, productCode, unitPrice, "DISCONTINUED");
+    return insert(dsl, AsTenant.TENANT, productCode, unitPrice, "DISCONTINUED");
   }
 
   private static UUID insert(
       final DSLContext dsl,
+      final TenantId tenant,
       final String productCode,
       final String unitPrice,
       final String salesStatus) {
@@ -40,6 +52,7 @@ public final class TestProducts {
     AsModule.run(
         dsl,
         "product",
+        tenant,
         tx ->
             TestCommonColumns.runAs(() ->
                 insert(

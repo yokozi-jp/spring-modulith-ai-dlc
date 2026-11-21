@@ -24,6 +24,7 @@ import org.jspecify.annotations.Nullable;
  * @param schemaPrivileges アプリロールのスキーマへの権限
  * @param relationPrivileges アプリロールのテーブルとビューへの権限
  * @param moduleRoles 名前が {@code _module} で終わるロール（モジュールのロール）
+ * @param policies 行レベルセキュリティのポリシー
  */
 record CatalogSnapshot(
     List<RelationRow> relations,
@@ -40,7 +41,8 @@ record CatalogSnapshot(
     RoleRow migrationRole,
     List<SchemaPrivilegeRow> schemaPrivileges,
     List<RelationPrivilegeRow> relationPrivileges,
-    List<ModuleRoleRow> moduleRoles) {
+    List<ModuleRoleRow> moduleRoles,
+    List<PolicyRow> policies) {
 
   /**
    * {@code pg_class}の1行。
@@ -50,13 +52,36 @@ record CatalogSnapshot(
    * @param relkind {@code relkind}（{@code r}、{@code p}、{@code v}、{@code m}、{@code f}）
    * @param primaryKey 主キーの先頭の列名。主キーがなければ{@code null}
    * @param inheritanceParent パーティションでない継承の親テーブル。なければ{@code null}
+   * @param rowSecurity 行レベルセキュリティを有効にしたか（{@code relrowsecurity}）
+   * @param forceRowSecurity 表の所有者にも行レベルセキュリティを効かせるか（{@code relforcerowsecurity}）
    */
   /* package */ record RelationRow(
       String schema,
       String name,
       String relkind,
       @Nullable String primaryKey,
-      @Nullable String inheritanceParent) {}
+      @Nullable String inheritanceParent,
+      boolean rowSecurity,
+      boolean forceRowSecurity) {
+
+    /** テーブルの{@code relkind}（通常のテーブルとパーティションテーブル）。 */
+    private static final Set<String> TABLE_KINDS = Set.of("r", "p");
+
+    /** 行レベルセキュリティのないテーブルかビュー。 */
+    /* package */ RelationRow(
+        final String schema,
+        final String name,
+        final String relkind,
+        final @Nullable String primaryKey,
+        final @Nullable String inheritanceParent) {
+      this(schema, name, relkind, primaryKey, inheritanceParent, false, false);
+    }
+
+    /** ビューでなく、テーブルか。 */
+    /* package */ boolean isTable() {
+      return TABLE_KINDS.contains(relkind);
+    }
+  }
 
   /**
    * {@code pg_attribute}の1行。
@@ -69,6 +94,7 @@ record CatalogSnapshot(
    * @param identity {@code attidentity}（{@code a}、{@code d}、空文字）
    * @param generated 生成列の種類（pg_attribute.attgenerated。空文字でなければ生成列）
    * @param defaultExpression 既定値の式。なければ{@code null}
+   * @param notNull NOT NULLか（{@code attnotnull}）
    */
   /* package */ record ColumnRow(
       String schema,
@@ -78,7 +104,23 @@ record CatalogSnapshot(
       String typeKind,
       String identity,
       String generated,
-      @Nullable String defaultExpression) {}
+      @Nullable String defaultExpression,
+      boolean notNull) {
+
+    /** NULLを許すカラム。 */
+    /* package */ ColumnRow(
+        final String schema,
+        final String table,
+        final String column,
+        final String typeName,
+        final String typeKind,
+        final String identity,
+        final String generated,
+        final @Nullable String defaultExpression) {
+      this(
+          schema, table, column, typeName, typeKind, identity, generated, defaultExpression, false);
+    }
+  }
 
   /**
    * {@code pg_constraint}の1行。
@@ -88,9 +130,30 @@ record CatalogSnapshot(
    * @param name 制約名
    * @param type {@code contype}
    * @param referencedSchema 外部キーが参照するテーブルのスキーマ名。外部キーでなければ{@code null}
+   * @param columns 制約の列（{@code conkey}の順）
+   * @param referencedTable 外部キーが参照するテーブル名。外部キーでなければ{@code null}
+   * @param referencedColumns 外部キーが参照する列（{@code confkey}の順）。外部キーでなければ空
    */
   /* package */ record ConstraintRow(
-      String schema, String table, String name, String type, @Nullable String referencedSchema) {}
+      String schema,
+      String table,
+      String name,
+      String type,
+      @Nullable String referencedSchema,
+      List<String> columns,
+      @Nullable String referencedTable,
+      List<String> referencedColumns) {
+
+    /** 列を判定に使わない制約。 */
+    /* package */ ConstraintRow(
+        final String schema,
+        final String table,
+        final String name,
+        final String type,
+        final @Nullable String referencedSchema) {
+      this(schema, table, name, type, referencedSchema, List.of(), null, List.of());
+    }
+  }
 
   /**
    * {@code pg_index}の1行。
@@ -105,6 +168,8 @@ record CatalogSnapshot(
    * @param hasExpressions 式を含むか
    * @param hasPredicate 部分インデックスか
    * @param backsExclusionConstraint 排他制約のインデックスか
+   * @param unique ユニークインデックスか
+   * @param firstColumn 先頭のキーの列名。先頭が式なら{@code null}
    */
   /* package */ record IndexRow(
       String schema,
@@ -116,7 +181,9 @@ record CatalogSnapshot(
       int totalColumnCount,
       boolean hasExpressions,
       boolean hasPredicate,
-      boolean backsExclusionConstraint) {}
+      boolean backsExclusionConstraint,
+      boolean unique,
+      @Nullable String firstColumn) {}
 
   /**
    * {@code pg_trigger}の1行。
@@ -224,4 +291,26 @@ record CatalogSnapshot(
       boolean appRoleCanSet,
       boolean appRoleInherits,
       Set<String> privileges) {}
+
+  /**
+   * {@code pg_policies}の1行。
+   *
+   * @param schema スキーマ名
+   * @param table テーブル名
+   * @param name ポリシー名
+   * @param permissive {@code PERMISSIVE}か{@code RESTRICTIVE}
+   * @param roles 対象のロール。{@code PUBLIC}は{@code public}
+   * @param command 対象の操作（{@code ALL}、{@code SELECT}など）
+   * @param using {@code USING}の式。なければ{@code null}
+   * @param withCheck {@code WITH CHECK}の式。なければ{@code null}
+   */
+  /* package */ record PolicyRow(
+      String schema,
+      String table,
+      String name,
+      String permissive,
+      List<String> roles,
+      String command,
+      @Nullable String using,
+      @Nullable String withCheck) {}
 }

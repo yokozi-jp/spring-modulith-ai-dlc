@@ -13,6 +13,7 @@ import com.example.demo.payment.domain.model.OrderId;
 import com.example.demo.payment.domain.model.PaymentGateway;
 import com.example.demo.shared.infrastructure.persistence.EventPublicationResubmitOnce;
 import com.example.demo.testkit.AsTenant;
+import com.example.demo.testkit.BindTestTenantExtension;
 import com.example.demo.testkit.CleanGeneratedTablesExtension;
 import com.example.demo.testkit.SharedTestConfiguration;
 import com.github.tomakehurst.wiremock.WireMockServer;
@@ -61,7 +62,7 @@ import org.springframework.web.client.HttpServerErrorException;
 @SuppressWarnings("PMD.TooManyMethods")
 @ApplicationModuleTest(mode = BootstrapMode.ALL_DEPENDENCIES)
 @Import({SharedTestConfiguration.class, OrderConfirmedFixture.class})
-@ExtendWith(CleanGeneratedTablesExtension.class)
+@ExtendWith({CleanGeneratedTablesExtension.class, BindTestTenantExtension.class})
 class PaymentGatewayClientIntegrationTest {
 
   /** 決済代行の Resilience4j の instance の名前。 */

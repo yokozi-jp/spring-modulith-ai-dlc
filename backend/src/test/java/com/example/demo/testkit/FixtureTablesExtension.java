@@ -4,7 +4,6 @@ import static com.example.demo.jooq.tables.FixtureItemDetailTable.FIXTURE_ITEM_D
 import static com.example.demo.jooq.tables.FixtureItemTable.FIXTURE_ITEM;
 
 import java.sql.Connection;
-import java.sql.DriverManager;
 import java.sql.SQLException;
 import org.jooq.DSLContext;
 import org.jooq.Name;
@@ -66,11 +65,7 @@ public final class FixtureTablesExtension implements BeforeAllCallback, AfterAll
       final ExtensionContext context, final MigrationStatements statements) throws SQLException {
     final Environment environment = SpringExtension.getApplicationContext(context).getEnvironment();
     final Name appRole = DSL.name(environment.getRequiredProperty("spring.datasource.username"));
-    try (Connection connection =
-        DriverManager.getConnection(
-            environment.getRequiredProperty("spring.datasource.url"),
-            environment.getRequiredProperty("MIGRATION_DB_USERNAME"),
-            environment.getRequiredProperty("MIGRATION_DB_PASSWORD"))) {
+    try (Connection connection = MigrationRoleConnections.open(environment)) {
       statements.run(DSL.using(connection, SQLDialect.POSTGRES), appRole);
     }
   }

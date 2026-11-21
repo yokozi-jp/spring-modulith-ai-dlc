@@ -31,6 +31,6 @@ public class Indexes {
     // INDEX definitions
     // -------------------------------------------------------------------------
 
-    public static final Index UK_2_M_PRODUCT = Internal.createIndex(DSL.name("uk_2_m_product"), MProduct.M_PRODUCT, new OrderField[] { MProduct.M_PRODUCT.PRODUCT_CODE }, true);
-    public static final Index UK_M_PRODUCT = Internal.createIndex(DSL.name("uk_m_product"), MProduct.M_PRODUCT, new OrderField[] { MProduct.M_PRODUCT.PUBLIC_ID }, true);
+    public static final Index UK_2_M_PRODUCT = Internal.createIndex(DSL.name("uk_2_m_product"), MProduct.M_PRODUCT, new OrderField[] { MProduct.M_PRODUCT.TENANT_PUBLIC_ID, MProduct.M_PRODUCT.PRODUCT_CODE }, true);
+    public static final Index UK_M_PRODUCT = Internal.createIndex(DSL.name("uk_m_product"), MProduct.M_PRODUCT, new OrderField[] { MProduct.M_PRODUCT.TENANT_PUBLIC_ID, MProduct.M_PRODUCT.PUBLIC_ID }, true);
 }

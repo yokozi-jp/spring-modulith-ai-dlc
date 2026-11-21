@@ -44,10 +44,25 @@ class ModuleRolesTest {
     assertThat(ModuleRoles.roleFor(transactionName)).isEmpty();
   }
 
+  @ParameterizedTest(name = "{0} はテナントが要る: {1}")
+  @CsvSource({
+    "com.example.demo.product.application.ProductQueryService.search, true",
+    "com.example.demo.ordering.application.ConfirmOrderCommandHandler.handle, true",
+    "com.example.demo.payment.application.OrderConfirmedListener.on, true",
+    "com.example.demo.tenancy.application.SignInUserCommandHandler.handle, false",
+    "com.example.demo.shared.infrastructure.persistence.EventPublicationResubmitter.run, false",
+    "org.springframework.modulith.events.jdbc.JdbcEventPublicationRepository.markCompleted, false"
+  })
+  @DisplayName("業務の表を持つモジュールの名前だけが、テナントを要する")
+  void requiresTenantOnlyForBusinessModules(final String transactionName, final boolean required) {
+    assertThat(ModuleRoles.requiresTenant(transactionName)).isEqualTo(required);
+  }
+
   @Test
-  @DisplayName("名前のないトランザクションは、ロールを引かない")
+  @DisplayName("名前のないトランザクションは、ロールを引かず、テナントも要さない")
   void doesNotResolveMissingName() {
     assertThat(ModuleRoles.roleFor(null)).isEqualTo(Optional.empty());
+    assertThat(ModuleRoles.requiresTenant(null)).isFalse();
   }
 
   @Test

@@ -58,6 +58,7 @@ git diff --stat "$(sed -n 's/^同期コミット：`\([0-9a-f]*\)`.*/\1/p' "$ski
   backend/src/main/java/com/example/demo/ordering/application/CancelOrderCommandHandler.java \
   backend/src/main/java/com/example/demo/error/presentation/web/ApiExceptionHandler.java \
   backend/src/main/resources/db/changelog/changesets/004-create-order-tables.yaml \
+  backend/src/main/resources/db/changelog/changesets/019-rebuild-order-tables-for-tenants.yaml \
   backend/src/main/resources/application.yaml \
   docs/database/postgresql-concurrency-control.md
 ```

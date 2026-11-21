@@ -6,6 +6,7 @@ import static org.assertj.core.groups.Tuple.tuple;
 import com.example.demo.product.ProductQueries;
 import com.example.demo.product.ProductSummary;
 import com.example.demo.product.TestProducts;
+import com.example.demo.testkit.BindTestTenantExtension;
 import com.example.demo.testkit.CleanGeneratedTablesExtension;
 import com.example.demo.testkit.SharedTestConfiguration;
 import com.example.demo.testkit.UniqueCodes;
@@ -22,7 +23,7 @@ import org.springframework.modulith.test.ApplicationModuleTest;
 /** 商品の参照を、ProductQueries を通して検証する。 */
 @ApplicationModuleTest
 @Import(SharedTestConfiguration.class)
-@ExtendWith(CleanGeneratedTablesExtension.class)
+@ExtendWith({CleanGeneratedTablesExtension.class, BindTestTenantExtension.class})
 class ProductQueryServiceTest {
 
   /** テスト対象の参照のインタフェース。 */

@@ -76,6 +76,11 @@ public class TOrderLine extends TableImpl<TOrderLineRecord> {
     public final TableField<TOrderLineRecord, Long> ORDER_LINE_ID = createField(DSL.name("order_line_id"), SQLDataType.BIGINT.nullable(false).generatedAlwaysAsIdentity(), this, "");
 
     /**
+     * The column <code>ordering.t_order_line.tenant_public_id</code>.
+     */
+    public final TableField<TOrderLineRecord, UUID> TENANT_PUBLIC_ID = createField(DSL.name("tenant_public_id"), SQLDataType.UUID.nullable(false).defaultValue(DSL.field(DSL.raw("(current_setting('app.current_tenant'::text))::uuid"), SQLDataType.UUID)), this, "");
+
+    /**
      * The column <code>ordering.t_order_line.order_id</code>.
      */
     public final TableField<TOrderLineRecord, Long> ORDER_ID = createField(DSL.name("order_id"), SQLDataType.BIGINT.nullable(false), this, "");

@@ -1,5 +1,17 @@
 package com.example.demo.persistence.conventions;
 
+import static com.example.demo.persistence.conventions.CatalogRows.BIGINT;
+import static com.example.demo.persistence.conventions.CatalogRows.BTREE;
+import static com.example.demo.persistence.conventions.CatalogRows.ITEM;
+import static com.example.demo.persistence.conventions.CatalogRows.ITEM_ID;
+import static com.example.demo.persistence.conventions.CatalogRows.MODULITH;
+import static com.example.demo.persistence.conventions.CatalogRows.TABLE;
+import static com.example.demo.persistence.conventions.CatalogRows.UUID;
+import static com.example.demo.persistence.conventions.CatalogRows.index;
+import static com.example.demo.persistence.conventions.CatalogRows.keys;
+import static com.example.demo.persistence.conventions.CatalogRows.tenantColumn;
+import static com.example.demo.persistence.conventions.CatalogRows.tenantPolicy;
+import static com.example.demo.persistence.conventions.CatalogRows.tenantTable;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.example.demo.persistence.conventions.CatalogSnapshot.ColumnRow;
@@ -17,7 +29,6 @@ import com.example.demo.persistence.conventions.CatalogSnapshot.ViewDependencyRo
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.stream.Collectors;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -28,34 +39,15 @@ import org.junit.jupiter.api.Test;
  *
  * <p>DBに接続しない。各テストは違反の規則の記号と対象を、{@code 規則 対象}のキーの集合で確かめる。
  */
+// 共有の行と定数（CatalogRows）を static import で読む。
+@SuppressWarnings("PMD.TooManyStaticImports")
 class SchemaConventionsTest {
-
-  /** 業務スキーマ。 */
-  private static final String ITEM = "item";
-
-  /** Spring Modulithのスキーマ。 */
-  private static final String MODULITH = "modulith";
 
   /** Liquibaseの管理テーブルのスキーマ。 */
   private static final String LIQUIBASE = "liquibase";
 
-  /** 業務テーブル。 */
-  private static final String TABLE = "m_item";
-
-  /** 業務テーブルの主キー。 */
-  private static final String ITEM_ID = "item_id";
-
-  /** uuidの型名。 */
-  private static final String UUID = "uuid";
-
-  /** bigintの型名。 */
-  private static final String BIGINT = "bigint";
-
   /** integerの型名。 */
   private static final String INTEGER = "integer";
-
-  /** btreeのアクセスメソッド。 */
-  private static final String BTREE = "btree";
 
   /** 商品のモジュールとスキーマの名前。 */
   private static final String PRODUCT = "product";
@@ -77,9 +69,10 @@ class SchemaConventionsTest {
   void conformingSnapshotHasNoViolations() {
     final CatalogSnapshot snapshot =
         new CatalogSnapshot(
-            List.of(relation(ITEM, "r", true, null), relation(MODULITH, "r", false, null)),
+            List.of(tenantTable(ITEM, TABLE, ITEM_ID), relation(MODULITH, "r", false, null)),
             List.of(
                 column(ITEM, BIGINT, "b", "a", "", null),
+                tenantColumn(ITEM, TABLE),
                 column(MODULITH, INTEGER, "b", "", "", "nextval('x'::regclass)")),
             List.of(
                 new ConstraintRow(ITEM, TABLE, "pk_m_item", "p", null),
@@ -104,7 +97,8 @@ class SchemaConventionsTest {
                 relationPrivilege(MODULITH, true, false, false),
                 relationPrivilege(ITEM, false, false, false),
                 relationPrivilege(LIQUIBASE, false, false, false)),
-            List.of());
+            List.of(),
+            List.of(tenantPolicy(ITEM, TABLE)));
 
     assertThat(SchemaConventions.check(snapshot, List.of())).as("違反").isEmpty();
   }
@@ -145,8 +139,8 @@ class SchemaConventionsTest {
     }
 
     @Test
-    @DisplayName("K1、K2、K3：外部キー、CHECK、ユニークの制約を拒否する")
-    void rejectsForeignKeyCheckAndUniqueConstraints() {
+    @DisplayName("K2、K3：CHECKとユニークの制約を拒否し、外部キーはこの規則で判定しない")
+    void rejectsCheckAndUniqueConstraints() {
       final List<ConstraintRow> rows =
           List.of(
               new ConstraintRow(ITEM, TABLE, "fk_x", "f", ITEM),
@@ -155,7 +149,7 @@ class SchemaConventionsTest {
 
       assertThat(keys(SchemaTableConventions.constraints(rows)))
           .as("制約: %s", rows)
-          .containsExactlyInAnyOrder("K1 item.fk_x", "K2 item.chk_x", "K3 item.uq_x");
+          .containsExactlyInAnyOrder("K2 item.chk_x", "K3 item.uq_x");
     }
 
     @Test
@@ -200,9 +194,11 @@ class SchemaConventionsTest {
     @DisplayName("K7：排他制約のGiSTだけを受け入れる")
     void acceptsGistOnlyForExclusionConstraints() {
       final IndexRow exclusion =
-          new IndexRow(ITEM, TABLE, "ex_m_item", "gist", false, 2, 2, false, false, true);
+          new IndexRow(
+              ITEM, TABLE, "ex_m_item", "gist", false, 2, 2, false, false, true, false, null);
       final IndexRow plainGist =
-          new IndexRow(ITEM, TABLE, "idx_2_m_item", "gist", false, 1, 1, false, false, false);
+          new IndexRow(
+              ITEM, TABLE, "idx_2_m_item", "gist", false, 1, 1, false, false, false, false, null);
 
       assertThat(keys(SchemaTableConventions.indexes(List.of(exclusion, plainGist))))
           .containsExactly("K7 item.idx_2_m_item");
@@ -212,7 +208,8 @@ class SchemaConventionsTest {
     @DisplayName("K8：式インデックスを拒否する")
     void rejectsExpressionIndexes() {
       final IndexRow row =
-          new IndexRow(ITEM, TABLE, "idx_1_m_item", BTREE, false, 1, 1, true, false, false);
+          new IndexRow(
+              ITEM, TABLE, "idx_1_m_item", BTREE, false, 1, 1, true, false, false, false, null);
 
       assertThat(keys(SchemaTableConventions.indexes(List.of(row))))
           .containsExactly("K8 item.idx_1_m_item");
@@ -222,7 +219,8 @@ class SchemaConventionsTest {
     @DisplayName("K9：部分インデックスとINCLUDE付きインデックスを拒否する")
     void rejectsPartialAndIncludeIndexes() {
       final IndexRow partial =
-          new IndexRow(ITEM, TABLE, "idx_2_m_item", BTREE, false, 1, 1, false, true, false);
+          new IndexRow(
+              ITEM, TABLE, "idx_2_m_item", BTREE, false, 1, 1, false, true, false, false, null);
       final IndexRow include = index(ITEM, BTREE, false, 1, 2);
 
       assertThat(keys(SchemaTableConventions.indexes(List.of(partial, include))))
@@ -403,6 +401,31 @@ class SchemaConventionsTest {
                               "",
                               "''::character varying")))))
           .isEmpty();
+    }
+
+    @Test
+    @DisplayName("T13：テナントの列の、トランザクションのテナントを入れるDEFAULTだけを許可する")
+    void acceptsOnlyTenantColumnDefaultedByCurrentTenant() {
+      final String tenantDefault = TenantIsolation.CATALOG_TENANT_DEFAULT;
+
+      assertThat(
+              keys(
+                  SchemaTableConventions.columns(
+                      List.of(
+                          new ColumnRow(
+                              ITEM, TABLE, "tenant_public_id", UUID, "b", "", "", tenantDefault),
+                          new ColumnRow(ITEM, TABLE, "public_id", UUID, "b", "", "", tenantDefault),
+                          new ColumnRow(
+                              ITEM,
+                              TABLE,
+                              "tenant_public_id",
+                              UUID,
+                              "b",
+                              "",
+                              "",
+                              "gen_random_uuid()")))))
+          .containsExactlyInAnyOrder(
+              "T13 item.m_item.public_id", "T13 item.m_item.tenant_public_id");
     }
 
     @Test
@@ -775,10 +798,6 @@ class SchemaConventionsTest {
     }
   }
 
-  private static Set<String> keys(final List<ConventionViolation> violations) {
-    return violations.stream().map(ConventionViolation::key).collect(Collectors.toSet());
-  }
-
   private static RelationRow relation(
       final String schema, final String relkind, final boolean hasPrimaryKey, final String parent) {
     return new RelationRow(schema, TABLE, relkind, hasPrimaryKey ? ITEM_ID : null, parent);
@@ -797,25 +816,6 @@ class SchemaConventionsTest {
       final String defaultExpression) {
     return new ColumnRow(
         schema, TABLE, ITEM_ID, typeName, typeKind, identity, generated, defaultExpression);
-  }
-
-  private static IndexRow index(
-      final String schema,
-      final String accessMethod,
-      final boolean primary,
-      final int keyColumnCount,
-      final int totalColumnCount) {
-    return new IndexRow(
-        schema,
-        TABLE,
-        "idx_1_m_item",
-        accessMethod,
-        primary,
-        keyColumnCount,
-        totalColumnCount,
-        false,
-        false,
-        false);
   }
 
   private static RoleRow cleanRole() {

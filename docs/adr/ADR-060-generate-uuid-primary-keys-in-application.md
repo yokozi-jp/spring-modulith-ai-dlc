@@ -11,6 +11,9 @@ tags: [adr, database, postgresql, backend]
 
 Accepted
 
+Amended by [ADR-107](ADR-107-isolate-tenants-with-rls-set-per-transaction.md)：業務テーブルの `tenant_public_id` に、トランザクションに設定したテナントを入れる既定値 `current_setting('app.current_tenant')::uuid` を付けること。
+uuid の列の `DEFAULT` の禁止の、ただ 1 つの例外にする。
+
 ## Date
 
 2026-11-19

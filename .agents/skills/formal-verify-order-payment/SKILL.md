@@ -68,6 +68,7 @@ git diff --stat "$(sed -n 's/^同期コミット：`\([0-9a-f]*\)`.*/\1/p' "$ski
   backend/src/main/java/com/example/demo/shared/infrastructure/persistence/EventPublicationResubmitOnce.java \
   backend/src/main/java/com/example/demo/shared/infrastructure/persistence/TableWriter.java \
   backend/src/main/resources/db/changelog/changesets/006-create-payment-tables.yaml \
+  backend/src/main/resources/db/changelog/changesets/020-rebuild-payment-tables-for-tenants.yaml \
   backend/src/main/resources/application.yaml \
   backend/build.gradle
 ```

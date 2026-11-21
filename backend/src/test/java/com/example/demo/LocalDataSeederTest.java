@@ -16,6 +16,7 @@ import com.example.demo.LocalDataSeeder.Mode;
 import com.example.demo.LocalDataSeeder.Outcome;
 import com.example.demo.jooq.DefaultCatalog;
 import com.example.demo.product.TestProducts;
+import com.example.demo.shared.tenant.TenantId;
 import com.example.demo.tenancy.TenancySeeds;
 import com.example.demo.testkit.AsModule;
 import com.example.demo.testkit.DatabaseTest;
@@ -45,7 +46,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 @DatabaseTest
 // 生成したテーブルと AssertJ を static import で読みやすくする。
 // 読み取りの補助メソッドが増えるため、メソッド数の上限も外す。
-@SuppressWarnings({"PMD.TooManyStaticImports", "PMD.TooManyMethods"})
+@SuppressWarnings({"PMD.TooManyStaticImports", "PMD.TooManyMethods", "PMD.CouplingBetweenObjects"})
 class LocalDataSeederTest {
 
   /** test-user と test-admin を所属させる発行者。 */
@@ -68,91 +69,40 @@ class LocalDataSeederTest {
   /** 決済のモジュール。決済のロールは、依存の方向に沿って注文のスキーマも読める。 */
   private static final String PAYMENT = "payment";
 
+  /** 代表データを入れる 2 つのテナント。 */
+  private static final List<TenantId> TENANTS = TenancySeeds.TENANTS;
+
+  /** test-user と test-admin が属するテナント。 */
+  private static final TenantId TRADING = new TenantId(TenancySeeds.TRADING_TENANT);
+
   /** テスト用の DB の jOOQ のコンテキスト。テストごとにロールバックする。 */
   @Autowired private DSLContext dsl;
 
   @Test
-  @DisplayName("空の DB に商品 5 件、注文 6 件、決済 2 件を入れ、2 回目は何も入れない")
+  @DisplayName(
+      "空の DB の 2 つのテナントのそれぞれに、BUSINESS_TABLES のすべての表の行と、商品 5 件、注文 6 件、決済 2 件を入れ、2 回目は何も入れない")
   void seedsRepresentativeDataOnlyWhenEmpty() {
-    LocalDataSeeder.BUSINESS_TABLES.forEach(
-        table -> inModule(AsModule.moduleOf(table), tx -> tx.deleteFrom(table).execute()));
+    for (final TenantId tenant : TENANTS) {
+      LocalDataSeeder.BUSINESS_TABLES.forEach(table ->
+          inModule(tenant, AsModule.moduleOf(table), tx -> tx.deleteFrom(table).execute()));
+    }
     final int publications = dsl.fetchCount(EVENT_PUBLICATION);
 
     assertThat(SEEDER.seed(dsl, Mode.SEED)).isEqualTo(Outcome.SEEDED);
 
-    assertThat(this.<Integer>inModule(PRODUCT, tx -> tx.fetchCount(M_PRODUCT))).isEqualTo(5);
-    assertThat(
-            this.<List<String>>inModule(
-                PRODUCT,
-                tx ->
-                    tx.select(M_PRODUCT.PRODUCT_CODE)
-                        .from(M_PRODUCT)
-                        .where(M_PRODUCT.SALES_STATUS_TYP.eq("DISCONTINUED"))
-                        .fetch(M_PRODUCT.PRODUCT_CODE)))
-        .containsExactly("SEED-P05");
-    assertThat(
-            this.<Map<String, Integer>>inModule(
-                ORDERING,
-                tx ->
-                    tx.select(T_ORDER.ORDER_STATUS_TYP, DSL.count())
-                        .from(T_ORDER)
-                        .groupBy(T_ORDER.ORDER_STATUS_TYP)
-                        .fetchMap(T_ORDER.ORDER_STATUS_TYP, DSL.count())))
-        .isEqualTo(Map.of("DRAFT", 2, "CONFIRMED", 3, "CANCELLED", 1));
-    assertThat(
-            this.<Integer>inModule(
-                ORDERING,
-                tx ->
-                    tx.fetchCount(
-                        T_ORDER,
-                        DSL.notExists(
-                            tx.selectOne()
-                                .from(T_ORDER_LINE)
-                                .where(T_ORDER_LINE.ORDER_ID.eq(T_ORDER.ORDER_ID))))))
-        .isZero();
-    assertThat(
-            this.<Map<String, String>>inModule(
-                PAYMENT,
-                tx ->
-                    tx.select(
-                            T_ORDER.CUSTOMER_ORDER_CODE,
-                            DSL.coalesce(T_PAYMENT.PAYMENT_STATUS_TYP, DSL.inline("NONE")))
-                        .from(T_ORDER)
-                        .leftJoin(T_PAYMENT)
-                        .on(T_PAYMENT.ORDER_PUBLIC_ID.eq(T_ORDER.PUBLIC_ID))
-                        .where(T_ORDER.ORDER_STATUS_TYP.eq("CONFIRMED"))
-                        .fetchMap(Record2::value1, Record2::value2)))
-        .isEqualTo(Map.of("SEED-C03", "PAID", "SEED-C05", "DECLINED", "SEED-C06", "NONE"));
-    final Result<Record3<String, BigDecimal, BigDecimal>> amounts =
-        inModule(
-            PAYMENT,
-            tx ->
-                tx.select(
-                        T_PAYMENT.GATEWAY_PAYMENT_CODE,
-                        T_PAYMENT.CHARGED_AMOUNT_JPY,
-                        DSL.sum(
-                            T_ORDER_LINE.ORDERED_UNIT_PRICE_JPY.mul(T_ORDER_LINE.ORDERED_COUNT)))
-                    .from(T_PAYMENT)
-                    .join(T_ORDER)
-                    .on(T_ORDER.PUBLIC_ID.eq(T_PAYMENT.ORDER_PUBLIC_ID))
-                    .join(T_ORDER_LINE)
-                    .on(T_ORDER_LINE.ORDER_ID.eq(T_ORDER.ORDER_ID))
-                    .groupBy(T_PAYMENT.GATEWAY_PAYMENT_CODE, T_PAYMENT.CHARGED_AMOUNT_JPY)
-                    .fetch());
-    assertThat(amounts).hasSize(2);
-    assertThat(amounts)
-        .allSatisfy(row -> assertThat(row.value2()).isEqualByComparingTo(row.value3()));
-    assertThat(createdPgmCds(M_PRODUCT, M_PRODUCT.CREATED_PGM_CD, M_PRODUCT.CREATED_BY))
-        .containsOnly("product.SeedLocalData");
-    assertThat(createdPgmCds(T_ORDER, T_ORDER.CREATED_PGM_CD, T_ORDER.CREATED_BY))
-        .containsOnly("ordering.SeedLocalData");
-    assertThat(createdPgmCds(T_ORDER_LINE, T_ORDER_LINE.CREATED_PGM_CD, T_ORDER_LINE.CREATED_BY))
-        .containsOnly("ordering.SeedLocalData");
-    assertThat(createdPgmCds(T_PAYMENT, T_PAYMENT.CREATED_PGM_CD, T_PAYMENT.CREATED_BY))
-        .containsOnly("payment.SeedLocalData");
+    for (final TenantId tenant : TENANTS) {
+      assertRepresentativeData(tenant);
+      for (final Table<?> table : LocalDataSeeder.BUSINESS_TABLES) {
+        assertThat(
+                this.<Integer>inModule(
+                    tenant, AsModule.moduleOf(table), tx -> tx.fetchCount(table)))
+            .as("テナント %s の %s の行数", tenant, table)
+            .isPositive();
+      }
+    }
     assertThat(dsl.fetchCount(EVENT_PUBLICATION)).isEqualTo(publications);
 
-    final List<List<Map<String, Object>>> before = snapshot();
+    final List<List<List<Map<String, Object>>>> before = snapshot();
     assertThat(SEEDER.seed(dsl, Mode.SEED)).isEqualTo(Outcome.SKIPPED_NOT_EMPTY);
     assertThat(snapshot()).isEqualTo(before);
   }
@@ -160,7 +110,7 @@ class LocalDataSeederTest {
   @Test
   @DisplayName("業務データがあっても、2 つのテナントと test-user と test-admin の所属を入れ、何度入れても増やさない")
   void seedsTenantsAndMembershipsIdempotently() {
-    TestProducts.onSale(dsl, "NOT-SEED-2", "100");
+    TestProducts.onSale(dsl, TRADING, "NOT-SEED-2", "100");
 
     assertThat(SEEDER.seed(dsl, Mode.SEED)).isEqualTo(Outcome.SKIPPED_NOT_EMPTY);
     final Map<String, List<String>> first = memberships();
@@ -195,16 +145,18 @@ class LocalDataSeederTest {
         .set(EVENT_PUBLICATION_ARCHIVE.SERIALIZED_EVENT, "{}")
         .set(EVENT_PUBLICATION_ARCHIVE.PUBLICATION_DATE, publishedAt)
         .execute();
-    TestProducts.onSale(dsl, "NOT-SEED-1", "100");
+    TestProducts.onSale(dsl, TRADING, "NOT-SEED-1", "100");
 
     assertThat(SEEDER.seed(dsl, Mode.RESET)).isEqualTo(Outcome.SEEDED);
-    final List<List<Map<String, Object>>> first = snapshot();
+    final List<List<List<Map<String, Object>>>> first = snapshot();
     assertThat(SEEDER.seed(dsl, Mode.RESET)).isEqualTo(Outcome.SEEDED);
 
     assertThat(snapshot()).isEqualTo(first);
     assertThat(
             this.<Boolean>inModule(
-                PRODUCT, tx -> tx.fetchExists(M_PRODUCT, M_PRODUCT.PRODUCT_CODE.eq("NOT-SEED-1"))))
+                TRADING,
+                PRODUCT,
+                tx -> tx.fetchExists(M_PRODUCT, M_PRODUCT.PRODUCT_CODE.eq("NOT-SEED-1"))))
         .isFalse();
     assertThat(dsl.fetchExists(EVENT_PUBLICATION, EVENT_PUBLICATION.ID.eq(publication))).isTrue();
     assertThat(
@@ -248,35 +200,126 @@ class LocalDataSeederTest {
   void publicIdsAreVersion4() {
     SEEDER.seed(dsl, Mode.RESET);
 
-    final List<UUID> ids =
-        Stream.of(
-                inModule(
-                    PRODUCT,
-                    tx ->
-                        tx.select(M_PRODUCT.PUBLIC_ID).from(M_PRODUCT).fetch(M_PRODUCT.PUBLIC_ID)),
-                inModule(
-                    ORDERING,
-                    tx -> tx.select(T_ORDER.PUBLIC_ID).from(T_ORDER).fetch(T_ORDER.PUBLIC_ID)),
-                inModule(
-                    PAYMENT,
-                    tx ->
-                        tx.select(T_PAYMENT.PUBLIC_ID).from(T_PAYMENT).fetch(T_PAYMENT.PUBLIC_ID)))
-            .flatMap(List::stream)
-            .toList();
+    final List<UUID> ids = TENANTS.stream().flatMap(tenant -> publicIds(tenant).stream()).toList();
 
-    assertThat(ids).hasSize(13);
     assertThat(ids)
+        .isNotEmpty()
+        .doesNotHaveDuplicates()
         .allSatisfy(id -> assertThat(List.of(id.version(), id.variant())).isEqualTo(List.of(4, 2)));
   }
 
-  /** モジュールのロールで読み書きする。アプリロールは業務のスキーマに権限を持たない（ADR-094）。 */
-  private <T> T inModule(final String module, final Function<DSLContext, T> body) {
-    return AsModule.call(dsl, module, body);
+  private List<UUID> publicIds(final TenantId tenant) {
+    return Stream.of(
+            inModule(
+                tenant,
+                PRODUCT,
+                tx -> tx.select(M_PRODUCT.PUBLIC_ID).from(M_PRODUCT).fetch(M_PRODUCT.PUBLIC_ID)),
+            inModule(
+                tenant,
+                ORDERING,
+                tx -> tx.select(T_ORDER.PUBLIC_ID).from(T_ORDER).fetch(T_ORDER.PUBLIC_ID)),
+            inModule(
+                tenant,
+                PAYMENT,
+                tx -> tx.select(T_PAYMENT.PUBLIC_ID).from(T_PAYMENT).fetch(T_PAYMENT.PUBLIC_ID)))
+        .flatMap(List::stream)
+        .toList();
+  }
+
+  private void assertRepresentativeData(final TenantId tenant) {
+
+    assertThat(this.<Integer>inModule(tenant, PRODUCT, tx -> tx.fetchCount(M_PRODUCT)))
+        .isEqualTo(5);
+    assertThat(
+            this.<List<String>>inModule(
+                tenant,
+                PRODUCT,
+                tx ->
+                    tx.select(M_PRODUCT.PRODUCT_CODE)
+                        .from(M_PRODUCT)
+                        .where(M_PRODUCT.SALES_STATUS_TYP.eq("DISCONTINUED"))
+                        .fetch(M_PRODUCT.PRODUCT_CODE)))
+        .containsExactly("SEED-P05");
+    assertThat(
+            this.<Map<String, Integer>>inModule(
+                tenant,
+                ORDERING,
+                tx ->
+                    tx.select(T_ORDER.ORDER_STATUS_TYP, DSL.count())
+                        .from(T_ORDER)
+                        .groupBy(T_ORDER.ORDER_STATUS_TYP)
+                        .fetchMap(T_ORDER.ORDER_STATUS_TYP, DSL.count())))
+        .isEqualTo(Map.of("DRAFT", 2, "CONFIRMED", 3, "CANCELLED", 1));
+    assertThat(
+            this.<Integer>inModule(
+                tenant,
+                ORDERING,
+                tx ->
+                    tx.fetchCount(
+                        T_ORDER,
+                        DSL.notExists(
+                            tx.selectOne()
+                                .from(T_ORDER_LINE)
+                                .where(T_ORDER_LINE.ORDER_ID.eq(T_ORDER.ORDER_ID))))))
+        .isZero();
+    assertThat(
+            this.<Map<String, String>>inModule(
+                tenant,
+                PAYMENT,
+                tx ->
+                    tx.select(
+                            T_ORDER.CUSTOMER_ORDER_CODE,
+                            DSL.coalesce(T_PAYMENT.PAYMENT_STATUS_TYP, DSL.inline("NONE")))
+                        .from(T_ORDER)
+                        .leftJoin(T_PAYMENT)
+                        .on(T_PAYMENT.ORDER_PUBLIC_ID.eq(T_ORDER.PUBLIC_ID))
+                        .where(T_ORDER.ORDER_STATUS_TYP.eq("CONFIRMED"))
+                        .fetchMap(Record2::value1, Record2::value2)))
+        .isEqualTo(Map.of("SEED-C03", "PAID", "SEED-C05", "DECLINED", "SEED-C06", "NONE"));
+    final Result<Record3<String, BigDecimal, BigDecimal>> amounts =
+        inModule(
+            tenant,
+            PAYMENT,
+            tx ->
+                tx.select(
+                        T_PAYMENT.GATEWAY_PAYMENT_CODE,
+                        T_PAYMENT.CHARGED_AMOUNT_JPY,
+                        DSL.sum(
+                            T_ORDER_LINE.ORDERED_UNIT_PRICE_JPY.mul(T_ORDER_LINE.ORDERED_COUNT)))
+                    .from(T_PAYMENT)
+                    .join(T_ORDER)
+                    .on(T_ORDER.PUBLIC_ID.eq(T_PAYMENT.ORDER_PUBLIC_ID))
+                    .join(T_ORDER_LINE)
+                    .on(T_ORDER_LINE.ORDER_ID.eq(T_ORDER.ORDER_ID))
+                    .groupBy(T_PAYMENT.GATEWAY_PAYMENT_CODE, T_PAYMENT.CHARGED_AMOUNT_JPY)
+                    .fetch());
+    assertThat(amounts).hasSize(2);
+    assertThat(amounts)
+        .allSatisfy(row -> assertThat(row.value2()).isEqualByComparingTo(row.value3()));
+    assertThat(createdPgmCds(tenant, M_PRODUCT, M_PRODUCT.CREATED_PGM_CD, M_PRODUCT.CREATED_BY))
+        .containsOnly("product.SeedLocalData");
+    assertThat(createdPgmCds(tenant, T_ORDER, T_ORDER.CREATED_PGM_CD, T_ORDER.CREATED_BY))
+        .containsOnly("ordering.SeedLocalData");
+    assertThat(
+            createdPgmCds(
+                tenant, T_ORDER_LINE, T_ORDER_LINE.CREATED_PGM_CD, T_ORDER_LINE.CREATED_BY))
+        .containsOnly("ordering.SeedLocalData");
+    assertThat(createdPgmCds(tenant, T_PAYMENT, T_PAYMENT.CREATED_PGM_CD, T_PAYMENT.CREATED_BY))
+        .containsOnly("payment.SeedLocalData");
+  }
+
+  private <T> T inModule(
+      final TenantId tenant, final String module, final Function<DSLContext, T> body) {
+    return AsModule.call(dsl, module, tenant, body);
   }
 
   private Set<String> createdPgmCds(
-      final Table<?> table, final Field<String> pgmCd, final Field<String> createdBy) {
+      final TenantId tenant,
+      final Table<?> table,
+      final Field<String> pgmCd,
+      final Field<String> createdBy) {
     return inModule(
+        tenant,
         AsModule.moduleOf(table),
         tx -> {
           final Set<String> values =
@@ -288,7 +331,8 @@ class LocalDataSeederTest {
 
   /** 発行者 {@link #ISSUER} の subject ごとの、「テナントの名前:役割」の一覧。 */
   private Map<String, List<String>> memberships() {
-    return inModule(
+    return AsModule.call(
+        dsl,
         TENANCY,
         tx ->
             tx.select(
@@ -307,13 +351,17 @@ class LocalDataSeederTest {
                 .fetchMap(Record2::value1, row -> List.of(row.value2())));
   }
 
-  /** reset の後に比べる値。IDENTITY の主キーとそれを指す列を除き、public_id（明細は注文の public_id と番号）で並べる。 */
-  private List<List<Map<String, Object>>> snapshot() {
+  private List<List<List<Map<String, Object>>>> snapshot() {
+    return TENANTS.stream().map(this::tenantSnapshot).toList();
+  }
+
+  private List<List<Map<String, Object>>> tenantSnapshot(final TenantId tenant) {
     return List.of(
-        rows(M_PRODUCT, M_PRODUCT.PRODUCT_ID, M_PRODUCT.PUBLIC_ID),
-        rows(T_ORDER, T_ORDER.ORDER_ID, T_ORDER.PUBLIC_ID),
-        rows(T_PAYMENT, T_PAYMENT.PAYMENT_ID, T_PAYMENT.PUBLIC_ID),
+        rows(tenant, M_PRODUCT, M_PRODUCT.PRODUCT_ID, M_PRODUCT.PUBLIC_ID),
+        rows(tenant, T_ORDER, T_ORDER.ORDER_ID, T_ORDER.PUBLIC_ID),
+        rows(tenant, T_PAYMENT, T_PAYMENT.PAYMENT_ID, T_PAYMENT.PUBLIC_ID),
         inModule(
+            tenant,
             ORDERING,
             tx ->
                 tx.select(T_ORDER.PUBLIC_ID)
@@ -328,8 +376,12 @@ class LocalDataSeederTest {
   }
 
   private List<Map<String, Object>> rows(
-      final Table<?> table, final Field<Long> identity, final Field<UUID> publicId) {
+      final TenantId tenant,
+      final Table<?> table,
+      final Field<Long> identity,
+      final Field<UUID> publicId) {
     return inModule(
+        tenant,
         AsModule.moduleOf(table),
         tx -> tx.select(without(table, identity)).from(table).orderBy(publicId).fetch().intoMaps());
   }

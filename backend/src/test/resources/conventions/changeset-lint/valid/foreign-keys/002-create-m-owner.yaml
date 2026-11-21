@@ -1,0 +1,160 @@
+databaseChangeLog:
+  - changeSet:
+      id: "002-create-m-owner"
+      author: system
+      changes:
+        - createTable:
+            tableName: m_owner
+            schemaName: tenancy
+            columns:
+              - column:
+                  name: owner_id
+                  type: bigint
+                  autoIncrement: true
+                  generationType: ALWAYS
+                  constraints:
+                    primaryKey: true
+                    primaryKeyName: pk_m_owner
+              - column:
+                  name: item_code
+                  type: varchar(20)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: created_at
+                  type: timestamptz
+                  constraints:
+                    nullable: false
+              - column:
+                  name: created_by
+                  type: varchar(64)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: created_pgm_cd
+                  type: varchar(64)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: created_tx_id
+                  type: varchar(32)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: updated_at
+                  type: timestamptz
+                  constraints:
+                    nullable: false
+              - column:
+                  name: updated_by
+                  type: varchar(64)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: updated_pgm_cd
+                  type: varchar(64)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: updated_tx_id
+                  type: varchar(32)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: lock_no
+                  type: bigint
+                  constraints:
+                    nullable: false
+              - column:
+                  name: patched_at
+                  type: timestamptz
+              - column:
+                  name: patched_by
+                  type: varchar(64)
+              - column:
+                  name: patched_id
+                  type: integer
+        - createTable:
+            tableName: m_owner_key
+            schemaName: tenancy
+            columns:
+              - column:
+                  name: owner_key_id
+                  type: bigint
+                  autoIncrement: true
+                  generationType: ALWAYS
+                  constraints:
+                    primaryKey: true
+                    primaryKeyName: pk_m_owner_key
+              - column:
+                  name: owner_id
+                  type: bigint
+                  constraints:
+                    nullable: false
+              - column:
+                  name: item_code
+                  type: varchar(20)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: created_at
+                  type: timestamptz
+                  constraints:
+                    nullable: false
+              - column:
+                  name: created_by
+                  type: varchar(64)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: created_pgm_cd
+                  type: varchar(64)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: created_tx_id
+                  type: varchar(32)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: updated_at
+                  type: timestamptz
+                  constraints:
+                    nullable: false
+              - column:
+                  name: updated_by
+                  type: varchar(64)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: updated_pgm_cd
+                  type: varchar(64)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: updated_tx_id
+                  type: varchar(32)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: lock_no
+                  type: bigint
+                  constraints:
+                    nullable: false
+              - column:
+                  name: patched_at
+                  type: timestamptz
+              - column:
+                  name: patched_by
+                  type: varchar(64)
+              - column:
+                  name: patched_id
+                  type: integer
+        - addForeignKeyConstraint:
+            constraintName: fk_m_owner_key
+            baseTableSchemaName: tenancy
+            baseTableName: m_owner_key
+            baseColumnNames: owner_id
+            referencedTableSchemaName: tenancy
+            referencedTableName: m_owner
+            referencedColumnNames: owner_id

@@ -9,6 +9,7 @@ import com.example.demo.ordering.application.DraftOrderCommand;
 import com.example.demo.ordering.application.DraftOrderCommandHandler;
 import com.example.demo.product.TestProducts;
 import com.example.demo.testkit.AsModule;
+import com.example.demo.testkit.BindTestTenantExtension;
 import com.example.demo.testkit.CleanGeneratedTablesExtension;
 import com.example.demo.testkit.SharedTestConfiguration;
 import com.example.demo.testkit.UniqueCodes;
@@ -44,7 +45,7 @@ import org.springframework.test.util.ReflectionTestUtils;
 /** IdP のログインから、アプリの利用者を引くか作り、書き込みの作成者に利用者の ID が入るまでを、実際の Spring の構成で検証する。 */
 @SpringBootTest
 @Import(SharedTestConfiguration.class)
-@ExtendWith(CleanGeneratedTablesExtension.class)
+@ExtendWith({CleanGeneratedTablesExtension.class, BindTestTenantExtension.class})
 class SignInOidcUserLoginTest {
 
   /** 時刻を固定したトークンの発行時刻。 */

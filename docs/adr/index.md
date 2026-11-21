@@ -61,7 +61,7 @@
 - [ADR-057: E2E テストに Playwright と Chromium を採用し、テストデータを公開 API で作る](ADR-057-adopt-playwright-for-e2e-tests.md)（Proposed, 2026-10-04）
 - [ADR-058: problem type にパスを全部書いた相対 URI を使う](ADR-058-use-path-absolute-relative-uri-for-problem-types.md)（Accepted, 2026-10-04）
 - [ADR-059: 401 の WWW-Authenticate に独自の Session challenge を返す](ADR-059-send-a-session-challenge-in-www-authenticate-on-401.md)（Accepted, 2026-10-05）
-- [ADR-060: UUID の採番をアプリケーションで行い、DB の DEFAULT で採番しない](ADR-060-generate-uuid-primary-keys-in-application.md)（Accepted, 2026-11-19）
+- [ADR-060: UUID の採番をアプリケーションで行い、DB の DEFAULT で採番しない](ADR-060-generate-uuid-primary-keys-in-application.md)（Accepted, Amended by ADR-107, 2026-11-19）
 - [ADR-061: ヘルスチェックは liveness と readiness だけを未認証で許可する](ADR-061-allow-only-health-probes-unauthenticated.md)（Proposed, 2026-10-06）
 - [ADR-062: 業務上の失敗を 3 つの例外の型で表し、404、409、422 の Problem Details に対応づける](ADR-062-map-business-exceptions-to-404-409-422.md)（Proposed, 2026-10-06）
 - [ADR-063: Gradle の依存キャッシュを MIT の範囲で restore-keys 付きに復元する](ADR-063-restore-gradle-cache-with-restore-keys-on-mit-caching.md)（Proposed, 2026-10-06）
@@ -74,7 +74,7 @@
 - [ADR-070: SQL の span を jOOQ の ExecuteListener で作り、SQL の文と値を入れない](ADR-070-record-sql-spans-with-jooq-execute-listener.md)（Proposed, 2026-10-07）
 - [ADR-071: 作業で得た学びを 5 つの層へ還元し、上の層を優先する](ADR-071-reinforce-learnings-into-five-layers.md)（Proposed, 2026-10-08）
 - [ADR-072: 外部システムを本番のコードで偽らず、WireMock のコンテナで偽る](ADR-072-fake-external-systems-with-wiremock.md)（Accepted, 2026-10-08）
-- [ADR-073: E2E はシーダーの代表データを読むだけにし、変更するデータは各テストが作る](ADR-073-read-seeded-data-in-e2e.md)（Accepted, 2026-10-08）
+- [ADR-073: E2E はシーダーの代表データを読むだけにし、変更するデータは各テストが作る](ADR-073-read-seeded-data-in-e2e.md)（Accepted, Amended by ADR-107, 2026-10-08）
 - [ADR-074: jscpd の閾値を、クラスの役割の定型を含む実測の 3.93% に合わせて 4.0% にする](ADR-074-raise-jscpd-threshold-for-class-role-boilerplate.md)（Superseded by ADR-106, 2026-10-09）
 - [ADR-075: 他モジュールが分岐に使う状態の意味を、状態を持つモジュールが参照の結果の boolean で返す](ADR-075-return-state-meaning-in-query-results.md)（Proposed, 2026-10-11）
 - [ADR-076: PIT を必須でない別のワークフローで変更ごとに実行し、coverage の下限に line とクラスやファイルごとの下限を加える](ADR-076-run-mutation-tests-per-change-and-tighten-coverage-gates.md)（Proposed, 2026-10-11）
@@ -106,3 +106,5 @@
 - [ADR-104: compose-test を使う実行ごとに slot を割り当て、worktree をまたいで同時に流す](ADR-104-allocate-test-stack-slots-per-run.md)（Proposed, 2026-11-19）
 - [ADR-105: 操作しているテナントを ScopedValue で束縛し、リクエストはセッションから、リスナーはイベントから取る](ADR-105-bind-tenant-to-request-and-event-context.md)（Proposed, 2026-11-19）
 - [ADR-106: jscpd は import 文を比べず、閾値を実測の 1.90% に合わせて 2.0% にする](ADR-106-ignore-import-statements-in-jscpd.md)（Proposed, 2026-11-21）
+- [ADR-107: 業務テーブルを RLS でテナントごとに分け、テナントをロールと同じ SQL でトランザクションごとに設定する](ADR-107-isolate-tenants-with-rls-set-per-transaction.md)（Proposed, 2026-11-21）
+- [ADR-108: 同じモジュールの表どうしの参照に、テナントを含む複合の外部キーを作る](ADR-108-add-tenant-composite-foreign-keys-within-modules.md)（Proposed, 2026-11-21）

@@ -109,6 +109,16 @@ jOOQの生成物の`com.example.demo.jooq`はOPENのモジュールであり、`
 - `tenantIsBoundOnlyByTenantSelectionFilterAndListenerAspect`：`TenantContext.call`を呼べるクラスは、`tenancy.presentation.web.TenantSelectionFilter`と`shared.infrastructure.persistence.TenantListenerAspect`の2つだけにする。
   CommandHandlerやControllerや別のfilterが束縛を切り替えて、認証の権限やイベントに無関係なテナントを操作することを防ぐ。メソッド参照も検出する（[ADR-105](../adr/ADR-105-bind-tenant-to-request-and-event-context.md)）。
   違反フィクスチャの`TenantSwitchingCommandHandler`（直接の呼び出し）と`HeaderTenantFilter`（別のモジュールのfilterのメソッド参照）で確かめ、規約どおりのフィクスチャの`TenantSelectionFilter`が通ることを確かめる。
+- `unboundTenantIsReadOnlyByTransactionManager`：本番のコードで`TenantContext.findCurrent`を呼べるクラスは、`shared.infrastructure.persistence.ModuleRoleTransactionManager`だけにする。
+  ArchUnitは本番のクラスだけを解析するので、テストの補助（`AsTenant`など）は対象の外である。
+  `findCurrent`は束縛のないことを空で返すため、業務の処理が使うと、テナントを束縛し忘れた呼び出しをテナントのない処理として通す。
+  業務の処理は`TenantContext.current()`で読む。
+  メソッド参照も検出する（[ADR-105](../adr/ADR-105-bind-tenant-to-request-and-event-context.md)、[ADR-107](../adr/ADR-107-isolate-tenants-with-rls-set-per-transaction.md)）。
+  違反フィクスチャの`TenantDefaultingCommandHandler`で確かめ、規約どおりのフィクスチャの`ModuleRoleTransactionManager`が通ることを確かめる。
+- `roleAndTenantAreSetOnlyByTransactionManager`：本番のコードで`ModuleRoleTransactionManager.setLocal`を呼べるクラスは、`ModuleRoleTransactionManager`だけにする。
+  `setLocal`はトランザクションのロールとテナントを、トランザクションの名前と束縛によらずに変えるので、ほかのクラスが呼ぶとモジュールのロールの権限とテナントのRLSを迂回できる。
+  テストの補助（`AsModule`）とシーダーは、本番と同じSQLを通すために呼ぶが、ArchUnitの解析対象の外である（[ADR-094](../adr/ADR-094-switch-to-module-database-roles.md)、[ADR-107](../adr/ADR-107-isolate-tenants-with-rls-set-per-transaction.md)）。
+  違反フィクスチャの`TenantSwitchingOrderAccess`で確かめ、規約どおりのフィクスチャの`ModuleRoleTransactionManager`が通ることを確かめる。
 - `eventListenersAreApplicationModuleListeners`：`@ApplicationModuleListener`を付けていないメソッドは、`@EventListener`をメタアノテーションに持たない。
   `@EventListener`と`@TransactionalEventListener`を直接付けた受信を拒否し、`@TransactionalEventListener`をメタアノテーションに持つ`@ApplicationModuleListener`は対象から除く。
   守らせる規約と理由は[Listener](class-roles/listener.md)に示す。
@@ -310,7 +320,7 @@ INSERTの共通カラムは`CommonColumns.forInsert`で、UPDATEとDELETEの共�
   `Update`と`Delete`を作る入口をすべて禁じるため、`batch`や`subscribe`のように作った問い合わせを受け取って実行するAPIは禁じない。
 
   `tableWritesGoThroughTableWriter`が除外するのは、`TableWriter`、`LockedRoot`、`DeletedRoot`と、トランザクションの初めにモジュールのロールへ切り替える`ModuleRoleTransactionManager`とその`Config`の完全修飾型名だけである。
-  `ModuleRoleTransactionManager`は業務テーブルに触れず、固定の`set_config`だけを実行する（[ADR-094](../adr/ADR-094-switch-to-module-database-roles.md)）。
+  `ModuleRoleTransactionManager`は業務テーブルに触れず、ロールとテナントを設定する`set_config`だけを実行する（[ADR-094](../adr/ADR-094-switch-to-module-database-roles.md)、[ADR-107](../adr/ADR-107-isolate-tenants-with-rls-set-per-transaction.md)）。
   除外を足す、外す、または除外する型を移すときは、先に[ADR-054](../adr/ADR-054-detect-optimistic-lock-conflicts-by-update-count.md)の判断を変える。
   同じ変更で、`tableWritesGoThroughTableWriterRule`の完全修飾型名と、除外する型を置く適合フィクスチャ（`archfixture/conforming/shared/infrastructure/persistence/`）を更新する。
   禁止するAPIの違反フィクスチャ（`DirectOrderWriter`）は、禁止の一覧か`isDirectWrite`の判定を変えるときだけ更新する。
@@ -394,6 +404,22 @@ DBの規約のほかの検査は`backend/src/test/java/com/example/demo/persiste
 - G3：権限のSQL（`GRANT`、`REVOKE`、`ALTER DEFAULT PRIVILEGES`）は、`ChangesetPrivilegeRules`が判定する。`PUBLIC`、`WITH GRANT OPTION`、DML以外の権限、スキーマを指定しない`ALTER DEFAULT PRIVILEGES`、モジュールのロール（`<module>_module`）とアプリロールのプレースホルダ以外の付与先を拒否する。012以降のchangesetは、業務のスキーマの権限をアプリロールに与えない。権限のSQLだけのchangesetは、任意のSQL（M17）の許可リストに載せない。
 - G4：モジュールのロールの一覧が`ModuleRoles.MODULES`と一致し、ログインできず、DDLの属性を持たず、アプリロールが継承なしで切り替えられる。
 - G5：モジュールのロールの権限が、自分のスキーマのDML、依存の方向のSELECT、`modulith.event_publication`へのINSERTだけで、期待する集合と完全に一致する。
+
+テナントと外部キーの規則は次のとおりである。
+根拠は[PostgreSQLのマルチテナント設計](../database/postgresql-multitenancy.md)と[PostgreSQLの制約とインデックス](../database/postgresql-constraints-and-indexes.md#外部キー)にある。
+テナントで分ける業務テーブルの範囲は[RLSでテナントを分ける業務テーブル](../database/postgresql-multitenancy.md#rlsでテナントを分ける業務テーブル)に示す。
+
+- S1：changesetのRLSとポリシーのSQLは、テナントで分ける業務テーブルへの決まった3文（`ENABLE`、`FORCE`、`tenant_isolation`のポリシーの作成）だけにする。
+  `missing_ok`を渡すポリシー、`PUBLIC`以外を対象にするポリシー、テナントで分ける業務テーブルの外の表へのRLS、ほかの形の文を、rollbackを含めて拒否する。
+  3文だけのSQLは、任意のSQL（M17）の許可リストに載せない。
+- S2：changesetでRLSの文を書いた表には、3文をすべて同じchangesetに書く。
+- S3：カタログのテナントで分ける業務テーブルに、`ENABLE`と`FORCE`のRLSが付いている。
+- S4：カタログのテナントで分ける業務テーブルが、uuidのNOT NULLで、既定値がトランザクションのテナントの`tenant_public_id`を持つ。
+- S5：カタログのテナントで分ける業務テーブルのポリシーが、`PERMISSIVE`、`FOR ALL`、`TO PUBLIC`、`missing_ok`を使わない`USING`の式、`WITH CHECK`なしの1つだけである。
+- S6：カタログのテナントで分ける業務テーブルの、主キー以外のユニークインデックスが`tenant_public_id`から始まる。
+- K1：カタログの同じスキーマのほかの表の主キーと同じ名前の列に、外部キーがある。
+  外部キーは、テナントで分ける業務テーブルなら`(tenant_public_id, 参照先の主キー)`、`tenancy`の表なら参照先の主キーだけの形にし、形の違う外部キーも拒否する。
+- K4：changesetの外部キーは`addForeignKeyConstraint`だけで作り、名前を`fk_{表}`か`fk_{連番}_{表}`にし、同じスキーマの表をK1と同じ列で参照し、`onDelete`、`onUpdate`、`deleteCascade`を付けない。
 
 スキーマ検査の規則を足すときは、判定に要る行を`CatalogSnapshot`に足して`SchemaCatalog.read`で埋め、判定する関数を`SchemaConventions.check`から呼ぶ。
 

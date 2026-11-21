@@ -7,21 +7,15 @@ import static com.example.demo.jooq.product.Tables.M_PRODUCT;
 import static com.example.demo.jooq.tenancy.Tables.M_MEMBERSHIP;
 import static com.example.demo.jooq.tenancy.Tables.M_TENANT;
 
-import com.example.demo.ordering.domain.model.Money;
-import com.example.demo.ordering.domain.model.Order;
-import com.example.demo.ordering.domain.model.ProductId;
-import com.example.demo.ordering.domain.model.ProductOffer;
-import com.example.demo.ordering.infrastructure.persistence.OrderSeeds;
-import com.example.demo.payment.infrastructure.persistence.PaymentSeeds;
-import com.example.demo.product.ProductSeeds;
+import com.example.demo.shared.tenant.TenantId;
 import com.example.demo.tenancy.TenancySeeds;
 import com.example.demo.testkit.AsModule;
+import com.example.demo.testkit.BusinessSeeds;
 import java.net.InetAddress;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.SQLException;
 import java.time.Clock;
-import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.List;
@@ -43,8 +37,10 @@ import org.jooq.conf.Settings;
 import org.jooq.impl.DSL;
 
 /**
- * 開発用の代表データ（#114）を、業務データが空のローカルかテストの DB に入れる。テナントと所属（{@link
+ * 開発用の代表データ（#114）を、業務データが空のローカルかテストの DB の、{@link TenancySeeds#TENANTS} の各テナントに入れる。テナントと所属（{@link
  * TenancySeeds}）は、業務データの有無によらず、足りない行だけを毎回入れる。
+ *
+ * <p>業務の表は RLS でテナントごとに分かれるため（ADR-107）、「空」の判定と reset の削除は {@code tenancy.m_tenant} のテナントごとに行う。
  *
  * <p>Gradle の {@code seedLocalData}（JavaExec、テストの runtime classpath）が {@link #main} を呼ぶ。Spring
  * を起動せず、Bean にもしないので、ほかのテストのコンテキストでは動かない。環境の確認、「空」の判定、reset の削除を 1 つのトランザクションで行う。
@@ -123,9 +119,9 @@ public final class LocalDataSeeder {
     final boolean migrated =
         Stream.concat(BUSINESS_TABLES.stream(), TENANCY_TABLES.stream())
             .allMatch(table ->
-                inModuleOf(
+                AsModule.callWithoutTenant(
                     dsl,
-                    table,
+                    AsModule.moduleOf(table),
                     tx ->
                         tx.fetchValue("select to_regclass({0})::text", DSL.inline(tx.render(table)))
                             != null));
@@ -136,15 +132,28 @@ public final class LocalDataSeeder {
       }
       throw new IllegalStateException("業務の表がありません。task be-migrate の後に実行してください");
     }
-    AsModule.run(dsl, "tenancy", tx -> TenancySeeds.insert(tx, issuer));
+    final List<TenantId> tenants =
+        AsModule.callWithoutTenant(
+            dsl,
+            "tenancy",
+            tx -> {
+              TenancySeeds.insert(tx, issuer);
+              return tx.select(M_TENANT.PUBLIC_ID)
+                  .from(M_TENANT)
+                  .orderBy(M_TENANT.TENANT_ID)
+                  .fetch(row -> new TenantId(row.value1()));
+            });
     if (mode == Mode.RESET) {
-      BUSINESS_TABLES.forEach(
-          table -> inModuleOf(dsl, table, tx -> tx.deleteFrom(table).execute()));
+      tenants.forEach(tenant ->
+          BUSINESS_TABLES.forEach(
+              table -> inModuleOf(dsl, tenant, table, tx -> tx.deleteFrom(table).execute())));
     }
     final List<String> nonEmpty =
-        BUSINESS_TABLES.stream()
-            .filter(table -> inModuleOf(dsl, table, tx -> tx.fetchExists(table)))
-            .map(LocalDataSeeder::name)
+        tenants.stream()
+            .flatMap(tenant ->
+                BUSINESS_TABLES.stream()
+                    .filter(table -> inModuleOf(dsl, tenant, table, tx -> tx.fetchExists(table)))
+                    .map(table -> tenant + ":" + name(table)))
             .toList();
     if (!nonEmpty.isEmpty()) {
       log.info("業務データがあるため、代表データを入れません: {}", nonEmpty);
@@ -154,45 +163,17 @@ public final class LocalDataSeeder {
     final Random random = new Random(RANDOM_SEED);
     final Faker faker = new Faker(Locale.ENGLISH, random);
     final Supplier<UUID> ids = () -> uuidV4(random);
-    // faker と ids は同じ random を引く。順（商品 P01〜P05、注文 C01〜C06、決済 C03、C05）を変えると値が変わる。
-    final List<ProductOffer> offers =
-        AsModule.call(
-                dsl,
-                "product",
-                tx -> ProductSeeds.insert(tx, faker, ids, base.minus(Duration.ofDays(1))))
-            .stream()
-            .filter(ProductSeeds.Seeded::onSale)
-            .map(s ->
-                new ProductOffer(new ProductId(s.publicId()), new Money(s.unitPrice()), s.onSale()))
-            .toList();
-    final OrderSeeds.Confirmed confirmed =
-        AsModule.call(dsl, "ordering", tx -> OrderSeeds.insert(tx, offers, ids, base));
-    AsModule.run(
-        dsl,
-        "payment",
-        tx -> {
-          insertPayment(tx, ids, confirmed.paid(), false);
-          insertPayment(tx, ids, confirmed.declined(), true);
-        });
+    // faker と ids は同じ random を引く。テナントの順（TenancySeeds.TENANTS）を変えると値が変わる。
+    TenancySeeds.TENANTS.forEach(tenant -> BusinessSeeds.insert(dsl, tenant, faker, ids, base));
     return Outcome.SEEDED;
   }
 
-  /** 表を持つモジュール（スキーマ名と同じ）のロールで本体を実行する。本番と同じく、アプリロールには業務のスキーマの権限がない。 */
   private static <T> T inModuleOf(
-      final DSLContext dsl, final Table<?> table, final Function<DSLContext, T> body) {
-    return AsModule.call(dsl, AsModule.moduleOf(table), body);
-  }
-
-  /** 注文の合計金額で、確定の 1 分後に決済記録を入れる。 */
-  private static void insertPayment(
-      final DSLContext dsl, final Supplier<UUID> ids, final Order order, final boolean declined) {
-    PaymentSeeds.insert(
-        dsl,
-        ids.get(),
-        order.id().value(),
-        order.total().amount(),
-        declined,
-        order.orderedAt().plus(Duration.ofMinutes(1)));
+      final DSLContext dsl,
+      final TenantId tenant,
+      final Table<?> table,
+      final Function<DSLContext, T> body) {
+    return AsModule.call(dsl, AsModule.moduleOf(table), tenant, body);
   }
 
   // ponytail: DB_HOST の loopback の判定は、SSH のポート転送で STG の DB を localhost に向けた場合を防げない。

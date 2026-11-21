@@ -4,7 +4,9 @@ import static com.example.demo.jooq.tenancy.Tables.M_USER;
 import static com.example.demo.jooq.tenancy.Tables.M_USER_IDENTITY;
 
 import com.example.demo.shared.infrastructure.persistence.TestCommonColumns;
+import com.example.demo.shared.tenant.TenantId;
 import java.time.Instant;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.jooq.DSLContext;
@@ -27,6 +29,10 @@ public final class TenancySeeds {
 
   /** test-user だけが属するテナント。 */
   public static final UUID GOODS_TENANT = UUID.fromString("dd4c8e16-e0d7-4496-b4d9-63a56877b50e");
+
+  /** 代表データを入れるテナント。シーダーはこの順に入れる。 */
+  public static final List<TenantId> TENANTS =
+      List.of(new TenantId(TRADING_TENANT), new TenantId(GOODS_TENANT));
 
   /** シーダーが書く {@code *_pgm_cd}。 */
   private static final String PGM_CD = "tenancy.SeedLocalData";

@@ -1,6 +1,7 @@
 package com.example.demo.shared.infrastructure.persistence;
 
 import com.example.demo.shared.tenant.TenantContext;
+import com.example.demo.shared.tenant.TenantId;
 import com.example.demo.shared.tenant.TenantScoped;
 import org.aspectj.lang.ProceedingJoinPoint;
 import org.aspectj.lang.annotation.Around;
@@ -30,10 +31,9 @@ public class TenantListenerAspect {
    * <p>対象のクラスは {@code within} の名前で絞る。継承した {@code on} は対象にしないため、Listener の継承を ArchUnit の {@code
    * commandHandlersAndListenersDoNotUseInheritance} で禁じる。
    *
-   * @throws IllegalStateException 引数のイベントが {@link TenantScoped} でない場合。ArchUnit の {@code
-   *     moduleListenerEventsAreTenantScoped} が先に止める
-   * @throws NullPointerException イベントのテナントが null の場合。{@code tenantId} の項目がない古い出版を JSON から読むと null
-   *     になる
+   * @throws IllegalStateException 引数のイベントが {@link TenantScoped} でない場合（ArchUnit の {@code
+   *     moduleListenerEventsAreTenantScoped} が先に止める）と、イベントのテナントが null の場合（{@code tenantId}
+   *     の項目がない古い出版を JSON から読むと null になる）
    */
   @Around(
       "within(com.example.demo.*..*Listener)"
@@ -45,6 +45,13 @@ public class TenantListenerAspect {
           "the event of an @ApplicationModuleListener must implement TenantScoped: "
               + joinPoint.getSignature());
     }
-    return TenantContext.call(event.tenantId(), joinPoint::proceed);
+    final @Nullable TenantId tenantId = event.tenantId();
+    if (tenantId == null) {
+      throw new IllegalStateException(
+          "the event of an @ApplicationModuleListener has no tenantId"
+              + " (a publication written before the event carried the tenant): "
+              + event.getClass().getName());
+    }
+    return TenantContext.call(tenantId, joinPoint::proceed);
   }
 }

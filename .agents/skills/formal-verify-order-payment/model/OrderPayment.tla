@@ -214,7 +214,8 @@ RecordOf(r) == IF r \in {"PAID", "DECLINED"} THEN r ELSE "FAILED"
 
 \* Payment.record, JooqPaymentRepository.add -> TableWriter.insert, then the
 \* listener transaction commits. The unique index uk_2_t_payment
-\* (order_public_id) rejects a second row: ConflictException, rollback.
+\* (tenant_public_id, order_public_id) rejects a second row of the order:
+\* ConflictException, rollback. The model has one tenant.
 \* PostgreSQL makes a concurrent INSERT wait for the other commit, so
 \* INSERT and COMMIT act as one step.
 DInsert(d) ==

@@ -91,6 +91,7 @@ final class ChangesetLint {
         ChangesetTableRules.check(
             replay.tables().stream().filter(table -> isBusinessSchema(table.schema())).toList()));
     found.addAll(ChangesetChangeRules.check(changesets, replay));
+    found.addAll(ChangesetForeignKeyRules.check(changesets));
     found.addAll(ChangesetOnlineChangeRules.check(changesets, replay));
     return AllowlistEntry.apply(found, allowlist);
   }
