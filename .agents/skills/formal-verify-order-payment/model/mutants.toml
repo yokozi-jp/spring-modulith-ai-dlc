@@ -3,7 +3,7 @@
 
 [[mutant]]
 name = "no-unique-index"
-change = "drop uk_2_t_payment (order_public_id) from 006-create-payment-tables.yaml"
+change = "drop uk_2_t_payment (tenant_public_id, order_public_id) from 020-rebuild-payment-tables-for-tenants.yaml"
 config = "contract"
 invariants = ["AtMostOnePaymentRecord"]
 
