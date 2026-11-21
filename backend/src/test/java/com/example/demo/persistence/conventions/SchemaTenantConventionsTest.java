@@ -289,6 +289,34 @@ class SchemaTenantConventionsTest {
               "K1 ordering.fk_t_order_line", "K1 tenancy.fk_m_user_identity");
     }
 
+    @Test
+    @DisplayName("K1：別のスキーマの同じ名前の表の外部キーは、外部キーのない参照を隠さない")
+    void foreignKeyOfSameNamedTableInAnotherSchemaDoesNotCoverReference() {
+      final String archive = "archive";
+      final List<RelationRow> tables =
+          List.of(
+              tenantTable(ORDERING, T_ORDER, ORDER_ID),
+              tenantTable(ORDERING, T_ORDER_LINE, "order_line_id"),
+              tenantTable(archive, T_ORDER, ORDER_ID),
+              tenantTable(archive, T_ORDER_LINE, "order_line_id"));
+      final List<ColumnRow> references =
+          List.of(
+              new ColumnRow(ORDERING, T_ORDER_LINE, ORDER_ID, BIGINT, "b", "", "", null, true),
+              new ColumnRow(archive, T_ORDER_LINE, ORDER_ID, BIGINT, "b", "", "", null, true));
+      final List<ConstraintRow> constraints =
+          List.of(
+              foreignKey(
+                  ORDERING,
+                  T_ORDER_LINE,
+                  "fk_t_order_line",
+                  List.of(TENANT, ORDER_ID),
+                  T_ORDER,
+                  List.of(TENANT, ORDER_ID)));
+
+      assertThat(keys(SchemaTenantConventions.foreignKeys(tables, references, constraints)))
+          .containsExactly("K1 archive.t_order_line.order_id");
+    }
+
     private static ConstraintRow foreignKey(
         final String schema,
         final String table,

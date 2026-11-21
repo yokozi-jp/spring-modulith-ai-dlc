@@ -214,8 +214,10 @@ final class SchemaTenantConventions {
         .filter(row -> !row.column().equals(primaryKeys.get(row.schema() + "." + row.table())))
         .filter(row ->
             foreignKeys.stream()
-                .noneMatch(
-                    fk -> fk.table().equals(row.table()) && fk.columns().contains(row.column())))
+                .noneMatch(fk ->
+                    fk.schema().equals(row.schema())
+                        && fk.table().equals(row.table())
+                        && fk.columns().contains(row.column())))
         .map(row ->
             new ConventionViolation(
                 "K1",
