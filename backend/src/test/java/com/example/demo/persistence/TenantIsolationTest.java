@@ -332,6 +332,20 @@ class TenantIsolationTest {
 
   @ParameterizedTest(name = "{0}")
   @MethodSource("businessTables")
+  // テナントを設定しない接続を、テストのトランザクションの外で作る。
+  @Transactional(propagation = Propagation.NOT_SUPPORTED)
+  @DisplayName("テナントを設定しないモジュールのロールの INSERT は、行を入れずにエラーになる")
+  void insertingWithoutTenantFails(final Table<?> table) {
+    assertSqlState(
+        () ->
+            withoutTenant(
+                AsModule.moduleOf(table), tx -> tx.insertInto(table).defaultValues().execute()),
+        UNSET,
+        EMPTY);
+  }
+
+  @ParameterizedTest(name = "{0}")
+  @MethodSource("businessTables")
   @DisplayName("表の所有者のマイグレーションロールも、テナントを設定しないと業務の表を読めない")
   void ownerCannotReadWithoutTenant(final Table<?> table) throws SQLException {
     try (Connection connection = ownerConnection()) {

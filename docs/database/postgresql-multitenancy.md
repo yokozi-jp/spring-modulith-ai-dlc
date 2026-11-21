@@ -102,7 +102,7 @@ RLSの規則は次の検査で確かめる。
 
 - **カタログのテスト**：`SchemaConventionsTest`と`SchemaInspectionTest`が、業務の表に`ENABLE`と`FORCE`があること（規則S3）、`tenant_public_id`の型、NOT NULL、既定値（規則S4）、ポリシーが`PUBLIC`を対象にする1つだけで`missing_ok`を使わないこと（規則S5）を確かめる。表の一覧を持たずにカタログから導くため、「RLSでテナントを分ける表」の範囲に表を足すと、その表も検査の対象になる。
 - **changesetのlint**：`ChangesetLintTest`が、RLSとポリシーのSQLが上の3文の形だけであること（規則S1）と、3文が同じchangesetに揃うこと（規則S2）を確かめる。
-- **`@DatabaseTest`**：`TenantIsolationTest`が、別のテナントの行を読めず書けないこと、明細が別のテナントの注文を指せないこと、テナントを設定しないモジュールのロールの読み取りがエラーになることを確かめる。テナントを束縛しない業務のトランザクションを、汎用の実行計画が0件を返す接続でも、トランザクションマネージャーが拒否することも確かめる。業務の表は、`tenant_public_id`を持つjOOQの生成した表から導く。
+- **`@DatabaseTest`**：`TenantIsolationTest`が、別のテナントの行を読めず書けないこと、明細が別のテナントの注文を指せないこと、テナントを設定しないモジュールのロールの読み取りとINSERTがエラーになることを確かめる。表の所有者のマイグレーションロールの接続でも、テナントを設定しない読み取りがエラーになり、設定したテナントの行だけを読むことを確かめ、`FORCE ROW LEVEL SECURITY`の効き目を見る。テナントを束縛しない業務のトランザクションを、汎用の実行計画が0件を返す接続でも、トランザクションマネージャーが拒否することも確かめる。業務の表は、`tenant_public_id`を持つjOOQの生成した表から導く。
 - **`@CommittedDatabaseTest`**：`ModuleRoleTransactionTest`が、commitとrollbackの後、プールの接続にテナントが残らないことと、テナントを束縛しない`product`、`ordering`、`payment`のトランザクションを始めないことを確かめる。設定の後に空文字列が残る場合も、ポリシーが失敗する側に倒れることを確かめる。
 
 ## ノイジーネイバーへの対策
