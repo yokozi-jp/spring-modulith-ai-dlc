@@ -168,6 +168,8 @@ task be-seed             # 2 つのテナントと、test-user と test-admin �
 `task be-seed`は、業務データがあっても、足りないテナントと所属だけを入れる。
 test-userは2つのテナント（サンプル商事、サンプル物産）に属するのでログインの後にテナントを選ぶ画面が出て、test-adminはサンプル商事だけに属するので選ばずに業務の画面に入る。
 
+業務テーブルをテナントの列とRLSを持つ形に作り直した変更（018から020のchangeset、[ADR-107](../adr/ADR-107-isolate-tenants-with-rls-set-per-transaction.md)）の後は、`task be-migrate`を実行し、それが消したローカルの商品、注文、決済の代表データを`task be-seed`で入れ直す。
+
 公開先は次のとおり。
 
 - フロントエンド：<http://localhost:5173>（ブラウザで開く入口）
