@@ -10,16 +10,13 @@ package com.example.demo.shared.concurrency;
  */
 public record ExpectedLockNo(long value) {
 
-  /** 版の最小値。INSERT が {@code lock_no = 1} で書く。 */
-  private static final long FIRST_LOCK_NO = 1L;
-
   /**
    * 版が 1 以上であることを確かめる。
    *
    * @throws IllegalArgumentException {@code value} が 1 未満の場合
    */
   public ExpectedLockNo {
-    if (value < FIRST_LOCK_NO) {
+    if (value < Versioned.FIRST_LOCK_NO) {
       throw new IllegalArgumentException(
           "expected lock number must be 1 or greater: value=" + value);
     }

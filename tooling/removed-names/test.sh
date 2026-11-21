@@ -11,10 +11,10 @@ out="$tmp/out"
 trap 'rm -rf "$tmp"' EXIT
 failures=0
 
-# expect <label> <exit code> <output fragment>
+# expect <label> <exit code> <output fragment> [実行するディレクトリ（リポジトリの根からの相対）]
 expect() {
-  local label="$1" want="$2" fragment="$3" code
-  (cd "$tmp/repo" && "$dir/check.sh" "$tmp/names.txt") >"$out" 2>&1
+  local label="$1" want="$2" fragment="$3" from="${4:-.}" code
+  (cd "$tmp/repo/$from" && "$dir/check.sh" "$tmp/names.txt") >"$out" 2>&1
   code=$?
   if [ "$code" != "$want" ] || ! grep -qF -- "$fragment" "$out"; then
     echo "FAIL: $label (exit $code, want $want; fragment '$fragment')"
@@ -37,6 +37,7 @@ printf '# 規約\nOldWriter を使う。\n' >"$tmp/repo/docs/backend/rule.md"
 git -C "$tmp/repo" add -A
 expect "規約に残った旧名は失敗にする" 1 "削除した識別子 OldWriter が残っている"
 expect "失敗の出力に残った場所を出す" 1 "docs/backend/rule.md:2"
+expect "サブディレクトリから実行しても同じ範囲を見て失敗にする" 1 "削除した識別子 OldWriter が残っている" backend/src
 
 printf '# 規約\nOldWriterXY は別の名前なので、語の境界で一致しない。\n' >"$tmp/repo/docs/backend/rule.md"
 git -C "$tmp/repo" add -A

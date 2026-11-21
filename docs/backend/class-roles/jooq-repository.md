@@ -103,10 +103,10 @@ jOOQ の Repository は業務規則を持たない。
   これらは `UpdatableRecord.store()` でしか働かず、この役割は UPDATE を `TableWriter` で書く（[PostgreSQL の排他制御](../../database/postgresql-concurrency-control.md)）。
 - 共通カラムのうち、このクラスが参照するのは、集約の復元のために読む `LOCK_NO` だけにし、`LOCK_NO` を書かず、`CREATED_*`、`UPDATED_*`、`PATCHED_*` の列を参照しない（[ADR-048](../../adr/ADR-048-add-shared-module-for-jooq-common-code.md)）。
   `ColumnValues` に共通カラムを渡すと `IllegalArgumentException` になる。
-- `NOWAIT` が投げる Spring の例外（`CannotAcquireLockException`、`DuplicateKeyException`）を Repository の外へ出さない。
-  外へ出すときは、原因を付けずに、種類（`ConflictException.Kind.LOCK` か `Kind.UNIQUE`）を付けた `ConflictException` に変えて投げる。
-  原因の例外のメッセージには SQL と入力値が入り、ログに出るためである（[ADR-062](../../adr/ADR-062-map-business-exceptions-to-404-409-422.md)）。
-  catch した例外を原因に渡さないと PMD の `PreserveStackTrace` と Error Prone の `UnusedException` が警告するため、そのメソッドに `@SuppressWarnings({"PMD.PreserveStackTrace", "UnusedException"})` を付け、直前に理由のコメントを書く。
+- Spring の例外（`CannotAcquireLockException`、`DuplicateKeyException`）を catch して `ConflictException` に変えない。
+  書き込みの行ロックの失敗（`55P03`）と一意制約の違反（`23505`）は、`TableWriter` が SQLSTATE で見分けて、原因を付けない `ConflictException`（`Kind.LOCK` か `Kind.UNIQUE`）にする（[ADR-054](../../adr/ADR-054-detect-optimistic-lock-conflicts-by-update-count.md)、[ADR-062](../../adr/ADR-062-map-business-exceptions-to-404-409-422.md)）。
+  Spring は `21000`（`CARDINALITY_VIOLATION`）も `DuplicateKeyException` にまとめるため、型で catch して 409 にすると、実装の誤りを 409 に隠す。
+  `SELECT ... FOR UPDATE NOWAIT` を Repository が書く必要が出たら、`TableWriter` に入口を足す ADR-054 の更新から始める。
 - `@Transactional` を付けない。
 - クラス、フィールド、コンストラクタに Javadoc を書く。
 - `infrastructure.persistence` のパッケージに `@NullMarked` を宣言する `package-info.java` を置く。
@@ -402,7 +402,6 @@ Repository のテストは列と集約の往復と子の行の差分だけを確
 - [ ] 集約ルートの `LOCK_NO` を選び、`restore` の `lockNo` に渡す。［自分で点検］
 - [ ] 集約の形を `AggregateTable` と `ChildTable` のクラスの定数として一度だけ宣言し、子の外部キーの列に親の内部の主キーを指す列を渡す。［自分で点検（往復のテストで確かめる）］
 - [ ] `add` は `tableWriter.insert(...)` を呼び、ルートの列と子の全行を `ColumnValues` で渡す。`insertInto` を呼ばない。［ArchUnit で検査：TableWriterArchTest.tableWritesGoThroughTableWriter］
-- [ ] Spring の例外（`CannotAcquireLockException`、`DuplicateKeyException`）を Repository の外へ出さず、出すときは原因を付けずに種類を付けた `ConflictException` に変える。［自分で点検］
 - [ ] 集約ルートを受け取る `add` 以外の public メソッドは、`update` という名前で、`TableWriter.update` を、そのメソッドの中で直接呼ぶ。［ArchUnit で検査：TableWriterArchTest.repositoryUpdateCallsVersionedEntryPoint］
 - [ ] 集約ルートを `Versioned` にし、`AggregateTable` の第 3 型引数にそのクラスを指定して、`update` はその集約ルートを `TableWriter.update` に渡す（テーブルから読み直した版は渡せない）。［型で検査 + 自分で点検（`Versioned` そのものを指定しない。読み直した版で集約ルートを作り直して渡さない）］
 - [ ] 集約ルートを受け取る public メソッドは、`add` と `update` だけにする（`save` や `delete` のような名前は、`TableWriter.update` を呼んでも H3 が検出する）。［ArchUnit で検査：TableWriterArchTest.repositoryUpdateCallsVersionedEntryPoint］

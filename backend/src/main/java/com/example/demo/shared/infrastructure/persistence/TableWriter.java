@@ -37,11 +37,8 @@ import org.springframework.stereotype.Component;
 @Component
 public class TableWriter {
 
-  /** 一つの文で変える行数。 */
+  /** 一つの文や宣言に合う行の数の、あるべき値。 */
   private static final int ONE_ROW = 1;
-
-  /** 版の最小値。INSERT が {@code lock_no = 1} で書く。 */
-  private static final long FIRST_LOCK_NO = 1L;
 
   /** INSERT と UPDATE を実行する jOOQ のコンテキスト。 */
   private final DSLContext dsl;
@@ -73,11 +70,12 @@ public class TableWriter {
    * @throws ConflictException 一意制約に違反した場合（種類は {@code UNIQUE}）、行ロックを {@code lock_timeout}
    *     までに取れない場合（種類は {@code LOCK}）。原因は持たない
    */
-  public <R extends Record, K, A extends Versioned> void insert(
+  @SafeVarargs
+  public final <R extends Record, K, A extends Versioned> void insert(
       final AggregateTable<R, K, A> aggregate,
       final A root,
       final Consumer<ColumnValues<R>> rootColumns,
-      final ChildRows<?, ?>... childRows) {
+      final ChildRows<R, ?>... childRows) {
     requireTransaction();
     final List<ChildRows<?, ?>> rows = inDeclaredOrder(aggregate, Arrays.asList(childRows));
     final long id = insertRoot(aggregate, aggregate.keyOf(root), rootColumns);
@@ -104,16 +102,17 @@ public class TableWriter {
    * @throws ConflictException 更新件数が 0 で一意の列の行がある場合（種類は {@code VERSION}）、一意制約に違反した場合（種類は {@code
    *     UNIQUE}）、行ロックを {@code lock_timeout} までに取れない場合（種類は {@code LOCK}）。原因は持たない
    */
-  public <R extends Record, K, A extends Versioned> void update(
+  @SafeVarargs
+  public final <R extends Record, K, A extends Versioned> void update(
       final AggregateTable<R, K, A> aggregate,
       final A root,
       final Consumer<ColumnValues<R>> rootColumns,
-      final ChildRows<?, ?>... childRows) {
+      final ChildRows<R, ?>... childRows) {
     requireTransaction();
     final K key = aggregate.keyOf(root);
     final long expectedLockNo = root.lockNo();
     final Table<R> table = aggregate.table();
-    if (expectedLockNo < FIRST_LOCK_NO) {
+    if (expectedLockNo < Versioned.FIRST_LOCK_NO) {
       throw new IllegalArgumentException(
           "expectedLockNo must be 1 or greater: table="
               + table.getName()
@@ -136,7 +135,7 @@ public class TableWriter {
                     .returningResult(aggregate.id())
                     .fetch(),
             target);
-    requireOneRow(updated, aggregate, key, expectedLockNo);
+    requireOneRow(updated, aggregate, key, target);
     final long id = updated.getFirst().value1();
     for (final ChildRows<?, ?> childRow : rows) {
       children.replace(id, childRow);
@@ -148,19 +147,17 @@ public class TableWriter {
       final Result<Record1<Long>> updated,
       final AggregateTable<R, K, ?> aggregate,
       final K key,
-      final long expectedLockNo) {
-    final Table<R> table = aggregate.table();
-    final String target = target(table, aggregate.key(), key, expectedLockNo);
+      final Supplier<String> target) {
     if (updated.size() > ONE_ROW) {
       throw new IllegalStateException(
-          "key condition matched " + updated.size() + " rows: " + target);
+          "key condition matched " + updated.size() + " rows: " + target.get());
     }
     if (updated.isEmpty()) {
-      if (!dsl.fetchExists(table, aggregate.key().eq(key))) {
-        throw new NotFoundException("row not found: " + target);
+      if (!dsl.fetchExists(aggregate.table(), aggregate.key().eq(key))) {
+        throw new NotFoundException("row not found: " + target.get());
       }
       throw new ConflictException(
-          ConflictException.Kind.VERSION, "row was updated by another request: " + target);
+          ConflictException.Kind.VERSION, "row was updated by another request: " + target.get());
     }
   }
 
@@ -195,24 +192,25 @@ public class TableWriter {
   /** 渡された子の行を宣言の順に並べ、宣言した子と過不足がないことを SQL の前に確かめる。 */
   private static List<ChildRows<?, ?>> inDeclaredOrder(
       final AggregateTable<?, ?, ?> aggregate, final List<ChildRows<?, ?>> given) {
-    final List<ChildRows<?, ?>> ordered = new ArrayList<>();
-    for (final ChildTable<?, ?> child : aggregate.children()) {
-      final List<ChildRows<?, ?>> matched =
-          given.stream().filter(rows -> child.equals(rows.child())).toList();
-      if (matched.isEmpty() || matched.size() > ONE_ROW) {
-        throw new IllegalArgumentException(
-            (matched.isEmpty()
-                    ? "child rows were not put: table="
-                    : "child rows were put twice: table=")
-                + child.table().getName());
-      }
-      ordered.add(matched.getFirst());
-    }
     for (final ChildRows<?, ?> rows : given) {
       if (!aggregate.children().contains(rows.child())) {
         throw new IllegalArgumentException(
             "child is not declared by the aggregate: table=" + rows.child().table().getName());
       }
+    }
+    final List<ChildRows<?, ?>> ordered = new ArrayList<>();
+    for (final ChildTable<?, ?> child : aggregate.children()) {
+      final List<ChildRows<?, ?>> matched =
+          given.stream().filter(rows -> child.equals(rows.child())).toList();
+      if (matched.isEmpty()) {
+        throw new IllegalArgumentException(
+            "child rows were not put: table=" + child.table().getName());
+      }
+      if (matched.size() > ONE_ROW) {
+        throw new IllegalArgumentException(
+            "child rows were put twice: table=" + child.table().getName());
+      }
+      ordered.add(matched.getFirst());
     }
     return ordered;
   }

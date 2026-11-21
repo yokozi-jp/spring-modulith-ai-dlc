@@ -151,7 +151,9 @@ PITのHTMLとXMLのレポートは、変異対象がある場合に`backend/buil
 - **`task ruleset-diff`**：GitHub上のrulesetと`.github/rulesets/main.json`の差分を表示する。認証済みの`gh`が要るため、CIでは動かさず、管理者が手元で使う。
 - **`task ruleset-apply`**：`main.json`をGitHub上のrulesetへ反映する。`CONFIRM_RULESET=yes`が要る。手順は[mainブランチの保護設定](../repository/branch-protection.md)にある。
 - **`task okf-check`**：OKF適合、内部リンク、孤立文書、変更した文書の責務の見直し合図（250行超の警告）、steering境界、ADRの整合（`adr-lint`）、削除した識別子が残っていないこと（`removed-names-check`）、rulesetの必須チェックとdocsの一覧とworkflowの名前の一致（`ruleset-check`）、iweのMCPサーバーの起動コマンドが選ぶ`iwe-mcp.sh`（`iwe-mcp-check`）、Taskfile文書同期候補を検査する。
-  `removed-names-check`は内部タスクで、`be-lint`と`skills-check`からも動き、`tooling/removed-names/names.txt`に書いた削除した識別子が、`docs/`、`.agents/`、`backend/src/`（生成コードを除く）に残っていないことを確かめる。
+  `removed-names-check`は内部タスクで、`tooling/removed-names/names.txt`に書いた削除した識別子が、`docs/`、`.agents/`、`backend/src/`（生成コードを除く）に残っていないことを確かめる。
+  `be-lint`と`skills-check`からも動く。`backend-ci`のlintジョブは`be-lint`を呼ばないので、`check.sh`を直接実行する。
+  `check.sh`の自己検査（`tooling/removed-names/test.sh`）は`okf-check`だけが実行する。
   識別子を削除、改名するときは、同じ変更で`names.txt`に足す。検査するのは識別子だけで、古い言い回しは見つけられない。残してよいのは、`names.txt`に書いた判断の履歴（ADRの背景と選択肢）だけである。
   `adr-lint`は内部タスクで、`okf-check`の中でだけ動く。
   `tooling/adr-lint/test.sh`が壊れたfixtureで期待の終了コードを確かめてから、`tooling/adr-lint/adr-lint.mjs`が実際のツリーを検査する。

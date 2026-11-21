@@ -285,6 +285,7 @@ tasks:
       - task: lint-docs-sync
       - task: docs-boundary-check
       - task: adr-lint
+      - task: removed-names-test
       - task: removed-names-check
       - task: ruleset-check
       - task: iwe-mcp-check
@@ -324,8 +325,14 @@ tasks:
     internal: true
     silent: true
     cmds:
-      - bash tooling/removed-names/test.sh
       - bash tooling/removed-names/check.sh
+
+  # check.sh の自己検査。検査の道具を変える okf-check だけが実行する。
+  removed-names-test:
+    internal: true
+    silent: true
+    cmds:
+      - bash tooling/removed-names/test.sh
 
   # .kiro/settings/mcp.json の iwe の起動コマンドが、作業ディレクトリごとに正しい iwe-mcp.sh を選ぶかを検査する（ADR-093）。
   iwe-mcp-check:
