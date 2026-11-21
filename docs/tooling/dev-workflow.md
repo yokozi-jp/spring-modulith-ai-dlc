@@ -184,8 +184,12 @@ task be-seed-reset CONFIRM_RESET=yes   # 業務データを消して代表デー
 task be-seed                           # 業務データが空のときだけ代表データを入れる
 ```
 
+代表データ（商品5件、注文6件、決済2件）は、`TenancySeeds`の2つのテナント（サンプル商事、サンプル物産）の両方に入る（[ADR-107](../adr/ADR-107-isolate-tenants-with-rls-set-per-transaction.md)）。
+業務データが空かの判定とresetの削除は、`tenancy.m_tenant`のテナントごとに、そのテナントを設定して行う。
+業務の表はRLSでテナントごとに分かれ、テナントを設定しないまま読むとエラーになるためである（[PostgreSQLのマルチテナント設計](../database/postgresql-multitenancy.md#全テナントの行を書き換える処理)）。
+
 reset は業務の4表（`product.m_product`、`ordering.t_order`、`ordering.t_order_line`、`payment.t_payment`）だけを消す。
-`modulith`の出版の表とLiquibaseの管理表は残す。
+`tenancy`の表、`modulith`の出版の表、Liquibaseの管理表は残す。
 消した注文を指す出版が残ることがあり、手での1回の再投入（`EVENT_PUBLICATION_RESUBMIT_ONCE_TARGET`）で再投入しても注文がないか状態が違うので、決済代行は呼ばれない。
 出版も消したいときは`task compose-reset CONFIRM_RESET=yes`でDBを作り直す。
 接続先がローカルかテストでないとき（`OTEL_DEPLOYMENT_ENVIRONMENT_NAME`が`local`か`test`でない、または`DB_HOST`がloopbackでない）は、DBに触れずに失敗する。
