@@ -6,6 +6,7 @@ databaseChangeLog:
         注文の表（t_order、t_order_line）を、テナントの列と行レベルセキュリティを持つ形に作り直す。
         明細から注文への参照は (tenant_public_id, order_id) の複合の外部キーにし、別のテナントの注文を指す明細を DB で拒否する。
         本番にデータがないため、移行の手順を作らず表を作り直す（#377）。
+        旧版のアプリは作り直した表を読み書きできず、schema-v8 以前への切り戻しは表を空で作り直す（docs/database/runbook-deploy-and-rollback.md）。
         tenant_public_id の既定値は、トランザクションに設定したテナント（app.current_tenant）である。
         テナントを設定しないトランザクションでは、既定値とポリシーが current_setting のエラーで失敗する。
         権限は 012 の既定の権限（ALTER DEFAULT PRIVILEGES）でモジュールのロールに付く。
