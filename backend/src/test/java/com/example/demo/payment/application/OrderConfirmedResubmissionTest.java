@@ -8,13 +8,18 @@ import com.example.demo.ordering.OrderConfirmed;
 import com.example.demo.shared.tenant.TenantId;
 import com.example.demo.testkit.AsModule;
 import com.example.demo.testkit.AsTenant;
+import com.example.demo.testkit.CapturedLogRecords;
 import com.example.demo.testkit.CleanGeneratedTablesExtension;
 import com.example.demo.testkit.SharedTestConfiguration;
+import io.opentelemetry.api.common.AttributeKey;
+import io.opentelemetry.api.logs.Severity;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
+import java.util.List;
 import java.util.UUID;
 import org.jooq.DSLContext;
+import org.jooq.impl.DSL;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -47,6 +52,10 @@ class OrderConfirmedResubmissionTest {
   private static final TenantId TENANT_B =
       new TenantId(UUID.fromString("0b0b0b0b-0000-4000-8000-00000000000b"));
 
+  /** 失敗した出版の ERROR を記録する Spring の処理。 */
+  private static final String ASYNC_ERROR_SCOPE =
+      "org.springframework.aop.interceptor.SimpleAsyncUncaughtExceptionHandler";
+
   /** 確定する注文を作り、出版の状態を読む補助。 */
   @Autowired private OrderConfirmedFixture fixture;
 
@@ -62,6 +71,9 @@ class OrderConfirmedResubmissionTest {
   /** 固定した時計。出版の時刻になる。 */
   @Autowired private Clock clock;
 
+  /** OTLP へ送る LogRecord。 */
+  @Autowired private CapturedLogRecords capturedLogRecords;
+
   @BeforeEach
   void resetGateway() {
     gateway.reset();
@@ -73,10 +85,11 @@ class OrderConfirmedResubmissionTest {
     final String orderId = fixture.draftedOrderId(TENANT_B);
     gateway.setFailing(true);
     fixture.confirmAndAwait(
-        scenario, TENANT_B, orderId, "FAILED の出版", state -> "FAILED".equals(state.status()));
+        scenario, TENANT_B, orderId, "FAILED の出版", OrderConfirmedResubmissionTest::failed);
     gateway.setFailing(false);
 
     assertThat(AsTenant.currentOrUnbound()).as("再投入するスレッドのテナントの束縛").isEqualTo("unbound");
+    backdate(orderId, 1);
     resubmit(orderId);
     OrderConfirmedFixture.await(
         scenario.stimulate(() -> {}),
@@ -100,18 +113,77 @@ class OrderConfirmedResubmissionTest {
     assertThat(payments).as("orderId=%s の、イベントのテナントの決済記録", orderId).isEqualTo(1);
   }
 
-  /** 注文 ID の出版を、再投入できるよう時計の 1 マイクロ秒前の出版にして、再投入する。 */
-  private void resubmit(final String orderId) {
-    // 時計は止まっているため、出版の時刻が今のままでは再投入の対象にならない（ResubmissionOptionsLearningTest の
+  @Test
+  @DisplayName("tenantId を持たない古い出版は、再投入しても ERROR を記録して FAILED に残り、同じ回に後から再投入した出版の完了を妨げない")
+  void publicationWithoutTenantStaysFailedWithoutBlockingOthers(final Scenario scenario) {
+    final String oldOrderId = fixture.draftedOrderId(TENANT_B);
+    final String orderId = fixture.draftedOrderId(TENANT_B);
+    gateway.setFailing(true);
+    fixture.confirmAndAwait(
+        scenario, TENANT_B, oldOrderId, "FAILED の出版", OrderConfirmedResubmissionTest::failed);
+    fixture.confirmAndAwait(
+        scenario, TENANT_B, orderId, "FAILED の出版", OrderConfirmedResubmissionTest::failed);
+    gateway.setFailing(false);
+    // イベントがテナントを運ぶ前に書いた出版の形にする。
+    dsl.update(EVENT_PUBLICATION)
+        .set(
+            EVENT_PUBLICATION.SERIALIZED_EVENT,
+            DSL.field(
+                "({0}::jsonb - 'tenantId')::text",
+                String.class, EVENT_PUBLICATION.SERIALIZED_EVENT))
+        .where(EVENT_PUBLICATION.SERIALIZED_EVENT.contains(oldOrderId))
+        .execute();
+
+    // 古い順に再投入するため、テナントのない出版を先にする。
+    backdate(oldOrderId, 2);
+    backdate(orderId, 1);
+    resubmit(oldOrderId, orderId);
+    OrderConfirmedFixture.await(
+        scenario.stimulate(() -> {}),
+        orderId,
+        "再投入の完了した出版",
+        () -> fixture.registry(orderId),
+        state -> state.archived() == 1);
+    OrderConfirmedFixture.await(
+        scenario.stimulate(() -> {}),
+        oldOrderId,
+        "attempts 2 の FAILED の出版",
+        () -> fixture.registry(oldOrderId),
+        state -> failed(state) && Integer.valueOf(2).equals(state.attempts()));
+
+    assertThat(capturedLogRecords.withScope(ASYNC_ERROR_SCOPE))
+        .as("orderId=%s のテナントのない出版の ERROR のログ", oldOrderId)
+        .anySatisfy(log -> {
+          assertThat(log.getSeverity()).isEqualTo(Severity.ERROR);
+          assertThat(log.getAttributes().get(AttributeKey.stringKey("exception.type")))
+              .isEqualTo(IllegalStateException.class.getName());
+          assertThat(log.getAttributes().get(AttributeKey.stringKey("exception.message")))
+              .contains(OrderConfirmed.class.getName());
+        });
+  }
+
+  private static boolean failed(final OrderConfirmedFixture.RegistryState state) {
+    return "FAILED".equals(state.status());
+  }
+
+  /** 時計は止まっているため、注文 ID の出版の時刻を時計より前にして、再投入の対象にする。 */
+  private void backdate(final String orderId, final long micros) {
+    // ResubmissionOptions の既定は、時計の今より前の出版だけを再投入する（ResubmissionOptionsLearningTest の
     // defaultsResubmitOnlyPublicationsOlderThanNow）。
     dsl.update(EVENT_PUBLICATION)
-        .set(EVENT_PUBLICATION.PUBLICATION_DATE, Instant.now(clock).minus(1, ChronoUnit.MICROS))
+        .set(
+            EVENT_PUBLICATION.PUBLICATION_DATE, Instant.now(clock).minus(micros, ChronoUnit.MICROS))
         .where(EVENT_PUBLICATION.SERIALIZED_EVENT.contains(orderId))
         .execute();
+  }
+
+  /** 注文 ID の失敗した出版を、1 回の再投入でまとめて再投入する。 */
+  private void resubmit(final String... orderIds) {
+    final List<String> targets = List.of(orderIds);
     failedEventPublications.resubmit(
         ResubmissionOptions.defaults()
             .withFilter(publication ->
                 publication.getEvent() instanceof OrderConfirmed event
-                    && event.orderId().equals(orderId)));
+                    && targets.contains(event.orderId())));
   }
 }

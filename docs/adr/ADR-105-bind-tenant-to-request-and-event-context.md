@@ -85,7 +85,9 @@ DB のロールとテナントの設定は、トランザクションマネー�
 
 ### Neutral
 
-- 発行済みで未完了のイベントの出版は、テナントの項目を持たず、再投入すると `NullPointerException` で失敗して `FAILED` に残る。`TenantContext.call` と `TenantId` が null を拒否するため、テナントなしで動くことはない。本番にデータはまだないため、移行の手順は作らない。
+- 発行済みで未完了のイベントの出版は、テナントの項目を持たず、再投入すると `TenantListenerAspect` がイベントの型を示す `IllegalStateException` で拒否し、`FAILED` に残る。
+  リスナーを呼ぶ前に拒否するため、テナントなしで動くことはない。
+  本番にデータはまだないため、移行の手順は作らない。
 - `TenantListenerAspect` の `@Order` の値は `PgmCdAspect` と同じ向きで選び、ほかの Aspect を足すときに前後を決め直す。
 
 ## Alternatives Considered
