@@ -48,10 +48,24 @@ public class MProductRecord extends UpdatableRecordImpl<MProductRecord> {
     }
 
     /**
+     * Setter for <code>product.m_product.tenant_public_id</code>.
+     */
+    public void setTenantPublicId(UUID value) {
+        set(1, value);
+    }
+
+    /**
+     * Getter for <code>product.m_product.tenant_public_id</code>.
+     */
+    public UUID getTenantPublicId() {
+        return (UUID) get(1);
+    }
+
+    /**
      * Setter for <code>product.m_product.public_id</code>.
      */
     public void setPublicId(@NonNull UUID value) {
-        set(1, value);
+        set(2, value);
     }
 
     /**
@@ -59,42 +73,42 @@ public class MProductRecord extends UpdatableRecordImpl<MProductRecord> {
      */
     @NonNull
     public UUID getPublicId() {
-        return (UUID) get(1);
+        return (UUID) get(2);
     }
 
     /**
      * Setter for <code>product.m_product.product_code</code>.
      */
     public void setProductCode(String value) {
-        set(2, value);
+        set(3, value);
     }
 
     /**
      * Getter for <code>product.m_product.product_code</code>.
      */
     public String getProductCode() {
-        return (String) get(2);
+        return (String) get(3);
     }
 
     /**
      * Setter for <code>product.m_product.product_name</code>.
      */
     public void setProductName(String value) {
-        set(3, value);
+        set(4, value);
     }
 
     /**
      * Getter for <code>product.m_product.product_name</code>.
      */
     public String getProductName() {
-        return (String) get(3);
+        return (String) get(4);
     }
 
     /**
      * Setter for <code>product.m_product.unit_price_jpy</code>.
      */
     public void setUnitPriceJpy(@NonNull BigDecimal value) {
-        set(4, value);
+        set(5, value);
     }
 
     /**
@@ -102,28 +116,28 @@ public class MProductRecord extends UpdatableRecordImpl<MProductRecord> {
      */
     @NonNull
     public BigDecimal getUnitPriceJpy() {
-        return (BigDecimal) get(4);
+        return (BigDecimal) get(5);
     }
 
     /**
      * Setter for <code>product.m_product.sales_status_typ</code>.
      */
     public void setSalesStatusTyp(String value) {
-        set(5, value);
+        set(6, value);
     }
 
     /**
      * Getter for <code>product.m_product.sales_status_typ</code>.
      */
     public String getSalesStatusTyp() {
-        return (String) get(5);
+        return (String) get(6);
     }
 
     /**
      * Setter for <code>product.m_product.created_at</code>.
      */
     public void setCreatedAt(@NonNull Instant value) {
-        set(6, value);
+        set(7, value);
     }
 
     /**
@@ -131,14 +145,14 @@ public class MProductRecord extends UpdatableRecordImpl<MProductRecord> {
      */
     @NonNull
     public Instant getCreatedAt() {
-        return (Instant) get(6);
+        return (Instant) get(7);
     }
 
     /**
      * Setter for <code>product.m_product.created_by</code>.
      */
     public void setCreatedBy(@NonNull String value) {
-        set(7, value);
+        set(8, value);
     }
 
     /**
@@ -146,14 +160,14 @@ public class MProductRecord extends UpdatableRecordImpl<MProductRecord> {
      */
     @NonNull
     public String getCreatedBy() {
-        return (String) get(7);
+        return (String) get(8);
     }
 
     /**
      * Setter for <code>product.m_product.created_pgm_cd</code>.
      */
     public void setCreatedPgmCd(@NonNull String value) {
-        set(8, value);
+        set(9, value);
     }
 
     /**
@@ -161,14 +175,14 @@ public class MProductRecord extends UpdatableRecordImpl<MProductRecord> {
      */
     @NonNull
     public String getCreatedPgmCd() {
-        return (String) get(8);
+        return (String) get(9);
     }
 
     /**
      * Setter for <code>product.m_product.created_tx_id</code>.
      */
     public void setCreatedTxId(@NonNull String value) {
-        set(9, value);
+        set(10, value);
     }
 
     /**
@@ -176,14 +190,14 @@ public class MProductRecord extends UpdatableRecordImpl<MProductRecord> {
      */
     @NonNull
     public String getCreatedTxId() {
-        return (String) get(9);
+        return (String) get(10);
     }
 
     /**
      * Setter for <code>product.m_product.updated_at</code>.
      */
     public void setUpdatedAt(@NonNull Instant value) {
-        set(10, value);
+        set(11, value);
     }
 
     /**
@@ -191,14 +205,14 @@ public class MProductRecord extends UpdatableRecordImpl<MProductRecord> {
      */
     @NonNull
     public Instant getUpdatedAt() {
-        return (Instant) get(10);
+        return (Instant) get(11);
     }
 
     /**
      * Setter for <code>product.m_product.updated_by</code>.
      */
     public void setUpdatedBy(@NonNull String value) {
-        set(11, value);
+        set(12, value);
     }
 
     /**
@@ -206,14 +220,14 @@ public class MProductRecord extends UpdatableRecordImpl<MProductRecord> {
      */
     @NonNull
     public String getUpdatedBy() {
-        return (String) get(11);
+        return (String) get(12);
     }
 
     /**
      * Setter for <code>product.m_product.updated_pgm_cd</code>.
      */
     public void setUpdatedPgmCd(@NonNull String value) {
-        set(12, value);
+        set(13, value);
     }
 
     /**
@@ -221,14 +235,14 @@ public class MProductRecord extends UpdatableRecordImpl<MProductRecord> {
      */
     @NonNull
     public String getUpdatedPgmCd() {
-        return (String) get(12);
+        return (String) get(13);
     }
 
     /**
      * Setter for <code>product.m_product.updated_tx_id</code>.
      */
     public void setUpdatedTxId(@NonNull String value) {
-        set(13, value);
+        set(14, value);
     }
 
     /**
@@ -236,14 +250,14 @@ public class MProductRecord extends UpdatableRecordImpl<MProductRecord> {
      */
     @NonNull
     public String getUpdatedTxId() {
-        return (String) get(13);
+        return (String) get(14);
     }
 
     /**
      * Setter for <code>product.m_product.lock_no</code>.
      */
     public void setLockNo(@NonNull Long value) {
-        set(14, value);
+        set(15, value);
     }
 
     /**
@@ -251,14 +265,14 @@ public class MProductRecord extends UpdatableRecordImpl<MProductRecord> {
      */
     @NonNull
     public Long getLockNo() {
-        return (Long) get(14);
+        return (Long) get(15);
     }
 
     /**
      * Setter for <code>product.m_product.patched_at</code>.
      */
     public void setPatchedAt(@Nullable Instant value) {
-        set(15, value);
+        set(16, value);
     }
 
     /**
@@ -266,14 +280,14 @@ public class MProductRecord extends UpdatableRecordImpl<MProductRecord> {
      */
     @Nullable
     public Instant getPatchedAt() {
-        return (Instant) get(15);
+        return (Instant) get(16);
     }
 
     /**
      * Setter for <code>product.m_product.patched_by</code>.
      */
     public void setPatchedBy(@Nullable String value) {
-        set(16, value);
+        set(17, value);
     }
 
     /**
@@ -281,14 +295,14 @@ public class MProductRecord extends UpdatableRecordImpl<MProductRecord> {
      */
     @Nullable
     public String getPatchedBy() {
-        return (String) get(16);
+        return (String) get(17);
     }
 
     /**
      * Setter for <code>product.m_product.patched_id</code>.
      */
     public void setPatchedId(@Nullable Integer value) {
-        set(17, value);
+        set(18, value);
     }
 
     /**
@@ -296,7 +310,7 @@ public class MProductRecord extends UpdatableRecordImpl<MProductRecord> {
      */
     @Nullable
     public Integer getPatchedId() {
-        return (Integer) get(17);
+        return (Integer) get(18);
     }
 
     // -------------------------------------------------------------------------
@@ -323,10 +337,11 @@ public class MProductRecord extends UpdatableRecordImpl<MProductRecord> {
     /**
      * Create a detached, initialised MProductRecord
      */
-    public MProductRecord(Long productId, @NonNull UUID publicId, String productCode, String productName, @NonNull BigDecimal unitPriceJpy, String salesStatusTyp, @NonNull Instant createdAt, @NonNull String createdBy, @NonNull String createdPgmCd, @NonNull String createdTxId, @NonNull Instant updatedAt, @NonNull String updatedBy, @NonNull String updatedPgmCd, @NonNull String updatedTxId, @NonNull Long lockNo, @Nullable Instant patchedAt, @Nullable String patchedBy, @Nullable Integer patchedId) {
+    public MProductRecord(Long productId, UUID tenantPublicId, @NonNull UUID publicId, String productCode, String productName, @NonNull BigDecimal unitPriceJpy, String salesStatusTyp, @NonNull Instant createdAt, @NonNull String createdBy, @NonNull String createdPgmCd, @NonNull String createdTxId, @NonNull Instant updatedAt, @NonNull String updatedBy, @NonNull String updatedPgmCd, @NonNull String updatedTxId, @NonNull Long lockNo, @Nullable Instant patchedAt, @Nullable String patchedBy, @Nullable Integer patchedId) {
         super(MProduct.M_PRODUCT);
 
         setProductId(productId);
+        setTenantPublicId(tenantPublicId);
         setPublicId(publicId);
         setProductCode(productCode);
         setProductName(productName);

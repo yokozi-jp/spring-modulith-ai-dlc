@@ -12,7 +12,7 @@ import java.util.Set;
 import java.util.stream.Collectors;
 
 /**
- * 業務テーブルの制約、インデックス、主キー、カラムの規則（O2、K1、K2、K3、K7、K8、K9、P1、P2、P3、P4、T1、T2、T11、T13）を、カタログの行から判定する。
+ * 業務テーブルの制約、インデックス、主キー、カラムの規則（O2、K2、K3、K7、K8、K9、P1、P2、P3、P4、T1、T2、T11、T13）を、カタログの行から判定する。
  *
  * <p>DBに接続しない純粋な関数である。各関数は{@link SchemaConventions#isBusinessSchema(String)}で業務スキーマの行だけを判定する。
  */
@@ -31,7 +31,6 @@ final class SchemaTableConventions {
   /** 禁止する制約の{@code contype}と、規則の記号と内容。PG18の{@code n}（NOT NULL）は含めない。 */
   private static final Map<String, Map.Entry<String, String>> BANNED_CONSTRAINTS =
       Map.of(
-          "f", Map.entry("K1", "外部キー制約を作らず、参照整合性はアプリケーションで保つ"),
           "c", Map.entry("K2", "CHECK制約を使わず、値の検証はアプリケーションで行う"),
           "u", Map.entry("K3", "ユニーク制約ではなく、ユニークインデックスで一意性を表す"));
 
@@ -60,7 +59,7 @@ final class SchemaTableConventions {
   }
 
   /**
-   * K1、K2、K3：外部キー、CHECK、ユニークの制約を使わない。
+   * K2、K3：CHECK、ユニークの制約を使わない。
    *
    * @param rows 制約
    * @return 違反
@@ -246,11 +245,14 @@ final class SchemaTableConventions {
     return violations;
   }
 
-  /** T13：uuidのDEFAULT。 */
+  /** T13：uuidのDEFAULT。テナントの列の、トランザクションのテナントを入れる既定値はIDの採番ではないため除く。 */
   private static void uuidDefault(
       final ColumnRow row, final String target, final List<ConventionViolation> violations) {
     final String defaultExpression = row.defaultExpression();
-    if ("uuid".equals(row.typeName()) && defaultExpression != null) {
+    final boolean tenantDefault =
+        TenantIsolation.TENANT_COLUMN.equals(row.column())
+            && TenantIsolation.CATALOG_TENANT_DEFAULT.equals(defaultExpression);
+    if ("uuid".equals(row.typeName()) && defaultExpression != null && !tenantDefault) {
       violations.add(
           new ConventionViolation(
               "T13",

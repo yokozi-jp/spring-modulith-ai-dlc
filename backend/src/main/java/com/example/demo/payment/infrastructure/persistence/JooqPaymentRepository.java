@@ -51,7 +51,7 @@ class JooqPaymentRepository implements PaymentRepository {
 
   @Override
   public void add(final Payment payment) {
-    // ユニークインデックスは public_id（UUID v4 で衝突しない）と order_public_id だけなので、409 は注文の決済記録の重複である。
+    // ユニークインデックスはテナントごとの public_id（UUID v4 で衝突しない）と order_public_id だけなので、409 は注文の決済記録の重複である。
     tableWriter.insert(
         dsl.insertInto(T_PAYMENT)
             .set(T_PAYMENT.PUBLIC_ID, payment.id().value())

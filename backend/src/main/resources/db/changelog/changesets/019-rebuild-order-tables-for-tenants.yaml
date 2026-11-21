@@ -1,0 +1,485 @@
+databaseChangeLog:
+  - changeSet:
+      id: 019-rebuild-order-tables-for-tenants
+      author: system
+      comment: >-
+        注文の表（t_order、t_order_line）を、テナントの列と行レベルセキュリティを持つ形に作り直す。
+        明細から注文への参照は (tenant_public_id, order_id) の複合の外部キーにし、別のテナントの注文を指す明細を DB で拒否する。
+        本番にデータがないため、移行の手順を作らず表を作り直す（#377）。
+        tenant_public_id の既定値は、トランザクションに設定したテナント（app.current_tenant）である。
+        テナントを設定しないトランザクションでは、既定値とポリシーが current_setting のエラーで失敗する。
+        権限は 012 の既定の権限（ALTER DEFAULT PRIVILEGES）でモジュールのロールに付く。
+      preConditions:
+        - dbms:
+            type: postgresql
+      changes:
+        - dropTable:
+            tableName: t_order_line
+            schemaName: ordering
+        - dropTable:
+            tableName: t_order
+            schemaName: ordering
+        - createTable:
+            tableName: t_order
+            schemaName: ordering
+            columns:
+              - column:
+                  name: order_id
+                  type: bigint
+                  autoIncrement: true
+                  generationType: ALWAYS
+                  constraints:
+                    primaryKey: true
+                    primaryKeyName: pk_t_order
+              - column:
+                  name: tenant_public_id
+                  type: uuid
+                  defaultValueComputed: current_setting('app.current_tenant')::uuid
+                  constraints:
+                    nullable: false
+              - column:
+                  name: public_id
+                  type: uuid
+                  constraints:
+                    nullable: false
+              - column:
+                  name: customer_order_code
+                  type: varchar(30)
+                  defaultValue: ""
+                  constraints:
+                    nullable: false
+              - column:
+                  name: order_status_typ
+                  type: varchar(10)
+                  defaultValue: ""
+                  constraints:
+                    nullable: false
+              - column:
+                  name: ordered_at
+                  type: timestamptz
+                  constraints:
+                    nullable: false
+              - column:
+                  name: created_at
+                  type: timestamptz
+                  constraints:
+                    nullable: false
+              - column:
+                  name: created_by
+                  type: varchar(64)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: created_pgm_cd
+                  type: varchar(64)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: created_tx_id
+                  type: varchar(32)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: updated_at
+                  type: timestamptz
+                  constraints:
+                    nullable: false
+              - column:
+                  name: updated_by
+                  type: varchar(64)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: updated_pgm_cd
+                  type: varchar(64)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: updated_tx_id
+                  type: varchar(32)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: lock_no
+                  type: bigint
+                  constraints:
+                    nullable: false
+              - column:
+                  name: patched_at
+                  type: timestamptz
+              - column:
+                  name: patched_by
+                  type: varchar(64)
+              - column:
+                  name: patched_id
+                  type: integer
+        - createTable:
+            tableName: t_order_line
+            schemaName: ordering
+            columns:
+              - column:
+                  name: order_line_id
+                  type: bigint
+                  autoIncrement: true
+                  generationType: ALWAYS
+                  constraints:
+                    primaryKey: true
+                    primaryKeyName: pk_t_order_line
+              - column:
+                  name: tenant_public_id
+                  type: uuid
+                  defaultValueComputed: current_setting('app.current_tenant')::uuid
+                  constraints:
+                    nullable: false
+              - column:
+                  name: order_id
+                  type: bigint
+                  constraints:
+                    nullable: false
+              - column:
+                  name: line_no
+                  type: integer
+                  constraints:
+                    nullable: false
+              - column:
+                  name: product_public_id
+                  type: uuid
+                  constraints:
+                    nullable: false
+              - column:
+                  name: ordered_count
+                  type: integer
+                  constraints:
+                    nullable: false
+              - column:
+                  name: ordered_unit_price_jpy
+                  type: numeric(12, 2)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: created_at
+                  type: timestamptz
+                  constraints:
+                    nullable: false
+              - column:
+                  name: created_by
+                  type: varchar(64)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: created_pgm_cd
+                  type: varchar(64)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: created_tx_id
+                  type: varchar(32)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: updated_at
+                  type: timestamptz
+                  constraints:
+                    nullable: false
+              - column:
+                  name: updated_by
+                  type: varchar(64)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: updated_pgm_cd
+                  type: varchar(64)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: updated_tx_id
+                  type: varchar(32)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: lock_no
+                  type: bigint
+                  constraints:
+                    nullable: false
+              - column:
+                  name: patched_at
+                  type: timestamptz
+              - column:
+                  name: patched_by
+                  type: varchar(64)
+              - column:
+                  name: patched_id
+                  type: integer
+        - createIndex:
+            indexName: uk_t_order
+            tableName: t_order
+            schemaName: ordering
+            unique: true
+            columns:
+              - column:
+                  name: tenant_public_id
+              - column:
+                  name: public_id
+        - createIndex:
+            indexName: uk_2_t_order
+            tableName: t_order
+            schemaName: ordering
+            unique: true
+            columns:
+              - column:
+                  name: tenant_public_id
+              - column:
+                  name: customer_order_code
+        # 明細の複合の外部キーが参照する組。
+        - createIndex:
+            indexName: uk_3_t_order
+            tableName: t_order
+            schemaName: ordering
+            unique: true
+            columns:
+              - column:
+                  name: tenant_public_id
+              - column:
+                  name: order_id
+        - createIndex:
+            indexName: uk_t_order_line
+            tableName: t_order_line
+            schemaName: ordering
+            unique: true
+            columns:
+              - column:
+                  name: tenant_public_id
+              - column:
+                  name: order_id
+              - column:
+                  name: line_no
+        - addForeignKeyConstraint:
+            constraintName: fk_t_order_line
+            baseTableSchemaName: ordering
+            baseTableName: t_order_line
+            baseColumnNames: tenant_public_id, order_id
+            referencedTableSchemaName: ordering
+            referencedTableName: t_order
+            referencedColumnNames: tenant_public_id, order_id
+        - sql:
+            sql: |
+              ALTER TABLE ordering.t_order ENABLE ROW LEVEL SECURITY;
+              ALTER TABLE ordering.t_order FORCE ROW LEVEL SECURITY;
+              CREATE POLICY tenant_isolation ON ordering.t_order AS PERMISSIVE FOR ALL TO PUBLIC USING (tenant_public_id = current_setting('app.current_tenant')::uuid);
+        - sql:
+            sql: |
+              ALTER TABLE ordering.t_order_line ENABLE ROW LEVEL SECURITY;
+              ALTER TABLE ordering.t_order_line FORCE ROW LEVEL SECURITY;
+              CREATE POLICY tenant_isolation ON ordering.t_order_line AS PERMISSIVE FOR ALL TO PUBLIC USING (tenant_public_id = current_setting('app.current_tenant')::uuid);
+      rollback:
+        - dropTable:
+            tableName: t_order_line
+            schemaName: ordering
+        - dropTable:
+            tableName: t_order
+            schemaName: ordering
+        - createTable:
+            tableName: t_order
+            schemaName: ordering
+            columns:
+              - column:
+                  name: order_id
+                  type: bigint
+                  autoIncrement: true
+                  generationType: ALWAYS
+                  constraints:
+                    primaryKey: true
+                    primaryKeyName: pk_t_order
+              - column:
+                  name: public_id
+                  type: uuid
+                  constraints:
+                    nullable: false
+              - column:
+                  name: customer_order_code
+                  type: varchar(30)
+                  defaultValue: ""
+                  constraints:
+                    nullable: false
+              - column:
+                  name: order_status_typ
+                  type: varchar(10)
+                  defaultValue: ""
+                  constraints:
+                    nullable: false
+              - column:
+                  name: ordered_at
+                  type: timestamptz
+                  constraints:
+                    nullable: false
+              - column:
+                  name: created_at
+                  type: timestamptz
+                  constraints:
+                    nullable: false
+              - column:
+                  name: created_by
+                  type: varchar(64)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: created_pgm_cd
+                  type: varchar(64)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: created_tx_id
+                  type: varchar(32)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: updated_at
+                  type: timestamptz
+                  constraints:
+                    nullable: false
+              - column:
+                  name: updated_by
+                  type: varchar(64)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: updated_pgm_cd
+                  type: varchar(64)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: updated_tx_id
+                  type: varchar(32)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: lock_no
+                  type: bigint
+                  constraints:
+                    nullable: false
+              - column:
+                  name: patched_at
+                  type: timestamptz
+              - column:
+                  name: patched_by
+                  type: varchar(64)
+              - column:
+                  name: patched_id
+                  type: integer
+        - createTable:
+            tableName: t_order_line
+            schemaName: ordering
+            columns:
+              - column:
+                  name: order_line_id
+                  type: bigint
+                  autoIncrement: true
+                  generationType: ALWAYS
+                  constraints:
+                    primaryKey: true
+                    primaryKeyName: pk_t_order_line
+              - column:
+                  name: order_id
+                  type: bigint
+                  constraints:
+                    nullable: false
+              - column:
+                  name: line_no
+                  type: integer
+                  constraints:
+                    nullable: false
+              - column:
+                  name: product_public_id
+                  type: uuid
+                  constraints:
+                    nullable: false
+              - column:
+                  name: ordered_count
+                  type: integer
+                  constraints:
+                    nullable: false
+              - column:
+                  name: ordered_unit_price_jpy
+                  type: numeric(12, 2)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: created_at
+                  type: timestamptz
+                  constraints:
+                    nullable: false
+              - column:
+                  name: created_by
+                  type: varchar(64)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: created_pgm_cd
+                  type: varchar(64)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: created_tx_id
+                  type: varchar(32)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: updated_at
+                  type: timestamptz
+                  constraints:
+                    nullable: false
+              - column:
+                  name: updated_by
+                  type: varchar(64)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: updated_pgm_cd
+                  type: varchar(64)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: updated_tx_id
+                  type: varchar(32)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: lock_no
+                  type: bigint
+                  constraints:
+                    nullable: false
+              - column:
+                  name: patched_at
+                  type: timestamptz
+              - column:
+                  name: patched_by
+                  type: varchar(64)
+              - column:
+                  name: patched_id
+                  type: integer
+        - createIndex:
+            indexName: uk_t_order
+            tableName: t_order
+            schemaName: ordering
+            unique: true
+            columns:
+              - column:
+                  name: public_id
+        - createIndex:
+            indexName: uk_2_t_order
+            tableName: t_order
+            schemaName: ordering
+            unique: true
+            columns:
+              - column:
+                  name: customer_order_code
+        - createIndex:
+            indexName: uk_t_order_line
+            tableName: t_order_line
+            schemaName: ordering
+            unique: true
+            columns:
+              - column:
+                  name: order_id
+              - column:
+                  name: line_no

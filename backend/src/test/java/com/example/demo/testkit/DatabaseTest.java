@@ -8,6 +8,7 @@ import java.lang.annotation.Target;
 import org.springframework.boot.jdbc.test.autoconfigure.AutoConfigureTestDatabase;
 import org.springframework.boot.jooq.test.autoconfigure.JooqTest;
 import org.springframework.context.annotation.Import;
+import org.springframework.test.context.TestExecutionListeners;
 
 /**
  * ロールバックで隔離される、jOOQ スライスのDBテスト向け合成アノテーション。
@@ -19,6 +20,9 @@ import org.springframework.context.annotation.Import;
  * する（ADR-094）。テストのトランザクションは、テストクラスの名前（{@code
  * com.example.demo.<module>.…}）からモジュールのロールで動く。モジュールの外のテストクラスは、アプリロールのままで、{@link AsModule} で切り替える。
  *
+ * <p>テストのトランザクションには、{@link DatabaseTestTenantListener} がテストの利用者のテナント（{@link
+ * AsTenant#TENANT}）を設定する。別のテナントの読み書きは {@link AsModule} を別のテナントの束縛の中で呼ぶ。
+ *
  * <p>{@code replace = NONE} で組み込みDBへの差し替えを止め、生成コードと同じ方言の実 PostgreSQL を使う。
  *
  * <p>実際にコミットして読み戻す忠実さが要るテスト（timestamptz 往復やイベント発行など）は、 代わりに {@link CommittedDatabaseTest} を使う。
@@ -28,4 +32,7 @@ import org.springframework.context.annotation.Import;
 @JooqTest
 @Import(ModuleRoleTransactionManager.Config.class)
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
+@TestExecutionListeners(
+    listeners = DatabaseTestTenantListener.class,
+    mergeMode = TestExecutionListeners.MergeMode.MERGE_WITH_DEFAULTS)
 public @interface DatabaseTest {}

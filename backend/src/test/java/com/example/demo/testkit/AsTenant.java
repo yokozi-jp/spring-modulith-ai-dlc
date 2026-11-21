@@ -8,7 +8,8 @@ import java.util.function.Supplier;
 /**
  * リクエストもリスナーも通らないテストの呼び出しを、{@link AppUsers#TENANT_ID} のテナントを束縛して実行する。
  *
- * <p>本番は、リクエストの入口の filter かリスナーの Aspect が束縛する。CommandHandler を直接呼ぶテストは、同じ束縛をこの補助で作る。
+ * <p>本番は、リクエストの入口の filter かリスナーの Aspect が束縛する。CommandHandler を直接呼ぶテストは、同じ束縛をこの補助か、テストのメソッド全体を束縛する
+ * {@link BindTestTenantExtension} で作る。
  */
 public final class AsTenant {
 

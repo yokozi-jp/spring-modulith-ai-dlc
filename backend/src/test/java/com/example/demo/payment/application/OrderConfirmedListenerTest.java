@@ -19,6 +19,7 @@ import com.example.demo.shared.concurrency.ExpectedLockNo;
 import com.example.demo.testkit.AppUsers;
 import com.example.demo.testkit.AsModule;
 import com.example.demo.testkit.AsTenant;
+import com.example.demo.testkit.BindTestTenantExtension;
 import com.example.demo.testkit.CapturedLogRecords;
 import com.example.demo.testkit.CleanGeneratedTablesExtension;
 import com.example.demo.testkit.SharedTestConfiguration;
@@ -77,7 +78,7 @@ import org.springframework.web.client.ResourceAccessException;
   OrderConfirmedFixture.class,
   OrderConfirmedListenerTest.GatewayConfiguration.class
 })
-@ExtendWith(CleanGeneratedTablesExtension.class)
+@ExtendWith({CleanGeneratedTablesExtension.class, BindTestTenantExtension.class})
 class OrderConfirmedListenerTest {
 
   /** 固定した現在時刻。決済した時刻と、イベント出版の時刻になる。 */

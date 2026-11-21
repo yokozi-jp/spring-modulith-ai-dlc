@@ -10,7 +10,7 @@ import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 /**
- * changesetのファイル名と構造の規則（M2、M4、M6、M9、M12、M13からM17）と、権限のSQLの規則（G3）を判定する。
+ * changesetのファイル名と構造の規則（M2、M4、M6、M9、M12、M13からM17）と、権限のSQLの規則（G3）と、RLSのSQLの規則（R1、R2）を判定する。
  *
  * <p>{@code modulith}スキーマのchangesetを含め、すべてのchangesetに適用する。
  */
@@ -126,6 +126,7 @@ final class ChangesetStructureRules {
     schemaNames(changeset).ifPresent(violations::add);
     violations.addAll(rawSql(changeset));
     violations.addAll(ChangesetPrivilegeRules.check(changeset));
+    violations.addAll(ChangesetRowSecurityRules.check(changeset));
     exceptionConstructs(changeset).ifPresent(violations::add);
     return violations;
   }
@@ -153,7 +154,9 @@ final class ChangesetStructureRules {
         .allChanges()
         .map(Change::rawSql)
         .flatMap(Optional::stream)
-        .filter(sql -> !ChangesetPrivilegeRules.isPrivilegeOnly(sql))
+        .filter(sql ->
+            !ChangesetPrivilegeRules.isPrivilegeOnly(sql)
+                && !ChangesetRowSecurityRules.isRowSecurityOnly(sql))
         .map(sql ->
             new ConventionViolation(
                 "M17",

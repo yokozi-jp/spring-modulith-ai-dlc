@@ -1,0 +1,48 @@
+databaseChangeLog:
+  - changeSet:
+      id: 021-add-tenancy-foreign-keys
+      author: system
+      comment: >-
+        tenancy の表どうしの参照に外部キーを作る（#377）。
+        tenancy の表は RLS の外にあり tenant_public_id を持たないため、参照先の主キーだけの外部キーにする。
+      preConditions:
+        - dbms:
+            type: postgresql
+      changes:
+        - addForeignKeyConstraint:
+            constraintName: fk_m_user_identity
+            baseTableSchemaName: tenancy
+            baseTableName: m_user_identity
+            baseColumnNames: user_id
+            referencedTableSchemaName: tenancy
+            referencedTableName: m_user
+            referencedColumnNames: user_id
+        - addForeignKeyConstraint:
+            constraintName: fk_m_membership
+            baseTableSchemaName: tenancy
+            baseTableName: m_membership
+            baseColumnNames: user_id
+            referencedTableSchemaName: tenancy
+            referencedTableName: m_user
+            referencedColumnNames: user_id
+        - addForeignKeyConstraint:
+            constraintName: fk_2_m_membership
+            baseTableSchemaName: tenancy
+            baseTableName: m_membership
+            baseColumnNames: tenant_id
+            referencedTableSchemaName: tenancy
+            referencedTableName: m_tenant
+            referencedColumnNames: tenant_id
+      rollback:
+        - dropForeignKeyConstraint:
+            constraintName: fk_2_m_membership
+            baseTableSchemaName: tenancy
+            baseTableName: m_membership
+        - dropForeignKeyConstraint:
+            constraintName: fk_m_membership
+            baseTableSchemaName: tenancy
+            baseTableName: m_membership
+        - dropForeignKeyConstraint:
+            constraintName: fk_m_user_identity
+            baseTableSchemaName: tenancy
+            baseTableName: m_user_identity

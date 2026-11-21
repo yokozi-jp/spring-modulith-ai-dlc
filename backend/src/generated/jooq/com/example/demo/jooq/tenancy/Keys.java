@@ -15,10 +15,12 @@ import com.example.demo.jooq.tenancy.tables.records.MUserRecord;
 
 import javax.annotation.processing.Generated;
 
+import org.jooq.ForeignKey;
 import org.jooq.TableField;
 import org.jooq.UniqueKey;
 import org.jooq.impl.DSL;
 import org.jooq.impl.Internal;
+import org.jooq.impl.QOM.ForeignKeyRule;
 
 
 /**
@@ -43,4 +45,12 @@ public class Keys {
     public static final UniqueKey<MTenantRecord> PK_M_TENANT = Internal.createUniqueKey(MTenant.M_TENANT, DSL.name("pk_m_tenant"), new TableField[] { MTenant.M_TENANT.TENANT_ID }, true);
     public static final UniqueKey<MUserRecord> PK_M_USER = Internal.createUniqueKey(MUser.M_USER, DSL.name("pk_m_user"), new TableField[] { MUser.M_USER.USER_ID }, true);
     public static final UniqueKey<MUserIdentityRecord> PK_M_USER_IDENTITY = Internal.createUniqueKey(MUserIdentity.M_USER_IDENTITY, DSL.name("pk_m_user_identity"), new TableField[] { MUserIdentity.M_USER_IDENTITY.USER_IDENTITY_ID }, true);
+
+    // -------------------------------------------------------------------------
+    // FOREIGN KEY definitions
+    // -------------------------------------------------------------------------
+
+    public static final ForeignKey<MMembershipRecord, MTenantRecord> M_MEMBERSHIP__FK_2_M_MEMBERSHIP = Internal.createForeignKey(MMembership.M_MEMBERSHIP, DSL.name("fk_2_m_membership"), new TableField[] { MMembership.M_MEMBERSHIP.TENANT_ID }, Keys.PK_M_TENANT, new TableField[] { MTenant.M_TENANT.TENANT_ID }, true, ForeignKeyRule.NO_ACTION, ForeignKeyRule.NO_ACTION);
+    public static final ForeignKey<MMembershipRecord, MUserRecord> M_MEMBERSHIP__FK_M_MEMBERSHIP = Internal.createForeignKey(MMembership.M_MEMBERSHIP, DSL.name("fk_m_membership"), new TableField[] { MMembership.M_MEMBERSHIP.USER_ID }, Keys.PK_M_USER, new TableField[] { MUser.M_USER.USER_ID }, true, ForeignKeyRule.NO_ACTION, ForeignKeyRule.NO_ACTION);
+    public static final ForeignKey<MUserIdentityRecord, MUserRecord> M_USER_IDENTITY__FK_M_USER_IDENTITY = Internal.createForeignKey(MUserIdentity.M_USER_IDENTITY, DSL.name("fk_m_user_identity"), new TableField[] { MUserIdentity.M_USER_IDENTITY.USER_ID }, Keys.PK_M_USER, new TableField[] { MUser.M_USER.USER_ID }, true, ForeignKeyRule.NO_ACTION, ForeignKeyRule.NO_ACTION);
 }

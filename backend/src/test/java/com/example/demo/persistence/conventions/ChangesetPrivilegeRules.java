@@ -265,7 +265,7 @@ final class ChangesetPrivilegeRules {
   }
 
   /** Liquibaseと同じく{@code ;}で文に分け、空の文を捨てる。空白は1つにそろえる。 */
-  private static List<String> statements(final String sql) {
+  /* package */ static List<String> statements(final String sql) {
     return Arrays.stream(sql.split(";"))
         .map(statement -> statement.strip().replaceAll("\\s+", " "))
         .filter(statement -> !statement.isEmpty())

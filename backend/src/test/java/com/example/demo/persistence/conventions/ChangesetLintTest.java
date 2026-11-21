@@ -52,6 +52,37 @@ class ChangesetLintTest {
   /** 違反のケースの多くが使うテーブル。 */
   private static final String M_ITEM = "item.m_item";
 
+  /** テーブルとRLSを作るchangesetの、RLSの書き方（R1）の違反のキーの先頭。 */
+  private static final String ROW_SECURITY = "R1 001-create-m-item: ";
+
+  /** テーブルとRLSを作るchangesetの、任意のSQL（M17）の違反のキーの先頭。 */
+  private static final String ARBITRARY_SQL = "M17 001-create-m-item: ";
+
+  /** {@code item.m_item}のRLSの3文が揃わない（R2）違反のキー。 */
+  private static final String INCOMPLETE_ROW_SECURITY = "R2 001-create-m-item: item.m_item";
+
+  /** 設定がなくてもエラーにしない{@code missing_ok}を使ったポリシー。 */
+  private static final String MISSING_OK_POLICY =
+      "CREATE POLICY tenant_isolation ON item.m_item AS PERMISSIVE FOR ALL TO PUBLIC"
+          + " USING (tenant_public_id = current_setting('app.current_tenant', true)::uuid)";
+
+  /** 対象をPUBLICでなくモジュールのロールにしたポリシー。 */
+  private static final String ROLE_POLICY =
+      "CREATE POLICY tenant_isolation ON item.m_item AS PERMISSIVE FOR ALL TO item_module"
+          + " USING (tenant_public_id = current_setting('app.current_tenant')::uuid)";
+
+  /** RLSの外のスキーマの表に付けたENABLE。 */
+  private static final String EXEMPT_ENABLE =
+      "ALTER TABLE tenancy.m_item ENABLE ROW LEVEL SECURITY";
+
+  /** RLSの外のスキーマの表に付けたFORCE。 */
+  private static final String EXEMPT_FORCE = "ALTER TABLE tenancy.m_item FORCE ROW LEVEL SECURITY";
+
+  /** RLSの外のスキーマの表に付けたポリシー。 */
+  private static final String EXEMPT_POLICY =
+      "CREATE POLICY tenant_isolation ON tenancy.m_item AS PERMISSIVE FOR ALL TO PUBLIC"
+          + " USING (tenant_public_id = current_setting('app.current_tenant')::uuid)";
+
   /** 違反のないケース。 */
   private static final List<LintCase> VALID_CASES =
       List.of(
@@ -64,7 +95,8 @@ class ChangesetLintTest {
           lintCase("replay-add-column", List.of()),
           lintCase("modulith-excluded", List.of()),
           lintCase("module-role-privileges", List.of()),
-          lintCase("allowlisted-sql", sqlAllowlist(COMMENT_SQL, UNCOMMENT_SQL)));
+          lintCase("allowlisted-sql", sqlAllowlist(COMMENT_SQL, UNCOMMENT_SQL)),
+          lintCase("row-level-security", List.of()));
 
   /** 違反のケースと、期待する違反のキー。 */
   private static final List<LintCase> INVALID_CASES =
@@ -164,6 +196,23 @@ class ChangesetLintTest {
               "unused-allowlist-entry",
               sqlAllowlist("999-unused: SELECT 1;"),
               "ALLOWLIST M17 999-unused: SELECT 1;"),
+          lintCase(
+              "r1-policy-missing-ok",
+              ROW_SECURITY + MISSING_OK_POLICY,
+              ARBITRARY_SQL + MISSING_OK_POLICY + ";",
+              INCOMPLETE_ROW_SECURITY),
+          lintCase(
+              "r1-policy-to-role",
+              ROW_SECURITY + ROLE_POLICY,
+              ARBITRARY_SQL + ROLE_POLICY + ";",
+              INCOMPLETE_ROW_SECURITY),
+          lintCase(
+              "r1-exempt-schema",
+              ROW_SECURITY + EXEMPT_ENABLE,
+              ROW_SECURITY + EXEMPT_FORCE,
+              ROW_SECURITY + EXEMPT_POLICY,
+              ARBITRARY_SQL + String.join(";\n", EXEMPT_ENABLE, EXEMPT_FORCE, EXEMPT_POLICY) + ";"),
+          lintCase("r2-without-force", INCOMPLETE_ROW_SECURITY),
           lintCase("m7-create-index-on-existing-table", "M7 item.idx_1_m_item"),
           lintCase(
               "m7-sql-index-without-concurrently",

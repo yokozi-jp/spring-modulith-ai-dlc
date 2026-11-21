@@ -145,8 +145,8 @@ class SchemaConventionsTest {
     }
 
     @Test
-    @DisplayName("K1、K2、K3：外部キー、CHECK、ユニークの制約を拒否する")
-    void rejectsForeignKeyCheckAndUniqueConstraints() {
+    @DisplayName("K2、K3：CHECKとユニークの制約を拒否し、外部キーはこの規則で判定しない")
+    void rejectsCheckAndUniqueConstraints() {
       final List<ConstraintRow> rows =
           List.of(
               new ConstraintRow(ITEM, TABLE, "fk_x", "f", ITEM),
@@ -155,7 +155,7 @@ class SchemaConventionsTest {
 
       assertThat(keys(SchemaTableConventions.constraints(rows)))
           .as("制約: %s", rows)
-          .containsExactlyInAnyOrder("K1 item.fk_x", "K2 item.chk_x", "K3 item.uq_x");
+          .containsExactlyInAnyOrder("K2 item.chk_x", "K3 item.uq_x");
     }
 
     @Test
@@ -403,6 +403,31 @@ class SchemaConventionsTest {
                               "",
                               "''::character varying")))))
           .isEmpty();
+    }
+
+    @Test
+    @DisplayName("T13：テナントの列の、トランザクションのテナントを入れるDEFAULTだけを許可する")
+    void acceptsOnlyTenantColumnDefaultedByCurrentTenant() {
+      final String tenantDefault = TenantIsolation.CATALOG_TENANT_DEFAULT;
+
+      assertThat(
+              keys(
+                  SchemaTableConventions.columns(
+                      List.of(
+                          new ColumnRow(
+                              ITEM, TABLE, "tenant_public_id", UUID, "b", "", "", tenantDefault),
+                          new ColumnRow(ITEM, TABLE, "public_id", UUID, "b", "", "", tenantDefault),
+                          new ColumnRow(
+                              ITEM,
+                              TABLE,
+                              "tenant_public_id",
+                              UUID,
+                              "b",
+                              "",
+                              "",
+                              "gen_random_uuid()")))))
+          .containsExactlyInAnyOrder(
+              "T13 item.m_item.public_id", "T13 item.m_item.tenant_public_id");
     }
 
     @Test

@@ -10,6 +10,8 @@ import java.sql.DriverManager;
 import java.sql.SQLException;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Properties;
 import org.awaitility.Awaitility;
 import org.jooq.DSLContext;
@@ -90,7 +92,7 @@ public final class CleanGeneratedTablesExtension implements AfterEachCallback {
     try (Connection owner =
         DriverManager.getConnection(
             environment.getRequiredProperty("spring.datasource.url"), properties)) {
-      final DSLContext ownerDsl = DSL.using(owner, SQLDialect.POSTGRES);
+      final List<Table<?>> owned = new ArrayList<>();
       for (final Schema schema : DefaultCatalog.DEFAULT_CATALOG.getSchemas()) {
         for (final Table<?> table : schema.getTables()) {
           if (MODULITH.equals(schema)) {
@@ -98,10 +100,12 @@ public final class CleanGeneratedTablesExtension implements AfterEachCallback {
               dslContext.deleteFrom(table).execute();
             }
           } else {
-            ownerDsl.truncate(table).execute();
+            owned.add(table);
           }
         }
       }
+      // 外部キーで参照される表は、参照する表と同じ TRUNCATE でなければ消せない。
+      DSL.using(owner, SQLDialect.POSTGRES).truncate(owned).execute();
     } catch (SQLException e) {
       throw new IllegalStateException("テストの後始末で所有者の接続を使えない", e);
     }

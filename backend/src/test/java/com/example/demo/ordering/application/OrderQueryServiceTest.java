@@ -10,6 +10,7 @@ import com.example.demo.ordering.OrderSummary;
 import com.example.demo.product.TestProducts;
 import com.example.demo.shared.concurrency.ExpectedLockNo;
 import com.example.demo.testkit.AsTenant;
+import com.example.demo.testkit.BindTestTenantExtension;
 import com.example.demo.testkit.CleanGeneratedTablesExtension;
 import com.example.demo.testkit.SharedTestConfiguration;
 import com.example.demo.testkit.UniqueCodes;
@@ -31,7 +32,7 @@ import org.springframework.modulith.test.ApplicationModuleTest.BootstrapMode;
 /** 注文の参照を、OrderQueries を通して検証する。 */
 @ApplicationModuleTest(mode = BootstrapMode.DIRECT_DEPENDENCIES)
 @Import(SharedTestConfiguration.class)
-@ExtendWith(CleanGeneratedTablesExtension.class)
+@ExtendWith({CleanGeneratedTablesExtension.class, BindTestTenantExtension.class})
 class OrderQueryServiceTest {
 
   /** テスト対象の参照のインタフェース。 */

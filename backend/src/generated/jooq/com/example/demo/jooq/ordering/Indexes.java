@@ -32,7 +32,8 @@ public class Indexes {
     // INDEX definitions
     // -------------------------------------------------------------------------
 
-    public static final Index UK_2_T_ORDER = Internal.createIndex(DSL.name("uk_2_t_order"), TOrder.T_ORDER, new OrderField[] { TOrder.T_ORDER.CUSTOMER_ORDER_CODE }, true);
-    public static final Index UK_T_ORDER = Internal.createIndex(DSL.name("uk_t_order"), TOrder.T_ORDER, new OrderField[] { TOrder.T_ORDER.PUBLIC_ID }, true);
-    public static final Index UK_T_ORDER_LINE = Internal.createIndex(DSL.name("uk_t_order_line"), TOrderLine.T_ORDER_LINE, new OrderField[] { TOrderLine.T_ORDER_LINE.ORDER_ID, TOrderLine.T_ORDER_LINE.LINE_NO }, true);
+    public static final Index UK_2_T_ORDER = Internal.createIndex(DSL.name("uk_2_t_order"), TOrder.T_ORDER, new OrderField[] { TOrder.T_ORDER.TENANT_PUBLIC_ID, TOrder.T_ORDER.CUSTOMER_ORDER_CODE }, true);
+    public static final Index UK_3_T_ORDER = Internal.createIndex(DSL.name("uk_3_t_order"), TOrder.T_ORDER, new OrderField[] { TOrder.T_ORDER.TENANT_PUBLIC_ID, TOrder.T_ORDER.ORDER_ID }, true);
+    public static final Index UK_T_ORDER = Internal.createIndex(DSL.name("uk_t_order"), TOrder.T_ORDER, new OrderField[] { TOrder.T_ORDER.TENANT_PUBLIC_ID, TOrder.T_ORDER.PUBLIC_ID }, true);
+    public static final Index UK_T_ORDER_LINE = Internal.createIndex(DSL.name("uk_t_order_line"), TOrderLine.T_ORDER_LINE, new OrderField[] { TOrderLine.T_ORDER_LINE.TENANT_PUBLIC_ID, TOrderLine.T_ORDER_LINE.ORDER_ID, TOrderLine.T_ORDER_LINE.LINE_NO }, true);
 }
