@@ -1,5 +1,6 @@
 package com.example.demo.payment.domain.model;
 
+import com.example.demo.shared.concurrency.Versioned;
 import java.time.Instant;
 import java.util.UUID;
 import org.jspecify.annotations.Nullable;
@@ -12,7 +13,7 @@ import org.jspecify.annotations.Nullable;
 // record と同じ形のアクセサ（id() など）にそろえるため、フィールド名と同名の短いメソッドを許す。
 // 決済記録は請求の結果を記録するだけで変更しないため、振る舞いのないアクセサだけの集約になる。
 @SuppressWarnings({"PMD.AvoidFieldNameMatchingMethodName", "PMD.ShortMethodName", "PMD.DataClass"})
-public final class Payment {
+public final class Payment implements Versioned {
 
   /** 決済記録の ID。 */
   private final PaymentId id;
@@ -109,6 +110,7 @@ public final class Payment {
   }
 
   /** ロック番号を返す。 */
+  @Override
   public long lockNo() {
     return lockNo;
   }

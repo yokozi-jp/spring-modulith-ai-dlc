@@ -2,6 +2,7 @@ package com.example.demo.ordering.domain.model;
 
 import com.example.demo.shared.concurrency.ConflictException;
 import com.example.demo.shared.concurrency.ExpectedLockNo;
+import com.example.demo.shared.concurrency.Versioned;
 import com.example.demo.shared.failure.BusinessRuleViolationException;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -19,7 +20,7 @@ import org.jspecify.annotations.Nullable;
   "PMD.ShortMethodName",
   "PMD.TooManyMethods"
 })
-public final class Order {
+public final class Order implements Versioned {
 
   /** 注文 ID。 */
   private final OrderId id;
@@ -165,6 +166,7 @@ public final class Order {
   }
 
   /** 楽観的ロックのロック番号を返す。 */
+  @Override
   public long lockNo() {
     return lockNo;
   }

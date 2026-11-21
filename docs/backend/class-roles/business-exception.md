@@ -43,9 +43,9 @@ HTTP のステータスとログレベルは `error` モジュールの `ApiExce
   メッセージは応答の本文に出ず、ログにだけ出る。
 - `Optional` からは `orElseThrow(() -> new NotFoundException("order not found: orderId=" + orderId))` で取り出す。
 - 集約の状態遷移と Domain Service の業務規則の違反は `BusinessRuleViolationException` で投げる。
-- Repository の実装は、Spring と jOOQ の例外（`CannotAcquireLockException`、`DuplicateKeyException`）を Repository の外へ出さない。
-  外へ出すときは、原因を付けずに、種類を付けた `ConflictException` に変えて投げる（[jOOQ の Repository](jooq-repository.md)）。
-  種類は、版の不一致が `ConflictException.Kind.VERSION`、行ロックの失敗が `Kind.LOCK`、一意制約の違反が `Kind.UNIQUE` である。
+- Repository の実装は、Spring と jOOQ の例外（`CannotAcquireLockException`、`DuplicateKeyException`）を Repository の外へ出さず、自分で catch して変えることもしない。
+  書き込みは `TableWriter` が、SQLSTATE で見分けて、原因を付けずに種類を付けた `ConflictException` に変える（[jOOQ の Repository](jooq-repository.md)）。
+  種類は、版の不一致が `ConflictException.Kind.VERSION`、行ロックの失敗（`55P03`）が `Kind.LOCK`、一意制約の違反（`23505`）が `Kind.UNIQUE` である。
 - 三つの型は原因（cause）を持たない。
   コンストラクタは原因を受け取らず、後から `initCause` を呼ぶと `IllegalStateException` になる。
 
@@ -96,17 +96,6 @@ private void ensureStatus(final OrderStatus expected) {
   }
 }
 ```
-
-Repository の実装は、`NOWAIT` のロックの失敗を、原因を付けずに種類を付けた `ConflictException` に変える（抜粋）。
-
-```java
-} catch (final CannotAcquireLockException e) {
-  throw new ConflictException(
-      ConflictException.Kind.LOCK, "row is locked by another request: orderId=" + orderId);
-}
-```
-
-catch した例外を原因に渡さないため、この断片を写したメソッドには PMD と Error Prone の警告の抑止が要り、その書き方は [jOOQ の Repository](jooq-repository.md) に従う。
 
 Controller は参照の結果がなければ `NotFoundException` を投げ、ステータスを自分で決めない（[Controller](controller.md)）。
 

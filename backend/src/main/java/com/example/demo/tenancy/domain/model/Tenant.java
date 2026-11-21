@@ -2,6 +2,7 @@ package com.example.demo.tenancy.domain.model;
 
 import com.example.demo.shared.concurrency.ConflictException;
 import com.example.demo.shared.concurrency.ExpectedLockNo;
+import com.example.demo.shared.concurrency.Versioned;
 import com.example.demo.shared.failure.BusinessRuleViolationException;
 import com.example.demo.shared.failure.NotFoundException;
 import com.example.demo.shared.tenant.TenantId;
@@ -15,7 +16,7 @@ import java.util.Locale;
  */
 // record と同じ形のアクセサ（id() など）にそろえるため、フィールド名と同名の短いメソッドを許す。
 @SuppressWarnings({"PMD.AvoidFieldNameMatchingMethodName", "PMD.ShortMethodName"})
-public final class Tenant {
+public final class Tenant implements Versioned {
 
   /** テナント ID。 */
   private final TenantId id;
@@ -79,6 +80,7 @@ public final class Tenant {
   }
 
   /** ロック番号を返す。 */
+  @Override
   public long lockNo() {
     return lockNo;
   }

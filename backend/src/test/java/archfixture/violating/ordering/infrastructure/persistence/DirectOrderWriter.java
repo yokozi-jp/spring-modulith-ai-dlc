@@ -103,6 +103,16 @@ public final class DirectOrderWriter {
     return dsl.executeUpdate(row);
   }
 
+  /** {@code DSLContext.executeInsert} を呼ぶ。 */
+  public static <R extends TableRecord<R>> int dslExecuteInsert(final DSLContext dsl, final R row) {
+    return dsl.executeInsert(row);
+  }
+
+  /** {@code DSLContext.loadInto} を呼ぶ。 */
+  public static Object dslLoadInto(final DSLContext dsl) {
+    return dsl.loadInto(ORDERS);
+  }
+
   /** {@code DSLContext.executeDelete} を呼ぶ。 */
   public static <R extends UpdatableRecord<R>> int dslExecuteDelete(
       final DSLContext dsl, final R row) {
@@ -194,6 +204,26 @@ public final class DirectOrderWriter {
     return new SqlUpdate(dataSource, DELETE_SQL).update();
   }
 
+  /** {@code DSLContext.insertInto} を呼ぶ。 */
+  public static Object dslInsertInto(final DSLContext dsl) {
+    return dsl.insertInto(ORDERS);
+  }
+
+  /** {@code DSLContext.insertQuery} を呼ぶ。 */
+  public static Object dslInsertQuery(final DSLContext dsl) {
+    return dsl.insertQuery(ORDERS);
+  }
+
+  /** {@code DSLContext.batchInsert} を呼ぶ。 */
+  public static Batch dslBatchInsert(final DSLContext dsl, final UpdatableRecord<?> row) {
+    return dsl.batchInsert(row);
+  }
+
+  /** {@code DSL.insertInto} で接続のない INSERT を作る。 */
+  public static Object staticDslInsertInto() {
+    return DSL.insertInto(ORDERS);
+  }
+
   /** {@code DSL.update} で接続のない UPDATE を作る。 */
   public static Object staticDslUpdate() {
     return DSL.update(ORDERS);
@@ -275,6 +305,18 @@ public final class DirectOrderWriter {
   /** {@code UpdatableRecord.merge} を呼ぶ。 */
   public static int recordMerge(final UpdatableRecord<?> row) {
     return row.merge();
+  }
+
+  /** {@code TableRecord.insert} を呼ぶ。 */
+  public static int recordInsert(final TableRecord<?> row) {
+    return row.insert();
+  }
+
+  /** {@code DAO.insert} を呼ぶ。 */
+  public static <R extends TableRecord<R>> String daoInsert(
+      final DAO<R, String, String> dao, final String order) {
+    dao.insert(order);
+    return order;
   }
 
   /** {@code DAO.update} を呼ぶ。 */

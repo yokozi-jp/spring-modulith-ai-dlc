@@ -100,7 +100,7 @@ git diff --name-only --diff-filter=A "$(sed -n 's/^同期コミット：`\([0-9a
 | アクション        | コード                                                                                                                                                                                             |
 | ----------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `CmdRead`         | `ConfirmOrderCommandHandler.handle`、`CancelOrderCommandHandler.handle` の `findById` と `Order.ensureLockNo`                                                                                       |
-| `CmdWrite`        | `Order.confirm` / `Order.cancel`（`ensureDraft`）、`JooqOrderRepository.update` → `TableWriter.updateCheckingVersion`、確定なら `OrderConfirmed` の発行と出版の行の INSERT（同じトランザクション） |
+| `CmdWrite`        | `Order.confirm` / `Order.cancel`（`ensureDraft`）、`JooqOrderRepository.update` → `TableWriter.update`、確定なら `OrderConfirmed` の発行と出版の行の INSERT（同じトランザクション） |
 | `DStart`          | Spring Modulith 2.1.2 の `CompletionRegisteringMethodInterceptor` → `markProcessing`（`status != 'PROCESSING'` の UPDATE）                                                                          |
 | `DReadPayment`    | `ChargeOrderCommandHandler.handle` の `paymentRepository.findByOrderId`                                                                                                                            |
 | `DReadOrder`      | `ChargeOrderCommandHandler.handle` の `orderQueries.findDetails` と `details.confirmed()`                                                                                                          |

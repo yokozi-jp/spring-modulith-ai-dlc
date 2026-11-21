@@ -56,9 +56,10 @@ tags: [convention, backend, class-role]
 - 生成時に決まる値は `private final` フィールドにし、変わる状態（`status`、`discount`）だけを final でないフィールドにする。
 - ロック番号は `private final long lockNo` に持ち、`restore` の最後の引数で受け取る。
   `place` は、INSERT で登録する値と同じ `1` にする。
+  集約ルートは `shared.concurrency` の `Versioned` を実装し、`lockNo()` で返す。`TableWriter.update` が集約ルートをこの型で受け取る。
 - 画面から受け取ったロック番号を比べる public メソッド `ensureLockNo(ExpectedLockNo expectedLockNo)` を置き、違えば `ConflictException` を投げる。
   引数を `long` にしない。`long` のオーバーロードがあると、CommandHandler の検査（`commandHandlersEnsureScreenLockNo`）を満たせない。
-  CommandHandler が DB から読み直した集約の `lockNo` を `ensureLockNo` が画面の値と比べ、Repository の `update` がその `lockNo` を `shared` の `TableWriter` に渡して更新の時点の行の値と比べる（[jOOQ の Repository](jooq-repository.md)、[ADR-054](../../adr/ADR-054-detect-optimistic-lock-conflicts-by-update-count.md)）。
+  CommandHandler が DB から読み直した集約の `lockNo` を `ensureLockNo` が画面の値と比べ、Repository の `update` が集約ルートを `shared` の `TableWriter.update` に渡して更新の時点の行の値と比べる（[jOOQ の Repository](jooq-repository.md)、[ADR-054](../../adr/ADR-054-detect-optimistic-lock-conflicts-by-update-count.md)）。
 - setter を作らず、子の Entity のリストは `List.copyOf` で保持する。
 - 他の集約は識別子（`CustomerId`）で持ち、現在時刻は引数の `Instant` で受け取る。
 - 例外のメッセージは英語にし、対象の識別子を `orderId=...` の形で含める。

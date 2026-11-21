@@ -3,13 +3,17 @@ package com.example.demo.tenancy.infrastructure.persistence;
 import static com.example.demo.jooq.tenancy.Tables.M_USER;
 import static com.example.demo.jooq.tenancy.Tables.M_USER_IDENTITY;
 
-import com.example.demo.shared.infrastructure.persistence.CommonColumns;
+import com.example.demo.jooq.tenancy.tables.records.MUserIdentityRecord;
+import com.example.demo.jooq.tenancy.tables.records.MUserRecord;
+import com.example.demo.shared.infrastructure.persistence.AggregateTable;
+import com.example.demo.shared.infrastructure.persistence.ChildTable;
 import com.example.demo.shared.infrastructure.persistence.TableWriter;
 import com.example.demo.tenancy.domain.model.ExternalIdentity;
 import com.example.demo.tenancy.domain.model.User;
 import com.example.demo.tenancy.domain.model.UserId;
 import com.example.demo.tenancy.domain.model.UserRepository;
 import java.util.Optional;
+import java.util.UUID;
 import org.jooq.DSLContext;
 import org.jooq.Records;
 import org.jooq.impl.DSL;
@@ -19,20 +23,28 @@ import org.springframework.stereotype.Repository;
 @Repository
 class JooqUserRepository implements UserRepository {
 
+  /** 利用者の IdP の識別。親の中の行は、発行者と識別子の組で同定する。 */
+  private static final ChildTable<MUserIdentityRecord> IDENTITIES =
+      ChildTable.of(
+          M_USER_IDENTITY,
+          M_USER_IDENTITY.USER_ID,
+          M_USER_IDENTITY.ISSUER_URL,
+          M_USER_IDENTITY.SUBJECT_CODE);
+
+  /** 利用者の集約。ルートは公開 ID で一つに決める。 */
+  private static final AggregateTable<MUserRecord, UUID, User> USER =
+      AggregateTable.of(
+          M_USER, M_USER.PUBLIC_ID, user -> user.id().value(), M_USER.USER_ID, IDENTITIES);
+
   /** SQL を組み立てて実行する jOOQ のコンテキスト。 */
   private final DSLContext dsl;
 
-  /** 共通カラムの値を作る shared の共通処理。 */
-  private final CommonColumns commonColumns;
-
-  /** 業務テーブルの INSERT を実行する shared の入口。 */
+  /** 利用者の集約を INSERT する shared の入口。 */
   private final TableWriter tableWriter;
 
-  /** jOOQ のコンテキストと shared の共通処理を受け取る。 */
-  /* package */ JooqUserRepository(
-      final DSLContext dsl, final CommonColumns commonColumns, final TableWriter tableWriter) {
+  /** jOOQ のコンテキストと shared の入口を受け取る。 */
+  /* package */ JooqUserRepository(final DSLContext dsl, final TableWriter tableWriter) {
     this.dsl = dsl;
-    this.commonColumns = commonColumns;
     this.tableWriter = tableWriter;
   }
 
@@ -61,23 +73,13 @@ class JooqUserRepository implements UserRepository {
   @Override
   public void add(final User user) {
     tableWriter.insert(
-        dsl.insertInto(M_USER)
-            .set(M_USER.PUBLIC_ID, user.id().value())
-            .set(commonColumns.forInsert(M_USER)));
-    // TableWriter.insert は RETURNING の値を返さないため、内部の主キーを読み直す。
-    final Long userId =
-        dsl.select(M_USER.USER_ID)
-            .from(M_USER)
-            .where(M_USER.PUBLIC_ID.eq(user.id().value()))
-            .fetchSingle()
-            .value1();
-    for (final ExternalIdentity identity : user.identities()) {
-      tableWriter.insert(
-          dsl.insertInto(M_USER_IDENTITY)
-              .set(M_USER_IDENTITY.USER_ID, userId)
-              .set(M_USER_IDENTITY.ISSUER_URL, identity.issuer())
-              .set(M_USER_IDENTITY.SUBJECT_CODE, identity.subject())
-              .set(commonColumns.forInsert(M_USER_IDENTITY)));
-    }
+        USER,
+        user,
+        set -> {},
+        IDENTITIES.rows(
+            user.identities(),
+            (identity, set) ->
+                set.set(M_USER_IDENTITY.ISSUER_URL, identity.issuer())
+                    .set(M_USER_IDENTITY.SUBJECT_CODE, identity.subject())));
   }
 }

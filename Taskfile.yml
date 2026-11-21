@@ -285,6 +285,8 @@ tasks:
       - task: lint-docs-sync
       - task: docs-boundary-check
       - task: adr-lint
+      - task: removed-names-test
+      - task: removed-names-check
       - task: ruleset-check
       - task: iwe-mcp-check
       - |
@@ -316,6 +318,21 @@ tasks:
     cmds:
       - bash tooling/adr-lint/test.sh
       - node tooling/adr-lint/adr-lint.mjs
+
+  # 削除した識別子（tooling/removed-names/names.txt）が docs、.agents、backend/src に残っていないかを検査する。
+  # 規約や skill に旧名が残ると、エージェントが写して、削除した API を呼ぶ。自己検査（test.sh）は removed-names-test が実行する。
+  removed-names-check:
+    internal: true
+    silent: true
+    cmds:
+      - bash tooling/removed-names/check.sh
+
+  # check.sh の自己検査。検査の道具を変える okf-check だけが実行する。
+  removed-names-test:
+    internal: true
+    silent: true
+    cmds:
+      - bash tooling/removed-names/test.sh
 
   # .kiro/settings/mcp.json の iwe の起動コマンドが、作業ディレクトリごとに正しい iwe-mcp.sh を選ぶかを検査する（ADR-093）。
   iwe-mcp-check:
@@ -472,6 +489,8 @@ tasks:
       - bash .kiro/hooks/block-agent-git.test.sh
       - bash tooling/skills-check/test.sh
       - node tooling/skills-check/skills-check.mjs
+      # 検査の範囲に .agents があるが、okf-check は .agents の変更で起動しない。
+      - task: removed-names-check
 
   # 検査の本体は tooling/ci-gate-check/ci-gate-check.py に置き、自己検査（test.sh）を先に実行する。
   # 理由と除外の一覧の扱いは docs/adr/ADR-087 にある。
@@ -540,13 +559,14 @@ tasks:
       - bash tooling/formal-verify/test.sh
 
   formal-verify:
-    desc: 検証スキル（.agents/skills/formal-verify-*）の全設定と全変異を検査（数分かかる）
+    desc: 検証スキル（.agents/skills/formal-verify-*）の同期コミット、全設定、全変異を検査（数分かかる）
     silent: true
     cmds:
       - |
         status=0
         for skill in .agents/skills/formal-verify-*/; do
           echo "== $skill"
+          tooling/formal-verify/sync-check.sh "$skill" || status=1
           tooling/formal-verify/check.sh "$skill" || status=1
           tooling/formal-verify/mutants.py "$skill" || status=1
         done
@@ -904,6 +924,8 @@ tasks:
     dir: backend
     cmds:
       - ./gradlew spotlessCheck pmdMain pmdTest spotbugsMain spotbugsTest
+      # 検査の範囲に backend/src があるが、okf-check は backend/src の変更で起動しない。
+      - task: removed-names-check
 
   be-openapi-lint:
     desc: OpenAPI 3.1契約をopenapi/openapi.yamlへ生成しSpectralで検査（テストの依存はTestcontainersが起動する）

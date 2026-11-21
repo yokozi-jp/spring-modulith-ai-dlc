@@ -38,7 +38,7 @@ Spring Modulithのイベント出版テーブルのように、フレームワ�
 - **`created_pgm_cd`**：作成した機能やプログラムを一意に識別する値。`モジュール名.ユースケース名`の形式にする（例：`ordering.PlaceOrder`）。ユースケース名は、呼び出し中の`<UseCase>CommandHandler`の`handle`か`<Event>Listener`のpublicメソッドのクラスの単純名から、`CommandHandler`か`Listener`を除いた名前である。CommandHandlerやListenerの呼び出しが入れ子になったら、内側の名前を登録する。`<Event>Listener`の`on`は`<UseCase>CommandHandler`の`handle`を呼ぶため、イベントを受けた書き込みにはCommandHandlerの名前（例：`ordering.ChargeOrder`）が入る。どちらの呼び出しの中でもなければ例外にし、登録を失敗させる（[ADR-051](../adr/ADR-051-bind-pgm-cd-with-scoped-value-and-aspect.md)）。
 - **`created_tx_id`**：作成した処理の呼び出しを識別する値。Micrometer Tracingの現在のスパンのtrace IDを登録する。traceがなければ例外にし、登録を失敗させる。
 - **`updated_at`**、**`updated_by`**、**`updated_pgm_cd`**、**`updated_tx_id`**：更新について、作成と同じ値を登録する。INSERTのときも登録する。
-- **`lock_no`**：楽観的ロックのロック番号。INSERTのときは`1`を登録する。使い方は[PostgreSQLの排他制御](postgresql-concurrency-control.md)に従う。
+- **`lock_no`**：楽観的ロックのロック番号。INSERTのときは`1`を登録する。親子のテーブルを`TableWriter`で保存すると、子の行は、内容が変わらなくても保存のたびにUPDATEされて`lock_no`と`updated_*`が進む。子の`lock_no`は「内容が変わったか」を表さない。使い方は[PostgreSQLの排他制御](postgresql-concurrency-control.md)に従う。
 - **`patched_at`**：データパッチの日時。パッチを当てていない行ではNULLにする。
 - **`patched_by`**：データパッチの作業者を特定できる値。パッチを当てていない行ではNULLにする。
 - **`patched_id`**：データパッチの課題番号。GitHub Issueの番号を`integer`で登録する。パッチを当てていない行ではNULLにする。

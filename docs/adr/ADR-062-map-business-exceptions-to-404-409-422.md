@@ -69,12 +69,13 @@ ADR は Proposed のままであるため、新しい ADR を起こさず、こ�
 - `IllegalStateException`、`IllegalArgumentException`、`NoSuchElementException` などの JDK の例外は、4xx に対応づけず 500 のままにする。
   これらはプログラムの誤りにも使われ、まとめて 4xx にすると誤りが 4xx に化けて隠れるためである。
 - `TableWriter` は、主キーの行がないときに `NotFoundException` を投げる。
-  `LockedRoot.updateChild` の 0 件は `BusinessRuleViolationException` にし、`shared.infrastructure.persistence` から Spring Web への依存をなくす。
-- `23505` は、`TableWriter` の既存の変換の入口 `executeOrConflict` で、原因を付けずに `Kind.UNIQUE` の `ConflictException` に変える。
+  子の行の更新が 1 行でないことは、ルートの行ロックの下で読んだ自然キーに対する更新で起こらない状態のため、`IllegalStateException` にする（ADR-054）。
+  `shared.infrastructure.persistence` は Spring Web に依存しない。
+- `23505` は、`TableWriter` の変換の入口で、原因を付けずに `Kind.UNIQUE` の `ConflictException` に変える。
   集約ルートの INSERT の入口 `TableWriter.insert` を足し、同じ変換を通す。
   `DataIntegrityViolationException` の他の違反（外部キー、NOT NULL、CHECK、排他制約）は、入力の検証か実装の誤りであるため 500 のままにする。
-- Repository の実装は、`updateWhere`、`deleteWhere`、`NOWAIT` が投げる Spring の例外（`CannotAcquireLockException`、`DuplicateKeyException`）を Repository の外へ出さない。
-  外へ出すときは、原因を付けずに、種類（`Kind.LOCK` か `Kind.UNIQUE`）を付けた `ConflictException` に変えて投げる。
+- Repository の実装は、Spring の例外（`CannotAcquireLockException`、`DuplicateKeyException`）を catch して変えない。
+  書き込みの `55P03` と `23505` は、`TableWriter` が SQLSTATE で、原因を付けずに種類（`Kind.LOCK` か `Kind.UNIQUE`）を付けた `ConflictException` に変える（ADR-054）。
 - ArchUnit に 2 つの規則を足す。
   `noSuchElementExceptionIsNotThrown` は、`NoSuchElementException` の生成と引数なしの `Optional.orElseThrow()` を禁じる。
   `sharedModuleDoesNotDependOnHttp` は、`shared` から Spring Web、Spring の HTTP、Servlet の型への依存を禁じる。
@@ -100,14 +101,13 @@ ADR は Proposed のままであるため、新しい ADR を起こさず、こ�
 - `shared.failure` の 2 つの型が public になり、アーキテクチャ指標の全体の相対可視性の上限を、外部可視型数 20、全型数 33 の実測値に書き直した。
 - `ConflictException` の意味を一意制約の違反へ広げ、楽観的ロックの語彙を置く `shared.concurrency` に置いたままにする。
   パッケージの名前は、3 つの型の一部を表さない。
-- `TableWriter.insert` の 409 のメッセージは、テーブル名と制約名を持たない。
-  テーブル名は jOOQ の `Insert` の公開 API で取れず、制約名を取るには PostgreSQL の JDBC ドライバへのコンパイル時の依存が要る。
-  必要になったら、`insert` にテーブルを渡す入口を足す。
+- `TableWriter` の 409 のメッセージは、テーブル名とルートの一意の列の値を持ち、制約名を持たない。
+  制約名を取るには PostgreSQL の JDBC ドライバへのコンパイル時の依存が要る。
 - 原因がないため、PostgreSQL のエラーの詳細（`detail`、`hint`）をログで見られない。
 - `ConflictException.Kind` で public の型が 1 つ増え、アーキテクチャ指標の全体の相対可視性の上限を書き直した。
-- `TableWriter.executeOrConflict` は catch した例外を原因に渡さないため、PMD の `PreserveStackTrace` と Error Prone の `UnusedException` を、そのメソッドに限って抑止する。
-- `TableWriter.insert` を通さない INSERT と、子の行の `dsl.batch` の INSERT の `23505` は 500 のまま残る。
-  ArchUnit では強制しない。
+- `ConflictTranslator.executeOrConflict` は catch した例外を原因に渡さないため、PMD の `PreserveStackTrace` と Error Prone の `UnusedException` を、そのメソッドに限って抑止する。
+- `TableWriter` を通さない INSERT の `23505` は 500 のまま残る。
+  H1 が `TableWriter` の外の `insertInto` などを禁じる（ADR-054）。
 - `Optional.get()`、`Iterator.next()`、`Optional::orElseThrow` のメソッド参照などが中で投げる `NoSuchElementException` は検出しない。
 - 業務固有の `type` がないため、画面は 404 と 422 の理由を本文から区別できない。
 
@@ -138,7 +138,7 @@ ADR は Proposed のままであるため、新しい ADR を起こさず、こ�
 
 - **Description**：3 つの型を `shared.failure` にそろえる。
 - **Pros**：3 つの型が 1 か所にそろう。
-- **Cons**：`ConflictException` は `TableWriter`、`LockedRoot`、`DeletedRoot`、`ApiExceptionHandler`、テスト、フィクスチャ、十数の文書が参照している。
+- **Cons**：`ConflictException` は `TableWriter`、`ApiExceptionHandler`、テスト、フィクスチャ、十数の文書が参照している。
   移しても振る舞いは変わらず、差分だけが増える。
 
 ### 選択肢4: JDK の例外を 404 と 422 に対応づける
@@ -185,7 +185,7 @@ ADR は Proposed のままであるため、新しい ADR を起こさず、こ�
 - [ADR-016: API と SPA のメッセージをローカライズする](ADR-016-localize-api-and-spa-messages.md)
 - [ADR-048: jOOQ の共通処理を共有モジュール shared に置く](ADR-048-add-shared-module-for-jooq-common-code.md)
 - [ADR-050: バックエンドのクラスの役割と命名を定める](ADR-050-define-backend-class-roles-and-naming.md)
-- [ADR-054: 楽観的ロックの競合を lock_no の条件と更新件数で判定し、業務テーブルの UPDATE と DELETE を TableWriter に集める](ADR-054-detect-optimistic-lock-conflicts-by-update-count.md)
+- [ADR-054: 楽観的ロックの競合を lock_no の条件と更新件数で判定し、業務テーブルの INSERT と UPDATE を集約の宣言から TableWriter が書く](ADR-054-detect-optimistic-lock-conflicts-by-update-count.md)
 - [ADR-058: problem type にパスを全部書いた相対 URI を使う](ADR-058-use-path-absolute-relative-uri-for-problem-types.md)
 - [ADR-060: UUID の採番をアプリケーションで行い、DB の DEFAULT で採番しない](ADR-060-generate-uuid-primary-keys-in-application.md)
 - [RFC 9457: Problem Details for HTTP APIs](https://www.rfc-editor.org/rfc/rfc9457)

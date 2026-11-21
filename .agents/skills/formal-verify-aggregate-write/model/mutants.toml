@@ -3,7 +3,7 @@
 
 [[mutant]]
 name = "children-before-root"
-change = "JooqOrderRepository.update writes the lines before tableWriter.updateCheckingVersion"
+change = "JooqOrderRepository.update writes the lines before tableWriter.update"
 config = "two-saves"
 invariants = ["OnlyConflictErrors"]
 
@@ -25,7 +25,7 @@ new = '''            /\ w' = [w EXCEPT ![i].pc = "commit"]'''
 
 [[mutant]]
 name = "unversioned-root"
-change = "JooqOrderRepository.update uses tableWriter.updateWhere (lock_no = lock_no + 1) for the root"
+change = "TableWriter.update bumps lock_no without comparing the expected version (lock_no = lock_no + 1)"
 config = "two-saves"
 invariants = ["NoLostUpdate"]
 
@@ -39,10 +39,10 @@ new = '''
 
 [[mutant]]
 name = "no-delete-of-removed-lines"
-change = "JooqOrderRepository.update drops root.deleteChildren for lines not in the aggregate"
+change = "ChildWriter.replace drops the DELETE of the saved lines the aggregate no longer has"
 config = "two-saves"
 invariants = ["AggregateWhole"]
 
 [[mutant.edits]]
-old = '''![i].ops = <<DeleteOp>> \o keep'''
-new = '''![i].ops = keep'''
+old = '''![i].ops = deletes \o updates \o inserts'''
+new = '''![i].ops = updates \o inserts'''

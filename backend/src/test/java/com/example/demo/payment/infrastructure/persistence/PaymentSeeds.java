@@ -51,8 +51,6 @@ public final class PaymentSeeds {
     final CommonColumns commonColumns = TestCommonColumns.at(recordedAt);
     TestCommonColumns.runAs(
         PGM_CD,
-        () ->
-            new JooqPaymentRepository(dsl, commonColumns, new TableWriter(dsl, commonColumns))
-                .add(payment));
+        () -> new JooqPaymentRepository(dsl, new TableWriter(dsl, commonColumns)).add(payment));
   }
 }

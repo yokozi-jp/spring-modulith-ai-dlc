@@ -113,6 +113,10 @@ jobs:
       - name: Check session-level SQL
         run: task lint-session-sql
 
+      # 削除した識別子が backend/src に残っていないかを検査する。okf-validate は backend/src の変更で起動しない。
+      - name: Check removed names
+        run: bash tooling/removed-names/check.sh
+
       # PR は cache を書かない。
       # 既存の key は上書きされないため、main の完全一致しなかった run だけが保存する。
       - name: Save Gradle cache

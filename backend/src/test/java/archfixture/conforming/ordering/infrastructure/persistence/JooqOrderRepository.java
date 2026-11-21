@@ -5,9 +5,7 @@ import archfixture.conforming.ordering.domain.model.Order;
 import archfixture.conforming.ordering.domain.model.OrderId;
 import archfixture.conforming.ordering.domain.model.OrderRepository;
 import archfixture.conforming.ordering.domain.model.OrderStatus;
-import archfixture.conforming.shared.infrastructure.persistence.CommonColumns;
 import archfixture.conforming.shared.infrastructure.persistence.TableWriter;
-import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -20,7 +18,7 @@ import org.springframework.stereotype.Repository;
  *
  * <p>フィクスチャなので ID の採番は仮の実装である。
  *
- * <p>共通カラムの値は shared の共通処理から受け取り、UPDATE と DELETE は shared の TableWriter で書く。
+ * <p>INSERT と UPDATE は shared の TableWriter で書く。
  */
 @Repository
 class JooqOrderRepository implements OrderRepository {
@@ -28,19 +26,14 @@ class JooqOrderRepository implements OrderRepository {
   /** 保存した注文。 */
   private final Map<OrderId, Order> orders = new ConcurrentHashMap<>();
 
-  /** 保存した注文の共通カラムの値。 */
-  private final Map<OrderId, Map<String, Object>> commonColumnValues = new ConcurrentHashMap<>();
+  /** 保存した注文の書き込みの結果。 */
+  private final Map<OrderId, String> writeResults = new ConcurrentHashMap<>();
 
-  /** 共通カラムの値を作る shared の共通処理。 */
-  private final CommonColumns commonColumns;
-
-  /** 業務テーブルの UPDATE と DELETE の入口。 */
+  /** 業務テーブルの INSERT と UPDATE の入口。 */
   private final TableWriter tableWriter;
 
-  /** shared の共通処理を受け取る。 */
-  /* package */ JooqOrderRepository(
-      final CommonColumns commonColumns, final TableWriter tableWriter) {
-    this.commonColumns = commonColumns;
+  /** shared の入口を受け取る。 */
+  /* package */ JooqOrderRepository(final TableWriter tableWriter) {
     this.tableWriter = tableWriter;
   }
 
@@ -69,18 +62,12 @@ class JooqOrderRepository implements OrderRepository {
   @Override
   public void add(final Order order) {
     orders.put(order.id(), order);
-    commonColumnValues.put(order.id(), commonColumns.forInsert());
+    writeResults.put(order.id(), tableWriter.insert("orders"));
   }
 
   @Override
   public void update(final Order order) {
-    commonColumnValues.put(
-        order.id(), Map.of("result", tableWriter.updateCheckingVersion("orders", order.lockNo())));
+    writeResults.put(order.id(), tableWriter.update("orders", order));
     orders.put(order.id(), order);
-  }
-
-  /** 期限を過ぎた取消済みの注文を、集約を読み込まずに一括で削除し、件数を返す。 */
-  /* package */ int purgeCancelledBefore(final Instant threshold) {
-    return tableWriter.deleteWhere("orders:" + threshold);
   }
 }

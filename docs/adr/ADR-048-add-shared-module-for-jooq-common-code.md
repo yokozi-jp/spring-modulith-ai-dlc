@@ -40,14 +40,14 @@ shared モジュールは、モジュール単位の統合テストでも常に�
 jOOQ の共通処理は `com.example.demo.shared.infrastructure.persistence` に置く。
 このパッケージはモジュールのルートではないため、[バックエンドアーキテクチャ](../backend/architecture.md) の定めに従い `@NamedInterface` で公開する。
 
-`shared` には、共通カラムの値を組み立てる共通処理、NULL を空文字へ変える Converter、業務テーブルの UPDATE と DELETE の入口と、楽観的ロックの語彙（`shared.concurrency` の `ExpectedLockNo`、`VersionedCommand`、`ConflictException`）、業務上の失敗の例外（`shared.failure` の `NotFoundException`、`BusinessRuleViolationException`、[ADR-062](ADR-062-map-business-exceptions-to-404-409-422.md)）だけを置き、業務の概念を置かない。
+`shared` には、共通カラムの値を組み立てる共通処理、NULL を空文字へ変える Converter、業務テーブルの INSERT と UPDATE の入口と、楽観的ロックの語彙（`shared.concurrency` の `ExpectedLockNo`、`VersionedCommand`、`ConflictException`）、業務上の失敗の例外（`shared.failure` の `NotFoundException`、`BusinessRuleViolationException`、[ADR-062](ADR-062-map-business-exceptions-to-404-409-422.md)）だけを置き、業務の概念を置かない。
 `shared.concurrency` も `@NamedInterface("concurrency")` で公開する。
 INSERT の共通カラムの値には `lock_no` を含め、`1` にする。
 UPDATE の共通カラムの値（`forUpdate`）は `updated_*` だけを返し、UPDATE の `lock_no` は `TableWriter` だけが書く。
 `*_pgm_cd` の値の求め方は [ADR-051](ADR-051-bind-pgm-cd-with-scoped-value-and-aspect.md) で決める。
 ADR-051 の `*_pgm_cd` を束縛する Aspect も、共通カラムの値を組み立てる共通処理の一部として `shared` に置く。
 
-業務テーブルの UPDATE と DELETE を組み立てて実行する唯一の入口で、集約ルートの INSERT の入口である `TableWriter` も `shared` に置く（[ADR-054](ADR-054-detect-optimistic-lock-conflicts-by-update-count.md)）。
+業務テーブルの INSERT と UPDATE を組み立てて実行する唯一の入口である `TableWriter` も `shared` に置く（[ADR-054](ADR-054-detect-optimistic-lock-conflicts-by-update-count.md)）。
 `shared` は Domain と `error` の型に依存しない。
 楽観的ロックの競合の例外は、`shared.concurrency` の `ConflictException` にする。
 `error` が 409 に変える `ConflictException` のために `error` から `shared` への依存が増えるので、`shared` はルートパッケージの型に依存しない（`PgmCdAspect` は自分のパッケージからベースパッケージを導く）。
@@ -109,7 +109,7 @@ ADR-051 の `*_pgm_cd` を束縛する Aspect も、共通カラムの値を組�
 - [ADR-002: package by feature とオニオンアーキテクチャ](ADR-002-package-by-feature-onion-architecture.md)
 - [ADR-003: データアクセスに jOOQ を採用](ADR-003-adopt-jooq-for-data-access.md)
 - [ADR-051: 共通カラムの pgm_cd を Aspect と ScopedValue で渡し、Aspect をトランザクションの外側で動かす](ADR-051-bind-pgm-cd-with-scoped-value-and-aspect.md)
-- [ADR-054: 楽観的ロックの競合を lock_no の条件と更新件数で判定し、業務テーブルの UPDATE と DELETE を TableWriter に集める](ADR-054-detect-optimistic-lock-conflicts-by-update-count.md)
+- [ADR-054: 楽観的ロックの競合を lock_no の条件と更新件数で判定し、業務テーブルの INSERT と UPDATE を集約の宣言から TableWriter が書く](ADR-054-detect-optimistic-lock-conflicts-by-update-count.md)
 - [バックエンドアーキテクチャ](../backend/architecture.md)
 - [バックエンドのアーキテクチャテスト](../backend/architecture-tests.md)
 - [PostgreSQL の共通カラム](../database/postgresql-common-columns.md)

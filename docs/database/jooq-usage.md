@@ -9,7 +9,7 @@ tags: [convention, database, jooq]
 
 SQLは生成されたメタモデルのクラスから組み立てる。
 Plain SQLのAPIと`withRenderSchema(false)`は使わない。
-業務テーブルのUPDATEとDELETEは、sharedモジュールの`TableWriter`で書く。
+業務テーブルのINSERTとUPDATEは、sharedモジュールの`TableWriter`で書く。
 
 ## 対象
 
@@ -45,12 +45,12 @@ jOOQの生成コードには適用しない。
 ## 楽観的ロック
 
 jOOQの楽観的ロックの機能を使わない規則は、[PostgreSQLの排他制御](postgresql-concurrency-control.md)に従う。
-業務テーブルのUPDATEとDELETEは、sharedモジュールの`TableWriter`だけが組み立てて実行する（[ADR-054](../adr/ADR-054-detect-optimistic-lock-conflicts-by-update-count.md)）。
-`TableWriter`、`LockedRoot`、`DeletedRoot`の外で使わない書き込みのAPIの一覧は、[アーキテクチャテスト](../backend/architecture-tests.md)の「書き込みの入口」にある。
+業務テーブルのINSERTとUPDATEは、sharedモジュールの`TableWriter`だけが組み立てて実行する（[ADR-054](../adr/ADR-054-detect-optimistic-lock-conflicts-by-update-count.md)）。
+`TableWriter`の外で使わない書き込みのAPIの一覧は、[アーキテクチャテスト](../backend/architecture-tests.md)の「書き込みの入口」にある。
 
 ## 共通処理
 
-INSERTの共通カラムの値は、sharedモジュールの`CommonColumns.forInsert(table)`が返し、`set(...)`で登録する（[ADR-048](../adr/ADR-048-add-shared-module-for-jooq-common-code.md)）。
+共通カラムの値は、sharedモジュールの`CommonColumns`が作り、`TableWriter`が書く（[ADR-048](../adr/ADR-048-add-shared-module-for-jooq-common-code.md)）。
 UPDATEの共通カラムの値と`lock_no`は`TableWriter`が書く。
 `CommonColumns.forUpdate`は`TableWriter`だけが使うpackage-privateのメソッドである。
 Repositoryでの書き方は[クラスの役割：jOOQ の Repository](../backend/class-roles/jooq-repository.md)に従う。

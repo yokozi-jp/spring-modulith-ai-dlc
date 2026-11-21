@@ -1,0 +1,14 @@
+# 削除した識別子の一覧。docs、.agents、backend/src のどこにも残さない。
+# 形式：<識別子><TAB><残してよいパスの正規表現。なければ ->
+# 識別子を削除、改名するときは、同じ変更でここへ足す。足すだけで、docs に残った旧名が検査で見つかる。
+# 残してよいパスは、判断の履歴（ADR の背景と選択肢）に限る。規約、skill、コードには残さない。
+updateCheckingVersion	^docs/adr/ADR-(054|062)-
+deleteCheckingVersion	^docs/adr/ADR-(054|062)-
+updateWhere	^docs/adr/ADR-(054|062)-
+deleteWhere	^docs/adr/ADR-(054|062)-
+LockedRoot	^docs/adr/ADR-(054|062)-
+DeletedRoot	^docs/adr/ADR-(054|062)-
+aggregateRootInsertsGoThroughTableWriter	^docs/adr/ADR-054-
+aggregateMethodsDoNotUseUnversionedWrites	^docs/adr/ADR-054-
+unversionedWritesRequireUsingTheCount	^docs/adr/ADR-054-
+repositoryUpdateAndDeleteCheckVersion	^docs/adr/ADR-054-

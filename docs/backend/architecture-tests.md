@@ -177,11 +177,11 @@ R2は`ReopenPolicy`（Domain Serviceの`update`と`save`）、`PurgeOrderQuerySe
 R3は`ForgedLockNoCommandHandler`（コンストラクタと`ExpectedLockNo::new`）と`OrderLockController`で確かめる。
 R4は`ApproveOrderCommandHandler`（`handle`から呼ばないprivateメソッドだけが`ensureLockNo`を呼ぶ）と`OverloadedEnsureCommandHandler`で確かめる。
 `LambdaEnsureCommandHandler`は、`Optional.ifPresent`のラムダの中の`ensureLockNo`をR4が満たすものとして数えることを`LambdaFixtureTest`で固定する（違反フィクスチャのパッケージにあるが、R4は検出しない）。
-`aggregateRootInsertsGoThroughTableWriter`は、違反フィクスチャの`JooqOrderDraftRepository`の`add`（`Insert`の`execute()`の直接の呼び出し）で確かめる。
-`JooqOrderLambdaDraftRepository`の`add`（ラムダの中の`execute()`）と`JooqOrderRepository`の`updateLater`（ラムダの中の`updateWhere`）は、`LambdaFixtureTest`で確かめる。
 `commandsAndResultsAreApplicationRecords`の型単位の除外は、`shared.concurrency`のrecordではない`ForceUnlockCommand`で確かめる。
 規約どおりのフィクスチャには、`shared.concurrency`と`shared.failure`の型と、Requestが`ExpectedLockNo`を作る`CancelOrderRequest`、Listenerが版のないCommandを作る`OrderPlacedExpiryListener`を置く。
 `archfixture.conforming`と`archfixture.violating`の`shared.infrastructure.persistence`には、規則が名前で見る`TableWriter`のスタブを置く。
+H3は、違反フィクスチャの`JooqOrderRepository`の`update`と`save`（`TableWriter.update`を呼ばない）と`store`（`TableWriter.update`を呼ぶが`update`という名前ではない）で確かめる。
+H6は、`UnversionedOrderRepository`（集約ルートではなく識別子を受け取る）で確かめる。
 `allowedUsagesAreNotDetected`の一行は、対応づけの二つの規則が`convertFrom`、`Records.mapping`、`into(Table)`、`fetch(RecordMapper)`、`intoArray(Field, Class)`、`intoSet(Field, Class)`、`fetch(Field, Class)`、`newRecord(Table)`を誤検出しないことを確かめる。
 `noSuchElementExceptionIsNotThrown`は、違反フィクスチャの`LegacyOrderFinder`の`notFound`（`NoSuchElementException`の生成）と`firstOrFail`（引数なしの`orElseThrow()`）で確かめる。
 規約どおりのフィクスチャの`CancelOrderCommandHandler`、`CancelExpiredOrderCommandHandler`、`ReserveStockCommandHandler`、`OrderController`は`NotFoundException`を、`Order`と`OrderLimitPolicy`は`BusinessRuleViolationException`を投げ、Domain、Application、Presentationから`shared.failure`を使っても規則が通ることを確かめる。
@@ -292,56 +292,49 @@ Error ProneはすべてのJavaコンパイルで`JavaTimeDefaultTimeZone`と`Jav
 ## 共通カラム
 
 `JooqCommonColumnsArchTest`は、jOOQの生成クラスの`CREATED_*`、`UPDATED_*`、`PATCHED_*`フィールドを参照するクラスが、`com.example.demo.shared.infrastructure.persistence`の外にないことを検査する。
-INSERTの共通カラムは`CommonColumns.forInsert`で、UPDATEとDELETEの共通カラムは`TableWriter`で書く。
-集約ルートのINSERTは、`CommonColumns.forInsert`で共通カラムを書いたうえで`TableWriter.insert`で実行する。
+INSERTとUPDATEの共通カラムは`TableWriter`が書く。Repositoryは`CommonColumns`を使わない。
+`CommonColumns.forInsert`はテストのデータ作成のために公開しているが、本番のコードは`insertInto`を`TableWriter`の外で呼べない（H1）。
 `LOCK_NO`は各モジュールが楽観的ロックの版を読むため対象外にし、書き込みは`ColumnValues`が実行時に拒否する。
 生成したRecordのgetterは検査しない。
 共通カラムの扱いは[PostgreSQLの共通カラム](../database/postgresql-common-columns.md)、sharedモジュールの決定は[ADR-048](../adr/ADR-048-add-shared-module-for-jooq-common-code.md)を参照する。
 
 ## 書き込みの入口
 
-`TableWriterArchTest`は、業務テーブルのUPDATEとDELETEと集約ルートのINSERTを`shared`の`TableWriter`に集める規則を検査する（[PostgreSQLの排他制御](../database/postgresql-concurrency-control.md)、[ADR-054](../adr/ADR-054-detect-optimistic-lock-conflicts-by-update-count.md)）。
-集約ルートは、`domain.model`にあり、引数のない`long lockNo()`を宣言する型とする。
+`TableWriterArchTest`は、業務テーブルのINSERTとUPDATEを`shared`の`TableWriter`に集める規則を検査する（[PostgreSQLの排他制御](../database/postgresql-concurrency-control.md)、[ADR-054](../adr/ADR-054-detect-optimistic-lock-conflicts-by-update-count.md)）。
+集約ルートは、`domain.model`にあり、`shared.concurrency`の`Versioned`を実装する型とする。
 
-- `tableWritesGoThroughTableWriter`：`TableWriter`、`LockedRoot`、`DeletedRoot`の外の本番のコードは、次のAPIを呼ばず、メソッド参照もしない。
+- `tableWritesGoThroughTableWriter`：`TableWriter`と、その子の行の書き込み（`ChildWriter`）の外の本番のコードは、次のAPIを呼ばず、メソッド参照もしない。
   呼び出し先の型が、挙げた型に代入できるかで判定する。
-  - `DSLContext`、`DSL`、`WithStep`の`update`、`delete`、`deleteFrom`、`mergeInto`、`updateQuery`、`deleteQuery`
-  - `DSLContext`の`batchUpdate`、`batchStore`、`batchDelete`、`batchMerge`、`executeUpdate`、`executeDelete`、`connection`、`connectionResult`
+  - `DSLContext`、`DSL`、`WithStep`の`insertInto`、`insertQuery`、`update`、`delete`、`deleteFrom`、`mergeInto`、`updateQuery`、`deleteQuery`
+  - `DSLContext`の`batchInsert`、`executeInsert`、`loadInto`、`batchUpdate`、`batchStore`、`batchDelete`、`batchMerge`、`executeUpdate`、`executeDelete`、`connection`、`connectionResult`
   - `Update`と`Delete`の`execute`、`executeAsync`、`returning`、`returningResult`と、名前が`fetch`で始まるメソッド
   - `Query`、`RowCountQuery`、`DMLQuery`の同じ実行（メソッド参照のバイトコードには`execute`を宣言した`Query`が残るため）
   - `Merge`のすべてのメソッド
   - `InsertOnDuplicateStep`と`InsertQuery`の`onConflict`、`onConflictOnConstraint`、`onConflictWhere`、`onDuplicateKeyUpdate`、`addValueForUpdate`、`addValuesForUpdate`と、`LoaderOptionsStep`の`onDuplicateKeyUpdate`
-  - `UpdatableRecord`の`store`、`update`、`delete`、`merge`と、`DAO`の`update`、`delete`、`deleteById`、`merge`
+  - `TableRecord`と`UpdatableRecord`の`insert`、`store`、`update`、`delete`、`merge`と、`DAO`の`insert`、`update`、`delete`、`deleteById`、`merge`
   - `DataSource.getConnection`、`ConnectionProvider.acquire`、`Connection`と`Statement`のすべてのメソッド
   - `org.jooq`のパッケージの型の、名前が`$`で始まるメソッド（`QOM`の問い合わせのモデルのAPIは、`$onDuplicateKeyUpdate`でINSERTをUPSERTに組み替えられるため）
   - Spring JDBCの`org.springframework.jdbc`とそのサブパッケージの型（`ResourceDatabasePopulator`と`ScriptUtils`も任意のSQLを流せるため）
   - `DataSource`、`Connection`、`ConnectionProvider`に代入できる型を引数に取るメソッドとコンストラクタ（Spring Bootの`DataSourceScriptDatabaseInitializer`や`DSL.using(Connection)`のように、接続の元を受け取るライブラリは、パッケージを選ばずに任意のSQLを流せるため）
 
-  `Update`と`Delete`を作る入口をすべて禁じるため、`batch`や`subscribe`のように作った問い合わせを受け取って実行するAPIは禁じない。
+  `Insert`、`Update`、`Delete`を作る入口をすべて禁じるため、`batch`や`subscribe`のように作った問い合わせを受け取って実行するAPIは禁じない。
 
-  `tableWritesGoThroughTableWriter`が除外するのは、`TableWriter`、`LockedRoot`、`DeletedRoot`と、トランザクションの初めにモジュールのロールへ切り替える`ModuleRoleTransactionManager`とその`Config`の完全修飾型名だけである。
+  `tableWritesGoThroughTableWriter`が除外するのは、`TableWriter`、`ChildWriter`と、トランザクションの初めにモジュールのロールへ切り替える`ModuleRoleTransactionManager`とその`Config`の完全修飾型名だけである。
   `ModuleRoleTransactionManager`は業務テーブルに触れず、ロールとテナントを設定する`set_config`だけを実行する（[ADR-094](../adr/ADR-094-switch-to-module-database-roles.md)、[ADR-107](../adr/ADR-107-isolate-tenants-with-rls-set-per-transaction.md)）。
   除外を足す、外す、または除外する型を移すときは、先に[ADR-054](../adr/ADR-054-detect-optimistic-lock-conflicts-by-update-count.md)の判断を変える。
   同じ変更で、`tableWritesGoThroughTableWriterRule`の完全修飾型名と、除外する型を置く適合フィクスチャ（`archfixture/conforming/shared/infrastructure/persistence/`）を更新する。
   禁止するAPIの違反フィクスチャ（`DirectOrderWriter`）は、禁止の一覧か`isDirectWrite`の判定を変えるときだけ更新する。
-- `repositoryUpdateAndDeleteCheckVersion`：`Jooq*Repository`の、集約ルートを受け取る`add`以外のpublicメソッドは、版を比べる入口をそのメソッドの中で直接呼ぶ。
-  `update`は`updateCheckingVersion`を、`delete`は`deleteCheckingVersion`を、ほかの名前ならどちらかを呼ぶ。
-  名前で対象を選ばないため、`save`のような名前でも検査を外れない。
-  同じメソッドの中で引数の集約ルートの`lockNo()`も呼ぶ。
-  テーブルから読み直した版を期待する版に渡すと、競合を検出しないためである。
-  値の流れは追わないため、`lockNo()`を呼んだうえで別の値を渡す書き方はレビューで見る。
+- `repositoryUpdateCallsVersionedEntryPoint`：`Jooq*Repository`の、集約ルートを受け取る`add`以外のpublicメソッドは、`update`という名前で、`TableWriter.update`をそのメソッドの中で直接呼ぶ。
+  名前で対象を選ばないため、`save`のような名前のメソッドも検出する。
+  `TableWriter`には`delete`の入口がないため、`delete`も検出する。必要になったら[ADR-054](../adr/ADR-054-detect-optimistic-lock-conflicts-by-update-count.md)を更新して入口を足す。
+  期待する版は`TableWriter.update`が、受け取った集約ルート（`Versioned`）の`lockNo()`から読むため、`lockNo()`の呼び出しは求めない。
+  テーブルから読み直した版を期待する版に渡す書き方は、`AggregateTable`の型引数`A`に集約ルートのクラスを指定すれば、型で書けない（`Versioned`そのものを指定してラムダを渡す書き方と、読み直した版で集約ルートを作り直して渡す書き方は、レビューで見る）。
 - `repositoryWritesTakeVersionedAggregates`：`domain.model`の`*Repository`インタフェースの`add`、`update`、`delete`は、集約ルートを一つだけ受け取る。
-  集約ルートが`long lockNo()`を持たないと、ほかの規則が集約ルートを見つけられず空のまま通るため、この規則で形を確かめる。
-  必須の`add`を対象に含めるため、`save`のような名前で保存するRepositoryでも、`lockNo()`を持たない集約は`add`で検出される。
-- `aggregateMethodsDoNotUseUnversionedWrites`：集約ルートを引数に取るメソッドは、`updateWhere`と`deleteWhere`を呼ばない。
-  ArchUnitはラムダの本体の呼び出しを外側のメソッドの呼び出しとして数えるため、ラムダの中の呼び出しも同じ判定で見る。
-- `aggregateRootInsertsGoThroughTableWriter`：`Jooq*Repository`の`add`（ラムダの中を含む）は、`Insert`に代入できる型の`execute`、`executeAsync`、`returning`、`returningResult`と、名前が`fetch`で始まるメソッドを呼ばない。
-  集約ルートのINSERTは`TableWriter.insert`に渡し、子の行のINSERTは`dsl.batch`で実行する。
-  `update`で子の行のINSERTを直接実行するため、対象を`add`に限る。
-  検出しない書き方は[ADR-054](../adr/ADR-054-detect-optimistic-lock-conflicts-by-update-count.md)のNegativeに示す。
+  集約ルートが`Versioned`を実装しないと、ほかの規則が集約ルートを見つけられず空のまま通るため、この規則で形を確かめる。
+  必須の`add`を対象に含めるため、`save`のような名前で保存するRepositoryでも、`Versioned`を実装しない集約は`add`で検出される。
 - R1とR2は、`domain.model`の`*Repository`の`add`以外の書き込みを同じ判定で見つける。
   書き込みは、`update`、`delete`と、集約ルートを受け取るメソッドである。
-  `repositoryUpdateAndDeleteCheckVersion`と同じく集約ルートの引数で選ぶため、`save`のような別名でも規則を外れない。
+  `repositoryUpdateCallsVersionedEntryPoint`と同じく集約ルートの引数で選ぶため、`save`のような別名でも規則を外れない。
 - `commandsBuiltByPresentationForWritesAreVersioned`（R1）：`.presentation.`のクラスが作ったCommandを`handle`で受け取り、Repositoryの`add`以外の書き込みを呼ぶ`*CommandHandler`は、そのCommandが`VersionedCommand`を実装する。
   作るとは、コンストラクタの呼び出し、コンストラクタ参照、Command自身を返すstatic factoryの呼び出しとメソッド参照のどれかである。
   RequestとListenerの両方が作るCommandは、Request用とListener用に分ける。
@@ -358,12 +351,6 @@ INSERTの共通カラムは`CommonColumns.forInsert`で、UPDATEとDELETEの共�
   別の集約のインスタンスに呼ぶ、業務の検査の後に呼ぶ、`command.expectedLockNo()`以外の値を渡す書き方は検査しない（値の流れは追わない）。
 - `jooqVersionIsReviewed`：実行時のjOOQの版が、禁止の一覧を見直した版と一致する。
   版が変わったら[jOOQのSQLの書き方](../database/jooq-usage.md)の「jOOQの版を上げるとき」に従う。
-- `unversionedWritesRequireUsingTheCount`：`updateWhere`と`deleteWhere`が`@CheckReturnValue`を持つ。
-  注釈の型はテストの実行時のクラスパスにないため、バイトコードから読む。
-
-Error Proneの`CheckReturnValue`は既定でerrorであり、`updateWhere`と`deleteWhere`の戻り値を捨てるとコンパイルが失敗する。
-戻り値を変数に入れて読まない場合は、errorにしている`UnusedVariable`で失敗する。
-ただし、`UnusedVariable`は`ignored`という名前と`unused`で始まる名前の変数を対象外にするため、その名前で件数を捨てる書き方はレビューで見る。
 
 ## DB
 

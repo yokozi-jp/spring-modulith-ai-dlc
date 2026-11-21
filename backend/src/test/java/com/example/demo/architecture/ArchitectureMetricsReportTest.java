@@ -43,12 +43,13 @@ class ArchitectureMetricsReportTest {
   /**
    * 現在の外部可視型数 87、全型数 132（product、ordering、payment を含む）を基準とする global relative visibility の上限。
    *
-   * <p>shared の TableWriter、ColumnValues、LockedRoot、DeletedRoot は他のモジュールの Repository が使う入口のため
-   * public にしている（ADR-054）。shared.concurrency の ExpectedLockNo、VersionedCommand、ConflictException
-   * は全層から使うため public である（ADR-048）。shared.failure の NotFoundException、BusinessRuleViolationException
-   * は全層から使うため public である（ADR-062）。409 の種類を表す ConflictException.Kind は ApiExceptionHandler
-   * がログに記録するため public である（ADR-062）。 product、ordering、payment は、モジュールルートの公開契約、Domain
-   * の型、CommandHandler、Command、 Result、Request、Response を規約どおり public
+   * <p>shared の TableWriter、ColumnValues、AggregateTable、ChildTable、ChildRows は他のモジュールの Repository
+   * が使う入口のため public にしている（ADR-054）。shared.concurrency の
+   * ExpectedLockNo、VersionedCommand、Versioned、ConflictException は全層から使うため public
+   * である（ADR-048）。shared.failure の NotFoundException、BusinessRuleViolationException は全層から使うため public
+   * である（ADR-062）。409 の種類を表す ConflictException.Kind は ApiExceptionHandler がログに記録するため public
+   * である（ADR-062）。 product、ordering、payment は、モジュールルートの公開契約、Domain の型、CommandHandler、Command、
+   * Result、Request、Response を規約どおり public
    * にしている（docs/backend/class-roles/index.md）。payment.infrastructure.client の
    * IgnoredClientErrorPredicate は、 Resilience4j が application.yaml の ignore-exception-predicate
    * から反射で作るため public である（ADR-072）。

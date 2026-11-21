@@ -28,6 +28,7 @@ import org.jooq.InsertQuery;
 import org.jooq.LoaderOptionsStep;
 import org.jooq.Merge;
 import org.jooq.Query;
+import org.jooq.TableRecord;
 import org.jooq.UpdatableRecord;
 import org.jooq.Update;
 import org.jooq.UpdateSetMoreStep;
@@ -73,6 +74,14 @@ class DirectWriteFixtureTest {
           new DirectWrite("dslMergeInto", DSLContext.class, "mergeInto"),
           new DirectWrite("dslBatchUpdate", DSLContext.class, "batchUpdate"),
           new DirectWrite("dslBatchStore", DSLContext.class, "batchStore"),
+          new DirectWrite("dslBatchInsert", DSLContext.class, "batchInsert"),
+          new DirectWrite("dslExecuteInsert", DSLContext.class, "executeInsert"),
+          new DirectWrite("dslLoadInto", DSLContext.class, "loadInto"),
+          new DirectWrite("recordInsert", TableRecord.class, "insert"),
+          new DirectWrite("daoInsert", DAO.class, "insert"),
+          new DirectWrite("dslInsertInto", DSLContext.class, "insertInto"),
+          new DirectWrite("dslInsertQuery", DSLContext.class, "insertQuery"),
+          new DirectWrite("staticDslInsertInto", DSL.class, "insertInto"),
           new DirectWrite("dslBatchDelete", DSLContext.class, "batchDelete"),
           new DirectWrite("dslBatchMerge", DSLContext.class, "batchMerge"),
           new DirectWrite("dslExecuteUpdate", DSLContext.class, "executeUpdate"),

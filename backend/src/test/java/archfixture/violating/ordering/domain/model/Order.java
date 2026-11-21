@@ -1,11 +1,12 @@
 package archfixture.violating.ordering.domain.model;
 
 import archfixture.violating.shared.concurrency.ExpectedLockNo;
+import archfixture.violating.shared.concurrency.Versioned;
 
 /** 違反フィクスチャが保存する集約ルート。これ自体は規約どおり。 */
 // record と同じ形のアクセサ（id() など）にそろえるため、フィールド名と同名の短いメソッドを許す。
 @SuppressWarnings({"PMD.AvoidFieldNameMatchingMethodName", "PMD.ShortMethodName"})
-public final class Order {
+public final class Order implements Versioned {
 
   /** 注文 ID。 */
   private final OrderId id;
@@ -37,6 +38,7 @@ public final class Order {
   }
 
   /** 読み込んだときの版を返す。 */
+  @Override
   public long lockNo() {
     return lockNo;
   }

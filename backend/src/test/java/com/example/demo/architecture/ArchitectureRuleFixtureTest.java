@@ -149,7 +149,7 @@ class ArchitectureRuleFixtureTest {
               "shared.concurrency.LockRequest.rowId"));
 
   /** 版を比べない入口を使う違反フィクスチャの Repository。 */
-  private static final String UNVERSIONED_REPOSITORY =
+  private static final String VIOLATING_JOOQ_REPOSITORY =
       "ordering.infrastructure.persistence.JooqOrderRepository";
 
   /** プロキシで動くアノテーションを付けたメソッドを同じクラスから呼ぶ違反フィクスチャのクラス名。 */
@@ -277,21 +277,25 @@ class ArchitectureRuleFixtureTest {
         .flatMap(rows -> rows);
   }
 
-  /** TableWriter の規則（H3、H5、H6、H7、R1 から R4）が、対応する違反フィクスチャを検出することを確かめる行を作る。 */
+  /** TableWriter の規則（H3、H6、R1 から R4）が、対応する違反フィクスチャを検出することを確かめる行を作る。 */
   private static Stream<Arguments> tableWriterRows() {
     return Stream.of(
         row(
-            "repositoryUpdateAndDeleteCheckVersion",
-            TableWriterArchTest.repositoryUpdateAndDeleteCheckVersionRule(VIOLATING),
-            UNVERSIONED_REPOSITORY + ".update("),
+            "repositoryUpdateCallsVersionedEntryPoint",
+            TableWriterArchTest.repositoryUpdateCallsVersionedEntryPointRule(VIOLATING),
+            VIOLATING_JOOQ_REPOSITORY + ".update("),
         row(
-            "repositoryUpdateAndDeleteCheckVersion: save",
-            TableWriterArchTest.repositoryUpdateAndDeleteCheckVersionRule(VIOLATING),
-            UNVERSIONED_REPOSITORY + ".save("),
+            "repositoryUpdateCallsVersionedEntryPoint: update call under another name",
+            TableWriterArchTest.repositoryUpdateCallsVersionedEntryPointRule(VIOLATING),
+            VIOLATING_JOOQ_REPOSITORY + ".store("),
         row(
-            "repositoryUpdateAndDeleteCheckVersion: re-read lockNo",
-            TableWriterArchTest.repositoryUpdateAndDeleteCheckVersionRule(VIOLATING),
-            UNVERSIONED_REPOSITORY + ".updateStatus("),
+            "repositoryUpdateCallsVersionedEntryPoint: delete has no TableWriter entry point",
+            TableWriterArchTest.repositoryUpdateCallsVersionedEntryPointRule(VIOLATING),
+            VIOLATING_JOOQ_REPOSITORY + ".delete("),
+        row(
+            "repositoryUpdateCallsVersionedEntryPoint: save",
+            TableWriterArchTest.repositoryUpdateCallsVersionedEntryPointRule(VIOLATING),
+            VIOLATING_JOOQ_REPOSITORY + ".save("),
         row(
             "repositoryWritesTakeVersionedAggregates",
             TableWriterArchTest.repositoryWritesTakeVersionedAggregatesRule(),
@@ -331,7 +335,8 @@ class ArchitectureRuleFixtureTest {
         row(
             "onlyCommandHandlersUpdateOrDeleteAggregates: Repository implementation",
             TableWriterArchTest.onlyCommandHandlersUpdateOrDeleteAggregatesRule(),
-            UNVERSIONED_REPOSITORY + ".save(archfixture.violating.ordering.domain.model.OrderId)"),
+            VIOLATING_JOOQ_REPOSITORY
+                + ".save(archfixture.violating.ordering.domain.model.OrderId)"),
         row(
             "onlyCommandHandlersUpdateOrDeleteAggregates: Domain Service",
             TableWriterArchTest.onlyCommandHandlersUpdateOrDeleteAggregatesRule(),
@@ -351,15 +356,7 @@ class ArchitectureRuleFixtureTest {
         row(
             "expectedLockNoIsCreatedOnlyByRequests: Controller",
             TableWriterArchTest.expectedLockNoIsCreatedOnlyByRequestsRule(VIOLATING),
-            "ordering.presentation.web.OrderLockController.lockNo("),
-        row(
-            "aggregateMethodsDoNotUseUnversionedWrites",
-            TableWriterArchTest.aggregateMethodsDoNotUseUnversionedWritesRule(VIOLATING),
-            UNVERSIONED_REPOSITORY + ".update("),
-        row(
-            "aggregateRootInsertsGoThroughTableWriter",
-            TableWriterArchTest.aggregateRootInsertsGoThroughTableWriterRule(),
-            "ordering.infrastructure.persistence.JooqOrderDraftRepository.add("));
+            "ordering.presentation.web.OrderLockController.lockNo("));
   }
 
   @ParameterizedTest(name = "{0}")
@@ -599,14 +596,12 @@ class ArchitectureRuleFixtureTest {
         ClassRoleArchTest.mappingLibrariesAreNotUsed,
         ClassRoleArchTest.jooqReflectionMappingIsNotUsed,
         TableWriterArchTest.tableWritesGoThroughTableWriterRule(basePackage),
-        TableWriterArchTest.repositoryUpdateAndDeleteCheckVersionRule(basePackage),
+        TableWriterArchTest.repositoryUpdateCallsVersionedEntryPointRule(basePackage),
         TableWriterArchTest.repositoryWritesTakeVersionedAggregatesRule(),
         TableWriterArchTest.commandHandlersEnsureScreenLockNoRule(basePackage),
         TableWriterArchTest.commandsBuiltByPresentationForWritesAreVersionedRule(basePackage),
         TableWriterArchTest.onlyCommandHandlersUpdateOrDeleteAggregatesRule(),
         TableWriterArchTest.expectedLockNoIsCreatedOnlyByRequestsRule(basePackage),
-        TableWriterArchTest.aggregateMethodsDoNotUseUnversionedWritesRule(basePackage),
-        TableWriterArchTest.aggregateRootInsertsGoThroughTableWriterRule(),
         PublicIdArchTest.numericIdsDoNotLeaveModulesRule(basePackage),
         DatabaseConventionsArchTest.ownGeneratedSchemaRule(
             basePackage, JOOQ_PACKAGE, FIXTURE_MODULES),

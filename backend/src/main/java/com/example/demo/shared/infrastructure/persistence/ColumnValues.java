@@ -1,5 +1,6 @@
 package com.example.demo.shared.infrastructure.persistence;
 
+import java.util.Collection;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -11,45 +12,33 @@ import org.jooq.TableField;
 import org.jspecify.annotations.Nullable;
 
 /**
- * {@link TableWriter} の UPDATE で SET する業務の列の値だけを受け取る（ADR-054）。
+ * {@link TableWriter} の INSERT と UPDATE で書く業務の列の値だけを受け取る（ADR-054）。
  *
  * <p>{@code where} も {@code execute} も持たないため、Repository のラムダからは列の値しか書けない。列は更新するテーブルの型 {@code R}
  * に結び付いた {@link TableField} に限るため、別のテーブルの列と型の違う値はコンパイルで失敗する。
  *
- * <p>共通カラム（{@code lock_no}、{@code created_*}、{@code updated_*}、{@code patched_*} の規約の 12 列）は {@link
- * TableWriter} が書くため、渡すと {@link IllegalArgumentException} を投げる。{@code updated_reason}
- * のような、規約にない業務の列は拒否しない。
+ * <p>共通カラム（{@code lock_no}、{@code created_*}、{@code updated_*}、{@code patched_*} の規約の 12
+ * 列）と、集約の宣言から {@link TableWriter} が書く列（ルートの一意の列、内部の主キー、子の外部キー）は、渡すと {@link
+ * IllegalArgumentException} を投げる。{@code updated_reason} のような、規約にない業務の列は拒否しない。
  *
  * @param <R> 更新するテーブルの Record の型
  */
 public final class ColumnValues<R extends Record> {
 
-  /** {@link TableWriter} と共通処理だけが書く共通カラムの名前（docs/database/postgresql-common-columns.md）。 */
-  private static final Set<String> COMMON_COLUMNS =
-      Set.of(
-          "created_at",
-          "created_by",
-          "created_pgm_cd",
-          "created_tx_id",
-          "updated_at",
-          "updated_by",
-          "updated_pgm_cd",
-          "updated_tx_id",
-          "lock_no",
-          "patched_at",
-          "patched_by",
-          "patched_id");
-
   /** 更新するテーブル。メッセージに名前を入れるために持つ。 */
   private final Table<R> table;
+
+  /** {@link TableWriter} が宣言から書く列（ルートの一意の列、内部の主キー、子の外部キー）。渡すと拒否する。 */
+  private final Set<Field<?>> reserved;
 
   /** SET する列と値。SQL を決定的にするため、登録の順を保つ。 */
   // 一つの UPDATE を組み立てる間だけ一つのスレッドで使い、登録の順が要るため LinkedHashMap にする。
   @SuppressWarnings("PMD.UseConcurrentHashMap")
   private final Map<Field<?>, @Nullable Object> assignments = new LinkedHashMap<>();
 
-  /* package */ ColumnValues(final Table<R> table) {
+  /* package */ ColumnValues(final Table<R> table, final Collection<? extends Field<?>> reserved) {
     this.table = table;
+    this.reserved = Set.copyOf(reserved);
   }
 
   /**
@@ -77,18 +66,10 @@ public final class ColumnValues<R extends Record> {
     return Collections.unmodifiableMap(assignments);
   }
 
-  /** 一つも値を登録していなければ {@code true} を返す。 */
-  /* package */ boolean isEmpty() {
-    return assignments.isEmpty();
-  }
-
   private ColumnValues<R> put(final TableField<R, ?> field, final @Nullable Object value) {
-    if (COMMON_COLUMNS.contains(field.getName())) {
+    if (CommonColumns.NAMES.contains(field.getName()) || reserved.contains(field)) {
       throw new IllegalArgumentException(
-          "common column is set by TableWriter: table="
-              + table.getName()
-              + ", column="
-              + field.getName());
+          "column is set by TableWriter: table=" + table.getName() + ", column=" + field.getName());
     }
     assignments.put(field, value);
     return this;

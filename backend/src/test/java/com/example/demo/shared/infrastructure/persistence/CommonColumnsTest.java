@@ -243,8 +243,7 @@ class CommonColumnsTest {
 
     assertThat(written).as("forInsert と patched_*").hasSize(12);
     assertThat(
-            ((Set<?>) privateConstant(ColumnValues.class, "COMMON_COLUMNS"))
-                .stream().map(String::valueOf))
+            ((Set<?>) privateConstant(CommonColumns.class, "NAMES")).stream().map(String::valueOf))
         .as("ColumnValues が拒否する列")
         .containsExactlyInAnyOrderElementsOf(written);
     assertThat(

@@ -150,7 +150,11 @@ PITのHTMLとXMLのレポートは、変異対象がある場合に`backend/buil
 - **`task lint-md-fix`**：markdownlint-cli2で安全に修正できるMarkdownの問題を修正する。
 - **`task ruleset-diff`**：GitHub上のrulesetと`.github/rulesets/main.json`の差分を表示する。認証済みの`gh`が要るため、CIでは動かさず、管理者が手元で使う。
 - **`task ruleset-apply`**：`main.json`をGitHub上のrulesetへ反映する。`CONFIRM_RULESET=yes`が要る。手順は[mainブランチの保護設定](../repository/branch-protection.md)にある。
-- **`task okf-check`**：OKF適合、内部リンク、孤立文書、変更した文書の責務の見直し合図（250行超の警告）、steering境界、ADRの整合（`adr-lint`）、rulesetの必須チェックとdocsの一覧とworkflowの名前の一致（`ruleset-check`）、iweのMCPサーバーの起動コマンドが選ぶ`iwe-mcp.sh`（`iwe-mcp-check`）、Taskfile文書同期候補を検査する。
+- **`task okf-check`**：OKF適合、内部リンク、孤立文書、変更した文書の責務の見直し合図（250行超の警告）、steering境界、ADRの整合（`adr-lint`）、削除した識別子が残っていないこと（`removed-names-check`）、rulesetの必須チェックとdocsの一覧とworkflowの名前の一致（`ruleset-check`）、iweのMCPサーバーの起動コマンドが選ぶ`iwe-mcp.sh`（`iwe-mcp-check`）、Taskfile文書同期候補を検査する。
+  `removed-names-check`は内部タスクで、`tooling/removed-names/names.txt`に書いた削除した識別子が、`docs/`、`.agents/`、`backend/src/`（生成コードを除く）に残っていないことを確かめる。
+  `be-lint`と`skills-check`からも動く。`backend-ci`のlintジョブは`be-lint`を呼ばないので、`check.sh`を直接実行する。
+  `check.sh`の自己検査（`tooling/removed-names/test.sh`）は`okf-check`だけが実行する。
+  識別子を削除、改名するときは、同じ変更で`names.txt`に足す。検査するのは識別子だけで、古い言い回しは見つけられない。残してよいのは、`names.txt`に書いた判断の履歴（ADRの背景と選択肢）だけである。
   `adr-lint`は内部タスクで、`okf-check`の中でだけ動く。
   `tooling/adr-lint/test.sh`が壊れたfixtureで期待の終了コードを確かめてから、`tooling/adr-lint/adr-lint.mjs`が実際のツリーを検査する。
   失敗にするのは、ADR番号の重複、ADRファイルごとに索引の行がちょうど1つでない状態、索引と本文の状態と日付の不一致、`[ADR-NNN](…ADR-MMM-….md)`のラベルと宛先の番号の不一致である。
@@ -187,7 +191,7 @@ PITのHTMLとXMLのレポートは、変異対象がある場合に`backend/buil
   ケースは`tooling/formal-verify/test.sh`が正で、この文書には写さない。
   初回は、TLCの取得にネットワークが要る。
   Javaは`JAVA_HOME`か、なければPATHの`java`（通常は`mise.lock`の版を選ぶshims、[ADR-090](../adr/ADR-090-pin-cli-tools-with-mise-lock.md)）を使う。
-- **`task formal-verify`**：`.agents/skills/formal-verify-*`の全スキルについて、`check.sh`で全設定を、`mutants.py`で全変異を検査する。
+- **`task formal-verify`**：`.agents/skills/formal-verify-*`の全スキルについて、`sync-check.sh`で同期コミットが`HEAD`の祖先として解決できることを、`check.sh`で全設定を、`mutants.py`で全変異を検査する。
   数分かかる。
   CIの`formal-verify.yml`が`formal-verify-test`とともに実行する。
   対象のパスはworkflowが正である。
@@ -226,7 +230,7 @@ betterleaksの誤検知の除外の書き方は[betterleaksの誤検知の除外
 - **pre-commit（Dockerfileの変更）**：`lint-docker`相当と`lint-docker-check`相当を実行する。
 - **pre-commit（Composeファイルの変更）**：`lint-compose`相当を実行する。
 - **pre-commit（Markdownの変更）**：変更ファイルへ`lint-md`相当を実行する。
-- **pre-commit（docs、steering、Taskfile、README、`tooling/adr-lint/`、`.kiro/settings/mcp.json`、`tooling/iwe-mcp/`、`.github/rulesets/`、`.github/workflows/`、`tooling/ruleset-check/`、`tooling/ruleset-sync/`の変更）**：`okf-check`を実行する。
+- **pre-commit（docs、steering、Taskfile、README、`tooling/adr-lint/`、`tooling/removed-names/`、`.kiro/settings/mcp.json`、`tooling/iwe-mcp/`、`.github/rulesets/`、`.github/workflows/`、`tooling/ruleset-check/`、`tooling/ruleset-sync/`の変更）**：`okf-check`を実行する。
 - **pre-commit（`.agents/skills/`、`.kiro/`、`skills-lock.json`、`tooling/skills-check/`の変更）**：`skills-check`を実行する。
 - **pre-commit（Taskfile、`lefthook.yml`、GitHub Actionsワークフロー、`tooling/taskfile-cleanup/`、`tooling/task-calls/`の変更）**：`lint-taskfile`を実行する。
 - **pre-commit（`tooling/agent-git/`の変更）**：`agent-git-test`を実行する。

@@ -2,13 +2,14 @@ package archfixture.conforming.ordering.domain.model;
 
 import archfixture.conforming.shared.concurrency.ConflictException;
 import archfixture.conforming.shared.concurrency.ExpectedLockNo;
+import archfixture.conforming.shared.concurrency.Versioned;
 import archfixture.conforming.shared.failure.BusinessRuleViolationException;
 import java.time.Instant;
 
 /** 注文の集約ルート。 */
 // record と同じ形のアクセサ（id() など）にそろえるため、フィールド名と同名の短いメソッドを許す。
 @SuppressWarnings({"PMD.AvoidFieldNameMatchingMethodName", "PMD.ShortMethodName"})
-public final class Order {
+public final class Order implements Versioned {
 
   /** 注文 ID。 */
   private final OrderId id;
@@ -54,6 +55,7 @@ public final class Order {
   }
 
   /** 読み込んだときの版を返す。 */
+  @Override
   public long lockNo() {
     return lockNo;
   }

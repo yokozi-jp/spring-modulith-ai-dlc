@@ -1,7 +1,7 @@
 ---
 type: Convention
 title: PostgreSQLの排他制御
-description: トランザクション分離レベル、楽観的ロック、悲観的ロック、DBの行ロックの使い分けと、業務テーブルのUPDATEとDELETEをTableWriterで書く規則、ロック待ちとデッドロックの扱いを定める規約。業務テーブルのUPDATEかDELETEを書くとき（集約の保存と削除、在庫の引き当て、保存期間を過ぎた行の削除、ワークテーブルの後始末）、分離レベルを変えたくなったときに読む。
+description: トランザクション分離レベル、楽観的ロック、悲観的ロック、DBの行ロックの使い分けと、業務テーブルのINSERTとUPDATEをTableWriterで書く規則、ロック待ちとデッドロックの扱いを定める規約。業務テーブルのINSERTかUPDATEを書くとき、ロックの方式を選ぶとき、ロック待ちの失敗とデッドロックを扱うとき。
 tags: [convention, database, postgresql, concurrency, locking, future-arch-guidelines]
 ---
 
@@ -9,7 +9,7 @@ tags: [convention, database, postgresql, concurrency, locking, future-arch-guide
 
 分離レベルはPostgreSQLの既定のREAD COMMITTEDのまま使う。
 同じ行を同時に更新しうる処理には楽観的ロックを使い、UPDATEの条件で`lock_no`を比較して更新件数で判定する。
-業務テーブルのUPDATEとDELETEは、sharedモジュールの`TableWriter`だけで書く。
+業務テーブルのINSERTとUPDATEは、sharedモジュールの`TableWriter`だけで書く。
 画面を開いた時点で行をロックする悲観的ロックは避ける。
 
 ## 分離レベル
@@ -39,30 +39,31 @@ DBの行ロックは、在庫の引き当てのように性能が重要になる
 ## 楽観的ロック
 
 ロック番号には[共通カラム](postgresql-common-columns.md)の`lock_no`を使い、最終更新日時で代用しない。
-業務テーブルのUPDATEとDELETEは、sharedモジュールの`TableWriter`だけが組み立てて実行する（[ADR-054](../adr/ADR-054-detect-optimistic-lock-conflicts-by-update-count.md)）。
-版の条件、`lock_no`の設定、更新件数の判定、ロック待ちの失敗の変換は`TableWriter`が持ち、Repositoryは業務の列の値だけを書く。
+業務テーブルのINSERTとUPDATEは、sharedモジュールの`TableWriter`だけが組み立てて実行する（[ADR-054](../adr/ADR-054-detect-optimistic-lock-conflicts-by-update-count.md)）。
+版の条件、`lock_no`の設定、共通カラム、更新件数の判定、ロック待ちと一意制約の違反の変換、親の外部キーの条件は`TableWriter`が持ち、Repositoryは業務の列の値だけを書く。
 Repositoryでの書き方は[jOOQのRepository](../backend/class-roles/jooq-repository.md)に従う。
 
-入口は、呼び出し側が期待する版（以前に読んだ集約ルートの`lock_no`）を持っているかだけで選ぶ。
+Repositoryは集約の形を、クラスの定数として一度だけ宣言する。
+`AggregateTable`はルートのテーブル、ルートを一つに決める一意の列、内部の主キー、子を持ち、`ChildTable`は子のテーブル、親の外部キーの列、親の中で行を同定する自然キーを持つ。
+保存のたびに、ルートの列の値と、保存後にあるべき子の全行（`ChildTable.rows`が作る`ChildRows`）を渡す。`Condition`は渡さない。
 
-- **期待する版を持つ**：`updateCheckingVersion`と`deleteCheckingVersion`を使う。
+- **`insert`**：ルートを`INSERT ... RETURNING 内部の主キー`で書き、続けて子を複数行のINSERTで書く。`lock_no = 1`にする。
+- **`update`**：以前に読んだ集約ルート（`Versioned`）を受け取り、その`lockNo()`を期待する版にする。
   更新件数が1件なら成功する。
-  0件なら主キーで行の有無を確かめ、行がなければ`shared.failure`の`NotFoundException`を、行があれば「他の人が更新した」として`shared.concurrency`の`ConflictException`を投げる。
-  子の行は、戻り値の`LockedRoot`（削除では`DeletedRoot`）で書く。
-  `updateChild`は、子の行が0件なら`shared.failure`の`BusinessRuleViolationException`（422）を、2件以上なら`IllegalStateException`を投げる（[ADR-062](../adr/ADR-062-map-business-exceptions-to-404-409-422.md)）。
-- **期待する版を持たない**：`updateWhere`と`deleteWhere`を使う。
-  更新件数を返し、件数の意味は呼び出し側が決める。
+  0件なら一意の列で行の有無を確かめ、行がなければ`shared.failure`の`NotFoundException`を、行があれば「他の人が更新した」として`shared.concurrency`の`ConflictException`（種類は`version`）を投げる。
+  2件以上は`IllegalStateException`にする。
+  ルートの行ロックを取った後に、子を差分で書く（後述の「親子のテーブルの保存の順序」）。
 
-`TableWriter`のどのUPDATEも`lock_no`を1進める。
-`updateCheckingVersion`は、期待する版が6の行に対して次のSQLを実行する。
+`update`は、期待する版が6の行に対して次のSQLを実行する。
 
 ```sql
-UPDATE t_order SET status = 'PAID', updated_at = ..., updated_by = ..., updated_pgm_cd = ..., updated_tx_id = ..., lock_no = 7
-WHERE order_id = 1 AND lock_no = 6;
+UPDATE t_order SET order_status_typ = 'PAID', updated_at = ..., updated_by = ..., updated_pgm_cd = ..., updated_tx_id = ..., lock_no = 7
+WHERE public_id = ? AND lock_no = 6
+RETURNING order_id;
 ```
 
-`updateWhere`は、`lock_no = lock_no + 1`で版を進める。
-版を比べない更新が先に走れば、その前に読んだ画面の保存は上書きせずに競合として返る。
+どのUPDATEも`lock_no`を1進める。
+版を比べる入口しかないため、版の数値を渡す引数も、版を比べない入口も`TableWriter`にはない。
 
 ### 対象と対象外の分け方
 
@@ -70,38 +71,37 @@ WHERE order_id = 1 AND lock_no = 6;
 版を比べるかは、期待する版を持っているかで決まる。
 機械の検査の列は、書き間違いを検出する検査である。
 
-| 書き込みの種類                                                                              | 版を比べるか                                   | 使うAPI                                                                                                                                                         | 機械の検査                                                                                                                                                                                                                                                                                                       |
-| ------------------------------------------------------------------------------------------- | ---------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 画面からの集約の更新（Commandが`VersionedCommand`）                                         | 比べる（画面の版と読んだ版、読んだ版と行の版） | Requestが作る`ExpectedLockNo`、CommandHandlerの`ensureLockNo`と、Repositoryの`update`の`updateCheckingVersion`                                                  | `commandsBuiltByPresentationForWritesAreVersioned`、`commandHandlersEnsureScreenLockNo`、`expectedLockNoIsCreatedOnlyByRequests`、`onlyCommandHandlersUpdateOrDeleteAggregates`、`repositoryUpdateAndDeleteCheckVersion`、`repositoryWritesTakeVersionedAggregates`、`aggregateMethodsDoNotUseUnversionedWrites` |
-| Listenerやバッチからの集約の更新（画面の版を持たない）                                      | 比べる（読んだ版と行の版）                     | Repositoryの`update`の`updateCheckingVersion`                                                                                                                   | `repositoryUpdateAndDeleteCheckVersion`、`repositoryWritesTakeVersionedAggregates`、`aggregateMethodsDoNotUseUnversionedWrites`                                                                                                                                                                                  |
-| 集約ルートの物理削除                                                                        | 比べる                                         | Repositoryの`delete`の`deleteCheckingVersion`                                                                                                                   | `repositoryUpdateAndDeleteCheckVersion`、`repositoryWritesTakeVersionedAggregates`、`aggregateMethodsDoNotUseUnversionedWrites`                                                                                                                                                                                  |
-| 集約の子の行の更新                                                                          | 比べない（ルートの行ロックと版で守る）         | `LockedRoot.updateChild`                                                                                                                                        | `tableWritesGoThroughTableWriter`                                                                                                                                                                                                                                                                                |
-| 集約の子の行の削除（子の集合が減ったとき、ルートを削除したとき）                            | 比べない                                       | `LockedRoot.deleteChildren`、`DeletedRoot.deleteChildren`                                                                                                       | `tableWritesGoThroughTableWriter`                                                                                                                                                                                                                                                                                |
-| 集約の子の行の追加                                                                          | 該当なし（`lock_no = 1`）                      | `insertInto(...).set(commonColumns.forInsert(...))`。`LockedRoot`を通らない                                                                                     | 既定値のないNOT NULL。ルートを書かない追加は検出しない（ADR-054のNegative）                                                                                                                                                                                                                                      |
-| DBの行ロック（在庫の引き当て）、外部同期による状態の上書き、一括更新                        | 比べない                                       | `updateWhere`（件数を返す）                                                                                                                                     | `tableWritesGoThroughTableWriter`、`aggregateMethodsDoNotUseUnversionedWrites`、Error Proneの`CheckReturnValue`                                                                                                                                                                                                  |
-| ワークテーブルの後始末、保存期間を過ぎた行の削除、集約を読み込まない一括の物理削除          | 比べない                                       | `deleteWhere`（件数を返す）                                                                                                                                     | `tableWritesGoThroughTableWriter`、`aggregateMethodsDoNotUseUnversionedWrites`、Error Proneの`CheckReturnValue`                                                                                                                                                                                                  |
-| 集約ルートのINSERT                                                                          | 該当なし（`lock_no = 1`）                      | `TableWriter.insert(insertInto(...).set(commonColumns.forInsert(...)))`                                                                                         | `aggregateRootInsertsGoThroughTableWriter`、既定値のないNOT NULL。`Jooq<Aggregate>Repository`の`add`とその中のラムダだけを見る（検出しない範囲はADR-054のNegative）                                                                                                                                              |
-| 追記だけのワークテーブル（`w_`）                                                            | 比べない                                       | 追記だけにする。INSERTは`forInsert`、削除は`deleteWhere`                                                                                                        | `tableWritesGoThroughTableWriter`                                                                                                                                                                                                                                                                                |
-| Javaの外の書き込み（psqlのデータパッチ、Liquibaseのデータ変更、スキーマ変更に伴う値の設定） | 比べない                                       | [共通カラム](postgresql-common-columns.md)（データパッチでは`patched_*`だけを更新する）と[ロックを抑えるスキーマ変更](postgresql-online-schema-change.md)に従う | なし（ADR-054のNegative）                                                                                                                                                                                                                                                                                        |
-| フレームワークのテーブル（`modulith`と`liquibase`のスキーマ）                               | 対象外                                         | 対象外                                                                                                                                                          | スキーマ検査の対象外（`SchemaConventions.FRAMEWORK_SCHEMAS`）                                                                                                                                                                                                                                                    |
+| 書き込みの種類                                                                              | 版を比べるか                                   | 使うAPI                                                                                                             | 機械の検査                                                                                            |
+| ------------------------------------------------------------------------------------------- | ---------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------- |
+| 画面からの集約の更新（Commandが`VersionedCommand`）                                         | 比べる（画面の版と読んだ版、読んだ版と行の版） | Requestが作る`ExpectedLockNo`、CommandHandlerの`ensureLockNo`、Repositoryの`update`の`TableWriter.update`           | R1からR4、H3                                                                                          |
+| Listenerやバッチからの集約の更新（画面の版を持たない）                                      | 比べる（読んだ版と行の版）                     | Repositoryの`update`の`TableWriter.update`                                                                          | H3                                                                                                    |
+| 集約の子の行の更新                                                                          | 比べない（ルートの行ロックと版で守る）         | `update`が差分で書く（子の`lock_no`を1進める）                                                                      | 親の外部キーは`TableWriter`が付ける                                                                   |
+| 集約の子の行の削除、追加                                                                    | 比べない / 該当なし（追加は`lock_no = 1`）     | `update`が差分で書く。`insert`が複数行のINSERTで書く                                                                | 同上                                                                                                  |
+| 集約ルートのINSERT                                                                          | 該当なし（`lock_no = 1`）                      | `TableWriter.insert`                                                                                                | H1（`insertInto`を`TableWriter`の外で呼べない）                                                       |
+| 集約ルートの物理削除、DBの行ロック（在庫の引き当て）、一括更新、ワークテーブルの後始末      | 今は入口がない                                 | 必要になったとき、[ADR-054](../adr/ADR-054-detect-optimistic-lock-conflicts-by-update-count.md)を更新して入口を足す | H1                                                                                                    |
+| Javaの外の書き込み（psqlのデータパッチ、Liquibaseのデータ変更、スキーマ変更に伴う値の設定） | 比べない                                       | [共通カラム](postgresql-common-columns.md)（データパッチでは`lock_no`を進めない）                                   | 検出しない（[ADR-054](../adr/ADR-054-detect-optimistic-lock-conflicts-by-update-count.md)のNegative） |
+| フレームワークのテーブル（`modulith`と`liquibase`のスキーマ）                               | 対象外                                         | 対象外                                                                                                              | 対象外                                                                                                |
 
-期待する版を持つ書き込みは、集約ルートを受け取るRepositoryの`update`と`delete`に限る。
+期待する版を持つ書き込みは、集約ルートを受け取るRepositoryの`update`に限る。
 識別子と版を受け取るRepositoryのメソッドを作らない。
 
 ### 親子のテーブルの保存の順序
 
-集約のように親子のテーブルを一緒に書くときは、先に親の行（集約のルート）を`updateCheckingVersion`で更新し、子の行は後で書く。
+集約のように親子のテーブルを一緒に書くときは、`TableWriter`が先に親の行（集約のルート）を更新し、子の行は後で書く。
 親の業務のカラムが変わらなくても、親の行を更新して`lock_no`を進める。
 
 子の集合が増減する集約は、全置換ではなく差分で保存する。
 全置換では、子の`created_*`が保存のたびに変わる。
+`update`は、親の行ロックを取った後に、次の順で子を書く。
 
-1. 親を`updateCheckingVersion`で更新する。
-2. 保存済みの子のキーを読む。
-3. 集約にない子を`root.deleteChildren(子のテーブル, 親の条件.and(キー.notIn(集約の子のキー)))`で削除する。
-   集約の子が空なら`notIn`は常に真になり、すべての子を削除する。
-4. 保存済みにない子を`forInsert`でINSERTする。
-5. 両方にある子を`root.updateChild`で更新する。
+1. 保存済みの子の自然キーを読む。
+2. 保存後にない子を、親の外部キーと自然キーの条件で削除する。
+   保存後の子が空なら、すべての子を削除する。
+3. 両方にある子を、1行ずつUPDATEして子の`lock_no`を1進める。
+4. 保存済みにない子を、複数行のINSERTで書く。
+
+保存後にあるべき子の全行を渡す置き換えのため、子の一部だけを渡すと残りを削除する。
+宣言した子を渡さない呼び出しと、自然キーが`null`か重複する呼び出しは、SQLを実行する前に`IllegalArgumentException`にする。
 
 ### jOOQの楽観的ロックの機能
 
@@ -114,17 +114,18 @@ jOOQの機能の動作は[jOOQのマニュアル](https://www.jooq.org/doc/lates
 
 `SELECT ... FOR UPDATE`で複数の行やテーブルをロックする場合は、ロックするテーブルの順序と、行の並び順（主キーの順など）を決め、すべての処理がそれに従う。
 UPDATEも更新する行のロックを取るため、同じ順序に従う。
-楽観的ロックでは、親の行を先に更新し、子の行は主キーの順に更新する。
+楽観的ロックでは、親の行を先に更新し、子の行は後で書く。
+親の行ロックが同じ集約を書く`TableWriter`の処理を直列にするため、子の行の更新の順序は規則にしない。
 
 ## ロック待ち
 
 アプリの接続には`lock_timeout`でロック待ちの上限を設定し、既定の無期限待ちのままにしない（[DB接続情報とロール分離](connections.md)、[ADR-055](../adr/ADR-055-set-db-time-limits-per-connection.md)）。
 上限まで待ってもロックを取れなければ、文はSQLSTATE `55P03`で失敗する。
-`updateCheckingVersion`、`deleteCheckingVersion`、集約ルートのINSERTの入口`insert`と、子の行の`LockedRoot.updateChild`、`LockedRoot.deleteChildren`、`DeletedRoot.deleteChildren`は、この失敗を、原因を付けずに種類`lock`（`ConflictException.Kind.LOCK`）の`ConflictException`に変える。
-`updateWhere`と`deleteWhere`は、Springの`CannotAcquireLockException`と、`updateWhere`の`DuplicateKeyException`をそのまま投げ、扱いは呼び出し側が決める。
-一意制約の違反（SQLSTATE `23505`）は、`TableWriter`の版を比べる入口、子の行の書き込み、集約ルートのINSERTの入口`insert`で、`DuplicateKeyException`を、原因を付けずに種類`unique`（`ConflictException.Kind.UNIQUE`）の`ConflictException`に変える。
+`TableWriter`のすべての文は、この失敗を、原因を付けずに種類`lock`（`ConflictException.Kind.LOCK`）の`ConflictException`にする（[ADR-062](../adr/ADR-062-map-business-exceptions-to-404-409-422.md)）。
+一意制約の違反（SQLSTATE `23505`）も、すべての文で原因を付けずに種類`unique`（`ConflictException.Kind.UNIQUE`）の`ConflictException`にする。
+変換は例外の型ではなくSQLSTATEで決め、それ以外のSQLSTATE（`21000`など）は変換せずに投げる。理由は[ADR-054](../adr/ADR-054-detect-optimistic-lock-conflicts-by-update-count.md)にある。
 原因の例外のメッセージにはSQLと重複したキーの値が入るため、原因を付けない（[ADR-062](../adr/ADR-062-map-business-exceptions-to-404-409-422.md)）。
-集約ルートのINSERTは`TableWriter.insert`で実行し、子の行の`dsl.batch`のINSERTは変換しない。
+書き込みは、開いていて読み取り専用ではないトランザクションの中でだけ行う。そうでなければ、SQLを実行する前に`IllegalStateException`にする。
 
 要件に合わせて、次の待ち方も使う。
 
@@ -140,18 +141,9 @@ HTTPの要求と応答をまたいでDBのトランザクションを保てな�
 
 ## DBの行ロック
 
-数量の更新のように、前回の値を確認する必要がない処理では、`updateWhere`の条件付きのUPDATEと更新件数で判定してよい。
-
-```java
-final int reserved =
-    tableWriter.updateWhere(
-        T_STOCK,
-        T_STOCK.ITEM_ID.eq(itemId).and(T_STOCK.STOCK_COUNT.ge(5)),
-        set -> set.set(T_STOCK.STOCK_COUNT, T_STOCK.STOCK_COUNT.minus(5)));
-```
-
-このUPDATEも`lock_no = lock_no + 1`で版を進めるため、引き当ての前に読んだ画面の保存は競合になる。
-更新件数が0件なら、在庫不足として利用者へ返し、業務判断を委ねる。
+数量の更新のように、前回の値を確認する必要がない処理は、DBの行ロックと更新件数で判定してよい。
+`TableWriter`には、版を比べない更新の入口を今は持たない。理由と、足すときの手順は[ADR-054](../adr/ADR-054-detect-optimistic-lock-conflicts-by-update-count.md)にある。
+その入口も`lock_no`を1進め、引き当ての前に読んだ画面の保存が競合になるようにする。
 マスタの保守のように後勝ちの上書きを許容できない更新と、状態の遷移を伴う更新には使わない。
 
 ## 定期のジョブの排他
@@ -176,6 +168,6 @@ ShedLockはロックの行を作ったことをメモリに覚えるため、`mo
 
 - フューチャー株式会社「PostgreSQL設計ガイドライン」（[アーキテクチャ設計ガイドライン](https://future-architect.github.io/arch-guidelines/documents/forDB/postgresql_guidelines.html)、commit `e309a6d`）、[CC BY 4.0](https://creativecommons.org/licenses/by/4.0/deed.ja)
 - このリポジトリの規約に合わせて抜粋、再構成、改変している。取り込みの方針は [ADR-040](../adr/ADR-040-import-future-architecture-guidelines.md) に従う。
-- 楽観的ロックの方式を、先にロックしてから比較する原典の方式から、UPDATEの条件と更新件数で判定し、業務テーブルのUPDATEとDELETEを`TableWriter`に集める方式に変えている（[ADR-054](../adr/ADR-054-detect-optimistic-lock-conflicts-by-update-count.md)）。
+- 楽観的ロックの方式を、先にロックしてから比較する原典の方式から、UPDATEの条件と更新件数で判定し、業務テーブルのINSERTとUPDATEを集約の宣言から`TableWriter`が書く方式に変えている（[ADR-054](../adr/ADR-054-detect-optimistic-lock-conflicts-by-update-count.md)）。
   jOOQの楽観的ロックの機能を使わない規則を追加している。
 - ロック待ちの上限を、アプリの接続ごとに`lock_timeout`で設定する規則を追加している（[ADR-055](../adr/ADR-055-set-db-time-limits-per-connection.md)）。

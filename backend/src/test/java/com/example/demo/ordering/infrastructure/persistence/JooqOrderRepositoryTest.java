@@ -164,7 +164,7 @@ class JooqOrderRepositoryTest {
 
   private OrderRepository repository(final Instant at) {
     final CommonColumns commonColumns = TestCommonColumns.at(at);
-    return new JooqOrderRepository(dsl, commonColumns, new TableWriter(dsl, commonColumns));
+    return new JooqOrderRepository(dsl, new TableWriter(dsl, commonColumns));
   }
 
   private Order find(final Order order) {

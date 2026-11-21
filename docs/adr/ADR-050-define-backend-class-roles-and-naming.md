@@ -100,9 +100,9 @@ Proposed
 - 読み取りは、`select` に並べた列を `Field.convertFrom` で値オブジェクトと enum に変え、子の Entity を `multiset` の副問い合わせで同じ SQL で読み、`Records.mapping(Order::restore)` で集約にする（[jOOQ, Ad-hoc converters](https://www.jooq.org/doc/latest/manual/sql-execution/fetching/ad-hoc-converter/)、[jOOQ, The MULTISET value constructor](https://www.jooq.org/doc/latest/manual/sql-building/column-expressions/multiset-value-constructor/)）。jOOQ の作者も、一対多の対応づけにこの形を示している（[Stack Overflow, Mapping a one-to-many relationship to a list of records in jOOQ](https://stackoverflow.com/a/71855430/521799)）。列の数や型が `restore` や Entity のコンストラクタの引数と合わないと、コンパイルが失敗する。
 - Repository の書き込みは、新しい集約の `add` と、既存の集約の `update` に分ける。
   新規と更新を一つの `save` にすると、実装は行の有無で INSERT と UPDATE を選ぶことになり、他の人が消した集約の更新が新しい行の作成になって、「行がない」（404）として返せないためである。
-- `add` は、`insertInto` の `set(列, 値)` で業務の全列を書き、`lock_no` を含む共通カラムの値は [ADR-048](ADR-048-add-shared-module-for-jooq-common-code.md) の `shared` の共通処理から受け取る。
+- `add` は、集約の宣言（`AggregateTable`、`ChildTable`）とルートの列の値、子の全行を `shared` の `TableWriter.insert` に渡す。`lock_no` を含む共通カラムの値は、`TableWriter` が [ADR-048](ADR-048-add-shared-module-for-jooq-common-code.md) の `shared` の共通処理から受け取る（[ADR-054](ADR-054-detect-optimistic-lock-conflicts-by-update-count.md)）。
 - `update` は、[PostgreSQL の排他制御](../database/postgresql-concurrency-control.md)の楽観的ロックに従う（[ADR-054](ADR-054-detect-optimistic-lock-conflicts-by-update-count.md)）。
-  集約ルートの行は `shared` の `TableWriter.updateCheckingVersion` に、集約の `lockNo` と業務の列の値を渡して先に更新し、子の行は戻り値の `LockedRoot` で後から更新する。
+  集約ルート（`Versioned`）と業務の列の値、子の全行を `shared` の `TableWriter.update` に渡す。`TableWriter` が、集約ルートの行を先に更新し、子の行を差分で後から書く。
   版の条件、版の設定、件数の判定は `TableWriter` が持ち、0 件のとき、行がなければ `shared.failure` の `NotFoundException` を、行があれば `shared.concurrency` の `ConflictException` を投げる。
   `lock_timeout` までに行のロックを取れないときも、`TableWriter` が `ConflictException` に変える。
 - Controller が作り、既存の集約の状態を変える Command は、クライアントが参照の応答で受け取った `lockNo` を `ExpectedLockNo` にして持ち、`VersionedCommand` を実装する。
@@ -309,7 +309,7 @@ Proposed
 - [ADR-013: HTTP API 契約を標準化する](ADR-013-standardize-http-api-contracts.md)
 - [ADR-019: 外部連携の耐障害性と容量制御を標準化する](ADR-019-define-resilience-and-capacity-guardrails.md)
 - [ADR-048: jOOQ の共通処理を共有モジュール shared に置く](ADR-048-add-shared-module-for-jooq-common-code.md)
-- [ADR-054: 楽観的ロックの競合を lock_no の条件と更新件数で判定し、業務テーブルの UPDATE と DELETE を TableWriter に集める](ADR-054-detect-optimistic-lock-conflicts-by-update-count.md)
+- [ADR-054: 楽観的ロックの競合を lock_no の条件と更新件数で判定し、業務テーブルの INSERT と UPDATE を集約の宣言から TableWriter が書く](ADR-054-detect-optimistic-lock-conflicts-by-update-count.md)
 - [PostgreSQL の排他制御](../database/postgresql-concurrency-control.md)
 - [PostgreSQL の共通カラム](../database/postgresql-common-columns.md)
 - [メッセージングの設計](../integration/async-messaging-design.md)
