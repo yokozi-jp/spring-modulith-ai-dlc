@@ -1,11 +1,11 @@
 ---
 type: ADR
-title: 'ADR-106: jscpd は import 文を比べず、閾値を実測の 1.86% に合わせて 2.0% にする'
+title: 'ADR-106: jscpd は import 文を比べず、閾値を実測の 1.90% に合わせて 2.0% にする'
 description: クラスの役割とテストの規約が求める import の並びが重複率を押し上げ、閾値を上げ続ける問題を避けるため、jscpd の比較から import 文を外し、閾値を 2.0% に改める決定。
 tags: [adr, quality, ci, lint]
 ---
 
-# ADR-106: jscpd は import 文を比べず、閾値を実測の 1.86% に合わせて 2.0% にする
+# ADR-106: jscpd は import 文を比べず、閾値を実測の 1.90% に合わせて 2.0% にする
 
 ## Status
 
@@ -22,7 +22,7 @@ Proposed
 
 Pull Request #552（テナントの所属の管理）で、この合図が出た。
 `main` の重複率は 3.88% で、この変更を merge した結果は 4.07% になり、`lint-duplicates` が失敗した。
-`main` の `.jscpd.json` と同じ設定のまま、`import` 文だけを比べない設定で測ると、`main` が 1.86%、merge の結果が 1.85% で、この変更は import 以外の重複をほとんど足していなかった。
+`main` の `.jscpd.json` と同じ設定のまま、`import` 文だけを比べない設定で測ると、当時の `main` が 1.86%、merge の結果が 1.85% で、この変更は import 以外の重複をほとんど足していなかった（その後の `main` は 1.90%）。
 増えた重複は、同じ役割のクラスとテストが持つ import の並び（`org.springframework.test.web.servlet.request.MockMvcRequestBuilders` の static import の並びなど）であり、規約が求める定型である。
 
 import の並びは、型の依存を宣言するだけで、共通化できる処理ではない。
@@ -32,7 +32,7 @@ import の重複を理由に基底クラスや共通の部品を作ると、ADR-
 ## Decision
 
 `.jscpd.json` の `ignorePattern` に `\nimport [^;]*;` を足し、Java と TypeScript の `import` 文を jscpd の比較から外す。
-`threshold` は、この方式での `main` の実測 1.86% を通す 2.0% にする。
+`threshold` は、この方式での `main` の実測 1.90% を通す 2.0% にする。
 検査の対象、除外する生成コード、Task を共通の入口にすることなど、[ADR-035](ADR-035-adopt-jscpd-and-knip-quality-gates.md) のほかの決定は変えない。
 
 ADR-074 は、閾値の値と検出の方式の両方を改めるため、この ADR で置き換える。

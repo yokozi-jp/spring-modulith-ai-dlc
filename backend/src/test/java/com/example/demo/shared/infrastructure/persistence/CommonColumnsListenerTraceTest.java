@@ -3,6 +3,9 @@ package com.example.demo.shared.infrastructure.persistence;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.example.demo.jooq.tables.FixtureItemTable;
+import com.example.demo.shared.tenant.TenantId;
+import com.example.demo.shared.tenant.TenantScoped;
+import com.example.demo.testkit.AsTenant;
 import com.example.demo.testkit.CleanGeneratedTablesExtension;
 import com.example.demo.testkit.SharedTestConfiguration;
 import io.micrometer.observation.Observation;
@@ -89,21 +92,25 @@ class CommonColumnsListenerTraceTest {
     final AtomicReference<String> publisherTraceId = new AtomicReference<>();
 
     Observation.createNotStarted("trace-probe", observationRegistry)
-        .observe(
-            () -> {
-              final Span publisherSpan =
-                  Objects.requireNonNull(tracer.currentSpan(), "発行側に現在の span があること");
-              publisherTraceId.set(publisherSpan.context().traceId());
-              scenario
-                  .publish(new TraceProbeEvent(asUser))
-                  .andWaitForStateChange(probe::result)
-                  .andVerify(result -> {});
-            });
+        .observe(() -> {
+          final Span publisherSpan =
+              Objects.requireNonNull(tracer.currentSpan(), "発行側に現在の span があること");
+          publisherTraceId.set(publisherSpan.context().traceId());
+          scenario
+              .publish(new TraceProbeEvent(asUser, AsTenant.TENANT))
+              .andWaitForStateChange(probe::result)
+              .andVerify(result -> {});
+        });
     return publisherTraceId.get();
   }
 
-  /** リスナーを起動するためのイベント。{@code asUser} なら、Listener の中で利用者の認証を立てる。 */
-  /* package */ record TraceProbeEvent(boolean asUser) {}
+  /**
+   * リスナーを起動するためのイベント。{@code asUser} なら、Listener の中で利用者の認証を立てる。
+   *
+   * @param asUser Listener の中で利用者の認証を立てるか
+   * @param tenantId イベントのテナント
+   */
+  /* package */ record TraceProbeEvent(boolean asUser, TenantId tenantId) implements TenantScoped {}
 
   /** モジュールのイベントリスナーで共通カラムを組み立て、trace ID、pgm_cd、作成者か例外を記録する。 */
   // 非同期とトランザクションのプロキシを作れるよう、final にしない。

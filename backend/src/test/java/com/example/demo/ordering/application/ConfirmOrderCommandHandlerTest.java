@@ -9,6 +9,7 @@ import com.example.demo.shared.concurrency.ConflictException;
 import com.example.demo.shared.concurrency.ExpectedLockNo;
 import com.example.demo.shared.failure.BusinessRuleViolationException;
 import com.example.demo.testkit.AsModule;
+import com.example.demo.testkit.AsTenant;
 import com.example.demo.testkit.CleanGeneratedTablesExtension;
 import com.example.demo.testkit.SharedTestConfiguration;
 import io.micrometer.observation.Observation;
@@ -63,18 +64,23 @@ class ConfirmOrderCommandHandlerTest {
                 .stimulate(
                     // Scenario#stimulate は名前のないトランザクションで呼ぶため、本番の入口と同じく ordering のロールで入る。
                     () ->
-                        AsModule.call(
-                            dsl,
-                            "ordering",
-                            tx ->
-                                confirmOrder.handle(
-                                    new ConfirmOrderCommand(orderId, new ExpectedLockNo(1)))))
+                        AsTenant.call(() ->
+                            AsModule.call(
+                                dsl,
+                                "ordering",
+                                tx ->
+                                    confirmOrder.handle(
+                                        new ConfirmOrderCommand(orderId, new ExpectedLockNo(1))))))
                 .andWaitForEventOfType(OrderConfirmed.class)
                 .matching(event -> event.orderId().equals(orderId))
-                .toArriveAndVerify(event ->
-                    assertThat(event.confirmedAt())
-                        .as("orderId=%s の confirmedAt", orderId)
-                        .isNotNull()));
+                .toArriveAndVerify(event -> {
+                  assertThat(event.confirmedAt())
+                      .as("orderId=%s の confirmedAt", orderId)
+                      .isNotNull();
+                  assertThat(event.tenantId())
+                      .as("orderId=%s の確定を束縛中のテナントで発行する", orderId)
+                      .isEqualTo(AsTenant.TENANT);
+                }));
   }
 
   @Test

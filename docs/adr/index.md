@@ -104,4 +104,5 @@
 - [ADR-101: テナント、所属、役割をアプリの DB に持ち、テナントを選んだ時点で役割の権限を組み立てる](ADR-101-keep-tenants-and-roles-in-app-database.md)（Proposed, 2026-11-19）
 - [ADR-102: 本番の IdP に Amazon Cognito を使い、ローカルとテストでは Keycloak で代える](ADR-102-use-amazon-cognito-as-production-idp.md)（Proposed, 2026-11-19）
 - [ADR-104: compose-test を使う実行ごとに slot を割り当て、worktree をまたいで同時に流す](ADR-104-allocate-test-stack-slots-per-run.md)（Proposed, 2026-11-19）
-- [ADR-106: jscpd は import 文を比べず、閾値を実測の 1.86% に合わせて 2.0% にする](ADR-106-ignore-import-statements-in-jscpd.md)（Proposed, 2026-11-21）
+- [ADR-105: 操作しているテナントを ScopedValue で束縛し、リクエストはセッションから、リスナーはイベントから取る](ADR-105-bind-tenant-to-request-and-event-context.md)（Proposed, 2026-11-19）
+- [ADR-106: jscpd は import 文を比べず、閾値を実測の 1.90% に合わせて 2.0% にする](ADR-106-ignore-import-statements-in-jscpd.md)（Proposed, 2026-11-21）

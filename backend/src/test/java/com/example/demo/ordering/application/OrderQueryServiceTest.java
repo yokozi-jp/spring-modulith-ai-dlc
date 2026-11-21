@@ -9,6 +9,7 @@ import com.example.demo.ordering.OrderSearchCriteria;
 import com.example.demo.ordering.OrderSummary;
 import com.example.demo.product.TestProducts;
 import com.example.demo.shared.concurrency.ExpectedLockNo;
+import com.example.demo.testkit.AsTenant;
 import com.example.demo.testkit.CleanGeneratedTablesExtension;
 import com.example.demo.testkit.SharedTestConfiguration;
 import com.example.demo.testkit.UniqueCodes;
@@ -85,9 +86,9 @@ class OrderQueryServiceTest {
     final UUID pen = TestProducts.onSale(dsl, UniqueCodes.next("P"), "120.00");
     final String confirmedOrderId = draft(UniqueCodes.next("C"), pen, 1, pen, 1);
     final String cancelledOrderId = draft(UniqueCodes.next("C"), pen, 1, pen, 1);
-    observed(
-        () ->
-            confirmOrder.handle(new ConfirmOrderCommand(confirmedOrderId, new ExpectedLockNo(1))));
+    observed(() ->
+        AsTenant.call(() ->
+            confirmOrder.handle(new ConfirmOrderCommand(confirmedOrderId, new ExpectedLockNo(1)))));
     observed(
         () -> cancelOrder.handle(new CancelOrderCommand(cancelledOrderId, new ExpectedLockNo(1))));
 
@@ -135,16 +136,15 @@ class OrderQueryServiceTest {
       final int firstQuantity,
       final UUID secondProduct,
       final int secondQuantity) {
-    return observed(
-        () ->
-            draftOrder
-                .handle(
-                    new DraftOrderCommand(
-                        customerOrderCode,
-                        List.of(
-                            new DraftOrderCommand.Line(firstProduct.toString(), firstQuantity),
-                            new DraftOrderCommand.Line(secondProduct.toString(), secondQuantity))))
-                .orderId());
+    return observed(() ->
+        draftOrder
+            .handle(
+                new DraftOrderCommand(
+                    customerOrderCode,
+                    List.of(
+                        new DraftOrderCommand.Line(firstProduct.toString(), firstQuantity),
+                        new DraftOrderCommand.Line(secondProduct.toString(), secondQuantity))))
+            .orderId());
   }
 
   /** 共通カラムの trace ID を取れるよう、observation の中で処理を呼ぶ。 */

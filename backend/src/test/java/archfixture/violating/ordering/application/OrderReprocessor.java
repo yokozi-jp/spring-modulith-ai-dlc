@@ -25,7 +25,7 @@ public class OrderReprocessor extends OrderReprocessorBase {
     orderIds.forEach(orderId -> retryArchive(orderId.trim()));
     archiveWithLimit(orderIds.getLast());
     processed.add(cachedStatus(orderIds.getFirst()));
-    on(new OrderPlaced(orderIds.getFirst()));
+    on(new OrderPlaced(orderIds.getFirst(), "tenant-1"));
   }
 
   /** 注文を保管する。 */

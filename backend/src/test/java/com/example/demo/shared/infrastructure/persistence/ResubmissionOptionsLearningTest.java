@@ -6,6 +6,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.example.demo.shared.infrastructure.persistence.EventPublicationResubmitterTest.ProbeListener;
 import com.example.demo.shared.infrastructure.persistence.EventPublicationResubmitterTest.ResubmissionProbe;
+import com.example.demo.testkit.AsTenant;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
@@ -228,7 +229,7 @@ class ResubmissionOptionsLearningTest {
     final String id = UUID.randomUUID().toString();
     final AtomicReference<@Nullable UUID> publication = new AtomicReference<>();
     scenario
-        .publish(new ResubmissionProbe(id))
+        .publish(new ResubmissionProbe(id, AsTenant.TENANT))
         .andWaitForStateChange(() ->
             dsl.select(EVENT_PUBLICATION.ID)
                 .from(EVENT_PUBLICATION)

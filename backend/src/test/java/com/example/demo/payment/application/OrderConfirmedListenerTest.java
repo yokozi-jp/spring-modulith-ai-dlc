@@ -18,6 +18,7 @@ import com.example.demo.payment.domain.model.PaymentGateway;
 import com.example.demo.shared.concurrency.ExpectedLockNo;
 import com.example.demo.testkit.AppUsers;
 import com.example.demo.testkit.AsModule;
+import com.example.demo.testkit.AsTenant;
 import com.example.demo.testkit.CapturedLogRecords;
 import com.example.demo.testkit.CleanGeneratedTablesExtension;
 import com.example.demo.testkit.SharedTestConfiguration;
@@ -157,13 +158,24 @@ class OrderConfirmedListenerTest {
   }
 
   @Test
+  @DisplayName("Listener が呼ぶ決済代行の時点で、イベントのテナントが束縛されている")
+  void gatewayIsChargedInEventTenant(final Scenario scenario) {
+    final String orderId = fixture.draftedOrderId();
+    fixture.confirmAndAwait(scenario, orderId, "完了した出版", state -> state.archived() == 1);
+
+    assertThat(gateway.recordedTenants())
+        .as("orderId=%s の請求の時点のテナント", orderId)
+        .containsExactly(AsTenant.TENANT.toString());
+  }
+
+  @Test
   @DisplayName("同じ注文の OrderConfirmed を二度受けても、決済記録は 1 件のままで二度目は請求しない")
   void secondDeliveryDoesNotChargeAgain(final Scenario scenario) {
     final String orderId = fixture.draftedOrderId();
     fixture.confirmAndAwait(scenario, orderId, "1 件目の完了した出版", state -> state.archived() == 1);
 
     OrderConfirmedFixture.await(
-        scenario.publish(new OrderConfirmed(orderId, NOW)),
+        scenario.publish(new OrderConfirmed(orderId, NOW, AsTenant.TENANT)),
         orderId,
         "2 件目の完了した出版",
         () -> fixture.registry(orderId),
@@ -256,7 +268,7 @@ class OrderConfirmedListenerTest {
         () -> cancelOrder.handle(new CancelOrderCommand(orderId, new ExpectedLockNo(1))));
 
     OrderConfirmedFixture.await(
-        scenario.publish(new OrderConfirmed(orderId, NOW)),
+        scenario.publish(new OrderConfirmed(orderId, NOW, AsTenant.TENANT)),
         orderId,
         "完了した出版",
         () -> fixture.registry(orderId),
@@ -285,7 +297,7 @@ class OrderConfirmedListenerTest {
     final String orderId = UUID.randomUUID().toString();
 
     OrderConfirmedFixture.await(
-        scenario.publish(new OrderConfirmed(orderId, NOW)),
+        scenario.publish(new OrderConfirmed(orderId, NOW, AsTenant.TENANT)),
         orderId,
         "FAILED の出版",
         () -> fixture.registry(orderId),
@@ -360,6 +372,9 @@ class OrderConfirmedListenerTest {
     /** 請求の中の trace ID。span がなければ空文字。 */
     private final List<String> traceIds = new CopyOnWriteArrayList<>();
 
+    /** 請求の中で束縛されていたテナント。束縛されていなければ {@code unbound}。 */
+    private final List<String> tenants = new CopyOnWriteArrayList<>();
+
     /** 請求の手前で止める門。開いていれば null。 */
     private final AtomicReference<@Nullable CountDownLatch> gate = new AtomicReference<>();
 
@@ -376,6 +391,7 @@ class OrderConfirmedListenerTest {
     public ChargeOutcome charge(final OrderId orderId, final Money amount) {
       final @Nullable Span span = tracer.currentSpan();
       traceIds.add(span == null ? "" : span.context().traceId());
+      tenants.add(AsTenant.currentOrUnbound());
       final @Nullable CountDownLatch latch = gate.get();
       if (latch != null) {
         waiting.incrementAndGet();
@@ -400,6 +416,7 @@ class OrderConfirmedListenerTest {
       failing.set(false);
       charged.clear();
       traceIds.clear();
+      tenants.clear();
       gate.set(null);
       waiting.set(0);
     }
@@ -429,6 +446,10 @@ class OrderConfirmedListenerTest {
 
     /* package */ List<String> recordedTraceIds() {
       return new ArrayList<>(traceIds);
+    }
+
+    /* package */ List<String> recordedTenants() {
+      return new ArrayList<>(tenants);
     }
   }
 
