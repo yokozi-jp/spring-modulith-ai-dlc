@@ -39,6 +39,9 @@ Spring は、別々の Aspect と `@Transactional` の advisor が同じメソ�
 しかし、テナントを束縛する Aspect（[issue #369](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/369)）は、トランザクションの開始の時点で値が束縛されている必要がある。
 そこで、Aspect とトランザクションの順序の決定を Decision に足した。
 
+1 つのユースケースの中で現在時刻を 1 回だけ読む決定（[ADR-109](ADR-109-read-use-case-time-once.md)）で、`PgmCdAspect` がユースケースの現在時刻も束縛することになった。
+そこで、その束縛を Decision に足した。
+
 ## Decision
 
 `org.springframework.boot:spring-boot-starter-aspectj` を依存に加え、`shared.infrastructure.persistence` に `@Aspect` の `PgmCdAspect` を置く。
@@ -61,6 +64,9 @@ Spring は、別々の Aspect と `@Transactional` の advisor が同じメソ�
     その引き継ぎに頼らない。
   - 起点の利用者は、起点の集約の行の `*_by` と、`*_tx_id` の trace からたどれる。
   起点の利用者を行に残す要件が出たら、利用者をイベントに明示的に載せ、`*_by` とは別の列に書く形で足す。
+
+- `PgmCdAspect` は、一番外の呼び出しでユースケースの現在時刻も束縛し、内側の呼び出しは外側の時刻を引き継ぐ。
+  束縛の規則と理由は [ADR-109](ADR-109-read-use-case-time-once.md) にある。
 
 Aspect は Spring AOP のプロキシで動かし、ロード時やコンパイル時のウィービングは使わない。
 
@@ -134,6 +140,7 @@ Aspect とトランザクションの順序は、次のように明示する。
 
 - [ADR-048: jOOQ の共通処理を共有モジュール shared に置く](ADR-048-add-shared-module-for-jooq-common-code.md)
 - [ADR-050: バックエンドのクラスの役割と命名を定める](ADR-050-define-backend-class-roles-and-naming.md)
+- [ADR-109: ユースケースの現在時刻を 1 回だけ読み、PgmCdAspect が ScopedValue で渡す](ADR-109-read-use-case-time-once.md)
 - [PostgreSQL の共通カラム](../database/postgresql-common-columns.md)
 - [JEP 506: Scoped Values](https://openjdk.org/jeps/506)
 - [Spring Framework, Declaring an Aspect](https://docs.spring.io/spring-framework/reference/core/aop/ataspectj/at-aspectj.html)

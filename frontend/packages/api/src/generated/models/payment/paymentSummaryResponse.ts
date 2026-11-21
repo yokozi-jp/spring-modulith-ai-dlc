@@ -15,7 +15,7 @@ export interface PaymentSummaryResponse {
   orderId: string;
   /** 決済記録の ID */
   paymentId: string;
-  /** 請求の結果を記録した時刻。status が意味を決める */
+  /** 請求の結果を記録した処理の開始時刻。status が意味を決める */
   recordedAt: string;
   /** 請求の結果のコード値（PAID、DECLINED、FAILED） */
   status: string;

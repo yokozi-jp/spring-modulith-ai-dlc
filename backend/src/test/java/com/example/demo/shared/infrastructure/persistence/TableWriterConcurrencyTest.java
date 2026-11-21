@@ -15,10 +15,8 @@ import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.sql.Connection;
 import java.sql.SQLException;
-import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
-import java.time.ZoneOffset;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -63,6 +61,9 @@ class TableWriterConcurrencyTest {
   /** 更新のユースケースとして束縛する pgm_cd。 */
   private static final String PGM_CD = "shared.TableWriterConcurrencyTest";
 
+  /** ユースケースの現在時刻として束縛する時刻。 */
+  private static final Instant NOW = Instant.parse("2026-10-04T01:02:03.123456Z");
+
   /** 現在のスパンの trace ID。 */
   private static final String TRACE_ID = "4bf92f3577b34da6a3ce929d0e0e4736";
 
@@ -89,10 +90,7 @@ class TableWriterConcurrencyTest {
 
   @BeforeEach
   void setUp() {
-    commonColumns =
-        new CommonColumns(
-            Clock.fixed(Instant.parse("2026-10-04T01:02:03.123456Z"), ZoneOffset.UTC),
-            TracerStubs.withTraceId(TRACE_ID));
+    commonColumns = new CommonColumns(TracerStubs.withTraceId(TRACE_ID));
     writer = new TableWriter(dsl, commonColumns);
   }
 
@@ -175,7 +173,7 @@ class TableWriterConcurrencyTest {
 
   /** ユースケースの呼び出しの中で、子の行の書き込みが、原因を持たない LOCK の競合の例外になることを確かめる。 */
   private static void assertChildLockConflict(final Runnable childWrite) {
-    assertThatThrownBy(() -> ScopedValue.where(PgmCdAspect.PGM_CD, PGM_CD).run(childWrite))
+    assertThatThrownBy(() -> runInUseCase(childWrite))
         .isInstanceOf(ConflictException.class)
         .hasMessageContaining("row is locked by another request")
         .hasMessageContaining("table=t_fixture_item_detail")
@@ -210,15 +208,14 @@ class TableWriterConcurrencyTest {
   /** B で子の行を作ってコミットし、その子の行だけを更新してコミットせずに行ロックを持つ。ルートの行はロックしない。 */
   private void lockChildInSessionB(final Connection sessionB) throws SQLException {
     final DSLContext sessionDsl = DSL.using(sessionB, SQLDialect.POSTGRES);
-    ScopedValue.where(PgmCdAspect.PGM_CD, PGM_CD)
-        .run(() ->
-            sessionDsl
-                .insertInto(FIXTURE_ITEM_DETAIL)
-                .set(commonColumns.forInsert(FIXTURE_ITEM_DETAIL))
-                .set(FIXTURE_ITEM_DETAIL.ITEM_ID, ITEM_ID)
-                .set(FIXTURE_ITEM_DETAIL.DETAIL_NO, DETAIL_NO)
-                .set(FIXTURE_ITEM_DETAIL.DETAIL_TEXT, "seed")
-                .execute());
+    runInUseCase(() ->
+        sessionDsl
+            .insertInto(FIXTURE_ITEM_DETAIL)
+            .set(commonColumns.forInsert(FIXTURE_ITEM_DETAIL))
+            .set(FIXTURE_ITEM_DETAIL.ITEM_ID, ITEM_ID)
+            .set(FIXTURE_ITEM_DETAIL.DETAIL_NO, DETAIL_NO)
+            .set(FIXTURE_ITEM_DETAIL.DETAIL_TEXT, "seed")
+            .execute());
     sessionB.commit();
     sessionDsl
         .update(FIXTURE_ITEM_DETAIL)
@@ -231,14 +228,13 @@ class TableWriterConcurrencyTest {
   private Connection openSessionB() throws SQLException {
     final Connection sessionB = dataSource.getConnection();
     sessionB.setAutoCommit(false);
-    ScopedValue.where(PgmCdAspect.PGM_CD, PGM_CD)
-        .run(() ->
-            DSL.using(sessionB, SQLDialect.POSTGRES)
-                .insertInto(FIXTURE_ITEM)
-                .set(commonColumns.forInsert(FIXTURE_ITEM))
-                .set(FIXTURE_ITEM.ITEM_ID, ITEM_ID)
-                .set(FIXTURE_ITEM.ITEM_NAME, "seed")
-                .execute());
+    runInUseCase(() ->
+        DSL.using(sessionB, SQLDialect.POSTGRES)
+            .insertInto(FIXTURE_ITEM)
+            .set(commonColumns.forInsert(FIXTURE_ITEM))
+            .set(FIXTURE_ITEM.ITEM_ID, ITEM_ID)
+            .set(FIXTURE_ITEM.ITEM_NAME, "seed")
+            .execute());
     sessionB.commit();
     return sessionB;
   }
@@ -296,8 +292,8 @@ class TableWriterConcurrencyTest {
                     .set(FIXTURE_ITEM_DETAIL.DETAIL_TEXT, text)));
   }
 
-  /** ユースケースの呼び出しの中として、pgm_cd を束縛して実行する。 */
+  /** ユースケースの呼び出しの中として、pgm_cd と現在時刻を束縛して実行する。 */
   private static void runInUseCase(final Runnable call) {
-    ScopedValue.where(PgmCdAspect.PGM_CD, PGM_CD).run(call);
+    TestCommonColumns.runAs(PGM_CD, NOW, call);
   }
 }

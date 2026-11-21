@@ -2,7 +2,7 @@ openapi: 3.1.0
 info:
   description: Demo アプリケーションの HTTP API
   title: Demo API
-  version: 0.7.0
+  version: 0.7.1
 servers:
 - description: 現在のオリジン
   url: /
@@ -795,7 +795,7 @@ components:
         recordedAt:
           type: string
           format: date-time
-          description: 請求の結果を記録した時刻。status が意味を決める
+          description: 請求の結果を記録した処理の開始時刻。status が意味を決める
           example: 2026-10-06T01:02:03.123456Z
         status:
           type: string

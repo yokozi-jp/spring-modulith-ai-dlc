@@ -11,7 +11,6 @@ import com.example.demo.payment.domain.model.Payment;
 import com.example.demo.payment.domain.model.PaymentRepository;
 import com.example.demo.payment.domain.model.PaymentStatus;
 import com.example.demo.shared.concurrency.ConflictException;
-import com.example.demo.shared.infrastructure.persistence.CommonColumns;
 import com.example.demo.shared.infrastructure.persistence.TableWriter;
 import com.example.demo.shared.infrastructure.persistence.TestCommonColumns;
 import com.example.demo.testkit.DatabaseTest;
@@ -41,7 +40,7 @@ class JooqPaymentRepositoryTest {
   void savesAndFindsByOrderId() {
     final OrderId orderId = new OrderId(UUID.randomUUID());
     final Payment payment = payment(orderId, AMOUNT);
-    TestCommonColumns.runAs(() -> repository().add(payment));
+    TestCommonColumns.runAs(RECORDED_AT, () -> repository().add(payment));
 
     final Payment found =
         repository()
@@ -66,8 +65,9 @@ class JooqPaymentRepositoryTest {
     final GatewayPaymentCode declinedCode = new GatewayPaymentCode("ch_" + declinedOrder.value());
     final PaymentRepository repository = repository();
     TestCommonColumns.runAs(
-        () -> repository.add(payment(failedOrder, AMOUNT, ChargeOutcome.failed())));
+        RECORDED_AT, () -> repository.add(payment(failedOrder, AMOUNT, ChargeOutcome.failed())));
     TestCommonColumns.runAs(
+        RECORDED_AT,
         () -> repository.add(payment(declinedOrder, AMOUNT, ChargeOutcome.declined(declinedCode))));
 
     assertThat(repository.findByOrderId(failedOrder))
@@ -89,10 +89,10 @@ class JooqPaymentRepositoryTest {
   void secondPaymentOfSameOrderBecomesConflict() {
     final OrderId orderId = new OrderId(UUID.randomUUID());
     final PaymentRepository repository = repository();
-    TestCommonColumns.runAs(() -> repository.add(payment(orderId, AMOUNT)));
+    TestCommonColumns.runAs(RECORDED_AT, () -> repository.add(payment(orderId, AMOUNT)));
     final Payment duplicate = payment(orderId, AMOUNT);
 
-    assertThatThrownBy(() -> TestCommonColumns.runAs(() -> repository.add(duplicate)))
+    assertThatThrownBy(() -> TestCommonColumns.runAs(RECORDED_AT, () -> repository.add(duplicate)))
         .isInstanceOfSatisfying(
             ConflictException.class,
             conflict ->
@@ -102,8 +102,7 @@ class JooqPaymentRepositoryTest {
   }
 
   private PaymentRepository repository() {
-    final CommonColumns commonColumns = TestCommonColumns.at(RECORDED_AT);
-    return new JooqPaymentRepository(dsl, new TableWriter(dsl, commonColumns));
+    return new JooqPaymentRepository(dsl, new TableWriter(dsl, TestCommonColumns.create()));
   }
 
   private static Payment payment(final OrderId orderId, final String amount) {

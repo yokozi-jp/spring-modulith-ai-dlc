@@ -16,7 +16,7 @@ import org.jspecify.annotations.Nullable;
  * @param amount 請求した金額
  * @param status 請求の結果のコード値（PAID、DECLINED、FAILED）
  * @param gatewayPaymentCode 決済代行が採番した決済の識別子。採番されなかったときは省く
- * @param recordedAt 請求の結果を記録した時刻。status が意味を決める
+ * @param recordedAt 請求の結果を記録した処理の開始時刻。status が意味を決める
  */
 public record PaymentSummaryResponse(
     @NotNull @Schema(example = "7c1e4b2a-3d5f-4a6b-8c9d-0e1f2a3b4c5d") UUID paymentId,

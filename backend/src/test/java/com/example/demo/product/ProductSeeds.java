@@ -40,6 +40,7 @@ public final class ProductSeeds {
     final List<Seeded> seeded = new ArrayList<>();
     TestCommonColumns.runAs(
         PGM_CD,
+        registeredAt,
         () -> {
           for (int n = 1; n <= COUNT; n++) {
             final String productName = faker.commerce().productName();
@@ -54,8 +55,7 @@ public final class ProductSeeds {
                 productCode,
                 productName,
                 unitPrice,
-                onSale ? "ON_SALE" : "DISCONTINUED",
-                registeredAt);
+                onSale ? "ON_SALE" : "DISCONTINUED");
             seeded.add(new Seeded(productCode, publicId, unitPrice, onSale));
           }
         });

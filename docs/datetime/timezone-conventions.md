@@ -21,6 +21,13 @@ APIは絶対時刻をUTCで返し、フロントエンドが画面の要件に�
 
 - イベント発生日時、作成日時、更新日時には`Instant`を使う。
 - 現在時刻を使うクラスは`Clock`をコンストラクタ引数で受け取り、`Instant.now(clock)`を使う。
+- ユースケース（HTTPの要求で呼ぶCommandHandlerの`handle`、Listenerの1回の配信）の中では、現在時刻を1回だけ読み、その値を業務の時刻と共通カラムの`*_at`に使う。
+  `PgmCdAspect`が、一番外のCommandHandlerの`handle`かListenerのpublicメソッドの呼び出しで`Clock`を1回読み、`shared.time.UseCaseTime`に束縛する。
+  Listenerの中で呼ぶCommandHandlerは、Listenerの値を引き継ぐ。
+  CommandHandlerは`Clock`を受け取らず、`UseCaseTime.now()`で読む（`ordered_at`、イベントの時刻、決済の`recorded_at`）。
+  `CommonColumns`も同じ値を`*_at`に登録し、束縛されていなければ時計を読み直さずに例外にする。
+  経過時間を測る読み取り（失敗したイベント出版の再投入の、時間の予算の判定）はこの規則の対象外であり、`Instant.now(clock)`で読む。
+  この決定は[ADR-109](../adr/ADR-109-read-use-case-time-once.md)を参照する。
 - `Instant`以外の`java.time`型の`now(Clock)`は使わない。
   これらは`Clock`のゾーンで値を決め、注入する`Clock`はUTCなので、日本では0時から9時の間に`LocalDate.now(clock)`が前日を返す。
 - 業務日付や地域の日時を現在時刻から求めるときは、`LocalDate.ofInstant(Instant.now(clock), businessZone)`のように業務タイムゾーンを明示する。
@@ -146,6 +153,7 @@ Javaの`LocalDateTime.atZone()`は、gapでは時刻を後ろへずらし、over
 
 - 通常のバックエンドテストはUTCのJVMで一回だけ実行する。
 - 現在時刻を使うテストには`Clock.fixed(...)`を渡す。
+- ユースケースの中で現在時刻を1回だけ読むことを確かめるテストには、読むたびに進む時計（テストの`AdvancingClock`）を渡す。
 - JSONの絶対時刻は`Z`付き文字列との完全一致で検証する。
 - DB統合テストは`SHOW TIME ZONE`と`Instant`の保存往復を検証する。
 - テストデータの`Instant`は、保持精度のマイクロ秒に合わせ、ナノ秒に依存させない。
@@ -164,6 +172,8 @@ Javaの`LocalDateTime.atZone()`は、gapでは時刻を後ろへずらし、over
   - `Clock`を受け取らない`now(...)`（引数なし、または`ZoneId`だけを受け取るもの）、`System.currentTimeMillis()`、`ZoneId.systemDefault()`による時刻取得を検出する。
   - `Instant`以外の`java.time`型の`now(Clock)`を検出する。
     違反したクラスは`LocalDate.ofInstant(Instant.now(clock), zone)`のように設定値のゾーンで求める。
+  - `application`の`*CommandHandler`と`*Listener`の`Clock`への依存を検出する（`ClassRoleArchTest.commandHandlersAndListenersDoNotReadClock`）。
+    違反したクラスは`UseCaseTime.now()`でユースケースの現在時刻を読む。
   - システム時刻を直接供給する`Clock`ファクトリは、`com.example.demo.DemoApplication.clock()`以外での使用を検出する。
     `InstantSource.system()`はどこで使っても検出する。
     違反したクラスは`Clock`をコンストラクタ引数で受け取り、`Instant.now(clock)`などへ置き換える。

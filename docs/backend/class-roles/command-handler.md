@@ -50,7 +50,7 @@ CommandHandler は他モジュールから呼ばれない。
   Repository の `update` は、読んだ値と更新の時点の行の値を UPDATE の条件で比べる（[jOOQ の Repository](jooq-repository.md)）。
   この二つの比較で、[PostgreSQL の排他制御](../../database/postgresql-concurrency-control.md)の楽観的ロック（UPDATE の条件で画面などから受け取った `lock_no` を比べる）を満たす。
 - イベントは、保存の後に `ApplicationEventPublisher` の `publishEvent` で発行する。
-- 現在時刻は、コンストラクタで受け取った `Clock` から `Instant.now(clock)` で取る。
+- 現在時刻は `Clock` から読まず、`shared.time.UseCaseTime.now()` で、ユースケースの現在時刻を読む（[日時とタイムゾーンの規約](../../datetime/timezone-conventions.md)の「バックエンド」）。
 - 別の CommandHandler を呼ばない。
   後続の処理はイベントを発行し、受信側の Listener に任せる。
 - 他モジュールの情報は相手の[参照のインタフェース](feature-queries.md)で読み、Domain の型に直して集約と Domain Service に渡す。
@@ -96,17 +96,11 @@ public class CancelOrderCommandHandler {
   /** イベントを発行する。 */
   private final ApplicationEventPublisher events;
 
-  /** 取消時刻を取る時計。 */
-  private final Clock clock;
-
   /** 依存を受け取る。 */
   public CancelOrderCommandHandler(
-      final OrderRepository orderRepository,
-      final ApplicationEventPublisher events,
-      final Clock clock) {
+      final OrderRepository orderRepository, final ApplicationEventPublisher events) {
     this.orderRepository = orderRepository;
     this.events = events;
-    this.clock = clock;
   }
 
   /** ロック番号を確かめて注文を取り消して保存し、取消のイベントを発行する。 */
@@ -120,14 +114,14 @@ public class CancelOrderCommandHandler {
     order.ensureLockNo(command.expectedLockNo());
     order.cancel();
     orderRepository.update(order);
-    events.publishEvent(new OrderCancelled(order.id().value().toString(), Instant.now(clock)));
+    events.publishEvent(new OrderCancelled(order.id().value().toString(), UseCaseTime.now()));
     return new CancelOrderResult(order.id().value().toString());
   }
 }
 ```
 
 典型的な例は、注文を受け付ける `PlaceOrderCommandHandler` の `handle` である（抜粋）。
-依存は `orderRepository`、`orderLimitPolicy`、`discountPolicy`、`customerQueries`、`productQueries`、`events`、`clock` の七つである。
+依存は `orderRepository`、`orderLimitPolicy`、`discountPolicy`、`customerQueries`、`productQueries`、`events` の六つである。
 
 ```java
 /** 上限を確かめて注文を受け付け、会員ランクの割引を適用して保存し、受付のイベントを発行する。 */
@@ -136,7 +130,7 @@ public PlaceOrderResult handle(final PlaceOrderCommand command) {
   final CustomerId customerId = new CustomerId(command.customerId());
   orderLimitPolicy.ensureCanPlace(customerId);
   final Order order =
-      Order.place(orderRepository.nextId(), customerId, toOrderLines(command.lines()), Instant.now(clock));
+      Order.place(orderRepository.nextId(), customerId, toOrderLines(command.lines()), UseCaseTime.now());
   final CustomerMembership membership =
       customerQueries
           .findMembership(command.customerId())
@@ -186,7 +180,8 @@ private List<OrderLine> toOrderLines(final List<PlaceOrderCommand.Line> commandL
 order.ensureLockNo(command.expectedLockNo());
 order.confirm();
 orderRepository.update(order);
-events.publishEvent(new OrderConfirmed(order.id().value().toString(), Instant.now(clock)));
+events.publishEvent(
+    new OrderConfirmed(order.id().value().toString(), UseCaseTime.now(), TenantContext.current()));
 return new ConfirmOrderResult(order.id().value().toString());
 ```
 
@@ -299,7 +294,7 @@ class CancelOrderCommandHandlerTest {
 - [ ] 外部システムのインタフェースに依存するのは CommandHandler と Client だけにする。［ArchUnit で検査：ClassRoleArchTest.externalSystemInterfacesAreUsedOnlyByCommandHandlersAndClients］
 - [ ] 外部システムのインタフェースに依存する CommandHandler は、イベントを受けた `application` の Listener からだけ呼び、画面から呼ばれる CommandHandler は外部システムを呼ばない。［ArchUnit で検査：ClassRoleArchTest.externalSystemCommandHandlersAreDependedOnlyByListeners］
 - [ ] 外部システムを呼ぶ CommandHandler は、集約がその操作を終えていれば何もせずに Result を返し、外部システムに冪等性キーを渡す。［自分で点検］
-- [ ] 現在時刻は `Instant.now(clock)` で取る。［自分で点検］
+- [ ] 現在時刻は `UseCaseTime.now()` で読み、`Clock` に依存しない。［ArchUnit で検査：ClassRoleArchTest.commandHandlersAndListenersDoNotReadClock］
 - [ ] 業務上の失敗は[業務上の失敗の例外](business-exception.md)の型で投げる。［ArchUnit で検査：GeneralCodingRulesArchTest.noSuchElementExceptionIsNotThrown］
 - [ ] クラス、フィールド、コンストラクタ、`handle` に Javadoc を書く。［自分で点検］
 - [ ] `@ApplicationModuleTest` と `Scenario` のテストを書く。［自分で点検］

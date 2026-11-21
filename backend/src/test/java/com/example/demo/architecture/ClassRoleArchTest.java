@@ -28,6 +28,7 @@ import com.tngtech.archunit.lang.ArchCondition;
 import com.tngtech.archunit.lang.ArchRule;
 import com.tngtech.archunit.lang.ConditionEvents;
 import com.tngtech.archunit.lang.SimpleConditionEvent;
+import java.time.Clock;
 import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -185,6 +186,23 @@ class ClassRoleArchTest {
                   + "直し方：共通の業務規則は集約か Domain Service へ移し、"
                   + "後続の処理はイベントを発行して Listener から別の CommandHandler を呼ぶ。"
                   + conventions(COMMAND_HANDLER_DOC, ADR_050));
+
+  /** CommandHandler と Listener は {@code Clock} に依存せず、ユースケースの現在時刻を {@code UseCaseTime} で読む。 */
+  @ArchTest
+  /* package */ static final ArchRule commandHandlersAndListenersDoNotReadClock =
+      noClasses()
+          .that(APPLICATION_COMMAND_HANDLER.or(APPLICATION_LISTENER))
+          .should()
+          .dependOnClassesThat(type(Clock.class))
+          .allowEmptyShould(true)
+          .because(
+              "ユースケースの中で時計を読み直すと、業務の時刻と共通カラムの *_at が食い違うため。"
+                  + "Clock.fixed のテストでは同じ値になり、食い違いが見えない。"
+                  + "直し方：Clock を受け取らず、shared.time.UseCaseTime.now() で、"
+                  + "PgmCdAspect が一番外のユースケースで 1 回だけ読んだ時刻を読む。"
+                  + conventions(
+                      "docs/datetime/timezone-conventions.md",
+                      "docs/adr/ADR-109-read-use-case-time-once.md"));
 
   /** 外部システムのインタフェースに依存する CommandHandler は、application の Listener からだけ依存される。 */
   @ArchTest

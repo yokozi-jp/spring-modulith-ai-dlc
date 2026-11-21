@@ -11,6 +11,8 @@ tags: [adr, datetime, timezone, backend]
 
 Accepted
 
+Amended by [ADR-109](ADR-109-read-use-case-time-once.md)：1 つのユースケースの中では現在時刻を 1 回だけ読み、CommandHandler は `Clock` を受け取らずに `UseCaseTime.now()` で読むこと。
+
 ## Date
 
 2026-09-11
@@ -72,3 +74,4 @@ Accepted
 - `backend/build.gradle`（Error Prone 設定）
 - [ADR-044: 絶対時刻の保持精度をマイクロ秒にそろえる](ADR-044-store-absolute-time-at-microsecond-precision.md)
 - [ADR-046: 業務日付と地域の日時を設定値の業務タイムゾーンで明示して求める](ADR-046-derive-local-dates-with-configured-business-zone.md)：ゾーンに依存する型では、「`now(Clock)` で取得する」を `Instant.now(clock)` に狭める。
+- [ADR-109: ユースケースの現在時刻を 1 回だけ読み、PgmCdAspect が ScopedValue で渡す](ADR-109-read-use-case-time-once.md)：1 つのユースケースの中では、現在時刻を 1 回だけ読む。

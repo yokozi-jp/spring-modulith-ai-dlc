@@ -4,8 +4,7 @@ import com.example.demo.ordering.domain.model.Order;
 import com.example.demo.ordering.domain.model.OrderRepository;
 import com.example.demo.ordering.domain.model.OrderedItem;
 import com.example.demo.product.ProductQueries;
-import java.time.Clock;
-import java.time.Instant;
+import com.example.demo.shared.time.UseCaseTime;
 import java.util.List;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -20,17 +19,11 @@ public class DraftOrderCommandHandler {
   /** 明細の商品の単価と販売の状態を読む。 */
   private final ProductQueries productQueries;
 
-  /** 作成した時刻を取る時計。 */
-  private final Clock clock;
-
   /** 依存を受け取る。 */
   public DraftOrderCommandHandler(
-      final OrderRepository orderRepository,
-      final ProductQueries productQueries,
-      final Clock clock) {
+      final OrderRepository orderRepository, final ProductQueries productQueries) {
     this.orderRepository = orderRepository;
     this.productQueries = productQueries;
-    this.clock = clock;
   }
 
   /** 明細の商品を読んで下書きの注文を作り、保存する。 */
@@ -45,7 +38,7 @@ public class DraftOrderCommandHandler {
             command.customerOrderCode(),
             items,
             OrderedItems.offers(productQueries, items),
-            Instant.now(clock));
+            UseCaseTime.now());
     orderRepository.add(order);
     return new DraftOrderResult(order.id().value().toString());
   }

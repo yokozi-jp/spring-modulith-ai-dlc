@@ -74,7 +74,7 @@ tags: [convention, backend, class-role]
 ## 依存してよい型、してはいけない型
 
 - **依存してよい型**：`java..` の標準型、`org.jspecify..`、同じ `domain.model` の Entity、値オブジェクト、enum、`shared.concurrency` の `ConflictException` と `ExpectedLockNo`、`shared.failure` の `BusinessRuleViolationException` と `NotFoundException`。
-- **依存してはいけない型**：Spring、jOOQ、jOOQ の生成型、JPA、Jackson の型、`domain.service`、`application`、モジュールルートの型、他モジュールの型、Repository と外部システムのインタフェース、`Clock`。
+- **依存してはいけない型**：Spring、jOOQ、jOOQ の生成型、JPA、Jackson の型、`domain.service`、`application`、モジュールルートの型、他モジュールの型、Repository と外部システムのインタフェース、`Clock`、`UseCaseTime`。
 
 ## 最小の例と典型的な例
 
@@ -267,7 +267,7 @@ class OrderTest {
   不変条件の検査を通らずに状態が変わる。
 - 状態遷移の判定を CommandHandler に書き、集約をデータの入れ物にする。
   [ドメインモデル貧血症](https://www.martinfowler.com/bliki/AnemicDomainModel.html)になり、同じ判定がユースケースごとに重複する。
-- 集約の中で Repository、`Clock`、引数なしの `Instant.now()` を使う。
+- 集約の中で Repository、`Clock`、`UseCaseTime`、引数なしの `Instant.now()` を使う。
 - 他の集約（`Customer`）をフィールドで持ち、一つの操作で二つの集約を変える。
 - `lockNo` を業務の判定に使う、または状態を変える操作で `lockNo` を書き換える。
   `lock_no` を進めるのは Repository の実装の `update` だけである。

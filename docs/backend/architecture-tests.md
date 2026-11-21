@@ -87,6 +87,7 @@ jOOQの生成物の`com.example.demo.jooq`はOPENのモジュールであり、`
 - `commandHandlersExposeOnlyTransactionalHandle`：`*CommandHandler`のpublicメソッドは、`@Transactional`を付けた`handle`一つだけにし、`*Command`を一つ受け取り`*Result`を返す。
 - `commandsAndResultsAreApplicationRecords`：`*Command`と`*Result`は`application`のrecordにする。
 - `commandHandlersDoNotDependOnOtherCommandHandlers`：`*CommandHandler`は別の`*CommandHandler`に依存しない。
+- `commandHandlersAndListenersDoNotReadClock`：`application`の`*CommandHandler`と`*Listener`は`Clock`に依存せず、ユースケースの現在時刻を`UseCaseTime.now()`で読む（[ADR-109](../adr/ADR-109-read-use-case-time-once.md)）。
 - `externalSystemCommandHandlersAreDependedOnlyByListeners`：外部システムのインタフェースに直接依存する`application`の`*CommandHandler`は、`application`の`*Listener`からだけ依存される。
   外部システムのインタフェースは、`domain.model`のinterfaceのうち、Repository、アノテーション、`package-info`でないものとする。
   守らせる規約は[CommandHandler](class-roles/command-handler.md)のアンチパターンに示し、理由は[ADR-050](../adr/ADR-050-define-backend-class-roles-and-naming.md)に示す。

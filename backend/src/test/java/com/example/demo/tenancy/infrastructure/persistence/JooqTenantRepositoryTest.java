@@ -70,7 +70,7 @@ class JooqTenantRepositoryTest {
     tenant.changeRole(userId(second), Role.ADMIN);
     tenant.removeMember(userId(third));
 
-    TestCommonColumns.runAs(() -> repository().update(tenant));
+    TestCommonColumns.runAs(UPDATED_AT, () -> repository().update(tenant));
 
     final Tenant saved = find(tenantId);
     assertThat(saved.members())
@@ -101,7 +101,7 @@ class JooqTenantRepositoryTest {
                 new TenantMember(userId(UUID.randomUUID().toString()), Role.MEMBER)),
             1L);
 
-    assertThatThrownBy(() -> TestCommonColumns.runAs(() -> repository().update(tenant)))
+    assertThatThrownBy(() -> TestCommonColumns.runAs(UPDATED_AT, () -> repository().update(tenant)))
         .isInstanceOf(IllegalStateException.class)
         .hasMessageContaining("tenant member user not found");
 
@@ -120,7 +120,7 @@ class JooqTenantRepositoryTest {
     final Tenant tenant = find(tenantId);
     tenant.removeMember(userId(both));
 
-    TestCommonColumns.runAs(() -> repository().update(tenant));
+    TestCommonColumns.runAs(UPDATED_AT, () -> repository().update(tenant));
 
     assertThat(find(tenantId).members())
         .extracting(TenantMember::userId)
@@ -139,10 +139,10 @@ class JooqTenantRepositoryTest {
     final Tenant stale = find(tenantId);
     final Tenant winner = find(tenantId);
     winner.changeRole(userId(member), Role.ADMIN);
-    TestCommonColumns.runAs(() -> repository().update(winner));
+    TestCommonColumns.runAs(UPDATED_AT, () -> repository().update(winner));
     stale.removeMember(userId(member));
 
-    assertThatThrownBy(() -> TestCommonColumns.runAs(() -> repository().update(stale)))
+    assertThatThrownBy(() -> TestCommonColumns.runAs(UPDATED_AT, () -> repository().update(stale)))
         .isInstanceOfSatisfying(
             ConflictException.class,
             conflict ->
@@ -185,7 +185,7 @@ class JooqTenantRepositoryTest {
   }
 
   private TenantRepository repository() {
-    return new JooqTenantRepository(dsl, new TableWriter(dsl, TestCommonColumns.at(UPDATED_AT)));
+    return new JooqTenantRepository(dsl, new TableWriter(dsl, TestCommonColumns.create()));
   }
 
   private static UserId userId(final String userId) {

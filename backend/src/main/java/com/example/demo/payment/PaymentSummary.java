@@ -12,7 +12,7 @@ import org.jspecify.annotations.Nullable;
  * @param amount 請求した金額
  * @param status 請求の結果（{@code PAID}、{@code DECLINED}、{@code FAILED}）
  * @param gatewayPaymentCode 決済代行が採番した決済の識別子。採番されなかったときは null
- * @param recordedAt 請求の結果を記録した時刻
+ * @param recordedAt 請求の結果を記録した処理の開始時刻
  */
 public record PaymentSummary(
     String paymentId,

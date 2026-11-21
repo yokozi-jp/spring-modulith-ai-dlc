@@ -6,8 +6,7 @@ import com.example.demo.ordering.domain.model.OrderId;
 import com.example.demo.ordering.domain.model.OrderRepository;
 import com.example.demo.shared.failure.NotFoundException;
 import com.example.demo.shared.tenant.TenantContext;
-import java.time.Clock;
-import java.time.Instant;
+import com.example.demo.shared.time.UseCaseTime;
 import java.util.UUID;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
@@ -23,17 +22,11 @@ public class ConfirmOrderCommandHandler {
   /** イベントを発行する。 */
   private final ApplicationEventPublisher events;
 
-  /** 確定した時刻を取る時計。 */
-  private final Clock clock;
-
   /** 依存を受け取る。 */
   public ConfirmOrderCommandHandler(
-      final OrderRepository orderRepository,
-      final ApplicationEventPublisher events,
-      final Clock clock) {
+      final OrderRepository orderRepository, final ApplicationEventPublisher events) {
     this.orderRepository = orderRepository;
     this.events = events;
-    this.clock = clock;
   }
 
   /** ロック番号を確かめて注文を確定して保存し、確定のイベントを発行する。 */
@@ -49,7 +42,7 @@ public class ConfirmOrderCommandHandler {
     orderRepository.update(order);
     events.publishEvent(
         new OrderConfirmed(
-            order.id().value().toString(), Instant.now(clock), TenantContext.current()));
+            order.id().value().toString(), UseCaseTime.now(), TenantContext.current()));
     return new ConfirmOrderResult(order.id().value().toString());
   }
 }

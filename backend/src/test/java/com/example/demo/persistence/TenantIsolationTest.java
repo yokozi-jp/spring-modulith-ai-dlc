@@ -189,15 +189,17 @@ class TenantIsolationTest {
                   dsl,
                   ORDERING_MODULE,
                   tx ->
-                      TestCommonColumns.runAs(() ->
-                          tx.insertInto(T_ORDER_LINE)
-                              .set(T_ORDER_LINE.ORDER_ID, otherOrder)
-                              .set(T_ORDER_LINE.LINE_NO, 99)
-                              .set(T_ORDER_LINE.PRODUCT_PUBLIC_ID, UUID.randomUUID())
-                              .set(T_ORDER_LINE.ORDERED_COUNT, 1)
-                              .set(T_ORDER_LINE.ORDERED_UNIT_PRICE_JPY, BigDecimal.TEN)
-                              .set(TestCommonColumns.at(SEEDED_AT).forInsert(T_ORDER_LINE))
-                              .execute())),
+                      TestCommonColumns.runAs(
+                          SEEDED_AT,
+                          () ->
+                              tx.insertInto(T_ORDER_LINE)
+                                  .set(T_ORDER_LINE.ORDER_ID, otherOrder)
+                                  .set(T_ORDER_LINE.LINE_NO, 99)
+                                  .set(T_ORDER_LINE.PRODUCT_PUBLIC_ID, UUID.randomUUID())
+                                  .set(T_ORDER_LINE.ORDERED_COUNT, 1)
+                                  .set(T_ORDER_LINE.ORDERED_UNIT_PRICE_JPY, BigDecimal.TEN)
+                                  .set(TestCommonColumns.create().forInsert(T_ORDER_LINE))
+                                  .execute())),
           FOREIGN_KEY_VIOLATION);
     }
   }
@@ -213,16 +215,18 @@ class TenantIsolationTest {
                 dsl,
                 PRODUCT_MODULE,
                 tx ->
-                    TestCommonColumns.runAs(() ->
-                        tx.insertInto(M_PRODUCT)
-                            .set(M_PRODUCT.TENANT_PUBLIC_ID, OTHER.value())
-                            .set(M_PRODUCT.PUBLIC_ID, UUID.randomUUID())
-                            .set(M_PRODUCT.PRODUCT_CODE, "TENANT-OTHER")
-                            .set(M_PRODUCT.PRODUCT_NAME, "other")
-                            .set(M_PRODUCT.UNIT_PRICE_JPY, BigDecimal.TEN)
-                            .set(M_PRODUCT.SALES_STATUS_TYP, "ON_SALE")
-                            .set(TestCommonColumns.at(SEEDED_AT).forInsert(M_PRODUCT))
-                            .execute())),
+                    TestCommonColumns.runAs(
+                        SEEDED_AT,
+                        () ->
+                            tx.insertInto(M_PRODUCT)
+                                .set(M_PRODUCT.TENANT_PUBLIC_ID, OTHER.value())
+                                .set(M_PRODUCT.PUBLIC_ID, UUID.randomUUID())
+                                .set(M_PRODUCT.PRODUCT_CODE, "TENANT-OTHER")
+                                .set(M_PRODUCT.PRODUCT_NAME, "other")
+                                .set(M_PRODUCT.UNIT_PRICE_JPY, BigDecimal.TEN)
+                                .set(M_PRODUCT.SALES_STATUS_TYP, "ON_SALE")
+                                .set(TestCommonColumns.create().forInsert(M_PRODUCT))
+                                .execute())),
         POLICY_VIOLATION);
     assertSqlState(
         () ->
@@ -341,15 +345,16 @@ class TenantIsolationTest {
       try {
         for (final TenantId tenant : List.of(AsTenant.TENANT, OTHER)) {
           ModuleRoleTransactionManager.setLocal(connection, null, tenant.toString());
-          TestCommonColumns.runAs(() ->
-              TestProducts.insert(
-                  owner,
-                  UUID.randomUUID(),
-                  "OWNER-" + tenant.value().toString().substring(0, 8),
-                  "owner",
-                  BigDecimal.TEN,
-                  "ON_SALE",
-                  SEEDED_AT));
+          TestCommonColumns.runAs(
+              SEEDED_AT,
+              () ->
+                  TestProducts.insert(
+                      owner,
+                      UUID.randomUUID(),
+                      "OWNER-" + tenant.value().toString().substring(0, 8),
+                      "owner",
+                      BigDecimal.TEN,
+                      "ON_SALE"));
         }
         ModuleRoleTransactionManager.setLocal(connection, null, OTHER.toString());
 

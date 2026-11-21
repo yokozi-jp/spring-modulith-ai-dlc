@@ -31,9 +31,10 @@ class TestCommonColumnsTest {
   @Test
   @DisplayName("runAs の中では、固定の時刻、trace ID、pgm_cd で共通カラムを登録できる")
   void insertsCommonColumnsInsideRunAs() {
-    final CommonColumns commonColumns = TestCommonColumns.at(NOW);
+    final CommonColumns commonColumns = TestCommonColumns.create();
 
     TestCommonColumns.runAs(
+        NOW,
         () ->
             dsl.insertInto(FIXTURE_ITEM)
                 .set(commonColumns.forInsert(FIXTURE_ITEM))
@@ -58,7 +59,7 @@ class TestCommonColumnsTest {
   @Test
   @DisplayName("runAs の外では pgm_cd が束縛されず、共通カラムを組み立てられない")
   void rejectsOutsideRunAs() {
-    final CommonColumns commonColumns = TestCommonColumns.at(NOW);
+    final CommonColumns commonColumns = TestCommonColumns.create();
 
     assertThatThrownBy(() -> commonColumns.forInsert(FIXTURE_ITEM))
         .isInstanceOf(IllegalStateException.class)

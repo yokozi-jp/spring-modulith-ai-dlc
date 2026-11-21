@@ -6,7 +6,6 @@ import com.example.demo.ordering.domain.model.OrderLine;
 import com.example.demo.ordering.domain.model.OrderStatus;
 import com.example.demo.ordering.domain.model.ProductOffer;
 import com.example.demo.ordering.domain.model.Quantity;
-import com.example.demo.shared.infrastructure.persistence.CommonColumns;
 import com.example.demo.shared.infrastructure.persistence.TableWriter;
 import com.example.demo.shared.infrastructure.persistence.TestCommonColumns;
 import java.time.Duration;
@@ -53,17 +52,13 @@ public final class OrderSeeds {
     final ProductOffer p03 = offers.get(2);
     final ProductOffer p04 = offers.get(3);
     final List<Order> orders = new ArrayList<>();
-    TestCommonColumns.runAs(
-        PGM_CD,
-        () -> {
-          orders.add(add(dsl, ids, base, 1, OrderStatus.DRAFT, line(p01, 1), line(p02, 2)));
-          orders.add(add(dsl, ids, base, 2, OrderStatus.DRAFT, line(p03, 1)));
-          orders.add(add(dsl, ids, base, 3, OrderStatus.CONFIRMED, line(p01, 2), line(p04, 1)));
-          orders.add(add(dsl, ids, base, 4, OrderStatus.CANCELLED, line(p02, 1)));
-          // C05 と C06 は C04 の後に引き、C01〜C04 の ID を変えない。
-          orders.add(add(dsl, ids, base, 5, OrderStatus.CONFIRMED, line(p03, 2)));
-          orders.add(add(dsl, ids, base, 6, OrderStatus.CONFIRMED, line(p04, 1), line(p03, 1)));
-        });
+    orders.add(add(dsl, ids, base, 1, OrderStatus.DRAFT, line(p01, 1), line(p02, 2)));
+    orders.add(add(dsl, ids, base, 2, OrderStatus.DRAFT, line(p03, 1)));
+    orders.add(add(dsl, ids, base, 3, OrderStatus.CONFIRMED, line(p01, 2), line(p04, 1)));
+    orders.add(add(dsl, ids, base, 4, OrderStatus.CANCELLED, line(p02, 1)));
+    // C05 と C06 は C04 の後に引き、C01〜C04 の ID を変えない。
+    orders.add(add(dsl, ids, base, 5, OrderStatus.CONFIRMED, line(p03, 2)));
+    orders.add(add(dsl, ids, base, 6, OrderStatus.CONFIRMED, line(p04, 1), line(p03, 1)));
     return new Confirmed(orders.get(2), orders.get(4));
   }
 
@@ -88,9 +83,13 @@ public final class OrderSeeds {
     final Order order =
         Order.restore(
             new OrderId(ids.get()), "SEED-C0" + number, status, orderLines, orderedAt, 1L);
-    // JooqOrderRepository は CommonColumns の Clock から時刻を取るので、注文ごとに作る。
-    final CommonColumns commonColumns = TestCommonColumns.at(orderedAt);
-    new JooqOrderRepository(dsl, new TableWriter(dsl, commonColumns)).add(order);
+    // 共通カラムの時刻を ordered_at とそろえるため、注文ごとに束縛する。
+    TestCommonColumns.runAs(
+        PGM_CD,
+        orderedAt,
+        () ->
+            new JooqOrderRepository(dsl, new TableWriter(dsl, TestCommonColumns.create()))
+                .add(order));
     return order;
   }
 

@@ -160,16 +160,18 @@ class PaymentApiTest {
         dsl,
         "payment",
         tx ->
-            TestCommonColumns.runAs(() ->
-                tx.insertInto(T_PAYMENT)
-                    .set(T_PAYMENT.PUBLIC_ID, paymentId)
-                    .set(T_PAYMENT.ORDER_PUBLIC_ID, orderId)
-                    .set(T_PAYMENT.CHARGED_AMOUNT_JPY, new BigDecimal("240.00"))
-                    .set(T_PAYMENT.PAYMENT_STATUS_TYP, status)
-                    .set(T_PAYMENT.GATEWAY_PAYMENT_CODE, code)
-                    .set(T_PAYMENT.RECORDED_AT, RECORDED_AT)
-                    .set(TestCommonColumns.at(RECORDED_AT).forInsert(T_PAYMENT))
-                    .execute()));
+            TestCommonColumns.runAs(
+                RECORDED_AT,
+                () ->
+                    tx.insertInto(T_PAYMENT)
+                        .set(T_PAYMENT.PUBLIC_ID, paymentId)
+                        .set(T_PAYMENT.ORDER_PUBLIC_ID, orderId)
+                        .set(T_PAYMENT.CHARGED_AMOUNT_JPY, new BigDecimal("240.00"))
+                        .set(T_PAYMENT.PAYMENT_STATUS_TYP, status)
+                        .set(T_PAYMENT.GATEWAY_PAYMENT_CODE, code)
+                        .set(T_PAYMENT.RECORDED_AT, RECORDED_AT)
+                        .set(TestCommonColumns.create().forInsert(T_PAYMENT))
+                        .execute()));
     return paymentId;
   }
 }

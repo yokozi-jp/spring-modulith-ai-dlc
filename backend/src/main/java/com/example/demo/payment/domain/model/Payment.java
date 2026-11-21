@@ -30,7 +30,7 @@ public final class Payment implements Versioned {
   /** 決済代行が採番した決済の識別子。採番されなかったときは null。 */
   private final @Nullable GatewayPaymentCode gatewayPaymentCode;
 
-  /** 請求の結果を記録した時刻。 */
+  /** 請求の結果を記録した処理の開始時刻。 */
   private final Instant recordedAt;
 
   /** 楽観的ロックのロック番号。 */
@@ -58,7 +58,7 @@ public final class Payment implements Versioned {
    * @param orderId 請求した注文の ID
    * @param amount 請求した金額
    * @param outcome 請求の結果
-   * @param recordedAt 請求の結果を記録した時刻
+   * @param recordedAt 請求の結果を記録した処理の開始時刻
    */
   public static Payment record(
       final OrderId orderId,
@@ -104,7 +104,7 @@ public final class Payment implements Versioned {
     return gatewayPaymentCode;
   }
 
-  /** 請求の結果を記録した時刻を返す。 */
+  /** 請求の結果を記録した処理の開始時刻を返す。 */
   public Instant recordedAt() {
     return recordedAt;
   }

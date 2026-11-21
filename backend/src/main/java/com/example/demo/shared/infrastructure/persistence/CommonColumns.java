@@ -2,9 +2,9 @@ package com.example.demo.shared.infrastructure.persistence;
 
 import com.example.demo.shared.concurrency.Versioned;
 import com.example.demo.shared.security.AppUserPrincipal;
+import com.example.demo.shared.time.UseCaseTime;
 import io.micrometer.tracing.Span;
 import io.micrometer.tracing.Tracer;
-import java.time.Clock;
 import java.time.Instant;
 import java.util.Collections;
 import java.util.LinkedHashMap;
@@ -33,7 +33,8 @@ import org.springframework.stereotype.Component;
  * TableWriter} だけが使い、UPDATE の {@code lock_no} は {@link TableWriter} だけが書く（ADR-054）。
  *
  * <ul>
- *   <li>{@code *_at}：注入した {@link Clock} の現在時刻。
+ *   <li>{@code *_at}：{@link PgmCdAspect} が束縛した、一番外のユースケースの現在時刻（{@link
+ *       UseCaseTime}）。業務の時刻と同じ値になる（ADR-109）。
  *   <li>{@code *_by}：利用者の操作では、ログインのときに {@code tenancy} が引いたアプリの利用者の ID（{@link
  *       AppUserPrincipal#userId()}）。 {@code sub} は登録しない。利用者の操作でない処理と、{@code *Listener} の中の処理では
  *       {@code *_pgm_cd} と同じ値。Listener の中では、伝わった利用者の認証を使わない。
@@ -43,7 +44,8 @@ import org.springframework.stereotype.Component;
  *
  * <p>{@link #forInsert} と {@link #forUpdate} は、共通カラムがない、または型が異なる場合に {@link
  * IllegalArgumentException} を投げる。trace がない場合、{@code *_pgm_cd} が束縛されていない場合、または Listener の外で
- * principal が {@link AppUserPrincipal} でない認証の場合に {@link IllegalStateException} を投げる。
+ * principal が {@link AppUserPrincipal} でない認証の場合に {@link IllegalStateException}
+ * を投げる。現在時刻が束縛されていない場合も {@link IllegalStateException} を投げ、時計を読み直さない。
  */
 @Component
 public class CommonColumns {
@@ -70,15 +72,11 @@ public class CommonColumns {
   /** 更新のカラムを省いてよい、追記だけのワークテーブルの接頭辞。 */
   private static final String WORK_TABLE_PREFIX = "w_";
 
-  /** 共通カラムの {@code *_at} に登録する現在時刻を取る。 */
-  private final Clock clock;
-
   /** 共通カラムの {@code *_tx_id} に登録する trace ID を取る。 */
   private final Tracer tracer;
 
-  /** 現在時刻と trace ID の取得元を受け取る。 */
-  public CommonColumns(final Clock clock, final Tracer tracer) {
-    this.clock = clock;
+  /** trace ID の取得元を受け取る。 */
+  public CommonColumns(final Tracer tracer) {
     this.tracer = tracer;
   }
 
@@ -151,11 +149,11 @@ public class CommonColumns {
     return typed;
   }
 
-  /** 1 回の呼び出しで、現在時刻と trace ID を 1 回だけ取る。 */
+  /** 1 回の呼び出しで、trace ID を 1 回だけ取る。 */
   private AuditValues audit() {
     final String pgmCd = PgmCdAspect.current();
     final String operator = PgmCdAspect.inListener() ? pgmCd : operator(pgmCd);
-    return new AuditValues(Instant.now(clock), operator, pgmCd, traceId());
+    return new AuditValues(UseCaseTime.now(), operator, pgmCd, traceId());
   }
 
   /** SQL を決定的にするため、カラムの順序を保った変更できない Map にする。 */

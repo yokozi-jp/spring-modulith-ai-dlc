@@ -92,7 +92,7 @@ public record GatewayPaymentCode(String value) {
 // com.example.demo.payment.application.ChargeOrderCommandHandler（抜粋）
 final Money amount = new Money(details.totalAmount());
 final ChargeOutcome outcome = paymentGateway.charge(orderId, amount);
-final Payment payment = Payment.record(orderId, amount, outcome, Instant.now(clock));
+final Payment payment = Payment.record(orderId, amount, outcome, UseCaseTime.now());
 paymentRepository.add(payment);
 ```
 

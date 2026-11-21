@@ -1,5 +1,7 @@
 package com.example.demo.shared.infrastructure.persistence;
 
+import com.example.demo.shared.time.UseCaseTime;
+import java.time.Clock;
 import org.aspectj.lang.ProceedingJoinPoint;
 import org.aspectj.lang.annotation.Around;
 import org.aspectj.lang.annotation.Aspect;
@@ -17,6 +19,8 @@ import org.springframework.stereotype.Component;
  *
  * <p>{@code *Listener} の呼び出しの間は、内側の CommandHandler の呼び出しも含めて、Listener の中であることも束縛する。{@link
  * CommonColumns} は、Listener の中の書き込みの {@code *_by} に、起点の利用者でなく {@code *_pgm_cd} と同じ値を登録する。
+ *
+ * <p>一番外のユースケースの呼び出しでは、時計を 1 回だけ読んで {@link UseCaseTime} に束縛する（ADR-109）。内側の呼び出しは外側の時刻を引き継ぐ。
  *
  * <p>トランザクションの advisor（Spring の既定の {@link Ordered#LOWEST_PRECEDENCE}）より外側で動き、トランザクションの開始から commit と
  * rollback、その前後のコールバックまで値を束縛済みにする。
@@ -38,8 +42,16 @@ public class PgmCdAspect {
   /** 呼び出し中のユースケースが、{@code *Listener} の呼び出しの中にあるか。 */
   private static final ScopedValue<Boolean> IN_LISTENER = ScopedValue.newInstance();
 
+  /** 一番外のユースケースの現在時刻を読む時計。 */
+  private final Clock clock;
+
+  /** 現在時刻を読む時計を受け取る。 */
+  public PgmCdAspect(final Clock clock) {
+    this.clock = clock;
+  }
+
   /**
-   * 呼び出し中のユースケースの {@code *_pgm_cd} を、呼び出しの間だけ束縛する。
+   * 呼び出し中のユースケースの {@code *_pgm_cd} と、一番外のユースケースの現在時刻を、呼び出しの間だけ束縛する。
    *
    * <p>対象のクラスは {@code within} の名前で絞る。{@code execution} の宣言型に名前の型パターンを書くと、AspectJ はすべての Bean
    * のすべてのメソッドで上位型をたどって照合し、起動が数倍遅くなる。{@code within} は継承した型を対象にしないため、CommandHandler と Listener の継承を
@@ -50,9 +62,12 @@ public class PgmCdAspect {
           + " || (within(com.example.demo.*..*Listener) && execution(public * *(..)))")
   public @Nullable Object bindPgmCd(final ProceedingJoinPoint joinPoint) throws Throwable {
     final Class<?> useCase = joinPoint.getSignature().getDeclaringType();
-    return ScopedValue.where(PGM_CD, pgmCd(useCase))
-        .where(IN_LISTENER, inListener() || useCase.getSimpleName().endsWith("Listener"))
-        .call(joinPoint::proceed);
+    return UseCaseTime.call(
+        clock,
+        () ->
+            ScopedValue.where(PGM_CD, pgmCd(useCase))
+                .where(IN_LISTENER, inListener() || useCase.getSimpleName().endsWith("Listener"))
+                .call(joinPoint::proceed));
   }
 
   /** 呼び出し中のユースケースが {@code *Listener} の呼び出しの中にあれば true を返す。束縛の外では false を返す。 */

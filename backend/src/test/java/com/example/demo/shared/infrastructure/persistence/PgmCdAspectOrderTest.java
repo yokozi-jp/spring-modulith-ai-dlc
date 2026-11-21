@@ -2,6 +2,9 @@ package com.example.demo.shared.infrastructure.persistence;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.time.Clock;
+import java.time.Instant;
+import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.List;
 import org.jspecify.annotations.Nullable;
@@ -64,6 +67,8 @@ class PgmCdAspectOrderTest {
         .withConfiguration(
             AutoConfigurations.of(AopAutoConfiguration.class, TransactionAutoConfiguration.class))
         .withUserConfiguration(PgmCdAspect.class)
+        .withBean(
+            Clock.class, () -> Clock.fixed(Instant.parse("2026-10-03T00:00:00Z"), ZoneOffset.UTC))
         .withBean(RecordingTransactionManager.class)
         .withBean(ShipOrderCommandHandler.class)
         .withBean(OrderShippedListener.class);

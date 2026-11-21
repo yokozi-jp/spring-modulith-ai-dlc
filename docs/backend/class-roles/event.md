@@ -43,7 +43,7 @@ tags: [convention, backend, class-role]
   発行する CommandHandler は `TenantContext.current()` を詰める。
   `@ApplicationModuleListener` が受けるイベントは `TenantScoped` を実装する必要がある（[ADR-105](../../adr/ADR-105-bind-tenant-to-request-and-event-context.md)）。
 - 集約の識別子と、出来事の時刻（`placedAt`、`cancelledAt`）を持つ。
-  時刻は `Instant` にし、CommandHandler が `Instant.now(clock)` で取った値か、集約が持つ値を入れる。
+  時刻は `Instant` にし、CommandHandler が `UseCaseTime.now()` で読んだユースケースの現在時刻か、集約が持つ値を入れる。
 - 発行は `<UseCase>CommandHandler` の `handle` の中で、`ApplicationEventPublisher.publishEvent` を呼んで行う。
   `handle` は `@Transactional` なので、イベントは業務データの更新と同じトランザクションでイベント出版レジストリに記録される。
 - 受信は `<Event>Listener` の `@ApplicationModuleListener` を付けた `on` メソッドで行う。

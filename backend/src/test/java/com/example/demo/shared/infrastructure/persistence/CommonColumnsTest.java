@@ -5,6 +5,7 @@ import static com.example.demo.jooq.tables.FixtureWorkLogTable.FIXTURE_WORK_LOG;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import com.example.demo.shared.time.UseCaseTime;
 import com.example.demo.testkit.AppUsers;
 import java.time.Clock;
 import java.time.Instant;
@@ -37,7 +38,7 @@ class CommonColumnsTest {
   /** 固定した現在時刻。 */
   private static final Instant NOW = Instant.parse("2026-10-03T01:02:03.123456Z");
 
-  /** 固定した現在時刻を返す Clock。 */
+  /** ユースケースの現在時刻として束縛する、固定した時刻を返す Clock。 */
   private static final Clock CLOCK = Clock.fixed(NOW, ZoneOffset.UTC);
 
   /** 現在のスパンの trace ID。 */
@@ -47,8 +48,7 @@ class CommonColumnsTest {
   private static final String PGM_CD = "ordering.PlaceOrder";
 
   /** 現在のスパンを持つ、検証対象の共通処理。 */
-  private final CommonColumns commonColumns =
-      new CommonColumns(CLOCK, TracerStubs.withTraceId(TRACE_ID));
+  private final CommonColumns commonColumns = new CommonColumns(TracerStubs.withTraceId(TRACE_ID));
 
   @AfterEach
   void clearSecurityContext() {
@@ -143,9 +143,9 @@ class CommonColumnsTest {
   @Test
   @DisplayName("現在のスパンがない、または trace ID がすべて 0 なら、登録を失敗させる")
   void missingTraceIsRejected() {
-    final CommonColumns withoutSpan = new CommonColumns(CLOCK, TracerStubs.withoutSpan());
+    final CommonColumns withoutSpan = new CommonColumns(TracerStubs.withoutSpan());
     final CommonColumns invalidTrace =
-        new CommonColumns(CLOCK, TracerStubs.withTraceId("00000000000000000000000000000000"));
+        new CommonColumns(TracerStubs.withTraceId("00000000000000000000000000000000"));
 
     assertThatThrownBy(() -> inUseCase(() -> withoutSpan.forInsert(FIXTURE_ITEM)))
         .as("スパンがない")
@@ -212,6 +212,16 @@ class CommonColumnsTest {
   }
 
   @Test
+  @DisplayName("pgm_cd が束縛されていても、ユースケースの現在時刻が束縛されていなければ、時計を読み直さず例外にする")
+  void unboundUseCaseTimeIsRejected() {
+    assertThatThrownBy(() ->
+            ScopedValue.where(PgmCdAspect.PGM_CD, PGM_CD)
+                .call(() -> commonColumns.forInsert(FIXTURE_ITEM)))
+        .isInstanceOf(IllegalStateException.class)
+        .hasMessageContaining("use case time is not bound");
+  }
+
+  @Test
   @DisplayName("カラムがない、または型が異なれば例外にする")
   void missingOrMistypedColumnIsRejected() {
     assertThatThrownBy(() -> CommonColumns.requiredField(FIXTURE_ITEM, "lock_no", Integer.class))
@@ -268,8 +278,9 @@ class CommonColumnsTest {
     return field.get(null);
   }
 
-  /** ユースケースの呼び出しの中として、pgm_cd を束縛して実行する。 */
+  /** ユースケースの呼び出しの中として、pgm_cd と現在時刻を束縛して実行する。 */
   private static <T> T inUseCase(final Supplier<T> call) {
-    return ScopedValue.where(PgmCdAspect.PGM_CD, PGM_CD).call(call::get);
+    return UseCaseTime.call(
+        CLOCK, () -> ScopedValue.where(PgmCdAspect.PGM_CD, PGM_CD).call(call::get));
   }
 }

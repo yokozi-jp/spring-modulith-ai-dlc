@@ -7,7 +7,6 @@ import com.example.demo.payment.domain.model.OrderId;
 import com.example.demo.payment.domain.model.Payment;
 import com.example.demo.payment.domain.model.PaymentId;
 import com.example.demo.payment.domain.model.PaymentStatus;
-import com.example.demo.shared.infrastructure.persistence.CommonColumns;
 import com.example.demo.shared.infrastructure.persistence.TableWriter;
 import com.example.demo.shared.infrastructure.persistence.TestCommonColumns;
 import java.math.BigDecimal;
@@ -48,9 +47,11 @@ public final class PaymentSeeds {
             new ChargeOutcome(status, new GatewayPaymentCode("ch_" + orderId)),
             recordedAt,
             1L);
-    final CommonColumns commonColumns = TestCommonColumns.at(recordedAt);
     TestCommonColumns.runAs(
         PGM_CD,
-        () -> new JooqPaymentRepository(dsl, new TableWriter(dsl, commonColumns)).add(payment));
+        recordedAt,
+        () ->
+            new JooqPaymentRepository(dsl, new TableWriter(dsl, TestCommonColumns.create()))
+                .add(payment));
   }
 }

@@ -575,6 +575,7 @@ class ArchitectureRuleFixtureTest {
         ClassRoleArchTest.commandHandlersExposeOnlyTransactionalHandle,
         ClassRoleArchTest.commandsAndResultsAreApplicationRecordsRule(basePackage),
         ClassRoleArchTest.commandHandlersDoNotDependOnOtherCommandHandlers,
+        ClassRoleArchTest.commandHandlersAndListenersDoNotReadClock,
         ClassRoleArchTest.commandHandlersAndListenersDoNotUseInheritance,
         ClassRoleArchTest.externalSystemCommandHandlersAreDependedOnlyByListeners,
         ClassRoleArchTest.externalSystemInterfacesAreUsedOnlyByCommandHandlersAndClients,

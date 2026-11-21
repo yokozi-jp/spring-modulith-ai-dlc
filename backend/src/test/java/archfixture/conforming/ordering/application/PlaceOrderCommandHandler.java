@@ -6,8 +6,7 @@ import archfixture.conforming.ordering.domain.model.Order;
 import archfixture.conforming.ordering.domain.model.OrderRepository;
 import archfixture.conforming.ordering.domain.service.OrderLimitPolicy;
 import archfixture.conforming.shared.tenant.TenantContext;
-import java.time.Clock;
-import java.time.Instant;
+import archfixture.conforming.shared.time.UseCaseTime;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -25,19 +24,14 @@ public class PlaceOrderCommandHandler {
   /** イベントを発行する。 */
   private final ApplicationEventPublisher events;
 
-  /** 受付時刻を取る時計。 */
-  private final Clock clock;
-
   /** 依存を受け取る。 */
   public PlaceOrderCommandHandler(
       final OrderRepository orderRepository,
       final OrderLimitPolicy orderLimitPolicy,
-      final ApplicationEventPublisher events,
-      final Clock clock) {
+      final ApplicationEventPublisher events) {
     this.orderRepository = orderRepository;
     this.orderLimitPolicy = orderLimitPolicy;
     this.events = events;
-    this.clock = clock;
   }
 
   /** 上限を確かめて注文を保存し、受付のイベントを発行する。 */
@@ -45,7 +39,7 @@ public class PlaceOrderCommandHandler {
   public PlaceOrderResult handle(final PlaceOrderCommand command) {
     final CustomerId customerId = new CustomerId(command.customerId());
     orderLimitPolicy.ensureCanPlace(customerId);
-    final Order order = Order.place(orderRepository.nextId(), customerId, Instant.now(clock));
+    final Order order = Order.place(orderRepository.nextId(), customerId, UseCaseTime.now());
     orderRepository.add(order);
     events.publishEvent(
         new OrderPlaced(
