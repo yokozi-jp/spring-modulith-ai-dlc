@@ -5,7 +5,7 @@
 
 ## Sub-features
 
-- `auth-login`：`/oauth2/authorization/web` から Keycloak の画面へ移り、資格情報を送ると `http://localhost:5173/` へ戻る。
+- `auth-login`：`/oauth2/authorization/web` から Keycloak の画面へ移り、資格情報を送り、テナント選択でサンプル商事を選ぶと `webOrigin`（slot 0 は `http://localhost:5173`）の `/` へ戻る。
 - `auth-session`：ログインの前後で `APP_SESSION` の Cookie の値が変わり、`/api/missing` が 401 でなく 404 を返す。
 - `auth-logout`：「ログアウト」で「ログアウトしました」の画面に着き、古い `APP_SESSION` で `/api/**` を呼ぶと 401 になる。
 - `auth-login-again`：ログアウト後の「もう一度ログイン」から、再び Keycloak の画面へ移る。
@@ -27,19 +27,19 @@ Preconditions:
 `node .kiro/skills/verify-demo/scripts/drive.mjs .kiro/skills/verify-demo/journeys/login-logout.mjs` が、次のすべてを順に実行する。
 
 - **ログイン（`auth-login`、`auth-session`）。**
-  `page.goto("/oauth2/authorization/web")` の後、`expect(page).toHaveURL(/^http:\/\/127\.0\.0\.1:8081\//u)` で Keycloak の画面を確かめて `step` する。
+  `page.goto("/oauth2/authorization/web")` の後、`expect(page).toHaveURL((url) => url.origin === idpOrigin)` で Keycloak の画面を確かめて `step` する。
   `context.cookies()` の `APP_SESSION` を覚えてから `login()` を呼ぶ。
-  URL が `http://localhost:5173/` になり、`main` の `heading`（level 1、「はじめる」）が見え、Cookie の値が変わる。
+  URL が `webOrigin` の `/` になり、`main` の `heading`（level 1、「はじめる」）が見え、Cookie の値が変わる。
   `page.request.get("/api/missing")` が 404 を返す。
 - **ログアウト（`auth-logout`）。**
   `page.getByRole("button", { name: "ログアウト" }).click()` で押す。
   `heading`「ログアウトしました」が見える。
-  `const fresh = await request.newContext({ baseURL: "http://localhost:5173" })` で Cookie を共有しない要求を作る。
+  `const fresh = await request.newContext({ baseURL: webOrigin })` で Cookie を共有しない要求を作る。
   ログアウトの前の `APP_SESSION` を `headers: { Cookie: \`APP_SESSION=${session}\` }` に付けて `fresh.get("/api/missing")` を呼ぶと、401 を返す。
   最後に `fresh.dispose()` を呼ぶ。
 - **もう一度ログイン（`auth-login-again`）。**
   「もう一度ログイン」を押す。
-  URL が `http://127.0.0.1:8081/` で始まり、Keycloak の `Username or email` の欄が見える。
+  URL の origin が `idpOrigin` になり、Keycloak の `Username or email` の欄が見える。
 
 ## Gotchas
 
@@ -48,7 +48,7 @@ Preconditions:
   `page.request` と `context.request` は Cookie を共有する。
 - `/` は SPA が認証を確かめずに表示する。
   トップページが見えることだけをログイン済みの証拠にしない。
-- Keycloak の issuer は `http://127.0.0.1:8081` に固定されている。
-  `localhost:8081` を開くと issuer が一致せず失敗する。
+- Keycloak の issuer は `idpOrigin`（slot 0 は `http://127.0.0.1:8081`）に固定されている。
+  `localhost` で開くと issuer が一致せず失敗する。
 - compose-test には Collector がない。
   `drive.mjs` が `/collect` を 202 で返すので、ログアウトのフォームの送信は止まらない。

@@ -75,7 +75,7 @@
 - [ADR-071: 作業で得た学びを 5 つの層へ還元し、上の層を優先する](ADR-071-reinforce-learnings-into-five-layers.md)（Proposed, 2026-10-08）
 - [ADR-072: 外部システムを本番のコードで偽らず、WireMock のコンテナで偽る](ADR-072-fake-external-systems-with-wiremock.md)（Accepted, 2026-10-08）
 - [ADR-073: E2E はシーダーの代表データを読むだけにし、変更するデータは各テストが作る](ADR-073-read-seeded-data-in-e2e.md)（Accepted, 2026-10-08）
-- [ADR-074: jscpd の閾値を、クラスの役割の定型を含む実測の 3.93% に合わせて 4.0% にする](ADR-074-raise-jscpd-threshold-for-class-role-boilerplate.md)（Proposed, 2026-10-09）
+- [ADR-074: jscpd の閾値を、クラスの役割の定型を含む実測の 3.93% に合わせて 4.0% にする](ADR-074-raise-jscpd-threshold-for-class-role-boilerplate.md)（Superseded by ADR-106, 2026-10-09）
 - [ADR-075: 他モジュールが分岐に使う状態の意味を、状態を持つモジュールが参照の結果の boolean で返す](ADR-075-return-state-meaning-in-query-results.md)（Proposed, 2026-10-11）
 - [ADR-076: PIT を必須でない別のワークフローで変更ごとに実行し、coverage の下限に line とクラスやファイルごとの下限を加える](ADR-076-run-mutation-tests-per-change-and-tighten-coverage-gates.md)（Proposed, 2026-10-11）
 - [ADR-077: OpenAPI 契約の operation と status の組ごとに、MockMvc の契約テストの宣言を検査する](ADR-077-check-contract-test-coverage-per-response-status.md)（Proposed, 2026-10-11）
@@ -91,7 +91,7 @@
 - [ADR-087: 必須チェックを集約ジョブ CI gate を中心にまとめる](ADR-087-gate-required-checks-with-single-aggregate-job.md)（Accepted, 2026-11-17）
 - [ADR-088: フロントエンドで useEffect を禁止し、Oxlint で止める](ADR-088-ban-react-effects-in-frontend.md)（Accepted, 2026-11-17）
 - [ADR-089: 主キーをモジュールのスキーマと Repository の中に閉じ、外に出る値には例外なく public_id を使う](ADR-089-keep-primary-keys-inside-modules-and-expose-public-ids.md)（Proposed, 2026-11-17）
-- [ADR-090: Task、betterleaks、iwe、Java、zizmor、Kiro CLI の版を mise.toml と mise.lock に固定し、ローカルと CI で同じ lock から入れる](ADR-090-pin-cli-tools-with-mise-lock.md)（Proposed, 2026-11-18）
+- [ADR-090: Task、betterleaks、iwe、jq、Java、zizmor、Kiro CLI の版を mise.toml と mise.lock に固定し、ローカルと CI で同じ lock から入れる](ADR-090-pin-cli-tools-with-mise-lock.md)（Proposed, 2026-11-18）
 - [ADR-091: エージェントの commit を本物の index の写しから作る](ADR-091-commit-agent-changes-from-a-copy-of-the-index.md)（Proposed, 2026-11-18）
 - [ADR-092: frontend を Vite+ の workspace に分け、共有を packages/ui と packages/api に置く](ADR-092-split-frontend-into-vite-plus-workspace.md)（Accepted, 2026-11-18）
 - [ADR-093: Kiro Web のサンドボックスを開発環境に加え、道具とコンテナを source するスクリプトで揃える](ADR-093-support-kiro-web-sandbox-as-development-environment.md)（Proposed, 2026-11-18）
@@ -103,3 +103,6 @@
 - [ADR-100: 2 つ以上の package が使う frontend の依存は pnpm の catalog で版を 1 つにする](ADR-100-pin-shared-frontend-dependencies-in-pnpm-catalog.md)（Proposed, 2026-11-19）
 - [ADR-101: テナント、所属、役割をアプリの DB に持ち、テナントを選んだ時点で役割の権限を組み立てる](ADR-101-keep-tenants-and-roles-in-app-database.md)（Proposed, 2026-11-19）
 - [ADR-102: 本番の IdP に Amazon Cognito を使い、ローカルとテストでは Keycloak で代える](ADR-102-use-amazon-cognito-as-production-idp.md)（Proposed, 2026-11-19）
+- [ADR-104: compose-test を使う実行ごとに slot を割り当て、worktree をまたいで同時に流す](ADR-104-allocate-test-stack-slots-per-run.md)（Proposed, 2026-11-19）
+- [ADR-105: 操作しているテナントを ScopedValue で束縛し、リクエストはセッションから、リスナーはイベントから取る](ADR-105-bind-tenant-to-request-and-event-context.md)（Proposed, 2026-11-19）
+- [ADR-106: jscpd は import 文を比べず、閾値を実測の 1.90% に合わせて 2.0% にする](ADR-106-ignore-import-statements-in-jscpd.md)（Proposed, 2026-11-21）

@@ -1,6 +1,12 @@
 import type { BrowserContext, Page } from "@playwright/test";
 
-import { authFile, chooseSeededTenant, signInOnKeycloak } from "./environment";
+import {
+  authFile,
+  chooseSeededTenant,
+  idpOrigin,
+  signInOnKeycloak,
+  webOrigin,
+} from "./environment";
 import { expect, test as setup } from "./fixtures";
 
 async function sessionCookie(context: BrowserContext): Promise<string | undefined> {
@@ -12,14 +18,14 @@ async function sessionCookie(context: BrowserContext): Promise<string | undefine
 async function logIn(page: Page, context: BrowserContext): Promise<string | undefined> {
   // storageState を持たない context で、認証の開始から始める。
   await page.goto("/oauth2/authorization/web");
-  await expect(page).toHaveURL(/^http:\/\/127\.0\.0\.1:8081\//u);
+  await expect(page).toHaveURL((url) => url.origin === idpOrigin);
   // 認証開始の時点で authorization request を保存する session が作られ、APP_SESSION が発行される。
   const sessionBeforeLogin = await sessionCookie(context);
 
   await signInOnKeycloak(page);
 
   // 認証の成立時に Spring Security が session ID を変える。
-  await expect(page).toHaveURL("http://localhost:5173/tenants");
+  await expect(page).toHaveURL(`${webOrigin}/tenants`);
   const sessionAfterLogin = await sessionCookie(context);
   expect(sessionAfterLogin).toBeDefined();
   expect(sessionAfterLogin).not.toBe(sessionBeforeLogin);

@@ -12,6 +12,7 @@ function pathFromHere(relative: string): string {
 const env = loadEnv("test", pathFromHere("../../../.."), [
   "E2E_",
   "CI",
+  "OIDC_ISSUER_URI",
   "PAYMENT_GATEWAY_BASE_URL",
 ]);
 
@@ -25,6 +26,16 @@ function requireEnv(name: "E2E_USERNAME" | "E2E_PASSWORD" | "PAYMENT_GATEWAY_BAS
   return value;
 }
 
+// vite.config.ts の preview.port と同じ変数で、並行する task e2e ごとに port をずらす。
+function webPort(): number {
+  const value = env.E2E_WEB_PORT ?? "5173";
+  const port = Number(value);
+  if (!/^\d+$/u.test(value) || port < 1 || port > 65_535) {
+    throw new Error(`E2E_WEB_PORT は 1 から 65535 の整数にしてください：${value}`);
+  }
+  return port;
+}
+
 export const isCI = Boolean(env.CI);
 const credentials = {
   username: requireEnv("E2E_USERNAME"),
@@ -32,6 +43,10 @@ const credentials = {
 };
 // ホストへ公開した compose-test の決済代行の WireMock（.env.test の PAYMENT_GATEWAY_BASE_URL）。
 export const paymentGatewayUrl = requireEnv("PAYMENT_GATEWAY_BASE_URL");
+// Keycloak の redirect URI と Cookie の host に合わせ、127.0.0.1 ではなく localhost を使う。
+export const webOrigin = `http://localhost:${webPort()}`;
+// task fe-check は .env.test なしでこのファイルを import するため、compose-test の既定の issuer の origin を既定値にする。
+export const idpOrigin = new URL(env.OIDC_ISSUER_URI ?? "http://127.0.0.1:8081").origin;
 // playwright-report/ と test-results/ の外に置き、CI の artifact に入れない。
 export const authFile = pathFromHere(".auth/user.json");
 
@@ -44,9 +59,9 @@ export async function signInOnKeycloak(page: Page): Promise<void> {
 
 // test-user は seed（backend の TenancySeeds）で 2 つのテナントに属するため、ログインの後にテナントを選ぶ画面が出る。
 export async function chooseSeededTenant(page: Page): Promise<void> {
-  await expect(page).toHaveURL("http://localhost:5173/tenants");
+  await expect(page).toHaveURL(`${webOrigin}/tenants`);
   await page.getByRole("button", { name: "サンプル商事" }).click();
-  await expect(page).toHaveURL("http://localhost:5173/");
+  await expect(page).toHaveURL(`${webOrigin}/`);
 }
 
 // Keycloak の資格情報の入力画面でログインし、テナントを選んでトップページへ戻る。

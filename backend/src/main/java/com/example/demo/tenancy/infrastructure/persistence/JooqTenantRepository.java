@@ -6,9 +6,9 @@ import static com.example.demo.jooq.tenancy.Tables.M_USER;
 
 import com.example.demo.shared.infrastructure.persistence.LockedRoot;
 import com.example.demo.shared.infrastructure.persistence.TableWriter;
+import com.example.demo.shared.tenant.TenantId;
 import com.example.demo.tenancy.domain.model.Role;
 import com.example.demo.tenancy.domain.model.Tenant;
-import com.example.demo.tenancy.domain.model.TenantId;
 import com.example.demo.tenancy.domain.model.TenantMember;
 import com.example.demo.tenancy.domain.model.TenantRepository;
 import com.example.demo.tenancy.domain.model.UserId;

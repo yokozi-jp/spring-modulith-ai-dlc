@@ -77,7 +77,7 @@ sudo chmod -R 755 /home/projects
 sudo apt update && sudo apt upgrade -y
 sudo apt install -y curl git wget unzip jq vim tree gnupg2 software-properties-common extrepo
 
-# mise（Task、betterleaks、iwe、Java、zizmor、Kiro CLI を mise.lock の版で入れる）の apt リポジトリ
+# mise（Task、betterleaks、iwe、jq、Java、zizmor、Kiro CLI を mise.lock の版で入れる）の apt リポジトリ
 sudo extrepo enable mise
 sudo apt update && sudo apt install -y mise
 
@@ -155,11 +155,12 @@ trust はパスごとに記録され、中身が変わっても取り消され�
 実行する前に `mise.toml` を読んで確かめてください。
 worktree を作ったときも、そこで `mise trust` を実行します。
 
-`mise install --locked` は、`mise.toml` の Task、betterleaks、iwe、Java（Amazon Corretto）、zizmor、Kiro CLI、手順 11 の jdtls と Lombok を、`mise.lock` と `.mise/locks/` に記録した版と checksum で検証して入れます（[ADR-090](../adr/ADR-090-pin-cli-tools-with-mise-lock.md)）。
+`mise install --locked` は、`mise.toml` の Task、betterleaks、iwe、jq、Java（Amazon Corretto）、zizmor、Kiro CLI、手順 11 の jdtls と Lombok を、`mise.lock` と `.mise/locks/` に記録した版と checksum で検証して入れます（[ADR-090](../adr/ADR-090-pin-cli-tools-with-mise-lock.md)）。
 `--locked` を付けると、lock に無い版を入れずに止まります。
 `task setup` は `04-setup-shell.sh` で、mise の shims を PATH の先頭に通す行を `~/.bashrc` と `~/.profile` に足します。
 ログインシェルでは `~/.profile` が `~/.bashrc` の後で `~/.local/bin` を先頭へ足すので、`~/.profile` の末尾でも shims を先頭へ足し直します。
 VS Code Server は、ログインシェルで作った PATH を拡張とターミナルに渡します。
+`task setup` は最後に、Kiro の権限の雛形を `~/.kiro/settings/permissions.yaml` に置きます（`permissions.yaml` か `permissions.json` がすでにあれば置かず、雛形との差分を表示します）。
 
 以前の手順で作った環境は、`bash -lic 'type -a task kiro-cli'` を実行し、どちらも先頭が `~/.local/share/mise/shims` になることを確かめます。
 ならなければ、`bash docs/local-env-setup/04-setup-shell.sh` を実行し、新しいターミナルで Kiro CLI を起動し直します。

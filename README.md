@@ -87,8 +87,8 @@ clone したら、[スキルの取得元と更新](docs/agents/skill-sources.md)
 | インフラとツール | PostgreSQL                 | 18         |                                                |
 | インフラとツール | Redis                      | 7.x        | 分散セッション                                 |
 | インフラとツール | Keycloak                   | 26.7.3     | OIDC の認可サーバー                            |
-| インフラとツール | Grafana OpenTelemetry LGTM | 0.32.1     | 可観測性データの集約                           |
-| インフラとツール | OpenTelemetry Collector    | 0.161.0    | ログの属性の絞り込み                           |
+| インフラとツール | Grafana OpenTelemetry LGTM | 0.40.0     | 可観測性データの集約                           |
+| インフラとツール | OpenTelemetry Collector    | 0.165.0    | ログの属性の絞り込み                           |
 
 ログ相関、PII、保持は[可観測性データの規約](docs/observability/conventions.md)、フロントエンドの構成は[フロントエンドアーキテクチャ](docs/frontend/architecture.md)を参照してください。
 その他のパッケージのバージョンは `backend/build.gradle` と、`frontend/` の下の各 `package.json` と `frontend/pnpm-workspace.yaml` の `catalog:`、Task、betterleaks、iwe、Java、zizmor、Kiro CLI のバージョンは `mise.toml` を参照してください。
@@ -250,7 +250,7 @@ Docker Compose の操作（サービスの起動、停止、状態確認、Keycl
 ### E2E
 
 - `task e2e` は frontend と backend イメージをビルドし、compose-test で依存サービスと backend を起動して migration と代表データを入れ、Vite preview に対して Playwright を実行してから、backend のログを `frontend/apps/web/test-results/backend.log` に残して後片付けします。
-- 開発用の Vite（5173）と Keycloak（8080）を止めてから実行します。
+- 実行ごとに空いている slot を取り、slot ごとの Compose project とポートで動くので、複数の worktree で同時に実行できます（[compose-test の slot](docs/tooling/test-slots.md)）。
   失敗した環境を調べるときは `E2E_KEEP_ENV=1 task e2e` で残せます（CI では常に片付けます）。
 - 起動だけを行う `task e2e-up` と、backend のログを書いて秘密の混入を検査する `task e2e-collect-logs LOG=<パス>` も、単独で実行できます。
   `task e2e-up` は片付けないので、実行したら自分で片付けます。
@@ -291,7 +291,7 @@ Docker Compose の操作（サービスの起動、停止、状態確認、Keycl
   1. 上と同じく `FRONTEND_OTEL_ENABLED=true` で `task compose-up` を実行し、`task dev` と `task fe-dev` を起動します。
   2. ログインして画面を開き、開発者ツールの console で `fetch("/api/missing")` を実行します。
   3. Grafana の Explore で Tempo を選び、`{resource.service.name="demo-web"}` を検索して trace を開きます。
-     `demo-web` の `Browser request` の span の子に、`demo-api` の server span がつながります。
+     `demo-web` の `Browser request` の span の子に、`demo-api` の server span がつながります（Tempo の使い方は[ローカルでトレースを見る](docs/observability/runbook-local-traces.md)）。
   4. SQL を発行する `/api/**` を呼ぶと、同じ trace に `jooq.query` の span（名前は `READ` など）が入ります（[ADR-070](docs/adr/ADR-070-record-sql-spans-with-jooq-execute-listener.md)）。
      main には SQL を発行する `/api/**` がまだありません。
 - CSP違反の報告は、Collectorの`webhook_event` receiverが受け、Grafanaで`{service_name="demo-web"} | telemetry_signal="csp-violation"`を検索して見ます。

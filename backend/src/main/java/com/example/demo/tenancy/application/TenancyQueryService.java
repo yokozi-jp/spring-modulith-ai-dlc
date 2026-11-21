@@ -1,12 +1,12 @@
 package com.example.demo.tenancy.application;
 
+import com.example.demo.shared.tenant.TenantId;
 import com.example.demo.tenancy.MembershipSummary;
 import com.example.demo.tenancy.TenancyQueries;
 import com.example.demo.tenancy.TenantMembersDetails;
 import com.example.demo.tenancy.domain.model.Membership;
 import com.example.demo.tenancy.domain.model.MembershipRepository;
 import com.example.demo.tenancy.domain.model.Tenant;
-import com.example.demo.tenancy.domain.model.TenantId;
 import com.example.demo.tenancy.domain.model.TenantRepository;
 import com.example.demo.tenancy.domain.model.UserId;
 import java.util.List;

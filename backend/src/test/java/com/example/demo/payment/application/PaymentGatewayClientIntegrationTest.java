@@ -12,6 +12,7 @@ import com.example.demo.payment.domain.model.Money;
 import com.example.demo.payment.domain.model.OrderId;
 import com.example.demo.payment.domain.model.PaymentGateway;
 import com.example.demo.shared.infrastructure.persistence.EventPublicationResubmitOnce;
+import com.example.demo.testkit.AsTenant;
 import com.example.demo.testkit.CleanGeneratedTablesExtension;
 import com.example.demo.testkit.SharedTestConfiguration;
 import com.github.tomakehurst.wiremock.WireMockServer;
@@ -383,7 +384,7 @@ class PaymentGatewayClientIntegrationTest {
 
     // 3. 同じ注文の OrderConfirmed をもう一度受けても、請求せず、決済記録は 1 件のまま。
     OrderConfirmedFixture.await(
-        scenario.publish(new OrderConfirmed(orderId, REDELIVERED_AT)),
+        scenario.publish(new OrderConfirmed(orderId, REDELIVERED_AT, AsTenant.TENANT)),
         orderId,
         "2 件目の完了した出版",
         () -> fixture.registry(orderId),

@@ -4,6 +4,7 @@ import com.example.demo.shared.concurrency.ConflictException;
 import com.example.demo.shared.concurrency.ExpectedLockNo;
 import com.example.demo.shared.failure.BusinessRuleViolationException;
 import com.example.demo.shared.failure.NotFoundException;
+import com.example.demo.shared.tenant.TenantId;
 import java.util.List;
 import java.util.Locale;
 

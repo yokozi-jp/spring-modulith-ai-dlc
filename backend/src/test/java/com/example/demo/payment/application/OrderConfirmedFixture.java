@@ -10,6 +10,7 @@ import com.example.demo.ordering.application.ConfirmOrderCommandHandler;
 import com.example.demo.ordering.application.DraftOrderCommandHandler;
 import com.example.demo.shared.concurrency.ExpectedLockNo;
 import com.example.demo.testkit.AsModule;
+import com.example.demo.testkit.AsTenant;
 import io.micrometer.observation.Observation;
 import io.micrometer.observation.ObservationRegistry;
 import java.time.Instant;
@@ -65,10 +66,11 @@ final class OrderConfirmedFixture {
   /* package */ Object confirm(final String orderId) {
     // Scenario#stimulate は名前のないトランザクションの中で呼ぶため、そのままではアプリロールで動く。
     // 本番の Controller が名前付きのトランザクションで入るのと同じく、ordering のロールで入る。
-    return AsModule.call(
-        dsl,
-        "ordering",
-        tx -> confirmOrder.handle(new ConfirmOrderCommand(orderId, new ExpectedLockNo(1))));
+    return AsTenant.call(() ->
+        AsModule.call(
+            dsl,
+            "ordering",
+            tx -> confirmOrder.handle(new ConfirmOrderCommand(orderId, new ExpectedLockNo(1)))));
   }
 
   /** 共通カラムの trace ID を取れるよう、observation の中で処理を呼ぶ。 */

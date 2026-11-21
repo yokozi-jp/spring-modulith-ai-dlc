@@ -1,5 +1,6 @@
 package com.example.demo.tenancy.domain.model;
 
+import com.example.demo.shared.tenant.TenantId;
 import java.util.Optional;
 
 /** テナントの集約を取り出して保存する。 */

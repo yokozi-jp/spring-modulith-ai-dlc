@@ -2,7 +2,7 @@
 // 検証スタックに Chromium でログインし、journey を 1 つ実行して証拠を build/verify/runs/<run>/ に残す。
 // 使い方: drive.mjs <journey.mjs> [key=value ...]
 import { execFileSync } from "node:child_process";
-import { appendFileSync, mkdirSync, writeFileSync } from "node:fs";
+import { appendFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import { basename, dirname, join, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -12,11 +12,18 @@ const root = execFileSync("git", ["rev-parse", "--show-toplevel"], {
   encoding: "utf8",
 }).trim();
 const web = join(root, "frontend/apps/web");
+// up が取った slot のポートと Compose project を環境変数へ入れる。e2e/environment.ts と docker compose がそれを読む。
+const slotFile = join(root, "build/verify/stack/slot.env");
+if (!existsSync(slotFile)) {
+  console.error("build/verify/stack/slot.env がありません。stack.sh up を実行してください。");
+  process.exit(2);
+}
+for (const [, key, value] of readFileSync(slotFile, "utf8").matchAll(/^export ([A-Z_0-9]+)=(.*)$/gmu)) process.env[key] = value;
 const require = createRequire(join(web, "package.json"));
 const { chromium, expect, request } = require("@playwright/test");
 const e2e = (file) => import(pathToFileURL(join(web, "e2e", file)).href);
 // 資格情報と決済代行の URL は .env.test から e2e/environment.ts が読み、なければ止まる。
-const { signInOnKeycloak } = await e2e("environment.ts");
+const { chooseSeededTenant, idpOrigin, signInOnKeycloak, webOrigin } = await e2e("environment.ts");
 const { chargeRequestCount, failChargesFor } = await e2e("payment-gateway.ts");
 const orders = await e2e("orders.ts");
 
@@ -26,7 +33,7 @@ if (journeyArg === undefined) {
   process.exit(2);
 }
 const params = Object.fromEntries(rest.map((pair) => pair.split(/=(.*)/su).slice(0, 2)));
-const baseURL = "http://localhost:5173";
+const baseURL = webOrigin;
 
 const journeyPath = resolve(journeyArg);
 const name = basename(journeyPath, ".mjs");
@@ -70,7 +77,7 @@ const gateway = {
 // アプリのロール demo は業務のスキーマを読めない（ADR-094）。payment_module は payment と ordering を読める。
 // 値は psql の変数（vars）で渡し、クエリの中で :'name' と書く。読み取り専用は誤操作の防止で、クエリの中で解除できる。
 function sql(query, vars = {}) {
-  const args = ["compose", "-f", "docker/compose-test.yml", "exec", "-T", "postgres",
+  const args = ["compose", "-f", "docker/compose-test.yml", "--profile", "e2e", "exec", "-T", "postgres",
     "psql", "-U", "demo", "-d", "demo", "-v", "ON_ERROR_STOP=1", "-qtA"];
   for (const [key, value] of Object.entries(vars)) args.push("-v", `${key}=${value}`);
   const input = `SET ROLE payment_module;\nSET default_transaction_read_only = on;\n${query};\n`;
@@ -82,7 +89,8 @@ function sql(query, vars = {}) {
 async function login(target = page) {
   await target.goto("/oauth2/authorization/web");
   await signInOnKeycloak(target);
-  await expect(target).toHaveURL(`${baseURL}/`);
+  // test-user は 2 つのテナントに属するので、ログインの後にテナントを選ぶ。選んだ後にトップページへ戻る。
+  await chooseSeededTenant(target);
 }
 
 const result = { journey: journeyPath, params, startedAt: new Date().toISOString(), status: "passed", records: {} };
@@ -91,7 +99,7 @@ try {
   // ログインそのものを確かめる journey は export const login = false で自分でログインする。
   if (journey.login !== false) await login();
   await journey.default({
-    page, context, expect, step, gateway, sql, login, orders, params,
+    page, context, expect, step, gateway, sql, login, orders, params, webOrigin, idpOrigin,
     request,
     record: (key, value) => (result.records[key] = value),
   });

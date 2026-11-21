@@ -21,6 +21,7 @@ barrelの `index.ts` は作らない。
 
 業務データ、API型、feature固有の文言を扱うcomponentは `packages/ui` に置かない。
 `@frontend/ui` はアプリと `@frontend/api` を参照しない。
+`@frontend/ui` も `exports` で `src` を直接公開し、ビルドしない。
 
 共有primitiveを組み合わせた業務componentは、利用するfeatureの `components` に置く。
 
@@ -34,6 +35,9 @@ Base UIが提供するkeyboard操作、focus管理、ARIA属性を維持し、�
 Tailwindの読込とテーマの変数（`--background` などのtokenと `@theme`）は `packages/ui/src/style.css` に置く。
 アプリの `style.css` は、これを `@import "@frontend/ui/style.css"` で読み込み、`@source "../../../packages/ui/src"` で `@frontend/ui` のclassを走査させる。
 `@source` を書かないと、`@frontend/ui` の部品のclassがCSSに出ない。
+Tailwindの自動検出が、アプリのdirectoryの外にある `packages/ui` を走査しないためである。
+このとき型検査とlintは通ったまま、見た目だけが壊れる。
+`frontend/lint/workspace-layout.test.js` が、`apps/*/src/style.css` のすべてに `packages/ui/src` を指す `@source` があることを確かめる。
 feature固有styleは対象componentの近くへ置く。
 
 ## UIの書き方

@@ -1,8 +1,8 @@
 package com.example.demo.tenancy.application;
 
 import com.example.demo.shared.failure.NotFoundException;
+import com.example.demo.shared.tenant.TenantId;
 import com.example.demo.tenancy.domain.model.Tenant;
-import com.example.demo.tenancy.domain.model.TenantId;
 import com.example.demo.tenancy.domain.model.TenantRepository;
 import com.example.demo.tenancy.domain.model.UserId;
 import java.util.UUID;
