@@ -61,6 +61,7 @@ Gradleのforkごとに別のDBになるため、forkどうしの後始末は衝�
   別のテナントの業務データ一式は、開発用のシーダーと同じ[BusinessSeeds](../../backend/src/test/java/com/example/demo/testkit/BusinessSeeds.java)で入れる。
 - **テナントを使わない処理と、テナントのない読み書きの失敗を確かめるとき**：`AsModule.callWithoutTenant`で、ロールだけを設定して本体を実行する。
   RLSの外の`tenancy`の表とカタログを読む処理と、DBがテナントの設定忘れを止めることを確かめるテストが使う。
+  テナントのない読み取りのエラーを確かめるテストは、テナントのある間に作った実行計画がプールの接続に残ると空の表から0件を返しうるため（[ADR-107](../adr/ADR-107-isolate-tenants-with-rls-set-per-transaction.md#consequences)の2段目の防御）、読み取りの直前に`AsModule.discardCachedPlans`で計画を捨てる。
 
 別のテナントの行を読めず書けないこととテナントの設定忘れのエラーは`TenantIsolationTest`、プールの接続にテナントが残らないことと、テナントの束縛のない業務のトランザクションを始めないことは`ModuleRoleTransactionTest`が確かめる。
 
