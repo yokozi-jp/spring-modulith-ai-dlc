@@ -88,11 +88,13 @@ SELECT set_config('role', ?, true), set_config('app.current_tenant', ?, true)
 - テナントは`TenantContext.findCurrent()`で束縛から読む（[ADR-105](../adr/ADR-105-bind-tenant-to-request-and-event-context.md)）。
   束縛がないトランザクションでは`app.current_tenant`を設定しない。
 - 業務テーブルを持つモジュール（`product`、`ordering`、`payment`）のトランザクションを、テナントを束縛せずに始めたら、SQLを流す前に`IllegalStateException`で失敗させる。
-  モジュールの一覧は`ModuleRoles.TENANT_SCOPED_MODULES`にある。
+  モジュールの一覧は、`ModuleRoles.MODULES`から`ModuleRoles.RLS_EXEMPT_MODULES`（RLSの外に置くモジュール）を除いた`ModuleRoles.TENANT_SCOPED_MODULES`である。
+  カタログとchangesetの検査は、RLSの外に置くスキーマを、`modulith`と`RLS_EXEMPT_MODULES`から導く。
   `tenancy`のトランザクションと、モジュールが分からないトランザクションは、テナントなしで始められる。
 - モジュールが分からないトランザクションでは、ロールを設定しない（[DB接続情報とロール分離](connections.md#モジュールのロール)）。
   SQLには設定するものの`set_config`だけを並べ、どちらもなければSQLを流さない。
   上のSQLは、両方を設定するときの形である。
+- この設定のSQLを流す`ModuleRoleTransactionManager.setLocal`を、本番のコードで呼べるのは`ModuleRoleTransactionManager`だけである（[バックエンドのアーキテクチャテスト](../backend/architecture-tests.md)の`roleAndTenantAreSetOnlyByTransactionManager`）。
 - 接続プールの初期化のSQL（HikariCPの`connection-init-sql`）とセッション単位の`SET`には、テナントを書かない。
 
 テナントを設定しない読み書きをポリシーのエラーで止めるのは、2段目の防御である。
@@ -119,10 +121,11 @@ RLSの規則は次の検査で確かめる。
 - **changesetのlint**：`ChangesetLintTest`が、RLSとポリシーのSQLが上の3文の形だけであること（規則S1）と、3文が同じchangesetに揃うこと（規則S2）を確かめる。
 - **`@DatabaseTest`**：`TenantIsolationTest`が、別のテナントの行を読めず書けないこと、明細が別のテナントの注文を指せないこと、テナントを設定しないモジュールのロールの読み取りとINSERTがエラーになることを確かめる。
   表の所有者のマイグレーションロールの接続でも、テナントを設定しない読み取りがエラーになり、設定したテナントの行だけを読むことを確かめ、`FORCE ROW LEVEL SECURITY`の効き目を見る。
-  テナントを束縛しない業務のトランザクションを、汎用の実行計画が0件を返す接続でも、トランザクションマネージャーが拒否することも確かめる。
+  トランザクションマネージャーを通らない読み取りが、汎用の実行計画が残った接続ではエラーにならず0件を返すことも確かめ、マネージャーの検査が要る前提を示す。
+  テナントのないトランザクションの中で、テストの補助の`AsModule`がテナントを設定して戻した後も、テナントのない読み取りがエラーになることを確かめる。
   業務テーブルは、`tenant_public_id`を持つjOOQの生成した表から導く。
-- **`@CommittedDatabaseTest`**：`ModuleRoleTransactionTest`が、commitとrollbackの後、プールの接続にテナントが残らないことと、テナントを束縛しない`product`、`ordering`、`payment`のトランザクションを始めないことを確かめる。
-  設定の後に空文字列が残る場合も、ポリシーが失敗する側に倒れることを確かめる。
+- **`@CommittedDatabaseTest`**：`ModuleRoleTransactionTest`が、commitとrollbackの後、プールの接続にロールとテナントが残らないことと、テナントを束縛しない`product`、`ordering`、`payment`のトランザクションを始めないことを確かめる。
+  設定の後に空文字列が残る接続でも、ポリシーが失敗する側に倒れることを、残った設定ごとのSQLSTATE（未設定なら`42704`、空文字列なら`22P02`）で確かめる。
 
 ## ノイジーネイバーへの対策
 

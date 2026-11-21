@@ -58,6 +58,9 @@ Gradleのforkごとに別のDBになるため、forkどうしの後始末は衝�
 - **`@ApplicationModuleTest`や`@SpringBootTest`で、CommandHandlerやQueryServiceをテストのスレッドから直接呼ぶとき**：テストクラスに`@ExtendWith`で[BindTestTenantExtension](../../backend/src/test/java/com/example/demo/testkit/BindTestTenantExtension.java)を付ける。
   `@BeforeEach`とテストのメソッドが`AsTenant.TENANT`の束縛の中で動き、トランザクションマネージャーがそのテナントを設定する。
 - **別のテナントの行を読み書きするとき**：`AsModule`の`call`か`run`にそのテナントを渡す。
+  別のテナントの業務データ一式は、開発用のシーダーと同じ[BusinessSeeds](../../backend/src/test/java/com/example/demo/testkit/BusinessSeeds.java)で入れる。
+- **テナントを使わない処理と、テナントのない読み書きの失敗を確かめるとき**：`AsModule.callWithoutTenant`で、ロールだけを設定して本体を実行する。
+  RLSの外の`tenancy`の表とカタログを読む処理と、DBがテナントの設定忘れを止めることを確かめるテストが使う。
 
 別のテナントの行を読めず書けないこととテナントの設定忘れのエラーは`TenantIsolationTest`、プールの接続にテナントが残らないことと、テナントの束縛のない業務のトランザクションを始めないことは`ModuleRoleTransactionTest`が確かめる。
 
@@ -69,6 +72,7 @@ Liquibase管理テーブルはコード生成から除外されているため�
 業務のスキーマの表は、アプリロールにもモジュールのロールにも別のモジュールの表を消す権限がないため、表の所有者（マイグレーションロール）の接続で、1つの`TRUNCATE`でまとめて消す。
 外部キーで参照される表は、参照する表と同じ`TRUNCATE`でなければ消せないからである。
 `TRUNCATE`は行レベルセキュリティの対象外で、モジュールとテナントの境界に左右されない。
+所有者の接続は、テスト専用テーブルのDDLと所有者のRLSのテストと同じ[MigrationRoleConnections](../../backend/src/test/java/com/example/demo/testkit/MigrationRoleConnections.java)で開き、表のロックを10秒より長く待たない。
 `modulith`スキーマの表は、アプリロールで`DELETE`する。
 消す前に、状態が`PUBLISHED`、`PROCESSING`、`RESUBMITTED`のイベント出版がなくなるまで最大10秒待つ。
 非同期のListenerはテストの本体の後にコミットすることがあり、待たずに消すと、後から書いた行が次のテストに残るためである。

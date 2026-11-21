@@ -115,6 +115,10 @@ jOOQの生成物の`com.example.demo.jooq`はOPENのモジュールであり、`
   業務の処理は`TenantContext.current()`で読む。
   メソッド参照も検出する（[ADR-105](../adr/ADR-105-bind-tenant-to-request-and-event-context.md)、[ADR-107](../adr/ADR-107-isolate-tenants-with-rls-set-per-transaction.md)）。
   違反フィクスチャの`TenantDefaultingCommandHandler`で確かめ、規約どおりのフィクスチャの`ModuleRoleTransactionManager`が通ることを確かめる。
+- `roleAndTenantAreSetOnlyByTransactionManager`：本番のコードで`ModuleRoleTransactionManager.setLocal`を呼べるクラスは、`ModuleRoleTransactionManager`だけにする。
+  `setLocal`はトランザクションのロールとテナントを、トランザクションの名前と束縛によらずに変えるので、ほかのクラスが呼ぶとモジュールのロールの権限とテナントのRLSを迂回できる。
+  テストの補助（`AsModule`）とシーダーは、本番と同じSQLを通すために呼ぶが、ArchUnitの解析対象の外である（[ADR-094](../adr/ADR-094-switch-to-module-database-roles.md)、[ADR-107](../adr/ADR-107-isolate-tenants-with-rls-set-per-transaction.md)）。
+  違反フィクスチャの`TenantSwitchingOrderAccess`で確かめ、規約どおりのフィクスチャの`ModuleRoleTransactionManager`が通ることを確かめる。
 - `eventListenersAreApplicationModuleListeners`：`@ApplicationModuleListener`を付けていないメソッドは、`@EventListener`をメタアノテーションに持たない。
   `@EventListener`と`@TransactionalEventListener`を直接付けた受信を拒否し、`@TransactionalEventListener`をメタアノテーションに持つ`@ApplicationModuleListener`は対象から除く。
   守らせる規約と理由は[Listener](class-roles/listener.md)に示す。
