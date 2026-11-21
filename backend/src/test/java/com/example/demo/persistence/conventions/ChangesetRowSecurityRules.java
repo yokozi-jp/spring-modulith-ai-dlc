@@ -16,7 +16,8 @@ import java.util.stream.Stream;
  * 業務の表の行レベルセキュリティの SQL の書き方（R1、R2）を判定する。
  *
  * <p>RLS の SQL は Liquibase OSS の Change Type で書けないため任意の SQL になる。決まった 3 文だけを書かせ、その SQL だけの変更は任意の
- * SQL（M17）の許可リストに載せずにこの規則で判定する。業務の表に RLS とポリシーが揃っていることは、カタログの検査が確かめる。
+ * SQL（M17）の許可リストに載せずにこの規則で判定する。業務の表に RLS とポリシーが揃っていることは、カタログの検査（{@link
+ * SchemaTenantConventions}）が確かめる。
  */
 final class ChangesetRowSecurityRules {
 

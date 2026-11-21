@@ -7,6 +7,7 @@ import com.example.demo.persistence.conventions.CatalogSnapshot.ConstraintRow;
 import com.example.demo.persistence.conventions.CatalogSnapshot.FunctionRow;
 import com.example.demo.persistence.conventions.CatalogSnapshot.IndexRow;
 import com.example.demo.persistence.conventions.CatalogSnapshot.ModuleRoleRow;
+import com.example.demo.persistence.conventions.CatalogSnapshot.PolicyRow;
 import com.example.demo.persistence.conventions.CatalogSnapshot.RelationPrivilegeRow;
 import com.example.demo.persistence.conventions.CatalogSnapshot.RelationRow;
 import com.example.demo.persistence.conventions.CatalogSnapshot.RoleRow;
@@ -77,9 +78,21 @@ class SchemaConventionsTest {
   void conformingSnapshotHasNoViolations() {
     final CatalogSnapshot snapshot =
         new CatalogSnapshot(
-            List.of(relation(ITEM, "r", true, null), relation(MODULITH, "r", false, null)),
+            List.of(
+                new RelationRow(ITEM, TABLE, "r", ITEM_ID, null, true, true),
+                relation(MODULITH, "r", false, null)),
             List.of(
                 column(ITEM, BIGINT, "b", "a", "", null),
+                new ColumnRow(
+                    ITEM,
+                    TABLE,
+                    TenantIsolation.TENANT_COLUMN,
+                    UUID,
+                    "b",
+                    "",
+                    "",
+                    TenantIsolation.CATALOG_TENANT_DEFAULT,
+                    true),
                 column(MODULITH, INTEGER, "b", "", "", "nextval('x'::regclass)")),
             List.of(
                 new ConstraintRow(ITEM, TABLE, "pk_m_item", "p", null),
@@ -104,7 +117,17 @@ class SchemaConventionsTest {
                 relationPrivilege(MODULITH, true, false, false),
                 relationPrivilege(ITEM, false, false, false),
                 relationPrivilege(LIQUIBASE, false, false, false)),
-            List.of());
+            List.of(),
+            List.of(
+                new PolicyRow(
+                    ITEM,
+                    TABLE,
+                    TenantIsolation.POLICY_NAME,
+                    "PERMISSIVE",
+                    List.of("public"),
+                    "ALL",
+                    TenantIsolation.CATALOG_POLICY_USING,
+                    null)));
 
     assertThat(SchemaConventions.check(snapshot, List.of())).as("違反").isEmpty();
   }
@@ -200,9 +223,11 @@ class SchemaConventionsTest {
     @DisplayName("K7：排他制約のGiSTだけを受け入れる")
     void acceptsGistOnlyForExclusionConstraints() {
       final IndexRow exclusion =
-          new IndexRow(ITEM, TABLE, "ex_m_item", "gist", false, 2, 2, false, false, true);
+          new IndexRow(
+              ITEM, TABLE, "ex_m_item", "gist", false, 2, 2, false, false, true, false, null);
       final IndexRow plainGist =
-          new IndexRow(ITEM, TABLE, "idx_2_m_item", "gist", false, 1, 1, false, false, false);
+          new IndexRow(
+              ITEM, TABLE, "idx_2_m_item", "gist", false, 1, 1, false, false, false, false, null);
 
       assertThat(keys(SchemaTableConventions.indexes(List.of(exclusion, plainGist))))
           .containsExactly("K7 item.idx_2_m_item");
@@ -212,7 +237,8 @@ class SchemaConventionsTest {
     @DisplayName("K8：式インデックスを拒否する")
     void rejectsExpressionIndexes() {
       final IndexRow row =
-          new IndexRow(ITEM, TABLE, "idx_1_m_item", BTREE, false, 1, 1, true, false, false);
+          new IndexRow(
+              ITEM, TABLE, "idx_1_m_item", BTREE, false, 1, 1, true, false, false, false, null);
 
       assertThat(keys(SchemaTableConventions.indexes(List.of(row))))
           .containsExactly("K8 item.idx_1_m_item");
@@ -222,7 +248,8 @@ class SchemaConventionsTest {
     @DisplayName("K9：部分インデックスとINCLUDE付きインデックスを拒否する")
     void rejectsPartialAndIncludeIndexes() {
       final IndexRow partial =
-          new IndexRow(ITEM, TABLE, "idx_2_m_item", BTREE, false, 1, 1, false, true, false);
+          new IndexRow(
+              ITEM, TABLE, "idx_2_m_item", BTREE, false, 1, 1, false, true, false, false, null);
       final IndexRow include = index(ITEM, BTREE, false, 1, 2);
 
       assertThat(keys(SchemaTableConventions.indexes(List.of(partial, include))))
@@ -840,7 +867,9 @@ class SchemaConventionsTest {
         totalColumnCount,
         false,
         false,
-        false);
+        false,
+        false,
+        null);
   }
 
   private static RoleRow cleanRole() {

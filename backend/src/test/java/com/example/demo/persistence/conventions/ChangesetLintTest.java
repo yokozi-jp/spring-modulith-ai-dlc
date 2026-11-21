@@ -61,6 +61,9 @@ class ChangesetLintTest {
   /** {@code item.m_item}のRLSの3文が揃わない（R2）違反のキー。 */
   private static final String INCOMPLETE_ROW_SECURITY = "R2 001-create-m-item: item.m_item";
 
+  /** 明細から{@code item.m_item}への外部キーの書き方（K4）の違反のキー。 */
+  private static final String ITEM_LINE_FOREIGN_KEY = "K4 item.fk_t_item_line";
+
   /** 設定がなくてもエラーにしない{@code missing_ok}を使ったポリシー。 */
   private static final String MISSING_OK_POLICY =
       "CREATE POLICY tenant_isolation ON item.m_item AS PERMISSIVE FOR ALL TO PUBLIC"
@@ -96,7 +99,8 @@ class ChangesetLintTest {
           lintCase("modulith-excluded", List.of()),
           lintCase("module-role-privileges", List.of()),
           lintCase("allowlisted-sql", sqlAllowlist(COMMENT_SQL, UNCOMMENT_SQL)),
-          lintCase("row-level-security", List.of()));
+          lintCase("row-level-security", List.of()),
+          lintCase("foreign-keys", List.of()));
 
   /** 違反のケースと、期待する違反のキー。 */
   private static final List<LintCase> INVALID_CASES =
@@ -213,6 +217,10 @@ class ChangesetLintTest {
               ROW_SECURITY + EXEMPT_POLICY,
               ARBITRARY_SQL + String.join(";\n", EXEMPT_ENABLE, EXEMPT_FORCE, EXEMPT_POLICY) + ";"),
           lintCase("r2-without-force", INCOMPLETE_ROW_SECURITY),
+          lintCase("k4-single-column-in-tenant-schema", ITEM_LINE_FOREIGN_KEY),
+          lintCase("k4-column-constraint", "K4 item.t_item_line.item_id"),
+          lintCase("k4-on-delete-cascade", ITEM_LINE_FOREIGN_KEY),
+          lintCase("k4-cross-schema-and-name", "K4 item.t_item_line_item_id_fkey"),
           lintCase("m7-create-index-on-existing-table", "M7 item.idx_1_m_item"),
           lintCase(
               "m7-sql-index-without-concurrently",
