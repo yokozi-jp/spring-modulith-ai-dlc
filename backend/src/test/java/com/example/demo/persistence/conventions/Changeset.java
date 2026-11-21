@@ -1,5 +1,6 @@
 package com.example.demo.persistence.conventions;
 
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -47,6 +48,14 @@ record Changeset(String fileName, Map<String, Object> node) {
       return items.stream().flatMap(Change::from).toList();
     }
     return Change.from(rollback).toList();
+  }
+
+  /** SQLを、Liquibaseと同じく{@code ;}で文に分け、空の文を捨てる。空白は1つにそろえる。 */
+  /* package */ static List<String> statements(final String sql) {
+    return Arrays.stream(sql.split(";"))
+        .map(statement -> statement.strip().replaceAll("\\s+", " "))
+        .filter(statement -> !statement.isEmpty())
+        .toList();
   }
 
   /** {@code changes}と{@code rollback}の全変更。 */
@@ -115,13 +124,12 @@ record Changeset(String fileName, Map<String, Object> node) {
         return sql.isBlank() ? Stream.empty() : Stream.of(new Change(SQL, Map.of(SQL, sql)));
       }
       return YamlNodes.map(item).entrySet().stream()
-          .map(
-              entry ->
-                  new Change(
-                      entry.getKey(),
-                      entry.getValue() instanceof String value
-                          ? Map.of(SQL, value)
-                          : YamlNodes.map(entry.getValue())));
+          .map(entry ->
+              new Change(
+                  entry.getKey(),
+                  entry.getValue() instanceof String value
+                      ? Map.of(SQL, value)
+                      : YamlNodes.map(entry.getValue())));
     }
   }
 }

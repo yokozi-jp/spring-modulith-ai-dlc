@@ -2,6 +2,7 @@ package com.example.demo.shared.tenant;
 
 import java.lang.ScopedValue.CallableOp;
 import java.util.Objects;
+import java.util.Optional;
 import org.jspecify.annotations.Nullable;
 
 /**
@@ -44,5 +45,15 @@ public final class TenantContext {
     return BOUND.orElseThrow(() ->
         new IllegalStateException(
             "tenant is not bound: call from a request with a selected tenant or an @ApplicationModuleListener"));
+  }
+
+  /**
+   * 呼び出し中のテナントを、束縛していなければ空で返す。
+   *
+   * <p>テナントのない呼び出し（Spring Modulith の内部、再投入、ShedLock）も通るトランザクションマネージャーのためにある。業務の処理は {@link
+   * #current()} を使い、テナントがないことを「データがない」と取り違えない。
+   */
+  public static Optional<TenantId> findCurrent() {
+    return BOUND.isBound() ? Optional.of(BOUND.get()) : Optional.empty();
   }
 }

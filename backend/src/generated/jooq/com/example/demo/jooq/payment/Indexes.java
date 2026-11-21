@@ -31,6 +31,6 @@ public class Indexes {
     // INDEX definitions
     // -------------------------------------------------------------------------
 
-    public static final Index UK_2_T_PAYMENT = Internal.createIndex(DSL.name("uk_2_t_payment"), TPayment.T_PAYMENT, new OrderField[] { TPayment.T_PAYMENT.ORDER_PUBLIC_ID }, true);
-    public static final Index UK_T_PAYMENT = Internal.createIndex(DSL.name("uk_t_payment"), TPayment.T_PAYMENT, new OrderField[] { TPayment.T_PAYMENT.PUBLIC_ID }, true);
+    public static final Index UK_2_T_PAYMENT = Internal.createIndex(DSL.name("uk_2_t_payment"), TPayment.T_PAYMENT, new OrderField[] { TPayment.T_PAYMENT.TENANT_PUBLIC_ID, TPayment.T_PAYMENT.ORDER_PUBLIC_ID }, true);
+    public static final Index UK_T_PAYMENT = Internal.createIndex(DSL.name("uk_t_payment"), TPayment.T_PAYMENT, new OrderField[] { TPayment.T_PAYMENT.TENANT_PUBLIC_ID, TPayment.T_PAYMENT.PUBLIC_ID }, true);
 }

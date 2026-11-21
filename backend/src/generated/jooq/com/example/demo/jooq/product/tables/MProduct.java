@@ -77,6 +77,11 @@ public class MProduct extends TableImpl<MProductRecord> {
     public final TableField<MProductRecord, Long> PRODUCT_ID = createField(DSL.name("product_id"), SQLDataType.BIGINT.nullable(false).generatedAlwaysAsIdentity(), this, "");
 
     /**
+     * The column <code>product.m_product.tenant_public_id</code>.
+     */
+    public final TableField<MProductRecord, UUID> TENANT_PUBLIC_ID = createField(DSL.name("tenant_public_id"), SQLDataType.UUID.nullable(false).defaultValue(DSL.field(DSL.raw("(current_setting('app.current_tenant'::text))::uuid"), SQLDataType.UUID)), this, "");
+
+    /**
      * The column <code>product.m_product.public_id</code>.
      */
     public final TableField<MProductRecord, UUID> PUBLIC_ID = createField(DSL.name("public_id"), SQLDataType.UUID.nullable(false), this, "");

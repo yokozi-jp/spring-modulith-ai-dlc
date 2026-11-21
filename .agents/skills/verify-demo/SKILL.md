@@ -84,6 +84,8 @@ journey は ESM の 1 ファイルで、既定の export の関数が次を受�
 - 接続はモジュールのロール `payment_module` で、`payment` と `ordering` を読める。
   アプリのロール `demo` は業務のスキーマを読めない（ADR-094）。
   `product` は読めない。
+- クエリは、ログインの後に選ぶサンプル商事のテナントで流れ、ほかのテナントの行は見えない（ADR-107）。
+  `drive.mjs` は `scripts/seeded-tenant.sql` でテナントを名前から引き、そのテナントに代表の注文がなければ journey の前に止まる。
 - 値は第 2 引数のオブジェクトで渡し、クエリの中で `:'name'` と書く（例：`sql("select ... where public_id = :'orderId'", { orderId })`）。
   クエリの文字列に値を埋め込まない。
 - 複数の列は `|` で区切った 1 つの文字列で返る（例：`PAID|1200|CONFIRMED`）。

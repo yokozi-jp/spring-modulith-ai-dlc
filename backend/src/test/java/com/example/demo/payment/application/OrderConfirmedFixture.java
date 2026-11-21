@@ -9,6 +9,8 @@ import com.example.demo.ordering.application.ConfirmOrderCommand;
 import com.example.demo.ordering.application.ConfirmOrderCommandHandler;
 import com.example.demo.ordering.application.DraftOrderCommandHandler;
 import com.example.demo.shared.concurrency.ExpectedLockNo;
+import com.example.demo.shared.tenant.TenantContext;
+import com.example.demo.shared.tenant.TenantId;
 import com.example.demo.testkit.AsModule;
 import com.example.demo.testkit.AsTenant;
 import io.micrometer.observation.Observation;
@@ -57,20 +59,35 @@ final class OrderConfirmedFixture {
     this.observationRegistry = observationRegistry;
   }
 
-  /** 単価 120 円の商品を 2 個の下書きの注文を作り、注文 ID を返す。 */
+  /** テストの利用者のテナントに、単価 120 円の商品を 2 個の下書きの注文を作り、注文 ID を返す。 */
   /* package */ String draftedOrderId() {
-    return TestOrders.drafted(dsl, draftOrder, observationRegistry);
+    return draftedOrderId(AsTenant.TENANT);
   }
 
-  /** 作った直後（{@code lockNo} 1）の下書きの注文を確定する。 */
+  /** テナントを束縛して、そのテナントに単価 120 円の商品を 2 個の下書きの注文を作り、注文 ID を返す。 */
+  /* package */ String draftedOrderId(final TenantId tenant) {
+    return TenantContext.call(
+        tenant, () -> TestOrders.drafted(dsl, tenant, draftOrder, observationRegistry));
+  }
+
+  /** テストの利用者のテナントで、作った直後（{@code lockNo} 1）の下書きの注文を確定する。 */
   /* package */ Object confirm(final String orderId) {
+    return confirm(orderId, AsTenant.TENANT);
+  }
+
+  /** テナントを束縛して、そのテナントの作った直後（{@code lockNo} 1）の下書きの注文を確定する。 */
+  /* package */ Object confirm(final String orderId, final TenantId tenant) {
     // Scenario#stimulate は名前のないトランザクションの中で呼ぶため、そのままではアプリロールで動く。
     // 本番の Controller が名前付きのトランザクションで入るのと同じく、ordering のロールで入る。
-    return AsTenant.call(() ->
-        AsModule.call(
-            dsl,
-            "ordering",
-            tx -> confirmOrder.handle(new ConfirmOrderCommand(orderId, new ExpectedLockNo(1)))));
+    return TenantContext.call(
+        tenant,
+        () ->
+            AsModule.call(
+                dsl,
+                "ordering",
+                tenant,
+                tx ->
+                    confirmOrder.handle(new ConfirmOrderCommand(orderId, new ExpectedLockNo(1)))));
   }
 
   /** 共通カラムの trace ID を取れるよう、observation の中で処理を呼ぶ。 */
@@ -78,15 +95,25 @@ final class OrderConfirmedFixture {
     return Observation.createNotStarted("payment-test", observationRegistry).observe(action);
   }
 
-  /** 注文を observation の中で確定し、出版の状態が条件を満たすまで待つ。 */
+  /** テストの利用者のテナントの注文を observation の中で確定し、出版の状態が条件を満たすまで待つ。 */
   /* package */ void confirmAndAwait(
       final Scenario scenario,
       final String orderId,
       final String expectation,
       final Predicate<RegistryState> done) {
+    confirmAndAwait(scenario, AsTenant.TENANT, orderId, expectation, done);
+  }
+
+  /** テナントの注文を observation の中で確定し、出版の状態が条件を満たすまで待つ。 */
+  /* package */ void confirmAndAwait(
+      final Scenario scenario,
+      final TenantId tenant,
+      final String orderId,
+      final String expectation,
+      final Predicate<RegistryState> done) {
     observed(() -> {
       await(
-          scenario.stimulate(() -> confirm(orderId)),
+          scenario.stimulate(() -> confirm(orderId, tenant)),
           orderId,
           expectation,
           () -> registry(orderId),

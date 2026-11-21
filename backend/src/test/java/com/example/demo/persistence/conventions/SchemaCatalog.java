@@ -5,6 +5,7 @@ import com.example.demo.persistence.conventions.CatalogSnapshot.ConstraintRow;
 import com.example.demo.persistence.conventions.CatalogSnapshot.FunctionRow;
 import com.example.demo.persistence.conventions.CatalogSnapshot.IndexRow;
 import com.example.demo.persistence.conventions.CatalogSnapshot.ModuleRoleRow;
+import com.example.demo.persistence.conventions.CatalogSnapshot.PolicyRow;
 import com.example.demo.persistence.conventions.CatalogSnapshot.RelationPrivilegeRow;
 import com.example.demo.persistence.conventions.CatalogSnapshot.RelationRow;
 import com.example.demo.persistence.conventions.CatalogSnapshot.RoleRow;
@@ -66,7 +67,14 @@ final class SchemaCatalog {
                 query(
                     """
                     SELECT n.nspname AS schema_name, c.relname AS table_name, con.conname AS object_name,
-                           con.contype::text AS kind, rn.nspname AS referenced_schema
+                           con.contype::text AS kind, rn.nspname AS referenced_schema,
+                           rc.relname AS referenced_table,
+                           ARRAY(SELECT a.attname::text FROM unnest(con.conkey) WITH ORDINALITY k(attnum, ord)
+                                 JOIN pg_attribute a ON a.attrelid = con.conrelid AND a.attnum = k.attnum
+                                 ORDER BY k.ord) AS column_names,
+                           ARRAY(SELECT a.attname::text FROM unnest(con.confkey) WITH ORDINALITY k(attnum, ord)
+                                 JOIN pg_attribute a ON a.attrelid = con.confrelid AND a.attnum = k.attnum
+                                 ORDER BY k.ord) AS referenced_column_names
                     FROM pg_constraint con
                     JOIN pg_class c ON c.oid = con.conrelid
                     JOIN pg_namespace n ON n.oid = c.relnamespace
@@ -80,7 +88,10 @@ final class SchemaCatalog {
                     text(r, TABLE),
                     text(r, NAME),
                     text(r, "kind"),
-                    r.get("referenced_schema", String.class))),
+                    r.get("referenced_schema", String.class),
+                    texts(r, "column_names"),
+                    r.get("referenced_table", String.class),
+                    texts(r, "referenced_column_names"))),
         indexes(dsl),
         dsl.resultQuery(
                 query(
@@ -125,7 +136,27 @@ final class SchemaCatalog {
         role(dsl, migrationRole),
         schemaPrivileges(dsl),
         relationPrivileges(dsl),
-        moduleRoles(dsl));
+        moduleRoles(dsl),
+        policies(dsl));
+  }
+
+  private static List<PolicyRow> policies(final DSLContext dsl) {
+    return dsl.resultQuery(
+            """
+            SELECT schemaname AS schema_name, tablename AS table_name, policyname AS object_name,
+                   permissive, roles::text[] AS role_names, cmd, qual, with_check
+            FROM pg_policies
+            """)
+        .fetch(r ->
+            new PolicyRow(
+                text(r, SCHEMA),
+                text(r, TABLE),
+                text(r, NAME),
+                text(r, "permissive"),
+                texts(r, "role_names"),
+                text(r, "cmd"),
+                r.get("qual", String.class),
+                r.get("with_check", String.class)));
   }
 
   private static List<RelationRow> relations(final DSLContext dsl) {
@@ -137,7 +168,8 @@ final class SchemaCatalog {
                         JOIN pg_attribute a ON a.attrelid = i.indrelid AND a.attnum = i.indkey[0]
                         WHERE i.indrelid = c.oid AND i.indisprimary) AS primary_key,
                        (SELECT p.relname FROM pg_inherits h JOIN pg_class p ON p.oid = h.inhparent
-                        WHERE h.inhrelid = c.oid AND p.relkind <> 'p' LIMIT 1) AS inheritance_parent
+                        WHERE h.inhrelid = c.oid AND p.relkind <> 'p' LIMIT 1) AS inheritance_parent,
+                       c.relrowsecurity AS row_security, c.relforcerowsecurity AS force_row_security
                 FROM pg_class c
                 JOIN pg_namespace n ON n.oid = c.relnamespace
                 WHERE c.relkind IN /*RELATION_KINDS*/ AND /*NOT_SYSTEM*/
@@ -148,7 +180,9 @@ final class SchemaCatalog {
                 text(r, NAME),
                 text(r, "kind"),
                 r.get("primary_key", String.class),
-                r.get("inheritance_parent", String.class)));
+                r.get("inheritance_parent", String.class),
+                r.get("row_security", Boolean.class),
+                r.get("force_row_security", Boolean.class)));
   }
 
   private static List<ColumnRow> columns(final DSLContext dsl) {
@@ -158,7 +192,7 @@ final class SchemaCatalog {
                 SELECT n.nspname AS schema_name, c.relname AS table_name, a.attname AS object_name,
                        format_type(a.atttypid, a.atttypmod) AS type_name, t.typtype::text AS type_kind,
                        a.attidentity::text AS identity_kind, a.attgenerated::text AS generated_kind,
-                       pg_get_expr(d.adbin, d.adrelid) AS default_expression
+                       pg_get_expr(d.adbin, d.adrelid) AS default_expression, a.attnotnull AS not_null
                 FROM pg_attribute a
                 JOIN pg_class c ON c.oid = a.attrelid
                 JOIN pg_namespace n ON n.oid = c.relnamespace
@@ -175,7 +209,8 @@ final class SchemaCatalog {
                 text(r, "type_kind"),
                 text(r, "identity_kind"),
                 text(r, "generated_kind"),
-                r.get("default_expression", String.class)));
+                r.get("default_expression", String.class),
+                r.get("not_null", Boolean.class)));
   }
 
   private static List<IndexRow> indexes(final DSLContext dsl) {
@@ -187,7 +222,10 @@ final class SchemaCatalog {
                        i.indnkeyatts AS key_count, i.indnatts AS total_count,
                        i.indexprs IS NOT NULL AS has_expressions, i.indpred IS NOT NULL AS has_predicate,
                        EXISTS (SELECT 1 FROM pg_constraint x
-                               WHERE x.conindid = i.indexrelid AND x.contype = 'x') AS backs_exclusion
+                               WHERE x.conindid = i.indexrelid AND x.contype = 'x') AS backs_exclusion,
+                       i.indisunique AS is_unique,
+                       (SELECT a.attname FROM pg_attribute a
+                        WHERE a.attrelid = i.indrelid AND a.attnum = i.indkey[0]) AS first_column
                 FROM pg_index i
                 JOIN pg_class ic ON ic.oid = i.indexrelid
                 JOIN pg_class t ON t.oid = i.indrelid
@@ -206,7 +244,9 @@ final class SchemaCatalog {
                 r.get("total_count", Integer.class),
                 r.get("has_expressions", Boolean.class),
                 r.get("has_predicate", Boolean.class),
-                r.get("backs_exclusion", Boolean.class)));
+                r.get("backs_exclusion", Boolean.class),
+                r.get("is_unique", Boolean.class),
+                r.get("first_column", String.class)));
   }
 
   private static List<ViewDependencyRow> viewDependencies(final DSLContext dsl) {
@@ -392,5 +432,9 @@ final class SchemaCatalog {
 
   private static String text(final Record row, final String column) {
     return row.get(column, String.class);
+  }
+
+  private static List<String> texts(final Record row, final String column) {
+    return List.of(row.get(column, String[].class));
   }
 }

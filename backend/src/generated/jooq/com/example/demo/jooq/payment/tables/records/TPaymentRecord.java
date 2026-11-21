@@ -48,10 +48,24 @@ public class TPaymentRecord extends UpdatableRecordImpl<TPaymentRecord> {
     }
 
     /**
+     * Setter for <code>payment.t_payment.tenant_public_id</code>.
+     */
+    public void setTenantPublicId(UUID value) {
+        set(1, value);
+    }
+
+    /**
+     * Getter for <code>payment.t_payment.tenant_public_id</code>.
+     */
+    public UUID getTenantPublicId() {
+        return (UUID) get(1);
+    }
+
+    /**
      * Setter for <code>payment.t_payment.public_id</code>.
      */
     public void setPublicId(@NonNull UUID value) {
-        set(1, value);
+        set(2, value);
     }
 
     /**
@@ -59,14 +73,14 @@ public class TPaymentRecord extends UpdatableRecordImpl<TPaymentRecord> {
      */
     @NonNull
     public UUID getPublicId() {
-        return (UUID) get(1);
+        return (UUID) get(2);
     }
 
     /**
      * Setter for <code>payment.t_payment.order_public_id</code>.
      */
     public void setOrderPublicId(@NonNull UUID value) {
-        set(2, value);
+        set(3, value);
     }
 
     /**
@@ -74,14 +88,14 @@ public class TPaymentRecord extends UpdatableRecordImpl<TPaymentRecord> {
      */
     @NonNull
     public UUID getOrderPublicId() {
-        return (UUID) get(2);
+        return (UUID) get(3);
     }
 
     /**
      * Setter for <code>payment.t_payment.charged_amount_jpy</code>.
      */
     public void setChargedAmountJpy(@NonNull BigDecimal value) {
-        set(3, value);
+        set(4, value);
     }
 
     /**
@@ -89,28 +103,42 @@ public class TPaymentRecord extends UpdatableRecordImpl<TPaymentRecord> {
      */
     @NonNull
     public BigDecimal getChargedAmountJpy() {
-        return (BigDecimal) get(3);
+        return (BigDecimal) get(4);
+    }
+
+    /**
+     * Setter for <code>payment.t_payment.payment_status_typ</code>.
+     */
+    public void setPaymentStatusTyp(String value) {
+        set(5, value);
+    }
+
+    /**
+     * Getter for <code>payment.t_payment.payment_status_typ</code>.
+     */
+    public String getPaymentStatusTyp() {
+        return (String) get(5);
     }
 
     /**
      * Setter for <code>payment.t_payment.gateway_payment_code</code>.
      */
     public void setGatewayPaymentCode(String value) {
-        set(4, value);
+        set(6, value);
     }
 
     /**
      * Getter for <code>payment.t_payment.gateway_payment_code</code>.
      */
     public String getGatewayPaymentCode() {
-        return (String) get(4);
+        return (String) get(6);
     }
 
     /**
      * Setter for <code>payment.t_payment.recorded_at</code>.
      */
     public void setRecordedAt(@NonNull Instant value) {
-        set(5, value);
+        set(7, value);
     }
 
     /**
@@ -118,14 +146,14 @@ public class TPaymentRecord extends UpdatableRecordImpl<TPaymentRecord> {
      */
     @NonNull
     public Instant getRecordedAt() {
-        return (Instant) get(5);
+        return (Instant) get(7);
     }
 
     /**
      * Setter for <code>payment.t_payment.created_at</code>.
      */
     public void setCreatedAt(@NonNull Instant value) {
-        set(6, value);
+        set(8, value);
     }
 
     /**
@@ -133,14 +161,14 @@ public class TPaymentRecord extends UpdatableRecordImpl<TPaymentRecord> {
      */
     @NonNull
     public Instant getCreatedAt() {
-        return (Instant) get(6);
+        return (Instant) get(8);
     }
 
     /**
      * Setter for <code>payment.t_payment.created_by</code>.
      */
     public void setCreatedBy(@NonNull String value) {
-        set(7, value);
+        set(9, value);
     }
 
     /**
@@ -148,14 +176,14 @@ public class TPaymentRecord extends UpdatableRecordImpl<TPaymentRecord> {
      */
     @NonNull
     public String getCreatedBy() {
-        return (String) get(7);
+        return (String) get(9);
     }
 
     /**
      * Setter for <code>payment.t_payment.created_pgm_cd</code>.
      */
     public void setCreatedPgmCd(@NonNull String value) {
-        set(8, value);
+        set(10, value);
     }
 
     /**
@@ -163,14 +191,14 @@ public class TPaymentRecord extends UpdatableRecordImpl<TPaymentRecord> {
      */
     @NonNull
     public String getCreatedPgmCd() {
-        return (String) get(8);
+        return (String) get(10);
     }
 
     /**
      * Setter for <code>payment.t_payment.created_tx_id</code>.
      */
     public void setCreatedTxId(@NonNull String value) {
-        set(9, value);
+        set(11, value);
     }
 
     /**
@@ -178,14 +206,14 @@ public class TPaymentRecord extends UpdatableRecordImpl<TPaymentRecord> {
      */
     @NonNull
     public String getCreatedTxId() {
-        return (String) get(9);
+        return (String) get(11);
     }
 
     /**
      * Setter for <code>payment.t_payment.updated_at</code>.
      */
     public void setUpdatedAt(@NonNull Instant value) {
-        set(10, value);
+        set(12, value);
     }
 
     /**
@@ -193,14 +221,14 @@ public class TPaymentRecord extends UpdatableRecordImpl<TPaymentRecord> {
      */
     @NonNull
     public Instant getUpdatedAt() {
-        return (Instant) get(10);
+        return (Instant) get(12);
     }
 
     /**
      * Setter for <code>payment.t_payment.updated_by</code>.
      */
     public void setUpdatedBy(@NonNull String value) {
-        set(11, value);
+        set(13, value);
     }
 
     /**
@@ -208,14 +236,14 @@ public class TPaymentRecord extends UpdatableRecordImpl<TPaymentRecord> {
      */
     @NonNull
     public String getUpdatedBy() {
-        return (String) get(11);
+        return (String) get(13);
     }
 
     /**
      * Setter for <code>payment.t_payment.updated_pgm_cd</code>.
      */
     public void setUpdatedPgmCd(@NonNull String value) {
-        set(12, value);
+        set(14, value);
     }
 
     /**
@@ -223,14 +251,14 @@ public class TPaymentRecord extends UpdatableRecordImpl<TPaymentRecord> {
      */
     @NonNull
     public String getUpdatedPgmCd() {
-        return (String) get(12);
+        return (String) get(14);
     }
 
     /**
      * Setter for <code>payment.t_payment.updated_tx_id</code>.
      */
     public void setUpdatedTxId(@NonNull String value) {
-        set(13, value);
+        set(15, value);
     }
 
     /**
@@ -238,14 +266,14 @@ public class TPaymentRecord extends UpdatableRecordImpl<TPaymentRecord> {
      */
     @NonNull
     public String getUpdatedTxId() {
-        return (String) get(13);
+        return (String) get(15);
     }
 
     /**
      * Setter for <code>payment.t_payment.lock_no</code>.
      */
     public void setLockNo(@NonNull Long value) {
-        set(14, value);
+        set(16, value);
     }
 
     /**
@@ -253,14 +281,14 @@ public class TPaymentRecord extends UpdatableRecordImpl<TPaymentRecord> {
      */
     @NonNull
     public Long getLockNo() {
-        return (Long) get(14);
+        return (Long) get(16);
     }
 
     /**
      * Setter for <code>payment.t_payment.patched_at</code>.
      */
     public void setPatchedAt(@Nullable Instant value) {
-        set(15, value);
+        set(17, value);
     }
 
     /**
@@ -268,14 +296,14 @@ public class TPaymentRecord extends UpdatableRecordImpl<TPaymentRecord> {
      */
     @Nullable
     public Instant getPatchedAt() {
-        return (Instant) get(15);
+        return (Instant) get(17);
     }
 
     /**
      * Setter for <code>payment.t_payment.patched_by</code>.
      */
     public void setPatchedBy(@Nullable String value) {
-        set(16, value);
+        set(18, value);
     }
 
     /**
@@ -283,14 +311,14 @@ public class TPaymentRecord extends UpdatableRecordImpl<TPaymentRecord> {
      */
     @Nullable
     public String getPatchedBy() {
-        return (String) get(16);
+        return (String) get(18);
     }
 
     /**
      * Setter for <code>payment.t_payment.patched_id</code>.
      */
     public void setPatchedId(@Nullable Integer value) {
-        set(17, value);
+        set(19, value);
     }
 
     /**
@@ -298,21 +326,7 @@ public class TPaymentRecord extends UpdatableRecordImpl<TPaymentRecord> {
      */
     @Nullable
     public Integer getPatchedId() {
-        return (Integer) get(17);
-    }
-
-    /**
-     * Setter for <code>payment.t_payment.payment_status_typ</code>.
-     */
-    public void setPaymentStatusTyp(String value) {
-        set(18, value);
-    }
-
-    /**
-     * Getter for <code>payment.t_payment.payment_status_typ</code>.
-     */
-    public String getPaymentStatusTyp() {
-        return (String) get(18);
+        return (Integer) get(19);
     }
 
     // -------------------------------------------------------------------------
@@ -339,13 +353,15 @@ public class TPaymentRecord extends UpdatableRecordImpl<TPaymentRecord> {
     /**
      * Create a detached, initialised TPaymentRecord
      */
-    public TPaymentRecord(Long paymentId, @NonNull UUID publicId, @NonNull UUID orderPublicId, @NonNull BigDecimal chargedAmountJpy, String gatewayPaymentCode, @NonNull Instant recordedAt, @NonNull Instant createdAt, @NonNull String createdBy, @NonNull String createdPgmCd, @NonNull String createdTxId, @NonNull Instant updatedAt, @NonNull String updatedBy, @NonNull String updatedPgmCd, @NonNull String updatedTxId, @NonNull Long lockNo, @Nullable Instant patchedAt, @Nullable String patchedBy, @Nullable Integer patchedId, String paymentStatusTyp) {
+    public TPaymentRecord(Long paymentId, UUID tenantPublicId, @NonNull UUID publicId, @NonNull UUID orderPublicId, @NonNull BigDecimal chargedAmountJpy, String paymentStatusTyp, String gatewayPaymentCode, @NonNull Instant recordedAt, @NonNull Instant createdAt, @NonNull String createdBy, @NonNull String createdPgmCd, @NonNull String createdTxId, @NonNull Instant updatedAt, @NonNull String updatedBy, @NonNull String updatedPgmCd, @NonNull String updatedTxId, @NonNull Long lockNo, @Nullable Instant patchedAt, @Nullable String patchedBy, @Nullable Integer patchedId) {
         super(TPayment.T_PAYMENT);
 
         setPaymentId(paymentId);
+        setTenantPublicId(tenantPublicId);
         setPublicId(publicId);
         setOrderPublicId(orderPublicId);
         setChargedAmountJpy(chargedAmountJpy);
+        setPaymentStatusTyp(paymentStatusTyp);
         setGatewayPaymentCode(gatewayPaymentCode);
         setRecordedAt(recordedAt);
         setCreatedAt(createdAt);
@@ -360,7 +376,6 @@ public class TPaymentRecord extends UpdatableRecordImpl<TPaymentRecord> {
         setPatchedAt(patchedAt);
         setPatchedBy(patchedBy);
         setPatchedId(patchedId);
-        setPaymentStatusTyp(paymentStatusTyp);
         resetTouchedOnNotNull();
     }
 }

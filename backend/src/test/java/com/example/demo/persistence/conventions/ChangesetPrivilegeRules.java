@@ -136,7 +136,7 @@ final class ChangesetPrivilegeRules {
    * @return 文が1つ以上あり、すべてが権限のSQLなら{@code true}
    */
   /* package */ static boolean isPrivilegeOnly(final String sql) {
-    final List<String> statements = statements(sql);
+    final List<String> statements = Changeset.statements(sql);
     return !statements.isEmpty()
         && statements.stream().allMatch(statement -> PRIVILEGE_STATEMENT.matcher(statement).find());
   }
@@ -162,7 +162,7 @@ final class ChangesetPrivilegeRules {
   private static Stream<String> statementsOf(final Stream<Change> changes) {
     return changes
         .filter(change -> "sql".equals(change.type()))
-        .flatMap(change -> statements(change.text("sql")).stream())
+        .flatMap(change -> Changeset.statements(change.text("sql")).stream())
         .filter(statement -> PRIVILEGE_STATEMENT.matcher(statement).find());
   }
 
@@ -262,13 +262,5 @@ final class ChangesetPrivilegeRules {
   private static Optional<Integer> number(final Changeset changeset) {
     final Matcher matcher = FILE_NUMBER.matcher(changeset.fileName());
     return matcher.find() ? Optional.of(Integer.parseInt(matcher.group(1))) : Optional.empty();
-  }
-
-  /** Liquibaseと同じく{@code ;}で文に分け、空の文を捨てる。空白は1つにそろえる。 */
-  private static List<String> statements(final String sql) {
-    return Arrays.stream(sql.split(";"))
-        .map(statement -> statement.strip().replaceAll("\\s+", " "))
-        .filter(statement -> !statement.isEmpty())
-        .toList();
   }
 }

@@ -1,5 +1,6 @@
 package archfixture.conforming.shared.tenant;
 
+import java.util.Optional;
 import java.util.function.Supplier;
 
 /** 呼び出し中のテナントを返す入口。フィクスチャは束縛を持たず、固定のテナントを返す。 */
@@ -15,5 +16,10 @@ public final class TenantContext {
   /** 呼び出し中のテナント。 */
   public static String current() {
     return "tenant-1";
+  }
+
+  /** 呼び出し中のテナント。フィクスチャは束縛を持たず、空を返す。 */
+  public static Optional<String> findCurrent() {
+    return Optional.empty();
   }
 }

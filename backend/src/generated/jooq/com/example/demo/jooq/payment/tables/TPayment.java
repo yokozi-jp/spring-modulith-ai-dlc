@@ -77,6 +77,11 @@ public class TPayment extends TableImpl<TPaymentRecord> {
     public final TableField<TPaymentRecord, Long> PAYMENT_ID = createField(DSL.name("payment_id"), SQLDataType.BIGINT.nullable(false).generatedAlwaysAsIdentity(), this, "");
 
     /**
+     * The column <code>payment.t_payment.tenant_public_id</code>.
+     */
+    public final TableField<TPaymentRecord, UUID> TENANT_PUBLIC_ID = createField(DSL.name("tenant_public_id"), SQLDataType.UUID.nullable(false).defaultValue(DSL.field(DSL.raw("(current_setting('app.current_tenant'::text))::uuid"), SQLDataType.UUID)), this, "");
+
+    /**
      * The column <code>payment.t_payment.public_id</code>.
      */
     public final TableField<TPaymentRecord, UUID> PUBLIC_ID = createField(DSL.name("public_id"), SQLDataType.UUID.nullable(false), this, "");
@@ -90,6 +95,11 @@ public class TPayment extends TableImpl<TPaymentRecord> {
      * The column <code>payment.t_payment.charged_amount_jpy</code>.
      */
     public final TableField<TPaymentRecord, BigDecimal> CHARGED_AMOUNT_JPY = createField(DSL.name("charged_amount_jpy"), SQLDataType.NUMERIC(18, 2).nullable(false), this, "");
+
+    /**
+     * The column <code>payment.t_payment.payment_status_typ</code>.
+     */
+    public final TableField<TPaymentRecord, String> PAYMENT_STATUS_TYP = createField(DSL.name("payment_status_typ"), SQLDataType.VARCHAR(10).nullable(false).defaultValue(DSL.field(DSL.raw("''::character varying"), SQLDataType.VARCHAR)), this, "", new NullToEmptyStringConverter());
 
     /**
      * The column <code>payment.t_payment.gateway_payment_code</code>.
@@ -160,11 +170,6 @@ public class TPayment extends TableImpl<TPaymentRecord> {
      * The column <code>payment.t_payment.patched_id</code>.
      */
     public final TableField<TPaymentRecord, Integer> PATCHED_ID = createField(DSL.name("patched_id"), SQLDataType.INTEGER, this, "");
-
-    /**
-     * The column <code>payment.t_payment.payment_status_typ</code>.
-     */
-    public final TableField<TPaymentRecord, String> PAYMENT_STATUS_TYP = createField(DSL.name("payment_status_typ"), SQLDataType.VARCHAR(10).nullable(false).defaultValue(DSL.field(DSL.raw("''::character varying"), SQLDataType.VARCHAR)), this, "", new NullToEmptyStringConverter());
 
     private TPayment(Name alias, Table<TPaymentRecord> aliased) {
         this(alias, aliased, (Field<?>[]) null, null);

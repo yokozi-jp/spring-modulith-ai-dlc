@@ -16,9 +16,11 @@ import com.example.demo.payment.domain.model.Money;
 import com.example.demo.payment.domain.model.OrderId;
 import com.example.demo.payment.domain.model.PaymentGateway;
 import com.example.demo.shared.concurrency.ExpectedLockNo;
+import com.example.demo.shared.infrastructure.persistence.ModuleRoleTransactionManager;
 import com.example.demo.testkit.AppUsers;
 import com.example.demo.testkit.AsModule;
 import com.example.demo.testkit.AsTenant;
+import com.example.demo.testkit.BindTestTenantExtension;
 import com.example.demo.testkit.CapturedLogRecords;
 import com.example.demo.testkit.CleanGeneratedTablesExtension;
 import com.example.demo.testkit.SharedTestConfiguration;
@@ -42,6 +44,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import org.jooq.DSLContext;
+import org.jooq.impl.DSL;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -77,7 +80,7 @@ import org.springframework.web.client.ResourceAccessException;
   OrderConfirmedFixture.class,
   OrderConfirmedListenerTest.GatewayConfiguration.class
 })
-@ExtendWith(CleanGeneratedTablesExtension.class)
+@ExtendWith({CleanGeneratedTablesExtension.class, BindTestTenantExtension.class})
 class OrderConfirmedListenerTest {
 
   /** 固定した現在時刻。決済した時刻と、イベント出版の時刻になる。 */
@@ -158,13 +161,16 @@ class OrderConfirmedListenerTest {
   }
 
   @Test
-  @DisplayName("Listener が呼ぶ決済代行の時点で、イベントのテナントが束縛されている")
+  @DisplayName("Listener が呼ぶ決済代行の時点で、イベントのテナントが束縛され、Listener のトランザクションに設定されている")
   void gatewayIsChargedInEventTenant(final Scenario scenario) {
     final String orderId = fixture.draftedOrderId();
     fixture.confirmAndAwait(scenario, orderId, "完了した出版", state -> state.archived() == 1);
 
     assertThat(gateway.recordedTenants())
-        .as("orderId=%s の請求の時点のテナント", orderId)
+        .as("orderId=%s の請求の時点のテナントの束縛", orderId)
+        .containsExactly(AsTenant.TENANT.toString());
+    assertThat(gateway.recordedTenantSettings())
+        .as("orderId=%s の請求の時点の、Listener のトランザクションのテナントの設定", orderId)
         .containsExactly(AsTenant.TENANT.toString());
   }
 
@@ -375,14 +381,21 @@ class OrderConfirmedListenerTest {
     /** 請求の中で束縛されていたテナント。束縛されていなければ {@code unbound}。 */
     private final List<String> tenants = new CopyOnWriteArrayList<>();
 
+    /** 請求の中で、呼び出し元のトランザクションに設定されていたテナント。一度も設定していない接続では空文字。 */
+    private final List<String> tenantSettings = new CopyOnWriteArrayList<>();
+
+    /** 請求の呼び出し元のトランザクションの設定を読む。 */
+    private final DSLContext dsl;
+
     /** 請求の手前で止める門。開いていれば null。 */
     private final AtomicReference<@Nullable CountDownLatch> gate = new AtomicReference<>();
 
     /** 門の前で待っている呼び出しの数。 */
     private final AtomicInteger waiting = new AtomicInteger();
 
-    /* package */ ControllablePaymentGateway(final Tracer tracer) {
+    /* package */ ControllablePaymentGateway(final Tracer tracer, final DSLContext dsl) {
       this.tracer = tracer;
+      this.dsl = dsl;
     }
 
     @Override
@@ -392,6 +405,11 @@ class OrderConfirmedListenerTest {
       final @Nullable Span span = tracer.currentSpan();
       traceIds.add(span == null ? "" : span.context().traceId());
       tenants.add(AsTenant.currentOrUnbound());
+      tenantSettings.add(
+          dsl.fetchValue(
+              DSL.field(
+                  "coalesce(current_setting({0}, true), '')",
+                  String.class, DSL.val(ModuleRoleTransactionManager.TENANT_SETTING))));
       final @Nullable CountDownLatch latch = gate.get();
       if (latch != null) {
         waiting.incrementAndGet();
@@ -417,6 +435,7 @@ class OrderConfirmedListenerTest {
       charged.clear();
       traceIds.clear();
       tenants.clear();
+      tenantSettings.clear();
       gate.set(null);
       waiting.set(0);
     }
@@ -451,6 +470,10 @@ class OrderConfirmedListenerTest {
     /* package */ List<String> recordedTenants() {
       return new ArrayList<>(tenants);
     }
+
+    /* package */ List<String> recordedTenantSettings() {
+      return new ArrayList<>(tenantSettings);
+    }
   }
 
   /** 決済代行と時計を差し替える。 */
@@ -459,8 +482,9 @@ class OrderConfirmedListenerTest {
 
     @Bean
     @Primary
-    /* package */ ControllablePaymentGateway controllablePaymentGateway(final Tracer tracer) {
-      return new ControllablePaymentGateway(tracer);
+    /* package */ ControllablePaymentGateway controllablePaymentGateway(
+        final Tracer tracer, final DSLContext dsl) {
+      return new ControllablePaymentGateway(tracer, dsl);
     }
 
     @Bean

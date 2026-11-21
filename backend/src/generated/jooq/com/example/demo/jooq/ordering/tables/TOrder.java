@@ -76,6 +76,11 @@ public class TOrder extends TableImpl<TOrderRecord> {
     public final TableField<TOrderRecord, Long> ORDER_ID = createField(DSL.name("order_id"), SQLDataType.BIGINT.nullable(false).generatedAlwaysAsIdentity(), this, "");
 
     /**
+     * The column <code>ordering.t_order.tenant_public_id</code>.
+     */
+    public final TableField<TOrderRecord, UUID> TENANT_PUBLIC_ID = createField(DSL.name("tenant_public_id"), SQLDataType.UUID.nullable(false).defaultValue(DSL.field(DSL.raw("(current_setting('app.current_tenant'::text))::uuid"), SQLDataType.UUID)), this, "");
+
+    /**
      * The column <code>ordering.t_order.public_id</code>.
      */
     public final TableField<TOrderRecord, UUID> PUBLIC_ID = createField(DSL.name("public_id"), SQLDataType.UUID.nullable(false), this, "");
@@ -193,7 +198,7 @@ public class TOrder extends TableImpl<TOrderRecord> {
     @Override
     @NonNull
     public List<Index> getIndexes() {
-        return Arrays.asList(Indexes.UK_2_T_ORDER, Indexes.UK_T_ORDER);
+        return Arrays.asList(Indexes.UK_2_T_ORDER, Indexes.UK_3_T_ORDER, Indexes.UK_T_ORDER);
     }
 
     @Override

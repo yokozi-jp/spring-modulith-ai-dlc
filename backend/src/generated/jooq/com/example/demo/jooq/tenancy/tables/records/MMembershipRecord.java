@@ -78,13 +78,14 @@ public class MMembershipRecord extends UpdatableRecordImpl<MMembershipRecord> {
     /**
      * Setter for <code>tenancy.m_membership.role_typ</code>.
      */
-    public void setRoleTyp(String value) {
+    public void setRoleTyp(@NonNull String value) {
         set(3, value);
     }
 
     /**
      * Getter for <code>tenancy.m_membership.role_typ</code>.
      */
+    @NonNull
     public String getRoleTyp() {
         return (String) get(3);
     }
@@ -293,7 +294,7 @@ public class MMembershipRecord extends UpdatableRecordImpl<MMembershipRecord> {
     /**
      * Create a detached, initialised MMembershipRecord
      */
-    public MMembershipRecord(Long membershipId, @NonNull Long userId, @NonNull Long tenantId, String roleTyp, @NonNull Instant createdAt, @NonNull String createdBy, @NonNull String createdPgmCd, @NonNull String createdTxId, @NonNull Instant updatedAt, @NonNull String updatedBy, @NonNull String updatedPgmCd, @NonNull String updatedTxId, @NonNull Long lockNo, @Nullable Instant patchedAt, @Nullable String patchedBy, @Nullable Integer patchedId) {
+    public MMembershipRecord(Long membershipId, @NonNull Long userId, @NonNull Long tenantId, @NonNull String roleTyp, @NonNull Instant createdAt, @NonNull String createdBy, @NonNull String createdPgmCd, @NonNull String createdTxId, @NonNull Instant updatedAt, @NonNull String updatedBy, @NonNull String updatedPgmCd, @NonNull String updatedTxId, @NonNull Long lockNo, @Nullable Instant patchedAt, @Nullable String patchedBy, @Nullable Integer patchedId) {
         super(MMembership.M_MEMBERSHIP);
 
         setMembershipId(membershipId);

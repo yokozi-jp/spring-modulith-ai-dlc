@@ -2,6 +2,7 @@ package com.example.demo.shared.infrastructure.persistence;
 
 import java.util.Optional;
 import java.util.Set;
+import java.util.stream.Collectors;
 import org.jspecify.annotations.Nullable;
 
 /**
@@ -17,6 +18,15 @@ public final class ModuleRoles {
 
   /** ロールとスキーマを持つ機能モジュール。 */
   public static final Set<String> MODULES = Set.of("product", "ordering", "payment", "tenancy");
+
+  /** テナントの RLS の外に表を置くモジュール。{@code tenancy} は、テナントを選ぶ前に引く表を持つ（ADR-107）。 */
+  public static final Set<String> RLS_EXEMPT_MODULES = Set.of("tenancy");
+
+  /** 業務の表をテナントの RLS で分けるモジュール。トランザクションは、テナントを束縛した呼び出しの中でだけ始める（ADR-107）。 */
+  public static final Set<String> TENANT_SCOPED_MODULES =
+      MODULES.stream()
+          .filter(module -> !RLS_EXEMPT_MODULES.contains(module))
+          .collect(Collectors.toUnmodifiableSet());
 
   /** ロール名の接尾辞。 */
   private static final String ROLE_SUFFIX = "_module";
@@ -45,12 +55,26 @@ public final class ModuleRoles {
    * @return モジュールのロール。モジュールが分からなければ空
    */
   public static Optional<String> roleFor(final @Nullable String transactionName) {
+    return moduleFor(transactionName).map(ModuleRoles::roleOf);
+  }
+
+  /**
+   * トランザクションの名前のモジュールが、{@link #TENANT_SCOPED_MODULES} に含まれるか。
+   *
+   * @param transactionName {@code TransactionDefinition#getName()}。名前がなければ {@code null}
+   * @return テナントを設定しないと始められないトランザクションなら {@code true}
+   */
+  public static boolean requiresTenant(final @Nullable String transactionName) {
+    return moduleFor(transactionName).filter(TENANT_SCOPED_MODULES::contains).isPresent();
+  }
+
+  private static Optional<String> moduleFor(final @Nullable String transactionName) {
     if (transactionName == null || !transactionName.startsWith(BASE_PACKAGE)) {
       return Optional.empty();
     }
     final String relative = transactionName.substring(BASE_PACKAGE.length());
     final int end = relative.indexOf('.');
     final String module = end < 0 ? relative : relative.substring(0, end);
-    return MODULES.contains(module) ? Optional.of(roleOf(module)) : Optional.empty();
+    return MODULES.contains(module) ? Optional.of(module) : Optional.empty();
   }
 }

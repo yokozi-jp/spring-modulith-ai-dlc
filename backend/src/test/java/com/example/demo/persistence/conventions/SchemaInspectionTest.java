@@ -21,8 +21,7 @@ import org.springframework.modulith.core.ApplicationModules;
 /**
  * マイグレーション済みのテストDBを、アプリロールで{@code pg_catalog}から読んで検査する。
  *
- * <p>業務テーブルはまだないため、規約の検査は{@code modulith}と{@code
- * liquibase}の除外が正しいことと、アプリロールが業務のスキーマに権限を持たないこと、モジュールのロールが依存の方向の権限だけを持つこと、マイグレーションロールがsuperuserでもBYPASSRLSでもないことを確かめる。判定の拒否経路は{@link
+ * <p>業務の表がテーブル、テナント、外部キーの規約を満たすことと、アプリロールが業務のスキーマに権限を持たないこと、モジュールのロールが依存の方向の権限だけを持つこと、マイグレーションロールがsuperuserでもBYPASSRLSでもないことを確かめる。判定の拒否経路は{@link
  * SchemaConventionsTest}が違反を含む行で検証する。
  */
 @DatabaseTest

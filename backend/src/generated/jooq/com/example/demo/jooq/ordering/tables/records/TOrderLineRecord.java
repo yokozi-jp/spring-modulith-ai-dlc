@@ -48,10 +48,24 @@ public class TOrderLineRecord extends UpdatableRecordImpl<TOrderLineRecord> {
     }
 
     /**
+     * Setter for <code>ordering.t_order_line.tenant_public_id</code>.
+     */
+    public void setTenantPublicId(UUID value) {
+        set(1, value);
+    }
+
+    /**
+     * Getter for <code>ordering.t_order_line.tenant_public_id</code>.
+     */
+    public UUID getTenantPublicId() {
+        return (UUID) get(1);
+    }
+
+    /**
      * Setter for <code>ordering.t_order_line.order_id</code>.
      */
     public void setOrderId(@NonNull Long value) {
-        set(1, value);
+        set(2, value);
     }
 
     /**
@@ -59,14 +73,14 @@ public class TOrderLineRecord extends UpdatableRecordImpl<TOrderLineRecord> {
      */
     @NonNull
     public Long getOrderId() {
-        return (Long) get(1);
+        return (Long) get(2);
     }
 
     /**
      * Setter for <code>ordering.t_order_line.line_no</code>.
      */
     public void setLineNo(@NonNull Integer value) {
-        set(2, value);
+        set(3, value);
     }
 
     /**
@@ -74,14 +88,14 @@ public class TOrderLineRecord extends UpdatableRecordImpl<TOrderLineRecord> {
      */
     @NonNull
     public Integer getLineNo() {
-        return (Integer) get(2);
+        return (Integer) get(3);
     }
 
     /**
      * Setter for <code>ordering.t_order_line.product_public_id</code>.
      */
     public void setProductPublicId(@NonNull UUID value) {
-        set(3, value);
+        set(4, value);
     }
 
     /**
@@ -89,14 +103,14 @@ public class TOrderLineRecord extends UpdatableRecordImpl<TOrderLineRecord> {
      */
     @NonNull
     public UUID getProductPublicId() {
-        return (UUID) get(3);
+        return (UUID) get(4);
     }
 
     /**
      * Setter for <code>ordering.t_order_line.ordered_count</code>.
      */
     public void setOrderedCount(@NonNull Integer value) {
-        set(4, value);
+        set(5, value);
     }
 
     /**
@@ -104,14 +118,14 @@ public class TOrderLineRecord extends UpdatableRecordImpl<TOrderLineRecord> {
      */
     @NonNull
     public Integer getOrderedCount() {
-        return (Integer) get(4);
+        return (Integer) get(5);
     }
 
     /**
      * Setter for <code>ordering.t_order_line.ordered_unit_price_jpy</code>.
      */
     public void setOrderedUnitPriceJpy(@NonNull BigDecimal value) {
-        set(5, value);
+        set(6, value);
     }
 
     /**
@@ -119,14 +133,14 @@ public class TOrderLineRecord extends UpdatableRecordImpl<TOrderLineRecord> {
      */
     @NonNull
     public BigDecimal getOrderedUnitPriceJpy() {
-        return (BigDecimal) get(5);
+        return (BigDecimal) get(6);
     }
 
     /**
      * Setter for <code>ordering.t_order_line.created_at</code>.
      */
     public void setCreatedAt(@NonNull Instant value) {
-        set(6, value);
+        set(7, value);
     }
 
     /**
@@ -134,14 +148,14 @@ public class TOrderLineRecord extends UpdatableRecordImpl<TOrderLineRecord> {
      */
     @NonNull
     public Instant getCreatedAt() {
-        return (Instant) get(6);
+        return (Instant) get(7);
     }
 
     /**
      * Setter for <code>ordering.t_order_line.created_by</code>.
      */
     public void setCreatedBy(@NonNull String value) {
-        set(7, value);
+        set(8, value);
     }
 
     /**
@@ -149,14 +163,14 @@ public class TOrderLineRecord extends UpdatableRecordImpl<TOrderLineRecord> {
      */
     @NonNull
     public String getCreatedBy() {
-        return (String) get(7);
+        return (String) get(8);
     }
 
     /**
      * Setter for <code>ordering.t_order_line.created_pgm_cd</code>.
      */
     public void setCreatedPgmCd(@NonNull String value) {
-        set(8, value);
+        set(9, value);
     }
 
     /**
@@ -164,14 +178,14 @@ public class TOrderLineRecord extends UpdatableRecordImpl<TOrderLineRecord> {
      */
     @NonNull
     public String getCreatedPgmCd() {
-        return (String) get(8);
+        return (String) get(9);
     }
 
     /**
      * Setter for <code>ordering.t_order_line.created_tx_id</code>.
      */
     public void setCreatedTxId(@NonNull String value) {
-        set(9, value);
+        set(10, value);
     }
 
     /**
@@ -179,14 +193,14 @@ public class TOrderLineRecord extends UpdatableRecordImpl<TOrderLineRecord> {
      */
     @NonNull
     public String getCreatedTxId() {
-        return (String) get(9);
+        return (String) get(10);
     }
 
     /**
      * Setter for <code>ordering.t_order_line.updated_at</code>.
      */
     public void setUpdatedAt(@NonNull Instant value) {
-        set(10, value);
+        set(11, value);
     }
 
     /**
@@ -194,14 +208,14 @@ public class TOrderLineRecord extends UpdatableRecordImpl<TOrderLineRecord> {
      */
     @NonNull
     public Instant getUpdatedAt() {
-        return (Instant) get(10);
+        return (Instant) get(11);
     }
 
     /**
      * Setter for <code>ordering.t_order_line.updated_by</code>.
      */
     public void setUpdatedBy(@NonNull String value) {
-        set(11, value);
+        set(12, value);
     }
 
     /**
@@ -209,14 +223,14 @@ public class TOrderLineRecord extends UpdatableRecordImpl<TOrderLineRecord> {
      */
     @NonNull
     public String getUpdatedBy() {
-        return (String) get(11);
+        return (String) get(12);
     }
 
     /**
      * Setter for <code>ordering.t_order_line.updated_pgm_cd</code>.
      */
     public void setUpdatedPgmCd(@NonNull String value) {
-        set(12, value);
+        set(13, value);
     }
 
     /**
@@ -224,14 +238,14 @@ public class TOrderLineRecord extends UpdatableRecordImpl<TOrderLineRecord> {
      */
     @NonNull
     public String getUpdatedPgmCd() {
-        return (String) get(12);
+        return (String) get(13);
     }
 
     /**
      * Setter for <code>ordering.t_order_line.updated_tx_id</code>.
      */
     public void setUpdatedTxId(@NonNull String value) {
-        set(13, value);
+        set(14, value);
     }
 
     /**
@@ -239,14 +253,14 @@ public class TOrderLineRecord extends UpdatableRecordImpl<TOrderLineRecord> {
      */
     @NonNull
     public String getUpdatedTxId() {
-        return (String) get(13);
+        return (String) get(14);
     }
 
     /**
      * Setter for <code>ordering.t_order_line.lock_no</code>.
      */
     public void setLockNo(@NonNull Long value) {
-        set(14, value);
+        set(15, value);
     }
 
     /**
@@ -254,14 +268,14 @@ public class TOrderLineRecord extends UpdatableRecordImpl<TOrderLineRecord> {
      */
     @NonNull
     public Long getLockNo() {
-        return (Long) get(14);
+        return (Long) get(15);
     }
 
     /**
      * Setter for <code>ordering.t_order_line.patched_at</code>.
      */
     public void setPatchedAt(@Nullable Instant value) {
-        set(15, value);
+        set(16, value);
     }
 
     /**
@@ -269,14 +283,14 @@ public class TOrderLineRecord extends UpdatableRecordImpl<TOrderLineRecord> {
      */
     @Nullable
     public Instant getPatchedAt() {
-        return (Instant) get(15);
+        return (Instant) get(16);
     }
 
     /**
      * Setter for <code>ordering.t_order_line.patched_by</code>.
      */
     public void setPatchedBy(@Nullable String value) {
-        set(16, value);
+        set(17, value);
     }
 
     /**
@@ -284,14 +298,14 @@ public class TOrderLineRecord extends UpdatableRecordImpl<TOrderLineRecord> {
      */
     @Nullable
     public String getPatchedBy() {
-        return (String) get(16);
+        return (String) get(17);
     }
 
     /**
      * Setter for <code>ordering.t_order_line.patched_id</code>.
      */
     public void setPatchedId(@Nullable Integer value) {
-        set(17, value);
+        set(18, value);
     }
 
     /**
@@ -299,7 +313,7 @@ public class TOrderLineRecord extends UpdatableRecordImpl<TOrderLineRecord> {
      */
     @Nullable
     public Integer getPatchedId() {
-        return (Integer) get(17);
+        return (Integer) get(18);
     }
 
     // -------------------------------------------------------------------------
@@ -326,10 +340,11 @@ public class TOrderLineRecord extends UpdatableRecordImpl<TOrderLineRecord> {
     /**
      * Create a detached, initialised TOrderLineRecord
      */
-    public TOrderLineRecord(Long orderLineId, @NonNull Long orderId, @NonNull Integer lineNo, @NonNull UUID productPublicId, @NonNull Integer orderedCount, @NonNull BigDecimal orderedUnitPriceJpy, @NonNull Instant createdAt, @NonNull String createdBy, @NonNull String createdPgmCd, @NonNull String createdTxId, @NonNull Instant updatedAt, @NonNull String updatedBy, @NonNull String updatedPgmCd, @NonNull String updatedTxId, @NonNull Long lockNo, @Nullable Instant patchedAt, @Nullable String patchedBy, @Nullable Integer patchedId) {
+    public TOrderLineRecord(Long orderLineId, UUID tenantPublicId, @NonNull Long orderId, @NonNull Integer lineNo, @NonNull UUID productPublicId, @NonNull Integer orderedCount, @NonNull BigDecimal orderedUnitPriceJpy, @NonNull Instant createdAt, @NonNull String createdBy, @NonNull String createdPgmCd, @NonNull String createdTxId, @NonNull Instant updatedAt, @NonNull String updatedBy, @NonNull String updatedPgmCd, @NonNull String updatedTxId, @NonNull Long lockNo, @Nullable Instant patchedAt, @Nullable String patchedBy, @Nullable Integer patchedId) {
         super(TOrderLine.T_ORDER_LINE);
 
         setOrderLineId(orderLineId);
+        setTenantPublicId(tenantPublicId);
         setOrderId(orderId);
         setLineNo(lineNo);
         setProductPublicId(productPublicId);

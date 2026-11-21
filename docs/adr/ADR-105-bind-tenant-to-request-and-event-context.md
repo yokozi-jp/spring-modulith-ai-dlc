@@ -31,6 +31,11 @@ RLS のポリシーは、トランザクションに設定したテナントの�
 `PgmCdAspect` が `ScopedValue` に値を束縛し、すべての `@Aspect` はトランザクションの advisor より外側で動く（[ADR-051](ADR-051-bind-pgm-cd-with-scoped-value-and-aspect.md)）。
 テナントの値の渡し方も、この形に揃えられるかを決める。
 
+実装（#377）で、Decision に `TenantContext.findCurrent()` を足した。
+トランザクションマネージャーは、テナントのないトランザクションでも例外を投げずに、束縛の有無を知る必要があるからである。
+同じ実装で、`findCurrent()` を呼べるクラスをトランザクションマネージャーに限る検査を足し、Consequences の本物の流れでの確認を、それを確かめるテストに書き換えた。
+トランザクションマネージャーが #377 でリスナーのトランザクションにテナントを設定するようになり、確認を置く先が決まったからである。
+
 ## Decision
 
 操作しているテナントの `public_id` を、`shared.tenant` の `ScopedValue` に束縛する。
@@ -39,6 +44,9 @@ RLS のポリシーは、トランザクションに設定したテナントの�
   置く型は、`public_id` の UUID を包む値オブジェクト `TenantId`、テナントを運ぶイベントの型 `TenantScoped`、束縛と読み出しの入口 `TenantContext` である。
   `tenancy` の `domain.model` も、テナントの ID に同じ `TenantId` を使う。テナントの ID を表す型を 2 つ持たない。
 - `TenantContext.current()` は、束縛された `TenantId` を返す。束縛がなければ `IllegalStateException` を投げ、テナントがない状態を「データがない」と取り違えさせない。
+- `TenantContext.findCurrent()` は、束縛がなければ空を返す。
+  テナントのない呼び出し（Spring Modulith の内部、再投入、ShedLock）も通るトランザクションマネージャー（[ADR-107](ADR-107-isolate-tenants-with-rls-set-per-transaction.md)）のためにあり、業務の処理は `current()` を使う。
+  本番のコードで `findCurrent()` を呼べるのは `ModuleRoleTransactionManager` だけで、ArchUnit の `unboundTenantIsReadOnlyByTransactionManager` で検査する。
 - リクエストでは、`tenancy` の `TenantSelectionFilter` が、所属を引き直して残っているテナントを、リクエストの残りの処理の間だけ束縛する。
   テナントは認証の権限だけから取る。リクエストの header、パス、本文から取らない。
 - リスナーでは、`shared.infrastructure.persistence` の `TenantListenerAspect` が引数のイベントの `TenantScoped.tenantId()` を、呼び出しの間だけ束縛する。
@@ -53,8 +61,7 @@ RLS のポリシーは、トランザクションに設定したテナントの�
   メソッド参照も検出する。filter を別のモジュールに足すときも、この規則の許可先とこの ADR を先に変える。
 - ArchUnit の `moduleApiDoesNotExposeInternalTypes` は、モジュールルートの型が依存してよい型に、`shared.tenant.TenantId` と `shared.tenant.TenantScoped` の 2 つだけを足す。イベントがこの 2 つを使うためで、`TenantContext` には依存させない。
 
-束縛はこの決定の範囲では DB に使わない。
-DB のロールとテナントの設定は #377 で、トランザクションマネージャーが `TenantContext` を読んで行う。
+DB のロールとテナントの設定は、トランザクションマネージャーが `TenantContext` を読んで行う（ADR-107）。
 
 ## Consequences
 
@@ -72,11 +79,15 @@ DB のロールとテナントの設定は #377 で、トランザクション�
 - リクエストでもリスナーでもない入口（バッチ、起動時の処理）は、この決定の範囲では束縛できない。足すときは、ArchUnit の許可先とこの ADR を先に変える。
 - `OncePerRequestFilter` は非同期ディスパッチでは動かないため、`Callable` や `DeferredResult` を返す Controller の非同期の処理には束縛されない。現時点で該当する Controller はない。
 - Spring AOP のプロキシを通らない呼び出しと、別のスレッドへ渡した処理では束縛されない。
-- 「リスナーのトランザクションが始まる時点で束縛済み」という性質は、`TenantListenerAspectTest` が偽のトランザクションマネージャーで確かめる。本物の流れでの確認は、トランザクションの開始時にテナントを読む #377 で足す。
+- 「リスナーのトランザクションが始まる時点で束縛済み」という性質は、`TenantListenerAspectTest` が偽のトランザクションマネージャーで確かめる。
+  本物の流れでは、`OrderConfirmedListenerTest` が、リスナーが呼ぶ決済代行の時点で、リスナーのトランザクションに設定された DB のテナント（`app.current_tenant`）がイベントのテナントであることを確かめる。
+  束縛がトランザクションより遅れると、トランザクションマネージャーがテナントのない業務のトランザクションとして拒否し、リスナーは失敗する（ADR-107）。
 
 ### Neutral
 
-- 発行済みで未完了のイベントの出版は、テナントの項目を持たず、再投入すると `NullPointerException` で失敗して `FAILED` に残る。`TenantContext.call` と `TenantId` が null を拒否するため、テナントなしで動くことはない。本番にデータはまだないため、移行の手順は作らない。
+- 発行済みで未完了のイベントの出版は、テナントの項目を持たず、再投入すると `TenantListenerAspect` がイベントの型を示す `IllegalStateException` で拒否し、`FAILED` に残る。
+  リスナーを呼ぶ前に拒否するため、テナントなしで動くことはない。
+  本番にデータはまだないため、移行の手順は作らない。
 - `TenantListenerAspect` の `@Order` の値は `PgmCdAspect` と同じ向きで選び、ほかの Aspect を足すときに前後を決め直す。
 
 ## Alternatives Considered
@@ -103,5 +114,6 @@ DB のロールとテナントの設定は #377 で、トランザクション�
 
 - [ADR-051: 共通カラムの pgm_cd を Aspect と ScopedValue で渡し、Aspect をトランザクションの外側で動かす](ADR-051-bind-pgm-cd-with-scoped-value-and-aspect.md)
 - [ADR-101: テナント、所属、役割をアプリの DB に持ち、テナントを選んだ時点で役割の権限を組み立てる](ADR-101-keep-tenants-and-roles-in-app-database.md)
+- [ADR-107: 業務テーブルを RLS でテナントごとに分け、テナントをロールと同じ SQL でトランザクションごとに設定する](ADR-107-isolate-tenants-with-rls-set-per-transaction.md)
 - [issue #369: テナントでデータを分ける](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/369)
 - [JEP 506: Scoped Values](https://openjdk.org/jeps/506)

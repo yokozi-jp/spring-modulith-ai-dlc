@@ -10,6 +10,7 @@ import com.example.demo.shared.concurrency.ExpectedLockNo;
 import com.example.demo.shared.failure.BusinessRuleViolationException;
 import com.example.demo.testkit.AsModule;
 import com.example.demo.testkit.AsTenant;
+import com.example.demo.testkit.BindTestTenantExtension;
 import com.example.demo.testkit.CleanGeneratedTablesExtension;
 import com.example.demo.testkit.SharedTestConfiguration;
 import io.micrometer.observation.Observation;
@@ -33,7 +34,7 @@ import org.springframework.modulith.test.Scenario;
  */
 @ApplicationModuleTest(mode = BootstrapMode.DIRECT_DEPENDENCIES)
 @Import(SharedTestConfiguration.class)
-@ExtendWith(CleanGeneratedTablesExtension.class)
+@ExtendWith({CleanGeneratedTablesExtension.class, BindTestTenantExtension.class})
 class ConfirmOrderCommandHandlerTest {
 
   /** テスト対象の CommandHandler。 */
@@ -64,13 +65,12 @@ class ConfirmOrderCommandHandlerTest {
                 .stimulate(
                     // Scenario#stimulate は名前のないトランザクションで呼ぶため、本番の入口と同じく ordering のロールで入る。
                     () ->
-                        AsTenant.call(() ->
-                            AsModule.call(
-                                dsl,
-                                "ordering",
-                                tx ->
-                                    confirmOrder.handle(
-                                        new ConfirmOrderCommand(orderId, new ExpectedLockNo(1))))))
+                        AsModule.call(
+                            dsl,
+                            "ordering",
+                            tx ->
+                                confirmOrder.handle(
+                                    new ConfirmOrderCommand(orderId, new ExpectedLockNo(1)))))
                 .andWaitForEventOfType(OrderConfirmed.class)
                 .matching(event -> event.orderId().equals(orderId))
                 .toArriveAndVerify(event -> {

@@ -42,6 +42,33 @@ const runDir = join(root, "build/verify/runs", `${stamp}-${name}`);
 mkdirSync(runDir, { recursive: true });
 const log = (file, line) => appendFileSync(join(runDir, file), `${line}\n`);
 
+function psql(input, vars = {}) {
+  const args = ["compose", "-f", "docker/compose-test.yml", "--profile", "e2e", "exec", "-T", "postgres",
+    "psql", "-U", "demo", "-d", "demo", "-v", "ON_ERROR_STOP=1", "-qtA"];
+  for (const [key, value] of Object.entries(vars)) args.push("-v", `${key}=${value}`);
+  return execFileSync("docker", args, { cwd: root, encoding: "utf8", input }).trim();
+}
+// 業務の表は RLS でテナントごとに分かれ、テナントを設定しない読み取りは失敗する（ADR-107）。
+// ログインの後に選ぶテナントを、doctor と同じ SQL で名前から引く。
+const tenant = psql(readFileSync(join(dirname(fileURLToPath(import.meta.url)), "seeded-tenant.sql"), "utf8"));
+if (!/^[0-9a-f-]{36}$/u.test(tenant)) {
+  console.error(`ログインの後に選ぶテナントを tenancy.m_tenant から引けません（${JSON.stringify(tenant)}）。stack.sh doctor を実行してください。`);
+  process.exit(1);
+}
+// アプリのロール demo は業務のスキーマを読めない（ADR-094）。payment_module は payment と ordering を読める。
+// 値は psql の変数（vars）で渡し、クエリの中で :'name' と書く。読み取り専用は誤操作の防止で、クエリの中で解除できる。
+function sql(query, vars = {}) {
+  const input = `SET ROLE payment_module;\nSET app.current_tenant = '${tenant}';\nSET default_transaction_read_only = on;\n${query};\n`;
+  const out = psql(input, vars);
+  log("sql.log", `> ${query} ${JSON.stringify(vars)}\n${out}`);
+  return out;
+}
+// テナントを取り違えると、件数が 0 であることの確かめが黙って通るので、テナントの代表の注文があることを先に確かめる。
+if (sql("select count(*) from ordering.t_order where customer_order_code like 'SEED-C0%'") === "0") {
+  console.error(`テナント ${tenant} に代表の注文（SEED-C0*）がありません。stack.sh doctor を実行してください。`);
+  process.exit(1);
+}
+
 const browser = await chromium.launch();
 const context = await browser.newContext({ baseURL, locale: "ja-JP", viewport: { width: 1280, height: 900 } });
 // compose-test には Collector がないので、E2E と同じく /collect を 202 で返す（e2e/fixtures.ts）。
@@ -74,17 +101,6 @@ const gateway = {
   failChargesFor: (orderId, failure) => failChargesFor(context.request, orderId, failure),
 };
 
-// アプリのロール demo は業務のスキーマを読めない（ADR-094）。payment_module は payment と ordering を読める。
-// 値は psql の変数（vars）で渡し、クエリの中で :'name' と書く。読み取り専用は誤操作の防止で、クエリの中で解除できる。
-function sql(query, vars = {}) {
-  const args = ["compose", "-f", "docker/compose-test.yml", "--profile", "e2e", "exec", "-T", "postgres",
-    "psql", "-U", "demo", "-d", "demo", "-v", "ON_ERROR_STOP=1", "-qtA"];
-  for (const [key, value] of Object.entries(vars)) args.push("-v", `${key}=${value}`);
-  const input = `SET ROLE payment_module;\nSET default_transaction_read_only = on;\n${query};\n`;
-  const out = execFileSync("docker", args, { cwd: root, encoding: "utf8", input }).trim();
-  log("sql.log", `> ${query} ${JSON.stringify(vars)}\n${out}`);
-  return out;
-}
 
 async function login(target = page) {
   await target.goto("/oauth2/authorization/web");

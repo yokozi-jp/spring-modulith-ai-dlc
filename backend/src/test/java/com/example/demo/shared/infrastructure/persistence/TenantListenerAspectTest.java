@@ -80,14 +80,19 @@ class TenantListenerAspectTest {
   @Test
   // 型の上は null でない値を、JSON から読んだ値を模して null にする。
   @SuppressWarnings("NullAway")
-  @DisplayName("イベントのテナントが null（項目のない古い出版を読んだ場合）なら、束縛せず NullPointerException で拒否する")
+  @DisplayName("イベントのテナントが null（項目のない古い出版を読んだ場合）なら、リスナーを呼ばず、イベントの型を示す IllegalStateException で拒否する")
   void eventWithNullTenantIsRejected() {
     contextRunner()
-        .run(context ->
-            assertThatThrownBy(
-                    () -> context.getBean(OrderShippedListener.class).on(new OrderShipped(null)))
-                .isInstanceOf(NullPointerException.class)
-                .hasMessageContaining("tenantId"));
+        .run(context -> {
+          assertThatThrownBy(
+                  () -> context.getBean(OrderShippedListener.class).on(new OrderShipped(null)))
+              .isInstanceOf(IllegalStateException.class)
+              .hasMessageContaining(OrderShipped.class.getName());
+
+          assertThat(context.getBean(RecordingTransactionManager.class).tenantsAtBegin)
+              .as("リスナーのトランザクションの開始")
+              .isEmpty();
+        });
   }
 
   private static ApplicationContextRunner contextRunner() {
