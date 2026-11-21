@@ -36,8 +36,7 @@ import org.springframework.modulith.test.Scenario;
  * 失敗した {@link OrderConfirmed} の出版を、テナントを束縛していないスレッドから再投入したときのテナントの扱いを検証する。
  *
  * <p>定期の再投入はスケジューラのスレッドで動き、テナントを束縛しない。同じ状態にするため、このクラスには {@code BindTestTenantExtension}
- * を付けず、テストの利用者のテナントでもない別のテナントの注文を使う。構成は {@link OrderConfirmedListenerTest} と同じにし、Spring
- * のコンテキストを共有する。
+ * を付けず、テストの利用者のテナントでもない別のテナントの注文を使う。決済代行と時計は、{@link OrderConfirmedListenerTest} と同じ差し替えを使う。
  */
 @ApplicationModuleTest(mode = BootstrapMode.ALL_DEPENDENCIES)
 @Import({
