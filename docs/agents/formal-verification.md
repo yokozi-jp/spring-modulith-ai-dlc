@@ -117,6 +117,9 @@ TLC の結果は `/statechart` スキルで読む。
    merge の後に、main のコミットでモデルがコードを写すと確かめ直して進める。
 6. スキルを直したら、[スキルの取得元と更新](skill-sources.md)の「このリポジトリで書くスキルを記録する」に従って `skills-lock.json` の `computedHash` を直す。
 
+`task formal-verify` は、各スキルの同期コミットが `HEAD` の祖先として解決できることも `tooling/formal-verify/sync-check.sh` で検査する。
+squash merge の後に、Pull Request の中で書いた同期コミットが消えると、この検査が失敗し、main のコミットへ進めさせる。
+
 CI の `formal-verify.yml` はモデルを自分の期待に照らして検査するだけで、コードとモデルのずれは検出しない。
 ずれの検出は、この手順の「関わるか」のコマンドによる手作業である。
 

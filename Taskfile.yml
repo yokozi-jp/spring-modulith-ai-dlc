@@ -285,6 +285,7 @@ tasks:
       - task: lint-docs-sync
       - task: docs-boundary-check
       - task: adr-lint
+      - task: removed-names-check
       - task: ruleset-check
       - task: iwe-mcp-check
       - |
@@ -316,6 +317,15 @@ tasks:
     cmds:
       - bash tooling/adr-lint/test.sh
       - node tooling/adr-lint/adr-lint.mjs
+
+  # 削除した識別子（tooling/removed-names/names.txt）が docs、.agents、backend/src に残っていないかを検査する。
+  # 規約や skill に旧名が残ると、エージェントが写して、削除した API を呼ぶ。壊れた fixture に対する自己検査（test.sh）を先に実行する。
+  removed-names-check:
+    internal: true
+    silent: true
+    cmds:
+      - bash tooling/removed-names/test.sh
+      - bash tooling/removed-names/check.sh
 
   # .kiro/settings/mcp.json の iwe の起動コマンドが、作業ディレクトリごとに正しい iwe-mcp.sh を選ぶかを検査する（ADR-093）。
   iwe-mcp-check:
@@ -540,13 +550,14 @@ tasks:
       - bash tooling/formal-verify/test.sh
 
   formal-verify:
-    desc: 検証スキル（.agents/skills/formal-verify-*）の全設定と全変異を検査（数分かかる）
+    desc: 検証スキル（.agents/skills/formal-verify-*）の同期コミット、全設定、全変異を検査（数分かかる）
     silent: true
     cmds:
       - |
         status=0
         for skill in .agents/skills/formal-verify-*/; do
           echo "== $skill"
+          tooling/formal-verify/sync-check.sh "$skill" || status=1
           tooling/formal-verify/check.sh "$skill" || status=1
           tooling/formal-verify/mutants.py "$skill" || status=1
         done

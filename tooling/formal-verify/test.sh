@@ -5,6 +5,8 @@
 set -u
 
 dir="$(cd "$(dirname "$0")" && pwd)"
+# 一時のリポジトリへの git を、本物のリポジトリと利用者の git の設定から切り離す（task lint-scratch-git が source の位置を検査する）。
+. "$dir/../scratch-git/scratch-git.sh" || exit 1
 fixture="$dir/fixtures/counter"
 runs="${XDG_CACHE_HOME:-$HOME/.cache}/formal-verify-tla/runs"
 tmp="$(mktemp -d)"
@@ -53,6 +55,35 @@ expect "mutants.py catches a real mutant and rejects a vacuous one" 1 \
   "VACUOUS  vacuous: the unmutated model does not pass holds (Limit = 3) with BelowThree" -- \
   "$dir/mutants.py" "$fixture"
 grep -oP 'TLC output: \K\S+' "$out" | xargs -r -n 1 dirname | xargs -r rm -rf
+
+# sync-check.sh: 一時のリポジトリで、同期コミットの 4 つの場合を確かめる。
+repo="$tmp/sync-repo"
+mkdir -p "$repo/skill"
+gitc() { git -C "$repo" -c user.name=test -c user.email=test@example.com "$@"; }
+gitc init -q
+gitc "com""mit" -q --allow-empty -m first
+first="$(gitc rev-parse HEAD)"
+gitc "com""mit" -q --allow-empty -m second
+printf '同期コミット：`%s`（main）\n' "$first" >"$repo/skill/SKILL.md"
+expect "sync-check.sh passes when the sync commit is an ancestor of HEAD" 0 \
+  "OK   skill/SKILL.md: 同期コミット $first" -- \
+  bash -c "cd '$repo' && '$dir/sync-check.sh' skill"
+printf '同期コミット：`%s`（main）\n' "0000000000000000000000000000000000000001" >"$repo/skill/SKILL.md"
+expect "sync-check.sh fails when the sync commit does not resolve" 1 \
+  "squash merge で消えた可能性がある" -- \
+  bash -c "cd '$repo' && '$dir/sync-check.sh' skill"
+gitc checkout -q -b side "$first"
+gitc "com""mit" -q --allow-empty -m side
+side="$(gitc rev-parse HEAD)"
+gitc checkout -q -
+printf '同期コミット：`%s`（side）\n' "$side" >"$repo/skill/SKILL.md"
+expect "sync-check.sh fails when the sync commit is not an ancestor of HEAD" 1 \
+  "HEAD の祖先ではない" -- \
+  bash -c "cd '$repo' && '$dir/sync-check.sh' skill"
+printf 'なし\n' >"$repo/skill/SKILL.md"
+expect "sync-check.sh fails when SKILL.md has no sync commit line" 1 \
+  "同期コミット" -- \
+  bash -c "cd '$repo' && '$dir/sync-check.sh' skill"
 
 if [ "$failures" -gt 0 ]; then
   echo "$failures failure(s)"

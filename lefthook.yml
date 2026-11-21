@@ -169,6 +169,7 @@ pre-commit:
         - "Taskfile.yml"
         - "README.md"
         - "tooling/adr-lint/**"
+        - "tooling/removed-names/**"
         - ".kiro/settings/mcp.json"
         - "tooling/iwe-mcp/**"
         - ".github/rulesets/**"
