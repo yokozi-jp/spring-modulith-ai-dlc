@@ -100,6 +100,12 @@ package-private と `protected` のメソッドは CGLIB のプロキシが上�
 
 アノテーションを付けたメソッドは別の Bean へ移し、その Bean を注入して外から呼ぶ。
 
+アノテーションがなくても、モジュールの public な Bean クラス（`@Component` をメタアノテーションに持つ `@Service`、`@Repository`、`@Controller` など）の public メソッドに `final` を付けない。
+Spring Modulith の observability（`spring-modulith-starter-insight`）が、モジュールの public な Bean をアノテーションの有無によらず CGLIB のプロキシにする。
+`final` のメソッドはプロキシのインスタンスの上でそのまま動き、注入したフィールドが `null` のため `NullPointerException` になる。
+クラスを `new` で作る単体テストと起動は通り、Spring を起動する統合テストだけが失敗する。
+package-private のクラスはこの observability のプロキシにならなかったが（`EventPublicationResubmitter` など）、public にしたときに壊れるため、規則は public のクラスだけを見る。
+
 `@Async` のメソッドは `void` か `Future` を返す。
 Spring は、戻り値の型が `void` と `Future` 以外の `@Async` のメソッドを、呼ぶたびに `IllegalArgumentException` で拒否する。
 `void` の `@Async` が投げた例外は呼び出し元に届かず、既定の `AsyncUncaughtExceptionHandler` が ERROR のログに出すだけである。

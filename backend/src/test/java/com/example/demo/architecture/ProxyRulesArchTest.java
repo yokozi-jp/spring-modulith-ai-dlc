@@ -60,6 +60,7 @@ import org.springframework.security.access.prepost.PostAuthorize;
 import org.springframework.security.access.prepost.PostFilter;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.access.prepost.PreFilter;
+import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.EnableTransactionManagement;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -232,6 +233,36 @@ class ProxyRulesArchTest {
               "Spring の AOP プロキシはサブクラスでメソッドを上書きして呼び出しを横取りし、"
                   + "上書きできない private、final、static のメソッドではアノテーションが黙って効かないため。"
                   + "直し方：アノテーションを付けたメソッドから private、final、static を外し、別の Bean から注入して呼ぶ。"
+                  + JAVA_CODING_DOC);
+
+  /**
+   * モジュールの public な Bean クラスの public メソッドを、プロキシが上書きできる final でないメソッドにする。
+   *
+   * <p>Spring Modulith の observability（{@code spring-modulith-starter-insight}）が、モジュールの public な
+   * Bean を、アノテーションの有無によらず CGLIB のプロキシにする。
+   */
+  @ArchTest
+  /* package */ static final ArchRule publicBeanMethodsAreNotFinal =
+      methods()
+          .that()
+          .arePublic()
+          .and()
+          .areNotStatic()
+          .and()
+          .areDeclaredInClassesThat(
+              DescribedPredicate.describe(
+                  "public で @Component をメタアノテーションに持つ",
+                  type ->
+                      type.getModifiers().contains(JavaModifier.PUBLIC)
+                          && type.isMetaAnnotatedWith(Component.class)))
+          .should()
+          .notHaveModifier(JavaModifier.FINAL)
+          .allowEmptyShould(true)
+          .because(
+              "Spring Modulith の observability がモジュールの public な Bean をプロキシにし、"
+                  + "final のメソッドはプロキシが上書きできず、注入したフィールドが null のプロキシの上で動いて NullPointerException になるため。"
+                  + "起動とクラス単体のテストは通り、Spring を起動する統合テストだけが失敗する。"
+                  + "直し方：public な Bean のメソッドから final を外す。"
                   + JAVA_CODING_DOC);
 
   /** {@link Async} のメソッドは、Spring が受け付ける void か {@link Future} を返す。 */
