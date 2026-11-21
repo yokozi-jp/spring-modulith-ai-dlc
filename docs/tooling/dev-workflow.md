@@ -88,6 +88,9 @@ task agent-push
 task agent-wait
 ```
 
+pre-pushの検査は作業ツリーを対象にする。
+`task agent-push`は、追跡しているファイルに未commitの変更があると、push するコミットを検査できないので、変更のファイルを出して止まる。commitするか退避してから実行する。
+
 commitやpushを始められないときは、Taskが理由と直し方を出して止まるので、それに従う。
 Taskは失敗の終了コードを201にまとめるので、元の終了コードは出力の`exit=`の行かTaskのエラーの`exit status`で読む。
 `task agent-wait`が「まだ実行中です」と出したら（Taskのエラーは`exit status 75`）、同じコマンドをもう一度実行する。

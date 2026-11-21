@@ -409,7 +409,7 @@ prepush_here() {
 
 push() {
   [ $# -eq 0 ] || usage
-  local branch lock running run
+  local branch lock running run dirty
   branch="$(git symbolic-ref --quiet --short HEAD)" || fail "ブランチを checkout していないので push できません。"
   # pre-push の task test は compose-test のプロジェクト名とポートが固定なので、worktree をまたいで push を一つずつにする。
   # ロックは background の wrapper が受け継いで持ち続け、push が終わるか止まると外れる。
@@ -420,6 +420,10 @@ push() {
   running="$(prepush_here)" || fail "pgrep で前の pre-push を確かめられません。"
   [ -z "$running" ] || fail "このリポジトリの前の pre-push がまだ動いています。終わるのを待つか止めてから push してください（止めたときの片付けは docs/tooling/dev-workflow.md）。
 $running"
+  # pre-push の検査は作業ツリーを見るので、未 commit の変更があると、push するコミットを検査せずに通る。
+  dirty="$(git status --porcelain --untracked-files=no)" || exit 1
+  [ -z "$dirty" ] || fail "追跡しているファイルに未 commit の変更があります。pre-push の検査は作業ツリーを対象にするため、push するコミットの検査になりません。commit するか、退避してから push してください。
+$dirty"
   run="$(new_run push)" || exit 1
   echo "$run" >"$lock"
   launch "$run" git push -u origin "$branch"
