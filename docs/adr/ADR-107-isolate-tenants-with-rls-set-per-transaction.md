@@ -1,7 +1,7 @@
 ---
 type: ADR
 title: 'ADR-107: 業務の表を RLS でテナントごとに分け、テナントをロールと同じ SQL でトランザクションごとに設定する'
-description: 業務の表に tenant_public_id を持たせ、ENABLE と FORCE の RLS と、missing_ok を使わない TO PUBLIC のポリシーでテナントを分ける決定。テナントはトランザクションマネージャーが TenantContext から読み、モジュールのロールと同じ SQL でトランザクションの間だけ設定する。RLS の外に置くのは modulith と tenancy のスキーマの表だけにし、業務の一意索引は tenant_public_id から始め、全テナントの行はテナントを 1 つずつ設定して書き換える。
+description: 業務の表に tenant_public_id を持たせ、既定値をトランザクションのテナントにし、ENABLE と FORCE の RLS と、missing_ok を使わない TO PUBLIC のポリシーでテナントを分ける決定。テナントはトランザクションマネージャーが TenantContext から読み、モジュールのロールと同じ SQL でトランザクションの間だけ設定する。RLS の外に置くのは modulith と tenancy のスキーマの表だけにし、業務の一意索引は tenant_public_id から始め、全テナントの行はテナントを 1 つずつ設定して書き換える。
 tags: [adr, database, postgresql, security, tenancy, rls]
 ---
 
@@ -40,9 +40,13 @@ PostgreSQL の RLS と設定の関数には、次の性質がある。
 - superuser と `BYPASSRLS` のロールは、常にポリシーを受けない。表の所有者も、`FORCE ROW LEVEL SECURITY` を付けない限りポリシーを受けない。
 - ロールを指定しないか `PUBLIC` を指定したポリシーは、すべてのロールに効く。`USING` だけを書いたポリシーは、同じ式で INSERT と UPDATE の新しい行も確かめる。
 - `current_setting` は、`missing_ok` を真にしない限り、ない設定を読むとエラーになる。
+- 列の既定値の式は、その列に値を書かない INSERT のたびに評価される。
 - `set_config` の `is_local` を真にすると、設定はそのトランザクションの間だけ効く。
 - 一意性、主キー、外部キーの検査は、常に RLS を受けない。検査の結果から、見えない行の有無が分かる。
 - `TRUNCATE` は RLS を受けない。
+
+実装（#377）で、Decision に `tenant_public_id` の既定値を足した。
+Repository と seed の INSERT がテナントの列を書かずに済み、書き忘れる余地がなくなるためである。
 
 ## Decision
 
@@ -51,6 +55,8 @@ PostgreSQL の RLS と設定の関数には、次の性質がある。
 今は `product.m_product`、`ordering.t_order`、`ordering.t_order_line`、`payment.t_payment` である。
 
 - 業務の表は、テナントの `public_id` を `tenant_public_id`（uuid、NOT NULL）として持つ。テナントの主キーは持たない（[ADR-089](ADR-089-keep-primary-keys-inside-modules-and-expose-public-ids.md)）。
+- `tenant_public_id` の既定値は `current_setting('app.current_tenant')::uuid` にし、Repository と seed の INSERT はこの列を書かない。Repository のコードが列を書き忘れる余地がなく、テナントを設定しないトランザクションの INSERT は `current_setting` のエラーで失敗する。値を書いた INSERT も、別のテナントの値ならポリシーが拒否する。
+- uuid の列に DEFAULT を付けない規則（[ADR-060](ADR-060-generate-uuid-primary-keys-in-application.md)）の例外は、この既定値だけにする。この既定値は ID を採番せず、トランザクションに設定したテナントを入れるだけだからである。例外の範囲は[PostgreSQLの主キー](../database/postgresql-primary-keys.md#uuidの採番)に示す。
 - 業務の表に `ENABLE ROW LEVEL SECURITY` と `FORCE ROW LEVEL SECURITY` を付ける。`FORCE` で、表の所有者のマイグレーション用のロールにもポリシーを効かせる。
 - ポリシーは `USING (tenant_public_id = current_setting('app.current_tenant')::uuid)` にし、`missing_ok` を使わない。テナントを設定しないトランザクションは、業務の表に触れた時点でエラーになり、0 件を返さない。
 - ポリシーの対象は `PUBLIC` にする。ポリシーは行だけを絞り、どのロールが表に触れるかは表の権限（ADR-094 のモジュールのロール）で絞る。
@@ -96,6 +102,7 @@ RLS の外に置く表は、`modulith` と `tenancy` のスキーマの表だけ
 - テナントを設定し忘れたトランザクションは、業務の表に触れた時点でエラーになる。設定の漏れを「データがない」と取り違えない。
 - ロールとテナントを 1 か所の 1 つの SQL で、トランザクションの間だけ設定するため、プールの接続に残らない。
 - 一意索引の先頭がテナントなので、別のテナントの値と衝突せず、INSERT の失敗から別のテナントの値が分からない。客先注文番号のような業務の値を、テナントごとに同じ値で持てる。
+- Repository と seed の INSERT は `tenant_public_id` を書かず、列の書き忘れが起きない。
 
 ### Negative
 
@@ -103,6 +110,8 @@ RLS の外に置く表は、`modulith` と `tenancy` のスキーマの表だけ
 - 全テナントの行を扱う処理は、テナントの設定を切り替えながら、同じ処理をテナントの数だけ繰り返す。
 - PostgreSQL は、RLS を受けるロールの `COPY FROM` を受け付けない。`FORCE` で表の所有者もポリシーを受けるため、アプリ、モジュール、マイグレーション用のどのロールからも、業務の表へ `COPY FROM` で取り込めない。大量の行も INSERT で入れることになる。
 - 業務の一意索引の 1 件ごとに、`tenant_public_id` の 16 バイトが増える。テナントの主キー（bigint）を持つ場合より 8 バイト多い（#363 の Q24）。
+- INSERT の文に、行のテナントが現れない。どのテナントの行になるかは、トランザクションに設定したテナントで決まる。
+- uuid の列に DEFAULT を付けない規則に、テナントの列の例外が 1 つ増え、カタログのテスト（規則 T13）がその既定値の式だけを除く。
 - seed、テストのデータ、DB のテストは、テナントを設定して書く。テストの掃除は、RLS を受けない所有者の接続の `TRUNCATE` で行う。
 - アプリのロールは、どの SQL からでも `set_config` でテナントを変えられる。DB で止められるのは誤りで、故意の迂回は止められない。ADR-094 の ArchUnit の規則（接続の設定の変更の禁止）で補う。
 
@@ -150,12 +159,19 @@ RLS の外に置く表は、`modulith` と `tenancy` のスキーマの表だけ
 - **Pros**：全テナントの行を 1 つのトランザクションで扱える。
 - **Cons**：イベントの出版は RLS の外の `modulith` の表にあり、Outbox を自前で持たないため、全テナントを読む処理がない（#363 の「取り込まないもの」）。このロールに切り替える誤りが、そのまま全テナントのデータの漏れになる。
 
+### 選択肢7: Repository が `TenantContext` から `tenant_public_id` を書く
+
+- **Description**：`tenant_public_id` に既定値を付けず、Repository と seed の INSERT が `TenantContext.current()` の値を書く。
+- **Pros**：INSERT の文に行のテナントが現れる。uuid の列に DEFAULT を付けない規則に例外が要らない。
+- **Cons**：すべての Repository と seed の INSERT に同じ代入が増える。列を書き忘れた INSERT は NOT NULL の違反で止まるが、書き忘れがないことを Repository ごとのテストで確かめることになる。
+
 ## References
 
 - [issue #369: テナントでデータを分ける](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/369)
 - [issue #377: 業務の表に tenant_public_id と RLS を入れる](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/377)
 - [issue #363](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/363)
 - [issue #306](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/306)
+- [ADR-060: UUID の採番をアプリケーションで行い、DB の DEFAULT で採番しない](ADR-060-generate-uuid-primary-keys-in-application.md)
 - [ADR-073: E2E はシーダーの代表データを読むだけにし、変更するデータは各テストが作る](ADR-073-read-seeded-data-in-e2e.md)
 - [ADR-089: 主キーをモジュールのスキーマと Repository の中に閉じ、外に出る値には例外なく public_id を使う](ADR-089-keep-primary-keys-inside-modules-and-expose-public-ids.md)
 - [ADR-094: トランザクションの初めにモジュールの DB ロールへ切り替え、アプリロールを業務のスキーマから外す](ADR-094-switch-to-module-database-roles.md)

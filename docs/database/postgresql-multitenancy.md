@@ -40,6 +40,7 @@ changesetが作るスキーマのうち、`modulith`と`tenancy`を除くスキ�
 今の業務の表は、`product.m_product`、`ordering.t_order`、`ordering.t_order_line`、`payment.t_payment`である。
 
 - 業務の表は、テナントの`public_id`を`tenant_public_id`（`uuid`、NOT NULL）として持つ。テナントの主キーは持たない（[PostgreSQLの主キー](postgresql-primary-keys.md#主キーと公開用idの使い分け)）。
+- `tenant_public_id`の既定値は`current_setting('app.current_tenant')::uuid`にし、RepositoryとseedのINSERTはこの列を書かない。列の値はトランザクションに設定したテナントになり、テナントを設定しないトランザクションのINSERTはエラーになる。uuidの`DEFAULT`の禁止の例外である（[PostgreSQLの主キー](postgresql-primary-keys.md#uuidの採番)）。
 - 業務の表に`ENABLE ROW LEVEL SECURITY`と`FORCE ROW LEVEL SECURITY`を付ける。
 - ポリシーは次の式で比べ、`current_setting`に`missing_ok`を渡さない。式は、読む行と、INSERTとUPDATEで書く行の両方に効かせる。
 - ポリシーの対象は`PUBLIC`にする。表に触れるロールは、表の権限で絞る（[DB接続情報とロール分離](connections.md#モジュールのロール)）。
