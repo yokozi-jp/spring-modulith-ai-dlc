@@ -4,6 +4,7 @@
 set -euo pipefail
 
 ROOT="$(git -C "$(dirname "$0")" rev-parse --show-toplevel)"
+SEEDED_TENANT_SQL="$(cd "$(dirname "$0")" && pwd)/seeded-tenant.sql"
 cd "$ROOT"
 STATE=build/verify/stack
 WEB=frontend/apps/web
@@ -114,12 +115,15 @@ keycloak_issuer() {
     | grep -q "\"issuer\":\"http://127.0.0.1:$TEST_KEYCLOAK_PORT/realms/spring-modulith\""
 }
 wiremock_admin() { curl --fail --silent --max-time 3 "http://127.0.0.1:$TEST_WIREMOCK_PORT/__admin/mappings"; }
+psql_demo() { compose exec -T postgres psql -U demo -d demo -v ON_ERROR_STOP=1 -qtA; }
 # アプリのロールは業務のスキーマを読めないので、モジュールのロールへ切り替える（ADR-094）。
-# 業務の表はテナントごとに分かれるので、サンプル商事（TenancySeeds.TRADING_TENANT）を設定して数える（ADR-107）。
-TRADING_TENANT=696ad4fa-fa01-478e-ae38-4f0394a01c94
+# 業務の表はテナントごとに分かれるので、ログインの後に選ぶテナントを名前で引いて設定する（ADR-107）。
 seeded_orders() {
-  printf '%s\n' "SET ROLE ordering_module;" "SET app.current_tenant = '$TRADING_TENANT';" "select count(*) from ordering.t_order where customer_order_code like 'SEED-C0%';" \
-    | compose exec -T postgres psql -U demo -d demo -v ON_ERROR_STOP=1 -qtA | grep -qx 6
+  local tenant
+  tenant="$(psql_demo < "$SEEDED_TENANT_SQL")"
+  [[ "$tenant" =~ ^[0-9a-f-]{36}$ ]] || return 1
+  printf '%s\n' "SET ROLE ordering_module;" "SET app.current_tenant = '$tenant';" "select count(*) from ordering.t_order where customer_order_code like 'SEED-C0%';" \
+    | psql_demo | grep -qx 6
 }
 source_unchanged() { [ "$(cat "$STATE/fingerprint")" = "$(fingerprint)" ]; }
 
