@@ -47,8 +47,7 @@ import org.jooq.impl.DSL;
  * 開発用の代表データ（#114）を、業務データが空のローカルかテストの DB の、{@link TenancySeeds#TENANTS} の各テナントに入れる。テナントと所属（{@link
  * TenancySeeds}）は、業務データの有無によらず、足りない行だけを毎回入れる。
  *
- * <p>業務の表は RLS でテナントごとに分かれる（ADR-107）。「空」の判定と reset の削除は {@code tenancy.m_tenant}
- * のテナントごとに、そのテナントを設定して行い、テナントを設定しないまま業務の表を読まない。
+ * <p>業務の表は RLS でテナントごとに分かれるため（ADR-107）、「空」の判定と reset の削除は {@code tenancy.m_tenant} のテナントごとに行う。
  *
  * <p>Gradle の {@code seedLocalData}（JavaExec、テストの runtime classpath）が {@link #main} を呼ぶ。Spring
  * を起動せず、Bean にもしないので、ほかのテストのコンテキストでは動かない。環境の確認、「空」の判定、reset の削除を 1 つのトランザクションで行う。
@@ -176,7 +175,6 @@ public final class LocalDataSeeder {
     return Outcome.SEEDED;
   }
 
-  /** テナントに、商品 P01〜P05、注文 C01〜C06、決済 C03 と C05 をこの順に入れる。 */
   private static void seedTenant(
       final DSLContext dsl,
       final TenantId tenant,
@@ -206,7 +204,6 @@ public final class LocalDataSeeder {
         });
   }
 
-  /** 表を持つモジュール（スキーマ名と同じ）のロールとテナントで本体を実行する。本番と同じく、アプリロールには業務のスキーマの権限がない。 */
   private static <T> T inModuleOf(
       final DSLContext dsl,
       final TenantId tenant,

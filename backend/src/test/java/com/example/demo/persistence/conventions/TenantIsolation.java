@@ -50,7 +50,7 @@ final class TenantIsolation {
   }
 
   /**
-   * 同じモジュールの表を指す外部キーの列。テナントで分ける表は {@code (tenant_public_id, 参照先の主キー)}、RLS の外の表は参照先の主キーだけにする。
+   * 同じモジュールの表を指す外部キーの列。
    *
    * @param schema 外部キーを持つ表のスキーマ
    * @param key 参照先の主キーの列

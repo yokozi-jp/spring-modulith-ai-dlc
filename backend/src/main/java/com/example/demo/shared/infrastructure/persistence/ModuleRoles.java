@@ -21,8 +21,7 @@ public final class ModuleRoles {
   /**
    * 業務の表をテナントの RLS で分けるモジュール。トランザクションは、テナントを束縛した呼び出しの中でだけ始める（ADR-107）。
    *
-   * <p>{@code tenancy} は、テナントを選ぶ前に引く表を持つため含めない。RLS の外に置くスキーマとの一致は {@code
-   * SchemaTenantConventionsTest} が確かめる。
+   * <p>{@code tenancy} は、テナントを選ぶ前に引く表を持つため含めない。
    */
   public static final Set<String> TENANT_SCOPED_MODULES = Set.of("product", "ordering", "payment");
 

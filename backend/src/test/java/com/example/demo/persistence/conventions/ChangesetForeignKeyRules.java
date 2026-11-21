@@ -10,10 +10,7 @@ import java.util.regex.Pattern;
 /**
  * 外部キーの changeset の書き方（K4）を判定する。
  *
- * <p>外部キーは {@code addForeignKeyConstraint} だけで作り、名前を {@code fk_{表}} か {@code fk_{連番}_{表}}
- * にし、同じスキーマの表だけを参照し、{@code ON DELETE} と {@code ON UPDATE} の動作を付けない。テナントで分けるスキーマでは {@code
- * (tenant_public_id, 参照先の主キー)} の 2 列、RLS の外のスキーマでは参照先の主キーの 1 列にする。外部キーのない参照の列は、カタログの検査（{@link
- * SchemaTenantConventions#foreignKeys}）が拒否する。
+ * <p>外部キーのない参照の列は、カタログの検査（{@link SchemaTenantConventions#foreignKeys}）が拒否する。
  */
 final class ChangesetForeignKeyRules {
 
@@ -107,7 +104,6 @@ final class ChangesetForeignKeyRules {
     }
   }
 
-  /** 列の並びが、最後の列を参照先の主キーとみなした {@link TenantIsolation#foreignKeyColumns} の形か。 */
   private static boolean hasForeignKeyColumns(final String schema, final List<String> columns) {
     return !columns.isEmpty()
         && columns.equals(TenantIsolation.foreignKeyColumns(schema, columns.getLast()));

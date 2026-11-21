@@ -58,13 +58,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 /**
  * 業務の表の RLS が、別のテナントの行の読み書きと、テナントを設定し忘れた読み書きを DB で止めることと、テナントを束縛し忘れた業務のトランザクションを トランザクションマネージャーが DB
  * より先に止めることを確かめる（ADR-107）。
- *
- * <p>テストのトランザクションは {@link AsTenant#TENANT} のテナントで動く。別のテナントの商品、注文、明細、決済は、{@link AsModule}
- * にそのテナントを渡して入れる。業務の表は、{@code tenant_public_id} を持つ生成した表から導く。
  */
-// 生成したテーブルと AssertJ を static import で読みやすくする。
-// 読み、書き、外部キー、表の所有者、テナントの設定忘れの経路ごとにテストと補助を分け、3 つのモジュールの表と JDBC を使う。
-// 業務の表ごとのパラメータ化テストは、同じ表の一覧と表示名を使う。
 @SuppressWarnings({
   "PMD.TooManyStaticImports",
   "PMD.TooManyMethods",
@@ -117,7 +111,6 @@ class TenantIsolationTest {
   /** 表の所有者の接続先と資格情報。 */
   @Autowired private Environment environment;
 
-  /** テナントの列を持つ、生成した業務の表。 */
   private static List<Table<?>> businessTables() {
     return DefaultCatalog.DEFAULT_CATALOG.getSchemas().stream()
         .flatMap(schema -> schema.getTables().stream())
@@ -125,7 +118,6 @@ class TenantIsolationTest {
         .toList();
   }
 
-  /** 別のテナントに、商品、注文と明細、決済を入れる。 */
   private void seedOtherTenant() {
     final Random random = new Random(377L);
     final Faker faker = new Faker(Locale.ENGLISH, random);
@@ -284,14 +276,12 @@ class TenantIsolationTest {
   }
 
   @Test
-  // テナントを束縛しないトランザクションを、テストのトランザクションの外で本番のトランザクションマネージャーから始める。
   @Transactional(propagation = Propagation.NOT_SUPPORTED)
   @DisplayName("テナントを束縛し忘れた業務のトランザクションは、汎用の実行計画で 0 件を返しうる読み取りの前に失敗する")
   void transactionWithoutTenantFailsBeforeGenericPlanReturnsNoRows() {
     final TransactionTemplate module = new TransactionTemplate(transactionManager);
-    // ModuleRoles はトランザクションの名前のベースパッケージの直下からモジュールを引く。
-    final String name = "com.example.demo.ordering.TenantProbe.read";
-    module.setName(name);
+    final String orderingTransactionName = "com.example.demo.ordering.TenantProbe.read";
+    module.setName(orderingTransactionName);
     final TransactionCallback<Integer> countUnknownStatus =
         status -> {
           // 索引で RLS の式を引く計画は走査の初めにエラーになるため、順に走査する汎用の計画にする。
@@ -317,12 +307,11 @@ class TenantIsolationTest {
     assertThat(NestedExceptionUtils.getMostSpecificCause(thrown))
         .as("例外: %s", thrown)
         .isInstanceOf(IllegalStateException.class)
-        .hasMessageContaining(name);
+        .hasMessageContaining(orderingTransactionName);
   }
 
   @ParameterizedTest(name = "{0}")
   @MethodSource("businessTables")
-  // テナントを設定しない接続を、テストのトランザクションの外で作る。
   @Transactional(propagation = Propagation.NOT_SUPPORTED)
   @DisplayName("テナントを設定しないモジュールのロールは、業務の表を 0 件で読まずにエラーになる")
   void readingWithoutTenantFails(final Table<?> table) {
@@ -332,7 +321,6 @@ class TenantIsolationTest {
 
   @ParameterizedTest(name = "{0}")
   @MethodSource("businessTables")
-  // テナントを設定しない接続を、テストのトランザクションの外で作る。
   @Transactional(propagation = Propagation.NOT_SUPPORTED)
   @DisplayName("テナントを設定しないモジュールのロールの INSERT は、行を入れずにエラーになる")
   void insertingWithoutTenantFails(final Table<?> table) {
@@ -394,7 +382,6 @@ class TenantIsolationTest {
     }
   }
 
-  /** 表の所有者（マイグレーションロール）の接続。テストのトランザクションの外にあり、FORCE ROW LEVEL SECURITY の効き目を見る。 */
   private Connection ownerConnection() throws SQLException {
     final Properties properties = new Properties();
     properties.setProperty("user", environment.getRequiredProperty("MIGRATION_DB_USERNAME"));
@@ -403,7 +390,7 @@ class TenantIsolationTest {
         environment.getRequiredProperty("spring.datasource.url"), properties);
   }
 
-  /** テナントを設定せず、モジュールのロールだけで本体を実行する。トランザクションマネージャーより後ろの、DB の防御を確かめる。 */
+  /** トランザクションマネージャーの検査を通らずに、DB の防御だけを確かめる。 */
   private <T> T withoutTenant(final String module, final Function<DSLContext, T> body) {
     return dsl.transactionResult(configuration -> {
       final DSLContext tx = configuration.dsl();

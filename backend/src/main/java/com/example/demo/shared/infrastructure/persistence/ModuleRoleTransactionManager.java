@@ -22,12 +22,10 @@ import org.springframework.transaction.TransactionDefinition;
  * トランザクションを始めた直後に、トランザクションの名前から引いたモジュールのロールと、{@link TenantContext}
  * に束縛したテナントを、そのトランザクションの間だけ設定する（ADR-094、ADR-107）。
  *
- * <p>どちらも {@code set_config(..., true)} で設定し、トランザクションの終わりで元に戻るため、プールの接続に残らない。モジュールが分からないトランザクションは
- * アプリロールのまま、テナントを束縛していないトランザクションはテナントを設定せずに動かす。
+ * <p>どちらも {@code set_config(..., true)} で設定し、トランザクションの終わりで元に戻るため、プールの接続に残らない。
  *
- * <p>業務の表を持つモジュール（{@link ModuleRoles#TENANT_SCOPED_MODULES}）のトランザクションを、テナントを束縛せずに始めると、SQL を流す前に
- * {@link IllegalStateException} で失敗させる。業務の表の RLS のポリシーも設定のないテナントをエラーにするが、それは 2
- * 段目の防御である。汎用の実行計画では、RLS の式より先に別の条件が全行を落とすと、エラーにならず 0 件を返すことがある。
+ * <p>テナントのない業務のトランザクションを SQL の前に止めるのは、RLS のポリシーのエラーに頼れないためである。汎用の実行計画では、RLS
+ * の式より先に別の条件が全行を落とすと、エラーにならず 0 件を返すことがある。
  */
 public class ModuleRoleTransactionManager extends JdbcTransactionManager {
 
@@ -71,8 +69,7 @@ public class ModuleRoleTransactionManager extends JdbcTransactionManager {
   }
 
   /**
-   * ロールとテナントを、呼び出し中のトランザクションの間だけ、1 つの SQL で変える。設定の名前は SQL に固定し、値はバインド変数で渡す。どちらも {@code null} なら SQL
-   * を流さない。
+   * ロールとテナントを、呼び出し中のトランザクションの間だけ変える。
    *
    * <p>Spring のトランザクションの外でロールとテナントを切り替えるテストの補助とシーダーも、本番と同じ SQL を通すためにこれを呼ぶ。
    *

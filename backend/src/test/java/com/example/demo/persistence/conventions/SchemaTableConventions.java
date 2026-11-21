@@ -16,7 +16,6 @@ import java.util.stream.Collectors;
  *
  * <p>DBに接続しない純粋な関数である。各関数は{@link SchemaConventions#isBusinessSchema(String)}で業務スキーマの行だけを判定する。
  */
-// 規則ごとに関数を分けるため、メソッドの数は規則の数に比例する。
 @SuppressWarnings("PMD.TooManyMethods")
 final class SchemaTableConventions {
 
@@ -164,7 +163,7 @@ final class SchemaTableConventions {
   }
 
   /**
-   * 主キーの列を、{@code スキーマ.列}の集合で返す。P3とK1が、同じスキーマの行を指す列を見分けるのに使う。
+   * 主キーの列を、{@code スキーマ.列}の集合で返す。
    *
    * @param relations テーブルとビュー
    * @return 主キーを持つテーブルの、{@code スキーマ.主キーの列}

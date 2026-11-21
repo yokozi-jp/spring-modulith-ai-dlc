@@ -46,7 +46,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 @DatabaseTest
 // 生成したテーブルと AssertJ を static import で読みやすくする。
 // 読み取りの補助メソッドが増えるため、メソッド数の上限も外す。
-// 4 つのモジュールの表を 2 つのテナントで読むため、型への依存の上限も外す。
 @SuppressWarnings({"PMD.TooManyStaticImports", "PMD.TooManyMethods", "PMD.CouplingBetweenObjects"})
 class LocalDataSeederTest {
 
@@ -217,7 +216,6 @@ class LocalDataSeederTest {
         .allSatisfy(id -> assertThat(List.of(id.version(), id.variant())).isEqualTo(List.of(4, 2)));
   }
 
-  /** テナントの商品、注文、決済の public_id。 */
   private List<UUID> publicIds(final TenantId tenant) {
     return Stream.of(
             inModule(
@@ -236,7 +234,6 @@ class LocalDataSeederTest {
         .toList();
   }
 
-  /** テナントに、代表データの商品、注文、決済があることを確かめる。 */
   private void assertRepresentativeData(final TenantId tenant) {
 
     assertThat(this.<Integer>inModule(tenant, PRODUCT, tx -> tx.fetchCount(M_PRODUCT)))
@@ -319,7 +316,6 @@ class LocalDataSeederTest {
         .containsOnly("payment.SeedLocalData");
   }
 
-  /** モジュールのロールとテナントで読み書きする。アプリロールは業務のスキーマに権限を持たず（ADR-094）、業務の表はテナントの行だけを読み書きできる（ADR-107）。 */
   private <T> T inModule(
       final TenantId tenant, final String module, final Function<DSLContext, T> body) {
     return AsModule.call(dsl, module, tenant, body);
@@ -363,12 +359,10 @@ class LocalDataSeederTest {
                 .fetchMap(Record2::value1, row -> List.of(row.value2())));
   }
 
-  /** reset の後に比べる、テナントごとの値。 */
   private List<List<List<Map<String, Object>>>> snapshot() {
     return TENANTS.stream().map(this::tenantSnapshot).toList();
   }
 
-  /** テナントの値。IDENTITY の主キーとそれを指す列を除き、public_id（明細は注文の public_id と番号）で並べる。 */
   private List<List<Map<String, Object>>> tenantSnapshot(final TenantId tenant) {
     return List.of(
         rows(tenant, M_PRODUCT, M_PRODUCT.PRODUCT_ID, M_PRODUCT.PUBLIC_ID),

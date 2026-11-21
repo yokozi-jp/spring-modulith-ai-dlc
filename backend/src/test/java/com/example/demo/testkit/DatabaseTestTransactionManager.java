@@ -19,7 +19,7 @@ import org.springframework.transaction.interceptor.TransactionAttribute;
  *
  * <p>本番のトランザクションマネージャーは、業務のモジュールのトランザクションをテナントの束縛の中でだけ始める（ADR-107）。テストのトランザクションはテストのメソッドより前に {@code
  * TransactionalTestExecutionListener} が始め、{@code ScopedValue} の束縛の中に入れられない。そのため、{@link
- * DatabaseTest} が付ける {@link #LABEL} のトランザクションだけ、始める間だけテナントを束縛して本番の処理に渡す。ほかのトランザクションは本番と同じに動く。
+ * DatabaseTest} が付ける {@link #LABEL} のトランザクションだけ、始める間だけテナントを束縛して本番の処理に渡す。
  */
 public final class DatabaseTestTransactionManager extends ModuleRoleTransactionManager {
 

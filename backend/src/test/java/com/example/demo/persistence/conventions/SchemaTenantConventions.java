@@ -17,8 +17,7 @@ import java.util.stream.Stream;
 /**
  * 業務の表をテナントで分ける規則（S3、S4、S5、S6）と、同じモジュールの表どうしの参照の外部キーの規則（K1）を、カタログの行から判定する。
  *
- * <p>DBに接続しない純粋な関数である。テナントで分ける表は、業務スキーマのうち {@link TenantIsolation#RLS_EXEMPT_SCHEMAS}
- * 以外のスキーマのテーブルとする。表の一覧は持たず、カタログから導く。
+ * <p>DBに接続しない純粋な関数である。
  */
 final class SchemaTenantConventions {
 
@@ -37,7 +36,7 @@ final class SchemaTenantConventions {
   }
 
   /**
-   * S3：テナントで分ける表に、ENABLEとFORCEの行レベルセキュリティを付ける。RLSの外に置けるのは{@code modulith}と{@code tenancy}の表だけである。
+   * S3：テナントで分ける表に、ENABLEとFORCEの行レベルセキュリティを付ける。
    *
    * @param relations テーブルとビュー
    * @return 違反

@@ -73,7 +73,6 @@ final class ChangesetRowSecurityRules {
    * @param changeset 判定する changeset
    * @return 違反
    */
-  // S2 の違反を表の出てくる順に並べる、1 回の検査の中だけで使う単一スレッドの状態である。
   @SuppressWarnings("PMD.UseConcurrentHashMap")
   /* package */ static List<ConventionViolation> check(final Changeset changeset) {
     final String id = changeset.changesetId();
@@ -120,7 +119,6 @@ final class ChangesetRowSecurityRules {
         .filter(statement -> ROW_SECURITY.matcher(statement).find());
   }
 
-  /** 決まった RLS の文なら、その対象の表を返す。 */
   private static Optional<String> canonicalTarget(final String statement) {
     final Matcher matcher = TARGET.matcher(statement);
     if (!matcher.find() || !TenantIsolation.isTenantScoped(matcher.group(1))) {

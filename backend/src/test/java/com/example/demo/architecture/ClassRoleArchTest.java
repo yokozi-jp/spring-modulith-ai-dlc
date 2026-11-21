@@ -559,8 +559,6 @@ class ClassRoleArchTest {
 
   /**
    * {@code TenantContext.findCurrent} を呼べるクラスを、{@code ModuleRoleTransactionManager} だけに限る規則を組み立てる。
-   *
-   * <p>{@code findCurrent} は、テナントの束縛がないことを空で返す。業務の処理が使うと、束縛し忘れた呼び出しを「テナントのない処理」として通す。メソッド参照も検出する。
    */
   /* package */ static ArchRule unboundTenantIsReadOnlyByTransactionManagerRule(
       final String basePackage) {

@@ -33,7 +33,6 @@ import org.springframework.transaction.support.TransactionTemplate;
  * <p>プールの接続は少数を使い回すため、モジュールのロールのトランザクションの後に、名前のないトランザクションを繰り返し、すべてアプリロールで動くことを見る。
  */
 @CommittedDatabaseTest
-// ロールとテナントの切り替え、戻し、テナントのない業務のトランザクションの拒否を、本番のマネージャーで 1 つずつ確かめる。
 @SuppressWarnings("PMD.TooManyMethods")
 class ModuleRoleTransactionTest {
 
