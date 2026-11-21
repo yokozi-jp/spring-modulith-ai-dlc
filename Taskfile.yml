@@ -656,7 +656,7 @@ tasks:
   lint-duplicates:
     desc: フロントエンドとバックエンドの手書きコードの重複をjscpdで検査
     cmds:
-      # ponytail: 4.0%は参照業務機能（product、ordering、payment）の手書きの重複を除いた後の実測3.93%に合わせた値（ADR-074。ADR-035の3.2%を改めた）。残りは、モジュールごとのクラスの役割とテストの規約が求める import、注釈、フィールドの定型である。業務機能が増えて規約の定型の重複で4.0%を超えたら、上限を上げる前に検出の方式を見直す。
+      # ponytail: 2.0%は、import文を比べない（.jscpd.jsonのignorePattern）方式での実測1.90%を通す値（ADR-106。ADR-074の4.0%を置き換えた）。import文はクラスの役割とテストの規約が求める定型で、共通化できない。import文を除いた重複が2.0%を超えたら、閾値を上げる前に重複を解消する。
       - npm exec -- jscpd frontend/apps frontend/packages frontend/lint frontend/vite.config.ts backend/src/main/java backend/src/test/java
 
   # PgBouncer のトランザクションモードや RDS Proxy の後ろで壊れる、セッションに状態を残す SQL を本番のコードから検出する。

@@ -75,7 +75,7 @@
 - [ADR-071: 作業で得た学びを 5 つの層へ還元し、上の層を優先する](ADR-071-reinforce-learnings-into-five-layers.md)（Proposed, 2026-10-08）
 - [ADR-072: 外部システムを本番のコードで偽らず、WireMock のコンテナで偽る](ADR-072-fake-external-systems-with-wiremock.md)（Accepted, 2026-10-08）
 - [ADR-073: E2E はシーダーの代表データを読むだけにし、変更するデータは各テストが作る](ADR-073-read-seeded-data-in-e2e.md)（Accepted, 2026-10-08）
-- [ADR-074: jscpd の閾値を、クラスの役割の定型を含む実測の 3.93% に合わせて 4.0% にする](ADR-074-raise-jscpd-threshold-for-class-role-boilerplate.md)（Proposed, 2026-10-09）
+- [ADR-074: jscpd の閾値を、クラスの役割の定型を含む実測の 3.93% に合わせて 4.0% にする](ADR-074-raise-jscpd-threshold-for-class-role-boilerplate.md)（Superseded by ADR-106, 2026-10-09）
 - [ADR-075: 他モジュールが分岐に使う状態の意味を、状態を持つモジュールが参照の結果の boolean で返す](ADR-075-return-state-meaning-in-query-results.md)（Proposed, 2026-10-11）
 - [ADR-076: PIT を必須でない別のワークフローで変更ごとに実行し、coverage の下限に line とクラスやファイルごとの下限を加える](ADR-076-run-mutation-tests-per-change-and-tighten-coverage-gates.md)（Proposed, 2026-10-11）
 - [ADR-077: OpenAPI 契約の operation と status の組ごとに、MockMvc の契約テストの宣言を検査する](ADR-077-check-contract-test-coverage-per-response-status.md)（Proposed, 2026-10-11）
@@ -105,3 +105,4 @@
 - [ADR-102: 本番の IdP に Amazon Cognito を使い、ローカルとテストでは Keycloak で代える](ADR-102-use-amazon-cognito-as-production-idp.md)（Proposed, 2026-11-19）
 - [ADR-104: compose-test を使う実行ごとに slot を割り当て、worktree をまたいで同時に流す](ADR-104-allocate-test-stack-slots-per-run.md)（Proposed, 2026-11-19）
 - [ADR-105: 操作しているテナントを ScopedValue で束縛し、リクエストはセッションから、リスナーはイベントから取る](ADR-105-bind-tenant-to-request-and-event-context.md)（Proposed, 2026-11-19）
+- [ADR-106: jscpd は import 文を比べず、閾値を実測の 1.90% に合わせて 2.0% にする](ADR-106-ignore-import-statements-in-jscpd.md)（Proposed, 2026-11-21）
