@@ -7,22 +7,15 @@ import static com.example.demo.jooq.product.Tables.M_PRODUCT;
 import static com.example.demo.jooq.tenancy.Tables.M_MEMBERSHIP;
 import static com.example.demo.jooq.tenancy.Tables.M_TENANT;
 
-import com.example.demo.ordering.domain.model.Money;
-import com.example.demo.ordering.domain.model.Order;
-import com.example.demo.ordering.domain.model.ProductId;
-import com.example.demo.ordering.domain.model.ProductOffer;
-import com.example.demo.ordering.infrastructure.persistence.OrderSeeds;
-import com.example.demo.payment.infrastructure.persistence.PaymentSeeds;
-import com.example.demo.product.ProductSeeds;
 import com.example.demo.shared.tenant.TenantId;
 import com.example.demo.tenancy.TenancySeeds;
 import com.example.demo.testkit.AsModule;
+import com.example.demo.testkit.BusinessSeeds;
 import java.net.InetAddress;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.SQLException;
 import java.time.Clock;
-import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.List;
@@ -170,38 +163,10 @@ public final class LocalDataSeeder {
     final Random random = new Random(RANDOM_SEED);
     final Faker faker = new Faker(Locale.ENGLISH, random);
     final Supplier<UUID> ids = () -> uuidV4(random);
-    // faker と ids は同じ random を引く。テナントの順（TenancySeeds.TENANTS）と、テナントの中の順を変えると値が変わる。
-    TenancySeeds.TENANTS.forEach(tenant -> seedTenant(dsl, new TenantId(tenant), faker, ids, base));
+    // faker と ids は同じ random を引く。テナントの順（TenancySeeds.TENANTS）を変えると値が変わる。
+    TenancySeeds.TENANTS.forEach(
+        tenant -> BusinessSeeds.insert(dsl, new TenantId(tenant), faker, ids, base));
     return Outcome.SEEDED;
-  }
-
-  private static void seedTenant(
-      final DSLContext dsl,
-      final TenantId tenant,
-      final Faker faker,
-      final Supplier<UUID> ids,
-      final Instant base) {
-    final List<ProductOffer> offers =
-        AsModule.call(
-                dsl,
-                "product",
-                tenant,
-                tx -> ProductSeeds.insert(tx, faker, ids, base.minus(Duration.ofDays(1))))
-            .stream()
-            .filter(ProductSeeds.Seeded::onSale)
-            .map(s ->
-                new ProductOffer(new ProductId(s.publicId()), new Money(s.unitPrice()), s.onSale()))
-            .toList();
-    final OrderSeeds.Confirmed confirmed =
-        AsModule.call(dsl, "ordering", tenant, tx -> OrderSeeds.insert(tx, offers, ids, base));
-    AsModule.run(
-        dsl,
-        "payment",
-        tenant,
-        tx -> {
-          insertPayment(tx, ids, confirmed.paid(), false);
-          insertPayment(tx, ids, confirmed.declined(), true);
-        });
   }
 
   private static <T> T inModuleOf(
@@ -210,18 +175,6 @@ public final class LocalDataSeeder {
       final Table<?> table,
       final Function<DSLContext, T> body) {
     return AsModule.call(dsl, AsModule.moduleOf(table), tenant, body);
-  }
-
-  /** 注文の合計金額で、確定の 1 分後に決済記録を入れる。 */
-  private static void insertPayment(
-      final DSLContext dsl, final Supplier<UUID> ids, final Order order, final boolean declined) {
-    PaymentSeeds.insert(
-        dsl,
-        ids.get(),
-        order.id().value(),
-        order.total().amount(),
-        declined,
-        order.orderedAt().plus(Duration.ofMinutes(1)));
   }
 
   // ponytail: DB_HOST の loopback の判定は、SSH のポート転送で STG の DB を localhost に向けた場合を防げない。

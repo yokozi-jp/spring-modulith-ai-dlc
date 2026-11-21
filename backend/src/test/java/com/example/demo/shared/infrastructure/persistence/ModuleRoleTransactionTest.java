@@ -16,6 +16,7 @@ import java.util.stream.IntStream;
 import org.jooq.DSLContext;
 import org.jooq.Field;
 import org.jooq.impl.DSL;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -39,12 +40,18 @@ class ModuleRoleTransactionTest {
   /** 試す回数。プールの上限（テストは 4）より多くして、すべての接続を通す。 */
   private static final int ROUNDS = 12;
 
+  /** ordering のモジュールのロール。 */
+  private static final String ORDERING_ROLE = "ordering_module";
+
   /** ordering のトランザクションの名前。 */
   private static final String ORDERING = "com.example.demo.ordering.application.Probe.handle";
 
   /** 束縛するテナント。 */
   private static final TenantId TENANT =
       new TenantId(UUID.fromString("7a1c3e5f-2b4d-4f6a-8c0e-1d3f5a7b9c2e"));
+
+  /** ordering のトランザクションの中のロールとテナント。 */
+  private static final Session IN_ORDERING = new Session(ORDERING_ROLE, TENANT.toString());
 
   /** 空文字列のテナントを uuid に変換できないときの SQLSTATE（invalid_text_representation）。 */
   private static final String INVALID_UUID = "22P02";
@@ -69,18 +76,18 @@ class ModuleRoleTransactionTest {
   @Autowired private DSLContext dsl;
 
   @Test
-  @DisplayName("モジュールの名前のトランザクションは、モジュールのロールで動き、commit の後にアプリロールへ戻る")
-  void commitRestoresAppRole() {
+  @DisplayName("モジュールの名前のトランザクションは、モジュールのロールと束縛したテナントで動き、commit の後にプールの接続へ残さない")
+  void commitRestoresAppRoleWithoutTenant() {
     for (int round = 0; round < ROUNDS; round++) {
-      assertThat(TenantContext.call(TENANT, () -> currentUserIn(ORDERING)))
-          .isEqualTo("ordering_module");
-      assertThat(currentUserIn(null)).isEqualTo(appRole);
+      assertThat(TenantContext.call(TENANT, () -> sessionIn(ORDERING))).isEqualTo(IN_ORDERING);
+      assertAppRoleWithoutTenant(sessionIn(null));
     }
   }
 
   @Test
-  @DisplayName("モジュールの名前のトランザクションが失敗して rollback しても、アプリロールへ戻る")
-  void rollbackRestoresAppRole() {
+  @DisplayName("モジュールの名前のトランザクションが失敗して rollback しても、ロールとテナントをプールの接続へ残さない")
+  void rollbackRestoresAppRoleWithoutTenant() {
+    final List<Session> inside = new ArrayList<>();
     for (int round = 0; round < ROUNDS; round++) {
       assertThatThrownBy(() ->
               TenantContext.call(
@@ -88,19 +95,21 @@ class ModuleRoleTransactionTest {
                   () ->
                       template(ORDERING)
                           .execute(status -> {
+                            inside.add(session());
                             throw new IllegalStateException("rollback");
                           })))
           .isInstanceOf(IllegalStateException.class)
           .hasMessage("rollback");
-      assertThat(currentUserIn(null)).isEqualTo(appRole);
+      assertAppRoleWithoutTenant(sessionIn(null));
     }
+    assertThat(inside).as("rollback したトランザクションの中").hasSize(ROUNDS).containsOnly(IN_ORDERING);
   }
 
   @Test
   @DisplayName("名前のないトランザクションと、モジュールでない名前のトランザクションは、アプリロールで動く")
   void unnamedAndNonModuleTransactionsRunAsAppRole() {
-    assertThat(currentUserIn(null)).isEqualTo(appRole);
-    assertThat(currentUserIn("com.example.demo.shared.infrastructure.persistence.Probe.run"))
+    assertThat(roleIn(null)).isEqualTo(appRole);
+    assertThat(roleIn("com.example.demo.shared.infrastructure.persistence.Probe.run"))
         .isEqualTo(appRole);
     assertThat(dsl.fetchValue("select current_user")).isEqualTo(appRole);
   }
@@ -112,7 +121,7 @@ class ModuleRoleTransactionTest {
     final String name = "com.example.demo." + module + ".application.Probe.handle";
     final List<Object> users = new ArrayList<>();
 
-    final Throwable thrown = catchThrowable(() -> users.add(currentUserIn(name)));
+    final Throwable thrown = catchThrowable(() -> users.add(roleIn(name)));
 
     assertThat(users).as("始まったトランザクションの利用者").isEmpty();
     assertThat(NestedExceptionUtils.getMostSpecificCause(thrown))
@@ -124,7 +133,7 @@ class ModuleRoleTransactionTest {
   @Test
   @DisplayName("tenancy のトランザクションは、テナントを束縛していなくても tenancy のロールで動く")
   void tenancyTransactionRunsWithoutTenant() {
-    assertThat(currentUserIn("com.example.demo.tenancy.application.Probe.handle"))
+    assertThat(roleIn("com.example.demo.tenancy.application.Probe.handle"))
         .isEqualTo("tenancy_module");
   }
 
@@ -139,30 +148,9 @@ class ModuleRoleTransactionTest {
                     .execute(status ->
                         dsl.transactionResult(cfg -> cfg.dsl().fetchValue("select current_user"))));
 
-    assertThat(user).isEqualTo("ordering_module");
-    assertThat(IntStream.range(0, ROUNDS).mapToObj(round -> currentUserIn(null)))
+    assertThat(user).isEqualTo(ORDERING_ROLE);
+    assertThat(IntStream.range(0, ROUNDS).mapToObj(round -> roleIn(null)))
         .allSatisfy(role -> assertThat(role).isEqualTo(appRole));
-  }
-
-  @Test
-  @DisplayName("テナントを束縛したトランザクションはそのテナントを設定し、commit と rollback の後にプールの接続へ残さない")
-  void tenantIsSetOnlyForBoundTransactions() {
-    for (int round = 0; round < ROUNDS; round++) {
-      assertThat(TenantContext.call(TENANT, () -> currentTenantIn(ORDERING)))
-          .as("束縛したトランザクションのテナント")
-          .isEqualTo(TENANT.toString());
-      assertThat(currentTenantIn(null)).as("commit の後のテナント").isIn("", null);
-      assertThatThrownBy(() ->
-              TenantContext.call(
-                  TENANT,
-                  () ->
-                      template(ORDERING)
-                          .execute(status -> {
-                            throw new IllegalStateException("rollback");
-                          })))
-          .isInstanceOf(IllegalStateException.class);
-      assertThat(currentTenantIn(null)).as("rollback の後のテナント").isIn("", null);
-    }
   }
 
   @Test
@@ -170,7 +158,7 @@ class ModuleRoleTransactionTest {
   void emptyTenantLeftOnPooledConnectionFailsClosed() {
     final List<String> leftovers = new ArrayList<>();
     for (int round = 0; round < ROUNDS; round++) {
-      TenantContext.call(TENANT, () -> currentTenantIn(ORDERING));
+      TenantContext.call(TENANT, () -> sessionIn(ORDERING));
       final Throwable thrown =
           catchThrowable(() ->
               template(null)
@@ -183,11 +171,11 @@ class ModuleRoleTransactionTest {
                     dsl.fetchCount(T_ORDER);
                   }));
 
+      final String expected = leftovers.getLast() == null ? UNDEFINED_SETTING : INVALID_UUID;
       assertThat(NestedExceptionUtils.getMostSpecificCause(thrown))
-          .as("テナントのない読み取りの例外: %s", thrown)
+          .as("残っていた設定 %s のテナントのない読み取りの例外: %s", leftovers.getLast(), thrown)
           .isInstanceOfSatisfying(
-              SQLException.class,
-              cause -> assertThat(cause.getSQLState()).isIn(INVALID_UUID, UNDEFINED_SETTING));
+              SQLException.class, cause -> assertThat(cause.getSQLState()).isEqualTo(expected));
     }
     assertThat(leftovers)
         .as("テナントのないトランザクションに残っていた設定")
@@ -195,13 +183,22 @@ class ModuleRoleTransactionTest {
         .contains("");
   }
 
-  private String currentTenantIn(final String transactionName) {
-    return template(transactionName).execute(status -> dsl.fetchValue(CURRENT_TENANT));
+  private void assertAppRoleWithoutTenant(final Session session) {
+    assertThat(session.role()).as("トランザクションの後のロール").isEqualTo(appRole);
+    assertThat(session.tenant()).as("トランザクションの後のテナント").isIn("", null);
   }
 
-  private Object currentUserIn(final String transactionName) {
-    final TransactionTemplate template = template(transactionName);
-    return template.execute(status -> dsl.fetchValue("select current_user"));
+  private String roleIn(final String transactionName) {
+    return sessionIn(transactionName).role();
+  }
+
+  private Session sessionIn(final String transactionName) {
+    return template(transactionName).execute(status -> session());
+  }
+
+  private Session session() {
+    return dsl.select(DSL.field("current_user", String.class), CURRENT_TENANT)
+        .fetchSingle(row -> new Session(row.value1(), row.value2()));
   }
 
   private TransactionTemplate template(final String transactionName) {
@@ -211,4 +208,12 @@ class ModuleRoleTransactionTest {
     }
     return template;
   }
+
+  /**
+   * トランザクションの中のロールとテナントの設定。
+   *
+   * @param role {@code current_user}
+   * @param tenant テナントの設定。一度も設定していない接続では {@code null}
+   */
+  private record Session(String role, @Nullable String tenant) {}
 }

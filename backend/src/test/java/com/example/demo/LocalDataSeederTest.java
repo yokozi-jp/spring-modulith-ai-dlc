@@ -80,7 +80,8 @@ class LocalDataSeederTest {
   @Autowired private DSLContext dsl;
 
   @Test
-  @DisplayName("空の DB の 2 つのテナントのそれぞれに商品 5 件、注文 6 件、決済 2 件を入れ、2 回目は何も入れない")
+  @DisplayName(
+      "空の DB の 2 つのテナントのそれぞれに、BUSINESS_TABLES のすべての表の行と、商品 5 件、注文 6 件、決済 2 件を入れ、2 回目は何も入れない")
   void seedsRepresentativeDataOnlyWhenEmpty() {
     for (final TenantId tenant : TENANTS) {
       LocalDataSeeder.BUSINESS_TABLES.forEach(table ->
@@ -92,20 +93,6 @@ class LocalDataSeederTest {
 
     for (final TenantId tenant : TENANTS) {
       assertRepresentativeData(tenant);
-    }
-    assertThat(dsl.fetchCount(EVENT_PUBLICATION)).isEqualTo(publications);
-
-    final List<List<List<Map<String, Object>>>> before = snapshot();
-    assertThat(SEEDER.seed(dsl, Mode.SEED)).isEqualTo(Outcome.SKIPPED_NOT_EMPTY);
-    assertThat(snapshot()).isEqualTo(before);
-  }
-
-  @Test
-  @DisplayName("BUSINESS_TABLES の表ごとに、2 つのテナントのそれぞれで 1 行以上を入れる")
-  void seedsEveryBusinessTableInEachTenant() {
-    SEEDER.seed(dsl, Mode.RESET);
-
-    for (final TenantId tenant : TENANTS) {
       for (final Table<?> table : LocalDataSeeder.BUSINESS_TABLES) {
         assertThat(
                 this.<Integer>inModule(
@@ -114,6 +101,11 @@ class LocalDataSeederTest {
             .isPositive();
       }
     }
+    assertThat(dsl.fetchCount(EVENT_PUBLICATION)).isEqualTo(publications);
+
+    final List<List<List<Map<String, Object>>>> before = snapshot();
+    assertThat(SEEDER.seed(dsl, Mode.SEED)).isEqualTo(Outcome.SKIPPED_NOT_EMPTY);
+    assertThat(snapshot()).isEqualTo(before);
   }
 
   @Test
@@ -211,8 +203,9 @@ class LocalDataSeederTest {
 
     final List<UUID> ids = TENANTS.stream().flatMap(tenant -> publicIds(tenant).stream()).toList();
 
-    assertThat(ids).hasSize(26).doesNotHaveDuplicates();
     assertThat(ids)
+        .isNotEmpty()
+        .doesNotHaveDuplicates()
         .allSatisfy(id -> assertThat(List.of(id.version(), id.variant())).isEqualTo(List.of(4, 2)));
   }
 

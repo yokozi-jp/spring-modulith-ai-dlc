@@ -56,13 +56,13 @@ class ModuleRolesTest {
   @DisplayName("業務の表を持つモジュールの名前だけが、テナントを要する")
   void requiresTenantOnlyForBusinessModules(final String transactionName, final boolean required) {
     assertThat(ModuleRoles.requiresTenant(transactionName)).isEqualTo(required);
-    assertThat(ModuleRoles.requiresTenant(null)).isFalse();
   }
 
   @Test
-  @DisplayName("名前のないトランザクションは、ロールを引かない")
+  @DisplayName("名前のないトランザクションは、ロールを引かず、テナントも要さない")
   void doesNotResolveMissingName() {
     assertThat(ModuleRoles.roleFor(null)).isEqualTo(Optional.empty());
+    assertThat(ModuleRoles.requiresTenant(null)).isFalse();
   }
 
   @Test

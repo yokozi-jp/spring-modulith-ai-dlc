@@ -7,27 +7,20 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.catchThrowable;
 
 import com.example.demo.jooq.DefaultCatalog;
-import com.example.demo.ordering.domain.model.Money;
-import com.example.demo.ordering.domain.model.ProductId;
-import com.example.demo.ordering.domain.model.ProductOffer;
-import com.example.demo.ordering.infrastructure.persistence.OrderSeeds;
-import com.example.demo.payment.infrastructure.persistence.PaymentSeeds;
-import com.example.demo.product.ProductSeeds;
 import com.example.demo.product.TestProducts;
 import com.example.demo.shared.infrastructure.persistence.ModuleRoleTransactionManager;
 import com.example.demo.shared.infrastructure.persistence.ModuleRoles;
 import com.example.demo.shared.infrastructure.persistence.TestCommonColumns;
-import com.example.demo.shared.tenant.TenantContext;
 import com.example.demo.shared.tenant.TenantId;
 import com.example.demo.testkit.AsModule;
 import com.example.demo.testkit.AsTenant;
+import com.example.demo.testkit.BusinessSeeds;
 import com.example.demo.testkit.DatabaseTest;
 import java.math.BigDecimal;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.SQLException;
 import java.time.Instant;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
@@ -42,29 +35,22 @@ import org.jooq.Field;
 import org.jooq.SQLDialect;
 import org.jooq.Table;
 import org.jooq.impl.DSL;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.NestedExceptionUtils;
 import org.springframework.core.env.Environment;
-import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.transaction.support.TransactionCallback;
-import org.springframework.transaction.support.TransactionTemplate;
 
 /**
- * 業務の表の RLS が、別のテナントの行の読み書きと、テナントを設定し忘れた読み書きを DB で止めることと、テナントを束縛し忘れた業務のトランザクションを トランザクションマネージャーが DB
- * より先に止めることを確かめる（ADR-107）。
+ * 業務の表の RLS が、別のテナントの行の読み書きと、テナントを設定し忘れた読み書きを DB で止めることと、汎用の実行計画では DB の防御だけに頼れないことを確かめる（ADR-107）。
  */
-@SuppressWarnings({
-  "PMD.TooManyStaticImports",
-  "PMD.TooManyMethods",
-  "PMD.CouplingBetweenObjects",
-  "PMD.AvoidDuplicateLiterals"
-})
+@SuppressWarnings({"PMD.TooManyStaticImports", "PMD.TooManyMethods"})
 @DatabaseTest
 class TenantIsolationTest {
 
@@ -99,116 +85,123 @@ class TenantIsolationTest {
   /** 前のトランザクションの設定が空文字列で残った接続の SQLSTATE（invalid_text_representation）。 */
   private static final String EMPTY = "22P02";
 
+  /** 業務の表を返す引数の供給元。入れ子のテストクラスからも引く。 */
+  private static final String BUSINESS_TABLES =
+      "com.example.demo.persistence.TenantIsolationTest#businessTables";
+
   /** プールの接続に汎用の計画を残すために、同じ問い合わせを流す回数。 */
   private static final int GENERIC_PLAN_ROUNDS = 8;
 
   /** テスト用の DB の jOOQ のコンテキスト。テストごとにロールバックする。 */
   @Autowired private DSLContext dsl;
 
-  /** 名前のあるトランザクションを、本番と同じトランザクションマネージャーで始める。 */
-  @Autowired private PlatformTransactionManager transactionManager;
-
   /** 表の所有者の接続先と資格情報。 */
   @Autowired private Environment environment;
 
-  private static List<Table<?>> businessTables() {
+  /* package */ static List<Table<?>> businessTables() {
     return DefaultCatalog.DEFAULT_CATALOG.getSchemas().stream()
         .flatMap(schema -> schema.getTables().stream())
         .filter(table -> table.field(TENANT_COLUMN) != null)
         .toList();
   }
 
-  private void seedOtherTenant() {
-    final Random random = new Random(377L);
-    final Faker faker = new Faker(Locale.ENGLISH, random);
-    final List<ProductOffer> offers =
-        AsModule.call(
-                dsl,
-                PRODUCT_MODULE,
-                OTHER,
-                tx -> ProductSeeds.insert(tx, faker, UUID::randomUUID, SEEDED_AT))
-            .stream()
-            .filter(ProductSeeds.Seeded::onSale)
-            .map(seeded ->
-                new ProductOffer(
-                    new ProductId(seeded.publicId()), new Money(seeded.unitPrice()), true))
-            .toList();
-    final OrderSeeds.Confirmed confirmed =
-        AsModule.call(
-            dsl,
-            ORDERING_MODULE,
-            OTHER,
-            tx -> OrderSeeds.insert(tx, offers, UUID::randomUUID, SEEDED_AT));
-    AsModule.run(
-        dsl,
-        "payment",
-        OTHER,
-        tx ->
-            PaymentSeeds.insert(
-                tx,
-                UUID.randomUUID(),
-                confirmed.paid().id().value(),
-                confirmed.paid().total().amount(),
-                false,
-                SEEDED_AT));
-  }
+  /** 別のテナントの商品、注文、明細、決済を入れてから確かめる、読み書きと外部キー。 */
+  /* package */ @Nested
+  class OtherTenantRowsTest {
 
-  @ParameterizedTest(name = "{0}")
-  @MethodSource("businessTables")
-  @DisplayName("別のテナントの行は、そのテナントからは見え、テストのテナントからは見えない")
-  void otherTenantRowsAreInvisible(final Table<?> table) {
-    seedOtherTenant();
-    final Field<UUID> tenant = tenantOf(table);
+    @BeforeEach
+    void seedOtherTenant() {
+      BusinessSeeds.insert(
+          dsl, OTHER, new Faker(Locale.ENGLISH, new Random(377L)), UUID::randomUUID, SEEDED_AT);
+    }
 
-    assertThat(
-            AsModule.<Integer>call(
-                dsl,
-                AsModule.moduleOf(table),
-                OTHER,
-                tx -> tx.fetchCount(table, tenant.eq(OTHER.value()))))
-        .as("%s の別のテナントの行を、別のテナントから数える", table)
-        .isPositive();
-    assertThat(
-            AsModule.<Integer>call(
-                dsl,
-                AsModule.moduleOf(table),
-                tx -> tx.fetchCount(table, tenant.eq(OTHER.value()))))
-        .as("%s の別のテナントの行を、テストのテナントから数える", table)
-        .isZero();
-  }
+    @ParameterizedTest(name = "{0}")
+    @MethodSource(BUSINESS_TABLES)
+    @DisplayName("別のテナントの行は、そのテナントからは見え、テストのテナントからは見えない")
+    void otherTenantRowsAreInvisible(final Table<?> table) {
+      final Field<UUID> tenant = tenantOf(table);
 
-  @ParameterizedTest(name = "{0}")
-  @MethodSource("businessTables")
-  @DisplayName("別のテナントの行は、テストのテナントから更新も削除もできない")
-  void otherTenantRowsAreNotWritable(final Table<?> table) {
-    seedOtherTenant();
-    final Field<UUID> tenant = tenantOf(table);
-    final Field<String> updatedBy =
-        Objects.requireNonNull(table.field("updated_by", String.class), "updated_by");
-    final String module = AsModule.moduleOf(table);
-    final int before =
-        AsModule.<Integer>call(
-            dsl, module, OTHER, tx -> tx.fetchCount(table, tenant.eq(OTHER.value())));
+      assertThat(
+              AsModule.<Integer>call(
+                  dsl,
+                  AsModule.moduleOf(table),
+                  OTHER,
+                  tx -> tx.fetchCount(table, tenant.eq(OTHER.value()))))
+          .as("%s の別のテナントの行を、別のテナントから数える", table)
+          .isPositive();
+      assertThat(
+              AsModule.<Integer>call(
+                  dsl,
+                  AsModule.moduleOf(table),
+                  tx -> tx.fetchCount(table, tenant.eq(OTHER.value()))))
+          .as("%s の別のテナントの行を、テストのテナントから数える", table)
+          .isZero();
+    }
 
-    final int updated =
-        AsModule.<Integer>call(
-            dsl,
-            module,
-            tx ->
-                tx.update(table).set(updatedBy, UPDATER).where(tenant.eq(OTHER.value())).execute());
-    final int deleted =
-        AsModule.<Integer>call(
-            dsl, module, tx -> tx.deleteFrom(table).where(tenant.eq(OTHER.value())).execute());
+    @ParameterizedTest(name = "{0}")
+    @MethodSource(BUSINESS_TABLES)
+    @DisplayName("別のテナントの行は、テストのテナントから更新も削除もできない")
+    void otherTenantRowsAreNotWritable(final Table<?> table) {
+      final Field<UUID> tenant = tenantOf(table);
+      final Field<String> updatedBy =
+          Objects.requireNonNull(table.field("updated_by", String.class), "updated_by");
+      final String module = AsModule.moduleOf(table);
+      final int before =
+          AsModule.<Integer>call(
+              dsl, module, OTHER, tx -> tx.fetchCount(table, tenant.eq(OTHER.value())));
 
-    assertThat(List.of(updated, deleted)).as("%s の更新と削除の件数", table).containsOnly(0);
-    assertThat(
-            AsModule.<Integer>call(
-                dsl,
-                module,
-                OTHER,
-                tx -> tx.fetchCount(table, tenant.eq(OTHER.value()).and(updatedBy.ne(UPDATER)))))
-        .as("%s の別のテナントの行", table)
-        .isEqualTo(before);
+      final int updated =
+          AsModule.<Integer>call(
+              dsl,
+              module,
+              tx ->
+                  tx.update(table)
+                      .set(updatedBy, UPDATER)
+                      .where(tenant.eq(OTHER.value()))
+                      .execute());
+      final int deleted =
+          AsModule.<Integer>call(
+              dsl, module, tx -> tx.deleteFrom(table).where(tenant.eq(OTHER.value())).execute());
+
+      assertThat(List.of(updated, deleted)).as("%s の更新と削除の件数", table).containsOnly(0);
+      assertThat(
+              AsModule.<Integer>call(
+                  dsl,
+                  module,
+                  OTHER,
+                  tx -> tx.fetchCount(table, tenant.eq(OTHER.value()).and(updatedBy.ne(UPDATER)))))
+          .as("%s の別のテナントの行", table)
+          .isEqualTo(before);
+    }
+
+    @Test
+    @DisplayName("明細は、別のテナントの注文を指せず、複合の外部キーで拒否される")
+    void orderLineCannotReferToAnotherTenantsOrder() {
+      final Long otherOrder =
+          AsModule.call(
+              dsl,
+              ORDERING_MODULE,
+              OTHER,
+              tx ->
+                  tx.select(T_ORDER.ORDER_ID).from(T_ORDER).limit(1).fetchSingle(T_ORDER.ORDER_ID));
+
+      assertSqlState(
+          () ->
+              AsModule.run(
+                  dsl,
+                  ORDERING_MODULE,
+                  tx ->
+                      TestCommonColumns.runAs(() ->
+                          tx.insertInto(T_ORDER_LINE)
+                              .set(T_ORDER_LINE.ORDER_ID, otherOrder)
+                              .set(T_ORDER_LINE.LINE_NO, 99)
+                              .set(T_ORDER_LINE.PRODUCT_PUBLIC_ID, UUID.randomUUID())
+                              .set(T_ORDER_LINE.ORDERED_COUNT, 1)
+                              .set(T_ORDER_LINE.ORDERED_UNIT_PRICE_JPY, BigDecimal.TEN)
+                              .set(TestCommonColumns.at(SEEDED_AT).forInsert(T_ORDER_LINE))
+                              .execute())),
+          FOREIGN_KEY_VIOLATION);
+    }
   }
 
   @Test
@@ -247,71 +240,28 @@ class TenantIsolationTest {
   }
 
   @Test
-  @DisplayName("明細は、別のテナントの注文を指せず、複合の外部キーで拒否される")
-  void orderLineCannotReferToAnotherTenantsOrder() {
-    seedOtherTenant();
-    final Long otherOrder =
-        AsModule.call(
-            dsl,
-            ORDERING_MODULE,
-            OTHER,
-            tx -> tx.select(T_ORDER.ORDER_ID).from(T_ORDER).limit(1).fetchSingle(T_ORDER.ORDER_ID));
-
-    assertSqlState(
-        () ->
-            AsModule.run(
-                dsl,
-                ORDERING_MODULE,
-                tx ->
-                    TestCommonColumns.runAs(() ->
-                        tx.insertInto(T_ORDER_LINE)
-                            .set(T_ORDER_LINE.ORDER_ID, otherOrder)
-                            .set(T_ORDER_LINE.LINE_NO, 99)
-                            .set(T_ORDER_LINE.PRODUCT_PUBLIC_ID, UUID.randomUUID())
-                            .set(T_ORDER_LINE.ORDERED_COUNT, 1)
-                            .set(T_ORDER_LINE.ORDERED_UNIT_PRICE_JPY, BigDecimal.TEN)
-                            .set(TestCommonColumns.at(SEEDED_AT).forInsert(T_ORDER_LINE))
-                            .execute())),
-        FOREIGN_KEY_VIOLATION);
-  }
-
-  @Test
   @Transactional(propagation = Propagation.NOT_SUPPORTED)
-  @DisplayName("テナントを束縛し忘れた業務のトランザクションは、汎用の実行計画で 0 件を返しうる読み取りの前に失敗する")
-  void transactionWithoutTenantFailsBeforeGenericPlanReturnsNoRows() {
-    final TransactionTemplate module = new TransactionTemplate(transactionManager);
-    final String orderingTransactionName = "com.example.demo.ordering.TenantProbe.read";
-    module.setName(orderingTransactionName);
-    final TransactionCallback<Integer> countUnknownStatus =
-        status -> {
+  @DisplayName("汎用の実行計画が残った接続では、テナントを設定しない読み取りがエラーにならず 0 件を返しうるので、DB の防御だけには頼れない")
+  void genericPlanCanReturnNoRowsWithoutTenant() {
+    final Function<DSLContext, Integer> countUnknownStatus =
+        tx -> {
           // 索引で RLS の式を引く計画は走査の初めにエラーになるため、順に走査する汎用の計画にする。
-          dsl.execute(
+          tx.execute(
               "select set_config('enable_indexscan', 'off', true),"
                   + " set_config('enable_bitmapscan', 'off', true),"
                   + " set_config('plan_cache_mode', 'force_generic_plan', true)");
-          return dsl.fetchCount(T_ORDER, T_ORDER.ORDER_STATUS_TYP.eq("NO_SUCH_STATUS"));
+          return tx.fetchCount(T_ORDER, T_ORDER.ORDER_STATUS_TYP.eq("NO_SUCH_STATUS"));
         };
     // テナントのある間に、プールの接続へ汎用の計画を残す。pgjdbc は 5 回目からサーバーの prepared statement にする。
-    TenantContext.call(
-        AsTenant.TENANT,
-        () ->
-            IntStream.range(0, GENERIC_PLAN_ROUNDS)
-                .map(round -> module.execute(countUnknownStatus))
-                .sum());
-    final List<Integer> counts = new ArrayList<>();
+    IntStream.range(0, GENERIC_PLAN_ROUNDS)
+        .forEach(round -> AsModule.call(dsl, ORDERING_MODULE, countUnknownStatus));
 
     // 残った計画は、漏洩のない比較で全行を落とし、RLS の式を評価しないまま 0 件を返す。
-    final Throwable thrown = catchThrowable(() -> counts.add(module.execute(countUnknownStatus)));
-
-    assertThat(counts).as("テナントのないトランザクションで数えた件数").isEmpty();
-    assertThat(NestedExceptionUtils.getMostSpecificCause(thrown))
-        .as("例外: %s", thrown)
-        .isInstanceOf(IllegalStateException.class)
-        .hasMessageContaining(orderingTransactionName);
+    assertThat(withoutTenant(ORDERING_MODULE, countUnknownStatus)).as("テナントを設定しない読み取りの件数").isZero();
   }
 
   @ParameterizedTest(name = "{0}")
-  @MethodSource("businessTables")
+  @MethodSource(BUSINESS_TABLES)
   @Transactional(propagation = Propagation.NOT_SUPPORTED)
   @DisplayName("テナントを設定しないモジュールのロールは、業務の表を 0 件で読まずにエラーになる")
   void readingWithoutTenantFails(final Table<?> table) {
@@ -319,31 +269,28 @@ class TenantIsolationTest {
         () -> withoutTenant(AsModule.moduleOf(table), tx -> tx.fetchCount(table)), UNSET, EMPTY);
   }
 
-  @ParameterizedTest(name = "{0}")
-  @MethodSource("businessTables")
+  @Test
   @Transactional(propagation = Propagation.NOT_SUPPORTED)
   @DisplayName("テナントを設定しないモジュールのロールの INSERT は、行を入れずにエラーになる")
-  void insertingWithoutTenantFails(final Table<?> table) {
+  void insertingWithoutTenantFails() {
     assertSqlState(
         () ->
-            withoutTenant(
-                AsModule.moduleOf(table), tx -> tx.insertInto(table).defaultValues().execute()),
+            withoutTenant(PRODUCT_MODULE, tx -> tx.insertInto(M_PRODUCT).defaultValues().execute()),
         UNSET,
         EMPTY);
   }
 
-  @ParameterizedTest(name = "{0}")
-  @MethodSource("businessTables")
+  @Test
   @DisplayName("表の所有者のマイグレーションロールも、テナントを設定しないと業務の表を読めない")
-  void ownerCannotReadWithoutTenant(final Table<?> table) throws SQLException {
+  void ownerCannotReadWithoutTenant() throws SQLException {
     try (Connection connection = ownerConnection()) {
       final DSLContext owner = DSL.using(connection, SQLDialect.POSTGRES);
 
-      assertSqlState(() -> owner.fetchCount(table), UNSET);
+      assertSqlState(() -> owner.fetchCount(M_PRODUCT), UNSET);
       connection.setAutoCommit(false);
       ModuleRoleTransactionManager.setLocal(connection, null, OTHER.toString());
       connection.commit();
-      assertSqlState(() -> owner.fetchCount(table), EMPTY);
+      assertSqlState(() -> owner.fetchCount(M_PRODUCT), EMPTY);
     }
   }
 
