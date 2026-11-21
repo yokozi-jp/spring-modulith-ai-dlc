@@ -586,6 +586,7 @@ class ArchitectureRuleFixtureTest {
         ProxyRulesArchTest.transactionManagementIsNotRedeclared,
         ProxyRulesArchTest.proxiedMethodsAreNotCalledFromSameClass,
         ProxyRulesArchTest.proxiedMethodsAreNotPrivateFinalOrStatic,
+        ProxyRulesArchTest.publicBeanMethodsAreNotFinal,
         ProxyRulesArchTest.asyncMethodsReturnVoidOrFuture,
         ProxyRulesArchTest.scheduledMethodsAreNoArgVoidAndNotPrivateOrFinal,
         ClassRoleArchTest.moduleListenersAreApplicationListeners,
