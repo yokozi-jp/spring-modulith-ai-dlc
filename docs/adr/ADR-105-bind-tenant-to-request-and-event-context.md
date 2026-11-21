@@ -33,6 +33,8 @@ RLS のポリシーは、トランザクションに設定したテナントの�
 
 実装（#377）で、Decision に `TenantContext.findCurrent()` を足した。
 トランザクションマネージャーは、テナントのないトランザクションでも例外を投げずに、束縛の有無を知る必要があるためである。
+同じ実装で、`findCurrent()` を呼べるクラスをトランザクションマネージャーに限る検査を足し、Consequences の本物の流れでの確認を、それを確かめるテストに書き換えた。
+トランザクションマネージャーが #377 でリスナーのトランザクションにテナントを設定するようになり、確認を置く先が決まったためである。
 
 ## Decision
 
@@ -42,7 +44,7 @@ RLS のポリシーは、トランザクションに設定したテナントの�
   置く型は、`public_id` の UUID を包む値オブジェクト `TenantId`、テナントを運ぶイベントの型 `TenantScoped`、束縛と読み出しの入口 `TenantContext` である。
   `tenancy` の `domain.model` も、テナントの ID に同じ `TenantId` を使う。テナントの ID を表す型を 2 つ持たない。
 - `TenantContext.current()` は、束縛された `TenantId` を返す。束縛がなければ `IllegalStateException` を投げ、テナントがない状態を「データがない」と取り違えさせない。
-- `TenantContext.findCurrent()` は、束縛がなければ空を返す。テナントのない呼び出し（Spring Modulith の内部、再投入、ShedLock）も通るトランザクションマネージャー（[ADR-107](ADR-107-isolate-tenants-with-rls-set-per-transaction.md)）のためにあり、業務の処理は `current()` を使う。
+- `TenantContext.findCurrent()` は、束縛がなければ空を返す。テナントのない呼び出し（Spring Modulith の内部、再投入、ShedLock）も通るトランザクションマネージャー（[ADR-107](ADR-107-isolate-tenants-with-rls-set-per-transaction.md)）のためにあり、業務の処理は `current()` を使う。`findCurrent()` を呼べるのは `ModuleRoleTransactionManager` だけで、ArchUnit の `unboundTenantIsReadOnlyByTransactionManager` で検査する。
 - リクエストでは、`tenancy` の `TenantSelectionFilter` が、所属を引き直して残っているテナントを、リクエストの残りの処理の間だけ束縛する。
   テナントは認証の権限だけから取る。リクエストの header、パス、本文から取らない。
 - リスナーでは、`shared.infrastructure.persistence` の `TenantListenerAspect` が引数のイベントの `TenantScoped.tenantId()` を、呼び出しの間だけ束縛する。
@@ -57,8 +59,7 @@ RLS のポリシーは、トランザクションに設定したテナントの�
   メソッド参照も検出する。filter を別のモジュールに足すときも、この規則の許可先とこの ADR を先に変える。
 - ArchUnit の `moduleApiDoesNotExposeInternalTypes` は、モジュールルートの型が依存してよい型に、`shared.tenant.TenantId` と `shared.tenant.TenantScoped` の 2 つだけを足す。イベントがこの 2 つを使うためで、`TenantContext` には依存させない。
 
-束縛はこの決定の範囲では DB に使わない。
-DB のロールとテナントの設定は #377 で、トランザクションマネージャーが `TenantContext` を読んで行う。
+DB のロールとテナントの設定は、トランザクションマネージャーが `TenantContext` を読んで行う（ADR-107）。
 
 ## Consequences
 
@@ -76,7 +77,7 @@ DB のロールとテナントの設定は #377 で、トランザクション�
 - リクエストでもリスナーでもない入口（バッチ、起動時の処理）は、この決定の範囲では束縛できない。足すときは、ArchUnit の許可先とこの ADR を先に変える。
 - `OncePerRequestFilter` は非同期ディスパッチでは動かないため、`Callable` や `DeferredResult` を返す Controller の非同期の処理には束縛されない。現時点で該当する Controller はない。
 - Spring AOP のプロキシを通らない呼び出しと、別のスレッドへ渡した処理では束縛されない。
-- 「リスナーのトランザクションが始まる時点で束縛済み」という性質は、`TenantListenerAspectTest` が偽のトランザクションマネージャーで確かめる。本物の流れでの確認は、トランザクションの開始時にテナントを読む #377 で足す。
+- 「リスナーのトランザクションが始まる時点で束縛済み」という性質は、`TenantListenerAspectTest` が偽のトランザクションマネージャーで確かめる。本物の流れでは、`OrderConfirmedListenerTest` が、リスナーが呼ぶ決済代行の時点で、リスナーのトランザクションに設定された DB のテナント（`app.current_tenant`）がイベントのテナントであることを確かめる。束縛がトランザクションより遅れると、トランザクションマネージャーがテナントのない業務のトランザクションとして拒否し、リスナーは失敗する（ADR-107）。
 
 ### Neutral
 
