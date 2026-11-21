@@ -75,12 +75,14 @@ const gateway = {
 };
 
 // アプリのロール demo は業務のスキーマを読めない（ADR-094）。payment_module は payment と ordering を読める。
+// 業務の表は RLS でテナントごとに分かれ、テナントを設定しない読み取りは失敗する（ADR-107）。ログインの後に選ぶサンプル商事（TenancySeeds.TRADING_TENANT）を設定する。
 // 値は psql の変数（vars）で渡し、クエリの中で :'name' と書く。読み取り専用は誤操作の防止で、クエリの中で解除できる。
+const TRADING_TENANT = "696ad4fa-fa01-478e-ae38-4f0394a01c94";
 function sql(query, vars = {}) {
   const args = ["compose", "-f", "docker/compose-test.yml", "--profile", "e2e", "exec", "-T", "postgres",
     "psql", "-U", "demo", "-d", "demo", "-v", "ON_ERROR_STOP=1", "-qtA"];
   for (const [key, value] of Object.entries(vars)) args.push("-v", `${key}=${value}`);
-  const input = `SET ROLE payment_module;\nSET default_transaction_read_only = on;\n${query};\n`;
+  const input = `SET ROLE payment_module;\nSET app.current_tenant = '${TRADING_TENANT}';\nSET default_transaction_read_only = on;\n${query};\n`;
   const out = execFileSync("docker", args, { cwd: root, encoding: "utf8", input }).trim();
   log("sql.log", `> ${query} ${JSON.stringify(vars)}\n${out}`);
   return out;

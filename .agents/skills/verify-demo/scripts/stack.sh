@@ -115,8 +115,10 @@ keycloak_issuer() {
 }
 wiremock_admin() { curl --fail --silent --max-time 3 "http://127.0.0.1:$TEST_WIREMOCK_PORT/__admin/mappings"; }
 # アプリのロールは業務のスキーマを読めないので、モジュールのロールへ切り替える（ADR-094）。
+# 業務の表はテナントごとに分かれるので、サンプル商事（TenancySeeds.TRADING_TENANT）を設定して数える（ADR-107）。
+TRADING_TENANT=696ad4fa-fa01-478e-ae38-4f0394a01c94
 seeded_orders() {
-  printf '%s\n' "SET ROLE ordering_module;" "select count(*) from ordering.t_order where customer_order_code like 'SEED-C0%';" \
+  printf '%s\n' "SET ROLE ordering_module;" "SET app.current_tenant = '$TRADING_TENANT';" "select count(*) from ordering.t_order where customer_order_code like 'SEED-C0%';" \
     | compose exec -T postgres psql -U demo -d demo -v ON_ERROR_STOP=1 -qtA | grep -qx 6
 }
 source_unchanged() { [ "$(cat "$STATE/fingerprint")" = "$(fingerprint)" ]; }
