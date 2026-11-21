@@ -5,6 +5,7 @@ import static com.example.demo.shared.infrastructure.persistence.ModuleRoleTrans
 import com.example.demo.shared.infrastructure.persistence.ModuleRoleTransactionManager;
 import com.example.demo.shared.infrastructure.persistence.ModuleRoles;
 import com.example.demo.shared.tenant.TenantContext;
+import com.example.demo.shared.tenant.TenantId;
 import java.util.Objects;
 import java.util.function.Consumer;
 import java.util.function.Function;
@@ -17,8 +18,8 @@ import org.jooq.Table;
  *
  * <p>アプリロールは業務のスキーマに権限を持たず、業務の表はテナントを設定しないと読み書きできない。本番はトランザクションマネージャーがトランザクションの名前と {@link
  * TenantContext} から設定するが、トランザクションの名前を持たないテストの補助（商品の登録、行の読み戻し）とシーダーは、同じ {@link
- * ModuleRoleTransactionManager#setLocal} で設定する。テナントは {@link TenantContext} に束縛したテナント、束縛していなければ
- * {@link AsTenant#TENANT} にする。
+ * ModuleRoleTransactionManager#setLocal} で設定する。テナントは引数で渡し、渡さなければテストの利用者のテナント（{@link
+ * AsTenant#TENANT}）にする。
  *
  * <p>設定は呼び出しの間だけで、正常に終わったら元のロールとテナントへ戻す。本体が失敗したときは、jOOQ
  * がセーブポイントまで戻すため、設定も戻る。テストのトランザクションの中でも、アプリロールのままの接続でも使える。
@@ -32,36 +33,55 @@ public final class AsModule {
     return Objects.requireNonNull(table.getSchema(), "schema").getName();
   }
 
+  /** モジュールのロールとテストの利用者のテナント（{@link AsTenant#TENANT}）で本体を実行し、結果を返す。 */
+  public static <T> T call(
+      final DSLContext dsl, final String module, final Function<DSLContext, T> body) {
+    return call(dsl, module, AsTenant.TENANT, body);
+  }
+
   /**
    * モジュールのロールとテナントで本体を実行し、結果を返す。
    *
    * @param dsl jOOQ のコンテキスト
    * @param module 切り替えるモジュールの名前
+   * @param tenant 設定するテナント
    * @param body モジュールのロールで動かす処理。引数はそのトランザクションの jOOQ のコンテキスト
    * @return 本体の結果
    */
   public static <T> T call(
-      final DSLContext dsl, final String module, final Function<DSLContext, T> body) {
-    final String tenant = TenantContext.findCurrent().orElse(AsTenant.TENANT).toString();
+      final DSLContext dsl,
+      final String module,
+      final TenantId tenant,
+      final Function<DSLContext, T> body) {
     return dsl.transactionResult(configuration -> {
       final DSLContext tx = configuration.dsl();
       final Record previous =
           tx.fetchSingle(
               "select current_setting('role'), coalesce(current_setting(?, true), '')",
               TENANT_SETTING);
-      setLocal(tx, ModuleRoles.roleOf(module), tenant);
+      setLocal(tx, ModuleRoles.roleOf(module), tenant.toString());
       final T result = body.apply(tx);
       setLocal(tx, previous.get(0, String.class), previous.get(1, String.class));
       return result;
     });
   }
 
-  /** モジュールのロールとテナントで本体を実行する。 */
+  /** モジュールのロールとテストの利用者のテナント（{@link AsTenant#TENANT}）で本体を実行する。 */
   public static void run(
       final DSLContext dsl, final String module, final Consumer<DSLContext> body) {
+    run(dsl, module, AsTenant.TENANT, body);
+  }
+
+  /** モジュールのロールとテナントで本体を実行する。 */
+  public static void run(
+      final DSLContext dsl,
+      final String module,
+      final TenantId tenant,
+      final Consumer<DSLContext> body) {
     call(
         dsl,
         module,
+        tenant,
         tx -> {
           body.accept(tx);
           return null;

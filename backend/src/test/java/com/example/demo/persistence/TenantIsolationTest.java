@@ -53,8 +53,8 @@ import org.springframework.transaction.support.TransactionTemplate;
  * 業務の表の RLS が、別のテナントの行の読み書きと、テナントを設定し忘れた読み書きを DB で止めることと、テナントを束縛し忘れた業務のトランザクションを トランザクションマネージャーが DB
  * より先に止めることを確かめる（ADR-107）。
  *
- * <p>テストのトランザクションは {@link AsTenant#TENANT} のテナントで動く。別のテナントの商品、注文、明細、決済は、そのテナントを束縛した {@link
- * AsModule} で入れる。業務の表は、{@code tenant_public_id} を持つ生成した表から導く。
+ * <p>テストのトランザクションは {@link AsTenant#TENANT} のテナントで動く。別のテナントの商品、注文、明細、決済は、{@link AsModule}
+ * にそのテナントを渡して入れる。業務の表は、{@code tenant_public_id} を持つ生成した表から導く。
  */
 // 生成したテーブルと AssertJ を static import で読みやすくする。
 // 読み、書き、外部キー、テナントの設定忘れの経路ごとにテストと補助を分ける。
@@ -115,7 +115,11 @@ class TenantIsolationTest {
     final Random random = new Random(377L);
     final Faker faker = new Faker(Locale.ENGLISH, random);
     final List<ProductOffer> offers =
-        asOther(PRODUCT_MODULE, tx -> ProductSeeds.insert(tx, faker, UUID::randomUUID, SEEDED_AT))
+        AsModule.call(
+                dsl,
+                PRODUCT_MODULE,
+                OTHER,
+                tx -> ProductSeeds.insert(tx, faker, UUID::randomUUID, SEEDED_AT))
             .stream()
             .filter(ProductSeeds.Seeded::onSale)
             .map(seeded ->
@@ -123,19 +127,23 @@ class TenantIsolationTest {
                     new ProductId(seeded.publicId()), new Money(seeded.unitPrice()), true))
             .toList();
     final OrderSeeds.Confirmed confirmed =
-        asOther(ORDERING_MODULE, tx -> OrderSeeds.insert(tx, offers, UUID::randomUUID, SEEDED_AT));
-    asOther(
+        AsModule.call(
+            dsl,
+            ORDERING_MODULE,
+            OTHER,
+            tx -> OrderSeeds.insert(tx, offers, UUID::randomUUID, SEEDED_AT));
+    AsModule.run(
+        dsl,
         "payment",
-        tx -> {
-          PaymentSeeds.insert(
-              tx,
-              UUID.randomUUID(),
-              confirmed.paid().id().value(),
-              confirmed.paid().total().amount(),
-              false,
-              SEEDED_AT);
-          return null;
-        });
+        OTHER,
+        tx ->
+            PaymentSeeds.insert(
+                tx,
+                UUID.randomUUID(),
+                confirmed.paid().id().value(),
+                confirmed.paid().total().amount(),
+                false,
+                SEEDED_AT));
   }
 
   @ParameterizedTest(name = "{0}")
@@ -146,8 +154,11 @@ class TenantIsolationTest {
     final Field<UUID> tenant = tenantOf(table);
 
     assertThat(
-            this.<Integer>asOther(
-                AsModule.moduleOf(table), tx -> tx.fetchCount(table, tenant.eq(OTHER.value()))))
+            AsModule.<Integer>call(
+                dsl,
+                AsModule.moduleOf(table),
+                OTHER,
+                tx -> tx.fetchCount(table, tenant.eq(OTHER.value()))))
         .as("%s の別のテナントの行を、別のテナントから数える", table)
         .isPositive();
     assertThat(
@@ -169,7 +180,8 @@ class TenantIsolationTest {
         Objects.requireNonNull(table.field("updated_by", String.class), "updated_by");
     final String module = AsModule.moduleOf(table);
     final int before =
-        this.<Integer>asOther(module, tx -> tx.fetchCount(table, tenant.eq(OTHER.value())));
+        AsModule.<Integer>call(
+            dsl, module, OTHER, tx -> tx.fetchCount(table, tenant.eq(OTHER.value())));
 
     final int updated =
         AsModule.<Integer>call(
@@ -183,8 +195,10 @@ class TenantIsolationTest {
 
     assertThat(List.of(updated, deleted)).as("%s の更新と削除の件数", table).containsOnly(0);
     assertThat(
-            this.<Integer>asOther(
+            AsModule.<Integer>call(
+                dsl,
                 module,
+                OTHER,
                 tx -> tx.fetchCount(table, tenant.eq(OTHER.value()).and(updatedBy.ne(UPDATER)))))
         .as("%s の別のテナントの行", table)
         .isEqualTo(before);
@@ -230,8 +244,10 @@ class TenantIsolationTest {
   void orderLineCannotReferToAnotherTenantsOrder() {
     seedOtherTenant();
     final Long otherOrder =
-        asOther(
+        AsModule.call(
+            dsl,
             ORDERING_MODULE,
+            OTHER,
             tx -> tx.select(T_ORDER.ORDER_ID).from(T_ORDER).limit(1).fetchSingle(T_ORDER.ORDER_ID));
 
     assertSqlState(
@@ -307,11 +323,6 @@ class TenantIsolationTest {
           ModuleRoleTransactionManager.setLocal(connection, ModuleRoles.roleOf(module), null));
       return body.apply(tx);
     });
-  }
-
-  /** 別のテナントを束縛し、モジュールのロールで本体を実行する。 */
-  private <T> T asOther(final String module, final Function<DSLContext, T> body) {
-    return TenantContext.call(OTHER, () -> AsModule.call(dsl, module, body));
   }
 
   private static void assertSqlState(final Runnable action, final String... expected) {

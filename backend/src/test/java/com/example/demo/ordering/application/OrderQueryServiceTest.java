@@ -9,7 +9,6 @@ import com.example.demo.ordering.OrderSearchCriteria;
 import com.example.demo.ordering.OrderSummary;
 import com.example.demo.product.TestProducts;
 import com.example.demo.shared.concurrency.ExpectedLockNo;
-import com.example.demo.testkit.AsTenant;
 import com.example.demo.testkit.BindTestTenantExtension;
 import com.example.demo.testkit.CleanGeneratedTablesExtension;
 import com.example.demo.testkit.SharedTestConfiguration;
@@ -88,8 +87,7 @@ class OrderQueryServiceTest {
     final String confirmedOrderId = draft(UniqueCodes.next("C"), pen, 1, pen, 1);
     final String cancelledOrderId = draft(UniqueCodes.next("C"), pen, 1, pen, 1);
     observed(() ->
-        AsTenant.call(() ->
-            confirmOrder.handle(new ConfirmOrderCommand(confirmedOrderId, new ExpectedLockNo(1)))));
+        confirmOrder.handle(new ConfirmOrderCommand(confirmedOrderId, new ExpectedLockNo(1))));
     observed(
         () -> cancelOrder.handle(new CancelOrderCommand(cancelledOrderId, new ExpectedLockNo(1))));
 

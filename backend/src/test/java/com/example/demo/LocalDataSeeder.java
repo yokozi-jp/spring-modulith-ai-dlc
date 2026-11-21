@@ -14,7 +14,6 @@ import com.example.demo.ordering.domain.model.ProductOffer;
 import com.example.demo.ordering.infrastructure.persistence.OrderSeeds;
 import com.example.demo.payment.infrastructure.persistence.PaymentSeeds;
 import com.example.demo.product.ProductSeeds;
-import com.example.demo.shared.tenant.TenantContext;
 import com.example.demo.shared.tenant.TenantId;
 import com.example.demo.tenancy.TenancySeeds;
 import com.example.demo.testkit.AsModule;
@@ -128,9 +127,9 @@ public final class LocalDataSeeder {
     final boolean migrated =
         Stream.concat(BUSINESS_TABLES.stream(), TENANCY_TABLES.stream())
             .allMatch(table ->
-                inModuleOf(
+                AsModule.call(
                     dsl,
-                    table,
+                    AsModule.moduleOf(table),
                     tx ->
                         tx.fetchValue("select to_regclass({0})::text", DSL.inline(tx.render(table)))
                             != null));
@@ -154,19 +153,14 @@ public final class LocalDataSeeder {
             .map(row -> new TenantId(row.value1()));
     if (mode == Mode.RESET) {
       tenants.forEach(tenant ->
-          runInTenant(
-              tenant,
-              () ->
-                  BUSINESS_TABLES.forEach(
-                      table -> inModuleOf(dsl, table, tx -> tx.deleteFrom(table).execute()))));
+          BUSINESS_TABLES.forEach(
+              table -> inModuleOf(dsl, tenant, table, tx -> tx.deleteFrom(table).execute())));
     }
     final List<String> nonEmpty =
         tenants.stream()
             .flatMap(tenant ->
                 BUSINESS_TABLES.stream()
-                    .filter(table ->
-                        callInTenant(
-                            tenant, () -> inModuleOf(dsl, table, tx -> tx.fetchExists(table))))
+                    .filter(table -> inModuleOf(dsl, tenant, table, tx -> tx.fetchExists(table)))
                     .map(table -> tenant + ":" + name(table)))
             .toList();
     if (!nonEmpty.isEmpty()) {
@@ -178,18 +172,22 @@ public final class LocalDataSeeder {
     final Faker faker = new Faker(Locale.ENGLISH, random);
     final Supplier<UUID> ids = () -> uuidV4(random);
     // faker と ids は同じ random を引く。テナントの順（TenancySeeds.TENANTS）と、テナントの中の順を変えると値が変わる。
-    TenancySeeds.TENANTS.forEach(
-        tenant -> runInTenant(new TenantId(tenant), () -> seedTenant(dsl, faker, ids, base)));
+    TenancySeeds.TENANTS.forEach(tenant -> seedTenant(dsl, new TenantId(tenant), faker, ids, base));
     return Outcome.SEEDED;
   }
 
-  /** 束縛したテナントに、商品 P01〜P05、注文 C01〜C06、決済 C03 と C05 をこの順に入れる。 */
+  /** テナントに、商品 P01〜P05、注文 C01〜C06、決済 C03 と C05 をこの順に入れる。 */
   private static void seedTenant(
-      final DSLContext dsl, final Faker faker, final Supplier<UUID> ids, final Instant base) {
+      final DSLContext dsl,
+      final TenantId tenant,
+      final Faker faker,
+      final Supplier<UUID> ids,
+      final Instant base) {
     final List<ProductOffer> offers =
         AsModule.call(
                 dsl,
                 "product",
+                tenant,
                 tx -> ProductSeeds.insert(tx, faker, ids, base.minus(Duration.ofDays(1))))
             .stream()
             .filter(ProductSeeds.Seeded::onSale)
@@ -197,35 +195,24 @@ public final class LocalDataSeeder {
                 new ProductOffer(new ProductId(s.publicId()), new Money(s.unitPrice()), s.onSale()))
             .toList();
     final OrderSeeds.Confirmed confirmed =
-        AsModule.call(dsl, "ordering", tx -> OrderSeeds.insert(tx, offers, ids, base));
+        AsModule.call(dsl, "ordering", tenant, tx -> OrderSeeds.insert(tx, offers, ids, base));
     AsModule.run(
         dsl,
         "payment",
+        tenant,
         tx -> {
           insertPayment(tx, ids, confirmed.paid(), false);
           insertPayment(tx, ids, confirmed.declined(), true);
         });
   }
 
-  /** テナントを束縛して本体を実行し、結果を返す。{@link AsModule} が、本番と同じ SQL でそのテナントを設定する。 */
-  private static <T> T callInTenant(final TenantId tenant, final Supplier<T> body) {
-    return TenantContext.call(tenant, body::get);
-  }
-
-  /** テナントを束縛して本体を実行する。 */
-  private static void runInTenant(final TenantId tenant, final Runnable body) {
-    callInTenant(
-        tenant,
-        () -> {
-          body.run();
-          return null;
-        });
-  }
-
-  /** 表を持つモジュール（スキーマ名と同じ）のロールで本体を実行する。本番と同じく、アプリロールには業務のスキーマの権限がない。 */
+  /** 表を持つモジュール（スキーマ名と同じ）のロールとテナントで本体を実行する。本番と同じく、アプリロールには業務のスキーマの権限がない。 */
   private static <T> T inModuleOf(
-      final DSLContext dsl, final Table<?> table, final Function<DSLContext, T> body) {
-    return AsModule.call(dsl, AsModule.moduleOf(table), body);
+      final DSLContext dsl,
+      final TenantId tenant,
+      final Table<?> table,
+      final Function<DSLContext, T> body) {
+    return AsModule.call(dsl, AsModule.moduleOf(table), tenant, body);
   }
 
   /** 注文の合計金額で、確定の 1 分後に決済記録を入れる。 */

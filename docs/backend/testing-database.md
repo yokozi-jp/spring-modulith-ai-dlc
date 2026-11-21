@@ -31,7 +31,7 @@ Gradleのforkごとに別のDBになるため、forkどうしの後始末は衝�
 テストのトランザクションも同じ規則で動く。
 
 - **テストクラスがモジュールのパッケージにあるとき**：`@DatabaseTest`のロールバック用トランザクションは、テストクラスの名前（`com.example.demo.ordering...`）から、そのモジュールのロールで動く。`@JooqTest`は`@Configuration`を読み込まないため、`@DatabaseTest`が切り替えを行うトランザクションマネージャーを`@Import`する。
-- **テストクラスがモジュールの外にあるとき、または別のモジュールの表を読み書きするとき**：[AsModule](../../backend/src/test/java/com/example/demo/testkit/AsModule.java)で、本番と同じSQLでモジュールのロールとテナントを設定して本体を実行する。テナントは、束縛中のテナントか、束縛していなければテストの利用者のテナント（[AsTenant](../../backend/src/test/java/com/example/demo/testkit/AsTenant.java)の`TENANT`）にする。商品を登録する`TestProducts`のような補助は、`AsModule`の中で書く。
+- **テストクラスがモジュールの外にあるとき、または別のモジュールの表を読み書きするとき**：[AsModule](../../backend/src/test/java/com/example/demo/testkit/AsModule.java)で、本番と同じSQLでモジュールのロールとテナントを設定して本体を実行する。テナントは引数で渡し、渡さなければテストの利用者のテナント（[AsTenant](../../backend/src/test/java/com/example/demo/testkit/AsTenant.java)の`TENANT`）にする。商品を登録する`TestProducts`のような補助は、`AsModule`の中で書く。
 - **`Scenario#stimulate`の中でCommandHandlerを呼ぶとき**：`stimulate`は名前のないトランザクションで呼ぶため、そのままではアプリロールで動き、権限エラーになる。本番のControllerが名前付きのトランザクションで入るのと同じく、`AsModule`の中で呼ぶ。
 
 業務のスキーマの読み書きを、モジュールの境界の外から確かめるテストは`ModuleRoleIsolationTest`、トランザクションマネージャーの切り替えとプールの接続への残留は`ModuleRoleTransactionTest`が確かめる。
@@ -50,8 +50,8 @@ Gradleのforkごとに別のDBになるため、forkどうしの後始末は衝�
 テストのトランザクションには、次のとおりテナントを設定する。
 
 - **`@DatabaseTest`のロールバック用トランザクション**：[DatabaseTestTransactionManager](../../backend/src/test/java/com/example/demo/testkit/DatabaseTestTransactionManager.java)が、テストの利用者のテナント（`AsTenant.TENANT`）を束縛してテストのトランザクションを始め、本番のトランザクションマネージャーの処理がロールとテナントを設定する。テストのトランザクションはテストのメソッドより前に始まり、本番のトランザクションマネージャーはテナントの束縛のない業務のモジュールのトランザクションを始めないためである。対象は`@DatabaseTest`の`@Transactional`のラベルで見分け、ほかのトランザクションは本番と同じに動く。テストのトランザクションのないメソッド（`Propagation.NOT_SUPPORTED`）には関わらない。
-- **`@ApplicationModuleTest`や`@SpringBootTest`で、CommandHandlerやQueryServiceをテストのスレッドから直接呼ぶとき**：テストクラスに`@ExtendWith`で[BindTestTenantExtension](../../backend/src/test/java/com/example/demo/testkit/BindTestTenantExtension.java)を付ける。`@BeforeEach`とテストのメソッドが`AsTenant.TENANT`の束縛の中で動き、トランザクションマネージャーがそのテナントを設定する。呼び出しごとに束縛するときは`AsTenant.call`を使う。
-- **別のテナントの行を読み書きするとき**：そのテナントを`TenantContext.call`で束縛し、その中で`AsModule`を呼ぶ。
+- **`@ApplicationModuleTest`や`@SpringBootTest`で、CommandHandlerやQueryServiceをテストのスレッドから直接呼ぶとき**：テストクラスに`@ExtendWith`で[BindTestTenantExtension](../../backend/src/test/java/com/example/demo/testkit/BindTestTenantExtension.java)を付ける。`@BeforeEach`とテストのメソッドが`AsTenant.TENANT`の束縛の中で動き、トランザクションマネージャーがそのテナントを設定する。
+- **別のテナントの行を読み書きするとき**：`AsModule`の`call`か`run`にそのテナントを渡す。
 
 別のテナントの行を読めず書けないこととテナントの設定忘れのエラーは`TenantIsolationTest`、プールの接続にテナントが残らないことと、テナントの束縛のない業務のトランザクションを始めないことは`ModuleRoleTransactionTest`が確かめる。
 

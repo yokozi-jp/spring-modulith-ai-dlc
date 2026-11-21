@@ -65,13 +65,12 @@ class ConfirmOrderCommandHandlerTest {
                 .stimulate(
                     // Scenario#stimulate は名前のないトランザクションで呼ぶため、本番の入口と同じく ordering のロールで入る。
                     () ->
-                        AsTenant.call(() ->
-                            AsModule.call(
-                                dsl,
-                                "ordering",
-                                tx ->
-                                    confirmOrder.handle(
-                                        new ConfirmOrderCommand(orderId, new ExpectedLockNo(1))))))
+                        AsModule.call(
+                            dsl,
+                            "ordering",
+                            tx ->
+                                confirmOrder.handle(
+                                    new ConfirmOrderCommand(orderId, new ExpectedLockNo(1)))))
                 .andWaitForEventOfType(OrderConfirmed.class)
                 .matching(event -> event.orderId().equals(orderId))
                 .toArriveAndVerify(event -> {

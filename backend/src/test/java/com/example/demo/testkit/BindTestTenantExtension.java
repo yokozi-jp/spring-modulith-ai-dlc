@@ -11,7 +11,7 @@ import org.junit.jupiter.api.extension.ReflectiveInvocationContext;
  *
  * <p>本番の CommandHandler と QueryService は、リクエストの入口の filter かリスナーの Aspect
  * が束縛したテナントの中で呼ばれる。それらをテストのスレッドから直接呼ぶテストのクラスに {@code @ExtendWith}
- * で付け、トランザクションマネージャーがテナントを設定できるようにする。呼び出しごとに束縛するときは {@link AsTenant#call} を使う。
+ * で付け、トランザクションマネージャーがテナントを設定できるようにする。
  */
 public final class BindTestTenantExtension implements InvocationInterceptor {
 
