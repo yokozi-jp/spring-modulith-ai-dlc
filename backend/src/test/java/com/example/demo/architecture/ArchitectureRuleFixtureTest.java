@@ -158,6 +158,9 @@ class ArchitectureRuleFixtureTest {
   /** プロキシが上書きできないメソッドにアノテーションを付けた違反フィクスチャのクラス名。 */
   private static final String ORDER_ARCHIVER = "ordering.application.OrderArchiver";
 
+  /** public な Bean の final のメソッドに違反するフィクスチャのクラス名。 */
+  private static final String ORDER_REPORTER = "ordering.application.OrderReporter";
+
   /** {@code @Scheduled} のメソッドの形に違反するフィクスチャのクラス名。 */
   private static final String STALE_LOCK_SWEEPER =
       "shared.infrastructure.persistence.StaleLockSweeper";
@@ -201,6 +204,10 @@ class ArchitectureRuleFixtureTest {
               "proxiedMethodsAreNotPrivateFinalOrStatic: 合成アノテーション",
               ProxyRulesArchTest.proxiedMethodsAreNotPrivateFinalOrStatic,
               ORDER_ARCHIVER + ".on("),
+          row(
+              "publicBeanMethodsAreNotFinal",
+              ProxyRulesArchTest.publicBeanMethodsAreNotFinal,
+              ORDER_REPORTER + ".report("),
           row(
               "asyncMethodsReturnVoidOrFuture",
               ProxyRulesArchTest.asyncMethodsReturnVoidOrFuture,
@@ -579,6 +586,7 @@ class ArchitectureRuleFixtureTest {
         ProxyRulesArchTest.transactionManagementIsNotRedeclared,
         ProxyRulesArchTest.proxiedMethodsAreNotCalledFromSameClass,
         ProxyRulesArchTest.proxiedMethodsAreNotPrivateFinalOrStatic,
+        ProxyRulesArchTest.publicBeanMethodsAreNotFinal,
         ProxyRulesArchTest.asyncMethodsReturnVoidOrFuture,
         ProxyRulesArchTest.scheduledMethodsAreNoArgVoidAndNotPrivateOrFinal,
         ClassRoleArchTest.moduleListenersAreApplicationListeners,

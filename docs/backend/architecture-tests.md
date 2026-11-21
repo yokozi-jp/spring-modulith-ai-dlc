@@ -254,6 +254,11 @@ Class <archfixture.violating.ordering.application.ShipOrderCommandHandler> is me
 - `scheduledMethodsAreNoArgVoidAndNotPrivateOrFinal`：`@Scheduled`と、繰り返した`@Scheduled`をまとめる`@Schedules`を付けたメソッドの、戻り値の型、引数、`private`、`final`を検査する。
   `static`は拒否しない。
 
+- `publicBeanMethodsAreNotFinal`：public で`@Component`をメタアノテーションに持つクラスの、public で`static`でないメソッドの`final`を拒否する。
+  Spring Modulithのobservabilityが、モジュールのpublicなBeanをアノテーションの有無によらずプロキシにするためである。
+  違反フィクスチャの`ordering.application.OrderReporter`で確かめる。
+  規則はBeanのクラス自身が宣言したメソッドだけを見るため、親クラスで宣言した`final`のメソッドは検出しない。
+
 同じクラスの`pointcutsNarrowTargetsWithWithin`は、AspectJのadviceと`@Pointcut`の式（`value`と`pointcut`）に`within(`があることを検査する。
 違反フィクスチャの`shared.infrastructure.persistence.SlowPgmCdAspect`で確かめ、規約どおりのフィクスチャの`PgmCdAspect`を誤検出しないことも確かめる。
 同じクラスの`aspectsDeclareOrder`は、`@Aspect`のクラスに`Ordered.LOWEST_PRECEDENCE`より小さい値の`@Order`があることを検査する。
