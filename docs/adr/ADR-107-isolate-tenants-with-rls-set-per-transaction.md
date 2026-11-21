@@ -101,6 +101,7 @@ RLS の外に置く表は、`modulith` と `tenancy` のスキーマの表だけ
 
 - 業務の表を読み書きするトランザクションは、`TenantContext` の束縛の中で始める必要がある。束縛のない入口（バッチ、起動時の処理）から業務の表に触れるとエラーになる。入口を足すときは、ADR-105 の束縛の許可先を先に変える。
 - 全テナントの行を扱う処理は、テナントの数だけトランザクションを流す。
+- PostgreSQL は、RLS を受けるロールの `COPY FROM` を受け付けない。`FORCE` で表の所有者もポリシーを受けるため、アプリ、モジュール、マイグレーション用のどのロールからも、業務の表へ `COPY FROM` で取り込めない。大量の行も INSERT で入れることになる。
 - 業務の一意索引の 1 件ごとに、`tenant_public_id` の 16 バイトが増える。テナントの主キー（bigint）を持つ場合より 8 バイト多い（#363 の Q24）。
 - seed、テストのデータ、DB のテストは、テナントを設定して書く。テストの掃除は、RLS を受けない所有者の接続の `TRUNCATE` で行う。
 - アプリのロールは、どの SQL からでも `set_config` でテナントを変えられる。DB で止められるのは誤りで、故意の迂回は止められない。ADR-094 の ArchUnit の規則（接続の設定の変更の禁止）で補う。
@@ -165,3 +166,4 @@ RLS の外に置く表は、`modulith` と `tenancy` のスキーマの表だけ
 - [PostgreSQL Row Security Policies](https://www.postgresql.org/docs/current/ddl-rowsecurity.html)
 - [PostgreSQL CREATE POLICY](https://www.postgresql.org/docs/current/sql-createpolicy.html)
 - [PostgreSQL System Administration Functions](https://www.postgresql.org/docs/current/functions-admin.html)
+- [PostgreSQL COPY](https://www.postgresql.org/docs/current/sql-copy.html)

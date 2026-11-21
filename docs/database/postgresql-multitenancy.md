@@ -50,6 +50,10 @@ USING (tenant_public_id = current_setting('app.current_tenant')::uuid)
 
 業務の一意索引と、同じモジュールの表どうしの外部キーは、[PostgreSQLの制約とインデックス](postgresql-constraints-and-indexes.md)の「外部キー」と「一意性」に従う。
 
+業務の表には、`COPY FROM`で取り込めない。
+PostgreSQLはRLSを受けるロールの`COPY FROM`を受け付けず、`FORCE ROW LEVEL SECURITY`で表の所有者もRLSを受けるためである。
+業務の表への大量の取り込みが必要になったら、取り込みの方式をADRで決める。
+
 ## RLSの外に置く表
 
 RLSの外に置く表は、`modulith`と`tenancy`のスキーマの表だけにする。

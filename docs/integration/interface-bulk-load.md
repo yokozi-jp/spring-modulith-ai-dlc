@@ -16,6 +16,7 @@ tags: [convention, integration, interface, postgresql, performance, future-arch-
 - 大きくなりうるファイルの取り込みは、アプリケーションからのバッチ INSERT ではなく、最初から `COPY` で設計する。
 - `TRUNCATE` と `COPY` で洗い替えた後は、`ANALYZE` で統計情報を更新する。
 - 取り込みの速度が足りない場合は、取り込みの間だけインデックスを外し、完了後に作り直すことを検討する。
+- 業務の表（RLS でテナントごとに分ける表）には、`COPY FROM` で取り込めない。扱いは [PostgreSQLのマルチテナント設計](../database/postgresql-multitenancy.md#rlsでテナントを分ける表)に従う。
 - バイナリ形式の `COPY` は、性能要件が厳しい取り込みだけに使う。
   ファイルが特定の DB に依存し、可読性と他システムでの再利用性を失うため。
 

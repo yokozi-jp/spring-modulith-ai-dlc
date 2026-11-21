@@ -51,6 +51,7 @@ PL/pgSQLや `generate_series` で、DBの中だけで大量の行を生成する
 ### ファイルの一括取り込み
 
 CSVなどのファイルを用意し、`COPY` で一括で取り込む。
+業務の表には `COPY FROM` で取り込めないため、扱いは[PostgreSQLのマルチテナント設計](../database/postgresql-multitenancy.md#rlsでテナントを分ける表)に従う。
 クライアント側のファイルを psql の `\copy` で送る方式は準備が要らないが、通信の帯域に依存し、接続が切れると中断する。
 マネージドサービスがオブジェクトストレージからサーバー側で取り込む機能を提供する場合は、大きなファイルではそちらを使う。
 
@@ -66,7 +67,9 @@ CSVなどのファイルを用意し、`COPY` で一括で取り込む。
   書き込みのIOPSがボトルネックになりやすいためである。
 - 投入の後に `ANALYZE` で統計情報を更新する。
 
-物理テーブルには外部キー制約を作らないため（[PostgreSQLの制約とインデックス](../database/postgresql-constraints-and-indexes.md)）、外部キー制約の付け外しは要らない。
+同じモジュールの表どうしの参照には外部キー制約があるため（[PostgreSQLの制約とインデックス](../database/postgresql-constraints-and-indexes.md#外部キー)）、参照先の表から順に投入する。
+外部キーの参照先のユニークインデックスは、外部キー制約を外してからでないと外せない。
+業務の表はテナントごとにRLSで分けるため、テナントを1つずつ設定して投入する（[PostgreSQLのマルチテナント設計](../database/postgresql-multitenancy.md#全テナントの行を書き換える処理)）。
 VACUUMは[PostgreSQLのサーバー設定と拡張機能](../database/postgresql-server-configuration.md)に従い自動バキュームに任せる。
 
 ## データのパターン
