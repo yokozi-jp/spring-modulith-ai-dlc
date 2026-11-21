@@ -28,6 +28,12 @@
 (* that waited sees the rows the other request committed meanwhile.        *)
 (* PostgreSQL's UPDATE and DELETE do neither, because their snapshot is    *)
 (* taken when the statement starts.                                        *)
+(*                                                                         *)
+(* The model leaves out the foreign key check of a child INSERT            *)
+(* (fk_t_order_line). It locks the parent row FOR KEY SHARE, which only    *)
+(* FOR UPDATE (a DELETE, or an UPDATE of a unique-key column) conflicts    *)
+(* with. In the order checked here the request already holds the root row  *)
+(* lock, so the check never waits.                                         *)
 (***************************************************************************)
 EXTENDS Naturals, Sequences, FiniteSets
 
