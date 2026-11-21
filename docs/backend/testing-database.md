@@ -1,7 +1,7 @@
 ---
 type: Convention
 title: バックエンドのDBテスト
-description: 実PostgreSQLを使うバックエンドテストの隔離環境、ロールバック、コミット後の後始末、テスト専用テーブル、イベント検証を定め、DBへ書き込むテストを作るとき、業務テーブルのない共通処理を実DBで確かめるときに読む規約。
+description: 実PostgreSQLを使うバックエンドテストの隔離環境、ロールバック、モジュールのロールとテナントの設定、コミット後の後始末、テスト専用テーブル、イベント検証を定め、DBへ書き込むテストを作るとき、業務テーブルのない共通処理を実DBで確かめるときに読む規約。
 tags: [convention, backend, testing, database, spring-modulith]
 ---
 
@@ -31,7 +31,7 @@ Gradleのforkごとに別のDBになるため、forkどうしの後始末は衝�
 テストのトランザクションも同じ規則で動く。
 
 - **テストクラスがモジュールのパッケージにあるとき**：`@DatabaseTest`のロールバック用トランザクションは、テストクラスの名前（`com.example.demo.ordering...`）から、そのモジュールのロールで動く。`@JooqTest`は`@Configuration`を読み込まないため、`@DatabaseTest`が切り替えを行うトランザクションマネージャーを`@Import`する。
-- **テストクラスがモジュールの外にあるとき、または別のモジュールの表を読み書きするとき**：[AsModule](../../backend/src/test/java/com/example/demo/testkit/AsModule.java)で、本番と同じ`set_config('role', ?, true)`を使い、モジュールのロールで本体を実行する。商品を登録する`TestProducts`のような補助は、`AsModule`の中で書く。
+- **テストクラスがモジュールの外にあるとき、または別のモジュールの表を読み書きするとき**：[AsModule](../../backend/src/test/java/com/example/demo/testkit/AsModule.java)で、本番と同じSQLでモジュールのロールとテナントを設定して本体を実行する。テナントは、束縛中のテナントか、束縛していなければテストの利用者のテナント（[AsTenant](../../backend/src/test/java/com/example/demo/testkit/AsTenant.java)の`TENANT`）にする。商品を登録する`TestProducts`のような補助は、`AsModule`の中で書く。
 - **`Scenario#stimulate`の中でCommandHandlerを呼ぶとき**：`stimulate`は名前のないトランザクションで呼ぶため、そのままではアプリロールで動き、権限エラーになる。本番のControllerが名前付きのトランザクションで入るのと同じく、`AsModule`の中で呼ぶ。
 
 業務のスキーマの読み書きを、モジュールの境界の外から確かめるテストは`ModuleRoleIsolationTest`、トランザクションマネージャーの切り替えとプールの接続への残留は`ModuleRoleTransactionTest`が確かめる。
@@ -44,12 +44,23 @@ Gradleのforkごとに別のDBになるため、forkどうしの後始末は衝�
 - **`dsl.transaction`と`dsl.transactionResult`**：呼び出し元のトランザクションに参加するため、呼び出し元と同じロールで動く。呼び出し元がなければアプリロールで動く。
 - **ShedLockとSpring Modulithの内部**：モジュールの名前を持たず、アプリロールで動く。`modulith`の表だけを使うため、権限エラーにならない。実物の`JooqLockProvider`がアプリロールでロックを取れることは、`ShedLockSessionTimeZoneTest`が確かめる。
 
+## テナントを設定して読み書きするテスト
+
+業務の表は、テナントを設定しないトランザクションでは読み書きできない（[PostgreSQLのマルチテナント設計](../database/postgresql-multitenancy.md#テナントの設定)）。
+テストのトランザクションには、次のとおりテナントを設定する。
+
+- **`@DatabaseTest`のロールバック用トランザクション**：テストのメソッドの前に、テストの利用者のテナント（`AsTenant.TENANT`）を、本番と同じSQLで設定する。テストのトランザクションはテナントを束縛する前に始まるため、トランザクションマネージャーは設定しない。テストのトランザクションのないメソッド（`Propagation.NOT_SUPPORTED`）には設定しない。
+- **`@ApplicationModuleTest`や`@SpringBootTest`で、CommandHandlerやQueryServiceをテストのスレッドから直接呼ぶとき**：テストクラスに`@ExtendWith`で[BindTestTenantExtension](../../backend/src/test/java/com/example/demo/testkit/BindTestTenantExtension.java)を付ける。`@BeforeEach`とテストのメソッドが`AsTenant.TENANT`の束縛の中で動き、トランザクションマネージャーがそのテナントを設定する。呼び出しごとに束縛するときは`AsTenant.call`を使う。
+- **別のテナントの行を読み書きするとき**：そのテナントを`TenantContext.call`で束縛し、その中で`AsModule`を呼ぶ。
+
+別のテナントの行を読めず書けないこととテナントの設定忘れのエラーは`TenantIsolationTest`、プールの接続にテナントが残らないことは`ModuleRoleTransactionTest`が確かめる。
+
 ## コミットするテスト
 
 コミット時にだけ起きる挙動には、[CommittedDatabaseTest](../../backend/src/test/java/com/example/demo/testkit/CommittedDatabaseTest.java)を使う。
 [CleanGeneratedTablesExtension](../../backend/src/test/java/com/example/demo/testkit/CleanGeneratedTablesExtension.java)は、各テスト後にjOOQ生成対象のアプリケーションテーブルの行を消す。
 Liquibase管理テーブルはコード生成から除外されているため、後始末の対象にしない。
-業務のスキーマの表は、アプリロールにもモジュールのロールにも別のモジュールの表を消す権限がないため、表の所有者（マイグレーションロール）の接続で`TRUNCATE`する。`TRUNCATE`は行レベルセキュリティの対象外で、モジュールとテナントの境界に左右されない。
+業務のスキーマの表は、アプリロールにもモジュールのロールにも別のモジュールの表を消す権限がないため、表の所有者（マイグレーションロール）の接続で、1つの`TRUNCATE`でまとめて消す。外部キーで参照される表は、参照する表と同じ`TRUNCATE`でなければ消せないためである。`TRUNCATE`は行レベルセキュリティの対象外で、モジュールとテナントの境界に左右されない。
 `modulith`スキーマの表は、アプリロールで`DELETE`する。
 消す前に、状態が`PUBLISHED`、`PROCESSING`、`RESUBMITTED`のイベント出版がなくなるまで最大10秒待つ。
 非同期のListenerはテストの本体の後にコミットすることがあり、待たずに消すと、後から書いた行が次のテストに残るためである。
