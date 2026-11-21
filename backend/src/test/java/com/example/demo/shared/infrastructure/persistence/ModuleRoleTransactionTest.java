@@ -7,6 +7,7 @@ import static org.assertj.core.api.Assertions.catchThrowable;
 
 import com.example.demo.shared.tenant.TenantContext;
 import com.example.demo.shared.tenant.TenantId;
+import com.example.demo.testkit.AsModule;
 import com.example.demo.testkit.CommittedDatabaseTest;
 import java.sql.SQLException;
 import java.util.ArrayList;
@@ -168,6 +169,7 @@ class ModuleRoleTransactionTest {
                     dsl.connection(connection ->
                         ModuleRoleTransactionManager.setLocal(
                             connection, ModuleRoles.roleOf("ordering"), null));
+                    AsModule.discardCachedPlans(dsl);
                     dsl.fetchCount(T_ORDER);
                   }));
 

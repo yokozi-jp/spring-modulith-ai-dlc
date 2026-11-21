@@ -22,7 +22,8 @@ import org.jspecify.annotations.Nullable;
  * ModuleRoleTransactionManager#setLocal} で設定する。
  *
  * <p>設定は呼び出しの間だけで、正常に終わったら元のロールとテナントへ戻す。PostgreSQL
- * はトランザクションの中で設定を未設定へ戻せないため、元のテナントが未設定なら空文字列へ戻すが、どちらの状態でもテナントのない業務の表の読み書きは失敗する。本体が失敗したときは、jOOQ
+ * はトランザクションの中で設定を未設定へ戻せないため、元のテナントが未設定なら空文字列へ戻すが、どちらの状態でも、テナントのない業務の表への INSERT と、計画し直した読み取り（{@link
+ * #discardCachedPlans}）は失敗する。本体が失敗したときは、jOOQ
  * がセーブポイントまで戻すため、設定も戻る。テストのトランザクションの中でも、アプリロールのままの接続でも使える。
  */
 public final class AsModule {
@@ -65,6 +66,17 @@ public final class AsModule {
   public static <T> T callWithoutTenant(
       final DSLContext dsl, final String module, final Function<DSLContext, T> body) {
     return inTransaction(dsl, module, null, body);
+  }
+
+  /**
+   * 接続に残った実行計画を捨て、次の SQL を今のテナントの設定で計画し直させる。
+   *
+   * <p>テナントのない業務の表の読み取りは、PostgreSQL
+   * が計画を作るときにポリシーの式を評価してエラーになる。テナントのある間に作った計画がプールの接続に残ると、計画を作り直さず、空の表を順に走査して 0
+   * 件を返しうる（ADR-107）。パラメーターのない SQL は {@code plan_cache_mode} によらず残った計画を使うので、計画を捨てる。
+   */
+  public static void discardCachedPlans(final DSLContext tx) {
+    tx.execute("discard plans");
   }
 
   /** モジュールのロールとテストの利用者のテナント（{@link AsTenant#TENANT}）で本体を実行する。 */

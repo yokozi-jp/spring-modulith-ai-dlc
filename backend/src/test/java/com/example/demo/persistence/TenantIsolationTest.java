@@ -258,6 +258,17 @@ class TenantIsolationTest {
     assertThat(AsModule.callWithoutTenant(dsl, ORDERING_MODULE, countUnknownStatus))
         .as("テナントを設定しない読み取りの件数")
         .isZero();
+    // 0 件は残った計画のためで、計画を捨てれば同じ読み取りは計画を作る時点でエラーになる。
+    assertSqlState(
+        () ->
+            AsModule.callWithoutTenant(
+                dsl,
+                ORDERING_MODULE,
+                tx -> {
+                  AsModule.discardCachedPlans(tx);
+                  return countUnknownStatus.apply(tx);
+                }),
+        EMPTY);
   }
 
   @ParameterizedTest(name = "{0}")
@@ -266,7 +277,14 @@ class TenantIsolationTest {
   @DisplayName("テナントを設定しないモジュールのロールは、業務の表を 0 件で読まずにエラーになる")
   void readingWithoutTenantFails(final Table<?> table) {
     assertSqlState(
-        () -> AsModule.callWithoutTenant(dsl, AsModule.moduleOf(table), tx -> tx.fetchCount(table)),
+        () ->
+            AsModule.callWithoutTenant(
+                dsl,
+                AsModule.moduleOf(table),
+                tx -> {
+                  AsModule.discardCachedPlans(tx);
+                  return tx.fetchCount(table);
+                }),
         UNSET,
         EMPTY);
   }
@@ -294,6 +312,7 @@ class TenantIsolationTest {
                 PRODUCT_MODULE,
                 tx -> {
                   AsModule.call(tx, PRODUCT_MODULE, OTHER, inner -> inner.fetchCount(M_PRODUCT));
+                  AsModule.discardCachedPlans(tx);
                   return tx.fetchCount(M_PRODUCT);
                 }),
         EMPTY);
