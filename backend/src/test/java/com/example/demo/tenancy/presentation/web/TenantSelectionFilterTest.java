@@ -8,6 +8,7 @@ import com.example.demo.shared.tenant.TenantContext;
 import com.example.demo.shared.tenant.TenantId;
 import com.example.demo.tenancy.MembershipSummary;
 import com.example.demo.tenancy.TenancyQueries;
+import com.example.demo.tenancy.TenantMembersDetails;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import java.io.IOException;
@@ -45,6 +46,11 @@ class TenantSelectionFilterTest {
         @Override
         public Optional<MembershipSummary> membership(final String userId, final String tenantId) {
           return Optional.of(new MembershipSummary(TENANT, "tenant", ROLE));
+        }
+
+        @Override
+        public Optional<TenantMembersDetails> findMembers(final String tenantId) {
+          return Optional.empty();
         }
       };
 

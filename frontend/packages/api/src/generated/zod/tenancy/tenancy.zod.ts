@@ -25,6 +25,54 @@ export const SelectTenantBody = zod.object({
 export const SelectTenantResponse = zod.void()
 
 /**
+ * 一覧は所属した順に items で包んで返す。lockNo は変更の操作で送り返す。管理者以外には 403 を返す。
+ * @summary 選んだテナントに所属している利用者の一覧を返す。
+ */
+export const ListTenantMembersResponse = zod.object({
+  "items": zod.array(zod.object({
+  "role": zod.string().describe('テナントの中の役割のコード値（ADMIN、MEMBER）'),
+  "userId": zod.uuid().describe('利用者の ID')
+}).describe('テナントに所属している利用者。')).describe('所属している利用者。所属した順に並ぶ'),
+  "lockNo": zod.int().describe('所属を変える操作の本文で送り返す、テナントのロック番号')
+}).describe('テナントの所属の一覧を items で包んで返す API の本文。')
+
+/**
+ * 外した利用者は、次のリクエストから業務の API を呼べない。管理者以外には 403、最後の管理者を外すと 422 を返す。
+ * @summary 所属している利用者を外す。
+ */
+export const RemoveTenantMemberParams = zod.object({
+  "userId": zod.uuid().describe('所属を外す利用者の ID')
+})
+
+
+
+
+export const RemoveTenantMemberQueryParams = zod.object({
+  "lockNo": zod.int().min(1).describe('画面が読んだテナントのロック番号')
+})
+
+export const RemoveTenantMemberResponse = zod.void()
+
+/**
+ * 変更は、その利用者の次のリクエストから効く。管理者以外には 403、最後の管理者を下げると 422 を返す。
+ * @summary 所属している利用者の役割を変える。
+ */
+export const ChangeTenantMemberRoleParams = zod.object({
+  "userId": zod.uuid().describe('役割を変える利用者の ID')
+})
+
+
+export const changeTenantMemberRoleBodyRoleRegExp = new RegExp('^(ADMIN|MEMBER)$');
+
+
+export const ChangeTenantMemberRoleBody = zod.object({
+  "lockNo": zod.int().min(1).describe('画面が読んだテナントのロック番号'),
+  "role": zod.string().regex(changeTenantMemberRoleBodyRoleRegExp).describe('新しい役割のコード値（ADMIN、MEMBER）')
+}).describe('テナントに所属している利用者の役割を変える API の本文。')
+
+export const ChangeTenantMemberRoleResponse = zod.void()
+
+/**
  * 一覧はテナントの名前の順に items で包んで返す。テナントを選ぶ前にも呼べる。所属がなければ空の items を返す。
  * @summary ログインした利用者の所属の一覧を返す。
  */

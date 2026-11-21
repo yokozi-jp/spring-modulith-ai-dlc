@@ -4,7 +4,7 @@ import { useSuspenseQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
-import type { Notice } from "@/features/orders/notice";
+import type { Notice } from "@/lib/notice";
 
 import { useOrderLinesEditor } from "./use-order-lines-editor";
 import { useOrderStatusActions } from "./use-order-status-actions";

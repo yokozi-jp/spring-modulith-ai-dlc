@@ -1,4 +1,4 @@
-import type { Notice } from "@/features/orders/notice";
+import type { Notice } from "@/lib/notice";
 
 /** 常に描画する live region。output の内容は phrasing content なので、見出しは strong で表す。見出しと説明を別の要素に分け、1 つの文字列に連結しない。 */
 export function ProblemNotice({ notice }: { notice: Notice | undefined }) {

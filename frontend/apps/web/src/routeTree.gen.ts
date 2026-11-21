@@ -14,6 +14,7 @@ import { Route as LoggedOutRouteImport } from './routes/logged-out'
 import { Route as AuthenticatedTenantRouteRouteImport } from './routes/_authenticated/_tenant/route'
 import { Route as AuthenticatedTenantsRouteImport } from './routes/_authenticated/tenants'
 import { Route as AuthenticatedTenantIndexRouteImport } from './routes/_authenticated/_tenant/index'
+import { Route as AuthenticatedTenantMembersRouteImport } from './routes/_authenticated/_tenant/members'
 import { Route as AuthenticatedTenantOrdersIndexRouteImport } from './routes/_authenticated/_tenant/orders/index'
 import { Route as AuthenticatedTenantOrdersNewRouteImport } from './routes/_authenticated/_tenant/orders/new'
 import { Route as AuthenticatedTenantOrdersOrderIdIndexRouteImport } from './routes/_authenticated/_tenant/orders/$orderId/index'
@@ -43,6 +44,12 @@ const AuthenticatedTenantIndexRoute =
     path: '/',
     getParentRoute: () => AuthenticatedTenantRouteRoute,
   } as any)
+const AuthenticatedTenantMembersRoute =
+  AuthenticatedTenantMembersRouteImport.update({
+    id: '/members',
+    path: '/members',
+    getParentRoute: () => AuthenticatedTenantRouteRoute,
+  } as any)
 const AuthenticatedTenantOrdersIndexRoute =
   AuthenticatedTenantOrdersIndexRouteImport.update({
     id: '/orders/',
@@ -66,6 +73,7 @@ export interface FileRoutesByFullPath {
   '/': typeof AuthenticatedTenantIndexRoute
   '/logged-out': typeof LoggedOutRoute
   '/tenants': typeof AuthenticatedTenantsRoute
+  '/members': typeof AuthenticatedTenantMembersRoute
   '/orders/new': typeof AuthenticatedTenantOrdersNewRoute
   '/orders/': typeof AuthenticatedTenantOrdersIndexRoute
   '/orders/$orderId/': typeof AuthenticatedTenantOrdersOrderIdIndexRoute
@@ -74,6 +82,7 @@ export interface FileRoutesByTo {
   '/': typeof AuthenticatedTenantIndexRoute
   '/logged-out': typeof LoggedOutRoute
   '/tenants': typeof AuthenticatedTenantsRoute
+  '/members': typeof AuthenticatedTenantMembersRoute
   '/orders/new': typeof AuthenticatedTenantOrdersNewRoute
   '/orders': typeof AuthenticatedTenantOrdersIndexRoute
   '/orders/$orderId': typeof AuthenticatedTenantOrdersOrderIdIndexRoute
@@ -84,6 +93,7 @@ export interface FileRoutesById {
   '/logged-out': typeof LoggedOutRoute
   '/_authenticated/_tenant': typeof AuthenticatedTenantRouteRouteWithChildren
   '/_authenticated/tenants': typeof AuthenticatedTenantsRoute
+  '/_authenticated/_tenant/members': typeof AuthenticatedTenantMembersRoute
   '/_authenticated/_tenant/': typeof AuthenticatedTenantIndexRoute
   '/_authenticated/_tenant/orders/new': typeof AuthenticatedTenantOrdersNewRoute
   '/_authenticated/_tenant/orders/': typeof AuthenticatedTenantOrdersIndexRoute
@@ -95,6 +105,7 @@ export interface FileRouteTypes {
     | '/'
     | '/logged-out'
     | '/tenants'
+    | '/members'
     | '/orders/new'
     | '/orders/'
     | '/orders/$orderId/'
@@ -103,6 +114,7 @@ export interface FileRouteTypes {
     | '/'
     | '/logged-out'
     | '/tenants'
+    | '/members'
     | '/orders/new'
     | '/orders'
     | '/orders/$orderId'
@@ -112,6 +124,7 @@ export interface FileRouteTypes {
     | '/logged-out'
     | '/_authenticated/_tenant'
     | '/_authenticated/tenants'
+    | '/_authenticated/_tenant/members'
     | '/_authenticated/_tenant/'
     | '/_authenticated/_tenant/orders/new'
     | '/_authenticated/_tenant/orders/'
@@ -160,6 +173,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedTenantIndexRouteImport
       parentRoute: typeof AuthenticatedTenantRouteRoute
     }
+    '/_authenticated/_tenant/members': {
+      id: '/_authenticated/_tenant/members'
+      path: '/members'
+      fullPath: '/members'
+      preLoaderRoute: typeof AuthenticatedTenantMembersRouteImport
+      parentRoute: typeof AuthenticatedTenantRouteRoute
+    }
     '/_authenticated/_tenant/orders/': {
       id: '/_authenticated/_tenant/orders/'
       path: '/orders'
@@ -185,6 +205,7 @@ declare module '@tanstack/react-router' {
 }
 
 interface AuthenticatedTenantRouteRouteChildren {
+  AuthenticatedTenantMembersRoute: typeof AuthenticatedTenantMembersRoute
   AuthenticatedTenantIndexRoute: typeof AuthenticatedTenantIndexRoute
   AuthenticatedTenantOrdersNewRoute: typeof AuthenticatedTenantOrdersNewRoute
   AuthenticatedTenantOrdersIndexRoute: typeof AuthenticatedTenantOrdersIndexRoute
@@ -193,6 +214,7 @@ interface AuthenticatedTenantRouteRouteChildren {
 
 const AuthenticatedTenantRouteRouteChildren: AuthenticatedTenantRouteRouteChildren =
   {
+    AuthenticatedTenantMembersRoute: AuthenticatedTenantMembersRoute,
     AuthenticatedTenantIndexRoute: AuthenticatedTenantIndexRoute,
     AuthenticatedTenantOrdersNewRoute: AuthenticatedTenantOrdersNewRoute,
     AuthenticatedTenantOrdersIndexRoute: AuthenticatedTenantOrdersIndexRoute,

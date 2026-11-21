@@ -7,7 +7,7 @@ tags: [convention, backend, class-role]
 
 # クラスの役割：Request
 
-`<UseCase>Request` は、リクエストボディを受ける操作の入力を表す record であり、`presentation.web` に置く。
+`<UseCase>Request` は、リクエストボディを受ける操作の入力（DELETE はロック番号のクエリパラメータ）を表す record であり、`presentation.web` に置く。
 形式の検証を Bean Validation の制約で書き、`toCommand(...)` で Command に変換する。
 既存の集約を変える操作（確定、取消）も、ロック番号を本文で受けるため Request を作る。
 役割の決定理由は [ADR-050](../../adr/ADR-050-define-backend-class-roles-and-naming.md) に示す。
@@ -16,7 +16,7 @@ tags: [convention, backend, class-role]
 
 HTTP のリクエストボディは、API の利用者との契約であり、ユースケースの入力とは別に変わる。
 **Request**（`<UseCase>Request`）は、リクエストボディの JSON の形と、単項目の形式の検証を表す record である。
-[Controller](controller.md) が `@Valid @RequestBody` で受け取り、`toCommand(...)` で [Command](command.md) に変換して CommandHandler に渡す。
+[Controller](controller.md) が `@Valid @RequestBody` で受け取り（DELETE は下の「DELETE の入力」に従う）、`toCommand(...)` で [Command](command.md) に変換して CommandHandler に渡す。
 制約は springdoc-openapi が OpenAPI のスキーマに反映する。
 
 Request は Command ではない。
@@ -36,7 +36,7 @@ CommandHandler に Request を渡さず、Request に業務の不変条件を書
 - `public record` にする。
 - 単項目の形式の検証を、component に Bean Validation の制約で書く（`@NotBlank`、`@NotEmpty`、`@Min(1)`）。
   ネストした record のリストは `List<@Valid Line>` にし、要素も検証する。
-- 既存の集約を変える操作の Request は、参照の応答で返したロック番号を `@Min(1) long lockNo` に持つ。
+- 本文で受ける、既存の集約を変える操作の Request は、参照の応答で返したロック番号を `@Min(1) long lockNo` に持つ。DELETE の Request は例外で、制約を Controller の引数に書く。
   ロック番号は[更新の競合制御](../../web-api/optimistic-locking.md)のとおりリクエストボディで受け、`lock_no` は1から始まるため `@Min(1)` を付ける。
   HTTP の Request と OpenAPI は数値のままにする。
 - `toCommand` で `new ExpectedLockNo(lockNo)` を作って Command に渡す。
@@ -50,7 +50,18 @@ CommandHandler に Request を渡さず、Request に業務の不変条件を書
   enum、boolean、ネストした record、`List` には付けない（[OpenAPIのアノテーションとJavadoc](../../web-api/openapi-annotations.md#example)）。
 - `presentation.web` のパッケージの `package-info.java` は Controller と共有する。
 
-形式の違反は `MethodArgumentNotValidException` になり、`ApiExceptionHandler` が処理して、type が `/problems/validation-error` の 400 になる。
+## DELETE の入力
+
+DELETE は本文を持たず、ロック番号をクエリパラメータで受ける（[更新の競合制御](../../web-api/optimistic-locking.md#delete)）。
+クエリは [ADR-053](../../adr/ADR-053-document-openapi-from-javadoc-with-minimal-annotations.md) に従い、Controller が `@RequestParam @Min(1) long lockNo` で 1 つずつ受ける。
+その値を `new <UseCase>Request(lockNo)`（`RemoveMemberRequest`）に渡し、`toCommand(...)` で Command に変換する。
+`@ParameterObject` と `@ModelAttribute` では受けない。
+この Request の component には制約も `@Schema(example)` も付けない。`@Min(1)` は Controller の引数に付け、OpenAPI の説明は Controller の Javadoc の `@param` から作る。
+`@Min(1)` の違反は `HandlerMethodValidationException` になり、`ApiExceptionHandler` が 400 にする。
+
+## 形式の違反
+
+本文の形式の違反は `MethodArgumentNotValidException` になり、`ApiExceptionHandler` が処理して、type が `/problems/validation-error` の 400 になる。
 `errors` 拡張に、誤りのある項目の JSON Pointer と説明が入る（[ADR-058](../../adr/ADR-058-use-path-absolute-relative-uri-for-problem-types.md)）。
 複数の項目の組み合わせ、マスタの存在、業務の状態に依存する検証は Request に書かず、[APIの入力検証の配置](../../web-api/validation.md)に従ってアプリケーションで行う。
 
@@ -160,10 +171,10 @@ Controller の MockMvc のテストで、制約に違反する本文が 400 の 
 - [ ] `presentation.web` の record にする。［ArchUnit で検査：ClassRoleArchTest.requestsAndResponsesArePresentationWebRecords］
 - [ ] Domain の型に依存しない。［ArchUnit で検査：PackageByFeatureOnionArchitectureTest.presentationDoesNotDependOnDomain］
 - [ ] 状態を変える操作ごとに作り、名前を Command と同じ `<UseCase>` に `Request` を付けた形にする。［自分で点検］
-- [ ] 既存の集約を変える操作の Request に `@Min(1) long lockNo` を持たせる。［自分で点検］
+- [ ] 本文で受ける、既存の集約を変える操作の Request に `@Min(1) long lockNo` を持たせる（DELETE は Controller の引数に `@RequestParam @Min(1)` を付ける）。［自分で点検］
 - [ ] `ExpectedLockNo` は Request の `toCommand` だけで作る。［ArchUnit で検査：TableWriterArchTest.expectedLockNoIsCreatedOnlyByRequests］
 - [ ] 単項目の形式の検証を Bean Validation の制約で書き、ネストした record のリストは `List<@Valid ...>` にする。［自分で点検］
-- [ ] Controller で `@Valid @RequestBody` で受ける。［自分で点検］
+- [ ] Controller で `@Valid @RequestBody` で受ける（DELETE は `@RequestParam` の値を Request に渡す）。［自分で点検］
 - [ ] `toCommand(...)` で Command に変換し、パス変数の値は引数で受け取る。［自分で点検］
 - [ ] `List` の component をコンパクトコンストラクタで `List.copyOf` に置き換える。［自分で点検］
 - [ ] record、ネストした record、`toCommand` に Javadoc を書く。［自分で点検］

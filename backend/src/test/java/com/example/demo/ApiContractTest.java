@@ -85,6 +85,15 @@ class ApiContractTest {
   @ContractCase(method = RequestMethod.GET, path = "/api/memberships", status = 401)
   @ContractCase(method = RequestMethod.GET, path = "/api/current-tenant", status = 401)
   @ContractCase(method = RequestMethod.PUT, path = "/api/current-tenant", status = 401)
+  @ContractCase(method = RequestMethod.GET, path = "/api/current-tenant/members", status = 401)
+  @ContractCase(
+      method = RequestMethod.PUT,
+      path = "/api/current-tenant/members/{userId}",
+      status = 401)
+  @ContractCase(
+      method = RequestMethod.DELETE,
+      path = "/api/current-tenant/members/{userId}",
+      status = 401)
   void unauthenticatedOperationReturnsUnauthorized(final String method, final String path)
       throws Exception {
     mockMvc
@@ -103,6 +112,14 @@ class ApiContractTest {
   @ContractCase(method = RequestMethod.POST, path = "/api/orders/{orderId}/confirm", status = 403)
   @ContractCase(method = RequestMethod.POST, path = "/api/orders/{orderId}/cancel", status = 403)
   @ContractCase(method = RequestMethod.PUT, path = "/api/current-tenant", status = 403)
+  @ContractCase(
+      method = RequestMethod.PUT,
+      path = "/api/current-tenant/members/{userId}",
+      status = 403)
+  @ContractCase(
+      method = RequestMethod.DELETE,
+      path = "/api/current-tenant/members/{userId}",
+      status = 403)
   void updateWithoutCsrfTokenReturnsForbidden(final String method, final String path)
       throws Exception {
     mockMvc
@@ -125,6 +142,15 @@ class ApiContractTest {
   @ContractCase(method = RequestMethod.GET, path = "/api/payments", status = 403)
   @ContractCase(method = RequestMethod.GET, path = "/api/products", status = 403)
   @ContractCase(method = RequestMethod.GET, path = "/api/current-tenant", status = 403)
+  @ContractCase(method = RequestMethod.GET, path = "/api/current-tenant/members", status = 403)
+  @ContractCase(
+      method = RequestMethod.PUT,
+      path = "/api/current-tenant/members/{userId}",
+      status = 403)
+  @ContractCase(
+      method = RequestMethod.DELETE,
+      path = "/api/current-tenant/members/{userId}",
+      status = 403)
   void operationBeforeTenantSelectionReturnsTenantNotSelected(
       final String method, final String path) throws Exception {
     // 役割の権限だけを持つ認証は、テナントを選んだことにならない。
