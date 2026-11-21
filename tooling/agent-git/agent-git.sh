@@ -409,7 +409,7 @@ prepush_here() {
 
 push() {
   [ $# -eq 0 ] || usage
-  local branch lock running run
+  local branch lock running run dirty
   branch="$(git symbolic-ref --quiet --short HEAD)" || fail "ブランチを checkout していないので push できません。"
   # pre-push の task test は compose-test のプロジェクト名とポートが固定なので、worktree をまたいで push を一つずつにする。
   # ロックは background の wrapper が受け継いで持ち続け、push が終わるか止まると外れる。
