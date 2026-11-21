@@ -95,6 +95,8 @@ RLSのポリシー名はテーブルごとに一意であればよく、業務�
 - **外部キー**：`fk_{テーブル名}`。同じテーブルに複数あるときは`fk_{連番}_{テーブル名}`とする（例：`tenancy.m_membership`の`fk_m_membership`と`fk_2_m_membership`）。
 - **RLSのポリシー**：`tenant_isolation`（[PostgreSQLのマルチテナント設計](postgresql-multitenancy.md#rlsでテナントを分ける表)）。
 
+外部キー名はchangesetのlint（規則K4）、ポリシー名はRLSのSQLのlint（規則S1）が確かめる（[バックエンドのアーキテクチャテスト](../backend/architecture-tests.md)）。
+
 ## シーケンス名
 
 IDENTITY列が暗黙に作るシーケンスは、PostgreSQLの自動命名に任せる。

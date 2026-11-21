@@ -38,9 +38,10 @@ Spring Modulithのイベント出版テーブルのように、フレームワ�
 名前は[PostgreSQLの命名規約](postgresql-naming.md#外部キー名とポリシー名)に従う。
 
 外部キーは次の検査で確かめる。
+規則の記号の定義は[バックエンドのアーキテクチャテスト](../backend/architecture-tests.md)にある。
 
-- **カタログのテスト**：`SchemaConventionsTest`と`SchemaInspectionTest`（[バックエンドのアーキテクチャテスト](../backend/architecture-tests.md)）が、同じモジュールの業務の表どうしの参照に複合の外部キーがあることを確かめる。規則P4は、別のスキーマのテーブルを参照する外部キーを拒否する。
-- **changesetのlint**：`ChangesetLintTest`が、外部キーのchangesetの書き方を確かめる。
+- **カタログのテスト**：`SchemaConventionsTest`と`SchemaInspectionTest`が、同じモジュールの表を指す列に外部キーがあることと、外部キーの列が業務の表なら複合、`tenancy`の表なら単独の形であることを確かめる（規則K1）。規則P4は、別のスキーマのテーブルを参照する外部キーを拒否する。
+- **changesetのlint**：`ChangesetLintTest`が、外部キーを`addForeignKeyConstraint`で作ること、名前、参照先のスキーマと列、`onDelete`と`onUpdate`がないことを確かめる（規則K4）。
 
 ## NOT NULL
 
@@ -63,7 +64,7 @@ CHECK制約は使わない。
 Liquibaseでは`addUniqueConstraint`ではなく、`unique: true`を付けた`createIndex`を使う。
 
 業務の表（[PostgreSQLのマルチテナント設計](postgresql-multitenancy.md#rlsでテナントを分ける表)）のユニークインデックスは、すべて`tenant_public_id`から始める。
-先頭の列はカタログのテスト（`SchemaConventionsTest`と`SchemaInspectionTest`）が確かめる。
+先頭の列はカタログのテスト（`SchemaConventionsTest`と`SchemaInspectionTest`の規則S6）が確かめる。
 理由は[ADR-107](../adr/ADR-107-isolate-tenants-with-rls-set-per-transaction.md)に示す。
 
 - ユニークインデックスはNULLの重複を許す。NULLの重複を禁止するときは`NULLS NOT DISTINCT`を付ける。

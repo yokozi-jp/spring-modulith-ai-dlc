@@ -42,11 +42,16 @@ changesetが作るスキーマのうち、`modulith`と`tenancy`を除くスキ�
 - 業務の表は、テナントの`public_id`を`tenant_public_id`（`uuid`、NOT NULL）として持つ。テナントの主キーは持たない（[PostgreSQLの主キー](postgresql-primary-keys.md#主キーと公開用idの使い分け)）。
 - `tenant_public_id`の既定値は`current_setting('app.current_tenant')::uuid`にし、RepositoryとseedのINSERTはこの列を書かない。列の値はトランザクションに設定したテナントになり、テナントを設定しないトランザクションのINSERTはエラーになる。uuidの`DEFAULT`の禁止の例外である（[PostgreSQLの主キー](postgresql-primary-keys.md#uuidの採番)）。
 - 業務の表に`ENABLE ROW LEVEL SECURITY`と`FORCE ROW LEVEL SECURITY`を付ける。
-- ポリシーは次の式で比べ、`current_setting`に`missing_ok`を渡さない。式は、読む行と、INSERTとUPDATEで書く行の両方に効かせる。
+- ポリシー`tenant_isolation`は`tenant_public_id = current_setting('app.current_tenant')::uuid`で比べ、`current_setting`に`missing_ok`を渡さない。式は、読む行と、INSERTとUPDATEで書く行の両方に効かせる。
 - ポリシーの対象は`PUBLIC`にする。表に触れるロールは、表の権限で絞る（[DB接続情報とロール分離](connections.md#モジュールのロール)）。
 
+changesetには、表ごとに次の3文を同じchangesetに書く。
+空白の数を除いてこの形のとおりに書き、ほかの形のRLSとポリシーの文は、rollbackにも書かない。
+
 ```sql
-USING (tenant_public_id = current_setting('app.current_tenant')::uuid)
+ALTER TABLE <スキーマ>.<表> ENABLE ROW LEVEL SECURITY;
+ALTER TABLE <スキーマ>.<表> FORCE ROW LEVEL SECURITY;
+CREATE POLICY tenant_isolation ON <スキーマ>.<表> AS PERMISSIVE FOR ALL TO PUBLIC USING (tenant_public_id = current_setting('app.current_tenant')::uuid);
 ```
 
 業務の一意索引と、同じモジュールの表どうしの外部キーは、[PostgreSQLの制約とインデックス](postgresql-constraints-and-indexes.md)の「外部キー」と「一意性」に従う。
@@ -86,12 +91,13 @@ SELECT set_config(?, ?, true), set_config(?, ?, true)
 ## RLSの検査
 
 RLSの規則は次の検査で確かめる。
+規則の記号の定義は[バックエンドのアーキテクチャテスト](../backend/architecture-tests.md)にある。
 一意索引の先頭の列と外部キーの検査は、[PostgreSQLの制約とインデックス](postgresql-constraints-and-indexes.md)に示す。
 
-- **カタログのテスト**：`SchemaConventionsTest`と`SchemaInspectionTest`（[バックエンドのアーキテクチャテスト](../backend/architecture-tests.md)）が、業務の表に`ENABLE`と`FORCE`があること、`tenant_public_id`の型、RLSの外の表が`modulith`と`tenancy`のスキーマの表だけであること、ポリシーの対象が`PUBLIC`であることを確かめる。
-- **changesetのlint**：`ChangesetLintTest`が、RLSとポリシーのchangesetの書き方を確かめる。
-- **`@DatabaseTest`**：別のテナントの行を読めず書けないことと、テナントを設定し忘れるとエラーになることを確かめる。
-- **`@CommittedDatabaseTest`**：commitとrollbackの後、プールの接続にテナントが残らないことを確かめる。設定の後に空文字列が残る場合も、ポリシーが失敗する側に倒れることを確かめる。
+- **カタログのテスト**：`SchemaConventionsTest`と`SchemaInspectionTest`が、業務の表に`ENABLE`と`FORCE`があること（規則S3）、`tenant_public_id`の型、NOT NULL、既定値（規則S4）、ポリシーが`PUBLIC`を対象にする1つだけで`missing_ok`を使わないこと（規則S5）を確かめる。表の一覧を持たずにカタログから導くため、「RLSでテナントを分ける表」の範囲に表を足すと、その表も検査の対象になる。
+- **changesetのlint**：`ChangesetLintTest`が、RLSとポリシーのSQLが上の3文の形だけであること（規則S1）と、3文が同じchangesetに揃うこと（規則S2）を確かめる。
+- **`@DatabaseTest`**：`TenantIsolationTest`が、別のテナントの行を読めず書けないこと、明細が別のテナントの注文を指せないこと、テナントを設定し忘れるとエラーになることを確かめる。業務の表は、`tenant_public_id`を持つjOOQの生成した表から導く。
+- **`@CommittedDatabaseTest`**：`ModuleRoleTransactionTest`が、commitとrollbackの後、プールの接続にテナントが残らないことを確かめる。設定の後に空文字列が残る場合も、ポリシーが失敗する側に倒れることを確かめる。
 
 ## ノイジーネイバーへの対策
 

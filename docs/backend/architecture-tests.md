@@ -395,6 +395,19 @@ DBの規約のほかの検査は`backend/src/test/java/com/example/demo/persiste
 - G4：モジュールのロールの一覧が`ModuleRoles.MODULES`と一致し、ログインできず、DDLの属性を持たず、アプリロールが継承なしで切り替えられる。
 - G5：モジュールのロールの権限が、自分のスキーマのDML、依存の方向のSELECT、`modulith.event_publication`へのINSERTだけで、期待する集合と完全に一致する。
 
+テナントと外部キーの規則は次のとおりである。
+根拠は[PostgreSQLのマルチテナント設計](../database/postgresql-multitenancy.md)と[PostgreSQLの制約とインデックス](../database/postgresql-constraints-and-indexes.md#外部キー)にある。
+テナントで分ける表の範囲は[RLSでテナントを分ける表](../database/postgresql-multitenancy.md#rlsでテナントを分ける表)に示す。
+
+- S1：changesetのRLSとポリシーのSQLは、テナントで分ける表への決まった3文（`ENABLE`、`FORCE`、`tenant_isolation`のポリシーの作成）だけにする。`missing_ok`を渡すポリシー、`PUBLIC`以外を対象にするポリシー、テナントで分ける表の外の表へのRLS、ほかの形の文を、rollbackを含めて拒否する。3文だけのSQLは、任意のSQL（M17）の許可リストに載せない。
+- S2：changesetでRLSの文を書いた表には、3文をすべて同じchangesetに書く。
+- S3：カタログのテナントで分ける表に、`ENABLE`と`FORCE`のRLSが付いている。
+- S4：カタログのテナントで分ける表が、uuidのNOT NULLで、既定値がトランザクションのテナントの`tenant_public_id`を持つ。
+- S5：カタログのテナントで分ける表のポリシーが、`PERMISSIVE`、`FOR ALL`、`TO PUBLIC`、`missing_ok`を使わない`USING`の式、`WITH CHECK`なしの1つだけである。
+- S6：カタログのテナントで分ける表の、主キー以外のユニークインデックスが`tenant_public_id`から始まる。
+- K1：カタログの同じスキーマのほかの表の主キーと同じ名前の列に、外部キーがある。外部キーは、テナントで分ける表なら`(tenant_public_id, 参照先の主キー)`、`tenancy`の表なら参照先の主キーだけの形にし、形の違う外部キーも拒否する。
+- K4：changesetの外部キーは`addForeignKeyConstraint`だけで作り、名前を`fk_{表}`か`fk_{連番}_{表}`にし、同じスキーマの表をK1と同じ列で参照し、`onDelete`、`onUpdate`、`deleteCascade`を付けない。
+
 スキーマ検査の規則を足すときは、判定に要る行を`CatalogSnapshot`に足して`SchemaCatalog.read`で埋め、判定する関数を`SchemaConventions.check`から呼ぶ。
 
 規約の例外は、理由を付けて`ChangesetLint.ALLOWLIST`と`SchemaConventions.ALLOWLIST`に載せる。
