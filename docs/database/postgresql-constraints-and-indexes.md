@@ -27,8 +27,15 @@ Spring Modulithのイベント出版テーブルのように、フレームワ�
 理由は[ADR-108](../adr/ADR-108-add-tenant-composite-foreign-keys-within-modules.md)に示す。
 
 - **業務の表どうしの参照**：`(tenant_public_id, 参照先の主キー)`の複合の外部キーにし、参照先に同じ組のユニークインデックスを作る（`ordering.t_order_line`から`ordering.t_order`）。業務の表の範囲は[PostgreSQLのマルチテナント設計](postgresql-multitenancy.md#rlsでテナントを分ける表)に示す。
-- **`tenancy`の表どうしの参照**：`tenant_public_id`を持たないため、単独の列の外部キーにする（`tenancy.m_user_identity.user_id`から`tenancy.m_user.user_id`）。
+- **`tenancy`の表どうしの参照**：`tenant_public_id`を持たないため、参照先の主キーだけの単独の列の外部キーにする。今の該当は、`tenancy.m_user_identity.user_id`と`tenancy.m_membership.user_id`から`tenancy.m_user.user_id`、`tenancy.m_membership.tenant_id`から`tenancy.m_tenant.tenant_id`である。
 - **モジュールをまたぐ参照**：外部キー（スキーマをまたぐ外部キー）を作らない。論理設計のER図に書き、参照の整合性はアプリケーションで保つ。別のモジュールの行は`<対象>_public_id`の`uuid`の列で指す（[PostgreSQLの主キー](postgresql-primary-keys.md)）。理由は[ADR-089](../adr/ADR-089-keep-primary-keys-inside-modules-and-expose-public-ids.md)に示す。
+
+同じスキーマのほかの表の主キーと同じ名前の列（`t_order_line`の`order_id`など）は、その表への参照とみなし、外部キーを作る。
+
+外部キーは、changesetの`addForeignKeyConstraint`で作る。
+列の`constraints`には書かず、`onDelete`、`onUpdate`、`deleteCascade`を付けない。
+参照先の行を消したときと変えたときの動作は、既定の`NO ACTION`になる。
+名前は[PostgreSQLの命名規約](postgresql-naming.md#外部キー名とポリシー名)に従う。
 
 外部キーは次の検査で確かめる。
 

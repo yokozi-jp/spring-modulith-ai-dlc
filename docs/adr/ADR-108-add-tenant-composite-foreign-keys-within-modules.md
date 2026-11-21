@@ -1,7 +1,7 @@
 ---
 type: ADR
 title: 'ADR-108: 同じモジュールの表どうしの参照に、テナントを含む複合の外部キーを作る'
-description: 物理の外部キーを作らない規約を改め、同じモジュールの表どうしの参照に外部キーを作る決定。RLS の表どうしは (tenant_public_id, 参照先の主キー) の複合の外部キーにして参照先に同じ組の一意索引を作り、tenant_public_id を持たない tenancy の表どうしは単独の列の外部キーにする。モジュールをまたぐ参照には外部キーを作らない。
+description: 物理の外部キーを作らない規約を改め、同じモジュールの表どうしの参照に外部キーを作る決定。RLS の表どうしは (tenant_public_id, 参照先の主キー) の複合の外部キーにして参照先に同じ組の一意索引を作り、tenant_public_id を持たない tenancy の表どうしは単独の列の外部キーにする。外部キーに ON DELETE と ON UPDATE の動作を付けない。モジュールをまたぐ参照には外部キーを作らない。
 tags: [adr, database, postgresql, constraints, tenancy, rls]
 ---
 
@@ -40,12 +40,19 @@ RLS の外に置く `tenancy` の表にも、同じモジュールの中の参�
 [PR #450](https://github.com/yokozi-jp/spring-modulith-ai-dlc/pull/450) のレビューで、Amazon Q は `tenancy.m_user_identity.user_id` に `tenancy.m_user.user_id` への外部キーがなく、参照先のない ID 連携の行を DB が止めないと指摘した。
 この指摘は、規約を改める [issue #377](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/377) で扱うことにした。
 
+同じ形の参照は、所属の `tenancy.m_membership` の `user_id` と `tenant_id` にもある。
+実装（#377）で、Decision の `tenancy` の対象を、指摘の 1 列から `tenancy` の表どうしの参照すべてに広げた。
+付ける基準を「同じモジュールの表どうしの参照すべて」に揃えるためである。
+外部キーに `ON DELETE` と `ON UPDATE` の動作を付けないことも、同じ実装で Decision に足した。
+上に挙げた理由の 4 つ目（動作の誤解による意図しない削除）を、動作を付けないことで避けるためである。
+
 ## Decision
 
 物理の外部キーを作らない規約を改め、同じモジュールの表どうしの参照に外部キーを作る。
 
 - `tenant_public_id` を持つ表（RLS の表）どうしの参照は、`(tenant_public_id, 参照先の主キー)` の複合の外部キーにする。参照先には、同じ組の一意索引を作る。今の該当は、`ordering.t_order_line` から `ordering.t_order` への参照である。
-- `tenant_public_id` を持たない `tenancy` の表どうしの参照は、単独の列の外部キーにする（`tenancy.m_user_identity.user_id` から `tenancy.m_user.user_id` など）。
+- `tenant_public_id` を持たない `tenancy` の表どうしの参照は、すべて単独の列の外部キーにする。今の該当は、`tenancy.m_user_identity.user_id` と `tenancy.m_membership.user_id` から `tenancy.m_user.user_id` への参照と、`tenancy.m_membership.tenant_id` から `tenancy.m_tenant.tenant_id` への参照である。
+- 外部キーに `ON DELETE` と `ON UPDATE` の動作を付けず、既定の `NO ACTION` にする。参照される行は、参照する行を消してから消す。
 - モジュールをまたぐ参照には、外部キーを作らない。別のモジュールの行は `<対象>_public_id` の uuid の列で指す（ADR-089 のまま）。
 
 ADR-089 の Neutral に残していた「同じモジュールの中の外部キーの扱い」は、この ADR が決める。
@@ -58,7 +65,7 @@ ADR-089 の Neutral に残していた「同じモジュールの中の外部キ
 ### Positive
 
 - あるテナントの行が、同じモジュールの別のテナントの行を指すと、DB が INSERT と UPDATE を拒否する。アプリのコードの誤りが、テナントをまたぐ参照として残らない。
-- 同じモジュールの中で、参照先のない行（注文のない注文明細、利用者のない ID 連携）を DB が止める。
+- 同じモジュールの中で、参照先のない行（注文のない注文明細、利用者のない ID 連携、利用者かテナントのない所属）を DB が止める。
 - 付ける基準が「同じモジュールの表どうしの参照すべて」に決まり、表ごとに判断しない。
 
 ### Negative
@@ -66,7 +73,7 @@ ADR-089 の Neutral に残していた「同じモジュールの中の外部キ
 - 参照先の表に、`(tenant_public_id, 主キー)` の一意索引が増え、書き込みのたびに更新する索引が 1 つ増える。主キーが一意なので、この索引が新しく止める重複はなく、外部キーの参照先にするためだけにある。
 - テストとデータの投入は、参照先の行を先に入れる必要がある。外部キーは同じモジュールの中だけなので、用意する行もそのモジュールの中で終わる。
 - 大量データの移行や投入では、参照先の表から順に入れるか、制約を外して付け直す手順が要る。
-- `ON DELETE` と `ON UPDATE` の挙動を誤解すると、意図しない削除が起きうる。外部キーの changeset の書き方は、changeset の lint で確かめる。
+- 参照される行は、参照する行を消してからでないと消せない。外部キーに `ON DELETE` の動作を付けないため、DB は連鎖して消さない。動作を付けた changeset は、changeset の lint が止める。
 
 ### Neutral
 
