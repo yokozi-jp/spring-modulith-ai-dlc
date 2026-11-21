@@ -9,7 +9,6 @@ import static org.assertj.core.api.Assertions.catchThrowable;
 import com.example.demo.jooq.DefaultCatalog;
 import com.example.demo.product.TestProducts;
 import com.example.demo.shared.infrastructure.persistence.ModuleRoleTransactionManager;
-import com.example.demo.shared.infrastructure.persistence.ModuleRoles;
 import com.example.demo.shared.infrastructure.persistence.TestCommonColumns;
 import com.example.demo.shared.tenant.TenantId;
 import com.example.demo.testkit.AsModule;
@@ -256,7 +255,9 @@ class TenantIsolationTest {
         .forEach(round -> AsModule.call(dsl, ORDERING_MODULE, countUnknownStatus));
 
     // 残った計画は、漏洩のない比較で全行を落とし、RLS の式を評価しないまま 0 件を返す。
-    assertThat(withoutTenant(ORDERING_MODULE, countUnknownStatus)).as("テナントを設定しない読み取りの件数").isZero();
+    assertThat(AsModule.callWithoutTenant(dsl, ORDERING_MODULE, countUnknownStatus))
+        .as("テナントを設定しない読み取りの件数")
+        .isZero();
   }
 
   @ParameterizedTest(name = "{0}")
@@ -265,7 +266,9 @@ class TenantIsolationTest {
   @DisplayName("テナントを設定しないモジュールのロールは、業務の表を 0 件で読まずにエラーになる")
   void readingWithoutTenantFails(final Table<?> table) {
     assertSqlState(
-        () -> withoutTenant(AsModule.moduleOf(table), tx -> tx.fetchCount(table)), UNSET, EMPTY);
+        () -> AsModule.callWithoutTenant(dsl, AsModule.moduleOf(table), tx -> tx.fetchCount(table)),
+        UNSET,
+        EMPTY);
   }
 
   @Test
@@ -274,8 +277,25 @@ class TenantIsolationTest {
   void insertingWithoutTenantFails() {
     assertSqlState(
         () ->
-            withoutTenant(PRODUCT_MODULE, tx -> tx.insertInto(M_PRODUCT).defaultValues().execute()),
+            AsModule.callWithoutTenant(
+                dsl, PRODUCT_MODULE, tx -> tx.insertInto(M_PRODUCT).defaultValues().execute()),
         UNSET,
+        EMPTY);
+  }
+
+  @Test
+  @Transactional(propagation = Propagation.NOT_SUPPORTED)
+  @DisplayName("テナントのないトランザクションでは、AsModule でテナントを設定して戻した後も、テナントを設定しない読み取りはエラーになる")
+  void readingAfterAsModuleRestoresNoTenantFails() {
+    assertSqlState(
+        () ->
+            AsModule.callWithoutTenant(
+                dsl,
+                PRODUCT_MODULE,
+                tx -> {
+                  AsModule.call(tx, PRODUCT_MODULE, OTHER, inner -> inner.fetchCount(M_PRODUCT));
+                  return tx.fetchCount(M_PRODUCT);
+                }),
         EMPTY);
   }
 
@@ -326,16 +346,6 @@ class TenantIsolationTest {
         connection.rollback();
       }
     }
-  }
-
-  /** トランザクションマネージャーの検査を通らずに、DB の防御だけを確かめる。 */
-  private <T> T withoutTenant(final String module, final Function<DSLContext, T> body) {
-    return dsl.transactionResult(configuration -> {
-      final DSLContext tx = configuration.dsl();
-      tx.connection(connection ->
-          ModuleRoleTransactionManager.setLocal(connection, ModuleRoles.roleOf(module), null));
-      return body.apply(tx);
-    });
   }
 
   private static void assertSqlState(final Runnable action, final String... expected) {

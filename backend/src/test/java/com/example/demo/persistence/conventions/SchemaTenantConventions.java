@@ -5,11 +5,9 @@ import com.example.demo.persistence.conventions.CatalogSnapshot.ConstraintRow;
 import com.example.demo.persistence.conventions.CatalogSnapshot.IndexRow;
 import com.example.demo.persistence.conventions.CatalogSnapshot.PolicyRow;
 import com.example.demo.persistence.conventions.CatalogSnapshot.RelationRow;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -171,58 +169,62 @@ final class SchemaTenantConventions {
                 Collectors.toMap(
                     row -> row.schema() + "." + row.name(),
                     row -> Objects.requireNonNull(row.primaryKey())));
-    final Set<String> primaryKeyColumns = SchemaTableConventions.primaryKeyColumns(relations);
+    final Set<String> primaryKeyColumns =
+        relations.stream()
+            .filter(row -> row.primaryKey() != null)
+            .map(row -> row.schema() + "." + row.primaryKey())
+            .collect(Collectors.toSet());
     final List<ConstraintRow> foreignKeys =
         constraints.stream()
             .filter(
                 row -> "f".equals(row.type()) && SchemaConventions.isBusinessSchema(row.schema()))
             .filter(row -> row.schema().equals(row.referencedSchema()))
             .toList();
-    final List<ConventionViolation> violations = new ArrayList<>();
-    foreignKeys.stream()
-        .filter(row -> !hasExpectedShape(row, primaryKeys))
-        .map(row ->
-            new ConventionViolation(
-                "K1",
-                row.schema() + "." + row.name(),
-                TenantIsolation.foreignKeyShape(row.schema())
-                    + "の外部キーにし、参照先に同じ組のユニークインデックスを作る（"
-                    + CONSTRAINTS_DOC
-                    + "）。"))
-        .forEach(violations::add);
-    columns.stream()
-        .filter(row -> SchemaConventions.isBusinessSchema(row.schema()))
-        .filter(row -> primaryKeyColumns.contains(row.schema() + "." + row.column()))
-        .filter(row -> !row.column().equals(primaryKeys.get(row.schema() + "." + row.table())))
-        .filter(row ->
-            foreignKeys.stream()
-                .noneMatch(fk ->
-                    fk.schema().equals(row.schema())
-                        && fk.table().equals(row.table())
-                        && fk.columns().contains(row.column())))
-        .map(row ->
-            new ConventionViolation(
-                "K1",
-                row.schema() + "." + row.table() + "." + row.column(),
-                "同じモジュールの表を指す列に、"
-                    + TenantIsolation.foreignKeyShape(row.schema())
-                    + "の外部キーを作る（"
-                    + CONSTRAINTS_DOC
-                    + "）。"))
-        .forEach(violations::add);
-    return violations;
+    final Stream<ConventionViolation> misshaped =
+        foreignKeys.stream()
+            .filter(row -> !hasExpectedShape(row, primaryKeys))
+            .map(row ->
+                new ConventionViolation(
+                    "K1",
+                    row.schema() + "." + row.name(),
+                    TenantIsolation.foreignKeyShape(row.schema())
+                        + "の外部キーにし、参照先に同じ組のユニークインデックスを作る（"
+                        + CONSTRAINTS_DOC
+                        + "）。"));
+    final Stream<ConventionViolation> missing =
+        columns.stream()
+            .filter(row -> SchemaConventions.isBusinessSchema(row.schema()))
+            .filter(row -> primaryKeyColumns.contains(row.schema() + "." + row.column()))
+            .filter(row -> !row.column().equals(primaryKeys.get(row.schema() + "." + row.table())))
+            .filter(row ->
+                foreignKeys.stream()
+                    .noneMatch(fk ->
+                        fk.schema().equals(row.schema())
+                            && fk.table().equals(row.table())
+                            && fk.columns().contains(row.column())))
+            .map(row ->
+                new ConventionViolation(
+                    "K1",
+                    row.schema() + "." + row.table() + "." + row.column(),
+                    "同じモジュールの表を指す列に、"
+                        + TenantIsolation.foreignKeyShape(row.schema())
+                        + "の外部キーを作る（"
+                        + CONSTRAINTS_DOC
+                        + "）。"));
+    return Stream.concat(misshaped, missing).toList();
   }
 
   private static boolean hasExpectedShape(
       final ConstraintRow row, final Map<String, String> primaryKeys) {
-    final Optional<String> referencedKey =
-        Optional.ofNullable(row.referencedTable())
-            .map(table -> primaryKeys.get(row.referencedSchema() + "." + table));
-    if (referencedKey.isEmpty()) {
+    if (row.referencedTable() == null) {
       return false;
     }
-    final List<String> expected =
-        TenantIsolation.foreignKeyColumns(row.schema(), referencedKey.get());
+    final String referencedKey =
+        primaryKeys.get(row.referencedSchema() + "." + row.referencedTable());
+    if (referencedKey == null) {
+      return false;
+    }
+    final List<String> expected = TenantIsolation.foreignKeyColumns(row.schema(), referencedKey);
     return expected.equals(row.columns()) && expected.equals(row.referencedColumns());
   }
 

@@ -12,6 +12,7 @@ import java.util.function.Function;
 import org.jooq.DSLContext;
 import org.jooq.Record;
 import org.jooq.Table;
+import org.jspecify.annotations.Nullable;
 
 /**
  * テストの DB の読み書きを、トランザクションの間だけモジュールのロールとテナントで実行する（ADR-094、ADR-107）。
@@ -20,7 +21,8 @@ import org.jooq.Table;
  * TenantContext} から設定するが、トランザクションの名前を持たないテストの補助（商品の登録、行の読み戻し）とシーダーは、同じ {@link
  * ModuleRoleTransactionManager#setLocal} で設定する。
  *
- * <p>設定は呼び出しの間だけで、正常に終わったら元のロールとテナントへ戻す。本体が失敗したときは、jOOQ
+ * <p>設定は呼び出しの間だけで、正常に終わったら元のロールとテナントへ戻す。PostgreSQL
+ * はトランザクションの中で設定を未設定へ戻せないため、元のテナントが未設定なら空文字列へ戻すが、どちらの状態でもテナントのない業務の表の読み書きは失敗する。本体が失敗したときは、jOOQ
  * がセーブポイントまで戻すため、設定も戻る。テストのトランザクションの中でも、アプリロールのままの接続でも使える。
  */
 public final class AsModule {
@@ -52,17 +54,17 @@ public final class AsModule {
       final String module,
       final TenantId tenant,
       final Function<DSLContext, T> body) {
-    return dsl.transactionResult(configuration -> {
-      final DSLContext tx = configuration.dsl();
-      final Record previous =
-          tx.fetchSingle(
-              "select current_setting('role'), coalesce(current_setting(?, true), '')",
-              TENANT_SETTING);
-      setLocal(tx, ModuleRoles.roleOf(module), tenant.toString());
-      final T result = body.apply(tx);
-      setLocal(tx, previous.get(0, String.class), previous.get(1, String.class));
-      return result;
-    });
+    return inTransaction(dsl, module, tenant.toString(), body);
+  }
+
+  /**
+   * テナントを設定せず、モジュールのロールだけで本体を実行し、結果を返す。
+   *
+   * <p>RLS の外の表（{@code tenancy}）とカタログを読むときと、テナントを設定し忘れた読み書きを DB が止めることを確かめるときに使う。
+   */
+  public static <T> T callWithoutTenant(
+      final DSLContext dsl, final String module, final Function<DSLContext, T> body) {
+    return inTransaction(dsl, module, null, body);
   }
 
   /** モジュールのロールとテストの利用者のテナント（{@link AsTenant#TENANT}）で本体を実行する。 */
@@ -87,7 +89,27 @@ public final class AsModule {
         });
   }
 
-  private static void setLocal(final DSLContext tx, final String role, final String tenant) {
+  private static <T> T inTransaction(
+      final DSLContext dsl,
+      final String module,
+      final @Nullable String tenant,
+      final Function<DSLContext, T> body) {
+    return dsl.transactionResult(configuration -> {
+      final DSLContext tx = configuration.dsl();
+      final Record previous =
+          tx.fetchSingle(
+              "select current_setting('role'), coalesce(current_setting(?, true), '')",
+              TENANT_SETTING);
+      setLocal(tx, ModuleRoles.roleOf(module), tenant);
+      final T result = body.apply(tx);
+      setLocal(
+          tx, previous.get(0, String.class), tenant == null ? null : previous.get(1, String.class));
+      return result;
+    });
+  }
+
+  private static void setLocal(
+      final DSLContext tx, final String role, final @Nullable String tenant) {
     tx.connection(connection -> ModuleRoleTransactionManager.setLocal(connection, role, tenant));
   }
 }

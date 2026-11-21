@@ -119,7 +119,7 @@ public final class LocalDataSeeder {
     final boolean migrated =
         Stream.concat(BUSINESS_TABLES.stream(), TENANCY_TABLES.stream())
             .allMatch(table ->
-                AsModule.call(
+                AsModule.callWithoutTenant(
                     dsl,
                     AsModule.moduleOf(table),
                     tx ->
@@ -132,17 +132,17 @@ public final class LocalDataSeeder {
       }
       throw new IllegalStateException("業務の表がありません。task be-migrate の後に実行してください");
     }
-    AsModule.run(dsl, "tenancy", tx -> TenancySeeds.insert(tx, issuer));
     final List<TenantId> tenants =
-        AsModule.call(
-                dsl,
-                "tenancy",
-                tx ->
-                    tx.select(M_TENANT.PUBLIC_ID)
-                        .from(M_TENANT)
-                        .orderBy(M_TENANT.TENANT_ID)
-                        .fetch())
-            .map(row -> new TenantId(row.value1()));
+        AsModule.callWithoutTenant(
+            dsl,
+            "tenancy",
+            tx -> {
+              TenancySeeds.insert(tx, issuer);
+              return tx.select(M_TENANT.PUBLIC_ID)
+                  .from(M_TENANT)
+                  .orderBy(M_TENANT.TENANT_ID)
+                  .fetch(row -> new TenantId(row.value1()));
+            });
     if (mode == Mode.RESET) {
       tenants.forEach(tenant ->
           BUSINESS_TABLES.forEach(
@@ -164,8 +164,7 @@ public final class LocalDataSeeder {
     final Faker faker = new Faker(Locale.ENGLISH, random);
     final Supplier<UUID> ids = () -> uuidV4(random);
     // faker と ids は同じ random を引く。テナントの順（TenancySeeds.TENANTS）を変えると値が変わる。
-    TenancySeeds.TENANTS.forEach(
-        tenant -> BusinessSeeds.insert(dsl, new TenantId(tenant), faker, ids, base));
+    TenancySeeds.TENANTS.forEach(tenant -> BusinessSeeds.insert(dsl, tenant, faker, ids, base));
     return Outcome.SEEDED;
   }
 

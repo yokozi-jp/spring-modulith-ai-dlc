@@ -62,7 +62,7 @@ final class ChangesetRowSecurityRules {
    * @return 文が 1 つ以上あり、すべてが決まった RLS の文なら {@code true}
    */
   /* package */ static boolean isRowSecurityOnly(final String sql) {
-    final List<String> statements = ChangesetPrivilegeRules.statements(sql);
+    final List<String> statements = Changeset.statements(sql);
     return !statements.isEmpty()
         && statements.stream().allMatch(statement -> canonicalTarget(statement).isPresent());
   }
@@ -115,7 +115,7 @@ final class ChangesetRowSecurityRules {
   private static Stream<String> rowSecurityStatements(final Stream<Change> changes) {
     return changes
         .filter(change -> "sql".equals(change.type()))
-        .flatMap(change -> ChangesetPrivilegeRules.statements(change.text("sql")).stream())
+        .flatMap(change -> Changeset.statements(change.text("sql")).stream())
         .filter(statement -> ROW_SECURITY.matcher(statement).find());
   }
 

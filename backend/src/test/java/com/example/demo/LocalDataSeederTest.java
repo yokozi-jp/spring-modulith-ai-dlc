@@ -70,8 +70,7 @@ class LocalDataSeederTest {
   private static final String PAYMENT = "payment";
 
   /** 代表データを入れる 2 つのテナント。 */
-  private static final List<TenantId> TENANTS =
-      TenancySeeds.TENANTS.stream().map(TenantId::new).toList();
+  private static final List<TenantId> TENANTS = TenancySeeds.TENANTS;
 
   /** test-user と test-admin が属するテナント。 */
   private static final TenantId TRADING = new TenantId(TenancySeeds.TRADING_TENANT);

@@ -85,22 +85,28 @@ final class ChangesetForeignKeyRules {
           new ConventionViolation(
               RULE, target, "外部キーの名前を fk_" + table + " か fk_{連番}_" + table + " にする（" + DOC + "）。"));
     }
-    final boolean shaped =
-        !schema.isEmpty()
-            && schema.equals(change.text("referencedTableSchemaName"))
-            && REFERENTIAL_ACTION_KEYS.stream().noneMatch(change.attributes()::containsKey)
-            && hasForeignKeyColumns(schema, columnList(change.text("baseColumnNames")))
-            && hasForeignKeyColumns(schema, columnList(change.text("referencedColumnNames")));
-    if (!shaped) {
+    if (schema.isEmpty() || !schema.equals(change.text("referencedTableSchemaName"))) {
       out.add(
           new ConventionViolation(
               RULE,
               target,
-              "外部キーは同じスキーマの表を、"
-                  + TenantIsolation.foreignKeyShape(schema)
-                  + "で参照し、onDelete と onUpdate を付けない（"
+              "外部キーは baseTableSchemaName と同じ referencedTableSchemaName の表だけを参照する。"
+                  + "モジュールをまたぐ参照には外部キーを作らない（"
                   + DOC
                   + "）。"));
+    }
+    if (REFERENTIAL_ACTION_KEYS.stream().anyMatch(change.attributes()::containsKey)) {
+      out.add(
+          new ConventionViolation(
+              RULE, target, "外部キーに onDelete、onUpdate、deleteCascade を付けない（" + DOC + "）。"));
+    }
+    if (!hasForeignKeyColumns(schema, columnList(change.text("baseColumnNames")))
+        || !hasForeignKeyColumns(schema, columnList(change.text("referencedColumnNames")))) {
+      out.add(
+          new ConventionViolation(
+              RULE,
+              target,
+              "外部キーは " + TenantIsolation.foreignKeyShape(schema) + " の列で参照する（" + DOC + "）。"));
     }
   }
 
