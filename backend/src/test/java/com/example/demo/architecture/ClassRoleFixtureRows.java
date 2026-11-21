@@ -209,6 +209,10 @@ final class ClassRoleFixtureRows {
             ClassRoleArchTest.unboundTenantIsReadOnlyByTransactionManagerRule(VIOLATING),
             "ordering.application.TenantDefaultingCommandHandler"),
         row(
+            "roleAndTenantAreSetOnlyByTransactionManager",
+            ClassRoleArchTest.roleAndTenantAreSetOnlyByTransactionManagerRule(VIOLATING),
+            "ordering.infrastructure.persistence.TenantSwitchingOrderAccess"),
+        row(
             "eventListenersAreApplicationModuleListeners: @EventListener",
             ClassRoleArchTest.eventListenersAreApplicationModuleListeners,
             "inventory.application.StockEventReceiver.onPlaced("),

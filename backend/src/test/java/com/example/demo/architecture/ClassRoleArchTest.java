@@ -296,6 +296,13 @@ class ClassRoleArchTest {
       unboundTenantIsReadOnlyByTransactionManagerRule(BASE_PACKAGE);
 
   /**
+   * {@code ModuleRoleTransactionManager.setLocal} を呼ぶクラスを、{@code ModuleRoleTransactionManager} に限る。
+   */
+  @ArchTest
+  /* package */ static final ArchRule roleAndTenantAreSetOnlyByTransactionManager =
+      roleAndTenantAreSetOnlyByTransactionManagerRule(BASE_PACKAGE);
+
+  /**
    * イベントは {@code @ApplicationModuleListener} だけで受け、{@code @EventListener} と
    * {@code @TransactionalEventListener} を直接付けない。
    *
@@ -585,6 +592,36 @@ class ClassRoleArchTest {
                 + "規約：docs/backend/architecture-tests.md、"
                 + ADR_105
                 + "、docs/adr/ADR-107-isolate-tenants-with-rls-set-per-transaction.md");
+  }
+
+  /**
+   * {@code ModuleRoleTransactionManager.setLocal} を呼べるクラスを、{@code ModuleRoleTransactionManager}
+   * だけに限る規則を組み立てる。
+   */
+  /* package */ static ArchRule roleAndTenantAreSetOnlyByTransactionManagerRule(
+      final String basePackage) {
+    final String transactionManager =
+        basePackage + ".shared.infrastructure.persistence.ModuleRoleTransactionManager";
+    return noClasses()
+        .that(
+            DescribedPredicate.describe(
+                "are not the transaction manager",
+                (JavaClass javaClass) -> !transactionManager.equals(javaClass.getName())))
+        .should()
+        .accessTargetWhere(
+            DescribedPredicate.describe(
+                "ModuleRoleTransactionManager.setLocal",
+                (JavaAccess<?> access) ->
+                    access.getTargetOwner().getName().equals(transactionManager)
+                        && "setLocal".equals(access.getName())))
+        .because(
+            "setLocal はトランザクションのロールとテナントを、トランザクションの名前と束縛によらずに変え、"
+                + "モジュールのロールの権限とテナントの RLS を迂回できるため。"
+                + "直し方：ロールとテナントは、トランザクションの名前と TenantContext の束縛から"
+                + " ModuleRoleTransactionManager に設定させる。"
+                + "規約：docs/backend/architecture-tests.md、"
+                + "docs/adr/ADR-094-switch-to-module-database-roles.md、"
+                + "docs/adr/ADR-107-isolate-tenants-with-rls-set-per-transaction.md");
   }
 
   /** モジュールルートの型を record、enum、{@code *Queries} interface に限る規則を組み立てる。 */

@@ -6,7 +6,10 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 import javax.sql.DataSource;
 import org.jspecify.annotations.Nullable;
 import org.springframework.beans.factory.ObjectProvider;
@@ -32,15 +35,8 @@ public class ModuleRoleTransactionManager extends JdbcTransactionManager {
   /** 業務の表の RLS のポリシーと {@code tenant_public_id} の既定値が読む、トランザクションのテナントの設定。 */
   public static final String TENANT_SETTING = "app.current_tenant";
 
-  /** ロールだけを設定する SQL。 */
-  private static final String SET_ROLE = "SELECT set_config('role', ?, true)";
-
-  /** テナントだけを設定する SQL。 */
-  private static final String SET_TENANT = "SELECT set_config('" + TENANT_SETTING + "', ?, true)";
-
-  /** ロールとテナントを設定する SQL。 */
-  private static final String SET_ROLE_AND_TENANT =
-      "SELECT set_config('role', ?, true), set_config('" + TENANT_SETTING + "', ?, true)";
+  /** トランザクションのロールの設定。 */
+  private static final String ROLE_SETTING = "role";
 
   /** トランザクションマネージャーは {@code Serializable} だが、直列化しない。 */
   private static final long serialVersionUID = 1L;
@@ -71,7 +67,7 @@ public class ModuleRoleTransactionManager extends JdbcTransactionManager {
   /**
    * ロールとテナントを、呼び出し中のトランザクションの間だけ変える。
    *
-   * <p>Spring のトランザクションの外でロールとテナントを切り替えるテストの補助とシーダーも、本番と同じ SQL を通すためにこれを呼ぶ。
+   * <p>本番のコードでは、このクラスだけが呼ぶ。Spring のトランザクションの外でロールとテナントを切り替えるテストの補助とシーダーも、本番と同じ SQL を通すためにこれを呼ぶ。
    *
    * @param connection トランザクション中の接続
    * @param role 設定するロール。{@code null} ならロールを変えない
@@ -81,24 +77,23 @@ public class ModuleRoleTransactionManager extends JdbcTransactionManager {
   public static void setLocal(
       final Connection connection, final @Nullable String role, final @Nullable String tenant)
       throws SQLException {
-    final String sql;
-    final List<String> values;
-    if (role == null) {
-      if (tenant == null) {
-        return;
-      }
-      sql = SET_TENANT;
-      values = List.of(tenant);
-    } else if (tenant == null) {
-      sql = SET_ROLE;
-      values = List.of(role);
-    } else {
-      sql = SET_ROLE_AND_TENANT;
-      values = List.of(role, tenant);
+    final List<Map.Entry<String, String>> settings =
+        Stream.of(
+                Optional.ofNullable(role).map(value -> Map.entry(ROLE_SETTING, value)),
+                Optional.ofNullable(tenant).map(value -> Map.entry(TENANT_SETTING, value)))
+            .flatMap(Optional::stream)
+            .toList();
+    if (settings.isEmpty()) {
+      return;
     }
+    // 設定の名前は定数だけで、値はバインド変数で渡す。
+    final String sql =
+        settings.stream()
+            .map(setting -> "set_config('" + setting.getKey() + "', ?, true)")
+            .collect(Collectors.joining(", ", "SELECT ", ""));
     try (PreparedStatement statement = connection.prepareStatement(sql)) {
-      for (int i = 0; i < values.size(); i++) {
-        statement.setString(i + 1, values.get(i));
+      for (int i = 0; i < settings.size(); i++) {
+        statement.setString(i + 1, settings.get(i).getValue());
       }
       statement.execute();
     }
