@@ -1,14 +1,14 @@
 ---
 type: Convention
 title: PostgreSQLの制約とインデックス
-description: 主キー、外部キー、NOT NULL、CHECK、一意性、排他制約の使い分けと、インデックスの種類と設計の方針を定める規約。テーブルに制約やインデックスを追加するとき、性能対策でインデックスを見直すときに読む。
+description: 主キー、外部キーを作る範囲、NOT NULL、CHECK、一意性（業務の表のユニークインデックスの先頭の列を含む）、排他制約の使い分けと、インデックスの種類と設計の方針を定める規約。テーブルに制約やインデックスを追加するとき、表どうしの参照を足すとき、性能対策でインデックスを見直すときに読む。
 tags: [convention, database, postgresql, constraints, index, future-arch-guidelines]
 ---
 
 # PostgreSQLの制約とインデックス
 
 NOT NULLはできる限り付け、一意性はユニーク制約ではなくユニークインデックスで表す。
-外部キー制約とCHECK制約は物理テーブルに作らず、期間の重なりは排他制約で防ぐ。
+外部キー制約は同じモジュールの表どうしの参照にだけ作り、CHECK制約は作らず、期間の重なりは排他制約で防ぐ。
 インデックスはB-treeだけを使い、必要最小限に保つ。
 
 ## 対象
@@ -23,18 +23,17 @@ Spring Modulithのイベント出版テーブルのように、フレームワ�
 
 ## 外部キー
 
-外部キー制約は論理設計のER図に書き、物理テーブルには作らない。
-参照整合性はアプリケーションで保つ。
-次の問題を避けるためである。
+外部キー制約は、同じモジュールの表どうしの参照にだけ作る。
+理由は[ADR-108](../adr/ADR-108-add-tenant-composite-foreign-keys-within-modules.md)に示す。
 
-- 関連があっても参照を制約すべきでない場合（削除したアカウントの注文履歴を監査のために残すなど）があり、付ける基準が揺れる。
-- 親子の片方しか使わないテストでも、両方のテーブルにデータを用意する必要がある。
-- 大量データの移行で、制約を一時的に外す手順が要る。
-- `ON DELETE`と`ON UPDATE`の挙動を誤解すると、意図しない削除が起きる。
+- **業務の表どうしの参照**：`(tenant_public_id, 参照先の主キー)`の複合の外部キーにし、参照先に同じ組のユニークインデックスを作る（`ordering.t_order_line`から`ordering.t_order`）。業務の表の範囲は[PostgreSQLのマルチテナント設計](postgresql-multitenancy.md#rlsでテナントを分ける表)に示す。
+- **`tenancy`の表どうしの参照**：`tenant_public_id`を持たないため、単独の列の外部キーにする（`tenancy.m_user_identity.user_id`から`tenancy.m_user.user_id`）。
+- **モジュールをまたぐ参照**：外部キー（スキーマをまたぐ外部キー）を作らない。論理設計のER図に書き、参照の整合性はアプリケーションで保つ。別のモジュールの行は`<対象>_public_id`の`uuid`の列で指す（[PostgreSQLの主キー](postgresql-primary-keys.md)）。理由は[ADR-089](../adr/ADR-089-keep-primary-keys-inside-modules-and-expose-public-ids.md)に示す。
 
-スキーマをまたぐ外部キー（モジュール間の外部キー）は作らない。
-別のモジュールの行は`<対象>_public_id`の`uuid`の列で指し、カタログの検査の規則P4がスキーマをまたぐ外部キーを拒否する（[PostgreSQLの主キー](postgresql-primary-keys.md)）。
-理由は[ADR-089](../adr/ADR-089-keep-primary-keys-inside-modules-and-expose-public-ids.md)に示す。
+外部キーは次の検査で確かめる。
+
+- **カタログのテスト**：`SchemaConventionsTest`と`SchemaInspectionTest`（[バックエンドのアーキテクチャテスト](../backend/architecture-tests.md)）が、同じモジュールの業務の表どうしの参照に複合の外部キーがあることを確かめる。規則P4は、別のスキーマのテーブルを参照する外部キーを拒否する。
+- **changesetのlint**：`ChangesetLintTest`が、外部キーのchangesetの書き方を確かめる。
 
 ## NOT NULL
 
@@ -55,6 +54,10 @@ CHECK制約は使わない。
 
 一意性はユニーク制約ではなく、明示的に作るユニークインデックスで表す。
 Liquibaseでは`addUniqueConstraint`ではなく、`unique: true`を付けた`createIndex`を使う。
+
+業務の表（[PostgreSQLのマルチテナント設計](postgresql-multitenancy.md#rlsでテナントを分ける表)）のユニークインデックスは、すべて`tenant_public_id`から始める。
+先頭の列はカタログのテスト（`SchemaConventionsTest`と`SchemaInspectionTest`）が確かめる。
+理由は[ADR-107](../adr/ADR-107-isolate-tenants-with-rls-set-per-transaction.md)に示す。
 
 - ユニークインデックスはNULLの重複を許す。NULLの重複を禁止するときは`NULLS NOT DISTINCT`を付ける。
 - 文字列のカラムを空文字の既定値にした場合、空文字は重複として扱われる。

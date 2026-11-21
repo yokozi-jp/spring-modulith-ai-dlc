@@ -84,7 +84,7 @@ JSON の値は変わらない。
 
 - [ADR-060](ADR-060-generate-uuid-primary-keys-in-application.md) は、UUID v7 の主キーを Repository の `nextId()` が発行し、そのインタフェースを `domain.model` に置くと定める。
   主キーを Repository の外に出さないこの決定と合わせるため、UUID v7 を主キーにする最初のテーブルを作るときに、`nextId()` の戻り値を Repository の外で使わない形を決める。
-- 同じモジュールの中の外部キーの扱いは、#369 の別の判断で決める。
+- 同じモジュールの中の外部キーの扱いは、[ADR-108](ADR-108-add-tenant-composite-foreign-keys-within-modules.md) が決める。
 
 ## Alternatives Considered
 

@@ -106,3 +106,5 @@
 - [ADR-104: compose-test を使う実行ごとに slot を割り当て、worktree をまたいで同時に流す](ADR-104-allocate-test-stack-slots-per-run.md)（Proposed, 2026-11-19）
 - [ADR-105: 操作しているテナントを ScopedValue で束縛し、リクエストはセッションから、リスナーはイベントから取る](ADR-105-bind-tenant-to-request-and-event-context.md)（Proposed, 2026-11-19）
 - [ADR-106: jscpd は import 文を比べず、閾値を実測の 1.90% に合わせて 2.0% にする](ADR-106-ignore-import-statements-in-jscpd.md)（Proposed, 2026-11-21）
+- [ADR-107: 業務の表を RLS でテナントごとに分け、テナントをロールと同じ SQL でトランザクションごとに設定する](ADR-107-isolate-tenants-with-rls-set-per-transaction.md)（Proposed, 2026-11-21）
+- [ADR-108: 同じモジュールの表どうしの参照に、テナントを含む複合の外部キーを作る](ADR-108-add-tenant-composite-foreign-keys-within-modules.md)（Proposed, 2026-11-21）
