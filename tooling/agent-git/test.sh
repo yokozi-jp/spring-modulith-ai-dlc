@@ -668,6 +668,15 @@ fact "the index matches the gitlink commit" clean
 git -C sm commit -q -am c3 && git add sm && git -C sm commit -q --allow-empty -m c4
 expect "refuses a gitlink whose submodule moved after the stage" 1 "    sm" bash "$tool" commit "$msg" sm
 git reset -q sm
+git add sm && git commit -q --no-verify -m "move submodule"
+
+# 追跡しているファイルに未 commit の変更がある間の push。pre-push の検査は作業ツリーを見るので、push するコミットを検査できない。
+scene "push with uncommitted changes"
+echo changed >>main.txt
+expect "push refuses a modified tracked file" 1 "未 commit の変更があります" bash "$tool" push
+expect "push names the modified file" 1 " M main.txt" bash "$tool" push
+git checkout -q -- main.txt
+fact "the clean tree has no uncommitted changes" clean
 
 # このリポジトリの外で pre-push が動いている間の push。一覧の最後には、親のディレクトリごと消えた worktree がある。
 git switch -q -c topic
