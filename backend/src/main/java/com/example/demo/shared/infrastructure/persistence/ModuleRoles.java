@@ -2,6 +2,7 @@ package com.example.demo.shared.infrastructure.persistence;
 
 import java.util.Optional;
 import java.util.Set;
+import java.util.stream.Collectors;
 import org.jspecify.annotations.Nullable;
 
 /**
@@ -18,12 +19,14 @@ public final class ModuleRoles {
   /** ロールとスキーマを持つ機能モジュール。 */
   public static final Set<String> MODULES = Set.of("product", "ordering", "payment", "tenancy");
 
-  /**
-   * 業務の表をテナントの RLS で分けるモジュール。トランザクションは、テナントを束縛した呼び出しの中でだけ始める（ADR-107）。
-   *
-   * <p>{@code tenancy} は、テナントを選ぶ前に引く表を持つため含めない。
-   */
-  public static final Set<String> TENANT_SCOPED_MODULES = Set.of("product", "ordering", "payment");
+  /** テナントの RLS の外に表を置くモジュール。{@code tenancy} は、テナントを選ぶ前に引く表を持つ（ADR-107）。 */
+  public static final Set<String> RLS_EXEMPT_MODULES = Set.of("tenancy");
+
+  /** 業務の表をテナントの RLS で分けるモジュール。トランザクションは、テナントを束縛した呼び出しの中でだけ始める（ADR-107）。 */
+  public static final Set<String> TENANT_SCOPED_MODULES =
+      MODULES.stream()
+          .filter(module -> !RLS_EXEMPT_MODULES.contains(module))
+          .collect(Collectors.toUnmodifiableSet());
 
   /** ロール名の接尾辞。 */
   private static final String ROLE_SUFFIX = "_module";

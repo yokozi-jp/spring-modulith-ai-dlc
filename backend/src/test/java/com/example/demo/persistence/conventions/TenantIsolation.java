@@ -2,16 +2,20 @@ package com.example.demo.persistence.conventions;
 
 import static com.example.demo.shared.infrastructure.persistence.ModuleRoleTransactionManager.TENANT_SETTING;
 
+import com.example.demo.shared.infrastructure.persistence.ModuleRoles;
 import java.util.List;
 import java.util.Set;
 import java.util.TreeSet;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 /** 業務の表をテナントで分ける RLS の決まった形。changeset の検査とカタログの検査が同じ形を使う。 */
 final class TenantIsolation {
 
-  /** RLS の外に置くスキーマ。{@code modulith} はフレームワークの表、{@code tenancy} はテナントが決まる前に引く表を持つ。 */
-  /* package */ static final Set<String> RLS_EXEMPT_SCHEMAS = Set.of("modulith", "tenancy");
+  /** RLS の外に置くスキーマ。{@code modulith} はフレームワークの表を持つ。 */
+  /* package */ static final Set<String> RLS_EXEMPT_SCHEMAS =
+      Stream.concat(Stream.of("modulith"), ModuleRoles.RLS_EXEMPT_MODULES.stream())
+          .collect(Collectors.toUnmodifiableSet());
 
   /** 違反のメッセージに書く、RLS の外に置くスキーマの名前。 */
   /* package */ static final String RLS_EXEMPT_SCHEMA_NAMES =
