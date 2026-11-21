@@ -1,7 +1,7 @@
 ---
 type: Convention
 title: PostgreSQLの制約とインデックス
-description: 主キー、外部キーを作る範囲、NOT NULL、CHECK、一意性（業務の表のユニークインデックスの先頭の列を含む）、排他制約の使い分けと、インデックスの種類と設計の方針を定める規約。テーブルに制約やインデックスを追加するとき、表どうしの参照を足すとき、性能対策でインデックスを見直すときに読む。
+description: 主キー、外部キーを作る範囲、NOT NULL、CHECK、一意性（業務テーブルのユニークインデックスの先頭の列を含む）、排他制約の使い分けと、インデックスの種類と設計の方針を定める規約。テーブルに制約やインデックスを追加するとき、表どうしの参照を足すとき、性能対策でインデックスを見直すときに読む。
 tags: [convention, database, postgresql, constraints, index, future-arch-guidelines]
 ---
 
@@ -26,9 +26,14 @@ Spring Modulithのイベント出版テーブルのように、フレームワ�
 外部キー制約は、同じモジュールの表どうしの参照にだけ作る。
 理由は[ADR-108](../adr/ADR-108-add-tenant-composite-foreign-keys-within-modules.md)に示す。
 
-- **業務の表どうしの参照**：`(tenant_public_id, 参照先の主キー)`の複合の外部キーにし、参照先に同じ組のユニークインデックスを作る（`ordering.t_order_line`から`ordering.t_order`）。業務の表の範囲は[PostgreSQLのマルチテナント設計](postgresql-multitenancy.md#rlsでテナントを分ける表)に示す。
-- **`tenancy`の表どうしの参照**：`tenant_public_id`を持たないため、参照先の主キーだけの単独の列の外部キーにする。今の該当は、`tenancy.m_user_identity.user_id`と`tenancy.m_membership.user_id`から`tenancy.m_user.user_id`、`tenancy.m_membership.tenant_id`から`tenancy.m_tenant.tenant_id`である。
-- **モジュールをまたぐ参照**：外部キー（スキーマをまたぐ外部キー）を作らない。論理設計のER図に書き、参照の整合性はアプリケーションで保つ。別のモジュールの行は`<対象>_public_id`の`uuid`の列で指す（[PostgreSQLの主キー](postgresql-primary-keys.md)）。理由は[ADR-089](../adr/ADR-089-keep-primary-keys-inside-modules-and-expose-public-ids.md)に示す。
+- **業務テーブルどうしの参照**：`(tenant_public_id, 参照先の主キー)`の複合の外部キーにし、参照先に同じ組のユニークインデックスを作る（`ordering.t_order_line`から`ordering.t_order`）。
+  業務テーブルの範囲は[PostgreSQLのマルチテナント設計](postgresql-multitenancy.md#rlsでテナントを分ける業務テーブル)に示す。
+- **`tenancy`の表どうしの参照**：`tenant_public_id`を持たないため、参照先の主キーだけの単独の列の外部キーにする。
+  今の該当は、`tenancy.m_user_identity.user_id`と`tenancy.m_membership.user_id`から`tenancy.m_user.user_id`、`tenancy.m_membership.tenant_id`から`tenancy.m_tenant.tenant_id`である。
+- **モジュールをまたぐ参照**：外部キー（スキーマをまたぐ外部キー）を作らない。
+  論理設計のER図に書き、参照の整合性はアプリケーションで保つ。
+  別のモジュールの行は`<対象>_public_id`の`uuid`の列で指す（[PostgreSQLの主キー](postgresql-primary-keys.md)）。
+  理由は[ADR-089](../adr/ADR-089-keep-primary-keys-inside-modules-and-expose-public-ids.md)に示す。
 
 同じスキーマのほかの表の主キーと同じ名前の列（`t_order_line`の`order_id`など）は、その表への参照とみなし、外部キーを作る。
 
@@ -40,7 +45,8 @@ Spring Modulithのイベント出版テーブルのように、フレームワ�
 外部キーは次の検査で確かめる。
 規則の記号の定義は[バックエンドのアーキテクチャテスト](../backend/architecture-tests.md)にある。
 
-- **カタログのテスト**：`SchemaConventionsTest`と`SchemaInspectionTest`が、同じモジュールの表を指す列に外部キーがあることと、外部キーの列が業務の表なら複合、`tenancy`の表なら単独の形であることを確かめる（規則K1）。規則P4は、別のスキーマのテーブルを参照する外部キーを拒否する。
+- **カタログのテスト**：`SchemaConventionsTest`と`SchemaInspectionTest`が、同じモジュールの表を指す列に外部キーがあることと、外部キーの列が業務テーブルなら複合、`tenancy`の表なら単独の形であることを確かめる（規則K1）。
+  規則P4は、別のスキーマのテーブルを参照する外部キーを拒否する。
 - **changesetのlint**：`ChangesetLintTest`が、外部キーを`addForeignKeyConstraint`で作ること、名前、参照先のスキーマと列、`onDelete`と`onUpdate`がないことを確かめる（規則K4）。
 
 ## NOT NULL
@@ -63,7 +69,7 @@ CHECK制約は使わない。
 一意性はユニーク制約ではなく、明示的に作るユニークインデックスで表す。
 Liquibaseでは`addUniqueConstraint`ではなく、`unique: true`を付けた`createIndex`を使う。
 
-業務の表（[PostgreSQLのマルチテナント設計](postgresql-multitenancy.md#rlsでテナントを分ける表)）のユニークインデックスは、すべて`tenant_public_id`から始める。
+業務テーブル（[PostgreSQLのマルチテナント設計](postgresql-multitenancy.md#rlsでテナントを分ける業務テーブル)）のユニークインデックスは、すべて`tenant_public_id`から始める。
 先頭の列はカタログのテスト（`SchemaConventionsTest`と`SchemaInspectionTest`の規則S6）が確かめる。
 理由は[ADR-107](../adr/ADR-107-isolate-tenants-with-rls-set-per-transaction.md)に示す。
 

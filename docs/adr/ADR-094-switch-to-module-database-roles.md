@@ -35,7 +35,7 @@ RLS だけでは、別のモジュールのスキーマを越える読み書き�
 - SELECT の権限なしに、`modulith.event_publication` へ INSERT できる。
 
 この ADR が Proposed の間に、#377 でロールを切り替える SQL を、テナントも同じ文で設定する形に改めた（[ADR-107](ADR-107-isolate-tenants-with-rls-set-per-transaction.md)）。
-ロールとテナントを、トランザクションを始めた直後の 1 か所で、1 つの SQL で設定すると ADR-107 で決めたためである。
+ロールとテナントを、トランザクションを始めた直後の 1 か所で、1 つの SQL で設定すると ADR-107 で決めたからである。
 Decision の切り替えの SQL を、その文に合わせて書き直した。
 
 ## Decision
@@ -63,7 +63,8 @@ Decision の切り替えの SQL を、その文に合わせて書き直した。
 ロールを決めるのは、物理的なトランザクションを始めた外側の名前である。
 別のモジュールの公開 API を呼ぶと、その処理は `REQUIRED` で外側のトランザクションに参加し、呼び出し元のロールで動く。
 依存の方向に SELECT を与えるのはこのためである。
-設定の名前は SQL に固定し、ロールの値はバインド変数で渡す。接続プールの初期化の SQL とセッション単位の設定には書かない。
+設定の名前は SQL に固定し、ロールの値はバインド変数で渡す。
+接続プールの初期化の SQL とセッション単位の設定には書かない。
 
 ロールは環境を作る手順で先に作る。
 ローカルは `docker/initdb`、本番は構築の手順である。
@@ -144,7 +145,7 @@ DB のロールで止められるのは誤りで、故意の迂回は止めら�
 - [DB接続情報とロール分離](../database/connections.md)
 - [issue #307](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/307)
 - [issue #369](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/369)
-- [ADR-107: 業務の表を RLS でテナントごとに分け、テナントをロールと同じ SQL でトランザクションごとに設定する](ADR-107-isolate-tenants-with-rls-set-per-transaction.md)
+- [ADR-107: 業務テーブルを RLS でテナントごとに分け、テナントをロールと同じ SQL でトランザクションごとに設定する](ADR-107-isolate-tenants-with-rls-set-per-transaction.md)
 - [PostgreSQL GRANT](https://www.postgresql.org/docs/current/sql-grant.html)
 - [PostgreSQL SET ROLE](https://www.postgresql.org/docs/current/sql-set-role.html)
 - [PostgreSQL ALTER DEFAULT PRIVILEGES](https://www.postgresql.org/docs/current/sql-alterdefaultprivileges.html)

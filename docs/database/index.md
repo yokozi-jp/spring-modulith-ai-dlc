@@ -7,13 +7,13 @@
 - [DB接続情報とロール分離](connections.md)：接続用の環境変数やDBロールを追加、変更するとき、ステージングや本番のDBを準備するとき
 - [DBのデプロイと切り戻し](runbook-deploy-and-rollback.md)：本番マイグレーションのパイプラインを組むとき、DBを切り戻すとき
 - [PostgreSQLのテーブル論理設計](postgresql-logical-design.md)：業務テーブルを新しく設計するとき、区分値、論理削除、多言語データの持ち方を決めるとき
-- [PostgreSQLの命名規約](postgresql-naming.md)：テーブル、カラム、インデックス、シーケンスの物理名を決めるとき
+- [PostgreSQLの命名規約](postgresql-naming.md)：テーブル、カラム、インデックス、シーケンス、外部キー、RLSのポリシーの物理名を決めるとき
 - [PostgreSQLのデータ型](postgresql-data-types.md)：カラムのデータ型を選ぶとき、changesetの型をレビューするとき
 - [PostgreSQLの主キー](postgresql-primary-keys.md)：主キーの種類や採番方式を決めるとき、IDをURLやAPIに出すとき
 - [PostgreSQLの制約とインデックス](postgresql-constraints-and-indexes.md)：制約やインデックスを追加するとき、表どうしの参照を足すとき、性能対策でインデックスを見直すとき
 - [PostgreSQLの共通カラム](postgresql-common-columns.md)：業務テーブルを追加するとき、INSERTやUPDATEを実装するとき、データパッチを当てるとき
 - [PostgreSQLの時間で変わる業務データ](postgresql-temporal-data.md)：業務日付、適用期間付きのマスタ、マスタの世代管理を設計するとき
-- [PostgreSQLのマルチテナント設計](postgresql-multitenancy.md)：業務の表を足すとき、RLSのポリシーやテナントの設定を変えるとき、全テナントの行を書き換える処理を書くとき、テナントの分離方式を見直すとき
+- [PostgreSQLのマルチテナント設計](postgresql-multitenancy.md)：業務テーブルを足すとき、RLSのポリシーやテナントの設定を変えるとき、全テナントの行を書き換える処理を書くとき、テナントの分離方式を見直すとき
 - [PostgreSQLのテーブル以外のDBオブジェクト](postgresql-database-objects.md)：関数、トリガー、ビュー、一時テーブルを作るとき、他システムのDBとつなぐ要件が出たとき
 - [PostgreSQLのパーティションと改廃](postgresql-partitioning-and-retention.md)：大量データのトランを設計するとき、保持期限を過ぎたデータの削除を作るとき
 - [PostgreSQLの排他制御](postgresql-concurrency-control.md)：業務テーブルのUPDATEかDELETEを書くとき（集約の保存と削除、在庫の引き当て、保存期間を過ぎた行の削除、ワークテーブルの後始末）、分離レベルを変えたくなったとき

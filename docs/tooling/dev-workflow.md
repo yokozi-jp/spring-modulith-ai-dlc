@@ -145,7 +145,7 @@ Taskのテスト系タスクは、`.env.test`に足りない変数を`.env.test.
 定期の再投入のロックの表（`010-create-shedlock-table`）を足した変更の後は、既存のローカルのDBに`task be-migrate`を実行する。
 表がないと、定期の再投入は毎回`Event publication resubmission failed`のWARNで失敗する。
 
-マイグレーション用のロールをsuperuserから分けた変更の後は、既存の`.env`へ`.env.example`の`POSTGRES_SUPERUSER_PASSWORD`の行を足す（[DB接続情報とロール分離](../database/connections.md)）。
+マイグレーションロールをsuperuserから分けた変更の後は、既存の`.env`へ`.env.example`の`POSTGRES_SUPERUSER_PASSWORD`の行を足す（[DB接続情報とロール分離](../database/connections.md)）。
 この行がないと、`task compose-up`と`task dev`はPostgreSQLのsecretを作れずに止まる。
 既存の`postgres_data`ボリュームでは`docker/initdb`が再実行されず、`demo_migration`はsuperuserのまま残るため、`task compose-reset CONFIRM_RESET=yes`でボリュームを消し（ほかのサービスのデータも消える）、`task compose-up`で起動してから`task be-migrate`を実行する。
 
@@ -186,7 +186,7 @@ task be-seed                           # 業務データが空のときだけ代
 
 代表データ（商品5件、注文6件、決済2件）は、`TenancySeeds`の2つのテナント（サンプル商事、サンプル物産）の両方に入る（[ADR-107](../adr/ADR-107-isolate-tenants-with-rls-set-per-transaction.md)）。
 業務データが空かの判定とresetの削除は、`tenancy.m_tenant`のテナントごとに、そのテナントを設定して行う。
-業務の表はRLSでテナントごとに分かれ、テナントを設定しないまま読むとエラーになるためである（[PostgreSQLのマルチテナント設計](../database/postgresql-multitenancy.md#全テナントの行を書き換える処理)）。
+業務テーブルはRLSでテナントごとに分かれ、テナントを設定しないまま読むとエラーになるからである（[PostgreSQLのマルチテナント設計](../database/postgresql-multitenancy.md#全テナントの行を書き換える処理)）。
 
 reset は業務の4表（`product.m_product`、`ordering.t_order`、`ordering.t_order_line`、`payment.t_payment`）だけを消す。
 `tenancy`の表、`modulith`の出版の表、Liquibaseの管理表は残す。

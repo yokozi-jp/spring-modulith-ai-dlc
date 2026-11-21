@@ -109,8 +109,11 @@ jOOQの生成物の`com.example.demo.jooq`はOPENのモジュールであり、`
 - `tenantIsBoundOnlyByTenantSelectionFilterAndListenerAspect`：`TenantContext.call`を呼べるクラスは、`tenancy.presentation.web.TenantSelectionFilter`と`shared.infrastructure.persistence.TenantListenerAspect`の2つだけにする。
   CommandHandlerやControllerや別のfilterが束縛を切り替えて、認証の権限やイベントに無関係なテナントを操作することを防ぐ。メソッド参照も検出する（[ADR-105](../adr/ADR-105-bind-tenant-to-request-and-event-context.md)）。
   違反フィクスチャの`TenantSwitchingCommandHandler`（直接の呼び出し）と`HeaderTenantFilter`（別のモジュールのfilterのメソッド参照）で確かめ、規約どおりのフィクスチャの`TenantSelectionFilter`が通ることを確かめる。
-- `unboundTenantIsReadOnlyByTransactionManager`：`TenantContext.findCurrent`を呼べるクラスは、`shared.infrastructure.persistence.ModuleRoleTransactionManager`だけにする。
-  `findCurrent`は束縛のないことを空で返すため、業務の処理が使うと、テナントを束縛し忘れた呼び出しをテナントのない処理として通す。業務の処理は`TenantContext.current()`で読む。メソッド参照も検出する（[ADR-105](../adr/ADR-105-bind-tenant-to-request-and-event-context.md)、[ADR-107](../adr/ADR-107-isolate-tenants-with-rls-set-per-transaction.md)）。
+- `unboundTenantIsReadOnlyByTransactionManager`：本番のコードで`TenantContext.findCurrent`を呼べるクラスは、`shared.infrastructure.persistence.ModuleRoleTransactionManager`だけにする。
+  ArchUnitは本番のクラスだけを解析するので、テストの補助（`AsTenant`など）は対象の外である。
+  `findCurrent`は束縛のないことを空で返すため、業務の処理が使うと、テナントを束縛し忘れた呼び出しをテナントのない処理として通す。
+  業務の処理は`TenantContext.current()`で読む。
+  メソッド参照も検出する（[ADR-105](../adr/ADR-105-bind-tenant-to-request-and-event-context.md)、[ADR-107](../adr/ADR-107-isolate-tenants-with-rls-set-per-transaction.md)）。
   違反フィクスチャの`TenantDefaultingCommandHandler`で確かめ、規約どおりのフィクスチャの`ModuleRoleTransactionManager`が通ることを確かめる。
 - `eventListenersAreApplicationModuleListeners`：`@ApplicationModuleListener`を付けていないメソッドは、`@EventListener`をメタアノテーションに持たない。
   `@EventListener`と`@TransactionalEventListener`を直接付けた受信を拒否し、`@TransactionalEventListener`をメタアノテーションに持つ`@ApplicationModuleListener`は対象から除く。
@@ -400,15 +403,18 @@ DBの規約のほかの検査は`backend/src/test/java/com/example/demo/persiste
 
 テナントと外部キーの規則は次のとおりである。
 根拠は[PostgreSQLのマルチテナント設計](../database/postgresql-multitenancy.md)と[PostgreSQLの制約とインデックス](../database/postgresql-constraints-and-indexes.md#外部キー)にある。
-テナントで分ける表の範囲は[RLSでテナントを分ける表](../database/postgresql-multitenancy.md#rlsでテナントを分ける表)に示す。
+テナントで分ける業務テーブルの範囲は[RLSでテナントを分ける業務テーブル](../database/postgresql-multitenancy.md#rlsでテナントを分ける業務テーブル)に示す。
 
-- S1：changesetのRLSとポリシーのSQLは、テナントで分ける表への決まった3文（`ENABLE`、`FORCE`、`tenant_isolation`のポリシーの作成）だけにする。`missing_ok`を渡すポリシー、`PUBLIC`以外を対象にするポリシー、テナントで分ける表の外の表へのRLS、ほかの形の文を、rollbackを含めて拒否する。3文だけのSQLは、任意のSQL（M17）の許可リストに載せない。
+- S1：changesetのRLSとポリシーのSQLは、テナントで分ける業務テーブルへの決まった3文（`ENABLE`、`FORCE`、`tenant_isolation`のポリシーの作成）だけにする。
+  `missing_ok`を渡すポリシー、`PUBLIC`以外を対象にするポリシー、テナントで分ける業務テーブルの外の表へのRLS、ほかの形の文を、rollbackを含めて拒否する。
+  3文だけのSQLは、任意のSQL（M17）の許可リストに載せない。
 - S2：changesetでRLSの文を書いた表には、3文をすべて同じchangesetに書く。
-- S3：カタログのテナントで分ける表に、`ENABLE`と`FORCE`のRLSが付いている。
-- S4：カタログのテナントで分ける表が、uuidのNOT NULLで、既定値がトランザクションのテナントの`tenant_public_id`を持つ。
-- S5：カタログのテナントで分ける表のポリシーが、`PERMISSIVE`、`FOR ALL`、`TO PUBLIC`、`missing_ok`を使わない`USING`の式、`WITH CHECK`なしの1つだけである。
-- S6：カタログのテナントで分ける表の、主キー以外のユニークインデックスが`tenant_public_id`から始まる。
-- K1：カタログの同じスキーマのほかの表の主キーと同じ名前の列に、外部キーがある。外部キーは、テナントで分ける表なら`(tenant_public_id, 参照先の主キー)`、`tenancy`の表なら参照先の主キーだけの形にし、形の違う外部キーも拒否する。
+- S3：カタログのテナントで分ける業務テーブルに、`ENABLE`と`FORCE`のRLSが付いている。
+- S4：カタログのテナントで分ける業務テーブルが、uuidのNOT NULLで、既定値がトランザクションのテナントの`tenant_public_id`を持つ。
+- S5：カタログのテナントで分ける業務テーブルのポリシーが、`PERMISSIVE`、`FOR ALL`、`TO PUBLIC`、`missing_ok`を使わない`USING`の式、`WITH CHECK`なしの1つだけである。
+- S6：カタログのテナントで分ける業務テーブルの、主キー以外のユニークインデックスが`tenant_public_id`から始まる。
+- K1：カタログの同じスキーマのほかの表の主キーと同じ名前の列に、外部キーがある。
+  外部キーは、テナントで分ける業務テーブルなら`(tenant_public_id, 参照先の主キー)`、`tenancy`の表なら参照先の主キーだけの形にし、形の違う外部キーも拒否する。
 - K4：changesetの外部キーは`addForeignKeyConstraint`だけで作り、名前を`fk_{表}`か`fk_{連番}_{表}`にし、同じスキーマの表をK1と同じ列で参照し、`onDelete`、`onUpdate`、`deleteCascade`を付けない。
 
 スキーマ検査の規則を足すときは、判定に要る行を`CatalogSnapshot`に足して`SchemaCatalog.read`で埋め、判定する関数を`SchemaConventions.check`から呼ぶ。

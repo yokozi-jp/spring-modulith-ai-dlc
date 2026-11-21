@@ -1,13 +1,13 @@
 ---
 type: Convention
 title: PostgreSQLのマルチテナント設計
-description: マルチテナントでテナントのデータを分離する方式の選び方と、このシステムのRLSの規則（RLSで分ける表とRLSの外に置く表、tenant_public_idとポリシー、トランザクションごとのテナントの設定、全テナントの行を書き換える処理、検査）、テナントごとのスキーマ差の禁止、テナントのシャーディングを定める規約。業務の表を足すとき、RLSのポリシーやテナントの設定を変えるとき、全テナントの行を書き換える処理を書くとき、テナント分離の方式を見直すときに読む。
+description: マルチテナントでテナントのデータを分離する方式の選び方と、このシステムのRLSの規則（RLSで分ける表とRLSの外に置く表、tenant_public_idとポリシー、トランザクションごとのテナントの設定、全テナントの行を書き換える処理、検査）、テナントごとのスキーマ差の禁止、テナントのシャーディングを定める規約。業務テーブルを足すとき、RLSのポリシーやテナントの設定を変えるとき、全テナントの行を書き換える処理を書くとき、テナント分離の方式を見直すときに読む。
 tags: [convention, database, postgresql, multi-tenancy, rls, future-arch-guidelines]
 ---
 
 # PostgreSQLのマルチテナント設計
 
-業務の表はRow Level Security（RLS）でテナントごとに分け、`tenant_public_id`とトランザクションに設定したテナントを比べるポリシーで、別のテナントの行を読めず書けなくする。
+業務テーブルはRow Level Security（RLS）でテナントごとに分け、`tenant_public_id`とトランザクションに設定したテナントを比べるポリシーで、別のテナントの行を読めず書けなくする。
 テナントはモジュールのロールと同じSQLでトランザクションの間だけ設定し、テナントを束縛しない業務のトランザクションはトランザクションマネージャーが始めない。
 全テナントの行を書き換える処理はテナントを1つずつ設定して流し、テナントごとにスキーマの差を作らない。
 
@@ -34,16 +34,21 @@ tags: [convention, database, postgresql, multi-tenancy, rls, future-arch-guideli
 このシステムはRLS分離を使う。
 規則は次の節から示し、理由は[ADR-107](../adr/ADR-107-isolate-tenants-with-rls-set-per-transaction.md)にある。
 
-## RLSでテナントを分ける表
+## RLSでテナントを分ける業務テーブル
 
-changesetが作るスキーマのうち、`modulith`と`tenancy`を除くスキーマの表を、すべて業務の表としてRLSでテナントごとに分ける。
-今の業務の表は、`product.m_product`、`ordering.t_order`、`ordering.t_order_line`、`payment.t_payment`である。
+changesetが作るスキーマのうち、`modulith`と`tenancy`を除くスキーマの表を、すべて業務テーブルとしてRLSでテナントごとに分ける。
+今の業務テーブルは、`product.m_product`、`ordering.t_order`、`ordering.t_order_line`、`payment.t_payment`である。
 
-- 業務の表は、テナントの`public_id`を`tenant_public_id`（`uuid`、NOT NULL）として持つ。テナントの主キーは持たない（[PostgreSQLの主キー](postgresql-primary-keys.md#主キーと公開用idの使い分け)）。
-- `tenant_public_id`の既定値は`current_setting('app.current_tenant')::uuid`にし、RepositoryとseedのINSERTはこの列を書かない。列の値はトランザクションに設定したテナントになり、テナントを設定しないトランザクションのINSERTはエラーになる。uuidの`DEFAULT`の禁止の例外である（[PostgreSQLの主キー](postgresql-primary-keys.md#uuidの採番)）。
-- 業務の表に`ENABLE ROW LEVEL SECURITY`と`FORCE ROW LEVEL SECURITY`を付ける。
-- ポリシー`tenant_isolation`は`tenant_public_id = current_setting('app.current_tenant')::uuid`で比べ、`current_setting`に`missing_ok`を渡さない。式は、読む行と、INSERTとUPDATEで書く行の両方に効かせる。
-- ポリシーの対象は`PUBLIC`にする。表に触れるロールは、表の権限で絞る（[DB接続情報とロール分離](connections.md#モジュールのロール)）。
+- 業務テーブルは、テナントの`public_id`を`tenant_public_id`（`uuid`、NOT NULL）として持つ。
+  テナントの主キーは持たない（[PostgreSQLの主キー](postgresql-primary-keys.md#主キーと公開用idの使い分け)）。
+- `tenant_public_id`の既定値は`current_setting('app.current_tenant')::uuid`にし、RepositoryとseedのINSERTはこの列を書かない。
+  列の値はトランザクションに設定したテナントになり、テナントを設定しないトランザクションのINSERTはエラーになる。
+  uuidの`DEFAULT`の禁止の例外である（[PostgreSQLの主キー](postgresql-primary-keys.md#uuidの採番)）。
+- 業務テーブルに`ENABLE ROW LEVEL SECURITY`と`FORCE ROW LEVEL SECURITY`を付ける。
+- ポリシー`tenant_isolation`は`tenant_public_id = current_setting('app.current_tenant')::uuid`で比べ、`current_setting`に`missing_ok`を渡さない。
+  式は、読む行と、INSERTとUPDATEで書く行の両方に効かせる。
+- ポリシーの対象は`PUBLIC`にする。
+  表に触れるロールは、表の権限で絞る（[DB接続情報とロール分離](connections.md#モジュールのロール)）。
 
 changesetには、表ごとに次の3文を同じchangesetに書く。
 空白の数を除いてこの形のとおりに書き、ほかの形のRLSとポリシーの文は、rollbackにも書かない。
@@ -54,18 +59,21 @@ ALTER TABLE <スキーマ>.<表> FORCE ROW LEVEL SECURITY;
 CREATE POLICY tenant_isolation ON <スキーマ>.<表> AS PERMISSIVE FOR ALL TO PUBLIC USING (tenant_public_id = current_setting('app.current_tenant')::uuid);
 ```
 
-業務の一意索引と、同じモジュールの表どうしの外部キーは、[PostgreSQLの制約とインデックス](postgresql-constraints-and-indexes.md)の「外部キー」と「一意性」に従う。
+業務テーブルのユニークインデックスと、同じモジュールの表どうしの外部キーは、[PostgreSQLの制約とインデックス](postgresql-constraints-and-indexes.md)の「外部キー」と「一意性」に従う。
 
-業務の表には、`COPY FROM`で取り込めない。
-PostgreSQLはRLSを受けるロールの`COPY FROM`を受け付けず、`FORCE ROW LEVEL SECURITY`で表の所有者もRLSを受けるためである。
-業務の表への大量の取り込みが必要になったら、取り込みの方式をADRで決める。
+業務テーブルには、`COPY FROM`で取り込めない。
+PostgreSQLはRLSを受けるロールの`COPY FROM`を受け付けず、`FORCE ROW LEVEL SECURITY`で表の所有者もRLSを受けるからである。
+業務テーブルへの大量の取り込みが必要になったら、取り込みの方式をADRで決める。
 
 ## RLSの外に置く表
 
 RLSの外に置く表は、`modulith`と`tenancy`のスキーマの表だけにする。
 
-- **`modulith`**：Spring Modulithのイベントの出版とそのarchive、ShedLockの表である。テナントは、イベントの本文が運ぶ（[ADR-105](../adr/ADR-105-bind-tenant-to-request-and-event-context.md)）。
-- **`tenancy`**：テナント、利用者、ID連携、所属の表である。テナントが決まる前に引く。触れるのは`tenancy_module`だけである（[DB接続情報とロール分離](connections.md#モジュールのロール)）。
+- **`modulith`**：Spring Modulithのイベントの出版とそのarchive、ShedLockの表である。
+  テナントは、イベントの本文が運ぶ（[ADR-105](../adr/ADR-105-bind-tenant-to-request-and-event-context.md)）。
+- **`tenancy`**：テナント、利用者、ID連携、所属の表である。
+  テナントが決まる前に引く。
+  触れるのは`tenancy_module`だけである（[DB接続情報とロール分離](connections.md#モジュールのロール)）。
 
 ## テナントの設定
 
@@ -75,10 +83,16 @@ RLSの外に置く表は、`modulith`と`tenancy`のスキーマの表だけに�
 SELECT set_config('role', ?, true), set_config('app.current_tenant', ?, true)
 ```
 
-- どちらも`is_local`を`true`にし、トランザクションの間だけ効かせる。設定の名前（`role`と`app.current_tenant`）はSQLに固定し、値をバインド変数で渡す。
-- テナントは`TenantContext.findCurrent()`で束縛から読む（[ADR-105](../adr/ADR-105-bind-tenant-to-request-and-event-context.md)）。束縛がないトランザクションでは`app.current_tenant`を設定しない。
-- 業務の表を持つモジュール（`product`、`ordering`、`payment`）のトランザクションを、テナントを束縛せずに始めたら、SQLを流す前に`IllegalStateException`で失敗させる。モジュールの一覧は`ModuleRoles.TENANT_SCOPED_MODULES`にある。`tenancy`のトランザクションと、モジュールが分からないトランザクションは、テナントなしで始められる。
-- モジュールが分からないトランザクションでは、ロールを設定しない（[DB接続情報とロール分離](connections.md#モジュールのロール)）。SQLには設定するものの`set_config`だけを並べ、どちらもなければSQLを流さない。上のSQLは、両方を設定するときの形である。
+- どちらも`is_local`を`true`にし、トランザクションの間だけ効かせる。
+  設定の名前（`role`と`app.current_tenant`）はSQLに固定し、値をバインド変数で渡す。
+- テナントは`TenantContext.findCurrent()`で束縛から読む（[ADR-105](../adr/ADR-105-bind-tenant-to-request-and-event-context.md)）。
+  束縛がないトランザクションでは`app.current_tenant`を設定しない。
+- 業務テーブルを持つモジュール（`product`、`ordering`、`payment`）のトランザクションを、テナントを束縛せずに始めたら、SQLを流す前に`IllegalStateException`で失敗させる。
+  モジュールの一覧は`ModuleRoles.TENANT_SCOPED_MODULES`にある。
+  `tenancy`のトランザクションと、モジュールが分からないトランザクションは、テナントなしで始められる。
+- モジュールが分からないトランザクションでは、ロールを設定しない（[DB接続情報とロール分離](connections.md#モジュールのロール)）。
+  SQLには設定するものの`set_config`だけを並べ、どちらもなければSQLを流さない。
+  上のSQLは、両方を設定するときの形である。
 - 接続プールの初期化のSQL（HikariCPの`connection-init-sql`）とセッション単位の`SET`には、テナントを書かない。
 
 テナントを設定しない読み書きをポリシーのエラーで止めるのは、2段目の防御である。
@@ -90,7 +104,7 @@ SELECT set_config('role', ?, true), set_config('app.current_tenant', ?, true)
 
 全テナントの行を書き換える処理（データの移行、開発用の代表データのreset）は、テナントを1つずつ設定して流す。
 全テナントの行を読めるロールと、`BYPASSRLS`を持つロールは使わない。
-マイグレーション用のロールも`FORCE ROW LEVEL SECURITY`でポリシーを受けるため、changesetのデータの移行もテナントを設定して流す。
+マイグレーションロールも`FORCE ROW LEVEL SECURITY`でポリシーを受けるため、changesetのデータの移行もテナントを設定して流す。
 
 開発用の代表データの「空」の判定とresetの削除も、`tenancy.m_tenant`のテナントごとに、そのテナントを設定して行う（[開発ワークフロー](../tooling/dev-workflow.md#代表データを入れ直すとき)）。
 
@@ -98,12 +112,17 @@ SELECT set_config('role', ?, true), set_config('app.current_tenant', ?, true)
 
 RLSの規則は次の検査で確かめる。
 規則の記号の定義は[バックエンドのアーキテクチャテスト](../backend/architecture-tests.md)にある。
-一意索引の先頭の列と外部キーの検査は、[PostgreSQLの制約とインデックス](postgresql-constraints-and-indexes.md)に示す。
+ユニークインデックスの先頭の列と外部キーの検査は、[PostgreSQLの制約とインデックス](postgresql-constraints-and-indexes.md)に示す。
 
-- **カタログのテスト**：`SchemaConventionsTest`と`SchemaInspectionTest`が、業務の表に`ENABLE`と`FORCE`があること（規則S3）、`tenant_public_id`の型、NOT NULL、既定値（規則S4）、ポリシーが`PUBLIC`を対象にする1つだけで`missing_ok`を使わないこと（規則S5）を確かめる。表の一覧を持たずにカタログから導くため、「RLSでテナントを分ける表」の範囲に表を足すと、その表も検査の対象になる。
+- **カタログのテスト**：`SchemaConventionsTest`と`SchemaInspectionTest`が、業務テーブルに`ENABLE`と`FORCE`があること（規則S3）、`tenant_public_id`の型、NOT NULL、既定値（規則S4）、ポリシーが`PUBLIC`を対象にする1つだけで`missing_ok`を使わないこと（規則S5）を確かめる。
+  表の一覧を持たずにカタログから導くため、「RLSでテナントを分ける業務テーブル」の範囲に表を足すと、その表も検査の対象になる。
 - **changesetのlint**：`ChangesetLintTest`が、RLSとポリシーのSQLが上の3文の形だけであること（規則S1）と、3文が同じchangesetに揃うこと（規則S2）を確かめる。
-- **`@DatabaseTest`**：`TenantIsolationTest`が、別のテナントの行を読めず書けないこと、明細が別のテナントの注文を指せないこと、テナントを設定しないモジュールのロールの読み取りとINSERTがエラーになることを確かめる。表の所有者のマイグレーションロールの接続でも、テナントを設定しない読み取りがエラーになり、設定したテナントの行だけを読むことを確かめ、`FORCE ROW LEVEL SECURITY`の効き目を見る。テナントを束縛しない業務のトランザクションを、汎用の実行計画が0件を返す接続でも、トランザクションマネージャーが拒否することも確かめる。業務の表は、`tenant_public_id`を持つjOOQの生成した表から導く。
-- **`@CommittedDatabaseTest`**：`ModuleRoleTransactionTest`が、commitとrollbackの後、プールの接続にテナントが残らないことと、テナントを束縛しない`product`、`ordering`、`payment`のトランザクションを始めないことを確かめる。設定の後に空文字列が残る場合も、ポリシーが失敗する側に倒れることを確かめる。
+- **`@DatabaseTest`**：`TenantIsolationTest`が、別のテナントの行を読めず書けないこと、明細が別のテナントの注文を指せないこと、テナントを設定しないモジュールのロールの読み取りとINSERTがエラーになることを確かめる。
+  表の所有者のマイグレーションロールの接続でも、テナントを設定しない読み取りがエラーになり、設定したテナントの行だけを読むことを確かめ、`FORCE ROW LEVEL SECURITY`の効き目を見る。
+  テナントを束縛しない業務のトランザクションを、汎用の実行計画が0件を返す接続でも、トランザクションマネージャーが拒否することも確かめる。
+  業務テーブルは、`tenant_public_id`を持つjOOQの生成した表から導く。
+- **`@CommittedDatabaseTest`**：`ModuleRoleTransactionTest`が、commitとrollbackの後、プールの接続にテナントが残らないことと、テナントを束縛しない`product`、`ordering`、`payment`のトランザクションを始めないことを確かめる。
+  設定の後に空文字列が残る場合も、ポリシーが失敗する側に倒れることを確かめる。
 
 ## ノイジーネイバーへの対策
 

@@ -8,7 +8,7 @@ tags: [convention, integration, interface, postgresql, performance, future-arch-
 # 大量データの取り込み性能
 
 大きくなりうる連携ファイルは、最初から PostgreSQL の `COPY` で取り込むように設計する。
-ただし、RLS でテナントを分ける業務の表には `COPY FROM` を使えないので、取り込み先がその表のときは [PostgreSQLのマルチテナント設計](../database/postgresql-multitenancy.md#rlsでテナントを分ける表)を先に読む。
+ただし、RLS でテナントを分ける業務テーブルには `COPY FROM` を使えないので、取り込み先がその表のときは [PostgreSQLのマルチテナント設計](../database/postgresql-multitenancy.md#rlsでテナントを分ける業務テーブル)を先に読む。
 `TRUNCATE` と `COPY` で洗い替えた後は `ANALYZE` を実行する。
 取り込みの性能は、処理方式を変えられるプロジェクトの早い時期に確かめる。
 
@@ -17,7 +17,8 @@ tags: [convention, integration, interface, postgresql, performance, future-arch-
 - 大きくなりうるファイルの取り込みは、アプリケーションからのバッチ INSERT ではなく、最初から `COPY` で設計する。
 - `TRUNCATE` と `COPY` で洗い替えた後は、`ANALYZE` で統計情報を更新する。
 - 取り込みの速度が足りない場合は、取り込みの間だけインデックスを外し、完了後に作り直すことを検討する。
-- 業務の表（RLS でテナントごとに分ける表）には、`COPY FROM` で取り込めない。扱いは [PostgreSQLのマルチテナント設計](../database/postgresql-multitenancy.md#rlsでテナントを分ける表)に従う。
+- 業務テーブル（RLS でテナントごとに分ける表）には、`COPY FROM` で取り込めない。
+  扱いは [PostgreSQLのマルチテナント設計](../database/postgresql-multitenancy.md#rlsでテナントを分ける業務テーブル)に従う。
 - バイナリ形式の `COPY` は、性能要件が厳しい取り込みだけに使う。
   ファイルが特定の DB に依存し、可読性と他システムでの再利用性を失うため。
 
