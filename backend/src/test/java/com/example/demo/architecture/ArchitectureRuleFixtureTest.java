@@ -588,6 +588,7 @@ class ArchitectureRuleFixtureTest {
         ClassRoleArchTest.moduleListenerEventsAreTenantScopedRule(basePackage),
         ClassRoleArchTest.tenantIsBoundOnlyByTenantSelectionFilterAndListenerAspectRule(
             basePackage),
+        ClassRoleArchTest.unboundTenantIsReadOnlyByTransactionManagerRule(basePackage),
         ClassRoleArchTest.eventListenersAreApplicationModuleListeners,
         ClassRoleArchTest.applicationListenerIsNotImplemented,
         ClassRoleArchTest.listenersExposeOnlyOnAndCallOneCommandHandler,

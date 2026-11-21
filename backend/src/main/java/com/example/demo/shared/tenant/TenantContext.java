@@ -51,7 +51,8 @@ public final class TenantContext {
    * 呼び出し中のテナントを、束縛していなければ空で返す。
    *
    * <p>テナントのない呼び出し（Spring Modulith の内部、再投入、ShedLock）も通るトランザクションマネージャーのためにある。業務の処理は {@link
-   * #current()} を使い、テナントがないことを「データがない」と取り違えない。
+   * #current()} を使い、テナントがないことを「データがない」と取り違えない。ほかのクラスから呼ぶと、ArchUnit の {@code
+   * unboundTenantIsReadOnlyByTransactionManager} が止める。
    */
   public static Optional<TenantId> findCurrent() {
     return BOUND.isBound() ? Optional.of(BOUND.get()) : Optional.empty();

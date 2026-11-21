@@ -290,6 +290,11 @@ class ClassRoleArchTest {
   /* package */ static final ArchRule tenantIsBoundOnlyByTenantSelectionFilterAndListenerAspect =
       tenantIsBoundOnlyByTenantSelectionFilterAndListenerAspectRule(BASE_PACKAGE);
 
+  /** {@code TenantContext.findCurrent} を呼ぶクラスを、{@code ModuleRoleTransactionManager} に限る。 */
+  @ArchTest
+  /* package */ static final ArchRule unboundTenantIsReadOnlyByTransactionManager =
+      unboundTenantIsReadOnlyByTransactionManagerRule(BASE_PACKAGE);
+
   /**
    * イベントは {@code @ApplicationModuleListener} だけで受け、{@code @EventListener} と
    * {@code @TransactionalEventListener} を直接付けない。
@@ -550,6 +555,38 @@ class ClassRoleArchTest {
                 + "新しい入口が要るときは、この規則の許可先と ADR-105 を先に変える。"
                 + "規約：docs/backend/architecture.md、"
                 + ADR_105);
+  }
+
+  /**
+   * {@code TenantContext.findCurrent} を呼べるクラスを、{@code ModuleRoleTransactionManager} だけに限る規則を組み立てる。
+   *
+   * <p>{@code findCurrent} は、テナントの束縛がないことを空で返す。業務の処理が使うと、束縛し忘れた呼び出しを「テナントのない処理」として通す。メソッド参照も検出する。
+   */
+  /* package */ static ArchRule unboundTenantIsReadOnlyByTransactionManagerRule(
+      final String basePackage) {
+    final String tenantContext = basePackage + ".shared.tenant.TenantContext";
+    final String transactionManager =
+        basePackage + ".shared.infrastructure.persistence.ModuleRoleTransactionManager";
+    return noClasses()
+        .that(
+            DescribedPredicate.describe(
+                "are not the transaction manager",
+                (JavaClass javaClass) -> !transactionManager.equals(javaClass.getName())))
+        .should()
+        .accessTargetWhere(
+            DescribedPredicate.describe(
+                "TenantContext.findCurrent",
+                (JavaAccess<?> access) ->
+                    access.getTargetOwner().getName().equals(tenantContext)
+                        && "findCurrent".equals(access.getName())))
+        .because(
+            "findCurrent はテナントの束縛がないことを空で返し、束縛し忘れた呼び出しを、テナントのない処理として通すため。"
+                + "直し方：業務の処理は TenantContext.current() で読み、束縛がなければ例外にする。"
+                + "テナントのない呼び出し（Spring Modulith の内部、再投入、ShedLock）も通すのは、"
+                + "トランザクションを始めるときにテナントを設定する ModuleRoleTransactionManager だけである。"
+                + "規約：docs/backend/architecture-tests.md、"
+                + ADR_105
+                + "、docs/adr/ADR-107-isolate-tenants-with-rls-set-per-transaction.md");
   }
 
   /** モジュールルートの型を record、enum、{@code *Queries} interface に限る規則を組み立てる。 */

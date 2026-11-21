@@ -109,6 +109,9 @@ jOOQの生成物の`com.example.demo.jooq`はOPENのモジュールであり、`
 - `tenantIsBoundOnlyByTenantSelectionFilterAndListenerAspect`：`TenantContext.call`を呼べるクラスは、`tenancy.presentation.web.TenantSelectionFilter`と`shared.infrastructure.persistence.TenantListenerAspect`の2つだけにする。
   CommandHandlerやControllerや別のfilterが束縛を切り替えて、認証の権限やイベントに無関係なテナントを操作することを防ぐ。メソッド参照も検出する（[ADR-105](../adr/ADR-105-bind-tenant-to-request-and-event-context.md)）。
   違反フィクスチャの`TenantSwitchingCommandHandler`（直接の呼び出し）と`HeaderTenantFilter`（別のモジュールのfilterのメソッド参照）で確かめ、規約どおりのフィクスチャの`TenantSelectionFilter`が通ることを確かめる。
+- `unboundTenantIsReadOnlyByTransactionManager`：`TenantContext.findCurrent`を呼べるクラスは、`shared.infrastructure.persistence.ModuleRoleTransactionManager`だけにする。
+  `findCurrent`は束縛のないことを空で返すため、業務の処理が使うと、テナントを束縛し忘れた呼び出しをテナントのない処理として通す。業務の処理は`TenantContext.current()`で読む。メソッド参照も検出する（[ADR-105](../adr/ADR-105-bind-tenant-to-request-and-event-context.md)、[ADR-107](../adr/ADR-107-isolate-tenants-with-rls-set-per-transaction.md)）。
+  違反フィクスチャの`TenantDefaultingCommandHandler`で確かめ、規約どおりのフィクスチャの`ModuleRoleTransactionManager`が通ることを確かめる。
 - `eventListenersAreApplicationModuleListeners`：`@ApplicationModuleListener`を付けていないメソッドは、`@EventListener`をメタアノテーションに持たない。
   `@EventListener`と`@TransactionalEventListener`を直接付けた受信を拒否し、`@TransactionalEventListener`をメタアノテーションに持つ`@ApplicationModuleListener`は対象から除く。
   守らせる規約と理由は[Listener](class-roles/listener.md)に示す。

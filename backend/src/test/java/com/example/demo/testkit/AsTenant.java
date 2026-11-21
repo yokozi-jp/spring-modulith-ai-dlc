@@ -19,10 +19,6 @@ public final class AsTenant {
 
   /** 束縛中のテナントの文字列を返す。束縛していなければ {@code unbound} を返す。 */
   public static String currentOrUnbound() {
-    try {
-      return TenantContext.current().toString();
-    } catch (IllegalStateException unbound) {
-      return "unbound";
-    }
+    return TenantContext.findCurrent().map(TenantId::toString).orElse("unbound");
   }
 }
