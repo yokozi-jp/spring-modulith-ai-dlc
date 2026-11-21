@@ -24,7 +24,7 @@ import org.springframework.stereotype.Repository;
 class JooqUserRepository implements UserRepository {
 
   /** 利用者の IdP の識別。親の中の行は、発行者と識別子の組で同定する。 */
-  private static final ChildTable<MUserRecord, MUserIdentityRecord> IDENTITIES =
+  private static final ChildTable<MUserIdentityRecord> IDENTITIES =
       ChildTable.of(
           M_USER_IDENTITY,
           M_USER_IDENTITY.USER_ID,

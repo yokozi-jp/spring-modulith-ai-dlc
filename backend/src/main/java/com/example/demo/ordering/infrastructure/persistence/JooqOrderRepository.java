@@ -34,7 +34,7 @@ import org.springframework.stereotype.Repository;
 class JooqOrderRepository implements OrderRepository {
 
   /** 注文の明細。親の中の行は、明細番号で同定する。 */
-  private static final ChildTable<TOrderRecord, TOrderLineRecord> LINES =
+  private static final ChildTable<TOrderLineRecord> LINES =
       ChildTable.of(T_ORDER_LINE, T_ORDER_LINE.ORDER_ID, T_ORDER_LINE.LINE_NO);
 
   /** 注文の集約。ルートは公開 ID で一つに決める。 */

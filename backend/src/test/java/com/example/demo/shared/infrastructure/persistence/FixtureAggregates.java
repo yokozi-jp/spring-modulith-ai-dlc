@@ -11,7 +11,7 @@ import org.jooq.Record;
 final class FixtureAggregates {
 
   /** 子の行。親の中の行は、明細番号で同定する。 */
-  /* package */ static final ChildTable<Record, Record> DETAILS =
+  /* package */ static final ChildTable<Record> DETAILS =
       ChildTable.of(
           FIXTURE_ITEM_DETAIL, FIXTURE_ITEM_DETAIL.ITEM_ID, FIXTURE_ITEM_DETAIL.DETAIL_NO);
 
@@ -37,7 +37,7 @@ final class FixtureAggregates {
   }
 
   /** 明細番号と文言を子の列に書く、{@link #DETAILS} の全行を作る。 */
-  /* package */ static ChildRows<Record, Record> detailRows(final List<Detail> details) {
+  /* package */ static ChildRows<Record> detailRows(final List<Detail> details) {
     return DETAILS.rows(
         details,
         (detail, set) ->

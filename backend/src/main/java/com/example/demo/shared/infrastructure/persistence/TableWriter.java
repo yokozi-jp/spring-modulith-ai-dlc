@@ -70,16 +70,15 @@ public class TableWriter {
    * @throws ConflictException 一意制約に違反した場合（種類は {@code UNIQUE}）、行ロックを {@code lock_timeout}
    *     までに取れない場合（種類は {@code LOCK}）。原因は持たない
    */
-  @SafeVarargs
-  public final <R extends Record, K, A extends Versioned> void insert(
+  public <R extends Record, K, A extends Versioned> void insert(
       final AggregateTable<R, K, A> aggregate,
       final A root,
       final Consumer<ColumnValues<R>> rootColumns,
-      final ChildRows<R, ?>... childRows) {
+      final ChildRows<?>... childRows) {
     requireTransaction();
-    final List<ChildRows<?, ?>> rows = inDeclaredOrder(aggregate, Arrays.asList(childRows));
+    final List<ChildRows<?>> rows = inDeclaredOrder(aggregate, Arrays.asList(childRows));
     final long id = insertRoot(aggregate, aggregate.keyOf(root), rootColumns);
-    for (final ChildRows<?, ?> childRow : rows) {
+    for (final ChildRows<?> childRow : rows) {
       children.insertAll(id, childRow);
     }
   }
@@ -102,12 +101,11 @@ public class TableWriter {
    * @throws ConflictException 更新件数が 0 で一意の列の行がある場合（種類は {@code VERSION}）、一意制約に違反した場合（種類は {@code
    *     UNIQUE}）、行ロックを {@code lock_timeout} までに取れない場合（種類は {@code LOCK}）。原因は持たない
    */
-  @SafeVarargs
-  public final <R extends Record, K, A extends Versioned> void update(
+  public <R extends Record, K, A extends Versioned> void update(
       final AggregateTable<R, K, A> aggregate,
       final A root,
       final Consumer<ColumnValues<R>> rootColumns,
-      final ChildRows<R, ?>... childRows) {
+      final ChildRows<?>... childRows) {
     requireTransaction();
     final K key = aggregate.keyOf(root);
     final long expectedLockNo = root.lockNo();
@@ -119,7 +117,7 @@ public class TableWriter {
               + ", expectedLockNo="
               + expectedLockNo);
     }
-    final List<ChildRows<?, ?>> rows = inDeclaredOrder(aggregate, Arrays.asList(childRows));
+    final List<ChildRows<?>> rows = inDeclaredOrder(aggregate, Arrays.asList(childRows));
     final ColumnValues<R> values = collect(aggregate, rootColumns);
     final Field<Long> lockNo =
         CommonColumns.requiredField(table, CommonColumns.LOCK_NO, Long.class);
@@ -137,7 +135,7 @@ public class TableWriter {
             target);
     requireOneRow(updated, aggregate, key, target);
     final long id = updated.getFirst().value1();
-    for (final ChildRows<?, ?> childRow : rows) {
+    for (final ChildRows<?> childRow : rows) {
       children.replace(id, childRow);
     }
   }
@@ -190,17 +188,17 @@ public class TableWriter {
   }
 
   /** 渡された子の行を宣言の順に並べ、宣言した子と過不足がないことを SQL の前に確かめる。 */
-  private static List<ChildRows<?, ?>> inDeclaredOrder(
-      final AggregateTable<?, ?, ?> aggregate, final List<ChildRows<?, ?>> given) {
-    for (final ChildRows<?, ?> rows : given) {
+  private static List<ChildRows<?>> inDeclaredOrder(
+      final AggregateTable<?, ?, ?> aggregate, final List<ChildRows<?>> given) {
+    for (final ChildRows<?> rows : given) {
       if (!aggregate.children().contains(rows.child())) {
         throw new IllegalArgumentException(
             "child is not declared by the aggregate: table=" + rows.child().table().getName());
       }
     }
-    final List<ChildRows<?, ?>> ordered = new ArrayList<>();
-    for (final ChildTable<?, ?> child : aggregate.children()) {
-      final List<ChildRows<?, ?>> matched =
+    final List<ChildRows<?>> ordered = new ArrayList<>();
+    for (final ChildTable<?> child : aggregate.children()) {
+      final List<ChildRows<?>> matched =
           given.stream().filter(rows -> child.equals(rows.child())).toList();
       if (matched.isEmpty()) {
         throw new IllegalArgumentException(

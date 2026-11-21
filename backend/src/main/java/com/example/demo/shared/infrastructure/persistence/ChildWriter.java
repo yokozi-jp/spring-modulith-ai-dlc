@@ -40,8 +40,7 @@ import org.jspecify.annotations.Nullable;
   }
 
   /** 新しい集約の子の全行を、1 文の複数行の INSERT で書く。 */
-  /* package */ <R extends Record, C extends Record> void insertAll(
-      final long rootId, final ChildRows<R, C> rows) {
+  /* package */ <C extends Record> void insertAll(final long rootId, final ChildRows<C> rows) {
     insertChildren(rows.child(), rootId, List.copyOf(rows.rows().values()));
   }
 
@@ -50,9 +49,8 @@ import org.jspecify.annotations.Nullable;
    *
    * @throws IllegalStateException 残る子の更新が 1 行でない場合
    */
-  /* package */ <R extends Record, C extends Record> void replace(
-      final long rootId, final ChildRows<R, C> rows) {
-    final ChildTable<R, C> child = rows.child();
+  /* package */ <C extends Record> void replace(final long rootId, final ChildRows<C> rows) {
+    final ChildTable<C> child = rows.child();
     final Map<List<Object>, ColumnValues<C>> desired = rows.rows();
     final Set<List<Object>> stored =
         new LinkedHashSet<>(
@@ -77,8 +75,8 @@ import org.jspecify.annotations.Nullable;
   }
 
   /** なくなった子を、自然キーの組で削除する。 */
-  private <R extends Record, C extends Record> void deleteChildren(
-      final ChildTable<R, C> child, final long rootId, final List<List<Object>> removed) {
+  private <C extends Record> void deleteChildren(
+      final ChildTable<C> child, final long rootId, final List<List<Object>> removed) {
     final Table<C> table = child.table();
     final Condition removedKeys =
         DSL.or(removed.stream().map(naturalKey -> naturalKeyCondition(child, naturalKey)).toList());
@@ -92,8 +90,8 @@ import org.jspecify.annotations.Nullable;
    *
    * <p>ponytail: 上限：子の行の UPDATE は 1 行ずつ実行する。子が多い集約が出たら、バッチにして件数の配列で 1 件ずつを確かめる。
    */
-  private <R extends Record, C extends Record> void updateChild(
-      final ChildTable<R, C> child,
+  private <C extends Record> void updateChild(
+      final ChildTable<C> child,
       final long rootId,
       final List<Object> naturalKey,
       final ColumnValues<C> row) {
@@ -124,8 +122,8 @@ import org.jspecify.annotations.Nullable;
   }
 
   /** 新しい子を、1 文の複数行の INSERT で書く。 */
-  private <R extends Record, C extends Record> void insertChildren(
-      final ChildTable<R, C> child, final long rootId, final List<ColumnValues<C>> added) {
+  private <C extends Record> void insertChildren(
+      final ChildTable<C> child, final long rootId, final List<ColumnValues<C>> added) {
     if (added.isEmpty()) {
       return;
     }
@@ -158,8 +156,8 @@ import org.jspecify.annotations.Nullable;
   }
 
   /** 自然キーの値の組に合う行の条件。 */
-  private static <R extends Record, C extends Record> Condition naturalKeyCondition(
-      final ChildTable<R, C> child, final List<Object> naturalKey) {
+  private static <C extends Record> Condition naturalKeyCondition(
+      final ChildTable<C> child, final List<Object> naturalKey) {
     final Map<Field<?>, Object> equalities = new LinkedHashMap<>();
     for (int i = 0; i < naturalKey.size(); i++) {
       equalities.put(child.naturalKey().get(i), naturalKey.get(i));

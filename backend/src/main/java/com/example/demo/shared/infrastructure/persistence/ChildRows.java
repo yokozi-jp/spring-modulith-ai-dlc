@@ -18,27 +18,26 @@ import org.jooq.Record;
  * <p>行の不備（自然キーが {@code null} か重複する、行ごとに書く列が違う）は、{@link ChildTable#rows} が SQL を実行する前に {@link
  * IllegalArgumentException} にする。
  *
- * @param <R> 集約ルートのテーブルの Record の型
  * @param <C> 子のテーブルの Record の型
  */
 // 宣言を読むアクセサ（child()、rows()）はフィールドと同名にし、static factory の名前を of にする。
 @SuppressWarnings({"PMD.AvoidFieldNameMatchingMethodName", "PMD.ShortMethodName"})
-public final class ChildRows<R extends Record, C extends Record> {
+public final class ChildRows<C extends Record> {
 
   /** 子の宣言。 */
-  private final ChildTable<R, C> child;
+  private final ChildTable<C> child;
 
   /** 子の全行。自然キーの値の組で引く。行の順を保つ。 */
   private final Map<List<Object>, ColumnValues<C>> rows;
 
-  private ChildRows(final ChildTable<R, C> child, final Map<List<Object>, ColumnValues<C>> rows) {
+  private ChildRows(final ChildTable<C> child, final Map<List<Object>, ColumnValues<C>> rows) {
     this.child = child;
     this.rows = rows;
   }
 
   /** 子の行を作り、自然キーの値の組で引く形にして検査する。 */
-  /* package */ static <R extends Record, C extends Record, T> ChildRows<R, C> of(
-      final ChildTable<R, C> child,
+  /* package */ static <C extends Record, T> ChildRows<C> of(
+      final ChildTable<C> child,
       final Collection<? extends T> items,
       final BiConsumer<? super T, ColumnValues<C>> columns) {
     // 一つの保存の呼び出しの間だけ、一つのスレッドで使う。
@@ -65,7 +64,7 @@ public final class ChildRows<R extends Record, C extends Record> {
   }
 
   private static <C extends Record, T> ColumnValues<C> newRow(
-      final ChildTable<?, C> child,
+      final ChildTable<C> child,
       final BiConsumer<? super T, ColumnValues<C>> columns,
       final T item) {
     final ColumnValues<C> row = new ColumnValues<>(child.table(), List.of(child.parentKey()));
@@ -73,7 +72,7 @@ public final class ChildRows<R extends Record, C extends Record> {
     return row;
   }
 
-  /* package */ ChildTable<R, C> child() {
+  /* package */ ChildTable<C> child() {
     return child;
   }
 

@@ -19,18 +19,10 @@ import org.jooq.TableField;
  * <p>親の中で行を同定する自然キー（{@code line_no} など）と、親の内部の主キーを持つ外部キーの列を持つ。{@link TableWriter}
  * は、子の書き込みのたびに外部キーの列の条件を自分で付けるため、親の条件を書き忘れた子の書き込みは書けない。
  *
- * @param <R> 親（集約ルート）のテーブルの Record の型。定数には、親の型を明示して宣言する。{@link AggregateTable#of} と {@link
- *     TableWriter} の入口は、同じ型の子と子の行だけを受け取る
- *     ので、別の集約の定数や、別の集約の子の行を渡すとコンパイルで失敗する。外部キーの列が親を指すことは、この型では確かめられない
  * @param <C> 子のテーブルの Record の型
  */
-// R は実行時に使わず、型の検査のためだけにある。
-@SuppressWarnings({
-  "UnusedTypeParameter",
-  "PMD.AvoidFieldNameMatchingMethodName",
-  "PMD.ShortMethodName"
-})
-public final class ChildTable<R extends Record, C extends Record> {
+@SuppressWarnings({"PMD.AvoidFieldNameMatchingMethodName", "PMD.ShortMethodName"})
+public final class ChildTable<C extends Record> {
 
   /** 自然キーに使える型。{@code BigDecimal} の桁数や {@code Instant} の精度の違いで、保存済みの値と一致しなくなる型は使えない。 */
   private static final Set<Class<?>> COMPARABLE_TYPES =
@@ -64,7 +56,7 @@ public final class ChildTable<R extends Record, C extends Record> {
    * @throws IllegalArgumentException テーブルに共通カラムがない場合
    */
   @SafeVarargs
-  public static <R extends Record, C extends Record> ChildTable<R, C> of(
+  public static <C extends Record> ChildTable<C> of(
       final Table<C> table,
       final TableField<C, Long> parentKey,
       final TableField<C, ?> firstKey,
@@ -84,7 +76,7 @@ public final class ChildTable<R extends Record, C extends Record> {
    * @param columns 業務の値から子の列の値を作る。自然キーの列も書く。親の外部キーと共通カラムは書けない
    * @throws IllegalArgumentException 自然キーが {@code null} か重複する場合、行ごとに書く列が違う場合、書けない列を渡した場合
    */
-  public <T> ChildRows<R, C> rows(
+  public <T> ChildRows<C> rows(
       final Collection<? extends T> items, final BiConsumer<? super T, ColumnValues<C>> columns) {
     return ChildRows.of(this, items, columns);
   }

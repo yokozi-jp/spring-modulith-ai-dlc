@@ -50,9 +50,8 @@ PostgreSQL の READ COMMITTED では、後の UPDATE は先の UPDATE のコミ�
   `AggregateTable<R, K, A>` は、ルートのテーブル、ルートを一つに決める一意の列（`public_id` など）、集約ルートからその列の値を取る関数、内部の主キー、子のテーブルを持つ。
   `A` は集約ルートのクラス（`Versioned` を実装する）で、`insert` と `update` が受け取る集約ルートの型になる。
   一意の列の値は関数で集約ルートから取るため、呼び出し側が別の集約ルートの値と組にして渡す誤りは書けない。
-  `ChildTable<R, C>` は、子のテーブル、親の内部の主キーを持つ外部キーの列、親の中で行を同定する自然キーの列（一つ以上）を持つ。
-  `ChildTable` の `R` はルートのテーブルの型で、`AggregateTable<R, K, A>` と `TableWriter` の入口（`insert`、`update`）は、同じ `R` の子と子の行（`ChildRows<R, ?>`）だけを受け取る。
-  子の定数に親の型を明示して宣言すれば、別の集約のために型を付けた定数を使い回す誤りと、別の集約の子の行を渡す誤りは、コンパイルで失敗する。
+  `ChildTable<C>` は、子のテーブル、親の内部の主キーを持つ外部キーの列、親の中で行を同定する自然キーの列（一つ以上）を持つ。
+  `ChildTable` はどの集約の子かを型に持たない。`TableWriter` は、渡された子の行が宣言した子と過不足なく合うことを、SQL の前に実行時に確かめる（`IllegalArgumentException`）。
   子の自然キーの列は、保存済みの値と `equals` で比べるため、`Integer`、`Long`、`Short`、`String`、`UUID` に限る。
   宣言は構造と、ルートを一つに決める値の取り方（`keyOf`）だけを持ち、業務の値から列への変換は、保存のたびに渡すラムダが持つ。
   Repository は、保存のたびにルートの列の値と、保存後にあるべき子の全行（`ChildRows`）を渡す。
@@ -157,7 +156,7 @@ PostgreSQL の READ COMMITTED では、後の UPDATE は先の UPDATE のコミ�
 - 期待する版は集約ルートのクラス（`AggregateTable` の `A`）から読むため、テーブルから読み直した版や、版を返すラムダを渡す誤りは書けない。集約ルートを作り直して渡す誤りは、型では止まらない。
 - jOOQ の INSERT と UPDATE を含む書き込みの API、Spring JDBC、JDBC と、接続の元を受け取るライブラリを `TableWriter` の外で使うと、テスト（ArchUnit）で失敗する。
   禁止の一覧は、テストで固定した jOOQ の版の API で見直してある。
-  別のテーブルの列、型の違う値、別の集約の型を付けた子の定数の使い回しと、別の集約の子の行は、コンパイルで失敗する。
+  別のテーブルの列と型の違う値は、コンパイルで失敗する。別の集約の子の行は、宣言した子と合わないため、SQL の前に `IllegalArgumentException` になる。
 - 競合と行なしの判定は `TableWriter` の実 PostgreSQL のテストに集まり、Repository のテストは列と集約の往復と子の行の差分だけを確かめる。
 - 更新と削除の Command に `VersionedCommand` の実装忘れ、`ensureLockNo` の呼び忘れ、`ExpectedLockNo` の偽造があると、ArchUnit で失敗する。
 - 競合の例外が一つになり、集約ごとに例外を作らなくてよい。
@@ -179,7 +178,7 @@ PostgreSQL の READ COMMITTED では、後の UPDATE は先の UPDATE のコミ�
   - **子の宣言の外部キーの列の誤り**：`ChildTable.of` は、親の外部キーの列の型が `Long` であることしか確かめない。
     生成された jOOQ のコードが FOREIGN KEY の情報を持つのは tenancy のテーブルだけである（`021-add-tenancy-foreign-keys.yaml`）。
     ordering の `fk_t_order_line` は、テナントの公開 ID と注文の内部の主キーの複合キーで、`ChildTable` の `parentKey`（`Long` の 1 列）とは形が違う。
-    `R` は型の印であり、`parentKey` の列が `R` のテーブルを指すかは、制約のあるテーブルでも確かめない。別の集約の列を渡してもコンパイルは通る。
+    `parentKey` の列が親のテーブルを指すかは、制約のあるテーブルでも確かめない。別の集約の列を渡してもコンパイルは通る。
     各集約の `AggregateTable` を通した保存、更新の往復のテストで確かめる。
   - **集約ルートの形を外れた集約**：規則は、`domain.model` にあり `Versioned` を実装する型を集約ルートとみなす。
     Repository の `add`、`update`、`delete` の引数はこの形を検査する。

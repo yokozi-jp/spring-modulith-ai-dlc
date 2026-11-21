@@ -36,14 +36,14 @@ public final class AggregateTable<R extends Record, K, A extends Versioned> {
   private final TableField<R, Long> id;
 
   /** 子のテーブル。 */
-  private final List<ChildTable<R, ?>> children;
+  private final List<ChildTable<?>> children;
 
   private AggregateTable(
       final Table<R> table,
       final TableField<R, K> key,
       final Function<A, K> keyOf,
       final TableField<R, Long> id,
-      final List<ChildTable<R, ?>> children) {
+      final List<ChildTable<?>> children) {
     this.table = table;
     this.key = key;
     this.keyOf = keyOf;
@@ -62,13 +62,12 @@ public final class AggregateTable<R extends Record, K, A extends Versioned> {
    * @param children 子のテーブル。なければ省く
    * @throws IllegalArgumentException テーブルに共通カラムがない場合
    */
-  @SafeVarargs
   public static <R extends Record, K, A extends Versioned> AggregateTable<R, K, A> of(
       final Table<R> table,
       final TableField<R, K> key,
       final Function<A, K> keyOf,
       final TableField<R, Long> id,
-      final ChildTable<R, ?>... children) {
+      final ChildTable<?>... children) {
     CommonColumns.requireAuditColumns(table);
     return new AggregateTable<>(table, key, keyOf, id, List.of(children));
   }
@@ -89,7 +88,7 @@ public final class AggregateTable<R extends Record, K, A extends Versioned> {
     return id;
   }
 
-  /* package */ List<ChildTable<R, ?>> children() {
+  /* package */ List<ChildTable<?>> children() {
     return children;
   }
 }

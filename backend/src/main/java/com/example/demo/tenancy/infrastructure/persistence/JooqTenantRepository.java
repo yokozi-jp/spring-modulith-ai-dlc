@@ -29,7 +29,7 @@ import org.springframework.stereotype.Repository;
 class JooqTenantRepository implements TenantRepository {
 
   /** テナントの所属。親の中の行は、利用者の内部の主キーで同定する（所属は利用者とテナントの組が一意）。 */
-  private static final ChildTable<MTenantRecord, MMembershipRecord> MEMBERSHIPS =
+  private static final ChildTable<MMembershipRecord> MEMBERSHIPS =
       ChildTable.of(M_MEMBERSHIP, M_MEMBERSHIP.TENANT_ID, M_MEMBERSHIP.USER_ID);
 
   /** テナントの集約。ルートは公開 ID で一つに決める。 */

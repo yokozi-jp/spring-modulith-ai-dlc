@@ -26,7 +26,7 @@ class AggregateDeclarationsTest {
     for (final Field field : aggregateTableFields()) {
       field.setAccessible(true);
       final AggregateTable<?, ?, ?> aggregate = (AggregateTable<?, ?, ?>) field.get(null);
-      for (final ChildTable<?, ?> child : aggregate.children()) {
+      for (final ChildTable<?> child : aggregate.children()) {
         declared.add(child.table().getName());
       }
     }

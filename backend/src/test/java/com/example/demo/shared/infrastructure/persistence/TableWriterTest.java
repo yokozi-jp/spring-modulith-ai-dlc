@@ -186,9 +186,8 @@ class TableWriterTest {
         .as("集約")
         .isInstanceOf(IllegalArgumentException.class)
         .hasMessageContaining("column=lock_no");
-    assertThatThrownBy(() ->
-            ChildTable.<Record, Record>of(
-                NO_LOCK_TABLE, FIXTURE_ITEM.ITEM_ID, FIXTURE_ITEM.ITEM_ID))
+    assertThatThrownBy(
+            () -> ChildTable.<Record>of(NO_LOCK_TABLE, FIXTURE_ITEM.ITEM_ID, FIXTURE_ITEM.ITEM_ID))
         .as("子")
         .isInstanceOf(IllegalArgumentException.class)
         .hasMessageContaining("column=lock_no");
@@ -198,7 +197,7 @@ class TableWriterTest {
   @DisplayName("自然キーに、保存済みの値と equals で比べられない型の列は使えない")
   void incomparableNaturalKeyTypeIsRejected() {
     assertThatThrownBy(() ->
-            ChildTable.<Record, Record>of(
+            ChildTable.<Record>of(
                 FIXTURE_ITEM_DETAIL, FIXTURE_ITEM_DETAIL.ITEM_ID, FIXTURE_ITEM_DETAIL.CREATED_AT))
         .isInstanceOf(IllegalArgumentException.class)
         .hasMessageContaining("natural key column must be");
@@ -457,7 +456,7 @@ class TableWriterTest {
   @Test
   @DisplayName("子の自然キーが一意制約で裏づけられず、残す子の更新が 2 行に合えば IllegalStateException を投げる")
   void childNaturalKeyMatchingTwoRowsIsRejected() {
-    final ChildTable<Record, Record> byText =
+    final ChildTable<Record> byText =
         ChildTable.of(
             FIXTURE_ITEM_DETAIL, FIXTURE_ITEM_DETAIL.ITEM_ID, FIXTURE_ITEM_DETAIL.DETAIL_TEXT);
     final AggregateTable<Record, Long, Item> aggregate =
