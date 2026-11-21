@@ -1,5 +1,45 @@
 # Changelog
 
+## [0.13.0](https://github.com/yokozi-jp/spring-modulith-ai-dlc/compare/v0.12.0...v0.13.0) (2026-11-21)
+
+
+### Features
+
+* **agents:** adopt RGDD with pstack and thermos for Kiro ([#365](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/365)) ([13916d9](https://github.com/yokozi-jp/spring-modulith-ai-dlc/commit/13916d9353dca36dc55247a2475938dfd4fa81c0))
+* **agents:** 隔離したスタックでアプリを操作して証拠を残す検証スキル verify-demo を加える ([#496](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/496)) ([dadc26f](https://github.com/yokozi-jp/spring-modulith-ai-dlc/commit/dadc26f640e3cd21c57f490ef4a079bc27291573))
+* **api:** docs/web-api の規約のうち lint が見ていないものを Spectral の規則に足す ([#503](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/503)) ([18193c5](https://github.com/yokozi-jp/spring-modulith-ai-dlc/commit/18193c54356e1d9a8d80b16c3fd53c9d9f6fd58f)), closes [#461](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/461)
+* **api:** openapi の契約に認証要件を書く ([#537](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/537)) ([14c15cf](https://github.com/yokozi-jp/spring-modulith-ai-dlc/commit/14c15cf971221f58593f8fb2e84967b1194c4b26)), closes [#464](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/464)
+* **backend:** テナントをリクエストとイベントの文脈に束縛する ([#547](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/547)) ([d08c4ac](https://github.com/yokozi-jp/spring-modulith-ai-dlc/commit/d08c4ac482b04a70bb3217088633e1b27c004bc7))
+* **ci:** 依存関係の脆弱性検査に dep-scan を Trivy と並べて加える ([#495](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/495)) ([386a298](https://github.com/yokozi-jp/spring-modulith-ai-dlc/commit/386a298feb1bae448f63ef7bce14cd506481c971))
+* **database:** モジュールごとの DB ロールへ切り替え、アプリロールを業務のスキーマから外す ([#441](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/441)) ([faaf0d0](https://github.com/yokozi-jp/spring-modulith-ai-dlc/commit/faaf0d049563c206c2824e0f75725ed7e2f72c6c))
+* **database:** 業務の表に tenant_public_id と RLS を入れる ([#600](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/600)) ([f3f0b7e](https://github.com/yokozi-jp/spring-modulith-ai-dlc/commit/f3f0b7ec5493ba506a2368a42fe98c3caa21fe1e)), closes [#377](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/377)
+* **frontend:** ban useEffect with a local oxlint rule ([#400](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/400)) ([3c1b20f](https://github.com/yokozi-jp/spring-modulith-ai-dlc/commit/3c1b20f9c2145b91e00fff29c94d46a20786deb5))
+* **skills:** retroとwriting-for-agentsを導入しタスクの区切りで実行する ([#220](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/220)) ([625c127](https://github.com/yokozi-jp/spring-modulith-ai-dlc/commit/625c1278451f1600fcc43babb415d6c9563962b5))
+* **skills:** 注文と決済、イベント出版の再投入、集約の保存を TLA+ で全順序検査するスキルを足す ([#502](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/502)) ([7ca0235](https://github.com/yokozi-jp/spring-modulith-ai-dlc/commit/7ca02354c8301236c63574e03a149e9684fad2e0))
+* **tenancy:** テナントの管理者が所属と役割を管理する ([#552](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/552)) ([c376b92](https://github.com/yokozi-jp/spring-modulith-ai-dlc/commit/c376b928c97af0b661d88b2160992a500fa4aeb4)), closes [#379](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/379)
+* **tenancy:** ログインの後にアプリの利用者を引き、作成者と更新者に利用者の ID を登録する ([#450](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/450)) ([66db822](https://github.com/yokozi-jp/spring-modulith-ai-dlc/commit/66db822ec92bdcf00880c8be6ddf24a1f37ec1bd))
+* **tenancy:** ログインの後にテナントを選び、選ぶ前の業務の API を 403 にする ([#507](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/507)) ([872b163](https://github.com/yokozi-jp/spring-modulith-ai-dlc/commit/872b163f2216c0930068cb382ed0430a4a4c643b))
+* **tooling:** compose-test の実行ごとに slot を取り、worktree をまたいで同時に流す ([#554](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/554)) ([63e5c9f](https://github.com/yokozi-jp/spring-modulith-ai-dlc/commit/63e5c9f840d399178e6d37b05897f771247c2c00))
+* **tooling:** エージェントの commit と push をバックグラウンドで実行し、終わりを待つ task を足す ([#393](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/393)) ([8159cd3](https://github.com/yokozi-jp/spring-modulith-ai-dlc/commit/8159cd35cbd67d557306331ee6bf66eddb0f22d3))
+
+
+### Bug Fixes
+
+* **backend:** opentelemetry の cve-2026-118259 を bom と logback appender で 1.67 系に上げて直す ([#416](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/416)) ([324de9a](https://github.com/yokozi-jp/spring-modulith-ai-dlc/commit/324de9a2b8f37c39c46674432ff5ffbf87d5a8d4))
+* **backend:** spring modulith を 2.1.2 に上げ、staleness monitor が処理中の再投入を failed に戻さないようにする ([#497](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/497)) ([56e0bf9](https://github.com/yokozi-jp/spring-modulith-ai-dlc/commit/56e0bf91076ccef87bfe464266a438ca2b5e501f))
+* **backend:** テストで OTLP のログ exporter を作らず、出力の検査が背景の ERROR で落ちないようにする ([#485](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/485)) ([45ba12f](https://github.com/yokozi-jp/spring-modulith-ai-dlc/commit/45ba12f8a9762246f6b2ff9649fd73d25904a996)), closes [#402](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/402)
+* **ci:** pin betterleaks and pass its config explicitly ([#399](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/399)) ([a0114f4](https://github.com/yokozi-jp/spring-modulith-ai-dlc/commit/a0114f4b991bda113d9a93c16d3479dfeb6dd0b9))
+* **error:** コミット前の切断の前提を直し、切断の ERROR を固定するテストを足す ([#553](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/553)) ([602d693](https://github.com/yokozi-jp/spring-modulith-ai-dlc/commit/602d6937a5a3c464a6e4dc18e2427d99ec6d71a0)), closes [#489](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/489)
+* **hooks:** backend直下のgradleファイルとdocs直下のmdをフックの対象にする ([#230](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/230)) ([9075d79](https://github.com/yokozi-jp/spring-modulith-ai-dlc/commit/9075d79cf6ec8e4fe5734d17902ced49ba931582))
+* **tooling:** ~/.profile に shims を書く理由を ~/.local/bin より前に戻すことに直す ([#524](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/524)) ([712b68a](https://github.com/yokozi-jp/spring-modulith-ai-dlc/commit/712b68a341c3355fbf099e942d25946283514889))
+* **tooling:** betterleaks の allowlist をファイル全体の除外から行単位の除外に直す ([#521](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/521)) ([c014649](https://github.com/yokozi-jp/spring-modulith-ai-dlc/commit/c014649fbb73aec6fb87160d16db4aeb51f117f2))
+* **tooling:** git commit が失敗したら、同じ内容の commit が HEAD にあっても agent-wait を成功にしない ([#470](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/470)) ([587c9af](https://github.com/yokozi-jp/spring-modulith-ai-dlc/commit/587c9afb557023209b7ae07550a3af396a1f2b75))
+* **tooling:** kiro web でも iwe の mcp サーバーを起動できるようにする ([#482](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/482)) ([3e496c6](https://github.com/yokozi-jp/spring-modulith-ai-dlc/commit/3e496c6cfee5d130d03243654b925cc043a2e9ae))
+* **tooling:** linked worktree で npm ci と lefthook run が共有のフックを書き換えないようにする ([#469](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/469)) ([0a2259f](https://github.com/yokozi-jp/spring-modulith-ai-dlc/commit/0a2259fc238efbbaf4965a69dbb5b9eb901762c6))
+* **tooling:** mise の shims を ~/.profile にも通し、vs code から起動した kiro に path を渡す ([#523](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/523)) ([af9bf58](https://github.com/yokozi-jp/spring-modulith-ai-dlc/commit/af9bf58847de51086494b84946d935e73384f2da))
+* **tooling:** 未 commit の変更がある間は agent-push を止める ([#606](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/606)) ([bb70c21](https://github.com/yokozi-jp/spring-modulith-ai-dlc/commit/bb70c212741fb0052b192e8c8d5899034af61a81))
+* 主キーと public_id の使い分けを規約にし、ArchUnit、カタログ、Spectral で検査する ([#405](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/405)) ([9a8d8c2](https://github.com/yokozi-jp/spring-modulith-ai-dlc/commit/9a8d8c2f2ed76f237faea84830f953d014ad5a5b))
+
 ## [0.12.0](https://github.com/yokozi-jp/spring-modulith-ai-dlc/compare/v0.11.0...v0.12.0) (2026-10-21)
 
 
