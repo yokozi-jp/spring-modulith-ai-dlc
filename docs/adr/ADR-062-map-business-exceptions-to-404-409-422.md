@@ -74,8 +74,8 @@ ADR は Proposed のままであるため、新しい ADR を起こさず、こ�
 - `23505` は、`TableWriter` の変換の入口で、原因を付けずに `Kind.UNIQUE` の `ConflictException` に変える。
   集約ルートの INSERT の入口 `TableWriter.insert` を足し、同じ変換を通す。
   `DataIntegrityViolationException` の他の違反（外部キー、NOT NULL、CHECK、排他制約）は、入力の検証か実装の誤りであるため 500 のままにする。
-- Repository の実装は、`NOWAIT` が投げる Spring の例外（`CannotAcquireLockException`、`DuplicateKeyException`）を Repository の外へ出さない。
-  外へ出すときは、原因を付けずに、種類（`Kind.LOCK` か `Kind.UNIQUE`）を付けた `ConflictException` に変えて投げる。
+- Repository の実装は、Spring の例外（`CannotAcquireLockException`、`DuplicateKeyException`）を catch して変えない。
+  書き込みの `55P03` と `23505` は、`TableWriter` が SQLSTATE で、原因を付けずに種類（`Kind.LOCK` か `Kind.UNIQUE`）を付けた `ConflictException` に変える（ADR-054）。
 - ArchUnit に 2 つの規則を足す。
   `noSuchElementExceptionIsNotThrown` は、`NoSuchElementException` の生成と引数なしの `Optional.orElseThrow()` を禁じる。
   `sharedModuleDoesNotDependOnHttp` は、`shared` から Spring Web、Spring の HTTP、Servlet の型への依存を禁じる。

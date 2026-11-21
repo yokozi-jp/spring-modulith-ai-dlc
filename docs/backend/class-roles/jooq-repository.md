@@ -400,7 +400,8 @@ Repository のテストは列と集約の往復と子の行の差分だけを確
 - [ ] 子の Entity を `multiset` で集約ルートと同じ SQL で読み、集約を `Records.mapping(Order::restore)` で作る。［自分で点検］
 - [ ] `multiset` の副問い合わせに、子を識別する列の `orderBy` を付ける（`orderBy(T_ORDER_LINE.LINE_NO)`）。［自分で点検］
 - [ ] 集約ルートの `LOCK_NO` を選び、`restore` の `lockNo` に渡す。［自分で点検］
-- [ ] 集約の形を `AggregateTable` と `ChildTable` のクラスの定数として一度だけ宣言し、子の外部キーの列に親の内部の主キーを指す列を渡す。［自分で点検（往復のテストで確かめる）］
+- [ ] 集約の形を `AggregateTable` と `ChildTable` のクラスの定数として一度だけ宣言し、子の外部キーの列に親の内部の主キーを指す列を渡す。同じ子のテーブルを別の集約で宣言しない。［テストで検査：AggregateDeclarationsTest + 自分で点検（外部キーの列は往復のテストで確かめる）］
+- [ ] Spring の例外（`CannotAcquireLockException`、`DuplicateKeyException`）を catch して `ConflictException` に変えない。［自分で点検］
 - [ ] `add` は `tableWriter.insert(...)` を呼び、ルートの列と子の全行を `ColumnValues` で渡す。`insertInto` を呼ばない。［ArchUnit で検査：TableWriterArchTest.tableWritesGoThroughTableWriter］
 - [ ] 集約ルートを受け取る `add` 以外の public メソッドは、`update` という名前で、`TableWriter.update` を、そのメソッドの中で直接呼ぶ。［ArchUnit で検査：TableWriterArchTest.repositoryUpdateCallsVersionedEntryPoint］
 - [ ] 集約ルートを `Versioned` にし、`AggregateTable` の第 3 型引数にそのクラスを指定して、`update` はその集約ルートを `TableWriter.update` に渡す（テーブルから読み直した版は渡せない）。［型で検査 + 自分で点検（`Versioned` そのものを指定しない。読み直した版で集約ルートを作り直して渡さない）］

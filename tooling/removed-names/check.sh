@@ -6,7 +6,8 @@
 set -euo pipefail
 
 dir="$(cd "$(dirname "$0")" && pwd)"
-names="${1:-$dir/names.txt}"
+# 相対パスの引数は、リポジトリの根へ移る前の位置で絶対パスにする。
+names="$(realpath "${1:-$dir/names.txt}")"
 # git grep のパスはカレントディレクトリからの相対なので、サブディレクトリからの実行でも同じ範囲を見るようにリポジトリの根へ移る。
 cd "$(git rev-parse --show-toplevel)"
 roots=(docs .agents backend/src)

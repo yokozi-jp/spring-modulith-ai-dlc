@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # test.sh: check.sh を一時のリポジトリで検査する。
-# 実行: bash tooling/removed-names/test.sh（task removed-names-check が、check.sh の前に実行する）
+# 実行: bash tooling/removed-names/test.sh（task okf-check が、removed-names-test として実行する）
 set -u
 
 dir="$(cd "$(dirname "$0")" && pwd)"

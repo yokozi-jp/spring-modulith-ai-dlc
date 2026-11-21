@@ -1,5 +1,6 @@
 package com.example.demo.shared.infrastructure.persistence;
 
+import com.example.demo.shared.concurrency.Versioned;
 import com.example.demo.shared.security.AppUserPrincipal;
 import io.micrometer.tracing.Span;
 import io.micrometer.tracing.Tracer;
@@ -102,7 +103,8 @@ public class CommonColumns {
                     ? audit.entries(table, "updated_")
                     : Stream.<Entry<Field<?>, Object>>empty(),
                 Stream.of(
-                    Map.<Field<?>, Object>entry(requiredField(table, LOCK_NO, Long.class), 1L)))
+                    Map.<Field<?>, Object>entry(
+                        requiredField(table, LOCK_NO, Long.class), Versioned.FIRST_LOCK_NO)))
             .flatMap(Function.identity()));
   }
 

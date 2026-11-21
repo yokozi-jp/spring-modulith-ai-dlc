@@ -320,7 +320,7 @@ tasks:
       - node tooling/adr-lint/adr-lint.mjs
 
   # 削除した識別子（tooling/removed-names/names.txt）が docs、.agents、backend/src に残っていないかを検査する。
-  # 規約や skill に旧名が残ると、エージェントが写して、削除した API を呼ぶ。壊れた fixture に対する自己検査（test.sh）を先に実行する。
+  # 規約や skill に旧名が残ると、エージェントが写して、削除した API を呼ぶ。自己検査（test.sh）は removed-names-test が実行する。
   removed-names-check:
     internal: true
     silent: true

@@ -52,6 +52,7 @@ PostgreSQL の READ COMMITTED では、後の UPDATE は先の UPDATE のコミ�
   一意の列の値は関数で集約ルートから取るため、呼び出し側が別の集約ルートの値と組にして渡す誤りは書けない。
   `ChildTable<C>` は、子のテーブル、親の内部の主キーを持つ外部キーの列、親の中で行を同定する自然キーの列（一つ以上）を持つ。
   `ChildTable` はどの集約の子かを型に持たない。`TableWriter` は、渡された子の行が宣言した子と過不足なく合うことを、SQL の前に実行時に確かめる（`IllegalArgumentException`）。
+  同じ子のテーブルを二つの集約の子として宣言する誤りと、子のテーブルを別の集約のルートとして宣言する誤りは、この確かめで見つからないため、`AggregateDeclarationsTest` が本番の全 Repository の宣言を調べる。
   子の自然キーの列は、保存済みの値と `equals` で比べるため、`Integer`、`Long`、`Short`、`String`、`UUID` に限る。
   宣言は構造と、ルートを一つに決める値の取り方（`keyOf`）だけを持ち、業務の値から列への変換は、保存のたびに渡すラムダが持つ。
   Repository は、保存のたびにルートの列の値と、保存後にあるべき子の全行（`ChildRows`）を渡す。

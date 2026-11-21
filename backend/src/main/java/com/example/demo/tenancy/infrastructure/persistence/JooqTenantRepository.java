@@ -79,7 +79,8 @@ class JooqTenantRepository implements TenantRepository {
     // 所属は、保存後にあるべき全行として渡す。保存済みの所属との差分は TableWriter が、ルートの行をロックした後に取る。
     // 外す所属は、集約が読んだ所属ではなく、今の行との差で決める。所属を足す処理は、同じトランザクションで m_tenant.lock_no を進めること。
     // 進めないと、読んだ後に足された行をここで消す。M_MEMBERSHIP の INSERT は TableWriter だけが書け（ArchUnit H1）、
-    // 別の集約が M_MEMBERSHIP を ChildTable として宣言する場合だけ、この前提が破れる（AggregateDeclarationsTest が検出する）。
+    // 別の集約が M_MEMBERSHIP を ChildTable かルートのテーブルとして宣言する場合だけ、この前提が破れる（AggregateDeclarationsTest
+    // が検出する）。
     final Map<UUID, Long> userIds = internalUserIds(tenant);
     tableWriter.update(
         TENANT,
