@@ -314,17 +314,17 @@ INSERTとUPDATEの共通カラムは`TableWriter`が書く。Repositoryは`Commo
   除外を足す、外す、または除外する型を移すときは、先に[ADR-054](../adr/ADR-054-detect-optimistic-lock-conflicts-by-update-count.md)の判断を変える。
   同じ変更で、`tableWritesGoThroughTableWriterRule`の完全修飾型名と、除外する型を置く適合フィクスチャ（`archfixture/conforming/shared/infrastructure/persistence/`）を更新する。
   禁止するAPIの違反フィクスチャ（`DirectOrderWriter`）は、禁止の一覧か`isDirectWrite`の判定を変えるときだけ更新する。
-- `repositoryUpdateAndDeleteCheckVersion`：`Jooq*Repository`の、集約ルートを受け取る`add`以外のpublicメソッドは、`update`という名前で、`TableWriter.update`をそのメソッドの中で直接呼ぶ。
+- `repositoryUpdateCallsVersionedEntryPoint`：`Jooq*Repository`の、集約ルートを受け取る`add`以外のpublicメソッドは、`update`という名前で、`TableWriter.update`をそのメソッドの中で直接呼ぶ。
   名前で対象を選ばないため、`save`のような名前のメソッドも検出する。
   `TableWriter`には`delete`の入口がないため、`delete`も検出する。必要になったら[ADR-054](../adr/ADR-054-detect-optimistic-lock-conflicts-by-update-count.md)を更新して入口を足す。
   期待する版は`TableWriter.update`が、受け取った集約ルート（`Versioned`）の`lockNo()`から読むため、`lockNo()`の呼び出しは求めない。
-  テーブルから読み直した版を期待する版に渡す書き方は、`AggregateTable`の型引数`A`に集約ルートのクラスを指定すれば、型で書けない（`Versioned`そのものを指定してラムダを渡す書き方は、レビューで見る）。
+  テーブルから読み直した版を期待する版に渡す書き方は、`AggregateTable`の型引数`A`に集約ルートのクラスを指定すれば、型で書けない（`Versioned`そのものを指定してラムダを渡す書き方と、読み直した版で集約ルートを作り直して渡す書き方は、レビューで見る）。
 - `repositoryWritesTakeVersionedAggregates`：`domain.model`の`*Repository`インタフェースの`add`、`update`、`delete`は、集約ルートを一つだけ受け取る。
   集約ルートが`Versioned`を実装しないと、ほかの規則が集約ルートを見つけられず空のまま通るため、この規則で形を確かめる。
   必須の`add`を対象に含めるため、`save`のような名前で保存するRepositoryでも、`Versioned`を実装しない集約は`add`で検出される。
 - R1とR2は、`domain.model`の`*Repository`の`add`以外の書き込みを同じ判定で見つける。
   書き込みは、`update`、`delete`と、集約ルートを受け取るメソッドである。
-  `repositoryUpdateAndDeleteCheckVersion`と同じく集約ルートの引数で選ぶため、`save`のような別名でも規則を外れない。
+  `repositoryUpdateCallsVersionedEntryPoint`と同じく集約ルートの引数で選ぶため、`save`のような別名でも規則を外れない。
 - `commandsBuiltByPresentationForWritesAreVersioned`（R1）：`.presentation.`のクラスが作ったCommandを`handle`で受け取り、Repositoryの`add`以外の書き込みを呼ぶ`*CommandHandler`は、そのCommandが`VersionedCommand`を実装する。
   作るとは、コンストラクタの呼び出し、コンストラクタ参照、Command自身を返すstatic factoryの呼び出しとメソッド参照のどれかである。
   RequestとListenerの両方が作るCommandは、Request用とListener用に分ける。

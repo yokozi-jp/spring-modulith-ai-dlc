@@ -112,13 +112,14 @@ TLC の結果は `/statechart` スキルで読む。
 4. 確かめたコミットの完全なハッシュを、同期の記録に書く。
    関わるかのコマンドは、同期の記録のハッシュを読むため、直さなくてよい。
    確かめていないコミットへ進めない。
-5. Pull Request の中で同期コミットを進めるときは、Pull Request の最後のコード変更のコミットを書く。
-   squash merge の後はそのコミットが main に残らず、関わるかのコマンドが「bad revision」で失敗する。
-   merge の後に、main のコミットでモデルがコードを写すと確かめ直して進める。
+5. Pull Request の中でモデルとコードを一緒に変えるときは、Pull Request の土台にした main のコミット（`git merge-base HEAD origin/main`）を書く。
+   Pull Request の中のコミットは squash merge の後に main に残らず、関わるかのコマンドが「bad revision」で失敗し、`task formal-verify` が main で落ちる。
+   このとき、関わるかのコマンドは Pull Request の変更を差分に出す。
+   モデルはその変更と一緒に確かめ済みなので、読んで一致を確かめたら、merge の後の main のコミットへ進めてよい。
 6. スキルを直したら、[スキルの取得元と更新](skill-sources.md)の「このリポジトリで書くスキルを記録する」に従って `skills-lock.json` の `computedHash` を直す。
 
 `task formal-verify` は、各スキルの同期コミットが `HEAD` の祖先として解決できることも `tooling/formal-verify/sync-check.sh` で検査する。
-squash merge の後に、Pull Request の中で書いた同期コミットが消えると、この検査が失敗し、main のコミットへ進めさせる。
+Pull Request の中のコミットを書いたまま squash merge すると、この検査が失敗する。main のコミットを書いて防ぐ。
 
 CI の `formal-verify.yml` はモデルを自分の期待に照らして検査するだけで、コードとモデルのずれは検出しない。
 ずれの検出は、この手順の「関わるか」のコマンドによる手作業である。

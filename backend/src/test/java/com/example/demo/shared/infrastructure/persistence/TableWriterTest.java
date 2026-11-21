@@ -5,6 +5,8 @@ import static com.example.demo.jooq.tables.FixtureItemTable.FIXTURE_ITEM;
 import static com.example.demo.shared.infrastructure.persistence.FixtureAggregates.DETAILS;
 import static com.example.demo.shared.infrastructure.persistence.FixtureAggregates.ITEM;
 import static com.example.demo.shared.infrastructure.persistence.FixtureAggregates.ITEM_ONLY;
+import static com.example.demo.shared.infrastructure.persistence.FixtureAggregates.detail;
+import static com.example.demo.shared.infrastructure.persistence.FixtureAggregates.detailRows;
 import static com.example.demo.shared.infrastructure.persistence.FixtureAggregates.itemRoot;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
@@ -12,6 +14,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.example.demo.shared.concurrency.ConflictException;
 import com.example.demo.shared.failure.NotFoundException;
+import com.example.demo.shared.infrastructure.persistence.FixtureAggregates.Detail;
 import com.example.demo.shared.infrastructure.persistence.FixtureAggregates.Item;
 import com.example.demo.testkit.DatabaseTest;
 import com.example.demo.testkit.FixtureTablesExtension;
@@ -34,6 +37,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.DataAccessException;
@@ -156,9 +160,8 @@ class TableWriterTest {
     final AggregateTable<Record, String, Item> byName =
         AggregateTable.of(FIXTURE_ITEM, FIXTURE_ITEM.ITEM_NAME, Item::name, FIXTURE_ITEM.ITEM_ID);
 
-    assertThatThrownBy(() ->
-            runInUseCase(
-                () -> writer.update(byName, new Item(1L, "same", 1L), set -> {}, rows -> {})))
+    assertThatThrownBy(
+            () -> runInUseCase(() -> writer.update(byName, new Item(1L, "same", 1L), set -> {})))
         .isInstanceOf(IllegalStateException.class)
         .hasMessageContaining("matched 2 rows");
   }
@@ -289,12 +292,11 @@ class TableWriterTest {
   }
 
   @Test
-  @DisplayName("子を渡さない、同じ子を二度渡す、自然キーが重複か null、行ごとに書く列が違う呼び出しは IllegalArgumentException にする")
-  void invalidChildRowsAreRejected() {
+  @DisplayName("子を渡さない、同じ子を二度渡す呼び出しは SQL の前に IllegalArgumentException にする")
+  void unmatchedChildRowsAreRejected() {
     insertItem(1L, "root");
 
-    assertThatThrownBy(
-            () -> runInUseCase(() -> writer.update(ITEM, itemRoot(1L, 1L), set -> {}, rows -> {})))
+    assertThatThrownBy(() -> runInUseCase(() -> writer.update(ITEM, itemRoot(1L, 1L), set -> {})))
         .as("子を渡さない")
         .isInstanceOf(IllegalArgumentException.class)
         .hasMessageContaining("child rows were not put");
@@ -304,47 +306,35 @@ class TableWriterTest {
                     ITEM,
                     itemRoot(1L, 1L),
                     set -> {},
-                    rows ->
-                        rows.put(DETAILS, List.of(), (n, set) -> {})
-                            .put(DETAILS, List.of(), (n, set) -> {}))))
+                    detailRows(List.of()),
+                    detailRows(List.of()))))
         .as("二度渡す")
         .isInstanceOf(IllegalArgumentException.class)
         .hasMessageContaining("put twice");
-    assertThatThrownBy(() ->
-            runInUseCase(() -> save(1L, 1L, set -> {}, List.of(detail(5, "a"), detail(5, "b")))))
+  }
+
+  @Test
+  @DisplayName("自然キーが重複か null、行ごとに書く列が違う子の行は、作るときに IllegalArgumentException にする")
+  void invalidChildRowsAreRejected() {
+    assertThatThrownBy(() -> detailRows(List.of(detail(5, "a"), detail(5, "b"))))
         .as("自然キーの重複")
         .isInstanceOf(IllegalArgumentException.class)
         .hasMessageContaining("natural key is duplicated");
     assertThatThrownBy(() ->
-            runInUseCase(() ->
-                writer.update(
-                    ITEM,
-                    itemRoot(1L, 1L),
-                    set -> {},
-                    rows ->
-                        rows.put(
-                            DETAILS,
-                            List.of(detail(1, "a"), detail(2, "b")),
-                            (d, set) -> {
-                              set.set(FIXTURE_ITEM_DETAIL.DETAIL_NO, d.number());
-                              if (d.number() == FIRST_DETAIL) {
-                                set.set(FIXTURE_ITEM_DETAIL.DETAIL_TEXT, d.text());
-                              }
-                            }))))
+            DETAILS.rows(
+                List.of(detail(1, "a"), detail(2, "b")),
+                (d, set) -> {
+                  set.set(FIXTURE_ITEM_DETAIL.DETAIL_NO, d.number());
+                  if (d.number() == FIRST_DETAIL) {
+                    set.set(FIXTURE_ITEM_DETAIL.DETAIL_TEXT, d.text());
+                  }
+                }))
         .as("行ごとに書く列が違う")
         .isInstanceOf(IllegalArgumentException.class)
         .hasMessageContaining("child rows must set the same columns");
     assertThatThrownBy(() ->
-            runInUseCase(() ->
-                writer.update(
-                    ITEM,
-                    itemRoot(1L, 1L),
-                    set -> {},
-                    rows ->
-                        rows.put(
-                            DETAILS,
-                            List.of("x"),
-                            (text, set) -> set.set(FIXTURE_ITEM_DETAIL.DETAIL_TEXT, text)))))
+            DETAILS.rows(
+                List.of("x"), (text, set) -> set.set(FIXTURE_ITEM_DETAIL.DETAIL_TEXT, text)))
         .as("自然キーを書かない")
         .isInstanceOf(IllegalArgumentException.class)
         .hasMessageContaining("natural key must be a non-null value");
@@ -358,13 +348,7 @@ class TableWriterTest {
             ITEM,
             itemRoot(1L, 1L),
             set -> set.set(FIXTURE_ITEM.ITEM_NAME, "new"),
-            rows ->
-                rows.put(
-                    DETAILS,
-                    List.of(detail(1, "one"), detail(2, "two")),
-                    (d, set) ->
-                        set.set(FIXTURE_ITEM_DETAIL.DETAIL_NO, d.number())
-                            .set(FIXTURE_ITEM_DETAIL.DETAIL_TEXT, d.text()))));
+            detailRows(List.of(detail(1, "one"), detail(2, "two")))));
 
     final Record row = item(1L);
     assertThat(row.get(FIXTURE_ITEM.ITEM_NAME)).isEqualTo("new");
@@ -383,17 +367,13 @@ class TableWriterTest {
                     ITEM_ONLY,
                     itemRoot(1L, 1L),
                     set -> set.set(FIXTURE_ITEM.ITEM_NAME, "x"),
-                    rows -> rows.put(DETAILS, List.of(), (d, set) -> {}))))
+                    detailRows(List.of()))))
         .as("子を宣言していない集約に子")
         .isInstanceOf(IllegalArgumentException.class)
         .hasMessageContaining("child is not declared by the aggregate");
     assertThatThrownBy(() ->
             runInUseCase(() ->
-                writer.insert(
-                    ITEM,
-                    itemRoot(1L, 1L),
-                    set -> set.set(FIXTURE_ITEM.ITEM_NAME, "x"),
-                    rows -> {})))
+                writer.insert(ITEM, itemRoot(1L, 1L), set -> set.set(FIXTURE_ITEM.ITEM_NAME, "x"))))
         .as("子を宣言した集約に子を渡さない")
         .isInstanceOf(IllegalArgumentException.class)
         .hasMessageContaining("child rows were not put");
@@ -403,11 +383,7 @@ class TableWriterTest {
   @DisplayName("insert は子を宣言していない集約を、空の子で書く")
   void insertWritesRootOnlyAggregate() {
     runInUseCase(() ->
-        writer.insert(
-            ITEM_ONLY,
-            itemRoot(1L, 1L),
-            set -> set.set(FIXTURE_ITEM.ITEM_NAME, "only"),
-            rows -> {}));
+        writer.insert(ITEM_ONLY, itemRoot(1L, 1L), set -> set.set(FIXTURE_ITEM.ITEM_NAME, "only")));
 
     assertThat(item(1L).get(FIXTURE_ITEM.ITEM_NAME)).isEqualTo("only");
   }
@@ -423,8 +399,7 @@ class TableWriterTest {
                 writer.insert(
                     ITEM_ONLY,
                     itemRoot(1L, 1L),
-                    set -> set.set(FIXTURE_ITEM.ITEM_NAME, "duplicate"),
-                    rows -> {})))
+                    set -> set.set(FIXTURE_ITEM.ITEM_NAME, "duplicate"))))
         .isInstanceOf(ConflictException.class)
         .hasMessageContaining("unique key already exists")
         .hasMessageContaining("table=t_fixture_item")
@@ -446,8 +421,7 @@ class TableWriterTest {
                     set ->
                         set.set(
                             FIXTURE_ITEM.ITEM_NAME,
-                            DSL.field(DSL.select(FIXTURE_ITEM.ITEM_NAME).from(FIXTURE_ITEM))),
-                    rows -> {})))
+                            DSL.field(DSL.select(FIXTURE_ITEM.ITEM_NAME).from(FIXTURE_ITEM))))))
         .isInstanceOf(DataAccessException.class)
         .isNotInstanceOf(ConflictException.class)
         .rootCause()
@@ -455,39 +429,55 @@ class TableWriterTest {
             SQLException.class, sql -> assertThat(sql.getSQLState()).isEqualTo("21000"));
   }
 
-  @Test
+  @ParameterizedTest(name = "読み取り専用={0}、insert={1}")
+  @CsvSource({"false, true", "false, false", "true, true", "true, false"})
   @DisplayName("トランザクションの外と、読み取り専用のトランザクションでは、書き込みを SQL の前に拒否する")
-  void writesRequireReadWriteTransaction() {
-    final TransactionTemplate outside = new TransactionTemplate(transactionManager);
-    outside.setPropagationBehavior(TransactionDefinition.PROPAGATION_NOT_SUPPORTED);
-    final TransactionTemplate readOnly = new TransactionTemplate(transactionManager);
-    readOnly.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
-    readOnly.setReadOnly(true);
+  void writesRequireReadWriteTransaction(final boolean readOnlyTransaction, final boolean insert) {
+    final TransactionTemplate template = new TransactionTemplate(transactionManager);
+    template.setPropagationBehavior(
+        readOnlyTransaction
+            ? TransactionDefinition.PROPAGATION_REQUIRES_NEW
+            : TransactionDefinition.PROPAGATION_NOT_SUPPORTED);
+    template.setReadOnly(readOnlyTransaction);
+    final Consumer<ColumnValues<Record>> rootColumns = set -> set.set(FIXTURE_ITEM.ITEM_NAME, "x");
 
-    for (final TransactionTemplate template : List.of(outside, readOnly)) {
-      assertThatThrownBy(() ->
-              template.executeWithoutResult(status ->
-                  runInUseCase(() ->
-                      writer.insert(
-                          ITEM_ONLY,
-                          itemRoot(1L, 1L),
-                          set -> set.set(FIXTURE_ITEM.ITEM_NAME, "x"),
-                          rows -> {}))))
-          .as("insert")
-          .isInstanceOf(IllegalStateException.class)
-          .hasMessageContaining("read-write transaction");
-      assertThatThrownBy(() ->
-              template.executeWithoutResult(status ->
-                  runInUseCase(() ->
-                      writer.update(
-                          ITEM_ONLY,
-                          itemRoot(1L, 1L),
-                          set -> set.set(FIXTURE_ITEM.ITEM_NAME, "x"),
-                          rows -> {}))))
-          .as("update")
-          .isInstanceOf(IllegalStateException.class)
-          .hasMessageContaining("read-write transaction");
-    }
+    assertThatThrownBy(() ->
+            template.executeWithoutResult(status ->
+                runInUseCase(() -> {
+                  if (insert) {
+                    writer.insert(ITEM_ONLY, itemRoot(1L, 1L), rootColumns);
+                  } else {
+                    writer.update(ITEM_ONLY, itemRoot(1L, 1L), rootColumns);
+                  }
+                })))
+        .isInstanceOf(IllegalStateException.class)
+        .hasMessageContaining("read-write transaction");
+  }
+
+  @Test
+  @DisplayName("子の自然キーが一意制約で裏づけられず、残す子の更新が 2 行に合えば IllegalStateException を投げる")
+  void childNaturalKeyMatchingTwoRowsIsRejected() {
+    final ChildTable<Record, Record> byText =
+        ChildTable.of(
+            FIXTURE_ITEM_DETAIL, FIXTURE_ITEM_DETAIL.ITEM_ID, FIXTURE_ITEM_DETAIL.DETAIL_TEXT);
+    final AggregateTable<Record, Long, Item> aggregate =
+        AggregateTable.of(
+            FIXTURE_ITEM, FIXTURE_ITEM.ITEM_ID, Item::id, FIXTURE_ITEM.ITEM_ID, byText);
+    insertItem(1L, "root");
+    insertDetail(1L, 1, "same");
+    insertDetail(1L, 2, "same");
+
+    assertThatThrownBy(() ->
+            runInUseCase(() ->
+                writer.update(
+                    aggregate,
+                    itemRoot(1L, 1L),
+                    set -> {},
+                    byText.rows(
+                        List.of("same"),
+                        (text, set) -> set.set(FIXTURE_ITEM_DETAIL.DETAIL_TEXT, text)))))
+        .isInstanceOf(IllegalStateException.class)
+        .hasMessageContaining("child natural key matched 2 rows");
   }
 
   /**
@@ -525,29 +515,12 @@ class TableWriterTest {
       final long expectedLockNo,
       final Consumer<ColumnValues<Record>> rootColumns,
       final List<Detail> details) {
-    writer.update(
-        ITEM,
-        itemRoot(itemId, expectedLockNo),
-        rootColumns,
-        rows ->
-            rows.put(
-                DETAILS,
-                details,
-                (detail, set) ->
-                    set.set(FIXTURE_ITEM_DETAIL.DETAIL_NO, detail.number())
-                        .set(FIXTURE_ITEM_DETAIL.DETAIL_TEXT, detail.text())));
+    writer.update(ITEM, itemRoot(itemId, expectedLockNo), rootColumns, detailRows(details));
   }
 
   /** 集約ルートの行を、版を比べて更新する。 */
   private void updateItem(final long itemId, final long expectedLockNo, final String name) {
     save(itemId, expectedLockNo, set -> set.set(FIXTURE_ITEM.ITEM_NAME, name), List.of());
-  }
-
-  /** 子の行にする値。 */
-  private record Detail(int number, String text) {}
-
-  private static Detail detail(final int number, final String text) {
-    return new Detail(number, text);
   }
 
   /** {@code lock_no = 1} の行を作る。 */

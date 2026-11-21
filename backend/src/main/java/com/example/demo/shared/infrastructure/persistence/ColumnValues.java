@@ -25,22 +25,6 @@ import org.jspecify.annotations.Nullable;
  */
 public final class ColumnValues<R extends Record> {
 
-  /** {@link TableWriter} と共通処理だけが書く共通カラムの名前（docs/database/postgresql-common-columns.md）。 */
-  private static final Set<String> COMMON_COLUMNS =
-      Set.of(
-          "created_at",
-          "created_by",
-          "created_pgm_cd",
-          "created_tx_id",
-          "updated_at",
-          "updated_by",
-          "updated_pgm_cd",
-          "updated_tx_id",
-          "lock_no",
-          "patched_at",
-          "patched_by",
-          "patched_id");
-
   /** 更新するテーブル。メッセージに名前を入れるために持つ。 */
   private final Table<R> table;
 
@@ -83,7 +67,7 @@ public final class ColumnValues<R extends Record> {
   }
 
   private ColumnValues<R> put(final TableField<R, ?> field, final @Nullable Object value) {
-    if (COMMON_COLUMNS.contains(field.getName()) || reserved.contains(field)) {
+    if (CommonColumns.NAMES.contains(field.getName()) || reserved.contains(field)) {
       throw new IllegalArgumentException(
           "column is set by TableWriter: table=" + table.getName() + ", column=" + field.getName());
     }

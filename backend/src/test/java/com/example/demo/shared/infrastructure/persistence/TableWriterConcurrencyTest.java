@@ -289,13 +289,11 @@ class TableWriterConcurrencyTest {
         ITEM,
         itemRoot(ITEM_ID, expectedLockNo),
         set -> set.set(FIXTURE_ITEM.ITEM_NAME, "A"),
-        rows ->
-            rows.put(
-                DETAILS,
-                detailTexts,
-                (text, set) ->
-                    set.set(FIXTURE_ITEM_DETAIL.DETAIL_NO, DETAIL_NO)
-                        .set(FIXTURE_ITEM_DETAIL.DETAIL_TEXT, text)));
+        DETAILS.rows(
+            detailTexts,
+            (text, set) ->
+                set.set(FIXTURE_ITEM_DETAIL.DETAIL_NO, DETAIL_NO)
+                    .set(FIXTURE_ITEM_DETAIL.DETAIL_TEXT, text)));
   }
 
   /** ユースケースの呼び出しの中として、pgm_cd を束縛して実行する。 */

@@ -45,7 +45,7 @@ Repositoryでの書き方は[jOOQのRepository](../backend/class-roles/jooq-repo
 
 Repositoryは集約の形を、クラスの定数として一度だけ宣言する。
 `AggregateTable`はルートのテーブル、ルートを一つに決める一意の列、内部の主キー、子を持ち、`ChildTable`は子のテーブル、親の外部キーの列、親の中で行を同定する自然キーを持つ。
-保存のたびに、ルートの列の値と、保存後にあるべき子の全行（`ChildRows`）を渡す。`Condition`は渡さない。
+保存のたびに、ルートの列の値と、保存後にあるべき子の全行（`ChildTable.rows`が作る`ChildRows`）を渡す。`Condition`は渡さない。
 
 - **`insert`**：ルートを`INSERT ... RETURNING 内部の主キー`で書き、続けて子を複数行のINSERTで書く。`lock_no = 1`にする。
 - **`update`**：以前に読んだ集約ルート（`Versioned`）を受け取り、その`lockNo()`を期待する版にする。
@@ -123,8 +123,7 @@ UPDATEも更新する行のロックを取るため、同じ順序に従う。
 上限まで待ってもロックを取れなければ、文はSQLSTATE `55P03`で失敗する。
 `TableWriter`のすべての文は、この失敗を、原因を付けずに種類`lock`（`ConflictException.Kind.LOCK`）の`ConflictException`にする（[ADR-062](../adr/ADR-062-map-business-exceptions-to-404-409-422.md)）。
 一意制約の違反（SQLSTATE `23505`）も、すべての文で原因を付けずに種類`unique`（`ConflictException.Kind.UNIQUE`）の`ConflictException`にする。
-変換は例外の型ではなくSQLSTATEで決める。Springは`21000`（サブクエリが2行以上を返した）も重複キーの例外にまとめるため、型で変換すると、コードの誤りが409になる。
-それ以外のSQLSTATEは変換せずに投げる。
+変換は例外の型ではなくSQLSTATEで決め、それ以外のSQLSTATE（`21000`など）は変換せずに投げる。理由は[ADR-054](../adr/ADR-054-detect-optimistic-lock-conflicts-by-update-count.md)にある。
 原因の例外のメッセージにはSQLと重複したキーの値が入るため、原因を付けない（[ADR-062](../adr/ADR-062-map-business-exceptions-to-404-409-422.md)）。
 書き込みは、開いていて読み取り専用ではないトランザクションの中でだけ行う。そうでなければ、SQLを実行する前に`IllegalStateException`にする。
 
@@ -143,9 +142,7 @@ HTTPの要求と応答をまたいでDBのトランザクションを保てな�
 ## DBの行ロック
 
 数量の更新のように、前回の値を確認する必要がない処理は、DBの行ロックと更新件数で判定してよい。
-`TableWriter`には、版を比べない更新の入口を今は持たない。
-本番の呼び出しがなく、`Condition`を受け取る入口は、版の比べ忘れと子の絞り込み忘れの抜け道になるためである。
-在庫の引き当てを実装するときは、[ADR-054](../adr/ADR-054-detect-optimistic-lock-conflicts-by-update-count.md)を更新し、集約と一意の列で行を指し、件数の意味を結果の型で返す入口を足す。
+`TableWriter`には、版を比べない更新の入口を今は持たない。理由と、足すときの手順は[ADR-054](../adr/ADR-054-detect-optimistic-lock-conflicts-by-update-count.md)にある。
 その入口も`lock_no`を1進め、引き当ての前に読んだ画面の保存が競合になるようにする。
 マスタの保守のように後勝ちの上書きを許容できない更新と、状態の遷移を伴う更新には使わない。
 

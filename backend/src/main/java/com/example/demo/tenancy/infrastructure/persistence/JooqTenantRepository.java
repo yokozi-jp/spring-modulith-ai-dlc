@@ -17,7 +17,6 @@ import com.example.demo.tenancy.domain.model.TenantRepository;
 import com.example.demo.tenancy.domain.model.UserId;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
 import org.jooq.DSLContext;
@@ -78,24 +77,19 @@ class JooqTenantRepository implements TenantRepository {
   public void update(final Tenant tenant) {
     // 所属だけの変更でも、ルートの版を進める。同じテナントの所属を同時に変える 2 つのリクエストの片方が、409 になる。
     // 所属は、保存後にあるべき全行として渡す。保存済みの所属との差分は TableWriter が、ルートの行をロックした後に取る。
-    // ponytail: 外す所属は、集約が読んだ所属ではなく、今の行との差で決める。所属を足す処理は、同じ
-    // トランザクションで m_tenant.lock_no を進めること。進めないと、読んだ後に足された行をここで消す。
+    // 外す所属は、集約が読んだ所属ではなく、今の行との差で決める。所属を足す処理は、同じトランザクションで m_tenant.lock_no を進めること。
+    // 進めないと、読んだ後に足された行をここで消す。M_MEMBERSHIP の INSERT は TableWriter だけが書け（ArchUnit H1）、
+    // 別の集約が M_MEMBERSHIP を ChildTable として宣言する場合だけ、この前提が破れる。
     final Map<UUID, Long> userIds = internalUserIds(tenant);
     tableWriter.update(
         TENANT,
         tenant,
         set -> {},
-        rows ->
-            rows.put(
-                MEMBERSHIPS,
-                tenant.members(),
-                (member, set) ->
-                    set.set(
-                            M_MEMBERSHIP.USER_ID,
-                            Objects.requireNonNull(
-                                userIds.get(member.userId().value()),
-                                "user not found: userId=" + member.userId().value()))
-                        .set(M_MEMBERSHIP.ROLE_TYP, member.role().name())));
+        MEMBERSHIPS.rows(
+            tenant.members(),
+            (member, set) ->
+                set.set(M_MEMBERSHIP.USER_ID, userId(userIds, member))
+                    .set(M_MEMBERSHIP.ROLE_TYP, member.role().name())));
   }
 
   /** テナントの所属の利用者の、公開 ID から内部の主キーへの対応を引く。 */
@@ -106,5 +100,15 @@ class JooqTenantRepository implements TenantRepository {
         .from(M_USER)
         .where(M_USER.PUBLIC_ID.in(publicIds))
         .fetchMap(M_USER.PUBLIC_ID, M_USER.USER_ID);
+  }
+
+  /** 所属の利用者の内部の主キー。利用者の行がないのはデータの不整合で、SQL を実行する前に止める。 */
+  private static long userId(final Map<UUID, Long> userIds, final TenantMember member) {
+    final Long id = userIds.get(member.userId().value());
+    if (id == null) {
+      throw new IllegalStateException(
+          "tenant member user not found: userId=" + member.userId().value());
+    }
+    return id;
   }
 }

@@ -10,8 +10,10 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 import java.util.stream.Stream;
 import org.jooq.Field;
 import org.jooq.Table;
@@ -47,6 +49,22 @@ public class CommonColumns {
 
   /** 楽観的ロックの版のカラム名。 */
   /* package */ static final String LOCK_NO = "lock_no";
+
+  /** 共通カラムの名前の全 12 列。{@link TableWriter} と共通処理だけが書き、{@link ColumnValues} は業務の列としては拒否する。 */
+  /* package */ static final Set<String> NAMES =
+      Set.of(
+          "created_at",
+          "created_by",
+          "created_pgm_cd",
+          "created_tx_id",
+          "updated_at",
+          "updated_by",
+          "updated_pgm_cd",
+          "updated_tx_id",
+          LOCK_NO,
+          "patched_at",
+          "patched_by",
+          "patched_id");
 
   /** 更新のカラムを省いてよい、追記だけのワークテーブルの接頭辞。 */
   private static final String WORK_TABLE_PREFIX = "w_";
@@ -96,10 +114,7 @@ public class CommonColumns {
   /* package */ static void requireAuditColumns(final Table<?> table) {
     requiredField(table, LOCK_NO, Long.class);
     for (final String prefix : List.of("created_", "updated_")) {
-      requiredField(table, prefix + "at", Instant.class);
-      requiredField(table, prefix + "by", String.class);
-      requiredField(table, prefix + "pgm_cd", String.class);
-      requiredField(table, prefix + "tx_id", String.class);
+      AuditValues.fields(table, prefix);
     }
   }
 
@@ -183,13 +198,24 @@ public class CommonColumns {
   /** 作成と更新のカラムに共通する、1 回の呼び出しの値。 */
   private record AuditValues(Instant at, String by, String pgmCd, String txId) {
 
+    /**
+     * 接頭辞（{@code created_} か {@code updated_}）の 4 列を、{@code at}、{@code by}、{@code pgm_cd}、{@code
+     * tx_id} の順で返す。
+     */
+    private static List<Field<?>> fields(final Table<?> table, final String prefix) {
+      return List.of(
+          requiredField(table, prefix + "at", Instant.class),
+          requiredField(table, prefix + "by", String.class),
+          requiredField(table, prefix + "pgm_cd", String.class),
+          requiredField(table, prefix + "tx_id", String.class));
+    }
+
     /** 接頭辞（{@code created_} か {@code updated_}）のカラムと値の組を返す。 */
     private Stream<Entry<Field<?>, Object>> entries(final Table<?> table, final String prefix) {
-      return Stream.of(
-          Map.entry(requiredField(table, prefix + "at", Instant.class), at),
-          Map.entry(requiredField(table, prefix + "by", String.class), by),
-          Map.entry(requiredField(table, prefix + "pgm_cd", String.class), pgmCd),
-          Map.entry(requiredField(table, prefix + "tx_id", String.class), txId));
+      final List<Field<?>> fields = fields(table, prefix);
+      final List<Object> values = List.of(at, by, pgmCd, txId);
+      return IntStream.range(0, fields.size())
+          .mapToObj(i -> Map.<Field<?>, Object>entry(fields.get(i), values.get(i)));
     }
   }
 }

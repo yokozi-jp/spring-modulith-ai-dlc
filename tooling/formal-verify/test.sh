@@ -59,11 +59,11 @@ grep -oP 'TLC output: \K\S+' "$out" | xargs -r -n 1 dirname | xargs -r rm -rf
 # sync-check.sh: 一時のリポジトリで、同期コミットの 4 つの場合を確かめる。
 repo="$tmp/sync-repo"
 mkdir -p "$repo/skill"
-gitc() { git -C "$repo" -c user.name=test -c user.email=test@example.com "$@"; }
+gitc() { git -C "$repo" "$@"; }
 gitc init -q
-gitc "com""mit" -q --allow-empty -m first
+gitc commit -q --allow-empty -m first
 first="$(gitc rev-parse HEAD)"
-gitc "com""mit" -q --allow-empty -m second
+gitc commit -q --allow-empty -m second
 printf '同期コミット：`%s`（main）\n' "$first" >"$repo/skill/SKILL.md"
 expect "sync-check.sh passes when the sync commit is an ancestor of HEAD" 0 \
   "OK   skill/SKILL.md: 同期コミット $first" -- \
@@ -73,7 +73,7 @@ expect "sync-check.sh fails when the sync commit does not resolve" 1 \
   "squash merge で消えた可能性がある" -- \
   bash -c "cd '$repo' && '$dir/sync-check.sh' skill"
 gitc checkout -q -b side "$first"
-gitc "com""mit" -q --allow-empty -m side
+gitc commit -q --allow-empty -m side
 side="$(gitc rev-parse HEAD)"
 gitc checkout -q -
 printf '同期コミット：`%s`（side）\n' "$side" >"$repo/skill/SKILL.md"

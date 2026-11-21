@@ -62,8 +62,7 @@ class JooqPaymentRepository implements PaymentRepository {
                 .set(T_PAYMENT.CHARGED_AMOUNT_JPY, payment.amount().amount())
                 .set(T_PAYMENT.PAYMENT_STATUS_TYP, payment.status().name())
                 .set(T_PAYMENT.GATEWAY_PAYMENT_CODE, codeValue(payment.gatewayPaymentCode()))
-                .set(T_PAYMENT.RECORDED_AT, payment.recordedAt()),
-        rows -> {});
+                .set(T_PAYMENT.RECORDED_AT, payment.recordedAt()));
   }
 
   /** 決済記録の列を、restore の引数の型と順に選ぶ。 */

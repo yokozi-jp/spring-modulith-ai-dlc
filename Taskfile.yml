@@ -482,6 +482,8 @@ tasks:
       - bash .kiro/hooks/block-agent-git.test.sh
       - bash tooling/skills-check/test.sh
       - node tooling/skills-check/skills-check.mjs
+      # 検査の範囲に .agents があるが、okf-check は .agents の変更で起動しない。
+      - task: removed-names-check
 
   # 検査の本体は tooling/ci-gate-check/ci-gate-check.py に置き、自己検査（test.sh）を先に実行する。
   # 理由と除外の一覧の扱いは docs/adr/ADR-087 にある。
@@ -915,6 +917,8 @@ tasks:
     dir: backend
     cmds:
       - ./gradlew spotlessCheck pmdMain pmdTest spotbugsMain spotbugsTest
+      # 検査の範囲に backend/src があるが、okf-check は backend/src の変更で起動しない。
+      - task: removed-names-check
 
   be-openapi-lint:
     desc: OpenAPI 3.1契約をopenapi/openapi.yamlへ生成しSpectralで検査（テストの依存はTestcontainersが起動する）

@@ -13,6 +13,12 @@ status=0
 
 while IFS=$'\t' read -r name allowed; do
   case "$name" in '' | '#'*) continue ;; esac
+  # 区切りがタブでない行は、識別子と正規表現が一語になり、何にも一致せず検査が黙って通る。
+  if ! [[ "$name" =~ ^[A-Za-z_][A-Za-z0-9_]*$ ]]; then
+    echo "FAIL names.txt の行が「<識別子><TAB><正規表現か ->」の形でない: $name" >&2
+    status=1
+    continue
+  fi
   allowed="${allowed:--}"
   hits="$(git grep -nIw -e "$name" -- "${roots[@]}" "${excluded[@]}" || true)"
   [ -z "$hits" ] && continue

@@ -114,7 +114,7 @@ grep -rn "tableWriter.update(" backend/src/main/java --include=*.java
 
 ## 同期の記録
 
-同期コミット：`f4f320c548a0b087726948685585a90c109b8dd7`（Pull Request #599 の最後のコード変更。squash merge の後に、main のコミットで確かめ直して進める）
+同期コミット：`c376b928c97af0b661d88b2160992a500fa4aeb4`（main。Pull Request #599 の土台。この Pull Request の変更はこのコミットとの差分に出るが、モデルは確かめ済みで、merge の後に main のコミットへ進めてよい）
 
 このコミットで、「変更がこの検証に関わるか」のファイルと対応表がモデルと一致することを確かめた。
 読んだのはこのリポジトリのコードで、PostgreSQL の振る舞いはモデルの冒頭の注記に並べた前提である。

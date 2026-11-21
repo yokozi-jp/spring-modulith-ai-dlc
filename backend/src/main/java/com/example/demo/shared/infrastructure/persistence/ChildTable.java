@@ -1,9 +1,11 @@
 package com.example.demo.shared.infrastructure.persistence;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
+import java.util.function.BiConsumer;
 import org.jooq.Field;
 import org.jooq.Record;
 import org.jooq.Table;
@@ -71,6 +73,18 @@ public final class ChildTable<R extends Record, C extends Record> {
     naturalKey.addAll(List.of(moreKeys));
     naturalKey.forEach(ChildTable::requireComparableType);
     return new ChildTable<>(table, parentKey, naturalKey);
+  }
+
+  /**
+   * 保存後にあるべき、この子の全行を作る。{@link TableWriter} の入口に渡す。
+   *
+   * @param items 子の行にする業務の値。空なら、その子の行をすべて消す
+   * @param columns 業務の値から子の列の値を作る。自然キーの列も書く。親の外部キーと共通カラムは書けない
+   * @throws IllegalArgumentException 自然キーが {@code null} か重複する場合、行ごとに書く列が違う場合、書けない列を渡した場合
+   */
+  public <T> ChildRows<R, C> rows(
+      final Collection<? extends T> items, final BiConsumer<? super T, ColumnValues<C>> columns) {
+    return ChildRows.of(this, items, columns);
   }
 
   /**

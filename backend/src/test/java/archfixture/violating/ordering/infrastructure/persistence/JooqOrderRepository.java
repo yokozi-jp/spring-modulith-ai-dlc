@@ -7,9 +7,9 @@ import archfixture.violating.ordering.domain.model.UnversionedOrderRepository;
 import archfixture.violating.shared.infrastructure.persistence.TableWriter;
 
 /**
- * 違反：repositoryUpdateAndDeleteCheckVersion（update と save が TableWriter の update を呼ばず、store が update
- * という名前ではない）と onlyCommandHandlersUpdateOrDeleteAggregates（Repository の実装が別の Repository の delete
- * を呼ぶ）。
+ * 違反：repositoryUpdateCallsVersionedEntryPoint（update と save が TableWriter の update を呼ばず、store が
+ * update という名前ではない）と onlyCommandHandlersUpdateOrDeleteAggregates（Repository の実装が別の Repository の
+ * delete を呼ぶ）。
  */
 public final class JooqOrderRepository implements OrderRepository {
 

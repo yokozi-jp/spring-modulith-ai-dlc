@@ -59,17 +59,18 @@ PostgreSQL の READ COMMITTED では、後の UPDATE は先の UPDATE のコミ�
 - `TableWriter.insert` は、新しい集約ルートを受け取り、ルートを `INSERT ... RETURNING 内部の主キー` で書き、続けて子を 1 文の複数行の INSERT で書く。
   `lock_no = 1` と共通カラムは `TableWriter` が書く。
   内部の主キーは `RETURNING` で受けるため、Repository は読み直さない。
-  子を宣言していない集約は、`rows -> {}` を渡す。
+  子を宣言していない集約は、子の行を渡さない。
 - `TableWriter.update` は、以前に読んだ集約ルート（`AggregateTable` の `A`、`shared.concurrency` の `Versioned`、`long lockNo()`）を受け取り、その `lockNo()` を期待する版にする。
   版の数値を渡す入口はなく、`A` に集約ルートのクラスを指定すれば、版を返すラムダも渡せないため、テーブルから読み直した版を期待する版に渡す誤りは書けない。
   `A` に `Versioned` そのものを指定すると、ラムダを渡せる。集約ルートのクラスを指定することはレビューで見る。
+  Repository が読み直した版で `Order.restore(...)` のように集約ルートを作り直して渡す誤りは、型では止まらない。これもレビューで見る。
   ルートは `SET 業務の列, updated_*, lock_no = 期待値 + 1` と `WHERE 一意の列 AND lock_no = 期待値` の UPDATE で書き、`RETURNING 内部の主キー` で受ける。
   件数が 1 なら成功、0 なら一意の列で行の有無を確かめて `ConflictException`（種類は `VERSION`）か `NotFoundException` に分け、2 以上なら `IllegalStateException` にする。
   期待する版が 1 未満なら、SQL を実行する前に `IllegalArgumentException` にする。
   業務の列が一つもなくても、版と `updated_*` を進める。
-- `update` は、ルートの行ロックを取った後に、子を差分で書く。
-  保存済みの子の自然キーを読み、保存後にない子の削除、残る子の更新（その行の `lock_no` を 1 進める）、新しい子の追加の順に実行する。
-  `ChildRows` に宣言した子すべてを渡さないと、`IllegalArgumentException` にする。
+- `update` は、ルートの行ロックを取った後に、子を差分で書く。手順は[PostgreSQL の排他制御](../database/postgresql-concurrency-control.md)を正とする。
+  残る子の `lock_no` は 1 進む。
+  宣言した子すべての `ChildRows` を渡さないと、`IllegalArgumentException` にする。
   渡さないことを「変更なし」と読むと、消えるべき子が残るためである。
   自然キーが `null` か重複する、行ごとに書く列が違う、宣言していない子を渡すといった不備も、SQL を実行する前に `IllegalArgumentException` にする。
   残る子の更新が 1 行でなければ `IllegalStateException` にする。ルートの行ロックの下で読んだ自然キーに対する更新なので、0 件や 2 件以上は起こらない状態である。
@@ -101,10 +102,8 @@ PostgreSQL の READ COMMITTED では、後の UPDATE は先の UPDATE のコミ�
     除外はクラスの場所で判定し、そのパッケージに置いた手書きのクラスもすべての検査を外れるため、そのパッケージには jOOQ のコード生成の出力だけを置く。
     `ProductionCodeOnlyTest` は、そのパッケージの本番のクラスのソースファイルがすべて `src/generated/jooq` にあることを確かめる。
     `Insert`、`Update`、`Delete` を作る入口（`DSLContext`、`DSL`、`WithStep` の `insertInto`、`insertQuery`、`batchInsert`、`update`、`delete`、`deleteFrom`、`updateQuery`、`deleteQuery`）をすべて禁じるため、`batch` のように作った問い合わせを受け取って実行する API は禁じなくてよい。
-  - `Jooq<Aggregate>Repository` の、集約ルートを受け取る `add` 以外の public メソッドは、`update` という名前で、`TableWriter.update` を直接呼ぶ。
-    名前で対象を選ばないため、`save` のような名前のメソッドも検出する。
-    `TableWriter` には `delete` の入口がないため、`delete` も検出する。必要になったら、この ADR を更新して入口を足す。
-    版は `Versioned` の集約ルートから `TableWriter` が読むため、`lockNo()` の呼び出しは求めない。
+  - `repositoryUpdateCallsVersionedEntryPoint`（H3）：`Jooq<Aggregate>Repository` の、集約ルートを受け取る `add` 以外の public メソッドは、`update` という名前で、`TableWriter.update` を直接呼ぶ。
+    `save` や `delete` のような名前は検出する。範囲は[アーキテクチャテスト](../backend/architecture-tests.md)を正とする。
   - `domain.model` の `<Aggregate>Repository` の `add`、`update`、`delete` は、`Versioned` を実装する集約ルートを一つだけ受け取る。
     集約ルートが `Versioned` を実装しないと、版を比べる規則が集約ルートを見つけられず、`TableWriter.update` にも渡せないためである。
     必須の `add` を含めるため、`save` のような名前で保存する Repository でも、形を外れた集約は `add` で検出される。
@@ -154,7 +153,7 @@ PostgreSQL の READ COMMITTED では、後の UPDATE は先の UPDATE のコミ�
 - 書き込みの入口は `insert` と `update` の二つで、Repository が調整する手順は 1 回の呼び出しになる。
   内部の主キーの読み直し、保存済みの子の読み取り、子の削除と更新と追加の振り分けは、Repository から消える。
 - 親の外部キーの条件は `TableWriter` が付けるため、子の書き込みに親の条件を書き忘れて、他の集約の行を書く誤りは書けない。
-- 期待する版は集約ルートのクラス（`AggregateTable` の `A`）から読むため、テーブルから読み直した版や、版を返すラムダを渡す誤りは書けない。
+- 期待する版は集約ルートのクラス（`AggregateTable` の `A`）から読むため、テーブルから読み直した版や、版を返すラムダを渡す誤りは書けない。集約ルートを作り直して渡す誤りは、型では止まらない。
 - jOOQ の INSERT と UPDATE を含む書き込みの API、Spring JDBC、JDBC と、接続の元を受け取るライブラリを `TableWriter` の外で使うと、テスト（ArchUnit）で失敗する。
   禁止の一覧は、テストで固定した jOOQ の版の API で見直してある。
   別のテーブルの列、型の違う値、別の集約の型を付けた子の定数の使い回しは、コンパイルで失敗する。

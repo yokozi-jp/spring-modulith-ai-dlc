@@ -11,3 +11,4 @@ DeletedRoot	^docs/adr/ADR-(054|062)-
 aggregateRootInsertsGoThroughTableWriter	^docs/adr/ADR-054-
 aggregateMethodsDoNotUseUnversionedWrites	^docs/adr/ADR-054-
 unversionedWritesRequireUsingTheCount	^docs/adr/ADR-054-
+repositoryUpdateAndDeleteCheckVersion	^docs/adr/ADR-054-

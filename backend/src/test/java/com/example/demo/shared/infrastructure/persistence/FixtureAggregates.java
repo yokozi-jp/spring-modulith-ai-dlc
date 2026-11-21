@@ -4,6 +4,7 @@ import static com.example.demo.jooq.tables.FixtureItemDetailTable.FIXTURE_ITEM_D
 import static com.example.demo.jooq.tables.FixtureItemTable.FIXTURE_ITEM;
 
 import com.example.demo.shared.concurrency.Versioned;
+import java.util.List;
 import org.jooq.Record;
 
 /** {@link TableWriter} のテストが使う、テスト専用のテーブルの集約の宣言。 */
@@ -27,6 +28,22 @@ final class FixtureAggregates {
 
   /** テスト用の集約ルート。ルートの一意の列は {@code id}、読み込んだ版は {@code lockNo} である。 */
   /* package */ record Item(long id, String name, long lockNo) implements Versioned {}
+
+  /** 子の行にする値。 */
+  /* package */ record Detail(int number, String text) {}
+
+  /* package */ static Detail detail(final int number, final String text) {
+    return new Detail(number, text);
+  }
+
+  /** 明細番号と文言を子の列に書く、{@link #DETAILS} の全行を作る。 */
+  /* package */ static ChildRows<Record, Record> detailRows(final List<Detail> details) {
+    return DETAILS.rows(
+        details,
+        (detail, set) ->
+            set.set(FIXTURE_ITEM_DETAIL.DETAIL_NO, detail.number())
+                .set(FIXTURE_ITEM_DETAIL.DETAIL_TEXT, detail.text()));
+  }
 
   /** 版が {@code lockNo} で、名前が {@code x} の集約ルートを表す。 */
   /* package */ static Item itemRoot(final long id, final long lockNo) {

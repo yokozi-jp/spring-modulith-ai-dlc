@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # test.sh: check.sh を一時のリポジトリで検査する。
-# 実行: bash tooling/removed-names/test.sh（task removed-names-test が実行する）
+# 実行: bash tooling/removed-names/test.sh（task removed-names-check が、check.sh の前に実行する）
 set -u
 
 dir="$(cd "$(dirname "$0")" && pwd)"
@@ -41,6 +41,9 @@ expect "失敗の出力に残った場所を出す" 1 "docs/backend/rule.md:2"
 printf '# 規約\nOldWriterXY は別の名前なので、語の境界で一致しない。\n' >"$tmp/repo/docs/backend/rule.md"
 git -C "$tmp/repo" add -A
 expect "別の識別子の一部は一致させない" 0 "OK   removed-names"
+
+printf 'OldWriter ^docs/adr/ADR-001-\n' >"$tmp/names.txt"
+expect "区切りがタブでない行は失敗にする" 1 "names.txt の行が"
 
 if [ "$failures" -gt 0 ]; then
   echo "$failures failure(s)"

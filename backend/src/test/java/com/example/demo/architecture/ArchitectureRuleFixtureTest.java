@@ -281,20 +281,20 @@ class ArchitectureRuleFixtureTest {
   private static Stream<Arguments> tableWriterRows() {
     return Stream.of(
         row(
-            "repositoryUpdateAndDeleteCheckVersion",
-            TableWriterArchTest.repositoryUpdateAndDeleteCheckVersionRule(VIOLATING),
+            "repositoryUpdateCallsVersionedEntryPoint",
+            TableWriterArchTest.repositoryUpdateCallsVersionedEntryPointRule(VIOLATING),
             VIOLATING_JOOQ_REPOSITORY + ".update("),
         row(
-            "repositoryUpdateAndDeleteCheckVersion: update call under another name",
-            TableWriterArchTest.repositoryUpdateAndDeleteCheckVersionRule(VIOLATING),
+            "repositoryUpdateCallsVersionedEntryPoint: update call under another name",
+            TableWriterArchTest.repositoryUpdateCallsVersionedEntryPointRule(VIOLATING),
             VIOLATING_JOOQ_REPOSITORY + ".store("),
         row(
-            "repositoryUpdateAndDeleteCheckVersion: delete has no TableWriter entry point",
-            TableWriterArchTest.repositoryUpdateAndDeleteCheckVersionRule(VIOLATING),
+            "repositoryUpdateCallsVersionedEntryPoint: delete has no TableWriter entry point",
+            TableWriterArchTest.repositoryUpdateCallsVersionedEntryPointRule(VIOLATING),
             VIOLATING_JOOQ_REPOSITORY + ".delete("),
         row(
-            "repositoryUpdateAndDeleteCheckVersion: save",
-            TableWriterArchTest.repositoryUpdateAndDeleteCheckVersionRule(VIOLATING),
+            "repositoryUpdateCallsVersionedEntryPoint: save",
+            TableWriterArchTest.repositoryUpdateCallsVersionedEntryPointRule(VIOLATING),
             VIOLATING_JOOQ_REPOSITORY + ".save("),
         row(
             "repositoryWritesTakeVersionedAggregates",
@@ -594,7 +594,7 @@ class ArchitectureRuleFixtureTest {
         ClassRoleArchTest.mappingLibrariesAreNotUsed,
         ClassRoleArchTest.jooqReflectionMappingIsNotUsed,
         TableWriterArchTest.tableWritesGoThroughTableWriterRule(basePackage),
-        TableWriterArchTest.repositoryUpdateAndDeleteCheckVersionRule(basePackage),
+        TableWriterArchTest.repositoryUpdateCallsVersionedEntryPointRule(basePackage),
         TableWriterArchTest.repositoryWritesTakeVersionedAggregatesRule(),
         TableWriterArchTest.commandHandlersEnsureScreenLockNoRule(basePackage),
         TableWriterArchTest.commandsBuiltByPresentationForWritesAreVersionedRule(basePackage),

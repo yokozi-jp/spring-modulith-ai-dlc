@@ -83,7 +83,7 @@ class JooqOrderRepository implements OrderRepository {
         ORDER,
         order,
         set -> rootColumns(order, set),
-        rows -> rows.put(LINES, order.lines(), JooqOrderRepository::lineColumns));
+        LINES.rows(order.lines(), JooqOrderRepository::lineColumns));
   }
 
   @Override
@@ -92,7 +92,7 @@ class JooqOrderRepository implements OrderRepository {
         ORDER,
         order,
         set -> rootColumns(order, set),
-        rows -> rows.put(LINES, order.lines(), JooqOrderRepository::lineColumns));
+        LINES.rows(order.lines(), JooqOrderRepository::lineColumns));
   }
 
   /** 注文の列の値。公開 ID は {@link TableWriter} が書く。 */

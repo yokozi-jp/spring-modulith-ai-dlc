@@ -41,8 +41,8 @@ import org.jspecify.annotations.Nullable;
 
   /** 新しい集約の子の全行を、1 文の複数行の INSERT で書く。 */
   /* package */ <R extends Record, C extends Record> void insertAll(
-      final ChildTable<R, C> child, final long rootId, final ChildRows<R> rows) {
-    insertChildren(child, rootId, List.copyOf(rows.rowsOf(child).values()));
+      final long rootId, final ChildRows<R, C> rows) {
+    insertChildren(rows.child(), rootId, List.copyOf(rows.rows().values()));
   }
 
   /**
@@ -51,8 +51,9 @@ import org.jspecify.annotations.Nullable;
    * @throws IllegalStateException 残る子の更新が 1 行でない場合
    */
   /* package */ <R extends Record, C extends Record> void replace(
-      final ChildTable<R, C> child, final long rootId, final ChildRows<R> rows) {
-    final Map<List<Object>, ColumnValues<C>> desired = rows.rowsOf(child);
+      final long rootId, final ChildRows<R, C> rows) {
+    final ChildTable<R, C> child = rows.child();
+    final Map<List<Object>, ColumnValues<C>> desired = rows.rows();
     final Set<List<Object>> stored =
         new LinkedHashSet<>(
             dsl.select(child.naturalKey())

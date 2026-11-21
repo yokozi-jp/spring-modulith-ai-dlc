@@ -76,12 +76,10 @@ class JooqUserRepository implements UserRepository {
         USER,
         user,
         set -> {},
-        rows ->
-            rows.put(
-                IDENTITIES,
-                user.identities(),
-                (identity, set) ->
-                    set.set(M_USER_IDENTITY.ISSUER_URL, identity.issuer())
-                        .set(M_USER_IDENTITY.SUBJECT_CODE, identity.subject())));
+        IDENTITIES.rows(
+            user.identities(),
+            (identity, set) ->
+                set.set(M_USER_IDENTITY.ISSUER_URL, identity.issuer())
+                    .set(M_USER_IDENTITY.SUBJECT_CODE, identity.subject())));
   }
 }

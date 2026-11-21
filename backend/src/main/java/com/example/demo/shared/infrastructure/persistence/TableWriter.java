@@ -3,7 +3,9 @@ package com.example.demo.shared.infrastructure.persistence;
 import com.example.demo.shared.concurrency.ConflictException;
 import com.example.demo.shared.concurrency.Versioned;
 import com.example.demo.shared.failure.NotFoundException;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.List;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
 import org.jooq.DSLContext;
@@ -60,13 +62,13 @@ public class TableWriter {
   /**
    * 集約を INSERT する。ルートを書き、子を複数行の INSERT で書く。
    *
-   * <p>子を宣言していない集約は、{@code rows -> {}} を渡す。
+   * <p>子を宣言していない集約は、{@code childRows} を省く。
    *
    * @param aggregate 集約の宣言
    * @param root 新しい集約ルート。ルートの一意の列の値は、宣言の {@code keyOf} で集約ルートから取る
    * @param rootColumns ルートの業務の列の値。ルートの一意の列と内部の主キーは書けない
-   * @param childRows 宣言した子すべての行。空の子は空の一覧で渡す
-   * @throws IllegalArgumentException 宣言した子を渡していない場合、宣言していない子を渡した場合、書けない列を渡した場合
+   * @param childRows 宣言した子すべての行（{@link ChildTable#rows}）。空の子は空の一覧で作る
+   * @throws IllegalArgumentException 宣言した子を渡していない場合、宣言していない子か同じ子を二度渡した場合、書けない列を渡した場合
    * @throws IllegalStateException トランザクションが開いていない、または読み取り専用の場合
    * @throws ConflictException 一意制約に違反した場合（種類は {@code UNIQUE}）、行ロックを {@code lock_timeout}
    *     までに取れない場合（種類は {@code LOCK}）。原因は持たない
@@ -75,12 +77,12 @@ public class TableWriter {
       final AggregateTable<R, K, A> aggregate,
       final A root,
       final Consumer<ColumnValues<R>> rootColumns,
-      final Consumer<ChildRows<R>> childRows) {
+      final ChildRows<?, ?>... childRows) {
     requireTransaction();
-    final ChildRows<R> rows = collectChildRows(aggregate, childRows);
+    final List<ChildRows<?, ?>> rows = inDeclaredOrder(aggregate, Arrays.asList(childRows));
     final long id = insertRoot(aggregate, aggregate.keyOf(root), rootColumns);
-    for (final ChildTable<R, ?> child : aggregate.children()) {
-      children.insertAll(child, id, rows);
+    for (final ChildRows<?, ?> childRow : rows) {
+      children.insertAll(id, childRow);
     }
   }
 
@@ -95,9 +97,8 @@ public class TableWriter {
    * @param root 以前に読んだ集約ルート。ルートの一意の列の値は宣言の {@code keyOf} で、期待する版は {@link Versioned#lockNo}
    *     で、この集約ルートから取る
    * @param rootColumns ルートの業務の列の値
-   * @param childRows 宣言した子すべての、保存後にあるべき行。渡した子の自然キーにない保存済みの子は削除する
-   * @throws IllegalArgumentException 期待する版が 1 未満の場合、宣言した子を渡していない場合、宣言していない子を渡した場合、自然キーが null
-   *     か重複する場合、書けない列を渡した場合
+   * @param childRows 宣言した子すべての、保存後にあるべき行（{@link ChildTable#rows}）。渡した子の自然キーにない保存済みの子は削除する
+   * @throws IllegalArgumentException 期待する版が 1 未満の場合、宣言した子を渡していない場合、宣言していない子か同じ子を二度渡した場合
    * @throws IllegalStateException トランザクションが開いていない、または読み取り専用の場合、更新件数が 2 以上の場合
    * @throws NotFoundException 更新件数が 0 で、一意の列の行がない場合
    * @throws ConflictException 更新件数が 0 で一意の列の行がある場合（種類は {@code VERSION}）、一意制約に違反した場合（種類は {@code
@@ -107,7 +108,7 @@ public class TableWriter {
       final AggregateTable<R, K, A> aggregate,
       final A root,
       final Consumer<ColumnValues<R>> rootColumns,
-      final Consumer<ChildRows<R>> childRows) {
+      final ChildRows<?, ?>... childRows) {
     requireTransaction();
     final K key = aggregate.keyOf(root);
     final long expectedLockNo = root.lockNo();
@@ -119,7 +120,7 @@ public class TableWriter {
               + ", expectedLockNo="
               + expectedLockNo);
     }
-    final ChildRows<R> rows = collectChildRows(aggregate, childRows);
+    final List<ChildRows<?, ?>> rows = inDeclaredOrder(aggregate, Arrays.asList(childRows));
     final ColumnValues<R> values = collect(aggregate, rootColumns);
     final Field<Long> lockNo =
         CommonColumns.requiredField(table, CommonColumns.LOCK_NO, Long.class);
@@ -137,8 +138,8 @@ public class TableWriter {
             target);
     requireOneRow(updated, aggregate, key, expectedLockNo);
     final long id = updated.getFirst().value1();
-    for (final ChildTable<R, ?> child : aggregate.children()) {
-      children.replace(child, id, rows);
+    for (final ChildRows<?, ?> childRow : rows) {
+      children.replace(id, childRow);
     }
   }
 
@@ -191,13 +192,29 @@ public class TableWriter {
     return values;
   }
 
-  /** 呼び出し側のラムダから子の行を集め、宣言した子と過不足がないことを SQL の前に確かめる。 */
-  private static <R extends Record, K> ChildRows<R> collectChildRows(
-      final AggregateTable<R, K, ?> aggregate, final Consumer<ChildRows<R>> childRows) {
-    final ChildRows<R> rows = new ChildRows<>(aggregate.children());
-    childRows.accept(rows);
-    rows.requireAllPut();
-    return rows;
+  /** 渡された子の行を宣言の順に並べ、宣言した子と過不足がないことを SQL の前に確かめる。 */
+  private static List<ChildRows<?, ?>> inDeclaredOrder(
+      final AggregateTable<?, ?, ?> aggregate, final List<ChildRows<?, ?>> given) {
+    final List<ChildRows<?, ?>> ordered = new ArrayList<>();
+    for (final ChildTable<?, ?> child : aggregate.children()) {
+      final List<ChildRows<?, ?>> matched =
+          given.stream().filter(rows -> child.equals(rows.child())).toList();
+      if (matched.isEmpty() || matched.size() > ONE_ROW) {
+        throw new IllegalArgumentException(
+            (matched.isEmpty()
+                    ? "child rows were not put: table="
+                    : "child rows were put twice: table=")
+                + child.table().getName());
+      }
+      ordered.add(matched.getFirst());
+    }
+    for (final ChildRows<?, ?> rows : given) {
+      if (!aggregate.children().contains(rows.child())) {
+        throw new IllegalArgumentException(
+            "child is not declared by the aggregate: table=" + rows.child().table().getName());
+      }
+    }
+    return ordered;
   }
 
   /**

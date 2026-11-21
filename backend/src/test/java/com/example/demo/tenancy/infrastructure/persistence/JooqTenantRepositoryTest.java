@@ -17,6 +17,7 @@ import com.example.demo.tenancy.domain.model.TenantRepository;
 import com.example.demo.tenancy.domain.model.UserId;
 import com.example.demo.testkit.DatabaseTest;
 import java.time.Instant;
+import java.util.List;
 import java.util.UUID;
 import org.jooq.DSLContext;
 import org.junit.jupiter.api.DisplayName;
@@ -24,6 +25,8 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 
 /** テナントの所属の読み出しと、所属の変更の保存を検証する。 */
+// 所属の保存の場合ごとにテストを分けるため、メソッド数の上限を外す。
+@SuppressWarnings("PMD.TooManyMethods")
 @DatabaseTest
 class JooqTenantRepositoryTest {
 
@@ -83,6 +86,27 @@ class JooqTenantRepositoryTest {
     assertThat(dsl.fetchExists(M_USER, M_USER.PUBLIC_ID.eq(UUID.fromString(third))))
         .as("所属を外しても、利用者の行は残る userId=%s", third)
         .isTrue();
+  }
+
+  @Test
+  @DisplayName("所属の利用者の行がないテナントは、SQL を実行する前に IllegalStateException にし、所属を変えない")
+  void missingMemberUserIsRejectedBeforeWriting() {
+    final UUID tenantId = UUID.randomUUID();
+    final String admin = joinNewUser(tenantId, ADMIN);
+    final Tenant tenant =
+        Tenant.restore(
+            new TenantId(tenantId),
+            List.of(
+                new TenantMember(userId(admin), Role.ADMIN),
+                new TenantMember(userId(UUID.randomUUID().toString()), Role.MEMBER)),
+            1L);
+
+    assertThatThrownBy(() -> TestCommonColumns.runAs(() -> repository().update(tenant)))
+        .isInstanceOf(IllegalStateException.class)
+        .hasMessageContaining("tenant member user not found");
+
+    assertThat(find(tenantId).members()).hasSize(1);
+    assertThat(find(tenantId).lockNo()).isEqualTo(1L);
   }
 
   @Test

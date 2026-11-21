@@ -45,7 +45,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 /**
- * 業務テーブルの UPDATE と DELETE と集約ルートの INSERT を {@code TableWriter} に集め、楽観的ロックの版の比べ忘れを止める（ADR-054、
+ * 集約の INSERT と UPDATE の入口を {@code TableWriter} に集め、その他の書き込みを禁じて、楽観的ロックの版の比べ忘れを止める（ADR-054、
  * docs/database/postgresql-concurrency-control.md）。
  *
  * <p>基底パッケージを含む規則は {@code xxxRule(basePackage)} のファクトリで組み立て、{@link ArchitectureRuleFixtureTest}
@@ -214,8 +214,8 @@ class TableWriterArchTest {
    * TableWriter.update} を呼ぶ（H3）。版は {@code Versioned} の集約ルートから {@code TableWriter} が読む。
    */
   @ArchTest
-  /* package */ static final ArchRule repositoryUpdateAndDeleteCheckVersion =
-      repositoryUpdateAndDeleteCheckVersionRule(BASE_PACKAGE);
+  /* package */ static final ArchRule repositoryUpdateCallsVersionedEntryPoint =
+      repositoryUpdateCallsVersionedEntryPointRule(BASE_PACKAGE);
 
   /**
    * Repository の {@code add}、{@code update}、{@code delete} は、{@code Versioned} を持つ集約ルートを受け取る（H6）。
@@ -292,7 +292,7 @@ class TableWriterArchTest {
   }
 
   /** H3 の規則を組み立てる。 */
-  /* package */ static ArchRule repositoryUpdateAndDeleteCheckVersionRule(
+  /* package */ static ArchRule repositoryUpdateCallsVersionedEntryPointRule(
       final String basePackage) {
     final String writer = basePackage + WRITER_PACKAGE + "TableWriter";
     return methods()

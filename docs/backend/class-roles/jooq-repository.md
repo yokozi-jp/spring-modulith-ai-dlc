@@ -80,8 +80,8 @@ jOOQ の Repository は業務規則を持たない。
   外部キーの列は、親の内部の主キーと同じ型（`Long`）であることしかコンパイルで確かめられない。正しい列を渡したことは、`@DatabaseTest` の往復で確かめる。
 - `add` は、`tableWriter.insert(ORDER, order, ルートの列の値, 子の全行)` を呼ぶ。
   ルートの列の値は、ラムダで `ColumnValues` に `set(列, 値)` で渡す。一意の列、内部の主キー、共通カラムは書かない（渡すと `IllegalArgumentException` になる）。
-  子の全行は、ラムダで `rows.put(LINES, order.lines(), (line, set) -> ...)` として渡す。子の自然キーの列も `set` で書く。
-  子を宣言していない集約は、`rows -> {}` を渡す。
+  子の全行は、`LINES.rows(order.lines(), (line, set) -> ...)` で作って渡す。子の自然キーの列も `set` で書く。
+  子を宣言していない集約は、子の行を渡さない。
   内部の主キーは `TableWriter` が `RETURNING` で受けて子の外部キーに書くため、読み直さない。
   一意制約の違反（`23505`）は `Kind.UNIQUE` の、`lock_timeout` までに行のロックを取れないこと（`55P03`）は `Kind.LOCK` の `ConflictException` に、`TableWriter` が変える。
   値オブジェクトと enum は、アクセサ（`value()`、`amount()`、`name()`）で列の値に直す。
@@ -91,8 +91,7 @@ jOOQ の Repository は業務規則を持たない。
   集約ルートの業務の列が変わらなくても、集約ルートの行を更新して版を進める。
   0 件のとき、行がなければ `shared.failure` の `NotFoundException` が、行があれば `shared.concurrency` の `ConflictException` が投げられる。
   Repository は例外を作らず、関数も渡さない。
-- 子の行は、`TableWriter.update` が、ルートの行ロックを取った後に差分で書く。
-  保存済みの子の自然キーを読み、保存後にない子を削除し、残る子を更新し、新しい子を追加する。
+- 子の行は、`TableWriter.update` が、ルートの行ロックを取った後に差分で書く（手順は[PostgreSQL の排他制御](../../database/postgresql-concurrency-control.md)）。
   Repository は子の読み取り、削除、更新、追加の振り分けを書かない。
   渡した子の全行が保存後の姿になるため、子の一部だけを渡さない。保存後に子が空なら、空の一覧を渡す。
 - `update` は、`TableWriter.update` を、そのメソッドの中で直接呼ぶ。
@@ -252,7 +251,7 @@ class JooqOrderRepository implements OrderRepository {
         ORDER,
         order,
         set -> rootColumns(order, set),
-        rows -> rows.put(LINES, order.lines(), JooqOrderRepository::lineColumns));
+        LINES.rows(order.lines(), JooqOrderRepository::lineColumns));
   }
 
   @Override
@@ -261,7 +260,7 @@ class JooqOrderRepository implements OrderRepository {
         ORDER,
         order,
         set -> rootColumns(order, set),
-        rows -> rows.put(LINES, order.lines(), JooqOrderRepository::lineColumns));
+        LINES.rows(order.lines(), JooqOrderRepository::lineColumns));
   }
 
   /** 注文の列の値。公開 ID と内部の主キー、共通カラムは TableWriter が書く。 */
@@ -404,10 +403,10 @@ Repository のテストは列と集約の往復と子の行の差分だけを確
 - [ ] 集約の形を `AggregateTable` と `ChildTable` のクラスの定数として一度だけ宣言し、子の外部キーの列に親の内部の主キーを指す列を渡す。［自分で点検（往復のテストで確かめる）］
 - [ ] `add` は `tableWriter.insert(...)` を呼び、ルートの列と子の全行を `ColumnValues` で渡す。`insertInto` を呼ばない。［ArchUnit で検査：TableWriterArchTest.tableWritesGoThroughTableWriter］
 - [ ] Spring の例外（`CannotAcquireLockException`、`DuplicateKeyException`）を Repository の外へ出さず、出すときは原因を付けずに種類を付けた `ConflictException` に変える。［自分で点検］
-- [ ] 集約ルートを受け取る `add` 以外の public メソッドは、`update` という名前で、`TableWriter.update` を、そのメソッドの中で直接呼ぶ。［ArchUnit で検査：TableWriterArchTest.repositoryUpdateAndDeleteCheckVersion］
-- [ ] 集約ルートを `Versioned` にし、`AggregateTable` の第 3 型引数にそのクラスを指定して、`update` はその集約ルートを `TableWriter.update` に渡す（テーブルから読み直した版は渡せない）。［型で検査 + 自分で点検（`Versioned` そのものを指定しない）］
-- [ ] 集約ルートを受け取る public メソッドは、`add` と `update` だけにする（`save` や `delete` のような名前は、`TableWriter.update` を呼んでも H3 が検出する）。［ArchUnit で検査：TableWriterArchTest.repositoryUpdateAndDeleteCheckVersion］
-- [ ] 子の行は `ChildRows` で保存後の全行を渡し、子を宣言しない集約は `rows -> {}` を渡す。［自分で点検］
+- [ ] 集約ルートを受け取る `add` 以外の public メソッドは、`update` という名前で、`TableWriter.update` を、そのメソッドの中で直接呼ぶ。［ArchUnit で検査：TableWriterArchTest.repositoryUpdateCallsVersionedEntryPoint］
+- [ ] 集約ルートを `Versioned` にし、`AggregateTable` の第 3 型引数にそのクラスを指定して、`update` はその集約ルートを `TableWriter.update` に渡す（テーブルから読み直した版は渡せない）。［型で検査 + 自分で点検（`Versioned` そのものを指定しない。読み直した版で集約ルートを作り直して渡さない）］
+- [ ] 集約ルートを受け取る public メソッドは、`add` と `update` だけにする（`save` や `delete` のような名前は、`TableWriter.update` を呼んでも H3 が検出する）。［ArchUnit で検査：TableWriterArchTest.repositoryUpdateCallsVersionedEntryPoint］
+- [ ] 子の行は `ChildTable.rows` で保存後の全行を作って渡し、子を宣言しない集約は子の行を渡さない。［自分で点検］
 - [ ] jOOQ の INSERT、UPDATE、DELETE、UPSERT（`INSERT ... ON CONFLICT`）、MERGE、`TableRecord`、`UpdatableRecord`、`DAO` の書き込み、Spring JDBC と JDBC の直接の利用を、`TableWriter` の外で使わない（一覧は[アーキテクチャテスト](../architecture-tests.md)の「書き込みの入口」）。［ArchUnit で検査：TableWriterArchTest.tableWritesGoThroughTableWriter］
 - [ ] jOOQ の `Settings` の `executeWithOptimisticLocking` と、コード生成の `recordVersionFields` を使わない。［自分で点検］
 - [ ] 生成クラスの `CREATED_*`、`UPDATED_*`、`PATCHED_*` の列を参照しない。［ArchUnit で検査：JooqCommonColumnsArchTest.commonColumnsAreReferencedOnlyBySharedPersistence］
