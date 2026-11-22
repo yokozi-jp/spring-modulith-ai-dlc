@@ -74,6 +74,23 @@ slot 1: web http://localhost:21173、backend http://localhost:21080、Keycloak h
 出力に自分のworktreeが出ていて、そのworktreeで動いている実行が無ければ、中断した前の実行がslotを持ったまま残っている。
 [compose-testのslot](test-slots.md#中断した実行が残した-slot)の手順で片付ける。
 
+### 開発環境は同時に1つのworktreeしか起動できない
+
+`task dev`、`task compose-up`、`task fe-dev`が使う開発環境は、worktreeごとに分かれない。
+一度に起動できるのは1つのworktreeで、別のworktreeで起動する前に、起動中のほうを`task compose-down`などで止める。
+
+- **`.env`が無い。** `.env`はgitignoreされていて、worktreeには存在しない。開発環境を動かすworktreeでは、`cp .env.example .env`で作ってパスワードを変更する。`.env.test`は、テスト系のTaskが`.env.test.example`から自動で作るので、手で作らない。
+- **Composeのprojectとボリュームが共有される。** `docker/compose.yml`の`name:`は`spring-modulith-local`で固定なので、PostgreSQL、Redis、Keycloak、Grafanaのボリュームがworktreeをまたいで同じになる。2つ目のworktreeで`task compose-up`すると、エラーなしに、そのworktreeのファイルでコンテナが作り直される。
+- **ホスト側のポートが固定である。** Keycloakの8080とWireMockの8090は固定で、PostgreSQL、Redis、Grafana、Collectorのポートは`.env`の値（`DB_PORT`など）で決まる。別のprojectで同じポートを使うと、`port is already allocated`で起動に失敗する。
+- **Viteの開発サーバーは5173に固定である。** `strictPort: true`なので、別のworktreeが5173を使っていると起動に失敗する（[ADR-033](../adr/ADR-033-pin-vite-dev-origin-and-source-proxy-port.md)）。Keycloakのrealmのredirect URIも、5173、18080、4173とcompose-testのslot用のポートに固定している。ほかのポートで動かすと、ログインのコールバックが拒否される。
+- **initdbとrealmは、ボリュームを作った最初の起動でしか効かない。** `docker/initdb`と`docker/keycloak/realm.json`が変わったら、`task compose-reset CONFIRM_RESET=yes`でボリュームを消して作り直す（ほかのサービスのデータも消える）。realmにredirect URIを足しても、既存のボリュームでは「Import skipped」になり、Keycloakに届かない。
+- **マイグレーションの版が違うと、DBが壊れる。** ボリュームを共有したまま、版の違うworktreeで`task be-migrate`すると、古い版のmigrateが警告なしに成功し、アプリのロールが`permission denied for schema product`になることがある（新しい版のchangeset 012がGRANTを外したため）。古いinitdbで作ったボリュームに新しい版のmigrateをかけると、`role "product_module" does not exist`で失敗する。
+
+次のTaskは開発環境を使わないので、開発環境の起動中でも、worktreeごとに同時に実行できる。
+
+- `task be-test`は、Testcontainersが空いているホストポートへDBなどを起動する。`backend/src`に固定のホストポートの指定がない。
+- compose-testを使うTaskは、前節のとおりslotで分かれる。開発用のKeycloakが`127.0.0.1:8080`で動いていても、slot 0を飛ばして別のslotを取る（[compose-testのslot](test-slots.md#割り当ての規則)）。
+
 ## エージェントがcommitとpushをするとき
 
 エージェントはcommitとpushを次のTaskだけで行い、`git commit`と`git push`を直接実行しない。
