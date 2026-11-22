@@ -158,6 +158,14 @@ new = '''Next == n <= Limit'''
 `VACUOUS` が出たら、`overrides` が退行と関係のない違反を起こしていないかを見る。
 変異は、設定の値ではなく、写したコードの退行で約束を破るものにする。
 
+## TLA+ でない検証スキル
+
+問いがスレッドをまたぐ順序でなく、一つのスレッドの中の組み合わせなら、本物の Java のコードを網羅の列挙で動かす検証スキルにしてよい。
+名前は `formal-verify-` で始めず、`exhaustive-verify-<対象>` にする。
+`task formal-verify` と `check.sh` は `model/*.tla` を前提にするため、`formal-verify-*` の名前に合わないスキルを入れない。
+今ある例は `.agents/skills/exhaustive-verify-tenant-context` で、`scripts/check.sh` と `scripts/mutants.py` を持つ。
+同期コミットの進め方と変異で捕まえる確かめ方は、このRunbookの「同期コミットを進める」と「変異を書く」に従う。
+
 ## 共通の道具を変える
 
 `tooling/formal-verify/` を変えたら、`task formal-verify-test` を実行する。
