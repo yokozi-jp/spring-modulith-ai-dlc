@@ -16,10 +16,12 @@ import java.io.UncheckedIOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.slf4j.MDC;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -87,6 +89,21 @@ class TenantSelectionFilterTest {
 
     assertThat(seen).extracting(TenantId::toString).containsExactly(TENANT);
     assertThatThrownBy(TenantContext::current).isInstanceOf(IllegalStateException.class);
+  }
+
+  @Test
+  @DisplayName("認証したリクエストの残りの処理の間だけ、MDC に利用者の ID とテナントの ID が入り、終わると消える")
+  void putsUserAndTenantIntoMdcOnlyWhileFilterChainRuns() throws IOException, ServletException {
+    final List<@Nullable String> seen = new ArrayList<>();
+
+    doFilter((request, response) -> {
+      seen.add(MDC.get("user.id"));
+      seen.add(MDC.get("tenant.id"));
+    });
+
+    assertThat(seen).as("残りの処理の中の user.id と tenant.id").containsExactly("user-1", TENANT);
+    assertThat(MDC.get("user.id")).as("filter を出た後の user.id").isNull();
+    assertThat(MDC.get("tenant.id")).as("filter を出た後の tenant.id").isNull();
   }
 
   @Test

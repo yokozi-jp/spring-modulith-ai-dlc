@@ -2,8 +2,10 @@ package com.example.demo;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import com.example.demo.testkit.AppUsers;
 import com.example.demo.testkit.CapturedLogRecords;
 import com.example.demo.testkit.SharedTestConfiguration;
 import io.micrometer.observation.Observation;
@@ -14,6 +16,7 @@ import io.opentelemetry.api.common.Attributes;
 import io.opentelemetry.instrumentation.logback.appender.v1_0.OpenTelemetryAppender;
 import io.opentelemetry.sdk.logs.data.LogRecordData;
 import java.util.List;
+import java.util.UUID;
 import java.util.concurrent.atomic.AtomicReference;
 import lombok.extern.slf4j.Slf4j;
 import org.junit.jupiter.api.BeforeEach;
@@ -25,14 +28,27 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.system.CapturedOutput;
 import org.springframework.boot.test.system.OutputCaptureExtension;
+import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.context.annotation.Import;
+import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.request.MockMvcRequestBuilders;
+import org.springframework.test.web.servlet.result.MockMvcResultMatchers;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.json.JsonMapper;
 
-/** 構造化ログ、トレース相関、OTLP 属性の運用契約を検証する。 */
+/** 構造化ログ、トレース相関、OTLP 属性、テナントと利用者の文脈の運用契約を検証する。 */
 @Slf4j
 @SpringBootTest
+@AutoConfigureMockMvc
 @Import(SharedTestConfiguration.class)
 @ExtendWith(OutputCaptureExtension.class)
 class ObservabilityContractTest {
+
+  /** ログの属性の、テナントの {@code public_id}。 */
+  private static final AttributeKey<String> TENANT_ID = AttributeKey.stringKey("tenant.id");
+
+  /** ログの属性の、アプリの利用者の ID。 */
+  private static final AttributeKey<String> USER_ID = AttributeKey.stringKey("user.id");
 
   /** HTTP などと同じ tracing handler が登録された observation registry。 */
   @Autowired private ObservationRegistry observationRegistry;
@@ -42,6 +58,9 @@ class ObservabilityContractTest {
 
   /** このコンテキストの OpenTelemetry。 */
   @Autowired private OpenTelemetry openTelemetry;
+
+  /** 実際の Spring MVC と Security filter chain を通すクライアント。 */
+  @Autowired private MockMvc mockMvc;
 
   @BeforeEach
   void installAppender() {
@@ -57,12 +76,11 @@ class ObservabilityContractTest {
     final String message = "observability correlation contract";
 
     Observation.createNotStarted("observability.contract", observationRegistry)
-        .observe(
-            () -> {
-              traceId.set(MDC.get("traceId"));
-              spanId.set(MDC.get("spanId"));
-              log.info(message);
-            });
+        .observe(() -> {
+          traceId.set(MDC.get("traceId"));
+          spanId.set(MDC.get("spanId"));
+          log.info(message);
+        });
 
     assertNotNull(traceId.get(), "active observation の trace ID が MDC に存在すること");
     assertNotNull(spanId.get(), "active observation の span ID が MDC に存在すること");
@@ -109,6 +127,58 @@ class ObservabilityContractTest {
     assertTrue(
         stackTrace != null && stackTrace.contains("ObservabilityContractTest"),
         () -> event + ": " + attributes);
+  }
+
+  @Test
+  @DisplayName("MDC の tenant.id と user.id は、コンソールの JSON の入れ子の項目と OTLP の LogRecord 属性の両方に出る")
+  void tenantAndUserInMdcAppearInConsoleAndLogRecord(final CapturedOutput output) {
+    final String event = "observability mdc contract";
+
+    try (MDC.MDCCloseable ignoredTenant = MDC.putCloseable("tenant.id", AppUsers.TENANT_ID);
+        MDC.MDCCloseable ignoredUser = MDC.putCloseable("user.id", AppUsers.USER_ID)) {
+      log.info(event);
+    }
+
+    final Attributes attributes = singleRecordAttributes(event);
+    assertEquals(AppUsers.TENANT_ID, attributes.get(TENANT_ID), () -> event + ": " + attributes);
+    assertEquals(AppUsers.USER_ID, attributes.get(USER_ID), () -> event + ": " + attributes);
+    final JsonNode line =
+        JsonMapper.builder()
+            .build()
+            .readTree(
+                output
+                    .getAll()
+                    .lines()
+                    .filter(candidate -> candidate.startsWith("{") && candidate.contains(event))
+                    .findFirst()
+                    .orElseThrow(() -> new AssertionError(event + " の JSON の行")));
+    assertEquals(AppUsers.TENANT_ID, line.at("/tenant/id").asString(), line::toString);
+    assertEquals(AppUsers.USER_ID, line.at("/user/id").asString(), line::toString);
+  }
+
+  @Test
+  @DisplayName("テナントを選んだ利用者の要求の中のログは tenant.id と user.id を持ち、要求の後の MDC に残らない")
+  void requestLogCarriesTenantAndUser() throws Exception {
+    final String orderId = UUID.randomUUID().toString();
+
+    mockMvc
+        .perform(
+            MockMvcRequestBuilders.get("/api/orders/{orderId}", orderId).with(AppUsers.oidcLogin()))
+        .andExpect(MockMvcResultMatchers.status().isNotFound());
+
+    final Attributes attributes =
+        capturedLogRecords.withBody("API business failure").stream()
+            .map(LogRecordData::getAttributes)
+            .filter(candidate ->
+                String.valueOf(candidate.get(AttributeKey.stringKey("exception.message")))
+                    .contains(orderId))
+            .findFirst()
+            .orElseThrow(
+                () -> new AssertionError("orderId=" + orderId + " の API business failure"));
+    assertEquals(AppUsers.TENANT_ID, attributes.get(TENANT_ID), attributes::toString);
+    assertEquals(AppUsers.USER_ID, attributes.get(USER_ID), attributes::toString);
+    assertNull(MDC.get("tenant.id"), "要求の後の MDC の tenant.id");
+    assertNull(MDC.get("user.id"), "要求の後の MDC の user.id");
   }
 
   private Attributes singleRecordAttributes(final String event) {

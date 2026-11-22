@@ -14,6 +14,7 @@ import java.io.IOException;
 import java.util.Optional;
 import java.util.UUID;
 import org.jspecify.annotations.Nullable;
+import org.slf4j.MDC;
 import org.springframework.http.HttpMethod;
 import org.springframework.security.authentication.AuthenticationTrustResolver;
 import org.springframework.security.authentication.AuthenticationTrustResolverImpl;
@@ -35,11 +36,19 @@ import org.springframework.web.filter.OncePerRequestFilter;
  *
  * <p>テナントを選んだ後のリクエストは、残りの処理の間だけ、選んだテナントを {@link TenantContext} に束縛する。テナントはセッションの権限だけから取り、リクエストの
  * header、パス、本文から取らない。
+ *
+ * <p>認証したリクエストは、所属の引き直しを含む残りの処理の間だけ、アプリの利用者の ID を MDC の {@value #USER_ID_LOG_KEY} に入れる。
  */
 final class TenantSelectionFilter extends OncePerRequestFilter {
 
   /** テナントが決まっている必要がある API。 */
   private static final RequestMatcher REQUIRES_TENANT;
+
+  /**
+   * ログとトレースで、アプリの利用者の ID（{@link
+   * AppUserPrincipal#userId()}）を持つ項目の名前（docs/observability/conventions.md）。
+   */
+  private static final String USER_ID_LOG_KEY = "user.id";
 
   static {
     final PathPatternRequestMatcher.Builder paths = PathPatternRequestMatcher.withDefaults();
@@ -75,6 +84,32 @@ final class TenantSelectionFilter extends OncePerRequestFilter {
 
   @Override
   protected void doFilterInternal(
+      final HttpServletRequest request,
+      final HttpServletResponse response,
+      final FilterChain filterChain)
+      throws ServletException, IOException {
+    final @Nullable String userId = authenticatedUserId();
+    if (userId == null) {
+      doFilterInSelectedTenant(request, response, filterChain);
+      return;
+    }
+    try (MDC.MDCCloseable ignored = MDC.putCloseable(USER_ID_LOG_KEY, userId)) {
+      doFilterInSelectedTenant(request, response, filterChain);
+    }
+  }
+
+  /** 認証した利用者の、アプリの利用者の ID を返す。認証していないか、利用者が {@link AppUserPrincipal} でなければ null を返す。 */
+  private @Nullable String authenticatedUserId() {
+    final @Nullable Authentication authentication = holder.getContext().getAuthentication();
+    return authentication != null
+            && trustResolver.isAuthenticated(authentication)
+            && authentication.getPrincipal() instanceof AppUserPrincipal user
+        ? user.userId()
+        : null;
+  }
+
+  /** 選んだテナントが残っていれば、束縛してリクエストの残りの処理を呼ぶ。 */
+  private void doFilterInSelectedTenant(
       final HttpServletRequest request,
       final HttpServletResponse response,
       final FilterChain filterChain)

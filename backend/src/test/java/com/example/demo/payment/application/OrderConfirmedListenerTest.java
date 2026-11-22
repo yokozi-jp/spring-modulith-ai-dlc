@@ -50,6 +50,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.slf4j.MDC;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Bean;
@@ -267,28 +268,34 @@ class OrderConfirmedListenerTest {
   }
 
   @Test
-  @DisplayName("取り消した注文の OrderConfirmed では請求せず、決済記録を作らず、INFO を記録して出版を完了にする")
+  @DisplayName("取り消した注文の OrderConfirmed では請求せず、決済記録を作らず、イベントのテナントを持ち利用者を持たない INFO を記録して出版を完了にする")
   void cancelledOrderIsNotCharged(final Scenario scenario) {
     final String orderId = fixture.draftedOrderId();
     fixture.observed(
         () -> cancelOrder.handle(new CancelOrderCommand(orderId, new ExpectedLockNo(1))));
 
-    OrderConfirmedFixture.await(
-        scenario.publish(new OrderConfirmed(orderId, NOW, AsTenant.TENANT)),
-        orderId,
-        "完了した出版",
-        () -> fixture.registry(orderId),
-        state -> state.archived() == 1);
+    // 要求の中で発行したときと同じく、発行するスレッドの MDC に利用者を入れ、Listener へ伝わらないことを確かめる。
+    try (MDC.MDCCloseable ignored = MDC.putCloseable("user.id", AppUsers.USER_ID)) {
+      OrderConfirmedFixture.await(
+          scenario.publish(new OrderConfirmed(orderId, NOW, AsTenant.TENANT)),
+          orderId,
+          "完了した出版",
+          () -> fixture.registry(orderId),
+          state -> state.archived() == 1);
+    }
 
     assertThat(gateway.recordedTraceIds()).as("orderId=%s の取消後の決済代行の呼び出し", orderId).isEmpty();
     assertThat(payments(orderId)).as("orderId=%s の取消後の決済記録", orderId).isEmpty();
     assertThat(capturedLogRecords.withScope(HANDLER_SCOPE))
-        .as("orderId=%s の確定していない注文の INFO のログ", orderId)
+        .as("orderId=%s の確定していない注文の INFO のログ、そのテナントと利用者", orderId)
         .anySatisfy(log -> {
           assertThat(log.getSeverity()).isEqualTo(Severity.INFO);
           assertThat(log.getBodyValue()).isNotNull();
           assertThat(log.getBodyValue().asString())
               .contains("orderId=" + orderId + ", status=CANCELLED");
+          assertThat(log.getAttributes().get(AttributeKey.stringKey("tenant.id")))
+              .isEqualTo(AsTenant.TENANT.toString());
+          assertThat(log.getAttributes().get(AttributeKey.stringKey("user.id"))).isNull();
         });
     assertThat(capturedLogRecords.withScope(ASYNC_ERROR_SCOPE))
         .as("orderId=%s の確定していない注文の ERROR のログ", orderId)

@@ -4,10 +4,12 @@
     <include resource="org/springframework/boot/logging/logback/structured-console-appender.xml"/>
 
     <!-- SLF4J の key-value はすべて OTLP 属性へ送り、allowlist は Collector で適用する（ADR-015）。 -->
+    <!-- MDC は、テナントと利用者の ID だけを属性にする（docs/observability/conventions.md）。 -->
     <appender
         name="OTEL"
         class="io.opentelemetry.instrumentation.logback.appender.v1_0.OpenTelemetryAppender">
         <captureKeyValuePairAttributes>true</captureKeyValuePairAttributes>
+        <mdcAttributesIncluded>tenant.id,user.id</mdcAttributesIncluded>
     </appender>
 
     <root level="INFO">
