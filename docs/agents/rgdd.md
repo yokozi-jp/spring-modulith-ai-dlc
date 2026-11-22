@@ -80,6 +80,9 @@ pstack のプレイブックには、このリポジトリの規約と食い違�
 サブエージェントがワークスペースで `./gradlew` を動かすと、同じ DB のコンテナを使う `task be-test` や pre-push の `be-test` と重なり、`PaymentGatewayClientIntegrationTest` が負荷で落ちる。
 `/thermos` を実行するエージェントは、差分とブランチの状態を読むだけにさせ、テストの実行は自分で、レビューの前に済ませておく。
 
+Kiro Web では `invoke_sub_agent` が無く `/thermos` を実行できない。
+代わりの手順は [Kiro Web の開発環境](../local-env-setup/kiro-web.md)の「レビューを実行する」に従う。
+
 変更の種類によって、次のレビューを足す。
 どちらも指摘を報告するだけで、コードは直さない。
 
