@@ -21,6 +21,8 @@ APIは絶対時刻をUTCで返し、フロントエンドが画面の要件に�
 
 - イベント発生日時、作成日時、更新日時には`Instant`を使う。
 - 現在時刻を使うクラスは`Clock`をコンストラクタ引数で受け取り、`Instant.now(clock)`を使う。
+- 業務の時刻（`ordered_at`など）と共通カラムの`*_at`は別の値であり、一致を前提にしない。
+  同じユースケースの中で2回読んでもよい。業務の時刻は、ユースケースの入口で1回読み、必要なら引数で渡す。
 - `Instant`以外の`java.time`型の`now(Clock)`は使わない。
   これらは`Clock`のゾーンで値を決め、注入する`Clock`はUTCなので、日本では0時から9時の間に`LocalDate.now(clock)`が前日を返す。
 - 業務日付や地域の日時を現在時刻から求めるときは、`LocalDate.ofInstant(Instant.now(clock), businessZone)`のように業務タイムゾーンを明示する。
