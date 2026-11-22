@@ -16,7 +16,7 @@
 - [ADR-012: プロパティベーステストとミューテーションテストを採用する](ADR-012-adopt-property-based-and-mutation-testing.md)（Proposed, 2026-09-14）
 - [ADR-013: HTTP API 契約を標準化する](ADR-013-standardize-http-api-contracts.md)（Accepted, 2026-09-14）
 - [ADR-014: SPA とバックエンドを同一オリジンで公開する](ADR-014-use-same-origin-spa-security-boundary.md)（Accepted, 2026-09-14）
-- [ADR-015: 可観測性データを構造化し保護する](ADR-015-structure-and-protect-observability-data.md)（Accepted, 2026-09-15）
+- [ADR-015: 可観測性データを構造化し保護する](ADR-015-structure-and-protect-observability-data.md)（Accepted, Amended by ADR-110, 2026-09-15）
 - [ADR-016: API と SPA のメッセージをローカライズする](ADR-016-localize-api-and-spa-messages.md)（Accepted, Amended by ADR-047, 2026-09-15）
 - [ADR-017: トランクベース開発とリポジトリ保護を採用する](ADR-017-adopt-trunk-based-repository-governance.md)（Proposed, 2026-09-15）
 - [ADR-018: release-please でセマンティックリリースを自動化する](ADR-018-automate-semantic-releases.md)（Proposed, 2026-09-15）
@@ -109,3 +109,4 @@
 - [ADR-107: 業務テーブルを RLS でテナントごとに分け、テナントをロールと同じ SQL でトランザクションごとに設定する](ADR-107-isolate-tenants-with-rls-set-per-transaction.md)（Proposed, 2026-11-21）
 - [ADR-108: 同じモジュールの表どうしの参照に、テナントを含む複合の外部キーを作る](ADR-108-add-tenant-composite-foreign-keys-within-modules.md)（Proposed, 2026-11-21）
 - [ADR-109: バックエンドのテストを America/New_York の JVM で流す](ADR-109-run-backend-tests-in-new-york-jvm.md)（Proposed, 2026-11-22）
+- [ADR-110: ログとトレースに、テナントの public_id とアプリの利用者の ID を付ける](ADR-110-add-tenant-and-user-ids-to-logs-and-traces.md)（Proposed, 2026-11-22）

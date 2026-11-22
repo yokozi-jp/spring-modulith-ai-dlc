@@ -1,7 +1,7 @@
 ---
 type: Convention
 title: 可観測性データの規約
-description: OpenTelemetry へ記録するデータ、例外の記録、ログとトレースの相関、発生源で渡さない値、Collector の allowlist、本番のロググループ、保持、アクセス、本番の受け入れ条件を定め、可観測性データの実装、Collector の設定、本番収集基盤を変更するとき、フロントエンドのテレメトリに値を足すときに読む規約。
+description: OpenTelemetry へ記録するデータ、例外の記録、ログとトレースの相関、テナントと利用者の項目、発生源で渡さない値、Collector の allowlist、本番のロググループ、保持、アクセス、本番の受け入れ条件を定め、可観測性データの実装、Collector の設定、本番収集基盤を変更するとき、フロントエンドのテレメトリに値を足すときに読む規約。
 tags: [convention, observability, opentelemetry, security]
 ---
 
@@ -11,12 +11,13 @@ tags: [convention, observability, opentelemetry, security]
 CSP 違反は、ブラウザ自身が Reporting API で同一オリジンの `/csp-report` から Collector へ送る。
 例外は logger へ渡して標準どおりに記録し、禁止値はアプリケーションから渡さない。
 ログの属性は Collector の allowlist で絞り、保存先で閲覧の制限と表示時のマスクを行う。
-設計判断は [ADR-015](../adr/ADR-015-structure-and-protect-observability-data.md)、[ADR-043](../adr/ADR-043-send-production-telemetry-to-cloudwatch-via-otel-collector.md)、[ADR-045](../adr/ADR-045-remove-aws-docs-and-production-cd-example.md)、[ADR-068](../adr/ADR-068-collect-browser-telemetry-with-faro-via-collector.md)、[ADR-070](../adr/ADR-070-record-sql-spans-with-jooq-execute-listener.md) に記録している。
+設計判断は [ADR-015](../adr/ADR-015-structure-and-protect-observability-data.md)、[ADR-043](../adr/ADR-043-send-production-telemetry-to-cloudwatch-via-otel-collector.md)、[ADR-045](../adr/ADR-045-remove-aws-docs-and-production-cd-example.md)、[ADR-068](../adr/ADR-068-collect-browser-telemetry-with-faro-via-collector.md)、[ADR-070](../adr/ADR-070-record-sql-spans-with-jooq-execute-listener.md)、[ADR-110](../adr/ADR-110-add-tenant-and-user-ids-to-logs-and-traces.md) に記録している。
 
 ## 記録
 
 コンソールログは一行一 JSON の Elastic Common Schema（ECS）で出力する。
 OpenTelemetry appender は同じ Logback event を OTLP の LogRecord として送り、SLF4J の key-value をすべて属性にする。
+MDC は、`tenant.id` と `user.id` だけを属性にする（`mdcAttributesIncluded`）。
 
 アプリケーションログの message は検索可能な静的 event 名にし、変動する値は SLF4J の key-value 属性へ置く。
 属性名には OpenTelemetry の semantic conventions が定義する名前を優先する。
@@ -47,17 +48,39 @@ OTLP では SDK が `exception.type`、`exception.message`、`exception.stacktra
 Grafana では trace ID を使ってログとトレースを相互に検索する。
 起動時やバッチの span 外で発生したログには相関情報がないため、空文字の ID を補わない。
 
+## テナントと利用者
+
+ログの毎行と HTTP の受信の span に、テナントと利用者の ID を付ける（[ADR-110](../adr/ADR-110-add-tenant-and-user-ids-to-logs-and-traces.md)）。
+
+- **`tenant.id`**：テナントの `public_id`（`TenantId.toString()` の UUID）。業務テーブルの `tenant_public_id` でそのまま引ける。`tenancy.m_tenant` の主キーの `tenant_id`（bigint）ではない。
+- **`user.id`**：アプリの利用者の ID（`AppUserPrincipal.userId()`、`tenancy.m_user` の `public_id` の UUID）。IdP の `sub` ではない。
+
+ログでは、2 つを MDC に入れ、ログを書く処理から key-value で渡さない。
+
+- `tenant.id` は、`TenantContext.call` がテナントを束縛する間だけ入る。リクエストのログにもリスナーのログにも付く。
+- `user.id` は、`TenantSelectionFilter` が認証したリクエストの間だけ入れる。リスナーのログには付かない。
+- コンソールの ECS JSON では `{"tenant":{"id":…},"user":{"id":…}}` の入れ子の項目になり、OTLP では LogRecord の属性になる。
+- リスナーの外で記録するログ（リスナーが投げた例外を Spring の `SimpleAsyncUncaughtExceptionHandler` が記録する ERROR など）は、`tenant.id` を持たない。
+
+トレースでは、`TenantSelectionFilter` が HTTP の受信の span にだけ、2 つを属性として付ける。
+
+- Micrometer の Observation の高い濃度の key value にだけ入れ、低い濃度の key value に入れない。低い濃度の key value は、メトリクスの tag にもなる。
+- リスナーは自分の span を持たないので、リスナーの処理の span には付かない。
+- Micrometer Tracing の baggage（`management.tracing.baggage.*`）で伝えない。
+
 ## 発生源で渡さない値
 
 次の値は、アプリケーションのコードから message、属性、URL、span のいずれにも渡さない。
 
-- Authorization、Cookie、認証 session ID、利用者へ結び付く ID、token、password、secret、接続文字列
+- Authorization、Cookie、認証 session ID、IdP の `sub`、token、password、secret、接続文字列
 - request body、response body、フォーム入力、DOM text
 - query string、URL fragment
 - SQL、認可判断で存在確認に使える値
 - 氏名、メールアドレス、login ID、住所、電話番号
 
-ログの属性で許可するのは、例外の属性（`exception.type`、`exception.message`、`exception.stacktrace`）、HTTP status、409 の種類（`conflict.kind`）、trace と span の相関情報、業務上必要な内部 ID である。
+利用者とテナントを指す ID は、アプリが採番した `user.id`（利用者の ID）と `tenant.id`（テナントの `public_id`）だけを渡す（「[テナントと利用者](#テナントと利用者)」）。
+
+ログの属性で許可するのは、例外の属性（`exception.type`、`exception.message`、`exception.stacktrace`）、HTTP status、409 の種類（`conflict.kind`）、テナントと利用者の ID（`tenant.id`、`user.id`）、trace と span の相関情報、業務上必要な内部 ID である。
 イベント出版の定期の再投入と手での 1 回の再投入は、業務上必要な内部 ID として出版の ID、イベントの型とリスナーの完全修飾名、試行の回数（`event_publication.id`、`event_publication.event_type`、`event_publication.listener_id`、`event_publication.completion_attempts`）と、1 回の実行の件数（`event_publication.resubmitted.count`、`event_publication.exhausted.count`）と、手での 1 回の再投入の結果の件数（`event_publication.completed.count`、`event_publication.incomplete.count`、`event_publication.remaining.count`）を出す（[ADR-079](../adr/ADR-079-resubmit-failed-event-publications-periodically-with-shedlock.md)）。
 イベントの本文（`serialized_event`）は読まず、ログへ渡さない。
 内部 ID と氏名などの表示値を同じ event へ載せない。
@@ -109,7 +132,7 @@ Collector の設定（`docker/otel-collector/config.yaml`）は、ローカル�
 - **バックエンドのトレースとメトリクス**：加工しない。計装を追加して禁止値が入る属性が見つかった場合は、transform で消す。
 
 ログに属性を追加するときは、Collector の `keep_keys` とこの文書の許可する値を同じ変更で直す。
-現在の `keep_keys` は、使っている `exception.type`、`exception.message`、`exception.stacktrace`、`http.response.status_code`、`conflict.kind`、`event_publication.id`、`event_publication.event_type`、`event_publication.listener_id`、`event_publication.completion_attempts`、`event_publication.resubmitted.count`、`event_publication.exhausted.count`、`event_publication.completed.count`、`event_publication.incomplete.count`、`event_publication.remaining.count` だけを持つ。
+現在の `keep_keys` は、使っている `exception.type`、`exception.message`、`exception.stacktrace`、`http.response.status_code`、`conflict.kind`、`tenant.id`、`user.id`、`event_publication.id`、`event_publication.event_type`、`event_publication.listener_id`、`event_publication.completion_attempts`、`event_publication.resubmitted.count`、`event_publication.exhausted.count`、`event_publication.completed.count`、`event_publication.incomplete.count`、`event_publication.remaining.count` だけを持つ。
 
 フロントエンドのログは、バックエンドと別の pipeline（`logs/frontend`）で絞る。
 検証、filter、正規化の三段で faro receiver の logfmt 本文を処理し、検証済みの record だけを保存先へ送る。
@@ -170,6 +193,9 @@ faro receiver は処理に失敗すると、payload の全体を Collector 自�
   `webhook_event` の受け口が、`application/reports+json` 以外の `Content-Type`（旧形式、header なし、有効な本文の `text/plain`）に 401、正しい `Content-Type` の JSON でない本文に 200（出口には残さない）、64 KiB を超える本文と空の本文に 400、GET に 405、別のパスに 404 を返すことも確かめる。
   Collector の設定を変えたら実行する。
 - **`ObservabilityContractTest`**：key-value と例外が LogRecord の属性になることを確かめる。
+  MDC の `tenant.id` と `user.id` がコンソールの JSON の入れ子の項目と LogRecord の属性に出ることと、テナントを選んだ要求の中のログと受信の span がその 2 つを持ち、`http.server.requests` の tag が持たないことも確かめる。
+- **`OrderConfirmedListenerTest`**：リスナーの中のログが、イベントのテナントの `tenant.id` を持ち、発行したスレッドの MDC の `user.id` を持たないことを確かめる。
+- **`TenantContextTest`**：MDC の `tenant.id` が、入れ子の束縛から戻ると外側のテナントに戻り、束縛を出ると消えることを確かめる。
 
 ## 本番の保存先
 
