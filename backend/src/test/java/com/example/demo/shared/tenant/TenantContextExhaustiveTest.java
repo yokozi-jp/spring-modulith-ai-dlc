@@ -7,15 +7,17 @@ import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
 import org.jspecify.annotations.Nullable;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.slf4j.MDC;
 
 /**
- * {@link TenantContext#call} を、入れ子、例外、例外の握りつぶしのすべての組み合わせ（式の大きさ {@value #MAX_SIZE} 以下）で動かし、MDC の
- * {@code tenant.id}、束縛、トランザクションマネージャーが読む束縛が、どの時点でも内側の束縛のテナントと一致し、最も外側を出ると何も残らないことを検証する。
+ * {@link TenantContext#call} を、入れ子、例外（検査されない例外、検査される例外、{@link Error}）、例外の握りつぶしのすべての組み合わせ（式の大きさ
+ * {@value #MAX_SIZE} 以下）で動かし、MDC の {@code
+ * tenant.id}、束縛、トランザクションマネージャーが読む束縛が、どの時点でも内側の束縛のテナントと一致し、最も外側を出ると何も残らず、例外がそのまま出ることを検証する。
  *
- * <p>手で選んだ入れ子の例と違い、組み合わせを機械的に尽くす。検証の範囲と変異は {@code
+ * <p>{@link TenantContextTest} は読みやすい代表例で、この検査はその例を含めて組み合わせを機械的に尽くす。検証の範囲と変異は {@code
  * .agents/skills/exhaustive-verify-tenant-context/SKILL.md} にある。
  */
 class TenantContextExhaustiveTest {
@@ -29,8 +31,41 @@ class TenantContextExhaustiveTest {
           new TenantId(UUID.fromString("5d2e8f4a-1b3c-4d6e-9f70-8a1b2c3d4e5f")),
           new TenantId(UUID.fromString("9a8b7c6d-5e4f-4a3b-8c2d-1e0f9a8b7c6d")));
 
-  /** MDC の項目の名前。 */
-  private static final String KEY = TenantContext.ATTRIBUTE_KEY;
+  /** MDC の項目の名前。{@code TenantContext.ATTRIBUTE_KEY} の定数名が変わっても、ログの項目名が変わらないよう、値をここに固定する。 */
+  private static final String KEY = "tenant.id";
+
+  /** 例外をまだ投げていないことを表す。 */
+  private static final Throwable NOTHING_THROWN = new IllegalStateException("nothing thrown");
+
+  /** 投げる例外の種類。 */
+  private enum Kind {
+    /** 検査されない例外。 */
+    UNCHECKED,
+    /** 検査される例外。リクエストの filter が通す {@code ServletException} に当たる。 */
+    CHECKED,
+    /** {@link Error}（{@link AssertionError} で代表する）。 */
+    ERROR
+  }
+
+  /** 投げる検査される例外。 */
+  private static final class CheckedBoom extends Exception {
+
+    private static final long serialVersionUID = 1L;
+
+    /* package */ CheckedBoom() {
+      super("checked", null, false, false);
+    }
+  }
+
+  /** 投げる検査されない例外。 */
+  private static final class UncheckedBoom extends RuntimeException {
+
+    private static final long serialVersionUID = 1L;
+
+    /* package */ UncheckedBoom() {
+      super("unchecked", null, false, false);
+    }
+  }
 
   /** {@link TenantContext#call} の中で動かす式。 */
   private sealed interface Expr {
@@ -47,7 +82,7 @@ class TenantContextExhaustiveTest {
     }
 
     /** 例外を投げる。 */
-    record Throw() implements Expr {
+    record Throw(Kind kind) implements Expr {
       @Override
       public boolean throwsOut() {
         return true;
@@ -62,7 +97,10 @@ class TenantContextExhaustiveTest {
       }
     }
 
-    /** 前の式の後に後の式を動かす。前が例外を投げたら後は動かさない。 */
+    /**
+     * 前の式の後に後の式を動かす。前が例外を投げたら後は動かさない。結合則が成り立つため、{@code Seq(Seq(a,b),c)} と {@code Seq(a,Seq(b,c))}
+     * は重複する。
+     */
     record Seq(Expr first, Expr second) implements Expr {
       @Override
       public boolean throwsOut() {
@@ -79,84 +117,122 @@ class TenantContextExhaustiveTest {
     }
   }
 
-  /** 式の中で投げる例外。呼び出し側が同じ例外を受け取ることを確かめる。 */
-  private static final class Boom extends RuntimeException {
-
-    private static final long serialVersionUID = 1L;
-
-    /** 例外を作る。 */
-    /* package */ Boom() {
-      super("boom", null, false, false);
-    }
+  @AfterEach
+  void clearMdc() {
+    // 退行でテナントが残っても、同じ JVM の別のテストの失敗にしない。
+    MDC.remove(KEY);
   }
 
   @Test
-  @DisplayName("どの入れ子、例外、握りつぶしの組み合わせでも、MDC と束縛は内側のテナントと一致し、最も外側を出ると何も残らない")
+  @DisplayName("どの入れ子、例外、握りつぶしの組み合わせでも、MDC と束縛は内側のテナントと一致し、最も外側を出ると何も残らず、例外はそのまま出る")
   void mdcAndBindingAgreeForEveryNestingUpToBound() {
-    int checked = 0;
-    final List<String> violations = new ArrayList<>();
-    for (final Expr expr : expressionsUpTo(MAX_SIZE)) {
+    final List<Expr> expressions = expressionsUpTo(MAX_SIZE);
+    final Run run = new Run();
+    for (final Expr expr : expressions) {
+      run.reset();
+      final @Nullable Throwable escaped = run.outermost(expr);
+      final boolean thrown = escaped != null;
+      if (thrown == expr.throwsOut()) {
+        if (thrown && !escaped.equals(run.lastThrown)) {
+          run.violations.add("ExceptionUnchanged: 最後に投げた例外と別の例外が出た。出た例外=" + escaped);
+        }
+      } else {
+        run.violations.add("ExceptionUnchanged: 例外が出るかが式の意味と違う。出た例外=" + escaped);
+      }
+      if (MDC.get(KEY) != null) {
+        run.violations.add("NothingRemains: 最も外側を出た後に MDC が残る。MDC=" + MDC.get(KEY));
+      }
+      if (TenantContext.findCurrent().isPresent()) {
+        run.violations.add("NothingRemains: 最も外側を出た後に束縛が残る");
+      }
+      assertThat(run.violations).as("式 %s", expr).isEmpty();
+    }
+    assertThat(expressions).as("列挙した式").hasSize(49_764);
+  }
+
+  /** 式を一つ動かし、観測の食い違いを集める。 */
+  private static final class Run {
+
+    /** 食い違いの説明。約束の名前で始める。 */
+    private final List<String> violations = new ArrayList<>();
+
+    /** 最後に投げた例外。外へ出る例外は、いつもこれである。 */
+    private Throwable lastThrown = NOTHING_THROWN;
+
+    /** 次の式のために、食い違いと最後に投げた例外を消す。 */
+    private void reset() {
       violations.clear();
-      final boolean thrown = runOutermost(expr, violations);
-      if (thrown != expr.throwsOut()) {
-        violations.add("最も外側から例外が出るかが式の意味と違う: 出た=" + thrown);
-      }
-      assertThat(MDC.get(KEY)).as("式 %s の後に残った MDC", expr).isNull();
-      assertThat(TenantContext.findCurrent()).as("式 %s の後に残った束縛", expr).isEmpty();
-      assertThat(violations).as("式 %s", expr).isEmpty();
-      checked++;
+      lastThrown = NOTHING_THROWN;
     }
-    assertThat(checked).as("列挙した式の数").isGreaterThan(10_000);
-  }
 
-  /** 最も外側から式を動かす。式から例外が出たかを返す。 */
-  private static boolean runOutermost(final Expr expr, final List<String> violations) {
-    try {
-      run(expr, null, violations);
-      return false;
-    } catch (Boom boom) {
-      return true;
-    }
-  }
-
-  /** 式を動かし、{@link Expr.Probe} で MDC と束縛が、内側のテナントと一致することを確かめる。 */
-  private static void run(
-      final Expr expr, final @Nullable TenantId expected, final List<String> violations) {
-    switch (expr) {
-      case Expr.Probe() -> observe(expected, violations);
-      case Expr.Throw() -> throw new Boom();
-      case Expr.Call call ->
-          TenantContext.<@Nullable Object, RuntimeException>call(
-              call.tenant(),
-              () -> {
-                run(call.body(), call.tenant(), violations);
-                return null;
-              });
-      case Expr.Seq seq -> {
-        run(seq.first(), expected, violations);
-        run(seq.second(), expected, violations);
+    /** 最も外側から式を動かす。式から出た例外を返す。 */
+    private @Nullable Throwable outermost(final Expr expr) {
+      try {
+        run(expr, null);
+        return null;
+      } catch (CheckedBoom | UncheckedBoom | AssertionError thrown) {
+        return thrown;
       }
-      case Expr.Catch caught -> {
-        try {
-          run(caught.body(), expected, violations);
-        } catch (Boom swallowed) {
-          // 握りつぶした後も、束縛と MDC は外側のテナントに戻っている必要がある。
-          observe(expected, violations);
+    }
+
+    /** 式を動かし、{@link Expr.Probe} で MDC と束縛が、内側のテナントと一致することを確かめる。 */
+    private void run(final Expr expr, final @Nullable TenantId expected) throws CheckedBoom {
+      switch (expr) {
+        case Expr.Probe() -> observe(expected);
+        case Expr.Throw(var kind) -> throwNew(kind);
+        case Expr.Call call ->
+            TenantContext.<@Nullable Object, CheckedBoom>call(
+                call.tenant(),
+                () -> {
+                  run(call.body(), call.tenant());
+                  return null;
+                });
+        case Expr.Seq seq -> {
+          run(seq.first(), expected);
+          run(seq.second(), expected);
+        }
+        case Expr.Catch caught -> {
+          try {
+            run(caught.body(), expected);
+          } catch (CheckedBoom | UncheckedBoom | AssertionError swallowed) {
+            observe(expected);
+          }
         }
       }
     }
-  }
 
-  /** 今の MDC、束縛が、期待するテナントと一致するかを確かめる。 */
-  private static void observe(final @Nullable TenantId expected, final List<String> violations) {
-    final @Nullable String expectedText = expected == null ? null : expected.toString();
-    final @Nullable String mdc = MDC.get(KEY);
-    if (!Objects.equals(mdc, expectedText)) {
-      violations.add("MDC tenant.id=" + mdc + " だが内側の束縛は " + expectedText);
+    private void throwNew(final Kind kind) throws CheckedBoom {
+      switch (kind) {
+        case UNCHECKED -> {
+          final UncheckedBoom thrown = new UncheckedBoom();
+          lastThrown = thrown;
+          throw thrown;
+        }
+        case CHECKED -> {
+          final CheckedBoom thrown = new CheckedBoom();
+          lastThrown = thrown;
+          throw thrown;
+        }
+        case ERROR -> {
+          final AssertionError thrown = new AssertionError("error");
+          lastThrown = thrown;
+          throw thrown;
+        }
+      }
     }
-    final @Nullable String bound = TenantContext.findCurrent().map(TenantId::toString).orElse(null);
-    if (!Objects.equals(bound, expectedText)) {
-      violations.add("束縛=" + bound + " だが内側の束縛は " + expectedText);
+
+    /** 今の MDC、束縛が、期待するテナントと一致するかを確かめる。 */
+    private void observe(final @Nullable TenantId expected) {
+      final @Nullable String expectedText = expected == null ? null : expected.toString();
+      final @Nullable String mdc = MDC.get(KEY);
+      if (!Objects.equals(mdc, expectedText)) {
+        violations.add("MdcFollowsBinding: MDC tenant.id=" + mdc + " だが内側の束縛は " + expectedText);
+      }
+      final @Nullable String bound =
+          TenantContext.findCurrent().map(TenantId::toString).orElse(null);
+      if (!Objects.equals(bound, expectedText)) {
+        violations.add("MdcFollowsBinding: 束縛=" + bound + " だが内側の束縛は " + expectedText);
+      }
     }
   }
 
@@ -164,7 +240,12 @@ class TenantContextExhaustiveTest {
   private static List<Expr> expressionsUpTo(final int maxSize) {
     final List<List<Expr>> bySize = new ArrayList<>();
     bySize.add(List.of());
-    bySize.add(List.of(new Expr.Probe(), new Expr.Throw()));
+    bySize.add(
+        List.of(
+            new Expr.Probe(),
+            new Expr.Throw(Kind.UNCHECKED),
+            new Expr.Throw(Kind.CHECKED),
+            new Expr.Throw(Kind.ERROR)));
     for (int size = 2; size <= maxSize; size++) {
       bySize.add(expressionsOfSize(bySize, size));
     }

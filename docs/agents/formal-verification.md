@@ -1,7 +1,7 @@
 ---
 type: Runbook
 title: 形式検証スキルの使い方
-description: TLA+ の形式検証スキル（.agents/skills/formal-verify-*）の検査の実行、結果の読み方、違反の切り分け、既知の発見の残し方、意図した変更でのモデルの直し方、同期コミットの進め方、変異の書き方を定める Runbook。formal-verify-* のスキルを使うとき、そのモデル、設定、変異を変えるとき、tooling/formal-verify/ を変えるときに読む。
+description: TLA+ の形式検証スキル（.agents/skills/formal-verify-*）と、本物の Java を網羅の列挙で検査するスキル（.agents/skills/exhaustive-verify-*）の検査の実行、結果の読み方、違反の切り分け、既知の発見の残し方、意図した変更でのモデルの直し方、同期コミットの進め方、変異の書き方を定める Runbook。formal-verify-* か exhaustive-verify-* のスキルを使うとき、そのモデル、設定、変異を変えるとき、tooling/formal-verify/ を変えるときに読む。
 tags: [runbook, agent-skills, formal-verification, tla-plus]
 ---
 
@@ -13,6 +13,7 @@ tags: [runbook, agent-skills, formal-verification, tla-plus]
 - 変更がスキルの「変更がこの検証に関わるか」のファイルに触れたら、`check.sh` と `mutants.py` を流す。
 - 違反は本物の不具合かモデルの誤りかに切り分け、本物の不具合は不変条件やモデルを緩めずに既知の発見として残す。
 - 同期コミットは、モデルがそのコミットのコードを写すと確かめてから進める。
+- 本物の Java を網羅の列挙で検査するスキル（`exhaustive-verify-*`）は TLA+ の道具の外にあり、変異と同期コミットを手で流す（「TLA+ でない検証スキル」）。
 
 ## スキルの中身
 
@@ -160,11 +161,19 @@ new = '''Next == n <= Limit'''
 
 ## TLA+ でない検証スキル
 
-問いがスレッドをまたぐ順序でなく、一つのスレッドの中の組み合わせなら、本物の Java のコードを網羅の列挙で動かす検証スキルにしてよい。
-名前は `formal-verify-` で始めず、`exhaustive-verify-<対象>` にする。
-`task formal-verify` と `check.sh` は `model/*.tla` を前提にするため、`formal-verify-*` の名前に合わないスキルを入れない。
-今ある例は `.agents/skills/exhaustive-verify-tenant-context` で、`scripts/check.sh` と `scripts/mutants.py` を持つ。
-同期コミットの進め方と変異で捕まえる確かめ方は、このRunbookの「同期コミットを進める」と「変異を書く」に従う。
+問いがスレッドをまたぐ順序でなく、一つのスレッドの中の組み合わせなら、本物の Java のコードを網羅の列挙で動かすスキルにしてよい。
+名前は `exhaustive-verify-<対象>` にする。
+`formal-verify-` で始めると、`task formal-verify` が `model/*.tla` を探して落ちる。
+
+このスキルは TLA+ の道具の外にある。
+次の 3 点がこの Runbook の他の節と違う。
+
+- `tooling/formal-verify/check.sh` と `mutants.py` を使わず、スキルの `scripts/check.sh` と `scripts/mutants.py` を使う。
+- 変異は `model/mutants.toml` ではなくスキルの直下の `mutants.toml` に置く。項目は `name`、`change`、`edits`（`old` と `new`）だけで、本物のソースへ当てる。
+- 変異、同期コミットの検査、「変更がこの検証に関わるか」のコマンドは CI で流れない。列挙のテストだけが `task be-test` で流れる。
+
+同期コミットを進める手順は「同期コミットを進める」に従う。
+今ある例は `.agents/skills/exhaustive-verify-tenant-context` である。
 
 ## 共通の道具を変える
 

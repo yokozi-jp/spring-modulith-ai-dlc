@@ -24,10 +24,12 @@ Java の検証器（JBMC など）は、`ScopedValue` と SLF4J の MDC を持�
 ```
 
 `check.sh` は `TenantContextExhaustiveTest` だけを Gradle で流す（Gradle の daemon が温まっていれば約 10 秒。初回は 1 分ほど）。
-同じテストは `task be-test` でも流れるため、退行は通常の CI でも落ちる。
+同じテストは `task be-test` でも流れるため、テストが捕まえる退行は通常の CI でも落ちる。
+`mutants.py`、同期コミットの検査、「変更がこの検証に関わるか」のコマンドは CI で流れない（`task formal-verify` は `formal-verify-*` だけを見る）。手で流す。
+どちらの実行も `.env.test`（`task be-test` が作る）を要する。
 `mutants.py` は、`mutants.toml` の変異を本物の `TenantContext.java` に一つずつ当て、テストが落ちることを確かめ、ソースを元に戻す（約 3 分。変異ごとに Gradle を流す）。
-`TenantContext.java` を直す前に、作業ツリーに未コミットの変更があるときは先に退避する。
-`mutants.py` は終了時にこのファイルを、実行前の内容に書き戻す。
+`mutants.py` は、`TenantContext.java` に未コミットの変更があると、何も書き換えずに止まる。
+終了、Ctrl-C、SIGTERM、SIGHUP では実行前の内容に書き戻す。SIGKILL で止めたら `git checkout -- backend/src/main/java/com/example/demo/shared/tenant/TenantContext.java` で戻す。
 
 ## 約束
 
@@ -35,17 +37,17 @@ Java の検証器（JBMC など）は、`ScopedValue` と SLF4J の MDC を持�
 | -------------------- | -------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------- |
 | `MdcFollowsBinding`  | `TenantContext.call` の中のどの時点でも、MDC の `tenant.id` と `TenantContext.findCurrent()` が、内側の束縛のテナントと一致する。 | ログが別のテナントの ID を持つ。トランザクションのテナントとログがずれる。      |
 | `OuterRestored`      | 入れ子の `call` から戻ると（例外を握りつぶした場合も）、MDC と束縛が外側のテナントに戻る。                                       | 外側の処理の後半のログが、内側のテナントの ID を持つ。                          |
-| `NothingRemains`     | 最も外側の `call` を出ると（正常でも例外でも）、MDC の `tenant.id` が消え、束縛が外れる。                                        | 同じスレッドの次の処理のログに前のテナントの ID が残り、別のテナントの調査を誤らせる。 |
-| `ExceptionUnchanged` | 処理が投げた例外は、包まれず、最も外側からそのまま出る。握りつぶされた例外は出ない。                                             | フィルターの `IOException` の変換と例外ハンドラーが、別の例外を受ける。          |
+| `NothingRemains`     | 最も外側の `call` を出ると（正常でも例外でも）、MDC の `tenant.id` が消え、束縛が外れる。                                        | 同じスレッドの次の処理のログに前のテナントの ID が残り、別のテナントの調査を誤らせる（束縛は `ScopedValue` が外すため、残るのは MDC）。 |
+| `ExceptionUnchanged` | 処理が投げた例外（検査されない例外、検査される例外、`Error`）は、包まれず、握りつぶされず、最も外側からそのまま出る。                                             | フィルターの `IOException` の変換と例外ハンドラーが、別の例外を受ける。          |
 
 ## 範囲と前提
 
 検査の範囲は次のとおりで、これを超える保証はない。
 
-- 式は `Probe`（MDC と束縛を観測する）、`Throw`、`Call(テナント, 式)`、`Seq(式, 式)`、`Catch(式)` の 5 種類で、ノードの数が 7 以下のすべて（10,878 式）。
+- 式は `Probe`（MDC と束縛を観測する）、`Throw`（検査されない例外、検査される例外、`Error` の 3 種類）、`Call(テナント, 式)`、`Seq(式, 式)`、`Catch(式)` の 5 種類で、ノードの数が 7 以下のすべて（49,764 式）。
   テナントは 2 つで、同じテナントの入れ子と違うテナントの入れ子の両方を含む。
   深さ 7 の入れ子や、8 ノード以上の組み合わせは見ない。
-  上限は `TenantContextExhaustiveTest.MAX_SIZE` で、上げると式の数がおよそ 4.7 倍ずつ増える。
+  上限は `TenantContextExhaustiveTest.MAX_SIZE` で、上げると式の数が急に増える（6 から 7 で約 5.6 倍）。
 - 動かすのは本物の `TenantContext.call` と SLF4J の MDC（Logback の `LogbackMDCAdapter`）である。
   束縛は `findCurrent()` で観測する。
   `ModuleRoleTransactionManager.prepareTransactionalConnection` が読むのは同じ `findCurrent()` で、`set_config` に渡す値は束縛と同じである。
@@ -74,7 +76,7 @@ Java の検証器（JBMC など）は、`ScopedValue` と SLF4J の MDC を持�
    `MDC.put`（入口）、`ScopedValue.where(...).call`（束縛）、`finally`（戻す側）のどれがその式で効かなかったかを見る。
 2. `MdcFollowsBinding` の違反で束縛が合っていて MDC だけ違うなら、`MDC.put` の値か戻す側の `BOUND.get()` を疑う。
 3. `NothingRemains` の違反は、`finally` の `MDC.remove` が通らない経路（例外、`Error`）があるかを見る。
-4. 式の意味（`Expr.throwsOut` と `run`）が `TenantContext.call` の意図した振る舞いと違うなら、それはテストの誤りで、直してから変異を流し直す。
+4. 式の意味（テストの `Expr.throwsOut` と `Run.run`）が `TenantContext.call` の意図した振る舞いと違うなら、それはテストの誤りで、直してから変異を流し直す。
    意図した振る舞いは `TenantContext` の Javadoc と ADR-110 にある。
 5. 式が現実に起きない経路を作っていても、テナントの束縛は入れ子と例外を許す（`call` が公開 API）ため、本物の不具合として扱う。
 
@@ -127,10 +129,13 @@ grep -rn "TenantContext.call\|TenantContext\.<" backend/src/main/java --include=
 | `mdc-not-set`                   | `MdcFollowsBinding`                       |
 | `inner-shows-outer-tenant`      | `MdcFollowsBinding`                       |
 | `restore-skipped-on-exception`  | `NothingRemains`、`OuterRestored`         |
+| `restore-skipped-on-error`      | `NothingRemains`（`Error` のとき）        |
+| `exception-wrapped`             | `ExceptionUnchanged`                      |
+| `inner-binding-ignored`         | `MdcFollowsBinding`（束縛の側）           |
 
-`ExceptionUnchanged` を破る変異は、`TenantContext.call` の戻し方でなく例外の包み方を変える退行に当たる。
-今の `call` は例外を包む処理を持たないため、変異は書いていない。
-`TenantSelectionFilter` が `CarriedIOException` で包む部分は、`TenantSelectionFilterTest` が確かめる。
+`mutants.toml` の `old` は、`TenantContext.java` の字下げまで含む完全一致の文字列である。
+`call` を整形し直したり文を足したりすると `FAIL ... ちょうど一度は現れない` で止まる。
+そのときは変異の `old` を新しい形に合わせ直す。
 
 ## 既知の発見
 
@@ -140,9 +145,6 @@ grep -rn "TenantContext.call\|TenantContext\.<" backend/src/main/java --include=
 
 同期コミット：`c70aaf597cdea2644887b70d82b5a2f836f6ad95`（main。Pull Request #617 の土台）
 
-`TenantContext.call` の MDC の出し入れは Pull Request #617 が足す。
-Pull Request の中のコミットは squash merge の後に main に残らないため、土台の main のコミットを書いた。
-関わるかのコマンドは、Pull Request の変更（`TenantContext`、`TenantSelectionFilter`、`logback-spring.xml`）を差分に出す。
-その差分を読み、列挙の式と変異が `TenantContext.call` の今の形と一致することを確かめた。
-#617 が main に入ったら、そのときの main のコミットへ進める。
-進める前に、`check.sh` と `mutants.py` を流し、差分を読み直す。
+`TenantContext.call` の MDC の出し入れは #617 が足すため、「変更がこの検証に関わるか」のコマンドは、#617 が main に入るまで #617 の変更を差分に出す。
+差分を読み、列挙の式と変異が `TenantContext.call` の今の形と一致することを確かめた。
+Pull Request の中のコミットを書かない理由と、進め方は `docs/agents/formal-verification.md` の「同期コミットを進める」にある。
