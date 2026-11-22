@@ -1,20 +1,26 @@
 package com.example.demo;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.example.demo.testkit.AppUsers;
 import com.example.demo.testkit.CapturedLogRecords;
+import com.example.demo.testkit.CapturedSpans;
 import com.example.demo.testkit.SharedTestConfiguration;
+import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.Tag;
 import io.micrometer.observation.Observation;
 import io.micrometer.observation.ObservationRegistry;
 import io.opentelemetry.api.OpenTelemetry;
 import io.opentelemetry.api.common.AttributeKey;
 import io.opentelemetry.api.common.Attributes;
+import io.opentelemetry.api.trace.SpanKind;
 import io.opentelemetry.instrumentation.logback.appender.v1_0.OpenTelemetryAppender;
 import io.opentelemetry.sdk.logs.data.LogRecordData;
+import io.opentelemetry.sdk.trace.data.SpanData;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicReference;
@@ -37,6 +43,7 @@ import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 
 /** 構造化ログ、トレース相関、OTLP 属性、テナントと利用者の文脈の運用契約を検証する。 */
+@SuppressWarnings("PMD.TooManyStaticImports")
 @Slf4j
 @SpringBootTest
 @AutoConfigureMockMvc
@@ -44,10 +51,10 @@ import tools.jackson.databind.json.JsonMapper;
 @ExtendWith(OutputCaptureExtension.class)
 class ObservabilityContractTest {
 
-  /** ログの属性の、テナントの {@code public_id}。 */
+  /** ログとトレースの、テナントの {@code public_id} の項目。 */
   private static final AttributeKey<String> TENANT_ID = AttributeKey.stringKey("tenant.id");
 
-  /** ログの属性の、アプリの利用者の ID。 */
+  /** ログとトレースの、アプリの利用者の ID の項目。 */
   private static final AttributeKey<String> USER_ID = AttributeKey.stringKey("user.id");
 
   /** HTTP などと同じ tracing handler が登録された observation registry。 */
@@ -61,6 +68,12 @@ class ObservabilityContractTest {
 
   /** 実際の Spring MVC と Security filter chain を通すクライアント。 */
   @Autowired private MockMvc mockMvc;
+
+  /** 終えた span。 */
+  @Autowired private CapturedSpans capturedSpans;
+
+  /** HTTP の observation が記録するメトリクス。 */
+  @Autowired private MeterRegistry meterRegistry;
 
   @BeforeEach
   void installAppender() {
@@ -134,8 +147,8 @@ class ObservabilityContractTest {
   void tenantAndUserInMdcAppearInConsoleAndLogRecord(final CapturedOutput output) {
     final String event = "observability mdc contract";
 
-    try (MDC.MDCCloseable ignoredTenant = MDC.putCloseable("tenant.id", AppUsers.TENANT_ID);
-        MDC.MDCCloseable ignoredUser = MDC.putCloseable("user.id", AppUsers.USER_ID)) {
+    try (MDC.MDCCloseable ignoredTenant = MDC.putCloseable(TENANT_ID.getKey(), AppUsers.TENANT_ID);
+        MDC.MDCCloseable ignoredUser = MDC.putCloseable(USER_ID.getKey(), AppUsers.USER_ID)) {
       log.info(event);
     }
 
@@ -177,8 +190,42 @@ class ObservabilityContractTest {
                 () -> new AssertionError("orderId=" + orderId + " の API business failure"));
     assertEquals(AppUsers.TENANT_ID, attributes.get(TENANT_ID), attributes::toString);
     assertEquals(AppUsers.USER_ID, attributes.get(USER_ID), attributes::toString);
-    assertNull(MDC.get("tenant.id"), "要求の後の MDC の tenant.id");
-    assertNull(MDC.get("user.id"), "要求の後の MDC の user.id");
+    assertNull(MDC.get(TENANT_ID.getKey()), "要求の後の MDC の tenant.id");
+    assertNull(MDC.get(USER_ID.getKey()), "要求の後の MDC の user.id");
+  }
+
+  @Test
+  @DisplayName(
+      "テナントを選んだ利用者の要求の受信の span は tenant.id と user.id を属性に持ち、http.server.requests の tag には持たない")
+  void serverSpanCarriesTenantAndUserButMetricsDoNot() throws Exception {
+    final String orderId = UUID.randomUUID().toString();
+
+    mockMvc
+        .perform(
+            MockMvcRequestBuilders.get("/api/orders/{orderId}", orderId).with(AppUsers.oidcLogin()))
+        .andExpect(MockMvcResultMatchers.status().isNotFound());
+
+    final List<SpanData> spans =
+        capturedSpans.withAttribute("http.url", "/api/orders/" + orderId).stream()
+            .filter(span -> span.getKind() == SpanKind.SERVER)
+            .toList();
+    assertEquals(1, spans.size(), () -> "orderId=" + orderId + " の受信の span: " + spans);
+    final Attributes attributes = spans.getFirst().getAttributes();
+    assertEquals(AppUsers.TENANT_ID, attributes.get(TENANT_ID), attributes::toString);
+    assertEquals(AppUsers.USER_ID, attributes.get(USER_ID), attributes::toString);
+    final List<String> tagKeys =
+        meterRegistry
+            .find("http.server.requests")
+            .tag("uri", "/api/orders/{orderId}")
+            .meters()
+            .stream()
+            .flatMap(meter -> meter.getId().getTags().stream())
+            .map(Tag::getKey)
+            .distinct()
+            .toList();
+    assertFalse(tagKeys.isEmpty(), "GET /api/orders/{orderId} の http.server.requests");
+    assertFalse(tagKeys.contains(TENANT_ID.getKey()), tagKeys::toString);
+    assertFalse(tagKeys.contains(USER_ID.getKey()), tagKeys::toString);
   }
 
   private Attributes singleRecordAttributes(final String event) {

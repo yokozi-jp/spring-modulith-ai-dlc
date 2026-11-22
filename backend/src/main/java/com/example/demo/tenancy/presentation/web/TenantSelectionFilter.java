@@ -6,6 +6,7 @@ import com.example.demo.shared.tenant.TenantContext;
 import com.example.demo.shared.tenant.TenantId;
 import com.example.demo.tenancy.MembershipSummary;
 import com.example.demo.tenancy.TenancyQueries;
+import io.micrometer.common.KeyValue;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -27,6 +28,7 @@ import org.springframework.security.web.util.matcher.NegatedRequestMatcher;
 import org.springframework.security.web.util.matcher.OrRequestMatcher;
 import org.springframework.security.web.util.matcher.RequestMatcher;
 import org.springframework.web.filter.OncePerRequestFilter;
+import org.springframework.web.filter.ServerHttpObservationFilter;
 
 /**
  * セッションで選んだテナントの所属をリクエストのたびに引き直し、業務の API をテナントを選んだ後だけ通す。
@@ -37,7 +39,8 @@ import org.springframework.web.filter.OncePerRequestFilter;
  * <p>テナントを選んだ後のリクエストは、残りの処理の間だけ、選んだテナントを {@link TenantContext} に束縛する。テナントはセッションの権限だけから取り、リクエストの
  * header、パス、本文から取らない。
  *
- * <p>認証したリクエストは、所属の引き直しを含む残りの処理の間だけ、アプリの利用者の ID を MDC の {@value #USER_ID_LOG_KEY} に入れる。
+ * <p>認証したリクエストは、所属の引き直しを含む残りの処理の間だけ、アプリの利用者の ID を MDC の {@value #USER_ID_LOG_KEY} に入れる。 利用者の ID
+ * と束縛したテナントは、HTTP の受信の span の属性にも入れる。
  */
 final class TenantSelectionFilter extends OncePerRequestFilter {
 
@@ -93,6 +96,7 @@ final class TenantSelectionFilter extends OncePerRequestFilter {
       doFilterInSelectedTenant(request, response, filterChain);
       return;
     }
+    addToServerSpan(request, USER_ID_LOG_KEY, userId);
     try (MDC.MDCCloseable ignored = MDC.putCloseable(USER_ID_LOG_KEY, userId)) {
       doFilterInSelectedTenant(request, response, filterChain);
     }
@@ -119,7 +123,16 @@ final class TenantSelectionFilter extends OncePerRequestFilter {
       filterChain.doFilter(request, response);
       return;
     }
+    addToServerSpan(request, TenantContext.LOG_KEY, tenantId.get().toString());
     doFilterInTenant(tenantId.get(), request, response, filterChain);
+  }
+
+  /** HTTP の受信の observation に、span の属性になる値を足す。 */
+  private static void addToServerSpan(
+      final HttpServletRequest request, final String key, final String value) {
+    // 低い濃度の key value はメトリクスの tag にもなり、系列がテナントと利用者の数だけ増えるため、高い濃度にだけ入れる。
+    ServerHttpObservationFilter.findObservationContext(request)
+        .ifPresent(context -> context.addHighCardinalityKeyValue(KeyValue.of(key, value)));
   }
 
   /**

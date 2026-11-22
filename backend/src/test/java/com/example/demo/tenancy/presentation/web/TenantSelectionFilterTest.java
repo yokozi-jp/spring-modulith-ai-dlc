@@ -9,6 +9,7 @@ import com.example.demo.shared.tenant.TenantId;
 import com.example.demo.tenancy.MembershipSummary;
 import com.example.demo.tenancy.TenancyQueries;
 import com.example.demo.tenancy.TenantMembersDetails;
+import io.micrometer.common.KeyValue;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import java.io.IOException;
@@ -22,11 +23,13 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.slf4j.MDC;
+import org.springframework.http.server.observation.ServerRequestObservationContext;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.web.filter.ServerHttpObservationFilter;
 
 /** {@link TenantSelectionFilter} が、選んだテナントを残りの処理の間だけ束縛し、下流の例外をそのまま戻すことを検証する（ADR-105）。 */
 class TenantSelectionFilterTest {
@@ -104,6 +107,25 @@ class TenantSelectionFilterTest {
     assertThat(seen).as("残りの処理の中の user.id と tenant.id").containsExactly("user-1", TENANT);
     assertThat(MDC.get("user.id")).as("filter を出た後の user.id").isNull();
     assertThat(MDC.get("tenant.id")).as("filter を出た後の tenant.id").isNull();
+  }
+
+  @Test
+  @DisplayName("利用者の ID と選んだテナントを、受信の observation の高い濃度の key value にだけ足す")
+  void addsUserAndTenantToServerObservationAsHighCardinality()
+      throws IOException, ServletException {
+    final MockHttpServletRequest request = new MockHttpServletRequest("GET", "/api/orders");
+    final MockHttpServletResponse response = new MockHttpServletResponse();
+    final ServerRequestObservationContext context =
+        new ServerRequestObservationContext(request, response);
+    request.setAttribute(
+        ServerHttpObservationFilter.CURRENT_OBSERVATION_CONTEXT_ATTRIBUTE, context);
+
+    filter.doFilter(request, response, (chainRequest, chainResponse) -> {});
+
+    assertThat(context.getHighCardinalityKeyValues())
+        .containsExactlyInAnyOrder(
+            KeyValue.of("user.id", "user-1"), KeyValue.of("tenant.id", TENANT));
+    assertThat(context.getLowCardinalityKeyValues()).as("メトリクスの tag になる key value").isEmpty();
   }
 
   @Test

@@ -10,7 +10,7 @@ import org.springframework.security.oauth2.core.AuthorizationGrantType;
 import org.springframework.security.oauth2.core.ClientAuthenticationMethod;
 
 /**
- * 複数の {@code @SpringBootTest} が共有する、OIDC クライアント登録の差し替えと OTLP ログの観測を持つ構成。
+ * 複数の {@code @SpringBootTest} が共有する、OIDC クライアント登録の差し替えと、OTLP のログと span の観測を持つ構成。
  *
  * <p>同一の構成を共有することで、Spring のテストコンテキストキャッシュを再利用し、テストが増えても コンテキストの再ロードを増やさない。
  */
@@ -21,6 +21,12 @@ public class SharedTestConfiguration {
   @Bean
   /* package */ CapturedLogRecords capturedLogRecords() {
     return new CapturedLogRecords();
+  }
+
+  /** 終えた span を観測する processor。Spring Boot が SDK へ登録する。 */
+  @Bean
+  /* package */ CapturedSpans capturedSpans() {
+    return new CapturedSpans();
   }
 
   @Bean
