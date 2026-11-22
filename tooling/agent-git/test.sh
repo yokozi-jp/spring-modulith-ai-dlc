@@ -161,6 +161,10 @@ expect "wait refuses an invalid AGENT_GIT_WAIT_SECONDS" 1 "0 以上の整数" en
 # 始める前に止まる場合。どれも HEAD と index を変えない。
 scene "refusals"
 init="$(git rev-parse HEAD)"
+echo '{}' >package.json
+expect "commit refuses without node_modules" 1 "npm ci" bash "$tool" commit "$msg" package.json
+expect "push refuses without node_modules" 1 "npm ci" bash "$tool" push
+rm package.json
 echo a >a.txt
 expect "refuses an empty message file" 1 "が無いか空です" bash "$tool" commit "$tmp/empty" a.txt
 echo other >other.txt && git add other.txt

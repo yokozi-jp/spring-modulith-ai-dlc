@@ -184,11 +184,20 @@ check_paths() {
   別の作業や利用者が一部だけを stage したものなら、この Task では commit できないので、その作業か利用者に確かめてください。"
 }
 
+# need_node_modules: フックの lefthook と commitlint は node_modules から動く。worktree を作った直後は無く、フックが npx の不明なエラーで落ちるので、始める前に止める。
+need_node_modules() {
+  local top
+  top="$(git rev-parse --show-toplevel)" || exit 1
+  [ ! -f "$top/package.json" ] || [ -d "$top/node_modules" ] ||
+    fail "node_modules がありません。worktree を作った直後は npm ci を実行してください（docs/tooling/dev-workflow.md の「git worktreeで作業するとき」）。"
+}
+
 commit() {
   [ $# -ge 2 ] || usage
   local msg="$1" r run merge
   shift
   git rev-parse --is-inside-work-tree >/dev/null || exit 1
+  need_node_modules
   [ -s "$msg" ] || fail "メッセージのファイル $msg が無いか空です。"
   # 同じ worktree の 2 つの commit は同じ HEAD から始まり、後に終わったほうを git が拒むので、フックを待たせる前に止める。
   # ponytail: 確かめてから pid を書くまでの数ミリ秒の間に始めた 2 つ目は通り、git が後に終わったほうを拒む（フックの時間が無駄になる）。
@@ -411,6 +420,7 @@ push() {
   [ $# -eq 0 ] || usage
   local branch lock running run dirty
   branch="$(git symbolic-ref --quiet --short HEAD)" || fail "ブランチを checkout していないので push できません。"
+  need_node_modules
   # pre-push の task test は compose-test のプロジェクト名とポートが固定なので、worktree をまたいで push を一つずつにする。
   # ロックは background の wrapper が受け継いで持ち続け、push が終わるか止まると外れる。
   lock="$(git rev-parse --path-format=absolute --git-common-dir)/agent-git-push.lock"
