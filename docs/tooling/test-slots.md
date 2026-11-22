@@ -50,7 +50,6 @@ slot n（1 から 3）のポートは、`20000 + n × 1000 + slot 0 のポート
 | Keycloak            | `TEST_KEYCLOAK_PORT` | 8081   | 21081  | 22081  | 23081  |
 | 決済代行の WireMock | `TEST_WIREMOCK_PORT` | 8082   | 21082  | 22082  | 23082  |
 | PostgreSQL          | `TEST_PG_PORT`       | 5433   | 21433  | 22433  | 23433  |
-| Redis               | `TEST_REDIS_PORT`    | 6380   | 21380  | 22380  | 23380  |
 
 `bash tooling/test-slot/test-slot.sh ports <n>` が、slot n の値を出す。
 `task scan-dast` が自分で使う 4173（preview）、18081（backend）、18082（ZAP の proxy）は、slot によらず固定である。
@@ -65,7 +64,7 @@ slot 1: web http://localhost:21173、backend http://localhost:21080、Keycloak h
 
 続けて、次の環境変数を export する。
 
-- `TEST_SLOT`、`COMPOSE_PROJECT_NAME`、表の 6 つのポート。
+- `TEST_SLOT`、`COMPOSE_PROJECT_NAME`、表の 5 つのポート。
 - `TEST_ENV_FILE`：slot の env ファイル（`build/test-slot/slot-<n>.env`）。
 - `SERVER_PORT`（`TEST_BACKEND_PORT` と同じ値）、`OIDC_ISSUER_URI`、`PAYMENT_GATEWAY_BASE_URL`（後の 2 つは slot の env ファイルと同じ値）。
   `task e2e`、`task e2e-up`、`task scan-dast` だけが渡す（`acquire` の第 2 引数 `web`）。
@@ -73,13 +72,12 @@ slot 1: web http://localhost:21173、backend http://localhost:21080、Keycloak h
   `vp preview` と Playwright は、ルートの `.env.test` よりこれらの環境変数を優先して読む。
 
 slot の env ファイルは、基にする env ファイル（Task の `TEST_ENV_FILE`、既定は `.env.test`）の写しである。
-ホストから見たポートを持つ次の 4 つの変数だけを、slot の値に置き換える。
+ホストから見たポートを持つ次の 3 つの変数だけを、slot の値に置き換える。
 基にする env ファイルは書き換えない。
 
 | 変数                       | slot の値                                                      |
 | -------------------------- | -------------------------------------------------------------- |
 | `DB_PORT`                  | `TEST_PG_PORT`                                                 |
-| `REDIS_PORT`               | `TEST_REDIS_PORT`                                              |
 | `OIDC_ISSUER_URI`          | `http://127.0.0.1:<TEST_KEYCLOAK_PORT>/realms/spring-modulith` |
 | `PAYMENT_GATEWAY_BASE_URL` | `http://127.0.0.1:<TEST_WIREMOCK_PORT>`                        |
 

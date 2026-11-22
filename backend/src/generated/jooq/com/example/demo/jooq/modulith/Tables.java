@@ -7,6 +7,8 @@ package com.example.demo.jooq.modulith;
 import com.example.demo.jooq.modulith.tables.EventPublication;
 import com.example.demo.jooq.modulith.tables.EventPublicationArchive;
 import com.example.demo.jooq.modulith.tables.Shedlock;
+import com.example.demo.jooq.modulith.tables.SpringSession;
+import com.example.demo.jooq.modulith.tables.SpringSessionAttributes;
 
 import javax.annotation.processing.Generated;
 
@@ -38,4 +40,14 @@ public class Tables {
      * The table <code>modulith.shedlock</code>.
      */
     public static final Shedlock SHEDLOCK = Shedlock.SHEDLOCK;
+
+    /**
+     * The table <code>modulith.spring_session</code>.
+     */
+    public static final SpringSession SPRING_SESSION = SpringSession.SPRING_SESSION;
+
+    /**
+     * The table <code>modulith.spring_session_attributes</code>.
+     */
+    public static final SpringSessionAttributes SPRING_SESSION_ATTRIBUTES = SpringSessionAttributes.SPRING_SESSION_ATTRIBUTES;
 }

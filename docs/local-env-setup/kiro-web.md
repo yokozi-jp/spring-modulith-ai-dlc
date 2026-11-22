@@ -1,7 +1,7 @@
 ---
 type: Runbook
 title: Kiro Web の開発環境
-description: Kiro Web のサンドボックスで、ローカルと同じ Task、検査、テスト、開発用の依存、E2E、DAST を実行する手順と、Agent Config の iwe の設定、サンドボックス固有の制約と、`/thermos` の代わりに `run_workflow` でレビューする手順。Kiro Web でタスクやテストを実行する前、Pull Request をレビューするとき、サンドボックスで道具やコンテナが動かないとき、iwe の MCP サーバーが接続しないときに読む。
+description: Kiro Web のサンドボックスで、ローカルと同じ Task、検査、テスト、開発用の依存、E2E、DAST を実行する手順と、Agent Config の iwe の設定、サンドボックス固有の制約、`/thermos` の代わりに `run_workflow` でレビューする手順。Kiro Web でタスクやテストを実行する前、Pull Request をレビューするとき、サンドボックスで道具やコンテナが動かないとき、`task` や `docker` が見つからない、`gh` が mise のエラーで止まるなどの症状が出たとき、iwe の MCP サーバーが接続しないときに読む。
 tags: [runbook, setup, kiro-web, mise, podman]
 ---
 
@@ -80,6 +80,21 @@ Agent Config > Powers & MCP の `iwe` を、次の手順で `.kiro/settings/mcp.
 接続しないときの症状は `MCP server "iwe" failed to connect: Connection closed` である。
 原因は、Agent Config の `iwe` が `.kiro/settings/mcp.json` と違うことである。
 たとえば #482 より前のコマンド `cd "$(git rev-parse --show-toplevel)/docs" && exec iwec` は、git の外の `/projects/sandbox` で `cd` が失敗する。
+
+## 症状と対処
+
+素のサンドボックスでは、`kiro-web.sh` を source していないために、道具が無い、またはコンテナが動かないように見える。
+次の症状が出たら、表の対処を試す。
+
+| 症状                                                         | 原因                                                              | 対処                                                                                                         |
+| ------------------------------------------------------------ | ----------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
+| `could not find a working conmon binary`                     | 素の `docker` を呼んでいる。                                      | `kiro-web.sh` を source する。                                                                               |
+| `Config files in ... are not trusted`                        | `gh` や `java` の shim が mise に止められている。                 | `kiro-web.sh` を source する。                                                                               |
+| `task: command not found`、`iwe` や `lefthook` が無い        | `kiro-web.sh` を source していない。                              | `kiro-web.sh` を source する。                                                                               |
+| `/tmp` のファイルが次の tool call で消える                   | `/tmp` は tool call ごとに消える。                                | ログは `$KIRO_WEB_HOME` に書く。                                                                             |
+| `grep_search` の `includePattern` に一致しない               | パスの起点がワークスペースのルート（`/projects/sandbox`）である。 | ルートからのパスで書く。例は `spring-modulith-ai-dlc/docs/**/*.md`。                                         |
+| `execute_bash` の出力が 30000 文字で切れる                   | 長い出力は、プレビューに切り詰められる。                          | 全文はセッションの tool-outputs に保存されるので、`grep` と `tail` で読む。                                  |
+| `docker info --format '{{.ServerVersion}}'` が失敗する       | `docker` は Podman への中継で、`ServerVersion` を返さない。       | `--format` を付けず、`docker info` の本文を読む。                                                            |
 
 ## サンドボックスの制約
 

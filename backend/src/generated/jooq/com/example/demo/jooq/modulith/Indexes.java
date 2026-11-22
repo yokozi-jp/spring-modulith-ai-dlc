@@ -6,6 +6,7 @@ package com.example.demo.jooq.modulith;
 
 import com.example.demo.jooq.modulith.tables.EventPublication;
 import com.example.demo.jooq.modulith.tables.EventPublicationArchive;
+import com.example.demo.jooq.modulith.tables.SpringSession;
 
 import javax.annotation.processing.Generated;
 
@@ -36,4 +37,7 @@ public class Indexes {
     public static final Index EVENT_PUBLICATION_ARCHIVE_SERIALIZED_EVENT_HASH_IDX = Internal.createIndex(DSL.name("event_publication_archive_serialized_event_hash_idx"), EventPublicationArchive.EVENT_PUBLICATION_ARCHIVE, new OrderField[] { EventPublicationArchive.EVENT_PUBLICATION_ARCHIVE.SERIALIZED_EVENT }, false);
     public static final Index EVENT_PUBLICATION_BY_COMPLETION_DATE_IDX = Internal.createIndex(DSL.name("event_publication_by_completion_date_idx"), EventPublication.EVENT_PUBLICATION, new OrderField[] { EventPublication.EVENT_PUBLICATION.COMPLETION_DATE }, false);
     public static final Index EVENT_PUBLICATION_SERIALIZED_EVENT_HASH_IDX = Internal.createIndex(DSL.name("event_publication_serialized_event_hash_idx"), EventPublication.EVENT_PUBLICATION, new OrderField[] { EventPublication.EVENT_PUBLICATION.SERIALIZED_EVENT }, false);
+    public static final Index SPRING_SESSION_EXPIRY_TIME_IDX = Internal.createIndex(DSL.name("spring_session_expiry_time_idx"), SpringSession.SPRING_SESSION, new OrderField[] { SpringSession.SPRING_SESSION.EXPIRY_TIME }, false);
+    public static final Index SPRING_SESSION_PRINCIPAL_NAME_IDX = Internal.createIndex(DSL.name("spring_session_principal_name_idx"), SpringSession.SPRING_SESSION, new OrderField[] { SpringSession.SPRING_SESSION.PRINCIPAL_NAME }, false);
+    public static final Index SPRING_SESSION_SESSION_ID_IDX = Internal.createIndex(DSL.name("spring_session_session_id_idx"), SpringSession.SPRING_SESSION, new OrderField[] { SpringSession.SPRING_SESSION.SESSION_ID }, true);
 }

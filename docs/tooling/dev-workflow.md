@@ -43,6 +43,12 @@ Dependabotの更新が`frontend/pnpm-lock.yaml`を変えずに来ると、CIの`
 
 ## git worktreeで作業するとき
 
+エージェントは、ファイルを変える作業を始める前に`origin/main`から自分のworktreeを作り、mainのworktreeで変更、commit、テストをしない。
+mainのworktreeは複数のセッションが同時に使うためである。
+別のセッションがブランチを切り替えると、未commitの変更がそのブランチへ移る。
+同じ`backend/build`へ書くGradleのテストが重なると、クラスが見つからない失敗になる。
+調べるだけの作業はmainのworktreeで行ってよい。
+
 worktreeを作る前に、mainのworktreeで`npm ci`を実行しておく。
 mainのworktreeは最初にcloneした作業ツリーで、`git worktree list`の1行目に出る。
 実行しておかないと、新しいworktreeでの`npm ci`は、mainのworktreeにlefthookが無いことを知らせる`prepare`のメッセージで失敗する。
@@ -73,6 +79,23 @@ slot 1: web http://localhost:21173、backend http://localhost:21080、Keycloak h
 4つのslotがすべて使用中なら、Taskは最大15分待ち、30秒ごとに待っていることとslotを持つworktreeを出すので、止めずに待つ。
 出力に自分のworktreeが出ていて、そのworktreeで動いている実行が無ければ、中断した前の実行がslotを持ったまま残っている。
 [compose-testのslot](test-slots.md#中断した実行が残した-slot)の手順で片付ける。
+
+### 開発環境は同時に1つのworktreeしか起動できない
+
+`task dev`、`task compose-up`、`task fe-dev`が使う開発環境は、worktreeごとに分かれない。
+一度に起動できるのは1つのworktreeで、別のworktreeで起動する前に、起動中のほうを`task compose-down`などで止める。
+
+- **`.env`が無い。** `.env`はgitignoreされていて、worktreeには存在しない。開発環境を動かすworktreeでは、`cp .env.example .env`で作ってパスワードを変更する。`.env.test`は、テスト系のTaskが`.env.test.example`から自動で作るので、手で作らない。
+- **Composeのprojectとボリュームが共有される。** `docker/compose.yml`の`name:`は`spring-modulith-local`で固定なので、PostgreSQL、Redis、Keycloak、Grafanaのボリュームがworktreeをまたいで同じになる。2つ目のworktreeで`task compose-up`すると、エラーなしに、そのworktreeのファイルでコンテナが作り直される。
+- **ホスト側のポートが固定である。** Keycloakの8080とWireMockの8090は固定で、PostgreSQL、Redis、Grafana、Collectorのポートは`.env`の値（`DB_PORT`など）で決まる。別のprojectで同じポートを使うと、`port is already allocated`で起動に失敗する。
+- **Viteの開発サーバーは5173に固定である。** `strictPort: true`なので、別のworktreeが5173を使っていると起動に失敗する（[ADR-033](../adr/ADR-033-pin-vite-dev-origin-and-source-proxy-port.md)）。Keycloakのrealmのredirect URIも、5173、18080、4173とcompose-testのslot用のポートに固定している。ほかのポートで動かすと、ログインのコールバックが拒否される。
+- **initdbとrealmは、ボリュームを作った最初の起動でしか効かない。** `docker/initdb`と`docker/keycloak/realm.json`が変わったら、`task compose-reset CONFIRM_RESET=yes`でボリュームを消して作り直す（ほかのサービスのデータも消える）。realmにredirect URIを足しても、既存のボリュームでは「Import skipped」になり、Keycloakに届かない。
+- **マイグレーションの版が違うと、DBが壊れる。** ボリュームを共有したまま、版の違うworktreeで`task be-migrate`すると、古い版のmigrateが警告なしに成功し、アプリのロールが`permission denied for schema product`になることがある（新しい版のchangeset 012がGRANTを外したため）。古いinitdbで作ったボリュームに新しい版のmigrateをかけると、`role "product_module" does not exist`で失敗する。
+
+次のTaskは開発環境を使わないので、開発環境の起動中でも、worktreeごとに同時に実行できる。
+
+- `task be-test`は、Testcontainersが空いているホストポートへDBなどを起動する。`backend/src`に固定のホストポートの指定がない。
+- compose-testを使うTaskは、前節のとおりslotで分かれる。開発用のKeycloakが`127.0.0.1:8080`で動いていても、slot 0を飛ばして別のslotを取る（[compose-testのslot](test-slots.md#割り当ての規則)）。
 
 ## エージェントがcommitとpushをするとき
 
@@ -124,7 +147,7 @@ task api-gen
 
 ```bash
 cp .env.example .env       # 環境変数を用意し、パスワードを変更する
-task compose-up            # PostgreSQL、Keycloak、Redis、Collector、Grafanaを起動する
+task compose-up            # PostgreSQL、Keycloak、Collector、Grafanaを起動する
 task be-migrate            # 初回はマイグレーションを明示実行する
 task dev                   # 依存を起動し、バックエンドを起動する
 # 別のターミナルで
@@ -156,7 +179,7 @@ Taskのテスト系タスクは、`.env.test`に足りない変数を`.env.test.
 `task be-migrate`は012と014のchangesetのGRANTがロールの不在で失敗するため、`task compose-reset CONFIRM_RESET=yes`でボリュームを消し、`task compose-up`で起動してから`task be-migrate`を実行する（[DB接続情報とロール分離](../database/connections.md)）。
 
 セッションの利用者を`AppUserPrincipal`にした変更（[ADR-096](../adr/ADR-096-require-app-user-principal-for-audit-columns.md)）の後は、ブラウザでログアウトしてログインし直す。
-ローカルのRedisはセッションを残すため、変更の前のセッションのままでは書き込みが500になる（[APIの認証、セッション、権限](../web-api/authentication-and-session.md)）。
+ローカルのDBはセッションを残すため、変更の前のセッションのままでは書き込みが500になる（[APIの認証、セッション、権限](../web-api/authentication-and-session.md)）。
 
 テナントと所属の表（016 changeset）を足した変更（[ADR-101](../adr/ADR-101-keep-tenants-and-roles-in-app-database.md)）の後は、既存のローカルの環境で次の順に実行し、ブラウザでログアウトしてログインし直す。
 
@@ -170,6 +193,10 @@ task be-seed             # 2 つのテナントと、test-user と test-admin �
 読み直さないと、Keycloakのtest-userとtest-adminのIDがseedの所属の利用者と食い違い、ログインしても所属がなく、招待を待つ画面になる。
 `task be-seed`は、業務データがあっても、足りないテナントと所属だけを入れる。
 test-userは2つのテナント（サンプル商事、サンプル物産）に属するのでログインの後にテナントを選ぶ画面が出て、test-adminはサンプル商事だけに属するので選ばずに業務の画面に入る。
+
+セッションをPostgreSQLに移した変更（023 changeset、[ADR-111](../adr/ADR-111-store-sessions-in-postgresql-until-user-growth-needs-redis.md)）の後は、`task be-migrate`でセッションの表を作ってからバックエンドを起動し、ブラウザでログインし直す。
+表がないと、ログインの最初の要求がセッションを保存できずに失敗する。
+Redisのセッションは引き継がない。
 
 業務テーブルをテナントの列とRLSを持つ形に作り直した変更（018から020のchangeset、[ADR-107](../adr/ADR-107-isolate-tenants-with-rls-set-per-transaction.md)）の後は、`task be-migrate`を実行し、それが消したローカルの商品、注文、決済の代表データを`task be-seed`で入れ直す。
 
@@ -315,7 +342,7 @@ task scan-dast
 task scan-dast-active
 ```
 
-slotを取り、slotのPostgreSQL、Redis、Keycloak、WireMockと、slotによらず固定のポート4173、18081、18082を使う。
+slotを取り、slotのPostgreSQL、Keycloak、WireMockと、slotによらず固定のポート4173、18081、18082を使う。
 開発環境、`task test`、`task e2e`とは同時に実行できるが、2つの`task scan-dast`は同時に実行できず、2本目はポートの確認で失敗する。
 ZAPとbackendは`--network host`で起動するので、Docker Desktopではhost networkingを有効にしておく必要がある。
 backendの起動の前に`task be-migrate`でマイグレーションを適用するため、JDKが要る。

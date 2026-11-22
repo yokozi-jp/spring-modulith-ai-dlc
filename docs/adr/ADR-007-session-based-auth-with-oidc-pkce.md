@@ -11,6 +11,8 @@ tags: [adr, security, auth, oidc]
 
 Accepted
 
+Amended by [ADR-111](ADR-111-store-sessions-in-postgresql-until-user-growth-needs-redis.md)：セッションの保存先を、開発初期は Redis ではなく PostgreSQL にすること。
+
 ## Date
 
 2026-09-11

@@ -65,7 +65,6 @@ check "slot 0 は従来の web のポート" 5173 "$(value_of "$out" E2E_WEB_POR
 out="$(acquire)"
 check "slot 0 が使用中なら slot 1" 1 "$(slot_of "$out")"
 check "slot 1 の PostgreSQL" 21433 "$(value_of "$out" TEST_PG_PORT)"
-check "slot 1 の Redis" 21380 "$(value_of "$out" TEST_REDIS_PORT)"
 check "slot 1 の backend" 21080 "$(value_of "$out" TEST_BACKEND_PORT)"
 check "slot 1 の Keycloak" 21081 "$(value_of "$out" TEST_KEYCLOAK_PORT)"
 check "slot 1 の WireMock" 21082 "$(value_of "$out" TEST_WIREMOCK_PORT)"
@@ -75,7 +74,6 @@ check "slot 1 の issuer" "http://127.0.0.1:21081/realms/spring-modulith" "$(val
 
 env_file="$work/build/test-slot/slot-1.env"
 check "env ファイルの DB_PORT" "DB_PORT=21433" "$(grep '^DB_PORT=' "$env_file")"
-check "env ファイルの REDIS_PORT" "REDIS_PORT=21380" "$(grep '^REDIS_PORT=' "$env_file")"
 check "env ファイルの決済代行" "PAYMENT_GATEWAY_BASE_URL=http://127.0.0.1:21082" "$(grep '^PAYMENT_GATEWAY_BASE_URL=' "$env_file")"
 check "web 用の SERVER_PORT は slot の backend のポート" "21080" "$(value_of "$out" SERVER_PORT)"
 check "ポート以外の変数は基の値のまま" "$(grep '^OIDC_CLIENT_ID=' "$work/.env.test")" "$(grep '^OIDC_CLIENT_ID=' "$env_file")"
