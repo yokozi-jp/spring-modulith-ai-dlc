@@ -8,7 +8,7 @@ set -euo pipefail
 
 SLOTS=4
 # slot 0 は従来のポートのまま。slot n は 20000 + n * 1000 + 従来のポートの下 3 桁。
-BASE_WEB=5173 BASE_BACKEND=8080 BASE_KEYCLOAK=8081 BASE_WIREMOCK=8082 BASE_PG=5433 BASE_REDIS=6380
+BASE_WEB=5173 BASE_BACKEND=8080 BASE_KEYCLOAK=8081 BASE_WIREMOCK=8082 BASE_PG=5433
 PROJECT_PREFIX=spring-modulith-test
 WAIT_SECONDS="${TEST_SLOT_WAIT_SECONDS:-900}"
 POLL_SECONDS="${TEST_SLOT_POLL_SECONDS:-5}"
@@ -26,7 +26,6 @@ ports() {
   echo "TEST_KEYCLOAK_PORT=$(port_of "$n" $BASE_KEYCLOAK)"
   echo "TEST_WIREMOCK_PORT=$(port_of "$n" $BASE_WIREMOCK)"
   echo "TEST_PG_PORT=$(port_of "$n" $BASE_PG)"
-  echo "TEST_REDIS_PORT=$(port_of "$n" $BASE_REDIS)"
 }
 
 # 基にする env ファイルのうち、ホストから見たポートを持つ変数だけを slot の値へ置き換えて書く。
@@ -34,9 +33,9 @@ write_env_file() {
   local n="$1" base="$2" out="$3" kc wm
   kc="$(port_of "$n" $BASE_KEYCLOAK)" wm="$(port_of "$n" $BASE_WIREMOCK)"
   mkdir -p "$(dirname "$out")"
-  awk -F= -v db="$(port_of "$n" $BASE_PG)" -v redis="$(port_of "$n" $BASE_REDIS)" \
+  awk -F= -v db="$(port_of "$n" $BASE_PG)" \
     -v issuer="http://127.0.0.1:$kc/realms/spring-modulith" -v payment="http://127.0.0.1:$wm" '
-    BEGIN { v["DB_PORT"] = db; v["REDIS_PORT"] = redis; v["OIDC_ISSUER_URI"] = issuer; v["PAYMENT_GATEWAY_BASE_URL"] = payment }
+    BEGIN { v["DB_PORT"] = db; v["OIDC_ISSUER_URI"] = issuer; v["PAYMENT_GATEWAY_BASE_URL"] = payment }
     $1 in v { print $1 "=" v[$1]; seen[$1] = 1; next }
     { print }
     END { for (k in v) if (!(k in seen)) print k "=" v[k] }

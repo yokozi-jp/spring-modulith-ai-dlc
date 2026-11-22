@@ -147,7 +147,7 @@ task api-gen
 
 ```bash
 cp .env.example .env       # 環境変数を用意し、パスワードを変更する
-task compose-up            # PostgreSQL、Keycloak、Redis、Collector、Grafanaを起動する
+task compose-up            # PostgreSQL、Keycloak、Collector、Grafanaを起動する
 task be-migrate            # 初回はマイグレーションを明示実行する
 task dev                   # 依存を起動し、バックエンドを起動する
 # 別のターミナルで
@@ -179,7 +179,7 @@ Taskのテスト系タスクは、`.env.test`に足りない変数を`.env.test.
 `task be-migrate`は012と014のchangesetのGRANTがロールの不在で失敗するため、`task compose-reset CONFIRM_RESET=yes`でボリュームを消し、`task compose-up`で起動してから`task be-migrate`を実行する（[DB接続情報とロール分離](../database/connections.md)）。
 
 セッションの利用者を`AppUserPrincipal`にした変更（[ADR-096](../adr/ADR-096-require-app-user-principal-for-audit-columns.md)）の後は、ブラウザでログアウトしてログインし直す。
-ローカルのRedisはセッションを残すため、変更の前のセッションのままでは書き込みが500になる（[APIの認証、セッション、権限](../web-api/authentication-and-session.md)）。
+ローカルのDBはセッションを残すため、変更の前のセッションのままでは書き込みが500になる（[APIの認証、セッション、権限](../web-api/authentication-and-session.md)）。
 
 テナントと所属の表（016 changeset）を足した変更（[ADR-101](../adr/ADR-101-keep-tenants-and-roles-in-app-database.md)）の後は、既存のローカルの環境で次の順に実行し、ブラウザでログアウトしてログインし直す。
 
@@ -193,6 +193,10 @@ task be-seed             # 2 つのテナントと、test-user と test-admin �
 読み直さないと、Keycloakのtest-userとtest-adminのIDがseedの所属の利用者と食い違い、ログインしても所属がなく、招待を待つ画面になる。
 `task be-seed`は、業務データがあっても、足りないテナントと所属だけを入れる。
 test-userは2つのテナント（サンプル商事、サンプル物産）に属するのでログインの後にテナントを選ぶ画面が出て、test-adminはサンプル商事だけに属するので選ばずに業務の画面に入る。
+
+セッションをPostgreSQLに移した変更（023 changeset、[ADR-111](../adr/ADR-111-store-sessions-in-postgresql-until-user-growth-needs-redis.md)）の後は、`task be-migrate`でセッションの表を作ってからバックエンドを起動し、ブラウザでログインし直す。
+表がないと、ログインの最初の要求がセッションを保存できずに失敗する。
+Redisのセッションは引き継がない。
 
 業務テーブルをテナントの列とRLSを持つ形に作り直した変更（018から020のchangeset、[ADR-107](../adr/ADR-107-isolate-tenants-with-rls-set-per-transaction.md)）の後は、`task be-migrate`を実行し、それが消したローカルの商品、注文、決済の代表データを`task be-seed`で入れ直す。
 
@@ -338,7 +342,7 @@ task scan-dast
 task scan-dast-active
 ```
 
-slotを取り、slotのPostgreSQL、Redis、Keycloak、WireMockと、slotによらず固定のポート4173、18081、18082を使う。
+slotを取り、slotのPostgreSQL、Keycloak、WireMockと、slotによらず固定のポート4173、18081、18082を使う。
 開発環境、`task test`、`task e2e`とは同時に実行できるが、2つの`task scan-dast`は同時に実行できず、2本目はポートの確認で失敗する。
 ZAPとbackendは`--network host`で起動するので、Docker Desktopではhost networkingを有効にしておく必要がある。
 backendの起動の前に`task be-migrate`でマイグレーションを適用するため、JDKが要る。

@@ -164,7 +164,7 @@ jobs:
             gradle-${{ runner.os }}-test-
 
       # rollback の検証はローカルの task test と同じく compose の PostgreSQL 5433 を使う。
-      # テストは fork ごとに Testcontainers の PostgreSQL、Redis と WireMock を起動する（ADR-085）。
+      # テストは fork ごとに Testcontainers の PostgreSQL と WireMock を起動する（ADR-085）。
       # .env.test は Git 除外のため、.env.test.example からコピーして作る。
       - name: Create test env file
         run: cp .env.test.example .env.test

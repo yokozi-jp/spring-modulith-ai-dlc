@@ -28,7 +28,7 @@ foreign=$!
 cleanup() { kill -- "-$foreign" 2>/dev/null || true; rm -rf "$STATE"; compose down --volumes --remove-orphans >/dev/null 2>&1 || true; }
 trap cleanup EXIT
 # 確かめた直後に、slot 3 を使用中にする。以降、ほかの実行がこの slot を取らない（テストの途中で project を空にしない）。
-compose up -d --wait redis > /dev/null
+compose up -d --wait wiremock > /dev/null
 sleep 0.5
 
 failures=0
@@ -83,12 +83,12 @@ assert "記録と違う compose-test を止めない" others_kept
 # 起動が打ち切られ、コンテナの記録がないとき。状態の後に作られたコンテナは、その起動のものとして片付ける。
 stale_state "$boot" "1"
 rm "$STATE/containers"
-compose up -d --force-recreate --wait redis > /dev/null 2>&1
+compose up -d --force-recreate --wait wiremock > /dev/null 2>&1
 assert "コンテナの記録がなくても down が成功する" run_down
 assert "打ち切られた起動のコンテナを片付ける" no_containers
 
 # 状態より前から動いているコンテナは、記録がなくてもほかの実行のものとして残す。
-compose up -d --wait redis > /dev/null 2>&1
+compose up -d --wait wiremock > /dev/null 2>&1
 other="$(compose ps -aq)"
 sleep 1
 stale_state "$boot" "1"

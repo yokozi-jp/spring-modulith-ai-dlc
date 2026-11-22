@@ -1,7 +1,7 @@
 ---
 type: ADR
 title: 'ADR-085: バックエンドのテストの依存を Testcontainers で fork ごとに起動し、テストを並列に実行する'
-description: バックエンドのテストが共有の compose-test に頼るのをやめ、テストの JVM ごとに Testcontainers で PostgreSQL と Redis、プロセス内で WireMock を起動し、Gradle の fork を並列にし、カバレッジの検証を test から check へ移す決定。
+description: バックエンドのテストが共有の compose-test に頼るのをやめ、テストの JVM ごとに Testcontainers で PostgreSQL、プロセス内で WireMock を起動し、Gradle の fork を並列にし、カバレッジの検証を test から check へ移す決定。
 tags: [adr, testing, backend, database, tooling]
 ---
 
@@ -38,11 +38,13 @@ Pull Request のレビューで Decision を書き直した。
 - 必須の CI からスキーマタグの宣言の検証が抜けた。
 - WireMock をプロセス内で起動すると、版とオプションを compose と手で合わせる必要があった。
 
+[ADR-111](ADR-111-store-sessions-in-postgresql-until-user-growth-needs-redis.md) で Redis を外したため、Proposed の間に起動するものから Redis を除いた。
+
 ## Decision
 
 バックエンドのテストの依存を、テストの JVM ごとに起動し、Gradle の fork を並列にする。
 
-- **起動するもの。** テストの JVM ごとに、Testcontainers で PostgreSQL、Redis、決済代行の WireMock のコンテナを 1 つずつ起動する（`testkit.InfrastructureContainers`）。
+- **起動するもの。** テストの JVM ごとに、Testcontainers で PostgreSQL、決済代行の WireMock のコンテナを 1 つずつ起動する（`testkit.InfrastructureContainers`）。
   ポートは compose と同じく `127.0.0.1` だけで公開する。
 - **起動の契機。** `META-INF/spring.factories` に登録した `ContextCustomizerFactory` が、最初の Spring のテストのコンテキストを作るときに起動する。Spring を使わないテストだけの fork では起動しない。
 - **接続先の渡し方。** 接続先は、`application.yaml` のプレースホルダの名前で、最も優先する property source としてコンテキストへ足す。

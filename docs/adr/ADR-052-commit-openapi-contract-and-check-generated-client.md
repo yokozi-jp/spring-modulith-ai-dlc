@@ -33,6 +33,8 @@ OpenAPI の `info.version` は、仕様では OpenAPI 文書の版であり、�
 現在は `OpenApiConfig` に `0.0.1` を固定しており、版の上げ方を決めていない。
 [APIの互換性と廃止](../web-api/versioning.md) は、API の版をリリース版の番号と連動させないと定めている。
 
+[ADR-111](ADR-111-store-sessions-in-postgresql-until-user-growth-needs-redis.md) で Redis を外したため、Proposed の間に帰結から Redis を除いた。
+
 ## Decision
 
 ### 契約のファイル
@@ -109,7 +111,7 @@ OpenAPI の `info.version` は、仕様では OpenAPI 文書の版であり、�
 ### Negative
 
 - 契約を変えるたびに、契約と生成物を同じコミットに含める手間が増える。
-- `task api-gen` はテスト用の PostgreSQL と Redis を起動するため、数十秒以上かかる。
+- `task api-gen` はテスト用の PostgreSQL を起動するため、数十秒以上かかる。
 - 生成物をコミットするため、リポジトリと PR の差分が大きくなる。
 - ラベルは triage 権限があれば誰でも付けられ、ruleset は承認なしの merge を許す。
   例外の承認は規約にとどまり、強制できない。

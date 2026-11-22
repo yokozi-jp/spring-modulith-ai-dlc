@@ -114,9 +114,9 @@ retry の回数を増やして隠さない。
 
 ## 実行環境
 
-`task e2e` は `docker/compose-test.yml` の `e2e` profile で PostgreSQL、Redis、Keycloak、決済代行の WireMock、backend を起動する。
+`task e2e` は `docker/compose-test.yml` の `e2e` profile で PostgreSQL、Keycloak、決済代行の WireMock、backend を起動する。
 WireMock には profile を付けず、`task test` と共有する。
-backend は compose の network に置き、PostgreSQL、Redis、Keycloak、WireMock へ service 名で接続する。
+backend は compose の network に置き、PostgreSQL、Keycloak、WireMock へ service 名で接続する。
 compose の `environment` が `.env.test` の接続先を service 名に上書きする。
 Keycloak は hostname v2 で issuer をブラウザと同じ `http://127.0.0.1:<slot の Keycloak の port>` に固定し、backend は discovery を `OIDC_DISCOVERY_URI`（`keycloak:8080`）から読む。
 backend は discovery の `issuer` が `OIDC_ISSUER_URI` と一致しなければ起動しない（理由は [ADR-057](../adr/ADR-057-adopt-playwright-for-e2e-tests.md)）。
@@ -132,7 +132,6 @@ slot 0 の port は次のとおりである。
 | 5173 | Vite preview（Keycloak の redirect URI と同じ origin） |
 | 8080 | backend                                                |
 | 5433 | PostgreSQL                                             |
-| 6380 | Redis                                                  |
 | 8081 | Keycloak                                               |
 | 8082 | 決済代行の WireMock（Playwright が管理 API を呼ぶ）    |
 
@@ -151,7 +150,7 @@ slot 0 の port は次のとおりである。
 2. `task e2e-up` を実行する。
    slot の web と backend の port（slot 0 は 5173 と 8080）が空いていることを確かめ、frontend の依存の導入と build、Chromium の導入、backend イメージの build を行う。
    frontend は `vp build --mode test` で build し、`.env.test` の `FRONTEND_OTEL_ENABLED=true` で Faro を有効にする。
-3. PostgreSQL、Redis、Keycloak、WireMock を起動し、`task be-migrate` で migration を適用し、`task be-seed` で代表データを入れる。
+3. PostgreSQL、Keycloak、WireMock を起動し、`task be-migrate` で migration を適用し、`task be-seed` で代表データを入れる。
 4. backend を起動し、ホストから readiness を確かめる。
 5. Playwright を実行する。
    Playwright が `webServer` で Vite preview を起動し、終了時に止める。
