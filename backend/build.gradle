@@ -197,13 +197,15 @@ def testLiquibaseTag = providers.gradleProperty('testAllChangesets').isPresent()
 
 // テストの設定（接続先以外）。開発用の ../.env でなく、テスト用の値を読ませる（ADR-085）。
 // 無ければ task be-test などが .env.test.example から作る。-PtestEnvFile=<backend からの相対パス> で変える。
+// 本番（UTC）とも業務（東京）とも違い、夏時間のあるタイムゾーンでテストを流す（ADR-109）。
+def testJvmTimeZone = 'America/New_York'
 def testEnvFile = layout.projectDirectory.file(providers.gradleProperty('testEnvFile').getOrElse('../.env.test')).asFile
 def testSpringConfigImport = "file:${testEnvFile.absolutePath}[.properties]"
 def missingTestEnvFile = "${testEnvFile} がありません。.env.test.example をコピーするか、task be-test を実行してください。"
 
 tasks.withType(Test).configureEach {
     useJUnitPlatform()
-    systemProperty 'user.timezone', 'UTC'
+    systemProperty 'user.timezone', testJvmTimeZone
     systemProperty 'test.liquibase.tag', testLiquibaseTag
     systemProperty 'spring.config.import', testSpringConfigImport
     doFirst { if (!testEnvFile.exists()) throw new GradleException(missingTestEnvFile) }
@@ -350,7 +352,7 @@ pitest {
     failWhenNoMutations = false
     outputFormats = ['HTML', 'XML']
     timestampedReports = false
-    jvmArgs = ['-Duser.timezone=UTC', "-Dtest.liquibase.tag=${testLiquibaseTag}", "-Dspring.config.import=${testSpringConfigImport}"]
+    jvmArgs = ["-Duser.timezone=${testJvmTimeZone}", "-Dtest.liquibase.tag=${testLiquibaseTag}", "-Dspring.config.import=${testSpringConfigImport}"]
 }
 
 /*

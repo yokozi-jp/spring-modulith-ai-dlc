@@ -28,7 +28,7 @@ APIは絶対時刻をUTCで返し、フロントエンドが画面の要件に�
   業務タイムゾーンはIANAタイムゾーンIDの設定値から受け取り、`Clock`のゾーンやJVMの既定タイムゾーンから取らない。
   この決定は[ADR-046](../adr/ADR-046-derive-local-dates-with-configured-business-zone.md)を参照する。
 - システム時刻を供給する`Clock`は`com.example.demo.DemoApplication.clock()`の`@Bean`メソッドだけで生成し、このメソッドが`Clock.tick(Clock.systemUTC(), Duration.ofNanos(1_000))`を返す。
-- JVMには`-Duser.timezone=UTC`を設定する。
+- 本番、`bootRun`、`seedLocalData`のJVMには`-Duser.timezone=UTC`を設定する。テストのJVMは例外で、[テスト](#テスト)に従う。
 - `ZoneId.systemDefault()`や`Clock`を受け取らない`now(...)`に業務処理を依存させない。
 - APIの絶対時刻はRFC 3339形式のUTC表現で返し、UTCオフセットには常に`Z`を使う。
   `+09:00`のようなオフセット表記では返さない。
@@ -45,7 +45,8 @@ APIは絶対時刻をUTCで返し、フロントエンドが画面の要件に�
 - PostgreSQLのアプリケーション接続とログはUTCへ固定する。
   これは主に表示とタイムゾーンなし入力の解釈に効く防御策であり、`TIMESTAMP WITH TIME ZONE`の保存がUTCになること自体はセッション設定に依存しない。
 - アプリケーション接続のセッションタイムゾーンは、JVMの設定と`connection-init-sql`の2段で決まる。
-  PgJDBCは接続時にJVMの既定タイムゾーン（`-Duser.timezone=UTC`）を起動パラメータ`TimeZone`として送り、サーバーの設定値を上書きする（[pgjdbc#2927](https://github.com/pgjdbc/pgjdbc/issues/2927)）。
+  PgJDBCは接続時にJVMの既定タイムゾーン（本番は`-Duser.timezone=UTC`）を起動パラメータ`TimeZone`として送り、サーバーの設定値を上書きする（[pgjdbc#2927](https://github.com/pgjdbc/pgjdbc/issues/2927)）。
+  テストのJVMは`America/New_York`なので、`connection-init-sql`だけがUTCにする。`DemoApplicationTest`がこれを確かめる（[ADR-109](../adr/ADR-109-run-backend-tests-in-new-york-jvm.md)）。
   その後、HikariCPの`connection-init-sql`の`SET TIME ZONE 'UTC'`が新しい物理接続ごとに実行され、JVMの設定にかかわらず実効値をUTCにする。
 - PostgreSQLサーバーの`timezone`と`log_timezone`のUTC指定は、残しておく防御策である。
   前者はpsqlのように`TimeZone`を送らないクライアントのセッションに効き、後者はサーバーログの時刻に効く（[PostgreSQL 18, Client Connection Defaults](https://www.postgresql.org/docs/18/runtime-config-client.html#GUC-TIMEZONE)）。
@@ -54,7 +55,7 @@ APIは絶対時刻をUTCで返し、フロントエンドが画面の要件に�
 基準となる設定は次を参照する。
 
 - Spring Boot（Jackson、`connection-init-sql`）：[application.yaml](../../backend/src/main/resources/application.yaml)
-- JVM（`user.timezone`、PgJDBCが接続時に送るセッションタイムゾーン）：コンテナは[Dockerfile](../../backend/Dockerfile)、`test`と`bootRun`は[build.gradle](../../backend/build.gradle)
+- JVM（`user.timezone`、PgJDBCが接続時に送るセッションタイムゾーン）：コンテナは[Dockerfile](../../backend/Dockerfile)、`bootRun`と`seedLocalData`のUTCと`test`の`America/New_York`は[build.gradle](../../backend/build.gradle)
 - PostgreSQLサーバー（他のクライアントとログへの防御策）：[compose.yml](../../docker/compose.yml)
 - DBマイグレーション：[001-create-event-publication-tables.yaml](../../backend/src/main/resources/db/changelog/changesets/001-create-event-publication-tables.yaml)
 
@@ -144,7 +145,9 @@ Javaの`LocalDateTime.atZone()`は、gapでは時刻を後ろへずらし、over
 
 ## テスト
 
-- 通常のバックエンドテストはUTCのJVMで一回だけ実行する。
+- 通常のバックエンドテストは`America/New_York`のJVMで一回だけ実行する。
+  本番（UTC）とも業務（東京）とも違い、夏時間があるタイムゾーンにすることで、プロセスのタイムゾーンに頼る誤りを落とす。
+  理由は[ADR-109](../adr/ADR-109-run-backend-tests-in-new-york-jvm.md)に書く。
 - 現在時刻を使うテストには`Clock.fixed(...)`を渡す。
 - JSONの絶対時刻は`Z`付き文字列との完全一致で検証する。
 - DB統合テストは`SHOW TIME ZONE`と`Instant`の保存往復を検証する。
@@ -167,7 +170,8 @@ Javaの`LocalDateTime.atZone()`は、gapでは時刻を後ろへずらし、over
   - システム時刻を直接供給する`Clock`ファクトリは、`com.example.demo.DemoApplication.clock()`以外での使用を検出する。
     `InstantSource.system()`はどこで使っても検出する。
     違反したクラスは`Clock`をコンストラクタ引数で受け取り、`Instant.now(clock)`などへ置き換える。
-- JVMのタイムゾーンは`-Duser.timezone=UTC`を`test`タスク、`bootRun`、コンテナの`JAVA_TOOL_OPTIONS`で固定する。
+- JVMのタイムゾーンは、`-Duser.timezone=UTC`を`bootRun`、`seedLocalData`、コンテナの`JAVA_TOOL_OPTIONS`で固定する。
+  `test`タスクとPITは`America/New_York`にし、`JvmTimeZoneTest`が設定の外れを検出する。
 - Jacksonの`Z`付き絶対時刻表現、DBセッションのUTC固定、`Instant`の保存往復は、契約テストと統合テストで検証する。
 
 型の選択そのものは、その値が絶対時刻かどうかという意味の判断を伴うため機械判定しない。
