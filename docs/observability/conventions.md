@@ -50,7 +50,7 @@ Grafana では trace ID を使ってログとトレースを相互に検索す�
 
 ## テナントと利用者
 
-ログの毎行と HTTP の受信の span に、テナントと利用者の ID を付ける（[ADR-110](../adr/ADR-110-add-tenant-and-user-ids-to-logs-and-traces.md)）。
+認証した要求とリスナーの中のログと、HTTP の受信の span に、テナントと利用者の ID を付ける（[ADR-110](../adr/ADR-110-add-tenant-and-user-ids-to-logs-and-traces.md)）。
 
 - **`tenant.id`**：テナントの `public_id`（`TenantId.toString()` の UUID）。業務テーブルの `tenant_public_id` でそのまま引ける。`tenancy.m_tenant` の主キーの `tenant_id`（bigint）ではない。
 - **`user.id`**：アプリの利用者の ID（`AppUserPrincipal.userId()`、`tenancy.m_user` の `public_id` の UUID）。IdP の `sub` ではない。
@@ -61,6 +61,17 @@ Grafana では trace ID を使ってログとトレースを相互に検索す�
 - `user.id` は、`TenantSelectionFilter` が認証したリクエストの間だけ入れる。リスナーのログには付かない。
 - コンソールの ECS JSON では `{"tenant":{"id":…},"user":{"id":…}}` の入れ子の項目になり、OTLP では LogRecord の属性になる。
 - リスナーの外で記録するログ（リスナーが投げた例外を Spring の `SimpleAsyncUncaughtExceptionHandler` が記録する ERROR など）は、`tenant.id` を持たない。
+
+Spring Security の filter の連鎖のうち、`TenantSelectionFilter` の外で記録するログは、`tenant.id` も `user.id` も持たない。
+`TenantSecurityCustomizer` は、この filter を `ExceptionTranslationFilter` と `AuthorizationFilter` の間に置く。
+次のログがこれにあたる。
+
+- `AuthorizationFilter` が拒否し、`ExceptionTranslationFilter` が返す 401 と 403
+- `TenantSelectionFilter` が投げる `TenantNotSelectedException`
+- CSRF の検証の失敗
+- Spring Security の entry point
+
+Controller の中の `@PreAuthorize` が拒否したときのログは、2 つを持つ。
 
 トレースでは、`TenantSelectionFilter` が HTTP の受信の span にだけ、2 つを属性として付ける。
 
@@ -84,6 +95,7 @@ Grafana では trace ID を使ってログとトレースを相互に検索す�
 イベント出版の定期の再投入と手での 1 回の再投入は、業務上必要な内部 ID として出版の ID、イベントの型とリスナーの完全修飾名、試行の回数（`event_publication.id`、`event_publication.event_type`、`event_publication.listener_id`、`event_publication.completion_attempts`）と、1 回の実行の件数（`event_publication.resubmitted.count`、`event_publication.exhausted.count`）と、手での 1 回の再投入の結果の件数（`event_publication.completed.count`、`event_publication.incomplete.count`、`event_publication.remaining.count`）を出す（[ADR-079](../adr/ADR-079-resubmit-failed-event-publications-periodically-with-shedlock.md)）。
 イベントの本文（`serialized_event`）は読まず、ログへ渡さない。
 内部 ID と氏名などの表示値を同じ event へ載せない。
+MDC が付ける `user.id` と `tenant.id` はこの規則の対象外とするが、要求とリスナーの中の event に付くので、ログを書く処理は利用者とテナントの表示値（利用者の氏名、テナントの名前）を event へ載せない。
 HTTP の URL パスは span に入るため、API のパスに個人データと秘密情報を置かない。
 ブラウザの例外は画面の route template を `view.name` に持つため、画面の path にも個人データと秘密情報を置かず、識別子は内部 ID にする（[フロントエンドのURL設計](../frontend/url-design.md)）。
 DTO やエンティティを logger へ渡さず、許可した値だけを個別の属性として渡す。

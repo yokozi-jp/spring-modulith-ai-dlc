@@ -38,7 +38,7 @@ Spring Boot が出力する起動ログで足りる段階は、アプリケー�
 - **HTTP メソッド**：`http.request.method`
 - **route**：`http.route`
 - **URL パス**：`url.path`
-- **利用者の内部 ID**：`user.id`（ログイン済みの場合だけ）
+- **アプリの利用者の ID**：`user.id`（ログイン済みの場合だけ。「[テナントと利用者](conventions.md#テナントと利用者)」）
 
 応答時には、次の属性も記録する。
 

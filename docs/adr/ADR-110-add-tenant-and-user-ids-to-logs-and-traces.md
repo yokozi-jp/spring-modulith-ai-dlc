@@ -1,7 +1,7 @@
 ---
 type: ADR
 title: 'ADR-110: ログとトレースに、テナントの public_id とアプリの利用者の ID を付ける'
-description: ログの毎行と HTTP の受信の span に、テナントの public_id を tenant.id、アプリの利用者の ID を user.id として付け、ADR-015 が発生源で渡さないとした「利用者へ結び付く ID」から、アプリが採番したこの 2 つを外す決定。ログには MDC で入れ、span には Observation の高い濃度の key value だけで入れ、baggage は使わない。
+description: 認証した要求とリスナーの中のログと、HTTP の受信の span に、テナントの public_id を tenant.id、アプリの利用者の ID を user.id として付け、ADR-015 が発生源で渡さないとした「利用者へ結び付く ID」から、アプリが採番したこの 2 つを外す決定。ログには MDC で入れ、span には Observation の高い濃度の key value だけで入れ、baggage は使わない。
 tags: [adr, observability, logging, tracing, tenancy]
 ---
 
@@ -82,6 +82,7 @@ appender の `mdcAttributesIncluded` は、MDC のうち OTLP の属性にする
 ### Negative
 
 - リスナーの外で記録するログは `tenant.id` を持たない。リスナーが投げた例外を Spring の `SimpleAsyncUncaughtExceptionHandler` が記録する ERROR がこれにあたる。
+- Spring Security の filter の連鎖のうち、`TenantSelectionFilter` の外で記録するログは、`tenant.id` も `user.id` も持たない。`TenantSecurityCustomizer` はこの filter を `ExceptionTranslationFilter` と `AuthorizationFilter` の間に置くので、`AuthorizationFilter` の拒否も、この filter を出てから 401 か 403 として記録される。この filter が投げる `TenantNotSelectedException`、CSRF の失敗、entry point のログも同じである。Controller の中の `@PreAuthorize` の拒否は、この filter の中で記録されるので 2 つを持つ。範囲は[可観測性データの規約](../observability/conventions.md#テナントと利用者)に書く。
 - 受信の span 以外の span（外向きの HTTP、SQL、リスナーの中の処理）は `tenant.id` を持たない。受信の span の trace ID からたどる。
 - 利用者の ID から利用者を特定できるので、ADR-015 の閲覧権限と保持期間で守る。
 

@@ -11,7 +11,8 @@ tags: [adr, observability, logging, security]
 
 Accepted
 
-Amended by [ADR-110](ADR-110-add-tenant-and-user-ids-to-logs-and-traces.md)：ログと span の属性に、アプリが採番したテナントの `public_id`（`tenant.id`）と利用者の ID（`user.id`）を許すこと。Alternative 4 の「appender の属性 allowlist は使っている版に存在しない」が 2.33.0-alpha で成り立たなくなったこと（判断は変えない）。
+Amended by [ADR-110](ADR-110-add-tenant-and-user-ids-to-logs-and-traces.md)：ログと span の属性に、アプリが採番したテナントの `public_id`（`tenant.id`）と利用者の ID（`user.id`）を許すこと。
+Amended by [ADR-110](ADR-110-add-tenant-and-user-ids-to-logs-and-traces.md)：Alternative 4 の「appender の属性 allowlist は使っている版に存在しない」が 2.33.0-alpha で成り立たなくなったこと（判断は変えない）。
 
 ## Date
 
