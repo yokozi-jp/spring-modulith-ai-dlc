@@ -11,6 +11,8 @@ tags: [adr, datetime, timezone, backend]
 
 Accepted
 
+Amended by [ADR-109](ADR-109-run-backend-tests-in-new-york-jvm.md)：テストの JVM のタイムゾーンを America/New_York にする。
+
 ## Date
 
 2026-09-11
