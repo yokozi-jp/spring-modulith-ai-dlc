@@ -63,7 +63,7 @@ clone したら、[スキルの取得元と更新](docs/agents/skill-sources.md)
 | 分類             | 技術                       | バージョン | 用途                                           |
 | ---------------- | -------------------------- | ---------- | ---------------------------------------------- |
 | Backend          | Java (Amazon Corretto)     | 25         |                                                |
-| Backend          | Spring Boot                | 4.1.1      | Web、Security（OIDC Client）、Session（Redis） |
+| Backend          | Spring Boot                | 4.1.1      | Web、Security（OIDC Client）、Session（JDBC）  |
 | Backend          | Spring Modulith            | 2.1.2      | モジュール境界の検証                           |
 | Backend          | jOOQ                       | 3.21.8     | スキーマから生成する型安全な SQL               |
 | Backend          | Liquibase                  |            | DB マイグレーション                            |
@@ -85,7 +85,6 @@ clone したら、[スキルの取得元と更新](docs/agents/skill-sources.md)
 | Frontend         | Node.js                    | 24.21.0    |                                                |
 | Frontend         | pnpm                       | 11.21.0    |                                                |
 | インフラとツール | PostgreSQL                 | 18         |                                                |
-| インフラとツール | Redis                      | 7.x        | 分散セッション                                 |
 | インフラとツール | Keycloak                   | 26.7.3     | OIDC の認可サーバー                            |
 | インフラとツール | Grafana OpenTelemetry LGTM | 0.40.0     | 可観測性データの集約                           |
 | インフラとツール | OpenTelemetry Collector    | 0.165.0    | ログの属性の絞り込み                           |

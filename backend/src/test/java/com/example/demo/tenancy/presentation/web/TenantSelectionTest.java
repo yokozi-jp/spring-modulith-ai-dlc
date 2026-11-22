@@ -60,7 +60,7 @@ import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.jwt.JwtDecoderFactory;
 import org.springframework.security.web.context.HttpSessionSecurityContextRepository;
 import org.springframework.session.Session;
-import org.springframework.session.data.redis.RedisSessionRepository;
+import org.springframework.session.jdbc.JdbcIndexedSessionRepository;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.test.web.servlet.ResultActions;
@@ -70,7 +70,7 @@ import org.springframework.web.util.UriComponentsBuilder;
 import org.springframework.web.util.UriUtils;
 
 /**
- * OIDC のログインから、所属を引いてテナントを選ぶまでを、実際の Security filter chain と Redis のセッションで確かめる。
+ * OIDC のログインから、所属を引いてテナントを選ぶまでを、実際の Security filter chain と DB のセッションで確かめる。
  *
  * <p>IdP のトークンの endpoint と ID トークンの検証だけを {@link FakeIdp} に差し替え、ログインのコールバックは本物の {@code
  * OAuth2LoginAuthenticationFilter} を通す。Cookie はブラウザと同じく応答の {@code Set-Cookie} を次のリクエストに送る。
@@ -121,8 +121,8 @@ class TenantSelectionTest {
   /** テナントと所属の行を書く jOOQ のコンテキスト。 */
   @Autowired private DSLContext dsl;
 
-  /** セッションが残っているかと、保存した認証を読む Redis のリポジトリ。 */
-  @Autowired private RedisSessionRepository sessions;
+  /** セッションが残っているかと、保存した認証を読む JDBC のリポジトリ。 */
+  @Autowired private JdbcIndexedSessionRepository sessions;
 
   /** ログインが保存した OAuth2 の認可済みのクライアント。 */
   @Autowired private OAuth2AuthorizedClientRepository authorizedClients;
@@ -457,9 +457,9 @@ class TenantSelectionTest {
         UTF_8);
   }
 
-  /** Redis のセッションに保存した認証。 */
+  /** DB のセッションに保存した認証。 */
   private Authentication authenticationIn(final String sessionId) {
-    // RedisSessionRepository のセッションの型は公開されていないため、Session として受ける。
+    // JdbcIndexedSessionRepository のセッションの型は公開されていないため、Session として受ける。
     final Session session =
         Objects.requireNonNull(
             sessions.findById(sessionId), () -> "セッションがない: sessionId=" + sessionId);

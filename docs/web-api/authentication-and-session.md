@@ -34,8 +34,8 @@ IdPを移るときは、組と利用者の対応づけだけを書き換え、�
 `tenancy`の`SignInOidcUserService`が`OAuth2UserService<OidcUserRequest, OidcUser>`を実装し、Spring SecurityがこのBeanをOIDCログインに使う。
 ログインのコールバックでは前のセッションの認証がまだ残っているため、利用者を作る間だけ認証を外し、`*_by`には処理の名前を登録する。
 
-セッションはRedisに、`OidcUser`の実装のクラス名ごと直列化して保存する。
-次の2つのときは、デプロイと同時に既存のセッションを消す（`REDIS_SESSION_NAMESPACE`を変える）。
+セッションはPostgreSQLの`modulith.spring_session`と`modulith.spring_session_attributes`に、`OidcUser`の実装のクラス名ごと直列化して保存する（[ADR-111](../adr/ADR-111-store-sessions-in-postgresql-until-user-growth-needs-redis.md)）。
+次の2つのときは、デプロイと同時に既存のセッションを消す（`DELETE FROM modulith.spring_session`を実行する。`spring_session_attributes`の行は外部キーのカスケードで消える）。
 
 - `AppUserPrincipal`でない`OidcUser`を保存していた版から上げるとき。消さないと、そのセッションが切れるまで書き込みが失敗する。
 - `SignInOidcUserService`が返す`OidcUser`のクラスか、選んだテナントの権限のクラス（`TenantMembershipAuthority`）を持たない版へ切り戻すとき、またはそれらのクラスを移動、改名するとき。消さないと、セッションを読めずにリクエストが500になる。
@@ -70,14 +70,14 @@ chainの`SecurityContextRepository`は`HttpSecurity`のbuildで作られ、`Tena
 ### テナントを選んだ後のセッション
 
 テナントを選ぶ処理が認証とセッションのIDを作り直したときの、ほかの状態への影響を`TenantSelectionTest`で確かめた。
-テストは、本物の`OAuth2LoginAuthenticationFilter`のログインのコールバックとRedisのセッションを通し、IdPのトークンのendpointだけを差し替える。
+テストは、本物の`OAuth2LoginAuthenticationFilter`のログインのコールバックとDBのセッションを通し、IdPのトークンのendpointだけを差し替える。
 確かめた版は、Spring Boot 4.1.2、Spring Security 7.1.2、Spring Session 4.1.1である。
 
 - **OAuth2の認可済みのクライアント**：ログインが保存したクライアントを、作り直した認証でも引ける。Spring Bootが構成する`AuthenticatedPrincipalOAuth2AuthorizedClientRepository`は、クライアントを登録のIDと認証の名前（`getName()`、アプリの利用者のID）で引き、作り直した認証は同じprincipalを持つためである。
 - **CSRFのトークン**：セッションのIDを作り直しても`__Host-XSRF-TOKEN`のCookieは変わらず、選ぶ前に受け取ったトークンで更新できる。トークンはセッションではなくCookieにあり、テナントを選ぶ処理はログインの`CsrfAuthenticationStrategy`を通らないためである。
-- **前のセッションのID**：Redisから消え、そのCookieでの要求は401になる。
+- **前のセッションのID**：DBから消え、そのCookieでの要求は401になる。
 
-認可済みのクライアントの保存先は、既定の`InMemoryOAuth2AuthorizedClientService`で、Redisのセッションには入らない。
+認可済みのクライアントの保存先は、既定の`InMemoryOAuth2AuthorizedClientService`で、DBのセッションには入らない。
 アプリを再起動したときと別のインスタンスでは引けない。
 今の`backend/src/main`には認可済みのクライアントを読むコードがないため、影響はない。
 ログアウトでトークンを失効させるなど、認可済みのクライアントを読む処理を足すときは、保存先をセッションかDBに移す。

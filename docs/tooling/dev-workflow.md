@@ -124,7 +124,7 @@ task api-gen
 
 ```bash
 cp .env.example .env       # 環境変数を用意し、パスワードを変更する
-task compose-up            # PostgreSQL、Keycloak、Redis、Collector、Grafanaを起動する
+task compose-up            # PostgreSQL、Keycloak、Collector、Grafanaを起動する
 task be-migrate            # 初回はマイグレーションを明示実行する
 task dev                   # 依存を起動し、バックエンドを起動する
 # 別のターミナルで
@@ -156,7 +156,7 @@ Taskのテスト系タスクは、`.env.test`に足りない変数を`.env.test.
 `task be-migrate`は012と014のchangesetのGRANTがロールの不在で失敗するため、`task compose-reset CONFIRM_RESET=yes`でボリュームを消し、`task compose-up`で起動してから`task be-migrate`を実行する（[DB接続情報とロール分離](../database/connections.md)）。
 
 セッションの利用者を`AppUserPrincipal`にした変更（[ADR-096](../adr/ADR-096-require-app-user-principal-for-audit-columns.md)）の後は、ブラウザでログアウトしてログインし直す。
-ローカルのRedisはセッションを残すため、変更の前のセッションのままでは書き込みが500になる（[APIの認証、セッション、権限](../web-api/authentication-and-session.md)）。
+ローカルのDBはセッションを残すため、変更の前のセッションのままでは書き込みが500になる（[APIの認証、セッション、権限](../web-api/authentication-and-session.md)）。
 
 テナントと所属の表（016 changeset）を足した変更（[ADR-101](../adr/ADR-101-keep-tenants-and-roles-in-app-database.md)）の後は、既存のローカルの環境で次の順に実行し、ブラウザでログアウトしてログインし直す。
 
@@ -315,7 +315,7 @@ task scan-dast
 task scan-dast-active
 ```
 
-slotを取り、slotのPostgreSQL、Redis、Keycloak、WireMockと、slotによらず固定のポート4173、18081、18082を使う。
+slotを取り、slotのPostgreSQL、Keycloak、WireMockと、slotによらず固定のポート4173、18081、18082を使う。
 開発環境、`task test`、`task e2e`とは同時に実行できるが、2つの`task scan-dast`は同時に実行できず、2本目はポートの確認で失敗する。
 ZAPとbackendは`--network host`で起動するので、Docker Desktopではhost networkingを有効にしておく必要がある。
 backendの起動の前に`task be-migrate`でマイグレーションを適用するため、JDKが要る。

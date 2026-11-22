@@ -32,7 +32,7 @@ tags: [convention, nfr, availability, resilience, future-arch-guidelines]
 
 - 単一障害点を許容しない方針を要件に置き、各層の単一障害点を設計で洗い出す。
 - 認証基盤、DNS、共有ストレージは単一障害点になりやすく、見落とされやすい。
-- このリポジトリでは、OIDC の IdP と、セッションを保持する Redis も洗い出しの対象にする（[ADR-007](../adr/ADR-007-session-based-auth-with-oidc-pkce.md)）。
+- このリポジトリでは、OIDC の IdP も洗い出しの対象にする（[ADR-007](../adr/ADR-007-session-based-auth-with-oidc-pkce.md)）。
 - DB の構成は[PostgreSQLのバックアップと災害対策](../database/postgresql-backup-and-recovery.md)に従う。
 
 ## フェイルオーバー

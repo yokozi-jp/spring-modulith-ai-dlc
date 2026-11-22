@@ -1,5 +1,5 @@
 # このファイルの方針:
-#   環境変数（DB/Redis など）の参照にはデフォルト値を設定しない。
+#   環境変数（DB など）の参照にはデフォルト値を設定しない。
 #   設定漏れをアプリ起動時に検知しやすくするため（未設定なら起動に失敗させる）。
 
 # コンソールは収集基盤やコンテナランタイムが解釈できる ECS JSON で出力する。
@@ -86,15 +86,11 @@ spring:
   # DBマイグレーションはアプリ起動から分離済み（spring-boot-starter-liquibase を依存に持たず、
   # 起動時の自動実行は起こらない）。変更は ./gradlew migrateDatabase などの明示コマンドで適用する。
 
-  # Redis
-  data:
-    redis:
-      host: ${REDIS_HOST}
-      port: ${REDIS_PORT}
+  # セッションは modulith スキーマの表に保存する（ADR-111）。表は Liquibase で作り、起動時には作らない。
   session:
-    data:
-      redis:
-        namespace: ${REDIS_SESSION_NAMESPACE}
+    jdbc:
+      table-name: modulith.spring_session
+      initialize-schema: never
 
   # OIDC Client: Authorization Code Flow を使用するサーバーサイド Web クライアント。
   # PKCE は SecurityConfig で認可リクエストごとに S256 の challenge を付与する。
@@ -231,7 +227,7 @@ payment-gateway:
   read-timeout: 2s
 
 # 外部 client は依存先ごとに名前付き instance を定義し、client adapter の境界で適用する。
-# 現在の PostgreSQL、Redis、OIDC 通信へは自動適用されない。
+# 現在の PostgreSQL、OIDC 通信へは自動適用されない。
 resilience4j:
   circuitbreaker:
     configs:
@@ -307,7 +303,7 @@ management:
         include: health
   endpoint:
     health:
-      # 認証状態にかかわらず、DB や Redis などのコンポーネント詳細を公開しない。
+      # 認証状態にかかわらず、DB などのコンポーネント詳細を公開しない。
       show-details: never
       # ECS と通常の Docker でも liveness/readiness の health group を有効にする。
       probes:

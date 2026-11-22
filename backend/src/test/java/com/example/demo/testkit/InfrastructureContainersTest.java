@@ -30,7 +30,7 @@ class InfrastructureContainersTest {
   @Autowired private DataSource dataSource;
 
   @Test
-  @DisplayName("DB、Redis、決済代行の接続先は、この JVM が起動したコンテナを指す")
+  @DisplayName("DB、決済代行の接続先は、この JVM が起動したコンテナを指す")
   void connectionsPointToStartedContainers() throws SQLException {
     final Map<String, Object> started = InfrastructureContainers.properties();
     final String jdbcUrl =
@@ -42,9 +42,6 @@ class InfrastructureContainersTest {
     try (Connection connection = dataSource.getConnection()) {
       assertThat(connection.getMetaData().getURL()).as("接続した DB").isEqualTo(jdbcUrl);
     }
-    assertThat(environment.getProperty("spring.data.redis.port"))
-        .as("spring.data.redis.port")
-        .isEqualTo(started.get("REDIS_PORT"));
     assertThat(environment.getProperty("payment-gateway.base-url"))
         .as("payment-gateway.base-url")
         .isEqualTo(started.get("PAYMENT_GATEWAY_BASE_URL"));

@@ -69,7 +69,7 @@ PostgreSQLはRLSを受けるロールの`COPY FROM`を受け付けず、`FORCE R
 
 RLSの外に置く表は、`modulith`と`tenancy`のスキーマの表だけにする。
 
-- **`modulith`**：Spring Modulithのイベントの出版とそのarchive、ShedLockの表である。
+- **`modulith`**：Spring Modulithのイベントの出版とそのarchive、ShedLockとSpring Sessionの表である。
   テナントは、イベントの本文が運ぶ（[ADR-105](../adr/ADR-105-bind-tenant-to-request-and-event-context.md)）。
 - **`tenancy`**：テナント、利用者、ID連携、所属の表である。
   テナントが決まる前に引く。
