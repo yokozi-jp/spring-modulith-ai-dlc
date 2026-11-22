@@ -64,7 +64,7 @@ slot 1: web http://localhost:21173、backend http://localhost:21080、Keycloak h
 
 続けて、次の環境変数を export する。
 
-- `TEST_SLOT`、`COMPOSE_PROJECT_NAME`、表の 6 つのポート。
+- `TEST_SLOT`、`COMPOSE_PROJECT_NAME`、表の 5 つのポート。
 - `TEST_ENV_FILE`：slot の env ファイル（`build/test-slot/slot-<n>.env`）。
 - `SERVER_PORT`（`TEST_BACKEND_PORT` と同じ値）、`OIDC_ISSUER_URI`、`PAYMENT_GATEWAY_BASE_URL`（後の 2 つは slot の env ファイルと同じ値）。
   `task e2e`、`task e2e-up`、`task scan-dast` だけが渡す（`acquire` の第 2 引数 `web`）。

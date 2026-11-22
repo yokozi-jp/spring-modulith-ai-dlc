@@ -6,8 +6,10 @@ databaseChangeLog:
         - dbms:
             type: postgresql
       changes:
-        # Spring Session JDBC のセッションの表（ADR-111）。列は Spring Session の PostgreSQL の DDL に合わせる。
-        # 時刻の列（creation_time、last_access_time、expiry_time）は Spring Session が epoch ミリ秒の bigint で読み書くため、業務の絶対時刻と違い timestamptz にしない。
+        # Spring Session JDBC のセッションの表（ADR-111）。
+        # 列名、型（char(36)、epoch ミリ秒の bigint）、主キー、カスケードの外部キーは、
+        # spring-session-jdbc の schema-postgresql.sql に合わせる。業務テーブルの規約に合わせて変えると、
+        # Spring Session の SQL が動かなくなる（LogoutContractTest と TenantSelectionTest が実際の表で確かめる）。
         - createTable:
             tableName: spring_session
             schemaName: modulith

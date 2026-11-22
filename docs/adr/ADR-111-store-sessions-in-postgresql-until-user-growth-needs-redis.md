@@ -40,7 +40,7 @@ Spring Session は保存先を `SessionRepository` で抽象化しているた�
 - セッションの表（`spring_session`、`spring_session_attributes`）は `modulith` スキーマに置く。Liquibase の changeset で作り、アプリケーション用ロールに SELECT、INSERT、UPDATE、DELETE を与える。ShedLock の表（ADR-079）と同じ扱いである。
 - アプリケーションの起動時に Spring Session が表を作らないようにする（`spring.session.jdbc.initialize-schema=never`）。表の作成は [DB マイグレーション規約](../database/migrations.md)の経路だけにする。
 - セッションの直列化は、ADR-007 の実装のままにする（`OidcUser` の実装のクラス名ごとの Java 直列化）。保存先が替わっても、権限のクラスを移動、改名するときにセッションを消す規約は変わらない。
-- 期限切れのセッションは、Spring Session JDBC の定期削除（`spring.session.jdbc.cleanup-cron`）で消す。
+- 期限切れのセッションは、Spring Session JDBC の定期削除で消す。間隔は既定（各インスタンスで毎分）のままにする。
 
 Redis へ戻す条件は、セッションの読み書きが PostgreSQL の負荷として観測され、チューニングで解決できなくなったときとする。
 観測には、スロークエリ、`spring_session` へのクエリの所要時間、接続プールの待ち（Hikari の pending）を使う。
@@ -61,9 +61,8 @@ Redis へ戻す条件は、セッションの読み書きが PostgreSQL の負�
 
 ### Negative
 
-- 認証済みのリクエストごとに、セッションの読み取りと、変更があれば書き込みが PostgreSQL に走る。利用者が増えると、業務のクエリと接続プールを競う。
+- 認証済みのリクエストごとに、セッションの読み取りと、最終アクセス時刻の UPDATE が PostgreSQL に走る。Spring Session はそれぞれを別のトランザクション（`REQUIRES_NEW`）で実行するため、利用者が増えると、業務のクエリと接続プールを競う。
 - 期限切れのセッションの削除が、定期のクエリになる。Redis の TTL のような自動の失効ではない。
-- 利用者が増えて Redis へ戻すときは、セッションが全部切れ、再ログインになる。
 
 ### Neutral
 

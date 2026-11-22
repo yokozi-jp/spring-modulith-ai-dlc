@@ -35,7 +35,9 @@ IdPを移るときは、組と利用者の対応づけだけを書き換え、�
 ログインのコールバックでは前のセッションの認証がまだ残っているため、利用者を作る間だけ認証を外し、`*_by`には処理の名前を登録する。
 
 セッションはPostgreSQLの`modulith.spring_session`と`modulith.spring_session_attributes`に、`OidcUser`の実装のクラス名ごと直列化して保存する（[ADR-111](../adr/ADR-111-store-sessions-in-postgresql-until-user-growth-needs-redis.md)）。
-次の2つのときは、デプロイと同時に既存のセッションを消す（`DELETE FROM modulith.spring_session`を実行する。`spring_session_attributes`の行は外部キーのカスケードで消える）。
+次の2つのときは、デプロイで既存のセッションを消す（`DELETE FROM modulith.spring_session`を実行する。`spring_session_attributes`の行は外部キーのカスケードで消える）。
+すべてのインスタンスが同じ表を使うため、消すのは前の版のインスタンスがすべて止まった後にする。
+前の版が動いている間に消しても、前の版が前のクラスでセッションを書き直す。
 
 - `AppUserPrincipal`でない`OidcUser`を保存していた版から上げるとき。消さないと、そのセッションが切れるまで書き込みが失敗する。
 - `SignInOidcUserService`が返す`OidcUser`のクラスか、選んだテナントの権限のクラス（`TenantMembershipAuthority`）を持たない版へ切り戻すとき、またはそれらのクラスを移動、改名するとき。消さないと、セッションを読めずにリクエストが500になる。

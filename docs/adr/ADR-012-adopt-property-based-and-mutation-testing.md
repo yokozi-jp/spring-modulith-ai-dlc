@@ -42,6 +42,8 @@ QuickTheoriesの最新版0.26は2019年公開が最後で、実質的に更新�
 PITはテストを繰り返し実行するため、通常の単体テストやJaCoCoより実行コストが高い。
 現時点では対象コードも少ないため、通常のpush前検証やpull requestの必須ジョブへ組み込まず、明示実行と手動CIで結果を蓄積する必要がある。
 
+[ADR-111](ADR-111-store-sessions-in-postgresql-until-user-growth-needs-redis.md) で Redis を外したため、Proposed の間にPIT の実行環境から Redis を除いた。
+
 ## Decision
 
 プロパティベーステストにはQuickTheories 0.26を使い、JUnit Jupiterのテストメソッド内で実行する。
@@ -56,7 +58,7 @@ GradleプラグインによるJUnit Platform Launcherの自動追加は無効に
 jOOQ生成コード、起動クラス、Springの設定と外部ライブラリを接続する配線クラスは除外する。
 業務コードがまだ存在しない間は、変異対象がない実行を失敗にしない。
 
-`task mutation-test`をローカルの共通入口とし、使い捨てのPostgreSQLとRedis、確定済みマイグレーションを使ってPITを実行する。
+`task mutation-test`をローカルの共通入口とし、使い捨てのPostgreSQL、確定済みマイグレーションを使ってPITを実行する。
 通常の`task verify`とpull requestの必須CIには含めない。
 GitHub Actionsでは手動実行だけを提供し、HTMLとXMLのレポートを成果物として保存する。
 

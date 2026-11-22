@@ -19,7 +19,7 @@ Proposed
 
 バックエンドは Resilience4j と仮想スレッドを導入済みだが、外部連携に適用する timeout、retry、circuit breaker の共通値を定めていない。
 
-現時点ではアプリケーションが所有する外部 HTTP クライアントがなく、PostgreSQL、Redis、OIDC の通信は各 Spring starter が管理している。
+現時点ではアプリケーションが所有する外部 HTTP クライアントがなく、PostgreSQL、OIDC の通信は各 Spring starter が管理している。
 Resilience4j の設定を追加しても、これらの通信には自動適用されない。
 
 retry をすべての呼び出しへ一律に適用すると、非冪等な更新や認証処理を重複実行する可能性がある。
@@ -32,6 +32,8 @@ JDK 25 では JEP 491 により、通常の `synchronized` メソッドとブロ
 一方、native frame などによる pinning と、制限のない外部資源への同時実行は別の問題として残る。
 
 この判断は、外部 client を infrastructure adapter に置く [ADR-002](ADR-002-package-by-feature-onion-architecture.md) と、環境差のある値を外部注入する [ADR-008](ADR-008-single-application-yaml-external-config.md) に従う。
+
+[ADR-111](ADR-111-store-sessions-in-postgresql-until-user-growth-needs-redis.md) で Redis を外したため、Proposed の間にstarter が管理する通信から Redis を除いた。
 
 ## Decision
 
@@ -89,7 +91,7 @@ maximum-pool-size × 最大アプリケーションタスク数
 
 ### Neutral
 
-- 現在の PostgreSQL、Redis、OIDC 通信は Resilience4j の対象にせず、各 starter の timeout と再接続設定を使う。
+- 現在の PostgreSQL、OIDC 通信は Resilience4j の対象にせず、各 starter の timeout と再接続設定を使う。
 - bulkhead と rate limiter は依存先の同時実行上限が判明した時点で、名前付き instance へ追加する。
 - JFR の pinning 検証は常時有効化せず、負荷スモークと障害調査で実行する。
 
