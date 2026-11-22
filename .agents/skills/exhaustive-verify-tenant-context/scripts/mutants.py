@@ -6,28 +6,27 @@
 失敗がコンパイルエラーなら caught と数えず FAIL にする（テストが捕まえたことにならない）。
 ソースは終了時に必ず元へ戻す。
 """
+import re
 import subprocess
 import sys
 import tomllib
-import xml.etree.ElementTree as ET
 from pathlib import Path
 
 root = Path(__file__).resolve().parents[4]
 source = root / "backend/src/main/java/com/example/demo/shared/tenant/TenantContext.java"
 mutants = tomllib.loads((Path(__file__).resolve().parents[1] / "mutants.toml").read_text())["mutant"]
-report = root / "backend/build/test-results/test/TEST-com.example.demo.shared.tenant.TenantContextExhaustiveTest.xml"
 
 
 def run_test() -> str:
     """テストを流し、pass、fail（テストの失敗）、error（コンパイルなどの失敗）のどれかを返す。"""
-    report.unlink(missing_ok=True)
     result = subprocess.run(
         ["./gradlew", "test", "--tests", "*TenantContextExhaustiveTest", "-PtestEnvFile=../.env.test"],
         cwd=root / "backend", capture_output=True, text=True,
     )
     if result.returncode == 0:
         return "pass"
-    if report.exists() and int(ET.parse(report).getroot().get("failures")) > 0:
+    # Gradle はテストの失敗を「<クラス> > <テスト> FAILED」の行で出す。コンパイルの失敗にはこの行がない。
+    if re.search(r"TenantContextExhaustiveTest > .* FAILED", result.stdout):
         return "fail"
     print(result.stdout[-3000:] + result.stderr[-3000:])
     return "error"
