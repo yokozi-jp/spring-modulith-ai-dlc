@@ -43,6 +43,12 @@ Dependabotの更新が`frontend/pnpm-lock.yaml`を変えずに来ると、CIの`
 
 ## git worktreeで作業するとき
 
+エージェントは、ファイルを変える作業を始める前に`origin/main`から自分のworktreeを作り、mainのworktreeで変更、commit、テストをしない。
+mainのworktreeは複数のセッションが同時に使うためである。
+別のセッションがブランチを切り替えると、未commitの変更がそのブランチへ移る。
+同じ`backend/build`へ書くGradleのテストが重なると、クラスが見つからない失敗になる。
+調べるだけの作業はmainのworktreeで行ってよい。
+
 worktreeを作る前に、mainのworktreeで`npm ci`を実行しておく。
 mainのworktreeは最初にcloneした作業ツリーで、`git worktree list`の1行目に出る。
 実行しておかないと、新しいworktreeでの`npm ci`は、mainのworktreeにlefthookが無いことを知らせる`prepare`のメッセージで失敗する。
