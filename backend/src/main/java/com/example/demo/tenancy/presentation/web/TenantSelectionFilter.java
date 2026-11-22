@@ -39,8 +39,8 @@ import org.springframework.web.filter.ServerHttpObservationFilter;
  * <p>テナントを選んだ後のリクエストは、残りの処理の間だけ、選んだテナントを {@link TenantContext} に束縛する。テナントはセッションの権限だけから取り、リクエストの
  * header、パス、本文から取らない。
  *
- * <p>認証したリクエストは、所属の引き直しを含む残りの処理の間だけ、アプリの利用者の ID を MDC の {@value #USER_ID_LOG_KEY} に入れる。 利用者の ID
- * と束縛したテナントは、HTTP の受信の span の属性にも入れる。
+ * <p>認証したリクエストは、所属の引き直しを含む残りの処理の間だけ、アプリの利用者の ID を MDC の {@value #USER_ID_ATTRIBUTE_KEY} に入れる。 利用者の
+ * ID と束縛したテナントは、HTTP の受信の span の属性にも入れる。
  */
 final class TenantSelectionFilter extends OncePerRequestFilter {
 
@@ -51,7 +51,7 @@ final class TenantSelectionFilter extends OncePerRequestFilter {
    * ログとトレースで、アプリの利用者の ID（{@link
    * AppUserPrincipal#userId()}）を持つ項目の名前（docs/observability/conventions.md）。
    */
-  private static final String USER_ID_LOG_KEY = "user.id";
+  private static final String USER_ID_ATTRIBUTE_KEY = "user.id";
 
   static {
     final PathPatternRequestMatcher.Builder paths = PathPatternRequestMatcher.withDefaults();
@@ -96,8 +96,8 @@ final class TenantSelectionFilter extends OncePerRequestFilter {
       doFilterInSelectedTenant(request, response, filterChain);
       return;
     }
-    addToServerSpan(request, USER_ID_LOG_KEY, userId);
-    try (MDC.MDCCloseable ignored = MDC.putCloseable(USER_ID_LOG_KEY, userId)) {
+    addToServerSpan(request, USER_ID_ATTRIBUTE_KEY, userId);
+    try (MDC.MDCCloseable ignored = MDC.putCloseable(USER_ID_ATTRIBUTE_KEY, userId)) {
       doFilterInSelectedTenant(request, response, filterChain);
     }
   }
@@ -123,7 +123,7 @@ final class TenantSelectionFilter extends OncePerRequestFilter {
       filterChain.doFilter(request, response);
       return;
     }
-    addToServerSpan(request, TenantContext.LOG_KEY, tenantId.get().toString());
+    addToServerSpan(request, TenantContext.ATTRIBUTE_KEY, tenantId.get().toString());
     doFilterInTenant(tenantId.get(), request, response, filterChain);
   }
 
