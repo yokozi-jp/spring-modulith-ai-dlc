@@ -36,6 +36,7 @@ steering は入口の案内だけを持ち、規約の本文を持たない（[A
 | 非機能要件                                                    | `docs/nfr/index.md`              |
 | 性能テスト                                                    | `docs/performance-test/index.md` |
 | 帳票                                                          | `docs/report/index.md`           |
+| メール（送るメール、送信ドメイン、メールアドレス）            | `docs/mail/index.md`             |
 | コードレビュー（変更内容の観点）                              | `docs/code-review/index.md`      |
 | Pull Request（作成、依頼、マージの手順）                      | `docs/pull-request/index.md`     |
 | ナレッジ管理（docs と steering の役割分担）                   | `docs/knowledge/index.md`        |
