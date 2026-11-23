@@ -5,7 +5,7 @@
 (* deliveries, crashes, lost gateway replies, and the staleness monitor.   *)
 (*                                                                         *)
 (* Paths are relative to backend/src/main/java/com/example/demo/.          *)
-(* Spring Modulith 2.1.2 behavior is cited by class name.                  *)
+(* Spring Modulith 2.2.0 behavior is cited by class name.                  *)
 (* Each action is one indivisible step in the code: one SQL statement, or  *)
 (* one transaction whose effects other transactions see only at commit.    *)
 (***************************************************************************)
@@ -28,6 +28,9 @@ NoPub == "NONE"
 \* The row left event_publication: archive mode copies it to
 \* event_publication_archive and deletes it.
 Archived == "ARCHIVED"
+\* ResubmissionPolicies (AbandonPolicy) gave up on the publication; archive
+\* mode copies it to the archive as ABANDONED and deletes the row.
+Abandoned == "ABANDONED"
 RowStatus == {"PUBLISHED", "PROCESSING", "FAILED", "RESUBMITTED"}
 
 VARIABLES
@@ -51,7 +54,7 @@ TypeOK ==
   /\ orderLock \in Nat
   /\ cmdPc \in [Cmds -> {"idle", "read", "done"}]
   /\ cmdLock \in [Cmds -> Nat]
-  /\ pub \in RowStatus \cup {NoPub, Archived}
+  /\ pub \in RowStatus \cup {NoPub, Archived, Abandoned}
   /\ payments \in Seq({"PAID", "DECLINED", "FAILED"})
   /\ gateway \in {"NONE", "LOCKED", "PAID", "DECLINED", "REJECTED"}
   /\ dpc \in [D -> {"idle", "start", "readPayment", "readOrder", "charge",
@@ -238,7 +241,11 @@ DMarkCompleted(d) ==
                  dres, launched, rpc>>
 
 \* DefaultEventPublicationRegistry.markFailed finds this delivery's entry in
-\* PublicationsInProgress and runs JdbcEventPublicationRepositoryV2
+\* PublicationsInProgress and runs markFailedOrAbandoned. When the row's
+\* completion_attempts (launched) is past max-resubmissions (launched =
+\* MaxDeliveries), ResubmissionPolicies.shouldAbandon returns ABANDON and
+\* JdbcEventPublicationRepositoryV2.markAbandoned moves the row to the
+\* archive. Otherwise JdbcEventPublicationRepositoryV2
 \* .markFailed: UPDATE ... SET status = 'FAILED' WHERE id = ? AND
 \* completion_date IS NULL AND status != 'FAILED'. The entry is always
 \* there: PublicationsInProgress.Key compares events by identity, the first
@@ -247,7 +254,9 @@ DMarkCompleted(d) ==
 \* removes another delivery's entry.
 DMarkFailed(d) ==
   /\ dpc[d] = "markFailed"
-  /\ pub' = IF RowExists THEN "FAILED" ELSE pub
+  /\ pub' = IF ~RowExists THEN pub
+            ELSE IF launched = MaxDeliveries THEN Abandoned
+            ELSE "FAILED"
   /\ dpc' = [dpc EXCEPT ![d] = "done"]
   /\ UNCHANGED <<orderStatus, orderLock, cmdPc, cmdLock, payments, gateway,
                  dres, launched, rpc>>
@@ -281,7 +290,7 @@ Stale ==
 
 \* EventPublicationResubmitter.resubmit -> FailedEventPublications.resubmit
 \* reads FAILED rows and ResubmissionPolicies.isDue accepts this one.
-\* MaxDeliveries stands in for max-resubmissions.
+\* MaxDeliveries stands in for max-resubmissions + 1 (the first delivery).
 RPick ==
   /\ rpc = "idle"
   /\ pub = "FAILED"
@@ -306,14 +315,15 @@ RClaim ==
 
 -----------------------------------------------------------------------------
 
-\* Nothing can happen any more. A FAILED row past the resubmission bound is
-\* the dead letter that operators handle by Runbook.
+\* Nothing can happen any more. An ABANDONED publication, and a FAILED row
+\* past the resubmission bound after a crash, are the dead letters that
+\* operators handle by Runbook.
 Settled ==
   /\ \A c \in Cmds: cmdPc[c] = "done"
   /\ \A d \in D: dpc[d] \in {"idle", "done"}
   /\ rpc = "idle"
   /\ gateway # "LOCKED"
-  /\ pub \in {NoPub, Archived, "FAILED"}
+  /\ pub \in {NoPub, Archived, Abandoned, "FAILED"}
   /\ pub = "FAILED" => launched = MaxDeliveries
 
 Done == Settled /\ UNCHANGED vars
@@ -350,9 +360,9 @@ ChargedOnlyIfConfirmed == gateway # "NONE" => orderStatus = "CONFIRMED"
 CompletedOnlyWithRecord == pub = Archived => Len(payments) = 1
 
 \* When everything has stopped, a customer whose money the gateway took
-\* has a PAID record, or operators see a FAILED dead letter.
+\* has a PAID record, or operators see a FAILED or ABANDONED dead letter.
 ChargeNeverSilentlyLost ==
   (Settled /\ gateway = "PAID") =>
-    (payments = <<"PAID">> \/ pub = "FAILED")
+    (payments = <<"PAID">> \/ pub \in {"FAILED", Abandoned})
 
 =============================================================================
