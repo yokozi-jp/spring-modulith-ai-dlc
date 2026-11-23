@@ -1,0 +1,32 @@
+// 資格情報は環境変数 E2E_USERNAME と E2E_PASSWORD（ルートの .env.test の値）で渡す。
+import { createRequire } from "node:module";
+const require = createRequire("/home/projects/wt-research-345-exp/frontend/apps/web/package.json");
+const { chromium } = require("@playwright/test");
+const origin = "http://localhost:21173";
+const browser = await chromium.launch();
+const page = await (await browser.newContext()).newPage();
+const seen = [];
+page.on("console", (m) => { if (/Cross-Origin|CORP|COOP|blocked/i.test(m.text())) seen.push(m.text().slice(0, 200)); });
+page.on("requestfailed", (r) => seen.push("FAILED " + r.url() + " " + r.failure()?.errorText));
+await page.route(origin + "/**", async (route) => {
+  const req = route.request();
+  const r = await route.fetch({ maxRedirects: 0 });
+  const h = { ...r.headers() };
+  if (req.resourceType() === "document") h["cross-origin-opener-policy"] = "same-origin";
+  if (new URL(req.url()).pathname.startsWith("/api/")) h["cross-origin-resource-policy"] = "same-origin";
+  await route.fulfill({ response: r, headers: h });
+});
+await page.goto(origin + "/oauth2/authorization/web");
+await page.getByLabel("Username or email").fill(process.env.E2E_USERNAME);
+await page.getByLabel("Password", { exact: true }).fill(process.env.E2E_PASSWORD);
+await page.getByRole("button", { name: "Sign In" }).click();
+await page.waitForURL(origin + "/tenants");
+await page.getByRole("button", { name: "サンプル商事" }).click();
+await page.waitForURL(origin + "/");
+await page.getByRole("button", { name: /ログアウト|Log ?out/i }).waitFor();
+console.log("home ok:", (await page.locator("body").innerText()).replace(/\s+/g, " ").slice(0, 70));
+// 別 origin（IdP）を経由して戻っても API が通る
+await page.getByRole("button", { name: /ログアウト|Log ?out/i }).click();
+await page.waitForURL(origin + "/logged-out");
+console.log("logged-out ok", page.url(), "issues:", JSON.stringify(seen));
+await browser.close();

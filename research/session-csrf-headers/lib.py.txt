@@ -1,0 +1,27 @@
+import os
+import re, html, http.client, urllib.parse, json
+BACK=("127.0.0.1",21080); KC=("127.0.0.1",21081); HOSTH="localhost:21173"
+def req(addr, method, path, headers=None, body=None, host=None):
+    h={"Host": host or f"{addr[0]}:{addr[1]}"}; h.update(headers or {})
+    c=http.client.HTTPConnection(*addr, timeout=30)
+    c.request(method, path, body=body, headers=h)
+    r=c.getresponse(); b=r.read().decode("utf8","replace")
+    return r.status, r.getheaders(), b
+def setcookies(hd):
+    out={}
+    for k,v in hd:
+        if k.lower()=="set-cookie":
+            n,_,rest=v.partition("="); out[n]=rest.split(";")[0]
+    return out
+def login(user="test-user"):
+    jar={}
+    s,h,b=req(BACK,"GET","/oauth2/authorization/web",host=HOSTH); jar.update(setcookies(h))
+    loc=dict((k.lower(),v) for k,v in h)["location"]
+    u=urllib.parse.urlsplit(loc); kc={}
+    s,h,b=req(KC,"GET",u.path+"?"+u.query); kc.update(setcookies(h))
+    act=html.unescape(re.search(r'<form[^>]+action="([^"]+)"',b).group(1)); au=urllib.parse.urlsplit(act)
+    s,h,b=req(KC,"POST",au.path+"?"+au.query,{"Content-Type":"application/x-www-form-urlencoded","Cookie":"; ".join(f"{k}={v}" for k,v in kc.items())},urllib.parse.urlencode({"username":user,"password":os.environ["E2E_PASSWORD"],"credentialId":""}))
+    loc=dict((k.lower(),v) for k,v in h)["location"]; cb=urllib.parse.urlsplit(loc)
+    s,h,b=req(BACK,"GET",cb.path+"?"+cb.query,{"Cookie":"; ".join(f"{k}={v}" for k,v in jar.items())},host=HOSTH); jar.update(setcookies(h))
+    return jar,s,h
+def ck(jar): return "; ".join(f"{k}={v}" for k,v in jar.items())

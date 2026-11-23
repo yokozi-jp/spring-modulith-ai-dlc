@@ -1,0 +1,33 @@
+// 資格情報は環境変数 E2E_USERNAME と E2E_PASSWORD（ルートの .env.test の値）で渡す。
+import { createRequire } from "node:module";
+const require = createRequire("/home/projects/wt-research-345-exp/frontend/apps/web/package.json");
+const { chromium } = require("@playwright/test");
+const origin = "http://localhost:21173";
+async function run(label, csd, ignoreDefault) {
+  const browser = await chromium.launch({ ignoreDefaultArgs: ignoreDefault ? ["--disable-back-forward-cache"] : [] });
+  const ctx = await browser.newContext();
+  const page = await ctx.newPage();
+  await page.addInitScript(() => { window.addEventListener("pageshow", (e) => { (window.__shows ??= []).push(e.persisted); sessionStorage.setItem("shows", JSON.stringify(window.__shows)); }); });
+  if (csd) await page.route("**/logout", async (route) => { const r = await route.fetch({ maxRedirects: 0 }); await route.fulfill({ response: r, headers: { ...r.headers(), "clear-site-data": '"cache", "cookies"' } }); });
+  await page.goto(origin + "/oauth2/authorization/web");
+  await page.getByLabel("Username or email").fill(process.env.E2E_USERNAME);
+  await page.getByLabel("Password", { exact: true }).fill(process.env.E2E_PASSWORD);
+  await page.getByRole("button", { name: "Sign In" }).click();
+  await page.waitForURL(origin + "/tenants");
+  await page.getByRole("button", { name: "サンプル商事" }).click();
+  await page.waitForURL(origin + "/");
+  await page.getByRole("button", { name: /ログアウト|Log ?out|Sign out/i }).waitFor();
+  const before = await page.locator("body").innerText();
+  await page.getByRole("button", { name: /ログアウト|Log ?out|Sign out/i }).click();
+  await page.waitForURL(origin + "/logged-out");
+  await page.goBack();
+  await page.waitForTimeout(2500);
+  const url = page.url();
+  const body = (await page.locator("body").innerText()).replace(/\s+/g, " ").slice(0, 160);
+  const persisted = await page.evaluate(() => sessionStorage.getItem("shows"));
+  console.log(JSON.stringify({ label, url, body, persisted, beforeHead: before.replace(/\s+/g, " ").slice(0, 80) }));
+  await browser.close();
+}
+await run("bfcache-enabled, no CSD", false, true);
+await run("bfcache-enabled, with CSD", true, true);
+await run("bfcache-disabled(default PW), no CSD", false, false);
