@@ -102,6 +102,21 @@ class ApiErrorContractTest {
         .andExpect(jsonPath("$.detail").doesNotExist());
   }
 
+  @Test
+  @DisplayName("405 の Allow は、Controller が宣言した method だけを返す")
+  void methodNotAllowedAdvertisesDeclaredMethods() throws Exception {
+    final String allow =
+        mockMvc
+            .perform(delete("/api/error-fixture/items").with(csrf()).with(oidcLogin()))
+            .andExpect(status().isMethodNotAllowed())
+            .andReturn()
+            .getResponse()
+            .getHeader(HttpHeaders.ALLOW);
+
+    assertEquals(
+        Set.of("GET", "POST"), Set.of(allow.split(",\\s*")), "405 の Allow は宣言した method だけ");
+  }
+
   private static Stream<Arguments> problemCases() {
     final String validation = "入力内容に誤りがあります";
     final String badRequest = "リクエストが不正です";

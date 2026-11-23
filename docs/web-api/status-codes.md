@@ -15,6 +15,12 @@ tags: [convention, web-api, http, future-arch-guidelines]
 
 エラー応答の本文はRFC 9457のProblem Detailsとし、`status`を実際のステータスコードと一致させる。
 この契約は[ADR-013](../adr/ADR-013-standardize-http-api-contracts.md)が定める。
+例外は、Tomcatがアプリへ渡す前に拒否する要求である。
+リクエスト行とヘッダーの合計が`server.max-http-request-header-size`（既定8KB）を超えると、Tomcatが`text/html`の400を返す。
+不正なHTTPバージョンの要求には505を返す。
+どちらもProblem Detailsにならず、Spring Bootの設定でProblem Detailsにする方法はない。
+RFC 9112 3は、解釈しない長さのリクエスト行に414を求めるが、Tomcatは414を返さない。
+8KBを超えるURLを作るエンドポイントを作るときは、この応答を許すか、POSTで検索する（[検索にPOSTを使う条件](http-methods.md#検索にpostを使う条件)）。
 `/error`は、`HttpStatus`に定義のない4xxと5xx（499など）も転送元のステータスコードのまま返し、それ以外は500にする。
 このとき`title`は、4xxなら400の文言、5xxなら500の文言にする。
 このため、ログやダッシュボードには下の一覧にないステータスコードが現れることがある。
@@ -39,6 +45,11 @@ OpenAPIへのエラー応答の付け方は[OpenAPIのアノテーションとJa
 - **404 Not Found**：パスで指定したリソースが存在しない、または参照する権限がない。
   `shared.failure`の`NotFoundException`は、`ApiExceptionHandler`が404にする（[業務上の失敗の例外](../backend/class-roles/business-exception.md)）。
 - **405 Method Not Allowed**：エンドポイントが対応しないHTTPメソッドを指定された。
+  `Allow`には、Controllerが宣言したメソッドだけが入る（RFC 9110 15.5.6）。
+  たとえば`GET`だけのエンドポイントへの`POST`は`Allow: GET`になり、HEADとOPTIONSは入らない。
+  認証前の要求は401、CSRFトークンのない更新系の要求は403が先に返り、405は認証後に返る。
+  エンドポイントのないパスは、メソッドによらず404になる。
+  405はOpenAPIに書かない。`commonProblemResponses`の対象は400、401、403、500だけである。
 - **409 Conflict**：楽観ロックの競合、悲観ロックの取得失敗、一意制約違反。
   楽観ロックの`ConflictException`（`lock_timeout`による失敗と、一意制約違反を含む）は、`ApiExceptionHandler`が409にする。
 - **413 Content Too Large**：リクエストのヘッダーまたは本文が上限を超えた。
@@ -51,7 +62,7 @@ OpenAPIへのエラー応答の付け方は[OpenAPIのアノテーションとJa
 次のステータスコードは使わない。
 
 - **412 Precondition Failed**：`If-Match`を使わないため、楽観ロックの競合も409にする。
-- **414 URI Too Long**：URLの長さはスキーマ検証の400にまとめる。
+- **414 URI Too Long**：Tomcatが解釈できない長さの要求は、アプリへ渡す前にTomcatが返すので、アプリは414を返さない。
 - **501 Not Implemented**：開発中の仮実装に限って使い、このコードを返すエンドポイントを本番へリリースしない。
 
 ## 判断に迷うユースケース
