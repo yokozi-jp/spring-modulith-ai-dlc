@@ -25,6 +25,7 @@ E2E テストは、複数画面にまたがる主要な利用者の流れだけ�
 `frontend/apps/web/e2e/environment.ts` は、ログイン情報をルートの `.env.test` から読み、`storageState` のパスを決める。
 web の origin（`webOrigin`）と IdP の origin（`idpOrigin`）は、slot が渡す `E2E_WEB_PORT` と `OIDC_ISSUER_URI` から決め、無ければ slot 0 の値を使う。
 Keycloak の画面でログインする手順（`signInOnKeycloak`）も持ち、setup とログアウトの spec が共有する。
+`frontend/apps/web/e2e/session.ts` は、ログアウトの操作、ログアウト後の画面、認証済みのトップページの確認を持ち、複数の spec が共有する。
 `frontend/apps/web/e2e/payment-gateway.ts` は、決済代行の WireMock の管理 API を呼ぶ補助を持つ。
 注文ごとの失敗のスタブ（`failChargesFor`）と、注文 ID を冪等性キーにした請求の回数（`chargeRequestCount`）である。
 `environment.ts`、`fixtures.ts`、`orders.ts`、`payment-gateway.ts` は、Playwright の外から Node が直接 import できるよう、相対の import に拡張子 `.ts` を付ける。
@@ -82,7 +83,7 @@ backend を再起動せず、シナリオの途中で注文ごとに応答を切
 
 setup project は、`storageState` を持たない browser context で `/oauth2/authorization/web` を開き、Keycloak の画面で `test-user` としてログインする。
 `/` から始めると、SPA が API の 401 を受けて自分でログインへ遷移し、setup project の遷移と競合する。
-この遷移そのものは、`unauthenticated-redirect.spec.ts` がログアウト後に `/` を開いて確かめる。
+この遷移そのものは、ログアウト後に `/` を開く `logout.spec.ts` のテストと、未認証で認証必須の画面を開く `unauthenticated-redirect.spec.ts` が確かめる。
 `test-user` は代表データで 2 つのテナントに属するため、戻り先はテナントを選ぶ画面（web の origin の `/tenants`）になる。
 認証の前後で `APP_SESSION` Cookie の値が変わったことで認証済みと判断し、サンプル商事を選ぶ。
 選んだ後に web の origin の `/` へ移り、`APP_SESSION` の値がもう一度変わったことを確かめてから、`frontend/apps/web/e2e/.auth/user.json` に保存する。

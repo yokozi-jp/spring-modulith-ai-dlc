@@ -2,6 +2,7 @@ import type { APIRequestContext, BrowserContext, Cookie, Locator, Page } from "@
 
 import { idpOrigin, logIn, signInAndChooseTenant, webOrigin } from "./environment";
 import { expect, test } from "./fixtures";
+import { expectAuthenticatedHome, expectLoggedOutPage, homeHeading, logoutButton } from "./session";
 import {
   collectTelemetry,
   exerciseSession,
@@ -15,27 +16,9 @@ test.use({ storageState: { cookies: [], origins: [] } });
 
 const endSessionEndpoint = `${idpOrigin}/realms/spring-modulith/protocol/openid-connect/logout?`;
 
-function logoutButton(page: Page): Locator {
-  return page.getByRole("button", { name: "ログアウト" });
-}
-function homeHeading(page: Page): Locator {
-  return page.getByRole("main").getByRole("heading", { level: 1, name: "はじめる" });
-}
 // hidden input は role を持たないため、規約の例外として locator で取る。
 function csrfInput(page: Page): Locator {
   return page.locator('input[name="_csrf"]');
-}
-
-async function apiStatus(page: Page): Promise<number> {
-  const response = await page.request.get("/api/missing");
-  return response.status();
-}
-
-// 見出しは SPA の描画にすぎないため、/api/missing が 404（401 でない）であることでサーバ側の認証済みも確かめる。
-async function expectAuthenticatedHome(page: Page): Promise<void> {
-  await expect(page).toHaveURL(`${webOrigin}/`);
-  await expect(homeHeading(page)).toBeVisible();
-  expect(await apiStatus(page)).toBe(404);
 }
 
 // ログアウトの前の APP_SESSION を送り直すため、browser の Cookie を共有しない request で確かめる。
@@ -56,11 +39,6 @@ async function expectApplicationSessionEnded(
   expect(cookies.map(({ name }) => name)).not.toContain("APP_SESSION");
   // ログアウト前の APP_SESSION を送り直しても、サーバ側のセッションが消えていれば 401 になる。
   expect(await replayedApiStatus(request, oldSession)).toBe(401);
-}
-
-async function expectLoggedOutPage(page: Page): Promise<void> {
-  await expect(page).toHaveURL(`${webOrigin}/logged-out`);
-  await expect(page.getByRole("heading", { level: 1, name: "ログアウトしました" })).toBeVisible();
 }
 
 // 改変したフォームで送ると 403 になり、ログアウトせずに認証済みのまま残ることを確かめる。
@@ -193,6 +171,22 @@ test("ログアウト後はアプリと SSO のセッションが終わり、も
   // Keycloak の SSO セッションが終わっていれば、資格情報の入力を求められる。
   await page.getByRole("link", { name: "もう一度ログイン" }).click();
   await expect(page.getByLabel("Username or email")).toBeVisible();
+  await signInAndChooseTenant(page);
+
+  await expectAuthenticatedHome(page);
+});
+
+test("ログアウト後に / を開くと資格情報の入力を求められ、ログインすると / へ戻る", async ({
+  page,
+}) => {
+  await logIn(page);
+  await logoutButton(page).click();
+  await expectLoggedOutPage(page);
+
+  // load を待つと、SPA が 401 を受けて始めるログインへの遷移と競合する。
+  await page.goto("/", { waitUntil: "commit" });
+  await expect(page.getByLabel("Username or email")).toBeVisible();
+  // ログインの後の着地が /tenants であることが、/api/** の要求を保存しない（NullRequestCache）証拠になる。
   await signInAndChooseTenant(page);
 
   await expectAuthenticatedHome(page);

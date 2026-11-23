@@ -87,4 +87,24 @@ describe("createQueryClient", () => {
     expect(mutation.getCurrentResult().isPending).toBeFalsy();
     expect(query.getCurrentResult().data).toMatchObject({ data: { fetchCount: 2 } });
   });
+
+  it("mutation が 401 を返すと、描画中の query がなくてもログインへ遷移する", async () => {
+    const assign = vi.fn<(url: string) => void>();
+    vi.stubGlobal("location", { href: "http://localhost/", origin: "http://localhost", assign });
+    server.use(
+      http.post(itemsUrl, () =>
+        HttpResponse.json(
+          { type: "about:blank", title: "Unauthorized", status: 401 },
+          { status: 401, headers: { "Content-Type": "application/problem+json" } },
+        ),
+      ),
+    );
+    const mutation = new MutationObserver(createTestQueryClient(), {
+      mutationFn: () => apiFetch<{ status: number }>(itemsUrl, { method: "POST" }),
+    });
+
+    await expect(mutation.mutate()).rejects.toMatchObject({ status: 401 });
+
+    expect(assign).toHaveBeenCalledExactlyOnceWith("/oauth2/authorization/web");
+  });
 });
