@@ -24,9 +24,10 @@ checkout() {
 }
 
 # expect <説明> <作業ディレクトリ> <終了コード> <出力>
+# 待つ秒数は IWE_MCP_WAIT_SECONDS で渡す（既定は 0 で、見つからなければすぐに止まる）。
 expect() {
   local out code
-  out="$(cd "$2" && bash -c "$cmd" 2>&1)"
+  out="$(cd "$2" && IWE_MCP_WAIT_SECONDS="${wait:-0}" bash -c "$cmd" 2>&1)"
   code=$?
   if [ "$code" != "$3" ] || [ "$out" != "$4" ]; then
     echo "FAIL: $1 (exit $code, want $3): $out"
@@ -43,6 +44,12 @@ expect "the repository root picks its own launcher" "$tmp/workspace/main-repo" 0
 expect "a subdirectory picks its repository's launcher" "$tmp/workspace/main-repo/backend" 0 "picked main-repo"
 expect "outside git, a main checkout wins over a worktree that sorts first" "$tmp/workspace" 0 "picked main-repo"
 expect "a directory without a checkout fails with a message" "$tmp/empty" 1 "kiro: docs/local-env-setup/iwe-mcp.sh が見つかりません"
+
+# Kiro Web は clone を終える前に MCP サーバーを起動することがある。後から現れた checkout を待って選ぶ。
+mkdir -p "$tmp/late"
+(sleep 1 && checkout "$tmp/late/repo" main) &
+wait=10 expect "a checkout cloned after the start is picked" "$tmp/late" 0 "picked repo"
+wait
 
 if [ "$failures" -eq 0 ]; then
   echo "all passed"
