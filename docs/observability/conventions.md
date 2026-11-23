@@ -192,6 +192,17 @@ URL の query と fragment の除去はこの規則の対象外とし、フロ�
 
 faro receiver は処理に失敗すると、payload の全体を Collector 自身のログに ERROR で出す（[ADR-068](../adr/ADR-068-collect-browser-telemetry-with-faro-via-collector.md)）。
 
+全 pipeline の最初の processor に `memory_limiter` を置く（`check_interval: 1s`、`limit_percentage: 80`、`spike_limit_percentage: 25`）。
+上限を超えると受信を拒否し、Collector が OOM で落ちる前に送り手の再送へ回す。
+Compose の `otel-collector` にメモリ上限が無く、`limit_percentage` はホストのメモリを基準にする。上限を決めたときに `GOMEMLIMIT` を hard limit の 80% で足す。それまでは設定しない。
+
+transform と filter の `error_mode` は `ignore` にする。
+失敗した文は Collector のログに warn で出て、処理は続く。
+次の 2 つだけは、失敗が通常の経路か、送り手の値がログに出るので `silent` に残し、理由を設定のコメントに書く。
+
+- `transform/frontend_validate` と `transform/frontend_csp`：型や項目が違う record で、nil への `Len`、`IsMatch`、`ExtractPatterns` が失敗するのが通常の経路で、record ごとに warn が出る。
+- `transform/frontend_csp_parse`：JSON でない本文を送られるたびに、送り手が書いた先頭の文字を含む warn が出る。
+
 ## 検証
 
 - **`task otel-collector-check`**：許可していない属性を含む OTLP のログを Collector に流し、出口に残らないことと、許可した属性が残ることを確かめる。
