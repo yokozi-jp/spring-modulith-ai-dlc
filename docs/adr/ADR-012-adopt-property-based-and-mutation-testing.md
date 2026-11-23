@@ -39,6 +39,14 @@ QuickTheoriesの最新版0.26は2019年公開が最後で、実質的に更新�
 実際、Java 25.0.2で`JacksonConfigTest`のプロパティテストがパスすることを確認済みである。
 残る停滞リスクは、将来のJDK更新でQuickTheoriesが動作しなくなった時点で本ADRを再評価する形で管理する。
 
+[#595](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/595)で、jqwik 1.10.2へ替えるかを再評価し、QuickTheoriesを使い続けると決めた。
+jqwik 1.10.2はJUnit Platform 6.0.3上で動き、反例の縮小とPITとの組み合わせも確認できた。
+ただし、`@Property`にJUnitの`@DisplayName`を付けると実行されずにスキップされ、`@JsonTest`などのSpringのスライスでは`@Property`を使えない。
+また、1.10.1と1.10.2のエンジンは実行のたびに、エージェントへjqwikを使わずテスト結果を無視するよう求める文を標準出力へ出す。
+`hideAntiAiClause`はこの文を人の端末から隠すだけで、CIのログとエージェントの入力には残る。
+検証の結果をエージェントに疑わせる文を毎回出すライブラリを、エージェントが`task check`で使う基盤に置くことは、保守の停滞より大きなリスクと判断した。
+QuickTheories 0.26はOSVとGitHub Advisory Databaseに既知の脆弱性がなく、テストの実行時の依存はQuickTheoriesだけである。
+
 PITはテストを繰り返し実行するため、通常の単体テストやJaCoCoより実行コストが高い。
 現時点では対象コードも少ないため、通常のpush前検証やpull requestの必須ジョブへ組み込まず、明示実行と手動CIで結果を蓄積する必要がある。
 
