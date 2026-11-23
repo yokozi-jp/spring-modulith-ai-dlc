@@ -122,6 +122,35 @@ describe("workspace の層の規則", () => {
 
       expect(sources).toContain(path.join(frontendRoot, "packages/ui/src"));
     });
+
+    // 足し忘れた部品は、中身が空でも jsx-a11y が報告しない。素の要素を包まない部品を足したら、ここで除く。
+    it("packages/ui の部品が jsx-a11y の components で素の要素に対応づいている", async () => {
+      const uiSource = path.join(frontendRoot, "packages/ui/src");
+      const files = readdirSync(uiSource, { recursive: true, encoding: "utf8" }).filter(
+        (file) => file.endsWith(".tsx") && !file.includes(".test."),
+      );
+      const keyLists = await Promise.all(
+        files.map(async (file) => {
+          /** @type {Record<string, unknown>} */
+          const loadedModule = await import(path.join(uiSource, file));
+          return Object.keys(loadedModule);
+        }),
+      );
+      const exported = keyLists.flat().filter((name) => /^[A-Z]/u.test(name));
+      const loaded = await loadConfigFromFile(
+        { command: "serve", mode: "test" },
+        path.join(frontendRoot, "vite.config.ts"),
+      );
+      const components = loaded?.config.lint?.settings?.["jsx-a11y"]?.components ?? {};
+
+      expect(exported).toContain("Button");
+      expect(
+        Object.fromEntries(exported.map((name) => [name, components[name]])),
+        "vite.config.ts の lint.settings の jsx-a11y.components に、部品の名前と包む要素を足す",
+      ).toStrictEqual(
+        Object.fromEntries(exported.map((name) => [name, expect.stringMatching(/^[a-z]+$/u)])),
+      );
+    });
   });
 
   describe("package の参照", () => {
