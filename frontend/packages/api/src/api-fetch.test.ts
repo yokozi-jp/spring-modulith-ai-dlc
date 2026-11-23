@@ -385,6 +385,23 @@ describe("api-fetch", () => {
       expect(assign).toHaveBeenCalledExactlyOnceWith(loginPath);
     });
 
+    it("遷移の前に、いまの path、query、hash を戻り先として保存する", async () => {
+      stubSessionStorage();
+      vi.stubGlobal("location", {
+        assign,
+        href: `${baseUrl}/orders/new?a=1#x`,
+        origin: baseUrl,
+        pathname: "/orders/new",
+        search: "?a=1",
+        hash: "#x",
+      });
+
+      api.redirectToLoginOnUnauthorized(new api.ApiProblemError(401, undefined));
+
+      const { takeReturnTo } = await import("./login-return-to");
+      expect(takeReturnTo()).toBe("/orders/new?a=1#x");
+    });
+
     it("30 秒を過ぎた 401 では再び遷移する", () => {
       stubSessionStorage();
       vi.useFakeTimers();

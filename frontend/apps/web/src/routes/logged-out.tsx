@@ -1,3 +1,4 @@
+import { clearReturnTo } from "@frontend/api/login-return-to";
 import { buttonVariants } from "@frontend/ui/button";
 import { createFileRoute } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
@@ -21,4 +22,9 @@ function LoggedOutPage() {
   );
 }
 
-export const Route = createFileRoute("/logged-out")({ component: LoggedOutPage });
+// 利用者をまたいで戻り先を残さない。
+function beforeLoad() {
+  clearReturnTo();
+}
+
+export const Route = createFileRoute("/logged-out")({ beforeLoad, component: LoggedOutPage });

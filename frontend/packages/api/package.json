@@ -6,6 +6,7 @@
   "exports": {
     "./api-fetch": "./src/api-fetch.ts",
     "./csrf": "./src/csrf.ts",
+    "./login-return-to": "./src/login-return-to.ts",
     "./endpoints/*": "./src/generated/endpoints/*.ts",
     "./mocks/*": "./src/generated/mocks/*.ts",
     "./models": "./src/generated/models/index.ts",
