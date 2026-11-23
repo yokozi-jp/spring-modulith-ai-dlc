@@ -136,14 +136,14 @@ public class MMembershipRecord extends UpdatableRecordImpl<MMembershipRecord> {
     }
 
     /**
-     * Setter for <code>tenancy.m_membership.created_tx_id</code>. 作成トランザクションID
+     * Setter for <code>tenancy.m_membership.created_tx_id</code>. 作成トレースID
      */
     public void setCreatedTxId(@NonNull String value) {
         set(7, value);
     }
 
     /**
-     * Getter for <code>tenancy.m_membership.created_tx_id</code>. 作成トランザクションID
+     * Getter for <code>tenancy.m_membership.created_tx_id</code>. 作成トレースID
      */
     @NonNull
     public String getCreatedTxId() {
@@ -196,14 +196,14 @@ public class MMembershipRecord extends UpdatableRecordImpl<MMembershipRecord> {
     }
 
     /**
-     * Setter for <code>tenancy.m_membership.updated_tx_id</code>. 更新トランザクションID
+     * Setter for <code>tenancy.m_membership.updated_tx_id</code>. 更新トレースID
      */
     public void setUpdatedTxId(@NonNull String value) {
         set(11, value);
     }
 
     /**
-     * Getter for <code>tenancy.m_membership.updated_tx_id</code>. 更新トランザクションID
+     * Getter for <code>tenancy.m_membership.updated_tx_id</code>. 更新トレースID
      */
     @NonNull
     public String getUpdatedTxId() {

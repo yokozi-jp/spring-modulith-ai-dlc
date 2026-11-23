@@ -101,9 +101,9 @@ public class MUser extends TableImpl<MUserRecord> {
     public final TableField<MUserRecord, String> CREATED_PGM_CD = createField(DSL.name("created_pgm_cd"), SQLDataType.VARCHAR(64).nullable(false), this, "作成プログラムコード");
 
     /**
-     * The column <code>tenancy.m_user.created_tx_id</code>. 作成トランザクションID
+     * The column <code>tenancy.m_user.created_tx_id</code>. 作成トレースID
      */
-    public final TableField<MUserRecord, String> CREATED_TX_ID = createField(DSL.name("created_tx_id"), SQLDataType.VARCHAR(32).nullable(false), this, "作成トランザクションID");
+    public final TableField<MUserRecord, String> CREATED_TX_ID = createField(DSL.name("created_tx_id"), SQLDataType.VARCHAR(32).nullable(false), this, "作成トレースID");
 
     /**
      * The column <code>tenancy.m_user.updated_at</code>. 更新日時
@@ -121,9 +121,9 @@ public class MUser extends TableImpl<MUserRecord> {
     public final TableField<MUserRecord, String> UPDATED_PGM_CD = createField(DSL.name("updated_pgm_cd"), SQLDataType.VARCHAR(64).nullable(false), this, "更新プログラムコード");
 
     /**
-     * The column <code>tenancy.m_user.updated_tx_id</code>. 更新トランザクションID
+     * The column <code>tenancy.m_user.updated_tx_id</code>. 更新トレースID
      */
-    public final TableField<MUserRecord, String> UPDATED_TX_ID = createField(DSL.name("updated_tx_id"), SQLDataType.VARCHAR(32).nullable(false), this, "更新トランザクションID");
+    public final TableField<MUserRecord, String> UPDATED_TX_ID = createField(DSL.name("updated_tx_id"), SQLDataType.VARCHAR(32).nullable(false), this, "更新トレースID");
 
     /**
      * The column <code>tenancy.m_user.lock_no</code>. ロック番号

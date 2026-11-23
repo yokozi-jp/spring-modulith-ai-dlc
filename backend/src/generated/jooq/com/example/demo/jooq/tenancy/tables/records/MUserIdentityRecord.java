@@ -61,28 +61,32 @@ public class MUserIdentityRecord extends UpdatableRecordImpl<MUserIdentityRecord
     }
 
     /**
-     * Setter for <code>tenancy.m_user_identity.issuer_url</code>. 発行者URL
+     * Setter for <code>tenancy.m_user_identity.issuer_url</code>.
+     * IdP識別の発行者（iss）
      */
     public void setIssuerUrl(String value) {
         set(2, value);
     }
 
     /**
-     * Getter for <code>tenancy.m_user_identity.issuer_url</code>. 発行者URL
+     * Getter for <code>tenancy.m_user_identity.issuer_url</code>.
+     * IdP識別の発行者（iss）
      */
     public String getIssuerUrl() {
         return (String) get(2);
     }
 
     /**
-     * Setter for <code>tenancy.m_user_identity.subject_code</code>. サブジェクトコード
+     * Setter for <code>tenancy.m_user_identity.subject_code</code>.
+     * IdP識別のサブジェクト（sub）
      */
     public void setSubjectCode(String value) {
         set(3, value);
     }
 
     /**
-     * Getter for <code>tenancy.m_user_identity.subject_code</code>. サブジェクトコード
+     * Getter for <code>tenancy.m_user_identity.subject_code</code>.
+     * IdP識別のサブジェクト（sub）
      */
     public String getSubjectCode() {
         return (String) get(3);
@@ -136,16 +140,14 @@ public class MUserIdentityRecord extends UpdatableRecordImpl<MUserIdentityRecord
     }
 
     /**
-     * Setter for <code>tenancy.m_user_identity.created_tx_id</code>.
-     * 作成トランザクションID
+     * Setter for <code>tenancy.m_user_identity.created_tx_id</code>. 作成トレースID
      */
     public void setCreatedTxId(@NonNull String value) {
         set(7, value);
     }
 
     /**
-     * Getter for <code>tenancy.m_user_identity.created_tx_id</code>.
-     * 作成トランザクションID
+     * Getter for <code>tenancy.m_user_identity.created_tx_id</code>. 作成トレースID
      */
     @NonNull
     public String getCreatedTxId() {
@@ -200,16 +202,14 @@ public class MUserIdentityRecord extends UpdatableRecordImpl<MUserIdentityRecord
     }
 
     /**
-     * Setter for <code>tenancy.m_user_identity.updated_tx_id</code>.
-     * 更新トランザクションID
+     * Setter for <code>tenancy.m_user_identity.updated_tx_id</code>. 更新トレースID
      */
     public void setUpdatedTxId(@NonNull String value) {
         set(11, value);
     }
 
     /**
-     * Getter for <code>tenancy.m_user_identity.updated_tx_id</code>.
-     * 更新トランザクションID
+     * Getter for <code>tenancy.m_user_identity.updated_tx_id</code>. 更新トレースID
      */
     @NonNull
     public String getUpdatedTxId() {

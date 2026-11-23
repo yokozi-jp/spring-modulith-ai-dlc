@@ -107,14 +107,14 @@ public class MUserRecord extends UpdatableRecordImpl<MUserRecord> {
     }
 
     /**
-     * Setter for <code>tenancy.m_user.created_tx_id</code>. 作成トランザクションID
+     * Setter for <code>tenancy.m_user.created_tx_id</code>. 作成トレースID
      */
     public void setCreatedTxId(@NonNull String value) {
         set(5, value);
     }
 
     /**
-     * Getter for <code>tenancy.m_user.created_tx_id</code>. 作成トランザクションID
+     * Getter for <code>tenancy.m_user.created_tx_id</code>. 作成トレースID
      */
     @NonNull
     public String getCreatedTxId() {
@@ -167,14 +167,14 @@ public class MUserRecord extends UpdatableRecordImpl<MUserRecord> {
     }
 
     /**
-     * Setter for <code>tenancy.m_user.updated_tx_id</code>. 更新トランザクションID
+     * Setter for <code>tenancy.m_user.updated_tx_id</code>. 更新トレースID
      */
     public void setUpdatedTxId(@NonNull String value) {
         set(9, value);
     }
 
     /**
-     * Getter for <code>tenancy.m_user.updated_tx_id</code>. 更新トランザクションID
+     * Getter for <code>tenancy.m_user.updated_tx_id</code>. 更新トレースID
      */
     @NonNull
     public String getUpdatedTxId() {

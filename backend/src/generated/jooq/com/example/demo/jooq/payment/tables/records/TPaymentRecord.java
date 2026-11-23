@@ -195,14 +195,14 @@ public class TPaymentRecord extends UpdatableRecordImpl<TPaymentRecord> {
     }
 
     /**
-     * Setter for <code>payment.t_payment.created_tx_id</code>. 作成トランザクションID
+     * Setter for <code>payment.t_payment.created_tx_id</code>. 作成トレースID
      */
     public void setCreatedTxId(@NonNull String value) {
         set(11, value);
     }
 
     /**
-     * Getter for <code>payment.t_payment.created_tx_id</code>. 作成トランザクションID
+     * Getter for <code>payment.t_payment.created_tx_id</code>. 作成トレースID
      */
     @NonNull
     public String getCreatedTxId() {
@@ -255,14 +255,14 @@ public class TPaymentRecord extends UpdatableRecordImpl<TPaymentRecord> {
     }
 
     /**
-     * Setter for <code>payment.t_payment.updated_tx_id</code>. 更新トランザクションID
+     * Setter for <code>payment.t_payment.updated_tx_id</code>. 更新トレースID
      */
     public void setUpdatedTxId(@NonNull String value) {
         set(15, value);
     }
 
     /**
-     * Getter for <code>payment.t_payment.updated_tx_id</code>. 更新トランザクションID
+     * Getter for <code>payment.t_payment.updated_tx_id</code>. 更新トレースID
      */
     @NonNull
     public String getUpdatedTxId() {

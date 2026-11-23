@@ -85,14 +85,16 @@ public class MUserIdentity extends TableImpl<MUserIdentityRecord> {
     public final TableField<MUserIdentityRecord, Long> USER_ID = createField(DSL.name("user_id"), SQLDataType.BIGINT.nullable(false), this, "利用者ID");
 
     /**
-     * The column <code>tenancy.m_user_identity.issuer_url</code>. 発行者URL
+     * The column <code>tenancy.m_user_identity.issuer_url</code>.
+     * IdP識別の発行者（iss）
      */
-    public final TableField<MUserIdentityRecord, String> ISSUER_URL = createField(DSL.name("issuer_url"), SQLDataType.VARCHAR(255).nullable(false).defaultValue(DSL.field(DSL.raw("''::character varying"), SQLDataType.VARCHAR)), this, "発行者URL", new NullToEmptyStringConverter());
+    public final TableField<MUserIdentityRecord, String> ISSUER_URL = createField(DSL.name("issuer_url"), SQLDataType.VARCHAR(255).nullable(false).defaultValue(DSL.field(DSL.raw("''::character varying"), SQLDataType.VARCHAR)), this, "IdP識別の発行者（iss）", new NullToEmptyStringConverter());
 
     /**
-     * The column <code>tenancy.m_user_identity.subject_code</code>. サブジェクトコード
+     * The column <code>tenancy.m_user_identity.subject_code</code>.
+     * IdP識別のサブジェクト（sub）
      */
-    public final TableField<MUserIdentityRecord, String> SUBJECT_CODE = createField(DSL.name("subject_code"), SQLDataType.VARCHAR(255).nullable(false).defaultValue(DSL.field(DSL.raw("''::character varying"), SQLDataType.VARCHAR)), this, "サブジェクトコード", new NullToEmptyStringConverter());
+    public final TableField<MUserIdentityRecord, String> SUBJECT_CODE = createField(DSL.name("subject_code"), SQLDataType.VARCHAR(255).nullable(false).defaultValue(DSL.field(DSL.raw("''::character varying"), SQLDataType.VARCHAR)), this, "IdP識別のサブジェクト（sub）", new NullToEmptyStringConverter());
 
     /**
      * The column <code>tenancy.m_user_identity.created_at</code>. 作成日時
@@ -111,10 +113,9 @@ public class MUserIdentity extends TableImpl<MUserIdentityRecord> {
     public final TableField<MUserIdentityRecord, String> CREATED_PGM_CD = createField(DSL.name("created_pgm_cd"), SQLDataType.VARCHAR(64).nullable(false), this, "作成プログラムコード");
 
     /**
-     * The column <code>tenancy.m_user_identity.created_tx_id</code>.
-     * 作成トランザクションID
+     * The column <code>tenancy.m_user_identity.created_tx_id</code>. 作成トレースID
      */
-    public final TableField<MUserIdentityRecord, String> CREATED_TX_ID = createField(DSL.name("created_tx_id"), SQLDataType.VARCHAR(32).nullable(false), this, "作成トランザクションID");
+    public final TableField<MUserIdentityRecord, String> CREATED_TX_ID = createField(DSL.name("created_tx_id"), SQLDataType.VARCHAR(32).nullable(false), this, "作成トレースID");
 
     /**
      * The column <code>tenancy.m_user_identity.updated_at</code>. 更新日時
@@ -133,10 +134,9 @@ public class MUserIdentity extends TableImpl<MUserIdentityRecord> {
     public final TableField<MUserIdentityRecord, String> UPDATED_PGM_CD = createField(DSL.name("updated_pgm_cd"), SQLDataType.VARCHAR(64).nullable(false), this, "更新プログラムコード");
 
     /**
-     * The column <code>tenancy.m_user_identity.updated_tx_id</code>.
-     * 更新トランザクションID
+     * The column <code>tenancy.m_user_identity.updated_tx_id</code>. 更新トレースID
      */
-    public final TableField<MUserIdentityRecord, String> UPDATED_TX_ID = createField(DSL.name("updated_tx_id"), SQLDataType.VARCHAR(32).nullable(false), this, "更新トランザクションID");
+    public final TableField<MUserIdentityRecord, String> UPDATED_TX_ID = createField(DSL.name("updated_tx_id"), SQLDataType.VARCHAR(32).nullable(false), this, "更新トレースID");
 
     /**
      * The column <code>tenancy.m_user_identity.lock_no</code>. ロック番号

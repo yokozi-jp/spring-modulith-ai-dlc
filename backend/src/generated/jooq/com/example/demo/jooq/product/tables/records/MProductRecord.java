@@ -179,14 +179,14 @@ public class MProductRecord extends UpdatableRecordImpl<MProductRecord> {
     }
 
     /**
-     * Setter for <code>product.m_product.created_tx_id</code>. 作成トランザクションID
+     * Setter for <code>product.m_product.created_tx_id</code>. 作成トレースID
      */
     public void setCreatedTxId(@NonNull String value) {
         set(10, value);
     }
 
     /**
-     * Getter for <code>product.m_product.created_tx_id</code>. 作成トランザクションID
+     * Getter for <code>product.m_product.created_tx_id</code>. 作成トレースID
      */
     @NonNull
     public String getCreatedTxId() {
@@ -239,14 +239,14 @@ public class MProductRecord extends UpdatableRecordImpl<MProductRecord> {
     }
 
     /**
-     * Setter for <code>product.m_product.updated_tx_id</code>. 更新トランザクションID
+     * Setter for <code>product.m_product.updated_tx_id</code>. 更新トレースID
      */
     public void setUpdatedTxId(@NonNull String value) {
         set(14, value);
     }
 
     /**
-     * Getter for <code>product.m_product.updated_tx_id</code>. 更新トランザクションID
+     * Getter for <code>product.m_product.updated_tx_id</code>. 更新トレースID
      */
     @NonNull
     public String getUpdatedTxId() {

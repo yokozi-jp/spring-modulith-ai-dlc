@@ -164,14 +164,14 @@ public class TOrderRecord extends UpdatableRecordImpl<TOrderRecord> {
     }
 
     /**
-     * Setter for <code>ordering.t_order.created_tx_id</code>. 作成トランザクションID
+     * Setter for <code>ordering.t_order.created_tx_id</code>. 作成トレースID
      */
     public void setCreatedTxId(@NonNull String value) {
         set(9, value);
     }
 
     /**
-     * Getter for <code>ordering.t_order.created_tx_id</code>. 作成トランザクションID
+     * Getter for <code>ordering.t_order.created_tx_id</code>. 作成トレースID
      */
     @NonNull
     public String getCreatedTxId() {
@@ -224,14 +224,14 @@ public class TOrderRecord extends UpdatableRecordImpl<TOrderRecord> {
     }
 
     /**
-     * Setter for <code>ordering.t_order.updated_tx_id</code>. 更新トランザクションID
+     * Setter for <code>ordering.t_order.updated_tx_id</code>. 更新トレースID
      */
     public void setUpdatedTxId(@NonNull String value) {
         set(13, value);
     }
 
     /**
-     * Getter for <code>ordering.t_order.updated_tx_id</code>. 更新トランザクションID
+     * Getter for <code>ordering.t_order.updated_tx_id</code>. 更新トレースID
      */
     @NonNull
     public String getUpdatedTxId() {

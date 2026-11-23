@@ -68,7 +68,7 @@ databaseChangeLog:
             schemaName: product
             tableName: m_product
             columnName: created_tx_id
-            remarks: 作成トランザクションID
+            remarks: 作成トレースID
         - setColumnRemarks:
             schemaName: product
             tableName: m_product
@@ -88,7 +88,7 @@ databaseChangeLog:
             schemaName: product
             tableName: m_product
             columnName: updated_tx_id
-            remarks: 更新トランザクションID
+            remarks: 更新トレースID
         - setColumnRemarks:
             schemaName: product
             tableName: m_product
@@ -162,7 +162,7 @@ databaseChangeLog:
             schemaName: ordering
             tableName: t_order
             columnName: created_tx_id
-            remarks: 作成トランザクションID
+            remarks: 作成トレースID
         - setColumnRemarks:
             schemaName: ordering
             tableName: t_order
@@ -182,7 +182,7 @@ databaseChangeLog:
             schemaName: ordering
             tableName: t_order
             columnName: updated_tx_id
-            remarks: 更新トランザクションID
+            remarks: 更新トレースID
         - setColumnRemarks:
             schemaName: ordering
             tableName: t_order
@@ -261,7 +261,7 @@ databaseChangeLog:
             schemaName: ordering
             tableName: t_order_line
             columnName: created_tx_id
-            remarks: 作成トランザクションID
+            remarks: 作成トレースID
         - setColumnRemarks:
             schemaName: ordering
             tableName: t_order_line
@@ -281,7 +281,7 @@ databaseChangeLog:
             schemaName: ordering
             tableName: t_order_line
             columnName: updated_tx_id
-            remarks: 更新トランザクションID
+            remarks: 更新トレースID
         - setColumnRemarks:
             schemaName: ordering
             tableName: t_order_line
@@ -365,7 +365,7 @@ databaseChangeLog:
             schemaName: payment
             tableName: t_payment
             columnName: created_tx_id
-            remarks: 作成トランザクションID
+            remarks: 作成トレースID
         - setColumnRemarks:
             schemaName: payment
             tableName: t_payment
@@ -385,7 +385,7 @@ databaseChangeLog:
             schemaName: payment
             tableName: t_payment
             columnName: updated_tx_id
-            remarks: 更新トランザクションID
+            remarks: 更新トレースID
         - setColumnRemarks:
             schemaName: payment
             tableName: t_payment
@@ -444,7 +444,7 @@ databaseChangeLog:
             schemaName: tenancy
             tableName: m_tenant
             columnName: created_tx_id
-            remarks: 作成トランザクションID
+            remarks: 作成トレースID
         - setColumnRemarks:
             schemaName: tenancy
             tableName: m_tenant
@@ -464,7 +464,7 @@ databaseChangeLog:
             schemaName: tenancy
             tableName: m_tenant
             columnName: updated_tx_id
-            remarks: 更新トランザクションID
+            remarks: 更新トレースID
         - setColumnRemarks:
             schemaName: tenancy
             tableName: m_tenant
@@ -518,7 +518,7 @@ databaseChangeLog:
             schemaName: tenancy
             tableName: m_user
             columnName: created_tx_id
-            remarks: 作成トランザクションID
+            remarks: 作成トレースID
         - setColumnRemarks:
             schemaName: tenancy
             tableName: m_user
@@ -538,7 +538,7 @@ databaseChangeLog:
             schemaName: tenancy
             tableName: m_user
             columnName: updated_tx_id
-            remarks: 更新トランザクションID
+            remarks: 更新トレースID
         - setColumnRemarks:
             schemaName: tenancy
             tableName: m_user
@@ -577,12 +577,12 @@ databaseChangeLog:
             schemaName: tenancy
             tableName: m_user_identity
             columnName: issuer_url
-            remarks: 発行者URL
+            remarks: IdP識別の発行者（iss）
         - setColumnRemarks:
             schemaName: tenancy
             tableName: m_user_identity
             columnName: subject_code
-            remarks: サブジェクトコード
+            remarks: IdP識別のサブジェクト（sub）
         - setColumnRemarks:
             schemaName: tenancy
             tableName: m_user_identity
@@ -602,7 +602,7 @@ databaseChangeLog:
             schemaName: tenancy
             tableName: m_user_identity
             columnName: created_tx_id
-            remarks: 作成トランザクションID
+            remarks: 作成トレースID
         - setColumnRemarks:
             schemaName: tenancy
             tableName: m_user_identity
@@ -622,7 +622,7 @@ databaseChangeLog:
             schemaName: tenancy
             tableName: m_user_identity
             columnName: updated_tx_id
-            remarks: 更新トランザクションID
+            remarks: 更新トレースID
         - setColumnRemarks:
             schemaName: tenancy
             tableName: m_user_identity
@@ -686,7 +686,7 @@ databaseChangeLog:
             schemaName: tenancy
             tableName: m_membership
             columnName: created_tx_id
-            remarks: 作成トランザクションID
+            remarks: 作成トレースID
         - setColumnRemarks:
             schemaName: tenancy
             tableName: m_membership
@@ -706,7 +706,7 @@ databaseChangeLog:
             schemaName: tenancy
             tableName: m_membership
             columnName: updated_tx_id
-            remarks: 更新トランザクションID
+            remarks: 更新トレースID
         - setColumnRemarks:
             schemaName: tenancy
             tableName: m_membership
