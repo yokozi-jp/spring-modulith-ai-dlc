@@ -28,7 +28,7 @@ import com.tngtech.archunit.lang.ArchCondition;
 import com.tngtech.archunit.lang.ArchRule;
 import com.tngtech.archunit.lang.ConditionEvents;
 import com.tngtech.archunit.lang.SimpleConditionEvent;
-import java.lang.reflect.RecordComponent;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -109,6 +109,12 @@ class ClassRoleArchTest {
                   commandHandler.getDirectDependenciesFromSelf().stream()
                       .map(Dependency::getTargetClass)
                       .anyMatch(EXTERNAL_SYSTEM_INTERFACE)));
+
+  /** Result の名前の末尾。 */
+  private static final String RESULT = "Result";
+
+  /** Result の役割を定めた文書のパス。 */
+  private static final String RESULT_DOC = "docs/backend/class-roles/result.md";
 
   /** CommandHandler の規約のパス。 */
   private static final String COMMAND_HANDLER_DOC = "docs/backend/class-roles/command-handler.md";
@@ -663,7 +669,7 @@ class ClassRoleArchTest {
         .that(
             resideInAPackage(basePackage + ".*..")
                 .and(not(name(basePackage + ".shared.concurrency.VersionedCommand")))
-                .and(simpleNameEndingWith("Command").or(simpleNameEndingWith("Result"))))
+                .and(simpleNameEndingWith("Command").or(simpleNameEndingWith(RESULT))))
         .should(beRecordOrSealedInterfaceOfRecordsForResult())
         .andShould()
         .resideInAPackage(basePackage + ".*.application")
@@ -671,10 +677,7 @@ class ClassRoleArchTest {
         .because(
             "Command と Result はユースケースの入出力であり、モジュールルートに置いて他モジュールから同期で呼ばせないため。"
                 + "直し方：<UseCase>Command を <モジュール>.application の record にする。<UseCase>Result は record か、許可された型がすべて record の sealed interface にする。"
-                + conventions(
-                    "docs/backend/class-roles/command.md",
-                    "docs/backend/class-roles/result.md",
-                    ADR_050));
+                + conventions("docs/backend/class-roles/command.md", RESULT_DOC, ADR_050));
   }
 
   /** {@code *Result}（入れ子の record を含む）の record の component に {@code @Nullable} を付けない規則を組み立てる。 */
@@ -685,12 +688,12 @@ class ClassRoleArchTest {
                 .and(
                     DescribedPredicate.describe(
                         "a record nested in or named *Result", ClassRoleArchTest::isResultRecord)))
-        .should(haveNoNullableRecordComponent())
+        .should(noNullableRecordComponent())
         .allowEmptyShould(true)
         .because(
             "@Nullable の component を並べて、どれかが入ることを約束にする record は、場合ごとの型より読み手に分岐を残すため。"
                 + "直し方：場合ごとに record を作り、<UseCase>Result を sealed interface にする。"
-                + conventions("docs/backend/class-roles/result.md", ADR_050));
+                + conventions(RESULT_DOC, ADR_050));
   }
 
   private static boolean isResultRecord(final JavaClass javaClass) {
@@ -701,19 +704,20 @@ class ClassRoleArchTest {
     while (outermost.getEnclosingClass().isPresent()) {
       outermost = outermost.getEnclosingClass().get();
     }
-    return outermost.getSimpleName().endsWith("Result");
+    return outermost.getSimpleName().endsWith(RESULT);
   }
 
-  private static ArchCondition<JavaClass> haveNoNullableRecordComponent() {
+  private static ArchCondition<JavaClass> noNullableRecordComponent() {
     return new ArchCondition<>("have no @Nullable record component") {
       @Override
       public void check(final JavaClass item, final ConditionEvents events) {
-        for (final RecordComponent component : item.reflect().getRecordComponents()) {
-          final boolean nullable = component.getAnnotatedType().isAnnotationPresent(Nullable.class);
-          events.add(
-              new SimpleConditionEvent(
-                  item, !nullable, item.getName() + "." + component.getName() + " is @Nullable"));
-        }
+        Arrays.stream(item.reflect().getRecordComponents())
+            .map(component ->
+                new SimpleConditionEvent(
+                    item,
+                    !component.getAnnotatedType().isAnnotationPresent(Nullable.class),
+                    item.getName() + "." + component.getName() + " is @Nullable"))
+            .forEach(events::add);
       }
     };
   }
@@ -750,10 +754,10 @@ class ClassRoleArchTest {
       public void check(final JavaClass item, final ConditionEvents events) {
         final boolean ok =
             item.isRecord()
-                || (item.getSimpleName().endsWith("Result")
+                || (item.getSimpleName().endsWith(RESULT)
                     && item.isInterface()
                     && item.reflect().isSealed()
-                    && java.util.Arrays.stream(item.reflect().getPermittedSubclasses())
+                    && Arrays.stream(item.reflect().getPermittedSubclasses())
                         .allMatch(Class::isRecord));
         events.add(
             new SimpleConditionEvent(

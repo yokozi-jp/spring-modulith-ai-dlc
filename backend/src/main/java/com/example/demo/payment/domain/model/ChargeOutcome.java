@@ -34,9 +34,9 @@ public sealed interface ChargeOutcome {
   /** 決済記録に書く状態を返す。 */
   default PaymentStatus status() {
     return switch (this) {
-      case Paid paid -> PaymentStatus.PAID;
-      case Declined declined -> PaymentStatus.DECLINED;
-      case Failed failed -> PaymentStatus.FAILED;
+      case Paid _ -> PaymentStatus.PAID;
+      case Declined _ -> PaymentStatus.DECLINED;
+      case Failed _ -> PaymentStatus.FAILED;
     };
   }
 }

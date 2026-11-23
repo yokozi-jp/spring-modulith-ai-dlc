@@ -51,7 +51,7 @@ public final class Payment implements Versioned {
         switch (outcome) {
           case ChargeOutcome.Paid paid -> paid.gatewayPaymentCode();
           case ChargeOutcome.Declined declined -> declined.gatewayPaymentCode();
-          case ChargeOutcome.Failed failed -> null;
+          case ChargeOutcome.Failed _ -> null;
         };
     this.recordedAt = recordedAt;
     this.lockNo = lockNo;
