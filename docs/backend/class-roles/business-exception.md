@@ -111,7 +111,8 @@ Controller は参照の結果がなければ `NotFoundException` を投げ、ス
 
 ## 対応するテスト
 
-集約、値オブジェクト、Domain Service の単体テストで、投げる例外の型と、メッセージの識別子を確かめる（`isInstanceOf(BusinessRuleViolationException.class)`）。
+集約と Domain Service の単体テストで、投げる例外の型と、メッセージの識別子を確かめる（`isInstanceOf(BusinessRuleViolationException.class)`）。
+値オブジェクトの単体テストは、`IllegalArgumentException` を確かめる。
 例外から HTTP のステータス、本文、ログへの対応づけは `ApiErrorContractTest` と `ApiExceptionHandlerTest` が確かめるため、機能ごとのテストでは確かめない。
 
 ## アンチパターン
