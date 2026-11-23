@@ -456,11 +456,17 @@ class PackageByFeatureOnionArchitectureTest {
                 + "規約：docs/backend/shared-module.md、docs/backend/class-roles/business-exception.md");
   }
 
-  /** 機能ルートの型が標準型、JSpecify、同じルートパッケージの型だけに依存することを強制する規則を組み立てる。 */
+  /**
+   * 機能ルートの型が標準型、JSpecify、同じルートパッケージの型だけに依存することを強制する規則を組み立てる。
+   *
+   * <p>{@code package-info} は、モジュールの宣言（{@code @ApplicationModule}）を持つ型で公開契約ではないため、対象から除く。
+   */
   /* package */ static ArchRule moduleApiDoesNotExposeInternalTypesRule(final String basePackage) {
     return classes()
         .that()
         .resideInAPackage(basePackage + ".*")
+        .and()
+        .doNotHaveSimpleName("package-info")
         .should(dependOnlyOnStandardTypesOrOwnPackage(basePackage))
         .allowEmptyShould(true)
         .because(

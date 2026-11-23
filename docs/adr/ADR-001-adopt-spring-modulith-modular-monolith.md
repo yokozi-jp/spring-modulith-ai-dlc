@@ -74,3 +74,4 @@ Spring Modulith を用いたモジュラーモノリスを採用する。
 
 - `backend/src/main/resources/application.yaml`（`spring.modulith.*`）
 - `backend/src/test/java/com/example/demo/architecture/ApplicationModuleArchitectureTest.java`
+- [ADR-118: モジュールの依存先を allowedDependencies で宣言する](ADR-118-declare-module-dependencies-with-allowed-dependencies.md)

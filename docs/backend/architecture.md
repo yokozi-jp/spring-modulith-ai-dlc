@@ -161,7 +161,7 @@ Java パッケージを作るときは、`@NullMarked` を宣言する `package-
 ルートの型は、`String`、`Instant`、`BigDecimal` などの Java の標準型と、同じルートパッケージの型だけを持つ。
 Domain の型、Command と Result、Spring MVC の Request と Response、jOOQ の生成型は置かない。
 
-機能モジュールは Spring Modulith の既定の閉じたモジュールとし、`@ApplicationModule` と `@NamedInterface` を付けない。
+機能モジュールは Spring Modulith の既定の閉じたモジュールとし、ルートの `package-info.java` に `@ApplicationModule(allowedDependencies = ...)` を書く。`@NamedInterface` は付けない（[ADR-118](../adr/ADR-118-declare-module-dependencies-with-allowed-dependencies.md)）。
 
 ## 共有モジュール shared
 
@@ -195,6 +195,21 @@ infrastructure.client ───────────────────�
 - Presentation、Batch、Persistence、外部 Client は相互に依存しない。
 
 ## モジュール間の連携
+
+モジュールが依存してよいモジュールは、そのモジュールのルートの `package-info.java` に `@ApplicationModule(allowedDependencies = ...)` で宣言する。
+宣言にないモジュールへの依存は、`ApplicationModules.verify()` が `Module 'payment' depends on module 'product'` のように失敗にする。
+`jooq` は OPEN のモジュールなので、jOOQ の生成型を使うモジュールは `"jooq"` を書く。
+`shared` の名前付きインタフェース（`concurrency`、`failure`、`events`、`security`、`tenant`、`persistence`）は、`@Modulithic(sharedModules = "shared")` では暗黙の許可先に入らない。
+入るのは `shared` のルートだけなので、使うモジュールは `"shared :: *"` を書く。
+
+| モジュール | `allowedDependencies`                       |
+| ---------- | ------------------------------------------- |
+| `product`  | `"jooq"`                                    |
+| `ordering` | `{"product", "shared :: *", "jooq"}`        |
+| `payment`  | `{"ordering", "shared :: *", "jooq"}`       |
+| `tenancy`  | `{"shared :: *", "jooq"}`                   |
+| `error`    | `"shared :: *"`                             |
+| `shared`   | `"jooq"`                                    |
 
 機能モジュールの間の連携は、次の二つだけにする。
 

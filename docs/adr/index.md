@@ -117,3 +117,4 @@
 - [ADR-115: 業務のバッチを Spring Batch の Job で作り、1 つの期間を 1 つの JobInstance にして毎日追いつく](ADR-115-build-business-batches-with-spring-batch.md)（Proposed, 2026-11-23）
 - [ADR-116: フロントエンドのファイルを役割ごとに分け、役割ごとの文書とチェックリストを置く](ADR-116-define-frontend-file-roles.md)（Proposed, 2026-11-23）
 - [ADR-117: Problem Details に traceId を付け、instance を設定しない](ADR-117-add-trace-id-and-omit-instance-in-problem-details.md)（Proposed, 2026-11-23）
+- [ADR-118: モジュールの依存先を allowedDependencies で宣言する](ADR-118-declare-module-dependencies-with-allowed-dependencies.md)（Proposed, 2026-11-23）
