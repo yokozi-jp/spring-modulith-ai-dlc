@@ -132,7 +132,7 @@ task agent-push && AGENT_GIT_WAIT_SECONDS=1500 task agent-wait
 そのままやり直しても次の`task test`は別のslotを取るが、片付けるまでslotを1つ使い続けるので、[compose-testのslot](test-slots.md#中断した実行が残した-slot)の手順で片付ける。
 
 Lefthookの出力は`lefthook.yml`の`output`で絞ってある（[Lintとテストのリファレンス](lint-and-test.md)）。
-`LEFTHOOK_OUTPUT=summary,failure`でさらに絞ると、成功の扱いで出る`adr-check`の注意喚起が消えるので、付けない。
+`LEFTHOOK_OUTPUT=summary,failure`でさらに絞ると、成功の扱いで出る`adr-check`と`test-weakening`の注意喚起が消えるので、付けない。
 
 ## APIを変更するとき
 

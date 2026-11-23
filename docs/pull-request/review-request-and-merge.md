@@ -49,6 +49,7 @@ gh pr checks <番号> --required --watch --fail-fast
 - 認証、認可、CSRF、秘密情報の扱いを変える。
 - 依存を追加する。
 - テストを弱める。テストファイルを消す、テストケースを減らす、coverageやmutationの基準を下げる、検査をskipするなどが該当する。
+  テストファイルの削除とテストケースの減少は、pre-pushの[`task test-weakening`](../tooling/lint-and-test.md)が警告する。
 
 Dependabotのpatchとminorの更新は、[ADR-021](../adr/ADR-021-group-dependabot-minor-and-patch-updates.md)に従って自動でマージされるため、この条件の対象にしない。
 

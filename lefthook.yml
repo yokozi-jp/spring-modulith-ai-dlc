@@ -52,7 +52,7 @@
 no_auto_install: true
 
 # lefthook の版の表示、skip の行、EXECUTE の行を省く。
-# job の出力は残す。adr-check の注意喚起は成功の扱いで出るため、成功した job の出力も消さない。
+# job の出力は残す。adr-check と test-weakening の注意喚起は成功の扱いで出るため、成功した job の出力も消さない。
 # 全部を出すときは LEFTHOOK_OUTPUT=meta,summary,success,failure,execution,execution_out,execution_info,skips を付ける。
 output:
   - summary
@@ -213,6 +213,15 @@ pre-commit:
         task test-slot-test
       fail_text: "test-slot の自己検査に失敗しました。task test-slot-test で再実行してください。"
 
+    # check.sh か自己検査にステージ済み変更があるとき、一時の git リポジトリで自己検査する（task test-weakening-test）。
+    - name: test-weakening-test
+      glob:
+        - "tooling/test-weakening/**"
+      run: |
+        echo "{staged_files}" >/dev/null
+        task test-weakening-test
+      fail_text: "test-weakening の自己検査に失敗しました。task test-weakening-test で再実行してください。"
+
     # Taskfile、フック、ワークフロー、tooling の fixture の変更で、タスク名と Taskfile を検証する（task lint-taskfile）。
     - name: lint-taskfile
       glob:
@@ -290,6 +299,10 @@ pre-push:
     # ローカルと同じ判定を task adr-check に集約している。
     - name: adr-check
       run: task adr-check
+
+    # push 前に、テストファイルの削除とテストケースの減少を警告（ナッジ）。止めず、TESTS_ACK=1 で抑制。
+    - name: test-weakening
+      run: task test-weakening
 
     # push 前に現在のブランチから辿れる履歴をシークレットスキャン（Betterleaks）
     - name: betterleaks-history-scan
