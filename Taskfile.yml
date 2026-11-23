@@ -504,6 +504,19 @@ tasks:
       - bash tooling/ci-changes/test.sh
       - python3 tooling/ci-gate-check/ci-gate-check.py
 
+  # テストファイルの削除とテストケースの減少を警告する。止めず、TESTS_ACK=1 で抑える。
+  test-weakening:
+    desc: テストファイルの削除とテストケースの減少を警告
+    silent: true
+    cmds:
+      - bash tooling/test-weakening/check.sh
+
+  test-weakening-test:
+    desc: test-weakening の自己検査
+    silent: true
+    cmds:
+      - bash tooling/test-weakening/test.sh
+
   # CI の job は使う道具だけを入れるので、ほかの道具の版を上げて lock を作り直さない変更はここで止める（ADR-090）。
   mise-lock-check:
     desc: mise.toml の全ての道具の版が mise.lock に載ることを検証

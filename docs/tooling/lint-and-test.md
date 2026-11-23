@@ -224,6 +224,12 @@ Vitestは`globals`を渡さず、Testing Libraryの自動cleanupが効かない�
 - **`task adr-check`**：判断が絡む変更にADRが伴うかを確認する。
   `frontend/`の変更のうち、テストファイル（`*.test.*`、`*.spec.*`）、`frontend/apps/*/e2e/`、`frontend/lint/fixtures/`、`frontend/apps/*/src/testing/`は対象から外す。
   警告は止めず、`ADR_STRICT=1`で失敗にし、`ADR_ACK=1`で抑制する。
+- **`task test-weakening`**：`origin/main`とのmerge baseから`HEAD`までで、テストファイルの削除とテストケースの減少を警告する（[人が必ず読むPull Request](../pull-request/review-request-and-merge.md#人が必ず読むpull-request)の「テストを弱める」の目印にする）。
+  対象は`*Test.java`、`*Tests.java`、`*.test.ts`、`*.test.tsx`で、renameは削除に数えず、追加したファイルは減少に数えない。
+  テストケースの数は、行頭の`@Test`、`@ParameterizedTest`、`@RepeatedTest`、`@TestFactory`、`@TestTemplate`、`@ArchTest`、`it(`、`test(`の行数で数える概算である。コメントと文字列の中の宣言も数える。
+  警告は標準エラーに出し、終了コードは常に0にする。`TESTS_ACK=1`で抑制し、比較の起点が無ければ理由を出して通す。
+  `.skip`、`.only`、理由のない`@Disabled`、coverageの低下は別の検査が止めるので、ここでは扱わない。
+  自己検査は`task test-weakening-test`（`tooling/test-weakening/test.sh`）で、削除、減少、rename、変化なしの出力を確かめる。
 
 Knipとjscpdの採用理由は[ADR-035](../adr/ADR-035-adopt-jscpd-and-knip-quality-gates.md)を、jscpdがimport文を比べず、閾値を2.0%にする理由は[ADR-106](../adr/ADR-106-ignore-import-statements-in-jscpd.md)を参照する。
 DASTの検出ではタスクを失敗させず、起動、ログイン、CSRFの前提確認の失敗だけで失敗させる（[ADR-056](../adr/ADR-056-run-authenticated-dast-with-zap-in-ci.md)）。
@@ -251,7 +257,8 @@ betterleaksの誤検知の除外の書き方は[betterleaksの誤検知の除外
 - **pre-commit（`package.json`、`lefthook.yml`、`tooling/lefthook-install/`の変更）**：`lefthook-install-test`を実行する。
 - **pre-commit（`tooling/formal-verify/`の変更）**：`formal-verify-test`を実行する。
 - **pre-commit（`tooling/*/test.sh`、`.kiro/hooks/*.test.sh`、`tooling/scratch-git/`の変更）**：`lint-scratch-git`を実行する。
-- **pre-push（すべて）**：`adr-check`と`scan-secrets-all`を実行する。
+- **pre-commit（`tooling/test-weakening/`の変更）**：`test-weakening-test`を実行する。
+- **pre-push（すべて）**：`adr-check`、`test-weakening`、`scan-secrets-all`を実行する。
 - **pre-push（バックエンドのJavaまたはGradle変更）**：`be-lint`相当と`test`を実行する。
 - **pre-push（フロントエンドの変更）**：`fe-test-build`を、Vitestのdot reporterと、報告を出さない`none`のcoverage reporterで実行する。
   下限の検査は報告の形式によらず働く。
