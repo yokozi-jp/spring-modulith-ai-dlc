@@ -15,6 +15,8 @@ tags: [convention, database, postgresql, view, trigger, future-arch-guidelines]
 
 関数は、一般的な事実に基づく処理か、業務上ほとんど変わらない処理に限って作ってよい。
 Oracleからの移行で使う互換関数や、体系を持つSKUコードから品番を取り出す補助関数がこれに当たる。
+現在時刻やタイムゾーンを読む関数（`sysdate`など）は、互換関数でも作らない。
+現在時刻はアプリの`Clock`から読み、暦日と境界の求め方は[暦日のAPIとSQL](../datetime/timezone-conventions.md#暦日のapiとsql)に従う。
 
 テーブルを参照する関数は作らない。
 テーブル間の依存関係が見えなくなり、リリースで想定外の障害を招くためである。

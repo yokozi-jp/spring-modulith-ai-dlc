@@ -242,6 +242,16 @@ components:
           enum:
             - PLACED
             - CANCELLED
+        placedAt:
+          type: string
+          format: date-time
+          description: 注文を受け付けた絶対時刻
+          example: 2023-09-29T15:00:00Z
+        deliveryDate:
+          type: string
+          format: date
+          description: 届け日の暦日
+          example: 2023-09-30
         customer:
           $ref: "#/components/schemas/SampleCustomer"
           description: 注文した顧客

@@ -1,16 +1,19 @@
 package com.example.demo.config;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.quicktheories.QuickTheory.qt;
 import static org.quicktheories.generators.SourceDSL.longs;
 
 import java.time.Duration;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.json.JsonTest;
+import tools.jackson.core.JacksonException;
 import tools.jackson.databind.json.JsonMapper;
 
 /**
@@ -53,6 +56,24 @@ class JacksonConfigTest {
   }
 
   @Test
+  @DisplayName("LocalDate を full-date の文字列として読み書きする")
+  void localDatesAreWrittenAndReadAsFullDate() {
+    final String json = jsonMapper.writeValueAsString(new HasDate(LocalDate.parse("2023-09-30")));
+    assertThat(json).isEqualTo("{\"day\":\"2023-09-30\"}");
+    assertThat(jsonMapper.readValue(json, HasDate.class).day())
+        .isEqualTo(LocalDate.parse("2023-09-30"));
+  }
+
+  @Test
+  @DisplayName("LocalDate は時刻つきの文字列を受けない")
+  void localDatesRejectTimestamps() {
+    // 既定の寛容な読み取りだと 2023-09-29 として受け、東京の 9 月 30 日がずれる。
+    assertThatThrownBy(
+            () -> jsonMapper.readValue("{\"day\":\"2023-09-29T15:00:00Z\"}", HasDate.class))
+        .isInstanceOf(JacksonException.class);
+  }
+
+  @Test
   @DisplayName("Duration を ISO 8601 文字列として直列化する")
   void durationsAreWrittenAsIso8601String() {
     final String json = jsonMapper.writeValueAsString(new HasDuration(Duration.ofHours(1)));
@@ -75,6 +96,8 @@ class JacksonConfigTest {
   }
 
   /* package */ record HasInstant(Instant when) {}
+
+  /* package */ record HasDate(LocalDate day) {}
 
   /* package */ record HasDuration(Duration length) {}
 

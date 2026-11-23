@@ -38,6 +38,7 @@ import java.util.Set;
 import java.util.TimeZone;
 import java.util.function.Function;
 import java.util.function.Supplier;
+import org.jooq.impl.DSL;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -68,6 +69,28 @@ class DateTimeConventionsArchTest {
   private static final Set<String> SYSTEM_CLOCK_FACTORY_METHODS =
       Set.of(
           "systemUTC", "systemDefaultZone", "system", "tickMillis", "tickSeconds", "tickMinutes");
+
+  /**
+   * DB の時計を読む jOOQ の {@code DSL} の関数名。{@code DSL.now()} も含む。
+   *
+   * <p>ponytail: 日時から暦日や境界を作る {@code DSL.trunc(...)}、{@code DSL.date(Field)}、{@code cast(DATE)}
+   * は止めない。引数のない時計の読み取りだけを機械で止め、暦を作る関数はレビューで確認する。
+   */
+  private static final Set<String> DATABASE_CLOCK_FUNCTIONS =
+      Set.of(
+          "currentDate",
+          "currentTime",
+          "currentTimestamp",
+          "currentLocalDate",
+          "currentLocalDateTime",
+          "currentLocalTime",
+          "currentOffsetDateTime",
+          "currentOffsetTime",
+          "currentInstant",
+          "now");
+
+  /** DB の時計を読む関数の違反に付く修正方法の文。 */
+  private static final String DATABASE_CLOCK_REMEDIATION = "DB の時計を読まず、Clock から求めた値を bind する";
 
   /**
    * システム {@code Clock} ファクトリの違反に付く修正方法の文。
@@ -164,6 +187,29 @@ class DateTimeConventionsArchTest {
         .hasMessageContaining("java.time.MonthDay" + NOW_CLOCK_REMEDIATION);
   }
 
+  /** jOOQ の {@code DSL} で DB の時計を読む関数を拒否する。 */
+  @Test
+  @DisplayName("DSL.currentDate() など DB の時計を読む jOOQ の関数を拒否する")
+  void databaseClockFunctionsAreRejected() {
+    // フィクスチャを実際に呼び出してIDEにも使用済みと認識させる。拒否判定は続くArchUnitの検査が担う。
+    assertThat(DatabaseClockBypass.createForbiddenFields()).hasSize(10);
+
+    assertThatThrownBy(() ->
+            injectedClockRule()
+                .check(new ClassFileImporter().importClasses(DatabaseClockBypass.class)))
+        .isInstanceOf(AssertionError.class)
+        .hasMessageContaining("DSL.currentDate(...) は" + DATABASE_CLOCK_REMEDIATION)
+        .hasMessageContaining("DSL.currentTime(...) は" + DATABASE_CLOCK_REMEDIATION)
+        .hasMessageContaining("DSL.currentTimestamp(...) は" + DATABASE_CLOCK_REMEDIATION)
+        .hasMessageContaining("DSL.currentLocalDate(...) は" + DATABASE_CLOCK_REMEDIATION)
+        .hasMessageContaining("DSL.currentLocalDateTime(...) は" + DATABASE_CLOCK_REMEDIATION)
+        .hasMessageContaining("DSL.currentLocalTime(...) は" + DATABASE_CLOCK_REMEDIATION)
+        .hasMessageContaining("DSL.currentOffsetDateTime(...) は" + DATABASE_CLOCK_REMEDIATION)
+        .hasMessageContaining("DSL.currentOffsetTime(...) は" + DATABASE_CLOCK_REMEDIATION)
+        .hasMessageContaining("DSL.currentInstant(...) は" + DATABASE_CLOCK_REMEDIATION)
+        .hasMessageContaining("DSL.now(...) は" + DATABASE_CLOCK_REMEDIATION);
+  }
+
   /** メソッド参照による迂回も呼び出しと同じく拒否する。 */
   @Test
   @DisplayName("Instant::now などのメソッド参照による迂回を拒否する")
@@ -171,10 +217,9 @@ class DateTimeConventionsArchTest {
     // フィクスチャを実際に呼び出してIDEにも使用済みと認識させる。拒否判定は続くArchUnitの検査が担う。
     assertThat(MethodReferenceBypass.createForbiddenReferences()).hasSize(4);
 
-    assertThatThrownBy(
-            () ->
-                injectedClockRule()
-                    .check(new ClassFileImporter().importClasses(MethodReferenceBypass.class)))
+    assertThatThrownBy(() ->
+            injectedClockRule()
+                .check(new ClassFileImporter().importClasses(MethodReferenceBypass.class)))
         .isInstanceOf(AssertionError.class)
         .hasMessageContaining("java.time.Instant.now()" + NOW_REMEDIATION)
         .hasMessageContaining("java.time.LocalDate" + NOW_CLOCK_REMEDIATION)
@@ -206,6 +251,7 @@ class DateTimeConventionsArchTest {
         .because(
             "システム時計を直接読むとテストの Clock.fixed(...) が効かず、"
                 + "UTC の Clock のゾーンで日付を決めると日本では0時から9時の間に前日になるため。"
+                + "DB の時計と暦も同じで、セッションの TimeZone（UTC）で日付を決めると同じく前日になる。"
                 + "直し方：Clock をコンストラクタ引数で受け取り、Instant.now(clock) または clock.millis() を使う。"
                 + "システム Clock は "
                 + CLOCK_BEAN_METHOD
@@ -241,6 +287,16 @@ class DateTimeConventionsArchTest {
     }
     if ("java.time.ZoneId".equals(owner) && "systemDefault".equals(method)) {
       return "ZoneId.systemDefault() を削除し、使用する ZoneId をコンストラクタ引数または設定値で受け取る。UTCなら ZoneOffset.UTC を使う。";
+    }
+
+    if (DSL.class.getName().equals(owner) && DATABASE_CLOCK_FUNCTIONS.contains(method)) {
+      return "DSL."
+          + method
+          + "(...) は"
+          + DATABASE_CLOCK_REMEDIATION
+          + "。"
+          + "絶対時刻は Instant.now(clock)、暦日は LocalDate.ofInstant(Instant.now(clock), zone) で求め、"
+          + "SQL の引数として渡す。";
     }
 
     final String nowRemediation = remediationForNow(call, owner, method);
@@ -365,6 +421,24 @@ class DateTimeConventionsArchTest {
           YearMonth.now(clock),
           // 日の境目でUTCの月日になる。
           MonthDay.now(clock));
+    }
+  }
+
+  /** ArchUnit の拒否経路を検証するため、DB の時計を読む jOOQ の関数を意図的に含めたフィクスチャ。 */
+  private static final class DatabaseClockBypass {
+
+    private static List<Object> createForbiddenFields() {
+      return List.of(
+          DSL.currentDate(),
+          DSL.currentTime(),
+          DSL.currentTimestamp(),
+          DSL.currentLocalDate(),
+          DSL.currentLocalDateTime(),
+          DSL.currentLocalTime(),
+          DSL.currentOffsetDateTime(),
+          DSL.currentOffsetTime(),
+          DSL.currentInstant(),
+          DSL.now());
     }
   }
 

@@ -3,7 +3,7 @@ type: Convention
 title: 日時とタイムゾーンの規約
 description: >-
   絶対時刻をUTCのInstantとtimestamptzに統一し、表示用タイムゾーンへの変換をフロントエンドで行う規約。
-  日時の保存、API、表示、テスト、DSTの扱い、精度、自動強制を定め、日時を扱うコード、DB、API、画面、テストを変更するときに読む。
+  日時の保存、API、表示、暦日のfull-dateとSQLでの暦日の求め方、テスト、DSTの扱い、精度、自動強制を定め、日時を扱うコード、DB、API、画面、テストを変更するときに読む。
 tags: [convention, datetime, backend, frontend, database]
 ---
 
@@ -118,6 +118,36 @@ PostgreSQL自身も有用性に疑問があるとし、他の日時型の組み�
 
 日付だけの値を現在時刻から求めるときは、「バックエンド」の業務タイムゾーンの規則に従う。
 業務日付を管理するモジュールでは、管理テーブルの[業務日付](../database/postgresql-temporal-data.md#業務日付)を正とし、現在時刻から求めない。
+APIでの形とSQLでの求め方は、次の「暦日のAPIとSQL」に従う。
+
+## 暦日のAPIとSQL
+
+暦日は、APIでは`full-date`で受け渡し、SQLでは日時から作らずに引数で受け取る。
+この決定は[ADR-114](../adr/ADR-114-pass-calendar-dates-as-full-date-and-bind-boundaries.md)を参照する。
+
+### API
+
+- APIの暦日は`LocalDate`で受け渡し、RFC 3339の`full-date`（`YYYY-MM-DD`）で表す。
+  OpenAPIでは`type: string`と`format: date`にする。
+- 暦日を、UTCの0時の瞬間（`2023-09-30T00:00:00Z`）で返さない。
+  画面はブラウザの既定のタイムゾーンで表示するため、UTCより西のタイムゾーンでは前日に見える。
+- 項目名の接尾辞で型を分ける。
+  `At`で終わる項目は絶対時刻で`format: date-time`、`Date`で終わる項目は暦日で`format: date`にする。
+- `LocalDate`は、時刻つきの文字列を受けない。
+  Jacksonの既定の読み取りは寛容で、`"2023-09-29T15:00:00Z"`（東京の9月30日）を`2023-09-29`として受けるため、`spring.jackson.default-leniency: false`で止める。
+  この設定は`Instant`と`LocalDate`の空文字列も、`null`にせず読み取りの失敗にする。
+
+### SQL
+
+- 暦日と期間の境界は、Javaで業務タイムゾーンから求めて引数で渡す。
+  現在の暦日は`LocalDate.ofInstant(Instant.now(clock), businessZone)`、期間の始まりは`localDate.atStartOfDay(businessZone).toInstant()`で求める。
+  業務タイムゾーンは[ADR-046](../adr/ADR-046-derive-local-dates-with-configured-business-zone.md)に従う。
+- SQLの`CURRENT_DATE`、`now()`、`date_trunc`、`::date`、`AT TIME ZONE`で、日時から暦日や境界を作らない。
+  PostgreSQLはこれらの暦をセッションの`TimeZone`で決める（[PostgreSQL 18, Date/Time Functions and Operators](https://www.postgresql.org/docs/18/functions-datetime.html)）。
+  このリポジトリのセッションはUTCなので、日本の0時から9時に前日になる。
+- DBの関数に、現在時刻とタイムゾーンを読ませない。
+  Oracleの`sysdate`などの互換関数も同じである。
+  現在時刻はアプリの`Clock`から読む。
 
 将来の一度きりの予定で、地域の時計が指す時刻そのものに意味がある場合は、`LocalDateTime`とIANAタイムゾーンIDを組で保存する。
 固定オフセットでは夏時間や法改正を表せないため、`+09:00`ではなく`Asia/Tokyo`や`America/New_York`のような地域IDを使う。
@@ -172,6 +202,12 @@ Javaの`LocalDateTime.atZone()`は、gapでは時刻を後ろへずらし、over
   - システム時刻を直接供給する`Clock`ファクトリは、`com.example.demo.DemoApplication.clock()`以外での使用を検出する。
     `InstantSource.system()`はどこで使っても検出する。
     違反したクラスは`Clock`をコンストラクタ引数で受け取り、`Instant.now(clock)`などへ置き換える。
+  - jOOQの`DSL`でDBの時計を読む関数（`currentDate()`、`currentLocalDate()`、`currentTimestamp()`、`now()`など）を検出する。
+    違反したクラスは、`Clock`から求めた値を引数で渡す。
+    日時から暦日や境界を作る`DSL.trunc(...)`、`DSL.date(Field)`、`cast(DATE)`は検出しないため、レビューで確認する。
+- Spectralの`instant-property-date-time`と`calendar-date-property-full-date`は、名前が`At`で終わる項目に`type: string`と`format: date-time`を、`Date`で終わる項目に`type: string`と`format: date`を求める。
+  検査の対象は、`.spectral.yaml`に書くとおり名前で見分ける。
+- `spring.jackson.default-leniency: false`の読み取りは、`JacksonConfigTest`が検証する。
 - JVMのタイムゾーンは、`-Duser.timezone=UTC`を`bootRun`、`seedLocalData`、コンテナの`JAVA_TOOL_OPTIONS`で固定する。
   `test`タスクとPITは`America/New_York`にし、`JvmTimeZoneTest`が設定の外れを検出する。
 - Jacksonの`Z`付き絶対時刻表現、DBセッションのUTC固定、`Instant`の保存往復は、契約テストと統合テストで検証する。

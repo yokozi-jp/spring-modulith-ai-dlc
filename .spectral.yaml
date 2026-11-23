@@ -159,6 +159,43 @@ rules:
             format:
               const: uuid
 
+  # ponytail: 名前で見分ける。名前が At や Date で終わらない日時は検査しない。
+  instant-property-date-time:
+    description: 名前が At で終わる項目は絶対時刻なので、type string、format date-time にする（docs/datetime/timezone-conventions.md の「APIの日時」）。
+    severity: error
+    given:
+      - "$..parameters[?(@.in === 'query' && @.name && @.name.match(/At$/))].schema"
+      - "$..properties[?(@property.match(/At$/))]"
+    then:
+      function: schema
+      functionOptions:
+        schema:
+          type: object
+          required: [type, format]
+          properties:
+            type:
+              const: string
+            format:
+              const: date-time
+
+  calendar-date-property-full-date:
+    description: 名前が Date で終わる項目は暦日なので、type string、format date（RFC 3339 の full-date）にする。0 時の瞬間で表さない（docs/datetime/timezone-conventions.md の「APIの日時」）。
+    severity: error
+    given:
+      - "$..parameters[?(@.in === 'query' && @.name && @.name.match(/Date$/))].schema"
+      - "$..properties[?(@property.match(/Date$/))]"
+    then:
+      function: schema
+      functionOptions:
+        schema:
+          type: object
+          required: [type, format]
+          properties:
+            type:
+              const: string
+            format:
+              const: date
+
   tag-name-format:
     description: tag は業務機能のパッケージ名を英小文字の kebab-case にし、Controller の名前を使わない。
     severity: error
