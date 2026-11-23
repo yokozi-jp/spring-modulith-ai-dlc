@@ -1,7 +1,7 @@
 ---
 type: Convention
 title: バッチのテスト観点
-description: 業務のバッチの単体テスト（期間の一覧、境界の時刻、引数の検査）と、spring-batch-test で Job と Step を起動する結合テストの観点（2 回流す、0 件、日回し、追いつき、再開、失敗と終了コード、止まった期間、テナントの分離、同時に 2 本）を定める規約で、Job のテストを書くときや Job のテストが足りているかを確かめるときに読む。
+description: 業務のバッチの単体テスト（期間の一覧、境界の時刻、引数の検査）と、spring-batch-test で Job と Step を起動する結合テストの観点（2 回流す、0 件、日回し、追いつき、再開、失敗と終了コード、ABANDONED の期間、JobExecution のない JobInstance、テナントの分離、同時に 2 本）を定める規約で、Job のテストを書くときや Job のテストが足りているかを確かめるときに読む。
 tags: [convention, batch, spring-batch, testing, future-arch-guidelines]
 ---
 
@@ -28,10 +28,8 @@ Job の振る舞いは、`spring-batch-test` で Job と Step を起動する結
 DB はほかの DB のテストと同じく Testcontainers の PostgreSQL にし（[バックエンドのテストの実行基盤](../backend/testing-infrastructure.md)）、メタデータの表も changeset で作る。
 現在時刻は、テストが進められる `Clock` から取り、テストの中で日を進める。
 
-バッチの規約に書いた Spring Batch と Spring Boot の振る舞いは、Spring Boot 4.1.2 と Spring Batch 6.0.6 のソースで確かめた。
-最初の Job の結合テストは、下の観点でこの振る舞いを固定し、版を上げたときに変わったことを知らせる。
-
 次の観点を、期間で区切るすべての Job で確かめる。
+規約が前提にする Spring Batch と Spring Boot の振る舞い（終了コード、ABANDONED の扱い、partition の名前での再開）は、この観点のテストで固定し、版を上げて変わったら失敗させる。
 
 - **2 回流す**：同じ期間を 2 回流しても、業務の表の結果が 1 回だけ流したときと同じになる。
   2 回目の起動は `JobInstanceAlreadyCompleteException` で止まる。
@@ -45,13 +43,14 @@ DB はほかの DB のテストと同じく Testcontainers の PostgreSQL にし
 - **retry で解けない失敗**：retry の上限を超えて競合する行と、業務上の失敗の例外を投げる行で、Step と Job が FAILED になり、後の期間が流れない。
   行を直して次の起動をすると、同じ JobInstance が再開して COMPLETED になり、後の期間も流れる。
 - **失敗と終了コード**：Job の名前を渡して起動したアプリで、Job が FAILED になると Runner が `SpringApplication.exit` から終了コード 5 を得る。
-  Job を流す前に失敗すると、終了コード 1 になる。
-- **止まった期間**：最後の JobExecution を ABANDONED にした期間の次の起動で、Runner がその期間を流さずに次の期間を流す。
+  Job を流す前に失敗したときと、`job.execute` から例外が出たときは、終了コード 1 になる（[終了コード](job-entry.md#終了コード)）。
+- **ABANDONED の期間**：最後の JobExecution を ABANDONED にした期間の次の起動で、Runner がその期間を流さずに次の期間を流す。
+- **JobExecution のない JobInstance**：JobExecution のない JobInstance を置いた期間の次の起動で、Runner が終了コード 1 で終わり、後の期間を流さない（[止まった期間を直す](runbook-stuck-period.md#jobexecution-のない-jobinstance-を消す)）。
 - **2 つのテナントの分離**：2 つのテナントの行を置き、各テナントの結果に、ほかのテナントの行が入らない。
   1 つのテナントの partition を失敗させても、もう 1 つのテナントの partition は COMPLETED になる。
   テナントを 1 つ足してから再開しても、失敗したテナントの partition は同じテナントのまま再開する。
 - **同時に 2 本**：同じ期間を 2 つのスレッドで同時に起動し、業務の表の結果が 1 本だけ流したときと同じになる。
-  2 本目が止まるかどうかは確かめない（[冪等性と再開](idempotency-and-restart.md#二重の起動)）。
+  2 本目が止まるかどうかは確かめない（[冪等性と再開](job-entry.md#二重の起動)）。
 
 ## 性能テスト
 

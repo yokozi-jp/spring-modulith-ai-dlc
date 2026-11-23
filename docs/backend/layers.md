@@ -86,7 +86,7 @@ Job を持つ機能モジュールだけが `batch` を持つ。
 - **[`<Job>ItemWriter`](class-roles/item-writer.md)**：chunk の 1 件ごとに Command を作り、CommandHandler を 1 つ呼ぶ。
 - **[`<Job>Tasklet`](class-roles/tasklet.md)**：chunk にしない 1 単位の処理で Command を作り、CommandHandler を 1 つ呼ぶ。
 
-Step はトランザクションを持たず、トランザクション境界は ItemWriter と Tasklet が呼ぶ CommandHandler の `handle` に置く（[バッチのトランザクション、ロール、テナント](../batch/transaction-and-tenant.md)）。
+Batch はトランザクション境界を持たず、ItemWriter と Tasklet が呼ぶ CommandHandler の `handle` の境界を使う（[バッチのトランザクション、ロール、テナント](../batch/transaction-and-tenant.md#トランザクションとロール)）。
 Batch は Domain と Infrastructure に依存させない。
 
 ## Infrastructure

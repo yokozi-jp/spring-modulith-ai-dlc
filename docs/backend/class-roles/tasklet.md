@@ -8,7 +8,7 @@ tags: [convention, backend, class-role, batch]
 # クラスの役割：Tasklet
 
 `<Job>Tasklet` は、chunk にしない 1 単位の処理として、自分のモジュールの CommandHandler を 1 つだけ呼ぶ Spring Batch の Tasklet であり、Job を持つ機能モジュールの `batch` に package-private で置く。
-トランザクションは CommandHandler の `handle` が開き、Tasklet と Step はトランザクションを持たない。
+トランザクションは CommandHandler の `handle` が開き、Tasklet はトランザクションを持たない。
 Job の規則は [バッチ](../../batch/index.md) に、役割の決定理由は [ADR-115](../../adr/ADR-115-build-business-batches-with-spring-batch.md) に示す。
 
 ## 定義

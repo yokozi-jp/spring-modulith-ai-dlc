@@ -32,12 +32,14 @@ Step の中で DB への接続を並列にせず、並列にするときは part
 ## テナントごとの partition
 
 - テナントの業務の表を書く Job は、Step を `Partitioner` でテナントごとの partition に分ける。
-- テナントの一覧は、`tenancy` の `<Feature>Queries` の、全テナントを返すメソッドで読む。
+- テナントの一覧は、`tenancy` の `<Feature>Queries` の、全テナントの `public_id` を返すメソッドで読む。
+  このメソッドは、テナントの業務の表を書く Job と同じ変更で足す（[#667](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/667)）。
 - partition の名前はテナントの `public_id` にし、連番にしない。
 - 各 partition の ExecutionContext に、テナントの `public_id` を置く。
-- ItemReader の `read`、ItemWriter の `write`、Tasklet の `execute` の間は、`shared.batch` の Aspect が partition のテナントを `TenantContext` に束縛する。
+- ItemReader の `read`、ItemWriter の `write`、Tasklet の `execute` の間は、`shared.batch` の `TenantPartitionAspect` が partition のテナントを `TenantContext` に束縛する。
   ItemReader、ItemWriter、Tasklet は、自分でテナントを束縛しない。
-- Aspect は、ExecutionContext にテナントがない Step の呼び出しを `IllegalStateException` で拒否する。
+- Aspect は、StepExecution の ExecutionContext にテナントがある Step の呼び出しだけを束縛し、テナントがない Step（テナントを持たない Job）は束縛せずに流す。
+  テナントの業務の表を書く Step を partition にし忘れても、トランザクションマネージャーがテナントを束縛しない業務のトランザクションを始めないので、テナントなしでは書けない（[PostgreSQLのマルチテナント設計](../database/postgresql-multitenancy.md#テナントの設定)）。
 - 1 つのテナントの partition が失敗しても、ほかのテナントの partition は流れ、Job は FAILED で終わる。
   再開では、COMPLETED でない partition だけが流れる。
 

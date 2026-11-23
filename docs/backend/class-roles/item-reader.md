@@ -67,9 +67,9 @@ ItemReader は、Job を起動する結合テストで確かめる。
 
 ## アンチパターン
 
-- Spring Batch の JDBC の reader で、業務のスキーマを読む（理由は [ADR-115](../../adr/ADR-115-build-business-batches-with-spring-batch.md) の「置き場所」）。
+- Spring Batch の JDBC の reader で、業務のスキーマを読む（理由は [ADR-115 の Decision](../../adr/ADR-115-build-business-batches-with-spring-batch.md#decision)）。
 - `infrastructure.persistence` に reader を置き、jOOQ で読む。
-- 処理済みの列で絞らず、読んだ位置を ExecutionContext に保存して再開する（理由は ADR-115 の「再開と失敗」）。
+- 処理済みの列で絞らず、読んだ位置を ExecutionContext に保存して再開する（理由は [ADR-115 の Decision](../../adr/ADR-115-build-business-batches-with-spring-batch.md#decision)）。
 - 未処理の行を毎回先頭から読み、前に読んだキーより後から読まない。
 
 ## 作成時のチェックリスト

@@ -1,7 +1,7 @@
 ---
 type: Architecture
 title: バックエンドアーキテクチャ
-description: Package by feature とオニオンアーキテクチャによるバックエンドの構造を説明する。機能モジュールのパッケージ構成とクラスの役割名、モジュールルートの公開契約、依存方向、モジュール間の連携、共有モジュール shared の範囲、ベースパッケージ直下の全体設定を確認するときに読む。
+description: Package by feature とオニオンアーキテクチャによるバックエンドの構造を説明する。機能モジュールのパッケージ構成とクラスの役割名、モジュールルートの公開契約、依存方向、モジュール間の連携、ベースパッケージ直下の全体設定を確認するときに読む。
 tags: [architecture, backend, spring-modulith]
 ---
 
@@ -43,8 +43,9 @@ backend/src/main/java/com/example/demo/
 │   ├── package-info.java
 │   ├── batch/
 │   │   ├── package-info.java
+│   │   ├── CatchUpJobRunner.java
 │   │   ├── JobPeriodRule.java
-│   │   └── <追いつきの Runner とテナントを束縛する Aspect>.java
+│   │   └── TenantPartitionAspect.java
 │   ├── concurrency/
 │   │   ├── package-info.java
 │   │   ├── ConflictException.java
@@ -164,46 +165,8 @@ Domain の型、Command と Result、Spring MVC の Request と Response、jOOQ 
 
 ## 共有モジュール shared
 
-`com.example.demo.shared` は、機能モジュールではない唯一の技術的な共有モジュールである。
-`@Modulithic(sharedModules = "shared")` で Spring Modulith の shared モジュールにし、決定は [ADR-048](../adr/ADR-048-add-shared-module-for-jooq-common-code.md) に示す。
-
-- jOOQ の共通処理を `shared.infrastructure.persistence` に置き、このパッケージを `@NamedInterface` で公開する。
-  業務テーブルの INSERT と UPDATE を組み立てて実行する唯一の入口である `TableWriter` もここに置く（[ADR-054](../adr/ADR-054-detect-optimistic-lock-conflicts-by-update-count.md)）。
-- Spring Modulith のイベント出版のレジストリの、失敗した出版の定期の再投入（`EventPublicationResubmitter`）と手での 1 回の再投入（`EventPublicationResubmitOnce`）も `shared.infrastructure.persistence` に置く（[ADR-079](../adr/ADR-079-resubmit-failed-event-publications-periodically-with-shedlock.md)）。
-  レジストリは全モジュールが共有する基盤で業務の概念を持たず、jOOQ を使う処理は `infrastructure.persistence` に置くためである。
-  `EventPublicationResubmitOnce` 以外のクラスは package-private にし、他のモジュールから使えないようにする。
-  `EventPublicationResubmitOnce` は、他のモジュールの結合テストがリスナーの回復を確かめるため public にする。
-- 楽観的ロックの語彙（`ConflictException`、`ExpectedLockNo`、`VersionedCommand`）を `shared.concurrency` に置き、このパッケージも `@NamedInterface("concurrency")` で公開する。
-- 業務上の失敗の例外（`NotFoundException`、`BusinessRuleViolationException`）を `shared.failure` に置き、このパッケージも `@NamedInterface("failure")` で公開する（[ADR-062](../adr/ADR-062-map-business-exceptions-to-404-409-422.md)）。
-  `shared` は Spring Web、Spring の HTTP、Servlet の型に依存しない。
-  `shared` は Domain と `error` の型、ルートパッケージの型に依存しない。
-- リスナーが失敗した出版の再投入の方針を選ぶ注釈（`ResubmissionPolicy`）を `shared.events` に置き、このパッケージも `@NamedInterface("events")` で公開する（[ADR-079](../adr/ADR-079-resubmit-failed-event-publications-periodically-with-shedlock.md)）。
-- 共通カラムの `*_by` に登録するアプリの利用者を表す認証の principal（`AppUserPrincipal`）を `shared.security` に置き、このパッケージも `@NamedInterface("security")` で公開する（[ADR-096](../adr/ADR-096-require-app-user-principal-for-audit-columns.md)）。
-  テナントを選ぶ前の拒否を表す `TenantNotSelectedException` もここに置き、`tenancy` が投げて `error` が専用の type の 403 にする（[ADR-101](../adr/ADR-101-keep-tenants-and-roles-in-app-database.md)）。
-  この例外はテナントの ID も役割も持たず、ログインの状態（テナントをまだ選んでいないこと）だけを表すため、`AppUserPrincipal` と同じく認証の語彙として扱い、次の項目の業務の概念に含めない。
-  テナント、所属、役割の値と規則は `tenancy` に置く。
-- 操作しているテナントの語彙を `shared.tenant` に置き、このパッケージも `@NamedInterface("tenant")` で公開する（[ADR-105](../adr/ADR-105-bind-tenant-to-request-and-event-context.md)）。
-  置く型は、テナントの `public_id` を包む `TenantId`、テナントを運ぶイベントの型 `TenantScoped`、呼び出しの間だけテナントを `ScopedValue` に束縛する `TenantContext` である。
-  `TenantId` は `tenancy` の `domain.model` も使い、テナントの ID を表す型を 1 つにする。
-  `TenantContext.call` で束縛を切り替えてよいのは、リクエストの filter（`tenancy` の `TenantSelectionFilter`）、`TenantListenerAspect`、`shared.batch` のテナントを束縛する Aspect だけである。
-  テナントの値と規則は `tenancy` に置き、`shared.tenant` は、どのテナントを操作しているかを運ぶ語彙だけを持つ。
-- 業務のバッチの追いつきの Runner、テナントを束縛する Aspect、Job の期間の規則（`JobPeriodRule`）を `shared.batch` に置き、このパッケージも `@NamedInterface("batch")` で公開する（[ADR-115](../adr/ADR-115-build-business-batches-with-spring-batch.md)）。
-  Runner と Aspect は 1 つずつで、すべての Job が共有する。
-  `JobPeriodRule` 以外のクラスは package-private にする。
-  規則は [バッチ](../batch/index.md) に従う。
-- 業務の概念を置かない。
-  ルートのパッケージには `package-info.java` だけを置く。
-- `shared.infrastructure.persistence` を使ってよいのは、他のモジュールの `infrastructure.persistence` だけである。
-  `shared.batch` を使ってよいのは、機能モジュールの `batch` だけである。
-  `shared.concurrency`、`shared.failure`、`shared.events`、`shared.security`、`shared.tenant` は、どの層からも使える。
-
-使う場所の制限は、`PackageByFeatureOnionArchitectureTest` の `sharedModuleIsUsedOnlyByPersistenceAdapters` が検査する。
-ただし、`shared` の `PgmCdAspect` は、AOP で `<UseCase>CommandHandler` の `handle` と `<Event>Listener` の呼び出しを囲む（[ADR-051](../adr/ADR-051-bind-pgm-cd-with-scoped-value-and-aspect.md)）。
-`shared.infrastructure.persistence` の `TenantListenerAspect` も、`@ApplicationModuleListener` の呼び出しを囲み、イベントのテナントを束縛する（[ADR-105](../adr/ADR-105-bind-tenant-to-request-and-event-context.md)）。
-この呼び出しはクラスの依存にならないため、ArchUnit では検査できない。
-
-`shared` は機能モジュールではないため、「モジュール間の連携」の対象にならない。
-機能モジュールの間の連携は、`shared` があってもイベントと `<Feature>Queries` だけにする。
+`com.example.demo.shared` は、機能モジュールではない唯一の技術的な共有モジュールである（[ADR-048](../adr/ADR-048-add-shared-module-for-jooq-common-code.md)）。
+置くパッケージと型、使ってよい層、検査は [共有モジュール shared](shared-module.md) に示す。
 
 ## 依存方向
 
@@ -221,14 +184,15 @@ infrastructure.client ───────────────────�
 - `presentation.web` は `application` とモジュールルートに依存し、Domain には依存しない。
 - `application` は `domain.service`、`domain.model`、モジュールルートに依存する。
 - `domain.service` は `domain.model` に依存する。
-- `batch` は `application` の Command と CommandHandler、自分のモジュールのルート、`tenancy` のルート、`shared.batch` に依存し、Domain と Infrastructure に依存しない。
+- `batch` は `application` の Command、Result、CommandHandler、自分のモジュールのルート、`tenancy` のルート、`shared.batch` に依存し、Domain と Infrastructure に依存しない。
+  `batch` の依存方向はまだ ArchUnit で検査していない（[#667](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/667)、[バックエンドのアーキテクチャテスト](architecture-tests.md)）。
 - `infrastructure.persistence` と `infrastructure.client` は `domain.model` のインタフェースを実装し、`application`、`domain.service`、モジュールルートに依存しない。
 - `infrastructure.persistence` は `shared.infrastructure.persistence` に依存してよい。
   ほかの層は `shared.infrastructure.persistence` に依存しない。
-- どの層も、上の「どの層からも使える」パッケージに依存してよい。`error` の `presentation.web` も、4 つの例外を 403、404、409、422 にするために依存する。
+- どの層も、[共有モジュール shared](shared-module.md) の「どの層からも使える」パッケージに依存してよい。`error` の `presentation.web` も、4 つの例外を 403、404、409、422 にするために依存する。
 - モジュールルートの型は、標準型と同じルートの型のほかに、イベントが運ぶテナントの `shared.tenant.TenantId` と `shared.tenant.TenantScoped` だけに依存してよい。`TenantContext` には依存できない。
-- Domain と Application は、Presentation と Infrastructure に依存しない。
-- Presentation、Persistence、外部 Client は相互に依存しない。
+- Domain と Application は、Presentation、Batch、Infrastructure に依存しない。
+- Presentation、Batch、Persistence、外部 Client は相互に依存しない。
 
 ## モジュール間の連携
 
@@ -254,7 +218,7 @@ CommandHandler は `application` にあるため、他モジュールから呼�
 機能横断の API エラー契約は、`error` モジュールの `presentation.web` に置いている。
 
 複数の機能で似た処理が要るときも、処理は各機能内に置く。
-例外は、「共有モジュール shared」に示す jOOQ の共通処理と楽観的ロックの語彙と業務上の失敗の例外と、イベント出版の再投入とその方針の注釈だけである。
+例外は、[共有モジュール shared](shared-module.md) に示す jOOQ の共通処理と楽観的ロックの語彙と業務上の失敗の例外と、イベント出版の再投入とその方針の注釈と、業務のバッチの追いつきの Runner、テナントを束縛する Aspect、期間の規則だけである。
 
 ## 参照業務機能
 
@@ -274,6 +238,7 @@ CommandHandler は `application` にあるため、他モジュールから呼�
 - [ADR-048: jOOQ の共通処理を共有モジュール shared に置く](../adr/ADR-048-add-shared-module-for-jooq-common-code.md)
 - [ADR-050: バックエンドのクラスの役割と命名を定める](../adr/ADR-050-define-backend-class-roles-and-naming.md)
 - [バックエンドの層の責務](layers.md)
+- [共有モジュール shared](shared-module.md)
 - [バックエンドの Java 実装規約](java-coding.md)
 - [バックエンドのアーキテクチャテスト](architecture-tests.md)
 - [バックエンドの機能追加時の確認](runbook-add-feature.md)

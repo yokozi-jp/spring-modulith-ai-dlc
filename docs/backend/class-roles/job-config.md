@@ -8,7 +8,7 @@ tags: [convention, backend, class-role, batch]
 # クラスの役割：Job の設定
 
 `<Job>JobConfig` は、1 つの Spring Batch の Job と、その Step を Bean で定義する `@Configuration` であり、Job を持つ機能モジュールの `batch` に package-private で置く。
-Step には `transactionManager` と `transactionAttribute` を渡さず、業務の書き込みを ItemWriter と Tasklet が呼ぶ CommandHandler に任せる。
+業務の書き込みは ItemWriter と Tasklet が呼ぶ CommandHandler に任せ、Job の設定は Step の順、chunk、partition、retry だけを組み立てる。
 Job の規則は [バッチ](../../batch/index.md) に、役割の決定理由は [ADR-115](../../adr/ADR-115-build-business-batches-with-spring-batch.md) に示す。
 
 ## 定義
@@ -39,8 +39,8 @@ Job の設定は業務処理の置き場所ではない。
   期間で区切る Job は `period` を必須にする。
 - 期間で区切る Job は、`shared.batch` の `JobPeriodRule` を同じクラスの `@Bean` で定義する（[定時起動と追いつき](../../batch/scheduling-and-catch-up.md#期間の規則)）。
 - テナントの業務の表を書く Step は、テナントごとの partition にする（[トランザクション、ロール、テナント](../../batch/transaction-and-tenant.md#テナントごとの-partition)）。
-- retry は、[冪等性と再開](../../batch/idempotency-and-restart.md#retry-と失敗) の方針で `faultTolerant()` と `retryPolicy` に書き、`skipPolicy` を付けない。
-- `JobParametersIncrementer` を付けない。
+- retry と skip は、[冪等性と再開](../../batch/idempotency-and-restart.md#retry-と失敗) に従って書く。
+- `JobParametersIncrementer` を付けない（[ADR-115](../../adr/ADR-115-build-business-batches-with-spring-batch.md#decision)）。
 - クラスと `@Bean` のメソッドに Javadoc を書く。
 
 ## 依存してよい型、してはいけない型
@@ -82,7 +82,6 @@ Step closeMonth(
     final JobRepository jobRepository,
     final CloseMonthItemReader reader,
     final CloseMonthItemWriter writer) {
-  // transactionManager を渡さない。書き込みのトランザクションは CommandHandler の handle が開く。
   return new StepBuilder("ordering.CloseMonth.close", jobRepository)
       .<String, String>chunk(100)
       .reader(reader)
@@ -98,11 +97,8 @@ Job の設定は、Job を起動する結合テストで確かめる。
 
 ## アンチパターン
 
-- Step に `transactionManager` か `transactionAttribute` を渡し、`handle` を chunk のトランザクションに加える（[ADR-115](../../adr/ADR-115-build-business-batches-with-spring-batch.md) の選択肢3）。
 - Job や Step を `@Bean` にせず、メソッドの中で組み立てて起動する。
 - Job の設定に業務の条件分岐を書く。
-- `JobParametersIncrementer` を付ける。
-- `skipPolicy` を付けて、失敗した行を飛ばす。
 - partition の名前を連番にする。
 
 ## 作成時のチェックリスト
@@ -114,5 +110,5 @@ Job の設定は、Job を起動する結合テストで確かめる。
 - [ ] `JobParametersValidator` で必須の引数を検査する。［自分で点検］
 - [ ] 期間で区切る Job は、`JobPeriodRule` を `@Bean` で定義する。［自分で点検］
 - [ ] テナントの業務の表を書く Step を、テナントの `public_id` を名前にした partition にする。［自分で点検］
-- [ ] `JobParametersIncrementer` と `skipPolicy` を付けない。［自分で点検］
+- [ ] `JobParametersIncrementer` を付けず、skip を使わない。［自分で点検］
 - [ ] Job を起動する結合テストがある。［自分で点検］

@@ -9,7 +9,7 @@ tags: [convention, backend, class-role, batch]
 
 `<Job>ItemWriter` は、chunk の 1 件ごとに Command を作り、自分のモジュールの CommandHandler を 1 つだけ呼ぶ Spring Batch の ItemWriter である。
 Job を持つ機能モジュールの `batch` に package-private で置く。
-トランザクションは CommandHandler の `handle` が 1 件ごとに開き、ItemWriter と Step はトランザクションを持たない。
+トランザクションは CommandHandler の `handle` が 1 件ごとに開き、ItemWriter はトランザクションを持たない。
 Job の規則は [バッチの冪等性と再開](../../batch/idempotency-and-restart.md) に、役割の決定理由は [ADR-115](../../adr/ADR-115-build-business-batches-with-spring-batch.md) に示す。
 
 ## 定義

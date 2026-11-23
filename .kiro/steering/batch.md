@@ -7,9 +7,5 @@ description: 業務のバッチ（Spring Batch の Job、Step、ItemReader、Ite
 
 # バッチの docs への案内
 
-詳細は `docs/batch/index.md` から必要な文書だけ読み、クラスを作るときは `docs/backend/class-roles/index.md` の役割に従う。
-
-## 行動指針
-
-- 業務のバッチを作る前に、`docs/adr/ADR-115-build-business-batches-with-spring-batch.md` の決定を確かめる。
-- ItemWriter と Tasklet から呼ぶ CommandHandler を冪等にし、再開で同じ行が渡っても結果が変わらないことをテストで確かめる。
+詳細は `docs/batch/index.md` から必要な文書だけ読む。
+Job の設定、ItemReader、ItemWriter、Tasklet を作るときは、`docs/backend/class-roles/index.md` で役割を選び、その役割の文書のチェックリストで点検する。

@@ -45,11 +45,13 @@ tags: [convention, batch, spring-batch, scheduling, future-arch-guidelines]
 - 期間が締まる時刻は、期間の終わりの時刻に、締めるまで待つ時間を足した時刻である。
   期間の終わりの時刻は、次の期間の初日の 0 時を業務タイムゾーンで絶対時刻にしたものである。
 - `JobPeriodRule` がない Job は、期間で区切らない Job として扱う。
+  識別の引数は [ジョブの入口と起動](job-entry.md#識別の引数) に従う。
 
 ## 期間の後に届く行
 
 - Job が期間で行を選ぶ列は、期間が締まった後に、その期間の値を持つ行が増えない列にする。
-- 行を書いた時刻（`handle` が `Instant.now(clock)` で取った時刻）の列で選ぶときは、締めるまで待つ時間を、業務の書き込みの `handle` の最も長いトランザクションより長くする。
+- 行を書いた時刻（`handle` が `Instant.now(clock)` で取った時刻）の列で選ぶときは、締めるまで待つ時間を、業務の書き込みの `handle` の最も長いトランザクションと、インスタンスの間の時計のずれの上限を足した時間より長くする。
+  行を書くインスタンスと Runner を動かすインスタンスは別で、時計が同じ時刻を指すとは限らない。
 - 利用者や連携相手が渡す日時（過去の日付を持つ受信のファイルなど）で選ぶときは、次のどちらかを Job の設計書で決める。
   - 締まった期間の値を持つ行の書き込みを、CommandHandler が業務上の失敗の例外で拒否する。
   - 締まった期間の値を持つ行を、受け取った日の期間に入れる列を別に持ち、Job はその列で選ぶ。
@@ -60,10 +62,13 @@ tags: [convention, batch, spring-batch, scheduling, future-arch-guidelines]
 追いつきの Runner は、起動のたびに次の順で期間を流す。
 Runner の起動と終了は [ジョブの入口と起動](job-entry.md#追いつきの-runner-の起動) に従う。
 
-1. Job の最後の JobInstance を、`JobRepository` の `getLastJobInstance` で読む。
-2. 最後の JobInstance の最後の JobExecution が COMPLETED か ABANDONED なら、その次の期間を最初の期間にする。
-   それ以外なら、その JobInstance の期間を最初の期間にする。
-   JobInstance がなければ、`JobPeriodRule` の最初の期間にする。
+1. Job の最後の JobInstance を `JobRepository` の `getLastJobInstance` で読み、その最後の JobExecution を `getLastJobExecution` で読む。
+2. 最初の期間を次のとおり決める。
+   - JobInstance がなければ、`JobPeriodRule` の最初の期間にする。
+   - 最後の JobExecution が COMPLETED か ABANDONED なら、その JobInstance の次の期間にする。
+     ABANDONED は、運用者がその期間を Job で流さないと決めた印である。
+   - 最後の JobExecution がない（`getLastJobExecution` が `null` を返す）か、ほかの状態なら、その JobInstance の期間にする。
+     JobExecution のない JobInstance を流すと Spring Batch が `IllegalStateException` を投げ、Runner は終了コード 1 で終える（[止まった期間を直す](runbook-stuck-period.md)）。
 3. 最初の期間から、締まる時刻が起動した時刻（`Instant.now(clock)`）以前の最後の期間までを、古い順に 1 つずつ `super.execute` で流す。
 4. 流した期間の最後の JobExecution を JobRepository から読み、COMPLETED でなければそこで止める。
    残りの期間は次の起動で流す。
@@ -86,7 +91,7 @@ Runner の起動と終了は [ジョブの入口と起動](job-entry.md#追い�
 - 前回の起動で失敗した期間は、次の起動で追いつきの Runner が同じ引数で流し、Spring Batch が失敗した Step と chunk から再開する。
   手での再実行を前提にしない。
 - 失敗した期間が COMPLETED になるまで、それより後の期間を流さない。
-- 再開できない状態で止まった期間は、[冪等性と再開](idempotency-and-restart.md#止まった期間) に従って運用者が直す。
+- 再開できない状態で止まった期間は、[止まった期間を直す](runbook-stuck-period.md) の手順で運用者が直す。
 
 ## 出典
 
