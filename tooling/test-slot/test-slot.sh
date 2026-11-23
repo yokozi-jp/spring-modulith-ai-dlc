@@ -66,15 +66,23 @@ project_containers() {
     --format '{{.ID}}	{{.Label "com.docker.compose.project.working_dir"}}'
 }
 
+# 行ごとの ID（$1）を、$2 以降のコマンドの後ろに渡して docker を実行する。ID が無ければ何もしない。
+docker_remove() {
+  local ids="$1"
+  local -a args
+  shift
+  [ -z "$ids" ] || { mapfile -t args <<<"$ids"; docker "$@" "${args[@]}" >/dev/null; }
+}
+
 # 持ち主の worktree が消えた project の、コンテナ、volume、network を消す。
 reclaim() {
   local project="$1" ids
   echo "持ち主の worktree が無い $project のコンテナを回収します。" >&2
-  mapfile -t ids < <(project_containers "$project" | cut -f1)
-  [ "${#ids[@]}" -eq 0 ] || docker rm --force --volumes "${ids[@]}" >/dev/null
+  ids="$(project_containers "$project" | cut -f1)"
+  docker_remove "$ids" rm --force --volumes
   for kind in volume network; do
-    mapfile -t ids < <(docker "$kind" ls -q --filter "label=com.docker.compose.project=$project")
-    [ "${#ids[@]}" -eq 0 ] || docker "$kind" rm "${ids[@]}" >/dev/null
+    ids="$(docker "$kind" ls -q --filter "label=com.docker.compose.project=$project")"
+    docker_remove "$ids" "$kind" rm
   done
 }
 
