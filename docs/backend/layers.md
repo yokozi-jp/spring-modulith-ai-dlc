@@ -1,13 +1,13 @@
 ---
 type: Architecture
 title: バックエンドの層の責務
-description: 機能モジュール内の Domain、Application、Presentation、Infrastructure に置くクラスの役割と、トランザクション境界の置き場所を説明する。クラスをどの層のどの役割にするか決めるとき、トランザクション境界やイベントの発行と受信の置き場所を確かめるときに読む。
+description: 機能モジュール内の Domain、Application、Presentation、Batch、Infrastructure に置くクラスの役割と、トランザクション境界の置き場所を説明する。クラスをどの層のどの役割にするか決めるとき、トランザクション境界やイベントの発行と受信の置き場所を確かめるときに読む。
 tags: [architecture, backend, onion-architecture]
 ---
 
 # バックエンドの層の責務
 
-機能モジュールの内部は、内側の Domain と Application、外側の Presentation と Infrastructure に分ける。
+機能モジュールの内部は、内側の Domain と Application、外側の Presentation、Batch、Infrastructure に分ける。
 内側の層は外側の実装へ依存させない。
 トランザクション境界は、Application の CommandHandler の `handle`、QueryService の public メソッド、Listener の `on` に置く。
 層の間で許可する依存方向は [バックエンドアーキテクチャ](architecture.md) の「依存方向」に示し、役割の決定理由は [ADR-050](../adr/ADR-050-define-backend-class-roles-and-naming.md) に示す。
@@ -73,6 +73,21 @@ HTTP からの入力と出力を扱う外側の領域を **Presentation** とす
 - **認証のアダプター**：Spring Security の拡張点を実装するクラスは、その機能モジュールの `presentation.web` に置く（`tenancy` の `SignInOidcUserService`）。Command を作って CommandHandler を呼ぶ。OIDC ログインの `OAuth2UserService<OidcUserRequest, OidcUser>` は、Spring Security がこの型の Bean が 1 つだけあればそれを使うため、`SecurityConfig` で配線しない。認証の入口や拒否の handler など、ほかの拡張点は `SecurityConfig` で配線する。
 
 Presentation は Domain と Infrastructure に依存させない。
+
+## Batch
+
+業務のバッチの Job を Spring Batch で動かす外側の領域を **Batch** とする。
+Job を持つ機能モジュールだけが `batch` を持つ。
+
+`batch` には次の型を置く。
+
+- **[`<Job>JobConfig`](class-roles/job-config.md)**：Job と Step を Bean で定義する。
+- **[`<Job>ItemReader`](class-roles/item-reader.md)**：処理する行を自分のモジュールの `<Feature>Queries` から読む。
+- **[`<Job>ItemWriter`](class-roles/item-writer.md)**：chunk の 1 件ごとに Command を作り、CommandHandler を 1 つ呼ぶ。
+- **[`<Job>Tasklet`](class-roles/tasklet.md)**：chunk にしない 1 単位の処理で Command を作り、CommandHandler を 1 つ呼ぶ。
+
+Batch はトランザクション境界を持たず、ItemWriter と Tasklet が呼ぶ CommandHandler の `handle` の境界を使う（[バッチのトランザクション、ロール、テナント](../batch/transaction-and-tenant.md#トランザクションとロール)）。
+Batch は Domain と Infrastructure に依存させない。
 
 ## Infrastructure
 

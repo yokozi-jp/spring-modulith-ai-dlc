@@ -36,6 +36,9 @@ RLS のポリシーは、トランザクションに設定したテナントの�
 同じ実装で、`findCurrent()` を呼べるクラスをトランザクションマネージャーに限る検査を足し、Consequences の本物の流れでの確認を、それを確かめるテストに書き換えた。
 トランザクションマネージャーが #377 でリスナーのトランザクションにテナントを設定するようになり、確認を置く先が決まったからである。
 
+[ADR-115](ADR-115-build-business-batches-with-spring-batch.md) が、業務のバッチの partition のテナントを `shared.batch` の Aspect で束縛するとしたので、`TenantContext.call` を呼んでよいクラスを 3 つに書き直した。
+バッチの partition にはセッションもイベントもなく、テナントは partition の ExecutionContext が運ぶためである。
+
 ## Decision
 
 操作しているテナントの `public_id` を、`shared.tenant` の `ScopedValue` に束縛する。
@@ -56,9 +59,10 @@ RLS のポリシーは、トランザクションに設定したテナントの�
   引数が `TenantScoped` でなければ、`IllegalStateException` で拒否する。
 - テナントを持つイベントは、`TenantScoped` を実装し、`TenantId` の項目を持つ。イベントを発行する CommandHandler は `TenantContext.current()` を詰める。
   `@ApplicationModuleListener` の引数のイベントが `TenantScoped` を実装することを、ArchUnit の `moduleListenerEventsAreTenantScoped` で検査する。
-- `TenantContext.call` を呼んでよいのは、`tenancy` の `TenantSelectionFilter` と `TenantListenerAspect` の 2 つだけである。
+- `TenantContext.call` を呼んでよいのは、`tenancy` の `TenantSelectionFilter`、`TenantListenerAspect`、業務のバッチの partition のテナントを束縛する `shared.batch` の Aspect（[ADR-115](ADR-115-build-business-batches-with-spring-batch.md)）の 3 つだけである。
   ほかのクラスが呼ぶと、認証の権限やイベントに無関係なテナントへ切り替えられるため、ArchUnit の `tenantIsBoundOnlyByTenantSelectionFilterAndListenerAspect` で検査する。
   メソッド参照も検出する。filter を別のモジュールに足すときも、この規則の許可先とこの ADR を先に変える。
+  `shared.batch` の Aspect を規則の許可先に足すのは、Aspect を作る [#667](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/667) である。
 - ArchUnit の `moduleApiDoesNotExposeInternalTypes` は、モジュールルートの型が依存してよい型に、`shared.tenant.TenantId` と `shared.tenant.TenantScoped` の 2 つだけを足す。イベントがこの 2 つを使うためで、`TenantContext` には依存させない。
 
 DB のロールとテナントの設定は、トランザクションマネージャーが `TenantContext` を読んで行う（ADR-107）。

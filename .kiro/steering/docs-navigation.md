@@ -25,6 +25,7 @@ steering は入口の案内だけを持ち、規約の本文を持たない（[A
 | データベース（マイグレーション、jOOQ、接続、PostgreSQL 設計） | `docs/database/index.md`         |
 | Web API（HTTP API の設計と契約）                              | `docs/web-api/index.md`          |
 | システム連携と非同期処理                                      | `docs/integration/index.md`      |
+| バッチ（Spring Batch の Job、追いつき、再開）                 | `docs/batch/index.md`            |
 | 可観測性とログ                                                | `docs/observability/index.md`    |
 | 日時とタイムゾーン                                            | `docs/datetime/index.md`         |
 | コンテナ（Dockerfile、Compose）                               | `docs/container/index.md`        |
