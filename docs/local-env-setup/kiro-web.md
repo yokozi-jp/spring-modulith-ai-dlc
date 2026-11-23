@@ -1,7 +1,7 @@
 ---
 type: Runbook
 title: Kiro Web の開発環境
-description: Kiro Web のサンドボックスで、ローカルと同じ Task、検査、テスト、開発用の依存、E2E、DAST を実行する手順と、Agent Config の iwe の設定、サンドボックス固有の制約。Kiro Web でタスクやテストを実行する前、サンドボックスで道具やコンテナが動かないとき、`task` や `docker` が見つからない、`gh` が mise のエラーで止まるなどの症状が出たとき、iwe の MCP サーバーが接続しないときに読む。
+description: Kiro Web のサンドボックスで、ローカルと同じ Task、検査、テスト、開発用の依存、E2E、DAST を実行する手順と、Agent Config の iwe の設定、サンドボックス固有の制約、`/thermos` の代わりに `run_workflow` でレビューする手順。Kiro Web でタスクやテストを実行する前、Pull Request をレビューするとき、サンドボックスで道具やコンテナが動かないとき、`task` や `docker` が見つからない、`gh` が mise のエラーで止まるなどの症状が出たとき、iwe の MCP サーバーが接続しないときに読む。
 tags: [runbook, setup, kiro-web, mise, podman]
 ---
 
@@ -112,6 +112,20 @@ Agent Config > Powers & MCP の `iwe` を、次の手順で `.kiro/settings/mcp.
   長い Task には `timeout` を付ける。
 - `task dev` の backend の `/actuator/health` は、認証なしでは 401 を返す。
   起動の待ち合わせでは、応答があることを条件にする。
+
+## レビューを実行する
+
+Kiro Web のセッションには `invoke_sub_agent` が無く、[RGDD の開発フロー](../agents/rgdd.md)のフェーズ4の `/thermos` はサブエージェントを起動できない。
+代わりに `run_workflow` で `bundled://semantic-review-multi-model` を起動する。
+この recipe は、異なるモデルの2人の reviewer を並列に動かし、`<workdir>/.agents/reviews/` に1つの指摘一覧を書く。
+
+- `target` に、レビューする Pull Request のブランチと `main` の差分、`.kiro/.kiro-plugins-installed` に載るファイルを対象外にすること、重点を置くファイルを書く。
+- `workdir` にリポジトリのルートを渡す。`.agents/reviews/` の報告はコミットしない。
+- 2人の reviewer は `/thermos` の2観点（正しさとセキュリティ、保守性）に分かれない。同じ差分を独立に読み、結果を1つにまとめる。保守性の観点は `target` に書いて伝える。
+- 規約への照らし合わせは `/thermos` と同じく、起動したセッションで [レビュー観点と参照する規約](../code-review/review-viewpoints.md) に従って行い、同じ一覧に加える。
+
+この手順は上流（`yokozi-jp/cursor-plugins`）が `thermos` と `kiro-adapter` に `run_workflow` 経路を足すまでの暫定である。
+取り込んだら、固定コミットを [スキルの取得元と更新](../agents/skill-sources.md) に従って更新し、この節を消す。
 
 ## 版を上げるとき
 
