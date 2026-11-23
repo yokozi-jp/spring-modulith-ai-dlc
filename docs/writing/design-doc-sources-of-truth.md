@@ -37,7 +37,7 @@ API の契約は OpenAPI、テーブル定義は Liquibase の changeset、区�
 - 処理の目的、処理の流れ、計算式、条件分岐の業務ルール。
 - 複数項目の組み合わせや DB の参照が必要な入力検証の業務ルール。
 - 区分値を導入した目的と、区分値で分岐する業務ルール。
-- テーブルの保持期限は、[PostgreSQL のパーティションと改廃](../database/postgresql-partitioning-and-retention.md)の保持期限の一覧に書く。
+- テーブルの保持期限は、[テーブルごとの保持期限と個人情報の有無の一覧](../database/table-retention-and-personal-data.md)に書く。
 - テーブルが個人情報を含むかどうかは、保持期限と同じ一覧に書く。
 
 ## 正本から作る補足

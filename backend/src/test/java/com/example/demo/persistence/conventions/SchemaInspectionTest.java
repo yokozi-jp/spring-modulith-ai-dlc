@@ -5,11 +5,17 @@ import static org.assertj.core.api.Assertions.assertThat;
 import com.example.demo.DemoApplication;
 import com.example.demo.shared.infrastructure.persistence.ModuleRoles;
 import com.example.demo.testkit.DatabaseTest;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.TreeSet;
 import java.util.function.Function;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import org.jooq.DSLContext;
 import org.junit.jupiter.api.DisplayName;
@@ -26,6 +32,10 @@ import org.springframework.modulith.core.ApplicationModules;
  */
 @DatabaseTest
 class SchemaInspectionTest {
+
+  /** テーブルごとの保持期限と個人情報の有無の一覧。{@code backend}をカレントにして実行する。 */
+  private static final Path RETENTION_DOCUMENT =
+      Path.of("../docs/database/table-retention-and-personal-data.md");
 
   /** アプリロールで接続したjOOQのコンテキスト。 */
   @Autowired private DSLContext dsl;
@@ -75,6 +85,26 @@ class SchemaInspectionTest {
                         .map(module -> module.getIdentifier().toString())
                         .filter(ModuleRoles.MODULES::contains)
                         .collect(Collectors.toSet())));
+  }
+
+  @Test
+  @DisplayName("テーブルは保持期限と個人情報の一覧に載っている")
+  void everyTableIsListedInRetentionDocument() throws IOException {
+    final Set<String> actual =
+        SchemaCatalog.read(dsl, migrationRole).relations().stream()
+            .filter(CatalogSnapshot.RelationRow::isTable)
+            .filter(row -> !"liquibase".equals(row.schema()))
+            .map(row -> row.schema() + "." + row.name())
+            .collect(Collectors.toCollection(TreeSet::new));
+    final Matcher listed =
+        Pattern.compile("^\\| `([a-z_]+\\.[a-z_]+)`\\s*\\|", Pattern.MULTILINE)
+            .matcher(Files.readString(RETENTION_DOCUMENT));
+    final Set<String> documented = new TreeSet<>();
+    while (listed.find()) {
+      documented.add(listed.group(1));
+    }
+
+    assertThat(documented).as("%s の「保持期限と個人情報」の行", RETENTION_DOCUMENT).isEqualTo(actual);
   }
 
   @Test

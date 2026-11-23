@@ -248,6 +248,8 @@ tasks.named('test') {
     inputs.dir(layout.projectDirectory.dir('../docker/initdb')).withPropertyName('testInitdb')
     // 決済代行の結合テストは docker/wiremock のスタブを読むため、スタブを変えたらテストをやり直す。
     inputs.dir(layout.projectDirectory.dir('../docker/wiremock')).withPropertyName('wiremockStubs')
+    // SchemaInspectionTest は保持期限の一覧を読むため、一覧を変えたらテストをやり直す。
+    inputs.file(layout.projectDirectory.file('../docs/database/table-retention-and-personal-data.md')).withPropertyName('retentionDocument')
     // -PopenapiExport=true のときだけ、OpenApiContractTest に契約を書き出させる（ADR-064）。
     // 契約だけを再生成するときは --tests com.example.demo.OpenApiContractTest で絞る（ADR-085）。
     // 出力に宣言しないと、build cache の復元時に契約が書かれず、drift 検査が素通りになる。
