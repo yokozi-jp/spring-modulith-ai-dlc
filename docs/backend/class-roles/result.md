@@ -8,7 +8,7 @@ tags: [convention, backend, class-role]
 # クラスの役割：Result
 
 `<UseCase>Result` は、CommandHandler の `handle` が返すユースケースの出力の record か、許可された型がすべて record の sealed interface であり、`application` に置く。
-CommandHandler ごとに必ず一つ作り、少なくとも状態を変えた集約の ID を持つ。
+CommandHandler ごとに必ず一つ作り、状態を変えた集約があるときは、その ID を持つ。
 Controller は Result の ID から、作成したリソースの `Location` を作る。
 役割の決定理由は [ADR-050](../../adr/ADR-050-define-backend-class-roles-and-naming.md) に示す。
 
@@ -41,8 +41,9 @@ Result は集約を返す手段でもない。
 - `@Nullable` の component で場合を表さない。
   場合ごとに record を作る。
 - アノテーションを付けない。
-- component は Java の標準型だけにし、少なくとも状態を変えた集約の ID を持つ。
-- 返す値がないユースケースも `handle` を `void` にせず、ID だけの Result を返す。
+- component は Java の標準型だけにし、状態を変えた集約があるときは、その ID を持つ。
+  何も変えなかった場合（`NotCharged`）は、component を持たなくてよい。
+- 返す値がないユースケースも `handle` を `void` にせず、ID だけの Result か、場合を表す Result を返す。
 - ID 以外の component は、呼び出し元が処理の続きで使う値だけにする。
 - record に Javadoc を書く。
 - `application` のパッケージの `package-info.java` は Command と共有する。
@@ -147,7 +148,7 @@ ArchUnit が形を検査し、この record を使う側のテストが中身を
 - [ ] record の component に `@Nullable` を付けない。［ArchUnit で検査：ClassRoleArchTest.resultComponentsAreNotNullable］
 - [ ] CommandHandler の `handle` の戻り値の型にする。［ArchUnit で検査：ClassRoleArchTest.commandHandlersExposeOnlyTransactionalHandle］
 - [ ] 名前を Command と同じ `<UseCase>` に `Result` を付けた形にする。［自分で点検］
-- [ ] component は Java の標準型だけにし、状態を変えた集約の ID を持つ。［自分で点検］
+- [ ] component は Java の標準型だけにし、状態を変えた集約があるときは、その ID を持つ。［自分で点検］
 - [ ] アノテーションを付けない。［自分で点検］
 - [ ] record に Javadoc を書く。［自分で点検］
 - [ ] `application` のパッケージに `@NullMarked` の `package-info.java` がある。［Error Prone で検査：RequireExplicitNullMarking］
