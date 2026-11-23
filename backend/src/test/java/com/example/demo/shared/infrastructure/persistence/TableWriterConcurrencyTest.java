@@ -27,6 +27,7 @@ import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.regex.Pattern;
 import javax.sql.DataSource;
+import org.awaitility.core.ConditionTimeoutException;
 import org.jooq.Condition;
 import org.jooq.DSLContext;
 import org.jooq.Record;
@@ -282,9 +283,16 @@ class TableWriterConcurrencyTest {
                                         .eq(DSL.currentCatalog()))))
                     .as("行ロックを待つセッションの数（期限 %s）", WAIT_DETECTION_LIMIT)
                     .isPositive());
-      } finally {
-        sessionB.commit();
+      } catch (ConditionTimeoutException awaitFailure) {
+        // B のコミットの失敗が、待ちの失敗（期限と最後に観測した数）を覆い隠さないよう、抑制した例外として付ける。
+        try {
+          sessionB.commit();
+        } catch (SQLException commitFailure) {
+          awaitFailure.addSuppressed(commitFailure);
+        }
+        throw awaitFailure;
       }
+      sessionB.commit();
     }
   }
 
