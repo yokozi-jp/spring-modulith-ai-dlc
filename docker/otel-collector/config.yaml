@@ -38,13 +38,14 @@ processors:
     limit_percentage: 80
     spike_limit_percentage: 25
   transform/log_attributes:
+    error_mode: ignore
     log_statements:
       # ログ属性の allowlist。属性を足すときは docs/observability/conventions.md と同じ変更で直す。
       - keep_keys(log.attributes, ["exception.type", "exception.message", "exception.stacktrace", "http.response.status_code", "conflict.kind", "tenant.id", "user.id", "event_publication.id", "event_publication.event_type", "event_publication.listener_id", "event_publication.completion_attempts", "event_publication.resubmitted.count", "event_publication.exhausted.count", "event_publication.completed.count", "event_publication.incomplete.count", "event_publication.remaining.count"])
   # faro receiver の logfmt 本文を解析し、型と値を検証した record だけへ Collector 内部の印を付ける。
   transform/frontend_validate:
-    # 型が違う record では Len や IsMatch が nil に対して失敗するのが通常の経路で、record ごとに warn が出る。
-    # 失敗した文は属性を付けず、frontend.accepted が付かない record は filter が捨てるので、ここだけ silent にする。
+    # 型が違う record では Len が nil に対して失敗するのが通常の経路で、record ごとに warn が出る。
+    # 失敗した文は属性を付けず、frontend.accepted が付かない record は filter が捨てるので silent にする。
     error_mode: silent
     log_statements:
       - delete_key(log.attributes, "frontend.accepted")
@@ -115,7 +116,7 @@ processors:
       - keep_keys(log.attributes, ["telemetry.signal", "exception.type", "exception.message", "exception.stacktrace", "view.name", "measurement.type", "measurement.name", "measurement.value", "session.id"])
   # webhook_event の本文（application/reports+json の配列の文字列）を解析する。解析できなければ文字列のまま残り、検証で捨てる。
   transform/frontend_csp_parse:
-    # ignore にすると、JSON でない本文を送るたびに、送り手が書いた先頭の 1 文字を含む warn が出る。誰でも送れるので silent にする。
+    # ignore にすると、JSON でない本文を送るたびに、送り手が書いた文字を含む warn が出る。誰でも送れるので silent にする。
     error_mode: silent
     log_statements:
       - set(log.body, ParseJSON(log.body)) where IsString(log.body)
@@ -136,7 +137,8 @@ processors:
   # 検証済みの報告から固定本文と最終属性を作る。文書の URL は残さず、blockedURL は origin か scheme かキーワードまで縮約する。
   # 属性を足すときは docs/observability/conventions.md と同じ変更で直す。
   transform/frontend_csp:
-    # sourceFile のない報告では source_match の文が失敗するのが通常の経路で、report ごとに warn が出る。報告の属性は残さない側に倒れるので、ここだけ silent にする。
+    # blockedURL や sourceFile のない報告では、nil に対する Len、ExtractPatterns、ConvertCase が失敗するのが通常の経路で、報告ごとに warn が出る。
+    # 失敗した文は属性を付けない側に倒れるので silent にする。
     error_mode: silent
     log_statements:
       - set(log.cache["blocked"], log.body["body"]["blockedURL"]) where IsString(log.body["body"]["blockedURL"]) and Len(log.body["body"]["blockedURL"]) <= 8192
