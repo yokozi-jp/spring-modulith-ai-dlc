@@ -68,13 +68,12 @@ class OrderTest {
   void draftRejectsMissingProduct() {
     final ProductId missing = new ProductId(UUID.randomUUID());
 
-    assertThatThrownBy(
-            () ->
-                Order.draft(
-                    "C-0001",
-                    List.of(new OrderedItem(missing, new Quantity(1))),
-                    OFFERS,
-                    Instant.now(CLOCK)))
+    assertThatThrownBy(() ->
+            Order.draft(
+                "C-0001",
+                List.of(new OrderedItem(missing, new Quantity(1))),
+                OFFERS,
+                Instant.now(CLOCK)))
         .isInstanceOf(BusinessRuleViolationException.class)
         .hasMessageStartingWith("product not found: orderId=")
         .hasMessageContaining("productId=" + missing.value());

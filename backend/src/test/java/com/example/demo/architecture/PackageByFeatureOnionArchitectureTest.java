@@ -54,13 +54,16 @@ class PackageByFeatureOnionArchitectureTest {
   /** Domain のパッケージのパターン。 */
   private static final String DOMAIN_PACKAGE = "..domain..";
 
+  /** Domain Model のパッケージ。 */
+  private static final String DOMAIN_MODEL_PACKAGE = "..domain.model..";
+
   /**
    * Domain の外部システムのインタフェース。{@code domain.model} の interface のうち、Repository、アノテーション、{@code
    * package-info} 以外。
    */
   /* package */ static final DescribedPredicate<JavaClass> EXTERNAL_SYSTEM_INTERFACE =
       INTERFACES
-          .and(resideInAPackage("..domain.model.."))
+          .and(resideInAPackage(DOMAIN_MODEL_PACKAGE))
           .and(not(simpleNameEndingWith("Repository")))
           .and(not(ANNOTATIONS))
           .and(not(simpleName("package-info")));
@@ -149,7 +152,7 @@ class PackageByFeatureOnionArchitectureTest {
   /* package */ static final ArchRule domainModelDoesNotDependOnFrameworks =
       noClasses()
           .that()
-          .resideInAPackage("..domain.model..")
+          .resideInAPackage(DOMAIN_MODEL_PACKAGE)
           .should()
           .dependOnClassesThat()
           .resideInAnyPackage(
@@ -172,7 +175,7 @@ class PackageByFeatureOnionArchitectureTest {
   /* package */ static final ArchRule valueObjectsDoNotThrowBusinessRuleViolation =
       noClasses()
           .that()
-          .resideInAPackage("..domain.model..")
+          .resideInAPackage(DOMAIN_MODEL_PACKAGE)
           .and()
           .areRecords()
           .should()
@@ -290,7 +293,7 @@ class PackageByFeatureOnionArchitectureTest {
   /* package */ static final ArchRule repositoryImplementationsAreJooqRepositories =
       classes()
           .that()
-          .implement(simpleNameEndingWith("Repository").and(resideInAPackage("..domain.model..")))
+          .implement(simpleNameEndingWith("Repository").and(resideInAPackage(DOMAIN_MODEL_PACKAGE)))
           .should()
           .haveSimpleNameStartingWith("Jooq")
           .andShould()

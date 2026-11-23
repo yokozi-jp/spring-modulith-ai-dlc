@@ -1,6 +1,5 @@
 package com.example.demo.ordering.domain.model;
 
-
 /**
  * 明細の数量。
  *
