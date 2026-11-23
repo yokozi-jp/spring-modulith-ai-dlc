@@ -956,5 +956,5 @@ components:
     sessionCookie:
       description: ブラウザの Cookie セッション（ADR-007、ADR-059）
       in: cookie
-      name: APP_SESSION
+      name: __Host-APP_SESSION
       type: apiKey

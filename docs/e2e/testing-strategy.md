@@ -86,9 +86,9 @@ setup project は、`storageState` を持たない browser context で `/oauth2/
 `/` から始めると、SPA が API の 401 を受けて自分でログインへ遷移し、setup project の遷移と競合する。
 この遷移そのものは、ログアウト後に `/` を開く `logout.spec.ts` のテストと、未認証で認証必須の画面を開く `unauthenticated-redirect.spec.ts` が確かめる。
 `test-user` は代表データで 2 つのテナントに属するため、戻り先はテナントを選ぶ画面（web の origin の `/tenants`）になる。
-認証の前後で `APP_SESSION` Cookie の値が変わったことで認証済みと判断し、サンプル商事を選ぶ。
-選んだ後に web の origin の `/` へ移り、`APP_SESSION` の値がもう一度変わったことを確かめてから、`frontend/apps/web/e2e/.auth/user.json` に保存する。
-`APP_SESSION` は認証の開始時点で発行されるため、Cookie があることだけを認証の証拠にしない。
+認証の前後で `__Host-APP_SESSION` Cookie の値が変わったことで認証済みと判断し、サンプル商事を選ぶ。
+選んだ後に web の origin の `/` へ移り、`__Host-APP_SESSION` の値がもう一度変わったことを確かめてから、`frontend/apps/web/e2e/.auth/user.json` に保存する。
+`__Host-APP_SESSION` は認証の開始時点で発行されるため、Cookie があることだけを認証の証拠にしない。
 自分でログインする spec も、ログインの後に `environment.ts` の `chooseSeededTenant` でテナントを選ぶ。
 
 - spec は保存した `storageState` を共有し、ログインを繰り返さない。
@@ -159,7 +159,7 @@ slot 0 の port は次のとおりである。
    Playwright が `webServer` で Vite preview を起動し、終了時に止める。
 6. 成否にかかわらず、`task e2e-collect-logs` で backend のログを `frontend/apps/web/test-results/backend.log` に書き、slot の project のコンテナと volume を削除して slot を返す。
    ログに `.env.test` の `OIDC_CLIENT_SECRET` か `E2E_PASSWORD` の値が入っていれば、テストが成功していても失敗にする。
-   値の一致で見つからない秘密として、`APP_SESSION=` に続く Cookie の値と、`eyJ` で始まる 3 つの base64url をつないだ JWT の形の文字列も失敗にする。
+   値の一致で見つからない秘密として、`__Host-APP_SESSION=` に続く Cookie の値と、`eyJ` で始まる 3 つの base64url をつないだ JWT の形の文字列も失敗にする。
 
 手順 2 から 4 の `task e2e-up` は片付けを行わない。
 `task e2e` の外で起動して残す呼び出し側は、片付けの前に `task e2e-collect-logs LOG=<パス>` で同じ検査をし、自分で片付ける。

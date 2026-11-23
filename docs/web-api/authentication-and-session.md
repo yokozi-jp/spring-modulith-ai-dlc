@@ -98,13 +98,15 @@ Cookieは、セッションIDとADR-007のCSRFトークン以外の用途に使�
 どちらのCookieも次のとおりにする。
 
 - Cookieの値にユーザーIDや権限などの情報を含めない。
-- `SameSite`を`None`にしない。要件を満たせる場合に限り`Strict`にしてよい。
+- `SameSite`を`None`にしない。`Strict`は、別siteのIdPからのcallbackを壊さない場合に限る。
 - `Path`は`/`にする。
 - `Domain`は省略し、サブドメイン間でCookieを共有しない。
 
 ### セッションCookie
 
-セッションCookieの名前、`HttpOnly`、`Secure`、`SameSite`の設定はADR-007と[application.yaml](../../backend/src/main/resources/application.yaml)に従い、そのほかの扱いは次のとおりにする。
+セッションCookieは`__Host-APP_SESSION`にし、`Secure`（環境によらない）、`HttpOnly`、`SameSite=Lax`を付ける。
+`Strict`にしないのは、別siteのIdPからのcallbackでセッションに保存した認可リクエストを失うためである（[ADR-117](../adr/ADR-117-harden-session-cookie-with-host-prefix.md)）。
+設定は[application.yaml](../../backend/src/main/resources/application.yaml)にあり、そのほかの扱いは次のとおりにする。
 
 - セッションIDは、フレームワークが暗号論的に安全な乱数で生成した、十分に長く推測困難な値だけにする。
 - 有効期間は`Expires`ではなく`Max-Age`で指定し、合意したセッションの有効期間に合わせる。

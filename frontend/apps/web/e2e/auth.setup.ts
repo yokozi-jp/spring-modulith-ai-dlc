@@ -11,15 +11,15 @@ import { expect, test as setup } from "./fixtures";
 
 async function sessionCookie(context: BrowserContext): Promise<string | undefined> {
   const cookies = await context.cookies();
-  return cookies.find(({ name }) => name === "APP_SESSION")?.value;
+  return cookies.find(({ name }) => name === "__Host-APP_SESSION")?.value;
 }
 
-// 戻り先がテナントを選ぶ画面であることと、認証の前後で APP_SESSION の値が変わったことで、ログインの成立を確かめる。
+// 戻り先がテナントを選ぶ画面であることと、認証の前後で __Host-APP_SESSION の値が変わったことで、ログインの成立を確かめる。
 async function logIn(page: Page, context: BrowserContext): Promise<string | undefined> {
   // storageState を持たない context で、認証の開始から始める。
   await page.goto("/oauth2/authorization/web");
   await expect(page).toHaveURL((url) => url.origin === idpOrigin);
-  // 認証開始の時点で authorization request を保存する session が作られ、APP_SESSION が発行される。
+  // 認証開始の時点で authorization request を保存する session が作られ、__Host-APP_SESSION が発行される。
   const sessionBeforeLogin = await sessionCookie(context);
 
   await signInOnKeycloak(page);

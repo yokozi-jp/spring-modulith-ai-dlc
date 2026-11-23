@@ -27,10 +27,10 @@ function csrfInput(page: Page): Locator {
   return page.locator('input[name="_csrf"]');
 }
 
-// ログアウトの前の APP_SESSION を送り直すため、browser の Cookie を共有しない request で確かめる。
+// ログアウトの前の __Host-APP_SESSION を送り直すため、browser の Cookie を共有しない request で確かめる。
 async function replayedApiStatus(request: APIRequestContext, session: string): Promise<number> {
   const response = await request.get("/api/missing", {
-    headers: { Cookie: `APP_SESSION=${session}` },
+    headers: { Cookie: `__Host-APP_SESSION=${session}` },
   });
   return response.status();
 }
@@ -40,10 +40,10 @@ async function expectApplicationSessionEnded(
   request: APIRequestContext,
   oldSession: string,
 ): Promise<void> {
-  // ログアウトの応答は APP_SESSION を消す。
+  // ログアウトの応答は __Host-APP_SESSION を消す。
   const cookies = await context.cookies();
-  expect(cookies.map(({ name }) => name)).not.toContain("APP_SESSION");
-  // ログアウト前の APP_SESSION を送り直しても、サーバ側のセッションが消えていれば 401 になる。
+  expect(cookies.map(({ name }) => name)).not.toContain("__Host-APP_SESSION");
+  // ログアウト前の __Host-APP_SESSION を送り直しても、サーバ側のセッションが消えていれば 401 になる。
   expect(await replayedApiStatus(request, oldSession)).toBe(401);
 }
 
@@ -167,7 +167,7 @@ test("ログアウト後はアプリと SSO のセッションが終わり、も
   request,
 }) => {
   await logIn(page);
-  const { value: oldSession } = await findCookie(context, "APP_SESSION");
+  const { value: oldSession } = await findCookie(context, "__Host-APP_SESSION");
   // 再送の経路が Cookie を届けていることを、ログアウト前に同じ経路で示す。
   expect(await replayedApiStatus(request, oldSession)).toBe(404);
   await logoutButton(page).click();

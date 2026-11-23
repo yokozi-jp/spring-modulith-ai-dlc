@@ -24,7 +24,7 @@ env:
           pollUnits: requests
           loggedInRegex: '"status"\s*:\s*404'
           loggedOutRegex: '"status"\s*:\s*401'
-      # 自動検出で APP_SESSION を拾えなければ method: cookie にする。
+      # 自動検出で __Host-APP_SESSION を拾えなければ method: cookie にする。
       sessionManagement:
         method: autodetect
       users:
@@ -60,7 +60,7 @@ jobs:
       - ruleId: 10035
         context: spring-modulith-dast
         newRisk: False Positive
-      # Cookie Without Secure Flag：.env.test は SESSION_COOKIE_SECURE=false で、ADR-014 は本番を HTTPS の単一 origin で公開する。
+      # Cookie Without Secure Flag：スキャンは HTTP で動き、ADR-014 は本番を HTTPS の単一 origin で公開する。
       - ruleId: 10011
         context: spring-modulith-dast
         newRisk: False Positive

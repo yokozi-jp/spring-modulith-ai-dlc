@@ -25,7 +25,7 @@ env:
           pollUnits: requests
           loggedInRegex: '"status"\s*:\s*404'
           loggedOutRegex: '"status"\s*:\s*401'
-      # 自動検出で APP_SESSION を拾えなければ method: cookie にする。
+      # 自動検出で __Host-APP_SESSION を拾えなければ method: cookie にする。
       sessionManagement:
         method: autodetect
       users:

@@ -11,6 +11,8 @@ tags: [adr, security, csrf, cookie, frontend, backend]
 
 Accepted
 
+Amended by [ADR-117](ADR-117-harden-session-cookie-with-host-prefix.md)：セッションの Cookie も `__Host-` の名前にすること。方式の前提の `APP_SESSION` の記述は、この ADR の時点のものである。
+
 Proposed として起こし、[#157](https://github.com/yokozi-jp/spring-modulith-ai-dlc/pull/157) でコードと一緒にレビューし、main へ取り込むこの Pull Request で Accepted にした。
 
 ## Date

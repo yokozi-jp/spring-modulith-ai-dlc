@@ -148,7 +148,7 @@ public class SecurityConfig {
                 .logoutSuccessHandler(logoutSuccessHandler)
                 .invalidateHttpSession(true)
                 .clearAuthentication(true)
-                .deleteCookies("APP_SESSION"));
+                .deleteCookies("__Host-APP_SESSION"));
     return http.build();
   }
 
