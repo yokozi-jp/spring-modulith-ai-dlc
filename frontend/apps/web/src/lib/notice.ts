@@ -1,4 +1,4 @@
-import { ApiProblemError } from "@frontend/api/api-fetch";
+import { ApiProblemError } from "@frontend/api/api-error";
 import type { TFunction } from "i18next";
 
 /** 画面の live region に出す通知。heading は見出し、description は説明の段落。 */

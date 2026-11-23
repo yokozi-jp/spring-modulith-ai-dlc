@@ -110,6 +110,7 @@ barrelの`index.ts`は作らず、次の入口を個別に公開する。
 | `@frontend/api/mocks/<tag>/<tag>.msw` | `src/generated/mocks/<tag>/<tag>.msw.ts` |
 | `@frontend/api/zod/<tag>/<tag>.zod`   | `src/generated/zod/<tag>/<tag>.zod.ts`   |
 | `@frontend/api/api-fetch`             | `src/api-fetch.ts`                       |
+| `@frontend/api/api-error`             | `src/api-error.ts`                       |
 | `@frontend/api/csrf`                  | `src/csrf.ts`                            |
 
 `fetch`と`XMLHttpRequest`を使えるのは、この package の中だけである。
@@ -159,6 +160,7 @@ Problem Details、CSRF、timeoutなどの共通transport要件を組み込みFet
 Orvalの組み込みFetchは非2xxでもthrowせず`{ data, status, headers }`を返し、throwさせる設定もないと確認した。
 そのままではTanStack Queryが401や500を成功として扱い、`RouteError`も表示されない。
 そこでcustom mutatorを`src/api-fetch.ts`に置き、非2xxを`ApiProblemError`として投げる。
+`ApiProblemError`とエラーの判定は、送信から切り離して`src/api-error.ts`に置く。
 `ApiProblemError`は`status`と、`Content-Type`が`application/problem+json`のときの本文`problem`を持ち、それ以外の本文や壊れたJSONでは`problem`を`undefined`にする。
 `detail`は内部情報を含みうるため、`message`に入れない。
 timeoutと再試行はTanStack Queryが持つため、mutatorは小さなnative Fetchのwrapperにした（[ADR-024](../adr/ADR-024-adopt-orval-for-frontend-api-client.md)の範囲の選択）。

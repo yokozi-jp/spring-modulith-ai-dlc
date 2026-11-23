@@ -87,8 +87,8 @@ packageの`vite.config.ts`に`lint`か`fmt`があると、`vp lint`をpackageで
 各禁止の中身は次のとおりである。
 
 - **共有層**：`@/features/**`、`@/routes/**`、`@/routeTree.gen`。
-- **component**：`@frontend/api/endpoints/**`、`@frontend/api/models`、`@frontend/api/zod/**`。
-  `components`が使える`@frontend/api`の入口は`api-fetch`と`csrf`だけである。
+- **component**：`@frontend/api/api-fetch`、`@frontend/api/endpoints/**`、`@frontend/api/models`、`@frontend/api/zod/**`。
+  `components`が使える`@frontend/api`の入口は`api-error`と`csrf`だけである。
 - **lib**：共有層の禁止に加えて`@/components/**`。
   `lib`は依存の最下層であり、UIを参照しない。
 - **feature**：`@/routes/**`、`@/routeTree.gen`。

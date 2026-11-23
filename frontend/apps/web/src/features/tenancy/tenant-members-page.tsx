@@ -1,4 +1,4 @@
-import { ApiProblemError } from "@frontend/api/api-fetch";
+import { ApiProblemError } from "@frontend/api/api-error";
 import { getListTenantMembersSuspenseQueryOptions } from "@frontend/api/endpoints/tenancy/tenancy";
 import { useSuspenseQuery } from "@tanstack/react-query";
 import { useState } from "react";

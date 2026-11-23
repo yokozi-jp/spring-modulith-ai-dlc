@@ -39,10 +39,15 @@ const libLayerImports = {
   group: [...sharedLayerImports.group, "@/components/**"],
   message: "lib must not depend on components, features or routes.",
 };
-// components が使える @frontend/api の入口は api-fetch と csrf だけである。データの取得は route と feature が行う。
+// components が使える @frontend/api の入口は api-error と csrf だけである。送信とデータの取得は route と feature が行う。
 const componentLayerImports = {
-  group: ["@frontend/api/endpoints/**", "@frontend/api/models", "@frontend/api/zod/**"],
-  message: "components may use only @frontend/api/api-fetch and @frontend/api/csrf.",
+  group: [
+    "@frontend/api/api-fetch",
+    "@frontend/api/endpoints/**",
+    "@frontend/api/models",
+    "@frontend/api/zod/**",
+  ],
+  message: "components may use only @frontend/api/api-error and @frontend/api/csrf.",
 };
 const featureImports = {
   group: ["@/routes/**", "@/routeTree.gen"],
