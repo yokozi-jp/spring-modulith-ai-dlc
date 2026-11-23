@@ -46,8 +46,9 @@ Preconditions:
 - ログインの証拠の取り方と、未認証の `/api/**` を同じ context で呼んではいけない理由は、`docs/e2e/testing-strategy.md` の「認証」と `frontend/apps/web/e2e/logout.spec.ts` にある。
   401 の確認は、必ず `request.newContext` で作った要求で行う。
   `page.request` と `context.request` は Cookie を共有する。
-- `/` は SPA が認証を確かめずに表示する。
-  トップページが見えることだけをログイン済みの証拠にしない。
+- 未認証で `/` を開くと、`_tenant` の `beforeLoad` が呼ぶ `GET /api/current-tenant` の 401 で、SPA が `/oauth2/authorization/web` へ移る。
+  同じ tab で 30 秒以内に 2 回目の 401 を受けると移らず、`RouteError` を表示する（`redirectToLoginOnUnauthorized`）。
+  続けて別の画面を未認証で開くときは、`context.newPage()` で tab を分ける。
 - Keycloak の issuer は `idpOrigin`（slot 0 は `http://127.0.0.1:8081`）に固定されている。
   `localhost` で開くと issuer が一致せず失敗する。
 - compose-test には Collector がない。

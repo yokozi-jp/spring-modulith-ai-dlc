@@ -31,7 +31,7 @@ async function apiStatus(page: Page): Promise<number> {
   return response.status();
 }
 
-// / は SPA が認証を確かめずに表示するため、/api/missing が 404（401 でない）であることで認証済みを確かめる。
+// 画面の表示だけでなく、/api/missing が 404（401 でない）であることでも認証済みを確かめる。
 async function expectAuthenticatedHome(page: Page): Promise<void> {
   await expect(page).toHaveURL(`${webOrigin}/`);
   await expect(homeHeading(page)).toBeVisible();
