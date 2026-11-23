@@ -67,7 +67,7 @@ Spring Security の filter の連鎖のうち、`TenantSelectionFilter` の外�
 `TenantSecurityCustomizer` は、この filter を `ExceptionTranslationFilter` と `AuthorizationFilter` の間に置く。
 次のログがこれにあたる。
 
-- `AuthorizationFilter` が拒否し、`ExceptionTranslationFilter` が返す 401 と 403
+- `AuthorizationFilter` が拒否し、`ExceptionTranslationFilter` が返す 401 と 403（`user.id` を付ける案は #635 で扱う）
 - `TenantSelectionFilter` が投げる `TenantNotSelectedException`
 - CSRF の検証の失敗
 - Spring Security の entry point
@@ -76,7 +76,7 @@ Controller の中の `@PreAuthorize` が拒否したときのログは、2 つ�
 
 トレースでは、`TenantSelectionFilter` が HTTP の受信の span にだけ、2 つを属性として付ける。
 
-- Micrometer の Observation の高い濃度の key value にだけ入れ、低い濃度の key value に入れない。低い濃度の key value は、メトリクスの tag にもなる。
+- Micrometer の Observation の高い濃度の key value にだけ入れ、低い濃度の key value に入れない（理由は ADR-110）。
 - リスナーの処理の span は Spring Modulith が作る。この span には付けない。リスナーのログには `tenant.id` が付くので、ログの trace ID からたどる。
 - Micrometer Tracing の baggage（`management.tracing.baggage.*`）で伝えない。
 

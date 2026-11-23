@@ -91,34 +91,29 @@ final class TenantSelectionFilter extends OncePerRequestFilter {
       final HttpServletResponse response,
       final FilterChain filterChain)
       throws ServletException, IOException {
-    final @Nullable String userId = authenticatedUserId();
-    if (userId == null) {
-      doFilterInSelectedTenant(request, response, filterChain);
+    final @Nullable Authentication authentication = holder.getContext().getAuthentication();
+    if (authentication == null || !trustResolver.isAuthenticated(authentication)) {
+      filterChain.doFilter(request, response);
       return;
     }
-    addToServerSpan(request, USER_ID_ATTRIBUTE_KEY, userId);
-    try (MDC.MDCCloseable ignored = MDC.putCloseable(USER_ID_ATTRIBUTE_KEY, userId)) {
-      doFilterInSelectedTenant(request, response, filterChain);
+    if (!(authentication.getPrincipal() instanceof AppUserPrincipal user)) {
+      doFilterInSelectedTenant(authentication, request, response, filterChain);
+      return;
     }
-  }
-
-  /** 認証した利用者の、アプリの利用者の ID を返す。認証していないか、利用者が {@link AppUserPrincipal} でなければ null を返す。 */
-  private @Nullable String authenticatedUserId() {
-    final @Nullable Authentication authentication = holder.getContext().getAuthentication();
-    return authentication != null
-            && trustResolver.isAuthenticated(authentication)
-            && authentication.getPrincipal() instanceof AppUserPrincipal user
-        ? user.userId()
-        : null;
+    addToServerSpan(request, USER_ID_ATTRIBUTE_KEY, user.userId());
+    try (MDC.MDCCloseable ignored = MDC.putCloseable(USER_ID_ATTRIBUTE_KEY, user.userId())) {
+      doFilterInSelectedTenant(authentication, request, response, filterChain);
+    }
   }
 
   /** 選んだテナントが残っていれば、束縛してリクエストの残りの処理を呼ぶ。 */
   private void doFilterInSelectedTenant(
+      final Authentication authentication,
       final HttpServletRequest request,
       final HttpServletResponse response,
       final FilterChain filterChain)
       throws ServletException, IOException {
-    final Optional<TenantId> tenantId = recheckedTenant(request, response);
+    final Optional<TenantId> tenantId = recheckedTenant(authentication, request, response);
     if (tenantId.isEmpty()) {
       filterChain.doFilter(request, response);
       return;
@@ -143,11 +138,9 @@ final class TenantSelectionFilter extends OncePerRequestFilter {
    * @throws TenantNotSelectedException テナントの決まっている必要がある API を、テナントを選ぶ前に呼んだ場合
    */
   private Optional<TenantId> recheckedTenant(
-      final HttpServletRequest request, final HttpServletResponse response) {
-    final @Nullable Authentication authentication = holder.getContext().getAuthentication();
-    if (authentication == null || !trustResolver.isAuthenticated(authentication)) {
-      return Optional.empty();
-    }
+      final Authentication authentication,
+      final HttpServletRequest request,
+      final HttpServletResponse response) {
     final Optional<TenantId> tenant =
         TenantSession.selectedTenant(authentication)
             .flatMap(selected -> recheck(request, response, authentication, selected));

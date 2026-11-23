@@ -81,8 +81,7 @@ appender の `mdcAttributesIncluded` は、MDC のうち OTLP の属性にする
 
 ### Negative
 
-- リスナーの外で記録するログは `tenant.id` を持たない。リスナーが投げた例外を Spring の `SimpleAsyncUncaughtExceptionHandler` が記録する ERROR がこれにあたる。
-- Spring Security の filter の連鎖のうち、`TenantSelectionFilter` の外で記録するログは、`tenant.id` も `user.id` も持たない。`TenantSecurityCustomizer` はこの filter を `ExceptionTranslationFilter` と `AuthorizationFilter` の間に置くので、`AuthorizationFilter` の拒否も、この filter を出てから 401 か 403 として記録される。この filter が投げる `TenantNotSelectedException`、CSRF の失敗、entry point のログも同じである。Controller の中の `@PreAuthorize` の拒否は、この filter の中で記録されるので 2 つを持つ。範囲は[可観測性データの規約](../observability/conventions.md#テナントと利用者)に書く。
+- ログに `tenant.id` と `user.id` が付かない範囲がある（リスナーの外のログ、`TenantSelectionFilter` の外の拒否と CSRF のログ、所属の引き直しの間のログ）。範囲は[可観測性データの規約](../observability/conventions.md#テナントと利用者)に書く。認可の拒否のログに `user.id` を付ける案は #635 で扱う。
 - 受信の span 以外の span（外向きの HTTP、SQL、リスナーの span とその中の処理）は `tenant.id` を持たない。受信の span の trace ID からたどる。
 - 利用者の ID から利用者を特定できるので、ADR-015 の閲覧権限と保持期間で守る。
 
