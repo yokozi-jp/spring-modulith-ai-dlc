@@ -1,4 +1,4 @@
-import { ApiProblemError } from "@frontend/api/api-fetch";
+import { ApiProblemError } from "@frontend/api/api-error";
 import { getFindOrderByIdSuspenseQueryOptions } from "@frontend/api/endpoints/ordering/ordering";
 import { getListProductsSuspenseQueryOptions } from "@frontend/api/endpoints/product/product";
 import { createFileRoute, notFound } from "@tanstack/react-router";

@@ -1,4 +1,4 @@
-import { ApiProblemError } from "@frontend/api/api-fetch";
+import { ApiProblemError } from "@frontend/api/api-error";
 import type { ValidationProblem } from "@frontend/api/models";
 
 /** 400 の errors を、入力欄の名前ごとの detail と、入力欄に写せない detail に分けたもの。 */

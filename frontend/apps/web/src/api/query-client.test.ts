@@ -1,4 +1,5 @@
-import { ApiProblemError, apiFetch } from "@frontend/api/api-fetch";
+import { ApiProblemError } from "@frontend/api/api-error";
+import { apiFetch } from "@frontend/api/api-fetch";
 import { MutationObserver, QueryObserver } from "@tanstack/react-query";
 import { http, HttpResponse } from "msw";
 import { beforeEach, describe, expect, it, onTestFinished, vi } from "vite-plus/test";

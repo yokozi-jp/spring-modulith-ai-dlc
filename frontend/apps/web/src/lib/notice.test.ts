@@ -1,4 +1,4 @@
-import { ApiProblemError } from "@frontend/api/api-fetch";
+import { ApiProblemError } from "@frontend/api/api-error";
 import { describe, expect, it } from "vite-plus/test";
 
 import { t } from "@/testing/catalog-i18n";

@@ -1,4 +1,4 @@
-import { ApiProblemError } from "@frontend/api/api-fetch";
+import { ApiProblemError } from "@frontend/api/api-error";
 import type { ValidationProblem } from "@frontend/api/models";
 import { describe, expect, it } from "vite-plus/test";
 
