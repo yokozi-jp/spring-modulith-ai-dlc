@@ -158,7 +158,7 @@ public class EventPublicationArchive extends TableImpl<EventPublicationArchiveRe
     @Override
     @NonNull
     public List<Index> getIndexes() {
-        return Arrays.asList(Indexes.EVENT_PUBLICATION_ARCHIVE_BY_COMPLETION_DATE_IDX, Indexes.EVENT_PUBLICATION_ARCHIVE_SERIALIZED_EVENT_HASH_IDX);
+        return Arrays.asList(Indexes.EVENT_PUBLICATION_ARCHIVE_ABANDONED_IDX, Indexes.EVENT_PUBLICATION_ARCHIVE_BY_COMPLETION_DATE_IDX, Indexes.EVENT_PUBLICATION_ARCHIVE_SERIALIZED_EVENT_HASH_IDX);
     }
 
     @Override

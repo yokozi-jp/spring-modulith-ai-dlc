@@ -1,0 +1,21 @@
+databaseChangeLog:
+  - changeSet:
+      id: 027-add-event-publication-archive-abandoned-index
+      author: system
+      comment: >-
+        再投入の Gauge（state=exhausted）が毎回数える archive の ABANDONED の行に、部分索引を張る（ADR-079）。
+        archive の表は完了した出版も保持期限まで残すため、索引がないと集計が表の行数に比例して重くなる。
+        稼働中の表に書き込みを止めずに作るため CONCURRENTLY にし、トランザクションの外で実行する。
+      runInTransaction: false
+      preConditions:
+        - dbms:
+            type: postgresql
+      changes:
+        - sql:
+            sql: >-
+              CREATE INDEX CONCURRENTLY IF NOT EXISTS event_publication_archive_abandoned_idx
+              ON modulith.event_publication_archive (publication_date)
+              WHERE status = 'ABANDONED';
+      rollback:
+        - sql:
+            sql: DROP INDEX CONCURRENTLY IF EXISTS modulith.event_publication_archive_abandoned_idx;

@@ -204,6 +204,7 @@ class EventPublicationResubmitter {
               .where(EVENT_PUBLICATION.STATUS.eq(EventPublication.Status.FAILED.name()))
               .fetchSingle(),
           now);
+      // 条件を部分索引 event_publication_archive_abandoned_idx の述語と同じにし、archive の全行を読まない。
       exhausted.set(
           dsl.select(DSL.count(), DSL.min(EVENT_PUBLICATION_ARCHIVE.PUBLICATION_DATE))
               .from(EVENT_PUBLICATION_ARCHIVE)
