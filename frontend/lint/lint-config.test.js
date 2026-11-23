@@ -293,6 +293,22 @@ describe("fixture に適用したプロジェクトの lint 設定", () => {
       });
     });
 
+    describe("lint を止めるコメント", () => {
+      it("同じ行に -- <理由> のない disable のコメントを禁止し、理由のあるものを許可する", () => {
+        const found = diagnostics.filter(
+          (diagnostic) =>
+            diagnostic.filename === `${appDirectory}/src/lib/disable-without-reason.ts`,
+        );
+
+        expect(found.map((diagnostic) => diagnostic.code)).toStrictEqual([
+          "disable-reason(require-disable-reason)",
+          "disable-reason(require-disable-reason)",
+          "disable-reason(require-disable-reason)",
+        ]);
+        expect(found[0]?.message).toContain("-- <reason>");
+      });
+    });
+
     describe("undefined", () => {
       it("undefined との比較を許可する", () => {
         expect(codesIn("lib/is-missing.ts")).toStrictEqual([]);

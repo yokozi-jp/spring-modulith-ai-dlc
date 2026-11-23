@@ -17,8 +17,7 @@ let api = await import("./api-fetch");
 function stubSessionStorage() {
   const items = new Map<string, string>();
   vi.stubGlobal("sessionStorage", {
-    // Storage.getItem の仕様どおり、値がなければ null を返す。
-    // oxlint-disable-next-line unicorn/no-null
+    // oxlint-disable-next-line unicorn/no-null -- Storage.getItem の仕様どおり、値がなければ null を返す
     getItem: (key: string) => items.get(key) ?? null,
     setItem: (key: string, value: string) => items.set(key, value),
     removeItem: (key: string) => items.delete(key),
