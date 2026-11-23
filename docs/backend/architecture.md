@@ -41,6 +41,10 @@ backend/src/main/java/com/example/demo/
 │
 ├── shared/
 │   ├── package-info.java
+│   ├── batch/
+│   │   ├── package-info.java
+│   │   ├── JobPeriodRule.java
+│   │   └── <追いつきの Runner とテナントを束縛する Aspect>.java
 │   ├── concurrency/
 │   │   ├── package-info.java
 │   │   ├── ConflictException.java
@@ -82,6 +86,13 @@ backend/src/main/java/com/example/demo/
     │   ├── <Feature>QueryService.java
     │   └── <Event>Listener.java
     │
+    ├── batch/
+    │   ├── package-info.java
+    │   ├── <Job>JobConfig.java
+    │   ├── <Job>ItemReader.java
+    │   ├── <Job>ItemWriter.java
+    │   └── <Job>Tasklet.java
+    │
     ├── presentation/
     │   └── web/
     │       ├── package-info.java
@@ -121,6 +132,10 @@ backend/src/main/java/com/example/demo/
 - **`<UseCase>Result`**：[Result](class-roles/result.md)
 - **`<Feature>QueryService`**：[QueryService](class-roles/query-service.md)
 - **`<Event>Listener`**：[Listener](class-roles/listener.md)
+- **`<Job>JobConfig`**：[Job の設定](class-roles/job-config.md)
+- **`<Job>ItemReader`**：[ItemReader](class-roles/item-reader.md)
+- **`<Job>ItemWriter`**：[ItemWriter](class-roles/item-writer.md)
+- **`<Job>Tasklet`**：[Tasklet](class-roles/tasklet.md)
 - **`<Aggregate>Controller`**：[Controller](class-roles/controller.md)
 - **`<UseCase>Request`**：[Request](class-roles/request.md)
 - **`<QueryResult>Response`**：[Response](class-roles/response.md)
@@ -170,11 +185,16 @@ Domain の型、Command と Result、Spring MVC の Request と Response、jOOQ 
 - 操作しているテナントの語彙を `shared.tenant` に置き、このパッケージも `@NamedInterface("tenant")` で公開する（[ADR-105](../adr/ADR-105-bind-tenant-to-request-and-event-context.md)）。
   置く型は、テナントの `public_id` を包む `TenantId`、テナントを運ぶイベントの型 `TenantScoped`、呼び出しの間だけテナントを `ScopedValue` に束縛する `TenantContext` である。
   `TenantId` は `tenancy` の `domain.model` も使い、テナントの ID を表す型を 1 つにする。
-  `TenantContext.call` で束縛を切り替えてよいのは、リクエストの filter（`tenancy` の `TenantSelectionFilter`）と `TenantListenerAspect` だけである。
+  `TenantContext.call` で束縛を切り替えてよいのは、リクエストの filter（`tenancy` の `TenantSelectionFilter`）、`TenantListenerAspect`、`shared.batch` のテナントを束縛する Aspect だけである。
   テナントの値と規則は `tenancy` に置き、`shared.tenant` は、どのテナントを操作しているかを運ぶ語彙だけを持つ。
+- 業務のバッチの追いつきの Runner、テナントを束縛する Aspect、Job の期間の規則（`JobPeriodRule`）を `shared.batch` に置き、このパッケージも `@NamedInterface("batch")` で公開する（[ADR-115](../adr/ADR-115-build-business-batches-with-spring-batch.md)）。
+  Runner と Aspect は 1 つずつで、すべての Job が共有する。
+  `JobPeriodRule` 以外のクラスは package-private にする。
+  規則は [バッチ](../batch/index.md) に従う。
 - 業務の概念を置かない。
   ルートのパッケージには `package-info.java` だけを置く。
 - `shared.infrastructure.persistence` を使ってよいのは、他のモジュールの `infrastructure.persistence` だけである。
+  `shared.batch` を使ってよいのは、機能モジュールの `batch` だけである。
   `shared.concurrency`、`shared.failure`、`shared.events`、`shared.security`、`shared.tenant` は、どの層からも使える。
 
 使う場所の制限は、`PackageByFeatureOnionArchitectureTest` の `sharedModuleIsUsedOnlyByPersistenceAdapters` が検査する。
@@ -201,6 +221,7 @@ infrastructure.client ───────────────────�
 - `presentation.web` は `application` とモジュールルートに依存し、Domain には依存しない。
 - `application` は `domain.service`、`domain.model`、モジュールルートに依存する。
 - `domain.service` は `domain.model` に依存する。
+- `batch` は `application` の Command と CommandHandler、自分のモジュールのルート、`tenancy` のルート、`shared.batch` に依存し、Domain と Infrastructure に依存しない。
 - `infrastructure.persistence` と `infrastructure.client` は `domain.model` のインタフェースを実装し、`application`、`domain.service`、モジュールルートに依存しない。
 - `infrastructure.persistence` は `shared.infrastructure.persistence` に依存してよい。
   ほかの層は `shared.infrastructure.persistence` に依存しない。

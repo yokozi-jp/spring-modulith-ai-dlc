@@ -1,7 +1,7 @@
 ---
 type: Convention
 title: バッチとオンラインの排他
-description: 業務のバッチとオンラインの処理が同じ時間帯に同じ表を書くときの排他の要否の分類、ロックを使わない条件、集約を更新するときの楽観的ロックと retry と skip、採らない排他の形を定める規約。オンラインの時間帯に動く Job を作るとき、Job とオンラインが同じ表を書くかを確かめるときに読む。
+description: 業務のバッチとオンラインの処理が同じ時間帯に同じ表を書くときの排他の要否の分類、ロックを使わない条件、集約を更新するときの楽観的ロックと retry、採らない排他の形を定める規約で、オンラインの時間帯に動く Job を作るときや Job とオンラインが同じ表を書くかを確かめるときに読む。
 tags: [convention, batch, concurrency, future-arch-guidelines]
 ---
 
@@ -9,7 +9,7 @@ tags: [convention, batch, concurrency, future-arch-guidelines]
 
 排他の要否は、Job とオンラインが、同じ時間帯に、同じ表の同じ行を書くかで決める。
 Job が読む行がオンラインでもう変わらない状態にあり、Job が自分のモジュールの表とイベントだけを書くなら、ロックも `REPEATABLE READ` も使わない。
-集約を更新するなら、読んだ版と行の版を比べ、競合した 1 件は retry で読み直し、それでも競合すれば skip する。
+集約を更新するなら、読んだ版と行の版を比べ、競合した 1 件は retry で読み直し、それでも競合すれば Step を失敗させる。
 決定の理由は [ADR-115](../adr/ADR-115-build-business-batches-with-spring-batch.md) に示す。
 
 ## 要否の分類
@@ -41,10 +41,9 @@ Job が読む行の状態は、ItemReader の process indicator の条件（[冪
 ## 集約を更新する Job
 
 - オンラインも変える集約を Job が更新するときは、CommandHandler が集約を読み、Repository の `update` で、読んだ版と行の版を比べる（[PostgreSQLの排他制御](../database/postgresql-concurrency-control.md#楽観的ロック)）。
-- 競合した 1 件は、`ConflictException` を Spring Batch の retry で受け、`handle` に集約を読み直させる。
-  retry の上限を超えたら skip し、次の JobInstance か再開で読み直す（[冪等性と再開](idempotency-and-restart.md#skip-と-retry)）。
-- ロックを取れない行を飛ばして残りを更新するときは、`SELECT ... FOR UPDATE SKIP LOCKED` を使う（[PostgreSQLの排他制御](../database/postgresql-concurrency-control.md#ロック待ち)）。
-  飛ばした行を利用者に示すか、次の起動で拾うかは、業務と決める。
+- 競合した 1 件と、ロック待ちの上限を超えた 1 件は、`ConflictException` を Spring Batch の retry で受け、`handle` に集約を読み直させる（[PostgreSQLの排他制御](../database/postgresql-concurrency-control.md#ロック待ち)）。
+  retry の上限を超えたら Step を失敗させ、次の起動の再開で続ける（[冪等性と再開](idempotency-and-restart.md#retry-と失敗)）。
+- 競合が続いて期間が終わらないときは、起動時刻をオンラインがその表を書かない時間帯に動かせないかを、業務と決める。
 
 ## 採らない排他の形
 

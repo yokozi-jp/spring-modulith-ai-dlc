@@ -39,6 +39,9 @@ Spring は、別々の Aspect と `@Transactional` の advisor が同じメソ�
 しかし、テナントを束縛する Aspect（[issue #369](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/369)）は、トランザクションの開始の時点で値が束縛されている必要がある。
 そこで、Aspect とトランザクションの順序の決定を Decision に足した。
 
+[ADR-115](ADR-115-build-business-batches-with-spring-batch.md) は、業務のバッチの ItemWriter と Tasklet が CommandHandler を呼ぶ形にした。
+バッチは CommandHandler と Listener を通らない書き込みの入口にならないので、Consequences の「入口の役割と pointcut を決め直す」を、入口を作れないことに書き直した。
+
 ## Decision
 
 `org.springframework.boot:spring-boot-starter-aspectj` を依存に加え、`shared.infrastructure.persistence` に `@Aspect` の `PgmCdAspect` を置く。

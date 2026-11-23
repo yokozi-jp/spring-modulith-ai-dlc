@@ -20,7 +20,7 @@ tags: [convention, writing, design-doc, documentation, future-arch-guidelines]
 - **Web API**：OpenAPI の `operationId`（[Orval と API 境界](../frontend/api-client-orval.md)）。
 - **非同期処理**：イベント型名（[非同期処理の設計文書](../integration/async-design-documents.md)）。
 - **I/F**：I/F 一覧の機能 ID（[連携の一覧と定義書](../integration/interface-documentation.md)）。
-- **バッチ**：Spring Batch の Job の名前（[バッチのジョブの入口と起動](../batch/job-entry.md#置き場所と役割)）。
+- **バッチ**：Spring Batch の Job の名前（[クラスの役割：Job の設定](../backend/class-roles/job-config.md#置き場所と命名)）。
 
 ## 画面の設計書
 

@@ -1,13 +1,14 @@
 ---
 type: Convention
 title: クラスの役割：ItemWriter
-description: 機能モジュールの batch に置き、chunk の 1 件ごとに CommandHandler を 1 つだけ呼ぶ <Job>ItemWriter の定義、置き場所と命名、必須の記述（1 件ごとの handle、冪等、トランザクションを持たないこと）、依存、例、テスト、アンチパターン、作成時のチェックリストを定める。Job の chunk の書き込みを作るときに読む。
+description: 機能モジュールの batch に置き、chunk の 1 件ごとに CommandHandler を 1 つだけ呼ぶ <Job>ItemWriter の定義、置き場所と命名、必須の記述（1 件ごとの handle、冪等、トランザクションを持たないこと）、依存、例、テスト、アンチパターン、作成時のチェックリストを定める規約で、Job の chunk の書き込みを作るときに読む。
 tags: [convention, backend, class-role, batch]
 ---
 
 # クラスの役割：ItemWriter
 
-`<Job>ItemWriter` は、chunk の 1 件ごとに Command を作り、自分のモジュールの CommandHandler を 1 つだけ呼ぶ Spring Batch の ItemWriter であり、Job を持つ機能モジュールの `batch` に package-private で置く。
+`<Job>ItemWriter` は、chunk の 1 件ごとに Command を作り、自分のモジュールの CommandHandler を 1 つだけ呼ぶ Spring Batch の ItemWriter である。
+Job を持つ機能モジュールの `batch` に package-private で置く。
 トランザクションは CommandHandler の `handle` が 1 件ごとに開き、ItemWriter と Step はトランザクションを持たない。
 Job の規則は [バッチの冪等性と再開](../../batch/idempotency-and-restart.md) に、役割の決定理由は [ADR-115](../../adr/ADR-115-build-business-batches-with-spring-batch.md) に示す。
 
@@ -34,12 +35,12 @@ ItemWriter は業務処理の置き場所ではない。
 - `@Transactional` を付けない。
   `handle` が自分の名前のトランザクションを開き、モジュールのロールとテナントを設定する。
 - 呼ぶ CommandHandler を冪等にする。
-  再開と skip の再試行で、commit 済みの行がもう一度 `write` に渡る。
+  再開と retry で、commit 済みの行がもう一度 `write` に渡る。
   書き方は [冪等性と再開](../../batch/idempotency-and-restart.md#冪等な書き方) に従う。
 - テナントを自分で束縛しない。
-  `write` の呼び出しの間は、Aspect が partition のテナントを束縛する。
+  `write` の呼び出しの間は、Aspect が partition のテナントを束縛する（[トランザクション、ロール、テナント](../../batch/transaction-and-tenant.md#テナントごとの-partition)）。
 - 業務上の失敗の例外を捕まえない。
-  skip と retry は Job の設定の方針で決める。
+  retry と失敗の扱いは Job の設定で決める（[冪等性と再開](../../batch/idempotency-and-restart.md#retry-と失敗)）。
 - クラス、フィールド、コンストラクタ、`write` に Javadoc を書く。
 
 ## 依存してよい型、してはいけない型
@@ -48,8 +49,6 @@ ItemWriter は業務処理の置き場所ではない。
 - **依存してはいけない型**：2 つ目の CommandHandler、Repository、`TableWriter`、`DSLContext`、Domain の型、`PlatformTransactionManager`、`TransactionTemplate`。
 
 ## 最小の例
-
-まだこのリポジトリに Job はないので、名前は例である。
 
 ```java
 // com.example.demo.ordering.batch.CloseMonthItemWriter（抜粋）
@@ -71,7 +70,7 @@ ItemWriter は、Job を起動する結合テストで確かめる。
 - ItemWriter に業務処理を書く、または Repository、`TableWriter`、`DSLContext` を直接使う。
   `*_pgm_cd` が束縛されず、共通カラムの登録が失敗する。
 - chunk 全体を 1 つの Command にして、1 回の `handle` に渡す。
-  1 件の失敗で chunk 全体がロールバックし、skip の単位が chunk になる。
+  1 件の失敗で chunk 全体がロールバックし、retry の単位が chunk になる。
   まとめるのは、1 件ごとの commit が遅いと測ったときだけにする。
 - 1 つの `write` から複数の CommandHandler を呼ぶ。
 - 呼ぶ CommandHandler が冪等でなく、再開で同じ行を 2 回処理する。

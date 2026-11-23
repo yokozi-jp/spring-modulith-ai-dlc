@@ -1,7 +1,7 @@
 ---
 type: Convention
 title: クラスの役割：Tasklet
-description: 機能モジュールの batch に置き、chunk にしない 1 単位の処理で CommandHandler を 1 つだけ呼ぶ <Job>Tasklet の定義、置き場所と命名、必須の記述（1 単位の handle、冪等、トランザクションを持たないこと）、依存、例、テスト、アンチパターン、作成時のチェックリストを定める。Job の中で件数を数えずに 1 回だけ行う処理を作るときに読む。
+description: 機能モジュールの batch に置き、chunk にしない 1 単位の処理で CommandHandler を 1 つだけ呼ぶ <Job>Tasklet の定義、置き場所と命名、必須の記述（1 単位の handle、冪等、トランザクションを持たないこと）、依存、例、テスト、アンチパターン、作成時のチェックリストを定める規約で、Job の中で件数を数えずに 1 回だけ行う処理を作るときに読む。
 tags: [convention, backend, class-role, batch]
 ---
 
@@ -36,7 +36,7 @@ Tasklet は業務処理の置き場所ではない。
   `handle` が commit した後、Step の状態を保存する前に落ちると、再開で同じ `execute` がもう一度呼ばれる。
   書き方は [冪等性と再開](../../batch/idempotency-and-restart.md#冪等な書き方) に従う。
 - テナントを自分で束縛しない。
-  `execute` の呼び出しの間は、Aspect が partition のテナントを束縛する。
+  `execute` の呼び出しの間は、Aspect が partition のテナントを束縛する（[トランザクション、ロール、テナント](../../batch/transaction-and-tenant.md#テナントごとの-partition)）。
 - クラス、フィールド、コンストラクタ、`execute` に Javadoc を書く。
 
 ## 依存してよい型、してはいけない型
@@ -45,8 +45,6 @@ Tasklet は業務処理の置き場所ではない。
 - **依存してはいけない型**：2 つ目の CommandHandler、Repository、`TableWriter`、`DSLContext`、Domain の型、`PlatformTransactionManager`、`TransactionTemplate`。
 
 ## 最小の例
-
-まだこのリポジトリに Job はないので、名前は例である。
 
 ```java
 // com.example.demo.ordering.batch.SummarizeMonthTasklet（抜粋）

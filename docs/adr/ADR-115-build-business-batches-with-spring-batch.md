@@ -1,7 +1,7 @@
 ---
 type: ADR
 title: 'ADR-115: 業務のバッチを Spring Batch の Job で作り、1 つの期間を 1 つの JobInstance にして毎日追いつく'
-description: 締め、集計、ファイルの配信と集信のような業務のバッチを Spring Batch 6 の Job にし、JobRepository を modulith スキーマに置き、Step のトランザクションを持たずに CommandHandler の handle に任せる決定。入口、追いつき、再開、二重の起動、テナント、スパン、置き場所と役割を決める。
+description: 締め、集計、ファイルの配信と集信のような業務のバッチを Spring Batch 6 の Job にし、JobRepository を modulith スキーマに置き、Step のトランザクションを持たずに CommandHandler の handle に任せる決定。
 tags: [adr, batch, spring-batch, architecture, transaction]
 ---
 
@@ -41,143 +41,121 @@ Spring Batch のリファレンスは、業務の行に処理済みの列を持�
   同じ識別の引数で起動し直すと同じ JobInstance が再開して COMPLETED になり、3 件目がもう一度 ItemWriter に渡った。
   ItemWriter が確定済みの注文を飛ばしたので、5 件がそれぞれ 1 回だけ確定された。
   COMPLETED の JobInstance をもう一度起動すると `JobInstanceAlreadyCompleteException` になった。
-- Step に `ModuleRoleTransactionManager` と、モジュールの名前を付けた `transactionAttribute` を渡すと、Step は `permission denied for table batch_step_execution_context` で FAILED になった。
+- Step に `ModuleRoleTransactionManager` と、モジュールの名前を付けた `transactionAttribute` を渡した。
+  Step は `permission denied for table batch_step_execution_context` で FAILED になった。
   `ChunkOrientedStep` は、chunk のトランザクションの中で Step の状態を JobRepository に保存する（Spring Batch 6.0.6 のソースの `saveState`）。
   その保存が `ordering_module` のロールで流れ、メタデータの表に権限がなかった。
 - Spring Boot の構成と同じく Job と Step に `ObservationRegistry` を渡すと、ItemWriter の中に現在のスパンがあった。
   1 回の JobExecution の中の書き込みは、同じ trace ID になった。
 
+Proposed の間に、[#656](https://github.com/yokozi-jp/spring-modulith-ai-dlc/pull/656) のレビューで Decision を書き直した。
+レビューは、skip した行を読み直す処理がないこと、FAILED でも終了コードが 0 になりうること、ABANDONED の期間で追いつきが止まることなどを、上の版のソースで示した。
+あわせて、規則の本文を [バッチ](../batch/index.md) に移し、この ADR には決定と理由だけを残した。
+
 ## Decision
 
-### 入口の形
+### 入口と終了コード
 
-- 短い保守の処理（[ADR-079](ADR-079-resubmit-failed-event-publications-periodically-with-shedlock.md) の再投入、[#542](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/542) の archive の削除）は、これまでどおりアプリの中の `@Scheduled` で動かす。
-- 業務のバッチ（締め、集計、ファイルの配信と集信）は、Spring Batch の Job にする。
-- 依存は `spring-boot-starter-batch-jdbc` と、テストの `spring-boot-starter-batch-jdbc-test` にする。
-  どちらも最初のジョブと同じ変更で足す。
-- Spring Boot の Spring Batch の自動構成を使い、`@EnableBatchProcessing`、`@EnableJdbcJobRepository`、`DefaultBatchConfiguration` を宣言しない。
-  宣言すると、Spring Boot の自動構成（`spring.batch.*` の設定と、起動のときにジョブを流す Runner）が退く。
-- 同じイメージを、`spring.batch.job.name` に Job の名前を渡して 1 回だけ起動する。
-  名前を渡した起動では、Web のサーバー、再投入、Staleness Monitor を止め、処理中のリスナーの完了を待ってから JVM を終える。
-  形は、手での 1 回の再投入（ADR-079 の `EventPublicationResubmitOnce`）と同じにする。
-  名前を渡さない通常の起動では `spring.batch.job.enabled=false` にし、Job を動かさない。
-- 終了コードは、Spring Boot の `JobExecutionExitCodeGenerator` が返す `BatchStatus` の序数を `SpringApplication.exit` で返す。
-  COMPLETED は 0、FAILED は 5 である。
-  起動の前に失敗したとき（`JobExecutionAlreadyRunningException` など）は 1 で JVM を終える。
-- パラメータは JobParameters で受け取り、`JobParametersValidator` で検査する。
-
-### 起動元
-
-EventBridge Scheduler、Step Functions などの起動元は決めない。
-AWS の構成は、[ADR-045](ADR-045-remove-aws-docs-and-production-cd-example.md) の AWS の規約の書き直しで決める。
-Job は、どの起動元から何度起動されても、下の JobInstance と再開で正しく終わるように作る。
+- 短い保守の処理（[ADR-079](ADR-079-resubmit-failed-event-publications-periodically-with-shedlock.md) の再投入、[#542](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/542) の archive の削除）は、これまでどおり `@Scheduled` で動かす。
+- 業務のバッチ（締め、集計、ファイルの配信と集信）は、Spring Batch の Job にし、Spring Boot の自動構成で動かす。
+  Spring Batch の構成を自分で宣言すると、`spring.batch.*` の設定と自動構成が退くためである。
+- 同じイメージを、Job の名前を渡して 1 回だけ起動する。
+  形は、手での 1 回の再投入（ADR-079）と同じにする。
+- 起動元（EventBridge Scheduler、Step Functions など）は決めず、[ADR-045](ADR-045-remove-aws-docs-and-production-cd-example.md) の AWS の規約の書き直しで決める。
+  Job は、どの起動元から何度起動されても、下の JobInstance と再開で正しく終わるように作る。
+- Job は、`shared.batch` の 1 つの追いつきの Runner が起動し、終わったら Runner が JVM を終えて `BatchStatus` の序数を終了コードにする。
+  Spring Boot は `SpringApplication.exit` を自分で呼ばず、`JobExecutionExitCodeGenerator` は `JobLauncherApplicationRunner.execute` が出すイベントだけから終了コードを決めるためである。
+  Runner は `JobLauncherApplicationRunner` を継承し、Job を流すたびに `super.execute` を呼ぶ。
+- 通常の起動では Spring Boot の Runner も作らせない。
+  Spring Boot の Runner は、Runner の Bean がほかになく、`spring.batch.job.enabled` が `false` でなければ作られ、Job が 2 つ以上あると名前なしの起動で失敗するためである。
 
 ### JobRepository
 
-- Spring Boot が構成する JDBC の JobRepository を使う。
-  Spring Batch 6 の既定の `ResourcelessJobRepository` は、再開と並行の実行に対応しないので使わない。
-- メタデータの表（`BATCH_*`）は `modulith` スキーマに置き、`spring.batch.jdbc.table-prefix` を `modulith.BATCH_` にする。
-  表は Liquibase の changeset で、Spring Batch の `schema-postgresql.sql` と同じ形に作る。
-  `spring.batch.jdbc.initialize-schema` は `never` にする。
-- 表と sequence の権限は、アプリロールにだけ与え、モジュールのロールには与えない。
-  JobRepository は自分のトランザクションを開き、その名前は機能モジュールのパッケージで始まらないので、`ModuleRoles.roleFor` がモジュールを返さず、アプリロールのまま動く（[ADR-094](ADR-094-switch-to-module-database-roles.md)）。
-  使い捨てのテストでも、アプリロールにだけ権限を与えたメタデータの表に書けた。
-  テナントも設定しない。
-  メタデータの表は、`modulith` スキーマのほかの表と同じく RLS の外に置く（[ADR-107](ADR-107-isolate-tenants-with-rls-set-per-transaction.md)）。
-- 実行の履歴（開始、終了、件数、成否）はこの表で持ち、自前の実行の記録の表は作らない。
-- メタデータの表の時刻の列は Spring Batch の決めた `TIMESTAMP` のままにし、業務の判断に使わない。
-  業務の期間は JobParameters で持つ。
+- Spring Boot が構成する JDBC の JobRepository を使い、メタデータの表を `modulith` スキーマに置いて、アプリロールにだけ権限を与える。
+  Spring Batch 6 の既定の `ResourcelessJobRepository` は、再開と並行の実行に対応しない（選択肢2）。
+  JobRepository のトランザクションの名前は機能モジュールのパッケージで始まらないので、`ModuleRoles.roleFor` がモジュールを返さず、アプリロールのまま動く（[ADR-094](ADR-094-switch-to-module-database-roles.md)）。
+  `modulith` スキーマは RLS の外にあり（[ADR-107](ADR-107-isolate-tenants-with-rls-set-per-transaction.md)）、テナントを設定せずに書ける。
+- 実行の履歴は JobRepository の表で持ち、自前の実行の記録の表を作らない。
+- メタデータの表の時刻は、業務の判断に使わない。
+  Spring Batch は JVM の既定のタイムゾーンの `LocalDateTime.now()` で書き、`timestamptz` でないためである。
+  JVM を UTC にする [ADR-006](ADR-006-utc-instant-absolute-time-policy.md) の決定を、Job の起動の前提にする。
 
-### JobInstance と追いつき
+### 期間と追いつき
 
-- 期間で区切る Job は、対象の期間の初日を、業務タイムゾーン（[ADR-046](ADR-046-derive-local-dates-with-configured-business-zone.md)）の `LocalDate` で、識別に使う JobParameter `period` にする。
-  1 つの期間を 1 つの JobInstance にする。
-- 月次の Job も毎日起動する。
-- 期間で区切る Job は、Spring Boot の `JobLauncherApplicationRunner` を継承して `execute` を上書きした、追いつきの Runner で起動する。
-  Runner は、Job の最後の JobInstance が COMPLETED ならその次の期間から、COMPLETED でなければその期間から、起動した時刻より前に終わった期間までを古い順に流す。
-  JobInstance がまだなければ、Job の設定が決める最初の期間から流す。
-  1 つの期間が COMPLETED にならなければ、そこで止め、残りの期間を次の起動に回す。
-  処理する期間がなければ、何も流さずに終了コード 0 で終える。
-- 期間を引数で渡して流す起動は作らない。
+- 期間で区切る Job は、期間の初日を識別の引数にし、1 つの期間を 1 つの JobInstance にする。
+  どの期間がいつ、何件で、成功したかを JobRepository から読めるためである（選択肢5）。
+- 月次の Job も毎日起動し、Runner が済んでいない期間を古い順に流し、COMPLETED にならない期間で止める。
+  追いつきを起動元に持たせないためである（選択肢6）。
+- Runner は、COMPLETED と ABANDONED の JobInstance を済んだ期間として扱う。
+  Spring Batch は ABANDONED の JobInstance を COMPLETED と同じく起動しないので、済んだ期間として扱わないと Runner が毎日同じ期間で止まるためである。
+  ABANDONED は、運用者がその期間を Job で流さないと決めた印にする。
+- 期間が終わってから決めた時間を待って流し、期間が締まった後にその期間の行が増えない列で行を選ぶ。
+  COMPLETED の JobInstance は二度と流れず、次の期間の Job は期間で行を絞るので、後から入った行を拾う処理がないためである。
 - `JobParametersIncrementer` は使わない。
   Spring Batch 6.0.6 の `SimpleJobOperator.start` は、incrementer を持つ Job では渡した引数を捨て、前の JobExecution の引数から次の引数を作るので、失敗した期間を飛ばす。
-- 自前の「最後に処理した期間」の列は作らない。
-- 期間の境界は Java で業務タイムゾーンから求めて SQL に引数で渡し（[ADR-114](ADR-114-pass-calendar-dates-as-full-date-and-bind-boundaries.md)）、半開区間で書く。
+- 期間の境界は Java で業務タイムゾーンから求めて SQL に引数で渡す（[ADR-114](ADR-114-pass-calendar-dates-as-full-date-and-bind-boundaries.md)）。
 
-### 再開
+### 再開と失敗
 
-- 失敗した JobInstance は、次の起動で追いつきの Runner が同じ識別の引数で流し、Spring Batch の再開で、失敗した Step と chunk から続ける。
-- DB から読む reader は process indicator にする。
-  業務の行の状態の列で未処理だけを選び、読んだ位置を ExecutionContext に保存しない。
-  ファイルから読む reader は、Spring Batch の reader の既定のとおり読んだ位置を保存してよい。
-- 1 件の失敗は、Spring Batch の skip と retry で扱う。
+- DB から読む reader は process indicator にし、読んだ位置を保存しない。
+  Step の状態の保存と業務の書き込みが別のトランザクションなので（下の「トランザクションとロール」）、保存した位置と業務の行の状態がずれるためである。
+- 業務のバッチでは skip を使わない。
+  retry の上限を超えた競合と、ほかの例外は Step を失敗させ、Job を FAILED にして次の起動で再開する。
+  skip した行は未処理のまま残るが、skip のある Step も COMPLETED で終わり、期間の後に入った行と同じく、その行を読み直す処理がないためである。
+  同じ理由で、ロックを取れない行を `SKIP LOCKED` で飛ばさない。
+- 同じ行で失敗し続ける期間、UNKNOWN の期間、異常終了で STARTED のまま残った期間は、運用者が直す。
+  手順の Runbook は、最初の Job と同じ変更で作る（[#667](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/667)）。
 
 ### 二重の起動
 
-- 同じ JobInstance の 2 本目は、Spring Batch が `JobExecutionAlreadyRunningException` で止める。
-  COMPLETED の JobInstance の再起動は、`JobInstanceAlreadyCompleteException` で止める。
-- 業務のバッチには ShedLock を使わない。
-- それでも、書き込みは業務のキーの一意制約と、状態の遷移を WHERE に書いた UPDATE で守る（[#551](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/551) と同じ）。
+- 同じ JobInstance の二重の起動は、多くの場合 JobRepository が止める。
+  業務のバッチには ShedLock を使わない（選択肢9）。
+- それでも、正しさは `handle` の冪等性で守る（[#551](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/551) と同じ）。
+  Spring Batch 6.0.6 の `TaskExecutorJobLauncher` は、前の JobExecution の確認と新しい JobExecution の作成を別のトランザクションで行い、同時の 2 本を必ずは止めないためである。
 
 ### トランザクションとロール
 
-- Step に `transactionManager` と `transactionAttribute` を渡さない。
-  Spring Batch 6 の Step は、渡さなければ `ResourcelessTransactionManager` を使い、Step は DB のトランザクションを持たない。
-- ItemWriter と Tasklet は、1 件か 1 単位ごとに CommandHandler の `handle` を呼び、`handle` が自分の名前のあるトランザクションを開く。
-  [ADR-050](ADR-050-define-backend-class-roles-and-naming.md) の「トランザクションの境界は `handle`」と、ADR-094 のロールの切り替えをそのまま使う。
-- `handle` は 1 件ごとに commit するので、落ちた後の再開と skip の再試行で、同じ行が `handle` にもう一度渡る。
-  `handle` を冪等にし（process indicator、業務のキーの一意制約）、同じ結果に収める。
-- 1 件ごとの commit が遅いジョブは、Step にトランザクションを持たせず、1 つの Command に複数の行のキーを持たせ、1 回の `handle` で 1 つのトランザクションにまとめる。
+- Step はトランザクションを持たず、ItemWriter と Tasklet が呼ぶ CommandHandler の `handle` が 1 件か 1 単位ごとにトランザクションを開く。
+  [ADR-050](ADR-050-define-backend-class-roles-and-naming.md) の「トランザクションの境界は `handle`」と、ADR-094 のロールの切り替えをそのまま使うためである（選択肢3）。
+- `handle` を冪等にする。
+  1 件ごとに commit するので、落ちた後の再開と retry で、同じ行が `handle` にもう一度渡るためである。
 
-### 置き場所と役割
+### 置き場所
 
-- Job を持つ機能モジュールの中に `batch` の package（`com.example.demo.<module>.batch`）を作り、次の役割を置く。
-  役割の規則は [クラスの役割](../backend/class-roles/index.md) に置く。
-  - **`<Job>JobConfig`**：Job と Step を Bean で定義する `@Configuration`。
-  - **`<Job>ItemReader`**：処理する行を読む ItemReader。
-  - **`<Job>ItemWriter`**：chunk の 1 件ごとに CommandHandler を呼ぶ ItemWriter。
-  - **`<Job>Tasklet`**：chunk にしない 1 単位の処理で CommandHandler を呼ぶ Tasklet。
-- Job の名前は `<module>.<JobName>`（`ordering.CloseMonth`）にし、設計書の識別子にも使う。
-- `presentation` には置かない。
-  Job と Step の設定は chunk、skip、retry、partition で処理の進め方と再開の単位を決め、Controller のように要求を Command に変えるだけの薄い入口にならないためである。
-  機能モジュールの外にも置かない。
-  CommandHandler は各モジュールの内部の `application` にあり、外から呼ぶと Spring Modulith の `verify()` が止めるためである。
-- ItemReader は、自分のモジュールの `<Feature>Queries` を呼んで読む。
-  `<Feature>QueryService` の名前のある読み取り専用のトランザクションで、モジュールのロールとテナントが効く。
-  Spring Batch の JDBC の reader は使わず、`infrastructure.persistence` に reader を置かない。
-  JDBC の reader はアプリロールの接続で読み、業務のスキーマに権限がない。
-  `infrastructure.persistence` の reader は、`@Transactional` を `application` の public メソッドだけに許す ADR-050 の規則に反する。
-- ItemWriter と Tasklet は、1 件か 1 単位ごとに 1 つの CommandHandler だけを呼び、Repository、`TableWriter`、`DSLContext` を直接呼ばない。
-- `*_pgm_cd` は CommandHandler の `handle` の束縛（ADR-051）で入るので、`PgmCdAspect` の pointcut は変えない。
-  認証がないので、`*_by` には `*_pgm_cd` と同じ値が入る。
+- Job を持つ機能モジュールの `<module>.batch` に、Job の設定、ItemReader、ItemWriter、Tasklet の役割を置く。
+  `presentation` に置かないのは、Job と Step の設定が chunk、retry、partition で処理の進め方と再開の単位を決め、薄い入口にならないためである。
+  機能モジュールの外に置かないのは、内部の `application` の CommandHandler を外から呼ぶと、Spring Modulith の `verify()` が止めるためである。
+- 追いつきの Runner とテナントを束縛する Aspect は、`shared.batch` に 1 つずつ置く。
+  業務の概念を持たず、すべての Job に共通で、Job の設定が使う期間の規則の型を公開する必要があるためである。
+  `shared.infrastructure.persistence` は、他のモジュールの `infrastructure.persistence` だけが使える。
+- ItemReader は、自分のモジュールの `<Feature>Queries` で読む。
+  Spring Batch の JDBC の reader はアプリロールの接続で読み、業務のスキーマに権限がない。
+  `infrastructure.persistence` の reader は、`@Transactional` を `application` の public メソッドだけに許す ADR-050 に反する。
+- ItemWriter と Tasklet は 1 つの CommandHandler だけを呼ぶ。
+  `*_pgm_cd` は `handle` の束縛（ADR-051）で入るので、`PgmCdAspect` の pointcut を変えない。
 
 ### スパンとテナント
 
-- `*_tx_id` には、Spring Batch の Job と Step の observation が作るスパンの trace ID を使い、自前のスパンを始めない。
-  Spring Boot の構成は、Bean の Job と Step にアプリの `ObservationRegistry` を渡すので、Job と Step は Bean で定義する。
-- テナントの業務の表を書く Job は、Step を Spring Batch の partition（`Partitioner`）でテナントごとに分ける。
-  partition の一覧は `tenancy` の `<Feature>Queries` から `m_tenant` のテナントを読んで作り、各 partition の ExecutionContext にテナントの `public_id` を置く。
-- `shared.infrastructure.persistence` に Aspect を 1 つ置き、`<module>.batch` の ItemReader の `read`、ItemWriter の `write`、Tasklet の `execute` の呼び出しの間だけ、現在の Step の ExecutionContext のテナントを `TenantContext` に束縛する。
-  形と順序は、リスナーの `TenantListenerAspect`（[ADR-105](ADR-105-bind-tenant-to-request-and-event-context.md)）と同じにする。
-  テナントがない Step では、`IllegalStateException` で拒否する。
-- 1 つのテナントの partition が失敗しても、ほかのテナントの partition は流れる。
-  再開では、COMPLETED でない partition だけが流れる。
-- partition は既定の `SyncTaskExecutor` で順に流す。
-  並列に流すときは partition の `TaskExecutor` で行い、Step の中で DB への接続を並列にしない。
+- `*_tx_id` には、Spring Batch の Job と Step の observation が作るスパンの trace ID を使う。
+  Spring Boot がアプリの `ObservationRegistry` を渡すのは Bean の Job と Step だけなので、Job と Step は Bean で定義する。
+- テナントの業務の表を書く Job は、Step をテナントごとの partition に分け、partition の名前をテナントの `public_id` にする。
+  Spring Batch 6.0.6 の `SimpleStepExecutionSplitter` は、再開で同じ名前の partition の前回の ExecutionContext を使うので、連番の名前ではテナントが増減すると別のテナントの状態を引き継ぐためである。
+- partition のテナントは `shared.batch` の Aspect が束縛し、形と順序はリスナーの `TenantListenerAspect`（[ADR-105](ADR-105-bind-tenant-to-request-and-event-context.md)）と同じにする。
+- Step の中で DB への接続を並列にせず、並列は partition で行う。
+  スレッドごとにトランザクションが分かれ、Job の成否と再開の位置に一致しなくなるためである。
 
 ### オンラインとの排他
 
 - 排他の要否は、ジョブとオンラインが、同じ時間帯に同じ表の同じ行を書くかで決める。
   行の版（`lock_no`）は行ごとに 1 つなので、列が違っても同じ行なら版が競合する。
-- ジョブが読む行がオンラインでもう変わらない状態にあり、ジョブが自分のモジュールの表とイベントだけを書くなら、ロックも `REPEATABLE READ` も使わない。
-- 集約を更新するなら、読んだ版と行の版を比べ（[PostgreSQLの排他制御](../database/postgresql-concurrency-control.md)）、競合した 1 件は Spring Batch の retry で読み直し、それでも競合すれば skip する。
+- 集約を更新するなら、読んだ版と行の版を比べ（[PostgreSQLの排他制御](../database/postgresql-concurrency-control.md)）、競合は retry で読み直す。
 
 ## Consequences
 
 ### Positive
 
 - 入口、再開、二重の起動の検知、実行の履歴を自作せず、Spring Batch と Spring Boot の公開された API と設定で作る。
-  追いつきも、どの期間が COMPLETED かを JobRepository から読み、自作するのは期間を順に流す Runner だけになる。
+  自作するのは期間を順に流す Runner と、テナントを束縛する Aspect だけになる。
 - 1 つの期間が 1 つの JobInstance になり、どの期間がいつ、何件で、成功したかを JobRepository から読める。
 - 起動元に依存しないので、ADR-045 の書き直しで起動元を決めても Job を変えない。
 - トランザクションの境界が `handle` のままなので、ロール、テナント、`*_pgm_cd` の仕組みを変えない。
@@ -186,24 +164,22 @@ Job は、どの起動元から何度起動されても、下の JobInstance と
 
 - 1 件ごとに commit するので、chunk ごとに commit するより遅い。
   遅いジョブは、1 つの Command に複数の行をまとめて補う。
-- Step の状態の保存と業務の書き込みが別のトランザクションになり、再開と skip で同じ行がもう一度渡る。
-  すべての ItemWriter と Tasklet の `handle` を冪等にする必要がある。
-- 追いつきの Runner と、テナントを束縛する Aspect の 2 つは自作する。
-- 異常終了で STARTED のまま残った JobExecution は、次の起動を `JobExecutionAlreadyRunningException` で止める。
-  運用者が Spring Batch 6 の `JobOperator` の `recover` で直す必要がある。
+- すべての ItemWriter と Tasklet の `handle` を冪等にする必要がある。
+- 追いつきの Runner は、Spring Boot の自動構成のパッケージにある `JobLauncherApplicationRunner` を継承する。
+  `execute` と自動構成の条件は Spring Boot が互換を約束した拡張点ではなく、版を上げると変わることがある。
+  最初の Job の結合テストで、終了コードと Runner の差し替えを固定する。
+- skip を使わないので、1 件の業務上の失敗でその期間とそれより後の期間が止まり、運用者がデータパッチで直すまで流れない。
 - メタデータの表の時刻は、業務の表と違って `timestamptz` でなく、JVM の既定のタイムゾーンの時刻になる。
 
 ### Neutral
 
-- 最初のジョブと同じ変更で、次を足す。
-  - 依存と、メタデータの表の changeset。
-  - ItemWriter と Tasklet が Repository、`TableWriter`、`DSLContext` を使わないことと、`<module>.batch` の置き場所を確かめる ArchUnit の規則。
-  - ADR-105 の `TenantContext.call` の許可先と ArchUnit の規則に、テナントを束縛する Aspect を足す。
-  - `modulith` スキーマの表の一覧（[DB 接続](../database/connections.md)、[PostgreSQLのマルチテナント設計](../database/postgresql-multitenancy.md)）にメタデータの表を足す。
-  - 業務のモジュールが `tenancy` の `<Feature>Queries` を呼ぶ依存を、モジュールの依存の一覧に足す。
-  - STARTED のまま残った JobExecution を直す Runbook。
+- 最初の Job と同じ変更で足す依存、changeset、ArchUnit の規則、表の一覧の更新、Runbook は [#667](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/667) で扱う。
+- `tenancy` の `<Feature>Queries` に、全テナントの一覧を返すメソッドが要る。
+  ADR-107 の時点では、全テナントを読むコードがない（ADR-107 の選択肢6）。
+- Spring Batch と Spring Boot は、起動のときに JobParameters をすべて INFO のログに出す。
+  [処理ごとに記録するログ](../observability/log-output-points.md#一括処理) は allowlist の値だけを出すとしており、合わせ方は [#669](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/669) で決める。
+- 未起動と遅延を検知するメトリクスは、この ADR で決めない（[#668](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/668)）。
 - メタデータの表の保持期間と削除は、最初のジョブを作るときに決める。
-- 規則の本文は [バッチ](../batch/index.md) に置く。
 
 ## Alternatives Considered
 
@@ -211,7 +187,9 @@ Job は、どの起動元から何度起動されても、下の JobInstance と
 
 - **Description**：#314 の最初の結論。`EventPublicationResubmitOnce` と同じ形の Runner が環境変数を検査し、業務の表に持つ「最後に処理した期間」の次から追いつく。二重の起動は業務のキーの一意制約で止め、実行の記録の表を持たない。
 - **Pros**：依存が増えない。メタデータの表がない。
-- **Cons**：入口、引数の検査、追いつき、再開の位置、実行の履歴を自作し、テストする必要がある。Spring Batch を見送った理由の「再開の状態を JobRepository と業務の行の 2 か所に持つ」は、process indicator の形で成り立たない。
+- **Cons**：入口、引数の検査、追いつき、再開の位置、実行の履歴を自作し、テストする必要がある。
+  #314 の最初の結論は、Spring Batch を見送った理由に「再開の状態を JobRepository と業務の行の 2 か所に持つ」ことを挙げていた。
+  process indicator の reader は位置を保存せず、再開の状態を業務の行だけが持つので、この理由は成り立たない。
 
 ### 選択肢2: `ResourcelessJobRepository` を使う
 
@@ -223,13 +201,15 @@ Job は、どの起動元から何度起動されても、下の JobInstance と
 
 - **Description**：Step の `transactionManager` にアプリのトランザクションマネージャーを、`transactionAttribute` にモジュールの名前を渡す。
 - **Pros**：chunk の大きさの分だけ commit がまとまり、Step の状態の保存と業務の書き込みが同じトランザクションになる。
-- **Cons**：Step の状態の保存がモジュールのロールで流れ、`permission denied for table batch_step_execution_context` で失敗した（Context の確かめ）。動かすには、メタデータの表の権限をすべてのモジュールのロールに与え、テナントを Step の外で束縛する必要があり、ADR-094 のロールの分離と ADR-050 のトランザクションの境界に例外ができる。
+- **Cons**：Step の状態の保存がモジュールのロールで流れ、`permission denied for table batch_step_execution_context` で失敗した（Context の確かめ）。
+  動かすには、メタデータの表の権限をすべてのモジュールのロールに与え、テナントを Step の外で束縛する必要があり、ADR-094 のロールの分離と ADR-050 のトランザクションの境界に例外ができる。
 
 ### 選択肢4: メタデータの表を、どのモジュールにも属さない専用の `batch` スキーマに置く
 
 - **Description**：`modulith` と別のスキーマを作り、アプリロールに権限を与える。
 - **Pros**：Spring Batch の表と Spring Modulith の表が分かれる。
-- **Cons**：ADR-094 はアプリロールが触れる表を `modulith` スキーマに限り、ADR-107 は RLS の外に置くスキーマを `modulith` と `tenancy` に限る。2 つの ADR、changeset の検査、カタログのテストの除外を変える必要がある。ADR-111 はセッションの表を同じ理由で `modulith` に置いた。
+- **Cons**：ADR-094 はアプリロールが触れる表を `modulith` スキーマに限り、ADR-107 は RLS の外に置くスキーマを `modulith` と `tenancy` に限る。
+  2 つの ADR、changeset の検査、カタログのテストの除外を変える必要がある。ADR-111 はセッションの表を同じ理由で `modulith` に置いた。
 
 ### 選択肢5: 起動した日を 1 つの JobInstance にし、期間を業務の行で追う
 
@@ -259,11 +239,11 @@ Job は、どの起動元から何度起動されても、下の JobInstance と
 
 - **Description**：業務のバッチも ADR-079 と同じく ShedLock のロックを取る。
 - **Pros**：再投入と同じ仕組みで済む。
-- **Cons**：ShedLock は `lockAtMostFor` を超えた実行で複数のプロセスがロックを持ちうる。JobRepository が同じ JobInstance の二重の実行を止めるので、重ねる理由がない。
+- **Cons**：ShedLock は `lockAtMostFor` を超えた実行で複数のプロセスがロックを持ちうる。JobRepository も二重の起動を多くの場合止め、どちらも正しさを `handle` の冪等性に頼るので、重ねる理由がない。
 
 ### 選択肢10: オンラインが `NOWAIT` で悲観的ロックを取り、常にバッチで上書きする
 
-- **Description**：原文の「常にバッチで上書き」の形。
+- **Description**：取り込み元のフューチャーの「バッチ設計ガイドライン」（[ADR-040](ADR-040-import-future-architecture-guidelines.md)）が示す、オンラインのロックの失敗を返し、バッチは常に上書きする形。
 - **Pros**：バッチが楽観的ロックの失敗を扱わずに済む。
 - **Cons**：このリポジトリのオンラインは読んだ版と行の版を比べる楽観的ロックで（[ADR-054](ADR-054-detect-optimistic-lock-conflicts-by-update-count.md)）、HTTP の要求と応答をまたいで行のロックを保てない。
 
@@ -280,7 +260,7 @@ Job は、どの起動元から何度起動されても、下の JobInstance と
 - Spring Batch 6.0, Preventing State Persistence: <https://docs.spring.io/spring-batch/reference/6.0/readers-and-writers/process-indicator.html>
 - Spring Batch 6.0, What's new in Spring Batch 6: <https://docs.spring.io/spring-batch/reference/6.0/whatsnew.html>
 - Spring Batch 6.0, Scaling and Parallel Processing: <https://docs.spring.io/spring-batch/reference/6.0/scalability.html>
-- Spring Batch 6.0.6 のソース（`SimpleJobOperator`、`ChunkOrientedStep`、`TaskletStep`、`SimpleStepExecutionSplitter`、`BatchObservabilityBeanPostProcessor`）: <https://github.com/spring-projects/spring-batch/tree/v6.0.6/spring-batch-core>
+- Spring Batch 6.0.6 のソース（`SimpleJobOperator`、`TaskExecutorJobLauncher`、`ChunkOrientedStep`、`TaskletStep`、`SimpleStepExecutionSplitter`、`BatchObservabilityBeanPostProcessor`）: <https://github.com/spring-projects/spring-batch/tree/v6.0.6/spring-batch-core>
 - Spring Boot 4.1, Spring Batch: <https://docs.spring.io/spring-boot/4.1/reference/io/spring-batch.html>
 - Spring Boot 4.1, Batch Applications: <https://docs.spring.io/spring-boot/4.1/how-to/batch.html>
-- Spring Boot 4.1.2 のソース（`BatchJobLauncherAutoConfiguration`、`JobLauncherApplicationRunner`、`JobExecutionExitCodeGenerator`）: <https://github.com/spring-projects/spring-boot/tree/v4.1.2/module/spring-boot-batch>
+- Spring Boot 4.1.2 のソース（`BatchJobLauncherAutoConfiguration`、`JobLauncherApplicationRunner`、`JobExecutionExitCodeGenerator`、`SpringApplication`）: <https://github.com/spring-projects/spring-boot/tree/v4.1.2/module/spring-boot-batch>

@@ -1,7 +1,7 @@
 ---
 type: Convention
 title: クラスの役割：ItemReader
-description: 機能モジュールの batch に置き、Job が処理する行を自分のモジュールの <Feature>Queries から読む <Job>ItemReader の定義、置き場所と命名、必須の記述（process indicator、キーの順の読み方、位置を保存しないこと）、依存、例、テスト、アンチパターン、作成時のチェックリストを定める。Job が DB から読む行の選び方を作るときに読む。
+description: 機能モジュールの batch に置き、Job が処理する行を自分のモジュールの <Feature>Queries から読む <Job>ItemReader の定義、置き場所と命名、必須の記述（process indicator、キーの順の読み方、位置を保存しないこと）、依存、例、テスト、アンチパターン、作成時のチェックリストを定める規約で、Job が DB から読む行の選び方を作るときに読む。
 tags: [convention, backend, class-role, batch]
 ---
 
@@ -32,11 +32,10 @@ ItemReader は DB に直接触れない。
   `@StepScope` で、partition の Step の実行ごとに新しい reader になる。
 - `read` は、手元の件数を使い切ったら `<Feature>Queries` で次の件数を読み、なくなれば `null` を返す。
 - `<Feature>Queries` のメソッドは、未処理の行を業務のキーの昇順に、前に読んだキーより後から、決まった件数だけ返す。
-  skip した行は未処理のまま残るので、同じ Step の実行の中で読み直さないためである。
 - `ItemStream` を実装せず、読んだ位置を ExecutionContext に保存しない。
 - 読んだ行の全件をメモリに載せない。
 - テナントを自分で束縛しない。
-  `read` の呼び出しの間は、Aspect が partition のテナントを束縛する（[ジョブの入口と起動](../../batch/job-entry.md#スパンとテナント)）。
+  `read` の呼び出しの間は、Aspect が partition のテナントを束縛する（[トランザクション、ロール、テナント](../../batch/transaction-and-tenant.md#テナントごとの-partition)）。
 - クラス、フィールド、コンストラクタ、`read` に Javadoc を書く。
 
 ## 依存してよい型、してはいけない型
@@ -45,8 +44,6 @@ ItemReader は DB に直接触れない。
 - **依存してはいけない型**：Spring Batch の JDBC の reader（`JdbcCursorItemReader`、`JdbcPagingItemReader`）、`DataSource`、`JdbcTemplate`、`DSLContext`、Repository、CommandHandler、ほかのモジュールの `<Feature>Queries`。
 
 ## 最小の例
-
-まだこのリポジトリに Job はないので、名前は例である。
 
 ```java
 // com.example.demo.ordering.batch.CloseMonthItemReader（抜粋）
@@ -66,17 +63,14 @@ public @Nullable String read() {
 ## 対応するテスト
 
 ItemReader は、Job を起動する結合テストで確かめる。
-未処理の行だけを読むこと、skip した行を同じ実行で読み直さないこと、再開で未処理の行を読み直すことを含める（[バッチのテスト観点](../../batch/testing.md)）。
+未処理の行だけを読むこと、再開で未処理の行を読み直すことを含める（[バッチのテスト観点](../../batch/testing.md)）。
 
 ## アンチパターン
 
-- Spring Batch の JDBC の reader で、業務のスキーマを読む。
-  アプリロールの接続で読むので、業務のスキーマに権限がなく失敗する。
+- Spring Batch の JDBC の reader で、業務のスキーマを読む（理由は [ADR-115](../../adr/ADR-115-build-business-batches-with-spring-batch.md) の「置き場所」）。
 - `infrastructure.persistence` に reader を置き、jOOQ で読む。
-  トランザクションを `application` の外に作ることになる。
-- 処理済みの列で絞らず、読んだ位置を ExecutionContext に保存して再開する。
-  Step の状態の保存と業務の書き込みが別のトランザクションなので、位置と業務の行の状態がずれる。
-- 未処理の行を毎回先頭から読み、skip した行を同じ実行で何度も読む。
+- 処理済みの列で絞らず、読んだ位置を ExecutionContext に保存して再開する（理由は ADR-115 の「再開と失敗」）。
+- 未処理の行を毎回先頭から読み、前に読んだキーより後から読まない。
 
 ## 作成時のチェックリスト
 
