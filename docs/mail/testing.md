@@ -11,6 +11,8 @@ tags: [convention, mail, testing, wiremock, future-arch-guidelines]
 本物の宛先へ送らずに、送ったことと宛先、件名、本文を確かめる。
 本番の SES は手で疎通を確かめるだけにする。
 
+ESP は Amazon SES を前提にする（[送信ドメインの認証と評判](sending-domain.md#esp)）。
+
 ## ローカルとテスト
 
 - メールは、本番と同じ SES v2 の API の Client で送り、ローカル、結合テスト、E2E では接続先だけを WireMock に向ける。
@@ -25,7 +27,8 @@ tags: [convention, mail, testing, wiremock, future-arch-guidelines]
 
 ## 送る土台と読む手順
 
-- メールを送る Client、WireMock のスタブ、送ったメールを WireMock から読む手順は、[#571](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/571) で置く。
+- メールを送る Client、WireMock のスタブ、送ったメールを WireMock から読む手順は、まだ実装していない（[#571](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/571)）。
+  実装したら、この節を実装の場所と読む手順に書き換える。
 
 ## 出典
 
