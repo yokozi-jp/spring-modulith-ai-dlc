@@ -62,6 +62,7 @@ packageの`vite.config.ts`に`lint`か`fmt`があると、`vp lint`をpackageで
 - **`jsx-a11y`を部品へ効かせる**：`settings["jsx-a11y"].components`で`Link`を`a`、`Button`を`button`に対応づけ、中身が空の`Link`と`Button`を`anchor-has-content`と`control-has-associated-label`が報告するようにする。
   `jsx-a11y/anchor-is-valid`は`specialLink: ["to"]`にして、`<Link to>`を有効なリンクとして扱う（この規則だけで、ほかの規則は`href`を見る）。`<a href="#">`は引き続き報告する。
   `<Link to onClick>`は`no-static-element-interactions`などが報告する。
+  `packages/ui`の部品が`components`に載っているかは、`frontend/lint/workspace-layout.test.js`が確かめる。
   名前を変えたimport（`Link as RouterLink`）は`components`に載らず、検査されない。
 - **`apps/*/src/routes/**`**：`react/only-export-components`をoffにする。
 - **テストファイル**：`react/jsx-no-literals`と`import/max-dependencies`をoffにする。

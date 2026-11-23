@@ -165,4 +165,36 @@ describe("依存の版", () => {
       '版を pnpm-workspace.yaml の catalog に移し、package.json には "catalog:" と書く',
     ).toStrictEqual([]);
   });
+
+  // components に足し忘れた部品は、中身が空でも jsx-a11y が報告しない。素の要素を包まない部品は、ここに名前を足して外す。
+  /** @type {Set<string>} */
+  const notWrappingElements = new Set();
+
+  it("packages/ui の部品が jsx-a11y の components に載っている", async () => {
+    const uiSource = path.join(frontendRoot, "packages/ui/src");
+    const exported = readdirSync(uiSource)
+      .filter((file) => file.endsWith(".tsx") && !file.includes(".test."))
+      .flatMap((file) => {
+        const source = readFileSync(path.join(uiSource, file), "utf8");
+        const names = [...source.matchAll(/^export\s*\{(?<names>[^}]*)\}/gmu)].flatMap((match) =>
+          (match.groups?.names ?? "").split(","),
+        );
+        const declared = [...source.matchAll(/^export\s+(?:function|const)\s+(?<name>\w+)/gmu)].map(
+          (match) => match.groups?.name ?? "",
+        );
+        return [...names, ...declared].map((name) => name.trim());
+      })
+      .filter((name) => /^[A-Z]/u.test(name));
+    const loaded = await loadConfigFromFile(
+      { command: "serve", mode: "test" },
+      path.join(frontendRoot, "vite.config.ts"),
+    );
+    const mapped = Object.keys(loaded?.config.lint?.settings?.["jsx-a11y"]?.components ?? {});
+
+    expect(
+      exported.filter((name) => !mapped.includes(name) && !notWrappingElements.has(name)),
+      "vite.config.ts の lint.settings の jsx-a11y.components に足す（素の要素を包まない部品はこのテストの notWrappingElements に足す）",
+    ).toStrictEqual([]);
+    expect(exported).toContain("Button");
+  });
 });
