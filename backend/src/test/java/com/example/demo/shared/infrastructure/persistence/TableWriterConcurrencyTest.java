@@ -7,6 +7,7 @@ import static com.example.demo.shared.infrastructure.persistence.FixtureAggregat
 import static com.example.demo.shared.infrastructure.persistence.FixtureAggregates.itemRoot;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.awaitility.Awaitility.await;
 
 import com.example.demo.shared.concurrency.ConflictException;
 import com.example.demo.testkit.DatabaseTest;
@@ -27,6 +28,7 @@ import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.regex.Pattern;
 import javax.sql.DataSource;
+import org.awaitility.core.ConditionTimeoutException;
 import org.jooq.Condition;
 import org.jooq.DSLContext;
 import org.jooq.Record;
@@ -118,16 +120,18 @@ class TableWriterConcurrencyTest {
     try (ExecutorService watcher = Executors.newSingleThreadExecutor();
         Connection sessionB = openSessionB()) {
       updateInSessionB(sessionB);
-      final Future<Boolean> committed =
-          watcher.submit(() -> commitWhenAnotherSessionWaits(sessionB));
+      final Future<Void> committed =
+          watcher.submit(() -> {
+            commitWhenAnotherSessionWaits(sessionB);
+            return null;
+          });
 
       assertThatThrownBy(() -> runInUseCase(() -> updateItem(1L, List.of())))
           .isInstanceOf(ConflictException.class)
           .hasMessageContaining("row was updated by another request")
           .satisfies(thrown -> assertConflictWithoutSql(thrown, ConflictException.Kind.VERSION));
-      assertThat(committed.get(WAIT_LIMIT.toMillis(), TimeUnit.MILLISECONDS))
-          .as("A がロックを待ってから B がコミットした")
-          .isTrue();
+      // A がロックを待ってから B がコミットしたことは、見張りが例外なく戻ることで確かめる。
+      committed.get(WAIT_LIMIT.toMillis(), TimeUnit.MILLISECONDS);
       final Record row =
           DSL.using(sessionB, SQLDialect.POSTGRES)
               .selectFrom(FIXTURE_ITEM)
@@ -255,32 +259,41 @@ class TableWriterConcurrencyTest {
   }
 
   /**
-   * 別のセッションが行ロックを待ち始めたら B をコミットする。待ちが見えないまま上限を過ぎたら、B をコミットして {@code false} を返す。
+   * 別のセッションが行ロックを待ち始めたら B をコミットする。待ちが見えないまま上限を過ぎたときも、B をコミットしてから、待ちを見つけられなかった失敗を投げる。
    *
    * <p>このテストの A は {@code SET LOCAL} で {@code lock_timeout} を 4 秒にし、見張りは 10 ミリ秒ごとに最長 3 秒 {@code
    * pg_stat_activity} を見る。3 秒は A の {@code lock_timeout} より短く、A の {@code lock_timeout} は {@code
    * statement_timeout}（テストでは 5 秒）より短い。
    */
-  private boolean commitWhenAnotherSessionWaits(final Connection sessionB)
-      throws SQLException, InterruptedException {
+  private void commitWhenAnotherSessionWaits(final Connection sessionB) throws SQLException {
     try (Connection monitor = dataSource.getConnection()) {
       monitor.setAutoCommit(true);
       final DSLContext monitorDsl = DSL.using(monitor, SQLDialect.POSTGRES);
-      final long deadline = System.nanoTime() + WAIT_DETECTION_LIMIT.toNanos();
-      boolean waiting = false;
-      while (!waiting && System.nanoTime() < deadline) {
-        waiting =
-            monitorDsl.fetchExists(
-                DSL.table(DSL.name("pg_catalog", "pg_stat_activity")),
-                DSL.field(DSL.name("wait_event_type"), String.class)
-                    .eq("Lock")
-                    .and(DSL.field(DSL.name("datname"), String.class).eq(DSL.currentCatalog())));
-        if (!waiting) {
-          TimeUnit.MILLISECONDS.sleep(10);
+      try {
+        await("別のセッションの行ロックの待ち")
+            .atMost(WAIT_DETECTION_LIMIT)
+            .pollInterval(Duration.ofMillis(10))
+            .untilAsserted(() ->
+                assertThat(
+                        monitorDsl.fetchCount(
+                            DSL.table(DSL.name("pg_catalog", "pg_stat_activity")),
+                            DSL.field(DSL.name("wait_event_type"), String.class)
+                                .eq("Lock")
+                                .and(
+                                    DSL.field(DSL.name("datname"), String.class)
+                                        .eq(DSL.currentCatalog()))))
+                    .as("行ロックを待つセッションの数（期限 %s）", WAIT_DETECTION_LIMIT)
+                    .isPositive());
+      } catch (ConditionTimeoutException awaitFailure) {
+        // B のコミットの失敗が、待ちの失敗（期限と最後に観測した数）を覆い隠さないよう、抑制した例外として付ける。
+        try {
+          sessionB.commit();
+        } catch (SQLException commitFailure) {
+          awaitFailure.addSuppressed(commitFailure);
         }
+        throw awaitFailure;
       }
       sessionB.commit();
-      return waiting;
     }
   }
 
