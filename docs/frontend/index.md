@@ -1,6 +1,7 @@
 # フロントエンド
 
 - [フロントエンドアーキテクチャ](architecture.md)：業務機能の追加や分割、ディレクトリ構成、依存方向、共有コードの置き場所を決めるとき
+- [ファイルの役割](file-roles/index.md)：新しいファイルを作るとき、ファイルの役割を選んで作成時のチェックリストで点検するとき
 - [フロントエンドのルーティングと状態管理](routing-and-state.md)：route や loader を追加するとき、状態の置き場所や custom Hook を作るかを決めるとき、Effect の代わりの書き方を確認するとき
 - [OrvalとAPI境界](api-client-orval.md)：業務 API を追加するとき、Orval の生成設定や OpenAPI の tag と operationId、API の呼び出し方を変えるとき
 - [フロントエンドのUIとスタイル](ui-and-style.md)：component、style、アクセシビリティを追加または変更するとき

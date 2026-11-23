@@ -39,8 +39,7 @@ API の契約は OpenAPI、テーブル定義（表と列の論理名を含む�
 - 処理の目的、処理の流れ、計算式、条件分岐の業務ルール。
 - 複数項目の組み合わせや DB の参照が必要な入力検証の業務ルール。
 - 区分値を導入した目的と、区分値で分岐する業務ルール。
-- テーブルの保持期限は、[PostgreSQL のパーティションと改廃](../database/postgresql-partitioning-and-retention.md)の保持期限の一覧に書く。
-- テーブルが個人データ（[PostgreSQL のテーブル論理設計](../database/postgresql-logical-design.md#個人データ)）を含むかどうかは、保持期限と同じ一覧に書く。
+- テーブルの保持期限と、個人データ（[PostgreSQL のテーブル論理設計](../database/postgresql-logical-design.md#個人データ)）を含むかどうかは、[テーブルごとの保持期限と個人データの有無の一覧](../database/table-retention-and-personal-data.md)に書く。
 
 ## 正本から作る補足
 

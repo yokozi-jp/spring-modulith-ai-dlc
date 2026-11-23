@@ -97,6 +97,12 @@ rollback:
 
 コメントを変えたchangesetでも、jOOQのコードを生成し直します（[jOOQコード生成物の管理](jooq-codegen.md)）。
 
+## テーブルを足す、消すとき
+
+テーブルを作る、または消すchangesetは、同じ変更で[保持期限と個人データの有無の一覧](table-retention-and-personal-data.md)の行を足すか消します。
+`SchemaInspectionTest`が、DBのテーブルと一覧の行の食い違いを検出します。
+作りかけのchangesetでは、スキーマタグがないとこのテストが失敗するため、`task test-dev`で確かめます。
+
 ## CIでの検証
 
 バックエンドCIは使い捨てPostgreSQLに対して`verifyDatabaseMigrations`を実行します。

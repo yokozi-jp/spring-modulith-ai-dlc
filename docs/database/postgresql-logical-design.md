@@ -109,8 +109,7 @@ Spring Modulithのイベント出版テーブルのように、フレームワ�
 
 - IdPが持つ利用者の属性（氏名、メールアドレスなど）は、業務の処理に要るときだけ業務テーブルへ写す。
   画面に表示するためだけには写さない。
-- 表が個人データを含むかどうかは、テーブルごとの保持期限の一覧に書く（[設計書と正本の分担](../writing/design-doc-sources-of-truth.md#正本にない情報)）。
-  この一覧はまだなく、[#596](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/596)で作る。
+- 表が個人データを含むかどうかは、[テーブルごとの保持期限と個人データの有無の一覧](table-retention-and-personal-data.md)に書く。
 
 カラムが個人データかどうかは機械で判定できないため、changesetのレビューで確かめる。
 取り込む範囲は[ADR-040](../adr/ADR-040-import-future-architecture-guidelines.md)に示す。

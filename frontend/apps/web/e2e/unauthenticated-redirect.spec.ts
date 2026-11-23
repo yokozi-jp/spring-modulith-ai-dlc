@@ -35,3 +35,16 @@ test("テナントを選ぶ操作がアプリのセッション切れで 401 に
   await expect(page).toHaveURL(`${webOrigin}/tenants`);
   await expect(heading).toBeVisible();
 });
+
+// test-user は 2 つのテナントに属するため、ログインの後にテナントを選ぶ画面を挟み、選んだ後の `/` が戻り先を読む。
+test("未認証で /orders/new?from=e2e を開くと、ログインとテナントの選択の後に元の画面へ着く", async ({
+  page,
+}) => {
+  await openExpectingLogin(page, "/orders/new?from=e2e");
+  await signInOnKeycloak(page);
+  await expect(page).toHaveURL(`${webOrigin}/tenants`);
+
+  await page.getByRole("button", { name: "サンプル商事" }).click();
+
+  await expect(page).toHaveURL(`${webOrigin}/orders/new?from=e2e`);
+});
