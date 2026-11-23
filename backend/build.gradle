@@ -68,12 +68,13 @@ ext {
     set('springModulithVersion', "2.1.2")
 }
 
-// Dependabot が docker-compose の image だけを更新しても jar の版が追従するよう、版の正本を compose-test.yml に置く（ADR-072、ADR-085）。
-def wiremockMatch = (file('../docker/compose-test.yml').text =~ /image:\s*wiremock\/wiremock:([\d.]+)@/)
-if (!wiremockMatch.find()) {
+// 版の正本は compose-test.yml の image の tag（ADR-072、ADR-085）。Dependabot が image だけを上げても jar が追従する。
+// backend/Dockerfile のビルドの文脈は backend/ だけでファイルが無い。イメージのビルドはテストを実行しないため、無いときは jar を足さない。
+def composeTest = file('../docker/compose-test.yml')
+def wiremockMatch = composeTest.exists() ? (composeTest.text =~ /image:\s*wiremock\/wiremock:([\d.]+)@/) : null
+if (wiremockMatch != null && !wiremockMatch.find()) {
     throw new GradleException('docker/compose-test.yml に wiremock/wiremock:<版>@ の image が見つからない')
 }
-def wiremockVersion = wiremockMatch.group(1)
 
 dependencies {
     // --- Web・API ---
@@ -150,7 +151,9 @@ dependencies {
     testImplementation 'net.datafaker:datafaker:2.7.0'
     // 決済代行の結合テストの偽物。standalone は Jetty を shade 済みで Spring Boot の依存と衝突しない。
     // 版は docker/compose-test.yml の WireMock のイメージの tag から読み、jar とイメージを同じ版にする。Spring BOM の管理外。
-    testImplementation "org.wiremock:wiremock-standalone:${wiremockVersion}"
+    if (wiremockMatch != null) {
+        testImplementation "org.wiremock:wiremock-standalone:${wiremockMatch.group(1)}"
+    }
     // テストの JVM ごとに PostgreSQL、WireMock のコンテナを起動する（ADR-085）。版は Spring Boot が管理する。
     testImplementation 'org.testcontainers:testcontainers-postgresql'
     // テストのコンテナのイメージとコマンドを docker/compose-test.yml から読む（ADR-085）。版は Spring Boot が管理する。
