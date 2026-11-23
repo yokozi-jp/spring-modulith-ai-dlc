@@ -94,6 +94,8 @@ Kiro Web はリポジトリの clone を終える前に MCP サーバーを起�
 | `Config files in ... are not trusted`                        | `gh` や `java` の shim が mise に止められている。                 | `kiro-web.sh` を source する。                                                                               |
 | `task: command not found`、`iwe` や `lefthook` が無い        | `kiro-web.sh` を source していない。                              | `kiro-web.sh` を source する。                                                                               |
 | `/tmp` のファイルが次の tool call で消える                   | `/tmp` は tool call ごとに消える。                                | ログは `$KIRO_WEB_HOME` に書く。                                                                             |
+| `source` の後に `java` や `task` が見つからない              | `source` をパイプにつないだ。                                     | パイプにつなげず、`source` だけを実行する。                                                                  |
+| `~` へのファイル作成が `Read-only file system` で失敗        | `~` は読み取り専用である。                                        | `$KIRO_WEB_HOME` に書く。                                                                                    |
 | `grep_search` の `includePattern` に一致しない               | パスの起点がワークスペースのルート（`/projects/sandbox`）である。 | ルートからのパスで書く。例は `spring-modulith-ai-dlc/docs/**/*.md`。                                         |
 | `execute_bash` の出力が 30000 文字で切れる                   | 長い出力は、プレビューに切り詰められる。                          | 全文はセッションの tool-outputs に保存されるので、`grep` と `tail` で読む。                                  |
 | `docker info --format '{{.ServerVersion}}'` が失敗する       | `docker` は Podman への中継で、`ServerVersion` を返さない。       | `--format` を付けず、`docker info` の本文を読む。                                                            |
@@ -122,6 +124,7 @@ Kiro Web のセッションには `invoke_sub_agent` が無く、[RGDD の開発
 この recipe は、異なるモデルの2人の reviewer を並列に動かし、`<workdir>/.agents/reviews/` に1つの指摘一覧を書く。
 
 - `target` に、レビューする Pull Request のブランチと `main` の差分、`.kiro/.kiro-plugins-installed` に載るファイルを対象外にすること、重点を置くファイルを書く。
+- テストや検査を実行させるときは、`target` に「実行の前に `source docs/local-env-setup/kiro-web.sh` を実行する」と書く。書かないと reviewer は `docker` が動かないと報告し、DB を使うテストを未実行の指摘にする。
 - `workdir` にリポジトリのルートを渡す。`.agents/reviews/` の報告はコミットしない。
 - 2人の reviewer は `/thermos` の2観点（正しさとセキュリティ、保守性）に分かれない。同じ差分を独立に読み、結果を1つにまとめる。保守性の観点は `target` に書いて伝える。
 - 規約への照らし合わせは `/thermos` と同じく、起動したセッションで [レビュー観点と参照する規約](../code-review/review-viewpoints.md) に従って行い、同じ一覧に加える。

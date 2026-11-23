@@ -68,13 +68,12 @@ class OrderTest {
   void draftRejectsMissingProduct() {
     final ProductId missing = new ProductId(UUID.randomUUID());
 
-    assertThatThrownBy(
-            () ->
-                Order.draft(
-                    "C-0001",
-                    List.of(new OrderedItem(missing, new Quantity(1))),
-                    OFFERS,
-                    Instant.now(CLOCK)))
+    assertThatThrownBy(() ->
+            Order.draft(
+                "C-0001",
+                List.of(new OrderedItem(missing, new Quantity(1))),
+                OFFERS,
+                Instant.now(CLOCK)))
         .isInstanceOf(BusinessRuleViolationException.class)
         .hasMessageStartingWith("product not found: orderId=")
         .hasMessageContaining("productId=" + missing.value());
@@ -163,11 +162,11 @@ class OrderTest {
   }
 
   @Test
-  @DisplayName("1 未満の数量と負の金額は BusinessRuleViolationException になる")
+  @DisplayName("1 未満の数量と負の金額は IllegalArgumentException になる")
   void valueObjectsRejectInvalidValues() {
-    assertThatThrownBy(() -> new Quantity(0)).isInstanceOf(BusinessRuleViolationException.class);
+    assertThatThrownBy(() -> new Quantity(0)).isInstanceOf(IllegalArgumentException.class);
     assertThatThrownBy(() -> new Money(new BigDecimal("-1")))
-        .isInstanceOf(BusinessRuleViolationException.class);
+        .isInstanceOf(IllegalArgumentException.class);
   }
 
   private static Order draft(final OrderedItem... items) {

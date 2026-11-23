@@ -194,6 +194,9 @@ H6は、`UnversionedOrderRepository`（集約ルートではなく識別子を�
 `sharedModuleDoesNotDependOnHttp`は、違反フィクスチャの`shared.infrastructure.persistence`の`ChildRowWriter`が`ResponseStatusException`を投げることを検出する。
 MapStruct、ModelMapper、Dozerはテストのクラスパスにないため、`mappingLibrariesAreNotUsed`のフィクスチャは`DefaultRecordMapper`と`DefaultRecordUnmapper`への依存だけで確かめる。
 
+`TestConventionsArchTest`の`sleepIsNotUsedInTests`は、`SleepRuleFixtureTest`が`archfixture.sleep`のクラスで確かめる。
+直接の呼び出しとメソッド参照が検出され、`Thread`と`TimeUnit`以外の`sleep`が検出されないことを固定する。
+
 規則を追加するときは、違反フィクスチャのクラスを一つ追加し、`eachRuleDetectsItsViolatingFixture`の行と`rulesFor()`に規則を加える。
 この手順で、新しい規則が違反を検出し、規約どおりのコードを誤検出しないことを確かめる。
 注釈の属性の値で判定する規則では、属性を省いて既定値のままにした注釈も違反フィクスチャに置く。
@@ -442,6 +445,7 @@ changesetの検査は`modulith`スキーマを、スキーマ検査は`modulith`
 - `@Test`を持つクラス名が`Test`で終わる。
 - `@SpringBootTest`を直接付けたクラスが`SharedTestConfiguration`を`@Import`する。
 - `assertTimeoutPreemptively`を呼ばない。
+- `Thread.sleep`と`TimeUnit.sleep`を、呼び出しでもメソッド参照でも使わない。同名の別のメソッドは対象にしない。
 - テストコードでレガシー日時型を使わない。
 - クラスまたはメソッドの`@Disabled`に理由がある。
 
@@ -450,7 +454,7 @@ changesetの検査は`modulith`スキーマを、スキーマ検査は`modulith`
 
 ## PMD
 
-PMDはmainとtestに別のrulesetを適用し、Lombokの`@Data`と`@Setter`、手書きのLoggerフィールド、`LoggerFactory`の直接参照、`getLogger`のstatic import、`@Autowired`を付けた通常メソッドなどを検査する。
+PMDはmainに`ruleset.xml`を、testに`ruleset.xml`と`test-ruleset.xml`の両方を適用し、Lombokの`@Data`と`@Setter`、手書きのLoggerフィールド、`LoggerFactory`の直接参照、`getLogger`のstatic import、`@Autowired`を付けた通常メソッド、enum、型パターン、recordパターンのswitchの`default`（`NoDefaultInPatternOrEnumSwitch`）などを検査する。
 PMDの設定は[`ruleset.xml`](../../backend/config/pmd/ruleset.xml)と[`test-ruleset.xml`](../../backend/config/pmd/test-ruleset.xml)を正とする。
 カスタム規則の`message`は、ArchUnitのbecauseと同じ「理由。直し方：…。規約：…」の形にする。
 `ArchitectureRuleMessageTest`が、この形と「規約：」のパスの実在を確かめる。

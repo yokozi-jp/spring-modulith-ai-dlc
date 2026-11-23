@@ -291,6 +291,7 @@ tasks:
       - task: removed-names-check
       - task: ruleset-check
       - task: iwe-mcp-check
+      - task: iwe-tools-check
       - |
         iwe schema validate
         stats="$(iwe stats -f json)"
@@ -342,6 +343,14 @@ tasks:
     silent: true
     cmds:
       - bash tooling/iwe-mcp/test.sh
+
+  # iwec の全ツールが、残す読み取り系か mcp.json の disabledTools に入っているかを検査する。
+  iwe-tools-check:
+    internal: true
+    silent: true
+    cmds:
+      - bash tooling/iwe-tools/test.sh
+      - bash tooling/iwe-tools/check.sh
 
   # .github/rulesets/main.json の必須チェックを、branch-protection.md の一覧と workflow の name に突き合わせる。
   # ponytail: GitHub 上の ruleset との一致は CI で見ない。認証が要るため、比べるのは手元の task ruleset-diff で、限界に当たったら CI で API と比べる。
@@ -502,7 +511,21 @@ tasks:
     cmds:
       - bash tooling/ci-gate-check/test.sh
       - bash tooling/ci-changes/test.sh
+      - bash tooling/test-weakening/test.sh
       - python3 tooling/ci-gate-check/ci-gate-check.py
+
+  # テストファイルの削除とテストケースの減少を警告する。止めず、TESTS_ACK=1 で抑える。
+  test-weakening:
+    desc: テストファイルの削除とテストケースの減少を警告
+    silent: true
+    cmds:
+      - bash tooling/test-weakening/check.sh
+
+  test-weakening-test:
+    desc: test-weakening の自己検査
+    silent: true
+    cmds:
+      - bash tooling/test-weakening/test.sh
 
   # CI の job は使う道具だけを入れるので、ほかの道具の版を上げて lock を作り直さない変更はここで止める（ADR-090）。
   mise-lock-check:
@@ -948,8 +971,15 @@ tasks:
       - task: api-lint
 
   be-openapi-check:
-    desc: 直前のbe-testが書き出したOpenAPI契約をSpectralで検査し、コミット済みの内容と一致するか検査（前提はbe-testの実行済み。単体ではdriftを検出できない）
+    desc: 直前のbe-testが書き出したOpenAPI契約をSpectralで検査し、コミット済みの内容と一致するか検査（前提はbe-testの実行済み。be-testの開始後に契約が書かれていなければ失敗する）
     cmds:
+      # be-test の開始より新しくなければ、テストは契約を書き出していない（#467）。
+      # 契約を消さずに印の時刻と比べるのは、同じ実行の ApiContractCoverageTest が契約を読むため（ADR-077）。
+      - |
+        if [ ! -e backend/build/be-test.stamp ] || ! [ openapi/openapi.yaml -nt backend/build/be-test.stamp ]; then
+          echo "be-test の実行中に openapi/openapi.yaml が書き出されていません。task be-test を実行してください。" >&2
+          exit 1
+        fi
       - task: api-lint
       - task: api-drift-check
         vars: { PATHS: openapi/openapi.yaml }
@@ -959,6 +989,7 @@ tasks:
     dir: backend
     deps: [_ensure-test-env]
     cmds:
+      - mkdir -p build && touch build/be-test.stamp
       - ./gradlew test jacocoTestCoverageVerification -PopenapiExport=true -PtestEnvFile="../{{.TEST_ENV_FILE}}"
 
   be-test-dev:
@@ -1078,6 +1109,8 @@ tasks:
       vars: [PATHS]
     cmds:
       - |
+        # 追跡されていない path は git diff も ls-files --others も何も出さず、検査が素通りする。
+        git ls-files --error-unmatch -- {{.PATHS}} >/dev/null || { echo "追跡されていない path があります。PATHS を確認してください。" >&2; exit 1; }
         status=0
         git diff --exit-code -- {{.PATHS}} || status=1
         untracked="$(git ls-files --others --exclude-standard -- {{.PATHS}})"
@@ -1799,6 +1832,7 @@ tasks:
         echo "Taskfile OK: YAML構文とスキーマ構造の解析に成功しました。"
         bash tooling/taskfile-cleanup/test.sh
         bash tooling/task-calls/test.sh
+        bash tooling/openapi-drift/test.sh
         bash tooling/task-calls/task-calls.sh
 
   lint-lefthook:

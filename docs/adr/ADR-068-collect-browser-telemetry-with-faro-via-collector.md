@@ -47,7 +47,7 @@ Faro の形式を受ける contrib の `faroreceiver` は、Collector 0.161.0 �
 
 このリポジトリは、標準的な Web アプリのほぼすべてが本番で使うものだけを作る。
 tail sampling と Collector の振り分けの層は、必要になったプロジェクトが足す。
-外しても、バックエンドの trace（API から SQL まで）と、ログの trace ID からの調査は残る。
+外しても、バックエンドの trace（API から SQL まで）と、Problem Details の `traceId` での問い合わせは残る（[ADR-117](ADR-117-add-trace-id-and-omit-instance-in-problem-details.md)）。
 失うのは、ブラウザから見た所要時間（通信、TLS、CDN、待ち時間を含む）と、画面からの 1 本のつながりである。
 
 過去に Grafana Faro を採る ADR 案を ADR-009 の番号で起票したことがある。

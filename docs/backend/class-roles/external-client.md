@@ -107,7 +107,7 @@ Client は、外部システムの呼び出しの結果を次の四つに分け�
 | 資格情報の不備 | 401、403                                     | 例外を投げる         | 数えない        | `FAILED`     |
 | 契約の不備     | 401、403、429 以外の 4xx、契約に合わない応答 | 失敗を表す結果を返す | 数えない        | `COMPLETED`  |
 
-- 結果は `domain.model` の型（`ChargeOutcome` と、`PAID`、`DECLINED`、`FAILED` の `PaymentStatus`）で返す。
+- 結果は `domain.model` の型（`Paid`、`Declined`、`Failed` の三つの record を持つ sealed interface の `ChargeOutcome`）で返す。
   CommandHandler は結果を集約に記録して正常に返し、リスナーを正常終了させる。
 - 契約の不備は、Client が `HttpClientErrorException` を捕まえて失敗の結果に変え、状態のコードを WARN のログに残す。
 - 契約に合わない応答は、`201` 以外の 2xx と 3xx、本文がない、JSON として読めない（`UnknownContentTypeException`、原因が `HttpMessageNotReadableException`）、`status` が未知かない、`chargeId` がないか空白だけの応答である。

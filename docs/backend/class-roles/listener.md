@@ -176,13 +176,13 @@ public ChargeOrderResult handle(final ChargeOrderCommand command) {
   // 二度目の請求を避けるための先読み。並行の配信は INSERT の一意制約が ConflictException にする。
   final Optional<Payment> existing = paymentRepository.findByOrderId(orderId);
   if (existing.isPresent()) {
-    return new ChargeOrderResult(existing.get().id().value().toString());
+    return new ChargeOrderResult.AlreadyRecorded(existing.get().id().value().toString());
   }
   // ...
   final ChargeOutcome outcome = paymentGateway.charge(orderId, amount);
   final Payment payment = Payment.record(orderId, amount, outcome, Instant.now(clock));
   paymentRepository.add(payment);
-  return new ChargeOrderResult(payment.id().value().toString());
+  return new ChargeOrderResult.Charged(payment.id().value().toString());
 }
 ```
 

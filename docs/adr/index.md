@@ -14,7 +14,7 @@
 - [ADR-010: プロジェクトのタスクランナーに Task を採用する](ADR-010-adopt-task-as-project-task-runner.md)（Proposed, 2026-09-13）
 - [ADR-011: モジュール所有のデータベーススキーマを使う](ADR-011-use-module-owned-database-schemas.md)（Proposed, 2026-09-14）
 - [ADR-012: プロパティベーステストとミューテーションテストを採用する](ADR-012-adopt-property-based-and-mutation-testing.md)（Proposed, 2026-09-14）
-- [ADR-013: HTTP API 契約を標準化する](ADR-013-standardize-http-api-contracts.md)（Accepted, 2026-09-14）
+- [ADR-013: HTTP API 契約を標準化する](ADR-013-standardize-http-api-contracts.md)（Accepted, Amended by ADR-117, 2026-09-14）
 - [ADR-014: SPA とバックエンドを同一オリジンで公開する](ADR-014-use-same-origin-spa-security-boundary.md)（Accepted, 2026-09-14）
 - [ADR-015: 可観測性データを構造化し保護する](ADR-015-structure-and-protect-observability-data.md)（Accepted, Amended by ADR-110, 2026-09-15）
 - [ADR-016: API と SPA のメッセージをローカライズする](ADR-016-localize-api-and-spa-messages.md)（Accepted, Amended by ADR-047, 2026-09-15）
@@ -116,3 +116,4 @@
 - [ADR-114: 暦日を full-date で受け渡し、SQL で日時から暦日と境界を作らない](ADR-114-pass-calendar-dates-as-full-date-and-bind-boundaries.md)（Proposed, 2026-11-23）
 - [ADR-115: 業務のバッチを Spring Batch の Job で作り、1 つの期間を 1 つの JobInstance にして毎日追いつく](ADR-115-build-business-batches-with-spring-batch.md)（Proposed, 2026-11-23）
 - [ADR-116: フロントエンドのファイルを役割ごとに分け、役割ごとの文書とチェックリストを置く](ADR-116-define-frontend-file-roles.md)（Proposed, 2026-11-23）
+- [ADR-117: Problem Details に traceId を付け、instance を設定しない](ADR-117-add-trace-id-and-omit-instance-in-problem-details.md)（Proposed, 2026-11-23）

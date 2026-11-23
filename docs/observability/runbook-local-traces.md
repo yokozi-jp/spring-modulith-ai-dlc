@@ -1,7 +1,7 @@
 ---
 type: Runbook
 title: ローカルでトレースを見る
-description: ローカルの Grafana（grafana/otel-lgtm）で、バックエンドのログの trace ID からトレースを開く手順と、ブラウザを使わずに Grafana の proxy 経由で Tempo を検索する手順。API のトレースをローカルで確かめるときに使う。
+description: ローカルの Grafana（grafana/otel-lgtm）で、API の応答の traceId やバックエンドのログの trace ID からログとトレースを開く手順と、ブラウザを使わずに Grafana の proxy 経由で Tempo を検索する手順。API のトレースをローカルで確かめるときに使う。
 tags: [runbook, observability, tracing, grafana, tempo, local]
 ---
 
@@ -19,14 +19,26 @@ tags: [runbook, observability, tracing, grafana, tempo, local]
 
 ## trace ID からトレースを開く
 
-Problem Details に `traceId` は含まれない。
+失敗した API の応答の Problem Details は、その要求の trace ID を `traceId` に持つ（[HTTPステータスコードの選択](../web-api/status-codes.md#前提)）。
+利用者が問い合わせで伝えた `traceId` も、この節の手順で探す。
+Tomcat がアプリへ渡す前に拒否した要求（`text/html` の 400 や 505）は、Problem Details にならず、`traceId` を持たない。
+この要求はアプリの filter を通らないので、バックエンドのログにもトレースにも残らない。
+そのときは、失敗した要求が[アプリより前に拒否される要求](../web-api/edge-responsibilities.md#アプリより前に拒否される要求)の条件（リクエスト行とヘッダーの合計が 8KB を超える、HTTP の版が不正）に当たるかを確かめる。
+
 trace ID は、ログに出ているかどうかで探し方を分ける。
 
 - **ログに出ている**：trace ID の名前は、コンソールの ECS JSON では `traceId`（[可観測性データの規約](conventions.md)）、Grafana の Loki では `trace_id` である。
   バックエンドは失敗をログに残す。
   Explore の Loki で `{service_name="demo-api"} | trace_id != ""` を検索し、ログ行を開く。
+  `traceId` が分かっているときは、`{service_name="demo-api"} | trace_id = "<traceId>"` で、その trace ID を持つログに絞る。
   詳細の Links の `Trace: <trace ID>` を押すと、右の分割ペインで Tempo のトレースが開く。
-- **ログに出ていない**：次の「ブラウザを使わずに検索する」か、Explore の Tempo で TraceQL `{ resource.service.name = "demo-api" }` を実行し、一覧から開く。
+  見つからないときは、Grafana の右上の期間を、失敗した時刻を含むように広げる。
+  その trace ID を持つログには、要求が発行したイベントの非同期リスナーのログも入る（[非同期処理のトレースと監視](../integration/async-observability.md)）。
+  SPA の要求は `traceparent` を持たず、Spring Boot が要求ごとに新しい trace を始めるので、要求ごとに別の trace ID を持つ。
+  `traceparent` を自分で付けるクライアントが同じ trace ID を使い回すと、複数の要求のログが当たる。
+- **ログに出ていない**：ログを出さない失敗もある。
+  Spring Security の firewall が標準にない method を拒否した 400 は、ローカルで確かめたとき Loki のログが 0 行で、Tempo にはトレースがあった。
+  次の「ブラウザを使わずに検索する」か、Explore の Tempo で TraceQL `{ resource.service.name = "demo-api" }` を実行し、一覧から開く。
 
 trace ID が分かっているときは、次の順に開く。
 
