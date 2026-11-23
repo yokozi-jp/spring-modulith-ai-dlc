@@ -58,23 +58,25 @@ Grafana では trace ID を使ってログとトレースを相互に検索す�
 ログでは、2 つを MDC に入れ、ログを書く処理から key-value で渡さない。
 
 - `tenant.id` は、`TenantContext.call` がテナントを束縛する間だけ入る。リクエストのログにもリスナーのログにも付く。
-- `user.id` は、`TenantSelectionFilter` が、アプリの利用者（`AppUserPrincipal`）として認証したリクエストの間だけ入れる。リスナーのログには付かない。
+- `user.id` は、`UserIdMdcFilter` が、アプリの利用者（`AppUserPrincipal`）として認証したリクエストの間だけ入れる。リスナーのログには付かない。
 - `TenantSelectionFilter` が所属を引き直す間のログは、`user.id` を持ち、束縛の前なので `tenant.id` を持たない。
 - コンソールの ECS JSON では `{"tenant":{"id":…},"user":{"id":…}}` の入れ子の項目になり、OTLP では LogRecord の属性になる。
 - リスナーの外で記録するログ（リスナーが投げた例外を Spring の `SimpleAsyncUncaughtExceptionHandler` が記録する ERROR など）は、`tenant.id` を持たない。
 
-Spring Security の filter の連鎖のうち、`TenantSelectionFilter` の外で記録するログは、`tenant.id` も `user.id` も持たない。
-`TenantSecurityCustomizer` は、この filter を `ExceptionTranslationFilter` と `AuthorizationFilter` の間に置く。
-次のログがこれにあたる。
+`TenantSecurityCustomizer` は、`UserIdMdcFilter` を `SecurityContextHolderFilter` の直後（`CsrfFilter` の前）に、`TenantSelectionFilter` を `ExceptionTranslationFilter` と `AuthorizationFilter` の間に置く。
+次のログは、束縛の外で記録するので `tenant.id` を持たず、認証したアプリの利用者のものなら `user.id` を持つ。
 
-- `AuthorizationFilter` が拒否し、`ExceptionTranslationFilter` が返す 401 と 403（`user.id` を付ける案は #635 で扱う）
+- `AuthorizationFilter` が拒否し、`ExceptionTranslationFilter` が返す 403
 - `TenantSelectionFilter` が投げる `TenantNotSelectedException`
 - CSRF の検証の失敗
-- Spring Security の entry point
+
+認証していないリクエストのログは、`user.id` も `tenant.id` も持たない。
+401 と Spring Security の entry point のログがこれにあたる。
 
 Controller の中の `@PreAuthorize` が拒否したときのログは、2 つを持つ。
 
 トレースでは、`TenantSelectionFilter` が HTTP の受信の span にだけ、2 つを属性として付ける。
+`TenantSelectionFilter` の手前で拒否する CSRF の失敗の span は、ログと違い、どちらも持たない。
 
 - Micrometer の Observation の高い濃度の key value にだけ入れ、低い濃度の key value に入れない（理由は ADR-110）。
 - リスナーの処理の span は Spring Modulith が作る。この span には付けない。リスナーのログには `tenant.id` が付くので、ログの trace ID からたどる。
@@ -191,6 +193,23 @@ resource 属性はフロントエンドのログと同じ 4 つを Collector の
 URL の query と fragment の除去はこの規則の対象外とし、フロントエンドの pipeline に限って置く（[ADR-068](../adr/ADR-068-collect-browser-telemetry-with-faro-via-collector.md)）。
 
 faro receiver は処理に失敗すると、payload の全体を Collector 自身のログに ERROR で出す（[ADR-068](../adr/ADR-068-collect-browser-telemetry-with-faro-via-collector.md)）。
+
+全 pipeline の最初の processor に `memory_limiter` を置く（`check_interval: 1s`、`limit_percentage: 80`、`spike_limit_percentage: 25`）。
+上限を超えると受信を拒否し、Collector が OOM で落ちる前に負荷を落とす。
+OTLP は 503 を返すので送り手が再送する。
+faro と `webhook_event` は再送されず、拒否したデータは失われる。
+faro は拒否のときも payload の全体を ERROR で出す（上の ADR-068 の記録と同じ）。
+`limit_percentage` は cgroup の上限があればそれを、なければホストのメモリを基準にする。
+Compose の `otel-collector` にはメモリ上限が無いので、ローカルでは実質働かない。
+本番のサイドカーは、コンテナ単位のメモリ上限を置いて初めて意味を持つ。
+上限を決めたときに `GOMEMLIMIT` を hard limit の 80% で足す。それまでは設定しない。
+
+transform と filter の `error_mode` は `ignore` にする。
+失敗した文は Collector のログに warn で出て、処理は続く。
+次の processor だけは `silent` に残し、理由を設定のコメントに書く。
+
+- `transform/frontend_validate`、`transform/frontend_csp`：型や項目が違う record で nil に対する文が失敗するのが通常の経路で、record ごとに warn が出る。
+- `transform/frontend_csp_parse`：JSON でない本文を送られるたびに、送り手が書いた文字を含む warn が出る。
 
 ## 検証
 

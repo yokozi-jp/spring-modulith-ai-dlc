@@ -8,8 +8,7 @@ import { OrdersPage } from "@/features/orders/orders-page";
 
 export const Route = createFileRoute("/_authenticated/_tenant/orders/")({
   // 不正な status は捨てて全件を表示する（エラー画面にしない）。
-  // Zod の catch で、Promise の catch ではない。
-  // oxlint-disable-next-line promise/prefer-await-to-then, unicorn/prefer-top-level-await
+  // oxlint-disable-next-line promise/prefer-await-to-then, unicorn/prefer-top-level-await -- Zod の catch で、Promise の catch ではない。
   validateSearch: ListOrdersQueryParams.catch({}),
   loaderDeps: ({ search }) => ({
     status: isOrderStatus(search.status) ? search.status : undefined,

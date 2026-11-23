@@ -77,6 +77,23 @@ feature固有styleは対象componentの近くへ置く。
 ルートの `settings.shadcn.componentImports` でも、import元が `@frontend/ui` の部品を認識させる。
 認識した部品への `className` は `shadcn/no-restyle` が検査し、部品が持つ見た目のclassを検出する（[フロントエンドのLint設定](lint-config.md#例外と調整)）。
 
+## shadcnの部品の更新
+
+写した部品は依存ではないので、上流が変わってもDependabotは知らせない。
+Dependabotが上げるのはCLIの `shadcn`（`packages/ui/package.json`）の版だけで、`packages/ui/src` の部品は変わらない。
+
+次のときに、`packages/ui` で `vp exec shadcn add <部品名> --diff` を実行する。
+
+- 部品を直す前。
+- Dependabotが `shadcn` の版を上げたとき。
+
+`--diff` は何も書き込まず、上流の部品とこちらのファイルの差を出す。
+importの並びと書き方（`@frontend/ui/lib/utils` と `cn` など）は、追加後に `task fe-format` と設定で変えているため、差として出る。
+その差は取り込まない。
+上流の振る舞いやclassの変更だけを、手で `packages/ui/src/<部品名>.tsx` に取り込む。
+
+取り込んだあとは、追加のときと同じく `task fe-format` と `task fe-knip` を実行する。
+
 ## 関連資料
 
 - [ADR-025: shadcn/uiのBase UI版とTailwind CSSを採用する](../adr/ADR-025-adopt-shadcn-base-ui-and-tailwind.md)

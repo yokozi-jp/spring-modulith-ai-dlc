@@ -19,8 +19,7 @@ async function readProblem(response: Response): Promise<ProblemDetail | undefine
     return undefined;
   }
   try {
-    // 同一オリジンのバックエンドの形は契約テストが保証するため、Zod で検証しない（docs/frontend/api-client-orval.md）。
-    // oxlint-disable-next-line typescript/no-unsafe-type-assertion
+    // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- 同一オリジンのバックエンドの形は契約テストが保証するため、Zod で検証しない（docs/frontend/api-client-orval.md）。
     return (await response.json()) as ProblemDetail;
   } catch {
     return undefined;
@@ -93,8 +92,7 @@ export async function apiFetch<TResponse>(url: string, options: RequestInit): Pr
   // 本文が空の 201（Location だけ）でも response.json() の SyntaxError にならないよう、テキストで読む。
   const text = await response.text();
   const data: unknown = text === "" ? undefined : JSON.parse(text);
-  // 生成コードが期待する { data, status, headers } の型に合わせる。
-  // oxlint-disable-next-line typescript/no-unsafe-type-assertion
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- 生成コードが期待する { data, status, headers } の型に合わせる。
   return { data, status: response.status, headers: response.headers } as TResponse;
 }
 

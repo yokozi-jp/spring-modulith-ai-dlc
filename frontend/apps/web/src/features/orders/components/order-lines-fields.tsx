@@ -21,8 +21,7 @@ const defaultProps: OrderLinesFieldsProps = {
   idPrefix: "",
   products: [],
   serverErrors: { fields: {}, others: [] },
-  // withFieldGroup の props は型を与えるだけで、この関数は呼ばれない。
-  // oxlint-disable-next-line eslint/no-empty-function
+  // oxlint-disable-next-line eslint/no-empty-function -- withFieldGroup の props は型を与えるだけで、この関数は呼ばれない。
   onFieldChange: () => {},
 };
 
@@ -43,8 +42,7 @@ function errorText(text: string | undefined, id: string) {
 export const OrderLinesFields = withFieldGroup({
   defaultValues,
   props: defaultProps,
-  // React の component として hook を呼ぶため、名前を大文字で始める。
-  // oxlint-disable-next-line eslint/func-name-matching
+  // oxlint-disable-next-line eslint/func-name-matching -- React の component として hook を呼ぶため、名前を大文字で始める。
   render: function OrderLinesFieldsRender({
     group,
     idPrefix,

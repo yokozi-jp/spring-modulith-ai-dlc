@@ -108,6 +108,7 @@ export default defineConfig({
     jsPlugins: [
       { name: "vite-plus", specifier: "vite-plus/oxlint-plugin" },
       { name: "local-security", specifier: "./lint/local-security.js" },
+      { name: "disable-reason", specifier: "./lint/disable-reason.js" },
       { name: "shadcn", specifier: "@shadcn/lint" },
       { name: "better-tailwindcss", specifier: "eslint-plugin-better-tailwindcss" },
       { name: "tailwind-classes", specifier: "./lint/tailwind-classes.js" },
@@ -171,6 +172,7 @@ export default defineConfig({
       "no-restricted-globals": ["error", ...htmlSinkGlobals, ...networkGlobals],
       "no-restricted-properties": ["error", ...htmlSinkProperties, ...networkProperties],
       "local-security/no-jsx-srcdoc": "error",
+      "disable-reason/require-disable-reason": "error",
       "feature-boundaries/no-cross-feature-import": "error",
       "ui-composition/no-button-in-link": "error",
       "react-rules/no-effect": "error",
