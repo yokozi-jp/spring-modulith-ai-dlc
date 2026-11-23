@@ -27,23 +27,27 @@ import org.springframework.dao.DataAccessException;
    * <p>Spring が同じ型の例外にまとめる別の SQLSTATE（{@code 21000} など）は、変換せずに投げる。
    */
   // 原因の例外のメッセージに SQL と重複したキーの値が入るため、原因を付けない（ADR-062、docs/observability/conventions.md）。
-  @SuppressWarnings({"PMD.PreserveStackTrace", "UnusedException"})
   /* package */ static <T> T executeOrConflict(
       final Supplier<T> statement, final Supplier<String> target) {
     try {
       return statement.get();
     } catch (final DataAccessException e) {
-      final String sqlState = sqlStateOf(e);
-      if (LOCK_NOT_AVAILABLE.equals(sqlState)) {
-        throw new ConflictException(
-            ConflictException.Kind.LOCK, "row is locked by another request: " + target.get());
-      }
-      if (UNIQUE_VIOLATION.equals(sqlState)) {
-        throw new ConflictException(
-            ConflictException.Kind.UNIQUE, "unique key already exists: " + target.get());
-      }
-      throw e;
+      throw conflictOf(e, target);
     }
+  }
+
+  private static RuntimeException conflictOf(
+      final DataAccessException error, final Supplier<String> target) {
+    final String sqlState = sqlStateOf(error);
+    if (LOCK_NOT_AVAILABLE.equals(sqlState)) {
+      return new ConflictException(
+          ConflictException.Kind.LOCK, "row is locked by another request: " + target.get());
+    }
+    if (UNIQUE_VIOLATION.equals(sqlState)) {
+      return new ConflictException(
+          ConflictException.Kind.UNIQUE, "unique key already exists: " + target.get());
+    }
+    return error;
   }
 
   /** 例外の原因をたどり、最初の {@link SQLException} の SQLSTATE を返す。なければ空文字を返す。 */
