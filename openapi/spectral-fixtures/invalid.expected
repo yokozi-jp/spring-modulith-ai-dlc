@@ -1,4 +1,6 @@
 bad-request-validation-problem|components.responses.BadRequestProblem.content.application/problem+json.schema.$ref
+calendar-date-property-full-date|components.schemas.SampleOrderResponse.properties.deliveryDate.format
+calendar-date-property-full-date|paths./api/sample-orders.get.parameters[1].schema.format
 common-problem-detail-schema|components.schemas
 common-problem-responses|components.responses
 created-location-header|paths./api/sample-orders.post.responses[201]
@@ -6,6 +8,9 @@ error-response-problem-detail|paths./api/sample-orders/{sampleOrderId}.get.respo
 error-response-problem-detail|paths./api/sample-orders/{sampleOrderId}.get.responses.4XX.content
 error-response-problem-detail|paths./api/sample-orders/{sampleOrderId}.get.responses[404]
 error-response-problem-detail|paths./api/sample-orders/{sampleOrderId}.get.responses[404].content
+instant-property-date-time|components.schemas.SampleOrderResponse.properties.placedAt
+instant-property-date-time|components.schemas.SampleOrderResponse.properties.receivedAt.type
+instant-property-date-time|paths./api/sample-orders.get.parameters[0].schema
 no-top-level-array-response|paths./api/sample_items.get.responses[200].content.application/json.schema
 oas3-parameter-description|paths./api/sample-orders/{sampleOrderId}.get.parameters[0]
 oas3-schema|openapi

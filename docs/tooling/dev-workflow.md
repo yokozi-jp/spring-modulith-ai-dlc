@@ -18,7 +18,7 @@ task dev
 task check
 ```
 
-`task check`は、バックエンドの静的解析の前に`task lint-session-sql`でセッションに状態を残すSQLがないことを確かめる。
+`task check`は、バックエンドの静的解析の前に`task lint-session-sql`でセッションに状態を残すSQLがないことを、`task lint-db-clock`でDBの時計を読むSQLがないことを確かめる。
 
 `task be-lint`のSpotlessは、mainから変えたファイルを全体で検査するため、変えていない既存の行の書式も違反になる。
 `task be-format`を実行し、その出力を同じ変更に含める。

@@ -127,6 +127,9 @@ spring:
     # Jackson の日時フォーマット時に使用するコンテキスト TZ を UTC に固定する
     # 絶対時刻の API モデルには原則 Instant を使用する
     time-zone: UTC
+    # 寛容な読み取りを止める。LocalDate が "2023-09-29T15:00:00Z" のような時刻つきの文字列を
+    # 2023-09-29 として受けると、東京の 9 月 30 日がずれる（docs/datetime/timezone-conventions.md）
+    default-leniency: false
     # null のプロパティは出力しない（レスポンスを軽くする）
     default-property-inclusion: non_null
     # 日付・時刻関連（Jackson 3 では SerializationFeature でなく DateTimeFeature）

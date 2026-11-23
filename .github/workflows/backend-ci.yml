@@ -17,6 +17,7 @@ on:
       - "mise.lock"
       - ".github/actions/setup-mise/**"
       - "tooling/session-sql-lint/**"
+      - "tooling/db-clock-lint/**"
       - ".github/workflows/backend-ci.yml"
   # PR の検査は ci.yml から呼ばれて動く（docs/adr/ADR-087）。
   workflow_call:
@@ -63,6 +64,7 @@ jobs:
             'mise.lock' \
             '.github/actions/setup-mise/**' \
             'tooling/session-sql-lint/**' \
+            'tooling/db-clock-lint/**' \
             '.github/workflows/backend-ci.yml'
 
   lint:
@@ -112,6 +114,10 @@ jobs:
       # PgBouncer のトランザクションモードや RDS Proxy の後ろで壊れるセッションの SQL を検出する。
       - name: Check session-level SQL
         run: task lint-session-sql
+
+      # DB の時計を読む SQL と、日時から暦日や境界を作る SQL を検出する。
+      - name: Check DB clock SQL
+        run: task lint-db-clock
 
       # 削除した識別子が backend/src に残っていないかを検査する。okf-validate は backend/src の変更で起動しない。
       - name: Check removed names

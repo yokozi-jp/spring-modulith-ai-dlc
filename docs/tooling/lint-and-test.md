@@ -16,8 +16,8 @@ compose-testを使うTaskは、実行ごとにslotを取り、slotのComposeプ�
 
 ## 入口Task
 
-- **`task check`**：`lint-session-sql`とバックエンドの静的解析を実行する。
-- **`task verify`**：`lint-session-sql`、バックエンドの静的解析、マイグレーション検証、テストを実行する。
+- **`task check`**：`lint-session-sql`、`lint-db-clock`とバックエンドの静的解析を実行する。
+- **`task verify`**：`lint-session-sql`、`lint-db-clock`、バックエンドの静的解析、マイグレーション検証、テストを実行する。
 - **`task test`**：確定済みマイグレーションを使い捨てのPostgreSQLで検証し、バックエンドテスト、OpenAPI契約検査の後に片付ける。
 - **`task test-dev`**：`be-test-dev`の別名。
 - **`task mutation-test`**：`be-mutation-test`の別名。
@@ -40,6 +40,13 @@ compose-testを使うTaskは、実行ごとにslotを取り、slotのComposeプ�
   検査の本体は`tooling/session-sql-lint/session-sql-lint.sh`で、検出の前に`tooling/session-sql-lint/test.sh`が、検出すべき文と検出しない文のfixtureで終了コードと出力を確かめる。
   `SET`と`RESET`も同じ表でNeverだが、`spring.datasource.hikari.connection-init-sql`がセッションの`SET`を使うため検出しない（[ADR-079](../adr/ADR-079-resubmit-failed-event-publications-periodically-with-shedlock.md)）。
   設計の理由は[設計の作り込みの程度と段階的な再構築](../principles/right-sizing.md)の「テンプレートの利用先で変わる前提」にある。
+- **`task lint-db-clock`**：`backend/src/main/java`のJavaと`backend/src/main/resources/db`のSQLとYAMLから、DBの時計を読む文と、日時から暦日や境界を作る文を検出し、あれば失敗する。
+  対象は`CURRENT_DATE`、`CURRENT_TIME`、`CURRENT_TIMESTAMP`、`LOCALTIME`、`LOCALTIMESTAMP`、`now()`、`sysdate`、`clock_timestamp()`、`statement_timestamp()`、`transaction_timestamp()`、`date_trunc(`、`AT TIME ZONE`、`::date`である。
+  大文字と小文字を区別せず、Javadoc、行コメント、YAMLとSQLのコメントの行は除く。
+  `current_setting('app.current_tenant')`や`current_date_value`のような識別子は検出しない。
+  jOOQの`DSL`の呼び出しは[`DateTimeConventionsArchTest`](../backend/architecture-tests.md#日時)が止める。
+  検査の本体は`tooling/db-clock-lint/db-clock-lint.sh`で、検出の前に`tooling/db-clock-lint/test.sh`が、fixtureで終了コードと出力を確かめる。
+  規約は[日時とタイムゾーンの規約](../datetime/timezone-conventions.md)の「暦日のAPIとSQL」にある。
 - **`task be-openapi-lint`**：`OpenApiContractTest`だけを実行してOpenAPI 3.1契約を`openapi/openapi.yaml`へ生成し、Spectralで検査する。
 - **`task be-openapi-check`**：直前の`be-test`が書き出した契約をSpectralで検査し、コミット済みの`openapi/openapi.yaml`と差分があれば失敗する。
   テストを実行しないため、`be-test`の後に実行する。
@@ -260,7 +267,7 @@ pre-pushの「変更」は、`origin/main`とのmerge-baseからの差分で判�
 
 ## CI対応
 
-- **`backend-ci.yml`**：`be-lint`相当、`lint-session-sql`、`be-verify-migrations`、`be-test`、`be-openapi-check`を実行する。
+- **`backend-ci.yml`**：`be-lint`相当、`lint-session-sql`、`lint-db-clock`、`be-verify-migrations`、`be-test`、`be-openapi-check`を実行する。
   compose-testを止めた後に`test-deps-leftover-check`を実行する。
   契約は`be-test`が書き出し、`be-openapi-check`は`OpenApiContractTest`を再実行しない（[ADR-064](../adr/ADR-064-write-openapi-contract-from-test-task-in-ci.md)）。
   Gradle User Homeは`setup-gradle`の`cache-provider: external`にして、`actions/cache`のrestoreとsaveで扱う。

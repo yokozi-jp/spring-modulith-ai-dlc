@@ -271,6 +271,8 @@ Docker Compose の操作（サービスの起動、停止、状態確認、Keycl
 
 - `task lint-session-sql` は、PgBouncer のトランザクションモードや RDS Proxy の後ろで壊れる SQL（セッションの advisory lock、`LISTEN`、`WITH HOLD`、`PREPARE`、`DEALLOCATE`、`ON COMMIT PRESERVE ROWS` と `ON COMMIT DELETE ROWS`、`LOAD`）を、バックエンドの本番のコードと changelog から検出します。
   `task check`、`task verify`、Backend CI の lint で実行します（[設計の作り込みの程度と段階的な再構築](docs/principles/right-sizing.md)）。
+- `task lint-db-clock` は、DB の時計を読む SQL（`CURRENT_DATE`、`now()` など）と、日時から暦日や境界を作る SQL（`date_trunc`、`::date`、`AT TIME ZONE`）を、バックエンドの本番のコードと changelog から検出します。
+  `task check`、`task verify`、Backend CI の lint で実行します（[日時とタイムゾーンの規約](docs/datetime/timezone-conventions.md)）。
 
 ### 重複コード検査
 

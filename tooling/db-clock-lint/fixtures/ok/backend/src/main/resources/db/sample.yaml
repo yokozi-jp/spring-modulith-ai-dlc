@@ -1,0 +1,10 @@
+# defaultValueComputed: now() は使わない
+databaseChangeLog:
+  - changeSet:
+      id: sample
+      changes:
+        - addColumn:
+            columns:
+              - column:
+                  name: tenant_id
+                  defaultValueComputed: current_setting('app.current_tenant')::uuid

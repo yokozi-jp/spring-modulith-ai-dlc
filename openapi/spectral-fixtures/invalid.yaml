@@ -29,6 +29,20 @@ paths:
       summary: サンプル注文を一覧する。
       description: サンプル注文を一覧する。<p>新しい順に返す。
       operationId: listSampleOrders
+      parameters:
+        # instant-property-date-time（クエリの引数に format がない）
+        - name: shippedAt
+          in: query
+          description: 出荷した絶対時刻の下限
+          schema:
+            type: string
+        # calendar-date-property-full-date（クエリの引数が date でない）
+        - name: closedDate
+          in: query
+          description: 締め日の暦日
+          schema:
+            type: string
+            format: date-time
       responses:
         "200":
           description: サンプル注文の一覧
@@ -274,6 +288,23 @@ components:
           items:
             type: integer
             format: int64
+        # instant-property-date-time（format がない）
+        placedAt:
+          type: string
+          description: 注文を受け付けた絶対時刻
+          example: 2023-09-29T15:00:00Z
+        # calendar-date-property-full-date（format が date でない）
+        deliveryDate:
+          type: string
+          format: date-time
+          description: 届け日の暦日
+          example: 2023-09-30T00:00:00Z
+        # instant-property-date-time（type が string でない）
+        receivedAt:
+          type: integer
+          format: int64
+          description: 受け取った絶対時刻の UNIX 時刻
+          example: 1695999600
       required:
         - sampleOrderId
   # common-problem-responses（ConflictProblem などの共通 response がない）
