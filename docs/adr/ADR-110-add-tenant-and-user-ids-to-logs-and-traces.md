@@ -61,7 +61,7 @@ IdP の `sub`、login ID、メールアドレス、認証 session ID は、ADR-0
 
 - `TenantSelectionFilter` が、HTTP の受信の observation の高い濃度の key value に 2 つを足し、span の属性にする。低い濃度の key value には入れない。
 - Micrometer Tracing の baggage（`management.tracing.baggage.*`）は使わない。
-- リスナーは自分の span を持たないので、リスナーの処理の span には付けない。
+- リスナーの処理の span は Spring Modulith が作る（`module.invocation-type=event-listener`）。この span には付けない。リスナーのログには `tenant.id` が付くので、ログの trace ID からたどる。
 
 ### ADR-015 の Alternative 4 の理由
 
@@ -83,7 +83,7 @@ appender の `mdcAttributesIncluded` は、MDC のうち OTLP の属性にする
 
 - リスナーの外で記録するログは `tenant.id` を持たない。リスナーが投げた例外を Spring の `SimpleAsyncUncaughtExceptionHandler` が記録する ERROR がこれにあたる。
 - Spring Security の filter の連鎖のうち、`TenantSelectionFilter` の外で記録するログは、`tenant.id` も `user.id` も持たない。`TenantSecurityCustomizer` はこの filter を `ExceptionTranslationFilter` と `AuthorizationFilter` の間に置くので、`AuthorizationFilter` の拒否も、この filter を出てから 401 か 403 として記録される。この filter が投げる `TenantNotSelectedException`、CSRF の失敗、entry point のログも同じである。Controller の中の `@PreAuthorize` の拒否は、この filter の中で記録されるので 2 つを持つ。範囲は[可観測性データの規約](../observability/conventions.md#テナントと利用者)に書く。
-- 受信の span 以外の span（外向きの HTTP、SQL、リスナーの中の処理）は `tenant.id` を持たない。受信の span の trace ID からたどる。
+- 受信の span 以外の span（外向きの HTTP、SQL、リスナーの span とその中の処理）は `tenant.id` を持たない。受信の span の trace ID からたどる。
 - 利用者の ID から利用者を特定できるので、ADR-015 の閲覧権限と保持期間で守る。
 
 ### Neutral
