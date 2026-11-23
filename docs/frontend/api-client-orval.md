@@ -170,6 +170,7 @@ Problem Detailsの本文はZodで検証しない。
 Problem Detailsの検証が必要になったら、`readProblem`の型の断定を、生成したZod schemaに置き換える。
 
 401は、mutatorではなく`QueryCache`と`MutationCache`の`onError`（`redirectToLoginOnUnauthorized`）でログインへ遷移させる。
+遷移の前に、戻り先として画面のURLを保存する（[状態表示の分担](routing-and-state.md#状態表示の分担)）。
 遷移はerrorへの反応であり、loaderとcomponentの401を1か所で扱えるためである。
 扱いの詳細は[状態表示の分担](routing-and-state.md#状態表示の分担)にある。
 

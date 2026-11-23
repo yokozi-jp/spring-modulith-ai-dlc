@@ -16,7 +16,7 @@ API responseはTanStack Queryのmemory上のcacheだけで保持し、ブラウ�
 - **path parameter**：リソースの識別子。reloadと履歴で維持され、URLで共有できる。
 - **search parameter**：検索条件など、画面の前提となる条件。reloadと履歴で維持され、URLで共有できる。
 - **memory**：URLに出せない値、構造が複雑な一時的な値、API responseのcache。React stateとTanStack Queryで保持し、reloadで消える。
-- **sessionStorage**：tabの中だけで有効な一時的な値。tabを閉じると消える。
+- **sessionStorage**：tabの中だけで有効な一時的な値。tabを閉じると消える。用途は、ログインへ遷移する間の戻り先（`login-return-to.ts`）と、ログインへの遷移の間隔の記録（`api.loginRedirectedAt`）。戻り先は1回読んだら消し、`/logged-out`でも消す。
 - **localStorage**：利用者の表示設定のように、ブラウザを閉じても残す軽い値。同じoriginの全tabで共有される。
 - **IndexedDB**：オフライン対応で使う構造化データ。使う条件は[オフライン対応](offline-pwa.md)に従う。
 

@@ -18,8 +18,9 @@ tags: [convention, web-api, security, auth, future-arch-guidelines]
 アクセストークンはブラウザに渡さない。
 
 未認証のAPIリクエストには、401のProblem Detailsに`WWW-Authenticate: Session realm="demo"`を付けて返す。
-SPAは401を受けてログインへ遷移し、ログインの後は`/`に戻る。
-バックエンドは、401にした要求をログインの後の戻り先として保存しない（`NullRequestCache`）。
+SPAは401を受けると、いまの画面のpath、query、hashを戻り先としてsessionStorageに保存してからログインへ遷移する。
+バックエンドは、ログインの後は常に`/`へ戻す。SPAが`/`で保存した戻り先を読み、同一オリジンのpathのときだけその画面へ移す。
+画面のURLを知るのはSPAだけなので、バックエンドは、401にした要求をログインの後の戻り先として保存しない（`NullRequestCache`）。
 Spring Securityの既定の保存は、`Accept`のないAPIのGETを保存し、ログインの後にそのJSONへ戻すためである。
 `Session`は登録されていない独自のschemeであり、選んだ理由は[ADR-059](../adr/ADR-059-send-a-session-challenge-in-www-authenticate-on-401.md)にある。
 

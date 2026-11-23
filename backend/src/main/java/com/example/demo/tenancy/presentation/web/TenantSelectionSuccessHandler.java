@@ -16,7 +16,7 @@ import org.springframework.security.web.authentication.SimpleUrlAuthenticationSu
  * ログインの後、所属が 1 つだけならそのテナントを選んでから、{@code /} へ戻す。
  *
  * <p>所属がないか 2 つ以上なら選ばない。SPA が、招待を待つ画面かテナントを選ぶ画面を出す。chain は要求を保存しない（{@code
- * NullRequestCache}）ので、戻り先は常に {@code /} にする。
+ * NullRequestCache}）ので、バックエンドは常に {@code /} へ戻す。元の画面へは、SPA が保存した戻り先を {@code /} で読んで移す。
  */
 final class TenantSelectionSuccessHandler implements AuthenticationSuccessHandler {
 

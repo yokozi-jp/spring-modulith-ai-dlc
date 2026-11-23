@@ -1,4 +1,5 @@
 import type { ProblemDetail } from "./generated/models";
+import { saveReturnTo } from "./login-return-to";
 
 /** API が 2xx 以外を返したことを表す。problem は application/problem+json の本文。 */
 export class ApiProblemError extends Error {
@@ -65,6 +66,7 @@ export function redirectToLoginOnUnauthorized(error: unknown): void {
     return;
   }
   writeRedirectedAt(now);
+  saveReturnTo();
   globalThis.location.assign(loginPath);
 }
 

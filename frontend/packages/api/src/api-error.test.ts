@@ -80,6 +80,48 @@ describe("api-error", () => {
       expect(assign).toHaveBeenCalledExactlyOnceWith(loginPath);
     });
 
+    it("遷移の前に、いまの path、query、hash を戻り先として保存する", async () => {
+      stubSessionStorage();
+      vi.stubGlobal("location", {
+        assign,
+        href: "http://localhost/orders/new?a=1#x",
+        origin: "http://localhost",
+        pathname: "/orders/new",
+        search: "?a=1",
+        hash: "#x",
+      });
+
+      api.redirectToLoginOnUnauthorized(new api.ApiProblemError(401, undefined));
+
+      const { takeReturnTo } = await import("./login-return-to");
+      expect(takeReturnTo()).toBe("/orders/new?a=1#x");
+    });
+
+    it("30 秒以内の 2 回目の 401 は、保存した戻り先を書き換えない", async () => {
+      stubSessionStorage();
+      const error = new api.ApiProblemError(401, undefined);
+      vi.stubGlobal("location", {
+        assign,
+        origin: "http://localhost",
+        pathname: "/orders/1",
+        search: "",
+        hash: "",
+      });
+      api.redirectToLoginOnUnauthorized(error);
+      vi.stubGlobal("location", {
+        assign,
+        origin: "http://localhost",
+        pathname: "/orders/2",
+        search: "",
+        hash: "",
+      });
+
+      api.redirectToLoginOnUnauthorized(error);
+
+      const { takeReturnTo } = await import("./login-return-to");
+      expect(takeReturnTo()).toBe("/orders/1");
+    });
+
     it("30 秒を過ぎた 401 では再び遷移する", () => {
       stubSessionStorage();
       vi.useFakeTimers();

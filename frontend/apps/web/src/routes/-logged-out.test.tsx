@@ -20,4 +20,12 @@ describe("ログアウト後の画面", () => {
       expect(document.title).toBe("Demo application");
     });
   });
+
+  it("保存した戻り先を、利用者をまたいで残さないよう消す", async () => {
+    globalThis.sessionStorage.setItem("auth.returnTo", "/orders/new");
+
+    await renderRoute("/logged-out", { locale: "en" });
+
+    expect(globalThis.sessionStorage.getItem("auth.returnTo")).toBeNull();
+  });
 });

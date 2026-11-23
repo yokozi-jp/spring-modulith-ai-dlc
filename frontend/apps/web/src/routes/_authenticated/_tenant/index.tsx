@@ -1,5 +1,6 @@
+import { takeReturnTo } from "@frontend/api/login-return-to";
 import { Button } from "@frontend/ui/button";
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, redirect } from "@tanstack/react-router";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -92,4 +93,19 @@ function HomePage() {
   );
 }
 
-export const Route = createFileRoute("/_authenticated/_tenant/")({ component: HomePage });
+function beforeLoad({ preload }: { preload: boolean }) {
+  // 先読みで戻り先を消さない。
+  if (preload) {
+    return;
+  }
+  const returnTo = takeReturnTo();
+  if (returnTo !== undefined) {
+    // oxlint-disable-next-line typescript/only-throw-error -- TanStack Router は redirect を throw で受け取る。
+    throw redirect({ href: returnTo });
+  }
+}
+
+export const Route = createFileRoute("/_authenticated/_tenant/")({
+  beforeLoad,
+  component: HomePage,
+});
