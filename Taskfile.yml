@@ -948,8 +948,15 @@ tasks:
       - task: api-lint
 
   be-openapi-check:
-    desc: 直前のbe-testが書き出したOpenAPI契約をSpectralで検査し、コミット済みの内容と一致するか検査（前提はbe-testの実行済み。be-testが先に契約を消すので、書き出さなければ失敗する。単体ではdriftを検出できない）
+    desc: 直前のbe-testが書き出したOpenAPI契約をSpectralで検査し、コミット済みの内容と一致するか検査（前提はbe-testの実行済み。be-testの開始後に契約が書かれていなければ失敗する）
     cmds:
+      # be-test の開始より新しくなければ、テストは契約を書き出していない（#467）。
+      # 契約を消さずに印の時刻と比べるのは、同じ実行の ApiContractCoverageTest が契約を読むため（ADR-077）。
+      - |
+        if [ ! -e backend/build/be-test.stamp ] || ! [ openapi/openapi.yaml -nt backend/build/be-test.stamp ]; then
+          echo "be-test の実行中に openapi/openapi.yaml が書き出されていません。task be-test を実行してください。" >&2
+          exit 1
+        fi
       - task: api-lint
       - task: api-drift-check
         vars: { PATHS: openapi/openapi.yaml }
@@ -959,8 +966,7 @@ tasks:
     dir: backend
     deps: [_ensure-test-env]
     cmds:
-      # 書き出さないテストが古い契約を残したまま be-openapi-check を通さないよう、先に消す（#467）。
-      - rm -f ../openapi/openapi.yaml
+      - mkdir -p build && touch build/be-test.stamp
       - ./gradlew test jacocoTestCoverageVerification -PopenapiExport=true -PtestEnvFile="../{{.TEST_ENV_FILE}}"
 
   be-test-dev:

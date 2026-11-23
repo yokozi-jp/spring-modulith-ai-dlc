@@ -50,12 +50,13 @@ compose-testを使うTaskは、実行ごとにslotを取り、slotのComposeプ�
 - **`task be-openapi-lint`**：`OpenApiContractTest`だけを実行してOpenAPI 3.1契約を`openapi/openapi.yaml`へ生成し、Spectralで検査する。
 - **`task be-openapi-check`**：直前の`be-test`が書き出した契約をSpectralで検査し、コミット済みの`openapi/openapi.yaml`と差分があれば失敗する。
   テストを実行しないため、`be-test`の後に実行する。
-  単体で実行すると、コミット済みの契約を自分自身と比べるので、差分を検出できない。
+  `be-test`の開始時に作る`backend/build/be-test.stamp`より契約が新しくなければ失敗するので、`be-test`が契約を書き出さなかった実行や、`be-test`なしの実行は通らない。
 - **`task be-verify-migrations`**：現在タグが最後のchangelogに宣言されていることと、使い捨てDBでのchangesetの適用、rollback、再適用、現在タグの存在を検証する。
 - **`task be-test`**：確定済みchangesetを適用したテスト用のDBで、テストとcoverage検証を実行する。
   JaCoCoの下限は、全体のbranch 88%とline 95%、クラスごとのbranch 65%とline 70%で、下回ると失敗する（[ADR-076](../adr/ADR-076-run-mutation-tests-per-change-and-tighten-coverage-gates.md)）。
   `-PopenapiExport=true`を渡すので、`OpenApiContractTest`が`openapi/openapi.yaml`を書き出す。
   素の`./gradlew test`は契約に触れない。
+  開始時に`backend/build/be-test.stamp`を作り、`be-openapi-check`が契約の書き出しを確かめる印にする。
 - **`task be-test-dev`**：作りかけのchangesetを含めて適用したテスト用のDBで、テストを実行する。
   カバレッジは検証しない。
 - **`task be-mutation-test`**：PITを実行する。
@@ -210,7 +211,7 @@ Vitestは`globals`を渡さず、Testing Libraryの自動cleanupが効かない�
   検証スキルの手順の正文は[形式検証スキルの使い方](../agents/formal-verification.md)である。
 - **`task lint-taskfile`**：Task本体でTaskfileのYAML構文とスキーマ構造を検証する。
   `tooling/taskfile-cleanup/`のfixtureで、後片付けの定型が本体の終了コードを優先し、前段が失敗しても後段の後片付けを走らせることを検査する。
-  `tooling/openapi-drift/test.sh`は、`be-openapi-check`が書き出しなし、path の誤り、古い契約の3つの状態で失敗し、`be-test`が書き出しの前に契約を消すことを、一時のgitリポジトリで検査する。
+  `tooling/openapi-drift/test.sh`は、契約の書き出し漏れと追跡されていないpathによる`be-openapi-check`の素通りを、一時のgitリポジトリで検査する。ケースがこの文書の正である。
   `tooling/task-calls/task-calls.sh`は、フックとワークフローが呼ぶタスク名を検査する。
   対象は、`lefthook.yml`と`.github/workflows/`のYAMLにある`task <名前>`である。
   名前が`task --list-all`のタスクにも別名にも無いと失敗する。

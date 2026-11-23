@@ -78,10 +78,10 @@ Mutation Testing は計測がないため余裕を持たせ、計測が貯まっ
 
 - `task be-test` を単体で実行すると、`openapi/openapi.yaml` が書き換わる。
   これは `be-openapi-lint` や `task api-gen` と同じ、Task 経由の明示的な副作用である。
-- `task be-openapi-check` を `be-test` の前に単体で実行すると、コミット済みの契約を自分自身と比べるため、drift を検出できない。
-  前提を Task の `desc` と docs に書いた。
-  `be-test` は、テストを実行する前に `openapi/openapi.yaml` を消す。
-  テストが書き出さなければ、`be-openapi-check` は契約の削除を差分として検出して失敗する。
+- `task be-openapi-check` は、`be-test` を実行していないと、印がなく失敗する。
+  `be-test` は、開始時に `backend/build/be-test.stamp` を作る。
+  `be-openapi-check` は、契約がこの印より新しくなければ失敗する。
+  契約を消さないのは、同じ実行の `ApiContractCoverageTest` が契約を読むためである（ADR-077）。
 - `-PopenapiExport=true` を付けた `./gradlew cleanTest` は、出力に宣言した `openapi/openapi.yaml` を削除する。
   `git checkout -- openapi/openapi.yaml` か、再度の `task be-test` で戻る。
 - `test` と `exportOpenApi` は同じファイルを出力に宣言する。
