@@ -160,13 +160,20 @@ class ResubmissionPolicies implements AbandonPolicy {
         : "";
   }
 
-  /** 最後の試行から、出版の方針の次の待ち時間を過ぎたか。回数の上限は {@link #shouldAbandon} が失敗のたびに判断する。 */
+  /**
+   * 出版の方針の上限に達しておらず、最後の試行から次の待ち時間を過ぎたか。
+   *
+   * <p>上限を超えて失敗した出版は {@link #shouldAbandon} が {@code ABANDONED} にするため、ここに来ない。
+   * 回数を見るのは、失敗を記録せずに上限を超えて {@code FAILED} に戻った出版（最後の試行の途中で落ちたか、Staleness Monitor
+   * が処理中に戻した出版）を、上限を超えて再投入しないためである（ADR-079）。
+   */
   /* package */ boolean isDue(final EventPublication publication, final Instant now) {
-    return lastAttempt(publication)
-        .plus(
-            policyOf(listenerIdOf(publication))
-                .waitBefore(properties.waitAge(), publication.getCompletionAttempts()))
-        .isBefore(now);
+    final EventPublicationResubmissionConfig.Policy policy = policyOf(listenerIdOf(publication));
+    final int attempts = publication.getCompletionAttempts();
+    return attempts <= policy.maxResubmissions()
+        && lastAttempt(publication)
+            .plus(policy.waitBefore(properties.waitAge(), attempts))
+            .isBefore(now);
   }
 
   /**

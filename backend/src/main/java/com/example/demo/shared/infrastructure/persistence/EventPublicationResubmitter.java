@@ -32,9 +32,9 @@ import org.springframework.stereotype.Component;
 /**
  * 失敗したイベント出版を定期的に再投入するジョブ（ADR-079）。
  *
- * <p>ShedLock のロックを取れたインスタンスだけが、リスナーの方針（{@link ResubmissionPolicies}）の待ち時間を過ぎた {@code FAILED}
- * の出版を再投入する。方針の上限を超えて失敗した出版は、{@link ResubmissionPolicies#shouldAbandon} が {@code ABANDONED}
- * にするため、{@code FAILED} に残らない。 件数と最古の経過時間の Gauge は、ロックの外ですべてのインスタンスが集計する。
+ * <p>ShedLock のロックを取れたインスタンスだけが、リスナーの方針（{@link ResubmissionPolicies}）の待ち時間を過ぎ、再投入の回数が上限未満の {@code
+ * FAILED} の出版を再投入する。方針の上限を超えて失敗した出版は、{@link ResubmissionPolicies#shouldAbandon} が {@code ABANDONED}
+ * にする。 件数と最古の経過時間の Gauge は、ロックの外ですべてのインスタンスが集計する。
  */
 @Slf4j
 @Component
@@ -201,8 +201,8 @@ class EventPublicationResubmitter {
     // batchSizeLimitIsAppliedBeforeFilter）、毎回 FAILED の行をすべて読む。
     // withMinAge は publication_date から測り、最後の試行からの待ち時間を表せないため呼ばない。
     // withBatchSize(Integer.MAX_VALUE) で全件をヒープへ読むため、メモリの上限は FAILED の出版の数に比例する。
-    // 方針の上限を超えた出版は ABANDONED になって FAILED に残らないため、溜まるのは待ち時間を過ぎていない出版である。
-    // ponytail: 読んだ一覧は古くなる。実行が長引くと、その間に再投入されて再び FAILED に戻った行を、一覧が古いまま方針の待ち時間を待たずに再投入しうる。
+    // 方針の上限を超えて失敗した出版は ABANDONED になるため、FAILED に溜まるのは待ち時間の中の出版と、最後の試行の途中で落ちた出版である。
+    // ponytail: 読んだ一覧は古くなる。実行が長引くと、その間に再び FAILED に戻った行を、一覧が古いまま方針の上限を超えて再投入しうる。
     // 実行の長さを lockAtMostFor の半分までに抑え、超えた後の行は候補にせず次の回に回す（古い行から取るので飢えない）。
     // 実行が固まっても lockAtMostFor でロックは切れるため、KeepAliveLockProvider で延長しない。
     // 手での入口（EventPublicationResubmitOnce）は完了を待つ設計なので、この予算を適用しない。

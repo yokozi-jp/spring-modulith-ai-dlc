@@ -271,7 +271,8 @@ DELETE FROM modulith.event_publication
 警報が出たら、WARN の `unknown type` と次の SQL で古い型の出版を特定する。
 
 ```sql
-SELECT event_type, listener_id, count(*) AS publications, min(publication_date) AS oldest_published_at
+SELECT event_type, listener_id, count(*) AS publications, min(publication_date) AS oldest_published_at,
+       max(completion_attempts) AS max_completion_attempts
   FROM modulith.event_publication
  WHERE status = 'FAILED'
  GROUP BY event_type, listener_id
@@ -279,3 +280,12 @@ SELECT event_type, listener_id, count(*) AS publications, min(publication_date) 
 ```
 
 今のコードにない `event_type` の出版は、新しい型へ移す要否を決め、移さないものは「再投入しない出版の片付け」の手順で消す。
+
+## 上限を超えて FAILED に残った出版
+
+最後の再投入の途中でインスタンスが落ちた出版と、Staleness Monitor が処理中に `FAILED` に戻した出版は、失敗を記録しないため `ABANDONED` にならない。
+`completion_attempts` が方針の `max-resubmissions` + 1 以上なら、定期のジョブは再投入しない。
+ERROR の `exhausted` は出ず、`failed.oldest.age{state=retrying}` の警報で見つかる。
+上の SQL で `completion_attempts` も読み、方針の上限と比べて見分ける。
+原因を確かめたら「手での再投入」で再投入する。
+手での再投入でまた失敗すると、`ABANDONED` になり ERROR の `exhausted` が出る。

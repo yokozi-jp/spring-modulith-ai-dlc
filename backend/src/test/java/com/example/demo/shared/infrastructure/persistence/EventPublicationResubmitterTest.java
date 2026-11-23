@@ -286,6 +286,29 @@ class EventPublicationResubmitterTest {
   }
 
   @Test
+  @DisplayName("失敗を記録せずに上限を超えて FAILED に戻った出版（最後の試行の途中で落ちた出版）は、待ち時間を過ぎても再投入しない")
+  void failedPublicationPastLimitWithoutRecordedFailureIsNotResubmitted() {
+    // default の上限は 1 回。2 回目の試行の途中で落ち、Staleness Monitor が FAILED に戻した行にあたる。
+    final UUID publication = insertFailed(2, T0);
+    dsl.update(EVENT_PUBLICATION)
+        .set(EVENT_PUBLICATION.EVENT_TYPE, EVENT_TYPE)
+        .set(EVENT_PUBLICATION.SERIALIZED_EVENT, "{\"id\":\"" + publication + "\"}")
+        .where(EVENT_PUBLICATION.ID.eq(publication))
+        .execute();
+    clock.set(T0.plus(Duration.ofDays(1)));
+
+    runJob();
+
+    assertThat(
+            dsl.select(EVENT_PUBLICATION.STATUS, EVENT_PUBLICATION.COMPLETION_ATTEMPTS)
+                .from(EVENT_PUBLICATION)
+                .where(EVENT_PUBLICATION.ID.eq(publication))
+                .fetchOptional(Records.mapping(Row::new)))
+        .as("上限を超えた FAILED の出版の未完了の行")
+        .contains(new Row(FAILED, 2));
+  }
+
+  @Test
   @DisplayName("再投入した出版が処理中の間は数えず、リスナーが終わった後の次の回に completed を 1 だけ数える")
   void completionIsCountedOnTheRunAfterTheListenerFinishes(final Scenario scenario) {
     final String id = failedOnce(scenario);
@@ -645,8 +668,8 @@ class EventPublicationResubmitterTest {
   }
 
   /** リスナーを持たない FAILED の出版の行を、default の方針で作る。 */
-  private void insertFailed(final int completionAttempts, final Instant publicationDate) {
-    ResubmissionTestSupport.insertPublication(
+  private UUID insertFailed(final int completionAttempts, final Instant publicationDate) {
+    return ResubmissionTestSupport.insertPublication(
         dsl, UUID.randomUUID(), "gauge-test", publicationDate, FAILED, completionAttempts);
   }
 

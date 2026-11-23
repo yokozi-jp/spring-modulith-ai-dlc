@@ -124,8 +124,8 @@ Spring Modulith の `spring.modulith.events.resubmission.abandon-after-attempts`
   ゆらぎ（jitter）は入れない。
   `wait-age` は全体で 1 つの値で、`PUBLISHED` の Staleness Monitor の閾値と最初の待ち時間を兼ねる。
 - 再投入は `FailedEventPublications.resubmit(ResubmissionOptions)` で行い、独自の outbox の表を作らない。
-  条件の関数で、待ち時間を過ぎた出版だけを選ぶ。
-  回数の上限は条件の関数で見ず、下の `AbandonPolicy` に任せる。
+  条件の関数で、方針の上限未満で、待ち時間を過ぎた出版だけを選ぶ。
+  上限を超えて失敗した出版は下の `AbandonPolicy` が `ABANDONED` にし、条件の関数の回数の条件は、失敗を記録しない試行で上限を超えた出版だけを止める。
   待ち時間は条件の関数だけで強制し、Spring Modulith の最小の経過時間には頼らない。
   `LIMIT` は掛けず、1 回の件数の上限は条件の関数で数える。
 - `LIMIT` が条件の関数より先に掛かること、既定の最小の経過時間でも `publication_date` が今と同じ出版を読まないこと、Staleness Monitor が処理中の出版を `last_resubmission_date` から測ること、読んだ後に再投入された出版も `FAILED` にすること、`AbandonPolicy` に渡る出版の回数が再投入の前の値であることは、学習テスト（`ResubmissionOptionsLearningTest`）で固定する。
@@ -154,9 +154,11 @@ Spring Modulith の `spring.modulith.events.resubmission.abandon-after-attempts`
   件数の Gauge（`state=exhausted`）は表示と確認に使い、警報にしない。
   最古の経過時間の Gauge（`state=exhausted`）は、`async-observability.md` の DLQ の滞留時間の監視として、1 日を超えたら通知する。
   その後は手での 1 回の再投入と Runbook に引き継ぐ。
-- 最後の再投入の途中でインスタンスが落ちた出版は、Staleness Monitor が `FAILED` に戻し、もう 1 回再投入してから `ABANDONED` になる。
-  落ちた試行は失敗を記録しないため、`AbandonPolicy` が呼ばれないためである。
-  条件の関数に回数の条件を残すと、この出版は上限を超えた `FAILED` のまま残り、`ABANDONED` にも ERROR にもならないため、残さない。
+- 失敗を記録しない試行（最後の再投入の途中の停止、Staleness Monitor の遅れた印）で上限を超えて `FAILED` に戻った出版は、`AbandonPolicy` が呼ばれないため `ABANDONED` にならない。
+  定期の再投入は、条件の関数の回数の条件でこの出版を再投入しない。
+  回数の条件を外すと、Staleness Monitor の遅れた印の後に上限を超えて再投入する（形式検証の `listener-up-to-lock.cfg` で `ResubmissionsCapped` が破れ、変異 `is-due-ignores-cap` が捕まえる）。
+  この出版は `state=retrying` の Gauge と最古の経過時間の警報で見つけ、手での 1 回の再投入で扱う。
+  手での再投入で失敗すれば、`AbandonPolicy` が `ABANDONED` にする。
 - 件数と最古の経過時間の Gauge は、`FAILED` の出版を `state=retrying`、archive の `ABANDONED` の出版を `state=exhausted` で出し、ロックの外ですべてのインスタンスが集計する。
   どのインスタンスも同じ値を出すため、ダッシュボードと警報はインスタンスの間の最大値（`max`）で集め、合計しない。
 - ジョブの実行の回数（`event.publication.resubmission.runs`）、再投入の件数（`event.publication.resubmissions`）、再投入した出版の結果（`event.publication.resubmission.outcomes`）、上限で諦めた出版の数（`event.publication.resubmission.exhausted`）の Counter は、SLO がないためアプリケーションのメトリクスを出さないという `async-observability.md` の原則の例外とする。
@@ -226,7 +228,7 @@ shared の範囲は、ADR-048 の jOOQ の共通処理に加えて、Spring Modu
 - ロックの期限を DB の時刻で決めるため、インスタンスの時計のずれで排他が崩れない。
 - ジョブは接続を固定せず、`TableWriter` の規則（H1）の例外も要らない。
 - リスナーごとに回数と待ち時間を変えられ、長い障害の間の再投入の回数を指数的な待ち時間で抑えられる。
-- 上限に達した出版が `FAILED` から外れるため、定期のジョブが毎回読む `FAILED` の行に溜まらない。
+- 上限を超えて失敗した出版が `FAILED` から外れるため、定期のジョブが毎回読む `FAILED` の行に溜まらない。
   上限の判断、ERROR、`exhausted` の Counter が失敗のたびに 1 か所で決まり、回数を SQL で数える式、ERROR の重複を避ける記録、回収が要らない。
 - 手での再投入が定期のジョブと同じロックを取るため、重ねて再投入せず、定期のジョブを止める手順が要らない。
 - 手での再投入の結果を終了コードで返すため、ECS の RunTask や Kubernetes の Job の成否で確かめられる。
@@ -255,8 +257,8 @@ shared の範囲は、ADR-048 の jOOQ の共通処理に加えて、Spring Modu
 - `AbandonPolicy` は失敗のたびに、出版の行を主キーで 1 回読む。
 - ERROR と `exhausted` は `ABANDON` を返した時点で出すため、その後の `markAbandoned` のトランザクションが失敗すると、出版は `ABANDONED` にならないのに通知だけが出る。
   出版は処理中のまま残り、Staleness Monitor が `FAILED` に戻した後に、次の失敗でもう一度通知が出る。
-- 最後の再投入の途中でインスタンスが落ちると、その出版はもう 1 回再投入される（Decision）。
-  再投入の回数の上限は、`max-resubmissions` に、最後の試行の途中で落ちた回数を足したものになる。
+- 失敗を記録しない試行で上限を超えた出版は `FAILED` に残り、ERROR も `exhausted` も出ない（Decision）。
+  `state=retrying` の最古の経過時間の警報まで気づかない。
 - `ABANDONED` の出版を戻す操作は SQL の手作業で、Spring Modulith の表の列を直接書く。
   Spring Modulith が表の形を変えると、Runbook の SQL も直す必要がある。
 - 結果の突き合わせにも限界がある。
@@ -286,7 +288,7 @@ shared の範囲は、ADR-048 の jOOQ の共通処理に加えて、Spring Modu
   コードで確認したのは次の 3 点である。
   `OrderConfirmedListener.on` と `ChargeOrderCommandHandler` はこの例外を捕まえず（main に捕まえる箇所はない）、`PaymentGatewayClientIntegrationTest.consecutiveFailuresOpenCircuitBreaker` が open のときにこの例外が出て決済代行を呼ばないことを確かめている。
   再投入の予約（`markResubmitted`）が `completion_attempts` を 1 増やす。
-  上限の判定は回数だけを見て（`ResubmissionPolicies.shouldAbandon`）、失敗の原因を見分けない。
+  上限の判定は回数だけを見て（`ResubmissionPolicies.isDue`、`ResubmissionPolicies.shouldAbandon`）、失敗の原因を見分けない。
   確認していないのは頻度である。
   open は 30 秒で half-open に移るため、最初の待ち時間（本番想定 5 分）の後の再投入では多くの場合閉じているとみられるが、障害が続くと再び open になり、同じ時刻に再投入された複数の出版が呼び出しなしで回数を消費しうる。
   本番で観測してから `CallNotPermittedException` の扱いを見直す。
@@ -373,11 +375,11 @@ Resilience4j は再投入と補完関係にあり、ADR-019 のとおり client 
 - **Pros**：設定一つで済み、自作のコードがさらに減る。main の `default` と `payment` はどちらも 5 回で、今は一律の値でも足りる。
 - **Cons**：リスナーごとの回数を持てない。比べる回数が再投入の前の値のため、1 は最初の配信の失敗で諦め、2 以上は N 回の再投入の後に諦める、と設定の意味が値でずれる。待ち時間の方針はリスナーごとに残るため、回数だけ一律にしても `@ResubmissionPolicy` は消せない。
 
-### 選択肢11: 条件の関数に回数の条件を残し、上限を超えた `FAILED` を定期のジョブが `applyAbandonPolicy` で諦める
+### 選択肢11: 条件の関数の回数の条件を外し、回数の上限を `AbandonPolicy` だけに任せる
 
-- **Description**：`ResubmissionPolicies.isDue` に `completion_attempts <= max-resubmissions` を残し、落ちた試行で上限を超えて `FAILED` に戻った出版を、`FailedEventPublications.applyAbandonPolicy` で `ABANDONED` にする。
-- **Pros**：落ちた試行があっても、再投入の回数が `max-resubmissions` を超えない。
-- **Cons**：`applyAbandonPolicy` は `FAILED` の行をすべて読んでイベントを読み戻し、行ごとに方針を呼ぶため、定期のジョブの読み込みが倍になる。回数を数える条件が二か所に戻る。落ちた試行は失敗を記録しておらず、もう 1 回試すことに害は少ない。
+- **Description**：`ResubmissionPolicies.isDue` から `completion_attempts <= max-resubmissions` を外す。失敗を記録しない試行で上限を超えた出版は、もう 1 回再投入し、その失敗で `ABANDONED` にする。上限を超えた `FAILED` を `FailedEventPublications.applyAbandonPolicy` で諦める形も含む。
+- **Pros**：回数を見る場所が `AbandonPolicy` の一か所になる。上限を超えた出版が `FAILED` に残らない。
+- **Cons**：形式検証で、停止の後に Staleness Monitor の遅れた印が処理中の出版を `FAILED` に戻すと、ジョブが上限を超えてさらに再投入した（`listener-up-to-lock.cfg` の `ResubmissionsCapped`）。`applyAbandonPolicy` で諦める形は、`FAILED` の行をすべて読んでイベントを読み戻すため定期のジョブの読み込みが倍になり、遅れた印で `FAILED` に戻った処理中の出版を諦めるため、その配信が成功しても `ABANDONED` のまま残る。
 
 ### 選択肢12: 例外の種類を自作で記録し、`AbandonPolicy` が読んで直らない例外をすぐ諦める
 
