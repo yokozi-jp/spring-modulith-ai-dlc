@@ -35,7 +35,8 @@ case "$1 $2" in
     for id in "${@:4}"; do sed -i "/\t$id\t/d" "$state"; done
     echo "$*" >>"$FAKE_DOCKER_STATE.log"
     ;;
-  "volume ls" | "network ls") ;;
+  "volume ls" | "network ls") [ -z "${FAKE_RECLAIM_IDS:-}" ] || printf '%s\n' $FAKE_RECLAIM_IDS ;;
+  "volume rm" | "network rm") echo "$*" >>"$FAKE_DOCKER_STATE.log" ;;
   "compose -f")
     printf '%s\tc%s\t%s\n' "$COMPOSE_PROJECT_NAME" "$RANDOM$RANDOM" "$FAKE_OWNER/docker" >>"$state"
     ;;
@@ -98,6 +99,13 @@ hold 0 "$tmp/gone"
 out="$(acquire)"
 check "持ち主の worktree が無ければ回収して slot 0" 0 "$(slot_of "$out")"
 check "回収した持ち主のコンテナは残らない" no "$(contains "$state" "$tmp/gone")"
+
+: >"$state"
+: >"$state.log"
+hold 0 "$tmp/gone"
+FAKE_RECLAIM_IDS="r1 r2" acquire >/dev/null
+check "回収は複数の volume を 1 回の rm で消す" yes "$(contains "$state.log" "volume rm r1 r2")"
+check "回収は複数の network を 1 回の rm で消す" yes "$(contains "$state.log" "network rm r1 r2")"
 
 : >"$state"
 for n in 0 1 2 3; do hold "$n"; done
