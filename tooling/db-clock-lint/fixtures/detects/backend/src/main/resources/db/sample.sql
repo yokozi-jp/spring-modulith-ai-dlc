@@ -1,0 +1,1 @@
+CREATE VIEW v AS SELECT now() AS t;

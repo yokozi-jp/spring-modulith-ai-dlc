@@ -46,6 +46,7 @@ DBの関数には、互換関数でも現在時刻とタイムゾーンを読ま
 
 `DateTimeConventionsArchTest`は、jOOQの`DSL`でDBの時計を読む関数の呼び出しを拒否する。
 日時から暦日や境界を作る`DSL.trunc(...)`などは機械で止めず、レビューで確認する。
+文字列のSQLとchangelogは、`task lint-db-clock`が`CURRENT_DATE`、`now()`、`date_trunc`、`::date`、`AT TIME ZONE`などの語で止める。
 
 ## Consequences
 

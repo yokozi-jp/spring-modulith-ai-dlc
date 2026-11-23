@@ -204,6 +204,8 @@ Javaの`LocalDateTime.atZone()`は、gapでは時刻を後ろへずらし、over
   - jOOQの`DSL`でDBの時計を読む関数（`currentDate()`、`currentLocalDate()`、`currentTimestamp()`、`now()`など）を検出する。
     違反したクラスは、`Clock`から求めた値を引数で渡す。
     日時から暦日や境界を作る`DSL.trunc(...)`、`DSL.date(Field)`、`cast(DATE)`は検出しないため、レビューで確認する。
+- `task lint-db-clock`は、`backend/src/main/java`と`backend/src/main/resources/db`のSQLの文字列とchangelogから、`CURRENT_DATE`、`now()`、`date_trunc`、`::date`、`AT TIME ZONE`などを検出する。
+  関数やビューの本文も、changelogに書いてあれば対象である。
 - Spectralの`instant-property-date-time`と`calendar-date-property-full-date`は、名前が`At`で終わる項目に`type: string`と`format: date-time`を、`Date`で終わる項目に`type: string`と`format: date`を求める。
   検査の対象は、`.spectral.yaml`に書くとおり名前で見分ける。
 - `spring.jackson.default-leniency: false`の読み取りは、`JacksonConfigTest`が検証する。

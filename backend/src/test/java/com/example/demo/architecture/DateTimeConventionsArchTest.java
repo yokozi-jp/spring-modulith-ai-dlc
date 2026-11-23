@@ -38,7 +38,9 @@ import java.util.Set;
 import java.util.TimeZone;
 import java.util.function.Function;
 import java.util.function.Supplier;
+import org.jooq.DatePart;
 import org.jooq.impl.DSL;
+import org.jooq.impl.SQLDataType;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -188,9 +190,9 @@ class DateTimeConventionsArchTest {
         .hasMessageContaining("java.time.MonthDay" + NOW_CLOCK_REMEDIATION);
   }
 
-  /** jOOQ の {@code DSL} で DB の時計を読む関数を拒否する。 */
+  /** jOOQ の {@code DSL} で DB の時計を読む関数を拒否し、暦を作る関数はレビューに任せて拒否しない。 */
   @Test
-  @DisplayName("DSL.currentDate() など DB の時計を読む jOOQ の関数を拒否する")
+  @DisplayName("DSL.currentDate() など DB の時計を読む jOOQ の関数を拒否し、DSL.trunc(...) などは拒否しない")
   void databaseClockFunctionsAreRejected() {
     // フィクスチャを実際に呼び出してIDEにも使用済みと認識させる。拒否判定は続くArchUnitの検査が担う。
     // 禁止する関数を足したら、フィクスチャにも同じ関数の呼び出しを足す。
@@ -205,6 +207,10 @@ class DateTimeConventionsArchTest {
             DATABASE_CLOCK_FUNCTIONS.forEach(name ->
                 assertThat(error)
                     .hasMessageContaining("DSL." + name + "(...) は" + DATABASE_CLOCK_REMEDIATION)));
+
+    // 暦を作る関数は規約に書いたとおりレビューで判断するため、検査は拒否しない。
+    assertThat(DatabaseCalendarUsage.createCalendarFields()).hasSize(2);
+    injectedClockRule().check(new ClassFileImporter().importClasses(DatabaseCalendarUsage.class));
   }
 
   /** メソッド参照による迂回も呼び出しと同じく拒否する。 */
@@ -436,6 +442,16 @@ class DateTimeConventionsArchTest {
           DSL.currentOffsetTime(),
           DSL.currentInstant(),
           DSL.now());
+    }
+  }
+
+  /** 時計を読まずに暦を作る関数を呼ぶ、拒否しない経路のフィクスチャ。 */
+  private static final class DatabaseCalendarUsage {
+
+    private static List<Object> createCalendarFields() {
+      return List.of(
+          DSL.trunc(DSL.field("ordered_at", LocalDateTime.class), DatePart.DAY),
+          DSL.field("ordered_at", Instant.class).cast(SQLDataType.LOCALDATE));
     }
   }
 

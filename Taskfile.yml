@@ -44,12 +44,14 @@ tasks:
     desc: バックエンドの静的解析で素早く確認
     cmds:
       - task: lint-session-sql
+      - task: lint-db-clock
       - task: be-lint
 
   verify:
     desc: push前の静的解析と隔離テストを実行
     cmds:
       - task: lint-session-sql
+      - task: lint-db-clock
       - task: be-lint
       - task: test
 
@@ -689,6 +691,16 @@ tasks:
       # 検出の式の自己検査。検出すべき文を逃すか、トランザクションの advisory lock や識別子やコメントを誤検出したら失敗する。
       - bash tooling/session-sql-lint/test.sh
       - bash tooling/session-sql-lint/session-sql-lint.sh .
+
+  # DB の時計を読む文と、SQL で日時から暦日や境界を作る文を本番のコードから検出する（docs/datetime/timezone-conventions.md）。
+  # jOOQ の DSL の呼び出しは DateTimeConventionsArchTest が止める。ここは文字列の SQL と changelog を見る。
+  lint-db-clock:
+    desc: バックエンドの本番のコードに、DB の時計を読む SQL や日時から暦日を作る SQL がないか検査
+    silent: true
+    cmds:
+      # 検出の式の自己検査。検出すべき文を逃すか、識別子やコメントを誤検出したら失敗する。
+      - bash tooling/db-clock-lint/test.sh
+      - bash tooling/db-clock-lint/db-clock-lint.sh .
 
   # Backend
   be-run:
