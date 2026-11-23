@@ -54,6 +54,7 @@ record CatalogSnapshot(
    * @param inheritanceParent パーティションでない継承の親テーブル。なければ{@code null}
    * @param rowSecurity 行レベルセキュリティを有効にしたか（{@code relrowsecurity}）
    * @param forceRowSecurity 表の所有者にも行レベルセキュリティを効かせるか（{@code relforcerowsecurity}）
+   * @param comment 論理名のコメント（{@code obj_description}）。なければ空文字
    */
   /* package */ record RelationRow(
       String schema,
@@ -62,7 +63,8 @@ record CatalogSnapshot(
       @Nullable String primaryKey,
       @Nullable String inheritanceParent,
       boolean rowSecurity,
-      boolean forceRowSecurity) {
+      boolean forceRowSecurity,
+      String comment) {
 
     /** テーブルの{@code relkind}（通常のテーブルとパーティションテーブル）。 */
     private static final Set<String> TABLE_KINDS = Set.of("r", "p");
@@ -75,6 +77,18 @@ record CatalogSnapshot(
         final @Nullable String primaryKey,
         final @Nullable String inheritanceParent) {
       this(schema, name, relkind, primaryKey, inheritanceParent, false, false);
+    }
+
+    /** コメントのないテーブルかビュー。 */
+    /* package */ RelationRow(
+        final String schema,
+        final String name,
+        final String relkind,
+        final @Nullable String primaryKey,
+        final @Nullable String inheritanceParent,
+        final boolean rowSecurity,
+        final boolean forceRowSecurity) {
+      this(schema, name, relkind, primaryKey, inheritanceParent, rowSecurity, forceRowSecurity, "");
     }
 
     /** ビューでなく、テーブルか。 */
@@ -95,6 +109,7 @@ record CatalogSnapshot(
    * @param generated 生成列の種類（pg_attribute.attgenerated。空文字でなければ生成列）
    * @param defaultExpression 既定値の式。なければ{@code null}
    * @param notNull NOT NULLか（{@code attnotnull}）
+   * @param comment 論理名のコメント（{@code col_description}）。なければ空文字
    */
   /* package */ record ColumnRow(
       String schema,
@@ -105,7 +120,8 @@ record CatalogSnapshot(
       String identity,
       String generated,
       @Nullable String defaultExpression,
-      boolean notNull) {
+      boolean notNull,
+      String comment) {
 
     /** NULLを許すカラム。 */
     /* package */ ColumnRow(
@@ -119,6 +135,30 @@ record CatalogSnapshot(
         final @Nullable String defaultExpression) {
       this(
           schema, table, column, typeName, typeKind, identity, generated, defaultExpression, false);
+    }
+
+    /** コメントのないカラム。 */
+    /* package */ ColumnRow(
+        final String schema,
+        final String table,
+        final String column,
+        final String typeName,
+        final String typeKind,
+        final String identity,
+        final String generated,
+        final @Nullable String defaultExpression,
+        final boolean notNull) {
+      this(
+          schema,
+          table,
+          column,
+          typeName,
+          typeKind,
+          identity,
+          generated,
+          defaultExpression,
+          notNull,
+          "");
     }
   }
 

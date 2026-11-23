@@ -46,6 +46,9 @@ class SchemaConventionsTest {
   /** Liquibaseの管理テーブルのスキーマ。 */
   private static final String LIQUIBASE = "liquibase";
 
+  /** Spring Modulithのイベント出版テーブル。 */
+  private static final String EVENT_PUBLICATION = "event_publication";
+
   /** integerの型名。 */
   private static final String INTEGER = "integer";
 
@@ -71,7 +74,7 @@ class SchemaConventionsTest {
         new CatalogSnapshot(
             List.of(tenantTable(ITEM, TABLE, ITEM_ID), relation(MODULITH, "r", false, null)),
             List.of(
-                column(ITEM, BIGINT, "b", "a", "", null),
+                new ColumnRow(ITEM, TABLE, ITEM_ID, BIGINT, "b", "a", "", null, true, "品目ID"),
                 tenantColumn(ITEM, TABLE),
                 column(MODULITH, INTEGER, "b", "", "", "nextval('x'::regclass)")),
             List.of(
@@ -124,6 +127,40 @@ class SchemaConventionsTest {
     assertThat(SchemaConventions.ALLOWLIST)
         .as("SchemaConventions.ALLOWLIST")
         .allSatisfy(entry -> assertThat(entry.reason()).as("%s の理由", entry.key()).isNotBlank());
+  }
+
+  /** 表と列の論理名。 */
+  /* package */ @Nested
+  class LogicalNameRulesTest {
+
+    @Test
+    @DisplayName("N12：コメントのない業務テーブルとカラムを、直し方を添えて拒否する")
+    void rejectsBusinessTablesAndColumnsWithoutComments() {
+      final List<RelationRow> relations =
+          List.of(
+              new RelationRow(ITEM, TABLE, "r", ITEM_ID, null, true, true, ""),
+              new RelationRow(ITEM, "m_named", "r", ITEM_ID, null, true, true, "名前付き"),
+              new RelationRow(ITEM, "v_m_item", "v", null, null),
+              new RelationRow(MODULITH, EVENT_PUBLICATION, "r", "id", null),
+              new RelationRow(LIQUIBASE, "databasechangelog", "r", null, null));
+      final List<ColumnRow> columns =
+          List.of(
+              new ColumnRow(ITEM, TABLE, "item_code", "text", "b", "", "", null, true, ""),
+              new ColumnRow(ITEM, TABLE, "item_name", "text", "b", "", "", null, true, " "),
+              new ColumnRow(ITEM, TABLE, ITEM_ID, BIGINT, "b", "a", "", null, true, "品目ID"),
+              new ColumnRow(MODULITH, EVENT_PUBLICATION, "id", UUID, "b", "", "", null, true),
+              new ColumnRow(LIQUIBASE, "databasechangelog", "id", "text", "b", "", "", null));
+
+      final List<ConventionViolation> violations =
+          SchemaLogicalNameConventions.logicalNames(relations, columns);
+
+      assertThat(keys(violations))
+          .containsExactlyInAnyOrder(
+              "N12 item.m_item", "N12 item.m_item.item_code", "N12 item.m_item.item_name");
+      assertThat(violations)
+          .allSatisfy(
+              violation -> assertThat(violation.detail()).contains("remarks", "setColumnRemarks"));
+    }
   }
 
   /** トリガーと制約。 */
@@ -436,7 +473,7 @@ class SchemaConventionsTest {
                   List.of(
                       new ColumnRow(
                           MODULITH,
-                          "event_publication",
+                          EVENT_PUBLICATION,
                           "id",
                           "uuid",
                           "b",
@@ -674,7 +711,7 @@ class SchemaConventionsTest {
         List.of(
             new RelationRow(PRODUCT, "m_product", "r", null, null),
             new RelationRow("ordering", "t_order", "r", null, null),
-            new RelationRow("modulith", "event_publication", "r", null, null));
+            new RelationRow("modulith", EVENT_PUBLICATION, "r", null, null));
 
     @Test
     @DisplayName("G4：ログインできる、DDLの属性を持つ、アプリロールが継承するモジュールのロールを拒否する")

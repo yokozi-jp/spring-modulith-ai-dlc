@@ -61,13 +61,13 @@ final class CatalogRows {
         null);
   }
 
-  /** RLSのENABLEとFORCEを付けたテーブル。 */
+  /** RLSのENABLEとFORCEと、論理名のコメントを付けたテーブル。 */
   /* package */ static RelationRow tenantTable(
       final String schema, final String table, final String primaryKey) {
-    return new RelationRow(schema, table, "r", primaryKey, null, true, true);
+    return new RelationRow(schema, table, "r", primaryKey, null, true, true, "品目");
   }
 
-  /** トランザクションのテナントを既定値にした、uuidのNOT NULLのテナントの列。 */
+  /** トランザクションのテナントを既定値にした、uuidのNOT NULLの、論理名のコメントを付けたテナントの列。 */
   /* package */ static ColumnRow tenantColumn(final String schema, final String table) {
     return new ColumnRow(
         schema,
@@ -78,7 +78,8 @@ final class CatalogRows {
         "",
         "",
         TenantIsolation.CATALOG_TENANT_DEFAULT,
-        true);
+        true,
+        "テナント公開ID");
   }
 
   /** テナントの設定と行のテナントを比べる、PUBLICへの許可のポリシー。 */

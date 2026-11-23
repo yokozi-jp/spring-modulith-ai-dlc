@@ -169,7 +169,8 @@ final class SchemaCatalog {
                         WHERE i.indrelid = c.oid AND i.indisprimary) AS primary_key,
                        (SELECT p.relname FROM pg_inherits h JOIN pg_class p ON p.oid = h.inhparent
                         WHERE h.inhrelid = c.oid AND p.relkind <> 'p' LIMIT 1) AS inheritance_parent,
-                       c.relrowsecurity AS row_security, c.relforcerowsecurity AS force_row_security
+                       c.relrowsecurity AS row_security, c.relforcerowsecurity AS force_row_security,
+                       coalesce(obj_description(c.oid, 'pg_class'), '') AS object_comment
                 FROM pg_class c
                 JOIN pg_namespace n ON n.oid = c.relnamespace
                 WHERE c.relkind IN /*RELATION_KINDS*/ AND /*NOT_SYSTEM*/
@@ -182,7 +183,8 @@ final class SchemaCatalog {
                 r.get("primary_key", String.class),
                 r.get("inheritance_parent", String.class),
                 r.get("row_security", Boolean.class),
-                r.get("force_row_security", Boolean.class)));
+                r.get("force_row_security", Boolean.class),
+                text(r, "object_comment")));
   }
 
   private static List<ColumnRow> columns(final DSLContext dsl) {
@@ -192,7 +194,8 @@ final class SchemaCatalog {
                 SELECT n.nspname AS schema_name, c.relname AS table_name, a.attname AS object_name,
                        format_type(a.atttypid, a.atttypmod) AS type_name, t.typtype::text AS type_kind,
                        a.attidentity::text AS identity_kind, a.attgenerated::text AS generated_kind,
-                       pg_get_expr(d.adbin, d.adrelid) AS default_expression, a.attnotnull AS not_null
+                       pg_get_expr(d.adbin, d.adrelid) AS default_expression, a.attnotnull AS not_null,
+                       coalesce(col_description(a.attrelid, a.attnum), '') AS object_comment
                 FROM pg_attribute a
                 JOIN pg_class c ON c.oid = a.attrelid
                 JOIN pg_namespace n ON n.oid = c.relnamespace
@@ -210,7 +213,8 @@ final class SchemaCatalog {
                 text(r, "identity_kind"),
                 text(r, "generated_kind"),
                 r.get("default_expression", String.class),
-                r.get("not_null", Boolean.class)));
+                r.get("not_null", Boolean.class),
+                text(r, "object_comment")));
   }
 
   private static List<IndexRow> indexes(final DSLContext dsl) {
