@@ -27,7 +27,7 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
  * 失敗したイベント出版を、運用者の指定で 1 回だけ再投入し、リスナーの処理が終わるまで待つ（ADR-079）。
  *
  * <p>原因を直したあとに、自動の再投入を待たずに手で再投入する入口で使う。待ち時間は見ず、対象に合う {@code FAILED} の出版を {@code max-per-run}
- * 件まで再投入する。方針の上限を超えて {@code ABANDONED} になった出版は、Spring Modulith 2.2.0 に {@code FAILED} へ戻す API
+ * 件まで再投入する。回数の上限を超えて {@code ABANDONED} になった出版は、Spring Modulith 2.2.0 に {@code FAILED} へ戻す API
  * がないため、Runbook の SQL で戻してから使う（ADR-079）。定期の再投入と同じロックを取り、取れるまで {@code lock-at-most-for} を上限に待つ。
  * リスナーは別のスレッドで動くため、再投入した出版が {@code PUBLISHED}、{@code PROCESSING}、{@code RESUBMITTED}
  * でなくなるまで待ち、件数を記録する。
@@ -207,7 +207,7 @@ public class EventPublicationResubmitOnce {
   /**
    * 再投入した出版の処理が終わるまで待ち、結果を数える。完了した出版は archive の {@code COMPLETED} の行で数える。
    *
-   * <p>方針の上限を超えて失敗した出版も、{@code ABANDONED} として未完了の表から archive へ移るため、未完了の表に残った行では数えない。
+   * <p>回数の上限を超えて失敗した出版も、{@code ABANDONED} として未完了の表から archive へ移るため、未完了の表に残った行では数えない。
    */
   private Outcome awaitCompletion(final List<UUID> ids, final int remaining) {
     final int polls = pollsWithin(onceProperties.completionTimeout());

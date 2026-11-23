@@ -4,22 +4,26 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.example.demo.shared.events.ResubmissionPolicy;
-import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.time.Duration;
+import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.Map;
-import org.jooq.SQLDialect;
-import org.jooq.impl.DSL;
+import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.mockito.Mockito;
 import org.springframework.aop.framework.autoproxy.AutoProxyUtils;
 import org.springframework.beans.factory.CannotLoadBeanClassException;
 import org.springframework.beans.factory.config.ConfigurableListableBeanFactory;
 import org.springframework.beans.factory.support.DefaultListableBeanFactory;
 import org.springframework.beans.factory.support.RootBeanDefinition;
 import org.springframework.modulith.events.ApplicationModuleListener;
+import org.springframework.modulith.events.EventPublication;
+import org.springframework.modulith.events.core.PublicationTargetIdentifier;
+import org.springframework.modulith.events.core.TargetEventPublication;
 
 /**
- * {@link ResubmissionPolicies} が bean を走査して、リスナーの ID と方針の名前を対応づけることを検証する。
+ * {@link ResubmissionPolicies} が bean を走査してリスナーの ID と方針の名前を対応づけることと、再投入してよいかの判断を検証する。
  *
  * <p>DB と Spring の文脈は使わず、{@link DefaultListableBeanFactory} に bean の定義だけを登録して作る。
  */
@@ -31,7 +35,13 @@ class ResubmissionPoliciesTest {
   /** 設定にある方針の名前。 */
   private static final String PAYMENT = "payment";
 
-  /** 方針の設定値。{@code default} と {@code payment} を持つ。 */
+  /** 最後の試行の時刻。マイクロ秒の精度にする。 */
+  private static final Instant T0 = Instant.parse("2026-10-10T01:02:03.123456Z");
+
+  /** 再投入の回数の上限。 */
+  private static final int MAX_RESUBMISSIONS = 5;
+
+  /** 方針の設定値。{@code default} と、倍率の違う {@code payment} を持つ。 */
   private static final EventPublicationResubmissionConfig.Properties PROPERTIES =
       new EventPublicationResubmissionConfig.Properties(
           Duration.ofMinutes(5),
@@ -41,9 +51,9 @@ class ResubmissionPoliciesTest {
           Duration.ofMinutes(10),
           Map.of(
               EventPublicationResubmissionConfig.DEFAULT_POLICY,
-              new EventPublicationResubmissionConfig.Policy(5, 2, Duration.ofHours(1)),
+              new EventPublicationResubmissionConfig.Policy(2, Duration.ofHours(1)),
               PAYMENT,
-              new EventPublicationResubmissionConfig.Policy(3, 2, Duration.ofHours(1))));
+              new EventPublicationResubmissionConfig.Policy(3, Duration.ofHours(1))));
 
   @Test
   @DisplayName("型を解決できない bean があっても起動を失敗させず、他の bean の方針を対応づける")
@@ -99,11 +109,64 @@ class ResubmissionPoliciesTest {
     assertThat(id).isEqualTo(PaymentListener.class.getName() + ".on(java.lang.String)");
   }
 
-  /** DB を使わない構築。jOOQ と Counter は方針の対応づけに使わない。 */
+  @Test
+  @DisplayName("回数が上限と同じ出版は待ち時間の後に再投入し、上限を超えた出版は待ち時間を過ぎても再投入しない")
+  void attemptsAboveLimitAreNotDue() {
+    final ResubmissionPolicies policies = policiesOf(new DefaultListableBeanFactory());
+    // 5 回目の再投入の前の待ち時間は min(5 分 × 2^4, 1 時間) = 1 時間。
+    final Instant afterWait = T0.plus(Duration.ofHours(1)).plus(1, ChronoUnit.MICROS);
+
+    assertThat(policies.isDue(failed(MAX_RESUBMISSIONS), afterWait)).as("attempts = 上限").isTrue();
+    assertThat(policies.isDue(failed(MAX_RESUBMISSIONS + 1), afterWait.plus(Duration.ofDays(1))))
+        .as("attempts = 上限 + 1")
+        .isFalse();
+  }
+
+  @Test
+  @DisplayName("リスナーの ID を持たない出版は default の方針の待ち時間で、リスナーの出版はその方針の待ち時間で判断する")
+  void waitFollowsPolicyOfListenerAndDefaultsWithoutListener() {
+    final DefaultListableBeanFactory beanFactory = new DefaultListableBeanFactory();
+    beanFactory.registerBeanDefinition("named", new RootBeanDefinition(NamedListener.class));
+    final ResubmissionPolicies policies = policiesOf(beanFactory);
+    // 2 回目の再投入の前の待ち時間は、default が 5 分 × 2 = 10 分、payment が 5 分 × 3 = 15 分。
+    final Instant defaultWait = T0.plus(Duration.ofMinutes(10));
+
+    assertThat(policies.isDue(failed(2), defaultWait)).as("default のちょうど待ち時間").isFalse();
+    assertThat(policies.isDue(failed(2), defaultWait.plus(1, ChronoUnit.MICROS)))
+        .as("default の待ち時間の 1 マイクロ秒後")
+        .isTrue();
+    assertThat(policies.isDue(failed("custom-id", 2), defaultWait.plus(1, ChronoUnit.MICROS)))
+        .as("payment の待ち時間の前")
+        .isFalse();
+  }
+
+  /** DB を使わない構築。 */
   private static ResubmissionPolicies policiesOf(
       final ConfigurableListableBeanFactory beanFactory) {
     return new ResubmissionPolicies(
-        beanFactory, PROPERTIES, DSL.using(SQLDialect.POSTGRES), new SimpleMeterRegistry());
+        beanFactory,
+        PROPERTIES,
+        new EventPublicationResubmissionConfig.AbandonProperties(MAX_RESUBMISSIONS));
+  }
+
+  /** 最後の試行が {@link #T0} で、{@link TargetEventPublication} でない FAILED の出版。 */
+  private static EventPublication failed(final int attempts) {
+    return stub(Mockito.mock(EventPublication.class, Mockito.CALLS_REAL_METHODS), attempts);
+  }
+
+  /** 最後の試行が {@link #T0} で、リスナーの ID を持つ FAILED の出版。 */
+  private static EventPublication failed(final String listenerId, final int attempts) {
+    final TargetEventPublication publication =
+        Mockito.mock(TargetEventPublication.class, Mockito.CALLS_REAL_METHODS);
+    Mockito.doReturn(PublicationTargetIdentifier.of(listenerId))
+        .when(publication)
+        .getTargetIdentifier();
+    return stub(publication, attempts);
+  }
+
+  private static EventPublication stub(final EventPublication publication, final int attempts) {
+    return ResubmissionTestSupport.stubPublication(
+        publication, UUID.randomUUID(), attempts, T0.minus(Duration.ofDays(1)), T0);
   }
 
   /** 方針を指定し、id を明示しないリスナー。 */

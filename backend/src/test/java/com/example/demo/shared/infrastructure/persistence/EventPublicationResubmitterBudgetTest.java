@@ -92,10 +92,12 @@ class EventPublicationResubmitterBudgetTest {
 
   /** 待ち時間を十分に過ぎた、default の方針の FAILED の出版。 */
   private static EventPublication dueRow(final Instant runStart) {
-    final EventPublication publication = Mockito.mock(EventPublication.class);
-    Mockito.when(publication.getIdentifier()).thenReturn(UUID.randomUUID());
-    Mockito.when(publication.getPublicationDate()).thenReturn(runStart.minus(Duration.ofDays(1)));
-    return publication;
+    return ResubmissionTestSupport.stubPublication(
+        Mockito.mock(EventPublication.class, Mockito.CALLS_REAL_METHODS),
+        UUID.randomUUID(),
+        1,
+        runStart.minus(Duration.ofDays(1)),
+        null);
   }
 
   private void expireLock() {

@@ -173,6 +173,11 @@ spring:
       # 最初の配信が concurrency-limit の空きを待つ間に published を過ぎた出版は重ねて再投入しうる。リスナーの冪等性に頼る。
       # ponytail: 古い出版を読んでから markFailed を呼ぶまでに別のインスタンスが再投入した出版も、FAILED に戻しうる。
       # 根拠は ADR-079 と ResubmissionOptionsLearningTest の stalenessMarksPublicationResubmittedAfterRead である。
+      # 再投入の回数の上限。この回数目の再投入で失敗した出版を ABANDONED にして archive へ移す（ADR-079）。
+      # Spring Modulith は失敗した試行の前に読んだ completion_attempts と比べ、最初の配信と 1 回目の再投入をどちらも 1 と比べるため、2 以上にする。
+      # 定期の再投入もこの値を超えた出版を再投入しない。2 未満なら起動に失敗する。
+      resubmission:
+        abandon-after-attempts: 5
       staleness:
         published: ${event-publication.resubmission.wait-age}
         processing: ${event-publication.resubmission.in-flight-staleness}
@@ -207,14 +212,12 @@ event-publication:
     lock-at-most-for: PT10M
     # リスナーの再投入の方針。リスナーの on に @ResubmissionPolicy("<名前>") を付けて選び、付けなければ default にする。
     # n 回目の再投入の前に、最後の試行から min(wait-age × multiplier^(n-1), max-wait) だけ待つ。
-    # max-resubmissions 回の再投入の後に失敗した出版は、Spring Modulith の AbandonPolicy で ABANDONED にし、archive へ移す。
+    # 回数の上限は spring.modulith.events.resubmission.abandon-after-attempts で全リスナーに共通である。
     policies:
       default:
-        max-resubmissions: 5
         multiplier: 2
         max-wait: PT1H
       payment:
-        max-resubmissions: 5
         multiplier: 2
         max-wait: PT1H
   # 手での 1 回の再投入。対象（target）は起動のときだけ環境変数 EVENT_PUBLICATION_RESUBMIT_ONCE_TARGET で渡す。

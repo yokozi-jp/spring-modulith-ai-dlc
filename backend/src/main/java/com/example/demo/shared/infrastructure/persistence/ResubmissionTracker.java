@@ -1,20 +1,18 @@
 package com.example.demo.shared.infrastructure.persistence;
 
-import static com.example.demo.jooq.modulith.Tables.EVENT_PUBLICATION;
-import static com.example.demo.jooq.modulith.Tables.EVENT_PUBLICATION_ARCHIVE;
-
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
 import java.time.Duration;
 import java.time.Instant;
-import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.stream.Collectors;
+import lombok.extern.slf4j.Slf4j;
 import org.jooq.DSLContext;
-import org.jooq.impl.DSL;
 import org.jspecify.annotations.Nullable;
+import org.springframework.modulith.events.EventPublication.Status;
 
 /**
  * 定期のジョブが再投入した出版を覚え、次の回以降に結果を DB から読み戻して数える（ADR-079）。
@@ -29,13 +27,8 @@ import org.jspecify.annotations.Nullable;
 // Gauge（event.publication.failed）と最古の経過時間の警報が補う。完了と諦めは archive の行の status で判定するため
 // completion-mode: archive が前提である。
 // 結果の判定は次の回まで遅れる。確実に数える必要が出たら、結果を持つ表を足して全インスタンスで共有する。
+@Slf4j
 final class ResubmissionTracker {
-
-  /** Spring Modulith の失敗した出版の状態。 */
-  private static final String FAILED = "FAILED";
-
-  /** Spring Modulith の完了した出版の状態。 */
-  private static final String COMPLETED = "COMPLETED";
 
   /** 結果の Counter の名前。 */
   private static final String OUTCOMES_METRIC = "event.publication.resubmission.outcomes";
@@ -43,8 +36,11 @@ final class ResubmissionTracker {
   /** 再投入のあとに完了した出版の数。 */
   private final Counter completed;
 
-  /** 再投入のあとに再び失敗した出版の数。方針の上限を超えて ABANDONED になった出版を含む。 */
+  /** 再投入のあとに再び失敗した出版の数。回数の上限を超えて ABANDONED になった出版を含む。 */
   private final Counter failed;
+
+  /** 再投入の回数の上限を超えて ABANDONED になった出版の数。 */
+  private final Counter exhausted;
 
   /** Spring Boot が構成した jOOQ。 */
   private final DSLContext dsl;
@@ -63,6 +59,10 @@ final class ResubmissionTracker {
     this.lifetime = lifetimeOf(properties);
     this.completed = outcome(meterRegistry, "completed");
     this.failed = outcome(meterRegistry, "failed");
+    this.exhausted =
+        Counter.builder("event.publication.resubmission.exhausted")
+            .description("再投入の回数の上限を超えて失敗し、ABANDONED になった出版の数")
+            .register(meterRegistry);
   }
 
   private static Counter outcome(final MeterRegistry meterRegistry, final String outcome) {
@@ -101,32 +101,52 @@ final class ResubmissionTracker {
   /**
    * 覚えている出版の結果を DB から読み戻して数える。ロックの外ですべてのインスタンスが、自分が覚えている ID だけについて行う。
    *
-   * <p>archive の {@code COMPLETED} は完了、{@code FAILED} と archive の {@code ABANDONED} は再失敗として数えて忘れる。
-   * {@code RESUBMITTED}、{@code PROCESSING}、{@code PUBLISHED} は次の回に回す。どちらの表にもない出版は、運用者が消したので数えずに忘れる。
-   * 未完了の状態のまま {@code lifetime} を過ぎた ID は数えずに捨てる。
+   * <p>{@code COMPLETED} は完了、{@code FAILED} と {@code ABANDONED} は再失敗として数えて忘れる。{@code ABANDONED} は
+   * ERROR でも知らせる。 処理中の状態は次の回に回す。どちらの表にもない出版は、運用者が消したので数えずに忘れる。 未完了の状態のまま {@code lifetime} を過ぎた ID
+   * は数えずに捨てる。
    */
   /* package */ void reconcile(final Instant now) {
     if (inFlight.isEmpty()) {
       return;
     }
-    final Map<UUID, String> live =
-        dsl.select(EVENT_PUBLICATION.ID, EVENT_PUBLICATION.STATUS)
-            .from(EVENT_PUBLICATION)
-            .where(EVENT_PUBLICATION.ID.eq(DSL.any(inFlight.keySet().toArray(UUID[]::new))))
-            .fetchMap(EVENT_PUBLICATION.ID, EVENT_PUBLICATION.STATUS);
-    final Set<UUID> missing = new HashSet<>(inFlight.keySet());
-    missing.removeAll(live.keySet());
-    archivedAmong(missing)
-        .forEach((id, status) -> (COMPLETED.equals(status) ? completed : failed).increment());
-    missing.forEach(inFlight::remove);
-    live.forEach((id, status) -> {
-      if (FAILED.equals(status)) {
+    final Map<UUID, EventPublicationStates.State> states =
+        EventPublicationStates.read(dsl, inFlight.keySet());
+    inFlight.forEach((id, resubmittedAt) -> {
+      final EventPublicationStates.@Nullable State state = states.get(id);
+      final @Nullable Status status = state == null ? null : state.status();
+      if (state == null) {
         inFlight.remove(id);
-        failed.increment();
-      } else if (Duration.between(inFlight.get(id), now).compareTo(lifetime) > 0) {
-        inFlight.remove(id);
+      } else if (status == null) {
+        forgetIfExpired(id, resubmittedAt, now);
+      } else {
+        switch (status) {
+          case COMPLETED -> conclude(id, completed);
+          case FAILED -> conclude(id, failed);
+          case ABANDONED -> {
+            conclude(id, failed);
+            exhausted.increment();
+            log.atError()
+                .addKeyValue("event_publication.id", id.toString())
+                .addKeyValue("event_publication.event_type", state.eventType())
+                .addKeyValue("event_publication.listener_id", state.listenerId())
+                .addKeyValue("event_publication.completion_attempts", state.completionAttempts())
+                .log("Event publication resubmission exhausted");
+          }
+          case PUBLISHED, PROCESSING, RESUBMITTED -> forgetIfExpired(id, resubmittedAt, now);
+        }
       }
     });
+  }
+
+  private void conclude(final UUID id, final Counter outcome) {
+    inFlight.remove(id);
+    outcome.increment();
+  }
+
+  private void forgetIfExpired(final UUID id, final Instant resubmittedAt, final Instant now) {
+    if (Duration.between(resubmittedAt, now).compareTo(lifetime) > 0) {
+      inFlight.remove(id);
+    }
   }
 
   /**
@@ -137,37 +157,20 @@ final class ResubmissionTracker {
    * completion_attempts} が増えた行と、すでに完了するか ABANDONED になって archive に移った行を「進んだ」とする。 進んだ行は {@code
    * markResubmitted} が必ず {@code completion_attempts} を 1 増やす。
    */
-  /* package */ Set<UUID> advancedAmong(final Map<UUID, Integer> candidates) {
-    if (candidates.isEmpty()) {
-      return Set.of();
-    }
-    final Map<UUID, Integer> attempts =
-        dsl.select(EVENT_PUBLICATION.ID, EVENT_PUBLICATION.COMPLETION_ATTEMPTS)
-            .from(EVENT_PUBLICATION)
-            .where(EVENT_PUBLICATION.ID.eq(DSL.any(candidates.keySet().toArray(UUID[]::new))))
-            .fetchMap(EVENT_PUBLICATION.ID, EVENT_PUBLICATION.COMPLETION_ATTEMPTS);
-    final Set<UUID> advanced = new HashSet<>();
-    final Set<UUID> missing = new HashSet<>();
-    candidates.forEach((id, before) -> {
-      final @Nullable Integer after = attempts.get(id);
-      if (after == null) {
-        missing.add(id);
-      } else if (after > before) {
-        advanced.add(id);
-      }
-    });
-    advanced.addAll(archivedAmong(missing).keySet());
-    return advanced;
+  private Set<UUID> advancedAmong(final Map<UUID, Integer> candidates) {
+    final Map<UUID, EventPublicationStates.State> states =
+        EventPublicationStates.read(dsl, candidates.keySet());
+    return candidates.entrySet().stream()
+        .filter(candidate -> {
+          final EventPublicationStates.@Nullable State state = states.get(candidate.getKey());
+          return state != null
+              && (archived(state) || state.completionAttempts() > candidate.getValue());
+        })
+        .map(Map.Entry::getKey)
+        .collect(Collectors.toUnmodifiableSet());
   }
 
-  /** ID のうち、完了するか ABANDONED になって archive に移ったものと、その状態。 */
-  private Map<UUID, String> archivedAmong(final Set<UUID> ids) {
-    if (ids.isEmpty()) {
-      return Map.of();
-    }
-    return dsl.select(EVENT_PUBLICATION_ARCHIVE.ID, EVENT_PUBLICATION_ARCHIVE.STATUS)
-        .from(EVENT_PUBLICATION_ARCHIVE)
-        .where(EVENT_PUBLICATION_ARCHIVE.ID.eq(DSL.any(ids.toArray(UUID[]::new))))
-        .fetchMap(EVENT_PUBLICATION_ARCHIVE.ID, EVENT_PUBLICATION_ARCHIVE.STATUS);
+  private static boolean archived(final EventPublicationStates.State state) {
+    return state.status() == Status.COMPLETED || state.status() == Status.ABANDONED;
   }
 }

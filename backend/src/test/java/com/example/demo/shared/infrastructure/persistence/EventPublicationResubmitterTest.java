@@ -238,7 +238,7 @@ class EventPublicationResubmitterTest {
 
   @Test
   @DisplayName(
-      "方針の上限を超えて失敗した出版は ABANDONED で archive に移り、定期と手での再投入の対象にならず、Gauge の exhausted と ERROR に 1 回だけ出る")
+      "回数の上限の回数目の再投入で失敗した出版は ABANDONED で archive に移り、定期と手での再投入の対象にならず、Gauge の exhausted と ERROR に 1 回だけ出る")
   void exhaustedPublicationIsAbandonedAndNotResubmitted(final Scenario scenario) {
     listener.failTimes(Integer.MAX_VALUE);
     final double failedBefore = outcome("failed");
@@ -282,8 +282,8 @@ class EventPublicationResubmitterTest {
   @Test
   @DisplayName("失敗を記録せずに上限を超えて FAILED に戻った出版（最後の試行の途中で落ちた出版）は、待ち時間を過ぎても再投入しない")
   void failedPublicationPastLimitWithoutRecordedFailureIsNotResubmitted() {
-    // default の上限は 1 回。2 回目の試行の途中で落ち、Staleness Monitor が FAILED に戻した行にあたる。
-    final UUID publication = insertFailed(2, T0);
+    // テストの上限は 2 回。2 回目の再投入の途中で落ち、Staleness Monitor が FAILED に戻した行にあたる。
+    final UUID publication = insertFailed(3, T0);
     dsl.update(EVENT_PUBLICATION)
         .set(EVENT_PUBLICATION.EVENT_TYPE, EVENT_TYPE)
         .set(EVENT_PUBLICATION.SERIALIZED_EVENT, "{\"id\":\"" + publication + "\"}")
@@ -299,7 +299,7 @@ class EventPublicationResubmitterTest {
                 .where(EVENT_PUBLICATION.ID.eq(publication))
                 .fetchOptional(Records.mapping(Row::new)))
         .as("上限を超えた FAILED の出版の未完了の行")
-        .contains(new Row(FAILED, 2));
+        .contains(new Row(FAILED, 3));
   }
 
   @Test

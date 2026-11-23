@@ -50,8 +50,10 @@ import org.springframework.modulith.test.Scenario;
  * Modulith が読んだ後の再投入を守るようになったので、{@code application.yaml} の注記と ADR-079 の該当の Consequences を消す。 どの行も
  * FAILED で終わるため、{@code CleanGeneratedTablesExtension} の処理中の出版の待ちを止めない。
  *
- * <p>{@code abandonPolicySeesPublicationReadBeforeResubmission} が失敗したら、{@link
- * ResubmissionPolicies#shouldAbandon} が DB から回数を読む理由がなくなったので、渡された出版の回数で判断するよう見直す。
+ * <p>{@code abandonPolicySeesPublicationReadBeforeResubmission} が失敗したら、{@code
+ * spring.modulith.events.resubmission.abandon-after-attempts} の数え方が変わったので、{@link
+ * EventPublicationResubmissionConfig.AbandonProperties} の下限と {@link ResubmissionPolicies#isDue}
+ * の回数の条件と ADR-079 を見直す。
  */
 // 再投入、Staleness Monitor、諦めの判断の振る舞いを同じ文脈で固定し、行を読む補助を持つため、メソッドの数が多い。
 @SuppressWarnings("PMD.TooManyMethods")
@@ -147,8 +149,8 @@ class ResubmissionOptionsLearningTest {
 
   @Test
   @DisplayName(
-      "学習テスト：AbandonPolicy に渡る出版は、最初の配信では作ったときの PUBLISHED の値、"
-          + "再投入では再投入の前に読んだ FAILED の行の値で、回数と時刻だけでは最初の配信と 1 回目の再投入を見分けられない")
+      "学習テスト：AbandonPolicy に渡る出版は、最初の配信では作ったときの PUBLISHED の値、再投入では再投入の前に読んだ FAILED の行の値で、"
+          + "abandon-after-attempts=2 は 1 回目の再投入の失敗で諦めず、2 回目の再投入の失敗で諦める")
   void abandonPolicySeesPublicationReadBeforeResubmission(final Scenario scenario) {
     clock.set(T0);
     final UUID publication = failed(scenario);
@@ -172,7 +174,7 @@ class ResubmissionOptionsLearningTest {
         .andVerify(done -> {});
 
     assertThat(abandonPolicies.seen(publication))
-        .as("最初の配信、1 回目と 2 回目の再投入の失敗で渡された出版")
+        .as("最初の配信、1 回目と 2 回目の再投入の失敗で渡された出版。最初の 2 つは状態だけが違う")
         .containsExactly(
             new AbandonPolicyRecorder.Seen(EventPublication.Status.PUBLISHED, T0, T0, 1, T0),
             new AbandonPolicyRecorder.Seen(EventPublication.Status.FAILED, T0, T0, 1, T0),

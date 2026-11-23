@@ -75,7 +75,7 @@ class EventPublicationResubmissionConfigTest {
     "event-publication.resubmission.interval=PT1M",
     "event-publication.resubmission.max-per-run=100",
     "event-publication.resubmission.lock-at-most-for=PT10M",
-    "event-publication.resubmission.policies.default.max-resubmissions=5",
+    "spring.modulith.events.resubmission.abandon-after-attempts=5",
     "event-publication.resubmission.policies.default.multiplier=2",
     "event-publication.resubmission.policies.default.max-wait=PT1H",
     "event-publication.resubmit-once.completion-timeout=PT10M"
@@ -150,9 +150,13 @@ class EventPublicationResubmissionConfigTest {
   }
 
   @Test
-  @DisplayName("方針の上限の回数が 1 より小さいと起動に失敗する")
-  void zeroMaxResubmissionsFailsStartup() {
-    assertBindFailure("event-publication.resubmission.policies.default.max-resubmissions=0");
+  @DisplayName("再投入の回数の上限が 2 より小さいと起動に失敗し、2 なら起動する")
+  void abandonAfterAttemptsBelowTwoFailsStartup() {
+    assertBindFailure("spring.modulith.events.resubmission.abandon-after-attempts=1");
+    runner
+        .withPropertyValues(
+            ENABLED + "=false", "spring.modulith.events.resubmission.abandon-after-attempts=2")
+        .run(context -> assertThat(context).hasNotFailed());
   }
 
   @Test
@@ -177,7 +181,7 @@ class EventPublicationResubmissionConfigTest {
             "event-publication.resubmission.interval=PT1M",
             "event-publication.resubmission.max-per-run=100",
             "event-publication.resubmission.lock-at-most-for=PT10M",
-            "event-publication.resubmission.policies.other.max-resubmissions=5",
+            "spring.modulith.events.resubmission.abandon-after-attempts=5",
             "event-publication.resubmission.policies.other.multiplier=2",
             "event-publication.resubmission.policies.other.max-wait=PT1H",
             "event-publication.resubmit-once.completion-timeout=PT10M")
@@ -216,7 +220,6 @@ class EventPublicationResubmissionConfigTest {
   void unknownPolicyNameFailsStartup() {
     runner
         .withUserConfiguration(ResubmissionPolicies.class)
-        .withBean(MeterRegistry.class, SimpleMeterRegistry::new)
         .withBean(UnknownPolicyListener.class)
         .run(context ->
             assertThat(context)
@@ -230,7 +233,7 @@ class EventPublicationResubmissionConfigTest {
   @DisplayName("n 回目の再投入の前の待ち時間は min(wait-age × multiplier^(n-1), max-wait) である")
   void waitBeforeGrowsExponentiallyUpToMaxWait() {
     final EventPublicationResubmissionConfig.Policy policy =
-        new EventPublicationResubmissionConfig.Policy(5, 2, Duration.ofHours(1));
+        new EventPublicationResubmissionConfig.Policy(2, Duration.ofHours(1));
     final Duration waitAge = Duration.ofMinutes(5);
 
     assertThat(policy.waitBefore(waitAge, 1)).isEqualTo(Duration.ofMinutes(5));
@@ -239,7 +242,7 @@ class EventPublicationResubmissionConfigTest {
     assertThat(policy.waitBefore(waitAge, 5)).isEqualTo(Duration.ofHours(1));
     assertThat(policy.waitBefore(waitAge, 1_000)).isEqualTo(Duration.ofHours(1));
     assertThat(
-            new EventPublicationResubmissionConfig.Policy(5, 1, Duration.ofHours(1))
+            new EventPublicationResubmissionConfig.Policy(1, Duration.ofHours(1))
                 .waitBefore(waitAge, 5))
         .as("倍率 1")
         .isEqualTo(Duration.ofMinutes(5));

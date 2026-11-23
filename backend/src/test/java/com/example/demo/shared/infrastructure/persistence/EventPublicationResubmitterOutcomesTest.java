@@ -42,7 +42,7 @@ class EventPublicationResubmitterOutcomesTest {
   /** 出版の時刻。マイクロ秒の精度にする。待ち時間を十分に過ぎた時刻でジョブを動かす。 */
   private static final Instant T0 = Instant.parse("2026-10-10T01:02:03.123456Z");
 
-  /** 方針を持たない listener_id で、default（max-resubmissions=1）が使われる。 */
+  /** 方針を持たない listener_id で、default の方針が使われる。 */
   private static final String LISTENER_ID = "outcomes-test";
 
   /** 再投入の候補にする FAILED の状態。 */
@@ -205,8 +205,9 @@ class EventPublicationResubmitterOutcomesTest {
   }
 
   @Test
-  @DisplayName("再投入した出版が方針の上限を超えて ABANDONED で archive に移ったら、completed でなく failed を 1 だけ数える")
-  void abandonedIsCountedAsFailedOnce() {
+  @DisplayName(
+      "再投入した出版が回数の上限を超えて ABANDONED で archive に移ったら、completed でなく failed と exhausted を 1 だけ数える")
+  void abandonedIsCountedAsFailedAndExhaustedOnce() {
     final UUID id = insert(FAILED, 1);
     final EventPublicationResubmitter resubmitter = newResubmitter(properties);
     resubmitter.resubmitOnce();
@@ -217,6 +218,7 @@ class EventPublicationResubmitterOutcomesTest {
 
     assertThat(outcome(OUTCOME_FAILED)).isEqualTo(1.0);
     assertThat(outcome(OUTCOME_COMPLETED)).isZero();
+    assertThat(count("event.publication.resubmission.exhausted")).isEqualTo(1.0);
   }
 
   @Test
@@ -333,10 +335,13 @@ class EventPublicationResubmitterOutcomesTest {
                       .where(EVENT_PUBLICATION.STATUS.eq(FAILED))
                       .orderBy(EVENT_PUBLICATION.PUBLICATION_DATE)
                       .fetch()) {
-                final EventPublication publication = Mockito.mock(EventPublication.class);
-                Mockito.when(publication.getIdentifier()).thenReturn(row.value1());
-                Mockito.when(publication.getCompletionAttempts()).thenReturn(row.value2());
-                Mockito.when(publication.getPublicationDate()).thenReturn(row.value3());
+                final EventPublication publication =
+                    ResubmissionTestSupport.stubPublication(
+                        Mockito.mock(EventPublication.class, Mockito.CALLS_REAL_METHODS),
+                        row.value1(),
+                        row.value2(),
+                        row.value3(),
+                        null);
                 if (filter.test(publication) && !notMarked.contains(row.value1())) {
                   move(row.value1(), RESUBMITTED);
                   afterEach.run();
