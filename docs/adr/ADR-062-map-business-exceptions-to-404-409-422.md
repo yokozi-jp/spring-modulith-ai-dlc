@@ -105,7 +105,7 @@ ADR は Proposed のままであるため、新しい ADR を起こさず、こ�
   制約名を取るには PostgreSQL の JDBC ドライバへのコンパイル時の依存が要る。
 - 原因がないため、PostgreSQL のエラーの詳細（`detail`、`hint`）をログで見られない。
 - `ConflictException.Kind` で public の型が 1 つ増え、アーキテクチャ指標の全体の相対可視性の上限を書き直した。
-- `ConflictTranslator.executeOrConflict` は catch した例外を原因に渡さないため、PMD の `PreserveStackTrace` と Error Prone の `UnusedException` を、そのメソッドに限って抑止する。
+- `ConflictTranslator` は catch した例外を原因に渡さない。`translate` が例外を受けて `ConflictException` を作るので、PMD の `PreserveStackTrace` と Error Prone の `UnusedException` は抑止せずに通る。原因を持たないことは `TableWriterTest` の `hasNoCause()` が守る。
 - `TableWriter` を通さない INSERT の `23505` は 500 のまま残る。
   H1 が `TableWriter` の外の `insertInto` などを禁じる（ADR-054）。
 - `Optional.get()`、`Iterator.next()`、`Optional::orElseThrow` のメソッド参照などが中で投げる `NoSuchElementException` は検出しない。

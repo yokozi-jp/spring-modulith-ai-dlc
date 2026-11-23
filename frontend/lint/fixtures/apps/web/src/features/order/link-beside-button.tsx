@@ -6,7 +6,7 @@ export function LinkBesideButton({ label }: { label: string }) {
   return (
     <>
       <Link to="/">{label}</Link>
-      <Button render={<span />} />
+      <Button render={<span />}>{label}</Button>
     </>
   );
 }
