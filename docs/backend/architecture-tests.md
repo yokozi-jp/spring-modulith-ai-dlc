@@ -394,6 +394,7 @@ DBの規約のほかの検査は`backend/src/test/java/com/example/demo/persiste
 - `SchemaConventionsTest`は、`pg_catalog`の行から違反を判定する関数を、違反を含む行で検証する。
 - `SchemaInspectionTest`は、マイグレーション後のテストDBの`pg_catalog`をアプリロールで読み、同じ関数で検査する。
   モジュールのロールは、Spring Modulithが見つけた機能モジュールの直接の依存先と照らして検査する。
+  DBのテーブルが[保持期限と個人データの一覧](../database/table-retention-and-personal-data.md)に載っているかも検査する。
 
 権限の規則は次のとおりである。根拠は[DB接続情報とロール分離](../database/connections.md)にある。
 
