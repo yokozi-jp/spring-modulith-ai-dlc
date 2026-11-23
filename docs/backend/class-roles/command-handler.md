@@ -72,6 +72,12 @@ Command の形式は、Controller の `@Valid` で検証済みである。
 形式の違反は、`ApiExceptionHandler` が継承する `ResponseEntityExceptionHandler` が 400 の Problem Details にするため、CommandHandler に届かない。
 
 業務上の失敗は[業務上の失敗の例外](business-exception.md)の型で投げ、`ApiExceptionHandler` が 404、409、422 にする（[ADR-062](../../adr/ADR-062-map-business-exceptions-to-404-409-422.md)）。
+業務の状態に記録して正常に終える結果（決済の拒否、契約の不備、請求しない、処理済み）は、投げずに [Result](result.md) の値で返す。
+迷ったら、失敗の前に書いた行とイベントの出版を commit してよいかで決める。
+値を返すと Spring は commit し、Spring Modulith は出版を `COMPLETED` にする。
+値の失敗を `setRollbackOnly()` で rollback させない。
+基準は[業務上の失敗の例外](business-exception.md)の「例外と値の使い分け」に従う。
+
 ステータスコードの使い分けは[HTTPステータスコードの選択](../../web-api/status-codes.md)に、API のエラー契約は [ADR-013](../../adr/ADR-013-standardize-http-api-contracts.md) に従う。
 
 ## 依存してよい型、してはいけない型
@@ -204,12 +210,12 @@ public ChargeOrderResult handle(final ChargeOrderCommand command) {
           .orElseThrow(
               () -> new NotFoundException("order not found: orderId=" + command.orderId()));
   if (order.isPaid()) {
-    return new ChargeOrderResult(order.id().value().toString());
+    return new ChargeOrderResult.AlreadyRecorded(order.id().value().toString());
   }
   paymentGateway.charge(order.id(), order.total());
   order.markPaid();
   orderRepository.update(order);
-  return new ChargeOrderResult(order.id().value().toString());
+  return new ChargeOrderResult.Charged(order.id().value().toString());
 }
 ```
 
@@ -301,6 +307,7 @@ class CancelOrderCommandHandlerTest {
 - [ ] 外部システムを呼ぶ CommandHandler は、集約がその操作を終えていれば何もせずに Result を返し、外部システムに冪等性キーを渡す。［自分で点検］
 - [ ] 現在時刻は `Instant.now(clock)` で取る。［自分で点検］
 - [ ] 業務上の失敗は[業務上の失敗の例外](business-exception.md)の型で投げる。［ArchUnit で検査：GeneralCodingRulesArchTest.noSuchElementExceptionIsNotThrown］
+- [ ] 業務の状態に記録して正常に終える結果は、例外にせず Result の値で返す。［自分で点検］
 - [ ] クラス、フィールド、コンストラクタ、`handle` に Javadoc を書く。［自分で点検］
 - [ ] `@ApplicationModuleTest` と `Scenario` のテストを書く。［自分で点検］
 - [ ] `application` のパッケージに `@NullMarked` の `package-info.java` がある。［Error Prone で検査：RequireExplicitNullMarking］

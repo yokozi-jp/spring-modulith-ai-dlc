@@ -59,13 +59,17 @@ class PackageByFeatureOnionArchitectureTest {
 
   /**
    * Domain の外部システムのインタフェース。{@code domain.model} の interface のうち、Repository、アノテーション、{@code
-   * package-info} 以外。
+   * package-info}、sealed interface（結果を表す値）以外。
    */
   /* package */ static final DescribedPredicate<JavaClass> EXTERNAL_SYSTEM_INTERFACE =
       INTERFACES
           .and(resideInAPackage(DOMAIN_MODEL_PACKAGE))
           .and(not(simpleNameEndingWith("Repository")))
           .and(not(ANNOTATIONS))
+          .and(
+              not(
+                  DescribedPredicate.describe(
+                      "sealed", javaClass -> javaClass.reflect().isSealed())))
           .and(not(simpleName("package-info")));
 
   /** パッケージ構造を決めた ADR のパス。 */
