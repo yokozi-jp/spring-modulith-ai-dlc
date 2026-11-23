@@ -24,9 +24,12 @@ env:
           pollUnits: requests
           loggedInRegex: '"status"\s*:\s*404'
           loggedOutRegex: '"status"\s*:\s*401'
-      # 自動検出で __Host-APP_SESSION を拾えなければ method: cookie にする。
+      # ZAP は Secure の __Host-APP_SESSION を HTTP の要求に付けないため、script で付ける（ADR-117）。
       sessionManagement:
-        method: autodetect
+        method: script
+        parameters:
+          script: /zap/plans/scripts/session/app-session.js
+          scriptEngine: "ECMAScript : Graal.js"
       users:
         # demo realm（docker/keycloak/realm.json）のテストユーザーで、秘密ではない。
         - name: test-admin
@@ -44,8 +47,8 @@ jobs:
       action: add
       type: httpsender
       engine: "ECMAScript : Graal.js"
-      name: copy-xsrf-token-to-header.js
-      file: /zap/plans/scripts/httpsender/copy-xsrf-token-to-header.js
+      name: carry-host-cookies.js
+      file: /zap/plans/scripts/httpsender/carry-host-cookies.js
 
   # ADR-014 と ADR-030 で受容した差による指摘だけを除外する。X-Forwarded-Host 関連は先回りして除外しない。
   - type: alertFilter
@@ -58,10 +61,6 @@ jobs:
         newRisk: False Positive
       # Strict-Transport-Security：スキャンは HTTP で動かし、ADR-014 は HSTS を HTTPS の入口で付ける。
       - ruleId: 10035
-        context: spring-modulith-dast
-        newRisk: False Positive
-      # Cookie Without Secure Flag：スキャンは HTTP で動き、ADR-014 は本番を HTTPS の単一 origin で公開する。
-      - ruleId: 10011
         context: spring-modulith-dast
         newRisk: False Positive
       # Cookie No HttpOnly Flag（__Host-XSRF-TOKEN だけ）：csrf.spa() は SPA が読む前提で、ADR-014 は X-XSRF-TOKEN を許可している（ADR-066）。

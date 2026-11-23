@@ -36,7 +36,7 @@ Spring Boot は `application-<profile>.yaml` によるプロファイル分割�
 - ローカルはリポジトリルートの `.env` で環境変数を与える（`spring.config.import: optional:file:../.env[.properties]`）。
 - STG / 本番は ECS タスク定義の `environment` / `secrets` から、SSM Parameter Store または Secrets Manager の値を注入する。
 - CI / CD は GitHub Actions の変数とシークレットから注入する。
-- 環境差（例：`SPRINGDOC_ENABLED`、トレースのサンプリング率）は、プロファイル別 YAML ではなく環境変数の値で表現する。
+- 環境差（例：`SESSION_COOKIE_SECURE`、`SPRINGDOC_ENABLED`、トレースのサンプリング率）は、プロファイル別 YAML ではなく環境変数の値で表現する。
 
 ## Consequences
 

@@ -23,7 +23,22 @@ Proposed
 `__Host-` は `Secure`、`Path=/`、`Domain` なしを要求する。
 セッションの `Secure` は環境変数 `SESSION_COOKIE_SECURE` で切り替えていた（ローカルは `false`）。
 ADR-066 は、`http://localhost` の `Secure` の Cookie を Chromium と Firefox が保存することを確かめ、Safari を対象外にした。
-セッションの Cookie も同じ環境で動く。
+ローカルの開発と E2E のセッションの Cookie も、この確認の範囲で動く。
+
+DAST（[ADR-056](ADR-056-run-authenticated-dast-with-zap-in-ci.md)）は、この確認の範囲に入らない。
+ZAP 2.17.0 の Firefox は `localhost` の通信も ZAP の proxy に通し（`network.proxy.allow_hijacking_localhost`）、そのとき `http://localhost` を安全とみなさず、`Secure` の Cookie を捨てる。
+ZAP 自身も、HTTP の要求に `Secure` の Cookie を付けない（ADR-066）。
+同じ image と plan の設定で、`Secure` の有無だけを変えた代わりの app に対して確かめた結果は次のとおり。
+
+| 構成                                                                           | ブラウザのログイン | ZAP の requestor の GET と POST |
+| ------------------------------------------------------------------------------ | ------------------ | ------------------------------- |
+| `Secure` なし、`sessionManagement: autodetect`                                 | 成立               | 404（認証済み）                 |
+| `Secure` あり、`autodetect`                                                    | 不成立             | 401                             |
+| `Secure` あり、Firefox の pref、`autodetect`                                   | 成立               | 401                             |
+| `Secure` あり、Firefox の pref、`sessionManagement: headers`                   | 成立               | 401                             |
+| `Secure` あり、Firefox の pref、`sessionManagement: script`、httpsender script | 成立               | 404                             |
+
+Firefox の pref は `network.proxy.testing_localhost_is_secure_when_hijacked` である。
 
 ## Decision
 
@@ -31,6 +46,8 @@ ADR-066 は、`http://localhost` の `Secure` の Cookie を Chromium と Firefo
 - `SESSION_COOKIE_SECURE` を廃止し、`server.servlet.session.cookie.secure` を `true` に固定する。
 - `SameSite` は `Lax` のまま `Strict` にしない。
 - ADR-007 の Cookie の名前と属性（`APP_SESSION`、`secure`）を、この ADR が改める。
+- ログアウトでは `deleteCookies` を使わず、無効にしたセッションの Cookie を Spring Session に消させる。`deleteCookies` は `Secure` を `request.isSecure()` で決めるので、HTTP では `__Host-` の削除の条件を満たさない。
+- DAST は、ZAP の Firefox に `network.proxy.testing_localhost_is_secure_when_hijacked` を設定し、`sessionManagement` を script にする。httpsender script（`docker/zap/scripts/httpsender/carry-host-cookies.js`）が最後に受け取ったセッションの Cookie を保存し、session management script（`docker/zap/scripts/session/app-session.js`）が ZAP の要求に付ける。
 
 ### SameSite=Strict にしない理由
 
@@ -58,6 +75,7 @@ IdP が別 site なら、callback にセッションの Cookie が付かず、�
 - ローカルの HTTP の Safari ではセッションの Cookie が保存されず、ログインできない。ADR-066 の CSRF の Cookie と同じ制約である（[issue #158](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/158)）。
 - デプロイの時点で、`APP_SESSION` を持つ利用者のセッションは使えなくなり、再ログインが要る。
 - 外部の検査や手順書が `APP_SESSION` を名前で指していれば、直しが要る。
+- DAST は、ZAP の Firefox の pref と 2 つの script に依存する。pref の名前は Firefox の試験用で、Firefox や ZAP の版で変わりうる。
 
 ### Neutral
 
@@ -89,5 +107,6 @@ IdP が別 site なら、callback にセッションの Cookie が付かず、�
 - [issue #158](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/158)
 - [RFC 6265bis: Cookies: HTTP State Management Mechanism](https://datatracker.ietf.org/doc/draft-ietf-httpbis-rfc6265bis/)（cookie prefix と SameSite）
 - [ADR-007](ADR-007-session-based-auth-with-oidc-pkce.md)
+- [ADR-056](ADR-056-run-authenticated-dast-with-zap-in-ci.md)
 - [ADR-066](ADR-066-harden-csrf-cookie-with-host-prefix.md)
 - [ADR-102](ADR-102-use-amazon-cognito-as-production-idp.md)

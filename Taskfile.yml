@@ -210,8 +210,8 @@ tasks:
           fi
         done
         # 値の一致では見つからない、セッションの Cookie の値と JWT の形（eyJ で始まる 3 つの base64url）も失敗にする。
-        if grep -E -q 'APP_SESSION=[^;[:space:]"]+|eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+' "{{.LOG}}"; then
-          echo "{{.LOG}} に APP_SESSION の Cookie の値か JWT の形の文字列が入っています。ログに出す値を確かめてください。" >&2
+        if grep -E -q '__Host-APP_SESSION=[^;[:space:]"]+|eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+' "{{.LOG}}"; then
+          echo "{{.LOG}} に __Host-APP_SESSION の Cookie の値か JWT の形の文字列が入っています。ログに出す値を確かめてください。" >&2
           status=1
         fi
         exit "$status"
@@ -1690,10 +1690,16 @@ tasks:
             fail "preview 経由の GET /api/missing が 401 ではありません（$code）。"
           fi
 
+          # ZAP の Firefox は localhost も ZAP の proxy に通す（allow_hijacking_localhost）。
+          # そのままでは http://localhost を安全とみなさず、Secure の __Host- の Cookie を捨ててログインできない（ADR-117）。
           zap() {
             {{.DOCKER}} run --rm --name "$zap_name" --network host \
               -v "$report_dir/plans:/zap/plans:ro" -v "$report_dir:/zap/wrk:rw" \
-              "$zap_image" zap.sh -cmd -port 18082 -autorun "/zap/plans/$1.yaml"
+              "$zap_image" zap.sh -cmd -port 18082 \
+              -config 'selenium.firefoxPrefs.pref(0).name=network.proxy.testing_localhost_is_secure_when_hijacked' \
+              -config 'selenium.firefoxPrefs.pref(0).value=true' \
+              -config 'selenium.firefoxPrefs.pref(0).enabled=true' \
+              -autorun "/zap/plans/$1.yaml"
           }
           if ! zap preflight; then
             fail "認証付きの前提確認に失敗しました。GET /api/missing（ログイン）と POST /api/missing（CSRF）がどちらも 404 になる必要があります。"

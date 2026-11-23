@@ -98,13 +98,12 @@ Cookieは、セッションIDとADR-007のCSRFトークン以外の用途に使�
 どちらのCookieも次のとおりにする。
 
 - Cookieの値にユーザーIDや権限などの情報を含めない。
-- `SameSite`を`None`にしない。`Strict`は、別siteのIdPからのcallbackを壊さない場合に限る。
-- `Path`は`/`にする。
-- `Domain`は省略し、サブドメイン間でCookieを共有しない。
+- 名前を`__Host-`で始める。ブラウザが`Secure`、`Path=/`、`Domain`なしを強制し、別のhostから書き込めなくなる。`Secure`は環境によらず付ける。
+- `SameSite`は`Lax`にする。
 
 ### セッションCookie
 
-セッションCookieは`__Host-APP_SESSION`にし、`Secure`（環境によらない）、`HttpOnly`、`SameSite=Lax`を付ける。
+セッションCookieは`__Host-APP_SESSION`にし、`HttpOnly`を付ける。
 `Strict`にしないのは、別siteのIdPからのcallbackでセッションに保存した認可リクエストを失うためである（[ADR-117](../adr/ADR-117-harden-session-cookie-with-host-prefix.md)）。
 設定は[application.yaml](../../backend/src/main/resources/application.yaml)にあり、そのほかの扱いは次のとおりにする。
 
@@ -115,8 +114,7 @@ Cookieは、セッションIDとADR-007のCSRFトークン以外の用途に使�
 
 ### CSRFのCookie
 
-`__Host-XSRF-TOKEN`にする。
-`Secure`（環境によらない）と`SameSite=Lax`を付け、SPAが読むため`HttpOnly`を付けない。
+`__Host-XSRF-TOKEN`にし、SPAが読むため`HttpOnly`を付けない。
 有効期間は付けず、発行と削除はSpring Securityに任せる。
 CSRFトークンの検証に失敗した403は、権限不足の403と区別できるよう`/problems/csrf-token-invalid`で返す。
 対象は、`/api/**`の更新系と、`/logout`のフォームの送信である。

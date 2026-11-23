@@ -1,5 +1,5 @@
 import { expect } from "@playwright/test";
-import type { Page } from "@playwright/test";
+import type { BrowserContext, Cookie, Page } from "@playwright/test";
 import { loadEnv } from "vite-plus";
 
 // 作業ディレクトリに依存しないよう、このファイルの位置からパスを決める。
@@ -47,6 +47,8 @@ export const paymentGatewayUrl = requireEnv("PAYMENT_GATEWAY_BASE_URL");
 export const webOrigin = `http://localhost:${webPort()}`;
 // task fe-check は .env.test なしでこのファイルを import するため、compose-test の既定の issuer の origin を既定値にする。
 export const idpOrigin = new URL(env.OIDC_ISSUER_URI ?? "http://127.0.0.1:8081").origin;
+// backend の server.servlet.session.cookie.name と同じ値にする（ADR-117）。
+export const sessionCookieName = "__Host-APP_SESSION";
 // playwright-report/ と test-results/ の外に置き、CI の artifact に入れない。
 export const authFile = pathFromHere(".auth/user.json");
 
@@ -74,4 +76,14 @@ export async function signInAndChooseTenant(page: Page): Promise<void> {
 export async function logIn(page: Page): Promise<void> {
   await page.goto("/oauth2/authorization/web");
   await signInAndChooseTenant(page);
+}
+
+// Cookie がないまま undefined を送り、別の理由で失敗するのを防ぐ。
+export async function findCookie(context: BrowserContext, name: string): Promise<Cookie> {
+  const cookies = await context.cookies();
+  const cookie = cookies.find((candidate) => candidate.name === name);
+  if (cookie === undefined || cookie.value === "") {
+    throw new Error(`${name} Cookie がありません`);
+  }
+  return cookie;
 }

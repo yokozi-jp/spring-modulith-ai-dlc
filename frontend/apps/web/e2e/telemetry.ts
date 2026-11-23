@@ -177,6 +177,6 @@ export function expectWireLimits(payloads: string[]): void {
     expect(itemCount).toBeLessThanOrEqual(1);
   }
   expect(payloads.join("\n")).not.toMatch(
-    /secret-query|secret-fragment|__Host-APP_SESSION|person@example\.com|isSampled|unknown|#secret-selector/u,
+    /secret-query|secret-fragment|APP_SESSION|person@example\.com|isSampled|unknown|#secret-selector/u,
   );
 }

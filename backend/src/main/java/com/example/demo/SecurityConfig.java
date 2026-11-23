@@ -146,9 +146,10 @@ public class SecurityConfig {
         .logout(logout ->
             logout
                 .logoutSuccessHandler(logoutSuccessHandler)
+                // セッションの Cookie は、無効にしたセッションを Spring Session が Secure 付きで消す。
+                // deleteCookies は Secure を request.isSecure() で決め、HTTP では __Host- の削除が捨てられる。
                 .invalidateHttpSession(true)
-                .clearAuthentication(true)
-                .deleteCookies("__Host-APP_SESSION"));
+                .clearAuthentication(true));
     return http.build();
   }
 
