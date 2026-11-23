@@ -53,9 +53,12 @@ describe("ホームの画面", () => {
     expect(globalThis.sessionStorage.getItem("auth.returnTo")).toBeNull();
   });
 
-  it("戻り先がなければ `/` のまま表示する", async () => {
-    const { router } = await renderRoute("/", { locale: "en" });
+  it("先読みでは戻り先を読まず、消さない", async () => {
+    const { router } = await renderRoute("/logged-out", { locale: "en" });
+    globalThis.sessionStorage.setItem("auth.returnTo", "/orders");
 
-    expect(router.state.location.pathname).toBe("/");
+    await router.preloadRoute({ to: "/" });
+
+    expect(globalThis.sessionStorage.getItem("auth.returnTo")).toBe("/orders");
   });
 });

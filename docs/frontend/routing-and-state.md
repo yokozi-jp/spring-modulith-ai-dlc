@@ -103,6 +103,8 @@ errorの表示はcatalogの文言を使い、`error.message` を画面に出さ�
 401は `QueryCache` と `MutationCache` の `onError` がログインへ遷移させる。
 遷移の前に、いまのpath、query、hashを戻り先としてsessionStorageに1つだけ保存する（`@frontend/api/login-return-to`）。
 `/` のrouteの `beforeLoad` が戻り先を1回読んで消し、`new URL()` で解決した先が同一originのpathのときだけ、その画面へ移す。使えない値は `/` のまま表示する。
+ログインの後に着く `/` と `/tenants` は保存しない。
+戻り先はその tab の sessionStorage にあり、`/` を開くか `/logged-out` を開くまで残る。別のテナントを選んだときは、その画面が存在しないことがある。
 テナントを複数持つ利用者は、テナントを選んだ後に文書を `/` で読み直すので、選んだ後の `/` が戻り先を読む。
 30秒以内の2回目は遷移せず、戻り先も書き換えず、queryは `RouteError`、mutationは呼び出したcomponentのerror状態に任せる。
 

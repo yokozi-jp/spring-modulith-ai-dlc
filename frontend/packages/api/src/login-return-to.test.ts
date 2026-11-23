@@ -1,7 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from "vite-plus/test";
 
+import { parseReturnTo, saveReturnTo, takeReturnTo, clearReturnTo } from "./login-return-to";
+
 const origin = "http://localhost";
-let returnTo = await import("./login-return-to");
 
 function stubSessionStorage() {
   const items = new Map<string, string>();
@@ -26,9 +27,7 @@ function stubLocation(pathname: string, search = "", hash = "") {
 }
 
 describe("login-return-to", () => {
-  beforeEach(async () => {
-    vi.resetModules();
-    returnTo = await import("./login-return-to");
+  beforeEach(() => {
     stubLocation("/");
   });
 
@@ -40,7 +39,7 @@ describe("login-return-to", () => {
       ["/a//b", "/a//b"],
       [String.raw`/a\b`, "/a/b"],
     ])("同一オリジンの path として通す: %j", (value, expected) => {
-      expect(returnTo.parseReturnTo(value)).toBe(expected);
+      expect(parseReturnTo(value)).toBe(expected);
     });
 
     it.each([
@@ -60,11 +59,11 @@ describe("login-return-to", () => {
       "",
       " /claims",
     ])("拒む: %j", (value) => {
-      expect(returnTo.parseReturnTo(value)).toBeUndefined();
+      expect(parseReturnTo(value)).toBeUndefined();
     });
 
     it.each([undefined, 1, {}, ["/claims"]])("文字列でない値は拒む: %j", (value) => {
-      expect(returnTo.parseReturnTo(value)).toBeUndefined();
+      expect(parseReturnTo(value)).toBeUndefined();
     });
   });
 
@@ -73,48 +72,59 @@ describe("login-return-to", () => {
       stubSessionStorage();
       stubLocation("/orders/1", "?tab=a", "#top");
 
-      returnTo.saveReturnTo();
+      saveReturnTo();
 
-      expect(returnTo.takeReturnTo()).toBe("/orders/1?tab=a#top");
-      expect(returnTo.takeReturnTo()).toBeUndefined();
+      expect(takeReturnTo()).toBe("/orders/1?tab=a#top");
+      expect(takeReturnTo()).toBeUndefined();
     });
 
     it("保存は 1 つだけで、後の保存が前を置き換える", () => {
       stubSessionStorage();
       stubLocation("/a");
-      returnTo.saveReturnTo();
+      saveReturnTo();
       stubLocation("/b");
-      returnTo.saveReturnTo();
+      saveReturnTo();
 
-      expect(returnTo.takeReturnTo()).toBe("/b");
+      expect(takeReturnTo()).toBe("/b");
     });
 
     it("使えない値が保存されていれば undefined にして消す", () => {
       stubSessionStorage();
       globalThis.sessionStorage.setItem("auth.returnTo", "//evil.example");
 
-      expect(returnTo.takeReturnTo()).toBeUndefined();
+      expect(takeReturnTo()).toBeUndefined();
       expect(globalThis.sessionStorage.getItem("auth.returnTo")).toBeNull();
     });
 
     it("clearReturnTo は保存を使わずに消す", () => {
       stubSessionStorage();
       stubLocation("/orders/1");
-      returnTo.saveReturnTo();
+      saveReturnTo();
 
-      returnTo.clearReturnTo();
+      clearReturnTo();
 
-      expect(returnTo.takeReturnTo()).toBeUndefined();
+      expect(takeReturnTo()).toBeUndefined();
     });
 
-    it("sessionStorage が例外を投げても memory で 1 回だけ読める", () => {
+    it("sessionStorage が例外を投げても例外を出さず、戻り先なしになる", () => {
       stubThrowingSessionStorage();
       stubLocation("/orders/new");
 
-      returnTo.saveReturnTo();
+      expect(() => {
+        saveReturnTo();
+      }).not.toThrow();
+      expect(takeReturnTo()).toBeUndefined();
+    });
 
-      expect(returnTo.takeReturnTo()).toBe("/orders/new");
-      expect(returnTo.takeReturnTo()).toBeUndefined();
+    it.each(["/", "/tenants"])("ログインの後に着く %s は保存せず、前の値も消す", (path) => {
+      stubSessionStorage();
+      stubLocation("/orders/1");
+      saveReturnTo();
+      stubLocation(path);
+
+      saveReturnTo();
+
+      expect(takeReturnTo()).toBeUndefined();
     });
   });
 });

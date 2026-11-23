@@ -93,10 +93,13 @@ function HomePage() {
   );
 }
 
-function beforeLoad() {
+function beforeLoad({ preload }: { preload: boolean }) {
+  // 先読みで戻り先を消さない。
+  if (preload) {
+    return;
+  }
   const returnTo = takeReturnTo();
-  // 戻り先がログイン前の `/` なら、移らずに表示する。
-  if (returnTo !== undefined && returnTo !== "/") {
+  if (returnTo !== undefined) {
     // oxlint-disable-next-line typescript/only-throw-error -- TanStack Router は redirect を throw で受け取る。
     throw redirect({ href: returnTo });
   }

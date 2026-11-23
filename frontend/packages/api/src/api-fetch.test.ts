@@ -402,6 +402,31 @@ describe("api-fetch", () => {
       expect(takeReturnTo()).toBe("/orders/new?a=1#x");
     });
 
+    it("30 秒以内の 2 回目の 401 は、保存した戻り先を書き換えない", async () => {
+      stubSessionStorage();
+      const error = new api.ApiProblemError(401, undefined);
+      vi.stubGlobal("location", {
+        assign,
+        origin: baseUrl,
+        pathname: "/orders/1",
+        search: "",
+        hash: "",
+      });
+      api.redirectToLoginOnUnauthorized(error);
+      vi.stubGlobal("location", {
+        assign,
+        origin: baseUrl,
+        pathname: "/orders/2",
+        search: "",
+        hash: "",
+      });
+
+      api.redirectToLoginOnUnauthorized(error);
+
+      const { takeReturnTo } = await import("./login-return-to");
+      expect(takeReturnTo()).toBe("/orders/1");
+    });
+
     it("30 秒を過ぎた 401 では再び遷移する", () => {
       stubSessionStorage();
       vi.useFakeTimers();

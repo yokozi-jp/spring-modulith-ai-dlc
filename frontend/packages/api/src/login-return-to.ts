@@ -1,7 +1,8 @@
 const returnToKey = "auth.returnTo";
 
-// ponytail: memory の値は再読み込みで消える。storage が使えない browser では、ログインの往復で戻り先が失われ `/` に着く。
-let returnToFallback = "";
+// ログインへの遷移で文書が捨てられるため、memory には持てない。storage が使えないときは戻り先なしで `/` に着く。
+/** ログインの後に着く画面。戻り先にしても `/` から動かないので保存しない。 */
+const landingPaths = new Set(["/", "/tenants"]);
 
 function resolveUrl(value: string): URL | undefined {
   try {
@@ -32,32 +33,42 @@ export function parseReturnTo(value: unknown): string | undefined {
   return resolved;
 }
 
-/** ログインへ遷移する前に、いまの path、query、hash を戻り先として 1 つだけ保存する。 */
+function removeStored(): void {
+  try {
+    globalThis.sessionStorage.removeItem(returnToKey);
+  } catch {
+    // storage が使えないときは、消す値もない。
+  }
+}
+
+/**
+ * ログインへ遷移する前に、いまの path、query、hash を戻り先として 1 つだけ保存する。
+ * ログインの後に着く画面（`/`、`/tenants`）は保存せず、前の値も消す。
+ */
 export function saveReturnTo(): void {
   const { pathname, search, hash } = globalThis.location;
-  const returnTo = `${pathname}${search}${hash}`;
-  returnToFallback = returnTo;
+  if (landingPaths.has(pathname)) {
+    removeStored();
+    return;
+  }
   try {
-    globalThis.sessionStorage.setItem(returnToKey, returnTo);
+    globalThis.sessionStorage.setItem(returnToKey, `${pathname}${search}${hash}`);
   } catch {
-    // storage が使えないときは memory の値が残る。
+    // 戻り先なしで `/` に着く。
   }
 }
 
 /** 保存した戻り先を 1 回だけ読み、消す。保存がないか、使えない値のときは undefined にする。 */
 export function takeReturnTo(): string | undefined {
-  let stored = returnToFallback;
+  let stored: string | null = "";
   try {
-    stored = globalThis.sessionStorage.getItem(returnToKey) ?? stored;
-    globalThis.sessionStorage.removeItem(returnToKey);
+    stored = globalThis.sessionStorage.getItem(returnToKey);
   } catch {
-    // storage が使えないときは memory の値を使う。
+    // storage が使えないときは、読む値がない。
   }
-  returnToFallback = "";
+  removeStored();
   return parseReturnTo(stored);
 }
 
 /** 保存した戻り先を、使わずに消す。 */
-export function clearReturnTo(): void {
-  takeReturnTo();
-}
+export const clearReturnTo = removeStored;
