@@ -14,6 +14,7 @@ import org.springframework.modulith.core.ApplicationModules;
 /** Spring Modulith が認識するアプリケーションモジュールの境界を検証する。 */
 class ApplicationModuleArchitectureTest {
 
+  /** 宣言のないモジュールがあるときの失敗の説明。直し方を含める。 */
   private static final String MISSING_DECLARATION_MESSAGE =
       "allowedDependencies を宣言していないモジュールがある。モジュールのルートの package-info.java に"
           + " @ApplicationModule(allowedDependencies = ...) を書く（ADR-118）";
@@ -29,7 +30,8 @@ class ApplicationModuleArchitectureTest {
    * 宣言のないモジュールを違反にするテストを、Spring Modulith の設定では作れないため手で書く。
    *
    * <p>{@code verify()} は {@code allowedDependencies} を宣言したモジュールの依存先だけを確かめ、宣言のないモジュール（既定は {@code
-   * OPEN_TOKEN}）の依存先は確かめない。{@code VerificationOptions} は ArchUnit の規則を足せるだけで、宣言のないことを違反にする設定がない（ADR-118）。
+   * OPEN_TOKEN}）の依存先は確かめない。{@code VerificationOptions} は ArchUnit
+   * の規則を足せるだけで、宣言のないことを違反にする設定がない（ADR-118）。
    */
   @Test
   @DisplayName("OPEN 以外のすべてのモジュールが allowedDependencies を宣言している")
@@ -42,22 +44,25 @@ class ApplicationModuleArchitectureTest {
   @Test
   @DisplayName("allowedDependencies のないモジュールは名前を挙げて検出する")
   void detectsModuleWithoutAllowedDependencies() {
-    assertThat(modulesWithoutAllowedDependencies(ApplicationModules.of("archfixture.modulegate", new ImportOption.DoNotIncludeJars())))
+    assertThat(
+            modulesWithoutAllowedDependencies(
+                ApplicationModules.of(
+                    "archfixture.modulegate", new ImportOption.DoNotIncludeJars())))
         .containsExactly("undeclared");
   }
 
   private static List<String> modulesWithoutAllowedDependencies(final ApplicationModules modules) {
-    return modules
-        .stream()
+    return modules.stream()
         .filter(module -> !module.isOpen())
-        .filter(
-            module ->
-                module
-                    .getBasePackage()
-                    .findAnnotation(org.springframework.modulith.ApplicationModule.class)
-                    .map(declared -> List.of(declared.allowedDependencies()))
-                    .filter(names -> !names.equals(List.of(org.springframework.modulith.ApplicationModule.OPEN_TOKEN)))
-                    .isEmpty())
+        .filter(module ->
+            module
+                .getBasePackage()
+                .findAnnotation(org.springframework.modulith.ApplicationModule.class)
+                .map(declared -> List.of(declared.allowedDependencies()))
+                .filter(names ->
+                    !names.equals(
+                        List.of(org.springframework.modulith.ApplicationModule.OPEN_TOKEN)))
+                .isEmpty())
         .map(module -> module.getIdentifier().toString())
         .toList();
   }
