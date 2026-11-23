@@ -28,15 +28,26 @@ Web API、PostgreSQL、非同期処理、システム間連携、ログ、フロ
 そのまま置くと、[ADR-038](ADR-038-route-steering-to-docs-knowledge.md) の1ファイル1責務と、[日本語技術文書の文章規範](../writing/japanese-tech-writing.md) に合わない。
 原文には、このリポジトリの ADR と矛盾する記述がある。
 たとえば Git ブランチフローは develop ブランチと release ブランチを使い、[ADR-017](ADR-017-adopt-trunk-based-repository-governance.md) のトランクベース開発と両立しない。
-Terraform、DynamoDB、メールのように、このリポジトリで使うと決めていない技術を前提にする原文もある。
+Terraform や DynamoDB のように、このリポジトリで使うと決めていない技術を前提にする原文もある。
 一方、本番デプロイのワークフロー例（[ADR-045](ADR-045-remove-aws-docs-and-production-cd-example.md) で削除）は、ECR、ECS、ALB、RDS などの AWS 構成を仮定している。
+
+バッチ、メール、データガバナンスは、当初は取り込まない原文に入れていた。
+次の決定により、取り込む側へ移した。
+ADR が Proposed の間は Decision を直接直す（[ADR の規約](conventions.md#ライフサイクル)）。
+
+- バッチ：ADR と規約にバッチを前提にした規則があるのに、ジョブの入口、冪等性と再開、二重の起動を定める文書がない（[#314](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/314) の調査、[#558](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/558)）。
+- メール：テナントの管理者が利用者をメールで招待すると決め、「使うと決めていない技術」でなくなった（[#323](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/323) の調査、[#572](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/572)）。SMS は、電話番号を集めず、SMS を送る機能もないため、取り込まないまま残す。
+- データガバナンス：データ基盤と、部署をまたぐ二次利用者がないため、論理名のコメントと個人データの規則の2つだけを取り込む（[#326](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/326) の調査、[#575](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/575)）。
+
+3つの Issue が同じ行を直すため、書き直しは [#597](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/597) にまとめた。
 
 ## Decision
 
 原文を転載せず、このリポジトリの規約に合わせて書き直した文書として `docs/` に置く。
 
-- 取り込む原文は、Web API、PostgreSQL、非同期、I/F、ログ、Web フロントエンド、テクニカルライティング、Markdown 設計ドキュメント、アーキテクチャ原則、コードレビュー、性能テスト、非機能要件、帳票、AWS とする。
-- Git ブランチ、Terraform、DynamoDB、バッチ、メールと SMS、Slack、ソフトスキル、データマネジメント、データガバナンスは取り込まない。
+- 取り込む原文は、Web API、PostgreSQL、非同期、I/F、ログ、Web フロントエンド、テクニカルライティング、Markdown 設計ドキュメント、アーキテクチャ原則、コードレビュー、性能テスト、非機能要件、帳票、AWS、バッチ、メール、データガバナンスとする。
+- データガバナンスは、表と列の論理名のコメントと、業務に要らない個人データの列を作らない規則の2つだけを取り込む。
+- Git ブランチ、Terraform、DynamoDB、SMS、Slack、ソフトスキル、データマネジメントは取り込まない。データガバナンスのうち、データ分類、マスキングの基準、データカタログ、品質の SLA、推進体制、AI-Ready も取り込まない。
 - 原文の各ルールは、このリポジトリに当てはまり、既存の ADR と規約に矛盾しないものだけを採用する。既存の ADR と規約が原文より優先する。
 - 既存の docs と同じ内容は書き写さず、既存文書へリンクする。
 - 採用したルールは、既存の領域か新しい領域に、1ファイル1責務の文書として書く。
