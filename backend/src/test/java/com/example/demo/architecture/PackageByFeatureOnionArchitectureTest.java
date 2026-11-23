@@ -54,13 +54,16 @@ class PackageByFeatureOnionArchitectureTest {
   /** Domain のパッケージのパターン。 */
   private static final String DOMAIN_PACKAGE = "..domain..";
 
+  /** Domain Model のパッケージ。 */
+  private static final String DOMAIN_MODEL_PACKAGE = "..domain.model..";
+
   /**
    * Domain の外部システムのインタフェース。{@code domain.model} の interface のうち、Repository、アノテーション、{@code
    * package-info} 以外。
    */
   /* package */ static final DescribedPredicate<JavaClass> EXTERNAL_SYSTEM_INTERFACE =
       INTERFACES
-          .and(resideInAPackage("..domain.model.."))
+          .and(resideInAPackage(DOMAIN_MODEL_PACKAGE))
           .and(not(simpleNameEndingWith("Repository")))
           .and(not(ANNOTATIONS))
           .and(not(simpleName("package-info")));
@@ -149,7 +152,7 @@ class PackageByFeatureOnionArchitectureTest {
   /* package */ static final ArchRule domainModelDoesNotDependOnFrameworks =
       noClasses()
           .that()
-          .resideInAPackage("..domain.model..")
+          .resideInAPackage(DOMAIN_MODEL_PACKAGE)
           .should()
           .dependOnClassesThat()
           .resideInAnyPackage(
@@ -166,6 +169,23 @@ class PackageByFeatureOnionArchitectureTest {
                   + "技術の処理は Application か Infrastructure へ移す。"
                   + "規約：docs/backend/layers.md、"
                   + ADR_002);
+
+  /** 値オブジェクトの不変条件の違反を、422 になる業務上の失敗ではなく {@link IllegalArgumentException} で表す。 */
+  @ArchTest
+  /* package */ static final ArchRule valueObjectsDoNotThrowBusinessRuleViolation =
+      noClasses()
+          .that()
+          .resideInAPackage(DOMAIN_MODEL_PACKAGE)
+          .and()
+          .areRecords()
+          .should()
+          .dependOnClassesThat(simpleName("BusinessRuleViolationException"))
+          .allowEmptyShould(true)
+          .because(
+              "値オブジェクトの違反は、利用者が直せない状態であり、422 にするとプログラムの誤りが隠れるため。"
+                  + "直し方：不変条件の違反には IllegalArgumentException を投げ、"
+                  + "状態に依存する業務規則は集約か Domain Service で BusinessRuleViolationException にする。"
+                  + "規約：docs/backend/class-roles/value-object.md、docs/backend/class-roles/business-exception.md");
 
   /** Domain Service は標準型、JSpecify、Lombok、Domain と {@code @Service} だけに依存させる。 */
   @ArchTest
@@ -273,7 +293,7 @@ class PackageByFeatureOnionArchitectureTest {
   /* package */ static final ArchRule repositoryImplementationsAreJooqRepositories =
       classes()
           .that()
-          .implement(simpleNameEndingWith("Repository").and(resideInAPackage("..domain.model..")))
+          .implement(simpleNameEndingWith("Repository").and(resideInAPackage(DOMAIN_MODEL_PACKAGE)))
           .should()
           .haveSimpleNameStartingWith("Jooq")
           .andShould()

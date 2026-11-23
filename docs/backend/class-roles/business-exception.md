@@ -111,7 +111,8 @@ Controller は参照の結果がなければ `NotFoundException` を投げ、ス
 
 ## 対応するテスト
 
-集約、値オブジェクト、Domain Service の単体テストで、投げる例外の型と、メッセージの識別子を確かめる（`isInstanceOf(BusinessRuleViolationException.class)`）。
+集約と Domain Service の単体テストで、投げる例外の型と、メッセージの識別子を確かめる（`isInstanceOf(BusinessRuleViolationException.class)`）。
+値オブジェクトの単体テストは、`IllegalArgumentException` を確かめる。
 例外から HTTP のステータス、本文、ログへの対応づけは `ApiErrorContractTest` と `ApiExceptionHandlerTest` が確かめるため、機能ごとのテストでは確かめない。
 
 ## アンチパターン
@@ -134,6 +135,7 @@ Controller は参照の結果がなければ `NotFoundException` を投げ、ス
 ## 作成時のチェックリスト
 
 - [ ] 業務上の失敗は `NotFoundException`、`BusinessRuleViolationException`、`ConflictException` のどれかで投げる。［自分で点検］
+- [ ] 値オブジェクトの record は `BusinessRuleViolationException` を投げず、不変条件の違反を `IllegalArgumentException` で表す。［ArchUnit で検査：PackageByFeatureOnionArchitectureTest.valueObjectsDoNotThrowBusinessRuleViolation］
 - [ ] `NoSuchElementException` を生成せず、引数なしの `Optional.orElseThrow()` を呼ばない。［ArchUnit で検査：GeneralCodingRulesArchTest.noSuchElementExceptionIsNotThrown］
 - [ ] `Throwable`、`Exception`、`RuntimeException`、`Error` を投げない。［ArchUnit で検査：GeneralCodingRulesArchTest.noClassesShouldThrowGenericExceptions］
 - [ ] `shared` の型は Spring Web、Spring の HTTP、Servlet の型に依存しない。［ArchUnit で検査：PackageByFeatureOnionArchitectureTest.sharedModuleDoesNotDependOnHttp］

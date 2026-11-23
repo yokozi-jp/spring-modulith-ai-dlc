@@ -557,6 +557,7 @@ class ArchitectureRuleFixtureTest {
             .databaseTechnologyApisAreOnlyUsedByPersistenceAdapters,
         GeneralCodingRulesArchTest.noSuchElementExceptionIsNotThrown,
         PackageByFeatureOnionArchitectureTest.domainModelDoesNotDependOnFrameworks,
+        PackageByFeatureOnionArchitectureTest.valueObjectsDoNotThrowBusinessRuleViolation,
         PackageByFeatureOnionArchitectureTest.domainServicesDependOnlyOnDomainAndJavaRule(
             basePackage),
         PackageByFeatureOnionArchitectureTest.domainServicesAreAnnotatedWithService,
