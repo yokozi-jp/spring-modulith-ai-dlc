@@ -56,6 +56,9 @@ class EventPublicationResubmissionConfigTest {
   /** 定期の実行の有効と無効のキー。 */
   private static final String ENABLED = "event-publication.resubmission.enabled";
 
+  /** 定期の実行を無効にする設定。 */
+  private static final String DISABLED = ENABLED + "=false";
+
   /** 手での 1 回の再投入の対象のキー。 */
   private static final String RESUBMIT_ONCE_TARGET =
       EventPublicationResubmissionConfig.RESUBMIT_ONCE_TARGET;
@@ -98,7 +101,7 @@ class EventPublicationResubmissionConfigTest {
   @DisplayName("enabled が false なら定期の実行を登録しない")
   void disabledDoesNotRegisterScheduling() {
     runner
-        .withPropertyValues(ENABLED + "=false")
+        .withPropertyValues(DISABLED)
         .run(context ->
             assertThat(context)
                 .hasNotFailed()
@@ -155,7 +158,7 @@ class EventPublicationResubmissionConfigTest {
     assertBindFailure("spring.modulith.events.resubmission.abandon-after-attempts=1");
     runner
         .withPropertyValues(
-            ENABLED + "=false", "spring.modulith.events.resubmission.abandon-after-attempts=2")
+            DISABLED, "spring.modulith.events.resubmission.abandon-after-attempts=2")
         .run(context -> assertThat(context).hasNotFailed());
   }
 
@@ -210,8 +213,7 @@ class EventPublicationResubmissionConfigTest {
   void inFlightStalenessNotLongerThanTwiceLockAtMostForFailsStartup() {
     assertBindFailure("event-publication.resubmission.in-flight-staleness=PT20M");
     runner
-        .withPropertyValues(
-            ENABLED + "=false", "event-publication.resubmission.in-flight-staleness=PT20M1S")
+        .withPropertyValues(DISABLED, "event-publication.resubmission.in-flight-staleness=PT20M1S")
         .run(context -> assertThat(context).hasNotFailed());
   }
 
@@ -422,7 +424,7 @@ class EventPublicationResubmissionConfigTest {
 
   private void assertBindFailure(final String property) {
     runner
-        .withPropertyValues(ENABLED + "=false", property)
+        .withPropertyValues(DISABLED, property)
         .run(context ->
             assertThat(context)
                 .getFailure()

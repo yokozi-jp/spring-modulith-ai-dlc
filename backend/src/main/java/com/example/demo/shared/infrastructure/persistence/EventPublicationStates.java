@@ -48,7 +48,7 @@ final class EventPublicationStates {
                 .where(EVENT_PUBLICATION_ARCHIVE.ID.eq(DSL.any(keys))))
         .fetchMap(
             row -> row.value1(),
-            row -> State.of(row.value2(), row.value3(), row.value4(), row.value5()));
+            row -> State.fromColumns(row.value2(), row.value3(), row.value4(), row.value5()));
   }
 
   /**
@@ -65,7 +65,7 @@ final class EventPublicationStates {
       String eventType,
       int completionAttempts) {
 
-    private static State of(
+    private static State fromColumns(
         final @Nullable String status,
         final String listenerId,
         final String eventType,

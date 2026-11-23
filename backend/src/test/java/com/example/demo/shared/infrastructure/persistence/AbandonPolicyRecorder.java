@@ -23,7 +23,7 @@ final class AbandonPolicyRecorder implements AbandonPolicy {
   public Decision shouldAbandon(final EventPublication publication) {
     seenById
         .computeIfAbsent(publication.getIdentifier(), id -> new CopyOnWriteArrayList<>())
-        .add(Seen.of(publication));
+        .add(Seen.from(publication));
     return Decision.DEFAULT;
   }
 
@@ -39,7 +39,7 @@ final class AbandonPolicyRecorder implements AbandonPolicy {
       int completionAttempts,
       Instant lastPublicationDate) {
 
-    /* package */ static Seen of(final EventPublication publication) {
+    /* package */ static Seen from(final EventPublication publication) {
       return new Seen(
           publication.getStatus(),
           publication.getLastResubmissionDate(),

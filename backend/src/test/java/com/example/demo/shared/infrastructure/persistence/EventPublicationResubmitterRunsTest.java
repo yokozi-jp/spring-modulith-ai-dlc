@@ -13,6 +13,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.Supplier;
 import net.javacrumbs.shedlock.core.LockConfiguration;
 import net.javacrumbs.shedlock.core.LockProvider;
 import net.javacrumbs.shedlock.core.LockingTaskExecutor;
@@ -185,9 +186,12 @@ class EventPublicationResubmitterRunsTest {
     final EventPublicationResubmitter resubmitter =
         new EventPublicationResubmitter(
             failingDsl, failed, lockingTaskExecutor, policies, clock, meterRegistry, properties);
+    final Supplier<Double> exhaustedGauge =
+        () ->
+            meterRegistry.get("event.publication.failed").tag("state", "exhausted").gauge().value();
     ResubmissionTestSupport.insertArchived(dsl, clock.instant(), "ABANDONED");
     resubmitter.resubmitOnce();
-    final double exhaustedBefore = exhaustedGauge();
+    final double exhaustedBefore = exhaustedGauge.get();
     final int warningsBefore = capturedLogRecords.withBody(GAUGES_FAILED).size();
 
     failArchiveReads.set(true);
@@ -195,7 +199,7 @@ class EventPublicationResubmitterRunsTest {
     expireLock();
     resubmitter.resubmitOnce();
 
-    assertThat(exhaustedGauge()).as("集計が失敗した回の Gauge").isEqualTo(exhaustedBefore);
+    assertThat(exhaustedGauge.get()).as("集計が失敗した回の Gauge").isEqualTo(exhaustedBefore);
     assertThat(capturedLogRecords.withBody(GAUGES_FAILED)).hasSize(warningsBefore + 1);
     assertThat(runs(COMPLETED)).isEqualTo(2.0);
     assertThat(runs(FAILED)).isZero();
@@ -212,10 +216,6 @@ class EventPublicationResubmitterRunsTest {
         clock,
         meterRegistry,
         properties);
-  }
-
-  private double exhaustedGauge() {
-    return meterRegistry.get("event.publication.failed").tag("state", "exhausted").gauge().value();
   }
 
   /** ロックの実行が、決めた例外を投げるモック。 */
