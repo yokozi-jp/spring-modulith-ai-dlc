@@ -36,6 +36,9 @@ Proposed
 - ワークスペースのルートは git の外の `/projects/sandbox` で、リポジトリはその子にある。
   Kiro Web が読む MCP の設定は Agent Config の値であり、リポジトリの `.kiro/settings/mcp.json` ではない。
   Decision は、Kiro Web がこのファイルを読むと想定して書いていたので、Proposed のまま書き直した。
+- Kiro Web の画面は、セッションの開始時に「Cloning repository」の後で `MCP server "iwe" failed to connect: Connection closed` を出した。
+  MCP の設定が書かれたのは clone の完了より前で、そのときのコマンドはスクリプトを一度だけ探して止まっていた。
+  Decision に、スクリプトが現れるまで待つことを、Proposed のまま足した。
 
 ## Decision
 
@@ -57,6 +60,9 @@ Proposed
   コマンドは子のディレクトリからもこのスクリプトを探す。
   子のディレクトリは `.git` がディレクトリの本体の checkout だけを候補にし、横に作った git worktree を選ばない。
   本体の checkout が 2 つあれば、名前順で先のものを選ぶ。
+  Kiro Web は MCP サーバーを、リポジトリの clone を終える前に起動することがある。
+  コマンドは、スクリプトが見つかるまで 1 秒ごとに探し直し、既定で 60 秒待つ。
+  待つ秒数は環境変数 `IWE_MCP_WAIT_SECONDS` で変えられる。
   サンドボックスでは、このスクリプトが `kiro-web.sh` で道具を揃えてから `iwec` を実行する。
 - ホストの 8080 から 8082 を公開するサービスを起動する Task は、`kiro-web-netns` で作る専用のネットワーク名前空間のなかで実行する。
   外への通信は veth と NAT で通し、名前解決はホスト側の dnsmasq が中継する。

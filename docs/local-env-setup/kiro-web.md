@@ -79,6 +79,8 @@ Agent Config > Powers & MCP の `iwe` を、次の手順で `.kiro/settings/mcp.
 
 接続しないときの症状は `MCP server "iwe" failed to connect: Connection closed` である。
 原因は、Agent Config の `iwe` が `.kiro/settings/mcp.json` と違うことである。
+Kiro Web はリポジトリの clone を終える前に MCP サーバーを起動することがあり、`.kiro/settings/mcp.json` のコマンドは `iwe-mcp.sh` が現れるまで最大 60 秒待つ。
+待たない古いコマンドのままだと、セッションの開始時に同じ症状が出る。
 たとえば #482 より前のコマンド `cd "$(git rev-parse --show-toplevel)/docs" && exec iwec` は、git の外の `/projects/sandbox` で `cd` が失敗する。
 
 ## 症状と対処
