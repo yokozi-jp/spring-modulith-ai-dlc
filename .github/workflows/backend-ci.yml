@@ -6,6 +6,7 @@ on:
     branches: ["main"]
     paths:
       - "backend/**"
+      - "docs/database/table-retention-and-personal-data.md"
       - "openapi/**"
       - ".spectral.yaml"
       - "docker/compose-test.yml"
@@ -53,6 +54,7 @@ jobs:
         run: |
           bash tooling/ci-changes/changed.sh \
             'backend/**' \
+            'docs/database/table-retention-and-personal-data.md' \
             'openapi/**' \
             'docker/initdb/**' \
             'docker/wiremock/**' \

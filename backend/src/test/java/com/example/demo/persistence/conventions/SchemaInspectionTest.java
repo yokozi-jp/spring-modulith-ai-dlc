@@ -27,7 +27,7 @@ import org.springframework.modulith.core.ApplicationModules;
 /**
  * マイグレーション済みのテストDBを、アプリロールで{@code pg_catalog}から読んで検査する。
  *
- * <p>業務の表がテーブル、テナント、外部キーの規約を満たすことと、アプリロールが業務のスキーマに権限を持たないこと、モジュールのロールが依存の方向の権限だけを持つこと、マイグレーションロールがsuperuserでもBYPASSRLSでもないことを確かめる。判定の拒否経路は{@link
+ * <p>業務の表がテーブル、テナント、外部キーの規約を満たすことと、アプリロールが業務のスキーマに権限を持たないこと、モジュールのロールが依存の方向の権限だけを持つこと、マイグレーションロールがsuperuserでもBYPASSRLSでもないことを確かめる。DBのテーブルが保持期限と個人情報の一覧に載っていることも確かめる。判定の拒否経路は{@link
  * SchemaConventionsTest}が違反を含む行で検証する。
  */
 @DatabaseTest
@@ -36,6 +36,16 @@ class SchemaInspectionTest {
   /** テーブルごとの保持期限と個人情報の有無の一覧。{@code backend}をカレントにして実行する。 */
   private static final Path RETENTION_DOCUMENT =
       Path.of("../docs/database/table-retention-and-personal-data.md");
+
+  /** 一覧の表がある節の見出し。 */
+  private static final String RETENTION_HEADING = "## 保持期限と個人情報";
+
+  /** 一覧の表の行から、{@code スキーマ.テーブル}を取り出す。 */
+  private static final Pattern TABLE_ROW =
+      Pattern.compile("^\\| `([a-z0-9_]+\\.[a-z0-9_]+)`\\s*\\|", Pattern.MULTILINE);
+
+  /** Liquibaseの管理テーブルのスキーマ。一覧に載せない。 */
+  private static final String LIQUIBASE_SCHEMA = "liquibase";
 
   /** アプリロールで接続したjOOQのコンテキスト。 */
   @Autowired private DSLContext dsl;
@@ -93,18 +103,26 @@ class SchemaInspectionTest {
     final Set<String> actual =
         SchemaCatalog.read(dsl, migrationRole).relations().stream()
             .filter(CatalogSnapshot.RelationRow::isTable)
-            .filter(row -> !"liquibase".equals(row.schema()))
+            .filter(row -> !LIQUIBASE_SCHEMA.equals(row.schema()))
             .map(row -> row.schema() + "." + row.name())
             .collect(Collectors.toCollection(TreeSet::new));
-    final Matcher listed =
-        Pattern.compile("^\\| `([a-z_]+\\.[a-z_]+)`\\s*\\|", Pattern.MULTILINE)
-            .matcher(Files.readString(RETENTION_DOCUMENT));
-    final Set<String> documented = new TreeSet<>();
-    while (listed.find()) {
-      documented.add(listed.group(1));
-    }
 
-    assertThat(documented).as("%s の「保持期限と個人情報」の行", RETENTION_DOCUMENT).isEqualTo(actual);
+    assertThat(documentedTables(Files.readString(RETENTION_DOCUMENT)))
+        .as("%sの「保持期限と個人情報」の表の行。直し方：テーブルを足す、消すchangesetと同じ変更で行を足す、消す", RETENTION_DOCUMENT)
+        .isEqualTo(actual);
+  }
+
+  /** 一覧の「保持期限と個人情報」の節にある表の、先頭の列のテーブル名。次の節の表は読まない。 */
+  private static Set<String> documentedTables(final String markdown) {
+    final int start = markdown.indexOf(RETENTION_HEADING);
+    final int end = markdown.indexOf("\n## ", start + RETENTION_HEADING.length());
+    final Matcher row =
+        TABLE_ROW.matcher(markdown.substring(start, end < 0 ? markdown.length() : end));
+    final Set<String> tables = new TreeSet<>();
+    while (row.find()) {
+      tables.add(row.group(1));
+    }
+    return tables;
   }
 
   @Test

@@ -56,6 +56,12 @@ changesetのファイルは、次の規則で作ります。
 - ファイル名は`NNN-kebab-case.yaml`とし、`NNN`はゼロ埋めした連番で、番号を重複させません。
   `includeAll`はファイル名の順にchangesetを適用するため、並行するブランチで番号が衝突すると適用順が崩れます。
 
+## テーブルを足す、消すとき
+
+テーブルを作る、または消すchangesetは、同じ変更で[保持期限と個人情報の有無の一覧](table-retention-and-personal-data.md)の行を足すか消します。
+`SchemaInspectionTest`が、DBのテーブルと一覧の行の食い違いを検出します。
+作りかけのchangesetでは、スキーマタグがないとこのテストが失敗するため、`task test-dev`で確かめます。
+
 ## CIでの検証
 
 バックエンドCIは使い捨てPostgreSQLに対して`verifyDatabaseMigrations`を実行します。
