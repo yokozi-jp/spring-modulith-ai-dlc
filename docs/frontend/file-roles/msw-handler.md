@@ -54,7 +54,7 @@ Orval が生成する MSW handler（`packages/api/src/generated/mocks/<tag>/<tag
   引数を省くと、OpenAPI の example と faker で作った値が返り、配列の件数が 1 から 10 の乱数になる。
 - 要求ごとに応答を変える、または要求を記録するときは、生成 handler に関数を渡す（`getFindOrderByIdMockHandler(() => state.order)`）。
   関数は MSW の resolver の引数を受け取る（`({ request }) => ...`）。
-- 生成 handler は、OpenAPI の成功の status（200 か 204）を固定で返す。
+- 生成 handler は、OpenAPI の成功の status（200、201、204 など）を固定で返す。
 - 失敗の応答は、backend と同じ `Content-Type: application/problem+json` と Problem Details の本文で返す（`problemResponse`、`tenantNotSelected`）。
   `apiFetch` は、この `Content-Type` のときだけ本文を `problem` に読む（[transportとruntime検証](../api-client-orval.md#transportとruntime検証)）。
 - ID は、版と variant の桁が正しい UUID にする（`11111111-1111-4111-8111-111111111111`）。

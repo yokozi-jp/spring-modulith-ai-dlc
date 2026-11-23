@@ -190,7 +190,7 @@ coverage のファイルごとの下限は component にもかかる（[coverage
 - [ ] component 以外を export しない。［Oxlint で検査：react/only-export-components］
 - [ ] data と操作を props で受け、event を受ける props を `on` で始める。［自分で点検］
 - [ ] 補足の欄の例外を除き、取得を画面に任せる。［自分で点検］
-- [ ] 文言を JSX に直接書かず、catalog の key を `t` で引く。［Oxlint で検査：react/jsx-no-literals］
+- [ ] 文言を JSX に直接書かず、catalog の key を `t` で引く。［JSX の子は Oxlint で検査：react/jsx-no-literals。属性の文言は自分で点検］
 - [ ] 区分値の表示名を feature の module か catalog の key の対応で引く。［自分で点検］
 - [ ] link と button を入れ子にしない。［Oxlint で検査：ui-composition/no-button-in-link］
 - [ ] class 名を値から組み立てない。［Oxlint で検査：tailwind-classes/no-dynamic-class-name］

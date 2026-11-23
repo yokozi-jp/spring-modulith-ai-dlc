@@ -29,7 +29,7 @@ Loading、Error、存在しない resource の表示は、画面ではなく rou
 
 ## 必須の記述
 
-- `export function <画面>Page()` の関数宣言にし、props を受けない。
+- `export function <画面>Page()` の関数宣言にする。他の feature の component を内側に置くときだけ、route から `children` か slot の props で受ける（[業務機能の境界](../architecture.md#業務機能の境界)）。
 - route の情報は、module の先頭で `const routeApi = getRouteApi("<route id>")` を作り、`routeApi.useParams()` か `routeApi.useLoaderDeps()` で読む。
 - 初期描画の data は、loader と同じ引数の `get<Operation>SuspenseQueryOptions(...)` を `useSuspenseQuery` で読む。
   loader と画面が同じ引数を組むときは、引数を組む関数を [feature の module](feature-module.md) に置く（`listOrdersParams`）。
@@ -189,7 +189,7 @@ role と label で要素を見つけ、`renderRoute` が返す `user` で操作�
 - [ ] 初期描画の data は、loader と同じ引数の生成 suspense query options を `useSuspenseQuery` で読む。［自分で点検］
 - [ ] Loading、Error、Not Found を画面に書かず、Empty と Content だけを分ける。［自分で点検］
 - [ ] `<title>` を描画し、`<h1>` の id を `<section>` の `aria-labelledby` で指す。［自分で点検］
-- [ ] 文言を JSX に直接書かず、catalog の key を `t` で引く。［Oxlint で検査：react/jsx-no-literals］
+- [ ] 文言を JSX に直接書かず、catalog の key を `t` で引く。［JSX の子は Oxlint で検査：react/jsx-no-literals。属性の文言は自分で点検］
 - [ ] Effect を使わない。［Oxlint で検査：react-rules/no-effect］
 - [ ] mutation の後の画面遷移と通知を、`mutate` に渡す callback に置く。［自分で点検］
 - [ ] form に `noValidate` を付け、送信の button を入力の誤りで `disabled` にしない。［自分で点検］

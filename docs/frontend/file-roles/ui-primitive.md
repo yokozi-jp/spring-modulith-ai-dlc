@@ -160,6 +160,6 @@ describe("Button", () => {
 - [ ] production source でテスト用部品を import せず、テレメトリ SDK も import しない。［Oxlint で検査：no-restricted-imports］
 - [ ] 部品を関数 component で書く。［Oxlint で検査：func-style、react/prefer-function-component］
 - [ ] native semantics と Base UI の ARIA 属性を保つ。［自分で点検］
-- [ ] 値から Tailwind の class 名を組み立てない。［Oxlint で検査：tailwind-classes/no-dynamic-class-name］
+- [ ] 値から Tailwind の class 名を組み立てない。［Oxlint で検査：tailwind-classes/no-dynamic-class-name（`className` の template literal だけ。`cn` の使い方は自分で点検）］
 - [ ] テストを部品と同じディレクトリに置き、server render の出力と resolve で確かめる。［自分で点検］
 - [ ] テストファイルで Base UI を直接 import しない。［Oxlint で検査：no-restricted-imports］

@@ -24,8 +24,9 @@ tags: [runbook, frontend, feature]
 7. Orvalの再生成は[APIを変更する](../web-api/runbook-api-change.md)の手順で`task api-gen`を実行する。
 8. local UI state、server state、URL state、form stateを対応する既存機構へ割り当てる。
 9. 利用者向けの固定文言を追加または変更する場合は、[国際化](i18n.md)に従い、`src/i18n/locales/`の`ja.json`と`en.json`を同じ変更で更新する。
-10. custom Hookと共通化は、具体的な再利用または外部system同期が存在する場合だけ追加する。
-11. 対象コードの隣へ最小のtestを追加し、[Lintとテストのリファレンス](../tooling/lint-and-test.md#フロントエンド)に従って`task fe-verify`を実行する。
+10. 新しいファイルを作るときは、[ファイルの役割](file-roles/index.md)で役割を選び、その文書のチェックリストで点検する。
+11. custom Hookと共通化は、具体的な再利用または外部system同期が存在する場合だけ追加する。
+12. 対象コードの隣へ最小のtestを追加し、[Lintとテストのリファレンス](../tooling/lint-and-test.md#フロントエンド)に従って`task fe-verify`を実行する。
 
 ## APIやbackendの変更が要るときの確認
 

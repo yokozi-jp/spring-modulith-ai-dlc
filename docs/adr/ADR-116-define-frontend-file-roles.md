@@ -1,7 +1,7 @@
 ---
 type: ADR
 title: 'ADR-116: フロントエンドのファイルを役割ごとに分け、役割ごとの文書とチェックリストを置く'
-description: フロントエンドの src にあるファイルを、ディレクトリと拡張子で決まる14の役割に分け、役割ごとに docs/frontend/file-roles/ の文書とチェックリストを置く決定。ADR-050 を広げず、別の ADR にする。
+description: フロントエンドの src にあるファイルを、置き場所とファイル名で決まる14の役割に分け、役割ごとに docs/frontend/file-roles/ の文書とチェックリストを置く決定。ADR-050 を広げず、別の ADR にする。
 tags: [adr, frontend, architecture, documentation]
 ---
 
@@ -29,14 +29,15 @@ ADR-050 は、Java のクラス、ArchUnit、Spring Modulith を前提にして�
 
 ## Decision
 
-`frontend/` の `src/` にあるファイルを、置き場所と拡張子で決まる次の役割に分け、役割ごとに一つの文書を `docs/frontend/file-roles/` に置く。
+`frontend/` の `src/` にあるファイルのうち、業務のコードと共有のコードを、置き場所とファイル名で決まる次の役割に分け、役割ごとに一つの文書を `docs/frontend/file-roles/` に置く。
 各文書は、backend の `class-roles/` と同じ節（定義、置き場所と命名、必須の記述、依存してよいもの、してはいけないもの、最小の例と典型的な例、対応するテスト、アンチパターン、作成時のチェックリスト）を持つ。
 
-- **粒度**：ファイルの種類を単位にする。ディレクトリ単位にはしない。`features/<feature>/` の直下の `.ts` は、入力の条件（`schemas.ts`）、form の組み立て（`form.ts`）、それ以外の module に分ける。
+- **粒度**：ファイルの種類を単位にする。`features/<feature>/` の直下には画面、入力の条件、form の組み立て、module が並ぶので、ディレクトリ単位にせず、ファイル名で分ける。`lib`、`components`、`i18n` のように、ディレクトリ全体が一つの役割になる場所は、ディレクトリと役割が一対一になる。
+- **対象外**：アプリの起動と組立てのファイル（`main.tsx`、`router-defaults.ts`）、CSS（`style.css`）、生成物（`routeTree.gen.ts`、Orval の生成物）には役割の文書を置かない。起動と組立ては [フロントエンドアーキテクチャ](../frontend/architecture.md#現在の構成) が、生成物は [OrvalとAPI境界](../frontend/api-client-orval.md) が定める。
 - **対象**：実在するファイルがある役割だけに文書を置く。今の役割は、route、feature の画面、component、Hook、form の組み立て、入力 schema、module、アプリの共有 component、UI primitive、API 層、lib、国際化の resource、テストの道具、MSW の handler と fixture である。
 - **新しい役割**：その役割のファイルを最初に作る変更と同じ変更で、文書を足す。
 - **lint が止める規則**：チェックリストには、規則の内容を重ねて書かず、検査する規則の名前を書く。機械で止められない項目だけを、自分で点検する項目にする。
-- **規約の正文**：既存の `docs/frontend/` の文書にあり、役割の文書は役割ごとの形に整理して、その文書へリンクする。規約を新しく決めるときは、既存の文書を先に直す。
+- **規約の正文**：振る舞いの規約（状態の置き場所、409 の扱い、cache、Effect、Hook を作る条件）の正文は、既存の `docs/frontend/` の文書にあり、役割の文書はリンクで指す。ファイルの形の規約（置き場所、命名、export の形、チェックリスト）は、役割の文書が持つ。振る舞いの規約を新しく決めるときは、既存の文書を先に直す。
 - **steering**：`.kiro/steering/frontend.md` は、新しいファイルを作るときに `docs/frontend/file-roles/index.md` で役割を選ぶよう案内する。
 
 ADR-050 は広げず、この ADR で別に決める。
@@ -51,7 +52,7 @@ ADR-050 は広げず、この ADR で別に決める。
 
 ### Negative
 
-- 規約の記述が、既存の領域の文書と役割の文書の両方に現れる。規約を変えるとき、両方を直す必要がある。
+- 役割の文書が、ファイルの形の規約を新しく持つ。振る舞いの規約は既存の文書へのリンクにとどめるが、依存してよいものの一覧は lint の表と重なるので、lint の設定を変えるときは役割の文書も見直す。
 - 14文書の保守が要る。コードが変わると、引用した例が古くなる。
 
 ### Neutral

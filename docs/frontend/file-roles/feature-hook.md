@@ -40,8 +40,7 @@ React の state を使わない処理は Hook にせず、[feature の module](f
 - 画面遷移と通知は、`mutate` に渡す callback（`onSuccess`、`onError`）に置き、`useMutation` の options に置かない（[mutationの後のcache](../routing-and-state.md#mutationの後のcache)）。
 - 失敗の通知は、`@/lib/notice` の `failureNotice` か、feature の module の関数（`formFailure`）で作る。
   見出しは backend の `title` を使い、説明は操作ごとの catalog の文言にする（[更新の競合（409）の画面の扱い](../update-conflicts.md)）。
-- 既存の版を変える操作は、表示中の `lockNo` を送る。
-  409 を自動で再送せず、最新の `lockNo` を黙って差し込まない。
+- 既存の版を変える操作の `lockNo` と 409 の扱いは、[更新の競合（409）の画面の扱い](../update-conflicts.md)に従う。
 - 送信中の 2 回目は送らない。
 - 複数の Hook が一つの通知を共有するときは、通知の state を呼び出し側に置き、`setNotice` を引数で受ける（`use-order-status-actions.ts`、`use-member-actions.ts`）。
 - cache を読むときは、生成の `get<Operation>QueryKey()` を使い、key を手書きしない。
@@ -185,15 +184,7 @@ Hook は、Hook を使う画面の component test で確かめ、Hook ごとの�
 ## アンチパターン
 
 - 一回の `useState` を隠すだけの Hook、生成 Hook をそのまま返すだけの Hook、`useMount` のように React の lifecycle を言い換える Hook を作る。
-- Hook を呼ばない関数に `use` を付ける。
-  呼び出し側に Rules of Hooks の制約がかかり、条件分岐の中から呼べなくなる。
-- Effect で取得や通知をする。
-- 画面遷移と通知を `useMutation` の options か global の callback に置く。
-- 409 の後に自動で再送する。
-  最新の `lockNo` を黙って差し込んで送る。
-- query key を配列で手書きする。
-- Problem Details の `title` や `detail` の文字列で分岐する。
-- `useMemo` と `useCallback` を先回りして足す。
+- Hook の作り方、Effect、`useMemo` と `useCallback`、409 の扱い、query key の書き方に反する書き方は、[React Hooksと状態](../routing-and-state.md#react-hooksと状態)と[更新の競合（409）の画面の扱い](../update-conflicts.md)のアンチパターンに従う。
 
 ## 作成時のチェックリスト
 

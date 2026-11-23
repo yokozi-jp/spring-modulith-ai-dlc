@@ -213,7 +213,7 @@ describe("注文の入力の失敗の通知", () => {
 - [ ] `react` と `react-i18next`、同じ feature の画面、component、Hook に依存しない。［自分で点検］
 - [ ] 区分値の表示名を `as const satisfies Record<区分値, string>` の対応で書き、対応にない値はコード値を返す。［自分で点検］
 - [ ] 失敗の判定を `status` と Problem Details の `type` で行う。［自分で点検］
-- [ ] catalog に存在する key だけを `t` に渡す。［Oxlint で検査：typeCheck（`i18next.d.ts` の型）］
+- [ ] catalog に存在する key だけを `t` に渡す。［型検査で検査：i18next.d.ts の CustomTypeOptions］
 - [ ] 他の feature を import しない。［Oxlint で検査：feature-boundaries/no-cross-feature-import］
 - [ ] route、テスト用の部品、テレメトリの SDK を import しない。［Oxlint で検査：no-restricted-imports］
 - [ ] `../` で親の directory から import しない。［Oxlint で検査：import/no-relative-parent-imports］

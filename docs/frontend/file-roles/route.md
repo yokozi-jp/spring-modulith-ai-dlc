@@ -189,7 +189,7 @@ describe("ログアウト後の画面", () => {
 - [ ] 存在しない resource は、loader で `notFound()` を投げる。［自分で点検］
 - [ ] `redirect()` と `notFound()` を投げる行の抑制に、TanStack Router が throw で受け取る理由を書く。［自分で点検］
 - [ ] layout の component は `<Outlet />` を描画する。［自分で点検］
-- [ ] 文言を JSX に直接書かず、catalog の key を `t` で引く。［Oxlint で検査：react/jsx-no-literals］
+- [ ] 文言を JSX に直接書かず、catalog の key を `t` で引く。［JSX の子は Oxlint で検査：react/jsx-no-literals。属性の文言は自分で点検］
 - [ ] Base UI、テスト用の部品、テレメトリの SDK を import しない。［Oxlint で検査：no-restricted-imports］
 - [ ] `fetch` と `XMLHttpRequest` を直接使わない。［Oxlint で検査：no-restricted-globals、no-restricted-properties］
 - [ ] 業務機能の route は、画面のテストが `renderRoute` で確かめる。業務機能に属さない route は、`-` で始まるテストを route の近くに置く。［自分で点検］

@@ -156,7 +156,7 @@ Node 環境の unit test を対象と同じディレクトリに置く（[観点
 
 ## 作成時のチェックリスト
 
-- [ ] 二つ以上の feature で使い、特定の feature の業務語彙に属さない。［自分で点検］
+- [ ] 特定の feature の業務語彙に属さない。feature 以外（`main.tsx`、`components/`）だけが使うときも、描画を持たなければ lib に置く。［自分で点検］
 - [ ] component を置かず、React の state を使わない通常の関数にする。［自分で点検］
 - [ ] ファイル名を kebab-case にする。［Oxlint で検査：unicorn/filename-case］
 - [ ] 関数を関数宣言で書く。［Oxlint で検査：func-style］

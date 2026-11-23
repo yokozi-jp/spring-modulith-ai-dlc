@@ -38,10 +38,8 @@ tags: [convention, frontend, file-role]
 - TanStack Form の `errors` は Standard Schema の issue の配列なので、入力欄の誤りは `firstErrorMessage` で最初の `message` を取る。
   `message` がなければ `undefined` を返す。
 - 文言が要る補助関数は、`t` を最初の引数で受け、Hook を呼ばない（`productOptions(t, products, selectedId)`）。
-- 選択肢は、選べる値だけにする。
-  販売終了の商品は、すでに選択中のときだけ、状態を添えた文言で残す。
-- `withFieldGroup` の `props` に渡す既定値は型を与えるだけで、関数は呼ばれない。
-  空の関数には、Oxlint を無効にする理由を書く。
+- 選択肢を作る関数は、`t` と元の data を受け、選択肢の配列を返す。
+  何を選択肢に含めるかは、業務の規則に従って関数の中で決める。
 
 ## 依存してよいもの、してはいけないもの
 

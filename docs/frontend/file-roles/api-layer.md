@@ -54,15 +54,9 @@ API 層は業務の処理を持たない。
 - `createQueryClient()` は、`QueryCache` と `MutationCache` の `onError` に `redirectToLoginOnUnauthorized` を、`defaultOptions.queries.retry` に `retryUnlessClientError` を渡し、`MutationCache` の `onSettled` で全 query を無効化する（[mutationの後のcache](../routing-and-state.md#mutationの後のcache)）。
 - `preloadQuery` は `queryClient.query()` を呼び、無効化された query だけを取得し直す（[状態表示の分担](../routing-and-state.md#状態表示の分担)）。
 
-## 生成物の使い方
+## 生成物の扱い
 
-- loader は `preloadQuery(context.queryClient, get<Operation>SuspenseQueryOptions(...))` で cache に入れ、component は同じ options を `useSuspenseQuery` で読む。
-  `ensureQueryData` を loader から呼ばない。
-- 更新は生成した `use<Operation>` の mutation Hook で送り、画面遷移と通知は `mutate` に渡す callback に書く。
-- 個別に無効化するときは、生成した `get<Operation>QueryKey()` を使い、key を手書きしない。
-- 型は `@frontend/api/models` から、runtime の検証の schema は `@frontend/api/zod/<tag>/<tag>.zod` から import し、同じ型と schema を手書きしない。
-- 生成した MSW の handler（`@frontend/api/mocks/<tag>/<tag>.msw`）は、テストと `src/testing/` だけが import する。
-- エラーは `ApiProblemError` の `status` と `problem.type` で分岐する（[分岐と文言](../update-conflicts.md#分岐と文言)）。
+生成物の使い方（loader の `preloadQuery`、mutation の後の cache、key の書き方）は [OrvalとAPI境界](../api-client-orval.md)と[フロントエンドのルーティングと状態管理](../routing-and-state.md)に従う。
 
 生成物を変えるときは、契約の生成元（バックエンドの Controller と DTO）か `orval.config.ts` を変え、`task api-gen` か `task api-client-gen` で再生成する（[生成物のGit管理と再生成](../api-client-orval.md#生成物のgit管理と再生成)）。
 生成ファイルを直接編集しない。

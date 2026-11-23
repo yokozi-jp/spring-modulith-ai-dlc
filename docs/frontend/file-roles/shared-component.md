@@ -200,7 +200,7 @@ jsdom の component test で、role と label から要素を探し、利用者�
 - [ ] component を関数宣言で書く。［Oxlint で検査：func-style、react/prefer-function-component］
 - [ ] feature、route、route tree、Base UI、テスト用部品、テレメトリ SDK を import しない。［Oxlint で検査：no-restricted-imports］
 - [ ] `fetch` と `XMLHttpRequest` を使わない。［Oxlint で検査：no-restricted-globals、no-restricted-properties］
-- [ ] 文言を JSX に直接書かず、`t` で catalog から出す。［Oxlint で検査：react/jsx-no-literals］
+- [ ] 文言を JSX に直接書かず、`t` で catalog から出す。［JSX の子は Oxlint で検査：react/jsx-no-literals。属性の文言は自分で点検］
 - [ ] `error.message` と `detail` を表示しない。［自分で点検］
 - [ ] backend の `title` は独立した要素に出し、catalog の文言と連結しない。［自分で点検］
 - [ ] 状態の変化を読み上げる領域を `<output>` にする。［Oxlint で検査：jsx-a11y/prefer-tag-over-role（`role="status"` を書いた場合だけ。領域の要否は自分で点検）］
