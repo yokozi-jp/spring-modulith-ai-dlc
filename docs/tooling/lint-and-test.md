@@ -210,6 +210,7 @@ Vitestは`globals`を渡さず、Testing Libraryの自動cleanupが効かない�
   検証スキルの手順の正文は[形式検証スキルの使い方](../agents/formal-verification.md)である。
 - **`task lint-taskfile`**：Task本体でTaskfileのYAML構文とスキーマ構造を検証する。
   `tooling/taskfile-cleanup/`のfixtureで、後片付けの定型が本体の終了コードを優先し、前段が失敗しても後段の後片付けを走らせることを検査する。
+  `tooling/openapi-drift/test.sh`は、`be-openapi-check`が書き出しなし、path の誤り、古い契約の3つの状態で失敗し、`be-test`が書き出しの前に契約を消すことを、一時のgitリポジトリで検査する。
   `tooling/task-calls/task-calls.sh`は、フックとワークフローが呼ぶタスク名を検査する。
   対象は、`lefthook.yml`と`.github/workflows/`のYAMLにある`task <名前>`である。
   名前が`task --list-all`のタスクにも別名にも無いと失敗する。
@@ -243,7 +244,7 @@ betterleaksの誤検知の除外の書き方は[betterleaksの誤検知の除外
 - **pre-commit（Markdownの変更）**：変更ファイルへ`lint-md`相当を実行する。
 - **pre-commit（docs、steering、Taskfile、README、`tooling/adr-lint/`、`tooling/removed-names/`、`.kiro/settings/mcp.json`、`tooling/iwe-mcp/`、`.github/rulesets/`、`.github/workflows/`、`tooling/ruleset-check/`、`tooling/ruleset-sync/`の変更）**：`okf-check`を実行する。
 - **pre-commit（`.agents/skills/`、`.kiro/`、`skills-lock.json`、`tooling/skills-check/`の変更）**：`skills-check`を実行する。
-- **pre-commit（Taskfile、`lefthook.yml`、GitHub Actionsワークフロー、`tooling/taskfile-cleanup/`、`tooling/task-calls/`の変更）**：`lint-taskfile`を実行する。
+- **pre-commit（Taskfile、`lefthook.yml`、GitHub Actionsワークフロー、`tooling/taskfile-cleanup/`、`tooling/task-calls/`、`tooling/openapi-drift/`の変更）**：`lint-taskfile`を実行する。
 - **pre-commit（`tooling/agent-git/`の変更）**：`agent-git-test`を実行する。
 - **pre-commit（`tooling/test-slot/`、`docker/keycloak/realm.json`、`docker/compose-test.yml`の変更）**：`test-slot-test`を実行する。
 - **pre-commit（`lefthook.yml`か`tooling/lefthook-glob/`の変更）**：`lint-lefthook`を実行する。

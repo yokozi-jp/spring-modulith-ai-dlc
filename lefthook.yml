@@ -221,6 +221,7 @@ pre-commit:
         - ".github/workflows/*.{yml,yaml}"
         - "tooling/taskfile-cleanup/**"
         - "tooling/task-calls/**"
+        - "tooling/openapi-drift/**"
       run: |
         echo "{staged_files}" >/dev/null
         task lint-taskfile

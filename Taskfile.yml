@@ -948,7 +948,7 @@ tasks:
       - task: api-lint
 
   be-openapi-check:
-    desc: 直前のbe-testが書き出したOpenAPI契約をSpectralで検査し、コミット済みの内容と一致するか検査（前提はbe-testの実行済み。単体ではdriftを検出できない）
+    desc: 直前のbe-testが書き出したOpenAPI契約をSpectralで検査し、コミット済みの内容と一致するか検査（前提はbe-testの実行済み。be-testが先に契約を消すので、書き出さなければ失敗する。単体ではdriftを検出できない）
     cmds:
       - task: api-lint
       - task: api-drift-check
@@ -959,6 +959,8 @@ tasks:
     dir: backend
     deps: [_ensure-test-env]
     cmds:
+      # 書き出さないテストが古い契約を残したまま be-openapi-check を通さないよう、先に消す（#467）。
+      - rm -f ../openapi/openapi.yaml
       - ./gradlew test jacocoTestCoverageVerification -PopenapiExport=true -PtestEnvFile="../{{.TEST_ENV_FILE}}"
 
   be-test-dev:
@@ -1078,6 +1080,8 @@ tasks:
       vars: [PATHS]
     cmds:
       - |
+        # 追跡されていない path は git diff も ls-files --others も何も出さず、検査が素通りする。
+        git ls-files --error-unmatch -- {{.PATHS}} >/dev/null || { echo "追跡されていない path があります。PATHS を確認してください。" >&2; exit 1; }
         status=0
         git diff --exit-code -- {{.PATHS}} || status=1
         untracked="$(git ls-files --others --exclude-standard -- {{.PATHS}})"
@@ -1833,6 +1837,7 @@ tasks:
         echo "Taskfile OK: YAML構文とスキーマ構造の解析に成功しました。"
         bash tooling/taskfile-cleanup/test.sh
         bash tooling/task-calls/test.sh
+        bash tooling/openapi-drift/test.sh
         bash tooling/task-calls/task-calls.sh
 
   lint-lefthook:
