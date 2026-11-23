@@ -153,7 +153,7 @@ spring:
     events:
       # 完了したイベント出版レコードをアーカイブへ移し、調査可能な履歴を保持する。
       completion-mode: archive
-      # 完了の記録を、リスナーのトランザクションの後の新しいトランザクションで行う（Spring Modulith 2.1 までの振る舞い、ADR-079）。
+      # 完了の記録を、リスナーのトランザクションの後の新しいトランザクションで行う（Spring Modulith 2.1 までの振る舞い、ADR-118）。
       # 2.2 の既定の in-listener はリスナーのトランザクションの中で記録し、モジュールのロール（ADR-094）が持たない modulith の表の権限を要する。
       completion: in-interceptor
       jdbc:

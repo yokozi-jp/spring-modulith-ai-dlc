@@ -44,7 +44,7 @@ changeset が作る全テーブルについて、保持期限と個人データ�
 
 | テーブル                             | 改廃方法             | 自動化                                            | 実行のタイミング                  | 改廃の条件                                                                                                                                                      | `ANALYZE` と `VACUUM`  |
 | ------------------------------------ | -------------------- | ------------------------------------------------- | --------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------- |
-| `modulith.event_publication_archive` | DELETE               | なし（[#542] で実装する）                         | 1 日 1 回                         | `COMPLETED` で完了から 7 日を過ぎた行。`ABANDONED` の行は消さない（[ADR-079](../adr/ADR-079-resubmit-failed-event-publications-periodically-with-shedlock.md)） | 自動バキュームに任せる |
+| `modulith.event_publication_archive` | DELETE               | なし（[#542] で実装する）                         | 1 日 1 回                         | `COMPLETED` で完了から 7 日を過ぎた行。`ABANDONED` の行は消さない（[ADR-120]）                                                                                  | 自動バキュームに任せる |
 | `modulith.spring_session`            | DELETE               | あり（Spring Session JDBC の定期削除。[ADR-111]） | 各インスタンスで毎分              | `expiry_time` を過ぎた行                                                                                                                                        | 自動バキュームに任せる |
 | `modulith.spring_session_attributes` | 外部キーのカスケード | あり                                              | `spring_session` の行の削除と同時 | 親の行の削除                                                                                                                                                    | 自動バキュームに任せる |
 
@@ -52,3 +52,4 @@ changeset が作る全テーブルについて、保持期限と個人データ�
 [#671]: https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/671
 [#672]: https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/672
 [ADR-111]: ../adr/ADR-111-store-sessions-in-postgresql-until-user-growth-needs-redis.md
+[ADR-120]: ../adr/ADR-120-keep-abandoned-event-publications-out-of-archive-retention.md

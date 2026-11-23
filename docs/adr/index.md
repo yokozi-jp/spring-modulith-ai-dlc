@@ -116,3 +116,6 @@
 - [ADR-114: 暦日を full-date で受け渡し、SQL で日時から暦日と境界を作らない](ADR-114-pass-calendar-dates-as-full-date-and-bind-boundaries.md)（Proposed, 2026-11-23）
 - [ADR-115: 業務のバッチを Spring Batch の Job で作り、1 つの期間を 1 つの JobInstance にして毎日追いつく](ADR-115-build-business-batches-with-spring-batch.md)（Proposed, 2026-11-23）
 - [ADR-116: フロントエンドのファイルを役割ごとに分け、役割ごとの文書とチェックリストを置く](ADR-116-define-frontend-file-roles.md)（Proposed, 2026-11-23）
+- [ADR-118: イベント出版の完了を、リスナーのトランザクションの後の新しいトランザクションで記録する](ADR-118-record-event-publication-completion-in-interceptor.md)（Proposed, 2026-11-24）
+- [ADR-119: Spring Modulith 2.2.0 を Spring Boot 4.1.2 のまま入れ、Spring Boot 4.2 と Spring Cloud 2026.0 への更新を別の変更にする](ADR-119-keep-spring-boot-4-1-with-spring-modulith-2-2.md)（Proposed, 2026-11-24）
+- [ADR-120: archive の表の保持期限を COMPLETED の行だけに掛け、ABANDONED の行は運用者が戻すか消すまで残す](ADR-120-keep-abandoned-event-publications-out-of-archive-retention.md)（Proposed, 2026-11-24）

@@ -33,7 +33,7 @@ client adapter の短期の再試行と、イベント出版の持続的な再�
 ## Spring Modulith のイベントの失敗
 
 外部ブローカーを導入するまでは、リスナーが失敗したイベント出版がレジストリに `FAILED` の状態で残る。
-方針の上限まで再投入しても失敗した出版は `ABANDONED` の状態で archive の表に移り、これが DLQ の役割を兼ねる。
+回数の上限まで再投入しても失敗した出版は `ABANDONED` の状態で archive の表に移り、これが DLQ の役割を兼ねる。
 失敗した出版の再投入は `FailedEventPublications` を使い、落ちたまま残った出版は Staleness Monitor で `FAILED` に戻してから同じ再投入で扱う。
 
 Spring Modulith 2.2.0 のイベント出版は、次の状態を持つ（[Spring Modulith: Event Publication Lifecycle](https://docs.spring.io/spring-modulith/reference/events.html)）。
@@ -43,7 +43,7 @@ Spring Modulith 2.2.0 のイベント出版は、次の状態を持つ（[Spring
 - **`COMPLETED`**：リスナーが成功した。
 - **`FAILED`**：リスナーが例外を送出した、または Staleness Monitor が古いと判定した。
 - **`RESUBMITTED`**：失敗した出版を再投入し、実行を待っている。
-- **`ABANDONED`**：リスナーが例外を送出し、`AbandonPolicy` が諦めると判断した。再投入と Staleness Monitor の対象にならない。`completion-mode: archive` では archive の表へ移る。
+- **`ABANDONED`**：リスナーが例外を送出し、`AbandonPolicy` か `abandon-after-attempts` の回数で諦めると判断した。再投入と Staleness Monitor の対象にならない。`completion-mode: archive` では archive の表へ移る。
 
 出版は試行の回数（`completion_attempts`）も持つ。
 公式のリファレンスは `PROCESSING` に移るときに増えると書くが、2.2.0 の JDBC の実装は、出版を作るときに 1 を入れ、再投入で `RESUBMITTED` にするたびに 1 増やし、`PROCESSING` に移るときには増やさない。
@@ -55,7 +55,7 @@ Spring Modulith 2.2.0 のイベント出版は、次の状態を持つ（[Spring
 
 - 失敗した出版の再投入は、`FailedEventPublications.resubmit(ResubmissionOptions)` を使う。
   `ResubmissionOptions` で、一度に扱う件数、同時に実行する件数、最小の経過時間、条件（イベントの型、`completionAttempts` の上限）を付ける。
-  回数の上限を超えた出版は、`AbandonPolicy` で `ABANDONED` にして再投入の対象から外し、人の確認に回す。
+  回数の上限を超えた出版は、`spring.modulith.events.resubmission.abandon-after-attempts` で `ABANDONED` にして再投入の対象から外し、人の確認に回す。
   `resubmit` は再投入した件数を返さない。
   条件の関数は `RESUBMITTED` への更新より前に呼ばれ、更新できなかった出版でも呼ばれるため、そこで数えた値は再投入の候補の件数であり、再投入した件数ではない。
   定期の再投入は、再投入のあとに `event_publication` と archive の表を読み戻し、実際に `RESUBMITTED` へ進んだ出版の件数を `event.publication.resubmissions` に記録する（[ADR-079](../adr/ADR-079-resubmit-failed-event-publications-periodically-with-shedlock.md)）。
@@ -82,19 +82,19 @@ Spring Modulith 2.2.0 のイベント出版は、次の状態を持つ（[Spring
   内部の不変条件の違反は、確定のイベントを受けたのに注文がないような、不具合でしか起きない状態である。
   業務の状態に記録すると不具合が隠れるため、例外を投げてデッドレターとして意図して残す。
   出版はイベントを保ち、ERROR のログが運用者に届き、不具合を直したあとに再投入できる。
-  定期の再投入は失敗の原因を見分けないため、この出版もリスナーの方針の上限の回数まで再投入する（[ADR-079](../adr/ADR-079-resubmit-failed-event-publications-periodically-with-shedlock.md)）。
+  定期の再投入は失敗の原因を見分けないため、この出版も回数の上限まで再投入する（[ADR-079](../adr/ADR-079-resubmit-failed-event-publications-periodically-with-shedlock.md)）。
 - リスナーが動く前に業務の状態が変わったとき（確定のあとに取り消した注文）は、業務の結果として処理せずに正常終了させる。
   再投入しても結果は変わらないため、`FAILED` に残さない。
 
-失敗した出版は、定期のジョブ（`shared.infrastructure.persistence` の `EventPublicationResubmitter`）が、リスナーの方針の待ち時間を過ぎたものを方針の上限の回数まで自動で再投入する（[ADR-079](../adr/ADR-079-resubmit-failed-event-publications-periodically-with-shedlock.md)）。
+失敗した出版は、定期のジョブ（`shared.infrastructure.persistence` の `EventPublicationResubmitter`）が、リスナーの方針の待ち時間を過ぎたものを回数の上限まで自動で再投入する（[ADR-079](../adr/ADR-079-resubmit-failed-event-publications-periodically-with-shedlock.md)）。
 方針はリスナーの `on` に付ける `@ResubmissionPolicy`（`shared.events`）で選び、付けなければ `default` になる。
 n 回目の再投入の前に、最後の試行から `min(wait-age × multiplier^(n-1), max-wait)` を待つ。
 ジョブは ShedLock のロックで、同時に 1 つのインスタンスだけが動く。
-上限の回数の再投入の後にまた失敗した出版は、`ResubmissionPolicies`（`AbandonPolicy`）が `ABANDONED` にして出版ごとの ERROR のログで知らせる。
+上限の回数目の再投入でまた失敗した出版は、Spring Modulith が `abandon-after-attempts` で `ABANDONED` にし、定期のジョブが出版ごとの ERROR のログで知らせる。
 運用者は、`FAILED` に戻して手での 1 回の再投入（`EventPublicationResubmitOnce`）で再投入するか片付ける。
 調べ方と手順は[イベント出版の再投入のログイベント](../observability/runbook-event-publication-resubmission.md)にある。
 再投入の検証は、決済の `PaymentGatewayClientIntegrationTest` が、本番の Client と手での 1 回の再投入で、一時障害の `FAILED` から試行の回数 2 の `COMPLETED` になり決済記録が 1 件になることを確かめる。
-`completion-mode: archive` で完了した出版を移す archive の表の保存期間と消し方は、別の Issue で決める。
+`completion-mode: archive` で完了した出版を移す archive の表の保存期間と消し方は、別の Issue で決め、`ABANDONED` の行には掛けない（[ADR-120](../adr/ADR-120-keep-abandoned-event-publications-out-of-archive-retention.md)）。
 
 ## DLQ の構成
 
