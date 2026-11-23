@@ -88,7 +88,7 @@ describe("fixture に適用したプロジェクトの lint 設定", () => {
   });
 
   describe("共有層", () => {
-    it("共有コードから feature と route の import を禁止する", () => {
+    it("共有コードから feature、route、route tree の import を禁止する", () => {
       expect(countIn("lib/feature-import.ts", "eslint(no-restricted-imports)")).toBe(1);
       expect(countIn("components/route-import.tsx", "eslint(no-restricted-imports)")).toBe(2);
     });
@@ -269,7 +269,7 @@ describe("fixture に適用したプロジェクトの lint 設定", () => {
       expect(countIn("weak-tests.test.tsx", code, uiDirectory)).toBe(1);
     });
 
-    it("production source からテスト用部品の import を禁止する", () => {
+    it("production source から msw と msw/node を含むテスト用部品の import を禁止する", () => {
       expect(countIn("components/msw-import.ts", "eslint(no-restricted-imports)")).toBe(5);
     });
 
