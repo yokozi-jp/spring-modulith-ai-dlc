@@ -7,6 +7,7 @@ import static com.example.demo.shared.infrastructure.persistence.FixtureAggregat
 import static com.example.demo.shared.infrastructure.persistence.FixtureAggregates.itemRoot;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.awaitility.Awaitility.await;
 
 import com.example.demo.shared.concurrency.ConflictException;
 import com.example.demo.testkit.DatabaseTest;
@@ -26,6 +27,7 @@ import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.regex.Pattern;
 import javax.sql.DataSource;
+import org.awaitility.core.ConditionTimeoutException;
 import org.jooq.Condition;
 import org.jooq.DSLContext;
 import org.jooq.Record;
@@ -260,23 +262,25 @@ class TableWriterConcurrencyTest {
    * pg_stat_activity} を見る。3 秒は A の {@code lock_timeout} より短く、A の {@code lock_timeout} は {@code
    * statement_timeout}（テストでは 5 秒）より短い。
    */
-  private boolean commitWhenAnotherSessionWaits(final Connection sessionB)
-      throws SQLException, InterruptedException {
+  private boolean commitWhenAnotherSessionWaits(final Connection sessionB) throws SQLException {
     try (Connection monitor = dataSource.getConnection()) {
       monitor.setAutoCommit(true);
       final DSLContext monitorDsl = DSL.using(monitor, SQLDialect.POSTGRES);
-      final long deadline = System.nanoTime() + WAIT_DETECTION_LIMIT.toNanos();
-      boolean waiting = false;
-      while (!waiting && System.nanoTime() < deadline) {
-        waiting =
-            monitorDsl.fetchExists(
-                DSL.table(DSL.name("pg_catalog", "pg_stat_activity")),
-                DSL.field(DSL.name("wait_event_type"), String.class)
-                    .eq("Lock")
-                    .and(DSL.field(DSL.name("datname"), String.class).eq(DSL.currentCatalog())));
-        if (!waiting) {
-          TimeUnit.MILLISECONDS.sleep(10);
-        }
+      boolean waiting = true;
+      try {
+        await("別のセッションの行ロックの待ち")
+            .atMost(WAIT_DETECTION_LIMIT)
+            .pollInterval(Duration.ofMillis(10))
+            .until(() ->
+                monitorDsl.fetchExists(
+                    DSL.table(DSL.name("pg_catalog", "pg_stat_activity")),
+                    DSL.field(DSL.name("wait_event_type"), String.class)
+                        .eq("Lock")
+                        .and(
+                            DSL.field(DSL.name("datname"), String.class)
+                                .eq(DSL.currentCatalog()))));
+      } catch (ConditionTimeoutException e) {
+        waiting = false;
       }
       sessionB.commit();
       return waiting;

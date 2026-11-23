@@ -173,6 +173,18 @@ class TestConventionsArchTest {
                   + "規約："
                   + TESTING_CODE_STYLE_DOC);
 
+  /** {@code Thread.sleep} と {@code TimeUnit.sleep} を禁止する。固定時間の待ちは遅い環境で偶然に失敗するため。 */
+  @ArchTest
+  /* package */ static final ArchRule sleepIsNotUsedInTests =
+      noClasses()
+          .should()
+          .callMethodWhere(target(name("sleep")))
+          .because(
+              "固定時間の待ちは、遅い環境で偶然に失敗し、速い環境で余計に待つため。"
+                  + "直し方：イベントは Spring Modulith の Scenario で、それ以外は Awaitility の"
+                  + "await(\"<対象と期待>\").atMost(<期限>) で条件を待つ。規約："
+                  + TESTING_CODE_STYLE_DOC);
+
   /** テストコードでもレガシー日時型を禁止する（型を参照する ArchUnit 定義自身がある architecture は除外）。 */
   @ArchTest
   /* package */ static final ArchRule legacyDateTimeTypesAreNotUsedInTests =

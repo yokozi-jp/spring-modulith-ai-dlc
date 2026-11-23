@@ -99,7 +99,7 @@ final Instant actual =
 
 ## 非同期待機
 
-固定時間を待つ`Thread.sleep()`を使わない。
+固定時間を待つ`Thread.sleep()`を使わない（`sleep`の呼び出しは`TestConventionsArchTest`が止める）。
 イベントの発行と購読はSpring Modulithの`Scenario`で条件を待つ。
 それ以外の非同期の条件は、Awaitilityの期限付きの条件待機で待つ（[ADR-080](../adr/ADR-080-wait-for-async-conditions-with-awaitility.md)）。
 対象APIが期限付きの条件待機を持つときは、そのAPIを使ってよい。
