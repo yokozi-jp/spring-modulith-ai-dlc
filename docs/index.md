@@ -10,6 +10,7 @@ okf_version: '0.2'
 - [データベース](database/index.md)：マイグレーション、jOOQ コード生成、DB 接続、DB のデプロイと切り戻しを扱うとき
 - [Web API](web-api/index.md)：HTTP API のパス、メソッド、パラメータ、応答、ステータスコード、互換性を設計または変更するとき
 - [システム連携と非同期処理](integration/index.md)：非同期のイベントやジョブ、別システムとのファイル連携やメッセージ連携を設計するとき
+- [バッチ](batch/index.md)：締め、集計、ファイルの配信と集信のような業務のバッチを Spring Batch で作るとき、起動、追いつき、再開、オンラインとの排他、テストを決めるとき
 - [可観測性とログ](observability/index.md)：ログのレベル、メッセージ、出力箇所、量を決めるとき、可観測性データの規約や PII 混入時の対応を確認するとき
 - [日時](datetime/index.md)：日時の保存、API の日時表現、表示、日時のテストを扱うとき
 - [コンテナ](container/index.md)：Dockerfile、.dockerignore、Compose ファイルを書く、または直すとき
