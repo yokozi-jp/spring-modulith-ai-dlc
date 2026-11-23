@@ -21,6 +21,7 @@ import io.opentelemetry.api.common.AttributeKey;
 import io.opentelemetry.api.logs.Severity;
 import io.opentelemetry.instrumentation.logback.appender.v1_0.OpenTelemetryAppender;
 import io.opentelemetry.sdk.logs.data.LogRecordData;
+import java.io.UnsupportedEncodingException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
@@ -43,6 +44,9 @@ import org.springframework.http.MediaType;
 import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.json.JsonMapper;
+import tools.jackson.databind.node.ObjectNode;
 
 /** テスト専用の Controller で、入力検証、未処理例外、Spring MVC の標準例外の Problem Details とログを検証する。 */
 @SuppressWarnings({
@@ -84,7 +88,7 @@ class ApiErrorContractTest {
 
   @ParameterizedTest(name = "{0}")
   @MethodSource("problemCases")
-  @DisplayName("各エラーは期待した status、type、日本語の title の Problem Details を detail なしで返す")
+  @DisplayName("各エラーは期待した status、type、日本語の title の Problem Details を detail と instance なしで返す")
   void errorsReturnProblemDetails(
       final String name,
       final MockHttpServletRequestBuilder request,
@@ -99,7 +103,8 @@ class ApiErrorContractTest {
         .andExpect(jsonPath("$.type").value(type))
         .andExpect(jsonPath("$.title").value(title))
         .andExpect(jsonPath("$.status").value(status))
-        .andExpect(jsonPath("$.detail").doesNotExist());
+        .andExpect(jsonPath("$.detail").doesNotExist())
+        .andExpect(jsonPath("$.instance").doesNotExist());
   }
 
   private static Stream<Arguments> problemCases() {
@@ -257,7 +262,7 @@ class ApiErrorContractTest {
   }
 
   @Test
-  @DisplayName("識別子の違う 2 つの 404 は、本文と Content-Type、Content-Language が同じになる")
+  @DisplayName("識別子の違う 2 つの 404 は、要求ごとの traceId を除いた本文と Content-Type、Content-Language が同じになる")
   void notFoundBodiesAreIdentical() throws Exception {
     final List<MockHttpServletResponse> responses = new ArrayList<>();
     for (final String id : List.of("a", "b")) {
@@ -275,7 +280,7 @@ class ApiErrorContractTest {
     final MockHttpServletResponse first = responses.getFirst();
     final MockHttpServletResponse second = responses.getLast();
 
-    assertEquals(first.getContentAsString(), second.getContentAsString(), "本文");
+    assertEquals(withoutTraceId(first), withoutTraceId(second), "本文");
     assertEquals(first.getContentType(), second.getContentType(), "Content-Type");
     assertEquals(
         first.getHeader(HttpHeaders.CONTENT_LANGUAGE),
@@ -400,6 +405,15 @@ class ApiErrorContractTest {
             .collect(Collectors.toSet());
     assertEquals(expected, actual, event + " の属性");
     return record;
+  }
+
+  private static JsonNode withoutTraceId(final MockHttpServletResponse response)
+      throws UnsupportedEncodingException {
+    final ObjectNode body =
+        (ObjectNode) JsonMapper.builder().build().readTree(response.getContentAsString());
+    assertTrue(body.has("traceId"), body::toString);
+    body.remove("traceId");
+    return body;
   }
 
   private static MockHttpServletRequestBuilder postItems() {

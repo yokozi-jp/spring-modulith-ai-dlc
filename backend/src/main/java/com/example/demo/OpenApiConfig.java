@@ -37,7 +37,7 @@ public class OpenApiConfig {
    *
    * <p>互換な追加で MINOR、破壊的変更で MAJOR を上げ、アプリのリリース版と連動させない（docs/web-api/versioning.md）。
    */
-  /* package */ static final String CONTRACT_VERSION = "0.7.0";
+  /* package */ static final String CONTRACT_VERSION = "0.8.0";
 
   /** 共通の Problem response を参照する接頭辞。 */
   private static final String PROBLEM_RESPONSE_REF = "#/components/responses/";
@@ -191,7 +191,11 @@ public class OpenApiConfig {
         "status", new IntegerSchema().format("int32").description("実際の HTTP status code"));
     schema.addProperty("detail", new StringSchema().description("この失敗に固有の、人が読むための説明"));
     schema.addProperty(
-        "instance", new StringSchema().format("uri-reference").description("失敗発生を識別する URI"));
+        "traceId",
+        new StringSchema()
+            .pattern("^[0-9a-f]{32}$")
+            .description("問い合わせとログを結ぶ W3C Trace Context の trace ID。要求の span がないときは付かない")
+            .example("4bf92f3577b34da6a3ce929d0e0e4736"));
     return schema;
   }
 

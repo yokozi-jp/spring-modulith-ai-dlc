@@ -1,5 +1,9 @@
 package com.example.demo.error.presentation.web;
 
+import io.micrometer.tracing.Span;
+import io.micrometer.tracing.Tracer;
+import io.micrometer.tracing.handler.TracingObservationHandler.TracingContext;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.ConstraintViolation;
 import jakarta.validation.ConstraintViolationException;
 import jakarta.validation.ElementKind;
@@ -23,6 +27,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.validation.BindingResult;
 import org.springframework.validation.Errors;
 import org.springframework.validation.method.ParameterErrors;
+import org.springframework.web.filter.ServerHttpObservationFilter;
 import org.springframework.web.method.annotation.HandlerMethodValidationException;
 
 /** RFC 9457 Problem Details の共通フィールドを生成する。 */
@@ -41,6 +46,9 @@ final class ApiProblemDetails {
   /** 入力検証エラー（/problems/validation-error）の拡張メンバーで、入力検証の誤りを入れる（ADR-058）。 */
   /* package */ static final String ERRORS = "errors";
 
+  /** 問い合わせとログを結ぶ trace ID を入れる拡張メンバー（ADR-117）。 */
+  private static final String TRACE_ID = "traceId";
+
   /**
    * 401 の WWW-Authenticate に入れる challenge（RFC 9110 §15.5.2）。
    *
@@ -55,25 +63,55 @@ final class ApiProblemDetails {
   /** ロケール別の API エラーメッセージを解決する。 */
   private final MessageSource messageSource;
 
-  /** アプリケーションの MessageSource を受け取る。 */
-  /* package */ ApiProblemDetails(final MessageSource messageSource) {
+  /** 応答に入れる trace ID を、要求の現在の span から取る。 */
+  private final Tracer tracer;
+
+  /** アプリケーションの MessageSource と trace ID の取得元を受け取る。 */
+  /* package */ ApiProblemDetails(final MessageSource messageSource, final Tracer tracer) {
     this.messageSource = messageSource;
+    this.tracer = tracer;
   }
 
-  /** advice を通らない {@code /error} 用に、正規化済み Problem Details を生成する。 */
-  /* package */ ProblemDetail localizedForStatus(final HttpStatusCode status, final Locale locale) {
+  /**
+   * advice を通らない {@code /error} 用に、正規化済み Problem Details を生成する。
+   *
+   * <p>コンテナの {@code /error} への転送は要求の observation の外で動くため、traceId は転送元の要求の span から取る。 転送元に span
+   * がなければ（Tomcat が自分で返す失敗など）、現在の span から取る。
+   */
+  /* package */ ProblemDetail localizedForStatus(
+      final HttpStatusCode status, final Locale locale, final HttpServletRequest request) {
     final ProblemDetail problem = ProblemDetail.forStatus(status);
-    normalize(problem, status, locale);
+    final @Nullable Span requestSpan =
+        ServerHttpObservationFilter.findObservationContext(request)
+            .map(context -> context.<TracingContext>get(TracingContext.class))
+            .map(TracingContext::getSpan)
+            .orElseGet(tracer::currentSpan);
+    normalize(problem, status, locale, requestSpan);
     return problem;
   }
 
   /**
    * 標準 type を補い、about:blank のときだけ title を翻訳して detail を消す。業務 type は変えない。
    *
+   * <p>現在の span があれば、どの type にも traceId を足す。
+   *
    * <p>HttpStatus に定義のない status の title は、4xx なら 400、それ以外なら 500 の文言にする。 status は変えない。
    */
   /* package */ void normalize(
       final ProblemDetail problem, final HttpStatusCode status, final Locale locale) {
+    normalize(problem, status, locale, tracer.currentSpan());
+  }
+
+  private void normalize(
+      final ProblemDetail problem,
+      final HttpStatusCode status,
+      final Locale locale,
+      final @Nullable Span span) {
+    final String traceId = span == null ? "" : span.context().traceId();
+    // OpenTelemetry は trace がないとき、すべて 0 の無効な trace ID を返す。
+    if (!traceId.isEmpty() && !traceId.matches("0+")) {
+      problem.setProperty(TRACE_ID, traceId);
+    }
     final URI type = Objects.requireNonNullElse(problem.getType(), ABOUT_BLANK);
     problem.setType(type);
     if (ABOUT_BLANK.equals(type)) {
