@@ -153,6 +153,9 @@ spring:
     events:
       # 完了したイベント出版レコードをアーカイブへ移し、調査可能な履歴を保持する。
       completion-mode: archive
+      # 完了の記録を、リスナーのトランザクションの後の新しいトランザクションで行う（Spring Modulith 2.1 までの振る舞い、ADR-079）。
+      # 2.2 の既定の in-listener はリスナーのトランザクションの中で記録し、モジュールのロール（ADR-094）が持たない modulith の表の権限を要する。
+      completion: in-interceptor
       jdbc:
         # Spring Modulith が所有する共有インフラを業務モジュールのスキーマから分離する。
         schema: modulith
@@ -165,7 +168,7 @@ spring:
       # 複数インスタンスでの競合を避けるため、起動時には自動再配信しない。
       republish-outstanding-events-on-restart: false
       # 落ちたまま PUBLISHED、PROCESSING、RESUBMITTED に残った出版を FAILED に戻し、再投入の対象にする（ADR-079）。
-      # Spring Modulith 2.1.2 は、最後の出版か再投入の時刻（last_resubmission_date、なければ publication_date）から測る。
+      # Spring Modulith 2.2.0 は、最後の出版か再投入の時刻（last_resubmission_date、なければ publication_date）から測る。
       # published は wait-age にする。processing と resubmitted は、再投入して処理中の出版を FAILED に戻さないよう in-flight-staleness にする。
       # 最初の配信が concurrency-limit の空きを待つ間に published を過ぎた出版は重ねて再投入しうる。リスナーの冪等性に頼る。
       # ponytail: 古い出版を読んでから markFailed を呼ぶまでに別のインスタンスが再投入した出版も、FAILED に戻しうる。
