@@ -22,7 +22,7 @@ tooling/formal-verify/mutants.py .agents/skills/formal-verify-event-resubmission
 | 名前                       | 約束                                                                                                                                                         | 破れたときの害                                     |
 | -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------- |
 | `OneDeliveryAtATime`       | 一つの出版のリスナーが、同時に二つ動かない（待ちの列にあるものも含む）。                                                                                     | 冪等でない副作用が二重に起きる。                   |
-| `ResubmissionsCapped`      | ジョブが一つの出版を再投入する回数は `max-resubmissions` まで。                                                                                              | 回復しない出版を際限なく流し、上限の警報も遅れる。 |
+| `ResubmissionsCapped`      | ジョブが一つの出版を再投入する回数は `abandon-after-attempts` まで。                                                                                         | 回復しない出版を際限なく流し、上限の警報も遅れる。 |
 | `OneLockedRun`             | ロックの中の処理を、同時に 2 台が実行しない。                                                                                                                | 古い一覧で同じ出版を重ねて再投入する。             |
 | `InFlightNeverMarkedStale` | Staleness Monitor は、待ちの列にあるか実行中の配信の出版を `FAILED` に戻さない（起動時の検査 `isInFlightStalenessLongerThanTwiceLockAtMostFor` の約束）。 | 処理中の出版がまた再投入の対象になる。             |
 
@@ -67,7 +67,7 @@ git diff --stat "$(sed -n 's/^同期コミット：`\([0-9a-f]*\)`.*/\1/p' "$ski
   backend/build.gradle
 ```
 
-`application.yaml` は `spring.modulith.events`（`completion-mode`、`staleness`）、`spring.task.execution`、`spring.task.scheduling`、`spring.threads.virtual`、`event-publication.resubmission` の節だけ、`build.gradle` は `springModulithVersion`、ShedLock、Spring Boot の版だけが関わる。
+`application.yaml` は `spring.modulith.events`（`completion-mode`、`staleness`、`resubmission`）、`spring.task.execution`、`spring.task.scheduling`、`spring.threads.virtual`、`event-publication.resubmission` の節だけ、`build.gradle` は `springModulithVersion`、ShedLock、Spring Boot の版だけが関わる。
 `spring.threads.virtual.enabled` のとき Spring Boot が使う `SimpleAsyncTaskScheduler` は、fixed delay のタスクを一つのスレッドで順に動かすため、同じインスタンスの再投入のジョブと Staleness Monitor は重ならない。
 スケジューラを変えて二つが重なるようになったら、モデルの `ThreadFree` を直す。
 
@@ -85,12 +85,12 @@ git diff --stat "$(sed -n 's/^同期コミット：`\([0-9a-f]*\)`.*/\1/p' "$ski
 | `StaleMark`  | 同じメソッドが読んだ一覧の各行に呼ぶ `JdbcEventPublicationRepositoryV2.markFailed(id)`（`completion_date IS NULL AND status != 'FAILED'` の UPDATE。状態と日時を確かめ直さない）                                           |
 | `ExecStart`  | `CompletionRegisteringMethodInterceptor` → `markProcessing`。配信は `spring.task.execution` の executor の空きを待ってから始まる                                                                                             |
 | `ExecSucceed` | `markCompleted`（archive への写しと削除）                                                                                                                                                                                   |
-| `ExecFail`   | `markFailed` → `markFailedOrAbandoned`。`ResubmissionPolicies.shouldAbandon` が行の `completion_attempts` を読み、`max-resubmissions` を超えたら `markAbandoned`（archive へ `ABANDONED` で写して削除。状態を確かめない）、超えなければ `markFailed`（`status != 'FAILED'` の UPDATE） |
+| `ExecFail`   | `markFailed` → `markFailedOrAbandoned`。`AbandonPolicies` の既定（`ResubmissionProperties.shouldAbandon`）が、渡された出版の `getCompletionAttempts()`（配信の `seen`。最初の配信は 1、再投入は `RunRead` で読んだ値）を `abandon-after-attempts` と比べ、それ以上なら `markAbandoned`（archive へ `ABANDONED` で写して削除。状態を確かめない）、未満なら `markFailed`（`status != 'FAILED'` の UPDATE） |
 | `Crash`      | インスタンスの停止。ロックの行は `lock_until` まで残り、そのインスタンスの配信と Staleness Monitor の印は付かずに消える                                                                                                     |
 | `Restart`    | 再起動。再投入の最初の回は `initialDelay` = `interval` の後                                                                                                                                                                  |
 | `Tick`       | 時間を 1 進める。定期の実行の時刻、実行と配信の期限、Staleness Monitor の読む期限（`interval` + 1 回の実行）と印を付ける期限（読んでから 1 回の実行）に来た操作が先に動く                                                  |
 
-定数のうち、`Interval`、`LockAtMostFor`、`WaitAge`、`Multiplier`、`MaxWait`、`MaxResubmissions`、`InFlightStaleness` は設定値で、モデルの `ASSUME` が起動時の検査（`Properties` の `@AssertTrue`）と同じ条件を課す。
+定数のうち、`Interval`、`LockAtMostFor`、`WaitAge`、`Multiplier`、`MaxWait`、`MaxResubmissions`（`abandon-after-attempts`）、`InFlightStaleness` は設定値で、モデルの `ASSUME` が起動時の検査（`Properties` の `@AssertTrue` と `AbandonProperties` の `@Min(2)`）と同じ条件を課す。
 `QueueMax <= LockAtMostFor` と `ListenerMax <= LockAtMostFor` は検査でなく前提で、ADR-079 が置いている。
 最初の配信の空きの待ちが `wait-age` を超えると、`PUBLISHED` の出版を処理中に `FAILED` に戻しうる。
 `application.yaml` の注記が既知としてリスナーの冪等性に頼っているため、どの設定も `QueueMax < WaitAge` にしている。
@@ -113,10 +113,11 @@ git diff --stat "$(sed -n 's/^同期コミット：`\([0-9a-f]*\)`.*/\1/p' "$ski
   1 回の実行が三つの状態を順に読むことは、読む時刻を選べることで代える。
 - 手での 1 回の再投入（`EventPublicationResubmitOnce`）は扱わない。
   同じロックを取る運用者の入口で、待ち時間と回数の上限を見ない。
-- `ResubmissionTracker` の数え方とメトリクス、上限到達の ERROR のログは扱わない。
+- `ResubmissionTracker` の数え方とメトリクス、上限到達の ERROR と上限を超えた `FAILED` の件数の ERROR のログは扱わない。
 - `ABANDONED` は、`ARCHIVED` と同じく行が未完了の表から消えた終端の状態として扱う。
-  `ResubmissionsCapped` は、`AbandonPolicy` を外しても `ResubmissionPolicies.isDue` の回数の条件だけで守られる。
+  `ResubmissionsCapped` は、`ABANDONED` にする判断を外しても `ResubmissionPolicies.isDue` の回数の条件だけで守られる。
   失敗を記録しない試行（停止、Staleness Monitor の遅れた印）で上限を超えて `FAILED` に戻った出版は、`AbandonPolicy` が呼ばれないためである（変異 `is-due-ignores-cap`）。
+  古い一覧から再投入した出版は、渡される回数が行の回数より小さく、失敗しても `ABANDONED` にならずに `FAILED` に残りうる。
 - 落ちたまま `PROCESSING` に残った出版は、最後の出版か再投入から `in-flight-staleness` まで回復しない。
 - `ModuleRoleTransactionManager` のトランザクションごとのロールの切り替えは、ロックと状態の順序を変えないため扱わない。
 
@@ -162,5 +163,5 @@ git diff --stat "$(sed -n 's/^同期コミット：`\([0-9a-f]*\)`.*/\1/p' "$ski
 
 同期コミット：`91119568e0d323a37290e4474028c0c9c3a9b77a`（main。#562 の Pull Request の土台）
 
-#562 の Pull Request のコードで、「変更がこの検証に関わるか」のファイルと対応表がモデルと一致することを確かめた。
-読んだライブラリは、Spring Modulith 2.2.0 の `DefaultEventPublicationRegistry`（`markFailedOrAbandoned`、`markStalePublicationsFailed`）、`AbandonPolicies`、`JdbcEventPublicationRepositoryV2`（`markAbandoned`、`markResubmitted`、`markFailed`）、`CompletionRegisteringAdvisor`（`CompletionRegisteringMethodInterceptor`、`spring.modulith.events.completion: in-interceptor`）、`PersistentApplicationEventMulticaster`、`StalenessMonitorConfiguration`、`ResubmissionOptions`、ShedLock 7.11.0 の `JooqStorageAccessor`、Spring Framework 7.0.10 の `SimpleAsyncTaskScheduler`、Spring Boot 4.1.2 の `DefaultTaskSchedulerConfiguration` である。
+#562 の Pull Request のコード（回数の上限を `abandon-after-attempts` に任せた後）で、「変更がこの検証に関わるか」のファイルと対応表がモデルと一致することを確かめた。
+読んだライブラリは、Spring Modulith 2.2.0 の `DefaultEventPublicationRegistry`（`markFailedOrAbandoned`、`markStalePublicationsFailed`）、`AbandonPolicies`、`ResubmissionProperties`、`DefaultEventPublication`、`JdbcEventPublicationRepositoryV2`（`markAbandoned`、`markResubmitted`、`markFailed`）、`CompletionRegisteringAdvisor`（`CompletionRegisteringMethodInterceptor`、`spring.modulith.events.completion: in-interceptor`）、`PersistentApplicationEventMulticaster`、`StalenessMonitorConfiguration`、`ResubmissionOptions`、ShedLock 7.11.0 の `JooqStorageAccessor`、Spring Framework 7.0.10 の `SimpleAsyncTaskScheduler`、Spring Boot 4.1.2 の `DefaultTaskSchedulerConfiguration` である。

@@ -28,7 +28,7 @@ NoPub == "NONE"
 \* The row left event_publication: archive mode copies it to
 \* event_publication_archive and deletes it.
 Archived == "ARCHIVED"
-\* ResubmissionPolicies (AbandonPolicy) gave up on the publication; archive
+\* Spring Modulith (abandon-after-attempts) gave up on the publication; archive
 \* mode copies it to the archive as ABANDONED and deletes the row.
 Abandoned == "ABANDONED"
 RowStatus == {"PUBLISHED", "PROCESSING", "FAILED", "RESUBMITTED"}
@@ -241,11 +241,13 @@ DMarkCompleted(d) ==
                  dres, launched, rpc>>
 
 \* DefaultEventPublicationRegistry.markFailed finds this delivery's entry in
-\* PublicationsInProgress and runs markFailedOrAbandoned. When the row's
-\* completion_attempts (launched) is past max-resubmissions (launched =
-\* MaxDeliveries), ResubmissionPolicies.shouldAbandon returns ABANDON and
-\* JdbcEventPublicationRepositoryV2.markAbandoned moves the row to the
-\* archive. Otherwise JdbcEventPublicationRepositoryV2
+\* PublicationsInProgress and runs markFailedOrAbandoned. The default
+\* AbandonPolicy compares getCompletionAttempts() of the publication it was
+\* handed with abandon-after-attempts (MaxDeliveries - 1): delivery d hands
+\* d - 1, the value RPick read before RClaim, and the first delivery hands 1
+\* (ResubmissionOptionsLearningTest). So only the last delivery d =
+\* MaxDeliveries is abandoned, and JdbcEventPublicationRepositoryV2
+\* .markAbandoned moves the row to the archive. Otherwise JdbcEventPublicationRepositoryV2
 \* .markFailed: UPDATE ... SET status = 'FAILED' WHERE id = ? AND
 \* completion_date IS NULL AND status != 'FAILED'. The entry is always
 \* there: PublicationsInProgress.Key compares events by identity, the first
@@ -255,7 +257,7 @@ DMarkCompleted(d) ==
 DMarkFailed(d) ==
   /\ dpc[d] = "markFailed"
   /\ pub' = IF ~RowExists THEN pub
-            ELSE IF launched = MaxDeliveries THEN Abandoned
+            ELSE IF d = MaxDeliveries THEN Abandoned
             ELSE "FAILED"
   /\ dpc' = [dpc EXCEPT ![d] = "done"]
   /\ UNCHANGED <<orderStatus, orderLock, cmdPc, cmdLock, payments, gateway,
@@ -290,7 +292,7 @@ Stale ==
 
 \* EventPublicationResubmitter.resubmit -> FailedEventPublications.resubmit
 \* reads FAILED rows and ResubmissionPolicies.isDue accepts this one.
-\* MaxDeliveries stands in for max-resubmissions + 1 (the first delivery).
+\* MaxDeliveries stands in for abandon-after-attempts + 1 (the first delivery).
 RPick ==
   /\ rpc = "idle"
   /\ pub = "FAILED"

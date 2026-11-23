@@ -109,7 +109,7 @@ git diff --name-only --diff-filter=A "$(sed -n 's/^同期コミット：`\([0-9a
 | `DReply`          | `PaymentGatewayClient.charge` の戻り値（`toOutcome`、`contractError`）か例外（タイムアウト、5xx、401、403、429）                                                                                    |
 | `DInsert`         | `Payment.record`、`JooqPaymentRepository.add` → `TableWriter.insert` とリスナーのトランザクションのコミット。`uk_2_t_payment` が二件目を拒む                                                        |
 | `DMarkCompleted`  | `DefaultEventPublicationRegistry.markCompleted`（archive への写しと削除）                                                                                                                          |
-| `DMarkFailed`     | `DefaultEventPublicationRegistry.markFailed` → `markFailedOrAbandoned`。`PublicationsInProgress` のこの配信の登録は、ほかの配信が外さないため、必ず判断する。`completion_attempts`（`launched`）が `max-resubmissions` を超えたら（`launched = MaxDeliveries`）`ResubmissionPolicies.shouldAbandon` が `ABANDON` を返して archive へ `ABANDONED` で移し、超えなければ `status != 'FAILED'` の UPDATE を実行する |
+| `DMarkFailed`     | `DefaultEventPublicationRegistry.markFailed` → `markFailedOrAbandoned`。`PublicationsInProgress` のこの配信の登録は、ほかの配信が外さないため、必ず判断する。`AbandonPolicies` の既定が、渡された出版の `getCompletionAttempts()`（配信 `d` では `d - 1`、最初の配信では 1）を `abandon-after-attempts` と比べ、それ以上なら（`d = MaxDeliveries`）archive へ `ABANDONED` で移し、未満なら `status != 'FAILED'` の UPDATE を実行する |
 | `DCrash`          | 配信の途中のプロセスの停止。リスナーのトランザクションはロールバックする                                                                                                                           |
 | `Stale`           | `DefaultEventPublicationRegistry.markStalePublicationsFailed`（`spring.modulith.events.staleness.*`、`last_resubmission_date` から測る）                                                           |
 | `RPick`、`RClaim` | `EventPublicationResubmitter.resubmit` か `EventPublicationResubmitOnce.run` → `FailedEventPublications.resubmit`、`JdbcEventPublicationRepositoryV2.markResubmitted`（`status != 'RESUBMITTED'` の UPDATE） |
@@ -129,7 +129,7 @@ git diff --name-only --diff-filter=A "$(sed -n 's/^同期コミット：`\([0-9a
   判定はモデルの外の約束である。
 - 明細の変更（`ChangeOrderLinesCommandHandler`）、金額の正しさ、HTTP の層、認証、複数の注文の間の干渉は扱わない。
 - 手での再投入（`EventPublicationResubmitOnce`）は、定期の再投入と同じ `markResubmitted` を通るため、`RPick` と `RClaim` に含まれる。
-  配信の数の上限は `MaxDeliveries`（`max-resubmissions` + 1）で、上限の配信が失敗すると出版は `ABANDONED` になる。
+  配信の数の上限は `MaxDeliveries`（`abandon-after-attempts` + 1）で、上限の配信が失敗すると出版は `ABANDONED` になる。
 - `ResubmissionTracker` の上限到達の記録とメトリクスは扱わない。
 - テナントは一つとし、行のセキュリティ（RLS）のポリシーは扱わない。
   リスナーは `TenantListenerAspect` がイベントの `tenantId` を束縛してから動く。
@@ -165,5 +165,5 @@ git diff --name-only --diff-filter=A "$(sed -n 's/^同期コミット：`\([0-9a
 
 同期コミット：`91119568e0d323a37290e4474028c0c9c3a9b77a`（main。#562 の Pull Request の土台）
 
-#562 の Pull Request のコードで、「変更がこの検証に関わるか」のファイルと対応表がモデルと一致することを確かめた。
-読んだライブラリは、Spring Modulith 2.2.0 の `DefaultEventPublicationRegistry`（`PublicationsInProgress`、`markFailedOrAbandoned`）、`JdbcEventPublicationRepositoryV2`（`markAbandoned`）、`CompletionRegisteringAdvisor`（`CompletionRegisteringMethodInterceptor`、`spring.modulith.events.completion: in-interceptor`）、`PersistentApplicationEventMulticaster`、`DefaultFailedEventPublications` である。
+#562 の Pull Request のコード（回数の上限を `abandon-after-attempts` に任せた後）で、「変更がこの検証に関わるか」のファイルと対応表がモデルと一致することを確かめた。
+読んだライブラリは、Spring Modulith 2.2.0 の `DefaultEventPublicationRegistry`（`PublicationsInProgress`、`markFailedOrAbandoned`）、`AbandonPolicies`、`ResubmissionProperties`、`JdbcEventPublicationRepositoryV2`（`markAbandoned`）、`CompletionRegisteringAdvisor`（`CompletionRegisteringMethodInterceptor`、`spring.modulith.events.completion: in-interceptor`）、`PersistentApplicationEventMulticaster`、`DefaultFailedEventPublications` である。
