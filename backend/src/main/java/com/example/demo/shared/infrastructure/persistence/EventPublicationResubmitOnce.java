@@ -1,13 +1,12 @@
 package com.example.demo.shared.infrastructure.persistence;
 
-import static com.example.demo.jooq.modulith.Tables.EVENT_PUBLICATION;
-import static com.example.demo.jooq.modulith.Tables.EVENT_PUBLICATION_ARCHIVE;
-
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.Collection;
+import java.util.EnumSet;
 import java.util.List;
-import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -53,7 +52,11 @@ public class EventPublicationResubmitOnce {
   private static final String EVENT_TYPE_PREFIX = "event-type:";
 
   /** 処理が終わっていない状態。 */
-  private static final List<String> IN_FLIGHT = List.of("PUBLISHED", "PROCESSING", "RESUBMITTED");
+  private static final Set<EventPublication.Status> IN_FLIGHT =
+      EnumSet.of(
+          EventPublication.Status.PUBLISHED,
+          EventPublication.Status.PROCESSING,
+          EventPublication.Status.RESUBMITTED);
 
   /** Spring Boot が構成した jOOQ。 */
   private final DSLContext dsl;
@@ -207,36 +210,23 @@ public class EventPublicationResubmitOnce {
   /**
    * 再投入した出版の処理が終わるまで待ち、結果を数える。完了した出版は archive の {@code COMPLETED} の行で数える。
    *
-   * <p>回数の上限を超えて失敗した出版も、{@code ABANDONED} として未完了の表から archive へ移るため、未完了の表に残った行では数えない。
+   * <p>回数の上限を超えて失敗した出版は、{@code ABANDONED} で archive へ移り、完了と数えない。
    */
   private Outcome awaitCompletion(final List<UUID> ids, final int remaining) {
     final int polls = pollsWithin(onceProperties.completionTimeout());
-    for (int poll = 0; poll < polls && inFlight(countByStatus(ids)) > 0; poll++) {
+    for (int poll = 0; poll < polls && count(ids, IN_FLIGHT) > 0; poll++) {
       sleep();
     }
-    final int completed =
-        dsl.fetchCount(
-            EVENT_PUBLICATION_ARCHIVE,
-            EVENT_PUBLICATION_ARCHIVE
-                .ID
-                .in(ids)
-                .and(EVENT_PUBLICATION_ARCHIVE.STATUS.eq("COMPLETED")));
+    final int completed = count(ids, EnumSet.of(EventPublication.Status.COMPLETED));
     return new Outcome(ids.size(), completed, ids.size() - completed, remaining);
   }
 
-  private Map<String, Integer> countByStatus(final List<UUID> ids) {
-    if (ids.isEmpty()) {
-      return Map.of();
-    }
-    return dsl.select(EVENT_PUBLICATION.STATUS, org.jooq.impl.DSL.count())
-        .from(EVENT_PUBLICATION)
-        .where(EVENT_PUBLICATION.ID.in(ids))
-        .groupBy(EVENT_PUBLICATION.STATUS)
-        .fetchMap(record -> String.valueOf(record.value1()), record -> record.value2());
-  }
-
-  private static int inFlight(final Map<String, Integer> byStatus) {
-    return IN_FLIGHT.stream().mapToInt(status -> byStatus.getOrDefault(status, 0)).sum();
+  /** 出版のうち、状態が {@code statuses} のどれかの数。 */
+  private int count(final List<UUID> ids, final Collection<EventPublication.Status> statuses) {
+    return (int)
+        EventPublicationStates.read(dsl, ids).values().stream()
+            .filter(state -> statuses.contains(state.status()))
+            .count();
   }
 
   /**
