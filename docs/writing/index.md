@@ -10,5 +10,5 @@
 - [使いやすく古びにくい文書](technical-writing-maintainability.md)：手順書、Runbook、README、環境構築の文書でコマンド、リンク、バージョン、GUI 操作を書くとき
 - [文書のセルフレビュー、レビュー依頼、フィードバック](technical-writing-review.md)：文書のレビューを依頼するとき、他者の文書へフィードバックするとき
 - [設計書と正本の分担](design-doc-sources-of-truth.md)：設計書を書くとき、API、テーブル、区分値、メッセージ、画面の見た目を設計書に書くか迷ったとき
-- [機能の設計書の構成](design-doc-feature-specs.md)：画面、Web API、非同期処理、I/F の設計書を新しく書くとき、既存の設計書に節を追加するとき
+- [機能の設計書の構成](design-doc-feature-specs.md)：画面、Web API、非同期処理、I/F、バッチの設計書を新しく書くとき、既存の設計書に節を追加するとき
 - [設計書の図](design-doc-diagrams.md)：シーケンス図、ER 図、システム構成図を設計書や docs に追加するとき

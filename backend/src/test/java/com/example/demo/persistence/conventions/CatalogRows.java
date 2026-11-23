@@ -2,6 +2,8 @@ package com.example.demo.persistence.conventions;
 
 import com.example.demo.persistence.conventions.CatalogSnapshot.ColumnRow;
 import com.example.demo.persistence.conventions.CatalogSnapshot.IndexRow;
+import com.example.demo.persistence.conventions.CatalogSnapshot.LogicalName;
+import com.example.demo.persistence.conventions.CatalogSnapshot.Origin;
 import com.example.demo.persistence.conventions.CatalogSnapshot.PolicyRow;
 import com.example.demo.persistence.conventions.CatalogSnapshot.RelationRow;
 import java.util.List;
@@ -61,13 +63,29 @@ final class CatalogRows {
         null);
   }
 
-  /** RLSのENABLEとFORCEを付けたテーブル。 */
+  /** RLSのENABLEとFORCEを付けた、論理名が「品目」のテーブル。 */
   /* package */ static RelationRow tenantTable(
       final String schema, final String table, final String primaryKey) {
-    return new RelationRow(schema, table, "r", primaryKey, null, true, true);
+    return tableRow(schema, table, "r", primaryKey, new LogicalName("品目", Origin.PLAIN));
   }
 
-  /** トランザクションのテナントを既定値にした、uuidのNOT NULLのテナントの列。 */
+  /** RLSのENABLEとFORCEを付けた、論理名が{@code logicalName}のテーブル。 */
+  /* package */ static RelationRow tableRow(
+      final String schema,
+      final String table,
+      final String relkind,
+      final String primaryKey,
+      final LogicalName logicalName) {
+    return new RelationRow(schema, table, relkind, primaryKey, null, true, true, logicalName);
+  }
+
+  /** bigintのIDENTITYのNOT NULLの、論理名が{@code logicalName}のカラム。 */
+  /* package */ static ColumnRow columnRow(
+      final String schema, final String table, final String column, final LogicalName logicalName) {
+    return new ColumnRow(schema, table, column, BIGINT, "b", "a", "", null, true, logicalName);
+  }
+
+  /** トランザクションのテナントを既定値にした、uuidのNOT NULLの、論理名のコメントを付けたテナントの列。 */
   /* package */ static ColumnRow tenantColumn(final String schema, final String table) {
     return new ColumnRow(
         schema,
@@ -78,7 +96,8 @@ final class CatalogRows {
         "",
         "",
         TenantIsolation.CATALOG_TENANT_DEFAULT,
-        true);
+        true,
+        new LogicalName("テナント公開ID", Origin.PLAIN));
   }
 
   /** テナントの設定と行のテナントを比べる、PUBLICへの許可のポリシー。 */

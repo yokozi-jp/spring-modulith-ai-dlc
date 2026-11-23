@@ -19,7 +19,7 @@ tags: [convention, web-api, infrastructure, future-arch-guidelines]
 ## 入口に持たせる機能
 
 - **レート制限**：大量の呼び出しを遮断し、超過したら`429 Too Many Requests`と`Retry-After`ヘッダーを返す。
-- **リクエストサイズの上限**：巨大なヘッダーと本文を拒否する。アプリケーションへ届いた超過は413を返す。
+- **リクエストサイズの上限**：巨大なヘッダーと本文を拒否する。アプリケーションへ届いた本文の超過は413を返す。ヘッダーの超過は[アプリより前に拒否される要求](#アプリより前に拒否される要求)になる。
 - **低速な送信への対策**：本文を少しずつ送り続けて接続を占有する攻撃（Slow DoS）を遮断する。
 - **応答の圧縮**：JSONの応答をgzipで圧縮する。
 - **攻撃文字列の検知**：SQLインジェクションやXSSの文字列を検知する。
@@ -27,6 +27,16 @@ tags: [convention, web-api, infrastructure, future-arch-guidelines]
 攻撃文字列の検知は第二防御であり、アプリケーションでもSQLのパラメータをバインドし、HTMLへの出力をエスケープする。
 認証と認可は入口に持たせず、[ADR-007](../adr/ADR-007-session-based-auth-with-oidc-pkce.md)に従いアプリケーションで行う。
 応答のキャッシュは[APIのリクエストヘッダーとレスポンスヘッダー](headers.md)の`Cache-Control`に従う。
+
+## アプリより前に拒否される要求
+
+入口を通っても、Tomcatは、リクエスト行とヘッダーの合計が`server.max-http-request-header-size`（既定8KB）を超えると、アプリへ渡さず`text/html`の400を返す。
+HTTPバージョンが不正な要求には、同じく`text/html`の505を返す。
+どちらもProblem Detailsにならず、Spring Bootの設定でProblem Detailsにする方法は見つかっていない。
+RFC 9112 3は、実装が解釈しない長さのrequest-targetに414を求める（MUST）が、Tomcatは414を返さない。
+同じ節は、実装が少なくとも8000オクテットのリクエスト行を受け付けることを推奨する（RECOMMENDED）が、これは最小の長さであり、上限ではない。
+入口の上限（ALBなど）は、Tomcatより先に効くことがあり、確かめていない。
+8KBを超えるURLを作るエンドポイントは、POSTで検索する（[検索にPOSTを使う条件](http-methods.md#検索にpostを使う条件)）。
 
 ## 入口に持たせない機能
 

@@ -7,6 +7,7 @@ import static com.example.demo.persistence.conventions.CatalogRows.ITEM_ID;
 import static com.example.demo.persistence.conventions.CatalogRows.MODULITH;
 import static com.example.demo.persistence.conventions.CatalogRows.TABLE;
 import static com.example.demo.persistence.conventions.CatalogRows.UUID;
+import static com.example.demo.persistence.conventions.CatalogRows.columnRow;
 import static com.example.demo.persistence.conventions.CatalogRows.index;
 import static com.example.demo.persistence.conventions.CatalogRows.keys;
 import static com.example.demo.persistence.conventions.CatalogRows.tenantColumn;
@@ -18,7 +19,9 @@ import com.example.demo.persistence.conventions.CatalogSnapshot.ColumnRow;
 import com.example.demo.persistence.conventions.CatalogSnapshot.ConstraintRow;
 import com.example.demo.persistence.conventions.CatalogSnapshot.FunctionRow;
 import com.example.demo.persistence.conventions.CatalogSnapshot.IndexRow;
+import com.example.demo.persistence.conventions.CatalogSnapshot.LogicalName;
 import com.example.demo.persistence.conventions.CatalogSnapshot.ModuleRoleRow;
+import com.example.demo.persistence.conventions.CatalogSnapshot.Origin;
 import com.example.demo.persistence.conventions.CatalogSnapshot.RelationPrivilegeRow;
 import com.example.demo.persistence.conventions.CatalogSnapshot.RelationRow;
 import com.example.demo.persistence.conventions.CatalogSnapshot.RoleRow;
@@ -71,7 +74,7 @@ class SchemaConventionsTest {
         new CatalogSnapshot(
             List.of(tenantTable(ITEM, TABLE, ITEM_ID), relation(MODULITH, "r", false, null)),
             List.of(
-                column(ITEM, BIGINT, "b", "a", "", null),
+                columnRow(ITEM, TABLE, ITEM_ID, new LogicalName("品目ID", Origin.PLAIN)),
                 tenantColumn(ITEM, TABLE),
                 column(MODULITH, INTEGER, "b", "", "", "nextval('x'::regclass)")),
             List.of(

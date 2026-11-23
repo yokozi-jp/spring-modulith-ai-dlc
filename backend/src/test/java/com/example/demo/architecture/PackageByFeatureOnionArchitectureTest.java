@@ -415,7 +415,7 @@ class PackageByFeatureOnionArchitectureTest {
                 + "だけである。"
                 + "直し方：shared の型を使う処理を <モジュール>.infrastructure.persistence の "
                 + "Jooq<Aggregate>Repository へ移し、Application と Domain からは Repository を通して使う。"
-                + "規約：docs/backend/architecture.md、"
+                + "規約：docs/backend/shared-module.md、"
                 + ADR_048);
   }
 
@@ -433,7 +433,7 @@ class PackageByFeatureOnionArchitectureTest {
                 + "直し方：業務上の失敗は shared.failure の NotFoundException、BusinessRuleViolationException と "
                 + "shared.concurrency の ConflictException で表し、"
                 + "HTTP のステータスへの対応づけは error の ApiExceptionHandler に置く。"
-                + "規約：docs/backend/architecture.md、docs/backend/class-roles/business-exception.md");
+                + "規約：docs/backend/shared-module.md、docs/backend/class-roles/business-exception.md");
   }
 
   /** 機能ルートの型が標準型、JSpecify、同じルートパッケージの型だけに依存することを強制する規則を組み立てる。 */

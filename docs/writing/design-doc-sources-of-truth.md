@@ -8,7 +8,7 @@ tags: [convention, writing, design-doc, documentation, future-arch-guidelines]
 # 設計書と正本の分担
 
 設計書には、正本から読み取れない情報だけを書き、正本の内容を書き写さない。
-API の契約は OpenAPI、テーブル定義は Liquibase の changeset、区分値とメッセージはソースコード、画面の見た目はデザインツールのファイルを正本にする。
+API の契約は OpenAPI、テーブル定義（表と列の論理名を含む）は Liquibase の changeset、区分値とメッセージはソースコード、画面の見た目はデザインツールのファイルを正本にする。
 列が多く横に読めない表を Markdown で保守しない。
 
 ## 用語
@@ -22,7 +22,9 @@ API の契約は OpenAPI、テーブル定義は Liquibase の changeset、区�
 
 - **Web API のパス、パラメータ、リクエストとレスポンスの項目、エラー応答**：コードから springdoc-openapi が生成する OpenAPI（[ADR-013](../adr/ADR-013-standardize-http-api-contracts.md)）。`openapi.yaml` を手で書かない。
 - **単項目の入力検証**：リクエスト DTO の Bean Validation の制約と、そこから生成される OpenAPI スキーマ（[API の入力検証の配置](../web-api/validation.md)）。
-- **テーブル、カラム、制約、インデックス**：Liquibase の changeset（[DB マイグレーション規約](../database/migrations.md)）。テーブル定義書を別に作らない。
+- **テーブル、カラム、制約、インデックス、表と列の論理名**：Liquibase の changeset（[DB マイグレーション規約](../database/migrations.md)）。
+  論理名は changeset の `remarks` に書く。
+  テーブル定義書を別に作らない。
 - **区分値と名称の対応**：ソースコードまたは定義ファイル（[PostgreSQL の論理設計](../database/postgresql-logical-design.md)）。区分値の一覧表を設計書に作らない。
 - **区分値の表示名と画面の固定文言**：フロントエンドの message catalog（[フロントエンドの国際化](../frontend/i18n.md)）。
 - **API が返す文言と問題種別**：バックエンドの `MessageSource` と Problem Details の `type`（[ADR-013](../adr/ADR-013-standardize-http-api-contracts.md)、[ADR-016](../adr/ADR-016-localize-api-and-spa-messages.md)）。メッセージ定義表を設計書に作らない。
@@ -37,7 +39,7 @@ API の契約は OpenAPI、テーブル定義は Liquibase の changeset、区�
 - 処理の目的、処理の流れ、計算式、条件分岐の業務ルール。
 - 複数項目の組み合わせや DB の参照が必要な入力検証の業務ルール。
 - 区分値を導入した目的と、区分値で分岐する業務ルール。
-- テーブルの保持期限と個人情報を含むかどうかは、[テーブルごとの保持期限と個人情報の有無の一覧](../database/table-retention-and-personal-data.md)に書く。
+- テーブルの保持期限と、個人データ（[PostgreSQL のテーブル論理設計](../database/postgresql-logical-design.md#個人データ)）を含むかどうかは、[テーブルごとの保持期限と個人データの有無の一覧](../database/table-retention-and-personal-data.md)に書く。
 
 ## 正本から作る補足
 

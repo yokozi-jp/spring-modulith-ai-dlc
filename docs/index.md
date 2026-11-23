@@ -10,6 +10,7 @@ okf_version: '0.2'
 - [データベース](database/index.md)：マイグレーション、jOOQ コード生成、DB 接続、DB のデプロイと切り戻しを扱うとき
 - [Web API](web-api/index.md)：HTTP API のパス、メソッド、パラメータ、応答、ステータスコード、互換性を設計または変更するとき
 - [システム連携と非同期処理](integration/index.md)：非同期のイベントやジョブ、別システムとのファイル連携やメッセージ連携を設計するとき
+- [バッチ](batch/index.md)：締め、集計、ファイルの配信と集信のような業務のバッチを Spring Batch で作るとき、起動、追いつき、再開、オンラインとの排他、テストを決めるとき
 - [可観測性とログ](observability/index.md)：ログのレベル、メッセージ、出力箇所、量を決めるとき、可観測性データの規約や PII 混入時の対応を確認するとき
 - [日時](datetime/index.md)：日時の保存、API の日時表現、表示、日時のテストを扱うとき
 - [コンテナ](container/index.md)：Dockerfile、.dockerignore、Compose ファイルを書く、または直すとき
@@ -20,6 +21,7 @@ okf_version: '0.2'
 - [非機能要件](nfr/index.md)：可用性、耐障害性、災害対策などの非機能要件を定義、合意するとき
 - [性能テスト](performance-test/index.md)：性能テストを計画、実施、分析、報告するとき
 - [帳票](report/index.md)：PDF、Excel、紙の帳票を作るか判断するとき、帳票を設計するとき
+- [メール](mail/index.md)：システムが送るメールの宛先と本文、送信ドメイン、到達性の監視、メールアドレスの扱い、メールのテストを決めるとき
 - [コードレビュー](code-review/index.md)：人またはエージェントが変更の内容をレビューして、問題を探すとき
 - [Pull Request](pull-request/index.md)：Pull Request を作る、分ける、本文を書く、Ready for review にする、レビュアーとしてコメントする、マージするとき
 - [ナレッジ管理](knowledge/index.md)：docs や steering を追加、分割、移動するとき、知識をどこに書くか迷ったとき

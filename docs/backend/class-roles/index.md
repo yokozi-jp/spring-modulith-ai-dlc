@@ -15,6 +15,10 @@
 - [クラスの役割：Result](result.md)：CommandHandler が返す結果の record を作るとき、作成の応答の Location を作るとき
 - [クラスの役割：QueryService](query-service.md)：参照のインタフェースを実装するとき、参照のメソッドを足すとき
 - [クラスの役割：Listener](listener.md)：他モジュールのイベントを受けて自モジュールの状態を変えるとき、外部システムの呼び出しをイベントで始めるとき
+- [クラスの役割：Job の設定](job-config.md)：業務のバッチの Job と Step を定義するとき、Step のトランザクション、期間の規則、partition、retry を決めるとき
+- [クラスの役割：ItemReader](item-reader.md)：Job が DB から読む行の選び方を作るとき
+- [クラスの役割：ItemWriter](item-writer.md)：Job の chunk の 1 件ごとの書き込みを作るとき
+- [クラスの役割：Tasklet](tasklet.md)：Job の中で行を数えずに 1 回だけ行う処理を作るとき
 - [クラスの役割：業務上の失敗の例外](business-exception.md)：見つからない、業務規則の違反、競合を例外で表すとき、例外と HTTP のステータス、ログ、Listener での扱いを確かめるとき
 - [クラスの役割：Controller](controller.md)：HTTP API のエンドポイントを作るとき、ステータスコードと Location を確かめるとき
 - [クラスの役割：Request](request.md)：リクエストボディを受ける操作の入力と形式の検証を作るとき

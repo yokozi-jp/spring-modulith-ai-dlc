@@ -6,8 +6,8 @@
 - [jOOQのSQLの書き方](jooq-usage.md)：infrastructure.persistenceでjOOQのクエリを書くとき、jOOQのSettingsを変えたくなったとき、jOOQかSpring Bootの版を上げるとき（「jOOQの版を上げるとき」）
 - [DB接続情報とロール分離](connections.md)：接続用の環境変数やDBロールを追加、変更するとき、ステージングや本番のDBを準備するとき
 - [DBのデプロイと切り戻し](runbook-deploy-and-rollback.md)：本番マイグレーションのパイプラインを組むとき、DBを切り戻すとき
-- [PostgreSQLのテーブル論理設計](postgresql-logical-design.md)：業務テーブルを新しく設計するとき、区分値、論理削除、多言語データの持ち方を決めるとき
-- [PostgreSQLの命名規約](postgresql-naming.md)：テーブル、カラム、インデックス、シーケンス、外部キー、RLSのポリシーの物理名を決めるとき
+- [PostgreSQLのテーブル論理設計](postgresql-logical-design.md)：業務テーブルを新しく設計するとき、区分値、論理削除、個人データ、多言語データの持ち方を決めるとき
+- [PostgreSQLの命名規約](postgresql-naming.md)：テーブル、カラム、インデックス、シーケンス、外部キー、RLSのポリシーの物理名を決めるとき、表と列の論理名のコメントを書くとき
 - [PostgreSQLのデータ型](postgresql-data-types.md)：カラムのデータ型を選ぶとき、changesetの型をレビューするとき
 - [PostgreSQLの主キー](postgresql-primary-keys.md)：主キーの種類や採番方式を決めるとき、IDをURLやAPIに出すとき
 - [PostgreSQLの制約とインデックス](postgresql-constraints-and-indexes.md)：制約やインデックスを追加するとき、表どうしの参照を足すとき、性能対策でインデックスを見直すとき
@@ -16,7 +16,7 @@
 - [PostgreSQLのマルチテナント設計](postgresql-multitenancy.md)：業務テーブルを足すとき、RLSのポリシーやテナントの設定を変えるとき、全テナントの行を書き換える処理を書くとき、テナントの分離方式を見直すとき
 - [PostgreSQLのテーブル以外のDBオブジェクト](postgresql-database-objects.md)：関数、トリガー、ビュー、一時テーブルを作るとき、他システムのDBとつなぐ要件が出たとき
 - [PostgreSQLのパーティションと改廃](postgresql-partitioning-and-retention.md)：大量データのトランを設計するとき、保持期限を過ぎたデータの削除を作るとき
-- [テーブルごとの保持期限と個人情報の有無の一覧](table-retention-and-personal-data.md)：テーブルを追加または削除する changeset を書くとき、保持期限や個人情報の扱いを決めるとき、データの削除を実装するとき
+- [テーブルごとの保持期限と個人データの有無の一覧](table-retention-and-personal-data.md)：テーブルを追加または削除する changeset を書くとき、保持期限や個人データの扱いを決めるとき、データの削除を実装するとき
 - [PostgreSQLの排他制御](postgresql-concurrency-control.md)：業務テーブルのINSERTかUPDATEを書くとき（集約の保存、ロックの方式の選び方、ロック待ちの失敗）、分離レベルを変えたくなったとき
 - [PostgreSQLの性能対策と負荷分散](postgresql-performance.md)：スロークエリを調整するとき、リードレプリカやキャッシュの導入を検討するとき
 - [PostgreSQLのロックを抑えるスキーマ変更](postgresql-online-schema-change.md)：稼働中のテーブルを変更するchangesetを書くとき、レビューするとき

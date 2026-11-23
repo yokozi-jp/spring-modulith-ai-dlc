@@ -9,7 +9,7 @@ import { createRoot } from "react-dom/client";
 import { useTranslation } from "react-i18next";
 import { z } from "zod";
 
-import { ApiProblemError } from "@frontend/api/api-fetch";
+import { ApiProblemError } from "@frontend/api/api-error";
 
 export const dependencies = [
   useForm,

@@ -15,6 +15,7 @@ tags: [convention, web-api, http, future-arch-guidelines]
 
 エラー応答の本文はRFC 9457のProblem Detailsとし、`status`を実際のステータスコードと一致させる。
 この契約は[ADR-013](../adr/ADR-013-standardize-http-api-contracts.md)が定める。
+例外は、Tomcatがアプリへ渡す前に拒否する要求で、Problem Detailsにならない（[リクエストサイズの上限](edge-responsibilities.md#アプリより前に拒否される要求)）。
 `/error`は、`HttpStatus`に定義のない4xxと5xx（499など）も転送元のステータスコードのまま返し、それ以外は500にする。
 このとき`title`は、4xxなら400の文言、5xxなら500の文言にする。
 このため、ログやダッシュボードには下の一覧にないステータスコードが現れることがある。
@@ -39,9 +40,17 @@ OpenAPIへのエラー応答の付け方は[OpenAPIのアノテーションとJa
 - **404 Not Found**：パスで指定したリソースが存在しない、または参照する権限がない。
   `shared.failure`の`NotFoundException`は、`ApiExceptionHandler`が404にする（[業務上の失敗の例外](../backend/class-roles/business-exception.md)）。
 - **405 Method Not Allowed**：エンドポイントが対応しないHTTPメソッドを指定された。
+  `Allow`には、Controllerが宣言したメソッドだけが入る（RFC 9110 15.5.6）。
+  たとえば`GET`だけのエンドポイントへの`POST`は`Allow: GET`になり、HEADとOPTIONSは入らない。
+  405は、CSRFトークンの検査と認証を通った後に返る。
+  CSRFトークンのない更新系の要求は、認証前でも403になり、認証されていない要求は401になる。
+  認証後にエンドポイントのないパスを指定すると、メソッドによらず404になる。
+  Spring Securityが受け付ける7つのメソッド（DELETE、GET、HEAD、OPTIONS、PATCH、POST、PUT）以外は、405にも404にもならず400になる。
+  OpenAPIには、405を今は書いていない。
+  `commonProblemResponses`が付けるのは、401、403、500と、入力を持つ操作の400である。
 - **409 Conflict**：楽観ロックの競合、悲観ロックの取得失敗、一意制約違反。
   楽観ロックの`ConflictException`（`lock_timeout`による失敗と、一意制約違反を含む）は、`ApiExceptionHandler`が409にする。
-- **413 Content Too Large**：リクエストのヘッダーまたは本文が上限を超えた。
+- **413 Content Too Large**：リクエストの本文が上限を超えた。ヘッダーの超過は、Tomcatが400を返す。
 - **422 Unprocessable Content**：入力が業務処理の条件を満たさない（在庫不足で出荷指示できない場合など）。
   `shared.failure`の`BusinessRuleViolationException`は、`ApiExceptionHandler`が422にする。
 - **429 Too Many Requests**：レート制限を超えた。
@@ -51,14 +60,14 @@ OpenAPIへのエラー応答の付け方は[OpenAPIのアノテーションとJa
 次のステータスコードは使わない。
 
 - **412 Precondition Failed**：`If-Match`を使わないため、楽観ロックの競合も409にする。
-- **414 URI Too Long**：URLの長さはスキーマ検証の400にまとめる。
+- **414 URI Too Long**：Tomcatは414を返さず、長すぎるリクエストを400にする。URLの長さはアプリに届かないので、アプリも414を返さない。
 - **501 Not Implemented**：開発中の仮実装に限って使い、このコードを返すエンドポイントを本番へリリースしない。
 
 ## 判断に迷うユースケース
 
 - **一覧検索の結果が0件**：200を返す。0件は正常な結果であり、一覧は件数やページング情報を返すため204にできない。
 - **POSTで親リソースがない**：`POST /articles/1/comments`で記事1がなければ404を返す。
-- **未対応のメソッド**：GETやPOSTへフォールバックせず405を返す。
+- **未対応のメソッド**：GETやPOSTへフォールバックせず405を返す。Spring Securityが受け付けないメソッドは400になる。
 - **DELETEの2回目**：初回は204、2回目は404を返す。冪等性はリソースの状態についての性質であり、ステータスコードは変わってよい。
 - **DELETE対象が既に削除済み**：他の利用者が先に削除した場合も、最初から存在しない場合と区別できないため404を返す。
 - **参照権限のないリソースのGET**：403ではなく404を返す。403はリソースが存在するという手掛かりを与えるためである。社内向けのAPIでも同じにする。

@@ -27,18 +27,18 @@ import org.springframework.modulith.core.ApplicationModules;
 /**
  * マイグレーション済みのテストDBを、アプリロールで{@code pg_catalog}から読んで検査する。
  *
- * <p>業務の表がテーブル、テナント、外部キーの規約を満たすことと、アプリロールが業務のスキーマに権限を持たないこと、モジュールのロールが依存の方向の権限だけを持つこと、マイグレーションロールがsuperuserでもBYPASSRLSでもないことを確かめる。DBのテーブルが保持期限と個人情報の一覧に載っていることも確かめる。判定の拒否経路は{@link
+ * <p>業務の表がテーブル、テナント、外部キーの規約を満たすことと、アプリロールが業務のスキーマに権限を持たないこと、モジュールのロールが依存の方向の権限だけを持つこと、マイグレーションロールがsuperuserでもBYPASSRLSでもないことを確かめる。DBのテーブルが保持期限と個人データの一覧に載っていることも確かめる。判定の拒否経路は{@link
  * SchemaConventionsTest}が違反を含む行で検証する。
  */
 @DatabaseTest
 class SchemaInspectionTest {
 
-  /** テーブルごとの保持期限と個人情報の有無の一覧。{@code backend}をカレントにして実行する。 */
+  /** テーブルごとの保持期限と個人データの有無の一覧。{@code backend}をカレントにして実行する。 */
   private static final Path RETENTION_DOCUMENT =
       Path.of("../docs/database/table-retention-and-personal-data.md");
 
   /** 一覧の表がある節の見出し。 */
-  private static final String RETENTION_HEADING = "## 保持期限と個人情報";
+  private static final String RETENTION_HEADING = "## 保持期限と個人データ";
 
   /** 一覧の表の行から、{@code スキーマ.テーブル}を取り出す。 */
   private static final Pattern TABLE_ROW =
@@ -98,7 +98,7 @@ class SchemaInspectionTest {
   }
 
   @Test
-  @DisplayName("テーブルは保持期限と個人情報の一覧に載っている")
+  @DisplayName("テーブルは保持期限と個人データの一覧に載っている")
   void everyTableIsListedInRetentionDocument() throws IOException {
     final Set<String> actual =
         SchemaCatalog.read(dsl, migrationRole).relations().stream()
@@ -108,11 +108,11 @@ class SchemaInspectionTest {
             .collect(Collectors.toCollection(TreeSet::new));
 
     assertThat(documentedTables(Files.readString(RETENTION_DOCUMENT)))
-        .as("%sの「保持期限と個人情報」の表の行。直し方：テーブルを足す、消すchangesetと同じ変更で行を足す、消す", RETENTION_DOCUMENT)
+        .as("%sの「保持期限と個人データ」の表の行。直し方：テーブルを足す、消すchangesetと同じ変更で行を足す、消す", RETENTION_DOCUMENT)
         .isEqualTo(actual);
   }
 
-  /** 一覧の「保持期限と個人情報」の節にある表の、先頭の列のテーブル名。次の節の表は読まない。 */
+  /** 一覧の「保持期限と個人データ」の節にある表の、先頭の列のテーブル名。次の節の表は読まない。 */
   private static Set<String> documentedTables(final String markdown) {
     final int start = markdown.indexOf(RETENTION_HEADING);
     final int end = markdown.indexOf("\n## ", start + RETENTION_HEADING.length());

@@ -1,4 +1,4 @@
-import { ApiProblemError, isTenantNotSelected } from "@frontend/api/api-fetch";
+import { ApiProblemError, isTenantNotSelected } from "@frontend/api/api-error";
 import { getListTenantMembersSuspenseQueryOptions } from "@frontend/api/endpoints/tenancy/tenancy";
 import { createFileRoute } from "@tanstack/react-router";
 import type { ErrorComponentProps } from "@tanstack/react-router";

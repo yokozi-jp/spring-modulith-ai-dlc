@@ -12,6 +12,7 @@ tags: [adr, architecture, onion-architecture, package-by-feature]
 Accepted
 
 Amended by [ADR-050](ADR-050-define-backend-class-roles-and-naming.md)：インタフェースの置き場所、Messaging Adapter の扱い、Domain Service に Spring の `@Service` だけを許すこと。
+Amended by [ADR-115](ADR-115-build-business-batches-with-spring-batch.md)：機能モジュールの内部に、業務のバッチの Job を置く `batch` を足すこと。
 
 ## Date
 
