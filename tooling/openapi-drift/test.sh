@@ -19,7 +19,8 @@ cd "$tmp/repo" || exit 1
 cp "$root/Taskfile.yml" "$root/.env.test.example" .
 mkdir openapi backend
 echo "openapi: 3.1.0" > openapi/openapi.yaml
-printf '#!/bin/sh\n[ -z "$FAKE_WRITE" ] || echo "$FAKE_WRITE" > ../openapi/openapi.yaml\n' > backend/gradlew
+# 印と契約の mtime が同じ刻みに入ると -nt が偽になるため、書く前に待つ。
+printf '#!/bin/sh\n[ -z "$FAKE_WRITE" ] || { sleep 0.05; echo "$FAKE_WRITE" > ../openapi/openapi.yaml; }\n' > backend/gradlew
 chmod +x backend/gradlew
 # api-drift-check は internal なので、include した Taskfile の外から PATHS を渡すために包む。
 cat > wrap.yml <<'WRAP'
@@ -33,7 +34,7 @@ tasks:
         vars: { PATHS: openapi/missing.yaml }
 WRAP
 printf 'build/\n.env.test\n' > .gitignore
-git add -A && git commit -q -m base
+git add -A && git commit -q -m base || { echo "FAIL: 一時のリポジトリの初期化"; exit 1; }
 
 # expect <名前> <pass|fail> <出力に含まれる文字列。無ければ空> <コマンド>...
 expect() {
