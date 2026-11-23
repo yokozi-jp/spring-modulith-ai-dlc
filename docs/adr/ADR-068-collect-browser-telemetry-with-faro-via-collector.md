@@ -38,12 +38,16 @@ Faro の形式を受ける contrib の `faroreceiver` は、Collector 0.161.0 �
 理由は次の 3 つである。
 
 - 標準が実験的である。`@grafana/faro-web-tracing` 2.12.1 は、`@opentelemetry/*` の 0.x 系（0.222）を含む 10 個のパッケージに依存する。
-- バックエンドの sampling が効かなくなる。Spring Boot の sampler は `parentBased(traceIdRatioBased(...))` で、ブラウザは sampled flag を 1 にして送るので、画面からの要求は `MANAGEMENT_TRACING_SAMPLING_PROBABILITY` を下げても全部記録される。本番で量を減らすには tail sampling が要り、同じ trace の span を 1 か所の Collector に集める必要がある。ブラウザの span は gateway に、バックエンドの span は各サイドカーに届くので、振り分けの層がもう一段要る。
+- バックエンドの sampling が効かなくなる。
+  Spring Boot の sampler は `parentBased(traceIdRatioBased(...))` である。
+  ブラウザは sampled flag を 1 にして送るので、画面からの要求は `MANAGEMENT_TRACING_SAMPLING_PROBABILITY` を下げても全部記録される。
+  本番で量を減らすには tail sampling が要り、同じ trace の span を 1 か所の Collector に集める必要がある。
+  ブラウザの span は受信専用の Collector に、バックエンドの span は各サイドカーに届くので、振り分けの層がもう一段要る。
 - 残る情報が少ない。Collector で伏せた後のブラウザの span には、固定の名前、HTTP の method と status、時刻、trace ID と親子関係だけが残る。どの画面のどの API かは、バックエンドの span で知る。
 
 このリポジトリは、標準的な Web アプリのほぼすべてが本番で使うものだけを作る。
 tail sampling と Collector の振り分けの層は、必要になったプロジェクトが足す。
-外しても、バックエンドの trace（API から SQL まで）と、Problem Details の `traceId` での問い合わせは残る。
+外しても、バックエンドの trace（API から SQL まで）と、ログの trace ID からの調査は残る。
 失うのは、ブラウザから見た所要時間（通信、TLS、CDN、待ち時間を含む）と、画面からの 1 本のつながりである。
 
 過去に Grafana Faro を採る ADR 案を ADR-009 の番号で起票したことがある。
@@ -101,7 +105,7 @@ query か fragment を持つ URL は、ファイル名が一致しても token �
   feature と route と component から SDK を呼ばない。
 - `traceparent` は付けず、ブラウザの span は作らない。
   `TracingInstrumentation` を入れないので、fetch と XHR は計装されない。
-- Session instrumentation の `samplingRate=1` を維持する。
+- Session instrumentation の `samplingRate=1` にする。
   ブラウザの送信量の調整は、本番の入口と合わせて #185 で決める。
 - session は `persistent=false` とし、Faro の volatile session を `sessionStorage` に保持する。
   15 分の非操作または開始から 4 時間で切り替える。
@@ -265,7 +269,7 @@ Faro を更新するたびに、lockfile で `ua-parser-js` の版を確かめ�
 
 - **Description**：ブラウザの例外を Sentry の SDK と保存先で扱う。
 - **Pros**：エラーの画面が優れている。
-- **Cons**：OTel と別の製品と保存先になり、バックエンドのトレースとつなぎにくい。
+- **Cons**：OTel と別の製品と保存先になり、出口が Collector の一つでなくなる（ADR-015）。
 
 ### 選択肢4: OpenTelemetry JS をブラウザで直接組み立てる
 
@@ -295,7 +299,7 @@ Faro を更新するたびに、lockfile で `ua-parser-js` の版を確かめ�
 
 - **Description**：Faro のセッションの samplingRate を 1 未満にして、ブラウザで送る量を減らす。
 - **Pros**：ブラウザの送信量と保存先の量が減る。
-- **Cons**：Tracing を入れていた間は、sampled flag が 0 の `traceparent` が届くと、バックエンドの trace も消えた。Tracing を外した今は、送信量の調整を本番の入口と合わせて #185 で決める。
+- **Cons**：送信量の調整は、本番の入口（CDN か ALB と WAF）のレートの制限と合わせて決めるほうが一貫する。ブラウザだけで減らすと、入口の制限と二重になる。この判断は #185 で行う。
 
 ### 選択肢9: localStorage の persistent session
 
@@ -333,6 +337,12 @@ Faro を更新するたびに、lockfile で `ua-parser-js` の版を確かめ�
 - **Pros**：`trustPolicyExclude` を増やさずに済む。
 - **Cons**：2.x は AGPL-3.0-or-later で、1.x の MIT から license が変わる。Faro は 2.x で試されていない。
 
+### 選択肢15: ブラウザの trace を送る（#151 で入れ、#421 で外した）
+
+- **Description**：`@grafana/faro-web-tracing` で `/api/**` の fetch と XHR に `traceparent` を付け、ブラウザの span を `traces/frontend` で Collector へ送る。
+- **Pros**：ブラウザから見た所要時間と、画面の操作からバックエンドまでの 1 本の trace を見られる。
+- **Cons**：Context に書いた 3 つの理由（標準が実験的、バックエンドの sampling が効かない、残る情報が少ない）。
+
 ## References
 
 - [#149: ブラウザのテレメトリをバックエンドと同じ Grafana で見られるようにする](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/149)
@@ -348,6 +358,8 @@ Faro を更新するたびに、lockfile で `ua-parser-js` の版を確かめ�
 - [Loki の OTLP 取り込み](https://grafana.com/docs/loki/latest/send-data/otel/)
 - [unrollprocessor v0.161.0](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/v0.161.0/processor/unrollprocessor)
 - [Grafana Faro Web SDK 2.12.1](https://www.npmjs.com/package/@grafana/faro-web-sdk/v/2.12.1)
+- [Grafana Faro Web Tracing 2.12.1](https://www.npmjs.com/package/@grafana/faro-web-tracing/v/2.12.1)
+- [OpenTelemetry の instrumentation-fetch 0.222.0](https://www.npmjs.com/package/@opentelemetry/instrumentation-fetch/v/0.222.0)
 - [OpenTelemetry JavaScript](https://opentelemetry.io/docs/languages/js/)
 - [OpenTelemetry Browser](https://opentelemetry.io/docs/languages/js/getting-started/browser/)
 - [ADR-014: SPA とバックエンドを同一オリジンで公開する](ADR-014-use-same-origin-spa-security-boundary.md)

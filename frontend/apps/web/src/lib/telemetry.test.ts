@@ -133,40 +133,28 @@ describe("resetTelemetrySession", () => {
     },
   );
 
-  it("pause が失敗すると session を切り替えず、送信を止める", async () => {
-    const setSession = vi.fn<NonNullable<Sink["api"]["setSession"]>>();
-    const pushError = vi.fn<Sink["api"]["pushError"]>();
-    replaceTelemetryForTesting({
-      api: { pushError, setSession },
-      pause: () => {
-        throw new Error("pause failed");
-      },
-    });
+  it.each(["pause", "unpause"] as const)(
+    "%s が失敗しても送信を止めたままにする",
+    async (failure) => {
+      const setSession = vi.fn<NonNullable<Sink["api"]["setSession"]>>();
+      const pushError = vi.fn<Sink["api"]["pushError"]>();
+      function fail(): never {
+        throw new Error(`${failure} failed`);
+      }
+      replaceTelemetryForTesting({
+        api: { pushError, setSession },
+        ...(failure === "pause" ? { pause: fail } : { unpause: fail }),
+      });
 
-    await resetTelemetrySession();
-    reportCaughtError(new Error("after failed pause"));
-    await Promise.resolve();
+      await resetTelemetrySession();
+      reportCaughtError(new Error("after switch"));
+      // 送信は faroReady を待つ 1 つの microtask の後に起きるので、それより後に確かめる。
+      await Promise.resolve();
 
-    expect(setSession).not.toHaveBeenCalled();
-    expect(pushError).not.toHaveBeenCalled();
-  });
-
-  it("unpause が失敗しても送信を止めたままにする", async () => {
-    const pushError = vi.fn<Sink["api"]["pushError"]>();
-    replaceTelemetryForTesting({
-      api: { pushError },
-      unpause: () => {
-        throw new Error("unpause failed");
-      },
-    });
-
-    await resetTelemetrySession();
-    reportCaughtError(new Error("after switch"));
-    // 送信は faroReady を待つ 1 つの microtask の後に起きるので、それより後に確かめる。
-    await Promise.resolve();
-
-    expect(pushError).not.toHaveBeenCalled();
-  });
+      expect(pushError).not.toHaveBeenCalled();
+      expect(setSession).toHaveBeenCalledTimes(failure === "pause" ? 0 : 1);
+    },
+  );
 });
 
 describe("reportCaughtError", () => {

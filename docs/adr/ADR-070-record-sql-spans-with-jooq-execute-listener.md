@@ -49,7 +49,7 @@ jOOQ の `ExecuteListener` で、jOOQ が発行する SQL ごとに Micrometer �
 
 ### Positive
 
-- 画面の API 呼び出しから SQL までが同じ trace ID でつながり、どの要求でどの種類の SQL が何回、何秒かかったかを Tempo で見られる。
+- API の受信から SQL までが同じ trace ID でつながり、どの要求でどの種類の SQL が何回、何秒かかったかを Tempo で見られる。
 - SQL の文と値が span に入らないので、Collector で消す処理に頼らずに済む。
 - 新しい依存を足さない（jOOQ と、`spring-boot-starter-opentelemetry` が持つ Micrometer Observation だけを使う）。
 

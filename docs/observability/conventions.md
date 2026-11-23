@@ -7,7 +7,8 @@ tags: [convention, observability, opentelemetry, security]
 
 # 可観測性データの規約
 
-バックエンドはログ、トレース、メトリクスを OpenTelemetry で Collector へ送ってコンソールにも ECS JSON を出し、フロントエンドは Faro Web SDK でブラウザの例外、画面遷移、Core Web Vitals を Collector へ送る。ブラウザの trace は送らない（[ADR-068](../adr/ADR-068-collect-browser-telemetry-with-faro-via-collector.md)）。
+バックエンドはログ、トレース、メトリクスを OpenTelemetry で Collector へ送ってコンソールにも ECS JSON を出し、フロントエンドは Faro Web SDK でブラウザの例外、画面遷移、Core Web Vitals を Collector へ送る。
+ブラウザの trace は送らない（[ADR-068](../adr/ADR-068-collect-browser-telemetry-with-faro-via-collector.md)）。
 CSP 違反は、ブラウザ自身が Reporting API で同一オリジンの `/csp-report` から Collector へ送る。
 例外は logger へ渡して標準どおりに記録し、禁止値はアプリケーションから渡さない。
 ログの属性は Collector の allowlist で絞り、保存先で閲覧の制限と表示時のマスクを行う。
@@ -212,7 +213,8 @@ transform と filter の `error_mode` は `ignore` にする。
   URL token、UUID の session ID、利用者情報、DOM 情報、追加の measurement 値が出口に残らないことも確かめる。
   同一オリジンの `/assets/<名前>.js` の stack frame が path と行と列だけで残り、query か fragment を持つ URL と別の path が置き換わることも確かめる。
   最初に、route の allowlist と `routeTree.gen.ts` の一致も確かめる。
-  同じ fixture は trace も持ち、faro receiver がそれを受け付けることを確かめる。trace の pipeline はないので出口に届かない。
+  同じ fixture は trace も持ち、faro receiver がそれを受け付けることと、出口のどのファイルにも trace ID が現れないことを確かめる。
+  faro receiver を使う trace の pipeline がないので、span は捨てられる。
   faro receiver の受け口が、GET に 405、`text/plain` に 415、別のパスに 202、1 MiB を超える本文に 400 を返すことも確かめる。
   CSP の報告の fixture（`csp-reports.json`）を `logs/frontend_csp` に流し、出口の件数、7 つの属性、縮約した URL、resource 属性、空の scope の属性を確かめる。
   fixture は、query と fragment、大文字の scheme、userinfo、path の ID、長すぎる origin、数値でない port、`@` を重ねた userinfo、別オリジンの `sourceFile`、範囲外の行番号、`disposition` のない報告、CSP 以外の型（deprecation、intervention、crash）を含み、CSP 以外の型、不正な directive、`disposition` のない報告が捨てられることを確かめる。

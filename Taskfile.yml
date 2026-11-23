@@ -1435,6 +1435,10 @@ tasks:
         ' "$out/frontend.json" >/dev/null; then
           fail "フロントエンドの例外、View、Web Vitals、session の正規形が期待値と一致しません。"
         fi
+        # fixture の trace は pipeline がないので捨てられる。faro を traces の receivers に足すと、ここで見つかる。
+        if grep -qF "0af7651916cd43dd8448eb211c80319c" "$out/backend.json" "$out/frontend.json" "$out/frontend-csp.json"; then
+          fail "faro receiver が受けた trace が出口に届きました。"
+        fi
         # CSP の報告。webhook_event の起動も OTLP より遅れうるので、200 になるまで送る。200 の後は再送しない。
         accepted=0
         for _ in $(seq 1 30); do
