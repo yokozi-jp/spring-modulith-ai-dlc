@@ -16,10 +16,8 @@ import org.junit.jupiter.api.Test;
 import org.slf4j.MDC;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
-import org.springframework.security.authentication.AnonymousAuthenticationToken;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
-import org.springframework.security.core.authority.AuthorityUtils;
 import org.springframework.security.core.context.SecurityContextHolder;
 
 /** {@link UserIdMdcFilter} が、アプリの利用者として認証したリクエストの残りの処理の間だけ、MDC に利用者の ID を入れることを検証する。 */
@@ -75,20 +73,6 @@ class UserIdMdcFilterTest {
   @Test
   @DisplayName("認証していないリクエストは、MDC に利用者の ID を入れない")
   void unauthenticatedRequestAddsNoUserId() throws IOException, ServletException {
-    doFilter((request, response) -> seen.add(MDC.get(USER_ID_KEY)));
-
-    assertThat(seen).as(SEEN_DESCRIPTION).containsExactly((String) null);
-  }
-
-  @Test
-  @DisplayName("匿名の認証は、利用者が AppUserPrincipal でも、MDC に利用者の ID を入れない")
-  void anonymousAuthenticationAddsNoUserId() throws IOException, ServletException {
-    authenticate(
-        new AnonymousAuthenticationToken(
-            "key",
-            (AppUserPrincipal) () -> USER,
-            AuthorityUtils.createAuthorityList("ROLE_ANONYMOUS")));
-
     doFilter((request, response) -> seen.add(MDC.get(USER_ID_KEY)));
 
     assertThat(seen).as(SEEN_DESCRIPTION).containsExactly((String) null);

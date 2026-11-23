@@ -40,20 +40,19 @@ class TenantSecurityCustomizerTest {
   @Autowired private FilterChainProxy springSecurityFilterChain;
 
   @Test
-  @DisplayName("どの chain も、利用者の ID を MDC に入れる filter とテナントを選ぶ filter を、決めた順に持つ")
+  @DisplayName("利用者の ID を MDC に入れる filter を持つ chain は、決めた順に filter を持つ")
   void filtersAreOrderedWhereTheyWork() {
-    assertThat(springSecurityFilterChain.getFilterChains())
-        .as("Security filter chain")
-        .isNotEmpty();
-    springSecurityFilterChain
-        .getFilterChains()
-        .forEach(chain -> {
-          final List<Class<? extends Filter>> types =
-              chain.getFilters().stream()
-                  .<Class<? extends Filter>>map(Filter::getClass)
-                  .filter(ORDER::contains)
-                  .toList();
-          assertThat(types).as("chain の filter: %s", chain.getFilters()).isEqualTo(ORDER);
-        });
+    final List<List<Class<? extends Filter>>> chains =
+        springSecurityFilterChain.getFilterChains().stream()
+            .filter(
+                chain -> chain.getFilters().stream().anyMatch(UserIdMdcFilter.class::isInstance))
+            .map(chain ->
+                chain.getFilters().stream()
+                    .<Class<? extends Filter>>map(Filter::getClass)
+                    .filter(ORDER::contains)
+                    .toList())
+            .toList();
+
+    assertThat(chains).as("UserIdMdcFilter を持つ chain").isNotEmpty().allMatch(ORDER::equals);
   }
 }

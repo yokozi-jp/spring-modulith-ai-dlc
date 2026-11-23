@@ -63,9 +63,8 @@ Grafana では trace ID を使ってログとトレースを相互に検索す�
 - コンソールの ECS JSON では `{"tenant":{"id":…},"user":{"id":…}}` の入れ子の項目になり、OTLP では LogRecord の属性になる。
 - リスナーの外で記録するログ（リスナーが投げた例外を Spring の `SimpleAsyncUncaughtExceptionHandler` が記録する ERROR など）は、`tenant.id` を持たない。
 
-`TenantSecurityCustomizer` は、`UserIdMdcFilter` を `SecurityContextHolderFilter` の直後に、`TenantSelectionFilter` を `ExceptionTranslationFilter` と `AuthorizationFilter` の間に置く。
-`UserIdMdcFilter` は `CsrfFilter` の前にあるので、認証した利用者の次のログは `user.id` を持つ。
-束縛の外で記録するので、`tenant.id` は持たない。
+`TenantSecurityCustomizer` は、`UserIdMdcFilter` を `SecurityContextHolderFilter` の直後（`CsrfFilter` の前）に、`TenantSelectionFilter` を `ExceptionTranslationFilter` と `AuthorizationFilter` の間に置く。
+次のログは、束縛の外で記録するので `tenant.id` を持たず、認証したアプリの利用者のものなら `user.id` を持つ。
 
 - `AuthorizationFilter` が拒否し、`ExceptionTranslationFilter` が返す 403
 - `TenantSelectionFilter` が投げる `TenantNotSelectedException`
@@ -77,6 +76,7 @@ Grafana では trace ID を使ってログとトレースを相互に検索す�
 Controller の中の `@PreAuthorize` が拒否したときのログは、2 つを持つ。
 
 トレースでは、`TenantSelectionFilter` が HTTP の受信の span にだけ、2 つを属性として付ける。
+`TenantSelectionFilter` の手前で拒否する CSRF の失敗の span は、ログと違い、どちらも持たない。
 
 - Micrometer の Observation の高い濃度の key value にだけ入れ、低い濃度の key value に入れない（理由は ADR-110）。
 - リスナーの処理の span は Spring Modulith が作る。この span には付けない。リスナーのログには `tenant.id` が付くので、ログの trace ID からたどる。

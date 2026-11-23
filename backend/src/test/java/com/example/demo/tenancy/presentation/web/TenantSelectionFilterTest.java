@@ -32,6 +32,7 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.filter.ServerHttpObservationFilter;
 
 /** {@link TenantSelectionFilter} が、選んだテナントを残りの処理の間だけ束縛し、下流の例外をそのまま戻すことを検証する（ADR-105）。 */
+@SuppressWarnings("PMD.TooManyMethods")
 class TenantSelectionFilterTest {
 
   /** 選ぶテナントの ID。 */
@@ -126,10 +127,7 @@ class TenantSelectionFilterTest {
       throws IOException, ServletException {
     final MockHttpServletRequest request = new MockHttpServletRequest(GET, ORDERS);
     final MockHttpServletResponse response = new MockHttpServletResponse();
-    final ServerRequestObservationContext context =
-        new ServerRequestObservationContext(request, response);
-    request.setAttribute(
-        ServerHttpObservationFilter.CURRENT_OBSERVATION_CONTEXT_ATTRIBUTE, context);
+    final ServerRequestObservationContext context = observe(request, response);
 
     filter.doFilter(request, response, (chainRequest, chainResponse) -> {});
 
@@ -145,10 +143,7 @@ class TenantSelectionFilterTest {
     SecurityContextHolder.clearContext();
     final MockHttpServletRequest request = new MockHttpServletRequest(GET, ORDERS);
     final MockHttpServletResponse response = new MockHttpServletResponse();
-    final ServerRequestObservationContext context =
-        new ServerRequestObservationContext(request, response);
-    request.setAttribute(
-        ServerHttpObservationFilter.CURRENT_OBSERVATION_CONTEXT_ATTRIBUTE, context);
+    final ServerRequestObservationContext context = observe(request, response);
     final List<@Nullable String> seen = new ArrayList<>();
 
     filter.doFilter(
@@ -167,10 +162,7 @@ class TenantSelectionFilterTest {
     final MockHttpServletRequest request =
         new MockHttpServletRequest(GET, MembershipController.PATH);
     final MockHttpServletResponse response = new MockHttpServletResponse();
-    final ServerRequestObservationContext context =
-        new ServerRequestObservationContext(request, response);
-    request.setAttribute(
-        ServerHttpObservationFilter.CURRENT_OBSERVATION_CONTEXT_ATTRIBUTE, context);
+    final ServerRequestObservationContext context = observe(request, response);
 
     filter.doFilter(request, response, (chainRequest, chainResponse) -> {});
 
@@ -199,6 +191,16 @@ class TenantSelectionFilterTest {
               throw failure;
             }))
         .isSameAs(failure);
+  }
+
+  /** リクエストに、受信の observation を持たせて返す。 */
+  private static ServerRequestObservationContext observe(
+      final MockHttpServletRequest request, final MockHttpServletResponse response) {
+    final ServerRequestObservationContext context =
+        new ServerRequestObservationContext(request, response);
+    request.setAttribute(
+        ServerHttpObservationFilter.CURRENT_OBSERVATION_CONTEXT_ATTRIBUTE, context);
+    return context;
   }
 
   private void doFilter(final FilterChain chain) throws IOException, ServletException {

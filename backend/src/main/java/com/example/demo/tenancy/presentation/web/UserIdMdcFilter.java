@@ -8,8 +8,6 @@ import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.MDC;
-import org.springframework.security.authentication.AuthenticationTrustResolver;
-import org.springframework.security.authentication.AuthenticationTrustResolverImpl;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.context.SecurityContextHolderStrategy;
@@ -19,8 +17,7 @@ import org.springframework.web.filter.OncePerRequestFilter;
  * {@link AppUserPrincipal} として認証したリクエストの残りの処理の間だけ、アプリの利用者の ID を MDC の {@value
  * #USER_ID_ATTRIBUTE_KEY} に入れる。
  *
- * <p>認可の拒否、CSRF の検証の失敗、テナントを選ぶ前の拒否のログにも利用者の ID を付けるため、{@code TenantSecurityCustomizer} は、この filter
- * をセッションの認証を読む filter の直後、CSRF の検証の前に置く。
+ * <p>配置の理由は {@link TenantSecurityCustomizer} に書く。
  */
 final class UserIdMdcFilter extends OncePerRequestFilter {
 
@@ -30,10 +27,7 @@ final class UserIdMdcFilter extends OncePerRequestFilter {
    */
   /* package */ static final String USER_ID_ATTRIBUTE_KEY = "user.id";
 
-  /** 匿名の認証を見分ける。 */
-  private final AuthenticationTrustResolver trustResolver = new AuthenticationTrustResolverImpl();
-
-  /** このリクエストの認証を持つ。 */
+  /** 認証を読む。この filter は匿名の認証を足す filter より前にあるので、匿名の認証は見分けない。 */
   private final SecurityContextHolderStrategy holder =
       SecurityContextHolder.getContextHolderStrategy();
 
@@ -45,7 +39,7 @@ final class UserIdMdcFilter extends OncePerRequestFilter {
       throws ServletException, IOException {
     final @Nullable Authentication authentication = holder.getContext().getAuthentication();
     if (authentication == null
-        || !trustResolver.isAuthenticated(authentication)
+        || !authentication.isAuthenticated()
         || !(authentication.getPrincipal() instanceof AppUserPrincipal user)) {
       filterChain.doFilter(request, response);
       return;

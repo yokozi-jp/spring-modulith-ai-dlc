@@ -45,7 +45,11 @@ import org.springframework.test.web.servlet.result.MockMvcResultMatchers;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 
-/** 構造化ログ、トレース相関、OTLP 属性、テナントと利用者の文脈の運用契約を検証する。 */
+/**
+ * 構造化ログ、トレース相関、OTLP 属性、テナントと利用者の文脈の運用契約を検証する。
+ *
+ * <p>契約ごとに分けると、同じ Bean の注入と appender の準備を重ねるので、1 つの class にまとめる。
+ */
 @SuppressWarnings({"PMD.TooManyStaticImports", "PMD.TooManyMethods"})
 @Slf4j
 @SpringBootTest
@@ -243,7 +247,7 @@ class ObservabilityContractTest {
         .perform(MockMvcRequestBuilders.get(path).with(AppUsers.oidcLogin()))
         .andExpect(MockMvcResultMatchers.status().isForbidden());
 
-    assertDenialLogCarriesOnlyUser(path);
+    assertDenialLogCarriesOnlyUserAndLeavesNoMdc(path);
   }
 
   @Test
@@ -261,7 +265,7 @@ class ObservabilityContractTest {
         .andExpect(MockMvcResultMatchers.status().isForbidden())
         .andExpect(MockMvcResultMatchers.jsonPath("$.type").value("/problems/tenant-not-selected"));
 
-    assertDenialLogCarriesOnlyUser(path);
+    assertDenialLogCarriesOnlyUserAndLeavesNoMdc(path);
   }
 
   @Test
@@ -274,7 +278,7 @@ class ObservabilityContractTest {
         .andExpect(MockMvcResultMatchers.status().isForbidden())
         .andExpect(MockMvcResultMatchers.jsonPath("$.type").value("/problems/csrf-token-invalid"));
 
-    assertDenialLogCarriesOnlyUser(path);
+    assertDenialLogCarriesOnlyUserAndLeavesNoMdc(path);
   }
 
   @Test
@@ -291,7 +295,7 @@ class ObservabilityContractTest {
     assertNull(attributes.get(TENANT_ID), attributes::toString);
   }
 
-  private void assertDenialLogCarriesOnlyUser(final String path) {
+  private void assertDenialLogCarriesOnlyUserAndLeavesNoMdc(final String path) {
     final Attributes attributes = clientErrorAttributes(path);
     assertEquals(AppUsers.USER_ID, attributes.get(USER_ID), attributes::toString);
     assertNull(attributes.get(TENANT_ID), attributes::toString);

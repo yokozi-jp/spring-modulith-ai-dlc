@@ -81,7 +81,10 @@ appender の `mdcAttributesIncluded` は、MDC のうち OTLP の属性にする
 
 ### Negative
 
-- ログに `tenant.id` と `user.id` が付かない範囲がある（リスナーの外のログは両方、認可の拒否と CSRF の失敗、`TenantNotSelectedException`、所属の引き直しの間のログは `tenant.id` だけ）。範囲は[可観測性データの規約](../observability/conventions.md#テナントと利用者)に書く（[issue #635](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/635)）。
+- ログに `tenant.id` と `user.id` が付かない範囲がある。範囲は[可観測性データの規約](../observability/conventions.md#テナントと利用者)に書く。
+  - 両方を持たない：リスナーの外のログ、認証していないリクエストのログ。
+  - `tenant.id` だけを持たない：認可の拒否、CSRF の失敗、`TenantNotSelectedException`、所属の引き直しの間のログ。
+- `TenantSelectionFilter` の手前で拒否する CSRF の失敗の受信の span は、ログと違い、`user.id` を持たない。
 - 受信の span 以外の span（外向きの HTTP、SQL、リスナーの span とその中の処理）は `tenant.id` を持たない。受信の span の trace ID からたどる。
 - 利用者の ID から利用者を特定できるので、ADR-015 の閲覧権限と保持期間で守る。
 
