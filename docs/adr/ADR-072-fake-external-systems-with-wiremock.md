@@ -100,8 +100,8 @@ Accepted
   compose-test の 8082 は 5433、6380、8081 と同じく compose-test だけが使うため、`task e2e` の開始時の空きの確認には足さない。
 - JDK の `HttpClient` が平文の HTTP で HTTP/2 への upgrade（h2c）を試み、WireMock（Jetty）では本文付きの POST が切れた。
   偽物の側で compose の `--disable-http2-plain` と結合テストの `http2PlainDisabled(true)` を指定する必要がある。
-- テストの依存の jar の版とイメージのタグを、人の手で同じに保つ必要がある。
-  Dependabot は両者を別々の Pull Request で更新する。
+- テストの依存の jar の版は `backend/build.gradle` が `docker/compose-test.yml` のイメージの tag から読むため、jar とそのイメージは手で同じに保つ必要がない。
+  `docker/compose.yml` のイメージの tag は別に書かれ、`docker-compose` の更新は `docker/` の 2 ファイルを同じ Pull Request で上げる。
 - `@RegisterExtension` の `WireMockExtension` は `@DynamicPropertySource` と組み合わせられず、static の初期化でサーバを起動する。
   Spring のコンテキストが URL を読む時点で、拡張がサーバを起動していないためである。
 - `PAYMENT_GATEWAY_BASE_URL` を持たない古い `.env.test` では、Spring のテストが `${PAYMENT_GATEWAY_BASE_URL}` のプレースホルダーを解決できず失敗する。
