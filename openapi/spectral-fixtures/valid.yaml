@@ -59,6 +59,18 @@ paths:
           schema:
             type: string
             format: uuid
+        - name: placedAt
+          in: query
+          description: 受け付けた絶対時刻の下限
+          schema:
+            type: string
+            format: date-time
+        - name: deliveryDate
+          in: query
+          description: 届け日の暦日
+          schema:
+            type: string
+            format: date
         # public-id-uuid はヘッダーの引数を対象にしない
         - name: X-Request-Id
           in: header

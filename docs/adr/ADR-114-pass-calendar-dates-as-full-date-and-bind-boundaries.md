@@ -23,7 +23,7 @@ APIでの形と、SQLでの求め方は定めていなかった（[issue #586](h
 画面はブラウザの既定のタイムゾーンで表示する（[ADR-047](ADR-047-parse-api-datetimes-with-temporal.md)）。
 暦日を`2023-09-30T00:00:00Z`のようなUTCの0時の瞬間で返すと、UTCより西のタイムゾーンで前日に見える。
 
-PostgreSQLの`date_trunc`、`CURRENT_DATE`、`::date`、`AT TIME ZONE`は、セッションの`TimeZone`で暦を決める（[PostgreSQL 18, Date/Time Functions and Operators](https://www.postgresql.org/docs/18/functions-datetime.html)）。
+PostgreSQLの`timestamptz`に対する`date_trunc`、`CURRENT_DATE`、`::date`は、セッションの`TimeZone`で暦を決める（[PostgreSQL 18, Date/Time Functions and Operators](https://www.postgresql.org/docs/18/functions-datetime.html)）。
 このリポジトリのセッションはUTCなので、SQLで暦日を作ると日本の0時から9時に前日になる。
 [ADR-046](ADR-046-derive-local-dates-with-configured-business-zone.md)がJavaの`LocalDate.now(clock)`を止めた理由と同じである。
 
@@ -53,7 +53,7 @@ DBの関数には、互換関数でも現在時刻とタイムゾーンを読ま
 
 - 暦日がブラウザのタイムゾーンで前日に見える誤りを、契約の形で防げる。
 - SQLの暦がセッションの`TimeZone`に依存しなくなり、DBのセッション設定が変わっても結果が変わらない。
-- 名前と`format`の食い違いを、Spectralが生成前のOpenAPIで止める。
+- 名前と`format`の食い違いを、Spectralが、Orvalでクライアントを生成する前の生成済みOpenAPIで止める。
 
 ### Negative
 

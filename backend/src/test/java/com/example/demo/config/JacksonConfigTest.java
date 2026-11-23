@@ -14,6 +14,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.json.JsonTest;
 import tools.jackson.core.JacksonException;
+import tools.jackson.databind.exc.InvalidFormatException;
 import tools.jackson.databind.json.JsonMapper;
 
 /**
@@ -70,6 +71,15 @@ class JacksonConfigTest {
     // 既定の寛容な読み取りだと 2023-09-29 として受け、東京の 9 月 30 日がずれる。
     assertThatThrownBy(
             () -> jsonMapper.readValue("{\"day\":\"2023-09-29T15:00:00Z\"}", HasDate.class))
+        .isInstanceOf(InvalidFormatException.class);
+  }
+
+  @Test
+  @DisplayName("Instant と LocalDate は空文字列を null にせず拒否する")
+  void emptyStringsAreRejectedForInstantAndLocalDate() {
+    assertThatThrownBy(() -> jsonMapper.readValue("{\"when\":\"\"}", HasInstant.class))
+        .isInstanceOf(JacksonException.class);
+    assertThatThrownBy(() -> jsonMapper.readValue("{\"day\":\"\"}", HasDate.class))
         .isInstanceOf(JacksonException.class);
   }
 

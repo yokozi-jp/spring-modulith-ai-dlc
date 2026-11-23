@@ -74,7 +74,8 @@ class DateTimeConventionsArchTest {
    * DB の時計を読む jOOQ の {@code DSL} の関数名。{@code DSL.now()} も含む。
    *
    * <p>ponytail: 日時から暦日や境界を作る {@code DSL.trunc(...)}、{@code DSL.date(Field)}、{@code cast(DATE)}
-   * は止めない。引数のない時計の読み取りだけを機械で止め、暦を作る関数はレビューで確認する。
+   * は止めない。時計の読み取りだけを機械で止め、暦を作る関数はレビューで確認する。 暦を作る関数で誤りが出たら、{@code trunc} と {@code date}
+   * を引数の型ごとに調べて止める。
    */
   private static final Set<String> DATABASE_CLOCK_FUNCTIONS =
       Set.of(
@@ -192,22 +193,18 @@ class DateTimeConventionsArchTest {
   @DisplayName("DSL.currentDate() など DB の時計を読む jOOQ の関数を拒否する")
   void databaseClockFunctionsAreRejected() {
     // フィクスチャを実際に呼び出してIDEにも使用済みと認識させる。拒否判定は続くArchUnitの検査が担う。
-    assertThat(DatabaseClockBypass.createForbiddenFields()).hasSize(10);
+    // 禁止する関数を足したら、フィクスチャにも同じ関数の呼び出しを足す。
+    assertThat(DatabaseClockBypass.createForbiddenFields())
+        .hasSize(DATABASE_CLOCK_FUNCTIONS.size());
 
     assertThatThrownBy(() ->
             injectedClockRule()
                 .check(new ClassFileImporter().importClasses(DatabaseClockBypass.class)))
         .isInstanceOf(AssertionError.class)
-        .hasMessageContaining("DSL.currentDate(...) は" + DATABASE_CLOCK_REMEDIATION)
-        .hasMessageContaining("DSL.currentTime(...) は" + DATABASE_CLOCK_REMEDIATION)
-        .hasMessageContaining("DSL.currentTimestamp(...) は" + DATABASE_CLOCK_REMEDIATION)
-        .hasMessageContaining("DSL.currentLocalDate(...) は" + DATABASE_CLOCK_REMEDIATION)
-        .hasMessageContaining("DSL.currentLocalDateTime(...) は" + DATABASE_CLOCK_REMEDIATION)
-        .hasMessageContaining("DSL.currentLocalTime(...) は" + DATABASE_CLOCK_REMEDIATION)
-        .hasMessageContaining("DSL.currentOffsetDateTime(...) は" + DATABASE_CLOCK_REMEDIATION)
-        .hasMessageContaining("DSL.currentOffsetTime(...) は" + DATABASE_CLOCK_REMEDIATION)
-        .hasMessageContaining("DSL.currentInstant(...) は" + DATABASE_CLOCK_REMEDIATION)
-        .hasMessageContaining("DSL.now(...) は" + DATABASE_CLOCK_REMEDIATION);
+        .satisfies(error ->
+            DATABASE_CLOCK_FUNCTIONS.forEach(name ->
+                assertThat(error)
+                    .hasMessageContaining("DSL." + name + "(...) は" + DATABASE_CLOCK_REMEDIATION)));
   }
 
   /** メソッド参照による迂回も呼び出しと同じく拒否する。 */
@@ -251,7 +248,7 @@ class DateTimeConventionsArchTest {
         .because(
             "システム時計を直接読むとテストの Clock.fixed(...) が効かず、"
                 + "UTC の Clock のゾーンで日付を決めると日本では0時から9時の間に前日になるため。"
-                + "DB の時計と暦も同じで、セッションの TimeZone（UTC）で日付を決めると同じく前日になる。"
+                + "DB の時計（DSL.currentDate() や DSL.now() など）も、注入した Clock を迂回するため同じである。"
                 + "直し方：Clock をコンストラクタ引数で受け取り、Instant.now(clock) または clock.millis() を使う。"
                 + "システム Clock は "
                 + CLOCK_BEAN_METHOD

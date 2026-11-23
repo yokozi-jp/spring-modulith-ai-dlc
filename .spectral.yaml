@@ -160,6 +160,8 @@ rules:
               const: uuid
 
   # ponytail: 名前で見分ける。名前が At や Date で終わらない日時は検査しない。
+  # 名前の食い違いで誤りが出たら、Java の型（Instant と LocalDate）から OpenAPI を生成する検査へ替える。
+  # パスの引数は public-id-uuid が uuid に限るため、この 2 規則の対象外にする。
   instant-property-date-time:
     description: 名前が At で終わる項目は絶対時刻なので、type string、format date-time にする（docs/datetime/timezone-conventions.md の「APIの日時」）。
     severity: error

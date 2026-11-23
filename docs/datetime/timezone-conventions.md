@@ -118,36 +118,7 @@ PostgreSQL自身も有用性に疑問があるとし、他の日時型の組み�
 
 日付だけの値を現在時刻から求めるときは、「バックエンド」の業務タイムゾーンの規則に従う。
 業務日付を管理するモジュールでは、管理テーブルの[業務日付](../database/postgresql-temporal-data.md#業務日付)を正とし、現在時刻から求めない。
-APIでの形とSQLでの求め方は、次の「暦日のAPIとSQL」に従う。
-
-## 暦日のAPIとSQL
-
-暦日は、APIでは`full-date`で受け渡し、SQLでは日時から作らずに引数で受け取る。
-この決定は[ADR-114](../adr/ADR-114-pass-calendar-dates-as-full-date-and-bind-boundaries.md)を参照する。
-
-### API
-
-- APIの暦日は`LocalDate`で受け渡し、RFC 3339の`full-date`（`YYYY-MM-DD`）で表す。
-  OpenAPIでは`type: string`と`format: date`にする。
-- 暦日を、UTCの0時の瞬間（`2023-09-30T00:00:00Z`）で返さない。
-  画面はブラウザの既定のタイムゾーンで表示するため、UTCより西のタイムゾーンでは前日に見える。
-- 項目名の接尾辞で型を分ける。
-  `At`で終わる項目は絶対時刻で`format: date-time`、`Date`で終わる項目は暦日で`format: date`にする。
-- `LocalDate`は、時刻つきの文字列を受けない。
-  Jacksonの既定の読み取りは寛容で、`"2023-09-29T15:00:00Z"`（東京の9月30日）を`2023-09-29`として受けるため、`spring.jackson.default-leniency: false`で止める。
-  この設定は`Instant`と`LocalDate`の空文字列も、`null`にせず読み取りの失敗にする。
-
-### SQL
-
-- 暦日と期間の境界は、Javaで業務タイムゾーンから求めて引数で渡す。
-  現在の暦日は`LocalDate.ofInstant(Instant.now(clock), businessZone)`、期間の始まりは`localDate.atStartOfDay(businessZone).toInstant()`で求める。
-  業務タイムゾーンは[ADR-046](../adr/ADR-046-derive-local-dates-with-configured-business-zone.md)に従う。
-- SQLの`CURRENT_DATE`、`now()`、`date_trunc`、`::date`、`AT TIME ZONE`で、日時から暦日や境界を作らない。
-  PostgreSQLはこれらの暦をセッションの`TimeZone`で決める（[PostgreSQL 18, Date/Time Functions and Operators](https://www.postgresql.org/docs/18/functions-datetime.html)）。
-  このリポジトリのセッションはUTCなので、日本の0時から9時に前日になる。
-- DBの関数に、現在時刻とタイムゾーンを読ませない。
-  Oracleの`sysdate`などの互換関数も同じである。
-  現在時刻はアプリの`Clock`から読む。
+APIでの形とSQLでの求め方は、後述の「暦日のAPIとSQL」に従う。
 
 将来の一度きりの予定で、地域の時計が指す時刻そのものに意味がある場合は、`LocalDateTime`とIANAタイムゾーンIDを組で保存する。
 固定オフセットでは夏時間や法改正を表せないため、`+09:00`ではなく`Asia/Tokyo`や`America/New_York`のような地域IDを使う。
@@ -165,6 +136,34 @@ Javaの`LocalDateTime.atZone()`は、gapでは時刻を後ろへずらし、over
 将来の地域時刻から求めた`Instant`は保存せず、使う時点で求める。
 政府が夏時間やUTCオフセットを変えるとIANAのタイムゾーンデータベースが更新され、JDK、OS、ブラウザの更新で反映されるが、保存済みの`Instant`は古い定義のまま残る（[IANA Time Zone Database](https://www.iana.org/time-zones)）。
 通知の予約のように保存が必要な場合は、タイムゾーンデータベースの更新を契機に再計算する仕組みを設ける。
+
+## 暦日のAPIとSQL
+
+暦日は、APIでは`full-date`で受け渡し、SQLでは日時から作らずに引数で受け取る。
+理由は[ADR-114](../adr/ADR-114-pass-calendar-dates-as-full-date-and-bind-boundaries.md)に書く。
+
+### API
+
+- APIの暦日は`LocalDate`で受け渡し、RFC 3339の`full-date`（`YYYY-MM-DD`）で表す。
+  OpenAPIでは`type: string`と`format: date`にする。
+  UTCの0時の瞬間（`2023-09-30T00:00:00Z`）では返さない。
+- 項目名の接尾辞で型を分ける。
+  `At`で終わる項目は絶対時刻で`format: date-time`、`Date`で終わる項目は暦日で`format: date`にする。
+- リクエストボディの`LocalDate`は、時刻つきの文字列を受けない。
+  `spring.jackson.default-leniency: false`がこれを止め、`Instant`と`LocalDate`の空文字列も`null`にせず読み取りの失敗にする。
+  クエリパラメータはSpringの変換で読むため、この設定の対象外である。
+
+### SQL
+
+- 暦日と期間の境界は、Javaで業務タイムゾーンから求めて引数で渡す。
+  現在の暦日は`LocalDate.ofInstant(Instant.now(clock), businessZone)`、期間の始まりは`localDate.atStartOfDay(businessZone).toInstant()`で求める。
+  業務タイムゾーンは[ADR-046](../adr/ADR-046-derive-local-dates-with-configured-business-zone.md)に従う。
+- SQLの`CURRENT_DATE`、`now()`、`date_trunc`、`::date`、`AT TIME ZONE`で、日時から暦日や境界を作らない。
+  `timestamptz`から暦日を作る`CURRENT_DATE`、`date_trunc`、`::date`は、セッションの`TimeZone`で暦を決める（[PostgreSQL 18, Date/Time Functions and Operators](https://www.postgresql.org/docs/18/functions-datetime.html)）。
+  `AT TIME ZONE`はSQLにゾーンを書くため、業務タイムゾーンの設定と二重になる。
+- DBの関数に、現在時刻とタイムゾーンを読ませない。
+  Oracleの`sysdate`などの互換関数も同じである。
+  現在時刻はアプリの`Clock`から読む。
 
 ## 精度
 
