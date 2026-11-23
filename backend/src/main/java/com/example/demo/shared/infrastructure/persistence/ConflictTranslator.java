@@ -26,17 +26,18 @@ import org.springframework.dao.DataAccessException;
    *
    * <p>Spring が同じ型の例外にまとめる別の SQLSTATE（{@code 21000} など）は、変換せずに投げる。
    */
-  // 原因の例外のメッセージに SQL と重複したキーの値が入るため、原因を付けない（ADR-062、docs/observability/conventions.md）。
   /* package */ static <T> T executeOrConflict(
       final Supplier<T> statement, final Supplier<String> target) {
     try {
       return statement.get();
     } catch (final DataAccessException e) {
-      throw conflictOf(e, target);
+      throw translate(e, target);
     }
   }
 
-  private static RuntimeException conflictOf(
+  /** 変換できない例外は、そのまま返す。 */
+  // 原因の例外のメッセージに SQL と重複したキーの値が入るため、原因を付けない（ADR-062、docs/observability/conventions.md）。
+  private static RuntimeException translate(
       final DataAccessException error, final Supplier<String> target) {
     final String sqlState = sqlStateOf(error);
     if (LOCK_NOT_AVAILABLE.equals(sqlState)) {
