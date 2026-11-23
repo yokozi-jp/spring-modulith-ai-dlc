@@ -6,6 +6,8 @@
     <description>PMD ruleset for Java</description>
 
     <rule ref="category/java/bestpractices.xml">
+        <!-- NoDefaultInPatternOrEnumSwitch が同じ switch を含めて止めるため、二重報告を避けて除外 -->
+        <exclude name="ExhaustiveSwitchHasDefault"/>
         <!-- テストでは複数アサーションが自然なため無効化 -->
         <exclude name="UnitTestContainsTooManyAsserts"/>
     </rule>
@@ -80,6 +82,24 @@
                         pmd-java:typeIs('lombok.Data')
                         or pmd-java:typeIs('lombok.Setter')
                     ]
+                ]]></value>
+            </property>
+        </properties>
+    </rule>
+    <rule name="NoDefaultInPatternOrEnumSwitch"
+          language="java"
+          message="default があると、バリアントや定数を足してもコンパイルが通り、新しい場合を黙って受けるため。直し方：default を消し、残りの場合を case に書く。規約：docs/backend/java-type-modeling.md"
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule">
+        <description>
+            enum、型パターン、record パターンの switch に default を書くことを禁止し、場合の追加をコンパイルで検出させる。
+        </description>
+        <priority>3</priority>
+        <properties>
+            <property name="xpath">
+                <value><![CDATA[
+                    //(SwitchStatement|SwitchExpression)
+                        [@DefaultCase = true()]
+                        [@EnumSwitch = true() or */SwitchLabel/(TypePattern|RecordPattern)]
                 ]]></value>
             </property>
         </properties>

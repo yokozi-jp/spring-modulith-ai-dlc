@@ -128,7 +128,7 @@ if (data instanceof User user) {
 
 ## switch を網羅させる
 
-sealed 型の switch に `default` を書かない。
+sealed 型と enum の switch に `default` を書かない。
 `default` があると、バリアントを足してもコンパイルが通り、新しい場合を黙って受ける。
 
 ```java
@@ -155,5 +155,10 @@ enum は switch 式で書く。
 ## 検査
 
 ビルドが検査するのは、生型と非検査の警告（`-Xlint:rawtypes,unchecked`）と、`@NullMarked` のコードの null の違反と付け忘れ（Error Prone の NullAway と `RequireExplicitNullMarking`）である。
-sealed の使い方、`default` の禁止、キャストの禁止は、機械では検査していない。
+PMD の `NonExhaustiveSwitch` が、一部の enum 定数だけを書いた `default` のない switch 文を止める。
+`NoDefaultInPatternOrEnumSwitch` が、enum、型パターン、record パターンの switch の `default` を、すべての場合を書いたものも含めて止める。
+同じ switch を二重に報告しないよう、`ExhaustiveSwitchHasDefault` は外している。
+この規則は switch 対象の型が sealed かを読めないため、`Object` を型パターンで振り分ける switch の `default` も止める。
+規約の外の形なので、理由を書いて `@SuppressWarnings("PMD.NoDefaultInPatternOrEnumSwitch")` で抑える。
+sealed の使い方とキャストの禁止は、機械では検査していない。
 レビューで確かめる。
