@@ -78,7 +78,7 @@ feature固有styleは対象componentの近くへ置く。
 認識した部品への `className` は `shadcn/no-restyle` が検査し、部品が持つ見た目のclassを検出する（[フロントエンドのLint設定](lint-config.md#例外と調整)）。
 
 素の要素（`a`や`button`など）を包む部品を追加したら、ルートの`frontend/vite.config.ts`の`lint.settings["jsx-a11y"].components`に、JSXの名前と包む要素を足す。
-`components`はJSXの名前から要素への写像で、`packages/ui`に部品を足しても自動では増えない。足さないと、`jsx-a11y`の規則はその部品の中身が空でも報告しない（[フロントエンドのLint設定](lint-config.md#例外と調整)）。
+`packages/ui`に部品を足しても自動では増えない（[フロントエンドのLint設定](lint-config.md#例外と調整)）。
 
 ## shadcnの部品の更新
 

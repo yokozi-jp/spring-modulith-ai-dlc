@@ -143,6 +143,7 @@ export default defineConfig({
       "oxc/no-optional-chaining": "off",
       "oxc/no-rest-spread-properties": "off",
       "no-void": ["error", { allowAsStatement: true }],
+      // settings の jsx-a11y.components で Link を a に対応づけた組。
       "jsx-a11y/anchor-is-valid": ["error", { specialLink: ["to"] }],
       "no-undefined": "off",
       "typescript/explicit-function-return-type": "off",
@@ -364,10 +365,10 @@ export default defineConfig({
         },
       },
     ],
-    // shadcn の部品を別 package の @frontend/ui から import するため、components.json の alias に加えて import 元でも部品と認識させる（ADR-092）。
-    // jsx-a11y の規則を、素の要素を包む部品にも効かせる。components は JSX の名前から要素への写像で、@frontend/ui の部品を足しても自動では増えない。
     settings: {
+      // shadcn の部品を別 package の @frontend/ui から import するため、components.json の alias に加えて import 元でも部品と認識させる（ADR-092）。
       shadcn: { componentImports: ["^@frontend/ui(/|$)"] },
+      // JSX の名前から要素への写像。docs/frontend/lint-config.md の「jsx-a11y を部品へ効かせる」を参照。
       "jsx-a11y": { components: { Link: "a", Button: "button" } },
     },
     options: {
