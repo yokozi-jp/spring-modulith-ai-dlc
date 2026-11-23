@@ -37,15 +37,17 @@ trace ID の正本は Micrometer Tracing の trace ID であり、独自の requ
 ADR-013 のエラー表現のうち、`traceId` と `instance` の行を次のとおり改める。
 
 - 要求に span があるとき、4xx と 5xx のすべての Problem Details に、W3C Trace Context の trace ID（32 桁の小文字の 16 進数）を `traceId` 拡張で付ける。業務固有の problem type にも付ける。
-- span がないとき（trace ID が空か、すべて 0 のとき）は、`traceId` を付けない。
+- 要求に span がないとき（trace ID が無効なとき、たとえばすべて 0 のとき）は、`traceId` を付けない。
 - `instance` は設定しない。OpenAPI の `ProblemDetail` からも外す。
 - `X-Request-Id` のような独自の request ID を応答に付けない。ADR-015 のとおり、trace ID を正本にする。
 - `traceId` は相関のためだけに使い、認可と冪等性の鍵に使わない。クライアントが `traceparent` で値を決められるためである。
 
-コンテナが `/error` へ転送した失敗は、要求の HTTP の observation の外で処理される。
-Spring Boot が observation の filter を REQUEST と ASYNC の dispatch だけに登録するためである。
-そこで `/error` の Problem Details は、転送元の要求の span から trace ID を取る。
-転送元に span がないときは、`/error` を処理する時点の現在の span から取る。
+`traceId` と `instance` は、Spring MVC が Problem Details を書く直前に呼ぶ `ErrorResponse.Interceptor` の 1 か所で扱う。
+advice が返す Problem Details も、`/error` が返す Problem Details も、この interceptor を通るためである。
+trace ID は、現在の span ではなく、要求の属性に残る HTTP の observation（`ServerHttpObservationFilter` が作る）の span から取る。
+コンテナが `/error` へ転送した失敗は、要求の HTTP の observation の外で処理されるためである。
+Spring Boot が observation の filter を REQUEST と ASYNC の dispatch だけに登録するので、ERROR の dispatch では HTTP の observation が開かない。
+要求に observation がなければ、`traceId` を付けない。
 
 契約の版（`OpenApiConfig.CONTRACT_VERSION`）は、MINOR を上げて `0.8.0` にする。
 `instance` を外すことは、ADR-013 に反する値を返していた不具合の修正として扱う。
@@ -63,7 +65,8 @@ Spring Boot が observation の filter を REQUEST と ASYNC の dispatch だけ
 ### Negative
 
 - 同じ失敗でも、要求ごとに本文の `traceId` が変わる。本文の完全一致で 2 つの応答を比べられない。
-- Spring Framework 7.0 の間は、`instance` を消す `ErrorResponse.Interceptor` を持つ。7.1 へ上げたら消す。
+- Spring Framework 7.0 の間は、interceptor で `instance` を消す。7.1 へ上げたら、その処理を消す。
+  Spring Framework が空の `instance` に要求のパスを入れなくなると、`ProblemDetailsConfigTest` が失敗して知らせる。
 - sampling で標本にならなかった trace の span は Tempo に送られないので、その trace ID で引けるのはログだけになる。
 
 ### Neutral
@@ -81,17 +84,26 @@ Spring Boot が observation の filter を REQUEST と ASYNC の dispatch だけ
 
 ### 選択肢2: Problem Details を正規化する処理で instance を空にするだけにする
 
-- **Description**：`traceId` を足す処理と同じ箇所で、`instance` を `null` にする。
-- **Pros**：変更が 1 か所で済む。
-- **Cons**：Spring Framework 7.0 は handler が返した後で空の `instance` に要求のパスを入れるので、応答の `instance` は消えない。契約テストで確かめた。
+- **Description**：`ApiProblemDetails` の正規化の処理で、`instance` を `null` にする。
+- **Pros**：interceptor が要らない。
+- **Cons**：Spring Framework 7.0 は handler が返した後で空の `instance` に要求のパスを入れるので、応答の `instance` は消えない。
+  `ProblemDetailsConfigTest` が、Spring Framework のこの振る舞いを確かめる。
 
-### 選択肢3: 契約の版の MAJOR を上げて 1.0.0 にする
+### 選択肢3: Problem Details を正規化する処理で、現在の span から trace ID を取る
+
+- **Description**：`ApiProblemDetails` に `Tracer` を渡し、`Tracer.currentSpan()` の trace ID を付ける。
+- **Pros**：要求の属性を読まずに済む。
+- **Cons**：`/error` を処理する時点の現在の span は、要求とは別の trace に属する。
+  [PR #688](https://github.com/yokozi-jp/spring-modulith-ai-dlc/pull/688) の作業で、`/error` の 400 の契約テストに一時的な出力を足し、現在の span の trace ID が `traceparent` の値と違うことを見た。
+  advice と `/error` で取り方を分けると、`ApiProblemDetails` が Problem Details の生成と trace ID の取得の 2 つの責務を持つ。
+
+### 選択肢4: 契約の版の MAJOR を上げて 1.0.0 にする
 
 - **Description**：応答の項目の削除を、後方互換を壊す変更として扱う。
 - **Pros**：項目の削除を一律に MAJOR とする読み方に合う。
 - **Cons**：[ADR-052](ADR-052-commit-openapi-contract-and-check-generated-client.md) と versioning.md は、`1.0.0` を `/api/v1` を導入するときの版にしている。破壊的変更の手順では Conventional Commits の `!` が要り、release-please がアプリの版も 1.0.0 に上げる。
 
-### 選択肢4: instance に失敗ごとの URI を入れる
+### 選択肢5: instance に失敗ごとの URI を入れる
 
 - **Description**：失敗ごとに `urn:uuid:` などの URI を作り、`instance` に入れる。
 - **Pros**：RFC 9457 の `instance` の意味に合う。

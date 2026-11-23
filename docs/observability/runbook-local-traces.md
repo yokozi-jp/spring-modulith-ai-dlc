@@ -27,6 +27,8 @@ tags: [runbook, observability, tracing, grafana, tempo, local]
 3. ログ行を開き、詳細の Links の `Trace: <trace ID>` を押す。右の分割ペインで Tempo のトレースが開く。
 
 ログが見つからないときは、Grafana の右上の期間を、問い合わせの時刻を含むように広げる。
+ログを出さない失敗もある（Spring Security の firewall が標準にない method を拒否した 400 など）。
+そのときは、次の節の trace ID が分かっているときの手順で Tempo のトレースを開く。
 sampling で標本にならなかった要求は、ログだけが残り、Tempo にトレースがない（[ADR-117](../adr/ADR-117-add-trace-id-and-omit-instance-in-problem-details.md)）。
 
 ## trace ID からトレースを開く
