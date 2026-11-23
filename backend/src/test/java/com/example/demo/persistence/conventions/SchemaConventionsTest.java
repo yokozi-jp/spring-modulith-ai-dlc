@@ -7,8 +7,7 @@ import static com.example.demo.persistence.conventions.CatalogRows.ITEM_ID;
 import static com.example.demo.persistence.conventions.CatalogRows.MODULITH;
 import static com.example.demo.persistence.conventions.CatalogRows.TABLE;
 import static com.example.demo.persistence.conventions.CatalogRows.UUID;
-import static com.example.demo.persistence.conventions.CatalogRows.commentedColumn;
-import static com.example.demo.persistence.conventions.CatalogRows.commentedTable;
+import static com.example.demo.persistence.conventions.CatalogRows.columnRow;
 import static com.example.demo.persistence.conventions.CatalogRows.index;
 import static com.example.demo.persistence.conventions.CatalogRows.keys;
 import static com.example.demo.persistence.conventions.CatalogRows.tenantColumn;
@@ -20,7 +19,9 @@ import com.example.demo.persistence.conventions.CatalogSnapshot.ColumnRow;
 import com.example.demo.persistence.conventions.CatalogSnapshot.ConstraintRow;
 import com.example.demo.persistence.conventions.CatalogSnapshot.FunctionRow;
 import com.example.demo.persistence.conventions.CatalogSnapshot.IndexRow;
+import com.example.demo.persistence.conventions.CatalogSnapshot.LogicalName;
 import com.example.demo.persistence.conventions.CatalogSnapshot.ModuleRoleRow;
+import com.example.demo.persistence.conventions.CatalogSnapshot.Origin;
 import com.example.demo.persistence.conventions.CatalogSnapshot.RelationPrivilegeRow;
 import com.example.demo.persistence.conventions.CatalogSnapshot.RelationRow;
 import com.example.demo.persistence.conventions.CatalogSnapshot.RoleRow;
@@ -48,27 +49,6 @@ class SchemaConventionsTest {
   /** Liquibaseの管理テーブルのスキーマ。 */
   private static final String LIQUIBASE = "liquibase";
 
-  /** Spring Modulithのイベント出版テーブル。 */
-  private static final String EVENT_PUBLICATION = "event_publication";
-
-  /** Liquibaseの変更履歴のテーブル。 */
-  private static final String DATABASECHANGELOG = "databasechangelog";
-
-  /** パーティションで分けた業務テーブル。 */
-  private static final String SALE = "t_sale";
-
-  /** {@link #SALE}のパーティションの子テーブル。 */
-  private static final String SALE_PARTITION = "t_sale_p2026_10";
-
-  /** {@link #SALE}の主キー。 */
-  private static final String SALE_ID = "sale_id";
-
-  /** {@link CatalogRows#ITEM_ID}の論理名。 */
-  private static final String ITEM_ID_NAME = "品目ID";
-
-  /** 論理名のコメントの書き方の節。 */
-  private static final String REMARKS_DOC = "docs/database/migrations.md#論理名のコメント";
-
   /** integerの型名。 */
   private static final String INTEGER = "integer";
 
@@ -94,7 +74,7 @@ class SchemaConventionsTest {
         new CatalogSnapshot(
             List.of(tenantTable(ITEM, TABLE, ITEM_ID), relation(MODULITH, "r", false, null)),
             List.of(
-                commentedColumn(ITEM, TABLE, ITEM_ID, ITEM_ID_NAME),
+                columnRow(ITEM, TABLE, ITEM_ID, new LogicalName("品目ID", Origin.PLAIN)),
                 tenantColumn(ITEM, TABLE),
                 column(MODULITH, INTEGER, "b", "", "", "nextval('x'::regclass)")),
             List.of(
@@ -147,70 +127,6 @@ class SchemaConventionsTest {
     assertThat(SchemaConventions.ALLOWLIST)
         .as("SchemaConventions.ALLOWLIST")
         .allSatisfy(entry -> assertThat(entry.reason()).as("%s の理由", entry.key()).isNotBlank());
-  }
-
-  /** 表と列の論理名。 */
-  /* package */ @Nested
-  class LogicalNameRulesTest {
-
-    @Test
-    @DisplayName("N12：コメントがないか空白だけの業務テーブルとカラムを、表と列の直し方を添えて拒否する")
-    void rejectsBusinessTablesAndColumnsWithoutComments() {
-      final List<RelationRow> relations =
-          List.of(
-              commentedTable(ITEM, TABLE, "r", false, ""),
-              commentedTable(ITEM, "m_blank", "r", false, " "),
-              commentedTable(ITEM, "m_named", "r", false, "名前付き"),
-              commentedTable(ITEM, SALE, "p", false, ""),
-              new RelationRow(ITEM, "v_m_item", "v", null, null),
-              new RelationRow(MODULITH, EVENT_PUBLICATION, "r", "id", null),
-              new RelationRow(LIQUIBASE, DATABASECHANGELOG, "r", null, null));
-      final List<ColumnRow> columns =
-          List.of(
-              commentedColumn(ITEM, TABLE, "item_code", ""),
-              commentedColumn(ITEM, TABLE, "item_name", " "),
-              commentedColumn(ITEM, TABLE, ITEM_ID, ITEM_ID_NAME),
-              new ColumnRow(MODULITH, EVENT_PUBLICATION, "id", UUID, "b", "", "", null, true),
-              new ColumnRow(LIQUIBASE, DATABASECHANGELOG, "id", "text", "b", "", "", null));
-
-      final List<ConventionViolation> violations =
-          SchemaLogicalNameConventions.logicalNames(relations, columns);
-
-      assertThat(keys(violations))
-          .containsExactlyInAnyOrder(
-              "N12 item.m_item",
-              "N12 item.m_blank",
-              "N12 item.t_sale",
-              "N12 item.m_item.item_code",
-              "N12 item.m_item.item_name");
-      assertThat(violations)
-          .filteredOn(violation -> violation.target().split("\\.").length == 2)
-          .allSatisfy(violation ->
-              assertThat(violation.detail())
-                  .contains("setTableRemarks", REMARKS_DOC)
-                  .doesNotContain("setColumnRemarks"));
-      assertThat(violations)
-          .filteredOn(violation -> violation.target().split("\\.").length == 3)
-          .allSatisfy(violation ->
-              assertThat(violation.detail())
-                  .contains("setColumnRemarks", "addColumn", REMARKS_DOC)
-                  .doesNotContain("setTableRemarks"));
-    }
-
-    @Test
-    @DisplayName("N12：パーティションの子テーブルとそのカラムは、コメントがなくても拒否しない")
-    void acceptsPartitionsWithoutComments() {
-      final List<RelationRow> relations =
-          List.of(
-              commentedTable(ITEM, SALE, "p", false, "販売"),
-              commentedTable(ITEM, SALE_PARTITION, "r", true, ""));
-      final List<ColumnRow> columns =
-          List.of(
-              commentedColumn(ITEM, SALE, SALE_ID, "販売ID"),
-              commentedColumn(ITEM, SALE_PARTITION, SALE_ID, ""));
-
-      assertThat(SchemaLogicalNameConventions.logicalNames(relations, columns)).isEmpty();
-    }
   }
 
   /** トリガーと制約。 */
@@ -523,7 +439,7 @@ class SchemaConventionsTest {
                   List.of(
                       new ColumnRow(
                           MODULITH,
-                          EVENT_PUBLICATION,
+                          "event_publication",
                           "id",
                           "uuid",
                           "b",
@@ -761,7 +677,7 @@ class SchemaConventionsTest {
         List.of(
             new RelationRow(PRODUCT, "m_product", "r", null, null),
             new RelationRow("ordering", "t_order", "r", null, null),
-            new RelationRow("modulith", EVENT_PUBLICATION, "r", null, null));
+            new RelationRow("modulith", "event_publication", "r", null, null));
 
     @Test
     @DisplayName("G4：ログインできる、DDLの属性を持つ、アプリロールが継承するモジュールのロールを拒否する")

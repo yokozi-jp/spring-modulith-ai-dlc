@@ -1,10 +1,10 @@
 package com.example.demo.persistence.conventions;
 
 import com.example.demo.persistence.conventions.CatalogSnapshot.ColumnRow;
+import com.example.demo.persistence.conventions.CatalogSnapshot.LogicalName;
+import com.example.demo.persistence.conventions.CatalogSnapshot.Origin;
 import com.example.demo.persistence.conventions.CatalogSnapshot.RelationRow;
 import java.util.List;
-import java.util.Set;
-import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 /**
@@ -17,7 +17,7 @@ import java.util.stream.Stream;
 final class SchemaLogicalNameConventions {
 
   /** 論理名のコメントの書き方の節。 */
-  private static final String REMARKS_DOC = ChangesetStructureRules.MIGRATIONS_DOC + "#論理名のコメント";
+  private static final String REMARKS_DOC = "docs/database/migrations.md#論理名のコメント";
 
   /** 表のN12の違反の直し方。 */
   private static final String TABLE_DETAIL =
@@ -48,25 +48,23 @@ final class SchemaLogicalNameConventions {
    */
   /* package */ static List<ConventionViolation> logicalNames(
       final List<RelationRow> relations, final List<ColumnRow> columns) {
-    final Set<String> partitions =
-        relations.stream()
-            .filter(RelationRow::partition)
-            .map(row -> row.schema() + "." + row.name())
-            .collect(Collectors.toSet());
     final Stream<ConventionViolation> tables =
         relations.stream()
             .filter(row -> SchemaConventions.isBusinessSchema(row.schema()))
-            .filter(row -> row.isTable() && !row.partition() && row.comment().isBlank())
+            .filter(row -> row.isTable() && isMissing(row.logicalName()))
             .map(row ->
                 new ConventionViolation("N12", row.schema() + "." + row.name(), TABLE_DETAIL));
     final Stream<ConventionViolation> tableColumns =
         columns.stream()
             .filter(row -> SchemaConventions.isBusinessSchema(row.schema()))
-            .filter(row -> !partitions.contains(row.schema() + "." + row.table()))
-            .filter(row -> row.comment().isBlank())
+            .filter(row -> isMissing(row.logicalName()))
             .map(row ->
                 new ConventionViolation(
                     "N12", row.schema() + "." + row.table() + "." + row.column(), COLUMN_DETAIL));
     return Stream.concat(tables, tableColumns).toList();
+  }
+
+  private static boolean isMissing(final LogicalName logicalName) {
+    return logicalName.origin() == Origin.PLAIN && logicalName.comment().isBlank();
   }
 }

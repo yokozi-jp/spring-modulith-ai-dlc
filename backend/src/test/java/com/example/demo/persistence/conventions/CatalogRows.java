@@ -2,6 +2,8 @@ package com.example.demo.persistence.conventions;
 
 import com.example.demo.persistence.conventions.CatalogSnapshot.ColumnRow;
 import com.example.demo.persistence.conventions.CatalogSnapshot.IndexRow;
+import com.example.demo.persistence.conventions.CatalogSnapshot.LogicalName;
+import com.example.demo.persistence.conventions.CatalogSnapshot.Origin;
 import com.example.demo.persistence.conventions.CatalogSnapshot.PolicyRow;
 import com.example.demo.persistence.conventions.CatalogSnapshot.RelationRow;
 import java.util.List;
@@ -61,26 +63,26 @@ final class CatalogRows {
         null);
   }
 
-  /** RLSのENABLEとFORCEと、論理名のコメントを付けたテーブル。 */
+  /** RLSのENABLEとFORCEを付けた、論理名が「品目」のテーブル。 */
   /* package */ static RelationRow tenantTable(
       final String schema, final String table, final String primaryKey) {
-    return new RelationRow(schema, table, "r", false, primaryKey, null, true, true, "品目");
+    return tableRow(schema, table, "r", primaryKey, new LogicalName("品目", Origin.PLAIN));
   }
 
-  /** 主キーが{@link #ITEM_ID}の、RLSのENABLEとFORCEを付けた、論理名のコメントが{@code comment}のテーブル。 */
-  /* package */ static RelationRow commentedTable(
+  /** RLSのENABLEとFORCEを付けた、論理名が{@code logicalName}のテーブル。 */
+  /* package */ static RelationRow tableRow(
       final String schema,
       final String table,
       final String relkind,
-      final boolean partition,
-      final String comment) {
-    return new RelationRow(schema, table, relkind, partition, ITEM_ID, null, true, true, comment);
+      final String primaryKey,
+      final LogicalName logicalName) {
+    return new RelationRow(schema, table, relkind, primaryKey, null, true, true, logicalName);
   }
 
-  /** bigintのIDENTITYのNOT NULLの、論理名のコメントが{@code comment}のカラム。 */
-  /* package */ static ColumnRow commentedColumn(
-      final String schema, final String table, final String column, final String comment) {
-    return new ColumnRow(schema, table, column, BIGINT, "b", "a", "", null, true, comment);
+  /** bigintのIDENTITYのNOT NULLの、論理名が{@code logicalName}のカラム。 */
+  /* package */ static ColumnRow columnRow(
+      final String schema, final String table, final String column, final LogicalName logicalName) {
+    return new ColumnRow(schema, table, column, BIGINT, "b", "a", "", null, true, logicalName);
   }
 
   /** トランザクションのテナントを既定値にした、uuidのNOT NULLの、論理名のコメントを付けたテナントの列。 */
@@ -95,7 +97,7 @@ final class CatalogRows {
         "",
         TenantIsolation.CATALOG_TENANT_DEFAULT,
         true,
-        "テナント公開ID");
+        new LogicalName("テナント公開ID", Origin.PLAIN));
   }
 
   /** テナントの設定と行のテナントを比べる、PUBLICへの許可のポリシー。 */

@@ -4,7 +4,9 @@ import com.example.demo.persistence.conventions.CatalogSnapshot.ColumnRow;
 import com.example.demo.persistence.conventions.CatalogSnapshot.ConstraintRow;
 import com.example.demo.persistence.conventions.CatalogSnapshot.FunctionRow;
 import com.example.demo.persistence.conventions.CatalogSnapshot.IndexRow;
+import com.example.demo.persistence.conventions.CatalogSnapshot.LogicalName;
 import com.example.demo.persistence.conventions.CatalogSnapshot.ModuleRoleRow;
+import com.example.demo.persistence.conventions.CatalogSnapshot.Origin;
 import com.example.demo.persistence.conventions.CatalogSnapshot.PolicyRow;
 import com.example.demo.persistence.conventions.CatalogSnapshot.RelationPrivilegeRow;
 import com.example.demo.persistence.conventions.CatalogSnapshot.RelationRow;
@@ -181,12 +183,11 @@ final class SchemaCatalog {
                 text(r, SCHEMA),
                 text(r, NAME),
                 text(r, "kind"),
-                r.get("is_partition", Boolean.class),
                 r.get("primary_key", String.class),
                 r.get("inheritance_parent", String.class),
                 r.get("row_security", Boolean.class),
                 r.get("force_row_security", Boolean.class),
-                text(r, "object_comment")));
+                logicalName(r)));
   }
 
   private static List<ColumnRow> columns(final DSLContext dsl) {
@@ -197,7 +198,8 @@ final class SchemaCatalog {
                        format_type(a.atttypid, a.atttypmod) AS type_name, t.typtype::text AS type_kind,
                        a.attidentity::text AS identity_kind, a.attgenerated::text AS generated_kind,
                        pg_get_expr(d.adbin, d.adrelid) AS default_expression, a.attnotnull AS not_null,
-                       coalesce(col_description(a.attrelid, a.attnum), '') AS object_comment
+                       coalesce(col_description(a.attrelid, a.attnum), '') AS object_comment,
+                       c.relispartition AS is_partition
                 FROM pg_attribute a
                 JOIN pg_class c ON c.oid = a.attrelid
                 JOIN pg_namespace n ON n.oid = c.relnamespace
@@ -216,7 +218,7 @@ final class SchemaCatalog {
                 text(r, "generated_kind"),
                 r.get("default_expression", String.class),
                 r.get("not_null", Boolean.class),
-                text(r, "object_comment")));
+                logicalName(r)));
   }
 
   private static List<IndexRow> indexes(final DSLContext dsl) {
@@ -434,6 +436,12 @@ final class SchemaCatalog {
     return template
         .replace("/*NOT_SYSTEM*/", NOT_SYSTEM)
         .replace("/*RELATION_KINDS*/", RELATION_KINDS);
+  }
+
+  private static LogicalName logicalName(final Record row) {
+    return new LogicalName(
+        text(row, "object_comment"),
+        row.get("is_partition", Boolean.class) ? Origin.PARTITION_CHILD : Origin.PLAIN);
   }
 
   private static String text(final Record row, final String column) {

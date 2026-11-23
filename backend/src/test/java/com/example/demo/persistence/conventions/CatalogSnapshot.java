@@ -50,28 +50,26 @@ record CatalogSnapshot(
    * @param schema スキーマ名
    * @param name テーブル名
    * @param relkind {@code relkind}（{@code r}、{@code p}、{@code v}、{@code m}、{@code f}）
-   * @param partition パーティションの子テーブルか（{@code relispartition}）
    * @param primaryKey 主キーの先頭の列名。主キーがなければ{@code null}
    * @param inheritanceParent パーティションでない継承の親テーブル。なければ{@code null}
    * @param rowSecurity 行レベルセキュリティを有効にしたか（{@code relrowsecurity}）
    * @param forceRowSecurity 表の所有者にも行レベルセキュリティを効かせるか（{@code relforcerowsecurity}）
-   * @param comment 論理名のコメント（{@code obj_description}）。なければ空文字
+   * @param logicalName 論理名のコメント（{@code obj_description}）と、パーティションの子か
    */
   /* package */ record RelationRow(
       String schema,
       String name,
       String relkind,
-      boolean partition,
       @Nullable String primaryKey,
       @Nullable String inheritanceParent,
       boolean rowSecurity,
       boolean forceRowSecurity,
-      String comment) {
+      LogicalName logicalName) {
 
     /** テーブルの{@code relkind}（通常のテーブルとパーティションテーブル）。 */
     private static final Set<String> TABLE_KINDS = Set.of("r", "p");
 
-    /** 行レベルセキュリティとコメントのない、パーティションの子でないテーブルかビュー。 */
+    /** 行レベルセキュリティと論理名のない、パーティションの子でないテーブルかビュー。 */
     /* package */ RelationRow(
         final String schema,
         final String name,
@@ -81,7 +79,7 @@ record CatalogSnapshot(
       this(schema, name, relkind, primaryKey, inheritanceParent, false, false);
     }
 
-    /** コメントのない、パーティションの子でないテーブルかビュー。 */
+    /** 論理名のない、パーティションの子でないテーブルかビュー。 */
     /* package */ RelationRow(
         final String schema,
         final String name,
@@ -94,12 +92,11 @@ record CatalogSnapshot(
           schema,
           name,
           relkind,
-          false,
           primaryKey,
           inheritanceParent,
           rowSecurity,
           forceRowSecurity,
-          "");
+          LogicalName.NONE);
     }
 
     /** ビューでなく、テーブルか。 */
@@ -120,7 +117,7 @@ record CatalogSnapshot(
    * @param generated 生成列の種類（pg_attribute.attgenerated。空文字でなければ生成列）
    * @param defaultExpression 既定値の式。なければ{@code null}
    * @param notNull NOT NULLか（{@code attnotnull}）
-   * @param comment 論理名のコメント（{@code col_description}）。なければ空文字
+   * @param logicalName 論理名のコメント（{@code col_description}）と、表がパーティションの子か
    */
   /* package */ record ColumnRow(
       String schema,
@@ -132,9 +129,9 @@ record CatalogSnapshot(
       String generated,
       @Nullable String defaultExpression,
       boolean notNull,
-      String comment) {
+      LogicalName logicalName) {
 
-    /** NULLを許す、コメントのないカラム。 */
+    /** NULLを許す、論理名のない、パーティションの子でないテーブルのカラム。 */
     /* package */ ColumnRow(
         final String schema,
         final String table,
@@ -148,7 +145,7 @@ record CatalogSnapshot(
           schema, table, column, typeName, typeKind, identity, generated, defaultExpression, false);
     }
 
-    /** コメントのないカラム。 */
+    /** 論理名のない、パーティションの子でないテーブルのカラム。 */
     /* package */ ColumnRow(
         final String schema,
         final String table,
@@ -169,8 +166,28 @@ record CatalogSnapshot(
           generated,
           defaultExpression,
           notNull,
-          "");
+          LogicalName.NONE);
     }
+  }
+
+  /**
+   * 表か列の、論理名のコメントと、その表がパーティションの子か。
+   *
+   * @param comment コメント。なければ空文字
+   * @param origin 表がパーティションの子か（{@code relispartition}）。列はその表の値を持つ
+   */
+  /* package */ record LogicalName(String comment, Origin origin) {
+
+    /** コメントのない、パーティションの子でない表か列。 */
+    /* package */ static final LogicalName NONE = new LogicalName("", Origin.PLAIN);
+  }
+
+  /** 表がパーティションの子か。 */
+  /* package */ enum Origin {
+    /** パーティションの子でない。 */
+    PLAIN,
+    /** パーティションの子（{@code relispartition}）。 */
+    PARTITION_CHILD
   }
 
   /**
