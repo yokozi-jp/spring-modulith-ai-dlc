@@ -57,6 +57,10 @@ final class ClassRoleFixtureRows {
             PackageByFeatureOnionArchitectureTest.domainModelDoesNotDependOnFrameworks,
             "ordering.domain.model.OrderFactory"),
         row(
+            "valueObjectsDoNotThrowBusinessRuleViolation",
+            PackageByFeatureOnionArchitectureTest.valueObjectsDoNotThrowBusinessRuleViolation,
+            "ordering.domain.model.Discount"),
+        row(
             "domainServicesDependOnlyOnDomainAndJava",
             PackageByFeatureOnionArchitectureTest.domainServicesDependOnlyOnDomainAndJavaRule(
                 VIOLATING),

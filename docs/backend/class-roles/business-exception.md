@@ -134,6 +134,7 @@ Controller は参照の結果がなければ `NotFoundException` を投げ、ス
 ## 作成時のチェックリスト
 
 - [ ] 業務上の失敗は `NotFoundException`、`BusinessRuleViolationException`、`ConflictException` のどれかで投げる。［自分で点検］
+- [ ] 値オブジェクトの record は `BusinessRuleViolationException` を投げず、不変条件の違反を `IllegalArgumentException` で表す。［ArchUnit で検査：PackageByFeatureOnionArchitectureTest.valueObjectsDoNotThrowBusinessRuleViolation］
 - [ ] `NoSuchElementException` を生成せず、引数なしの `Optional.orElseThrow()` を呼ばない。［ArchUnit で検査：GeneralCodingRulesArchTest.noSuchElementExceptionIsNotThrown］
 - [ ] `Throwable`、`Exception`、`RuntimeException`、`Error` を投げない。［ArchUnit で検査：GeneralCodingRulesArchTest.noClassesShouldThrowGenericExceptions］
 - [ ] `shared` の型は Spring Web、Spring の HTTP、Servlet の型に依存しない。［ArchUnit で検査：PackageByFeatureOnionArchitectureTest.sharedModuleDoesNotDependOnHttp］

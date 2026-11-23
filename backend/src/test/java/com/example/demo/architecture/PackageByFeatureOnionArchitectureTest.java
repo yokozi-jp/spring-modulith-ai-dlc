@@ -167,6 +167,23 @@ class PackageByFeatureOnionArchitectureTest {
                   + "規約：docs/backend/layers.md、"
                   + ADR_002);
 
+  /** 値オブジェクトの不変条件の違反を、422 になる業務上の失敗ではなく {@link IllegalArgumentException} で表す。 */
+  @ArchTest
+  /* package */ static final ArchRule valueObjectsDoNotThrowBusinessRuleViolation =
+      noClasses()
+          .that()
+          .resideInAPackage("..domain.model..")
+          .and()
+          .areRecords()
+          .should()
+          .dependOnClassesThat(simpleName("BusinessRuleViolationException"))
+          .allowEmptyShould(true)
+          .because(
+              "値オブジェクトの違反は、利用者が直せない状態であり、422 にするとプログラムの誤りが隠れるため。"
+                  + "直し方：不変条件の違反には IllegalArgumentException を投げ、"
+                  + "状態に依存する業務規則は集約か Domain Service で BusinessRuleViolationException にする。"
+                  + "規約：docs/backend/class-roles/value-object.md、docs/backend/class-roles/business-exception.md");
+
   /** Domain Service は標準型、JSpecify、Lombok、Domain と {@code @Service} だけに依存させる。 */
   @ArchTest
   /* package */ static final ArchRule domainServicesDependOnlyOnDomainAndJava =

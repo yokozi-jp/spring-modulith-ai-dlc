@@ -1,6 +1,5 @@
 package com.example.demo.ordering.domain.model;
 
-import com.example.demo.shared.failure.BusinessRuleViolationException;
 
 /**
  * 明細の数量。
@@ -15,7 +14,7 @@ public record Quantity(int value) {
   /** 数量が 1 以上であることを確かめる。 */
   public Quantity {
     if (value < MINIMUM) {
-      throw new BusinessRuleViolationException("quantity must be 1 or greater: value=" + value);
+      throw new IllegalArgumentException("quantity must be 1 or greater: value=" + value);
     }
   }
 }

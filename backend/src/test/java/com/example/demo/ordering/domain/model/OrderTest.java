@@ -163,11 +163,11 @@ class OrderTest {
   }
 
   @Test
-  @DisplayName("1 未満の数量と負の金額は BusinessRuleViolationException になる")
+  @DisplayName("1 未満の数量と負の金額は IllegalArgumentException になる")
   void valueObjectsRejectInvalidValues() {
-    assertThatThrownBy(() -> new Quantity(0)).isInstanceOf(BusinessRuleViolationException.class);
+    assertThatThrownBy(() -> new Quantity(0)).isInstanceOf(IllegalArgumentException.class);
     assertThatThrownBy(() -> new Money(new BigDecimal("-1")))
-        .isInstanceOf(BusinessRuleViolationException.class);
+        .isInstanceOf(IllegalArgumentException.class);
   }
 
   private static Order draft(final OrderedItem... items) {
