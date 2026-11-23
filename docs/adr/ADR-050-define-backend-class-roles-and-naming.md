@@ -17,7 +17,7 @@ Proposed
 
 ## Context
 
-[ADR-002](ADR-002-package-by-feature-onion-architecture.md) は、機能モジュールの内部を Domain、Application、Presentation、Infrastructure に分けると決めた。
+[ADR-002](ADR-002-package-by-feature-onion-architecture.md) は、機能モジュールの内部を層に分けると決めた（層の一覧は [バックエンドの層の責務](../backend/layers.md)）。
 しかし、各層に置くクラスの役割と命名は決めておらず、以前の `docs/backend/architecture.md` には次の問題があった。
 
 - モジュールルートに置く `<Feature>Operations`、`<Command>`、`<Result>` が何を表すかの定義と例がなかった。
@@ -33,6 +33,9 @@ Proposed
 
 クラス設計の標準、デファクトスタンダード、アンチパターンは、DDD とオニオンアーキテクチャの一次資料、CQRS の文献、Spring と Spring Modulith の公式文書、公開サンプルで調べた。
 検討した論点は Alternatives Considered に示す。
+
+[ADR-115](ADR-115-build-business-batches-with-spring-batch.md) は、機能モジュールに業務のバッチの層 `batch` を足し、`shared` に `shared.batch` を置いた。
+そこで、Context の層の数を書き直し、`shared` を使う層の決定に `shared.batch` を書き足した。
 
 ## Decision
 
@@ -119,6 +122,7 @@ Proposed
 - CommandHandler は内部パッケージの `application` に置くため、他モジュールから呼ぶと Spring Modulith の `ApplicationModules.verify()` で失敗する。
 - [ADR-048](ADR-048-add-shared-module-for-jooq-common-code.md) の `com.example.demo.shared` は、機能モジュールではない唯一の技術的な共有モジュールである。
   `shared.infrastructure.persistence` を `@NamedInterface` で公開し、業務の概念を持たず、他のモジュールの `infrastructure.persistence` だけから使う。
+  業務のバッチの `shared.batch` は、機能モジュールの `batch` だけから使う（ADR-115）。
   `shared` は機能モジュールの間の連携の手段ではなく、機能モジュールの間の連携はイベントと `<Feature>Queries` だけのままである。
   使う場所の制限は、ArchUnit の `sharedModuleIsUsedOnlyByPersistenceAdapters` で検査する。
 

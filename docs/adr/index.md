@@ -3,7 +3,7 @@
 - [ADR の運用ルール](conventions.md)
 - [ADR テンプレート](adr-template.md)
 - [ADR-001: Spring Modulith によるモジュラーモノリス](ADR-001-adopt-spring-modulith-modular-monolith.md)（Accepted, 2026-09-11）
-- [ADR-002: package by feature とオニオンアーキテクチャ](ADR-002-package-by-feature-onion-architecture.md)（Accepted, Amended by ADR-050, 2026-09-11）
+- [ADR-002: package by feature とオニオンアーキテクチャ](ADR-002-package-by-feature-onion-architecture.md)（Accepted, Amended by ADR-050, Amended by ADR-115, 2026-09-11）
 - [ADR-003: データアクセスに jOOQ を採用](ADR-003-adopt-jooq-for-data-access.md)（Accepted, 2026-09-11）
 - [ADR-004: jOOQ 生成コードを Git 管理する](ADR-004-commit-jooq-generated-code.md)（Accepted, 2026-09-11）
 - [ADR-005: Liquibase をアプリケーション起動から分離する](ADR-005-decouple-liquibase-from-app-startup.md)（Accepted, 2026-09-11）
@@ -114,3 +114,4 @@
 - [ADR-112: 複合主キーを使わず、業務キーの組にはユニークインデックスを張る](ADR-112-forbid-composite-primary-keys.md)（Proposed, 2026-11-22）
 - [ADR-113: 論理削除フラグを作らず、業務上の意味を持つカラムか物理削除で表す](ADR-113-forbid-logical-delete-flags.md)（Proposed, 2026-11-22）
 - [ADR-114: 暦日を full-date で受け渡し、SQL で日時から暦日と境界を作らない](ADR-114-pass-calendar-dates-as-full-date-and-bind-boundaries.md)（Proposed, 2026-11-23）
+- [ADR-115: 業務のバッチを Spring Batch の Job で作り、1 つの期間を 1 つの JobInstance にして毎日追いつく](ADR-115-build-business-batches-with-spring-batch.md)（Proposed, 2026-11-23）

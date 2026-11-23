@@ -40,7 +40,7 @@ public class Product extends SchemaImpl {
     public static final Product PRODUCT = new Product();
 
     /**
-     * The table <code>product.m_product</code>.
+     * 商品
      */
     public final MProduct M_PRODUCT = MProduct.M_PRODUCT;
 

@@ -70,6 +70,10 @@ jOOQの生成物の`com.example.demo.jooq`はOPENのモジュールであり、`
 
 ベースパッケージ直下の起動クラスと全体設定は、オニオン規則の所属検査から除外する。
 
+業務のバッチの`<module>.batch`と`shared.batch`（[ADR-115](../adr/ADR-115-build-business-batches-with-spring-batch.md)）の規則は、まだない。
+`batch`を`dependenciesPointInward`の層に足すこと、`shared.batch`を使えるクラスを`batch`に限ること、`batch`の依存方向を検査することは、Jobを足す[#667](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/667)で行う。
+`batch`を層に足すまでは、`<module>.batch`のクラスは`dependenciesPointInward`の所属検査で失敗する。
+
 共有モジュール`shared`（[ADR-048](../adr/ADR-048-add-shared-module-for-jooq-common-code.md)）のために、ほかの規則へ例外を足していない。
 `shared.infrastructure.persistence`はオニオン規則の`persistence`の層に入るため、機能モジュールの`infrastructure.persistence`からの依存は同じ層の中の依存になる。
 `infrastructureDependsOnlyOnDomainModel`が拒否するモジュールルートは`com.example.demo.<feature>`の直下だけであり、`shared.infrastructure.persistence`は含まれない。
@@ -109,6 +113,7 @@ jOOQの生成物の`com.example.demo.jooq`はOPENのモジュールであり、`
 - `tenantIsBoundOnlyByTenantSelectionFilterAndListenerAspect`：`TenantContext.call`を呼べるクラスは、`tenancy.presentation.web.TenantSelectionFilter`と`shared.infrastructure.persistence.TenantListenerAspect`の2つだけにする。
   CommandHandlerやControllerや別のfilterが束縛を切り替えて、認証の権限やイベントに無関係なテナントを操作することを防ぐ。メソッド参照も検出する（[ADR-105](../adr/ADR-105-bind-tenant-to-request-and-event-context.md)）。
   違反フィクスチャの`TenantSwitchingCommandHandler`（直接の呼び出し）と`HeaderTenantFilter`（別のモジュールのfilterのメソッド参照）で確かめ、規約どおりのフィクスチャの`TenantSelectionFilter`が通ることを確かめる。
+  業務のバッチの`shared.batch`のAspectを許可先に足すのは、Aspectを作る[#667](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/667)である（[ADR-105](../adr/ADR-105-bind-tenant-to-request-and-event-context.md)）。
 - `unboundTenantIsReadOnlyByTransactionManager`：本番のコードで`TenantContext.findCurrent`を呼べるクラスは、`shared.infrastructure.persistence.ModuleRoleTransactionManager`だけにする。
   ArchUnitは本番のクラスだけを解析するので、テストの補助（`AsTenant`など）は対象の外である。
   `findCurrent`は束縛のないことを空で返すため、業務の処理が使うと、テナントを束縛し忘れた呼び出しをテナントのない処理として通す。
@@ -412,6 +417,14 @@ DBの規約のほかの検査は`backend/src/test/java/com/example/demo/persiste
 - K1：カタログの同じスキーマのほかの表の主キーと同じ名前の列に、外部キーがある。
   外部キーは、テナントで分ける業務テーブルなら`(tenant_public_id, 参照先の主キー)`、`tenancy`の表なら参照先の主キーだけの形にし、形の違う外部キーも拒否する。
 - K4：changesetの外部キーは`addForeignKeyConstraint`だけで作り、名前を`fk_{表}`か`fk_{連番}_{表}`にし、同じスキーマの表をK1と同じ列で参照し、`onDelete`、`onUpdate`、`deleteCascade`を付けない。
+
+表と列の論理名の規則は次のとおりである。
+根拠は[PostgreSQLの命名規約](../database/postgresql-naming.md#論理名のコメント)にある。
+
+- N12：カタログの業務テーブルと、そのカラムに、空白だけでないコメントがある。
+  ビューと、パーティションの子テーブル（`relispartition`）とそのカラムは対象外にする。
+  PostgreSQLは、親のパーティションテーブルのコメントを子へ写さないためである。
+  違反のメッセージは、表と列のそれぞれの直し方を示す。
 
 スキーマ検査の規則を足すときは、判定に要る行を`CatalogSnapshot`に足して`SchemaCatalog.read`で埋め、判定する関数を`SchemaConventions.check`から呼ぶ。
 

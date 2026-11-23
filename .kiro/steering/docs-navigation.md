@@ -25,6 +25,7 @@ steering は入口の案内だけを持ち、規約の本文を持たない（[A
 | データベース（マイグレーション、jOOQ、接続、PostgreSQL 設計） | `docs/database/index.md`         |
 | Web API（HTTP API の設計と契約）                              | `docs/web-api/index.md`          |
 | システム連携と非同期処理                                      | `docs/integration/index.md`      |
+| バッチ（Spring Batch の Job、追いつき、再開）                 | `docs/batch/index.md`            |
 | 可観測性とログ                                                | `docs/observability/index.md`    |
 | 日時とタイムゾーン                                            | `docs/datetime/index.md`         |
 | コンテナ（Dockerfile、Compose）                               | `docs/container/index.md`        |
@@ -35,6 +36,7 @@ steering は入口の案内だけを持ち、規約の本文を持たない（[A
 | 非機能要件                                                    | `docs/nfr/index.md`              |
 | 性能テスト                                                    | `docs/performance-test/index.md` |
 | 帳票                                                          | `docs/report/index.md`           |
+| メール（送るメール、送信ドメイン、メールアドレス）            | `docs/mail/index.md`             |
 | コードレビュー（変更内容の観点）                              | `docs/code-review/index.md`      |
 | Pull Request（作成、依頼、マージの手順）                      | `docs/pull-request/index.md`     |
 | ナレッジ管理（docs と steering の役割分担）                   | `docs/knowledge/index.md`        |

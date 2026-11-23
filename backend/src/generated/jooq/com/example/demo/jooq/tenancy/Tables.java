@@ -26,22 +26,22 @@ import javax.annotation.processing.Generated;
 public class Tables {
 
     /**
-     * The table <code>tenancy.m_membership</code>.
+     * 所属
      */
     public static final MMembership M_MEMBERSHIP = MMembership.M_MEMBERSHIP;
 
     /**
-     * The table <code>tenancy.m_tenant</code>.
+     * テナント
      */
     public static final MTenant M_TENANT = MTenant.M_TENANT;
 
     /**
-     * The table <code>tenancy.m_user</code>.
+     * 利用者
      */
     public static final MUser M_USER = MUser.M_USER;
 
     /**
-     * The table <code>tenancy.m_user_identity</code>.
+     * IdP識別
      */
     public static final MUserIdentity M_USER_IDENTITY = MUserIdentity.M_USER_IDENTITY;
 }

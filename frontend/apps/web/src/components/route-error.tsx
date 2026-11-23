@@ -1,4 +1,4 @@
-import { isTenantNotSelected } from "@frontend/api/api-fetch";
+import { isTenantNotSelected } from "@frontend/api/api-error";
 import { Button, buttonVariants } from "@frontend/ui/button";
 import { useQueryErrorResetBoundary } from "@tanstack/react-query";
 import { Link, useRouter } from "@tanstack/react-router";

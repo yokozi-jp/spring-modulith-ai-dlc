@@ -20,7 +20,7 @@ description: バックエンド（Spring Boot、Spring Modulith、jOOQ）のコ�
 
 - 新しい機能モジュールを作る：`docs/backend/runbook-add-feature.md`
 - パッケージ構成、モジュール間の参照、ベースパッケージ直下の設定を扱う：`docs/backend/architecture.md`
-- クラスを Domain、Application、Presentation、Infrastructure のどこに置くか決める：`docs/backend/layers.md`
+- クラスを Domain、Application、Presentation、Batch、Infrastructure のどこに置くか決める：`docs/backend/layers.md`
 - 新しいクラスを作る：`docs/backend/class-roles/index.md` で役割を選び、その役割の文書のチェックリストで点検する
 - Lombok、record、ロギングの書き方、または型の設計（sealed interface、キャスト、`default`、null）を決める：`docs/backend/java-coding.md`、`docs/backend/java-type-modeling.md`
 - ArchUnit、Spring Modulith の検証、PMD が失敗した：`docs/backend/architecture-tests.md`

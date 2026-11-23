@@ -560,7 +560,7 @@ class ClassRoleArchTest {
                 + "束縛は tenancy の TenantSelectionFilter がセッションで選んだテナントを、"
                 + "TenantListenerAspect がイベントのテナントを行う。"
                 + "新しい入口が要るときは、この規則の許可先と ADR-105 を先に変える。"
-                + "規約：docs/backend/architecture.md、"
+                + "規約：docs/backend/shared-module.md、"
                 + ADR_105);
   }
 
