@@ -82,6 +82,7 @@ backend を再起動せず、シナリオの途中で注文ごとに応答を切
 
 setup project は、`storageState` を持たない browser context で `/oauth2/authorization/web` を開き、Keycloak の画面で `test-user` としてログインする。
 `/` から始めると、SPA が API の 401 を受けて自分でログインへ遷移し、setup project の遷移と競合する。
+この遷移そのものは、`unauthenticated-redirect.spec.ts` がログアウト後に `/` を開いて確かめる。
 `test-user` は代表データで 2 つのテナントに属するため、戻り先はテナントを選ぶ画面（web の origin の `/tenants`）になる。
 認証の前後で `APP_SESSION` Cookie の値が変わったことで認証済みと判断し、サンプル商事を選ぶ。
 選んだ後に web の origin の `/` へ移り、`APP_SESSION` の値がもう一度変わったことを確かめてから、`frontend/apps/web/e2e/.auth/user.json` に保存する。

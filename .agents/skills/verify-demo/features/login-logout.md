@@ -49,6 +49,7 @@ Preconditions:
 - 未認証で `/` を開くと、`_tenant` の `beforeLoad` が呼ぶ `GET /api/current-tenant` の 401 で、SPA が `/oauth2/authorization/web` へ移る。
   同じ tab で 30 秒以内に 2 回目の 401 を受けると移らず、`RouteError` を表示する（`redirectToLoginOnUnauthorized`）。
   続けて別の画面を未認証で開くときは、`context.newPage()` で tab を分ける。
+  この遷移は `frontend/apps/web/e2e/unauthenticated-redirect.spec.ts` が固定する。
 - Keycloak の issuer は `idpOrigin`（slot 0 は `http://127.0.0.1:8081`）に固定されている。
   `localhost` で開くと issuer が一致せず失敗する。
 - compose-test には Collector がない。

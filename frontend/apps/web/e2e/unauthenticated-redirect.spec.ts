@@ -11,12 +11,12 @@ test("ログアウト後に / を開くと資格情報の入力を求められ�
   await page.getByRole("button", { name: "ログアウト" }).click();
   await expect(page).toHaveURL(`${webOrigin}/logged-out`);
 
-  await page.goto("/");
+  // load を待つと、SPA が 401 を受けて始めるログインへの遷移と競合する。
+  await page.goto("/", { waitUntil: "commit" });
   await expect(page.getByLabel("Username or email")).toBeVisible();
-  // 戻り先は画面の URL になり、401 を返した API の URL（/api/**）にならない。
+  // ログインの後の着地が /tenants であることが、/api/** の要求を保存しない（NullRequestCache）証拠になる。
   await signInAndChooseTenant(page);
 
-  await expect(page).toHaveURL(`${webOrigin}/`);
   await expect(
     page.getByRole("main").getByRole("heading", { level: 1, name: "はじめる" }),
   ).toBeVisible();
