@@ -3,7 +3,6 @@ package com.example.demo.error.presentation.web;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 
-import io.micrometer.tracing.Tracer;
 import java.net.URI;
 import java.util.List;
 import java.util.Locale;
@@ -17,18 +16,14 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.http.ProblemDetail;
-import org.springframework.mock.web.MockHttpServletRequest;
 
 /** Problem Details の公開情報と応答ヘッダを API 契約へ正規化することを検証する。 */
-// 正規化の規則ごとにテストを分けるため、メソッドの数の上限を外す。
-@SuppressWarnings("PMD.TooManyMethods")
 class ApiProblemDetailsTest {
 
   @Test
   @DisplayName("about:blank では framework が生成した detail を除去する")
   void normalizeRemovesGenericFrameworkDetail() {
-    final ApiProblemDetails problemDetails =
-        new ApiProblemDetails(new StaticMessageSource(), Tracer.NOOP);
+    final ApiProblemDetails problemDetails = new ApiProblemDetails(new StaticMessageSource());
     final ProblemDetail problem =
         ProblemDetail.forStatusAndDetail(HttpStatus.NOT_FOUND, "No static resource api/missing.");
 
@@ -39,27 +34,11 @@ class ApiProblemDetailsTest {
   }
 
   @Test
-  @DisplayName("現在の span がない（Tracer.NOOP の）ときは traceId を付けない")
-  void normalizeOmitsTraceIdWithoutSpan() {
-    final ApiProblemDetails problemDetails =
-        new ApiProblemDetails(new StaticMessageSource(), Tracer.NOOP);
-
-    final ProblemDetail advice = ProblemDetail.forStatus(HttpStatus.BAD_REQUEST);
-    problemDetails.normalize(advice, HttpStatus.BAD_REQUEST, Locale.ENGLISH);
-    final ProblemDetail forwarded =
-        problemDetails.localizedForStatus(
-            HttpStatus.BAD_REQUEST, Locale.ENGLISH, new MockHttpServletRequest());
-
-    assertNull(advice.getProperties(), "advice の Problem Details の拡張メンバー");
-    assertNull(forwarded.getProperties(), "/error の Problem Details の拡張メンバー");
-  }
-
-  @Test
   @DisplayName("業務固有 type の明示的な title と detail は保持する")
   void normalizeKeepsExplicitTitleAndDetailForCustomType() {
     final StaticMessageSource messages = new StaticMessageSource();
     messages.addMessage("problem.title.409", Locale.JAPANESE, "競合が発生しました");
-    final ApiProblemDetails problemDetails = new ApiProblemDetails(messages, Tracer.NOOP);
+    final ApiProblemDetails problemDetails = new ApiProblemDetails(messages);
     final ProblemDetail problem =
         ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, "安全な業務エラーの説明");
     problem.setType(URI.create("/problems/order-conflict"));
@@ -78,7 +57,7 @@ class ApiProblemDetailsTest {
     final StaticMessageSource messages = new StaticMessageSource();
     messages.addMessage("problem.title.409", Locale.JAPANESE, "競合が発生しました");
     messages.addMessage("problem.title.409", Locale.ENGLISH, "Conflict");
-    final ApiProblemDetails problemDetails = new ApiProblemDetails(messages, Tracer.NOOP);
+    final ApiProblemDetails problemDetails = new ApiProblemDetails(messages);
     final ProblemDetail problem = ProblemDetail.forStatus(HttpStatus.CONFLICT);
     problem.setTitle("framework title");
 
@@ -107,11 +86,8 @@ class ApiProblemDetailsTest {
     messages.addMessage("problem.title.500", Locale.ENGLISH, "Internal Server Error");
 
     final ProblemDetail problem =
-        new ApiProblemDetails(messages, Tracer.NOOP)
-            .localizedForStatus(
-                HttpStatusCode.valueOf(code),
-                Locale.forLanguageTag(language),
-                new MockHttpServletRequest());
+        new ApiProblemDetails(messages)
+            .localizedForStatus(HttpStatusCode.valueOf(code), Locale.forLanguageTag(language));
 
     assertEquals(code, problem.getStatus(), "status: 入力 " + code);
     assertEquals(URI.create("about:blank"), problem.getType(), "type: 入力 " + code);
@@ -126,7 +102,7 @@ class ApiProblemDetailsTest {
     final StaticMessageSource messages = new StaticMessageSource();
     messages.addMessage("problem.title.validation-error", Locale.JAPANESE, "入力内容に誤りがあります");
     messages.addMessage("problem.title.400", Locale.JAPANESE, "リクエストが不正です");
-    final ApiProblemDetails problemDetails = new ApiProblemDetails(messages, Tracer.NOOP);
+    final ApiProblemDetails problemDetails = new ApiProblemDetails(messages);
     final Locale locale = Locale.forLanguageTag(language);
     final List<ApiProblemDetails.ValidationError> errors =
         List.of(new ApiProblemDetails.ValidationError("/name", "この項目は必須です。"));

@@ -40,7 +40,7 @@ public class ApiErrorController implements ErrorController {
     final Locale locale = LocaleSupport.resolve(request);
     return ResponseEntity.status(status)
         .headers(ApiProblemDetails.responseHeaders(new HttpHeaders(), status, locale))
-        .body(problemDetails.localizedForStatus(status, locale, request));
+        .body(problemDetails.localizedForStatus(status, locale));
   }
 
   /** 4xx と 5xx は HttpStatus に定義がなくても保ち、それ以外は 500 にする（ADR-013）。 */

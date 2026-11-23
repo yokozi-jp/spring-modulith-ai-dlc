@@ -4,7 +4,6 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.quicktheories.QuickTheory.qt;
 import static org.quicktheories.generators.SourceDSL.integers;
 
-import io.micrometer.tracing.Tracer;
 import jakarta.servlet.RequestDispatcher;
 import java.util.Objects;
 import org.junit.jupiter.api.DisplayName;
@@ -19,23 +18,24 @@ class ApiErrorControllerTest {
 
   /** MessageSource に key のない状態の検証対象。 */
   private final ApiErrorController controller =
-      new ApiErrorController(new ApiProblemDetails(new StaticMessageSource(), Tracer.NOOP));
+      new ApiErrorController(new ApiProblemDetails(new StaticMessageSource()));
 
   @Test
   @DisplayName("400 から 599 の status は HttpStatus に定義がなくてもそのまま返し、それ以外は 500 にする")
   void errorKeepsOnlyClientAndServerErrorStatus() {
     qt().withExamples(2_000)
         .forAll(integers().between(-1_000, 2_000))
-        .checkAssert(code -> {
-          final int expected = code >= 400 && code <= 599 ? code : 500;
-          final MockHttpServletRequest request = new MockHttpServletRequest();
-          request.setAttribute(RequestDispatcher.ERROR_STATUS_CODE, code);
+        .checkAssert(
+            code -> {
+              final int expected = code >= 400 && code <= 599 ? code : 500;
+              final MockHttpServletRequest request = new MockHttpServletRequest();
+              request.setAttribute(RequestDispatcher.ERROR_STATUS_CODE, code);
 
-          final ResponseEntity<ProblemDetail> response = controller.error(request);
+              final ResponseEntity<ProblemDetail> response = controller.error(request);
 
-          assertEquals(expected, response.getStatusCode().value(), "応答の status: 入力 " + code);
-          assertEquals(expected, body(response).getStatus(), "body の status: 入力 " + code);
-        });
+              assertEquals(expected, response.getStatusCode().value(), "応答の status: 入力 " + code);
+              assertEquals(expected, body(response).getStatus(), "body の status: 入力 " + code);
+            });
   }
 
   @Test

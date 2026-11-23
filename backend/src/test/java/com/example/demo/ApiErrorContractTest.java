@@ -19,6 +19,7 @@ import errorfixture.presentation.web.ErrorFixture;
 import io.opentelemetry.api.OpenTelemetry;
 import io.opentelemetry.api.common.AttributeKey;
 import io.opentelemetry.api.logs.Severity;
+import io.opentelemetry.api.trace.TraceId;
 import io.opentelemetry.instrumentation.logback.appender.v1_0.OpenTelemetryAppender;
 import io.opentelemetry.sdk.logs.data.LogRecordData;
 import java.io.UnsupportedEncodingException;
@@ -388,6 +389,25 @@ class ApiErrorContractTest {
     assertTrue(
         capturedLogRecords.withScope("org.springframework.web.servlet.PageNotFound").isEmpty(),
         "PageNotFound の記録がないこと");
+  }
+
+  @Test
+  @DisplayName("Problem Details の traceId は、同じ要求の API client error のログの trace ID と同じになる")
+  void problemTraceIdMatchesLoggedTraceId() throws Exception {
+    final String body =
+        mockMvc
+            .perform(delete("/api/error-fixture/items").with(oidcLogin()).with(csrf()))
+            .andExpect(status().isMethodNotAllowed())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+    final String traceId = JsonMapper.builder().build().readTree(body).path("traceId").asString();
+
+    assertTrue(TraceId.isValid(traceId), body);
+    assertTrue(
+        capturedLogRecords.withBody("API client error").stream()
+            .anyMatch(record -> traceId.equals(record.getSpanContext().getTraceId())),
+        () -> "traceId=" + traceId + " の API client error の LogRecord");
   }
 
   private LogRecordData assertLogged(

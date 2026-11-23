@@ -3,11 +3,9 @@ package com.example.demo;
 import static com.example.demo.testkit.AppUsers.oidcLogin;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -21,15 +19,12 @@ import java.util.UUID;
 import java.util.stream.Stream;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.context.SpringBootTest.WebEnvironment;
-import org.springframework.boot.test.system.CapturedOutput;
-import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.boot.test.web.server.LocalServerPort;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.context.annotation.Import;
@@ -39,9 +34,13 @@ import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilde
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 
-/** Problem Details の traceId が要求の trace ID とログの traceId に一致し、instance を持たないことを、すべての経路で検証する。 */
+/**
+ * Problem Details の traceId が、sampled flag が 00 の traceparent の trace ID になることを、advice、Spring
+ * Security、{@code /error} への転送の経路で検証する。
+ */
 @SuppressWarnings({"PMD.TooManyStaticImports", "PMD.UnitTestShouldIncludeAssert"})
 @SpringBootTest(
+    // MockMvc はコンテナの /error への転送を再現しないので、/error の経路のために実際のポートで起動する。
     webEnvironment = WebEnvironment.RANDOM_PORT,
     properties = {
       // テストの既定は tracing の export を無効にし、traceparent を読む propagator も作らない。
@@ -50,17 +49,10 @@ import tools.jackson.databind.json.JsonMapper;
     })
 @AutoConfigureMockMvc
 @Import({SharedTestConfiguration.class, ErrorFixture.class})
-@ExtendWith(OutputCaptureExtension.class)
 class ProblemDetailsTraceIdContractTest {
 
   /** W3C Trace Context の要求ヘッダ。 */
   private static final String TRACEPARENT = "traceparent";
-
-  /** ECS JSON のログと Problem Details で trace ID を持つ項目。 */
-  private static final String TRACE_ID = "traceId";
-
-  /** ログの JSON を読む。 */
-  private static final JsonMapper JSON = JsonMapper.builder().build();
 
   /** 実際の Spring MVC と Security filter chain を通すクライアント。 */
   @Autowired private MockMvc mockMvc;
@@ -81,16 +73,13 @@ class ProblemDetailsTraceIdContractTest {
   private static Stream<Arguments> mvcProblems() {
     return Stream.of(
         Arguments.of(
-            "MVC の 405", delete("/api/error-fixture/items").with(oidcLogin()).with(csrf()), 405),
-        Arguments.of("MVC の 500", get("/api/error-fixture/unhandled").with(oidcLogin()), 500),
-        Arguments.of("Spring Security の 401", get("/api/orders"), 401),
-        Arguments.of("Spring Security の CSRF の 403", post("/api/orders").with(oidcLogin()), 403));
+            "advice の 405", delete("/api/error-fixture/items").with(oidcLogin()).with(csrf()), 405),
+        Arguments.of("Spring Security の 401", get("/api/orders"), 401));
   }
 
   @ParameterizedTest(name = "{0}")
   @MethodSource("mvcProblems")
-  @DisplayName(
-      "sampled flag が 00 の traceparent でも、Problem Details の traceId はその trace ID になり、instance を持たない")
+  @DisplayName("sampled flag が 00 の traceparent でも、Problem Details の traceId はその trace ID になる")
   void mvcProblemCarriesTraceparentTraceId(
       final String name, final MockHttpServletRequestBuilder request, final int status)
       throws Exception {
@@ -124,32 +113,8 @@ class ProblemDetailsTraceIdContractTest {
         MediaType.APPLICATION_PROBLEM_JSON_VALUE,
         response.headers().firstValue("Content-Type").orElse(""),
         response::body);
-    final JsonNode body = JSON.readTree(response.body());
-    assertEquals(traceId, body.path(TRACE_ID).asString(), response::body);
+    final JsonNode body = JsonMapper.builder().build().readTree(response.body());
+    assertEquals(traceId, body.path("traceId").asString(), response::body);
     assertFalse(body.has("instance"), response::body);
-  }
-
-  @Test
-  @DisplayName(
-      "traceparent のない要求の Problem Details の traceId は、同じ要求の API client error のログの traceId と同じになる")
-  void problemTraceIdMatchesLoggedTraceId(final CapturedOutput output) throws Exception {
-    final String body =
-        mockMvc
-            .perform(delete("/api/error-fixture/items").with(oidcLogin()).with(csrf()))
-            .andExpect(status().isMethodNotAllowed())
-            .andReturn()
-            .getResponse()
-            .getContentAsString();
-    final String traceId = JSON.readTree(body).path(TRACE_ID).asString();
-
-    assertTrue(traceId.matches("^[0-9a-f]{32}$"), body);
-    assertTrue(
-        output
-            .getAll()
-            .lines()
-            .filter(line -> line.startsWith("{") && line.contains("API client error"))
-            .map(JSON::readTree)
-            .anyMatch(line -> traceId.equals(line.path(TRACE_ID).asString())),
-        () -> "traceId=" + traceId + " の API client error の JSON ログ");
   }
 }

@@ -14,7 +14,6 @@ import ch.qos.logback.core.read.ListAppender;
 import com.example.demo.shared.concurrency.ConflictException;
 import com.example.demo.shared.failure.BusinessRuleViolationException;
 import com.example.demo.shared.failure.NotFoundException;
-import io.micrometer.tracing.Tracer;
 import jakarta.validation.ConstraintViolation;
 import jakarta.validation.ConstraintViolationException;
 import jakarta.validation.Valid;
@@ -103,7 +102,7 @@ class ApiExceptionHandlerTest {
     messages.addMessage("problem.title.422", Locale.JAPANESE, "処理できない内容です");
     messages.addMessage("problem.title.500", Locale.JAPANESE, "サーバー内部エラー");
     messages.addMessage("problem.title.validation-error", Locale.JAPANESE, "入力内容に誤りがあります");
-    return new ApiExceptionHandler(new ApiProblemDetails(messages, Tracer.NOOP));
+    return new ApiExceptionHandler(new ApiProblemDetails(messages));
   }
 
   @Test
