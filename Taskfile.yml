@@ -10,7 +10,7 @@ vars:
   TEST_COMPOSE_FILE: '{{.TEST_COMPOSE_FILE | default "docker/compose-test.yml"}}'
   # frontend/ で vp run と vp exec が対象にする apps/web。名前が合わないときは、黙って何も実行せず失敗にする。
   FE_WEB: --filter @frontend/web --fail-if-no-match
-  # frontend/ で vp run が対象にする packages/api。Orval の生成物と api-fetch の置き場。
+  # frontend/ で vp run が対象にする packages/api。Orval の生成物と api-fetch、api-error の置き場。
   FE_API: --filter @frontend/api --fail-if-no-match
   DB_ROLLBACK_TAG: '{{.DB_ROLLBACK_TAG | default ""}}'
   CONFIRM_ROLLBACK: '{{.CONFIRM_ROLLBACK | default ""}}'

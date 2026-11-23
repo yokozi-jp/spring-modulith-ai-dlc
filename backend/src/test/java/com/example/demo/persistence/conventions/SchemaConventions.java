@@ -15,8 +15,8 @@ import java.util.stream.Stream;
  *
  * <p>DBに接続しない純粋な関数である。業務テーブルは{@link
  * #FRAMEWORK_SCHEMAS}以外のスキーマのテーブルとする。DBオブジェクト、拡張機能、独自型、ラージオブジェクトの規則（O1、O3、O4、O7、T10、T12）をここで判定し、テーブルの規則は{@link
- * SchemaTableConventions}、テナントと外部キーの規則は{@link SchemaTenantConventions}、権限の規則は{@link
- * SchemaPrivilegeConventions}が判定する。
+ * SchemaTableConventions}、論理名の規則は{@link SchemaLogicalNameConventions}、テナントと外部キーの規則は{@link
+ * SchemaTenantConventions}、権限の規則は{@link SchemaPrivilegeConventions}が判定する。
  */
 final class SchemaConventions {
 
@@ -71,6 +71,7 @@ final class SchemaConventions {
             SchemaTableConventions.constraints(snapshot.constraints()),
             SchemaTableConventions.indexes(snapshot.indexes()),
             SchemaTableConventions.primaryKeys(snapshot.relations()),
+            SchemaLogicalNameConventions.logicalNames(snapshot.relations(), snapshot.columns()),
             SchemaTableConventions.references(snapshot.relations(), snapshot.columns()),
             SchemaTableConventions.crossSchemaForeignKeys(snapshot.constraints()),
             SchemaTenantConventions.foreignKeys(

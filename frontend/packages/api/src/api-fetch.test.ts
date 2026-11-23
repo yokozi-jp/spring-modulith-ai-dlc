@@ -9,33 +9,9 @@ import { server } from "./testing/msw";
 
 // Node の fetch は相対 URL を解決しないため、絶対 URL にする。
 const baseUrl = "http://localhost";
-const loginPath = "/oauth2/authorization/web";
-const assign = vi.fn<(url: string) => void>();
-// fallback の memory の値はモジュールの変数なので、テストごとに読み直す（beforeEach）。
 let api = await import("./api-fetch");
-
-function stubSessionStorage() {
-  const items = new Map<string, string>();
-  vi.stubGlobal("sessionStorage", {
-    // Storage.getItem の仕様どおり、値がなければ null を返す。
-    // oxlint-disable-next-line unicorn/no-null
-    getItem: (key: string) => items.get(key) ?? null,
-    setItem: (key: string, value: string) => items.set(key, value),
-    removeItem: (key: string) => items.delete(key),
-  });
-}
-
-function failStorage(): never {
-  throw new Error("storage is disabled");
-}
-
-function stubThrowingSessionStorage() {
-  vi.stubGlobal("sessionStorage", {
-    getItem: failStorage,
-    setItem: failStorage,
-    removeItem: failStorage,
-  });
-}
+// resetModules の後に読み直さないと、api-fetch が投げる ApiProblemError と別の class になる。
+let { ApiProblemError } = await import("./api-error");
 
 async function fetchError(path: string): Promise<unknown> {
   try {
@@ -47,10 +23,8 @@ async function fetchError(path: string): Promise<unknown> {
 }
 
 const csrfTokenInvalidType = "/problems/csrf-token-invalid";
-const tenantNotSelectedType = "/problems/tenant-not-selected";
 const csrfProblem = { type: csrfTokenInvalidType, title: "Invalid", status: 403 };
 const permissionProblem = { type: "about:blank", title: "Forbidden", status: 403 };
-const tenantProblem = { type: tenantNotSelectedType, title: "No tenant selected", status: 403 };
 
 function forbidden(problem: object) {
   return HttpResponse.json(problem, {
@@ -71,8 +45,8 @@ describe("api-fetch", () => {
   beforeEach(async () => {
     vi.resetModules();
     api = await import("./api-fetch");
-    assign.mockReset();
-    vi.stubGlobal("location", { assign, href: `${baseUrl}/`, origin: baseUrl });
+    ({ ApiProblemError } = await import("./api-error"));
+    vi.stubGlobal("location", { href: `${baseUrl}/`, origin: baseUrl });
     // Node には document がないため、Cookie のない document を置く。
     vi.stubGlobal("document", { cookie: "" });
   });
@@ -137,7 +111,7 @@ describe("api-fetch", () => {
 
       const error = await fetchError("/api/items");
 
-      expect(error).toBeInstanceOf(api.ApiProblemError);
+      expect(error).toBeInstanceOf(ApiProblemError);
       expect(error).toMatchObject({ status: 400, problem });
     });
 
@@ -155,7 +129,7 @@ describe("api-fetch", () => {
 
       const error = await fetchError("/api/items");
 
-      expect(error).toBeInstanceOf(api.ApiProblemError);
+      expect(error).toBeInstanceOf(ApiProblemError);
       expect(error).toMatchObject({ status: 502, problem: undefined });
     });
 
@@ -173,7 +147,7 @@ describe("api-fetch", () => {
 
       const error = await fetchError("/api/items");
 
-      expect(error).toBeInstanceOf(api.ApiProblemError);
+      expect(error).toBeInstanceOf(ApiProblemError);
       expect(error).toMatchObject({ status: 500, problem: undefined });
     });
   });
@@ -251,31 +225,6 @@ describe("api-fetch", () => {
     });
   });
 
-  describe("isTenantNotSelected", () => {
-    it("テナントを選ぶ前の type の 403 を、テナントを選ぶ前の拒否とみなす", () => {
-      expect(api.isTenantNotSelected(new api.ApiProblemError(403, tenantProblem))).toBe(true);
-    });
-
-    it.each([
-      ["権限不足の 403", () => new api.ApiProblemError(403, permissionProblem)],
-      ["CSRF の 403", () => new api.ApiProblemError(403, csrfProblem)],
-      ["problem のない 403", () => new api.ApiProblemError(403, undefined)],
-      ["同じ type の 400", () => new api.ApiProblemError(400, { ...tenantProblem, status: 400 })],
-      ["通信の失敗", () => new Error("network")],
-    ])("%s は、テナントを選ぶ前の拒否とみなさない", (_name, error) => {
-      expect(api.isTenantNotSelected(error())).toBeFalsy();
-    });
-
-    it("判定に使う type は、コミット済みの OpenAPI 契約にある", () => {
-      const contract = readFileSync(
-        new URL("../../../../openapi/openapi.yaml", import.meta.url),
-        "utf8",
-      );
-
-      expect(contract).toContain(tenantNotSelectedType);
-    });
-  });
-
   describe("CSRF の 403 の再試行", () => {
     const tokens: (string | undefined)[] = [];
 
@@ -320,7 +269,7 @@ describe("api-fetch", () => {
 
       const error = await post();
 
-      expect(error).toBeInstanceOf(api.ApiProblemError);
+      expect(error).toBeInstanceOf(ApiProblemError);
       expect(error).toMatchObject({ status: 403, problem: csrfProblem });
       expect(tokens).toHaveLength(2);
     });
@@ -330,7 +279,7 @@ describe("api-fetch", () => {
 
       const error = await post();
 
-      expect(error).toBeInstanceOf(api.ApiProblemError);
+      expect(error).toBeInstanceOf(ApiProblemError);
       expect(error).toMatchObject({ status: 403, problem: csrfProblem });
       expect(tokens).toStrictEqual(["stale", "stale"]);
     });
@@ -350,7 +299,7 @@ describe("api-fetch", () => {
 
       const error = await post();
 
-      expect(error).toBeInstanceOf(api.ApiProblemError);
+      expect(error).toBeInstanceOf(ApiProblemError);
       expect(error).toMatchObject({ status: 403, problem: permissionProblem });
       expect(tokens).toHaveLength(1);
     });
@@ -372,86 +321,6 @@ describe("api-fetch", () => {
 
       expect(error).toMatchObject({ status: 403, problem: undefined });
       expect(tokens).toHaveLength(1);
-    });
-  });
-
-  describe("redirectToLoginOnUnauthorized", () => {
-    it("401 でログインへ 1 回だけ遷移する", () => {
-      stubSessionStorage();
-      const error = new api.ApiProblemError(401, undefined);
-
-      api.redirectToLoginOnUnauthorized(error);
-      api.redirectToLoginOnUnauthorized(error);
-
-      expect(assign).toHaveBeenCalledExactlyOnceWith(loginPath);
-    });
-
-    it("30 秒を過ぎた 401 では再び遷移する", () => {
-      stubSessionStorage();
-      vi.useFakeTimers();
-      vi.setSystemTime(new Date("2025-01-01T00:00:00Z"));
-      const error = new api.ApiProblemError(401, undefined);
-
-      api.redirectToLoginOnUnauthorized(error);
-      vi.setSystemTime(new Date("2025-01-01T00:00:29.999Z"));
-      api.redirectToLoginOnUnauthorized(error);
-      vi.setSystemTime(new Date("2025-01-01T00:00:30Z"));
-      api.redirectToLoginOnUnauthorized(error);
-
-      expect(assign).toHaveBeenCalledTimes(2);
-    });
-
-    it("401 以外と ApiProblemError 以外では遷移しない", () => {
-      stubSessionStorage();
-
-      api.redirectToLoginOnUnauthorized(new api.ApiProblemError(403, undefined));
-      api.redirectToLoginOnUnauthorized(new TypeError("Failed to fetch"));
-      api.redirectToLoginOnUnauthorized(Object.assign(new Error("x"), { status: 401 }));
-
-      expect(assign).not.toHaveBeenCalled();
-    });
-
-    it("sessionStorage が例外を投げても遷移を 1 回に抑える", () => {
-      stubThrowingSessionStorage();
-      const error = new api.ApiProblemError(401, undefined);
-
-      api.redirectToLoginOnUnauthorized(error);
-      api.redirectToLoginOnUnauthorized(error);
-
-      expect(assign).toHaveBeenCalledExactlyOnceWith(loginPath);
-    });
-
-    it("数値でない保存値は遷移していないとして扱う", () => {
-      stubSessionStorage();
-      globalThis.sessionStorage.setItem("api.loginRedirectedAt", "not-a-number");
-
-      api.redirectToLoginOnUnauthorized(new api.ApiProblemError(401, undefined));
-
-      expect(assign).toHaveBeenCalledExactlyOnceWith(loginPath);
-    });
-  });
-
-  describe("retryUnlessClientError", () => {
-    it("408 と 429 以外の 4xx の ApiProblemError は再試行しない", () => {
-      expect(api.retryUnlessClientError(0, new api.ApiProblemError(400, undefined))).toBeFalsy();
-      expect(api.retryUnlessClientError(0, new api.ApiProblemError(499, undefined))).toBeFalsy();
-    });
-
-    it.each([408, 429])("%i の ApiProblemError は 3 回まで再試行する", (status) => {
-      const error = new api.ApiProblemError(status, undefined);
-
-      expect(api.retryUnlessClientError(2, error)).toBe(true);
-      expect(api.retryUnlessClientError(3, error)).toBeFalsy();
-    });
-
-    it("5xx と通信の失敗は 3 回まで再試行する", () => {
-      const serverError = new api.ApiProblemError(500, undefined);
-      const networkError = new TypeError("Failed to fetch");
-
-      expect(api.retryUnlessClientError(2, serverError)).toBe(true);
-      expect(api.retryUnlessClientError(3, serverError)).toBeFalsy();
-      expect(api.retryUnlessClientError(2, networkError)).toBe(true);
-      expect(api.retryUnlessClientError(3, networkError)).toBeFalsy();
     });
   });
 });

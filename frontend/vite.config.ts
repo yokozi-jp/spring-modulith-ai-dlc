@@ -39,6 +39,16 @@ const libLayerImports = {
   group: [...sharedLayerImports.group, "@/components/**"],
   message: "lib must not depend on components, features or routes.",
 };
+// components が使える @frontend/api の入口は api-error と csrf だけである。送信とデータの取得は route と feature が行う。
+const componentLayerImports = {
+  group: [
+    "@frontend/api/api-fetch",
+    "@frontend/api/endpoints/**",
+    "@frontend/api/models",
+    "@frontend/api/zod/**",
+  ],
+  message: "components may use only @frontend/api/api-error and @frontend/api/csrf.",
+};
 const featureImports = {
   group: ["@/routes/**", "@/routeTree.gen"],
   message: "Use getRouteApi instead of importing a route.",
@@ -108,12 +118,14 @@ export default defineConfig({
     jsPlugins: [
       { name: "vite-plus", specifier: "vite-plus/oxlint-plugin" },
       { name: "local-security", specifier: "./lint/local-security.js" },
+      { name: "disable-reason", specifier: "./lint/disable-reason.js" },
       { name: "shadcn", specifier: "@shadcn/lint" },
       { name: "better-tailwindcss", specifier: "eslint-plugin-better-tailwindcss" },
       { name: "tailwind-classes", specifier: "./lint/tailwind-classes.js" },
       { name: "feature-boundaries", specifier: "./lint/feature-boundaries.js" },
       { name: "ui-composition", specifier: "./lint/ui-composition.js" },
       { name: "react-rules", specifier: "./lint/react-rules.js" },
+      { name: "testing-library", specifier: "eslint-plugin-testing-library" },
     ],
     rules: {
       "react/react-in-jsx-scope": "off",
@@ -171,6 +183,7 @@ export default defineConfig({
       "no-restricted-globals": ["error", ...htmlSinkGlobals, ...networkGlobals],
       "no-restricted-properties": ["error", ...htmlSinkProperties, ...networkProperties],
       "local-security/no-jsx-srcdoc": "error",
+      "disable-reason/require-disable-reason": "error",
       "feature-boundaries/no-cross-feature-import": "error",
       "ui-composition/no-button-in-link": "error",
       "react-rules/no-effect": "error",
@@ -202,6 +215,27 @@ export default defineConfig({
         rules: tailwindRules(`${import.meta.dirname}/apps/web/src/style.css`),
       },
       {
+        files: ["apps/*/src/**/*.test.{ts,tsx}", "apps/*/src/testing/**"],
+        rules: {
+          "testing-library/await-async-queries": "error",
+          "testing-library/await-async-utils": "error",
+          "testing-library/no-container": "error",
+          "testing-library/no-manual-cleanup": "error",
+          "testing-library/no-node-access": "error",
+          "testing-library/no-unnecessary-act": "error",
+          "testing-library/no-wait-for-multiple-assertions": "error",
+          "testing-library/no-wait-for-side-effects": "error",
+          "testing-library/prefer-find-by": "error",
+          "testing-library/prefer-screen-queries": "error",
+          "testing-library/prefer-user-event": "error",
+        },
+      },
+      // Vitest は globals を渡さないので、Testing Library の自動 cleanup が効かない。setup.ts の cleanup() が唯一の後片付けである。
+      {
+        files: ["apps/*/src/testing/setup.ts"],
+        rules: { "testing-library/no-manual-cleanup": "off" },
+      },
+      {
         files: ["lint/**"],
         env: { node: true },
         rules: {
@@ -214,12 +248,29 @@ export default defineConfig({
         },
       },
       {
-        files: ["apps/*/src/{api,components,i18n}/**"],
+        files: ["apps/*/src/{api,i18n}/**"],
         rules: {
           "no-restricted-imports": [
             "error",
             {
               patterns: [sharedLayerImports, baseUiImports, testOnlyImports, telemetrySdkImports],
+            },
+          ],
+        },
+      },
+      {
+        files: ["apps/*/src/components/**"],
+        rules: {
+          "no-restricted-imports": [
+            "error",
+            {
+              patterns: [
+                sharedLayerImports,
+                componentLayerImports,
+                baseUiImports,
+                testOnlyImports,
+                telemetrySdkImports,
+              ],
             },
           ],
         },

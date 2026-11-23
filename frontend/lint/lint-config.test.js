@@ -93,6 +93,13 @@ describe("fixture に適用したプロジェクトの lint 設定", () => {
       expect(countIn("components/route-import.tsx", "eslint(no-restricted-imports)")).toBe(1);
     });
 
+    it("components から api-fetch と生成 API の endpoints、models、zod の import を禁止し、api-error と csrf を許可する", () => {
+      expect(countIn("components/generated-api-import.ts", "eslint(no-restricted-imports)")).toBe(
+        4,
+      );
+      expect(codesIn("components/api-entry-import.ts")).toStrictEqual([]);
+    });
+
     it("lib から components の import を禁止する", () => {
       expect(countIn("lib/component-import.ts", "eslint(no-restricted-imports)")).toBe(1);
     });
@@ -290,6 +297,23 @@ describe("fixture に適用したプロジェクトの lint 設定", () => {
 
       it("式の中の void を禁止する", () => {
         expect(countIn("lib/void-expression.ts", "eslint(no-void)")).toBe(1);
+      });
+    });
+
+    describe("lint を止めるコメント", () => {
+      it("同じ行に -- <理由> のない disable のコメントを禁止し、直し方を示す", () => {
+        expect(
+          countIn("lib/disable-without-reason.ts", "disable-reason(require-disable-reason)"),
+        ).toBe(3);
+        expect(
+          diagnostics.find(
+            (diagnostic) => diagnostic.code === "disable-reason(require-disable-reason)",
+          )?.message,
+        ).toContain("-- <reason>");
+      });
+
+      it("理由のある disable のコメントを許可する", () => {
+        expect(codesIn("lib/disable-with-reason.ts")).toStrictEqual([]);
       });
     });
 

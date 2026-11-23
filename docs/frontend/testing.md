@@ -17,7 +17,7 @@ APIを使うcomponent testはMSWでHTTP境界を置き換え、`vi.mock`でmodul
 
 複数のテストで使う準備のコードは、[フロントエンドアーキテクチャ](architecture.md#テストの置き場所)に従い `src/testing/` に置く。
 
-Vitestの`setupFiles`（`apps/web`は`src/testing/setup.ts`）は、全テストでTesting Libraryの待つ上限の設定とMSWのserver（`src/testing/msw.ts`）の起動を行い、各テストの後に`cleanup`、handlerの初期化、mockとglobalのstubの復元、localeの`ja`への初期化を行う。
+Vitestの`setupFiles`（`apps/web`は`src/testing/setup.ts`）は、全テストでTesting Libraryの待つ上限の設定、`@testing-library/jest-dom/vitest`のmatcherの登録、MSWのserver（`src/testing/msw.ts`）の起動を行い、各テストの後に`cleanup`、handlerの初期化、mockとglobalのstubの復元、localeの`ja`への初期化を行う。
 テストで`configure`を呼ばず、同じ`afterEach`も書かない。
 HTTPはOrvalが生成したMSW handlerを使い、生成handlerがない境界（`apiFetch`のtransportの検査など）だけ、テストの中で`server.use()`に手書きのhandlerを渡す。
 routeの描画は`src/testing/render-route.tsx`の`renderRoute`を使い、`main.tsx`と同じproviderとrouterの既定値で、最初のloaderを終えてから描画する。
@@ -36,6 +36,8 @@ componentの内部state、Hookの呼出回数、CSS classだけを主要な期�
 
 - **実行環境の指定**：jsdomを使うテストは、ファイルの先頭に`/* @vitest-environment jsdom */`を書く。
 - **クエリ**：role、label、placeholder、text、display valueの順に選び、`data-testid`は他のクエリで取れない場合だけ使い、`container.querySelector`は使わない。
+- **focusとdisabled**：focusは`toHaveFocus()`、無効は`toBeDisabled()`で検査し、`document.activeElement`を直接比べない。
+  matcherは`@testing-library/jest-dom`が`setup.ts`で登録する。
 - **user-event**：renderの前に`userEvent.setup()`を呼び、返ったinstanceで操作する。
 - **非同期の待ち**：DOMの変化は、Testing Libraryの`findBy`か`waitFor`で待つ。
   mockの呼出などDOM以外の値は、`expect.poll`で待つ。
@@ -53,6 +55,11 @@ componentの内部state、Hookの呼出回数、CSS classだけを主要な期�
 - **テスト名**：利用者から見える振る舞いを日本語で書き、関数名やstate名を書かない。
   `it`、`test`、`describe`のtitleに日本語を1文字は含めることを、Oxlintの`vitest/valid-title`の`mustMatch`が検査する。
   `describe`だけは、コードの名前をそのまま指す、空白を含まない1語のtitle（`resolveLocale`など）を許す。
+- **Testing Libraryの規則**：`apps/*/src`の`*.test.ts(x)`と`src/testing/`は、`eslint-plugin-testing-library`の規則をerrorで適用する（理由は[Lintとテストのリファレンス](../tooling/lint-and-test.md#フロントエンド)）。
+  `container`や`closest`によるNodeの探索、`render`の戻り値の`container`、`waitFor`の中の副作用や複数のassertionを禁止する。
+- **jsdomの補い（stub）**：jsdomに無いAPIを補うstubは、`scrollTo`の1種だけである（`src/testing/render-route.tsx`と`src/router-defaults.test.tsx`）。
+  `ResizeObserver`や`getBoundingClientRect`などを足して3種を超えたら、Vitest Browser ModeをADRで判断する。
+  それまでは入れない。
 - **不安定なテスト**：Vitestの`retry`で隠さず、同じ変更で直すか削除し、`skip`で残さない。
 - **テストを弱める記述**：次の5規則がerrorで禁止する。
   - `vitest/no-focused-tests`：`.only`を禁止する。

@@ -84,9 +84,7 @@ describe("注文の詳細の画面の失敗", () => {
     screen.getByRole("button", { name: "変更を捨てて最新を表示する" }).focus();
 
     await user.tab();
-    expect(document.activeElement).toBe(
-      screen.getByRole("button", { name: "最新の版に変更を適用し直す" }),
-    );
+    expect(screen.getByRole("button", { name: "最新の版に変更を適用し直す" })).toHaveFocus();
     await user.keyboard("{Enter}");
 
     await expect(within(notice()).findByText("明細を変更しました。")).resolves.toBeTruthy();

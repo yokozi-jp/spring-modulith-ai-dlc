@@ -1,4 +1,4 @@
-import { isTenantNotSelected } from "@frontend/api/api-fetch";
+import { isTenantNotSelected } from "@frontend/api/api-error";
 import { getFindCurrentTenantSuspenseQueryOptions } from "@frontend/api/endpoints/tenancy/tenancy";
 import { useSuspenseQuery } from "@tanstack/react-query";
 import { createFileRoute, Link, Outlet, redirect } from "@tanstack/react-router";

@@ -49,6 +49,10 @@ packageの`vite.config.ts`に`lint`か`fmt`があると、`vp lint`をpackageで
   objectや配列からclassを選ぶkey（`` tones[`${tone}-strong`] ``）は対象にしない。
   関数の引数に渡すkey（`` tones.get(`${tone}-strong`) ``）は報告するため、classはobjectか配列に並べて選ぶ。
   `className`の外で組み立てた文字列と、`cn()`に渡す変数は検出しない。
+- **lintを止めるコメント**：jsPluginの`disable-reason/require-disable-reason`は、`oxlint-disable`、`oxlint-disable-next-line`、`oxlint-disable-line`、`eslint-disable`、`eslint-disable-next-line`、`eslint-disable-line`のコメントに、同じ行の`-- <理由>`を求める。
+  理由を前の行や、ブロックコメントの次の行に書いても、規則は報告する。
+  生成物（`routeTree.gen.ts`と`packages/api/src/generated/**`）は、Lintの対象外なので検査しない。
+  `reportUnusedDisableDirectives`は、使われていないコメントを止める別の検査である。
 - **`lint/**`**：`import/no-nodejs-modules`、`new-cap`、`typescript/no-unsafe-assignment`、`typescript/no-unsafe-call`、`typescript/no-unsafe-member-access`をoffにし、Nodeのglobalを許した`no-undef`を有効にする。
   `lint/**`のJSDocの型の注釈は消さない。
 - **`packages/ui/**`**：`shadcn/no-restyle`、`shadcn/no-arbitrary-values`、`shadcn/require-static-classes`、`react/only-export-components`をoffにする。
@@ -68,20 +72,23 @@ packageの`vite.config.ts`に`lint`か`fmt`があると、`vp lint`をpackageで
 そのため禁止の一覧をルートの`vite.config.ts`の定数に分け、overrideごとに組み合わせている。
 同じファイルに複数のoverrideが一致すると、後のoverrideのoptionだけが効くので、overrideの並び順を変えるときは組み合わせ結果を確かめる。
 
-| 対象のファイル                          | `no-restricted-imports`                       | `no-restricted-globals`と`no-restricted-properties` |
-| --------------------------------------- | --------------------------------------------- | --------------------------------------------------- |
-| すべて（top-level）                     | Base UI、テスト用部品、テレメトリSDK          | HTML sink、network                                  |
-| `apps/web/src/{api,components,i18n}/**` | 共有層、Base UI、テスト用部品、テレメトリSDK  | top-levelを引き継ぐ                                 |
-| `apps/web/src/lib/**`                   | lib、Base UI、テスト用部品、テレメトリSDK     | top-levelを引き継ぐ                                 |
-| `apps/web/src/lib/telemetry.ts`         | lib、Base UI、テスト用部品                    | top-levelを引き継ぐ                                 |
-| `apps/web/src/features/**`              | feature、Base UI、テスト用部品、テレメトリSDK | top-levelを引き継ぐ                                 |
-| `packages/ui/**`                        | テスト用部品、テレメトリSDK                   | top-levelを引き継ぐ                                 |
-| `packages/api/**`                       | Base UI、テスト用部品、テレメトリSDK          | HTML sinkだけ                                       |
-| テストファイルと`src/testing/**`        | Base UI、テレメトリSDK                        | top-levelを引き継ぐ                                 |
+| 対象のファイル                   | `no-restricted-imports`                                 | `no-restricted-globals`と`no-restricted-properties` |
+| -------------------------------- | ------------------------------------------------------- | --------------------------------------------------- |
+| すべて（top-level）              | Base UI、テスト用部品、テレメトリSDK                    | HTML sink、network                                  |
+| `apps/web/src/{api,i18n}/**`     | 共有層、Base UI、テスト用部品、テレメトリSDK            | top-levelを引き継ぐ                                 |
+| `apps/web/src/components/**`     | 共有層、component、Base UI、テスト用部品、テレメトリSDK | top-levelを引き継ぐ                                 |
+| `apps/web/src/lib/**`            | lib、Base UI、テスト用部品、テレメトリSDK               | top-levelを引き継ぐ                                 |
+| `apps/web/src/lib/telemetry.ts`  | lib、Base UI、テスト用部品                              | top-levelを引き継ぐ                                 |
+| `apps/web/src/features/**`       | feature、Base UI、テスト用部品、テレメトリSDK           | top-levelを引き継ぐ                                 |
+| `packages/ui/**`                 | テスト用部品、テレメトリSDK                             | top-levelを引き継ぐ                                 |
+| `packages/api/**`                | Base UI、テスト用部品、テレメトリSDK                    | HTML sinkだけ                                       |
+| テストファイルと`src/testing/**` | Base UI、テレメトリSDK                                  | top-levelを引き継ぐ                                 |
 
 各禁止の中身は次のとおりである。
 
 - **共有層**：`@/features/**`、`@/routes/**`、`@/routeTree.gen`。
+- **component**：`@frontend/api/api-fetch`、`@frontend/api/endpoints/**`、`@frontend/api/models`、`@frontend/api/zod/**`。
+  `components`が使える`@frontend/api`の入口は`api-error`と`csrf`だけである。
 - **lib**：共有層の禁止に加えて`@/components/**`。
   `lib`は依存の最下層であり、UIを参照しない。
 - **feature**：`@/routes/**`、`@/routeTree.gen`。

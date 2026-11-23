@@ -1,7 +1,7 @@
 ---
 type: Convention
 title: PostgreSQLのテーブル論理設計
-description: テーブル種別、正規化、バリュードメイン、区分値、スナップショット属性、導出属性、真偽値の代替、論理削除、多言語データの持ち方を定める規約。業務テーブルを新しく設計するとき、カラムで何を表すか決めるときに読む。
+description: テーブル種別、正規化、バリュードメイン、区分値、スナップショット属性、導出属性、真偽値の代替、論理削除、個人データ、多言語データの持ち方を定める規約。業務テーブルを新しく設計するとき、カラムで何を表すか決めるとき、個人データのカラムを足すときに読む。
 tags: [convention, database, postgresql, data-modeling, future-arch-guidelines]
 ---
 
@@ -10,6 +10,7 @@ tags: [convention, database, postgresql, data-modeling, future-arch-guidelines]
 テーブルはマスタ、トラン、ワーク、サマリの種別に分け、第3正規形を基本とする。
 区分値はenumの名前で持ち、定義はソースコードで管理する。
 論理削除フラグは作らず、業務上の意味を持つカラムか物理削除で表す。
+個人データのカラムは、業務の処理に要るものだけを作る。
 
 ## 対象
 
@@ -100,6 +101,24 @@ Spring Modulithのイベント出版テーブルのように、フレームワ�
 
 削除済みの親を子が指したままになることや、データの増加など、取り込み元に無い理由は、このリポジトリで検討していないので、ここに書かない。
 
+## 個人データ
+
+**個人データ**：氏名、メールアドレス、電話番号のように、特定の個人を識別できる値。
+
+業務の処理に要らない個人データのカラムは作らない。
+
+- IdPが持つ利用者の属性（氏名、メールアドレスなど）は、業務の処理に要るときだけ業務テーブルへ写す。
+  画面に表示するためだけには写さない。
+- 表が個人データを含むかどうかは、テーブルごとの保持期限の一覧に書く（[設計書と正本の分担](../writing/design-doc-sources-of-truth.md#正本にない情報)）。
+  この一覧はまだなく、[#596](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/596)で作る。
+
+カラムが個人データかどうかは機械で判定できないため、changesetのレビューで確かめる。
+取り込む範囲は[ADR-040](../adr/ADR-040-import-future-architecture-guidelines.md)に示す。
+
+`tenancy.m_user_identity`の`issuer_url`と`subject_code`（IdPの識別）は、個人データに当たる。
+2つの組はIdPの1つのアカウントを指し、IdPの記録と照らせば利用者の個人を特定できる。
+ログインで利用者を引くために要るので、業務の処理に要るカラムとして持つ。
+
 ## 多言語データ
 
 画面の文言だけを多言語化する場合は、DBを変更しない。
@@ -111,4 +130,6 @@ APIとSPAの文言のローカライズは[ADR-016](../adr/ADR-016-localize-api-
 ## 出典
 
 - フューチャー株式会社「PostgreSQL設計ガイドライン」（[アーキテクチャ設計ガイドライン](https://future-architect.github.io/arch-guidelines/documents/forDB/postgresql_guidelines.html)、commit `e309a6d`）、[CC BY 4.0](https://creativecommons.org/licenses/by/4.0/deed.ja)
+- フューチャー株式会社「データガバナンス設計ガイドライン」（[アーキテクチャ設計ガイドライン](https://future-architect.github.io/arch-guidelines/documents/forDataGovernance/data_governance_guidelines.html)、commit `e309a6d`）、[CC BY 4.0](https://creativecommons.org/licenses/by/4.0/deed.ja)
+  「個人データ」の節は、このガイドラインの、特定を防ぐ最も確実な方法は最初から持たないことである、という記述を、DBに保存するカラムへ広げている。
 - このリポジトリの規約に合わせて抜粋、再構成、改変している。取り込みの方針は [ADR-040](../adr/ADR-040-import-future-architecture-guidelines.md) に従う。

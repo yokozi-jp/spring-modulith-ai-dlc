@@ -23,7 +23,7 @@ import javax.annotation.processing.Generated;
 public class Tables {
 
     /**
-     * The table <code>product.m_product</code>.
+     * 商品
      */
     public static final MProduct M_PRODUCT = MProduct.M_PRODUCT;
 }

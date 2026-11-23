@@ -41,12 +41,12 @@ public class Ordering extends SchemaImpl {
     public static final Ordering ORDERING = new Ordering();
 
     /**
-     * The table <code>ordering.t_order</code>.
+     * 注文
      */
     public final TOrder T_ORDER = TOrder.T_ORDER;
 
     /**
-     * The table <code>ordering.t_order_line</code>.
+     * 注文明細
      */
     public final TOrderLine T_ORDER_LINE = TOrderLine.T_ORDER_LINE;
 

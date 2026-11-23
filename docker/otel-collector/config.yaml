@@ -31,12 +31,21 @@ receivers:
     max_request_body_size: 65536
 
 processors:
+  # OOM kill の前に受信を止める。全 pipeline の最初に置く。
+  # Compose にメモリ上限が無いため、limit_percentage はホストのメモリを基準にする。
+  memory_limiter:
+    check_interval: 1s
+    limit_percentage: 80
+    spike_limit_percentage: 25
   transform/log_attributes:
+    error_mode: ignore
     log_statements:
       # ログ属性の allowlist。属性を足すときは docs/observability/conventions.md と同じ変更で直す。
       - keep_keys(log.attributes, ["exception.type", "exception.message", "exception.stacktrace", "http.response.status_code", "conflict.kind", "tenant.id", "user.id", "event_publication.id", "event_publication.event_type", "event_publication.listener_id", "event_publication.completion_attempts", "event_publication.resubmitted.count", "event_publication.exhausted.count", "event_publication.completed.count", "event_publication.incomplete.count", "event_publication.remaining.count"])
   # faro receiver の logfmt 本文を解析し、型と値を検証した record だけへ Collector 内部の印を付ける。
   transform/frontend_validate:
+    # 型が違う record では Len が nil に対して失敗するのが通常の経路で、record ごとに warn が出る。
+    # 失敗した文は属性を付けず、frontend.accepted が付かない record は filter が捨てるので silent にする。
     error_mode: silent
     log_statements:
       - delete_key(log.attributes, "frontend.accepted")
@@ -61,13 +70,13 @@ processors:
       - set(log.attributes["frontend.accepted"], "true") where log.attributes["kind"] == "event" and log.cache["event_name"] == "view_changed" and log.attributes["frontend.session"] != nil and log.attributes["frontend.view"] != nil
       - set(log.attributes["frontend.accepted"], "true") where log.attributes["kind"] == "measurement" and log.cache["type"] == "web-vitals" and log.attributes["frontend.session"] != nil and log.attributes["frontend.view"] != nil and ((log.attributes["frontend.lcp"] != nil and log.attributes["frontend.lcp"] >= 0 and log.cache["value_inp"] == nil and log.cache["value_cls"] == nil) or (log.cache["value_lcp"] == nil and log.attributes["frontend.inp"] != nil and log.attributes["frontend.inp"] >= 0 and log.cache["value_cls"] == nil) or (log.cache["value_lcp"] == nil and log.cache["value_inp"] == nil and log.attributes["frontend.cls"] != nil and log.attributes["frontend.cls"] >= 0))
   filter/frontend_logs:
-    error_mode: silent
+    error_mode: ignore
     logs:
       log_record:
         - log.attributes["frontend.accepted"] != "true"
   # 検証済みの候補だけから固定本文と最終属性を作る。
   transform/frontend_logs:
-    error_mode: silent
+    error_mode: ignore
     log_statements:
       - set(log.attributes["exception.type"], log.attributes["frontend.type"]) where log.attributes["kind"] == "exception"
       - set(log.attributes["view.name"], log.attributes["frontend.view"]) where log.attributes["frontend.view"] != nil
@@ -107,6 +116,7 @@ processors:
       - keep_keys(log.attributes, ["telemetry.signal", "exception.type", "exception.message", "exception.stacktrace", "view.name", "measurement.type", "measurement.name", "measurement.value", "session.id"])
   # webhook_event の本文（application/reports+json の配列の文字列）を解析する。解析できなければ文字列のまま残り、検証で捨てる。
   transform/frontend_csp_parse:
+    # ignore にすると、JSON でない本文を送るたびに、送り手が書いた文字を含む warn が出る。誰でも送れるので silent にする。
     error_mode: silent
     log_statements:
       - set(log.body, ParseJSON(log.body)) where IsString(log.body)
@@ -115,18 +125,20 @@ processors:
   # csp-violation の型と値を検証した record だけへ Collector 内部の印を付ける。
   # deprecation、intervention、crash などの他の型と、旧形式の report-uri の本文には印が付かない。
   transform/frontend_csp_validate:
-    error_mode: silent
+    error_mode: ignore
     log_statements:
       - delete_key(log.attributes, "frontend.accepted")
       - set(log.attributes["frontend.accepted"], "true") where IsMap(log.body) and log.body["type"] == "csp-violation" and IsMap(log.body["body"]) and IsMatch(log.body["body"]["effectiveDirective"], "^[a-z-]{1,64}$$") and IsMatch(log.body["body"]["disposition"], "^(enforce|report)$$")
   filter/frontend_csp:
-    error_mode: silent
+    error_mode: ignore
     logs:
       log_record:
         - log.attributes["frontend.accepted"] != "true"
   # 検証済みの報告から固定本文と最終属性を作る。文書の URL は残さず、blockedURL は origin か scheme かキーワードまで縮約する。
   # 属性を足すときは docs/observability/conventions.md と同じ変更で直す。
   transform/frontend_csp:
+    # blockedURL や sourceFile のない報告では、nil に対する Len、ExtractPatterns、ConvertCase が失敗するのが通常の経路で、報告ごとに warn が出る。
+    # 失敗した文は属性を付けない側に倒れるので silent にする。
     error_mode: silent
     log_statements:
       - set(log.cache["blocked"], log.body["body"]["blockedURL"]) where IsString(log.body["body"]["blockedURL"]) and Len(log.body["body"]["blockedURL"]) <= 8192
@@ -169,7 +181,7 @@ processors:
   # フロントエンドの span も filter と transform の 2 段で守る。/collect は誰でも送れる（ADR-068）ので、送り手が書ける値を信頼しない。
   # span の event は例外のメッセージなどを持ちうるので、すべて捨てる。
   filter/frontend_span_events:
-    error_mode: silent
+    error_mode: ignore
     traces:
       spanevent:
         # 引用符を外すと YAML の bool になり、Collector が起動しない。
@@ -178,7 +190,7 @@ processors:
   # 属性を足すときは docs/observability/conventions.md と同じ変更で直す。
   transform/frontend_traces:
     # 解析に失敗した文は飛ばし、keep_keys で許可した属性以外を残さない側に倒す。
-    error_mode: silent
+    error_mode: ignore
     trace_statements:
       # URL は route template を安全に得られないため、最後の keep_keys ですべて削除する。
       - delete_key(span.attributes, "http.request.method") where not IsMatch(span.attributes["http.request.method"], "^(GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS)$$")
@@ -206,25 +218,27 @@ service:
   pipelines:
     logs:
       receivers: [otlp]
-      processors: [transform/log_attributes]
+      processors: [memory_limiter, transform/log_attributes]
       exporters: [otlp_http/lgtm]
     # バックエンドの allowlist と混ぜないため、フロントエンドの pipeline を分ける。
     logs/frontend:
       receivers: [faro]
-      processors: [transform/frontend_validate, filter/frontend_logs, transform/frontend_logs]
+      processors: [memory_limiter, transform/frontend_validate, filter/frontend_logs, transform/frontend_logs]
       exporters: [otlp_http/lgtm]
     # CSP 違反の報告。faro と本文の形式も allowlist も違うので、logs/frontend と分ける。
     logs/frontend_csp:
       receivers: [webhook_event]
-      processors: [transform/frontend_csp_parse, unroll/frontend_csp, transform/frontend_csp_validate, filter/frontend_csp, transform/frontend_csp]
+      processors: [memory_limiter, transform/frontend_csp_parse, unroll/frontend_csp, transform/frontend_csp_validate, filter/frontend_csp, transform/frontend_csp]
       exporters: [otlp_http/lgtm]
     traces:
       receivers: [otlp]
+      processors: [memory_limiter]
       exporters: [otlp_http/lgtm]
     traces/frontend:
       receivers: [faro]
-      processors: [filter/frontend_span_events, transform/frontend_traces]
+      processors: [memory_limiter, filter/frontend_span_events, transform/frontend_traces]
       exporters: [otlp_http/lgtm]
     metrics:
       receivers: [otlp]
+      processors: [memory_limiter]
       exporters: [otlp_http/lgtm]
