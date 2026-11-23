@@ -52,4 +52,6 @@ Step の中で DB への接続を並列にせず、並列にするときは part
 ## 出典
 
 - フューチャー株式会社「バッチ設計ガイドライン」（[アーキテクチャ設計ガイドライン](https://future-architect.github.io/arch-guidelines/documents/forBatch/batch_guidelines.html)、commit `e309a6d`）、[CC BY 4.0](https://creativecommons.org/licenses/by/4.0/deed.ja)
+- 原文から採ったのは、DB への接続をプログラム内で並列にしない規則（原文の「バッチ処理の並列化」）だけである。
+  ほかの規則は [ADR-115](../adr/ADR-115-build-business-batches-with-spring-batch.md) の決定であり、原文にない。
 - このリポジトリの規約に合わせて抜粋、再構成、改変している。取り込みの方針は [ADR-040](../adr/ADR-040-import-future-architecture-guidelines.md) に従う。
