@@ -24,6 +24,7 @@ import org.jooq.DSLContext;
 import org.jooq.Record2;
 import org.jooq.impl.DSL;
 import org.jspecify.annotations.Nullable;
+import org.springframework.modulith.events.EventPublication;
 import org.springframework.modulith.events.FailedEventPublications;
 import org.springframework.modulith.events.ResubmissionOptions;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -42,12 +43,6 @@ class EventPublicationResubmitter {
 
   /** 定期の再投入と手での 1 回の再投入が共有するロックの名前。 */
   /* package */ static final String LOCK_NAME = "event-publication-resubmission";
-
-  /** Spring Modulith の失敗した出版の状態。 */
-  private static final String FAILED = "FAILED";
-
-  /** Spring Modulith の諦めた出版の状態。 */
-  private static final String ABANDONED = "ABANDONED";
 
   /** ジョブの実行の回数の Counter の名前。 */
   private static final String RUNS_METRIC = "event.publication.resubmission.runs";
@@ -85,17 +80,11 @@ class EventPublicationResubmitter {
   /** 再投入した（{@code RESUBMITTED} に進んだ）出版の数。 */
   private final Counter resubmissions;
 
-  /** 自動の再投入を待つ FAILED の出版の数。 */
-  private final AtomicLong retrying = new AtomicLong();
+  /** 自動の再投入を待つ FAILED の出版の Gauge。 */
+  private final StateGauges retrying;
 
-  /** 上限に達した ABANDONED の出版の数。 */
-  private final AtomicLong exhausted = new AtomicLong();
-
-  /** 自動の再投入を待つ最も古い出版の経過秒数。 */
-  private final AtomicLong retryingOldestAge = new AtomicLong();
-
-  /** 上限に達した最も古い出版の経過秒数。 */
-  private final AtomicLong exhaustedOldestAge = new AtomicLong();
+  /** 上限に達した ABANDONED の出版の Gauge。 */
+  private final StateGauges exhausted;
 
   /** 再投入した出版の覚え書きと、結果の読み戻し。 */
   private final ResubmissionTracker tracker;
@@ -122,27 +111,8 @@ class EventPublicationResubmitter {
         Counter.builder("event.publication.resubmissions")
             .description("再投入した（RESUBMITTED に進んだ）出版の数")
             .register(meterRegistry);
-    // Micrometer は状態のオブジェクトを弱い参照で持つため、final のフィールドを渡す。
-    Gauge.builder("event.publication.failed", retrying, AtomicLong::get)
-        .tag(STATE, "retrying")
-        .register(meterRegistry);
-    Gauge.builder("event.publication.failed", exhausted, AtomicLong::get)
-        .tag(STATE, "exhausted")
-        .register(meterRegistry);
-    TimeGauge.builder(
-            "event.publication.failed.oldest.age",
-            retryingOldestAge,
-            TimeUnit.SECONDS,
-            AtomicLong::get)
-        .tag(STATE, "retrying")
-        .register(meterRegistry);
-    TimeGauge.builder(
-            "event.publication.failed.oldest.age",
-            exhaustedOldestAge,
-            TimeUnit.SECONDS,
-            AtomicLong::get)
-        .tag(STATE, "exhausted")
-        .register(meterRegistry);
+    this.retrying = StateGauges.register(meterRegistry, "retrying");
+    this.exhausted = StateGauges.register(meterRegistry, "exhausted");
   }
 
   private static Counter runs(final MeterRegistry meterRegistry, final String outcome) {
@@ -162,7 +132,7 @@ class EventPublicationResubmitter {
   /* package */ void resubmitOnce() {
     try {
       final Instant now = Instant.now(clock);
-      updateGauges(now);
+      refreshGauges(now);
       tracker.reconcile(now);
       final AtomicReference<@Nullable Integer> run = new AtomicReference<>();
       lockingTaskExecutor.executeWithLock(
@@ -223,28 +193,59 @@ class EventPublicationResubmitter {
   /**
    * FAILED の出版と、上限に達した ABANDONED の出版の件数と最古の経過時間を集計し、Gauge の値にする。
    *
-   * <p>{@code completion-mode: archive} では、ABANDONED の出版は archive の表にある。
+   * <p>{@code completion-mode: archive} では、ABANDONED の出版は archive の表にある。 DB の既知の失敗は WARN で記録し、Gauge
+   * は前の値のまま再投入を続ける。 Gauge の集計は表示と警報のためで、再投入の前提ではないためである。
    */
-  // ponytail: archive の表の status には索引がなく、完了した出版も残るため、ABANDONED の集計は archive の全行を読む。
-  // archive の保持期限（ADR-079 の Neutral）で行を消すまでは表とともに重くなる。重くなったら status = 'ABANDONED' の部分索引を足す。
-  private void updateGauges(final Instant now) {
-    final Record2<Integer, Instant> failed =
-        dsl.select(DSL.count(), DSL.min(EVENT_PUBLICATION.PUBLICATION_DATE))
-            .from(EVENT_PUBLICATION)
-            .where(EVENT_PUBLICATION.STATUS.eq(FAILED))
-            .fetchSingle();
-    final Record2<Integer, Instant> abandoned =
-        dsl.select(DSL.count(), DSL.min(EVENT_PUBLICATION_ARCHIVE.PUBLICATION_DATE))
-            .from(EVENT_PUBLICATION_ARCHIVE)
-            .where(EVENT_PUBLICATION_ARCHIVE.STATUS.eq(ABANDONED))
-            .fetchSingle();
-    retrying.set(failed.value1());
-    retryingOldestAge.set(ageSeconds(failed.value2(), now));
-    exhausted.set(abandoned.value1());
-    exhaustedOldestAge.set(ageSeconds(abandoned.value2(), now));
+  private void refreshGauges(final Instant now) {
+    try {
+      retrying.set(
+          dsl.select(DSL.count(), DSL.min(EVENT_PUBLICATION.PUBLICATION_DATE))
+              .from(EVENT_PUBLICATION)
+              .where(EVENT_PUBLICATION.STATUS.eq(EventPublication.Status.FAILED.name()))
+              .fetchSingle(),
+          now);
+      exhausted.set(
+          dsl.select(DSL.count(), DSL.min(EVENT_PUBLICATION_ARCHIVE.PUBLICATION_DATE))
+              .from(EVENT_PUBLICATION_ARCHIVE)
+              .where(EVENT_PUBLICATION_ARCHIVE.STATUS.eq(EventPublication.Status.ABANDONED.name()))
+              .fetchSingle(),
+          now);
+    } catch (org.springframework.dao.DataAccessException
+        | org.jooq.exception.DataAccessException e) {
+      log.atWarn().setCause(e).log("Event publication gauges refresh failed");
+    }
   }
 
-  private static long ageSeconds(final @Nullable Instant oldest, final Instant now) {
-    return oldest == null ? 0 : Math.max(0, Duration.between(oldest, now).toSeconds());
+  /**
+   * 1 つの {@code state} の、件数と最古の経過秒数の Gauge。
+   *
+   * <p>Micrometer は状態のオブジェクトを弱い参照で持つため、final のフィールドで持つ。
+   *
+   * @param count 件数
+   * @param oldestAge 最も古い出版の経過秒数
+   */
+  private record StateGauges(AtomicLong count, AtomicLong oldestAge) {
+
+    private static StateGauges register(final MeterRegistry meterRegistry, final String state) {
+      final StateGauges gauges = new StateGauges(new AtomicLong(), new AtomicLong());
+      Gauge.builder("event.publication.failed", gauges.count, AtomicLong::get)
+          .tag(STATE, state)
+          .register(meterRegistry);
+      TimeGauge.builder(
+              "event.publication.failed.oldest.age",
+              gauges.oldestAge,
+              TimeUnit.SECONDS,
+              AtomicLong::get)
+          .tag(STATE, state)
+          .register(meterRegistry);
+      return gauges;
+    }
+
+    /** 件数と最も古い出版の時刻から値を決める。時計が出版より前なら経過秒数を 0 にする。 */
+    private void set(final Record2<Integer, Instant> countAndOldest, final Instant now) {
+      final @Nullable Instant oldest = countAndOldest.value2();
+      count.set(countAndOldest.value1());
+      oldestAge.set(oldest == null ? 0 : Math.max(0, Duration.between(oldest, now).toSeconds()));
+    }
   }
 }
