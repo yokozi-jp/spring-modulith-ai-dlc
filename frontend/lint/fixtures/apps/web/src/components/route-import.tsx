@@ -1,5 +1,4 @@
 import { Route } from "@/routes/index";
+import { routeTree } from "@/routeTree.gen";
 
-export function RoutePath() {
-  return <span>{Route.path}</span>;
-}
+export const routes = { Route, routeTree };
