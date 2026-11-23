@@ -1,7 +1,7 @@
 ---
 type: Runbook
 title: ローカルでトレースを見る
-description: ローカルの Grafana（grafana/otel-lgtm）で、API の応答の traceId からログを探す手順、バックエンドのログの trace ID からトレースを開く手順と、ブラウザを使わずに Grafana の proxy 経由で Tempo を検索する手順。API のトレースをローカルで確かめるときに使う。
+description: ローカルの Grafana（grafana/otel-lgtm）で、API の応答の traceId やバックエンドのログの trace ID からログとトレースを開く手順と、ブラウザを使わずに Grafana の proxy 経由で Tempo を検索する手順。API のトレースをローカルで確かめるときに使う。
 tags: [runbook, observability, tracing, grafana, tempo, local]
 ---
 
@@ -17,29 +17,28 @@ tags: [runbook, observability, tracing, grafana, tempo, local]
 依存サービスとバックエンドを起動してから、[開発のワークフロー](../tooling/dev-workflow.md)の Grafana の URL を開く。
 ローカルの Grafana はログインなしで開き、匿名の利用者が Admin になる。これは `grafana/otel-lgtm` の既定で、Compose は上書きしない。
 
-## 応答の traceId からログを探す
+## trace ID からトレースを開く
 
 失敗した API の応答の Problem Details は、その要求の trace ID を `traceId` に持つ（[HTTPステータスコードの選択](../web-api/status-codes.md#前提)）。
-利用者が問い合わせで伝えた `traceId` から、同じ要求のログを次の順に探す。
-
-1. Grafana の左メニューから Explore を開き、データソースに Loki を選ぶ。
-2. クエリを Code のモードにし、`{service_name="demo-api"} | trace_id = "<traceId>"` を入れて Run query を押す。
-3. ログ行を開き、詳細の Links の `Trace: <trace ID>` を押す。右の分割ペインで Tempo のトレースが開く。
-
-ログが見つからないときは、Grafana の右上の期間を、問い合わせの時刻を含むように広げる。
-ログを出さない失敗もある（Spring Security の firewall が標準にない method を拒否した 400 など）。
-そのときは、次の節の trace ID が分かっているときの手順で Tempo のトレースを開く。
-sampling で標本にならなかった要求は、ログだけが残り、Tempo にトレースがない（[ADR-117](../adr/ADR-117-add-trace-id-and-omit-instance-in-problem-details.md)）。
-
-## trace ID からトレースを開く
+利用者が問い合わせで伝えた `traceId` も、この節の手順で探す。
+Tomcat がアプリへ渡す前に拒否した要求（`text/html` の 400 や 505）は、Problem Details にならず、`traceId` を持たない。
+この要求はアプリの filter を通らないので、バックエンドのログにもトレースにも残らない。
+そのときは、失敗した要求が[アプリより前に拒否される要求](../web-api/edge-responsibilities.md#アプリより前に拒否される要求)の条件（リクエスト行とヘッダーの合計が 8KB を超える、HTTP の版が不正）に当たるかを確かめる。
 
 trace ID は、ログに出ているかどうかで探し方を分ける。
 
 - **ログに出ている**：trace ID の名前は、コンソールの ECS JSON では `traceId`（[可観測性データの規約](conventions.md)）、Grafana の Loki では `trace_id` である。
   バックエンドは失敗をログに残す。
   Explore の Loki で `{service_name="demo-api"} | trace_id != ""` を検索し、ログ行を開く。
+  `traceId` が分かっているときは、`{service_name="demo-api"} | trace_id = "<traceId>"` で、その trace ID を持つログに絞る。
   詳細の Links の `Trace: <trace ID>` を押すと、右の分割ペインで Tempo のトレースが開く。
-- **ログに出ていない**：次の「ブラウザを使わずに検索する」か、Explore の Tempo で TraceQL `{ resource.service.name = "demo-api" }` を実行し、一覧から開く。
+  見つからないときは、Grafana の右上の期間を、失敗した時刻を含むように広げる。
+  その trace ID を持つログには、要求が発行したイベントの非同期リスナーのログも入る（[非同期処理のトレースと監視](../integration/async-observability.md)）。
+  SPA の要求は、Faro の TracingInstrumentation が登録する fetch の計装が親の span のない fetch ごとに新しい trace を始めるので、要求ごとに別の trace ID を持つ。
+  `traceparent` を自分で付けるクライアントが同じ trace ID を使い回すと、複数の要求のログが当たる。
+- **ログに出ていない**：ログを出さない失敗もある。
+  Spring Security の firewall が標準にない method を拒否した 400 は、ローカルで確かめたとき Loki のログが 0 行で、Tempo にはトレースがあった。
+  次の「ブラウザを使わずに検索する」か、Explore の Tempo で TraceQL `{ resource.service.name = "demo-api" }` を実行し、一覧から開く。
 
 trace ID が分かっているときは、次の順に開く。
 
