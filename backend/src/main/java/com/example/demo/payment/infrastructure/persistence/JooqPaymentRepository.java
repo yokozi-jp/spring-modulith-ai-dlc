@@ -88,10 +88,13 @@ class JooqPaymentRepository implements PaymentRepository {
       final String gatewayPaymentCode,
       final Instant recordedAt,
       final long lockNo) {
-    final @Nullable GatewayPaymentCode code =
-        gatewayPaymentCode.isEmpty() ? null : new GatewayPaymentCode(gatewayPaymentCode);
-    return Payment.restore(
-        id, orderId, amount, new ChargeOutcome(status, code), recordedAt, lockNo);
+    final ChargeOutcome outcome =
+        switch (status) {
+          case PAID -> ChargeOutcome.paid(new GatewayPaymentCode(gatewayPaymentCode));
+          case DECLINED -> ChargeOutcome.declined(new GatewayPaymentCode(gatewayPaymentCode));
+          case FAILED -> ChargeOutcome.failed();
+        };
+    return Payment.restore(id, orderId, amount, outcome, recordedAt, lockNo);
   }
 
   /** 識別子がなければ空文字を書く（docs/database/postgresql-data-types.md の「文字列の既定値」）。 */

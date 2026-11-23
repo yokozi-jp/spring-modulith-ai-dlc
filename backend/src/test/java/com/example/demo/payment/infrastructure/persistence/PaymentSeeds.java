@@ -6,7 +6,6 @@ import com.example.demo.payment.domain.model.Money;
 import com.example.demo.payment.domain.model.OrderId;
 import com.example.demo.payment.domain.model.Payment;
 import com.example.demo.payment.domain.model.PaymentId;
-import com.example.demo.payment.domain.model.PaymentStatus;
 import com.example.demo.shared.infrastructure.persistence.CommonColumns;
 import com.example.demo.shared.infrastructure.persistence.TableWriter;
 import com.example.demo.shared.infrastructure.persistence.TestCommonColumns;
@@ -39,13 +38,15 @@ public final class PaymentSeeds {
       final BigDecimal amount,
       final boolean declined,
       final Instant recordedAt) {
-    final PaymentStatus status = declined ? PaymentStatus.DECLINED : PaymentStatus.PAID;
+    final GatewayPaymentCode code = new GatewayPaymentCode("ch_" + orderId);
+    final ChargeOutcome outcome =
+        declined ? ChargeOutcome.declined(code) : ChargeOutcome.paid(code);
     final Payment payment =
         Payment.restore(
             new PaymentId(paymentId),
             new OrderId(orderId),
             new Money(amount),
-            new ChargeOutcome(status, new GatewayPaymentCode("ch_" + orderId)),
+            outcome,
             recordedAt,
             1L);
     final CommonColumns commonColumns = TestCommonColumns.at(recordedAt);

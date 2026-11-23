@@ -28,6 +28,7 @@ import com.tngtech.archunit.lang.ArchCondition;
 import com.tngtech.archunit.lang.ArchRule;
 import com.tngtech.archunit.lang.ConditionEvents;
 import com.tngtech.archunit.lang.SimpleConditionEvent;
+import java.lang.reflect.RecordComponent;
 import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -35,6 +36,7 @@ import org.jooq.DSLContext;
 import org.jooq.Record;
 import org.jooq.impl.DefaultRecordMapper;
 import org.jooq.impl.DefaultRecordUnmapper;
+import org.jspecify.annotations.Nullable;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.context.ApplicationListener;
 import org.springframework.context.event.ApplicationEventMulticaster;
@@ -168,6 +170,11 @@ class ClassRoleArchTest {
   @ArchTest
   /* package */ static final ArchRule commandsAndResultsAreApplicationRecords =
       commandsAndResultsAreApplicationRecordsRule(BASE_PACKAGE);
+
+  /** Result の record の component に @Nullable を付けない。 */
+  @ArchTest
+  /* package */ static final ArchRule resultComponentsAreNotNullable =
+      resultComponentsAreNotNullableRule(BASE_PACKAGE);
 
   /** CommandHandler から別の CommandHandler への依存を禁止する。 */
   @ArchTest
@@ -657,18 +664,58 @@ class ClassRoleArchTest {
             resideInAPackage(basePackage + ".*..")
                 .and(not(name(basePackage + ".shared.concurrency.VersionedCommand")))
                 .and(simpleNameEndingWith("Command").or(simpleNameEndingWith("Result"))))
-        .should()
-        .beRecords()
+        .should(beRecordOrSealedInterfaceOfRecordsForResult())
         .andShould()
         .resideInAPackage(basePackage + ".*.application")
         .allowEmptyShould(true)
         .because(
             "Command と Result はユースケースの入出力であり、モジュールルートに置いて他モジュールから同期で呼ばせないため。"
-                + "直し方：<UseCase>Command と <UseCase>Result を <モジュール>.application の record にする。"
+                + "直し方：<UseCase>Command を <モジュール>.application の record にする。<UseCase>Result は record か、許可された型がすべて record の sealed interface にする。"
                 + conventions(
                     "docs/backend/class-roles/command.md",
                     "docs/backend/class-roles/result.md",
                     ADR_050));
+  }
+
+  /** {@code *Result}（入れ子の record を含む）の record の component に {@code @Nullable} を付けない規則を組み立てる。 */
+  /* package */ static ArchRule resultComponentsAreNotNullableRule(final String basePackage) {
+    return classes()
+        .that(
+            resideInAPackage(basePackage + ".*.application")
+                .and(
+                    DescribedPredicate.describe(
+                        "a record nested in or named *Result", ClassRoleArchTest::isResultRecord)))
+        .should(haveNoNullableRecordComponent())
+        .allowEmptyShould(true)
+        .because(
+            "@Nullable の component を並べて、どれかが入ることを約束にする record は、場合ごとの型より読み手に分岐を残すため。"
+                + "直し方：場合ごとに record を作り、<UseCase>Result を sealed interface にする。"
+                + conventions("docs/backend/class-roles/result.md", ADR_050));
+  }
+
+  private static boolean isResultRecord(final JavaClass javaClass) {
+    if (!javaClass.isRecord()) {
+      return false;
+    }
+    JavaClass outermost = javaClass;
+    while (outermost.getEnclosingClass().isPresent()) {
+      outermost = outermost.getEnclosingClass().get();
+    }
+    return outermost.getSimpleName().endsWith("Result");
+  }
+
+  private static ArchCondition<JavaClass> haveNoNullableRecordComponent() {
+    return new ArchCondition<>("have no @Nullable record component") {
+      @Override
+      public void check(final JavaClass item, final ConditionEvents events) {
+        for (final RecordComponent component : item.reflect().getRecordComponents()) {
+          final boolean nullable = component.getAnnotatedType().isAnnotationPresent(Nullable.class);
+          events.add(
+              new SimpleConditionEvent(
+                  item, !nullable, item.getName() + "." + component.getName() + " is @Nullable"));
+        }
+      }
+    };
   }
 
   /** {@code *Request} と {@code *Response} を {@code presentation.web} の record に限る規則を組み立てる。 */
@@ -690,6 +737,32 @@ class ClassRoleArchTest {
                     "docs/backend/class-roles/request.md",
                     "docs/backend/class-roles/response.md",
                     ADR_050));
+  }
+
+  /**
+   * {@code *Command} は record、{@code *Result} は record か、許可された型がすべて record の sealed interface
+   * であることを求める。
+   */
+  private static ArchCondition<JavaClass> beRecordOrSealedInterfaceOfRecordsForResult() {
+    return new ArchCondition<>(
+        "be a record (a Result may be a sealed interface whose permitted types are all records)") {
+      @Override
+      public void check(final JavaClass item, final ConditionEvents events) {
+        final boolean ok =
+            item.isRecord()
+                || (item.getSimpleName().endsWith("Result")
+                    && item.isInterface()
+                    && item.reflect().isSealed()
+                    && java.util.Arrays.stream(item.reflect().getPermittedSubclasses())
+                        .allMatch(Class::isRecord));
+        events.add(
+            new SimpleConditionEvent(
+                item,
+                ok,
+                item.getName()
+                    + (ok ? " is allowed" : " is not a record or a sealed interface of records")));
+      }
+    };
   }
 
   private static ArchCondition<JavaClass> notExtendOrBeExtended() {

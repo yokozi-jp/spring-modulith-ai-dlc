@@ -47,7 +47,12 @@ public final class Payment implements Versioned {
     this.orderId = orderId;
     this.amount = amount;
     this.status = outcome.status();
-    this.gatewayPaymentCode = outcome.gatewayPaymentCode();
+    this.gatewayPaymentCode =
+        switch (outcome) {
+          case ChargeOutcome.Paid paid -> paid.gatewayPaymentCode();
+          case ChargeOutcome.Declined declined -> declined.gatewayPaymentCode();
+          case ChargeOutcome.Failed failed -> null;
+        };
     this.recordedAt = recordedAt;
     this.lockNo = lockNo;
   }
