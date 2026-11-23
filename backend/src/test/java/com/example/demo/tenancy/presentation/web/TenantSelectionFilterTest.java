@@ -46,7 +46,7 @@ class TenantSelectionFilterTest {
   /** 認証した利用者の、アプリの利用者の ID。 */
   private static final String USER = "user-1";
 
-  /** MDC と observation で利用者の ID を持つ項目の名前。 */
+  /** observation で利用者の ID を持つ項目の名前。 */
   private static final String USER_ID_KEY = "user.id";
 
   /** MDC と observation でテナントの ID を持つ項目の名前。 */
@@ -110,17 +110,13 @@ class TenantSelectionFilterTest {
   }
 
   @Test
-  @DisplayName("認証したリクエストの残りの処理の間だけ、MDC に利用者の ID とテナントの ID が入り、終わると消える")
-  void putsUserAndTenantIntoMdcOnlyWhileFilterChainRuns() throws IOException, ServletException {
+  @DisplayName("選んだテナントの残りの処理の間だけ、MDC にテナントの ID が入り、終わると消える")
+  void putsTenantIntoMdcOnlyWhileFilterChainRuns() throws IOException, ServletException {
     final List<@Nullable String> seen = new ArrayList<>();
 
-    doFilter((request, response) -> {
-      seen.add(MDC.get(USER_ID_KEY));
-      seen.add(MDC.get(TENANT_ID_KEY));
-    });
+    doFilter((request, response) -> seen.add(MDC.get(TENANT_ID_KEY)));
 
-    assertThat(seen).as("残りの処理の中の user.id と tenant.id").containsExactly(USER, TENANT);
-    assertThat(MDC.get(USER_ID_KEY)).as("filter を出た後の user.id").isNull();
+    assertThat(seen).as("残りの処理の中の tenant.id").containsExactly(TENANT);
     assertThat(MDC.get(TENANT_ID_KEY)).as("filter を出た後の tenant.id").isNull();
   }
 
@@ -144,7 +140,7 @@ class TenantSelectionFilterTest {
   }
 
   @Test
-  @DisplayName("認証していないリクエストは、MDC にも受信の observation にも利用者の ID とテナントの ID を入れない")
+  @DisplayName("認証していないリクエストは、MDC にテナントの ID を、受信の observation に利用者の ID とテナントの ID を入れない")
   void unauthenticatedRequestAddsNeitherUserNorTenant() throws IOException, ServletException {
     SecurityContextHolder.clearContext();
     final MockHttpServletRequest request = new MockHttpServletRequest(GET, ORDERS);
@@ -156,31 +152,29 @@ class TenantSelectionFilterTest {
     final List<@Nullable String> seen = new ArrayList<>();
 
     filter.doFilter(
-        request,
-        response,
-        (chainRequest, chainResponse) -> {
-          seen.add(MDC.get(USER_ID_KEY));
-          seen.add(MDC.get(TENANT_ID_KEY));
-        });
+        request, response, (chainRequest, chainResponse) -> seen.add(MDC.get(TENANT_ID_KEY)));
 
-    assertThat(seen).as("残りの処理の中の user.id と tenant.id").containsExactly(null, null);
+    assertThat(seen).as("残りの処理の中の tenant.id").containsExactly((String) null);
     assertThat(context.getHighCardinalityKeyValues()).as("受信の observation の key value").isEmpty();
   }
 
   @Test
-  @DisplayName("利用者が AppUserPrincipal でない認証は、MDC に利用者の ID を入れない")
-  void nonAppUserPrincipalAddsNoUserId() throws IOException, ServletException {
+  @DisplayName("利用者が AppUserPrincipal でない認証は、受信の observation に利用者の ID を入れない")
+  void nonAppUserPrincipalAddsNoUserIdToServerObservation() throws IOException, ServletException {
     SecurityContextHolder.getContext()
         .setAuthentication(
             UsernamePasswordAuthenticationToken.authenticated(USER, "n/a", List.of()));
-    final List<@Nullable String> seen = new ArrayList<>();
+    final MockHttpServletRequest request =
+        new MockHttpServletRequest(GET, MembershipController.PATH);
+    final MockHttpServletResponse response = new MockHttpServletResponse();
+    final ServerRequestObservationContext context =
+        new ServerRequestObservationContext(request, response);
+    request.setAttribute(
+        ServerHttpObservationFilter.CURRENT_OBSERVATION_CONTEXT_ATTRIBUTE, context);
 
-    filter.doFilter(
-        new MockHttpServletRequest(GET, MembershipController.PATH),
-        new MockHttpServletResponse(),
-        (request, response) -> seen.add(MDC.get(USER_ID_KEY)));
+    filter.doFilter(request, response, (chainRequest, chainResponse) -> {});
 
-    assertThat(seen).as("残りの処理の中の user.id").containsExactly((String) null);
+    assertThat(context.getHighCardinalityKeyValues()).as("受信の observation の key value").isEmpty();
   }
 
   @Test

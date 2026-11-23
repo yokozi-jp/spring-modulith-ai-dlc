@@ -36,6 +36,9 @@ import org.springframework.boot.test.system.CapturedOutput;
 import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.context.annotation.Import;
+import org.springframework.security.oauth2.client.authentication.OAuth2AuthenticationToken;
+import org.springframework.security.oauth2.core.oidc.user.OidcUser;
+import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders;
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers;
@@ -43,7 +46,7 @@ import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 
 /** 構造化ログ、トレース相関、OTLP 属性、テナントと利用者の文脈の運用契約を検証する。 */
-@SuppressWarnings("PMD.TooManyStaticImports")
+@SuppressWarnings({"PMD.TooManyStaticImports", "PMD.TooManyMethods"})
 @Slf4j
 @SpringBootTest
 @AutoConfigureMockMvc
@@ -56,6 +59,9 @@ class ObservabilityContractTest {
 
   /** ログとトレースの、アプリの利用者の ID の項目。 */
   private static final AttributeKey<String> USER_ID = AttributeKey.stringKey("user.id");
+
+  /** 注文の API のパスの前半。 */
+  private static final String ORDERS_PATH = "/api/orders/";
 
   /** HTTP などと同じ tracing handler が登録された observation registry。 */
   @Autowired private ObservationRegistry observationRegistry;
@@ -206,7 +212,7 @@ class ObservabilityContractTest {
         .andExpect(MockMvcResultMatchers.status().isNotFound());
 
     final List<SpanData> spans =
-        capturedSpans.withAttribute("http.url", "/api/orders/" + orderId).stream()
+        capturedSpans.withAttribute("http.url", ORDERS_PATH + orderId).stream()
             .filter(span -> span.getKind() == SpanKind.SERVER)
             .toList();
     assertEquals(1, spans.size(), () -> "orderId=" + orderId + " の受信の span: " + spans);
@@ -226,6 +232,86 @@ class ObservabilityContractTest {
     assertFalse(tagKeys.isEmpty(), "GET /api/orders/{orderId} の http.server.requests");
     assertFalse(tagKeys.contains(TENANT_ID.getKey()), tagKeys::toString);
     assertFalse(tagKeys.contains(USER_ID.getKey()), tagKeys::toString);
+  }
+
+  @Test
+  @DisplayName("認可が拒否した 403 のログは、user.id を持ち、拒否がテナントの束縛の外で記録されるので tenant.id を持たない")
+  void authorizationDenialLogCarriesUserWithoutTenant() throws Exception {
+    final String path = "/api/current-tenant/members/" + UUID.randomUUID();
+
+    mockMvc
+        .perform(MockMvcRequestBuilders.get(path).with(AppUsers.oidcLogin()))
+        .andExpect(MockMvcResultMatchers.status().isForbidden());
+
+    assertDenialLogCarriesOnlyUser(path);
+  }
+
+  @Test
+  @DisplayName("テナントを選ぶ前の利用者の拒否のログは、user.id を持ち、tenant.id を持たない")
+  void tenantNotSelectedLogCarriesUserWithoutTenant() throws Exception {
+    final String path = ORDERS_PATH + UUID.randomUUID();
+    final OidcUser user = AppUsers.oidcUser();
+
+    mockMvc
+        .perform(
+            MockMvcRequestBuilders.get(path)
+                .with(
+                    SecurityMockMvcRequestPostProcessors.authentication(
+                        new OAuth2AuthenticationToken(user, user.getAuthorities(), "web"))))
+        .andExpect(MockMvcResultMatchers.status().isForbidden())
+        .andExpect(MockMvcResultMatchers.jsonPath("$.type").value("/problems/tenant-not-selected"));
+
+    assertDenialLogCarriesOnlyUser(path);
+  }
+
+  @Test
+  @DisplayName("CSRF の検証の失敗のログは、user.id を持ち、tenant.id を持たない")
+  void csrfFailureLogCarriesUserWithoutTenant() throws Exception {
+    final String path = ORDERS_PATH + UUID.randomUUID();
+
+    mockMvc
+        .perform(MockMvcRequestBuilders.post(path).with(AppUsers.oidcLogin()))
+        .andExpect(MockMvcResultMatchers.status().isForbidden())
+        .andExpect(MockMvcResultMatchers.jsonPath("$.type").value("/problems/csrf-token-invalid"));
+
+    assertDenialLogCarriesOnlyUser(path);
+  }
+
+  @Test
+  @DisplayName("認証していない要求の 401 のログは、user.id も tenant.id も持たない")
+  void unauthenticatedLogCarriesNeitherUserNorTenant() throws Exception {
+    final String path = ORDERS_PATH + UUID.randomUUID();
+
+    mockMvc
+        .perform(MockMvcRequestBuilders.get(path))
+        .andExpect(MockMvcResultMatchers.status().isUnauthorized());
+
+    final Attributes attributes = clientErrorAttributes(path);
+    assertNull(attributes.get(USER_ID), attributes::toString);
+    assertNull(attributes.get(TENANT_ID), attributes::toString);
+  }
+
+  private void assertDenialLogCarriesOnlyUser(final String path) {
+    final Attributes attributes = clientErrorAttributes(path);
+    assertEquals(AppUsers.USER_ID, attributes.get(USER_ID), attributes::toString);
+    assertNull(attributes.get(TENANT_ID), attributes::toString);
+    assertNull(MDC.get(USER_ID.getKey()), "要求の後の MDC の user.id");
+  }
+
+  /** {@code path} の要求の受信の span と同じ trace の、{@code ApiExceptionHandler} の 4xx のログの属性を返す。 */
+  private Attributes clientErrorAttributes(final String path) {
+    final List<String> traceIds =
+        capturedSpans.withAttribute("http.url", path).stream()
+            .filter(span -> span.getKind() == SpanKind.SERVER)
+            .map(SpanData::getTraceId)
+            .toList();
+    assertEquals(1, traceIds.size(), () -> path + " の受信の span の trace: " + traceIds);
+    final List<LogRecordData> records =
+        capturedLogRecords.withBody("API client error").stream()
+            .filter(record -> traceIds.getFirst().equals(record.getSpanContext().getTraceId()))
+            .toList();
+    assertEquals(1, records.size(), () -> path + " の API client error: " + records);
+    return records.getFirst().getAttributes();
   }
 
   private Attributes singleRecordAttributes(final String event) {

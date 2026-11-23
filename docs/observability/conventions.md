@@ -58,19 +58,21 @@ Grafana では trace ID を使ってログとトレースを相互に検索す�
 ログでは、2 つを MDC に入れ、ログを書く処理から key-value で渡さない。
 
 - `tenant.id` は、`TenantContext.call` がテナントを束縛する間だけ入る。リクエストのログにもリスナーのログにも付く。
-- `user.id` は、`TenantSelectionFilter` が、アプリの利用者（`AppUserPrincipal`）として認証したリクエストの間だけ入れる。リスナーのログには付かない。
+- `user.id` は、`UserIdMdcFilter` が、アプリの利用者（`AppUserPrincipal`）として認証したリクエストの間だけ入れる。リスナーのログには付かない。
 - `TenantSelectionFilter` が所属を引き直す間のログは、`user.id` を持ち、束縛の前なので `tenant.id` を持たない。
 - コンソールの ECS JSON では `{"tenant":{"id":…},"user":{"id":…}}` の入れ子の項目になり、OTLP では LogRecord の属性になる。
 - リスナーの外で記録するログ（リスナーが投げた例外を Spring の `SimpleAsyncUncaughtExceptionHandler` が記録する ERROR など）は、`tenant.id` を持たない。
 
-Spring Security の filter の連鎖のうち、`TenantSelectionFilter` の外で記録するログは、`tenant.id` も `user.id` も持たない。
-`TenantSecurityCustomizer` は、この filter を `ExceptionTranslationFilter` と `AuthorizationFilter` の間に置く。
-次のログがこれにあたる。
+`TenantSecurityCustomizer` は、`UserIdMdcFilter` を `SecurityContextHolderFilter` の直後に、`TenantSelectionFilter` を `ExceptionTranslationFilter` と `AuthorizationFilter` の間に置く。
+`UserIdMdcFilter` は `CsrfFilter` の前にあるので、認証した利用者の次のログは `user.id` を持つ。
+束縛の外で記録するので、`tenant.id` は持たない。
 
-- `AuthorizationFilter` が拒否し、`ExceptionTranslationFilter` が返す 401 と 403（`user.id` を付ける案は #635 で扱う）
+- `AuthorizationFilter` が拒否し、`ExceptionTranslationFilter` が返す 403
 - `TenantSelectionFilter` が投げる `TenantNotSelectedException`
 - CSRF の検証の失敗
-- Spring Security の entry point
+
+認証していないリクエストのログは、`user.id` も `tenant.id` も持たない。
+401 と Spring Security の entry point のログがこれにあたる。
 
 Controller の中の `@PreAuthorize` が拒否したときのログは、2 つを持つ。
 
