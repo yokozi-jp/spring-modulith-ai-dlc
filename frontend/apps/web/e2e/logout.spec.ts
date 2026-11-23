@@ -2,7 +2,13 @@ import type { APIRequestContext, BrowserContext, Cookie, Locator, Page } from "@
 
 import { idpOrigin, logIn, signInAndChooseTenant, webOrigin } from "./environment";
 import { expect, test } from "./fixtures";
-import { expectAuthenticatedHome, expectLoggedOutPage, homeHeading, logoutButton } from "./session";
+import {
+  expectAuthenticatedHome,
+  expectLoggedOutPage,
+  homeHeading,
+  logoutButton,
+  openExpectingLogin,
+} from "./pages";
 import {
   collectTelemetry,
   exerciseSession,
@@ -183,9 +189,7 @@ test("ログアウト後に / を開くと資格情報の入力を求められ�
   await logoutButton(page).click();
   await expectLoggedOutPage(page);
 
-  // load を待つと、SPA が 401 を受けて始めるログインへの遷移と競合する。
-  await page.goto("/", { waitUntil: "commit" });
-  await expect(page.getByLabel("Username or email")).toBeVisible();
+  await openExpectingLogin(page, "/");
   // ログインの後の着地が /tenants であることが、/api/** の要求を保存しない（NullRequestCache）証拠になる。
   await signInAndChooseTenant(page);
 

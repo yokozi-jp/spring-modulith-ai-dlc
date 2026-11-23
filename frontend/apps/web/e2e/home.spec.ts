@@ -1,5 +1,5 @@
 import { expect, test } from "./fixtures";
-import { homeHeading } from "./session";
+import { homeHeading } from "./pages";
 
 test("認証済みのトップページで見出しを確かめ、カウントを増やせる", async ({ page }) => {
   await page.goto("/");

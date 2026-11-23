@@ -24,8 +24,9 @@ E2E テストは、複数画面にまたがる主要な利用者の流れだけ�
 `frontend/apps/web/e2e/` に、ログインや WireMock の初期化を行う `*.setup.ts` とシナリオの `*.spec.ts` を置く。
 `frontend/apps/web/e2e/environment.ts` は、ログイン情報をルートの `.env.test` から読み、`storageState` のパスを決める。
 web の origin（`webOrigin`）と IdP の origin（`idpOrigin`）は、slot が渡す `E2E_WEB_PORT` と `OIDC_ISSUER_URI` から決め、無ければ slot 0 の値を使う。
-Keycloak の画面でログインする手順（`signInOnKeycloak`）も持ち、setup とログアウトの spec が共有する。
-`frontend/apps/web/e2e/session.ts` は、ログアウトの操作、ログアウト後の画面、認証済みのトップページの確認を持ち、複数の spec が共有する。
+Keycloak の画面でログインする手順（`signInOnKeycloak`）も持ち、setup、ログアウトの spec、未認証の spec が共有する。
+`frontend/apps/web/e2e/pages.ts` は、ログアウトのボタンとトップページの見出しの locator、ログアウト後の画面と認証済みのトップページの確認、未認証で開いたときのログインの入力画面の確認を持つ。
+`telemetry.ts` と `pages.ts` は Playwright の中だけで使うため、相対の import に拡張子を付けない。
 `frontend/apps/web/e2e/payment-gateway.ts` は、決済代行の WireMock の管理 API を呼ぶ補助を持つ。
 注文ごとの失敗のスタブ（`failChargesFor`）と、注文 ID を冪等性キーにした請求の回数（`chargeRequestCount`）である。
 `environment.ts`、`fixtures.ts`、`orders.ts`、`payment-gateway.ts` は、Playwright の外から Node が直接 import できるよう、相対の import に拡張子 `.ts` を付ける。

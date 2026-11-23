@@ -58,11 +58,13 @@ async function mutateWhileRefetchIsHeld(status: 204 | 409) {
 }
 
 describe("createQueryClient", () => {
+  const assign = vi.fn<(url: string) => void>();
+
   beforeEach(() => {
     // POST の apiFetch が CSRF の Cookie を読むため、Node に document を置く。
     vi.stubGlobal("document", { cookie: "" });
     // 更新系の apiFetch が送信先の origin を location と比べるため、Node に location を置く。
-    vi.stubGlobal("location", { href: "http://localhost/", origin: "http://localhost" });
+    vi.stubGlobal("location", { href: "http://localhost/", origin: "http://localhost", assign });
   });
 
   it("mutation の成功の後に描画中の query を取り直し、終わるまで pending を保つ", async () => {
@@ -88,9 +90,8 @@ describe("createQueryClient", () => {
     expect(query.getCurrentResult().data).toMatchObject({ data: { fetchCount: 2 } });
   });
 
-  it("mutation が 401 を返すと、描画中の query がなくてもログインへ遷移する", async () => {
-    const assign = vi.fn<(url: string) => void>();
-    vi.stubGlobal("location", { href: "http://localhost/", origin: "http://localhost", assign });
+  // 30 秒の遷移ガードの記録は module 内に残る。2 件目の 401 は遷移しないため、このファイルで 401 を確かめるのはこの 1 件にする。
+  it("mutation の 401 でログインへ遷移する。描画中の query の再取得に頼らない", async () => {
     server.use(
       http.post(itemsUrl, () =>
         HttpResponse.json(

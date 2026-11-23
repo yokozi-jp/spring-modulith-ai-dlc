@@ -1,27 +1,20 @@
-import { idpOrigin, signInOnKeycloak, webOrigin } from "./environment";
+import { signInOnKeycloak, webOrigin } from "./environment";
 import { expect, test } from "./fixtures";
+import { openExpectingLogin } from "./pages";
 
-// 共有のログイン済みの storageState を使わず、未認証から始める。
 test.use({ storageState: { cookies: [], origins: [] } });
 
-// 30 秒の遷移ガードは tab ごとなので、画面ごとに tab を分ける。
-// load を待つと、SPA が 401 を受けて始めるログインへの遷移と競合する。
-test("未認証で認証必須の画面を開くと、どの画面でも Keycloak の入力画面へ移る", async ({
-  context,
-}) => {
-  await Promise.all(
-    ["/tenants", "/orders", "/members"].map(async (path) => {
-      const page = await context.newPage();
-      await page.goto(path, { waitUntil: "commit" });
+// 401 を受ける経路が違う。/tenants は loader、/orders は _tenant の beforeLoad が受ける。
+test("未認証で /tenants を開くと、Keycloak の入力画面へ移る", async ({ page }) => {
+  await openExpectingLogin(page, "/tenants");
+});
 
-      await expect(page, path).toHaveURL((url) => url.origin === idpOrigin);
-      await expect(page.getByLabel("Username or email"), path).toBeVisible();
-    }),
-  );
+test("未認証で /orders を開くと、Keycloak の入力画面へ移る", async ({ page }) => {
+  await openExpectingLogin(page, "/orders");
 });
 
 // Keycloak の SSO セッションは残るため、遷移の後は入力画面を挟まずに /tenants へ戻る。
-test("アプリのセッションを失った後の更新が 401 になると、ログインし直して /tenants へ戻る", async ({
+test("テナントを選ぶ操作がアプリのセッション切れで 401 になると、ログインし直して /tenants へ戻る", async ({
   page,
   context,
 }) => {
@@ -31,11 +24,13 @@ test("アプリのセッションを失った後の更新が 401 になると、
   await expect(heading).toBeVisible();
 
   await context.clearCookies({ name: "APP_SESSION" });
-  const callback = page.waitForResponse(
-    (response) => new URL(response.url()).pathname === "/login/oauth2/code/web",
+  // 401 を受けた元の文書も一覧を取り直して 401 になるため、200 は読み込み直した文書だけが返す。
+  const reloaded = page.waitForResponse(
+    (response) =>
+      new URL(response.url()).pathname === "/api/memberships" && response.status() === 200,
   );
   await page.getByRole("button", { name: "サンプル商事" }).click();
-  await callback;
+  await reloaded;
 
   await expect(page).toHaveURL(`${webOrigin}/tenants`);
   await expect(heading).toBeVisible();
