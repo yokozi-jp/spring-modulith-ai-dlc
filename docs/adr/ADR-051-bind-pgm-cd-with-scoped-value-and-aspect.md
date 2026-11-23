@@ -93,7 +93,8 @@ Aspect とトランザクションの順序は、次のように明示する。
   役割名を変えるときは、`PgmCdAspect` の pointcut も変える必要がある。
 - `*CommandHandler` と `*Listener` は、基底クラスやサブクラスで共通の処理をまとめられない。
 - Spring AOP のプロキシを通らない呼び出し（同じクラスの中からの呼び出し、Bean でないインスタンスの呼び出し）と、別のスレッドへ渡した処理では束縛されない。
-- バッチのように CommandHandler と Listener を通らない書き込みの入口を作るときは、入口の役割と pointcut を決め直す必要がある。
+- CommandHandler と Listener を通らない書き込みの入口は作れない。
+  業務のバッチは、ItemWriter と Tasklet が CommandHandler を呼ぶ形にし、pointcut を変えない（[ADR-115](ADR-115-build-business-batches-with-spring-batch.md)）。
 - Aspect を足すたびに、`@Order` の値を選び、ほかの Aspect との前後を決める必要がある。
 - トランザクションの内側で動く Aspect は、この決定を変えないと置けない。
 

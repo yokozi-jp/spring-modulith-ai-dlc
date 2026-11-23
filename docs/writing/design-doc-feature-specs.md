@@ -1,13 +1,13 @@
 ---
 type: Convention
 title: 機能の設計書の構成
-description: 画面、Web API、非同期処理、I/F の設計書を作る単位と識別子、処理概要、処理シーケンス、ビジネスロジック、DB 項目の書き方、Web API の応答項目の由来と I/F のエラー処理の書き方を定める規約。機能の設計書を新しく書くとき、既存の設計書に節を追加するときに読む。
+description: 画面、Web API、非同期処理、I/F、バッチの設計書を作る単位と識別子、処理概要、処理シーケンス、ビジネスロジック、DB 項目の書き方、Web API の応答項目の由来と I/F のエラー処理の書き方を定める規約。機能の設計書を新しく書くとき、既存の設計書に節を追加するときに読む。
 tags: [convention, writing, design-doc, documentation, future-arch-guidelines]
 ---
 
 # 機能の設計書の構成
 
-設計書は画面、Web API、非同期処理、I/F の単位で作り、正本にある識別子をタイトルに付ける。
+設計書は画面、Web API、非同期処理、I/F、バッチの単位で作り、正本にある識別子をタイトルに付ける。
 処理の設計書は、処理概要、処理シーケンス、ビジネスロジック、DB 項目の順に書く。
 画面の設計書には見た目を書かず、API の呼び出し、利用者の操作、画面間で受け渡す値、入力検証の業務ルールを書く。
 正本にある情報は[設計書と正本の分担](design-doc-sources-of-truth.md)に従って書き写さない。
@@ -20,6 +20,7 @@ tags: [convention, writing, design-doc, documentation, future-arch-guidelines]
 - **Web API**：OpenAPI の `operationId`（[Orval と API 境界](../frontend/api-client-orval.md)）。
 - **非同期処理**：イベント型名（[非同期処理の設計文書](../integration/async-design-documents.md)）。
 - **I/F**：I/F 一覧の機能 ID（[連携の一覧と定義書](../integration/interface-documentation.md)）。
+- **バッチ**：Spring Batch の Job の名前（[バッチのジョブの入口と起動](../batch/job-entry.md#置き場所と役割)）。
 
 ## 画面の設計書
 
@@ -33,7 +34,7 @@ tags: [convention, writing, design-doc, documentation, future-arch-guidelines]
 
 ## 処理の設計書
 
-Web API、非同期処理のプロデューサーとコンシューマー、I/F の受信と配信の処理は、次の4節をこの順に置く。
+Web API、非同期処理のプロデューサーとコンシューマー、I/F の受信と配信の処理、バッチは、次の4節をこの順に置く。
 
 - **処理概要**：処理が必要な理由と、起動契機と処理の概略を箇条書きで書く。
 - **処理シーケンス**：処理の流れを Mermaid のシーケンス図で書く。書き方は[設計書の図](design-doc-diagrams.md)に従う。

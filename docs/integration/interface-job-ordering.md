@@ -14,7 +14,9 @@ tags: [convention, integration, interface, scheduling, future-arch-guidelines]
 ## ジョブの多重起動
 
 - 前回のジョブが終わっていなければ、次のジョブを起動しない。
-  この制御はワークフローエンジンの多重起動防止の機能で行い、アプリケーションに独自の排他を実装しない。
+  ワークフローエンジンがある構成では、ワークフローエンジンの多重起動防止の機能で行う。
+  ワークフローエンジンがない構成では、業務のバッチの多重起動を Spring Batch の JobRepository で止め（[ADR-115](../adr/ADR-115-build-business-batches-with-spring-batch.md)）、`@Scheduled` の保守の処理の重複を ShedLock で減らす（[ADR-079](../adr/ADR-079-resubmit-failed-event-publications-periodically-with-shedlock.md)）。
+  どちらの構成でも、正しさは業務のキーの一意制約と状態の遷移の条件で守る（[バッチの冪等性と再開](../batch/idempotency-and-restart.md#二重の起動)）。
 - 前回が異常終了しても、次回の定時起動でそのまま実行できるように設計する。
   手動の再実行を前提にしない。
 - 前回の異常終了を解消するまで次回を実行させない連携では、ワークフローエンジンの制御に加え、アプリケーションでも前回の状態を確認する。
