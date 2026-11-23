@@ -1,7 +1,7 @@
 ---
 type: Runbook
 title: ローカルでトレースを見る
-description: ローカルの Grafana（grafana/otel-lgtm）で、バックエンドのログの trace ID からトレースを開く手順と、ブラウザを使わずに Grafana の proxy 経由で Tempo を検索する手順。API のトレースをローカルで確かめるときに使う。
+description: ローカルの Grafana（grafana/otel-lgtm）で、API の応答の traceId からログを探す手順、バックエンドのログの trace ID からトレースを開く手順と、ブラウザを使わずに Grafana の proxy 経由で Tempo を検索する手順。API のトレースをローカルで確かめるときに使う。
 tags: [runbook, observability, tracing, grafana, tempo, local]
 ---
 
@@ -17,9 +17,20 @@ tags: [runbook, observability, tracing, grafana, tempo, local]
 依存サービスとバックエンドを起動してから、[開発のワークフロー](../tooling/dev-workflow.md)の Grafana の URL を開く。
 ローカルの Grafana はログインなしで開き、匿名の利用者が Admin になる。これは `grafana/otel-lgtm` の既定で、Compose は上書きしない。
 
+## 応答の traceId からログを探す
+
+失敗した API の応答の Problem Details は、その要求の trace ID を `traceId` に持つ（[HTTPステータスコードの選択](../web-api/status-codes.md#前提)）。
+利用者が問い合わせで伝えた `traceId` から、同じ要求のログを次の順に探す。
+
+1. Grafana の左メニューから Explore を開き、データソースに Loki を選ぶ。
+2. クエリを Code のモードにし、`{service_name="demo-api"} | trace_id = "<traceId>"` を入れて Run query を押す。
+3. ログ行を開き、詳細の Links の `Trace: <trace ID>` を押す。右の分割ペインで Tempo のトレースが開く。
+
+ログが見つからないときは、Grafana の右上の期間を、問い合わせの時刻を含むように広げる。
+sampling で標本にならなかった要求は、ログだけが残り、Tempo にトレースがない（[ADR-117](../adr/ADR-117-add-trace-id-and-omit-instance-in-problem-details.md)）。
+
 ## trace ID からトレースを開く
 
-Problem Details に `traceId` は含まれない。
 trace ID は、ログに出ているかどうかで探し方を分ける。
 
 - **ログに出ている**：trace ID の名前は、コンソールの ECS JSON では `traceId`（[可観測性データの規約](conventions.md)）、Grafana の Loki では `trace_id` である。
