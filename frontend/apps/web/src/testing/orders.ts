@@ -128,9 +128,9 @@ async function changeQuantity(user: UserEvent, value: string) {
 
 /** 決済の欄の外の status（ProblemNotice の output）。 */
 export function notice() {
-  const element = screen
-    .getAllByRole("status")
-    .find((el) => el.closest('[aria-labelledby="payment-heading"]') === null);
+  const payment = screen.queryByRole("region", { name: "決済" });
+  const inPayment = payment === null ? [] : within(payment).queryAllByRole("status");
+  const element = screen.getAllByRole("status").find((el) => !inPayment.includes(el));
   if (element === undefined) {
     throw new Error("ProblemNotice の status がない");
   }
