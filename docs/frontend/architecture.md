@@ -305,6 +305,7 @@ features -> @frontend/api
          -> i18n
 
 components -> @frontend/ui
+           -> @frontend/api/api-fetch、@frontend/api/csrf
            -> lib
            -> i18n
 ```
@@ -317,13 +318,16 @@ components -> @frontend/ui
 
 `api`、`components`、`lib`、`i18n` からfeatureとrouteを参照しない。
 
+`components` が参照できる `@frontend/api` の入口は、`api-fetch` と `csrf` だけである。
+`endpoints`、`models`、`zod` は参照せず、データの取得はrouteとfeatureが行う。
+
 `lib` は最下層であり、`components` も参照しない。
 
 `@frontend/ui` からアプリのコードを参照しない。
 
 `@frontend/api` は `@frontend/ui` を `package.json` に書かないので、UIを参照できない。
 
-`lib` から `@frontend/api`、`i18n` から `components`、`components` から `api` の向きは、図に定めがないためlintでは止めていない。
+`lib` から `@frontend/api`、`i18n` から `components`、`components` から `api`（`apps/web/src/api`）の向きは、図に定めがないためlintでは止めていない。
 使う場面が出たら、図に向きを書いてから検査を加えるか外す。
 
 featureからrouteを参照せず、routeの情報は `getRouteApi` で取る。

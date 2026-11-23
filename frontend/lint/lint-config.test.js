@@ -93,6 +93,13 @@ describe("fixture に適用したプロジェクトの lint 設定", () => {
       expect(countIn("components/route-import.tsx", "eslint(no-restricted-imports)")).toBe(1);
     });
 
+    it("components から生成 API の endpoints、models、zod の import を禁止し、api-fetch と csrf を許可する", () => {
+      expect(countIn("components/generated-api-import.ts", "eslint(no-restricted-imports)")).toBe(
+        3,
+      );
+      expect(codesIn("components/api-entry-import.ts")).toStrictEqual([]);
+    });
+
     it("lib から components の import を禁止する", () => {
       expect(countIn("lib/component-import.ts", "eslint(no-restricted-imports)")).toBe(1);
     });

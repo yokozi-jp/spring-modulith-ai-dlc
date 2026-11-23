@@ -39,6 +39,11 @@ const libLayerImports = {
   group: [...sharedLayerImports.group, "@/components/**"],
   message: "lib must not depend on components, features or routes.",
 };
+// components が使える @frontend/api の入口は api-fetch と csrf だけである。データの取得は route と feature が行う。
+const componentLayerImports = {
+  group: ["@frontend/api/endpoints/**", "@frontend/api/models", "@frontend/api/zod/**"],
+  message: "components may use only @frontend/api/api-fetch and @frontend/api/csrf.",
+};
 const featureImports = {
   group: ["@/routes/**", "@/routeTree.gen"],
   message: "Use getRouteApi instead of importing a route.",
@@ -238,12 +243,29 @@ export default defineConfig({
         },
       },
       {
-        files: ["apps/*/src/{api,components,i18n}/**"],
+        files: ["apps/*/src/{api,i18n}/**"],
         rules: {
           "no-restricted-imports": [
             "error",
             {
               patterns: [sharedLayerImports, baseUiImports, testOnlyImports, telemetrySdkImports],
+            },
+          ],
+        },
+      },
+      {
+        files: ["apps/*/src/components/**"],
+        rules: {
+          "no-restricted-imports": [
+            "error",
+            {
+              patterns: [
+                sharedLayerImports,
+                componentLayerImports,
+                baseUiImports,
+                testOnlyImports,
+                telemetrySdkImports,
+              ],
             },
           ],
         },

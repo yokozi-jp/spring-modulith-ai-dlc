@@ -72,20 +72,23 @@ packageの`vite.config.ts`に`lint`か`fmt`があると、`vp lint`をpackageで
 そのため禁止の一覧をルートの`vite.config.ts`の定数に分け、overrideごとに組み合わせている。
 同じファイルに複数のoverrideが一致すると、後のoverrideのoptionだけが効くので、overrideの並び順を変えるときは組み合わせ結果を確かめる。
 
-| 対象のファイル                          | `no-restricted-imports`                       | `no-restricted-globals`と`no-restricted-properties` |
-| --------------------------------------- | --------------------------------------------- | --------------------------------------------------- |
-| すべて（top-level）                     | Base UI、テスト用部品、テレメトリSDK          | HTML sink、network                                  |
-| `apps/web/src/{api,components,i18n}/**` | 共有層、Base UI、テスト用部品、テレメトリSDK  | top-levelを引き継ぐ                                 |
-| `apps/web/src/lib/**`                   | lib、Base UI、テスト用部品、テレメトリSDK     | top-levelを引き継ぐ                                 |
-| `apps/web/src/lib/telemetry.ts`         | lib、Base UI、テスト用部品                    | top-levelを引き継ぐ                                 |
-| `apps/web/src/features/**`              | feature、Base UI、テスト用部品、テレメトリSDK | top-levelを引き継ぐ                                 |
-| `packages/ui/**`                        | テスト用部品、テレメトリSDK                   | top-levelを引き継ぐ                                 |
-| `packages/api/**`                       | Base UI、テスト用部品、テレメトリSDK          | HTML sinkだけ                                       |
-| テストファイルと`src/testing/**`        | Base UI、テレメトリSDK                        | top-levelを引き継ぐ                                 |
+| 対象のファイル                   | `no-restricted-imports`                                 | `no-restricted-globals`と`no-restricted-properties` |
+| -------------------------------- | ------------------------------------------------------- | --------------------------------------------------- |
+| すべて（top-level）              | Base UI、テスト用部品、テレメトリSDK                    | HTML sink、network                                  |
+| `apps/web/src/{api,i18n}/**`     | 共有層、Base UI、テスト用部品、テレメトリSDK            | top-levelを引き継ぐ                                 |
+| `apps/web/src/components/**`     | 共有層、component、Base UI、テスト用部品、テレメトリSDK | top-levelを引き継ぐ                                 |
+| `apps/web/src/lib/**`            | lib、Base UI、テスト用部品、テレメトリSDK               | top-levelを引き継ぐ                                 |
+| `apps/web/src/lib/telemetry.ts`  | lib、Base UI、テスト用部品                              | top-levelを引き継ぐ                                 |
+| `apps/web/src/features/**`       | feature、Base UI、テスト用部品、テレメトリSDK           | top-levelを引き継ぐ                                 |
+| `packages/ui/**`                 | テスト用部品、テレメトリSDK                             | top-levelを引き継ぐ                                 |
+| `packages/api/**`                | Base UI、テスト用部品、テレメトリSDK                    | HTML sinkだけ                                       |
+| テストファイルと`src/testing/**` | Base UI、テレメトリSDK                                  | top-levelを引き継ぐ                                 |
 
 各禁止の中身は次のとおりである。
 
 - **共有層**：`@/features/**`、`@/routes/**`、`@/routeTree.gen`。
+- **component**：`@frontend/api/endpoints/**`、`@frontend/api/models`、`@frontend/api/zod/**`。
+  `components`が使える`@frontend/api`の入口は`api-fetch`と`csrf`だけである。
 - **lib**：共有層の禁止に加えて`@/components/**`。
   `lib`は依存の最下層であり、UIを参照しない。
 - **feature**：`@/routes/**`、`@/routeTree.gen`。
