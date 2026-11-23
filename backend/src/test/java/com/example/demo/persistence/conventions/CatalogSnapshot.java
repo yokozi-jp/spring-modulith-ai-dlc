@@ -50,6 +50,7 @@ record CatalogSnapshot(
    * @param schema スキーマ名
    * @param name テーブル名
    * @param relkind {@code relkind}（{@code r}、{@code p}、{@code v}、{@code m}、{@code f}）
+   * @param partition パーティションの子テーブルか（{@code relispartition}）
    * @param primaryKey 主キーの先頭の列名。主キーがなければ{@code null}
    * @param inheritanceParent パーティションでない継承の親テーブル。なければ{@code null}
    * @param rowSecurity 行レベルセキュリティを有効にしたか（{@code relrowsecurity}）
@@ -60,6 +61,7 @@ record CatalogSnapshot(
       String schema,
       String name,
       String relkind,
+      boolean partition,
       @Nullable String primaryKey,
       @Nullable String inheritanceParent,
       boolean rowSecurity,
@@ -69,7 +71,7 @@ record CatalogSnapshot(
     /** テーブルの{@code relkind}（通常のテーブルとパーティションテーブル）。 */
     private static final Set<String> TABLE_KINDS = Set.of("r", "p");
 
-    /** 行レベルセキュリティのないテーブルかビュー。 */
+    /** 行レベルセキュリティとコメントのない、パーティションの子でないテーブルかビュー。 */
     /* package */ RelationRow(
         final String schema,
         final String name,
@@ -79,7 +81,7 @@ record CatalogSnapshot(
       this(schema, name, relkind, primaryKey, inheritanceParent, false, false);
     }
 
-    /** コメントのないテーブルかビュー。 */
+    /** コメントのない、パーティションの子でないテーブルかビュー。 */
     /* package */ RelationRow(
         final String schema,
         final String name,
@@ -88,7 +90,16 @@ record CatalogSnapshot(
         final @Nullable String inheritanceParent,
         final boolean rowSecurity,
         final boolean forceRowSecurity) {
-      this(schema, name, relkind, primaryKey, inheritanceParent, rowSecurity, forceRowSecurity, "");
+      this(
+          schema,
+          name,
+          relkind,
+          false,
+          primaryKey,
+          inheritanceParent,
+          rowSecurity,
+          forceRowSecurity,
+          "");
     }
 
     /** ビューでなく、テーブルか。 */
@@ -123,7 +134,7 @@ record CatalogSnapshot(
       boolean notNull,
       String comment) {
 
-    /** NULLを許すカラム。 */
+    /** NULLを許す、コメントのないカラム。 */
     /* package */ ColumnRow(
         final String schema,
         final String table,

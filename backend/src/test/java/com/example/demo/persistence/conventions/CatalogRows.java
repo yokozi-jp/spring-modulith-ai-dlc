@@ -64,7 +64,23 @@ final class CatalogRows {
   /** RLSのENABLEとFORCEと、論理名のコメントを付けたテーブル。 */
   /* package */ static RelationRow tenantTable(
       final String schema, final String table, final String primaryKey) {
-    return new RelationRow(schema, table, "r", primaryKey, null, true, true, "品目");
+    return new RelationRow(schema, table, "r", false, primaryKey, null, true, true, "品目");
+  }
+
+  /** 主キーが{@link #ITEM_ID}の、RLSのENABLEとFORCEを付けた、論理名のコメントが{@code comment}のテーブル。 */
+  /* package */ static RelationRow commentedTable(
+      final String schema,
+      final String table,
+      final String relkind,
+      final boolean partition,
+      final String comment) {
+    return new RelationRow(schema, table, relkind, partition, ITEM_ID, null, true, true, comment);
+  }
+
+  /** bigintのIDENTITYのNOT NULLの、論理名のコメントが{@code comment}のカラム。 */
+  /* package */ static ColumnRow commentedColumn(
+      final String schema, final String table, final String column, final String comment) {
+    return new ColumnRow(schema, table, column, BIGINT, "b", "a", "", null, true, comment);
   }
 
   /** トランザクションのテナントを既定値にした、uuidのNOT NULLの、論理名のコメントを付けたテナントの列。 */

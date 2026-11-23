@@ -164,6 +164,7 @@ final class SchemaCatalog {
             query(
                 """
                 SELECT n.nspname AS schema_name, c.relname AS object_name, c.relkind::text AS kind,
+                       c.relispartition AS is_partition,
                        (SELECT a.attname FROM pg_index i
                         JOIN pg_attribute a ON a.attrelid = i.indrelid AND a.attnum = i.indkey[0]
                         WHERE i.indrelid = c.oid AND i.indisprimary) AS primary_key,
@@ -180,6 +181,7 @@ final class SchemaCatalog {
                 text(r, SCHEMA),
                 text(r, NAME),
                 text(r, "kind"),
+                r.get("is_partition", Boolean.class),
                 r.get("primary_key", String.class),
                 r.get("inheritance_parent", String.class),
                 r.get("row_security", Boolean.class),

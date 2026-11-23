@@ -16,8 +16,8 @@ import java.util.stream.Collectors;
  */
 final class ChangesetStructureRules {
 
-  /** changesetのidとファイル名の規則を定める文書。 */
-  private static final String MIGRATIONS_DOC = "docs/database/migrations.md";
+  /** changesetのid、ファイル名、論理名のコメントの書き方を定める文書。 */
+  /* package */ static final String MIGRATIONS_DOC = "docs/database/migrations.md";
 
   /** ロックを抑えるスキーマ変更の規則を定める文書。 */
   private static final String ONLINE_CHANGE_DOC =

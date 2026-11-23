@@ -3,26 +3,44 @@ package com.example.demo.persistence.conventions;
 import com.example.demo.persistence.conventions.CatalogSnapshot.ColumnRow;
 import com.example.demo.persistence.conventions.CatalogSnapshot.RelationRow;
 import java.util.List;
+import java.util.Set;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 /**
  * 業務テーブルと、そのカラムの論理名のコメントの規則（N12）を、カタログの行から判定する。
  *
  * <p>DBに接続しない純粋な関数である。{@link SchemaConventions#isBusinessSchema(String)}で業務スキーマの行だけを判定する。
+ *
+ * <p>N12は、{@link SchemaTableConventions}のメソッドの数がPMDのTooManyMethodsの上限を超えないよう、別のファイルに置く。
  */
 final class SchemaLogicalNameConventions {
 
-  /** N12の違反の直し方。 */
-  private static final String LOGICAL_NAME_DETAIL =
-      "日本語の論理名をコメントで付ける。表と列を作るchangesetではcreateTableとaddColumnのremarksに書き、"
-          + "既存の表と列にはsetTableRemarksとsetColumnRemarksのchangesetで足す（docs/database/postgresql-naming.md）。";
+  /** 論理名のコメントの書き方の節。 */
+  private static final String REMARKS_DOC = ChangesetStructureRules.MIGRATIONS_DOC + "#論理名のコメント";
+
+  /** 表のN12の違反の直し方。 */
+  private static final String TABLE_DETAIL =
+      "表に日本語の論理名のコメントを付ける。表を作るchangesetではcreateTableのremarksに書き、"
+          + "既存の表にはsetTableRemarksのchangesetで足す（"
+          + REMARKS_DOC
+          + "）。";
+
+  /** 列のN12の違反の直し方。 */
+  private static final String COLUMN_DETAIL =
+      "列に日本語の論理名のコメントを付ける。列を作るchangesetではcreateTableかaddColumnのcolumnのremarksに書き、"
+          + "既存の列にはsetColumnRemarksのchangesetで足す（"
+          + REMARKS_DOC
+          + "）。";
 
   private SchemaLogicalNameConventions() {
     // 静的メソッドだけを持つ。
   }
 
   /**
-   * N12：業務テーブルとそのカラムに、論理名のコメントがある。ビューは対象外にする。
+   * N12：業務テーブルとそのカラムに、空白だけでないコメントがある。
+   *
+   * <p>ビューと、パーティションの子テーブルとそのカラムは対象外にする。PostgreSQLはパーティションの親のコメントを子へ写さない。
    *
    * @param relations テーブルとビュー
    * @param columns カラム
@@ -30,18 +48,25 @@ final class SchemaLogicalNameConventions {
    */
   /* package */ static List<ConventionViolation> logicalNames(
       final List<RelationRow> relations, final List<ColumnRow> columns) {
-    final Stream<String> tables =
+    final Set<String> partitions =
+        relations.stream()
+            .filter(RelationRow::partition)
+            .map(row -> row.schema() + "." + row.name())
+            .collect(Collectors.toSet());
+    final Stream<ConventionViolation> tables =
         relations.stream()
             .filter(row -> SchemaConventions.isBusinessSchema(row.schema()))
-            .filter(row -> row.isTable() && row.comment().isBlank())
-            .map(row -> row.schema() + "." + row.name());
-    final Stream<String> tableColumns =
+            .filter(row -> row.isTable() && !row.partition() && row.comment().isBlank())
+            .map(row ->
+                new ConventionViolation("N12", row.schema() + "." + row.name(), TABLE_DETAIL));
+    final Stream<ConventionViolation> tableColumns =
         columns.stream()
             .filter(row -> SchemaConventions.isBusinessSchema(row.schema()))
+            .filter(row -> !partitions.contains(row.schema() + "." + row.table()))
             .filter(row -> row.comment().isBlank())
-            .map(row -> row.schema() + "." + row.table() + "." + row.column());
-    return Stream.concat(tables, tableColumns)
-        .map(target -> new ConventionViolation("N12", target, LOGICAL_NAME_DETAIL))
-        .toList();
+            .map(row ->
+                new ConventionViolation(
+                    "N12", row.schema() + "." + row.table() + "." + row.column(), COLUMN_DETAIL));
+    return Stream.concat(tables, tableColumns).toList();
   }
 }
