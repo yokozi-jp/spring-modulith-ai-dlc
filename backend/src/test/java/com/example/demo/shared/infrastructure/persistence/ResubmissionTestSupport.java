@@ -81,11 +81,15 @@ final class ResubmissionTestSupport {
     return id;
   }
 
-  /** {@code test.event} の archive の行を、出版の時刻に終わった状態（{@code COMPLETED} か {@code ABANDONED}）で作る。 */
-  /* package */ static void insertArchived(
+  /**
+   * {@code test.event} の archive の行を、出版の時刻に終わった状態（{@code COMPLETED} か {@code ABANDONED}）で作り、その ID
+   * を返す。
+   */
+  /* package */ static UUID insertArchived(
       final DSLContext dsl, final Instant publicationDate, final String status) {
+    final UUID id = UUID.randomUUID();
     dsl.insertInto(EVENT_PUBLICATION_ARCHIVE)
-        .set(EVENT_PUBLICATION_ARCHIVE.ID, UUID.randomUUID())
+        .set(EVENT_PUBLICATION_ARCHIVE.ID, id)
         .set(EVENT_PUBLICATION_ARCHIVE.LISTENER_ID, "archived-test")
         .set(EVENT_PUBLICATION_ARCHIVE.EVENT_TYPE, "test.event")
         .set(EVENT_PUBLICATION_ARCHIVE.SERIALIZED_EVENT, "{}")
@@ -94,6 +98,7 @@ final class ResubmissionTestSupport {
         .set(EVENT_PUBLICATION_ARCHIVE.STATUS, status)
         .set(EVENT_PUBLICATION_ARCHIVE.COMPLETION_ATTEMPTS, 1)
         .execute();
+    return id;
   }
 
   /**
