@@ -1,19 +1,28 @@
 package com.example.demo;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import com.example.demo.testkit.AppUsers;
 import com.example.demo.testkit.CapturedLogRecords;
+import com.example.demo.testkit.CapturedSpans;
 import com.example.demo.testkit.SharedTestConfiguration;
+import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.Tag;
 import io.micrometer.observation.Observation;
 import io.micrometer.observation.ObservationRegistry;
 import io.opentelemetry.api.OpenTelemetry;
 import io.opentelemetry.api.common.AttributeKey;
 import io.opentelemetry.api.common.Attributes;
+import io.opentelemetry.api.trace.SpanKind;
 import io.opentelemetry.instrumentation.logback.appender.v1_0.OpenTelemetryAppender;
 import io.opentelemetry.sdk.logs.data.LogRecordData;
+import io.opentelemetry.sdk.trace.data.SpanData;
 import java.util.List;
+import java.util.UUID;
 import java.util.concurrent.atomic.AtomicReference;
 import lombok.extern.slf4j.Slf4j;
 import org.junit.jupiter.api.BeforeEach;
@@ -25,14 +34,28 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.system.CapturedOutput;
 import org.springframework.boot.test.system.OutputCaptureExtension;
+import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.context.annotation.Import;
+import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.request.MockMvcRequestBuilders;
+import org.springframework.test.web.servlet.result.MockMvcResultMatchers;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.json.JsonMapper;
 
-/** 構造化ログ、トレース相関、OTLP 属性の運用契約を検証する。 */
+/** 構造化ログ、トレース相関、OTLP 属性、テナントと利用者の文脈の運用契約を検証する。 */
+@SuppressWarnings("PMD.TooManyStaticImports")
 @Slf4j
 @SpringBootTest
+@AutoConfigureMockMvc
 @Import(SharedTestConfiguration.class)
 @ExtendWith(OutputCaptureExtension.class)
 class ObservabilityContractTest {
+
+  /** ログとトレースの、テナントの {@code public_id} の項目。 */
+  private static final AttributeKey<String> TENANT_ID = AttributeKey.stringKey("tenant.id");
+
+  /** ログとトレースの、アプリの利用者の ID の項目。 */
+  private static final AttributeKey<String> USER_ID = AttributeKey.stringKey("user.id");
 
   /** HTTP などと同じ tracing handler が登録された observation registry。 */
   @Autowired private ObservationRegistry observationRegistry;
@@ -42,6 +65,15 @@ class ObservabilityContractTest {
 
   /** このコンテキストの OpenTelemetry。 */
   @Autowired private OpenTelemetry openTelemetry;
+
+  /** 実際の Spring MVC と Security filter chain を通すクライアント。 */
+  @Autowired private MockMvc mockMvc;
+
+  /** 終えた span。 */
+  @Autowired private CapturedSpans capturedSpans;
+
+  /** HTTP の observation が記録するメトリクス。 */
+  @Autowired private MeterRegistry meterRegistry;
 
   @BeforeEach
   void installAppender() {
@@ -57,12 +89,11 @@ class ObservabilityContractTest {
     final String message = "observability correlation contract";
 
     Observation.createNotStarted("observability.contract", observationRegistry)
-        .observe(
-            () -> {
-              traceId.set(MDC.get("traceId"));
-              spanId.set(MDC.get("spanId"));
-              log.info(message);
-            });
+        .observe(() -> {
+          traceId.set(MDC.get("traceId"));
+          spanId.set(MDC.get("spanId"));
+          log.info(message);
+        });
 
     assertNotNull(traceId.get(), "active observation の trace ID が MDC に存在すること");
     assertNotNull(spanId.get(), "active observation の span ID が MDC に存在すること");
@@ -109,6 +140,92 @@ class ObservabilityContractTest {
     assertTrue(
         stackTrace != null && stackTrace.contains("ObservabilityContractTest"),
         () -> event + ": " + attributes);
+  }
+
+  @Test
+  @DisplayName("MDC の tenant.id と user.id は、コンソールの JSON の入れ子の項目と OTLP の LogRecord 属性の両方に出る")
+  void tenantAndUserInMdcAppearInConsoleAndLogRecord(final CapturedOutput output) {
+    final String event = "observability mdc contract";
+
+    try (MDC.MDCCloseable ignoredTenant = MDC.putCloseable(TENANT_ID.getKey(), AppUsers.TENANT_ID);
+        MDC.MDCCloseable ignoredUser = MDC.putCloseable(USER_ID.getKey(), AppUsers.USER_ID)) {
+      log.info(event);
+    }
+
+    final Attributes attributes = singleRecordAttributes(event);
+    assertEquals(AppUsers.TENANT_ID, attributes.get(TENANT_ID), () -> event + ": " + attributes);
+    assertEquals(AppUsers.USER_ID, attributes.get(USER_ID), () -> event + ": " + attributes);
+    final JsonNode line =
+        JsonMapper.builder()
+            .build()
+            .readTree(
+                output
+                    .getAll()
+                    .lines()
+                    .filter(candidate -> candidate.startsWith("{") && candidate.contains(event))
+                    .findFirst()
+                    .orElseThrow(() -> new AssertionError(event + " の JSON の行")));
+    assertEquals(AppUsers.TENANT_ID, line.at("/tenant/id").asString(), line::toString);
+    assertEquals(AppUsers.USER_ID, line.at("/user/id").asString(), line::toString);
+  }
+
+  @Test
+  @DisplayName("テナントを選んだ利用者の要求の中のログは tenant.id と user.id を持ち、要求の後の MDC に残らない")
+  void requestLogCarriesTenantAndUser() throws Exception {
+    final String orderId = UUID.randomUUID().toString();
+
+    mockMvc
+        .perform(
+            MockMvcRequestBuilders.get("/api/orders/{orderId}", orderId).with(AppUsers.oidcLogin()))
+        .andExpect(MockMvcResultMatchers.status().isNotFound());
+
+    final Attributes attributes =
+        capturedLogRecords.withBody("API business failure").stream()
+            .map(LogRecordData::getAttributes)
+            .filter(candidate ->
+                String.valueOf(candidate.get(AttributeKey.stringKey("exception.message")))
+                    .contains(orderId))
+            .findFirst()
+            .orElseThrow(
+                () -> new AssertionError("orderId=" + orderId + " の API business failure"));
+    assertEquals(AppUsers.TENANT_ID, attributes.get(TENANT_ID), attributes::toString);
+    assertEquals(AppUsers.USER_ID, attributes.get(USER_ID), attributes::toString);
+    assertNull(MDC.get(TENANT_ID.getKey()), "要求の後の MDC の tenant.id");
+    assertNull(MDC.get(USER_ID.getKey()), "要求の後の MDC の user.id");
+  }
+
+  @Test
+  @DisplayName(
+      "テナントを選んだ利用者の要求の受信の span は tenant.id と user.id を属性に持ち、http.server.requests の tag には持たない")
+  void serverSpanCarriesTenantAndUserButMetricsDoNot() throws Exception {
+    final String orderId = UUID.randomUUID().toString();
+
+    mockMvc
+        .perform(
+            MockMvcRequestBuilders.get("/api/orders/{orderId}", orderId).with(AppUsers.oidcLogin()))
+        .andExpect(MockMvcResultMatchers.status().isNotFound());
+
+    final List<SpanData> spans =
+        capturedSpans.withAttribute("http.url", "/api/orders/" + orderId).stream()
+            .filter(span -> span.getKind() == SpanKind.SERVER)
+            .toList();
+    assertEquals(1, spans.size(), () -> "orderId=" + orderId + " の受信の span: " + spans);
+    final Attributes attributes = spans.getFirst().getAttributes();
+    assertEquals(AppUsers.TENANT_ID, attributes.get(TENANT_ID), attributes::toString);
+    assertEquals(AppUsers.USER_ID, attributes.get(USER_ID), attributes::toString);
+    final List<String> tagKeys =
+        meterRegistry
+            .find("http.server.requests")
+            .tag("uri", "/api/orders/{orderId}")
+            .meters()
+            .stream()
+            .flatMap(meter -> meter.getId().getTags().stream())
+            .map(Tag::getKey)
+            .distinct()
+            .toList();
+    assertFalse(tagKeys.isEmpty(), "GET /api/orders/{orderId} の http.server.requests");
+    assertFalse(tagKeys.contains(TENANT_ID.getKey()), tagKeys::toString);
+    assertFalse(tagKeys.contains(USER_ID.getKey()), tagKeys::toString);
   }
 
   private Attributes singleRecordAttributes(final String event) {

@@ -15,6 +15,7 @@ tags: [convention, database, postgresql, multi-tenancy, rls, future-arch-guideli
 
 この規約は、複数のテナントのデータを一つのシステムで扱う場合に適用する。
 あるテナントが別のテナントのデータにアクセスできる状態は、どの方式でも許容しない。
+キャッシュのキーにテナントを含める規則は、[PostgreSQLの性能対策と負荷分散](postgresql-performance.md#キャッシュのキー)にある。
 規則の検査は「[RLSの検査](#rlsの検査)」に示す。
 
 ## 分離方式

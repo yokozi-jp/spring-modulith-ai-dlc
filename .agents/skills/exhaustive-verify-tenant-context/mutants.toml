@@ -1,0 +1,113 @@
+# TenantContext.call の退行を写す変異。scripts/mutants.py が backend の本物のソースへ当て、
+# TenantContextExhaustiveTest が失敗することを確かめ、ソースを元に戻す。
+
+[[mutant]]
+name = "outer-mdc-not-restored"
+change = "入れ子の束縛から戻ったとき、外側のテナントに戻さず MDC の tenant.id を消す"
+
+[[mutant.edits]]
+old = '''        MDC.put(ATTRIBUTE_KEY, BOUND.get().toString());'''
+new = '''        MDC.remove(ATTRIBUTE_KEY);'''
+
+[[mutant]]
+name = "inner-mdc-kept-after-return"
+change = "入れ子の束縛から戻っても、内側のテナントを MDC に残す"
+
+[[mutant.edits]]
+old = '''        MDC.put(ATTRIBUTE_KEY, BOUND.get().toString());'''
+new = '''        MDC.put(ATTRIBUTE_KEY, bound.toString());'''
+
+[[mutant]]
+name = "mdc-left-after-outermost"
+change = "最も外側の束縛を出ても、MDC の tenant.id を消さない"
+
+[[mutant.edits]]
+old = '''        MDC.remove(ATTRIBUTE_KEY);'''
+new = '''        MDC.put(ATTRIBUTE_KEY, bound.toString());'''
+
+[[mutant]]
+name = "mdc-not-set"
+change = "束縛の間に MDC へ tenant.id を入れない"
+
+[[mutant.edits]]
+old = '''    MDC.put(ATTRIBUTE_KEY, bound.toString());
+    try {'''
+new = '''    try {'''
+
+[[mutant]]
+name = "inner-shows-outer-tenant"
+change = "入れ子の内側で、MDC に外側のテナントを入れる"
+
+[[mutant.edits]]
+old = '''    MDC.put(ATTRIBUTE_KEY, bound.toString());'''
+new = '''    MDC.put(ATTRIBUTE_KEY, BOUND.isBound() ? BOUND.get().toString() : bound.toString());'''
+
+[[mutant]]
+name = "restore-skipped-on-exception"
+change = "処理が例外を投げたとき、MDC を戻さない（finally でなく正常に戻ったときだけ戻す）"
+
+[[mutant.edits]]
+old = '''    try {
+      return ScopedValue.where(BOUND, bound).call(operation);
+    } finally {'''
+new = '''    final R result = ScopedValue.where(BOUND, bound).call(operation);
+    {'''
+
+[[mutant.edits]]
+old = '''        MDC.remove(ATTRIBUTE_KEY);
+      }
+    }
+  }'''
+new = '''        MDC.remove(ATTRIBUTE_KEY);
+      }
+    }
+    return result;
+  }'''
+
+[[mutant]]
+name = "exception-wrapped"
+change = "処理が投げた例外を IllegalStateException で包む"
+
+[[mutant.edits]]
+old = '''      return ScopedValue.where(BOUND, bound).call(operation);'''
+new = '''      try {
+        return ScopedValue.where(BOUND, bound).call(operation);
+      } catch (Exception wrapped) {
+        throw new IllegalStateException(wrapped);
+      }'''
+
+[[mutant]]
+name = "restore-skipped-on-error"
+change = "処理が Error を投げたとき、MDC を戻さない（検査されない例外と検査される例外のときだけ戻す）"
+
+[[mutant.edits]]
+old = '''    try {
+      return ScopedValue.where(BOUND, bound).call(operation);
+    } finally {'''
+new = '''    boolean failedWithError = false;
+    try {
+      return ScopedValue.where(BOUND, bound).call(operation);
+    } catch (Error error) {
+      failedWithError = true;
+      throw error;
+    } finally {
+      if (!failedWithError) {'''
+
+[[mutant.edits]]
+old = '''        MDC.remove(ATTRIBUTE_KEY);
+      }
+    }
+  }'''
+new = '''        MDC.remove(ATTRIBUTE_KEY);
+      }
+      }
+    }
+  }'''
+
+[[mutant]]
+name = "inner-binding-ignored"
+change = "入れ子の内側で、束縛を外側のテナントのままにする（MDC は内側のテナントを入れる）"
+
+[[mutant.edits]]
+old = '''ScopedValue.where(BOUND, bound)'''
+new = '''ScopedValue.where(BOUND, BOUND.isBound() ? BOUND.get() : bound)'''

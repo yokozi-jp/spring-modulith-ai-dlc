@@ -390,8 +390,10 @@ class ApiErrorContractTest {
     final LogRecordData record = capturedLogRecords.withBody(event).getLast();
     assertEquals(severity, record.getSeverity(), event + " のレベル");
     assertEquals(status, record.getAttributes().get(STATUS_CODE), event + " の status");
+    // 要求はテナントを選んだ利用者なので、MDC のテナントと利用者も付く。
     final Set<String> expected =
-        Stream.concat(Stream.of(STATUS_CODE.getKey()), others.stream()).collect(Collectors.toSet());
+        Stream.concat(Stream.of(STATUS_CODE.getKey(), "tenant.id", "user.id"), others.stream())
+            .collect(Collectors.toSet());
     final Set<String> actual =
         record.getAttributes().asMap().keySet().stream()
             .map(AttributeKey::getKey)

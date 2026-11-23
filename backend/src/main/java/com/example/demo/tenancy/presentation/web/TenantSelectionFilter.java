@@ -6,6 +6,7 @@ import com.example.demo.shared.tenant.TenantContext;
 import com.example.demo.shared.tenant.TenantId;
 import com.example.demo.tenancy.MembershipSummary;
 import com.example.demo.tenancy.TenancyQueries;
+import io.micrometer.common.KeyValue;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -14,6 +15,7 @@ import java.io.IOException;
 import java.util.Optional;
 import java.util.UUID;
 import org.jspecify.annotations.Nullable;
+import org.slf4j.MDC;
 import org.springframework.http.HttpMethod;
 import org.springframework.security.authentication.AuthenticationTrustResolver;
 import org.springframework.security.authentication.AuthenticationTrustResolverImpl;
@@ -26,6 +28,7 @@ import org.springframework.security.web.util.matcher.NegatedRequestMatcher;
 import org.springframework.security.web.util.matcher.OrRequestMatcher;
 import org.springframework.security.web.util.matcher.RequestMatcher;
 import org.springframework.web.filter.OncePerRequestFilter;
+import org.springframework.web.filter.ServerHttpObservationFilter;
 
 /**
  * セッションで選んだテナントの所属をリクエストのたびに引き直し、業務の API をテナントを選んだ後だけ通す。
@@ -35,11 +38,20 @@ import org.springframework.web.filter.OncePerRequestFilter;
  *
  * <p>テナントを選んだ後のリクエストは、残りの処理の間だけ、選んだテナントを {@link TenantContext} に束縛する。テナントはセッションの権限だけから取り、リクエストの
  * header、パス、本文から取らない。
+ *
+ * <p>{@link AppUserPrincipal} として認証したリクエストは、所属の引き直しを含む残りの処理の間だけ、アプリの利用者の ID を MDC の {@value
+ * #USER_ID_ATTRIBUTE_KEY} に入れる。利用者の ID と束縛したテナントは、HTTP の受信の span の属性にも入れる。
  */
 final class TenantSelectionFilter extends OncePerRequestFilter {
 
   /** テナントが決まっている必要がある API。 */
   private static final RequestMatcher REQUIRES_TENANT;
+
+  /**
+   * ログとトレースで、アプリの利用者の ID（{@link
+   * AppUserPrincipal#userId()}）を持つ項目の名前（docs/observability/conventions.md）。
+   */
+  private static final String USER_ID_ATTRIBUTE_KEY = "user.id";
 
   static {
     final PathPatternRequestMatcher.Builder paths = PathPatternRequestMatcher.withDefaults();
@@ -79,12 +91,43 @@ final class TenantSelectionFilter extends OncePerRequestFilter {
       final HttpServletResponse response,
       final FilterChain filterChain)
       throws ServletException, IOException {
-    final Optional<TenantId> tenantId = recheckedTenant(request, response);
+    final @Nullable Authentication authentication = holder.getContext().getAuthentication();
+    if (authentication == null || !trustResolver.isAuthenticated(authentication)) {
+      filterChain.doFilter(request, response);
+      return;
+    }
+    if (!(authentication.getPrincipal() instanceof AppUserPrincipal user)) {
+      doFilterInSelectedTenant(authentication, request, response, filterChain);
+      return;
+    }
+    addToServerSpan(request, USER_ID_ATTRIBUTE_KEY, user.userId());
+    try (MDC.MDCCloseable ignored = MDC.putCloseable(USER_ID_ATTRIBUTE_KEY, user.userId())) {
+      doFilterInSelectedTenant(authentication, request, response, filterChain);
+    }
+  }
+
+  /** 選んだテナントが残っていれば、束縛してリクエストの残りの処理を呼ぶ。 */
+  private void doFilterInSelectedTenant(
+      final Authentication authentication,
+      final HttpServletRequest request,
+      final HttpServletResponse response,
+      final FilterChain filterChain)
+      throws ServletException, IOException {
+    final Optional<TenantId> tenantId = recheckedTenant(authentication, request, response);
     if (tenantId.isEmpty()) {
       filterChain.doFilter(request, response);
       return;
     }
+    addToServerSpan(request, TenantContext.ATTRIBUTE_KEY, tenantId.get().toString());
     doFilterInTenant(tenantId.get(), request, response, filterChain);
+  }
+
+  /** HTTP の受信の observation に、span の属性になる値を足す。 */
+  private static void addToServerSpan(
+      final HttpServletRequest request, final String key, final String value) {
+    // 低い濃度の key value はメトリクスの tag にもなり、系列がテナントと利用者の数だけ増えるため、高い濃度にだけ入れる。
+    ServerHttpObservationFilter.findObservationContext(request)
+        .ifPresent(context -> context.addHighCardinalityKeyValue(KeyValue.of(key, value)));
   }
 
   /**
@@ -95,11 +138,9 @@ final class TenantSelectionFilter extends OncePerRequestFilter {
    * @throws TenantNotSelectedException テナントの決まっている必要がある API を、テナントを選ぶ前に呼んだ場合
    */
   private Optional<TenantId> recheckedTenant(
-      final HttpServletRequest request, final HttpServletResponse response) {
-    final @Nullable Authentication authentication = holder.getContext().getAuthentication();
-    if (authentication == null || !trustResolver.isAuthenticated(authentication)) {
-      return Optional.empty();
-    }
+      final Authentication authentication,
+      final HttpServletRequest request,
+      final HttpServletResponse response) {
     final Optional<TenantId> tenant =
         TenantSession.selectedTenant(authentication)
             .flatMap(selected -> recheck(request, response, authentication, selected));
