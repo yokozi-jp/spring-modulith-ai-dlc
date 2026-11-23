@@ -4,6 +4,7 @@ import static com.example.demo.testkit.AppUsers.oidcLogin;
 import static org.hamcrest.Matchers.not;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
@@ -113,6 +114,7 @@ class ApiErrorContractTest {
             .getResponse()
             .getHeader(HttpHeaders.ALLOW);
 
+    assertNotNull(allow, "405 は Allow を返す");
     assertEquals(
         Set.of("GET", "POST"), Set.of(allow.split(",\\s*")), "405 の Allow は宣言した method だけ");
   }
