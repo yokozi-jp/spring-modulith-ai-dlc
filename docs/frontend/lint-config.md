@@ -59,6 +59,8 @@ packageの`vite.config.ts`に`lint`か`fmt`があると、`vp lint`をpackageで
   Base UIをimportできるのはこのpackageだけで、`apps/**`では禁止する。
 - **shadcnの部品の認識**：`@shadcn/lint`は、アプリの`components.json`の`aliases.ui`（`@frontend/ui`）と、ルートの`settings.shadcn.componentImports`（`^@frontend/ui(/|$)`）の両方で、`@frontend/ui`からimportした部品を認識する。
   認識した部品の`className`に、部品が持つ見た目のclass（`p-4`など）を渡すと`shadcn/no-restyle`が報告し、`mt-2`のような配置のclassは許す。
+- **`jsx-a11y`を部品へ効かせる**：`settings["jsx-a11y"].components`で`Link`を`a`、`Button`を`button`に対応づけ、中身が空の`Link`と`Button`を`anchor-has-content`と`control-has-associated-label`が報告するようにする。
+  `jsx-a11y/anchor-is-valid`は`specialLink: ["to"]`にして、`<Link to>`を`href`のある`<a>`として扱う。`<a href="#">`は引き続き報告する。
 - **`apps/*/src/routes/**`**：`react/only-export-components`をoffにする。
 - **テストファイル**：`react/jsx-no-literals`と`import/max-dependencies`をoffにする。
 

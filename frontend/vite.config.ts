@@ -143,6 +143,7 @@ export default defineConfig({
       "oxc/no-optional-chaining": "off",
       "oxc/no-rest-spread-properties": "off",
       "no-void": ["error", { allowAsStatement: true }],
+      "jsx-a11y/anchor-is-valid": ["error", { specialLink: ["to"] }],
       "no-undefined": "off",
       "typescript/explicit-function-return-type": "off",
       "typescript/explicit-module-boundary-types": "off",
@@ -364,7 +365,11 @@ export default defineConfig({
       },
     ],
     // shadcn の部品を別 package の @frontend/ui から import するため、components.json の alias に加えて import 元でも部品と認識させる（ADR-092）。
-    settings: { shadcn: { componentImports: ["^@frontend/ui(/|$)"] } },
+    // jsx-a11y の規則を、素の要素を包む部品にも効かせる。components は JSX の名前から要素への写像で、@frontend/ui の部品を足しても自動では増えない。
+    settings: {
+      shadcn: { componentImports: ["^@frontend/ui(/|$)"] },
+      "jsx-a11y": { components: { Link: "a", Button: "button" } },
+    },
     options: {
       denyWarnings: true,
       reportUnusedDisableDirectives: "error",

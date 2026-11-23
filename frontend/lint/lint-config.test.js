@@ -189,6 +189,22 @@ describe("fixture に適用したプロジェクトの lint 設定", () => {
       });
     });
 
+    describe("アクセシビリティ", () => {
+      it("中身が空の Link と Button を禁止する", () => {
+        const file = "features/order/a11y-empty-link-button.tsx";
+        expect(countIn(file, "jsx-a11y(anchor-has-content)")).toBe(1);
+        expect(countIn(file, "jsx-a11y(control-has-associated-label)")).toBe(1);
+      });
+
+      it("中身のある Link の to を href として許可する", () => {
+        expect(codesIn("features/order/a11y-link-with-content.tsx")).toStrictEqual([]);
+      });
+
+      it('<a href="#"> を禁止する', () => {
+        expect(countIn("features/order/a11y-anchor-hash.tsx", "jsx-a11y(anchor-is-valid)")).toBe(1);
+      });
+    });
+
     describe("link と button の組み合わせ", () => {
       it("link の中の button と、Button の render に渡した link を禁止する", () => {
         expect(
