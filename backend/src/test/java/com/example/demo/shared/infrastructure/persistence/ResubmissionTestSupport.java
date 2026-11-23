@@ -1,6 +1,7 @@
 package com.example.demo.shared.infrastructure.persistence;
 
 import static com.example.demo.jooq.modulith.Tables.EVENT_PUBLICATION;
+import static com.example.demo.jooq.modulith.Tables.EVENT_PUBLICATION_ARCHIVE;
 
 import com.example.demo.testkit.CapturedLogRecords;
 import com.example.demo.testkit.CleanGeneratedTablesExtension;
@@ -20,7 +21,7 @@ import org.jooq.DSLContext;
 import org.springframework.context.annotation.Import;
 import org.springframework.test.context.TestPropertySource;
 
-/** 再投入のテストで使う、Spring の文脈の設定、ロックの期限、出版の行、上限到達の ERROR の操作。 */
+/** 再投入のテストで使う、Spring の文脈の設定、ロックの期限、出版の行と archive の行、上限到達の ERROR の操作。 */
 final class ResubmissionTestSupport {
 
   private ResubmissionTestSupport() {}
@@ -76,6 +77,21 @@ final class ResubmissionTestSupport {
         .set(EVENT_PUBLICATION.COMPLETION_ATTEMPTS, completionAttempts)
         .execute();
     return id;
+  }
+
+  /** {@code test.event} の archive の行を、出版の時刻に終わった状態（{@code COMPLETED} か {@code ABANDONED}）で作る。 */
+  /* package */ static void insertArchived(
+      final DSLContext dsl, final Instant publicationDate, final String status) {
+    dsl.insertInto(EVENT_PUBLICATION_ARCHIVE)
+        .set(EVENT_PUBLICATION_ARCHIVE.ID, UUID.randomUUID())
+        .set(EVENT_PUBLICATION_ARCHIVE.LISTENER_ID, "archived-test")
+        .set(EVENT_PUBLICATION_ARCHIVE.EVENT_TYPE, "test.event")
+        .set(EVENT_PUBLICATION_ARCHIVE.SERIALIZED_EVENT, "{}")
+        .set(EVENT_PUBLICATION_ARCHIVE.PUBLICATION_DATE, publicationDate)
+        .set(EVENT_PUBLICATION_ARCHIVE.COMPLETION_DATE, publicationDate)
+        .set(EVENT_PUBLICATION_ARCHIVE.STATUS, status)
+        .set(EVENT_PUBLICATION_ARCHIVE.COMPLETION_ATTEMPTS, 1)
+        .execute();
   }
 
   /** {@code publicationId} の出版についての、上限に達した出版の ERROR。 */

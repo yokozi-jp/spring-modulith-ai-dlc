@@ -207,6 +207,7 @@ event-publication:
     lock-at-most-for: PT10M
     # リスナーの再投入の方針。リスナーの on に @ResubmissionPolicy("<名前>") を付けて選び、付けなければ default にする。
     # n 回目の再投入の前に、最後の試行から min(wait-age × multiplier^(n-1), max-wait) だけ待つ。
+    # max-resubmissions 回の再投入の後に失敗した出版は、Spring Modulith の AbandonPolicy で ABANDONED にし、archive へ移す。
     policies:
       default:
         max-resubmissions: 5

@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.example.demo.shared.events.ResubmissionPolicy;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.time.Duration;
 import java.util.Map;
 import org.jooq.SQLDialect;
@@ -12,6 +13,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.aop.framework.autoproxy.AutoProxyUtils;
 import org.springframework.beans.factory.CannotLoadBeanClassException;
+import org.springframework.beans.factory.config.ConfigurableListableBeanFactory;
 import org.springframework.beans.factory.support.DefaultListableBeanFactory;
 import org.springframework.beans.factory.support.RootBeanDefinition;
 import org.springframework.modulith.events.ApplicationModuleListener;
@@ -44,15 +46,6 @@ class ResubmissionPoliciesTest {
               new EventPublicationResubmissionConfig.Policy(3, 2, Duration.ofHours(1))));
 
   @Test
-  @DisplayName("方針を指定したリスナーがなければ、再投入の回数の上限の式は既定の方針の上限になる")
-  void maxResubmissionsFallsBackToDefaultPolicyWithoutAnnotatedListeners() {
-    final ResubmissionPolicies policies =
-        new ResubmissionPolicies(new DefaultListableBeanFactory(), PROPERTIES);
-
-    assertThat(DSL.using(SQLDialect.POSTGRES).render(policies.maxResubmissions())).isEqualTo("5");
-  }
-
-  @Test
   @DisplayName("型を解決できない bean があっても起動を失敗させず、他の bean の方針を対応づける")
   void unresolvableBeanIsSkipped() throws NoSuchMethodException {
     final DefaultListableBeanFactory beanFactory = new DefaultListableBeanFactory();
@@ -62,7 +55,7 @@ class ResubmissionPoliciesTest {
     assertThatThrownBy(() -> AutoProxyUtils.determineTargetClass(beanFactory, "missing"))
         .isInstanceOf(CannotLoadBeanClassException.class);
 
-    final ResubmissionPolicies policies = new ResubmissionPolicies(beanFactory, PROPERTIES);
+    final ResubmissionPolicies policies = policiesOf(beanFactory);
 
     assertThat(
             policies.nameOf(
@@ -77,7 +70,7 @@ class ResubmissionPoliciesTest {
     final DefaultListableBeanFactory beanFactory = new DefaultListableBeanFactory();
     beanFactory.registerBeanDefinition("plain", new RootBeanDefinition(NonListener.class));
 
-    assertThatThrownBy(() -> new ResubmissionPolicies(beanFactory, PROPERTIES))
+    assertThatThrownBy(() -> policiesOf(beanFactory))
         .isInstanceOf(IllegalStateException.class)
         .hasMessageContaining("@ApplicationModuleListener")
         .hasMessageContaining("NonListener.on");
@@ -89,7 +82,7 @@ class ResubmissionPoliciesTest {
     final DefaultListableBeanFactory beanFactory = new DefaultListableBeanFactory();
     beanFactory.registerBeanDefinition("named", new RootBeanDefinition(NamedListener.class));
 
-    final ResubmissionPolicies policies = new ResubmissionPolicies(beanFactory, PROPERTIES);
+    final ResubmissionPolicies policies = policiesOf(beanFactory);
 
     assertThat(policies.nameOf("custom-id")).isEqualTo(PAYMENT);
     assertThat(policies.nameOf("other-id"))
@@ -104,6 +97,13 @@ class ResubmissionPoliciesTest {
             PaymentListener.class.getDeclaredMethod("on", String.class));
 
     assertThat(id).isEqualTo(PaymentListener.class.getName() + ".on(java.lang.String)");
+  }
+
+  /** DB を使わない構築。jOOQ と Counter は方針の対応づけに使わない。 */
+  private static ResubmissionPolicies policiesOf(
+      final ConfigurableListableBeanFactory beanFactory) {
+    return new ResubmissionPolicies(
+        beanFactory, PROPERTIES, DSL.using(SQLDialect.POSTGRES), new SimpleMeterRegistry());
   }
 
   /** 方針を指定し、id を明示しないリスナー。 */

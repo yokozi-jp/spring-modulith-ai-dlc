@@ -1,6 +1,7 @@
 package com.example.demo.shared.infrastructure.persistence;
 
 import static com.example.demo.jooq.modulith.Tables.EVENT_PUBLICATION;
+import static com.example.demo.jooq.modulith.Tables.EVENT_PUBLICATION_ARCHIVE;
 
 import java.time.Clock;
 import java.time.Duration;
@@ -25,14 +26,15 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
 /**
  * 失敗したイベント出版を、運用者の指定で 1 回だけ再投入し、リスナーの処理が終わるまで待つ（ADR-079）。
  *
- * <p>定期の再投入の上限に達した出版を、原因を直したあとに手で再投入する入口で使う。待ち時間と回数の上限は見ず、対象に合う {@code FAILED} の出版を {@code
- * max-per-run} 件まで再投入する。定期の再投入と同じロックを取り、取れるまで {@code lock-at-most-for} を上限に待つ。
+ * <p>原因を直したあとに、自動の再投入を待たずに手で再投入する入口で使う。待ち時間は見ず、対象に合う {@code FAILED} の出版を {@code max-per-run}
+ * 件まで再投入する。方針の上限を超えて {@code ABANDONED} になった出版は、Spring Modulith 2.2.0 に {@code FAILED} へ戻す API
+ * がないため、Runbook の SQL で戻してから使う（ADR-079）。定期の再投入と同じロックを取り、取れるまで {@code lock-at-most-for} を上限に待つ。
  * リスナーは別のスレッドで動くため、再投入した出版が {@code PUBLISHED}、{@code PROCESSING}、{@code RESUBMITTED}
  * でなくなるまで待ち、件数を記録する。
  *
  * <p>定期の再投入にある {@code lock-at-most-for} の半分の時間予算は適用しない。この入口は完了を待つ設計で、{@code max-per-run} だけで件数を抑える。
  */
-// 定期の再投入の上限に達した出版を手で再投入する運用者の入口で、docs/backend/class-roles/index.md にない役割である。
+// 失敗した出版を手で再投入する運用者の入口で、docs/backend/class-roles/index.md にない役割である。
 // 結合テストが他のモジュールのリスナーの回復を確かめるため public にする。他のモジュールの本番のコードからは ArchUnit が使わせない。
 @Slf4j
 @Component
@@ -189,30 +191,37 @@ public class EventPublicationResubmitOnce {
     failedEventPublications.resubmit(
         ResubmissionOptions.defaults()
             .withBatchSize(Integer.MAX_VALUE)
-            .withFilter(
-                publication -> {
-                  if (!selected.test(publication)) {
-                    return false;
-                  }
-                  if (resubmitted.size() >= properties.maxPerRun()) {
-                    remaining.incrementAndGet();
-                    return false;
-                  }
-                  resubmitted.add(publication.getIdentifier());
-                  return true;
-                }));
+            .withFilter(publication -> {
+              if (!selected.test(publication)) {
+                return false;
+              }
+              if (resubmitted.size() >= properties.maxPerRun()) {
+                remaining.incrementAndGet();
+                return false;
+              }
+              resubmitted.add(publication.getIdentifier());
+              return true;
+            }));
   }
 
-  /** 再投入した出版の処理が終わるまで待ち、結果を数える。完了した出版は未完了の表から消えるため、残った行で数える。 */
+  /**
+   * 再投入した出版の処理が終わるまで待ち、結果を数える。完了した出版は archive の {@code COMPLETED} の行で数える。
+   *
+   * <p>方針の上限を超えて失敗した出版も、{@code ABANDONED} として未完了の表から archive へ移るため、未完了の表に残った行では数えない。
+   */
   private Outcome awaitCompletion(final List<UUID> ids, final int remaining) {
     final int polls = pollsWithin(onceProperties.completionTimeout());
-    Map<String, Integer> byStatus = countByStatus(ids);
-    for (int poll = 0; poll < polls && inFlight(byStatus) > 0; poll++) {
+    for (int poll = 0; poll < polls && inFlight(countByStatus(ids)) > 0; poll++) {
       sleep();
-      byStatus = countByStatus(ids);
     }
-    final int left = byStatus.values().stream().mapToInt(Integer::intValue).sum();
-    return new Outcome(ids.size(), ids.size() - left, left, remaining);
+    final int completed =
+        dsl.fetchCount(
+            EVENT_PUBLICATION_ARCHIVE,
+            EVENT_PUBLICATION_ARCHIVE
+                .ID
+                .in(ids)
+                .and(EVENT_PUBLICATION_ARCHIVE.STATUS.eq("COMPLETED")));
+    return new Outcome(ids.size(), completed, ids.size() - completed, remaining);
   }
 
   private Map<String, Integer> countByStatus(final List<UUID> ids) {
@@ -255,7 +264,7 @@ public class EventPublicationResubmitOnce {
    *
    * @param resubmitted 再投入した出版の数
    * @param completed そのうち処理を完了した数
-   * @param incomplete そのうち FAILED に戻った数と、待つ上限を過ぎても処理中の数
+   * @param incomplete そのうち FAILED に戻るか ABANDONED になった数と、待つ上限を過ぎても処理中の数
    * @param remaining 対象に合うが、{@code max-per-run} を超えたため再投入しなかった数
    */
   public record Outcome(int resubmitted, int completed, int incomplete, int remaining) {

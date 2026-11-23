@@ -216,6 +216,7 @@ class EventPublicationResubmissionConfigTest {
   void unknownPolicyNameFailsStartup() {
     runner
         .withUserConfiguration(ResubmissionPolicies.class)
+        .withBean(MeterRegistry.class, SimpleMeterRegistry::new)
         .withBean(UnknownPolicyListener.class)
         .run(context ->
             assertThat(context)

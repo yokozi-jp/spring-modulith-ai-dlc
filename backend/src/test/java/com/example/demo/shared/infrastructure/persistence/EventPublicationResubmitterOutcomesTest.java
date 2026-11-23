@@ -4,13 +4,10 @@ import static com.example.demo.jooq.modulith.Tables.EVENT_PUBLICATION;
 import static com.example.demo.jooq.modulith.Tables.EVENT_PUBLICATION_ARCHIVE;
 import static org.assertj.core.api.Assertions.assertThat;
 
-import com.example.demo.testkit.CapturedLogRecords;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
-import io.opentelemetry.sdk.logs.data.LogRecordData;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
-import java.util.List;
 import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
@@ -63,9 +60,6 @@ class EventPublicationResubmitterOutcomesTest {
   /** 再び失敗した結果の outcome。 */
   private static final String OUTCOME_FAILED = "failed";
 
-  /** 上限に達した出版の Counter の名前。 */
-  private static final String EXHAUSTED = "event.publication.resubmission.exhausted";
-
   /** 再投入した出版の数の Counter の名前。 */
   private static final String RESUBMISSIONS = "event.publication.resubmissions";
 
@@ -80,9 +74,6 @@ class EventPublicationResubmitterOutcomesTest {
 
   /** 差し替えられる時計。 */
   @Autowired private EventPublicationResubmitterTest.MutableClock clock;
-
-  /** OTLP へ送る LogRecord。 */
-  @Autowired private CapturedLogRecords capturedLogRecords;
 
   /** 出版の行を動かす DB。 */
   @Autowired private DSLContext dsl;
@@ -196,11 +187,10 @@ class EventPublicationResubmitterOutcomesTest {
 
     assertThat(outcome(OUTCOME_COMPLETED)).as("完了した後は 1 回だけ").isEqualTo(1.0);
     assertThat(outcome(OUTCOME_FAILED)).isZero();
-    assertThat(count(EXHAUSTED)).isZero();
   }
 
   @Test
-  @DisplayName("再投入した出版が上限未満で再び失敗したら failed を 1 だけ数え、exhausted は数えない")
+  @DisplayName("再投入した出版が再び失敗して FAILED に戻ったら failed を 1 だけ数える")
   void refailureIsCountedOnce() {
     final UUID id = insert(FAILED, 0);
     final EventPublicationResubmitter resubmitter = newResubmitter(properties);
@@ -212,35 +202,21 @@ class EventPublicationResubmitterOutcomesTest {
 
     assertThat(outcome(OUTCOME_FAILED)).isEqualTo(1.0);
     assertThat(outcome(OUTCOME_COMPLETED)).isZero();
-    assertThat(count(EXHAUSTED)).isZero();
-    assertThat(exhaustedErrors(id)).isEmpty();
   }
 
   @Test
-  @DisplayName("再投入した出版が再び失敗して上限に達したら failed と exhausted を 1 だけ数え、ERROR も 1 回だけ記録する")
-  void exhaustionIsCountedAndReportedOnce() {
+  @DisplayName("再投入した出版が方針の上限を超えて ABANDONED で archive に移ったら、completed でなく failed を 1 だけ数える")
+  void abandonedIsCountedAsFailedOnce() {
     final UUID id = insert(FAILED, 1);
-    // interval が 1 時間なら毎回の実行が回収も行うので、回収と読み戻しが同じ出版を重ねて記録しないことも確かめる。
-    final EventPublicationResubmitter resubmitter =
-        newResubmitter(
-            new EventPublicationResubmissionConfig.Properties(
-                properties.waitAge(),
-                properties.inFlightStaleness(),
-                Duration.ofHours(1),
-                properties.maxPerRun(),
-                Duration.ofHours(2),
-                properties.policies()));
+    final EventPublicationResubmitter resubmitter = newResubmitter(properties);
     resubmitter.resubmitOnce();
-    assertThat(attempts(id)).isEqualTo(2);
 
-    move(id, FAILED);
-    run(resubmitter);
+    archive(id, "ABANDONED");
     run(resubmitter);
     run(resubmitter);
 
     assertThat(outcome(OUTCOME_FAILED)).isEqualTo(1.0);
-    assertThat(count(EXHAUSTED)).isEqualTo(1.0);
-    assertThat(exhaustedErrors(id)).as("複数回の実行で増えない").hasSize(1);
+    assertThat(outcome(OUTCOME_COMPLETED)).isZero();
   }
 
   @Test
@@ -393,6 +369,11 @@ class EventPublicationResubmitterOutcomesTest {
 
   /** リスナーの完了と同じく、行を archive へ移す。 */
   private void complete(final UUID id) {
+    archive(id, "COMPLETED");
+  }
+
+  /** 完了か諦めと同じく、行を {@code status} で archive へ移す。 */
+  private void archive(final UUID id, final String status) {
     dsl.insertInto(EVENT_PUBLICATION_ARCHIVE)
         .columns(
             EVENT_PUBLICATION_ARCHIVE.ID,
@@ -410,7 +391,7 @@ class EventPublicationResubmitterOutcomesTest {
                     EVENT_PUBLICATION.EVENT_TYPE,
                     EVENT_PUBLICATION.SERIALIZED_EVENT,
                     EVENT_PUBLICATION.PUBLICATION_DATE,
-                    DSL.inline("COMPLETED"),
+                    DSL.inline(status),
                     DSL.inline(clock.instant()),
                     EVENT_PUBLICATION.COMPLETION_ATTEMPTS)
                 .from(EVENT_PUBLICATION)
@@ -454,10 +435,6 @@ class EventPublicationResubmitterOutcomesTest {
 
   private double outcome(final String outcome) {
     return meterRegistry.get(OUTCOMES).tag("outcome", outcome).counter().count();
-  }
-
-  private List<LogRecordData> exhaustedErrors(final UUID id) {
-    return ResubmissionTestSupport.exhaustedErrors(capturedLogRecords, id.toString());
   }
 
   private double count(final String name) {

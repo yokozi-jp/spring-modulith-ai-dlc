@@ -21,9 +21,12 @@ import java.time.ZoneId;
 import java.time.ZoneOffset;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -48,6 +51,9 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Primary;
+import org.springframework.core.Ordered;
+import org.springframework.core.annotation.Order;
+import org.springframework.modulith.events.AbandonPolicy;
 import org.springframework.modulith.events.ApplicationModuleListener;
 import org.springframework.modulith.events.EventPublication;
 import org.springframework.modulith.events.config.StalenessProperties;
@@ -86,6 +92,9 @@ class EventPublicationResubmitterTest {
 
   /** FAILED の状態。 */
   private static final String FAILED = "FAILED";
+
+  /** 方針の上限を超えて諦めた状態。 */
+  private static final String ABANDONED = "ABANDONED";
 
   /** リスナーの呼び出しの回数の説明。 */
   private static final String CALLS = "id=%s のリスナーの呼び出し";
@@ -234,44 +243,46 @@ class EventPublicationResubmitterTest {
   }
 
   @Test
-  @DisplayName("方針の上限に達した出版は再投入せず、Gauge の exhausted を 1 にし、ERROR を同じインスタンスで 1 回だけ記録する")
-  void exhaustedPublicationIsReportedOnceAndNotResubmitted(final Scenario scenario) {
+  @DisplayName(
+      "方針の上限を超えて失敗した出版は ABANDONED で archive に移り、定期と手での再投入の対象にならず、Gauge の exhausted と ERROR に 1 回だけ出る")
+  void exhaustedPublicationIsAbandonedAndNotResubmitted(final Scenario scenario) {
     listener.failTimes(Integer.MAX_VALUE);
     final double failedBefore = outcome("failed");
     final double exhaustedBefore = exhaustedCount();
     final String id = failedOnce(scenario);
+    final String publicationId = publicationId(id);
     final Instant first = T0.plus(WAIT_AGE).plusSeconds(1);
     resubmitAndAwaitFailure(scenario, id, first, 2);
-    final Instant second = first.plus(WAIT_AGE.multipliedBy(2)).plusSeconds(1);
-    resubmitAndAwaitFailure(scenario, id, second, 3);
+    assertThat(exhaustedErrors(publicationId)).as("id=%s の上限の前の ERROR", id).isEmpty();
+    clock.set(first.plus(WAIT_AGE.multipliedBy(2)).plusSeconds(1));
+    runJob();
+    awaitState(
+        scenario.stimulate(() -> {}),
+        id,
+        "ABANDONED の出版",
+        s -> s.incomplete() == 0 && ABANDONED.equals(s.status()));
 
-    clock.set(second.plus(Duration.ofDays(1)));
+    clock.set(clock.instant().plus(Duration.ofDays(1)));
     runJob();
 
-    final String publicationId = publicationId(id);
     assertThat(state(id).attempts()).as("id=%s の上限の後の attempts", id).isEqualTo(3);
+    assertThat(runOnce(ALL).resubmitted()).as("手での 1 回の再投入").isZero();
     assertThat(listener.calls()).as(CALLS, id).isEqualTo(3);
-    assertThat(
-            meterRegistry
-                .get("event.publication.failed")
-                .tag("state", STATE_EXHAUSTED)
-                .gauge()
-                .value())
-        .as("上限に達した出版の数")
-        .isEqualTo(1.0);
-    final List<LogRecordData> errors = exhaustedErrors(publicationId);
+    assertThat(gauge(STATE_EXHAUSTED)).as("上限に達した出版の数").isEqualTo(1.0);
+    assertThat(gauge(STATE_RETRYING)).as("自動の再投入を待つ出版の数").isZero();
     assertThat(outcome("failed") - failedBefore).as("再投入の後の再失敗").isEqualTo(2.0);
     assertThat(exhaustedCount() - exhaustedBefore).as("上限に達した遷移").isEqualTo(1.0);
+    final List<LogRecordData> errors = exhaustedErrors(publicationId);
     assertThat(errors).as("id=%s の上限に達した ERROR", id).hasSize(1);
     final LogRecordData error = errors.getFirst();
     assertThat(error.getSeverity()).isEqualTo(Severity.ERROR);
     assertThat(error.getAttributes().get(AttributeKey.stringKey("event_publication.event_type")))
         .isEqualTo(EVENT_TYPE);
-
-    runJob();
-
-    assertThat(exhaustedErrors(publicationId)).as("id=%s の 2 回目の後の ERROR", id).hasSize(1);
-    assertThat(state(id).attempts()).as("id=%s の 2 回目の後の attempts", id).isEqualTo(3);
+    assertThat(
+            error
+                .getAttributes()
+                .get(AttributeKey.longKey("event_publication.completion_attempts")))
+        .isEqualTo(3L);
   }
 
   @Test
@@ -303,13 +314,15 @@ class EventPublicationResubmitterTest {
   }
 
   @Test
-  @DisplayName("Gauge は、方針の上限で分けた FAILED の件数と、それぞれの最古の経過秒数を表す")
-  void gaugesSplitFailedPublicationsByPolicyLimitWithOldestAge() {
-    // default の上限は 1 回なので、attempts が 1 以下は retrying、2 以上は exhausted。待ち時間（5 分）の前なので再投入されない。
-    insertFailed(0, T0);
-    insertFailed(1, T0.plusSeconds(10));
-    insertFailed(2, T0.plusSeconds(20));
-    insertFailed(3, T0.plusSeconds(30));
+  @DisplayName(
+      "Gauge は、FAILED の件数と最古の経過秒数を retrying に、archive の ABANDONED の件数と最古の経過秒数を exhausted に出し、COMPLETED は数えない")
+  void gaugesCountFailedAsRetryingAndAbandonedAsExhaustedWithOldestAge() {
+    // completion_attempts は FAILED の分け方に関わらない。待ち時間（5 分）の前なので再投入されない。
+    insertFailed(1, T0);
+    insertFailed(3, T0.plusSeconds(10));
+    ResubmissionTestSupport.insertArchived(dsl, T0, "COMPLETED");
+    ResubmissionTestSupport.insertArchived(dsl, T0.plusSeconds(20), ABANDONED);
+    ResubmissionTestSupport.insertArchived(dsl, T0.plusSeconds(30), ABANDONED);
     clock.set(T0.plusSeconds(100));
 
     runJob();
@@ -321,7 +334,7 @@ class EventPublicationResubmitterTest {
   }
 
   @Test
-  @DisplayName("Gauge は、FAILED の出版がないとき 0 で、時計が出版より前のとき経過秒数を負にせず 0 にする")
+  @DisplayName("Gauge は、FAILED と ABANDONED の出版がないとき 0 で、時計が出版より前のとき経過秒数を負にせず 0 にする")
   void gaugesAreZeroWithoutPublicationsAndWhenClockIsBehind() {
     runJob();
 
@@ -330,11 +343,12 @@ class EventPublicationResubmitterTest {
     assertThat(oldestAge(STATE_RETRYING)).isZero();
     assertThat(oldestAge(STATE_EXHAUSTED)).isZero();
 
-    insertFailed(0, T0.plusSeconds(60));
-    insertFailed(2, T0.plusSeconds(60));
+    insertFailed(1, T0.plusSeconds(60));
+    ResubmissionTestSupport.insertArchived(dsl, T0.plusSeconds(60), ABANDONED);
     runJob();
 
     assertThat(gauge(STATE_RETRYING)).isEqualTo(1.0);
+    assertThat(gauge(STATE_EXHAUSTED)).isEqualTo(1.0);
     assertThat(oldestAge(STATE_RETRYING)).as("時計が出版より前").isZero();
     assertThat(oldestAge(STATE_EXHAUSTED)).as("時計が出版より前").isZero();
   }
@@ -859,6 +873,31 @@ class EventPublicationResubmitterTest {
     @Bean
     /* package */ ProbeListener probeListener() {
       return new ProbeListener();
+    }
+
+    @Bean
+    @Order(Ordered.HIGHEST_PRECEDENCE)
+    /* package */ AbandonPolicyRecorder abandonPolicyRecorder() {
+      return new AbandonPolicyRecorder();
+    }
+  }
+
+  /** Spring Modulith が諦めを判断するときに渡す出版の {@code completionAttempts} を記録し、判断はアプリの方針に任せる。 */
+  /* package */ static final class AbandonPolicyRecorder implements AbandonPolicy {
+
+    /** 出版の ID ごとの、渡された {@code completionAttempts} の並び。 */
+    private final Map<UUID, List<Integer>> attemptsById = new ConcurrentHashMap<>();
+
+    @Override
+    public Decision shouldAbandon(final EventPublication publication) {
+      attemptsById
+          .computeIfAbsent(publication.getIdentifier(), id -> new CopyOnWriteArrayList<>())
+          .add(publication.getCompletionAttempts());
+      return Decision.DEFAULT;
+    }
+
+    /* package */ List<Integer> seen(final UUID publication) {
+      return List.copyOf(attemptsById.getOrDefault(publication, List.of()));
     }
   }
 }

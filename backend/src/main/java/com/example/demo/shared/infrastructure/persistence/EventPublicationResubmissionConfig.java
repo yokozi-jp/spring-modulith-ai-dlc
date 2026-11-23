@@ -229,7 +229,7 @@ class EventPublicationResubmissionConfig {
    * @param inFlightStaleness PROCESSING と RESUBMITTED の Staleness Monitor
    *     の閾値。最後の出版か再投入の時刻から測る。{@code lock-at-most-for} の 2 倍より長くする
    * @param interval 前の回の終わりから次の回までの間隔
-   * @param maxPerRun 1 回の実行で再投入する件数と、新しく記録する ERROR の件数の上限
+   * @param maxPerRun 1 回の実行で再投入する件数の上限
    * @param lockAtMostFor ロックを持つ上限。実行が落ちて解放できなかったとき、この時間を過ぎると他のインスタンスが取れる。1 回の実行の最長の時間より十分に長くする
    * @param policies リスナーの再投入の方針。名前は {@code @ResubmissionPolicy} の値で、{@code default} は必須
    */
@@ -299,7 +299,7 @@ class EventPublicationResubmissionConfig {
   /**
    * リスナーの再投入の方針。n 回目の再投入の前の待ち時間は、最後の試行から {@code min(wait-age × multiplier^(n-1), max-wait)} である。
    *
-   * @param maxResubmissions 自動で再投入する回数の上限
+   * @param maxResubmissions 自動で再投入する回数の上限。超えて失敗した出版は ABANDONED になる
    * @param multiplier 再投入のたびに待ち時間に掛ける倍率。1 なら待ち時間を延ばさない
    * @param maxWait 待ち時間の上限
    */
