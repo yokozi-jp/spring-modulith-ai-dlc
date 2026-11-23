@@ -52,7 +52,7 @@
 no_auto_install: true
 
 # lefthook の版の表示、skip の行、EXECUTE の行を省く。
-# job の出力は残す。adr-check の注意喚起は成功の扱いで出るため、成功した job の出力も消さない。
+# job の出力は残す。adr-check と test-weakening の注意喚起は成功の扱いで出るため、成功した job の出力も消さない。
 # 全部を出すときは LEFTHOOK_OUTPUT=meta,summary,success,failure,execution,execution_out,execution_info,skips を付ける。
 output:
   - summary

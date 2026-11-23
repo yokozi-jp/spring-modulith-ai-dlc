@@ -45,10 +45,19 @@ printf '@Test\nvoid n() {}\n' > src/NewTest.java
 git add -A; git commit -q -m pr
 expect_empty "増加、追加、テスト以外の変更は警告しない" "$(run_check)"
 
+reset_pr; git mv src/FooTest.java src/Foo.java; git commit -q -m pr
+expect_has "テストでない名前への rename を挙げる" "src/FooTest.java -> src/Foo.java" "$(run_check)"
+
+reset_pr; printf "test.each([1])('a', () => {});\n" > src/bar.test.ts; git commit -qam pr
+expect_has "each の宣言も数える" "src/bar.test.ts (2 -> 1)" "$(run_check)"
+
+reset_pr; git mv src/bar.test.ts src/bar.spec.ts; printf "it('a', () => {});\n// x\n" > src/bar.spec.ts; git commit -qam pr
+expect_has "spec のテストケースの減少を挙げる" "src/bar.spec.ts (2 -> 1)" "$(run_check)"
+
 reset_pr; git rm -q src/FooTest.java; git commit -q -m pr
 expect_has "TESTS_ACK=1 は警告を抑える" "TESTS_ACK=1 のため" "$(TESTS_ACK=1 run_check)"
 bash "$dir/check.sh" >/dev/null 2>&1
-expect_has "警告があっても終了コードは 0" "0" "$?"
+if [ "$?" -eq 0 ]; then echo "ok: 警告があっても終了コードは 0"; else echo "FAIL: 終了コードが 0 でない"; failures=$((failures + 1)); fi
 
 expect_has "比較起点が無ければ理由を出して通す" "スキップします" "$(TESTS_DIFF_BASE=missing run_check)"
 

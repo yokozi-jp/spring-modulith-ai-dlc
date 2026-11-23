@@ -502,6 +502,7 @@ tasks:
     cmds:
       - bash tooling/ci-gate-check/test.sh
       - bash tooling/ci-changes/test.sh
+      - bash tooling/test-weakening/test.sh
       - python3 tooling/ci-gate-check/ci-gate-check.py
 
   # テストファイルの削除とテストケースの減少を警告する。止めず、TESTS_ACK=1 で抑える。
