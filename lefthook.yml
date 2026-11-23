@@ -172,6 +172,7 @@ pre-commit:
         - "tooling/removed-names/**"
         - ".kiro/settings/mcp.json"
         - "tooling/iwe-mcp/**"
+        - "tooling/iwe-tools/**"
         - ".github/rulesets/**"
         - "tooling/ruleset-check/**"
         - "tooling/ruleset-sync/**"

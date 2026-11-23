@@ -34,6 +34,8 @@ rename や move のツールが他のファイルに加える編集と、shell �
 ## block-iwe-normalize
 
 `iwe normalize` の通常の実行を拒否する。
+hook が止めるのは shell の CLI の経路である。
+MCP の経路は `.kiro/settings/mcp.json` の `disabledTools` が止める。
 拒否する理由と、意図して実行する手順は [docs文書の作成と変更](../knowledge/documentation-authoring.md)の「破壊的操作」にある。
 
 ## block-agent-git

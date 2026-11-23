@@ -291,6 +291,7 @@ tasks:
       - task: removed-names-check
       - task: ruleset-check
       - task: iwe-mcp-check
+      - task: iwe-tools-check
       - |
         iwe schema validate
         stats="$(iwe stats -f json)"
@@ -342,6 +343,14 @@ tasks:
     silent: true
     cmds:
       - bash tooling/iwe-mcp/test.sh
+
+  # iwec の全ツールが、残す読み取り系か mcp.json の disabledTools に入っているかを検査する。
+  iwe-tools-check:
+    internal: true
+    silent: true
+    cmds:
+      - bash tooling/iwe-tools/test.sh
+      - bash tooling/iwe-tools/check.sh
 
   # .github/rulesets/main.json の必須チェックを、branch-protection.md の一覧と workflow の name に突き合わせる。
   # ponytail: GitHub 上の ruleset との一致は CI で見ない。認証が要るため、比べるのは手元の task ruleset-diff で、限界に当たったら CI で API と比べる。
