@@ -97,6 +97,10 @@ PITのHTMLとXMLのレポートは、変異対象がある場合に`backend/buil
   再生成した`fullPaths`がCollectorのroute allowlist（`transform/frontend_validate`の1か所）と一致しなければ、差分の検査より前に失敗する。
 - **`task api-client-check`**：Orvalで`packages/api/src/generated`を再生成し、コミット済みの内容と差分があれば失敗する（後述の「API契約」）。
 
+`eslint-plugin-testing-library`はOxlintの`jsPlugins`で読み込み、`apps/*/src`のテストと`src/testing/`に`await-async-queries`、`await-async-utils`、`no-container`、`no-manual-cleanup`、`no-node-access`、`no-unnecessary-act`、`no-wait-for-multiple-assertions`、`no-wait-for-side-effects`、`prefer-find-by`、`prefer-screen-queries`、`prefer-user-event`をerrorで適用する。
+Oxlintで読めることを確かめて入れた。依存を1つ足すだけで外せるので、ADRは起こさない。
+Vitestは`globals`を渡さず、Testing Libraryの自動cleanupが効かない。そのため`src/testing/setup.ts`の`cleanup()`が唯一の後片付けで、このファイルだけ`no-manual-cleanup`を`off`にする。
+
 フロントエンドのLintの例外と調整、ファイルの範囲ごとの制限、Lintを通る書き方は[フロントエンドのLint設定](../frontend/lint-config.md)にある。
 
 ## API契約

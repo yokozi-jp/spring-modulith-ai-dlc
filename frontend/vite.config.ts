@@ -115,6 +115,7 @@ export default defineConfig({
       { name: "feature-boundaries", specifier: "./lint/feature-boundaries.js" },
       { name: "ui-composition", specifier: "./lint/ui-composition.js" },
       { name: "react-rules", specifier: "./lint/react-rules.js" },
+      { name: "testing-library", specifier: "eslint-plugin-testing-library" },
     ],
     rules: {
       "react/react-in-jsx-scope": "off",
@@ -202,6 +203,27 @@ export default defineConfig({
       {
         files: ["apps/web/**"],
         rules: tailwindRules(`${import.meta.dirname}/apps/web/src/style.css`),
+      },
+      {
+        files: ["apps/*/src/**/*.test.{ts,tsx}", "apps/*/src/testing/**"],
+        rules: {
+          "testing-library/await-async-queries": "error",
+          "testing-library/await-async-utils": "error",
+          "testing-library/no-container": "error",
+          "testing-library/no-manual-cleanup": "error",
+          "testing-library/no-node-access": "error",
+          "testing-library/no-unnecessary-act": "error",
+          "testing-library/no-wait-for-multiple-assertions": "error",
+          "testing-library/no-wait-for-side-effects": "error",
+          "testing-library/prefer-find-by": "error",
+          "testing-library/prefer-screen-queries": "error",
+          "testing-library/prefer-user-event": "error",
+        },
+      },
+      // Vitest は globals を渡さないので、Testing Library の自動 cleanup が効かない。setup.ts の cleanup() が唯一の後片付けである。
+      {
+        files: ["apps/*/src/testing/setup.ts"],
+        rules: { "testing-library/no-manual-cleanup": "off" },
       },
       {
         files: ["lint/**"],
