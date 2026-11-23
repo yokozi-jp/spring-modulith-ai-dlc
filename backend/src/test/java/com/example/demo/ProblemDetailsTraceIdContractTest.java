@@ -6,6 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -18,7 +19,6 @@ import java.net.http.HttpResponse;
 import java.util.UUID;
 import java.util.stream.Stream;
 import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
@@ -37,10 +37,13 @@ import tools.jackson.databind.json.JsonMapper;
 /**
  * Problem Details の traceId が、sampled flag が 00 の traceparent の trace ID になることを、advice、Spring
  * Security、{@code /error} への転送の経路で検証する。
+ *
+ * <p>実際のポートの要求は、RequestContextFilter が Spring Security より前に要求を束縛し、ServerHttpObservationFilter が
+ * REQUEST の dispatch で observation を要求の属性に置くことも固定する。MockMvc は要求を自分で束縛し、コンテナの /error
+ * への転送もしないので、これらを示せない。
  */
 @SuppressWarnings({"PMD.TooManyStaticImports", "PMD.UnitTestShouldIncludeAssert"})
 @SpringBootTest(
-    // MockMvc はコンテナの /error への転送を再現しないので、/error の経路のために実際のポートで起動する。
     webEnvironment = WebEnvironment.RANDOM_PORT,
     properties = {
       // テストの既定は tracing の export を無効にし、traceparent を読む propagator も作らない。
@@ -54,10 +57,13 @@ class ProblemDetailsTraceIdContractTest {
   /** W3C Trace Context の要求ヘッダ。 */
   private static final String TRACEPARENT = "traceparent";
 
+  /** 応答の本文を読む。 */
+  private static final JsonMapper JSON = JsonMapper.builder().build();
+
   /** 実際の Spring MVC と Security filter chain を通すクライアント。 */
   @Autowired private MockMvc mockMvc;
 
-  /** サーブレットコンテナの /error への転送を通すための、起動したサーバーのポート。 */
+  /** サーブレットコンテナの filter の順と /error への転送を通すための、起動したサーバーのポート。 */
   @LocalServerPort private int port;
 
   /** 新しい trace ID（32 桁の小文字の 16 進数）を作る。 */
@@ -74,32 +80,42 @@ class ProblemDetailsTraceIdContractTest {
     return Stream.of(
         Arguments.of(
             "advice の 405", delete("/api/error-fixture/items").with(oidcLogin()).with(csrf()), 405),
-        Arguments.of("Spring Security の 401", get("/api/orders"), 401));
+        Arguments.of("Spring Security の 401", get("/api/orders"), 401),
+        Arguments.of("CSRF トークンのない更新の 403", post("/api/orders").with(oidcLogin()), 403));
   }
 
   @ParameterizedTest(name = "{0}")
   @MethodSource("mvcProblems")
   @DisplayName("sampled flag が 00 の traceparent でも、Problem Details の traceId はその trace ID になる")
   void mvcProblemCarriesTraceparentTraceId(
-      final String name, final MockHttpServletRequestBuilder request, final int status)
+      final String name, final MockHttpServletRequestBuilder request, final int expectedStatus)
       throws Exception {
     final String traceId = newTraceId();
 
     mockMvc
         .perform(request.header(TRACEPARENT, unsampledTraceparent(traceId)))
-        .andExpect(status().is(status))
+        .andExpect(status().is(expectedStatus))
         .andExpect(jsonPath("$.traceId").value(traceId))
         .andExpect(jsonPath("$.instance").doesNotExist());
   }
 
-  @Test
-  @DisplayName("/error へ転送された 400 の Problem Details も、traceparent の trace ID を持ち、instance を持たない")
-  void forwardedErrorCarriesTraceparentTraceId() throws Exception {
+  private static Stream<Arguments> containerProblems() {
+    return Stream.of(
+        Arguments.of("Spring Security の 401", "GET", 401),
+        Arguments.of("CSRF トークンのない更新の 403", "POST", 403),
+        // 標準にない method は Spring Security の firewall が拒否し、コンテナが /error へ転送する。
+        Arguments.of("/error へ転送された 400", "FOO", 400));
+  }
+
+  @ParameterizedTest(name = "{0}")
+  @MethodSource("containerProblems")
+  @DisplayName("実際のポートの要求でも、Problem Details は traceparent の trace ID を持ち、instance を持たない")
+  void containerProblemCarriesTraceparentTraceId(
+      final String name, final String method, final int expectedStatus) throws Exception {
     final String traceId = newTraceId();
-    // 標準にない method は Spring Security の firewall が拒否し、コンテナが /error へ転送する。
     final HttpRequest request =
         HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/orders"))
-            .method("FOO", HttpRequest.BodyPublishers.noBody())
+            .method(method, HttpRequest.BodyPublishers.noBody())
             .header(TRACEPARENT, unsampledTraceparent(traceId))
             .build();
 
@@ -108,12 +124,12 @@ class ProblemDetailsTraceIdContractTest {
       response = client.send(request, HttpResponse.BodyHandlers.ofString());
     }
 
-    assertEquals(400, response.statusCode(), response::body);
+    assertEquals(expectedStatus, response.statusCode(), response::body);
     assertEquals(
         MediaType.APPLICATION_PROBLEM_JSON_VALUE,
         response.headers().firstValue("Content-Type").orElse(""),
         response::body);
-    final JsonNode body = JsonMapper.builder().build().readTree(response.body());
+    final JsonNode body = JSON.readTree(response.body());
     assertEquals(traceId, body.path("traceId").asString(), response::body);
     assertFalse(body.has("instance"), response::body);
   }
