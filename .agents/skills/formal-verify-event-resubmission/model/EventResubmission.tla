@@ -3,8 +3,8 @@
 (* One event publication in modulith.event_publication, two app instances, *)
 (* and discrete time. Covers the periodic resubmission job                 *)
 (* (EventPublicationResubmitter) under the ShedLock lock, the Spring       *)
-(* Modulith 2.1.2 staleness monitor, listener deliveries, and instance     *)
-(* crashes.                                                                *)
+(* Modulith 2.2.0 staleness monitor, listener deliveries with the          *)
+(* AbandonPolicy (ResubmissionPolicies), and instance crashes.             *)
 (*                                                                         *)
 (* Paths are relative to backend/src/main/java/com/example/demo/shared/    *)
 (* infrastructure/persistence/. Spring Modulith and ShedLock are cited by  *)
@@ -77,7 +77,10 @@ VARIABLES
 
 vars == <<now, row, lock, inst, exec, mon, crashes, staleHitInFlight>>
 
-Statuses == {"PUBLISHED", "PROCESSING", "FAILED", "RESUBMITTED", "ARCHIVED"}
+\* ARCHIVED and ABANDONED: the row moved to event_publication_archive
+\* (completion-mode archive) as COMPLETED or ABANDONED.
+Statuses == {"PUBLISHED", "PROCESSING", "FAILED", "RESUBMITTED", "ARCHIVED",
+             "ABANDONED"}
 
 TypeOK ==
   /\ now \in 0..Horizon
@@ -109,7 +112,7 @@ Init ==
   /\ crashes = 0
   /\ staleHitInFlight = FALSE
 
-RowExists == row.status # "ARCHIVED"
+RowExists == row.status \notin {"ARCHIVED", "ABANDONED"}
 InFlight(k) == exec[k].st \in {"queued", "running"}
 SetStatus(s) == IF row.status = s THEN row
                 ELSE [row EXCEPT !.status = s, !.since = now]
@@ -244,11 +247,18 @@ ExecSucceed(k) ==
   /\ row' = SetStatus("ARCHIVED")
   /\ UNCHANGED <<now, lock, inst, mon, crashes, staleHitInFlight>>
 
+\* DefaultEventPublicationRegistry.markFailed -> markFailedOrAbandoned:
+\* ResubmissionPolicies.shouldAbandon reads completion_attempts of the row.
+\* Above max-resubmissions: markAbandoned copies the row to the archive as
+\* ABANDONED and deletes it, without checking the status. Otherwise
 \* markFailed: UPDATE SET status = 'FAILED' WHERE id = ? AND status != 'FAILED'.
 ExecFail(k) ==
   /\ exec[k].st = "running"
   /\ exec' = [exec EXCEPT ![k] = [st |-> "done", on |-> None, t |-> 0]]
-  /\ row' = IF RowExists /\ row.status # "FAILED" THEN SetStatus("FAILED") ELSE row
+  /\ row' = IF ~RowExists THEN row
+            ELSE IF row.attempts > MaxResubmissions THEN SetStatus("ABANDONED")
+            ELSE IF row.status # "FAILED" THEN SetStatus("FAILED")
+            ELSE row
   /\ UNCHANGED <<now, lock, inst, mon, crashes, staleHitInFlight>>
 
 -----------------------------------------------------------------------------

@@ -85,7 +85,7 @@ git diff --stat "$(sed -n 's/^同期コミット：`\([0-9a-f]*\)`.*/\1/p' "$ski
 | `StaleMark`  | 同じメソッドが読んだ一覧の各行に呼ぶ `JdbcEventPublicationRepositoryV2.markFailed(id)`（`completion_date IS NULL AND status != 'FAILED'` の UPDATE。状態と日時を確かめ直さない）                                           |
 | `ExecStart`  | `CompletionRegisteringMethodInterceptor` → `markProcessing`。配信は `spring.task.execution` の executor の空きを待ってから始まる                                                                                             |
 | `ExecSucceed` | `markCompleted`（archive への写しと削除）                                                                                                                                                                                   |
-| `ExecFail`   | `markFailed`                                                                                                                                                                                                                 |
+| `ExecFail`   | `markFailed` → `markFailedOrAbandoned`。`ResubmissionPolicies.shouldAbandon` が行の `completion_attempts` を読み、`max-resubmissions` を超えたら `markAbandoned`（archive へ `ABANDONED` で写して削除。状態を確かめない）、超えなければ `markFailed`（`status != 'FAILED'` の UPDATE） |
 | `Crash`      | インスタンスの停止。ロックの行は `lock_until` まで残り、そのインスタンスの配信と Staleness Monitor の印は付かずに消える                                                                                                     |
 | `Restart`    | 再起動。再投入の最初の回は `initialDelay` = `interval` の後                                                                                                                                                                  |
 | `Tick`       | 時間を 1 進める。定期の実行の時刻、実行と配信の期限、Staleness Monitor の読む期限（`interval` + 1 回の実行）と印を付ける期限（読んでから 1 回の実行）に来た操作が先に動く                                                  |
@@ -114,6 +114,9 @@ git diff --stat "$(sed -n 's/^同期コミット：`\([0-9a-f]*\)`.*/\1/p' "$ski
 - 手での 1 回の再投入（`EventPublicationResubmitOnce`）は扱わない。
   同じロックを取る運用者の入口で、待ち時間と回数の上限を見ない。
 - `ResubmissionTracker` の数え方とメトリクス、上限到達の ERROR のログは扱わない。
+- `ABANDONED` は、`ARCHIVED` と同じく行が未完了の表から消えた終端の状態として扱う。
+  `ResubmissionsCapped` は、`AbandonPolicy` を外しても `ResubmissionPolicies.isDue` の回数の条件だけで守られる。
+  失敗を記録しない試行（停止、Staleness Monitor の遅れた印）で上限を超えて `FAILED` に戻った出版は、`AbandonPolicy` が呼ばれないためである（変異 `is-due-ignores-cap`）。
 - 落ちたまま `PROCESSING` に残った出版は、最後の出版か再投入から `in-flight-staleness` まで回復しない。
 - `ModuleRoleTransactionManager` のトランザクションごとのロールの切り替えは、ロックと状態の順序を変えないため扱わない。
 
@@ -157,7 +160,7 @@ git diff --stat "$(sed -n 's/^同期コミット：`\([0-9a-f]*\)`.*/\1/p' "$ski
 
 ## 同期の記録
 
-同期コミット：`a99d855a9e7830988e3bd312609c65cb20fe38cd`（main）
+同期コミット：`91119568e0d323a37290e4474028c0c9c3a9b77a`（main。#562 の Pull Request の土台）
 
-このコミットで、「変更がこの検証に関わるか」のファイルと対応表がモデルと一致することを確かめた。
-読んだライブラリは、Spring Modulith 2.1.2 の `DefaultEventPublicationRegistry`、`JdbcEventPublicationRepositoryV2`、`CompletionRegisteringAdvisor`（`CompletionRegisteringMethodInterceptor`）、`PersistentApplicationEventMulticaster`、`StalenessMonitorConfiguration`、`ResubmissionOptions`、ShedLock 7.11.0 の `JooqStorageAccessor`、Spring Framework 7.0.10 の `SimpleAsyncTaskScheduler`、Spring Boot 4.1.2 の `DefaultTaskSchedulerConfiguration` である。
+#562 の Pull Request のコードで、「変更がこの検証に関わるか」のファイルと対応表がモデルと一致することを確かめた。
+読んだライブラリは、Spring Modulith 2.2.0 の `DefaultEventPublicationRegistry`（`markFailedOrAbandoned`、`markStalePublicationsFailed`）、`AbandonPolicies`、`JdbcEventPublicationRepositoryV2`（`markAbandoned`、`markResubmitted`、`markFailed`）、`CompletionRegisteringAdvisor`（`CompletionRegisteringMethodInterceptor`、`spring.modulith.events.completion: in-interceptor`）、`PersistentApplicationEventMulticaster`、`StalenessMonitorConfiguration`、`ResubmissionOptions`、ShedLock 7.11.0 の `JooqStorageAccessor`、Spring Framework 7.0.10 の `SimpleAsyncTaskScheduler`、Spring Boot 4.1.2 の `DefaultTaskSchedulerConfiguration` である。
