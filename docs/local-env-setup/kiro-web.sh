@@ -72,7 +72,20 @@ _kw_setup() (
     # サンドボックスは自分の kiro-cli を持つので、139MB の zip を取る http:kiro-cli は入れない。
     # Kiro Web には LSP の機能が無いので、jdtls と Lombok も入れない。
     # shellcheck disable=SC2046
-    mise install --locked $(mise ls --local --json | jq -r 'keys[] | select(. != "http:kiro-cli" and . != "http:jdtls" and . != "http:lombok")') >&2
+    mise install --locked $(mise ls --local --json | jq -r 'keys[] | select(. != "http:kiro-cli" and . != "http:jdtls" and . != "http:lombok")') >&2 2>"$work/install.err" \
+      || install_status=$?
+    # サンドボックスのグローバル設定は Java の別名 lts を持ち、mise は読み取り専用の共有ディレクトリにも corretto-lts の symlink を作ろうとして、終了コード 1 を返す。
+    # 道具は入り終わっているので、この失敗だけなら ERROR の行を説明に置き換えて続ける。ほかの失敗は止める。
+    known='^(mise ERROR (failed to rebuild runtime symlinks$|[0-9]+ runtime symlink repair\(s\) failed:$|Version: |Run with --verbose )|failed to rebuild runtime symlinks for .*Read-only file system \(os error 30\)$)'
+    grep -vE "$known" "$work/install.err" >"$work/install.rest" || true
+    if [ "${install_status:-0}" -ne 0 ] && grep -q 'Read-only file system' "$work/install.err" \
+      && ! grep -qiE 'error|failed' "$work/install.rest"; then
+      cat "$work/install.rest" >&2
+      echo "kiro-web: mise が読み取り専用の共有ディレクトリ（MISE_SHARED_INSTALL_DIRS）の Java に別名の symlink を作れませんでした。道具は入っており、無害です" >&2
+    else
+      cat "$work/install.err" >&2
+      [ "${install_status:-0}" -eq 0 ] || exit "$install_status"
+    fi
     mise reshim
     touch "$stamp"
   fi

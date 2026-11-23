@@ -42,6 +42,11 @@ DBを`schema-v5`以前へ切り戻すと012が戻るため、同時に旧版の�
 未完了の`OrderConfirmed`のイベント出版がある環境では、`schema-v9`を適用する前に、それらを完了させるか、[再投入しない出版の片付け](../observability/runbook-event-publication-resubmission.md#再投入しない出版の片付け)の手順で消します（テナントを持たない出版は、再投入しても`FAILED`に残り、上限に達すると`Event publication resubmission exhausted`のERRORになるからです）。
 DBを`schema-v8`以前へ切り戻すと、rollbackが4つの表を消して`schema-v8`の形で空のまま作り直すため、4つの表の業務データはすべて消えます。
 切り戻すときは同時に旧版のアプリケーションへ戻し、その間は業務のAPIを止めます。
+
+023のchangeset（`schema-v10`）はセッションの表を作ります（[ADR-111](../adr/ADR-111-store-sessions-in-postgresql-until-user-growth-needs-redis.md)）。
+新版は表がないとセッションを保存できずログインが失敗するため、023を適用してから新版をデプロイします。
+Redisにあったセッションは引き継がないので、新版へ切り替えると全員がログインし直します。
+DBを`schema-v9`以前へ切り戻すとセッションの表が消えるため、同時にRedisを使う旧版のアプリケーションとRedisへ戻します。
 この形は、本番にまだ業務データがなく、移す行がないために選んでいます。
 本番に業務データを入れた後で同じ種類の変更をするときは、移行の手順を作ります。
 

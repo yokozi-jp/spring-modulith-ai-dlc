@@ -30,6 +30,8 @@ Liquibase の migration はアプリケーションの起動から切り離さ�
 [ADR-104](ADR-104-allocate-test-stack-slots-per-run.md) が compose-test を使う実行ごとに slot を割り当てたため、preview の port を「`localhost:5173` に固定」から「slot ごとの固定の port」に書き直した。
 この ADR のホストの port（5173、8080、8081）は、slot 0 の値である。
 
+[ADR-111](ADR-111-store-sessions-in-postgresql-until-user-growth-needs-redis.md) で Redis を外したため、Proposed の間にbackend の接続先から Redis を除いた。
+
 ## Decision
 
 E2E テストに Playwright を使い、ブラウザは Chromium だけにする。
@@ -41,7 +43,7 @@ setup project が Keycloak の画面でログインし、保存した `storageSt
 Datafaker のシーダーと E2E のデータを共有しない。
 
 実行環境は `docker/compose-test.yml` の `e2e` profile とし、backend は既存の `backend/Dockerfile` からビルドして compose の network に置く。
-backend は PostgreSQL、Redis、Keycloak へ service 名で接続し、compose が公開する port はすべて `127.0.0.1` に限る。
+backend は PostgreSQL、Keycloak へ service 名で接続し、compose が公開する port はすべて `127.0.0.1` に限る。
 
 ブラウザは公開用の `127.0.0.1:8081`、backend は `keycloak:8080` で Keycloak へ到達するため、issuer を次のようにそろえる。
 

@@ -31,6 +31,8 @@ Issue #374 では、`tenancy` がログインのときに `(iss, sub)` から利
 `*_by` は監査のための列で、誤った値が入ると後から直せない。
 `shared` は機能モジュールに依存できないため、`tenancy` の型を `CommonColumns` から参照できない。
 
+[ADR-111](ADR-111-store-sessions-in-postgresql-until-user-growth-needs-redis.md) で Redis を外したため、Proposed の間に帰結から Redis を除いた。
+
 ## Decision
 
 - 認証の principal の語彙を置く `shared.security` を作り、`AppUserPrincipal`（`userId()` を持つインターフェース）を置く。`@NamedInterface("security")` で公開し、どの層からも使えるようにする。
@@ -53,7 +55,7 @@ Issue #374 では、`tenancy` がログインのときに `(iss, sub)` から利
 
 - `shared` に、永続化の外の語彙のパッケージが 1 つ増える。ArchUnit の `dependenciesPointInward` と `sharedModuleIsUsedOnlyByPersistenceAdapters` は、`shared.security` を `shared.concurrency` と同じ扱いにする。
 - 今の利用先は `tenancy` の `presentation.web` だけだが、ほかの `shared` の語彙のパッケージにそろえて、どの層からも使えるようにする。
-- `AppUserPrincipal` には、利用者の識別だけを置く。#375 で選ぶテナントは、リクエストごとに選ぶ状態なので principal に足さない。principal に足すと Redis のセッションの形が変わり、デプロイのたびにセッションを消すことになるためである。
+- `AppUserPrincipal` には、利用者の識別だけを置く。#375 で選ぶテナントは、リクエストごとに選ぶ状態なので principal に足さない。principal に足すとセッションに直列化する形が変わり、デプロイのたびにセッションを消すことになるためである。
 
 ## Alternatives Considered
 

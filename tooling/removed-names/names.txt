@@ -12,3 +12,9 @@ aggregateRootInsertsGoThroughTableWriter	^docs/adr/ADR-054-
 aggregateMethodsDoNotUseUnversionedWrites	^docs/adr/ADR-054-
 unversionedWritesRequireUsingTheCount	^docs/adr/ADR-054-
 repositoryUpdateAndDeleteCheckVersion	^docs/adr/ADR-054-
+REDIS_HOST	^docs/adr/ADR-(007|111)-
+REDIS_PORT	^docs/adr/ADR-(007|111)-
+REDIS_SESSION_NAMESPACE	^docs/adr/ADR-(007|111)-
+TEST_REDIS_PORT	^docs/adr/ADR-(007|111)-
+BASE_REDIS	^docs/adr/ADR-(007|111)-
+RedisSessionRepository	^docs/adr/ADR-(007|111)-

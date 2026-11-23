@@ -43,7 +43,7 @@ import org.springframework.test.context.junit.jupiter.SpringExtension;
  */
 public final class CleanGeneratedTablesExtension implements AfterEachCallback {
 
-  /** イベントの出版の表と ShedLock の表を持つスキーマ。 */
+  /** イベントの出版、ShedLock、セッションの表を持つスキーマ。 */
   private static final Schema MODULITH = Modulith.MODULITH;
 
   /** 未完了の出版がなくなるのを待つ上限。決済代行の最悪の時間（3 秒）より長くする。 */

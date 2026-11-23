@@ -1,13 +1,13 @@
 ---
 type: Convention
 title: バックエンドのテストの実行基盤
-description: バックエンドのテストが使うPostgreSQL、Redis、WireMockをテストのJVMごとに起動する決まり、forkの並列度、テストの実行のしかた、依存を足すときの決まりを定める規約。テストを実行する、テストの依存や並列度を変える、テストで接続先を読むコードを書くときに読む。
+description: バックエンドのテストが使うPostgreSQL、WireMockをテストのJVMごとに起動する決まり、forkの並列度、テストの実行のしかた、依存を足すときの決まりを定める規約。テストを実行する、テストの依存や並列度を変える、テストで接続先を読むコードを書くときに読む。
 tags: [convention, backend, testing, testcontainers, gradle]
 ---
 
 # バックエンドのテストの実行基盤
 
-テストのJVMごとに、PostgreSQL、Redis、WireMockのコンテナを1つずつ起動し、Gradleのforkを並列にする。
+テストのJVMごとに、PostgreSQL、WireMockのコンテナを1つずつ起動し、Gradleのforkを並列にする。
 テストの依存のコンテナは[InfrastructureContainers](../../backend/src/test/java/com/example/demo/testkit/InfrastructureContainers.java)だけが起動する。
 起動のしかたと接続先の渡し方はクラスのJavadocに、決定の理由は[ADR-085](../adr/ADR-085-start-test-dependencies-per-fork-with-testcontainers.md)にある。
 
@@ -23,7 +23,7 @@ PostgreSQLの初期化は`docker/initdb`を、WireMockのスタブは`docker/wir
 
 ## 設定と接続先
 
-接続先（`DB_*`、`MIGRATION_DB_*`、`REDIS_*`、`PAYMENT_GATEWAY_BASE_URL`）は、起動したコンテナの値がほかのすべての設定より優先される。
+接続先（`DB_*`、`MIGRATION_DB_*`、`PAYMENT_GATEWAY_BASE_URL`）は、起動したコンテナの値がほかのすべての設定より優先される。
 接続先以外の設定は`.env.test`から読む。
 Gradleの`test`とPITは`.env.test`を`spring.config.import`で読み込み、開発用の`.env`を使わない。
 `-PtestEnvFile=<backendからの相対パス>`で読むファイルを変える。

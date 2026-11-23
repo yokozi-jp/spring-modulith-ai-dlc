@@ -167,7 +167,7 @@ class EventPublicationResubmissionConfig {
     }
   }
 
-  // 1 回の実行の後は、Redis や OTLP の送信のスレッドが残っても終わるよう、JVM を明示して終える。
+  // 1 回の実行の後は、OTLP の送信のスレッドが残っても終わるよう、JVM を明示して終える。
   @SuppressWarnings("PMD.DoNotTerminateVM")
   private static void exit(final int exitCode) {
     System.exit(exitCode);

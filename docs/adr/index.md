@@ -8,7 +8,7 @@
 - [ADR-004: jOOQ 生成コードを Git 管理する](ADR-004-commit-jooq-generated-code.md)（Accepted, 2026-09-11）
 - [ADR-005: Liquibase をアプリケーション起動から分離する](ADR-005-decouple-liquibase-from-app-startup.md)（Accepted, 2026-09-11）
 - [ADR-006: 絶対時刻を UTC / Instant / timestamptz に統一する](ADR-006-utc-instant-absolute-time-policy.md)（Accepted, Amended by ADR-109, 2026-09-11）
-- [ADR-007: セッションベース認証と OIDC Authorization Code + PKCE](ADR-007-session-based-auth-with-oidc-pkce.md)（Accepted, 2026-09-11）
+- [ADR-007: セッションベース認証と OIDC Authorization Code + PKCE](ADR-007-session-based-auth-with-oidc-pkce.md)（Accepted, Amended by ADR-111, 2026-09-11）
 - [ADR-008: application.yaml を単一にし設定を外部注入する](ADR-008-single-application-yaml-external-config.md)（Accepted, 2026-09-11）
 - [ADR-009: DB 接続を単一アカウントから二つの役割へ分ける](ADR-009-unify-db-connection-target-credentials-only-role-split.md)（Superseded by ADR-011, 2026-09-13）
 - [ADR-010: プロジェクトのタスクランナーに Task を採用する](ADR-010-adopt-task-as-project-task-runner.md)（Proposed, 2026-09-13）
@@ -110,3 +110,6 @@
 - [ADR-108: 同じモジュールの表どうしの参照に、テナントを含む複合の外部キーを作る](ADR-108-add-tenant-composite-foreign-keys-within-modules.md)（Proposed, 2026-11-21）
 - [ADR-109: バックエンドのテストを America/New_York の JVM で流す](ADR-109-run-backend-tests-in-new-york-jvm.md)（Proposed, 2026-11-22）
 - [ADR-110: ログとトレースに、テナントの public_id とアプリの利用者の ID を付ける](ADR-110-add-tenant-and-user-ids-to-logs-and-traces.md)（Proposed, 2026-11-22）
+- [ADR-111: ユーザー数が未知の間はセッションを PostgreSQL に保存し、Redis は負荷が出たときに戻す](ADR-111-store-sessions-in-postgresql-until-user-growth-needs-redis.md)（Proposed, 2026-11-22）
+- [ADR-112: 複合主キーを使わず、業務キーの組にはユニークインデックスを張る](ADR-112-forbid-composite-primary-keys.md)（Proposed, 2026-11-22）
+- [ADR-113: 論理削除フラグを作らず、業務上の意味を持つカラムか物理削除で表す](ADR-113-forbid-logical-delete-flags.md)（Proposed, 2026-11-22）

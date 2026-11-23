@@ -33,6 +33,8 @@ Keycloak の issuer（`KC_HOSTNAME`）と SPA の origin は、起動の前に�
 slot の数は、[Issue #418](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/418) の計測から 4 にした。
 8 コアのマシンで 4 本の `task e2e` が全て通り、Keycloak の起動は最悪 93 秒だった（healthcheck が失敗にするのは約 140 秒）。
 
+[ADR-111](ADR-111-store-sessions-in-postgresql-until-user-growth-needs-redis.md) で Redis を外したため、Proposed の間にslot のポートと置き換える変数から Redis を除いた。
+
 ## Decision
 
 compose-test を使う Task は、実行ごとに slot を 1 つ取り、slot ごとの Compose project と固定のポートで compose-test を起動する。
@@ -47,7 +49,7 @@ Issue #418 で決めたことは次のとおりである。
   PID や記録のファイルは持たない。
 - **割り当ての排他**：git の共通ディレクトリの `test-slot.lock` で `flock` を取り、空きを探して最初のコンテナ（`docker compose create postgres`）を作るまでだけ持つ。
 - **ポート**：slot 0 は従来のポートのままにする。
-  slot n（1 から 3）は `20000 + n × 1000 +` 従来のポートの下 3 桁にする（slot 1 は web 21173、backend 21080、Keycloak 21081、WireMock 21082、PostgreSQL 21433、Redis 21380）。
+  slot n（1 から 3）は `20000 + n × 1000 +` 従来のポートの下 3 桁にする（slot 1 は web 21173、backend 21080、Keycloak 21081、WireMock 21082、PostgreSQL 21433）。
   OS の ephemeral port（32768 から 60999）と、開発用のポート（18080、8090、5432 など）を避けるためである。
   ポートを別のプロセスが使っている slot は飛ばす。
 - **realm**：test realm（`docker/keycloak/realm.json`）に、4 つの slot の web の origin（5173、21173、22173、23173）を、redirect URI、web origin、ログアウト後の URI として静的に並べる。
@@ -61,7 +63,7 @@ Issue #418 で決めたことは次のとおりである。
   ADR-033 は変えず、preview の `strictPort` も slot ごとの固定のポートで残す。
 
 slot の値は、環境変数と slot の env ファイル（`build/test-slot/slot-<n>.env`）で渡す。
-slot の env ファイルは `.env.test` の写しで、ホストから見たポートを持つ変数（`DB_PORT`、`REDIS_PORT`、`OIDC_ISSUER_URI`、`PAYMENT_GATEWAY_BASE_URL`）だけを置き換える。
+slot の env ファイルは `.env.test` の写しで、ホストから見たポートを持つ変数（`DB_PORT`、`OIDC_ISSUER_URI`、`PAYMENT_GATEWAY_BASE_URL`）だけを置き換える。
 compose-test の backend はコンテナの待ち受けのポートを `SERVER_PORT: "8080"` に固定し、`.env.test` の `SERVER_PORT` は、ホストから見た backend のポートだけを表すようにする。
 
 `task test` は、`be-verify-migrations` と `be-test` の間で PostgreSQL のコンテナを消さずに止め、最後の `down` まで slot を持つ。

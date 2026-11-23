@@ -7,16 +7,22 @@ package com.example.demo.jooq.modulith;
 import com.example.demo.jooq.modulith.tables.EventPublication;
 import com.example.demo.jooq.modulith.tables.EventPublicationArchive;
 import com.example.demo.jooq.modulith.tables.Shedlock;
+import com.example.demo.jooq.modulith.tables.SpringSession;
+import com.example.demo.jooq.modulith.tables.SpringSessionAttributes;
 import com.example.demo.jooq.modulith.tables.records.EventPublicationArchiveRecord;
 import com.example.demo.jooq.modulith.tables.records.EventPublicationRecord;
 import com.example.demo.jooq.modulith.tables.records.ShedlockRecord;
+import com.example.demo.jooq.modulith.tables.records.SpringSessionAttributesRecord;
+import com.example.demo.jooq.modulith.tables.records.SpringSessionRecord;
 
 import javax.annotation.processing.Generated;
 
+import org.jooq.ForeignKey;
 import org.jooq.TableField;
 import org.jooq.UniqueKey;
 import org.jooq.impl.DSL;
 import org.jooq.impl.Internal;
+import org.jooq.impl.QOM.ForeignKeyRule;
 
 
 /**
@@ -40,4 +46,12 @@ public class Keys {
     public static final UniqueKey<EventPublicationRecord> EVENT_PUBLICATION_PKEY = Internal.createUniqueKey(EventPublication.EVENT_PUBLICATION, DSL.name("event_publication_pkey"), new TableField[] { EventPublication.EVENT_PUBLICATION.ID }, true);
     public static final UniqueKey<EventPublicationArchiveRecord> EVENT_PUBLICATION_ARCHIVE_PKEY = Internal.createUniqueKey(EventPublicationArchive.EVENT_PUBLICATION_ARCHIVE, DSL.name("event_publication_archive_pkey"), new TableField[] { EventPublicationArchive.EVENT_PUBLICATION_ARCHIVE.ID }, true);
     public static final UniqueKey<ShedlockRecord> SHEDLOCK_PKEY = Internal.createUniqueKey(Shedlock.SHEDLOCK, DSL.name("shedlock_pkey"), new TableField[] { Shedlock.SHEDLOCK.NAME }, true);
+    public static final UniqueKey<SpringSessionRecord> SPRING_SESSION_PKEY = Internal.createUniqueKey(SpringSession.SPRING_SESSION, DSL.name("spring_session_pkey"), new TableField[] { SpringSession.SPRING_SESSION.PRIMARY_ID }, true);
+    public static final UniqueKey<SpringSessionAttributesRecord> SPRING_SESSION_ATTRIBUTES_PKEY = Internal.createUniqueKey(SpringSessionAttributes.SPRING_SESSION_ATTRIBUTES, DSL.name("spring_session_attributes_pkey"), new TableField[] { SpringSessionAttributes.SPRING_SESSION_ATTRIBUTES.SESSION_PRIMARY_ID, SpringSessionAttributes.SPRING_SESSION_ATTRIBUTES.ATTRIBUTE_NAME }, true);
+
+    // -------------------------------------------------------------------------
+    // FOREIGN KEY definitions
+    // -------------------------------------------------------------------------
+
+    public static final ForeignKey<SpringSessionAttributesRecord, SpringSessionRecord> SPRING_SESSION_ATTRIBUTES__SPRING_SESSION_ATTRIBUTES_SESSION_PRIMARY_ID_FKEY = Internal.createForeignKey(SpringSessionAttributes.SPRING_SESSION_ATTRIBUTES, DSL.name("spring_session_attributes_session_primary_id_fkey"), new TableField[] { SpringSessionAttributes.SPRING_SESSION_ATTRIBUTES.SESSION_PRIMARY_ID }, Keys.SPRING_SESSION_PKEY, new TableField[] { SpringSession.SPRING_SESSION.PRIMARY_ID }, true, ForeignKeyRule.CASCADE, ForeignKeyRule.NO_ACTION);
 }

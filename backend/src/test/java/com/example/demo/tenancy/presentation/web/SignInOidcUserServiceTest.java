@@ -73,7 +73,7 @@ class SignInOidcUserServiceTest {
   }
 
   @Test
-  @DisplayName("セッションの Redis に保存するため、直列化して読み戻しても、同じ名前と同じ ID トークンの利用者になる")
+  @DisplayName("セッションの表に保存するため、直列化して読み戻しても、同じ名前と同じ ID トークンの利用者になる")
   void survivesSessionSerialization() {
     when(delegate.loadUser(any())).thenReturn(idpUser(ISSUER, SUBJECT, Map.of()));
     when(handler.handle(any())).thenReturn(new SignInUserResult(USER_ID));

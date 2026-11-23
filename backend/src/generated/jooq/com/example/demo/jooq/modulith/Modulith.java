@@ -8,6 +8,8 @@ import com.example.demo.jooq.DefaultCatalog;
 import com.example.demo.jooq.modulith.tables.EventPublication;
 import com.example.demo.jooq.modulith.tables.EventPublicationArchive;
 import com.example.demo.jooq.modulith.tables.Shedlock;
+import com.example.demo.jooq.modulith.tables.SpringSession;
+import com.example.demo.jooq.modulith.tables.SpringSessionAttributes;
 
 import java.util.Arrays;
 import java.util.List;
@@ -57,6 +59,16 @@ public class Modulith extends SchemaImpl {
     public final Shedlock SHEDLOCK = Shedlock.SHEDLOCK;
 
     /**
+     * The table <code>modulith.spring_session</code>.
+     */
+    public final SpringSession SPRING_SESSION = SpringSession.SPRING_SESSION;
+
+    /**
+     * The table <code>modulith.spring_session_attributes</code>.
+     */
+    public final SpringSessionAttributes SPRING_SESSION_ATTRIBUTES = SpringSessionAttributes.SPRING_SESSION_ATTRIBUTES;
+
+    /**
      * No further instances allowed
      */
     private Modulith() {
@@ -76,7 +88,9 @@ public class Modulith extends SchemaImpl {
         return Arrays.asList(
             EventPublication.EVENT_PUBLICATION,
             EventPublicationArchive.EVENT_PUBLICATION_ARCHIVE,
-            Shedlock.SHEDLOCK
+            Shedlock.SHEDLOCK,
+            SpringSession.SPRING_SESSION,
+            SpringSessionAttributes.SPRING_SESSION_ATTRIBUTES
         );
     }
 }

@@ -48,7 +48,7 @@ Kiro Web では、tool call の最初に `source docs/local-env-setup/kiro-web.s
 commitとpushの前に、`docs/tooling/dev-workflow.md`の「エージェントがcommitとpushをするとき」を読む。
 pushはその文書のとおりbackgroundで実行する。
 Pull RequestはDraftで作り、Ready for reviewにする前に`/thermos`を実行して指摘を直す（`docs/agents/rgdd.md`のフェーズ4）。
-git worktreeを作ったら、同じ文書の「git worktreeで作業するとき」に従って依存を入れる。
+ファイルを変える作業は自分のgit worktreeで行い、作り方と依存の入れ方は同じ文書の「git worktreeで作業するとき」に従う。
 
 ### Commit messages
 

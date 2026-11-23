@@ -36,6 +36,8 @@ IdP は、ローカルとテストでは Keycloak、本番では Amazon Cognito 
 決めた時点では、Spring Security 7 で認証のトークンを作り直したときの OAuth2 の認可済みのクライアントとの対応と、セッションの ID を作り直したときの CSRF のトークンの扱いが確かめられていなかった。
 どちらも #375 のテストで確かめ、結果を [APIの認証、セッション、権限](../web-api/authentication-and-session.md#テナントを選んだ後のセッション)に記録した。
 
+[ADR-111](ADR-111-store-sessions-in-postgresql-until-user-growth-needs-redis.md) で Redis を外したため、Proposed の間に帰結から Redis を除いた。
+
 ## Decision
 
 テナント、所属、役割をアプリの DB に持ち、IdP には認証だけを任せる。
@@ -94,7 +96,7 @@ IdP は、ローカルとテストでは Keycloak、本番では Amazon Cognito 
 ### Negative
 
 - テナントを選んだ後のリクエストのたびに、所属を引く問い合わせが 1 つ増える。
-- 権限のクラス（`TenantMembershipAuthority`）を、認証ごと Redis のセッションに直列化する。このクラスを移動、改名するときは、デプロイと同時に既存のセッションを消す。
+- 権限のクラス（`TenantMembershipAuthority`）を、認証ごとセッションに直列化する。このクラスを移動、改名するときは、デプロイと同時に既存のセッションを消す。
 - `/api/**` に新しい API を足すと、テナントを選ぶ前は 403 になる。テナントの前に呼ぶ API を足すときは、`tenancy` の filter の除外を直す。
 
 ### Neutral

@@ -184,11 +184,21 @@ check_paths() {
   別の作業や利用者が一部だけを stage したものなら、この Task では commit できないので、その作業か利用者に確かめてください。"
 }
 
+# need_commitlint: commit-msg フックは npx --no-install commitlint を動かす。worktree を作った直後は node_modules が無く、フックが npx の不明なエラーで落ちるので、始める前に止める。
+# push は node_modules を見ない。pre-push が使う lefthook は main の worktree のものを指し、フロントエンドの依存は task fe-install が入れる。
+need_commitlint() {
+  local top
+  top="$(git rev-parse --show-toplevel)" || exit 1
+  [ ! -f "$top/package.json" ] || [ -x "$top/node_modules/.bin/commitlint" ] ||
+    fail "commitlint がありません。worktree を作った直後は npm ci を実行してください（docs/tooling/dev-workflow.md の「git worktreeで作業するとき」）。"
+}
+
 commit() {
   [ $# -ge 2 ] || usage
   local msg="$1" r run merge
   shift
   git rev-parse --is-inside-work-tree >/dev/null || exit 1
+  need_commitlint
   [ -s "$msg" ] || fail "メッセージのファイル $msg が無いか空です。"
   # 同じ worktree の 2 つの commit は同じ HEAD から始まり、後に終わったほうを git が拒むので、フックを待たせる前に止める。
   # ponytail: 確かめてから pid を書くまでの数ミリ秒の間に始めた 2 つ目は通り、git が後に終わったほうを拒む（フックの時間が無駄になる）。

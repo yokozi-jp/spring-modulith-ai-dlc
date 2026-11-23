@@ -143,8 +143,9 @@ grep -rn "TenantContext.call\|TenantContext\.<" backend/src/main/java --include=
 
 ## 同期の記録
 
-同期コミット：`c70aaf597cdea2644887b70d82b5a2f836f6ad95`（main。Pull Request #617 の土台）
+同期コミット：`4fe673a25c619cd0fecbb3b14e7f5a7ed2f7d22b`（main。Pull Request #617 の土台）
 
-`TenantContext.call` の MDC の出し入れは #617 が足すため、「変更がこの検証に関わるか」のコマンドは、#617 が main に入るまで #617 の変更を差分に出す。
+`TenantContext.call` の MDC の出し入れは Pull Request #617 が足すため、「変更がこの検証に関わるか」のコマンドは、#617 が main に入るまで #617 の変更を差分に出す。
 差分を読み、列挙の式と変異が `TenantContext.call` の今の形と一致することを確かめた。
+main の変更のうち、関わるファイルに触れたのは `application.yaml` のセッションの保存先（ADR-111）だけで、`spring.threads` と `spring.task` は変わっていない。
 Pull Request の中のコミットを書かない理由と、進め方は `docs/agents/formal-verification.md` の「同期コミットを進める」にある。

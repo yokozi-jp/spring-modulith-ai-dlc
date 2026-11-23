@@ -1,0 +1,114 @@
+databaseChangeLog:
+  - changeSet:
+      id: 023-create-spring-session-tables
+      author: system
+      preConditions:
+        - dbms:
+            type: postgresql
+      changes:
+        # Spring Session JDBC のセッションの表（ADR-111）。
+        # 列名、型（char(36)、epoch ミリ秒の bigint）、主キー、カスケードの外部キーは、
+        # spring-session-jdbc の schema-postgresql.sql に合わせる。業務テーブルの規約に合わせて変えると、
+        # Spring Session の SQL が動かなくなる（LogoutContractTest と TenantSelectionTest が実際の表で確かめる）。
+        - createTable:
+            tableName: spring_session
+            schemaName: modulith
+            columns:
+              - column:
+                  name: primary_id
+                  type: char(36)
+                  constraints:
+                    nullable: false
+                    primaryKey: true
+                    primaryKeyName: spring_session_pkey
+              - column:
+                  name: session_id
+                  type: char(36)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: creation_time
+                  type: bigint
+                  constraints:
+                    nullable: false
+              - column:
+                  name: last_access_time
+                  type: bigint
+                  constraints:
+                    nullable: false
+              - column:
+                  name: max_inactive_interval
+                  type: int
+                  constraints:
+                    nullable: false
+              - column:
+                  name: expiry_time
+                  type: bigint
+                  constraints:
+                    nullable: false
+              - column:
+                  name: principal_name
+                  type: varchar(100)
+        - createIndex:
+            indexName: spring_session_session_id_idx
+            tableName: spring_session
+            schemaName: modulith
+            unique: true
+            columns:
+              - column:
+                  name: session_id
+        - createIndex:
+            indexName: spring_session_expiry_time_idx
+            tableName: spring_session
+            schemaName: modulith
+            columns:
+              - column:
+                  name: expiry_time
+        - createIndex:
+            indexName: spring_session_principal_name_idx
+            tableName: spring_session
+            schemaName: modulith
+            columns:
+              - column:
+                  name: principal_name
+        - createTable:
+            tableName: spring_session_attributes
+            schemaName: modulith
+            columns:
+              - column:
+                  name: session_primary_id
+                  type: char(36)
+                  constraints:
+                    nullable: false
+                    primaryKey: true
+                    primaryKeyName: spring_session_attributes_pkey
+              - column:
+                  name: attribute_name
+                  type: varchar(200)
+                  constraints:
+                    nullable: false
+                    primaryKey: true
+                    primaryKeyName: spring_session_attributes_pkey
+              - column:
+                  name: attribute_bytes
+                  type: bytea
+                  constraints:
+                    nullable: false
+        - addForeignKeyConstraint:
+            constraintName: spring_session_attributes_session_primary_id_fkey
+            baseTableName: spring_session_attributes
+            baseTableSchemaName: modulith
+            baseColumnNames: session_primary_id
+            referencedTableName: spring_session
+            referencedTableSchemaName: modulith
+            referencedColumnNames: primary_id
+            onDelete: CASCADE
+        - sql:
+            sql: GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE modulith.spring_session, modulith.spring_session_attributes TO "${appDatabaseUsername}";
+      rollback:
+        - dropTable:
+            tableName: spring_session_attributes
+            schemaName: modulith
+        - dropTable:
+            tableName: spring_session
+            schemaName: modulith

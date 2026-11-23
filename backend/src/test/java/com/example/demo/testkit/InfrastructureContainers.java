@@ -33,7 +33,7 @@ import org.testcontainers.utility.MountableFile;
 import org.yaml.snakeyaml.Yaml;
 
 /**
- * テストの JVM ごとに 1 つずつ起動する PostgreSQL、Redis、決済代行の WireMock のコンテナ（ADR-085）。
+ * テストの JVM ごとに 1 つずつ起動する PostgreSQL、決済代行の WireMock のコンテナ（ADR-085）。
  *
  * <p>Gradle は fork ごとに別の JVM を起動するため、fork どうしは DB を共有しない。 最初の Spring のテストのコンテキストを作るときに起動し、JVM の終了で
  * Testcontainers の Ryuk が片付ける。 イメージと WireMock のコマンドは {@code docker/compose-test.yml} から読み、E2E
@@ -90,9 +90,6 @@ final class InfrastructureContainers {
   /** PostgreSQL の待ち受けポート。 */
   private static final int POSTGRES_PORT = 5432;
 
-  /** Redis の待ち受けポート。 */
-  private static final int REDIS_PORT = 6379;
-
   /** WireMock の待ち受けポート。 */
   private static final int WIREMOCK_PORT = 8080;
 
@@ -131,9 +128,6 @@ final class InfrastructureContainers {
             .withEnv("DB_PASSWORD", PASSWORD)
             .withCopyFileToContainer(
                 MountableFile.forHostPath(INITDB_DIR), "/docker-entrypoint-initdb.d/");
-    final GenericContainer<?> redis =
-        new GenericContainer<>(DockerImageName.parse(image(compose, "redis")))
-            .withExposedPorts(REDIS_PORT);
     final GenericContainer<?> wireMock =
         new GenericContainer<>(DockerImageName.parse(image(compose, WIREMOCK)))
             .withCommand(command(compose, WIREMOCK))
@@ -142,9 +136,8 @@ final class InfrastructureContainers {
             .withExposedPorts(WIREMOCK_PORT)
             .waitingFor(Wait.forHttp("/__admin/health"));
     bindToLoopback(postgres, POSTGRES_PORT);
-    bindToLoopback(redis, REDIS_PORT);
     bindToLoopback(wireMock, WIREMOCK_PORT);
-    Startables.deepStart(postgres, redis, wireMock).join();
+    Startables.deepStart(postgres, wireMock).join();
 
     final String paymentGateway =
         "http://" + LOOPBACK + ":" + wireMock.getMappedPort(WIREMOCK_PORT);
@@ -159,8 +152,6 @@ final class InfrastructureContainers {
         Map.entry("DB_PASSWORD", PASSWORD),
         Map.entry("MIGRATION_DB_USERNAME", MIGRATION_USER),
         Map.entry("MIGRATION_DB_PASSWORD", PASSWORD),
-        Map.entry("REDIS_HOST", LOOPBACK),
-        Map.entry("REDIS_PORT", String.valueOf(redis.getMappedPort(REDIS_PORT))),
         Map.entry("PAYMENT_GATEWAY_BASE_URL", paymentGateway));
   }
 

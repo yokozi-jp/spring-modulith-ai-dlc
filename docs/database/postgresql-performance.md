@@ -81,8 +81,8 @@ DBへの書き込みを非同期で後回しにするWrite Backは、データ�
 ## キャッシュのキー
 
 テナントのデータを持つキャッシュのキーには、テナントの`public_id`（`TenantId.toString()`）を含め、別のテナントの値を返さないようにする（[PostgreSQLのマルチテナント設計](postgresql-multitenancy.md)）。
-Spring SessionがRedisに置くセッションは利用者ごとに分かれるため、セッションのキーにはテナントを含めない。
-今のバックエンドはRedisをSpring Sessionだけに使い、キャッシュを持たない。
+Spring SessionがPostgreSQLの`modulith.spring_session`に置くセッションは利用者ごとに分かれるため、セッションのキーにはテナントを含めない。
+今のバックエンドはRedisを使わず、キャッシュを持たない（[ADR-111](../adr/ADR-111-store-sessions-in-postgresql-until-user-growth-needs-redis.md)）。
 キーにテナントを含めることは機械で検査せず、キャッシュを足す変更のレビューで確かめる。
 
 ## 出典

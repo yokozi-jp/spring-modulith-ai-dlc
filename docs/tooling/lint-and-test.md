@@ -62,7 +62,7 @@ compose-testを使うTaskは、実行ごとにslotを取り、slotのComposeプ�
 - **`task test-deps-leftover-check`**：名前に`spring-modulith-test`を含むコンテナかvolumeが残っていれば失敗する。
   slotのプロジェクト（`spring-modulith-test-<n>`）と、CIが`docker compose`を直接呼ぶときの既定のプロジェクト（`spring-modulith-test`）の両方を検出する。
 
-テストが使うPostgreSQL、Redis、WireMockは、テストのJVMごとにTestcontainersが起動して片付け、Gradleのforkを並列にする（[バックエンドのテストの実行基盤](../backend/testing-infrastructure.md)）。
+テストが使うPostgreSQL、WireMockは、テストのJVMごとにTestcontainersが起動して片付け、Gradleのforkを並列にする（[バックエンドのテストの実行基盤](../backend/testing-infrastructure.md)）。
 `docker/compose-test.yml`のPostgreSQL（slot 0では5433）は、`be-verify-migrations`のrollbackの検証だけが使う。
 `.env.test`は、Gitで管理する`.env.test.example`からコピーして作るローカルファイルで、無ければTaskが作る。
 GradleのテストとPITは、接続先以外の設定を`.env.test`から読む。

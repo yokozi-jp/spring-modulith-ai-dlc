@@ -33,7 +33,7 @@ import org.springframework.security.oauth2.core.oidc.user.OidcUser;
 import org.springframework.security.web.context.HttpSessionSecurityContextRepository;
 import org.springframework.session.Session;
 import org.springframework.session.SessionRepository;
-import org.springframework.session.data.redis.RedisSessionRepository;
+import org.springframework.session.jdbc.JdbcIndexedSessionRepository;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.web.util.UriComponentsBuilder;
 import org.springframework.web.util.UriUtils;
@@ -41,7 +41,7 @@ import org.springframework.web.util.UriUtils;
 /**
  * ログアウトの CSRF 保護、IdP の end session endpoint への redirect、セッションの破棄を検証する。
  *
- * <p>ログアウト後の古い Cookie を確かめるため、{@code oidcLogin()} ではなく Redis に保存したセッションと、そのセッション Cookie を通す。 Spring
+ * <p>ログアウト後の古い Cookie を確かめるため、{@code oidcLogin()} ではなく DB に保存したセッションと、そのセッション Cookie を通す。 Spring
  * Security 7 は request post processor の認証をセッションへ保存しないためである。
  */
 @SuppressWarnings({"PMD.AvoidDuplicateLiterals", "PMD.TooManyStaticImports"})
@@ -53,8 +53,8 @@ class LogoutContractTest {
   /** 実際の Spring MVC と Security filter chain を通すクライアント。 */
   @Autowired private MockMvc mockMvc;
 
-  /** ログイン済みのセッションを用意し、ログアウト後に残っているかを確かめる Redis のリポジトリ。 */
-  @Autowired private RedisSessionRepository sessionRepository;
+  /** ログイン済みのセッションを用意し、ログアウト後に残っているかを確かめる JDBC のリポジトリ。 */
+  @Autowired private JdbcIndexedSessionRepository sessionRepository;
 
   /** テストごとに作るセッションの ID。 */
   private String sessionId;
@@ -82,7 +82,7 @@ class LogoutContractTest {
     mockMvc.perform(get("/api/memberships").cookie(sessionCookie)).andExpect(status().isOk());
   }
 
-  // RedisSessionRepository のセッションの型は公開されていないため、型変数で受けて Session として扱う。
+  // JdbcIndexedSessionRepository のセッションの型は公開されていないため、型変数で受けて Session として扱う。
   private static <S extends Session> String saveSession(
       final SessionRepository<S> repository, final SecurityContext securityContext) {
     final S session = repository.createSession();
@@ -184,7 +184,7 @@ class LogoutContractTest {
 
     assertNull(
         sessionRepository.findById(sessionId),
-        () -> "POST /logout の後もセッションが Redis に残っている: sessionId=" + sessionId);
+        () -> "POST /logout の後もセッションが DB に残っている: sessionId=" + sessionId);
     mockMvc.perform(get("/api/missing").cookie(sessionCookie)).andExpect(status().isUnauthorized());
   }
 }
