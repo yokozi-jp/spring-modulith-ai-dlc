@@ -44,15 +44,27 @@ ADR-013 のエラー表現のうち、`traceId` と `instance` の行を次の�
 
 `traceId` と `instance` は、Spring MVC が Problem Details を書く直前に呼ぶ `ErrorResponse.Interceptor` の 1 か所で扱う。
 advice が返す Problem Details も、`/error` が返す Problem Details も、この interceptor を通るためである。
+`ErrorResponse.Interceptor` は要求を引数に受け取らないので、interceptor は要求を `RequestContextHolder`（スレッドに束縛した要求）から読む。
+interceptor を呼ぶのは、Spring MVC の handler の戻り値の処理だけである。
+Spring MVC の中では `FrameworkServlet` が要求を束縛し、Spring Security の拒否の handler（認証、認可、CSRF の失敗）が advice を呼ぶときは、Spring Boot の `RequestContextFilter` が束縛している。
+`RequestContextFilter` は Spring Security の filter より前に、ERROR を含むすべての dispatch に登録される。
+`ProblemDetailsTraceIdContractTest` は、実際のポートへの 401 と CSRF の 403 で、この順を固定する。
+MockMvc は要求を自分で束縛するので、この順を確かめられない。
 trace ID は、現在の span ではなく、要求の属性に残る HTTP の observation（`ServerHttpObservationFilter` が作る）の span から取る。
 コンテナが `/error` へ転送した失敗は、要求の HTTP の observation の外で処理されるためである。
 Spring Boot が observation の filter を REQUEST と ASYNC の dispatch だけに登録するので、ERROR の dispatch では HTTP の observation が開かない。
+observation の filter が Spring Security の filter より前にあることも、`ProblemDetailsTraceIdContractTest` の実際のポートへの要求が固定する。
 要求に observation がなければ、`traceId` を付けない。
 
 契約の版（`OpenApiConfig.CONTRACT_VERSION`）は、MINOR を上げて `0.8.0` にする。
 `instance` を外すことは、ADR-013 に反する値を返していた不具合の修正として扱う。
 [APIの互換性と廃止](../web-api/versioning.md)は、バグ修正を後方互換を壊す改修として扱わず、バグに依存するクライアントとは個別に調整するとしている。
-利用者は同時配備の SPA だけで、SPA は `instance` を読まないので、調整することはない。
+この扱いは、次の 2 つがどちらも成り立つこの `instance` だけの判断であり、応答の項目を削除するときの一般の規則にしない。
+
+- 返していた値（要求のパスか `/error`）が、ADR-013 と RFC 9457 の `instance` の意味に反していた。
+- 項目を読む既知の利用者がいない。利用者は同時配備の SPA だけで、SPA は `instance` を読まない。
+
+ほかの項目の削除は、versioning.md のとおり後方互換を壊す改修として扱う。
 `traceId` の追加は互換な追加である。
 
 ## Consequences
@@ -67,7 +79,8 @@ Spring Boot が observation の filter を REQUEST と ASYNC の dispatch だけ
 - 同じ失敗でも、要求ごとに本文の `traceId` が変わる。本文の完全一致で 2 つの応答を比べられない。
 - Spring Framework 7.0 の間は、interceptor で `instance` を消す。7.1 へ上げたら、その処理を消す。
   Spring Framework が空の `instance` に要求のパスを入れなくなると、`ProblemDetailsConfigTest` が失敗して知らせる。
-- sampling で標本にならなかった trace の span は Tempo に送られないので、その trace ID で引けるのはログだけになる。
+- sampling で標本にならなかった trace の span は Tempo に送られないので、その trace ID で Tempo のトレースは開けない。
+- 要求を `RequestContextHolder` から読むので、filter の順が変わって要求が束縛されないと、`traceId` が付かない。Spring Framework は interceptor の例外を無視するので、失敗は応答に出ない。実際のポートの契約テストが、この順の変化を検出する。
 
 ### Neutral
 
@@ -97,13 +110,21 @@ Spring Boot が observation の filter を REQUEST と ASYNC の dispatch だけ
   [PR #688](https://github.com/yokozi-jp/spring-modulith-ai-dlc/pull/688) の作業で、`/error` の 400 の契約テストに一時的な出力を足し、現在の span の trace ID が `traceparent` の値と違うことを見た。
   advice と `/error` で取り方を分けると、`ApiProblemDetails` が Problem Details の生成と trace ID の取得の 2 つの責務を持つ。
 
-### 選択肢4: 契約の版の MAJOR を上げて 1.0.0 にする
+### 選択肢4: ResponseBodyAdvice で traceId を付け、instance を消す
+
+- **Description**：`ResponseBodyAdvice` の `beforeBodyWrite` で、本文が Problem Details のときに `traceId` を付け、`instance` を消す。
+- **Pros**：要求を引数で受け取るので、`RequestContextHolder` と filter の順に頼らない。Spring Framework 7.0 が空の `instance` に要求のパスを入れた後で呼ばれるので、`instance` も消せる。
+- **Cons**：成功の応答も含むすべての本文の書き出しで呼ばれ、本文の型で Problem Details を見分ける処理が要る。
+  `ErrorResponse.Interceptor` は Problem Details を書くときだけ呼ばれる Spring Framework の拡張点で、この用途に合う。
+  filter の順に頼る弱さは、実際のポートの契約テストで補えるので、interceptor を選んだ。
+
+### 選択肢5: 契約の版の MAJOR を上げて 1.0.0 にする
 
 - **Description**：応答の項目の削除を、後方互換を壊す変更として扱う。
 - **Pros**：項目の削除を一律に MAJOR とする読み方に合う。
 - **Cons**：[ADR-052](ADR-052-commit-openapi-contract-and-check-generated-client.md) と versioning.md は、`1.0.0` を `/api/v1` を導入するときの版にしている。破壊的変更の手順では Conventional Commits の `!` が要り、release-please がアプリの版も 1.0.0 に上げる。
 
-### 選択肢5: instance に失敗ごとの URI を入れる
+### 選択肢6: instance に失敗ごとの URI を入れる
 
 - **Description**：失敗ごとに `urn:uuid:` などの URI を作り、`instance` に入れる。
 - **Pros**：RFC 9457 の `instance` の意味に合う。
