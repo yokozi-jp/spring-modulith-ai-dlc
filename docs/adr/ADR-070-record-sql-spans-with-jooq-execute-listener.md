@@ -18,7 +18,8 @@ Proposed
 ## Context
 
 Issue #151 は、画面の API 呼び出し、Spring Boot の処理、SQL を Grafana の Tempo で一本の trace として見られるようにする。
-ブラウザから Spring Boot までは、W3C Trace Context の `traceparent` と Micrometer Tracing の標準の伝播でつながる（[ADR-068](ADR-068-collect-browser-telemetry-with-faro-via-collector.md)）。
+このうちブラウザの span と `traceparent` は #421 で外した（[ADR-068](ADR-068-collect-browser-telemetry-with-faro-via-collector.md)）。
+この ADR が扱うのは、Spring Boot の受信から SQL までを一本の trace にする部分である。
 一方、Spring Boot 4.1 の標準の構成には SQL の span を作る仕組みがない。
 `JooqAutoConfiguration` は `ExecuteListenerProvider` の Bean を jOOQ の設定に入れるが、SQL の観測は行わない。
 

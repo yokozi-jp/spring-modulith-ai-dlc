@@ -34,6 +34,18 @@ Proposed
 OpenTelemetry 公式は、ブラウザの計装を experimental で、ほぼ仕様がないとしている。
 Faro の形式を受ける contrib の `faroreceiver` は、Collector 0.161.0 で alpha（logs、traces）である。
 
+ブラウザの trace（API 呼び出しの span と `traceparent`）は、#151 で入れたあと #421 で外した。
+理由は次の 3 つである。
+
+- 標準が実験的である。`@grafana/faro-web-tracing` 2.12.1 は、`@opentelemetry/*` の 0.x 系（0.222）を含む 10 個のパッケージに依存する。
+- バックエンドの sampling が効かなくなる。Spring Boot の sampler は `parentBased(traceIdRatioBased(...))` で、ブラウザは sampled flag を 1 にして送るので、画面からの要求は `MANAGEMENT_TRACING_SAMPLING_PROBABILITY` を下げても全部記録される。本番で量を減らすには tail sampling が要り、同じ trace の span を 1 か所の Collector に集める必要がある。ブラウザの span は gateway に、バックエンドの span は各サイドカーに届くので、振り分けの層がもう一段要る。
+- 残る情報が少ない。Collector で伏せた後のブラウザの span には、固定の名前、HTTP の method と status、時刻、trace ID と親子関係だけが残る。どの画面のどの API かは、バックエンドの span で知る。
+
+このリポジトリは、標準的な Web アプリのほぼすべてが本番で使うものだけを作る。
+tail sampling と Collector の振り分けの層は、必要になったプロジェクトが足す。
+外しても、バックエンドの trace（API から SQL まで）と、Problem Details の `traceId` での問い合わせは残る。
+失うのは、ブラウザから見た所要時間（通信、TLS、CDN、待ち時間を含む）と、画面からの 1 本のつながりである。
+
 過去に Grafana Faro を採る ADR 案を ADR-009 の番号で起票したことがある。
 その案は、次の点で現在の構成と合わないので、この ADR で置き換える。
 
@@ -57,7 +69,7 @@ Faro の形式を受ける contrib の `faroreceiver` は、Collector 0.161.0 �
 - Grafana Alloy は入れず、出口を既存の Collector の一つに保つ。
 - フロントエンド用の pipeline（`logs/frontend`、processor は `transform/frontend_logs`）を、バックエンド用と分ける。
   バックエンドのログ属性の allowlist はそのまま残す。
-- faro receiver の traces は、フロントエンド用の `traces/frontend`（processor は `filter/frontend_span_events` と `transform/frontend_traces`）で受ける。
+- ブラウザの trace は送らない。faro receiver に traces の pipeline を置かず、`/collect` に span が届いても捨てる。
   バックエンドの `traces` pipeline は加工しないまま残す。
 
 faroreceiver はブラウザ、ページ、セッションなどのメタデータをログの本文（logfmt）に入れるので、属性の `keep_keys` だけでは保護できない。
@@ -74,18 +86,11 @@ Vite が付ける hash 付きのファイル名は秘密を含まず、本番の
 query か fragment を持つ URL は、ファイル名が一致しても token 全体を置き換える。
 ブラウザと Collector の両方で縮約し、実際の ID を推測して一部だけ加工する方式は使わない。
 
-フロントエンドの span は、送り手が書ける値を信頼せず、許可したものだけを残す。
-resource 属性はログと同じ 4 つに絞り、`service.name` は Collector の値で上書きする。
-span の属性は検証済みの `http.request.method` と `http.response.status_code` だけにし、すべての `url.*` 属性を削除する。
-span の名前は固定の `Browser request` にし、status の message、`trace_state`、links、instrumentation scope の名前と版と属性も固定の値か空にする。
-span の event は例外のメッセージなどを持ちうるので、すべて捨てる。
-trace ID、span ID、親 span ID は属性ではないので残り、バックエンドの span とつながる。
-
 ### SDK とセッション
 
-- 入れるのは `@grafana/faro-web-sdk`（後の段階で `@grafana/faro-web-tracing`）だけにし、exact version に固定する。
+- 入れるのは `@grafana/faro-web-sdk` だけにし、exact version に固定する。
   `@grafana/faro-react` は入れない。
-- `getWebInstrumentations()` の既定は使わず、Session、View、Errors、WebVitals、Tracing の順で明示的に有効にする。
+- `getWebInstrumentations()` の既定は使わず、Session、View、Errors、WebVitals の順で明示的に有効にする。
   Console、Performance、UserAction、Frustration、Navigation、CSP は無効のままにする。
 - batching は無効にし、一つの signal を一つの HTTP envelope で送る。
   Faro 2.12.1 の公開 API に flush の完了待ちがないため、session の切替前後を同じ envelope に混ぜないことを優先する。
@@ -94,12 +99,10 @@ trace ID、span ID、親 span ID は属性ではないので残り、バック�
 - SDK を呼ぶコードは `frontend/src/lib/telemetry.ts` の 1 ファイルにまとめ、初期化は composition root の `main.tsx` で行う。
   SDK に依存しない `beforeSend` の縮約は `frontend/src/lib/telemetry-sanitize.ts` に分け、`telemetry.ts` だけが呼ぶ。
   feature と route と component から SDK を呼ばない。
-- `traceparent` は同一オリジンの `/api/**` だけに付ける。
-  範囲は Faro の設定の `ignoreUrls` に「同一オリジンの `/api/**` 以外」に一致する正規表現を 1 つ渡して決める。
-  IdP を含む別オリジンには `propagateTraceHeaderCorsUrls` を指定しないので付かず、`/collect` は Faro の既定の除外で付かない。
-  `TracingInstrumentation` の `fetchInstrumentationOptions.ignoreUrls` に渡すと、transport の既定の `/collect` の除外を上書きして消すので使わない。
-- ブラウザでは sampling せず、Session instrumentation の `samplingRate=1` を使う。
-  sampled flag が 1 の `traceparent` を維持する。
+- `traceparent` は付けず、ブラウザの span は作らない。
+  `TracingInstrumentation` を入れないので、fetch と XHR は計装されない。
+- Session instrumentation の `samplingRate=1` を維持する。
+  ブラウザの送信量の調整は、本番の入口と合わせて #185 で決める。
 - session は `persistent=false` とし、Faro の volatile session を `sessionStorage` に保持する。
   15 分の非操作または開始から 4 時間で切り替える。
 - ログアウトの native submit より前に送信を pause し、SDK の `genShortID` で 10 文字の匿名 ID を作って `setSession` した後で送信を再開する。
@@ -157,7 +160,7 @@ Faro の CSP の計装は無効のままにし、二重に送らない。
 ### 段階
 
 最初の段階（#150）で入れるのは Errors だけである。
-2 つ目の段階（#151）で、`@grafana/faro-web-tracing` の Tracing（fetch と XHR）と `traces/frontend` を入れる。
+2 つ目の段階（#151）で入れた Tracing（fetch と XHR）と `traces/frontend` は、#421 で外した。
 SQL の span は、ブラウザと関係なく効くバックエンドの判断なので、[ADR-070](ADR-070-record-sql-spans-with-jooq-execute-listener.md) に分ける。
 3 つ目の段階（#152）で、WebVitals、Session、View を入れる。
 4 つ目の段階（#153）で、CSP 違反の報告と `logs/frontend_csp` を入れる。
@@ -166,7 +169,6 @@ SQL の span は、ブラウザと関係なく効くバックエンドの判断�
 
 - 本番の受け口は、アプリのサイドカーと分けた受信専用の Collector（gateway）に置く。
   ADR-043 のサイドカーは `localhost` で待ち受けるので、ブラウザから届かない。
-  また、tail sampling は同じ trace の span を 1 か所に集めないと動かない。
   gateway は `/collect` と同じく `/csp-report` も受ける。
 - 入口（CDN か ALB と WAF）で、サイズ、レート、Origin を制限する。
 - CDN と reverse proxy は、`/collect` と `/csp-report` を転送するときに `Cookie`、`Authorization`、`Proxy-Authorization` を消す。
@@ -177,7 +179,6 @@ SQL の span は、ブラウザと関係なく効くバックエンドの判断�
   `logs/frontend_csp` の resource 属性は Collector の環境変数の固定値なので、送り手は stream を増やせない。
   `logs/frontend` の `service.namespace` と `deployment.environment.name` は送り手の値を形式だけ検証して使うので、送り手が stream を増やしうる。
   これを Collector の値で上書きするかは、gateway のレートと Origin の制限と同時に決める。
-- sampling は gateway の tail sampling で決める（エラーと遅い trace を残し、通常の trace は一定割合にする）。
 - 本番の保存先は CloudWatch（ADR-043）とし、exporter の上書きで変えられる。
 - ソースマップは hidden で生成し、配信物から除き、非公開の場所に release ごとに保存する。
   最初は必要なときに手で元に戻す。
@@ -223,11 +224,7 @@ Faro を更新するたびに、lockfile で `ua-parser-js` の版を確かめ�
   秘密を残さないことを表示の再現性より優先する。
 - batching を無効にするため、有効なビルドでは signal ごとに `/collect` の HTTP request が発生する。
 - Faro の chunk は使わない計装も含むので、有効のときの chunk が大きい（約 112.5 kB、gzip で約 38.3 kB）。
-- Tracing を入れると、有効のビルドの JavaScript が合わせて約 89.3 kB（gzip で約 28.7 kB）増える。
-  web-tracing と OpenTelemetry JS の chunk（84.1 kB、gzip で 26.3 kB）と、SDK と共有する chunk（3.0 kB、gzip で 1.3 kB）が増え、SDK の chunk が約 1.6 kB 増える。
-  無効のビルドの bundle は変わらない。
-- `ignoreUrls` は Tracing だけでなく Faro の全計装の除外にも効く。
-  Performance や UserAction を有効にするときは、範囲の指定を Tracing の option に移す必要がある。
+- ブラウザから見た所要時間（通信、TLS、CDN、待ち時間を含む）と、画面の操作からバックエンドまでの 1 本の trace を失う。
 - `ua-parser-js@1.0.41` を provenance のないまま受け入れる。
 - `logs/frontend_csp` が使う `unroll` processor は logs で alpha で、Collector の更新で壊れうる。
   `task otel-collector-check` の CSP の fixture の件数の検査で検出する。
@@ -242,8 +239,8 @@ Faro を更新するたびに、lockfile で `ua-parser-js` の版を確かめ�
 - `docker/otel-collector/config.yaml` は本番と共有する（ADR-043）ので、本番のサイドカーの Collector も faro receiver を起動する。
   gateway を作るまでは、サイドカーの faro receiver は `localhost` で待ち受け、ブラウザから届かないので何も受けない。
   `webhook_event` receiver も同じく `localhost` で起動し、何も受けない。
-- 本番の上書きファイルは `logs/frontend`、`logs/frontend_csp`、`traces/frontend` の exporters も定めなければならず、定めなければ `otlp_http/lgtm` のままになる。
-- gateway を作るときに、faro receiver、`webhook_event` receiver、`logs/frontend`、`logs/frontend_csp`、`traces/frontend` を共有の設定から gateway の設定へ移す。
+- 本番の上書きファイルは `logs/frontend`、`logs/frontend_csp` の exporters も定めなければならず、定めなければ `otlp_http/lgtm` のままになる。
+- gateway を作るときに、faro receiver、`webhook_event` receiver、`logs/frontend`、`logs/frontend_csp` を共有の設定から gateway の設定へ移す。
 - CSP の報告の `service.version` は、Compose が `version.txt` から渡す環境変数を Collector が付ける。
   この版は報告を送った bundle の版ではなく、Collector が起動したときに配信していた版を指す。
   Collector は報告から bundle の版を知れないので、配信の直後は古い bundle の違反が新しい版として記録されうる。
@@ -298,7 +295,7 @@ Faro を更新するたびに、lockfile で `ua-parser-js` の版を確かめ�
 
 - **Description**：Faro のセッションの samplingRate を 1 未満にして、ブラウザで送る量を減らす。
 - **Pros**：ブラウザの送信量と保存先の量が減る。
-- **Cons**：sampled flag が 0 の `traceparent` が届くと、バックエンドの trace も消える。
+- **Cons**：Tracing を入れていた間は、sampled flag が 0 の `traceparent` が届くと、バックエンドの trace も消えた。Tracing を外した今は、送信量の調整を本番の入口と合わせて #185 で決める。
 
 ### 選択肢9: localStorage の persistent session
 
@@ -344,15 +341,15 @@ Faro を更新するたびに、lockfile で `ua-parser-js` の版を確かめ�
 - [faro_to_logs.go v0.161.0](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/v0.161.0/pkg/translator/faro/faro_to_logs.go)
 - [OTTL の ParseKeyValue](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/v0.161.0/pkg/ottl/ottlfuncs/README.md#parsekeyvalue)
 - [#151: 2/4 画面の操作から DB までを一本のトレースで見られるようにする](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/151)
+- [#421: ブラウザのトレースを外す](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/421)
 - [#153: 4/4 CSP 違反の報告を Grafana で見られるようにする](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/153)
 - [W3C Reporting API](https://www.w3.org/TR/reporting-1/)
 - [webhookeventreceiver v0.161.0](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/v0.161.0/receiver/webhookeventreceiver)
 - [Loki の OTLP 取り込み](https://grafana.com/docs/loki/latest/send-data/otel/)
 - [unrollprocessor v0.161.0](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/v0.161.0/processor/unrollprocessor)
 - [Grafana Faro Web SDK 2.12.1](https://www.npmjs.com/package/@grafana/faro-web-sdk/v/2.12.1)
-- [Grafana Faro Web Tracing 2.12.1](https://www.npmjs.com/package/@grafana/faro-web-tracing/v/2.12.1)
-- [OpenTelemetry の instrumentation-fetch 0.222.0](https://www.npmjs.com/package/@opentelemetry/instrumentation-fetch/v/0.222.0)
 - [OpenTelemetry JavaScript](https://opentelemetry.io/docs/languages/js/)
+- [OpenTelemetry Browser](https://opentelemetry.io/docs/languages/js/getting-started/browser/)
 - [ADR-014: SPA とバックエンドを同一オリジンで公開する](ADR-014-use-same-origin-spa-security-boundary.md)
 - [ADR-015: 可観測性データを構造化し保護する](ADR-015-structure-and-protect-observability-data.md)
 - [ADR-022: semver 6.3.1 を pnpm trust policy の例外にする](ADR-022-exclude-semver-from-pnpm-trust-policy.md)

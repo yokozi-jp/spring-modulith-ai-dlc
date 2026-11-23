@@ -5,7 +5,6 @@ import {
   replaceTelemetryForTesting,
   reportCaughtError,
   resetTelemetrySession,
-  untracedUrl,
 } from "./telemetry";
 
 type Sink = NonNullable<Parameters<typeof replaceTelemetryForTesting>[0]>;
@@ -134,6 +133,24 @@ describe("resetTelemetrySession", () => {
     },
   );
 
+  it("pause が失敗すると session を切り替えず、送信を止める", async () => {
+    const setSession = vi.fn<NonNullable<Sink["api"]["setSession"]>>();
+    const pushError = vi.fn<Sink["api"]["pushError"]>();
+    replaceTelemetryForTesting({
+      api: { pushError, setSession },
+      pause: () => {
+        throw new Error("pause failed");
+      },
+    });
+
+    await resetTelemetrySession();
+    reportCaughtError(new Error("after failed pause"));
+    await Promise.resolve();
+
+    expect(setSession).not.toHaveBeenCalled();
+    expect(pushError).not.toHaveBeenCalled();
+  });
+
   it("unpause が失敗しても送信を止めたままにする", async () => {
     const pushError = vi.fn<Sink["api"]["pushError"]>();
     replaceTelemetryForTesting({
@@ -150,27 +167,6 @@ describe("resetTelemetrySession", () => {
 
     expect(pushError).not.toHaveBeenCalled();
   });
-});
-
-describe("untracedUrl", () => {
-  const origin = "http://localhost:5173";
-  function absolute(url: string): string {
-    return url.startsWith("/") ? new URL(url, origin).href : url;
-  }
-
-  it.each(["http://localhost:5173/api", "/api/x", "/api?x=1", "/api#f"])(
-    "同一オリジンの API の URL %s は trace する",
-    (url) => {
-      expect(untracedUrl(origin).test(absolute(url))).toBeFalsy();
-    },
-  );
-
-  it.each(["/apix", "/collect", "http://localhost:8080/realms/demo", "http://other.test/api"])(
-    "%s は trace しない",
-    (url) => {
-      expect(untracedUrl(origin).test(absolute(url))).toBe(true);
-    },
-  );
 });
 
 describe("reportCaughtError", () => {
