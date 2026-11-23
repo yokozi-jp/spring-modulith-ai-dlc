@@ -413,6 +413,11 @@ DBの規約のほかの検査は`backend/src/test/java/com/example/demo/persiste
   外部キーは、テナントで分ける業務テーブルなら`(tenant_public_id, 参照先の主キー)`、`tenancy`の表なら参照先の主キーだけの形にし、形の違う外部キーも拒否する。
 - K4：changesetの外部キーは`addForeignKeyConstraint`だけで作り、名前を`fk_{表}`か`fk_{連番}_{表}`にし、同じスキーマの表をK1と同じ列で参照し、`onDelete`、`onUpdate`、`deleteCascade`を付けない。
 
+表と列の論理名の規則は次のとおりである。
+根拠は[PostgreSQLの命名規約](../database/postgresql-naming.md#論理名のコメント)にある。
+
+- N12：カタログの業務テーブルと、そのカラムに、空でないコメントがある。ビューは対象外にする。違反のメッセージは、`createTable`と`addColumn`の`remarks`と、`setTableRemarks`と`setColumnRemarks`のchangesetの直し方を示す。
+
 スキーマ検査の規則を足すときは、判定に要る行を`CatalogSnapshot`に足して`SchemaCatalog.read`で埋め、判定する関数を`SchemaConventions.check`から呼ぶ。
 
 規約の例外は、理由を付けて`ChangesetLint.ALLOWLIST`と`SchemaConventions.ALLOWLIST`に載せる。

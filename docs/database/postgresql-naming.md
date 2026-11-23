@@ -1,13 +1,14 @@
 ---
 type: Convention
 title: PostgreSQLの命名規約
-description: 論物変換辞書、予約語、モジュール名とスキーマ名の予約語、テーブル種別の接頭辞、カラム名の接尾辞、インデックス名、外部キー名、RLSのポリシー名、シーケンス名の付け方を定める規約。テーブル、カラム、インデックス、外部キー、シーケンスを追加するとき、物理名を決めるときに読む。
+description: 論物変換辞書、表と列の論理名のコメント、予約語、モジュール名とスキーマ名の予約語、テーブル種別の接頭辞、カラム名の接尾辞、インデックス名、外部キー名、RLSのポリシー名、シーケンス名の付け方を定める規約。テーブル、カラム、インデックス、外部キー、シーケンスを追加するとき、物理名を決めるときに読む。
 tags: [convention, database, postgresql, naming, future-arch-guidelines]
 ---
 
 # PostgreSQLの命名規約
 
 物理名は論物変換辞書から組み立て、テーブル名とカラム名にSQLのキーワードを、モジュール名とスキーマ名にSQLの予約語を使わない。
+業務テーブルと、そのカラムには、日本語の論理名をコメントで付ける。
 テーブル名は種別の接頭辞を付けた単数形にし、カラム名は値の種類を表す接尾辞で終える。
 インデックス名、外部キー名、シーケンス名にはテーブル名を含め、RLSのポリシー名は`tenant_isolation`にする。
 
@@ -31,6 +32,21 @@ Spring Modulithのイベント出版テーブルのように、フレームワ�
 
 PostgreSQLの識別子は63バイトを超えると切り詰められる。
 物理名は辞書の単語から短く組み立てる。
+
+## 論理名のコメント
+
+業務テーブルと、そのすべてのカラム（共通カラムを含む）には、日本語の論理名をコメント（`COMMENT ON`）で付ける。
+表と列を作るchangesetで、最初から書く。
+
+- コメントには、最低限、論理名（例：`注文`、`注文日時`）を書く。説明を書き足すことは求めない。
+- 論理名は`GLOSSARY.md`の用語にそろえる。
+- 論物変換辞書を作るときは、辞書の論理名とコメントを一致させる。
+
+コメントはchangesetの`remarks`に書く。
+書き方は[DBマイグレーション規約](migrations.md#論理名のコメント)に示す。
+jOOQのコード生成は、コメントを生成物のJavadocと`getComment()`に写す。
+
+付け忘れは、スキーマ検査の規則N12が止める（[バックエンドのアーキテクチャテスト](../backend/architecture-tests.md#db)）。
 
 ## 使わない名前
 
@@ -106,4 +122,5 @@ IDENTITY列が暗黙に作るシーケンスは、PostgreSQLの自動命名に�
 ## 出典
 
 - フューチャー株式会社「PostgreSQL設計ガイドライン」（[アーキテクチャ設計ガイドライン](https://future-architect.github.io/arch-guidelines/documents/forDB/postgresql_guidelines.html)、commit `e309a6d`）、[CC BY 4.0](https://creativecommons.org/licenses/by/4.0/deed.ja)
+- フューチャー株式会社「データガバナンス設計ガイドライン」（[アーキテクチャ設計ガイドライン](https://future-architect.github.io/arch-guidelines/documents/forDataGovernance/data_governance_guidelines.html)、commit `e309a6d`）、[CC BY 4.0](https://creativecommons.org/licenses/by/4.0/deed.ja)。「論理名のコメント」の節が、`description`を最初から必ず書き、最低限は日本語の名前にする推奨を取り込んでいる。
 - このリポジトリの規約に合わせて抜粋、再構成、改変している。取り込みの方針は [ADR-040](../adr/ADR-040-import-future-architecture-guidelines.md) に従う。
