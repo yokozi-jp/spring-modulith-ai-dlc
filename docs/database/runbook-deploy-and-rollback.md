@@ -39,7 +39,7 @@ DBを`schema-v5`以前へ切り戻すと012が戻るため、同時に旧版の�
 018から020のchangesetは、商品、注文、明細、決済の表を消し、テナントの列とRLSを持つ形に作り直す破壊的変更で、expand-and-contractに分けられません。
 旧版のアプリケーションはトランザクションにテナントを設定しないため、018から020を適用すると、作り直した表を読むことも書くこともできなくなります。
 018の適用から新版のデプロイが終わるまで、業務のAPIを止めます（[ADR-107](../adr/ADR-107-isolate-tenants-with-rls-set-per-transaction.md)）。
-未完了の`OrderConfirmed`のイベント出版がある環境では、`schema-v9`を適用する前に、それらを完了させるか、[再投入しない出版の片付け](../observability/runbook-event-publication-resubmission.md#再投入しない出版の片付け)の手順で消します（テナントを持たない出版は、再投入しても`FAILED`に残り、上限に達すると`Event publication resubmission exhausted`のERRORになるからです）。
+未完了の`OrderConfirmed`のイベント出版がある環境では、`schema-v9`を適用する前に、それらを完了させるか、[再投入しない出版の片付け](../observability/runbook-event-publication-resubmission.md#再投入しない出版の片付け)の手順で消します（テナントを持たない出版は、再投入しても`FAILED`に残り、上限を超えると`ABANDONED`になって`Event publication resubmission exhausted`のERRORになるからです）。
 DBを`schema-v8`以前へ切り戻すと、rollbackが4つの表を消して`schema-v8`の形で空のまま作り直すため、4つの表の業務データはすべて消えます。
 切り戻すときは同時に旧版のアプリケーションへ戻し、その間は業務のAPIを止めます。
 
