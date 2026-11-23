@@ -34,9 +34,10 @@ Kiroでは`iwe_create`にキーと本文を渡して作成する。
 既存文書の編集、移動、分割には、iweの`rename`、`update`、`extract`、`inline`を使わない。
 これらの操作は対象文書とリンク元をiweの書式で書き直し、一文一改行を段落へ連結したり、frontmatterの`tags`をブロック形式へ変えたりするためである。
 
-MCP では、既存文書を書き換える`iwe_normalize`、`iwe_rename`、`iwe_update`、`iwe_extract`、`iwe_inline`、`iwe_attach`、`iwe_delete`、`iwe_query`を`.kiro/settings/mcp.json`の`disabledTools`で隠してある。
-MCP から使えるのは、読み取りか新規作成だけの`iwe_create`、`iwe_find`、`iwe_retrieve`、`iwe_stats`、`iwe_tree`、`iwe_squash`である。
-iweを上げて増えたツールは、`task okf-check`の`iwe-tools-check`が、`disabledTools`か残す一覧のどちらにも入っていなければ失敗させる。
+MCPでは、既存文書を書き換えうる`iwe_normalize`、`iwe_rename`、`iwe_update`、`iwe_extract`、`iwe_inline`、`iwe_attach`、`iwe_delete`、`iwe_query`を`.kiro/settings/mcp.json`の`disabledTools`で隠してある。
+MCPから使えるのは、読み取りか新規作成だけの`iwe_create`、`iwe_find`、`iwe_retrieve`、`iwe_stats`、`iwe_tree`、`iwe_squash`である。
+iweを上げてツールが増えたとき、`disabledTools`と`tooling/iwe-tools/check.sh`の`kept`のどちらにも入っていなければ、`task okf-check`の`iwe-tools-check`が失敗する。
+Kiro Webは`mcp.json`を読まないため、Agent Configへ`disabledTools`を手で写す（[Kiro Webの開発環境](../local-env-setup/kiro-web.md)）。
 
 既存文書はファイル編集ツールで書き換える。
 文書の移動には`git mv`を使い、リンク元の相対パスを手動で修正する。
@@ -139,6 +140,7 @@ MCPの`update`と`delete`は`disabledTools`で隠れているため、この条�
 
 `iwe normalize`は`docs/`の全文書を機械的に書き換えるため、PreToolUseフック`block-iwe-normalize`で通常実行を拒否する。
 hookの定義`.kiro/hooks/block-iwe-normalize.json`はKiroのCLIとIDEがリポジトリから読み、Webはアップロードした写しを読み、判定本体の`.kiro/hooks/block-iwe-normalize.sh`がCLI経路とMCP経路を検出して`exit 2`を返す。
+MCP経路の検出は、別名のMCPサーバーやcustom agentが`iwe`を上書きした場合の後ろ盾として残す。
 
 意図して`iwe normalize`を実行する場合は、先に`docs/`をコミットする。
 その後、環境変数`IWE_ALLOW_NORMALIZE=1`を設定してKiroを再起動する。

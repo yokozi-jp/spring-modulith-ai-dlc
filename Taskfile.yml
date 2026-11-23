@@ -344,7 +344,7 @@ tasks:
     cmds:
       - bash tooling/iwe-mcp/test.sh
 
-  # iwec の全ツールが、残す読み取り系か mcp.json の disabledTools に入っているかを検査する。iwec が無い端末では飛ばす。
+  # iwec の全ツールが、残す読み取り系か mcp.json の disabledTools に入っているかを検査する。
   iwe-tools-check:
     internal: true
     silent: true
