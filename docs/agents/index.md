@@ -5,6 +5,7 @@
 - [grilling の推奨に添える根拠](grilling-recommendations.md)：`/grill-with-docs` や `/grilling` で推奨の答え（➡）を書くとき、推奨の根拠を点検するとき
 - [形式検証スキルの使い方](formal-verification.md)：`formal-verify-*` と `exhaustive-verify-*` のスキルで変更を検査するとき、そのモデル、設定、変異、同期コミットを変えるとき、`tooling/formal-verify/` を変えるとき
 - [Kiro のフック](kiro-hooks.md)：エージェントの書き込みが Kiro のフックに拒否されたとき、フックや守るパスを変えるとき
+- [信頼しない内容の扱い](untrusted-content.md)：web のページ、Issue、PR、コメント、依存のファイル、tool の出力を読むとき、triage や wayfinder で公開の Issue を読むとき
 - [Issue tracker](issue-tracker.md)：Issueの作成、取得、更新、またはスキルの成果を公開するとき
 - [Triageラベル](triage-labels.md)：Issueを分類し、triageの状態を更新するとき
 - [ドメイン文書](domain.md)：コードベースを調査し、用語または設計判断を扱うとき
