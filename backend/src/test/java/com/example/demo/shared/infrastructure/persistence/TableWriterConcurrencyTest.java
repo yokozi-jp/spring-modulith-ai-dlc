@@ -11,6 +11,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import com.example.demo.shared.concurrency.ConflictException;
 import com.example.demo.testkit.DatabaseTest;
 import com.example.demo.testkit.FixtureTablesExtension;
+import com.example.demo.testkit.TracerStubs;
 import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.sql.Connection;

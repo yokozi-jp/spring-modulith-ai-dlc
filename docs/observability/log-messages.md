@@ -60,6 +60,9 @@ OpenTelemetry semantic conventions に該当する名前がない属性は、業
 ログには trace ID が付くため、問い合わせで受け取った trace ID からログを検索できる。
 独自の request ID やエラー ID を発行しない。
 
+`traceId` は、問い合わせとログの相関だけに使う。
+クライアントが要求の `traceparent` で値を決められるため、認可の判定と冪等性の鍵に使わない（[ADR-117](../adr/ADR-117-add-trace-id-and-omit-instance-in-problem-details.md)）。
+
 ## 出典
 
 - フューチャー株式会社「ログ設計ガイドライン」（[アーキテクチャ設計ガイドライン](https://future-architect.github.io/arch-guidelines/documents/forLog/log_guidelines.html)、commit `e309a6d`）、[CC BY 4.0](https://creativecommons.org/licenses/by/4.0/deed.ja)

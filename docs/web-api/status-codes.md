@@ -16,6 +16,7 @@ tags: [convention, web-api, http, future-arch-guidelines]
 エラー応答の本文はRFC 9457のProblem Detailsとし、`status`を実際のステータスコードと一致させる。
 この契約は[ADR-013](../adr/ADR-013-standardize-http-api-contracts.md)が定める。
 例外は、Tomcatがアプリへ渡す前に拒否する要求で、Problem Detailsにならない（[リクエストサイズの上限](edge-responsibilities.md#アプリより前に拒否される要求)）。
+要求にspanがあるときは、すべてのProblem Detailsに`traceId`拡張でtrace ID（32桁の小文字の16進数）を付け、`instance`は設定しない（[ADR-117](../adr/ADR-117-add-trace-id-and-omit-instance-in-problem-details.md)）。
 `/error`は、`HttpStatus`に定義のない4xxと5xx（499など）も転送元のステータスコードのまま返し、それ以外は500にする。
 このとき`title`は、4xxなら400の文言、5xxなら500の文言にする。
 このため、ログやダッシュボードには下の一覧にないステータスコードが現れることがある。

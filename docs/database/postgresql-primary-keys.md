@@ -131,7 +131,7 @@ UUID v7は作成時刻が値に含まれて見えるため、公開用IDに使�
 
 トレースIDとスパンID（`traceId`、`spanId`）は、行を指す識別子ではないため、この使い分けの対象にしない。
 トレースIDは32桁の16進数であり、UUIDではない。
-Problem Detailsの`traceId`拡張は[ADR-013](../adr/ADR-013-standardize-http-api-contracts.md)が、ログの`traceId`と`spanId`は[ADR-015](../adr/ADR-015-structure-and-protect-observability-data.md)が定める。
+Problem Detailsの`traceId`拡張は[ADR-013](../adr/ADR-013-standardize-http-api-contracts.md)と[ADR-117](../adr/ADR-117-add-trace-id-and-omit-instance-in-problem-details.md)が、ログの`traceId`と`spanId`は[ADR-015](../adr/ADR-015-structure-and-protect-observability-data.md)が定める。
 ログとトレースに行の識別子を載せるときは、`public_id`を使う。
 
 Javaでは、主キーの値をRepositoryの外に返さない。

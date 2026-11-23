@@ -18,6 +18,7 @@ import com.example.demo.shared.infrastructure.persistence.FixtureAggregates.Deta
 import com.example.demo.shared.infrastructure.persistence.FixtureAggregates.Item;
 import com.example.demo.testkit.DatabaseTest;
 import com.example.demo.testkit.FixtureTablesExtension;
+import com.example.demo.testkit.TracerStubs;
 import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.sql.SQLException;
