@@ -20,6 +20,7 @@ description: frontend/ 配下の React と TypeScript のコード、route、API
 
 ## ケースごとに読む文書
 
+- 新しいファイルを作る：`docs/frontend/file-roles/index.md` で役割を選び、その役割の文書のチェックリストで点検する
 - ディレクトリ構成、業務機能の境界、依存方向、共有コードを決める：`docs/frontend/architecture.md`
 - route、loader、状態の置き場所、custom Hook を扱う：`docs/frontend/routing-and-state.md`
 - 業務 API の追加、Orval の設定、OpenAPI の tag と operationId を扱う：`docs/frontend/api-client-orval.md`
