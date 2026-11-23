@@ -43,22 +43,22 @@ public class Tenancy extends SchemaImpl {
     public static final Tenancy TENANCY = new Tenancy();
 
     /**
-     * The table <code>tenancy.m_membership</code>.
+     * 所属
      */
     public final MMembership M_MEMBERSHIP = MMembership.M_MEMBERSHIP;
 
     /**
-     * The table <code>tenancy.m_tenant</code>.
+     * テナント
      */
     public final MTenant M_TENANT = MTenant.M_TENANT;
 
     /**
-     * The table <code>tenancy.m_user</code>.
+     * 利用者
      */
     public final MUser M_USER = MUser.M_USER;
 
     /**
-     * The table <code>tenancy.m_user_identity</code>.
+     * IdP識別
      */
     public final MUserIdentity M_USER_IDENTITY = MUserIdentity.M_USER_IDENTITY;
 

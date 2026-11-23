@@ -40,7 +40,7 @@ public class Payment extends SchemaImpl {
     public static final Payment PAYMENT = new Payment();
 
     /**
-     * The table <code>payment.t_payment</code>.
+     * 決済記録
      */
     public final TPayment T_PAYMENT = TPayment.T_PAYMENT;
 

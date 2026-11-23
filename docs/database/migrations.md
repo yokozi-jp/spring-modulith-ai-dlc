@@ -1,7 +1,7 @@
 ---
 type: Convention
 title: DBマイグレーション規約
-description: Liquibase changesetとスキーマタグの追加規約、マイグレーションの実行経路、CIでのrollback検証を定め、changesetやスキーマタグを追加する、または実行経路や検査方法を変更するときに読む。
+description: Liquibase changesetとスキーマタグの追加規約、表と列の論理名のコメントの書き方、マイグレーションの実行経路、CIでのrollback検証を定め、changesetやスキーマタグを追加する、または実行経路や検査方法を変更するときに読む。
 tags: [convention, database, liquibase, migration]
 ---
 
@@ -56,6 +56,47 @@ changesetのファイルは、次の規則で作ります。
 - ファイル名は`NNN-kebab-case.yaml`とし、`NNN`はゼロ埋めした連番で、番号を重複させません。
   `includeAll`はファイル名の順にchangesetを適用するため、並行するブランチで番号が衝突すると適用順が崩れます。
 
+## 論理名のコメント
+
+業務テーブルと、そのカラムの論理名（[PostgreSQLの命名規約](postgresql-naming.md#論理名のコメント)）は、changesetの`remarks`に書きます。
+LiquibaseはPostgreSQLの`COMMENT ON TABLE`と`COMMENT ON COLUMN`を出します。
+
+表と列を作るchangesetでは、`createTable`の`remarks`に表の論理名を、`createTable`と`addColumn`の各`column`の`remarks`に列の論理名を書きます。
+この2つのrollbackは表と列を消すため、コメントのrollbackを別に書きません。
+
+```yaml
+- createTable:
+    schemaName: ordering
+    tableName: t_order
+    remarks: 注文
+    columns:
+      - column:
+          name: ordered_at
+          type: timestamptz
+          remarks: 注文日時
+```
+
+適用したchangesetは書き換えないため、すでにある表と列には、`setTableRemarks`と`setColumnRemarks`のchangesetを足します。
+この2つには自動のrollbackがないため、`rollback`に空の`remarks`を書きます。
+PostgreSQLは空の文字列のコメントを、コメントの削除として扱います。
+
+```yaml
+changes:
+  - setColumnRemarks:
+      schemaName: ordering
+      tableName: t_order
+      columnName: ordered_at
+      remarks: 注文日時
+rollback:
+  - setColumnRemarks:
+      schemaName: ordering
+      tableName: t_order
+      columnName: ordered_at
+      remarks: ""
+```
+
+コメントを変えたchangesetでも、jOOQのコードを生成し直します（[jOOQコード生成物の管理](jooq-codegen.md)）。
+
 ## CIでの検証
 
 バックエンドCIは使い捨てPostgreSQLに対して`verifyDatabaseMigrations`を実行します。
@@ -72,3 +113,6 @@ Liquibaseの`updateTestingRollback`によって、全changesetを適用し、同
 - Liquibase `tagDatabase`: <https://docs.liquibase.com/reference-guide/change-types/tagDatabase>
 - Liquibase `update-to-tag`: <https://docs.liquibase.com/commands/update/update-to-tag.html>
 - Liquibase `update-testing-rollback`: <https://docs.liquibase.com/commands/update/update-testing-rollback.html>
+- Liquibase `setColumnRemarks`: <https://docs.liquibase.com/reference-guide/change-types/setcolumnremarks>
+- Liquibase `setTableRemarks`: <https://docs.liquibase.com/reference-guide/change-types/settableremarks>
+- PostgreSQL `COMMENT`: <https://www.postgresql.org/docs/current/sql-comment.html>

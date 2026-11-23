@@ -6,8 +6,8 @@
 - [jOOQのSQLの書き方](jooq-usage.md)：infrastructure.persistenceでjOOQのクエリを書くとき、jOOQのSettingsを変えたくなったとき、jOOQかSpring Bootの版を上げるとき（「jOOQの版を上げるとき」）
 - [DB接続情報とロール分離](connections.md)：接続用の環境変数やDBロールを追加、変更するとき、ステージングや本番のDBを準備するとき
 - [DBのデプロイと切り戻し](runbook-deploy-and-rollback.md)：本番マイグレーションのパイプラインを組むとき、DBを切り戻すとき
-- [PostgreSQLのテーブル論理設計](postgresql-logical-design.md)：業務テーブルを新しく設計するとき、区分値、論理削除、多言語データの持ち方を決めるとき
-- [PostgreSQLの命名規約](postgresql-naming.md)：テーブル、カラム、インデックス、シーケンス、外部キー、RLSのポリシーの物理名を決めるとき
+- [PostgreSQLのテーブル論理設計](postgresql-logical-design.md)：業務テーブルを新しく設計するとき、区分値、論理削除、個人データ、多言語データの持ち方を決めるとき
+- [PostgreSQLの命名規約](postgresql-naming.md)：テーブル、カラム、インデックス、シーケンス、外部キー、RLSのポリシーの物理名を決めるとき、表と列の論理名のコメントを書くとき
 - [PostgreSQLのデータ型](postgresql-data-types.md)：カラムのデータ型を選ぶとき、changesetの型をレビューするとき
 - [PostgreSQLの主キー](postgresql-primary-keys.md)：主キーの種類や採番方式を決めるとき、IDをURLやAPIに出すとき
 - [PostgreSQLの制約とインデックス](postgresql-constraints-and-indexes.md)：制約やインデックスを追加するとき、表どうしの参照を足すとき、性能対策でインデックスを見直すとき
