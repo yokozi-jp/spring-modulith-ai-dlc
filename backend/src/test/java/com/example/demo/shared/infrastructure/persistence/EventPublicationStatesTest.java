@@ -21,6 +21,9 @@ class EventPublicationStatesTest {
   /** 出版の時刻。マイクロ秒の精度にする。 */
   private static final Instant T0 = Instant.parse("2026-10-10T01:02:03.123456Z");
 
+  /** 未完了の行のリスナーの ID。 */
+  private static final String LISTENER_ID = "states-test";
+
   /** 出版の行を作る DB。 */
   @Autowired private DSLContext dsl;
 
@@ -29,10 +32,10 @@ class EventPublicationStatesTest {
   void readsLiveAndArchivedRows() {
     final UUID failed =
         ResubmissionTestSupport.insertPublication(
-            dsl, UUID.randomUUID(), "states-test", T0, "FAILED", 2);
+            dsl, UUID.randomUUID(), LISTENER_ID, T0, "FAILED", 2);
     final UUID legacy =
         ResubmissionTestSupport.insertPublication(
-            dsl, UUID.randomUUID(), "states-test", T0, "PUBLISHED", 1);
+            dsl, UUID.randomUUID(), LISTENER_ID, T0, "PUBLISHED", 1);
     dsl.update(EVENT_PUBLICATION)
         .setNull(EVENT_PUBLICATION.STATUS)
         .setNull(EVENT_PUBLICATION.COMPLETION_ATTEMPTS)
@@ -43,8 +46,8 @@ class EventPublicationStatesTest {
 
     assertThat(EventPublicationStates.read(dsl, List.of(failed, legacy, abandoned, deleted)))
         .containsOnly(
-            entry(failed, EventPublication.Status.FAILED, "states-test", 2),
-            entry(legacy, null, "states-test", 0),
+            entry(failed, EventPublication.Status.FAILED, LISTENER_ID, 2),
+            entry(legacy, null, LISTENER_ID, 0),
             entry(abandoned, EventPublication.Status.ABANDONED, "archived-test", 1));
     assertThat(EventPublicationStates.read(dsl, List.of())).isEmpty();
   }
