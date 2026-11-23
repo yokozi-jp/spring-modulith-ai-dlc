@@ -50,7 +50,7 @@ import org.springframework.modulith.test.Scenario;
  * Modulith が読んだ後の再投入を守るようになったので、{@code application.yaml} の注記と ADR-079 の該当の Consequences を消す。 どの行も
  * FAILED で終わるため、{@code CleanGeneratedTablesExtension} の処理中の出版の待ちを止めない。
  *
- * <p>{@code abandonPolicySeesAttemptsReadBeforeResubmission} が失敗したら、{@link
+ * <p>{@code abandonPolicySeesPublicationReadBeforeResubmission} が失敗したら、{@link
  * ResubmissionPolicies#shouldAbandon} が DB から回数を読む理由がなくなったので、渡された出版の回数で判断するよう見直す。
  */
 // 再投入、Staleness Monitor、諦めの判断の振る舞いを同じ文脈で固定し、行を読む補助を持つため、メソッドの数が多い。
@@ -87,7 +87,7 @@ class ResubmissionOptionsLearningTest {
   @Autowired private EventPublicationResubmitterTest.MutableClock clock;
 
   /** Spring Modulith が諦めの判断に渡す出版の回数。 */
-  @Autowired private EventPublicationResubmitterTest.AbandonPolicyRecorder abandonPolicies;
+  @Autowired private AbandonPolicyRecorder abandonPolicies;
 
   @BeforeEach
   void reset() {
@@ -147,24 +147,36 @@ class ResubmissionOptionsLearningTest {
 
   @Test
   @DisplayName(
-      "学習テスト：再投入した出版が失敗したとき、AbandonPolicy に渡る出版の completionAttempts は、再投入で 1 増えた行の値でなく再投入の前に読んだ値である")
-  void abandonPolicySeesAttemptsReadBeforeResubmission(final Scenario scenario) {
+      "学習テスト：AbandonPolicy に渡る出版は、最初の配信では作ったときの PUBLISHED の値、"
+          + "再投入では再投入の前に読んだ FAILED の行の値で、回数と時刻だけでは最初の配信と 1 回目の再投入を見分けられない")
+  void abandonPolicySeesPublicationReadBeforeResubmission(final Scenario scenario) {
     clock.set(T0);
     final UUID publication = failed(scenario);
-    listener.failTimes(1);
-    clock.set(T0.plus(1, ChronoUnit.MICROS));
+    final Instant first = T0.plus(1, ChronoUnit.MICROS);
+    final Instant second = T0.plus(2, ChronoUnit.MICROS);
+    listener.failTimes(2);
 
+    clock.set(first);
     failedEventPublications.resubmit(ResubmissionOptions.defaults());
-
     scenario
         .stimulate(() -> {})
         .andWaitForStateChange(
             () -> FAILED_STATUS.equals(status(publication)) && attempts(publication) == 2,
             Boolean.TRUE::equals)
         .andVerify(done -> {});
+    clock.set(second);
+    failedEventPublications.resubmit(ResubmissionOptions.defaults());
+    scenario
+        .stimulate(() -> {})
+        .andWaitForStateChange(() -> archivedStatus(publication), "ABANDONED"::equals)
+        .andVerify(done -> {});
+
     assertThat(abandonPolicies.seen(publication))
-        .as("最初の配信の失敗と、1 回目の再投入の失敗で渡された completionAttempts")
-        .containsExactly(1, 1);
+        .as("最初の配信、1 回目と 2 回目の再投入の失敗で渡された出版")
+        .containsExactly(
+            new AbandonPolicyRecorder.Seen(EventPublication.Status.PUBLISHED, T0, T0, 1, T0),
+            new AbandonPolicyRecorder.Seen(EventPublication.Status.FAILED, T0, T0, 1, T0),
+            new AbandonPolicyRecorder.Seen(EventPublication.Status.FAILED, first, T0, 2, first));
   }
 
   @ParameterizedTest
@@ -253,6 +265,14 @@ class ResubmissionOptionsLearningTest {
 
   private boolean archived(final UUID publication) {
     return dsl.fetchExists(EVENT_PUBLICATION_ARCHIVE, EVENT_PUBLICATION_ARCHIVE.ID.eq(publication));
+  }
+
+  private @Nullable String archivedStatus(final UUID publication) {
+    return dsl.select(EVENT_PUBLICATION_ARCHIVE.STATUS)
+        .from(EVENT_PUBLICATION_ARCHIVE)
+        .where(EVENT_PUBLICATION_ARCHIVE.ID.eq(publication))
+        .fetchOptional(EVENT_PUBLICATION_ARCHIVE.STATUS)
+        .orElse(null);
   }
 
   private @Nullable String status(final UUID publication) {

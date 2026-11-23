@@ -30,7 +30,7 @@ final class ResubmissionTestSupport {
   /* package */ @Target(ElementType.TYPE)
   @Retention(RetentionPolicy.RUNTIME)
   @CommittedDatabaseTest
-  @Import(EventPublicationResubmitterTest.ProbeConfiguration.class)
+  @Import({EventPublicationResubmitterTest.ProbeConfiguration.class, AbandonPolicyRecorder.class})
   @TestPropertySource(
       properties = {
         "event-publication.resubmission.wait-age=PT5M",

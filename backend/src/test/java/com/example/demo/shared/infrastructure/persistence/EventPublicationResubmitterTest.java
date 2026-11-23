@@ -21,12 +21,9 @@ import java.time.ZoneId;
 import java.time.ZoneOffset;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
-import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -51,9 +48,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Primary;
-import org.springframework.core.Ordered;
-import org.springframework.core.annotation.Order;
-import org.springframework.modulith.events.AbandonPolicy;
 import org.springframework.modulith.events.ApplicationModuleListener;
 import org.springframework.modulith.events.EventPublication;
 import org.springframework.modulith.events.config.StalenessProperties;
@@ -896,31 +890,6 @@ class EventPublicationResubmitterTest {
     @Bean
     /* package */ ProbeListener probeListener() {
       return new ProbeListener();
-    }
-
-    @Bean
-    @Order(Ordered.HIGHEST_PRECEDENCE)
-    /* package */ AbandonPolicyRecorder abandonPolicyRecorder() {
-      return new AbandonPolicyRecorder();
-    }
-  }
-
-  /** Spring Modulith が諦めを判断するときに渡す出版の {@code completionAttempts} を記録し、判断はアプリの方針に任せる。 */
-  /* package */ static final class AbandonPolicyRecorder implements AbandonPolicy {
-
-    /** 出版の ID ごとの、渡された {@code completionAttempts} の並び。 */
-    private final Map<UUID, List<Integer>> attemptsById = new ConcurrentHashMap<>();
-
-    @Override
-    public Decision shouldAbandon(final EventPublication publication) {
-      attemptsById
-          .computeIfAbsent(publication.getIdentifier(), id -> new CopyOnWriteArrayList<>())
-          .add(publication.getCompletionAttempts());
-      return Decision.DEFAULT;
-    }
-
-    /* package */ List<Integer> seen(final UUID publication) {
-      return List.copyOf(attemptsById.getOrDefault(publication, List.of()));
     }
   }
 }
