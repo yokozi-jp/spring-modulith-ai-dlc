@@ -23,7 +23,9 @@ Spring Modulithのイベント出版テーブルのように、フレームワ�
 **論物変換**：業務用語の論理名を物理名へ変換すること。
 
 業務用語を英訳するかローマ字にするかはチームで一つに決め、論理名と物理名の対応を論物変換辞書で管理する。
-辞書の論理名は`GLOSSARY.md`の用語と一致させる。
+辞書の論理名と、表と列の[論理名のコメント](#論理名のコメント)は、`GLOSSARY.md`の用語と一致させる。
+`GLOSSARY.md`が定める用語はテナント、利用者、所属、役割だけなので、この規則が効くのは、この4つを含む論理名だけである。
+コメントと`GLOSSARY.md`の一致は、changesetのレビューで確かめる。
 辞書と`GLOSSARY.md`の一致の機械検査は、辞書がまだないため行わず、辞書を作るときに要否を決める。
 
 - 辞書には、それ以上分解できない単語から登録する。
@@ -37,16 +39,18 @@ PostgreSQLの識別子は63バイトを超えると切り詰められる。
 
 業務テーブルと、そのすべてのカラム（共通カラムを含む）には、日本語の論理名をコメント（`COMMENT ON`）で付ける。
 表と列を作るchangesetで、最初から書く。
+コメントには、最低限、論理名（例：`注文`、`注文日時`）を書き、説明を書き足すことは求めない。
 
-- コメントには、最低限、論理名（例：`注文`、`注文日時`）を書く。説明を書き足すことは求めない。
-- 論理名は`GLOSSARY.md`の用語にそろえる。
-- 論物変換辞書を作るときは、辞書の論理名とコメントを一致させる。
+パーティションの子テーブルと、そのカラムには、コメントを付けなくてよい。
+PostgreSQLは、`PARTITION OF`で作った子にも、`ATTACH PARTITION`で付けた子にも、親のコメントを写さない。
+論理名は、親のパーティションテーブルと、そのカラムに付ける。
 
 コメントはchangesetの`remarks`に書く。
 書き方は[DBマイグレーション規約](migrations.md#論理名のコメント)に示す。
 jOOQのコード生成は、コメントを生成物のJavadocと`getComment()`に写す。
 
 付け忘れは、スキーマ検査の規則N12が止める（[バックエンドのアーキテクチャテスト](../backend/architecture-tests.md#db)）。
+N12は、パーティションの子テーブルとそのカラムを判定しない。
 
 ## 使わない名前
 
@@ -122,5 +126,6 @@ IDENTITY列が暗黙に作るシーケンスは、PostgreSQLの自動命名に�
 ## 出典
 
 - フューチャー株式会社「PostgreSQL設計ガイドライン」（[アーキテクチャ設計ガイドライン](https://future-architect.github.io/arch-guidelines/documents/forDB/postgresql_guidelines.html)、commit `e309a6d`）、[CC BY 4.0](https://creativecommons.org/licenses/by/4.0/deed.ja)
-- フューチャー株式会社「データガバナンス設計ガイドライン」（[アーキテクチャ設計ガイドライン](https://future-architect.github.io/arch-guidelines/documents/forDataGovernance/data_governance_guidelines.html)、commit `e309a6d`）、[CC BY 4.0](https://creativecommons.org/licenses/by/4.0/deed.ja)。「論理名のコメント」の節が、`description`を最初から必ず書き、最低限は日本語の名前にする推奨を取り込んでいる。
+- フューチャー株式会社「データガバナンス設計ガイドライン」（[アーキテクチャ設計ガイドライン](https://future-architect.github.io/arch-guidelines/documents/forDataGovernance/data_governance_guidelines.html)、commit `e309a6d`）、[CC BY 4.0](https://creativecommons.org/licenses/by/4.0/deed.ja)
+  「論理名のコメント」の節は、このガイドラインの、`description`を最初から必ず書き、最低限は日本語の名前にする推奨を取り込んでいる。
 - このリポジトリの規約に合わせて抜粋、再構成、改変している。取り込みの方針は [ADR-040](../adr/ADR-040-import-future-architecture-guidelines.md) に従う。

@@ -416,7 +416,10 @@ DBの規約のほかの検査は`backend/src/test/java/com/example/demo/persiste
 表と列の論理名の規則は次のとおりである。
 根拠は[PostgreSQLの命名規約](../database/postgresql-naming.md#論理名のコメント)にある。
 
-- N12：カタログの業務テーブルと、そのカラムに、空でないコメントがある。ビューは対象外にする。違反のメッセージは、`createTable`と`addColumn`の`remarks`と、`setTableRemarks`と`setColumnRemarks`のchangesetの直し方を示す。
+- N12：カタログの業務テーブルと、そのカラムに、空白だけでないコメントがある。
+  ビューと、パーティションの子テーブル（`relispartition`）とそのカラムは対象外にする。
+  PostgreSQLは、親のパーティションテーブルのコメントを子へ写さないためである。
+  違反のメッセージは、表と列のそれぞれの直し方を示す。
 
 スキーマ検査の規則を足すときは、判定に要る行を`CatalogSnapshot`に足して`SchemaCatalog.read`で埋め、判定する関数を`SchemaConventions.check`から呼ぶ。
 

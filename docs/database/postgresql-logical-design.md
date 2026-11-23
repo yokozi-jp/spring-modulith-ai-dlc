@@ -107,11 +107,17 @@ Spring Modulithのイベント出版テーブルのように、フレームワ�
 
 個人データのカラムは、業務の処理に要るものだけを作る。
 
-- IdPが持つ利用者の属性（氏名、メールアドレスなど）は、業務の処理に要るときだけ業務テーブルへ写す。画面に表示するためだけには写さない。
-- 個人データを含む表は、保持期限と同じ一覧に書く（[設計書と正本の分担](../writing/design-doc-sources-of-truth.md#正本にない情報)）。
+- IdPが持つ利用者の属性（氏名、メールアドレスなど）は、業務の処理に要るときだけ業務テーブルへ写す。
+  画面に表示するためだけには写さない。
+- 表が個人データを含むかどうかは、テーブルごとの保持期限の一覧に書く（[設計書と正本の分担](../writing/design-doc-sources-of-truth.md#正本にない情報)）。
+  この一覧はまだなく、[#596](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/596)で作る。
 
 カラムが個人データかどうかは機械で判定できないため、changesetのレビューで確かめる。
 取り込む範囲は[ADR-040](../adr/ADR-040-import-future-architecture-guidelines.md)に示す。
+
+`tenancy.m_user_identity`の`issuer_url`と`subject_code`（IdPの識別）は、個人データに当たる。
+2つの組はIdPの1つのアカウントを指し、IdPの記録と照らせば利用者の個人を特定できる。
+ログインで利用者を引くために要るので、業務の処理に要るカラムとして持つ。
 
 ## 多言語データ
 
@@ -124,5 +130,6 @@ APIとSPAの文言のローカライズは[ADR-016](../adr/ADR-016-localize-api-
 ## 出典
 
 - フューチャー株式会社「PostgreSQL設計ガイドライン」（[アーキテクチャ設計ガイドライン](https://future-architect.github.io/arch-guidelines/documents/forDB/postgresql_guidelines.html)、commit `e309a6d`）、[CC BY 4.0](https://creativecommons.org/licenses/by/4.0/deed.ja)
-- フューチャー株式会社「データガバナンス設計ガイドライン」（[アーキテクチャ設計ガイドライン](https://future-architect.github.io/arch-guidelines/documents/forDataGovernance/data_governance_guidelines.html)、commit `e309a6d`）、[CC BY 4.0](https://creativecommons.org/licenses/by/4.0/deed.ja)。「個人データ」の節が、特定を防ぐ最も確実な方法は最初から持たないことである、という記述を、DBに保存するカラムへ広げている。
+- フューチャー株式会社「データガバナンス設計ガイドライン」（[アーキテクチャ設計ガイドライン](https://future-architect.github.io/arch-guidelines/documents/forDataGovernance/data_governance_guidelines.html)、commit `e309a6d`）、[CC BY 4.0](https://creativecommons.org/licenses/by/4.0/deed.ja)
+  「個人データ」の節は、このガイドラインの、特定を防ぐ最も確実な方法は最初から持たないことである、という記述を、DBに保存するカラムへ広げている。
 - このリポジトリの規約に合わせて抜粋、再構成、改変している。取り込みの方針は [ADR-040](../adr/ADR-040-import-future-architecture-guidelines.md) に従う。
