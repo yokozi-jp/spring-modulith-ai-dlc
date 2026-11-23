@@ -228,7 +228,7 @@ describe("注文の作成の画面", () => {
 
     await user.type(await screen.findByLabelText("客先注文番号"), "C-009");
     await user.tab();
-    expect(document.activeElement).toBe(screen.getByLabelText("商品"));
+    expect(screen.getByLabelText("商品")).toHaveFocus();
     await user.selectOptions(screen.getByLabelText("商品"), "ノート");
     await user.type(screen.getByLabelText("数量"), "{Enter}");
 

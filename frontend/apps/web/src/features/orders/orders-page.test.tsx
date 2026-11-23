@@ -59,7 +59,7 @@ describe("注文の一覧の画面", () => {
     all.focus();
 
     await user.tab();
-    expect(document.activeElement).toBe(screen.getByRole("link", { name: "下書き" }));
+    expect(screen.getByRole("link", { name: "下書き" })).toHaveFocus();
     await user.keyboard("{Enter}");
 
     await waitFor(() => {
