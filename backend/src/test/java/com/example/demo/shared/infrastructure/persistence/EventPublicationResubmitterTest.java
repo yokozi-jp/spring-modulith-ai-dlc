@@ -111,6 +111,9 @@ class EventPublicationResubmitterTest {
   /** 再投入の結果の Counter の名前。 */
   private static final String OUTCOMES = "event.publication.resubmission.outcomes";
 
+  /** 上限を超えた FAILED の出版の ERROR の本文。 */
+  private static final String EXCEEDED = "Failed event publications exceed the resubmission limit";
+
   /** 完了の待ちの説明。 */
   private static final String COMPLETED = "完了した出版";
 
@@ -280,7 +283,8 @@ class EventPublicationResubmitterTest {
   }
 
   @Test
-  @DisplayName("失敗を記録せずに上限を超えて FAILED に戻った出版（最後の試行の途中で落ちた出版）は、待ち時間を過ぎても再投入しない")
+  @DisplayName(
+      "失敗を記録せずに上限を超えて FAILED に戻った出版（最後の試行の途中で落ちた出版）は、待ち時間を過ぎても再投入せず、ロックを取った回ごとに件数の ERROR を 1 つ出す")
   void failedPublicationPastLimitWithoutRecordedFailureIsNotResubmitted() {
     // テストの上限は 2 回。2 回目の再投入の途中で落ち、Staleness Monitor が FAILED に戻した行にあたる。
     final UUID publication = insertFailed(3, T0);
@@ -290,6 +294,7 @@ class EventPublicationResubmitterTest {
         .where(EVENT_PUBLICATION.ID.eq(publication))
         .execute();
     clock.set(T0.plus(Duration.ofDays(1)));
+    final int errorsBefore = capturedLogRecords.withBody(EXCEEDED).size();
 
     runJob();
 
@@ -300,6 +305,15 @@ class EventPublicationResubmitterTest {
                 .fetchOptional(Records.mapping(Row::new)))
         .as("上限を超えた FAILED の出版の未完了の行")
         .contains(new Row(FAILED, 3));
+    final List<LogRecordData> errors = capturedLogRecords.withBody(EXCEEDED);
+    assertThat(errors).as("上限を超えた FAILED の出版の ERROR").hasSize(errorsBefore + 1);
+    assertThat(errors.getLast().getSeverity()).isEqualTo(Severity.ERROR);
+    assertThat(
+            errors
+                .getLast()
+                .getAttributes()
+                .get(AttributeKey.longKey("event_publication.exhausted.count")))
+        .isEqualTo(1L);
   }
 
   @Test

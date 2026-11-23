@@ -141,6 +141,11 @@ class ResubmissionPolicies {
         : "";
   }
 
+  /** 出版の再投入の回数が上限に達し、もう再投入しないか。 */
+  /* package */ boolean isExhausted(final EventPublication publication) {
+    return abandon.exceeded(publication.getCompletionAttempts());
+  }
+
   /**
    * 出版の再投入の回数が上限に達しておらず、最後の試行から次の待ち時間を過ぎたか。
    *
@@ -149,7 +154,7 @@ class ResubmissionPolicies {
    */
   /* package */ boolean isDue(final EventPublication publication, final Instant now) {
     final int attempts = publication.getCompletionAttempts();
-    return !abandon.exceeded(attempts)
+    return !isExhausted(publication)
         && publication
             .getLastPublicationDate()
             .plus(policyOf(listenerIdOf(publication)).waitBefore(properties.waitAge(), attempts))

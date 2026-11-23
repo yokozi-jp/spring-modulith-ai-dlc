@@ -14,6 +14,7 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 import lombok.extern.slf4j.Slf4j;
@@ -177,16 +178,28 @@ class EventPublicationResubmitter {
     // 実行が固まっても lockAtMostFor でロックは切れるため、KeepAliveLockProvider で延長しない。
     // 手での入口（EventPublicationResubmitOnce）は完了を待つ設計なので、この予算を適用しない。
     final Duration budget = properties.lockAtMostFor().dividedBy(2);
+    final AtomicInteger exhausted = new AtomicInteger();
     failedEventPublications.resubmit(
         ResubmissionOptions.defaults()
             .withBatchSize(Integer.MAX_VALUE)
-            .withFilter(publication ->
-                Duration.between(now, Instant.now(clock)).compareTo(budget) <= 0
-                    && policies.isDue(publication, now)
-                    && candidates.size() < properties.maxPerRun()
-                    && candidates.put(
-                            publication.getIdentifier(), publication.getCompletionAttempts())
-                        == null));
+            .withFilter(publication -> {
+              if (policies.isExhausted(publication)) {
+                exhausted.incrementAndGet();
+                return false;
+              }
+              return Duration.between(now, Instant.now(clock)).compareTo(budget) <= 0
+                  && policies.isDue(publication, now)
+                  && candidates.size() < properties.maxPerRun()
+                  && candidates.put(
+                          publication.getIdentifier(), publication.getCompletionAttempts())
+                      == null;
+            }));
+    if (exhausted.get() > 0) {
+      // 失敗を記録しない試行で上限を超えた出版は ABANDONED にならず、ERROR も出ないため、ロックを取った回ごとに件数で知らせる。
+      log.atError()
+          .addKeyValue("event_publication.exhausted.count", exhausted.get())
+          .log("Failed event publications exceed the resubmission limit");
+    }
     return tracker.track(candidates, now);
   }
 

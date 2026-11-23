@@ -1335,8 +1335,9 @@ tasks:
           )
           and any(
             .resourceLogs[]?.scopeLogs[]?.logRecords[]?;
-            ([.attributes[]?.key] | sort) == ["event_publication.resubmitted.count"]
+            ([.attributes[]?.key] | sort) == ["event_publication.exhausted.count", "event_publication.resubmitted.count"]
               and (first(.attributes[]? | select(.key == "event_publication.resubmitted.count") | .value.intValue) == "3")
+              and (first(.attributes[]? | select(.key == "event_publication.exhausted.count") | .value.intValue) == "1")
           )
           and any(
             .resourceLogs[]?.scopeLogs[]?.logRecords[]?;
