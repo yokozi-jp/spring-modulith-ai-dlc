@@ -23,7 +23,7 @@ import javax.annotation.processing.Generated;
 public class Tables {
 
     /**
-     * The table <code>payment.t_payment</code>.
+     * 決済記録
      */
     public static final TPayment T_PAYMENT = TPayment.T_PAYMENT;
 }

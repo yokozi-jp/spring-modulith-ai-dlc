@@ -24,12 +24,12 @@ import javax.annotation.processing.Generated;
 public class Tables {
 
     /**
-     * The table <code>ordering.t_order</code>.
+     * 注文
      */
     public static final TOrder T_ORDER = TOrder.T_ORDER;
 
     /**
-     * The table <code>ordering.t_order_line</code>.
+     * 注文明細
      */
     public static final TOrderLine T_ORDER_LINE = TOrderLine.T_ORDER_LINE;
 }
