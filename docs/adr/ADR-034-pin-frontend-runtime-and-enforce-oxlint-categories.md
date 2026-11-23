@@ -109,7 +109,7 @@ feature 間の import は、動的な規則が要るため jsPlugin の `feature
 
 - 新しい依存や書き方が、これまで警告だった規則でエラーになり、修正が必要になる場合がある。
 - Oxlint の更新で規則やカテゴリの内容が変わると、例外リストの見直しが必要になる。
-- Node.js の版更新は `.node-version`、CI、Vite+ の三者を揃える手順を伴う。
+- Node.js の版更新は `.node-version` を書き換えるだけでよい。CI の workflow は `node-version-file` で、Vite+ は `.node-version` で、同じ値を読む。
 - import と global の制限は override の並び順と option の置き換えに依存し、override を並べ替えるときは fixture のテストで組合せを確かめる必要がある。
 - テストファイルの override は層の import 制限も外すため、テストにも層の制限が要るようになったら dependency-cruiser への移行を判断する必要がある。
 

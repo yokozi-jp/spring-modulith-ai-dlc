@@ -38,7 +38,7 @@ Accepted
 - 失敗と業務上の拒否は、冪等性キーに一致する注文ごとのスタブで、共有のスタブより優先度を高くして作る。
   E2E は管理 API（`POST /__admin/mappings`、`DELETE /__admin/mappings/{id}`）で、結合テストは Java の DSL で、実行中に足して取り除く。
 - Client の単体テストは JDK の `HttpServer` のままにする。
-  WireMock（`org.wiremock:wiremock-standalone` 3.13.2、`testImplementation` だけ）は、リトライとサーキットブレーカーを確かめる Spring の結合テストと E2E に使う。
+  WireMock（`org.wiremock:wiremock-standalone`、`testImplementation` だけ）は、リトライとサーキットブレーカーを確かめる Spring の結合テストと E2E に使う。
 - 接続先の URL に既定値を置かず、未設定なら起動に失敗させる。
   WireMock の URL は env の例と compose ファイルにだけ書き、本番が既定値のまま WireMock を向くことを防ぐ。
   明示した誤った値（平文の `http://` や誤ったホスト）は起動の時点で止まらず、デプロイの設定のレビューに依存する。
@@ -100,8 +100,10 @@ Accepted
   compose-test の 8082 は 5433、6380、8081 と同じく compose-test だけが使うため、`task e2e` の開始時の空きの確認には足さない。
 - JDK の `HttpClient` が平文の HTTP で HTTP/2 への upgrade（h2c）を試み、WireMock（Jetty）では本文付きの POST が切れた。
   偽物の側で compose の `--disable-http2-plain` と結合テストの `http2PlainDisabled(true)` を指定する必要がある。
-- テストの依存の jar の版とイメージのタグを、人の手で同じに保つ必要がある。
-  Dependabot は両者を別々の Pull Request で更新する。
+- テストの依存の jar の版は `backend/build.gradle` が `docker/compose-test.yml` のイメージの tag から読むため、jar とそのイメージは手で同じに保つ必要がない。
+  `docker/compose.yml` のイメージの tag は別に書かれ、`docker/compose-test.yml` と同じにする必要がある。
+  Dependabot は minor と patch を 1 つの Pull Request にまとめるが、major は別々に更新し、一致を検査しない。
+- `backend/Dockerfile` のビルドの文脈は `backend/` だけで、`docker/compose-test.yml` が無い。そのため `build.gradle` は、ファイルが無いときは jar を足さない。
 - `@RegisterExtension` の `WireMockExtension` は `@DynamicPropertySource` と組み合わせられず、static の初期化でサーバを起動する。
   Spring のコンテキストが URL を読む時点で、拡張がサーバを起動していないためである。
 - `PAYMENT_GATEWAY_BASE_URL` を持たない古い `.env.test` では、Spring のテストが `${PAYMENT_GATEWAY_BASE_URL}` のプレースホルダーを解決できず失敗する。

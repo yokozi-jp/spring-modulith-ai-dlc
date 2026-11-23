@@ -112,7 +112,7 @@ services:
 外部システムは、本番のコードで偽らず、ローカルとテストの compose に置く WireMock で偽る（[ADR-072](../adr/ADR-072-fake-external-systems-with-wiremock.md)）。
 例は `docker/compose.yml` と `docker/compose-test.yml` の `wiremock` である。
 
-- WireMock のイメージはタグと digest で固定し、テストの依存の `org.wiremock:wiremock-standalone` と同じ版にする。
+- WireMock のイメージはタグと digest で固定し、テストの依存の `org.wiremock:wiremock-standalone` の版の正本にする。jar の版は `backend/build.gradle` が `docker/compose-test.yml` のイメージの tag から読む。`docker/compose.yml` のイメージは手で `docker/compose-test.yml` と同じにする。
 - `command` に `--disable-http2-plain` を付ける。
   JDK の `HttpClient` は平文の HTTP で HTTP/2 への upgrade（h2c）を試み、WireMock（Jetty）では本文付きの POST が切れるためである。
 - 成功のスタブは `docker/wiremock/mappings/` に置き、`/home/wiremock/mappings` へ `:ro` でマウントする。
