@@ -25,11 +25,12 @@ Proposed
 [#340](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/340) の調査で、`yokozi-jp/agent-software-factory` の ADR 0026 が、モジュールが依存してよいモジュールをモジュール自身が宣言する形を取ると分かった。
 こちらでは同じ役割を `@ApplicationModule(allowedDependencies = ...)` で持てる。
 
-`@Modulithic(sharedModules = "shared")` で暗黙に許可先に入るのは `shared` のルートだけで、名前付きインタフェースは入らない（Spring Modulith 2.1.2 の `ApplicationModule.java:975-980`）。
+`@Modulithic(sharedModules = "shared")` で暗黙に許可先に入るのは `shared` のルートだけで、名前付きインタフェースは入らない（Spring Modulith 2.1.2 の `ApplicationModule#getAllowedDependencies` と `AllowedDependency.to`）。
 
 ## Decision
 
 各モジュールのルートの `package-info.java` に `@ApplicationModule(allowedDependencies = ...)` を書き、依存先をモジュール自身が宣言する。
+現在の値の正本は各 `package-info.java` で、次の表は決定時のものである。
 `@NamedInterface` は機能モジュールに付けない。
 
 | モジュール | `allowedDependencies`                       |
@@ -63,11 +64,13 @@ Spring Modulith には宣言のないモジュールを違反にする設定が�
 ### Negative
 
 - 新しいモジュールは `package-info.java` に宣言を書く手間が増える。
+- 宣言を広げる変更（たとえば `payment` に `"product"` を足す）は、どのテストも失敗にしない。レビューだけが止める。
 - `shared` の名前付きインタフェースを使うモジュールは、`"shared :: *"` を書き忘れると `verify()` が失敗する。
 
 ### Neutral
 
 - 宣言の必須を確かめるテストは手書きで残る。
+- 宣言は `spring.modulith.runtime.verification-enabled` により、起動時の検証でも効く。
 - `sharedModules` の暗黙の許可の範囲は Spring Modulith の版で変わりうる。
 
 ## Alternatives Considered

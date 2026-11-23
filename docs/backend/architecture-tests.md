@@ -38,7 +38,8 @@ backend/src/test/java/com/example/demo/architecture/
 
 `ApplicationModuleArchitectureTest`はSpring Modulithの`ApplicationModules.verify()`を使い、モジュール間の循環、内部パッケージ参照、`allowedDependencies`にない依存を検出する。
 依存してよいモジュールは各モジュールの`package-info.java`で宣言する（[ADR-118](../adr/ADR-118-declare-module-dependencies-with-allowed-dependencies.md)）。
-`verify()`は宣言のないモジュールの依存先を確かめず、宣言のないことを違反にする設定もないため、OPEN以外のすべてのモジュールが`allowedDependencies`を宣言していることを同じクラスのテストが確かめる。
+同じクラスのテストが、OPEN以外のすべてのモジュールが`allowedDependencies`を宣言していることを確かめる。
+手書きにした理由はテストのJavadocに書く。
 モジュール構造の決定は[ADR-001](../adr/ADR-001-adopt-spring-modulith-modular-monolith.md)を参照する。
 jOOQの生成物の`com.example.demo.jooq`はOPENのモジュールであり、`verify()`は生成型への依存を内部の型への依存として扱わない。
 `ApplicationModuleArchitectureTest`がこれを確かめる。

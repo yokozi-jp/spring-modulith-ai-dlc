@@ -15,7 +15,10 @@ tags: [runbook, backend, spring-modulith]
 
 新しい機能を追加するときは、次の順序でクラスを置く。
 
-1. Spring Modulith の機能モジュール名を決め、`com.example.demo.<feature>` を作る。ルートの `package-info.java` に、依存してよいモジュールを `@ApplicationModule(allowedDependencies = ...)` で宣言する（書かないと `ApplicationModuleArchitectureTest` が失敗する。書き方は [バックエンドアーキテクチャ](architecture.md) の「モジュール間の連携」）。
+1. Spring Modulith の機能モジュール名を決め、`com.example.demo.<feature>` を作る。
+   ルートの `package-info.java` に、依存してよいモジュールを `@ApplicationModule(allowedDependencies = ...)` で宣言する。
+   書かないと `ApplicationModuleArchitectureTest` が失敗する。
+   書き方は [バックエンドアーキテクチャ](architecture.md) の「モジュール間の連携」に従う。
 2. モジュールルートに `<Feature>Queries`、参照の結果と検索条件の record、他モジュールと自モジュールの後続の処理へ通知するイベントの record を置く。
 3. `domain.model` に集約、Entity、値オブジェクト、`<Aggregate>Repository`、外部システムのインタフェースを置く。
 4. 集約にも値オブジェクトにも置けない業務規則を、`domain.service` の Domain Service に置く。
