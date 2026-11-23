@@ -1,0 +1,129 @@
+package com.example.demo.xexp;
+
+import java.lang.annotation.ElementType;
+import java.lang.annotation.Retention;
+import java.lang.annotation.RetentionPolicy;
+import java.lang.annotation.Target;
+import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.List;
+import org.springframework.context.annotation.Bean;
+import org.springframework.boot.test.context.TestConfiguration;
+import org.springframework.core.annotation.AliasFor;
+import org.springframework.modulith.events.ApplicationModuleListener;
+import org.springframework.scheduling.annotation.Async;
+import org.springframework.transaction.annotation.Propagation;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.event.TransactionalEventListener;
+
+/** 実験用。業務モジュールの外の package に置き、テナントの束縛を要らなくして、executor の選択だけを確かめる。 */
+public final class ComposedListeners {
+
+  private ComposedListeners() {}
+
+  /** V1：{@code @ApplicationModuleListener} の 3 つの注釈を自分で並べ、{@code @Async} だけ executor を指す。 */
+  @Retention(RetentionPolicy.RUNTIME)
+  @Target(ElementType.METHOD)
+  @Async("slowListenerExecutor")
+  @Transactional(propagation = Propagation.REQUIRES_NEW)
+  @TransactionalEventListener
+  public @interface ExternalModuleListenerV1 {}
+
+  /** V2：{@code @ApplicationModuleListener} を meta 注釈にし、{@code @Async} の value を別名で上書きする。 */
+  @Retention(RetentionPolicy.RUNTIME)
+  @Target(ElementType.METHOD)
+  @ApplicationModuleListener
+  public @interface ExternalModuleListenerV2 {
+
+    /** 上書きする {@code @Async} の executor 名。 */
+    @AliasFor(annotation = Async.class, attribute = "value")
+    String executor() default "slowListenerExecutor";
+  }
+
+  public record V1Event(String id) {}
+
+  public record V2Event(String id) {}
+
+  public record SlowComposedEvent(String id) {}
+
+  /** 受けたスレッドの名前を記録する。 */
+  public static final class Seen {
+    public final List<String> threads = new CopyOnWriteArrayList<>();
+  }
+
+  @TestConfiguration(proxyBeanMethods = false)
+  public static class Config {
+    @Bean
+    Seen seen() {
+      return new Seen();
+    }
+
+    @Bean
+    ComposedV1Listener composedV1Listener(final Seen seen) {
+      return new ComposedV1Listener(seen);
+    }
+
+    @Bean
+    ComposedV2Listener composedV2Listener(final Seen seen) {
+      return new ComposedV2Listener(seen);
+    }
+
+    @Bean
+    ComposedSlowListener composedSlowListener(final Seen seen, final org.jooq.DSLContext dsl) {
+      return new ComposedSlowListener(seen, dsl);
+    }
+
+    @Bean(name = "slowListenerExecutor")
+    org.springframework.core.task.SimpleAsyncTaskExecutor slowListenerExecutor(
+        final org.springframework.boot.task.SimpleAsyncTaskExecutorBuilder builder) {
+      return builder.threadNamePrefix("slow-listener-").concurrencyLimit(2).build();
+    }
+  }
+
+  public static class ComposedV1Listener {
+    private final Seen seen;
+
+    public ComposedV1Listener(final Seen seen) {
+      this.seen = seen;
+    }
+
+    @ExternalModuleListenerV1
+    public void on(final V1Event event) {
+      seen.threads.add("V1:" + Thread.currentThread().getName());
+    }
+  }
+
+  public static class ComposedV2Listener {
+    private final Seen seen;
+
+    public ComposedV2Listener(final Seen seen) {
+      this.seen = seen;
+    }
+
+    @ExternalModuleListenerV2
+    public void on(final V2Event event) {
+      seen.threads.add("V2:" + Thread.currentThread().getName());
+    }
+  }
+
+  /** 遅い外部呼び出しの代わりに、トランザクションの中で眠る。専用の executor で動く。 */
+  public static class ComposedSlowListener {
+    private final Seen seen;
+    private final org.jooq.DSLContext dsl;
+
+    public ComposedSlowListener(final Seen seen, final org.jooq.DSLContext dsl) {
+      this.seen = seen;
+      this.dsl = dsl;
+    }
+
+    @ExternalModuleListenerV2
+    public void on(final SlowComposedEvent event) {
+      seen.threads.add("slow:" + event.id() + ":" + Thread.currentThread().getName());
+      dsl.selectOne().fetch();
+      try {
+        Thread.sleep(1500);
+      } catch (InterruptedException e) {
+        Thread.currentThread().interrupt();
+      }
+    }
+  }
+}

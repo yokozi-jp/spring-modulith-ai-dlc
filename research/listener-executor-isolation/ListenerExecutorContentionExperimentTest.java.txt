@@ -1,0 +1,178 @@
+package com.example.demo.payment.application;
+
+import static com.example.demo.payment.application.ExperimentSupport.SLOW_MS;
+import static com.example.demo.payment.application.ExperimentSupport.awaitTrue;
+import static com.example.demo.payment.application.ExperimentSupport.hikariActive;
+import static com.example.demo.payment.application.ExperimentSupport.publish;
+import static com.example.demo.payment.application.ExperimentSupport.report;
+import static com.example.demo.payment.application.ExperimentSupport.sessionStates;
+
+import com.example.demo.payment.application.ExperimentSupport.FastEvent;
+import com.example.demo.payment.application.ExperimentSupport.Recorder;
+import com.example.demo.payment.application.ExperimentSupport.SlowEvent;
+import com.example.demo.payment.application.ExperimentSupport.SplitEvent;
+import com.example.demo.shared.tenant.TenantContext;
+import com.example.demo.testkit.AsTenant;
+import com.example.demo.testkit.BindTestTenantExtension;
+import com.example.demo.testkit.CleanGeneratedTablesExtension;
+import com.example.demo.testkit.SharedTestConfiguration;
+import java.util.Arrays;
+import java.util.UUID;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.atomic.AtomicLong;
+import javax.sql.DataSource;
+import org.jooq.DSLContext;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.context.annotation.Import;
+import org.springframework.core.task.SimpleAsyncTaskExecutor;
+import org.springframework.core.task.TaskExecutor;
+import org.springframework.modulith.test.ApplicationModuleTest;
+import org.springframework.modulith.test.ApplicationModuleTest.BootstrapMode;
+import org.springframework.transaction.PlatformTransactionManager;
+
+/** C1：今の設定（applicationTaskExecutor の concurrency-limit が 2）で、遅い Listener と DB だけの Listener が枠を取り合うことを測る。 */
+@ApplicationModuleTest(mode = BootstrapMode.ALL_DEPENDENCIES)
+@Import({SharedTestConfiguration.class, ExperimentListeners.Config.class})
+@ExtendWith({CleanGeneratedTablesExtension.class, BindTestTenantExtension.class})
+class ListenerExecutorContentionExperimentTest {
+
+  private static final String R = "C1";
+
+  @Autowired private PlatformTransactionManager tm;
+  @Autowired private ApplicationEventPublisher publisher;
+  @Autowired private DSLContext dsl;
+  @Autowired private Recorder recorder;
+  @Autowired private DataSource dataSource;
+
+  @Autowired
+  @Qualifier("applicationTaskExecutor")
+  private TaskExecutor executor;
+
+  @BeforeEach
+  void reset() {
+    awaitTrue(() -> recorder.running.get() == 0, 10_000);
+    ExperimentSupport.sleep(300);
+    recorder.reset();
+  }
+
+  @AfterEach
+  void drain() {
+    awaitTrue(() -> recorder.running.get() == 0, 15_000);
+    ExperimentSupport.sleep(500);
+  }
+
+  private static String id() {
+    return UUID.randomUUID().toString();
+  }
+
+  @Test
+  void a_slowListenersHoldBothSlots_fastEventPublisherWaits() {
+    final String limit =
+        executor instanceof SimpleAsyncTaskExecutor s ? String.valueOf(s.getConcurrencyLimit()) : "?";
+    report(R, "executor=" + executor.getClass().getSimpleName() + " concurrencyLimit=" + limit);
+    final String s1 = id();
+    final String s2 = id();
+    final String f1 = id();
+    final long p1 = publish(tm, publisher, new SlowEvent(s1, AsTenant.TENANT));
+    final long p2 = publish(tm, publisher, new SlowEvent(s2, AsTenant.TENANT));
+    awaitTrue(() -> recorder.running.get() == 2, 5_000);
+    final int active = hikariActive(dataSource);
+    final var states = sessionStates(dsl);
+    final long t0 = System.nanoTime();
+    final long publishFastMs = publish(tm, publisher, new FastEvent(f1, AsTenant.TENANT));
+    awaitTrue(() -> recorder.startedAtNanos.containsKey("fast:" + f1), 10_000);
+    final long fastStartMs = (recorder.startedAtNanos.get("fast:" + f1) - t0) / 1_000_000;
+    report(
+        R,
+        "a: publish(slow1)=%dms publish(slow2)=%dms hikariActiveWhile2SlowRunning=%d sessionStates=%s"
+            .formatted(p1, p2, active, states));
+    report(
+        R,
+        "a: publish(fast) returned after %dms (SLOW_MS=%d); fast listener started %dms after the publish began; maxRunning=%d"
+            .formatted(publishFastMs, SLOW_MS, fastStartMs, recorder.maxRunning.get()));
+  }
+
+  @Test
+  void b_blockedPublisherKeepsItsConnection() throws Exception {
+    final CountDownLatch release = new CountDownLatch(1);
+    for (int i = 0; i < 2; i++) {
+      executor.execute(
+          () -> {
+            try {
+              release.await();
+            } catch (InterruptedException e) {
+              Thread.currentThread().interrupt();
+            }
+          });
+    }
+    final int activeBefore = hikariActive(dataSource);
+    final AtomicLong publishMs = new AtomicLong();
+    final String f = id();
+    final Thread publisherThread =
+        Thread.ofPlatform()
+            .name("experiment-publisher")
+            .start(
+                () ->
+                    publishMs.set(
+                        TenantContext.call(
+                            AsTenant.TENANT,
+                            () -> publish(tm, publisher, new FastEvent(f, AsTenant.TENANT)))));
+    ExperimentSupport.sleep(700);
+    final Thread.State state = publisherThread.getState();
+    final var frames =
+        Arrays.stream(publisherThread.getStackTrace())
+            .map(e -> e.getClassName().replaceAll("^.*\\.", "") + "." + e.getMethodName())
+            .limit(14)
+            .toList();
+    final int activeWhileBlocked = hikariActive(dataSource);
+    final var states = sessionStates(dsl);
+    release.countDown();
+    publisherThread.join(10_000);
+    report(
+        R,
+        "b: hikariActive before=%d whileTheOnlyPublisherIsBlockedInExecutorSubmit=%d sessionStates=%s publisherState=%s"
+            .formatted(activeBefore, activeWhileBlocked, states, state));
+    report(R, "b: publisher stack(top 14)=" + frames);
+    report(R, "b: publish returned after " + publishMs.get() + "ms");
+  }
+
+  @Test
+  void c_splitListenerReleasesTheConnectionButStillTakesASlot() {
+    final String a = id();
+    final String b = id();
+    final String f = id();
+    publish(tm, publisher, new SplitEvent(a, AsTenant.TENANT));
+    publish(tm, publisher, new SplitEvent(b, AsTenant.TENANT));
+    awaitTrue(() -> recorder.running.get() == 2, 5_000);
+    ExperimentSupport.sleep(SLOW_MS / 2 + 100);
+    final int activeMidWait = hikariActive(dataSource);
+    final var states = sessionStates(dsl);
+    final long t0 = System.nanoTime();
+    final long publishFastMs = publish(tm, publisher, new FastEvent(f, AsTenant.TENANT));
+    awaitTrue(() -> recorder.startedAtNanos.containsKey("fast:" + f), 10_000);
+    final long fastStartMs = (recorder.startedAtNanos.get("fast:" + f) - t0) / 1_000_000;
+    awaitTrue(() -> recorder.running.get() == 0, 10_000);
+    ExperimentSupport.sleep(500);
+    report(
+        R,
+        "c: hikariActive while 2 split listeners wait for the external call=%d (listener-recorded mid-wait value=%d) sessionStates=%s"
+            .formatted(activeMidWait, recorder.midSleepActiveConnections.get(), states));
+    report(
+        R,
+        "c: publish(fast) returned after %dms, fast listener started %dms after the publish began (split listeners still hold the 2 slots)"
+            .formatted(publishFastMs, fastStartMs));
+    report(
+        R,
+        "c: split listener archived a=%d b=%d tenantInside=%s"
+            .formatted(
+                ExperimentSupport.archived(dsl, "ExperimentSplitListener", a),
+                ExperimentSupport.archived(dsl, "ExperimentSplitListener", b),
+                recorder.tenantOf.get("split:" + a)));
+  }
+}

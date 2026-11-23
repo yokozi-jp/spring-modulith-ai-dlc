@@ -1,0 +1,116 @@
+package com.example.demo.payment.application;
+
+import static com.example.demo.payment.application.ExperimentSupport.SLOW_MS;
+import static com.example.demo.payment.application.ExperimentSupport.awaitTrue;
+import static com.example.demo.payment.application.ExperimentSupport.hikariActive;
+import static com.example.demo.payment.application.ExperimentSupport.publish;
+import static com.example.demo.payment.application.ExperimentSupport.report;
+
+import com.example.demo.payment.application.ExperimentSupport.FastEvent;
+import com.example.demo.payment.application.ExperimentSupport.Recorder;
+import com.example.demo.payment.application.ExperimentSupport.TenantComposedEvent;
+import com.example.demo.testkit.AsTenant;
+import com.example.demo.testkit.BindTestTenantExtension;
+import com.example.demo.testkit.CleanGeneratedTablesExtension;
+import com.example.demo.testkit.SharedTestConfiguration;
+import com.example.demo.xexp.ComposedListeners;
+import com.example.demo.xexp.ComposedListeners.Seen;
+import com.example.demo.xexp.ComposedListeners.SlowComposedEvent;
+import com.example.demo.xexp.ComposedListeners.V1Event;
+import com.example.demo.xexp.ComposedListeners.V2Event;
+import java.util.UUID;
+import javax.sql.DataSource;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.context.annotation.Import;
+import org.springframework.modulith.test.ApplicationModuleTest;
+import org.springframework.modulith.test.ApplicationModuleTest.BootstrapMode;
+import org.springframework.transaction.PlatformTransactionManager;
+
+/** C2：別の executor を指す合成した注釈（候補 1）が、実際にその executor で動き、枠の取り合いを断つかを測る。 */
+@ApplicationModuleTest(mode = BootstrapMode.ALL_DEPENDENCIES)
+@Import({
+  SharedTestConfiguration.class,
+  ExperimentListeners.Config.class,
+  ComposedListeners.Config.class,
+  ExperimentListeners.TenantComposedConfig.class
+})
+@ExtendWith({CleanGeneratedTablesExtension.class, BindTestTenantExtension.class})
+@org.springframework.test.context.TestPropertySource(properties = "spring.task.execution.mode=force")
+class ListenerExecutorIsolationExperimentTest {
+
+  private static final String R = "C2";
+
+  @Autowired private PlatformTransactionManager tm;
+  @Autowired private ApplicationEventPublisher publisher;
+  @Autowired private Recorder recorder;
+  @Autowired private Seen seen;
+  @Autowired private DataSource dataSource;
+
+  @BeforeEach
+  void reset() {
+    awaitTrue(() -> recorder.running.get() == 0, 10_000);
+    ExperimentSupport.sleep(300);
+    recorder.reset();
+    seen.threads.clear();
+  }
+
+  private static String id() {
+    return UUID.randomUUID().toString();
+  }
+
+  /** V1 と V2 のどちらの注釈でも、リスナーが専用の executor のスレッドで動くか。 */
+  @Test
+  void a_composedAnnotationsRouteToTheNamedExecutor() {
+    publish(tm, publisher, new V1Event(id()));
+    publish(tm, publisher, new V2Event(id()));
+    awaitTrue(() -> seen.threads.size() >= 2, 10_000);
+    report(R, "a: threads=" + seen.threads);
+  }
+
+  /** 専用の executor の 2 枠を遅いリスナーが埋めても、DB だけのリスナーは待たず、出版した要求も待たない。 */
+  @Test
+  void b_slowExecutorFullDoesNotDelayFastListener() {
+    final String f = id();
+    final long p1 = publish(tm, publisher, new SlowComposedEvent("s1-" + id()));
+    final long p2 = publish(tm, publisher, new SlowComposedEvent("s2-" + id()));
+    awaitTrue(() -> seen.threads.size() == 2, 5_000);
+    final long t0 = System.nanoTime();
+    final long publishFastMs = publish(tm, publisher, new FastEvent(f, AsTenant.TENANT));
+    awaitTrue(() -> recorder.startedAtNanos.containsKey("fast:" + f), 10_000);
+    final long fastStartMs = (recorder.startedAtNanos.get("fast:" + f) - t0) / 1_000_000;
+    report(
+        R,
+        "b: slow executor full; publish(slow)=%d,%dms publish(fast)=%dms fastStarted=%dms after (SLOW=%d) fastThread=%s hikariActive=%d"
+            .formatted(
+                p1, p2, publishFastMs, fastStartMs, SLOW_MS, recorder.threadOf.get("fast:" + f),
+                hikariActive(dataSource)));
+  }
+
+  /** 専用の executor が埋まったとき、3 つ目の遅いリスナーを出版した要求は待つか（待つなら接続を持つか）。 */
+  @Test
+  void c_thirdSlowPublisherStillBlocksOnTheSlowExecutor() {
+    publish(tm, publisher, new SlowComposedEvent("s1-" + id()));
+    publish(tm, publisher, new SlowComposedEvent("s2-" + id()));
+    awaitTrue(() -> seen.threads.size() == 2, 5_000);
+    final long p3 = publish(tm, publisher, new SlowComposedEvent("s3-" + id()));
+    report(R, "c: publish(3rd slow) returned after " + p3 + "ms");
+    awaitTrue(() -> seen.threads.size() == 3, 10_000);
+    ExperimentSupport.sleep(SLOW_MS + 300);
+  }
+
+  /** 業務モジュールの package に置いた合成の注釈のリスナーに、TenantListenerAspect が効くか。 */
+  @Test
+  void d_tenantAspectOnComposedAnnotation() {
+    final String t = id();
+    publish(tm, publisher, new TenantComposedEvent(t, AsTenant.TENANT));
+    awaitTrue(() -> recorder.startedAtNanos.containsKey("tenantComposed:" + t), 8_000);
+    report(
+        R,
+        "d: tenantComposed started thread=%s tenantInside=%s"
+            .formatted(recorder.threadOf.get("tenantComposed:" + t), recorder.tenantOf.get("tenantComposed:" + t)));
+  }
+}

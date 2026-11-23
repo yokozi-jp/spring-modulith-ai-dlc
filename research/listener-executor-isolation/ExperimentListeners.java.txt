@@ -1,0 +1,207 @@
+package com.example.demo.payment.application;
+
+import com.example.demo.payment.application.ExperimentSupport.FastEvent;
+import com.example.demo.payment.application.ExperimentSupport.LimitedEvent;
+import com.example.demo.payment.application.ExperimentSupport.Recorder;
+import com.example.demo.payment.application.ExperimentSupport.SlowEvent;
+import com.example.demo.payment.application.ExperimentSupport.SplitEvent;
+import com.example.demo.payment.application.ExperimentSupport.TenantComposedEvent;
+import com.example.demo.xexp.ComposedListeners.ExternalModuleListenerV2;
+import javax.sql.DataSource;
+import org.jooq.DSLContext;
+import org.springframework.context.annotation.Bean;
+import org.springframework.boot.test.context.TestConfiguration;
+import org.springframework.modulith.events.ApplicationModuleListener;
+import org.springframework.resilience.annotation.ConcurrencyLimit;
+import org.springframework.resilience.annotation.ConcurrencyLimitBeanPostProcessor;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.annotation.Propagation;
+import org.springframework.transaction.support.TransactionTemplate;
+
+/** 実験用の Listener 群。クラス名は TenantListenerAspect の pointcut（{@code within(...*Listener)}）に合わせて Listener で終える。 */
+public final class ExperimentListeners {
+
+  private ExperimentListeners() {}
+
+  @TestConfiguration(proxyBeanMethods = false)
+  public static class Config {
+    @Bean
+    Recorder recorder() {
+      return new Recorder();
+    }
+
+    @Bean
+    ExperimentSlowListener experimentSlowListener(final DSLContext dsl, final Recorder r) {
+      return new ExperimentSlowListener(dsl, r);
+    }
+
+    @Bean
+    ExperimentFastListener experimentFastListener(final DSLContext dsl, final Recorder r) {
+      return new ExperimentFastListener(dsl, r);
+    }
+
+    @Bean
+    ExperimentSplitListener experimentSplitListener(
+        final DSLContext dsl,
+        final Recorder r,
+        final PlatformTransactionManager tm,
+        final DataSource ds) {
+      return new ExperimentSplitListener(dsl, r, tm, ds);
+    }
+  }
+
+  /** C3 用：Spring Framework 7 の {@code @ConcurrencyLimit} だけを有効にする（{@code @Retryable} は有効にしない）。 */
+  @TestConfiguration(proxyBeanMethods = false)
+  public static class LimitConfig {
+    @Bean
+    static ConcurrencyLimitBeanPostProcessor concurrencyLimitBeanPostProcessor() {
+      return new ConcurrencyLimitBeanPostProcessor();
+    }
+
+    @Bean
+    Recorder recorder() {
+      return new Recorder();
+    }
+
+    @Bean
+    ExperimentFastListener experimentFastListener(final DSLContext dsl, final Recorder r) {
+      return new ExperimentFastListener(dsl, r);
+    }
+
+    @Bean
+    ExperimentLimitedListener experimentLimitedListener(
+        final DSLContext dsl, final Recorder r, final DataSource ds) {
+      return new ExperimentLimitedListener(dsl, r, ds);
+    }
+  }
+
+  /** C2 用：合成した注釈（V2）の Listener を、業務モジュールの package に置いたとき。 */
+  @TestConfiguration(proxyBeanMethods = false)
+  public static class TenantComposedConfig {
+    @Bean
+    ExperimentTenantComposedListener experimentTenantComposedListener(final Recorder r) {
+      return new ExperimentTenantComposedListener(r);
+    }
+  }
+
+  /** 外部システムを呼ぶ Listener の代わり：トランザクションの中で SLOW_MS 眠る。 */
+  public static class ExperimentSlowListener {
+    private final DSLContext dsl;
+    private final Recorder recorder;
+
+    ExperimentSlowListener(final DSLContext dsl, final Recorder recorder) {
+      this.dsl = dsl;
+      this.recorder = recorder;
+    }
+
+    @ApplicationModuleListener
+    public void on(final SlowEvent event) {
+      recorder.enter("slow:" + event.id());
+      try {
+        dsl.selectOne().fetch();
+        ExperimentSupport.sleep(ExperimentSupport.SLOW_MS);
+      } finally {
+        recorder.exit("slow:" + event.id());
+      }
+    }
+  }
+
+  /** DB だけを読む Listener。 */
+  public static class ExperimentFastListener {
+    private final DSLContext dsl;
+    private final Recorder recorder;
+
+    ExperimentFastListener(final DSLContext dsl, final Recorder recorder) {
+      this.dsl = dsl;
+      this.recorder = recorder;
+    }
+
+    @ApplicationModuleListener
+    public void on(final FastEvent event) {
+      recorder.enter("fast:" + event.id());
+      try {
+        dsl.selectOne().fetch();
+      } finally {
+        recorder.exit("fast:" + event.id());
+      }
+    }
+  }
+
+  /** 候補 2：Listener のトランザクションを持たず（NOT_SUPPORTED）、待つ間は接続を持たない。 */
+  public static class ExperimentSplitListener {
+    private final DSLContext dsl;
+    private final Recorder recorder;
+    private final TransactionTemplate tx;
+    private final DataSource dataSource;
+
+    ExperimentSplitListener(
+        final DSLContext dsl,
+        final Recorder recorder,
+        final PlatformTransactionManager tm,
+        final DataSource dataSource) {
+      this.dsl = dsl;
+      this.recorder = recorder;
+      this.dataSource = dataSource;
+      this.tx = new TransactionTemplate(tm);
+      // ModuleRoleTransactionManager は名前から payment のロールとテナントの要否を決める。
+      this.tx.setName(ExperimentSplitListener.class.getName() + ".on");
+    }
+
+    @ApplicationModuleListener(propagation = Propagation.NOT_SUPPORTED)
+    public void on(final SplitEvent event) {
+      recorder.enter("split:" + event.id());
+      try {
+        tx.executeWithoutResult(status -> dsl.selectOne().fetch());
+        recorder.midSleepActiveConnections.set(-2);
+        // 外部システムを待つ区間：接続を持たない。
+        ExperimentSupport.sleep(ExperimentSupport.SLOW_MS / 2);
+        recorder.midSleepActiveConnections.set(ExperimentSupport.hikariActive(dataSource));
+        ExperimentSupport.sleep(ExperimentSupport.SLOW_MS / 2);
+        tx.executeWithoutResult(status -> dsl.selectOne().fetch());
+      } finally {
+        recorder.exit("split:" + event.id());
+      }
+    }
+  }
+
+  /** 方式 D：遅い Listener に {@code @ConcurrencyLimit} を付ける。限界は設定から読む。 */
+  public static class ExperimentLimitedListener {
+    private final DSLContext dsl;
+    private final Recorder recorder;
+    private final DataSource dataSource;
+
+    ExperimentLimitedListener(final DSLContext dsl, final Recorder recorder, final DataSource ds) {
+      this.dsl = dsl;
+      this.recorder = recorder;
+      this.dataSource = ds;
+    }
+
+    @ApplicationModuleListener
+    @ConcurrencyLimit(limitString = "${experiment.slow-limit}")
+    public void on(final LimitedEvent event) {
+      recorder.enter("limited:" + event.id());
+      try {
+        dsl.selectOne().fetch();
+        recorder.midSleepActiveConnections.set(ExperimentSupport.hikariActive(dataSource));
+        ExperimentSupport.sleep(ExperimentSupport.SLOW_MS);
+      } finally {
+        recorder.exit("limited:" + event.id());
+      }
+    }
+  }
+
+  /** 合成した注釈（V2）を業務モジュールの package の Listener に付けたとき、テナントが束縛されるか。 */
+  public static class ExperimentTenantComposedListener {
+    private final Recorder recorder;
+
+    ExperimentTenantComposedListener(final Recorder recorder) {
+      this.recorder = recorder;
+    }
+
+    @ExternalModuleListenerV2(executor = "slowListenerExecutor")
+    public void on(final TenantComposedEvent event) {
+      recorder.enter("tenantComposed:" + event.id());
+      recorder.exit("tenantComposed:" + event.id());
+    }
+  }
+}

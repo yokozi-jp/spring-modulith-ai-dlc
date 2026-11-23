@@ -1,0 +1,72 @@
+package com.example.demo.payment.application;
+
+import static com.example.demo.payment.application.ExperimentSupport.SLOW_MS;
+import static com.example.demo.payment.application.ExperimentSupport.awaitTrue;
+import static com.example.demo.payment.application.ExperimentSupport.hikariActive;
+import static com.example.demo.payment.application.ExperimentSupport.publish;
+import static com.example.demo.payment.application.ExperimentSupport.report;
+
+import com.example.demo.payment.application.ExperimentSupport.FastEvent;
+import com.example.demo.payment.application.ExperimentSupport.Recorder;
+import com.example.demo.payment.application.ExperimentSupport.SlowEvent;
+import com.example.demo.testkit.AsTenant;
+import com.example.demo.testkit.BindTestTenantExtension;
+import com.example.demo.testkit.CleanGeneratedTablesExtension;
+import com.example.demo.testkit.SharedTestConfiguration;
+import java.util.UUID;
+import javax.sql.DataSource;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.context.annotation.Import;
+import org.springframework.core.task.TaskExecutor;
+import org.springframework.modulith.test.ApplicationModuleTest;
+import org.springframework.modulith.test.ApplicationModuleTest.BootstrapMode;
+import org.springframework.test.context.TestPropertySource;
+import org.springframework.transaction.PlatformTransactionManager;
+
+/** C4：キュー付きの executor（Boot の pool のプロパティだけ）で、出版した要求が待たないかを測る。 */
+@ApplicationModuleTest(mode = BootstrapMode.ALL_DEPENDENCIES)
+@Import({SharedTestConfiguration.class, ExperimentListeners.Config.class})
+@ExtendWith({CleanGeneratedTablesExtension.class, BindTestTenantExtension.class})
+@TestPropertySource(
+    properties = {
+      "spring.threads.virtual.enabled=false",
+      "spring.task.execution.pool.core-size=2",
+      "spring.task.execution.pool.max-size=2",
+      "spring.task.execution.pool.queue-capacity=50"
+    })
+class QueuedExecutorExperimentTest {
+
+  @Autowired private PlatformTransactionManager tm;
+  @Autowired private ApplicationEventPublisher publisher;
+  @Autowired private Recorder recorder;
+  @Autowired private DataSource dataSource;
+
+  @Autowired
+  @Qualifier("applicationTaskExecutor")
+  private TaskExecutor executor;
+
+  @Test
+  void a_queuedExecutorDoesNotBlockThePublisherButStillStarvesTheFastListener() {
+    recorder.reset();
+    final String f = UUID.randomUUID().toString();
+    final long p1 = publish(tm, publisher, new SlowEvent(UUID.randomUUID().toString(), AsTenant.TENANT));
+    final long p2 = publish(tm, publisher, new SlowEvent(UUID.randomUUID().toString(), AsTenant.TENANT));
+    awaitTrue(() -> recorder.running.get() == 2, 5_000);
+    final long t0 = System.nanoTime();
+    final long p3 = publish(tm, publisher, new SlowEvent(UUID.randomUUID().toString(), AsTenant.TENANT));
+    final long pf = publish(tm, publisher, new FastEvent(f, AsTenant.TENANT));
+    final int active = hikariActive(dataSource);
+    awaitTrue(() -> recorder.startedAtNanos.containsKey("fast:" + f), 15_000);
+    final long fastStartMs = (recorder.startedAtNanos.get("fast:" + f) - t0) / 1_000_000;
+    report(
+        "C4",
+        "a: executor=%s; publish(slow)=%d,%d,%d(3rd, queued) publish(fast)=%dms hikariActive right after publishes=%d; fastStarted=%dms after (SLOW=%d)"
+            .formatted(executor.getClass().getSimpleName(), p1, p2, p3, pf, active, fastStartMs, SLOW_MS));
+    awaitTrue(() -> recorder.running.get() == 0, 15_000);
+    ExperimentSupport.sleep(SLOW_MS + 300);
+  }
+}

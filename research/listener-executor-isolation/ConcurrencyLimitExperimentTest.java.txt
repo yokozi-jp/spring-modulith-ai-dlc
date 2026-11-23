@@ -1,0 +1,75 @@
+package com.example.demo.payment.application;
+
+import static com.example.demo.payment.application.ExperimentSupport.SLOW_MS;
+import static com.example.demo.payment.application.ExperimentSupport.awaitTrue;
+import static com.example.demo.payment.application.ExperimentSupport.hikariActive;
+import static com.example.demo.payment.application.ExperimentSupport.publish;
+import static com.example.demo.payment.application.ExperimentSupport.report;
+import static com.example.demo.payment.application.ExperimentSupport.sessionStates;
+
+import com.example.demo.payment.application.ExperimentSupport.FastEvent;
+import com.example.demo.payment.application.ExperimentSupport.LimitedEvent;
+import com.example.demo.payment.application.ExperimentSupport.Recorder;
+import com.example.demo.testkit.AsTenant;
+import com.example.demo.testkit.BindTestTenantExtension;
+import com.example.demo.testkit.CleanGeneratedTablesExtension;
+import com.example.demo.testkit.SharedTestConfiguration;
+import java.util.UUID;
+import javax.sql.DataSource;
+import org.jooq.DSLContext;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.context.annotation.Import;
+import org.springframework.modulith.test.ApplicationModuleTest;
+import org.springframework.modulith.test.ApplicationModuleTest.BootstrapMode;
+import org.springframework.test.context.TestPropertySource;
+import org.springframework.transaction.PlatformTransactionManager;
+
+/** C3：{@code @ConcurrencyLimit(1)} を遅いリスナーに付けても、共有の executor の枠と接続を取り合うかを測る。 */
+@ApplicationModuleTest(mode = BootstrapMode.ALL_DEPENDENCIES)
+@Import({SharedTestConfiguration.class, ExperimentListeners.LimitConfig.class})
+@ExtendWith({CleanGeneratedTablesExtension.class, BindTestTenantExtension.class})
+@TestPropertySource(properties = "experiment.slow-limit=1")
+class ConcurrencyLimitExperimentTest {
+
+  private static final String R = "C3";
+
+  @Autowired private PlatformTransactionManager tm;
+  @Autowired private ApplicationEventPublisher publisher;
+  @Autowired private Recorder recorder;
+  @Autowired private DataSource dataSource;
+  @Autowired private DSLContext dsl;
+
+  @BeforeEach
+  void reset() {
+    awaitTrue(() -> recorder.running.get() == 0, 10_000);
+    ExperimentSupport.sleep(300);
+    recorder.reset();
+  }
+
+  @Test
+  void a_limitedListenersStillHoldSlotsAndConnectionsWhileWaiting() {
+    publish(tm, publisher, new LimitedEvent(UUID.randomUUID().toString(), AsTenant.TENANT));
+    publish(tm, publisher, new LimitedEvent(UUID.randomUUID().toString(), AsTenant.TENANT));
+    awaitTrue(() -> recorder.running.get() >= 1, 5_000);
+    ExperimentSupport.sleep(300);
+    final int active = hikariActive(dataSource);
+    final var states = sessionStates(dsl);
+    final String f = UUID.randomUUID().toString();
+    final long t0 = System.nanoTime();
+    final long publishMs = publish(tm, publisher, new FastEvent(f, AsTenant.TENANT));
+    awaitTrue(() -> recorder.startedAtNanos.containsKey("fast:" + f), 10_000);
+    final long fastStartMs = (recorder.startedAtNanos.get("fast:" + f) - t0) / 1_000_000;
+    report(
+        R,
+        "a: limit=1, 2 limited events; running=%d maxRunning=%d hikariActive=%d sessionStates=%s; publish(fast)=%dms fastStarted=%dms after (SLOW=%d)"
+            .formatted(
+                recorder.running.get(), recorder.maxRunning.get(), active, states, publishMs,
+                fastStartMs, SLOW_MS));
+    awaitTrue(() -> recorder.running.get() == 0, 10_000);
+    ExperimentSupport.sleep(SLOW_MS + 300);
+  }
+}

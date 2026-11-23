@@ -1,0 +1,167 @@
+package com.example.demo.payment.application;
+
+import static com.example.demo.jooq.modulith.Tables.EVENT_PUBLICATION;
+import static com.example.demo.jooq.modulith.Tables.EVENT_PUBLICATION_ARCHIVE;
+
+import com.example.demo.shared.tenant.TenantContext;
+import com.example.demo.shared.tenant.TenantId;
+import com.example.demo.shared.tenant.TenantScoped;
+import com.example.demo.testkit.AsTenant;
+import com.zaxxer.hikari.HikariDataSource;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.atomic.AtomicInteger;
+import javax.sql.DataSource;
+import org.jooq.DSLContext;
+import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
+
+/** 実験用の補助。#557 の調査で executor の枠の取り合いを確かめるためのもので、main には入れない。 */
+public final class ExperimentSupport {
+
+  /** 遅い Listener が（外部システムを待つ代わりに）トランザクションの中で眠る時間。 */
+  public static final long SLOW_MS = 1500;
+
+  private ExperimentSupport() {}
+
+  public record SlowEvent(String id, TenantId tenantId) implements TenantScoped {}
+
+  public record FastEvent(String id, TenantId tenantId) implements TenantScoped {}
+
+  public record SplitEvent(String id, TenantId tenantId) implements TenantScoped {}
+
+  public record LimitedEvent(String id, TenantId tenantId) implements TenantScoped {}
+
+  public record TenantComposedEvent(String id, TenantId tenantId) implements TenantScoped {}
+
+  /** Listener の開始と終了、同時に動いた数、スレッド名を記録する。 */
+  public static final class Recorder {
+    public final Map<String, Long> startedAtNanos = new ConcurrentHashMap<>();
+    public final Map<String, String> threadOf = new ConcurrentHashMap<>();
+    public final Map<String, String> tenantOf = new ConcurrentHashMap<>();
+    public final List<String> order = new CopyOnWriteArrayList<>();
+    public final AtomicInteger running = new AtomicInteger();
+    public final AtomicInteger maxRunning = new AtomicInteger();
+    public final AtomicInteger midSleepActiveConnections = new AtomicInteger(-1);
+
+    public void enter(final String key) {
+      startedAtNanos.put(key, System.nanoTime());
+      threadOf.put(key, Thread.currentThread().getName());
+      tenantOf.put(key, AsTenant.currentOrUnbound());
+      order.add("enter:" + key);
+      maxRunning.accumulateAndGet(running.incrementAndGet(), Math::max);
+    }
+
+    public void exit(final String key) {
+      running.decrementAndGet();
+      order.add("exit:" + key);
+    }
+
+    public void reset() {
+      startedAtNanos.clear();
+      threadOf.clear();
+      tenantOf.clear();
+      order.clear();
+      running.set(0);
+      maxRunning.set(0);
+      midSleepActiveConnections.set(-1);
+    }
+  }
+
+  /** Hikari の貸し出し中の接続の数。 */
+  public static int hikariActive(final DataSource dataSource) {
+    try {
+      return dataSource.unwrap(HikariDataSource.class).getHikariPoolMXBean().getActiveConnections();
+    } catch (java.sql.SQLException e) {
+      throw new IllegalStateException(e);
+    }
+  }
+
+  /** テナントを束縛し、トランザクションの中でイベントを出版する。出版した呼び出しがコミットから戻るまでの時間（ミリ秒）を返す。 */
+  public static long publish(
+      final PlatformTransactionManager tm,
+      final ApplicationEventPublisher publisher,
+      final Object event) {
+    final long t0 = System.nanoTime();
+    TenantContext.call(
+        AsTenant.TENANT,
+        () ->
+            new TransactionTemplate(tm)
+                .execute(
+                    status -> {
+                      publisher.publishEvent(event);
+                      return null;
+                    }));
+    return (System.nanoTime() - t0) / 1_000_000;
+  }
+
+  /** イベントの id を本文に含む出版の、未完了の状態の一覧（listener_id の末尾の一部で絞る）。 */
+  public static List<String> statuses(final DSLContext dsl, final String listenerFragment, final String id) {
+    return dsl.select(EVENT_PUBLICATION.STATUS)
+        .from(EVENT_PUBLICATION)
+        .where(
+            EVENT_PUBLICATION
+                .LISTENER_ID
+                .contains(listenerFragment)
+                .and(EVENT_PUBLICATION.SERIALIZED_EVENT.contains(id)))
+        .fetch(r -> String.valueOf(r.value1()));
+  }
+
+  public static int archived(final DSLContext dsl, final String listenerFragment, final String id) {
+    return dsl.fetchCount(
+        EVENT_PUBLICATION_ARCHIVE,
+        EVENT_PUBLICATION_ARCHIVE
+            .LISTENER_ID
+            .contains(listenerFragment)
+            .and(EVENT_PUBLICATION_ARCHIVE.SERIALIZED_EVENT.contains(id)));
+  }
+
+  /** 自分以外の接続のセッションの状態ごとの数（アプリの DB の中）。 */
+  public static Map<String, Integer> sessionStates(final DSLContext dsl) {
+    final Map<String, Integer> result = new ConcurrentHashMap<>();
+    dsl.resultQuery(
+            "select coalesce(state, 'null') as s, count(*) from pg_stat_activity"
+                + " where datname = current_database() and pid <> pg_backend_pid()"
+                + " and backend_type = 'client backend' group by 1")
+        .fetch()
+        .forEach(r -> result.put(r.get(0, String.class), r.get(1, Integer.class)));
+    return result;
+  }
+
+  /** 結果を /tmp/exp-results/<name>.txt に追記する。Gradle の標準出力に頼らない。 */
+  public static void report(final String name, final String line) {
+    try {
+      final java.nio.file.Path dir = java.nio.file.Path.of("/tmp/exp-results");
+      java.nio.file.Files.createDirectories(dir);
+      java.nio.file.Files.writeString(
+          dir.resolve(name + ".txt"),
+          line + System.lineSeparator(),
+          java.nio.file.StandardOpenOption.CREATE,
+          java.nio.file.StandardOpenOption.APPEND);
+    } catch (java.io.IOException e) {
+      throw new java.io.UncheckedIOException(e);
+    }
+  }
+
+  public static void sleep(final long millis) {
+    try {
+      Thread.sleep(millis);
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
+      throw new IllegalStateException(e);
+    }
+  }
+
+  public static void awaitTrue(final java.util.function.BooleanSupplier condition, final long timeoutMs) {
+    final long deadline = System.nanoTime() + timeoutMs * 1_000_000;
+    while (!condition.getAsBoolean()) {
+      if (System.nanoTime() > deadline) {
+        throw new IllegalStateException("timeout");
+      }
+      sleep(10);
+    }
+  }
+}
