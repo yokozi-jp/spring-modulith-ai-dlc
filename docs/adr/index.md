@@ -114,3 +114,4 @@
 - [ADR-112: 複合主キーを使わず、業務キーの組にはユニークインデックスを張る](ADR-112-forbid-composite-primary-keys.md)（Proposed, 2026-11-22）
 - [ADR-113: 論理削除フラグを作らず、業務上の意味を持つカラムか物理削除で表す](ADR-113-forbid-logical-delete-flags.md)（Proposed, 2026-11-22）
 - [ADR-114: 暦日を full-date で受け渡し、SQL で日時から暦日と境界を作らない](ADR-114-pass-calendar-dates-as-full-date-and-bind-boundaries.md)（Proposed, 2026-11-23）
+- [ADR-116: フロントエンドのファイルを役割ごとに分け、役割ごとの文書とチェックリストを置く](ADR-116-define-frontend-file-roles.md)（Proposed, 2026-11-23）
