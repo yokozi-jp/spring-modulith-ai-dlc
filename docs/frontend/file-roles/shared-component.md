@@ -64,8 +64,9 @@ feature の中のコードを components へ移す条件は[共有コード](../
 ファイルの範囲ごとの禁止の一覧は[ファイルの範囲ごとの制限](../lint-config.md#ファイルの範囲ごとの制限)にある。
 テストファイルと `src/testing/` では、テスト用部品と層の import の禁止が外れる。
 
-`@frontend/api` への向きは、[依存方向](../architecture.md#依存方向)の図に書かれていない。
-今の `app-shell.tsx` は `@frontend/api/csrf` を、`route-error.tsx` は `@frontend/api/api-fetch` を import しており、lint はこの向きを止めていない。
+`components` が参照できる `@frontend/api` の入口は、`api-error` と `csrf` だけである（[依存方向](../architecture.md#依存方向)）。
+`api-fetch`、`endpoints`、`models`、`zod` は lint が止める。
+今の `app-shell.tsx` は `@frontend/api/csrf` を、`route-error.tsx` は `@frontend/api/api-error` を import している。
 
 ## 最小の例と典型的な例
 
@@ -87,7 +88,7 @@ export function RoutePending() {
 `error.message` を出さず、テナントを選ぶ前の 403 だけはテナントを選ぶ画面へ案内する。
 
 ```tsx
-import { isTenantNotSelected } from "@frontend/api/api-fetch";
+import { isTenantNotSelected } from "@frontend/api/api-error";
 import { Button, buttonVariants } from "@frontend/ui/button";
 import { useQueryErrorResetBoundary } from "@tanstack/react-query";
 import { Link, useRouter } from "@tanstack/react-router";
@@ -199,6 +200,7 @@ jsdom の component test で、role と label から要素を探し、利用者�
 - [ ] 1 ファイルに component を 1 つだけ置き、component 以外を export しない。［Oxlint で検査：react/no-multi-comp、react/only-export-components］
 - [ ] component を関数宣言で書く。［Oxlint で検査：func-style、react/prefer-function-component］
 - [ ] feature、route、route tree、Base UI、テスト用部品、テレメトリ SDK を import しない。［Oxlint で検査：no-restricted-imports］
+- [ ] `@frontend/api` は `api-error` と `csrf` だけを import し、`api-fetch`、`endpoints`、`models`、`zod` を import しない。［Oxlint で検査：no-restricted-imports］
 - [ ] `fetch` と `XMLHttpRequest` を使わない。［Oxlint で検査：no-restricted-globals、no-restricted-properties］
 - [ ] 文言を JSX に直接書かず、`t` で catalog から出す。［JSX の子は Oxlint で検査：react/jsx-no-literals。属性の文言は自分で点検］
 - [ ] `error.message` と `detail` を表示しない。［自分で点検］

@@ -94,8 +94,7 @@ export function ConflictChoices({
 export const CustomerOrderCodeField = withFieldGroup({
   defaultValues: { customerOrderCode: "" },
   props: defaultProps,
-  // React の component として hook を呼ぶため、名前を大文字で始める。
-  // oxlint-disable-next-line eslint/func-name-matching
+  // oxlint-disable-next-line eslint/func-name-matching -- React の component として hook を呼ぶため、名前を大文字で始める。
   render: function CustomerOrderCodeFieldRender({ group, idPrefix, serverError, onFieldChange }) {
     const { t } = useTranslation();
     const id = `${idPrefix}-customer-order-code`;

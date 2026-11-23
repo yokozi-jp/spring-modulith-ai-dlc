@@ -44,7 +44,7 @@ feature の直下の `.ts` でも、入力 schema の `schemas.ts` は [feature 
 
 ## 依存してよいもの、してはいけないもの
 
-- **依存してよいもの**：`@frontend/api/models` の型、`@frontend/api/api-fetch` の `ApiProblemError`、i18next の `TFunction` の型、`@/lib/`、同じ feature の module。
+- **依存してよいもの**：`@frontend/api/models` の型、`@frontend/api/api-error` の `ApiProblemError`、i18next の `TFunction` の型、`@/lib/`、同じ feature の module。
 - **依存してはいけないもの**：`react` と `react-i18next`（Hook と JSX）、同じ feature の画面、component、Hook、`@/routes/**` と `@/routeTree.gen`、他の feature、テスト用の部品、テレメトリの SDK、global の `fetch` と `XMLHttpRequest`。
 
 ## 最小の例と典型的な例
@@ -155,7 +155,7 @@ jsdom の指定（`/* @vitest-environment jsdom */`）を書かず、`t` は cat
 次は `features/orders/notice.test.ts` である（抜粋）。
 
 ```ts
-import { ApiProblemError } from "@frontend/api/api-fetch";
+import { ApiProblemError } from "@frontend/api/api-error";
 import type { ValidationProblem } from "@frontend/api/models";
 import { describe, expect, it } from "vite-plus/test";
 

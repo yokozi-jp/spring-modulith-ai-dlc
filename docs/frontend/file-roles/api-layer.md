@@ -18,7 +18,8 @@ API 層は、画面とバックエンドの HTTP API のあいだに置くファ
 **API 層**は、その形を決めるファイルの集まりであり、次のファイルを持つ。
 
 - **`packages/api/src/generated/**`**：`openapi/openapi.yaml` から Orval が生成した endpoint、query options、Hook、型、Zod の schema、MSW の handler（[生成API境界](../api-client-orval.md#生成api境界)）。
-- **`packages/api/src/api-fetch.ts`**：生成した関数が呼ぶ custom mutator の `apiFetch`、非 2xx を表す `ApiProblemError`、401 の遷移と再試行の判定。
+- **`packages/api/src/api-fetch.ts`**：生成した関数が呼ぶ custom mutator の `apiFetch`。
+- **`packages/api/src/api-error.ts`**：非 2xx を表す `ApiProblemError`、エラーの判定、401 の遷移、再試行の判定。
 - **`packages/api/src/csrf.ts`**：CSRF の Cookie の値を読む `csrfToken` と、form に入れる値を作る `maskedCsrfToken`。
 - **`packages/api/src/testing/`**：この package のテストが共有する MSW の server と setup。
 - **`apps/web/src/api/query-client.ts`**：本番とテストが同じ設定で使う `QueryClient` を作る `createQueryClient`。
@@ -66,7 +67,7 @@ API 層は業務の処理を持たない。
 
 - **`@frontend/api` が依存してよいもの**：同じ package のファイル、`packages/api/package.json` に書いた依存。
 - **`@frontend/api` が依存してはいけないもの**：`@frontend/ui`、アプリのコード、`@base-ui/**`、`@grafana/*`、手書きの production source からのテスト用部品（`msw` を含む）。
-- **アプリの `src/api/` が依存してよいもの**：`@frontend/api/api-fetch`、`@tanstack/react-query`。
+- **アプリの `src/api/` が依存してよいもの**：`@frontend/api/api-error`、`@tanstack/react-query`。
 - **アプリの `src/api/` が依存してはいけないもの**：`@/features/**`、`@/routes/**`、`@/routeTree.gen`、`@base-ui/**`、テスト用部品、`@grafana/*`、global の `fetch` と `XMLHttpRequest`。
 
 `fetch` と `XMLHttpRequest` は `packages/api/**` の外で使えない（[ファイルの範囲ごとの制限](../lint-config.md#ファイルの範囲ごとの制限)）。
@@ -98,7 +99,7 @@ component は同じ生成 query options を `useSuspenseQuery` で読む（`fron
 典型的な例は `createQueryClient` である（`frontend/apps/web/src/api/query-client.ts`）。
 
 ```ts
-import { redirectToLoginOnUnauthorized, retryUnlessClientError } from "@frontend/api/api-fetch";
+import { redirectToLoginOnUnauthorized, retryUnlessClientError } from "@frontend/api/api-error";
 import { MutationCache, QueryCache, QueryClient } from "@tanstack/react-query";
 
 /** 本番とテストが同じ設定で使う QueryClient を作る。 */
@@ -126,7 +127,7 @@ export function createQueryClient(): QueryClient {
 - `@frontend/api` のテストは Node で走り、`src/testing/setup.ts` が MSW の server の起動と後片付けを全テストで行う。
   生成した handler がない transport の検査は、テストの中で `server.use()` に手書きの handler を渡す（[配置と実行環境](../testing.md#配置と実行環境)）。
   `document` と `location` は `vi.stubGlobal` で置く。
-- `api-fetch.test.ts` は、比べる problem type がコミット済みの `openapi/openapi.yaml` にあることも確かめる。
+- `api-error.test.ts` は、比べる problem type がコミット済みの `openapi/openapi.yaml` にあることも確かめる。
 - `query-client.test.ts` は、`QueryObserver`、`MutationObserver`、MSW で、mutation の後の再取得が終わるまで pending を保つことを確かめる。
 - `preload-query.test.ts` は、`createTestQueryClient()` と `vi.fn` の `queryFn` で、cache の再利用と無効化の後の取り直しを確かめる。
 - 生成物そのものはテストせず、coverage からも外す。

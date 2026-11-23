@@ -58,7 +58,7 @@ feature の中のコードを lib へ移す条件は[共有コード](../archite
 ファイルの範囲ごとの禁止の一覧は[ファイルの範囲ごとの制限](../lint-config.md#ファイルの範囲ごとの制限)にある。
 テストファイルと `src/testing/` では、テスト用部品と層の import の禁止が外れる。
 
-`notice.ts` は `@frontend/api/api-fetch` の `ApiProblemError` を import している。
+`notice.ts` は `@frontend/api/api-error` の `ApiProblemError` を import している。
 [依存方向](../architecture.md#依存方向)は lib から `@frontend/api` への向きを図に定めておらず、lint はこの向きを止めていない。
 
 ## 最小の例と典型的な例

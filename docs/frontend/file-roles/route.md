@@ -53,7 +53,7 @@ URL の path を増やさずに、配下の route に `beforeLoad` と layout �
 
 ## 依存してよいもの、してはいけないもの
 
-- **依存してよいもの**：`@tanstack/react-router`、`@frontend/api/endpoints/<tag>/<tag>` の生成 query options、`@frontend/api/zod/<tag>/<tag>.zod` の生成 schema、`@frontend/api/api-fetch` の `ApiProblemError` と `isTenantNotSelected`、`@/api/preload-query`、`@/components/` の共有の component、`@/features/<feature>/` の画面と [feature の module](feature-module.md)（`isOrderStatus`、`listOrdersParams`）。
+- **依存してよいもの**：`@tanstack/react-router`、`@frontend/api/endpoints/<tag>/<tag>` の生成 query options、`@frontend/api/zod/<tag>/<tag>.zod` の生成 schema、`@frontend/api/api-error` の `ApiProblemError` と `isTenantNotSelected`、`@/api/preload-query`、`@/components/` の共有の component、`@/features/<feature>/` の画面と [feature の module](feature-module.md)（`isOrderStatus`、`listOrdersParams`）。
 - **依存してはいけないもの**：Base UI（`@base-ui/**`）、テスト用の部品（`msw`、`@/testing/**`、`@testing-library/**`）、テレメトリの SDK（`@grafana/*`）、global の `fetch` と `XMLHttpRequest`。
 
 ## 最小の例と典型的な例
@@ -78,7 +78,7 @@ export const Route = createFileRoute("/_authenticated/_tenant/orders/new")({
 注文と商品を並べて取得し、404 と 400 を not found にする。
 
 ```tsx
-import { ApiProblemError } from "@frontend/api/api-fetch";
+import { ApiProblemError } from "@frontend/api/api-error";
 import { getFindOrderByIdSuspenseQueryOptions } from "@frontend/api/endpoints/ordering/ordering";
 import { getListProductsSuspenseQueryOptions } from "@frontend/api/endpoints/product/product";
 import { createFileRoute, notFound } from "@tanstack/react-router";
@@ -96,8 +96,7 @@ export const Route = createFileRoute("/_authenticated/_tenant/orders/$orderId/")
     } catch (error) {
       // 400 は path の UUID の形の誤りで、利用者には存在しない注文と同じに見せる。
       if (error instanceof ApiProblemError && (error.status === 404 || error.status === 400)) {
-        // TanStack Router は notFound() の戻り値を投げる形で not found を扱う。
-        // oxlint-disable-next-line typescript/only-throw-error
+        // oxlint-disable-next-line typescript/only-throw-error -- TanStack Router は notFound() の戻り値を投げる形で not found を扱う。
         throw notFound();
       }
       throw error;
@@ -187,7 +186,7 @@ describe("ログアウト後の画面", () => {
 - [ ] loader から `ensureQueryData` を呼ばない。［Oxlint で検査：typescript/no-deprecated］
 - [ ] 複数の query は `Promise.all` で並べて取得する。［自分で点検］
 - [ ] 存在しない resource は、loader で `notFound()` を投げる。［自分で点検］
-- [ ] `redirect()` と `notFound()` を投げる行の抑制に、TanStack Router が throw で受け取る理由を書く。［自分で点検］
+- [ ] `redirect()` と `notFound()` を投げる行の抑制に、同じ行の `--` の後に、TanStack Router が throw で受け取る理由を書く。［理由の有無は Oxlint で検査：disable-reason/require-disable-reason。内容は自分で点検］
 - [ ] layout の component は `<Outlet />` を描画する。［自分で点検］
 - [ ] 文言を JSX に直接書かず、catalog の key を `t` で引く。［JSX の子は Oxlint で検査：react/jsx-no-literals。属性の文言は自分で点検］
 - [ ] Base UI、テスト用の部品、テレメトリの SDK を import しない。［Oxlint で検査：no-restricted-imports］

@@ -42,7 +42,7 @@ Loading、Error、存在しない resource の表示は、画面ではなく rou
 
 ## 依存してよいもの、してはいけないもの
 
-- **依存してよいもの**：`@frontend/api/endpoints/<tag>/<tag>` の生成 query options と生成 Hook（他の tag も使ってよい）、`@frontend/api/models` の型、`@frontend/api/api-fetch` の `ApiProblemError`、`@frontend/ui/<部品>`、`@tanstack/react-query`、`@tanstack/react-router` の `getRouteApi` と `Link`、`react`、`react-i18next`、`@/components/` の共有の component、`@/lib/`、同じ feature の component、Hook、module。
+- **依存してよいもの**：`@frontend/api/endpoints/<tag>/<tag>` の生成 query options と生成 Hook（他の tag も使ってよい）、`@frontend/api/models` の型、`@frontend/api/api-error` の `ApiProblemError`、`@frontend/ui/<部品>`、`@tanstack/react-query`、`@tanstack/react-router` の `getRouteApi` と `Link`、`react`、`react-i18next`、`@/components/` の共有の component、`@/lib/`、同じ feature の component、Hook、module。
 - **依存してはいけないもの**：`@/routes/**` と `@/routeTree.gen`、他の feature、Base UI（`@base-ui/**`）、テスト用の部品、テレメトリの SDK、global の `fetch` と `XMLHttpRequest`。
 
 ## 最小の例と典型的な例
