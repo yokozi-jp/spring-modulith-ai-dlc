@@ -156,9 +156,11 @@ enum は switch 式で書く。
 
 ビルドが検査するのは、生型と非検査の警告（`-Xlint:rawtypes,unchecked`）と、`@NullMarked` のコードの null の違反と付け忘れ（Error Prone の NullAway と `RequireExplicitNullMarking`）である。
 PMD の `NonExhaustiveSwitch` が、一部の enum 定数だけを書いた `default` のない switch 文を止める。
+この規則の message は `default` を足せと言うが、足すと次の規則に止められる。直し方は、定数を全部 `case` に書くか、switch 式にすることである。
 `NoDefaultInPatternOrEnumSwitch` が、enum、型パターン、record パターンの switch の `default` を、すべての場合を書いたものも含めて止める。
 同じ switch を二重に報告しないよう、`ExhaustiveSwitchHasDefault` は外している。
 この規則は switch 対象の型が sealed かを読めないため、`Object` を型パターンで振り分ける switch の `default` も止める。
 規約の外の形なので、理由を書いて `@SuppressWarnings("PMD.NoDefaultInPatternOrEnumSwitch")` で抑える。
+sealed 型を実装した enum の修飾した定数だけで振り分ける switch の `default` は、PMD の判定にかからず止まらない。
 sealed の使い方とキャストの禁止は、機械では検査していない。
 レビューで確かめる。

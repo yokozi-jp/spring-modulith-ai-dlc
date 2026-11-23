@@ -86,9 +86,10 @@
             </property>
         </properties>
     </rule>
+
     <rule name="NoDefaultInPatternOrEnumSwitch"
           language="java"
-          message="default があると、バリアントや定数を足してもコンパイルが通り、新しい場合を黙って受けるため。直し方：default を消し、残りの場合を case に書く。規約：docs/backend/java-type-modeling.md"
+          message="default があると、バリアントや定数を足してもコンパイルが通り、新しい場合を黙って受けるため。直し方：default を消し、残りの場合を case に書く。sealed でない型を振り分ける switch なら、理由を書いて @SuppressWarnings(&quot;PMD.NoDefaultInPatternOrEnumSwitch&quot;) で抑える。規約：docs/backend/java-type-modeling.md"
           class="net.sourceforge.pmd.lang.rule.xpath.XPathRule">
         <description>
             enum、型パターン、record パターンの switch に default を書くことを禁止し、場合の追加をコンパイルで検出させる。

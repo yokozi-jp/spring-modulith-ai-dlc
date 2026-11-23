@@ -436,7 +436,7 @@ changesetの検査は`modulith`スキーマを、スキーマ検査は`modulith`
 
 ## PMD
 
-PMDはmainとtestに別のrulesetを適用し、Lombokの`@Data`と`@Setter`、手書きのLoggerフィールド、`LoggerFactory`の直接参照、`getLogger`のstatic import、`@Autowired`を付けた通常メソッド、enum、型パターン、recordパターンのswitchの`default`（`NoDefaultInPatternOrEnumSwitch`）などを検査する。
+PMDはmainに`ruleset.xml`を、testに`ruleset.xml`と`test-ruleset.xml`の両方を適用し、Lombokの`@Data`と`@Setter`、手書きのLoggerフィールド、`LoggerFactory`の直接参照、`getLogger`のstatic import、`@Autowired`を付けた通常メソッド、enum、型パターン、recordパターンのswitchの`default`（`NoDefaultInPatternOrEnumSwitch`）などを検査する。
 PMDの設定は[`ruleset.xml`](../../backend/config/pmd/ruleset.xml)と[`test-ruleset.xml`](../../backend/config/pmd/test-ruleset.xml)を正とする。
 カスタム規則の`message`は、ArchUnitのbecauseと同じ「理由。直し方：…。規約：…」の形にする。
 `ArchitectureRuleMessageTest`が、この形と「規約：」のパスの実在を確かめる。
