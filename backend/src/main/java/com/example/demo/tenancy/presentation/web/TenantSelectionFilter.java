@@ -39,8 +39,8 @@ import org.springframework.web.filter.ServerHttpObservationFilter;
  * <p>テナントを選んだ後のリクエストは、残りの処理の間だけ、選んだテナントを {@link TenantContext} に束縛する。テナントはセッションの権限だけから取り、リクエストの
  * header、パス、本文から取らない。
  *
- * <p>認証したリクエストは、所属の引き直しを含む残りの処理の間だけ、アプリの利用者の ID を MDC の {@value #USER_ID_ATTRIBUTE_KEY} に入れる。 利用者の
- * ID と束縛したテナントは、HTTP の受信の span の属性にも入れる。
+ * <p>{@link AppUserPrincipal} として認証したリクエストは、所属の引き直しを含む残りの処理の間だけ、アプリの利用者の ID を MDC の {@value
+ * #USER_ID_ATTRIBUTE_KEY} に入れる。利用者の ID と束縛したテナントは、HTTP の受信の span の属性にも入れる。
  */
 final class TenantSelectionFilter extends OncePerRequestFilter {
 

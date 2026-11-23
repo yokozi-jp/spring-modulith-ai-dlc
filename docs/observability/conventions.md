@@ -58,7 +58,7 @@ Grafana では trace ID を使ってログとトレースを相互に検索す�
 ログでは、2 つを MDC に入れ、ログを書く処理から key-value で渡さない。
 
 - `tenant.id` は、`TenantContext.call` がテナントを束縛する間だけ入る。リクエストのログにもリスナーのログにも付く。
-- `user.id` は、`TenantSelectionFilter` が認証したリクエストの間だけ入れる。リスナーのログには付かない。
+- `user.id` は、`TenantSelectionFilter` が、アプリの利用者（`AppUserPrincipal`）として認証したリクエストの間だけ入れる。リスナーのログには付かない。
 - `TenantSelectionFilter` が所属を引き直す間のログは、`user.id` を持ち、束縛の前なので `tenant.id` を持たない。
 - コンソールの ECS JSON では `{"tenant":{"id":…},"user":{"id":…}}` の入れ子の項目になり、OTLP では LogRecord の属性になる。
 - リスナーの外で記録するログ（リスナーが投げた例外を Spring の `SimpleAsyncUncaughtExceptionHandler` が記録する ERROR など）は、`tenant.id` を持たない。
