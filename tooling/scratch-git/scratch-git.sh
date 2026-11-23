@@ -3,8 +3,7 @@
 # Run: . "$(dirname "$0")/../scratch-git/scratch-git.sh" || exit 1（source する位置は task lint-scratch-git が検査する）
 
 # フックの中では GIT_DIR や GIT_INDEX_FILE が本物のリポジトリを指す。残すと一時のリポジトリへの git が本物を書き換える（git init が core.bare=true にした）。
-# shellcheck disable=SC2046
-unset $(git rev-parse --local-env-vars)
+while read -r name; do unset "$name"; done < <(git rev-parse --local-env-vars)
 # 利用者の設定（commit.gpgsign、core.hooksPath、init.defaultBranch など）で結果が変わらないようにし、commit に要る名前を渡す。
 # 利用者の safe.directory も読まないので、本物の checkout に git を実行する自己検査は、checkout の所有者が違うコンテナで失敗する。
 export GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1

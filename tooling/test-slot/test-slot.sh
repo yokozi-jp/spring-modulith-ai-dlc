@@ -70,13 +70,11 @@ project_containers() {
 reclaim() {
   local project="$1" ids
   echo "持ち主の worktree が無い $project のコンテナを回収します。" >&2
-  ids="$(project_containers "$project" | cut -f1)"
-  # shellcheck disable=SC2086
-  [ -z "$ids" ] || docker rm --force --volumes $ids >/dev/null
+  mapfile -t ids < <(project_containers "$project" | cut -f1)
+  [ "${#ids[@]}" -eq 0 ] || docker rm --force --volumes "${ids[@]}" >/dev/null
   for kind in volume network; do
-    ids="$(docker "$kind" ls -q --filter "label=com.docker.compose.project=$project")"
-    # shellcheck disable=SC2086
-    [ -z "$ids" ] || docker "$kind" rm $ids >/dev/null
+    mapfile -t ids < <(docker "$kind" ls -q --filter "label=com.docker.compose.project=$project")
+    [ "${#ids[@]}" -eq 0 ] || docker "$kind" rm "${ids[@]}" >/dev/null
   done
 }
 
