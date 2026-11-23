@@ -10,7 +10,7 @@ const defaultProps: {
 } = {
   idPrefix: "",
   serverError: undefined,
-  // oxlint-disable-next-line eslint/no-empty-function -- withFieldGroup の props は型を与えるだけで、この関数は呼ばれない
+  // oxlint-disable-next-line eslint/no-empty-function -- withFieldGroup の props は型を与えるだけで、この関数は呼ばれない。
   onFieldChange: () => {},
 };
 
@@ -18,7 +18,7 @@ const defaultProps: {
 export const CustomerOrderCodeField = withFieldGroup({
   defaultValues: { customerOrderCode: "" },
   props: defaultProps,
-  // oxlint-disable-next-line eslint/func-name-matching -- React の component として hook を呼ぶため、名前を大文字で始める
+  // oxlint-disable-next-line eslint/func-name-matching -- React の component として hook を呼ぶため、名前を大文字で始める。
   render: function CustomerOrderCodeFieldRender({ group, idPrefix, serverError, onFieldChange }) {
     const { t } = useTranslation();
     const id = `${idPrefix}-customer-order-code`;

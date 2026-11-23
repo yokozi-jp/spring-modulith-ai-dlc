@@ -1,7 +1,7 @@
 const disableDirective = /^\s*(?:oxlint|eslint)-disable(?:-next-line|-line)?(?=\s|$)/u;
-const reason = /\s--\s+\S/u;
+const reason = /[^\S\n]-{2,}[^\S\n]+\S/u;
 
-// ponytail: OxlintにもESLintにも、無効化コメントの理由を求める組み込みの規則がない。組み込みができたら置き換える。
+// ponytail: OxlintにもESLintにも（eslint-commentsのrequire-descriptionはoxlint-*を知らない）、無効化コメントの理由を求める組み込みの規則がない。組み込みができたら置き換える。
 export const requireDisableReason = {
   meta: {
     messages: {

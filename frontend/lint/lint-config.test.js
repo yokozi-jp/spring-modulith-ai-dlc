@@ -294,18 +294,19 @@ describe("fixture に適用したプロジェクトの lint 設定", () => {
     });
 
     describe("lint を止めるコメント", () => {
-      it("同じ行に -- <理由> のない disable のコメントを禁止し、理由のあるものを許可する", () => {
-        const found = diagnostics.filter(
-          (diagnostic) =>
-            diagnostic.filename === `${appDirectory}/src/lib/disable-without-reason.ts`,
-        );
+      it("同じ行に -- <理由> のない disable のコメントを禁止し、直し方を示す", () => {
+        expect(
+          countIn("lib/disable-without-reason.ts", "disable-reason(require-disable-reason)"),
+        ).toBe(3);
+        expect(
+          diagnostics.find(
+            (diagnostic) => diagnostic.code === "disable-reason(require-disable-reason)",
+          )?.message,
+        ).toContain("-- <reason>");
+      });
 
-        expect(found.map((diagnostic) => diagnostic.code)).toStrictEqual([
-          "disable-reason(require-disable-reason)",
-          "disable-reason(require-disable-reason)",
-          "disable-reason(require-disable-reason)",
-        ]);
-        expect(found[0]?.message).toContain("-- <reason>");
+      it("理由のある disable のコメントを許可する", () => {
+        expect(codesIn("lib/disable-with-reason.ts")).toStrictEqual([]);
       });
     });
 

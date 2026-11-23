@@ -50,7 +50,7 @@ packageの`vite.config.ts`に`lint`か`fmt`があると、`vp lint`をpackageで
   関数の引数に渡すkey（`` tones.get(`${tone}-strong`) ``）は報告するため、classはobjectか配列に並べて選ぶ。
   `className`の外で組み立てた文字列と、`cn()`に渡す変数は検出しない。
 - **lintを止めるコメント**：jsPluginの`disable-reason/require-disable-reason`は、`oxlint-disable`、`oxlint-disable-next-line`、`oxlint-disable-line`、`eslint-disable`、`eslint-disable-next-line`、`eslint-disable-line`のコメントに、同じ行の`-- <理由>`を求める。
-  理由を前の行に書いても、規則は同じ行になければ報告する。
+  理由を前の行や、ブロックコメントの次の行に書いても、規則は報告する。
   生成物（`routeTree.gen.ts`と`packages/api/src/generated/**`）は、Lintの対象外なので検査しない。
   `reportUnusedDisableDirectives`は、使われていないコメントを止める別の検査である。
 - **`lint/**`**：`import/no-nodejs-modules`、`new-cap`、`typescript/no-unsafe-assignment`、`typescript/no-unsafe-call`、`typescript/no-unsafe-member-access`をoffにし、Nodeのglobalを許した`no-undef`を有効にする。

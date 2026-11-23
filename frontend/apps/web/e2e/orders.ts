@@ -27,7 +27,7 @@ interface Product {
 
 // 公開 API の応答の本文。形は backend の契約テストが保証するため、ここでは検証しない（docs/frontend/api-client-orval.md）。
 export async function readJson<Body>(response: APIResponse): Promise<Body> {
-  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- Playwright の response.json() は any を返すため、型引数 Body へ断定する
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- Playwright の response.json() は any を返すため、型引数 Body へ断定する。
   return (await response.json()) as Body;
 }
 
