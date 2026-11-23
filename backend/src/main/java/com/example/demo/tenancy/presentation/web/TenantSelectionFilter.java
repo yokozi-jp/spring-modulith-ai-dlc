@@ -15,7 +15,6 @@ import java.io.IOException;
 import java.util.Optional;
 import java.util.UUID;
 import org.jspecify.annotations.Nullable;
-import org.slf4j.MDC;
 import org.springframework.http.HttpMethod;
 import org.springframework.security.authentication.AuthenticationTrustResolver;
 import org.springframework.security.authentication.AuthenticationTrustResolverImpl;
@@ -39,19 +38,13 @@ import org.springframework.web.filter.ServerHttpObservationFilter;
  * <p>テナントを選んだ後のリクエストは、残りの処理の間だけ、選んだテナントを {@link TenantContext} に束縛する。テナントはセッションの権限だけから取り、リクエストの
  * header、パス、本文から取らない。
  *
- * <p>{@link AppUserPrincipal} として認証したリクエストは、所属の引き直しを含む残りの処理の間だけ、アプリの利用者の ID を MDC の {@value
- * #USER_ID_ATTRIBUTE_KEY} に入れる。利用者の ID と束縛したテナントは、HTTP の受信の span の属性にも入れる。
+ * <p>{@link AppUserPrincipal} として認証したリクエストの利用者の ID と、束縛したテナントは、HTTP の受信の span の属性に入れる。MDC の利用者の ID
+ * は {@link UserIdMdcFilter} が入れる。
  */
 final class TenantSelectionFilter extends OncePerRequestFilter {
 
   /** テナントが決まっている必要がある API。 */
   private static final RequestMatcher REQUIRES_TENANT;
-
-  /**
-   * ログとトレースで、アプリの利用者の ID（{@link
-   * AppUserPrincipal#userId()}）を持つ項目の名前（docs/observability/conventions.md）。
-   */
-  private static final String USER_ID_ATTRIBUTE_KEY = "user.id";
 
   static {
     final PathPatternRequestMatcher.Builder paths = PathPatternRequestMatcher.withDefaults();
@@ -96,14 +89,10 @@ final class TenantSelectionFilter extends OncePerRequestFilter {
       filterChain.doFilter(request, response);
       return;
     }
-    if (!(authentication.getPrincipal() instanceof AppUserPrincipal user)) {
-      doFilterInSelectedTenant(authentication, request, response, filterChain);
-      return;
+    if (authentication.getPrincipal() instanceof AppUserPrincipal user) {
+      addToServerSpan(request, UserIdMdcFilter.USER_ID_ATTRIBUTE_KEY, user.userId());
     }
-    addToServerSpan(request, USER_ID_ATTRIBUTE_KEY, user.userId());
-    try (MDC.MDCCloseable ignored = MDC.putCloseable(USER_ID_ATTRIBUTE_KEY, user.userId())) {
-      doFilterInSelectedTenant(authentication, request, response, filterChain);
-    }
+    doFilterInSelectedTenant(authentication, request, response, filterChain);
   }
 
   /** 選んだテナントが残っていれば、束縛してリクエストの残りの処理を呼ぶ。 */

@@ -53,7 +53,7 @@ IdP の `sub`、login ID、メールアドレス、認証 session ID は、ADR-0
 
 - 2 つを SLF4J の MDC に入れ、ログを書く処理から key-value で渡さない。
 - `tenant.id` は、`TenantContext.call` が束縛の間だけ入れる。入れ子の束縛から戻ると外側のテナントに戻し、束縛を出ると消す。
-- `user.id` は、`TenantSelectionFilter` が、アプリの利用者（`AppUserPrincipal`）として認証したリクエストの所属の引き直しを含む残りの処理の間だけ入れる。リスナーには入れない。
+- `user.id` は、`UserIdMdcFilter` が、アプリの利用者（`AppUserPrincipal`）として認証したリクエストの、セッションの認証を読んだ後の残りの処理の間だけ入れる。`TenantSecurityCustomizer` が、この filter を `SecurityContextHolderFilter` の直後、`CsrfFilter` の前に置く。`CsrfFilter` は `ExceptionTranslationFilter` の手前で拒否するので、`ExceptionTranslationFilter` の手前に置くと、CSRF の失敗のログに付かない。リスナーには入れない。
 - OpenTelemetry appender は `mdcAttributesIncluded` で MDC のうち 2 つだけを属性にし、Collector の `keep_keys` に 2 つを足す。
 - コンソールの ECS JSON は、Spring Boot が MDC を出すので、設定を足さない。
 
@@ -81,7 +81,10 @@ appender の `mdcAttributesIncluded` は、MDC のうち OTLP の属性にする
 
 ### Negative
 
-- ログに `tenant.id` と `user.id` が付かない範囲がある（リスナーの外のログ、`TenantSelectionFilter` の外の拒否と CSRF のログは両方、所属の引き直しの間のログは `tenant.id` だけ）。範囲は[可観測性データの規約](../observability/conventions.md#テナントと利用者)に書く。認可の拒否のログに `user.id` を付ける案は #635 で扱う。
+- ログに `tenant.id` と `user.id` が付かない範囲がある。範囲は[可観測性データの規約](../observability/conventions.md#テナントと利用者)に書く。
+  - 両方を持たない：リスナーの外のログ、認証していないリクエストのログ。
+  - `tenant.id` だけを持たない：認可の拒否、CSRF の失敗、`TenantNotSelectedException`、所属の引き直しの間のログ。
+- `TenantSelectionFilter` の手前で拒否する CSRF の失敗の受信の span は、ログと違い、`user.id` を持たない。
 - 受信の span 以外の span（外向きの HTTP、SQL、リスナーの span とその中の処理）は `tenant.id` を持たない。受信の span の trace ID からたどる。
 - 利用者の ID から利用者を特定できるので、ADR-015 の閲覧権限と保持期間で守る。
 
@@ -130,5 +133,7 @@ appender の `mdcAttributesIncluded` は、MDC のうち OTLP の属性にする
 - [OpenTelemetry Logback Appender](https://github.com/open-telemetry/opentelemetry-java-instrumentation/tree/main/instrumentation/logback/logback-appender-1.0/library)
 - `backend/src/main/java/com/example/demo/shared/tenant/TenantContext.java`
 - `backend/src/main/java/com/example/demo/tenancy/presentation/web/TenantSelectionFilter.java`
+- `backend/src/main/java/com/example/demo/tenancy/presentation/web/UserIdMdcFilter.java`
+- `backend/src/main/java/com/example/demo/tenancy/presentation/web/TenantSecurityCustomizer.java`
 - `backend/src/main/resources/logback-spring.xml`
 - `docker/otel-collector/config.yaml`

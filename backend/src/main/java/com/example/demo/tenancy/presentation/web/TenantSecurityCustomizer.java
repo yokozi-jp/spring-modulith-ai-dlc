@@ -4,14 +4,19 @@ import com.example.demo.tenancy.TenancyQueries;
 import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.web.access.intercept.AuthorizationFilter;
+import org.springframework.security.web.context.SecurityContextHolderFilter;
 import org.springframework.stereotype.Component;
 
 /**
- * アプリの Security filter chain に、テナントを選ぶ処理を足す。
+ * アプリの Security filter chain に、テナントを選ぶ処理と、MDC に利用者の ID を入れる処理を足す。
  *
  * <p>Spring Security は、{@code Customizer<HttpSecurity>} の Bean を {@code SecurityConfig} が受け取る前の
  * {@link HttpSecurity} に適用する。認可の {@link AuthorizationFilter} の前で所属を引き直し、テナントを選ぶ前の業務の API を拒否する。
  * OIDC のログインの後には、所属が 1 つだけならそのテナントを選ぶ。選んだテナントの所属の API は、管理者だけに許す。
+ *
+ * <p>MDC に利用者の ID を入れる {@link UserIdMdcFilter} は、セッションの認証を読む {@link SecurityContextHolderFilter}
+ * の直後、{@code CsrfFilter} の前に置く。{@code CsrfFilter} は {@code ExceptionTranslationFilter} の外側で CSRF
+ * の検証の失敗を拒否するので、{@code ExceptionTranslationFilter} の手前に置くと、その拒否のログに利用者の ID が付かない。
  *
  * <p>この Bean は、アプリが作るすべての {@link HttpSecurity} に適用される。ブラウザのセッションでない chain（Client Credentials
  * など）を足すときは、その chain をこの処理から外す。
@@ -38,6 +43,7 @@ class TenantSecurityCustomizer implements Customizer<HttpSecurity> {
     // が引き直した所属の役割から来る。
     http.authorizeHttpRequests(auth ->
             auth.requestMatchers(CurrentTenantMemberController.PATH + "/**").hasRole("ADMIN"))
+        .addFilterAfter(new UserIdMdcFilter(), SecurityContextHolderFilter.class)
         .addFilterBefore(
             new TenantSelectionFilter(tenancyQueries, tenantSession), AuthorizationFilter.class)
         .oauth2Login(login ->
