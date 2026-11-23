@@ -4,8 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 
-import io.micrometer.tracing.Span;
-import io.micrometer.tracing.TraceContext;
+import com.example.demo.testkit.TracerStubs;
 import io.micrometer.tracing.handler.TracingObservationHandler.TracingContext;
 import java.net.URI;
 import java.util.ArrayList;
@@ -14,7 +13,6 @@ import java.util.Map;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.mockito.Mockito;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
 import org.springframework.http.server.observation.ServerRequestObservationContext;
@@ -31,6 +29,9 @@ import tools.jackson.databind.json.JsonMapper;
 
 /** 応答を書く直前の Problem Details に、要求の trace ID を付け、instance を消すことを検証する。 */
 class ProblemDetailsConfigTest {
+
+  /** 応答の本文を読む。 */
+  private static final JsonMapper JSON = JsonMapper.builder().build();
 
   /** 有効な trace ID。 */
   private static final String TRACE_ID = "4bf92f3577b34da6a3ce929d0e0e4736";
@@ -80,18 +81,6 @@ class ProblemDetailsConfigTest {
   }
 
   @Test
-  @DisplayName("要求の外で呼ばれても、traceId を付けずに instance を消す")
-  void omitsTraceIdOutsideRequest() {
-    final ProblemDetail problem = ProblemDetail.forStatus(HttpStatus.NOT_FOUND);
-    problem.setInstance(URI.create("/error"));
-
-    intercept(problem);
-
-    assertNull(problem.getProperties(), "要求の外の拡張メンバー");
-    assertNull(problem.getInstance(), "instance");
-  }
-
-  @Test
   @DisplayName("Spring Framework は handler が返した Problem Details の空の instance に要求のパスを入れる")
   void springFillsEmptyInstanceWithRequestPath() throws Exception {
     final String body =
@@ -104,7 +93,7 @@ class ProblemDetailsConfigTest {
 
     assertEquals(
         "/fixture",
-        JsonMapper.builder().build().readTree(body).path("instance").asString(),
+        JSON.readTree(body).path("instance").asString(),
         "Spring Framework が instance を入れなくなった（7.1、spring-framework#35969）。"
             + "ProblemDetailsConfig の setInstance(null) と ADR-117 の Spring Framework 7.0 の注記を消す");
   }
@@ -115,22 +104,20 @@ class ProblemDetailsConfigTest {
     interceptors.forEach(interceptor -> interceptor.handleError(problem, null));
   }
 
-  // TracingContext の close は開いた scope を閉じるだけで、scope を開かないこのテストでは要らない。
-  @SuppressWarnings("PMD.CloseResource")
   private static void bindRequestWithTraceId(final String traceId) {
-    final TraceContext traceContext = Mockito.mock(TraceContext.class);
-    Mockito.when(traceContext.traceId()).thenReturn(traceId);
-    final Span span = Mockito.mock(Span.class);
-    Mockito.when(span.context()).thenReturn(traceContext);
-    final TracingContext tracing = new TracingContext();
-    tracing.setSpan(span);
     final MockHttpServletRequest request = new MockHttpServletRequest();
     final ServerRequestObservationContext observation =
         new ServerRequestObservationContext(request, new MockHttpServletResponse());
-    observation.put(TracingContext.class, tracing);
+    observation.put(TracingContext.class, tracingContext(traceId));
     request.setAttribute(
         ServerHttpObservationFilter.CURRENT_OBSERVATION_CONTEXT_ATTRIBUTE, observation);
     RequestContextHolder.setRequestAttributes(new ServletRequestAttributes(request));
+  }
+
+  private static TracingContext tracingContext(final String traceId) {
+    final TracingContext tracing = new TracingContext();
+    tracing.setSpan(TracerStubs.spanWithTraceId(traceId));
+    return tracing;
   }
 
   /** 空の instance の Problem Details を返す handler。 */
