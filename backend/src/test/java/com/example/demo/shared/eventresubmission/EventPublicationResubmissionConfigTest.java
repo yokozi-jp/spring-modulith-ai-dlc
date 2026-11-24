@@ -2,6 +2,7 @@ package com.example.demo.shared.eventresubmission;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.example.demo.shared.eventresubmission.EventPublicationResubmitOnce.Target;
 import com.example.demo.shared.events.ResubmissionPolicy;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
@@ -403,10 +404,12 @@ class EventPublicationResubmissionConfigTest {
   @DisplayName("手での 1 回の再投入の終了コードは、すべて完了なら 0、未完了や例外なら 1 である")
   void resubmitOnceExitCode() {
     final EventPublicationResubmitOnce job = Mockito.mock(EventPublicationResubmitOnce.class);
-    Mockito.when(job.run("all")).thenReturn(new EventPublicationResubmitOnce.Outcome(2, 2, 0, 0));
-    Mockito.when(job.run("policy:payment"))
+    Mockito.when(job.run(Target.parse("all")))
+        .thenReturn(new EventPublicationResubmitOnce.Outcome(2, 2, 0, 0));
+    Mockito.when(job.run(Target.parse("policy:payment")))
         .thenReturn(new EventPublicationResubmitOnce.Outcome(2, 1, 1, 0));
-    Mockito.when(job.run("policy:missing")).thenThrow(new IllegalArgumentException("unknown"));
+    Mockito.when(job.run(Target.parse("policy:missing")))
+        .thenThrow(new IllegalArgumentException("unknown"));
 
     assertThat(EventPublicationResubmissionConfig.resubmitOnceExitCode(job, "all")).isZero();
     assertThat(EventPublicationResubmissionConfig.resubmitOnceExitCode(job, "policy:payment"))

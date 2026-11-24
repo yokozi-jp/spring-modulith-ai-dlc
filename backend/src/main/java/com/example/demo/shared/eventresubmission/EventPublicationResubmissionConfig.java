@@ -161,7 +161,10 @@ class EventPublicationResubmissionConfig {
   /* package */ static int resubmitOnceExitCode(
       final EventPublicationResubmitOnce job, final @Nullable String target) {
     try {
-      return job.run(target == null ? "" : target).succeeded() ? 0 : 1;
+      return job.run(EventPublicationResubmitOnce.Target.parse(target == null ? "" : target))
+              .succeeded()
+          ? 0
+          : 1;
     } catch (RuntimeException e) {
       log.atError().setCause(e).log("Event publication resubmit-once failed");
       return 1;

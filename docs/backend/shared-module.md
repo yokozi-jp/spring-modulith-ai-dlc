@@ -12,7 +12,7 @@ tags: [architecture, backend, spring-modulith, shared-module]
 
 - jOOQ の共通処理を `shared.persistence` に置き、このパッケージを `@NamedInterface` で公開する。
   業務テーブルの INSERT と UPDATE を組み立てて実行する唯一の入口である `TableWriter` もここに置く（[ADR-054](../adr/ADR-054-detect-optimistic-lock-conflicts-by-update-count.md)）。
-- Spring Modulith のイベント出版のレジストリの、失敗した出版の定期の再投入（`EventPublicationResubmitter`）と手での 1 回の再投入（`EventPublicationResubmitOnce`）は `shared.eventresubmission` に置く（[ADR-079](../adr/ADR-079-resubmit-failed-event-publications-periodically-with-shedlock.md)）。
+- Spring Modulith のイベント出版のレジストリの、失敗した出版の定期の再投入（`EventPublicationResubmitter`）と手での 1 回の再投入（`EventPublicationResubmitOnce`）は、両方が使う掃き取り（`FailedPublicationSweep`）とともに `shared.eventresubmission` に置く（[ADR-079](../adr/ADR-079-resubmit-failed-event-publications-periodically-with-shedlock.md)）。
   レジストリは全モジュールが共有する基盤で業務の概念を持たず、jOOQ を使う処理は Persistence Adapter の層に置く規則があり、`shared.eventresubmission` はその層に入るためである。
   `EventPublicationResubmitOnce` 以外のクラスは package-private にし、他のモジュールから使えないようにする。
   `EventPublicationResubmitOnce` は、他のモジュールの結合テストがリスナーの回復を確かめるため public にする。

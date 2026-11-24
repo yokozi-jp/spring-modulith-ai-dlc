@@ -119,7 +119,7 @@ class EventPublicationResubmitterRunsTest {
             .lock(
                 new LockConfiguration(
                     clock.instant(),
-                    EventPublicationResubmitter.LOCK_NAME,
+                    FailedPublicationSweep.LOCK_NAME,
                     Duration.ofMinutes(1),
                     Duration.ZERO))
             .orElseThrow(() -> new AssertionError("テストのロックを取れない"));
