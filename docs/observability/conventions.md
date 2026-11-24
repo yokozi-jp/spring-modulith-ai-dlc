@@ -114,7 +114,7 @@ query か fragment を持つ URL、別オリジンの URL、`/assets/` 以外の
 Session、View、Errors、WebVitals だけを明示的に有効にし、Console、Performance、UserAction、Frustration、Navigation、CSP は有効にしない。
 Web Vitals は LCP、INP、CLS の主値を一つだけ残し、付加情報を送らない。
 匿名の Faro session ID は同じタブの signal の相関だけに使い、`sessionStorage` に保持する。
-ログアウトの送信前に session ID を切り替え、`APP_SESSION` と利用者情報へ結び付けない。
+ログアウトの送信前に session ID を切り替え、`__Host-APP_SESSION` と利用者情報へ結び付けない。
 ブラウザは `traceparent` を付けず、span も送らない。
 Collector へは Cookie を送らない（`credentials: "omit"`）。
 CSP 違反の報告は Reporting API が同一オリジンの Cookie を付けて送るので、`/collect` と `/csp-report` を転送する層（開発は Vite の proxy、本番は CDN か reverse proxy）が `Cookie`、`Authorization`、`Proxy-Authorization` を消す（[ADR-068](../adr/ADR-068-collect-browser-telemetry-with-faro-via-collector.md)）。
@@ -164,7 +164,7 @@ route params の `$` は、Collector の環境変数の展開と正規表現の�
 route を追加するときは、Collector の allowlist とこの文書を同じ変更で更新する。
 allowlist は環境変数にしない。
 Collector は環境変数の既定値に `$` を書けず、本番で上書きして広げられる値にもしないためである。
-session ID は `^[a-km-zA-HJ-NP-Z0-9]{10}$` に一致する匿名の Faro ID だけを許可し、UUID の `APP_SESSION` を拒否する。
+session ID は `^[a-km-zA-HJ-NP-Z0-9]{10}$` に一致する匿名の Faro ID だけを許可し、UUID の `__Host-APP_SESSION` を拒否する。
 この形式も `transform/frontend_validate` の 1 か所だけに書く。
 resource 属性は `service.name`、`service.namespace`、`service.version`、`deployment.environment.name` だけを残し、`service.name` は Collector の `FRONTEND_OTEL_SERVICE_NAME` で上書きする。
 

@@ -8,7 +8,7 @@
 - [ADR-004: jOOQ 生成コードを Git 管理する](ADR-004-commit-jooq-generated-code.md)（Accepted, 2026-09-11）
 - [ADR-005: Liquibase をアプリケーション起動から分離する](ADR-005-decouple-liquibase-from-app-startup.md)（Accepted, 2026-09-11）
 - [ADR-006: 絶対時刻を UTC / Instant / timestamptz に統一する](ADR-006-utc-instant-absolute-time-policy.md)（Accepted, Amended by ADR-109, 2026-09-11）
-- [ADR-007: セッションベース認証と OIDC Authorization Code + PKCE](ADR-007-session-based-auth-with-oidc-pkce.md)（Accepted, Amended by ADR-111, 2026-09-11）
+- [ADR-007: セッションベース認証と OIDC Authorization Code + PKCE](ADR-007-session-based-auth-with-oidc-pkce.md)（Accepted, Amended by ADR-111, Amended by ADR-119, 2026-09-11）
 - [ADR-008: application.yaml を単一にし設定を外部注入する](ADR-008-single-application-yaml-external-config.md)（Accepted, 2026-09-11）
 - [ADR-009: DB 接続を単一アカウントから二つの役割へ分ける](ADR-009-unify-db-connection-target-credentials-only-role-split.md)（Superseded by ADR-011, 2026-09-13）
 - [ADR-010: プロジェクトのタスクランナーに Task を採用する](ADR-010-adopt-task-as-project-task-runner.md)（Proposed, 2026-09-13）
@@ -67,7 +67,7 @@
 - [ADR-063: Gradle の依存キャッシュを MIT の範囲で restore-keys 付きに復元する](ADR-063-restore-gradle-cache-with-restore-keys-on-mit-caching.md)（Proposed, 2026-10-06）
 - [ADR-064: OpenAPI 契約を test タスクで書き出し、Backend CI のテスト二重実行をやめる](ADR-064-write-openapi-contract-from-test-task-in-ci.md)（Proposed, 2026-10-06）
 - [ADR-065: 区分値を DB と API で enum の名前のまま持つ](ADR-065-store-category-values-as-enum-names.md)（Proposed, 2026-10-06）
-- [ADR-066: CSRF の Cookie を __Host- の名前にし、SameSite=Lax を付ける](ADR-066-harden-csrf-cookie-with-host-prefix.md)（Accepted, 2026-10-06）
+- [ADR-066: CSRF の Cookie を __Host- の名前にし、SameSite=Lax を付ける](ADR-066-harden-csrf-cookie-with-host-prefix.md)（Accepted, Amended by ADR-119, 2026-10-06）
 - [ADR-067: jOOQ の生成物を Spring Modulith の OPEN のモジュールにする](ADR-067-open-jooq-generated-module.md)（Proposed, 2026-10-06）
 - [ADR-068: ブラウザのテレメトリを Faro Web SDK で集め、同一オリジンの /collect から Collector へ送る](ADR-068-collect-browser-telemetry-with-faro-via-collector.md)（Proposed, 2026-10-06）
 - [ADR-069: モジュール名とスキーマ名に SQL の予約語を使わない](ADR-069-avoid-sql-reserved-words-in-module-names.md)（Proposed, 2026-10-07）
@@ -118,3 +118,4 @@
 - [ADR-116: フロントエンドのファイルを役割ごとに分け、役割ごとの文書とチェックリストを置く](ADR-116-define-frontend-file-roles.md)（Proposed, 2026-11-23）
 - [ADR-117: Problem Details に traceId を付け、instance を設定しない](ADR-117-add-trace-id-and-omit-instance-in-problem-details.md)（Proposed, 2026-11-23）
 - [ADR-118: モジュールの依存先を allowedDependencies で宣言する](ADR-118-declare-module-dependencies-with-allowed-dependencies.md)（Proposed, 2026-11-23）
+- [ADR-119: セッションの Cookie を __Host-APP_SESSION にし、SameSite=Lax を保つ](ADR-119-harden-session-cookie-with-host-prefix.md)（Proposed, 2026-11-24）

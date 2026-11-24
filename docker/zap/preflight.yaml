@@ -25,9 +25,12 @@ env:
           pollUnits: requests
           loggedInRegex: '"status"\s*:\s*404'
           loggedOutRegex: '"status"\s*:\s*401'
-      # 自動検出で APP_SESSION を拾えなければ method: cookie にする。
+      # ZAP は Secure の __Host-APP_SESSION を HTTP の要求に付けないため、script で付ける（ADR-119）。
       sessionManagement:
-        method: autodetect
+        method: script
+        parameters:
+          script: /zap/plans/scripts/session/app-session.js
+          scriptEngine: "ECMAScript : Graal.js"
       users:
         # demo realm（docker/keycloak/realm.json）のテストユーザーで、秘密ではない。
         - name: test-admin
@@ -45,8 +48,8 @@ jobs:
       action: add
       type: httpsender
       engine: "ECMAScript : Graal.js"
-      name: copy-xsrf-token-to-header.js
-      file: /zap/plans/scripts/httpsender/copy-xsrf-token-to-header.js
+      name: carry-host-cookies.js
+      file: /zap/plans/scripts/httpsender/carry-host-cookies.js
 
   - type: requestor
     parameters:

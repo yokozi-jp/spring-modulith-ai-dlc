@@ -6,8 +6,8 @@
 ## Sub-features
 
 - `auth-login`：`/oauth2/authorization/web` から Keycloak の画面へ移り、資格情報を送り、テナント選択でサンプル商事を選ぶと `webOrigin`（slot 0 は `http://localhost:5173`）の `/` へ戻る。
-- `auth-session`：ログインの前後で `APP_SESSION` の Cookie の値が変わり、`/api/missing` が 401 でなく 404 を返す。
-- `auth-logout`：「ログアウト」で「ログアウトしました」の画面に着き、古い `APP_SESSION` で `/api/**` を呼ぶと 401 になる。
+- `auth-session`：ログインの前後で `__Host-APP_SESSION` の Cookie の値が変わり、`/api/missing` が 401 でなく 404 を返す。
+- `auth-logout`：「ログアウト」で「ログアウトしました」の画面に着き、古い `__Host-APP_SESSION` で `/api/**` を呼ぶと 401 になる。
 - `auth-login-again`：ログアウト後の「もう一度ログイン」から、再び Keycloak の画面へ移る。
 
 ## How to get to it (user POV)
@@ -28,14 +28,14 @@ Preconditions:
 
 - **ログイン（`auth-login`、`auth-session`）。**
   `page.goto("/oauth2/authorization/web")` の後、`expect(page).toHaveURL((url) => url.origin === idpOrigin)` で Keycloak の画面を確かめて `step` する。
-  `context.cookies()` の `APP_SESSION` を覚えてから `login()` を呼ぶ。
+  `context.cookies()` の `__Host-APP_SESSION` を覚えてから `login()` を呼ぶ。
   URL が `webOrigin` の `/` になり、`main` の `heading`（level 1、「はじめる」）が見え、Cookie の値が変わる。
   `page.request.get("/api/missing")` が 404 を返す。
 - **ログアウト（`auth-logout`）。**
   `page.getByRole("button", { name: "ログアウト" }).click()` で押す。
   `heading`「ログアウトしました」が見える。
   `const fresh = await request.newContext({ baseURL: webOrigin })` で Cookie を共有しない要求を作る。
-  ログアウトの前の `APP_SESSION` を `headers: { Cookie: \`APP_SESSION=${session}\` }` に付けて `fresh.get("/api/missing")` を呼ぶと、401 を返す。
+  ログアウトの前の `__Host-APP_SESSION` を `headers: { Cookie: \`__Host-APP_SESSION=${session}\` }` に付けて `fresh.get("/api/missing")` を呼ぶと、401 を返す。
   最後に `fresh.dispose()` を呼ぶ。
 - **もう一度ログイン（`auth-login-again`）。**
   「もう一度ログイン」を押す。
