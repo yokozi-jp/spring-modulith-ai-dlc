@@ -16,4 +16,10 @@ public record MailSubject(String value) {
       throw new IllegalArgumentException("mailSubject must not contain a line break");
     }
   }
+
+  /** 件名は宛先の氏名を含みうるため（ADR-015）、値を伏せる。 */
+  @Override
+  public String toString() {
+    return "MailSubject[value=***]";
+  }
 }

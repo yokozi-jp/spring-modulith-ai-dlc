@@ -15,4 +15,10 @@ public record MailRecipient(String value) {
       throw new IllegalArgumentException("mailRecipient must not be blank");
     }
   }
+
+  /** 宛先のアドレスはログに出さないため（ADR-015）、値を伏せる。 */
+  @Override
+  public String toString() {
+    return "MailRecipient[value=***]";
+  }
 }

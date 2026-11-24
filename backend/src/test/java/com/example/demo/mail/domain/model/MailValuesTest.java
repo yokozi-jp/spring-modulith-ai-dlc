@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.quicktheories.QuickTheory.qt;
 
+import java.util.List;
 import java.util.function.Function;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -56,6 +57,20 @@ class MailValuesTest {
   @DisplayName("本文は改行を含んでよい")
   void acceptsMultiLineBodies() {
     assertThat(new MailBody("1 行目\n2 行目").value()).as("本文").isEqualTo("1 行目\n2 行目");
+  }
+
+  @Test
+  @DisplayName("宛先、件名、本文は、ログに渡されても toString で値を出さない")
+  void hidesValuesFromToString() {
+    assertThat(
+            List.of(
+                new MailRecipient("invitee-7f3a@example.net"),
+                new MailSubject("山田様 招待のお知らせ"),
+                new MailBody("https://app.example.com/invitations/token-7f3a")))
+        .extracting(Object::toString)
+        .as("toString")
+        .containsExactly(
+            "MailRecipient[value=***]", "MailSubject[value=***]", "MailBody[value=***]");
   }
 
   /** 空白だけの値で作ると {@link IllegalArgumentException} になることを、値の範囲全体で確かめる。 */

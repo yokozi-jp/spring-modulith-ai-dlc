@@ -13,4 +13,10 @@ public record MailBody(String value) {
       throw new IllegalArgumentException("mailBody must not be blank");
     }
   }
+
+  /** 本文は個人データや招待のリンクを含みうるため（ADR-015）、値を伏せる。 */
+  @Override
+  public String toString() {
+    return "MailBody[value=***]";
+  }
 }
