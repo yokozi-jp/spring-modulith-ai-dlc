@@ -53,6 +53,7 @@ PostgreSQL の READ COMMITTED では、後の UPDATE は先の UPDATE のコミ�
   `ChildTable<C>` は、子のテーブル、親の内部の主キーを持つ外部キーの列、親の中で行を同定する自然キーの列（一つ以上）を持つ。
   `ChildTable` はどの集約の子かを型に持たない。`TableWriter` は、渡された子の行が宣言した子と過不足なく合うことを、SQL の前に実行時に確かめる（`IllegalArgumentException`）。
   同じ子のテーブルを二つの集約の子として宣言する誤りと、子のテーブルを別の集約のルートとして宣言する誤りは、この確かめで見つからないため、`AggregateDeclarationsTest` が本番の全 Repository の宣言を調べる。
+  子を親の子として宣言し忘れる誤りと、`parentKey` の列の誤りは、`AggregateDeclarationInspectionTest` が宣言を DB の外部キーと突き合わせて止める（同じモジュールの外部キーは、参照する表が参照される表をルートとする集約の子であることと、`parentKey` が外部キーの列に含まれることを求める）。
   子の自然キーの列は、保存済みの値と `equals` で比べるため、`Integer`、`Long`、`Short`、`String`、`UUID` に限る。
   宣言は構造と、ルートを一つに決める値の取り方（`keyOf`）だけを持ち、業務の値から列への変換は、保存のたびに渡すラムダが持つ。
   Repository は、保存のたびにルートの列の値と、保存後にあるべき子の全行（`ChildRows`）を渡す。
@@ -177,10 +178,9 @@ PostgreSQL の READ COMMITTED では、後の UPDATE は先の UPDATE のコミ�
   - **`A` に `Versioned` を指定する誤り**：`AggregateTable` の第 3 型引数に集約ルートのクラスでなく `Versioned` を指定すると、版を返すラムダを渡せる。
     ArchUnit は型引数を検査しないため、レビューで見る。
   - **子の宣言の外部キーの列の誤り**：`ChildTable.of` は、親の外部キーの列の型が `Long` であることしか確かめない。
-    生成された jOOQ のコードが FOREIGN KEY の情報を持つのは tenancy のテーブルだけである（`021-add-tenancy-foreign-keys.yaml`）。
-    ordering の `fk_t_order_line` は、テナントの公開 ID と注文の内部の主キーの複合キーで、`ChildTable` の `parentKey`（`Long` の 1 列）とは形が違う。
-    `parentKey` の列が親のテーブルを指すかは、制約のあるテーブルでも確かめない。別の集約の列を渡してもコンパイルは通る。
-    各集約の `AggregateTable` を通した保存、更新の往復のテストで確かめる。
+    `AggregateDeclarationInspectionTest` が、宣言した子の `parentKey` が親への外部キーの列に含まれることと、同じモジュールの外部キーの参照元が親の子として宣言されていることを、カタログの外部キーと突き合わせて確かめる。
+    別の集約への参照は、理由を付けた許可リストに載せる（最初の項目は `tenancy.m_membership` から `tenancy.m_user`）。
+    外部キーを置かない表（規約の対象外）は、突き合わせの対象にならない。
   - **集約ルートの形を外れた集約**：規則は、`domain.model` にあり `Versioned` を実装する型を集約ルートとみなす。
     Repository の `add`、`update`、`delete` の引数はこの形を検査する。
     `add` を持たずに `save` のような名前だけで保存する Repository と、Repository のインタフェースを経由せずに保存する集約は、形を外れても規則が空のまま通る。

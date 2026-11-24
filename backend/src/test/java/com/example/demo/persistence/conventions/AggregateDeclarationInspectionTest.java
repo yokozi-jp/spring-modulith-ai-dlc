@@ -1,0 +1,82 @@
+package com.example.demo.persistence.conventions;
+
+import static org.assertj.core.api.Assertions.assertThat;
+
+import com.example.demo.shared.persistence.AggregateDeclarations;
+import com.example.demo.shared.persistence.DeclaredAggregate;
+import com.example.demo.shared.persistence.DeclaredAggregate.DeclaredChild;
+import com.example.demo.testkit.DatabaseTest;
+import java.util.ArrayList;
+import java.util.List;
+import org.jooq.DSLContext;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
+
+/** 本番の集約の宣言を、マイグレーション済みのテストDBの外部キーと突き合わせる。 */
+@DatabaseTest
+class AggregateDeclarationInspectionTest {
+
+  /** アプリロールで接続したjOOQのコンテキスト。 */
+  @Autowired private DSLContext dsl;
+
+  /** changesetを適用したマイグレーションロールの名前。 */
+  @Value("${MIGRATION_DB_USERNAME}")
+  private String migrationRole;
+
+  private List<ConventionViolation> check(final List<DeclaredAggregate> aggregates) {
+    return AggregateDeclarationConventions.check(
+        aggregates,
+        SchemaCatalog.read(dsl, migrationRole).constraints(),
+        AggregateDeclarationConventions.ALLOWLIST);
+  }
+
+  @Test
+  @DisplayName("本番の集約の宣言は、外部キーと一致する")
+  void declaredAggregatesMatchForeignKeys() {
+    final List<ConventionViolation> violations = check(AggregateDeclarations.declared());
+
+    assertThat(violations).as("集約の宣言の違反: %s", violations).isEmpty();
+  }
+
+  @Test
+  @DisplayName("t_order_line を ORDER の子から外して独立のルートにすると、拒否する")
+  void rejectsOrderLineDeclaredAsRoot() {
+    final List<DeclaredAggregate> mutated = new ArrayList<>();
+    for (final DeclaredAggregate aggregate : AggregateDeclarations.declared()) {
+      mutated.add(
+          new DeclaredAggregate(
+              aggregate.root(),
+              aggregate.children().stream()
+                  .filter(child -> !"ordering.t_order_line".equals(child.table()))
+                  .toList()));
+    }
+    mutated.add(new DeclaredAggregate("ordering.t_order_line", List.of()));
+
+    assertThat(check(mutated))
+        .extracting(ConventionViolation::key)
+        .containsExactly("AG1 ordering.t_order_line -> ordering.t_order");
+  }
+
+  @Test
+  @DisplayName("m_membership の parentKey を user_id にすると、拒否する")
+  void rejectsMembershipParentKeyOutsideTenantForeignKey() {
+    final List<DeclaredAggregate> mutated =
+        AggregateDeclarations.declared().stream()
+            .map(aggregate ->
+                new DeclaredAggregate(
+                    aggregate.root(),
+                    aggregate.children().stream()
+                        .map(child ->
+                            "tenancy.m_membership".equals(child.table())
+                                ? new DeclaredChild(child.table(), "user_id")
+                                : child)
+                        .toList()))
+            .toList();
+
+    assertThat(check(mutated))
+        .extracting(ConventionViolation::key)
+        .containsExactly("AG2 tenancy.m_membership.user_id");
+  }
+}

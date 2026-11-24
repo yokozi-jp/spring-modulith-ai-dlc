@@ -337,7 +337,6 @@ public long countUnshippedByCustomer(final CustomerId customerId) {
 
 `@DatabaseTest` で、`add` してから読み戻す往復と、`update` してから読み戻す往復を確かめる。
 子の行を持つ集約は、`update` で子の行が差分（削除、更新、追加）のとおりに変わることも確かめる。
-子の宣言の外部キーの列の誤りは、コンパイルでも `TableWriter` のテストでも見つからないため、このテストで確かめる。
 Repository のテストは列と集約の往復と子の行の差分だけを確かめ、競合と行がない場合のテストを Repository ごとには書かない。
 版の条件、件数の判定、競合と行なしの区別、ロック待ちの変換は、`shared` の `TableWriterTest` と `TableWriterConcurrencyTest` が実 PostgreSQL で確かめる。
 共通カラムの値はテストの検証対象にする（[PostgreSQL の共通カラム](../../database/postgresql-common-columns.md)）。
@@ -400,7 +399,7 @@ Repository のテストは列と集約の往復と子の行の差分だけを確
 - [ ] 子の Entity を `multiset` で集約ルートと同じ SQL で読み、集約を `Records.mapping(Order::restore)` で作る。［自分で点検］
 - [ ] `multiset` の副問い合わせに、子を識別する列の `orderBy` を付ける（`orderBy(T_ORDER_LINE.LINE_NO)`）。［自分で点検］
 - [ ] 集約ルートの `LOCK_NO` を選び、`restore` の `lockNo` に渡す。［自分で点検］
-- [ ] 集約の形を `AggregateTable` と `ChildTable` のクラスの定数として一度だけ宣言し、子の外部キーの列に親の内部の主キーを指す列を渡す。同じ子のテーブルを別の集約で宣言しない。［テストで検査：AggregateDeclarationsTest + 自分で点検（外部キーの列は往復のテストで確かめる）］
+- [ ] 集約の形を `AggregateTable` と `ChildTable` のクラスの定数として一度だけ宣言し、子の外部キーの列に親の内部の主キーを指す列を渡す。同じ子のテーブルを別の集約で宣言しない。［テストで検査：AggregateDeclarationsTest（宣言の重複）、AggregateDeclarationInspectionTest（外部キーとの突き合わせ）］
 - [ ] Spring の例外（`CannotAcquireLockException`、`DuplicateKeyException`）を catch して `ConflictException` に変えない。［自分で点検］
 - [ ] `add` は `tableWriter.insert(...)` を呼び、ルートの列と子の全行を `ColumnValues` で渡す。`insertInto` を呼ばない。［ArchUnit で検査：TableWriterArchTest.tableWritesGoThroughTableWriter］
 - [ ] 集約ルートを受け取る `add` 以外の public メソッドは、`update` という名前で、`TableWriter.update` を、そのメソッドの中で直接呼ぶ。［ArchUnit で検査：TableWriterArchTest.repositoryUpdateCallsVersionedEntryPoint］

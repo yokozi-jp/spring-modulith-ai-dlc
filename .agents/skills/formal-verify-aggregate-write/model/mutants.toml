@@ -46,3 +46,17 @@ invariants = ["AggregateWhole"]
 [[mutant.edits]]
 old = '''![i].ops = deletes \o updates \o inserts'''
 new = '''![i].ops = updates \o inserts'''
+
+[[mutant]]
+name = "unbumped-root"
+change = "TableWriter.update compares lock_no but does not bump it (lock_no = expected)"
+config = "two-saves"
+invariants = ["NoLostUpdate"]
+
+[[mutant.edits]]
+old = '''
+  /\ IF root.lock = w[i].expected
+       THEN /\ rootPend' = [holder |-> i, lock |-> w[i].expected + 1, tag |-> i]'''
+new = '''
+  /\ IF root.lock = w[i].expected
+       THEN /\ rootPend' = [holder |-> i, lock |-> w[i].expected, tag |-> i]'''
