@@ -12,13 +12,17 @@ import io.swagger.v3.oas.models.media.IntegerSchema;
 import io.swagger.v3.oas.models.media.ObjectSchema;
 import io.swagger.v3.oas.models.media.Schema;
 import io.swagger.v3.oas.models.media.StringSchema;
+import io.swagger.v3.oas.models.parameters.HeaderParameter;
+import io.swagger.v3.oas.models.parameters.Parameter;
 import io.swagger.v3.oas.models.responses.ApiResponse;
 import io.swagger.v3.oas.models.security.SecurityRequirement;
 import io.swagger.v3.oas.models.security.SecurityScheme;
 import io.swagger.v3.oas.models.servers.Server;
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Consumer;
+import java.util.stream.Stream;
 import org.springdoc.core.customizers.OpenApiCustomizer;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
@@ -37,13 +41,19 @@ public class OpenApiConfig {
    *
    * <p>互換な追加で MINOR、破壊的変更で MAJOR を上げ、アプリのリリース版と連動させない（docs/web-api/versioning.md）。
    */
-  /* package */ static final String CONTRACT_VERSION = "0.9.0";
+  /* package */ static final String CONTRACT_VERSION = "0.10.0";
 
   /** 共通の Problem response を参照する接頭辞。 */
   private static final String PROBLEM_RESPONSE_REF = "#/components/responses/";
 
   /** components の schema を参照する接頭辞。 */
   private static final String SCHEMA_REF = "#/components/schemas/";
+
+  /** 必須の Idempotency-Key ヘッダーを表す parameter の名前（ADR-126）。 */
+  private static final String IDEMPOTENCY_KEY = "IdempotencyKey";
+
+  /** テナントを選ぶ前の操作なので Idempotency-Key を求めない operation（ADR-126）。 */
+  private static final String SELECT_TENANT = "selectTenant";
 
   /** 認証の Cookie セッションを表す securityScheme の名前。 */
   private static final String SESSION_COOKIE_SCHEME = "sessionCookie";
@@ -68,11 +78,17 @@ public class OpenApiConfig {
                     .in(SecurityScheme.In.COOKIE)
                     .name(sessionCookieName)
                     .description("ブラウザの Cookie セッション（ADR-007、ADR-059）"))
+            .addParameters(IDEMPOTENCY_KEY, idempotencyKeyParameter())
             .addSchemas(PROBLEM_DETAIL, problemDetailSchema())
             .addSchemas("ValidationError", validationErrorSchema())
             .addSchemas("ValidationProblem", validationProblemSchema())
             .addResponses(
-                "BadRequestProblem", problemResponse("要求の形式または入力値が正しくない", "ValidationProblem"))
+                "BadRequestProblem",
+                problemResponse(
+                    "要求の形式または入力値が正しくない。Idempotency-Key がないときの type は /problems/idempotency-key-missing、"
+                        + "形式が正しくないときは /problems/idempotency-key-invalid、"
+                        + "同じキーで内容の違う要求を送ったときは /problems/idempotency-key-payload-mismatch",
+                    "ValidationProblem"))
             .addResponses(
                 "UnauthorizedProblem",
                 problemResponse("認証されていない", PROBLEM_DETAIL)
@@ -89,7 +105,18 @@ public class OpenApiConfig {
                         + "テナントを選ぶ前に業務の API を呼んだときの type は /problems/tenant-not-selected",
                     PROBLEM_DETAIL))
             .addResponses("NotFoundProblem", problemResponse("対象のリソースが存在しない", PROBLEM_DETAIL))
-            .addResponses("ConflictProblem", problemResponse("リソースの現在の状態と競合する", PROBLEM_DETAIL))
+            .addResponses(
+                "ConflictProblem",
+                problemResponse(
+                        "リソースの現在の状態と競合する。同じ Idempotency-Key の要求を処理しているときの type は "
+                            + "/problems/idempotency-key-in-progress で、Retry-After を付ける",
+                        PROBLEM_DETAIL)
+                    .addHeaderObject(
+                        HttpHeaders.RETRY_AFTER,
+                        new Header()
+                            .description(
+                                "同じキーで再試行するまで待つ秒数。type が /problems/idempotency-key-in-progress のときだけ付く")
+                            .schema(new IntegerSchema().minimum(BigDecimal.ZERO).example(1))))
             .addResponses(
                 "UnprocessableContentProblem", problemResponse("業務規則に反するため処理できない", PROBLEM_DETAIL))
             .addResponses(
@@ -113,6 +140,31 @@ public class OpenApiConfig {
   @Bean
   public OpenApiCustomizer commonProblemResponses() {
     return openApi -> forEachOperation(openApi, OpenApiConfig::addCommonProblemResponses);
+  }
+
+  /**
+   * POST、PUT、PATCH、DELETE の operation に、必須の Idempotency-Key と、キーの誤りの 400 を付ける。
+   *
+   * <p>キーの表はテナントごとなので、テナントを選ぶ操作には付けない（ADR-126）。
+   */
+  @Bean
+  public OpenApiCustomizer requireIdempotencyKey() {
+    return openApi -> {
+      final Map<String, PathItem> paths = openApi.getPaths();
+      if (paths == null) {
+        return;
+      }
+      paths.values().stream()
+          .flatMap(
+              item -> Stream.of(item.getPost(), item.getPut(), item.getPatch(), item.getDelete()))
+          .filter(
+              operation -> operation != null && !SELECT_TENANT.equals(operation.getOperationId()))
+          .forEach(operation -> {
+            operation.addParametersItem(
+                new Parameter().$ref("#/components/parameters/" + IDEMPOTENCY_KEY));
+            operation.getResponses().putIfAbsent("400", problemRef("BadRequestProblem"));
+          });
+    };
   }
 
   /**
@@ -175,6 +227,23 @@ public class OpenApiConfig {
     return new ApiResponse().$ref(PROBLEM_RESPONSE_REF + name);
   }
 
+  /** 利用者の操作ごとにクライアントが採番する Idempotency-Key の parameter を作る（ADR-126）。 */
+  private static Parameter idempotencyKeyParameter() {
+    return new HeaderParameter()
+        .name("Idempotency-Key")
+        .required(true)
+        .description(
+            "利用者の操作ごとにクライアントが採番する冪等性キー。"
+                + "値は Structured Field の String（引用符付き）で、中身は UUID に限る"
+                + "（draft-ietf-httpapi-idempotency-key-header-08）。"
+                + "自動の再試行は同じキーで送り、利用者が操作し直したときは新しいキーを採る")
+        .schema(
+            new StringSchema()
+                .pattern(
+                    "^\"[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\"$")
+                .example("\"8e03978e-40d5-43e8-bc93-6894a57f9324\""));
+  }
+
   /** RFC 9457 の Problem Details の schema を作る。 */
   private static Schema<?> problemDetailSchema() {
     final ObjectSchema schema = new ObjectSchema();
@@ -221,7 +290,9 @@ public class OpenApiConfig {
         "type",
         new StringSchema()
             .format("uri-reference")
-            .description("入力検証エラーなら /problems/validation-error。それ以外の 400 は about:blank")
+            .description(
+                "入力検証エラーなら /problems/validation-error。"
+                    + "Idempotency-Key の誤りなら /problems/idempotency-key- で始まる type。それ以外の 400 は about:blank")
             .example("/problems/validation-error"));
     extension.addProperty(
         "errors",

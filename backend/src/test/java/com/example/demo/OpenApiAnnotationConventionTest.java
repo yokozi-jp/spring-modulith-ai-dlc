@@ -25,7 +25,12 @@ import org.springframework.test.web.servlet.ResultMatcher;
  * <p>サンプル Controller は com.example.demo の外にあり、このテストだけが読み込む。OpenApiContractTest が書き出す契約には含まれない。
  */
 // MockMvc.perform が Exception を宣言するため、補助メソッドも Exception を宣言する。
-@SuppressWarnings({"PMD.SignatureDeclareThrowsException", "PMD.UnitTestShouldIncludeAssert"})
+// 規約ごとに 1 つのテストを置くため、メソッドの数の上限を外す。
+@SuppressWarnings({
+  "PMD.SignatureDeclareThrowsException",
+  "PMD.TooManyMethods",
+  "PMD.UnitTestShouldIncludeAssert"
+})
 @SpringBootTest
 @AutoConfigureMockMvc
 @Import({SharedTestConfiguration.class, SampleOrderOpenApiFixture.class})
@@ -126,6 +131,17 @@ class OpenApiAnnotationConventionTest {
       apiDocs.andExpect(problemRef(operation, "400", "BadRequestProblem"));
     }
     apiDocs.andExpect(jsonPath(LIST + ".responses['400']").doesNotExist());
+  }
+
+  @Test
+  @DisplayName("POST の operation は必須の Idempotency-Key を参照し、GET の operation は参照しない")
+  void unsafeOperationsReferenceIdempotencyKey() throws Exception {
+    final String idempotencyKey = "#/components/parameters/IdempotencyKey";
+    apiDocs()
+        .andExpect(jsonPath(PLACE + ".parameters[*]['$ref']").value(contains(idempotencyKey)))
+        .andExpect(jsonPath(CANCEL + ".parameters[*]['$ref']").value(contains(idempotencyKey)))
+        .andExpect(jsonPath(FIND + ".parameters[*]['$ref']").isEmpty())
+        .andExpect(jsonPath(LIST + ".parameters").doesNotExist());
   }
 
   @Test

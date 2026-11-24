@@ -6,6 +6,7 @@ import {
 } from "@frontend/api/mocks/ordering/ordering.msw";
 import { getListPaymentsMockHandler } from "@frontend/api/mocks/payment/payment.msw";
 import { getListProductsMockHandler } from "@frontend/api/mocks/product/product.msw";
+import { draftOrderHeaderIdempotencyKeyRegExp } from "@frontend/api/zod/ordering/ordering.zod";
 import { screen, waitFor, within } from "@testing-library/react";
 import type { UserEvent } from "@testing-library/user-event";
 import { http, HttpResponse } from "msw";
@@ -239,5 +240,34 @@ describe("注文の作成の画面", () => {
       customerOrderCode: "C-009",
       lines: [{ productId: notebookId, quantity: 1 }],
     });
+  });
+});
+
+describe("注文の作成の Idempotency-Key", () => {
+  beforeEach(() => {
+    stubCsrfCookie();
+    server.use(getListProductsMockHandler(products));
+  });
+
+  it("押すたびに、引用符で囲んだ UUID の新しい Idempotency-Key を送る", async () => {
+    const keys: (string | null)[] = [];
+    server.use(
+      http.post("*/api/orders", ({ request }) => {
+        keys.push(request.headers.get("Idempotency-Key"));
+        return problemResponse(409, "競合が発生しました");
+      }),
+    );
+    const user = await submitFilledForm();
+    await expect(within(notice()).findByText("競合が発生しました")).resolves.toBeTruthy();
+
+    await user.click(screen.getByRole("button", { name: "作成する" }));
+
+    await waitFor(() => {
+      expect(keys).toHaveLength(2);
+    });
+    for (const key of keys) {
+      expect(key).toMatch(draftOrderHeaderIdempotencyKeyRegExp);
+    }
+    expect(keys[0]).not.toBe(keys[1]);
   });
 });

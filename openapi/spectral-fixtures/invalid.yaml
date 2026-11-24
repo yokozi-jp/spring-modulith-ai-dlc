@@ -50,7 +50,7 @@ paths:
       tags:
         - sample-order
       summary: サンプル注文を受け付ける。
-      # operation-description（description がない）
+      # operation-description（description がない）と idempotency-key-required（parameters がない）
       operationId: placeSampleOrder
       requestBody:
         description: 受け付けるサンプル注文
@@ -119,6 +119,13 @@ paths:
           description: 強制するか
           schema:
             type: boolean
+        # idempotency-key-required（components の IdempotencyKey を参照せず、inline で書く）
+        - name: Idempotency-Key
+          in: header
+          description: 冪等性キー
+          required: true
+          schema:
+            type: string
       responses:
         "204":
           description: サンプル注文を取り消した
@@ -186,6 +193,7 @@ paths:
       summary: サンプル備考を追加する。
       description: サンプル備考を追加する。<p>在庫は変えない。
       operationId: addSampleNote
+      # idempotency-key-required（Idempotency-Key を参照しない）
       parameters:
         # query-parameter-get-only（POST）
         - name: draft

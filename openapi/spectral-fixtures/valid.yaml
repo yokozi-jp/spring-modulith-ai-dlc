@@ -18,6 +18,8 @@ paths:
       summary: サンプル注文を受け付ける。
       description: サンプル注文を受け付ける。<p>在庫は引き当てない。
       operationId: placeSampleOrder
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
       requestBody:
         description: 受け付けるサンプル注文
         content:
@@ -119,6 +121,7 @@ paths:
           schema:
             type: integer
             format: int64
+        - $ref: "#/components/parameters/IdempotencyKey"
       responses:
         "204":
           description: サンプル注文を取り消した
@@ -138,17 +141,39 @@ paths:
           schema:
             type: string
             format: uuid
+        - $ref: "#/components/parameters/IdempotencyKey"
       responses:
         "204":
           description: サンプル注文を出荷済みにした
         "4XX":
           $ref: "#/components/responses/BadRequestProblem"
+  # idempotency-key-required はテナントを選ぶ前の selectTenant を除く
+  /api/current-tenant:
+    put:
+      tags:
+        - sample-order
+      summary: テナントを選ぶ。
+      description: テナントを選ぶ。<p>選んだテナントをセッションに保存する。
+      operationId: selectTenant
+      responses:
+        "204":
+          description: テナントを選んだ
 components:
   securitySchemes:
     sessionCookie:
       type: apiKey
       in: cookie
       name: __Host-APP_SESSION
+  parameters:
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      description: 利用者の操作ごとにクライアントが採番する冪等性キー
+      required: true
+      schema:
+        type: string
+        pattern: '^"[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}"$'
+        example: '"8e03978e-40d5-43e8-bc93-6894a57f9324"'
   schemas:
     ProblemDetail:
       type: object

@@ -301,6 +301,25 @@ rules:
       functionOptions:
         notMatch: "^query$"
 
+  # ponytail: operation 直下の parameters の $ref だけを見る。パス直下の parameters と、同じ内容を inline で書いたヘッダーは違反にする。
+  idempotency-key-required:
+    description: POST、PUT、PATCH、DELETE の operation は、必須の Idempotency-Key ヘッダー（#/components/parameters/IdempotencyKey）を参照する。テナントを選ぶ前の selectTenant は除く（ADR-126）。
+    severity: error
+    resolved: false
+    given: "$.paths[*][?(@property.match(/^(post|put|patch|delete)$/) && @.operationId !== 'selectTenant')]"
+    then:
+      function: schema
+      functionOptions:
+        schema:
+          required: [parameters]
+          properties:
+            parameters:
+              contains:
+                required: [$ref]
+                properties:
+                  $ref:
+                    const: "#/components/parameters/IdempotencyKey"
+
   problem-response-content:
     description: 共通の Problem response は application/problem+json で ProblemDetail か ValidationProblem を返す。
     severity: error

@@ -2,6 +2,7 @@ import {
   useChangeTenantMemberRole,
   useRemoveTenantMember,
 } from "@frontend/api/endpoints/tenancy/tenancy";
+import { idempotencyKeyHeaders } from "@frontend/api/idempotency-key";
 import { useTranslation } from "react-i18next";
 
 import { failureNotice } from "@/lib/notice";
@@ -39,13 +40,16 @@ export function useMemberActions(lockNo: number, setNotice: (notice: Notice | un
     handleChangeRole: (userId: string, role: string) => {
       setNotice(undefined);
       changeRole(
-        { userId, data: { role, lockNo } },
+        { userId, data: { role, lockNo }, headers: idempotencyKeyHeaders() },
         callbacks(t("tenancy.members.notice.roleChanged")),
       );
     },
     handleRemove: (userId: string) => {
       setNotice(undefined);
-      removeMember({ userId, params: { lockNo } }, callbacks(t("tenancy.members.notice.removed")));
+      removeMember(
+        { userId, params: { lockNo }, headers: idempotencyKeyHeaders() },
+        callbacks(t("tenancy.members.notice.removed")),
+      );
     },
   };
 }

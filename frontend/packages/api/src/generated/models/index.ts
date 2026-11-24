@@ -13,6 +13,7 @@ export * from './internalServerErrorProblemResponse.ts';
 export * from './notFoundProblemResponse.ts';
 export * from './unauthorizedProblemResponse.ts';
 export * from './unprocessableContentProblemResponse.ts';
+export * from './idempotencyKeyParameter.ts';
 export * from './ordering/index.ts';
 export * from './payment/index.ts';
 export * from './product/index.ts';

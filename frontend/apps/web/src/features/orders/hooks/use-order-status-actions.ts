@@ -1,4 +1,5 @@
 import { useCancelOrder, useConfirmOrder } from "@frontend/api/endpoints/ordering/ordering";
+import { idempotencyKeyHeaders } from "@frontend/api/idempotency-key";
 import { useTranslation } from "react-i18next";
 
 import { failureNotice } from "@/lib/notice";
@@ -37,7 +38,7 @@ export function useOrderStatusActions(
       }
       setNotice(undefined);
       confirm(
-        { orderId, data },
+        { orderId, data, headers: idempotencyKeyHeaders() },
         {
           onSuccess: () => {
             setNotice({ heading: t("orders.notice.confirmed") });
@@ -54,7 +55,7 @@ export function useOrderStatusActions(
       }
       setNotice(undefined);
       cancel(
-        { orderId, data },
+        { orderId, data, headers: idempotencyKeyHeaders() },
         {
           onSuccess: () => {
             setNotice({ heading: t("orders.notice.cancelled") });

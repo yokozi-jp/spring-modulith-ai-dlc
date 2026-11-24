@@ -5,6 +5,6 @@
 import type { ProblemDetail } from './problemDetail.ts';
 
 /**
- * リソースの現在の状態と競合する
+ * リソースの現在の状態と競合する。同じ Idempotency-Key の要求を処理しているときの type は /problems/idempotency-key-in-progress で、Retry-After を付ける
  */
 export type ConflictProblemResponse = ProblemDetail;

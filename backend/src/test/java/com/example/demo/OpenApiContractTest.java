@@ -45,7 +45,7 @@ class OpenApiContractTest {
   @Autowired private MockMvc mockMvc;
 
   @Test
-  @DisplayName("生成 OpenAPI は 3.1 で契約の版と RFC 9457 共通 components を含む")
+  @DisplayName("生成 OpenAPI は 3.1 で契約の版、RFC 9457 と Idempotency-Key の共通 components を含む")
   void openApiDocumentContainsProblemDetailsComponents() throws Exception {
     mockMvc
         .perform(get("/v3/api-docs"))
@@ -72,9 +72,24 @@ class OpenApiContractTest {
         .andExpect(jsonPath("$.components.schemas.ValidationError").exists())
         .andExpect(
             jsonPath("$.components.schemas.ProblemDetail.properties.type.format")
-                .value("uri-reference"));
+                .value("uri-reference"))
+        .andExpect(jsonPath("$.components.parameters.IdempotencyKey.name").value("Idempotency-Key"))
+        .andExpect(jsonPath("$.components.parameters.IdempotencyKey.in").value("header"))
+        .andExpect(jsonPath("$.components.parameters.IdempotencyKey.required").value(true))
+        .andExpect(
+            jsonPath("$.components.responses.ConflictProblem.headers['Retry-After']").exists());
 
     exportWhenRequested();
+  }
+
+  @Test
+  @DisplayName("テナントを選ぶ操作はキーの表に書けないので、Idempotency-Key を求めない（ADR-126）")
+  void selectTenantDoesNotRequireIdempotencyKey() throws Exception {
+    mockMvc
+        .perform(get("/v3/api-docs"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.paths['/api/current-tenant'].put.operationId").value("selectTenant"))
+        .andExpect(jsonPath("$.paths['/api/current-tenant'].put.parameters").doesNotExist());
   }
 
   private static ResultMatcher problemResponseExists(final String name) {
