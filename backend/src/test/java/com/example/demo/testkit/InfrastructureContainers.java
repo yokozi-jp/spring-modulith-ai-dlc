@@ -40,8 +40,8 @@ import org.yaml.snakeyaml.Yaml;
  * とスモークの依存と版をそろえる。 ポートは compose と同じく {@code 127.0.0.1} だけで待ち受ける。
  *
  * <p>AWS の SDK は Spring の設定を読まないため、SES v2 の接続先、リージョン、ダミーの資格情報は、SDK
- * が環境変数より優先して読むシステムプロパティで渡す（ADR-125）。 Spring のコンテキストが SDK の Client を作る前に、{@link #properties()}
- * が設定する。
+ * が環境変数より優先して読むシステムプロパティで渡す（ADR-125）。Spring のコンテキストが SDK の Client を作る前に、{@link #properties()}
+ * の初回の呼び出しが設定する。
  */
 final class InfrastructureContainers {
 
@@ -100,18 +100,27 @@ final class InfrastructureContainers {
   /** 決済代行のスタブが請求に返す status。 */
   private static final int CHARGED = 201;
 
-  /** SES v2 の API のスタブが SendEmail に返す status。 */
-  private static final int SENT = 200;
-
   /** SDK が SES v2 の接続先を読むシステムプロパティ。環境変数 {@code AWS_ENDPOINT_URL_SESV2} と同じ意味。 */
   private static final String SES_ENDPOINT_PROPERTY = "aws.endpointUrlSesV2";
 
   /** テストの SDK が使うリージョン。WireMock はリージョンを見ない。 */
   private static final String AWS_REGION = "ap-northeast-1";
 
+  /** テストの SDK のダミーのアクセスキー。{@code .env.test.example} と同じ値で、WireMock は署名を見ない。 */
+  private static final String AWS_ACCESS_KEY_ID = "test-dummy-access-key";
+
+  /** テストの SDK のダミーのシークレットキー。{@code .env.test.example} と同じ値で、WireMock は署名を見ない。 */
+  private static final String AWS_SECRET_ACCESS_KEY = "test-dummy-secret-key";
+
   private InfrastructureContainers() {}
 
-  /** 起動した依存の接続先を、{@code application.yaml} のプレースホルダの名前で返す。初回の呼び出しで起動する。 */
+  /**
+   * 起動した依存の接続先を、{@code application.yaml} のプレースホルダの名前で返す。初回の呼び出しで起動し、副作用として、AWS の SDK の SES v2
+   * の接続先、リージョン、ダミーの資格情報を JVM 全体のシステムプロパティに設定する。
+   *
+   * <p>{@code AWS_ENDPOINT_URL_SESV2} はプレースホルダではなく、SDK がシステムプロパティで読む SES v2
+   * の接続先の写しで、テストが接続先を比べるために置く。
+   */
   /* package */ static Map<String, Object> properties() {
     return Holder.PROPERTIES;
   }
@@ -154,12 +163,12 @@ final class InfrastructureContainers {
 
     final String wireMockUrl = "http://" + LOOPBACK + ":" + wireMock.getMappedPort(WIREMOCK_PORT);
     warmUp(wireMockUrl);
-    // SDK の SES v2 の Client を同じ WireMock に向け、リージョンとダミーの資格情報を渡す（ADR-125）。
-    // システムプロパティは JVM の全体に効くが、コンテナと同じく fork の JVM ごとに 1 回だけ設定する。
+    // SDK は Spring の設定を読まず、システムプロパティを環境変数より優先して読む（ADR-125）。
+    // JVM の全体に効くが、コンテナと同じく fork の JVM ごとに 1 回だけ設定する。
     System.setProperty(SES_ENDPOINT_PROPERTY, wireMockUrl);
     System.setProperty("aws.region", AWS_REGION);
-    System.setProperty("aws.accessKeyId", "test-dummy-access-key");
-    System.setProperty("aws.secretAccessKey", PASSWORD);
+    System.setProperty("aws.accessKeyId", AWS_ACCESS_KEY_ID);
+    System.setProperty("aws.secretAccessKey", AWS_SECRET_ACCESS_KEY);
     final String dbPort = String.valueOf(postgres.getMappedPort(POSTGRES_PORT));
     migrate("jdbc:postgresql://" + LOOPBACK + ":" + dbPort + "/" + DB_NAME);
     return Map.ofEntries(
@@ -170,7 +179,8 @@ final class InfrastructureContainers {
         Map.entry("DB_PASSWORD", PASSWORD),
         Map.entry("MIGRATION_DB_USERNAME", MIGRATION_USER),
         Map.entry("MIGRATION_DB_PASSWORD", PASSWORD),
-        Map.entry("PAYMENT_GATEWAY_BASE_URL", wireMockUrl));
+        Map.entry("PAYMENT_GATEWAY_BASE_URL", wireMockUrl),
+        Map.entry("AWS_ENDPOINT_URL_SESV2", wireMockUrl));
   }
 
   /** コンテナのポートを、空いているホストのポートへ、{@code 127.0.0.1} だけで公開する。 */
@@ -184,17 +194,18 @@ final class InfrastructureContainers {
   }
 
   /**
-   * 決済代行と SES v2 の API の成功のスタブを 1 回ずつ呼ぶ。
+   * 決済代行のスタブを 1 回呼ぶ。
    *
-   * <p>ponytail: WireMock の最初の要求は JsonPath とテンプレートのクラスの読み込みで遅く、負荷の下では {@code
-   * payment-gateway.read-timeout} と {@code mail-sender.read-timeout} を超えるため、テストより先に 1 回ずつ呼ぶ。要求の形は
-   * {@code payment-gateway-charge.json} と {@code ses-send-email.json} の照合の写しなので、スタブの照合を変えたらここも変える。
-   * スタブが増えたら、各スタブを温めるか、テストの read-timeout を延ばす。
+   * <p>ponytail: WireMock の最初の請求は JsonPath とテンプレートのクラスの読み込みで遅く、負荷の下では {@code
+   * payment-gateway.read-timeout} を超えるため、テストより先に 1 回呼ぶ。温めるのは {@code /v1/charges} だけで、要求の形は {@code
+   * payment-gateway-charge.json} の照合の写しなので、スタブの照合を変えたらここも変える。 スタブが増えたら、各スタブを温めるか、テストの read-timeout
+   * を延ばす。SES の SendEmail のスタブは、呼ぶ唯一のテストの {@code MailSenderClientIntegrationTest} が長いタイムアウトの Client
+   * で温める。
    */
   // 割り込まれたら、割り込みの状態を戻して失敗させる。
   @SuppressWarnings("PMD.DoNotUseThreads")
   private static void warmUp(final String baseUrl) {
-    final HttpRequest charge =
+    final HttpRequest request =
         HttpRequest.newBuilder(URI.create(baseUrl + "/v1/charges"))
             .header("Idempotency-Key", "warm-up")
             .header("Content-Type", "application/json")
@@ -202,32 +213,16 @@ final class InfrastructureContainers {
                 HttpRequest.BodyPublishers.ofString(
                     "{\"orderId\":\"warm-up\",\"amount\":\"1\",\"currency\":\"JPY\"}"))
             .build();
-    final HttpRequest sendEmail =
-        HttpRequest.newBuilder(URI.create(baseUrl + "/v2/email/outbound-emails"))
-            .header("Content-Type", "application/json")
-            .POST(
-                HttpRequest.BodyPublishers.ofString(
-                    "{\"FromEmailAddress\":\"warm-up@example.com\","
-                        + "\"Destination\":{\"ToAddresses\":[\"warm-up@example.com\"]},"
-                        + "\"Content\":{\"Simple\":{\"Subject\":{\"Data\":\"warm-up\"},"
-                        + "\"Body\":{\"Text\":{\"Data\":\"warm-up\"}}}},"
-                        + "\"ConfigurationSetName\":\"warm-up\"}"))
-            .build();
     try (HttpClient client = HttpClient.newHttpClient()) {
-      for (final Map.Entry<HttpRequest, Integer> stub :
-          List.of(Map.entry(charge, CHARGED), Map.entry(sendEmail, SENT))) {
-        final int status =
-            client.send(stub.getKey(), HttpResponse.BodyHandlers.discarding()).statusCode();
-        if (status != stub.getValue()) {
-          throw new IllegalStateException(
-              "WireMock のスタブの準備の呼び出しが失敗した: uri=" + stub.getKey().uri() + ", status=" + status);
-        }
+      final int status = client.send(request, HttpResponse.BodyHandlers.discarding()).statusCode();
+      if (status != CHARGED) {
+        throw new IllegalStateException("決済代行のスタブの準備の呼び出しが失敗した: status=" + status);
       }
     } catch (IOException e) {
-      throw new UncheckedIOException("WireMock のスタブを準備できない", e);
+      throw new UncheckedIOException("決済代行のスタブを準備できない", e);
     } catch (InterruptedException e) {
       Thread.currentThread().interrupt();
-      throw new IllegalStateException("WireMock のスタブの準備の途中で割り込まれた", e);
+      throw new IllegalStateException("決済代行のスタブの準備の途中で割り込まれた", e);
     }
   }
 

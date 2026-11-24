@@ -53,6 +53,6 @@ class InfrastructureContainersTest {
     // SDK はシステムプロパティから接続先を読み、Client の設定の endpointOverride に入れる（ADR-125）。
     assertThat(sesV2Client.serviceClientConfiguration().endpointOverride())
         .as("SES v2 の Client の接続先")
-        .hasValue(URI.create((String) started.get("PAYMENT_GATEWAY_BASE_URL")));
+        .hasValue(URI.create((String) started.get("AWS_ENDPOINT_URL_SESV2")));
   }
 }
