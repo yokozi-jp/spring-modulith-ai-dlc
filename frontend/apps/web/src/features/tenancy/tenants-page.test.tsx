@@ -40,14 +40,14 @@ describe("テナントを選ぶ画面", () => {
     expect(selected).toStrictEqual([{ tenantId: goodsTenant.tenantId }]);
   });
 
-  it("所属がないときは、招待を待っていることを伝え、テナントのボタンを出さない", async () => {
+  it("所属がないときは、所属を待っていることを伝え、テナントのボタンを出さない", async () => {
     server.use(getListMembershipsMockHandler({ items: [] }));
     await renderRoute("/tenants");
 
     await expect(
-      screen.findByRole("heading", { level: 1, name: "招待を待っています" }),
+      screen.findByRole("heading", { level: 1, name: "所属を待っています" }),
     ).resolves.toBeTruthy();
-    expect(screen.getByText(/テナントの管理者に招待されると/u)).toBeTruthy();
+    expect(screen.getByText(/所属が登録されると/u)).toBeTruthy();
     expect(screen.queryByRole("list")).toBeNull();
     expect(screen.getByRole("button", { name: "ログアウト" })).toBeTruthy();
   });

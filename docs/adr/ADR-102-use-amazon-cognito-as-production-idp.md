@@ -52,7 +52,7 @@ IdP の前提を ADR にしておかないと、ローカルの Keycloak だけ�
 
 ### Neutral
 
-- ID トークンの `email_verified` を招待の受け入れに使うときは、Keycloak と Cognito の両方で claim が入ることを #380 で確かめる。
+- ID トークンの `email_verified` をアプリが本人の確認に使うときは、Keycloak と Cognito の両方で claim が入ることを、使い始める作業で確かめる。招待の受け入れは別のシステムが担当するので、今は使わない（[#363](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/363)）。
 - 本番のユーザープールの作り方と設定の値は、本番の構築の手順で決める。
 
 ## Alternatives Considered

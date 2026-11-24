@@ -36,7 +36,7 @@ Terraform や DynamoDB のように、このリポジトリで使うと決めて
 ADR が Proposed の間は Decision を直接直す（[ADR の規約](conventions.md#ライフサイクル)）。
 
 - バッチ：ADR と規約にバッチを前提にした規則があるのに、ジョブの入口、冪等性と再開、二重の起動を定める文書がない（[#314](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/314) の調査、[#558](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/558)）。
-- メール：テナントの管理者が利用者をメールで招待すると決め、「使うと決めていない技術」でなくなった（[#323](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/323) の調査、[#572](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/572)）。SMS は、電話番号を集めず、SMS を送る機能もないため、取り込まないまま残す。
+- メール：テナントの管理者が利用者をメールで招待すると決め、「使うと決めていない技術」でなくなった。その後、招待は別のシステムが担当すると決めたが（[#363](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/363)）、アプリがメールを送る可能性は残るので、取り込む側のままにする（[#323](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/323) の調査、[#572](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/572)）。SMS は、電話番号を集めず、SMS を送る機能もないため、取り込まないまま残す。
 - データガバナンス：データ基盤と、部署をまたぐ二次利用者がないため、論理名のコメントと個人データの規則の2つだけを取り込む（[#326](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/326) の調査、[#575](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/575)）。
 
 3つの Issue が同じ行を直すため、書き直しは [#597](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/597) にまとめた。

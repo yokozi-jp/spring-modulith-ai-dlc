@@ -50,7 +50,7 @@ IdPを移るときは、組と利用者の対応づけだけを書き換え、�
 理由は[ADR-101](../adr/ADR-101-keep-tenants-and-roles-in-app-database.md)にある。
 
 - ログインの成功の処理（`TenantSelectionSuccessHandler`）は、所属が1つならそのテナントを選ぶ。所属がないか2つ以上なら選ばない。
-- SPAは`GET /api/memberships`で所属の一覧を読み、`PUT /api/current-tenant`の本文でテナントのIDを送って選ぶ。所属がなければ、招待を待つ画面を出す。
+- SPAは`GET /api/memberships`で所属の一覧を読み、`PUT /api/current-tenant`の本文でテナントのIDを送って選ぶ。所属がなければ、所属を待つ画面を出す。
 - バックエンドは、送られたテナントのIDを所属の表で確かめる。所属にないテナントと、テナントを選んだ後にもう一度選ぶ要求は422にする。テナントを切り替えるには、ログインし直す。
 - テナントを選ぶと、セッションのIDを作り直してから、テナントの`public_id`と所属の役割を持つ権限（`TenantMembershipAuthority`）を足した認証をセッションに保存する。権限の名前は、役割から`ROLE_ADMIN`か`ROLE_MEMBER`にする。
 - テナントを選んだかどうかは、認証がこの権限を持つかどうかだけで表し、セッションの属性に別の値を持たない。書き換えは`TenantSession`だけが行う。
