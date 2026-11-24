@@ -9,7 +9,7 @@ import com.example.demo.jooq.tenancy.tables.records.MTenantRecord;
 import com.example.demo.shared.infrastructure.persistence.AggregateTable;
 import com.example.demo.shared.infrastructure.persistence.ChildTable;
 import com.example.demo.shared.infrastructure.persistence.TableWriter;
-import com.example.demo.shared.tenant.TenantId;
+import com.example.demo.shared.tenancy.TenantId;
 import com.example.demo.tenancy.domain.model.Role;
 import com.example.demo.tenancy.domain.model.Tenant;
 import com.example.demo.tenancy.domain.model.TenantMember;

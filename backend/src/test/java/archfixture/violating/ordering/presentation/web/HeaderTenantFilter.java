@@ -1,6 +1,6 @@
 package archfixture.violating.ordering.presentation.web;
 
-import archfixture.violating.shared.tenant.TenantContext;
+import archfixture.violating.shared.tenancy.TenantContext;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;

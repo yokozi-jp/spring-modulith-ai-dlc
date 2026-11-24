@@ -3,8 +3,8 @@ package com.example.demo.shared.infrastructure.persistence;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.example.demo.jooq.tables.FixtureItemTable;
-import com.example.demo.shared.tenant.TenantId;
-import com.example.demo.shared.tenant.TenantScoped;
+import com.example.demo.shared.tenancy.TenantId;
+import com.example.demo.shared.tenancy.TenantScoped;
 import com.example.demo.testkit.AsTenant;
 import com.example.demo.testkit.CleanGeneratedTablesExtension;
 import com.example.demo.testkit.SharedTestConfiguration;

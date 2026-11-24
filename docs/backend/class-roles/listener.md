@@ -40,7 +40,7 @@ Listener は Infrastructure の Adapter でもない。
 - クラスを継承せず、継承もさせない。Java 標準の型以外の interface も実装しない。
   `PgmCdAspect` は名前で対象を決め、継承した `on` には `*_pgm_cd` を束縛しない（[ADR-051](../../adr/ADR-051-bind-pgm-cd-with-scoped-value-and-aspect.md)）。
 - public メソッドは `@ApplicationModuleListener public void on(final <Event> event)` の一つだけにする。
-- 引数のイベントは `shared.tenant.TenantScoped` を実装する。
+- 引数のイベントは `shared.tenancy.TenantScoped` を実装する。
   `TenantListenerAspect` がイベントのテナントを、`on` のトランザクションが始まる時点で `TenantContext` に束縛する（[ADR-105](../../adr/ADR-105-bind-tenant-to-request-and-event-context.md)）。
 - イベントは `@ApplicationModuleListener` だけで受け、Listener 以外のクラスでも `@EventListener` と `@TransactionalEventListener` を直接付けず、`ApplicationListener` を実装しない。
   理由は[アンチパターン](#アンチパターン)に示す。

@@ -4,8 +4,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.example.demo.shared.security.AppUserPrincipal;
-import com.example.demo.shared.tenant.TenantContext;
-import com.example.demo.shared.tenant.TenantId;
+import com.example.demo.shared.tenancy.TenantContext;
+import com.example.demo.shared.tenancy.TenantId;
 import com.example.demo.tenancy.MembershipSummary;
 import com.example.demo.tenancy.TenancyQueries;
 import com.example.demo.tenancy.TenantMembersDetails;

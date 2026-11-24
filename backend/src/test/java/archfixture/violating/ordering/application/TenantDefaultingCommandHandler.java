@@ -1,6 +1,6 @@
 package archfixture.violating.ordering.application;
 
-import archfixture.violating.shared.tenant.TenantContext;
+import archfixture.violating.shared.tenancy.TenantContext;
 import org.springframework.stereotype.Service;
 
 /** 違反：unboundTenantIsReadOnlyByTransactionManager（CommandHandler が束縛のないテナントを既定値で通す）。 */

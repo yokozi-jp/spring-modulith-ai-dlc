@@ -7,7 +7,7 @@ import com.example.demo.ordering.domain.model.ProductOffer;
 import com.example.demo.ordering.infrastructure.persistence.OrderSeeds;
 import com.example.demo.payment.infrastructure.persistence.PaymentSeeds;
 import com.example.demo.product.ProductSeeds;
-import com.example.demo.shared.tenant.TenantId;
+import com.example.demo.shared.tenancy.TenantId;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;

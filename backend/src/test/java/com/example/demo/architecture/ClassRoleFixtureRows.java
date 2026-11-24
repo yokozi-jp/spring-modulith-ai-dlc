@@ -48,7 +48,7 @@ final class ClassRoleFixtureRows {
                 VIOLATING),
             "ordering.OrderPlacedWithModel"),
         row(
-            "moduleApiDoesNotExposeInternalTypes: shared.tenant の TenantContext",
+            "moduleApiDoesNotExposeInternalTypes: shared.tenancy の TenantContext",
             PackageByFeatureOnionArchitectureTest.moduleApiDoesNotExposeInternalTypesRule(
                 VIOLATING),
             "ordering.OrderPlacedReadingTenantContext"),

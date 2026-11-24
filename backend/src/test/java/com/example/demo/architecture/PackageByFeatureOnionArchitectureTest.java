@@ -93,7 +93,7 @@ class PackageByFeatureOnionArchitectureTest {
 
   /** どの層からも使ってよい shared のパッケージの一覧。層の除外と shared の利用の規則は、ここから組み立てる。 */
   private static final List<String> ANY_LAYER_SHARED_PACKAGES =
-      List.of("concurrency", "failure", "events", "security", "tenant");
+      List.of("concurrency", "failure", "events", "security", "tenancy");
 
   /** Persistence Adapter のパッケージ。 */
   private static final String PERSISTENCE_PACKAGE = "..infrastructure.persistence..";
@@ -473,7 +473,7 @@ class PackageByFeatureOnionArchitectureTest {
             "モジュールルートの型は他モジュールが読む公開契約であり、内部の型を持たせると他モジュールがその型に依存するため。"
                 + "直し方：項目を String、Instant、BigDecimal などの標準型か、"
                 + "同じルートパッケージの record と enum に置き換える。"
-                + "例外は、イベントが運ぶテナントの shared.tenant.TenantId と shared.tenant.TenantScoped だけである。"
+                + "例外は、イベントが運ぶテナントの shared.tenancy.TenantId と shared.tenancy.TenantScoped だけである。"
                 + "規約：docs/backend/architecture.md、"
                 + ADR_050);
   }
@@ -588,9 +588,9 @@ class PackageByFeatureOnionArchitectureTest {
       final String basePackage) {
     final Set<String> tenantTypes =
         Set.of(
-            basePackage + ".shared.tenant.TenantId", basePackage + ".shared.tenant.TenantScoped");
+            basePackage + ".shared.tenancy.TenantId", basePackage + ".shared.tenancy.TenantScoped");
     return new ArchCondition<>(
-        "depend only on java, org.jspecify, shared.tenant.TenantId, shared.tenant.TenantScoped,"
+        "depend only on java, org.jspecify, shared.tenancy.TenantId, shared.tenancy.TenantScoped,"
             + " or the same package") {
       @Override
       public void check(final JavaClass item, final ConditionEvents events) {

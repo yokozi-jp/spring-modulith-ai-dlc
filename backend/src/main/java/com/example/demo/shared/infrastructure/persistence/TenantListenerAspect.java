@@ -1,8 +1,8 @@
 package com.example.demo.shared.infrastructure.persistence;
 
-import com.example.demo.shared.tenant.TenantContext;
-import com.example.demo.shared.tenant.TenantId;
-import com.example.demo.shared.tenant.TenantScoped;
+import com.example.demo.shared.tenancy.TenantContext;
+import com.example.demo.shared.tenancy.TenantId;
+import com.example.demo.shared.tenancy.TenantScoped;
 import org.aspectj.lang.ProceedingJoinPoint;
 import org.aspectj.lang.annotation.Around;
 import org.aspectj.lang.annotation.Aspect;

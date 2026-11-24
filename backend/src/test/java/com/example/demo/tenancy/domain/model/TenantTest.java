@@ -7,7 +7,7 @@ import com.example.demo.shared.concurrency.ConflictException;
 import com.example.demo.shared.concurrency.ExpectedLockNo;
 import com.example.demo.shared.failure.BusinessRuleViolationException;
 import com.example.demo.shared.failure.NotFoundException;
-import com.example.demo.shared.tenant.TenantId;
+import com.example.demo.shared.tenancy.TenantId;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
