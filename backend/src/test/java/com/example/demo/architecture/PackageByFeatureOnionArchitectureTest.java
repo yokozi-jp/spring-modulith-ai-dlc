@@ -151,28 +151,15 @@ class PackageByFeatureOnionArchitectureTest {
                   + "規約：docs/backend/class-roles/jooq-repository.md、"
                   + ADR_002);
 
-  /** Domain Model を Spring、jOOQ、JPA、Jackson から独立させる。 */
+  /** Domain Model の依存先を許可した型だけに限る。 */
   @ArchTest
-  /* package */ static final ArchRule domainModelDoesNotDependOnFrameworks =
-      noClasses()
-          .that()
-          .resideInAPackage(DOMAIN_MODEL_PACKAGE)
-          .should()
-          .dependOnClassesThat()
-          .resideInAnyPackage(
-              "org.springframework..",
-              "org.jooq..",
-              "com.example.demo.jooq..",
-              "jakarta.persistence..",
-              "com.fasterxml.jackson..",
-              "tools.jackson..")
-          .allowEmptyShould(true)
-          .because(
-              "業務モデルと業務規則を技術詳細から独立させ、テストと変更をしやすくするため。"
-                  + "直し方：domain.model からフレームワークの型とアノテーションを取り除き、"
-                  + "技術の処理は Application か Infrastructure へ移す。"
-                  + "規約：docs/backend/layers.md、"
-                  + ADR_002);
+  /* package */ static final ArchRule domainModelDependsOnlyOnAllowedTypes =
+      domainModelDependsOnlyOnAllowedTypesRule(BASE_PACKAGE);
+
+  /** Application の依存先を、許可した外部ライブラリの型とこのアプリケーションの型に限る。 */
+  @ArchTest
+  /* package */ static final ArchRule applicationDependsOnlyOnAllowedTypes =
+      applicationDependsOnlyOnAllowedTypesRule(BASE_PACKAGE);
 
   /** 値オブジェクトの不変条件の違反を、422 になる業務上の失敗ではなく {@link IllegalArgumentException} で表す。 */
   @ArchTest
@@ -480,6 +467,70 @@ class PackageByFeatureOnionArchitectureTest {
                 + "例外は、イベントが運ぶテナントの shared.tenant.TenantId と shared.tenant.TenantScoped だけである。"
                 + "規約：docs/backend/architecture.md、"
                 + ADR_050);
+  }
+
+  /**
+   * Domain Model の依存先を {@code java..}、{@code org.jspecify..}、各モジュールの {@code domain.model}、{@code
+   * shared.concurrency}、{@code shared.failure}、{@code shared.tenant} に限る規則を組み立てる。
+   *
+   * <p>Lombok の注釈は、生成したコードに付く {@code lombok.Generated} だけがクラスファイルに残るので、その型だけを許す。
+   */
+  /* package */ static ArchRule domainModelDependsOnlyOnAllowedTypesRule(final String basePackage) {
+    return classes()
+        .that()
+        .resideInAPackage(basePackage + ".*.domain.model..")
+        .should()
+        .onlyDependOnClassesThat(
+            resideInAnyPackage(
+                "java..",
+                "org.jspecify..",
+                "lombok",
+                basePackage + ".*.domain.model..",
+                basePackage + ".shared.concurrency..",
+                basePackage + ".shared.failure..",
+                basePackage + ".shared.tenant.."))
+        .allowEmptyShould(true)
+        .because(
+            "業務モデルと業務規則を、フレームワークと外部システムの SDK の型から独立させ、テストと変更をしやすくするため。"
+                + "直し方：domain.model から許可していない型とアノテーションを取り除き、"
+                + "技術の処理は Application か Infrastructure へ移す。"
+                + "外部システムの SDK と生成型は infrastructure.client の中に閉じ、domain.model の型へ写す。"
+                + "許可する型を足すときは、この規則の一覧と docs/backend/architecture-tests.md を直す。"
+                + "規約：docs/backend/layers.md、docs/backend/class-roles/external-client.md、"
+                + ADR_002);
+  }
+
+  /**
+   * Application の依存先を、許可した外部ライブラリの型とこのアプリケーションの型に限る規則を組み立てる。
+   *
+   * <p>許可する外部ライブラリの型は、{@code java..}、{@code org.jspecify..}、{@code lombok.Generated}、{@code
+   * org.slf4j..}、Spring の {@code stereotype}、{@code transaction.annotation}、{@code
+   * modulith.events}、{@code context} である。
+   */
+  /* package */ static ArchRule applicationDependsOnlyOnAllowedTypesRule(final String basePackage) {
+    return classes()
+        .that()
+        .resideInAPackage(basePackage + ".*.application..")
+        .should()
+        .onlyDependOnClassesThat(
+            resideInAnyPackage(
+                "java..",
+                "org.jspecify..",
+                "lombok",
+                "org.slf4j..",
+                "org.springframework.stereotype..",
+                "org.springframework.transaction.annotation..",
+                "org.springframework.modulith.events..",
+                "org.springframework.context",
+                basePackage + ".."))
+        .allowEmptyShould(true)
+        .because(
+            "外部システムの SDK、生成型、HTTP の型が Application の引数と戻り値に出ると、"
+                + "ユースケースが外部の技術詳細に結びつくため。"
+                + "直し方：外部ライブラリの型は infrastructure の中に閉じ、Application では Domain の型を使う。"
+                + "許可する型を足すときは、この規則の一覧と docs/backend/architecture-tests.md を直す。"
+                + "規約：docs/backend/layers.md、docs/backend/class-roles/command-handler.md、"
+                + ADR_002);
   }
 
   /** Domain Service の依存先を標準型、JSpecify、Lombok、Domain と {@code @Service} に限る規則を組み立てる。 */

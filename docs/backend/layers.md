@@ -24,7 +24,8 @@ tags: [architecture, backend, onion-architecture]
 - **[`<Aggregate>Repository`](class-roles/repository.md)**：集約を保存し、取り出すインタフェース。
 - **[`<ExternalSystem>`](class-roles/external-system-interface.md)**：決済などの外部システムを、ドメインの語彙で表すインタフェース。
 
-`domain.model` は Spring、jOOQ、JPA、Jackson に依存させない。
+`domain.model` は、`java..`、`org.jspecify..`、`domain.model`、`shared.concurrency`、`shared.failure`、`shared.tenant` の型だけに依存させる。
+外部システムの SDK、OpenAPI から生成した型、Spring、jOOQ、JPA、Jackson の型は使わない。
 Domain Model を API の Request と Response や、永続化の Record として兼用しない。
 
 業務規則は、まず値オブジェクトか Entity に置く。

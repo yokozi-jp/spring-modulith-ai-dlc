@@ -126,7 +126,7 @@ class PaymentGatewayClient implements PaymentGateway {
 
 ## 作成時のチェックリスト
 
-- [ ] `domain.model` に置き、Spring、jOOQ、JPA、Jackson に依存しない。［ArchUnit で検査：PackageByFeatureOnionArchitectureTest.domainModelDoesNotDependOnFrameworks］
+- [ ] `domain.model` に置き、許可した型（`java..`、`org.jspecify..`、`domain.model`、`shared.concurrency`、`shared.failure`、`shared.tenant`）だけに依存する。［ArchUnit で検査：PackageByFeatureOnionArchitectureTest.domainModelDependsOnlyOnAllowedTypes］
 - [ ] `application` とモジュールルートの型に依存しない。［ArchUnit で検査：PackageByFeatureOnionArchitectureTest.dependenciesPointInward］
 - [ ] 名前は外部システムの業務上の役割を表す名詞にし、メソッドは業務の動詞にする。［自分で点検］
 - [ ] 引数と戻り値は値オブジェクトと Java の標準型にする。［自分で点検］

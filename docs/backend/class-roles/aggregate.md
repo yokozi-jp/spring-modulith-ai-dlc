@@ -276,7 +276,7 @@ class OrderTest {
 
 ## 作成時のチェックリスト
 
-- [ ] `domain.model` に置き、Spring、jOOQ、JPA、Jackson に依存しない。［ArchUnit で検査：PackageByFeatureOnionArchitectureTest.domainModelDoesNotDependOnFrameworks］
+- [ ] `domain.model` に置き、許可した型（`java..`、`org.jspecify..`、`domain.model`、`shared.concurrency`、`shared.failure`、`shared.tenant`）だけに依存する。［ArchUnit で検査：PackageByFeatureOnionArchitectureTest.domainModelDependsOnlyOnAllowedTypes］
 - [ ] `domain.service`、`application`、モジュールルートの型に依存しない。［ArchUnit で検査：PackageByFeatureOnionArchitectureTest.dependenciesPointInward］
 - [ ] `public final class` にし、private のコンストラクタを `place` などの業務の動詞の static メソッドと `restore` から呼ぶ。［自分で点検］
 - [ ] setter を作らず、状態は業務の操作のメソッドだけで変える。［自分で点検］
