@@ -61,10 +61,10 @@ url_api = "https://api.github.com/repos/jqlang/jq/releases/assets/453012752"
 provenance = "github-attestations"
 
 [[tools."npm:@iwe-org/iwe"]]
-version = "0.29.2"
-aube = { path = ".mise/locks/npm-iwe-org-iwe/0.29.2", digest = "sha256:2519bdd35ba6988e775629ddbad774a8a1074b2c2463f6979840587af133bdf9" }
+version = "0.33.0"
+aube = { path = ".mise/locks/npm-iwe-org-iwe/0.33.0", digest = "sha256:df9913c575c2c19bb577cc096f805412ac1e82d6e4c4842487001ed6e203e713" }
 backend = "npm:@iwe-org/iwe"
-specifiers = ["0.29.2"]
+specifiers = ["0.33.0"]
 
 [[tools.task]]
 version = "3.53.1"
