@@ -1,7 +1,7 @@
 ---
 type: ADR
 title: 'ADR-105: 操作しているテナントを ScopedValue で束縛し、リクエストはセッションから、リスナーはイベントから取る'
-description: 操作しているテナントの public_id を shared.tenant の ScopedValue に束縛する決定。リクエストの間は入口の filter がセッションで選んだテナントを、リスナーの間は Aspect がイベントの TenantScoped からテナントを、トランザクションより外側で束縛する。テナントを持つイベントは TenantScoped を実装し、束縛を切り替えられる呼び出し元も filter と Aspect だけに、ArchUnit で守る。
+description: 操作しているテナントの public_id を shared.tenancy の ScopedValue に束縛する決定。リクエストの間は入口の filter がセッションで選んだテナントを、リスナーの間は Aspect がイベントの TenantScoped からテナントを、トランザクションより外側で束縛する。テナントを持つイベントは TenantScoped を実装し、束縛を切り替えられる呼び出し元も filter と Aspect だけに、ArchUnit で守る。
 tags: [adr, backend, tenancy, aop, scoped-value, event]
 ---
 
@@ -41,9 +41,9 @@ RLS のポリシーは、トランザクションに設定したテナントの�
 
 ## Decision
 
-操作しているテナントの `public_id` を、`shared.tenant` の `ScopedValue` に束縛する。
+操作しているテナントの `public_id` を、`shared.tenancy` の `ScopedValue` に束縛する。
 
-- `shared.tenant` を新しく置き、`@NamedInterface("tenant")` で公開する。どの層からも使える。
+- `shared.tenancy` を新しく置き、`@NamedInterface("tenancy")` で公開する。どの層からも使える。
   置く型は、`public_id` の UUID を包む値オブジェクト `TenantId`、テナントを運ぶイベントの型 `TenantScoped`、束縛と読み出しの入口 `TenantContext` である。
   `tenancy` の `domain.model` も、テナントの ID に同じ `TenantId` を使う。テナントの ID を表す型を 2 つ持たない。
 - `TenantContext.current()` は、束縛された `TenantId` を返す。束縛がなければ `IllegalStateException` を投げ、テナントがない状態を「データがない」と取り違えさせない。
@@ -53,7 +53,7 @@ RLS のポリシーは、トランザクションに設定したテナントの�
 - リクエストでは、`tenancy` の `TenantSelectionFilter` が、所属を引き直して残っているテナントを、リクエストの残りの処理の間だけ束縛する。
   テナントは認証の権限だけから取る。リクエストの header、パス、本文から取らない。
 - リスナーでは、`shared.infrastructure.persistence` の `TenantListenerAspect` が引数のイベントの `TenantScoped.tenantId()` を、呼び出しの間だけ束縛する。
-  束縛した値は #377 で永続化の処理が読み、`PgmCdAspect` と同じ層に置くため、Aspect は `shared.tenant` でなく `infrastructure.persistence` に置く。
+  束縛した値は #377 で永続化の処理が読み、`PgmCdAspect` と同じ層に置くため、Aspect は `shared.tenancy` でなく `infrastructure.persistence` に置く。
   Aspect は `@Order(Ordered.LOWEST_PRECEDENCE - 200)` を付け、`PgmCdAspect` とトランザクションの advisor より外側で動かす。
   リスナーのトランザクションが始まる時点で、テナントは束縛済みになる。
   引数が `TenantScoped` でなければ、`IllegalStateException` で拒否する。
@@ -63,7 +63,7 @@ RLS のポリシーは、トランザクションに設定したテナントの�
   ほかのクラスが呼ぶと、認証の権限やイベントに無関係なテナントへ切り替えられるため、ArchUnit の `tenantIsBoundOnlyByTenantSelectionFilterAndListenerAspect` で検査する。
   メソッド参照も検出する。filter を別のモジュールに足すときも、この規則の許可先とこの ADR を先に変える。
   `shared.batch` の Aspect を規則の許可先に足すのは、Aspect を作る [#667](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/667) である。
-- ArchUnit の `moduleApiDoesNotExposeInternalTypes` は、モジュールルートの型が依存してよい型に、`shared.tenant.TenantId` と `shared.tenant.TenantScoped` の 2 つだけを足す。イベントがこの 2 つを使うためで、`TenantContext` には依存させない。
+- ArchUnit の `moduleApiDoesNotExposeInternalTypes` は、モジュールルートの型が依存してよい型に、`shared.tenancy.TenantId` と `shared.tenancy.TenantScoped` の 2 つだけを足す。イベントがこの 2 つを使うためで、`TenantContext` には依存させない。
 
 DB のロールとテナントの設定は、トランザクションマネージャーが `TenantContext` を読んで行う（ADR-107）。
 

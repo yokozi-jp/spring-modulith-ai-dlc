@@ -1,4 +1,4 @@
-package archfixture.violating.shared.tenant;
+package archfixture.violating.shared.tenancy;
 
 /** 違反フィクスチャが使う、テナントを運ぶイベントの型。これ自体は規約どおり。 */
 @FunctionalInterface

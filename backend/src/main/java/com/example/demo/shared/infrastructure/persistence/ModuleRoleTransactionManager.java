@@ -1,7 +1,7 @@
 package com.example.demo.shared.infrastructure.persistence;
 
-import com.example.demo.shared.tenant.TenantContext;
-import com.example.demo.shared.tenant.TenantId;
+import com.example.demo.shared.tenancy.TenantContext;
+import com.example.demo.shared.tenancy.TenantId;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;

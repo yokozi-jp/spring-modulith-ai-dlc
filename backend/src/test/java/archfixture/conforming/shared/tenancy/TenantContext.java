@@ -1,4 +1,4 @@
-package archfixture.conforming.shared.tenant;
+package archfixture.conforming.shared.tenancy;
 
 import java.util.Optional;
 import java.util.function.Supplier;

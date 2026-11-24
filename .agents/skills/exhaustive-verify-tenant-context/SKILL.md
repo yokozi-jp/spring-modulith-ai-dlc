@@ -29,7 +29,7 @@ Java の検証器（JBMC など）は、`ScopedValue` と SLF4J の MDC を持�
 どちらの実行も `.env.test`（`task be-test` が作る）を要する。
 `mutants.py` は、`mutants.toml` の変異を本物の `TenantContext.java` に一つずつ当て、テストが落ちることを確かめ、ソースを元に戻す（約 3 分。変異ごとに Gradle を流す）。
 `mutants.py` は、`TenantContext.java` に未コミットの変更があると、何も書き換えずに止まる。
-終了、Ctrl-C、SIGTERM、SIGHUP では実行前の内容に書き戻す。SIGKILL で止めたら `git checkout -- backend/src/main/java/com/example/demo/shared/tenant/TenantContext.java` で戻す。
+終了、Ctrl-C、SIGTERM、SIGHUP では実行前の内容に書き戻す。SIGKILL で止めたら `git checkout -- backend/src/main/java/com/example/demo/shared/tenancy/TenantContext.java` で戻す。
 
 ## 約束
 
@@ -87,7 +87,7 @@ Java の検証器（JBMC など）は、`ScopedValue` と SLF4J の MDC を持�
 ```bash
 skill=.agents/skills/exhaustive-verify-tenant-context/SKILL.md
 git diff --stat "$(sed -n 's/^同期コミット：`\([0-9a-f]*\)`.*/\1/p' "$skill")" -- \
-  backend/src/main/java/com/example/demo/shared/tenant/TenantContext.java \
+  backend/src/main/java/com/example/demo/shared/tenancy/TenantContext.java \
   backend/src/main/java/com/example/demo/shared/infrastructure/persistence/TenantListenerAspect.java \
   backend/src/main/java/com/example/demo/shared/infrastructure/persistence/ModuleRoleTransactionManager.java \
   backend/src/main/java/com/example/demo/tenancy/presentation/web/TenantSelectionFilter.java \

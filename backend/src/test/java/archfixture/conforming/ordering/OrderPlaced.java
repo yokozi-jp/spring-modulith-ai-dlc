@@ -1,6 +1,6 @@
 package archfixture.conforming.ordering;
 
-import archfixture.conforming.shared.tenant.TenantScoped;
+import archfixture.conforming.shared.tenancy.TenantScoped;
 import java.time.Instant;
 
 /** 注文を受け付けたことを他モジュールへ知らせるイベント。 */

@@ -15,7 +15,7 @@ import tomllib
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[4]
-SOURCE = ROOT / "backend/src/main/java/com/example/demo/shared/tenant/TenantContext.java"
+SOURCE = ROOT / "backend/src/main/java/com/example/demo/shared/tenancy/TenantContext.java"
 MUTANTS = tomllib.loads((Path(__file__).resolve().parents[1] / "mutants.toml").read_text(encoding="utf-8"))["mutant"]
 GRADLE_TIMEOUT_SECONDS = 900
 

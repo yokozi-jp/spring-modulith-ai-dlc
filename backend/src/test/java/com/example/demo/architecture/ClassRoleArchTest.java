@@ -527,12 +527,12 @@ class ClassRoleArchTest {
     return methods()
         .that()
         .areAnnotatedWith(ApplicationModuleListener.class)
-        .should(takeTenantScopedEvent(basePackage + ".shared.tenant.TenantScoped"))
+        .should(takeTenantScopedEvent(basePackage + ".shared.tenancy.TenantScoped"))
         .allowEmptyShould(true)
         .because(
             "TenantListenerAspect がイベントのテナントを、リスナーのトランザクションが始まる時点で束縛するため。"
                 + "イベントがテナントを持たないと、非同期の処理でテナントが失われる。"
-                + "直し方：イベントの record に shared.tenant.TenantScoped を実装させ、"
+                + "直し方：イベントの record に shared.tenancy.TenantScoped を実装させ、"
                 + "イベントを発行する CommandHandler が TenantContext.current() のテナントを詰める。"
                 + "規約："
                 + LISTENER_DOC
@@ -549,7 +549,7 @@ class ClassRoleArchTest {
    */
   /* package */ static ArchRule tenantIsBoundOnlyByTenantSelectionFilterAndListenerAspectRule(
       final String basePackage) {
-    final String tenantContext = basePackage + ".shared.tenant.TenantContext";
+    final String tenantContext = basePackage + ".shared.tenancy.TenantContext";
     final Set<String> allowedCallers =
         Set.of(
             basePackage + ".tenancy.presentation.web.TenantSelectionFilter",
@@ -582,7 +582,7 @@ class ClassRoleArchTest {
    */
   /* package */ static ArchRule unboundTenantIsReadOnlyByTransactionManagerRule(
       final String basePackage) {
-    final String tenantContext = basePackage + ".shared.tenant.TenantContext";
+    final String tenantContext = basePackage + ".shared.tenancy.TenantContext";
     final String transactionManager =
         basePackage + ".shared.infrastructure.persistence.ModuleRoleTransactionManager";
     return noClasses()

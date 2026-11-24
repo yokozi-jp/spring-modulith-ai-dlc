@@ -5,7 +5,7 @@ import archfixture.conforming.ordering.domain.model.CustomerId;
 import archfixture.conforming.ordering.domain.model.Order;
 import archfixture.conforming.ordering.domain.model.OrderRepository;
 import archfixture.conforming.ordering.domain.service.OrderLimitPolicy;
-import archfixture.conforming.shared.tenant.TenantContext;
+import archfixture.conforming.shared.tenancy.TenantContext;
 import java.time.Clock;
 import java.time.Instant;
 import org.springframework.context.ApplicationEventPublisher;

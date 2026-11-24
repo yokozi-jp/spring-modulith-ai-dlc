@@ -191,7 +191,7 @@ infrastructure.client ───────────────────�
 - `infrastructure.persistence` は `shared.infrastructure.persistence` に依存してよい。
   ほかの層は `shared.infrastructure.persistence` に依存しない。
 - どの層も、[共有モジュール shared](shared-module.md) の「どの層からも使える」パッケージに依存してよい。`error` の `presentation.web` も、4 つの例外を 403、404、409、422 にするために依存する。
-- モジュールルートの型は、標準型と同じルートの型のほかに、イベントが運ぶテナントの `shared.tenant.TenantId` と `shared.tenant.TenantScoped` だけに依存してよい。`TenantContext` には依存できない。
+- モジュールルートの型は、標準型と同じルートの型のほかに、イベントが運ぶテナントの `shared.tenancy.TenantId` と `shared.tenancy.TenantScoped` だけに依存してよい。`TenantContext` には依存できない。
 - Domain と Application は、Presentation、Batch、Infrastructure に依存しない。
 - Presentation、Batch、Persistence、外部 Client は相互に依存しない。
 
