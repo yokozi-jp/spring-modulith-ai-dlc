@@ -163,6 +163,8 @@ public enum SalesStatus {
 Spring を起動しない JUnit のテストを、値オブジェクトと同じパッケージのテストソースに置く（`QuantityTest`、`MoneyTest`）。
 不変条件ごとに、通る側と通らない側の両方を確かめる。
 片側だけでは、`value < 1` を `value <= 1` に変える PIT の `CONDITIONALS_BOUNDARY` の変異が生き残る（[ADR-012](../../adr/ADR-012-adopt-property-based-and-mutation-testing.md)）。
+PIT は既定の `FRECORD` の filter で record の正準コンストラクタを変異させないため、`task be-mutation-test` はコンパクトコンストラクタの変異を作らない。
+コンパクトコンストラクタの変異を確かめるときは、`backend/build.gradle` の `pitest` に `features = ['-FRECORD']` を一時的に足して実行する。
 境界の値は、範囲の両端を必ず生成する QuickTheories の 2 つの性質か、JUnit の `@ParameterizedTest` の具体例で書く。
 文字列は、空、空白だけ、上限の長さ、上限を 1 つ超える長さを書く。
 
