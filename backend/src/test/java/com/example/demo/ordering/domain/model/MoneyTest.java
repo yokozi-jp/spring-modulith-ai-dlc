@@ -16,21 +16,19 @@ class MoneyTest {
   @DisplayName("0 以上の金額は作れる")
   void acceptsAmountOfZeroOrMore() {
     qt().forAll(longs().between(0, Long.MAX_VALUE))
-        .checkAssert(
-            value ->
-                assertThat(new Money(BigDecimal.valueOf(value)).amount())
-                    .isEqualByComparingTo(BigDecimal.valueOf(value)));
+        .checkAssert(value ->
+            assertThat(new Money(BigDecimal.valueOf(value)).amount())
+                .isEqualByComparingTo(BigDecimal.valueOf(value)));
   }
 
   @Test
   @DisplayName("0 未満の金額は作れない")
   void rejectsAmountBelowZero() {
     qt().forAll(longs().between(Long.MIN_VALUE, -1))
-        .checkAssert(
-            value ->
-                assertThatThrownBy(() -> new Money(BigDecimal.valueOf(value)))
-                    .as("value=%d", value)
-                    .isInstanceOf(IllegalArgumentException.class));
+        .checkAssert(value ->
+            assertThatThrownBy(() -> new Money(BigDecimal.valueOf(value)))
+                .as("value=%d", value)
+                .isInstanceOf(IllegalArgumentException.class));
   }
 
   @Test

@@ -22,10 +22,9 @@ class QuantityTest {
   @DisplayName("1 未満の数量は作れない")
   void rejectsQuantityBelowOne() {
     qt().forAll(integers().between(Integer.MIN_VALUE, 0))
-        .checkAssert(
-            value ->
-                assertThatThrownBy(() -> new Quantity(value))
-                    .as("value=%d", value)
-                    .isInstanceOf(IllegalArgumentException.class));
+        .checkAssert(value ->
+            assertThatThrownBy(() -> new Quantity(value))
+                .as("value=%d", value)
+                .isInstanceOf(IllegalArgumentException.class));
   }
 }
