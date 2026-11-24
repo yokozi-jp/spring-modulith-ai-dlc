@@ -494,7 +494,7 @@ class PackageByFeatureOnionArchitectureTest {
                     basePackage + MODULE_DOMAIN_MODEL,
                     basePackage + ".shared.concurrency..",
                     basePackage + ".shared.failure..",
-                    basePackage + ".shared.tenant..")
+                    basePackage + ".shared.tenancy..")
                 .or(LOMBOK_GENERATED))
         .allowEmptyShould(true)
         .because(

@@ -59,7 +59,7 @@ jOOQの生成物の`com.example.demo.jooq`はOPENのモジュールであり、`
   `package-info`は`@ApplicationModule`の宣言を持つため対象から除く。
   違反フィクスチャの`OrderPlacedReadingTenantContext`（`TenantContext`への依存）で確かめる。
 - `databaseTechnologyApisAreOnlyUsedByPersistenceAdapters`：jOOQ APIと生成型は`infrastructure.persistence`だけで使う。
-- `domainModelDependsOnlyOnAllowedTypes`：`domain.model`は、`java..`、`org.jspecify..`、各モジュールの`domain.model`、`shared.concurrency`、`shared.failure`、`shared.tenant`、`lombok.Generated`だけに依存する。
+- `domainModelDependsOnlyOnAllowedTypes`：`domain.model`は、`java..`、`org.jspecify..`、各モジュールの`domain.model`、`shared.concurrency`、`shared.failure`、`shared.tenancy`、`lombok.Generated`だけに依存する。
   許可の一覧で止めるため、外部システムのSDKや生成型も、Spring、jOOQ、JPA、Jacksonの型と同じく落ちる。
   Lombokの注釈のうち、許すのは生成したコードに付く`lombok.Generated`だけである（`lombok.NonNull`など、クラスファイルに残るほかの注釈は落ちる）。
 - `applicationDependsOnlyOnAllowedTypes`：`application`は、このアプリケーションの型のほかに、`java..`、`org.jspecify..`、`lombok.Generated`、`org.slf4j..`、`org.springframework.stereotype..`、`org.springframework.transaction.annotation..`、`org.springframework.modulith.events..`、`org.springframework.context`（パッケージ直下）だけに依存する。
