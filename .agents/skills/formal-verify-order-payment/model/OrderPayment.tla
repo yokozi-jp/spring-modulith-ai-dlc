@@ -2,7 +2,7 @@
 (***************************************************************************)
 (* One order, from confirm or cancel through the OrderConfirmed event      *)
 (* publication to the payment record, with overlapping listener            *)
-(* deliveries, crashes, lost gateway replies, and the staleness monitor.   *)
+(* deliveries, crashes, lost gateway replies, and the stale check.        *)
 (*                                                                         *)
 (* Paths are relative to backend/src/main/java/com/example/demo/.          *)
 (* Spring Modulith 2.2.0 behavior is cited by class name.                  *)
@@ -274,13 +274,14 @@ DCrash(d) ==
                  gateway, dres, launched, rpc>>
 
 -----------------------------------------------------------------------------
-(* Recovery: Spring Modulith's staleness monitor and                       *)
-(* shared/eventresubmission/EventPublicationResubmitter.          *)
+(* Recovery: shared/eventresubmission/EventPublicationResubmitter, which   *)
+(* marks stale publications FAILED and then resubmits.                     *)
 
+\* FailedPublicationSweep, inside the resubmission lock, calls
 \* DefaultEventPublicationRegistry.markStalePublicationsFailed: findByStatus
 \* for PUBLISHED, PROCESSING, RESUBMITTED, keeps the rows whose
 \* last_resubmission_date (getLastPublicationDate) is older than
-\* spring.modulith.events.staleness.*, then markFailed by id without
+\* Properties.staleness, then markFailed by id without
 \* checking the status again. The model has no time, and the row can change
 \* between the find and the update, so any existing row that is not FAILED
 \* may become FAILED at any time.

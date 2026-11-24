@@ -112,7 +112,7 @@ git diff --name-only --diff-filter=A "$(sed -n 's/^同期コミット：`\([0-9a
 | `DMarkCompleted`  | `DefaultEventPublicationRegistry.markCompleted`（archive への写しと削除）                                                                                                                          |
 | `DMarkFailed`     | `DefaultEventPublicationRegistry.markFailed` → `markFailedOrAbandoned`。`PublicationsInProgress` のこの配信の登録は、ほかの配信が外さないため、必ず判断する。`AbandonPolicies` の既定が、渡された出版の `getCompletionAttempts()`（配信 `d` では `d - 1`、最初の配信では 1）を `abandon-after-attempts` と比べ、それ以上なら（`d = MaxDeliveries`）archive へ `ABANDONED` で移し、未満なら `status != 'FAILED'` の UPDATE を実行する |
 | `DCrash`          | 配信の途中のプロセスの停止。リスナーのトランザクションはロールバックする                                                                                                                           |
-| `Stale`           | `DefaultEventPublicationRegistry.markStalePublicationsFailed`（`spring.modulith.events.staleness.*`、`last_resubmission_date` から測る）                                                           |
+| `Stale`           | 再投入のロックの中で `FailedPublicationSweep` が呼ぶ `DefaultEventPublicationRegistry.markStalePublicationsFailed`（閾値は `Properties.staleness`、`last_resubmission_date` から測る）。モデルは時間もロックも持たないため、いつでも起きる |
 | `RPick`、`RClaim` | `FailedPublicationSweep.tryOnce`（`EventPublicationResubmitter`）か `FailedPublicationSweep.waitUpTo`（`EventPublicationResubmitOnce.run`）→ `FailedEventPublications.resubmit`、`JdbcEventPublicationRepositoryV2.markResubmitted`（`status != 'RESUBMITTED'` の UPDATE） |
 
 ## 変異
@@ -148,7 +148,7 @@ git diff --name-only --diff-filter=A "$(sed -n 's/^同期コミット：`\([0-9a
 `RecordMatchesGateway` の TLC の経路は次のとおり。
 
 1. 注文を確定し、最初の配信が始まる（`markProcessing`）。
-2. Staleness Monitor が出版を `FAILED` にする（最初の配信が `concurrency-limit` の空きを待つ間に `published` の期限を過ぎた場合など、`application.yaml` の注記にある場合）。
+2. 再投入のジョブが、古い出版として出版を `FAILED` にする（最初の配信が `concurrency-limit` の空きを待つ間に `wait-age` を過ぎた場合など、`application.yaml` の注記にある場合）。
 3. 最初の配信が `POST /v1/charges` を送り、決済代行が判定を始める。
 4. `EventPublicationResubmitter` が出版を `markResubmitted` で `RESUBMITTED` にし、二度目の配信が同じ `Idempotency-Key` で請求し、決済代行が 409 を返す。
 5. `PaymentGatewayClient.contractError` が 409 を契約の不備として `ChargeOutcome.failed()` にし（`PaymentGatewayClientTest.contractErrorReturnsFailed` が 409 でこれを確かめている）、`FAILED` の決済記録をコミットする。
