@@ -15,7 +15,7 @@ new = ''
 
 [[mutant]]
 name = "is-due-ignores-cap"
-change = "ResubmissionPolicies.isDue drops attempts <= maxResubmissions"
+change = "ResubmissionPolicies.isDue drops the abandon-after-attempts cap (AbandonProperties.exceeded)"
 config = "documented"
 invariants = ["ResubmissionsCapped"]
 

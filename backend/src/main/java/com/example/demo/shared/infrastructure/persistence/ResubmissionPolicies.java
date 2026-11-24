@@ -1,7 +1,5 @@
 package com.example.demo.shared.infrastructure.persistence;
 
-import static com.example.demo.jooq.modulith.Tables.EVENT_PUBLICATION;
-
 import com.example.demo.shared.events.ResubmissionPolicy;
 import java.lang.reflect.Method;
 import java.time.Instant;
@@ -10,10 +8,6 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.StringJoiner;
 import lombok.extern.slf4j.Slf4j;
-import org.jooq.CaseValueStep;
-import org.jooq.CaseWhenStep;
-import org.jooq.Field;
-import org.jooq.impl.DSL;
 import org.jspecify.annotations.Nullable;
 import org.springframework.aop.framework.autoproxy.AutoProxyUtils;
 import org.springframework.beans.factory.config.ConfigurableListableBeanFactory;
@@ -26,10 +20,10 @@ import org.springframework.stereotype.Component;
 import org.springframework.util.ClassUtils;
 
 /**
- * イベント出版を、リスナーの {@code on} に付けた {@link ResubmissionPolicy} の方針に対応づける（ADR-079）。
+ * イベント出版を、リスナーの {@code on} に付けた {@link ResubmissionPolicy} の方針に対応づけ、再投入してよいかを決める（ADR-079）。
  *
  * <p>出版はリスナーの ID（{@code listener_id}、{@link TargetEventPublication#getTargetIdentifier()}）で区別する。
- * Spring Modulith 2.1.2 は、{@code TransactionalApplicationListener.getListenerId()} を ID にし、Spring
+ * Spring Modulith 2.2.0 は、{@code TransactionalApplicationListener.getListenerId()} を ID にし、Spring
  * Framework は、注釈の {@code id} が空ならメソッドの完全修飾名と引数の型（{@code <クラス>.<メソッド>(<型>,...)}）を ID にする。 起動のときに
  * bean のメソッドを走査して同じ ID を作る。
  */
@@ -40,18 +34,19 @@ class ResubmissionPolicies {
   /** 方針の設定値。 */
   private final EventPublicationResubmissionConfig.Properties properties;
 
+  /** 再投入の回数の上限。 */
+  private final EventPublicationResubmissionConfig.AbandonProperties abandon;
+
   /** リスナーの ID から方針の名前。方針を指定しないリスナーは含まない。 */
   private final Map<String, String> policyNames;
 
-  /** 方針を指定したリスナーの方針と既定の方針の、再投入の回数の上限を SQL で求める式。 */
-  private final Field<Integer> maxResubmissionsExpression;
-
   /* package */ ResubmissionPolicies(
       final ConfigurableListableBeanFactory beanFactory,
-      final EventPublicationResubmissionConfig.Properties properties) {
+      final EventPublicationResubmissionConfig.Properties properties,
+      final EventPublicationResubmissionConfig.AbandonProperties abandon) {
     this.properties = properties;
+    this.abandon = abandon;
     this.policyNames = Map.copyOf(scan(beanFactory, properties));
-    this.maxResubmissionsExpression = buildMaxResubmissions(policyNames, properties);
   }
 
   /** bean の {@link ResubmissionPolicy} を付けたメソッドを走査し、リスナーの ID と方針の名前を返す。設定にない名前があれば起動に失敗する。 */
@@ -139,58 +134,25 @@ class ResubmissionPolicies {
     return Objects.requireNonNull(properties.policies().get(nameOf(listenerId)), "policy");
   }
 
-  /** 出版のリスナーの ID。Spring Modulith 2.1.2 の再投入は {@link TargetEventPublication} を渡す。 */
+  /** 出版のリスナーの ID。Spring Modulith 2.2.0 の再投入は {@link TargetEventPublication} を渡す。 */
   /* package */ static String listenerIdOf(final EventPublication publication) {
     return publication instanceof TargetEventPublication target
         ? target.getTargetIdentifier().getValue()
         : "";
   }
 
-  /** 出版の方針の上限に達しておらず、最後の試行から次の待ち時間を過ぎたか。 */
+  /**
+   * 出版の再投入の回数が上限に達しておらず、最後の試行から次の待ち時間を過ぎたか。
+   *
+   * <p>上限の回数目の再投入で失敗した出版は Spring Modulith が {@code ABANDONED} にするため、ここに来ない。 回数を見るのは、失敗を記録せずに上限を超えて
+   * {@code FAILED} に戻った出版（最後の試行の途中で落ちたか、Staleness Monitor が処理中に戻した出版）を、上限を超えて再投入しないためである（ADR-079）。
+   */
   /* package */ boolean isDue(final EventPublication publication, final Instant now) {
-    final EventPublicationResubmissionConfig.Policy policy = policyOf(listenerIdOf(publication));
     final int attempts = publication.getCompletionAttempts();
-    return attempts <= policy.maxResubmissions()
-        && lastAttempt(publication)
-            .plus(policy.waitBefore(properties.waitAge(), attempts))
+    return !abandon.exceeded(attempts)
+        && publication
+            .getLastPublicationDate()
+            .plus(policyOf(listenerIdOf(publication)).waitBefore(properties.waitAge(), attempts))
             .isBefore(now);
-  }
-
-  /** 最後の試行の時刻。再投入していなければ最初の試行の時刻。 */
-  private static Instant lastAttempt(final EventPublication publication) {
-    return Objects.requireNonNullElse(
-        publication.getLastResubmissionDate(), publication.getPublicationDate());
-  }
-
-  /** {@code modulith.event_publication} の行の、リスナーの方針の再投入の回数の上限。 */
-  /* package */ Field<Integer> maxResubmissions() {
-    return maxResubmissionsExpression;
-  }
-
-  private static Field<Integer> buildMaxResubmissions(
-      final Map<String, String> policyNames,
-      final EventPublicationResubmissionConfig.Properties properties) {
-    final Field<Integer> fallback =
-        DSL.inline(
-            Objects.requireNonNull(
-                    properties.policies().get(EventPublicationResubmissionConfig.DEFAULT_POLICY),
-                    "default policy")
-                .maxResubmissions());
-    if (policyNames.isEmpty()) {
-      return fallback;
-    }
-    final CaseValueStep<String> byListener = DSL.choose(EVENT_PUBLICATION.LISTENER_ID);
-    @Nullable CaseWhenStep<String, Integer> cases = null;
-    for (final Map.Entry<String, String> entry : policyNames.entrySet()) {
-      final Field<Integer> max =
-          DSL.inline(
-              Objects.requireNonNull(properties.policies().get(entry.getValue()), "policy")
-                  .maxResubmissions());
-      cases =
-          cases == null
-              ? byListener.when(DSL.inline(entry.getKey()), max)
-              : cases.when(DSL.inline(entry.getKey()), max);
-    }
-    return Objects.requireNonNull(cases).otherwise(fallback);
   }
 }

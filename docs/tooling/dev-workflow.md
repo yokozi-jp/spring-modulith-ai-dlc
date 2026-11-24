@@ -201,7 +201,7 @@ Taskのテスト系タスクは、`.env.test`に足りない変数を`.env.test.
 たとえば決済代行のClientを足した変更の後は、既存の`.env`へ`.env.example`の`PAYMENT_GATEWAY_BASE_URL`の行を足す。
 `task compose-up`などが`OTEL_SERVICE_NAMESPACE is required`のように変数不足で止まったときは、これが原因である。
 失敗したイベント出版の定期の再投入を足した変更の後は、既存の`.env`へ`.env.example`の`EVENT_PUBLICATION_RESUBMISSION_ENABLED`、`EVENT_PUBLICATION_RESUBMISSION_WAIT_AGE`、`EVENT_PUBLICATION_RESUBMISSION_IN_FLIGHT_STALENESS`、`EVENT_PUBLICATION_RESUBMISSION_INTERVAL`の4行を足す（[ADR-079](../adr/ADR-079-resubmit-failed-event-publications-periodically-with-shedlock.md)）。
-ローカルでは定期の再投入が短い間隔で有効なので、`FAILED`の出版は消した注文を指すものもリスナーの方針の上限の回数まで自動で再投入され、そのたびにリスナーのERRORが出る。
+ローカルでは定期の再投入が短い間隔で有効なので、`FAILED`の出版は消した注文を指すものも回数の上限まで自動で再投入され、そのたびにリスナーのERRORが出る。
 
 定期の再投入のロックの表（`010-create-shedlock-table`）を足した変更の後は、既存のローカルのDBに`task be-migrate`を実行する。
 表がないと、定期の再投入は毎回`Event publication resubmission failed`のWARNで失敗する。

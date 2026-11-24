@@ -53,6 +53,7 @@ import org.springframework.validation.annotation.Validated;
 @Configuration(proxyBeanMethods = false)
 @EnableConfigurationProperties({
   EventPublicationResubmissionConfig.Properties.class,
+  EventPublicationResubmissionConfig.AbandonProperties.class,
   EventPublicationResubmissionConfig.ResubmitOnceProperties.class
 })
 class EventPublicationResubmissionConfig {
@@ -229,7 +230,7 @@ class EventPublicationResubmissionConfig {
    * @param inFlightStaleness PROCESSING と RESUBMITTED の Staleness Monitor
    *     の閾値。最後の出版か再投入の時刻から測る。{@code lock-at-most-for} の 2 倍より長くする
    * @param interval 前の回の終わりから次の回までの間隔
-   * @param maxPerRun 1 回の実行で再投入する件数と、新しく記録する ERROR の件数の上限
+   * @param maxPerRun 1 回の実行で再投入する件数の上限
    * @param lockAtMostFor ロックを持つ上限。実行が落ちて解放できなかったとき、この時間を過ぎると他のインスタンスが取れる。1 回の実行の最長の時間より十分に長くする
    * @param policies リスナーの再投入の方針。名前は {@code @ResubmissionPolicy} の値で、{@code default} は必須
    */
@@ -299,14 +300,11 @@ class EventPublicationResubmissionConfig {
   /**
    * リスナーの再投入の方針。n 回目の再投入の前の待ち時間は、最後の試行から {@code min(wait-age × multiplier^(n-1), max-wait)} である。
    *
-   * @param maxResubmissions 自動で再投入する回数の上限
    * @param multiplier 再投入のたびに待ち時間に掛ける倍率。1 なら待ち時間を延ばさない
    * @param maxWait 待ち時間の上限
    */
   /* package */ record Policy(
-      @Min(1) int maxResubmissions,
-      @DecimalMin("1.0") double multiplier,
-      @NotNull @DurationMin(seconds = 1) Duration maxWait) {
+      @DecimalMin("1.0") double multiplier, @NotNull @DurationMin(seconds = 1) Duration maxWait) {
 
     /**
      * 次の再投入の前の待ち時間。
@@ -321,6 +319,31 @@ class EventPublicationResubmissionConfig {
         return maxWait;
       }
       return Duration.ofNanos(Math.round(waitAge.toNanos() * factor));
+    }
+  }
+
+  /**
+   * Spring Modulith の {@code spring.modulith.events.resubmission} のうち、再投入の回数の上限（ADR-079）。
+   *
+   * <p>Spring Modulith は、失敗した試行の前に読んだ {@code completion_attempts} がこの値以上なら、出版を {@code ABANDONED}
+   * にする。 最初の配信と 1 回目の再投入の失敗はどちらも 1 と比べる（ResubmissionOptionsLearningTest）ため、2 以上なら
+   * この値の回数目の再投入の失敗で諦め、1 なら最初の配信の失敗で諦める。 1 と未設定（Spring Modulith は諦めない）は起動に失敗させる。
+   *
+   * @param abandonAfterAttempts 自動で再投入する回数の上限
+   */
+  /* package */ @ConfigurationProperties("spring.modulith.events.resubmission")
+  @Validated
+  record AbandonProperties(
+      @Min(
+              value = 2,
+              message =
+                  "spring.modulith.events.resubmission.abandon-after-attempts must be at least 2:"
+                      + " 1 abandons the first delivery")
+          int abandonAfterAttempts) {
+
+    /** 行の {@code completion_attempts}（再投入した回数 + 1）が、もう再投入しない回数か。 */
+    /* package */ boolean exceeded(final int completionAttempts) {
+      return completionAttempts > abandonAfterAttempts;
     }
   }
 
