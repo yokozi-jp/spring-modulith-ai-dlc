@@ -32,7 +32,7 @@ tags: [convention, mail, backend, ses, external-system]
 | 場合                                            | 例                                                                                                    | `send`                | circuit breaker の失敗 | イベント出版 |
 | ----------------------------------------------- | ----------------------------------------------------------------------------------------------------- | --------------------- | ---------------------- | ------------ |
 | 送信済み                                        | SES が `MessageId` を返した                                                                           | `Sent(MailMessageId)` | 数えない               | `COMPLETED`  |
-| 回復しない拒否                                  | `MessageRejected`、`BadRequestException`、`MessageId` のない応答                                      | `Rejected`            | 数えない               | `COMPLETED`  |
+| 回復しない拒否                                  | 許可の外の宛先（SES を呼ばない）、`MessageRejected`、`BadRequestException`、`MessageId` のない応答    | `Rejected`            | 数えない               | `COMPLETED`  |
 | 一時障害                                        | 接続の失敗、タイムアウト（`ApiCallTimeoutException`）、`TooManyRequestsException`、5xx                | SDK の例外を投げる    | 数える                 | `FAILED`     |
 | 資格情報と権限の不備、運用者が直せる SES の不備 | `AccessDeniedException` などの 403、送信の停止、From のドメインの未検証、設定セットがない、送信の上限 | SDK の例外を投げる    | 数えない               | `FAILED`     |
 
@@ -67,14 +67,21 @@ tags: [convention, mail, backend, ses, external-system]
 設定は `application.yaml` の `mail-sender` にあり、次の環境変数で注入する。
 どれも既定値がなく、未設定なら起動に失敗する。
 
-| 環境変数                        | 値                                                                  |
-| ------------------------------- | ------------------------------------------------------------------- |
-| `MAIL_SENDER_FROM_ADDRESS`      | From のアドレス。SES で検証した ID のアドレスにする                 |
-| `MAIL_SENDER_FROM_NAME`         | From の表示名。UTF-8 で 45 バイト以下にする（日本語で 15 文字まで） |
-| `MAIL_SENDER_CONFIGURATION_SET` | 送るメールに付ける SES の設定セットの名前                           |
+| 環境変数                         | 値                                                                  |
+| -------------------------------- | ------------------------------------------------------------------- |
+| `MAIL_SENDER_FROM_ADDRESS`       | From のアドレス。SES で検証した ID のアドレスにする                 |
+| `MAIL_SENDER_FROM_NAME`          | From の表示名。UTF-8 で 45 バイト以下にする（日本語で 15 文字まで） |
+| `MAIL_SENDER_CONFIGURATION_SET`  | 送るメールに付ける SES の設定セットの名前                           |
+| `MAIL_SENDER_ALLOWED_RECIPIENTS` | 送ってよい宛先。カンマ区切りで、`*`、`@ドメイン`、アドレスのどれか  |
 
 - 表示名は、Client が RFC 2047 の encoded-word（UTF-8 の Base64）にして送る。
   1 つの encoded-word に収まらない表示名は、起動の時点で失敗する。
+- 送ってよい宛先は、許可リスト（`MAIL_SENDER_ALLOWED_RECIPIENTS`）で絞る。
+  項目は `*`（すべて）、`@example.com`（そのドメイン。サブドメインを含まない）、`user@example.com`（そのアドレス）のどれかで、大文字と小文字は区別しない。
+  許可の外の宛先には SES を呼ばず `Rejected` を返し、ログには宛先を出さず設定の名前だけを出す。
+  本番は `*` にし、ローカル、テスト、ステージングは自分たちのドメインや検証済みのアドレスにする。
+  空の値と、形の誤った項目は、起動の時点で失敗する。
+  接続先の書き忘れで本物の SES へ向かっても、許可の外の宛先へは送らない。
 - 形式の誤った From のアドレスと、空白だけの表示名と設定セットも、起動の時点で失敗する。
   起動を通すと、SES が要求ごとに `BadRequestException` を返し、すべてのメールが `Rejected` として記録されるためである。
 - 接続先、リージョン、資格情報は `application.yaml` に書かない。

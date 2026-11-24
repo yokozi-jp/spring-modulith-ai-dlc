@@ -65,6 +65,9 @@ class MailSenderClient implements MailSender {
   /** 送るメールに付ける SES の設定セットの名前。 */
   private final String configurationSet;
 
+  /** 送ってよい宛先。 */
+  private final AllowedRecipients allowedRecipients;
+
   /**
    * From と設定セットを持つ Client を作る。値に既定値はなく、未設定なら起動に失敗する（ADR-008）。
    *
@@ -75,12 +78,14 @@ class MailSenderClient implements MailSender {
    * @param fromAddress From のアドレス。SES で検証した ID のアドレスにする
    * @param fromName From の表示名。UTF-8 で 45 バイト以下にする
    * @param configurationSet 送るメールに付ける SES の設定セットの名前
+   * @param allowedRecipients 送ってよい宛先。カンマ区切りで、{@code *}、{@code @ドメイン}、アドレスのどれか
    */
   /* package */ MailSenderClient(
       final SesV2Client sesV2Client,
       @Value("${mail-sender.from-address}") final String fromAddress,
       @Value("${mail-sender.from-name}") final String fromName,
-      @Value("${mail-sender.configuration-set}") final String configurationSet) {
+      @Value("${mail-sender.configuration-set}") final String configurationSet,
+      @Value("${mail-sender.allowed-recipients}") final String allowedRecipients) {
     if (!MAIL_ADDRESS.matcher(fromAddress).matches()) {
       throw new IllegalArgumentException("mail-sender.from-address is not a mail address");
     }
@@ -93,17 +98,23 @@ class MailSenderClient implements MailSender {
     this.sesV2Client = sesV2Client;
     this.from = encodedWord(fromName) + " <" + fromAddress + ">";
     this.configurationSet = configurationSet;
+    this.allowedRecipients = AllowedRecipients.parse(allowedRecipients);
   }
 
   /**
    * メールを送り、業務の状態に記録する結果を返す。
    *
-   * <p>同じ要求で回復しない拒否と、契約に合わない応答は拒否の結果にする。それ以外の失敗は、SES の文面を落とした同じ型の SDK の例外で投げる。
+   * <p>許可の外の宛先には SES を呼ばず、拒否の結果にする。同じ要求で回復しない拒否と、契約に合わない応答も拒否の結果にする。それ以外の失敗は、SES の文面を落とした同じ型の SDK
+   * の例外で投げる。
    */
   @CircuitBreaker(name = "mail-sender")
   @Retry(name = "mail-sender")
   @Override
   public MailOutcome send(final MailRecipient to, final MailSubject subject, final MailBody body) {
+    if (!allowedRecipients.allows(to)) {
+      log.warn("The mail was not sent: the recipient is not in mail-sender.allowed-recipients");
+      return MailOutcome.rejected();
+    }
     final String messageId;
     try {
       messageId = sesV2Client.sendEmail(request(to, subject, body)).messageId();

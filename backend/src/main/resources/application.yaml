@@ -243,6 +243,8 @@ mail-sender:
   # UTF-8 で 45 バイト以下にする。RFC 2047 の 1 つの encoded-word に収めるためである。
   from-name: ${MAIL_SENDER_FROM_NAME}
   configuration-set: ${MAIL_SENDER_CONFIGURATION_SET}
+  # 送ってよい宛先。カンマ区切りで、* は全許可、@example.com はドメイン、user@example.com はアドレス。本番は * にする。
+  allowed-recipients: ${MAIL_SENDER_ALLOWED_RECIPIENTS}
   # ADR-019 の開始値。read-timeout は応答の読み取りと、SDK の呼び出し全体（apiCallTimeout）の両方の上限にする。
   connect-timeout: 1s
   read-timeout: 2s

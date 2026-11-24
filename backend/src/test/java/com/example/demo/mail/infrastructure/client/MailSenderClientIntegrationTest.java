@@ -105,7 +105,7 @@ class MailSenderClientIntegrationTest {
     final URI endpoint = endpointOf(springClient);
     try (SesV2Client client =
         SesV2TestClients.create(endpoint, Duration.ofSeconds(1), Duration.ofSeconds(30))) {
-      new MailSenderClient(client, "warm-up@example.com", "warm-up", "warm-up")
+      new MailSenderClient(client, "warm-up@example.com", "warm-up", "warm-up", "*")
           .send(new MailRecipient("warm-up@example.com"), SUBJECT, BODY);
     }
   }

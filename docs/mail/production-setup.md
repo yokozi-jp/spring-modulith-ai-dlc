@@ -26,11 +26,12 @@ tags: [runbook, mail, ses, aws, ecs, iam]
 backend のコンテナの `environment` に次の 3 つを入れる。
 秘密ではないので、`secrets` にしなくてよい。
 
-| 環境変数                        | 値の例                      |
-| ------------------------------- | --------------------------- |
-| `MAIL_SENDER_FROM_ADDRESS`      | `no-reply@mail.example.com` |
-| `MAIL_SENDER_FROM_NAME`         | `サービス名 招待`           |
-| `MAIL_SENDER_CONFIGURATION_SET` | `app-transactional`         |
+| 環境変数                         | 値の例                      |
+| -------------------------------- | --------------------------- |
+| `MAIL_SENDER_FROM_ADDRESS`       | `no-reply@mail.example.com` |
+| `MAIL_SENDER_FROM_NAME`          | `サービス名 招待`           |
+| `MAIL_SENDER_CONFIGURATION_SET`  | `app-transactional`         |
+| `MAIL_SENDER_ALLOWED_RECIPIENTS` | `*`                         |
 
 - 表示名は「サービス名と送る目的」にし（[送るメールの形と宛先](message-format.md#from)）、UTF-8 で 45 バイト以下にする。
   超えると backend が起動しない。

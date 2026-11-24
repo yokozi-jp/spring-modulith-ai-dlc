@@ -1,6 +1,6 @@
 ---
 type: ADR
-title: 'ADR-125: メールを SES v2 の API で送り、ローカルとテストは接続先を WireMock に向ける'
+title: "ADR-125: メールを SES v2 の API で送り、ローカルとテストは接続先を WireMock に向ける"
 description: 本番、ローカル、テストのどれも SES v2 の SendEmail を呼ぶ同じ Client でメールを送り、ローカルとテストは AWS の SDK の接続先の環境変数だけで既存の WireMock に向ける決定。ADR-072 の形を SES に広げる。
 tags: [adr, backend, mail, ses, wiremock, external-system]
 ---
@@ -48,7 +48,7 @@ SDK は OS の環境変数と JVM のシステムプロパティだけを読み�
 - 本番のコードは、`SendEmail` を呼ぶ Client（`mail` モジュールの `MailSenderClient`）だけを持つ。
   実装の切り替え、偽物の分岐、mode の設定を持たない。
 - Client は、宛先、件名、プレーンテキストの本文だけを受ける。
-  From のアドレスと表示名、設定セットの名前は既定値のない設定値にし、未設定なら起動に失敗させる（[ADR-008](ADR-008-single-application-yaml-external-config.md)）。
+  From のアドレスと表示名、設定セットの名前、送ってよい宛先は既定値のない設定値にし、未設定なら起動に失敗させる（[ADR-008](ADR-008-single-application-yaml-external-config.md)）。
   From のアドレスの形式の誤りと、空白だけの表示名と設定セットも、起動の時点で断る。
   起動を通すと、SES が要求ごとに `BadRequestException` を返し、すべてのメールが拒否として記録されるためである。
 - Client を作る `SesV2ClientConfig` は、Spring の設定に `AWS_ENDPOINT_URL_SESV2` があるときだけ、その接続先、`AWS_REGION`、`AWS_ACCESS_KEY_ID`、`AWS_SECRET_ACCESS_KEY` を Client に渡す。
@@ -62,7 +62,7 @@ SDK は OS の環境変数と JVM のシステムプロパティだけを読み�
   Gradle のテストは、テストの JVM ごとに起動する WireMock（[ADR-085](ADR-085-start-test-dependencies-per-fork-with-testcontainers.md)）の接続先を、ほかの接続先と同じく `InfrastructureContainers` の設定で渡す。
 - 接続先が Spring の設定にないと、Client は SDK の既定の取得になり、本物の SES へ送りうる。
   ADR-072 は接続先の URL に既定値を置かず、未設定なら起動に失敗させると決めたが、SES は本番が同じ設定を持たない点が決済代行と違う。
-  ローカルで `AWS_ENDPOINT_URL_SESV2` を書き忘れても、ダミーの資格情報も書き忘れていなければ SES は署名を断る。
+  ローカルで `AWS_ENDPOINT_URL_SESV2` を書き忘れても、送ってよい宛先の許可リスト（下記）が、許可の外の宛先への送信を止める。
   接続先は `.env` から読めるので、`task be-run`、`./gradlew bootRun`、IDE のどれで起動しても、`.env.example` の行を足せば同じに効く。
   本番の設定には `AWS_ENDPOINT_URL_SESV2` を書かない。
 - タイムアウトは [ADR-019](ADR-019-define-resilience-and-capacity-guardrails.md) の値にする。
@@ -76,6 +76,12 @@ SDK は OS の環境変数と JVM のシステムプロパティだけを読み�
   一時障害と、運用者が直したあとの再投入で回復できる不備（資格情報、権限、SES の設定）は、例外を投げてイベント出版を `FAILED` に残す。
   スロットリングを除く 4xx は、SES の不調ではないので circuit breaker の失敗に数えない。
   場合ごとの表は[メールを送る Client](../mail/sending.md#結果と失敗の扱い)にある。
+- 送ってよい宛先は、設定 `MAIL_SENDER_ALLOWED_RECIPIENTS`（カンマ区切り）の許可リストで絞る。
+  項目は `*`（すべて）、`@ドメイン`（サブドメインを含まない）、アドレスの完全一致のどれかで、大文字と小文字は区別しない。
+  許可の外の宛先には SES を呼ばず、拒否（`Rejected`）の結果にする。
+  既定値を置かず、本番は `*` を明示する。
+  本番のコードに環境の分岐を持たず、値の違いだけで挙動を変える。
+  ローカルとテストの値には `*` を置かない。
 - Client のログと、Client が投げる SES の例外のメッセージには、例外の型と SES のエラーコードだけを入れ、宛先のアドレスと SES のエラーの文面を入れない（[ADR-015](ADR-015-structure-and-protect-observability-data.md)）。
   SES の文面は、確かめられなかった宛先のアドレスを含みうるためである。
   投げた例外のメッセージも、Spring Modulith がリスナーの失敗を記録するログに出る。
@@ -96,8 +102,11 @@ SDK は OS の環境変数と JVM のシステムプロパティだけを読み�
   決済代行の WireMock と同じ割り切りで、本番での手による疎通の確認で補う。
 - 手元でメールを読む画面がなく、送ったメールは WireMock の要求の記録を JSON で読む。
 - 接続先の書き忘れは、アプリの起動の時点では止まらない。
-  `.env` に `AWS_` の行がなく、手元に `~/.aws` の profile があると、SDK はその資格情報で本物の SES へ送りうる。
-  この Client を呼ぶ機能は今はなく、機能を足す変更で、ローカルの起動の検査を決める。
+  `.env` に `AWS_` の行がなく、手元に `~/.aws` の profile があると、SDK はその資格情報で本物の SES へ向かう。
+  許可リストの外の宛先には送らないが、許可リストの中のアドレスには届く。
+  ローカルの許可リストは、自分たちが管理するドメインだけにする。
+- 本番で許可リストを `*` にし忘れる、または絞りすぎると、メールが `Rejected` として記録される。
+  Client の WARN のログ（設定の名前）で見つける。
 - 接続を待つ上限（2 秒）を超えると、SES が受け付けた後でも例外になり、再投入で同じメールを 2 通送りうる。
   SDK の最初の呼び出しは、クラスの読み込みで遅い。
   対策は Client を呼ぶ側の記録で、送った時刻を記録しても、応答を受け取る前の失敗は防げない（[メールを送る Client](../mail/sending.md)）。

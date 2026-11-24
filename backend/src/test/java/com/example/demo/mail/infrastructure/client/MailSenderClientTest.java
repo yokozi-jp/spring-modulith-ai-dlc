@@ -76,6 +76,9 @@ class MailSenderClientTest {
   /** 設定セットの名前。 */
   private static final String CONFIGURATION_SET = "app-transactional";
 
+  /** 送ってよい宛先。{@link #TO} のドメインを許す。 */
+  private static final String ALLOWED_RECIPIENTS = "@example.net";
+
   /** 要求の本文を読む。 */
   private static final JsonMapper JSON = JsonMapper.builder().build();
 
@@ -273,8 +276,9 @@ class MailSenderClientTest {
     // UTF-8 で 46 バイト。Base64 で 64 文字になり、前後の 12 文字と合わせて 75 文字を超える。
     final String fromName = "あ".repeat(15) + "a";
     try (SesV2Client unused = unconnectedClient()) {
-      assertThatThrownBy(
-              () -> new MailSenderClient(unused, FROM_ADDRESS, fromName, CONFIGURATION_SET))
+      assertThatThrownBy(() ->
+              new MailSenderClient(
+                  unused, FROM_ADDRESS, fromName, CONFIGURATION_SET, ALLOWED_RECIPIENTS))
           .isInstanceOf(IllegalArgumentException.class)
           .hasMessageContaining("mail-sender.from-name");
     }
@@ -284,7 +288,9 @@ class MailSenderClientTest {
   @DisplayName("From の表示名が UTF-8 で 45 バイトなら、Client を作れる")
   void longestFromNameIsAccepted() {
     try (SesV2Client unused = unconnectedClient()) {
-      assertThat(new MailSenderClient(unused, FROM_ADDRESS, "あ".repeat(15), CONFIGURATION_SET))
+      assertThat(
+              new MailSenderClient(
+                  unused, FROM_ADDRESS, "あ".repeat(15), CONFIGURATION_SET, ALLOWED_RECIPIENTS))
           .as("45 バイトの表示名の Client")
           .isNotNull();
     }
@@ -306,8 +312,9 @@ class MailSenderClientTest {
       final String configurationSet,
       final String property) {
     try (SesV2Client unused = unconnectedClient()) {
-      assertThatThrownBy(
-              () -> new MailSenderClient(unused, fromAddress, fromName, configurationSet))
+      assertThatThrownBy(() ->
+              new MailSenderClient(
+                  unused, fromAddress, fromName, configurationSet, ALLOWED_RECIPIENTS))
           .isInstanceOf(IllegalArgumentException.class)
           .hasMessageContaining(property);
     }
@@ -319,7 +326,8 @@ class MailSenderClientTest {
     contextRunner()
         .withPropertyValues(
             "mail-sender.from-name=" + FROM_NAME,
-            "mail-sender.configuration-set=" + CONFIGURATION_SET)
+            "mail-sender.configuration-set=" + CONFIGURATION_SET,
+            "mail-sender.allowed-recipients=" + ALLOWED_RECIPIENTS)
         .run(context ->
             assertThat(NestedExceptionUtils.getMostSpecificCause(context.getStartupFailure()))
                 .hasMessageContaining("Could not resolve placeholder 'mail-sender.from-address'"));
@@ -330,11 +338,46 @@ class MailSenderClientTest {
   void missingConfigurationSetFailsStartup() {
     contextRunner()
         .withPropertyValues(
-            "mail-sender.from-address=" + FROM_ADDRESS, "mail-sender.from-name=" + FROM_NAME)
+            "mail-sender.from-address=" + FROM_ADDRESS,
+            "mail-sender.from-name=" + FROM_NAME,
+            "mail-sender.allowed-recipients=" + ALLOWED_RECIPIENTS)
         .run(context ->
             assertThat(NestedExceptionUtils.getMostSpecificCause(context.getStartupFailure()))
                 .hasMessageContaining(
                     "Could not resolve placeholder 'mail-sender.configuration-set'"));
+  }
+
+  @Test
+  @DisplayName("許可する宛先の設定がなければ、placeholder の解決の失敗で起動に失敗する")
+  void missingAllowedRecipientsFailsStartup() {
+    contextRunner()
+        .withPropertyValues(
+            "mail-sender.from-address=" + FROM_ADDRESS,
+            "mail-sender.from-name=" + FROM_NAME,
+            "mail-sender.configuration-set=" + CONFIGURATION_SET)
+        .run(context ->
+            assertThat(NestedExceptionUtils.getMostSpecificCause(context.getStartupFailure()))
+                .hasMessageContaining(
+                    "Could not resolve placeholder 'mail-sender.allowed-recipients'"));
+  }
+
+  @Test
+  @DisplayName("許可の外の宛先には SES を呼ばずに拒否を返し、ログに宛先を出さない")
+  void recipientOutsideAllowListIsRejectedWithoutCallingSes(final CapturedOutput output)
+      throws IOException {
+    final AtomicInteger requests = new AtomicInteger();
+    final MailSenderClient client =
+        start(exchange -> {
+          requests.incrementAndGet();
+          reply(exchange, 200, null, "{\"MessageId\":\"msg-1\"}");
+        });
+    final MailRecipient outside = new MailRecipient("stranger-1c9d@example.org");
+
+    assertThat(client.send(outside, SUBJECT, BODY)).as("結果").isEqualTo(new MailOutcome.Rejected());
+    assertThat(requests).as("SES への要求の数").hasValue(0);
+    assertThat(output.getOut())
+        .contains("mail-sender.allowed-recipients")
+        .doesNotContain(outside.value());
   }
 
   /**
@@ -376,7 +419,8 @@ class MailSenderClientTest {
     final SesV2Client client =
         SesV2TestClients.create(URI.create(started.url()), Duration.ofSeconds(1), readTimeout);
     sdkClient = client;
-    return new MailSenderClient(client, FROM_ADDRESS, FROM_NAME, CONFIGURATION_SET);
+    return new MailSenderClient(
+        client, FROM_ADDRESS, FROM_NAME, CONFIGURATION_SET, ALLOWED_RECIPIENTS);
   }
 
   /** JSON の本文で応答する。エラーの種類があれば、SES と同じく {@code x-amzn-ErrorType} のヘッダーで返す。本文が空なら本文を送らない。 */

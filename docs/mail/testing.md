@@ -19,6 +19,8 @@ tags: [convention, mail, testing, wiremock, future-arch-guidelines]
   外部システムを WireMock で偽る形は [ADR-072](../adr/ADR-072-fake-external-systems-with-wiremock.md) に、SES に広げた理由は [ADR-125](../adr/ADR-125-send-mail-with-ses-v2-api-and-fake-it-with-wiremock.md) に従う。
 - 送ったメールの宛先、件名、本文は、WireMock の要求の記録から読んで確かめる。
 - テストから本物の宛先へメールを送らない。
+  ローカルとテストの `MAIL_SENDER_ALLOWED_RECIPIENTS` は、`@example.com` のような自分たちが管理するドメインだけにし、`*` を置かない。
+  テストの宛先は、許可したドメインのアドレスにする。
 
 ## 本番
 

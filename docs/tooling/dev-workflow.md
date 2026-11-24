@@ -199,10 +199,10 @@ task fe-dev                # SPAを起動し、APIとOIDCを同一オリジン�
 既存の`.env`と`.env.test`の値は上書きされない。
 Taskのテスト系タスクは、`.env.test`に足りない変数を`.env.test.example`の行のまま追記し、追記した変数名を出す。
 たとえば決済代行のClientを足した変更の後は、既存の`.env`へ`.env.example`の`PAYMENT_GATEWAY_BASE_URL`の行を足す。
-メールを送るClientを足した変更（[ADR-125](../adr/ADR-125-send-mail-with-ses-v2-api-and-fake-it-with-wiremock.md)）の後は、既存の`.env`へ`.env.example`の`MAIL_SENDER_`と`AWS_`で始まる7行を足す。
+メールを送るClientを足した変更（[ADR-125](../adr/ADR-125-send-mail-with-ses-v2-api-and-fake-it-with-wiremock.md)）の後は、既存の`.env`へ`.env.example`の`MAIL_SENDER_`と`AWS_`で始まる8行を足す。
 SESの接続先（`AWS_ENDPOINT_URL_SESV2`）などは、Springが`.env`から読み、`SesV2ClientConfig`がClientに渡す。
 `task be-run`、`./gradlew bootRun`、IDEのどれで起動しても同じに効く。
-`.env`に`AWS_`の行がないと、Clientは本物のSESへ向かう設定になるので、7行とも足す。
+`.env`に`AWS_`の行がないと、Clientは本物のSESへ向かう設定になるので、8行とも足す。
 `task compose-up`などが`OTEL_SERVICE_NAMESPACE is required`のように変数不足で止まったときは、これが原因である。
 失敗したイベント出版の定期の再投入を足した変更の後は、既存の`.env`へ`.env.example`の`EVENT_PUBLICATION_RESUBMISSION_ENABLED`、`EVENT_PUBLICATION_RESUBMISSION_WAIT_AGE`、`EVENT_PUBLICATION_RESUBMISSION_IN_FLIGHT_STALENESS`、`EVENT_PUBLICATION_RESUBMISSION_INTERVAL`の4行を足す（[ADR-079](../adr/ADR-079-resubmit-failed-event-publications-periodically-with-shedlock.md)）。
 ローカルでは定期の再投入が短い間隔で有効なので、`FAILED`の出版は消した注文を指すものも回数の上限まで自動で再投入され、そのたびにリスナーのERRORが出る。
