@@ -14,7 +14,7 @@ import org.junit.jupiter.params.provider.ValueSource;
 class GatewayPaymentCodeTest {
 
   /** 空白でない文字を 1 つ以上含み、64 文字以下の識別子。前後の空白は除かない。 */
-  static Stream<String> acceptedValues() {
+  /* default */ static Stream<String> acceptedValues() {
     return Stream.of("a", " a ", "a".repeat(64));
   }
 

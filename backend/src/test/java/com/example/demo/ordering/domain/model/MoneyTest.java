@@ -11,6 +11,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 /** 金額の不変条件を境界の両側で検証する。小数点以下の桁数は 0 から 6 桁を生成する。 */
+@SuppressWarnings("PMD.TooManyStaticImports")
 class MoneyTest {
 
   @Test
