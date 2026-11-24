@@ -69,7 +69,8 @@ git diff --stat "$(sed -n 's/^同期コミット：`\([0-9a-f]*\)`.*/\1/p' "$ski
 ```
 
 `application.yaml` は `spring.modulith.events`（`completion-mode`、`staleness`、`resubmission`）、`spring.task.execution`、`spring.task.scheduling`、`spring.threads.virtual`、`event-publication.resubmission` の節だけ、`build.gradle` は `springModulithVersion`、ShedLock、Spring Boot の版だけが関わる。
-`spring.modulith.events.staleness` の閾値を書くと、組み込みの Staleness Monitor がロックの外で動き、モデルにない経路ができる。
+`spring.modulith.events.staleness` の閾値を書くと起動に失敗する（`EventPublicationResubmissionConfig.StalenessMonitorProperties`）。
+この検査を外して閾値を書くと、組み込みの Staleness Monitor がロックの外で動き、モデルにない経路ができる。
 `spring.threads.virtual.enabled` のとき Spring Boot が使う `SimpleAsyncTaskScheduler` は、fixed delay のタスクを一つのスレッドで順に動かすため、同じインスタンスの再投入のジョブの回は重ならない。
 スケジューラを変えて回が重なるようになったら、モデルの `ThreadFree` を直す。
 
@@ -115,7 +116,7 @@ git diff --stat "$(sed -n 's/^同期コミット：`\([0-9a-f]*\)`.*/\1/p' "$ski
 - 古い出版を `FAILED` に戻す処理は、ロックを取った回の中で、古い行を読む `StaleFind` と印を付ける `StaleMark` に分けた。
   どちらも、その回の期限（`RunMax`）までのどの時刻でもよい。
   1 回の処理が三つの状態を順に読むことは、読む時刻を選べることで代える。
-- 組み込みの Staleness Monitor（`spring.modulith.events.staleness` の閾値）は登録しない前提で、モデルにない。
+- 組み込みの Staleness Monitor は、閾値を書くと起動に失敗するため（`StalenessMonitorProperties`）、モデルにない。
 - 手での 1 回の再投入（`EventPublicationResubmitOnce`）は扱わない。
   同じロックを取る運用者の入口で、ロックの中で古い出版を `FAILED` に戻してから、待ち時間と回数の上限を見ずに再投入する。
 - `ResubmissionTracker` の数え方とメトリクス、上限到達の ERROR と上限を超えた `FAILED` の件数の ERROR のログは扱わない。

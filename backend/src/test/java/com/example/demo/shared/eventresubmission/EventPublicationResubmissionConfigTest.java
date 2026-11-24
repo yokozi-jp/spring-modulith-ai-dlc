@@ -22,6 +22,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.Answers;
 import org.mockito.Mockito;
 import org.springframework.boot.ApplicationRunner;
@@ -36,6 +37,7 @@ import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 import org.springframework.boot.validation.autoconfigure.ValidationAutoConfiguration;
 import org.springframework.context.ApplicationContext;
 import org.springframework.core.env.MapPropertySource;
+import org.springframework.core.env.SystemEnvironmentPropertySource;
 import org.springframework.core.io.support.SpringFactoriesLoader;
 import org.springframework.core.task.SimpleAsyncTaskExecutor;
 import org.springframework.core.task.TaskExecutor;
@@ -140,24 +142,56 @@ class EventPublicationResubmissionConfigTest {
   }
 
   @Test
-  @DisplayName("application.yaml の設定で定期の実行を有効にしても、組み込みの Staleness Monitor の定期のタスクは登録せず、閾値を書くと登録する")
+  @DisplayName("application.yaml の設定で定期の実行を有効にしても、組み込みの Staleness Monitor の定期のタスクは登録しない")
   void builtInStalenessMonitorIsNotScheduledWithApplicationYaml() {
-    final ApplicationContextRunner withApplicationYaml =
-        scheduledRunner()
-            .withInitializer(new ConfigDataApplicationContextInitializer())
-            .withConfiguration(AutoConfigurations.of(EventPublicationAutoConfiguration.class))
-            .withBean(
-                EventPublicationRepository.class,
-                () -> Mockito.mock(EventPublicationRepository.class));
+    scheduledRunner()
+        .withInitializer(new ConfigDataApplicationContextInitializer())
+        .withConfiguration(AutoConfigurations.of(EventPublicationAutoConfiguration.class))
+        .withBean(
+            EventPublicationRepository.class, () -> Mockito.mock(EventPublicationRepository.class))
+        .run(context ->
+            assertThat(fixedDelayTasks(context))
+                .as("application.yaml の設定の固定の遅延のタスク")
+                .singleElement()
+                .satisfies(
+                    task -> assertThat(task.getRunnable().toString()).contains("resubmitOnce")));
+  }
 
-    withApplicationYaml.run(context ->
-        assertThat(fixedDelayTasks(context))
-            .as("application.yaml の設定の固定の遅延のタスク")
-            .singleElement()
-            .satisfies(task -> assertThat(task.getRunnable().toString()).contains("resubmitOnce")));
-    withApplicationYaml
-        .withPropertyValues("spring.modulith.events.staleness.published=PT5M")
-        .run(context -> assertThat(fixedDelayTasks(context)).as("閾値を書いたときの固定の遅延のタスク").hasSize(2));
+  @ParameterizedTest
+  @ValueSource(strings = {"published", "processing", "resubmitted"})
+  @DisplayName("組み込みの Staleness Monitor の閾値のどれかを書くと、起動に失敗する")
+  void builtInStalenessThresholdFailsStartup(final String threshold) {
+    assertStalenessMonitorRejected(
+        runner.withPropertyValues(
+            DISABLED, "spring.modulith.events.staleness." + threshold + "=PT5M"));
+  }
+
+  @Test
+  @DisplayName("組み込みの Staleness Monitor の閾値を環境変数で渡しても起動に失敗し、check-interval だけなら起動する")
+  void builtInStalenessThresholdFromEnvironmentVariableFailsStartup() {
+    assertStalenessMonitorRejected(
+        runner
+            .withPropertyValues(DISABLED)
+            .withInitializer(context ->
+                context
+                    .getEnvironment()
+                    .getPropertySources()
+                    .addFirst(
+                        new SystemEnvironmentPropertySource(
+                            "testEnvironment",
+                            Map.of("SPRING_MODULITH_EVENTS_STALENESS_PUBLISHED", "PT5M")))));
+    runner
+        .withPropertyValues(DISABLED, "spring.modulith.events.staleness.check-interval=PT1M")
+        .run(context -> assertThat(context).hasNotFailed());
+  }
+
+  private static void assertStalenessMonitorRejected(final ApplicationContextRunner rejected) {
+    rejected.run(context ->
+        assertThat(context)
+            .getFailure()
+            .hasRootCauseInstanceOf(BindValidationException.class)
+            .rootCause()
+            .hasMessageContaining("spring.modulith.events.staleness.published, processing and"));
   }
 
   /** 定期の実行を有効にし、定期の再投入を足した runner。初回の遅延が 1 分あり、テストの間にタスクは動かないため、依存は mock で足りる。 */

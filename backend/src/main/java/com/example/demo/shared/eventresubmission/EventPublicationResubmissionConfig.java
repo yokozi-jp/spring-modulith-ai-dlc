@@ -56,7 +56,8 @@ import org.springframework.validation.annotation.Validated;
 @EnableConfigurationProperties({
   EventPublicationResubmissionConfig.Properties.class,
   EventPublicationResubmissionConfig.AbandonProperties.class,
-  EventPublicationResubmissionConfig.ResubmitOnceProperties.class
+  EventPublicationResubmissionConfig.ResubmitOnceProperties.class,
+  EventPublicationResubmissionConfig.StalenessMonitorProperties.class
 })
 class EventPublicationResubmissionConfig {
 
@@ -366,6 +367,32 @@ class EventPublicationResubmissionConfig {
     /** 行の {@code completion_attempts}（再投入した回数 + 1）が、もう再投入しない回数か。 */
     /* package */ boolean exceeded(final int completionAttempts) {
       return completionAttempts > abandonAfterAttempts;
+    }
+  }
+
+  /**
+   * Spring Modulith の {@code spring.modulith.events.staleness} のうち、組み込みの Staleness Monitor の閾値。
+   *
+   * <p>どれかを書くと、Spring Modulith 2.2.0 は組み込みの Staleness Monitor を定期のタスクに登録し、古い出版をロックの外で FAILED に戻す。
+   * 古い出版を FAILED に戻す処理はロックの中で呼ぶため（{@link FailedPublicationSweep}、ADR-079）、書いたら起動に失敗させる。 {@code
+   * check-interval} だけではタスクを登録しないため、見ない。
+   *
+   * @param published {@code PUBLISHED} の閾値
+   * @param processing {@code PROCESSING} の閾値
+   * @param resubmitted {@code RESUBMITTED} の閾値
+   */
+  /* package */ @ConfigurationProperties("spring.modulith.events.staleness")
+  @Validated
+  record StalenessMonitorProperties(
+      @Nullable Duration published, @Nullable Duration processing, @Nullable Duration resubmitted) {
+
+    /** 組み込みの Staleness Monitor の閾値をどれも書いていないか。 */
+    @AssertTrue(
+        message =
+            "spring.modulith.events.staleness.published, processing and resubmitted must not be set:"
+                + " stale publications are marked failed inside the resubmission lock")
+    /* package */ boolean isBuiltInMonitorOff() {
+      return published == null && processing == null && resubmitted == null;
     }
   }
 

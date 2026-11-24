@@ -168,7 +168,8 @@ spring:
       # 複数インスタンスでの競合を避けるため、起動時には自動再配信しない。
       republish-outstanding-events-on-restart: false
       # 落ちたまま PUBLISHED、PROCESSING、RESUBMITTED に残った出版を FAILED に戻す組み込みの Staleness Monitor は使わない（ADR-079）。
-      # spring.modulith.events.staleness の閾値を書かなければ登録されない。0 は起動に失敗する。
+      # spring.modulith.events.staleness の閾値（published、processing、resubmitted）を書かなければ、StalenessMonitorConfiguration は読み込まれても定期のタスクを足さない。
+      # 閾値を書くと起動に失敗する（EventPublicationResubmissionConfig.StalenessMonitorProperties）。
       # 同じ処理は、定期の再投入と手での 1 回の再投入が ShedLock のロックの中で、再投入の前に呼ぶ（FailedPublicationSweep）。
       # 閾値は event-publication.resubmission の wait-age（PUBLISHED）と in-flight-staleness（PROCESSING と RESUBMITTED）である。
       # 最初の配信が concurrency-limit の空きを待つ間に wait-age を過ぎた出版は重ねて再投入しうる。リスナーの冪等性に頼る。

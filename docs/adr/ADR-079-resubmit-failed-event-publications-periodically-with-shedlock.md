@@ -78,11 +78,8 @@ Proposed の間に、上限を超えて `FAILED` に残った出版の知らせ�
 回ごとの ERROR は、運用者が扱うまで `interval`（本番 1 分）ごとに同じ通知を出し続け、警報が埋もれるためである。
 
 Proposed の間に、落ちたまま残った出版を `FAILED` に戻す処理を、組み込みの Staleness Monitor から、再投入のジョブがロックの中で呼ぶ形へ書き直した（[#556](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/556)）。
-組み込みの Staleness Monitor は、全インスタンスがロックの外で動かし、古い出版を `findByStatus` で読んだ後、状態を確かめずに ID だけで `markFailed` を呼ぶ。
-その間に別のインスタンスが再投入した出版は、処理中のまま `FAILED` に戻り、次の再投入で同じ出版のリスナーが同時に 2 本動きうる（`ResubmissionOptionsLearningTest` の `stalenessMarksPublicationResubmittedAfterRead`、形式検証の当時の既知の発見）。
-2.2.0 の `StalenessMonitorConfiguration` は、`spring.modulith.events.staleness` の閾値のどれかを書いたときだけ定期のタスクを登録し、そのタスクは `EventPublicationRegistry.markStalePublicationsFailed(Staleness)` を呼ぶだけである。
-`EventPublicationRegistry` と `Staleness` はどちらも public のインタフェースである。
-閾値に 0 を書くと、`StalenessProperties` が正の値を求めて起動に失敗するため、閾値は書かずに止める。
+組み込みの Staleness Monitor は全インスタンスがロックの外で動かし、古い出版を読んだ後に状態を確かめずに `markFailed` を呼ぶ。
+そのため、その間に別のインスタンスが再投入した出版を処理中のまま `FAILED` に戻し、同じ出版のリスナーを同時に 2 本動かしうる（`ResubmissionOptionsLearningTest` の `stalenessMarksPublicationResubmittedAfterRead`、形式検証の当時の既知の発見）。
 
 ## Decision
 
@@ -181,13 +178,15 @@ Proposed の間に、落ちたまま残った出版を `FAILED` に戻す処理�
   SQL は `completion_attempts` を残すため、戻した出版は定期のジョブでなく手での 1 回の再投入だけが扱い、また失敗すればすぐに `ABANDONED` に戻る。
   SQL の手順と確かめ方は Runbook の「上限に達した出版の戻し方」にある。
 - 落ちたまま残った `PUBLISHED`、`PROCESSING`、`RESUBMITTED` の出版は、Spring Modulith の `EventPublicationRegistry.markStalePublicationsFailed(Staleness)` で `FAILED` に戻す。
-  組み込みの Staleness Monitor（`StalenessMonitorConfiguration`）は使わず、`spring.modulith.events.staleness` の閾値を書かない。
-  閾値を書くと、全インスタンスがロックの外で定期に動かすためである（Context）。
-  代わりに、定期のジョブと手での 1 回の再投入が、ロックを取った中で、再投入の前に呼ぶ（`FailedPublicationSweep`）。
+  定期のジョブと手での 1 回の再投入が、ロックを取った中で、再投入の前に呼ぶ（`FailedPublicationSweep`）。
   一つの回が古い出版を読んでから `FAILED` にするまでの間、別のインスタンスはロックを取れず、その出版を再投入できない。
   `FAILED` に戻した出版は、同じ回の再投入の候補になる。
   閾値は `EventPublicationResubmissionConfig.Properties.staleness` が返し、`PUBLISHED` は `wait-age`、`PROCESSING` と `RESUBMITTED` は `event-publication.resubmission.in-flight-staleness` にする。
   `PROCESSING` と `RESUBMITTED` に `wait-age` を使わないのは、再投入して処理中の出版を `FAILED` に戻さないためである。
+- 組み込みの Staleness Monitor（`StalenessMonitorConfiguration`）は使わない（Context）。
+  2.2.0 は `spring.modulith.events.staleness` の閾値のどれかを書いたときだけ、全インスタンスで `markStalePublicationsFailed` をロックの外から呼ぶ定期のタスクを登録する。
+  閾値を書くと起動に失敗させる（`EventPublicationResubmissionConfig.StalenessMonitorProperties`）。
+  Spring Modulith は閾値に正の値を求めるため、0 を書いて止めることもできない。
 - 古い出版を `FAILED` に戻す処理はロックを取れた回だけで動く。
   組み込みの Staleness Monitor は各インスタンスで `check-interval` ごとに動いたが、この処理はクラスタ全体で `interval` あたりおよそ 1 回から 2 回になる。
   ロックを他のインスタンスが持つ回は省かれ、落ちたインスタンスがロックを残すと `lock-at-most-for` まで止まる。
@@ -204,7 +203,7 @@ Proposed の間に、落ちたまま残った出版を `FAILED` に戻す処理�
 - 2.2 に代わる仕組みがないため、次は自作のまま残す。
   - 指数的な待ち時間（`multiplier`、`max-wait`）：`ResubmissionOptions` は件数（`withBatchSize`、`withMaxInFlight`）、`publication_date` からの最小の経過時間（`withMinAge`）、条件の関数（`withFilter`）だけを持ち、最後の試行からの待ち時間も倍率も持たない。
   - 定期の実行と ShedLock のロック：2.2 で定期に動くのは Staleness Monitor だけで、失敗した出版の再投入を定期に動かす仕組みも、複数のインスタンスで排他する仕組みもない。
-  - 古い出版を `FAILED` に戻す処理をロックの中で呼ぶこと（`Properties.staleness`）：2.2 の Staleness Monitor は排他せずに全インスタンスで動く。
+  - 古い出版を `FAILED` に戻す処理をロックの中で呼ぶこと（`Properties.staleness`、`StalenessMonitorProperties`）：2.2 の Staleness Monitor は排他せずに全インスタンスで動く。
   - 手での 1 回の再投入（`EventPublicationResubmitOnce`）：2.2 の `FailedEventPublications` は再投入するだけで、リスナーの完了を待つことも、結果を終了コードで返すこともしない。
   - リスナーごとの方針の対応づけ（`@ResubmissionPolicy` と `ResubmissionPolicies`）：2.2 はリスナーごとの待ち時間の設定を持たない。
   - メトリクス（`runs`、`resubmissions`、`outcomes`、`exhausted`、`failed`、`failed.oldest.age`）と結果の読み戻し（`ResubmissionTracker`）：2.2 の可観測性はモジュールの境界の trace とイベントの Counter で、出版の状態の件数も再投入の結果も出さず、成功を知らせる hook もない。

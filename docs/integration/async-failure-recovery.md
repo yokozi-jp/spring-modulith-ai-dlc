@@ -61,8 +61,7 @@ Spring Modulith 2.2.0 のイベント出版は、次の状態を持つ（[Spring
   定期の再投入は、再投入のあとに `event_publication` と archive の表を読み戻し、実際に `RESUBMITTED` へ進んだ出版の件数を `event.publication.resubmissions` に記録する（[ADR-079](../adr/ADR-079-resubmit-failed-event-publications-periodically-with-shedlock.md)）。
 - `EventPublicationRegistry.markStalePublicationsFailed(Staleness)` は、状態が `PUBLISHED`、`PROCESSING`、`RESUBMITTED` の出版のうち、最後の出版か再投入の時刻（`last_resubmission_date`、なければ `publication_date`）から状態ごとの時間を過ぎたものを `FAILED` にする（2.2.0 の `DefaultEventPublicationRegistry`）。
   その状態に入ってからの時間では測らないため、`PROCESSING` の時間は executor の空きを待つ時間も含む。
-  Spring Modulith の組み込みの Staleness Monitor（`spring.modulith.events.staleness.*`）は、これを全インスタンスがロックの外で定期に呼ぶため、使わない。
-  閾値を書かなければ登録されず、0 以下の時間は起動に失敗する。
+  Spring Modulith の組み込みの Staleness Monitor（`spring.modulith.events.staleness.*`）は使わず、閾値を書くと起動に失敗する。
   代わりに、定期の再投入と手での 1 回の再投入が、ShedLock のロックの中で、再投入の前に呼ぶ（[ADR-079](../adr/ADR-079-resubmit-failed-event-publications-periodically-with-shedlock.md)）。
   `PUBLISHED` の時間は定期の再投入の最初の待ち時間（`wait-age`）と同じにする。
   `PROCESSING` と `RESUBMITTED` の時間は `in-flight-staleness` にし、`lock-at-most-for` の 2 倍より長いことを起動時に検証する。
