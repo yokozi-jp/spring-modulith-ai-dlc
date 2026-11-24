@@ -119,3 +119,4 @@
 - [ADR-117: Problem Details に traceId を付け、instance を設定しない](ADR-117-add-trace-id-and-omit-instance-in-problem-details.md)（Proposed, 2026-11-23）
 - [ADR-118: モジュールの依存先を allowedDependencies で宣言する](ADR-118-declare-module-dependencies-with-allowed-dependencies.md)（Proposed, 2026-11-23）
 - [ADR-119: セッションの Cookie を __Host-APP_SESSION にし、SameSite=Lax を保つ](ADR-119-harden-session-cookie-with-host-prefix.md)（Proposed, 2026-11-24）
+- [ADR-120: メールアドレスの形式の検査で、サーバーの式をクライアントの Zod の式に揃える](ADR-120-align-server-email-validation-with-zod.md)（Proposed, 2026-11-24）

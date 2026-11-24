@@ -8,7 +8,7 @@ tags: [convention, mail, validation, security, future-arch-guidelines]
 # メールアドレスの扱い
 
 利用者のメールアドレスの正は IdP に置き、アプリの利用者は ID トークンの `iss` と `sub` の組で引く。
-形式の検査は、ありえない形だけを断る寛容な検査にし、正規表現を自作せずフレームワークの検査を使う。
+形式の検査は、ありえない形だけを断る寛容な検査にし、正規表現を自作せず、フレームワークの検査とクライアントの Zod の式に合わせる。
 アドレスどうしは大文字と小文字を区別せずに比べ、エイリアスを正規化しない。
 
 ## 正の置き場所
@@ -25,19 +25,23 @@ tags: [convention, mail, validation, security, future-arch-guidelines]
 
 ## 形式の検査
 
-- 入力の前後の空白は、フォームの component が、生成した schema で検査する前に除く。
+- 入力の前後の空白は、フォームの component が、生成した schema で検査する前に除く（`EmailInput`）。
   Orval が生成する Zod の schema は値を変えずに検査するので、空白を除けないためである。
-  空白を除く処理を足すのは、[#664](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/664) で扱う。
-- サーバーは空白を除かずに検査し、前後に空白のある値を断る（`@Email` も `z.email()` も断る）。
+- サーバーは空白を除かずに検査し、前後に空白のある値を断る。
 - 検査は、ありえない形（`@` がない、空白を含む、`@` が全角であるなど）だけを断る。
   アドレスに届くかどうかは、形式の検査では確かめない。
-- 正規表現を自作しない。
-  - バックエンドは、Bean Validation の `@Email`（`jakarta.validation.constraints.Email`）を使う。
+- 正規表現を自作しない（[ADR-120](../adr/ADR-120-align-server-email-validation-with-zod.md)）。
+  - バックエンドは、`shared.validation` の `@MailAddress` を使う。
+    `@Email` に、Zod の `z.regexes.email` と同じ式を `regexp` として足した制約で、OpenAPI には `format: email` が出る。
+    式は Zod から写したもので、`MailAddress.PATTERN` の 1 か所に置く。
     検査の置き場所は [APIの入力検証の配置](../web-api/validation.md) に従う。
   - フロントエンドは、OpenAPI の `format: email` から Orval が生成する Zod の検査を使い、`z.email()` を手書きしない（[フォームの入力検証](../frontend/form-validation.md#検証条件の同期)）。
-- 2 つの検査が通す形は同じではなく、`user@localhost` のようにサーバーが通してクライアントが断る形がある。
-  この形では、[フォームの入力検証](../frontend/form-validation.md#クライアントとサーバーの役割)の「サーバーは、クライアントと同じかそれ以上の検証を必ず行う」に合わない。
-  ずれの埋め方は #664 で決める。
+- サーバーは、クライアントが通す形の部分集合だけを通す。
+  `@MailAddress` は Hibernate の `@Email` の検査も行うので、`a@x-.com` のようにクライアントが通してサーバーが断る形が少しある。
+- 式が Zod と同じ文字列であることと、`openapi/mail-address-cases.json` の入力の判定を、バックエンドの `MailAddressTest` とフロントエンドの `mail-address-cases.test.ts` が検査する。
+  Zod の更新で式が変わると、フロントエンドのテストが失敗する。
+- ASCII 以外のローカルパートと IDN のドメインは、クライアントもサーバーも断る。
+  ブラウザの `type="email"` は IDN のドメインを punycode に変えて渡すので、画面からは通る。
 - どちらの検査も、ドットが続くなど RFC に合わない古い携帯電話のアドレスを断る。
   取引先の業務のアドレスが相手なので、この差を受け入れる。
 
@@ -60,6 +64,6 @@ tags: [convention, mail, validation, security, future-arch-guidelines]
 - 原文は、確認のメールの送信を必須とする。
   この規約は、本人がアドレスを持つことを IdP の `email_verified` で判断し、アプリから確認のメールを送るかを定めない。
 - 原文は、RFC に合わない古い携帯電話のアドレスを誤って断らないよう、ありえない形だけを断る検査を勧める。
-  この規約は、`@Email` と `z.email()` がそうしたアドレスを断ることを受け入れる。
+  この規約は、`@MailAddress` と `z.email()` がそうしたアドレスを断ることを受け入れる。
 - 原文が勧めるドメインの存在の確認（MX と A のレコードの問い合わせ）を、この規約は定めない。
 - 原文が推奨するエイリアスの正規化は、「アドレスどうしの比べ方」の理由で採らない。

@@ -1,0 +1,23 @@
+{
+  "pattern": "^(?:[A-Za-z0-9_'+\\-]+\\.)*[A-Za-z0-9_'+\\-]*[A-Za-z0-9_+-]@(?:[A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$",
+  "accept": [
+    "user@example.com",
+    "a+b@x-y.example.com",
+    "o'neil@example.co.jp",
+    "a.b@example.com"
+  ],
+  "reject": [
+    "user@localhost",
+    "ユーザー@example.com",
+    "user@例え.jp",
+    "user@[1.2.3.4]",
+    "user@a_b.com",
+    "a@b",
+    " user@example.com",
+    "user@example.com ",
+    "user example@example.com",
+    "user＠example.com",
+    "　user@example.com",
+    "user@example.com　"
+  ]
+}
