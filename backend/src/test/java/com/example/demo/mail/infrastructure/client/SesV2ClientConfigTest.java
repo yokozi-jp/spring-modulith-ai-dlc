@@ -1,5 +1,6 @@
 package com.example.demo.mail.infrastructure.client;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.example.demo.testkit.LoopbackHttpServer;
@@ -12,9 +13,11 @@ import java.net.URI;
 import java.time.Duration;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import software.amazon.awssdk.core.exception.SdkClientException;
+import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.sesv2.SesV2Client;
 
 /**
@@ -28,8 +31,39 @@ class SesV2ClientConfigTest {
   /** 確かめるほうの上限。 */
   private static final Duration SHORT = Duration.ofSeconds(1);
 
+  /** SDK がリージョンを読むシステムプロパティ。 */
+  private static final String REGION_PROPERTY = "aws.region";
+
   /** 確かめないほうの上限。呼び出し全体の上限と、応答を止める時間より長い。 */
   private static final Duration LONG = Duration.ofSeconds(20);
+
+  @Test
+  @DisplayName("接続先の設定があれば、その接続先と、設定のリージョンの Client を作る")
+  void endpointFromSettingsIsUsed() {
+    try (SesV2Client client =
+        new SesV2ClientConfig()
+            .sesV2Client(
+                SHORT, SHORT, "http://127.0.0.1:9999", "ap-northeast-1", "access-key", "secret")) {
+      assertThat(client.serviceClientConfiguration().endpointOverride())
+          .as("接続先")
+          .hasValue(URI.create("http://127.0.0.1:9999"));
+      assertThat(client.serviceClientConfiguration().region())
+          .as("リージョン")
+          .isEqualTo(Region.AP_NORTHEAST_1);
+    }
+  }
+
+  @Test
+  @DisplayName("接続先の設定が空なら、接続先を上書きせず、SDK の既定の取得に任せる")
+  void blankEndpointLeavesSdkDefaults() {
+    final String previous = System.getProperty(REGION_PROPERTY);
+    System.setProperty(REGION_PROPERTY, "ap-northeast-1");
+    try (SesV2Client client = new SesV2ClientConfig().sesV2Client(SHORT, SHORT, "", "", "", "")) {
+      assertThat(client.serviceClientConfiguration().endpointOverride()).as("接続先の上書き").isEmpty();
+    } finally {
+      restore(previous);
+    }
+  }
 
   @Test
   @DisplayName("接続を受け付けない相手には、connectTimeout の上限で SdkClientException を投げる")
@@ -83,6 +117,15 @@ class SesV2ClientConfigTest {
     } finally {
       release.countDown();
       server.stop();
+    }
+  }
+
+  /** システムプロパティを元の値に戻す。 */
+  private static void restore(final @Nullable String previous) {
+    if (previous == null) {
+      System.clearProperty(REGION_PROPERTY);
+    } else {
+      System.setProperty(REGION_PROPERTY, previous);
     }
   }
 
