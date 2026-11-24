@@ -8,6 +8,7 @@ import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
 import java.time.Duration;
 import java.util.Map;
+import java.util.Objects;
 import lombok.extern.slf4j.Slf4j;
 import net.javacrumbs.shedlock.core.DefaultLockingTaskExecutor;
 import net.javacrumbs.shedlock.core.LockProvider;
@@ -161,10 +162,10 @@ class EventPublicationResubmissionConfig {
   /* package */ static int resubmitOnceExitCode(
       final EventPublicationResubmitOnce job, final @Nullable String target) {
     try {
-      return job.run(EventPublicationResubmitOnce.Target.parse(target == null ? "" : target))
-              .succeeded()
-          ? 0
-          : 1;
+      final boolean succeeded =
+          job.run(EventPublicationResubmitOnce.Target.parse(Objects.requireNonNull(target)))
+              .succeeded();
+      return succeeded ? 0 : 1;
     } catch (RuntimeException e) {
       log.atError().setCause(e).log("Event publication resubmit-once failed");
       return 1;

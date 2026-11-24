@@ -74,14 +74,8 @@ class EventPublicationResubmitterBudgetTest {
         .resubmit(Mockito.any(ResubmissionOptions.class));
     final SimpleMeterRegistry meterRegistry = new SimpleMeterRegistry();
     final EventPublicationResubmitter resubmitter =
-        new EventPublicationResubmitter(
-            dsl,
-            new FailedPublicationSweep(dsl, failed, lockingTaskExecutor, clock, properties),
-            policies,
-            clock,
-            meterRegistry,
-            properties,
-            abandon);
+        ResubmissionTestSupport.resubmitter(
+            dsl, failed, lockingTaskExecutor, clock, properties, policies, meterRegistry, abandon);
 
     resubmitter.resubmitOnce();
 

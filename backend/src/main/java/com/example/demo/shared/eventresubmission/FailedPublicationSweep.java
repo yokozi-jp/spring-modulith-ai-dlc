@@ -84,90 +84,73 @@ final class FailedPublicationSweep {
    * ロックを 1 回だけ試し、取れたら再投入する。他のインスタンスが持っていれば、何もせず空を返す。
    *
    * <p>ロックは、終わっても {@code lock-at-least-for}（実行の間隔の半分）の間は持ち続ける。
+   *
+   * <p>進んだ出版の読み戻しは、ロックを放してから行う。放すのに失敗したときは、結果を返さず例外で戻る。
    */
   /* package */ Optional<Swept> tryOnce(final Predicate<EventPublication> selection) {
-    final Run run = new Run(selection);
-    return locked(run, properties.lockAtLeastFor()) ? Optional.of(run.swept()) : Optional.empty();
+    return attempt(selection, properties.lockAtLeastFor());
   }
 
   /**
    * ロックを取れるまで {@code lock-at-most-for} を上限に待ち、取れたら再投入する。下限は置かず、終わったらすぐ放す。
    *
+   * <p>進んだ出版の読み戻しは、ロックを放してから行う。放すのに失敗したときは、結果を返さず例外で戻る。
+   *
    * @throws IllegalStateException 上限の間にロックを取れなかったとき
    */
   /* package */ Swept waitUpTo(final Predicate<EventPublication> selection) {
-    final Run run = new Run(selection);
     final int attempts = Polling.pollsWithin(properties.lockAtMostFor());
-    boolean locked = locked(run, Duration.ZERO);
-    for (int attempt = 0; attempt < attempts && !locked; attempt++) {
+    Optional<Swept> swept = attempt(selection, Duration.ZERO);
+    for (int attempt = 0; attempt < attempts && swept.isEmpty(); attempt++) {
       Polling.sleep();
-      locked = locked(run, Duration.ZERO);
+      swept = attempt(selection, Duration.ZERO);
     }
-    if (!locked) {
-      throw new IllegalStateException(
-          "lock " + LOCK_NAME + " was not acquired within " + properties.lockAtMostFor());
-    }
-    return run.swept();
+    return swept.orElseThrow(() ->
+        new IllegalStateException(
+            "lock " + LOCK_NAME + " was not acquired within " + properties.lockAtMostFor()));
   }
 
-  /** ロックを取れたら再投入し、取れたかを返す。 */
-  private boolean locked(final Run run, final Duration atLeastFor) {
+  /**
+   * ロックを 1 回試し、取れたら選んだ出版を再投入して、進んだ出版を返す。取れなければ空を返す。
+   *
+   * <p>{@code FailedEventPublications.resubmit} は {@code LIMIT} を条件の関数より先に掛けるため（Spring Modulith
+   * の挙動は {@code ResubmissionOptionsLearningTest} が固定する）、毎回 FAILED の行をすべて読む。{@code withMinAge} は
+   * publication_date から測り、最後の試行からの待ち時間を表せないため呼ばない。
+   */
+  // ponytail: withBatchSize(Integer.MAX_VALUE) で全件をヒープへ読むため、メモリの上限は FAILED の出版の数に比例する。
+  // 上限の回数目の再投入で失敗した出版は ABANDONED になるため、FAILED に溜まるのは待ち時間の中の出版と、最後の試行の途中で落ちた出版である。
+  private Optional<Swept> attempt(
+      final Predicate<EventPublication> selection, final Duration atLeastFor) {
+    // 再投入はロックを取れた 1 回だけ走るので、この 3 つは 1 回の呼び出しの中でだけ使う。
+    final Map<UUID, Integer> candidates = new ConcurrentHashMap<>();
+    final AtomicInteger remaining = new AtomicInteger();
     final AtomicBoolean locked = new AtomicBoolean();
+    final Predicate<EventPublication> limited =
+        publication -> {
+          if (!selection.test(publication)) {
+            return false;
+          }
+          if (candidates.size() >= properties.maxPerRun()) {
+            remaining.incrementAndGet();
+            return false;
+          }
+          candidates.put(publication.getIdentifier(), publication.getCompletionAttempts());
+          return true;
+        };
     lockingTaskExecutor.executeWithLock(
         (Runnable)
             () -> {
               locked.set(true);
-              run.resubmit();
+              failedEventPublications.resubmit(
+                  ResubmissionOptions.defaults()
+                      .withBatchSize(Integer.MAX_VALUE)
+                      .withFilter(limited));
             },
         new LockConfiguration(
             Instant.now(clock), LOCK_NAME, properties.lockAtMostFor(), atLeastFor));
-    return locked.get();
-  }
-
-  /** 1 回の呼び出しで選んだ出版と、上限を超えた数。 */
-  private final class Run {
-
-    /** 選んだ出版の ID と、再投入の前の completion_attempts。 */
-    private final Map<UUID, Integer> candidates = new ConcurrentHashMap<>();
-
-    /** 選ばれたが上限を超えた数。 */
-    private final AtomicInteger remaining = new AtomicInteger();
-
-    /** 呼び出し元の条件に、{@code max-per-run} の上限を重ねた条件。 */
-    private final Predicate<EventPublication> limited;
-
-    private Run(final Predicate<EventPublication> selection) {
-      this.limited =
-          publication -> {
-            if (!selection.test(publication)) {
-              return false;
-            }
-            if (candidates.size() >= properties.maxPerRun()) {
-              remaining.incrementAndGet();
-              return false;
-            }
-            candidates.put(publication.getIdentifier(), publication.getCompletionAttempts());
-            return true;
-          };
-    }
-
-    /**
-     * 選んだ出版を再投入する。
-     *
-     * <p>{@code FailedEventPublications.resubmit} は {@code LIMIT} を条件の関数より先に掛けるため（Spring Modulith
-     * の挙動は {@code ResubmissionOptionsLearningTest} が固定する）、毎回 FAILED の行をすべて読む。{@code withMinAge} は
-     * publication_date から測り、最後の試行からの待ち時間を表せないため呼ばない。
-     */
-    // ponytail: withBatchSize(Integer.MAX_VALUE) で全件をヒープへ読むため、メモリの上限は FAILED の出版の数に比例する。
-    // 上限の回数目の再投入で失敗した出版は ABANDONED になるため、FAILED に溜まるのは待ち時間の中の出版と、最後の試行の途中で落ちた出版である。
-    private void resubmit() {
-      failedEventPublications.resubmit(
-          ResubmissionOptions.defaults().withBatchSize(Integer.MAX_VALUE).withFilter(limited));
-    }
-
-    private Swept swept() {
-      return new Swept(advancedAmong(candidates), remaining.get());
-    }
+    return locked.get()
+        ? Optional.of(new Swept(advancedAmong(candidates), remaining.get()))
+        : Optional.empty();
   }
 
   /** 候補のうち、実際に {@code RESUBMITTED} へ進んだ出版の ID を返す。 */

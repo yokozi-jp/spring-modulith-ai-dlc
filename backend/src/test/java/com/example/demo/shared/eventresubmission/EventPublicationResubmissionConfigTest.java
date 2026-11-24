@@ -415,6 +415,11 @@ class EventPublicationResubmissionConfigTest {
         .isEqualTo(1);
     assertThat(EventPublicationResubmissionConfig.resubmitOnceExitCode(job, "policy:missing"))
         .isEqualTo(1);
+    assertThat(EventPublicationResubmissionConfig.resubmitOnceExitCode(job, "OrderConfirmed"))
+        .as("読めない対象は、job を呼ばずに 1 を返す")
+        .isEqualTo(1);
+    assertThat(EventPublicationResubmissionConfig.resubmitOnceExitCode(job, null)).isEqualTo(1);
+    Mockito.verify(job, Mockito.times(3)).run(Mockito.any());
   }
 
   @Test

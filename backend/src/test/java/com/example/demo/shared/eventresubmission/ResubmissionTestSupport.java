@@ -6,22 +6,26 @@ import static com.example.demo.jooq.modulith.Tables.EVENT_PUBLICATION_ARCHIVE;
 import com.example.demo.testkit.CapturedLogRecords;
 import com.example.demo.testkit.CleanGeneratedTablesExtension;
 import com.example.demo.testkit.CommittedDatabaseTest;
+import io.micrometer.core.instrument.MeterRegistry;
 import io.opentelemetry.api.common.AttributeKey;
 import io.opentelemetry.sdk.logs.data.LogRecordData;
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
+import java.time.Clock;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Supplier;
+import net.javacrumbs.shedlock.core.LockingTaskExecutor;
 import org.jooq.DSLContext;
 import org.jspecify.annotations.Nullable;
 import org.mockito.Mockito;
 import org.springframework.context.annotation.Import;
 import org.springframework.modulith.events.EventPublication;
+import org.springframework.modulith.events.FailedEventPublications;
 import org.springframework.test.context.TestPropertySource;
 
 /** 再投入のテストで使う、Spring の文脈の設定、ロックの期限、出版の行と archive の行、条件の関数に渡す出版、上限到達の ERROR の操作。 */
@@ -54,6 +58,26 @@ final class ResubmissionTestSupport {
   @SuppressWarnings("PMD.DoNotUseThreads")
   /* package */ static <T> CompletableFuture<T> onVirtualThread(final Supplier<T> task) {
     return CompletableFuture.supplyAsync(task, runnable -> Thread.ofVirtual().start(runnable));
+  }
+
+  /** 同じ {@code dsl}、{@code clock}、{@code properties} から Sweep と定期のジョブを組み立てる。 */
+  /* package */ static EventPublicationResubmitter resubmitter(
+      final DSLContext dsl,
+      final FailedEventPublications failed,
+      final LockingTaskExecutor lockingTaskExecutor,
+      final Clock clock,
+      final EventPublicationResubmissionConfig.Properties properties,
+      final ResubmissionPolicies policies,
+      final MeterRegistry meterRegistry,
+      final EventPublicationResubmissionConfig.AbandonProperties abandon) {
+    return new EventPublicationResubmitter(
+        dsl,
+        new FailedPublicationSweep(dsl, failed, lockingTaskExecutor, clock, properties),
+        policies,
+        clock,
+        meterRegistry,
+        properties,
+        abandon);
   }
 
   /** ロックの期限を過去にする。 */

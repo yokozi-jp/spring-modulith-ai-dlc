@@ -68,7 +68,7 @@ public class EventPublicationResubmitOnce {
   /**
    * 再投入の対象。環境変数の文字列は {@link #parse} で 1 回だけ型にする。
    *
-   * <p>{@link Policy} の名前が設定にあるかは、{@link #run} が対象を選ぶときに確かめる。
+   * <p>{@link Policy} の名前が設定にあるかは、{@link EventPublicationResubmitOnce#run} が対象を選ぶときに確かめる。
    */
   public sealed interface Target {
 
@@ -125,19 +125,20 @@ public class EventPublicationResubmitOnce {
     return switch (target) {
       case Target.All _ -> publication -> true;
       case Target.Policy policy -> {
-        if (!properties.policies().containsKey(policy.name())) {
-          throw new IllegalArgumentException(
-              "unknown resubmission policy: "
-                  + policy.name()
-                  + " "
-                  + properties.policies().keySet());
-        }
+        requireKnownPolicy(policy);
         yield publication ->
             policy.name().equals(policies.nameOf(ResubmissionPolicies.listenerIdOf(publication)));
       }
       case Target.EventType type ->
           publication -> type.className().equals(publication.getEvent().getClass().getName());
     };
+  }
+
+  private void requireKnownPolicy(final Target.Policy policy) {
+    if (!properties.policies().containsKey(policy.name())) {
+      throw new IllegalArgumentException(
+          "unknown resubmission policy: " + policy.name() + " " + properties.policies().keySet());
+    }
   }
 
   /** 結果の件数を記録する。すべて完了したら INFO、それ以外は WARN にする。 */

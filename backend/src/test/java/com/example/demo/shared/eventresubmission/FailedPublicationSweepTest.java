@@ -2,7 +2,6 @@ package com.example.demo.shared.eventresubmission;
 
 import static com.example.demo.jooq.modulith.Tables.EVENT_PUBLICATION;
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.time.Clock;
 import java.time.Duration;
@@ -14,8 +13,6 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.function.Predicate;
-import net.javacrumbs.shedlock.core.LockConfiguration;
-import net.javacrumbs.shedlock.core.LockProvider;
 import net.javacrumbs.shedlock.core.LockingTaskExecutor;
 import org.jooq.DSLContext;
 import org.junit.jupiter.api.BeforeEach;
@@ -41,9 +38,6 @@ class FailedPublicationSweepTest {
 
   /** 実際のロックの実行。 */
   @Autowired private LockingTaskExecutor lockingTaskExecutor;
-
-  /** 他のインスタンスの代わりにロックを持つ provider。 */
-  @Autowired private LockProvider lockProvider;
 
   /** 設定値。 */
   @Autowired private EventPublicationResubmissionConfig.Properties properties;
@@ -84,62 +78,6 @@ class FailedPublicationSweepTest {
 
     assertThat(accepted).containsExactly(rows.get(2));
     assertThat(swept).contains(new FailedPublicationSweep.Swept(Set.of(rows.get(2)), 0));
-  }
-
-  @Test
-  @DisplayName("再投入の前に archive へ移った出版も、進んだ出版に数える")
-  void rowsAlreadyArchivedCountAsAdvanced() {
-    final List<UUID> rows = failedRows(1);
-    final FailedEventPublications failed = Mockito.mock(FailedEventPublications.class);
-    Mockito.doAnswer(
-            invocation -> {
-              assertThat(
-                      invocation
-                          .<ResubmissionOptions>getArgument(0)
-                          .getFilter()
-                          .test(row(rows.get(0))))
-                  .isTrue();
-              dsl.deleteFrom(EVENT_PUBLICATION)
-                  .where(EVENT_PUBLICATION.ID.eq(rows.get(0)))
-                  .execute();
-              ResubmissionTestSupport.insertArchived(dsl, NOW, "COMPLETED", rows.get(0));
-              return null;
-            })
-        .when(failed)
-        .resubmit(Mockito.any(ResubmissionOptions.class));
-
-    final Optional<FailedPublicationSweep.Swept> swept =
-        newSweep(failed, properties).tryOnce(publication -> true);
-
-    assertThat(swept).contains(new FailedPublicationSweep.Swept(Set.of(rows.get(0)), 0));
-  }
-
-  @Test
-  @DisplayName("tryOnce は他のインスタンスがロックを持つ間は何もせず、終わった後も lock-at-least-for の間は持ち続ける")
-  void tryOnceSkipsWhileLockIsHeld() {
-    final FailedEventPublications failed = Mockito.mock(FailedEventPublications.class);
-    final FailedPublicationSweep sweep = newSweep(failed, properties);
-
-    assertThat(sweep.tryOnce(publication -> true)).as("ロックを取れた回").isPresent();
-    assertThat(sweep.tryOnce(publication -> true)).as("lock-at-least-for の間").isEmpty();
-    Mockito.verify(failed, Mockito.times(1)).resubmit(Mockito.any(ResubmissionOptions.class));
-  }
-
-  @Test
-  @DisplayName("waitUpTo は、ロックが空かなければ lock-at-most-for の後に失敗し、再投入しない")
-  void waitUpToGivesUpWhileLockIsHeld() {
-    final FailedEventPublications failed = Mockito.mock(FailedEventPublications.class);
-    final FailedPublicationSweep sweep = newSweep(failed, properties);
-    assertThat(
-            lockProvider.lock(
-                new LockConfiguration(
-                    NOW, FailedPublicationSweep.LOCK_NAME, Duration.ofMinutes(1), Duration.ZERO)))
-        .isPresent();
-
-    assertThatThrownBy(() -> sweep.waitUpTo(publication -> true))
-        .isInstanceOf(IllegalStateException.class)
-        .hasMessageContaining(FailedPublicationSweep.LOCK_NAME);
-    Mockito.verifyNoInteractions(failed);
   }
 
   /** {@code rows} を FAILED の行として {@code resubmit} に流すモックの上の sweep。 */

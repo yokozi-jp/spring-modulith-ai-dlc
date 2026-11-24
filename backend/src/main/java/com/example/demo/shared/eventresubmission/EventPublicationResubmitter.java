@@ -111,7 +111,7 @@ class EventPublicationResubmitter {
       }
       final Set<UUID> advanced = swept.get().advanced();
       final int resubmitted = advanced.size();
-      // sweep はロックを放してから戻る。放すのに失敗した回は、覚えも数えもせず、failed の回にだけ数える。
+      // 放すのに失敗した回は sweep が例外で戻るので、ここへ来ず、覚えも数えもせず failed の回にだけ数える。
       tracker.remember(advanced, now);
       resubmissions.increment(resubmitted);
       if (resubmitted > 0) {

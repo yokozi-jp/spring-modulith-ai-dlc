@@ -187,13 +187,14 @@ class EventPublicationResubmitterRunsTest {
             .dsl();
     final FailedEventPublications failed = Mockito.mock(FailedEventPublications.class);
     final EventPublicationResubmitter resubmitter =
-        new EventPublicationResubmitter(
+        ResubmissionTestSupport.resubmitter(
             failingDsl,
-            new FailedPublicationSweep(failingDsl, failed, lockingTaskExecutor, clock, properties),
-            policies,
+            failed,
+            lockingTaskExecutor,
             clock,
-            meterRegistry,
             properties,
+            policies,
+            meterRegistry,
             abandon);
     final Supplier<Double> exhaustedGauge =
         () ->
@@ -217,14 +218,14 @@ class EventPublicationResubmitterRunsTest {
 
   /** テスト専用のレジストリを使うジョブを作る。FailedEventPublications は何もしないモックで足りる。 */
   private EventPublicationResubmitter newResubmitter(final LockingTaskExecutor executor) {
-    return new EventPublicationResubmitter(
+    return ResubmissionTestSupport.resubmitter(
         dsl,
-        new FailedPublicationSweep(
-            dsl, Mockito.mock(FailedEventPublications.class), executor, clock, properties),
-        policies,
+        Mockito.mock(FailedEventPublications.class),
+        executor,
         clock,
-        meterRegistry,
         properties,
+        policies,
+        meterRegistry,
         abandon);
   }
 

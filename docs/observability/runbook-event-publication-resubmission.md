@@ -43,7 +43,7 @@ Staleness Monitor が処理中の出版を `FAILED` に戻すまでの `in-fligh
   リスナーの名前を変えたデプロイで、古い出版のリスナーが見つからない。
 - **対応**：「上限に達した出版の調べ方」の SQL で出版とリスナーを特定し、リスナーの ERROR のログと trace で原因を確かめる。
   原因を直したら「上限に達した出版の戻し方」で `FAILED` に戻してから「手での再投入」で再投入し、再投入しないと決めた出版は「再投入しない出版の片付け」で消す。
-- **通知**：再投入したインスタンスがその前に落ちると出ないため、`failed.oldest.age{state=exhausted}` の警報が補う（「メトリクスの見方」）。
+- **通知**：再投入したインスタンスがその前に落ちたときと、その回のロックの解放に失敗したときは出ないため、`failed.oldest.age{state=exhausted}` の警報が補う（「メトリクスの見方」）。
   監視の通知は `event_publication.id` でまとめる。
 
 ## Failed event publications exceed the resubmission limit
