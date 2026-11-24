@@ -4,7 +4,10 @@
  * com.example.demo.shared.tenancy.TenantContext} である（ADR-105）。リスナーの束縛は {@link
  * com.example.demo.shared.tenancy.TenantListenerAspect} が行う。
  *
- * <p>Domain、Application、Presentation、Infrastructure のどの層からも使ってよい。業務の概念を置かず、DB に依存しない。
+ * <p>Domain、Application、Presentation、Infrastructure のどの層からも使ってよい。ただし Domain（{@code
+ * domain.model}、{@code domain.service}）が使ってよいのは {@link com.example.demo.shared.tenancy.TenantId}
+ * だけで、{@link com.example.demo.shared.tenancy.TenantContext} は Application が読んで引数で渡す。業務の概念を置かず、DB
+ * に依存しない。
  */
 @NamedInterface("tenancy")
 @NullMarked

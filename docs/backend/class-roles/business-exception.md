@@ -156,7 +156,7 @@ Controller は参照の結果がなければ `NotFoundException` を投げ、ス
 - [ ] 値オブジェクトの record は `BusinessRuleViolationException` を投げず、不変条件の違反を `IllegalArgumentException` で表す。［ArchUnit で検査：PackageByFeatureOnionArchitectureTest.valueObjectsDoNotThrowBusinessRuleViolation］
 - [ ] `NoSuchElementException` を生成せず、引数なしの `Optional.orElseThrow()` を呼ばない。［ArchUnit で検査：GeneralCodingRulesArchTest.noSuchElementExceptionIsNotThrown］
 - [ ] `Throwable`、`Exception`、`RuntimeException`、`Error` を投げない。［ArchUnit で検査：GeneralCodingRulesArchTest.noClassesShouldThrowGenericExceptions］
-- [ ] `shared` の型は Spring Web、Spring の HTTP、Servlet の型に依存しない。［ArchUnit で検査：PackageByFeatureOnionArchitectureTest.sharedModuleDoesNotDependOnHttp］
+- [ ] `shared` と各モジュールの `domain`、`application`、`infrastructure.persistence` の型は、Spring Web、Spring の HTTP、Servlet の型に依存しない。［ArchUnit で検査：PackageByFeatureOnionArchitectureTest.httpTypesAreUsedOnlyByHttpLayers］
 - [ ] 集約ごとの例外の型を作らない。［自分で点検］
 - [ ] メッセージは英語にし、対象の識別子を含める。［自分で点検］
 - [ ] Controller に try と catch を書かない。［自分で点検］

@@ -24,8 +24,9 @@ tags: [architecture, backend, onion-architecture]
 - **[`<Aggregate>Repository`](class-roles/repository.md)**：集約を保存し、取り出すインタフェース。
 - **[`<ExternalSystem>`](class-roles/external-system-interface.md)**：決済などの外部システムを、ドメインの語彙で表すインタフェース。
 
-`domain.model` は、標準型、`org.jspecify..`、`domain.model`、`shared.concurrency`、`shared.failure`、`shared.tenancy` の型だけに依存させる（一覧の正本は[ArchUnit の規則](architecture-tests.md)）。
-外部システムの SDK、OpenAPI から生成した型、Spring、jOOQ、JPA、Jackson の型は使わない。
+`domain.model` は、`java.lang..`、`java.util..`、`java.math..`、`java.time..`、`org.jspecify..`、`lombok..`、`domain.model`、`shared.concurrency`、`shared.failure`、`shared.tenancy.TenantId` の型だけに依存させる（一覧の正本は[ArchUnit の規則](architecture-tests.md)）。
+`shared.tenancy.TenantContext` は暗黙の文脈で、Domain が読むと引数に現れない入力になるため、Application が読んで引数で渡す。
+外部システムの SDK、OpenAPI から生成した型、Spring、jOOQ、JPA、Jackson、SLF4J、`java.net.http` の型は使わない。
 Domain Model を API の Request と Response や、永続化の Record として兼用しない。
 
 業務規則は、まず値オブジェクトか Entity に置く。
@@ -52,6 +53,7 @@ Domain Service は Repository を使ってよく、イベントの発行、外�
 
 `application` は、このアプリケーションの型のほかに、標準型、`org.jspecify..`、`org.slf4j..`、Spring の `@Service` などのアノテーションと `ApplicationEventPublisher` だけに依存させる。
 外部システムの SDK や生成した型は使わない（一覧の正本は[ArchUnit の規則](architecture-tests.md)）。
+Spring Web、Spring の HTTP、Servlet の型にも依存させない。業務上の失敗は `shared.failure` の例外で表し、HTTP のステータスへの対応づけは `error` の `ApiExceptionHandler` が行う。
 
 CommandHandler は別の CommandHandler を呼ばない。
 
@@ -102,3 +104,4 @@ DB と外部システムとの接続を扱う外側の領域を **Infrastructure
 
 Persistence、外部 Client、Presentation は別々の Adapter として扱い、互いに依存させない。
 Infrastructure は Application、Domain Service、モジュールルートの型に依存させない。
+`infrastructure.persistence` は Spring Web、Spring の HTTP、Servlet の型にも依存させない。HTTP の型を使えるのは `presentation.web`、`infrastructure.client`（`RestClient` など）、ベースパッケージ直下の設定だけである。
