@@ -1,6 +1,7 @@
 package com.example.demo.shared.infrastructure.persistence;
 
 import static com.example.demo.jooq.modulith.Tables.EVENT_PUBLICATION;
+import static com.example.demo.jooq.modulith.Tables.EVENT_PUBLICATION_ARCHIVE;
 
 import com.example.demo.testkit.CapturedLogRecords;
 import com.example.demo.testkit.CleanGeneratedTablesExtension;
@@ -17,10 +18,13 @@ import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Supplier;
 import org.jooq.DSLContext;
+import org.jspecify.annotations.Nullable;
+import org.mockito.Mockito;
 import org.springframework.context.annotation.Import;
+import org.springframework.modulith.events.EventPublication;
 import org.springframework.test.context.TestPropertySource;
 
-/** 再投入のテストで使う、Spring の文脈の設定、ロックの期限、出版の行、上限到達の ERROR の操作。 */
+/** 再投入のテストで使う、Spring の文脈の設定、ロックの期限、出版の行と archive の行、条件の関数に渡す出版、上限到達の ERROR の操作。 */
 final class ResubmissionTestSupport {
 
   private ResubmissionTestSupport() {}
@@ -37,8 +41,7 @@ final class ResubmissionTestSupport {
         "event-publication.resubmission.interval=PT2S",
         "event-publication.resubmission.lock-at-most-for=PT3S",
         "event-publication.resubmission.max-per-run=100",
-        "event-publication.resubmission.policies.default.max-resubmissions=1",
-        "event-publication.resubmission.policies.probe.max-resubmissions=2",
+        "spring.modulith.events.resubmission.abandon-after-attempts=2",
         "event-publication.resubmission.policies.probe.multiplier=2",
         "event-publication.resubmission.policies.probe.max-wait=PT20M",
         // リスナーが進めない変異で、手での再投入が application.yaml の PT10M まで待たないようにする。
@@ -76,6 +79,46 @@ final class ResubmissionTestSupport {
         .set(EVENT_PUBLICATION.COMPLETION_ATTEMPTS, completionAttempts)
         .execute();
     return id;
+  }
+
+  /**
+   * {@code test.event} の archive の行を、出版の時刻に終わった状態（{@code COMPLETED} か {@code ABANDONED}）で作り、その ID
+   * を返す。
+   */
+  /* package */ static UUID insertArchived(
+      final DSLContext dsl, final Instant publicationDate, final String status) {
+    final UUID id = UUID.randomUUID();
+    dsl.insertInto(EVENT_PUBLICATION_ARCHIVE)
+        .set(EVENT_PUBLICATION_ARCHIVE.ID, id)
+        .set(EVENT_PUBLICATION_ARCHIVE.LISTENER_ID, "archived-test")
+        .set(EVENT_PUBLICATION_ARCHIVE.EVENT_TYPE, "test.event")
+        .set(EVENT_PUBLICATION_ARCHIVE.SERIALIZED_EVENT, "{}")
+        .set(EVENT_PUBLICATION_ARCHIVE.PUBLICATION_DATE, publicationDate)
+        .set(EVENT_PUBLICATION_ARCHIVE.COMPLETION_DATE, publicationDate)
+        .set(EVENT_PUBLICATION_ARCHIVE.STATUS, status)
+        .set(EVENT_PUBLICATION_ARCHIVE.COMPLETION_ATTEMPTS, 1)
+        .execute();
+    return id;
+  }
+
+  /**
+   * 再投入が条件の関数に渡す出版の代わり。{@link EventPublication} の既定のメソッドは本物を呼ぶ。
+   *
+   * @param publication {@link EventPublication} かその下位の型の mock。{@link Mockito#CALLS_REAL_METHODS}
+   *     で作る
+   * @param lastResubmissionDate 最後の再投入の時刻。再投入していなければ {@code null}
+   */
+  /* package */ static <T extends EventPublication> T stubPublication(
+      final T publication,
+      final UUID id,
+      final int completionAttempts,
+      final Instant publicationDate,
+      final @Nullable Instant lastResubmissionDate) {
+    Mockito.doReturn(id).when(publication).getIdentifier();
+    Mockito.doReturn(completionAttempts).when(publication).getCompletionAttempts();
+    Mockito.doReturn(publicationDate).when(publication).getPublicationDate();
+    Mockito.doReturn(lastResubmissionDate).when(publication).getLastResubmissionDate();
+    return publication;
   }
 
   /** {@code publicationId} の出版についての、上限に達した出版の ERROR。 */

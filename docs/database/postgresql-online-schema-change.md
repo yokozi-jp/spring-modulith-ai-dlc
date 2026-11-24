@@ -66,6 +66,10 @@ ALTER TABLE t_sale DROP CONSTRAINT chk_t_sale_item_id_not_null;
 これらを含むchangesetには`runInTransaction: false`を指定し、他の変更と同じchangesetに入れない。
 `sql`変更で書く場合も、CIのrollback検証が通るよう`rollback`を定義する。
 
+`CREATE INDEX CONCURRENTLY`が途中で止まると、無効なインデックスが残る。
+`IF NOT EXISTS`は無効なインデックスを作り直さずに飛ばすため、付けない。
+Liquibaseは失敗したchangesetを記録せず、次の適用で再び実行するため、同じchangesetで先に`DROP INDEX CONCURRENTLY IF EXISTS`を実行してから作る。
+
 スキーマの差分からDDLを生成するツールを補助に使う場合も、生成されたDDLを必ずレビューし、ビュー、権限、型、名前の変更が漏れていないか確認する。
 マイグレーションの適用はLiquibaseで行い、他のマイグレーションツールを使わない。
 

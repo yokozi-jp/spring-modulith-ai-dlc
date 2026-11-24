@@ -1,7 +1,7 @@
 ---
 type: Convention
 title: メールアドレスの扱い
-description: メールアドレスの正の置き場所、招待の受け入れでのアドレスの確認、形式の検査、アドレスどうしの比べ方、イベントとログでの扱いを定める規約。メールアドレスを受け取る、検査する、保存する、比べるコードを書くときに読む。
+description: メールアドレスの正の置き場所、`email_verified` の扱い、形式の検査、アドレスどうしの比べ方、イベントとログでの扱いを定める規約。メールアドレスを受け取る、検査する、保存する、比べるコードを書くときに読む。
 tags: [convention, mail, validation, security, future-arch-guidelines]
 ---
 
@@ -15,12 +15,11 @@ tags: [convention, mail, validation, security, future-arch-guidelines]
 
 - 利用者のメールアドレスの正は IdP に置き、アプリの利用者をメールアドレスで引かない。
   アプリは ID トークンの `iss` と `sub` の組から利用者を引く（[ADR-101](../adr/ADR-101-keep-tenants-and-roles-in-app-database.md)）。
-- 招待を受け入れるまでは、招待した相手のアドレスをアプリの DB の招待の表に持つ（[#380](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/380)）。
-  IdP のアドレスが正になるのは、招待された人が登録してログインした後である。
-- 招待の受け入れは、ID トークンの `email_verified` が `true` で、ID トークンのメールアドレスが招待のアドレスと一致するときだけ許す（#380）。
+- アプリの DB は利用者のメールアドレスを持たない（[ADR-101](../adr/ADR-101-keep-tenants-and-roles-in-app-database.md)）。
+- ID トークンのメールアドレスを本人の確認に使うときは、`email_verified` が `true` のときだけ許す。
   claim があるだけでは許さない。
   Keycloak と Cognito は、確認の済んでいないアドレスに `email_verified` を `false` で入れて発行しうるためである。
-  両方の IdP の ID トークンに `email_verified` が入ることは、#380 で確かめる（[ADR-102](../adr/ADR-102-use-amazon-cognito-as-production-idp.md#neutral)）。
+  アプリが使うことになったら、両方の IdP の ID トークンに `email_verified` が入ることを確かめる（[ADR-102](../adr/ADR-102-use-amazon-cognito-as-production-idp.md#neutral)）。
 - アプリから確認のメールを送るかは、まだ決まっていない。
 
 ## 形式の検査
@@ -30,7 +29,7 @@ tags: [convention, mail, validation, security, future-arch-guidelines]
 - サーバーは空白を除かずに検査し、前後に空白のある値を断る。
 - 検査は、ありえない形（`@` がない、空白を含む、`@` が全角であるなど）だけを断る。
   アドレスに届くかどうかは、形式の検査では確かめない。
-- 正規表現を自作しない（[ADR-120](../adr/ADR-120-align-server-email-validation-with-zod.md)）。
+- 正規表現を自作しない（[ADR-123](../adr/ADR-123-align-server-email-validation-with-zod.md)）。
   - バックエンドは、`shared.validation` の `@MailAddress` を使う。
     `@Email` に、Zod の `z.regexes.email` と同じ式を `regexp` として足した制約で、OpenAPI には `format: email` が出る。
     式は Zod から写したもので、`MailAddress.PATTERN` の 1 か所に置く。
@@ -50,7 +49,7 @@ tags: [convention, mail, validation, security, future-arch-guidelines]
 - 2 つのアドレスが同じかは、大文字と小文字を区別せずに比べる。
 - `+` 以降を除く、Gmail のローカルパートの `.` を除くといったエイリアスの正規化をしない。
   取引先の独自ドメインでは、`+` を含むアドレスが別の人の宛先でありうる。
-  正規化すると、別の人のアドレス宛ての招待を受け入れられてしまう。
+  正規化すると、別の人のアドレスを同じ宛先とみなし、アドレスで突き合わせた相手を取り違える。
 
 ## イベントとログ
 

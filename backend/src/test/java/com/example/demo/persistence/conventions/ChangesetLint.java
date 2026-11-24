@@ -45,7 +45,22 @@ final class ChangesetLint {
               moduleSchemaSql("003-create-product-tables", "product"),
               moduleSchemaSql("004-create-order-tables", "ordering"),
               moduleSchemaSql("006-create-payment-tables", "payment"),
-              moduleSchemaSql("014-create-tenancy-tables", "tenancy"))
+              moduleSchemaSql("014-create-tenancy-tables", "tenancy"),
+              List.of(
+                  new AllowlistEntry(
+                      ARBITRARY_SQL,
+                      "027-add-event-publication-archive-abandoned-index: CREATE INDEX CONCURRENTLY"
+                          + " event_publication_archive_abandoned_idx ON"
+                          + " modulith.event_publication_archive (publication_date) WHERE status ="
+                          + " 'ABANDONED';",
+                      "Liquibase OSS 5.0.4のcreateIndexは部分索引の条件とCONCURRENTLYを書けない。"
+                          + "稼働中のarchiveの表へ書き込みを止めずに作る（ADR-079）。"),
+                  new AllowlistEntry(
+                      ARBITRARY_SQL,
+                      "027-add-event-publication-archive-abandoned-index: DROP INDEX CONCURRENTLY"
+                          + " IF EXISTS modulith.event_publication_archive_abandoned_idx;",
+                      "中断したCREATE INDEX CONCURRENTLYが残す無効な索引を再試行の前に消すSQLと、そのrollbackである。"
+                          + "dropIndexはCONCURRENTLYを書けない。")))
           .flatMap(List::stream)
           .toList();
 

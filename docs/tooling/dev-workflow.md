@@ -41,6 +41,41 @@ Dependabotの更新が`frontend/pnpm-lock.yaml`を変えずに来ると、CIの`
 アプリのテストのファイルを1つだけ実行するときと、アプリの依存のコマンドを実行するときは、`frontend/apps/web`で`vp test run <ファイル>`か`vp exec <コマンド>`を実行する。
 `frontend/package.json`と`frontend/apps/web/package.json`の`devEngines`がpnpmを指定しているため、`npx`はnpmとして拒否される。
 
+## 作業の途中にテストを流すとき
+
+作業の途中は、変えたクラスとファイルのテストだけを流し、全体は[pushする前](#pushする前)に一度流す。
+`task be-test`のGradleの`test`は、テストのクラスパスが1バイトでも変わると全クラスを流し直す。
+コードを直すたびに`task be-test`を流すと、毎回約110秒かかる。
+build cacheが当たるのはバイトコードが変わらないときだけである。
+
+```bash
+# backend：変えたクラスのテスト
+cd backend && ./gradlew test --tests '<クラス>'
+# backend：まとまったら、そのモジュールのパッケージ
+cd backend && ./gradlew test --tests 'com.example.demo.<module>.*'
+# frontend：変えたテストのファイル
+cd frontend/apps/web && vp test run <ファイル>
+# frontend：変えたソースを import するテスト
+cd frontend/apps/web && vp test related --run <ソース>
+```
+
+`--tests`で流したときは、カバレッジの検証とOpenAPIの書き出しをしない。
+この2つは`task be-test`か`./gradlew check`で確かめる。
+
+Kiro Web（8コア）で測った所要時間は次のとおりである（各3回）。
+
+- **backendの全体**（977ケース）：`task be-test`と同じGradleの呼び出しで109から122秒
+- **`@ApplicationModuleTest`の1クラス**：`./gradlew test --tests '*ConfirmOrderCommandHandlerTest'`で27から28秒
+- **1モジュールのパッケージ**（6クラス、54ケース）：`./gradlew test --tests 'com.example.demo.ordering.*'`で40から41秒
+- **frontendの全体**：`task fe-coverage`で約24.5秒
+- **`apps/web`の1ファイル**：`vp test run src/features/orders/form.test.ts`で1.3秒
+
+`vp test related --run`は、測った例で18ファイル中10ファイルを5.9秒で流した。
+package全体の6.8秒と差が小さいので、ファイルが少ないときは`vp test run <ファイル>`で足りる。
+
+全体の`task verify`と`task fe-verify`は、pushする前に一度流す。
+pre-pushとCIも全体を流すので、途中で流した範囲の外の回帰はそこで見つかる。
+
 ## git worktreeで作業するとき
 
 エージェントは、ファイルを変える作業を始める前に`origin/main`から自分のworktreeを作り、mainのworktreeで変更、commit、テストをしない。
@@ -166,7 +201,7 @@ Taskのテスト系タスクは、`.env.test`に足りない変数を`.env.test.
 たとえば決済代行のClientを足した変更の後は、既存の`.env`へ`.env.example`の`PAYMENT_GATEWAY_BASE_URL`の行を足す。
 `task compose-up`などが`OTEL_SERVICE_NAMESPACE is required`のように変数不足で止まったときは、これが原因である。
 失敗したイベント出版の定期の再投入を足した変更の後は、既存の`.env`へ`.env.example`の`EVENT_PUBLICATION_RESUBMISSION_ENABLED`、`EVENT_PUBLICATION_RESUBMISSION_WAIT_AGE`、`EVENT_PUBLICATION_RESUBMISSION_IN_FLIGHT_STALENESS`、`EVENT_PUBLICATION_RESUBMISSION_INTERVAL`の4行を足す（[ADR-079](../adr/ADR-079-resubmit-failed-event-publications-periodically-with-shedlock.md)）。
-ローカルでは定期の再投入が短い間隔で有効なので、`FAILED`の出版は消した注文を指すものもリスナーの方針の上限の回数まで自動で再投入され、そのたびにリスナーのERRORが出る。
+ローカルでは定期の再投入が短い間隔で有効なので、`FAILED`の出版は消した注文を指すものも回数の上限まで自動で再投入され、そのたびにリスナーのERRORが出る。
 
 定期の再投入のロックの表（`010-create-shedlock-table`）を足した変更の後は、既存のローカルのDBに`task be-migrate`を実行する。
 表がないと、定期の再投入は毎回`Event publication resubmission failed`のWARNで失敗する。
@@ -190,7 +225,7 @@ task be-seed             # 2 つのテナントと、test-user と test-admin �
 ```
 
 `task keycloak-reimport`はKeycloakのデータだけを消して読み直すため、Keycloakのログインのセッションも消える。
-読み直さないと、Keycloakのtest-userとtest-adminのIDがseedの所属の利用者と食い違い、ログインしても所属がなく、招待を待つ画面になる。
+読み直さないと、Keycloakのtest-userとtest-adminのIDがseedの所属の利用者と食い違い、ログインしても所属がなく、所属を待つ画面になる。
 `task be-seed`は、業務データがあっても、足りないテナントと所属だけを入れる。
 test-userは2つのテナント（サンプル商事、サンプル物産）に属するのでログインの後にテナントを選ぶ画面が出て、test-adminはサンプル商事だけに属するので選ばずに業務の画面に入る。
 

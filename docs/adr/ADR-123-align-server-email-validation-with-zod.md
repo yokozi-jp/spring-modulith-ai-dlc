@@ -1,11 +1,11 @@
 ---
 type: ADR
-title: 'ADR-120: メールアドレスの形式の検査で、サーバーの式をクライアントの Zod の式に揃える'
+title: 'ADR-123: メールアドレスの形式の検査で、サーバーの式をクライアントの Zod の式に揃える'
 description: サーバーの `@Email` がクライアントの `z.email()` より緩いずれを、`@Email` に Zod と同じ式を足した `@MailAddress` で埋め、式の一致をテストで検査する。
 tags: [adr, backend, frontend, validation, mail]
 ---
 
-# ADR-120: メールアドレスの形式の検査で、サーバーの式をクライアントの Zod の式に揃える
+# ADR-123: メールアドレスの形式の検査で、サーバーの式をクライアントの Zod の式に揃える
 
 ## Status
 

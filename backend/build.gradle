@@ -27,7 +27,7 @@ plugins {
 }
 
 group = 'com.example'
-version = '0.13.0' // x-release-please-version
+version = '0.14.0' // x-release-please-version
 
 java {
     toolchain {
@@ -65,7 +65,7 @@ repositories {
 
 ext {
     set('springCloudVersion', "2025.1.2")
-    set('springModulithVersion', "2.1.2")
+    set('springModulithVersion', "2.2.0")
 }
 
 // 版の正本は compose-test.yml の image の tag（ADR-072、ADR-085）。Dependabot が image だけを上げても jar が追従する。

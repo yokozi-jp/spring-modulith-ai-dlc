@@ -1,5 +1,21 @@
 # Changelog
 
+## [0.14.0](https://github.com/yokozi-jp/spring-modulith-ai-dlc/compare/v0.13.0...v0.14.0) (2026-11-24)
+
+
+### Features
+
+* **api:** problem details に traceId を付け、instance を外す ([#688](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/688)) ([31ce20c](https://github.com/yokozi-jp/spring-modulith-ai-dlc/commit/31ce20cc6375a17d9cf04b6c4c459a66368ced5e)), closes [#650](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/650)
+* **backend:** セッションの Cookie を __Host-APP_SESSION にし、SameSite=Lax を保つ ([#710](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/710)) ([9d421e2](https://github.com/yokozi-jp/spring-modulith-ai-dlc/commit/9d421e27d5f675fc2fe2c8bf4f068fe1e01d2999)), closes [#159](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/159)
+* **frontend:** ログインの後に、ログインを求められた画面へ戻す ([#680](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/680)) ([d38c20d](https://github.com/yokozi-jp/spring-modulith-ai-dlc/commit/d38c20d60471247a7813dc42c8c5ac78297992d0)), closes [#644](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/644)
+* **observability:** 認可の拒否と CSRF の失敗のログにも user.id を付ける ([#642](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/642)) ([0e8be02](https://github.com/yokozi-jp/spring-modulith-ai-dlc/commit/0e8be027bab3f735b7a98acb098b52c9e3a41b2a)), closes [#635](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/635)
+
+
+### Bug Fixes
+
+* **backend:** 値オブジェクトの不変条件の違反を IllegalArgumentException に揃える ([#693](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/693)) ([421bff9](https://github.com/yokozi-jp/spring-modulith-ai-dlc/commit/421bff9a62ffb65f7e22b2c5e8a4ac6ae7aaa10d)), closes [#692](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/692)
+* **ci:** openapi の drift 検査が、書き出しなしと path の誤りで通らないようにする ([#703](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/703)) ([dc70cb9](https://github.com/yokozi-jp/spring-modulith-ai-dlc/commit/dc70cb9ad261fe6b5b032fe107be7d48183efb3e))
+
 ## [0.13.0](https://github.com/yokozi-jp/spring-modulith-ai-dlc/compare/v0.12.0...v0.13.0) (2026-11-23)
 
 

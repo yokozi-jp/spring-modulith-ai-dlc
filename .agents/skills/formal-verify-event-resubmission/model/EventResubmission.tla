@@ -3,8 +3,8 @@
 (* One event publication in modulith.event_publication, two app instances, *)
 (* and discrete time. Covers the periodic resubmission job                 *)
 (* (EventPublicationResubmitter) under the ShedLock lock, the Spring       *)
-(* Modulith 2.1.2 staleness monitor, listener deliveries, and instance     *)
-(* crashes.                                                                *)
+(* Modulith 2.2.0 staleness monitor, listener deliveries with the          *)
+(* abandon-after-attempts default AbandonPolicy, and instance crashes.     *)
 (*                                                                         *)
 (* Paths are relative to backend/src/main/java/com/example/demo/shared/    *)
 (* infrastructure/persistence/. Spring Modulith and ShedLock are cited by  *)
@@ -20,7 +20,7 @@ CONSTANTS
   WaitAge,           \* event-publication.resubmission.wait-age
   Multiplier,        \* policies.<name>.multiplier (an integer here)
   MaxWait,           \* policies.<name>.max-wait
-  MaxResubmissions,  \* policies.<name>.max-resubmissions
+  MaxResubmissions,  \* spring.modulith.events.resubmission.abandon-after-attempts
   InFlightStaleness, \* event-publication.resubmission.in-flight-staleness
   \* Timing of the environment. These are not settings: they are what the
   \* comments in application.yaml and EventPublicationResubmissionConfig
@@ -55,10 +55,15 @@ ASSUME /\ LockAtMostFor > Interval            \* isLockAtMostForLongerThanInterv
        \* lock-at-most-for bounds the wait for a thread inside a run, and the
        \* listener run (ADR-079).
        /\ QueueMax <= LockAtMostFor /\ ListenerMax <= LockAtMostFor
-       /\ WaitAge >= 1 /\ Interval >= 1 /\ MaxResubmissions >= 1
+       /\ WaitAge >= 1 /\ Interval >= 1
+       /\ MaxResubmissions >= 2                \* AbandonProperties @Min(2)
 
 \* Delivery slots: slot 1 is the first delivery; slot a is the delivery
 \* started when completion_attempts became a. Extra slots show an overrun.
+\* A slot's seen is getCompletionAttempts() of the publication Spring
+\* Modulith hands to the AbandonPolicy when that delivery fails: 1 for the
+\* first delivery (the in-memory publication), and the value the run read
+\* before markResubmitted for a resubmission (ResubmissionOptionsLearningTest).
 Slots == 1..(MaxResubmissions + 2)
 
 VARIABLES
@@ -77,7 +82,10 @@ VARIABLES
 
 vars == <<now, row, lock, inst, exec, mon, crashes, staleHitInFlight>>
 
-Statuses == {"PUBLISHED", "PROCESSING", "FAILED", "RESUBMITTED", "ARCHIVED"}
+\* ARCHIVED and ABANDONED: the row moved to event_publication_archive
+\* (completion-mode archive) as COMPLETED or ABANDONED.
+Statuses == {"PUBLISHED", "PROCESSING", "FAILED", "RESUBMITTED", "ARCHIVED",
+             "ABANDONED"}
 
 TypeOK ==
   /\ now \in 0..Horizon
@@ -85,6 +93,7 @@ TypeOK ==
   /\ row.attempts \in 1..(MaxResubmissions + 3)
   /\ \A i \in Instances: inst[i].phase \in {"idle", "locked", "read"}
   /\ \A k \in Slots: exec[k].st \in {"none", "queued", "running", "done"}
+  /\ \A k \in Slots: exec[k].seen \in 0..(MaxResubmissions + 3)
   /\ \A i \in Instances: mon[i].found \in BOOLEAN
 
 \* The resubmitter's first run is after initialDelay = interval.
@@ -103,13 +112,13 @@ Init ==
   /\ inst = [i \in Instances |-> IdleRun(Interval)]
   \* The first delivery is queued on the publishing instance after commit.
   /\ exec = [k \in Slots |->
-               IF k = 1 THEN [st |-> "queued", on |-> 1, t |-> 0]
-                        ELSE [st |-> "none", on |-> None, t |-> 0]]
+               IF k = 1 THEN [st |-> "queued", on |-> 1, t |-> 0, seen |-> 1]
+                        ELSE [st |-> "none", on |-> None, t |-> 0, seen |-> 0]]
   /\ mon = [i \in Instances |-> NoFind]
   /\ crashes = 0
   /\ staleHitInFlight = FALSE
 
-RowExists == row.status # "ARCHIVED"
+RowExists == row.status \notin {"ARCHIVED", "ABANDONED"}
 InFlight(k) == exec[k].st \in {"queued", "running"}
 SetStatus(s) == IF row.status = s THEN row
                 ELSE [row EXCEPT !.status = s, !.since = now]
@@ -152,7 +161,7 @@ RunRead(i) ==
 
 \* For the snapshot: the withFilter predicate (the time budget from the
 \* captured now, then ResubmissionPolicies.isDue: attempts <=
-\* max-resubmissions and lastAttempt + waitBefore(attempts) before the
+\* abandon-after-attempts and lastAttempt + waitBefore(attempts) before the
 \* captured now), then JdbcEventPublicationRepositoryV2.markResubmitted:
 \* UPDATE SET status = 'RESUBMITTED', completion_attempts + 1,
 \* last_resubmission_date = now WHERE id = ? AND status != 'RESUBMITTED'.
@@ -172,7 +181,8 @@ RunFinish(i) ==
           THEN /\ row' = [row EXCEPT !.status = "RESUBMITTED", !.attempts = a,
                                      !.lastAttempt = now, !.since = now]
                /\ exec' = IF a \in Slots
-                            THEN [exec EXCEPT ![a] = [st |-> "queued", on |-> i, t |-> now]]
+                            THEN [exec EXCEPT ![a] = [st |-> "queued", on |-> i, t |-> now,
+                                                      seen |-> inst[i].snapAttempts]]
                             ELSE exec
           ELSE UNCHANGED <<row, exec>>
   /\ lock' = IF lock.by = i
@@ -240,15 +250,24 @@ ExecStart(k) ==
 \* and delete the row.
 ExecSucceed(k) ==
   /\ exec[k].st = "running"
-  /\ exec' = [exec EXCEPT ![k] = [st |-> "done", on |-> None, t |-> 0]]
+  /\ exec' = [exec EXCEPT ![k] = [st |-> "done", on |-> None, t |-> 0, seen |-> 0]]
   /\ row' = SetStatus("ARCHIVED")
   /\ UNCHANGED <<now, lock, inst, mon, crashes, staleHitInFlight>>
 
-\* markFailed: UPDATE SET status = 'FAILED' WHERE id = ? AND status != 'FAILED'.
+\* DefaultEventPublicationRegistry.markFailed -> markFailedOrAbandoned:
+\* AbandonPolicies falls back to ResubmissionProperties.shouldAbandon,
+\* getCompletionAttempts() >= abandon-after-attempts on the publication it
+\* was handed (seen), not the row. Then markAbandoned copies the row to the
+\* archive as ABANDONED and deletes it, without checking the status.
+\* Otherwise markFailed: UPDATE SET status = 'FAILED' WHERE id = ? AND
+\* status != 'FAILED'.
 ExecFail(k) ==
   /\ exec[k].st = "running"
-  /\ exec' = [exec EXCEPT ![k] = [st |-> "done", on |-> None, t |-> 0]]
-  /\ row' = IF RowExists /\ row.status # "FAILED" THEN SetStatus("FAILED") ELSE row
+  /\ exec' = [exec EXCEPT ![k] = [st |-> "done", on |-> None, t |-> 0, seen |-> 0]]
+  /\ row' = IF ~RowExists THEN row
+            ELSE IF exec[k].seen >= MaxResubmissions THEN SetStatus("ABANDONED")
+            ELSE IF row.status # "FAILED" THEN SetStatus("FAILED")
+            ELSE row
   /\ UNCHANGED <<now, lock, inst, mon, crashes, staleHitInFlight>>
 
 -----------------------------------------------------------------------------
@@ -260,7 +279,7 @@ Crash(i) ==
   /\ inst[i].up /\ crashes < MaxCrashes
   /\ inst' = [inst EXCEPT ![i] = [IdleRun(0) EXCEPT !.up = FALSE]]
   /\ exec' = [k \in Slots |-> IF InFlight(k) /\ exec[k].on = i
-                                THEN [st |-> "done", on |-> None, t |-> 0]
+                                THEN [st |-> "done", on |-> None, t |-> 0, seen |-> 0]
                                 ELSE exec[k]]
   /\ mon' = [mon EXCEPT ![i] = NoFind]
   /\ crashes' = crashes + 1
@@ -317,7 +336,7 @@ OneDeliveryAtATime ==
 \* (isInFlightStalenessLongerThanTwiceLockAtMostFor) promises.
 InFlightNeverMarkedStale == ~staleHitInFlight
 
-\* The job resubmits a publication at most max-resubmissions times.
+\* The job resubmits a publication at most abandon-after-attempts times.
 ResubmissionsCapped == row.attempts <= MaxResubmissions + 1
 
 \* At most one instance is inside the locked part of a run.

@@ -15,7 +15,7 @@ import java.lang.annotation.Target;
  * <p>OpenAPI には {@code format: email} が出て、Orval が {@code z.email()} を生成する。
  * サーバーの検査がクライアントより緩いと、フロントエンドを通さない API の呼び出しがクライアントの断る形を保存してしまうため、 {@link #PATTERN} で揃える。{@code
  * openapi/mail-address-cases.json} の {@code pattern} が {@code PATTERN} と Zod の {@code
- * z.regexes.email} に同じ文字列であることと、表の入力の判定を、両側のテストが検査する（ADR-120）。
+ * z.regexes.email} に同じ文字列であることと、表の入力の判定を、両側のテストが検査する（ADR-123）。
  */
 @Documented
 @Email(regexp = MailAddress.PATTERN) @Constraint(validatedBy = {})

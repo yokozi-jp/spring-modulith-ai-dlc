@@ -12,12 +12,15 @@ import io.opentelemetry.sdk.logs.data.LogRecordData;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.Supplier;
 import net.javacrumbs.shedlock.core.LockConfiguration;
 import net.javacrumbs.shedlock.core.LockProvider;
 import net.javacrumbs.shedlock.core.LockingTaskExecutor;
 import net.javacrumbs.shedlock.core.SimpleLock;
 import net.javacrumbs.shedlock.support.LockException;
 import org.jooq.DSLContext;
+import org.jooq.ExecuteListener;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -27,8 +30,8 @@ import org.springframework.modulith.events.FailedEventPublications;
 
 /**
  * {@link EventPublicationResubmitter#resubmitOnce()} のジョブの実行の回数 {@code
- * event.publication.resubmission.runs} が、正常、他のインスタンスのロック、既知の失敗、予期しない例外のそれぞれで、正しい outcome の tag を 1
- * だけ増やすことを検証する。
+ * event.publication.resubmission.runs} が、正常、他のインスタンスのロック、既知の失敗、予期しない例外、Gauge の集計の失敗のそれぞれで、正しい
+ * outcome の tag を 1 だけ増やすことを検証する。
  *
  * <p>ジョブは、本物の DB とロックの表、モックの {@link FailedEventPublications}、テストごとの {@link SimpleMeterRegistry}
  * で作る。 Spring の文脈は {@link EventPublicationResubmitterTest} と同じ設定で共有する。
@@ -51,6 +54,9 @@ class EventPublicationResubmitterRunsTest {
   /** 既知の失敗の WARN の本文。 */
   private static final String FAILED_MESSAGE = "Event publication resubmission failed";
 
+  /** Gauge の集計の失敗の WARN の本文。 */
+  private static final String GAUGES_FAILED = "Event publication gauges refresh failed";
+
   /** 例外の型を持つ LogRecord の属性。 */
   private static final AttributeKey<String> EXCEPTION_TYPE =
       AttributeKey.stringKey("exception.type");
@@ -66,6 +72,9 @@ class EventPublicationResubmitterRunsTest {
 
   /** 設定値。 */
   @Autowired private EventPublicationResubmissionConfig.Properties properties;
+
+  /** 再投入の回数の上限。 */
+  @Autowired private EventPublicationResubmissionConfig.AbandonProperties abandon;
 
   /** 差し替えられる時計。 */
   @Autowired private EventPublicationResubmitterTest.MutableClock clock;
@@ -160,6 +169,53 @@ class EventPublicationResubmitterRunsTest {
         .isEqualTo(IllegalStateException.class.getName());
   }
 
+  @Test
+  @DisplayName("Gauge の集計が DB の失敗で終わっても、WARN で記録して Gauge を前の値に残し、再投入を続けて completed を数える")
+  void gaugeRefreshFailureDoesNotStopResubmission() {
+    final AtomicBoolean failArchiveReads = new AtomicBoolean();
+    final DSLContext failingDsl =
+        dsl.configuration()
+            .derive(
+                ExecuteListener.onExecuteStart(context -> {
+                  final String sql = context.sql();
+                  if (failArchiveReads.get()
+                      && sql != null
+                      && sql.contains("event_publication_archive")) {
+                    throw new org.jooq.exception.DataAccessException("archive is unavailable");
+                  }
+                }))
+            .dsl();
+    final FailedEventPublications failed = Mockito.mock(FailedEventPublications.class);
+    final EventPublicationResubmitter resubmitter =
+        new EventPublicationResubmitter(
+            failingDsl,
+            failed,
+            lockingTaskExecutor,
+            policies,
+            clock,
+            meterRegistry,
+            properties,
+            abandon);
+    final Supplier<Double> exhaustedGauge =
+        () ->
+            meterRegistry.get("event.publication.failed").tag("state", "exhausted").gauge().value();
+    ResubmissionTestSupport.insertArchived(dsl, clock.instant(), "ABANDONED");
+    resubmitter.resubmitOnce();
+    final double exhaustedBefore = exhaustedGauge.get();
+    final int warningsBefore = capturedLogRecords.withBody(GAUGES_FAILED).size();
+
+    failArchiveReads.set(true);
+    ResubmissionTestSupport.insertArchived(dsl, clock.instant(), "ABANDONED");
+    expireLock();
+    resubmitter.resubmitOnce();
+
+    assertThat(exhaustedGauge.get()).as("集計が失敗した回の Gauge").isEqualTo(exhaustedBefore);
+    assertThat(capturedLogRecords.withBody(GAUGES_FAILED)).hasSize(warningsBefore + 1);
+    assertThat(runs(COMPLETED)).isEqualTo(2.0);
+    assertThat(runs(FAILED)).isZero();
+    Mockito.verify(failed, Mockito.times(2)).resubmit(Mockito.any());
+  }
+
   /** テスト専用のレジストリを使うジョブを作る。FailedEventPublications は何もしないモックで足りる。 */
   private EventPublicationResubmitter newResubmitter(final LockingTaskExecutor executor) {
     return new EventPublicationResubmitter(
@@ -169,7 +225,8 @@ class EventPublicationResubmitterRunsTest {
         policies,
         clock,
         meterRegistry,
-        properties);
+        properties,
+        abandon);
   }
 
   /** ロックの実行が、決めた例外を投げるモック。 */

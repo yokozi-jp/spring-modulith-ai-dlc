@@ -19,21 +19,21 @@ changeset が作る全テーブルについて、保持期限と個人データ�
 内部 ID が `*_by` などの列に残る扱いは [#672] で決める。
 個人データを含むテーブルは、含む列を括弧に書く。
 
-| テーブル                             | 種別           | 保持期限                                  | 個人データ                                       |
-| ------------------------------------ | -------------- | ----------------------------------------- | ------------------------------------------------ |
-| `tenancy.m_tenant`                   | マスタ         | 無期限                                    | 含まない                                         |
-| `tenancy.m_user`                     | マスタ         | 未定（[#672]）                            | 含まない                                         |
-| `tenancy.m_user_identity`            | マスタ         | 未定（[#672]）                            | 含む（`issuer_url`、`subject_code`）             |
-| `tenancy.m_membership`               | マスタ         | 未定（[#672]）                            | 含まない                                         |
-| `product.m_product`                  | マスタ         | 無期限                                    | 含まない                                         |
-| `ordering.t_order`                   | トラン         | 未定（[#671]）                            | 含まない                                         |
-| `ordering.t_order_line`              | トラン         | 未定（[#671]）                            | 含まない                                         |
-| `payment.t_payment`                  | トラン         | 未定（[#671]）                            | 含まない                                         |
-| `modulith.event_publication`         | フレームワーク | 完了するまで。完了すると archive へ移る   | 含まない                                         |
-| `modulith.event_publication_archive` | フレームワーク | 7 日（[#542] で実装するまでは無期限）     | 含まない                                         |
-| `modulith.shedlock`                  | フレームワーク | 無期限（ジョブごとの 1 行を更新し続ける） | 含まない                                         |
-| `modulith.spring_session`            | フレームワーク | セッションの有効期限まで                  | 含まない                                         |
-| `modulith.spring_session_attributes` | フレームワーク | セッションの有効期限まで                  | 含む（`attribute_bytes`。直列化した `OidcUser`） |
+| テーブル                             | 種別           | 保持期限                                                                                   | 個人データ                                       |
+| ------------------------------------ | -------------- | ------------------------------------------------------------------------------------------ | ------------------------------------------------ |
+| `tenancy.m_tenant`                   | マスタ         | 無期限                                                                                     | 含まない                                         |
+| `tenancy.m_user`                     | マスタ         | 未定（[#672]）                                                                             | 含まない                                         |
+| `tenancy.m_user_identity`            | マスタ         | 未定（[#672]）                                                                             | 含む（`issuer_url`、`subject_code`）             |
+| `tenancy.m_membership`               | マスタ         | 未定（[#672]）                                                                             | 含まない                                         |
+| `product.m_product`                  | マスタ         | 無期限                                                                                     | 含まない                                         |
+| `ordering.t_order`                   | トラン         | 未定（[#671]）                                                                             | 含まない                                         |
+| `ordering.t_order_line`              | トラン         | 未定（[#671]）                                                                             | 含まない                                         |
+| `payment.t_payment`                  | トラン         | 未定（[#671]）                                                                             | 含まない                                         |
+| `modulith.event_publication`         | フレームワーク | 完了するまで。完了すると archive へ移る                                                    | 含まない                                         |
+| `modulith.event_publication_archive` | フレームワーク | `COMPLETED` は 7 日（[#542] で実装するまでは無期限）。`ABANDONED` は運用者が戻すか消すまで | 含まない                                         |
+| `modulith.shedlock`                  | フレームワーク | 無期限（ジョブごとの 1 行を更新し続ける）                                                  | 含まない                                         |
+| `modulith.spring_session`            | フレームワーク | セッションの有効期限まで                                                                   | 含まない                                         |
+| `modulith.spring_session_attributes` | フレームワーク | セッションの有効期限まで                                                                   | 含む（`attribute_bytes`。直列化した `OidcUser`） |
 
 `event_publication` の行は、イベントに個人データを載せない規約に従う（[非同期メッセージのセキュリティ](../integration/async-message-security.md)）。
 
@@ -42,13 +42,14 @@ changeset が作る全テーブルについて、保持期限と個人データ�
 改廃を実行するテーブルと、実装を決めたテーブルだけを書く。
 ここにないテーブルは、改廃の仕組みがまだない。
 
-| テーブル                             | 改廃方法             | 自動化                                            | 実行のタイミング                  | 改廃の条件               | `ANALYZE` と `VACUUM`  |
-| ------------------------------------ | -------------------- | ------------------------------------------------- | --------------------------------- | ------------------------ | ---------------------- |
-| `modulith.event_publication_archive` | DELETE               | なし（[#542] で実装する）                         | 1 日 1 回                         | 完了から 7 日を過ぎた行  | 自動バキュームに任せる |
-| `modulith.spring_session`            | DELETE               | あり（Spring Session JDBC の定期削除。[ADR-111]） | 各インスタンスで毎分              | `expiry_time` を過ぎた行 | 自動バキュームに任せる |
-| `modulith.spring_session_attributes` | 外部キーのカスケード | あり                                              | `spring_session` の行の削除と同時 | 親の行の削除             | 自動バキュームに任せる |
+| テーブル                             | 改廃方法             | 自動化                                            | 実行のタイミング                  | 改廃の条件                                                                                                                                                      | `ANALYZE` と `VACUUM`  |
+| ------------------------------------ | -------------------- | ------------------------------------------------- | --------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------- |
+| `modulith.event_publication_archive` | DELETE               | なし（[#542] で実装する）                         | 1 日 1 回                         | `COMPLETED` で完了から 7 日を過ぎた行。`ABANDONED` の行は消さない（[ADR-120]）                                                                                  | 自動バキュームに任せる |
+| `modulith.spring_session`            | DELETE               | あり（Spring Session JDBC の定期削除。[ADR-111]） | 各インスタンスで毎分              | `expiry_time` を過ぎた行                                                                                                                                        | 自動バキュームに任せる |
+| `modulith.spring_session_attributes` | 外部キーのカスケード | あり                                              | `spring_session` の行の削除と同時 | 親の行の削除                                                                                                                                                    | 自動バキュームに任せる |
 
 [#542]: https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/542
 [#671]: https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/671
 [#672]: https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/672
 [ADR-111]: ../adr/ADR-111-store-sessions-in-postgresql-until-user-growth-needs-redis.md
+[ADR-120]: ../adr/ADR-120-keep-abandoned-event-publications-out-of-archive-retention.md

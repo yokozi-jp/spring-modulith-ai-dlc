@@ -33,6 +33,7 @@ public class Indexes {
     // INDEX definitions
     // -------------------------------------------------------------------------
 
+    public static final Index EVENT_PUBLICATION_ARCHIVE_ABANDONED_IDX = Internal.createIndex(DSL.name("event_publication_archive_abandoned_idx"), EventPublicationArchive.EVENT_PUBLICATION_ARCHIVE, new OrderField[] { EventPublicationArchive.EVENT_PUBLICATION_ARCHIVE.PUBLICATION_DATE }, false);
     public static final Index EVENT_PUBLICATION_ARCHIVE_BY_COMPLETION_DATE_IDX = Internal.createIndex(DSL.name("event_publication_archive_by_completion_date_idx"), EventPublicationArchive.EVENT_PUBLICATION_ARCHIVE, new OrderField[] { EventPublicationArchive.EVENT_PUBLICATION_ARCHIVE.COMPLETION_DATE }, false);
     public static final Index EVENT_PUBLICATION_ARCHIVE_SERIALIZED_EVENT_HASH_IDX = Internal.createIndex(DSL.name("event_publication_archive_serialized_event_hash_idx"), EventPublicationArchive.EVENT_PUBLICATION_ARCHIVE, new OrderField[] { EventPublicationArchive.EVENT_PUBLICATION_ARCHIVE.SERIALIZED_EVENT }, false);
     public static final Index EVENT_PUBLICATION_BY_COMPLETION_DATE_IDX = Internal.createIndex(DSL.name("event_publication_by_completion_date_idx"), EventPublication.EVENT_PUBLICATION, new OrderField[] { EventPublication.EVENT_PUBLICATION.COMPLETION_DATE }, false);

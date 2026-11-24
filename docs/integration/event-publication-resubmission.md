@@ -13,16 +13,18 @@ tags: [architecture, integration, async, spring-modulith, resilience]
 ## 仕組みの全体像
 
 リスナーが例外を送出すると、そのイベント出版は `FAILED` の状態でレジストリに残る。
-定期のジョブが、待ち時間を過ぎた `FAILED` の出版を方針の上限の回数まで再投入する。
-上限に達した出版は ERROR のログで知らせ、運用者が手で扱う。
+定期のジョブが、待ち時間を過ぎた `FAILED` の出版を回数の上限まで再投入する。
+上限の回数目の再投入でまた失敗した出版は、Spring Modulith が `ABANDONED` にし、定期のジョブが ERROR のログで知らせ、運用者が手で扱う。
 設計の理由と代替案は [ADR-079](../adr/ADR-079-resubmit-failed-event-publications-periodically-with-shedlock.md) にある。
 
-出版の状態（`PUBLISHED`、`PROCESSING`、`COMPLETED`、`FAILED`、`RESUBMITTED`）の定義は[非同期処理の失敗時の再試行と回復](async-failure-recovery.md)にある。
+出版の状態（`PUBLISHED`、`PROCESSING`、`COMPLETED`、`FAILED`、`RESUBMITTED`、`ABANDONED`）の定義は[非同期処理の失敗時の再試行と回復](async-failure-recovery.md)にある。
 
 構成要素は次のとおりである。
 
 - **定期の再投入のジョブ**（`EventPublicationResubmitter`）：`FAILED` の出版を条件に合うものだけ再投入する。
 - **ShedLock**：ロックの行で、定期のジョブを同時に 1 つのインスタンスへ絞る。
+- **リスナーの方針**（`ResubmissionPolicies`）：出版をリスナーの待ち時間の方針に対応づけ、再投入してよいかを決める。
+- **回数の上限**（`spring.modulith.events.resubmission.abandon-after-attempts`）：Spring Modulith が、上限の回数目の再投入で失敗した出版を `ABANDONED` にする。
 - **手での 1 回の再投入のジョブ**（`EventPublicationResubmitOnce`）：運用者が 1 回だけ起動し、同じロックを取って再投入する。
 - **Staleness Monitor**：落ちたまま残った出版を `FAILED` に戻す。
 - **`in-flight-staleness`**：`PROCESSING` と `RESUBMITTED` の出版を、最後の出版か再投入の時刻から数えて `FAILED` に戻すまでの時間である。
