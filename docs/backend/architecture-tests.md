@@ -55,6 +55,7 @@ jOOQの生成物の`com.example.demo.jooq`はOPENのモジュールであり、`
   `shared`の中の依存は対象にしない。
   どの層からも使えるパッケージの一覧は、`PackageByFeatureOnionArchitectureTest`の`ANY_LAYER_SHARED_PACKAGES`が持つ。この規則と`dependenciesPointInward`の所属検査の除外が、そこから組み立てる（[ADR-048](../adr/ADR-048-add-shared-module-for-jooq-common-code.md)、[ADR-062](../adr/ADR-062-map-business-exceptions-to-404-409-422.md)、[ADR-079](../adr/ADR-079-resubmit-failed-event-publications-periodically-with-shedlock.md)、[ADR-096](../adr/ADR-096-require-app-user-principal-for-audit-columns.md)、[ADR-105](../adr/ADR-105-bind-tenant-to-request-and-event-context.md)）。
 - `httpTypesAreNotUsedByInnerLayers`：`shared`と各モジュールの`domain`、`application`、`infrastructure.persistence`は、Spring Web、Springの HTTP、Servletの型に依存しない。HTTPの型を使うのは`presentation.web`、`infrastructure.client`、ベースパッケージ直下の設定に限る意図だが、規則が検査するのは上の4つのパッケージである。
+- `httpErrorsAreMappedOnlyInErrorPresentationWeb`：`error.presentation.web`の外のクラスは、`ProblemDetail`、`ErrorResponseException`、`ResponseStatusException`、`@ExceptionHandler`、`@ControllerAdvice`、`@RestControllerAdvice`、`@ResponseStatus`に依存しない。注釈を付けることも依存に数える（[ADR-062](../adr/ADR-062-map-business-exceptions-to-404-409-422.md)）。
 - `moduleApiDoesNotExposeInternalTypes`：モジュールルートの型は、`java..`、`org.jspecify..`、同じルートパッケージの型、イベントが運ぶテナントの`shared.tenancy.TenantId`と`shared.tenancy.TenantScoped`だけに依存する。
   `package-info`は`@ApplicationModule`の宣言を持つため対象から除く。
   違反フィクスチャの`OrderPlacedReadingTenantContext`（`TenantContext`への依存）で確かめる。
@@ -210,6 +211,7 @@ H6は、`UnversionedOrderRepository`（集約ルートではなく識別子を�
 規約どおりのフィクスチャの`CancelOrderCommandHandler`、`CancelExpiredOrderCommandHandler`、`ReserveStockCommandHandler`、`OrderController`は`NotFoundException`を、`Order`と`OrderLimitPolicy`は`BusinessRuleViolationException`を投げ、Domain、Application、Presentationから`shared.failure`を使っても規則が通ることを確かめる。
 `allowedUsagesAreNotDetected`の別の一行は、`IllegalStateException`、`IllegalArgumentException`、3つの業務上の失敗の例外の送出と`orElseThrow(Supplier)`を、`noSuchElementExceptionIsNotThrown`が誤検出しないことを確かめる。
 `httpTypesAreNotUsedByInnerLayers`は、違反フィクスチャの`shared.persistence`の`ChildRowWriter`と`application`の`HttpStatusCommandHandler`が`ResponseStatusException`を投げること、`infrastructure.persistence`の`HttpStatusOrderReader`が`HttpStatus`を使うことを検出する。
+`httpErrorsAreMappedOnlyInErrorPresentationWeb`は、違反フィクスチャの`presentation.web`の`OrderErrorAdvice`（`@RestControllerAdvice`、`@ExceptionHandler`、`@ResponseStatus`、`ProblemDetail`の戻り値）、`OrderStatusAdvice`（`@ControllerAdvice`）、`OrderRejectedException`（`ErrorResponseException`の継承）と、`HttpStatusCommandHandler`（`ResponseStatusException`の生成）を、型と注釈ごとに1行ずつ検出する。
 `domainModelDependsOnlyOnAllowedTypes`は、違反フィクスチャの`LoggingOrder`（SLF4Jの`Logger`）、`RemoteOrderLookup`（`java.net.http.HttpClient`）、`TenantReadingOrder`（`TenantContext`）を検出する。規約どおりの`OrderTenantPolicy`（Domain Serviceが`TenantId`を使う）は`domainServicesDependOnlyOnDomainAndJava`が通す。
 MapStruct、ModelMapper、Dozerはテストのクラスパスにないため、`mappingLibrariesAreNotUsed`のフィクスチャは`DefaultRecordMapper`と`DefaultRecordUnmapper`への依存だけで確かめる。
 

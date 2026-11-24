@@ -552,6 +552,8 @@ class ArchitectureRuleFixtureTest {
         PackageByFeatureOnionArchitectureTest.sharedModuleIsUsedOnlyByPersistenceAdaptersRule(
             basePackage),
         PackageByFeatureOnionArchitectureTest.httpTypesAreNotUsedByInnerLayersRule(basePackage),
+        PackageByFeatureOnionArchitectureTest.httpErrorsAreMappedOnlyInErrorPresentationWebRule(
+            basePackage),
         PackageByFeatureOnionArchitectureTest.moduleApiDoesNotExposeInternalTypesRule(basePackage),
         PackageByFeatureOnionArchitectureTest
             .databaseTechnologyApisAreOnlyUsedByPersistenceAdapters,

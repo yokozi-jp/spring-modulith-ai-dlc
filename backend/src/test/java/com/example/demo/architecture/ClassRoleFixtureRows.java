@@ -13,6 +13,13 @@ final class ClassRoleFixtureRows {
   private static final String REFLECTIVE_READER =
       "ordering.infrastructure.persistence.ReflectiveOrderReader";
 
+  /** 例外を Problem Details へ変える違反フィクスチャのクラス名。 */
+  private static final String ERROR_ADVICE = "ordering.presentation.web.OrderErrorAdvice";
+
+  /** 違反フィクスチャの {@code OrderErrorAdvice} の、例外を変えるメソッド。 */
+  private static final String ERROR_ADVICE_HANDLE =
+      ERROR_ADVICE + ".handle(java.lang.IllegalStateException)>";
+
   /** クラスの役割と配置の規則が、対応する違反フィクスチャを検出することを確かめる行を作る。 */
   /* package */ static Stream<Arguments> rows() {
     return Stream.of(
@@ -42,6 +49,33 @@ final class ClassRoleFixtureRows {
             "httpTypesAreNotUsedByInnerLayers: infrastructure.persistence",
             PackageByFeatureOnionArchitectureTest.httpTypesAreNotUsedByInnerLayersRule(VIOLATING),
             "ordering.infrastructure.persistence.HttpStatusOrderReader"),
+        httpErrorRow(
+            "RestControllerAdvice",
+            ERROR_ADVICE
+                + "> is annotated with <org.springframework.web.bind.annotation.RestControllerAdvice>"),
+        httpErrorRow(
+            "ControllerAdvice",
+            "ordering.presentation.web.OrderStatusAdvice> is annotated with "
+                + "<org.springframework.web.bind.annotation.ControllerAdvice>"),
+        httpErrorRow(
+            "ExceptionHandler",
+            ERROR_ADVICE_HANDLE
+                + " is annotated with <org.springframework.web.bind.annotation.ExceptionHandler>"),
+        httpErrorRow(
+            "ResponseStatus",
+            ERROR_ADVICE_HANDLE
+                + " is annotated with <org.springframework.web.bind.annotation.ResponseStatus>"),
+        httpErrorRow(
+            "ProblemDetail",
+            ERROR_ADVICE_HANDLE + " has return type <org.springframework.http.ProblemDetail>"),
+        httpErrorRow(
+            "ErrorResponseException",
+            "ordering.presentation.web.OrderRejectedException> extends class "
+                + "<org.springframework.web.ErrorResponseException>"),
+        httpErrorRow(
+            "ResponseStatusException",
+            "ordering.application.HttpStatusCommandHandler.handle()> calls constructor "
+                + "<org.springframework.web.server.ResponseStatusException.<init>"),
         row(
             "noSuchElementExceptionIsNotThrown",
             GeneralCodingRulesArchTest.noSuchElementExceptionIsNotThrown,
@@ -323,6 +357,15 @@ final class ClassRoleFixtureRows {
         "jooqReflectionMappingIsNotUsed: " + method,
         ClassRoleArchTest.jooqReflectionMappingIsNotUsed,
         REFLECTIVE_READER + "." + method + "(");
+  }
+
+  /** {@code httpErrorsAreMappedOnlyInErrorPresentationWeb} が、型か注釈への依存を 1 つ検出することを確かめる行を作る。 */
+  private static Arguments httpErrorRow(final String type, final String violation) {
+    return row(
+        "httpErrorsAreMappedOnlyInErrorPresentationWeb: " + type,
+        PackageByFeatureOnionArchitectureTest.httpErrorsAreMappedOnlyInErrorPresentationWebRule(
+            VIOLATING),
+        violation);
   }
 
   private ClassRoleFixtureRows() {}
