@@ -3,32 +3,26 @@ package com.example.demo.payment.domain.model;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import java.util.stream.Stream;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.junit.jupiter.params.provider.ValueSource;
 
 /** 決済の識別子の不変条件を境界の両側で検証する。 */
 class GatewayPaymentCodeTest {
 
-  @Test
-  @DisplayName("64 文字の識別子は作れる")
-  void acceptsMaxLength() {
-    final String value = "a".repeat(64);
+  /** 空白でない文字を 1 つ以上含み、64 文字以下の識別子。前後の空白は除かない。 */
+  static Stream<String> acceptedValues() {
+    return Stream.of("a", " a ", "a".repeat(64));
+  }
 
+  @ParameterizedTest
+  @MethodSource("acceptedValues")
+  @DisplayName("空白でない文字を含む 64 文字以下の識別子は、そのまま作れる")
+  void acceptsNonBlankUpToMaxLength(final String value) {
     assertThat(new GatewayPaymentCode(value).value()).isEqualTo(value);
-  }
-
-  @Test
-  @DisplayName("1 文字の識別子は作れる")
-  void acceptsSingleCharacter() {
-    assertThat(new GatewayPaymentCode("a").value()).isEqualTo("a");
-  }
-
-  @Test
-  @DisplayName("前後に空白がある識別子は、そのまま作れる")
-  void acceptsSurroundingWhitespace() {
-    assertThat(new GatewayPaymentCode(" a ").value()).isEqualTo(" a ");
   }
 
   @ParameterizedTest

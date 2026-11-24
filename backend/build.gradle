@@ -359,6 +359,10 @@ pitest {
         'com.example.demo.jooq.*'
     ]
     failWhenNoMutations = false
+    // 既定の FRECORD は record のコンパクトコンストラクタの変異も除くため、確かめるときは -PpitFeatures=-FRECORD を渡す。
+    features = providers.gradleProperty('pitFeatures')
+        .map { it.split(',').toList() }
+        .getOrElse([])
     outputFormats = ['HTML', 'XML']
     timestampedReports = false
     jvmArgs = ["-Duser.timezone=${testJvmTimeZone}", "-Dtest.liquibase.tag=${testLiquibaseTag}", "-Dspring.config.import=${testSpringConfigImport}"]

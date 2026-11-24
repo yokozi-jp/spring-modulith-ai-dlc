@@ -19,12 +19,12 @@ class QuantityTest {
   }
 
   @Test
-  @DisplayName("1 未満の数量は作れない")
+  @DisplayName("1 未満の数量は、数量を含む IllegalArgumentException になる")
   void rejectsQuantityBelowOne() {
     qt().forAll(integers().between(Integer.MIN_VALUE, 0))
         .checkAssert(value ->
             assertThatThrownBy(() -> new Quantity(value))
-                .as("value=%d", value)
-                .isInstanceOf(IllegalArgumentException.class));
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("quantity must be 1 or greater: value=" + value));
   }
 }

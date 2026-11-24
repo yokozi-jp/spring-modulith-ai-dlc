@@ -1,7 +1,7 @@
 ---
 type: Convention
 title: クラスの役割：値オブジェクト
-description: domain.model に置く値オブジェクトの定義、置き場所と命名、必須の記述、依存、例、プロパティベーステスト、アンチパターン、作成時のチェックリストを定める。識別子、金額、数量のような値と不変条件の型を作るとき、固定の値の集合を enum にするときに読む。
+description: domain.model に置く値オブジェクトの定義、置き場所と命名、必須の記述、依存、例、不変条件の境界の両側のテスト、アンチパターン、作成時のチェックリストを定める。識別子、金額、数量のような値と不変条件の型を作るとき、固定の値の集合を enum にするときに読む。
 tags: [convention, backend, class-role]
 ---
 
@@ -162,14 +162,13 @@ public enum SalesStatus {
 
 Spring を起動しない JUnit のテストを、値オブジェクトと同じパッケージのテストソースに置く（`QuantityTest`、`MoneyTest`）。
 不変条件ごとに、通る側と通らない側の両方を確かめる。
-片側だけでは、`value < 1` を `value <= 1` に変える PIT の `CONDITIONALS_BOUNDARY` の変異が生き残る（[ADR-012](../../adr/ADR-012-adopt-property-based-and-mutation-testing.md)）。
-PIT は既定の `FRECORD` の filter で record の正準コンストラクタを変異させないため、`task be-mutation-test` はコンパクトコンストラクタの変異を作らない。
-コンパクトコンストラクタの変異を確かめるときは、`backend/build.gradle` の `pitest` に `features = ['-FRECORD']` を一時的に足して実行する。
+片側だけでは、`value < 1` を `value <= 1` に変えるような比較演算子の境界の取り違えを検出できない。
 境界の値は、範囲の両端を必ず生成する QuickTheories の 2 つの性質か、JUnit の `@ParameterizedTest` の具体例で書く。
 文字列は、空、空白だけ、上限の長さ、上限を 1 つ超える長さを書く。
+プロパティベーステストを使う理由は [ADR-012](../../adr/ADR-012-adopt-property-based-and-mutation-testing.md) にある。
 
 ```java
-/** 数量の不変条件を検証する。 */
+/** 数量の不変条件を境界の両側で検証する。 */
 class QuantityTest {
 
   @Test
@@ -180,19 +179,21 @@ class QuantityTest {
   }
 
   @Test
-  @DisplayName("1 未満の数量は作れない")
+  @DisplayName("1 未満の数量は、数量を含む IllegalArgumentException になる")
   void rejectsQuantityBelowOne() {
     qt().forAll(integers().between(Integer.MIN_VALUE, 0))
-        .checkAssert(
-            value ->
-                assertThatThrownBy(() -> new Quantity(value))
-                    .as("value=%d", value)
-                    .isInstanceOf(IllegalArgumentException.class));
+        .checkAssert(value ->
+            assertThatThrownBy(() -> new Quantity(value))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("quantity must be 1 or greater: value=" + value));
   }
 }
 ```
 
 `qt` は `org.quicktheories.QuickTheory.qt`、`integers` は `org.quicktheories.generators.SourceDSL.integers` を static import する。
+
+PIT は既定の `FRECORD` の filter で record のコンパクトコンストラクタを変異させないため、`task be-mutation-test` はこのテストの効き目を測らない。
+テストが境界の変異を殺すかは、`-PpitFeatures=-FRECORD` を付けて確かめる（[Lintとテストのリファレンス](../../tooling/lint-and-test.md)の `task be-mutation-test`）。
 
 ## アンチパターン
 
@@ -217,5 +218,5 @@ class QuantityTest {
 - [ ] 識別子の名前は対象の名前に `Id` を付け、単一の値の component は `Money` だけを `amount`、それ以外を `value` にする。［自分で点検］
 - [ ] 利用者の入力の誤りは Request の形式の検証で 400 にし、値オブジェクトの `IllegalArgumentException` に頼らない。［自分で点検］
 - [ ] Javadoc を書く。［自分で点検］
-- [ ] 不変条件を、通る側と通らない側の境界の両側で確かめる。［自分で点検］
+- [ ] 不変条件を、境界の両側（通る側と通らない側）で確かめる。［自分で点検］
 - [ ] `domain.model` のパッケージに `@NullMarked` の `package-info.java` がある。［Error Prone で検査：RequireExplicitNullMarking］
