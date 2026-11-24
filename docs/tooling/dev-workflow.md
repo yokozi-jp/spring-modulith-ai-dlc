@@ -190,7 +190,7 @@ task be-seed             # 2 つのテナントと、test-user と test-admin �
 ```
 
 `task keycloak-reimport`はKeycloakのデータだけを消して読み直すため、Keycloakのログインのセッションも消える。
-読み直さないと、Keycloakのtest-userとtest-adminのIDがseedの所属の利用者と食い違い、ログインしても所属がなく、招待を待つ画面になる。
+読み直さないと、Keycloakのtest-userとtest-adminのIDがseedの所属の利用者と食い違い、ログインしても所属がなく、所属を待つ画面になる。
 `task be-seed`は、業務データがあっても、足りないテナントと所属だけを入れる。
 test-userは2つのテナント（サンプル商事、サンプル物産）に属するのでログインの後にテナントを選ぶ画面が出て、test-adminはサンプル商事だけに属するので選ばずに業務の画面に入る。
 

@@ -52,7 +52,7 @@ IdP の前提を ADR にしておかないと、ローカルの Keycloak だけ�
 
 ### Neutral
 
-- ID トークンの `email_verified` を招待の受け入れに使うときは、Keycloak と Cognito の両方で claim が入ることを #380 で確かめる。
+- ID トークンの `email_verified` をアプリが本人の確認に使うときは、Keycloak と Cognito の両方で claim が入ることを、使い始める作業で確かめる。
 - 本番のユーザープールの作り方と設定の値は、本番の構築の手順で決める。
 
 ## Alternatives Considered
