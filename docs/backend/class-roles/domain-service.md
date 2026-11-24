@@ -105,6 +105,7 @@ public class OrderLimitPolicy {
   public void ensureCanPlace(final CustomerId customerId) {
     if (orderRepository.countUnshippedByCustomer(customerId) >= MAX_UNSHIPPED_ORDERS) {
       throw new BusinessRuleViolationException(
+          OrderFailure.UNSHIPPED_LIMIT_REACHED,
           "unshipped order limit reached: customerId=" + customerId.value());
     }
   }

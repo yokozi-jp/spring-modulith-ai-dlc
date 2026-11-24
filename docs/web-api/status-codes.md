@@ -21,7 +21,12 @@ tags: [convention, web-api, http, future-arch-guidelines]
 このとき`title`は、4xxなら400の文言、5xxなら500の文言にする。
 このため、ログやダッシュボードには下の一覧にないステータスコードが現れることがある。
 ステータス以上の意味がないproblemの`type`は`about:blank`にする。
-業務固有のproblem typeは、パスを全部書いた相対URI`/problems/<kebab-case>`にし、`title`をMessageSourceの`problem.title.<kebab-case>`で日本語と英語に解決する（[ADR-058](../adr/ADR-058-use-path-absolute-relative-uri-for-problem-types.md)）。
+業務固有のproblem typeは、パスを全部書いた相対URIにし、`title`をMessageSourceで日本語と英語に解決する（[ADR-058](../adr/ADR-058-use-path-absolute-relative-uri-for-problem-types.md)）。
+モジュールの422の理由のtypeは`/problems/<module>/<kebab-case>`、`title`のキーは`problem.title.<module>.<kebab-case>`にし、理由の`FailureReason`のenumの定数から作る（[ADR-125](../adr/ADR-125-derive-problem-types-from-failure-reasons.md)）。
+モジュールによらないtypeは`/problems/<kebab-case>`、`title`のキーは`problem.title.<kebab-case>`にする。
+422と409は`about:blank`にせず、失敗ごとのtypeを付ける。
+404は`about:blank`のままにする。
+OpenAPIの`ProblemDetail.type`の`x-extensible-enum`に、今あるtypeをすべて載せる。
 CSRFトークンの検証に失敗した403は`/problems/csrf-token-invalid`にする。
 対象は`/api/**`の更新系と`/logout`で、理由は[CSRFのCookie](authentication-and-session.md#csrfのcookie)にある。
 テナントを選ぶ前に業務のAPIを呼んだ403は`/problems/tenant-not-selected`にする（[テナントを選ぶ](authentication-and-session.md#テナントを選ぶ)）。
@@ -50,10 +55,12 @@ OpenAPIへのエラー応答の付け方は[OpenAPIのアノテーションとJa
   OpenAPIには、405を今は書いていない。
   `commonProblemResponses`が付けるのは、401、403、500と、入力を持つ操作の400である。
 - **409 Conflict**：楽観ロックの競合、悲観ロックの取得失敗、一意制約違反。
-  楽観ロックの`ConflictException`（`lock_timeout`による失敗と、一意制約違反を含む）は、`ApiExceptionHandler`が409にする。
+  `shared.concurrency`の`ConflictException`は、`ApiExceptionHandler`が種類ごとのtypeの409にする。
+  楽観ロックの競合は`/problems/version-conflict`、`lock_timeout`による失敗は`/problems/lock-timeout`、一意制約違反は`/problems/unique-violation`である。
 - **413 Content Too Large**：リクエストの本文が上限を超えた。ヘッダーの超過は、Tomcatが400を返す。
 - **422 Unprocessable Content**：入力が業務処理の条件を満たさない（在庫不足で出荷指示できない場合など）。
-  `shared.failure`の`BusinessRuleViolationException`は、`ApiExceptionHandler`が422にする。
+  `shared.failure`の`BusinessRuleViolationException`は、`ApiExceptionHandler`が理由ごとのtypeの422にする（例：下書きでない注文の操作は`/problems/ordering/not-draft`）。
+  理由の定義は[業務上の失敗の例外](../backend/class-roles/business-exception.md#422-の理由の-enum)に従う。
 - **429 Too Many Requests**：レート制限を超えた。
 - **500 Internal Server Error**：DB接続エラー、SQLの実行エラー、外部APIの実行時エラーなどのシステムエラー。
 - **503 Service Unavailable**：メンテナンス中、または一時的な過負荷。前段のリバースプロキシが返す場合もある。

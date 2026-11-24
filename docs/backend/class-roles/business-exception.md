@@ -1,16 +1,17 @@
 ---
 type: Convention
 title: クラスの役割：業務上の失敗の例外
-description: 業務上の失敗を表す例外（NotFoundException、BusinessRuleViolationException、ConflictException）の定義、置き場所、HTTP のステータス、ログレベル、Listener での扱い、例、テスト、アンチパターン、作成時のチェックリストを定める。見つからない、業務規則の違反、競合を例外で表すときに読む。
+description: 業務上の失敗を表す例外（NotFoundException、BusinessRuleViolationException、ConflictException）と 422 の理由の enum（FailureReason）の定義、置き場所、HTTP のステータスと problem type、ログレベル、Listener での扱い、例、テスト、アンチパターン、作成時のチェックリストを定める。見つからない、業務規則の違反、競合を例外で表すとき、422 の理由を足すときに読む。
 tags: [convention, backend, class-role]
 ---
 
 # クラスの役割：業務上の失敗の例外
 
 業務上の失敗は、`shared.failure` の `NotFoundException`（404）と `BusinessRuleViolationException`（422）、`shared.concurrency` の `ConflictException`（409）の三つの型だけで投げる。
+422 は理由をモジュールの `FailureReason` の enum の定数で渡し、409 は競合の種類で、どちらも理由ごとの problem type と `title` になる。
 集約ごとの型を作らず、JDK の例外と Spring の HTTP の例外を業務上の失敗に使わない。
-HTTP のステータスとログレベルは `error` モジュールの `ApiExceptionHandler` が決め、Controller は try と catch を書かない。
-決定理由は [ADR-062](../../adr/ADR-062-map-business-exceptions-to-404-409-422.md) に示す。
+HTTP のステータス、本文、ログレベルは `error` モジュールの `ApiExceptionHandler` が決め、Controller は try と catch を書かない。
+決定理由は [ADR-062](../../adr/ADR-062-map-business-exceptions-to-404-409-422.md) と [ADR-125](../../adr/ADR-125-derive-problem-types-from-failure-reasons.md) に示す。
 
 ## 定義
 
@@ -22,6 +23,7 @@ HTTP のステータスとログレベルは `error` モジュールの `ApiExce
   参照の権限がなく存在を隠す場合も同じ型を投げる。
 - **BusinessRuleViolationException**：許されない状態遷移、業務規則の違反、要求を今の状態へ適用できない。
   要求が参照する別の集約や値が存在しない場合も、この型を投げる。
+  理由を `FailureReason` の enum の定数で渡す。
 - **ConflictException**：版の不一致、行ロックの失敗、一意制約の違反。
   読み直せば解消しうる。
 
@@ -55,6 +57,22 @@ rollback させたい失敗は、例外にする。
 - 集約ごとの型（`OrderNotFoundException`）を作らない。
   三つの型は `final` であり、継承できない。
 
+## 422 の理由の enum
+
+- `BusinessRuleViolationException` は、理由とログ用のメッセージを受け取る。
+  メッセージだけのコンストラクタはない。
+- 理由は、`shared.failure.FailureReason` を実装する enum の定数で表す。
+  enum はモジュールごとに、理由を投げる層のパッケージに置く。
+  集約と Domain Service が投げる理由は `<module>.domain.model` に置く。
+  Presentation だけが投げる理由は `<module>.presentation.web` に置く（Presentation は Domain に依存できない）。
+- enum の名前は `<Aggregate>Failure`（`OrderFailure`、`TenantFailure`）にし、定数は理由を表す名前にする（`NOT_DRAFT`、`PRODUCT_NOT_FOUND`）。
+- enum は `com.example.demo.<module>` の下に置き、type と `title` のキーを書かない。
+  `FailureReason` が、type `/problems/<module>/<定数の kebab-case>` と `title` のキー `problem.title.<module>.<定数の kebab-case>` を作る。
+- 定数を足したら、`messages.properties` と `messages_ja.properties` にその `title` を足す。
+- 定数の名前を変えるか、enum を別のモジュールへ移すと type が変わり、API の契約を壊す。
+- 409 の `ConflictException` には理由の enum を渡さない。
+  type は `ConflictException.Kind` から決まり、モジュールによらず共通である。
+
 ## 必須の記述
 
 - メッセージは開発者向けの英語にし、対象と識別子を `order not found: orderId=...` の形で含める。
@@ -75,14 +93,15 @@ rollback させたい失敗は、例外にする。
 
 ## 例外、HTTP、ログ、Listener の対応
 
-| 例外                                                                                            | HTTP | 本文                                                         | API のログ                                                    | 非同期の Listener            |
-| ----------------------------------------------------------------------------------------------- | ---- | ------------------------------------------------------------ | ------------------------------------------------------------- | ---------------------------- |
-| `NotFoundException`                                                                             | 404  | `about:blank`、`title` は `problem.title.404`、`detail` なし | INFO、例外付き（原因なし）、`API business failure`            | 回復不能として再試行しない   |
-| `BusinessRuleViolationException`                                                                | 422  | `about:blank`、`title` は `problem.title.422`、`detail` なし | INFO、例外付き（原因なし）、`API business failure`            | 回復不能として再試行しない   |
-| `ConflictException`                                                                             | 409  | `about:blank`、`title` は `problem.title.409`、`detail` なし | INFO、例外付き（原因なし）、`conflict.kind`、`API conflict`   | 回復不能として再試行しない   |
-| JDK の例外ほか（`IllegalStateException`、`IllegalArgumentException`、`NoSuchElementException`） | 500  | `about:blank`、`title` は `problem.title.500`、`detail` なし | ERROR、例外と原因の連鎖付き、`Unhandled API exception`        | 予期しない例外として送出する |
+| 例外                                                                                            | HTTP | 本文                                                                                                      | API のログ                                                  | 非同期の Listener            |
+| ----------------------------------------------------------------------------------------------- | ---- | --------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------- | ---------------------------- |
+| `NotFoundException`                                                                             | 404  | `about:blank`、`title` は `problem.title.404`、`detail` なし                                              | INFO、例外付き（原因なし）、`API business failure`          | 回復不能として再試行しない   |
+| `BusinessRuleViolationException`                                                                | 422  | 理由の `/problems/<module>/<kebab-case>`、`title` は `problem.title.<module>.<kebab-case>`、`detail` なし | INFO、例外付き（原因なし）、`API business failure`          | 回復不能として再試行しない   |
+| `ConflictException`                                                                             | 409  | 種類の `/problems/<kebab-case>`、`title` は `problem.title.<kebab-case>`、`detail` なし                   | INFO、例外付き（原因なし）、`conflict.kind`、`API conflict` | 回復不能として再試行しない   |
+| JDK の例外ほか（`IllegalStateException`、`IllegalArgumentException`、`NoSuchElementException`） | 500  | `about:blank`、`title` は `problem.title.500`、`detail` なし                                              | ERROR、例外と原因の連鎖付き、`Unhandled API exception`      | 予期しない例外として送出する |
 
 `title` は `Accept-Language` から解決した言語で返り、404 の本文は対象がない場合と存在を隠す場合で同じになる。
+409 の type は、`Kind.VERSION` が `/problems/version-conflict`、`Kind.LOCK` が `/problems/lock-timeout`、`Kind.UNIQUE` が `/problems/unique-violation` である。
 Listener の扱いは[非同期処理の失敗時の再試行と回復](../../integration/async-failure-recovery.md)の「Spring Modulith のイベントの失敗」に合わせる。
 業務上の失敗の三つの型は、自動で再試行しない。
 ステータス管理テーブル（[非同期処理のステータス管理](../../integration/async-job-status.md)）を持つ処理は FAILED と失敗の内容を記録して正常終了し、持たない処理は `on` から送出してイベント出版を `FAILED` で残す（レジストリが DLQ を兼ねる）。
@@ -105,15 +124,27 @@ final Order order =
 ```
 
 典型的な例は、集約の許されない状態遷移を `BusinessRuleViolationException` で投げる `Order` である（抜粋）。
+理由は、同じ `domain.model` の `OrderFailure` の定数で渡す。
 
 ```java
-private void ensureStatus(final OrderStatus expected) {
-  if (status != expected) {
+public enum OrderFailure implements FailureReason {
+  /** 下書きでない注文を変更、確定、取消しようとした。 */
+  NOT_DRAFT,
+  /** 存在しない商品を指定した。 */
+  PRODUCT_NOT_FOUND
+}
+```
+
+```java
+private void ensureDraft() {
+  if (status != OrderStatus.DRAFT) {
     throw new BusinessRuleViolationException(
-        "order is not " + expected + ": orderId=" + id.value() + ", status=" + status);
+        OrderFailure.NOT_DRAFT, "order is not draft: orderId=" + id.value() + ", status=" + status);
   }
 }
 ```
+
+`NOT_DRAFT` の 422 は、type が `/problems/ordering/not-draft`、`title` が `messages_ja.properties` の `problem.title.ordering.not-draft` になる。
 
 Controller は参照の結果がなければ `NotFoundException` を投げ、ステータスを自分で決めない（[Controller](controller.md)）。
 
@@ -129,9 +160,10 @@ Controller は参照の結果がなければ `NotFoundException` を投げ、ス
 
 ## 対応するテスト
 
-集約と Domain Service の単体テストで、投げる例外の型と、メッセージの識別子を確かめる（`isInstanceOf(BusinessRuleViolationException.class)`）。
+集約と Domain Service の単体テストで、投げる例外の型、理由、メッセージの識別子を確かめる（`isInstanceOfSatisfying(BusinessRuleViolationException.class, exception -> assertThat(exception.reason()).isEqualTo(OrderFailure.NOT_DRAFT))`）。
 値オブジェクトの単体テストは、`IllegalArgumentException` を確かめる。
-例外から HTTP のステータス、本文、ログへの対応づけは `ApiErrorContractTest` と `ApiExceptionHandlerTest` が確かめるため、機能ごとのテストでは確かめない。
+例外から HTTP のステータス、本文、ログへの対応づけは `ApiErrorContractTest`、`ApiExceptionHandlerTest`、`ApiExceptionHandlerProblemTypeTest` が確かめるため、機能ごとのテストでは確かめない。
+すべての理由の定数と `Kind` に日本語と英語の `title` があることは `ProblemTitleMessagesTest` が、OpenAPI の `ProblemDetail.type` にすべての type が載ることは `OpenApiContractTest` が確かめる。
 
 ## アンチパターン
 
@@ -141,6 +173,10 @@ Controller は参照の結果がなければ `NotFoundException` を投げ、ス
   HTTP の 500 になり、プログラムの誤りと区別できない。
 - `ResponseStatusException` を投げる、または `@ResponseStatus` を付ける。
   Domain と `shared` が HTTP の型に依存し、`@ResponseStatus` は `@ExceptionHandler(Exception.class)` が先に受けて効かない。
+- モジュールで `@RestControllerAdvice` を置くか `ProblemDetail` を作り、失敗を自分で応答に変える。
+  type と `title` が `ApiExceptionHandler` の対応づけと食い違い、ログの記録が二重になる。
+- 別々の理由に同じ定数（`INVALID` など）を使う。
+  画面が理由を区別できず、`title` が理由を示さない。
 - Controller に try と catch を書き、例外をステータスへ変える。
   同じ対応づけが Controller ごとに重複し、ログの記録が `ApiExceptionHandler` と食い違う。
 - 例外のメッセージを応答の本文に出す。
@@ -157,6 +193,10 @@ Controller は参照の結果がなければ `NotFoundException` を投げ、ス
 - [ ] `NoSuchElementException` を生成せず、引数なしの `Optional.orElseThrow()` を呼ばない。［ArchUnit で検査：GeneralCodingRulesArchTest.noSuchElementExceptionIsNotThrown］
 - [ ] `Throwable`、`Exception`、`RuntimeException`、`Error` を投げない。［ArchUnit で検査：GeneralCodingRulesArchTest.noClassesShouldThrowGenericExceptions］
 - [ ] `shared` と各モジュールの `domain`、`application`、`infrastructure.persistence` の型は、Spring Web、Spring の HTTP、Servlet の型に依存しない。［ArchUnit で検査：PackageByFeatureOnionArchitectureTest.httpTypesAreNotUsedByInnerLayers］
+- [ ] `error.presentation.web` の外で、`ProblemDetail`、`ErrorResponseException`、`ResponseStatusException`、`@ExceptionHandler`、`@ControllerAdvice`、`@RestControllerAdvice`、`@ResponseStatus` を使わない。［ArchUnit で検査：PackageByFeatureOnionArchitectureTest.httpErrorsAreMappedOnlyInErrorPresentationWeb］
+- [ ] 422 の理由は、モジュールの `FailureReason` の enum の定数で渡す。［型で検査：`BusinessRuleViolationException` は理由を受け取るコンストラクタしか持たない］
+- [ ] `FailureReason` を enum で実装し、理由の定数ごとに日本語と英語の `title` を足す。［テストで検査：ProblemTitleMessagesTest］
+- [ ] 理由の定数の名前を変えず、enum を別のモジュールへ移さない。［自分で点検］
 - [ ] 集約ごとの例外の型を作らない。［自分で点検］
 - [ ] メッセージは英語にし、対象の識別子を含める。［自分で点検］
 - [ ] Controller に try と catch を書かない。［自分で点検］

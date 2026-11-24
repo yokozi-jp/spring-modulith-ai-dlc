@@ -149,6 +149,7 @@ public PlaceOrderResult handle(final PlaceOrderCommand command) {
           .orElseThrow(
               () ->
                   new BusinessRuleViolationException(
+                      OrderFailure.CUSTOMER_NOT_FOUND,
                       "customer not found: customerId=" + command.customerId()));
   final MembershipRank rank = MembershipRank.valueOf(membership.rank());
   order.applyDiscount(discountPolicy.discountFor(rank, order.subtotal()));
@@ -172,6 +173,7 @@ private List<OrderLine> toOrderLines(final List<PlaceOrderCommand.Line> commandL
             final BigDecimal unitPrice = unitPrices.get(line.productCode());
             if (unitPrice == null) {
               throw new BusinessRuleViolationException(
+                  OrderFailure.PRODUCT_NOT_FOUND,
                   "product not found: productCode=" + line.productCode());
             }
             return new OrderLine(

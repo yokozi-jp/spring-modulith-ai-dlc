@@ -59,7 +59,7 @@
 - [ADR-055: DB のロック待ち、文の実行、トランザクション中の待機の上限を接続ごとに設定する](ADR-055-set-db-time-limits-per-connection.md)（Proposed, 2026-10-03）
 - [ADR-056: CI で OWASP ZAP による認証付きの DAST を実行する](ADR-056-run-authenticated-dast-with-zap-in-ci.md)（Proposed, 2026-10-04）
 - [ADR-057: E2E テストに Playwright と Chromium を採用し、テストデータを公開 API で作る](ADR-057-adopt-playwright-for-e2e-tests.md)（Proposed, 2026-10-04）
-- [ADR-058: problem type にパスを全部書いた相対 URI を使う](ADR-058-use-path-absolute-relative-uri-for-problem-types.md)（Accepted, 2026-10-04）
+- [ADR-058: problem type にパスを全部書いた相対 URI を使う](ADR-058-use-path-absolute-relative-uri-for-problem-types.md)（Accepted, Amended by ADR-125, 2026-10-04）
 - [ADR-059: 401 の WWW-Authenticate に独自の Session challenge を返す](ADR-059-send-a-session-challenge-in-www-authenticate-on-401.md)（Accepted, 2026-10-05）
 - [ADR-060: UUID の採番をアプリケーションで行い、DB の DEFAULT で採番しない](ADR-060-generate-uuid-primary-keys-in-application.md)（Accepted, Amended by ADR-107, 2026-11-19）
 - [ADR-061: ヘルスチェックは liveness と readiness だけを未認証で許可する](ADR-061-allow-only-health-probes-unauthenticated.md)（Proposed, 2026-10-06）
@@ -124,3 +124,4 @@
 - [ADR-122: Spring Modulith 2.2.0 を Spring Boot 4.1.2 のまま入れてから、Spring Boot 4.2.0 と Spring Cloud 2026.0.0 へ別の変更で上げる](ADR-122-raise-spring-boot-4-2-after-spring-modulith-2-2.md)（Proposed, 2026-11-24）
 - [ADR-123: メールアドレスの形式の検査で、サーバーの式をクライアントの Zod の式に揃える](ADR-123-align-server-email-validation-with-zod.md)（Proposed, 2026-11-24）
 - [ADR-124: mise の版の更新だけを Renovate に任せ、Dependabot と併存させる](ADR-124-update-mise-pinned-versions-with-renovate.md)（Proposed, 2026-11-24）
+- [ADR-125: 失敗の理由の enum から problem type と title のキーを作る](ADR-125-derive-problem-types-from-failure-reasons.md)（Proposed, 2026-11-24）

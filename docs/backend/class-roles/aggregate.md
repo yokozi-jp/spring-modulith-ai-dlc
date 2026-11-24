@@ -73,7 +73,7 @@ tags: [convention, backend, class-role]
 
 ## 依存してよい型、してはいけない型
 
-- **依存してよい型**：`java.lang..`、`java.util..`、`java.math..`、`java.time..` の標準型、`org.jspecify..`、同じ `domain.model` の Entity、値オブジェクト、enum、`shared.concurrency` の `ConflictException` と `ExpectedLockNo`、`shared.failure` の `BusinessRuleViolationException` と `NotFoundException`。
+- **依存してよい型**：`java.lang..`、`java.util..`、`java.math..`、`java.time..` の標準型、`org.jspecify..`、同じ `domain.model` の Entity、値オブジェクト、enum、`shared.concurrency` の `ConflictException` と `ExpectedLockNo`、`shared.failure` の `BusinessRuleViolationException`、`NotFoundException`、`FailureReason`。
 - **依存してはいけない型**：Spring、jOOQ、jOOQ の生成型、JPA、Jackson の型、`domain.service`、`application`、モジュールルートの型、他モジュールの型、Repository と外部システムのインタフェース、`Clock`。
 
 ## 最小の例と典型的な例
@@ -155,6 +155,7 @@ public final class Order {
   private void ensureStatus(final OrderStatus expected) {
     if (status != expected) {
       throw new BusinessRuleViolationException(
+          OrderFailure.UNEXPECTED_STATUS,
           "order is not " + expected + ": orderId=" + id.value() + ", status=" + status);
     }
   }
@@ -280,7 +281,7 @@ class OrderTest {
 - [ ] `domain.service`、`application`、モジュールルートの型に依存しない。［ArchUnit で検査：PackageByFeatureOnionArchitectureTest.dependenciesPointInward］
 - [ ] `public final class` にし、private のコンストラクタを `place` などの業務の動詞の static メソッドと `restore` から呼ぶ。［自分で点検］
 - [ ] setter を作らず、状態は業務の操作のメソッドだけで変える。［自分で点検］
-- [ ] 許されない状態遷移で `BusinessRuleViolationException` を、不正な引数で `IllegalArgumentException` を投げ、メッセージに識別子を含める。［自分で点検］
+- [ ] 許されない状態遷移で、モジュールの `FailureReason` の enum の定数を渡した `BusinessRuleViolationException` を、不正な引数で `IllegalArgumentException` を投げ、メッセージに識別子を含める。［自分で点検］
 - [ ] `private final long lockNo` を `restore` の最後の引数で受け取り、`place` で `1` にし、`ensureLockNo(ExpectedLockNo)` で違えば `shared.concurrency` の `ConflictException` を投げる。［自分で点検］
 - [ ] 集約ごとの競合の例外を作らない。［自分で点検］
 - [ ] `lockNo` 以外の共通カラムを集約に持たない。［自分で点検］

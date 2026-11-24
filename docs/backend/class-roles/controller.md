@@ -63,6 +63,7 @@ Domain の型を Application の外へ出さず、HTTP API の形と Domain を�
   見つからないときは `NotFoundException` を投げる（[業務上の失敗の例外](business-exception.md)）。
 - 例外を catch しない。
   エラー応答は `ApiExceptionHandler` が Problem Details にする。
+- Controller だけが投げる 422 は、同じ `presentation.web` に置いた `FailureReason` の enum の定数を `BusinessRuleViolationException` に渡す（[業務上の失敗の例外](business-exception.md#422-の理由の-enum)）。
 - クラス、フィールド、コンストラクタ、ハンドラメソッドに Javadoc を書く。
   ハンドラメソッドの Javadoc は 1 行目を OpenAPI の summary にし、詳細を `<p>` の後に書き、引数ごとの `@param` と `@return` を書く。
 - 404、409、422 は起きるハンドラメソッドにだけ `@ApiResponse(responseCode, ref = "#/components/responses/<Name>Problem")` で書き、そのときは成功応答の `@ApiResponse` も書く。
@@ -245,6 +246,7 @@ class OrderControllerTest {
 - [ ] `presentation.web` に置き、名前を `Controller` で終える。［ArchUnit で検査：PackageByFeatureOnionArchitectureTest.controllersResideInPresentationWeb］
 - [ ] Domain の型と Repository に依存しない。［ArchUnit で検査：PackageByFeatureOnionArchitectureTest.presentationDoesNotDependOnDomain］
 - [ ] Infrastructure に依存しない。［ArchUnit で検査：PackageByFeatureOnionArchitectureTest.dependenciesPointInward］
+- [ ] `ResponseStatusException`、`ProblemDetail`、`@ExceptionHandler`、`@ResponseStatus` を使わず、エラー応答のステータスと本文を Controller で決めない。［ArchUnit で検査：PackageByFeatureOnionArchitectureTest.httpErrorsAreMappedOnlyInErrorPresentationWeb］
 - [ ] `@Transactional` を付けない。［ArchUnit で検査：PackageByFeatureOnionArchitectureTest.transactionalMethodsArePublicApplicationMethods］
 - [ ] ハンドラメソッドに `@Operation(operationId = "...")` を付け、名前を api-style.md の「operationId」の形にする。［Spectral で検査：operation-id-naming（形だけ。語彙は自分で点検）］
 - [ ] クラスに `@Tag(name, description)` を付け、tag を業務機能の kebab-case にし、`-controller` で終えない。［Spectral で検査：tag-name-format、tag-description、operation-singular-tag］
@@ -257,7 +259,7 @@ class OrderControllerTest {
 - [ ] 作成は 201 と `Location`、本文のない更新は 204、見つからない参照は 404 を返す。［自分で点検］
 - [ ] 参照は `<Feature>Queries` を呼んで `from(...)` で Response にし、一覧は `items` で包む。［自分で点検］
 - [ ] 例外を catch せず、try と catch を書かずに `ApiExceptionHandler` に任せる。［自分で点検］
-- [ ] 見つからない参照は `NotFoundException` で投げ、`ResponseStatusException` を使わない。［自分で点検］
+- [ ] 見つからない参照は `NotFoundException` で投げる。［自分で点検］
 - [ ] クラスに `@Validated` を付けない。入力検証は `@Valid` と引数の制約で行う。［自分で点検］
 - [ ] クラス、フィールド、コンストラクタ、ハンドラメソッドに Javadoc を書く。［自分で点検］
 - [ ] MockMvc のテストで、ステータスコードと Problem Details を確かめる。［自分で点検］

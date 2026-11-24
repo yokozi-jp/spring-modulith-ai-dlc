@@ -11,6 +11,8 @@ tags: [adr, backend, api, error, frontend]
 
 Accepted
 
+Amended by [ADR-125](ADR-125-derive-problem-types-from-failure-reasons.md)：モジュールの 422 の problem type を `/problems/<module>/<kebab-case>` にし、理由の enum の定数から type と `title` のキーを作ること。
+
 ## Date
 
 2026-10-04
