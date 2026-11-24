@@ -45,7 +45,7 @@ PostgreSQL の READ COMMITTED では、後の UPDATE は先の UPDATE のコミ�
 
 ## Decision
 
-- 業務テーブルの INSERT と UPDATE は、`shared.infrastructure.persistence` の `TableWriter` だけが組み立てて実行する。
+- 業務テーブルの INSERT と UPDATE は、`shared.persistence` の `TableWriter` だけが組み立てて実行する。
   Repository は集約の形を、クラスの定数として一度だけ宣言する。
   `AggregateTable<R, K, A>` は、ルートのテーブル、ルートを一つに決める一意の列（`public_id` など）、集約ルートからその列の値を取る関数、内部の主キー、子のテーブルを持つ。
   `A` は集約ルートのクラス（`Versioned` を実装する）で、`insert` と `update` が受け取る集約ルートの型になる。
@@ -126,7 +126,7 @@ PostgreSQL の READ COMMITTED では、後の UPDATE は先の UPDATE のコミ�
 - 期待する版は `shared.concurrency` の `ExpectedLockNo`（`long value`、1 未満は `IllegalArgumentException`）で運ぶ。
   既存の集約を変える Command は `VersionedCommand`（`ExpectedLockNo expectedLockNo()`）を実装する。
   HTTP の Request と OpenAPI は数値の `@Min(1) long lockNo` のままにし、Request の `toCommand` で `ExpectedLockNo` に変換する。
-  `ExpectedLockNo` は `shared.infrastructure.persistence` に置かない。
+  `ExpectedLockNo` は `shared.persistence` に置かない。
   `TableWriter.update` は `ExpectedLockNo` を受け取らず、集約ルートの `Versioned.lockNo()` から版を読む。画面の版は CommandHandler の `ensureLockNo` で比べる。
 - CommandHandler は `order.ensureLockNo(command.expectedLockNo())` を残す。
   画面の版が古いとき、業務の検査や外部の呼び出しより先に競合として失敗させるためである。

@@ -8,7 +8,7 @@ import com.example.demo.jooq.ordering.Indexes;
 import com.example.demo.jooq.ordering.Keys;
 import com.example.demo.jooq.ordering.Ordering;
 import com.example.demo.jooq.ordering.tables.records.TOrderRecord;
-import com.example.demo.shared.infrastructure.persistence.NullToEmptyStringConverter;
+import com.example.demo.shared.persistence.NullToEmptyStringConverter;
 
 import java.time.Instant;
 import java.util.Arrays;

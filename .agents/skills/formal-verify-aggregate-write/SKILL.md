@@ -49,20 +49,20 @@ tooling/formal-verify/mutants.py .agents/skills/formal-verify-aggregate-write
 ```bash
 skill=.agents/skills/formal-verify-aggregate-write/SKILL.md
 git diff --stat "$(sed -n 's/^同期コミット：`\([0-9a-f]*\)`.*/\1/p' "$skill")" -- \
-  backend/src/main/java/com/example/demo/shared/infrastructure/persistence/TableWriter.java \
-  backend/src/main/java/com/example/demo/shared/infrastructure/persistence/AggregateTable.java \
-  backend/src/main/java/com/example/demo/shared/infrastructure/persistence/ChildTable.java \
-  backend/src/main/java/com/example/demo/shared/infrastructure/persistence/ChildRows.java \
-  backend/src/main/java/com/example/demo/shared/infrastructure/persistence/ChildWriter.java \
-  backend/src/main/java/com/example/demo/shared/infrastructure/persistence/ConflictTranslator.java \
+  backend/src/main/java/com/example/demo/shared/persistence/TableWriter.java \
+  backend/src/main/java/com/example/demo/shared/persistence/AggregateTable.java \
+  backend/src/main/java/com/example/demo/shared/persistence/ChildTable.java \
+  backend/src/main/java/com/example/demo/shared/persistence/ChildRows.java \
+  backend/src/main/java/com/example/demo/shared/persistence/ChildWriter.java \
+  backend/src/main/java/com/example/demo/shared/persistence/ConflictTranslator.java \
   backend/src/main/java/com/example/demo/ordering/infrastructure/persistence/JooqOrderRepository.java \
   backend/src/main/java/com/example/demo/ordering/domain/model/Order.java \
   backend/src/main/java/com/example/demo/ordering/application/ChangeOrderLinesCommandHandler.java \
   backend/src/main/java/com/example/demo/ordering/application/ConfirmOrderCommandHandler.java \
   backend/src/main/java/com/example/demo/ordering/application/CancelOrderCommandHandler.java \
   backend/src/main/java/com/example/demo/error/presentation/web/ApiExceptionHandler.java \
-  backend/src/main/java/com/example/demo/shared/infrastructure/persistence/ModuleRoleTransactionManager.java \
-  backend/src/main/java/com/example/demo/shared/infrastructure/persistence/ModuleRoles.java \
+  backend/src/main/java/com/example/demo/shared/persistence/ModuleRoleTransactionManager.java \
+  backend/src/main/java/com/example/demo/shared/persistence/ModuleRoles.java \
   backend/src/main/resources/db/changelog/changesets/004-create-order-tables.yaml \
   backend/src/main/resources/db/changelog/changesets/019-rebuild-order-tables-for-tenants.yaml \
   backend/src/main/resources/application.yaml \

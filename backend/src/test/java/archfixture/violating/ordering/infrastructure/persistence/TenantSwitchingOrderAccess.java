@@ -1,6 +1,6 @@
 package archfixture.violating.ordering.infrastructure.persistence;
 
-import archfixture.violating.shared.infrastructure.persistence.ModuleRoleTransactionManager;
+import archfixture.violating.shared.persistence.ModuleRoleTransactionManager;
 
 /** 違反：roleAndTenantAreSetOnlyByTransactionManager（永続化のアダプターが自分でロールとテナントを切り替える）。 */
 public final class TenantSwitchingOrderAccess {

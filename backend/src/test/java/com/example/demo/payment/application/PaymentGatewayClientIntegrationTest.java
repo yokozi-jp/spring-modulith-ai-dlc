@@ -11,7 +11,7 @@ import com.example.demo.payment.domain.model.ChargeOutcome;
 import com.example.demo.payment.domain.model.Money;
 import com.example.demo.payment.domain.model.OrderId;
 import com.example.demo.payment.domain.model.PaymentGateway;
-import com.example.demo.shared.infrastructure.persistence.EventPublicationResubmitOnce;
+import com.example.demo.shared.eventresubmission.EventPublicationResubmitOnce;
 import com.example.demo.testkit.AsTenant;
 import com.example.demo.testkit.BindTestTenantExtension;
 import com.example.demo.testkit.CleanGeneratedTablesExtension;

@@ -1,9 +1,9 @@
 package com.example.demo.testkit;
 
-import static com.example.demo.shared.infrastructure.persistence.ModuleRoleTransactionManager.TENANT_SETTING;
+import static com.example.demo.shared.persistence.ModuleRoleTransactionManager.TENANT_SETTING;
 
-import com.example.demo.shared.infrastructure.persistence.ModuleRoleTransactionManager;
-import com.example.demo.shared.infrastructure.persistence.ModuleRoles;
+import com.example.demo.shared.persistence.ModuleRoleTransactionManager;
+import com.example.demo.shared.persistence.ModuleRoles;
 import com.example.demo.shared.tenancy.TenantContext;
 import com.example.demo.shared.tenancy.TenantId;
 import java.util.Objects;

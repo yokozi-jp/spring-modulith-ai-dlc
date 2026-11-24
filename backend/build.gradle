@@ -27,7 +27,7 @@ plugins {
 }
 
 group = 'com.example'
-version = '0.13.0' // x-release-please-version
+version = '0.14.0' // x-release-please-version
 
 java {
     toolchain {
@@ -243,6 +243,8 @@ tasks.named('test') {
     inputs.dir(layout.projectDirectory.dir('../docker/initdb')).withPropertyName('testInitdb')
     // 決済代行の結合テストは docker/wiremock のスタブを読むため、スタブを変えたらテストをやり直す。
     inputs.dir(layout.projectDirectory.dir('../docker/wiremock')).withPropertyName('wiremockStubs')
+    // MailAddressTest はフロントエンドと共有する入力の表を読むため、表を変えたらテストをやり直す。
+    inputs.file(layout.projectDirectory.file('../openapi/mail-address-cases.json')).withPropertyName('mailAddressCases')
     // SchemaInspectionTest は保持期限の一覧を読むため、一覧を変えたらテストをやり直す。
     inputs.file(layout.projectDirectory.file('../docs/database/table-retention-and-personal-data.md')).withPropertyName('retentionDocument')
     // -PopenapiExport=true のときだけ、OpenApiContractTest に契約を書き出させる（ADR-064）。

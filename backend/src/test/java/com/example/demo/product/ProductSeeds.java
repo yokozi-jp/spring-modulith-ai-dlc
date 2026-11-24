@@ -1,6 +1,6 @@
 package com.example.demo.product;
 
-import com.example.demo.shared.infrastructure.persistence.TestCommonColumns;
+import com.example.demo.shared.persistence.TestCommonColumns;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.ArrayList;

@@ -81,7 +81,7 @@ Proposed の間に、上限を超えて `FAILED` に残った出版の知らせ�
 
 失敗したイベント出版を、定期のジョブで自動で再投入する。
 
-- ジョブは `shared.infrastructure.persistence` の `EventPublicationResubmitter` に置き、`@Scheduled` の固定の遅延で動かす。
+- ジョブは `shared.eventresubmission` の `EventPublicationResubmitter` に置き、`@Scheduled` の固定の遅延で動かす。
   `event-publication.resubmission.enabled` が `true` 以外なら、定期の実行も Staleness Monitor も登録しない。
   この条件は `true`（大文字小文字を区別しない）だけを真と読むため、環境変数には `true` か `false` だけを使う。
   Spring Modulith の starter が入れる Moments は、既定で有効なとき `@EnableScheduling` を足し、この切り替えを効かなくする。
@@ -187,7 +187,7 @@ Proposed の間に、上限を超えて `FAILED` に残った出版の知らせ�
 - 起動時の自動再配信は、ADR-001 のとおり使わない。
 
 shared の範囲は、ADR-048 の jOOQ の共通処理に加えて、Spring Modulith のイベント出版のレジストリの再投入と、その方針をリスナーが選ぶ注釈まで広げる。
-レジストリは全モジュールが共有する基盤で業務の概念を持たず、jOOQ を使う処理は `infrastructure.persistence` に置く規則があるためである。
+レジストリは全モジュールが共有する基盤で業務の概念を持たず、jOOQ を使う処理は Persistence Adapter の層（`infrastructure.persistence` と、同じ層に入る `shared` のパッケージ）に置く規則があるためである。
 
 ## Consequences
 

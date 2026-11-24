@@ -10,7 +10,7 @@ import com.example.demo.jooq.tenancy.Tenancy;
 import com.example.demo.jooq.tenancy.tables.MTenant.MTenantPath;
 import com.example.demo.jooq.tenancy.tables.MUser.MUserPath;
 import com.example.demo.jooq.tenancy.tables.records.MMembershipRecord;
-import com.example.demo.shared.infrastructure.persistence.NullToEmptyStringConverter;
+import com.example.demo.shared.persistence.NullToEmptyStringConverter;
 
 import java.time.Instant;
 import java.util.Arrays;

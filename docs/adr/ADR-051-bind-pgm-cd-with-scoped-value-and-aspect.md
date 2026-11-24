@@ -44,7 +44,7 @@ Spring は、別々の Aspect と `@Transactional` の advisor が同じメソ�
 
 ## Decision
 
-`org.springframework.boot:spring-boot-starter-aspectj` を依存に加え、`shared.infrastructure.persistence` に `@Aspect` の `PgmCdAspect` を置く。
+`org.springframework.boot:spring-boot-starter-aspectj` を依存に加え、`shared.persistence` に `@Aspect` の `PgmCdAspect` を置く。
 
 - `PgmCdAspect` は、`com.example.demo.<モジュール>..` の `*CommandHandler` の `handle` と、`*Listener` の public メソッドの呼び出しを `@Around` で囲む。
 - pointcut は `within(com.example.demo.*..*CommandHandler) && execution(* handle(..))` の形にし、対象のクラスを `within` の名前だけで決める。

@@ -1,6 +1,6 @@
 package com.example.demo.jooq.tables;
 
-import com.example.demo.shared.infrastructure.persistence.NullToEmptyStringConverter;
+import com.example.demo.shared.persistence.NullToEmptyStringConverter;
 import org.jooq.Record;
 import org.jooq.TableField;
 import org.jooq.impl.DSL;

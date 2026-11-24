@@ -9,7 +9,7 @@ import com.example.demo.jooq.tenancy.Keys;
 import com.example.demo.jooq.tenancy.Tenancy;
 import com.example.demo.jooq.tenancy.tables.MMembership.MMembershipPath;
 import com.example.demo.jooq.tenancy.tables.records.MTenantRecord;
-import com.example.demo.shared.infrastructure.persistence.NullToEmptyStringConverter;
+import com.example.demo.shared.persistence.NullToEmptyStringConverter;
 
 import java.time.Instant;
 import java.util.Arrays;

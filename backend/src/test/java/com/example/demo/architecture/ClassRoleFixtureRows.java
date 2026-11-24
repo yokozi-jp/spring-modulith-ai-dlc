@@ -33,7 +33,7 @@ final class ClassRoleFixtureRows {
         row(
             "sharedModuleDoesNotDependOnHttp",
             PackageByFeatureOnionArchitectureTest.sharedModuleDoesNotDependOnHttpRule(VIOLATING),
-            "shared.infrastructure.persistence.ChildRowWriter"),
+            "shared.persistence.ChildRowWriter"),
         row(
             "noSuchElementExceptionIsNotThrown",
             GeneralCodingRulesArchTest.noSuchElementExceptionIsNotThrown,

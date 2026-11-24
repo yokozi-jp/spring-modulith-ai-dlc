@@ -59,10 +59,10 @@ tooling/formal-verify/mutants.py .agents/skills/formal-verify-event-resubmission
 ```bash
 skill=.agents/skills/formal-verify-event-resubmission/SKILL.md
 git diff --stat "$(sed -n 's/^同期コミット：`\([0-9a-f]*\)`.*/\1/p' "$skill")" -- \
-  backend/src/main/java/com/example/demo/shared/infrastructure/persistence/EventPublicationResubmitter.java \
-  backend/src/main/java/com/example/demo/shared/infrastructure/persistence/EventPublicationResubmissionConfig.java \
-  backend/src/main/java/com/example/demo/shared/infrastructure/persistence/ResubmissionPolicies.java \
-  backend/src/test/java/com/example/demo/shared/infrastructure/persistence/ResubmissionOptionsLearningTest.java \
+  backend/src/main/java/com/example/demo/shared/eventresubmission/EventPublicationResubmitter.java \
+  backend/src/main/java/com/example/demo/shared/eventresubmission/EventPublicationResubmissionConfig.java \
+  backend/src/main/java/com/example/demo/shared/eventresubmission/ResubmissionPolicies.java \
+  backend/src/test/java/com/example/demo/shared/eventresubmission/ResubmissionOptionsLearningTest.java \
   backend/src/main/resources/application.yaml \
   backend/build.gradle
 ```

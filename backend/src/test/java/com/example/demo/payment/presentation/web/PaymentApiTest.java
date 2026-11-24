@@ -7,7 +7,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import com.example.demo.shared.infrastructure.persistence.TestCommonColumns;
+import com.example.demo.shared.persistence.TestCommonColumns;
 import com.example.demo.testkit.AsModule;
 import com.example.demo.testkit.CleanGeneratedTablesExtension;
 import com.example.demo.testkit.ContractCase;
