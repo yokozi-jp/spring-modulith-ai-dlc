@@ -48,6 +48,8 @@ AWS SDK for Java v2 は、同じ値をシステムプロパティ `aws.endpointU
   実装の切り替え、偽物の分岐、mode の設定を持たない。
 - Client は、宛先、件名、プレーンテキストの本文だけを受ける。
   From のアドレスと表示名、設定セットの名前は既定値のない設定値にし、未設定なら起動に失敗させる（[ADR-008](ADR-008-single-application-yaml-external-config.md)）。
+  From のアドレスの形式の誤りと、空白だけの表示名と設定セットも、起動の時点で断る。
+  起動を通すと、SES が要求ごとに `BadRequestException` を返し、すべてのメールが拒否として記録されるためである。
 - 接続先、リージョン、資格情報は SDK の既定の取得に任せ、アプリの設定に書かない。
   本番は、ECS のタスクのロールの一時的な資格情報と、ECS がタスクに入れる `AWS_REGION` を使う（[Amazon ECS environment variables](https://docs.aws.amazon.com/AmazonECS/latest/developerguide/ecs-environment-variables.html)）。
   リージョンが取れなければ、SDK の Client を作れず、起動に失敗する。
@@ -72,8 +74,8 @@ AWS SDK for Java v2 は、同じ値をシステムプロパティ `aws.endpointU
   スロットリングを除く 4xx は、SES の不調ではないので circuit breaker の失敗に数えない。
   場合ごとの表は[メールを送る Client](../mail/sending.md#結果と失敗の扱い)にある。
 - Client のログと、Client が投げる SES の例外のメッセージには、例外の型と SES のエラーコードだけを入れ、宛先のアドレスと SES のエラーの文面を入れない（[ADR-015](ADR-015-structure-and-protect-observability-data.md)）。
-  投げた例外のメッセージは、Spring Modulith がリスナーの失敗を記録するログに出る。
-  `MessageRejected` の文面は、確かめられなかった宛先のアドレスを含みうるためである。
+  SES の文面は、確かめられなかった宛先のアドレスを含みうるためである。
+  投げた例外のメッセージも、Spring Modulith がリスナーの失敗を記録するログに出る。
 
 ## Consequences
 
