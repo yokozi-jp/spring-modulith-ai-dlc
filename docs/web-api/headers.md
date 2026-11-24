@@ -15,7 +15,6 @@ API応答はキャッシュさせない。
 
 - **認証情報**：ブラウザからはセッションCookie、システム間連携では`Authorization`ヘッダーで送る。クエリパラメータとリクエストボディには入れない。認証方式は[APIの認証、セッション、権限](authentication-and-session.md)に従う。
 - **Content-Type**：APIが対応するメディアタイプを指定させる。通常は`application/json`であり、PATCHは[HTTPメソッドの使い分け](http-methods.md)に従う。
-- **Idempotency-Key**：テナントを選んだ後の業務のAPIで、GETとHEAD以外のすべての操作に必須である。形式、保存期間、再送時の応答は[HTTPメソッドの使い分け](http-methods.md#再試行への備え)に従う。
 - **User-Agent**：クライアントが対向システムの場合は、利用実績を把握するため`User-Agent: SystemABC/1.0`の形式で送るよう求めてよい。
 - **Accept-Language**：応答の言語の選択は[ADR-016](../adr/ADR-016-localize-api-and-spa-messages.md)と[フロントエンドの国際化](../frontend/i18n.md)に従う。
 

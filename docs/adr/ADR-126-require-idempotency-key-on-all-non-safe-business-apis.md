@@ -18,21 +18,21 @@ Proposed
 ## Context
 
 [ADR-013](ADR-013-standardize-http-api-contracts.md) は、`Idempotency-Key` を回復困難な副作用の操作だけに要求すると決め、すべての POST に要求する案（Alternative 3）を退けた。
+退けた前提は「安全に再実行できる操作には、キーの保存と掃除の実装が要らない」だった。
 この前提は、今は成り立たない。
 
-- こちらの更新の操作は、成功して応答を失った後に再送すると、`lock_no` が進んでいるので 409 になる（注文の確定、取消、明細の変更）。
+- 更新の操作は、成功して応答を失った後に再送すると、`lock_no` が進んでいるので 409 になる（注文の確定、取消、明細の変更）。
   注文の作成も、客先注文番号の一意索引で 409 になる。
   重複は起きないが、成功した操作が失敗に見えるので、安全に再実行できる操作とは言えない。
 - 「回復困難な副作用の操作だけ」は、操作ごとの判断になり、機械で検査できない。
   一律にすれば、OpenAPI の Spectral の規則で付け忘れを止められる（[ADR-071](ADR-071-reinforce-learnings-into-five-layers.md) の、上の層を優先する方針）。
-- ADR-013 は IETF の文書を失効した Internet-Draft としていた。
-  今は draft-ietf-httpapi-idempotency-key-header-08（2026-10-22 公開、2027-04-25 まで有効）が出ている。
+- ADR-013 は IETF の文書を失効した Internet-Draft としていたが、今は draft-ietf-httpapi-idempotency-key-header-08（2026-10-22 公開、2027-04-25 まで有効）が出ている。
   draft 2.5.2 は、キーを要求する操作の仕様を resource が公開することを求めており、一律のほうが公開する内容が単純になる。
 
-向こうの `yokozi-jp/agent-software-factory` は、ADR 0040 で同じ問題を、キーの一律の必須化で解いている。
+`yokozi-jp/agent-software-factory` は、ADR 0040 で同じ問題を、キーの一律の必須化で解いている。
 調べた事実と出典は [#310](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/310) にある。
-こちらは更新を PUT で行い、DELETE も `lock_no` を運ぶので、向こうが PATCH に限った対象を広げる。
-キーの表は、テナントとモジュールのロールを分けた構成（#363）の上に作る。
+`agent-software-factory` は対象を PATCH に限るが、このリポジトリは更新を PUT で行い、DELETE も `lock_no` を運ぶので、PUT と DELETE も対象にする。
+キーの表は、テナントとモジュールのロールを分けた構成（[#363](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/363)）の上に作る。
 
 ## Decision
 
@@ -45,7 +45,9 @@ Proposed
 - Spring Security のログインとログアウトなど、OpenAPI の契約の外にある経路。
 - テナントを選ぶ前の操作（テナントの選択）。
   キーの主キーが `tenant_public_id` から始まり、テナントが決まる前は表に書けないためである。
-  テナントの選択は、同じ値で繰り返しても、選択済みの状態が変わらないので、再送で結果が変わらない。
+  テナントの選択は、成功して応答を失うと、再送が 422（選択済み）か、セッション ID が変わった後の 401 になる。
+  この問題は残り、Negative に書く。
+  招待の受け入れは、API が存在しないので、ここでは決めない。
 - 非同期のリスナーなど、HTTP の要求でない書き手。
   今の配信保証と冪等性の規約（`docs/integration/async-ordering-and-idempotency.md`）のままにする。
 
@@ -58,8 +60,6 @@ Proposed
 - キーはクライアントが利用者の操作ごとに採番する。キーを払い出す API を作らない。
 - 利用者がエラーの通知を見て押し直したときは、新しい操作として新しいキーを採る。
   同じキーで送るのは、クライアントの自動の再試行だけにする。
-  利用者が結果を知らずに押し直すと、成功済みの操作に対する誤った 409 が残る。
-  これは受け入れる（Consequences の Negative）。
 
 ### 保存先
 
@@ -68,7 +68,10 @@ Proposed
 - 主キーは `(tenant_public_id, 利用者の ID, キー)` にする。
   利用者の ID は、[ADR-096](ADR-096-require-app-user-principal-for-audit-columns.md) の `AppUserPrincipal` の値を使う。
 - 列は、ペイロードのハッシュ、保存した Result、期限を持つ。
-- RLS（`ENABLE` と `FORCE`）を付け、自分のモジュールのロールだけに権限を与える。
+- RLS（`ENABLE` と `FORCE`）で別のテナントの行を隠し、自分のモジュールのロールだけに権限を与える。
+  別の利用者の行は、主キーで分ける。
+  `tenancy` のスキーマは [ADR-107](ADR-107-isolate-tenants-with-rls-set-per-transaction.md) が RLS の外に置き、テナントなしでトランザクションを始められる。
+  `tenancy` のキーの表は RLS を付けず、主キーの `tenant_public_id` を、検索の条件に必ず入れて分ける。
 - 業務の更新と同じトランザクションに書くので、業務の結果とキーの記録は、一緒に commit されるか一緒に rollback される。
   Servlet の Filter や `HandlerInterceptor` など、トランザクションの外の層には置かない。
 
@@ -76,21 +79,31 @@ Proposed
 
 `shared` の共通の処理を、CommandHandler のトランザクションの中で呼ぶ。
 
-1. キーを `INSERT ... ON CONFLICT DO NOTHING` する。
-2. 入ったときだけ業務を実行し、Result を保存する。
-3. 行が既にあれば、ペイロードのハッシュが同じなら保存した Result を返す。違えば 400 にする。
+1. キーを `INSERT ... ON CONFLICT (主キー) DO UPDATE ... WHERE 期限 <= 現在` する。
+   期限切れで、まだ消えていない行は、この `UPDATE` で新しいキーとして取り直す。
+   現在は `Clock` の `Instant` を渡す。
+2. 行が入ったか更新されたときだけ業務を実行し、Result を保存する。
+3. 0 行だったら、有効な行が既にある。ペイロードのハッシュが同じなら保存した Result を返し、違えば 400 にする。
 
 - 同じキーの 2 つ目の要求は、キーの `INSERT` の一意索引で 1 つ目の終わりを待つ。
-  1 つ目が commit すれば 0 行になって保存した Result を読み、rollback すれば自分で入る。
+  1 つ目が commit すれば `INSERT` は 0 件になって保存した Result を読み、rollback すれば自分で入る。
 - ペイロードのハッシュは、操作の名前と Command から作る。
-  トランザクションの中に届くのは本文のバイト列でなく Command（パスの値を含む）なので、draft 2.4 が認める「選んだ要素のチェックサム」にあたる。
+  Command は、パスとクエリの値と本文の値を含む。
+  トランザクションの中に届くのは本文のバイト列でなく Command なので、draft 2.4 が認める「選んだ要素のチェックサム」にあたる。
+  パスの値だけ、またはクエリの値だけが違う再送も、ペイロードの不一致になる。
 - 保存するのは HTTP の応答でなく CommandHandler の Result にする。
   HTTP の状態コードとヘッダーは Controller が Result から作る（[ADR-050](ADR-050-define-backend-class-roles-and-naming.md)）。
   注文の作成は本文のない 201 で、`Location` に意味がある。
   Result を保存すれば、Controller が 1 回目と同じ 201 と `Location` を作り直せる。
   返し直しを示すヘッダーは付けない。
-- 2xx 以外は rollback し、キーの行を残さない。
+- CommandHandler が例外で終わったら rollback し、キーの行を残さない。
   業務の失敗（422 など）を直して同じキーで送ると、もう一度処理される。
+  CommandHandler が commit した後に、Controller の応答が失敗しても、キーの行は残る。
+  これが、応答を失った再送に保存した Result を返す場面である。
+- 再送も、認可は毎回通る。
+  操作が自分の権限を外した後の再送は、保存した Result でなく 403 になる。
+- 保存した Result は、24 時間の間に配備をまたいで読み直す。
+  Result の型を変えるときは、24 時間は古い形を読めるようにする。
 - キーの `INSERT` のロック待ちが [ADR-055](ADR-055-set-db-time-limits-per-connection.md) の `lock_timeout` で切れたときだけ、処理中の 409 と `Retry-After` を返す。
   業務の更新のロック待ちは、今の `ConflictException`（`lock_no` の競合）のままにする。
 - 外への副作用は今のまま、イベントの出版の表を通す。
@@ -114,13 +127,16 @@ Proposed
 - 同じキーの処理中：409。`Retry-After` を付ける。
 
 ペイロードの不一致は、draft 2.7 が SHOULD とする 422 でなく 400 にする。
-こちらの 422 は、[ADR-062](ADR-062-map-business-exceptions-to-404-409-422.md) で業務規則の違反に使っている。
-同じ状態コードに、入力の誤りと業務の失敗が混ざると、クライアントが `type` を見ずに状態コードで分岐できなくなるためである。
+422 は、[ADR-062](ADR-062-map-business-exceptions-to-404-409-422.md) で業務規則の違反に使っている。
+再送の不一致は、利用者の入力でなくクライアントの実装の誤りなので、業務規則の違反と状態コードを分ける。
+クライアントは [ADR-013](ADR-013-standardize-http-api-contracts.md) のとおり `type` で分岐する。
+処理中の 409（自動で再試行する）と `lock_no` の競合の 409（再試行しない）も、`type` で分ける。
 
 ### OpenAPI と検査
 
 - OpenAPI の共通の components に、必須のヘッダーのパラメータと、上の 4 つのエラー応答を置く。
 - Spectral に、GET と HEAD 以外の業務の operation が `Idempotency-Key` の必須のヘッダーを参照する規則を足し、違反の例を fixture に足す。
+  テナントの選択（`operationId` の許可リスト）は、規則の中で除外する。
 
 ### クライアント
 
@@ -128,13 +144,6 @@ Proposed
 - ネットワークの失敗、5xx、408、429、処理中の 409 では、同じキーで自動で再試行する。
   RFC 9110 9.2.2 は、冪等と分かっている要求だけを自動で再試行してよいとしており、キーがその根拠になる。
 - 処理中の 409 の通知を `failureNotice` に足す。
-
-### ADR-013 の変更
-
-- ADR-013 の「冪等性」の節と Alternative 3 を、この ADR が改める。
-  ADR-013 の Status に `Amended by` を書き、索引に表示する。
-- ADR-013 の Decision は書き換えない（[ADR の運用ルール](conventions.md)）。
-  Idempotency-Key の文書を「失効した Internet-Draft」とする ADR-013 の記述は、この ADR の Context が示すとおり、今は成り立たない。
 
 ## Consequences
 
@@ -152,13 +161,15 @@ Proposed
 - 処理中の 2 つ目の要求は、`lock_timeout` の間、接続を 1 本使って待つ。
 - 利用者がエラーの通知を見て押し直すと、成功済みの操作に対する誤った 409 が残る。
 - キーが効くのは、同じ利用者、同じテナント、同じキーで、24 時間のうちに届いた再送だけである。
+- テナントの選択は、成功して応答を失うと、再送が 422 か 401 になる。
+- Result の型を変えるとき、24 時間の互換性を保つ負担が増える。
 - draft 08 は RFC ではない。
 
 ### Neutral
 
 - RFC になった時点で、構文と、ペイロードの不一致の状態コード（422）を見直す。
 - テナントを選ぶ前の操作に冪等性が要るようになったら、別の判断をする。
-- Orval が必須のヘッダーのパラメータを mutation の変数に入れるか、キーの `INSERT` の `55P03` を業務の更新のロック待ちと区別して処理中の 409 にできるかは、実装の Issue で確かめる。
+- Orval が必須のヘッダーのパラメータを mutation の変数に入れるか、キーの `INSERT` の `55P03` を業務の更新のロック待ちと区別して処理中の 409 にできるかは、[#540](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/540) の実装で確かめる。
 
 ## Alternatives Considered
 
@@ -178,7 +189,7 @@ Proposed
 
 - **Description**：状態コードと本文を保存し、トランザクションの外の Filter で返し直す。
 - **Pros**：業務のコードがキーを意識しない。
-- **Cons**：業務の結果とキーの記録が別のトランザクションになる。ヘッダーを保存しないと `Location` が消え、保存すると古い契約の形がデプロイをまたいで残る。
+- **Cons**：業務の結果とキーの記録が別のトランザクションになる。ヘッダーを保存しないと `Location` が消える。
 
 ### 選択肢4: ペイロードの不一致に 422 を返す
 
@@ -198,4 +209,5 @@ Proposed
 - [ADR-062](ADR-062-map-business-exceptions-to-404-409-422.md)
 - [ADR-079](ADR-079-resubmit-failed-event-publications-periodically-with-shedlock.md)
 - [ADR-096](ADR-096-require-app-user-principal-for-audit-columns.md)
+- [ADR-107](ADR-107-isolate-tenants-with-rls-set-per-transaction.md)
 - [#310](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/310)、[#540](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/540)

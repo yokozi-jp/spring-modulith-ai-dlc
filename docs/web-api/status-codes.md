@@ -26,9 +26,6 @@ CSRFトークンの検証に失敗した403は`/problems/csrf-token-invalid`に�
 対象は`/api/**`の更新系と`/logout`で、理由は[CSRFのCookie](authentication-and-session.md#csrfのcookie)にある。
 テナントを選ぶ前に業務のAPIを呼んだ403は`/problems/tenant-not-selected`にする（[テナントを選ぶ](authentication-and-session.md#テナントを選ぶ)）。
 権限不足の403は`about:blank`のままにする。
-`Idempotency-Key`の失敗は、キーがない（`/problems/idempotency-key-missing`）、形式の誤り（`/problems/idempotency-key-invalid`）、同じキーで本文が違う（`/problems/idempotency-key-payload-mismatch`）を400にし、同じキーの処理中（`/problems/idempotency-key-in-progress`）を`Retry-After`付きの409にする（[ADR-126](../adr/ADR-126-require-idempotency-key-on-all-non-safe-business-apis.md)）。
-本文が違う場合を422にしないのは、422を業務規則の違反に使うためである。
-処理中の409は、`lock_no`の競合の409と`type`で区別する。
 入力検証エラーは`/problems/validation-error`の400で、`errors`拡張に誤りのある入力のJSON Pointerと説明を入れる。
 OpenAPIへのエラー応答の付け方は[OpenAPIのアノテーションとJavadoc](openapi-annotations.md#エラー応答)に従う。
 
