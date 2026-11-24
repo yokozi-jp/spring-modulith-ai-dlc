@@ -1,5 +1,5 @@
 // ZAP httpsender script（ADR-056）。
-// __Host- の Cookie は Secure なので、ZAP は HTTP の要求に自分では付けない（ADR-066、ADR-117）。
+// __Host- の Cookie は Secure なので、ZAP は HTTP の要求に自分では付けない（ADR-066、ADR-119）。
 // 最後に受け取った Set-Cookie の値を global var に保存し、session/app-session.js がセッションの Cookie を付ける。
 // Spring Security の csrf.spa() は __Host-XSRF-TOKEN の値を X-XSRF-TOKEN Header で送り返させる。
 // ZAP の anti-CSRF 処理はフォームのトークンしか扱わないため、unsafe メソッドの要求にこの Header と Cookie を付ける。

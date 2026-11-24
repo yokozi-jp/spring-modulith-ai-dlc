@@ -47,7 +47,7 @@ export const paymentGatewayUrl = requireEnv("PAYMENT_GATEWAY_BASE_URL");
 export const webOrigin = `http://localhost:${webPort()}`;
 // task fe-check は .env.test なしでこのファイルを import するため、compose-test の既定の issuer の origin を既定値にする。
 export const idpOrigin = new URL(env.OIDC_ISSUER_URI ?? "http://127.0.0.1:8081").origin;
-// backend の server.servlet.session.cookie.name と同じ値にする（ADR-117）。
+// backend の server.servlet.session.cookie.name と同じ値にする（ADR-119）。
 export const sessionCookieName = "__Host-APP_SESSION";
 // playwright-report/ と test-results/ の外に置き、CI の artifact に入れない。
 export const authFile = pathFromHere(".auth/user.json");

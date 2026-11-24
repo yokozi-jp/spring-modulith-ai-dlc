@@ -557,6 +557,7 @@ class ArchitectureRuleFixtureTest {
             .databaseTechnologyApisAreOnlyUsedByPersistenceAdapters,
         GeneralCodingRulesArchTest.noSuchElementExceptionIsNotThrown,
         PackageByFeatureOnionArchitectureTest.domainModelDoesNotDependOnFrameworks,
+        PackageByFeatureOnionArchitectureTest.valueObjectsDoNotThrowBusinessRuleViolation,
         PackageByFeatureOnionArchitectureTest.domainServicesDependOnlyOnDomainAndJavaRule(
             basePackage),
         PackageByFeatureOnionArchitectureTest.domainServicesAreAnnotatedWithService,
@@ -574,6 +575,7 @@ class ArchitectureRuleFixtureTest {
         ClassRoleArchTest.applicationServicesHaveRoleNames,
         ClassRoleArchTest.commandHandlersExposeOnlyTransactionalHandle,
         ClassRoleArchTest.commandsAndResultsAreApplicationRecordsRule(basePackage),
+        ClassRoleArchTest.resultComponentsAreNotNullableRule(basePackage),
         ClassRoleArchTest.commandHandlersDoNotDependOnOtherCommandHandlers,
         ClassRoleArchTest.commandHandlersAndListenersDoNotUseInheritance,
         ClassRoleArchTest.externalSystemCommandHandlersAreDependedOnlyByListeners,

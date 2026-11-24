@@ -12,7 +12,7 @@ tags: [adr, security, auth, oidc]
 Accepted
 
 Amended by [ADR-111](ADR-111-store-sessions-in-postgresql-until-user-growth-needs-redis.md)：セッションの保存先を、開発初期は Redis ではなく PostgreSQL にすること。
-Amended by [ADR-117](ADR-117-harden-session-cookie-with-host-prefix.md)：セッションの Cookie の名前を `__Host-APP_SESSION` にし、`Secure` を環境によらず付けること。
+Amended by [ADR-119](ADR-119-harden-session-cookie-with-host-prefix.md)：セッションの Cookie の名前を `__Host-APP_SESSION` にし、`Secure` を環境によらず付けること。
 
 ## Date
 

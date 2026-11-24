@@ -36,7 +36,10 @@ backend/src/test/java/com/example/demo/architecture/
 
 ## モジュールとパッケージ
 
-`ApplicationModuleArchitectureTest`はSpring Modulithの`ApplicationModules.verify()`を使い、モジュール間の循環、内部パッケージ参照、許可されていない依存を検出する。
+`ApplicationModuleArchitectureTest`はSpring Modulithの`ApplicationModules.verify()`を使い、モジュール間の循環、内部パッケージ参照、`allowedDependencies`にない依存を検出する。
+依存してよいモジュールは各モジュールの`package-info.java`で宣言する（[ADR-118](../adr/ADR-118-declare-module-dependencies-with-allowed-dependencies.md)）。
+同じクラスのテストが、OPEN以外のすべてのモジュールが`allowedDependencies`を宣言していることを確かめる。
+手書きにした理由はテストのJavadocに書く。
 モジュール構造の決定は[ADR-001](../adr/ADR-001-adopt-spring-modulith-modular-monolith.md)を参照する。
 jOOQの生成物の`com.example.demo.jooq`はOPENのモジュールであり、`verify()`は生成型への依存を内部の型への依存として扱わない。
 `ApplicationModuleArchitectureTest`がこれを確かめる。
@@ -53,6 +56,7 @@ jOOQの生成物の`com.example.demo.jooq`はOPENのモジュールであり、`
   どの層からも使えるパッケージの一覧は、`PackageByFeatureOnionArchitectureTest`の`ANY_LAYER_SHARED_PACKAGES`が持つ。この規則と`dependenciesPointInward`の所属検査の除外が、そこから組み立てる（[ADR-048](../adr/ADR-048-add-shared-module-for-jooq-common-code.md)、[ADR-062](../adr/ADR-062-map-business-exceptions-to-404-409-422.md)、[ADR-079](../adr/ADR-079-resubmit-failed-event-publications-periodically-with-shedlock.md)、[ADR-096](../adr/ADR-096-require-app-user-principal-for-audit-columns.md)、[ADR-105](../adr/ADR-105-bind-tenant-to-request-and-event-context.md)）。
 - `sharedModuleDoesNotDependOnHttp`：`shared`の型は、Spring Web、Springの HTTP、Servletの型に依存しない。
 - `moduleApiDoesNotExposeInternalTypes`：モジュールルートの型は、`java..`、`org.jspecify..`、同じルートパッケージの型、イベントが運ぶテナントの`shared.tenant.TenantId`と`shared.tenant.TenantScoped`だけに依存する。
+  `package-info`は`@ApplicationModule`の宣言を持つため対象から除く。
   違反フィクスチャの`OrderPlacedReadingTenantContext`（`TenantContext`への依存）で確かめる。
 - `databaseTechnologyApisAreOnlyUsedByPersistenceAdapters`：jOOQ APIと生成型は`infrastructure.persistence`だけで使う。
 - `domainModelDoesNotDependOnFrameworks`：`domain.model`はSpring、jOOQ、jOOQの生成型、JPA、Jacksonに依存しない。
@@ -193,6 +197,9 @@ H6は、`UnversionedOrderRepository`（集約ルートではなく識別子を�
 `allowedUsagesAreNotDetected`の別の一行は、`IllegalStateException`、`IllegalArgumentException`、3つの業務上の失敗の例外の送出と`orElseThrow(Supplier)`を、`noSuchElementExceptionIsNotThrown`が誤検出しないことを確かめる。
 `sharedModuleDoesNotDependOnHttp`は、違反フィクスチャの`shared.infrastructure.persistence`の`ChildRowWriter`が`ResponseStatusException`を投げることを検出する。
 MapStruct、ModelMapper、Dozerはテストのクラスパスにないため、`mappingLibrariesAreNotUsed`のフィクスチャは`DefaultRecordMapper`と`DefaultRecordUnmapper`への依存だけで確かめる。
+
+`TestConventionsArchTest`の`sleepIsNotUsedInTests`は、`SleepRuleFixtureTest`が`archfixture.sleep`のクラスで確かめる。
+直接の呼び出しとメソッド参照が検出され、`Thread`と`TimeUnit`以外の`sleep`が検出されないことを固定する。
 
 規則を追加するときは、違反フィクスチャのクラスを一つ追加し、`eachRuleDetectsItsViolatingFixture`の行と`rulesFor()`に規則を加える。
 この手順で、新しい規則が違反を検出し、規約どおりのコードを誤検出しないことを確かめる。
@@ -442,6 +449,7 @@ changesetの検査は`modulith`スキーマを、スキーマ検査は`modulith`
 - `@Test`を持つクラス名が`Test`で終わる。
 - `@SpringBootTest`を直接付けたクラスが`SharedTestConfiguration`を`@Import`する。
 - `assertTimeoutPreemptively`を呼ばない。
+- `Thread.sleep`と`TimeUnit.sleep`を、呼び出しでもメソッド参照でも使わない。同名の別のメソッドは対象にしない。
 - テストコードでレガシー日時型を使わない。
 - クラスまたはメソッドの`@Disabled`に理由がある。
 
@@ -450,7 +458,7 @@ changesetの検査は`modulith`スキーマを、スキーマ検査は`modulith`
 
 ## PMD
 
-PMDはmainとtestに別のrulesetを適用し、Lombokの`@Data`と`@Setter`、手書きのLoggerフィールド、`LoggerFactory`の直接参照、`getLogger`のstatic import、`@Autowired`を付けた通常メソッドなどを検査する。
+PMDはmainに`ruleset.xml`を、testに`ruleset.xml`と`test-ruleset.xml`の両方を適用し、Lombokの`@Data`と`@Setter`、手書きのLoggerフィールド、`LoggerFactory`の直接参照、`getLogger`のstatic import、`@Autowired`を付けた通常メソッド、enum、型パターン、recordパターンのswitchの`default`（`NoDefaultInPatternOrEnumSwitch`）などを検査する。
 PMDの設定は[`ruleset.xml`](../../backend/config/pmd/ruleset.xml)と[`test-ruleset.xml`](../../backend/config/pmd/test-ruleset.xml)を正とする。
 カスタム規則の`message`は、ArchUnitのbecauseと同じ「理由。直し方：…。規約：…」の形にする。
 `ArchitectureRuleMessageTest`が、この形と「規約：」のパスの実在を確かめる。

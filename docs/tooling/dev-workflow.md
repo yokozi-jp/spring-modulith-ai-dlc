@@ -132,7 +132,7 @@ task agent-push && AGENT_GIT_WAIT_SECONDS=1500 task agent-wait
 そのままやり直しても次の`task test`は別のslotを取るが、片付けるまでslotを1つ使い続けるので、[compose-testのslot](test-slots.md#中断した実行が残した-slot)の手順で片付ける。
 
 Lefthookの出力は`lefthook.yml`の`output`で絞ってある（[Lintとテストのリファレンス](lint-and-test.md)）。
-`LEFTHOOK_OUTPUT=summary,failure`でさらに絞ると、成功の扱いで出る`adr-check`の注意喚起が消えるので、付けない。
+`LEFTHOOK_OUTPUT=summary,failure`でさらに絞ると、成功の扱いで出る`adr-check`と`test-weakening`の注意喚起が消えるので、付けない。
 
 ## APIを変更するとき
 
@@ -330,8 +330,8 @@ task release-check
 task otel-collector-check
 ```
 
-このタスクは、バックエンドのログに加えて Faro の fixture もフロントエンドの pipeline（`logs/frontend` と `traces/frontend`）に流して出口を検査する。
-例外、View、LCP、INP、CLS の session 相関と、URL token、UUID の session ID、利用者情報、trace の URL 属性が残らないことを確かめる。
+このタスクは、バックエンドのログに加えて Faro の fixture もフロントエンドの pipeline（`logs/frontend`）に流して出口を検査する。
+例外、View、LCP、INP、CLS の session 相関と、URL token、UUID の session ID、利用者情報が残らないことを確かめる。
 最初に、Collector の route allowlist が `routeTree.gen.ts` の `fullPaths` と一致することを確かめる。
 ログ属性の allowlist は[可観測性データの規約](../observability/conventions.md)を参照する。
 

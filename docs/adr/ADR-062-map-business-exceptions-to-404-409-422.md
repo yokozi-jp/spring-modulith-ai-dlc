@@ -79,6 +79,13 @@ ADR は Proposed のままであるため、新しい ADR を起こさず、こ�
 - ArchUnit に 2 つの規則を足す。
   `noSuchElementExceptionIsNotThrown` は、`NoSuchElementException` の生成と引数なしの `Optional.orElseThrow()` を禁じる。
   `sharedModuleDoesNotDependOnHttp` は、`shared` から Spring Web、Spring の HTTP、Servlet の型への依存を禁じる。
+- 例外と値を、失敗の前に書いた行とイベントの出版を commit してよいかで使い分ける。
+  要求を断り、トランザクションで書いたものを取り消す失敗は、3 つの型の例外で投げる。
+  業務の状態に記録して正常に終える結果（決済の拒否、契約の不備、請求しない、処理済み）は、Result の値で返す。
+  場合が閉じていれば、Result を sealed interface と入れ子の record で表し、`@Nullable` の component で場合を表さない。
+  値を返すと Spring は commit し、Spring Modulith は出版を `COMPLETED` にする。
+  値の失敗を `setRollbackOnly()` で rollback させない。
+  ArchUnit は、`*Result` を record か、許可された型がすべて record の sealed interface に限り、`*Result` の record の component に `@Nullable` を付けることを禁じる。
 - `shared.failure` を、`dependenciesPointInward` と `sharedModuleIsUsedOnlyByPersistenceAdapters` の除外に足す。
   これは #130 が `shared.concurrency` のために足した 2 か所と同じ扱いである。
   Domain Service が 422 を投げるため、`domainServicesDependOnlyOnDomainAndJava` の許す型にも足す。
@@ -177,6 +184,32 @@ ADR は Proposed のままであるため、新しい ADR を起こさず、こ�
 - **Cons**：`exception.type`、`exception.message`、`exception.stacktrace` がすべて消え、どのテーブルの競合かも分からなくなる。
   SLF4J には連鎖の一部だけを落とす API がなく、残すには例外を作り直すか整形することになり、規約の「例外の詳細を独自に整形しない」に反する。
   ログ以外で例外を記録する経路には SQL が残る。
+
+### 選択肢9: 検査例外を業務上の失敗にする
+
+- **Description**：呼び出し側に処理を強いるため、業務上の失敗を検査例外にする。
+- **Pros**：呼び出し側が失敗の処理を書き忘れない。
+- **Cons**：Spring は既定で検査例外を rollback せず、`@EnableTransactionManagement(rollbackOn = RollbackOn.ALL_EXCEPTIONS)` か各 `@Transactional` の `rollbackFor` が要る。
+  ラムダと `Stream` の中で投げられず、`Optional.orElseThrow` の形も崩れる。
+  呼び出し側が失敗を処理せず `ApiExceptionHandler` が受けるため、強いる相手がいない。
+
+### 選択肢10: 自作の Result で業務上の失敗を返し、domain で throw しない
+
+- **Description**：失敗を自作の `Result` で返し、`domain` で `throw` しない。
+- **Pros**：失敗が型に出て、呼び出し側が見分けて処理を変えられる。
+- **Cons**：Java の標準ライブラリに `Result` はなく、Spring もそれを扱わない。
+  値を返すと Spring は commit し、イベント出版は完了になるため、rollback と出版の取り消しを手で書くことになる。
+  トランザクションの rollback、出版の `FAILED`、`ApiExceptionHandler` の変換は、すべて例外を合図にする。
+  業務の状態に記録して正常に終える結果だけは値で返し、sealed interface と record で表す。
+
+### 選択肢11: ErrorResponse を例外に実装させて type を変える
+
+- **Description**：例外に Spring の `ErrorResponse` を実装させ、理由ごとに `type` と `title` を変える。
+- **Pros**：理由ごとの `type` を例外の型から決められる。
+- **Cons**：`ErrorResponse` は `problemDetail.type.<クラスの完全名>` と `problemDetail.title.<クラスの完全名>` でクラスごとに `type` と `title` を解決する。
+  理由の数だけクラスを作ることになり、集約ごとの型を作らない決定とぶつかる。
+  `shared.failure` が Spring Web に依存し、選択肢5と同じ理由で `sharedModuleDoesNotDependOnHttp` に反する。
+  `type` と `title` は `ApiProblemDetails.businessProblem` が同じ `MessageSource` で作る。
 
 ## References
 

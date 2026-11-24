@@ -18,4 +18,11 @@ REDIS_SESSION_NAMESPACE	^docs/adr/ADR-(007|111)-
 TEST_REDIS_PORT	^docs/adr/ADR-(007|111)-
 BASE_REDIS	^docs/adr/ADR-(007|111)-
 RedisSessionRepository	^docs/adr/ADR-(007|111)-
-SESSION_COOKIE_SECURE	^docs/adr/ADR-(008|117)-
+untracedUrl	-
+removeTraceUrls	-
+withoutUrlAttributes	-
+frontend_traces	-
+frontend_span_events	-
+check_frontend_traces	-
+TracingInstrumentation	^docs/adr/ADR-068-
+SESSION_COOKIE_SECURE	^docs/adr/ADR-(008|119)-

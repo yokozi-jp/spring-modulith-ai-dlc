@@ -65,6 +65,7 @@ expect pre-commit tooling/betterleaks/test.sh "lint-betterleaks lint-scratch-git
 expect pre-commit tooling/lefthook-install/prepare.mjs "lefthook-install-test"
 expect pre-commit tooling/lefthook-install/test.sh "lefthook-install-test lint-scratch-git"
 expect pre-commit tooling/task-calls/test.sh "lint-scratch-git lint-taskfile"
+expect pre-commit tooling/openapi-drift/test.sh "lint-scratch-git lint-taskfile"
 expect pre-commit tooling/agent-git/agent-git.sh "agent-git-test"
 expect pre-commit tooling/agent-git/test.sh "agent-git-test lint-scratch-git"
 expect pre-commit tooling/test-slot/test-slot.sh "test-slot-test"

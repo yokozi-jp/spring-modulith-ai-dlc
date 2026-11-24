@@ -77,32 +77,6 @@ function redactStrings(value: unknown): void {
   }
 }
 
-function withoutUrlAttributes(attributes: unknown[]): unknown[] {
-  return attributes.filter((attribute) => {
-    const candidate = record(attribute);
-    return typeof candidate?.key !== "string" || !candidate.key.startsWith("url.");
-  });
-}
-
-function removeTraceUrls(value: unknown): void {
-  if (typeof value !== "object" || value === null) {
-    return;
-  }
-  if (Array.isArray(value)) {
-    for (const child of value) {
-      removeTraceUrls(child);
-    }
-    return;
-  }
-  for (const [key, child] of Object.entries(value)) {
-    if (key === "attributes" && Array.isArray(child)) {
-      Reflect.set(value, key, withoutUrlAttributes(child));
-    } else {
-      removeTraceUrls(child);
-    }
-  }
-}
-
 function normalizedMeta(
   metaValue: unknown,
   trustedRoutes: ReadonlySet<string>,
@@ -183,9 +157,6 @@ function normalizedPayload(
     return normalizeViewEvent(payload, trustedRoutes);
   }
   redactStrings(payload);
-  if (type === "trace") {
-    removeTraceUrls(payload);
-  }
   return payload;
 }
 

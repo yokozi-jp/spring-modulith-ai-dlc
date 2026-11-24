@@ -1,11 +1,11 @@
 ---
 type: ADR
-title: 'ADR-117: セッションの Cookie を __Host-APP_SESSION にし、SameSite=Lax を保つ'
+title: 'ADR-119: セッションの Cookie を __Host-APP_SESSION にし、SameSite=Lax を保つ'
 description: セッションの Cookie の名前を APP_SESSION から __Host-APP_SESSION（Secure、Path=/、Domain なし、HttpOnly、SameSite=Lax）に変え、SameSite=Strict にしない理由と、SESSION_COOKIE_SECURE を廃止する扱い。
 tags: [adr, security, session, cookie, backend]
 ---
 
-# ADR-117: セッションの Cookie を __Host-APP_SESSION にし、SameSite=Lax を保つ
+# ADR-119: セッションの Cookie を __Host-APP_SESSION にし、SameSite=Lax を保つ
 
 ## Status
 

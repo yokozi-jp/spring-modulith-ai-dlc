@@ -1,5 +1,6 @@
 package com.example.demo.shared.infrastructure.persistence;
 
+import com.example.demo.testkit.TracerStubs;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;

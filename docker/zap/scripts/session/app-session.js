@@ -1,4 +1,4 @@
-// ZAP の session management script（ADR-117）。
+// ZAP の session management script（ADR-119）。
 // method: autodetect と headers は、ZAP が利用者として送る要求に Secure の __Host-APP_SESSION を付けない。
 // httpsender/carry-host-cookies.js が保存した値を、要求を送る直前に Cookie へ足す。
 var ScriptVars = Java.type("org.zaproxy.zap.extension.script.ScriptVars");

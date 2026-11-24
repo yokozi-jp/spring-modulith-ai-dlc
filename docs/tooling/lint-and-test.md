@@ -50,12 +50,13 @@ compose-testを使うTaskは、実行ごとにslotを取り、slotのComposeプ�
 - **`task be-openapi-lint`**：`OpenApiContractTest`だけを実行してOpenAPI 3.1契約を`openapi/openapi.yaml`へ生成し、Spectralで検査する。
 - **`task be-openapi-check`**：直前の`be-test`が書き出した契約をSpectralで検査し、コミット済みの`openapi/openapi.yaml`と差分があれば失敗する。
   テストを実行しないため、`be-test`の後に実行する。
-  単体で実行すると、コミット済みの契約を自分自身と比べるので、差分を検出できない。
+  `be-test`の開始時に作る`backend/build/be-test.stamp`より契約が新しくなければ失敗するので、`be-test`が契約を書き出さなかった実行や、`be-test`なしの実行は通らない。
 - **`task be-verify-migrations`**：現在タグが最後のchangelogに宣言されていることと、使い捨てDBでのchangesetの適用、rollback、再適用、現在タグの存在を検証する。
 - **`task be-test`**：確定済みchangesetを適用したテスト用のDBで、テストとcoverage検証を実行する。
   JaCoCoの下限は、全体のbranch 88%とline 95%、クラスごとのbranch 65%とline 70%で、下回ると失敗する（[ADR-076](../adr/ADR-076-run-mutation-tests-per-change-and-tighten-coverage-gates.md)）。
   `-PopenapiExport=true`を渡すので、`OpenApiContractTest`が`openapi/openapi.yaml`を書き出す。
   素の`./gradlew test`は契約に触れない。
+  開始時に`backend/build/be-test.stamp`を作り、`be-openapi-check`が契約の書き出しを確かめる印にする。
 - **`task be-test-dev`**：作りかけのchangesetを含めて適用したテスト用のDBで、テストを実行する。
   カバレッジは検証しない。
 - **`task be-mutation-test`**：PITを実行する。
@@ -156,12 +157,13 @@ Vitestは`globals`を渡さず、Testing Libraryの自動cleanupが効かない�
   このタスクは`webhook_event`のportを直接叩き、Viteのproxyを通らない。
   Viteのproxyのhop（`/csp-report`と`/collect`の転送と資格情報のheaderの削除）は、`frontend/apps/web/vite-config.test.ts`が偽の受け口で検査する。
   ブラウザがHTTPSの配信から報告を送り、Grafanaに届くまでの経路全体は手動で実測する。
-  同じfixtureのtraceは`traces/frontend`の出口を別のファイルに分け、URL属性がなく、許可したHTTP属性とresource属性だけが残り、trace ID、span ID、親span IDが保たれることを確かめる。
+  同じfixtureはtraceも持ち、faro receiverがそれを受け付けることと、出口のどのファイルにもtrace IDが現れないことを確かめる。
+  faro receiverを使うtraceのpipelineがないので、spanは捨てられる（[ADR-068](../adr/ADR-068-collect-browser-telemetry-with-faro-via-collector.md)）。
 - **`task lint-md`**：`.markdownlint-cli2.yaml`の除外設定に従いMarkdownを検査する。
 - **`task lint-md-fix`**：markdownlint-cli2で安全に修正できるMarkdownの問題を修正する。
 - **`task ruleset-diff`**：GitHub上のrulesetと`.github/rulesets/main.json`の差分を表示する。認証済みの`gh`が要るため、CIでは動かさず、管理者が手元で使う。
 - **`task ruleset-apply`**：`main.json`をGitHub上のrulesetへ反映する。`CONFIRM_RULESET=yes`が要る。手順は[mainブランチの保護設定](../repository/branch-protection.md)にある。
-- **`task okf-check`**：OKF適合、内部リンク、孤立文書、変更した文書の責務の見直し合図（250行超の警告）、steering境界、ADRの整合（`adr-lint`）、削除した識別子が残っていないこと（`removed-names-check`）、rulesetの必須チェックとdocsの一覧とworkflowの名前の一致（`ruleset-check`）、iweのMCPサーバーの起動コマンドが選ぶ`iwe-mcp.sh`（`iwe-mcp-check`）、Taskfile文書同期候補を検査する。
+- **`task okf-check`**：OKF適合、内部リンク、孤立文書、変更した文書の責務の見直し合図（250行超の警告）、steering境界、ADRの整合（`adr-lint`）、削除した識別子が残っていないこと（`removed-names-check`）、rulesetの必須チェックとdocsの一覧とworkflowの名前の一致（`ruleset-check`）、iweのMCPサーバーの起動コマンドが選ぶ`iwe-mcp.sh`（`iwe-mcp-check`）、iweのMCPサーバーの全ツールが`disabledTools`か残す一覧に入っていること（`iwe-tools-check`）、Taskfile文書同期候補を検査する。
   `removed-names-check`は内部タスクで、`tooling/removed-names/names.txt`に書いた削除した識別子が、`docs/`、`.agents/`、`backend/src/`（生成コードを除く）に残っていないことを確かめる。
   `be-lint`と`skills-check`からも動く。`backend-ci`のlintジョブは`be-lint`を呼ばないので、`check.sh`を直接実行する。
   `check.sh`の自己検査（`tooling/removed-names/test.sh`）は`okf-check`だけが実行する。
@@ -210,6 +212,7 @@ Vitestは`globals`を渡さず、Testing Libraryの自動cleanupが効かない�
   検証スキルの手順の正文は[形式検証スキルの使い方](../agents/formal-verification.md)である。
 - **`task lint-taskfile`**：Task本体でTaskfileのYAML構文とスキーマ構造を検証する。
   `tooling/taskfile-cleanup/`のfixtureで、後片付けの定型が本体の終了コードを優先し、前段が失敗しても後段の後片付けを走らせることを検査する。
+  `tooling/openapi-drift/test.sh`は、契約の書き出し漏れと追跡されていないpathによる`be-openapi-check`の素通りを、一時のgitリポジトリで検査する。ケースがこの文書の正である。
   `tooling/task-calls/task-calls.sh`は、フックとワークフローが呼ぶタスク名を検査する。
   対象は、`lefthook.yml`と`.github/workflows/`のYAMLにある`task <名前>`である。
   名前が`task --list-all`のタスクにも別名にも無いと失敗する。
@@ -224,6 +227,11 @@ Vitestは`globals`を渡さず、Testing Libraryの自動cleanupが効かない�
 - **`task adr-check`**：判断が絡む変更にADRが伴うかを確認する。
   `frontend/`の変更のうち、テストファイル（`*.test.*`、`*.spec.*`）、`frontend/apps/*/e2e/`、`frontend/lint/fixtures/`、`frontend/apps/*/src/testing/`は対象から外す。
   警告は止めず、`ADR_STRICT=1`で失敗にし、`ADR_ACK=1`で抑制する。
+- **`task test-weakening`**：`origin/main`とのmerge baseから`HEAD`までで、テストファイルの削除とテストケースの減少を警告する（[人が必ず読むPull Request](../pull-request/review-request-and-merge.md#人が必ず読むpull-request)の「テストを弱める」の目印にする）。
+  対象のファイルと数え方は`tooling/test-weakening/check.sh`の冒頭が正である。数え方は概算で、renameは削除に数えず、テストでない名前へのrenameは削除に数える。
+  警告は標準エラーに出し、終了コードは常に0にする。`TESTS_ACK=1`で抑制し、比較の起点が無ければ理由を出して通す。
+  `.skip`、`.only`、理由のない`@Disabled`、coverageの低下は別の検査が止めるので、ここでは扱わない。
+  自己検査は`tooling/test-weakening/test.sh`で、`task test-weakening-test`で実行する。`task ci-gate-check`もCIで実行する。
 
 Knipとjscpdの採用理由は[ADR-035](../adr/ADR-035-adopt-jscpd-and-knip-quality-gates.md)を、jscpdがimport文を比べず、閾値を2.0%にする理由は[ADR-106](../adr/ADR-106-ignore-import-statements-in-jscpd.md)を参照する。
 DASTの検出ではタスクを失敗させず、起動、ログイン、CSRFの前提確認の失敗だけで失敗させる（[ADR-056](../adr/ADR-056-run-authenticated-dast-with-zap-in-ci.md)）。
@@ -241,9 +249,9 @@ betterleaksの誤検知の除外の書き方は[betterleaksの誤検知の除外
 - **pre-commit（Dockerfileの変更）**：`lint-docker`相当と`lint-docker-check`相当を実行する。
 - **pre-commit（Composeファイルの変更）**：`lint-compose`相当を実行する。
 - **pre-commit（Markdownの変更）**：変更ファイルへ`lint-md`相当を実行する。
-- **pre-commit（docs、steering、Taskfile、README、`tooling/adr-lint/`、`tooling/removed-names/`、`.kiro/settings/mcp.json`、`tooling/iwe-mcp/`、`.github/rulesets/`、`.github/workflows/`、`tooling/ruleset-check/`、`tooling/ruleset-sync/`の変更）**：`okf-check`を実行する。
+- **pre-commit（docs、steering、Taskfile、README、`tooling/adr-lint/`、`tooling/removed-names/`、`.kiro/settings/mcp.json`、`tooling/iwe-mcp/`、`tooling/iwe-tools/`、`.github/rulesets/`、`.github/workflows/`、`tooling/ruleset-check/`、`tooling/ruleset-sync/`の変更）**：`okf-check`を実行する。
 - **pre-commit（`.agents/skills/`、`.kiro/`、`skills-lock.json`、`tooling/skills-check/`の変更）**：`skills-check`を実行する。
-- **pre-commit（Taskfile、`lefthook.yml`、GitHub Actionsワークフロー、`tooling/taskfile-cleanup/`、`tooling/task-calls/`の変更）**：`lint-taskfile`を実行する。
+- **pre-commit（Taskfile、`lefthook.yml`、GitHub Actionsワークフロー、`tooling/taskfile-cleanup/`、`tooling/task-calls/`、`tooling/openapi-drift/`の変更）**：`lint-taskfile`を実行する。
 - **pre-commit（`tooling/agent-git/`の変更）**：`agent-git-test`を実行する。
 - **pre-commit（`tooling/test-slot/`、`docker/keycloak/realm.json`、`docker/compose-test.yml`の変更）**：`test-slot-test`を実行する。
 - **pre-commit（`lefthook.yml`か`tooling/lefthook-glob/`の変更）**：`lint-lefthook`を実行する。
@@ -251,7 +259,8 @@ betterleaksの誤検知の除外の書き方は[betterleaksの誤検知の除外
 - **pre-commit（`package.json`、`lefthook.yml`、`tooling/lefthook-install/`の変更）**：`lefthook-install-test`を実行する。
 - **pre-commit（`tooling/formal-verify/`の変更）**：`formal-verify-test`を実行する。
 - **pre-commit（`tooling/*/test.sh`、`.kiro/hooks/*.test.sh`、`tooling/scratch-git/`の変更）**：`lint-scratch-git`を実行する。
-- **pre-push（すべて）**：`adr-check`と`scan-secrets-all`を実行する。
+- **pre-commit（`tooling/test-weakening/`の変更）**：`test-weakening-test`を実行する。
+- **pre-push（すべて）**：`adr-check`、`test-weakening`、`scan-secrets-all`を実行する。
 - **pre-push（バックエンドのJavaまたはGradle変更）**：`be-lint`相当と`test`を実行する。
 - **pre-push（フロントエンドの変更）**：`fe-test-build`を、Vitestのdot reporterと、報告を出さない`none`のcoverage reporterで実行する。
   下限の検査は報告の形式によらず働く。

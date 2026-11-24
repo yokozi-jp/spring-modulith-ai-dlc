@@ -25,7 +25,7 @@ env:
           pollUnits: requests
           loggedInRegex: '"status"\s*:\s*404'
           loggedOutRegex: '"status"\s*:\s*401'
-      # ZAP は Secure の __Host-APP_SESSION を HTTP の要求に付けないため、script で付ける（ADR-117）。
+      # ZAP は Secure の __Host-APP_SESSION を HTTP の要求に付けないため、script で付ける（ADR-119）。
       sessionManagement:
         method: script
         parameters:

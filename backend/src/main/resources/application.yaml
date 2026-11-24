@@ -287,7 +287,7 @@ server:
       # URL rewriting を無効化し、セッション ID は Cookie だけで送受信する。
       tracking-modes: cookie
       cookie:
-        # __Host- は Secure、Path=/、Domain なしを要求し、別の host からの書き込みを塞ぐ（ADR-117）。
+        # __Host- は Secure、Path=/、Domain なしを要求し、別の host からの書き込みを塞ぐ（ADR-119）。
         name: __Host-APP_SESSION
         # JavaScript から Cookie を読めなくする（XSS によるセッション窃取対策）
         http-only: true

@@ -11,6 +11,8 @@ tags: [adr, backend, api, openapi]
 
 Accepted
 
+Amended by [ADR-117](ADR-117-add-trace-id-and-omit-instance-in-problem-details.md)：span があるすべての Problem Details に `traceId` を付け、`instance` を設定しないこと。
+
 ## Date
 
 2026-09-14

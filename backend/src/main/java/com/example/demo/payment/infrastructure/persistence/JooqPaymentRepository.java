@@ -79,7 +79,9 @@ class JooqPaymentRepository implements PaymentRepository {
         .from(T_PAYMENT);
   }
 
-  /** 列の値から決済記録を復元する。識別子の空文字は、採番されなかったことを表す。 */
+  /**
+   * 列の値から決済記録を復元する。契約の不備（`FAILED`）の行の識別子は空文字で、復元では使わない。受付と拒否の行の識別子が空なら `GatewayPaymentCode` が拒む。
+   */
   private static Payment restore(
       final PaymentId id,
       final OrderId orderId,
@@ -88,10 +90,13 @@ class JooqPaymentRepository implements PaymentRepository {
       final String gatewayPaymentCode,
       final Instant recordedAt,
       final long lockNo) {
-    final @Nullable GatewayPaymentCode code =
-        gatewayPaymentCode.isEmpty() ? null : new GatewayPaymentCode(gatewayPaymentCode);
-    return Payment.restore(
-        id, orderId, amount, new ChargeOutcome(status, code), recordedAt, lockNo);
+    final ChargeOutcome outcome =
+        switch (status) {
+          case PAID -> ChargeOutcome.paid(new GatewayPaymentCode(gatewayPaymentCode));
+          case DECLINED -> ChargeOutcome.declined(new GatewayPaymentCode(gatewayPaymentCode));
+          case FAILED -> ChargeOutcome.failed();
+        };
+    return Payment.restore(id, orderId, amount, outcome, recordedAt, lockNo);
   }
 
   /** 識別子がなければ空文字を書く（docs/database/postgresql-data-types.md の「文字列の既定値」）。 */

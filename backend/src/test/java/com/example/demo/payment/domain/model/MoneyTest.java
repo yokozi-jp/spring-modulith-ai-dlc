@@ -3,7 +3,6 @@ package com.example.demo.payment.domain.model;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import com.example.demo.shared.failure.BusinessRuleViolationException;
 import java.math.BigDecimal;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -18,10 +17,10 @@ class MoneyTest {
   }
 
   @Test
-  @DisplayName("負の金額は、金額を含む BusinessRuleViolationException になる")
+  @DisplayName("負の金額は、金額を含む IllegalArgumentException になる")
   void negativeIsRejected() {
     assertThatThrownBy(() -> new Money(new BigDecimal("-1")))
-        .isInstanceOf(BusinessRuleViolationException.class)
+        .isInstanceOf(IllegalArgumentException.class)
         .hasMessage("amount must not be negative: amount=-1");
   }
 }

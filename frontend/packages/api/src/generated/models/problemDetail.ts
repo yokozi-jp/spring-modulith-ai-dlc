@@ -9,12 +9,15 @@
 export interface ProblemDetail {
   /** この失敗に固有の、人が読むための説明 */
   detail?: string;
-  /** 失敗発生を識別する URI */
-  instance?: string;
   /** 実際の HTTP status code */
   status: number;
   /** Problem type の短い説明 */
   title: string;
+  /**
+     * 問い合わせとログを結ぶ W3C Trace Context の trace ID。要求の span がないときは付かない
+     * @pattern ^[0-9a-f]{32}$
+     */
+  traceId?: string;
   /** Problem type の識別 URI。about:blank かパスを全部書いた相対 URI */
   type: string;
 }

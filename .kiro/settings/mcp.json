@@ -6,7 +6,17 @@
         "-c",
         "for i in $(seq 0 \"${IWE_MCP_WAIT_SECONDS:-60}\"); do [ \"$i\" = 0 ] || sleep 1; for f in \"$(git rev-parse --show-toplevel 2>/dev/null || echo /nonexistent)\"/docs/local-env-setup/iwe-mcp.sh */.git/../docs/local-env-setup/iwe-mcp.sh; do [ -x \"$f\" ] && exec \"$f\"; done; done; echo 'kiro: docs/local-env-setup/iwe-mcp.sh が見つかりません' >&2; exit 1"
       ],
-      "disabled": false
+      "disabled": false,
+      "disabledTools": [
+        "iwe_normalize",
+        "iwe_rename",
+        "iwe_update",
+        "iwe_extract",
+        "iwe_inline",
+        "iwe_attach",
+        "iwe_delete",
+        "iwe_query"
+      ]
     }
   }
 }

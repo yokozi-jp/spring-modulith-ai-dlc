@@ -38,7 +38,7 @@ backend は SPA を配信しない。
 DAST の環境は空の DB のままだったため、ログインが失敗し、前提確認が 401 で止まった。
 そこで、この ADR の Decision と Consequences を、DAST の環境でもマイグレーションを実行する形に書き直した。
 
-セッションの Cookie を `__Host-APP_SESSION`（`Secure`）にしたため（[ADR-117](ADR-117-harden-session-cookie-with-host-prefix.md)）、自動検出のセッション管理ではログインも利用者の要求も Cookie を失った。
+セッションの Cookie を `__Host-APP_SESSION`（`Secure`）にしたため（[ADR-119](ADR-119-harden-session-cookie-with-host-prefix.md)）、自動検出のセッション管理ではログインも利用者の要求も Cookie を失った。
 そこで、セッション管理の Decision を、Firefox の pref と script で Cookie を付ける形に書き直した。
 
 開発者は dev 環境（5173、8080、18080）を動かしたまま検査したい。
@@ -63,7 +63,7 @@ redirect_uri が `http://localhost:4173` から組み立てられるので、`do
 認証は browser-based authentication（`firefox-headless`）で、ログインは `http://localhost:4173/oauth2/authorization/web` から始め、`test-admin` を使う。
 ログイン状態は `GET /api/missing` の poll で判定する（未認証なら 401、認証済みなら 404）。
 ZAP の Firefox に `network.proxy.testing_localhost_is_secure_when_hijacked` を設定し、`Secure` の Cookie を `http://localhost` でも保存させる。
-セッション管理は script にし、httpsender script が保存した `__Host-APP_SESSION` の値を ZAP の要求に付ける（ADR-117）。
+セッション管理は script にし、httpsender script が保存した `__Host-APP_SESSION` の値を ZAP の要求に付ける（ADR-119）。
 `/logout` はスキャン範囲から外す。
 
 `__Host-XSRF-TOKEN` Cookie の値を `X-XSRF-TOKEN` Header に写す httpsender script（`carry-host-cookies.js`）を作り、リポジトリで管理する。

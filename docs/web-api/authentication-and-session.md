@@ -104,7 +104,7 @@ Cookieは、セッションIDとADR-007のCSRFトークン以外の用途に使�
 ### セッションCookie
 
 セッションCookieは`__Host-APP_SESSION`にし、`HttpOnly`を付ける。
-`Strict`にしないのは、別siteのIdPからのcallbackでセッションに保存した認可リクエストを失うためである（[ADR-117](../adr/ADR-117-harden-session-cookie-with-host-prefix.md)）。
+`Strict`にしないのは、別siteのIdPからのcallbackでセッションに保存した認可リクエストを失うためである（[ADR-119](../adr/ADR-119-harden-session-cookie-with-host-prefix.md)）。
 設定は[application.yaml](../../backend/src/main/resources/application.yaml)にあり、そのほかの扱いは次のとおりにする。
 
 - セッションIDは、フレームワークが暗号論的に安全な乱数で生成した、十分に長く推測困難な値だけにする。

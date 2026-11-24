@@ -166,7 +166,6 @@ slot 0 の port は次のとおりである。
 
 E2E には Collector を置かず、テストが `/collect` を `page.route` で応答する（[ADR-068](../adr/ADR-068-collect-browser-telemetry-with-faro-via-collector.md)）。
 `frontend/apps/web/e2e/logout.spec.ts` は、`/collect` が 503 を返してもログインとログアウトのフォームを送信できることを確かめる。
-`frontend/apps/web/e2e/tracing.spec.ts` は、この stub のもとで要求の `traceparent` を観測し、同一オリジンの `/api/**` にだけ sampled flag が 1 の値が付き、`/api/**` 以外のパス、`/collect`、IdP には付かないことを確かめる。
 
 起動済みの環境に対して Playwright だけを実行するときは、`frontend/` で `vp run --filter @frontend/web e2e` を実行する。
 build、コンテナの起動、後片付けは行わない。
@@ -213,9 +212,9 @@ build、コンテナの起動、後片付けは行わない。
 - Safari と WebKit では実行しない。
   CSRF の Cookie は `Secure` の `__Host-` の名前で（[ADR-066](../adr/ADR-066-harden-csrf-cookie-with-host-prefix.md)）、Safari が `http://localhost` でこの Cookie を保存するかは未確認である（[#158](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/158)）。
   保存しなければ更新の要求に token を付けられないため、WebKit では CSRF で守る更新、ログアウト、注文の流れの全体が未検証である。
-- Tempo と Loki での trace とログのつながり（ブラウザ、backend、ordering、Listener、payment）は、`task e2e` では確かめない。
+- Tempo と Loki での trace とログのつながり（backend、ordering、Listener、payment）は、`task e2e` では確かめない。
   E2E には Collector を置かない（[ADR-068](../adr/ADR-068-collect-browser-telemetry-with-faro-via-collector.md)）。
-  代わりに、`tracing.spec.ts` がブラウザの `traceparent` を、backend の `OrderConfirmedListenerTest` と `CommonColumnsListenerTraceTest` が確定の trace の Listener への引き継ぎを確かめる。
+  代わりに、backend の `OrderConfirmedListenerTest` と `CommonColumnsListenerTraceTest` が確定の trace の Listener への引き継ぎを確かめる。
 
 ## CI
 

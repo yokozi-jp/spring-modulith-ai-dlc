@@ -17,7 +17,9 @@
  * に置き、どの層からも使う（ADR-105）。リスナーでテナントを束縛する {@code TenantListenerAspect} は {@code
  * infrastructure.persistence} に置く。
  */
+@ApplicationModule(allowedDependencies = "jooq")
 @NullMarked
 package com.example.demo.shared;
 
 import org.jspecify.annotations.NullMarked;
+import org.springframework.modulith.ApplicationModule;
