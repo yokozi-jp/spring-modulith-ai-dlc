@@ -1,4 +1,4 @@
-package com.example.demo.tenancy.domain.model;
+package com.example.demo.mail.domain.model;
 
 /** 利用者へメールを送る外部システム。 */
 // 外部システムの interface であり、ラムダで実装する関数型 interface ではない。

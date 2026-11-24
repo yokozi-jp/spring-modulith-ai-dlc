@@ -1,4 +1,4 @@
-package com.example.demo.tenancy.infrastructure.client;
+package com.example.demo.mail.infrastructure.client;
 
 import java.util.function.Predicate;
 import software.amazon.awssdk.core.exception.SdkServiceException;

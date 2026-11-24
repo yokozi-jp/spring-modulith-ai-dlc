@@ -1,4 +1,4 @@
-package com.example.demo.tenancy.infrastructure.client;
+package com.example.demo.mail.infrastructure.client;
 
 import static org.assertj.core.api.Assertions.assertThat;
 

@@ -1,4 +1,4 @@
-package com.example.demo.tenancy.domain.model;
+package com.example.demo.mail.domain.model;
 
 /**
  * 送信のサービスが採番したメールの識別子。

@@ -44,7 +44,7 @@ AWS SDK for Java v2 は、同じ値をシステムプロパティ `aws.endpointU
 メールは、本番、ローカル、テストのどれも、AWS SDK for Java v2 の `SesV2Client` で SES v2 の `SendEmail` を呼ぶ同じ Client で送る。
 具体的には次のようにする。
 
-- 本番のコードは、`SendEmail` を呼ぶ Client（`tenancy` の `MailSenderClient`）だけを持つ。
+- 本番のコードは、`SendEmail` を呼ぶ Client（`mail` モジュールの `MailSenderClient`）だけを持つ。
   実装の切り替え、偽物の分岐、mode の設定を持たない。
 - Client は、宛先、件名、プレーンテキストの本文だけを受ける。
   From のアドレスと表示名、設定セットの名前は既定値のない設定値にし、未設定なら起動に失敗させる（[ADR-008](ADR-008-single-application-yaml-external-config.md)）。
@@ -100,7 +100,9 @@ AWS SDK for Java v2 は、同じ値をシステムプロパティ `aws.endpointU
 
 - 今はこの Client を呼ぶ機能がない。
   [#380](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/380)（招待）が使う予定だったが、招待は別のシステムが担当することになり、#380 は実装しない。
-  置き場所は #571 の想定どおり `tenancy` の `infrastructure.client` にし、ほかのモジュールが使うことになったら見直す。
+  #571 は `tenancy` に置く想定だったが、`tenancy` にメールを使う機能がないので、専用の機能モジュール `mail` に置く。
+  `MailSender` は `mail` の内部の型なので、ほかのモジュールはイベントで `mail` に送らせる。
+  その形は、送る機能を足す変更で決める。
 - Keycloak のメール（realm の `resetPasswordAllowed` とメールアドレスの確認）の経路は [#593](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/593) で決め、Keycloak のメールだけを受ける Mailpit を別に足す。
   アプリのメールはこの ADR の経路のままにし、アプリは Mailpit に依存しない。
 - 規約文書（[メールを送る Client](../mail/sending.md)、[本番で SES から送る設定](../mail/production-setup.md)、[メールのテスト](../mail/testing.md)、[Compose の作り方](../container/compose.md)、[E2E テストの方針と書き方](../e2e/testing-strategy.md)、[バックエンドのテストの実行基盤](../backend/testing-infrastructure.md)）は、この ADR を起こす #571 の変更で更新した。

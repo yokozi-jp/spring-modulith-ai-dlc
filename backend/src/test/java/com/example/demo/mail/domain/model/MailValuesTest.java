@@ -1,4 +1,4 @@
-package com.example.demo.tenancy.domain.model;
+package com.example.demo.mail.domain.model;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;

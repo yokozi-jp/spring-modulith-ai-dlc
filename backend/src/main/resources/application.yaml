@@ -268,7 +268,7 @@ resilience4j:
       mail-sender:
         base-config: default
         # スロットリング以外の 4xx は資格情報か SES の設定の不備で、SES の不調ではないので失敗として数えない（ADR-125）。
-        ignore-exception-predicate: com.example.demo.tenancy.infrastructure.client.IgnoredSesClientErrorPredicate
+        ignore-exception-predicate: com.example.demo.mail.infrastructure.client.IgnoredSesClientErrorPredicate
   retry:
     configs:
       # 非冪等処理を重複実行しないよう、明示しない retry は無効にする。

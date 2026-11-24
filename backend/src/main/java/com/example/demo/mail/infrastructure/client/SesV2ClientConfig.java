@@ -1,4 +1,4 @@
-package com.example.demo.tenancy.infrastructure.client;
+package com.example.demo.mail.infrastructure.client;
 
 import java.time.Duration;
 import org.springframework.beans.factory.annotation.Value;

@@ -1,11 +1,11 @@
-package com.example.demo.tenancy.infrastructure.client;
+package com.example.demo.mail.infrastructure.client;
 
-import com.example.demo.tenancy.domain.model.MailBody;
-import com.example.demo.tenancy.domain.model.MailMessageId;
-import com.example.demo.tenancy.domain.model.MailOutcome;
-import com.example.demo.tenancy.domain.model.MailRecipient;
-import com.example.demo.tenancy.domain.model.MailSender;
-import com.example.demo.tenancy.domain.model.MailSubject;
+import com.example.demo.mail.domain.model.MailBody;
+import com.example.demo.mail.domain.model.MailMessageId;
+import com.example.demo.mail.domain.model.MailOutcome;
+import com.example.demo.mail.domain.model.MailRecipient;
+import com.example.demo.mail.domain.model.MailSender;
+import com.example.demo.mail.domain.model.MailSubject;
 import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
 import io.github.resilience4j.retry.annotation.Retry;
 import java.nio.charset.StandardCharsets;

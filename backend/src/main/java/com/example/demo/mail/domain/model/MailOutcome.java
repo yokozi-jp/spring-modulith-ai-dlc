@@ -1,4 +1,4 @@
-package com.example.demo.tenancy.domain.model;
+package com.example.demo.mail.domain.model;
 
 /**
  * メールの送信の、業務の状態に記録する結果。

@@ -1,13 +1,13 @@
-package com.example.demo.tenancy.infrastructure.client;
+package com.example.demo.mail.infrastructure.client;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import com.example.demo.tenancy.domain.model.MailBody;
-import com.example.demo.tenancy.domain.model.MailOutcome;
-import com.example.demo.tenancy.domain.model.MailRecipient;
-import com.example.demo.tenancy.domain.model.MailSender;
-import com.example.demo.tenancy.domain.model.MailSubject;
+import com.example.demo.mail.domain.model.MailBody;
+import com.example.demo.mail.domain.model.MailOutcome;
+import com.example.demo.mail.domain.model.MailRecipient;
+import com.example.demo.mail.domain.model.MailSender;
+import com.example.demo.mail.domain.model.MailSubject;
 import com.example.demo.testkit.SharedTestConfiguration;
 import com.github.tomakehurst.wiremock.client.ResponseDefinitionBuilder;
 import com.github.tomakehurst.wiremock.client.WireMock;

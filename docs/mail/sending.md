@@ -1,13 +1,13 @@
 ---
 type: Convention
 title: メールを送る Client
-description: メールを送る Client（tenancy の MailSender と MailSenderClient）の呼び方、結果と失敗の扱い、重複の防ぎ方、設定、ログの規則を定める規約。メールを送る機能を Listener と CommandHandler で作るとき、送信の失敗の扱いを決めるとき、メールの設定を足すときに読む。
+description: メールを送る Client（mail モジュールの MailSender と MailSenderClient）の呼び方、結果と失敗の扱い、重複の防ぎ方、設定、ログの規則を定める規約。メールを送る機能を Listener と CommandHandler で作るとき、送信の失敗の扱いを決めるとき、メールの設定を足すときに読む。
 tags: [convention, mail, backend, ses, external-system]
 ---
 
 # メールを送る Client
 
-メールは `tenancy` の `MailSender` で送り、実装の `MailSenderClient` が SES v2 の `SendEmail` を呼ぶ。
+メールは `mail` モジュールの `MailSender` で送り、実装の `MailSenderClient` が SES v2 の `SendEmail` を呼ぶ。
 同じ要求で回復しない拒否は結果の `Rejected` で返り、呼び出し元が業務の状態に記録する。
 一時障害、資格情報と権限の不備、運用者が直せる SES の不備は例外で返るので、捕まえずにイベント出版を `FAILED` に残す。
 送り方の決定の理由は [ADR-125](../adr/ADR-125-send-mail-with-ses-v2-api-and-fake-it-with-wiremock.md) に示す。
@@ -21,8 +21,9 @@ tags: [convention, mail, backend, ses, external-system]
 - 件名は改行を含められない。
   空白だけの宛先、件名、本文は `IllegalArgumentException` になる。
 - 宛先のアドレスはイベントに載せず、Listener が DB から読む（[メールアドレスの扱い](email-address.md#イベントとログ)）。
-- 今は `MailSender` を呼ぶ機能がない。
-  `tenancy` の外のモジュールが送ることになったら、置き場所を見直す。
+- `MailSender` は `mail` モジュールの `domain.model` にあるので、ほかのモジュールからは呼べない（[モジュール間の連携](../backend/architecture.md#モジュール間の連携)）。
+  今は `MailSender` を呼ぶ機能がない。
+  送る機能を足すときは、送る契機のイベントを `mail` の Listener で受ける形を、その機能の変更で決める。
 
 ## 結果と失敗の扱い
 
