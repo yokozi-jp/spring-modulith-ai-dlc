@@ -99,7 +99,7 @@ Repository と seed の INSERT がテナントの列を書かずに済み、書�
 
 RLS の外に置く表は、`modulith` と `tenancy` のスキーマの表だけにする。
 
-- `modulith` のスキーマの表（イベントの出版、その archive、ShedLock）は、Spring Modulith が決まった列だけを INSERT し、Staleness Monitor と再投入（[ADR-079](ADR-079-resubmit-failed-event-publications-periodically-with-shedlock.md)）が全テナントの行を扱う。
+- `modulith` のスキーマの表（イベントの出版、その archive、ShedLock）は、Spring Modulith が決まった列だけを INSERT し、再投入のジョブ（古い出版を `FAILED` に戻す処理を含む、[ADR-079](ADR-079-resubmit-failed-event-publications-periodically-with-shedlock.md)）が全テナントの行を扱う。
   テナントは、イベントの本文が運ぶ（ADR-105）。
 - `tenancy` のスキーマの表は、テナントが決まる前に引く。
   触れるのは `tenancy` のモジュールのロールだけである（ADR-094、ADR-101）。

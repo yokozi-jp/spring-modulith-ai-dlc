@@ -43,7 +43,7 @@ Spring Modulith の JDBC の V2 のスキーマは、状態、試行の回数（
 何度まで自動で試してよいかもリスナーごとに違いうるが、main の 2 つの方針（`default` と `payment`）はどちらも 5 回である。
 一律の待ち時間では、長い障害の間に短い間隔で再投入を繰り返すか、短い障害の回復を待たせすぎる。
 
-Spring Modulith の Staleness Monitor（`EventPublicationRegistry.markStalePublicationsFailed`）は落ちたまま残った出版を `FAILED` に戻せる。
+Spring Modulith の `EventPublicationRegistry.markStalePublicationsFailed`（組み込みの Staleness Monitor が定期に呼ぶ）は、落ちたまま残った出版を `FAILED` に戻せる。
 2.2.0 は、`PUBLISHED`、`PROCESSING`、`RESUBMITTED` のどれも、最後の出版か再投入の時刻（`last_resubmission_date`、なければ `publication_date`）から測る。
 その状態に入ってからの時間では測らないため、`PROCESSING` の閾値が 1 回の配信（executor の空きを待つ時間とリスナーの処理）の最長より短いと、処理中の出版を `FAILED` に戻す。
 
@@ -77,7 +77,7 @@ Proposed の間に回数の上限を自前の `AbandonPolicy` から `abandon-af
 Proposed の間に、上限を超えて `FAILED` に残った出版の知らせ方を、ロックを取った回ごとの ERROR から、`state=over-limit` の Gauge の警報と、件数が 0 から増えたときだけの ERROR へ書き直した。
 回ごとの ERROR は、運用者が扱うまで `interval`（本番 1 分）ごとに同じ通知を出し続け、警報が埋もれるためである。
 
-Proposed の間に、落ちたまま残った出版を `FAILED` に戻す処理を、組み込みの Staleness Monitor から、再投入のジョブがロックの中で呼ぶ形へ書き直した（[#556](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/556)）。
+Proposed の間に、古い出版を `FAILED` に戻す処理を、組み込みの Staleness Monitor から、再投入のジョブがロックの中で呼ぶ形へ書き直した（[#556](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/556)）。
 組み込みの Staleness Monitor は全インスタンスがロックの外で動かし、古い出版を読んだ後に状態を確かめずに `markFailed` を呼ぶ。
 そのため、その間に別のインスタンスが再投入した出版を処理中のまま `FAILED` に戻し、同じ出版のリスナーを同時に 2 本動かしうる（`ResubmissionOptionsLearningTest` の `stalenessMarksPublicationResubmittedAfterRead`、形式検証の当時の既知の発見）。
 
@@ -99,6 +99,7 @@ Proposed の間に、落ちたまま残った出版を `FAILED` に戻す処理�
   ロックを持つ下限は間隔の半分にし、N 台が動いてもクラスタ全体の実行が間隔あたりおよそ 1 回から 2 回に収まるようにする。
   下限を間隔と同じにしないのは、1 台のときに、DB の時刻とインスタンスの時刻の測り方の差で自分の次の回を省きうるためである。
 - 定期の 1 回の実行は、開始から `lock-at-most-for / 2` を過ぎたら、以降の候補を選ばずに次の回へ回す。
+  開始から測るため、ロックの中で先に動く古い出版を `FAILED` に戻す処理の時間も予算に入る。
   予算は `lock-at-most-for` から導き、設定値を増やさない。
   古い出版から処理するため、残りは次の回で先に処理され、飢えない。
   ShedLock の `KeepAliveLockProvider` は採らない。
@@ -164,7 +165,7 @@ Proposed の間に、落ちたまま残った出版を `FAILED` に戻す処理�
   不正な値は何もせずに起動する状態を作らず、終了コード 1 にする。
   定期のジョブと同じロックを、`lock-at-most-for` を上限に待って取り、待ち時間を見ずに対象の `FAILED` の出版を `max-per-run` 件まで再投入する。
   ロックの中では、定期のジョブと同じく、再投入の前に古い出版を `FAILED` に戻す。
-  対象（`target`）は再投入だけを絞り、`FAILED` に戻す処理は対象によらずすべての古い出版に掛かる。
+  対象（`target`）は再投入だけを絞り、古い出版を `FAILED` に戻す処理は対象によらずすべての古い出版に掛かる。
   定期の実行を無効にした環境でも、落ちたまま残った出版を運用者の 1 回の起動で回復できるためである。
   同じロックの中なので、定期のジョブの再投入とは重ならず、定期のジョブを動かす環境では次の回が同じ出版を `FAILED` に戻すのと変わらない。
   リスナーは別のスレッドで動くため、再投入した出版の処理が終わるまで待ち、すべて完了したら終了コード 0、それ以外は 1 で JVM を終える。
@@ -202,7 +203,7 @@ Proposed の間に、落ちたまま残った出版を `FAILED` に戻す処理�
 - 出版の完了は、リスナーのトランザクションの後の新しいトランザクションで記録する（[ADR-121](ADR-121-record-event-publication-completion-in-interceptor.md)）。
 - 2.2 に代わる仕組みがないため、次は自作のまま残す。
   - 指数的な待ち時間（`multiplier`、`max-wait`）：`ResubmissionOptions` は件数（`withBatchSize`、`withMaxInFlight`）、`publication_date` からの最小の経過時間（`withMinAge`）、条件の関数（`withFilter`）だけを持ち、最後の試行からの待ち時間も倍率も持たない。
-  - 定期の実行と ShedLock のロック：2.2 で定期に動くのは Staleness Monitor だけで、失敗した出版の再投入を定期に動かす仕組みも、複数のインスタンスで排他する仕組みもない。
+  - 定期の実行と ShedLock のロック：2.2 で定期に動くのは組み込みの Staleness Monitor だけで、失敗した出版の再投入を定期に動かす仕組みも、複数のインスタンスで排他する仕組みもない。
   - 古い出版を `FAILED` に戻す処理をロックの中で呼ぶこと（`Properties.staleness`、`StalenessMonitorProperties`）：2.2 の Staleness Monitor は排他せずに全インスタンスで動く。
   - 手での 1 回の再投入（`EventPublicationResubmitOnce`）：2.2 の `FailedEventPublications` は再投入するだけで、リスナーの完了を待つことも、結果を終了コードで返すこともしない。
   - リスナーごとの方針の対応づけ（`@ResubmissionPolicy` と `ResubmissionPolicies`）：2.2 はリスナーごとの待ち時間の設定を持たない。
@@ -220,7 +221,7 @@ shared の範囲は、ADR-048 の jOOQ の共通処理に加えて、Spring Modu
 - 外部 API の一時的な障害で失敗した出版が、人の操作なしで回復する。
 - 同時に再投入するインスタンスが 1 つになり、重複の処理と DB の負荷が増えない。
 - 古い出版を `FAILED` に戻す処理と再投入が、全インスタンスで 1 本のロックの下に並ぶ。
-  一つの回が古い出版を読んでから `FAILED` にするまでに、別のインスタンスが再投入した出版を、処理中のまま `FAILED` に戻さない（`EventPublicationResubmitterTest` の 2 つのインスタンスのテスト、形式検証の `InFlightNeverMarkedStale`）。
+  一つの回が古い出版を読んでから `FAILED` にするまでに、別のインスタンスが再投入した出版を、処理中のまま `FAILED` に戻さない（`EventPublicationResubmitterStalenessTest`、形式検証の `InFlightNeverMarkedStale`）。
   古い出版を読む問い合わせも、各インスタンスの `check-interval` ごとから、ロックを取った回だけに減る。
 - 接続が直結でも、接続を多重化するプロキシの後ろでも、インスタンスがいくつでも同じ設定で動く。
 - ロックの期限を DB の時刻で決めるため、インスタンスの時計のずれで排他が崩れない。
@@ -280,7 +281,7 @@ shared の範囲は、ADR-048 の jOOQ の共通処理に加えて、Spring Modu
 - 一つの回が古い出版を読んでから `FAILED` にするまでの間に `lock-at-most-for` を超えて止まると、ロックが切れ、別のインスタンスがその出版を `FAILED` に戻して再投入しうる。
   遅れて届いた `markFailed` は、読んだときの状態も `last_resubmission_date` も確かめないため、処理中の出版を `FAILED` に戻す（形式検証の既知の発見 1）。
   さらに配信が方針の待ち時間より長く続くと、同じ出版のリスナーが同時に二つ動く（既知の発見 2）。
-  時間の予算（`lock-at-most-for / 2`）は再投入の候補を選ぶ間だけに掛かり、この間には掛からない。
+  時間の予算（`lock-at-most-for / 2`）は候補を選ぶのを止めるだけで、古い出版を `FAILED` に戻す処理を止めない。
   回が 10 分止まる必要があるため、組み込みの Staleness Monitor のときより窓は狭く、残りはリスナーの冪等性に頼る。
   戻った出版も、動いていたリスナーが成功すれば、`markCompleted` が状態を見ずに完了にする。
   同じ型の競合は上流でも扱われている（[#1971](https://github.com/spring-projects/spring-modulith/issues/1971)、`markAbandoned` の [#1764](https://github.com/spring-projects/spring-modulith/issues/1764)）。

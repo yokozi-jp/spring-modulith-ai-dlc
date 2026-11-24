@@ -135,6 +135,8 @@ class EventPublicationResubmitter {
   /**
    * 待ち時間を過ぎた出版を選ぶ条件。
    *
+   * <p>時間の予算は {@code now}（回の開始）から測るため、ロックの中で先に動く古い出版を FAILED に戻す処理の時間も予算に入る。
+   *
    * <p>ponytail: 読んだ一覧は古くなる。実行が長引くと、その間に再び FAILED に戻った行を、一覧が古いまま回数の上限を超えて再投入しうる。 実行の長さを
    * lockAtMostFor の半分までに抑え、超えた後の行は候補にせず次の回に回す（古い行から取るので飢えない）。 実行が固まっても lockAtMostFor
    * でロックは切れるため、KeepAliveLockProvider で延長しない。

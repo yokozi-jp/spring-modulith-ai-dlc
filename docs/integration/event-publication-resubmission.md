@@ -28,7 +28,7 @@ tags: [architecture, integration, async, spring-modulith, resilience]
 - **リスナーの方針**（`ResubmissionPolicies`）：出版をリスナーの待ち時間の方針に対応づけ、再投入してよいかを決める。
 - **回数の上限**（`spring.modulith.events.resubmission.abandon-after-attempts`）：Spring Modulith が、上限の回数目の再投入で失敗した出版を `ABANDONED` にする。
 - **手での 1 回の再投入のジョブ**（`EventPublicationResubmitOnce`）：運用者が 1 回だけ起動し、同じロックを取って再投入する。対象は `all`、`policy:<名前>`、`event-type:<クラス>` で、起動時に `Target` に読む。
-- **古い出版を `FAILED` に戻す処理**（Spring Modulith の `markStalePublicationsFailed`）：落ちたまま残った出版を `FAILED` に戻す。掃き取りがロックの中で、再投入の前に呼ぶ。組み込みの Staleness Monitor は使わない。
+- **古い出版を `FAILED` に戻す処理**（Spring Modulith の `markStalePublicationsFailed`）：落ちたまま残った出版を `FAILED` に戻す。掃き取りがロックの中で、再投入の前に呼ぶ。組み込みの Staleness Monitor は使わず、その閾値を書くと起動に失敗する。
 - **`in-flight-staleness`**：`PROCESSING` と `RESUBMITTED` の出版を、最後の出版か再投入の時刻から数えて `FAILED` に戻すまでの時間である。`PUBLISHED` の出版は `wait-age` で測る。
 
 ## Resilience4j との関係

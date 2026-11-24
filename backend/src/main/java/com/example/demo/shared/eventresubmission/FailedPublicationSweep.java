@@ -30,7 +30,7 @@ import org.springframework.stereotype.Component;
  *
  * <p>古い出版を {@code FAILED} に戻す処理（{@link
  * EventPublicationRegistry#markStalePublicationsFailed}）は、Spring Modulith の組み込みの Staleness Monitor
- * でなく、ここでロックの中で呼ぶ。古い出版を読んでから {@code FAILED} にするまでの間に、別のインスタンスが再投入しないようにするためである。
+ * を使わず、ここでロックの中で呼ぶ（ADR-079）。
  *
  * <p>{@code FailedEventPublications.resubmit} は件数を返さず、{@code markResubmitted} は他の更新で偽になりうる（{@code
  * completion_date} が空で {@code RESUBMITTED} でない行だけを更新する）。そのため、再投入のあとに読み戻し、{@code
@@ -153,6 +153,11 @@ final class FailedPublicationSweep {
         (Runnable)
             () -> {
               locked.set(true);
+              // ponytail: markStalePublicationsFailed は、読んだ出版の状態を確かめずに FAILED にする。
+              // 読んでから FAILED にするまでに回が lock-at-most-for を超えて止まるとロックが切れ、
+              // 別のインスタンスが再投入した処理中の出版も FAILED に戻しうる（ADR-079）。
+              // 正しく動くのは、この間が lock-at-most-for より短い間である。
+              // 超えるなら、状態と last_resubmission_date を確かめて FAILED にする更新に替える。
               registry.markStalePublicationsFailed(properties.staleness());
               failedEventPublications.resubmit(
                   ResubmissionOptions.defaults()

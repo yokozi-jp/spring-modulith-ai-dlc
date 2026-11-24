@@ -45,9 +45,8 @@ import org.springframework.modulith.test.Scenario;
  * Modulith の版を上げて {@code LIMIT} のテストが失敗したら、ADR-079 と両方のクラスの読み方を見直す。 再投入が {@code publication_date}
  * が今より前の出版だけを読むことには、時計を止めて出版を作るテストが頼る。
  *
- * <p>{@link FailedPublicationSweep} は、組み込みの Staleness Monitor を止め、{@code
- * markStalePublicationsFailed} をロックの中で呼ぶ。 {@code EventPublicationRegistry} は Spring Modulith の
- * {@code core} のパッケージにあり、版を上げると変わりうる。 {@code markStalePublicationsFailed} のテストが失敗したら、{@code
+ * <p>{@link FailedPublicationSweep} は {@code markStalePublicationsFailed} をロックの中で呼ぶ（ADR-079）。
+ * {@code markStalePublicationsFailed} のテストが失敗したら、{@code
  * EventPublicationResubmissionConfig.Properties#staleness}、{@code
  * event-publication.resubmission.in-flight-staleness} の起動時の検証と ADR-079 を見直す。 {@code
  * stalenessMarksPublicationResubmittedAfterRead} が失敗したら、Spring Modulith が読んだ後の再投入を守るようになったので、組み込みの
@@ -59,7 +58,7 @@ import org.springframework.modulith.test.Scenario;
  * EventPublicationResubmissionConfig.AbandonProperties} の下限と {@link ResubmissionPolicies#isDue}
  * の回数の条件と ADR-079 を見直す。
  */
-// 再投入、Staleness Monitor、諦めの判断の振る舞いを同じ文脈で固定し、行を読む補助を持つため、メソッドの数が多い。
+// 再投入、古い出版を FAILED に戻す処理、諦めの判断の振る舞いを同じ文脈で固定し、行を読む補助を持つため、メソッドの数が多い。
 @SuppressWarnings("PMD.TooManyMethods")
 @ResubmissionTestSupport.SharedContext
 // 諦めの判断を記録する bean は、他の再投入のテストの文脈に入れない。
@@ -73,7 +72,7 @@ class ResubmissionOptionsLearningTest {
   /** 最初の出版の時刻。マイクロ秒の精度にする。 */
   private static final Instant T0 = Instant.parse("2026-10-10T01:02:03.123456Z");
 
-  /** Staleness Monitor のテストの閾値。 */
+  /** 古い出版を FAILED に戻す処理のテストの閾値。 */
   private static final Duration STALENESS = Duration.ofMinutes(5);
 
   /** Spring Modulith の失敗した出版の再投入。 */

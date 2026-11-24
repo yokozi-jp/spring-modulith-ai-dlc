@@ -244,6 +244,7 @@ docker compose --env-file .env -f docker/compose.yml --profile backend run --rm 
 ## 定期の実行の時間の予算
 
 定期の 1 回の実行は、開始から `lock-at-most-for / 2`（main では 5 分）を過ぎたら、以降の候補を選ばずに次の回へ回す。
+再投入の前に動く、古い出版を `FAILED` に戻す処理の時間も、この予算に入る。
 古い出版から処理するため、残りは次の回で先に処理される。
 `lock-at-most-for` を超えるとロックが切れて他のインスタンスが動くため、その手前で止める。
 

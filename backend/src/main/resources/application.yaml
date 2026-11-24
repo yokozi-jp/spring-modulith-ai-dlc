@@ -203,7 +203,8 @@ event-publication:
     interval: ${EVENT_PUBLICATION_RESUBMISSION_INTERVAL}
     # 以下は環境で変えないため固定値にする。
     max-per-run: 100
-    # ロックを持つ上限。1 回の実行（max-per-run 件の再投入。concurrency-limit の空きを待つ間も含む）の最長より十分に長くし、interval より長くする。
+    # ロックを持つ上限。1 回の実行（古い出版を FAILED に戻す処理と max-per-run 件の再投入。concurrency-limit の空きを待つ間も含む）の最長より十分に長くし、interval より長くする。
+    # 再投入の候補を選ぶのは実行の開始からこの半分までで、古い出版を FAILED に戻す処理の時間もこの半分に入る。
     # in-flight-staleness はこの 2 倍より長くするため、変えたら in-flight-staleness も見直す。
     lock-at-most-for: PT10M
     # リスナーの再投入の方針。リスナーの on に @ResubmissionPolicy("<名前>") を付けて選び、付けなければ default にする。
