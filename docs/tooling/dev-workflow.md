@@ -41,6 +41,41 @@ Dependabotの更新が`frontend/pnpm-lock.yaml`を変えずに来ると、CIの`
 アプリのテストのファイルを1つだけ実行するときと、アプリの依存のコマンドを実行するときは、`frontend/apps/web`で`vp test run <ファイル>`か`vp exec <コマンド>`を実行する。
 `frontend/package.json`と`frontend/apps/web/package.json`の`devEngines`がpnpmを指定しているため、`npx`はnpmとして拒否される。
 
+## 作業の途中にテストを流すとき
+
+作業の途中は、変えたクラスとファイルのテストだけを流し、全体は[pushする前](#pushする前)に一度流す。
+`task be-test`のGradleの`test`は、テストのクラスパスが1バイトでも変わると全クラスを流し直す。
+コードを直すたびに`task be-test`を流すと、毎回約110秒かかる。
+build cacheが当たるのはバイトコードが変わらないときだけである。
+
+```bash
+# backend：変えたクラスのテスト
+cd backend && ./gradlew test --tests '<クラス>'
+# backend：まとまったら、そのモジュールのパッケージ
+cd backend && ./gradlew test --tests 'com.example.demo.<module>.*'
+# frontend：変えたテストのファイル
+cd frontend/apps/web && vp test run <ファイル>
+# frontend：変えたソースを import するテスト
+cd frontend/apps/web && vp test related --run <ソース>
+```
+
+`--tests`で流したときは、カバレッジの検証とOpenAPIの書き出しをしない。
+この2つは`task be-test`か`./gradlew check`で確かめる。
+
+Kiro Web（8コア）で測った所要時間は次のとおりである（各3回）。
+
+- **backendの全体**（977ケース）：`task be-test`と同じGradleの呼び出しで109から122秒
+- **`@ApplicationModuleTest`の1クラス**：`./gradlew test --tests '*ConfirmOrderCommandHandlerTest'`で27から28秒
+- **1モジュールのパッケージ**（6クラス、54ケース）：`./gradlew test --tests 'com.example.demo.ordering.*'`で40から41秒
+- **frontendの全体**：`task fe-coverage`で約24.5秒
+- **`apps/web`の1ファイル**：`vp test run src/features/orders/form.test.ts`で1.3秒
+
+`vp test related --run`は、測った例で18ファイル中10ファイルを5.9秒で流した。
+package全体の6.8秒と差が小さいので、ファイルが少ないときは`vp test run <ファイル>`で足りる。
+
+全体の`task verify`と`task fe-verify`は、pushする前に一度流す。
+pre-pushとCIも全体を流すので、途中で流した範囲の外の回帰はそこで見つかる。
+
 ## git worktreeで作業するとき
 
 エージェントは、ファイルを変える作業を始める前に`origin/main`から自分のworktreeを作り、mainのworktreeで変更、commit、テストをしない。
