@@ -5,18 +5,14 @@ import io.micrometer.core.instrument.MeterRegistry;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
-import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Predicate;
 import lombok.extern.slf4j.Slf4j;
-import net.javacrumbs.shedlock.core.LockConfiguration;
-import net.javacrumbs.shedlock.core.LockingTaskExecutor;
 import net.javacrumbs.shedlock.support.LockException;
 import org.jooq.DSLContext;
-import org.jspecify.annotations.Nullable;
-import org.springframework.modulith.events.FailedEventPublications;
-import org.springframework.modulith.events.ResubmissionOptions;
+import org.springframework.modulith.events.EventPublication;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
@@ -32,17 +28,11 @@ import org.springframework.stereotype.Component;
 @Component
 class EventPublicationResubmitter {
 
-  /** 定期の再投入と手での 1 回の再投入が共有するロックの名前。 */
-  /* package */ static final String LOCK_NAME = "event-publication-resubmission";
-
   /** ジョブの実行の回数の Counter の名前。 */
   private static final String RUNS_METRIC = "event.publication.resubmission.runs";
 
-  /** Spring Modulith の失敗した出版の再投入。 */
-  private final FailedEventPublications failedEventPublications;
-
-  /** ロックの実行。 */
-  private final LockingTaskExecutor lockingTaskExecutor;
+  /** ロックを取って、失敗した出版を再投入する。 */
+  private final FailedPublicationSweep sweep;
 
   /** リスナーの再投入の方針。 */
   private final ResubmissionPolicies policies;
@@ -73,15 +63,13 @@ class EventPublicationResubmitter {
 
   /* package */ EventPublicationResubmitter(
       final DSLContext dsl,
-      final FailedEventPublications failedEventPublications,
-      final LockingTaskExecutor eventPublicationLockingTaskExecutor,
+      final FailedPublicationSweep sweep,
       final ResubmissionPolicies policies,
       final Clock clock,
       final MeterRegistry meterRegistry,
       final EventPublicationResubmissionConfig.Properties properties,
       final EventPublicationResubmissionConfig.AbandonProperties abandon) {
-    this.failedEventPublications = failedEventPublications;
-    this.lockingTaskExecutor = eventPublicationLockingTaskExecutor;
+    this.sweep = sweep;
     this.policies = policies;
     this.clock = clock;
     this.properties = properties;
@@ -115,18 +103,16 @@ class EventPublicationResubmitter {
       final Instant now = Instant.now(clock);
       gauges.refresh(now);
       tracker.reconcile(now);
-      final AtomicReference<@Nullable Integer> run = new AtomicReference<>();
-      lockingTaskExecutor.executeWithLock(
-          (Runnable) () -> run.set(resubmit(now)),
-          new LockConfiguration(
-              now, LOCK_NAME, properties.lockAtMostFor(), properties.lockAtLeastFor()));
-      final @Nullable Integer resubmitted = run.get();
-      if (resubmitted == null) {
+      final Optional<FailedPublicationSweep.Swept> swept = sweep.tryOnce(dueAt(now));
+      if (swept.isEmpty()) {
         skippedRuns.increment();
         log.debug("Event publication resubmission skipped");
         return;
       }
-      // 解放のあとに数え、解放に失敗した回を completed と failed の両方に数えない。
+      final Set<UUID> advanced = swept.get().advanced();
+      final int resubmitted = advanced.size();
+      // 放すのに失敗した回は sweep が例外で戻るので、ここへ来ず、覚えも数えもせず failed の回にだけ数える。
+      tracker.remember(advanced, now);
       resubmissions.increment(resubmitted);
       if (resubmitted > 0) {
         log.atInfo()
@@ -145,29 +131,17 @@ class EventPublicationResubmitter {
     }
   }
 
-  private int resubmit(final Instant now) {
-    // 候補にした出版の ID と、再投入の前の completion_attempts。
-    final Map<UUID, Integer> candidates = new ConcurrentHashMap<>();
-    // ponytail: LIMIT が条件の関数より先に掛かるため（ResubmissionOptionsLearningTest の
-    // batchSizeLimitIsAppliedBeforeFilter）、毎回 FAILED の行をすべて読む。
-    // withMinAge は publication_date から測り、最後の試行からの待ち時間を表せないため呼ばない。
-    // withBatchSize(Integer.MAX_VALUE) で全件をヒープへ読むため、メモリの上限は FAILED の出版の数に比例する。
-    // 上限の回数目の再投入で失敗した出版は ABANDONED になるため、FAILED に溜まるのは待ち時間の中の出版と、最後の試行の途中で落ちた出版である。
-    // ponytail: 読んだ一覧は古くなる。実行が長引くと、その間に再び FAILED に戻った行を、一覧が古いまま回数の上限を超えて再投入しうる。
-    // 実行の長さを lockAtMostFor の半分までに抑え、超えた後の行は候補にせず次の回に回す（古い行から取るので飢えない）。
-    // 実行が固まっても lockAtMostFor でロックは切れるため、KeepAliveLockProvider で延長しない。
-    // 手での入口（EventPublicationResubmitOnce）は完了を待つ設計なので、この予算を適用しない。
+  /**
+   * 待ち時間を過ぎた出版を選ぶ条件。
+   *
+   * <p>ponytail: 読んだ一覧は古くなる。実行が長引くと、その間に再び FAILED に戻った行を、一覧が古いまま回数の上限を超えて再投入しうる。 実行の長さを
+   * lockAtMostFor の半分までに抑え、超えた後の行は候補にせず次の回に回す（古い行から取るので飢えない）。 実行が固まっても lockAtMostFor
+   * でロックは切れるため、KeepAliveLockProvider で延長しない。
+   */
+  private Predicate<EventPublication> dueAt(final Instant now) {
     final Duration budget = properties.lockAtMostFor().dividedBy(2);
-    failedEventPublications.resubmit(
-        ResubmissionOptions.defaults()
-            .withBatchSize(Integer.MAX_VALUE)
-            .withFilter(publication ->
-                Duration.between(now, Instant.now(clock)).compareTo(budget) <= 0
-                    && policies.isDue(publication, now)
-                    && candidates.size() < properties.maxPerRun()
-                    && candidates.put(
-                            publication.getIdentifier(), publication.getCompletionAttempts())
-                        == null));
-    return tracker.track(candidates, now);
+    return publication ->
+        Duration.between(now, Instant.now(clock)).compareTo(budget) <= 0
+            && policies.isDue(publication, now);
   }
 }

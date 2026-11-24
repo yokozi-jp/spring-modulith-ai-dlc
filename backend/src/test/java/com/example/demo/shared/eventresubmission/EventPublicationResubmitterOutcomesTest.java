@@ -152,17 +152,17 @@ class EventPublicationResubmitterOutcomesTest {
   void publicationCompletedDuringResubmissionIsCounted() {
     final UUID id = insert(FAILED, 0);
     final EventPublicationResubmitter resubmitter =
-        new EventPublicationResubmitter(
+        ResubmissionTestSupport.resubmitter(
             dsl,
             failedPublications(() -> {
               move(id, RESUBMITTED);
               complete(id);
             }),
             lockingTaskExecutor,
-            policies,
             clock,
-            meterRegistry,
             properties,
+            policies,
+            meterRegistry,
             abandon);
 
     resubmitter.resubmitOnce();
@@ -288,14 +288,14 @@ class EventPublicationResubmitterOutcomesTest {
     final EventPublicationResubmitter first = newResubmitter(properties);
     final SimpleMeterRegistry otherRegistry = new SimpleMeterRegistry();
     final EventPublicationResubmitter second =
-        new EventPublicationResubmitter(
+        ResubmissionTestSupport.resubmitter(
             dsl,
             failedPublications(() -> {}),
             lockingTaskExecutor,
-            policies,
             clock,
-            otherRegistry,
             properties,
+            policies,
+            otherRegistry,
             abandon);
     first.resubmitOnce();
     complete(id);
@@ -311,14 +311,14 @@ class EventPublicationResubmitterOutcomesTest {
 
   private EventPublicationResubmitter newResubmitter(
       final EventPublicationResubmissionConfig.Properties jobProperties) {
-    return new EventPublicationResubmitter(
+    return ResubmissionTestSupport.resubmitter(
         dsl,
         failedPublications(() -> {}),
         lockingTaskExecutor,
-        policies,
         clock,
-        meterRegistry,
         jobProperties,
+        policies,
+        meterRegistry,
         abandon);
   }
 

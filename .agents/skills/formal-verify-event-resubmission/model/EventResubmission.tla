@@ -36,7 +36,7 @@ None == 0
 
 \* EventPublicationResubmissionConfig.Properties.lockAtLeastFor
 LockAtLeastFor == Interval \div 2
-\* EventPublicationResubmitter.resubmit: budget = lockAtMostFor / 2
+\* EventPublicationResubmitter.dueAt: budget = lockAtMostFor / 2
 Budget == LockAtMostFor \div 2
 
 Min(a, b) == IF a < b THEN a ELSE b
