@@ -11,6 +11,7 @@ import ch.qos.logback.classic.Level;
 import ch.qos.logback.classic.Logger;
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.read.ListAppender;
+import com.example.demo.ordering.domain.model.OrderFailure;
 import com.example.demo.shared.concurrency.ConflictException;
 import com.example.demo.shared.failure.BusinessRuleViolationException;
 import com.example.demo.shared.failure.NotFoundException;
@@ -198,7 +199,8 @@ class ApiExceptionHandlerTest {
     final ResponseEntity<Object> response =
         handler()
             .handleBusinessRuleViolationException(
-                new BusinessRuleViolationException("order is not placed: orderId=1"),
+                new BusinessRuleViolationException(
+                    OrderFailure.NOT_DRAFT, "order is not draft: orderId=1"),
                 new ServletWebRequest(new MockHttpServletRequest()));
 
     assertNotNull(response, "応答");
@@ -225,7 +227,7 @@ class ApiExceptionHandlerTest {
   }
 
   @Test
-  @DisplayName("422 の ResponseStatusException は about:blank の 422 にし、reason を detail に出さない")
+  @DisplayName("理由を持たない Spring の 422 の例外は about:blank の 422 にし、reason を detail に出さない")
   void unprocessableContentHidesReason() throws Exception {
     final ResponseEntity<Object> response =
         handler()

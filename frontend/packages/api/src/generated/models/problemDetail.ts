@@ -18,6 +18,6 @@ export interface ProblemDetail {
      * @pattern ^[0-9a-f]{32}$
      */
   traceId?: string;
-  /** Problem type の識別 URI。about:blank かパスを全部書いた相対 URI */
+  /** Problem type の識別 URI。about:blank かパスを全部書いた相対 URI。x-extensible-enum に今の値を載せる。値は増えることがある */
   type: string;
 }

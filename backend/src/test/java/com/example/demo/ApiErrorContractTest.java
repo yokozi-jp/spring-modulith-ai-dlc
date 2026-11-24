@@ -150,9 +150,18 @@ class ApiErrorContractTest {
             "404", get("/api/error-fixture/not-found?id=a"), 404, "about:blank", "リソースが見つかりません"),
         Arguments.of(
             "権限不足の 403", get("/api/error-fixture/forbidden"), 403, "about:blank", "アクセス権限がありません"),
-        Arguments.of("409", get("/api/error-fixture/conflict"), 409, "about:blank", "競合が発生しました"),
         Arguments.of(
-            "422", get("/api/error-fixture/unprocessable"), 422, "about:blank", "処理できない内容です"),
+            "409",
+            get("/api/error-fixture/conflict"),
+            409,
+            "/problems/unique-violation",
+            "同じ値がすでに使われています"),
+        Arguments.of(
+            "422",
+            get("/api/error-fixture/unprocessable"),
+            422,
+            "/problems/ordering/product-not-found",
+            "商品が見つかりません"),
         Arguments.of(
             "405",
             delete("/api/error-fixture/items").with(csrf()),
@@ -261,7 +270,7 @@ class ApiErrorContractTest {
   private static Stream<Arguments> businessFailureTitleCases() {
     return Stream.of(
         Arguments.of("/api/error-fixture/not-found?id=a", 404, "Not Found"),
-        Arguments.of("/api/error-fixture/unprocessable", 422, "Unprocessable Content"));
+        Arguments.of("/api/error-fixture/unprocessable", 422, "Product not found"));
   }
 
   @ParameterizedTest(name = "{0}")

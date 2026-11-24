@@ -37,7 +37,7 @@ public class OpenApiConfig {
    *
    * <p>互換な追加で MINOR、破壊的変更で MAJOR を上げ、アプリのリリース版と連動させない（docs/web-api/versioning.md）。
    */
-  /* package */ static final String CONTRACT_VERSION = "0.9.0";
+  /* package */ static final String CONTRACT_VERSION = "0.10.0";
 
   /** 共通の Problem response を参照する接頭辞。 */
   private static final String PROBLEM_RESPONSE_REF = "#/components/responses/";
@@ -89,9 +89,17 @@ public class OpenApiConfig {
                         + "テナントを選ぶ前に業務の API を呼んだときの type は /problems/tenant-not-selected",
                     PROBLEM_DETAIL))
             .addResponses("NotFoundProblem", problemResponse("対象のリソースが存在しない", PROBLEM_DETAIL))
-            .addResponses("ConflictProblem", problemResponse("リソースの現在の状態と競合する", PROBLEM_DETAIL))
             .addResponses(
-                "UnprocessableContentProblem", problemResponse("業務規則に反するため処理できない", PROBLEM_DETAIL))
+                "ConflictProblem",
+                problemResponse(
+                    "ほかの要求と競合した。版が一致しないときの type は /problems/version-conflict、"
+                        + "行ロックを待ち切れなかったときは /problems/lock-timeout、"
+                        + "一意制約に違反したときは /problems/unique-violation",
+                    PROBLEM_DETAIL))
+            .addResponses(
+                "UnprocessableContentProblem",
+                problemResponse(
+                    "業務規則に反するため処理できない。type は /problems/<module>/<理由> で、理由ごとに異なる", PROBLEM_DETAIL))
             .addResponses(
                 "InternalServerErrorProblem", problemResponse("サーバーの内部エラー", PROBLEM_DETAIL));
     return new OpenAPI()
@@ -184,7 +192,9 @@ public class OpenApiConfig {
         "type",
         new StringSchema()
             .format("uri-reference")
-            .description("Problem type の識別 URI。about:blank かパスを全部書いた相対 URI")
+            .description(
+                "Problem type の識別 URI。about:blank かパスを全部書いた相対 URI。"
+                    + "x-extensible-enum に今の値を載せる。値は増えることがある")
             .example("about:blank"));
     schema.addProperty("title", new StringSchema().description("Problem type の短い説明"));
     schema.addProperty(

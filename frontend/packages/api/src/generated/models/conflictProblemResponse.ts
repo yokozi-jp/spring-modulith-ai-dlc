@@ -5,6 +5,6 @@
 import type { ProblemDetail } from './problemDetail.ts';
 
 /**
- * リソースの現在の状態と競合する
+ * ほかの要求と競合した。版が一致しないときの type は /problems/version-conflict、行ロックを待ち切れなかったときは /problems/lock-timeout、一意制約に違反したときは /problems/unique-violation
  */
 export type ConflictProblemResponse = ProblemDetail;

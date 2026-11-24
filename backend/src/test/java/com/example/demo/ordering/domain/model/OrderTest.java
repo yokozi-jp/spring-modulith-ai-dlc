@@ -74,7 +74,9 @@ class OrderTest {
                 List.of(new OrderedItem(missing, new Quantity(1))),
                 OFFERS,
                 Instant.now(CLOCK)))
-        .isInstanceOf(BusinessRuleViolationException.class)
+        .isInstanceOfSatisfying(
+            BusinessRuleViolationException.class,
+            exception -> assertThat(exception.reason()).isEqualTo(OrderFailure.PRODUCT_NOT_FOUND))
         .hasMessageStartingWith("product not found: orderId=")
         .hasMessageContaining("productId=" + missing.value());
   }
@@ -83,7 +85,10 @@ class OrderTest {
   @DisplayName("販売終了の商品の明細は BusinessRuleViolationException になる")
   void draftRejectsDiscontinuedProduct() {
     assertThatThrownBy(() -> draft(item(DISCONTINUED, 1)))
-        .isInstanceOf(BusinessRuleViolationException.class)
+        .isInstanceOfSatisfying(
+            BusinessRuleViolationException.class,
+            exception ->
+                assertThat(exception.reason()).isEqualTo(OrderFailure.PRODUCT_DISCONTINUED))
         .hasMessageStartingWith("product is discontinued: orderId=")
         .hasMessageContaining("productId=" + DISCONTINUED.productId().value());
   }
@@ -92,7 +97,9 @@ class OrderTest {
   @DisplayName("明細のない注文は BusinessRuleViolationException になる")
   void draftRejectsEmptyLines() {
     assertThatThrownBy(() -> draft())
-        .isInstanceOf(BusinessRuleViolationException.class)
+        .isInstanceOfSatisfying(
+            BusinessRuleViolationException.class,
+            exception -> assertThat(exception.reason()).isEqualTo(OrderFailure.NO_LINES))
         .hasMessageStartingWith("order lines must not be empty: orderId=");
   }
 
@@ -144,7 +151,9 @@ class OrderTest {
 
     assertThatThrownBy(() -> operation.accept(order))
         .as(name)
-        .isInstanceOf(BusinessRuleViolationException.class)
+        .isInstanceOfSatisfying(
+            BusinessRuleViolationException.class,
+            exception -> assertThat(exception.reason()).isEqualTo(OrderFailure.NOT_DRAFT))
         .hasMessage("order is not draft: orderId=" + order.id().value() + ", status=" + before);
     assertThat(order.status()).as(name).isEqualTo(before);
   }

@@ -1,5 +1,6 @@
 package errorfixture.presentation.web;
 
+import com.example.demo.ordering.domain.model.OrderFailure;
 import com.example.demo.shared.concurrency.ConflictException;
 import com.example.demo.shared.failure.BusinessRuleViolationException;
 import com.example.demo.shared.failure.NotFoundException;
@@ -153,7 +154,8 @@ class ErrorFixtureController {
    */
   @GetMapping("/unprocessable")
   /* package */ ResponseEntity<Void> unprocessable() {
-    throw new BusinessRuleViolationException("child row not found: fixture_child id=secret-key");
+    throw new BusinessRuleViolationException(
+        OrderFailure.PRODUCT_NOT_FOUND, "child row not found: fixture_child id=secret-key");
   }
 
   /**

@@ -92,11 +92,14 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
         exception, body, new HttpHeaders(), HttpStatus.BAD_REQUEST, request);
   }
 
-  /** 楽観的ロックの競合を 409 Problem Details へ変換する。例外の内容は応答に入れない。 */
+  /** 競合を、種類ごとの type の 409 Problem Details へ変換する。例外のメッセージは応答に入れない。 */
   @ExceptionHandler(ConflictException.class)
   /* package */ @Nullable ResponseEntity<Object> handleConflictException(
       final ConflictException exception, final WebRequest request) {
-    return problem(exception, HttpStatus.CONFLICT, request);
+    final ProblemDetail body =
+        problemDetails.conflictProblem(exception.kind(), resolveLocale(request));
+    return handleExceptionInternal(
+        exception, body, new HttpHeaders(), HttpStatus.CONFLICT, request);
   }
 
   /** 見つからない集約や行を 404 Problem Details へ変換する。例外の内容は応答に入れない。 */
@@ -106,11 +109,14 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
     return problem(exception, HttpStatus.NOT_FOUND, request);
   }
 
-  /** 業務規則の違反を 422 Problem Details へ変換する。例外の内容は応答に入れない。 */
+  /** 業務規則の違反を、理由ごとの type の 422 Problem Details へ変換する。例外のメッセージは応答に入れない。 */
   @ExceptionHandler(BusinessRuleViolationException.class)
   /* package */ @Nullable ResponseEntity<Object> handleBusinessRuleViolationException(
       final BusinessRuleViolationException exception, final WebRequest request) {
-    return problem(exception, HttpStatus.UNPROCESSABLE_CONTENT, request);
+    final ProblemDetail body =
+        problemDetails.businessRuleViolationProblem(exception.reason(), resolveLocale(request));
+    return handleExceptionInternal(
+        exception, body, new HttpHeaders(), HttpStatus.UNPROCESSABLE_CONTENT, request);
   }
 
   /** MVC 内の未処理例外を、実装詳細を含まない 500 Problem Details へ変換する。 */

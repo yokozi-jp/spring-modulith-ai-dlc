@@ -3,6 +3,7 @@ package com.example.demo.shared.failure;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import com.example.demo.ordering.domain.model.OrderFailure;
 import java.util.stream.Stream;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -14,7 +15,8 @@ class BusinessFailureExceptionsTest {
   private static Stream<RuntimeException> exceptions() {
     return Stream.of(
         new NotFoundException("order not found: orderId=1"),
-        new BusinessRuleViolationException("order is not placed: orderId=1"));
+        new BusinessRuleViolationException(
+            OrderFailure.NOT_DRAFT, "order is not draft: orderId=1"));
   }
 
   @ParameterizedTest
