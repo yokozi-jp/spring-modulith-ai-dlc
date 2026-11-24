@@ -66,7 +66,7 @@ Dependabot は mise を扱えないので、この範囲は重ならない。
 - 更新の bot が 2 つになる。設定が 2 か所（`.github/dependabot.yml` と `renovate.jsonc`）に分かれる。
 - GitHub App のインストールは管理者の操作で、設定を main に merge するまで動かない。
 - Kiro CLI の PR は `mise.lock` を更新しないので、人が `mise lock` を実行して push するまで CI が落ちる。
-- `mise.lock`、`.mise/locks/npm-iwe-org-iwe/<版>`、`mise.kiro-web.lock` が mise manager の PR で更新されることは、Renovate のソースの読みによる推論である。App が安全モード（`MISE_SAFE`）で `mise lock` を実行するときに更新されるかは、App を入れた後の最初の PR で確かめる。
+- App を入れた後の最初の PR（#727 の iwe、#728 の Task）で、`mise.lock` が更新されることと、iwe の `.mise/locks/npm-iwe-org-iwe/<版>/` が追加されることを確かめた。`mise.lock` は `linux-x64` の記録だけを保った。`mise.kiro-web.lock` は docker-compose の PR がまだ出ておらず、未確認である。
 - Java（`corretto-...`）、`http:jdtls`、`http:lombok` は、どちらの bot も追わない。手で上げる。
 - 人が merge する PR が増える。mise の道具の PR は setup-mise を使うすべての workflow を動かす。
 

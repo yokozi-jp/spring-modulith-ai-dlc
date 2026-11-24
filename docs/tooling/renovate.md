@@ -1,7 +1,7 @@
 ---
 type: Runbook
 title: Renovate
-description: mise.toml と mise.lock に固定した道具の版を更新する Renovate の範囲、GitHub App のインストール、PR を merge する前の確認、App をインストールした後に確かめる項目、設定を変えたときの検査。Renovate の PR が出たとき、renovate.jsonc を変えるとき、App をインストールするときに読む。
+description: mise.toml と mise.lock に固定した道具の版を更新する Renovate の範囲、GitHub App のインストール、PR を merge する前の確認、App をインストールした後に確かめた結果と未確認の項目、設定を変えたときの検査。Renovate の PR が出たとき、renovate.jsonc を変えるとき、App をインストールするときに読む。
 tags: [tooling, runbook, renovate, mise]
 ---
 
@@ -41,13 +41,17 @@ tags: [tooling, runbook, renovate, mise]
 App は default branch の設定を読むので、`renovate.jsonc` を main に merge するまで動かない。
 `renovate.jsonc` が default branch にあれば onboarding の PR は出ず、`Dependency Dashboard` の issue ができる。
 
-## App をインストールした後に確かめる
+## App をインストールした後に確かめた結果
 
-最初の mise manager の PR で次を確かめ、結果を [ADR-124](../adr/ADR-124-update-mise-pinned-versions-with-renovate.md) の Consequences に反映する。
+最初の mise manager の PR（#727 の iwe、#728 の Task）で、次を確かめた。結果は [ADR-124](../adr/ADR-124-update-mise-pinned-versions-with-renovate.md) の Consequences にある。
 
-- `mise.lock` と `mise.kiro-web.lock` が、版を上げる PR で更新される。App は安全モード（`MISE_SAFE`）で `mise lock` を実行する。`http:` の道具の option を受け付けるかも見る。
-- iwe の PR が `.mise/locks/npm-iwe-org-iwe/<版>/` を更新する。更新されなければ、手で `mise lock --platform linux-x64` を実行して push する。
-- `mise lock` が `linux-x64` だけの記録を保つ。
+- `mise.lock` は、版を上げる PR で更新される。
+- iwe の PR は、`.mise/locks/npm-iwe-org-iwe/<版>/` を追加する。
+- `mise.lock` は `linux-x64` の記録だけを保つ。
+
+次は未確認である。最初の docker-compose の PR で確かめる。
+
+- `mise.kiro-web.lock` が、版を上げる PR で更新される。更新されなければ、手で `mise lock` を実行して push する。
 
 ## 設定を変えたとき
 
