@@ -161,11 +161,21 @@ public enum SalesStatus {
 ## 対応するテスト
 
 Spring を起動しない JUnit のテストを、値オブジェクトと同じパッケージのテストソースに置く（`QuantityTest`、`MoneyTest`）。
-不変条件は QuickTheories のプロパティベーステストで、入力の範囲全体について確かめる（[ADR-012](../../adr/ADR-012-adopt-property-based-and-mutation-testing.md)）。
+不変条件ごとに、通る側と通らない側の両方を確かめる。
+片側だけでは、`value < 1` を `value <= 1` に変える PIT の `CONDITIONALS_BOUNDARY` の変異が生き残る（[ADR-012](../../adr/ADR-012-adopt-property-based-and-mutation-testing.md)）。
+境界の値は、範囲の両端を必ず生成する QuickTheories の 2 つの性質か、JUnit の `@ParameterizedTest` の具体例で書く。
+文字列は、空、空白だけ、上限の長さ、上限を 1 つ超える長さを書く。
 
 ```java
 /** 数量の不変条件を検証する。 */
 class QuantityTest {
+
+  @Test
+  @DisplayName("1 以上の数量は作れる")
+  void acceptsQuantityOfOneOrMore() {
+    qt().forAll(integers().between(1, Integer.MAX_VALUE))
+        .checkAssert(value -> assertThat(new Quantity(value).value()).isEqualTo(value));
+  }
 
   @Test
   @DisplayName("1 未満の数量は作れない")
@@ -205,5 +215,5 @@ class QuantityTest {
 - [ ] 識別子の名前は対象の名前に `Id` を付け、単一の値の component は `Money` だけを `amount`、それ以外を `value` にする。［自分で点検］
 - [ ] 利用者の入力の誤りは Request の形式の検証で 400 にし、値オブジェクトの `IllegalArgumentException` に頼らない。［自分で点検］
 - [ ] Javadoc を書く。［自分で点検］
-- [ ] 不変条件を QuickTheories のプロパティベーステストで確かめる。［自分で点検］
+- [ ] 不変条件を、通る側と通らない側の境界の両側で確かめる。［自分で点検］
 - [ ] `domain.model` のパッケージに `@NullMarked` の `package-info.java` がある。［Error Prone で検査：RequireExplicitNullMarking］
