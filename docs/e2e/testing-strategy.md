@@ -87,7 +87,7 @@ backend は SES v2 の `SendEmail`（`POST /v2/email/outbound-emails`）を、�
 今はメールを送る機能がなく、メールを読む spec もない。
 メールを読む spec を足すときは、次のとおりにする。
 
-- WireMock の URL は、決済代行と同じく `environment.ts` の `paymentGatewayUrl`（slot の `PAYMENT_GATEWAY_BASE_URL`）を使う。
+- WireMock の URL は、決済代行と同じく `environment.ts` の `wireMockUrl`（slot の `PAYMENT_GATEWAY_BASE_URL`）を使う。
   `AWS_ENDPOINT_URL_SESV2` は backend の SDK だけが読み、slot は Playwright へ渡さない。
 - 宛先は spec ごとに一意にする（例：`invitee-<UUID>@example.com`）。
   並列の spec が送ったメールと分けるためである。
