@@ -24,7 +24,9 @@ main では `payment.application.OrderConfirmedListener` が `payment` を使い
 
 n 回目の再投入の前に、最後の試行から `min(wait-age × multiplier^(n-1), max-wait)` を待つ。
 `wait-age` は環境変数 `EVENT_PUBLICATION_RESUBMISSION_WAIT_AGE` である。
-Staleness Monitor が処理中の出版を `FAILED` に戻すまでの `in-flight-staleness` は環境変数 `EVENT_PUBLICATION_RESUBMISSION_IN_FLIGHT_STALENESS` で、本番は `PT25M` である。
+定期のジョブは、ロックを取った回の再投入の前に、落ちたまま残った出版を古い出版として `FAILED` に戻す。
+`PUBLISHED` の出版は `wait-age` を過ぎたら戻す。
+`PROCESSING` と `RESUBMITTED` の出版を戻すまでの `in-flight-staleness` は環境変数 `EVENT_PUBLICATION_RESUBMISSION_IN_FLIGHT_STALENESS` で、本番は `PT25M` である。
 `in-flight-staleness` は最後の出版か再投入の時刻から測り、`lock-at-most-for`（10 分）の 2 倍より長くしないと起動に失敗する。
 
 出版の `listener_id` は、リスナーのメソッドの完全修飾名と引数の型である（例：`com.example.demo.payment.application.OrderConfirmedListener.on(com.example.demo.ordering.OrderConfirmed)`）。
@@ -36,7 +38,7 @@ Staleness Monitor が処理中の出版を `FAILED` に戻すまでの `in-fligh
 - **事象**：定期のジョブが再投入した出版が、上限（`abandon-after-attempts`）の回数目の再投入でまた失敗し、Spring Modulith が `ABANDONED` にして archive の表へ移した。
   再投入したインスタンスが、次の回の先頭で archive の行を読み戻したときに 1 回だけ出す。
   手での 1 回の再投入でまた失敗した出版には出さない（「Event publication resubmit-once incomplete」）。
-  `ABANDONED` の出版は、定期の再投入、手での 1 回の再投入、Staleness Monitor のどれの対象にもならない。
+  `ABANDONED` の出版は、定期の再投入、手での 1 回の再投入、古い出版を `FAILED` に戻す処理のどれの対象にもならない。
 - **属性**：`event_publication.id`、`event_publication.event_type`、`event_publication.listener_id`、`event_publication.completion_attempts`（archive の行の値で、ふつうは上限 + 1）
 - **発生原因**：外部システムの障害が方針の待ち時間と上限の回数を超えて続いた。
   リスナーの不具合や内部の不変条件の違反（ADR-072 のデッドレター）で、何度動かしても失敗する。
@@ -57,8 +59,8 @@ Staleness Monitor が処理中の出版を `FAILED` に戻すまでの `in-fligh
   前の件数はインスタンスのメモリにあるため、起動の直後の回に件数が 0 より大きいときも出す。
 - **属性**：`event_publication.over_limit.count`（0 から増えた回に数えた、上限を超えた `FAILED` の出版の数）
 - **発生原因**：最後の再投入の途中でインスタンスが落ちた。
-  Staleness Monitor が処理中の出版を `FAILED` に戻した。
-  `ABANDONED` にする `markAbandoned` が DB の失敗で終わり、Staleness Monitor が `FAILED` に戻した。
+  処理中の出版を、古い出版として `FAILED` に戻した。
+  `ABANDONED` にする `markAbandoned` が DB の失敗で終わり、古い出版として `FAILED` に戻した。
   どれも失敗を記録しないため、Spring Modulith は `ABANDONED` にしない。
   「上限に達した出版の戻し方」で戻したまま、手での再投入をしていない出版も数える。
 - **対応**：次の SQL で出版を特定し、リスナーの ERROR のログで原因を確かめる。
@@ -94,6 +96,7 @@ Staleness Monitor が処理中の出版を `FAILED` に戻すまでの `in-fligh
 - **event 名**：`Event publication resubmission failed`
 - **レベル**：`WARN`
 - **事象**：定期のジョブの 1 回の実行が DB の例外かロックの例外で失敗し、その回の再投入をしなかった。
+  古い出版を `FAILED` に戻す処理が失敗した回も、ここに含む。
 - **属性**：`exception.type`、`exception.message`、`exception.stacktrace`
 - **発生原因**：接続の pool の枯渇（`connection-timeout`）、DB の停止、`statement_timeout`、`modulith.shedlock` の読み書きの失敗（ShedLock の `LockException`）。
 - **対応**：次の回で再試行するため、1 回だけなら対応しない。
@@ -219,8 +222,10 @@ SELECT id, listener_id, event_type, serialized_event, publication_date,
 
 対象は空白なら通常の起動で、空白以外なら `false` を含めて手での再投入の求めと読む。
 `all`、`policy:<名前>`、`event-type:<クラス>` のどれでもない値は、起動して何もしない状態にはならず、終了コード 1 で失敗する。
-対象を渡すと、アプリは Web のサーバーと定期の実行（Staleness Monitor を含む）を動かさない。
+対象を渡すと、アプリは Web のサーバーと定期の実行を動かさない。
 定期のジョブと同じロックを取るため、定期のジョブを止めずに起動してよい。
+ロックの中で、定期のジョブと同じく、対象によらず古い出版を `FAILED` に戻す。
+定期の実行を止めた環境でも、落ちたまま残った出版はこの起動で `FAILED` に戻り、対象に合えば同じ起動で再投入される。
 待ち時間を見ずに、対象の `FAILED` の出版を `max-per-run`（100 件）まで再投入し、リスナーの処理が終わるまで待ってから終わる。
 すべて完了したら終了コード 0、それ以外は 1 である。
 定期のジョブと違い、時間の予算（次の節）は適用しない。
@@ -270,7 +275,8 @@ DELETE FROM modulith.event_publication
 環境変数 `EVENT_PUBLICATION_RESUBMISSION_ENABLED` を `false` にしてデプロイする。
 値は `true` か `false` だけを使う。
 条件は `true`（大文字小文字を区別しない）だけを真と読み、`yes` や `1` は静かに無効の扱いになる。
-定期の実行と Spring Modulith の Staleness Monitor が一緒に止まり、落ちたまま `PUBLISHED`、`PROCESSING`、`RESUBMITTED` に残った出版も `FAILED` に戻らなくなる。
+定期の実行が止まり、落ちたまま `PUBLISHED`、`PROCESSING`、`RESUBMITTED` に残った出版も `FAILED` に戻らなくなる。
+止めている間に戻すときは、手での再投入を起動する（「手での再投入」）。
 再開するときは `true` に戻してデプロイする。
 
 ## メトリクスの見方
@@ -282,7 +288,7 @@ DELETE FROM modulith.event_publication
 | -------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `event.publication.resubmission.runs{outcome}`     | `completed` はロックを取って最後まで動いた回、`skipped` は他のインスタンスがロックを持っていた回、`failed` は WARN の `failed` か ERROR の `crashed` の回である                                             |
 | `event.publication.resubmissions`                  | 再投入した（実際に `RESUBMITTED` へ進んだ）出版の数。他の更新で進めなかった出版と、`max-per-run` で止まった候補は数えない                                                                                   |
-| `event.publication.resubmission.outcomes{outcome}` | 再投入した出版の結果。`completed` は archive に `COMPLETED` で移った数、`failed` は `FAILED` に戻った数（Staleness Monitor が戻した場合を含む）と `ABANDONED` で移った数。1 回の再投入につき 1 回だけ数える |
+| `event.publication.resubmission.outcomes{outcome}` | 再投入した出版の結果。`completed` は archive に `COMPLETED` で移った数、`failed` は `FAILED` に戻った数（古い出版として戻した場合を含む）と `ABANDONED` で移った数。1 回の再投入につき 1 回だけ数える       |
 | `event.publication.resubmission.exhausted`         | 定期のジョブが再投入した出版のうち、回数の上限を超えて失敗し、`ABANDONED` になった数。再投入したインスタンスが次の回に数え、同時に ERROR の `exhausted` を 1 回記録する                                     |
 | `event.publication.failed{state}`                  | `retrying` は自動の再投入を待つ `FAILED` の出版（`completion_attempts` が上限以下）、`over-limit` は上限を超えて `FAILED` に残った出版、`exhausted` は archive の表の `ABANDONED` の出版の数である          |
 | `event.publication.failed.oldest.age{state}`       | 各状態で最も古い出版の `publication_date` からの経過秒数である                                                                                                                                              |
@@ -301,7 +307,7 @@ DELETE FROM modulith.event_publication
   ダッシュボードと警報はインスタンスの間の最大値（`max`）で集め、合計（`sum`）しない。
   合計すると、同じ出版をインスタンスの数だけ数える。
 - 定期の実行を無効にした環境では更新されず、0 のままである。
-- `failed{state=retrying}` は、`concurrency-limit` の空きを待つ間に Staleness Monitor が `FAILED` に戻した処理中の出版も数えうるため、実際の失敗より多く出ることがある。
+- `failed{state=retrying}` は、`concurrency-limit` の空きを待つ間に古い出版として `FAILED` に戻した処理中の出版も数えうるため、実際の失敗より多く出ることがある。
 - `failed{state=exhausted}` の件数は、残っている件数の表示と片付けたあとの確認に使い、警報にしない。
   archive の表の `ABANDONED` の行は、戻すか消すまで残り、数え続ける。
 - 上限に達した出版を知る主な通知は ERROR のログの監視である。
