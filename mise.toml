@@ -8,7 +8,7 @@ betterleaks = "1.10.1"
 jq = "1.8.2"
 # 実行用のイメージと同じ Corretto の 25 系にする（ADR-090）。
 java = "corretto-25.0.5.0.10"
-task = "3.53.1"
+task = "3.54.0"
 # zizmor.yml の zizmor-action の version も同じ版にする（ADR-090）。
 zizmor = "1.32.0"
 # Kiro CLI の Java の LSP（.kiro/settings/lsp.json）。registry と aqua に無いので Eclipse の配布物を取り、版は手で上げる。
