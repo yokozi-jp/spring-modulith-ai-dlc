@@ -6,7 +6,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.example.demo.shared.eventresubmission.EventPublicationResubmitterTest.ProbeListener;
 import com.example.demo.shared.eventresubmission.EventPublicationResubmitterTest.ResubmissionProbe;
-import com.example.demo.testkit.AsTenant;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
@@ -14,7 +13,6 @@ import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
 import java.util.concurrent.CopyOnWriteArrayList;
-import java.util.concurrent.atomic.AtomicReference;
 import org.jooq.DSLContext;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.BeforeEach;
@@ -109,9 +107,9 @@ class ResubmissionOptionsLearningTest {
   void batchSizeLimitIsAppliedBeforeFilter(final Scenario scenario) {
     // ORDER BY publication_date の順を決めるため、出版の時刻をずらす。
     clock.set(T0);
-    final UUID older = failed(scenario);
+    final UUID older = ResubmissionTestSupport.failedProbe(scenario, listener, dsl);
     clock.set(T0.plusSeconds(1));
-    final UUID newer = failed(scenario);
+    final UUID newer = ResubmissionTestSupport.failedProbe(scenario, listener, dsl);
     // 新しい出版も読める時刻に進める（defaultsResubmitOnlyPublicationsOlderThanNow）。
     clock.set(T0.plusSeconds(2));
     final List<UUID> seen = new CopyOnWriteArrayList<>();
@@ -139,7 +137,7 @@ class ResubmissionOptionsLearningTest {
       "学習テスト：ResubmissionOptions.defaults() は publication_date が今と同じ FAILED の出版を再投入せず、1 マイクロ秒後には再投入する")
   void defaultsResubmitOnlyPublicationsOlderThanNow(final Scenario scenario) {
     clock.set(T0);
-    final UUID publication = failed(scenario);
+    final UUID publication = ResubmissionTestSupport.failedProbe(scenario, listener, dsl);
 
     failedEventPublications.resubmit(ResubmissionOptions.defaults());
 
@@ -161,7 +159,7 @@ class ResubmissionOptionsLearningTest {
           + "abandon-after-attempts=2 は 1 回目の再投入の失敗で諦めず、2 回目の再投入の失敗で諦める")
   void abandonPolicySeesPublicationReadBeforeResubmission(final Scenario scenario) {
     clock.set(T0);
-    final UUID publication = failed(scenario);
+    final UUID publication = ResubmissionTestSupport.failedProbe(scenario, listener, dsl);
     final Instant first = T0.plus(1, ChronoUnit.MICROS);
     final Instant second = T0.plus(2, ChronoUnit.MICROS);
     listener.failTimes(2);
@@ -291,18 +289,17 @@ class ResubmissionOptionsLearningTest {
   /**
    * リスナーを持たない出版の行を、T0 の出版の時刻と決めた状態で作る。
    *
-   * <p>Staleness Monitor は行のイベントを読み戻すため、読み戻せるテストのイベントの型と本文にする。
+   * <p>古い出版を FAILED に戻す処理は行のイベントを読み戻すため、読み戻せるテストのイベントの型にする。
    */
   private UUID insert(final EventPublication.Status status) {
-    final UUID publication =
-        ResubmissionTestSupport.insertPublication(
-            dsl, UUID.randomUUID(), "staleness-learning", T0, status.name(), 1);
-    dsl.update(EVENT_PUBLICATION)
-        .set(EVENT_PUBLICATION.EVENT_TYPE, ResubmissionProbe.class.getName())
-        .set(EVENT_PUBLICATION.SERIALIZED_EVENT, "{\"id\":\"" + publication + "\"}")
-        .where(EVENT_PUBLICATION.ID.eq(publication))
-        .execute();
-    return publication;
+    return ResubmissionTestSupport.insertPublication(
+        dsl,
+        UUID.randomUUID(),
+        "staleness-learning",
+        ResubmissionProbe.class.getName(),
+        T0,
+        status.name(),
+        1);
   }
 
   private int attempts(final UUID publication) {
@@ -331,26 +328,5 @@ class ResubmissionOptionsLearningTest {
         .from(EVENT_PUBLICATION)
         .where(EVENT_PUBLICATION.ID.eq(publication))
         .fetchSingle(EVENT_PUBLICATION.STATUS);
-  }
-
-  /** リスナーを 1 回失敗させて FAILED の出版を作り、その ID を返す。 */
-  private UUID failed(final Scenario scenario) {
-    listener.failTimes(1);
-    final String id = UUID.randomUUID().toString();
-    final AtomicReference<@Nullable UUID> publication = new AtomicReference<>();
-    scenario
-        .publish(new ResubmissionProbe(id, AsTenant.TENANT))
-        .andWaitForStateChange(() ->
-            dsl.select(EVENT_PUBLICATION.ID)
-                .from(EVENT_PUBLICATION)
-                .where(
-                    EVENT_PUBLICATION
-                        .SERIALIZED_EVENT
-                        .contains(id)
-                        .and(EVENT_PUBLICATION.STATUS.eq(FAILED_STATUS)))
-                .fetchOptional(EVENT_PUBLICATION.ID)
-                .orElse(null))
-        .andVerify(publication::set);
-    return Objects.requireNonNull(publication.get(), "FAILED の出版の ID");
   }
 }

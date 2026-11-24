@@ -3,6 +3,7 @@ package com.example.demo.shared.eventresubmission;
 import static com.example.demo.jooq.modulith.Tables.EVENT_PUBLICATION;
 import static com.example.demo.jooq.modulith.Tables.EVENT_PUBLICATION_ARCHIVE;
 
+import com.example.demo.testkit.AsTenant;
 import com.example.demo.testkit.CapturedLogRecords;
 import com.example.demo.testkit.CleanGeneratedTablesExtension;
 import com.example.demo.testkit.CommittedDatabaseTest;
@@ -14,12 +15,18 @@ import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 import java.time.Clock;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
+import java.util.Objects;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Supplier;
+import net.javacrumbs.shedlock.core.LockConfiguration;
+import net.javacrumbs.shedlock.core.LockProvider;
 import net.javacrumbs.shedlock.core.LockingTaskExecutor;
+import net.javacrumbs.shedlock.core.SimpleLock;
 import org.jooq.DSLContext;
 import org.jspecify.annotations.Nullable;
 import org.mockito.Mockito;
@@ -27,12 +34,16 @@ import org.springframework.context.annotation.Import;
 import org.springframework.modulith.events.EventPublication;
 import org.springframework.modulith.events.FailedEventPublications;
 import org.springframework.modulith.events.core.EventPublicationRegistry;
+import org.springframework.modulith.test.Scenario;
 import org.springframework.test.context.TestPropertySource;
 
 /** 再投入のテストで使う、Spring の文脈の設定、ジョブの組み立て、ロックの期限、出版の行と archive の行、条件の関数に渡す出版、上限到達の ERROR の操作。 */
-// 再投入のテストが共有する組み立てと行の操作を一か所に集めるため、メソッドの数が多い。
-@SuppressWarnings("PMD.TooManyMethods")
+// 再投入のテストが共有する組み立て、ロック、行の操作を一か所に集めるため、メソッドと型の数が多い。
+@SuppressWarnings({"PMD.CouplingBetweenObjects", "PMD.TooManyMethods"})
 final class ResubmissionTestSupport {
+
+  /** 他のインスタンスの代わりにロックを持つ時間。lock-at-most-for（3 秒）の待ちと、ロックを持つ間の 3 秒の待ちより長くする。 */
+  private static final Duration HELD_LOCK = Duration.ofSeconds(10);
 
   private ResubmissionTestSupport() {}
 
@@ -129,6 +140,66 @@ final class ResubmissionTestSupport {
   /** ロックの期限を過去にする。 */
   /* package */ static void expireLock(final DSLContext dsl) {
     CleanGeneratedTablesExtension.expireLocks(dsl);
+  }
+
+  /**
+   * 他のインスタンスの代わりに、定期の再投入と手での 1 回の再投入のロックを {@link #HELD_LOCK} だけ持つ。
+   *
+   * <p>放すときは {@link SimpleLock#unlock()} ではなく、ロックの期限を過去にする（{@link #expireLock}）。lock-at-least-for が
+   * 0 の解放は期限を {@code max(locked_at, DB の今)} にするため、取った後に DB の壁時計が戻ると、{@code locked_at} まで放されないためである。
+   */
+  /* package */ static void holdLock(final LockProvider lockProvider, final Clock clock) {
+    if (lockProvider
+        .lock(
+            new LockConfiguration(
+                Instant.now(clock), FailedPublicationSweep.LOCK_NAME, HELD_LOCK, Duration.ZERO))
+        .isEmpty()) {
+      throw new AssertionError("テストのロック " + FailedPublicationSweep.LOCK_NAME + " を取れない");
+    }
+  }
+
+  /** ロックの期限を過去にしてから、他のインスタンスの代わりにロックを持って {@code task} を呼び、終わったら期限を過去にする。 */
+  /* package */ static void whileLockHeld(
+      final DSLContext dsl,
+      final LockProvider lockProvider,
+      final Clock clock,
+      final Runnable task) {
+    expireLock(dsl);
+    holdLock(lockProvider, clock);
+    try {
+      task.run();
+    } finally {
+      expireLock(dsl);
+    }
+  }
+
+  /**
+   * テストのリスナーを 1 回失敗させ、今の時計の時刻に FAILED の出版を作り、その ID を返す。
+   *
+   * <p>今の時刻の出版は再投入の対象にならないため（{@code ResubmissionOptionsLearningTest} の {@code
+   * defaultsResubmitOnlyPublicationsOlderThanNow}）、再投入する前に時計を進める。
+   */
+  /* package */ static UUID failedProbe(
+      final Scenario scenario,
+      final EventPublicationResubmitterTest.ProbeListener listener,
+      final DSLContext dsl) {
+    listener.failTimes(1);
+    final String id = UUID.randomUUID().toString();
+    final AtomicReference<@Nullable UUID> publication = new AtomicReference<>();
+    scenario
+        .publish(new EventPublicationResubmitterTest.ResubmissionProbe(id, AsTenant.TENANT))
+        .andWaitForStateChange(() ->
+            dsl.select(EVENT_PUBLICATION.ID)
+                .from(EVENT_PUBLICATION)
+                .where(
+                    EVENT_PUBLICATION
+                        .SERIALIZED_EVENT
+                        .contains(id)
+                        .and(EVENT_PUBLICATION.STATUS.eq(EventPublication.Status.FAILED.name())))
+                .fetchOptional(EVENT_PUBLICATION.ID)
+                .orElse(null))
+        .andVerify(publication::set);
+    return Objects.requireNonNull(publication.get(), "FAILED の出版の ID");
   }
 
   /** {@code test.event} の出版の行を作り、その ID を返す。 */

@@ -12,7 +12,6 @@ import com.example.demo.shared.tenancy.TenantScoped;
 import com.example.demo.testkit.AsTenant;
 import com.example.demo.testkit.CapturedLogRecords;
 import io.micrometer.core.instrument.MeterRegistry;
-import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import io.opentelemetry.api.common.AttributeKey;
 import io.opentelemetry.api.logs.Severity;
 import io.opentelemetry.sdk.logs.data.LogRecordData;
@@ -34,10 +33,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Predicate;
-import net.javacrumbs.shedlock.core.DefaultLockingTaskExecutor;
-import net.javacrumbs.shedlock.core.LockConfiguration;
 import net.javacrumbs.shedlock.core.LockProvider;
-import net.javacrumbs.shedlock.core.SimpleLock;
 import org.awaitility.Awaitility;
 import org.jooq.DSLContext;
 import org.jooq.Records;
@@ -46,19 +42,12 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.mockito.AdditionalAnswers;
-import org.mockito.Mockito;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Primary;
 import org.springframework.modulith.events.ApplicationModuleListener;
-import org.springframework.modulith.events.EventPublication;
-import org.springframework.modulith.events.FailedEventPublications;
-import org.springframework.modulith.events.core.DefaultEventPublicationRegistry;
-import org.springframework.modulith.events.core.EventPublicationRepository;
-import org.springframework.modulith.events.core.TargetEventPublication;
 import org.springframework.modulith.test.EnableScenarios;
 import org.springframework.modulith.test.Scenario;
 import org.springframework.scheduling.config.ScheduledTaskHolder;
@@ -88,20 +77,11 @@ class EventPublicationResubmitterTest {
   /** {@code event-publication.resubmission.wait-age}。 */
   private static final Duration WAIT_AGE = Duration.ofMinutes(5);
 
-  /** {@code event-publication.resubmission.in-flight-staleness}。 */
-  private static final Duration IN_FLIGHT_STALENESS = Duration.ofMinutes(15);
-
   /** テストのイベントの {@code event_type}。 */
   private static final String EVENT_TYPE = ResubmissionProbe.class.getName();
 
   /** FAILED の状態。 */
   private static final String FAILED = "FAILED";
-
-  /** リスナーが処理している状態。 */
-  private static final String PROCESSING = "PROCESSING";
-
-  /** 再投入して処理を待つ状態。 */
-  private static final String RESUBMITTED = "RESUBMITTED";
 
   /** 回数の上限を超えて諦めた状態。 */
   private static final String ABANDONED = "ABANDONED";
@@ -116,7 +96,7 @@ class EventPublicationResubmitterTest {
   private static final String ATTEMPTS = "id=%s の attempts";
 
   /** テスト用のリスナーに付ける再投入の方針の名前。 */
-  private static final String PROBE_POLICY = "probe";
+  /* package */ static final String PROBE_POLICY = "probe";
 
   /** Gauge の state の値。上限に達した出版。 */
   private static final String STATE_EXHAUSTED = "exhausted";
@@ -135,9 +115,6 @@ class EventPublicationResubmitterTest {
 
   /** 2 つのスレッドの完了と、リスナーが門で待つ上限の秒数。 */
   private static final long JOIN_TIMEOUT_SECONDS = 10;
-
-  /** 他のインスタンスの代わりにロックを持つ時間。lock-at-most-for（3 秒）の待ちと、ロックを持つ間の 3 秒の待ちより長くする。 */
-  private static final Duration HELD_LOCK = Duration.ofSeconds(10);
 
   /** 検証対象の定期のジョブ。 */
   @Autowired private EventPublicationResubmitter resubmitter;
@@ -165,18 +142,6 @@ class EventPublicationResubmitterTest {
 
   /** メトリクス。 */
   @Autowired private MeterRegistry meterRegistry;
-
-  /** もう 1 つのインスタンスが使う、Spring Modulith の失敗した出版の再投入。 */
-  @Autowired private FailedEventPublications failedEventPublications;
-
-  /** もう 1 つのインスタンスが使う、Spring Modulith が出版を読み書きする Repository。 */
-  @Autowired private EventPublicationRepository repository;
-
-  /** 再投入の設定値。 */
-  @Autowired private EventPublicationResubmissionConfig.Properties properties;
-
-  /** 再投入の回数の上限。 */
-  @Autowired private EventPublicationResubmissionConfig.AbandonProperties abandon;
 
   /** OTLP へ送る LogRecord。 */
   @Autowired private CapturedLogRecords capturedLogRecords;
@@ -309,12 +274,9 @@ class EventPublicationResubmitterTest {
       "失敗を記録せずに上限を超えて FAILED に戻った出版（最後の試行の途中で落ちた出版）は、待ち時間を過ぎても再投入せず、Gauge の over-limit に出て retrying に出ない")
   void failedPublicationPastLimitWithoutRecordedFailureIsNotResubmitted() {
     // テストの上限は 2 回。2 回目の再投入の途中で落ち、古い出版として FAILED に戻した行にあたる。
-    final UUID publication = insertFailed(3, T0);
-    dsl.update(EVENT_PUBLICATION)
-        .set(EVENT_PUBLICATION.EVENT_TYPE, EVENT_TYPE)
-        .set(EVENT_PUBLICATION.SERIALIZED_EVENT, "{\"id\":\"" + publication + "\"}")
-        .where(EVENT_PUBLICATION.ID.eq(publication))
-        .execute();
+    final UUID publication =
+        ResubmissionTestSupport.insertPublication(
+            dsl, UUID.randomUUID(), "over-limit-test", EVENT_TYPE, T0, FAILED, 3);
     clock.set(T0.plus(Duration.ofDays(1)));
 
     runJob();
@@ -376,8 +338,7 @@ class EventPublicationResubmitterTest {
   @DisplayName("enabled が false なら、アプリ全体の文脈で定期のタスクを 1 つも登録せず、古い出版を FAILED に戻す処理も再投入も動かない")
   void disabledRegistersNoScheduledTaskInTheApplicationContext() {
     // 依存のライブラリ（Spring Modulith Moments など）が @EnableScheduling を足すと、enabled=false でもジョブが動く。
-    // 古い出版を FAILED に戻す処理は、定期のジョブのロックの中だけで動く
-    // （stalePublicationsAreMarkedFailedOnlyWhileTheJobHoldsTheLock）。
+    // 古い出版を FAILED に戻す処理は、定期のジョブのロックの中だけで動く（EventPublicationResubmitterStalenessTest）。
     assertThat(scheduledTaskHolders.stream().flatMap(holder -> holder.getScheduledTasks().stream()))
         .as("登録された定期のタスク")
         .isEmpty();
@@ -426,12 +387,7 @@ class EventPublicationResubmitterTest {
     clock.set(T0.plus(WAIT_AGE).plusSeconds(1));
     final double skippedBefore = skippedRuns();
 
-    holdLock();
-    try {
-      resubmitter.resubmitOnce();
-    } finally {
-      ResubmissionTestSupport.expireLock(dsl);
-    }
+    ResubmissionTestSupport.whileLockHeld(dsl, lockProvider, clock, resubmitter::resubmitOnce);
 
     assertThat(state(id).attempts()).as(ATTEMPTS, id).isEqualTo(1);
     assertThat(listener.calls()).as(CALLS, id).isEqualTo(1);
@@ -461,97 +417,6 @@ class EventPublicationResubmitterTest {
   }
 
   @Test
-  @DisplayName(
-      "定期のジョブは、in-flight-staleness より古い出版を手での 1 回の再投入が処理している間も FAILED に戻さず、手での 1 回の再投入は完了まで待つ")
-  void jobKeepsPublicationResubmittedOnceInFlight(final Scenario scenario) throws Exception {
-    final String id = failedOnce(scenario);
-    // publication_date（T0）からの経過が processing と resubmitted の閾値（in-flight-staleness）を超える。
-    clock.set(T0.plus(IN_FLIGHT_STALENESS).plus(Duration.ofMinutes(1)));
-    final CountDownLatch gate = listener.close();
-    final CompletableFuture<EventPublicationResubmitOnce.Outcome> future =
-        ResubmissionTestSupport.onVirtualThread(
-            () -> resubmitOnce.run(new Target.Policy(PROBE_POLICY)));
-    awaitListenerAtGate(id);
-
-    runJob();
-
-    assertThat(state(id).status()).as("id=%s の門で待つ間の状態", id).isIn(PROCESSING, RESUBMITTED);
-    gate.countDown();
-    assertThat(future.get(JOIN_TIMEOUT_SECONDS, TimeUnit.SECONDS))
-        .isEqualTo(new EventPublicationResubmitOnce.Outcome(1, 1, 0, 0));
-    assertThat(state(id).archived()).as(ARCHIVED, id).isEqualTo(1);
-  }
-
-  @Test
-  @DisplayName(
-      "古い出版は、定期のジョブがロックを取った回にだけ FAILED に戻り、PUBLISHED は wait-age、PROCESSING と RESUBMITTED は"
-          + " in-flight-staleness を過ぎたら古いとする")
-  void stalePublicationsAreMarkedFailedOnlyWhileTheJobHoldsTheLock() {
-    final UUID published = insertStale(EventPublication.Status.PUBLISHED);
-    final UUID processing = insertStale(EventPublication.Status.PROCESSING);
-    final UUID resubmitted = insertStale(EventPublication.Status.RESUBMITTED);
-
-    clock.set(T0.plus(WAIT_AGE).plus(1, ChronoUnit.MICROS));
-    runJob();
-
-    assertThat(List.of(statusOf(published), statusOf(processing), statusOf(resubmitted)))
-        .as("wait-age を過ぎた回の PUBLISHED、PROCESSING、RESUBMITTED の出版の状態")
-        .containsExactly(FAILED, PROCESSING, RESUBMITTED);
-
-    clock.set(T0.plus(IN_FLIGHT_STALENESS).plus(1, ChronoUnit.MICROS));
-    // 前の回のロックは lock-at-least-for の間残るため、期限を過去にしてから持つ。
-    ResubmissionTestSupport.expireLock(dsl);
-    holdLock();
-    try {
-      resubmitter.resubmitOnce();
-    } finally {
-      ResubmissionTestSupport.expireLock(dsl);
-    }
-
-    assertThat(List.of(statusOf(processing), statusOf(resubmitted)))
-        .as("in-flight-staleness を過ぎたが、ロックを取れなかった回の状態")
-        .containsExactly(PROCESSING, RESUBMITTED);
-
-    runJob();
-
-    assertThat(List.of(statusOf(processing), statusOf(resubmitted)))
-        .as("in-flight-staleness を過ぎ、ロックを取った回の状態")
-        .containsExactly(FAILED, FAILED);
-  }
-
-  @Test
-  @DisplayName("2 つのインスタンスでも、古い出版を読んでから FAILED に戻すまでにもう片方は再投入できず、片方が再投入した処理中の出版をもう片方は戻さない")
-  void otherInstanceCannotInterleaveWithStaleCheckOrMarkInFlightResubmission(
-      final Scenario scenario) {
-    // 最初の配信を executor に積んだまま落ち、PUBLISHED に残った出版にする。
-    final String id = failedOnce(scenario);
-    dsl.update(EVENT_PUBLICATION)
-        .set(EVENT_PUBLICATION.STATUS, "PUBLISHED")
-        .where(eventIs(id))
-        .execute();
-    clock.set(T0.plus(WAIT_AGE).plusSeconds(1));
-    final double skippedBefore = skippedRuns();
-    final CountDownLatch gate = listener.close();
-
-    otherInstanceRunningThisJobAfterStaleRead().resubmitOnce();
-
-    assertThat(skippedRuns() - skippedBefore)
-        .as("もう片方が古い出版を読んだ後、FAILED に戻す前のこのインスタンスの回")
-        .isEqualTo(1.0);
-    awaitListenerAtGate(id);
-
-    runJob();
-
-    assertThat(state(id).status())
-        .as("id=%s のもう片方が再投入して門で待つ間の状態", id)
-        .isIn(PROCESSING, RESUBMITTED);
-    gate.countDown();
-    awaitState(scenario.stimulate(() -> {}), id, COMPLETED, s -> s.archived() == 1);
-    assertThat(listener.calls()).as(CALLS, id).isEqualTo(2);
-    assertThat(state(id).attempts()).as(ATTEMPTS, id).isEqualTo(2);
-  }
-
-  @Test
   @DisplayName("手での 1 回の再投入は、イベントの型と all でも選び、他の方針の名前では選ばない")
   void resubmitOnceSelectsByTarget(final Scenario scenario) {
     final String id = failedOnce(scenario);
@@ -574,17 +439,17 @@ class EventPublicationResubmitterTest {
   void resubmitOnceWaitsForLockAndGivesUp(final Scenario scenario) throws Exception {
     final String id = failedOnce(scenario);
 
-    holdLock();
-    try {
-      assertThatThrownBy(() -> resubmitOnce.run(new Target.All()))
-          .isInstanceOf(IllegalStateException.class)
-          .hasMessageContaining(FailedPublicationSweep.LOCK_NAME);
-    } finally {
-      ResubmissionTestSupport.expireLock(dsl);
-    }
+    ResubmissionTestSupport.whileLockHeld(
+        dsl,
+        lockProvider,
+        clock,
+        () ->
+            assertThatThrownBy(() -> resubmitOnce.run(new Target.All()))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining(FailedPublicationSweep.LOCK_NAME));
     assertThat(state(id).attempts()).as("id=%s の失敗の後の attempts", id).isEqualTo(1);
 
-    holdLock();
+    ResubmissionTestSupport.holdLock(lockProvider, clock);
     final CompletableFuture<EventPublicationResubmitOnce.Outcome> future =
         ResubmissionTestSupport.onVirtualThread(() -> resubmitOnce.run(new Target.All()));
     Awaitility.await("ロックを持つ間の手での再投入")
@@ -604,24 +469,9 @@ class EventPublicationResubmitterTest {
   }
 
   /**
-   * 他のインスタンスの代わりに、同じロックを {@link #HELD_LOCK} だけ持つ。
-   *
-   * <p>放すときは {@link SimpleLock#unlock()} ではなく、ロックの期限を過去にする。lock-at-least-for が 0 の解放は期限を {@code
-   * max(locked_at, DB の今)} にするため、取った後に DB の壁時計が戻ると、{@code locked_at} まで放されないためである。
+   * ロックの期限を過去にしてから、手での 1 回の再投入を呼ぶ。前の呼び出しの解放は、DB の壁時計が戻ると期限が残るため（{@link
+   * ResubmissionTestSupport#holdLock}）。
    */
-  private void holdLock() {
-    assertThat(
-            lockProvider.lock(
-                new LockConfiguration(
-                    Instant.now(clock),
-                    FailedPublicationSweep.LOCK_NAME,
-                    HELD_LOCK,
-                    Duration.ZERO)))
-        .as("テストのロック %s", FailedPublicationSweep.LOCK_NAME)
-        .isPresent();
-  }
-
-  /** ロックの期限を過去にしてから、手での 1 回の再投入を呼ぶ。前の呼び出しの解放は、DB の壁時計が戻ると期限が残るため（{@link #holdLock}）。 */
   private EventPublicationResubmitOnce.Outcome runOnce(final Target target) {
     ResubmissionTestSupport.expireLock(dsl);
     return resubmitOnce.run(target);
@@ -701,78 +551,6 @@ class EventPublicationResubmitterTest {
 
   private double gauge(final String state) {
     return meterRegistry.get("event.publication.failed").tag("state", state).gauge().value();
-  }
-
-  /** リスナーを持たない FAILED の出版の行を、default の方針で作る。 */
-  private UUID insertFailed(final int completionAttempts, final Instant publicationDate) {
-    return ResubmissionTestSupport.insertPublication(
-        dsl, UUID.randomUUID(), "over-limit-test", publicationDate, FAILED, completionAttempts);
-  }
-
-  /**
-   * 落ちたまま残った出版の行を、T0 の出版の時刻と決めた状態で作る。
-   *
-   * <p>Spring Modulith は型を読めないイベントの行を古い出版の一覧から落とすため、テストのイベントの型にする。 回数はテストの上限（2 回）を超えた 3 にし、FAILED
-   * に戻した後の同じ回の再投入の候補から外す。
-   */
-  private UUID insertStale(final EventPublication.Status status) {
-    final UUID publication =
-        ResubmissionTestSupport.insertPublication(
-            dsl, UUID.randomUUID(), "staleness-test", T0, status.name(), 3);
-    dsl.update(EVENT_PUBLICATION)
-        .set(EVENT_PUBLICATION.EVENT_TYPE, EVENT_TYPE)
-        .set(EVENT_PUBLICATION.SERIALIZED_EVENT, "{\"id\":\"" + publication + "\"}")
-        .where(EVENT_PUBLICATION.ID.eq(publication))
-        .execute();
-    return publication;
-  }
-
-  private @Nullable String statusOf(final UUID publication) {
-    return dsl.select(EVENT_PUBLICATION.STATUS)
-        .from(EVENT_PUBLICATION)
-        .where(EVENT_PUBLICATION.ID.eq(publication))
-        .fetchSingle(EVENT_PUBLICATION.STATUS);
-  }
-
-  /**
-   * 同じ DB とロックを使う、もう 1 つのインスタンスの定期のジョブ。
-   *
-   * <p>古い {@code PUBLISHED} の出版を読んだ後、FAILED に戻す前に、このインスタンスの定期のジョブを別のスレッドで 1 回動かす。 組み込みの Staleness
-   * Monitor が、読んだ後に別のインスタンスが再投入した出版を FAILED に戻した時点である（{@code ResubmissionOptionsLearningTest} の
-   * {@code stalenessMarksPublicationResubmittedAfterRead}）。 同じスレッドで呼ぶと、ShedLock
-   * は持っているロックを取り直さずに中身を動かすため、別のスレッドにする。
-   */
-  private EventPublicationResubmitter otherInstanceRunningThisJobAfterStaleRead() {
-    final EventPublicationRepository interleaved =
-        Mockito.mock(EventPublicationRepository.class, AdditionalAnswers.delegatesTo(repository));
-    Mockito.doAnswer(
-            call -> {
-              final List<TargetEventPublication> read =
-                  repository.findByStatus(call.getArgument(0));
-              ResubmissionTestSupport.onVirtualThread(
-                      () -> {
-                        resubmitter.resubmitOnce();
-                        return Boolean.TRUE;
-                      })
-                  .get(JOIN_TIMEOUT_SECONDS, TimeUnit.SECONDS);
-              return read;
-            })
-        .when(interleaved)
-        .findByStatus(EventPublication.Status.PUBLISHED);
-    return new EventPublicationResubmitter(
-        dsl,
-        new FailedPublicationSweep(
-            dsl,
-            failedEventPublications,
-            new DefaultLockingTaskExecutor(lockProvider),
-            clock,
-            properties,
-            new DefaultEventPublicationRegistry(interleaved, clock)),
-        policies,
-        clock,
-        new SimpleMeterRegistry(),
-        properties,
-        abandon);
   }
 
   private double outcome(final String outcome) {
