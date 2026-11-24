@@ -45,6 +45,8 @@ export default defineConfig({
       mode: "tags-split",
       client: "react-query",
       httpClient: "fetch",
+      // 既定の false では、必須の Idempotency-Key ヘッダー（ADR-126）が生成した関数の引数に出ない。
+      headers: true,
       clean: true,
       mock: {
         path: "./src/generated/mocks",
@@ -86,6 +88,8 @@ export default defineConfig({
 });
 ```
 
+`headers`は、契約のheaderのparameterを生成した関数の引数とmutationの変数（`headers`）に入れる。
+既定の`false`では、必須の`Idempotency-Key`も生成物に出ない。
 `override.query.useSuspenseQuery`は、通常のquery optionsと同じquery keyを持つ`get<Operation>SuspenseQueryOptions()`を生成する。
 loaderと`useSuspenseQuery`での使い方は[状態表示の分担](routing-and-state.md#状態表示の分担)にある。
 `override.fetch.forceSuccessResponse`は、生成した関数の戻り値の型を成功の応答だけにする。
@@ -112,6 +116,7 @@ barrelの`index.ts`は作らず、次の入口を個別に公開する。
 | `@frontend/api/api-fetch`             | `src/api-fetch.ts`                       |
 | `@frontend/api/api-error`             | `src/api-error.ts`                       |
 | `@frontend/api/csrf`                  | `src/csrf.ts`                            |
+| `@frontend/api/idempotency-key`       | `src/idempotency-key.ts`                 |
 
 `fetch`と`XMLHttpRequest`を使えるのは、この package の中だけである。
 `frontend/vite.config.ts`の`no-restricted-globals`と`no-restricted-properties`が、`packages/api/**`以外で禁止する。
@@ -185,6 +190,9 @@ Cookieがあってheaderと食い違う場合は、403がCookieを作り直さ�
 権限不足の403（`about:blank`）と、再送後の2回目の403は再送せず、`ApiProblemError`にする。
 同時に複数の更新を発行する画面を作るときは、headerを組んでから送るまでに別の403がCookieを書き換える競合に当たらないかを確かめる。
 Cookieの名前と属性の理由は[ADR-066](../adr/ADR-066-harden-csrf-cookie-with-host-prefix.md)にある。
+
+`Idempotency-Key`は`apiFetch`で付けず、featureのHookが利用者の操作ごとに`idempotencyKeyHeaders()`で採り、mutationの変数で渡す（[ADR-126](../adr/ADR-126-require-idempotency-key-on-all-non-safe-business-apis.md)）。
+`apiFetch`で付けると、TanStack Queryの再試行で`mutationFn`が呼ばれるたびに新しいキーになり、同じ操作の再送と見なされない。
 
 `apiFetch`は、送信先のURLを`location`の上で解決したoriginが同じときだけheaderを付ける。
 別のoriginへtokenを送らないよう、Orvalの`baseUrl`を設定しない。

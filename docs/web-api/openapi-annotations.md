@@ -215,5 +215,6 @@ springdocやtherapiの版を上げてこのテストが失敗したら、この�
 - [ ] 201は`Location`ヘッダー、204は本文なしにし、200を残さない。［Spectralで検査：created-location-header（204の本文と200の残りは自分で点検）］
 - [ ] `@Operation(summary, description)`、`@Schema(description)`、`///`を使わない。［自分で点検］
 - [ ] クエリパラメータを`@ParameterObject`や`@ModelAttribute`でまとめて受けない。POST、PUT、PATCH、`lockNo`以外のDELETEは`in: query`を使わない（GETとHEADだけで使う）。［Spectralで検査：query-parameter-get-only（まとめて受けないことは自分で点検）］
+- [ ] POST、PUT、PATCH、DELETEの必須の`Idempotency-Key`は`OpenApiConfig`のcustomizerが付けるので、Controllerに書かない。テナントを選ぶ前の操作を足すときは、customizerと`.spectral.yaml`の除外に`operationId`を足す（[ADR-126](../adr/ADR-126-require-idempotency-key-on-all-non-safe-business-apis.md)）。［Spectralで検査：idempotency-key-required（参照の有無だけ。除外の一致は自分で点検）］
 - [ ] `/api/**`のoperationは`OpenApiConfig`の既定のCookieセッションの`security`を要する。認証なしにするoperationには空の`@SecurityRequirements`を付け、`SecurityConfig`の`permitAll`と合わせる。［Spectralで検査：operation-security（`security`の有無だけ。`permitAll`との一致は自分で点検）］
 - [ ] パスをkebab-caseにし、2xxの応答の配列をトップレベルにしない。［Spectralで検査：path-kebab-case、path-kebab-case-resource、no-top-level-array-response］
