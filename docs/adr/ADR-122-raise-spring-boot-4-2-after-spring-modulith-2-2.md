@@ -1,11 +1,11 @@
 ---
 type: ADR
-title: 'ADR-122: Spring Modulith 2.2.0 を Spring Boot 4.1.2 のまま入れ、Spring Boot 4.2 と Spring Cloud 2026.0 への更新を別の変更にする'
-description: Spring Modulith 2.2.0 は Spring Boot 4.2.0 でビルドされているが、参照する API が Spring Boot 4.1.2 で解決しテストが通ることを根拠に 4.1.2 のまま入れ、Spring Cloud 2026.0 を伴う Spring Boot 4.2 への更新を別の変更にする決定。
+title: 'ADR-122: Spring Modulith 2.2.0 を Spring Boot 4.1.2 のまま入れてから、Spring Boot 4.2.0 と Spring Cloud 2026.0.0 へ別の変更で上げる'
+description: Spring Modulith 2.2.0 は Spring Boot 4.2.0 でビルドされているが、参照する API が Spring Boot 4.1.2 で解決しテストが通ることを根拠に先に 4.1.2 のまま入れ、その後の別の変更で Spring Cloud 2026.0.0 と一緒に Spring Boot 4.2.0 へ上げた決定。
 tags: [adr, backend, spring-boot, spring-modulith, spring-cloud, dependencies]
 ---
 
-# ADR-122: Spring Modulith 2.2.0 を Spring Boot 4.1.2 のまま入れ、Spring Boot 4.2 と Spring Cloud 2026.0 への更新を別の変更にする
+# ADR-122: Spring Modulith 2.2.0 を Spring Boot 4.1.2 のまま入れてから、Spring Boot 4.2.0 と Spring Cloud 2026.0.0 へ別の変更で上げる
 
 ## Status
 
@@ -32,26 +32,34 @@ Spring Boot の minor の更新は、Spring Modulith と関係のない依存（
 
 ## Decision
 
-Spring Modulith 2.2.0 を Spring Boot 4.1.2 のまま入れる。
-Spring Boot を 4.2 系へ、Spring Cloud を 2026.0 系へ上げる変更は、この変更の後に 1 つの変更で行う。
-上げる条件（Spring Boot 4.2.0 と Spring Cloud 2026.0.0 の公開）は満たされている。
+Spring Modulith 2.2.0 を Spring Boot 4.1.2 のまま入れる（[#562](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/562)）。
+その後の別の変更（[#713](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/713)）で、Spring Boot を 4.2.0 へ、Spring Cloud を 2026.0.0 へ 1 つの変更で上げる。
+これで Spring Modulith 2.2.0 は、start.spring.io が対応づける Spring Boot 4.2 系で動く。
+
+### Spring Boot 4.2 への更新で直したもの
+
+- `server.forward-headers-strategy` は非推奨になった。`application.yaml` を `server.request.header.forwarded.strategy: framework` に置き換えた。転送ヘッダの名前は、4.2 の既定のまま `X-Forwarded-*` である。
+- Spring Framework 7.1 は空の `instance` に要求のパスを入れなくなった。[ADR-117](ADR-117-add-trace-id-and-omit-instance-in-problem-details.md) の予告どおり `ProblemDetailsConfigTest` が失敗したので、`ProblemDetailsConfig` の `setInstance(null)` を外し、テストを「入れない」ことの確認に反転した。
+
+[リリースノート](https://github.com/spring-projects/spring-boot/wiki/Spring-Boot-4.2-Release-Notes)の残りは、このリポジトリが使わない機能（`RestTemplate`、Pulsar、AMQP、LDAP、Redis、WebFlux、Buildpacks、Janino など）である。
+`backend/src` と `docker` に、これらの設定や型の参照がないことを grep で確かめた。
 
 ## Consequences
 
 ### Positive
 
-- 依存の更新を、Spring Modulith と、Spring Boot と Spring Cloud の 2 つの変更に分けて確かめられる。
+- 依存の更新を、Spring Modulith と、Spring Boot と Spring Cloud の 2 つの変更に分けて確かめられた。
   振る舞いが変わったときに、どちらの更新が原因かを切り分けられる。
+- Spring Modulith 2.2.0 と Spring Boot 4.2.0 の組が、start.spring.io の対応づけと一致する。
 
 ### Negative
 
-- Spring Modulith と Spring Boot の組み合わせは、start.spring.io が対応づける組から外れる。
-  2.2 系の patch が Spring Boot 4.2 だけの API を使うと、起動か実行の時に失敗する。
-  Spring Boot 4.2 へ上げるまでの間、Dependabot の Spring Modulith の更新で全テストが通らなければ、その patch を入れずに Spring Boot を先に上げる。
+- 2 つの変更の間は、Spring Modulith と Spring Boot の組み合わせが start.spring.io の対応づけから外れていた。
+  この期間は、#713 の変更で終わる。
 
 ### Neutral
 
-- Spring Boot 4.2 へ上げるときは、Spring Boot と Spring Framework の版を書いた他の ADR と docs（[ADR-115](ADR-115-build-business-batches-with-spring-batch.md) の Spring Batch の版など）も確かめる。
+- [ADR-115](ADR-115-build-business-batches-with-spring-batch.md) の Spring Batch の版（Spring Boot 4.1.2 が管理する 6.0.6）など、4.1 を前提に確かめた他の ADR と docs の記述は、その時点の記録として残す。
 
 ## Alternatives Considered
 
@@ -71,6 +79,8 @@ Spring Boot を 4.2 系へ、Spring Cloud を 2026.0 系へ上げる変更は、
 
 - [ADR-079: 失敗したイベント出版を、ShedLock で 1 つのインスタンスに絞った定期のジョブで、リスナーごとの方針で再投入する](ADR-079-resubmit-failed-event-publications-periodically-with-shedlock.md)
 - [ADR-115: 業務のバッチを Spring Batch の Job で作り、1 つの期間を 1 つの JobInstance にして毎日追いつく](ADR-115-build-business-batches-with-spring-batch.md)
+- [ADR-117: Problem Details に traceId を付け、instance を設定しない](ADR-117-add-trace-id-and-omit-instance-in-problem-details.md)
+- [Spring Boot 4.2 のリリースノート](https://github.com/spring-projects/spring-boot/wiki/Spring-Boot-4.2-Release-Notes)
 - [Spring Modulith 2.2.0 のリリースノート](https://github.com/spring-projects/spring-modulith/releases/tag/2.2.0)
 - [Maven Central の spring-boot-dependencies](https://repo1.maven.org/maven2/org/springframework/boot/spring-boot-dependencies/)
 - [Maven Central の spring-cloud-dependencies](https://repo1.maven.org/maven2/org/springframework/cloud/spring-cloud-dependencies/)

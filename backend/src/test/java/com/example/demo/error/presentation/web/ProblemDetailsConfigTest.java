@@ -6,7 +6,6 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 
 import com.example.demo.testkit.TracerStubs;
 import io.micrometer.tracing.handler.TracingObservationHandler.TracingContext;
-import java.net.URI;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -27,7 +26,7 @@ import org.springframework.web.context.request.ServletRequestAttributes;
 import org.springframework.web.filter.ServerHttpObservationFilter;
 import tools.jackson.databind.json.JsonMapper;
 
-/** 応答を書く直前の Problem Details に、要求の trace ID を付け、instance を消すことを検証する。 */
+/** 応答を書く直前の Problem Details に、要求の trace ID を付け、instance を設定しないことを検証する。 */
 class ProblemDetailsConfigTest {
 
   /** 応答の本文を読む。 */
@@ -42,11 +41,10 @@ class ProblemDetailsConfigTest {
   }
 
   @Test
-  @DisplayName("要求の observation の span の trace ID を traceId に入れ、instance を消す")
-  void addsRequestTraceIdAndRemovesInstance() {
+  @DisplayName("要求の observation の span の trace ID を traceId に入れる")
+  void addsRequestTraceIdWithoutInstance() {
     bindRequestWithTraceId(TRACE_ID);
     final ProblemDetail problem = ProblemDetail.forStatus(HttpStatus.NOT_FOUND);
-    problem.setInstance(URI.create("/error"));
 
     intercept(problem);
 
@@ -54,7 +52,6 @@ class ProblemDetailsConfigTest {
         Map.of(ProblemDetailsConfig.TRACE_ID, TRACE_ID),
         problem.getProperties(),
         "traceId だけの拡張メンバー");
-    assertNull(problem.getInstance(), "instance");
   }
 
   @Test
@@ -81,8 +78,8 @@ class ProblemDetailsConfigTest {
   }
 
   @Test
-  @DisplayName("Spring Framework は handler が返した Problem Details の空の instance に要求のパスを入れる")
-  void springFillsEmptyInstanceWithRequestPath() throws Exception {
+  @DisplayName("Spring Framework は handler が返した Problem Details の空の instance に要求のパスを入れない")
+  void springLeavesEmptyInstanceEmpty() throws Exception {
     final String body =
         MockMvcBuilders.standaloneSetup(new EmptyInstanceHandler())
             .build()
@@ -91,11 +88,9 @@ class ProblemDetailsConfigTest {
             .getResponse()
             .getContentAsString();
 
-    assertEquals(
-        "/fixture",
-        JSON.readTree(body).path("instance").asString(),
-        "Spring Framework が instance を入れなくなった（7.1、spring-framework#35969）。"
-            + "ProblemDetailsConfig の setInstance(null) と ADR-117 の Spring Framework 7.0 の注記を消す");
+    assertNull(
+        JSON.readTree(body).get("instance"),
+        "Spring Framework が instance を入れた。ProblemDetailsConfig に setInstance(null) を戻し、ADR-117 に注記する");
   }
 
   private static void intercept(final ProblemDetail problem) {
