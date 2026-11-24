@@ -33,8 +33,9 @@ ESP を選んだ理由は [#675](https://github.com/yokozi-jp/spring-modulith-ai
 
 SES v2 の `SendEmail` は JSON の REST の API（`POST /v2/email/outbound-emails`）なので、決済代行と同じく WireMock で偽れる。
 AWS の SDK は、サービスごとの接続先を環境変数 `AWS_ENDPOINT_URL_SESV2` で変えられる（[Service-specific endpoints](https://docs.aws.amazon.com/sdkref/latest/guide/feature-ss-endpoints.html)）。
-AWS SDK for Java v2 は、同じ値をシステムプロパティ `aws.endpointUrlSesV2` からも読み、環境変数より優先する（2.59.2 の `AwsClientEndpointProvider` と `DefaultSesV2BaseClientBuilder`）。
-そのため、アプリのコードが接続先の設定を持たなくても、ローカルとテストでは WireMock を呼べる。
+SDK は OS の環境変数と JVM のシステムプロパティだけを読み、Spring が `spring.config.import` で読む `.env` とテストの設定を見ない。
+そのため、接続先を SDK の取得に任せると、`.env` を環境変数にする回避策（Task の `dotenv`、Gradle の検査、テストの `System.setProperty`）が要る。
+一方、`SesV2ClientBuilder.endpointOverride` で、Spring の設定から読んだ接続先を Client に渡せる。
 
 [#323](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/323) のコメントは、本番を SES の API、ローカルとテストを Mailpit への SMTP にし、設定で実装を選ぶ形を一度決め、その後この ADR の形へ改めた。
 前の形では、本番のコードが環境で実装を選び、本番の実装がローカルとテストの経路を通らなかったためである。
@@ -50,17 +51,19 @@ AWS SDK for Java v2 は、同じ値をシステムプロパティ `aws.endpointU
   From のアドレスと表示名、設定セットの名前は既定値のない設定値にし、未設定なら起動に失敗させる（[ADR-008](ADR-008-single-application-yaml-external-config.md)）。
   From のアドレスの形式の誤りと、空白だけの表示名と設定セットも、起動の時点で断る。
   起動を通すと、SES が要求ごとに `BadRequestException` を返し、すべてのメールが拒否として記録されるためである。
-- 接続先、リージョン、資格情報は SDK の既定の取得に任せ、アプリの設定に書かない。
+- Client を作る `SesV2ClientConfig` は、Spring の設定に `AWS_ENDPOINT_URL_SESV2` があるときだけ、その接続先、`AWS_REGION`、`AWS_ACCESS_KEY_ID`、`AWS_SECRET_ACCESS_KEY` を Client に渡す。
+  ない（空の）ときは、接続先、リージョン、資格情報を SDK の既定の取得に任せる。
   本番は、ECS のタスクのロールの一時的な資格情報と、ECS がタスクに入れる `AWS_REGION` を使う（[Amazon ECS environment variables](https://docs.aws.amazon.com/AmazonECS/latest/developerguide/ecs-environment-variables.html)）。
   リージョンが取れなければ、SDK の Client を作れず、起動に失敗する。
+  接続先の有無は設定値の違いで、本番のコードの分岐や mode ではない。
 - ローカルとテストは、`AWS_ENDPOINT_URL_SESV2` で既存の WireMock に向ける。
   決済代行と同じ WireMock のコンテナを使い、コンテナを増やさない。
   `AWS_ENDPOINT_URL_SESV2`、`AWS_REGION`、ダミーの `AWS_ACCESS_KEY_ID` と `AWS_SECRET_ACCESS_KEY` は、env の例と compose ファイルにだけ書く。
-  Gradle のテストは、テストの JVM ごとに起動する WireMock（[ADR-085](ADR-085-start-test-dependencies-per-fork-with-testcontainers.md)）を、同じ意味のシステムプロパティで指す。
-- 接続先を設定しないと、SDK は本物の SES へ送る。
-  ADR-072 は接続先の URL に既定値を置かず、未設定なら起動に失敗させると決めたが、SES はこの点が決済代行と違う。
-  ローカルで `AWS_ENDPOINT_URL_SESV2` を書き忘れても、SES はダミーの資格情報の署名を断るので、本物の宛先へは届かない。
-  ホストで起動する `task be-run`（`./gradlew bootRun`）は、`AWS_ENDPOINT_URL_SESV2` が環境変数になければ起動しない。
+  Gradle のテストは、テストの JVM ごとに起動する WireMock（[ADR-085](ADR-085-start-test-dependencies-per-fork-with-testcontainers.md)）の接続先を、ほかの接続先と同じく `InfrastructureContainers` の設定で渡す。
+- 接続先が Spring の設定にないと、Client は SDK の既定の取得になり、本物の SES へ送りうる。
+  ADR-072 は接続先の URL に既定値を置かず、未設定なら起動に失敗させると決めたが、SES は本番が同じ設定を持たない点が決済代行と違う。
+  ローカルで `AWS_ENDPOINT_URL_SESV2` を書き忘れても、ダミーの資格情報も書き忘れていなければ SES は署名を断る。
+  接続先は `.env` から読めるので、`task be-run`、`./gradlew bootRun`、IDE のどれで起動しても、`.env.example` の行を足せば同じに効く。
   本番の設定には `AWS_ENDPOINT_URL_SESV2` を書かない。
 - タイムアウトは [ADR-019](ADR-019-define-resilience-and-capacity-guardrails.md) の値にする。
   HTTP の Client の接続を 1 秒、読み取りを 2 秒、SDK の `apiCallTimeout`（呼び出し全体）を 2 秒にする。
@@ -93,13 +96,14 @@ AWS SDK for Java v2 は、同じ値をシステムプロパティ `aws.endpointU
   決済代行の WireMock と同じ割り切りで、本番での手による疎通の確認で補う。
 - 手元でメールを読む画面がなく、送ったメールは WireMock の要求の記録を JSON で読む。
 - 接続先の書き忘れは、アプリの起動の時点では止まらない。
-  ダミーの資格情報も書き忘れると、SDK は手元の `~/.aws` の profile の資格情報を使い、本物の SES へ送りうる。
-  `bootRun` の検査で止めるが、IDE から起動するときは止まらない。
+  `.env` に `AWS_` の行がなく、手元に `~/.aws` の profile があると、SDK はその資格情報で本物の SES へ送りうる。
+  この Client を呼ぶ機能は今はなく、機能を足す変更で、ローカルの起動の検査を決める。
+- 接続を待つ上限（2 秒）を超えると、SES が受け付けた後でも例外になり、再投入で同じメールを 2 通送りうる。
+  SDK の最初の呼び出しは、クラスの読み込みで遅い。
+  対策は Client を呼ぶ側の記録で、送った時刻を記録しても、応答を受け取る前の失敗は防げない（[メールを送る Client](../mail/sending.md)）。
 - From の ID が検証されていないときも SES は `MessageRejected` を返すので、設定の誤りが回復しない拒否として業務の状態に記録される。
   Client の WARN のログ（エラーコード）と、本番での疎通の確認で見つける。
 - SDK の呼び出しは `RestClient` を通らないため、Boot の計測（`http.client.requests` のメトリクスとトレースの span）が付かない。
-- SDK は Spring の `spring.config.import` で読んだ `.env` を見ない。
-  ホストで起動する `task be-run` は、Task の `dotenv` で `.env` を環境変数にしてから起動する。
 
 ### Neutral
 
@@ -144,6 +148,12 @@ AWS SDK for Java v2 は、同じ値をシステムプロパティ `aws.endpointU
 - **Description**：LocalStack の SES の偽物を使い、送ったメールを LocalStack の API で読む。
 - **Pros**：SES の API を偽り、送ったメールを読む API を持つ。
 - **Cons**：Community 版でも 2026 年 3 月から auth token が要る。
+
+### 選択肢6: SDK の環境変数の取得に任せ、`.env` を環境変数にして渡す
+
+- **Description**：接続先を `AWS_ENDPOINT_URL_SESV2` の環境変数かシステムプロパティで SDK に読ませる。`task be-run` は Task の `dotenv` で、Gradle のテストは `System.setProperty` で渡す。
+- **Pros**：`SesV2ClientConfig` に接続先の分岐がない。
+- **Cons**：SDK は Spring の設定を読まないので、`.env` を環境変数にする回避策が 3 か所に要り、IDE から起動するときは効かない。
 
 ## References
 

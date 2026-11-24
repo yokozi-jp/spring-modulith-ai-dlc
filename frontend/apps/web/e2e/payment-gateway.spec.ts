@@ -1,6 +1,6 @@
 import type { APIRequestContext, APIResponse } from "@playwright/test";
 
-import { wireMockUrl } from "./environment";
+import { paymentGatewayUrl } from "./environment";
 import { expect, test } from "./fixtures";
 import { failChargesFor } from "./payment-gateway";
 
@@ -13,7 +13,7 @@ test.use({ storageState: { cookies: [], origins: [] } });
 
 // backend の Client と同じ形で、決済代行の WireMock へ直接請求する。
 function charge(request: APIRequestContext, orderId: string): Promise<APIResponse> {
-  return request.post(`${wireMockUrl}/v1/charges`, {
+  return request.post(`${paymentGatewayUrl}/v1/charges`, {
     headers: { "Idempotency-Key": orderId },
     data: { orderId, amount: 240, currency: "JPY" },
   });

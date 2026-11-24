@@ -729,8 +729,6 @@ tasks:
   be-run:
     desc: 業務データが空なら代表データを入れてから、バックエンドをホスト上で起動
     dir: backend
-    # AWS の SDK は Spring が読む ../.env を見ないので、../.env を環境変数にして bootRun に渡す（ADR-125）。
-    dotenv: ['../.env']
     cmds:
       # bootRun のアプリは常に ../.env を読むので、シードも .env に固定して接続先をそろえる。
       - task: _be-seed

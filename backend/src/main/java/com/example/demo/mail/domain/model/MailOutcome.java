@@ -16,4 +16,14 @@ public sealed interface MailOutcome {
 
   /** 同じ要求を送り直しても受け付けられないため、送らなかったメール。契約に合わない応答もここに入れる。 */
   record Rejected() implements MailOutcome {}
+
+  /** 送信のサービスが受け付けたメール。 */
+  static MailOutcome sent(final MailMessageId messageId) {
+    return new Sent(messageId);
+  }
+
+  /** 同じ要求を送り直しても受け付けられないため、送らなかったメール。 */
+  static MailOutcome rejected() {
+    return new Rejected();
+  }
 }

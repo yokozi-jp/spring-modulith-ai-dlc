@@ -41,8 +41,8 @@ const credentials = {
   username: requireEnv("E2E_USERNAME"),
   password: requireEnv("E2E_PASSWORD"),
 };
-// ホストへ公開した compose-test の WireMock（.env.test の PAYMENT_GATEWAY_BASE_URL）。決済代行と SES v2 の API の偽物を兼ねる。
-export const wireMockUrl = requireEnv("PAYMENT_GATEWAY_BASE_URL");
+// ホストへ公開した compose-test の決済代行の WireMock（.env.test の PAYMENT_GATEWAY_BASE_URL）。
+export const paymentGatewayUrl = requireEnv("PAYMENT_GATEWAY_BASE_URL");
 // Keycloak の redirect URI と Cookie の host に合わせ、127.0.0.1 ではなく localhost を使う。
 export const webOrigin = `http://localhost:${webPort()}`;
 // task fe-check は .env.test なしでこのファイルを import するため、compose-test の既定の issuer の origin を既定値にする。

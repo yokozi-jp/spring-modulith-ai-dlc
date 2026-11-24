@@ -82,29 +82,10 @@ backend を再起動せず、シナリオの途中で注文ごとに応答を切
 
 ## 送ったメールを読む
 
-backend が送ったメールは、compose-test の WireMock（`environment.ts` の `wireMockUrl`）の要求の記録から読む（[ADR-125](../adr/ADR-125-send-mail-with-ses-v2-api-and-fake-it-with-wiremock.md)）。
+backend が送ったメールは、compose-test の WireMock（`.env.test` の `PAYMENT_GATEWAY_BASE_URL`。決済代行と同じ WireMock を指す）の要求の記録から読む（[ADR-125](../adr/ADR-125-send-mail-with-ses-v2-api-and-fake-it-with-wiremock.md)）。
 メールを読む spec はまだない。
 
-- 管理 API の `POST /__admin/requests/find` に、`SendEmail` のパスと宛先で絞った条件を送る。
-  宛先は spec ごとに一意にし、並列の spec が送ったメールと分ける。
-
-  ```json
-  {
-    "method": "POST",
-    "url": "/v2/email/outbound-emails",
-    "bodyPatterns": [
-      {
-        "matchesJsonPath": {
-          "expression": "$.Destination.ToAddresses[0]",
-          "equalTo": "invitee-<UUID>@example.com"
-        }
-      }
-    ]
-  }
-  ```
-
-- 応答の `requests[].body` は SDK が送った JSON の文字列で、件名は `Content.Simple.Subject.Data`、本文は `Content.Simple.Body.Text.Data` にある。
-- setup project の開始時に `DELETE /__admin/requests` を一度呼び、前の実行のメールを読まないようにする。
+- 管理 API の `POST /__admin/requests/find` に、`/v2/email/outbound-emails` のパスと、`$.Destination.ToAddresses[0]` で絞った一意の宛先を送ると、`requests[].body` に SDK が送った JSON の文字列が返る。
 
 ## 認証
 

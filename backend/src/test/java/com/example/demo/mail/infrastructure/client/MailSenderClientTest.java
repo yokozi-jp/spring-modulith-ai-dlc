@@ -34,9 +34,7 @@ import org.springframework.boot.test.system.CapturedOutput;
 import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.core.NestedExceptionUtils;
 import org.springframework.core.env.StandardEnvironment;
-import software.amazon.awssdk.auth.credentials.AwsBasicCredentials;
-import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider;
-import software.amazon.awssdk.core.exception.ApiCallTimeoutException;
+import software.amazon.awssdk.core.exception.SdkClientException;
 import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.sesv2.SesV2Client;
 import software.amazon.awssdk.services.sesv2.model.SesV2Exception;
@@ -239,7 +237,7 @@ class MailSenderClientTest {
   }
 
   @Test
-  @DisplayName("応答が呼び出しのタイムアウト 2 秒を超えれば、ApiCallTimeoutException を投げる")
+  @DisplayName("応答が上限の 2 秒を超えれば、SdkClientException（呼び出しのタイムアウトか読み取りのタイムアウト）を投げる")
   // 応答を止める間に割り込まれたら、割り込みの状態を戻す。
   @SuppressWarnings("PMD.DoNotUseThreads")
   void slowReplyTimesOut() throws IOException {
@@ -258,7 +256,8 @@ class MailSenderClientTest {
     try {
       final long started = System.nanoTime();
       assertThatThrownBy(() -> client.send(TO, SUBJECT, BODY))
-          .isInstanceOf(ApiCallTimeoutException.class);
+          // 呼び出し全体の上限と読み取りの上限は同じ 2 秒で、どちらが先に切れるかは負荷で変わる。どちらも SdkClientException になる。
+          .isInstanceOf(SdkClientException.class);
       // 応答を止める 10 秒より十分に短いことを確かめる。負荷の下でも通るよう、2 秒に 3 倍の余裕を見る。
       assertThat(Duration.ofNanos(System.nanoTime() - started))
           .as("タイムアウトするまでの時間")
@@ -273,7 +272,7 @@ class MailSenderClientTest {
   void tooLongFromNameIsRejected() {
     // UTF-8 で 46 バイト。Base64 で 64 文字になり、前後の 12 文字と合わせて 75 文字を超える。
     final String fromName = "あ".repeat(15) + "a";
-    try (SesV2Client unused = SesV2Client.builder().region(Region.AP_NORTHEAST_1).build()) {
+    try (SesV2Client unused = unconnectedClient()) {
       assertThatThrownBy(
               () -> new MailSenderClient(unused, FROM_ADDRESS, fromName, CONFIGURATION_SET))
           .isInstanceOf(IllegalArgumentException.class)
@@ -284,7 +283,7 @@ class MailSenderClientTest {
   @Test
   @DisplayName("From の表示名が UTF-8 で 45 バイトなら、Client を作れる")
   void longestFromNameIsAccepted() {
-    try (SesV2Client unused = SesV2Client.builder().region(Region.AP_NORTHEAST_1).build()) {
+    try (SesV2Client unused = unconnectedClient()) {
       assertThat(new MailSenderClient(unused, FROM_ADDRESS, "あ".repeat(15), CONFIGURATION_SET))
           .as("45 バイトの表示名の Client")
           .isNotNull();
@@ -306,7 +305,7 @@ class MailSenderClientTest {
       final String fromName,
       final String configurationSet,
       final String property) {
-    try (SesV2Client unused = SesV2Client.builder().region(Region.AP_NORTHEAST_1).build()) {
+    try (SesV2Client unused = unconnectedClient()) {
       assertThatThrownBy(
               () -> new MailSenderClient(unused, fromAddress, fromName, configurationSet))
           .isInstanceOf(IllegalArgumentException.class)
@@ -351,9 +350,13 @@ class MailSenderClientTest {
                 .getPropertySources()
                 .remove(StandardEnvironment.SYSTEM_ENVIRONMENT_PROPERTY_SOURCE_NAME))
         .withConfiguration(AutoConfigurations.of(PropertyPlaceholderAutoConfiguration.class))
-        .withBean(
-            SesV2Client.class, () -> SesV2Client.builder().region(Region.AP_NORTHEAST_1).build())
+        .withBean(SesV2Client.class, MailSenderClientTest::unconnectedClient)
         .withBean(MailSenderClient.class);
+  }
+
+  /** 接続しない SDK の Client。リージョンだけを持つ。 */
+  private static SesV2Client unconnectedClient() {
+    return SesV2Client.builder().region(Region.AP_NORTHEAST_1).build();
   }
 
   /**
@@ -370,23 +373,10 @@ class MailSenderClientTest {
       throws IOException {
     final LoopbackHttpServer started = LoopbackHttpServer.start().handle(SEND_EMAIL, handler);
     server = started;
-    final SesV2Client client = sesV2Client(started, readTimeout);
+    final SesV2Client client =
+        SesV2TestClients.create(URI.create(started.url()), Duration.ofSeconds(1), readTimeout);
     sdkClient = client;
     return new MailSenderClient(client, FROM_ADDRESS, FROM_NAME, CONFIGURATION_SET);
-  }
-
-  /** 本番と同じ設定の SDK の Client に、HTTP サーバの接続先、リージョン、資格情報を足して作る。 */
-  private static SesV2Client sesV2Client(
-      final LoopbackHttpServer target, final Duration readTimeout) {
-    return SesV2ClientConfig.build(
-        SesV2Client.builder()
-            .endpointOverride(URI.create(target.url()))
-            .region(Region.AP_NORTHEAST_1)
-            .credentialsProvider(
-                StaticCredentialsProvider.create(
-                    AwsBasicCredentials.create("test-access-key", "test-secret-key"))),
-        Duration.ofSeconds(1),
-        readTimeout);
   }
 
   /** JSON の本文で応答する。エラーの種類があれば、SES と同じく {@code x-amzn-ErrorType} のヘッダーで返す。本文が空なら本文を送らない。 */

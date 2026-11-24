@@ -38,6 +38,8 @@ tags: [convention, mail, backend, ses, external-system]
 
 - 呼び出し元は、`Sent` と `Rejected` を業務の状態に記録して正常に返し、Listener を正常終了させる。
   `Rejected` は、同じ要求を再投入しても受け付けられないためである。
+- 資格情報を SDK が取れない失敗（タスクのロールがなく `Unable to load credentials` になる場合など）は、SES へ届く前の `SdkClientException` なので、一時障害と同じく circuit breaker の失敗に数え、イベント出版は `FAILED` になる。
+  SES が資格情報を断る 403 は数えない。
 - 呼び出し元は SDK の例外を捕まえない。
   例外が Listener の外へ出ると、イベント出版が `FAILED` に残り、再投入を待つ（[非同期処理の失敗時の再試行と回復](../integration/async-failure-recovery.md)）。
 - `MailOutcome` は `switch` で網羅して分ける（[バックエンドの型の設計規約](../backend/java-type-modeling.md#switch-を網羅させる)）。
@@ -52,6 +54,12 @@ tags: [convention, mail, backend, ses, external-system]
   呼び出し元は、自分で再試行しない。
 - 送ってから commit の前に落ちると、再投入で 2 通目が出る。
   呼び出し元は、送った時刻を業務の状態に記録し、記録があれば送らない。
+- タイムアウトと接続の切断（`ApiCallTimeoutException`、`SdkClientException`）では、SES が受け付けた後に応答を受け取れなかった場合がある。
+  このときは何も記録されず、再投入で同じメールが 2 通届く。
+  送った時刻の記録では防げないので、メールは少なくとも 1 回届く（at-least-once）ものとして、1 通多く届いても困らない本文にする。
+- SDK の最初の呼び出しはクラスの読み込みで遅く、タスクの起動直後の 1 通が、2 秒の上限を超えやすい。
+  本番は SES へ温め用の呼び出しをしない（権限と送信の実績を増やさないため）。
+  起動直後の失敗は、再投入で回復する。
   2 回届いたイベントで 2 回目が行を変えない形にする（[順序保証と冪等性](../integration/async-ordering-and-idempotency.md)）。
 
 ## 設定
@@ -69,14 +77,19 @@ tags: [convention, mail, backend, ses, external-system]
   1 つの encoded-word に収まらない表示名は、起動の時点で失敗する。
 - 形式の誤った From のアドレスと、空白だけの表示名と設定セットも、起動の時点で失敗する。
   起動を通すと、SES が要求ごとに `BadRequestException` を返し、すべてのメールが `Rejected` として記録されるためである。
-- 接続先、リージョン、資格情報は AWS の SDK の既定の取得に任せ、`application.yaml` に書かない。
+- 接続先、リージョン、資格情報は `application.yaml` に書かない。
+  Spring の設定に `AWS_ENDPOINT_URL_SESV2` があるときだけ、`SesV2ClientConfig` がその接続先と `AWS_REGION`、`AWS_ACCESS_KEY_ID`、`AWS_SECRET_ACCESS_KEY` を Client に渡す（ローカルとテスト）。
+  ないときは AWS の SDK の既定の取得に任せる（本番）。
   本番の値は[本番で SES から送る設定](production-setup.md)に、ローカルの値は `.env.example` にある。
+- Client は環境変数のプロキシ（`HTTP_PROXY` など）を読まない。
 - タイムアウトは接続 1 秒、呼び出し全体 2 秒にする（[ADR-019](../adr/ADR-019-define-resilience-and-capacity-guardrails.md)）。
   Listener はトランザクションの中で外部システムを呼ぶので、最悪の時間（2 秒）は `DB_IDLE_IN_TRANSACTION_TIMEOUT_MS` より短くする。
+  `DemoApplicationTest` が、`payment-gateway` と同じ式で `mail-sender` の最悪の時間を確かめる。
 
 ## ログ
 
-- `MailSenderClient` は、拒否したときだけ WARN のログに例外の型と SES のエラーコードを出す。
+- `MailSenderClient` は、拒否したときだけ WARN のログに例外の型、SES のエラーコード、SES の要求の ID を出す。
+  要求の ID は、SES の記録と突き合わせる鍵になる。
 - 宛先のアドレス、件名、本文、SES のエラーの文面をログに出さない（[ADR-015](../adr/ADR-015-structure-and-protect-observability-data.md)）。
   `MessageRejected` の文面は、確かめられなかった宛先を含みうる。
 - `MailSenderClient` が投げる SES の例外は、SES のエラーの文面を落とし、型、状態のコード、エラーコード、要求の ID だけを持つ。

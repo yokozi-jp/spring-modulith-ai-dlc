@@ -17,7 +17,6 @@ import org.jspecify.annotations.Nullable;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import software.amazon.awssdk.awscore.exception.AwsErrorDetails;
-import software.amazon.awssdk.awscore.exception.AwsServiceException;
 import software.amazon.awssdk.services.sesv2.SesV2Client;
 import software.amazon.awssdk.services.sesv2.model.BadRequestException;
 import software.amazon.awssdk.services.sesv2.model.Content;
@@ -115,9 +114,9 @@ class MailSenderClient implements MailSender {
     }
     if (messageId == null || messageId.isBlank()) {
       log.warn("SES reply violated the contract: MessageId is missing");
-      return new MailOutcome.Rejected();
+      return MailOutcome.rejected();
     }
-    return new MailOutcome.Sent(new MailMessageId(messageId));
+    return MailOutcome.sent(new MailMessageId(messageId));
   }
 
   /** 宛先を TO の 1 人にし、件名と本文を UTF-8 のプレーンテキストにした要求を作る。 */
@@ -136,10 +135,14 @@ class MailSenderClient implements MailSender {
   /** SES が拒否したことを、例外の型とエラーコードだけで記録し、拒否の結果を返す。 */
   private static MailOutcome rejected(final SesV2Exception exception) {
     final String type = exception.getClass().getSimpleName();
-    final @Nullable AwsErrorDetails details = exception.awsErrorDetails();
-    final @Nullable String errorCode = details == null ? null : details.errorCode();
-    log.warn("SES rejected the mail: exception={}, errorCode={}", type, errorCode);
-    return new MailOutcome.Rejected();
+    final @Nullable String errorCode = errorCode(exception);
+    final @Nullable String requestId = exception.requestId();
+    log.warn(
+        "SES rejected the mail: exception={}, errorCode={}, requestId={}",
+        type,
+        errorCode,
+        requestId);
+    return MailOutcome.rejected();
   }
 
   /**
@@ -147,20 +150,27 @@ class MailSenderClient implements MailSender {
    *
    * <p>投げた例外のメッセージは、Spring Modulith と非同期の実行のログに出る。SES の文面は宛先と ID を含みうるため、ここで落とす。
    */
-  private static AwsServiceException withoutErrorText(final SesV2Exception exception) {
+  private static SesV2Exception withoutErrorText(final SesV2Exception exception) {
     final @Nullable AwsErrorDetails details = exception.awsErrorDetails();
-    final @Nullable String errorCode = details == null ? null : details.errorCode();
-    return exception.toBuilder()
-        .message("SES returned an error: errorCode=" + errorCode)
-        .awsErrorDetails(
-            details == null
-                ? null
-                : AwsErrorDetails.builder()
-                    .errorCode(errorCode)
-                    .serviceName(details.serviceName())
-                    .build())
-        .cause(null)
-        .build();
+    // toBuilder は同じ型の builder を返すので、build の結果は元の例外と同じ型の SesV2Exception になる。
+    return (SesV2Exception)
+        exception.toBuilder()
+            .message("SES returned an error: errorCode=" + errorCode(exception))
+            .awsErrorDetails(
+                details == null
+                    ? null
+                    : AwsErrorDetails.builder()
+                        .errorCode(errorCode(exception))
+                        .serviceName(details.serviceName())
+                        .build())
+            .cause(null)
+            .build();
+  }
+
+  /** SES のエラーコード。詳細がなければ null。 */
+  private static @Nullable String errorCode(final SesV2Exception exception) {
+    final @Nullable AwsErrorDetails details = exception.awsErrorDetails();
+    return details == null ? null : details.errorCode();
   }
 
   /** UTF-8 の文字列の Content を作る。 */

@@ -14,10 +14,7 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import software.amazon.awssdk.auth.credentials.AwsBasicCredentials;
-import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider;
 import software.amazon.awssdk.core.exception.SdkClientException;
-import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.sesv2.SesV2Client;
 
 /**
@@ -92,15 +89,7 @@ class SesV2ClientConfigTest {
   /** 上限を渡して作った SDK の Client に、接続先、リージョン、資格情報を足して作る。 */
   private static SesV2Client client(
       final URI endpoint, final Duration connectTimeout, final Duration readTimeout) {
-    return SesV2ClientConfig.build(
-        SesV2Client.builder()
-            .endpointOverride(endpoint)
-            .region(Region.AP_NORTHEAST_1)
-            .credentialsProvider(
-                StaticCredentialsProvider.create(
-                    AwsBasicCredentials.create("test-access-key", "test-secret-key"))),
-        connectTimeout,
-        readTimeout);
+    return SesV2TestClients.create(endpoint, connectTimeout, readTimeout);
   }
 
   /** 呼び出し全体の上限を apiCallTimeout に延ばして 1 通送る。 */

@@ -23,9 +23,8 @@ PostgreSQLの初期化は`docker/initdb`を、WireMockのスタブは`docker/wir
 
 ## 設定と接続先
 
-接続先（`DB_*`、`MIGRATION_DB_*`、`PAYMENT_GATEWAY_BASE_URL`）は、起動したコンテナの値がほかのすべての設定より優先される。
-AWS の SDK は Spring の設定を読まないため、SES v2 の接続先、リージョン、ダミーの資格情報は、`InfrastructureContainers` が SDK のシステムプロパティ（`aws.endpointUrlSesV2`、`aws.region`、`aws.accessKeyId`、`aws.secretAccessKey`）で渡す（[ADR-125](../adr/ADR-125-send-mail-with-ses-v2-api-and-fake-it-with-wiremock.md)）。
-SDK はシステムプロパティを環境変数より優先するので、`.env.test` の `AWS_*` は Gradle のテストに効かない。
+接続先（`DB_*`、`MIGRATION_DB_*`、`PAYMENT_GATEWAY_BASE_URL`、`AWS_ENDPOINT_URL_SESV2`）は、起動したコンテナの値がほかのすべての設定より優先される。
+SES v2 の接続先と、ダミーの `AWS_REGION`、`AWS_ACCESS_KEY_ID`、`AWS_SECRET_ACCESS_KEY` も同じ経路で渡し、`SesV2ClientConfig` が Client に入れる（[ADR-125](../adr/ADR-125-send-mail-with-ses-v2-api-and-fake-it-with-wiremock.md)）。
 接続先以外の設定は`.env.test`から読む。
 Gradleの`test`とPITは`.env.test`を`spring.config.import`で読み込み、開発用の`.env`を使わない。
 `-PtestEnvFile=<backendからの相対パス>`で読むファイルを変える。

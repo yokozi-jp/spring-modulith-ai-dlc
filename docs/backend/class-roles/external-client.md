@@ -1,7 +1,7 @@
 ---
 type: Convention
 title: クラスの役割：外部システムの Client
-description: infrastructure.client に置き、外部システムのインタフェースを HTTP で実装する Client の定義、置き場所と命名、必須の記述（タイムアウトと名前付きの Resilience4j の instance）、呼び出しの結果の分類、依存、例、テスト（JDK の HttpServer と WireMock）、アンチパターン、作成時のチェックリストを定める。外部システムの HTTP API を呼ぶ実装を作るときに読む。
+description: infrastructure.client に置き、外部システムのインタフェースを HTTP で実装する Client の定義、置き場所と命名、必須の記述（タイムアウトと名前付きの Resilience4j の instance）、呼び出しの結果の分類、依存、例、テスト（LoopbackHttpServer と WireMock）、アンチパターン、作成時のチェックリストを定める。外部システムの HTTP API を呼ぶ実装を作るときに読む。
 tags: [convention, backend, class-role]
 ---
 
@@ -109,6 +109,8 @@ Client は、外部システムの呼び出しの結果を次の四つに分け�
 
 - 結果は `domain.model` の型（`Paid`、`Declined`、`Failed` の三つの record を持つ sealed interface の `ChargeOutcome`）で返す。
   CommandHandler は結果を集約に記録して正常に返し、リスナーを正常終了させる。
+- SDK を使う Client は、この分類のうち、結果と例外の分け方を自分の文書に持ってよい。
+  `MailSenderClient` は、4xx の多くを例外にして `FAILED` に残し、回復しない拒否と契約に合わない応答だけを結果にする（[メールを送る Client](../../mail/sending.md#結果と失敗の扱い)）。
 - 契約の不備は、Client が `HttpClientErrorException` を捕まえて失敗の結果に変え、状態のコードを WARN のログに残す。
 - 契約に合わない応答は、`201` 以外の 2xx と 3xx、本文がない、JSON として読めない（`UnknownContentTypeException`、原因が `HttpMessageNotReadableException`）、`status` が未知かない、`chargeId` がないか空白だけの応答である。
   同じ要求を再投入しても直らないため、Client は失敗の結果に変え、状態のコードと `status` を WARN のログに残し、本文はログに出さない。
@@ -133,6 +135,8 @@ SDK と生成した型は、Client の中だけで使う。
 - **閉じ込める。** SDK と生成した型を、Client の引数、戻り値、`domain.model` の型に出さない。Client の中で Domain の型へ写す。
 - **応答を検査する。** 応答は、必須の項目も `null` や型違いを許す前提で受け、検査してから Domain の型へ写す。生成した型を検査せずにそのまま返さない。検査に通らない応答は、契約の不備の結果にする。
 - **依存してよい型を足す。** SDK を使う Client の「依存してよい型」に、その SDK のパッケージを足す。ほかの Client と `domain.model`、`application` には足さない。
+  `MailSenderClient` と `SesV2ClientConfig` は、`software.amazon.awssdk..` と `com.example.demo.shared.validation.MailAddress` を足す。
+- **計測は SDK の機構に従う。** SDK の呼び出しは `RestClient` を通らないので、Boot の `http.client.requests` の計測は付かない。チェックリストの「Boot の計測が付く」は、SDK を使う Client では対象外にする（[ADR-125](../../adr/ADR-125-send-mail-with-ses-v2-api-and-fake-it-with-wiremock.md)）。
 
 `domain.model` と `application` が外部ライブラリの型に依存すると、ArchUnit の `domainModelDependsOnlyOnAllowedTypes` と `applicationDependsOnlyOnAllowedTypes` が落ちる（[ArchUnit の規則](../architecture-tests.md)）。
 `PaymentGatewayClient` は、手書きの private record `ChargeReply`（項目は `@Nullable`）で応答を受け、`toOutcome` で検査してから `ChargeOutcome` に写す。
@@ -247,7 +251,7 @@ paymentRepository.add(payment);
 
 ## 対応するテスト
 
-Client の単体テストは JDK の `HttpServer` で、リトライ、circuit breaker、イベント出版を通す結合テストと E2E は WireMock で書く。
+Client の単体テストは `testkit` の `LoopbackHttpServer`（JDK の `HttpServer`）で、リトライ、circuit breaker、イベント出版を通す結合テストと E2E は WireMock で書く。
 
 ### Client の単体テスト
 
@@ -301,6 +305,11 @@ class PaymentGatewayClientTest {
 
 ### WireMock の結合テスト
 
+SDK を使う Client の結合テストは、`@SpringBootTest` で `testkit` の `InfrastructureContainers` が起動する共有の WireMock を指す。
+例は `MailSenderClientIntegrationTest` で、`PaymentGatewayClientIntegrationTest` と違い、テストごとに `WireMockServer` を起動しない。
+共有の WireMock の記録は、テストごとに一意の宛先で絞って読む。
+以下は `RestClient` を使う Client の手順である。
+
 リトライ、circuit breaker、イベント出版の状態は、`@ApplicationModuleTest` の中で Client を WireMock（`org.wiremock:wiremock-standalone`、`testImplementation` だけ）に向けて確かめる。
 例は `PaymentGatewayClientIntegrationTest` である。
 
@@ -348,9 +357,9 @@ class PaymentGatewayClientTest {
 - [ ] `@Transactional` を付けない。［ArchUnit で検査：PackageByFeatureOnionArchitectureTest.transactionalMethodsArePublicApplicationMethods］
 - [ ] `@Component` を付けた package-private の class にし、URL を `@Value` で受け取る。［自分で点検］
 - [ ] `RestClient` を、注入された `RestClient.Builder` から作る（`RestClient.builder()`、`RestClient.create()`、`ClientHttpRequestFactoryBuilder.jdk()` などを使わない）。［ArchUnit で検査：GeneralCodingRulesArchTest.restClientIsBuiltFromInjectedBuilder］
-- [ ] 呼び出しに Boot の計測が付く。［結合テストで検査：DemoApplicationTest.paymentGatewayCallIsObserved］
+- [ ] 呼び出しに Boot の計測が付く（SDK を使う Client は対象外）。［結合テストで検査：DemoApplicationTest.paymentGatewayCallIsObserved］
 - [ ] 接続 1 秒、呼び出し 2 秒のタイムアウトを `application.yaml` に書き、コンストラクタで受け取る。［自分で点検］
-- [ ] トランザクションの中で呼ぶなら、最悪の時間を `DB_IDLE_IN_TRANSACTION_TIMEOUT_MS` より短くする。［結合テストで検査：DemoApplicationTest.paymentGatewayWorstCaseFitsIdleInTransactionTimeout］
+- [ ] トランザクションの中で呼ぶなら、最悪の時間を `DB_IDLE_IN_TRANSACTION_TIMEOUT_MS` より短くする。［結合テストで検査：DemoApplicationTest.externalClientWorstCaseFitsIdleInTransactionTimeout］
 - [ ] 名前付きの instance の `@CircuitBreaker` と `@Retry` をメソッドに付け、`application.yaml` に設定を書く。［自分で点検］
 - [ ] circuit breaker の instance に、429 以外の 4xx を無視する `ignore-exception-predicate` を指定する。［結合テストで検査：PaymentGatewayClientIntegrationTest］
 - [ ] 業務上の拒否と契約の不備を結果で返し、一時障害と資格情報の不備を例外で投げる。［結合テストで検査：PaymentGatewayClientIntegrationTest］

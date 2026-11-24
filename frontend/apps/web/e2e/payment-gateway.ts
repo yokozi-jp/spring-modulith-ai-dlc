@@ -1,6 +1,6 @@
 import type { APIRequestContext } from "@playwright/test";
 
-import { wireMockUrl } from "./environment.ts";
+import { paymentGatewayUrl } from "./environment.ts";
 import { expect } from "./fixtures.ts";
 import { readJson } from "./orders.ts";
 
@@ -32,7 +32,7 @@ function chargeResponse(orderId: string, failure: ChargeFailure) {
 // 実行中に足したスタブを消し、docker/wiremock/mappings の共有のスタブだけに戻す。
 // 前の実行で後片付けが走らずに残った注文ごとのスタブを持ち越さないよう、E2E の開始時に一度呼ぶ。
 export async function resetPaymentGatewayStubs(request: APIRequestContext): Promise<void> {
-  const reset = await request.post(`${wireMockUrl}/__admin/mappings/reset`);
+  const reset = await request.post(`${paymentGatewayUrl}/__admin/mappings/reset`);
   expect(reset.ok(), "決済代行の WireMock のスタブの初期化").toBe(true);
 }
 
@@ -41,7 +41,7 @@ export async function chargeRequestCount(
   request: APIRequestContext,
   orderId: string,
 ): Promise<number> {
-  const response = await request.post(`${wireMockUrl}/__admin/requests/count`, {
+  const response = await request.post(`${paymentGatewayUrl}/__admin/requests/count`, {
     data: {
       method: "POST",
       url: "/v1/charges",
@@ -63,7 +63,7 @@ export async function failChargesFor(
   const response = chargeResponse(orderId, failure);
   // 取り除くときに指す ID を自分で決めて渡し、応答の本文を読まずに済ませる。
   const id = crypto.randomUUID();
-  const created = await request.post(`${wireMockUrl}/__admin/mappings`, {
+  const created = await request.post(`${paymentGatewayUrl}/__admin/mappings`, {
     data: {
       id,
       priority: 1,
@@ -77,7 +77,7 @@ export async function failChargesFor(
   });
   expect(created.status(), `orderId=${orderId} の失敗のスタブの登録`).toBe(201);
   return async () => {
-    const removed = await request.delete(`${wireMockUrl}/__admin/mappings/${id}`);
+    const removed = await request.delete(`${paymentGatewayUrl}/__admin/mappings/${id}`);
     expect(removed.ok(), `orderId=${orderId} の失敗のスタブ ${id} の削除`).toBe(true);
   };
 }
