@@ -42,6 +42,7 @@ import org.springframework.web.bind.annotation.RestController;
 // ArchUnit の JUnit 5 エンジンが @ArchTest フィールドを読むため、規則ファクトリだけを持つクラスでもユーティリティクラスにしない。
 @SuppressWarnings({
   "PMD.TestClassWithoutTestCases",
+  "PMD.TooManyMethods",
   "PMD.TooManyStaticImports",
   "PMD.UseUtilityClass"
 })
@@ -53,6 +54,14 @@ class PackageByFeatureOnionArchitectureTest {
 
   /** Domain のパッケージのパターン。 */
   private static final String DOMAIN_PACKAGE = "..domain..";
+
+  /** Lombok が生成したコードに付ける注釈。テストの実行時のクラスパスに Lombok がないので、名前で比べる。 */
+  private static final DescribedPredicate<JavaClass> LOMBOK_GENERATED =
+      DescribedPredicate.describe(
+          "lombok.Generated", javaClass -> "lombok.Generated".equals(javaClass.getName()));
+
+  /** 基底パッケージに続く、各モジュールの Domain Model のパッケージ。 */
+  private static final String MODULE_DOMAIN_MODEL = ".*.domain.model..";
 
   /** Domain Model のパッケージ。 */
   private static final String DOMAIN_MODEL_PACKAGE = "..domain.model..";
@@ -151,28 +160,15 @@ class PackageByFeatureOnionArchitectureTest {
                   + "規約：docs/backend/class-roles/jooq-repository.md、"
                   + ADR_002);
 
-  /** Domain Model を Spring、jOOQ、JPA、Jackson から独立させる。 */
+  /** Domain Model の依存先を許可した型だけに限る。 */
   @ArchTest
-  /* package */ static final ArchRule domainModelDoesNotDependOnFrameworks =
-      noClasses()
-          .that()
-          .resideInAPackage(DOMAIN_MODEL_PACKAGE)
-          .should()
-          .dependOnClassesThat()
-          .resideInAnyPackage(
-              "org.springframework..",
-              "org.jooq..",
-              "com.example.demo.jooq..",
-              "jakarta.persistence..",
-              "com.fasterxml.jackson..",
-              "tools.jackson..")
-          .allowEmptyShould(true)
-          .because(
-              "業務モデルと業務規則を技術詳細から独立させ、テストと変更をしやすくするため。"
-                  + "直し方：domain.model からフレームワークの型とアノテーションを取り除き、"
-                  + "技術の処理は Application か Infrastructure へ移す。"
-                  + "規約：docs/backend/layers.md、"
-                  + ADR_002);
+  /* package */ static final ArchRule domainModelDependsOnlyOnAllowedTypes =
+      domainModelDependsOnlyOnAllowedTypesRule(BASE_PACKAGE);
+
+  /** Application の依存先を、許可した外部ライブラリの型とこのアプリケーションの型に限る。 */
+  @ArchTest
+  /* package */ static final ArchRule applicationDependsOnlyOnAllowedTypes =
+      applicationDependsOnlyOnAllowedTypesRule(BASE_PACKAGE);
 
   /** 値オブジェクトの不変条件の違反を、422 になる業務上の失敗ではなく {@link IllegalArgumentException} で表す。 */
   @ArchTest
@@ -366,7 +362,7 @@ class PackageByFeatureOnionArchitectureTest {
   /** 基底パッケージ配下の各機能モジュールに、外側から内側へ向かう依存を強制する規則を組み立てる。 */
   /* package */ static ArchRule dependenciesPointInwardRule(final String basePackage) {
     return Architectures.onionArchitecture()
-        .domainModels(basePackage + ".*.domain.model..")
+        .domainModels(basePackage + MODULE_DOMAIN_MODEL)
         .domainServices(basePackage + ".*.domain.service..")
         .applicationServices(basePackage + ".*", basePackage + ".*.application..")
         .adapter("presentation", basePackage + ".*.presentation..")
@@ -482,6 +478,62 @@ class PackageByFeatureOnionArchitectureTest {
                 + ADR_050);
   }
 
+  /**
+   * Domain Model の依存先を許可した型だけに限る規則を組み立てる。許可する型は、この規則の一覧と {@code docs/backend/architecture-tests.md}
+   * が持つ。
+   */
+  /* package */ static ArchRule domainModelDependsOnlyOnAllowedTypesRule(final String basePackage) {
+    return classes()
+        .that()
+        .resideInAPackage(basePackage + MODULE_DOMAIN_MODEL)
+        .should()
+        .onlyDependOnClassesThat(
+            resideInAnyPackage(
+                    "java..",
+                    "org.jspecify..",
+                    basePackage + MODULE_DOMAIN_MODEL,
+                    basePackage + ".shared.concurrency..",
+                    basePackage + ".shared.failure..",
+                    basePackage + ".shared.tenancy..")
+                .or(LOMBOK_GENERATED))
+        .allowEmptyShould(true)
+        .because(
+            "業務モデルと業務規則を、フレームワークと外部システムの SDK の型から独立させ、テストと変更をしやすくするため。"
+                + "直し方：domain.model から許可していない型とアノテーションを取り除き、"
+                + "技術の処理は Application か Infrastructure へ移す。"
+                + "外部システムの SDK と生成型は infrastructure.client の中に閉じ、domain.model の型へ写す。"
+                + "許可する型を足すときは、この規則の一覧と docs/backend/architecture-tests.md を直す。"
+                + "規約：docs/backend/layers.md、docs/backend/class-roles/external-client.md、"
+                + ADR_002);
+  }
+
+  /** Application の依存先を、許可した外部ライブラリの型とこのアプリケーションの型に限る規則を組み立てる。 */
+  /* package */ static ArchRule applicationDependsOnlyOnAllowedTypesRule(final String basePackage) {
+    return classes()
+        .that()
+        .resideInAPackage(basePackage + ".*.application..")
+        .should()
+        .onlyDependOnClassesThat(
+            resideInAnyPackage(
+                    "java..",
+                    "org.jspecify..",
+                    "org.slf4j..",
+                    "org.springframework.stereotype..",
+                    "org.springframework.transaction.annotation..",
+                    "org.springframework.modulith.events..",
+                    "org.springframework.context",
+                    basePackage + "..")
+                .or(LOMBOK_GENERATED))
+        .allowEmptyShould(true)
+        .because(
+            "外部システムの SDK、生成型、HTTP の型が Application の引数と戻り値に出ると、"
+                + "ユースケースが外部の技術詳細に結びつくため。"
+                + "直し方：外部ライブラリの型は infrastructure の中に閉じ、Application では Domain の型を使う。"
+                + "許可する型を足すときは、この規則の一覧と docs/backend/architecture-tests.md を直す。"
+                + "規約：docs/backend/layers.md、docs/backend/class-roles/command-handler.md、"
+                + ADR_002);
+  }
+
   /** Domain Service の依存先を標準型、JSpecify、Lombok、Domain と {@code @Service} に限る規則を組み立てる。 */
   /* package */ static ArchRule domainServicesDependOnlyOnDomainAndJavaRule(
       final String basePackage) {
@@ -513,7 +565,7 @@ class PackageByFeatureOnionArchitectureTest {
         .that()
         .resideOutsideOfPackage(DOMAIN_PACKAGE)
         .and()
-        .implement(resideInAPackage(basePackage + ".*.domain.model.."))
+        .implement(resideInAPackage(basePackage + MODULE_DOMAIN_MODEL))
         .should()
         .resideInAPackage("..infrastructure..")
         .allowEmptyShould(true)

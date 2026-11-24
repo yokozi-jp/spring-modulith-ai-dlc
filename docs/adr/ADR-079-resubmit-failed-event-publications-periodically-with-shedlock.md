@@ -54,7 +54,7 @@ Spring Modulith 2.2 は、終端の状態 `ABANDONED` と `AbandonPolicy`（[GH-
 利用者の `AbandonPolicy` が判断しなければ、`spring.modulith.events.resubmission.abandon-after-attempts` と、渡された出版の `getCompletionAttempts()` を比べ、それ以上なら諦める。
 `ABANDONED` の出版は、再投入にも Staleness Monitor にも読まれない。
 `completion-mode: archive` では、`COMPLETED` と同じく archive の表へ移る（2.2.0 の `JdbcEventPublicationRepositoryV2.markAbandoned`）。
-Spring Boot の版は [ADR-119](ADR-119-keep-spring-boot-4-1-with-spring-modulith-2-2.md) で決める。
+Spring Boot の版は [ADR-122](ADR-122-keep-spring-boot-4-1-with-spring-modulith-2-2.md) で決める。
 
 2.2.0 の `AbandonPolicy.shouldAbandon` は `EventPublication` だけを受け取る。
 `EventPublication` には失敗の例外を返すメソッドがなく、`CompletionRegisteringAdvisor` も例外を `markFailed` に渡さない（2.2.0 の `CompletionRegisteringAdvisor.java:153-181`）。
@@ -374,7 +374,7 @@ Resilience4j は再投入と補完関係にあり、ADR-019 のとおり client 
 - [ADR-070: SQL の span を jOOQ の ExecuteListener で作り、SQL の文と値を入れない](ADR-070-record-sql-spans-with-jooq-execute-listener.md)
 - [ADR-072: 外部システムを本番のコードで偽らず、WireMock のコンテナで偽る](ADR-072-fake-external-systems-with-wiremock.md)
 - [ADR-121: イベント出版の完了を、リスナーのトランザクションの後の新しいトランザクションで記録する](ADR-121-record-event-publication-completion-in-interceptor.md)
-- [ADR-119: Spring Modulith 2.2.0 を Spring Boot 4.1.2 のまま入れ、Spring Boot 4.2 と Spring Cloud 2026.0 への更新を別の変更にする](ADR-119-keep-spring-boot-4-1-with-spring-modulith-2-2.md)
+- [ADR-122: Spring Modulith 2.2.0 を Spring Boot 4.1.2 のまま入れ、Spring Boot 4.2 と Spring Cloud 2026.0 への更新を別の変更にする](ADR-122-keep-spring-boot-4-1-with-spring-modulith-2-2.md)
 - [ADR-120: archive の表の保持期限を COMPLETED の行だけに掛け、ABANDONED の行は運用者が戻すか消すまで残す](ADR-120-keep-abandoned-event-publications-out-of-archive-retention.md)
 - [設計の作り込みの程度と段階的な再構築](../principles/right-sizing.md)
 - [非同期処理の失敗時の再試行と回復](../integration/async-failure-recovery.md)

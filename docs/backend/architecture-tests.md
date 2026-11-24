@@ -59,7 +59,10 @@ jOOQの生成物の`com.example.demo.jooq`はOPENのモジュールであり、`
   `package-info`は`@ApplicationModule`の宣言を持つため対象から除く。
   違反フィクスチャの`OrderPlacedReadingTenantContext`（`TenantContext`への依存）で確かめる。
 - `databaseTechnologyApisAreOnlyUsedByPersistenceAdapters`：jOOQ APIと生成型は`infrastructure.persistence`だけで使う。
-- `domainModelDoesNotDependOnFrameworks`：`domain.model`はSpring、jOOQ、jOOQの生成型、JPA、Jacksonに依存しない。
+- `domainModelDependsOnlyOnAllowedTypes`：`domain.model`は、`java..`、`org.jspecify..`、各モジュールの`domain.model`、`shared.concurrency`、`shared.failure`、`shared.tenancy`、`lombok.Generated`だけに依存する。
+  許可の一覧で止めるため、外部システムのSDKや生成型も、Spring、jOOQ、JPA、Jacksonの型と同じく落ちる。
+  Lombokの注釈のうち、許すのは生成したコードに付く`lombok.Generated`だけである（`lombok.NonNull`など、クラスファイルに残るほかの注釈は落ちる）。
+- `applicationDependsOnlyOnAllowedTypes`：`application`は、このアプリケーションの型のほかに、`java..`、`org.jspecify..`、`lombok.Generated`、`org.slf4j..`、`org.springframework.stereotype..`、`org.springframework.transaction.annotation..`、`org.springframework.modulith.events..`、`org.springframework.context`（パッケージ直下）だけに依存する。
 - `domainServicesDependOnlyOnDomainAndJava`：`domain.service`は`java..`、`org.jspecify..`、`lombok..`、Domainの型、`shared.failure`の例外、`@Service`だけに依存する。
 - `domainServicesAreAnnotatedWithService`：`domain.service`のトップレベルのクラスに`@Service`を付ける。
 - `servicesResideInApplicationOrDomainService`：`@Service`を付けた型は`application`か`domain.service`に置く。
@@ -143,6 +146,17 @@ jOOQの生成物の`com.example.demo.jooq`はOPENのモジュールであり、`
   読み取りは、`into`、`intoMap`、`intoGroups`、`fetchMap`、`fetchGroups`と名前が`Into`で終わるメソッドのうち、`Class`を受け取るもの（`into(Class)`、`fetchInto(Class)`、`fetchMap(Field, Class)`など）を検出する。
   書き込みと既存のオブジェクトへの対応づけは、`Record`の`into(Object)`と`from(Object)`、`DSLContext.newRecord(Table, Object)`を検出する。
   `convertFrom`、`Records.mapping`、`into(Table)`、`fetch(RecordMapper)`と、列の型を変換する`intoArray(Field, Class)`、`intoSet(Field, Class)`、`fetch(Field, Class)`は呼んでよい。
+
+## 許可する外部ライブラリの型を足す
+
+`domain.model`と`application`が使える外部ライブラリの型は、`PackageByFeatureOnionArchitectureTest`の`domainModelDependsOnlyOnAllowedTypesRule`と`applicationDependsOnlyOnAllowedTypesRule`の`resideInAnyPackage`が持つ。
+`@PreAuthorize`のような型を使うときは、次の順で直す。
+
+1. 型を使う層が、その型を使ってよい理由を、層の規約（[layers.md](layers.md)とクラスの役割の「依存してよい型」）に書く。
+2. 該当する規則の`resideInAnyPackage`に、必要な最小のパッケージを足す。
+3. この節の上の規則の説明を直す。
+
+型を許す理由が書けないときは、型を`infrastructure`の中に閉じる。
 
 ## 規則を確かめるフィクスチャ
 

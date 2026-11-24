@@ -2,7 +2,7 @@ openapi: 3.1.0
 info:
   description: Demo アプリケーションの HTTP API
   title: Demo API
-  version: 0.8.0
+  version: 0.9.0
 servers:
 - description: 現在のオリジン
   url: /
@@ -957,5 +957,5 @@ components:
     sessionCookie:
       description: ブラウザの Cookie セッション（ADR-007、ADR-059）
       in: cookie
-      name: APP_SESSION
+      name: __Host-APP_SESSION
       type: apiKey

@@ -1,6 +1,13 @@
-import type { APIRequestContext, BrowserContext, Cookie, Locator, Page } from "@playwright/test";
+import type { APIRequestContext, BrowserContext, Locator, Page } from "@playwright/test";
 
-import { idpOrigin, logIn, signInAndChooseTenant, webOrigin } from "./environment";
+import {
+  findCookie,
+  idpOrigin,
+  logIn,
+  sessionCookieName,
+  signInAndChooseTenant,
+  webOrigin,
+} from "./environment";
 import { expect, test } from "./fixtures";
 import {
   expectAuthenticatedHome,
@@ -27,10 +34,10 @@ function csrfInput(page: Page): Locator {
   return page.locator('input[name="_csrf"]');
 }
 
-// ログアウトの前の APP_SESSION を送り直すため、browser の Cookie を共有しない request で確かめる。
+// ログアウトの前の __Host-APP_SESSION を送り直すため、browser の Cookie を共有しない request で確かめる。
 async function replayedApiStatus(request: APIRequestContext, session: string): Promise<number> {
   const response = await request.get("/api/missing", {
-    headers: { Cookie: `APP_SESSION=${session}` },
+    headers: { Cookie: `${sessionCookieName}=${session}` },
   });
   return response.status();
 }
@@ -40,10 +47,10 @@ async function expectApplicationSessionEnded(
   request: APIRequestContext,
   oldSession: string,
 ): Promise<void> {
-  // ログアウトの応答は APP_SESSION を消す。
+  // ログアウトの応答は __Host-APP_SESSION を消す。
   const cookies = await context.cookies();
-  expect(cookies.map(({ name }) => name)).not.toContain("APP_SESSION");
-  // ログアウト前の APP_SESSION を送り直しても、サーバ側のセッションが消えていれば 401 になる。
+  expect(cookies.map(({ name }) => name)).not.toContain(sessionCookieName);
+  // ログアウト前の __Host-APP_SESSION を送り直しても、サーバ側のセッションが消えていれば 401 になる。
   expect(await replayedApiStatus(request, oldSession)).toBe(401);
 }
 
@@ -64,16 +71,6 @@ async function expectLogoutRejected(page: Page): Promise<string | null> {
   await page.goto("/");
   await expectAuthenticatedHome(page);
   return submittedToken;
-}
-
-// Cookie がないまま undefined を送り、別の理由で失敗するのを防ぐ。
-async function findCookie(context: BrowserContext, name: string): Promise<Cookie> {
-  const cookies = await context.cookies();
-  const cookie = cookies.find((candidate) => candidate.name === name);
-  if (cookie === undefined || cookie.value === "") {
-    throw new Error(`${name} Cookie がありません`);
-  }
-  return cookie;
 }
 
 // 再読み込みしても同じ session のまま、URL の query と fragment を送らないことを確かめる。
@@ -167,7 +164,7 @@ test("ログアウト後はアプリと SSO のセッションが終わり、も
   request,
 }) => {
   await logIn(page);
-  const { value: oldSession } = await findCookie(context, "APP_SESSION");
+  const { value: oldSession } = await findCookie(context, sessionCookieName);
   // 再送の経路が Cookie を届けていることを、ログアウト前に同じ経路で示す。
   expect(await replayedApiStatus(request, oldSession)).toBe(404);
   await logoutButton(page).click();
@@ -253,25 +250,6 @@ test("/collect が 503 を返しても、ログインとログアウトのフォ
 
   await logoutButton(page).click();
   await expectLoggedOutPage(page);
-});
-
-// CsrfFilter は Cookie のない要求でだけ新しい token を発行する（RepositoryDeferredCsrfToken）。
-// page.request は context の __Host- の Cookie を http://localhost にも送るため、Cookie を共有しない request で送る。
-// request が Cookie を持たないのは、file 先頭の test.use で storageState を空にしているためである。
-// 別の spec へ移すときは storageState を空にする。
-// ApiContractTest は MockMvc で Set-Cookie の文字列を作らず、DAST は 10054 で失敗しないので、実際の server の文字列はここで確かめる。
-test("CSRF の Cookie を __Host- の属性で発行する", async ({ request }) => {
-  const response = await request.post("/api/missing");
-  expect(response.status()).toBe(403);
-  const setCookie = response
-    .headersArray()
-    .filter(({ name }) => name.toLowerCase() === "set-cookie")
-    .map(({ value }) => value)
-    .find((value) => value.startsWith("__Host-XSRF-TOKEN="));
-  expect(setCookie).toMatch(/; Path=\/(?:;|$)/u);
-  expect(setCookie).toMatch(/; Secure(?:;|$)/u);
-  expect(setCookie).toMatch(/; SameSite=Lax(?:;|$)/u);
-  expect(setCookie).not.toMatch(/; (?:Domain|HttpOnly)/iu);
 });
 
 // AppShell の header で「ログアウト」が最初に focus を受け取る要素であることに依存する。

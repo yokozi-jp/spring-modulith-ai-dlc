@@ -294,12 +294,12 @@ server:
       # URL rewriting を無効化し、セッション ID は Cookie だけで送受信する。
       tracking-modes: cookie
       cookie:
-        # アプリケーションが管理するセッション Cookie であることを明示する。
-        name: APP_SESSION
+        # __Host- は Secure、Path=/、Domain なしを要求し、別の host からの書き込みを塞ぐ（ADR-119）。
+        name: __Host-APP_SESSION
         # JavaScript から Cookie を読めなくする（XSS によるセッション窃取対策）
         http-only: true
-        # HTTPS 経由でのみ Cookie を送る。本番/STG は true、ローカル（HTTP）は false。
-        secure: ${SESSION_COOKIE_SECURE}
+        # __Host- の条件なので環境によらず true。localhost の HTTP は Chromium と Firefox が安全とみなす（ADR-066）。
+        secure: true
         # クロスサイトでの Cookie 送信を制限する（CSRF 対策）
         same-site: lax
 

@@ -1,4 +1,4 @@
-import { signInOnKeycloak, webOrigin } from "./environment";
+import { sessionCookieName, signInOnKeycloak, webOrigin } from "./environment";
 import { expect, test } from "./fixtures";
 import { openExpectingLogin } from "./pages";
 
@@ -23,7 +23,7 @@ test("テナントを選ぶ操作がアプリのセッション切れで 401 に
   const heading = page.getByRole("heading", { level: 1, name: "テナントを選んでください" });
   await expect(heading).toBeVisible();
 
-  await context.clearCookies({ name: "APP_SESSION" });
+  await context.clearCookies({ name: sessionCookieName });
   // 401 を受けた元の文書も一覧を取り直して 401 になるため、200 は読み込み直した文書だけが返す。
   const reloaded = page.waitForResponse(
     (response) =>

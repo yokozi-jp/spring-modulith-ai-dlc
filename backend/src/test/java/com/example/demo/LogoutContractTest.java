@@ -72,8 +72,8 @@ class LogoutContractTest {
             new SecurityContextImpl(
                 new OAuth2AuthenticationToken(user, user.getAuthorities(), "web")));
     // DefaultCookieSerializer の既定どおり、Cookie の値は session ID の Base64 にする。
-    // 埋め込みサーバのない MockMvc では server.servlet.session.cookie.name（APP_SESSION）が適用されず、
-    // Spring Session の既定名 SESSION になる。APP_SESSION の名前は E2E が実際のサーバで確かめる。
+    // 埋め込みサーバのない MockMvc では server.servlet.session.cookie.name（__Host-APP_SESSION）が適用されず、
+    // Spring Session の既定名 SESSION になる。__Host-APP_SESSION の名前は E2E が実際のサーバで確かめる。
     sessionCookie =
         new Cookie("SESSION", Base64.getEncoder().encodeToString(sessionId.getBytes(UTF_8)));
 

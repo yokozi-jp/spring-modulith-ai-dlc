@@ -1,11 +1,11 @@
 ---
 type: ADR
-title: 'ADR-119: Spring Modulith 2.2.0 を Spring Boot 4.1.2 のまま入れ、Spring Boot 4.2 と Spring Cloud 2026.0 への更新を別の変更にする'
+title: 'ADR-122: Spring Modulith 2.2.0 を Spring Boot 4.1.2 のまま入れ、Spring Boot 4.2 と Spring Cloud 2026.0 への更新を別の変更にする'
 description: Spring Modulith 2.2.0 は Spring Boot 4.2.0 でビルドされているが、参照する API が Spring Boot 4.1.2 で解決しテストが通ることを根拠に 4.1.2 のまま入れ、Spring Cloud 2026.0 を伴う Spring Boot 4.2 への更新を別の変更にする決定。
 tags: [adr, backend, spring-boot, spring-modulith, spring-cloud, dependencies]
 ---
 
-# ADR-119: Spring Modulith 2.2.0 を Spring Boot 4.1.2 のまま入れ、Spring Boot 4.2 と Spring Cloud 2026.0 への更新を別の変更にする
+# ADR-122: Spring Modulith 2.2.0 を Spring Boot 4.1.2 のまま入れ、Spring Boot 4.2 と Spring Cloud 2026.0 への更新を別の変更にする
 
 ## Status
 

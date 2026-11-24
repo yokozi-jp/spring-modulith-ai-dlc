@@ -148,7 +148,7 @@ components:
     sessionCookie:
       type: apiKey
       in: cookie
-      name: APP_SESSION
+      name: __Host-APP_SESSION
   schemas:
     ProblemDetail:
       type: object

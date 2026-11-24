@@ -65,7 +65,7 @@ function postWithCredentials({ address, port }: AddressInfo, path: string) {
         path,
         method: "POST",
         headers: {
-          Cookie: "APP_SESSION=secret",
+          Cookie: "__Host-APP_SESSION=secret",
           Authorization: "Bearer secret",
           "Proxy-Authorization": "Basic secret",
           "Content-Type": "application/reports+json",
