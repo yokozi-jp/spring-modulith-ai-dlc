@@ -12,23 +12,17 @@ import org.springframework.web.context.request.ServletRequestAttributes;
 import org.springframework.web.filter.ServerHttpObservationFilter;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
-/** どの Problem Details にも、要求の trace ID を traceId で付け、instance を出さない（ADR-117）。 */
+/** どの Problem Details にも、要求の trace ID を traceId で付け、instance を設定しない（ADR-117）。 */
 @Configuration(proxyBeanMethods = false)
 class ProblemDetailsConfig implements WebMvcConfigurer {
 
   /** 問い合わせとログを結ぶ trace ID を入れる拡張メンバー。 */
   /* package */ static final String TRACE_ID = "traceId";
 
-  /**
-   * 応答を書く直前の Problem Details を整える。
-   *
-   * <p>Spring Framework 7.0 は handler が返した後で空の instance に要求のパスを入れ、その後でこの interceptor を呼ぶ。 instance
-   * はどの handler の Problem Details でも消し、handler が外す手段はない。
-   */
+  /** 応答を書く直前の Problem Details を整える。 */
   @Override
   public void addErrorResponseInterceptors(final List<ErrorResponse.Interceptor> interceptors) {
     interceptors.add((detail, errorResponse) -> {
-      detail.setInstance(null);
       requestTraceId().ifPresent(traceId -> detail.setProperty(TRACE_ID, traceId));
     });
   }

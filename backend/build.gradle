@@ -13,7 +13,7 @@ buildscript {
 
 plugins {
     id 'java'
-    id 'org.springframework.boot' version '4.1.2'
+    id 'org.springframework.boot' version '4.2.0'
     id 'io.spring.dependency-management' version '1.1.7'
     id 'org.cyclonedx.bom' version '3.5.1'
     id 'jacoco'
@@ -64,7 +64,7 @@ repositories {
 }
 
 ext {
-    set('springCloudVersion', "2025.1.2")
+    set('springCloudVersion', "2026.0.0")
     set('springModulithVersion', "2.2.0")
 }
 
@@ -118,7 +118,7 @@ dependencies {
     // --- 可観測性・メトリクス ---
     implementation 'org.springframework.boot:spring-boot-starter-actuator'
     implementation 'org.springframework.boot:spring-boot-starter-opentelemetry'
-    // dependencyManagement の opentelemetry-bom と対応する版（2.33.0 は api 1.67.0 を前提にする）。BOM を上げるときは同時に上げる。
+    // Spring Boot の BOM の opentelemetry-bom と対応する版（2.33.0 は api 1.67.0 を前提にする、Boot 4.2.0 の BOM は 1.68.0）。Boot を上げるときは同時に上げる。
     implementation 'io.opentelemetry.instrumentation:opentelemetry-logback-appender-1.0:2.33.0-alpha'
 
     // --- 耐障害性 ---
@@ -185,11 +185,6 @@ dependencyManagement {
         mavenBom "com.fasterxml.jackson:jackson-bom:2.23.0"
         // Jackson 3.x 系（Spring Boot 4 / Modulith 由来の 3.1.5）を 3.1.6 へ。
         mavenBom "tools.jackson:jackson-bom:3.3.0"
-        // --- 脆弱性対応（OpenTelemetry BOM の推移的バージョン上書き） ---
-        // opentelemetry-api の CVE-2026-118259（W3C tracestate の解析で二次の CPU 消費）対応。
-        // api 単体ではなく BOM を上げ、sdk など同系列の版ずれを避ける。Spring Boot の BOM が 1.67.0 以上になったら、この行を消す。
-        // opentelemetry-logback-appender は api と版を対応させる必要があるため、同時に上げる（.github/dependabot.yml の ignore を参照）。
-        mavenBom "io.opentelemetry:opentelemetry-bom:1.68.0"
     }
     dependencies {
         // --- 脆弱性対応（推移的依存のバージョン強制） ---

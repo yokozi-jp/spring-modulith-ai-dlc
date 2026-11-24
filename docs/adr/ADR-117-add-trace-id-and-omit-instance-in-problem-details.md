@@ -26,7 +26,7 @@ Proposed
 Spring Framework 7.0.10 は、handler が返した Problem Details の `instance` が空なら、要求のパスを入れる。
 `/error` へ転送された失敗では、元のパスではなく `/error` が入る。
 どちらの値も特定の失敗の発生を識別しないので、RFC 9457 の `instance` の意味にも ADR-013 にも合わない。
-Spring Framework 7.1.0 は、同じ理由で `instance` を入れなくなる（[spring-framework#35969](https://github.com/spring-projects/spring-framework/issues/35969)）。
+Spring Framework 7.1 は、同じ理由で `instance` を入れなくなった（[spring-framework#35969](https://github.com/spring-projects/spring-framework/issues/35969)）。
 
 trace ID の正本は Micrometer Tracing の trace ID であり、独自の request ID を重ねない（[ADR-015](ADR-015-structure-and-protect-observability-data.md)）。
 コンソールの ECS JSON のログは `traceId` を、OTLP のログは LogRecord の TraceId を持つ。
@@ -42,7 +42,7 @@ ADR-013 のエラー表現のうち、`traceId` と `instance` の行を次の�
 - `X-Request-Id` のような独自の request ID を応答に付けない。ADR-015 のとおり、trace ID を正本にする。
 - `traceId` は相関のためだけに使い、認可と冪等性の鍵に使わない。クライアントが `traceparent` で値を決められるためである。
 
-`traceId` と `instance` は、Spring MVC が Problem Details を書く直前に呼ぶ `ErrorResponse.Interceptor` の 1 か所で扱う。
+`traceId` は、Spring MVC が Problem Details を書く直前に呼ぶ `ErrorResponse.Interceptor` の 1 か所で扱う。
 advice が返す Problem Details も、`/error` が返す Problem Details も、この interceptor を通るためである。
 `ErrorResponse.Interceptor` は要求を引数に受け取らないので、interceptor は要求を `RequestContextHolder`（スレッドに束縛した要求）から読む。
 interceptor を呼ぶのは、Spring MVC の handler の戻り値の処理だけである。
@@ -72,13 +72,11 @@ observation の filter が Spring Security の filter より前にあること�
 ### Positive
 
 - 利用者が応答の `traceId` を伝えれば、運用者は同じ trace のログとトレースを探せる。
-- `instance` に失敗を識別しない値が入らなくなり、RFC 9457 と ADR-013 に合う。Spring Framework 7.1 へ上げても応答は変わらない。
+- `instance` に失敗を識別しない値が入らなくなり、RFC 9457 と ADR-013 に合う。Spring Framework 7.1 へ上げても応答は変わらない（[ADR-122](ADR-122-raise-spring-boot-4-2-after-spring-modulith-2-2.md)）。応答に `instance` が出ないことは、`ApiErrorContractTest` と `ProblemDetailsTraceIdContractTest` が固定する。
 
 ### Negative
 
 - 同じ失敗でも、要求ごとに本文の `traceId` が変わる。本文の完全一致で 2 つの応答を比べられない。
-- Spring Framework 7.0 の間は、interceptor で `instance` を消す。7.1 へ上げたら、その処理を消す。
-  Spring Framework が空の `instance` に要求のパスを入れなくなると、`ProblemDetailsConfigTest` が失敗して知らせる。
 - sampling で標本にならなかった trace の span は Tempo に送られないので、その trace ID で Tempo のトレースは開けない。
 - 要求を `RequestContextHolder` から読むので、filter の順が変わって要求が束縛されないと、`traceId` が付かない。Spring Framework は interceptor の例外を無視するので、失敗は応答に出ない。実際のポートの契約テストが、この順の変化を検出する。
 
