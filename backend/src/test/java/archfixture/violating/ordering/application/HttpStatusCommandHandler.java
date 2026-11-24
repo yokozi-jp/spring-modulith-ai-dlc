@@ -4,7 +4,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Component;
 import org.springframework.web.server.ResponseStatusException;
 
-/** 違反：httpTypesAreUsedOnlyByHttpLayers（application の CommandHandler が HTTP の例外を投げる）。 */
+/** 違反：httpTypesAreNotUsedByInnerLayers（application の CommandHandler が HTTP の例外を投げる）。 */
 @Component
 public class HttpStatusCommandHandler {
 

@@ -2,7 +2,7 @@ package archfixture.violating.ordering.infrastructure.persistence;
 
 import org.springframework.http.HttpStatus;
 
-/** 違反：httpTypesAreUsedOnlyByHttpLayers（infrastructure.persistence が HTTP のステータスを使う）。 */
+/** 違反：httpTypesAreNotUsedByInnerLayers（infrastructure.persistence が HTTP のステータスを使う）。 */
 public final class HttpStatusOrderReader {
 
   /** 注文が見つからないときの HTTP のステータスを返す。 */

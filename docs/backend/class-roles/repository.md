@@ -64,7 +64,7 @@ Presentation は Repository を使わない。
 
 ## 依存してよい型、してはいけない型
 
-- **依存してよい型**：`java..` の標準型、`org.jspecify..`、同じ `domain.model` の集約ルート、値オブジェクト、enum、`shared.concurrency` の `ConflictException` と `shared.failure` の `NotFoundException`（Javadoc の `@throws` のため）。
+- **依存してよい型**：`java.lang..`、`java.util..`、`java.math..`、`java.time..` の標準型、`org.jspecify..`、同じ `domain.model` の集約ルート、値オブジェクト、enum、`shared.concurrency` の `ConflictException` と `shared.failure` の `NotFoundException`（Javadoc の `@throws` のため）。
 - **依存してはいけない型**：jOOQ の API と生成型（`DSLContext`、`Condition`、説明用の仮の生成型 `TOrderRecord`）、Spring の型（`Pageable`、`@Repository`）、JPA と Jackson の型、`application`、モジュールルートの型（参照の結果、検索条件）。
 
 ## 最小の例と典型的な例

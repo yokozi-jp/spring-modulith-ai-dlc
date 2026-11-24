@@ -31,16 +31,16 @@ final class ClassRoleFixtureRows {
                 VIOLATING),
             "ordering.application.OrderAuditColumns"),
         row(
-            "httpTypesAreUsedOnlyByHttpLayers: shared",
-            PackageByFeatureOnionArchitectureTest.httpTypesAreUsedOnlyByHttpLayersRule(VIOLATING),
+            "httpTypesAreNotUsedByInnerLayers: shared",
+            PackageByFeatureOnionArchitectureTest.httpTypesAreNotUsedByInnerLayersRule(VIOLATING),
             "shared.persistence.ChildRowWriter"),
         row(
-            "httpTypesAreUsedOnlyByHttpLayers: application",
-            PackageByFeatureOnionArchitectureTest.httpTypesAreUsedOnlyByHttpLayersRule(VIOLATING),
+            "httpTypesAreNotUsedByInnerLayers: application",
+            PackageByFeatureOnionArchitectureTest.httpTypesAreNotUsedByInnerLayersRule(VIOLATING),
             "ordering.application.HttpStatusCommandHandler"),
         row(
-            "httpTypesAreUsedOnlyByHttpLayers: infrastructure.persistence",
-            PackageByFeatureOnionArchitectureTest.httpTypesAreUsedOnlyByHttpLayersRule(VIOLATING),
+            "httpTypesAreNotUsedByInnerLayers: infrastructure.persistence",
+            PackageByFeatureOnionArchitectureTest.httpTypesAreNotUsedByInnerLayersRule(VIOLATING),
             "ordering.infrastructure.persistence.HttpStatusOrderReader"),
         row(
             "noSuchElementExceptionIsNotThrown",

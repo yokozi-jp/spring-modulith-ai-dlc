@@ -40,7 +40,7 @@ tags: [architecture, backend, spring-modulith, shared-module]
   `shared.eventresubmission` は `shared.persistence` と同じ層として扱う。`shared` に `infrastructure` のパッケージは置かない。
   `shared.batch` を使ってよいのは、機能モジュールの `batch` だけである。
   `shared.concurrency`、`shared.failure`、`shared.events`、`shared.security`、`shared.tenancy`、`shared.validation` は、どの層からも使える。
-  ただし `domain.model` と `domain.service` が使える `shared` の型は、`shared.concurrency`、`shared.failure`、`shared.tenancy.TenantId` に限る（`domain.service` は `shared.failure` と `TenantId`）。
+  ただし `domain.model` と `domain.service` が使える `shared` の型は許可リストに限る（[ArchUnit の規則](architecture-tests.md)）。
 
 使う場所の制限は、`PackageByFeatureOnionArchitectureTest` の `sharedModuleIsUsedOnlyByPersistenceAdapters` が検査する。
 ただし、`shared` の `PgmCdAspect` は、AOP で `<UseCase>CommandHandler` の `handle` と `<Event>Listener` の呼び出しを囲む（[ADR-051](../adr/ADR-051-bind-pgm-cd-with-scoped-value-and-aspect.md)）。

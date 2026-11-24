@@ -104,4 +104,4 @@ DB と外部システムとの接続を扱う外側の領域を **Infrastructure
 
 Persistence、外部 Client、Presentation は別々の Adapter として扱い、互いに依存させない。
 Infrastructure は Application、Domain Service、モジュールルートの型に依存させない。
-`infrastructure.persistence` は Spring Web、Spring の HTTP、Servlet の型にも依存させない。HTTP の型を使えるのは `presentation.web`、`infrastructure.client`（`RestClient` など）、ベースパッケージ直下の設定だけである。
+`infrastructure.persistence` は Spring Web、Spring の HTTP、Servlet の型にも依存させない。HTTP の型を使うのは `presentation.web`、`infrastructure.client`（`RestClient` など）、ベースパッケージ直下の設定に限る。

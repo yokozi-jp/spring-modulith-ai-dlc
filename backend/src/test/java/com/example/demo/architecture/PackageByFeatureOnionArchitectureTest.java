@@ -99,10 +99,15 @@ class PackageByFeatureOnionArchitectureTest {
   private static final List<String> ANY_LAYER_SHARED_PACKAGES =
       List.of("concurrency", "failure", "events", "security", "tenancy", "validation");
 
-  /** Domain が使ってよい標準型のパッケージ。{@code java..} 全体は許さず、HTTP、ログ、I/O の型を止める。 */
-  private static final String[] DOMAIN_JAVA_PACKAGES = {
-    "java.lang..", "java.util..", "java.math..", "java.time.."
-  };
+  /**
+   * Domain が使ってよい標準型のパッケージ。{@code java..} 全体は許さず、{@code java.net.http}、{@code java.io}、{@code
+   * java.nio} などを止める。
+   */
+  private static final List<String> DOMAIN_JAVA_PACKAGES =
+      List.of("java.lang..", "java.util..", "java.math..", "java.time..");
+
+  /** テナントの ID の型の名前の、基底パッケージより後ろ。 */
+  private static final String TENANT_ID_TYPE = ".shared.tenancy.TenantId";
 
   /** Persistence Adapter のパッケージ。 */
   private static final String PERSISTENCE_PACKAGE = "..infrastructure.persistence..";
@@ -142,10 +147,10 @@ class PackageByFeatureOnionArchitectureTest {
   /* package */ static final ArchRule sharedModuleIsUsedOnlyByPersistenceAdapters =
       sharedModuleIsUsedOnlyByPersistenceAdaptersRule(BASE_PACKAGE);
 
-  /** HTTP の型を使える層を、presentation.web、infrastructure.client、ベースパッケージ直下の設定に限る。 */
+  /** shared、domain、application、infrastructure.persistence から HTTP の型への依存を禁止する。 */
   @ArchTest
-  /* package */ static final ArchRule httpTypesAreUsedOnlyByHttpLayers =
-      httpTypesAreUsedOnlyByHttpLayersRule(BASE_PACKAGE);
+  /* package */ static final ArchRule httpTypesAreNotUsedByInnerLayers =
+      httpTypesAreNotUsedByInnerLayersRule(BASE_PACKAGE);
 
   /** 機能ルートの公開契約は、標準型、JSpecify、同じルートパッケージの型だけに依存させる。 */
   @ArchTest
@@ -200,7 +205,9 @@ class PackageByFeatureOnionArchitectureTest {
                   + "状態に依存する業務規則は集約か Domain Service で BusinessRuleViolationException にする。"
                   + "規約：docs/backend/class-roles/value-object.md、docs/backend/class-roles/business-exception.md");
 
-  /** Domain Service は標準型、JSpecify、Lombok、Domain と {@code @Service} だけに依存させる。 */
+  /**
+   * Domain Service は標準型、JSpecify、Lombok、Domain、shared.failure、TenantId と {@code @Service} だけに依存させる。
+   */
   @ArchTest
   /* package */ static final ArchRule domainServicesDependOnlyOnDomainAndJava =
       domainServicesDependOnlyOnDomainAndJavaRule(BASE_PACKAGE);
@@ -456,7 +463,7 @@ class PackageByFeatureOnionArchitectureTest {
    * shared と各モジュールの {@code domain}、{@code application}、{@code infrastructure.persistence} が、Spring
    * Web、Spring の HTTP、Servlet の型に依存することを禁止する規則を組み立てる。
    */
-  /* package */ static ArchRule httpTypesAreUsedOnlyByHttpLayersRule(final String basePackage) {
+  /* package */ static ArchRule httpTypesAreNotUsedByInnerLayersRule(final String basePackage) {
     return noClasses()
         .that()
         .resideInAnyPackage(
@@ -469,7 +476,7 @@ class PackageByFeatureOnionArchitectureTest {
         .resideInAnyPackage(
             "org.springframework.web..", "org.springframework.http..", "jakarta.servlet..")
         .because(
-            "HTTP の型を使ってよい層を presentation.web、infrastructure.client、ベースパッケージ直下の設定に限り、"
+            "HTTP の型を使うのは presentation.web、infrastructure.client、ベースパッケージ直下の設定に限り、"
                 + "業務の失敗が ADR-062 の例外と ApiExceptionHandler を通らずに HTTP のステータスになることを防ぐため。"
                 + "直し方：業務上の失敗は shared.failure の NotFoundException、BusinessRuleViolationException と "
                 + "shared.concurrency の ConflictException で表し、"
@@ -553,7 +560,10 @@ class PackageByFeatureOnionArchitectureTest {
                 + ADR_002);
   }
 
-  /** Domain Service の依存先を標準型、JSpecify、Lombok、Domain と {@code @Service} に限る規則を組み立てる。 */
+  /**
+   * Domain Service の依存先を標準型、JSpecify、Lombok、Domain、{@code shared.failure}、{@code
+   * TenantId}、{@code @Service} に限る規則を組み立てる。
+   */
   /* package */ static ArchRule domainServicesDependOnlyOnDomainAndJavaRule(
       final String basePackage) {
     return classes()
@@ -596,14 +606,14 @@ class PackageByFeatureOnionArchitectureTest {
    * Domain が依存してよい型の述語を返す。
    *
    * <p>標準型は {@link #DOMAIN_JAVA_PACKAGES}、ライブラリは JSpecify と Lombok、このアプリケーションの型は {@code
-   * shared.tenancy.TenantId} と {@code domainPackages} だけである。{@code shared.tenancy.TenantContext} は
+   * shared.tenancy.TenantId} と {@code layerPackages} だけである。{@code shared.tenancy.TenantContext} は
    * ScopedValue の暗黙の文脈で、Domain が読むと引数に現れない入力になるため許さない。
    */
   private static DescribedPredicate<JavaClass> allowedInDomain(
-      final String basePackage, final String... domainPackages) {
-    return resideInAnyPackage(DOMAIN_JAVA_PACKAGES)
+      final String basePackage, final String... layerPackages) {
+    return resideInAnyPackage(DOMAIN_JAVA_PACKAGES.toArray(String[]::new))
         .or(resideInAnyPackage("org.jspecify..", "lombok.."))
-        .or(resideInAnyPackage(domainPackages))
+        .or(resideInAnyPackage(layerPackages))
         .or(
             DescribedPredicate.describe(
                 "shared.tenancy.TenantId",
@@ -636,8 +646,7 @@ class PackageByFeatureOnionArchitectureTest {
   private static ArchCondition<JavaClass> dependOnlyOnStandardTypesOrOwnPackage(
       final String basePackage) {
     final Set<String> tenantTypes =
-        Set.of(
-            basePackage + ".shared.tenancy.TenantId", basePackage + ".shared.tenancy.TenantScoped");
+        Set.of(basePackage + TENANT_ID_TYPE, basePackage + ".shared.tenancy.TenantScoped");
     return new ArchCondition<>(
         "depend only on java, org.jspecify, shared.tenancy.TenantId, shared.tenancy.TenantScoped,"
             + " or the same package") {
