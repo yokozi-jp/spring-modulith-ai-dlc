@@ -6,14 +6,18 @@ databaseChangeLog:
         再投入の Gauge（state=exhausted）が毎回数える archive の ABANDONED の行に、部分索引を張る（ADR-079）。
         archive の表は完了した出版も保持期限まで残すため、索引がないと集計が表の行数に比例して重くなる。
         稼働中の表に書き込みを止めずに作るため CONCURRENTLY にし、トランザクションの外で実行する。
+        中断した CREATE INDEX CONCURRENTLY は無効な索引を残し、IF NOT EXISTS はそれを作り直さずに飛ばす。
+        Liquibase は失敗した changeset を記録せずに次の update で再び実行するため、先に同じ名前の索引を消してから作る。
       runInTransaction: false
       preConditions:
         - dbms:
             type: postgresql
       changes:
         - sql:
+            sql: DROP INDEX CONCURRENTLY IF EXISTS modulith.event_publication_archive_abandoned_idx;
+        - sql:
             sql: >-
-              CREATE INDEX CONCURRENTLY IF NOT EXISTS event_publication_archive_abandoned_idx
+              CREATE INDEX CONCURRENTLY event_publication_archive_abandoned_idx
               ON modulith.event_publication_archive (publication_date)
               WHERE status = 'ABANDONED';
       rollback:

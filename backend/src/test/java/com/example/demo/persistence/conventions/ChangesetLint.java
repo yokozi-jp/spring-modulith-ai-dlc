@@ -50,7 +50,7 @@ final class ChangesetLint {
                   new AllowlistEntry(
                       ARBITRARY_SQL,
                       "027-add-event-publication-archive-abandoned-index: CREATE INDEX CONCURRENTLY"
-                          + " IF NOT EXISTS event_publication_archive_abandoned_idx ON"
+                          + " event_publication_archive_abandoned_idx ON"
                           + " modulith.event_publication_archive (publication_date) WHERE status ="
                           + " 'ABANDONED';",
                       "Liquibase OSS 5.0.4のcreateIndexは部分索引の条件とCONCURRENTLYを書けない。"
@@ -59,7 +59,8 @@ final class ChangesetLint {
                       ARBITRARY_SQL,
                       "027-add-event-publication-archive-abandoned-index: DROP INDEX CONCURRENTLY"
                           + " IF EXISTS modulith.event_publication_archive_abandoned_idx;",
-                      "CREATE INDEX CONCURRENTLYのrollbackであり、dropIndexはCONCURRENTLYを書けない。")))
+                      "中断したCREATE INDEX CONCURRENTLYが残す無効な索引を再試行の前に消すSQLと、そのrollbackである。"
+                          + "dropIndexはCONCURRENTLYを書けない。")))
           .flatMap(List::stream)
           .toList();
 

@@ -50,6 +50,11 @@ DBを`schema-v9`以前へ切り戻すとセッションの表が消えるため�
 この形は、本番にまだ業務データがなく、移す行がないために選んでいます。
 本番に業務データを入れた後で同じ種類の変更をするときは、移行の手順を作ります。
 
+027のchangeset（`schema-v12`）は、archiveの表の`ABANDONED`の行に部分索引を`CONCURRENTLY`で作るため、書き込みを止めずに適用できます（[ADR-079](../adr/ADR-079-resubmit-failed-event-publications-periodically-with-shedlock.md)）。
+索引がない間も旧版と新版は動き、再投入のGaugeの集計がarchiveの表を全件読むだけです。
+適用が途中で止まると無効な索引が残りますが、次の`task be-release-migrate`がそれを消してから作り直します。
+DBを`schema-v11`以前へ切り戻すと索引だけが消え、行は失われません。
+
 ## DB切り戻し
 
 DB切り戻しは指定タグより後に適用されたchangesetを新しい順に戻します。
