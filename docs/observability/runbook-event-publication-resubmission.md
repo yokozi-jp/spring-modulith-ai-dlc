@@ -119,6 +119,7 @@ Staleness Monitor が処理中の出版を `FAILED` に戻すまでの `in-fligh
 - **レベル**：`WARN`
 - **事象**：手での 1 回の再投入で、再投入した出版の一部が完了しなかったか、`max-per-run` を超えて再投入しなかった出版が残った。終了コードは 1 である。
 - **属性**：`event_publication.resubmitted.count`、`event_publication.completed.count`、`event_publication.incomplete.count`、`event_publication.remaining.count`
+  `resubmitted` は、再投入して `RESUBMITTED` へ進んだ出版の数である。選ばれても進まなかった出版は、どの属性にも数えない。
 - **発生原因**：原因が直っておらずリスナーがまた失敗した（`incomplete`）。
   リスナーが `completion-timeout`（10 分）を過ぎても終わらない（`incomplete`）。
   対象が `max-per-run`（100 件）より多い（`remaining`）。

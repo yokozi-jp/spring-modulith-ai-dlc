@@ -5,13 +5,14 @@ import io.micrometer.core.instrument.MeterRegistry;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.Optional;
+import java.util.Set;
+import java.util.UUID;
 import java.util.function.Predicate;
 import lombok.extern.slf4j.Slf4j;
-import net.javacrumbs.shedlock.core.LockingTaskExecutor;
 import net.javacrumbs.shedlock.support.LockException;
 import org.jooq.DSLContext;
 import org.springframework.modulith.events.EventPublication;
-import org.springframework.modulith.events.FailedEventPublications;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
@@ -62,16 +63,13 @@ class EventPublicationResubmitter {
 
   /* package */ EventPublicationResubmitter(
       final DSLContext dsl,
-      final FailedEventPublications failedEventPublications,
-      final LockingTaskExecutor eventPublicationLockingTaskExecutor,
+      final FailedPublicationSweep sweep,
       final ResubmissionPolicies policies,
       final Clock clock,
       final MeterRegistry meterRegistry,
       final EventPublicationResubmissionConfig.Properties properties,
       final EventPublicationResubmissionConfig.AbandonProperties abandon) {
-    this.sweep =
-        new FailedPublicationSweep(
-            dsl, failedEventPublications, eventPublicationLockingTaskExecutor, clock, properties);
+    this.sweep = sweep;
     this.policies = policies;
     this.clock = clock;
     this.properties = properties;
@@ -105,17 +103,16 @@ class EventPublicationResubmitter {
       final Instant now = Instant.now(clock);
       gauges.refresh(now);
       tracker.reconcile(now);
-      final FailedPublicationSweep.Attempt result =
-          sweep.sweep(
-              dueAt(now), new FailedPublicationSweep.LockMode.TryOnce(properties.lockAtLeastFor()));
-      if (!(result instanceof FailedPublicationSweep.Attempt.Swept swept)) {
+      final Optional<FailedPublicationSweep.Swept> swept = sweep.tryOnce(dueAt(now));
+      if (swept.isEmpty()) {
         skippedRuns.increment();
         log.debug("Event publication resubmission skipped");
         return;
       }
-      tracker.remember(swept.advanced(), now);
-      final int resubmitted = swept.advanced().size();
-      // 解放のあとに数え、解放に失敗した回を completed と failed の両方に数えない。
+      final Set<UUID> advanced = swept.get().advanced();
+      final int resubmitted = advanced.size();
+      // sweep はロックを放してから戻る。放すのに失敗した回は、覚えも数えもせず、failed の回にだけ数える。
+      tracker.remember(advanced, now);
       resubmissions.increment(resubmitted);
       if (resubmitted > 0) {
         log.atInfo()
@@ -140,7 +137,6 @@ class EventPublicationResubmitter {
    * <p>ponytail: 読んだ一覧は古くなる。実行が長引くと、その間に再び FAILED に戻った行を、一覧が古いまま回数の上限を超えて再投入しうる。 実行の長さを
    * lockAtMostFor の半分までに抑え、超えた後の行は候補にせず次の回に回す（古い行から取るので飢えない）。 実行が固まっても lockAtMostFor
    * でロックは切れるため、KeepAliveLockProvider で延長しない。
-   * 手での入口（EventPublicationResubmitOnce）は完了を待つ設計なので、この予算を適用しない。
    */
   private Predicate<EventPublication> dueAt(final Instant now) {
     final Duration budget = properties.lockAtMostFor().dividedBy(2);

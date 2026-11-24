@@ -75,7 +75,13 @@ class EventPublicationResubmitterBudgetTest {
     final SimpleMeterRegistry meterRegistry = new SimpleMeterRegistry();
     final EventPublicationResubmitter resubmitter =
         new EventPublicationResubmitter(
-            dsl, failed, lockingTaskExecutor, policies, clock, meterRegistry, properties, abandon);
+            dsl,
+            new FailedPublicationSweep(dsl, failed, lockingTaskExecutor, clock, properties),
+            policies,
+            clock,
+            meterRegistry,
+            properties,
+            abandon);
 
     resubmitter.resubmitOnce();
 

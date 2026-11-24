@@ -154,11 +154,15 @@ class EventPublicationResubmitterOutcomesTest {
     final EventPublicationResubmitter resubmitter =
         new EventPublicationResubmitter(
             dsl,
-            failedPublications(() -> {
-              move(id, RESUBMITTED);
-              complete(id);
-            }),
-            lockingTaskExecutor,
+            new FailedPublicationSweep(
+                dsl,
+                failedPublications(() -> {
+                  move(id, RESUBMITTED);
+                  complete(id);
+                }),
+                lockingTaskExecutor,
+                clock,
+                properties),
             policies,
             clock,
             meterRegistry,
@@ -290,8 +294,8 @@ class EventPublicationResubmitterOutcomesTest {
     final EventPublicationResubmitter second =
         new EventPublicationResubmitter(
             dsl,
-            failedPublications(() -> {}),
-            lockingTaskExecutor,
+            new FailedPublicationSweep(
+                dsl, failedPublications(() -> {}), lockingTaskExecutor, clock, properties),
             policies,
             clock,
             otherRegistry,
@@ -313,8 +317,8 @@ class EventPublicationResubmitterOutcomesTest {
       final EventPublicationResubmissionConfig.Properties jobProperties) {
     return new EventPublicationResubmitter(
         dsl,
-        failedPublications(() -> {}),
-        lockingTaskExecutor,
+        new FailedPublicationSweep(
+            dsl, failedPublications(() -> {}), lockingTaskExecutor, clock, jobProperties),
         policies,
         clock,
         meterRegistry,

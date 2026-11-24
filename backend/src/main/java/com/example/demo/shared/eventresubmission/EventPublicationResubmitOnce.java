@@ -1,16 +1,13 @@
 package com.example.demo.shared.eventresubmission;
 
 import com.example.demo.shared.eventresubmission.EventPublicationStates.State;
-import java.time.Clock;
 import java.util.Collection;
 import java.util.Set;
 import java.util.UUID;
 import java.util.function.Predicate;
 import lombok.extern.slf4j.Slf4j;
-import net.javacrumbs.shedlock.core.LockingTaskExecutor;
 import org.jooq.DSLContext;
 import org.springframework.modulith.events.EventPublication;
-import org.springframework.modulith.events.FailedEventPublications;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 
@@ -57,16 +54,12 @@ public class EventPublicationResubmitOnce {
 
   /* package */ EventPublicationResubmitOnce(
       final DSLContext dsl,
-      final FailedEventPublications failedEventPublications,
-      final LockingTaskExecutor eventPublicationLockingTaskExecutor,
+      final FailedPublicationSweep sweep,
       final ResubmissionPolicies policies,
-      final Clock clock,
       final EventPublicationResubmissionConfig.Properties properties,
       final EventPublicationResubmissionConfig.ResubmitOnceProperties onceProperties) {
     this.dsl = dsl;
-    this.sweep =
-        new FailedPublicationSweep(
-            dsl, failedEventPublications, eventPublicationLockingTaskExecutor, clock, properties);
+    this.sweep = sweep;
     this.policies = policies;
     this.properties = properties;
     this.onceProperties = onceProperties;
@@ -97,7 +90,7 @@ public class EventPublicationResubmitOnce {
       if (ALL.equals(raw)) {
         return new All();
       }
-      if (raw.startsWith(POLICY_PREFIX)) {
+      if (raw.startsWith(POLICY_PREFIX) && raw.length() > POLICY_PREFIX.length()) {
         return new Policy(raw.substring(POLICY_PREFIX.length()));
       }
       if (raw.startsWith(EVENT_TYPE_PREFIX) && raw.length() > EVENT_TYPE_PREFIX.length()) {
@@ -122,16 +115,8 @@ public class EventPublicationResubmitOnce {
     if (TransactionSynchronizationManager.isActualTransactionActive()) {
       throw new IllegalStateException("resubmit-once must not run inside a transaction");
     }
-    final FailedPublicationSweep.Attempt result =
-        sweep.sweep(selector(target), new FailedPublicationSweep.LockMode.WaitUpTo());
-    if (!(result instanceof FailedPublicationSweep.Attempt.Swept swept)) {
-      throw new IllegalStateException(
-          "lock "
-              + FailedPublicationSweep.LOCK_NAME
-              + " was not acquired within "
-              + properties.lockAtMostFor());
-    }
-    final Outcome outcome = awaitCompletion(swept.advanced(), swept.overLimit());
+    final FailedPublicationSweep.Swept swept = sweep.waitUpTo(selector(target));
+    final Outcome outcome = awaitCompletion(swept.advanced(), swept.remaining());
     record(outcome);
     return outcome;
   }
@@ -190,7 +175,7 @@ public class EventPublicationResubmitOnce {
   /**
    * 1 回の再投入の結果。
    *
-   * @param resubmitted 再投入した出版の数
+   * @param resubmitted 再投入して {@code RESUBMITTED} へ進んだ出版の数。選ばれても進まなかった出版は数えない
    * @param completed そのうち処理を完了した数
    * @param incomplete そのうち FAILED に戻るか ABANDONED になった数と、待つ上限を過ぎても処理中の数
    * @param remaining 対象に合うが、{@code max-per-run} を超えたため再投入しなかった数

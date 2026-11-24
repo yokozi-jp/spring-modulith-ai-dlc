@@ -39,7 +39,6 @@ import org.springframework.core.task.SimpleAsyncTaskExecutor;
 import org.springframework.core.task.TaskExecutor;
 import org.springframework.mock.env.MockEnvironment;
 import org.springframework.modulith.events.ApplicationModuleListener;
-import org.springframework.modulith.events.FailedEventPublications;
 import org.springframework.scheduling.TaskScheduler;
 import org.springframework.scheduling.annotation.AsyncConfigurer;
 import org.springframework.scheduling.config.FixedDelayTask;
@@ -130,7 +129,7 @@ class EventPublicationResubmissionConfigTest {
         .withConfiguration(AutoConfigurations.of(TaskSchedulingAutoConfiguration.class))
         .withUserConfiguration(EventPublicationResubmitter.class, ResubmissionPolicies.class)
         // 初回の遅延が 1 分あり、テストの間にタスクは動かないため、依存は mock で足りる。
-        .withBean(FailedEventPublications.class, () -> Mockito.mock(FailedEventPublications.class))
+        .withBean(FailedPublicationSweep.class, () -> Mockito.mock(FailedPublicationSweep.class))
         .withBean(
             Clock.class,
             () -> Clock.fixed(Instant.parse("2026-01-01T00:00:00.000000Z"), ZoneOffset.UTC))

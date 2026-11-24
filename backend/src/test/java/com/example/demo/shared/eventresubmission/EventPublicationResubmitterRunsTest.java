@@ -189,8 +189,7 @@ class EventPublicationResubmitterRunsTest {
     final EventPublicationResubmitter resubmitter =
         new EventPublicationResubmitter(
             failingDsl,
-            failed,
-            lockingTaskExecutor,
+            new FailedPublicationSweep(failingDsl, failed, lockingTaskExecutor, clock, properties),
             policies,
             clock,
             meterRegistry,
@@ -220,8 +219,8 @@ class EventPublicationResubmitterRunsTest {
   private EventPublicationResubmitter newResubmitter(final LockingTaskExecutor executor) {
     return new EventPublicationResubmitter(
         dsl,
-        Mockito.mock(FailedEventPublications.class),
-        executor,
+        new FailedPublicationSweep(
+            dsl, Mockito.mock(FailedEventPublications.class), executor, clock, properties),
         policies,
         clock,
         meterRegistry,

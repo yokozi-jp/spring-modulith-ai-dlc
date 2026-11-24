@@ -370,7 +370,7 @@ class PaymentGatewayClientIntegrationTest {
     // 2. 決済代行を共有の成功のスタブに戻し、payment の方針の出版を手での 1 回の再投入で再投入する。
     // 1 回の再投入は本番と同じくトランザクションの外から呼び、リスナーの完了まで待ってから戻る。
     WIREMOCK.removeStub(failing);
-    assertThat(resubmitOnce.run(Target.parse("policy:payment")).succeeded())
+    assertThat(resubmitOnce.run(new Target.Policy("payment")).succeeded())
         .as("orderId=%s の 1 回の再投入の結果", orderId)
         .isTrue();
     OrderConfirmedFixture.await(

@@ -87,7 +87,12 @@ final class ResubmissionTestSupport {
    */
   /* package */ static UUID insertArchived(
       final DSLContext dsl, final Instant publicationDate, final String status) {
-    final UUID id = UUID.randomUUID();
+    return insertArchived(dsl, publicationDate, status, UUID.randomUUID());
+  }
+
+  /** {@link #insertArchived(DSLContext, Instant, String)} の、ID を指定する版。 */
+  /* package */ static UUID insertArchived(
+      final DSLContext dsl, final Instant publicationDate, final String status, final UUID id) {
     dsl.insertInto(EVENT_PUBLICATION_ARCHIVE)
         .set(EVENT_PUBLICATION_ARCHIVE.ID, id)
         .set(EVENT_PUBLICATION_ARCHIVE.LISTENER_ID, "archived-test")
