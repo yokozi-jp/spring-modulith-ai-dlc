@@ -66,11 +66,11 @@ AWS SDK for Java v2 は、同じ値をシステムプロパティ `aws.endpointU
 - SES の `SendEmail` には冪等キーがないので、SDK の再試行を止めて試行を 1 回にする。
   Resilience4j の `mail-sender` の retry も `default`（試行 1 回）を継承する。
   再投入で同じメールを 2 回送らない扱いは、Client を呼ぶ Listener が決める。
-- 呼び出しの結果を、ADR-072 の分け方に合わせて次の四つに分ける。
-  1. 一時障害（接続の失敗、タイムアウト、スロットリングの `TooManyRequestsException`、5xx）：例外を投げ、イベント出版を `FAILED` に残して再投入を待つ。circuit breaker の失敗に数える。
-  2. 回復しない拒否（`MessageRejected`、`BadRequestException`）：例外を投げずに拒否の結果を返し、呼び出し元が業務の状態に記録する。同じ要求を再投入しても受け付けられないためである。
-  3. 資格情報と権限の不備（`AccessDeniedException` などの 403）と、運用者が直せる SES の不備（送信の停止、From のドメインの未検証、設定セットがない、送信の上限）：例外を投げ、`FAILED` に残す。直したあとの再投入で回復できるためである。スロットリングを除く 4xx は、SES の不調ではないので circuit breaker の失敗に数えない。
-  4. 契約に合わない応答（2xx で `MessageId` がない）：拒否の結果を返す。送り直すと 2 通目が出うるためである。
+- 呼び出しの結果は、ADR-072 の分け方に合わせる。
+  同じ要求を再投入しても受け付けられない拒否（`MessageRejected`、`BadRequestException`）と、送り直すと 2 通目が出うる `MessageId` のない応答は、拒否の結果で返す。
+  一時障害と、運用者が直したあとの再投入で回復できる不備（資格情報、権限、SES の設定）は、例外を投げてイベント出版を `FAILED` に残す。
+  スロットリングを除く 4xx は、SES の不調ではないので circuit breaker の失敗に数えない。
+  場合ごとの表は[メールを送る Client](../mail/sending.md#結果と失敗の扱い)にある。
 - Client のログと、Client が投げる SES の例外のメッセージには、例外の型と SES のエラーコードだけを入れ、宛先のアドレスと SES のエラーの文面を入れない（[ADR-015](ADR-015-structure-and-protect-observability-data.md)）。
   投げた例外のメッセージは、Spring Modulith がリスナーの失敗を記録するログに出る。
   `MessageRejected` の文面は、確かめられなかった宛先のアドレスを含みうるためである。

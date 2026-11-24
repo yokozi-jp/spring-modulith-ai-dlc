@@ -267,7 +267,7 @@ resilience4j:
         ignore-exception-predicate: com.example.demo.payment.infrastructure.client.IgnoredClientErrorPredicate
       mail-sender:
         base-config: default
-        # スロットリング以外の 4xx は資格情報か SES の設定の不備で、SES の不調ではないので失敗として数えない（ADR-125）。
+        # スロットリング以外の 4xx は SES の不調ではないので失敗として数えない（docs/mail/sending.md の「結果と失敗の扱い」）。
         ignore-exception-predicate: com.example.demo.mail.infrastructure.client.IgnoredSesClientErrorPredicate
   retry:
     configs:

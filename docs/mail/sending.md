@@ -67,6 +67,8 @@ tags: [convention, mail, backend, ses, external-system]
 
 - 表示名は、Client が RFC 2047 の encoded-word（UTF-8 の Base64）にして送る。
   1 つの encoded-word に収まらない表示名は、起動の時点で失敗する。
+- 形式の誤った From のアドレスと、空白だけの表示名と設定セットも、起動の時点で失敗する。
+  起動を通すと、SES が要求ごとに `BadRequestException` を返し、すべてのメールが `Rejected` として記録されるためである。
 - 接続先、リージョン、資格情報は AWS の SDK の既定の取得に任せ、`application.yaml` に書かない。
   本番の値は[本番で SES から送る設定](production-setup.md)に、ローカルの値は `.env.example` にある。
 - タイムアウトは接続 1 秒、呼び出し全体 2 秒にする（[ADR-019](../adr/ADR-019-define-resilience-and-capacity-guardrails.md)）。
@@ -81,10 +83,3 @@ tags: [convention, mail, backend, ses, external-system]
   例外のメッセージは、Spring Modulith がリスナーの失敗を記録するログに出るためである。
   接続の失敗とタイムアウトの例外は SDK のメッセージのままで、SES の文面を含まない。
 - 送ったメールを SES の記録と突き合わせるときは、`Sent` の `MailMessageId` を使う。
-
-## テスト
-
-- テストの書き方は[メールのテスト](testing.md)に従う。
-- `MailSenderClientTest` は JDK の `HttpServer` で、成功、拒否、スロットリング、5xx、403、タイムアウトの扱いを確かめる。
-- `MailSenderClientIntegrationTest` は、テストの JVM の WireMock に送り、要求の記録から宛先、件名、本文を読む。
-  スロットリング、5xx、`MessageRejected`、403 を返させて、結果、例外、要求の数、circuit breaker の失敗の数を確かめる。

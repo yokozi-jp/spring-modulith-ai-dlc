@@ -82,16 +82,11 @@ backend を再起動せず、シナリオの途中で注文ごとに応答を切
 
 ## 送ったメールを読む
 
-backend が送ったメールは、compose-test の WireMock の要求の記録から読む（[ADR-125](../adr/ADR-125-send-mail-with-ses-v2-api-and-fake-it-with-wiremock.md)）。
-backend は SES v2 の `SendEmail`（`POST /v2/email/outbound-emails`）を、決済代行と同じ WireMock へ送り、共有のスタブ（`docker/wiremock/mappings/ses-send-email.json`）が送信済みを返す。
-今はメールを送る機能がなく、メールを読む spec もない。
-メールを読む spec を足すときは、次のとおりにする。
+backend が送ったメールは、compose-test の WireMock（`environment.ts` の `wireMockUrl`）の要求の記録から読む（[ADR-125](../adr/ADR-125-send-mail-with-ses-v2-api-and-fake-it-with-wiremock.md)）。
+メールを読む spec はまだない。
 
-- WireMock の URL は、決済代行と同じく `environment.ts` の `wireMockUrl`（slot の `PAYMENT_GATEWAY_BASE_URL`）を使う。
-  `AWS_ENDPOINT_URL_SESV2` は backend の SDK だけが読み、slot は Playwright へ渡さない。
-- 宛先は spec ごとに一意にする（例：`invitee-<UUID>@example.com`）。
-  並列の spec が送ったメールと分けるためである。
-- 管理 API の `POST /__admin/requests/find` に、`SendEmail` の形と宛先で絞った条件を送る。
+- 管理 API の `POST /__admin/requests/find` に、`SendEmail` のパスと宛先で絞った条件を送る。
+  宛先は spec ごとに一意にし、並列の spec が送ったメールと分ける。
 
   ```json
   {
@@ -108,12 +103,8 @@ backend は SES v2 の `SendEmail`（`POST /v2/email/outbound-emails`）を、�
   }
   ```
 
-- 応答の `requests[].body` は、backend の SDK が送った JSON の文字列である。
-  件名は `Content.Simple.Subject.Data`、本文は `Content.Simple.Body.Text.Data` にあり、リンクは本文から取り出す。
-- backend は非同期で送るので、要求が見つかるまで `expect.poll` で待つ。
+- 応答の `requests[].body` は SDK が送った JSON の文字列で、件名は `Content.Simple.Subject.Data`、本文は `Content.Simple.Body.Text.Data` にある。
 - setup project の開始時に `DELETE /__admin/requests` を一度呼び、前の実行のメールを読まないようにする。
-  `payment-gateway.setup.ts` の `POST /__admin/mappings/reset` も、WireMock 3.13.2 では要求の記録を消す（手元で確かめた）。
-  ただしこの API はスタブを戻すためのものなので、記録を消すことをこれに頼らない。
 
 ## 認証
 

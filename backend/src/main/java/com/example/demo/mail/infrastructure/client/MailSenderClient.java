@@ -32,11 +32,8 @@ import software.amazon.awssdk.services.sesv2.model.SesV2Exception;
  * に向ける（ADR-125）。タイムアウトと試行 1 回の設定は {@link SesV2ClientConfig} が持ち、circuit breaker と retry は ADR-019
  * の既定値のままにする。SES の SLO から値を変える根拠がまだないためである。
  *
- * <p>結果は ADR-072 の分け方に合わせる。{@code MessageRejected} と {@code BadRequestException}
- * は、同じ要求を送り直しても受け付けられないので、例外を投げずに拒否の結果を返し、呼び出し元が業務の状態に記録する。{@code MessageId} のない応答も、送り直すと 2
- * 通目が出うるので拒否の結果にする。接続の失敗、タイムアウト、スロットリング、5xx、資格情報と権限の不備、SES の設定の不備は例外を投げ、イベント出版を FAILED
- * に残して再投入を待つ。circuit breaker はスロットリング以外の 4xx を失敗に数えない（application.yaml の {@code
- * ignore-exception-predicate}）。
+ * <p>{@code MessageRejected}、{@code BadRequestException}、{@code MessageId}
+ * のない応答は拒否の結果にし、ほかの失敗は例外を投げる。分け方と理由は docs/mail/sending.md の「結果と失敗の扱い」 に示す。
  *
  * <p>Client のログと、投げる SES の例外のメッセージには、例外の型と SES のエラーコードだけを入れ、宛先のアドレスと SES のエラーの文面を入れない（ADR-015）。SES
  * の文面は、確かめられなかった宛先や ID を含みうるためである。
@@ -102,7 +99,7 @@ class MailSenderClient implements MailSender {
   /**
    * メールを送り、業務の状態に記録する結果を返す。
    *
-   * <p>同じ要求で回復しない拒否と、契約に合わない応答は拒否の結果にする。それ以外の失敗は SDK の例外のまま投げる。
+   * <p>同じ要求で回復しない拒否と、契約に合わない応答は拒否の結果にする。それ以外の失敗は、SES の文面を落とした同じ型の SDK の例外で投げる。
    */
   @CircuitBreaker(name = "mail-sender")
   @Retry(name = "mail-sender")
