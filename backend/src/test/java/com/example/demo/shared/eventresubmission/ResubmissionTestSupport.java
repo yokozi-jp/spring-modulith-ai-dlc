@@ -29,7 +29,9 @@ import org.springframework.modulith.events.FailedEventPublications;
 import org.springframework.modulith.events.core.EventPublicationRegistry;
 import org.springframework.test.context.TestPropertySource;
 
-/** 再投入のテストで使う、Spring の文脈の設定、ロックの期限、出版の行と archive の行、条件の関数に渡す出版、上限到達の ERROR の操作。 */
+/** 再投入のテストで使う、Spring の文脈の設定、ジョブの組み立て、ロックの期限、出版の行と archive の行、条件の関数に渡す出版、上限到達の ERROR の操作。 */
+// 再投入のテストが共有する組み立てと行の操作を一か所に集めるため、メソッドの数が多い。
+@SuppressWarnings("PMD.TooManyMethods")
 final class ResubmissionTestSupport {
 
   private ResubmissionTestSupport() {}
@@ -75,20 +77,53 @@ final class ResubmissionTestSupport {
       final ResubmissionPolicies policies,
       final MeterRegistry meterRegistry,
       final EventPublicationResubmissionConfig.AbandonProperties abandon) {
+    return resubmitter(
+        dsl,
+        failed,
+        lockingTaskExecutor,
+        clock,
+        properties,
+        policies,
+        meterRegistry,
+        abandon,
+        Mockito.mock(EventPublicationRegistry.class));
+  }
+
+  /** 古い出版を FAILED に戻す処理を {@code registry} にして、Sweep と定期のジョブを組み立てる。 */
+  /* package */ static EventPublicationResubmitter resubmitter(
+      final DSLContext dsl,
+      final FailedEventPublications failed,
+      final LockingTaskExecutor lockingTaskExecutor,
+      final Clock clock,
+      final EventPublicationResubmissionConfig.Properties properties,
+      final ResubmissionPolicies policies,
+      final MeterRegistry meterRegistry,
+      final EventPublicationResubmissionConfig.AbandonProperties abandon,
+      final EventPublicationRegistry registry) {
     return new EventPublicationResubmitter(
         dsl,
-        new FailedPublicationSweep(
-            dsl,
-            failed,
-            lockingTaskExecutor,
-            clock,
-            properties,
-            Mockito.mock(EventPublicationRegistry.class)),
+        new FailedPublicationSweep(dsl, failed, lockingTaskExecutor, clock, properties, registry),
         policies,
         clock,
         meterRegistry,
         properties,
         abandon);
+  }
+
+  /** 古い出版を FAILED に戻す処理を何もしないモックにして、Sweep を組み立てる。 */
+  /* package */ static FailedPublicationSweep sweep(
+      final DSLContext dsl,
+      final FailedEventPublications failed,
+      final LockingTaskExecutor lockingTaskExecutor,
+      final Clock clock,
+      final EventPublicationResubmissionConfig.Properties properties) {
+    return new FailedPublicationSweep(
+        dsl,
+        failed,
+        lockingTaskExecutor,
+        clock,
+        properties,
+        Mockito.mock(EventPublicationRegistry.class));
   }
 
   /** ロックの期限を過去にする。 */
@@ -104,11 +139,29 @@ final class ResubmissionTestSupport {
       final Instant publicationDate,
       final String status,
       final int completionAttempts) {
+    return insertPublication(
+        dsl, id, listenerId, "test.event", publicationDate, status, completionAttempts);
+  }
+
+  /**
+   * {@code eventType} の出版の行を、本文を {@code {"id":"<ID>"}} にして作り、その ID を返す。
+   *
+   * <p>Spring Modulith は、古い出版を FAILED に戻す処理と再投入で行のイベントを読み戻し、読めない型の行を落とす。
+   * 読み戻させる行には、テストのイベントの型（{@link EventPublicationResubmitterTest.ResubmissionProbe}）を渡す。
+   */
+  /* package */ static UUID insertPublication(
+      final DSLContext dsl,
+      final UUID id,
+      final String listenerId,
+      final String eventType,
+      final Instant publicationDate,
+      final String status,
+      final int completionAttempts) {
     dsl.insertInto(EVENT_PUBLICATION)
         .set(EVENT_PUBLICATION.ID, id)
         .set(EVENT_PUBLICATION.LISTENER_ID, listenerId)
-        .set(EVENT_PUBLICATION.EVENT_TYPE, "test.event")
-        .set(EVENT_PUBLICATION.SERIALIZED_EVENT, "{}")
+        .set(EVENT_PUBLICATION.EVENT_TYPE, eventType)
+        .set(EVENT_PUBLICATION.SERIALIZED_EVENT, "{\"id\":\"" + id + "\"}")
         .set(EVENT_PUBLICATION.PUBLICATION_DATE, publicationDate)
         .set(EVENT_PUBLICATION.STATUS, status)
         .set(EVENT_PUBLICATION.COMPLETION_ATTEMPTS, completionAttempts)

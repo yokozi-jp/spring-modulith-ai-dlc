@@ -117,7 +117,7 @@ public class EventPublicationResubmitOnce {
       throw new IllegalStateException("resubmit-once must not run inside a transaction");
     }
     final FailedPublicationSweep.Swept swept = sweep.waitUpTo(selector(target));
-    final Outcome outcome = awaitCompletion(swept.advanced(), swept.remaining());
+    final Outcome outcome = awaitCompletion(swept.advanced().keySet(), swept.remaining());
     record(outcome);
     return outcome;
   }

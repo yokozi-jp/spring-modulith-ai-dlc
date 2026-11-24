@@ -5,7 +5,6 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.Map;
 import java.util.Optional;
-import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -80,13 +79,14 @@ final class FailedPublicationSweep {
   /**
    * 再投入した結果。
    *
-   * @param advanced 実際に {@code RESUBMITTED} へ進んだ（または、すでに archive へ移った）出版の ID
+   * @param advanced 実際に {@code RESUBMITTED} へ進んだ（または、すでに archive へ移った）出版の ID と、この再投入の後の {@code
+   *     completion_attempts}
    * @param remaining 選ばれたが {@code max-per-run} を超えたため再投入しなかった数
    */
-  /* package */ record Swept(Set<UUID> advanced, int remaining) {
+  /* package */ record Swept(Map<UUID, Integer> advanced, int remaining) {
 
     /* package */ Swept {
-      advanced = Set.copyOf(advanced);
+      advanced = Map.copyOf(advanced);
     }
   }
 
@@ -166,8 +166,8 @@ final class FailedPublicationSweep {
         : Optional.empty();
   }
 
-  /** 候補のうち、実際に {@code RESUBMITTED} へ進んだ出版の ID を返す。 */
-  private Set<UUID> advancedAmong(final Map<UUID, Integer> candidates) {
+  /** 候補のうち、実際に {@code RESUBMITTED} へ進んだ出版の ID と、この再投入の後の {@code completion_attempts} を返す。 */
+  private Map<UUID, Integer> advancedAmong(final Map<UUID, Integer> candidates) {
     final Map<UUID, EventPublicationStates.State> states =
         EventPublicationStates.read(dsl, candidates.keySet());
     return candidates.entrySet().stream()
@@ -176,7 +176,7 @@ final class FailedPublicationSweep {
           return state != null
               && (state.isArchived() || state.completionAttempts() > candidate.getValue());
         })
-        .map(Map.Entry::getKey)
-        .collect(Collectors.toUnmodifiableSet());
+        .collect(
+            Collectors.toUnmodifiableMap(Map.Entry::getKey, candidate -> candidate.getValue() + 1));
   }
 }

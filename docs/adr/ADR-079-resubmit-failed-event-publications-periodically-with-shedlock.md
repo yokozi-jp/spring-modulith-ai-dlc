@@ -156,7 +156,8 @@ Proposed の間に、落ちたまま残った出版を `FAILED` に戻す処理�
   運用者がジョブの実行の結果と再投入の件数と成功と失敗を確かめる要求（#108 の user story 4）があるためである。
 - 再投入した出版の結果は、再投入したインスタンスが次の回の先頭で、`event_publication` と archive の表を読み戻して数える（`ResubmissionTracker`）。
   2.2.0 は再投入の件数も成功も知らせないため、公開された表の列だけで判定する。
-  覚えるのは自分が `RESUBMITTED` へ進めた出版だけで、インスタンスの間で二重に数えない。
+  覚えるのは自分が `RESUBMITTED` へ進めた出版と、その再投入の後の `completion_attempts` だけで、インスタンスの間で二重に数えない。
+  `completion_attempts` を増やすのは再投入だけなので、覚えた値より増えた出版と、覚えたまま自分がまた再投入した出版は、前の再投入を `failed` と数える。
   処理中の出版を覚えておく期間は `max(3 × lock-at-most-for, in-flight-staleness + lock-at-most-for + 2 × interval)` である。
 - 予期しない実行時の例外も受けて ERROR で記録し、`runs{outcome=failed}` に数える。
   スケジューラの既定のエラーハンドラに例外を漏らすと、ログは出ても `runs` のどの tag も動かず、停止に気づけないためである。
@@ -275,7 +276,7 @@ shared の範囲は、ADR-048 の jOOQ の共通処理に加えて、Spring Modu
   完了の待ちの間に ECS が SIGTERM で止めると、文脈は既定の順で閉じ、`DataSource` を閉じた後に executor を待つため、処理中のリスナーは DB に触れずに失敗する。
   リスナーのトランザクションは戻るため出版は失われず、次の再投入の対象に残る。
 - executor の空きの待ちかリスナーの処理が `lock-at-most-for` の前提を破り、再投入から `in-flight-staleness` を超えると、古い出版を `FAILED` に戻す処理が処理中の出版を `FAILED` に戻す。
-  結果の Counter は、その出版を `failed` と数えるか、同じ回に同じインスタンスが再投入し直したときは次の再投入の結果だけを数えうる。
+  結果の Counter は、戻した出版を同じ回にどのインスタンスが再投入し直しても、前の再投入を `failed` と数える。
 - 最初の配信が `concurrency-limit` の空きを待つ間に `wait-age` を過ぎた出版は、古い出版として `FAILED` に戻り、同じ回の再投入が重ねて再投入しうる。その場合はリスナーの冪等性に頼る。その間、`FAILED` の出版の Gauge は処理中の出版も数える。
 - 一つの回が古い出版を読んでから `FAILED` にするまでの間に `lock-at-most-for` を超えて止まると、ロックが切れ、別のインスタンスがその出版を `FAILED` に戻して再投入しうる。
   遅れて届いた `markFailed` は、読んだときの状態も `last_resubmission_date` も確かめないため、処理中の出版を `FAILED` に戻す（形式検証の既知の発見 1）。

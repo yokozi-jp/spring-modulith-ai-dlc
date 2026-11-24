@@ -5,8 +5,8 @@ import io.micrometer.core.instrument.MeterRegistry;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.Map;
 import java.util.Optional;
-import java.util.Set;
 import java.util.UUID;
 import java.util.function.Predicate;
 import lombok.extern.slf4j.Slf4j;
@@ -110,7 +110,7 @@ class EventPublicationResubmitter {
         log.debug("Event publication resubmission skipped");
         return;
       }
-      final Set<UUID> advanced = swept.get().advanced();
+      final Map<UUID, Integer> advanced = swept.get().advanced();
       final int resubmitted = advanced.size();
       // 放すのに失敗した回は sweep が例外で戻るので、ここへ来ず、覚えも数えもせず failed の回にだけ数える。
       tracker.remember(advanced, now);

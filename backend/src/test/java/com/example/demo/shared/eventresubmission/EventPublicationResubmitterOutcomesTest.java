@@ -25,6 +25,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.modulith.events.EventPublication;
 import org.springframework.modulith.events.FailedEventPublications;
 import org.springframework.modulith.events.ResubmissionOptions;
+import org.springframework.modulith.events.core.EventPublicationRegistry;
 
 /**
  * 定期の再投入が数える {@code event.publication.resubmissions} と、再投入の結果の Counter を、DB の行を直接動かして検証する。
@@ -33,6 +34,8 @@ import org.springframework.modulith.events.ResubmissionOptions;
  * と同じく FAILED の行を読んで条件の関数を適用し、通った行を {@code markResubmitted} と同じ更新で {@code RESUBMITTED}
  * に進める。リスナーの完了と再失敗は、テストが行を直接動かして作る。ジョブは テストごとの {@link SimpleMeterRegistry} で作り、Spring の文脈は {@link
  * EventPublicationResubmitterRunsTest} と同じ設定で共有する。
+ *
+ * <p>古い出版を FAILED に戻す処理は、ふつうは何もしないモックにし、その処理が戻した出版の数え方を確かめるテストだけ本物にする。
  */
 // 行の準備、リスナーの完了と再失敗の再現、Counter の読み出しを同じ文脈で扱うため、メソッドの数が多い。
 @SuppressWarnings("PMD.TooManyMethods")
@@ -77,6 +80,9 @@ class EventPublicationResubmitterOutcomesTest {
 
   /** 差し替えられる時計。 */
   @Autowired private EventPublicationResubmitterTest.MutableClock clock;
+
+  /** Spring Modulith の、古い出版を FAILED に戻す処理。時計は {@link #clock} である。 */
+  @Autowired private EventPublicationRegistry registry;
 
   /** 出版の行を動かす DB。 */
   @Autowired private DSLContext dsl;
@@ -309,6 +315,47 @@ class EventPublicationResubmitterOutcomesTest {
     assertThat(outcome(OUTCOME_COMPLETED)).as("再投入したインスタンス").isEqualTo(1.0);
   }
 
+  @Test
+  @DisplayName("処理中のまま残った再投入の出版を、同じインスタンスが古い出版として FAILED に戻して同じ回に再投入し直したら、前の再投入を failed に 1 だけ数える")
+  void staleResubmissionResubmittedAgainByTheSameInstanceIsCountedFailed() {
+    final UUID id = insertReadable();
+    final EventPublicationResubmitter resubmitter = withStaleCheck(meterRegistry);
+    resubmitter.resubmitOnce();
+
+    clock.set(pastInFlightStaleness());
+    run(resubmitter);
+    complete(id);
+    run(resubmitter);
+
+    assertThat(count(RESUBMISSIONS)).as("古い出版として戻した回の再投入も数える").isEqualTo(2.0);
+    assertThat(outcome(OUTCOME_FAILED)).as("処理中のまま残った前の再投入").isEqualTo(1.0);
+    assertThat(outcome(OUTCOME_COMPLETED)).as("再投入し直した後の完了").isEqualTo(1.0);
+  }
+
+  @Test
+  @DisplayName(
+      "処理中のまま残った再投入の出版を別のインスタンスが古い出版として FAILED に戻して再投入し直したら、前に再投入したインスタンスは failed に、"
+          + "再投入し直したインスタンスは結果に数える")
+  void staleResubmissionResubmittedAgainByOtherInstanceIsCountedFailedByTheFirst() {
+    final UUID id = insertReadable();
+    final EventPublicationResubmitter first = withStaleCheck(meterRegistry);
+    final SimpleMeterRegistry otherRegistry = new SimpleMeterRegistry();
+    final EventPublicationResubmitter second = withStaleCheck(otherRegistry);
+    first.resubmitOnce();
+
+    clock.set(pastInFlightStaleness());
+    run(second);
+    complete(id);
+    run(first);
+    run(second);
+
+    assertThat(outcome(OUTCOME_FAILED)).as("前に再投入したインスタンスの failed").isEqualTo(1.0);
+    assertThat(outcome(OUTCOME_COMPLETED)).as("前に再投入したインスタンスの completed").isZero();
+    assertThat(otherRegistry.get(OUTCOMES).tag("outcome", OUTCOME_COMPLETED).counter().count())
+        .as("再投入し直したインスタンスの completed")
+        .isEqualTo(1.0);
+  }
+
   private EventPublicationResubmitter newResubmitter(
       final EventPublicationResubmissionConfig.Properties jobProperties) {
     return ResubmissionTestSupport.resubmitter(
@@ -320,6 +367,25 @@ class EventPublicationResubmitterOutcomesTest {
         policies,
         meterRegistry,
         abandon);
+  }
+
+  /** 古い出版を FAILED に戻す処理を Spring Modulith の本物にしたジョブ。 */
+  private EventPublicationResubmitter withStaleCheck(final SimpleMeterRegistry jobMeterRegistry) {
+    return ResubmissionTestSupport.resubmitter(
+        dsl,
+        failedPublications(() -> {}),
+        lockingTaskExecutor,
+        clock,
+        properties,
+        policies,
+        jobMeterRegistry,
+        abandon,
+        registry);
+  }
+
+  /** 今の時刻を、in-flight-staleness より 1 マイクロ秒だけ後にした時刻。今の時刻に再投入した出版が古くなる。 */
+  private Instant pastInFlightStaleness() {
+    return clock.instant().plus(properties.inFlightStaleness()).plus(1, ChronoUnit.MICROS);
   }
 
   /**
@@ -409,6 +475,18 @@ class EventPublicationResubmitterOutcomesTest {
                 .where(EVENT_PUBLICATION.ID.eq(id)))
         .execute();
     dsl.deleteFrom(EVENT_PUBLICATION).where(EVENT_PUBLICATION.ID.eq(id)).execute();
+  }
+
+  /** 古い出版を FAILED に戻す処理が読み戻せるよう、テストのイベントの型で FAILED の出版の行を作る。 */
+  private UUID insertReadable() {
+    return ResubmissionTestSupport.insertPublication(
+        dsl,
+        UUID.randomUUID(),
+        LISTENER_ID,
+        EventPublicationResubmitterTest.ResubmissionProbe.class.getName(),
+        T0,
+        FAILED,
+        0);
   }
 
   private UUID insert(final String status, final int completionAttempts) {
