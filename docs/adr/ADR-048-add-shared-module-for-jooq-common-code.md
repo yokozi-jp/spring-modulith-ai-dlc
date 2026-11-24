@@ -54,8 +54,8 @@ ADR-051 の `*_pgm_cd` を束縛する Aspect も、共通カラムの値を組�
 これで、アーキテクチャ指標の NCCD を 1.0 以下に保つ。
 `shared.persistence` を使うのは、他のモジュールの `infrastructure.persistence` のアダプターだけとする。
 `shared` に `infrastructure` のパッケージを置かず、責務ごとに `shared` の直下へ置く。
-DB のロールとトランザクション（`ModuleRoleTransactionManager`）は `shared.persistence` に、失敗した出版の再投入（[ADR-079](ADR-079-resubmit-failed-event-publications-periodically-with-shedlock.md)）は `shared.eventresubmission` に、リスナーのテナントの束縛（[ADR-105](ADR-105-bind-tenant-to-request-and-event-context.md)）は `shared.tenantbinding` に置く。
-`shared.eventresubmission` と `shared.tenantbinding` は、jOOQ と Spring の基盤を使う `shared.persistence` と同じ層として扱う。
+DB のロールとトランザクション（`ModuleRoleTransactionManager`）は `shared.persistence` に、失敗した出版の再投入（[ADR-079](ADR-079-resubmit-failed-event-publications-periodically-with-shedlock.md)）は `shared.eventresubmission` に、リスナーのテナントの束縛（[ADR-105](ADR-105-bind-tenant-to-request-and-event-context.md)）は `shared.tenancy` に置く。
+`shared.eventresubmission` は、jOOQ を使う `shared.persistence` と同じ層として扱う。
 `shared.concurrency` と `shared.failure` は、どの層からも使える。
 
 生成クラスの `CREATED_*`、`UPDATED_*`、`PATCHED_*` のフィールドを参照してよいのは、`shared` の共通処理だけとする。

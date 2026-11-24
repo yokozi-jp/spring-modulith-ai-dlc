@@ -99,9 +99,9 @@ class PackageByFeatureOnionArchitectureTest {
   /** Persistence Adapter のパッケージ。 */
   private static final String PERSISTENCE_PACKAGE = "..infrastructure.persistence..";
 
-  /** jOOQ や Spring の基盤に依存する shared のパッケージ。機能モジュールの Persistence Adapter と同じ層に入る。 */
+  /** jOOQ を使う shared のパッケージ。機能モジュールの Persistence Adapter と同じ層に入る。 */
   private static final List<String> SHARED_ADAPTER_PACKAGES =
-      List.of("persistence", "eventresubmission", "tenantbinding");
+      List.of("persistence", "eventresubmission");
 
   /** 層の責務の規約と、クラスの役割を決めた ADR。 */
   private static final String LAYERS_DOCS = "規約：docs/backend/layers.md、" + ADR_050;

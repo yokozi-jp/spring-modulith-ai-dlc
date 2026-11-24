@@ -14,7 +14,7 @@
  * も役割も持たずログインの状態だけを表すので、認証の語彙として {@code security} に置く（ADR-101）。
  *
  * <p>操作しているテナントの語彙（{@code TenantId}、{@code TenantScoped}、{@code TenantContext}）は {@code tenancy}
- * に置き、どの層からも使う（ADR-105）。リスナーでテナントを束縛する {@code TenantListenerAspect} は {@code tenantbinding} に置く。
+ * に置き、どの層からも使う（ADR-105）。リスナーでテナントを束縛する {@code TenantListenerAspect} も {@code tenancy} に置く。
  */
 @ApplicationModule(allowedDependencies = "jooq")
 @NullMarked

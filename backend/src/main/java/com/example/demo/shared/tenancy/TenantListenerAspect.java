@@ -1,8 +1,5 @@
-package com.example.demo.shared.tenantbinding;
+package com.example.demo.shared.tenancy;
 
-import com.example.demo.shared.tenancy.TenantContext;
-import com.example.demo.shared.tenancy.TenantId;
-import com.example.demo.shared.tenancy.TenantScoped;
 import org.aspectj.lang.ProceedingJoinPoint;
 import org.aspectj.lang.annotation.Around;
 import org.aspectj.lang.annotation.Aspect;

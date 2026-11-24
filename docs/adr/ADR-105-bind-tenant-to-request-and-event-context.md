@@ -52,8 +52,8 @@ RLS のポリシーは、トランザクションに設定したテナントの�
   本番のコードで `findCurrent()` を呼べるのは `ModuleRoleTransactionManager` だけで、ArchUnit の `unboundTenantIsReadOnlyByTransactionManager` で検査する。
 - リクエストでは、`tenancy` の `TenantSelectionFilter` が、所属を引き直して残っているテナントを、リクエストの残りの処理の間だけ束縛する。
   テナントは認証の権限だけから取る。リクエストの header、パス、本文から取らない。
-- リスナーでは、`shared.tenantbinding` の `TenantListenerAspect` が引数のイベントの `TenantScoped.tenantId()` を、呼び出しの間だけ束縛する。
-  束縛した値は #377 で永続化の処理が読み、`PgmCdAspect` と同じ層に置くため、Aspect は、Spring AOP に依存せずどの層からも使う語彙の `shared.tenancy` でなく、`shared.tenantbinding` に置く。
+- リスナーでは、`shared.tenancy` の `TenantListenerAspect` が引数のイベントの `TenantScoped.tenantId()` を、呼び出しの間だけ束縛する。
+  束縛した値は #377 で永続化の処理が読む。Aspect は、束縛の語彙と同じ `shared.tenancy` に置く。
   Aspect は `@Order(Ordered.LOWEST_PRECEDENCE - 200)` を付け、`PgmCdAspect` とトランザクションの advisor より外側で動かす。
   リスナーのトランザクションが始まる時点で、テナントは束縛済みになる。
   引数が `TenantScoped` でなければ、`IllegalStateException` で拒否する。

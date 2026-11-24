@@ -36,13 +36,13 @@ tags: [architecture, backend, spring-modulith, shared-module]
 - 業務の概念を置かない。
   ルートのパッケージには `package-info.java` だけを置く。
 - `shared.persistence` を使ってよいのは、他のモジュールの `infrastructure.persistence` だけである。
-- `shared.eventresubmission` と `shared.tenantbinding` は、`shared.persistence` と同じ層として扱う。`shared` に `infrastructure` のパッケージは置かない。
+- `shared.eventresubmission` と `shared.tenancy` は、`shared.persistence` と同じ層として扱う。`shared` に `infrastructure` のパッケージは置かない。
   `shared.batch` を使ってよいのは、機能モジュールの `batch` だけである。
   `shared.concurrency`、`shared.failure`、`shared.events`、`shared.security`、`shared.tenancy` は、どの層からも使える。
 
 使う場所の制限は、`PackageByFeatureOnionArchitectureTest` の `sharedModuleIsUsedOnlyByPersistenceAdapters` が検査する。
 ただし、`shared` の `PgmCdAspect` は、AOP で `<UseCase>CommandHandler` の `handle` と `<Event>Listener` の呼び出しを囲む（[ADR-051](../adr/ADR-051-bind-pgm-cd-with-scoped-value-and-aspect.md)）。
-`shared.tenantbinding` の `TenantListenerAspect` も、`@ApplicationModuleListener` の呼び出しを囲み、イベントのテナントを束縛する（[ADR-105](../adr/ADR-105-bind-tenant-to-request-and-event-context.md)）。
+`shared.tenancy` の `TenantListenerAspect` も、`@ApplicationModuleListener` の呼び出しを囲み、イベントのテナントを束縛する（[ADR-105](../adr/ADR-105-bind-tenant-to-request-and-event-context.md)）。
 この呼び出しはクラスの依存にならないため、ArchUnit では検査できない。
 `shared.batch` を使える層の制限と、`TenantPartitionAspect` を `TenantContext.call` の許可先に足すことは、まだ検査していない（[#667](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/667)、[バックエンドのアーキテクチャテスト](architecture-tests.md)）。
 

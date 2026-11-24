@@ -553,7 +553,7 @@ class ClassRoleArchTest {
     final Set<String> allowedCallers =
         Set.of(
             basePackage + ".tenancy.presentation.web.TenantSelectionFilter",
-            basePackage + ".shared.tenantbinding.TenantListenerAspect");
+            basePackage + ".shared.tenancy.TenantListenerAspect");
     return noClasses()
         .that(
             DescribedPredicate.describe(
