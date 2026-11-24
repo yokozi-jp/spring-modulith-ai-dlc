@@ -1,4 +1,4 @@
-package com.example.demo.shared.tenant;
+package com.example.demo.shared.tenancy;
 
 /**
  * 発生したテナントを運ぶイベント。

@@ -16,7 +16,7 @@ import com.example.demo.LocalDataSeeder.Mode;
 import com.example.demo.LocalDataSeeder.Outcome;
 import com.example.demo.jooq.DefaultCatalog;
 import com.example.demo.product.TestProducts;
-import com.example.demo.shared.tenant.TenantId;
+import com.example.demo.shared.tenancy.TenantId;
 import com.example.demo.tenancy.TenancySeeds;
 import com.example.demo.testkit.AsModule;
 import com.example.demo.testkit.DatabaseTest;

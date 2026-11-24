@@ -1,6 +1,6 @@
 package com.example.demo.tenancy.domain.model;
 
-import com.example.demo.shared.tenant.TenantId;
+import com.example.demo.shared.tenancy.TenantId;
 
 /**
  * 利用者のテナントへの所属。所属するテナントと、そのテナントの中の役割を持つ。

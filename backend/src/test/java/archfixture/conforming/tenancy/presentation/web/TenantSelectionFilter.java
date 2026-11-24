@@ -1,6 +1,6 @@
 package archfixture.conforming.tenancy.presentation.web;
 
-import archfixture.conforming.shared.tenant.TenantContext;
+import archfixture.conforming.shared.tenancy.TenantContext;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;

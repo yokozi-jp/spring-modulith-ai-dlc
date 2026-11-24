@@ -1,4 +1,4 @@
-package archfixture.violating.shared.tenant;
+package archfixture.violating.shared.tenancy;
 
 import java.util.Optional;
 import java.util.function.Supplier;

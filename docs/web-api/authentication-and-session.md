@@ -57,7 +57,7 @@ IdPを移るときは、組と利用者の対応づけだけを書き換え、�
 - リクエストのたびに、`TenantSelectionFilter`が認証の利用者と権限のテナントの組で所属を引き直す。所属が消えていれば権限を外し、役割が変わっていれば新しい役割で権限を作り直す。作り直すときはセッションのIDを変えない。変えると、同時に送られたほかのリクエストが前のIDのCookieで401になるためである。
 - テナントを選ぶ前の業務のAPIは、typeが`/problems/tenant-not-selected`の403になる。所属の一覧とテナントを選ぶAPIだけは、選ぶ前にも呼べる。
 - テナントのIDは、テナントを選ぶAPIの本文からだけ受け取る。ほかのAPIは、テナントをリクエストの値から取らない。
-- テナントを選んだ後のリクエストは、`TenantSelectionFilter`が所属を引き直した後、リクエストの残りの処理の間だけ、選んだテナントを`shared.tenant`の`TenantContext`に束縛する。CommandHandlerが発行するイベントは、このテナントを運ぶ（[ADR-105](../adr/ADR-105-bind-tenant-to-request-and-event-context.md)）。
+- テナントを選んだ後のリクエストは、`TenantSelectionFilter`が所属を引き直した後、リクエストの残りの処理の間だけ、選んだテナントを`shared.tenancy`の`TenantContext`に束縛する。CommandHandlerが発行するイベントは、このテナントを運ぶ（[ADR-105](../adr/ADR-105-bind-tenant-to-request-and-event-context.md)）。
   `OncePerRequestFilter`は非同期ディスパッチでは動かないため、`Callable`や`DeferredResult`を返すControllerでは、非同期の処理の中でテナントが束縛されない。そのようなControllerを足すときは、束縛の方法を先に決める。
 
 `/api/**`に、テナントを選ぶ前に呼ぶAPIを足すときは、`TenantSelectionFilter`の除外に加える。

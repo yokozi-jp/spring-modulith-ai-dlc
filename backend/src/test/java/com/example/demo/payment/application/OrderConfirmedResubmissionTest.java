@@ -5,7 +5,7 @@ import static com.example.demo.jooq.payment.Tables.T_PAYMENT;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.example.demo.ordering.OrderConfirmed;
-import com.example.demo.shared.tenant.TenantId;
+import com.example.demo.shared.tenancy.TenantId;
 import com.example.demo.testkit.AsModule;
 import com.example.demo.testkit.AsTenant;
 import com.example.demo.testkit.CapturedLogRecords;

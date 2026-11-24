@@ -1,6 +1,6 @@
 package com.example.demo.testkit;
 
-import com.example.demo.shared.tenant.TenantContext;
+import com.example.demo.shared.tenancy.TenantContext;
 import java.lang.reflect.Method;
 import org.junit.jupiter.api.extension.ExtensionContext;
 import org.junit.jupiter.api.extension.InvocationInterceptor;
