@@ -24,7 +24,7 @@ tags: [architecture, backend, onion-architecture]
 - **[`<Aggregate>Repository`](class-roles/repository.md)**：集約を保存し、取り出すインタフェース。
 - **[`<ExternalSystem>`](class-roles/external-system-interface.md)**：決済などの外部システムを、ドメインの語彙で表すインタフェース。
 
-`domain.model` は、`java..`、`org.jspecify..`、`domain.model`、`shared.concurrency`、`shared.failure`、`shared.tenant` の型だけに依存させる。
+`domain.model` は、標準型、`org.jspecify..`、`domain.model`、`shared.concurrency`、`shared.failure`、`shared.tenant` の型だけに依存させる（一覧の正本は[ArchUnit の規則](architecture-tests.md)）。
 外部システムの SDK、OpenAPI から生成した型、Spring、jOOQ、JPA、Jackson の型は使わない。
 Domain Model を API の Request と Response や、永続化の Record として兼用しない。
 
@@ -49,6 +49,9 @@ Domain Service は Repository を使ってよく、イベントの発行、外�
 - **[`<Event>Listener`](class-roles/listener.md)**：他モジュールの[イベント](class-roles/event.md)、または外部システムを呼ぶための自モジュールのイベントを受信し、自モジュールの CommandHandler をちょうど一つ呼ぶ。
 
 [`<UseCase>Command`](class-roles/command.md) と [`<UseCase>Result`](class-roles/result.md) は、Java の標準型だけを持つ record として `application` に置く。
+
+`application` は、このアプリケーションの型のほかに、標準型、`org.jspecify..`、`org.slf4j..`、Spring の `@Service` などのアノテーションと `ApplicationEventPublisher` だけに依存させる。
+外部システムの SDK や生成した型は使わない（一覧の正本は[ArchUnit の規則](architecture-tests.md)）。
 
 CommandHandler は別の CommandHandler を呼ばない。
 

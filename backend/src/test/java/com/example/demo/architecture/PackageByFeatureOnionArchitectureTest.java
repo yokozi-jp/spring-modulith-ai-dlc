@@ -55,6 +55,11 @@ class PackageByFeatureOnionArchitectureTest {
   /** Domain のパッケージのパターン。 */
   private static final String DOMAIN_PACKAGE = "..domain..";
 
+  /** Lombok が生成したコードに付ける注釈。テストの実行時のクラスパスに Lombok がないので、名前で比べる。 */
+  private static final DescribedPredicate<JavaClass> LOMBOK_GENERATED =
+      DescribedPredicate.describe(
+          "lombok.Generated", javaClass -> "lombok.Generated".equals(javaClass.getName()));
+
   /** 基底パッケージに続く、各モジュールの Domain Model のパッケージ。 */
   private static final String MODULE_DOMAIN_MODEL = ".*.domain.model..";
 
@@ -474,10 +479,8 @@ class PackageByFeatureOnionArchitectureTest {
   }
 
   /**
-   * Domain Model の依存先を {@code java..}、{@code org.jspecify..}、各モジュールの {@code domain.model}、{@code
-   * shared.concurrency}、{@code shared.failure}、{@code shared.tenant} に限る規則を組み立てる。
-   *
-   * <p>Lombok の注釈は、生成したコードに付く {@code lombok.Generated} だけがクラスファイルに残るので、その型だけを許す。
+   * Domain Model の依存先を許可した型だけに限る規則を組み立てる。許可する型は、この規則の一覧と {@code docs/backend/architecture-tests.md}
+   * が持つ。
    */
   /* package */ static ArchRule domainModelDependsOnlyOnAllowedTypesRule(final String basePackage) {
     return classes()
@@ -486,13 +489,13 @@ class PackageByFeatureOnionArchitectureTest {
         .should()
         .onlyDependOnClassesThat(
             resideInAnyPackage(
-                "java..",
-                "org.jspecify..",
-                "lombok",
-                basePackage + MODULE_DOMAIN_MODEL,
-                basePackage + ".shared.concurrency..",
-                basePackage + ".shared.failure..",
-                basePackage + ".shared.tenant.."))
+                    "java..",
+                    "org.jspecify..",
+                    basePackage + MODULE_DOMAIN_MODEL,
+                    basePackage + ".shared.concurrency..",
+                    basePackage + ".shared.failure..",
+                    basePackage + ".shared.tenant..")
+                .or(LOMBOK_GENERATED))
         .allowEmptyShould(true)
         .because(
             "業務モデルと業務規則を、フレームワークと外部システムの SDK の型から独立させ、テストと変更をしやすくするため。"
@@ -504,13 +507,7 @@ class PackageByFeatureOnionArchitectureTest {
                 + ADR_002);
   }
 
-  /**
-   * Application の依存先を、許可した外部ライブラリの型とこのアプリケーションの型に限る規則を組み立てる。
-   *
-   * <p>許可する外部ライブラリの型は、{@code java..}、{@code org.jspecify..}、{@code lombok.Generated}、{@code
-   * org.slf4j..}、Spring の {@code stereotype}、{@code transaction.annotation}、{@code
-   * modulith.events}、{@code context} である。
-   */
+  /** Application の依存先を、許可した外部ライブラリの型とこのアプリケーションの型に限る規則を組み立てる。 */
   /* package */ static ArchRule applicationDependsOnlyOnAllowedTypesRule(final String basePackage) {
     return classes()
         .that()
@@ -518,15 +515,15 @@ class PackageByFeatureOnionArchitectureTest {
         .should()
         .onlyDependOnClassesThat(
             resideInAnyPackage(
-                "java..",
-                "org.jspecify..",
-                "lombok",
-                "org.slf4j..",
-                "org.springframework.stereotype..",
-                "org.springframework.transaction.annotation..",
-                "org.springframework.modulith.events..",
-                "org.springframework.context",
-                basePackage + ".."))
+                    "java..",
+                    "org.jspecify..",
+                    "org.slf4j..",
+                    "org.springframework.stereotype..",
+                    "org.springframework.transaction.annotation..",
+                    "org.springframework.modulith.events..",
+                    "org.springframework.context",
+                    basePackage + "..")
+                .or(LOMBOK_GENERATED))
         .allowEmptyShould(true)
         .because(
             "外部システムの SDK、生成型、HTTP の型が Application の引数と戻り値に出ると、"

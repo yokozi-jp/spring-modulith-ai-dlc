@@ -82,7 +82,7 @@ Command の形式は、Controller の `@Valid` で検証済みである。
 
 ## 依存してよい型、してはいけない型
 
-- **依存してよい型**：`java..` の標準型（`Clock` を含む）、`org.jspecify..`、`shared.failure` と `shared.concurrency` の例外、同じ `application` の Command と Result、同じモジュールの `domain.model`（集約、値オブジェクト、Repository、外部システムのインタフェース（Listener から呼ばれる CommandHandler だけ））と `domain.service`、モジュールルートの型、他モジュールの `<Feature>Queries` とルートの record、`@Service`、`@Transactional`、`ApplicationEventPublisher`。
+- **依存してよい型**：`java..` の標準型（`Clock` を含む）、`org.jspecify..`、`shared.failure` と `shared.concurrency` の例外、同じ `application` の Command と Result、同じモジュールの `domain.model`（集約、値オブジェクト、Repository、外部システムのインタフェース（Listener から呼ばれる CommandHandler だけ））と `domain.service`、モジュールルートの型、他モジュールの `<Feature>Queries` とルートの record、`@Service`、`@Transactional`、`ApplicationEventPublisher`、ログの `org.slf4j..`（`@Slf4j`）、Listener の `@ApplicationModuleListener`。
 - **依存してはいけない型**：別の CommandHandler、Presentation の型（Request、Response）、Infrastructure の型（`JooqOrderRepository`、`PaymentGatewayClient`）、jOOQ の API と生成型、他モジュールの内部パッケージの型。
 
 ## 最小の例と典型的な例

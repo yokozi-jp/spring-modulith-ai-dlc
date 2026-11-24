@@ -2,7 +2,7 @@ package archfixture.violating.ordering.domain.model;
 
 import org.springframework.stereotype.Component;
 
-/** 違反：domainModelDoesNotDependOnFrameworks（domain.model に @Component を付ける）。 */
+/** 違反：domainModelDependsOnlyOnAllowedTypes（domain.model に @Component を付ける）。 */
 @Component
 public class OrderFactory {
 

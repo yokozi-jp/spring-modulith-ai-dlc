@@ -357,7 +357,7 @@ class PaymentGatewayClientTest {
 - [ ] circuit breaker の instance に、429 以外の 4xx を無視する `ignore-exception-predicate` を指定する。［結合テストで検査：PaymentGatewayClientIntegrationTest］
 - [ ] 業務上の拒否と契約の不備を結果で返し、一時障害と資格情報の不備を例外で投げる。［結合テストで検査：PaymentGatewayClientIntegrationTest］
 - [ ] 外部システムの応答を Domain の型に変換して返す。［自分で点検］
-- [ ] SDK と生成した型を Client の中に閉じ、引数、戻り値、`domain.model` の型に出さない。［ArchUnit で検査：PackageByFeatureOnionArchitectureTest.domainModelDependsOnlyOnAllowedTypes、PackageByFeatureOnionArchitectureTest.applicationDependsOnlyOnAllowedTypes］
+- [ ] SDK と生成した型を Client の中に閉じ、引数、戻り値、`domain.model` の型に出さない。［自分で点検（`domain.model` と `application` への流入は ArchUnit が止める：PackageByFeatureOnionArchitectureTest.domainModelDependsOnlyOnAllowedTypes、PackageByFeatureOnionArchitectureTest.applicationDependsOnlyOnAllowedTypes）］
 - [ ] 応答を、必須の項目も `null` や型違いを許す前提で検査してから Domain の型へ写す。［自分で点検］
 - [ ] 契約に合わない応答（201 以外の 2xx、本文がない、状態が未知、識別子がない）を契約の不備の結果にする。［結合テストで検査：PaymentGatewayClientIntegrationTest］
 - [ ] クラス、定数、フィールド、コンストラクタ、実装するメソッドに Javadoc を書く。［自分で点検］
