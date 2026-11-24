@@ -19,11 +19,7 @@ class ProblemDetailsConfig implements WebMvcConfigurer {
   /** 問い合わせとログを結ぶ trace ID を入れる拡張メンバー。 */
   /* package */ static final String TRACE_ID = "traceId";
 
-  /**
-   * 応答を書く直前の Problem Details を整える。
-   *
-   * <p>instance は Spring Framework 7.1 が空のまま残すので、ここでは触れない。
-   */
+  /** 応答を書く直前の Problem Details を整える。 */
   @Override
   public void addErrorResponseInterceptors(final List<ErrorResponse.Interceptor> interceptors) {
     interceptors.add((detail, errorResponse) -> {

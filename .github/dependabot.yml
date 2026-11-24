@@ -20,7 +20,7 @@ updates:
           - "minor"
           - "patch"
     ignore:
-      # opentelemetry-logback-appender-1.0 は OpenTelemetry コア（backend/build.gradle の
+      # opentelemetry-logback-appender-1.0 は OpenTelemetry コア（Spring Boot の BOM の
       # opentelemetry-bom）と歩調を合わせる必要がある。コアより先行して上げると、
       # instrumentation-api が新しい SDK 前提のままコアが古い版に固定され、
       # ランタイムで API 不整合（NoSuchMethodError / NoClassDefFoundError）を起こす。

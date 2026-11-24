@@ -32,17 +32,22 @@ Spring Boot の minor の更新は、Spring Modulith と関係のない依存（
 
 ## Decision
 
+この ADR は Proposed の間に、#713 で Spring Boot を上げたので、Decision を実施の記録に書き直した。Context は、#562 の時点（Spring Boot 4.1.2、Spring Cloud 2025.1.2）の状況を書いている。
+
 Spring Modulith 2.2.0 を Spring Boot 4.1.2 のまま入れる（[#562](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/562)）。
 その後の別の変更（[#713](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/713)）で、Spring Boot を 4.2.0 へ、Spring Cloud を 2026.0.0 へ 1 つの変更で上げる。
 これで Spring Modulith 2.2.0 は、start.spring.io が対応づける Spring Boot 4.2 系で動く。
 
-### Spring Boot 4.2 への更新で直したもの
+### Spring Boot 4.2 への更新で確かめたもの
 
-- `server.forward-headers-strategy` は非推奨になった。`application.yaml` を `server.request.header.forwarded.strategy: framework` に置き換えた。転送ヘッダの名前は、4.2 の既定のまま `X-Forwarded-*` である。
-- Spring Framework 7.1 は空の `instance` に要求のパスを入れなくなった。[ADR-117](ADR-117-add-trace-id-and-omit-instance-in-problem-details.md) の予告どおり `ProblemDetailsConfigTest` が失敗したので、`ProblemDetailsConfig` の `setInstance(null)` を外し、テストを「入れない」ことの確認に反転した。
+[リリースノート](https://github.com/spring-projects/spring-boot/wiki/Spring-Boot-4.2-Release-Notes)のうち、このリポジトリに関わる変更を、jar と設定で確かめた。
 
-[リリースノート](https://github.com/spring-projects/spring-boot/wiki/Spring-Boot-4.2-Release-Notes)の残りは、このリポジトリが使わない機能（`RestTemplate`、Pulsar、AMQP、LDAP、Redis、WebFlux、Buildpacks、Janino など）である。
-`backend/src` と `docker` に、これらの設定や型の参照がないことを grep で確かめた。
+- `server.forward-headers-strategy` は非推奨になった。`server.request.header.forwarded.strategy: framework` に置き換えた。ALB の `X-Forwarded-*` の解釈は 4.1.2 と同じで、`Forwarded` と `X-Forwarded-Prefix` は無視される。キーを誤ると転送ヘッダを解釈しなくなるので、`ForwardedHeadersTest` が OIDC の `redirect_uri` で固定する。
+- `server.tomcat.servlet.use-relative-redirects` の既定が `true` になった。ALB 経由の要求は転送ヘッダの filter が絶対 URL にし、直接の要求の相対の `Location` は同じオリジンへ解決される。
+- Micrometer は、`LongTaskTimer` を既定で作らなくなった。同梱のダッシュボードと検証スキルは、その系列を使わない。
+- Spring Framework 7.1 は空の `instance` に要求のパスを入れなくなった。[ADR-117](ADR-117-add-trace-id-and-omit-instance-in-problem-details.md) の予告どおりに、`ProblemDetailsConfig` の `setInstance(null)` を外した。応答に `instance` が出ないことは、`ApiErrorContractTest` と `ProblemDetailsTraceIdContractTest` が固定する。
+
+残りの変更（`RestTemplate`、Pulsar、AMQP、LDAP、Redis、WebFlux、Buildpacks、Janino など）は、`backend/src` と `docker` に該当する設定や型の参照がない。
 
 ## Consequences
 
@@ -54,8 +59,9 @@ Spring Modulith 2.2.0 を Spring Boot 4.1.2 のまま入れる（[#562](https://
 
 ### Negative
 
-- 2 つの変更の間は、Spring Modulith と Spring Boot の組み合わせが start.spring.io の対応づけから外れていた。
-  この期間は、#713 の変更で終わる。
+- Spring Boot の更新は、Spring Batch、Spring Security、Spring Session の minor も上げる。
+  4.1 の版で確かめた記述（[ADR-115](ADR-115-build-business-batches-with-spring-batch.md) の Spring Batch 6.0.6、`docs/web-api/authentication-and-session.md` の Spring Security 7.1.2 など）は、4.2 で確かめ直していない。
+  各記述は、その時点の確認の記録として読む。
 
 ### Neutral
 
