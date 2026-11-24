@@ -26,6 +26,7 @@ import org.mockito.Mockito;
 import org.springframework.context.annotation.Import;
 import org.springframework.modulith.events.EventPublication;
 import org.springframework.modulith.events.FailedEventPublications;
+import org.springframework.modulith.events.core.EventPublicationRegistry;
 import org.springframework.test.context.TestPropertySource;
 
 /** 再投入のテストで使う、Spring の文脈の設定、ロックの期限、出版の行と archive の行、条件の関数に渡す出版、上限到達の ERROR の操作。 */
@@ -60,7 +61,11 @@ final class ResubmissionTestSupport {
     return CompletableFuture.supplyAsync(task, runnable -> Thread.ofVirtual().start(runnable));
   }
 
-  /** 同じ {@code dsl}、{@code clock}、{@code properties} から Sweep と定期のジョブを組み立てる。 */
+  /**
+   * 同じ {@code dsl}、{@code clock}、{@code properties} から Sweep と定期のジョブを組み立てる。
+   *
+   * <p>古い出版を FAILED に戻す処理は、何もしないモックにする。{@code clock} と Spring Modulith の時計が別でも、行の状態を変えないためである。
+   */
   /* package */ static EventPublicationResubmitter resubmitter(
       final DSLContext dsl,
       final FailedEventPublications failed,
@@ -72,7 +77,13 @@ final class ResubmissionTestSupport {
       final EventPublicationResubmissionConfig.AbandonProperties abandon) {
     return new EventPublicationResubmitter(
         dsl,
-        new FailedPublicationSweep(dsl, failed, lockingTaskExecutor, clock, properties),
+        new FailedPublicationSweep(
+            dsl,
+            failed,
+            lockingTaskExecutor,
+            clock,
+            properties,
+            Mockito.mock(EventPublicationRegistry.class)),
         policies,
         clock,
         meterRegistry,

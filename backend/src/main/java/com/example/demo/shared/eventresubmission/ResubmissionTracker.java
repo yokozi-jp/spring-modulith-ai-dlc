@@ -75,9 +75,9 @@ final class ResubmissionTracker {
    * 覚えておく期間。{@code max(3 × lock-at-most-for, in-flight-staleness + lock-at-most-for + 2 ×
    * interval)}。
    *
-   * <p>落ちたまま残った再投入の出版の last_resubmission_date は、この回の時刻から最大で {@code lock-at-most-for} 遅れる。 Staleness
-   * Monitor はそこから {@code in-flight-staleness} を過ぎた出版を {@code interval} ごとに FAILED に戻し、次の回はさらに最大で
-   * {@code interval} 後に数える。 その後の回で数えるまでの余裕として、ロックの上限の 3 倍とも比べて長い方を取る。
+   * <p>落ちたまま残った再投入の出版の last_resubmission_date は、この回の時刻から最大で {@code lock-at-most-for} 遅れる。
+   * 定期のジョブはロックを取った回に、そこから {@code in-flight-staleness} を過ぎた出版を FAILED に戻し、ロックはどれかのインスタンスがおよそ {@code
+   * interval} ごとに取る。 次の回はさらに最大で {@code interval} 後に数える。 その後の回で数えるまでの余裕として、ロックの上限の 3 倍とも比べて長い方を取る。
    */
   /* package */ static Duration lifetimeOf(
       final EventPublicationResubmissionConfig.Properties properties) {

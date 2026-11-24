@@ -23,6 +23,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.modulith.events.EventPublication;
 import org.springframework.modulith.events.FailedEventPublications;
 import org.springframework.modulith.events.ResubmissionOptions;
+import org.springframework.modulith.events.core.EventPublicationRegistry;
 
 /**
  * {@link FailedPublicationSweep} の interface だけを通して、件数の上限、進んだ出版の判定、ロックの取り方を確かめる。
@@ -121,7 +122,12 @@ class FailedPublicationSweepTest {
       final FailedEventPublications failed,
       final EventPublicationResubmissionConfig.Properties sweepProperties) {
     return new FailedPublicationSweep(
-        dsl, failed, lockingTaskExecutor, Clock.fixed(NOW, ZoneOffset.UTC), sweepProperties);
+        dsl,
+        failed,
+        lockingTaskExecutor,
+        Clock.fixed(NOW, ZoneOffset.UTC),
+        sweepProperties,
+        Mockito.mock(EventPublicationRegistry.class));
   }
 
   /** completion_attempts が 1 の FAILED の行を DB に作る。 */

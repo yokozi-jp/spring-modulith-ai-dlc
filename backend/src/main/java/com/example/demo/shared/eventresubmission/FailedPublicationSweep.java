@@ -19,14 +19,19 @@ import org.jspecify.annotations.Nullable;
 import org.springframework.modulith.events.EventPublication;
 import org.springframework.modulith.events.FailedEventPublications;
 import org.springframework.modulith.events.ResubmissionOptions;
+import org.springframework.modulith.events.core.EventPublicationRegistry;
 import org.springframework.stereotype.Component;
 
 /**
- * ロックを取り、選んだ {@code FAILED} の出版を {@code max-per-run} 件まで再投入し、{@code RESUBMITTED}
- * へ進んだ出版を返す（ADR-079）。
+ * ロックを取り、古い出版を {@code FAILED} に戻してから、選んだ {@code FAILED} の出版を {@code max-per-run} 件まで再投入し、{@code
+ * RESUBMITTED} へ進んだ出版を返す（ADR-079）。
  *
  * <p>定期の再投入（{@link EventPublicationResubmitter}）は {@link #tryOnce}、手での 1 回の再投入（{@link
  * EventPublicationResubmitOnce}）は {@link #waitUpTo} で呼ぶ。2 つは選ぶ条件、ロックの取り方、再投入のあとの扱いだけが違い、ほかはここに集める。
+ *
+ * <p>古い出版を {@code FAILED} に戻す処理（{@link
+ * EventPublicationRegistry#markStalePublicationsFailed}）は、Spring Modulith の組み込みの Staleness Monitor
+ * でなく、ここでロックの中で呼ぶ。古い出版を読んでから {@code FAILED} にするまでの間に、別のインスタンスが再投入しないようにするためである。
  *
  * <p>{@code FailedEventPublications.resubmit} は件数を返さず、{@code markResubmitted} は他の更新で偽になりうる（{@code
  * completion_date} が空で {@code RESUBMITTED} でない行だけを更新する）。そのため、再投入のあとに読み戻し、{@code
@@ -54,17 +59,22 @@ final class FailedPublicationSweep {
   /** 設定値。 */
   private final EventPublicationResubmissionConfig.Properties properties;
 
+  /** Spring Modulith の、古い出版を FAILED に戻す処理。 */
+  private final EventPublicationRegistry registry;
+
   /* package */ FailedPublicationSweep(
       final DSLContext dsl,
       final FailedEventPublications failedEventPublications,
       final LockingTaskExecutor eventPublicationLockingTaskExecutor,
       final Clock clock,
-      final EventPublicationResubmissionConfig.Properties properties) {
+      final EventPublicationResubmissionConfig.Properties properties,
+      final EventPublicationRegistry registry) {
     this.dsl = dsl;
     this.failedEventPublications = failedEventPublications;
     this.lockingTaskExecutor = eventPublicationLockingTaskExecutor;
     this.clock = clock;
     this.properties = properties;
+    this.registry = registry;
   }
 
   /**
@@ -111,7 +121,9 @@ final class FailedPublicationSweep {
   }
 
   /**
-   * ロックを 1 回試し、取れたら選んだ出版を再投入して、進んだ出版を返す。取れなければ空を返す。
+   * ロックを 1 回試し、取れたら古い出版を FAILED に戻してから選んだ出版を再投入して、進んだ出版を返す。取れなければ空を返す。
+   *
+   * <p>FAILED に戻した出版は、同じ回の再投入の候補になる。
    *
    * <p>{@code FailedEventPublications.resubmit} は {@code LIMIT} を条件の関数より先に掛けるため（Spring Modulith
    * の挙動は {@code ResubmissionOptionsLearningTest} が固定する）、毎回 FAILED の行をすべて読む。{@code withMinAge} は
@@ -141,6 +153,7 @@ final class FailedPublicationSweep {
         (Runnable)
             () -> {
               locked.set(true);
+              registry.markStalePublicationsFailed(properties.staleness());
               failedEventPublications.resubmit(
                   ResubmissionOptions.defaults()
                       .withBatchSize(Integer.MAX_VALUE)

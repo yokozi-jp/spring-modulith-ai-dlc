@@ -17,6 +17,7 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
  * <p>原因を直したあとに、自動の再投入を待たずに手で再投入する入口で使う。待ち時間は見ず、対象に合う {@code FAILED} の出版を {@code max-per-run}
  * 件まで再投入する。回数の上限を超えて {@code ABANDONED} になった出版は、Spring Modulith 2.2.0 に {@code FAILED} へ戻す API
  * がないため、Runbook の SQL で戻してから使う（ADR-079）。定期の再投入と同じロックを取り、取れるまで {@code lock-at-most-for} を上限に待つ。
+ * ロックの中では、定期の再投入と同じく、対象によらず古い出版を {@code FAILED} に戻してから再投入する（{@link FailedPublicationSweep}）。
  * リスナーは別のスレッドで動くため、再投入した出版が {@code PUBLISHED}、{@code PROCESSING}、{@code RESUBMITTED}
  * でなくなるまで待ち、件数を記録する。
  *

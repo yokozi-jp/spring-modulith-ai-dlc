@@ -19,9 +19,10 @@ import org.springframework.stereotype.Component;
 /**
  * 失敗したイベント出版を定期的に再投入するジョブ（ADR-079）。
  *
- * <p>ShedLock のロックを取れたインスタンスだけが、リスナーの方針（{@link ResubmissionPolicies}）の待ち時間を過ぎ、再投入の回数が上限に達していない
- * {@code FAILED} の出版を再投入する。上限の回数目の再投入で失敗した出版は、Spring Modulith が {@code abandon-after-attempts} で
- * {@code ABANDONED} にする。 件数と最古の経過時間の Gauge と、上限を超えた {@code FAILED} の出版が現れたときの ERROR
+ * <p>ShedLock のロックを取れたインスタンスだけが、古い出版を {@code FAILED} に戻してから（{@link
+ * FailedPublicationSweep}）、リスナーの方針（{@link ResubmissionPolicies}）の待ち時間を過ぎ、再投入の回数が上限に達していない {@code
+ * FAILED} の出版を再投入する。上限の回数目の再投入で失敗した出版は、Spring Modulith が {@code abandon-after-attempts} で {@code
+ * ABANDONED} にする。 件数と最古の経過時間の Gauge と、上限を超えた {@code FAILED} の出版が現れたときの ERROR
  * は、ロックの外ですべてのインスタンスが出す（{@link FailedPublicationGauges}）。
  */
 @Slf4j
