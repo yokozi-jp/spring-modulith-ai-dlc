@@ -33,11 +33,12 @@ tags: [architecture, backend, spring-modulith, shared-module]
 - 業務のバッチの追いつきの Runner（`CatchUpJobRunner`）、partition のテナントを束縛する Aspect（`TenantPartitionAspect`）、Job の期間の規則（`JobPeriodRule`）を `shared.batch` に置き、このパッケージも `@NamedInterface("batch")` で公開する（[ADR-115](../adr/ADR-115-build-business-batches-with-spring-batch.md)）。
   `JobPeriodRule` 以外のクラスは package-private にする。
   Runner と Aspect の振る舞いは [バッチ](../batch/index.md) に従う。
+- メールアドレスの形式の制約 `MailAddress` を `shared.validation` に置き、このパッケージも `@NamedInterface("validation")` で公開する（[メールアドレスの扱い](../mail/email-address.md#形式の検査)）。
 - 業務の概念を置かない。
   ルートのパッケージには `package-info.java` だけを置く。
 - `shared.infrastructure.persistence` を使ってよいのは、他のモジュールの `infrastructure.persistence` だけである。
   `shared.batch` を使ってよいのは、機能モジュールの `batch` だけである。
-  `shared.concurrency`、`shared.failure`、`shared.events`、`shared.security`、`shared.tenancy` は、どの層からも使える。
+  `shared.concurrency`、`shared.failure`、`shared.events`、`shared.security`、`shared.tenancy`、`shared.validation` は、どの層からも使える。
 
 使う場所の制限は、`PackageByFeatureOnionArchitectureTest` の `sharedModuleIsUsedOnlyByPersistenceAdapters` が検査する。
 ただし、`shared` の `PgmCdAspect` は、AOP で `<UseCase>CommandHandler` の `handle` と `<Event>Listener` の呼び出しを囲む（[ADR-051](../adr/ADR-051-bind-pgm-cd-with-scoped-value-and-aspect.md)）。
