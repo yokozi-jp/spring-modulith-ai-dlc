@@ -82,7 +82,7 @@ backend を再起動せず、シナリオの途中で注文ごとに応答を切
 
 ## 送ったメールを読む
 
-backend が送ったメールは、compose-test の WireMock の要求の記録から読む（[ADR-124](../adr/ADR-124-send-mail-with-ses-v2-api-and-fake-it-with-wiremock.md)）。
+backend が送ったメールは、compose-test の WireMock の要求の記録から読む（[ADR-125](../adr/ADR-125-send-mail-with-ses-v2-api-and-fake-it-with-wiremock.md)）。
 backend は SES v2 の `SendEmail`（`POST /v2/email/outbound-emails`）を、決済代行と同じ WireMock へ送り、共有のスタブ（`docker/wiremock/mappings/ses-send-email.json`）が送信済みを返す。
 今はメールを送る機能がなく、メールを読む spec もない。
 メールを読む spec を足すときは、次のとおりにする。

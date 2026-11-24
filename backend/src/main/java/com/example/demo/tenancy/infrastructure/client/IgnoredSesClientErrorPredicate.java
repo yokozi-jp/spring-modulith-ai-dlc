@@ -7,7 +7,7 @@ import software.amazon.awssdk.http.HttpStatusFamily;
 /**
  * メールの送信の circuit breaker が失敗に数えない例外を選ぶ。スロットリング以外の 4xx の {@link SdkServiceException} が当たる。
  *
- * <p>資格情報と権限の不備や SES の設定の不備は SES の不調ではないので数えず、スロットリングは一時障害なので数える（ADR-124）。 application.yaml の
+ * <p>資格情報と権限の不備や SES の設定の不備は SES の不調ではないので数えず、スロットリングは一時障害なので数える（ADR-125）。 application.yaml の
  * {@code ignore-exception-predicate} から Resilience4j が引数のないコンストラクタで作るため、public にする。
  */
 public final class IgnoredSesClientErrorPredicate implements Predicate<Throwable> {

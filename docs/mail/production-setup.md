@@ -10,7 +10,7 @@ tags: [runbook, mail, ses, aws, ecs, iam]
 本番の backend は、ECS のタスクのロールの一時的な資格情報で SES v2 の `SendEmail` を呼ぶ。
 タスク定義には From、表示名、設定セットの 3 つの環境変数だけを入れ、アクセスキーと接続先を入れない。
 タスクのロールには、From の ID と設定セットに絞った `ses:SendEmail` だけを許す。
-決定の理由は [ADR-124](../adr/ADR-124-send-mail-with-ses-v2-api-and-fake-it-with-wiremock.md) に示す。
+決定の理由は [ADR-125](../adr/ADR-125-send-mail-with-ses-v2-api-and-fake-it-with-wiremock.md) に示す。
 
 ## 前提
 

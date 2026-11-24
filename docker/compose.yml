@@ -177,7 +177,7 @@ services:
       MAIL_SENDER_FROM_ADDRESS: ${MAIL_SENDER_FROM_ADDRESS:?MAIL_SENDER_FROM_ADDRESS is required}
       MAIL_SENDER_FROM_NAME: ${MAIL_SENDER_FROM_NAME:?MAIL_SENDER_FROM_NAME is required}
       MAIL_SENDER_CONFIGURATION_SET: ${MAIL_SENDER_CONFIGURATION_SET:?MAIL_SENDER_CONFIGURATION_SET is required}
-      # メールは SES v2 の API の接続先を同じ WireMock に向ける（ADR-124）。
+      # メールは SES v2 の API の接続先を同じ WireMock に向ける（ADR-125）。
       # アクセスキーはダミーの値で、接続先を書き忘れても本物の SES はこの署名を断る。
       AWS_ENDPOINT_URL_SESV2: http://wiremock:8080
       AWS_REGION: ap-northeast-1

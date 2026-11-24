@@ -50,7 +50,7 @@ class InfrastructureContainersTest {
     assertThat(environment.getProperty("payment-gateway.base-url"))
         .as("payment-gateway.base-url")
         .isEqualTo(started.get("PAYMENT_GATEWAY_BASE_URL"));
-    // SDK はシステムプロパティから接続先を読み、Client の設定の endpointOverride に入れる（ADR-124）。
+    // SDK はシステムプロパティから接続先を読み、Client の設定の endpointOverride に入れる（ADR-125）。
     assertThat(sesV2Client.serviceClientConfiguration().endpointOverride())
         .as("SES v2 の Client の接続先")
         .hasValue(URI.create((String) started.get("PAYMENT_GATEWAY_BASE_URL")));

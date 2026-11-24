@@ -236,7 +236,7 @@ payment-gateway:
   connect-timeout: 1s
   read-timeout: 2s
 
-# メールの送信（ADR-124）。From のアドレスと表示名、SES の設定セットに既定値を置かず、未設定なら起動に失敗する。
+# メールの送信（ADR-125）。From のアドレスと表示名、SES の設定セットに既定値を置かず、未設定なら起動に失敗する。
 # 接続先、リージョン、資格情報は AWS の SDK の既定の取得に任せ、ここに書かない。
 mail-sender:
   from-address: ${MAIL_SENDER_FROM_ADDRESS}
@@ -267,7 +267,7 @@ resilience4j:
         ignore-exception-predicate: com.example.demo.payment.infrastructure.client.IgnoredClientErrorPredicate
       mail-sender:
         base-config: default
-        # スロットリング以外の 4xx は資格情報か SES の設定の不備で、SES の不調ではないので失敗として数えない（ADR-124）。
+        # スロットリング以外の 4xx は資格情報か SES の設定の不備で、SES の不調ではないので失敗として数えない（ADR-125）。
         ignore-exception-predicate: com.example.demo.tenancy.infrastructure.client.IgnoredSesClientErrorPredicate
   retry:
     configs:
@@ -291,7 +291,7 @@ resilience4j:
       # 冪等キーを渡すが、CommandHandler のトランザクションの中で呼ぶため default（試行 1 回）を継承する。
       payment-gateway:
         base-config: default
-      # SES の SendEmail には冪等キーがないため、default（試行 1 回）を継承する。SDK の再試行も止める（ADR-124）。
+      # SES の SendEmail には冪等キーがないため、default（試行 1 回）を継承する。SDK の再試行も止める（ADR-125）。
       mail-sender:
         base-config: default
   timelimiter:

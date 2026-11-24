@@ -1,11 +1,11 @@
 ---
 type: ADR
-title: 'ADR-124: メールを SES v2 の API で送り、ローカルとテストは接続先を WireMock に向ける'
+title: 'ADR-125: メールを SES v2 の API で送り、ローカルとテストは接続先を WireMock に向ける'
 description: 本番、ローカル、テストのどれも SES v2 の SendEmail を呼ぶ同じ Client でメールを送り、ローカルとテストは AWS の SDK の接続先の環境変数だけで既存の WireMock に向ける決定。ADR-072 の形を SES に広げる。
 tags: [adr, backend, mail, ses, wiremock, external-system]
 ---
 
-# ADR-124: メールを SES v2 の API で送り、ローカルとテストは接続先を WireMock に向ける
+# ADR-125: メールを SES v2 の API で送り、ローカルとテストは接続先を WireMock に向ける
 
 ## Status
 

@@ -26,7 +26,7 @@ import software.amazon.awssdk.services.sesv2.model.SesV2Exception;
  * SES v2 の {@code SendEmail} で、1 人の宛先へプレーンテキストのメールを送る。
  *
  * <p>本番もローカルもテストも、この Client で送る。ローカルとテストは、SDK の接続先の {@code AWS_ENDPOINT_URL_SESV2} だけを WireMock
- * に向ける（ADR-124）。タイムアウトと試行 1 回の設定は {@link SesV2ClientConfig} が持ち、circuit breaker と retry は ADR-019
+ * に向ける（ADR-125）。タイムアウトと試行 1 回の設定は {@link SesV2ClientConfig} が持ち、circuit breaker と retry は ADR-019
  * の既定値のままにする。SES の SLO から値を変える根拠がまだないためである。
  *
  * <p>結果は ADR-072 の分け方に合わせる。{@code MessageRejected} と {@code BadRequestException}

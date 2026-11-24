@@ -16,7 +16,7 @@ tags: [convention, mail, testing, wiremock, future-arch-guidelines]
 ## ローカルとテスト
 
 - メールは、本番と同じ SES v2 の API の Client（[メールを送る Client](sending.md)）で送り、ローカル、結合テスト、E2E では接続先だけを WireMock に向ける。
-  外部システムを WireMock で偽る形は [ADR-072](../adr/ADR-072-fake-external-systems-with-wiremock.md) に、SES に広げた理由は [ADR-124](../adr/ADR-124-send-mail-with-ses-v2-api-and-fake-it-with-wiremock.md) に従う。
+  外部システムを WireMock で偽る形は [ADR-072](../adr/ADR-072-fake-external-systems-with-wiremock.md) に、SES に広げた理由は [ADR-125](../adr/ADR-125-send-mail-with-ses-v2-api-and-fake-it-with-wiremock.md) に従う。
 - 送ったメールの宛先、件名、本文は、WireMock の要求の記録から読んで確かめる。
 - テストから本物の宛先へメールを送らない。
 

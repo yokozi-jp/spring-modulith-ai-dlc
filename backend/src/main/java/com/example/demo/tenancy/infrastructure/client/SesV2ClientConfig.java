@@ -12,7 +12,7 @@ import software.amazon.awssdk.services.sesv2.SesV2ClientBuilder;
 /**
  * メールを送る SES v2 の SDK の Client を作る。
  *
- * <p>接続先、リージョン、資格情報は SDK の既定の取得に任せ、ここで設定しない（ADR-124）。本番は ECS のタスクのロールと {@code AWS_REGION}
+ * <p>接続先、リージョン、資格情報は SDK の既定の取得に任せ、ここで設定しない（ADR-125）。本番は ECS のタスクのロールと {@code AWS_REGION}
  * を使い、ローカルとテストは {@code AWS_ENDPOINT_URL_SESV2} で WireMock を指す。リージョンが取れなければ Client を作れず、起動に失敗する。
  */
 @Configuration(proxyBeanMethods = false)

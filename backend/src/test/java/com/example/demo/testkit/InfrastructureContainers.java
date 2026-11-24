@@ -40,7 +40,7 @@ import org.yaml.snakeyaml.Yaml;
  * とスモークの依存と版をそろえる。 ポートは compose と同じく {@code 127.0.0.1} だけで待ち受ける。
  *
  * <p>AWS の SDK は Spring の設定を読まないため、SES v2 の接続先、リージョン、ダミーの資格情報は、SDK
- * が環境変数より優先して読むシステムプロパティで渡す（ADR-124）。 Spring のコンテキストが SDK の Client を作る前に、{@link #properties()}
+ * が環境変数より優先して読むシステムプロパティで渡す（ADR-125）。 Spring のコンテキストが SDK の Client を作る前に、{@link #properties()}
  * が設定する。
  */
 final class InfrastructureContainers {
@@ -154,7 +154,7 @@ final class InfrastructureContainers {
 
     final String wireMockUrl = "http://" + LOOPBACK + ":" + wireMock.getMappedPort(WIREMOCK_PORT);
     warmUp(wireMockUrl);
-    // SDK の SES v2 の Client を同じ WireMock に向け、リージョンとダミーの資格情報を渡す（ADR-124）。
+    // SDK の SES v2 の Client を同じ WireMock に向け、リージョンとダミーの資格情報を渡す（ADR-125）。
     // システムプロパティは JVM の全体に効くが、コンテナと同じく fork の JVM ごとに 1 回だけ設定する。
     System.setProperty(SES_ENDPOINT_PROPERTY, wireMockUrl);
     System.setProperty("aws.region", AWS_REGION);

@@ -120,7 +120,7 @@ services:
 - healthcheck は `/__admin/health` を `curl` で確かめる。
 - ポートは `127.0.0.1` に限って公開する（開発用 8090、compose-test は slot 0 で 8082）。
   backend は compose の network の中から service 名（`http://wiremock:8080`）で呼ぶ。
-- SES v2 の API は、backend の環境変数 `AWS_ENDPOINT_URL_SESV2` で WireMock に向ける（[ADR-124](../adr/ADR-124-send-mail-with-ses-v2-api-and-fake-it-with-wiremock.md)）。
+- SES v2 の API は、backend の環境変数 `AWS_ENDPOINT_URL_SESV2` で WireMock に向ける（[ADR-125](../adr/ADR-125-send-mail-with-ses-v2-api-and-fake-it-with-wiremock.md)）。
   アプリの設定に接続先の項目はなく、AWS の SDK がこの環境変数を読む。
   同じ backend に、ダミーの `AWS_ACCESS_KEY_ID` と `AWS_SECRET_ACCESS_KEY` と、`AWS_REGION` を渡す。
 - 手元で送ったメールは、開発用の WireMock の要求の記録から読む。

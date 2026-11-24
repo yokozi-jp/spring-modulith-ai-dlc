@@ -10,7 +10,7 @@ tags: [convention, mail, backend, ses, external-system]
 メールは `tenancy` の `MailSender` で送り、実装の `MailSenderClient` が SES v2 の `SendEmail` を呼ぶ。
 同じ要求で回復しない拒否は結果の `Rejected` で返り、呼び出し元が業務の状態に記録する。
 一時障害、資格情報と権限の不備、運用者が直せる SES の不備は例外で返るので、捕まえずにイベント出版を `FAILED` に残す。
-送り方の決定の理由は [ADR-124](../adr/ADR-124-send-mail-with-ses-v2-api-and-fake-it-with-wiremock.md) に示す。
+送り方の決定の理由は [ADR-125](../adr/ADR-125-send-mail-with-ses-v2-api-and-fake-it-with-wiremock.md) に示す。
 
 ## 呼び方
 

@@ -45,7 +45,7 @@ import tools.jackson.databind.json.JsonMapper;
  * のコンテナ（InfrastructureContainers）に向けて、送ったメールの中身と失敗の扱いを検証する。
  *
  * <p>Spring の Client は、本番と同じく SDK の既定の取得で接続先を読み、テストではシステムプロパティ {@code aws.endpointUrlSesV2} が
- * WireMock を指す（ADR-124）。成功は compose の WireMock と同じ {@code docker/wiremock/mappings}
+ * WireMock を指す（ADR-125）。成功は compose の WireMock と同じ {@code docker/wiremock/mappings}
  * の共有のスタブで返し、Client とスタブの契約が合うことを確かめる。失敗は、宛先に合う優先度の高いスタブをテストの中で足す。送ったメールは、E2E と同じく WireMock
  * の要求の記録（{@code POST /__admin/requests/find}）から宛先で絞って読む。 呼び出す Listener がまだないため、イベント出版の状態ではなく、Client
  * の結果と例外、SDK の要求の数、circuit breaker の失敗の数を確かめる。
