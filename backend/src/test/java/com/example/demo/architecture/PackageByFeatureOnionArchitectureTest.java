@@ -23,6 +23,7 @@ import com.tngtech.archunit.lang.ArchRule;
 import com.tngtech.archunit.lang.ConditionEvents;
 import com.tngtech.archunit.lang.SimpleConditionEvent;
 import com.tngtech.archunit.library.Architectures;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -98,6 +99,10 @@ class PackageByFeatureOnionArchitectureTest {
   /** Persistence Adapter のパッケージ。 */
   private static final String PERSISTENCE_PACKAGE = "..infrastructure.persistence..";
 
+  /** jOOQ を使う shared のパッケージ。機能モジュールの Persistence Adapter と同じ層に入る。 */
+  private static final List<String> SHARED_ADAPTER_PACKAGES =
+      List.of("persistence", "eventresubmission");
+
   /** 層の責務の規約と、クラスの役割を決めた ADR。 */
   private static final String LAYERS_DOCS = "規約：docs/backend/layers.md、" + ADR_050;
 
@@ -144,7 +149,7 @@ class PackageByFeatureOnionArchitectureTest {
   /* package */ static final ArchRule databaseTechnologyApisAreOnlyUsedByPersistenceAdapters =
       noClasses()
           .that()
-          .resideOutsideOfPackage(PERSISTENCE_PACKAGE)
+          .resideOutsideOfPackages(persistenceAdapterPackages(BASE_PACKAGE))
           .should()
           .dependOnClassesThat()
           .resideInAnyPackage(
@@ -366,7 +371,7 @@ class PackageByFeatureOnionArchitectureTest {
         .domainServices(basePackage + ".*.domain.service..")
         .applicationServices(basePackage + ".*", basePackage + ".*.application..")
         .adapter("presentation", basePackage + ".*.presentation..")
-        .adapter("persistence", basePackage + ".*.infrastructure.persistence..")
+        .adapter("persistence", persistenceAdapterPackages(basePackage))
         .adapter("external-client", basePackage + ".*.infrastructure.client..")
         .ensureAllClassesAreContainedInArchitectureIgnoring(
             Stream.concat(Stream.of(basePackage), Stream.of(anyLayerSharedPackages(basePackage)))
@@ -575,6 +580,21 @@ class PackageByFeatureOnionArchitectureTest {
                 + "直し方：Repository の実装は infrastructure.persistence へ、"
                 + "外部システムのインタフェースの実装は infrastructure.client へ移す。"
                 + LAYERS_DOCS);
+  }
+
+  /** {@link #SHARED_ADAPTER_PACKAGES} を、{@code resideInAnyPackage} に渡す形で返す。 */
+  private static String[] sharedAdapterPackages(final String basePackage) {
+    return SHARED_ADAPTER_PACKAGES.stream()
+        .map(name -> basePackage + ".shared." + name + "..")
+        .toArray(String[]::new);
+  }
+
+  /** 機能モジュールの Persistence Adapter と、{@link #SHARED_ADAPTER_PACKAGES} のパッケージを返す。 */
+  private static String[] persistenceAdapterPackages(final String basePackage) {
+    return Stream.concat(
+            Stream.of(basePackage + ".*.infrastructure.persistence.."),
+            Arrays.stream(sharedAdapterPackages(basePackage)))
+        .toArray(String[]::new);
   }
 
   /** どの層からも使ってよい shared のパッケージを、{@code resideInAnyPackage} に渡す形で返す。 */

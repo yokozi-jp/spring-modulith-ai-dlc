@@ -16,7 +16,7 @@ import com.example.demo.payment.domain.model.Money;
 import com.example.demo.payment.domain.model.OrderId;
 import com.example.demo.payment.domain.model.PaymentGateway;
 import com.example.demo.shared.concurrency.ExpectedLockNo;
-import com.example.demo.shared.infrastructure.persistence.ModuleRoleTransactionManager;
+import com.example.demo.shared.persistence.ModuleRoleTransactionManager;
 import com.example.demo.testkit.AppUsers;
 import com.example.demo.testkit.AsModule;
 import com.example.demo.testkit.AsTenant;

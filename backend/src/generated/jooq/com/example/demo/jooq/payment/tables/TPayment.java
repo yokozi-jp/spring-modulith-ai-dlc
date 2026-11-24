@@ -8,7 +8,7 @@ import com.example.demo.jooq.payment.Indexes;
 import com.example.demo.jooq.payment.Keys;
 import com.example.demo.jooq.payment.Payment;
 import com.example.demo.jooq.payment.tables.records.TPaymentRecord;
-import com.example.demo.shared.infrastructure.persistence.NullToEmptyStringConverter;
+import com.example.demo.shared.persistence.NullToEmptyStringConverter;
 
 import java.math.BigDecimal;
 import java.time.Instant;

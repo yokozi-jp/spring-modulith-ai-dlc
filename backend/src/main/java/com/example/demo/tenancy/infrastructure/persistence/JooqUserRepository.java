@@ -5,9 +5,9 @@ import static com.example.demo.jooq.tenancy.Tables.M_USER_IDENTITY;
 
 import com.example.demo.jooq.tenancy.tables.records.MUserIdentityRecord;
 import com.example.demo.jooq.tenancy.tables.records.MUserRecord;
-import com.example.demo.shared.infrastructure.persistence.AggregateTable;
-import com.example.demo.shared.infrastructure.persistence.ChildTable;
-import com.example.demo.shared.infrastructure.persistence.TableWriter;
+import com.example.demo.shared.persistence.AggregateTable;
+import com.example.demo.shared.persistence.ChildTable;
+import com.example.demo.shared.persistence.TableWriter;
 import com.example.demo.tenancy.domain.model.ExternalIdentity;
 import com.example.demo.tenancy.domain.model.User;
 import com.example.demo.tenancy.domain.model.UserId;

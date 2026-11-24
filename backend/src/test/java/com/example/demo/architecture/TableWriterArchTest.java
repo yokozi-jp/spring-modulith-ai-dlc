@@ -79,7 +79,7 @@ class TableWriterArchTest {
   private static final String BASE_PACKAGE = DemoApplication.class.getPackageName();
 
   /** 書き込みの入口を置く shared のパッケージ（基底パッケージからの相対）。 */
-  private static final String WRITER_PACKAGE = ".shared.infrastructure.persistence.";
+  private static final String WRITER_PACKAGE = ".shared.persistence.";
 
   /** 楽観的ロックの語彙を置く shared のパッケージ（基底パッケージからの相対）。 */
   private static final String CONCURRENCY_PACKAGE = ".shared.concurrency.";

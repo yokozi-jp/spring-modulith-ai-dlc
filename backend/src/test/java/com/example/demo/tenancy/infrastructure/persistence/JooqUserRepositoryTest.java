@@ -6,9 +6,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.example.demo.shared.concurrency.ConflictException;
-import com.example.demo.shared.infrastructure.persistence.CommonColumns;
-import com.example.demo.shared.infrastructure.persistence.TableWriter;
-import com.example.demo.shared.infrastructure.persistence.TestCommonColumns;
+import com.example.demo.shared.persistence.CommonColumns;
+import com.example.demo.shared.persistence.TableWriter;
+import com.example.demo.shared.persistence.TestCommonColumns;
 import com.example.demo.tenancy.domain.model.ExternalIdentity;
 import com.example.demo.tenancy.domain.model.User;
 import com.example.demo.tenancy.domain.model.UserRepository;

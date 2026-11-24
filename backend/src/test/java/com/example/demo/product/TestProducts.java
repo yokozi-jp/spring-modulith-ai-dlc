@@ -2,7 +2,7 @@ package com.example.demo.product;
 
 import static com.example.demo.jooq.product.Tables.M_PRODUCT;
 
-import com.example.demo.shared.infrastructure.persistence.TestCommonColumns;
+import com.example.demo.shared.persistence.TestCommonColumns;
 import com.example.demo.shared.tenancy.TenantId;
 import com.example.demo.testkit.AsModule;
 import com.example.demo.testkit.AsTenant;

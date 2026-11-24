@@ -5,7 +5,7 @@ import archfixture.conforming.ordering.domain.model.Order;
 import archfixture.conforming.ordering.domain.model.OrderId;
 import archfixture.conforming.ordering.domain.model.OrderRepository;
 import archfixture.conforming.ordering.domain.model.OrderStatus;
-import archfixture.conforming.shared.infrastructure.persistence.TableWriter;
+import archfixture.conforming.shared.persistence.TableWriter;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;

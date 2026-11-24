@@ -8,7 +8,7 @@ import com.example.demo.jooq.product.Indexes;
 import com.example.demo.jooq.product.Keys;
 import com.example.demo.jooq.product.Product;
 import com.example.demo.jooq.product.tables.records.MProductRecord;
-import com.example.demo.shared.infrastructure.persistence.NullToEmptyStringConverter;
+import com.example.demo.shared.persistence.NullToEmptyStringConverter;
 
 import java.math.BigDecimal;
 import java.time.Instant;

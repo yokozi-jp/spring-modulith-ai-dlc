@@ -64,12 +64,12 @@ git diff --stat "$(sed -n 's/^同期コミット：`\([0-9a-f]*\)`.*/\1/p' "$ski
   backend/src/main/java/com/example/demo/payment/domain/model/PaymentGateway.java \
   backend/src/main/java/com/example/demo/payment/infrastructure/client/PaymentGatewayClient.java \
   backend/src/main/java/com/example/demo/payment/infrastructure/persistence/JooqPaymentRepository.java \
-  backend/src/main/java/com/example/demo/shared/infrastructure/persistence/EventPublicationResubmitter.java \
-  backend/src/main/java/com/example/demo/shared/infrastructure/persistence/EventPublicationResubmitOnce.java \
-  backend/src/main/java/com/example/demo/shared/infrastructure/persistence/TableWriter.java \
-  backend/src/main/java/com/example/demo/shared/infrastructure/persistence/TenantListenerAspect.java \
-  backend/src/main/java/com/example/demo/shared/infrastructure/persistence/ModuleRoleTransactionManager.java \
-  backend/src/main/java/com/example/demo/shared/infrastructure/persistence/ModuleRoles.java \
+  backend/src/main/java/com/example/demo/shared/eventresubmission/EventPublicationResubmitter.java \
+  backend/src/main/java/com/example/demo/shared/eventresubmission/EventPublicationResubmitOnce.java \
+  backend/src/main/java/com/example/demo/shared/persistence/TableWriter.java \
+  backend/src/main/java/com/example/demo/shared/tenancy/TenantListenerAspect.java \
+  backend/src/main/java/com/example/demo/shared/persistence/ModuleRoleTransactionManager.java \
+  backend/src/main/java/com/example/demo/shared/persistence/ModuleRoles.java \
   backend/src/main/resources/db/changelog/changesets/006-create-payment-tables.yaml \
   backend/src/main/resources/db/changelog/changesets/020-rebuild-payment-tables-for-tenants.yaml \
   backend/src/main/resources/application.yaml \

@@ -88,8 +88,8 @@ Java の検証器（JBMC など）は、`ScopedValue` と SLF4J の MDC を持�
 skill=.agents/skills/exhaustive-verify-tenant-context/SKILL.md
 git diff --stat "$(sed -n 's/^同期コミット：`\([0-9a-f]*\)`.*/\1/p' "$skill")" -- \
   backend/src/main/java/com/example/demo/shared/tenancy/TenantContext.java \
-  backend/src/main/java/com/example/demo/shared/infrastructure/persistence/TenantListenerAspect.java \
-  backend/src/main/java/com/example/demo/shared/infrastructure/persistence/ModuleRoleTransactionManager.java \
+  backend/src/main/java/com/example/demo/shared/tenancy/TenantListenerAspect.java \
+  backend/src/main/java/com/example/demo/shared/persistence/ModuleRoleTransactionManager.java \
   backend/src/main/java/com/example/demo/tenancy/presentation/web/TenantSelectionFilter.java \
   backend/src/main/resources/logback-spring.xml \
   backend/src/main/resources/application.yaml

@@ -4,7 +4,7 @@ import archfixture.violating.ordering.domain.model.Order;
 import archfixture.violating.ordering.domain.model.OrderId;
 import archfixture.violating.ordering.domain.model.OrderRepository;
 import archfixture.violating.ordering.domain.model.UnversionedOrderRepository;
-import archfixture.violating.shared.infrastructure.persistence.TableWriter;
+import archfixture.violating.shared.persistence.TableWriter;
 
 /**
  * 違反：repositoryUpdateCallsVersionedEntryPoint（update と save が TableWriter の update を呼ばず、store が

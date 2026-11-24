@@ -553,7 +553,7 @@ class ClassRoleArchTest {
     final Set<String> allowedCallers =
         Set.of(
             basePackage + ".tenancy.presentation.web.TenantSelectionFilter",
-            basePackage + ".shared.infrastructure.persistence.TenantListenerAspect");
+            basePackage + ".shared.tenancy.TenantListenerAspect");
     return noClasses()
         .that(
             DescribedPredicate.describe(
@@ -584,7 +584,7 @@ class ClassRoleArchTest {
       final String basePackage) {
     final String tenantContext = basePackage + ".shared.tenancy.TenantContext";
     final String transactionManager =
-        basePackage + ".shared.infrastructure.persistence.ModuleRoleTransactionManager";
+        basePackage + ".shared.persistence.ModuleRoleTransactionManager";
     return noClasses()
         .that(
             DescribedPredicate.describe(
@@ -614,7 +614,7 @@ class ClassRoleArchTest {
   /* package */ static ArchRule roleAndTenantAreSetOnlyByTransactionManagerRule(
       final String basePackage) {
     final String transactionManager =
-        basePackage + ".shared.infrastructure.persistence.ModuleRoleTransactionManager";
+        basePackage + ".shared.persistence.ModuleRoleTransactionManager";
     return noClasses()
         .that(
             DescribedPredicate.describe(

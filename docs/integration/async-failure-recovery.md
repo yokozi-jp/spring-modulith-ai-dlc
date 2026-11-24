@@ -87,7 +87,7 @@ Spring Modulith 2.2.0 のイベント出版は、次の状態を持つ（[Spring
 - リスナーが動く前に業務の状態が変わったとき（確定のあとに取り消した注文）は、業務の結果として処理せずに正常終了させる。
   再投入しても結果は変わらないため、`FAILED` に残さない。
 
-失敗した出版は、定期のジョブ（`shared.infrastructure.persistence` の `EventPublicationResubmitter`）が、リスナーの方針の待ち時間を過ぎたものを回数の上限まで自動で再投入する（[ADR-079](../adr/ADR-079-resubmit-failed-event-publications-periodically-with-shedlock.md)）。
+失敗した出版は、定期のジョブ（`shared.eventresubmission` の `EventPublicationResubmitter`）が、リスナーの方針の待ち時間を過ぎたものを回数の上限まで自動で再投入する（[ADR-079](../adr/ADR-079-resubmit-failed-event-publications-periodically-with-shedlock.md)）。
 方針はリスナーの `on` に付ける `@ResubmissionPolicy`（`shared.events`）で選び、付けなければ `default` になる。
 n 回目の再投入の前に、最後の試行から `min(wait-age × multiplier^(n-1), max-wait)` を待つ。
 ジョブは ShedLock のロックで、同時に 1 つのインスタンスだけが動く。

@@ -1,8 +1,8 @@
 package com.example.demo.persistence.conventions;
 
-import static com.example.demo.shared.infrastructure.persistence.ModuleRoleTransactionManager.TENANT_SETTING;
+import static com.example.demo.shared.persistence.ModuleRoleTransactionManager.TENANT_SETTING;
 
-import com.example.demo.shared.infrastructure.persistence.ModuleRoles;
+import com.example.demo.shared.persistence.ModuleRoles;
 import java.util.List;
 import java.util.Set;
 import java.util.TreeSet;

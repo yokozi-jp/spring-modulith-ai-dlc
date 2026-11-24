@@ -121,7 +121,7 @@ Proposed
 - 他モジュールの状態を同期で変更しない。同期の状態変更が必要に見えたら、作業者（AI エージェントを含む）は実装を止めて利用者に確認し、ADR を起こす。
 - CommandHandler は内部パッケージの `application` に置くため、他モジュールから呼ぶと Spring Modulith の `ApplicationModules.verify()` で失敗する。
 - [ADR-048](ADR-048-add-shared-module-for-jooq-common-code.md) の `com.example.demo.shared` は、機能モジュールではない唯一の技術的な共有モジュールである。
-  `shared.infrastructure.persistence` を `@NamedInterface` で公開し、業務の概念を持たず、他のモジュールの `infrastructure.persistence` だけから使う。
+  `shared.persistence` を `@NamedInterface` で公開し、業務の概念を持たず、他のモジュールの `infrastructure.persistence` だけから使う。
   業務のバッチの `shared.batch` は、機能モジュールの `batch` だけから使う（ADR-115）。
   `shared` は機能モジュールの間の連携の手段ではなく、機能モジュールの間の連携はイベントと `<Feature>Queries` だけのままである。
   使う場所の制限は、ArchUnit の `sharedModuleIsUsedOnlyByPersistenceAdapters` で検査する。

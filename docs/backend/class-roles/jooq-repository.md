@@ -51,9 +51,9 @@ jOOQ の Repository は業務規則を持たない。
 `PLACED_AT` の生成型は、[日時とタイムゾーンの規約](../../datetime/timezone-conventions.md)のとおり `Instant` である。
 生成型の扱いは[jOOQコード生成物の管理](../../database/jooq-codegen.md)に従う。
 
-`CommonColumns` は `shared.infrastructure.persistence` の共通処理であり（[ADR-048](../../adr/ADR-048-add-shared-module-for-jooq-common-code.md)）、共通カラムの値を作って `TableWriter` に渡す。Repository は使わない。
+`CommonColumns` は `shared.persistence` の共通処理であり（[ADR-048](../../adr/ADR-048-add-shared-module-for-jooq-common-code.md)）、共通カラムの値を作って `TableWriter` に渡す。Repository は使わない。
 `*_PGM_CD` の値の求め方は [PostgreSQL の共通カラム](../../database/postgresql-common-columns.md)に従う。
-`TableWriter` も `shared.infrastructure.persistence` の共通処理であり、業務テーブルの INSERT と UPDATE を組み立てて実行する唯一の入口である（[ADR-054](../../adr/ADR-054-detect-optimistic-lock-conflicts-by-update-count.md)）。
+`TableWriter` も `shared.persistence` の共通処理であり、業務テーブルの INSERT と UPDATE を組み立てて実行する唯一の入口である（[ADR-054](../../adr/ADR-054-detect-optimistic-lock-conflicts-by-update-count.md)）。
 
 ## 必須の記述
 
@@ -193,7 +193,7 @@ private static Field<?> columnOf(final OrderSortKey key) {
 
 ## 依存してよい型、してはいけない型
 
-- **依存してよい型**：`java..` の標準型、`org.jspecify..`、jOOQ の API（`org.jooq..`）、jOOQ の生成型（`com.example.demo.jooq..`）、`shared.infrastructure.persistence` の共通処理（`TableWriter`、`ColumnValues`、`AggregateTable`、`ChildTable`、`ChildRows`）、`shared.concurrency` の `Versioned`、同じモジュールの `domain.model` の集約、Entity、値オブジェクト、enum、Repository、`@Repository`。
+- **依存してよい型**：`java..` の標準型、`org.jspecify..`、jOOQ の API（`org.jooq..`）、jOOQ の生成型（`com.example.demo.jooq..`）、`shared.persistence` の共通処理（`TableWriter`、`ColumnValues`、`AggregateTable`、`ChildTable`、`ChildRows`）、`shared.concurrency` の `Versioned`、同じモジュールの `domain.model` の集約、Entity、値オブジェクト、enum、Repository、`@Repository`。
 - **依存してはいけない型**：`application`、`domain.service`、`presentation.web`、`infrastructure.client` の型、モジュールルートの型、他の機能モジュールの型とテーブル、`@Transactional`、対応づけのライブラリ（MapStruct、ModelMapper、Dozer）。
 
 ## 最小の例と典型的な例
@@ -208,10 +208,10 @@ import static com.example.demo.jooq.ordering.Tables.T_ORDER_LINE;
 import static org.jooq.impl.DSL.multiset;
 import static org.jooq.impl.DSL.select;
 
-import com.example.demo.shared.infrastructure.persistence.AggregateTable;
-import com.example.demo.shared.infrastructure.persistence.ChildTable;
-import com.example.demo.shared.infrastructure.persistence.ColumnValues;
-import com.example.demo.shared.infrastructure.persistence.TableWriter;
+import com.example.demo.shared.persistence.AggregateTable;
+import com.example.demo.shared.persistence.ChildTable;
+import com.example.demo.shared.persistence.ColumnValues;
+import com.example.demo.shared.persistence.TableWriter;
 
 /** 注文の集約を jOOQ で保存し、取り出す。 */
 @Repository

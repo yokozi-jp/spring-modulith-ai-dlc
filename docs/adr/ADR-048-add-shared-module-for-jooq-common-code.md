@@ -1,7 +1,7 @@
 ---
 type: ADR
 title: 'ADR-048: jOOQ の共通処理を共有モジュール shared に置く'
-description: 共通カラムの値の設定、NULL から空文字への変換、楽観的ロックの更新件数の判定という jOOQ の共通処理を、Spring Modulith の shared モジュール com.example.demo.shared の infrastructure.persistence に置き、層をまたぐ楽観的ロックの語彙を shared.concurrency に、業務上の失敗の例外を shared.failure に置く決定。
+description: 共通カラムの値の設定、NULL から空文字への変換、楽観的ロックの更新件数の判定という jOOQ の共通処理を、Spring Modulith の shared モジュール com.example.demo.shared の persistence に置き、層をまたぐ楽観的ロックの語彙を shared.concurrency に、業務上の失敗の例外を shared.failure に置く決定。
 tags: [adr, backend, spring-modulith, jooq, database]
 ---
 
@@ -37,7 +37,7 @@ ArchUnit のオニオンの規則は、ベースパッケージ `com.example.dem
 アプリケーションモジュール `com.example.demo.shared` を作り、`@Modulithic(sharedModules = "shared")` で Spring Modulith の shared モジュールにする。
 shared モジュールは、モジュール単位の統合テストでも常に起動される。
 
-jOOQ の共通処理は `com.example.demo.shared.infrastructure.persistence` に置く。
+jOOQ の共通処理は `com.example.demo.shared.persistence` に置く。
 このパッケージはモジュールのルートではないため、[バックエンドアーキテクチャ](../backend/architecture.md) の定めに従い `@NamedInterface` で公開する。
 
 `shared` には、共通カラムの値を組み立てる共通処理、NULL を空文字へ変える Converter、業務テーブルの INSERT と UPDATE の入口と、楽観的ロックの語彙（`shared.concurrency` の `ExpectedLockNo`、`VersionedCommand`、`ConflictException`）、業務上の失敗の例外（`shared.failure` の `NotFoundException`、`BusinessRuleViolationException`、[ADR-062](ADR-062-map-business-exceptions-to-404-409-422.md)）だけを置き、業務の概念を置かない。
@@ -52,7 +52,10 @@ ADR-051 の `*_pgm_cd` を束縛する Aspect も、共通カラムの値を組�
 楽観的ロックの競合の例外は、`shared.concurrency` の `ConflictException` にする。
 `error` が 409 に変える `ConflictException` のために `error` から `shared` への依存が増えるので、`shared` はルートパッケージの型に依存しない（`PgmCdAspect` は自分のパッケージからベースパッケージを導く）。
 これで、アーキテクチャ指標の NCCD を 1.0 以下に保つ。
-`shared.infrastructure.persistence` を使うのは、他のモジュールの `infrastructure.persistence` のアダプターだけとする。
+`shared.persistence` を使うのは、他のモジュールの `infrastructure.persistence` のアダプターだけとする。
+`shared` に `infrastructure` のパッケージを置かず、責務ごとに `shared` の直下へ置く。
+DB のロールとトランザクション（`ModuleRoleTransactionManager`）は `shared.persistence` に、失敗した出版の再投入（[ADR-079](ADR-079-resubmit-failed-event-publications-periodically-with-shedlock.md)）は `shared.eventresubmission` に、リスナーのテナントの束縛（[ADR-105](ADR-105-bind-tenant-to-request-and-event-context.md)）は `shared.tenancy` に置く。
+`shared.eventresubmission` は、jOOQ を使う `shared.persistence` と同じ層として扱う。
 `shared.concurrency` と `shared.failure` は、どの層からも使える。
 
 生成クラスの `CREATED_*`、`UPDATED_*`、`PATCHED_*` のフィールドを参照してよいのは、`shared` の共通処理だけとする。
@@ -71,7 +74,7 @@ ADR-051 の `*_pgm_cd` を束縛する Aspect も、共通カラムの値を組�
 - `shared` に何でも置かれ、境界のない共通パッケージになるおそれがある。
   置くものを永続化の技術的な共通処理と、楽観的ロックの三つの型と、業務上の失敗の例外の型に限ることで抑える。
 - `shared.concurrency` と `shared.failure` は層をまたいで使えるため、`ArchUnit` の `sharedModuleIsUsedOnlyByPersistenceAdapters` の対象から外れる。
-  `shared.infrastructure.persistence` は、変わらず Persistence Adapter だけが使える。
+  `shared.persistence` は、変わらず Persistence Adapter だけが使える。
 
 ### Neutral
 

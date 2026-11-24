@@ -148,7 +148,7 @@ Javaでは、主キーの値をRepositoryの外に返さない。
   共通カラムの`created_tx_id`、`updated_tx_id`、`patched_id`は行を指さないため対象にしない。
   外部のシステムの識別子を`_id`で終わる列に入れるとP3が拒否するため、`_code`で終わる名前にする。
   規則P4は、別のスキーマのテーブルを参照する外部キーを拒否する。
-- **ArchUnit**：`PublicIdArchTest`の`numericIdsDoNotLeaveModules`が、モジュールルート、`domain`、`application`、`infrastructure.client`、`shared`（`shared.infrastructure`を除く）の型に、名前が`id`、`ids`か、`Id`、`Ids`で終わり、型が`long`、`Long`、`int`、`Integer`か、それを型引数や配列の要素に含む（`List<Long>`、`Optional<Long>`、`long[]`）フィールド、引数、戻り値がないことを確かめる。
+- **ArchUnit**：`PublicIdArchTest`の`numericIdsDoNotLeaveModules`が、モジュールルート、`domain`、`application`、`infrastructure.client`、`shared`（`shared.persistence`、`shared.eventresubmission`を除く）の型に、名前が`id`、`ids`か、`Id`、`Ids`で終わり、型が`long`、`Long`、`int`、`Integer`か、それを型引数や配列の要素に含む（`List<Long>`、`Optional<Long>`、`long[]`）フィールド、引数、戻り値がないことを確かめる。
 - **Spectral**：`.spectral.yaml`の`public-id-uuid`が、パスの引数と、名前が`id`か`Id`で終わるクエリの引数とpropertyを`type: string`、`format: uuid`に限る。
   名前が`ids`か`Ids`で終わるクエリの引数とpropertyは、配列の要素を同じ型に限る。
   ヘッダーの引数と、`traceId`と`spanId`のpropertyは対象にしない。
