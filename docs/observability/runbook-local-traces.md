@@ -34,7 +34,7 @@ trace ID は、ログに出ているかどうかで探し方を分ける。
   詳細の Links の `Trace: <trace ID>` を押すと、右の分割ペインで Tempo のトレースが開く。
   見つからないときは、Grafana の右上の期間を、失敗した時刻を含むように広げる。
   その trace ID を持つログには、要求が発行したイベントの非同期リスナーのログも入る（[非同期処理のトレースと監視](../integration/async-observability.md)）。
-  SPA の要求は、Faro の TracingInstrumentation が登録する fetch の計装が親の span のない fetch ごとに新しい trace を始めるので、要求ごとに別の trace ID を持つ。
+  SPA の要求は `traceparent` を持たず、Spring Boot が要求ごとに新しい trace を始めるので、要求ごとに別の trace ID を持つ。
   `traceparent` を自分で付けるクライアントが同じ trace ID を使い回すと、複数の要求のログが当たる。
 - **ログに出ていない**：ログを出さない失敗もある。
   Spring Security の firewall が標準にない method を拒否した 400 は、ローカルで確かめたとき Loki のログが 0 行で、Tempo にはトレースがあった。

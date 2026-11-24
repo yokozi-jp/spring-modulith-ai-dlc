@@ -7,7 +7,8 @@ tags: [convention, observability, opentelemetry, security]
 
 # 可観測性データの規約
 
-バックエンドはログ、トレース、メトリクスを OpenTelemetry で Collector へ送ってコンソールにも ECS JSON を出し、フロントエンドは Faro Web SDK でブラウザの例外、画面遷移、Core Web Vitals、同一オリジンの `/api/**` の要求の trace を Collector へ送る。
+バックエンドはログ、トレース、メトリクスを OpenTelemetry で Collector へ送ってコンソールにも ECS JSON を出し、フロントエンドは Faro Web SDK でブラウザの例外、画面遷移、Core Web Vitals を Collector へ送る。
+ブラウザの trace は送らない（[ADR-068](../adr/ADR-068-collect-browser-telemetry-with-faro-via-collector.md)）。
 CSP 違反は、ブラウザ自身が Reporting API で同一オリジンの `/csp-report` から Collector へ送る。
 例外は logger へ渡して標準どおりに記録し、禁止値はアプリケーションから渡さない。
 ログの属性は Collector の allowlist で絞り、保存先で閲覧の制限と表示時のマスクを行う。
@@ -110,12 +111,11 @@ SQL の span（jOOQ の `jooq.query`）は、SQL の種類だけを名前に持�
 ただし、同一オリジンのビルドのファイル名（`/assets/<名前>.js`）に行と列が続く stack frame は、origin を落とした path と行と列だけを残す。
 hash 付きのファイル名は秘密を含まず、source map で元の位置に戻すのに要るためである。
 query か fragment を持つ URL、別オリジンの URL、`/assets/` 以外の path は、ファイル名が `.js` で終わっても token 全体を置き換える。
-ブラウザ API trace の `url.*` 属性はすべて削除し、trace ID、span ID、親 span ID は維持する。
-Session、View、Errors、WebVitals、Tracing だけを明示的に有効にし、Console、Performance、UserAction、Frustration、Navigation、CSP は有効にしない。
+Session、View、Errors、WebVitals だけを明示的に有効にし、Console、Performance、UserAction、Frustration、Navigation、CSP は有効にしない。
 Web Vitals は LCP、INP、CLS の主値を一つだけ残し、付加情報を送らない。
 匿名の Faro session ID は同じタブの signal の相関だけに使い、`sessionStorage` に保持する。
 ログアウトの送信前に session ID を切り替え、`APP_SESSION` と利用者情報へ結び付けない。
-`traceparent` は同一オリジンの `/api/**` への fetch と XHR だけに付け、IdP を含む別オリジン、`/collect`、`/api/**` 以外のパスには付けない。
+ブラウザは `traceparent` を付けず、span も送らない。
 Collector へは Cookie を送らない（`credentials: "omit"`）。
 CSP 違反の報告は Reporting API が同一オリジンの Cookie を付けて送るので、`/collect` と `/csp-report` を転送する層（開発は Vite の proxy、本番は CDN か reverse proxy）が `Cookie`、`Authorization`、`Proxy-Authorization` を消す（[ADR-068](../adr/ADR-068-collect-browser-telemetry-with-faro-via-collector.md)）。
 
@@ -124,7 +124,7 @@ Collector は文書の URL を残さず、`blockedURL` を origin か scheme か
 CSP に `'report-sample'` を足さない。
 足すと、報告の `sample` に違反した DOM の文字列が入る。
 
-ブラウザの例外と trace を送るかはビルド時の `FRONTEND_OTEL_ENABLED` で決め、既定は無効にする（[ADR-068](../adr/ADR-068-collect-browser-telemetry-with-faro-via-collector.md)）。
+ブラウザの例外と画面の計測を送るかはビルド時の `FRONTEND_OTEL_ENABLED` で決め、既定は無効にする（[ADR-068](../adr/ADR-068-collect-browser-telemetry-with-faro-via-collector.md)）。
 環境ごとの値は次のとおり。
 
 - 開発（`.env`）：既定は `false`。ローカルで例外を送って確かめるときだけ `true` にし、`task compose-up` と `task fe-dev` の再起動で有効にする（README の手順）。
@@ -167,11 +167,6 @@ Collector は環境変数の既定値に `$` を書けず、本番で上書き�
 session ID は `^[a-km-zA-HJ-NP-Z0-9]{10}$` に一致する匿名の Faro ID だけを許可し、UUID の `APP_SESSION` を拒否する。
 この形式も `transform/frontend_validate` の 1 か所だけに書く。
 resource 属性は `service.name`、`service.namespace`、`service.version`、`deployment.environment.name` だけを残し、`service.name` は Collector の `FRONTEND_OTEL_SERVICE_NAME` で上書きする。
-
-フロントエンドのトレースは、バックエンドの `traces` と別の pipeline（`traces/frontend`）で絞る。
-span の event と link を捨て、属性は検証済みの `http.request.method` と `http.response.status_code` だけを残す。
-すべての `url.*` 属性を削除するが、trace ID、span ID、親 span ID は変更しない。
-resource 属性はフロントエンドのログと同じ 4 つに絞り、span の名前を `Browser request`、scope の名前を `browser` に固定する。
 
 CSP 違反の報告は、`webhook_event` receiver から別の pipeline（`logs/frontend_csp`）で絞る。
 `unroll` で報告ごとの record に分け、型が `csp-violation` で directive と disposition が形式に合う record だけを通す。
@@ -218,7 +213,8 @@ transform と filter の `error_mode` は `ignore` にする。
   URL token、UUID の session ID、利用者情報、DOM 情報、追加の measurement 値が出口に残らないことも確かめる。
   同一オリジンの `/assets/<名前>.js` の stack frame が path と行と列だけで残り、query か fragment を持つ URL と別の path が置き換わることも確かめる。
   最初に、route の allowlist と `routeTree.gen.ts` の一致も確かめる。
-  同じ fixture の trace は `traces/frontend` の出口を別のファイルに分けて検査し、URL 属性がなく、許可した HTTP 属性と resource 属性だけが残り、trace ID、span ID、親 span ID が保たれることを確かめる。
+  同じ fixture は trace も持ち、faro receiver がそれを受け付けることと、出口のどのファイルにも trace ID が現れないことを確かめる。
+  faro receiver を使う trace の pipeline がないので、span は捨てられる。
   faro receiver の受け口が、GET に 405、`text/plain` に 415、別のパスに 202、1 MiB を超える本文に 400 を返すことも確かめる。
   CSP の報告の fixture（`csp-reports.json`）を `logs/frontend_csp` に流し、出口の件数、7 つの属性、縮約した URL、resource 属性、空の scope の属性を確かめる。
   fixture は、query と fragment、大文字の scheme、userinfo、path の ID、長すぎる origin、数値でない port、`@` を重ねた userinfo、別オリジンの `sourceFile`、範囲外の行番号、`disposition` のない報告、CSP 以外の型（deprecation、intervention、crash）を含み、CSP 以外の型、不正な directive、`disposition` のない報告が捨てられることを確かめる。

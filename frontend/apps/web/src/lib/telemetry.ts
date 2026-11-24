@@ -51,13 +51,6 @@ function noop(): void {
   // テストが使わない SDK method を補う。
 }
 
-export function untracedUrl(origin: string): RegExp {
-  const escaped = origin.replaceAll(/[.*+?^${}()|[\]\\]/gu, String.raw`\$&`);
-  // origin は location.origin で利用者が制御できず、メタ文字をすべてエスケープした固定文字列の否定先読みなので ReDoS は起きない。
-  // nosemgrep: javascript.lang.security.audit.detect-non-literal-regexp.detect-non-literal-regexp
-  return new RegExp(`^(?!${escaped}/api(?:[/?#]|$))`, "u");
-}
-
 function validRouteTemplate(value: string | undefined): value is string {
   return (
     value !== undefined && value.startsWith("/") && !value.includes("?") && !value.includes("#")
@@ -135,22 +128,16 @@ export function initTelemetry(): void {
     storedSessionKey = "com.grafana.faro.session";
     faroReady = (async (): Promise<TelemetrySink | undefined> => {
       try {
-        const [
-          {
-            ErrorsInstrumentation,
-            FetchTransport,
-            InternalLoggerLevel,
-            SessionInstrumentation,
-            ViewInstrumentation,
-            WebVitalsInstrumentation,
-            genShortID,
-            initializeFaro,
-          },
-          { TracingInstrumentation },
-        ] = await Promise.all([
-          import("@grafana/faro-web-sdk"),
-          import("@grafana/faro-web-tracing"),
-        ]);
+        const {
+          ErrorsInstrumentation,
+          FetchTransport,
+          InternalLoggerLevel,
+          SessionInstrumentation,
+          ViewInstrumentation,
+          WebVitalsInstrumentation,
+          genShortID,
+          initializeFaro,
+        } = await import("@grafana/faro-web-sdk");
         const faro = initializeFaro({
           app: __TELEMETRY_APP__,
           batching: { enabled: false },
@@ -161,9 +148,7 @@ export function initTelemetry(): void {
             new ViewInstrumentation(),
             new ErrorsInstrumentation(),
             new WebVitalsInstrumentation(),
-            new TracingInstrumentation(),
           ],
-          ignoreUrls: [untracedUrl(globalThis.location.origin)],
           transports: [
             new FetchTransport({ url: "/collect", requestOptions: { credentials: "omit" } }),
           ],

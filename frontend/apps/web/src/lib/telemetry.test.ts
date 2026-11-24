@@ -5,7 +5,6 @@ import {
   replaceTelemetryForTesting,
   reportCaughtError,
   resetTelemetrySession,
-  untracedUrl,
 } from "./telemetry";
 
 type Sink = NonNullable<Parameters<typeof replaceTelemetryForTesting>[0]>;
@@ -134,41 +133,26 @@ describe("resetTelemetrySession", () => {
     },
   );
 
-  it("unpause が失敗しても送信を止めたままにする", async () => {
-    const pushError = vi.fn<Sink["api"]["pushError"]>();
-    replaceTelemetryForTesting({
-      api: { pushError },
-      unpause: () => {
-        throw new Error("unpause failed");
-      },
-    });
+  it.each(["pause", "unpause"] as const)(
+    "%s が失敗しても送信を止めたままにする",
+    async (failure) => {
+      const setSession = vi.fn<NonNullable<Sink["api"]["setSession"]>>();
+      const pushError = vi.fn<Sink["api"]["pushError"]>();
+      function fail(): never {
+        throw new Error(`${failure} failed`);
+      }
+      replaceTelemetryForTesting({
+        api: { pushError, setSession },
+        ...(failure === "pause" ? { pause: fail } : { unpause: fail }),
+      });
 
-    await resetTelemetrySession();
-    reportCaughtError(new Error("after switch"));
-    // 送信は faroReady を待つ 1 つの microtask の後に起きるので、それより後に確かめる。
-    await Promise.resolve();
+      await resetTelemetrySession();
+      reportCaughtError(new Error("after switch"));
+      // 送信は faroReady を待つ 1 つの microtask の後に起きるので、それより後に確かめる。
+      await Promise.resolve();
 
-    expect(pushError).not.toHaveBeenCalled();
-  });
-});
-
-describe("untracedUrl", () => {
-  const origin = "http://localhost:5173";
-  function absolute(url: string): string {
-    return url.startsWith("/") ? new URL(url, origin).href : url;
-  }
-
-  it.each(["http://localhost:5173/api", "/api/x", "/api?x=1", "/api#f"])(
-    "同一オリジンの API の URL %s は trace する",
-    (url) => {
-      expect(untracedUrl(origin).test(absolute(url))).toBeFalsy();
-    },
-  );
-
-  it.each(["/apix", "/collect", "http://localhost:8080/realms/demo", "http://other.test/api"])(
-    "%s は trace しない",
-    (url) => {
-      expect(untracedUrl(origin).test(absolute(url))).toBe(true);
+      expect(pushError).not.toHaveBeenCalled();
+      expect(setSession).toHaveBeenCalledTimes(failure === "pause" ? 0 : 1);
     },
   );
 });
