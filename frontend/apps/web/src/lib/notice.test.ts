@@ -12,24 +12,28 @@ const general = {
 };
 
 describe("操作の失敗の通知", () => {
-  it("ほかの操作と競合したら、サーバーの見出しと操作ごとの競合の説明を出す", () => {
-    const error = new ApiProblemError(409, { type: "about:blank", title: "Conflict", status: 409 });
+  it("ほかの操作と競合したら、競合の種類ごとのサーバーの見出しと操作ごとの競合の説明を出す", () => {
+    const error = new ApiProblemError(409, {
+      type: "/problems/version-conflict",
+      title: "ほかの操作が先に更新しました",
+      status: 409,
+    });
 
     expect(failureNotice(t, error, descriptions)).toStrictEqual({
-      heading: "Conflict",
+      heading: "ほかの操作が先に更新しました",
       description: "競合の説明",
     });
   });
 
-  it("業務の規則で受け付けられなかったら、サーバーの見出しと操作ごとの説明を出す", () => {
+  it("業務の規則で受け付けられなかったら、理由ごとのサーバーの見出しと操作ごとの説明を出す", () => {
     const error = new ApiProblemError(422, {
-      type: "about:blank",
-      title: "Unprocessable",
+      type: "/problems/ordering/not-draft",
+      title: "下書きではない注文です",
       status: 422,
     });
 
     expect(failureNotice(t, error, descriptions)).toStrictEqual({
-      heading: "Unprocessable",
+      heading: "下書きではない注文です",
       description: "処理できない説明",
     });
   });

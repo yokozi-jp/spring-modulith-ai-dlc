@@ -138,14 +138,18 @@ describe("注文の詳細の画面の失敗", () => {
     expect(screen.getByText("取消済み")).toBeTruthy();
   });
 
-  it("明細の変更の 422 は title と説明を通知し、入力を残す", async () => {
+  it("明細の変更の 422 は理由の title と説明を通知し、入力を残す", async () => {
     serveDetail(draftOrder());
-    serveUpdate("put", "lines", () => problemResponse(422, "処理できない内容です"));
+    serveUpdate("put", "lines", () =>
+      problemResponse(422, "販売を終了した商品です", {
+        type: "/problems/ordering/product-discontinued",
+      }),
+    );
     const { user } = await renderRoute(detailPath);
 
     await saveQuantity(user, "3");
 
-    await expect(within(notice()).findByText("処理できない内容です")).resolves.toBeTruthy();
+    await expect(within(notice()).findByText("販売を終了した商品です")).resolves.toBeTruthy();
     expect(notice().textContent).toContain("販売中の商品かを確かめてください。");
     expect(screen.getByLabelText("数量")).toHaveProperty("value", "3");
   });
