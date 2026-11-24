@@ -1,6 +1,5 @@
 package com.example.demo.shared.infrastructure.persistence;
 
-import static com.example.demo.jooq.modulith.Tables.EVENT_PUBLICATION;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.example.demo.testkit.CapturedLogRecords;
@@ -13,7 +12,6 @@ import io.opentelemetry.sdk.logs.data.LogRecordData;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
-import java.util.UUID;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Supplier;
 import net.javacrumbs.shedlock.core.LockConfiguration;
@@ -32,14 +30,12 @@ import org.springframework.modulith.events.FailedEventPublications;
 
 /**
  * {@link EventPublicationResubmitter#resubmitOnce()} のジョブの実行の回数 {@code
- * event.publication.resubmission.runs} が、正常、他のインスタンスのロック、既知の失敗、予期しない例外のそれぞれで、正しい outcome の tag を 1
- * だけ増やすことと、上限を超えた {@code FAILED} の出版の ERROR を件数が 0 から増えた回だけ出すことを検証する。
+ * event.publication.resubmission.runs} が、正常、他のインスタンスのロック、既知の失敗、予期しない例外、Gauge の集計の失敗のそれぞれで、正しい
+ * outcome の tag を 1 だけ増やすことを検証する。
  *
  * <p>ジョブは、本物の DB とロックの表、モックの {@link FailedEventPublications}、テストごとの {@link SimpleMeterRegistry}
  * で作る。 Spring の文脈は {@link EventPublicationResubmitterTest} と同じ設定で共有する。
  */
-// 実行の結果ごとのテストと、ジョブ、ロック、行を作る補助のため、メソッドの数が多い。
-@SuppressWarnings("PMD.TooManyMethods")
 @ResubmissionTestSupport.SharedContext
 class EventPublicationResubmitterRunsTest {
 
@@ -61,13 +57,6 @@ class EventPublicationResubmitterRunsTest {
   /** Gauge の集計の失敗の WARN の本文。 */
   private static final String GAUGES_FAILED = "Event publication gauges refresh failed";
 
-  /** 上限を超えた FAILED の出版が現れたときの ERROR の本文。 */
-  private static final String EXCEEDED = "Failed event publications exceed the resubmission limit";
-
-  /** 上限を超えた FAILED の出版の件数を持つ LogRecord の属性。 */
-  private static final AttributeKey<Long> EXHAUSTED_COUNT =
-      AttributeKey.longKey("event_publication.exhausted.count");
-
   /** 例外の型を持つ LogRecord の属性。 */
   private static final AttributeKey<String> EXCEPTION_TYPE =
       AttributeKey.stringKey("exception.type");
@@ -83,6 +72,9 @@ class EventPublicationResubmitterRunsTest {
 
   /** 設定値。 */
   @Autowired private EventPublicationResubmissionConfig.Properties properties;
+
+  /** 再投入の回数の上限。 */
+  @Autowired private EventPublicationResubmissionConfig.AbandonProperties abandon;
 
   /** 差し替えられる時計。 */
   @Autowired private EventPublicationResubmitterTest.MutableClock clock;
@@ -196,7 +188,14 @@ class EventPublicationResubmitterRunsTest {
     final FailedEventPublications failed = Mockito.mock(FailedEventPublications.class);
     final EventPublicationResubmitter resubmitter =
         new EventPublicationResubmitter(
-            failingDsl, failed, lockingTaskExecutor, policies, clock, meterRegistry, properties);
+            failingDsl,
+            failed,
+            lockingTaskExecutor,
+            policies,
+            clock,
+            meterRegistry,
+            properties,
+            abandon);
     final Supplier<Double> exhaustedGauge =
         () ->
             meterRegistry.get("event.publication.failed").tag("state", "exhausted").gauge().value();
@@ -217,38 +216,6 @@ class EventPublicationResubmitterRunsTest {
     Mockito.verify(failed, Mockito.times(2)).resubmit(Mockito.any());
   }
 
-  @Test
-  @DisplayName("上限を超えた FAILED の出版の ERROR は、件数が 0 から増えた回だけ出し、残る間と増えた回では出さず、0 に戻った後にまた現れた回に出す")
-  void overLimitErrorIsLoggedOnlyWhenCountRisesFromZero() {
-    final EventPublicationResubmitter resubmitter = newResubmitter(lockingTaskExecutor);
-    final int errorsBefore = capturedLogRecords.withBody(EXCEEDED).size();
-    final UUID first = insertOverLimit();
-    final UUID second = insertOverLimit();
-
-    runAgain(resubmitter);
-    runAgain(resubmitter);
-    final UUID third = insertOverLimit();
-    runAgain(resubmitter);
-
-    final List<LogRecordData> errors = capturedLogRecords.withBody(EXCEEDED);
-    assertThat(errors).as("残る間と増えた回の ERROR").hasSize(errorsBefore + 1);
-    assertThat(errors.getLast().getSeverity()).isEqualTo(Severity.ERROR);
-    assertThat(errors.getLast().getAttributes().get(EXHAUSTED_COUNT)).isEqualTo(2L);
-    assertThat(overLimitGauge()).isEqualTo(3.0);
-
-    dsl.deleteFrom(EVENT_PUBLICATION)
-        .where(EVENT_PUBLICATION.ID.in(first, second, third))
-        .execute();
-    runAgain(resubmitter);
-    assertThat(overLimitGauge()).as("片付けた後").isZero();
-    insertOverLimit();
-    runAgain(resubmitter);
-
-    final List<LogRecordData> again = capturedLogRecords.withBody(EXCEEDED);
-    assertThat(again).as("0 に戻った後にまた現れた回の ERROR").hasSize(errorsBefore + 2);
-    assertThat(again.getLast().getAttributes().get(EXHAUSTED_COUNT)).isEqualTo(1L);
-  }
-
   /** テスト専用のレジストリを使うジョブを作る。FailedEventPublications は何もしないモックで足りる。 */
   private EventPublicationResubmitter newResubmitter(final LockingTaskExecutor executor) {
     return new EventPublicationResubmitter(
@@ -258,7 +225,8 @@ class EventPublicationResubmitterRunsTest {
         policies,
         clock,
         meterRegistry,
-        properties);
+        properties,
+        abandon);
   }
 
   /** ロックの実行が、決めた例外を投げるモック。 */
@@ -280,20 +248,5 @@ class EventPublicationResubmitterRunsTest {
 
   private void expireLock() {
     ResubmissionTestSupport.expireLock(dsl);
-  }
-
-  private void runAgain(final EventPublicationResubmitter resubmitter) {
-    expireLock();
-    resubmitter.resubmitOnce();
-  }
-
-  /** テストの上限（2 回）を超えた completion_attempts の FAILED の出版を作る。 */
-  private UUID insertOverLimit() {
-    return ResubmissionTestSupport.insertPublication(
-        dsl, UUID.randomUUID(), "over-limit-test", clock.instant(), "FAILED", 3);
-  }
-
-  private double overLimitGauge() {
-    return meterRegistry.get("event.publication.failed").tag("state", "over-limit").gauge().value();
   }
 }

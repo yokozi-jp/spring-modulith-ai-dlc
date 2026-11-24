@@ -1,32 +1,20 @@
 package com.example.demo.shared.infrastructure.persistence;
 
-import static com.example.demo.jooq.modulith.Tables.EVENT_PUBLICATION;
-import static com.example.demo.jooq.modulith.Tables.EVENT_PUBLICATION_ARCHIVE;
-
 import io.micrometer.core.instrument.Counter;
-import io.micrometer.core.instrument.Gauge;
 import io.micrometer.core.instrument.MeterRegistry;
-import io.micrometer.core.instrument.TimeGauge;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 import lombok.extern.slf4j.Slf4j;
 import net.javacrumbs.shedlock.core.LockConfiguration;
 import net.javacrumbs.shedlock.core.LockingTaskExecutor;
 import net.javacrumbs.shedlock.support.LockException;
-import org.jooq.Condition;
 import org.jooq.DSLContext;
-import org.jooq.Record2;
-import org.jooq.Record4;
-import org.jooq.impl.DSL;
 import org.jspecify.annotations.Nullable;
-import org.springframework.modulith.events.EventPublication;
 import org.springframework.modulith.events.FailedEventPublications;
 import org.springframework.modulith.events.ResubmissionOptions;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -38,7 +26,7 @@ import org.springframework.stereotype.Component;
  * <p>ShedLock のロックを取れたインスタンスだけが、リスナーの方針（{@link ResubmissionPolicies}）の待ち時間を過ぎ、再投入の回数が上限に達していない
  * {@code FAILED} の出版を再投入する。上限の回数目の再投入で失敗した出版は、Spring Modulith が {@code abandon-after-attempts} で
  * {@code ABANDONED} にする。 件数と最古の経過時間の Gauge と、上限を超えた {@code FAILED} の出版が現れたときの ERROR
- * は、ロックの外ですべてのインスタンスが出す。
+ * は、ロックの外ですべてのインスタンスが出す（{@link FailedPublicationGauges}）。
  */
 @Slf4j
 @Component
@@ -49,12 +37,6 @@ class EventPublicationResubmitter {
 
   /** ジョブの実行の回数の Counter の名前。 */
   private static final String RUNS_METRIC = "event.publication.resubmission.runs";
-
-  /** 状態の tag の名前。 */
-  private static final String STATE = "state";
-
-  /** Spring Boot が構成した jOOQ。 */
-  private final DSLContext dsl;
 
   /** Spring Modulith の失敗した出版の再投入。 */
   private final FailedEventPublications failedEventPublications;
@@ -83,14 +65,8 @@ class EventPublicationResubmitter {
   /** 再投入した（{@code RESUBMITTED} に進んだ）出版の数。 */
   private final Counter resubmissions;
 
-  /** 自動の再投入を待つ FAILED の出版の Gauge。回数の上限を超えた出版は含めない。 */
-  private final StateGauges retrying;
-
-  /** 失敗を記録しない試行で回数の上限を超え、FAILED に残った出版の Gauge。 */
-  private final StateGauges overLimit;
-
-  /** 上限に達した ABANDONED の出版の Gauge。 */
-  private final StateGauges exhausted;
+  /** 失敗した出版の件数と最古の経過時間の Gauge。 */
+  private final FailedPublicationGauges gauges;
 
   /** 再投入した出版の覚え書きと、結果の読み戻し。 */
   private final ResubmissionTracker tracker;
@@ -102,8 +78,8 @@ class EventPublicationResubmitter {
       final ResubmissionPolicies policies,
       final Clock clock,
       final MeterRegistry meterRegistry,
-      final EventPublicationResubmissionConfig.Properties properties) {
-    this.dsl = dsl;
+      final EventPublicationResubmissionConfig.Properties properties,
+      final EventPublicationResubmissionConfig.AbandonProperties abandon) {
     this.failedEventPublications = failedEventPublications;
     this.lockingTaskExecutor = eventPublicationLockingTaskExecutor;
     this.policies = policies;
@@ -117,9 +93,7 @@ class EventPublicationResubmitter {
         Counter.builder("event.publication.resubmissions")
             .description("再投入した（RESUBMITTED に進んだ）出版の数")
             .register(meterRegistry);
-    this.retrying = StateGauges.register(meterRegistry, "retrying");
-    this.overLimit = StateGauges.register(meterRegistry, "over-limit");
-    this.exhausted = StateGauges.register(meterRegistry, "exhausted");
+    this.gauges = new FailedPublicationGauges(dsl, meterRegistry, abandon);
   }
 
   private static Counter runs(final MeterRegistry meterRegistry, final String outcome) {
@@ -139,7 +113,7 @@ class EventPublicationResubmitter {
   /* package */ void resubmitOnce() {
     try {
       final Instant now = Instant.now(clock);
-      refreshGauges(now);
+      gauges.refresh(now);
       tracker.reconcile(now);
       final AtomicReference<@Nullable Integer> run = new AtomicReference<>();
       lockingTaskExecutor.executeWithLock(
@@ -195,85 +169,5 @@ class EventPublicationResubmitter {
                             publication.getIdentifier(), publication.getCompletionAttempts())
                         == null));
     return tracker.track(candidates, now);
-  }
-
-  /**
-   * FAILED の出版を回数の上限の内と外に分け、上限に達した ABANDONED の出版と合わせて、件数と最古の経過時間を集計し、Gauge の値にする。
-   *
-   * <p>上限を超えた FAILED の出版の件数が 0 から増えたときだけ、件数の ERROR を 1 つ出す。 {@code completion-mode: archive}
-   * では、ABANDONED の出版は archive の表にある。 DB の既知の失敗は WARN で記録し、Gauge は前の値のまま再投入を続ける。 Gauge
-   * の集計は表示と警報のためで、再投入の前提ではないためである。
-   */
-  private void refreshGauges(final Instant now) {
-    try {
-      // Spring Modulith と同じく、空の completion_attempts は 0 と読む。
-      final Condition overLimitRow =
-          DSL.coalesce(EVENT_PUBLICATION.COMPLETION_ATTEMPTS, 0)
-              .gt(policies.abandonAfterAttempts());
-      final Record4<Integer, Instant, Integer, Instant> failed =
-          dsl.select(
-                  DSL.count().filterWhere(DSL.not(overLimitRow)),
-                  DSL.min(EVENT_PUBLICATION.PUBLICATION_DATE).filterWhere(DSL.not(overLimitRow)),
-                  DSL.count().filterWhere(overLimitRow),
-                  DSL.min(EVENT_PUBLICATION.PUBLICATION_DATE).filterWhere(overLimitRow))
-              .from(EVENT_PUBLICATION)
-              .where(EVENT_PUBLICATION.STATUS.eq(EventPublication.Status.FAILED.name()))
-              .fetchSingle();
-      retrying.set(failed.value1(), failed.value2(), now);
-      final long overLimitBefore = overLimit.set(failed.value3(), failed.value4(), now);
-      if (overLimitBefore == 0 && failed.value3() > 0) {
-        // 失敗を記録しない試行で上限を超えた出版は ABANDONED にならず、出版ごとの ERROR も出ない。
-        // 0 から増えたときだけ知らせ、残っている間は Gauge の警報に任せる。
-        log.atError()
-            .addKeyValue("event_publication.exhausted.count", failed.value3())
-            .log("Failed event publications exceed the resubmission limit");
-      }
-      // 条件を部分索引 event_publication_archive_abandoned_idx の述語と同じにし、archive の全行を読まない。
-      final Record2<Integer, Instant> abandoned =
-          dsl.select(DSL.count(), DSL.min(EVENT_PUBLICATION_ARCHIVE.PUBLICATION_DATE))
-              .from(EVENT_PUBLICATION_ARCHIVE)
-              .where(EVENT_PUBLICATION_ARCHIVE.STATUS.eq(EventPublication.Status.ABANDONED.name()))
-              .fetchSingle();
-      exhausted.set(abandoned.value1(), abandoned.value2(), now);
-    } catch (org.springframework.dao.DataAccessException
-        | org.jooq.exception.DataAccessException e) {
-      log.atWarn().setCause(e).log("Event publication gauges refresh failed");
-    }
-  }
-
-  /**
-   * 1 つの {@code state} の、件数と最古の経過秒数の Gauge。
-   *
-   * <p>Micrometer は状態のオブジェクトを弱い参照で持つため、final のフィールドで持つ。
-   *
-   * @param count 件数
-   * @param oldestAge 最も古い出版の経過秒数
-   */
-  private record StateGauges(AtomicLong count, AtomicLong oldestAge) {
-
-    private static StateGauges register(final MeterRegistry meterRegistry, final String state) {
-      final StateGauges gauges = new StateGauges(new AtomicLong(), new AtomicLong());
-      Gauge.builder("event.publication.failed", gauges.count, AtomicLong::get)
-          .tag(STATE, state)
-          .register(meterRegistry);
-      TimeGauge.builder(
-              "event.publication.failed.oldest.age",
-              gauges.oldestAge,
-              TimeUnit.SECONDS,
-              AtomicLong::get)
-          .tag(STATE, state)
-          .register(meterRegistry);
-      return gauges;
-    }
-
-    /**
-     * 件数と最も古い出版の時刻から値を決め、前の件数を返す。時計が出版より前なら経過秒数を 0 にする。
-     *
-     * <p>前の件数は {@code getAndSet} で読むため、同時に集計したスレッドのうち 1 つだけが 0 からの増加を見る。
-     */
-    private long set(final int newCount, final @Nullable Instant oldest, final Instant now) {
-      oldestAge.set(oldest == null ? 0 : Math.max(0, Duration.between(oldest, now).toSeconds()));
-      return count.getAndSet(newCount);
-    }
   }
 }

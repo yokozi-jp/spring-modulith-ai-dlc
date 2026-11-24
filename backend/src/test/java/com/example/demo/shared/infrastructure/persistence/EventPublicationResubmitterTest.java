@@ -87,7 +87,7 @@ class EventPublicationResubmitterTest {
   /** FAILED の状態。 */
   private static final String FAILED = "FAILED";
 
-  /** 方針の上限を超えて諦めた状態。 */
+  /** 回数の上限を超えて諦めた状態。 */
   private static final String ABANDONED = "ABANDONED";
 
   /** リスナーの呼び出しの回数の説明。 */
@@ -334,56 +334,6 @@ class EventPublicationResubmitterTest {
     runJob();
 
     assertThat(outcome("completed") - completedBefore).as("完了した後は 1 回だけ").isEqualTo(1.0);
-  }
-
-  @Test
-  @DisplayName(
-      "Gauge は、上限の内の FAILED を retrying に、上限を超えた FAILED を over-limit に、archive の ABANDONED を exhausted に、件数と最古の経過秒数で出し、COMPLETED は数えない")
-  void gaugesSplitFailedByLimitAndCountAbandonedAsExhaustedWithOldestAge() {
-    // テストの上限は 2 回なので、completion_attempts が 3 の行は over-limit、1 と 2 の行は retrying に入る。待ち時間（5
-    // 分）の前なので再投入されない。
-    insertFailed(1, T0.plusSeconds(5));
-    insertFailed(3, T0);
-    insertFailed(2, T0.plusSeconds(10));
-    insertFailed(3, T0.plusSeconds(15));
-    ResubmissionTestSupport.insertArchived(dsl, T0, "COMPLETED");
-    ResubmissionTestSupport.insertArchived(dsl, T0.plusSeconds(20), ABANDONED);
-    ResubmissionTestSupport.insertArchived(dsl, T0.plusSeconds(30), ABANDONED);
-    clock.set(T0.plusSeconds(100));
-
-    runJob();
-
-    assertThat(gauge(STATE_RETRYING)).isEqualTo(2.0);
-    assertThat(gauge(STATE_OVER_LIMIT)).isEqualTo(2.0);
-    assertThat(gauge(STATE_EXHAUSTED)).isEqualTo(2.0);
-    assertThat(oldestAge(STATE_RETRYING)).as("最古の retrying は T0 + 5 秒").isEqualTo(95.0);
-    assertThat(oldestAge(STATE_OVER_LIMIT)).as("最古の over-limit は T0").isEqualTo(100.0);
-    assertThat(oldestAge(STATE_EXHAUSTED)).as("最古の exhausted は T0 + 20 秒").isEqualTo(80.0);
-  }
-
-  @Test
-  @DisplayName("Gauge は、FAILED と ABANDONED の出版がないとき 0 で、時計が出版より前のとき経過秒数を負にせず 0 にする")
-  void gaugesAreZeroWithoutPublicationsAndWhenClockIsBehind() {
-    runJob();
-
-    assertThat(gauge(STATE_RETRYING)).isZero();
-    assertThat(gauge(STATE_OVER_LIMIT)).isZero();
-    assertThat(gauge(STATE_EXHAUSTED)).isZero();
-    assertThat(oldestAge(STATE_RETRYING)).isZero();
-    assertThat(oldestAge(STATE_OVER_LIMIT)).isZero();
-    assertThat(oldestAge(STATE_EXHAUSTED)).isZero();
-
-    insertFailed(1, T0.plusSeconds(60));
-    insertFailed(3, T0.plusSeconds(60));
-    ResubmissionTestSupport.insertArchived(dsl, T0.plusSeconds(60), ABANDONED);
-    runJob();
-
-    assertThat(gauge(STATE_RETRYING)).isEqualTo(1.0);
-    assertThat(gauge(STATE_OVER_LIMIT)).isEqualTo(1.0);
-    assertThat(gauge(STATE_EXHAUSTED)).isEqualTo(1.0);
-    assertThat(oldestAge(STATE_RETRYING)).as("時計が出版より前").isZero();
-    assertThat(oldestAge(STATE_OVER_LIMIT)).as("時計が出版より前").isZero();
-    assertThat(oldestAge(STATE_EXHAUSTED)).as("時計が出版より前").isZero();
   }
 
   @Test
@@ -669,18 +619,10 @@ class EventPublicationResubmitterTest {
     return meterRegistry.get("event.publication.failed").tag("state", state).gauge().value();
   }
 
-  private double oldestAge(final String state) {
-    return meterRegistry
-        .get("event.publication.failed.oldest.age")
-        .tag("state", state)
-        .timeGauge()
-        .value(TimeUnit.SECONDS);
-  }
-
   /** リスナーを持たない FAILED の出版の行を、default の方針で作る。 */
   private UUID insertFailed(final int completionAttempts, final Instant publicationDate) {
     return ResubmissionTestSupport.insertPublication(
-        dsl, UUID.randomUUID(), "gauge-test", publicationDate, FAILED, completionAttempts);
+        dsl, UUID.randomUUID(), "over-limit-test", publicationDate, FAILED, completionAttempts);
   }
 
   private double outcome(final String outcome) {

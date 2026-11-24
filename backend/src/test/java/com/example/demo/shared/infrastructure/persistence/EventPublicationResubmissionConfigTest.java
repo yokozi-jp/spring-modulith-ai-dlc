@@ -12,6 +12,7 @@ import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.stream.Stream;
 import org.awaitility.Awaitility;
 import org.jooq.DSLContext;
 import org.jooq.SQLDialect;
@@ -85,17 +86,19 @@ class EventPublicationResubmissionConfigTest {
   };
 
   /** 検証対象の設定だけを読み込み、妥当な設定値と、ロックの bean が受け取る依存の mock を与える runner。 */
-  private final ApplicationContextRunner runner =
-      new ApplicationContextRunner()
-          .withConfiguration(AutoConfigurations.of(ValidationAutoConfiguration.class))
-          .withUserConfiguration(EventPublicationResubmissionConfig.class)
-          // ロックの provider は作るだけで DB に触れないため、依存は mock で足りる。
-          .withBean(
-              DSLContext.class, () -> Mockito.mock(DSLContext.class, Answers.RETURNS_DEEP_STUBS))
-          .withBean(
-              PlatformTransactionManager.class,
-              () -> Mockito.mock(PlatformTransactionManager.class))
-          .withPropertyValues(VALID);
+  private final ApplicationContextRunner runner = bareRunner().withPropertyValues(VALID);
+
+  /** 検証対象の設定とロックの bean が受け取る依存の mock だけを与え、設定値を与えない runner。 */
+  private static ApplicationContextRunner bareRunner() {
+    return new ApplicationContextRunner()
+        .withConfiguration(AutoConfigurations.of(ValidationAutoConfiguration.class))
+        .withUserConfiguration(EventPublicationResubmissionConfig.class)
+        // ロックの provider は作るだけで DB に触れないため、依存は mock で足りる。
+        .withBean(
+            DSLContext.class, () -> Mockito.mock(DSLContext.class, Answers.RETURNS_DEEP_STUBS))
+        .withBean(
+            PlatformTransactionManager.class, () -> Mockito.mock(PlatformTransactionManager.class));
+  }
 
   @Test
   @DisplayName("enabled が false なら定期の実行を登録しない")
@@ -163,6 +166,25 @@ class EventPublicationResubmissionConfigTest {
   }
 
   @Test
+  @DisplayName("再投入の回数の上限が未設定（Spring Modulith は諦めない）だと起動に失敗する")
+  void unsetAbandonAfterAttemptsFailsStartup() {
+    bareRunner()
+        .withPropertyValues(
+            Stream.of(VALID)
+                .filter(property ->
+                    !property.startsWith(
+                        "spring.modulith.events.resubmission.abandon-after-attempts="))
+                .toArray(String[]::new))
+        .withPropertyValues(DISABLED)
+        .run(context ->
+            assertThat(context)
+                .getFailure()
+                .hasRootCauseInstanceOf(BindValidationException.class)
+                .rootCause()
+                .hasMessageContaining("abandon-after-attempts must be at least 2"));
+  }
+
+  @Test
   @DisplayName("倍率が 1 より小さいと起動に失敗する")
   void multiplierBelowOneFailsStartup() {
     assertBindFailure("event-publication.resubmission.policies.default.multiplier=0.5");
@@ -171,13 +193,7 @@ class EventPublicationResubmissionConfigTest {
   @Test
   @DisplayName("default の方針がないと起動に失敗する")
   void missingDefaultPolicyFailsStartup() {
-    new ApplicationContextRunner()
-        .withConfiguration(AutoConfigurations.of(ValidationAutoConfiguration.class))
-        .withUserConfiguration(EventPublicationResubmissionConfig.class)
-        .withBean(
-            DSLContext.class, () -> Mockito.mock(DSLContext.class, Answers.RETURNS_DEEP_STUBS))
-        .withBean(
-            PlatformTransactionManager.class, () -> Mockito.mock(PlatformTransactionManager.class))
+    bareRunner()
         .withPropertyValues(
             "event-publication.resubmission.wait-age=PT5M",
             "event-publication.resubmission.in-flight-staleness=PT25M",

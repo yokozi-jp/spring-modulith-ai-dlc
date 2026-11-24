@@ -1,12 +1,10 @@
 package com.example.demo.shared.infrastructure.persistence;
 
+import com.example.demo.shared.infrastructure.persistence.EventPublicationStates.State;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
-import java.util.Collection;
-import java.util.EnumSet;
 import java.util.List;
-import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -50,13 +48,6 @@ public class EventPublicationResubmitOnce {
 
   /** イベントの完全修飾名で対象を選ぶ指定の接頭辞。 */
   private static final String EVENT_TYPE_PREFIX = "event-type:";
-
-  /** 処理が終わっていない状態。 */
-  private static final Set<EventPublication.Status> IN_FLIGHT =
-      EnumSet.of(
-          EventPublication.Status.PUBLISHED,
-          EventPublication.Status.PROCESSING,
-          EventPublication.Status.RESUBMITTED);
 
   /** Spring Boot が構成した jOOQ。 */
   private final DSLContext dsl;
@@ -214,19 +205,16 @@ public class EventPublicationResubmitOnce {
    */
   private Outcome awaitCompletion(final List<UUID> ids, final int remaining) {
     final int polls = pollsWithin(onceProperties.completionTimeout());
-    for (int poll = 0; poll < polls && count(ids, IN_FLIGHT) > 0; poll++) {
+    for (int poll = 0; poll < polls && count(ids, State::isInFlight) > 0; poll++) {
       sleep();
     }
-    final int completed = count(ids, EnumSet.of(EventPublication.Status.COMPLETED));
+    final int completed = count(ids, state -> state.status() == EventPublication.Status.COMPLETED);
     return new Outcome(ids.size(), completed, ids.size() - completed, remaining);
   }
 
-  /** 出版のうち、状態が {@code statuses} のどれかの数。 */
-  private int count(final List<UUID> ids, final Collection<EventPublication.Status> statuses) {
-    return (int)
-        EventPublicationStates.read(dsl, ids).values().stream()
-            .filter(state -> statuses.contains(state.status()))
-            .count();
+  /** 出版のうち、状態が条件に合う数。 */
+  private int count(final List<UUID> ids, final Predicate<State> condition) {
+    return (int) EventPublicationStates.read(dsl, ids).values().stream().filter(condition).count();
   }
 
   /**

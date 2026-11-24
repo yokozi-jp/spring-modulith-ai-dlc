@@ -71,7 +71,7 @@
               "body": { "stringValue": "Event publications resubmitted" },
               "attributes": [
                 { "key": "event_publication.resubmitted.count", "value": { "intValue": "3" } },
-                { "key": "event_publication.exhausted.count", "value": { "intValue": "1" } },
+                { "key": "event_publication.over_limit.count", "value": { "intValue": "1" } },
                 { "key": "user.email", "value": { "stringValue": "person@example.com" } }
               ]
             },

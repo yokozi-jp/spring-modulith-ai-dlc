@@ -102,8 +102,9 @@ final class ResubmissionTracker {
    * 覚えている出版の結果を DB から読み戻して数える。ロックの外ですべてのインスタンスが、自分が覚えている ID だけについて行う。
    *
    * <p>{@code COMPLETED} は完了、{@code FAILED} と {@code ABANDONED} は再失敗として数えて忘れる。{@code ABANDONED} は
-   * ERROR でも知らせる。 処理中の状態は次の回に回す。どちらの表にもない出版は、運用者が消したので数えずに忘れる。 未完了の状態のまま {@code lifetime} を過ぎた ID
-   * は数えずに捨てる。
+   * ERROR でも知らせる。 処理中の状態（{@link
+   * EventPublicationStates.State#isInFlight()}）は次の回に回す。どちらの表にもない出版は、運用者が消したので数えずに忘れる。 未完了の状態のまま
+   * {@code lifetime} を過ぎた ID は数えずに捨てる。
    */
   /* package */ void reconcile(final Instant now) {
     if (inFlight.isEmpty()) {
@@ -113,26 +114,22 @@ final class ResubmissionTracker {
         EventPublicationStates.read(dsl, inFlight.keySet());
     inFlight.forEach((id, resubmittedAt) -> {
       final EventPublicationStates.@Nullable State state = states.get(id);
-      final @Nullable Status status = state == null ? null : state.status();
       if (state == null) {
         inFlight.remove(id);
-      } else if (status == null) {
+      } else if (state.isInFlight()) {
         forgetIfExpired(id, resubmittedAt, now);
+      } else if (state.status() == Status.COMPLETED) {
+        conclude(id, completed);
       } else {
-        switch (status) {
-          case COMPLETED -> conclude(id, completed);
-          case FAILED -> conclude(id, failed);
-          case ABANDONED -> {
-            conclude(id, failed);
-            exhausted.increment();
-            log.atError()
-                .addKeyValue("event_publication.id", id.toString())
-                .addKeyValue("event_publication.event_type", state.eventType())
-                .addKeyValue("event_publication.listener_id", state.listenerId())
-                .addKeyValue("event_publication.completion_attempts", state.completionAttempts())
-                .log("Event publication resubmission exhausted");
-          }
-          case PUBLISHED, PROCESSING, RESUBMITTED -> forgetIfExpired(id, resubmittedAt, now);
+        conclude(id, failed);
+        if (state.status() == Status.ABANDONED) {
+          exhausted.increment();
+          log.atError()
+              .addKeyValue("event_publication.id", id.toString())
+              .addKeyValue("event_publication.event_type", state.eventType())
+              .addKeyValue("event_publication.listener_id", state.listenerId())
+              .addKeyValue("event_publication.completion_attempts", state.completionAttempts())
+              .log("Event publication resubmission exhausted");
         }
       }
     });
@@ -164,13 +161,9 @@ final class ResubmissionTracker {
         .filter(candidate -> {
           final EventPublicationStates.@Nullable State state = states.get(candidate.getKey());
           return state != null
-              && (archived(state) || state.completionAttempts() > candidate.getValue());
+              && (state.isArchived() || state.completionAttempts() > candidate.getValue());
         })
         .map(Map.Entry::getKey)
         .collect(Collectors.toUnmodifiableSet());
-  }
-
-  private static boolean archived(final EventPublicationStates.State state) {
-    return state.status() == Status.COMPLETED || state.status() == Status.ABANDONED;
   }
 }

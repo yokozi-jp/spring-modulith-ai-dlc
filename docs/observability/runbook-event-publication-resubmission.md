@@ -55,7 +55,7 @@ Staleness Monitor が処理中の出版を `FAILED` に戻すまでの `in-fligh
   各インスタンスが Gauge を集計する回に、その件数（`event.publication.failed{state=over-limit}`）が 0 から増えたときだけ 1 つ出す。
   件数が 0 より大きい間は出さず、0 に戻った後にまた増えたら出す。
   前の件数はインスタンスのメモリにあるため、起動の直後の回に件数が 0 より大きいときも出す。
-- **属性**：`event_publication.exhausted.count`（0 から増えた回に数えた、上限を超えた `FAILED` の出版の数）
+- **属性**：`event_publication.over_limit.count`（0 から増えた回に数えた、上限を超えた `FAILED` の出版の数）
 - **発生原因**：最後の再投入の途中でインスタンスが落ちた。
   Staleness Monitor が処理中の出版を `FAILED` に戻した。
   `ABANDONED` にする `markAbandoned` が DB の失敗で終わり、Staleness Monitor が `FAILED` に戻した。
@@ -184,23 +184,26 @@ Spring Modulith 2.2.0 には、`ABANDONED` の出版を `FAILED` に戻す API �
 回数の上限をもう一度使わせたいときだけ、`completion_attempts` を 1 にする。
 1 にした出版は、最後の試行からふつう `wait-age` を過ぎているため、定期のジョブが次の回に再投入する。
 
+行の削除と挿入を 1 つの文にし、途中で止まっても同じ `id` が両方の表に残らないようにする。
+両方の表に同じ `id` があると、再投入の結果の読み戻しが失敗し、定期のジョブの回が「Event publication resubmission failed」で終わり続ける。
+
 ```sql
-BEGIN;
+WITH moved AS (
+  DELETE FROM modulith.event_publication_archive
+   WHERE id = :id
+     AND status = 'ABANDONED'
+  RETURNING id, listener_id, event_type, serialized_event, publication_date,
+            completion_attempts, last_resubmission_date
+)
 INSERT INTO modulith.event_publication
        (id, listener_id, event_type, serialized_event, publication_date,
         status, completion_date, completion_attempts, last_resubmission_date)
 SELECT id, listener_id, event_type, serialized_event, publication_date,
        'FAILED', NULL, completion_attempts, last_resubmission_date
-  FROM modulith.event_publication_archive
- WHERE id = :id
-   AND status = 'ABANDONED';
-DELETE FROM modulith.event_publication_archive
- WHERE id = :id
-   AND status = 'ABANDONED';
-COMMIT;
+  FROM moved;
 ```
 
-INSERT と DELETE の件数がどちらも 1 であることを確かめる。
+挿入した件数（`INSERT 0 1`）が 1 であることを確かめる。
 0 なら、`id` が違うか、すでに戻されたか消された。
 
 ## 手での再投入
@@ -270,6 +273,9 @@ DELETE FROM modulith.event_publication
 再開するときは `true` に戻してデプロイする。
 
 ## メトリクスの見方
+
+名前の `exhausted`（`event.publication.resubmission.exhausted`、`failed{state=exhausted}`、ERROR の「Event publication resubmission exhausted」）は、回数の上限に達して `ABANDONED` になった出版を指す。
+上限を超えたまま `FAILED` に残った出版は `over-limit`（`failed{state=over-limit}`、属性の `event_publication.over_limit.count`）と呼び、`exhausted` に含めない。
 
 | 名前                                               | 見方                                                                                                                                                                                                        |
 | -------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |

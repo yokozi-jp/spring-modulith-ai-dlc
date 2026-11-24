@@ -54,6 +54,8 @@ final class EventPublicationStates {
   /**
    * 出版の 1 行の状態。
    *
+   * <p>{@code status} が空の行（列は NULL を許す）は、完了も諦めも失敗も記録されていないため、処理中の出版として扱う。
+   *
    * @param status 状態。Spring Modulith と同じく、列が空なら {@code null}
    * @param listenerId リスナーの ID
    * @param eventType イベントの完全修飾名
@@ -64,6 +66,20 @@ final class EventPublicationStates {
       String listenerId,
       String eventType,
       int completionAttempts) {
+
+    /** 処理が終わっていないか。{@code PUBLISHED}、{@code PROCESSING}、{@code RESUBMITTED} と、空の状態である。 */
+    /* package */ boolean isInFlight() {
+      return status == null
+          || status == EventPublication.Status.PUBLISHED
+          || status == EventPublication.Status.PROCESSING
+          || status == EventPublication.Status.RESUBMITTED;
+    }
+
+    /** 完了したか諦めて、archive の表に移ったか。 */
+    /* package */ boolean isArchived() {
+      return status == EventPublication.Status.COMPLETED
+          || status == EventPublication.Status.ABANDONED;
+    }
 
     private static State fromColumns(
         final @Nullable String status,

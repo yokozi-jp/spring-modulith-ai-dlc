@@ -25,6 +25,7 @@ import org.junit.jupiter.params.provider.EnumSource;
 import org.mockito.AdditionalAnswers;
 import org.mockito.Mockito;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Import;
 import org.springframework.modulith.events.EventPublication;
 import org.springframework.modulith.events.FailedEventPublications;
 import org.springframework.modulith.events.ResubmissionOptions;
@@ -58,6 +59,8 @@ import org.springframework.modulith.test.Scenario;
 // 再投入、Staleness Monitor、諦めの判断の振る舞いを同じ文脈で固定し、行を読む補助を持つため、メソッドの数が多い。
 @SuppressWarnings("PMD.TooManyMethods")
 @ResubmissionTestSupport.SharedContext
+// 諦めの判断を記録する bean は、他の再投入のテストの文脈に入れない。
+@Import(AbandonPolicyRecorder.class)
 @EnableScenarios
 class ResubmissionOptionsLearningTest {
 
