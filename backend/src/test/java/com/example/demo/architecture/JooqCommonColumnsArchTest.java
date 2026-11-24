@@ -7,7 +7,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.example.demo.DemoApplication;
 import com.example.demo.jooq.tables.FixtureItemTable;
-import com.example.demo.shared.infrastructure.persistence.AllowedCommonColumnAccess;
+import com.example.demo.shared.persistence.AllowedCommonColumnAccess;
 import com.tngtech.archunit.base.DescribedPredicate;
 import com.tngtech.archunit.core.domain.JavaClass;
 import com.tngtech.archunit.core.importer.ClassFileImporter;
@@ -28,8 +28,7 @@ import org.junit.jupiter.api.Test;
 class JooqCommonColumnsArchTest {
 
   /** 共通カラムを参照してよいパッケージ。 */
-  private static final String SHARED_PERSISTENCE =
-      "com.example.demo.shared.infrastructure.persistence..";
+  private static final String SHARED_PERSISTENCE = "com.example.demo.shared.persistence..";
 
   /** 生成クラスの {@code CREATED_*}、{@code UPDATED_*}、{@code PATCHED_*} は shared の共通処理だけが参照する。 */
   @ArchTest

@@ -2,7 +2,7 @@ package com.example.demo.persistence.conventions;
 
 import com.example.demo.persistence.conventions.CatalogSnapshot.ModuleRoleRow;
 import com.example.demo.persistence.conventions.CatalogSnapshot.RelationRow;
-import com.example.demo.shared.infrastructure.persistence.ModuleRoles;
+import com.example.demo.shared.persistence.ModuleRoles;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashSet;

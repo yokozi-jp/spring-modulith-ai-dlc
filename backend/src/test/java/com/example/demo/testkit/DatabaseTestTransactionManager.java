@@ -1,6 +1,6 @@
 package com.example.demo.testkit;
 
-import com.example.demo.shared.infrastructure.persistence.ModuleRoleTransactionManager;
+import com.example.demo.shared.persistence.ModuleRoleTransactionManager;
 import com.example.demo.shared.tenancy.TenantContext;
 import java.sql.Connection;
 import java.sql.SQLException;

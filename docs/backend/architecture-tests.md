@@ -58,7 +58,7 @@ jOOQの生成物の`com.example.demo.jooq`はOPENのモジュールであり、`
 - `moduleApiDoesNotExposeInternalTypes`：モジュールルートの型は、`java..`、`org.jspecify..`、同じルートパッケージの型、イベントが運ぶテナントの`shared.tenancy.TenantId`と`shared.tenancy.TenantScoped`だけに依存する。
   `package-info`は`@ApplicationModule`の宣言を持つため対象から除く。
   違反フィクスチャの`OrderPlacedReadingTenantContext`（`TenantContext`への依存）で確かめる。
-- `databaseTechnologyApisAreOnlyUsedByPersistenceAdapters`：jOOQ APIと生成型は`infrastructure.persistence`だけで使う。
+- `databaseTechnologyApisAreOnlyUsedByPersistenceAdapters`：jOOQ APIと生成型は`infrastructure.persistence`と、同じ層に入る`shared.persistence`、`shared.eventresubmission`、`shared.tenantbinding`だけで使う。
 - `domainModelDependsOnlyOnAllowedTypes`：`domain.model`は、`java..`、`org.jspecify..`、各モジュールの`domain.model`、`shared.concurrency`、`shared.failure`、`shared.tenancy`、`lombok.Generated`だけに依存する。
   許可の一覧で止めるため、外部システムのSDKや生成型も、Spring、jOOQ、JPA、Jacksonの型と同じく落ちる。
   Lombokの注釈のうち、許すのは生成したコードに付く`lombok.Generated`だけである（`lombok.NonNull`など、クラスファイルに残るほかの注釈は落ちる）。
@@ -82,8 +82,8 @@ jOOQの生成物の`com.example.demo.jooq`はOPENのモジュールであり、`
 `batch`を層に足すまでは、`<module>.batch`のクラスは`dependenciesPointInward`の所属検査で失敗する。
 
 共有モジュール`shared`（[ADR-048](../adr/ADR-048-add-shared-module-for-jooq-common-code.md)）のために、ほかの規則へ例外を足していない。
-`shared.infrastructure.persistence`はオニオン規則の`persistence`の層に入るため、機能モジュールの`infrastructure.persistence`からの依存は同じ層の中の依存になる。
-`infrastructureDependsOnlyOnDomainModel`が拒否するモジュールルートは`com.example.demo.<feature>`の直下だけであり、`shared.infrastructure.persistence`は含まれない。
+`shared.persistence`、`shared.eventresubmission`、`shared.tenantbinding`はオニオン規則の`persistence`の層に入るため、機能モジュールの`infrastructure.persistence`からの依存は同じ層の中の依存になる。
+`infrastructureDependsOnlyOnDomainModel`が拒否するモジュールルートは`com.example.demo.<feature>`の直下だけであり、`shared.persistence`は含まれない。
 `shared.concurrency`の`VersionedCommand`は`Command`で終わるインタフェースなので、`ClassRoleArchTest`の`commandsAndResultsAreApplicationRecords`の対象から、`VersionedCommand`の完全修飾型名だけを除く。
 `shared.concurrency`に置いたほかの`*Command`は、この規則の対象のままである。
 `shared`のルートには`package-info.java`だけを置くため、`moduleRootTypesAreRecordsEnumsOrQueries`と`moduleApiDoesNotExposeInternalTypes`に当たる型がない。
@@ -117,11 +117,11 @@ jOOQの生成物の`com.example.demo.jooq`はOPENのモジュールであり、`
   引数が1つであることは、`listenersExposeOnlyOnAndCallOneCommandHandler`と`moduleListenersAreApplicationListeners`が見る。
   `TenantListenerAspect`がイベントのテナントを、リスナーのトランザクションが始まる時点で束縛するためである（[ADR-105](../adr/ADR-105-bind-tenant-to-request-and-event-context.md)）。
   違反フィクスチャの`OrderPlacedWithoutTenantListener`で確かめる。
-- `tenantIsBoundOnlyByTenantSelectionFilterAndListenerAspect`：`TenantContext.call`を呼べるクラスは、`tenancy.presentation.web.TenantSelectionFilter`と`shared.infrastructure.persistence.TenantListenerAspect`の2つだけにする。
+- `tenantIsBoundOnlyByTenantSelectionFilterAndListenerAspect`：`TenantContext.call`を呼べるクラスは、`tenancy.presentation.web.TenantSelectionFilter`と`shared.tenantbinding.TenantListenerAspect`の2つだけにする。
   CommandHandlerやControllerや別のfilterが束縛を切り替えて、認証の権限やイベントに無関係なテナントを操作することを防ぐ。メソッド参照も検出する（[ADR-105](../adr/ADR-105-bind-tenant-to-request-and-event-context.md)）。
   違反フィクスチャの`TenantSwitchingCommandHandler`（直接の呼び出し）と`HeaderTenantFilter`（別のモジュールのfilterのメソッド参照）で確かめ、規約どおりのフィクスチャの`TenantSelectionFilter`が通ることを確かめる。
   業務のバッチの`shared.batch`のAspectを許可先に足すのは、Aspectを作る[#667](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/667)である（[ADR-105](../adr/ADR-105-bind-tenant-to-request-and-event-context.md)）。
-- `unboundTenantIsReadOnlyByTransactionManager`：本番のコードで`TenantContext.findCurrent`を呼べるクラスは、`shared.infrastructure.persistence.ModuleRoleTransactionManager`だけにする。
+- `unboundTenantIsReadOnlyByTransactionManager`：本番のコードで`TenantContext.findCurrent`を呼べるクラスは、`shared.persistence.ModuleRoleTransactionManager`だけにする。
   ArchUnitは本番のクラスだけを解析するので、テストの補助（`AsTenant`など）は対象の外である。
   `findCurrent`は束縛のないことを空で返すため、業務の処理が使うと、テナントを束縛し忘れた呼び出しをテナントのない処理として通す。
   業務の処理は`TenantContext.current()`で読む。
@@ -164,14 +164,14 @@ jOOQの生成物の`com.example.demo.jooq`はOPENのモジュールであり、`
 `ArchitectureRuleFixtureTest`、`DirectWriteFixtureTest`、`LambdaFixtureTest`は、テスト専用のフィクスチャで各規則が働くことを確かめる。違反フィクスチャの読み込みは`ViolatingFixtures`で共有する。
 
 - `backend/src/test/java/archfixture/conforming/`：規約どおりの`ordering`モジュール、`inventory`モジュール、`payment`モジュール、`shared`モジュールの最小の例。すべての規則が誤検出しないことを確かめる。
-  `ordering`の`JooqOrderRepository`が`shared.infrastructure.persistence`の型を使い、`shared`のルートは`package-info.java`だけを持つ。
+  `ordering`の`JooqOrderRepository`が`shared.persistence`の型を使い、`shared`のルートは`package-info.java`だけを持つ。
 - `backend/src/test/java/archfixture/violating/`：規則ごとに違反するクラスを置く。各クラスのJavadocに違反する規則名を書く。パラメータ化テストが、規則ごとに対応する違反クラスの完全修飾名を含む失敗を確かめる。
 
 フィクスチャは`com.example.demo`の外に置く。
 そのため、Springのコンポーネントスキャン、Spring Modulithの`ApplicationModules`、プロダクション向けの`@AnalyzeClasses(packagesOf = DemoApplication.class)`は、フィクスチャを読まない。
 `ArchitectureRuleFixtureTest`は`ClassFileImporter`でフィクスチャを読み込み、ベースパッケージを引数に取る`<規則名>Rule(basePackage)`のファクトリか、規則のフィールドをそのまま使う。
 
-`sharedModuleIsUsedOnlyByPersistenceAdapters`は、違反フィクスチャの`application`の`OrderAuditColumns`が`shared.infrastructure.persistence`の型を使うことを検出し、規約どおりのフィクスチャの`JooqOrderRepository`を誤検出しないことを確かめる。
+`sharedModuleIsUsedOnlyByPersistenceAdapters`は、違反フィクスチャの`application`の`OrderAuditColumns`が`shared.persistence`の型を使うことを検出し、規約どおりのフィクスチャの`JooqOrderRepository`を誤検出しないことを確かめる。
 
 `externalSystemCommandHandlersAreDependedOnlyByListeners`は、違反フィクスチャの`ChargeOrderController`が呼ぶ`ChargeOrderCommandHandler`（`PaymentGateway`に直接依存する）を検出する。
 `presentation.web`に置いた名前だけの`ChargeOrderListener`が呼ぶ場合も検出する。
@@ -202,14 +202,14 @@ R4は`ApproveOrderCommandHandler`（`handle`から呼ばないprivateメソッ�
 `LambdaEnsureCommandHandler`は、`Optional.ifPresent`のラムダの中の`ensureLockNo`をR4が満たすものとして数えることを`LambdaFixtureTest`で固定する（違反フィクスチャのパッケージにあるが、R4は検出しない）。
 `commandsAndResultsAreApplicationRecords`の型単位の除外は、`shared.concurrency`のrecordではない`ForceUnlockCommand`で確かめる。
 規約どおりのフィクスチャには、`shared.concurrency`と`shared.failure`の型と、Requestが`ExpectedLockNo`を作る`CancelOrderRequest`、Listenerが版のないCommandを作る`OrderPlacedExpiryListener`を置く。
-`archfixture.conforming`と`archfixture.violating`の`shared.infrastructure.persistence`には、規則が名前で見る`TableWriter`のスタブを置く。
+`archfixture.conforming`と`archfixture.violating`の`shared.persistence`には、規則が名前で見る`TableWriter`のスタブを置く。
 H3は、違反フィクスチャの`JooqOrderRepository`の`update`と`save`（`TableWriter.update`を呼ばない）と`store`（`TableWriter.update`を呼ぶが`update`という名前ではない）で確かめる。
 H6は、`UnversionedOrderRepository`（集約ルートではなく識別子を受け取る）で確かめる。
 `allowedUsagesAreNotDetected`の一行は、対応づけの二つの規則が`convertFrom`、`Records.mapping`、`into(Table)`、`fetch(RecordMapper)`、`intoArray(Field, Class)`、`intoSet(Field, Class)`、`fetch(Field, Class)`、`newRecord(Table)`を誤検出しないことを確かめる。
 `noSuchElementExceptionIsNotThrown`は、違反フィクスチャの`LegacyOrderFinder`の`notFound`（`NoSuchElementException`の生成）と`firstOrFail`（引数なしの`orElseThrow()`）で確かめる。
 規約どおりのフィクスチャの`CancelOrderCommandHandler`、`CancelExpiredOrderCommandHandler`、`ReserveStockCommandHandler`、`OrderController`は`NotFoundException`を、`Order`と`OrderLimitPolicy`は`BusinessRuleViolationException`を投げ、Domain、Application、Presentationから`shared.failure`を使っても規則が通ることを確かめる。
 `allowedUsagesAreNotDetected`の別の一行は、`IllegalStateException`、`IllegalArgumentException`、3つの業務上の失敗の例外の送出と`orElseThrow(Supplier)`を、`noSuchElementExceptionIsNotThrown`が誤検出しないことを確かめる。
-`sharedModuleDoesNotDependOnHttp`は、違反フィクスチャの`shared.infrastructure.persistence`の`ChildRowWriter`が`ResponseStatusException`を投げることを検出する。
+`sharedModuleDoesNotDependOnHttp`は、違反フィクスチャの`shared.persistence`の`ChildRowWriter`が`ResponseStatusException`を投げることを検出する。
 MapStruct、ModelMapper、Dozerはテストのクラスパスにないため、`mappingLibrariesAreNotUsed`のフィクスチャは`DefaultRecordMapper`と`DefaultRecordUnmapper`への依存だけで確かめる。
 
 `TestConventionsArchTest`の`sleepIsNotUsedInTests`は、`SleepRuleFixtureTest`が`archfixture.sleep`のクラスで確かめる。
@@ -286,11 +286,11 @@ Class <archfixture.violating.ordering.application.ShipOrderCommandHandler> is me
   規則はBeanのクラス自身が宣言したメソッドだけを見るため、親クラスで宣言した`final`のメソッドは検出しない。
 
 同じクラスの`pointcutsNarrowTargetsWithWithin`は、AspectJのadviceと`@Pointcut`の式（`value`と`pointcut`）に`within(`があることを検査する。
-違反フィクスチャの`shared.infrastructure.persistence.SlowPgmCdAspect`で確かめ、規約どおりのフィクスチャの`PgmCdAspect`を誤検出しないことも確かめる。
+違反フィクスチャの`shared.persistence.SlowPgmCdAspect`で確かめ、規約どおりのフィクスチャの`PgmCdAspect`を誤検出しないことも確かめる。
 同じクラスの`aspectsDeclareOrder`は、`@Aspect`のクラスに`Ordered.LOWEST_PRECEDENCE`より小さい値の`@Order`があることを検査する。
-違反フィクスチャの`shared.infrastructure.persistence.UnorderedPgmCdAspect`（`@Order`がない）と`LowestOrderPgmCdAspect`（値のない`@Order`）で確かめ、規約どおりのフィクスチャの`PgmCdAspect`を誤検出しないことも確かめる。
+違反フィクスチャの`shared.persistence.UnorderedPgmCdAspect`（`@Order`がない）と`LowestOrderPgmCdAspect`（値のない`@Order`）で確かめ、規約どおりのフィクスチャの`PgmCdAspect`を誤検出しないことも確かめる。
 同じクラスの`transactionManagementIsNotRedeclared`は、`@EnableTransactionManagement`を宣言するクラスがないことを検査し、`aspectsDeclareOrder`が前提にするトランザクションのadvisorの順序を保つ。
-違反フィクスチャの`shared.infrastructure.persistence.TransactionOrderConfiguration`で確かめる。
+違反フィクスチャの`shared.persistence.TransactionOrderConfiguration`で確かめる。
 
 ### プロキシの規則が検出しない書き方
 
@@ -322,7 +322,7 @@ Error ProneはすべてのJavaコンパイルで`JavaTimeDefaultTimeZone`と`Jav
 
 ## 共通カラム
 
-`JooqCommonColumnsArchTest`は、jOOQの生成クラスの`CREATED_*`、`UPDATED_*`、`PATCHED_*`フィールドを参照するクラスが、`com.example.demo.shared.infrastructure.persistence`の外にないことを検査する。
+`JooqCommonColumnsArchTest`は、jOOQの生成クラスの`CREATED_*`、`UPDATED_*`、`PATCHED_*`フィールドを参照するクラスが、`com.example.demo.shared.persistence`の外にないことを検査する。
 INSERTとUPDATEの共通カラムは`TableWriter`が書く。Repositoryは`CommonColumns`を使わない。
 `CommonColumns.forInsert`はテストのデータ作成のために公開しているが、本番のコードは`insertInto`を`TableWriter`の外で呼べない（H1）。
 `LOCK_NO`は各モジュールが楽観的ロックの版を読むため対象外にし、書き込みは`ColumnValues`が実行時に拒否する。
@@ -353,7 +353,7 @@ INSERTとUPDATEの共通カラムは`TableWriter`が書く。Repositoryは`Commo
   `tableWritesGoThroughTableWriter`が除外するのは、`TableWriter`、`ChildWriter`と、トランザクションの初めにモジュールのロールへ切り替える`ModuleRoleTransactionManager`とその`Config`の完全修飾型名だけである。
   `ModuleRoleTransactionManager`は業務テーブルに触れず、ロールとテナントを設定する`set_config`だけを実行する（[ADR-094](../adr/ADR-094-switch-to-module-database-roles.md)、[ADR-107](../adr/ADR-107-isolate-tenants-with-rls-set-per-transaction.md)）。
   除外を足す、外す、または除外する型を移すときは、先に[ADR-054](../adr/ADR-054-detect-optimistic-lock-conflicts-by-update-count.md)の判断を変える。
-  同じ変更で、`tableWritesGoThroughTableWriterRule`の完全修飾型名と、除外する型を置く適合フィクスチャ（`archfixture/conforming/shared/infrastructure/persistence/`）を更新する。
+  同じ変更で、`tableWritesGoThroughTableWriterRule`の完全修飾型名と、除外する型を置く適合フィクスチャ（`archfixture/conforming/shared/persistence/`）を更新する。
   禁止するAPIの違反フィクスチャ（`DirectOrderWriter`）は、禁止の一覧か`isDirectWrite`の判定を変えるときだけ更新する。
 - `repositoryUpdateCallsVersionedEntryPoint`：`Jooq*Repository`の、集約ルートを受け取る`add`以外のpublicメソッドは、`update`という名前で、`TableWriter.update`をそのメソッドの中で直接呼ぶ。
   名前で対象を選ばないため、`save`のような名前のメソッドも検出する。

@@ -35,7 +35,7 @@ SQL の span には次の制約がある。
 ## Decision
 
 jOOQ の `ExecuteListener` で、jOOQ が発行する SQL ごとに Micrometer の `Observation`（名前は `jooq.query`）を作る。
-実装は jOOQ の共通処理として `shared.infrastructure.persistence` の `JooqObservationConfig` に置く（ADR-048）。
+実装は jOOQ の共通処理として `shared.persistence` の `JooqObservationConfig` に置く（ADR-048）。
 
 - span の名前（contextual name）は SQL の種類（`READ`、`WRITE`、`DDL`、`BATCH`、`ROUTINE`、`OTHER`）にする。
 - low cardinality の key value として `db.system.name=postgresql` を付ける。

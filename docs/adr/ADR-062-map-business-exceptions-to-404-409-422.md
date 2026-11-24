@@ -25,7 +25,7 @@ Proposed
 - `TableWriter.updateCheckingVersion` と `deleteCheckingVersion` は、主キーの行がないときに `NoSuchElementException` を投げ、利用者には 500 で返る。
 - 役割ごとの文書の例は、見つからない集約に `NoSuchElementException`、許されない状態遷移に `IllegalStateException` を投げており、写すと 500 になる。
 - `IllegalStateException` は、許されない状態遷移とプログラムの誤り（`TableWriter` の 2 件以上の更新）の両方に使われていた。
-- `LockedRoot.updateChild` は、`shared.infrastructure.persistence` から Spring Web の `ResponseStatusException` を投げて 422 にしていた。
+- `LockedRoot.updateChild` は、`shared.persistence` から Spring Web の `ResponseStatusException` を投げて 422 にしていた。
 - 一意制約の違反（`23505`）は、どこでも 409 に変換していなかった。
 - `controller.md` は、見つからない参照を Controller の `ResponseStatusException(HttpStatus.NOT_FOUND)` で 404 にする例を示していた。
 
@@ -70,7 +70,7 @@ ADR は Proposed のままであるため、新しい ADR を起こさず、こ�
   これらはプログラムの誤りにも使われ、まとめて 4xx にすると誤りが 4xx に化けて隠れるためである。
 - `TableWriter` は、主キーの行がないときに `NotFoundException` を投げる。
   子の行の更新が 1 行でないことは、ルートの行ロックの下で読んだ自然キーに対する更新で起こらない状態のため、`IllegalStateException` にする（ADR-054）。
-  `shared.infrastructure.persistence` は Spring Web に依存しない。
+  `shared.persistence` は Spring Web に依存しない。
 - `23505` は、`TableWriter` の変換の入口で、原因を付けずに `Kind.UNIQUE` の `ConflictException` に変える。
   集約ルートの INSERT の入口 `TableWriter.insert` を足し、同じ変換を通す。
   `DataIntegrityViolationException` の他の違反（外部キー、NOT NULL、CHECK、排他制約）は、入力の検証か実装の誤りであるため 500 のままにする。
@@ -96,7 +96,7 @@ ADR は Proposed のままであるため、新しい ADR を起こさず、こ�
 
 - 機能モジュールは型を投げるだけで、404、409、422 のステータス、本文、ログが決まる。
 - Controller に try と catch が要らない。
-- `shared.infrastructure.persistence` から Spring Web への依存が消え、`shared` が HTTP に依存しないことを ArchUnit で検査する。
+- `shared.persistence` から Spring Web への依存が消え、`shared` が HTTP に依存しないことを ArchUnit で検査する。
 - 一意制約の違反が、500 ではなく 409 になる。
 - 見つからないことを `NoSuchElementException` で表す誤りを、ArchUnit が検出する。
 - 409 のログに SQL と入力値が出ない。

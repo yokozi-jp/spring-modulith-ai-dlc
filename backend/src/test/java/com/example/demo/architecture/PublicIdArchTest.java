@@ -63,7 +63,10 @@ class PublicIdArchTest {
             basePackage + ".*.infrastructure.client..",
             basePackage + ".shared..")
         .and()
-        .resideOutsideOfPackage(basePackage + ".shared.infrastructure..")
+        .resideOutsideOfPackages(
+            basePackage + ".shared.persistence..",
+            basePackage + ".shared.eventresubmission..",
+            basePackage + ".shared.tenantbinding..")
         .should(notHoldNumericIds())
         .allowEmptyShould(true)
         .because(

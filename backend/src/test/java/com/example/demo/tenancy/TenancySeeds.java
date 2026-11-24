@@ -3,7 +3,7 @@ package com.example.demo.tenancy;
 import static com.example.demo.jooq.tenancy.Tables.M_USER;
 import static com.example.demo.jooq.tenancy.Tables.M_USER_IDENTITY;
 
-import com.example.demo.shared.infrastructure.persistence.TestCommonColumns;
+import com.example.demo.shared.persistence.TestCommonColumns;
 import com.example.demo.shared.tenancy.TenantId;
 import java.time.Instant;
 import java.util.List;

@@ -1,6 +1,6 @@
 package archfixture.violating.ordering.application;
 
-import archfixture.violating.shared.infrastructure.persistence.CommonColumns;
+import archfixture.violating.shared.persistence.CommonColumns;
 import java.util.Map;
 
 /** 違反：sharedModuleIsUsedOnlyByPersistenceAdapters（application から shared の共通処理を直接使う）。 */

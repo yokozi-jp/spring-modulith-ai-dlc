@@ -1,0 +1,77 @@
+package com.example.demo.shared.persistence;
+
+import java.util.Collection;
+import java.util.Collections;
+import java.util.LinkedHashMap;
+import java.util.Map;
+import java.util.Set;
+import org.jooq.Field;
+import org.jooq.Record;
+import org.jooq.Table;
+import org.jooq.TableField;
+import org.jspecify.annotations.Nullable;
+
+/**
+ * {@link TableWriter} の INSERT と UPDATE で書く業務の列の値だけを受け取る（ADR-054）。
+ *
+ * <p>{@code where} も {@code execute} も持たないため、Repository のラムダからは列の値しか書けない。列は更新するテーブルの型 {@code R}
+ * に結び付いた {@link TableField} に限るため、別のテーブルの列と型の違う値はコンパイルで失敗する。
+ *
+ * <p>共通カラム（{@code lock_no}、{@code created_*}、{@code updated_*}、{@code patched_*} の規約の 12
+ * 列）と、集約の宣言から {@link TableWriter} が書く列（ルートの一意の列、内部の主キー、子の外部キー）は、渡すと {@link
+ * IllegalArgumentException} を投げる。{@code updated_reason} のような、規約にない業務の列は拒否しない。
+ *
+ * @param <R> 更新するテーブルの Record の型
+ */
+public final class ColumnValues<R extends Record> {
+
+  /** 更新するテーブル。メッセージに名前を入れるために持つ。 */
+  private final Table<R> table;
+
+  /** {@link TableWriter} が宣言から書く列（ルートの一意の列、内部の主キー、子の外部キー）。渡すと拒否する。 */
+  private final Set<Field<?>> reserved;
+
+  /** SET する列と値。SQL を決定的にするため、登録の順を保つ。 */
+  // 一つの UPDATE を組み立てる間だけ一つのスレッドで使い、登録の順が要るため LinkedHashMap にする。
+  @SuppressWarnings("PMD.UseConcurrentHashMap")
+  private final Map<Field<?>, @Nullable Object> assignments = new LinkedHashMap<>();
+
+  /* package */ ColumnValues(final Table<R> table, final Collection<? extends Field<?>> reserved) {
+    this.table = table;
+    this.reserved = Set.copyOf(reserved);
+  }
+
+  /**
+   * 列に値を SET する。
+   *
+   * @throws IllegalArgumentException 共通カラムを渡した場合
+   */
+  public <T extends @Nullable Object> ColumnValues<R> set(
+      final TableField<R, T> field, final T value) {
+    return put(field, value);
+  }
+
+  /**
+   * 列に式（{@code STOCK_COUNT.minus(5)} など）を SET する。
+   *
+   * @throws IllegalArgumentException 共通カラムを渡した場合
+   */
+  public <T extends @Nullable Object> ColumnValues<R> set(
+      final TableField<R, T> field, final Field<T> value) {
+    return put(field, value);
+  }
+
+  /** SET する列と値を、登録の順で返す。 */
+  /* package */ Map<Field<?>, @Nullable Object> values() {
+    return Collections.unmodifiableMap(assignments);
+  }
+
+  private ColumnValues<R> put(final TableField<R, ?> field, final @Nullable Object value) {
+    if (CommonColumns.NAMES.contains(field.getName()) || reserved.contains(field)) {
+      throw new IllegalArgumentException(
+          "column is set by TableWriter: table=" + table.getName() + ", column=" + field.getName());
+    }
+    assignments.put(field, value);
+    return this;
+  }
+}

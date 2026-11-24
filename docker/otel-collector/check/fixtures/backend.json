@@ -40,7 +40,7 @@
                 {
                   "key": "exception.stacktrace",
                   "value": {
-                    "stringValue": "com.example.demo.shared.concurrency.ConflictException: unique key already exists: insert\n\tat com.example.demo.shared.infrastructure.persistence.TableWriter.executeOrConflict(TableWriter.java:280)"
+                    "stringValue": "com.example.demo.shared.concurrency.ConflictException: unique key already exists: insert\n\tat com.example.demo.shared.persistence.TableWriter.executeOrConflict(TableWriter.java:280)"
                   }
                 },
                 { "key": "http.response.status_code", "value": { "intValue": "409" } },

@@ -162,8 +162,7 @@ class ArchitectureRuleFixtureTest {
   private static final String ORDER_REPORTER = "ordering.application.OrderReporter";
 
   /** {@code @Scheduled} のメソッドの形に違反するフィクスチャのクラス名。 */
-  private static final String STALE_LOCK_SWEEPER =
-      "shared.infrastructure.persistence.StaleLockSweeper";
+  private static final String STALE_LOCK_SWEEPER = "shared.persistence.StaleLockSweeper";
 
   /** {@link ProxyRulesArchTest} の規則が、違反フィクスチャの各メソッドを検出することを確かめる行。 */
   private static final List<Arguments> PROXY_ROWS =
@@ -235,23 +234,23 @@ class ArchitectureRuleFixtureTest {
           row(
               "pointcutsNarrowTargetsWithWithin: value",
               ProxyRulesArchTest.pointcutsNarrowTargetsWithWithin,
-              "shared.infrastructure.persistence.SlowPgmCdAspect.bind("),
+              "shared.persistence.SlowPgmCdAspect.bind("),
           row(
               "pointcutsNarrowTargetsWithWithin: pointcut",
               ProxyRulesArchTest.pointcutsNarrowTargetsWithWithin,
-              "shared.infrastructure.persistence.SlowPgmCdAspect.afterListener("),
+              "shared.persistence.SlowPgmCdAspect.afterListener("),
           row(
               "aspectsDeclareOrder: @Order がない",
               ProxyRulesArchTest.aspectsDeclareOrder,
-              "shared.infrastructure.persistence.UnorderedPgmCdAspect"),
+              "shared.persistence.UnorderedPgmCdAspect"),
           row(
               "aspectsDeclareOrder: 値のない @Order",
               ProxyRulesArchTest.aspectsDeclareOrder,
-              "shared.infrastructure.persistence.LowestOrderPgmCdAspect"),
+              "shared.persistence.LowestOrderPgmCdAspect"),
           row(
               "transactionManagementIsNotRedeclared",
               ProxyRulesArchTest.transactionManagementIsNotRedeclared,
-              "shared.infrastructure.persistence.TransactionOrderConfiguration"));
+              "shared.persistence.TransactionOrderConfiguration"));
 
   @Test
   @DisplayName("規約どおりのフィクスチャはすべてのクラス役割規則を満たす")

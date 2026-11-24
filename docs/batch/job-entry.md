@@ -54,7 +54,7 @@ Job の名前を渡した起動は、手での 1 回の再投入（[失敗した
   2 つの Runner がそれぞれ `System.exit` を呼ぶと、先に呼んだ側がもう一方の処理を途中で止める。
 - Runner は、期間を流し終えるか止まったら、処理中のリスナーの完了を待ってから `System.exit(SpringApplication.exit(context))` を呼ぶ。
   待ち方は `EventPublicationResubmissionConfig.awaitRunningListeners` と同じにする。
-  このメソッドは `shared.infrastructure.persistence` の package-private なので、`shared.batch` からも呼べる置き場所へ移して使う。
+  このメソッドは `shared.eventresubmission` の package-private なので、`shared.batch` からも呼べる置き場所へ移して使う。
 - Runner は、Job を流す前と流している間に出たすべての例外（`RuntimeException` と `Error`）を受け、ERROR で記録して、`SpringApplication.exit` に終了コード 1 を渡してから `System.exit` を呼ぶ。
   Spring Batch 6.0.6 の `AbstractJob.execute` は `Exception` を受けて JobExecution を FAILED にするが、`Error` と JobRepository の更新の失敗は外へ出る。
   `TaskExecutorJobLauncher` はそれを投げ直し、その JobExecution は STARTED のまま残る（[止まった期間を直す](runbook-stuck-period.md)）。

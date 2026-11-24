@@ -3,7 +3,7 @@ package com.example.demo.persistence.conventions;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.example.demo.DemoApplication;
-import com.example.demo.shared.infrastructure.persistence.ModuleRoles;
+import com.example.demo.shared.persistence.ModuleRoles;
 import com.example.demo.testkit.DatabaseTest;
 import java.io.IOException;
 import java.nio.file.Files;
