@@ -13,6 +13,10 @@ import java.util.List;
  */
 public record DeclaredAggregate(String root, List<DeclaredChild> children) {
 
+  public DeclaredAggregate {
+    children = List.copyOf(children);
+  }
+
   /**
    * 子のテーブルの宣言。
    *

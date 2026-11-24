@@ -9,6 +9,7 @@ import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 import org.jooq.Table;
 
 /** 本番のクラスが宣言した集約を、テストから読む。 */
@@ -56,6 +57,6 @@ public final class AggregateDeclarations {
   }
 
   private static String qualified(final Table<?> table) {
-    return table.getSchema().getName() + "." + table.getName();
+    return Objects.requireNonNull(table.getSchema()).getName() + "." + table.getName();
   }
 }
