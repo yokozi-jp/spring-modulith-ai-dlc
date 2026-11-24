@@ -46,7 +46,7 @@ Entity は[値オブジェクト](value-object.md)ではない。
 
 ## 依存してよい型、してはいけない型
 
-- **依存してよい型**：`java..` の標準型、`org.jspecify..`、同じ `domain.model` の値オブジェクトと enum。
+- **依存してよい型**：`java.lang..`、`java.util..`、`java.math..`、`java.time..` の標準型、`org.jspecify..`、同じ `domain.model` の値オブジェクトと enum。
 - **依存してはいけない型**：Spring、jOOQ、jOOQ の生成型、JPA、Jackson の型、`domain.service`、`application`、モジュールルートの型、集約ルート、Repository と外部システムのインタフェース。
 
 ## 最小の例と典型的な例
