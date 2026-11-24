@@ -109,6 +109,7 @@ git diff --name-only --diff-filter=A "$(sed -n 's/^同期コミット：`\([0-9a
 ## 変異
 
 変異は `model/mutants.toml` にあり、各項目の `change` が写すコードの退行である。
+`unbumped-root` は `TableWriter.update` が `lock_no` を比べるが進めない退行で、`NoLostUpdate` が破れる。
 
 ## 範囲と前提
 
