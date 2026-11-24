@@ -39,9 +39,19 @@ tasks.named('bootJar') {
     archiveFileName = 'app.jar'
 }
 
+// AWS の SDK は、Spring が spring.config.import で読む ../.env を見ない（ADR-124）。
+// ホストで起動するときは、../.env の AWS_ で始まる変数を環境変数で渡す。
+def awsDotEnv = providers.fileContents(layout.projectDirectory.file('../.env')).asText.map { text ->
+    text.readLines().findAll { it.startsWith('AWS_') && it.contains('=') }.collectEntries { line ->
+        def (key, value) = line.split('=', 2)
+        [(key): value]
+    }
+}
+
 tasks.named('bootRun') {
     // ホスト起動でもコンテナと同じJVMデフォルトタイムゾーンを使う。
     jvmArgs('-Duser.timezone=UTC')
+    environment(awsDotEnv.getOrElse([:]))
 }
 
 // 開発用の代表データ（#114）。シーダーは src/test にあり、本番の jar と runtimeClasspath に入れない。
@@ -124,6 +134,15 @@ dependencies {
     // --- 耐障害性 ---
     implementation 'org.springframework.cloud:spring-cloud-starter-circuitbreaker-resilience4j'
 
+    // --- メールの送信（ADR-124）---
+    // SES v2 の API で送る。版は dependencyManagement の AWS SDK の BOM が決める。
+    // HTTP の Client は JDK の HttpURLConnection を使う url-connection-client にし、SDK が既定で入れる Apache と Netty の Client を外す。
+    implementation('software.amazon.awssdk:sesv2') {
+        exclude group: 'software.amazon.awssdk', module: 'apache5-client'
+        exclude group: 'software.amazon.awssdk', module: 'netty-nio-client'
+    }
+    implementation 'software.amazon.awssdk:url-connection-client'
+
     // --- 開発支援 ---
     compileOnly 'org.projectlombok:lombok'
     annotationProcessor 'org.projectlombok:lombok'
@@ -178,6 +197,8 @@ dependencyManagement {
     imports {
         mavenBom "org.springframework.modulith:spring-modulith-bom:${springModulithVersion}"
         mavenBom "org.springframework.cloud:spring-cloud-dependencies:${springCloudVersion}"
+        // AWS SDK for Java v2 の版をそろえる（ADR-124）。Spring BOM の管理外。
+        mavenBom "software.amazon.awssdk:bom:2.59.2"
         // --- 脆弱性対応（Jackson BOM の推移的バージョン上書き） ---
         // jackson-databind の CVE-2026-68497 / CVE-2026-83557 / CVE-2026-19032 対応。
         // databind 単体ではなく BOM を上げ、core など同系列の版ずれを避ける。

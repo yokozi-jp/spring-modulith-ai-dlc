@@ -34,8 +34,8 @@ write_env_file() {
   kc="$(port_of "$n" $BASE_KEYCLOAK)" wm="$(port_of "$n" $BASE_WIREMOCK)"
   mkdir -p "$(dirname "$out")"
   awk -F= -v db="$(port_of "$n" $BASE_PG)" \
-    -v issuer="http://127.0.0.1:$kc/realms/spring-modulith" -v payment="http://127.0.0.1:$wm" '
-    BEGIN { v["DB_PORT"] = db; v["OIDC_ISSUER_URI"] = issuer; v["PAYMENT_GATEWAY_BASE_URL"] = payment }
+    -v issuer="http://127.0.0.1:$kc/realms/spring-modulith" -v wiremock="http://127.0.0.1:$wm" '
+    BEGIN { v["DB_PORT"] = db; v["OIDC_ISSUER_URI"] = issuer; v["PAYMENT_GATEWAY_BASE_URL"] = wiremock; v["AWS_ENDPOINT_URL_SESV2"] = wiremock }
     $1 in v { print $1 "=" v[$1]; seen[$1] = 1; next }
     { print }
     END { for (k in v) if (!(k in seen)) print k "=" v[k] }

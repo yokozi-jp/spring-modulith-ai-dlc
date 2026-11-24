@@ -33,11 +33,15 @@ import org.testcontainers.utility.MountableFile;
 import org.yaml.snakeyaml.Yaml;
 
 /**
- * テストの JVM ごとに 1 つずつ起動する PostgreSQL、決済代行の WireMock のコンテナ（ADR-085）。
+ * テストの JVM ごとに 1 つずつ起動する PostgreSQL、決済代行と SES v2 の API の WireMock のコンテナ（ADR-085）。
  *
  * <p>Gradle は fork ごとに別の JVM を起動するため、fork どうしは DB を共有しない。 最初の Spring のテストのコンテキストを作るときに起動し、JVM の終了で
  * Testcontainers の Ryuk が片付ける。 イメージと WireMock のコマンドは {@code docker/compose-test.yml} から読み、E2E
  * とスモークの依存と版をそろえる。 ポートは compose と同じく {@code 127.0.0.1} だけで待ち受ける。
+ *
+ * <p>AWS の SDK は Spring の設定を読まないため、SES v2 の接続先、リージョン、ダミーの資格情報は、SDK
+ * が環境変数より優先して読むシステムプロパティで渡す（ADR-124）。 Spring のコンテキストが SDK の Client を作る前に、{@link #properties()}
+ * が設定する。
  */
 final class InfrastructureContainers {
 
@@ -96,6 +100,12 @@ final class InfrastructureContainers {
   /** 決済代行のスタブが請求に返す status。 */
   private static final int CHARGED = 201;
 
+  /** SDK が SES v2 の接続先を読むシステムプロパティ。環境変数 {@code AWS_ENDPOINT_URL_SESV2} と同じ意味。 */
+  private static final String SES_ENDPOINT_PROPERTY = "aws.endpointUrlSesV2";
+
+  /** テストの SDK が使うリージョン。WireMock はリージョンを見ない。 */
+  private static final String AWS_REGION = "ap-northeast-1";
+
   private InfrastructureContainers() {}
 
   /** 起動した依存の接続先を、{@code application.yaml} のプレースホルダの名前で返す。初回の呼び出しで起動する。 */
@@ -139,9 +149,14 @@ final class InfrastructureContainers {
     bindToLoopback(wireMock, WIREMOCK_PORT);
     Startables.deepStart(postgres, wireMock).join();
 
-    final String paymentGateway =
-        "http://" + LOOPBACK + ":" + wireMock.getMappedPort(WIREMOCK_PORT);
-    warmUp(paymentGateway);
+    final String wireMockUrl = "http://" + LOOPBACK + ":" + wireMock.getMappedPort(WIREMOCK_PORT);
+    warmUp(wireMockUrl);
+    // SDK の SES v2 の Client を同じ WireMock に向け、リージョンとダミーの資格情報を渡す（ADR-124）。
+    // システムプロパティは JVM の全体に効くが、コンテナと同じく fork の JVM ごとに 1 回だけ設定する。
+    System.setProperty(SES_ENDPOINT_PROPERTY, wireMockUrl);
+    System.setProperty("aws.region", AWS_REGION);
+    System.setProperty("aws.accessKeyId", "test-dummy-access-key");
+    System.setProperty("aws.secretAccessKey", PASSWORD);
     final String dbPort = String.valueOf(postgres.getMappedPort(POSTGRES_PORT));
     migrate("jdbc:postgresql://" + LOOPBACK + ":" + dbPort + "/" + DB_NAME);
     return Map.ofEntries(
@@ -152,7 +167,7 @@ final class InfrastructureContainers {
         Map.entry("DB_PASSWORD", PASSWORD),
         Map.entry("MIGRATION_DB_USERNAME", MIGRATION_USER),
         Map.entry("MIGRATION_DB_PASSWORD", PASSWORD),
-        Map.entry("PAYMENT_GATEWAY_BASE_URL", paymentGateway));
+        Map.entry("PAYMENT_GATEWAY_BASE_URL", wireMockUrl));
   }
 
   /** コンテナのポートを、空いているホストのポートへ、{@code 127.0.0.1} だけで公開する。 */
