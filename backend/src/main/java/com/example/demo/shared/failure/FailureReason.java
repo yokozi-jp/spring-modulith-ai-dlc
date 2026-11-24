@@ -34,9 +34,9 @@ public interface FailureReason {
       throw new IllegalStateException(
           "failure reason must reside in a module under " + basePackage + ": " + getClass());
     }
-    final String relative = packageName.substring(basePackage.length());
-    final int dot = relative.indexOf('.');
-    return dot < 0 ? relative : relative.substring(0, dot);
+    // 末尾に . を足し、モジュールのルートのパッケージ（下のパッケージがない）でも最初の . で切れるようにする。
+    final String relative = packageName.substring(basePackage.length()) + ".";
+    return relative.substring(0, relative.indexOf('.'));
   }
 
   private String kebabName() {
