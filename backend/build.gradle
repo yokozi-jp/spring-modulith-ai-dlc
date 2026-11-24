@@ -39,19 +39,19 @@ tasks.named('bootJar') {
     archiveFileName = 'app.jar'
 }
 
-// AWS の SDK は、Spring が spring.config.import で読む ../.env を見ない（ADR-125）。
-// ホストで起動するときは、../.env の AWS_ で始まる変数を環境変数で渡す。
-def awsDotEnv = providers.fileContents(layout.projectDirectory.file('../.env')).asText.map { text ->
-    text.readLines().findAll { it.startsWith('AWS_') && it.contains('=') }.collectEntries { line ->
-        def (key, value) = line.split('=', 2)
-        [(key): value]
-    }
-}
-
 tasks.named('bootRun') {
     // ホスト起動でもコンテナと同じJVMデフォルトタイムゾーンを使う。
     jvmArgs('-Duser.timezone=UTC')
-    environment(awsDotEnv.getOrElse([:]))
+    // AWS の SDK は Spring が読む ../.env を見ず、SES の接続先がなければ ~/.aws の資格情報で本物の SES へ送りうる（ADR-125）。
+    // task be-run は ../.env を環境変数にして渡す。接続先が環境変数になければ起動しない。
+    def sesEndpoint = providers.environmentVariable('AWS_ENDPOINT_URL_SESV2')
+    doFirst {
+        if (!sesEndpoint.getOrElse('').trim()) {
+            throw new GradleException(
+                'AWS_ENDPOINT_URL_SESV2 が環境変数にないため、本物の SES へ送らないよう起動しません。' +
+                'task be-run で起動するか、../.env に .env.example の AWS_ で始まる行を足して環境変数にしてください（ADR-125）。')
+        }
+    }
 }
 
 // 開発用の代表データ（#114）。シーダーは src/test にあり、本番の jar と runtimeClasspath に入れない。

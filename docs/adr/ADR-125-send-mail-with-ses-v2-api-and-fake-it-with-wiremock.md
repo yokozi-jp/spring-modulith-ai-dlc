@@ -58,6 +58,7 @@ AWS SDK for Java v2 は、同じ値をシステムプロパティ `aws.endpointU
 - 接続先を設定しないと、SDK は本物の SES へ送る。
   ADR-072 は接続先の URL に既定値を置かず、未設定なら起動に失敗させると決めたが、SES はこの点が決済代行と違う。
   ローカルで `AWS_ENDPOINT_URL_SESV2` を書き忘れても、SES はダミーの資格情報の署名を断るので、本物の宛先へは届かない。
+  ホストで起動する `task be-run`（`./gradlew bootRun`）は、`AWS_ENDPOINT_URL_SESV2` が環境変数になければ起動しない。
   本番の設定には `AWS_ENDPOINT_URL_SESV2` を書かない。
 - タイムアウトは [ADR-019](ADR-019-define-resilience-and-capacity-guardrails.md) の値にする。
   HTTP の Client の接続を 1 秒、読み取りを 2 秒、SDK の `apiCallTimeout`（呼び出し全体）を 2 秒にする。
@@ -89,13 +90,14 @@ AWS SDK for Java v2 は、同じ値をシステムプロパティ `aws.endpointU
 - WireMock は SES の要求の中身（宛先の形式、サンドボックスの宛先の確認、From の ID の検証）を検証しない。
   決済代行の WireMock と同じ割り切りで、本番での手による疎通の確認で補う。
 - 手元でメールを読む画面がなく、送ったメールは WireMock の要求の記録を JSON で読む。
-- 接続先の書き忘れは、起動の時点で止まらない。
+- 接続先の書き忘れは、アプリの起動の時点では止まらない。
   ダミーの資格情報も書き忘れると、SDK は手元の `~/.aws` の profile の資格情報を使い、本物の SES へ送りうる。
+  `bootRun` の検査で止めるが、IDE から起動するときは止まらない。
 - From の ID が検証されていないときも SES は `MessageRejected` を返すので、設定の誤りが回復しない拒否として業務の状態に記録される。
   Client の WARN のログ（エラーコード）と、本番での疎通の確認で見つける。
 - SDK の呼び出しは `RestClient` を通らないため、Boot の計測（`http.client.requests` のメトリクスとトレースの span）が付かない。
 - SDK は Spring の `spring.config.import` で読んだ `.env` を見ない。
-  ホストで起動する `task be-run` は、`.env` を環境変数にしてから起動する必要がある。
+  ホストで起動する `task be-run` は、Task の `dotenv` で `.env` を環境変数にしてから起動する。
 
 ### Neutral
 
