@@ -19,7 +19,7 @@ import org.springframework.stereotype.Component;
 @Aspect
 @Order(Ordered.LOWEST_PRECEDENCE - 200)
 @Component
-public class TenantListenerAspect {
+class TenantListenerAspect {
 
   /**
    * イベントのテナントを、リスナーの呼び出しの間だけ束縛する。
@@ -34,7 +34,7 @@ public class TenantListenerAspect {
   @Around(
       "within(com.example.demo.*..*Listener)"
           + " && @annotation(org.springframework.modulith.events.ApplicationModuleListener)")
-  public @Nullable Object bindTenant(final ProceedingJoinPoint joinPoint) throws Throwable {
+  /* package */ @Nullable Object bindTenant(final ProceedingJoinPoint joinPoint) throws Throwable {
     final Object[] arguments = joinPoint.getArgs();
     if (arguments.length != 1 || !(arguments[0] instanceof TenantScoped event)) {
       throw new IllegalStateException(

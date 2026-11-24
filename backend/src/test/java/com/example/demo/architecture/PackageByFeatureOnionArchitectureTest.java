@@ -371,12 +371,7 @@ class PackageByFeatureOnionArchitectureTest {
         .domainServices(basePackage + ".*.domain.service..")
         .applicationServices(basePackage + ".*", basePackage + ".*.application..")
         .adapter("presentation", basePackage + ".*.presentation..")
-        .adapter(
-            "persistence",
-            Stream.concat(
-                    Stream.of(basePackage + ".*.infrastructure.persistence.."),
-                    Arrays.stream(sharedAdapterPackages(basePackage)))
-                .toArray(String[]::new))
+        .adapter("persistence", persistenceAdapterPackages(basePackage))
         .adapter("external-client", basePackage + ".*.infrastructure.client..")
         .ensureAllClassesAreContainedInArchitectureIgnoring(
             Stream.concat(Stream.of(basePackage), Stream.of(anyLayerSharedPackages(basePackage)))
@@ -597,7 +592,8 @@ class PackageByFeatureOnionArchitectureTest {
   /** 機能モジュールの Persistence Adapter と、{@link #SHARED_ADAPTER_PACKAGES} のパッケージを返す。 */
   private static String[] persistenceAdapterPackages(final String basePackage) {
     return Stream.concat(
-            Stream.of(PERSISTENCE_PACKAGE), Arrays.stream(sharedAdapterPackages(basePackage)))
+            Stream.of(basePackage + ".*.infrastructure.persistence.."),
+            Arrays.stream(sharedAdapterPackages(basePackage)))
         .toArray(String[]::new);
   }
 

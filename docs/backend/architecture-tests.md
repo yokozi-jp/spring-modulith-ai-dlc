@@ -58,7 +58,7 @@ jOOQの生成物の`com.example.demo.jooq`はOPENのモジュールであり、`
 - `moduleApiDoesNotExposeInternalTypes`：モジュールルートの型は、`java..`、`org.jspecify..`、同じルートパッケージの型、イベントが運ぶテナントの`shared.tenancy.TenantId`と`shared.tenancy.TenantScoped`だけに依存する。
   `package-info`は`@ApplicationModule`の宣言を持つため対象から除く。
   違反フィクスチャの`OrderPlacedReadingTenantContext`（`TenantContext`への依存）で確かめる。
-- `databaseTechnologyApisAreOnlyUsedByPersistenceAdapters`：jOOQ APIと生成型は`infrastructure.persistence`と、同じ層に入る`shared.persistence`、`shared.eventresubmission`、`shared.tenancy`だけで使う。
+- `databaseTechnologyApisAreOnlyUsedByPersistenceAdapters`：jOOQ APIと生成型は`infrastructure.persistence`と、同じ層に入る`shared.persistence`と`shared.eventresubmission`だけで使う。
 - `domainModelDependsOnlyOnAllowedTypes`：`domain.model`は、`java..`、`org.jspecify..`、各モジュールの`domain.model`、`shared.concurrency`、`shared.failure`、`shared.tenancy`、`lombok.Generated`だけに依存する。
   許可の一覧で止めるため、外部システムのSDKや生成型も、Spring、jOOQ、JPA、Jacksonの型と同じく落ちる。
   Lombokの注釈のうち、許すのは生成したコードに付く`lombok.Generated`だけである（`lombok.NonNull`など、クラスファイルに残るほかの注釈は落ちる）。
@@ -82,8 +82,8 @@ jOOQの生成物の`com.example.demo.jooq`はOPENのモジュールであり、`
 `batch`を層に足すまでは、`<module>.batch`のクラスは`dependenciesPointInward`の所属検査で失敗する。
 
 共有モジュール`shared`（[ADR-048](../adr/ADR-048-add-shared-module-for-jooq-common-code.md)）のために、ほかの規則へ例外を足していない。
-`shared.persistence`、`shared.eventresubmission`、`shared.tenancy`はオニオン規則の`persistence`の層に入るため、機能モジュールの`infrastructure.persistence`からの依存は同じ層の中の依存になる。
-`infrastructureDependsOnlyOnDomainModel`が拒否するモジュールルートは`com.example.demo.<feature>`の直下だけであり、`shared.persistence`は含まれない。
+`shared.persistence`と`shared.eventresubmission`はオニオン規則の`persistence`の層に入るため、機能モジュールの`infrastructure.persistence`からの依存は同じ層の中の依存になる。
+`infrastructureDependsOnlyOnDomainModel`が拒否するモジュールルートは`com.example.demo.<feature>`の直下だけであり、`shared`のパッケージは含まれない。`shared`が機能モジュールの型に依存しないことは、Spring Modulithの`@ApplicationModule(allowedDependencies = "jooq")`と`ApplicationModuleArchitectureTest`が検査する。
 `shared.concurrency`の`VersionedCommand`は`Command`で終わるインタフェースなので、`ClassRoleArchTest`の`commandsAndResultsAreApplicationRecords`の対象から、`VersionedCommand`の完全修飾型名だけを除く。
 `shared.concurrency`に置いたほかの`*Command`は、この規則の対象のままである。
 `shared`のルートには`package-info.java`だけを置くため、`moduleRootTypesAreRecordsEnumsOrQueries`と`moduleApiDoesNotExposeInternalTypes`に当たる型がない。

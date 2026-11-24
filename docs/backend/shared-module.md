@@ -29,14 +29,14 @@ tags: [architecture, backend, spring-modulith, shared-module]
   置く型は、テナントの `public_id` を包む `TenantId`、テナントを運ぶイベントの型 `TenantScoped`、呼び出しの間だけテナントを `ScopedValue` に束縛する `TenantContext` である。
   `TenantId` は `tenancy` の `domain.model` も使い、テナントの ID を表す型を 1 つにする。
   `TenantContext.call` で束縛を切り替えてよいのは、リクエストの filter（`tenancy` の `TenantSelectionFilter`）、`TenantListenerAspect`、`shared.batch` の `TenantPartitionAspect` だけである。
-  テナントの値と規則は `tenancy` に置き、`shared.tenancy` は、どのテナントを操作しているかを運ぶ語彙だけを持つ。
+  テナントの値と規則は `tenancy` に置き、`shared.tenancy` は、どのテナントを操作しているかを運ぶ語彙と、リスナーでテナントを束縛する `TenantListenerAspect` だけを持つ。
 - 業務のバッチの追いつきの Runner（`CatchUpJobRunner`）、partition のテナントを束縛する Aspect（`TenantPartitionAspect`）、Job の期間の規則（`JobPeriodRule`）を `shared.batch` に置き、このパッケージも `@NamedInterface("batch")` で公開する（[ADR-115](../adr/ADR-115-build-business-batches-with-spring-batch.md)）。
   `JobPeriodRule` 以外のクラスは package-private にする。
   Runner と Aspect の振る舞いは [バッチ](../batch/index.md) に従う。
 - 業務の概念を置かない。
   ルートのパッケージには `package-info.java` だけを置く。
 - `shared.persistence` を使ってよいのは、他のモジュールの `infrastructure.persistence` だけである。
-- `shared.eventresubmission` と `shared.tenancy` は、`shared.persistence` と同じ層として扱う。`shared` に `infrastructure` のパッケージは置かない。
+  `shared.eventresubmission` は `shared.persistence` と同じ層として扱う。`shared` に `infrastructure` のパッケージは置かない。
   `shared.batch` を使ってよいのは、機能モジュールの `batch` だけである。
   `shared.concurrency`、`shared.failure`、`shared.events`、`shared.security`、`shared.tenancy` は、どの層からも使える。
 

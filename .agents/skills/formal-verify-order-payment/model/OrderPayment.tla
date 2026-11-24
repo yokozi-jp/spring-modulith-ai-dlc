@@ -275,7 +275,7 @@ DCrash(d) ==
 
 -----------------------------------------------------------------------------
 (* Recovery: Spring Modulith's staleness monitor and                       *)
-(* shared/infrastructure/persistence/EventPublicationResubmitter.          *)
+(* shared/eventresubmission/EventPublicationResubmitter.          *)
 
 \* DefaultEventPublicationRegistry.markStalePublicationsFailed: findByStatus
 \* for PUBLISHED, PROCESSING, RESUBMITTED, keeps the rows whose
