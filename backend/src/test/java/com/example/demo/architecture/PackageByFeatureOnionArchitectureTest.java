@@ -42,6 +42,7 @@ import org.springframework.web.bind.annotation.RestController;
 // ArchUnit の JUnit 5 エンジンが @ArchTest フィールドを読むため、規則ファクトリだけを持つクラスでもユーティリティクラスにしない。
 @SuppressWarnings({
   "PMD.TestClassWithoutTestCases",
+  "PMD.TooManyMethods",
   "PMD.TooManyStaticImports",
   "PMD.UseUtilityClass"
 })
@@ -53,6 +54,9 @@ class PackageByFeatureOnionArchitectureTest {
 
   /** Domain のパッケージのパターン。 */
   private static final String DOMAIN_PACKAGE = "..domain..";
+
+  /** 基底パッケージに続く、各モジュールの Domain Model のパッケージ。 */
+  private static final String MODULE_DOMAIN_MODEL = ".*.domain.model..";
 
   /** Domain Model のパッケージ。 */
   private static final String DOMAIN_MODEL_PACKAGE = "..domain.model..";
@@ -353,7 +357,7 @@ class PackageByFeatureOnionArchitectureTest {
   /** 基底パッケージ配下の各機能モジュールに、外側から内側へ向かう依存を強制する規則を組み立てる。 */
   /* package */ static ArchRule dependenciesPointInwardRule(final String basePackage) {
     return Architectures.onionArchitecture()
-        .domainModels(basePackage + ".*.domain.model..")
+        .domainModels(basePackage + MODULE_DOMAIN_MODEL)
         .domainServices(basePackage + ".*.domain.service..")
         .applicationServices(basePackage + ".*", basePackage + ".*.application..")
         .adapter("presentation", basePackage + ".*.presentation..")
@@ -478,14 +482,14 @@ class PackageByFeatureOnionArchitectureTest {
   /* package */ static ArchRule domainModelDependsOnlyOnAllowedTypesRule(final String basePackage) {
     return classes()
         .that()
-        .resideInAPackage(basePackage + ".*.domain.model..")
+        .resideInAPackage(basePackage + MODULE_DOMAIN_MODEL)
         .should()
         .onlyDependOnClassesThat(
             resideInAnyPackage(
                 "java..",
                 "org.jspecify..",
                 "lombok",
-                basePackage + ".*.domain.model..",
+                basePackage + MODULE_DOMAIN_MODEL,
                 basePackage + ".shared.concurrency..",
                 basePackage + ".shared.failure..",
                 basePackage + ".shared.tenant.."))
@@ -564,7 +568,7 @@ class PackageByFeatureOnionArchitectureTest {
         .that()
         .resideOutsideOfPackage(DOMAIN_PACKAGE)
         .and()
-        .implement(resideInAPackage(basePackage + ".*.domain.model.."))
+        .implement(resideInAPackage(basePackage + MODULE_DOMAIN_MODEL))
         .should()
         .resideInAPackage("..infrastructure..")
         .allowEmptyShould(true)
