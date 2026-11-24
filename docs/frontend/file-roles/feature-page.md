@@ -160,7 +160,7 @@ role と label で要素を見つけ、`renderRoute` が返す `user` で操作�
     await expect(
       screen.findByRole("heading", { level: 1, name: "所属を待っています" }),
     ).resolves.toBeTruthy();
-    expect(screen.getByText(/所属が登録されると/u)).toBeTruthy();
+    expect(screen.getByText(/所属が登録されたあとにこの画面を開き直すと/u)).toBeTruthy();
     expect(screen.queryByRole("list")).toBeNull();
     expect(screen.getByRole("button", { name: "ログアウト" })).toBeTruthy();
   });

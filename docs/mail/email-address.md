@@ -1,7 +1,7 @@
 ---
 type: Convention
 title: メールアドレスの扱い
-description: メールアドレスの正の置き場所、本人確認での `email_verified` の扱い、形式の検査、アドレスどうしの比べ方、イベントとログでの扱いを定める規約。メールアドレスを受け取る、検査する、保存する、比べるコードを書くときに読む。
+description: メールアドレスの正の置き場所、`email_verified` の扱い、形式の検査、アドレスどうしの比べ方、イベントとログでの扱いを定める規約。メールアドレスを受け取る、検査する、保存する、比べるコードを書くときに読む。
 tags: [convention, mail, validation, security, future-arch-guidelines]
 ---
 
@@ -15,7 +15,7 @@ tags: [convention, mail, validation, security, future-arch-guidelines]
 
 - 利用者のメールアドレスの正は IdP に置き、アプリの利用者をメールアドレスで引かない。
   アプリは ID トークンの `iss` と `sub` の組から利用者を引く（[ADR-101](../adr/ADR-101-keep-tenants-and-roles-in-app-database.md)）。
-- 利用者の招待と所属の作成は別のシステムが担当し、アプリは招待の表を持たない（[#363](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/363)）。
+- アプリの DB は利用者のメールアドレスを持たない（[ADR-101](../adr/ADR-101-keep-tenants-and-roles-in-app-database.md)）。
 - ID トークンのメールアドレスを本人の確認に使うときは、`email_verified` が `true` のときだけ許す。
   claim があるだけでは許さない。
   Keycloak と Cognito は、確認の済んでいないアドレスに `email_verified` を `false` で入れて発行しうるためである。
@@ -45,7 +45,7 @@ tags: [convention, mail, validation, security, future-arch-guidelines]
 - 2 つのアドレスが同じかは、大文字と小文字を区別せずに比べる。
 - `+` 以降を除く、Gmail のローカルパートの `.` を除くといったエイリアスの正規化をしない。
   取引先の独自ドメインでは、`+` を含むアドレスが別の人の宛先でありうる。
-  正規化すると、別の人のアドレスを同じアドレスとみなしてしまう。
+  正規化すると、別の人のアドレスを同じ宛先とみなし、アドレスで突き合わせた相手を取り違える。
 
 ## イベントとログ
 

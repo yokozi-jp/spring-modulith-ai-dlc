@@ -38,13 +38,16 @@ IdP は、ローカルとテストでは Keycloak、本番では Amazon Cognito 
 
 [ADR-111](ADR-111-store-sessions-in-postgresql-until-user-growth-needs-redis.md) で Redis を外したため、Proposed の間に帰結から Redis を除いた。
 
+利用者の招待を別のシステムが担当することにしたため（[#363](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/363) の Q17）、Proposed の間に Decision へ所属の作成の担当を足した。
+
 ## Decision
 
 テナント、所属、役割をアプリの DB に持ち、IdP には認証だけを任せる。
 
 - `tenancy` モジュールの `m_tenant` にテナントを持つ。主キーは bigint の IDENTITY で、外に出す ID は `public_id`（UUID v4）にする。
 - `m_membership` に所属を持つ。所属は利用者、テナント、役割（`ADMIN` か `MEMBER` のどちらか 1 つ）を持つ。
-- 所属の作成（利用者の招待を含む）は別のシステムが担当する。別のシステムが `m_membership` へ所属を入れる方法は、まだ決まっていない（[#363](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/363)）。
+- 所属の作成（利用者の招待を含む）は別のシステムが担当する。アプリは所属の役割の変更と、所属を外す操作だけを持つ。最初のテナントと管理者は seed で作る。
+- 別のシステムが `m_membership` へ所属を入れる方法（同じ DB を書くか、API を呼ぶか）は、まだ決まっていない。同じ DB を書くなら、同じトランザクションで `m_tenant.lock_no` を進めることと、`m_user` に利用者の行があることが要る。進めないと、アプリが次に役割を変えたときに、足された所属を消す（`JooqTenantRepository#update`）。
 - IdP の役割とグループを使わない。ローカルの Keycloak の realm からレルムの役割を削除し、管理者は seed の所属で作る。
 
 ログインの後に、所属の数でテナントを決める。
