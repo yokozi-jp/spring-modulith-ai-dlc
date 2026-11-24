@@ -134,54 +134,39 @@ Proposed の間に、上限を超えて `FAILED` に残った出版の知らせ�
 - `ABANDONED` の出版は、`completion-mode: archive` により archive の表に `status = 'ABANDONED'` で移り、`completion_date` は諦めた時刻になる。
   定期の再投入、手での 1 回の再投入、Staleness Monitor のどれも、`ABANDONED` の出版を読まない。
   archive の保持期限は `ABANDONED` の行に掛けない（[ADR-120](ADR-120-keep-abandoned-event-publications-out-of-archive-retention.md)）。
-- 上限に達した出版は、出版ごとの ERROR（`Event publication resubmission exhausted`）で知らせ、`event.publication.resubmission.exhausted` を 1 増やす。
-  どちらも、その出版を再投入したインスタンスが、次の回の先頭で archive の `ABANDONED` の行を読み戻したときに 1 回だけ行う（下の結果の読み戻し）。
-  archive の行から出すため、`ABANDONED` にならなかった出版について通知しない。
-  手での 1 回の再投入でまた失敗して `ABANDONED` に戻った出版は、終了コード 1 と WARN（`Event publication resubmit-once incomplete`）で分かるため、この ERROR を出さない。
-  件数の Gauge（`state=exhausted`）は表示と確認に使い、警報にしない。
-  最古の経過時間の Gauge（`state=exhausted`）は、`async-observability.md` の DLQ の滞留時間の監視として、1 日を超えたら通知する。
-  その後は手での 1 回の再投入と Runbook に引き継ぐ。
-- 失敗を記録しない試行で上限を超えて `FAILED` に残った出版は、件数と最古の経過時間の Gauge（`state=over-limit`）で出し、件数が 0 より大きい間を警報にする。
-  各インスタンスは、Gauge の件数が 0 から増えた回だけ件数の ERROR（`Failed event publications exceed the resubmission limit`）を 1 つ出し、0 に戻ったら次の増加でまた出す。
-  ロックを取った回ごとに ERROR を出すと、運用者が扱うまで `interval` ごとに通知が続くため、残っている状態は Gauge で、現れたことは ERROR で知らせる。
-  この出版は手での 1 回の再投入で扱い、また失敗すれば `ABANDONED` になる。
-- 件数と最古の経過時間の Gauge は、`completion_attempts` が上限以下の `FAILED` の出版を `state=retrying`、上限を超えた `FAILED` の出版を `state=over-limit`、archive の `ABANDONED` の出版を `state=exhausted` で出し、ロックの外ですべてのインスタンスが集計する。
-  `retrying` と `over-limit` は `FAILED` の行を 1 つの問い合わせで `completion_attempts` によって分けるため、同じ出版を両方に数えない。
-  どのインスタンスも同じ値を出すため、ダッシュボードと警報はインスタンスの間の最大値（`max`）で集め、合計しない。
-  archive の `ABANDONED` は部分索引（`event_publication_archive_abandoned_idx`）で数え、archive の `COMPLETED` の行が増えても重くならない。
-  集計が DB の既知の失敗で終わったら WARN（`Event publication gauges refresh failed`）で記録し、Gauge を前の値のまま残して再投入を続ける。
-- ジョブの実行の回数（`event.publication.resubmission.runs`）、再投入の件数（`event.publication.resubmissions`）、再投入した出版の結果（`event.publication.resubmission.outcomes`）、上限で諦めた出版の数（`event.publication.resubmission.exhausted`）の Counter は、SLO がないためアプリケーションのメトリクスを出さないという `async-observability.md` の原則の例外とする。
+- 上限に達した出版、上限を超えて `FAILED` に残った出版、自動の再投入を待つ出版を、ログとメトリクスで分けて知らせる。
+  Gauge の `state` の意味、ログの event 名と属性、警報の置き方、集め方（`max` と `sum`）の正本は [Runbook](../observability/runbook-event-publication-resubmission.md) である。
+  - 上限に達した出版は、その出版を再投入したインスタンスが、次の回の先頭で archive の `ABANDONED` の行を読み戻したときに、出版ごとの ERROR と Counter で 1 回だけ知らせる。
+    見落としと、知らせる前の停止は、最古の経過時間の Gauge（`state=exhausted`）の警報で拾う。
+    これは `async-observability.md` の DLQ の滞留時間の監視にあたる。
+  - 上限を超えて `FAILED` に残った出版は、Gauge（`state=over-limit`）が 0 より大きい間を警報にし、件数が 0 から増えた回だけ ERROR を出す。
+    回ごとに ERROR を出すと、運用者が扱うまで `interval` ごとに同じ通知が続くためである（Context）。
+  - Gauge は `FAILED` の行を 1 つの問い合わせで回数の上限の内と外に分け、ロックの外ですべてのインスタンスが集計する（`FailedPublicationGauges`）。
+    archive の `ABANDONED` は部分索引（`event_publication_archive_abandoned_idx`）で数え、archive の `COMPLETED` の行が増えても重くならないようにする。
+    集計の失敗は再投入を止めない。
+- ジョブの実行の回数、再投入の件数、再投入した出版の結果、上限で諦めた出版の数の Counter は、SLO がないためアプリケーションのメトリクスを出さないという `async-observability.md` の原則の例外とする。
   運用者がジョブの実行の結果と再投入の件数と成功と失敗を確かめる要求（#108 の user story 4）があるためである。
-- 再投入した出版の結果は、再投入したインスタンスが次の回の先頭で、`event_publication` と archive の表を読み戻して数える。
-  `resubmissions` は、再投入の後に `completion_attempts` が増えたか、archive に移った出版だけを数える。
-  他の更新で `markResubmitted` が偽になった出版は数えない。
-  `outcomes{outcome=completed}` は archive に `COMPLETED` で移った出版、`outcomes{outcome=failed}` は `FAILED` に戻った出版（Staleness Monitor が戻した場合を含む）と archive に `ABANDONED` で移った出版を、再投入ごとに 1 回だけ数える（`completion-mode: archive` が前提）。
-  処理中（`PUBLISHED`、`PROCESSING`、`RESUBMITTED`）は次の回に回し、どちらの表にもない出版（運用者が消した）は数えずに忘れる。
-  覚えておく期間は `max(3 × lock-at-most-for, in-flight-staleness + lock-at-most-for + 2 × interval)` で、未完了の状態の出版だけに適用する。
-  期限を超えた未完了の出版は数えずに捨て、`FAILED` と archive の終端の状態は期限によらず数える。
-- 結果の Counter と `exhausted` は再投入したインスタンスだけが数えるため、インスタンスの間で二重に数えず、ダッシュボードは合計（`sum`）で集める。
-- 予期しない実行時の例外は、ERROR の `Event publication resubmission crashed` で記録し、`runs{outcome=failed}` に数える。
+- 再投入した出版の結果は、再投入したインスタンスが次の回の先頭で、`event_publication` と archive の表を読み戻して数える（`ResubmissionTracker`）。
+  2.2.0 は再投入の件数も成功も知らせないため、公開された表の列だけで判定する。
+  覚えるのは自分が `RESUBMITTED` へ進めた出版だけで、インスタンスの間で二重に数えない。
+  処理中の出版を覚えておく期間は `max(3 × lock-at-most-for, in-flight-staleness + lock-at-most-for + 2 × interval)` である。
+- 予期しない実行時の例外も受けて ERROR で記録し、`runs{outcome=failed}` に数える。
   スケジューラの既定のエラーハンドラに例外を漏らすと、ログは出ても `runs` のどの tag も動かず、停止に気づけないためである。
-  DB とロックの既知の失敗は、WARN の `Event publication resubmission failed` である。
 - 手での再投入は、同じイメージを 1 回だけ起動するジョブ（`EventPublicationResubmitOnce`）にする。
   `event-publication.resubmit-once.target`（`all`、`policy:<名前>`、`event-type:<クラス>`）を渡したときだけ動き、Web のサーバーと定期の実行と Staleness Monitor を動かさない。
   ゲートは単一の述語で、`target` が空白なら通常の起動、空白以外なら `false` を含めて手での再投入の求めと読む。
-  不正な値は何もせずに起動する状態を作らず、`IllegalArgumentException` で終了コード 1 にする。
+  不正な値は何もせずに起動する状態を作らず、終了コード 1 にする。
   定期のジョブと同じロックを、`lock-at-most-for` を上限に待って取り、待ち時間を見ずに対象の `FAILED` の出版を `max-per-run` 件まで再投入する。
-  再投入した出版が `PUBLISHED`、`PROCESSING`、`RESUBMITTED` でなくなるまで待ち、件数を記録して、すべて archive に `COMPLETED` で移ったら終了コード 0、それ以外は 1 で JVM を終える。
-  回数の上限を超えてまた失敗した出版は `ABANDONED` で archive に移るため、完了と数えない。
+  リスナーは別のスレッドで動くため、再投入した出版の処理が終わるまで待ち、すべて完了したら終了コード 0、それ以外は 1 で JVM を終える。
+  終了の前に `applicationTaskExecutor` を閉じ、処理中のリスナーの完了を最大 20 秒待つ。
+  executor は DataSource より先に作られ、文脈を閉じるときは後で閉じられるため、文脈を閉じる前に閉じる。
+  20 秒は、`spring.lifecycle.timeout-per-shutdown-phase` の 30 秒と ECS の既定の stopTimeout の 30 秒より短い。
+  `resubmit-once` の profile と `ResubmitFailedPaymentsRunner` は消す。
 - `ABANDONED` の出版を `FAILED` に戻す仕組みは作らず、Runbook の SQL で戻す。
   2.2.0 には戻す API がないためである。
   `ABANDONED` は終端の状態で、`AbandonedEventPublications` は読むことと消すことだけを持ち、`FailedEventPublications.resubmit` は未完了の表の `FAILED` だけを読み、`EventPublicationRepository.markFailed` は archive の行に届かない。
-  Runbook の SQL は、archive の行を未完了の表へ `FAILED` で写して archive の行を消し、`completion_attempts` と `last_resubmission_date` をそのまま残す。
-  `completion_attempts` は上限を超えているため、定期のジョブは戻した出版を再投入せず、手での 1 回の再投入だけが扱う。
-  手での 1 回の再投入は待ち時間を見ず、`publication_date` が今より前の `FAILED` を読むため、`last_resubmission_date` は対象の選び方に効かない。
-  戻した出版がまた失敗すると、渡される回数が上限以上なので、すぐに `ABANDONED` に戻る。
-  リスナーは別のスレッドで動くため、待たずに終えると処理の途中で切れる。
-  終了の前に `applicationTaskExecutor` を閉じ、処理中のリスナーの完了を最大 20 秒待つ（`spring.task.execution.shutdown.await-termination`）。
-  20 秒は、`spring.lifecycle.timeout-per-shutdown-phase` の 30 秒と ECS の既定の stopTimeout の 30 秒より短い。
-  executor は DataSource より先に作られ、文脈を閉じるときは後で閉じられるため、文脈を閉じる前に閉じる。
-  `resubmit-once` の profile と `ResubmitFailedPaymentsRunner` は消す。
+  SQL は `completion_attempts` を残すため、戻した出版は定期のジョブでなく手での 1 回の再投入だけが扱い、また失敗すればすぐに `ABANDONED` に戻る。
+  SQL の手順と確かめ方は Runbook の「上限に達した出版の戻し方」にある。
 - Staleness Monitor を有効にし、落ちたまま残った `PUBLISHED`、`PROCESSING`、`RESUBMITTED` を `FAILED` に戻す。
   `published` は `wait-age` にする。
   `processing` と `resubmitted` は `event-publication.resubmission.in-flight-staleness` にし、再投入して処理中の出版を `FAILED` に戻さないようにする。
