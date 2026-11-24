@@ -52,8 +52,10 @@ Staleness Monitor が処理中の出版を `FAILED` に戻すまでの `in-fligh
 - **レベル**：`ERROR`
 - **事象**：`completion_attempts` が上限（`abandon-after-attempts`）を超えたまま `FAILED` に残った出版がある。
   定期のジョブはこの出版を再投入しない。
-  ロックを取ったインスタンスが、回ごとに件数で 1 つ出す。
-- **属性**：`event_publication.exhausted.count`（その回に読んだ、上限を超えた `FAILED` の出版の数）
+  各インスタンスが Gauge を集計する回に、その件数（`event.publication.failed{state=over-limit}`）が 0 から増えたときだけ 1 つ出す。
+  件数が 0 より大きい間は出さず、0 に戻った後にまた増えたら出す。
+  前の件数はインスタンスのメモリにあるため、起動の直後の回に件数が 0 より大きいときも出す。
+- **属性**：`event_publication.exhausted.count`（0 から増えた回に数えた、上限を超えた `FAILED` の出版の数）
 - **発生原因**：最後の再投入の途中でインスタンスが落ちた。
   Staleness Monitor が処理中の出版を `FAILED` に戻した。
   `ABANDONED` にする `markAbandoned` が DB の失敗で終わり、Staleness Monitor が `FAILED` に戻した。
@@ -72,8 +74,9 @@ Staleness Monitor が処理中の出版を `FAILED` に戻すまでの `in-fligh
    ORDER BY publication_date;
   ```
 
-- **通知**：扱うまで、ロックを取った回ごと（`interval` ごと）に出る。
+- **通知**：同じ増加を、ロックを取ったかどうかによらず各インスタンスが 1 つずつ出す。
   通知はこの event 名でまとめる。
+  扱うまで残っていることは、`failed{state=over-limit}` の警報で知る（「メトリクスの見方」）。
 
 ## Event publication gauges refresh failed
 
@@ -175,6 +178,7 @@ Spring Modulith 2.2.0 には、`ABANDONED` の出版を `FAILED` に戻す API �
 そのため、再投入する出版は、次の SQL で archive の表から未完了の表へ戻す。
 `completion_attempts` と `last_resubmission_date` は archive の行の値をそのまま写す。
 `completion_attempts` は上限を超えているため、定期のジョブは戻した出版を再投入せず、次の節の手での再投入だけが扱う。
+戻した出版は `failed{state=over-limit}` に数え、件数が 0 から増えると ERROR（「Failed event publications exceed the resubmission limit」）も出る。
 手での再投入は待ち時間を見ず、`publication_date` が今より前の `FAILED` の出版を読むため、`last_resubmission_date` によらず対象にする。
 戻した出版がまた失敗すると、すぐに `ABANDONED` に戻る。
 回数の上限をもう一度使わせたいときだけ、`completion_attempts` を 1 にする。
@@ -255,7 +259,7 @@ DELETE FROM modulith.event_publication
    AND status = 'FAILED';
 ```
 
-片付けたあとは、`event.publication.failed{state=exhausted}` か `state=retrying` が減ったことで確かめる。
+片付けたあとは、`event.publication.failed{state=exhausted}`、`state=over-limit`、`state=retrying` のどれかが減ったことで確かめる。
 
 ## 自動の再投入の停止
 
@@ -273,7 +277,7 @@ DELETE FROM modulith.event_publication
 | `event.publication.resubmissions`                  | 再投入した（実際に `RESUBMITTED` へ進んだ）出版の数。他の更新で進めなかった出版と、`max-per-run` で止まった候補は数えない                                                                                   |
 | `event.publication.resubmission.outcomes{outcome}` | 再投入した出版の結果。`completed` は archive に `COMPLETED` で移った数、`failed` は `FAILED` に戻った数（Staleness Monitor が戻した場合を含む）と `ABANDONED` で移った数。1 回の再投入につき 1 回だけ数える |
 | `event.publication.resubmission.exhausted`         | 定期のジョブが再投入した出版のうち、回数の上限を超えて失敗し、`ABANDONED` になった数。再投入したインスタンスが次の回に数え、同時に ERROR の `exhausted` を 1 回記録する                                     |
-| `event.publication.failed{state}`                  | `retrying` は自動の再投入を待つ `FAILED` の出版、`exhausted` は archive の表の `ABANDONED` の出版の数である                                                                                                 |
+| `event.publication.failed{state}`                  | `retrying` は自動の再投入を待つ `FAILED` の出版（`completion_attempts` が上限以下）、`over-limit` は上限を超えて `FAILED` に残った出版、`exhausted` は archive の表の `ABANDONED` の出版の数である          |
 | `event.publication.failed.oldest.age{state}`       | 各状態で最も古い出版の `publication_date` からの経過秒数である                                                                                                                                              |
 
 - Counter は、再投入したインスタンスだけが数える。
@@ -297,6 +301,11 @@ DELETE FROM modulith.event_publication
 - `failed.oldest.age{state=exhausted}` が 1 日を超えたら通知する。
   ERROR は出版ごとに 1 回しか出ないため、見落とした出版が残り続けるのをこの警報で拾う。
   通知を受けたら「Event publication resubmission exhausted」の節の手順で片付ける。
+- `failed{state=over-limit}` が 0 より大きい間は通知する。
+  この出版は自動では再投入も `ABANDONED` にもならず、運用者が扱うまで残るため、件数で警報にする。
+  ERROR（「Failed event publications exceed the resubmission limit」）は 0 から増えたときだけ出るため、残り続けることはこの警報で知る。
+  `failed.oldest.age{state=over-limit}` は、どれだけ前の出版が残っているかの確認に使う。
+  `retrying` と `over-limit` は `FAILED` の出版を `completion_attempts` で分けるため、同じ出版を両方に数えない。
 - `failed.oldest.age{state=retrying}` にも警報を置く（次の節）。
 
 ## イベントの型の名前を変えた出版

@@ -141,6 +141,11 @@ class ResubmissionPolicies {
         : "";
   }
 
+  /** 再投入の回数の上限（{@code abandon-after-attempts}）。{@code completion_attempts} がこれを超えた出版は再投入しない。 */
+  /* package */ int abandonAfterAttempts() {
+    return abandon.abandonAfterAttempts();
+  }
+
   /** 出版の再投入の回数が上限に達し、もう再投入しないか。 */
   /* package */ boolean isExhausted(final EventPublication publication) {
     return abandon.exceeded(publication.getCompletionAttempts());

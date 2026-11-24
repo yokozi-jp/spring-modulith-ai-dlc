@@ -74,6 +74,9 @@ Spring Boot の版は [ADR-119](ADR-119-keep-spring-boot-4-1-with-spring-modulit
 そのため、`abandon-after-attempts` を N（2 以上）にすると、N 回目の再投入の失敗で諦め、1 にすると最初の配信の失敗で諦める。
 Proposed の間に回数の上限を自前の `AbandonPolicy` から `abandon-after-attempts` へ書き直した理由は、この表と選択肢10 にある。
 
+Proposed の間に、上限を超えて `FAILED` に残った出版の知らせ方を、ロックを取った回ごとの ERROR から、`state=over-limit` の Gauge の警報と、件数が 0 から増えたときだけの ERROR へ書き直した。
+回ごとの ERROR は、運用者が扱うまで `interval`（本番 1 分）ごとに同じ通知を出し続け、警報が埋もれるためである。
+
 ## Decision
 
 失敗したイベント出版を、定期のジョブで自動で再投入する。
@@ -138,10 +141,12 @@ Proposed の間に回数の上限を自前の `AbandonPolicy` から `abandon-af
   件数の Gauge（`state=exhausted`）は表示と確認に使い、警報にしない。
   最古の経過時間の Gauge（`state=exhausted`）は、`async-observability.md` の DLQ の滞留時間の監視として、1 日を超えたら通知する。
   その後は手での 1 回の再投入と Runbook に引き継ぐ。
-- 失敗を記録しない試行で上限を超えて `FAILED` に残った出版は、定期のジョブが条件の関数を通すときに数え、ロックを取った回ごとに件数の ERROR（`Failed event publications exceed the resubmission limit`）を 1 つ出す。
-  追加の問い合わせは要らず、出版ごとの ERROR を毎回並べない。
+- 失敗を記録しない試行で上限を超えて `FAILED` に残った出版は、件数と最古の経過時間の Gauge（`state=over-limit`）で出し、件数が 0 より大きい間を警報にする。
+  各インスタンスは、Gauge の件数が 0 から増えた回だけ件数の ERROR（`Failed event publications exceed the resubmission limit`）を 1 つ出し、0 に戻ったら次の増加でまた出す。
+  ロックを取った回ごとに ERROR を出すと、運用者が扱うまで `interval` ごとに通知が続くため、残っている状態は Gauge で、現れたことは ERROR で知らせる。
   この出版は手での 1 回の再投入で扱い、また失敗すれば `ABANDONED` になる。
-- 件数と最古の経過時間の Gauge は、`FAILED` の出版を `state=retrying`、archive の `ABANDONED` の出版を `state=exhausted` で出し、ロックの外ですべてのインスタンスが集計する。
+- 件数と最古の経過時間の Gauge は、`completion_attempts` が上限以下の `FAILED` の出版を `state=retrying`、上限を超えた `FAILED` の出版を `state=over-limit`、archive の `ABANDONED` の出版を `state=exhausted` で出し、ロックの外ですべてのインスタンスが集計する。
+  `retrying` と `over-limit` は `FAILED` の行を 1 つの問い合わせで `completion_attempts` によって分けるため、同じ出版を両方に数えない。
   どのインスタンスも同じ値を出すため、ダッシュボードと警報はインスタンスの間の最大値（`max`）で集め、合計しない。
   archive の `ABANDONED` は部分索引（`event_publication_archive_abandoned_idx`）で数え、archive の `COMPLETED` の行が増えても重くならない。
   集計が DB の既知の失敗で終わったら WARN（`Event publication gauges refresh failed`）で記録し、Gauge を前の値のまま残して再投入を続ける。
@@ -239,10 +244,11 @@ shared の範囲は、ADR-048 の jOOQ の共通処理に加えて、Spring Modu
 - `markAbandoned` のトランザクションが失敗すると、出版は処理中のまま残り、Staleness Monitor が `FAILED` に戻す。
   `DefaultEventPublicationRegistry.markFailedOrAbandoned` は `markAbandoned` の戻り値も見ない。
   `completion_attempts` は上限を超えているため、`isDue` はこの出版を再投入せず、Spring Modulith が `AbandonPolicy` をもう一度聞くこともない。
-  この出版は `FAILED` に残り、件数の ERROR が知らせる。
+  この出版は `FAILED` に残り、`state=over-limit` の Gauge と件数の ERROR が知らせる。
 - 上限に達した出版の ERROR と `exhausted` は、再投入した次の回まで遅れる。
   再投入したインスタンスがその前に落ちると出ないため、最古の経過時間の警報（`state=exhausted`）で拾う。
-- 件数の ERROR は、上限を超えて `FAILED` に残った出版を扱うまで、ロックを取った回ごとに出る。
+- 件数の ERROR は、前の件数をインスタンスのメモリに持つため、各インスタンスが同じ増加を 1 つずつ出し、起動の直後の回にも出る。
+  扱うまで残っていることは ERROR では分からず、`state=over-limit` の警報に頼る。
 - `ABANDONED` の出版を戻す操作は SQL の手作業で、Spring Modulith の表の列を直接書く。
   Spring Modulith が表の形を変えると、Runbook の SQL も直す必要がある。
 - 結果の突き合わせは、再投入したインスタンスのメモリの記録に頼る。
