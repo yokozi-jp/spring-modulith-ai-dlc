@@ -1,0 +1,63 @@
+// mise.toml と mise.lock に固定した道具の版を更新する Renovate の設定（ADR-124、docs/tooling/renovate.md）。
+// gradle、npm、github-actions、docker、docker-compose は Dependabot が更新する（ADR-021）ので、Renovate は触らない。
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  // PR のタイトルは commitlint と Validate PR title を通す。
+  // config:recommended は depType が dependencies の type を fix にするので、:semanticCommitTypeAll(chore) で上書きする。
+  "extends": ["config:recommended", ":semanticCommitTypeAll(chore)"],
+  "semanticCommits": "enabled",
+  "semanticCommitScope": "deps",
+  // Dependabot が扱う manager を重ねて動かさない。
+  "enabledManagers": ["mise", "custom.regex"],
+  // Dependabot の cooldown（7 日、ADR-021）に合わせる。
+  // internalChecksFilter が strict でないと、待機中の更新も branch と PR になってしまう。
+  "minimumReleaseAge": "7 days",
+  "internalChecksFilter": "strict",
+  // 自動 merge は設定しない。betterleaks のような検査器は、壊れても「指摘なし」の成功と見分けられない（ADR-124）。
+  "automerge": false,
+  "packageRules": [
+    {
+      // zizmor.yml の zizmor-action の version は、mise.toml の zizmor と同じ版にする（ADR-090）。
+      "description": "mise.toml と zizmor.yml の zizmor を 1 つの PR で更新する",
+      "matchDepNames": ["zizmor"],
+      "groupName": "zizmor",
+    },
+    {
+      // mise.kiro-web.toml の docker-compose は、Compose 5 以降が buildx を要するので 2.x に置く（ADR-093）。
+      "description": "docker-compose を新しいメジャー版へ上げない",
+      "matchDepNames": ["docker-compose"],
+      "matchUpdateTypes": ["major"],
+      "enabled": false,
+    },
+  ],
+  // Kiro CLI の公式の版の一覧。mise manager は http: の道具を unsupported-datasource で飛ばすので、regex manager で扱う。
+  "customDatasources": {
+    "kiro-cli": {
+      "defaultRegistryUrlTemplate": "https://prod.download.cli.kiro.dev/stable/index.json",
+      "format": "json",
+      "transformTemplates": ["{ \"releases\": versions.{ \"version\": version } }"],
+    },
+  },
+  "customManagers": [
+    {
+      "customType": "regex",
+      "description": "mise.toml の [tools.\"http:kiro-cli\"] の version",
+      "managerFilePatterns": ["/^mise\\.toml$/"],
+      "matchStrings": [
+        "\\[tools\\.\"http:kiro-cli\"\\]\\s*\\nversion\\s*=\\s*\"(?<currentValue>[^\"]+)\"",
+      ],
+      "depNameTemplate": "kiro-cli",
+      "datasourceTemplate": "custom.kiro-cli",
+    },
+    {
+      "customType": "regex",
+      "description": "zizmor.yml の zizmor-action の version",
+      "managerFilePatterns": ["/^\\.github\\/workflows\\/zizmor\\.yml$/"],
+      "matchStrings": ["mise\\.toml の zizmor と同じ版にする[^\\n]*\\n\\s*version:\\s*(?<currentValue>\\S+)"],
+      "depNameTemplate": "zizmor",
+      "packageNameTemplate": "zizmorcore/zizmor",
+      "datasourceTemplate": "github-tags",
+      "extractVersionTemplate": "^v?(?<version>.+)",
+    },
+  ],
+}

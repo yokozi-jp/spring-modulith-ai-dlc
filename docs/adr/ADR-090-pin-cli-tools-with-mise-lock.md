@@ -119,7 +119,7 @@ shims は決まったディレクトリなので、受け継いだ PATH のま�
 - ローカルの shims は lock を強制しない。`mise.toml` の版だけを上げると、shims は初回の実行でその版を入れて `mise.lock` を書き換える。書き換わった `mise.lock` は差分に出て、commit しなければ CI が止める。
 - `.mise/locks/` が欠けると、`mise install --locked` は iwe の install で失敗する（mise のエラーは `mise lock` での修復を案内する）。
 - 版を上げる PR では、setup-mise を使う workflow がすべて走る。betterleaks か iwe だけを上げても backend、frontend、e2e、dast、mutation test が走る。
-- Dependabot は `mise.toml`（Java を含む）と composite action の `version` を更新しない。[#389](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/389) で Renovate を入れるまで手で上げる。`jdx/mise-action` の SHA は、`dependabot.yml` の `directories` に composite action を足して Dependabot に更新させる。
+- Dependabot は `mise.toml`（Java を含む）と composite action の `version` を更新しない。Java は Renovate も更新しないので手で上げる。Java 以外の道具は Renovate が更新する（[ADR-124](ADR-124-update-mise-pinned-versions-with-renovate.md)）。`jdx/mise-action` の SHA は、`dependabot.yml` の `directories` に composite action を足して Dependabot に更新させる。
 
 ### Neutral
 
@@ -130,7 +130,7 @@ shims は決まったディレクトリなので、受け継いだ PATH のま�
   iwe はサンドボックスの glibc 2.34 で動く 0.29.2 へ上げた。
 - Vite+ はこの ADR の対象外であり、番号付きのスクリプトに残る。
 - Kiro CLI は `linux-x64` だけを `mise.lock` に持つ。aarch64 の WSL では `mise install --locked` が失敗する。
-- Kiro CLI の版の自動更新は [#389](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/389) で Renovate を入れるまで、手で上げる。Dependabot は `http:` backend を扱えない。
+- Kiro CLI の版は Renovate の regex manager が更新する（[ADR-124](ADR-124-update-mise-pinned-versions-with-renovate.md)）。Dependabot は `http:` backend を扱えない。
 - [ADR-010](ADR-010-adopt-task-as-project-task-runner.md) の「ローカル導入スクリプトと CI で同じバージョンを使う」は、この ADR を Accepted にするときに、この ADR を指す記述へ直す。
 
 ## Alternatives Considered
