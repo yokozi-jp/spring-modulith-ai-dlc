@@ -251,7 +251,7 @@ Client の単体テストは JDK の `HttpServer` で、リトライ、circuit b
 
 ### Client の単体テスト
 
-Spring を起動しない JUnit のテストで、JDK の `com.sun.net.httpserver.HttpServer` を空いているポートで起動し、Client に URL を渡す。
+Spring を起動しない JUnit のテストで、`testkit` の `LoopbackHttpServer`（JDK の `com.sun.net.httpserver.HttpServer` を包む）をループバックの空いているポートで起動し、Client に `url()` を渡す。
 HTTP の本文と Domain の型の変換を確かめ、応答を遅らせたときにタイムアウトすることも同じ方法で確かめる。
 冪等性キーのヘッダーも同じ方法で確かめる。
 結果の分類（拒否、契約の不備の 4xx、契約に合わない応答、例外を投げる 401、403、429）も同じ方法で確かめる。
@@ -266,27 +266,22 @@ class PaymentGatewayClientTest {
   void chargesWithOrderIdAsIdempotencyKey() throws IOException {
     final UUID orderUuid = UUID.fromString("00000000-0000-4000-8000-000000000001");
     final AtomicReference<String> idempotencyKey = new AtomicReference<>();
-    final HttpServer server =
-        HttpServer.create(new InetSocketAddress(InetAddress.getLoopbackAddress(), 0), 0);
-    server.createContext(
-        "/v1/charges",
-        exchange -> {
-          idempotencyKey.set(exchange.getRequestHeaders().getFirst("Idempotency-Key"));
-          final byte[] body = "{\"chargeId\":\"ch_1\",\"status\":\"SUCCEEDED\"}".getBytes(StandardCharsets.UTF_8);
-          exchange.getResponseHeaders().add("Content-Type", "application/json");
-          exchange.sendResponseHeaders(201, body.length);
-          try (OutputStream out = exchange.getResponseBody()) {
-            out.write(body);
-          }
-        });
-    server.start();
+    final LoopbackHttpServer server =
+        LoopbackHttpServer.start()
+            .handle(
+                "/v1/charges",
+                exchange -> {
+                  idempotencyKey.set(exchange.getRequestHeaders().getFirst("Idempotency-Key"));
+                  LoopbackHttpServer.reply(
+                      exchange, 201, "{\"chargeId\":\"ch_1\",\"status\":\"SUCCEEDED\"}");
+                });
     try {
       final PaymentGatewayClient client =
           new PaymentGatewayClient(
               RestClient.builder(),
               ClientHttpRequestFactoryBuilder.jdk(),
               HttpClientSettings.defaults(),
-              "http://localhost:" + server.getAddress().getPort(),
+              server.url(),
               Duration.ofSeconds(1),
               Duration.ofSeconds(2));
 
@@ -298,7 +293,7 @@ class PaymentGatewayClientTest {
           .isEqualTo(ChargeOutcome.paid(new GatewayPaymentCode("ch_1")));
       assertThat(idempotencyKey).as("orderId の請求の冪等性キー").hasValue(orderUuid.toString());
     } finally {
-      server.stop(0);
+      server.stop();
     }
   }
 }
@@ -365,6 +360,6 @@ class PaymentGatewayClientTest {
 - [ ] 契約に合わない応答（201 以外の 2xx、本文がない、状態が未知、識別子がない）を契約の不備の結果にする。［結合テストで検査：PaymentGatewayClientIntegrationTest］
 - [ ] クラス、定数、フィールド、コンストラクタ、実装するメソッドに Javadoc を書く。［自分で点検］
 - [ ] 冪等性キーを受け取る操作は、キーをヘッダーで送る。［自分で点検］
-- [ ] JDK の `HttpServer` で、HTTP の呼び出しと冪等性キーのヘッダーを確かめるテストを書く。［自分で点検］
+- [ ] `LoopbackHttpServer` で、HTTP の呼び出しと冪等性キーのヘッダーを確かめるテストを書く。［自分で点検］
 - [ ] WireMock の結合テストで、リトライ、circuit breaker、イベント出版の状態を確かめる。［自分で点検］
 - [ ] `infrastructure.client` のパッケージに `@NullMarked` の `package-info.java` を置く。［Error Prone で検査：RequireExplicitNullMarking］

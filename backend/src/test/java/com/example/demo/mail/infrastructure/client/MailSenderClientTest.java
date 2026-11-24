@@ -8,13 +8,10 @@ import com.example.demo.mail.domain.model.MailMessageId;
 import com.example.demo.mail.domain.model.MailOutcome;
 import com.example.demo.mail.domain.model.MailRecipient;
 import com.example.demo.mail.domain.model.MailSubject;
+import com.example.demo.testkit.LoopbackHttpServer;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpHandler;
-import com.sun.net.httpserver.HttpServer;
 import java.io.IOException;
-import java.io.OutputStream;
-import java.net.InetAddress;
-import java.net.InetSocketAddress;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
@@ -87,7 +84,7 @@ class MailSenderClientTest {
   private static final JsonMapper JSON = JsonMapper.builder().build();
 
   /** テストごとに起動する SES の代わりの HTTP サーバ。 */
-  private @Nullable HttpServer server;
+  private @Nullable LoopbackHttpServer server;
 
   /** テストごとに作る SDK の Client。 */
   private @Nullable SesV2Client sdkClient;
@@ -100,13 +97,15 @@ class MailSenderClientTest {
    */
   @BeforeAll
   static void warmUpSdk() throws IOException {
-    final HttpServer warmUp =
-        serve(exchange -> reply(exchange, 200, null, "{\"MessageId\":\"warm-up\"}"));
+    final LoopbackHttpServer warmUp =
+        LoopbackHttpServer.start()
+            .handle(
+                SEND_EMAIL, exchange -> reply(exchange, 200, null, "{\"MessageId\":\"warm-up\"}"));
     try (SesV2Client client = sesV2Client(warmUp, Duration.ofSeconds(30))) {
       new MailSenderClient(client, FROM_ADDRESS, FROM_NAME, CONFIGURATION_SET)
           .send(TO, SUBJECT, BODY);
     } finally {
-      warmUp.stop(0);
+      warmUp.stop();
     }
   }
 
@@ -117,7 +116,7 @@ class MailSenderClientTest {
       sdkClient.close();
     }
     if (server != null) {
-      server.stop(0);
+      server.stop();
     }
   }
 
@@ -389,32 +388,19 @@ class MailSenderClientTest {
 
   /** ループバックの空いているポートで HTTP サーバを起動し、その URL を接続先にした Client を返す。 */
   private MailSenderClient start(final HttpHandler handler) throws IOException {
-    final HttpServer started = serve(handler);
+    final LoopbackHttpServer started = LoopbackHttpServer.start().handle(SEND_EMAIL, handler);
     server = started;
     final SesV2Client client = sesV2Client(started, Duration.ofSeconds(2));
     sdkClient = client;
     return new MailSenderClient(client, FROM_ADDRESS, FROM_NAME, CONFIGURATION_SET);
   }
 
-  /** ループバックの空いているポートで、SendEmail のパスを受ける HTTP サーバを起動する。 */
-  private static HttpServer serve(final HttpHandler handler) throws IOException {
-    final HttpServer started =
-        HttpServer.create(new InetSocketAddress(InetAddress.getLoopbackAddress(), 0), 0);
-    started.createContext(SEND_EMAIL, handler);
-    started.start();
-    return started;
-  }
-
   /** 本番と同じ設定の SDK の Client に、HTTP サーバの接続先、リージョン、資格情報を足して作る。 */
-  private static SesV2Client sesV2Client(final HttpServer target, final Duration readTimeout) {
+  private static SesV2Client sesV2Client(
+      final LoopbackHttpServer target, final Duration readTimeout) {
     return SesV2ClientConfig.build(
         SesV2Client.builder()
-            .endpointOverride(
-                URI.create(
-                    "http://"
-                        + InetAddress.getLoopbackAddress().getHostAddress()
-                        + ":"
-                        + target.getAddress().getPort()))
+            .endpointOverride(URI.create(target.url()))
             .region(Region.AP_NORTHEAST_1)
             .credentialsProvider(
                 StaticCredentialsProvider.create(
@@ -430,14 +416,9 @@ class MailSenderClientTest {
       final @Nullable String errorType,
       final String body)
       throws IOException {
-    final byte[] bytes = body.getBytes(StandardCharsets.UTF_8);
-    exchange.getResponseHeaders().add("Content-Type", "application/json");
     if (errorType != null) {
       exchange.getResponseHeaders().add("x-amzn-ErrorType", errorType);
     }
-    exchange.sendResponseHeaders(status, bytes.length == 0 ? -1 : bytes.length);
-    try (OutputStream out = exchange.getResponseBody()) {
-      out.write(bytes);
-    }
+    LoopbackHttpServer.reply(exchange, status, body);
   }
 }
