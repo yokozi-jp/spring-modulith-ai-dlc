@@ -1,24 +1,19 @@
 package com.example.demo.architecture;
 
-import static java.util.stream.Collectors.toMap;
-import static java.util.stream.Collectors.toSet;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.example.demo.DemoApplication;
 import com.example.demo.jooq.modulith.tables.EventPublication;
-import java.util.Map;
-import java.util.Set;
-import java.util.function.Function;
+import com.tngtech.archunit.core.importer.ImportOption;
+import java.util.List;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.modulith.core.ApplicationModule;
+import org.springframework.modulith.core.ApplicationModuleInformation;
 import org.springframework.modulith.core.ApplicationModules;
 
 /** Spring Modulith が認識するアプリケーションモジュールの境界を検証する。 */
 class ApplicationModuleArchitectureTest {
-
-  /** 依存の向きを確かめる機能モジュール。shared、jooq、error は基盤のモジュールなので含めない。 */
-  private static final Set<String> FEATURES = Set.of("product", "ordering", "payment", "tenancy");
 
   /** モジュール間の循環、内部パッケージ参照、明示した許可依存への違反がないことを検証する。 */
   @Test
@@ -27,39 +22,42 @@ class ApplicationModuleArchitectureTest {
     ApplicationModules.of(DemoApplication.class).verify();
   }
 
-  /** 循環にならない依存（payment から product など）は verify で検出できないため、機能モジュールの間の直接の依存を比べる。 */
+  /**
+   * 宣言のないモジュールを違反にするテストを、Spring Modulith の設定では作れないため手で書く。
+   *
+   * <p>{@code verify()} は {@code allowedDependencies} を宣言したモジュールの依存先だけを確かめ、宣言のないモジュール（既定は {@code
+   * OPEN_TOKEN}）の依存先は確かめない。{@code VerificationOptions} は ArchUnit
+   * の規則を足せるだけで、宣言のないことを違反にする設定がない（ADR-118）。
+   */
   @Test
-  @DisplayName("機能モジュールの間の直接の依存は ordering から product と payment から ordering だけで、tenancy はどこにも依存しない")
-  void featureModulesDependOnlyInDeclaredDirections() {
-    final ApplicationModules modules = ApplicationModules.of(DemoApplication.class);
+  @DisplayName("OPEN 以外のすべてのモジュールが allowedDependencies を宣言している")
+  void everyClosedModuleDeclaresAllowedDependencies() {
+    assertThat(modulesWithoutAllowedDependencies(ApplicationModules.of(DemoApplication.class)))
+        .as(
+            "allowedDependencies を宣言していないモジュールがある。"
+                + "モジュールのルートの package-info.java に @ApplicationModule(allowedDependencies = ...) を書く（ADR-118）")
+        .isEmpty();
+  }
 
-    final Map<String, Set<String>> actual =
-        FEATURES.stream()
-            .collect(
-                toMap(
-                    Function.identity(),
-                    name ->
-                        modules
-                            .getModuleByName(name)
-                            .orElseThrow(() -> new AssertionError("モジュールがない: " + name))
-                            .getDirectDependencies(modules)
-                            .uniqueModules()
-                            .map(module -> module.getIdentifier().toString())
-                            .filter(FEATURES::contains)
-                            .collect(toSet())));
+  @Test
+  @DisplayName("allowedDependencies のないモジュールは名前を挙げて検出する")
+  void detectsModuleWithoutAllowedDependencies() {
+    assertThat(
+            modulesWithoutAllowedDependencies(
+                ApplicationModules.of(
+                    "archfixture.modulegate", new ImportOption.DoNotIncludeJars())))
+        .containsExactlyInAnyOrder("undeclared", "defaulted");
+  }
 
-    assertThat(actual)
-        .as("機能モジュールごとの直接の依存先")
-        .isEqualTo(
-            Map.of(
-                "product",
-                Set.of(),
-                "ordering",
-                Set.of("product"),
-                "payment",
-                Set.of("ordering"),
-                "tenancy",
-                Set.of()));
+  private static List<String> modulesWithoutAllowedDependencies(final ApplicationModules modules) {
+    return modules.stream()
+        .filter(module -> !module.isOpen())
+        .filter(module ->
+            ApplicationModuleInformation.of(module.getBasePackage())
+                .getDeclaredDependencies()
+                .equals(List.of(org.springframework.modulith.ApplicationModule.OPEN_TOKEN)))
+        .map(module -> module.getIdentifier().toString())
+        .toList();
   }
 
   @Test

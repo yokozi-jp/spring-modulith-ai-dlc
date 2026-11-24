@@ -36,7 +36,10 @@ backend/src/test/java/com/example/demo/architecture/
 
 ## モジュールとパッケージ
 
-`ApplicationModuleArchitectureTest`はSpring Modulithの`ApplicationModules.verify()`を使い、モジュール間の循環、内部パッケージ参照、許可されていない依存を検出する。
+`ApplicationModuleArchitectureTest`はSpring Modulithの`ApplicationModules.verify()`を使い、モジュール間の循環、内部パッケージ参照、`allowedDependencies`にない依存を検出する。
+依存してよいモジュールは各モジュールの`package-info.java`で宣言する（[ADR-118](../adr/ADR-118-declare-module-dependencies-with-allowed-dependencies.md)）。
+同じクラスのテストが、OPEN以外のすべてのモジュールが`allowedDependencies`を宣言していることを確かめる。
+手書きにした理由はテストのJavadocに書く。
 モジュール構造の決定は[ADR-001](../adr/ADR-001-adopt-spring-modulith-modular-monolith.md)を参照する。
 jOOQの生成物の`com.example.demo.jooq`はOPENのモジュールであり、`verify()`は生成型への依存を内部の型への依存として扱わない。
 `ApplicationModuleArchitectureTest`がこれを確かめる。
@@ -53,6 +56,7 @@ jOOQの生成物の`com.example.demo.jooq`はOPENのモジュールであり、`
   どの層からも使えるパッケージの一覧は、`PackageByFeatureOnionArchitectureTest`の`ANY_LAYER_SHARED_PACKAGES`が持つ。この規則と`dependenciesPointInward`の所属検査の除外が、そこから組み立てる（[ADR-048](../adr/ADR-048-add-shared-module-for-jooq-common-code.md)、[ADR-062](../adr/ADR-062-map-business-exceptions-to-404-409-422.md)、[ADR-079](../adr/ADR-079-resubmit-failed-event-publications-periodically-with-shedlock.md)、[ADR-096](../adr/ADR-096-require-app-user-principal-for-audit-columns.md)、[ADR-105](../adr/ADR-105-bind-tenant-to-request-and-event-context.md)）。
 - `sharedModuleDoesNotDependOnHttp`：`shared`の型は、Spring Web、Springの HTTP、Servletの型に依存しない。
 - `moduleApiDoesNotExposeInternalTypes`：モジュールルートの型は、`java..`、`org.jspecify..`、同じルートパッケージの型、イベントが運ぶテナントの`shared.tenant.TenantId`と`shared.tenant.TenantScoped`だけに依存する。
+  `package-info`は`@ApplicationModule`の宣言を持つため対象から除く。
   違反フィクスチャの`OrderPlacedReadingTenantContext`（`TenantContext`への依存）で確かめる。
 - `databaseTechnologyApisAreOnlyUsedByPersistenceAdapters`：jOOQ APIと生成型は`infrastructure.persistence`だけで使う。
 - `domainModelDoesNotDependOnFrameworks`：`domain.model`はSpring、jOOQ、jOOQの生成型、JPA、Jacksonに依存しない。
