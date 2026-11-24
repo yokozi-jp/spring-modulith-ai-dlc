@@ -23,7 +23,7 @@ Dependabot は mise を扱えず（`http:` backend も同じ）、固定した�
 
 Renovate は mise manager を持ち、`mise.toml` と `mise.lock` を更新できる。
 `http:` の道具は mise manager が `unsupported-datasource` で飛ばすので、Kiro CLI は regex manager と `customDatasources` で扱う。
-参照元は `yokozi-jp/agent-software-factory` の ADR 0018 と ADR 0055 である。
+参照元は [yokozi-jp/agent-software-factory](https://github.com/yokozi-jp/agent-software-factory) の ADR 0018 と ADR 0055 である。
 
 Renovate 44 系を `--platform=local`、`--dry-run=lookup` で動かし、次を確かめた（2026-11-24）。
 
@@ -39,16 +39,11 @@ Mend Renovate の GitHub App を、このリポジトリだけに許可してイ
 
 - `enabledManagers` を `mise` と `custom.regex` に絞る。Dependabot が更新する gradle、npm、github-actions、docker、docker-compose の更新を、Renovate は重ねて出さない。`.github/dependabot.yml` と `dependabot-auto-merge.yml` は変えない。
 - 自動 merge は設定しない。Renovate の PR は人が merge する。betterleaks のような検査器は、壊れても「指摘なし」の成功と見分けられないためである。
-- `minimumReleaseAge` を 7 日にし、`internalChecksFilter` を `strict` にする。Dependabot の cooldown（7 日、[ADR-021](ADR-021-group-dependabot-minor-and-patch-updates.md)）に合わせる。`strict` がないと、待機中の更新も branch と PR になる。
-- PR のタイトルは `semanticCommits`、`semanticCommitType`（`:semanticCommitTypeAll(chore)`）、`semanticCommitScope` で `chore(deps): ...` にそろえる。
-- Kiro CLI は `customDatasources` と regex manager で更新する。
+- `minimumReleaseAge` を 7 日にする。Dependabot の cooldown（7 日、[ADR-021](ADR-021-group-dependabot-minor-and-patch-updates.md)）に合わせる。
+- PR のタイトルは `semanticCommits` で `chore(deps): ...` にそろえる。
+- Kiro CLI は `customDatasources` と regex manager で更新する。公式の `index.json` に公開日がないので、Kiro CLI だけ 7 日の待機を掛けない（`minimumReleaseAgeBehaviour: timestamp-optional`）。regex manager は `mise lock` を実行しないので、Kiro CLI の PR は `mise.lock` を更新しない。人が `mise lock --platform linux-x64 http:kiro-cli` を実行して push する。
 - `zizmor.yml` の `zizmor-action` の `version` は、regex manager で検出し、`mise.toml` の zizmor と同じ PR で更新する（ADR-090）。
 - docker-compose（`mise.kiro-web.toml`）のメジャー更新は出さない。Compose 5 以降は buildx を要し、サンドボックスの podman で動かない（[ADR-093](ADR-093-support-kiro-web-sandbox-as-development-environment.md)）。
-- betterleaks のメジャー更新を止める規則は置かない。参照元の ADR 0003 にあたる固定の判断と、`.betterleaks.toml` の版を `mise.toml` に揃える検査は、このリポジトリにない。メジャーの PR は人が merge するので、そこで判断する。
-
-`rebaseWhen` は設定しない。ruleset `main` の `strict_required_status_checks_policy` は `false` で、base に遅れた PR も merge できる（[ブランチ保護](../repository/branch-protection.md)）。ADR-021 が書く厳格モードは、その後に外れている。
-
-`secrets.RELEASE_PLEASE_TOKEN` を使うのは `release-please.yml` の `release` job だけで、`pull_request` では動かない。Renovate の PR は同じリポジトリのブランチから出て secret を読めるが、PR の workflow は secret を使わない。
 
 Dependabot と併存させる理由は、Dependabot が gradle、npm、github-actions、docker、docker-compose で grouping と auto-merge を設定済みで（ADR-021）、Renovate に移す利益より設定の作り直しの費用が大きいことである。
 Dependabot は mise を扱えないので、この範囲は重ならない。
@@ -63,14 +58,15 @@ Dependabot は mise を扱えないので、この範囲は重ならない。
 ### Positive
 
 - mise の道具の版（Java と `http:jdtls`、`http:lombok` を除く）を、人が上げ忘れても PR が出る。
-- Kiro CLI の `http:` backend を、Dependabot が扱えない範囲で更新できる。
+- Kiro CLI の新しい版が PR で分かる（lock の更新は人が行う）。
 - zizmor の版を `mise.toml` と `zizmor.yml` で食い違わせない。
 
 ### Negative
 
 - 更新の bot が 2 つになる。設定が 2 か所（`.github/dependabot.yml` と `renovate.jsonc`）に分かれる。
 - GitHub App のインストールは管理者の操作で、設定を main に merge するまで動かない。
-- `mise.lock` と `.mise/locks/npm-iwe-org-iwe/<版>`（npm backend の補助ファイル）、`mise.kiro-web.lock` が Renovate の PR で更新されるかは、App を入れた後の最初の PR で確かめるまで推論である。
+- Kiro CLI の PR は `mise.lock` を更新しないので、人が `mise lock` を実行して push するまで CI が落ちる。
+- `mise.lock`、`.mise/locks/npm-iwe-org-iwe/<版>`、`mise.kiro-web.lock` が mise manager の PR で更新されることは、Renovate のソースの読みによる推論である。App が安全モード（`MISE_SAFE`）で `mise lock` を実行するときに更新されるかは、App を入れた後の最初の PR で確かめる。
 - Java（`corretto-...`）、`http:jdtls`、`http:lombok` は、どちらの bot も追わない。手で上げる。
 - 人が merge する PR が増える。mise の道具の PR は setup-mise を使うすべての workflow を動かす。
 
