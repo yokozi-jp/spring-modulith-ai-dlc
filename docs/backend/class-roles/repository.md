@@ -197,7 +197,7 @@ class JooqOrderRepositoryTest {
 
 ## 作成時のチェックリスト
 
-- [ ] `domain.model` に置き、jOOQ、Spring、JPA、Jackson に依存しない。［ArchUnit で検査：PackageByFeatureOnionArchitectureTest.domainModelDoesNotDependOnFrameworks］
+- [ ] `domain.model` に置き、許可した型だけに依存する（一覧は [ArchUnit の規則](../architecture-tests.md)）。［ArchUnit で検査：PackageByFeatureOnionArchitectureTest.domainModelDependsOnlyOnAllowedTypes］
 - [ ] `application` とモジュールルートの型に依存しない。［ArchUnit で検査：PackageByFeatureOnionArchitectureTest.dependenciesPointInward］
 - [ ] 集約ルートごとに一つ、`<Aggregate>Repository` の名前で作る。［自分で点検］
 - [ ] 主キーが UUID のテーブルの集約では、`nextId()` を持つ。［自分で点検］

@@ -125,6 +125,19 @@ Client は、外部システムの呼び出しの結果を次の四つに分け�
 - **依存してよい型**：`java..` の標準型、`org.jspecify..`、同じモジュールの `domain.model` の外部システムのインタフェースと値オブジェクト、Spring の `RestClient`、`RestClient.Builder`、`ClientHttpRequestFactory`、`ClientHttpRequestFactoryBuilder`、`HttpClientSettings`、`HttpClientErrorException`、`HttpStatus`、`@Component`、`@Value`、Resilience4j の `@CircuitBreaker` と `@Retry`、Lombok の `@Slf4j`。
 - **依存してはいけない型**：`application`、`domain.service`、`presentation.web`、`infrastructure.persistence` の型、jOOQ の API と生成型、モジュールルートの型、他モジュールの型、`@Service`、`@Transactional`。
 
+### SDK と OpenAPI から生成した型を使うとき
+
+HTTP の `RestClient` の代わりに、外部システムの SDK（AWS SDK など）や OpenAPI から生成した型を使ってよい。
+SDK と生成した型は、Client の中だけで使う。
+
+- **閉じ込める。** SDK と生成した型を、Client の引数、戻り値、`domain.model` の型に出さない。Client の中で Domain の型へ写す。
+- **応答を検査する。** 応答は、必須の項目も `null` や型違いを許す前提で受け、検査してから Domain の型へ写す。生成した型を検査せずにそのまま返さない。検査に通らない応答は、契約の不備の結果にする。
+- **依存してよい型を足す。** SDK を使う Client の「依存してよい型」に、その SDK のパッケージを足す。ほかの Client と `domain.model`、`application` には足さない。
+
+`domain.model` と `application` が外部ライブラリの型に依存すると、ArchUnit の `domainModelDependsOnlyOnAllowedTypes` と `applicationDependsOnlyOnAllowedTypes` が落ちる（[ArchUnit の規則](../architecture-tests.md)）。
+`PaymentGatewayClient` は、手書きの private record `ChargeReply`（項目は `@Nullable`）で応答を受け、`toOutcome` で検査してから `ChargeOutcome` に写す。
+SDK を使う Client も、同じ形にする。
+
 ## 最小の例と典型的な例
 
 最小の例は、決済システムに代金を請求する `PaymentGatewayClient` である。
@@ -344,6 +357,8 @@ class PaymentGatewayClientTest {
 - [ ] circuit breaker の instance に、429 以外の 4xx を無視する `ignore-exception-predicate` を指定する。［結合テストで検査：PaymentGatewayClientIntegrationTest］
 - [ ] 業務上の拒否と契約の不備を結果で返し、一時障害と資格情報の不備を例外で投げる。［結合テストで検査：PaymentGatewayClientIntegrationTest］
 - [ ] 外部システムの応答を Domain の型に変換して返す。［自分で点検］
+- [ ] SDK と生成した型を Client の中に閉じ、引数、戻り値、`domain.model` の型に出さない。［自分で点検（`domain.model` と `application` への流入は ArchUnit が止める：PackageByFeatureOnionArchitectureTest.domainModelDependsOnlyOnAllowedTypes、PackageByFeatureOnionArchitectureTest.applicationDependsOnlyOnAllowedTypes）］
+- [ ] 応答を、必須の項目も `null` や型違いを許す前提で検査してから Domain の型へ写す。［自分で点検］
 - [ ] 契約に合わない応答（201 以外の 2xx、本文がない、状態が未知、識別子がない）を契約の不備の結果にする。［結合テストで検査：PaymentGatewayClientIntegrationTest］
 - [ ] クラス、定数、フィールド、コンストラクタ、実装するメソッドに Javadoc を書く。［自分で点検］
 - [ ] 冪等性キーを受け取る操作は、キーをヘッダーで送る。［自分で点検］

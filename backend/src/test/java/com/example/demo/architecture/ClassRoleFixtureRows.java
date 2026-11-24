@@ -53,9 +53,20 @@ final class ClassRoleFixtureRows {
                 VIOLATING),
             "ordering.OrderPlacedReadingTenantContext"),
         row(
-            "domainModelDoesNotDependOnFrameworks",
-            PackageByFeatureOnionArchitectureTest.domainModelDoesNotDependOnFrameworks,
+            "domainModelDependsOnlyOnAllowedTypes: Spring のアノテーション",
+            PackageByFeatureOnionArchitectureTest.domainModelDependsOnlyOnAllowedTypesRule(
+                VIOLATING),
             "ordering.domain.model.OrderFactory"),
+        row(
+            "domainModelDependsOnlyOnAllowedTypes: 外部ライブラリの型を戻り値にした interface",
+            PackageByFeatureOnionArchitectureTest.domainModelDependsOnlyOnAllowedTypesRule(
+                VIOLATING),
+            "ordering.domain.model.OrderRetryPolicy"),
+        row(
+            "applicationDependsOnlyOnAllowedTypes",
+            PackageByFeatureOnionArchitectureTest.applicationDependsOnlyOnAllowedTypesRule(
+                VIOLATING),
+            "ordering.application.OrderRetryRunner"),
         row(
             "valueObjectsDoNotThrowBusinessRuleViolation",
             PackageByFeatureOnionArchitectureTest.valueObjectsDoNotThrowBusinessRuleViolation,

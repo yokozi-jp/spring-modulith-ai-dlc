@@ -162,7 +162,7 @@ class OrderLineTest {
 
 ## 作成時のチェックリスト
 
-- [ ] `domain.model` に置き、Spring、jOOQ、JPA、Jackson に依存しない。［ArchUnit で検査：PackageByFeatureOnionArchitectureTest.domainModelDoesNotDependOnFrameworks］
+- [ ] `domain.model` に置き、許可した型だけに依存する（一覧は [ArchUnit の規則](../architecture-tests.md)）。［ArchUnit で検査：PackageByFeatureOnionArchitectureTest.domainModelDependsOnlyOnAllowedTypes］
 - [ ] `domain.service`、`application`、モジュールルートの型に依存しない。［ArchUnit で検査：PackageByFeatureOnionArchitectureTest.dependenciesPointInward］
 - [ ] `public final class` にし、集約の中で一意な識別子を `private final` フィールドに持つ。［自分で点検］
 - [ ] `equals` と `hashCode` を識別子だけで実装する。［自分で点検］

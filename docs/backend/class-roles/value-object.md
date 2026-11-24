@@ -196,7 +196,7 @@ class QuantityTest {
 
 ## 作成時のチェックリスト
 
-- [ ] `domain.model` に置き、Spring、jOOQ、JPA、Jackson に依存しない。［ArchUnit で検査：PackageByFeatureOnionArchitectureTest.domainModelDoesNotDependOnFrameworks］
+- [ ] `domain.model` に置き、許可した型だけに依存する（一覧は [ArchUnit の規則](../architecture-tests.md)）。［ArchUnit で検査：PackageByFeatureOnionArchitectureTest.domainModelDependsOnlyOnAllowedTypes］
 - [ ] `domain.service`、`application`、モジュールルートの型に依存しない。［ArchUnit で検査：PackageByFeatureOnionArchitectureTest.dependenciesPointInward］
 - [ ] `public record` にし、固定の値の集合は `public enum` にする。［自分で点検］
 - [ ] 不変条件をコンパクトコンストラクタで検査し、`IllegalArgumentException` を投げる。［ArchUnit で検査：PackageByFeatureOnionArchitectureTest.valueObjectsDoNotThrowBusinessRuleViolation］
