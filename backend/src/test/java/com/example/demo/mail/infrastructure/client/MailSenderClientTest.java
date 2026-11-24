@@ -15,14 +15,12 @@ import java.io.IOException;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
-import java.util.Base64;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -47,10 +45,10 @@ import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 
 /**
- * メールの送信の Client の SES v2 の API の呼び出しと、結果の分け方を、JDK の HttpServer で検証する。
+ * メールの送信の Client の SES v2 の API の呼び出しと、結果の分け方を、ループバックの HTTP サーバで検証する。
  *
- * <p>Client は {@link SesV2ClientConfig#build} と同じタイムアウトと試行 1 回の SDK の Client で呼ぶ。接続先、リージョン、資格情報だけを
- * builder で足す。Spring を起動しないため、circuit breaker と retry は働かない（WireMock の結合テストで確かめる）。
+ * <p>Client は {@link SesV2ClientConfig#build} の試行 1 回の SDK の Client で呼び、接続先、リージョン、資格情報を builder
+ * で足す。Spring を起動しないため、circuit breaker と retry は働かない（WireMock の結合テストで確かめる）。
  */
 // 成功、拒否、契約に合わない応答、スロットリング、5xx、403、タイムアウト、設定を一つの HttpServer の文脈で確かめるため、メソッドが多い。
 // 起動の確認は ApplicationContextRunner の run の中の AssertJ で書く。
@@ -88,26 +86,6 @@ class MailSenderClientTest {
 
   /** テストごとに作る SDK の Client。 */
   private @Nullable SesV2Client sdkClient;
-
-  /**
-   * SDK のクラスを読み込んでおく。
-   *
-   * <p>SDK の最初の呼び出しはクラスの読み込みで遅く、負荷の下では呼び出しのタイムアウト 2 秒を超えて、タイムアウト以外のテストまで失敗させるため、長いタイムアウトの Client で
-   * 1 回呼ぶ。
-   */
-  @BeforeAll
-  static void warmUpSdk() throws IOException {
-    final LoopbackHttpServer warmUp =
-        LoopbackHttpServer.start()
-            .handle(
-                SEND_EMAIL, exchange -> reply(exchange, 200, null, "{\"MessageId\":\"warm-up\"}"));
-    try (SesV2Client client = sesV2Client(warmUp, Duration.ofSeconds(30))) {
-      new MailSenderClient(client, FROM_ADDRESS, FROM_NAME, CONFIGURATION_SET)
-          .send(TO, SUBJECT, BODY);
-    } finally {
-      warmUp.stop();
-    }
-  }
 
   /** 起動した HTTP サーバと SDK の Client を止める。 */
   @AfterEach
@@ -154,13 +132,8 @@ class MailSenderClientTest {
         .as("件名の文字コード")
         .isEqualTo("UTF-8");
     assertThat(request.at("/FromEmailAddress").asString())
-        .as("From")
-        .isEqualTo(
-            "=?UTF-8?B?"
-                + Base64.getEncoder().encodeToString(FROM_NAME.getBytes(StandardCharsets.UTF_8))
-                + "?= <"
-                + FROM_ADDRESS
-                + ">");
+        .as("From（表示名「デモアプリ」の RFC 2047 の encoded-word）")
+        .isEqualTo("=?UTF-8?B?44OH44Oi44Ki44OX44Oq?= <no-reply@example.com>");
     assertThat(request.at("/ConfigurationSetName").asString())
         .as("設定セット")
         .isEqualTo(CONFIGURATION_SET);
@@ -271,20 +244,17 @@ class MailSenderClientTest {
   @SuppressWarnings("PMD.DoNotUseThreads")
   void slowReplyTimesOut() throws IOException {
     final CountDownLatch release = new CountDownLatch(1);
-    final AtomicInteger requests = new AtomicInteger();
     final MailSenderClient client =
-        start(exchange -> {
-          // 1 回目はすぐに返し、SDK の初回の準備の時間を測る時間から外す。
-          if (requests.getAndIncrement() > 0) {
-            try {
-              release.await(10, TimeUnit.SECONDS);
-            } catch (InterruptedException exception) {
-              Thread.currentThread().interrupt();
-            }
-          }
-          reply(exchange, 200, null, "{\"MessageId\":\"msg-1\"}");
-        });
-    client.send(TO, SUBJECT, BODY);
+        start(
+            exchange -> {
+              try {
+                release.await(10, TimeUnit.SECONDS);
+              } catch (InterruptedException exception) {
+                Thread.currentThread().interrupt();
+              }
+              reply(exchange, 200, null, "{\"MessageId\":\"msg-1\"}");
+            },
+            Duration.ofSeconds(2));
     try {
       final long started = System.nanoTime();
       assertThatThrownBy(() -> client.send(TO, SUBJECT, BODY))
@@ -386,11 +356,21 @@ class MailSenderClientTest {
         .withBean(MailSenderClient.class);
   }
 
-  /** ループバックの空いているポートで HTTP サーバを起動し、その URL を接続先にした Client を返す。 */
+  /**
+   * ループバックの空いているポートで HTTP サーバを起動し、その URL を接続先にした Client を返す。
+   *
+   * <p>SDK の最初の呼び出しはクラスの読み込みで遅く、負荷の下では本番の 2 秒を超えるため、タイムアウトを確かめるテストのほかは長い上限にする。
+   */
   private MailSenderClient start(final HttpHandler handler) throws IOException {
+    return start(handler, Duration.ofSeconds(30));
+  }
+
+  /** ループバックの空いているポートで HTTP サーバを起動し、その URL を接続先にした、読み取りの上限が readTimeout の Client を返す。 */
+  private MailSenderClient start(final HttpHandler handler, final Duration readTimeout)
+      throws IOException {
     final LoopbackHttpServer started = LoopbackHttpServer.start().handle(SEND_EMAIL, handler);
     server = started;
-    final SesV2Client client = sesV2Client(started, Duration.ofSeconds(2));
+    final SesV2Client client = sesV2Client(started, readTimeout);
     sdkClient = client;
     return new MailSenderClient(client, FROM_ADDRESS, FROM_NAME, CONFIGURATION_SET);
   }
