@@ -168,6 +168,7 @@ Accepted
 - [非同期処理の失敗時の再試行と回復](../integration/async-failure-recovery.md)
 - [ADR-050: バックエンドのクラスの役割と命名を定める](ADR-050-define-backend-class-roles-and-naming.md)
 - [ADR-057: E2E テストに Playwright と Chromium を採用し、テストデータを公開 API で作る](ADR-057-adopt-playwright-for-e2e-tests.md)
+- [ADR-124: メールを SES v2 の API で送り、ローカルとテストは接続先を WireMock に向ける](ADR-124-send-mail-with-ses-v2-api-and-fake-it-with-wiremock.md)（この ADR の形を SES に広げる）
 - [クラスの役割：外部システムの Client](../backend/class-roles/external-client.md)
 - [Compose の作り方](../container/compose.md)
 - [E2E テストの方針と書き方](../e2e/testing-strategy.md)
