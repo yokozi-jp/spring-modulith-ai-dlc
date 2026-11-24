@@ -376,8 +376,8 @@ class EventPublicationResubmitterTest {
   @DisplayName("enabled が false なら、アプリ全体の文脈で定期のタスクを 1 つも登録せず、古い出版を FAILED に戻す処理も再投入も動かない")
   void disabledRegistersNoScheduledTaskInTheApplicationContext() {
     // 依存のライブラリ（Spring Modulith Moments など）が @EnableScheduling を足すと、enabled=false でもジョブが動く。
-    // 古い出版を FAILED
-    // に戻す処理は定期のジョブのロックの中だけで動く（stalePublicationsAreMarkedFailedOnlyWhileTheJobHoldsTheLock）。
+    // 古い出版を FAILED に戻す処理は、定期のジョブのロックの中だけで動く
+    // （stalePublicationsAreMarkedFailedOnlyWhileTheJobHoldsTheLock）。
     assertThat(scheduledTaskHolders.stream().flatMap(holder -> holder.getScheduledTasks().stream()))
         .as("登録された定期のタスク")
         .isEmpty();
@@ -520,8 +520,7 @@ class EventPublicationResubmitterTest {
   }
 
   @Test
-  @DisplayName(
-      "2 つのインスタンスでも、片方が古い出版を読んでから FAILED に戻すまでにもう片方は再投入できず、片方が再投入した処理中の出版をもう片方は FAILED" + " に戻さない")
+  @DisplayName("2 つのインスタンスでも、古い出版を読んでから FAILED に戻すまでにもう片方は再投入できず、片方が再投入した処理中の出版をもう片方は戻さない")
   void otherInstanceCannotInterleaveWithStaleCheckOrMarkInFlightResubmission(
       final Scenario scenario) {
     // 最初の配信を executor に積んだまま落ち、PUBLISHED に残った出版にする。
