@@ -137,6 +137,9 @@ SDK と生成した型は、Client の中だけで使う。
 `domain.model` と `application` が外部ライブラリの型に依存すると、ArchUnit の `domainModelDependsOnlyOnAllowedTypes` と `applicationDependsOnlyOnAllowedTypes` が落ちる（[ArchUnit の規則](../architecture-tests.md)）。
 `PaymentGatewayClient` は、手書きの private record `ChargeReply`（項目は `@Nullable`）で応答を受け、`toOutcome` で検査してから `ChargeOutcome` に写す。
 SDK を使う Client も、同じ形にする。
+SDK を使う例は、`tenancy` の `MailSenderClient`（AWS SDK の `SesV2Client`）である。
+SDK の Client は同じパッケージの `@Configuration` が Bean として作り、タイムアウトと試行の回数をそこで設定する。
+結果の分け方と設定は[メールを送る Client](../../mail/sending.md)に示す。
 
 ## 最小の例と典型的な例
 

@@ -103,6 +103,7 @@ AWS SDK for Java v2 は、同じ値をシステムプロパティ `aws.endpointU
   置き場所は #571 の想定どおり `tenancy` の `infrastructure.client` にし、ほかのモジュールが使うことになったら見直す。
 - Keycloak のメール（realm の `resetPasswordAllowed` とメールアドレスの確認）の経路は [#593](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/593) で決め、Keycloak のメールだけを受ける Mailpit を別に足す。
   アプリのメールはこの ADR の経路のままにし、アプリは Mailpit に依存しない。
+- 規約文書（[メールを送る Client](../mail/sending.md)、[本番で SES から送る設定](../mail/production-setup.md)、[メールのテスト](../mail/testing.md)、[Compose の作り方](../container/compose.md)、[E2E テストの方針と書き方](../e2e/testing-strategy.md)、[バックエンドのテストの実行基盤](../backend/testing-infrastructure.md)）は、この ADR を起こす #571 の変更で更新した。
 
 ## Alternatives Considered
 
@@ -149,6 +150,8 @@ AWS SDK for Java v2 は、同じ値をシステムプロパティ `aws.endpointU
 - [ADR-041: ECS のタスクを Fargate で動かす](ADR-041-run-ecs-tasks-on-fargate.md)
 - [ADR-072: 外部システムを本番のコードで偽らず、WireMock のコンテナで偽る](ADR-072-fake-external-systems-with-wiremock.md)
 - [ADR-085: バックエンドのテストの依存を Testcontainers で fork ごとに起動し、テストを並列に実行する](ADR-085-start-test-dependencies-per-fork-with-testcontainers.md)
+- [メールを送る Client](../mail/sending.md)
+- [本番で SES から送る設定](../mail/production-setup.md)
 - [Obtaining Amazon SES SMTP credentials](https://docs.aws.amazon.com/ses/latest/dg/smtp-credentials.html)
 - [Managing access keys for IAM users](https://docs.aws.amazon.com/IAM/latest/UserGuide/securing_access-keys.html)
 - [Service-specific endpoints](https://docs.aws.amazon.com/sdkref/latest/guide/feature-ss-endpoints.html)
