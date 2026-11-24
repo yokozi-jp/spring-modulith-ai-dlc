@@ -64,6 +64,12 @@ import org.springframework.web.client.HttpServerErrorException;
 @Import(SharedTestConfiguration.class)
 class DemoApplicationTest {
 
+  /** 決済代行の Client の Resilience4j の instance の名前。 */
+  private static final String PAYMENT_GATEWAY = "payment-gateway";
+
+  /** メールの送信の Client の Resilience4j の instance の名前。 */
+  private static final String MAIL_SENDER = "mail-sender";
+
   /** UTC 固定を検証する対象のアプリケーション {@code Clock}。 */
   @Autowired private Clock clock;
 
@@ -210,8 +216,8 @@ class DemoApplicationTest {
   void paymentGatewayIsGuardedByResilience4j() {
     // YAML の instance は注釈がなくても registry に作られるため、呼び出しの件数の増加で aspect が掛かったことを確かめる。
     // 請求は、テストの JVM が起動する WireMock のコンテナ（InfrastructureContainers）のスタブが成功で返す。
-    final CircuitBreaker circuitBreaker = circuitBreakerRegistry.circuitBreaker("payment-gateway");
-    final Retry retry = retryRegistry.retry("payment-gateway");
+    final CircuitBreaker circuitBreaker = circuitBreakerRegistry.circuitBreaker(PAYMENT_GATEWAY);
+    final Retry retry = retryRegistry.retry(PAYMENT_GATEWAY);
     final long callsBefore = circuitBreaker.getMetrics().getNumberOfSuccessfulCalls();
     final long retryBefore = retry.getMetrics().getNumberOfSuccessfulCallsWithoutRetryAttempt();
 
@@ -225,17 +231,16 @@ class DemoApplicationTest {
         retryBefore + 1,
         retry.getMetrics().getNumberOfSuccessfulCallsWithoutRetryAttempt(),
         "payment-gateway の retry が再試行なしの成功を 1 件数えること");
-    assertEquals(
-        1, retry.getRetryConfig().getMaxAttempts(), "payment-gateway の retry の試行が 1 回であること");
   }
 
-  @Test
-  @DisplayName("メールの送信の retry の試行は 1 回で、SendEmail を重複して送らない")
-  void mailSenderDoesNotRetry() {
+  @ParameterizedTest
+  @ValueSource(strings = {PAYMENT_GATEWAY, MAIL_SENDER})
+  @DisplayName("外部システムの Client の retry の試行は 1 回で、トランザクションの中で同じ要求を重ねない")
+  void externalClientRetryIsSingleAttempt(final String instance) {
     assertEquals(
         1,
-        retryRegistry.retry("mail-sender").getRetryConfig().getMaxAttempts(),
-        "mail-sender の retry の試行が 1 回であること");
+        retryRegistry.retry(instance).getRetryConfig().getMaxAttempts(),
+        instance + " の retry の試行が 1 回であること");
   }
 
   @Test
@@ -271,7 +276,7 @@ class DemoApplicationTest {
   }
 
   @ParameterizedTest
-  @ValueSource(strings = {"payment-gateway", "mail-sender"})
+  @ValueSource(strings = {PAYMENT_GATEWAY, MAIL_SENDER})
   @DisplayName("外部システムの呼び出しの最悪の時間は、トランザクション中の待機の上限より短い")
   void externalClientWorstCaseFitsIdleInTransactionTimeout(final String instance) {
     // Listener はトランザクションの中で決済代行とメールの送信を呼ぶ（ADR-050）。待つ間に idle_in_transaction_session_timeout を超えると、

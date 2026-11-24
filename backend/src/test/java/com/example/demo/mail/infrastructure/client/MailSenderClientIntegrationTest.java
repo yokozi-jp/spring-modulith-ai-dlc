@@ -45,7 +45,7 @@ import tools.jackson.databind.json.JsonMapper;
  * メールの送信の Client を、テストの JVM が起動した WireMock のコンテナ（InfrastructureContainers）に向けて、送ったメールの中身と circuit
  * breaker の数え方を検証する。
  *
- * <p>Spring の Client は、本番と同じく SDK の既定の取得で接続先を読み、テストではシステムプロパティ {@code aws.endpointUrlSesV2} が
+ * <p>Spring の Client は、{@code InfrastructureContainers} が渡す {@code AWS_ENDPOINT_URL_SESV2} の設定で
  * WireMock を指す（ADR-125）。成功は compose の WireMock と同じ {@code docker/wiremock/mappings}
  * の共有のスタブで返し、Client とスタブの契約が合うことを確かめる。失敗は、宛先に合う優先度の高いスタブをテストの中で足す。送ったメールは、E2E と同じく WireMock
  * の要求の記録（{@code POST /__admin/requests/find}）から宛先で絞って読む。結果の分け方は {@code MailSenderClientTest} が確かめる。
@@ -97,14 +97,15 @@ class MailSenderClientIntegrationTest {
   /**
    * SDK のクラスを、長いタイムアウトの別の Client で 1 回呼んで読み込んでおく。
    *
-   * <p>SDK の最初の呼び出しは負荷の下で呼び出しのタイムアウト 2 秒を超えうるため、Spring の Client の最初の呼び出しをテストにしない。接続先は Spring の
-   * Client から読む。
+   * <p>SDK の最初の呼び出しと WireMock の SendEmail のスタブの最初の応答は、負荷の下で呼び出しのタイムアウト 2 秒を超えうるため、Spring の Client
+   * の最初の呼び出しをテストにしない。SES のスタブを呼ぶ Spring のテストはこのクラスだけなので、スタブもここで温める。接続先は Spring の Client から読む。
    */
   @BeforeAll
   static void warmUpSdk(@Autowired final SesV2Client springClient) {
     final URI endpoint = endpointOf(springClient);
     try (SesV2Client client =
-        SesV2TestClients.create(endpoint, Duration.ofSeconds(1), Duration.ofSeconds(30))) {
+        SesV2TestClients.create(
+            endpoint.toString(), Duration.ofSeconds(1), Duration.ofSeconds(30))) {
       new MailSenderClient(client, "warm-up@example.com", "warm-up", "warm-up", "*")
           .send(new MailRecipient("warm-up@example.com"), SUBJECT, BODY);
     }
@@ -136,7 +137,7 @@ class MailSenderClientIntegrationTest {
   }
 
   @Test
-  @DisplayName("共有のスタブで送れ、送ったメールの宛先、From、設定セットを WireMock の要求の記録から読める")
+  @DisplayName("共有のスタブで送れ、送ったメールの宛先、件名、本文、From、設定セットを WireMock の要求の記録から読める")
   void sentMailIsReadableFromRequestJournal() {
     final MailOutcome outcome = mailSender.send(to, SUBJECT, BODY);
 
@@ -148,6 +149,13 @@ class MailSenderClientIntegrationTest {
     final List<LoggedRequest> requests = sentTo(to);
     assertThat(requests).as("宛先への SendEmail の要求").hasSize(1);
     final JsonNode mail = JSON.readTree(requests.getFirst().getBodyAsString());
+    assertThat(mail.at("/Destination/ToAddresses/0").asString()).as("宛先").isEqualTo(to.value());
+    assertThat(mail.at("/Content/Simple/Subject/Data").asString())
+        .as("件名")
+        .isEqualTo(SUBJECT.value());
+    assertThat(mail.at("/Content/Simple/Body/Text/Data").asString())
+        .as("本文")
+        .isEqualTo(BODY.value());
     // From と設定セットは .env.test.example の MAIL_SENDER_* の値。表示名「DemoApp」の encoded-word。
     assertThat(mail.at("/FromEmailAddress").asString())
         .as("From")

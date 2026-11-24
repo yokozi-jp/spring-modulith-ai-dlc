@@ -2,6 +2,7 @@ package com.example.demo.mail.infrastructure.client;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 import com.example.demo.testkit.LoopbackHttpServer;
 import java.io.IOException;
@@ -13,9 +14,11 @@ import java.net.URI;
 import java.time.Duration;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
-import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
+import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider;
 import software.amazon.awssdk.core.exception.SdkClientException;
 import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.sesv2.SesV2Client;
@@ -31,9 +34,6 @@ class SesV2ClientConfigTest {
   /** 確かめるほうの上限。 */
   private static final Duration SHORT = Duration.ofSeconds(1);
 
-  /** SDK がリージョンを読むシステムプロパティ。 */
-  private static final String REGION_PROPERTY = "aws.region";
-
   /** 確かめないほうの上限。呼び出し全体の上限と、応答を止める時間より長い。 */
   private static final Duration LONG = Duration.ofSeconds(20);
 
@@ -43,26 +43,56 @@ class SesV2ClientConfigTest {
     try (SesV2Client client =
         new SesV2ClientConfig()
             .sesV2Client(
-                SHORT, SHORT, "http://127.0.0.1:9999", "ap-northeast-1", "access-key", "secret")) {
+                SHORT, SHORT, "ap-northeast-1", "http://127.0.0.1:9999", "access-key", "secret")) {
       assertThat(client.serviceClientConfiguration().endpointOverride())
           .as("接続先")
           .hasValue(URI.create("http://127.0.0.1:9999"));
       assertThat(client.serviceClientConfiguration().region())
           .as("リージョン")
           .isEqualTo(Region.AP_NORTHEAST_1);
+      assertThat(client.serviceClientConfiguration().credentialsProvider())
+          .as("資格情報")
+          .isInstanceOf(StaticCredentialsProvider.class);
     }
   }
 
   @Test
-  @DisplayName("接続先の設定が空なら、接続先を上書きせず、SDK の既定の取得に任せる")
+  @DisplayName("接続先の設定が空なら、接続先を上書きせず、資格情報も固定の値にせず、SDK の既定の取得に任せる")
   void blankEndpointLeavesSdkDefaults() {
-    final String previous = System.getProperty(REGION_PROPERTY);
-    System.setProperty(REGION_PROPERTY, "ap-northeast-1");
-    try (SesV2Client client = new SesV2ClientConfig().sesV2Client(SHORT, SHORT, "", "", "", "")) {
+    // SDK は環境変数の接続先も読むので、シェルが接続先を入れているときはこのテストを飛ばす。
+    assumeTrue(
+        System.getenv("AWS_ENDPOINT_URL_SESV2") == null
+            && System.getenv("AWS_ENDPOINT_URL") == null,
+        "シェルが AWS の接続先の環境変数を入れている");
+    try (SesV2Client client =
+        new SesV2ClientConfig().sesV2Client(SHORT, SHORT, "ap-northeast-1", "", "", "")) {
       assertThat(client.serviceClientConfiguration().endpointOverride()).as("接続先の上書き").isEmpty();
-    } finally {
-      restore(previous);
+      assertThat(client.serviceClientConfiguration().credentialsProvider())
+          .as("資格情報")
+          .isNotInstanceOf(StaticCredentialsProvider.class);
+      assertThat(client.serviceClientConfiguration().region())
+          .as("リージョン")
+          .isEqualTo(Region.AP_NORTHEAST_1);
     }
+  }
+
+  @ParameterizedTest(name = "{0}")
+  @CsvSource(
+      delimiter = '|',
+      value = {
+        "リージョンが空     | ''             | access-key | secret",
+        "アクセスキーが空   | ap-northeast-1 | ''         | secret",
+        "シークレットが空   | ap-northeast-1 | access-key | ''",
+      })
+  @DisplayName("接続先があるのにリージョンか資格情報が空なら、Client を作れず起動に失敗する")
+  void endpointWithMissingSettingFailsAtStartup(
+      final String label, final String region, final String accessKeyId, final String secret) {
+    assertThatThrownBy(() ->
+            new SesV2ClientConfig()
+                .sesV2Client(SHORT, SHORT, region, "http://127.0.0.1:9999", accessKeyId, secret)
+                .close())
+        .as(label)
+        .isInstanceOfAny(IllegalArgumentException.class, NullPointerException.class);
   }
 
   @Test
@@ -74,12 +104,11 @@ class SesV2ClientConfigTest {
         Socket _ = connectTo(listener);
         Socket _ = connectTo(listener);
         SesV2Client client =
-            client(
-                URI.create(
-                    "http://"
-                        + listener.getInetAddress().getHostAddress()
-                        + ":"
-                        + listener.getLocalPort()),
+            SesV2TestClients.create(
+                "http://"
+                    + listener.getInetAddress().getHostAddress()
+                    + ":"
+                    + listener.getLocalPort(),
                 SHORT,
                 LONG)) {
       assertThatThrownBy(() -> send(client, Duration.ofSeconds(10)))
@@ -108,7 +137,7 @@ class SesV2ClientConfigTest {
                   }
                   LoopbackHttpServer.reply(exchange, 200, "{\"MessageId\":\"msg-1\"}");
                 });
-    try (SesV2Client client = client(URI.create(server.url()), LONG, SHORT)) {
+    try (SesV2Client client = SesV2TestClients.create(server.url(), LONG, SHORT)) {
       assertThatThrownBy(() -> send(client, Duration.ofSeconds(30)))
           .isInstanceOf(SdkClientException.class)
           .rootCause()
@@ -118,21 +147,6 @@ class SesV2ClientConfigTest {
       release.countDown();
       server.stop();
     }
-  }
-
-  /** システムプロパティを元の値に戻す。 */
-  private static void restore(final @Nullable String previous) {
-    if (previous == null) {
-      System.clearProperty(REGION_PROPERTY);
-    } else {
-      System.setProperty(REGION_PROPERTY, previous);
-    }
-  }
-
-  /** 上限を渡して作った SDK の Client に、接続先、リージョン、資格情報を足して作る。 */
-  private static SesV2Client client(
-      final URI endpoint, final Duration connectTimeout, final Duration readTimeout) {
-    return SesV2TestClients.create(endpoint, connectTimeout, readTimeout);
   }
 
   /** 呼び出し全体の上限を apiCallTimeout に延ばして 1 通送る。 */

@@ -6,17 +6,16 @@ import com.example.demo.mail.domain.model.MailOutcome;
 import com.example.demo.mail.domain.model.MailRecipient;
 import com.example.demo.mail.domain.model.MailSender;
 import com.example.demo.mail.domain.model.MailSubject;
-import com.example.demo.shared.validation.MailAddress;
 import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
 import io.github.resilience4j.retry.annotation.Retry;
 import java.nio.charset.StandardCharsets;
 import java.util.Base64;
-import java.util.regex.Pattern;
 import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.Nullable;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import software.amazon.awssdk.awscore.exception.AwsErrorDetails;
+import software.amazon.awssdk.awscore.exception.AwsServiceException;
 import software.amazon.awssdk.services.sesv2.SesV2Client;
 import software.amazon.awssdk.services.sesv2.model.BadRequestException;
 import software.amazon.awssdk.services.sesv2.model.Content;
@@ -27,15 +26,15 @@ import software.amazon.awssdk.services.sesv2.model.SesV2Exception;
 /**
  * SES v2 の {@code SendEmail} で、1 人の宛先へプレーンテキストのメールを送る。
  *
- * <p>本番もローカルもテストも、この Client で送る。ローカルとテストは、SDK の接続先の {@code AWS_ENDPOINT_URL_SESV2} だけを WireMock
+ * <p>本番もローカルもテストも、この Client で送る。ローカルとテストは、{@link SesV2ClientConfig} が Spring の設定の接続先と資格情報で WireMock
  * に向ける（ADR-125）。タイムアウトと試行 1 回の設定は {@link SesV2ClientConfig} が持ち、circuit breaker と retry は ADR-019
  * の既定値のままにする。SES の SLO から値を変える根拠がまだないためである。
  *
- * <p>{@code MessageRejected}、{@code BadRequestException}、{@code MessageId}
- * のない応答は拒否の結果にし、ほかの失敗は例外を投げる。分け方と理由は docs/mail/sending.md の「結果と失敗の扱い」 に示す。
+ * <p>許可の外の宛先（{@link AllowedRecipients}）、{@code MessageRejected}、{@code BadRequestException}、{@code
+ * MessageId} のない応答は拒否の結果にし、ほかの失敗は例外を投げる。分け方と理由は docs/mail/sending.md の「結果と失敗の扱い」 に示す。
  *
- * <p>Client のログと、投げる SES の例外のメッセージには、例外の型と SES のエラーコードだけを入れ、宛先のアドレスと SES のエラーの文面を入れない（ADR-015）。SES
- * の文面は、確かめられなかった宛先や ID を含みうるためである。
+ * <p>Client のログと、投げる SES の例外のメッセージには、例外の型、SES のエラーコード、要求の ID だけを入れ、宛先のアドレスと SES
+ * のエラーの文面を入れない（ADR-015）。SES の文面は、確かめられなかった宛先や ID を含みうるためである。
  */
 @Slf4j
 @Component
@@ -52,9 +51,6 @@ class MailSenderClient implements MailSender {
 
   /** RFC 2047 の 1 つの encoded-word の長さの上限。 */
   private static final int MAX_ENCODED_WORD_LENGTH = 75;
-
-  /** From のアドレスの形式。入力のメールアドレスと同じ式で検査する。 */
-  private static final Pattern MAIL_ADDRESS = Pattern.compile(MailAddress.PATTERN);
 
   /** メールを送る SES v2 の Client。 */
   private final SesV2Client sesV2Client;
@@ -86,7 +82,7 @@ class MailSenderClient implements MailSender {
       @Value("${mail-sender.from-name}") final String fromName,
       @Value("${mail-sender.configuration-set}") final String configurationSet,
       @Value("${mail-sender.allowed-recipients}") final String allowedRecipients) {
-    if (!MAIL_ADDRESS.matcher(fromAddress).matches()) {
+    if (!AllowedRecipients.isMailAddress(fromAddress)) {
       throw new IllegalArgumentException("mail-sender.from-address is not a mail address");
     }
     if (fromName.isBlank()) {
@@ -119,7 +115,7 @@ class MailSenderClient implements MailSender {
     try {
       messageId = sesV2Client.sendEmail(request(to, subject, body)).messageId();
     } catch (MessageRejectedException | BadRequestException exception) {
-      return rejected(exception);
+      return rejectedBySes(exception);
     } catch (SesV2Exception exception) {
       throw withoutErrorText(exception);
     }
@@ -143,8 +139,8 @@ class MailSenderClient implements MailSender {
         .build();
   }
 
-  /** SES が拒否したことを、例外の型とエラーコードだけで記録し、拒否の結果を返す。 */
-  private static MailOutcome rejected(final SesV2Exception exception) {
+  /** SES が拒否したことを、例外の型、エラーコード、要求の ID だけで記録し、拒否の結果を返す。 */
+  private static MailOutcome rejectedBySes(final SesV2Exception exception) {
     final String type = exception.getClass().getSimpleName();
     final @Nullable String errorCode = errorCode(exception);
     final @Nullable String requestId = exception.requestId();
@@ -161,21 +157,20 @@ class MailSenderClient implements MailSender {
    *
    * <p>投げた例外のメッセージは、Spring Modulith と非同期の実行のログに出る。SES の文面は宛先と ID を含みうるため、ここで落とす。
    */
-  private static SesV2Exception withoutErrorText(final SesV2Exception exception) {
+  private static AwsServiceException withoutErrorText(final SesV2Exception exception) {
     final @Nullable AwsErrorDetails details = exception.awsErrorDetails();
-    // toBuilder は同じ型の builder を返すので、build の結果は元の例外と同じ型の SesV2Exception になる。
-    return (SesV2Exception)
-        exception.toBuilder()
-            .message("SES returned an error: errorCode=" + errorCode(exception))
-            .awsErrorDetails(
-                details == null
-                    ? null
-                    : AwsErrorDetails.builder()
-                        .errorCode(errorCode(exception))
-                        .serviceName(details.serviceName())
-                        .build())
-            .cause(null)
-            .build();
+    final @Nullable String errorCode = errorCode(exception);
+    return exception.toBuilder()
+        .message("SES returned an error: errorCode=" + errorCode)
+        .awsErrorDetails(
+            details == null
+                ? null
+                : AwsErrorDetails.builder()
+                    .errorCode(errorCode)
+                    .serviceName(details.serviceName())
+                    .build())
+        .cause(null)
+        .build();
   }
 
   /** SES のエラーコード。詳細がなければ null。 */

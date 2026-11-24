@@ -29,12 +29,12 @@ tags: [convention, mail, backend, ses, external-system]
 
 `MailSender.send` の結果は、次の場合に分かれる。
 
-| 場合                                            | 例                                                                                                    | `send`                | circuit breaker の失敗 | イベント出版 |
-| ----------------------------------------------- | ----------------------------------------------------------------------------------------------------- | --------------------- | ---------------------- | ------------ |
-| 送信済み                                        | SES が `MessageId` を返した                                                                           | `Sent(MailMessageId)` | 数えない               | `COMPLETED`  |
-| 回復しない拒否                                  | 許可の外の宛先（SES を呼ばない）、`MessageRejected`、`BadRequestException`、`MessageId` のない応答    | `Rejected`            | 数えない               | `COMPLETED`  |
-| 一時障害                                        | 接続の失敗、タイムアウト（`ApiCallTimeoutException`）、`TooManyRequestsException`、5xx                | SDK の例外を投げる    | 数える                 | `FAILED`     |
-| 資格情報と権限の不備、運用者が直せる SES の不備 | `AccessDeniedException` などの 403、送信の停止、From のドメインの未検証、設定セットがない、送信の上限 | SDK の例外を投げる    | 数えない               | `FAILED`     |
+| 場合                                            | 例                                                                                                                                       | `send`                | circuit breaker の失敗 | イベント出版 |
+| ----------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- | --------------------- | ---------------------- | ------------ |
+| 送信済み                                        | SES が `MessageId` を返した                                                                                                              | `Sent(MailMessageId)` | 数えない               | `COMPLETED`  |
+| 回復しない拒否                                  | 許可の外の宛先と、1 つのメールアドレスの形でない宛先（SES を呼ばない）、`MessageRejected`、`BadRequestException`、`MessageId` のない応答 | `Rejected`            | 数えない               | `COMPLETED`  |
+| 一時障害                                        | 接続の失敗、タイムアウト（`ApiCallTimeoutException`、読み取りの `SdkClientException`）、`TooManyRequestsException`、5xx                  | SDK の例外を投げる    | 数える                 | `FAILED`     |
+| 資格情報と権限の不備、運用者が直せる SES の不備 | `AccessDeniedException` などの 403、送信の停止、From のドメインの未検証、設定セットがない、送信の上限                                    | SDK の例外を投げる    | 数えない               | `FAILED`     |
 
 - 呼び出し元は、`Sent` と `Rejected` を業務の状態に記録して正常に返し、Listener を正常終了させる。
   `Rejected` は、同じ要求を再投入しても受け付けられないためである。
@@ -54,13 +54,13 @@ tags: [convention, mail, backend, ses, external-system]
   呼び出し元は、自分で再試行しない。
 - 送ってから commit の前に落ちると、再投入で 2 通目が出る。
   呼び出し元は、送った時刻を業務の状態に記録し、記録があれば送らない。
+  2 回届いたイベントで 2 回目が行を変えない形にする（[順序保証と冪等性](../integration/async-ordering-and-idempotency.md)）。
 - タイムアウトと接続の切断（`ApiCallTimeoutException`、`SdkClientException`）では、SES が受け付けた後に応答を受け取れなかった場合がある。
   このときは何も記録されず、再投入で同じメールが 2 通届く。
   送った時刻の記録では防げないので、メールは少なくとも 1 回届く（at-least-once）ものとして、1 通多く届いても困らない本文にする。
 - SDK の最初の呼び出しはクラスの読み込みで遅く、タスクの起動直後の 1 通が、2 秒の上限を超えやすい。
   本番は SES へ温め用の呼び出しをしない（権限と送信の実績を増やさないため）。
-  起動直後の失敗は、再投入で回復する。
-  2 回届いたイベントで 2 回目が行を変えない形にする（[順序保証と冪等性](../integration/async-ordering-and-idempotency.md)）。
+  起動直後のタイムアウトは、上の at-least-once の場合に当たり、再投入で 2 通目が届きうる。
 
 ## 設定
 
@@ -78,15 +78,16 @@ tags: [convention, mail, backend, ses, external-system]
   1 つの encoded-word に収まらない表示名は、起動の時点で失敗する。
 - 送ってよい宛先は、許可リスト（`MAIL_SENDER_ALLOWED_RECIPIENTS`）で絞る。
   項目は `*`（すべて）、`@example.com`（そのドメイン。サブドメインを含まない）、`user@example.com`（そのアドレス）のどれかで、大文字と小文字は区別しない。
-  許可の外の宛先には SES を呼ばず `Rejected` を返し、ログには宛先を出さず設定の名前だけを出す。
+  許可の外の宛先と、1 つのメールアドレスの形（`MailAddress.PATTERN`）でない宛先には SES を呼ばず `Rejected` を返し、ログには宛先を出さず設定の名前だけを出す。
   本番は `*` にし、ローカル、テスト、ステージングは自分たちのドメインや検証済みのアドレスにする。
   空の値と、形の誤った項目は、起動の時点で失敗する。
   接続先の書き忘れで本物の SES へ向かっても、許可の外の宛先へは送らない。
 - 形式の誤った From のアドレスと、空白だけの表示名と設定セットも、起動の時点で失敗する。
   起動を通すと、SES が要求ごとに `BadRequestException` を返し、すべてのメールが `Rejected` として記録されるためである。
 - 接続先、リージョン、資格情報は `application.yaml` に書かない。
-  Spring の設定に `AWS_ENDPOINT_URL_SESV2` があるときだけ、`SesV2ClientConfig` がその接続先と `AWS_REGION`、`AWS_ACCESS_KEY_ID`、`AWS_SECRET_ACCESS_KEY` を Client に渡す（ローカルとテスト）。
-  ないときは AWS の SDK の既定の取得に任せる（本番）。
+  `SesV2ClientConfig` は、リージョンを既定値のない `AWS_REGION` から読む（本番は ECS が入れる）。
+  Spring の設定に `AWS_ENDPOINT_URL_SESV2` があるときだけ、接続先と、`AWS_ACCESS_KEY_ID`、`AWS_SECRET_ACCESS_KEY` の固定の資格情報を Client に渡す（ローカルとテスト）。
+  ないときは、接続先と資格情報を AWS の SDK の既定の取得に任せる（本番）。
   本番の値は[本番で SES から送る設定](production-setup.md)に、ローカルの値は `.env.example` にある。
 - Client は環境変数のプロキシ（`HTTP_PROXY` など）を読まない。
 - タイムアウトは接続 1 秒、呼び出し全体 2 秒にする（[ADR-019](../adr/ADR-019-define-resilience-and-capacity-guardrails.md)）。

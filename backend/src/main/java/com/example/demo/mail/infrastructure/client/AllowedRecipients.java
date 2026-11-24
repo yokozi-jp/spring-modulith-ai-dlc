@@ -5,7 +5,9 @@ import com.example.demo.shared.validation.MailAddress;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Locale;
+import java.util.Set;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
 /**
  * メールを送ってよい宛先。許可になければ、SES を呼ばずに送らない。
@@ -18,19 +20,37 @@ import java.util.regex.Pattern;
  *   <li>{@code user@example.com}：そのアドレスだけを許す。
  * </ul>
  *
- * @param entries 小文字にした許可の項目。{@code *}、{@code @ドメイン}、アドレスのどれか
+ * <p>宛先が 1 つのメールアドレスの形（{@link MailAddress#PATTERN}）でなければ、{@code *} でも許さない。{@code
+ * a@x.org,b@example.com} のように、最後の {@code @} の後ろだけが許可に当たる値を通さないためである。
  */
-/* package */ record AllowedRecipients(List<String> entries) {
+final class AllowedRecipients {
 
   /** すべての宛先を許す項目。 */
   private static final String ANY = "*";
 
-  /** ドメインだけを許す項目の形。 */
-  private static final Pattern DOMAIN_ENTRY =
-      Pattern.compile("^@(?:[a-z0-9][a-z0-9\\-]*\\.)+[a-z]{2,}$");
+  /** メールアドレスの形。入力のメールアドレスと同じ式で検査する。 */
+  private static final Pattern MAIL_ADDRESS = Pattern.compile(MailAddress.PATTERN);
 
-  /** アドレスの項目の形。 */
-  private static final Pattern ADDRESS_ENTRY = Pattern.compile(MailAddress.PATTERN);
+  /** すべての宛先を許すか。 */
+  private final boolean any;
+
+  /** 許すドメイン。小文字で、{@code @} を含む。 */
+  private final Set<String> domains;
+
+  /** 許すアドレス。小文字。 */
+  private final Set<String> addresses;
+
+  private AllowedRecipients(
+      final boolean any, final Set<String> domains, final Set<String> addresses) {
+    this.any = any;
+    this.domains = Set.copyOf(domains);
+    this.addresses = Set.copyOf(addresses);
+  }
+
+  /** 値が 1 つのメールアドレスの形なら true を返す。 */
+  /* package */ static boolean isMailAddress(final String value) {
+    return MAIL_ADDRESS.matcher(value).matches();
+  }
 
   /**
    * カンマ区切りの設定値から作る。項目が 1 つもないか、形の誤った項目があれば、起動を失敗させる。
@@ -44,27 +64,45 @@ import java.util.regex.Pattern;
         Arrays.stream(setting.split(","))
             .map(String::strip)
             .filter(entry -> !entry.isEmpty())
+            .map(AllowedRecipients::checked)
             .map(entry -> entry.toLowerCase(Locale.ROOT))
             .toList();
     if (entries.isEmpty()) {
       throw new IllegalArgumentException("mail-sender.allowed-recipients must not be empty");
     }
-    for (final String entry : entries) {
-      if (!ANY.equals(entry)
-          && !DOMAIN_ENTRY.matcher(entry).matches()
-          && !ADDRESS_ENTRY.matcher(entry).matches()) {
-        throw new IllegalArgumentException(
-            "mail-sender.allowed-recipients has an entry that is neither *, @domain nor a mail address");
-      }
-    }
-    return new AllowedRecipients(entries);
+    return new AllowedRecipients(
+        entries.contains(ANY),
+        entries.stream().filter(entry -> entry.startsWith("@")).collect(Collectors.toSet()),
+        entries.stream().filter(AllowedRecipients::isMailAddress).collect(Collectors.toSet()));
   }
 
-  /** 宛先が許可の項目のどれかに当たれば true を返す。 */
+  /** 項目が {@code *}、{@code @ドメイン}、アドレスのどれかなら返し、どれでもなければ断る。 */
+  private static String checked(final String entry) {
+    final boolean valid =
+        ANY.equals(entry)
+            || (entry.startsWith("@") && isMailAddress("x" + entry))
+            || isMailAddress(entry);
+    if (!valid) {
+      throw new IllegalArgumentException(
+          "mail-sender.allowed-recipients has an entry that is neither *, @domain nor a mail address");
+    }
+    return entry;
+  }
+
+  /** 宛先が 1 つのメールアドレスの形で、許可の項目のどれかに当たれば true を返す。 */
   /* package */ boolean allows(final MailRecipient recipient) {
+    if (!isMailAddress(recipient.value())) {
+      return false;
+    }
     final String address = recipient.value().toLowerCase(Locale.ROOT);
-    final String domain = address.substring(address.lastIndexOf('@'));
-    return entries.stream()
-        .anyMatch(entry -> ANY.equals(entry) || entry.equals(address) || entry.equals(domain));
+    return any
+        || addresses.contains(address)
+        || domains.contains(address.substring(address.lastIndexOf('@')));
+  }
+
+  /** 許可の項目はアドレスを含みうるので、値を伏せる。 */
+  @Override
+  public String toString() {
+    return "AllowedRecipients[***]";
   }
 }

@@ -96,9 +96,6 @@ final class InfrastructureContainers {
   /** 決済代行のスタブが請求に返す status。 */
   private static final int CHARGED = 201;
 
-  /** SES v2 の API のスタブが SendEmail に返す status。 */
-  private static final int OK = 200;
-
   /** テストの SDK が使うリージョン。WireMock はリージョンを見ない。 */
   private static final String AWS_REGION = "ap-northeast-1";
 
@@ -181,17 +178,17 @@ final class InfrastructureContainers {
   }
 
   /**
-   * 決済代行と SES v2 の API のスタブを 1 回ずつ呼ぶ。
+   * 決済代行のスタブを 1 回呼ぶ。
    *
    * <p>ponytail: WireMock の最初の請求は JsonPath とテンプレートのクラスの読み込みで遅く、負荷の下では {@code
-   * payment-gateway.read-timeout} と {@code mail-sender.read-timeout} を超えるため、テストより先に 1 回ずつ呼ぶ。要求の形は
-   * {@code payment-gateway-charge.json} と {@code ses-send-email.json} の照合の写しなので、スタブの照合を変えたらここも変える。
-   * スタブが増えたら、各スタブを温めるか、テストの read-timeout を延ばす。
+   * payment-gateway.read-timeout} を超えるため、テストより先に 1 回呼ぶ。温めるのは {@code /v1/charges} だけで、要求の形は {@code
+   * payment-gateway-charge.json} の照合の写しなので、スタブの照合を変えたらここも変える。 スタブが増えたら、各スタブを温めるか、テストの read-timeout
+   * を延ばす。SES の SendEmail のスタブは、呼ぶ唯一の Spring のテストの {@code MailSenderClientIntegrationTest} が温める。
    */
   // 割り込まれたら、割り込みの状態を戻して失敗させる。
   @SuppressWarnings("PMD.DoNotUseThreads")
   private static void warmUp(final String baseUrl) {
-    final HttpRequest charge =
+    final HttpRequest request =
         HttpRequest.newBuilder(URI.create(baseUrl + "/v1/charges"))
             .header("Idempotency-Key", "warm-up")
             .header("Content-Type", "application/json")
@@ -199,32 +196,16 @@ final class InfrastructureContainers {
                 HttpRequest.BodyPublishers.ofString(
                     "{\"orderId\":\"warm-up\",\"amount\":\"1\",\"currency\":\"JPY\"}"))
             .build();
-    final HttpRequest sendEmail =
-        HttpRequest.newBuilder(URI.create(baseUrl + "/v2/email/outbound-emails"))
-            .header("Content-Type", "application/json")
-            .POST(
-                HttpRequest.BodyPublishers.ofString(
-                    "{\"FromEmailAddress\":\"warm-up@example.com\","
-                        + "\"Destination\":{\"ToAddresses\":[\"warm-up@example.com\"]},"
-                        + "\"Content\":{\"Simple\":{\"Subject\":{\"Data\":\"warm-up\"},"
-                        + "\"Body\":{\"Text\":{\"Data\":\"warm-up\"}}}},"
-                        + "\"ConfigurationSetName\":\"warm-up\"}"))
-            .build();
     try (HttpClient client = HttpClient.newHttpClient()) {
-      for (final Map.Entry<HttpRequest, Integer> call :
-          List.of(Map.entry(charge, CHARGED), Map.entry(sendEmail, OK))) {
-        final String path = call.getKey().uri().getPath();
-        final int status =
-            client.send(call.getKey(), HttpResponse.BodyHandlers.discarding()).statusCode();
-        if (status != call.getValue()) {
-          throw new IllegalStateException("スタブの準備の呼び出しが失敗した: path=" + path + ", status=" + status);
-        }
+      final int status = client.send(request, HttpResponse.BodyHandlers.discarding()).statusCode();
+      if (status != CHARGED) {
+        throw new IllegalStateException("決済代行のスタブの準備の呼び出しが失敗した: status=" + status);
       }
     } catch (IOException e) {
-      throw new UncheckedIOException("スタブを準備できない", e);
+      throw new UncheckedIOException("決済代行のスタブを準備できない", e);
     } catch (InterruptedException e) {
       Thread.currentThread().interrupt();
-      throw new IllegalStateException("スタブの準備の途中で割り込まれた", e);
+      throw new IllegalStateException("決済代行のスタブの準備の途中で割り込まれた", e);
     }
   }
 

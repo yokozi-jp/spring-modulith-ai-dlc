@@ -28,6 +28,11 @@ class AllowedRecipientsTest {
         "a@example.com, @example.net      | x@example.net             | true",
         "' @example.com , a@example.org ' | a@example.org             | true",
         "a+tag@example.com                | a@example.com             | false",
+        "*                                | noatsign                  | false",
+        "@example.com                     | noatsign                  | false",
+        "@example.com                     | victim@real.org,x@example.com | false",
+        "@example.com                     | Victim <victim@real.org>, x@example.com | false",
+        "@kyoto.jp                        | a@\u212Ayoto.jp           | false",
       })
   @DisplayName("宛先は、* と、@ドメインと、アドレスの完全一致のどれかに当たるときだけ許す。大文字と小文字は区別せず、エイリアスは正規化しない")
   void matchesEntries(final String setting, final String recipient, final boolean expected) {

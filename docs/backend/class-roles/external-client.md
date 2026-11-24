@@ -135,7 +135,7 @@ SDK と生成した型は、Client の中だけで使う。
 - **閉じ込める。** SDK と生成した型を、Client の引数、戻り値、`domain.model` の型に出さない。Client の中で Domain の型へ写す。
 - **応答を検査する。** 応答は、必須の項目も `null` や型違いを許す前提で受け、検査してから Domain の型へ写す。生成した型を検査せずにそのまま返さない。検査に通らない応答は、契約の不備の結果にする。
 - **依存してよい型を足す。** SDK を使う Client の「依存してよい型」に、その SDK のパッケージを足す。ほかの Client と `domain.model`、`application` には足さない。
-  `MailSenderClient` と `SesV2ClientConfig` は、`software.amazon.awssdk..` と `com.example.demo.shared.validation.MailAddress` を足す。
+  `MailSenderClient` と `SesV2ClientConfig` は `software.amazon.awssdk..` を、`AllowedRecipients` は `com.example.demo.shared.validation.MailAddress` を足す。
 - **計測は SDK の機構に従う。** SDK の呼び出しは `RestClient` を通らないので、Boot の `http.client.requests` の計測は付かない。チェックリストの「Boot の計測が付く」は、SDK を使う Client では対象外にする（[ADR-125](../../adr/ADR-125-send-mail-with-ses-v2-api-and-fake-it-with-wiremock.md)）。
 
 `domain.model` と `application` が外部ライブラリの型に依存すると、ArchUnit の `domainModelDependsOnlyOnAllowedTypes` と `applicationDependsOnlyOnAllowedTypes` が落ちる（[ArchUnit の規則](../architecture-tests.md)）。

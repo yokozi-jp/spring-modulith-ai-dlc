@@ -23,7 +23,7 @@ tags: [runbook, mail, ses, aws, ecs, iam]
 
 ## 1. タスク定義に環境変数を入れる
 
-backend のコンテナの `environment` に次の 3 つを入れる。
+backend のコンテナの `environment` に次の 4 つを入れる。
 秘密ではないので、`secrets` にしなくてよい。
 
 | 環境変数                         | 値の例                      |
@@ -41,6 +41,7 @@ backend のコンテナの `environment` に次の 3 つを入れる。
   SDK は、ECS がタスクに入れるコンテナの資格情報の URL から、タスクのロールの一時的な資格情報を取る。
 - 接続先を上書きする環境変数（`AWS_ENDPOINT_URL` と、`AWS_ENDPOINT_URL_` で始まるもの）を入れない。
   入れると、SES 以外へ送る。
+  `AWS_ENDPOINT_URL_SESV2` を入れると、`SesV2ClientConfig` は資格情報もタスクのロールから固定のキーに切り替え、キーがなければ起動に失敗する。
 
 ## 2. タスクのロールにポリシーを付ける
 

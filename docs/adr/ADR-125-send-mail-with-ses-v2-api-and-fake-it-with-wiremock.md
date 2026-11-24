@@ -51,14 +51,16 @@ SDK は OS の環境変数と JVM のシステムプロパティだけを読み�
   From のアドレスと表示名、設定セットの名前、送ってよい宛先は既定値のない設定値にし、未設定なら起動に失敗させる（[ADR-008](ADR-008-single-application-yaml-external-config.md)）。
   From のアドレスの形式の誤りと、空白だけの表示名と設定セットも、起動の時点で断る。
   起動を通すと、SES が要求ごとに `BadRequestException` を返し、すべてのメールが拒否として記録されるためである。
-- Client を作る `SesV2ClientConfig` は、Spring の設定に `AWS_ENDPOINT_URL_SESV2` があるときだけ、その接続先、`AWS_REGION`、`AWS_ACCESS_KEY_ID`、`AWS_SECRET_ACCESS_KEY` を Client に渡す。
-  ない（空の）ときは、接続先、リージョン、資格情報を SDK の既定の取得に任せる。
-  本番は、ECS のタスクのロールの一時的な資格情報と、ECS がタスクに入れる `AWS_REGION` を使う（[Amazon ECS environment variables](https://docs.aws.amazon.com/AmazonECS/latest/developerguide/ecs-environment-variables.html)）。
-  リージョンが取れなければ、SDK の Client を作れず、起動に失敗する。
-  接続先の有無は設定値の違いで、本番のコードの分岐や mode ではない。
+- Client を作る `SesV2ClientConfig` は、リージョンを既定値のない `AWS_REGION` から読み、未設定なら起動に失敗させる。
+  本番は、ECS がタスクに入れる `AWS_REGION` を使う（[Amazon ECS environment variables](https://docs.aws.amazon.com/AmazonECS/latest/developerguide/ecs-environment-variables.html)）。
+- `SesV2ClientConfig` は、Spring の設定に `AWS_ENDPOINT_URL_SESV2` があるときだけ、接続先を上書きし、資格情報を `AWS_ACCESS_KEY_ID` と `AWS_SECRET_ACCESS_KEY` の固定の値にする。
+  ないときは、接続先と資格情報を SDK の既定の取得に任せ、本番は ECS のタスクのロールの一時的な資格情報を使う。
+  接続先があるのに資格情報が空なら、Client を作れず起動に失敗する。
+  これは設定の有無で決まる `if` の分岐で、Client を作る設定のクラスの中だけにある。
+  送り方（`MailSenderClient` と要求の組み立て）は分けないので、本番の実装がローカルとテストの経路を通るという ADR-072 の目的は保てる。
 - ローカルとテストは、`AWS_ENDPOINT_URL_SESV2` で既存の WireMock に向ける。
   決済代行と同じ WireMock のコンテナを使い、コンテナを増やさない。
-  `AWS_ENDPOINT_URL_SESV2`、`AWS_REGION`、ダミーの `AWS_ACCESS_KEY_ID` と `AWS_SECRET_ACCESS_KEY` は、env の例と compose ファイルにだけ書く。
+  `AWS_ENDPOINT_URL_SESV2`、`AWS_REGION`、ダミーの `AWS_ACCESS_KEY_ID` と `AWS_SECRET_ACCESS_KEY` は、env の例、compose ファイル、テストの `InfrastructureContainers` にだけ書く。
   Gradle のテストは、テストの JVM ごとに起動する WireMock（[ADR-085](ADR-085-start-test-dependencies-per-fork-with-testcontainers.md)）の接続先を、ほかの接続先と同じく `InfrastructureContainers` の設定で渡す。
 - 接続先が Spring の設定にないと、Client は SDK の既定の取得になり、本物の SES へ送りうる。
   ADR-072 は接続先の URL に既定値を置かず、未設定なら起動に失敗させると決めたが、SES は本番が同じ設定を持たない点が決済代行と違う。
@@ -82,7 +84,7 @@ SDK は OS の環境変数と JVM のシステムプロパティだけを読み�
   既定値を置かず、本番は `*` を明示する。
   本番のコードに環境の分岐を持たず、値の違いだけで挙動を変える。
   ローカルとテストの値には `*` を置かない。
-- Client のログと、Client が投げる SES の例外のメッセージには、例外の型と SES のエラーコードだけを入れ、宛先のアドレスと SES のエラーの文面を入れない（[ADR-015](ADR-015-structure-and-protect-observability-data.md)）。
+- Client のログと、Client が投げる SES の例外のメッセージには、例外の型、SES のエラーコード、SES の要求の ID だけを入れ、宛先のアドレスと SES のエラーの文面を入れない（[ADR-015](ADR-015-structure-and-protect-observability-data.md)）。
   SES の文面は、確かめられなかった宛先のアドレスを含みうるためである。
   投げた例外のメッセージも、Spring Modulith がリスナーの失敗を記録するログに出る。
 
@@ -107,9 +109,9 @@ SDK は OS の環境変数と JVM のシステムプロパティだけを読み�
   ローカルの許可リストは、自分たちが管理するドメインだけにする。
 - 本番で許可リストを `*` にし忘れる、または絞りすぎると、メールが `Rejected` として記録される。
   Client の WARN のログ（設定の名前）で見つける。
-- 接続を待つ上限（2 秒）を超えると、SES が受け付けた後でも例外になり、再投入で同じメールを 2 通送りうる。
-  SDK の最初の呼び出しは、クラスの読み込みで遅い。
-  対策は Client を呼ぶ側の記録で、送った時刻を記録しても、応答を受け取る前の失敗は防げない（[メールを送る Client](../mail/sending.md)）。
+- 呼び出し全体の上限（2 秒）を超えるか接続が切れると、SES が受け付けた後でも例外になり、再投入で同じメールを 2 通送りうる。
+  SDK の最初の呼び出しはクラスの読み込みで遅く、起動直後の 1 通がこうなりやすい。
+  送った時刻の記録はこの場合を防げないので、メールは少なくとも 1 回届く（at-least-once）ものとし、1 通多く届いても困らない本文にする（[メールを送る Client](../mail/sending.md#重複の防ぎ方)）。
 - From の ID が検証されていないときも SES は `MessageRejected` を返すので、設定の誤りが回復しない拒否として業務の状態に記録される。
   Client の WARN のログ（エラーコード）と、本番での疎通の確認で見つける。
 - SDK の呼び出しは `RestClient` を通らないため、Boot の計測（`http.client.requests` のメトリクスとトレースの span）が付かない。

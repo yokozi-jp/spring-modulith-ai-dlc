@@ -236,8 +236,8 @@ payment-gateway:
   connect-timeout: 1s
   read-timeout: 2s
 
-# メールの送信（ADR-125）。From のアドレスと表示名、SES の設定セットに既定値を置かず、未設定なら起動に失敗する。
-# 接続先、リージョン、資格情報は AWS の SDK の既定の取得に任せ、ここに書かない。
+# メールの送信（ADR-125）。From のアドレスと表示名、SES の設定セット、送ってよい宛先に既定値を置かず、未設定なら起動に失敗する。
+# リージョン（AWS_REGION）と、ローカルとテストの接続先と資格情報（AWS_ENDPOINT_URL_SESV2 など）は SesV2ClientConfig が読む。
 mail-sender:
   from-address: ${MAIL_SENDER_FROM_ADDRESS}
   # UTF-8 で 45 バイト以下にする。RFC 2047 の 1 つの encoded-word に収めるためである。
