@@ -12,6 +12,7 @@ tags: [adr, backend, api, openapi]
 Accepted
 
 Amended by [ADR-117](ADR-117-add-trace-id-and-omit-instance-in-problem-details.md)：span があるすべての Problem Details に `traceId` を付け、`instance` を設定しないこと。
+Amended by [ADR-126](ADR-126-require-idempotency-key-on-all-non-safe-business-apis.md)：「冪等性」の節と Alternative 3 を改め、GET と HEAD 以外のすべての業務の API に `Idempotency-Key` を必須にすること。
 
 ## Date
 
