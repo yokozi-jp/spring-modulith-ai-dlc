@@ -30,6 +30,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.boot.autoconfigure.AutoConfigurations;
 import org.springframework.boot.autoconfigure.context.PropertyPlaceholderAutoConfiguration;
@@ -311,6 +312,29 @@ class MailSenderClientTest {
       assertThat(new MailSenderClient(unused, FROM_ADDRESS, "あ".repeat(15), CONFIGURATION_SET))
           .as("45 バイトの表示名の Client")
           .isNotNull();
+    }
+  }
+
+  @ParameterizedTest(name = "{3}")
+  @CsvSource(
+      delimiter = '|',
+      value = {
+        "no-reply            | デモアプリ | app-transactional | mail-sender.from-address",
+        "デモ <no-reply@example.com> | デモアプリ | app-transactional | mail-sender.from-address",
+        "no-reply@example.com | ' '     | app-transactional | mail-sender.from-name",
+        "no-reply@example.com | デモアプリ | ''              | mail-sender.configuration-set",
+      })
+  @DisplayName("From のアドレスの形式の誤りと、空白だけの表示名と設定セットは、要求ごとに断られる前に、Client を作る時点で断る")
+  void invalidSettingsAreRejectedAtStartup(
+      final String fromAddress,
+      final String fromName,
+      final String configurationSet,
+      final String property) {
+    try (SesV2Client unused = SesV2Client.builder().region(Region.AP_NORTHEAST_1).build()) {
+      assertThatThrownBy(
+              () -> new MailSenderClient(unused, fromAddress, fromName, configurationSet))
+          .isInstanceOf(IllegalArgumentException.class)
+          .hasMessageContaining(property);
     }
   }
 

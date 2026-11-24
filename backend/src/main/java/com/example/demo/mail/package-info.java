@@ -3,7 +3,7 @@
  *
  * <p>メールを送る機能はまだなく、ほかのモジュールとつなぐイベントも {@code MailQueries} もまだ置かない。
  */
-@ApplicationModule(allowedDependencies = {})
+@ApplicationModule(allowedDependencies = "shared :: validation")
 @NullMarked
 package com.example.demo.mail;
 

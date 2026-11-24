@@ -6,10 +6,12 @@ import com.example.demo.mail.domain.model.MailOutcome;
 import com.example.demo.mail.domain.model.MailRecipient;
 import com.example.demo.mail.domain.model.MailSender;
 import com.example.demo.mail.domain.model.MailSubject;
+import com.example.demo.shared.validation.MailAddress;
 import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
 import io.github.resilience4j.retry.annotation.Retry;
 import java.nio.charset.StandardCharsets;
 import java.util.Base64;
+import java.util.regex.Pattern;
 import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.Nullable;
 import org.springframework.beans.factory.annotation.Value;
@@ -43,16 +45,19 @@ import software.amazon.awssdk.services.sesv2.model.SesV2Exception;
 class MailSenderClient implements MailSender {
 
   /** 件名と本文の文字コード。 */
-  private static final String CHARSET = "UTF-8";
+  private static final String CHARSET = StandardCharsets.UTF_8.name();
 
   /** From の表示名を包む RFC 2047 の encoded-word の前半。 */
-  private static final String ENCODED_WORD_PREFIX = "=?UTF-8?B?";
+  private static final String ENCODED_WORD_PREFIX = "=?" + CHARSET + "?B?";
 
   /** From の表示名を包む RFC 2047 の encoded-word の後半。 */
   private static final String ENCODED_WORD_SUFFIX = "?=";
 
   /** RFC 2047 の 1 つの encoded-word の長さの上限。 */
   private static final int MAX_ENCODED_WORD_LENGTH = 75;
+
+  /** From のアドレスの形式。入力のメールアドレスと同じ式で検査する。 */
+  private static final Pattern MAIL_ADDRESS = Pattern.compile(MailAddress.PATTERN);
 
   /** メールを送る SES v2 の Client。 */
   private final SesV2Client sesV2Client;
@@ -66,6 +71,9 @@ class MailSenderClient implements MailSender {
   /**
    * From と設定セットを持つ Client を作る。値に既定値はなく、未設定なら起動に失敗する（ADR-008）。
    *
+   * <p>形式の誤った From のアドレスと、空白だけの表示名と設定セットも起動の時点で断る。SES は要求ごとに {@code BadRequestException}
+   * を返し、すべてのメールが {@code Rejected} として記録されてしまうためである。
+   *
    * @param sesV2Client タイムアウトを持ち、再試行しない SES v2 の Client
    * @param fromAddress From のアドレス。SES で検証した ID のアドレスにする
    * @param fromName From の表示名。UTF-8 で 45 バイト以下にする
@@ -76,6 +84,15 @@ class MailSenderClient implements MailSender {
       @Value("${mail-sender.from-address}") final String fromAddress,
       @Value("${mail-sender.from-name}") final String fromName,
       @Value("${mail-sender.configuration-set}") final String configurationSet) {
+    if (!MAIL_ADDRESS.matcher(fromAddress).matches()) {
+      throw new IllegalArgumentException("mail-sender.from-address is not a mail address");
+    }
+    if (fromName.isBlank()) {
+      throw new IllegalArgumentException("mail-sender.from-name must not be blank");
+    }
+    if (configurationSet.isBlank()) {
+      throw new IllegalArgumentException("mail-sender.configuration-set must not be blank");
+    }
     this.sesV2Client = sesV2Client;
     this.from = encodedWord(fromName) + " <" + fromAddress + ">";
     this.configurationSet = configurationSet;
