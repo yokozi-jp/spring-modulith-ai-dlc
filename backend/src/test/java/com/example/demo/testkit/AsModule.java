@@ -4,8 +4,8 @@ import static com.example.demo.shared.infrastructure.persistence.ModuleRoleTrans
 
 import com.example.demo.shared.infrastructure.persistence.ModuleRoleTransactionManager;
 import com.example.demo.shared.infrastructure.persistence.ModuleRoles;
-import com.example.demo.shared.tenant.TenantContext;
-import com.example.demo.shared.tenant.TenantId;
+import com.example.demo.shared.tenancy.TenantContext;
+import com.example.demo.shared.tenancy.TenantId;
 import java.util.Objects;
 import java.util.function.Consumer;
 import java.util.function.Function;

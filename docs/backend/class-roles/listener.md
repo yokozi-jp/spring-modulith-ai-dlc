@@ -40,7 +40,7 @@ Listener は Infrastructure の Adapter でもない。
 - クラスを継承せず、継承もさせない。Java 標準の型以外の interface も実装しない。
   `PgmCdAspect` は名前で対象を決め、継承した `on` には `*_pgm_cd` を束縛しない（[ADR-051](../../adr/ADR-051-bind-pgm-cd-with-scoped-value-and-aspect.md)）。
 - public メソッドは `@ApplicationModuleListener public void on(final <Event> event)` の一つだけにする。
-- 引数のイベントは `shared.tenant.TenantScoped` を実装する。
+- 引数のイベントは `shared.tenancy.TenantScoped` を実装する。
   `TenantListenerAspect` がイベントのテナントを、`on` のトランザクションが始まる時点で `TenantContext` に束縛する（[ADR-105](../../adr/ADR-105-bind-tenant-to-request-and-event-context.md)）。
 - イベントは `@ApplicationModuleListener` だけで受け、Listener 以外のクラスでも `@EventListener` と `@TransactionalEventListener` を直接付けず、`ApplicationListener` を実装しない。
   理由は[アンチパターン](#アンチパターン)に示す。
@@ -176,13 +176,13 @@ public ChargeOrderResult handle(final ChargeOrderCommand command) {
   // 二度目の請求を避けるための先読み。並行の配信は INSERT の一意制約が ConflictException にする。
   final Optional<Payment> existing = paymentRepository.findByOrderId(orderId);
   if (existing.isPresent()) {
-    return new ChargeOrderResult(existing.get().id().value().toString());
+    return new ChargeOrderResult.AlreadyRecorded(existing.get().id().value().toString());
   }
   // ...
   final ChargeOutcome outcome = paymentGateway.charge(orderId, amount);
   final Payment payment = Payment.record(orderId, amount, outcome, Instant.now(clock));
   paymentRepository.add(payment);
-  return new ChargeOrderResult(payment.id().value().toString());
+  return new ChargeOrderResult.Charged(payment.id().value().toString());
 }
 ```
 

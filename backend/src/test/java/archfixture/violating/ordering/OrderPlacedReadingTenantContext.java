@@ -1,9 +1,9 @@
 package archfixture.violating.ordering;
 
-import archfixture.violating.shared.tenant.TenantContext;
+import archfixture.violating.shared.tenancy.TenantContext;
 
 /**
- * 違反：moduleApiDoesNotExposeInternalTypes（ルートの record が shared.tenant の TenantId と TenantScoped
+ * 違反：moduleApiDoesNotExposeInternalTypes（ルートの record が shared.tenancy の TenantId と TenantScoped
  * 以外の型を使う）。
  */
 public record OrderPlacedReadingTenantContext(String orderId) {

@@ -2,7 +2,7 @@ openapi: 3.1.0
 info:
   description: Demo アプリケーションの HTTP API
   title: Demo API
-  version: 0.7.0
+  version: 0.8.0
 servers:
 - description: 現在のオリジン
   url: /
@@ -814,10 +814,6 @@ components:
         detail:
           type: string
           description: この失敗に固有の、人が読むための説明
-        instance:
-          type: string
-          format: uri-reference
-          description: 失敗発生を識別する URI
         status:
           type: integer
           format: int32
@@ -825,6 +821,11 @@ components:
         title:
           type: string
           description: Problem type の短い説明
+        traceId:
+          type: string
+          description: 問い合わせとログを結ぶ W3C Trace Context の trace ID。要求の span がないときは付かない
+          example: 4bf92f3577b34da6a3ce929d0e0e4736
+          pattern: "^[0-9a-f]{32}$"
         type:
           type: string
           format: uri-reference

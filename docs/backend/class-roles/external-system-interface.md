@@ -29,7 +29,7 @@ tags: [convention, backend, class-role]
   製品名（`StripeClient`）、`Port`、`Interface` の接尾辞、`I` の接頭辞を付けない。
 - メソッドは業務の動詞にする（`charge`）。
 - 外部システムが返す識別子は、同じ `domain.model` の[値オブジェクト](value-object.md)にする（`GatewayPaymentCode`）。
-- 業務上の拒否のように、例外でなく業務の状態に記録する応答があるときは、結果の値オブジェクトを返す（`ChargeOutcome`、[ADR-072](../../adr/ADR-072-fake-external-systems-with-wiremock.md)）。
+- 業務上の拒否のように、例外でなく業務の状態に記録する応答があるときは、結果の値を返す（sealed interface の `ChargeOutcome`、[ADR-072](../../adr/ADR-072-fake-external-systems-with-wiremock.md)）。
 - 実装は `infrastructure.client` の `<ExternalSystem>Client` にする（`PaymentGatewayClient`）。
 
 ## 必須の記述
@@ -51,7 +51,8 @@ tags: [convention, backend, class-role]
 ## 最小の例と典型的な例
 
 最小の例は、注文の代金を請求する `PaymentGateway` と、決済代行が採番した識別子の `GatewayPaymentCode` である。
-請求の結果の `ChargeOutcome` は、`GatewayPaymentCode` と `PaymentStatus` を持つ値オブジェクトである。
+請求の結果の `ChargeOutcome` は、受付（`Paid`）、拒否（`Declined`）、契約の不備（`Failed`）の三つの record を持つ sealed interface である。
+`Paid` と `Declined` は `GatewayPaymentCode` を持ち、`Failed` は持たない。
 
 ```java
 package com.example.demo.payment.domain.model;

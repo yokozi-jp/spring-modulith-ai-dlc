@@ -131,7 +131,7 @@ appender の `mdcAttributesIncluded` は、MDC のうち OTLP の属性にする
 - [OpenTelemetry: User attributes](https://opentelemetry.io/docs/specs/semconv/registry/attributes/user/)
 - [Micrometer Observation: Introduction](https://docs.micrometer.io/micrometer/reference/observation/introduction.html)
 - [OpenTelemetry Logback Appender](https://github.com/open-telemetry/opentelemetry-java-instrumentation/tree/main/instrumentation/logback/logback-appender-1.0/library)
-- `backend/src/main/java/com/example/demo/shared/tenant/TenantContext.java`
+- `backend/src/main/java/com/example/demo/shared/tenancy/TenantContext.java`
 - `backend/src/main/java/com/example/demo/tenancy/presentation/web/TenantSelectionFilter.java`
 - `backend/src/main/java/com/example/demo/tenancy/presentation/web/UserIdMdcFilter.java`
 - `backend/src/main/java/com/example/demo/tenancy/presentation/web/TenantSecurityCustomizer.java`

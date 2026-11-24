@@ -6,8 +6,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.example.demo.shared.events.ResubmissionPolicy;
-import com.example.demo.shared.tenant.TenantId;
-import com.example.demo.shared.tenant.TenantScoped;
+import com.example.demo.shared.tenancy.TenantId;
+import com.example.demo.shared.tenancy.TenantScoped;
 import com.example.demo.testkit.AsTenant;
 import com.example.demo.testkit.CapturedLogRecords;
 import io.micrometer.core.instrument.MeterRegistry;

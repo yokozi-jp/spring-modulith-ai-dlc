@@ -2,8 +2,8 @@ package com.example.demo.tenancy.presentation.web;
 
 import com.example.demo.shared.security.AppUserPrincipal;
 import com.example.demo.shared.security.TenantNotSelectedException;
-import com.example.demo.shared.tenant.TenantContext;
-import com.example.demo.shared.tenant.TenantId;
+import com.example.demo.shared.tenancy.TenantContext;
+import com.example.demo.shared.tenancy.TenantId;
 import com.example.demo.tenancy.MembershipSummary;
 import com.example.demo.tenancy.TenancyQueries;
 import io.micrometer.common.KeyValue;

@@ -7,7 +7,7 @@ import static com.example.demo.jooq.product.Tables.M_PRODUCT;
 import static com.example.demo.jooq.tenancy.Tables.M_MEMBERSHIP;
 import static com.example.demo.jooq.tenancy.Tables.M_TENANT;
 
-import com.example.demo.shared.tenant.TenantId;
+import com.example.demo.shared.tenancy.TenantId;
 import com.example.demo.tenancy.TenancySeeds;
 import com.example.demo.testkit.AsModule;
 import com.example.demo.testkit.BusinessSeeds;

@@ -6,6 +6,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.example.demo.testkit.AppUsers;
+import com.example.demo.testkit.TracerStubs;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
@@ -20,6 +21,8 @@ import org.jooq.Table;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.security.authentication.AnonymousAuthenticationToken;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.authority.AuthorityUtils;
@@ -141,18 +144,27 @@ class CommonColumnsTest {
   }
 
   @Test
-  @DisplayName("現在のスパンがない、または trace ID がすべて 0 なら、登録を失敗させる")
-  void missingTraceIsRejected() {
+  @DisplayName("現在のスパンがなければ、登録を失敗させる")
+  void missingSpanIsRejected() {
     final CommonColumns withoutSpan = new CommonColumns(CLOCK, TracerStubs.withoutSpan());
-    final CommonColumns invalidTrace =
-        new CommonColumns(CLOCK, TracerStubs.withTraceId("00000000000000000000000000000000"));
 
     assertThatThrownBy(() -> inUseCase(() -> withoutSpan.forInsert(FIXTURE_ITEM)))
-        .as("スパンがない")
         .isInstanceOf(IllegalStateException.class)
         .hasMessage("no current trace");
+  }
+
+  @ParameterizedTest
+  @ValueSource(
+      strings = {
+        "00000000000000000000000000000000",
+        "4bf92f3577b34da6",
+        "4BF92F3577B34DA6A3CE929D0E0E4736"
+      })
+  @DisplayName("trace ID がすべて 0、32 桁でない、大文字を含むなら、登録を失敗させる")
+  void invalidTraceIdIsRejected(final String traceId) {
+    final CommonColumns invalidTrace = new CommonColumns(CLOCK, TracerStubs.withTraceId(traceId));
+
     assertThatThrownBy(() -> inUseCase(() -> invalidTrace.forUpdate(FIXTURE_ITEM)))
-        .as("無効な trace ID")
         .isInstanceOf(IllegalStateException.class)
         .hasMessage("no current trace");
   }

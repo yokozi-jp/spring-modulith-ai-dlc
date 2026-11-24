@@ -54,15 +54,22 @@ class PackageByFeatureOnionArchitectureTest {
   /** Domain のパッケージのパターン。 */
   private static final String DOMAIN_PACKAGE = "..domain..";
 
+  /** Domain Model のパッケージ。 */
+  private static final String DOMAIN_MODEL_PACKAGE = "..domain.model..";
+
   /**
    * Domain の外部システムのインタフェース。{@code domain.model} の interface のうち、Repository、アノテーション、{@code
-   * package-info} 以外。
+   * package-info}、sealed interface（結果を表す値）以外。
    */
   /* package */ static final DescribedPredicate<JavaClass> EXTERNAL_SYSTEM_INTERFACE =
       INTERFACES
-          .and(resideInAPackage("..domain.model.."))
+          .and(resideInAPackage(DOMAIN_MODEL_PACKAGE))
           .and(not(simpleNameEndingWith("Repository")))
           .and(not(ANNOTATIONS))
+          .and(
+              not(
+                  DescribedPredicate.describe(
+                      "sealed", javaClass -> javaClass.reflect().isSealed())))
           .and(not(simpleName("package-info")));
 
   /** パッケージ構造を決めた ADR のパス。 */
@@ -77,7 +84,7 @@ class PackageByFeatureOnionArchitectureTest {
 
   /** どの層からも使ってよい shared のパッケージの一覧。層の除外と shared の利用の規則は、ここから組み立てる。 */
   private static final List<String> ANY_LAYER_SHARED_PACKAGES =
-      List.of("concurrency", "failure", "events", "security", "tenant");
+      List.of("concurrency", "failure", "events", "security", "tenancy");
 
   /** Persistence Adapter のパッケージ。 */
   private static final String PERSISTENCE_PACKAGE = "..infrastructure.persistence..";
@@ -149,7 +156,7 @@ class PackageByFeatureOnionArchitectureTest {
   /* package */ static final ArchRule domainModelDoesNotDependOnFrameworks =
       noClasses()
           .that()
-          .resideInAPackage("..domain.model..")
+          .resideInAPackage(DOMAIN_MODEL_PACKAGE)
           .should()
           .dependOnClassesThat()
           .resideInAnyPackage(
@@ -166,6 +173,23 @@ class PackageByFeatureOnionArchitectureTest {
                   + "技術の処理は Application か Infrastructure へ移す。"
                   + "規約：docs/backend/layers.md、"
                   + ADR_002);
+
+  /** 値オブジェクトの不変条件の違反を、422 になる業務上の失敗ではなく {@link IllegalArgumentException} で表す。 */
+  @ArchTest
+  /* package */ static final ArchRule valueObjectsDoNotThrowBusinessRuleViolation =
+      noClasses()
+          .that()
+          .resideInAPackage(DOMAIN_MODEL_PACKAGE)
+          .and()
+          .areRecords()
+          .should()
+          .dependOnClassesThat(simpleName("BusinessRuleViolationException"))
+          .allowEmptyShould(true)
+          .because(
+              "値オブジェクトの違反は、利用者が直せない状態であり、422 にするとプログラムの誤りが隠れるため。"
+                  + "直し方：不変条件の違反には IllegalArgumentException を投げ、"
+                  + "状態に依存する業務規則は集約か Domain Service で BusinessRuleViolationException にする。"
+                  + "規約：docs/backend/class-roles/value-object.md、docs/backend/class-roles/business-exception.md");
 
   /** Domain Service は標準型、JSpecify、Lombok、Domain と {@code @Service} だけに依存させる。 */
   @ArchTest
@@ -273,7 +297,7 @@ class PackageByFeatureOnionArchitectureTest {
   /* package */ static final ArchRule repositoryImplementationsAreJooqRepositories =
       classes()
           .that()
-          .implement(simpleNameEndingWith("Repository").and(resideInAPackage("..domain.model..")))
+          .implement(simpleNameEndingWith("Repository").and(resideInAPackage(DOMAIN_MODEL_PACKAGE)))
           .should()
           .haveSimpleNameStartingWith("Jooq")
           .andShould()
@@ -436,18 +460,24 @@ class PackageByFeatureOnionArchitectureTest {
                 + "規約：docs/backend/shared-module.md、docs/backend/class-roles/business-exception.md");
   }
 
-  /** 機能ルートの型が標準型、JSpecify、同じルートパッケージの型だけに依存することを強制する規則を組み立てる。 */
+  /**
+   * 機能ルートの型が標準型、JSpecify、同じルートパッケージの型だけに依存することを強制する規則を組み立てる。
+   *
+   * <p>{@code package-info} は、モジュールの宣言（{@code @ApplicationModule}）を持つ型で公開契約ではないため、対象から除く。
+   */
   /* package */ static ArchRule moduleApiDoesNotExposeInternalTypesRule(final String basePackage) {
     return classes()
         .that()
         .resideInAPackage(basePackage + ".*")
+        .and()
+        .doNotHaveSimpleName("package-info")
         .should(dependOnlyOnStandardTypesOrOwnPackage(basePackage))
         .allowEmptyShould(true)
         .because(
             "モジュールルートの型は他モジュールが読む公開契約であり、内部の型を持たせると他モジュールがその型に依存するため。"
                 + "直し方：項目を String、Instant、BigDecimal などの標準型か、"
                 + "同じルートパッケージの record と enum に置き換える。"
-                + "例外は、イベントが運ぶテナントの shared.tenant.TenantId と shared.tenant.TenantScoped だけである。"
+                + "例外は、イベントが運ぶテナントの shared.tenancy.TenantId と shared.tenancy.TenantScoped だけである。"
                 + "規約：docs/backend/architecture.md、"
                 + ADR_050);
   }
@@ -506,9 +536,9 @@ class PackageByFeatureOnionArchitectureTest {
       final String basePackage) {
     final Set<String> tenantTypes =
         Set.of(
-            basePackage + ".shared.tenant.TenantId", basePackage + ".shared.tenant.TenantScoped");
+            basePackage + ".shared.tenancy.TenantId", basePackage + ".shared.tenancy.TenantScoped");
     return new ArchCondition<>(
-        "depend only on java, org.jspecify, shared.tenant.TenantId, shared.tenant.TenantScoped,"
+        "depend only on java, org.jspecify, shared.tenancy.TenantId, shared.tenancy.TenantScoped,"
             + " or the same package") {
       @Override
       public void check(final JavaClass item, final ConditionEvents events) {

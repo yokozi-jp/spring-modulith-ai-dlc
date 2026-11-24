@@ -135,7 +135,7 @@ frontend/packages/ui/
 `main.tsx` は描画の前に `lib/telemetry.ts` の `initTelemetry()` を呼ぶが、SDKの読み込みを待たずに描画を始める。
 
 `lib/telemetry.ts` はFaro Web SDK（`@grafana/*`）を呼ぶ唯一のファイルであり、featureとrouteとcomponentからSDKを呼ばない。
-Session、View、Errors、WebVitals、Tracingを明示的に有効にし、routerが解決したroute templateと匿名session IDで例外、画面遷移、LCP、INP、CLSを相関する。
+Session、View、Errors、WebVitalsを明示的に有効にし、routerが解決したroute templateと匿名session IDで例外、画面遷移、LCP、INP、CLSを相関する。
 routerの既定のエラー表示（`components/route-error.tsx`）は、捕捉したエラーをこのファイルの `reportCaughtError` で送る。
 SDKに依存しない `beforeSend` の縮約は `lib/telemetry-sanitize.ts` に分ける。
 このファイルは `@grafana/*` を型も含めてimportせず、`lib/telemetry.ts` だけが呼ぶ。
@@ -292,7 +292,7 @@ shadcnのprimitiveと `cn` は、アプリの外の `packages/ui`（`@frontend/u
 ``` text
 main.tsx -> api/query-client.ts -> @frontend/api/api-error
          -> router-defaults.ts -> components
-         -> lib/telemetry.ts -> @grafana/faro-web-sdk、@grafana/faro-web-tracing（動的import）
+         -> lib/telemetry.ts -> @grafana/faro-web-sdk（動的import）
                              -> lib/telemetry-sanitize.ts
          -> routeTree.gen.ts -> routes
                                   |

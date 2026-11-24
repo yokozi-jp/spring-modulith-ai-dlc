@@ -4,7 +4,7 @@ import static com.example.demo.jooq.tenancy.Tables.M_MEMBERSHIP;
 import static com.example.demo.jooq.tenancy.Tables.M_TENANT;
 import static com.example.demo.jooq.tenancy.Tables.M_USER;
 
-import com.example.demo.shared.tenant.TenantId;
+import com.example.demo.shared.tenancy.TenantId;
 import com.example.demo.tenancy.domain.model.Membership;
 import com.example.demo.tenancy.domain.model.MembershipRepository;
 import com.example.demo.tenancy.domain.model.Role;

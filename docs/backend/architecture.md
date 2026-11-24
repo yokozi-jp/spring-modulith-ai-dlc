@@ -161,7 +161,8 @@ Java パッケージを作るときは、`@NullMarked` を宣言する `package-
 ルートの型は、`String`、`Instant`、`BigDecimal` などの Java の標準型と、同じルートパッケージの型だけを持つ。
 Domain の型、Command と Result、Spring MVC の Request と Response、jOOQ の生成型は置かない。
 
-機能モジュールは Spring Modulith の既定の閉じたモジュールとし、`@ApplicationModule` と `@NamedInterface` を付けない。
+機能モジュールは Spring Modulith の既定の閉じたモジュールとし、`@NamedInterface` を付けない。
+依存先の宣言は「モジュール間の連携」に従う。
 
 ## 共有モジュール shared
 
@@ -190,11 +191,18 @@ infrastructure.client ───────────────────�
 - `infrastructure.persistence` は `shared.infrastructure.persistence` に依存してよい。
   ほかの層は `shared.infrastructure.persistence` に依存しない。
 - どの層も、[共有モジュール shared](shared-module.md) の「どの層からも使える」パッケージに依存してよい。`error` の `presentation.web` も、4 つの例外を 403、404、409、422 にするために依存する。
-- モジュールルートの型は、標準型と同じルートの型のほかに、イベントが運ぶテナントの `shared.tenant.TenantId` と `shared.tenant.TenantScoped` だけに依存してよい。`TenantContext` には依存できない。
+- モジュールルートの型は、標準型と同じルートの型のほかに、イベントが運ぶテナントの `shared.tenancy.TenantId` と `shared.tenancy.TenantScoped` だけに依存してよい。`TenantContext` には依存できない。
 - Domain と Application は、Presentation、Batch、Infrastructure に依存しない。
 - Presentation、Batch、Persistence、外部 Client は相互に依存しない。
 
 ## モジュール間の連携
+
+モジュールが依存してよいモジュールは、そのモジュールのルートの `package-info.java` に `@ApplicationModule(allowedDependencies = ...)` で宣言する。
+宣言にないモジュールへの依存は、`ApplicationModules.verify()` が `Module 'payment' depends on module 'product'` のように失敗にする。
+`jooq` は OPEN のモジュールなので、jOOQ の生成型を使うモジュールは `"jooq"` を書く。
+`@Modulithic(sharedModules = "shared")` で暗黙の許可先に入るのは `shared` のルートだけで、名前付きインタフェースは入らない。
+`shared` の名前付きインタフェースを使うモジュールは `"shared :: *"` を書く。
+現在の値は各モジュールの `package-info.java` が正本である（決定時の一覧は [ADR-118](../adr/ADR-118-declare-module-dependencies-with-allowed-dependencies.md)）。
 
 機能モジュールの間の連携は、次の二つだけにする。
 

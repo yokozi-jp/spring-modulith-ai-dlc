@@ -48,7 +48,7 @@ final class ClassRoleFixtureRows {
                 VIOLATING),
             "ordering.OrderPlacedWithModel"),
         row(
-            "moduleApiDoesNotExposeInternalTypes: shared.tenant の TenantContext",
+            "moduleApiDoesNotExposeInternalTypes: shared.tenancy の TenantContext",
             PackageByFeatureOnionArchitectureTest.moduleApiDoesNotExposeInternalTypesRule(
                 VIOLATING),
             "ordering.OrderPlacedReadingTenantContext"),
@@ -56,6 +56,10 @@ final class ClassRoleFixtureRows {
             "domainModelDoesNotDependOnFrameworks",
             PackageByFeatureOnionArchitectureTest.domainModelDoesNotDependOnFrameworks,
             "ordering.domain.model.OrderFactory"),
+        row(
+            "valueObjectsDoNotThrowBusinessRuleViolation",
+            PackageByFeatureOnionArchitectureTest.valueObjectsDoNotThrowBusinessRuleViolation,
+            "ordering.domain.model.Discount"),
         row(
             "domainServicesDependOnlyOnDomainAndJava",
             PackageByFeatureOnionArchitectureTest.domainServicesDependOnlyOnDomainAndJavaRule(
@@ -119,9 +123,21 @@ final class ClassRoleFixtureRows {
             ClassRoleArchTest.commandsAndResultsAreApplicationRecordsRule(VIOLATING),
             "ordering.application.ConfirmOrderCommand"),
         row(
+            "commandsAndResultsAreApplicationRecords: sealed でない interface の Result",
+            ClassRoleArchTest.commandsAndResultsAreApplicationRecordsRule(VIOLATING),
+            "ordering.application.RefundOrderResult"),
+        row(
+            "commandsAndResultsAreApplicationRecords: 許可された型に class を持つ Result",
+            ClassRoleArchTest.commandsAndResultsAreApplicationRecordsRule(VIOLATING),
+            "ordering.application.VoidOrderResult"),
+        row(
             "commandsAndResultsAreApplicationRecords: shared.concurrency",
             ClassRoleArchTest.commandsAndResultsAreApplicationRecordsRule(VIOLATING),
             "shared.concurrency.ForceUnlockCommand"),
+        row(
+            "resultComponentsAreNotNullable",
+            ClassRoleArchTest.resultComponentsAreNotNullableRule(VIOLATING),
+            "ordering.application.HoldOrderResult"),
         row(
             "commandHandlersDoNotDependOnOtherCommandHandlers",
             ClassRoleArchTest.commandHandlersDoNotDependOnOtherCommandHandlers,

@@ -4,6 +4,7 @@ import com.example.demo.shared.concurrency.Versioned;
 import com.example.demo.shared.security.AppUserPrincipal;
 import io.micrometer.tracing.Span;
 import io.micrometer.tracing.Tracer;
+import io.opentelemetry.api.trace.TraceId;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.Collections;
@@ -191,7 +192,7 @@ public class CommonColumns {
     final @Nullable Span span = tracer.currentSpan();
     final String traceId = span == null ? "" : span.context().traceId();
     // OpenTelemetry は trace がないとき、すべて 0 の無効な trace ID を返す。
-    if (traceId.isEmpty() || traceId.matches("0+")) {
+    if (!TraceId.isValid(traceId)) {
       throw new IllegalStateException("no current trace");
     }
     return traceId;

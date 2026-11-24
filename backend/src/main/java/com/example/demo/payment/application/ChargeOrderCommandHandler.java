@@ -66,7 +66,7 @@ public class ChargeOrderCommandHandler {
     // 二度目の請求を避けるための先読み。並行の配信は INSERT の一意制約が ConflictException にする。
     final Optional<Payment> existing = paymentRepository.findByOrderId(orderId);
     if (existing.isPresent()) {
-      return new ChargeOrderResult(existing.get().id().value().toString());
+      return new ChargeOrderResult.AlreadyRecorded(existing.get().id().value().toString());
     }
     final OrderDetails details =
         orderQueries
@@ -82,12 +82,12 @@ public class ChargeOrderCommandHandler {
           "Skipped charging an order that is not confirmed: orderId={}, status={}",
           orderIdValue,
           orderStatus);
-      return new ChargeOrderResult(null);
+      return new ChargeOrderResult.NotCharged();
     }
     final Money amount = new Money(details.totalAmount());
     final ChargeOutcome outcome = paymentGateway.charge(orderId, amount);
     final Payment payment = Payment.record(orderId, amount, outcome, Instant.now(clock));
     paymentRepository.add(payment);
-    return new ChargeOrderResult(payment.id().value().toString());
+    return new ChargeOrderResult.Charged(payment.id().value().toString());
   }
 }

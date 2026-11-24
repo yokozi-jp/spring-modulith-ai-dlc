@@ -186,26 +186,6 @@ describe("sanitizeTelemetryItem のメタデータと payload", () => {
     expect(sanitizeTelemetryItem(measurement(values), root)).toBeNull();
   });
 
-  it("traceId などの相関の項目は変えずに、trace の url.* 属性をすべて除く", () => {
-    const span = {
-      traceId: "trace",
-      spanId: "span",
-      parentSpanId: "parent",
-      attributes: [
-        { key: "url.full", value: { stringValue: "http://localhost/api/42?q=x" } },
-        { key: "url.path", value: { stringValue: "/api/42" } },
-        { key: "url.scheme", value: { stringValue: "http" } },
-        { key: "http.request.method", value: { stringValue: "GET" } },
-      ],
-    };
-    const trace = item("trace", { resourceSpans: [{ scopeSpans: [{ spans: [span] }] }] });
-    const spans = [{ ...span, attributes: [span.attributes[3]] }];
-
-    expect(sanitizeTelemetryItem(trace, root)?.payload).toMatchObject({
-      resourceSpans: [{ scopeSpans: [{ spans }] }],
-    });
-  });
-
   it("複製できない item は捨てる", () => {
     const original = exceptionItem("failed", "app.js");
     Reflect.set(original.payload, "symbol", Symbol("not cloneable"));

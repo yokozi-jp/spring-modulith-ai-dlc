@@ -186,7 +186,7 @@ Proposed の間に回数の上限を自前の `AbandonPolicy` から `abandon-af
   本番は、`lock-at-most-for`（10 分）の 2 倍に 5 分の余裕を足した `PT25M` にする。
 - `wait-age` はリスナーの処理時間より十分に長くする。
 - 有効と無効、`wait-age`、`in-flight-staleness`、間隔は環境変数で注入し、方針、1 回の件数、ロックを持つ上限、手での再投入の完了を待つ上限は `application.yaml` の固定値にする（ADR-008）。
-- 出版の完了は、リスナーのトランザクションの後の新しいトランザクションで記録する（[ADR-118](ADR-118-record-event-publication-completion-in-interceptor.md)）。
+- 出版の完了は、リスナーのトランザクションの後の新しいトランザクションで記録する（[ADR-121](ADR-121-record-event-publication-completion-in-interceptor.md)）。
 - 2.2 に代わる仕組みがないため、次は自作のまま残す。
   - 指数的な待ち時間（`multiplier`、`max-wait`）：`ResubmissionOptions` は件数（`withBatchSize`、`withMaxInFlight`）、`publication_date` からの最小の経過時間（`withMinAge`）、条件の関数（`withFilter`）だけを持ち、最後の試行からの待ち時間も倍率も持たない。
   - 定期の実行と ShedLock のロック：2.2 で定期に動くのは Staleness Monitor だけで、失敗した出版の再投入を定期に動かす仕組みも、複数のインスタンスで排他する仕組みもない。
@@ -382,7 +382,7 @@ Resilience4j は再投入と補完関係にあり、ADR-019 のとおり client 
 - [ADR-054: 楽観的ロックの競合を lock_no の条件と更新件数で判定し、業務テーブルの INSERT と UPDATE を集約の宣言から TableWriter が書く](ADR-054-detect-optimistic-lock-conflicts-by-update-count.md)
 - [ADR-070: SQL の span を jOOQ の ExecuteListener で作り、SQL の文と値を入れない](ADR-070-record-sql-spans-with-jooq-execute-listener.md)
 - [ADR-072: 外部システムを本番のコードで偽らず、WireMock のコンテナで偽る](ADR-072-fake-external-systems-with-wiremock.md)
-- [ADR-118: イベント出版の完了を、リスナーのトランザクションの後の新しいトランザクションで記録する](ADR-118-record-event-publication-completion-in-interceptor.md)
+- [ADR-121: イベント出版の完了を、リスナーのトランザクションの後の新しいトランザクションで記録する](ADR-121-record-event-publication-completion-in-interceptor.md)
 - [ADR-119: Spring Modulith 2.2.0 を Spring Boot 4.1.2 のまま入れ、Spring Boot 4.2 と Spring Cloud 2026.0 への更新を別の変更にする](ADR-119-keep-spring-boot-4-1-with-spring-modulith-2-2.md)
 - [ADR-120: archive の表の保持期限を COMPLETED の行だけに掛け、ABANDONED の行は運用者が戻すか消すまで残す](ADR-120-keep-abandoned-event-publications-out-of-archive-retention.md)
 - [設計の作り込みの程度と段階的な再構築](../principles/right-sizing.md)

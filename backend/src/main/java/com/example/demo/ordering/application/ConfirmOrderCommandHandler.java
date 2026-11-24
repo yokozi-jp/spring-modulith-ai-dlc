@@ -5,7 +5,7 @@ import com.example.demo.ordering.domain.model.Order;
 import com.example.demo.ordering.domain.model.OrderId;
 import com.example.demo.ordering.domain.model.OrderRepository;
 import com.example.demo.shared.failure.NotFoundException;
-import com.example.demo.shared.tenant.TenantContext;
+import com.example.demo.shared.tenancy.TenantContext;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.UUID;

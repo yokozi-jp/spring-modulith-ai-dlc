@@ -199,7 +199,7 @@ class QuantityTest {
 - [ ] `domain.model` に置き、Spring、jOOQ、JPA、Jackson に依存しない。［ArchUnit で検査：PackageByFeatureOnionArchitectureTest.domainModelDoesNotDependOnFrameworks］
 - [ ] `domain.service`、`application`、モジュールルートの型に依存しない。［ArchUnit で検査：PackageByFeatureOnionArchitectureTest.dependenciesPointInward］
 - [ ] `public record` にし、固定の値の集合は `public enum` にする。［自分で点検］
-- [ ] 不変条件をコンパクトコンストラクタで検査し、`IllegalArgumentException` を投げる。［自分で点検］
+- [ ] 不変条件をコンパクトコンストラクタで検査し、`IllegalArgumentException` を投げる。［ArchUnit で検査：PackageByFeatureOnionArchitectureTest.valueObjectsDoNotThrowBusinessRuleViolation］
 - [ ] 演算は新しい値オブジェクトを返す。［自分で点検］
 - [ ] 他モジュールが分岐に使う状態の意味は、enum の定数ごとにコンストラクタの引数で決める。［自分で点検］
 - [ ] 識別子の名前は対象の名前に `Id` を付け、単一の値の component は `Money` だけを `amount`、それ以外を `value` にする。［自分で点検］

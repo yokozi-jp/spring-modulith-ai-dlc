@@ -52,7 +52,7 @@ feature の中のコードを lib へ移す条件は[共有コード](../archite
 ## 依存してよいもの、してはいけないもの
 
 - **依存してよいもの**：同じ lib のファイル、ブラウザの標準の API、型としての i18next の `TFunction`。
-  `lib/telemetry.ts` だけは `@grafana/faro-web-sdk` と `@grafana/faro-web-tracing` に依存してよい。
+  `lib/telemetry.ts` だけは `@grafana/faro-web-sdk` に依存してよい。
 - **依存してはいけないもの**：`@/components/**`、`@/features/**`、`@/routes/**`、`@/routeTree.gen`、`@base-ui/**`、テスト用部品、`lib/telemetry.ts` の外からの `@grafana/*`、global の `fetch` と `XMLHttpRequest`。
 
 ファイルの範囲ごとの禁止の一覧は[ファイルの範囲ごとの制限](../lint-config.md#ファイルの範囲ごとの制限)にある。

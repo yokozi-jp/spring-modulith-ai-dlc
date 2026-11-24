@@ -1,7 +1,7 @@
 package com.example.demo.ordering;
 
-import com.example.demo.shared.tenant.TenantId;
-import com.example.demo.shared.tenant.TenantScoped;
+import com.example.demo.shared.tenancy.TenantId;
+import com.example.demo.shared.tenancy.TenantScoped;
 import java.time.Instant;
 
 /**

@@ -291,6 +291,7 @@ tasks:
       - task: removed-names-check
       - task: ruleset-check
       - task: iwe-mcp-check
+      - task: iwe-tools-check
       - |
         iwe schema validate
         stats="$(iwe stats -f json)"
@@ -342,6 +343,14 @@ tasks:
     silent: true
     cmds:
       - bash tooling/iwe-mcp/test.sh
+
+  # iwec の全ツールが、残す読み取り系か mcp.json の disabledTools に入っているかを検査する。
+  iwe-tools-check:
+    internal: true
+    silent: true
+    cmds:
+      - bash tooling/iwe-tools/test.sh
+      - bash tooling/iwe-tools/check.sh
 
   # .github/rulesets/main.json の必須チェックを、branch-protection.md の一覧と workflow の name に突き合わせる。
   # ponytail: GitHub 上の ruleset との一致は CI で見ない。認証が要るため、比べるのは手元の task ruleset-diff で、限界に当たったら CI で API と比べる。
@@ -502,7 +511,21 @@ tasks:
     cmds:
       - bash tooling/ci-gate-check/test.sh
       - bash tooling/ci-changes/test.sh
+      - bash tooling/test-weakening/test.sh
       - python3 tooling/ci-gate-check/ci-gate-check.py
+
+  # テストファイルの削除とテストケースの減少を警告する。止めず、TESTS_ACK=1 で抑える。
+  test-weakening:
+    desc: テストファイルの削除とテストケースの減少を警告
+    silent: true
+    cmds:
+      - bash tooling/test-weakening/check.sh
+
+  test-weakening-test:
+    desc: test-weakening の自己検査
+    silent: true
+    cmds:
+      - bash tooling/test-weakening/test.sh
 
   # CI の job は使う道具だけを入れるので、ほかの道具の版を上げて lock を作り直さない変更はここで止める（ADR-090）。
   mise-lock-check:
@@ -948,8 +971,15 @@ tasks:
       - task: api-lint
 
   be-openapi-check:
-    desc: 直前のbe-testが書き出したOpenAPI契約をSpectralで検査し、コミット済みの内容と一致するか検査（前提はbe-testの実行済み。単体ではdriftを検出できない）
+    desc: 直前のbe-testが書き出したOpenAPI契約をSpectralで検査し、コミット済みの内容と一致するか検査（前提はbe-testの実行済み。be-testの開始後に契約が書かれていなければ失敗する）
     cmds:
+      # be-test の開始より新しくなければ、テストは契約を書き出していない（#467）。
+      # 契約を消さずに印の時刻と比べるのは、同じ実行の ApiContractCoverageTest が契約を読むため（ADR-077）。
+      - |
+        if [ ! -e backend/build/be-test.stamp ] || ! [ openapi/openapi.yaml -nt backend/build/be-test.stamp ]; then
+          echo "be-test の実行中に openapi/openapi.yaml が書き出されていません。task be-test を実行してください。" >&2
+          exit 1
+        fi
       - task: api-lint
       - task: api-drift-check
         vars: { PATHS: openapi/openapi.yaml }
@@ -959,6 +989,7 @@ tasks:
     dir: backend
     deps: [_ensure-test-env]
     cmds:
+      - mkdir -p build && touch build/be-test.stamp
       - ./gradlew test jacocoTestCoverageVerification -PopenapiExport=true -PtestEnvFile="../{{.TEST_ENV_FILE}}"
 
   be-test-dev:
@@ -1078,6 +1109,8 @@ tasks:
       vars: [PATHS]
     cmds:
       - |
+        # 追跡されていない path は git diff も ls-files --others も何も出さず、検査が素通りする。
+        git ls-files --error-unmatch -- {{.PATHS}} >/dev/null || { echo "追跡されていない path があります。PATHS を確認してください。" >&2; exit 1; }
         status=0
         git diff --exit-code -- {{.PATHS}} || status=1
         untracked="$(git ls-files --others --exclude-standard -- {{.PATHS}})"
@@ -1253,7 +1286,7 @@ tasks:
         echo "Login URL: http://localhost:18080/oauth2/authorization/web"
 
   otel-collector-check:
-    desc: Collectorの設定が許可したログとtraceの属性だけを残すことを確認
+    desc: Collectorの設定が許可したログの属性だけを残すことを確認
     silent: true
     cmds:
       - task: _frontend-view-allowlist-check
@@ -1263,7 +1296,7 @@ tasks:
         # 個人情報や URL のトークンが保存先に流れ、一度書かれたログは取り消せない。だから設定を変えたら必ず流して確かめる。
         # 検証する内容の正文は docs/observability/conventions.md の「検証」節と ADR-068 にある（Taskfile は手順だけを持つ）。
         # 本物の Grafana を立てず、check/check.yaml で出口だけをファイルに差し替える。processor は config.yaml のまま使う。
-        # 出口はバックエンド（backend.json）、フロントエンドのログ（frontend.json）と trace（frontend-traces.json）、CSP の報告（frontend-csp.json）に分け、それぞれ別の jq で検査する。
+        # 出口はバックエンド（backend.json）、フロントエンドのログ（frontend.json）、CSP の報告（frontend-csp.json）に分け、それぞれ別の jq で検査する。
         # 入力の fixture は check/fixtures/ に置き、backend.json は OTLP 形式、frontend.json は Faro の payload 形式、csp-reports.json は Reporting API の形式である。
         # イメージは Compose の定義から取り、Dependabot の更新と揃える。
         image="$({{.DOCKER}} compose --env-file .env.example -f docker/compose.yml config --format json | jq -r '.services["otel-collector"].image')"
@@ -1366,7 +1399,7 @@ tasks:
         done
         if [ "$accepted" -ne 1 ]; then fail "Collector の faro receiver が Faro の payload を受け付けませんでした。"; fi
         invalid="$out/invalid-session.json"
-        jq '.meta.session.id = "0b1e5c1a-4f0e-4c55-9d8e-2f1a3b4c5d6e" | .meta.app.version = "invalid-session-probe" | del(.traces)' \
+        jq '.meta.session.id = "0b1e5c1a-4f0e-4c55-9d8e-2f1a3b4c5d6e" | .meta.app.version = "invalid-session-probe"' \
           docker/otel-collector/check/fixtures/frontend.json > "$invalid"
         status="$(curl -s -o /dev/null -w '%{http_code}' -X POST -H "Content-Type: application/json" \
           --data-binary "@$invalid" "http://$faro_address/collect")"
@@ -1435,43 +1468,9 @@ tasks:
         ' "$out/frontend.json" >/dev/null; then
           fail "フロントエンドの例外、View、Web Vitals、session の正規形が期待値と一致しません。"
         fi
-        # 同じ payload の traces は traces/frontend を通り、frontend-traces.json に出る。
-        for _ in $(seq 1 30); do
-          if grep -qF 'resourceSpans' "$out/frontend-traces.json" 2>/dev/null; then break; fi
-          sleep 1
-        done
-        if [ ! -s "$out/frontend-traces.json" ]; then fail "フロントエンドの trace が出口に届きませんでした。"; fi
-        if grep -qE 'secret-|person@example\.com|fixture-user-id|fixture-session-id|FixtureAgent' "$out/frontend-traces.json"; then
-          fail "フロントエンドの trace に、許可していない値か URL の query か fragment が残りました。"
-        fi
-        if ! jq -s -e '
-          def attr($key): first(.attributes[]? | select(.key == $key) | .value.stringValue);
-          [.[].resourceSpans[]?] as $resources
-          | [$resources[].scopeSpans[]?] as $scopes
-          | [$scopes[].spans[]?] as $spans
-          | ($resources | length) > 0
-            and all($resources[]; .resource
-              | attr("service.name") == "demo-web"
-                and ([.attributes[]?.key] | sort) == ["deployment.environment.name", "service.name", "service.namespace", "service.version"])
-            and all($scopes[]; .scope.name == "browser" and ((.scope.version // "") == "") and ((.scope.attributes // []) | length) == 0)
-            and ($spans | length) == 2
-            and all($spans[];
-              .name == "Browser request"
-                and .traceId == "0af7651916cd43dd8448eb211c80319c"
-                and .parentSpanId == "00f067aa0ba902b7"
-                and ((.traceState // "") == "")
-                and ((.status.message // "") == "")
-                and ((.events // []) | length) == 0
-                and ((.links // []) | length) == 0)
-            and any($spans[];
-              .spanId == "b7ad6b7169203331"
-                and ([.attributes[]?.key] | sort) == ["http.request.method", "http.response.status_code"]
-                and attr("http.request.method") == "GET")
-            and any($spans[];
-              .spanId == "b7ad6b7169203332"
-                and ([.attributes[]?.key] | length) == 0)
-        ' "$out/frontend-traces.json" >/dev/null; then
-          fail "フロントエンドの trace の属性、resource 属性、span の項目のいずれかが期待値と一致しません。"
+        # fixture の trace は pipeline がないので捨てられる。faro を traces の receivers に足すと、ここで見つかる。
+        if grep -qF "0af7651916cd43dd8448eb211c80319c" "$out/backend.json" "$out/frontend.json" "$out/frontend-csp.json"; then
+          fail "faro receiver が受けた trace が出口に届きました。"
         fi
         # CSP の報告。webhook_event の起動も OTLP より遅れうるので、200 になるまで送る。200 の後は再送しない。
         accepted=0
@@ -1563,7 +1562,7 @@ tasks:
         ' "$out/frontend-csp.json" >/dev/null; then
           fail "CSP の報告の属性、resource 属性、scope の属性、件数のいずれかが期待値と一致しません。"
         fi
-        echo "Collector OK: 許可した属性だけを残し、Faro の payload のログと trace、CSP の報告から URL の query と許可していない値を消しました。"
+        echo "Collector OK: 許可した属性だけを残し、Faro の payload のログ、CSP の報告から URL の query と許可していない値を消しました。"
 
   compose-reset:
     desc: 明示確認付きでComposeサービスと全データを削除
@@ -1833,6 +1832,7 @@ tasks:
         echo "Taskfile OK: YAML構文とスキーマ構造の解析に成功しました。"
         bash tooling/taskfile-cleanup/test.sh
         bash tooling/task-calls/test.sh
+        bash tooling/openapi-drift/test.sh
         bash tooling/task-calls/task-calls.sh
 
   lint-lefthook:

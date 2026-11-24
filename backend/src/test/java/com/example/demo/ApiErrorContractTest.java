@@ -20,6 +20,7 @@ import errorfixture.presentation.web.ErrorFixture;
 import io.opentelemetry.api.OpenTelemetry;
 import io.opentelemetry.api.common.AttributeKey;
 import io.opentelemetry.api.logs.Severity;
+import io.opentelemetry.api.trace.TraceId;
 import io.opentelemetry.instrumentation.logback.appender.v1_0.OpenTelemetryAppender;
 import io.opentelemetry.sdk.logs.data.LogRecordData;
 import java.util.ArrayList;
@@ -44,6 +45,8 @@ import org.springframework.http.MediaType;
 import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
+import tools.jackson.databind.json.JsonMapper;
+import tools.jackson.databind.node.ObjectNode;
 
 /** テスト専用の Controller で、入力検証、未処理例外、Spring MVC の標準例外の Problem Details とログを検証する。 */
 @SuppressWarnings({
@@ -63,6 +66,9 @@ class ApiErrorContractTest {
   /** 入力値を含む本文。応答に入力値が出ないことを確かめる。 */
   private static final String INVALID_BODY =
       "{\"name\":\"\",\"items\":[{\"code\":\"secret-value\"}]}";
+
+  /** 応答の本文を読む。 */
+  private static final JsonMapper JSON = JsonMapper.builder().build();
 
   /** ログの属性名。 */
   private static final AttributeKey<Long> STATUS_CODE =
@@ -85,7 +91,8 @@ class ApiErrorContractTest {
 
   @ParameterizedTest(name = "{0}")
   @MethodSource("problemCases")
-  @DisplayName("各エラーは期待した status、type、日本語の title の Problem Details を detail なしで返す")
+  @DisplayName(
+      "各エラーは期待した status、type、日本語の title と traceId の Problem Details を detail と instance なしで返す")
   void errorsReturnProblemDetails(
       final String name,
       final MockHttpServletRequestBuilder request,
@@ -100,7 +107,9 @@ class ApiErrorContractTest {
         .andExpect(jsonPath("$.type").value(type))
         .andExpect(jsonPath("$.title").value(title))
         .andExpect(jsonPath("$.status").value(status))
-        .andExpect(jsonPath("$.detail").doesNotExist());
+        .andExpect(jsonPath("$.detail").doesNotExist())
+        .andExpect(jsonPath("$.instance").doesNotExist())
+        .andExpect(jsonPath("$.traceId").value(Matchers.matchesPattern("^[0-9a-f]{32}$")));
   }
 
   @Test
@@ -274,7 +283,7 @@ class ApiErrorContractTest {
   }
 
   @Test
-  @DisplayName("識別子の違う 2 つの 404 は、本文と Content-Type、Content-Language が同じになる")
+  @DisplayName("識別子の違う 2 つの 404 は、要求ごとの traceId を除いた本文と Content-Type、Content-Language が同じになる")
   void notFoundBodiesAreIdentical() throws Exception {
     final List<MockHttpServletResponse> responses = new ArrayList<>();
     for (final String id : List.of("a", "b")) {
@@ -292,7 +301,11 @@ class ApiErrorContractTest {
     final MockHttpServletResponse first = responses.getFirst();
     final MockHttpServletResponse second = responses.getLast();
 
-    assertEquals(first.getContentAsString(), second.getContentAsString(), "本文");
+    final ObjectNode firstBody = JSON.readValue(first.getContentAsString(), ObjectNode.class);
+    final ObjectNode secondBody = JSON.readValue(second.getContentAsString(), ObjectNode.class);
+    assertTrue(firstBody.has("traceId") && secondBody.has("traceId"), "どちらの本文も traceId を持つ");
+    assertEquals(
+        firstBody.deepCopy().without("traceId"), secondBody.deepCopy().without("traceId"), "本文");
     assertEquals(first.getContentType(), second.getContentType(), "Content-Type");
     assertEquals(
         first.getHeader(HttpHeaders.CONTENT_LANGUAGE),
@@ -400,6 +413,25 @@ class ApiErrorContractTest {
     assertTrue(
         capturedLogRecords.withScope("org.springframework.web.servlet.PageNotFound").isEmpty(),
         "PageNotFound の記録がないこと");
+  }
+
+  @Test
+  @DisplayName("Problem Details の traceId は、同じ要求の API client error のログの trace ID と同じになる")
+  void problemTraceIdMatchesLoggedTraceId() throws Exception {
+    final String body =
+        mockMvc
+            .perform(delete("/api/error-fixture/items").with(oidcLogin()).with(csrf()))
+            .andExpect(status().isMethodNotAllowed())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+    final String traceId = JSON.readTree(body).path("traceId").asString();
+
+    assertTrue(TraceId.isValid(traceId), body);
+    assertTrue(
+        capturedLogRecords.withBody("API client error").stream()
+            .anyMatch(record -> traceId.equals(record.getSpanContext().getTraceId())),
+        () -> "traceId=" + traceId + " の API client error の LogRecord");
   }
 
   private LogRecordData assertLogged(

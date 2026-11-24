@@ -9,6 +9,8 @@ import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
 
 import com.example.demo.DemoApplication;
 import com.example.demo.testkit.SharedTestConfiguration;
+import com.tngtech.archunit.base.DescribedPredicate;
+import com.tngtech.archunit.core.domain.JavaAccess;
 import com.tngtech.archunit.core.domain.JavaClass;
 import com.tngtech.archunit.core.domain.JavaMethod;
 import com.tngtech.archunit.junit.AnalyzeClasses;
@@ -21,6 +23,7 @@ import java.util.Arrays;
 import java.util.Calendar;
 import java.util.GregorianCalendar;
 import java.util.TimeZone;
+import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -56,6 +59,17 @@ class TestConventionsArchTest {
       "止めたテストを、なぜ止めたか分からないまま残さないため。"
           + "直し方：@Disabled(\"<停止理由>\") のように value に停止理由を書く。規約："
           + TESTING_CODE_STYLE_DOC;
+
+  /** 固定時間の待機を表す、{@code Thread} と {@code TimeUnit} の {@code sleep}。 */
+  // 禁止する API の所有クラスとして Thread を参照する。
+  @SuppressWarnings("PMD.DoNotUseThreads")
+  private static final DescribedPredicate<JavaAccess<?>> FIXED_TIME_SLEEP =
+      DescribedPredicate.describe(
+          "Thread.sleep か TimeUnit.sleep",
+          access ->
+              "sleep".equals(access.getName())
+                  && (access.getTargetOwner().isEquivalentTo(Thread.class)
+                      || access.getTargetOwner().isEquivalentTo(TimeUnit.class)));
 
   /** すべての {@code @Test} メソッドに {@code @DisplayName} で検証意図を明記させる。 */
   @ArchTest
@@ -171,6 +185,22 @@ class TestConventionsArchTest {
                   + "直し方：イベントは Spring Modulith の Scenario で、それ以外は対象 API の期限付き条件待機か、"
                   + "非プリエンプティブな assertTimeout で待つ。"
                   + "規約："
+                  + TESTING_CODE_STYLE_DOC);
+
+  /**
+   * {@code Thread.sleep} と {@code TimeUnit.sleep} を、呼び出しでもメソッド参照でも禁止する。固定時間の待ちは遅い環境で偶然に失敗するため。
+   *
+   * <p>所有クラスで絞るので、同名の別のメソッドは検出しない。
+   */
+  @ArchTest
+  /* package */ static final ArchRule sleepIsNotUsedInTests =
+      noClasses()
+          .should()
+          .accessTargetWhere(FIXED_TIME_SLEEP)
+          .because(
+              "固定時間の待ちは、遅い環境で偶然に失敗し、速い環境で余計に待つため。"
+                  + "直し方：イベントは Spring Modulith の Scenario で、それ以外は Awaitility の"
+                  + "await(\"<対象と期待>\").atMost(<期限>) で条件を待つ。規約："
                   + TESTING_CODE_STYLE_DOC);
 
   /** テストコードでもレガシー日時型を禁止する（型を参照する ArchUnit 定義自身がある architecture は除外）。 */

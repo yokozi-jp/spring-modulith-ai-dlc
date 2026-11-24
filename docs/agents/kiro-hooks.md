@@ -34,6 +34,8 @@ rename や move のツールが他のファイルに加える編集と、shell �
 ## block-iwe-normalize
 
 `iwe normalize` の通常の実行を拒否する。
+hook が止めるのは shell の CLI の経路である。
+MCP の経路は `.kiro/settings/mcp.json` の `disabledTools` が止める。
 拒否する理由と、意図して実行する手順は [docs文書の作成と変更](../knowledge/documentation-authoring.md)の「破壊的操作」にある。
 
 ## block-agent-git
@@ -52,7 +54,7 @@ shell のツールが `git commit` か `git push` を直接実行しようとす
 - ツールの呼び出しが動くディレクトリは見ない。このリポジトリの外の checkout で `git commit` をしても拒否する。
 - STDIN がない、JSON として読めない、`jq` がない（`mise install --locked` で入る）、コマンドの項目がない、のいずれかのときは許可する。
 - コマンドを文字列として読むだけで、shell の構文は解析しない。heredoc の本文の行頭にある `git push` は拒否し、`bash -c "git push"` やスクリプトのファイルの中の git は通す。意図した回避は止めず、docs に従うエージェントを正しい手順へ導くためのフックである。
-- `task agent-push` が行うのは通常の push だけで、force push の手順はない。`.kiro/kiro-permissions.yaml` も `git push *--force*` を拒否する。外から入れたスキルの playbook に `git push --force-with-lease` を指示する記述（`.kiro/skills/poteto-mode/playbooks/babysit.md` など）があるが、履歴の書き換えが要る場面では止めて利用者に報告する（[RGDD の開発フロー](rgdd.md)）。
+- `task agent-push` が行うのは通常の push だけで、force push の手順はない。`.kiro/kiro-permissions.yaml` も `git push *--force*` を拒否する。外から入れたスキルの playbook に `git push --force-with-lease` を指示する記述（`.kiro/skills/poteto-mode/playbooks/shipping.md` など）があるが、履歴の書き換えが要る場面では止めて利用者に報告する（[RGDD の開発フロー](rgdd.md)）。
 
 自己検査は `bash .kiro/hooks/block-agent-git.test.sh` で実行する。
 `task skills-check` がこの自己検査も実行するため、`.kiro/` を変えると Lefthook の pre-commit と CI でも動く。

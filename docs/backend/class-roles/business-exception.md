@@ -28,6 +28,24 @@ HTTP のステータスとログレベルは `error` モジュールの `ApiExce
 プログラムの誤り（主キーの条件が 2 行に合う、束縛すべき値がない）は業務上の失敗ではない。
 `IllegalStateException` と `IllegalArgumentException` で投げ、HTTP の 500 にする。
 
+## 例外と値の使い分け
+
+要求を断り、トランザクションで書いたものを取り消す失敗は、業務上の失敗の例外で投げる。
+業務の状態に記録して正常に終える結果（決済の拒否、契約の不備、請求しない、処理済み）は、[Result](result.md) の値で返す。
+場合が閉じていれば、Result を sealed interface と record で表す。
+
+迷ったら、失敗の前に書いた行とイベントの出版を commit してよいかで決める。
+commit してよければ値で返す。
+値を返すと Spring は commit し、Spring Modulith は出版を `COMPLETED` にする。
+commit してはいけなければ例外を投げる。
+例外は Spring のトランザクションの rollback、イベント出版の取り消し、`ApiExceptionHandler` の変換、出版の `FAILED` の合図になる。
+
+値の失敗を rollback させるために `TransactionAspectSupport.currentTransactionStatus().setRollbackOnly()` を呼ばない。
+rollback させたい失敗は、例外にする。
+
+この基準は[非同期処理の失敗時の再試行と回復](../../integration/async-failure-recovery.md)の「業務の状態に記録してリスナーを正常終了させる」と同じである。
+検査例外、自作の `Result`、`ErrorResponse` を実装した例外を採らない理由は [ADR-062](../../adr/ADR-062-map-business-exceptions-to-404-409-422.md) の Alternatives Considered に示す。
+
 ## 置き場所と命名
 
 - `NotFoundException` と `BusinessRuleViolationException` は `com.example.demo.shared.failure` に、`ConflictException` は `com.example.demo.shared.concurrency` に置く。
@@ -111,7 +129,8 @@ Controller は参照の結果がなければ `NotFoundException` を投げ、ス
 
 ## 対応するテスト
 
-集約、値オブジェクト、Domain Service の単体テストで、投げる例外の型と、メッセージの識別子を確かめる（`isInstanceOf(BusinessRuleViolationException.class)`）。
+集約と Domain Service の単体テストで、投げる例外の型と、メッセージの識別子を確かめる（`isInstanceOf(BusinessRuleViolationException.class)`）。
+値オブジェクトの単体テストは、`IllegalArgumentException` を確かめる。
 例外から HTTP のステータス、本文、ログへの対応づけは `ApiErrorContractTest` と `ApiExceptionHandlerTest` が確かめるため、機能ごとのテストでは確かめない。
 
 ## アンチパターン
@@ -134,6 +153,7 @@ Controller は参照の結果がなければ `NotFoundException` を投げ、ス
 ## 作成時のチェックリスト
 
 - [ ] 業務上の失敗は `NotFoundException`、`BusinessRuleViolationException`、`ConflictException` のどれかで投げる。［自分で点検］
+- [ ] 値オブジェクトの record は `BusinessRuleViolationException` を投げず、不変条件の違反を `IllegalArgumentException` で表す。［ArchUnit で検査：PackageByFeatureOnionArchitectureTest.valueObjectsDoNotThrowBusinessRuleViolation］
 - [ ] `NoSuchElementException` を生成せず、引数なしの `Optional.orElseThrow()` を呼ばない。［ArchUnit で検査：GeneralCodingRulesArchTest.noSuchElementExceptionIsNotThrown］
 - [ ] `Throwable`、`Exception`、`RuntimeException`、`Error` を投げない。［ArchUnit で検査：GeneralCodingRulesArchTest.noClassesShouldThrowGenericExceptions］
 - [ ] `shared` の型は Spring Web、Spring の HTTP、Servlet の型に依存しない。［ArchUnit で検査：PackageByFeatureOnionArchitectureTest.sharedModuleDoesNotDependOnHttp］
@@ -143,3 +163,5 @@ Controller は参照の結果がなければ `NotFoundException` を投げ、ス
 - [ ] Repository の実装は Spring と jOOQ の例外を外へ出さず、出すときは原因を付けずに種類を付けた `ConflictException` に変える。［自分で点検］
 - [ ] 三つの型に原因を付けない（`initCause` を呼ばない）。［実行時に検査：`initCause` は `IllegalStateException` になる］
 - [ ] 単体テストで例外の型を確かめる。［自分で点検］
+- [ ] 失敗の前に書いた行とイベントの出版を commit してよいときは、例外を投げず Result の値で返す。［自分で点検］
+- [ ] 値の失敗を `setRollbackOnly()` で rollback させない。［自分で点検］
