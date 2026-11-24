@@ -288,7 +288,10 @@ server:
   port: ${SERVER_PORT}
   # ALB などプロキシ配下で X-Forwarded-* を解釈し、元のスキーム/ホスト/IP を復元する。
   # ローカルはヘッダが付かないため透過的（全環境共通で可）。
-  forward-headers-strategy: framework
+  request:
+    header:
+      forwarded:
+        strategy: framework
   servlet:
     session:
       # URL rewriting を無効化し、セッション ID は Cookie だけで送受信する。
