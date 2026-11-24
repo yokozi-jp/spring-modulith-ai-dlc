@@ -17,6 +17,7 @@ import org.jspecify.annotations.Nullable;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import software.amazon.awssdk.awscore.exception.AwsErrorDetails;
+import software.amazon.awssdk.awscore.exception.AwsServiceException;
 import software.amazon.awssdk.services.sesv2.SesV2Client;
 import software.amazon.awssdk.services.sesv2.model.BadRequestException;
 import software.amazon.awssdk.services.sesv2.model.Content;
@@ -37,8 +38,8 @@ import software.amazon.awssdk.services.sesv2.model.SesV2Exception;
  * に残して再投入を待つ。circuit breaker はスロットリング以外の 4xx を失敗に数えない（application.yaml の {@code
  * ignore-exception-predicate}）。
  *
- * <p>ログには例外の型と SES のエラーコードだけを出し、宛先のアドレスと SES のエラーの文面を出さない（ADR-015）。{@code MessageRejected}
- * の文面は、確かめられなかった宛先を含みうるためである。
+ * <p>Client のログと、投げる SES の例外のメッセージには、例外の型と SES のエラーコードだけを入れ、宛先のアドレスと SES のエラーの文面を入れない（ADR-015）。SES
+ * の文面は、確かめられなかった宛先や ID を含みうるためである。
  */
 @Slf4j
 @Component
@@ -112,6 +113,8 @@ class MailSenderClient implements MailSender {
       messageId = sesV2Client.sendEmail(request(to, subject, body)).messageId();
     } catch (MessageRejectedException | BadRequestException exception) {
       return rejected(exception);
+    } catch (SesV2Exception exception) {
+      throw withoutErrorText(exception);
     }
     if (messageId == null || messageId.isBlank()) {
       log.warn("SES reply violated the contract: MessageId is missing");
@@ -140,6 +143,27 @@ class MailSenderClient implements MailSender {
     final @Nullable String errorCode = details == null ? null : details.errorCode();
     log.warn("SES rejected the mail: exception={}, errorCode={}", type, errorCode);
     return new MailOutcome.Rejected();
+  }
+
+  /**
+   * SES のエラーの文面を除いた、同じ型の例外を作る。型、状態のコード、エラーコード、要求の ID は残す。
+   *
+   * <p>投げた例外のメッセージは、Spring Modulith と非同期の実行のログに出る。SES の文面は宛先と ID を含みうるため、ここで落とす。
+   */
+  private static AwsServiceException withoutErrorText(final SesV2Exception exception) {
+    final @Nullable AwsErrorDetails details = exception.awsErrorDetails();
+    final @Nullable String errorCode = details == null ? null : details.errorCode();
+    return exception.toBuilder()
+        .message("SES returned an error: errorCode=" + errorCode)
+        .awsErrorDetails(
+            details == null
+                ? null
+                : AwsErrorDetails.builder()
+                    .errorCode(errorCode)
+                    .serviceName(details.serviceName())
+                    .build())
+        .cause(null)
+        .build();
   }
 
   /** UTF-8 の文字列の Content を作る。 */

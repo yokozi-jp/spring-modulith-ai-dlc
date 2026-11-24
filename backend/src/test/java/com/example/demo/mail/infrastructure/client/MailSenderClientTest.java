@@ -239,24 +239,31 @@ class MailSenderClientTest {
     assertThat(requests).as("%d の要求の数", status).hasValue(1);
   }
 
-  @Test
-  @DisplayName("権限の不備（AccessDeniedException）は再投入で回復できるので、SesV2Exception を投げる")
-  void accessDeniedThrows() throws IOException {
+  @ParameterizedTest(name = "{0} {1}")
+  @CsvSource({"403, AccessDeniedException", "400, MailFromDomainNotVerifiedException"})
+  @DisplayName("権限と送信の設定の不備は再投入で回復できるので例外を投げ、型、状態のコード、エラーコードを残して、SES の文面と宛先を落とす")
+  void operatorFixableErrorThrowsWithoutErrorText(final int status, final String errorType)
+      throws IOException {
     final MailSenderClient client =
         start(exchange ->
             reply(
                 exchange,
-                403,
-                "AccessDeniedException",
-                "{\"Message\":\"User is not authorized to perform: ses:SendEmail\"}"));
+                status,
+                errorType,
+                "{\"message\":\"not authorized to send to identity/" + TO.value() + "\"}"));
 
     assertThatThrownBy(() -> client.send(TO, SUBJECT, BODY))
         .isInstanceOfSatisfying(
             SesV2Exception.class,
-            exception ->
-                assertThat(exception.awsErrorDetails().errorCode())
-                    .as("エラーコード")
-                    .isEqualTo("AccessDeniedException"));
+            exception -> {
+              assertThat(exception.statusCode()).as("状態のコード").isEqualTo(status);
+              assertThat(exception.awsErrorDetails().errorCode()).as("エラーコード").isEqualTo(errorType);
+              assertThat(exception.getMessage())
+                  .as("例外のメッセージ")
+                  .contains(errorType)
+                  .doesNotContain(TO.value())
+                  .doesNotContain("not authorized");
+            });
   }
 
   @Test

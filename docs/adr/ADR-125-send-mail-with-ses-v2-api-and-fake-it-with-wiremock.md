@@ -70,7 +70,8 @@ AWS SDK for Java v2 は、同じ値をシステムプロパティ `aws.endpointU
   2. 回復しない拒否（`MessageRejected`、`BadRequestException`）：例外を投げずに拒否の結果を返し、呼び出し元が業務の状態に記録する。同じ要求を再投入しても受け付けられないためである。
   3. 資格情報と権限の不備（`AccessDeniedException` などの 403）と、運用者が直せる SES の不備（送信の停止、From のドメインの未検証、設定セットがない、送信の上限）：例外を投げ、`FAILED` に残す。直したあとの再投入で回復できるためである。スロットリングを除く 4xx は、SES の不調ではないので circuit breaker の失敗に数えない。
   4. 契約に合わない応答（2xx で `MessageId` がない）：拒否の結果を返す。送り直すと 2 通目が出うるためである。
-- Client のログには、例外の型と SES のエラーコードだけを出し、宛先のアドレスと SES のエラーの文面を出さない（[ADR-015](ADR-015-structure-and-protect-observability-data.md)）。
+- Client のログと、Client が投げる SES の例外のメッセージには、例外の型と SES のエラーコードだけを入れ、宛先のアドレスと SES のエラーの文面を入れない（[ADR-015](ADR-015-structure-and-protect-observability-data.md)）。
+  投げた例外のメッセージは、Spring Modulith がリスナーの失敗を記録するログに出る。
   `MessageRejected` の文面は、確かめられなかった宛先のアドレスを含みうるためである。
 
 ## Consequences

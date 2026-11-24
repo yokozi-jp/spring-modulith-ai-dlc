@@ -77,6 +77,9 @@ tags: [convention, mail, backend, ses, external-system]
 - `MailSenderClient` は、拒否したときだけ WARN のログに例外の型と SES のエラーコードを出す。
 - 宛先のアドレス、件名、本文、SES のエラーの文面をログに出さない（[ADR-015](../adr/ADR-015-structure-and-protect-observability-data.md)）。
   `MessageRejected` の文面は、確かめられなかった宛先を含みうる。
+- `MailSenderClient` が投げる SES の例外は、SES のエラーの文面を落とし、型、状態のコード、エラーコード、要求の ID だけを持つ。
+  例外のメッセージは、Spring Modulith がリスナーの失敗を記録するログに出るためである。
+  接続の失敗とタイムアウトの例外は SDK のメッセージのままで、SES の文面を含まない。
 - 送ったメールを SES の記録と突き合わせるときは、`Sent` の `MailMessageId` を使う。
 
 ## テスト
