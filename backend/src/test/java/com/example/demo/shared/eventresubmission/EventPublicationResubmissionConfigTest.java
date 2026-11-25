@@ -402,7 +402,7 @@ class EventPublicationResubmissionConfigTest {
   }
 
   @Test
-  @DisplayName("手での 1 回の再投入の対象があると、Web のサーバーと定期の実行を止め、なければ何もしない")
+  @DisplayName("手での 1 回の再投入の対象があると、Web のサーバーと定期の実行（再投入、冪等性キーの掃除、archive の保持期限の削除）を止め、なければ何もしない")
   void resubmitOnceEnvironmentDisablesWebAndScheduling() {
     final EventPublicationResubmissionConfig.ResubmitOnceEnvironment postProcessor =
         new EventPublicationResubmissionConfig.ResubmitOnceEnvironment();
@@ -419,6 +419,12 @@ class EventPublicationResubmissionConfigTest {
     assertThat(once.getProperty("spring.main.web-application-type")).isEqualTo("none");
     assertThat(once.getProperty(ENABLED)).isEqualTo("false");
     assertThat(once.getProperty(purgeEnabledKey())).isEqualTo("false");
+    assertThat(
+            once.getProperty(
+                EventPublicationArchiveRetentionConfig.Scheduling.class.getAnnotation(
+                        ConditionalOnBooleanProperty.class)
+                    .value()[0]))
+        .isEqualTo("false");
     assertThat(once.getProperty(AWAIT_TERMINATION)).isEqualTo("true");
     assertThat(once.getProperty(AWAIT_TERMINATION_PERIOD)).isEqualTo("20s");
     assertThat(normal.getProperty("spring.main.web-application-type")).isNull();
