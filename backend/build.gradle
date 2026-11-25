@@ -239,10 +239,9 @@ tasks.named('pitest') {
  */
 tasks.named('test') {
     // fork ごとに InfrastructureContainers がコンテナを起動し、DB を共有しない（ADR-085）。
-    // ponytail: 既定はコア数の半分。fork ごとに JVM、PostgreSQL、WireMock のメモリを使うため、
-    // メモリの少ない環境では -PtestForks=<n> で減らす。
-    maxParallelForks = providers.gradleProperty('testForks').map { it as int }
-        .getOrElse(Math.max(1, Runtime.runtime.availableProcessors().intdiv(2)))
+    // 既定は 2。同時に流すセッションを 3 つまでとし、8 コアの WSL で 3 本が重なっても飽和させないため。
+    // ponytail: コア数もホストの負荷も見ない。コアが少ない環境や同時のセッションが多いときは -PtestForks=<n> で変える。
+    maxParallelForks = providers.gradleProperty('testForks').map { it as int }.getOrElse(2)
     testLogging {
         events 'failed'
         exceptionFormat = 'full'

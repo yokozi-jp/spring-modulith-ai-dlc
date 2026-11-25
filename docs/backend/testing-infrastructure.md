@@ -46,15 +46,17 @@ SESの接続先は、Springの`SesV2Client`の`serviceClientConfiguration().endp
 
 ## 並列度
 
-`maxParallelForks`は既定でコア数の半分にし、`-PtestForks=<n>`で変える。
+`maxParallelForks`の既定は2で、`-PtestForks=<n>`で変える。
+既定の2は、8コアのWSLで3つのセッションが同時にテストを流しても、CPUを飽和させない値である。
 forkどうしは別のコンテナを使う。
 同じforkの中ではテストクラスを順に実行し、DB、Springのコンテキストのキャッシュ、固定の時計を共有する。
 テストの書き方の決まりは[バックエンドのテストコードの書き方](testing-code-style.md)の「並列と実行順」に従う。
 
-WSLで実行するときは、`.wslconfig`の`processors`がforkに使えるコアの上限になる。
+WSLのコア数は`.wslconfig`の`processors`で決まる。既定のforkは、コア数に関係なく2である。
 
-`maxParallelForks`は、ホストの負荷もほかのセッションの数も見ない。
-複数のセッションが同時にテストを流すと、forkの合計が`nproc`に達し、コンテナやGradleのプロセスと合わせてCPUを取り合う。
+`maxParallelForks`は、コア数もホストの負荷もほかのセッションの数も見ない。
+同時に流すセッションは3つまでを目安にする。
+それを超えると、forkの合計がコア数に達し、コンテナやGradleのプロセスと合わせてCPUを取り合う。
 `-PtestForks=<n>`でforkを絞ると、その実行は終えられるが、測った所要時間は負荷が低いときと比べられない。
 遅いときは、先に[バックエンドのテストが遅いときの調べ方](runbook-slow-tests.md)でload averageを見る。
 
@@ -66,7 +68,7 @@ WSLで実行するときは、`.wslconfig`の`processors`がforkに使えるコ�
 ```bash
 task be-test                                              # 全テストとカバレッジの検証
 cd backend && ./gradlew test --tests '*OrderApiTest'      # 一部だけ
-cd backend && ./gradlew test -PtestForks=1                # forkを1つにする
+cd backend && ./gradlew test -PtestForks=1                # forkを1つにする（既定は2）
 ```
 
 `./gradlew test`はカバレッジを検証しない。
