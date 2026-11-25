@@ -65,6 +65,9 @@ class EventPublicationResubmissionConfigTest {
   /** 定期の実行の有効と無効のキー。 */
   private static final String ENABLED = "event-publication.resubmission.enabled";
 
+  /** 定期の実行を有効にする設定。 */
+  private static final String ENABLE_SCHEDULING = ENABLED + "=true";
+
   /** 定期の実行を無効にする設定。 */
   private static final String DISABLED = ENABLED + "=false";
 
@@ -123,7 +126,7 @@ class EventPublicationResubmissionConfigTest {
   @DisplayName("enabled が true なら定期の実行を 1 つ登録する")
   void enabledRegistersScheduling() {
     runnerWithResubmitter()
-        .withPropertyValues(ENABLED + "=true")
+        .withPropertyValues(ENABLE_SCHEDULING)
         .run(context ->
             assertThat(context)
                 .hasNotFailed()
@@ -135,7 +138,7 @@ class EventPublicationResubmissionConfigTest {
   void enabledRegistersResubmitOnceAsFixedDelayTask() {
     runnerWithResubmitter()
         .withConfiguration(AutoConfigurations.of(TaskSchedulingAutoConfiguration.class))
-        .withPropertyValues(ENABLED + "=true")
+        .withPropertyValues(ENABLE_SCHEDULING)
         .run(context -> {
           final List<FixedDelayTask> tasks = fixedDelayTasks(context);
           assertThat(tasks).as("固定の遅延のタスク").hasSize(1);
@@ -225,7 +228,7 @@ class EventPublicationResubmissionConfigTest {
             Clock.class,
             () -> Clock.fixed(Instant.parse("2026-01-01T00:00:00.000000Z"), ZoneOffset.UTC))
         .withBean(MeterRegistry.class, SimpleMeterRegistry::new)
-        .withPropertyValues(ENABLED + "=true");
+        .withPropertyValues(ENABLE_SCHEDULING);
   }
 
   private static List<FixedDelayTask> fixedDelayTasks(final ApplicationContext context) {
@@ -548,7 +551,7 @@ class EventPublicationResubmissionConfigTest {
             AutoConfigurations.of(
                 TaskExecutionAutoConfiguration.class, TaskSchedulingAutoConfiguration.class))
         .withPropertyValues(
-            ENABLED + "=true",
+            ENABLE_SCHEDULING,
             "spring.threads.virtual.enabled=true",
             "spring.task.execution.simple.concurrency-limit=2")
         .run(context -> {
