@@ -212,8 +212,7 @@ task <タスク名>
 開発用の代表データとテナントは次の三つで入れます。
 
 - **`task be-seed`**：ローカルの業務データが空のときだけ代表データを入れる。
-- **`task be-seed-tenancy`**：業務データの有無によらず、テナントと所属の足りない行だけを入れ、業務データを入れない。
-  `task e2e-up`が呼ぶ。
+- **`task be-seed-tenancy`**：テナントと所属だけを入れる（[DB操作コマンドのリファレンス](docs/database/commands.md)）。
 - **`task be-seed-reset CONFIRM_RESET=yes`**：ローカルの業務データを消して代表データを入れ直す。
 
 エージェントは commit と push を `task agent-commit`、`task agent-push` でバックグラウンドで始め、`task agent-wait` で終わりを待ちます（[開発ワークフロー](docs/tooling/dev-workflow.md) の「エージェントがcommitとpushをするとき」）。
@@ -256,6 +255,8 @@ Docker Compose の操作（サービスの起動、停止、状態確認、Keycl
 - 起動だけを行う `task e2e-up` と、backend のログを書いて秘密の混入を検査する `task e2e-collect-logs LOG=<パス>` も、単独で実行できます。
   `task e2e-up` は片付けないので、実行したら自分で片付けます。
 - CI の `E2E tests 🎭` は対象パスの変更でだけ起動し、必須チェックにはしていません。
+- `task lint-e2e-seed` は、E2E のコード（`frontend/apps/web/e2e/`）が開発用のシーダーの代表データ（`SEED-`）を名指しする箇所を検出します。
+  `task fe-check`、`task fe-verify`、Frontend CI で実行します（[ADR-129](docs/adr/ADR-129-create-e2e-data-per-test-with-product-registration-api.md)）。
 - 書き方と前提は [E2E テストの方針と書き方](docs/e2e/testing-strategy.md) を参照してください。
 
 ### API 契約

@@ -46,16 +46,16 @@ Keycloak の画面でログインする手順（`signInOnKeycloak`）も持ち�
 
 `frontend/apps/web/playwright.config.ts` の設定は次のとおりである。
 
-| 項目              | 値                                                                             |
-| ----------------- | ------------------------------------------------------------------------------ |
-| project           | `setup`（`*.setup.ts`）と、`setup` に依存する `chromium`（`*.spec.ts`）        |
-| locale            | `ja-JP`                                                                        |
-| retry             | ローカル 0 回、CI 2 回                                                         |
-| trace、screenshot | 失敗時だけ保存する                                                             |
-| video             | 保存しない                                                                     |
-| `webServer`       | `vp preview --mode test` を `webOrigin` で起動し、既存の server を再利用しない |
-| `fullyParallel`   | 有効（実行順への依存を早く見つけるため）                                       |
-| workers           | 指定しない（Playwright の既定値）                                              |
+| 項目              | 値                                                                                  |
+| ----------------- | ----------------------------------------------------------------------------------- |
+| project           | `setup`（`*.setup.ts`）と、`setup` に依存する `chromium`（`*.spec.ts`）             |
+| locale            | `ja-JP`                                                                             |
+| retry             | ローカル 0 回、CI 2 回                                                              |
+| trace、screenshot | 失敗時だけ保存する                                                                  |
+| video             | 保存しない                                                                          |
+| `webServer`       | `vp preview --mode test` を `webOrigin` で起動し、既存の server を再利用しない      |
+| `fullyParallel`   | 有効（実行順への依存を早く見つけるため）                                            |
+| workers           | 指定しない（Playwright の既定値）                                                   |
 
 ## テストデータ
 
@@ -172,7 +172,7 @@ slot 0 の port は次のとおりである。
    slot の web と backend の port（slot 0 は 5173 と 8080）が空いていることを確かめ、frontend の依存の導入と build、Chromium の導入、backend イメージの build を行う。
    frontend は `vp build --mode test` で build し、`.env.test` の `FRONTEND_OTEL_ENABLED=true` で Faro を有効にする。
 3. PostgreSQL、Keycloak、WireMock を起動し、`task be-migrate` で migration を適用する。
-   `task be-seed-tenancy` でテナントと所属だけを入れ、業務データを入れない。
+   `task be-seed-tenancy`（[DB 操作コマンドのリファレンス](../database/commands.md)）でテナントと所属だけを入れる。
 4. backend を起動し、ホストから readiness を確かめる。
 5. Playwright を実行する。
    Playwright が `webServer` で Vite preview を起動し、終了時に止める。
