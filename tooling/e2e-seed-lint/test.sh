@@ -22,6 +22,7 @@ expect() {
 expect ok 0 "e2e-seed-lint OK"
 expect detects 1 'bad.spec.ts:3:'
 expect detects 1 'orders.ts:2:'
+expect detects 1 'lower.ts:1:'
 expect detects 1 "productFactory"
 expect missing 1 "がありません"
 

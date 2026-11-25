@@ -9,8 +9,8 @@ if [ ! -d "$dir" ]; then
   echo "✗ $dir がありません。E2E のディレクトリを移したら、この検査の対象も直してください。" >&2
   exit 1
 fi
-# ponytail: 文字列の grep なので、"SEE" + "D-C03" のように組み立てた名指しは検出できない。そうした書き方が出たら、TypeScript の AST で定数畳み込みをして調べる。
-found="$(grep -rnI --exclude-dir=.auth -- 'SEED-' "$dir")"
+# ponytail: 文字列の grep なので、"SEE" + "D-C03" の連結、"SEED\u002dC03" のエスケープ、シンボリックリンクの先のファイル（grep -r はたどらない）の名指しは検出できない。そうした書き方が出たら、TypeScript の AST で定数畳み込みをして調べる。
+found="$(grep -rniI --exclude-dir=.auth -- 'SEED-' "$dir")"
 if [ $? -gt 1 ]; then
   echo "✗ $dir を grep で読めませんでした。" >&2
   exit 1
