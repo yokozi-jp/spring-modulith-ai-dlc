@@ -38,7 +38,7 @@ Command はモジュールルートの公開契約でもない。
   Bean Validation の制約も付けない。
 - component は Java の標準型（`String`、`int`、`BigDecimal`、`Instant`、`List`）と、ネストした record だけにする。
   例外として、既存の集約を変える Command は `shared.concurrency` の `ExpectedLockNo` を持てる。
-  `Idempotency-Key` を求める操作（[ADR-126](../../adr/ADR-126-require-idempotency-key-on-all-non-safe-business-apis.md)の「対象」）の Command は、`shared.idempotency` の `IdempotencyKey` を `idempotencyKey` に持ち、`IdempotentCommand` を実装する。
+  `Idempotency-Key` を求める操作（[再試行への備え](../../web-api/http-methods.md#再試行への備え)の「対象」）の Command は、`shared.idempotency` の `IdempotencyKey` を `idempotencyKey` に持ち、`IdempotentCommand` を実装する。
   Controller が受け取ったキーを、Request の `toCommand` の引数で渡す。
   Listener がイベントから作る Command は持たない。
 - 入力が集約の ID とロック番号だけでも Command を作る（`CancelOrderCommand(String orderId, ExpectedLockNo expectedLockNo)`）。

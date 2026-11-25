@@ -9,11 +9,11 @@ tags: [adr, backend, api, idempotency, database]
 
 ## Status
 
-Proposed
+Accepted
 
 ## Date
 
-2026-11-24
+2026-11-25
 
 ## Context
 
@@ -41,6 +41,9 @@ Proposed の間に Decision を書き直した。
 Pull Request #742 のレビューを受けて、次を足した。
 キーの表の文がテナントを RLS に任せず自分で書くこと、重なったヘッダーの扱い、Controller がキーを受ける形、ペイロードのハッシュが配備をまたぐときの扱い、代表データの reset がキーの表を消す理由である。
 Pull Request #754 のレビューを受けて、`tenancy` のキーの表に RLS と既定値を付けない理由、期限切れの行を 1 つの文で消すこと、reset が残して古い Result を返しうることを明確にした（reset の対象は変えていない）。
+掃除のジョブとクライアントの再試行を実装したとき、ジョブがテナントを `tenancy.m_tenant` から読んで束縛すること、1 つの DELETE の行に上限を置くこと、キーを送らない操作を自動で再試行しないことを足した。
+`tenancy` のキーの表は、上限があるので 1 つの文でなく、テナントごとに回さない DELETE の繰り返しで消す。
+Orval が必須のヘッダーのパラメータを mutation の変数に入れることと、キーの `INSERT` の `55P03` を処理中の 409 にできることは、実装で確かめたので Neutral から外した。
 
 ## Decision
 
@@ -130,8 +133,12 @@ Pull Request #754 のレビューを受けて、`tenancy` のキーの表に RLS
 
 - 保存期間は 24 時間とし、docs と OpenAPI に公開する（draft 2.3、2.5.2）。
 - 期限切れの行は、[ADR-079](ADR-079-resubmit-failed-event-publications-periodically-with-shedlock.md) と同じ ShedLock の形の定期のジョブで消す。
-  RLS のスキーマのキーの表は、テナントとモジュールのロールを設定して、テナントごとに消す。
-  `tenancy` のキーの表は、RLS がなくテナントを設定しないので、テナントごとに回さず、`tenancy` のロールの 1 つの文で全テナントの行を消す。
+  ロックの表と provider は ADR-079 のものを共有し、ロックの名前で分ける。
+  RLS のスキーマのキーの表は、`tenancy.m_tenant` のテナントを 1 つずつ `TenantContext` に束縛し、そのモジュールのロールのトランザクションで、テナントごとに消す。
+  ジョブにはセッションもイベントもないので、[ADR-105](ADR-105-bind-tenant-to-request-and-event-context.md) の `TenantContext.call` の許可先に入れる。
+  `tenancy` のキーの表は、RLS がなくテナントを設定しないので、テナントごとに回さず、`tenancy` のロールで全テナントの行を消す。
+- 1 つの DELETE で消す行に上限を置き、トランザクションを短く保つ。消し残しは同じ回で繰り返し消す。
+  消す行は `SELECT ... FOR UPDATE SKIP LOCKED` で選び、要求が取り直している行を消さない。
 - 期限を過ぎて、まだ消えていない行は無いものとして扱い、同じキーは新しいキーとして受ける。
   取り直した行は、作成のカラムも取り直した操作の値にし、新しいキーを表すようにする。
 - ローカルとテストの代表データの reset は、`ordering` のキーの表を含む業務テーブルを消す。
@@ -177,6 +184,7 @@ type と `title` のキーは [ADR-127](ADR-127-derive-problem-types-from-failur
   `apiFetch` で付けると、TanStack Query の再試行で `mutationFn` が呼ばれるたびに新しいキーになり、同じ操作の再送と見なされないためである。
 - ネットワークの失敗、5xx、408、429、処理中の 409 では、同じキーで自動で再試行する。
   RFC 9110 9.2.2 は、冪等と分かっている要求だけを自動で再試行してよいとしており、キーがその根拠になる。
+  キーを送らない操作（テナントの選択）は、根拠がないので自動で再試行しない。
 - 処理中の 409 の通知を `failureNotice` に足す。
 
 ## Consequences
@@ -204,7 +212,6 @@ type と `title` のキーは [ADR-127](ADR-127-derive-problem-types-from-failur
 
 - RFC になった時点で、構文と、ペイロードの不一致の状態コード（422）を見直す。
 - テナントを選ぶ前の操作に冪等性が要るようになったら、別の判断をする。
-- Orval が必須のヘッダーのパラメータを mutation の変数に入れるか、キーの `INSERT` の `55P03` を業務の更新のロック待ちと区別して処理中の 409 にできるかは、[#540](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/540) の実装で確かめる。
 
 ## Alternatives Considered
 
@@ -244,6 +251,7 @@ type と `title` のキーは [ADR-127](ADR-127-derive-problem-types-from-failur
 - [ADR-062](ADR-062-map-business-exceptions-to-404-409-422.md)
 - [ADR-079](ADR-079-resubmit-failed-event-publications-periodically-with-shedlock.md)
 - [ADR-096](ADR-096-require-app-user-principal-for-audit-columns.md)
+- [ADR-105](ADR-105-bind-tenant-to-request-and-event-context.md)
 - [ADR-107](ADR-107-isolate-tenants-with-rls-set-per-transaction.md)
 - [ADR-112](ADR-112-forbid-composite-primary-keys.md)
 - [ADR-127](ADR-127-derive-problem-types-from-failure-reasons.md)

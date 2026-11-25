@@ -45,7 +45,7 @@ public class OpenApiConfig {
    *
    * <p>上げ方は docs/web-api/versioning.md に従い、アプリのリリース版と連動させない。
    */
-  /* package */ static final String CONTRACT_VERSION = "0.12.0";
+  /* package */ static final String CONTRACT_VERSION = "0.13.0";
 
   /** 共通の Problem response を参照する接頭辞。 */
   private static final String PROBLEM_RESPONSE_REF = "#/components/responses/";
@@ -254,7 +254,9 @@ public class OpenApiConfig {
         .description(
             "利用者の操作ごとにクライアントが採番する冪等性キー（ADR-126）。"
                 + "値は Structured Field の String（引用符付き）で、中身は UUID に限る"
-                + "（draft-ietf-httpapi-idempotency-key-header-08）")
+                + "（draft-ietf-httpapi-idempotency-key-header-08）。"
+                + "成功した要求のキーと結果は、受け付けてから 24 時間保存し、その間に同じキーと同じ内容で再送すると 1 回目と同じ応答を返す。"
+                + "期限を過ぎたキーは新しいキーとして扱う")
         .schema(
             new StringSchema()
                 .pattern(
