@@ -50,6 +50,19 @@ tail sampling と Collector の振り分けの層は、必要になったプロ�
 外しても、バックエンドの trace（API から SQL まで）と、Problem Details の `traceId` での問い合わせは残る（[ADR-117](ADR-117-add-trace-id-and-omit-instance-in-problem-details.md)）。
 失うのは、ブラウザから見た所要時間（通信、TLS、CDN、待ち時間を含む）と、画面からの 1 本のつながりである。
 
+CSP 違反の報告は、XSS の試みや CSP の設定の誤りに気づくための Web 標準の仕組みなので、集め続ける。
+MDN は Reporting API の `report-to` を推奨し、新しい方針は report-only で試すよう勧めている（[MDN CSP](https://developer.mozilla.org/en-US/docs/Web/HTTP/Guides/CSP)）。
+
+残す属性は、#422 で止めた先（`blockedURL` を縮約した `csp.blocked`）までに減らした。
+`code.file.path`、`code.line.number`、`code.column.number` は捨てる。
+
+- 止めた先は残す。
+  CSP の報告には、ブラウザの拡張機能が起こす違反が混ざることがある。
+  止めた先の scheme（`chrome-extension:` など）や origin がないと、攻撃や自分の設定の誤りと、拡張機能の雑音を分けられない。
+- ファイルと行と列は捨てる。
+  インラインのスクリプトを足して壊したときに役立つが、開発環境のブラウザのコンソールにも同じ違反が出るので、開発時に見つけられる。
+  残すには、`documentURL` と `sourceFile` の origin を比べる OTTL の 6 文と、その検査の fixture が要る。
+
 過去に Grafana Faro を採る ADR 案を ADR-009 の番号で起票したことがある。
 その案は、次の点で現在の構成と合わないので、この ADR で置き換える。
 
@@ -143,20 +156,19 @@ Faro の CSP の計装は無効のままにし、二重に送らない。
 - 報告は `logs/frontend_csp` で受ける。
   1 回の POST は複数の報告を持つ配列なので、`unroll` で報告ごとの record に分け、`logs/frontend` と同じ検証、filter、正規化の三段で処理する。
   型が `csp-violation` で、directive と disposition が形式に合う record だけを通す。
-- 本文は `Browser CSP violation` に固定し、属性は `telemetry.signal`、`csp.directive`、`csp.disposition`、`csp.blocked`、`code.file.path`、`code.line.number`、`code.column.number` だけを残す。
+- 本文は `Browser CSP violation` に固定し、属性は `telemetry.signal`、`csp.directive`、`csp.disposition`、`csp.blocked` だけを残す。
   resource 属性は `logs/frontend` と同じ 4 つを Collector の値で付け、receiver が付ける scope の属性は消す。
 - 文書の URL（`documentURL`、`url`、`referrer`）は残さない。
   画面に対応する URL は route template だけを残す方針で、Collector は生の path から route template を作れないためである。
-  違反の位置はファイル名と行番号で、環境は resource 属性で分かる。
 - `blockedURL` は、`inline` などのキーワードはそのまま、階層を持つ URL は `scheme://host[:port]`、それ以外の URL は scheme だけに縮約する。
   CSP の許可は origin を単位に書くので、修正の判断に path は要らず、別オリジンの path にはこちらが管理しない値が入りうる。
   authority の全体が hostname（英数字、`.`、`-`）か角括弧の IPv6 と数値の port に一致しなければ、`csp.blocked` を残さない。
   数値でない port や `@` を重ねた userinfo は、URL の解析とずれた値を host として残すためである。
-- `sourceFile` は、`documentURL` と同一オリジンの `/assets/<名前>.js` だけを、origin を落とした path で残し、query か fragment を持つ URL は残さない。
-  別オリジンの同名の path を自分の asset と取り違えないためである。
-  比べる相手を設定に持たず `documentURL` にするのは、本番の origin が環境ごとに違い、どちらも送り手が書ける値である点は変わらないためである。
-  `documentURL` は比べるだけで残さない。
-- `originalPolicy`、`sample`、`user_agent` は捨てる。
+- `sourceFile`、`lineNumber`、`columnNumber` は捨てる。
+  本番の報告から、違反したコードの位置は分からなくなる（画面は `documentURL` を残さないので元から分からない）。
+  調べるときは、directive と止めた先を手がかりに、開発環境のブラウザで再現する。
+  理由は Context に書いた。
+- `originalPolicy`、`sample`、`referrer`、`user_agent` は捨てる。
   CSP に `'report-sample'` を足さない（足すと `sample` に DOM の文字列が入る）。
 - Chromium は HTTP の `localhost` では `Reporting-Endpoints` を登録せず、報告を送らない。
   ローカルの `vp dev` と `vp preview` は HTTP なので、報告を見るには HTTPS で配信する必要がある。
@@ -179,7 +191,7 @@ SQL の span は、ブラウザと関係なく効くバックエンドの判断�
   Reporting API は同一オリジンの報告に Cookie を付けるので、`APP_SESSION` が認証に使わない Collector まで届くためである。
   開発では Vite の proxy が同じ header を消す。
 - Loki は OTLP の log の属性を structured metadata に入れ、index label にするのは `service.name` などの一部の resource 属性だけである。
-  `csp.blocked`、`code.file.path`、`code.line.number`、`code.column.number`、`session.id`、`measurement.value` は濃度が高いので、index label に昇格しない。
+  `csp.blocked`、`session.id`、`measurement.value` は濃度が高いので、index label に昇格しない。
   `logs/frontend_csp` の resource 属性は Collector の環境変数の固定値なので、送り手は stream を増やせない。
   `logs/frontend` の `service.namespace` と `deployment.environment.name` は送り手の値を形式だけ検証して使うので、送り手が stream を増やしうる。
   これを Collector の値で上書きするかは、gateway のレートと Origin の制限と同時に決める。
@@ -232,6 +244,9 @@ Faro を更新するたびに、lockfile で `ua-parser-js` の版を確かめ�
 - `ua-parser-js@1.0.41` を provenance のないまま受け入れる。
 - `logs/frontend_csp` が使う `unroll` processor は logs で alpha で、Collector の更新で壊れうる。
   `task otel-collector-check` の CSP の fixture の件数の検査で検出する。
+- 本番の CSP の報告から、違反した画面とコードの位置が分からない。
+  画面は `documentURL` を残さないことで、コードの位置は #422 で分からなくなった。
+  directive と止めた先を手がかりに、開発環境のブラウザで再現する。
 - HTTP のローカル開発では CSP の報告が届かない。
 - 報告は Reporting API を実装した Chromium 系のブラウザからだけ届く。
   Firefox と Safari は `report-to` を無視するので、これらのブラウザの違反は届かない。
@@ -353,6 +368,8 @@ Faro を更新するたびに、lockfile で `ua-parser-js` の版を確かめ�
 - [#151: 2/4 画面の操作から DB までを一本のトレースで見られるようにする](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/151)
 - [#421: ブラウザのトレースを外す](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/421)
 - [#153: 4/4 CSP 違反の報告を Grafana で見られるようにする](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/153)
+- [#422: CSP 違反の報告に残す属性を、止めた先までに減らす](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/422)
+- [MDN: Content Security Policy](https://developer.mozilla.org/en-US/docs/Web/HTTP/Guides/CSP)
 - [W3C Reporting API](https://www.w3.org/TR/reporting-1/)
 - [webhookeventreceiver v0.161.0](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/v0.161.0/receiver/webhookeventreceiver)
 - [Loki の OTLP 取り込み](https://grafana.com/docs/loki/latest/send-data/otel/)
