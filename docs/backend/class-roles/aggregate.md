@@ -73,12 +73,13 @@ tags: [convention, backend, class-role]
 
 ## 依存してよい型、してはいけない型
 
-- **依存してよい型**：`java.lang..`、`java.util..`、`java.math..`、`java.time..` の標準型、`org.jspecify..`、同じ `domain.model` の Entity、値オブジェクト、enum、`shared.concurrency` の `ConflictException` と `ExpectedLockNo`、`shared.failure` の `BusinessRuleViolationException` と `NotFoundException`。
+- **依存してよい型**：`java.lang..`、`java.util..`、`java.math..`、`java.time..` の標準型、`org.jspecify..`、同じ `domain.model` の Entity、値オブジェクト、enum、`shared.concurrency` の `ConflictException` と `ExpectedLockNo`、`shared.failure` の `BusinessRuleViolationException`、`NotFoundException`、`FailureReason`。
 - **依存してはいけない型**：Spring、jOOQ、jOOQ の生成型、JPA、Jackson の型、`domain.service`、`application`、モジュールルートの型、他モジュールの型、Repository と外部システムのインタフェース、`Clock`。
 
 ## 最小の例と典型的な例
 
 最小の例は、注文を受け付けて確定するまでの `Order` である。
+`OrderFailure` は、この例の状態遷移の失敗ごとに `NOT_PLACED`、`NOT_CONFIRMED`、`NOT_PAID` の定数を持つ、同じ `domain.model` の enum である（[業務上の失敗の例外](business-exception.md#422-の理由の-enum)）。
 
 ```java
 package com.example.demo.ordering.domain.model;
@@ -141,7 +142,7 @@ public final class Order {
 
   /** 受付の注文を確定する。 */
   public void confirm() {
-    ensureStatus(OrderStatus.PLACED);
+    ensureStatus(OrderStatus.PLACED, OrderFailure.NOT_PLACED);
     status = OrderStatus.CONFIRMED;
   }
 
@@ -152,10 +153,10 @@ public final class Order {
 
   // customerId()、status()、discount()、placedAt()、lockNo() も同じ形で返し、lines() は List.copyOf(lines) を返す。
 
-  private void ensureStatus(final OrderStatus expected) {
+  private void ensureStatus(final OrderStatus expected, final OrderFailure reason) {
     if (status != expected) {
       throw new BusinessRuleViolationException(
-          "order is not " + expected + ": orderId=" + id.value() + ", status=" + status);
+          reason, "order is not " + expected + ": orderId=" + id.value() + ", status=" + status);
     }
   }
 }
@@ -188,7 +189,7 @@ public void ensureLockNo(final ExpectedLockNo expectedLockNo) {
 
 /** 確定の注文を支払い済みにする。 */
 public void markPaid() {
-  ensureStatus(OrderStatus.CONFIRMED);
+  ensureStatus(OrderStatus.CONFIRMED, OrderFailure.NOT_CONFIRMED);
   status = OrderStatus.PAID;
 }
 
@@ -199,19 +200,19 @@ public boolean isPaid() {
 
 /** 支払い済みの注文を出荷する。 */
 public void ship() {
-  ensureStatus(OrderStatus.PAID);
+  ensureStatus(OrderStatus.PAID, OrderFailure.NOT_PAID);
   status = OrderStatus.SHIPPED;
 }
 
 /** 受付の注文を取り消す。 */
 public void cancel() {
-  ensureStatus(OrderStatus.PLACED);
+  ensureStatus(OrderStatus.PLACED, OrderFailure.NOT_PLACED);
   status = OrderStatus.CANCELLED;
 }
 
 /** 受付の注文に、小計を超えない割引を適用する。 */
 public void applyDiscount(final Money discount) {
-  ensureStatus(OrderStatus.PLACED);
+  ensureStatus(OrderStatus.PLACED, OrderFailure.NOT_PLACED);
   if (discount.amount().compareTo(subtotal().amount()) > 0) {
     throw new IllegalArgumentException("discount exceeds subtotal: orderId=" + id.value());
   }
@@ -280,7 +281,7 @@ class OrderTest {
 - [ ] `domain.service`、`application`、モジュールルートの型に依存しない。［ArchUnit で検査：PackageByFeatureOnionArchitectureTest.dependenciesPointInward］
 - [ ] `public final class` にし、private のコンストラクタを `place` などの業務の動詞の static メソッドと `restore` から呼ぶ。［自分で点検］
 - [ ] setter を作らず、状態は業務の操作のメソッドだけで変える。［自分で点検］
-- [ ] 許されない状態遷移で `BusinessRuleViolationException` を、不正な引数で `IllegalArgumentException` を投げ、メッセージに識別子を含める。［自分で点検］
+- [ ] 許されない状態遷移で、モジュールの `FailureReason` の enum の定数を渡した `BusinessRuleViolationException` を、不正な引数で `IllegalArgumentException` を投げ、メッセージに識別子を含める。［自分で点検］
 - [ ] `private final long lockNo` を `restore` の最後の引数で受け取り、`place` で `1` にし、`ensureLockNo(ExpectedLockNo)` で違えば `shared.concurrency` の `ConflictException` を投げる。［自分で点検］
 - [ ] 集約ごとの競合の例外を作らない。［自分で点検］
 - [ ] `lockNo` 以外の共通カラムを集約に持たない。［自分で点検］

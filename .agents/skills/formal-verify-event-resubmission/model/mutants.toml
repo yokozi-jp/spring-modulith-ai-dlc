@@ -29,7 +29,7 @@ new = ''
 name = "lock-ignores-expiry"
 change = "the lock provider takes the lock without lock_until <= now (or a second LockProvider bean)"
 config = "documented"
-invariants = ["OneLockedRun"]
+invariants = ["OneLockedRun", "InFlightNeverMarkedStale"]
 
 [[mutant.edits]]
 old = '''  /\ IF lock.until <= now'''
@@ -37,17 +37,13 @@ new = '''  /\ IF TRUE'''
 
 [[mutant]]
 name = "staleness-from-publication-date"
-change = "Spring Modulith back to 2.1.1: the staleness monitor measures from publication_date"
+change = "Spring Modulith back to 2.1.1: markStalePublicationsFailed measures from publication_date"
 config = "in-flight-slow-runs"
 invariants = ["InFlightNeverMarkedStale"]
 
 [[mutant.edits]]
 old = '''  /\ now > row.lastAttempt + Threshold(row.status)'''
 new = '''  /\ now > Threshold(row.status)'''
-
-[[mutant.edits]]
-old = '''  Max(row.since, row.lastAttempt + Threshold(row.status) + 1) + Interval + RunMax'''
-new = '''  Max(row.since, Threshold(row.status) + 1) + Interval + RunMax'''
 
 # The real startup check rejects in-flight-staleness = 5, so the control keeps the base config's 7,
 # the smallest value the check accepts. Only that constant differs between the control and the mutant.

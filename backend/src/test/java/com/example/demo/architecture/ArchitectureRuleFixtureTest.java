@@ -12,6 +12,7 @@ import com.example.demo.shared.failure.NotFoundException;
 import com.tngtech.archunit.core.domain.JavaClasses;
 import com.tngtech.archunit.core.importer.ClassFileImporter;
 import com.tngtech.archunit.lang.ArchRule;
+import errorfixture.presentation.web.ErrorFixtureFailure;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
@@ -457,7 +458,8 @@ class ArchitectureRuleFixtureTest {
     /** 受付でない注文を BusinessRuleViolationException で拒否する。 */
     /* package */ static void requirePlaced(final boolean placed) {
       if (!placed) {
-        throw new BusinessRuleViolationException("order is not placed");
+        throw new BusinessRuleViolationException(
+            ErrorFixtureFailure.REJECTED, "order is not placed");
       }
     }
 
@@ -551,6 +553,9 @@ class ArchitectureRuleFixtureTest {
         PackageByFeatureOnionArchitectureTest.sharedModuleIsUsedOnlyByPersistenceAdaptersRule(
             basePackage),
         PackageByFeatureOnionArchitectureTest.httpTypesAreNotUsedByInnerLayersRule(basePackage),
+        PackageByFeatureOnionArchitectureTest.httpErrorsAreMappedOnlyInErrorPresentationWebRule(
+            basePackage),
+        PackageByFeatureOnionArchitectureTest.failureReasonsAreModuleEnumsRule(basePackage),
         PackageByFeatureOnionArchitectureTest.moduleApiDoesNotExposeInternalTypesRule(basePackage),
         PackageByFeatureOnionArchitectureTest
             .databaseTechnologyApisAreOnlyUsedByPersistenceAdapters,

@@ -48,7 +48,7 @@ Job は `shared.batch` の追いつきの Runner が起動し、Runner はどの
 Job の名前を渡した起動は、手での 1 回の再投入（[失敗したイベント出版の再投入](../integration/event-publication-resubmission.md)）と同じ形にする。
 
 - Web のサーバーを動かさない（`spring.main.web-application-type=none`）。
-- 失敗したイベント出版の定期の再投入と Staleness Monitor を動かさない（`event-publication.resubmission.enabled=false`）。
+- 失敗したイベント出版の定期の再投入（古い出版を `FAILED` に戻す処理を含む）を動かさない（`event-publication.resubmission.enabled=false`）。
   `EventPublicationResubmissionConfig.ResubmitOnceEnvironment` は再投入の対象だけを見てこの 2 つを設定するので、Job の名前でも同じ設定を入れる。
 - Job の名前と手での再投入の対象（`event-publication.resubmit-once.target`）を両方渡した起動は、どちらも流さずに終了コード 1 で終える。
   2 つの Runner がそれぞれ `System.exit` を呼ぶと、先に呼んだ側がもう一方の処理を途中で止める。

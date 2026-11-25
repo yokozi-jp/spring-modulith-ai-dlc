@@ -37,6 +37,7 @@ Proposed
 Proposed の間に Decision を書き直した。
 契約を #540 で実装したとき、除外を `operationId` の一覧から operation の印に変え、キーを `apiFetch` で付けない理由を足したためである。
 サーバーを実装したとき、キーの組を主キーからユニークインデックスに変えた。
+[ADR-127](ADR-127-derive-problem-types-from-failure-reasons.md) が problem type の作り方を決めたので、失敗の表現の type をその形に合わせた。
 
 ## Decision
 
@@ -123,13 +124,14 @@ Proposed の間に Decision を書き直した。
 
 ### 失敗の表現
 
-次の problem type を `/problems/...` に足す（[ADR-058](ADR-058-use-path-absolute-relative-uri-for-problem-types.md)）。
+次の problem type を、モジュールによらない problem として `CommonProblem` に足す（[ADR-127](ADR-127-derive-problem-types-from-failure-reasons.md)）。
+type と `title` のキーは、定数の名前から `ProblemTypes` が作る。
 処理中の 409 は、`lock_no` の競合の `ConflictException` と別の `type` にする。
 
-- キーがない：400。
-- キーの形式の誤り：400。
-- ペイロードの不一致：400。
-- 同じキーの処理中：409。`Retry-After` を付ける。
+- キーがない：400、`/problems/idempotency-key-missing`。
+- キーの形式の誤り：400、`/problems/idempotency-key-invalid`。
+- ペイロードの不一致：400、`/problems/idempotency-key-payload-mismatch`。
+- 同じキーの処理中：409、`/problems/idempotency-key-in-progress`。`Retry-After` を付ける。
 
 ペイロードの不一致は、draft 2.7 が SHOULD とする 422 でなく 400 にする。
 422 は、[ADR-062](ADR-062-map-business-exceptions-to-404-409-422.md) で業務規則の違反に使っている。
@@ -217,6 +219,7 @@ Proposed の間に Decision を書き直した。
 - [ADR-062](ADR-062-map-business-exceptions-to-404-409-422.md)
 - [ADR-079](ADR-079-resubmit-failed-event-publications-periodically-with-shedlock.md)
 - [ADR-096](ADR-096-require-app-user-principal-for-audit-columns.md)
-- [ADR-112](ADR-112-forbid-composite-primary-keys.md)
 - [ADR-107](ADR-107-isolate-tenants-with-rls-set-per-transaction.md)
+- [ADR-112](ADR-112-forbid-composite-primary-keys.md)
+- [ADR-127](ADR-127-derive-problem-types-from-failure-reasons.md)
 - [#310](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/310)、[#540](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/540)

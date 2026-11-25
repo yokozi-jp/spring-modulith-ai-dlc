@@ -109,6 +109,12 @@ class TenantSelectionTest {
   /** テナントを選ぶ前の 403 の problem type。 */
   private static final String TENANT_NOT_SELECTED = "/problems/tenant-not-selected";
 
+  /** 所属していないテナントを選んだ 422 の problem type。 */
+  private static final String NOT_TENANT_MEMBER = "/problems/tenancy/not-tenant-member";
+
+  /** テナントを選んだ後に選び直した 422 の problem type。 */
+  private static final String TENANT_ALREADY_SELECTED = "/problems/tenancy/tenant-already-selected";
+
   /** 選んだテナントの API。 */
   private static final String CURRENT_TENANT = "/api/current-tenant";
 
@@ -315,8 +321,12 @@ class TenantSelectionTest {
     final UUID otherTenant = TestTenancy.tenant(dsl, "C 工業");
     final String beforeSelection = sessionId();
 
-    select(otherTenant).andExpect(status().isUnprocessableContent());
-    select(UUID.randomUUID()).andExpect(status().isUnprocessableContent());
+    select(otherTenant)
+        .andExpect(status().isUnprocessableContent())
+        .andExpect(jsonPath("$.type").value(NOT_TENANT_MEMBER));
+    select(UUID.randomUUID())
+        .andExpect(status().isUnprocessableContent())
+        .andExpect(jsonPath("$.type").value(NOT_TENANT_MEMBER));
 
     assertThat(sessionId()).as("選べなかった後のセッションの ID").isEqualTo(beforeSelection);
     perform(get(PRODUCTS))
@@ -330,8 +340,12 @@ class TenantSelectionTest {
     final TwoTenants user = loginWithTwoTenants();
     select(user.first()).andExpect(status().isNoContent());
 
-    select(user.second()).andExpect(status().isUnprocessableContent());
-    select(user.first()).andExpect(status().isUnprocessableContent());
+    select(user.second())
+        .andExpect(status().isUnprocessableContent())
+        .andExpect(jsonPath("$.type").value(TENANT_ALREADY_SELECTED));
+    select(user.first())
+        .andExpect(status().isUnprocessableContent())
+        .andExpect(jsonPath("$.type").value(TENANT_ALREADY_SELECTED));
 
     perform(get(CURRENT_TENANT))
         .andExpect(status().isOk())

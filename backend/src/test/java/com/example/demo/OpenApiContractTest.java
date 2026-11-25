@@ -3,6 +3,7 @@ package com.example.demo;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.contains;
 import static org.hamcrest.Matchers.hasItem;
+import static org.hamcrest.Matchers.hasItems;
 import static org.hamcrest.Matchers.not;
 import static org.hamcrest.Matchers.startsWith;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
@@ -138,6 +139,20 @@ class OpenApiContractTest {
       }
     }
     assertThat("x-idempotency-key: none の operation", exempt, contains("selectTenant"));
+  }
+
+  @Test
+  @DisplayName("ProblemDetail の type の x-extensible-enum は、about:blank、競合の種類、理由の problem type を持つ")
+  void problemDetailTypeListsProblemTypes() throws Exception {
+    // 一覧の全体は ProblemTypesTest が固定する。ここでは OpenAPI の文書に載ることを確かめる。
+    mockMvc
+        .perform(get("/v3/api-docs"))
+        .andExpect(status().isOk())
+        .andExpect(
+            jsonPath(
+                "$.components.schemas.ProblemDetail.properties.type['x-extensible-enum']",
+                hasItems(
+                    "about:blank", "/problems/version-conflict", "/problems/ordering/not-draft")));
   }
 
   private static ResultMatcher problemResponseExists(final String name) {

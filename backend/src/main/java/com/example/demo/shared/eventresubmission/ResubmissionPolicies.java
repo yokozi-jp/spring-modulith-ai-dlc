@@ -145,7 +145,7 @@ class ResubmissionPolicies {
    * 出版の再投入の回数が上限に達しておらず、最後の試行から次の待ち時間を過ぎたか。
    *
    * <p>上限の回数目の再投入で失敗した出版は Spring Modulith が {@code ABANDONED} にするため、ここに来ない。 回数を見るのは、失敗を記録せずに上限を超えて
-   * {@code FAILED} に戻った出版（最後の試行の途中で落ちたか、Staleness Monitor が処理中に戻した出版）を、上限を超えて再投入しないためである（ADR-079）。
+   * {@code FAILED} に戻った出版（最後の試行の途中で落ち、古い出版として FAILED に戻った出版など）を、上限を超えて再投入しないためである（ADR-079）。
    */
   /* package */ boolean isDue(final EventPublication publication, final Instant now) {
     final int attempts = publication.getCompletionAttempts();

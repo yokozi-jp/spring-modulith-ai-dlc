@@ -4,7 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.example.demo.shared.eventresubmission.EventPublicationResubmitOnce.Target;
 import java.time.Duration;
-import java.util.Set;
+import java.util.Map;
 import org.jooq.DSLContext;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -18,7 +18,7 @@ class EventPublicationResubmitOnceRunTest {
   void rowsThatDidNotAdvanceDoNotPreventSuccess() {
     final FailedPublicationSweep sweep = Mockito.mock(FailedPublicationSweep.class);
     Mockito.when(sweep.waitUpTo(Mockito.any()))
-        .thenReturn(new FailedPublicationSweep.Swept(Set.of(), 0));
+        .thenReturn(new FailedPublicationSweep.Swept(Map.of(), 0));
     final EventPublicationResubmitOnce job =
         new EventPublicationResubmitOnce(
             Mockito.mock(DSLContext.class),

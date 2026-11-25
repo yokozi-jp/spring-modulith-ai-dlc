@@ -11,7 +11,9 @@ import com.example.demo.shared.security.TenantNotSelectedException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.ConstraintViolationException;
+import java.net.URI;
 import java.util.Locale;
+import java.util.Objects;
 import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.Nullable;
 import org.springframework.beans.TypeMismatchException;
@@ -51,6 +53,9 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
   /** 409 の種類のログの属性名（version、lock、unique）。 */
   private static final String CONFLICT_KIND = "conflict.kind";
 
+  /** 404、409、422 のログの属性名。応答の type と同じ値を入れる（ADR-127）。 */
+  private static final String PROBLEM_TYPE = "problem.type";
+
   /** 同じ Idempotency-Key の処理中の 409 に付ける、再試行までの秒数。ADR-055 の lock_timeout の待ちと同じ桁にする。 */
   private static final String IN_PROGRESS_RETRY_AFTER_SECONDS = "1";
 
@@ -75,17 +80,16 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
   /* package */ @Nullable ResponseEntity<Object> handleAccessDeniedException(
       final AccessDeniedException exception, final WebRequest request) {
     final Locale locale = resolveLocale(request);
-    final ProblemDetail body;
     // Invalid と Missing の親にあたる CsrfException で受け、subtype が増えても専用の type にする。
     if (exception instanceof CsrfException) {
-      body = problemDetails.csrfTokenProblem(locale);
-    } else if (exception instanceof TenantNotSelectedException) {
-      body = problemDetails.tenantNotSelectedProblem(locale);
-    } else {
-      body = ProblemDetail.forStatus(HttpStatus.FORBIDDEN);
+      return problem(
+          exception, problemDetails.problem(CommonProblem.CSRF_TOKEN_INVALID, locale), request);
     }
-    return handleExceptionInternal(
-        exception, body, new HttpHeaders(), HttpStatus.FORBIDDEN, request);
+    if (exception instanceof TenantNotSelectedException) {
+      return problem(
+          exception, problemDetails.problem(CommonProblem.TENANT_NOT_SELECTED, locale), request);
+    }
+    return problem(exception, HttpStatus.FORBIDDEN, request);
   }
 
   /** メソッド検証の違反を 400 にする。戻り値の違反は実装の不備なので 500 にする。 */
@@ -95,26 +99,29 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
     if (ApiProblemDetails.hasReturnValueViolation(exception)) {
       return problem(exception, HttpStatus.INTERNAL_SERVER_ERROR, request);
     }
-    final ProblemDetail body =
+    return problem(
+        exception,
         problemDetails.validationProblem(
-            ApiProblemDetails.validationErrors(exception), resolveLocale(request));
-    return handleExceptionInternal(
-        exception, body, new HttpHeaders(), HttpStatus.BAD_REQUEST, request);
+            ApiProblemDetails.validationErrors(exception), resolveLocale(request)),
+        request);
   }
 
-  /** 楽観的ロックの競合を 409 Problem Details へ変換する。例外の内容は応答に入れない。 */
+  /** 競合を、種類ごとの type の 409 Problem Details へ変換する。例外のメッセージは応答に入れない。 */
   @ExceptionHandler(ConflictException.class)
   /* package */ @Nullable ResponseEntity<Object> handleConflictException(
       final ConflictException exception, final WebRequest request) {
-    return problem(exception, HttpStatus.CONFLICT, request);
+    return problem(
+        exception,
+        problemDetails.problem(CommonProblem.forConflict(exception.kind()), resolveLocale(request)),
+        request);
   }
 
   /** 有効な Idempotency-Key を内容の違う要求に使った 400 を、専用の type にする（ADR-126）。 */
   @ExceptionHandler(IdempotencyKeyPayloadMismatchException.class)
   /* package */ @Nullable ResponseEntity<Object> handleIdempotencyKeyPayloadMismatchException(
       final IdempotencyKeyPayloadMismatchException exception, final WebRequest request) {
-    return idempotencyKeyProblem(
-        exception, HttpStatus.BAD_REQUEST, "payload-mismatch", new HttpHeaders(), request);
+    return problem(
+        exception, CommonProblem.IDEMPOTENCY_KEY_PAYLOAD_MISMATCH, new HttpHeaders(), request);
   }
 
   /** 同じ Idempotency-Key の処理中を、lock_no の競合と別の type の 409 にし、Retry-After を付ける（ADR-126）。 */
@@ -123,7 +130,7 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
       final IdempotencyKeyInProgressException exception, final WebRequest request) {
     final HttpHeaders headers = new HttpHeaders();
     headers.set(HttpHeaders.RETRY_AFTER, IN_PROGRESS_RETRY_AFTER_SECONDS);
-    return idempotencyKeyProblem(exception, HttpStatus.CONFLICT, "in-progress", headers, request);
+    return problem(exception, CommonProblem.IDEMPOTENCY_KEY_IN_PROGRESS, headers, request);
   }
 
   /** 見つからない集約や行を 404 Problem Details へ変換する。例外の内容は応答に入れない。 */
@@ -133,11 +140,14 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
     return problem(exception, HttpStatus.NOT_FOUND, request);
   }
 
-  /** 業務規則の違反を 422 Problem Details へ変換する。例外の内容は応答に入れない。 */
+  /** 業務規則の違反を、理由ごとの type の 422 Problem Details へ変換する。例外のメッセージは応答に入れない。 */
   @ExceptionHandler(BusinessRuleViolationException.class)
   /* package */ @Nullable ResponseEntity<Object> handleBusinessRuleViolationException(
       final BusinessRuleViolationException exception, final WebRequest request) {
-    return problem(exception, HttpStatus.UNPROCESSABLE_CONTENT, request);
+    return problem(
+        exception,
+        problemDetails.businessRuleViolationProblem(exception.reason(), resolveLocale(request)),
+        request);
   }
 
   /** MVC 内の未処理例外を、実装詳細を含まない 500 Problem Details へ変換する。 */
@@ -188,7 +198,7 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
       final WebRequest request) {
     if (ex instanceof MissingRequestHeaderException missing
         && missing.getParameter().getParameterType() == IdempotencyKey.class) {
-      return idempotencyKeyProblem(ex, HttpStatus.BAD_REQUEST, "missing", headers, request);
+      return problem(ex, CommonProblem.IDEMPOTENCY_KEY_MISSING, headers, request);
     }
     return super.handleServletRequestBindingException(ex, headers, status, request);
   }
@@ -201,7 +211,7 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
       final HttpStatusCode status,
       final WebRequest request) {
     if (ex.getRequiredType() == IdempotencyKey.class) {
-      return idempotencyKeyProblem(ex, HttpStatus.BAD_REQUEST, "invalid", headers, request);
+      return problem(ex, CommonProblem.IDEMPOTENCY_KEY_INVALID, headers, request);
     }
     return super.handleTypeMismatch(ex, headers, status, request);
   }
@@ -219,7 +229,7 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
       if (DisconnectedClientHelper.isClientDisconnectedException(ex)) {
         log.atDebug().log("API client disconnected");
       } else {
-        logFailure(ex, statusCode);
+        logFailure(ex, statusCode, body);
       }
       // 基底クラスの WARN を重ねない。
       return null;
@@ -228,7 +238,7 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
     // 外部との通信の "connection reset" を空の 200 にしないためである。
     // Tomcat はブラウザの切断で ClientAbortException を投げる前にレスポンスを中断済み（コミット済み）にするので、
     // 切断はコミット済みの分岐で DEBUG になり、ここへは来ない。
-    logFailure(ex, statusCode);
+    logFailure(ex, statusCode, body);
     return super.handleExceptionInternal(ex, body, headers, statusCode, request);
   }
 
@@ -246,27 +256,34 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
         body, ApiProblemDetails.responseHeaders(headers, status, locale), status, request);
   }
 
-  private @Nullable ResponseEntity<Object> idempotencyKeyProblem(
+  /** モジュールによらない problem を、headers を付けて応答する。 */
+  private @Nullable ResponseEntity<Object> problem(
       final Exception exception,
-      final HttpStatus status,
-      final String reason,
+      final CommonProblem common,
       final HttpHeaders headers,
       final WebRequest request) {
     return handleExceptionInternal(
         exception,
-        problemDetails.idempotencyKeyProblem(status, reason, resolveLocale(request)),
+        problemDetails.problem(common, resolveLocale(request)),
         headers,
-        status,
+        common.status(),
         request);
   }
 
   private @Nullable ResponseEntity<Object> problem(
       final Exception exception, final HttpStatus status, final WebRequest request) {
-    return handleExceptionInternal(
-        exception, ProblemDetail.forStatus(status), new HttpHeaders(), status, request);
+    return problem(exception, ProblemDetail.forStatus(status), request);
   }
 
-  private static void logFailure(final Exception ex, final HttpStatusCode status) {
+  /** 本文の status で応答する。 */
+  private @Nullable ResponseEntity<Object> problem(
+      final Exception exception, final ProblemDetail body, final WebRequest request) {
+    return handleExceptionInternal(
+        exception, body, new HttpHeaders(), HttpStatusCode.valueOf(body.getStatus()), request);
+  }
+
+  private static void logFailure(
+      final Exception ex, final HttpStatusCode status, final @Nullable Object body) {
     if (status.is5xxServerError()) {
       log.atError()
           .setCause(ex)
@@ -279,6 +296,7 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
       log.atInfo()
           .setCause(ex)
           .addKeyValue(STATUS_CODE, status.value())
+          .addKeyValue(PROBLEM_TYPE, problemType(body))
           .addKeyValue(CONFLICT_KIND, conflict.kind().name().toLowerCase(Locale.ROOT))
           .log("API conflict");
     } else if (ex instanceof NotFoundException || ex instanceof BusinessRuleViolationException) {
@@ -286,6 +304,7 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
       log.atInfo()
           .setCause(ex)
           .addKeyValue(STATUS_CODE, status.value())
+          .addKeyValue(PROBLEM_TYPE, problemType(body))
           .log("API business failure");
     } else if (ex instanceof MethodArgumentNotValidException
         || ex instanceof HandlerMethodValidationException
@@ -294,6 +313,12 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
     } else {
       log.atInfo().addKeyValue(STATUS_CODE, status.value()).log("API client error");
     }
+  }
+
+  /** 本文の problem type を返す。本文が Problem Details でないか type がなければ about:blank にする。 */
+  private static String problemType(final @Nullable Object body) {
+    final @Nullable URI type = body instanceof ProblemDetail problem ? problem.getType() : null;
+    return Objects.requireNonNullElse(type, ProblemTypes.ABOUT_BLANK).toString();
   }
 
   private static boolean isCommitted(final WebRequest request) {

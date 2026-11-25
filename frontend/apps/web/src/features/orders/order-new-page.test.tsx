@@ -33,6 +33,14 @@ interface SentRequest {
   body: unknown;
 }
 
+/** 客先注文番号の一意制約に違反したときに backend が返す title。 */
+const uniqueViolationTitle = "同じ値がすでに使われています";
+
+/** 客先注文番号の一意制約に違反した 409。 */
+function uniqueViolation() {
+  return problemResponse(409, uniqueViolationTitle, { type: "/problems/unique-violation" });
+}
+
 /** 作成の要求を記録し、respond の応答を返す。 */
 function serveDraftOrder(respond: () => Response) {
   const sent: SentRequest[] = [];
@@ -135,7 +143,7 @@ describe("注文の作成の画面", () => {
 
   it("送信中は 2 回目を送らず、送信中であることを通知する", async () => {
     const create = createGate();
-    const sent = serveDraftOrder(() => problemResponse(409, "競合が発生しました"));
+    const sent = serveDraftOrder(() => uniqueViolation());
     server.use(http.post("*/api/orders", () => create.promise, { once: true }));
     const user = await submitFilledForm();
     await expect(within(notice()).findByText("送信しています")).resolves.toBeTruthy();
@@ -143,7 +151,7 @@ describe("注文の作成の画面", () => {
     await user.click(screen.getByRole("button", { name: "作成する" }));
     create.release();
 
-    await expect(within(notice()).findByText("競合が発生しました")).resolves.toBeTruthy();
+    await expect(within(notice()).findByText(uniqueViolationTitle)).resolves.toBeTruthy();
     expect(sent).toHaveLength(1);
   });
 
@@ -218,12 +226,22 @@ describe("注文の作成の画面", () => {
   });
 
   it.each([
-    [409, "競合が発生しました", "この客先注文番号は既に使われている可能性があります。"],
-    [422, "処理できない内容です", "入力した商品を確かめてください。"],
+    {
+      status: 409,
+      type: "/problems/unique-violation",
+      title: uniqueViolationTitle,
+      description: "この客先注文番号は既に使われている可能性があります。",
+    },
+    {
+      status: 422,
+      type: "/problems/ordering/product-discontinued",
+      title: "販売を終了した商品です",
+      description: "入力した商品を確かめてください。",
+    },
   ] as const)(
-    "%i では入力を残し、title と操作の説明を通知に出す",
-    async (status, title, description) => {
-      serveDraftOrder(() => problemResponse(status, title));
+    "$status の $type では入力を残し、title と操作の説明を通知に出す",
+    async ({ status, type, title, description }) => {
+      serveDraftOrder(() => problemResponse(status, title, { type }));
 
       await submitFilledForm();
 
@@ -247,7 +265,7 @@ describe("注文の作成の画面", () => {
   });
 
   it("keyboard だけで入力して送信できる", async () => {
-    const sent = serveDraftOrder(() => problemResponse(409, "競合が発生しました"));
+    const sent = serveDraftOrder(() => uniqueViolation());
     const { user } = await renderRoute("/orders/new");
 
     await user.type(await screen.findByLabelText("客先注文番号"), "C-009");

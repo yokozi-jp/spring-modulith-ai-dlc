@@ -13,6 +13,7 @@ import com.example.demo.testkit.AsModule;
 import com.example.demo.testkit.AsTenant;
 import com.example.demo.testkit.DatabaseTest;
 import com.example.demo.testkit.IdempotencyKeys;
+import errorfixture.presentation.web.ErrorFixtureFailure;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
@@ -133,7 +134,8 @@ class JooqIdempotencyTest {
                 new Order("A", key),
                 Result.class,
                 () -> {
-                  throw new BusinessRuleViolationException("rejected");
+                  throw new BusinessRuleViolationException(
+                      ErrorFixtureFailure.REJECTED, "rejected");
                 }))
         .isInstanceOf(BusinessRuleViolationException.class);
 

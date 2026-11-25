@@ -1,10 +1,13 @@
 package com.example.demo.error.presentation.web;
 
+import com.example.demo.OpenApiConfig;
 import io.micrometer.tracing.handler.TracingObservationHandler.TracingContext;
 import io.opentelemetry.api.trace.TraceId;
 import jakarta.servlet.http.HttpServletRequest;
 import java.util.List;
 import java.util.Optional;
+import org.springdoc.core.customizers.OpenApiCustomizer;
+import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.web.ErrorResponse;
 import org.springframework.web.context.request.RequestContextHolder;
@@ -12,12 +15,24 @@ import org.springframework.web.context.request.ServletRequestAttributes;
 import org.springframework.web.filter.ServerHttpObservationFilter;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
-/** どの Problem Details にも、要求の trace ID を traceId で付け、instance を設定しない（ADR-117）。 */
+/**
+ * どの Problem Details にも、要求の trace ID を traceId で付け、instance を設定しない（ADR-117）。
+ *
+ * <p>OpenAPI の {@code ProblemDetail.type} に、応答が返す problem type を載せる（ADR-127）。
+ */
 @Configuration(proxyBeanMethods = false)
 class ProblemDetailsConfig implements WebMvcConfigurer {
 
   /** 問い合わせとログを結ぶ trace ID を入れる拡張メンバー。 */
   /* package */ static final String TRACE_ID = "traceId";
+
+  /** 応答が返す problem type を、{@code ProblemDetail.type} の x-extensible-enum に載せる。 */
+  @Bean
+  /* package */ OpenApiCustomizer problemTypesInOpenApi() {
+    return openApi ->
+        OpenApiConfig.problemTypeSchema(openApi)
+            .addExtension("x-extensible-enum", ProblemTypes.all());
+  }
 
   /** 応答を書く直前の Problem Details を整える。 */
   @Override

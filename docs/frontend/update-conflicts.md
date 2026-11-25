@@ -13,12 +13,14 @@ tags: [convention, frontend, optimistic-locking, problem-details, accessibility]
 
 ## バックエンドが返す 409
 
-楽観的ロックの競合、悲観的ロックの取得失敗（`lock_timeout`）、一意制約の違反の 3 つとも、`type` は `about:blank` で、`title` は「競合が発生しました」（英語は `Conflict`）である（[ADR-062](../adr/ADR-062-map-business-exceptions-to-404-409-422.md)）。
+409 の `type` は、楽観的ロックの競合、悲観的ロックの取得失敗（`lock_timeout`）、一意制約の違反の原因ごとに分かれ、`title` が原因を示す（[ADR-062](../adr/ADR-062-map-business-exceptions-to-404-409-422.md)）。
+原因と `type` の対応は[業務上の失敗の例外](../backend/class-roles/business-exception.md#例外httpログlistener-の対応)にある。
+
 本文の版の項目名は `lockNo` で、版の送り方（本文か query parameter か）は[楽観的ロック](../web-api/optimistic-locking.md)に従う。
 
-原因を `type` で区別できないので、原因ごとの対応表は作らず、操作ごとに扱う。
+原因ごとの違いは backend の `title` が見出しで示すので、原因ごとの対応表は作らず、操作ごとに扱う。
 更新の 409 は版の競合として扱い、作成の 409 は重複と断定しない文言にする。
-原因を画面で区別する必要が出たら、[ADR-058](../adr/ADR-058-use-path-absolute-relative-uri-for-problem-types.md) の形（`/problems/<kebab-case>`）で業務固有の `type` を足す。
+画面の振る舞いを原因で変える必要が出たら、`type` で分岐する。
 
 ## 入力と版
 
@@ -39,7 +41,7 @@ tags: [convention, frontend, optimistic-locking, problem-details, accessibility]
 ## 分岐と文言
 
 - 分岐は Problem Details の `type` と status で行い、`detail` と `title` の文字列で分岐しない。
-- `type` が `about:blank` の 409 は、一般の競合として上と同じに扱う。
+- 知らない `type` の 409 は、一般の競合として上と同じに扱う。
 - backend の `title` は、通知の見出しとして独立した要素にそのまま表示する。
 - 何が起きたかの説明と選択肢の button の文言は、操作ごとに frontend の catalog に置く。
 - `title` と catalog の文言を 1 つの文字列に連結しない。

@@ -36,6 +36,8 @@ import java.util.concurrent.TimeoutException;
 import java.util.function.Predicate;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.http.client.HttpClientSettings;
@@ -61,6 +63,12 @@ import org.springframework.web.client.HttpServerErrorException;
 @SpringBootTest
 @Import(SharedTestConfiguration.class)
 class DemoApplicationTest {
+
+  /** 決済代行の Client の Resilience4j の instance の名前。 */
+  private static final String PAYMENT_GATEWAY = "payment-gateway";
+
+  /** メールの送信の Client の Resilience4j の instance の名前。 */
+  private static final String MAIL_SENDER = "mail-sender";
 
   /** UTC 固定を検証する対象のアプリケーション {@code Clock}。 */
   @Autowired private Clock clock;
@@ -208,8 +216,8 @@ class DemoApplicationTest {
   void paymentGatewayIsGuardedByResilience4j() {
     // YAML の instance は注釈がなくても registry に作られるため、呼び出しの件数の増加で aspect が掛かったことを確かめる。
     // 請求は、テストの JVM が起動する WireMock のコンテナ（InfrastructureContainers）のスタブが成功で返す。
-    final CircuitBreaker circuitBreaker = circuitBreakerRegistry.circuitBreaker("payment-gateway");
-    final Retry retry = retryRegistry.retry("payment-gateway");
+    final CircuitBreaker circuitBreaker = circuitBreakerRegistry.circuitBreaker(PAYMENT_GATEWAY);
+    final Retry retry = retryRegistry.retry(PAYMENT_GATEWAY);
     final long callsBefore = circuitBreaker.getMetrics().getNumberOfSuccessfulCalls();
     final long retryBefore = retry.getMetrics().getNumberOfSuccessfulCallsWithoutRetryAttempt();
 
@@ -223,8 +231,16 @@ class DemoApplicationTest {
         retryBefore + 1,
         retry.getMetrics().getNumberOfSuccessfulCallsWithoutRetryAttempt(),
         "payment-gateway の retry が再試行なしの成功を 1 件数えること");
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {PAYMENT_GATEWAY, MAIL_SENDER})
+  @DisplayName("外部システムの Client の retry の試行は 1 回で、トランザクションの中で同じ要求を重ねない")
+  void externalClientRetryIsSingleAttempt(final String instance) {
     assertEquals(
-        1, retry.getRetryConfig().getMaxAttempts(), "payment-gateway の retry の試行が 1 回であること");
+        1,
+        retryRegistry.retry(instance).getRetryConfig().getMaxAttempts(),
+        instance + " の retry の試行が 1 回であること");
   }
 
   @Test
@@ -259,23 +275,24 @@ class DemoApplicationTest {
         "spring.http.clients.redirects が dont-follow であること");
   }
 
-  @Test
-  @DisplayName("決済代行の呼び出しの最悪の時間は、トランザクション中の待機の上限より短い")
-  void paymentGatewayWorstCaseFitsIdleInTransactionTimeout() {
-    // Listener はトランザクションの中で決済代行を呼ぶ（ADR-050）。待つ間に idle_in_transaction_session_timeout を超えると、
-    // PostgreSQL が接続を切り、請求の結果を記録できない（ADR-055）。
+  @ParameterizedTest
+  @ValueSource(strings = {PAYMENT_GATEWAY, MAIL_SENDER})
+  @DisplayName("外部システムの呼び出しの最悪の時間は、トランザクション中の待機の上限より短い")
+  void externalClientWorstCaseFitsIdleInTransactionTimeout(final String instance) {
+    // Listener はトランザクションの中で決済代行とメールの送信を呼ぶ（ADR-050）。待つ間に idle_in_transaction_session_timeout を超えると、
+    // PostgreSQL が接続を切り、結果を記録できない（ADR-055）。メールは SDK の呼び出し全体の上限が read-timeout なので、上の式は上限になる。
     final Duration connectTimeout =
         applicationContext
             .getEnvironment()
-            .getRequiredProperty("payment-gateway.connect-timeout", Duration.class);
+            .getRequiredProperty(instance + ".connect-timeout", Duration.class);
     final Duration readTimeout =
         applicationContext
             .getEnvironment()
-            .getRequiredProperty("payment-gateway.read-timeout", Duration.class);
-    final RetryConfig retryConfig = retryRegistry.retry("payment-gateway").getRetryConfig();
+            .getRequiredProperty(instance + ".read-timeout", Duration.class);
+    final RetryConfig retryConfig = retryRegistry.retry(instance).getRetryConfig();
     final IntervalBiFunction<Object> intervalFunction =
         Objects.requireNonNull(
-            retryConfig.getIntervalBiFunction(), "payment-gateway の retry の interval function");
+            retryConfig.getIntervalBiFunction(), instance + " の retry の interval function");
     final Either<Throwable, Object> failure = Either.left(new IllegalStateException("一時障害のテスト入力"));
     final int attempts = retryConfig.getMaxAttempts();
     long worstCaseMillis = attempts * (connectTimeout.toMillis() + readTimeout.toMillis());
@@ -291,7 +308,8 @@ class DemoApplicationTest {
     assertTrue(
         worstCase < idleTimeoutMillis,
         () ->
-            "決済代行の最悪の時間 "
+            instance
+                + " の最悪の時間 "
                 + worstCase
                 + " ms が DB_IDLE_IN_TRANSACTION_TIMEOUT_MS "
                 + idleTimeoutMillis

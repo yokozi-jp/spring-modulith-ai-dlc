@@ -5,8 +5,8 @@ import io.micrometer.core.instrument.MeterRegistry;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.Map;
 import java.util.Optional;
-import java.util.Set;
 import java.util.UUID;
 import java.util.function.Predicate;
 import lombok.extern.slf4j.Slf4j;
@@ -19,9 +19,10 @@ import org.springframework.stereotype.Component;
 /**
  * 失敗したイベント出版を定期的に再投入するジョブ（ADR-079）。
  *
- * <p>ShedLock のロックを取れたインスタンスだけが、リスナーの方針（{@link ResubmissionPolicies}）の待ち時間を過ぎ、再投入の回数が上限に達していない
- * {@code FAILED} の出版を再投入する。上限の回数目の再投入で失敗した出版は、Spring Modulith が {@code abandon-after-attempts} で
- * {@code ABANDONED} にする。 件数と最古の経過時間の Gauge と、上限を超えた {@code FAILED} の出版が現れたときの ERROR
+ * <p>ShedLock のロックを取れたインスタンスだけが、古い出版を {@code FAILED} に戻してから（{@link
+ * FailedPublicationSweep}）、リスナーの方針（{@link ResubmissionPolicies}）の待ち時間を過ぎ、再投入の回数が上限に達していない {@code
+ * FAILED} の出版を再投入する。上限の回数目の再投入で失敗した出版は、Spring Modulith が {@code abandon-after-attempts} で {@code
+ * ABANDONED} にする。 件数と最古の経過時間の Gauge と、上限を超えた {@code FAILED} の出版が現れたときの ERROR
  * は、ロックの外ですべてのインスタンスが出す（{@link FailedPublicationGauges}）。
  */
 @Slf4j
@@ -109,7 +110,7 @@ class EventPublicationResubmitter {
         log.debug("Event publication resubmission skipped");
         return;
       }
-      final Set<UUID> advanced = swept.get().advanced();
+      final Map<UUID, Integer> advanced = swept.get().advanced();
       final int resubmitted = advanced.size();
       // 放すのに失敗した回は sweep が例外で戻るので、ここへ来ず、覚えも数えもせず failed の回にだけ数える。
       tracker.remember(advanced, now);
@@ -133,6 +134,8 @@ class EventPublicationResubmitter {
 
   /**
    * 待ち時間を過ぎた出版を選ぶ条件。
+   *
+   * <p>時間の予算は {@code now}（回の開始）から測るため、ロックの中で先に動く古い出版を FAILED に戻す処理の時間も予算に入る。
    *
    * <p>ponytail: 読んだ一覧は古くなる。実行が長引くと、その間に再び FAILED に戻った行を、一覧が古いまま回数の上限を超えて再投入しうる。 実行の長さを
    * lockAtMostFor の半分までに抑え、超えた後の行は候補にせず次の回に回す（古い行から取るので飢えない）。 実行が固まっても lockAtMostFor

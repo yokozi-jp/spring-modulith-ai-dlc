@@ -114,6 +114,7 @@ public final class Tenant implements Versioned {
   private void replaceMembers(final UserId target, final List<TenantMember> next) {
     if (hasAdmin(members) && !hasAdmin(next)) {
       throw new BusinessRuleViolationException(
+          TenantFailure.LAST_ADMIN,
           "tenant must keep an admin: tenantId=" + id.value() + ", userId=" + target.value());
     }
     members = List.copyOf(next);

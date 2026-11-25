@@ -6,20 +6,17 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.example.demo.shared.eventresubmission.EventPublicationResubmitOnce.Target;
-import com.example.demo.shared.events.ResubmissionPolicy;
-import com.example.demo.shared.tenancy.TenantId;
-import com.example.demo.shared.tenancy.TenantScoped;
+import com.example.demo.shared.eventresubmission.ResubmissionProbes.MutableClock;
+import com.example.demo.shared.eventresubmission.ResubmissionProbes.ProbeListener;
+import com.example.demo.shared.eventresubmission.ResubmissionProbes.ResubmissionProbe;
 import com.example.demo.testkit.AsTenant;
 import com.example.demo.testkit.CapturedLogRecords;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.opentelemetry.api.common.AttributeKey;
 import io.opentelemetry.api.logs.Severity;
 import io.opentelemetry.sdk.logs.data.LogRecordData;
-import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
-import java.time.ZoneId;
-import java.time.ZoneOffset;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Objects;
@@ -30,12 +27,9 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Predicate;
-import net.javacrumbs.shedlock.core.LockConfiguration;
 import net.javacrumbs.shedlock.core.LockProvider;
-import net.javacrumbs.shedlock.core.SimpleLock;
 import org.awaitility.Awaitility;
 import org.jooq.DSLContext;
 import org.jooq.Records;
@@ -46,13 +40,6 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.TestConfiguration;
-import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Primary;
-import org.springframework.modulith.events.ApplicationModuleListener;
-import org.springframework.modulith.events.EventPublication;
-import org.springframework.modulith.events.config.StalenessProperties;
-import org.springframework.modulith.events.core.EventPublicationRegistry;
 import org.springframework.modulith.test.EnableScenarios;
 import org.springframework.modulith.test.Scenario;
 import org.springframework.scheduling.config.ScheduledTaskHolder;
@@ -76,9 +63,6 @@ import org.springframework.transaction.support.TransactionTemplate;
 @EnableScenarios
 class EventPublicationResubmitterTest {
 
-  /** 最初の出版の時刻。マイクロ秒の精度にする。 */
-  private static final Instant T0 = Instant.parse("2026-10-10T01:02:03.123456Z");
-
   /** {@code event-publication.resubmission.wait-age}。 */
   private static final Duration WAIT_AGE = Duration.ofMinutes(5);
 
@@ -100,9 +84,6 @@ class EventPublicationResubmitterTest {
   /** {@code completion_attempts} の説明。 */
   private static final String ATTEMPTS = "id=%s の attempts";
 
-  /** テスト用のリスナーに付ける再投入の方針の名前。 */
-  private static final String PROBE_POLICY = "probe";
-
   /** Gauge の state の値。上限に達した出版。 */
   private static final String STATE_EXHAUSTED = "exhausted";
 
@@ -117,12 +98,6 @@ class EventPublicationResubmitterTest {
 
   /** 完了の待ちの説明。 */
   private static final String COMPLETED = "完了した出版";
-
-  /** 2 つのスレッドの完了と、リスナーが門で待つ上限の秒数。 */
-  private static final long JOIN_TIMEOUT_SECONDS = 10;
-
-  /** 他のインスタンスの代わりにロックを持つ時間。lock-at-most-for（3 秒）の待ちと、ロックを持つ間の 3 秒の待ちより長くする。 */
-  private static final Duration HELD_LOCK = Duration.ofSeconds(10);
 
   /** 検証対象の定期のジョブ。 */
   @Autowired private EventPublicationResubmitter resubmitter;
@@ -151,12 +126,6 @@ class EventPublicationResubmitterTest {
   /** メトリクス。 */
   @Autowired private MeterRegistry meterRegistry;
 
-  /** Staleness Monitor が呼ぶ、古い出版を FAILED に戻す処理。 */
-  @Autowired private EventPublicationRegistry registry;
-
-  /** 設定した Staleness Monitor の閾値。 */
-  @Autowired private StalenessProperties staleness;
-
   /** OTLP へ送る LogRecord。 */
   @Autowired private CapturedLogRecords capturedLogRecords;
 
@@ -165,7 +134,7 @@ class EventPublicationResubmitterTest {
 
   @BeforeEach
   void reset() {
-    clock.set(T0);
+    clock.set(ResubmissionProbes.T0);
     listener.reset();
     ResubmissionTestSupport.expireLock(dsl);
   }
@@ -195,7 +164,7 @@ class EventPublicationResubmitterTest {
         .isEqualTo(
             ResubmissionPolicies.listenerId(
                 ProbeListener.class.getDeclaredMethod("on", ResubmissionProbe.class)));
-    assertThat(policies.nameOf(listenerId)).isEqualTo(PROBE_POLICY);
+    assertThat(policies.nameOf(listenerId)).isEqualTo(ResubmissionProbes.PROBE_POLICY);
     assertThat(policies.nameOf("unknown.Listener.on(java.lang.Object)")).isEqualTo("default");
   }
 
@@ -204,14 +173,14 @@ class EventPublicationResubmitterTest {
   void resubmitsOnlyAfterWaitAge(final Scenario scenario) {
     final String id = failedOnce(scenario);
 
-    clock.set(T0.plus(WAIT_AGE));
+    clock.set(ResubmissionProbes.T0.plus(WAIT_AGE));
     runJob();
 
     assertThat(state(id).attempts()).as("id=%s のちょうど待ち時間の attempts", id).isEqualTo(1);
     assertThat(state(id).status()).as("id=%s のちょうど待ち時間の状態", id).isEqualTo(FAILED);
     assertThat(listener.calls()).as(CALLS, id).isEqualTo(1);
 
-    clock.set(T0.plus(WAIT_AGE).plus(1, ChronoUnit.MICROS));
+    clock.set(ResubmissionProbes.T0.plus(WAIT_AGE).plus(1, ChronoUnit.MICROS));
     runJob();
     awaitState(scenario.stimulate(() -> {}), id, COMPLETED, s -> s.archived() == 1);
 
@@ -226,7 +195,7 @@ class EventPublicationResubmitterTest {
   void secondResubmissionWaitsExponentially(final Scenario scenario) {
     listener.failTimes(2);
     final String id = failedOnce(scenario);
-    final Instant firstResubmission = T0.plus(WAIT_AGE).plusSeconds(1);
+    final Instant firstResubmission = ResubmissionProbes.T0.plus(WAIT_AGE).plusSeconds(1);
     resubmitAndAwaitFailure(scenario, id, firstResubmission, 2);
 
     clock.set(firstResubmission.plus(WAIT_AGE.multipliedBy(2)));
@@ -249,7 +218,7 @@ class EventPublicationResubmitterTest {
     final double exhaustedBefore = exhaustedCount();
     final String id = failedOnce(scenario);
     final String publicationId = publicationId(id);
-    final Instant first = T0.plus(WAIT_AGE).plusSeconds(1);
+    final Instant first = ResubmissionProbes.T0.plus(WAIT_AGE).plusSeconds(1);
     resubmitAndAwaitFailure(scenario, id, first, 2);
     assertThat(exhaustedErrors(publicationId)).as("id=%s の上限の前の ERROR", id).isEmpty();
     clock.set(first.plus(WAIT_AGE.multipliedBy(2)).plusSeconds(1));
@@ -287,14 +256,17 @@ class EventPublicationResubmitterTest {
   @DisplayName(
       "失敗を記録せずに上限を超えて FAILED に戻った出版（最後の試行の途中で落ちた出版）は、待ち時間を過ぎても再投入せず、Gauge の over-limit に出て retrying に出ない")
   void failedPublicationPastLimitWithoutRecordedFailureIsNotResubmitted() {
-    // テストの上限は 2 回。2 回目の再投入の途中で落ち、Staleness Monitor が FAILED に戻した行にあたる。
-    final UUID publication = insertFailed(3, T0);
-    dsl.update(EVENT_PUBLICATION)
-        .set(EVENT_PUBLICATION.EVENT_TYPE, EVENT_TYPE)
-        .set(EVENT_PUBLICATION.SERIALIZED_EVENT, "{\"id\":\"" + publication + "\"}")
-        .where(EVENT_PUBLICATION.ID.eq(publication))
-        .execute();
-    clock.set(T0.plus(Duration.ofDays(1)));
+    // テストの上限は 2 回。2 回目の再投入の途中で落ち、古い出版として FAILED に戻した行にあたる。
+    final UUID publication =
+        ResubmissionTestSupport.insertPublication(
+            dsl,
+            UUID.randomUUID(),
+            "over-limit-test",
+            EVENT_TYPE,
+            ResubmissionProbes.T0,
+            FAILED,
+            3);
+    clock.set(ResubmissionProbes.T0.plus(Duration.ofDays(1)));
 
     runJob();
 
@@ -317,7 +289,7 @@ class EventPublicationResubmitterTest {
     final double completedBefore = outcome("completed");
     final double resubmissionsBefore =
         meterRegistry.get("event.publication.resubmissions").counter().count();
-    clock.set(T0.plus(WAIT_AGE).plusSeconds(1));
+    clock.set(ResubmissionProbes.T0.plus(WAIT_AGE).plusSeconds(1));
 
     runJob();
     runJob();
@@ -352,9 +324,10 @@ class EventPublicationResubmitterTest {
   }
 
   @Test
-  @DisplayName("enabled が false なら、アプリ全体の文脈で定期のタスクを 1 つも登録しない")
+  @DisplayName("enabled が false なら、アプリ全体の文脈で定期のタスクを 1 つも登録せず、古い出版を FAILED に戻す処理も再投入も動かない")
   void disabledRegistersNoScheduledTaskInTheApplicationContext() {
     // 依存のライブラリ（Spring Modulith Moments など）が @EnableScheduling を足すと、enabled=false でもジョブが動く。
+    // 古い出版を FAILED に戻す処理は、定期のジョブのロックの中だけで動く（EventPublicationResubmitterStalenessTest）。
     assertThat(scheduledTaskHolders.stream().flatMap(holder -> holder.getScheduledTasks().stream()))
         .as("登録された定期のタスク")
         .isEmpty();
@@ -370,7 +343,7 @@ class EventPublicationResubmitterTest {
         COMPLETED,
         s -> s.archived() == 1);
 
-    clock.set(T0.plus(Duration.ofDays(1)));
+    clock.set(ResubmissionProbes.T0.plus(Duration.ofDays(1)));
     runJob();
 
     final State state = state(id);
@@ -384,7 +357,7 @@ class EventPublicationResubmitterTest {
   @DisplayName("2 つのスレッドから同時に動かしても、出版は 1 回だけ再投入される")
   void concurrentRunsResubmitOnce(final Scenario scenario) {
     final String id = failedOnce(scenario);
-    clock.set(T0.plus(WAIT_AGE).plusSeconds(1));
+    clock.set(ResubmissionProbes.T0.plus(WAIT_AGE).plusSeconds(1));
     final double skippedBefore = skippedRuns();
 
     resubmitFromTwoThreads();
@@ -400,15 +373,10 @@ class EventPublicationResubmitterTest {
   @DisplayName("別に ShedLock のロックを持つ間は再投入せず、skipped の回を 1 増やす")
   void heldLockSkipsRun(final Scenario scenario) {
     final String id = failedOnce(scenario);
-    clock.set(T0.plus(WAIT_AGE).plusSeconds(1));
+    clock.set(ResubmissionProbes.T0.plus(WAIT_AGE).plusSeconds(1));
     final double skippedBefore = skippedRuns();
 
-    holdLock();
-    try {
-      resubmitter.resubmitOnce();
-    } finally {
-      ResubmissionTestSupport.expireLock(dsl);
-    }
+    ResubmissionTestSupport.whileLockHeld(dsl, lockProvider, clock, resubmitter::resubmitOnce);
 
     assertThat(state(id).attempts()).as(ATTEMPTS, id).isEqualTo(1);
     assertThat(listener.calls()).as(CALLS, id).isEqualTo(1);
@@ -422,43 +390,18 @@ class EventPublicationResubmitterTest {
     final CountDownLatch gate = listener.close();
     final CompletableFuture<EventPublicationResubmitOnce.Outcome> future =
         ResubmissionTestSupport.onVirtualThread(
-            () -> resubmitOnce.run(new Target.Policy(PROBE_POLICY)));
-    awaitListenerAtGate(id);
+            () -> resubmitOnce.run(new Target.Policy(ResubmissionProbes.PROBE_POLICY)));
+    ResubmissionTestSupport.awaitListenerAtGate(listener, "id=" + id);
     assertThat(future).as("門で待つ間の手での再投入").isNotDone();
     gate.countDown();
 
     final EventPublicationResubmitOnce.Outcome result =
-        future.get(JOIN_TIMEOUT_SECONDS, TimeUnit.SECONDS);
+        future.get(ResubmissionProbes.JOIN_TIMEOUT_SECONDS, TimeUnit.SECONDS);
 
     // 戻った時点でリスナーが終わっていなければ、JVM を終えるとリスナーの処理が途中で切れる。
     assertThat(listener.finished()).as("戻った時点で終わったリスナーの呼び出し").isEqualTo(2);
     assertThat(result).isEqualTo(new EventPublicationResubmitOnce.Outcome(1, 1, 0, 0));
     assertThat(result.succeeded()).isTrue();
-    assertThat(state(id).archived()).as(ARCHIVED, id).isEqualTo(1);
-  }
-
-  @Test
-  @DisplayName(
-      "Staleness Monitor は、in-flight-staleness より古い出版を再投入して処理している間も FAILED に戻さず、手での 1 回の再投入は完了まで待つ")
-  void resubmitOnceKeepsInFlightPublicationAgainstStalenessMonitor(final Scenario scenario)
-      throws Exception {
-    final String id = failedOnce(scenario);
-    // publication_date（T0）からの経過が processing と resubmitted の閾値（in-flight-staleness）を超える。
-    clock.set(
-        T0.plus(staleness.getStaleness(EventPublication.Status.PROCESSING))
-            .plus(Duration.ofMinutes(1)));
-    final CountDownLatch gate = listener.close();
-    final CompletableFuture<EventPublicationResubmitOnce.Outcome> future =
-        ResubmissionTestSupport.onVirtualThread(
-            () -> resubmitOnce.run(new Target.Policy(PROBE_POLICY)));
-    awaitListenerAtGate(id);
-
-    registry.markStalePublicationsFailed(staleness);
-
-    assertThat(state(id).status()).as("id=%s の門で待つ間の状態", id).isIn("PROCESSING", "RESUBMITTED");
-    gate.countDown();
-    assertThat(future.get(JOIN_TIMEOUT_SECONDS, TimeUnit.SECONDS))
-        .isEqualTo(new EventPublicationResubmitOnce.Outcome(1, 1, 0, 0));
     assertThat(state(id).archived()).as(ARCHIVED, id).isEqualTo(1);
   }
 
@@ -485,17 +428,17 @@ class EventPublicationResubmitterTest {
   void resubmitOnceWaitsForLockAndGivesUp(final Scenario scenario) throws Exception {
     final String id = failedOnce(scenario);
 
-    holdLock();
-    try {
-      assertThatThrownBy(() -> resubmitOnce.run(new Target.All()))
-          .isInstanceOf(IllegalStateException.class)
-          .hasMessageContaining(FailedPublicationSweep.LOCK_NAME);
-    } finally {
-      ResubmissionTestSupport.expireLock(dsl);
-    }
+    ResubmissionTestSupport.whileLockHeld(
+        dsl,
+        lockProvider,
+        clock,
+        () ->
+            assertThatThrownBy(() -> resubmitOnce.run(new Target.All()))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining(FailedPublicationSweep.LOCK_NAME));
     assertThat(state(id).attempts()).as("id=%s の失敗の後の attempts", id).isEqualTo(1);
 
-    holdLock();
+    ResubmissionTestSupport.holdLock(lockProvider, clock);
     final CompletableFuture<EventPublicationResubmitOnce.Outcome> future =
         ResubmissionTestSupport.onVirtualThread(() -> resubmitOnce.run(new Target.All()));
     Awaitility.await("ロックを持つ間の手での再投入")
@@ -503,36 +446,20 @@ class EventPublicationResubmitterTest {
         .atMost(Duration.ofSeconds(3))
         .until(() -> !future.isDone());
     ResubmissionTestSupport.expireLock(dsl);
-    assertThat(future.get(JOIN_TIMEOUT_SECONDS, TimeUnit.SECONDS).completed())
+    assertThat(future.get(ResubmissionProbes.JOIN_TIMEOUT_SECONDS, TimeUnit.SECONDS).completed())
         .as("ロックが空いた後")
         .isEqualTo(1);
   }
 
   /** ロックの期限を過去にしてから、定期の再投入を呼ぶ。期限は DB の時刻で決まり、固定の時計では進まないため。 */
   private void runJob() {
-    ResubmissionTestSupport.expireLock(dsl);
-    resubmitter.resubmitOnce();
+    ResubmissionTestSupport.runJob(dsl, resubmitter);
   }
 
   /**
-   * 他のインスタンスの代わりに、同じロックを {@link #HELD_LOCK} だけ持つ。
-   *
-   * <p>放すときは {@link SimpleLock#unlock()} ではなく、ロックの期限を過去にする。lock-at-least-for が 0 の解放は期限を {@code
-   * max(locked_at, DB の今)} にするため、取った後に DB の壁時計が戻ると、{@code locked_at} まで放されないためである。
+   * ロックの期限を過去にしてから、手での 1 回の再投入を呼ぶ。前の呼び出しの解放は、DB の壁時計が戻ると期限が残るため（{@link
+   * ResubmissionTestSupport#holdLock}）。
    */
-  private void holdLock() {
-    assertThat(
-            lockProvider.lock(
-                new LockConfiguration(
-                    Instant.now(clock),
-                    FailedPublicationSweep.LOCK_NAME,
-                    HELD_LOCK,
-                    Duration.ZERO)))
-        .as("テストのロック %s", FailedPublicationSweep.LOCK_NAME)
-        .isPresent();
-  }
-
-  /** ロックの期限を過去にしてから、手での 1 回の再投入を呼ぶ。前の呼び出しの解放は、DB の壁時計が戻ると期限が残るため（{@link #holdLock}）。 */
   private EventPublicationResubmitOnce.Outcome runOnce(final Target target) {
     ResubmissionTestSupport.expireLock(dsl);
     return resubmitOnce.run(target);
@@ -571,13 +498,6 @@ class EventPublicationResubmitterTest {
     return id;
   }
 
-  /** 再投入したリスナーが門に着くまで待つ。着かなければイベントの ID と最後の呼び出しの回数を出して失敗する。 */
-  private void awaitListenerAtGate(final String id) {
-    Awaitility.await("id=" + id + " の再投入したリスナーが門に着く")
-        .atMost(Duration.ofSeconds(JOIN_TIMEOUT_SECONDS))
-        .untilAsserted(() -> assertThat(listener.calls()).as(CALLS, id).isEqualTo(2));
-  }
-
   // 2 つのスレッドの同時の開始と完了を待つ。開始の合図を待って呼ぶ。
   @SuppressWarnings("PMD.DoNotUseThreads")
   private void resubmitFromTwoThreads() {
@@ -586,7 +506,7 @@ class EventPublicationResubmitterTest {
       final Runnable runAfterStart =
           () -> {
             try {
-              if (!start.await(JOIN_TIMEOUT_SECONDS, TimeUnit.SECONDS)) {
+              if (!start.await(ResubmissionProbes.JOIN_TIMEOUT_SECONDS, TimeUnit.SECONDS)) {
                 throw new IllegalStateException("start signal was not given");
               }
             } catch (InterruptedException exception) {
@@ -599,7 +519,7 @@ class EventPublicationResubmitterTest {
           List.of(executor.submit(runAfterStart), executor.submit(runAfterStart));
       start.countDown();
       for (final Future<?> run : runs) {
-        run.get(JOIN_TIMEOUT_SECONDS, TimeUnit.SECONDS);
+        run.get(ResubmissionProbes.JOIN_TIMEOUT_SECONDS, TimeUnit.SECONDS);
       }
     } catch (InterruptedException exception) {
       Thread.currentThread().interrupt();
@@ -614,12 +534,6 @@ class EventPublicationResubmitterTest {
     return meterRegistry.get("event.publication.failed").tag("state", state).gauge().value();
   }
 
-  /** リスナーを持たない FAILED の出版の行を、default の方針で作る。 */
-  private UUID insertFailed(final int completionAttempts, final Instant publicationDate) {
-    return ResubmissionTestSupport.insertPublication(
-        dsl, UUID.randomUUID(), "over-limit-test", publicationDate, FAILED, completionAttempts);
-  }
-
   private double outcome(final String outcome) {
     return meterRegistry.get(OUTCOMES).tag("outcome", outcome).counter().count();
   }
@@ -629,11 +543,7 @@ class EventPublicationResubmitterTest {
   }
 
   private double skippedRuns() {
-    return meterRegistry
-        .get("event.publication.resubmission.runs")
-        .tag("outcome", "skipped")
-        .counter()
-        .count();
+    return ResubmissionTestSupport.skippedRuns(meterRegistry);
   }
 
   private List<LogRecordData> exhaustedErrors(final String publicationId) {
@@ -714,135 +624,4 @@ class EventPublicationResubmitterTest {
    */
   /* package */ record State(
       int incomplete, int archived, @Nullable String status, @Nullable Integer attempts) {}
-
-  /**
-   * テストのイベント。
-   *
-   * @param id 出版を見分ける ID
-   * @param tenantId イベントのテナント
-   */
-  /* package */ record ResubmissionProbe(String id, TenantId tenantId) implements TenantScoped {}
-
-  /** 呼び出しの回数を数え、決めた回数だけ失敗し、門が閉じていれば開くまで待つリスナー。 */
-  // @ApplicationModuleListener のトランザクションの proxy を作るため final にしない。受信メソッドは on と命名する規約のため。
-  @SuppressWarnings("PMD.ShortMethodName")
-  /* package */ static class ProbeListener {
-
-    /** 呼び出しの回数。 */
-    private final AtomicInteger callCount = new AtomicInteger();
-
-    /** 最後まで終えた呼び出しの回数。 */
-    private final AtomicInteger finishedCount = new AtomicInteger();
-
-    /** 残りの失敗の回数。 */
-    private final AtomicInteger remainingFailures = new AtomicInteger();
-
-    /** 閉じた門。開くまで呼び出しを待たせる。 */
-    private final AtomicReference<@Nullable CountDownLatch> gate = new AtomicReference<>();
-
-    // 門で待つ間に割り込まれたら、割り込みの状態を戻して失敗させる。
-    @SuppressWarnings("PMD.DoNotUseThreads")
-    @ApplicationModuleListener
-    @ResubmissionPolicy(PROBE_POLICY)
-    /* package */ void on(final ResubmissionProbe event) {
-      callCount.incrementAndGet();
-      try {
-        final @Nullable CountDownLatch latch = gate.get();
-        if (latch != null && !latch.await(JOIN_TIMEOUT_SECONDS, TimeUnit.SECONDS)) {
-          throw new IllegalStateException("gate was not opened: id=" + event.id());
-        }
-      } catch (InterruptedException exception) {
-        Thread.currentThread().interrupt();
-        throw new IllegalStateException("interrupted: id=" + event.id(), exception);
-      }
-      try {
-        if (remainingFailures.getAndUpdate(left -> left > 0 ? left - 1 : 0) > 0) {
-          throw new IllegalStateException("probe listener is configured to fail: id=" + event.id());
-        }
-      } finally {
-        finishedCount.incrementAndGet();
-      }
-    }
-
-    /* package */ void reset() {
-      callCount.set(0);
-      finishedCount.set(0);
-      remainingFailures.set(0);
-      open();
-    }
-
-    /** 門を開け、待っている呼び出しを進める。 */
-    /* package */ void open() {
-      final @Nullable CountDownLatch latch = gate.getAndSet(null);
-      if (latch != null) {
-        latch.countDown();
-      }
-    }
-
-    /* package */ void failTimes(final int times) {
-      remainingFailures.set(times);
-    }
-
-    /* package */ int failuresLeft() {
-      return remainingFailures.get();
-    }
-
-    /** 門を閉じ、開けるための latch を返す。 */
-    /* package */ CountDownLatch close() {
-      final CountDownLatch latch = new CountDownLatch(1);
-      gate.set(latch);
-      return latch;
-    }
-
-    /* package */ int calls() {
-      return callCount.get();
-    }
-
-    /* package */ int finished() {
-      return finishedCount.get();
-    }
-  }
-
-  /** テストが時刻を進められる時計。値は常に {@link Clock#fixed} の値にする。 */
-  /* package */ static final class MutableClock extends Clock {
-
-    /** 今の固定の時計。 */
-    private final AtomicReference<Clock> delegate =
-        new AtomicReference<>(fixed(T0, ZoneOffset.UTC));
-
-    /* package */ void set(final Instant instant) {
-      delegate.set(fixed(instant, ZoneOffset.UTC));
-    }
-
-    @Override
-    public ZoneId getZone() {
-      return ZoneOffset.UTC;
-    }
-
-    @Override
-    public Clock withZone(final ZoneId zone) {
-      return delegate.get().withZone(zone);
-    }
-
-    @Override
-    public Instant instant() {
-      return delegate.get().instant();
-    }
-  }
-
-  /** 時計とテストのリスナーを登録する。リスナーは他のテストの component scan に入らないよう {@code @Bean} にする。 */
-  @TestConfiguration(proxyBeanMethods = false)
-  /* package */ static class ProbeConfiguration {
-
-    @Bean
-    @Primary
-    /* package */ MutableClock mutableClock() {
-      return new MutableClock();
-    }
-
-    @Bean
-    /* package */ ProbeListener probeListener() {
-      return new ProbeListener();
-    }
-  }
 }
