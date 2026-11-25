@@ -10,7 +10,8 @@ final class OidcProviders {
 
   private OidcProviders() {}
 
-  static OidcAuthorizationCodeAuthenticationProvider oidcProvider(final @Nullable Object manager) {
+  /* package */ static OidcAuthorizationCodeAuthenticationProvider oidcProvider(
+      final @Nullable Object manager) {
     Object current = manager;
     // 観測のための ObservationAuthenticationManager が ProviderManager を包んでいる。
     while (current != null && !(current instanceof ProviderManager)) {

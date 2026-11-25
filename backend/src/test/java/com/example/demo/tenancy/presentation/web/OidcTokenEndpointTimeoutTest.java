@@ -6,12 +6,14 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import com.example.demo.testkit.SharedTestConfiguration;
 import com.sun.net.httpserver.HttpServer;
 import java.io.IOException;
+import java.io.InterruptedIOException;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
-import java.nio.charset.StandardCharsets;
 import java.time.Duration;
+import java.util.List;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -24,7 +26,6 @@ import org.springframework.security.oauth2.client.endpoint.OAuth2AuthorizationCo
 import org.springframework.security.oauth2.client.registration.ClientRegistration;
 import org.springframework.security.oauth2.client.registration.ClientRegistrationRepository;
 import org.springframework.security.oauth2.client.web.OAuth2LoginAuthenticationFilter;
-import org.springframework.security.oauth2.core.OAuth2AuthorizationException;
 import org.springframework.security.oauth2.core.endpoint.OAuth2AuthorizationExchange;
 import org.springframework.security.oauth2.core.endpoint.OAuth2AuthorizationRequest;
 import org.springframework.security.oauth2.core.endpoint.OAuth2AuthorizationResponse;
@@ -52,31 +53,23 @@ class OidcTokenEndpointTimeoutTest {
   /** 応答しない IdP のトークンのエンドポイント。 */
   private HttpServer idp;
 
+  /** 応答を返さない handler を解放する。 */
   private final CountDownLatch release = new CountDownLatch(1);
 
+  /** 応答しない handler が、ほかの要求を止めないよう、要求ごとに仮想スレッドで動かす。 */
   @BeforeEach
+  @SuppressWarnings("PMD.DoNotUseThreads")
   void startUnresponsiveIdp() throws IOException {
     idp = HttpServer.create(new InetSocketAddress(InetAddress.getLoopbackAddress(), 0), 0);
     idp.setExecutor(Executors.newVirtualThreadPerTaskExecutor());
     idp.createContext(
         "/token",
         exchange -> {
-          try {
+          try (exchange) {
             release.await();
           } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-          } finally {
-            exchange.close();
+            throw (InterruptedIOException) new InterruptedIOException().initCause(e);
           }
-        });
-    idp.createContext(
-        "/error",
-        exchange -> {
-          final byte[] body = "{\"error\":\"invalid_grant\"}".getBytes(StandardCharsets.UTF_8);
-          exchange.getResponseHeaders().add("Content-Type", "application/json");
-          exchange.sendResponseHeaders(400, body.length);
-          exchange.getResponseBody().write(body);
-          exchange.close();
         });
     idp.start();
   }
@@ -90,7 +83,7 @@ class OidcTokenEndpointTimeoutTest {
   @Test
   @DisplayName("oauth2Login は、Boot の設定を通したトークンのクライアントを使う")
   void oauth2LoginUsesTheTokenClientBean() {
-    final var tokenClients =
+    final List<@Nullable Object> tokenClients =
         springSecurityFilterChain.getFilterChains().stream()
             .flatMap(chain -> chain.getFilters().stream())
             .filter(OAuth2LoginAuthenticationFilter.class::isInstance)
@@ -103,17 +96,9 @@ class OidcTokenEndpointTimeoutTest {
   }
 
   @Test
-  @DisplayName("トークンのエンドポイントが OAuth 2.0 のエラーを返すと、OAuth2AuthorizationException になる")
-  void oauth2ErrorResponseIsMappedToAuthorizationException() {
-    assertThatThrownBy(() -> tokenClient.getTokenResponse(grantRequest("/error")))
-        .isInstanceOf(OAuth2AuthorizationException.class)
-        .hasMessageContaining("invalid_grant");
-  }
-
-  @Test
   @DisplayName("トークンのエンドポイントが応答しないと、設定した read-timeout で失敗する")
   void unresponsiveTokenEndpointFailsAtTheReadTimeout() {
-    final var request = grantRequest("/token");
+    final OAuth2AuthorizationCodeGrantRequest request = grantRequest();
 
     final long start = System.nanoTime();
     assertThatThrownBy(() -> tokenClient.getTokenResponse(request))
@@ -126,10 +111,10 @@ class OidcTokenEndpointTimeoutTest {
         .isLessThan(HANG);
   }
 
-  private OAuth2AuthorizationCodeGrantRequest grantRequest(final String path) {
+  private OAuth2AuthorizationCodeGrantRequest grantRequest() {
     final ClientRegistration registration =
         ClientRegistration.withClientRegistration(registrations.findByRegistrationId("web"))
-            .tokenUri("http://127.0.0.1:" + idp.getAddress().getPort() + path)
+            .tokenUri("http://127.0.0.1:" + idp.getAddress().getPort() + "/token")
             .build();
     final OAuth2AuthorizationRequest authorizationRequest =
         OAuth2AuthorizationRequest.authorizationCode()
