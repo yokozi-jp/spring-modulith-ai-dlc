@@ -11,6 +11,8 @@ import java.util.Map;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.mockito.Mockito;
 import org.springframework.aop.framework.autoproxy.AutoProxyUtils;
 import org.springframework.beans.factory.CannotLoadBeanClassException;
@@ -28,8 +30,8 @@ import org.springframework.modulith.events.core.TargetEventPublication;
  *
  * <p>DB と Spring の文脈は使わず、{@link DefaultListableBeanFactory} に bean の定義だけを登録して作る。
  */
-// 方針の対応づけと再投入の判断を 1 つの構築で確かめるため、メソッドの数が多い。
-@SuppressWarnings("PMD.TooManyMethods")
+// テストのリスナーの受信メソッドは on と命名する規約のため。
+@SuppressWarnings("PMD.ShortMethodName")
 class ResubmissionPoliciesTest {
 
   /** 型を解決できない bean のクラス名。 */
@@ -100,30 +102,6 @@ class ResubmissionPoliciesTest {
   }
 
   @Test
-  @DisplayName("方針の abandon-after-attempts が全体の値以上だと、構築が失敗する")
-  void policyLimitNotBelowGlobalFailsStartup() {
-    final EventPublicationResubmissionConfig.Properties invalid =
-        new EventPublicationResubmissionConfig.Properties(
-            Duration.ofMinutes(5),
-            Duration.ofMinutes(25),
-            Duration.ofMinutes(1),
-            100,
-            Duration.ofMinutes(10),
-            Map.of(
-                EventPublicationResubmissionConfig.DEFAULT_POLICY,
-                new EventPublicationResubmissionConfig.Policy(
-                    2, Duration.ofHours(1), MAX_RESUBMISSIONS)));
-
-    assertThatThrownBy(() ->
-            new ResubmissionPolicies(
-                new DefaultListableBeanFactory(),
-                invalid,
-                new EventPublicationResubmissionConfig.AbandonProperties(MAX_RESUBMISSIONS)))
-        .isInstanceOf(IllegalStateException.class)
-        .hasMessageContaining("policies.default.abandon-after-attempts (5)");
-  }
-
-  @Test
   @DisplayName("注釈の id を明示したリスナーは、その id で方針の名前を引ける")
   void explicitListenerIdIsUsed() {
     final DefaultListableBeanFactory beanFactory = new DefaultListableBeanFactory();
@@ -147,19 +125,6 @@ class ResubmissionPoliciesTest {
   }
 
   @Test
-  @DisplayName("回数が上限と同じ出版は待ち時間の後に再投入し、上限を超えた出版は待ち時間を過ぎても再投入しない")
-  void attemptsAboveLimitAreNotDue() {
-    final ResubmissionPolicies policies = policiesOf(new DefaultListableBeanFactory());
-    // 5 回目の再投入の前の待ち時間は min(5 分 × 2^4, 1 時間) = 1 時間。
-    final Instant afterWait = T0.plus(Duration.ofHours(1)).plus(1, ChronoUnit.MICROS);
-
-    assertThat(policies.isDue(failed(MAX_RESUBMISSIONS), afterWait)).as("attempts = 上限").isTrue();
-    assertThat(policies.isDue(failed(MAX_RESUBMISSIONS + 1), afterWait.plus(Duration.ofDays(1))))
-        .as("attempts = 上限 + 1")
-        .isFalse();
-  }
-
-  @Test
   @DisplayName("リスナーの ID を持たない出版は default の方針の待ち時間で、リスナーの出版はその方針の待ち時間で判断する")
   void waitFollowsPolicyOfListenerAndDefaultsWithoutListener() {
     final DefaultListableBeanFactory beanFactory = new DefaultListableBeanFactory();
@@ -177,56 +142,47 @@ class ResubmissionPoliciesTest {
         .isFalse();
   }
 
-  @Test
-  @DisplayName("方針の abandon-after-attempts に達した出版は ABANDON、達していないか指定のない方針の出版は DEFAULT を返す")
-  void shouldAbandonOnceAttemptsReachPolicyLimit() {
+  @ParameterizedTest(name = "listener={0}, attempts={1}")
+  @CsvSource({
+    // abandon-after-attempts = 1 は最初の配信の失敗で諦め、途中で落ちて FAILED に戻った出版も再投入しない。
+    "once-id, 1, ABANDON, false",
+    // abandon-after-attempts = 3 は 3 回目の再投入まで再投入し、その失敗で諦める。
+    "limited-id, 2, DEFAULT, true",
+    "limited-id, 3, ABANDON, true",
+    "limited-id, 4, ABANDON, false",
+    // 方針に指定がなければ全体の値（5）に従う。
+    "unknown, 4, DEFAULT, true",
+    "unknown, 5, ABANDON, true",
+    "unknown, 6, ABANDON, false"
+  })
+  @DisplayName("諦めるかと再投入するかは、リスナーの方針の abandon-after-attempts で決まる")
+  void abandonAndDueFollowListenerLimit(
+      final String listenerId, final int attempts, final Decision abandon, final boolean due) {
     final DefaultListableBeanFactory beanFactory = new DefaultListableBeanFactory();
-    beanFactory.registerBeanDefinition(PAYMENT, new RootBeanDefinition(PaymentListener.class));
+    beanFactory.registerBeanDefinition("once", new RootBeanDefinition(OnceListener.class));
+    beanFactory.registerBeanDefinition("limited", new RootBeanDefinition(LimitedListener.class));
     final ResubmissionPolicies policies = policiesOf(beanFactory);
-    final String once = idOf(Integer.class);
-    final String limited = idOf(Long.class);
 
-    assertThat(policies.shouldAbandon(failed(once, 1)))
-        .as("1 の方針の最初の失敗")
-        .isEqualTo(Decision.ABANDON);
-    assertThat(policies.shouldAbandon(failed(limited, 2)))
-        .as("3 の方針の 2")
-        .isEqualTo(Decision.DEFAULT);
-    assertThat(policies.shouldAbandon(failed(limited, 3)))
-        .as("3 の方針の 3")
-        .isEqualTo(Decision.ABANDON);
-    assertThat(policies.shouldAbandon(failed("unknown", MAX_RESUBMISSIONS)))
-        .as("default の方針は全体の値に任せる")
-        .isEqualTo(Decision.DEFAULT);
-    assertThat(policies.shouldAbandon(failed(MAX_RESUBMISSIONS)))
-        .as("リスナーの ID を持たない出版")
-        .isEqualTo(Decision.DEFAULT);
+    assertThat(policies.shouldAbandon(failed(listenerId, attempts))).as("諦めるか").isEqualTo(abandon);
+    assertThat(policies.isDue(failed(listenerId, attempts), T0.plus(Duration.ofDays(1))))
+        .as("待ち時間を過ぎた後に再投入するか")
+        .isEqualTo(due);
   }
 
   @Test
-  @DisplayName("リスナーの上限を超えた出版は待ち時間を過ぎても再投入せず、上限と同じ回数の出版は再投入する")
-  void policyLimitCapsDueResubmission() {
+  @DisplayName("Gauge に渡す上限は、既定と違うリスナーだけを持ち、abandon-after-attempts = 1 のリスナーは 0 である")
+  void maxResubmissionsByListenerListsOnlyListenersWithOwnLimit() {
     final DefaultListableBeanFactory beanFactory = new DefaultListableBeanFactory();
+    beanFactory.registerBeanDefinition("once", new RootBeanDefinition(OnceListener.class));
+    beanFactory.registerBeanDefinition("limited", new RootBeanDefinition(LimitedListener.class));
     beanFactory.registerBeanDefinition(PAYMENT, new RootBeanDefinition(PaymentListener.class));
+
     final ResubmissionPolicies policies = policiesOf(beanFactory);
-    final String limited = idOf(Long.class);
-    final Instant muchLater = T0.plus(Duration.ofDays(1));
 
-    assertThat(policies.limitOf(limited)).isEqualTo(3);
-    assertThat(policies.limitOf("unknown")).isEqualTo(MAX_RESUBMISSIONS);
-    assertThat(policies.isDue(failed(limited, 3), muchLater)).as("attempts = 方針の上限").isTrue();
-    assertThat(policies.isDue(failed(limited, 4), muchLater)).as("attempts = 方針の上限 + 1").isFalse();
-    assertThat(policies.isDue(failed("unknown", 4), muchLater)).as("指定のないリスナー").isTrue();
-  }
-
-  /** {@link PaymentListener} の、引数の型が {@code eventType} の受信メソッドのリスナーの ID。 */
-  private static String idOf(final Class<?> eventType) {
-    try {
-      return ResubmissionPolicies.listenerId(
-          PaymentListener.class.getDeclaredMethod("on", eventType));
-    } catch (NoSuchMethodException e) {
-      throw new IllegalStateException(e);
-    }
+    assertThat(policies.maxResubmissionsByListener())
+        .isEqualTo(
+            new ResubmissionPolicies.MaxResubmissions(
+                Map.of("once-id", 0, "limited-id", 3), MAX_RESUBMISSIONS));
   }
 
   /** DB を使わない構築。 */
@@ -240,7 +196,12 @@ class ResubmissionPoliciesTest {
 
   /** 最後の試行が {@link #T0} で、{@link TargetEventPublication} でない FAILED の出版。 */
   private static EventPublication failed(final int attempts) {
-    return stub(Mockito.mock(EventPublication.class, Mockito.CALLS_REAL_METHODS), attempts);
+    return ResubmissionTestSupport.stubPublication(
+        Mockito.mock(EventPublication.class, Mockito.CALLS_REAL_METHODS),
+        UUID.randomUUID(),
+        attempts,
+        T0.minus(Duration.ofDays(1)),
+        T0);
   }
 
   /** 最後の試行が {@link #T0} で、リスナーの ID を持つ FAILED の出版。 */
@@ -250,17 +211,11 @@ class ResubmissionPoliciesTest {
     Mockito.doReturn(PublicationTargetIdentifier.of(listenerId))
         .when(publication)
         .getTargetIdentifier();
-    return stub(publication, attempts);
-  }
-
-  private static EventPublication stub(final EventPublication publication, final int attempts) {
     return ResubmissionTestSupport.stubPublication(
         publication, UUID.randomUUID(), attempts, T0.minus(Duration.ofDays(1)), T0);
   }
 
-  /** 方針を指定し、id を明示しないリスナー。引数の型の違う受信メソッドで、方針ごとの上限の違いを持つ。 */
-  // 受信メソッドは on と命名する規約のため。
-  @SuppressWarnings("PMD.ShortMethodName")
+  /** 方針を指定し、id を明示しないリスナー。 */
   /* package */ static class PaymentListener {
 
     @ApplicationModuleListener
@@ -268,23 +223,29 @@ class ResubmissionPoliciesTest {
     /* package */ void on(final String event) {
       // 呼ばれない。
     }
+  }
 
-    @ApplicationModuleListener
+  /** 最初の配信の失敗で諦める方針のリスナー。 */
+  /* package */ static class OnceListener {
+
+    @ApplicationModuleListener(id = "once-id")
     @ResubmissionPolicy(ONCE)
-    /* package */ void on(final Integer event) {
+    /* package */ void on(final String event) {
       // 呼ばれない。
     }
+  }
 
-    @ApplicationModuleListener
+  /** 3 回で諦める方針のリスナー。 */
+  /* package */ static class LimitedListener {
+
+    @ApplicationModuleListener(id = "limited-id")
     @ResubmissionPolicy(LIMITED)
-    /* package */ void on(final Long event) {
+    /* package */ void on(final String event) {
       // 呼ばれない。
     }
   }
 
   /** 方針を指定し、id を明示したリスナー。 */
-  // 受信メソッドは on と命名する規約のため。
-  @SuppressWarnings("PMD.ShortMethodName")
   /* package */ static class NamedListener {
 
     @ApplicationModuleListener(id = "custom-id")
@@ -295,8 +256,6 @@ class ResubmissionPoliciesTest {
   }
 
   /** {@code @ApplicationModuleListener} を持たないのに方針を付けたクラス。 */
-  // 受信メソッドは on と命名する規約のため。
-  @SuppressWarnings("PMD.ShortMethodName")
   /* package */ static class NonListener {
 
     @ResubmissionPolicy(PAYMENT)

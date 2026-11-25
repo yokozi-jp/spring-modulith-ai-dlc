@@ -103,7 +103,6 @@ final class ResubmissionTestSupport {
       final EventPublicationResubmissionConfig.Properties properties,
       final ResubmissionPolicies policies,
       final MeterRegistry meterRegistry,
-      final EventPublicationResubmissionConfig.AbandonProperties abandon,
       final EventPublicationRegistry registry) {
     return new EventPublicationResubmitter(
         dsl,
@@ -111,8 +110,7 @@ final class ResubmissionTestSupport {
         policies,
         clock,
         meterRegistry,
-        properties,
-        abandon);
+        properties);
   }
 
   /** ロックの期限を過去にしてから、定期の再投入を呼ぶ。期限は DB の時刻で決まり、固定の時計では進まないため。 */

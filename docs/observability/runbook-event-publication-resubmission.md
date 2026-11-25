@@ -9,6 +9,7 @@ tags: [runbook, observability, logging, operations, integration, spring-modulith
 
 定期のジョブは、リスナーの失敗で `FAILED` に残ったイベント出版を、リスナーの方針の待ち時間の後に、回数の上限まで再投入する（[ADR-079](../adr/ADR-079-resubmit-failed-event-publications-periodically-with-shedlock.md)）。
 上限の回数目の再投入でまた失敗した出版は、Spring Modulith が `ABANDONED` にして archive の表（`modulith.event_publication_archive`）へ移し、定期のジョブが出版ごとの `ERROR` で知らせる。
+方針の `abandon-after-attempts` が 1 のリスナーの出版は、最初の配信の失敗で `ABANDONED` になり、`ResubmissionPolicies` が出版ごとの `ERROR` で知らせる。
 その後は運用者がこの文書の手順で扱う。
 仕組みの全体像は[イベント出版の再投入の全体像](../integration/event-publication-resubmission.md)を参照する。
 運用定義の項目は[運用者が対応するログイベントの管理](log-operational-events.md)に従う。
@@ -23,7 +24,8 @@ main では `payment.application.OrderConfirmedListener` が `payment` を使い
 2 未満にすると起動に失敗する。
 
 方針に `abandon-after-attempts` を書くと、その方針のリスナーだけ、その回数で諦める。
-数え方は全体の値と同じで、`1` は最初の配信の失敗で `ABANDONED` にして、自動では再投入しない。
+数え方は全体の値と同じで、2 以上の N は N 回目の再投入の失敗で諦める。
+`1` は最初の配信の失敗で `ABANDONED` にして、自動では再投入しない。
 冪等キーを持たない外部システムを呼ぶリスナーに使う。
 全体の値以上にすると起動に失敗する。
 諦めた出版は、`ABANDONED` の出版と同じ手順（「上限に達した出版の戻し方」）で運用者が扱う。
@@ -36,8 +38,10 @@ policies:
     abandon-after-attempts: 1
 ```
 
-処理の途中で落ちた出版は、この指定でも古い出版として `FAILED` に戻り、1 回は再投入される。
-外部の呼び出しの後で落ちると二重に呼ぶため、リスナー側で送信済みを記録する。
+`1` のリスナーの出版は、配信の途中で落ちて古い出版として `FAILED` に戻っても、定期のジョブが再投入せず、`over-limit` に数える（「Failed event publications exceed the resubmission limit」）。
+外部の呼び出しの後で落ちた出版は、外部の処理だけが済んでいることがある。
+手で再投入する前に、外部システムでその出版の処理が済んでいないかを確かめる。
+2 以上の値のリスナーは、配信の途中で落ちた出版を上限まで再投入するため、リスナーの冪等性に頼る。
 
 n 回目の再投入の前に、最後の試行から `min(wait-age × multiplier^(n-1), max-wait)` を待つ。
 `wait-age` は環境変数 `EVENT_PUBLICATION_RESUBMISSION_WAIT_AGE` である。
@@ -65,11 +69,29 @@ n 回目の再投入の前に、最後の試行から `min(wait-age × multiplie
 - **通知**：再投入したインスタンスがその前に落ちたときと、その回のロックの解放に失敗したときは出ないため、`failed.oldest.age{state=exhausted}` の警報が補う（「メトリクスの見方」）。
   監視の通知は `event_publication.id` でまとめる。
 
+## Event publication abandoned on first delivery
+
+- **event 名**：`Event publication abandoned on first delivery`
+- **レベル**：`ERROR`
+- **事象**：方針の `abandon-after-attempts` が 1 のリスナーの最初の配信が失敗し、Spring Modulith が `ABANDONED` にして archive の表へ移した。
+  定期のジョブは再投入しない。
+  失敗したインスタンスが、諦めると決めたときに 1 回だけ出す。
+  `event.publication.resubmission.exhausted` の Counter と「Event publication resubmission exhausted」には数えない。
+- **属性**：`event_publication.id`、`event_publication.event_type`、`event_publication.listener_id`、`event_publication.resubmission_policy`（方針の名前）
+- **発生原因**：外部システムの障害、リスナーの不具合や内部の不変条件の違反。
+  外部の呼び出しがタイムアウトした場合は、外部の処理が済んでいることがある。
+- **対応**：リスナーの ERROR のログと trace で原因を確かめ、外部システムでその出版の処理が済んでいるかを確かめる。
+  済んでいなければ、原因を直してから「上限に達した出版の戻し方」で `FAILED` に戻し、「手での再投入」で再投入する。
+  済んでいれば、「再投入しない出版の片付け」で消す。
+- **通知**：ERROR を出す前にインスタンスが落ちると出ないため、`failed.oldest.age{state=exhausted}` の警報が補う（「メトリクスの見方」）。
+  監視の通知は `event_publication.id` でまとめる。
+
 ## Failed event publications exceed the resubmission limit
 
 - **event 名**：`Failed event publications exceed the resubmission limit`
 - **レベル**：`ERROR`
-- **事象**：`completion_attempts` が上限（`abandon-after-attempts`）を超えたまま `FAILED` に残った出版がある。
+- **事象**：`completion_attempts` が、リスナーの再投入の回数の上限を超えたまま `FAILED` に残った出版がある。
+  上限は、リスナーの方針の `abandon-after-attempts`（なければ全体の値）が 2 以上なら同じ値、1 なら 0 である。
   定期のジョブはこの出版を再投入しない。
   各インスタンスが Gauge を集計する回に、その件数（`event.publication.failed{state=over-limit}`）が 0 から増えたときだけ 1 つ出す。
   件数が 0 より大きい間は出さず、0 に戻った後にまた増えたら出す。
@@ -78,6 +100,7 @@ n 回目の再投入の前に、最後の試行から `min(wait-age × multiplie
 - **発生原因**：最後の再投入の途中でインスタンスが落ちた。
   処理中の出版を、古い出版として `FAILED` に戻した。
   `ABANDONED` にする `markAbandoned` が DB の失敗で終わり、古い出版として `FAILED` に戻した。
+  方針の `abandon-after-attempts` が 1 のリスナーの最初の配信の途中で落ちたか、配信が `wait-age` より長く待った。
   どれも失敗を記録しないため、Spring Modulith は `ABANDONED` にしない。
   「上限に達した出版の戻し方」で戻したまま、手での再投入をしていない出版も数える。
 - **対応**：次の SQL で出版を特定し、リスナーの ERROR のログで原因を確かめる。
@@ -86,12 +109,15 @@ n 回目の再投入の前に、最後の試行から `min(wait-age × multiplie
 
   ```sql
   -- :max は spring.modulith.events.resubmission.abandon-after-attempts（main では 5）
+  -- 方針の abandon-after-attempts を書いたリスナーは、:listener_id と、その上限（1 なら 0）で別に読む
   SELECT id, event_type, listener_id, publication_date, last_resubmission_date, completion_attempts
     FROM modulith.event_publication
    WHERE status = 'FAILED'
      AND completion_attempts > :max
    ORDER BY publication_date;
   ```
+
+  方針の `abandon-after-attempts` が 1 のリスナーの出版は、外部の処理だけが済んでいることがあるため、外部システムを確かめてから再投入する。
 
 - **通知**：同じ増加を、ロックを取ったかどうかによらず各インスタンスが 1 つずつ出す。
   通知はこの event 名でまとめる。
@@ -198,11 +224,13 @@ SELECT event_type, listener_id, count(*) AS publications, min(publication_date) 
 Spring Modulith 2.2.0 には、`ABANDONED` の出版を `FAILED` に戻す API がない（ADR-079）。
 そのため、再投入する出版は、次の SQL で archive の表から未完了の表へ戻す。
 `completion_attempts` と `last_resubmission_date` は archive の行の値をそのまま写す。
-`completion_attempts` は上限を超えているため、定期のジョブは戻した出版を再投入せず、次の節の手での再投入だけが扱う。
+`completion_attempts` はリスナーの再投入の回数の上限を超えているため、定期のジョブは戻した出版を再投入せず、次の節の手での再投入だけが扱う。
+方針の `abandon-after-attempts` が 1 のリスナーの出版は、archive の行の値が 1 で、上限は 0 である。
 戻した出版は `failed{state=over-limit}` に数え、件数が 0 から増えると ERROR（「Failed event publications exceed the resubmission limit」）も出る。
 手での再投入は待ち時間を見ず、`publication_date` が今より前の `FAILED` の出版を読むため、`last_resubmission_date` によらず対象にする。
 戻した出版がまた失敗すると、すぐに `ABANDONED` に戻る。
 回数の上限をもう一度使わせたいときだけ、`completion_attempts` を 1 にする。
+方針の `abandon-after-attempts` が 1 のリスナーの出版は、1 にしても定期のジョブが再投入しない。
 1 にした出版は、最後の試行からふつう `wait-age` を過ぎているため、定期のジョブが次の回に再投入する。
 
 行の削除と挿入を 1 つの文にし、途中で止まっても同じ `id` が両方の表に残らないようにする。
@@ -308,7 +336,7 @@ DELETE FROM modulith.event_publication
 | `event.publication.resubmissions`                  | 再投入した（実際に `RESUBMITTED` へ進んだ）出版の数。他の更新で進めなかった出版と、`max-per-run` で止まった候補は数えない                                                                                                              |
 | `event.publication.resubmission.outcomes{outcome}` | 再投入した出版の結果。`completed` は archive に `COMPLETED` で移った数、`failed` は `FAILED` に戻った数（古い出版として戻した場合を含む）、結果を読む前に再び再投入された数、`ABANDONED` で移った数。1 回の再投入につき 1 回だけ数える |
 | `event.publication.resubmission.exhausted`         | 定期のジョブが再投入した出版のうち、回数の上限を超えて失敗し、`ABANDONED` になった数。再投入したインスタンスが次の回に数え、同時に ERROR の `exhausted` を 1 回記録する                                                                |
-| `event.publication.failed{state}`                  | `retrying` は自動の再投入を待つ `FAILED` の出版（`completion_attempts` が上限以下）、`over-limit` は上限を超えて `FAILED` に残った出版、`exhausted` は archive の表の `ABANDONED` の出版の数である                                     |
+| `event.publication.failed{state}`                  | `retrying` は自動の再投入を待つ `FAILED` の出版（`completion_attempts` がリスナーの上限以下）、`over-limit` は上限を超えて `FAILED` に残った出版、`exhausted` は archive の表の `ABANDONED` の出版の数である                           |
 | `event.publication.failed.oldest.age{state}`       | 各状態で最も古い出版の `publication_date` からの経過秒数である                                                                                                                                                                         |
 
 - Counter は、再投入したインスタンスだけが数える。

@@ -128,13 +128,21 @@ Proposed の間に、古い出版を `FAILED` に戻す処理を、組み込み�
 - 試行の回数は Spring Modulith の `completion_attempts` で持ち、表を足さない。
 - 回数の上限は、Spring Modulith の `spring.modulith.events.resubmission.abandon-after-attempts`（5）を全リスナーの既定にする。
   リスナーの方針は `abandon-after-attempts` を任意で持ち、指定した方針のリスナーだけ、その回数で諦める（選択肢10）。
-  `ResubmissionPolicies` が `AbandonPolicy` を実装し、方針の値に達した出版に `ABANDON` を、指定のない方針の出版に `DEFAULT` を返す。
+  `ResubmissionPolicies` が `AbandonPolicy` を実装し、リスナーの値（方針の値、なければ全体の値）に達した出版に `ABANDON` を返す。
+  比べ方は Spring Modulith の既定と同じ `>=` で、全体の値だけのリスナーの判断は既定と変わらない。
   渡る出版の `getCompletionAttempts()` は全体の値と同じ再投入の前の値なので、方針の値は全体の値と同じ数え方になり、DB を読み直さない。
-  方針の値は 1 以上で、全体の値より小さくする。全体の値以上なら全体の値が先に効くため、起動に失敗させる。
-  1 は最初の配信の失敗で諦め、自動では再投入しない。冪等キーを持たない外部システムを呼ぶリスナーに使う。
+  方針の値は 1 以上で、全体の値より小さくする。
+  全体の値と同じ値は書く意味がなく、大きい値は `isDue` が全体の上限を超えて再投入するため、起動に失敗させる。
+  1 は最初の配信の失敗で諦め、自動では再投入しない。
+  冪等キーを持たない外部システムを呼ぶリスナーに使う。
+  最初の配信で諦めた出版は定期のジョブが再投入していないため、`ResubmissionPolicies` が ERROR（`Event publication abandoned on first delivery`）を出す。
   Context の表のとおり、全体の値の 5 は 5 回目の再投入の失敗で出版が `ABANDONED` になる。
   1 は最初の配信の失敗で諦めるため、2 未満の値と未設定（Spring Modulith は諦めない）は起動に失敗させる（`EventPublicationResubmissionConfig.AbandonProperties`）。
-  `isDue` はリスナーの値（方針の値、なければこの値）を `ResubmissionPolicies.limitOf` で読み、`completion_attempts`（再投入した回数 + 1）がそれを超えた出版を再投入しない。
+  `isDue` は、リスナーの値から決まる再投入の回数の上限（`ResubmissionPolicies.Limit.maxResubmissions`）を読み、`completion_attempts`（再投入した回数 + 1）がそれを超えた出版を再投入しない。
+  上限は、2 以上の N なら N、1 なら 0 である。
+  Spring Modulith は最初の配信と 1 回目の再投入の失敗に同じ 1 を渡すため、1 は最初の配信で諦め、1 回目の再投入を許すと止めたい二重の呼び出しが残る。
+  上限を 0 にすると、配信の途中で落ちて古い出版として `FAILED` に戻った出版も再投入しない（形式検証の `NoResubmissionWhenAbandonOnFirst`）。
+  `FailedPublicationGauges` の `over-limit` も同じリスナーごとの上限で数える。
   回数を見るのは、失敗を記録しない試行（最後の再投入の途中の停止の後に、古い出版として `FAILED` に戻した出版）で上限を超えて `FAILED` に戻った出版を、上限を超えて再投入しないためである。
   この出版には `AbandonPolicy` が呼ばれないため、`ABANDONED` にならない。
   回数の条件を外すと、停止の後に古い出版として `FAILED` に戻した出版を上限を超えて再投入することを、形式検証（[formal-verify-event-resubmission](../../.agents/skills/formal-verify-event-resubmission/SKILL.md)）の `ResubmissionsCapped` が捕まえる。
@@ -236,7 +244,8 @@ shared の範囲は、ADR-048 の jOOQ の共通処理に加えて、Spring Modu
 - 上限を超えて失敗した出版が `FAILED` から外れるため、定期のジョブが毎回読む `FAILED` の行に溜まらない。
   諦めの判断は Spring Modulith の設定と、回数だけを比べる `AbandonPolicy` で、失敗のたびの DB の読み出し、回数を SQL で数える式、ERROR の重複を避ける記録、回収が要らない。
 - 冪等キーを持たない外部システムを呼ぶリスナーは、方針に `abandon-after-attempts: 1` を指定して、自動の再投入の対象から外せる。
-  出版は `ABANDONED` で archive に移り、既存の警報（ADR-120）と Runbook の戻し方で運用者が扱う。新しい状態も Gauge も要らない。
+  出版は `ABANDONED` で archive に移り、既存の警報（ADR-120）と Runbook の戻し方で運用者が扱う。
+  新しい状態も Gauge も要らない。
 - 手での再投入が定期のジョブと同じロックを取るため、重ねて再投入せず、定期のジョブを止める手順が要らない。
 - 手での再投入の結果を終了コードで返すため、ECS の RunTask や Kubernetes の Job の成否で確かめられる。
 - 起動時の再配信と違い、デプロイのたびに全インスタンスが同時に再配信しない。
@@ -260,10 +269,14 @@ shared の範囲は、ADR-048 の jOOQ の共通処理に加えて、Spring Modu
 - ShedLock はロックの行を作ったことをメモリに覚えるため、`modulith.shedlock` の行を手で消すと、再起動まで同じインスタンスがロックを取れない。
 - 毎回 `FAILED` の行をすべて読む（待ち時間でも絞られない）ため、待ち時間の中の出版が大量にあると、毎回の読み込みが重くなる。
   `FAILED` の全件読みのメモリの上限は残る。
-- 方針の `abandon-after-attempts` は、失敗を記録した試行だけを止める。
-  処理の途中で落ちた出版は、Staleness Monitor が `FAILED` に戻し、`attempts <= リスナーの値` の間は再投入する。
-  外部の呼び出しの後で落ちると、`abandon-after-attempts: 1` でも 1 回は二重に呼ぶ。冪等でないリスナーは、リスナー側で送信済みを記録する。
-- 方針の `abandon-after-attempts` に達して `ABANDONED` になった出版の `exhausted` の警報と Counter は、全体の上限に達した出版と区別しない。
+- `abandon-after-attempts: 1` のリスナーでも、外部の呼び出しの後で配信が落ちると、外部の処理だけが済んだ出版が `FAILED` に残る。
+  定期のジョブは再投入しないが、運用者が手で再投入すると二重に呼ぶ。
+  冪等でないリスナーは、リスナー側で送信済みを記録するか、運用者が外部システムの状態を確かめてから再投入する。
+- 2 以上の方針の値のリスナーは、配信の途中で落ちて古い出版として `FAILED` に戻った出版を、上限まで再投入する。
+  最初の配信が executor の空きを `wait-age` より長く待つか、実行がロックの上限を超えると、配信の途中の出版を再投入しうる（形式検証の既知の発見 1 と 2）。
+  どちらも、二重の呼び出しをリスナーの冪等性に頼る。
+- 最初の配信で諦めた出版は、`ResubmissionTracker` を通らないため、`Event publication resubmission exhausted` の ERROR も `event.publication.resubmission.exhausted` の Counter も数えない。
+  知らせは、`ResubmissionPolicies` の ERROR と、最古の経過時間の警報（`state=exhausted`）である。
 - `markAbandoned` のトランザクションが失敗すると、出版は処理中のまま残り、古い出版として `FAILED` に戻る。
   `DefaultEventPublicationRegistry.markFailedOrAbandoned` は `markAbandoned` の戻り値も見ない。
   `completion_attempts` は上限を超えているため、`isDue` はこの出版を再投入せず、Spring Modulith が `AbandonPolicy` をもう一度聞くこともない。
@@ -392,9 +405,10 @@ Resilience4j は再投入と補完関係にあり、ADR-019 のとおり client 
   これは全体の `abandon-after-attempts` と同じで、学習テストが変化を捕まえる。
 - **当初の却下と、採用に変えた理由**：当初は、main の 2 つの方針がどちらも 5 回で、リスナーごとの回数を使っていないため採らなかった。
   冪等キーを持たない外部システムを呼ぶリスナー（[#741](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/741)）が要件になり、全体の値だけでは二重の呼び出しを設定で防げなくなった。
-  回数の比較だけで判断し、ERROR と Counter は持たない形にしたため、自作の重さが当初の想定より小さい。
+  回数の比較だけで判断し、最初の配信で諦めたときの ERROR だけを持ち、Counter は持たない形にしたため、自作の重さが当初の想定より小さい。
 - **別の形として検討した、`FAILED` のまま止める案**：方針の回数に達した出版を `FAILED` に残し、手での再投入だけで進める。
-  `FAILED` の `retrying` の Gauge が止めた出版を待機中と数え、定期のジョブが毎回全件を読むため、止めた出版の分だけ読み込みが増える。新しい状態と警報も要るため採らない。
+  `FAILED` の `retrying` の Gauge が止めた出版を待機中と数え、定期のジョブが毎回全件を読むため、止めた出版の分だけ読み込みが増える。
+  新しい状態と警報も要るため採らない。
 
 ### 選択肢11: 条件の関数の回数の条件を外し、回数の上限を Spring Modulith の諦めの判断だけに任せる
 

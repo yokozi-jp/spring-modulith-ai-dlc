@@ -7,6 +7,8 @@ import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.time.ZoneOffset;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -50,23 +52,24 @@ import org.springframework.modulith.events.ApplicationModuleListener;
    */
   /* package */ record OnceProbe(String id, TenantId tenantId) implements TenantScoped {}
 
-  /** 常に失敗し、呼び出しの回数を数える、最初の配信の失敗で諦める方針のリスナー。 */
+  /** 常に失敗し、イベントの ID ごとに呼び出しの回数を数える、最初の配信の失敗で諦める方針のリスナー。 */
   // @ApplicationModuleListener のトランザクションの proxy を作るため final にしない。受信メソッドは on と命名する規約のため。
   @SuppressWarnings("PMD.ShortMethodName")
   /* package */ static class OnceProbeListener {
 
-    /** 呼び出しの回数。 */
-    private final AtomicInteger callCount = new AtomicInteger();
+    /** イベントの ID ごとの呼び出しの回数。テストの間で共有しないよう、ID で分ける。 */
+    private final Map<String, AtomicInteger> callCounts = new ConcurrentHashMap<>();
 
     @ApplicationModuleListener
     @ResubmissionPolicy(ONCE_POLICY)
     /* package */ void on(final OnceProbe event) {
-      callCount.incrementAndGet();
+      callCounts.computeIfAbsent(event.id(), id -> new AtomicInteger()).incrementAndGet();
       throw new IllegalStateException("once probe listener always fails: id=" + event.id());
     }
 
-    /* package */ int calls() {
-      return callCount.get();
+    /* package */ int calls(final String id) {
+      final @Nullable AtomicInteger count = callCounts.get(id);
+      return count == null ? 0 : count.get();
     }
   }
 
