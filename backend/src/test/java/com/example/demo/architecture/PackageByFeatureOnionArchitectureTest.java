@@ -28,11 +28,13 @@ import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
 import org.springframework.stereotype.Controller;
 import org.springframework.stereotype.Repository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.ErrorResponse;
 import org.springframework.web.ErrorResponseException;
 import org.springframework.web.bind.annotation.ControllerAdvice;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -499,9 +501,10 @@ class PackageByFeatureOnionArchitectureTest {
 
   /**
    * {@code error.presentation.web} の外で、Problem Details の型、HTTP のステータスを持つ Spring
-   * の例外、例外を応答へ変える注釈に依存することを禁止する規則を組み立てる。
+   * の例外、例外を応答へ変える注釈に依存することと、409 と 422 の {@link HttpStatus} の定数を読むことを禁止する規則を組み立てる。
    *
-   * <p>注釈を付けることも依存に数える。
+   * <p>注釈を付けることも依存に数え、入れ子の型（{@code ErrorResponse.Builder} など）も含める。 整数で書いた status（{@code
+   * sendError(422)}、{@code ResponseEntity.status(409)}）は検出しない。
    */
   /* package */ static ArchRule httpErrorsAreMappedOnlyInErrorPresentationWebRule(
       final String basePackage) {
@@ -514,17 +517,24 @@ class PackageByFeatureOnionArchitectureTest {
         .dependOnClassesThat()
         .belongToAnyOf(
             ProblemDetail.class,
+            ErrorResponse.class,
             ErrorResponseException.class,
             ResponseStatusException.class,
             ExceptionHandler.class,
             ControllerAdvice.class,
             RestControllerAdvice.class,
             ResponseStatus.class)
+        .orShould()
+        .accessField(HttpStatus.class, HttpStatus.CONFLICT.name())
+        .orShould()
+        .accessField(HttpStatus.class, HttpStatus.UNPROCESSABLE_CONTENT.name())
         .because(
             "失敗から status、problem type、title、ログへの対応づけを ApiExceptionHandler の 1 か所に置き、"
                 + "422 と 409 の type が about:blank に戻ることと、ログの記録が食い違うことを防ぐため。"
+                + "成功の応答の @ResponseStatus（CREATED など）も禁じる。"
                 + "直し方：業務上の失敗は shared.failure の BusinessRuleViolationException と NotFoundException、"
                 + "shared.concurrency の ConflictException で投げ、422 の理由はモジュールの FailureReason の enum で渡す。"
+                + "成功の status は ResponseEntity.created や noContent で返す。"
                 + "例外の変換と Problem Details の組み立ては error.presentation.web の ApiExceptionHandler と "
                 + "ApiProblemDetails に置く。"
                 + "規約：docs/backend/class-roles/business-exception.md、docs/web-api/status-codes.md");

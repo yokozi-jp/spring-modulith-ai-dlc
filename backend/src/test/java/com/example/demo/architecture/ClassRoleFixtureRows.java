@@ -16,6 +16,9 @@ final class ClassRoleFixtureRows {
   /** 例外を Problem Details へ変える違反フィクスチャのクラス名。 */
   private static final String ERROR_ADVICE = "ordering.presentation.web.OrderErrorAdvice";
 
+  /** 機能モジュールが応答の status と本文を決める違反フィクスチャのクラス名。 */
+  private static final String RESPONSE_STATUSES = "ordering.presentation.web.OrderResponseStatuses";
+
   /** 違反フィクスチャの {@code OrderErrorAdvice} の、例外を変えるメソッド。 */
   private static final String ERROR_ADVICE_HANDLE =
       ERROR_ADVICE + ".handle(java.lang.IllegalStateException)>";
@@ -76,6 +79,30 @@ final class ClassRoleFixtureRows {
             "ResponseStatusException",
             "ordering.application.HttpStatusCommandHandler.handle()> calls constructor "
                 + "<org.springframework.web.server.ResponseStatusException.<init>"),
+        httpErrorRow(
+            "ErrorResponse",
+            RESPONSE_STATUSES
+                + ".rejected(java.lang.Exception)> calls method "
+                + "<org.springframework.web.ErrorResponse.builder("),
+        httpErrorRow(
+            "HttpStatus.UNPROCESSABLE_CONTENT",
+            RESPONSE_STATUSES
+                + ".unprocessable()> gets field "
+                + "<org.springframework.http.HttpStatus.UNPROCESSABLE_CONTENT>"),
+        httpErrorRow(
+            "HttpStatus.CONFLICT",
+            RESPONSE_STATUSES
+                + ".conflict()> gets field <org.springframework.http.HttpStatus.CONFLICT>"),
+        httpErrorRow(
+            "ResponseStatus of a success",
+            RESPONSE_STATUSES
+                + ".created()> is annotated with "
+                + "<org.springframework.web.bind.annotation.ResponseStatus>"),
+        httpErrorRow(
+            "ResponseStatus without value",
+            RESPONSE_STATUSES
+                + ".unspecified()> is annotated with "
+                + "<org.springframework.web.bind.annotation.ResponseStatus>"),
         row(
             "noSuchElementExceptionIsNotThrown",
             GeneralCodingRulesArchTest.noSuchElementExceptionIsNotThrown,
