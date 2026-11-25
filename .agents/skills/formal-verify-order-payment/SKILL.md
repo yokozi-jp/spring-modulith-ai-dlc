@@ -25,6 +25,7 @@ tooling/formal-verify/mutants.py .agents/skills/formal-verify-order-payment
 | `RecordMatchesGateway`    | 決済記録が `PAID` か `DECLINED` なら決済代行の判定と同じ。`FAILED` なら決済代行は代金を取っておらず、判定の途中でもない。 | 代金を取ったのに失敗と記録し、客に二度目の支払いを求める。 |
 | `ChargedOnlyIfConfirmed`  | 決済代行に請求が届くのは確定した注文だけ。                                                                                 | 取り消した注文の代金を取る。                               |
 | `CompletedOnlyWithRecord` | イベント出版が完了（archive）になるのは決済記録があるときだけ。                                                            | 再投入されず、請求の結果がどこにも残らない。               |
+| `FailedOnlyOnGatewayError` | 配信が出版を `FAILED` か `ABANDONED` にするのは、決済代行の呼び出しが例外を投げたときだけ。決済代行の判定を受け取った配信は、INSERT が 1 回目の決済記録とぶつかる同時の 2 回目も、完了する。 | 記録済みの決済が再投入の回数を使い、上限の配信なら記録があるのに `ABANDONED` のデッドレターが残る。 |
 | `ChargeNeverSilentlyLost` | すべてが止まったとき、決済代行が代金を取った注文には `PAID` の記録があるか、`FAILED` か `ABANDONED` の出版（デッドレター）が残る。 | 代金を取ったことを誰も知らない。                           |
 
 ## 設定と期待する結果
@@ -62,6 +63,7 @@ git diff --stat "$(sed -n 's/^同期コミット：`\([0-9a-f]*\)`.*/\1/p' "$ski
   backend/src/main/java/com/example/demo/payment/domain/model/Payment.java \
   backend/src/main/java/com/example/demo/payment/domain/model/ChargeOutcome.java \
   backend/src/main/java/com/example/demo/payment/domain/model/PaymentGateway.java \
+  backend/src/main/java/com/example/demo/payment/domain/model/PaymentRepository.java \
   backend/src/main/java/com/example/demo/payment/infrastructure/client/PaymentGatewayClient.java \
   backend/src/main/java/com/example/demo/payment/infrastructure/persistence/JooqPaymentRepository.java \
   backend/src/main/java/com/example/demo/shared/eventresubmission/EventPublicationResubmitter.java \
@@ -103,12 +105,12 @@ git diff --name-only --diff-filter=A "$(sed -n 's/^同期コミット：`\([0-9a
 | `CmdRead`         | `ConfirmOrderCommandHandler.handle`、`CancelOrderCommandHandler.handle` の `findById` と `Order.ensureLockNo`                                                                                       |
 | `CmdWrite`        | `Order.confirm` / `Order.cancel`（`ensureDraft`）、`JooqOrderRepository.update` → `TableWriter.update`、確定なら `OrderConfirmed` の発行と出版の行の INSERT（同じトランザクション） |
 | `DStart`          | Spring Modulith 2.2.0 の `CompletionRegisteringMethodInterceptor` → `markProcessing`（`status != 'PROCESSING'` の UPDATE）                                                                          |
-| `DReadPayment`    | `ChargeOrderCommandHandler.handle` の `paymentRepository.findByOrderId`                                                                                                                            |
+| `DReadPayment`    | `ChargeOrderCommandHandler.handle` の `paymentRepository.findByOrderId`（ロックのない SELECT）。後の配信で決済代行を呼ばないための先読みで、重複の判定ではない（判定は `DInsert`）                  |
 | `DReadOrder`      | `ChargeOrderCommandHandler.handle` の `orderQueries.findDetails` と `details.confirmed()`                                                                                                          |
 | `DSend`           | `PaymentGatewayClient.charge` の `POST /v1/charges`（`Idempotency-Key` は注文 ID）                                                                                                                 |
 | `GatewayDecide`   | 決済代行が冪等性キーの判定を決める（モデルの外の決済代行。ADR-072 の契約）                                                                                                                         |
-| `DReply`          | `PaymentGatewayClient.charge` の戻り値（`toOutcome`、`contractError`）か例外（タイムアウト、5xx、401、403、429）                                                                                    |
-| `DInsert`         | `Payment.record`、`JooqPaymentRepository.add` → `TableWriter.insert` とリスナーのトランザクションのコミット。`uk_2_t_payment` が二件目を拒む                                                        |
+| `DReply`          | `PaymentGatewayClient.charge` の戻り値（`toOutcome`、`contractError`）か例外（タイムアウト、5xx、401、403、429）。例外なら、決済代行の判定によらず配信の見た結果を `TRANSIENT` にする             |
+| `DInsert`         | `Payment.record`、`JooqPaymentRepository.add` の `INSERT ... ON CONFLICT (tenant_public_id, order_public_id) DO NOTHING`（`uk_2_t_payment`）とリスナーのトランザクションのコミット。開いたままのトランザクションの行とぶつかる INSERT はその終わりを待つため、INSERT とコミットを一つのステップにする。0 件なら `ChargeOrderCommandHandler.handle` が 1 回目の決済記録を読んで `AlreadyRecorded` を返し、リスナーは正常に終わる |
 | `DMarkCompleted`  | `DefaultEventPublicationRegistry.markCompleted`（archive への写しと削除）                                                                                                                          |
 | `DMarkFailed`     | `DefaultEventPublicationRegistry.markFailed` → `markFailedOrAbandoned`。`PublicationsInProgress` のこの配信の登録は、ほかの配信が外さないため、必ず判断する。`AbandonPolicies` の既定が、渡された出版の `getCompletionAttempts()`（配信 `d` では `d - 1`、最初の配信では 1）を `abandon-after-attempts` と比べ、それ以上なら（`d = MaxDeliveries`）archive へ `ABANDONED` で移し、未満なら `status != 'FAILED'` の UPDATE を実行する |
 | `DCrash`          | 配信の途中のプロセスの停止。リスナーのトランザクションはロールバックする                                                                                                                           |
@@ -129,6 +131,11 @@ git diff --name-only --diff-filter=A "$(sed -n 's/^同期コミット：`\([0-9a
 - 決済代行は冪等性キーごとに判定を一度だけ決めると仮定する（`contract.cfg`）。
   判定はモデルの外の約束である。
 - 明細の変更（`ChangeOrderLinesCommandHandler`）、金額の正しさ、HTTP の層、認証、複数の注文の間の干渉は扱わない。
+- 重複の配信の判定は、決済記録の INSERT の `ON CONFLICT DO NOTHING` が行う。
+  先読みの `findByOrderId` は決済代行の呼び出しを省くだけで、モデルの約束はこれに頼らない。
+  先読みを消す退行の変異は置かない。
+  決済代行は冪等性キーで同じ判定を返すため（`contract.cfg`）約束は破れず、決済代行を呼ぶ回数はモデルの外である。
+- 1 回目の決済記録が消える経路はコードにないため、INSERT が 0 件のあとの読み出しは必ず記録を見つけるとする。
 - 手での再投入（`EventPublicationResubmitOnce`）は、定期の再投入と同じ `markResubmitted` を通るため、`RPick` と `RClaim` に含まれる。
   配信の数の上限は `MaxDeliveries`（`abandon-after-attempts` + 1）で、上限の配信が失敗すると出版は `ABANDONED` になる。
 - `ResubmissionTracker` の上限到達の記録とメトリクスは扱わない。
@@ -164,7 +171,10 @@ git diff --name-only --diff-filter=A "$(sed -n 's/^同期コミット：`\([0-9a
 
 ## 同期の記録
 
-同期コミット：`34e927baf0ba528776da46f805d9f0d1e129f51f`（main。#556 の Pull Request の土台）
+同期コミット：`62d0618f603f33861f01c57de9bbf1b1f1b29281`（main。#551 の Pull Request の土台）
+
+#551 の Pull Request のコード（決済記録を `INSERT ... ON CONFLICT DO NOTHING` で入れ、0 件なら 1 回目の決済記録を返すようにした後）で、`ChargeOrderCommandHandler`、`PaymentRepository`、`JooqPaymentRepository`、`TableWriter.insertIfAbsent` を読み、対応表の `DReadPayment`、`DReply`、`DInsert` がモデルと一致することを確かめた。
+同時の 2 回目の INSERT は 1 回目のトランザクションの終わりを待ち、例外にならずに完了する。
 
 #562 の Pull Request のコード（回数の上限を `abandon-after-attempts` に任せた後）で、「変更がこの検証に関わるか」のファイルと対応表がモデルと一致することを確かめた。
 読んだライブラリは、Spring Modulith 2.2.0 の `DefaultEventPublicationRegistry`（`PublicationsInProgress`、`markFailedOrAbandoned`）、`AbandonPolicies`、`ResubmissionProperties`、`JdbcEventPublicationRepositoryV2`（`markAbandoned`）、`CompletionRegisteringAdvisor`（`CompletionRegisteringMethodInterceptor`、`spring.modulith.events.completion: in-interceptor`）、`PersistentApplicationEventMulticaster`、`DefaultFailedEventPublications` である。
