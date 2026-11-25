@@ -264,7 +264,7 @@ betterleaksの誤検知の除外の書き方は[betterleaksの誤検知の除外
 - **pre-commit（`tooling/*/test.sh`、`.kiro/hooks/*.test.sh`、`tooling/scratch-git/`の変更）**：`lint-scratch-git`を実行する。
 - **pre-commit（`tooling/test-weakening/`の変更）**：`test-weakening-test`を実行する。
 - **pre-push（すべて）**：`adr-check`、`test-weakening`、`scan-secrets-all`を実行する。
-- **pre-push（バックエンドのJavaまたはGradle変更）**：`be-lint`相当と`test`を実行する。
+- **pre-push（バックエンドのJavaまたはGradle変更）**：`be-lint`相当を実行する。全体のテスト（`task test`）はpre-pushでは実行せず、Backend CIが流す（[ADR-128](../adr/ADR-128-run-backend-tests-in-ci-not-in-pre-push.md)）。
 - **pre-push（フロントエンドの変更）**：`fe-test-build`を、Vitestのdot reporterと、報告を出さない`none`のcoverage reporterで実行する。
   下限の検査は報告の形式によらず働く。
 - **pre-push（GitHub Actionsのワークフローかcomposite actionの変更）**：`lint-actions`相当と`lint-actions-security`相当を実行する。

@@ -43,7 +43,7 @@ Dependabotの更新が`frontend/pnpm-lock.yaml`を変えずに来ると、CIの`
 
 ## 作業の途中にテストを流すとき
 
-作業の途中は、変えたクラスとファイルのテストだけを流し、全体は[pushする前](#pushする前)に一度流す。
+作業の途中は、変えたクラスとファイルのテストだけを流す。バックエンドの全体のテストはpre-pushでは流れず、Backend CIが流す（[ADR-128](../adr/ADR-128-run-backend-tests-in-ci-not-in-pre-push.md)）。
 `task be-test`のGradleの`test`は、テストのクラスパスが1バイトでも変わると全クラスを流し直す。
 コードを直すたびに`task be-test`を流すと、毎回約110秒かかる。
 build cacheが当たるのはバイトコードが変わらないときだけである。
@@ -73,8 +73,9 @@ Kiro Web（8コア）で測った所要時間は次のとおりである（各3�
 `vp test related --run`は、測った例で18ファイル中10ファイルを5.9秒で流した。
 package全体の6.8秒と差が小さいので、ファイルが少ないときは`vp test run <ファイル>`で足りる。
 
-全体の`task verify`と`task fe-verify`は、pushする前に一度流す。
-pre-pushとCIも全体を流すので、途中で流した範囲の外の回帰はそこで見つかる。
+`task fe-verify`は、pushする前に一度流す。
+バックエンドの全体のテストは、pre-pushでは流れない。変えた範囲の外へ影響しうる変更（共通のクラス、DBのマイグレーション、設定）では、pushする前に`task verify`を流す。
+途中で流した範囲の外の回帰は、CIが見つける。
 
 ## git worktreeで作業するとき
 
@@ -163,7 +164,7 @@ task agent-push && AGENT_GIT_WAIT_SECONDS=1500 task agent-wait
 失敗を報告した実行のディレクトリは、ログを読めるように残る。
 消し方と、indexをcommitに合わせるコマンドは、`task agent-wait`が出す。
 
-前のpre-pushを止めたときは、止めた`task test`のコンテナがslotを持ったまま残ることがある。
+前の`task test`を止めたときは、止めた`task test`のコンテナがslotを持ったまま残ることがある。
 そのままやり直しても次の`task test`は別のslotを取るが、片付けるまでslotを1つ使い続けるので、[compose-testのslot](test-slots.md#中断した実行が残した-slot)の手順で片付ける。
 
 Lefthookの出力は`lefthook.yml`の`output`で絞ってある（[Lintとテストのリファレンス](lint-and-test.md)）。
