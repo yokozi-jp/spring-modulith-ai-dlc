@@ -14,6 +14,7 @@ import org.springframework.beans.factory.config.ConfigurableListableBeanFactory;
 import org.springframework.context.event.EventListener;
 import org.springframework.core.MethodIntrospector;
 import org.springframework.core.annotation.AnnotatedElementUtils;
+import org.springframework.modulith.events.AbandonPolicy;
 import org.springframework.modulith.events.EventPublication;
 import org.springframework.modulith.events.core.TargetEventPublication;
 import org.springframework.stereotype.Component;
@@ -26,10 +27,13 @@ import org.springframework.util.ClassUtils;
  * Spring Modulith 2.2.0 は、{@code TransactionalApplicationListener.getListenerId()} を ID にし、Spring
  * Framework は、注釈の {@code id} が空ならメソッドの完全修飾名と引数の型（{@code <クラス>.<メソッド>(<型>,...)}）を ID にする。 起動のときに
  * bean のメソッドを走査して同じ ID を作る。
+ *
+ * <p>Spring Modulith の {@link AbandonPolicy} も実装し、方針の {@code abandon-after-attempts}
+ * に達した出版を、全体の上限を待たずに {@code ABANDONED} にする。 冪等でない外部システムを呼ぶリスナーを、自動で再投入させないためである。
  */
 @Slf4j
 @Component
-class ResubmissionPolicies {
+class ResubmissionPolicies implements AbandonPolicy {
 
   /** 方針の設定値。 */
   private final EventPublicationResubmissionConfig.Properties properties;
@@ -46,7 +50,29 @@ class ResubmissionPolicies {
       final EventPublicationResubmissionConfig.AbandonProperties abandon) {
     this.properties = properties;
     this.abandon = abandon;
+    requireBelowGlobalLimit(properties, abandon);
     this.policyNames = Map.copyOf(scan(beanFactory, properties));
+  }
+
+  /** 方針の {@code abandon-after-attempts} が全体の値以上なら、全体の値が先に効いて意味がないため、起動に失敗させる。 */
+  private static void requireBelowGlobalLimit(
+      final EventPublicationResubmissionConfig.Properties properties,
+      final EventPublicationResubmissionConfig.AbandonProperties abandon) {
+    properties
+        .policies()
+        .forEach((name, policy) -> {
+          final @Nullable Integer own = policy.abandonAfterAttempts();
+          if (own != null && own >= abandon.abandonAfterAttempts()) {
+            throw new IllegalStateException(
+                "event-publication.resubmission.policies."
+                    + name
+                    + ".abandon-after-attempts ("
+                    + own
+                    + ") must be less than spring.modulith.events.resubmission.abandon-after-attempts ("
+                    + abandon.abandonAfterAttempts()
+                    + ")");
+          }
+        });
   }
 
   /** bean の {@link ResubmissionPolicy} を付けたメソッドを走査し、リスナーの ID と方針の名前を返す。設定にない名前があれば起動に失敗する。 */
@@ -134,6 +160,25 @@ class ResubmissionPolicies {
     return Objects.requireNonNull(properties.policies().get(nameOf(listenerId)), "policy");
   }
 
+  /** リスナーの ID の出版を諦める回数。方針に指定がなければ全体の値。 */
+  /* package */ int limitOf(final String listenerId) {
+    final @Nullable Integer own = policyOf(listenerId).abandonAfterAttempts();
+    return own != null ? own : abandon.abandonAfterAttempts();
+  }
+
+  /**
+   * 方針の {@code abandon-after-attempts} に達した出版を諦める。方針に指定がなければ判断せず、全体の値に任せる。
+   *
+   * <p>渡る出版の {@code getCompletionAttempts()} は、全体の値と同じく再投入の前に読んだ値である（ADR-079 の Context の表）。
+   */
+  @Override
+  public Decision shouldAbandon(final EventPublication publication) {
+    final @Nullable Integer own = policyOf(listenerIdOf(publication)).abandonAfterAttempts();
+    return own != null && publication.getCompletionAttempts() >= own
+        ? Decision.ABANDON
+        : Decision.DEFAULT;
+  }
+
   /** 出版のリスナーの ID。Spring Modulith 2.2.0 の再投入は {@link TargetEventPublication} を渡す。 */
   /* package */ static String listenerIdOf(final EventPublication publication) {
     return publication instanceof TargetEventPublication target
@@ -142,17 +187,18 @@ class ResubmissionPolicies {
   }
 
   /**
-   * 出版の再投入の回数が上限に達しておらず、最後の試行から次の待ち時間を過ぎたか。
+   * 出版の再投入の回数がリスナーの上限に達しておらず、最後の試行から次の待ち時間を過ぎたか。
    *
    * <p>上限の回数目の再投入で失敗した出版は Spring Modulith が {@code ABANDONED} にするため、ここに来ない。 回数を見るのは、失敗を記録せずに上限を超えて
    * {@code FAILED} に戻った出版（最後の試行の途中で落ち、古い出版として FAILED に戻った出版など）を、上限を超えて再投入しないためである（ADR-079）。
    */
   /* package */ boolean isDue(final EventPublication publication, final Instant now) {
     final int attempts = publication.getCompletionAttempts();
-    return !abandon.exceeded(attempts)
+    final String listenerId = listenerIdOf(publication);
+    return attempts <= limitOf(listenerId)
         && publication
             .getLastPublicationDate()
-            .plus(policyOf(listenerIdOf(publication)).waitBefore(properties.waitAge(), attempts))
+            .plus(policyOf(listenerId).waitBefore(properties.waitAge(), attempts))
             .isBefore(now);
   }
 }

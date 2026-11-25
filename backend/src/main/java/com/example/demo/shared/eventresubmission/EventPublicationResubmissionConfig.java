@@ -325,9 +325,13 @@ class EventPublicationResubmissionConfig {
    *
    * @param multiplier 再投入のたびに待ち時間に掛ける倍率。1 なら待ち時間を延ばさない
    * @param maxWait 待ち時間の上限
+   * @param abandonAfterAttempts このリスナーの出版を諦める回数。全体の {@code abandon-after-attempts} と同じ数え方で、1
+   *     は最初の配信の失敗で諦める（自動で再投入しない）。全体の値より小さくする。{@code null} なら全体の値に従う
    */
   /* package */ record Policy(
-      @DecimalMin("1.0") double multiplier, @NotNull @DurationMin(seconds = 1) Duration maxWait) {
+      @DecimalMin("1.0") double multiplier,
+      @NotNull @DurationMin(seconds = 1) Duration maxWait,
+      @Nullable @Min(1) Integer abandonAfterAttempts) {
 
     /**
      * 次の再投入の前の待ち時間。

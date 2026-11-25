@@ -19,8 +19,25 @@ tags: [runbook, observability, logging, operations, integration, spring-modulith
 方針は `application.yaml` の `event-publication.resubmission.policies.<名前>` にあり、`multiplier`（倍率）と `max-wait`（待ち時間の上限）を持つ。
 リスナーの `on` に付けた `@ResubmissionPolicy("<名前>")` で選び、付けないリスナーは `default` になる。
 main では `payment.application.OrderConfirmedListener` が `payment` を使い、`default` と `payment` はどちらも 2 倍、1 時間である。
-回数の上限は全リスナーに共通で、`spring.modulith.events.resubmission.abandon-after-attempts`（main では 5）である。
+回数の上限の既定は全リスナーに共通で、`spring.modulith.events.resubmission.abandon-after-attempts`（main では 5）である。
 2 未満にすると起動に失敗する。
+
+方針に `abandon-after-attempts` を書くと、その方針のリスナーだけ、その回数で諦める。
+数え方は全体の値と同じで、`1` は最初の配信の失敗で `ABANDONED` にして、自動では再投入しない。
+冪等キーを持たない外部システムを呼ぶリスナーに使う。
+全体の値以上にすると起動に失敗する。
+諦めた出版は、`ABANDONED` の出版と同じ手順（「上限に達した出版の戻し方」）で運用者が扱う。
+
+```yaml
+policies:
+  no-resubmit:
+    multiplier: 2
+    max-wait: PT1H
+    abandon-after-attempts: 1
+```
+
+処理の途中で落ちた出版は、この指定でも古い出版として `FAILED` に戻り、1 回は再投入される。
+外部の呼び出しの後で落ちると二重に呼ぶため、リスナー側で送信済みを記録する。
 
 n 回目の再投入の前に、最後の試行から `min(wait-age × multiplier^(n-1), max-wait)` を待つ。
 `wait-age` は環境変数 `EVENT_PUBLICATION_RESUBMISSION_WAIT_AGE` である。

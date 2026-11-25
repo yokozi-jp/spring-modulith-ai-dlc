@@ -67,6 +67,9 @@ final class ResubmissionTestSupport {
         "spring.modulith.events.resubmission.abandon-after-attempts=2",
         "event-publication.resubmission.policies.probe.multiplier=2",
         "event-publication.resubmission.policies.probe.max-wait=PT20M",
+        "event-publication.resubmission.policies.probe-once.multiplier=2",
+        "event-publication.resubmission.policies.probe-once.max-wait=PT20M",
+        "event-publication.resubmission.policies.probe-once.abandon-after-attempts=1",
         // リスナーが進めない変異で、手での再投入が application.yaml の PT10M まで待たないようにする。
         "event-publication.resubmit-once.completion-timeout=PT15S"
       })

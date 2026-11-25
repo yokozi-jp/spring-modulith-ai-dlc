@@ -17,6 +17,7 @@ import org.springframework.beans.factory.CannotLoadBeanClassException;
 import org.springframework.beans.factory.config.ConfigurableListableBeanFactory;
 import org.springframework.beans.factory.support.DefaultListableBeanFactory;
 import org.springframework.beans.factory.support.RootBeanDefinition;
+import org.springframework.modulith.events.AbandonPolicy.Decision;
 import org.springframework.modulith.events.ApplicationModuleListener;
 import org.springframework.modulith.events.EventPublication;
 import org.springframework.modulith.events.core.PublicationTargetIdentifier;
@@ -35,6 +36,12 @@ class ResubmissionPoliciesTest {
   /** 設定にある方針の名前。 */
   private static final String PAYMENT = "payment";
 
+  /** 最初の配信の失敗で諦める方針の名前（abandon-after-attempts = 1）。 */
+  private static final String ONCE = "once";
+
+  /** 3 回で諦める方針の名前（abandon-after-attempts = 3）。 */
+  private static final String LIMITED = "limited";
+
   /** 最後の試行の時刻。マイクロ秒の精度にする。 */
   private static final Instant T0 = Instant.parse("2026-10-10T01:02:03.123456Z");
 
@@ -51,9 +58,13 @@ class ResubmissionPoliciesTest {
           Duration.ofMinutes(10),
           Map.of(
               EventPublicationResubmissionConfig.DEFAULT_POLICY,
-              new EventPublicationResubmissionConfig.Policy(2, Duration.ofHours(1)),
+              new EventPublicationResubmissionConfig.Policy(2, Duration.ofHours(1), null),
               PAYMENT,
-              new EventPublicationResubmissionConfig.Policy(3, Duration.ofHours(1))));
+              new EventPublicationResubmissionConfig.Policy(3, Duration.ofHours(1), null),
+              ONCE,
+              new EventPublicationResubmissionConfig.Policy(2, Duration.ofHours(1), 1),
+              LIMITED,
+              new EventPublicationResubmissionConfig.Policy(2, Duration.ofHours(1), 3)));
 
   @Test
   @DisplayName("型を解決できない bean があっても起動を失敗させず、他の bean の方針を対応づける")
@@ -84,6 +95,30 @@ class ResubmissionPoliciesTest {
         .isInstanceOf(IllegalStateException.class)
         .hasMessageContaining("@ApplicationModuleListener")
         .hasMessageContaining("NonListener.on");
+  }
+
+  @Test
+  @DisplayName("方針の abandon-after-attempts が全体の値以上だと、構築が失敗する")
+  void policyLimitNotBelowGlobalFailsStartup() {
+    final EventPublicationResubmissionConfig.Properties invalid =
+        new EventPublicationResubmissionConfig.Properties(
+            Duration.ofMinutes(5),
+            Duration.ofMinutes(25),
+            Duration.ofMinutes(1),
+            100,
+            Duration.ofMinutes(10),
+            Map.of(
+                EventPublicationResubmissionConfig.DEFAULT_POLICY,
+                new EventPublicationResubmissionConfig.Policy(
+                    2, Duration.ofHours(1), MAX_RESUBMISSIONS)));
+
+    assertThatThrownBy(() ->
+            new ResubmissionPolicies(
+                new DefaultListableBeanFactory(),
+                invalid,
+                new EventPublicationResubmissionConfig.AbandonProperties(MAX_RESUBMISSIONS)))
+        .isInstanceOf(IllegalStateException.class)
+        .hasMessageContaining("policies.default.abandon-after-attempts (5)");
   }
 
   @Test
@@ -140,6 +175,57 @@ class ResubmissionPoliciesTest {
         .isFalse();
   }
 
+  @Test
+  @DisplayName("方針の abandon-after-attempts に達した出版は ABANDON、達していないか指定のない方針の出版は DEFAULT を返す")
+  void shouldAbandonOnceAttemptsReachPolicyLimit() {
+    final DefaultListableBeanFactory beanFactory = new DefaultListableBeanFactory();
+    beanFactory.registerBeanDefinition("once", new RootBeanDefinition(OnceListener.class));
+    beanFactory.registerBeanDefinition("limited", new RootBeanDefinition(LimitedListener.class));
+    final ResubmissionPolicies policies = policiesOf(beanFactory);
+    final String once = idOf(OnceListener.class);
+    final String limited = idOf(LimitedListener.class);
+
+    assertThat(policies.shouldAbandon(failed(once, 1)))
+        .as("1 の方針の最初の失敗")
+        .isEqualTo(Decision.ABANDON);
+    assertThat(policies.shouldAbandon(failed(limited, 2)))
+        .as("3 の方針の 2")
+        .isEqualTo(Decision.DEFAULT);
+    assertThat(policies.shouldAbandon(failed(limited, 3)))
+        .as("3 の方針の 3")
+        .isEqualTo(Decision.ABANDON);
+    assertThat(policies.shouldAbandon(failed("unknown", MAX_RESUBMISSIONS)))
+        .as("default の方針は全体の値に任せる")
+        .isEqualTo(Decision.DEFAULT);
+    assertThat(policies.shouldAbandon(failed(MAX_RESUBMISSIONS)))
+        .as("リスナーの ID を持たない出版")
+        .isEqualTo(Decision.DEFAULT);
+  }
+
+  @Test
+  @DisplayName("リスナーの上限を超えた出版は待ち時間を過ぎても再投入せず、上限と同じ回数の出版は再投入する")
+  void policyLimitCapsDueResubmission() {
+    final DefaultListableBeanFactory beanFactory = new DefaultListableBeanFactory();
+    beanFactory.registerBeanDefinition("limited", new RootBeanDefinition(LimitedListener.class));
+    final ResubmissionPolicies policies = policiesOf(beanFactory);
+    final String limited = idOf(LimitedListener.class);
+    final Instant muchLater = T0.plus(Duration.ofDays(1));
+
+    assertThat(policies.limitOf(limited)).isEqualTo(3);
+    assertThat(policies.limitOf("unknown")).isEqualTo(MAX_RESUBMISSIONS);
+    assertThat(policies.isDue(failed(limited, 3), muchLater)).as("attempts = 方針の上限").isTrue();
+    assertThat(policies.isDue(failed(limited, 4), muchLater)).as("attempts = 方針の上限 + 1").isFalse();
+    assertThat(policies.isDue(failed("unknown", 4), muchLater)).as("指定のないリスナー").isTrue();
+  }
+
+  private static String idOf(final Class<?> listener) {
+    try {
+      return ResubmissionPolicies.listenerId(listener.getDeclaredMethod("on", String.class));
+    } catch (NoSuchMethodException e) {
+      throw new IllegalStateException(e);
+    }
+  }
+
   /** DB を使わない構築。 */
   private static ResubmissionPolicies policiesOf(
       final ConfigurableListableBeanFactory beanFactory) {
@@ -176,6 +262,30 @@ class ResubmissionPoliciesTest {
 
     @ApplicationModuleListener
     @ResubmissionPolicy(PAYMENT)
+    /* package */ void on(final String event) {
+      // 呼ばれない。
+    }
+  }
+
+  /** 最初の配信の失敗で諦める方針のリスナー。 */
+  // 受信メソッドは on と命名する規約のため。
+  @SuppressWarnings("PMD.ShortMethodName")
+  /* package */ static class OnceListener {
+
+    @ApplicationModuleListener
+    @ResubmissionPolicy(ONCE)
+    /* package */ void on(final String event) {
+      // 呼ばれない。
+    }
+  }
+
+  /** 3 回で諦める方針のリスナー。 */
+  // 受信メソッドは on と命名する規約のため。
+  @SuppressWarnings("PMD.ShortMethodName")
+  /* package */ static class LimitedListener {
+
+    @ApplicationModuleListener
+    @ResubmissionPolicy(LIMITED)
     /* package */ void on(final String event) {
       // 呼ばれない。
     }

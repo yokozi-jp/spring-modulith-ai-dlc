@@ -26,6 +26,9 @@ import org.springframework.modulith.events.ApplicationModuleListener;
   /** テスト用のリスナーに付ける再投入の方針の名前。 */
   /* package */ static final String PROBE_POLICY = "probe";
 
+  /** 最初の配信の失敗で諦める、テスト用のリスナーの方針の名前。 */
+  /* package */ static final String ONCE_POLICY = "probe-once";
+
   /** 2 つのスレッドの完了と、リスナーが門で待つ上限の秒数。 */
   /* package */ static final long JOIN_TIMEOUT_SECONDS = 10;
 
@@ -38,6 +41,34 @@ import org.springframework.modulith.events.ApplicationModuleListener;
    * @param tenantId イベントのテナント
    */
   /* package */ record ResubmissionProbe(String id, TenantId tenantId) implements TenantScoped {}
+
+  /**
+   * 最初の配信の失敗で諦める方針のリスナーが受けるテストのイベント。
+   *
+   * @param id 出版を見分ける ID
+   * @param tenantId イベントのテナント
+   */
+  /* package */ record OnceProbe(String id, TenantId tenantId) implements TenantScoped {}
+
+  /** 常に失敗し、呼び出しの回数を数える、最初の配信の失敗で諦める方針のリスナー。 */
+  // @ApplicationModuleListener のトランザクションの proxy を作るため final にしない。受信メソッドは on と命名する規約のため。
+  @SuppressWarnings("PMD.ShortMethodName")
+  /* package */ static class OnceProbeListener {
+
+    /** 呼び出しの回数。 */
+    private final AtomicInteger callCount = new AtomicInteger();
+
+    @ApplicationModuleListener
+    @ResubmissionPolicy(ONCE_POLICY)
+    /* package */ void on(final OnceProbe event) {
+      callCount.incrementAndGet();
+      throw new IllegalStateException("once probe listener always fails: id=" + event.id());
+    }
+
+    /* package */ int calls() {
+      return callCount.get();
+    }
+  }
 
   /** 呼び出しの回数を数え、決めた回数だけ失敗し、門が閉じていれば開くまで待つリスナー。 */
   // @ApplicationModuleListener のトランザクションの proxy を作るため final にしない。受信メソッドは on と命名する規約のため。
@@ -159,6 +190,11 @@ import org.springframework.modulith.events.ApplicationModuleListener;
     @Bean
     /* package */ ProbeListener probeListener() {
       return new ProbeListener();
+    }
+
+    @Bean
+    /* package */ OnceProbeListener onceProbeListener() {
+      return new OnceProbeListener();
     }
   }
 }
