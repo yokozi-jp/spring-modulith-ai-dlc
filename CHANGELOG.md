@@ -1,5 +1,30 @@
 # Changelog
 
+## [0.15.0](https://github.com/yokozi-jp/spring-modulith-ai-dlc/compare/v0.14.0...v0.15.0) (2026-11-25)
+
+
+### Features
+
+* **api:** idempotency-key の期限切れの行を消し、同じキーで自動の再試行をする ([#760](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/760)) ([0978556](https://github.com/yokozi-jp/spring-modulith-ai-dlc/commit/0978556107dafcf71629aedb0f5da365331e6b41)), closes [#540](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/540)
+* **api:** 更新の api に idempotency-key を契約で必須にする ([#736](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/736)) ([e4b52ee](https://github.com/yokozi-jp/spring-modulith-ai-dlc/commit/e4b52ee7cb70d32e6ca6062a7064d607b5f56074)), closes [#540](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/540)
+* **backend:** 422 と 409 に失敗ごとの problem type を付ける ([#737](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/737)) ([f0c2698](https://github.com/yokozi-jp/spring-modulith-ai-dlc/commit/f0c2698f8f2cf5beab6ff0020e4e5545a202d8fb)), closes [#541](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/541)
+* **backend:** すべての子の削除で、削除前の行を履歴の表へ写す ([#757](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/757)) ([3cde2e0](https://github.com/yokozi-jp/spring-modulith-ai-dlc/commit/3cde2e06b4f160322c24a4a8edc39679c5074287)), closes [#609](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/609)
+* **backend:** 再投入の方針ごとに abandon-after-attempts を指定できるようにする ([#747](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/747)) ([8b785be](https://github.com/yokozi-jp/spring-modulith-ai-dlc/commit/8b785be3d9a5440eaaf5800f37a7f3edde5e3fec)), closes [#741](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/741)
+* **mail:** メールを SES v2 の API で送り、ローカルとテストは接続先を WireMock に向ける ([#732](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/732)) ([2d10352](https://github.com/yokozi-jp/spring-modulith-ai-dlc/commit/2d10352c0ba222608757064a3a15826ad49f914d)), closes [#571](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/571)
+* **product:** 商品を登録する API を足し、E2E の商品をその API で作る ([#752](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/752)) ([6c51126](https://github.com/yokozi-jp/spring-modulith-ai-dlc/commit/6c51126926d4b72006e9e9e8eb6702c9eaec8595)), closes [#612](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/612) [#759](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/759)
+* **shared:** 古い出版を FAILED に戻す処理を再投入のロックの中で動かす ([#738](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/738)) ([56361d7](https://github.com/yokozi-jp/spring-modulith-ai-dlc/commit/56361d777a378f2e5f4b0c913501d659306048e1)), closes [#556](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/556)
+* **shared:** 完了したイベント出版の archive を保持期限で消す ([#766](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/766)) ([1330a99](https://github.com/yokozi-jp/spring-modulith-ai-dlc/commit/1330a999d6a09d48f20550093b34315c85c4f8a7)), closes [#542](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/542)
+* **tenancy:** メンバーの更新で idempotency-key の再送に保存した result を返す ([#754](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/754)) ([8dea105](https://github.com/yokozi-jp/spring-modulith-ai-dlc/commit/8dea10562e6fc5dcf2bf3e7e0ef1361c4d39e211)), closes [#540](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/540)
+
+
+### Bug Fixes
+
+* **backend:** idp のトークンの取得と userinfo にタイムアウトを明示する ([#749](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/749)) ([076e269](https://github.com/yokozi-jp/spring-modulith-ai-dlc/commit/076e269d361223f8fe4305e9c7be92098f8ec113)), closes [#574](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/574)
+* **backend:** 応答ヘッダーを ADR-014 に揃え、CORP と COOP を足す ([#765](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/765)) ([9e23ec4](https://github.com/yokozi-jp/spring-modulith-ai-dlc/commit/9e23ec4497620e3ccbce273f3ed1c572a1663ed0)), closes [#683](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/683)
+* **database:** verifyDatabaseMigrations の rollback の順序を DB の時計に任せない ([#764](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/764)) ([03e0b3b](https://github.com/yokozi-jp/spring-modulith-ai-dlc/commit/03e0b3b39f18ea99ed61002c3e21204e3b0768f5)), closes [#756](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/756)
+* **mail:** メールアドレスの形式の検査で、サーバーをクライアントの Zod の式に揃える ([#718](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/718)) ([c9d5a3c](https://github.com/yokozi-jp/spring-modulith-ai-dlc/commit/c9d5a3cad76c85d874eff6123f8f6dd7b7f9a15b)), closes [#664](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/664)
+* **payment:** すべての Listener の 2 回目の配信を全件で検査し、同時の 2 回目の決済を直す ([#755](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/755)) ([8858540](https://github.com/yokozi-jp/spring-modulith-ai-dlc/commit/88585401e43e1bc9b7b18720d962d002dfd54e3f)), closes [#551](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/551)
+
 ## [0.14.0](https://github.com/yokozi-jp/spring-modulith-ai-dlc/compare/v0.13.0...v0.14.0) (2026-11-24)
 
 
