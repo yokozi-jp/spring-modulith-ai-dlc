@@ -10,6 +10,7 @@ import org.springframework.boot.security.autoconfigure.actuate.web.servlet.Endpo
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.oauth2.client.oidc.web.logout.OidcClientInitiatedLogoutSuccessHandler;
 import org.springframework.security.oauth2.client.registration.ClientRegistrationRepository;
@@ -34,9 +35,14 @@ import org.springframework.web.servlet.HandlerExceptionResolver;
  * /actuator/health} のルートとそれ以外の health 配下は、ログイン済みでも誰にも許可しない（ADR-061）。 probe のパスは明示しているため、{@code
  * management.endpoints.web.base-path} を変えたらここも直す。 拒否する側は {@link EndpointRequest#to}
  * でエンドポイントクラスから解決する。
+ *
+ * <p>{@link EnableMethodSecurity} は、役割で許す操作を、application の CommandHandler の {@code handle} に付けた
+ * {@code @PreAuthorize} で確かめるために有効にする。誰が要求したか（役割を含む）は domain ではなく application
+ * で確かめると決めたため（ADR-129）。拒否は {@code ApiExceptionHandler} が 403 の about:blank にする。
  */
 @Slf4j
 @Configuration
+@EnableMethodSecurity
 public class SecurityConfig {
 
   /**

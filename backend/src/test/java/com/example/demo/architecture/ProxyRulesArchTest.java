@@ -18,6 +18,7 @@ import com.tngtech.archunit.lang.ArchCondition;
 import com.tngtech.archunit.lang.ArchRule;
 import com.tngtech.archunit.lang.ConditionEvents;
 import com.tngtech.archunit.lang.SimpleConditionEvent;
+import com.tngtech.archunit.lang.conditions.ArchConditions;
 import com.tngtech.archunit.library.ProxyRules;
 import io.github.resilience4j.bulkhead.annotation.Bulkhead;
 import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
@@ -130,6 +131,26 @@ class ProxyRulesArchTest {
                   .map(type -> "@" + type.getSimpleName())
                   .collect(Collectors.joining(", ")),
           annotated -> INTERCEPTED_ANNOTATIONS.stream().anyMatch(annotated::isMetaAnnotatedWith));
+
+  /** 役割と権限を確かめる Spring Security の method security のアノテーション。 */
+  private static final List<Class<? extends Annotation>> METHOD_SECURITY_ANNOTATIONS =
+      List.of(
+          PreAuthorize.class,
+          PostAuthorize.class,
+          PreFilter.class,
+          PostFilter.class,
+          Secured.class);
+
+  /** {@link #METHOD_SECURITY_ANNOTATIONS} のどれかを、クラスか宣言したメソッドに、直接かメタアノテーションとして持つクラス。 */
+  private static final DescribedPredicate<JavaClass> CARRYING_METHOD_SECURITY =
+      DescribedPredicate.describe(
+          "method security annotations on the class or its methods",
+          type ->
+              METHOD_SECURITY_ANNOTATIONS.stream()
+                  .anyMatch(annotation ->
+                      type.isMetaAnnotatedWith(annotation)
+                          || type.getMethods().stream()
+                              .anyMatch(method -> method.isMetaAnnotatedWith(annotation))));
 
   /** プロキシがメソッドを上書きできなくなる修飾子。 */
   private static final List<JavaModifier> NOT_OVERRIDABLE =
@@ -264,6 +285,24 @@ class ProxyRulesArchTest {
                   + "起動とクラス単体のテストは通り、Spring を起動する統合テストだけが失敗する。"
                   + "直し方：public な Bean のメソッドから final を外す。"
                   + JAVA_CODING_DOC);
+
+  /**
+   * method security のアノテーションは、各モジュールの application のクラスとそのメソッドにだけ付ける。
+   *
+   * <p>Controller、domain、infrastructure に付けると、同じ操作の役割の確かめ方が層ごとに散る。
+   */
+  @ArchTest
+  /* package */ static final ArchRule methodSecurityAnnotationsAreOnlyOnApplicationClasses =
+      noClasses()
+          .that()
+          .resideOutsideOfPackage("..application..")
+          .should(ArchConditions.have(CARRYING_METHOD_SECURITY))
+          .because(
+              "誰が要求したか（役割を含む）は application で確かめると決めており（ADR-129）、"
+                  + "Controller や domain に付けると、操作の役割の確かめ方が層ごとに散るため。"
+                  + "直し方：@PreAuthorize などを Controller や domain から外し、"
+                  + "操作を受け持つ application の CommandHandler の handle に、役割か権限の名前だけを書いて付ける。"
+                  + "規約：docs/backend/layers.md");
 
   /** {@link Async} のメソッドは、Spring が受け付ける void か {@link Future} を返す。 */
   @ArchTest

@@ -1,5 +1,7 @@
 package com.example.demo;
 
+import static com.example.demo.testkit.AppUsers.TENANT_ID;
+import static com.example.demo.testkit.AppUsers.inTenant;
 import static com.example.demo.testkit.AppUsers.oidcLogin;
 import static org.hamcrest.Matchers.not;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -154,6 +156,12 @@ class ApiErrorContractTest {
         Arguments.of(
             "権限不足の 403", get("/api/error-fixture/forbidden"), 403, "about:blank", "アクセス権限がありません"),
         Arguments.of(
+            "@PreAuthorize の役割の不足",
+            get("/api/error-fixture/admin-only"),
+            403,
+            "about:blank",
+            "アクセス権限がありません"),
+        Arguments.of(
             "409",
             get("/api/error-fixture/conflict"),
             409,
@@ -185,6 +193,14 @@ class ApiErrorContractTest {
             badRequest),
         Arguments.of(
             "型の不一致", get("/api/error-fixture/items?limit=abc"), 400, "about:blank", badRequest));
+  }
+
+  @Test
+  @DisplayName("@PreAuthorize の役割を持つ利用者は、method security に拒否されない")
+  void preAuthorizeAllowsRequiredRole() throws Exception {
+    mockMvc
+        .perform(get("/api/error-fixture/admin-only").with(inTenant(TENANT_ID, "ADMIN")))
+        .andExpect(status().isNoContent());
   }
 
   @Test

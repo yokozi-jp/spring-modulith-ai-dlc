@@ -617,6 +617,7 @@ class PackageByFeatureOnionArchitectureTest {
                     "org.springframework.transaction.annotation..",
                     "org.springframework.modulith.events..",
                     "org.springframework.context",
+                    "org.springframework.security.access.prepost",
                     basePackage + "..")
                 .or(LOMBOK_GENERATED))
         .allowEmptyShould(true)

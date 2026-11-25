@@ -3,6 +3,7 @@ package errorfixture.presentation.web;
 import com.example.demo.shared.concurrency.ConflictException;
 import com.example.demo.shared.failure.BusinessRuleViolationException;
 import com.example.demo.shared.failure.NotFoundException;
+import errorfixture.application.AdminOnlyCommandHandler;
 import jakarta.validation.ConstraintViolationException;
 import jakarta.validation.Valid;
 import jakarta.validation.Validator;
@@ -29,9 +30,14 @@ class ErrorFixtureController {
   /** ConstraintViolationException を作る Validator。 */
   private final Validator validator;
 
-  /** アプリケーションの Validator を受け取る。 */
-  /* package */ ErrorFixtureController(final Validator validator) {
+  /** 管理者だけに許す操作。 */
+  private final AdminOnlyCommandHandler adminOnlyCommandHandler;
+
+  /** アプリケーションの Validator と、管理者だけに許す操作を受け取る。 */
+  /* package */ ErrorFixtureController(
+      final Validator validator, final AdminOnlyCommandHandler adminOnlyCommandHandler) {
     this.validator = validator;
+    this.adminOnlyCommandHandler = adminOnlyCommandHandler;
   }
 
   /**
@@ -124,6 +130,17 @@ class ErrorFixtureController {
   @GetMapping("/forbidden")
   /* package */ ResponseEntity<Void> forbidden() {
     throw new AccessDeniedException("fixture access denied");
+  }
+
+  /**
+   * 管理者だけに許す操作を呼ぶ。
+   *
+   * @return 本文のない 204 の応答
+   */
+  @GetMapping("/admin-only")
+  /* package */ ResponseEntity<Void> adminOnly() {
+    adminOnlyCommandHandler.handle();
+    return ResponseEntity.noContent().build();
   }
 
   /**

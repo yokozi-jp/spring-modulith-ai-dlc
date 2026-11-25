@@ -251,7 +251,11 @@ class ArchitectureRuleFixtureTest {
           row(
               "transactionManagementIsNotRedeclared",
               ProxyRulesArchTest.transactionManagementIsNotRedeclared,
-              "shared.persistence.TransactionOrderConfiguration"));
+              "shared.persistence.TransactionOrderConfiguration"),
+          row(
+              "methodSecurityAnnotationsAreOnlyOnApplicationClasses",
+              ProxyRulesArchTest.methodSecurityAnnotationsAreOnlyOnApplicationClasses,
+              "ordering.presentation.web.OrderPurgeController"));
 
   @Test
   @DisplayName("規約どおりのフィクスチャはすべてのクラス役割規則を満たす")
@@ -596,6 +600,7 @@ class ArchitectureRuleFixtureTest {
         ProxyRulesArchTest.publicBeanMethodsAreNotFinal,
         ProxyRulesArchTest.asyncMethodsReturnVoidOrFuture,
         ProxyRulesArchTest.scheduledMethodsAreNoArgVoidAndNotPrivateOrFinal,
+        ProxyRulesArchTest.methodSecurityAnnotationsAreOnlyOnApplicationClasses,
         ClassRoleArchTest.moduleListenersAreApplicationListeners,
         ClassRoleArchTest.moduleListenerEventsAreTenantScopedRule(basePackage),
         ClassRoleArchTest.tenantIsBoundOnlyByTenantSelectionFilterAndListenerAspectRule(
