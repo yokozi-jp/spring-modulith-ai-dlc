@@ -4,6 +4,7 @@ import static com.example.demo.jooq.modulith.Tables.EVENT_PUBLICATION;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.example.demo.shared.eventresubmission.ResubmissionProbes.MutableClock;
+import java.sql.Connection;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
@@ -138,7 +139,7 @@ class StalePublicationsTest {
     final Instant now = T0.plus(properties.waitAge()).plus(1, ChronoUnit.MICROS);
     clock.set(now);
 
-    try (var other = dataSource.getConnection()) {
+    try (Connection other = dataSource.getConnection()) {
       other.setAutoCommit(false);
       DSL.using(other, SQLDialect.POSTGRES)
           .update(EVENT_PUBLICATION)
