@@ -72,7 +72,11 @@ describe("操作の失敗の通知", () => {
   });
 
   it("競合を画面が自分で扱う場合に競合したら、一般の見出しと説明を出す", () => {
-    const error = new ApiProblemError(409, { type: "about:blank", title: "Conflict", status: 409 });
+    const error = new ApiProblemError(409, {
+      type: "/problems/version-conflict",
+      title: "ほかの操作が先に更新しました",
+      status: 409,
+    });
 
     expect(
       failureNotice(t, error, { conflict: undefined, unprocessable: "処理できない説明" }),

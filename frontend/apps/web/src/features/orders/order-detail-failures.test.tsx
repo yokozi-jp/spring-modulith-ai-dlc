@@ -25,7 +25,8 @@ import {
 import { renderRoute } from "@/testing/render-route";
 
 const detailPath = `/orders/${orderId}`;
-const conflictTitle = "競合が発生しました";
+const conflictTitle = "ほかの操作が先に更新しました";
+const versionConflict = { type: "/problems/version-conflict" };
 
 /** 最初の明細の変更だけを 409 にし、その間に注文を数量 5、lockNo 2 へ進める。 */
 function conflictOnce(detail: { order: OrderDetailsResponse }) {
@@ -40,7 +41,7 @@ function conflictOnce(detail: { order: OrderDetailsResponse }) {
       totalAmount: 600,
       lines: [{ lineNumber: 1, productId: penId, quantity: 5, unitPrice: 120, amount: 600 }],
     });
-    return problemResponse(409, conflictTitle);
+    return problemResponse(409, conflictTitle, versionConflict);
   });
 }
 
@@ -96,7 +97,7 @@ describe("注文の詳細の画面の失敗", () => {
 
   it("409 の後の取り直しが失敗したら、読み込めなかったことを通知し、選択肢を出さず入力を残す", async () => {
     serveDetailFailingRefetch(draftOrder());
-    serveUpdate("put", "lines", () => problemResponse(409, conflictTitle));
+    serveUpdate("put", "lines", () => problemResponse(409, conflictTitle, versionConflict));
     const { user } = await renderRoute(detailPath);
 
     await saveQuantity(user, "3");
@@ -111,7 +112,7 @@ describe("注文の詳細の画面の失敗", () => {
     const detail = serveDetail(draftOrder());
     serveUpdate("put", "lines", () => {
       detail.order = draftOrder({ lockNo: 2, status: "CONFIRMED" });
-      return problemResponse(409, conflictTitle);
+      return problemResponse(409, conflictTitle, versionConflict);
     });
     const { user } = await renderRoute(detailPath);
 
@@ -127,7 +128,7 @@ describe("注文の詳細の画面の失敗", () => {
     const detail = serveDetail(draftOrder());
     serveUpdate("post", "confirm", () => {
       detail.order = draftOrder({ lockNo: 2, status: "CANCELLED" });
-      return problemResponse(409, conflictTitle);
+      return problemResponse(409, conflictTitle, versionConflict);
     });
     const { user } = await renderRoute(detailPath);
 
@@ -170,12 +171,19 @@ describe("注文の詳細の画面の失敗", () => {
       name: "確定する",
       path: "confirm",
       status: 422,
+      problem: { type: "/problems/ordering/not-draft", title: "下書きではない注文です" },
       text: "この注文は今の状態では操作できません。",
     },
-    { name: "取り消す", path: "cancel", status: 500, text: "時間をおいてもう一度お試しください。" },
-  ] as const)("「$name」の $status は通知する", async ({ name, path, status, text }) => {
+    {
+      name: "取り消す",
+      path: "cancel",
+      status: 500,
+      problem: { type: "about:blank", title: "サーバー内部エラー" },
+      text: "時間をおいてもう一度お試しください。",
+    },
+  ] as const)("「$name」の $status は通知する", async ({ name, path, status, problem, text }) => {
     serveDetail(draftOrder());
-    serveUpdate("post", path, () => problemResponse(status, "失敗しました"));
+    serveUpdate("post", path, () => problemResponse(status, problem.title, { type: problem.type }));
     const { user } = await renderRoute(detailPath);
 
     await user.click(await screen.findByRole("button", { name }));

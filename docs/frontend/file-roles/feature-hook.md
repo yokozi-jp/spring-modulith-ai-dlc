@@ -165,7 +165,9 @@ Hook は、Hook を使う画面の component test で確かめ、Hook ごとの�
       getListTenantMembersMockHandler(members),
       http.put(memberPath, () => {
         requests += 1;
-        return problemResponse(409, "競合が発生しました");
+        return problemResponse(409, "ほかの操作が先に更新しました", {
+          type: "/problems/version-conflict",
+        });
       }),
     );
     const { user } = await renderRoute("/members");
@@ -175,7 +177,7 @@ Hook は、Hook を使う画面の component test で確かめ、Hook ごとの�
       "ADMIN",
     );
 
-    await expect(screen.findByText("競合が発生しました")).resolves.toBeTruthy();
+    await expect(screen.findByText("ほかの操作が先に更新しました")).resolves.toBeTruthy();
     expect(screen.getByText(/ほかの操作で所属が更新されました/u)).toBeTruthy();
     expect(requests).toBe(1);
   });
