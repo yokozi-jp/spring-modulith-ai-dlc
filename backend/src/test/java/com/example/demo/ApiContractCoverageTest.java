@@ -4,13 +4,10 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.example.demo.architecture.TestCodeOnly;
 import com.example.demo.testkit.ContractCase;
+import com.example.demo.testkit.OpenApiOperations;
 import com.tngtech.archunit.core.domain.JavaMethod;
 import com.tngtech.archunit.core.importer.ClassFileImporter;
-import io.swagger.v3.core.util.Yaml31;
-import io.swagger.v3.oas.models.OpenAPI;
-import java.io.IOException;
 import java.lang.reflect.Method;
-import java.nio.file.Path;
 import java.util.Arrays;
 import java.util.Locale;
 import java.util.Map;
@@ -32,9 +29,6 @@ import org.junit.platform.commons.support.AnnotationSupport;
  * <p>契約テストは {@link ContractCase} で確かめる組を宣言する。この検査は Spring も DB も起動しない。
  */
 class ApiContractCoverageTest {
-
-  /** コミット済みの OpenAPI 契約。テストは backend を作業ディレクトリにして走る。 */
-  private static final Path OPENAPI = Path.of("..", "openapi", "openapi.yaml");
 
   /**
    * OpenAPI に載らない {@code /error} が返しうる status。
@@ -70,14 +64,16 @@ class ApiContractCoverageTest {
 
   @Test
   @DisplayName("契約の operation と status の組と /error の status は、すべて MockMvc の契約テストで確かめる")
-  void everyDeclaredResponseHasContractCase() throws IOException {
+  void everyDeclaredResponseHasContractCase() {
     final Set<String> declared = declaredResponses();
     final Set<String> covered = coveredResponses();
 
     final Set<String> missing = new TreeSet<>(declared);
     missing.removeAll(covered);
     missing.removeIf(ApiContractCoverageTest::isExempt);
-    assertThat(missing).as("@ContractCase のない組。契約テストを足し、@ContractCase を付ける（%s）", OPENAPI).isEmpty();
+    assertThat(missing)
+        .as("@ContractCase のない組。契約テストを足し、@ContractCase を付ける（%s）", OpenApiOperations.OPENAPI)
+        .isEmpty();
 
     final Set<String> unknown = new TreeSet<>(covered);
     unknown.removeAll(declared);
@@ -92,18 +88,14 @@ class ApiContractCoverageTest {
   }
 
   /** 契約の operation と応答の status の組と、{@code /error} の status を「メソッド path status」で返す。 */
-  private static Set<String> declaredResponses() throws IOException {
-    final OpenAPI openApi = Yaml31.mapper().readValue(OPENAPI.toFile(), OpenAPI.class);
+  private static Set<String> declaredResponses() {
     final Set<String> responses = new TreeSet<>();
-    openApi
-        .getPaths()
-        .forEach((path, item) ->
-            item.readOperationsMap()
-                .forEach((method, operation) ->
-                    operation
-                        .getResponses()
-                        .keySet()
-                        .forEach(status -> responses.add(key(method.name(), path, status)))));
+    OpenApiOperations.operations()
+        .forEach(operation ->
+            operation
+                .statuses()
+                .forEach(status ->
+                    responses.add(key(operation.method().name(), operation.path(), status))));
     ERROR_ENDPOINT_STATUSES.forEach(
         status -> responses.add(key("GET", "/error", String.valueOf(status))));
     return responses;
@@ -164,6 +156,6 @@ class ApiContractCoverageTest {
   }
 
   private static String key(final String method, final String path, final String status) {
-    return method + " " + path + " " + status;
+    return OpenApiOperations.key(method, path) + " " + status;
   }
 }

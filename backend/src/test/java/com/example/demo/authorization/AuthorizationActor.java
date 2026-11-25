@@ -1,4 +1,4 @@
-package com.example.demo;
+package com.example.demo.authorization;
 
 /**
  * 認可の表の列。操作する人の種類と、その人のテナントでの役割（ADR-129）。
@@ -13,7 +13,9 @@ enum AuthorizationActor {
   /** 持ち主のテナントの、持ち主でない ADMIN。 */
   SAME_TENANT_ADMIN("ADMIN", false),
   /** 別のテナントの MEMBER。 */
-  OTHER_TENANT_MEMBER("MEMBER", true);
+  OTHER_TENANT_MEMBER("MEMBER", true),
+  /** 別のテナントの ADMIN。所属の管理の API を呼べるが、持ち主のテナントの所属は見えない。 */
+  OTHER_TENANT_ADMIN("ADMIN", true);
 
   /** テナントでの役割。 */
   private final String tenantRole;

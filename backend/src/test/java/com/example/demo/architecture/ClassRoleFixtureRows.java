@@ -165,6 +165,11 @@ final class ClassRoleFixtureRows {
                 VIOLATING),
             "ordering.application.OrderRetryRunner"),
         row(
+            "applicationDependsOnlyOnAllowedTypes: @PreAuthorize でない method security",
+            PackageByFeatureOnionArchitectureTest.applicationDependsOnlyOnAllowedTypesRule(
+                VIOLATING),
+            "ordering.application.PostFilteredOrderFinder"),
+        row(
             "valueObjectsDoNotThrowBusinessRuleViolation",
             PackageByFeatureOnionArchitectureTest.valueObjectsDoNotThrowBusinessRuleViolation,
             "ordering.domain.model.Discount"),

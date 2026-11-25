@@ -36,6 +36,7 @@ import org.junit.jupiter.params.provider.MethodSource;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.scheduling.annotation.Scheduled;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
@@ -62,6 +63,14 @@ class ArchitectureRuleFixtureTest {
   /** モジュールのロールを迂回する違反フィクスチャのクラス名。 */
   private static final String ROLE_BYPASS =
       "ordering.infrastructure.persistence.RoleBypassingOrderAccess";
+
+  /** method security のアノテーションの置き場所の規則を、違反フィクスチャに当てたもの。 */
+  private static final ArchRule METHOD_SECURITY_IN_APPLICATION =
+      ProxyRulesArchTest.methodSecurityAnnotationsAreOnlyOnApplicationClassesRule(VIOLATING);
+
+  /** {@code @PreAuthorize} に役割と権限の名前でない式を書く違反フィクスチャのクラス名。 */
+  private static final String SCRIPTED_AUTHORIZATION =
+      "ordering.application.ScriptedAuthorizationCommandHandler";
 
   /** モジュールのロールの規則が、違反フィクスチャの各メソッドを検出することを確かめる行。 */
   private static final List<Arguments> MODULE_ROLE_ROWS =
@@ -253,9 +262,45 @@ class ArchitectureRuleFixtureTest {
               ProxyRulesArchTest.transactionManagementIsNotRedeclared,
               "shared.persistence.TransactionOrderConfiguration"),
           row(
-              "methodSecurityAnnotationsAreOnlyOnApplicationClasses",
-              ProxyRulesArchTest.methodSecurityAnnotationsAreOnlyOnApplicationClasses,
-              "ordering.presentation.web.OrderPurgeController"));
+              "methodSecurityAnnotationsAreOnlyOnApplicationClasses: Controller のメソッド",
+              METHOD_SECURITY_IN_APPLICATION,
+              "ordering.presentation.web.OrderPurgeController.purge("),
+          row(
+              "methodSecurityAnnotationsAreOnlyOnApplicationClasses: infrastructure のクラス",
+              METHOD_SECURITY_IN_APPLICATION,
+              "ordering.infrastructure.persistence.AdminOrderReader"),
+          row(
+              "methodSecurityAnnotationsAreOnlyOnApplicationClasses: domain の interface のメソッド",
+              METHOD_SECURITY_IN_APPLICATION,
+              "ordering.domain.model.OrderApprovalPolicy.approve("),
+          row(
+              "methodSecurityAnnotationsAreOnlyOnApplicationClasses: メタアノテーション",
+              METHOD_SECURITY_IN_APPLICATION,
+              "ordering.domain.model.OrderArchive.archive("),
+          row(
+              "preAuthorizeUsesOnlyRoleOrAuthorityNames: クラスの式",
+              ProxyRulesArchTest.preAuthorizeUsesOnlyRoleOrAuthorityNames,
+              SCRIPTED_AUTHORIZATION + "> の @PreAuthorize(\"isAuthenticated()\")"),
+          row(
+              "preAuthorizeUsesOnlyRoleOrAuthorityNames: 引数を参照する SpEL",
+              ProxyRulesArchTest.preAuthorizeUsesOnlyRoleOrAuthorityNames,
+              SCRIPTED_AUTHORIZATION + ".approve("),
+          row(
+              "preAuthorizeUsesOnlyRoleOrAuthorityNames: Bean を参照する SpEL",
+              ProxyRulesArchTest.preAuthorizeUsesOnlyRoleOrAuthorityNames,
+              SCRIPTED_AUTHORIZATION + ".reject("),
+          row(
+              "preAuthorizeUsesOnlyRoleOrAuthorityNames: or で組んだ式",
+              ProxyRulesArchTest.preAuthorizeUsesOnlyRoleOrAuthorityNames,
+              SCRIPTED_AUTHORIZATION + ".hold("),
+          row(
+              "preAuthorizeUsesOnlyRoleOrAuthorityNames: 引用符のない役割",
+              ProxyRulesArchTest.preAuthorizeUsesOnlyRoleOrAuthorityNames,
+              SCRIPTED_AUTHORIZATION + ".ship("),
+          row(
+              "preAuthorizeUsesOnlyRoleOrAuthorityNames: 空の式",
+              ProxyRulesArchTest.preAuthorizeUsesOnlyRoleOrAuthorityNames,
+              SCRIPTED_AUTHORIZATION + ".release("));
 
   @Test
   @DisplayName("規約どおりのフィクスチャはすべてのクラス役割規則を満たす")
@@ -401,7 +446,39 @@ class ArchitectureRuleFixtureTest {
                 ProxyRulesArchTest.proxiedMethodsAreNotCalledFromSameClass,
                 ProxyRulesArchTest.proxiedMethodsAreNotPrivateFinalOrStatic,
                 ProxyRulesArchTest.asyncMethodsReturnVoidOrFuture,
-                ProxyRulesArchTest.scheduledMethodsAreNoArgVoidAndNotPrivateOrFinal)));
+                ProxyRulesArchTest.scheduledMethodsAreNoArgVoidAndNotPrivateOrFinal)),
+        Arguments.of(
+            "@PreAuthorize の役割と権限の名前だけの式",
+            RoleNameAuthorizations.class,
+            List.of(ProxyRulesArchTest.preAuthorizeUsesOnlyRoleOrAuthorityNames)));
+  }
+
+  /** {@code @PreAuthorize} の式の規則が許す、役割か権限の名前だけの式を持つフィクスチャ。 */
+  /* package */ static final class RoleNameAuthorizations {
+
+    /** 1 つの役割で許す。 */
+    @PreAuthorize("hasRole('ADMIN')")
+    /* package */ void byRole() {
+      // 式だけを検査するため、何もしない。
+    }
+
+    /** どれかの役割で許す。 */
+    @PreAuthorize("hasAnyRole('ADMIN', 'MEMBER')")
+    /* package */ void byAnyRole() {
+      // 式だけを検査するため、何もしない。
+    }
+
+    /** 1 つの権限で許す。 */
+    @PreAuthorize("hasAuthority('SCOPE_orders:write')")
+    /* package */ void byAuthority() {
+      // 式だけを検査するため、何もしない。
+    }
+
+    /** どれかの権限で許す。 */
+    @PreAuthorize("hasAnyAuthority('SCOPE_orders.read','SCOPE_orders-admin')")
+    /* package */ void byAnyAuthority() {
+      // 式だけを検査するため、何もしない。
+    }
   }
 
   /**
@@ -600,7 +677,8 @@ class ArchitectureRuleFixtureTest {
         ProxyRulesArchTest.publicBeanMethodsAreNotFinal,
         ProxyRulesArchTest.asyncMethodsReturnVoidOrFuture,
         ProxyRulesArchTest.scheduledMethodsAreNoArgVoidAndNotPrivateOrFinal,
-        ProxyRulesArchTest.methodSecurityAnnotationsAreOnlyOnApplicationClasses,
+        ProxyRulesArchTest.methodSecurityAnnotationsAreOnlyOnApplicationClassesRule(basePackage),
+        ProxyRulesArchTest.preAuthorizeUsesOnlyRoleOrAuthorityNames,
         ClassRoleArchTest.moduleListenersAreApplicationListeners,
         ClassRoleArchTest.moduleListenerEventsAreTenantScopedRule(basePackage),
         ClassRoleArchTest.tenantIsBoundOnlyByTenantSelectionFilterAndListenerAspectRule(

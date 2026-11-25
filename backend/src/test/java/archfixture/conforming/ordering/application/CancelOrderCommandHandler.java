@@ -5,7 +5,6 @@ import archfixture.conforming.ordering.domain.model.OrderId;
 import archfixture.conforming.ordering.domain.model.OrderRepository;
 import archfixture.conforming.shared.failure.NotFoundException;
 import java.util.UUID;
-import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -21,8 +20,7 @@ public class CancelOrderCommandHandler {
     this.orderRepository = orderRepository;
   }
 
-  /** 管理者の要求だけを受け、画面の版を確かめてから注文を取り消し、保存する。 */
-  @PreAuthorize("hasRole('ADMIN')")
+  /** 画面の版を確かめてから注文を取り消し、保存する。 */
   @Transactional
   public CancelOrderResult handle(final CancelOrderCommand command) {
     final Order order =

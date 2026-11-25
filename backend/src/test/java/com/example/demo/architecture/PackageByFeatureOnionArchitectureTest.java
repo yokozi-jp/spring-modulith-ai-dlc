@@ -29,6 +29,7 @@ import java.util.Set;
 import java.util.stream.Stream;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Controller;
 import org.springframework.stereotype.Repository;
 import org.springframework.stereotype.Service;
@@ -617,8 +618,8 @@ class PackageByFeatureOnionArchitectureTest {
                     "org.springframework.transaction.annotation..",
                     "org.springframework.modulith.events..",
                     "org.springframework.context",
-                    "org.springframework.security.access.prepost",
                     basePackage + "..")
+                .or(type(PreAuthorize.class))
                 .or(LOMBOK_GENERATED))
         .allowEmptyShould(true)
         .because(

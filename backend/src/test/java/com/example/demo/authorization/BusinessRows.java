@@ -1,4 +1,4 @@
-package com.example.demo;
+package com.example.demo.authorization;
 
 import com.example.demo.jooq.DefaultCatalog;
 import com.example.demo.jooq.modulith.Modulith;

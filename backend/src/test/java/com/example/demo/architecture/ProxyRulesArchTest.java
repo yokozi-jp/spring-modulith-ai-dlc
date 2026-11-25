@@ -7,18 +7,20 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.example.demo.DemoApplication;
 import com.tngtech.archunit.base.DescribedPredicate;
+import com.tngtech.archunit.base.HasDescription;
 import com.tngtech.archunit.core.domain.JavaAnnotation;
 import com.tngtech.archunit.core.domain.JavaClass;
 import com.tngtech.archunit.core.domain.JavaMethod;
 import com.tngtech.archunit.core.domain.JavaModifier;
 import com.tngtech.archunit.core.domain.properties.CanBeAnnotated;
+import com.tngtech.archunit.core.domain.properties.HasAnnotations;
 import com.tngtech.archunit.junit.AnalyzeClasses;
 import com.tngtech.archunit.junit.ArchTest;
 import com.tngtech.archunit.lang.ArchCondition;
 import com.tngtech.archunit.lang.ArchRule;
+import com.tngtech.archunit.lang.CompositeArchRule;
 import com.tngtech.archunit.lang.ConditionEvents;
 import com.tngtech.archunit.lang.SimpleConditionEvent;
-import com.tngtech.archunit.lang.conditions.ArchConditions;
 import com.tngtech.archunit.library.ProxyRules;
 import io.github.resilience4j.bulkhead.annotation.Bulkhead;
 import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
@@ -78,6 +80,12 @@ class ProxyRulesArchTest {
   /** because の最後に置く、Java の実装規約への参照。 */
   private static final String JAVA_CODING_DOC = "規約：" + JAVA_CODING_PATH;
 
+  /** because の最後に置く、層の責務の規約への参照。 */
+  private static final String LAYERS_DOC = "規約：docs/backend/layers.md";
+
+  /** 本番のコードの基底パッケージ。 */
+  private static final String BASE_PACKAGE = DemoApplication.class.getPackageName();
+
   /** {@link #INTERCEPTED_ANNOTATIONS} と同じアノテーションを箇条書きにする、Java の実装規約の見出し。 */
   private static final String INTERCEPTED_HEADING = "## プロキシで動くアノテーション";
 
@@ -98,40 +106,6 @@ class ProxyRulesArchTest {
           AfterThrowing.class,
           Pointcut.class);
 
-  /**
-   * Spring と Resilience4j のプロキシが呼び出しを横取りして動かすアノテーション。
-   *
-   * <p>{@code @ApplicationModuleListener} のように、これらをメタアノテーションに持つ合成アノテーションも対象にする。
-   */
-  private static final List<Class<? extends Annotation>> INTERCEPTED_ANNOTATIONS =
-      List.of(
-          Transactional.class,
-          Async.class,
-          Cacheable.class,
-          CachePut.class,
-          CacheEvict.class,
-          Retryable.class,
-          ConcurrencyLimit.class,
-          PreAuthorize.class,
-          PostAuthorize.class,
-          PreFilter.class,
-          PostFilter.class,
-          Secured.class,
-          CircuitBreaker.class,
-          Retry.class,
-          RateLimiter.class,
-          Bulkhead.class,
-          TimeLimiter.class);
-
-  /** {@link #INTERCEPTED_ANNOTATIONS} のどれかを、直接かメタアノテーションとして持つメソッドと呼び出し先。 */
-  private static final DescribedPredicate<CanBeAnnotated> INTERCEPTED =
-      DescribedPredicate.describe(
-          "are meta-annotated with one of "
-              + INTERCEPTED_ANNOTATIONS.stream()
-                  .map(type -> "@" + type.getSimpleName())
-                  .collect(Collectors.joining(", ")),
-          annotated -> INTERCEPTED_ANNOTATIONS.stream().anyMatch(annotated::isMetaAnnotatedWith));
-
   /** 役割と権限を確かめる Spring Security の method security のアノテーション。 */
   private static final List<Class<? extends Annotation>> METHOD_SECURITY_ANNOTATIONS =
       List.of(
@@ -141,16 +115,44 @@ class ProxyRulesArchTest {
           PostFilter.class,
           Secured.class);
 
-  /** {@link #METHOD_SECURITY_ANNOTATIONS} のどれかを、クラスか宣言したメソッドに、直接かメタアノテーションとして持つクラス。 */
-  private static final DescribedPredicate<JavaClass> CARRYING_METHOD_SECURITY =
-      DescribedPredicate.describe(
-          "method security annotations on the class or its methods",
-          type ->
-              METHOD_SECURITY_ANNOTATIONS.stream()
-                  .anyMatch(annotation ->
-                      type.isMetaAnnotatedWith(annotation)
-                          || type.getMethods().stream()
-                              .anyMatch(method -> method.isMetaAnnotatedWith(annotation))));
+  /**
+   * Spring と Resilience4j のプロキシが呼び出しを横取りして動かすアノテーション。
+   *
+   * <p>{@code @ApplicationModuleListener} のように、これらをメタアノテーションに持つ合成アノテーションも対象にする。
+   */
+  private static final List<Class<? extends Annotation>> INTERCEPTED_ANNOTATIONS =
+      Stream.of(
+              List.<Class<? extends Annotation>>of(
+                  Transactional.class,
+                  Async.class,
+                  Cacheable.class,
+                  CachePut.class,
+                  CacheEvict.class,
+                  Retryable.class,
+                  ConcurrencyLimit.class),
+              METHOD_SECURITY_ANNOTATIONS,
+              List.<Class<? extends Annotation>>of(
+                  CircuitBreaker.class,
+                  Retry.class,
+                  RateLimiter.class,
+                  Bulkhead.class,
+                  TimeLimiter.class))
+          .flatMap(List::stream)
+          .toList();
+
+  /** {@link #INTERCEPTED_ANNOTATIONS} のどれかを、直接かメタアノテーションとして持つメソッドと呼び出し先。 */
+  private static final DescribedPredicate<CanBeAnnotated> INTERCEPTED =
+      metaAnnotatedWithOneOf(INTERCEPTED_ANNOTATIONS);
+
+  /** {@link #METHOD_SECURITY_ANNOTATIONS} のどれかを、直接かメタアノテーションとして持つクラスとメソッド。 */
+  private static final DescribedPredicate<CanBeAnnotated> METHOD_SECURED =
+      metaAnnotatedWithOneOf(METHOD_SECURITY_ANNOTATIONS);
+
+  /** {@code @PreAuthorize} に書いてよい式。引用符で囲んだ役割か権限の名前を、1 つの関数に並べるだけにする。 */
+  private static final Pattern ROLE_OR_AUTHORITY_NAMES =
+      Pattern.compile(
+          "(hasRole|hasAuthority)\\('[\\w:.-]+'\\)"
+              + "|(hasAnyRole|hasAnyAuthority)\\('[\\w:.-]+'(\\s*,\\s*'[\\w:.-]+')*\\)");
 
   /** プロキシがメソッドを上書きできなくなる修飾子。 */
   private static final List<JavaModifier> NOT_OVERRIDABLE =
@@ -293,16 +295,30 @@ class ProxyRulesArchTest {
    */
   @ArchTest
   /* package */ static final ArchRule methodSecurityAnnotationsAreOnlyOnApplicationClasses =
-      noClasses()
-          .that()
-          .resideOutsideOfPackage("..application..")
-          .should(ArchConditions.have(CARRYING_METHOD_SECURITY))
+      methodSecurityAnnotationsAreOnlyOnApplicationClassesRule(BASE_PACKAGE);
+
+  /** {@code @PreAuthorize} には、役割か権限の名前だけを書く。 */
+  @ArchTest
+  /* package */ static final ArchRule preAuthorizeUsesOnlyRoleOrAuthorityNames =
+      CompositeArchRule.of(
+              classes()
+                  .that()
+                  .areAnnotatedWith(PreAuthorize.class)
+                  .should(useOnlyRoleOrAuthorityNames())
+                  .allowEmptyShould(true))
+          .and(
+              methods()
+                  .that()
+                  .areAnnotatedWith(PreAuthorize.class)
+                  .should(useOnlyRoleOrAuthorityNames())
+                  .allowEmptyShould(true))
           .because(
-              "誰が要求したか（役割を含む）は application で確かめると決めており（ADR-129）、"
-                  + "Controller や domain に付けると、操作の役割の確かめ方が層ごとに散るため。"
-                  + "直し方：@PreAuthorize などを Controller や domain から外し、"
-                  + "操作を受け持つ application の CommandHandler の handle に、役割か権限の名前だけを書いて付ける。"
-                  + "規約：docs/backend/layers.md");
+              "誰に許すかを役割で決め、見える範囲は Repository の SQL で絞ると決めており（ADR-129）、"
+                  + "引数や Bean を参照する SpEL や、and と or で組んだ式を書くと、許す条件が式の中に隠れて二重になるため。"
+                  + "直し方：@PreAuthorize の値を hasRole('ADMIN')、hasAnyRole('ADMIN', 'MEMBER')、"
+                  + "hasAuthority('<権限>')、hasAnyAuthority('<権限>', ...) のどれか 1 つにし、"
+                  + "本人や持ち主の確かめは、利用者の ID を Repository の WHERE に入れて行う。"
+                  + LAYERS_DOC);
 
   /** {@link Async} のメソッドは、Spring が受け付ける void か {@link Future} を返す。 */
   @ArchTest
@@ -352,6 +368,34 @@ class ProxyRulesArchTest {
                   + "結果はログかメトリクスに出す。"
                   + JAVA_CODING_DOC);
 
+  /** method security のアノテーションを各モジュールの application にだけ置く規則を組み立てる。 */
+  /* package */ static ArchRule methodSecurityAnnotationsAreOnlyOnApplicationClassesRule(
+      final String basePackage) {
+    final String application = basePackage + ".*.application..";
+    return CompositeArchRule.of(
+            classes()
+                .that(METHOD_SECURED)
+                .should()
+                .resideInAPackage(application)
+                .allowEmptyShould(true))
+        .and(
+            methods()
+                .that(METHOD_SECURED)
+                .should()
+                .beDeclaredInClassesThat()
+                .resideInAPackage(application)
+                .allowEmptyShould(true))
+        .because(
+            "誰が要求したか（役割を含む）は application で確かめると決めており（ADR-129）、"
+                + "Controller、domain、infrastructure に付けると、操作の役割の確かめ方が層ごとに散るため。"
+                + "直し方："
+                + annotationNames(METHOD_SECURITY_ANNOTATIONS, "、")
+                + " と、それをメタアノテーションに持つ注釈を、Controller、domain、infrastructure のクラスとメソッドから外し、"
+                + "操作を受け持つ各モジュールの application の CommandHandler の handle に、"
+                + "役割か権限の名前だけを書いた @PreAuthorize を付ける。"
+                + LAYERS_DOC);
+  }
+
   @Test
   @DisplayName("プロキシの規則が見るアノテーションは、Java の実装規約の一覧と一致する")
   void interceptedAnnotationsMatchJavaCodingList() throws IOException {
@@ -370,6 +414,42 @@ class ProxyRulesArchTest {
             JAVA_CODING_PATH, INTERCEPTED_HEADING.substring("## ".length()))
         .containsExactlyInAnyOrderElementsOf(
             INTERCEPTED_ANNOTATIONS.stream().map(Class::getSimpleName).toList());
+  }
+
+  /** アノテーションのどれかを、直接かメタアノテーションとして持つ要素。 */
+  private static DescribedPredicate<CanBeAnnotated> metaAnnotatedWithOneOf(
+      final List<Class<? extends Annotation>> annotations) {
+    return DescribedPredicate.describe(
+        "are meta-annotated with one of " + annotationNames(annotations, ", "),
+        annotated -> annotations.stream().anyMatch(annotated::isMetaAnnotatedWith));
+  }
+
+  /** アノテーションの名前を {@code @} 付きで区切って並べる。 */
+  private static String annotationNames(
+      final List<Class<? extends Annotation>> annotations, final String delimiter) {
+    return annotations.stream()
+        .map(type -> "@" + type.getSimpleName())
+        .collect(Collectors.joining(delimiter));
+  }
+
+  private static <T extends HasAnnotations<?> & HasDescription>
+      ArchCondition<T> useOnlyRoleOrAuthorityNames() {
+    return new ArchCondition<>("write only role or authority names in @PreAuthorize") {
+      @Override
+      public void check(final T item, final ConditionEvents events) {
+        item.tryGetAnnotationOfType(PreAuthorize.class)
+            .map(PreAuthorize::value)
+            .filter(expression -> !ROLE_OR_AUTHORITY_NAMES.matcher(expression).matches())
+            .ifPresent(expression ->
+                events.add(
+                    SimpleConditionEvent.violated(
+                        item,
+                        item.getDescription()
+                            + " の @PreAuthorize(\""
+                            + expression
+                            + "\") は、役割か権限の名前だけの式でない。")));
+      }
+    };
   }
 
   private static ArchCondition<JavaMethod> beOverridableByProxies() {
