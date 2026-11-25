@@ -642,10 +642,11 @@ tasks:
       - vp fmt
 
   fe-check:
-    desc: フロントエンドのformat、Oxlint（Tailwindとshadcn規則を含む）、型を検査
+    desc: フロントエンドのformat、Oxlint（Tailwindとshadcn規則を含む）、型と、E2Eのシーダーへの依存を検査
     dir: frontend
     cmds:
       - vp check
+      - task: lint-e2e-seed
       # e2e の補助は、Playwright の外から Node が直接 import する（検証スキルの drive.mjs）。相対の import に拡張子がないと、ここでしか壊れない。
       - |
         E2E_USERNAME=check E2E_PASSWORD=check PAYMENT_GATEWAY_BASE_URL=http://127.0.0.1:1 \
@@ -733,6 +734,14 @@ tasks:
       # 検出の式の自己検査。検出すべき文を逃すか、識別子やコメントを誤検出したら失敗する。
       - bash tooling/db-clock-lint/test.sh
       - bash tooling/db-clock-lint/db-clock-lint.sh .
+
+  lint-e2e-seed:
+    desc: E2E のコードが開発用のシーダーの代表データ（SEED-）を名指ししていないか検査
+    silent: true
+    cmds:
+      # 検出の自己検査。名指しを逃すか、SEED- を含まない名前を誤検出したら失敗する。
+      - bash tooling/e2e-seed-lint/test.sh
+      - bash tooling/e2e-seed-lint/e2e-seed-lint.sh .
 
   # Backend
   be-run:
