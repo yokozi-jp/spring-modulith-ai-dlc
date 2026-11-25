@@ -5,16 +5,16 @@ import java.time.Duration;
 import java.util.List;
 import java.util.Queue;
 import java.util.concurrent.ConcurrentLinkedQueue;
-import java.util.concurrent.CopyOnWriteArrayList;
-import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import org.aspectj.lang.ProceedingJoinPoint;
 import org.aspectj.lang.annotation.Around;
 import org.aspectj.lang.annotation.Aspect;
 import org.aspectj.lang.reflect.MethodSignature;
+import org.jooq.DSLContext;
+import org.jooq.impl.DSL;
 import org.jspecify.annotations.Nullable;
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
@@ -27,10 +27,11 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
  *
  * <p>{@code @ApplicationModuleListener} のメソッドを囲み、リスナーのトランザクションに同期を登録する。トランザクションの advisor
  * より内側で動く必要があり、{@link Ordered#LOWEST_PRECEDENCE} にする。同じ順位では、Spring の Bean の advisor（トランザクション）が
- * {@code @Aspect} の advisor より先（外側）に並ぶ。内側で動かなかったときは止めずに数え、検査が {@link
- * Violation.Kind#GATE_NOT_REACHED} にする。
+ * {@code @Aspect} の advisor より先（外側）に並ぶ。内側で動かなかったときは止めずに数え、検査が {@link Violation.Kind#FIRST_NOT_HELD}
+ * にする。
  *
- * <p>止めるのは、テストが通すか、{@link #HOLD_LIMIT} を過ぎるまでである。過ぎたら例外でロールバックさせる。上限は、止めたトランザクションを {@code
+ * <p>止めた配信は、届いた順に 1 つずつ通す（公平な {@link Semaphore}）。通す許可が届く前に出ていれば、届いた配信は待たずに通る。止めるのは、テストが通すか、{@link
+ * #HOLD_LIMIT} を過ぎるまでである。過ぎたら例外でロールバックさせる。上限は、止めたトランザクションを {@code
  * idle_in_transaction_session_timeout}（テストは 10 秒）が切るより短くする。
  */
 @Aspect
@@ -40,17 +41,32 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
   /** 1 回の配信を止める上限。 */
   /* package */ static final Duration HOLD_LIMIT = Duration.ofSeconds(5);
 
+  /** 止めた配信のセッションの ID を読む jOOQ のコンテキスト。リスナーのトランザクションの接続で読む。 */
+  private final DSLContext dsl;
+
   /** 閉じている門。開いていれば {@code null}。 */
   private final AtomicReference<@Nullable Hold> closed = new AtomicReference<>();
 
+  /* package */ CommitGate(final DSLContext dsl) {
+    this.dsl = dsl;
+  }
+
   /** 門を閉じ、そのリスナーの配信を、届くたびにコミットの直前で止める。閉じたままの門は開けてから閉じ直す。 */
   /* package */ Hold close(final ListenerId listener) {
-    final Hold hold = new Hold(listener, closed);
+    final Hold hold = new Hold(listener);
     final @Nullable Hold previous = closed.getAndSet(hold);
     if (previous != null) {
       previous.open();
     }
     return hold;
+  }
+
+  /** 止めている配信をすべて通し、門を開ける。開けた後に届いた配信は止めない。 */
+  /* package */ void open() {
+    final @Nullable Hold hold = closed.getAndSet(null);
+    if (hold != null) {
+      hold.open();
+    }
   }
 
   // 対象のリスナーが投げた例外を記録して投げ直すだけで、握りつぶさない。
@@ -67,11 +83,11 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
           new TransactionSynchronization() {
             @Override
             public void beforeCommit(final boolean readOnly) {
-              hold.arriveAndWait();
+              hold.arriveAndWait(backendPid());
             }
           });
     } else {
-      hold.outsideCount.incrementAndGet();
+      hold.outside.incrementAndGet();
     }
     try {
       return joinPoint.proceed();
@@ -81,51 +97,61 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
     }
   }
 
-  /** 閉じた門の 1 回分。開けると（{@link #open()}）、止めている配信をすべて通す。 */
+  /** 今のトランザクションの接続の、PostgreSQL のセッションの ID。 */
+  private int backendPid() {
+    return dsl.select(DSL.function(DSL.name("pg_backend_pid"), Integer.class))
+        .fetchSingle()
+        .value1();
+  }
+
+  /** 閉じた門の 1 回分。 */
   /* package */ static final class Hold {
 
     /** 止める対象のリスナー。 */
     private final ListenerId listener;
 
-    /** 門の状態。閉じたら自分を外す。 */
-    private final AtomicReference<@Nullable Hold> gate;
+    /** 止めた配信を通す許可。届いた順に通すため公平にする。 */
+    private final Semaphore commits = new Semaphore(0, true);
 
-    /** 届いた配信を止めている latch。届いた順に並ぶ。 */
-    private final List<CountDownLatch> latches = new CopyOnWriteArrayList<>();
-
-    /** 届いた配信のうち、通した数。 */
-    private final AtomicInteger released = new AtomicInteger();
+    /** コミットの直前に届いた配信のセッションの ID。届いた順に並ぶ。 */
+    private final Queue<Integer> arrivedPids = new ConcurrentLinkedQueue<>();
 
     /** トランザクションの外で対象のリスナーを囲んだ回数。 */
-    private final AtomicInteger outsideCount = new AtomicInteger();
+    private final AtomicInteger outside = new AtomicInteger();
 
     /** 対象のリスナーが投げた例外。 */
     private final Queue<Throwable> thrown = new ConcurrentLinkedQueue<>();
 
-    /** 開けたか。開けた後に届いた配信は止めない。 */
-    private final AtomicBoolean opened = new AtomicBoolean();
-
-    private Hold(final ListenerId listener, final AtomicReference<@Nullable Hold> gate) {
+    private Hold(final ListenerId listener) {
       this.listener = listener;
-      this.gate = gate;
     }
 
     /** コミットの直前に届いた配信の数。 */
     /* package */ int arrivals() {
-      return latches.size();
+      return arrivedPids.size();
     }
 
-    /** 止めている配信のうち、最も早く届いたものを通す。 */
-    /* package */ void releaseNext() {
-      final int next = released.getAndIncrement();
-      if (next < latches.size()) {
-        latches.get(next).countDown();
+    /**
+     * 最初にコミットの直前に届いた配信のセッションの ID。
+     *
+     * @throws IllegalStateException まだ届いた配信がない場合
+     */
+    /* package */ int firstPid() {
+      final @Nullable Integer pid = arrivedPids.peek();
+      if (pid == null) {
+        throw new IllegalStateException("no delivery has reached the commit gate: " + listener);
       }
+      return pid;
+    }
+
+    /** 止めている配信のうち、最も早く届いたものを通す。まだ届いていなければ、次に届く配信を通す。 */
+    /* package */ void releaseNext() {
+      commits.release();
     }
 
     /** トランザクションの外で対象のリスナーを囲んだ回数。0 でなければ、門は配信を止められない。 */
     /* package */ int outsideTransaction() {
-      return outsideCount.get();
+      return outside.get();
     }
 
     /** 対象のリスナーが投げた例外の要約。 */
@@ -133,24 +159,17 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
       return thrown.stream().map(Throwable::toString).toList();
     }
 
-    /** 止めている配信をすべて通し、門を開ける。 */
-    /* package */ void open() {
-      opened.set(true);
-      latches.forEach(CountDownLatch::countDown);
-      gate.compareAndSet(this, null);
+    /** 止めている配信と、これから届く配信をすべて通す。許可を上限まで足し、何度呼んでも溢れさせない。 */
+    private void open() {
+      commits.release(Integer.MAX_VALUE - commits.availablePermits());
     }
 
     // 止めている間に割り込まれたら、割り込みの状態を戻してロールバックさせる。
     @SuppressWarnings("PMD.DoNotUseThreads")
-    private void arriveAndWait() {
-      final CountDownLatch latch = new CountDownLatch(1);
-      latches.add(latch);
-      // 開けた後に届いた配信は、open が latch を見なかったかもしれないので自分で通す。
-      if (opened.get()) {
-        latch.countDown();
-      }
+    private void arriveAndWait(final int pid) {
+      arrivedPids.add(pid);
       try {
-        if (!latch.await(HOLD_LIMIT.toMillis(), TimeUnit.MILLISECONDS)) {
+        if (!commits.tryAcquire(HOLD_LIMIT.toMillis(), TimeUnit.MILLISECONDS)) {
           throw new IllegalStateException(
               "commit gate was not opened within " + HOLD_LIMIT + ": " + listener);
         }

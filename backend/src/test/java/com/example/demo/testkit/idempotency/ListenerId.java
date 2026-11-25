@@ -2,7 +2,6 @@ package com.example.demo.testkit.idempotency;
 
 import com.example.demo.shared.events.ListenerIds;
 import java.lang.reflect.Method;
-import java.util.Iterator;
 import java.util.Set;
 import org.springframework.core.MethodIntrospector;
 import org.springframework.core.annotation.AnnotatedElementUtils;
@@ -31,15 +30,14 @@ public record ListenerId(String value) {
    */
   public static ListenerId forListener(final Class<?> listener) {
     final Set<Method> methods = listenerMethods(listener);
-    final Iterator<Method> iterator = methods.iterator();
-    final Method method = iterator.hasNext() ? iterator.next() : null;
-    if (method == null || iterator.hasNext()) {
+    final boolean exactlyOne = methods.size() == 1;
+    if (!exactlyOne) {
       throw new IllegalArgumentException(
           listener.getName()
               + " must declare exactly one @ApplicationModuleListener method: "
               + methods);
     }
-    return forMethod(method);
+    return forMethod(methods.iterator().next());
   }
 
   /** クラスの {@code @ApplicationModuleListener} のメソッド。 */

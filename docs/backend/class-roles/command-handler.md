@@ -209,7 +209,6 @@ return new ConfirmOrderResult(order.id().value().toString());
 @Transactional
 public ChargeOrderResult handle(final ChargeOrderCommand command) {
   final OrderId orderId = new OrderId(UUID.fromString(command.orderId()));
-  // 決済代行の呼び出しを省く先読みで、重複の判定ではない。判定は add の ON CONFLICT が行う。
   final Optional<Payment> existing = paymentRepository.findByOrderId(orderId);
   if (existing.isPresent()) {
     return new ChargeOrderResult.AlreadyRecorded(existing.get().id().value().toString());
@@ -218,7 +217,13 @@ public ChargeOrderResult handle(final ChargeOrderCommand command) {
   final ChargeOutcome outcome = paymentGateway.charge(orderId, amount);
   final Payment payment = Payment.record(orderId, amount, outcome, Instant.now(clock));
   if (!paymentRepository.add(payment)) {
-    final Payment recorded = paymentRepository.findByOrderId(orderId).orElseThrow();
+    // 衝突した行はコミット済みで、READ COMMITTED の次の文から見える。
+    final Payment recorded =
+        paymentRepository
+            .findByOrderId(orderId)
+            .orElseThrow(() ->
+                new IllegalStateException(
+                    "payment was not inserted but not found: orderId=" + orderId.value()));
     return new ChargeOrderResult.AlreadyRecorded(recorded.id().value().toString());
   }
   return new ChargeOrderResult.Charged(payment.id().value().toString());

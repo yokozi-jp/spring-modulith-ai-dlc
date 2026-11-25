@@ -60,7 +60,8 @@ public class ChargeOrderCommandHandler {
    * 注文の決済記録がなければ、確定した注文の合計を請求して結果を決済記録に保存する。注文が確定していなければ請求せずに返す。
    *
    * <p>読んだ時点で決済記録があれば、請求せずに {@link ChargeOrderResult.AlreadyRecorded}
-   * を返す。保存しようとして同じ注文の決済記録が先にあれば、保存せずに先の決済記録の {@link ChargeOrderResult.AlreadyRecorded} を返す。
+   * を返す。保存しようとして同じ注文の決済記録が先にあれば、保存せずに先の決済記録の {@link ChargeOrderResult.AlreadyRecorded}
+   * を返す。先読みは外部システムの呼び出しを省くためで、重複の判定ではない。
    *
    * @throws NotFoundException
    *     注文がない場合。確定のイベントがあるのに注文がないのは内部の不変条件の違反（不具合）であり、業務の状態に記録すると隠れるため投げ、イベント出版を FAILED

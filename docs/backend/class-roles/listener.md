@@ -189,7 +189,6 @@ Listener を足したら、次の手順で入力例を足す。
 ```java
 public ChargeOrderResult handle(final ChargeOrderCommand command) {
   final OrderId orderId = new OrderId(UUID.fromString(command.orderId()));
-  // 二度目の請求を省く先読みであり、重複の判定ではない。判定は add の ON CONFLICT DO NOTHING が行う。
   final Optional<Payment> existing = paymentRepository.findByOrderId(orderId);
   if (existing.isPresent()) {
     return new ChargeOrderResult.AlreadyRecorded(existing.get().id().value().toString());
@@ -198,8 +197,13 @@ public ChargeOrderResult handle(final ChargeOrderCommand command) {
   final ChargeOutcome outcome = paymentGateway.charge(orderId, amount);
   final Payment payment = Payment.record(orderId, amount, outcome, Instant.now(clock));
   if (!paymentRepository.add(payment)) {
-    // 同時に届いた一つ目の配信が先に決済記録を入れた。
-    final Payment recorded = paymentRepository.findByOrderId(orderId).orElseThrow();
+    // 衝突した行はコミット済みで、READ COMMITTED の次の文から見える。
+    final Payment recorded =
+        paymentRepository
+            .findByOrderId(orderId)
+            .orElseThrow(() ->
+                new IllegalStateException(
+                    "payment was not inserted but not found: orderId=" + orderId.value()));
     return new ChargeOrderResult.AlreadyRecorded(recorded.id().value().toString());
   }
   return new ChargeOrderResult.Charged(payment.id().value().toString());

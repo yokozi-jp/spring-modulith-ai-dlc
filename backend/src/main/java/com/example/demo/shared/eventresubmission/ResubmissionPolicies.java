@@ -2,16 +2,13 @@ package com.example.demo.shared.eventresubmission;
 
 import com.example.demo.shared.events.ListenerIds;
 import com.example.demo.shared.events.ResubmissionPolicy;
-import java.lang.reflect.Method;
 import java.time.Instant;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
-import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.Nullable;
-import org.springframework.aop.framework.autoproxy.AutoProxyUtils;
 import org.springframework.beans.factory.config.ConfigurableListableBeanFactory;
 import org.springframework.core.MethodIntrospector;
 import org.springframework.core.annotation.AnnotatedElementUtils;
@@ -94,60 +91,34 @@ class ResubmissionPolicies implements AbandonPolicy {
       final ConfigurableListableBeanFactory beanFactory,
       final EventPublicationResubmissionConfig.Properties properties) {
     final Map<String, String> names = new HashMap<>();
-    for (final String beanName : beanFactory.getBeanDefinitionNames()) {
-      final @Nullable Class<?> type = targetClassOf(beanFactory, beanName);
-      if (type == null) {
-        continue;
-      }
-      final Map<Method, ResubmissionPolicy> methods =
-          MethodIntrospector.selectMethods(
-              type,
-              (MethodIntrospector.MetadataLookup<ResubmissionPolicy>)
-                  method ->
-                      AnnotatedElementUtils.findMergedAnnotation(method, ResubmissionPolicy.class));
-      methods.forEach((method, policy) -> {
-        if (!properties.policies().containsKey(policy.value())) {
-          throw new IllegalStateException(
-              "@ResubmissionPolicy(\""
-                  + policy.value()
-                  + "\") on "
-                  + method
-                  + " is not defined in event-publication.resubmission.policies "
-                  + properties.policies().keySet());
-        }
-        final Optional<String> listenerId = ListenerIds.fromMethod(method);
-        if (listenerId.isEmpty()) {
-          throw new IllegalStateException(
-              "@ResubmissionPolicy must be placed on an @ApplicationModuleListener method: "
-                  + method);
-        }
-        names.put(listenerId.get(), policy.value());
-      });
-    }
+    ListenerIds.beanClasses(beanFactory)
+        .forEach(type ->
+            MethodIntrospector.selectMethods(
+                    type,
+                    (MethodIntrospector.MetadataLookup<ResubmissionPolicy>)
+                        method ->
+                            AnnotatedElementUtils.findMergedAnnotation(
+                                method, ResubmissionPolicy.class))
+                .forEach((method, policy) -> {
+                  if (!properties.policies().containsKey(policy.value())) {
+                    throw new IllegalStateException(
+                        "@ResubmissionPolicy(\""
+                            + policy.value()
+                            + "\") on "
+                            + method
+                            + " is not defined in event-publication.resubmission.policies "
+                            + properties.policies().keySet());
+                  }
+                  final String listenerId =
+                      ListenerIds.fromMethod(method)
+                          .orElseThrow(() ->
+                              new IllegalStateException(
+                                  "@ResubmissionPolicy must be placed on an"
+                                      + " @ApplicationModuleListener method: "
+                                      + method));
+                  names.put(listenerId, policy.value());
+                }));
     return names;
-  }
-
-  /**
-   * bean の proxy の元のクラスを返す。型を解決できない bean は {@code null} を返して読み飛ばす。
-   *
-   * <p>{@code EventListenerMethodProcessor} も同じ呼び出しを囲んで読み飛ばす。 型を解決できない bean は
-   * {@code @ApplicationModuleListener} を持てないため、再投入と無関係な bean 1 つで起動を落とさない。 {@code OutOfMemoryError}
-   * などの {@code Error} は受けない。
-   */
-  // 遅延の bean や欠けたクラスで型の解決が RuntimeException か LinkageError になり、種類を絞れないため受ける。
-  @SuppressWarnings("PMD.AvoidCatchingGenericException")
-  private static @Nullable Class<?> targetClassOf(
-      final ConfigurableListableBeanFactory beanFactory, final String beanName) {
-    try {
-      // EventListenerMethodProcessor と同じく、proxy の元のクラスのメソッドを見る。
-      return AutoProxyUtils.determineTargetClass(beanFactory, beanName);
-    } catch (RuntimeException | LinkageError e) {
-      log.atDebug()
-          .addKeyValue("bean", beanName)
-          .setCause(e)
-          .log("Skipped a bean whose type cannot be resolved");
-      return null;
-    }
   }
 
   /** リスナーの ID の方針の名前。指定がなければ {@code default}。 */
