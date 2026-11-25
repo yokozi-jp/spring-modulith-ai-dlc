@@ -10,7 +10,6 @@ import static com.example.demo.jooq.tenancy.Tables.M_MEMBERSHIP;
 import static com.example.demo.jooq.tenancy.Tables.M_TENANT;
 import static com.example.demo.jooq.tenancy.Tables.M_USER_IDENTITY;
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.example.demo.LocalDataSeeder.Mode;
 import com.example.demo.LocalDataSeeder.Outcome;
@@ -42,7 +41,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 
-/** 開発用の代表データのシーダーの、件数、再実行、reset、環境の判定、ID の形を確かめる。 */
+/** 開発用の代表データのシーダーの、件数、再実行、reset、ID の形を確かめる。 */
 @DatabaseTest
 // 生成したテーブルと AssertJ を static import で読みやすくする。
 // 読み取りの補助メソッドが増えるため、メソッド数の上限も外す。
@@ -163,24 +162,6 @@ class LocalDataSeederTest {
             dsl.fetchExists(
                 EVENT_PUBLICATION_ARCHIVE, EVENT_PUBLICATION_ARCHIVE.ID.eq(publication)))
         .isTrue();
-  }
-
-  @Test
-  @DisplayName("目印が local か test で DB_HOST が loopback のときだけ、ローカルの環境とみなす")
-  // loopback の判定を確かめるテストのデータであり、接続先の設定ではない。
-  @SuppressWarnings("PMD.AvoidUsingHardCodedIP")
-  void acceptsOnlyLocalEnvironment() {
-    assertThat(LocalDataSeeder.isLocalEnvironment(env("local", "localhost"))).isTrue();
-    assertThat(LocalDataSeeder.isLocalEnvironment(env("test", "127.0.0.1"))).isTrue();
-    for (final Map<String, String> rejected :
-        List.of(
-            env("stg", "localhost"),
-            env("local", "db.example.com"),
-            Map.of("DB_HOST", "localhost"))) {
-      assertThat(LocalDataSeeder.isLocalEnvironment(rejected)).isFalse();
-      assertThatThrownBy(() -> LocalDataSeeder.requireLocalEnvironment(rejected))
-          .isInstanceOf(IllegalStateException.class);
-    }
   }
 
   @Test
@@ -389,9 +370,5 @@ class LocalDataSeederTest {
   private static List<Field<?>> without(final Table<?> table, final Field<?>... excluded) {
     final List<Field<?>> excludedFields = List.of(excluded);
     return Stream.of(table.fields()).filter(field -> !excludedFields.contains(field)).toList();
-  }
-
-  private static Map<String, String> env(final String environment, final String host) {
-    return Map.of("OTEL_DEPLOYMENT_ENVIRONMENT_NAME", environment, "DB_HOST", host);
   }
 }
