@@ -2,11 +2,11 @@
 
 - [バックエンドアーキテクチャ](architecture.md)：機能モジュールを追加するとき、パッケージ構成、モジュールルートの公開契約、依存方向、ベースパッケージ直下の設定を確認や変更するとき
 - [共有モジュール shared](shared-module.md)：shared に型やパッケージを足すとき、shared の型を使ってよい層を確かめるとき、shared の使う場所の検査が失敗したとき
-- [バックエンドの層の責務](layers.md)：クラスをDomain、Application、Presentation、Batch、Infrastructureのどこに置くか決めるとき、トランザクション境界やAdapterの分け方を決めるとき
+- [バックエンドの層の責務](layers.md)：クラスをDomain、Application、Presentation、Batch、Infrastructureのどこに置くか決めるとき、トランザクション境界やAdapterの分け方を決めるとき、誰が要求したかを確かめる層と利用者のIDの渡し方を決めるとき
 - [クラスの役割](class-roles/index.md)：新しいクラスを作るとき、既存クラスの役割、形、依存、テストを確かめるとき
 - [バックエンドのJava実装規約](java-coding.md)：Lombok、record、Domain Modelの状態変更、ロギング、依存の注入、例外、assert、非推奨のAPI、プロキシで動くアノテーション（`@Async`と`@Scheduled`のメソッドの形を含む）、警告の抑制の書き方を決めるとき、プロキシで動くアノテーションをレビューするとき
 - [バックエンドの型の設計規約](java-type-modeling.md)：sealed interface と record の選び方、値オブジェクトの要否、キャスト、switch の default、null の扱いなど、型で不正な状態を拒否する書き方を決めるとき
-- [バックエンドのアーキテクチャテスト](architecture-tests.md)：Spring Modulith、ArchUnit、PMD、Error Proneの検査実装や解析対象を確認するとき、ArchUnitの規則を追加するとき、検査の失敗を直すとき、プロキシの規則が検出しない書き方を確かめるとき
+- [バックエンドのアーキテクチャテスト](architecture-tests.md)：Spring Modulith、ArchUnit、PMD、Error Proneの検査実装や解析対象を確認するとき、ArchUnitの規則を追加するとき、検査の失敗を直すとき、プロキシの規則が検出しない書き方を確かめるとき、認可の表のテストに操作を足すとき
 - [バックエンドの機能追加時の確認](runbook-add-feature.md)：新しい機能モジュールを作る手順と、追加後に実行する検証コマンドを確認するとき
 - [バックエンドのテスト種別](testing-strategy.md)：新しいテストで検証対象に合う最小のテスト種別を選ぶとき
 - [バックエンドのDBテスト](testing-database.md)：DBテストの隔離、ロールバック、コミット時の挙動、テスト専用テーブル、Spring Modulithのイベント検証を決めるとき

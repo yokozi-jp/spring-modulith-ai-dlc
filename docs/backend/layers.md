@@ -1,7 +1,7 @@
 ---
 type: Architecture
 title: バックエンドの層の責務
-description: 機能モジュール内の Domain、Application、Presentation、Batch、Infrastructure に置くクラスの役割と、トランザクション境界の置き場所を説明する。クラスをどの層のどの役割にするか決めるとき、トランザクション境界やイベントの発行と受信の置き場所を確かめるときに読む。
+description: 機能モジュール内の Domain、Application、Presentation、Batch、Infrastructure に置くクラスの役割と、トランザクション境界の置き場所を説明する。クラスをどの層のどの役割にするか決めるとき、トランザクション境界やイベントの発行と受信の置き場所、誰が要求したかを確かめる層と利用者の ID の渡し方を確かめるときに読む。
 tags: [architecture, backend, onion-architecture]
 ---
 
@@ -29,6 +29,9 @@ tags: [architecture, backend, onion-architecture]
 外部システムの SDK、OpenAPI から生成した型、Spring、jOOQ、JPA、Jackson、SLF4J、`java.net.http` の型は使わない。
 Domain Model を API の Request と Response や、永続化の Record として兼用しない。
 
+Domain は、誰が要求したかを確かめず、認証の型（`Authentication`、`AppUserPrincipal`）を受け取らない。
+業務の規則が人に依るとき（申請した人と承認する人を分ける規則など）は、利用者の ID を値で受け取り、不変条件として確かめる（[ADR-129](../adr/ADR-129-place-authorization-in-application-and-test-it-per-operation-and-actor.md)）。
+
 業務規則は、まず値オブジェクトか Entity に置く。
 `domain.service` の **[Domain Service](class-roles/domain-service.md)** は、次の三つの規則だけを置く。
 
@@ -51,11 +54,19 @@ Domain Service は Repository を使ってよく、イベントの発行、外�
 
 [`<UseCase>Command`](class-roles/command.md) と [`<UseCase>Result`](class-roles/result.md) は、Java の標準型だけを持つ record として `application` に置く。
 
-`application` は、このアプリケーションの型のほかに、標準型、`org.jspecify..`、`org.slf4j..`、Spring の `@Service` などのアノテーションと `ApplicationEventPublisher` だけに依存させる。
+`application` は、このアプリケーションの型のほかに、標準型、`org.jspecify..`、`org.slf4j..`、Spring の `@Service` などのアノテーションと `ApplicationEventPublisher`、役割を確かめる `@PreAuthorize` などの method security のアノテーション（`org.springframework.security.access.prepost`）だけに依存させる。
 外部システムの SDK や生成した型は使わない（一覧の正本は[ArchUnit の規則](architecture-tests.md)）。
 Spring Web、Spring の HTTP、Servlet の型にも依存させない。業務上の失敗は `shared.failure` の例外で表し、HTTP のステータスへの対応づけは `error` の `ApiExceptionHandler` が行う。
 
 CommandHandler は別の CommandHandler を呼ばない。
+
+誰が要求したか（本人か、役割、見えるか）は、Application で確かめる（[ADR-129](../adr/ADR-129-place-authorization-in-application-and-test-it-per-operation-and-actor.md)）。
+利用者の ID は、Controller が `@AuthenticationPrincipal` で受け取った `AppUserPrincipal` の `userId()` を、Command と検索条件に入れて渡す。
+CommandHandler と QueryService は、その ID を Repository と `<Feature>Queries` に渡す。
+Application は `SecurityContextHolder` を読まず、利用者を引数で受け取る。
+役割で許す操作は、CommandHandler の `handle`（参照なら QueryService の public メソッド）に `@PreAuthorize` を付けて確かめる。
+method security のアノテーション（`@PreAuthorize`、`@PostAuthorize`、`@PreFilter`、`@PostFilter`、`@Secured`）は、Application のクラスだけに付ける。
+見える範囲の絞り方と `@PreAuthorize` に書く式は、[APIの認証、セッション、権限](../web-api/authentication-and-session.md#認可)に従う。
 
 トランザクション境界は次のメソッドに置く。
 

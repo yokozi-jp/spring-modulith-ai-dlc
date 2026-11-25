@@ -98,7 +98,7 @@ private static String itemNameOf(final OrderSortKey key) {
 
 ## 依存してよい型、してはいけない型
 
-- **依存してよい型**：`java..` の標準型、`org.jspecify..`、自モジュールのルートの `<Feature>Queries`、参照の結果、検索条件、同じモジュールの `domain.model` の集約、値オブジェクト、Repository、`@Service`、`@Transactional`。
+- **依存してよい型**：`java..` の標準型、`org.jspecify..`、自モジュールのルートの `<Feature>Queries`、参照の結果、検索条件、同じモジュールの `domain.model` の集約、値オブジェクト、Repository、`@Service`、`@Transactional`、役割を確かめる `@PreAuthorize`（[認可](../../web-api/authentication-and-session.md#認可)）。
 - **依存してはいけない型**：jOOQ の API と生成型（`DSLContext`）、`infrastructure.persistence` の型、Command、Result、CommandHandler、Presentation の型、`ApplicationEventPublisher`、外部システムのインタフェース、他モジュールの型。
 
 ## 最小の例と典型的な例
