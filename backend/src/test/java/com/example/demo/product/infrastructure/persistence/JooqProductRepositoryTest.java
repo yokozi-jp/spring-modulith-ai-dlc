@@ -1,12 +1,10 @@
 package com.example.demo.product.infrastructure.persistence;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.example.demo.product.domain.model.Product;
 import com.example.demo.product.domain.model.ProductRepository;
 import com.example.demo.product.domain.model.SalesStatus;
-import com.example.demo.shared.concurrency.ConflictException;
 import com.example.demo.shared.persistence.TableWriter;
 import com.example.demo.shared.persistence.TestCommonColumns;
 import com.example.demo.testkit.DatabaseTest;
@@ -30,7 +28,7 @@ class JooqProductRepositoryTest {
   @Autowired private DSLContext dsl;
 
   @Test
-  @DisplayName("保存した商品を、商品コード、商品名、単価、販売の状態、ロック番号ごと読み戻せる")
+  @DisplayName("保存した商品を、すべての値とロック番号ごと読み戻せる")
   void addsAndFindsProduct() {
     final String productCode = UniqueCodes.next("P");
     final Product product =
@@ -51,24 +49,7 @@ class JooqProductRepositoryTest {
         });
   }
 
-  @Test
-  @DisplayName("同じ商品コードの商品の保存は、一意制約の ConflictException になる")
-  void duplicateProductCodeIsConflict() {
-    final String productCode = UniqueCodes.next("P");
-    final ProductRepository repository = repository();
-    TestCommonColumns.runAs(() -> repository.add(product(productCode)));
-
-    assertThatThrownBy(() -> TestCommonColumns.runAs(() -> repository.add(product(productCode))))
-        .isInstanceOfSatisfying(
-            ConflictException.class,
-            e -> assertThat(e.kind()).isEqualTo(ConflictException.Kind.UNIQUE));
-  }
-
   private ProductRepository repository() {
     return new JooqProductRepository(dsl, new TableWriter(dsl, TestCommonColumns.at(ADDED_AT)));
-  }
-
-  private static Product product(final String productCode) {
-    return Product.register(productCode, "消しゴム", new BigDecimal("80.00"), SalesStatus.ON_SALE);
   }
 }

@@ -127,7 +127,7 @@ class LocalDataSeederTest {
   }
 
   @Test
-  @DisplayName("tenancy は、業務データが空でも 2 つのテナントと所属だけを入れて業務データを入れず、何度入れても増やさない")
+  @DisplayName("tenancy は、業務データを入れず、テナントと所属を何度入れても同じ内容にする")
   void tenancySeedsOnlyTenantsAndMemberships() {
     for (final TenantId tenant : TENANTS) {
       LocalDataSeeder.BUSINESS_TABLES.forEach(table ->
