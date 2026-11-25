@@ -11,7 +11,7 @@ import java.time.Instant;
 import java.util.UUID;
 import org.jooq.DSLContext;
 
-/** 商品の行をテストで登録する補助。テナントと共通カラムの時刻を指定するため、登録のユースケースを通さず、product のロールで DSLContext から直接 INSERT する。 */
+/** 商品の行をテストで登録する補助。product のロールで DSLContext から直接 INSERT する。 */
 // テストの補助であり、テストケースを持たない。
 @SuppressWarnings("PMD.TestClassWithoutTestCases")
 public final class TestProducts {

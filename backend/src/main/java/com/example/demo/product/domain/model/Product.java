@@ -6,7 +6,6 @@ import java.util.UUID;
 
 /** 商品の集約ルート。登録した後に状態を変える操作はない。 */
 // record と同じ形のアクセサ（id() など）にそろえるため、フィールド名と同名の短いメソッドを許す。
-// 登録した後に状態を変える操作がないため、データだけのクラスを許す。
 @SuppressWarnings({"PMD.AvoidFieldNameMatchingMethodName", "PMD.ShortMethodName", "PMD.DataClass"})
 public final class Product implements Versioned {
 

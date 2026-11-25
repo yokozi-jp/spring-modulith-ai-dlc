@@ -58,7 +58,6 @@ public final class LocalDataSeeder {
     SEED,
     /** 業務データを消してから入れ直す。 */
     RESET,
-    /** テナントと所属だけを入れ、業務データを入れない。 */
     TENANCY
   }
 
@@ -66,7 +65,6 @@ public final class LocalDataSeeder {
   /* package */ enum Outcome {
     /** 代表データを入れた。 */
     SEEDED,
-    /** テナントと所属だけを入れた。 */
     TENANCY_SEEDED,
     /** 業務データがあるので何もしなかった。 */
     SKIPPED_NOT_EMPTY,

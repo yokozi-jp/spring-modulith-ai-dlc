@@ -35,8 +35,6 @@ import org.springframework.test.web.servlet.ResultActions;
 import org.springframework.web.bind.annotation.RequestMethod;
 
 /** 商品の登録と一覧の API のステータスコード、Location、Problem Details を HTTP の形で検証する。 */
-// MockMvc の期待値は andExpect で書く。一つの API の契約を一つのクラスで確かめるため、同じパスと値と static import が多い。
-// 補助のメソッドは、Exception を宣言する MockMvc.perform を呼ぶ。
 @SuppressWarnings({
   "PMD.AvoidDuplicateLiterals",
   "PMD.SignatureDeclareThrowsException",

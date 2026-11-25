@@ -2,9 +2,6 @@ import type { APIRequestContext, APIResponse, Locator, Page } from "@playwright/
 
 import { expect } from "./fixtures.ts";
 
-// 注文の画面を操作する補助。商品は各テストが公開の API で作る（fixtures.ts の productFactory、ADR-129）。
-// 画面の文言は、spec と検証スキルの journey が同じ値を使うようここに置く。
-
 export const paymentNotYetText =
   "決済をまだ受け付けていません。処理中か、失敗して再投入を待っています。";
 export const linesConflictText =

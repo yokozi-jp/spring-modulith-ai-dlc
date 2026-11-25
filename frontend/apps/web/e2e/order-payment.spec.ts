@@ -22,7 +22,6 @@ async function attachScreenshot(page: Page, testInfo: TestInfo, name: string): P
   await testInfo.attach(name, { body: await page.screenshot(), contentType: "image/png" });
 }
 
-// 販売中の商品で下書きを作り、確定して、注文 ID、客先注文番号、合計金額を返す。確定の前に決済代行の応答を切り替えられる。
 async function createAndConfirm(
   page: Page,
   { product, prefix }: { product: Product; prefix: string },

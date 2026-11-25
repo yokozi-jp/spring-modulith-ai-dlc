@@ -34,7 +34,6 @@ class JooqProductRepository implements ProductRepository {
   /** 商品の集約を INSERT で書く shared の入口。 */
   private final TableWriter tableWriter;
 
-  /** jOOQ のコンテキストと shared の入口を受け取る。 */
   /* package */ JooqProductRepository(final DSLContext dsl, final TableWriter tableWriter) {
     this.dsl = dsl;
     this.tableWriter = tableWriter;
@@ -57,7 +56,6 @@ class JooqProductRepository implements ProductRepository {
 
   @Override
   public void add(final Product product) {
-    // ユニークインデックスは public_id（UUID v4 で衝突しない）と product_code だけなので、409 は商品コードの重複である。
     tableWriter.insert(
         PRODUCT,
         product,
