@@ -32,7 +32,9 @@ class ProductQueryService implements ProductQueries {
   @Override
   @Transactional(readOnly = true)
   public Optional<ProductSummary> findById(final String productId) {
-    return findByIds(List.of(productId)).stream().findFirst();
+    return productRepository.findByIds(List.of(new ProductId(UUID.fromString(productId)))).stream()
+        .findFirst()
+        .map(ProductQueryService::toSummary);
   }
 
   @Override
