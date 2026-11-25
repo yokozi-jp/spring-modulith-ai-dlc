@@ -52,12 +52,7 @@ final class FixtureAggregates {
 
   /** 明細番号と文言を子の列に書く、{@link #DETAILS} の全行を作る。 */
   /* package */ static ChildRows<Record> detailRows(final List<Detail> details) {
-    return rowsOf(DETAILS, details);
-  }
-
-  private static ChildRows<Record> rowsOf(
-      final ChildTable<Record> child, final List<Detail> details) {
-    return child.rows(
+    return DETAILS.rows(
         details,
         (detail, set) ->
             set.set(FIXTURE_ITEM_DETAIL.DETAIL_NO, detail.number())

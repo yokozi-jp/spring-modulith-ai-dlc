@@ -29,9 +29,6 @@ final class SchemaTenantConventions {
   /** ポリシーの対象の{@code PUBLIC}。 */
   private static final List<String> PUBLIC_ROLE = List.of("public");
 
-  /** 履歴の表が、行を退避した日時を持つ列。この列を持つ表は、削除した行を写して残すため、K1の外部キーを求めない（ADR-131）。 */
-  private static final String ARCHIVED_AT = "archived_at";
-
   private SchemaTenantConventions() {
     // 静的メソッドだけを持つ。
   }
@@ -198,7 +195,7 @@ final class SchemaTenantConventions {
                         + "）。"));
     final Set<String> archiveTables =
         columns.stream()
-            .filter(row -> ARCHIVED_AT.equals(row.column()))
+            .filter(row -> row.table().startsWith(ArchiveDeclarationConventions.PREFIX))
             .map(row -> row.schema() + "." + row.table())
             .collect(Collectors.toSet());
     final Stream<ConventionViolation> missing =

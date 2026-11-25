@@ -96,6 +96,9 @@ import org.jspecify.annotations.Nullable;
    *
    * <p>写すのは {@code DELETE ... RETURNING} が返した行そのものなので、削除した行と写した行は一致する。返った行がなければ、INSERT を実行しない（値のない
    * INSERT は書けない）。削除と写しは、{@link TableWriter} が要求する同じトランザクションの中にあり、写しが失敗すると削除も戻る。
+   *
+   * <p>ponytail: 上限：削除した行を 1 文で写すため、bind パラメータの上限（65535）を履歴の表の列数で割った行数を超えて一度に消すと失敗する。
+   * 子が多い集約が出たら、行を分けて INSERT する。
    */
   private void archiveRows(
       final ChildTable.Archive archive,

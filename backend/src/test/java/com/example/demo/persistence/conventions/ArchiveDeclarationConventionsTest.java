@@ -71,7 +71,7 @@ class ArchiveDeclarationConventionsTest {
   }
 
   @Test
-  @DisplayName("AG3：履歴の表の列の長さかNULLの可否が子と違う、または列がなければ拒否する")
+  @DisplayName("AG5：履歴の表の列の長さかNULLの可否が子と違う、または列がなければ拒否する")
   void rejectsColumnMismatch() {
     final List<ColumnRow> columns =
         List.of(
@@ -86,13 +86,13 @@ class ArchiveDeclarationConventionsTest {
                 ArchiveDeclarationConventions.check(
                     DECLARED, relations(LINE_TABLE, ARCHIVE), columns, List.of(), List.of())))
         .containsExactlyInAnyOrder(
-            "AG3 ordering.h_order_line.role_typ",
-            "AG3 ordering.h_order_line.note",
-            "AG3 ordering.h_order_line.memo");
+            "AG5 ordering.h_order_line.role_typ",
+            "AG5 ordering.h_order_line.note",
+            "AG5 ordering.h_order_line.memo");
   }
 
   @Test
-  @DisplayName("AG4：履歴の表に主キーがない、または一意制約、一意のインデックス、外部キーがあれば拒否する")
+  @DisplayName("AG6：履歴の表に主キーがない、または一意制約、一意のインデックス、外部キーがあれば拒否する")
   void rejectsWrongShape() {
     final List<RelationRow> noPrimaryKey =
         List.of(new RelationRow(SCHEMA, ARCHIVE, "r", null, null));
@@ -116,17 +116,17 @@ class ArchiveDeclarationConventionsTest {
 
     assertThat(keys(check(noPrimaryKey, List.of(), List.of())))
         .as("主キーがない")
-        .containsExactly("AG4 ordering.h_order_line");
+        .containsExactly("AG6 ordering.h_order_line");
     assertThat(keys(check(relations(ARCHIVE), List.of(foreignKey), List.of())))
         .as("外部キー")
-        .containsExactly("AG4 ordering.h_order_line");
+        .containsExactly("AG6 ordering.h_order_line");
     assertThat(keys(check(relations(ARCHIVE), List.of(), List.of(uniqueIndex))))
         .as("一意のインデックス")
-        .containsExactly("AG4 ordering.h_order_line");
+        .containsExactly("AG6 ordering.h_order_line");
   }
 
   @Test
-  @DisplayName("AG5：どの子からも宣言されていない履歴の表（h_）を拒否する")
+  @DisplayName("AG7：どの子からも宣言されていない履歴の表（h_）を拒否する")
   void rejectsOrphanArchive() {
     assertThat(
             keys(
@@ -136,7 +136,7 @@ class ArchiveDeclarationConventionsTest {
                     matchingColumns(),
                     List.of(),
                     List.of())))
-        .containsExactly("AG5 ordering.h_unused");
+        .containsExactly("AG7 ordering.h_unused");
   }
 
   private static List<ConventionViolation> check(

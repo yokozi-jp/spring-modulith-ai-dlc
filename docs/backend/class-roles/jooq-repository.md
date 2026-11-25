@@ -75,7 +75,7 @@ jOOQ の Repository は業務規則を持たない。
   `AggregateTable.of(T_ORDER, T_ORDER.PUBLIC_ID, order -> order.id().value(), T_ORDER.ORDER_ID, LINES)` は、ルートのテーブル、ルートを一つに決める一意の列、集約ルートからその列の値を取る関数、内部の主キー、子を渡す。
   関数を宣言に持つため、`insert` と `update` に一意の列の値を別に渡さず、別の集約ルートの値と組にして渡す誤りが書けない。
   定数の型は `AggregateTable<TOrderRecord, UUID, Order>` のように、第 3 型引数に集約ルートのクラスを指定する。`update` が版の持ち主をこの型で受け取るため、版の数値を返すラムダは渡せない。
-  `ChildTable.of(T_ORDER_LINE, T_ORDER_LINE.ORDER_ID, T_ORDER_LINE.LINE_NO)` は、子のテーブル、親の内部の主キーを持つ外部キーの列、親の中で行を同定する自然キーの列を渡す。
+  `ChildTable.of(T_ORDER_LINE, T_ORDER_LINE.ORDER_ID, Tables.H_ORDER_LINE, T_ORDER_LINE.LINE_NO)` は、子のテーブル、親の内部の主キーを持つ外部キーの列、削除する前の行を写す履歴の表、親の中で行を同定する自然キーの列を渡す（[履歴の表](../../database/postgresql-logical-design.md#履歴の表)）。
   自然キーの列の型は `Integer`、`Long`、`Short`、`String`、`UUID` に限り、その列の組を子のテーブルの一意制約で裏づける。
   外部キーの列は、親の内部の主キーと同じ型（`Long`）であることしかコンパイルで確かめられない。正しい列を渡したことは、`@DatabaseTest` の往復で確かめる。
 - `add` は、`tableWriter.insert(ORDER, order, ルートの列の値, 子の全行)` を呼ぶ。
@@ -213,6 +213,7 @@ import static com.example.demo.jooq.ordering.Tables.T_ORDER_LINE;
 import static org.jooq.impl.DSL.multiset;
 import static org.jooq.impl.DSL.select;
 
+import com.example.demo.jooq.ordering.Tables;
 import com.example.demo.shared.persistence.AggregateTable;
 import com.example.demo.shared.persistence.ChildTable;
 import com.example.demo.shared.persistence.ColumnValues;
@@ -224,7 +225,7 @@ class JooqOrderRepository implements OrderRepository {
 
   /** 注文の明細。親の中の行は、明細番号で同定する。 */
   private static final ChildTable<TOrderLineRecord> LINES =
-      ChildTable.of(T_ORDER_LINE, T_ORDER_LINE.ORDER_ID, T_ORDER_LINE.LINE_NO);
+      ChildTable.of(T_ORDER_LINE, T_ORDER_LINE.ORDER_ID, Tables.H_ORDER_LINE, T_ORDER_LINE.LINE_NO);
 
   /** 注文の集約。ルートは公開 ID で一つに決める。 */
   private static final AggregateTable<TOrderRecord, UUID, Order> ORDER =

@@ -5,6 +5,7 @@ import com.example.demo.persistence.conventions.CatalogSnapshot.ConstraintRow;
 import com.example.demo.persistence.conventions.CatalogSnapshot.IndexRow;
 import com.example.demo.persistence.conventions.CatalogSnapshot.RelationRow;
 import com.example.demo.shared.persistence.DeclaredAggregate;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -22,16 +23,16 @@ import java.util.stream.Stream;
 final class ArchiveDeclarationConventions {
 
   /** 履歴の表に、子のテーブルの列がないか、型かNULLの可否が違う。 */
-  /* package */ static final String COLUMN_MISMATCH = "AG3";
+  /* package */ static final String COLUMN_MISMATCH = "AG5";
 
   /** 履歴の表が、主キーを持たない、または一意制約、一意のインデックス、外部キーを持つ。 */
-  /* package */ static final String WRONG_SHAPE = "AG4";
+  /* package */ static final String WRONG_SHAPE = "AG6";
 
   /** 履歴の表（{@code h_}）が、どの子からも宣言されていない。 */
-  /* package */ static final String ORPHAN = "AG5";
+  /* package */ static final String ORPHAN = "AG7";
 
   /** 履歴の表の接頭辞。 */
-  private static final String PREFIX = "h_";
+  /* package */ static final String PREFIX = "h_";
 
   /** 履歴の表の規約の文書。 */
   private static final String DOC =
@@ -108,11 +109,27 @@ final class ArchiveDeclarationConventions {
             .anyMatch(row ->
                 qualified(row.schema(), row.table()).equals(archive)
                     && ("u".equals(row.type()) || "f".equals(row.type())));
-    return hasPrimaryKey && !hasUniqueIndex && !hasUniqueOrForeignKey
+    final List<String> causes = new ArrayList<>();
+    if (!hasPrimaryKey) {
+      causes.add("主キーがない");
+    }
+    if (hasUniqueIndex) {
+      causes.add("一意のインデックスがある");
+    }
+    if (hasUniqueOrForeignKey) {
+      causes.add("一意制約か外部キーがある");
+    }
+    return causes.isEmpty()
         ? Stream.empty()
         : Stream.of(
             new ConventionViolation(
-                WRONG_SHAPE, archive, "履歴の表は、代理の主キーだけを持ち、一意制約と外部キーを持たない（" + DOC + "）。"));
+                WRONG_SHAPE,
+                archive,
+                "履歴の表は、代理の主キーだけを持ち、一意制約と外部キーを持たない。今は「"
+                    + String.join("」「", causes)
+                    + "」（"
+                    + DOC
+                    + "）。"));
   }
 
   private static boolean isOf(final String archive, final IndexRow row) {

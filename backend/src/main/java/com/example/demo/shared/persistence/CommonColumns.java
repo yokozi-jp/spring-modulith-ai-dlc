@@ -50,6 +50,8 @@ import org.springframework.stereotype.Component;
  * IllegalArgumentException} を投げる。trace がない場合、{@code *_pgm_cd} が束縛されていない場合、または Listener の外で
  * principal が {@link AppUserPrincipal} でない認証の場合に {@link IllegalStateException} を投げる。
  */
+// 作成、更新、退避の共通カラムの検査と値の作成を 1 つのクラスに置くため、メソッドの数の上限を外す。
+@SuppressWarnings("PMD.TooManyMethods")
 @Component
 public class CommonColumns {
 

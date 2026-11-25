@@ -101,7 +101,7 @@ git diff --name-only --diff-filter=A "$(sed -n 's/^同期コミット：`\([0-9a
 | `Find`              | CommandHandler の `JooqOrderRepository.findById`（multiset の一つの SELECT）と `Order.ensureLockNo`                                                                                         |
 | `UpdateRoot`        | `TableWriter.update`（`lock_no = expected` の `UPDATE ... RETURNING`。0 件なら `requireOneRow` が `ConflictException`）                                                                     |
 | `ReadSaved`         | `ChildWriter.replace` の保存済みの `line_no` の SELECT と、それに続く文の順序の決定（保存後にない行の DELETE、残る行ごとの UPDATE、新しい行の複数行の INSERT）                              |
-| `ChildOp`           | `ChildWriter` の DELETE（保存済みの `line_no` のうち集約にない行）、UPDATE（0 件は `IllegalStateException`）、複数行の INSERT（`uk_t_order_line` の違反は `ConflictException`（`UNIQUE`）） |
+| `ChildOp`           | `ChildWriter` の DELETE（`DELETE ... RETURNING`。保存済みの `line_no` のうち集約にない行。返った行は同じトランザクションで履歴の表へ複数行の INSERT で写す）、UPDATE（0 件は `IllegalStateException`）、複数行の INSERT（`uk_t_order_line` の違反は `ConflictException`（`UNIQUE`）） |
 | `OpsDone`、`Commit` | `@Transactional` のコミット                                                                                                                                                                 |
 | `LockTimeout`       | `lock_timeout`（55P03）。`TableWriter` と `ChildWriter` のすべての文は `ConflictException`（`LOCK`）の 409                                                                                  |
 | `Deadlock`          | PostgreSQL のデッドロックの検出（40P01）。どこも変換しない                                                                                                                                  |
@@ -134,13 +134,17 @@ git diff --name-only --diff-filter=A "$(sed -n 's/^同期コミット：`\([0-9a
   その要求はルートの UPDATE で親の行のロックをすでに持ち、ルートを書く別の要求はそのロックを先に待つため、検査が待ちを増やさない。
   子の行をルートより先に書く順序にしたら、この前提は成り立たない（上の「切り分けの手がかり」の注記と同じ）。
 
+- 履歴の表（`h_order_line`）への INSERT を扱わない。
+  履歴の表は一意制約も外部キーも持たず、親の行のロックを待たない。
+  INSERT は DELETE と同じトランザクションにあり、失敗すると DELETE も戻るため、保存の成否と、ほかの要求から見える状態は変わらない。
+
 ## 既知の発見
 
 なし。
 
 ## 同期の記録
 
-同期コミット：`f3f0b7ec5493ba506a2368a42fe98c3caa21fe1e`（main）
+同期コミット：`6c51126926d4b72006e9e9e8eb6702c9eaec8595`（main）
 
 このコミットで、「変更がこの検証に関わるか」のファイルと対応表がモデルと一致することを確かめた。
 読んだのはこのリポジトリのコードで、PostgreSQL の振る舞いはモデルの冒頭の注記に並べた前提である。
