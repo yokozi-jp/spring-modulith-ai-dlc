@@ -99,6 +99,10 @@ liquibase {
             defaultSchemaName migrationDatabaseSchema
             liquibaseSchemaName migrationDatabaseSchema
             changelogParameters([appDatabaseUsername: appDatabaseUsername])
+            // verifyDatabaseMigrations専用。全changesetのDATEEXECUTEDを2000-01-01にそろえ、その前日までを切り戻す。
+            // 日時が同じなら、切り戻しの順序はORDEREXECUTEDだけで決まる。
+            sql "UPDATE ${migrationDatabaseSchema}.databasechangelog SET dateexecuted = TIMESTAMP '2000-01-01 00:00:00'"
+            date '1999-12-31'
         }
     }
     runList = 'main'
@@ -216,9 +220,9 @@ tasks.named('updateToTag') {
     }
 }
 
-// Liquibaseは、切り戻しの順序をDATEEXECUTED、ORDEREXECUTEDの順に並べて決める。
-// DATEEXECUTEDはPostgreSQLのNOW()（壁時計）で、changesetが数msで進むと時計の巻き戻りで順序が逆転し、
-// 依存する表やスキーマを先に消して失敗する（#756）。updateTestingRollbackはこの順序をDBの時計に任せるため使わない。
+// Liquibaseは切り戻しの順序をDATEEXECUTED、ORDEREXECUTEDの順に並べて決める。
+// DATEEXECUTEDはPostgreSQLのNOW()（壁時計）なので、逆転すると依存する表やスキーマを先に消して失敗する（#756）。
+// updateTestingRollbackはこの順序をDBの時計に任せるため使わない。
 tasks.named('updateTestingRollback') {
     group = 'database migration'
     description = '使用禁止です。verifyDatabaseMigrationsを使用してください。'
@@ -229,24 +233,17 @@ tasks.named('updateTestingRollback') {
     }
 }
 
-tasks.named('executeSql') {
-    configureLiquibaseDatabaseTask(delegate, 'Liquibase履歴の日時の固定')
-    description = 'verifyDatabaseMigrationsの中だけで、全changesetのDATEEXECUTEDを同じ値にそろえます。'
-}
-
-tasks.named('rollbackToDate') {
-    configureLiquibaseDatabaseTask(delegate, 'Liquibase rollback検証')
-    description = 'verifyDatabaseMigrationsの中だけで、適用済みのchangesetをすべて切り戻します。'
-}
-
-// executeSqlとrollbackToDateの引数は、verifyDatabaseMigrationsを実行するビルドだけに渡す。
-// 引数を既定にすると、単独で実行したときに本番の履歴を書き換え、全changesetを切り戻す。
-gradle.taskGraph.whenReady { graph ->
-    if (graph.hasTask(':verifyDatabaseMigrations')) {
-        liquibase.activities.main {
-            // 日時がそろうと、切り戻しの順序はORDEREXECUTEDだけで決まる。
-            sql "UPDATE ${migrationDatabaseSchema}.databasechangelog SET dateexecuted = TIMESTAMP '2000-01-01 00:00:00'"
-            date '1999-12-31'
+// executeSqlとrollbackToDateはDBの履歴を書き換え、全changesetを戻すため、verifyDatabaseMigrationsからだけ実行する。
+['executeSql': 'Liquibase履歴の日時の固定', 'rollbackToDate': 'Liquibase rollback検証'].each { taskName, operation ->
+    tasks.named(taskName) {
+        configureLiquibaseDatabaseTask(delegate, operation)
+        description = 'verifyDatabaseMigrations専用です。単独では実行できません。'
+        doFirst {
+            if (!gradle.taskGraph.hasTask(':verifyDatabaseMigrations')) {
+                throw new IllegalArgumentException(
+                    "${taskName}は履歴を書き換えて全changesetを戻すため、verifyDatabaseMigrationsからだけ実行します。"
+                )
+            }
         }
     }
 }
@@ -334,8 +331,20 @@ def assertSchemaTagExists = tasks.register('assertSchemaTagExists', migration.As
     }
 }
 
-tasks.named('updateToTag') {
+tasks.named('update') {
     mustRunAfter validateCurrentSchemaTag
+}
+
+tasks.named('executeSql') {
+    mustRunAfter tasks.named('update')
+}
+
+tasks.named('rollbackToDate') {
+    mustRunAfter tasks.named('executeSql')
+}
+
+tasks.named('updateToTag') {
+    mustRunAfter validateCurrentSchemaTag, tasks.named('rollbackToDate')
 }
 
 assertSchemaTagExists.configure {
@@ -405,21 +414,9 @@ def verifyDatabaseMigrations = tasks.register('verifyDatabaseMigrations') {
     group = 'verification'
     description = '現在タグの宣言と、使い捨てDBで全changesetのupdate、rollback、再update、現在タグの存在を検証します。'
     // 現在タグが最後の changelog に宣言されているかも確かめる。テストは migrateDatabase を通らないため（ADR-085）。
-    // 現在タグは最後の changelog にあるため、再updateはupdateToTagで全changesetを戻す。
+    // 現在タグは最後の changelog にあるため、再適用はupdateToTagで全changesetに届く。
     dependsOn validateCurrentSchemaTag, tasks.named('update'), tasks.named('executeSql'),
         tasks.named('rollbackToDate'), tasks.named('updateToTag'), assertSchemaTagExists
-}
-
-tasks.named('executeSql') {
-    mustRunAfter tasks.named('update')
-}
-
-tasks.named('rollbackToDate') {
-    mustRunAfter tasks.named('executeSql')
-}
-
-tasks.named('updateToTag') {
-    mustRunAfter tasks.named('rollbackToDate')
 }
 
 tasks.named('test') {

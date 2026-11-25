@@ -111,9 +111,13 @@ rollback:
 
 Liquibaseの`updateTestingRollback`は使いません。
 Liquibaseは切り戻しの順序を、`databasechangelog`の`dateexecuted`、`orderexecuted`の順に並べて決めます。
-`dateexecuted`はPostgreSQLの`NOW()`で、DBを動かす機器の時計が戻ると、数msで進むchangesetの`dateexecuted`が前のchangesetより小さくなり、順序が逆になることがあります。
-順序が逆になると、依存する表やスキーマを先に消し、`column "tenant_public_id" of relation "product.m_product" does not exist`のように失敗します（[#756](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/756)）。
-`executeSql`が全changesetの`dateexecuted`を同じ値にそろえるため、切り戻しの順序は`orderexecuted`だけで決まります。
+`dateexecuted`はPostgreSQLの`NOW()`で、前のchangesetより小さい値になると順序が逆になり、依存する表やスキーマを先に消して失敗します（[#756](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/756)）。
+`dateexecuted`が前より小さくなる原因は特定していません。WSLの時計が約30秒ごとに数ms戻ることは測りました。
+`executeSql`が全changesetの`dateexecuted`を同じ値にそろえるため、切り戻しの順序は原因によらず`orderexecuted`だけで決まります。
+`executeSql`と`rollbackToDate`は、`verifyDatabaseMigrations`の中でしか動きません。
+
+この検証は、DBの履歴にある全changesetを戻します。使い捨てDBだけで実行します。
+本番の切り戻し（`rollbackDatabase`）は同じ順序の決め方のままで、この変更の対象外です。
 
 この検証により、rollback定義の不足とタグchangesetの追加漏れをPull Requestで検出します。
 本番DBのデータ復元可能性までは保証しません。

@@ -61,6 +61,6 @@ tags: [reference, database, liquibase, jooq, taskfile, gradle]
 - **`./gradlew migrateAndGenerateJooq`**：現在のスキーマタグまで前進適用してからjOOQコードを生成する。
 
 `verifyDatabaseMigrations`は使い捨てDBだけで実行する。
-`verifyDatabaseMigrations`は、全changesetの適用日時を書き換えて全changesetを戻す。
-`executeSql`と`rollbackToDate`は、`verifyDatabaseMigrations`を含むビルドでだけ引数を持ち、単独では動かない。
+`verifyDatabaseMigrations`は、履歴の適用日時を書き換えて、適用済みの全changesetを戻す。
+`executeSql`と`rollbackToDate`は、単独で実行するとエラーになる。
 Liquibaseプラグインの`update`は現在タグより後のchangesetも適用するため、本番マイグレーションの入口に使わない。
