@@ -39,7 +39,7 @@ import org.jooq.impl.DSL;
 
 /**
  * 開発用の代表データ（#114）を、業務データが空のローカルかテストの DB の、{@link TenancySeeds#TENANTS} の各テナントに入れる。テナントと所属（{@link
- * TenancySeeds}）は、業務データの有無によらず、足りない行だけを毎回入れる。
+ * TenancySeeds}）は、業務データの有無によらず、足りない行だけを毎回入れる。{@link Mode#TENANCY} のモードは、テナントと所属だけを入れ、業務データを入れない。
  *
  * <p>業務テーブルは RLS でテナントごとに分かれるため（ADR-107）、「空」の判定と reset の削除は {@code tenancy.m_tenant} のテナントごとに行う。
  *
@@ -59,6 +59,7 @@ public final class LocalDataSeeder {
     SEED,
     /** 業務データを消してから入れ直す。 */
     RESET,
+    /** テナントと所属だけを入れ、業務データを入れない。 */
     TENANCY
   }
 
@@ -66,6 +67,7 @@ public final class LocalDataSeeder {
   /* package */ enum Outcome {
     /** 代表データを入れた。 */
     SEEDED,
+    /** テナントと所属だけを入れた。 */
     TENANCY_SEEDED,
     /** 業務データがあるので何もしなかった。 */
     SKIPPED_NOT_EMPTY,
