@@ -42,7 +42,7 @@ expect "一致は通る" 0 "OK"
 readme 3.21.8
 expect "版のずれを止める" 1 "README の jOOQ は「3.21.8」だが、build.gradle は「3.21.9」"
 readme 3.21.9
-sed -i '/archunit/d' "$tmp/build.gradle"
+grep -v archunit "$tmp/build.gradle" >"$tmp/build.gradle.new" && mv "$tmp/build.gradle.new" "$tmp/build.gradle"
 expect "取り出せない正本を止める" 1 "ArchUnit の版を"
 
 [ "$failures" -eq 0 ] && echo "OK   readme-versions-test"
