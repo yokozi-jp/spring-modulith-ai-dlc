@@ -26,6 +26,7 @@ import org.springframework.security.oauth2.client.endpoint.RestClientAuthorizati
 import org.springframework.security.oauth2.client.registration.ClientRegistration;
 import org.springframework.security.oauth2.core.AuthorizationGrantType;
 import org.springframework.security.oauth2.core.OAuth2AuthorizationException;
+import org.springframework.security.oauth2.core.endpoint.OAuth2AccessTokenResponse;
 import org.springframework.security.oauth2.core.endpoint.OAuth2AuthorizationExchange;
 import org.springframework.security.oauth2.core.endpoint.OAuth2AuthorizationRequest;
 import org.springframework.security.oauth2.core.endpoint.OAuth2AuthorizationResponse;
@@ -36,6 +37,9 @@ class OidcTokenClientTimeoutTest {
 
   /** 応答を返さない handler を待たせる上限。タイムアウトが効かなくても、この時間で handler が戻り、テストが失敗する。 */
   private static final long HANDLER_WAIT_SECONDS = 5;
+
+  /** トークンのエンドポイントのパス。 */
+  private static final String TOKEN_PATH = "/token";
 
   /** 認可の要求と応答で使うリダイレクト URI。 */
   private static final String REDIRECT_URI = "http://localhost/login/oauth2/code/web";
@@ -78,7 +82,7 @@ class OidcTokenClientTimeoutTest {
     idp =
         LoopbackHttpServer.start()
             .handle(
-                "/token",
+                TOKEN_PATH,
                 exchange -> {
                   try (exchange) {
                     release.await(HANDLER_WAIT_SECONDS, TimeUnit.SECONDS);
@@ -86,7 +90,7 @@ class OidcTokenClientTimeoutTest {
                     throw (InterruptedIOException) new InterruptedIOException().initCause(e);
                   }
                 });
-    final OAuth2AuthorizationCodeGrantRequest request = grantRequest(idp.url() + "/token");
+    final OAuth2AuthorizationCodeGrantRequest request = grantRequest(idp.url() + TOKEN_PATH);
 
     final AtomicReference<Throwable> failure = new AtomicReference<>();
     final AtomicReference<Duration> elapsed = new AtomicReference<>();
@@ -105,6 +109,33 @@ class OidcTokenClientTimeoutTest {
     assertThat(elapsed.get())
         .as("応答しないトークンのエンドポイントに失敗するまでの時間（read-timeout=500ms）")
         .isBetween(Duration.ofMillis(400), Duration.ofSeconds(2));
+  }
+
+  @Test
+  @DisplayName("トークンのエンドポイントが返す JSON を、OAuth2AccessTokenResponse として読む")
+  void readsTheTokenResponseAsJson() throws IOException {
+    idp =
+        LoopbackHttpServer.start()
+            .handle(
+                TOKEN_PATH,
+                exchange ->
+                    LoopbackHttpServer.reply(
+                        exchange,
+                        200,
+                        "{\"access_token\":\"abc\",\"token_type\":\"Bearer\",\"expires_in\":300}"));
+    final OAuth2AuthorizationCodeGrantRequest request = grantRequest(idp.url() + TOKEN_PATH);
+
+    final AtomicReference<OAuth2AccessTokenResponse> response = new AtomicReference<>();
+    // read-timeout は本文の読み取りまで含む。最初の要求は JVM の初期化で 500ms を超えうるため、長くする。
+    contextRunner
+        .withPropertyValues("spring.http.clients.read-timeout=30s")
+        .run(context ->
+            response.set(
+                context
+                    .getBean(RestClientAuthorizationCodeTokenResponseClient.class)
+                    .getTokenResponse(request)));
+
+    assertThat(response.get().getAccessToken().getTokenValue()).isEqualTo("abc");
   }
 
   private static OAuth2AuthorizationCodeGrantRequest grantRequest(final String tokenUri) {
