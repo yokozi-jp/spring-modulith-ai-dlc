@@ -25,11 +25,14 @@ changeset が作る全テーブルについて、保持期限と個人データ�
 | `tenancy.m_user`                     | マスタ         | 未定（[#672]）                                                                             | 含まない                                         |
 | `tenancy.m_user_identity`            | マスタ         | 未定（[#672]）                                                                             | 含む（`issuer_url`、`subject_code`）             |
 | `tenancy.m_membership`               | マスタ         | 未定（[#672]）                                                                             | 含まない                                         |
+| `tenancy.h_membership`               | 履歴           | 未定（[#672]）                                                                             | 含まない                                         |
+| `tenancy.h_user_identity`            | 履歴           | 未定（[#672]）                                                                             | 含む（`issuer_url`、`subject_code`）             |
 | `product.m_product`                  | マスタ         | 無期限                                                                                     | 含まない                                         |
 | `product.t_idempotency_key`          | トラン         | `expires_at`（作成から 24 時間）まで（[ADR-126]）                                          | 含まない                                         |
 | `ordering.t_idempotency_key`         | トラン         | `expires_at`（作成から 24 時間）まで（[ADR-126]）                                          | 含まない                                         |
 | `ordering.t_order`                   | トラン         | 未定（[#671]）                                                                             | 含まない                                         |
 | `ordering.t_order_line`              | トラン         | 未定（[#671]）                                                                             | 含まない                                         |
+| `ordering.h_order_line`              | 履歴           | 未定（[#671]）                                                                             | 含まない                                         |
 | `payment.t_payment`                  | トラン         | 未定（[#671]）                                                                             | 含まない                                         |
 | `modulith.event_publication`         | フレームワーク | 完了するまで。完了すると archive へ移る                                                    | 含まない                                         |
 | `modulith.event_publication_archive` | フレームワーク | `COMPLETED` は 7 日（[#542] で実装するまでは無期限）。`ABANDONED` は運用者が戻すか消すまで | 含まない                                         |

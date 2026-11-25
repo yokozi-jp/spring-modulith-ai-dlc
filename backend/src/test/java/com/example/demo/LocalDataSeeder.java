@@ -1,5 +1,6 @@
 package com.example.demo;
 
+import static com.example.demo.jooq.ordering.Tables.H_ORDER_LINE;
 import static com.example.demo.jooq.ordering.Tables.T_IDEMPOTENCY_KEY;
 import static com.example.demo.jooq.ordering.Tables.T_ORDER;
 import static com.example.demo.jooq.ordering.Tables.T_ORDER_LINE;
@@ -77,7 +78,10 @@ public final class LocalDataSeeder {
 
   /** 代表データを入れる業務テーブル。子から順に並べる。modulith と tenancy と Liquibase の表は含めない。 */
   /* package */ static final List<Table<?>> BUSINESS_TABLES =
-      List.of(T_PAYMENT, T_ORDER_LINE, T_ORDER, M_PRODUCT);
+      List.of(T_PAYMENT, H_ORDER_LINE, T_ORDER_LINE, T_ORDER, M_PRODUCT);
+
+  /** {@link #BUSINESS_TABLES} のうち、削除した行を写す履歴の表。代表データは行を削除しないため、入れた後も空である。 */
+  /* package */ static final List<Table<?>> HISTORY_TABLES = List.of(H_ORDER_LINE);
 
   /**
    * reset が消す業務テーブル。代表データを入れない {@code ordering.t_idempotency_key} と {@code

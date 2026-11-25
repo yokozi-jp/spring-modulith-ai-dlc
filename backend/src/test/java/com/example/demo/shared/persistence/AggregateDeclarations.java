@@ -66,7 +66,10 @@ public final class AggregateDeclarations {
                 aggregate.key().getName(),
                 aggregate.children().stream()
                     .map(child ->
-                        new DeclaredChild(qualified(child.table()), child.parentKey().getName()))
+                        new DeclaredChild(
+                            qualified(child.table()),
+                            child.parentKey().getName(),
+                            qualified(child.archive().table())))
                     .toList(),
                 aggregate.duplicateKey().stream().map(TableField::getName).toList()))
         .toList();

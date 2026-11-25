@@ -25,6 +25,9 @@ class AggregateDeclarationConventionsTest {
   /** 注文の明細のテーブル。 */
   private static final String LINE = "ordering.t_order_line";
 
+  /** 注文の明細の履歴の表。 */
+  private static final String ARCHIVE = "ordering.h_order_line";
+
   /** 明細から注文への外部キー。テナントの列との複合である。 */
   private static final ConstraintRow LINE_TO_ORDER =
       new ConstraintRow(
@@ -40,7 +43,7 @@ class AggregateDeclarationConventionsTest {
   /** 明細を注文の子として正しく宣言した集約。 */
   private static final DeclaredAggregate DECLARED =
       new DeclaredAggregate(
-          ORDER, PUBLIC_ID, List.of(new DeclaredChild(LINE, "order_id")), List.of());
+          ORDER, PUBLIC_ID, List.of(new DeclaredChild(LINE, "order_id", ARCHIVE)), List.of());
 
   /** 注文の、テナントと受付番号の一意索引。 */
   private static final IndexRow ORDER_NUMBER_INDEX =
@@ -93,7 +96,7 @@ class AggregateDeclarationConventionsTest {
     final List<DeclaredAggregate> mutated =
         List.of(
             new DeclaredAggregate(
-                ORDER, PUBLIC_ID, List.of(new DeclaredChild(LINE, "line_no")), List.of()));
+                ORDER, PUBLIC_ID, List.of(new DeclaredChild(LINE, "line_no", ARCHIVE)), List.of()));
 
     assertThat(
             keys(

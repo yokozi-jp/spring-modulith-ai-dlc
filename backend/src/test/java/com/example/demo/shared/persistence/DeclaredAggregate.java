@@ -26,6 +26,7 @@ public record DeclaredAggregate(
    *
    * @param table 子のテーブル。{@code スキーマ.テーブル}
    * @param parentKey 親の内部の主キーを持つとして宣言した列
+   * @param archive 削除する前の行を写す履歴の表。{@code スキーマ.テーブル}
    */
-  public record DeclaredChild(String table, String parentKey) {}
+  public record DeclaredChild(String table, String parentKey, String archive) {}
 }

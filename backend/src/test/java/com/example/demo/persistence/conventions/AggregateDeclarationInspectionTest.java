@@ -45,6 +45,22 @@ class AggregateDeclarationInspectionTest {
   }
 
   @Test
+  @DisplayName("本番の子の履歴の表は、子の列と同じ型とNULLの可否を持ち、一意制約と外部キーがなく、使われない履歴の表がない")
+  void declaredArchivesMatchCatalog() {
+    final CatalogSnapshot catalog = SchemaCatalog.read(dsl, migrationRole);
+
+    final List<ConventionViolation> violations =
+        ArchiveDeclarationConventions.check(
+            AggregateDeclarations.declared(),
+            catalog.relations(),
+            catalog.columns(),
+            catalog.constraints(),
+            catalog.indexes());
+
+    assertThat(violations).as("履歴の表の違反: %s", violations).isEmpty();
+  }
+
+  @Test
   @DisplayName("t_order_line を ORDER の子から外して独立のルートにすると、拒否する")
   void rejectsOrderLineDeclaredAsRoot() {
     final List<DeclaredAggregate> mutated = new ArrayList<>();
@@ -77,7 +93,7 @@ class AggregateDeclarationInspectionTest {
                     aggregate.children().stream()
                         .map(child ->
                             "tenancy.m_membership".equals(child.table())
-                                ? new DeclaredChild(child.table(), "user_id")
+                                ? new DeclaredChild(child.table(), "user_id", child.archive())
                                 : child)
                         .toList(),
                     aggregate.duplicateKey()))

@@ -1,5 +1,6 @@
 package com.example.demo.shared.persistence;
 
+import static com.example.demo.jooq.tables.FixtureItemDetailArchiveTable.FIXTURE_ITEM_DETAIL_ARCHIVE;
 import static com.example.demo.jooq.tables.FixtureItemDetailTable.FIXTURE_ITEM_DETAIL;
 import static com.example.demo.jooq.tables.FixtureItemTable.FIXTURE_ITEM;
 
@@ -10,10 +11,13 @@ import org.jooq.Record;
 /** {@link TableWriter} のテストが使う、テスト専用のテーブルの集約の宣言。 */
 final class FixtureAggregates {
 
-  /** 子の行。親の中の行は、明細番号で同定する。 */
+  /** 子の行。親の中の行は、明細番号で同定する。削除前の行は履歴の表に写す。 */
   /* package */ static final ChildTable<Record> DETAILS =
       ChildTable.of(
-          FIXTURE_ITEM_DETAIL, FIXTURE_ITEM_DETAIL.ITEM_ID, FIXTURE_ITEM_DETAIL.DETAIL_NO);
+          FIXTURE_ITEM_DETAIL,
+          FIXTURE_ITEM_DETAIL.ITEM_ID,
+          FIXTURE_ITEM_DETAIL_ARCHIVE,
+          FIXTURE_ITEM_DETAIL.DETAIL_NO);
 
   /** 子を持つ集約。ルートの一意の列と内部の主キーは、同じ item_id にする。 */
   /* package */ static final AggregateTable<Record, Long, Item> ITEM =

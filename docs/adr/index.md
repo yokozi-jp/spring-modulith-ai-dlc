@@ -130,3 +130,4 @@
 - [ADR-128: バックエンドの全体のテストを pre-push で流さず、CI に任せる](ADR-128-run-backend-tests-in-ci-not-in-pre-push.md)（Proposed, 2026-11-25）
 - [ADR-129: 処理済みのメッセージの表を一律に置かず、すべてのリスナーの冪等性を全件の結合テストで確かめる](ADR-129-check-all-listeners-for-idempotency-without-a-uniform-processed-message-table.md)（Proposed, 2026-11-25）
 - [ADR-130: E2E のデータを各テストが作り、商品は本番の商品を登録する API で作る](ADR-130-create-e2e-data-per-test-with-product-registration-api.md)（Proposed, 2026-11-25）
+- [ADR-131: すべての子に履歴の表を宣言させ、削除する前の行を TableWriter が同じトランザクションで履歴の表へ写す](ADR-131-archive-removed-child-rows-in-table-writer.md)（Proposed, 2026-11-25）

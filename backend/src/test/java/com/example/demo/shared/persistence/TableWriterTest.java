@@ -1,5 +1,6 @@
 package com.example.demo.shared.persistence;
 
+import static com.example.demo.jooq.tables.FixtureItemDetailArchiveTable.FIXTURE_ITEM_DETAIL_ARCHIVE;
 import static com.example.demo.jooq.tables.FixtureItemDetailTable.FIXTURE_ITEM_DETAIL;
 import static com.example.demo.jooq.tables.FixtureItemTable.FIXTURE_ITEM;
 import static com.example.demo.shared.persistence.FixtureAggregates.DETAILS;
@@ -35,7 +36,6 @@ import org.jooq.DSLContext;
 import org.jooq.Record;
 import org.jooq.Table;
 import org.jooq.impl.DSL;
-import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -73,9 +73,6 @@ class TableWriterTest {
   /** 更新のユースケースとして束縛する pgm_cd。 */
   private static final String PGM_CD = "shared.TableWriterTest";
 
-  /** 行を作るときに束縛する pgm_cd。 */
-  private static final String SEED_PGM_CD = "shared.Seed";
-
   /** 現在のスパンの trace ID。 */
   private static final String TRACE_ID = "4bf92f3577b34da6a3ce929d0e0e4736";
 
@@ -86,8 +83,8 @@ class TableWriterTest {
   /** アプリロールで接続した jOOQ のコンテキスト。 */
   @Autowired private DSLContext dsl;
 
-  /** 行を作るときの共通カラムの値。 */
-  private CommonColumns seedColumns;
+  /** 行を作る。 */
+  private FixtureSeeds seeds;
 
   /** トランザクションの有無と読み取り専用を切り替えて呼ぶ。 */
   @Autowired private PlatformTransactionManager transactionManager;
@@ -97,8 +94,11 @@ class TableWriterTest {
 
   @BeforeEach
   void setUp() {
-    seedColumns =
-        new CommonColumns(Clock.fixed(CREATED, ZoneOffset.UTC), TracerStubs.withTraceId(TRACE_ID));
+    seeds =
+        new FixtureSeeds(
+            dsl,
+            new CommonColumns(
+                Clock.fixed(CREATED, ZoneOffset.UTC), TracerStubs.withTraceId(TRACE_ID)));
     writer =
         new TableWriter(
             dsl,
@@ -108,7 +108,7 @@ class TableWriterTest {
   @Test
   @DisplayName("update は業務の列と updated_* を書き、版を期待値 + 1 にし、created_* を変えない")
   void updateWritesRootColumnsAndAdvancesVersion() {
-    insertItem(1L, "before");
+    seeds.insertItem(1L, "before");
 
     runInUseCase(() -> updateItem(1L, 1L, "after"));
 
@@ -118,13 +118,15 @@ class TableWriterTest {
     assertThat(row.get(FIXTURE_ITEM.UPDATED_AT)).as("updated_at").isEqualTo(NOW);
     assertThat(row.get(FIXTURE_ITEM.UPDATED_PGM_CD)).as("updated_pgm_cd").isEqualTo(PGM_CD);
     assertThat(row.get(FIXTURE_ITEM.CREATED_AT)).as("created_at").isEqualTo(CREATED);
-    assertThat(row.get(FIXTURE_ITEM.CREATED_PGM_CD)).as("created_pgm_cd").isEqualTo(SEED_PGM_CD);
+    assertThat(row.get(FIXTURE_ITEM.CREATED_PGM_CD))
+        .as("created_pgm_cd")
+        .isEqualTo(FixtureSeeds.SEED_PGM_CD);
   }
 
   @Test
   @DisplayName("update は業務の列がなくても、版と updated_* を進める")
   void updateWithoutBusinessColumnsAdvancesVersion() {
-    insertItem(1L, "before");
+    seeds.insertItem(1L, "before");
 
     runInUseCase(() -> save(1L, 1L, set -> {}, List.of()));
 
@@ -135,7 +137,7 @@ class TableWriterTest {
   @Test
   @DisplayName("update は版が違えば、原因なしの競合の例外を投げ、行を変えない")
   void updateWithStaleVersionConflicts() {
-    insertItem(1L, "before");
+    seeds.insertItem(1L, "before");
     makeStale(1L);
 
     assertThatThrownBy(() -> runInUseCase(() -> updateItem(1L, 1L, "after")))
@@ -159,8 +161,8 @@ class TableWriterTest {
   @Test
   @DisplayName("update は一意の列が 2 行に合えば IllegalStateException を投げる")
   void updateMatchingTwoRowsIsRejected() {
-    insertItem(1L, "same");
-    insertItem(2L, "same");
+    seeds.insertItem(1L, "same");
+    seeds.insertItem(2L, "same");
     final AggregateTable<Record, String, Item> byName =
         AggregateTable.of(FIXTURE_ITEM, FIXTURE_ITEM.ITEM_NAME, Item::name, FIXTURE_ITEM.ITEM_ID);
 
@@ -174,7 +176,7 @@ class TableWriterTest {
   @ValueSource(longs = {0L, -1L})
   @DisplayName("期待する版が 1 未満なら、SQL を実行する前に IllegalArgumentException にする")
   void expectedLockNoBelowOneIsRejected(final long expectedLockNo) {
-    insertItem(1L, "before");
+    seeds.insertItem(1L, "before");
 
     assertThatThrownBy(() -> runInUseCase(() -> updateItem(1L, expectedLockNo, "after")))
         .isInstanceOf(IllegalArgumentException.class)
@@ -190,8 +192,12 @@ class TableWriterTest {
         .as("集約")
         .isInstanceOf(IllegalArgumentException.class)
         .hasMessageContaining("column=lock_no");
-    assertThatThrownBy(
-            () -> ChildTable.<Record>of(NO_LOCK_TABLE, FIXTURE_ITEM.ITEM_ID, FIXTURE_ITEM.ITEM_ID))
+    assertThatThrownBy(() ->
+            ChildTable.<Record>of(
+                NO_LOCK_TABLE,
+                FIXTURE_ITEM.ITEM_ID,
+                FIXTURE_ITEM_DETAIL_ARCHIVE,
+                FIXTURE_ITEM.ITEM_ID))
         .as("子")
         .isInstanceOf(IllegalArgumentException.class)
         .hasMessageContaining("column=lock_no");
@@ -202,7 +208,10 @@ class TableWriterTest {
   void incomparableNaturalKeyTypeIsRejected() {
     assertThatThrownBy(() ->
             ChildTable.<Record>of(
-                FIXTURE_ITEM_DETAIL, FIXTURE_ITEM_DETAIL.ITEM_ID, FIXTURE_ITEM_DETAIL.CREATED_AT))
+                FIXTURE_ITEM_DETAIL,
+                FIXTURE_ITEM_DETAIL.ITEM_ID,
+                FIXTURE_ITEM_DETAIL_ARCHIVE,
+                FIXTURE_ITEM_DETAIL.CREATED_AT))
         .isInstanceOf(IllegalArgumentException.class)
         .hasMessageContaining("natural key column must be");
   }
@@ -239,10 +248,10 @@ class TableWriterTest {
   @Test
   @DisplayName("子は差分で保存し、集約にない子を削除し、両方にある子を更新し、新しい子を追加する")
   void childrenAreSavedAsDifference() {
-    insertItem(1L, "root");
-    insertDetail(1L, 1, "one");
-    insertDetail(1L, 2, "two");
-    insertDetail(1L, 3, "three");
+    seeds.insertItem(1L, "root");
+    seeds.insertDetail(1L, 1, "one");
+    seeds.insertDetail(1L, 2, "two");
+    seeds.insertDetail(1L, 3, "three");
     final Map<Integer, String> aggregateChildren = Map.of(2, "two'", 4, "four");
 
     runInUseCase(() -> saveChildren(1L, aggregateChildren));
@@ -271,9 +280,9 @@ class TableWriterTest {
   @Test
   @DisplayName("集約の子が空なら、保存済みのすべての子を消す")
   void emptyChildrenDeleteEveryStoredChild() {
-    insertItem(1L, "root");
-    insertDetail(1L, 1, "one");
-    insertDetail(1L, 2, "two");
+    seeds.insertItem(1L, "root");
+    seeds.insertDetail(1L, 1, "one");
+    seeds.insertDetail(1L, 2, "two");
 
     runInUseCase(() -> saveChildren(1L, Map.of()));
 
@@ -283,10 +292,10 @@ class TableWriterTest {
   @Test
   @DisplayName("他のルートの子は、差分の削除と更新の対象にならない")
   void childrenOfOtherRootsAreUntouched() {
-    insertItem(1L, "one");
-    insertItem(2L, "two");
-    insertDetail(1L, 1, "mine");
-    insertDetail(2L, 1, "other");
+    seeds.insertItem(1L, "one");
+    seeds.insertItem(2L, "two");
+    seeds.insertDetail(1L, 1, "mine");
+    seeds.insertDetail(2L, 1, "other");
 
     runInUseCase(() -> saveChildren(1L, Map.of()));
 
@@ -297,7 +306,7 @@ class TableWriterTest {
   @Test
   @DisplayName("子を渡さない、同じ子を二度渡す呼び出しは SQL の前に IllegalArgumentException にする")
   void unmatchedChildRowsAreRejected() {
-    insertItem(1L, "root");
+    seeds.insertItem(1L, "root");
 
     assertThatThrownBy(() -> runInUseCase(() -> writer.update(ITEM, itemRoot(1L, 1L), set -> {})))
         .as("子を渡さない")
@@ -396,7 +405,7 @@ class TableWriterTest {
   @Test
   @DisplayName("insert は一意制約の違反を、原因を付けず SQL と値を含まない UNIQUE の競合の例外にする")
   void insertDuplicateKeyConflicts() {
-    insertItem(1L, "one");
+    seeds.insertItem(1L, "one");
 
     // 23505 の後のトランザクションは中断状態になるため、この後に SQL を実行しない。
     assertThatThrownBy(() ->
@@ -433,7 +442,7 @@ class TableWriterTest {
   @Test
   @DisplayName("insert は重複を許すと宣言した列に同じ値の行があれば、例外にせず false を返し、ルートも子も書かない")
   void insertWithDuplicateKeySkipsConflictingRootAndChildren() {
-    insertItem(1L, "first", "A");
+    seeds.insertItem(1L, "first", "A");
 
     final boolean inserted =
         callInUseCase(() ->
@@ -446,7 +455,7 @@ class TableWriterTest {
     assertThat(inserted).isFalse();
     final Record row = item(1L);
     assertThat(row.get(FIXTURE_ITEM.ITEM_NAME)).isEqualTo("first");
-    assertThat(row.get(FIXTURE_ITEM.CREATED_PGM_CD)).isEqualTo(SEED_PGM_CD);
+    assertThat(row.get(FIXTURE_ITEM.CREATED_PGM_CD)).isEqualTo(FixtureSeeds.SEED_PGM_CD);
     assertThat(dsl.fetchExists(FIXTURE_ITEM, FIXTURE_ITEM.ITEM_ID.eq(2L)))
         .as("入れなかったルート")
         .isFalse();
@@ -456,7 +465,7 @@ class TableWriterTest {
   @Test
   @DisplayName("insert は重複を許すと宣言した列以外の一意制約の違反を、UNIQUE の競合の例外にする")
   void insertWithDuplicateKeyConflictsOnOtherUniqueKey() {
-    insertItem(1L, "first", "A");
+    seeds.insertItem(1L, "first", "A");
 
     // 23505 の後のトランザクションは中断状態になるため、この後に SQL を実行しない。
     assertThatThrownBy(() ->
@@ -496,8 +505,8 @@ class TableWriterTest {
   @Test
   @DisplayName("一意制約の違反ではない SQLSTATE（サブクエリが複数行を返す 21000）は、競合の例外にせずそのまま投げる")
   void cardinalityViolationIsNotConflict() {
-    insertItem(1L, "one");
-    insertItem(2L, "two");
+    seeds.insertItem(1L, "one");
+    seeds.insertItem(2L, "two");
 
     // 21000 の後のトランザクションは中断状態になるため、この後に SQL を実行しない。
     assertThatThrownBy(() ->
@@ -546,13 +555,16 @@ class TableWriterTest {
   void childNaturalKeyMatchingTwoRowsIsRejected() {
     final ChildTable<Record> byText =
         ChildTable.of(
-            FIXTURE_ITEM_DETAIL, FIXTURE_ITEM_DETAIL.ITEM_ID, FIXTURE_ITEM_DETAIL.DETAIL_TEXT);
+            FIXTURE_ITEM_DETAIL,
+            FIXTURE_ITEM_DETAIL.ITEM_ID,
+            FIXTURE_ITEM_DETAIL_ARCHIVE,
+            FIXTURE_ITEM_DETAIL.DETAIL_TEXT);
     final AggregateTable<Record, Long, Item> aggregate =
         AggregateTable.of(
             FIXTURE_ITEM, FIXTURE_ITEM.ITEM_ID, Item::id, FIXTURE_ITEM.ITEM_ID, byText);
-    insertItem(1L, "root");
-    insertDetail(1L, 1, "same");
-    insertDetail(1L, 2, "same");
+    seeds.insertItem(1L, "root");
+    seeds.insertDetail(1L, 1, "same");
+    seeds.insertDetail(1L, 2, "same");
 
     assertThatThrownBy(() ->
             runInUseCase(() ->
@@ -608,35 +620,6 @@ class TableWriterTest {
   /** 集約ルートの行を、版を比べて更新する。 */
   private void updateItem(final long itemId, final long expectedLockNo, final String name) {
     save(itemId, expectedLockNo, set -> set.set(FIXTURE_ITEM.ITEM_NAME, name), List.of());
-  }
-
-  /** {@code lock_no = 1} の、item_code のない行を作る。 */
-  private void insertItem(final long itemId, final String name) {
-    insertItem(itemId, name, null);
-  }
-
-  /** {@code lock_no = 1} の行を作る。 */
-  private void insertItem(final long itemId, final String name, final @Nullable String code) {
-    ScopedValue.where(PgmCdAspect.PGM_CD, SEED_PGM_CD)
-        .run(() ->
-            dsl.insertInto(FIXTURE_ITEM)
-                .set(seedColumns.forInsert(FIXTURE_ITEM))
-                .set(FIXTURE_ITEM.ITEM_ID, itemId)
-                .set(FIXTURE_ITEM.ITEM_NAME, name)
-                .set(FIXTURE_ITEM.ITEM_CODE, code)
-                .execute());
-  }
-
-  /** {@code lock_no = 1} の子の行を作る。 */
-  private void insertDetail(final long itemId, final int detailNo, final String text) {
-    ScopedValue.where(PgmCdAspect.PGM_CD, SEED_PGM_CD)
-        .run(() ->
-            dsl.insertInto(FIXTURE_ITEM_DETAIL)
-                .set(seedColumns.forInsert(FIXTURE_ITEM_DETAIL))
-                .set(FIXTURE_ITEM_DETAIL.ITEM_ID, itemId)
-                .set(FIXTURE_ITEM_DETAIL.DETAIL_NO, detailNo)
-                .set(FIXTURE_ITEM_DETAIL.DETAIL_TEXT, text)
-                .execute());
   }
 
   /** 別の人が先に更新した状態にする（版を 2 にする）。 */

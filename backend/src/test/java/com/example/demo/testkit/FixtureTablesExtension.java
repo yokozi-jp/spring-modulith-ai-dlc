@@ -1,6 +1,7 @@
 package com.example.demo.testkit;
 
 import static com.example.demo.jooq.tables.FixtureIdempotencyKeyTable.FIXTURE_IDEMPOTENCY_KEY;
+import static com.example.demo.jooq.tables.FixtureItemDetailArchiveTable.FIXTURE_ITEM_DETAIL_ARCHIVE;
 import static com.example.demo.jooq.tables.FixtureItemDetailTable.FIXTURE_ITEM_DETAIL;
 import static com.example.demo.jooq.tables.FixtureItemTable.FIXTURE_ITEM;
 
@@ -10,6 +11,7 @@ import org.jooq.DSLContext;
 import org.jooq.Name;
 import org.jooq.SQLDialect;
 import org.jooq.impl.DSL;
+import org.jooq.impl.SQLDataType;
 import org.junit.jupiter.api.extension.AfterAllCallback;
 import org.junit.jupiter.api.extension.BeforeAllCallback;
 import org.junit.jupiter.api.extension.ExtensionContext;
@@ -48,6 +50,11 @@ public final class FixtureTablesExtension implements BeforeAllCallback, AfterAll
           dsl.createTable(FIXTURE_ITEM_DETAIL)
               .columns(FIXTURE_ITEM_DETAIL.fields())
               .primaryKey(FIXTURE_ITEM_DETAIL.ITEM_ID, FIXTURE_ITEM_DETAIL.DETAIL_NO)
+              .execute();
+          dsl.createTable(FIXTURE_ITEM_DETAIL_ARCHIVE)
+              .column(DSL.name("archive_id"), SQLDataType.BIGINT.generatedAlwaysAsIdentity())
+              .columns(FIXTURE_ITEM_DETAIL_ARCHIVE.fields())
+              .primaryKey(DSL.name("archive_id"))
               .execute();
           dsl.createTable(FIXTURE_IDEMPOTENCY_KEY)
               .columns(FIXTURE_IDEMPOTENCY_KEY.fields())

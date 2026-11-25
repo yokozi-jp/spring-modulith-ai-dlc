@@ -28,6 +28,9 @@ final class SchemaTableConventions {
   /** 主キーの規約の文書。 */
   private static final String PRIMARY_KEYS_DOC = "docs/database/postgresql-primary-keys.md";
 
+  /** 履歴の表（{@code h_}）が、退避した処理の trace ID を持つ列。共通カラムの {@code created_tx_id} と同じく、行を指さない（ADR-131）。 */
+  private static final String ARCHIVED_TX_ID = "archived_tx_id";
+
   /** 禁止する制約の{@code contype}と、規則の記号と内容。PG18の{@code n}（NOT NULL）は含めない。 */
   private static final Map<String, Map.Entry<String, String>> BANNED_CONSTRAINTS =
       Map.of(
@@ -176,6 +179,8 @@ final class SchemaTableConventions {
     }
     return !column.endsWith("_id")
         || ChangesetCommonColumnRules.COMMON_COLUMN_NAMES.contains(column)
+        || (ARCHIVED_TX_ID.equals(column)
+            && row.table().startsWith(ArchiveDeclarationConventions.PREFIX))
         || primaryKeys.contains(row.schema() + "." + column);
   }
 

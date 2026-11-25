@@ -1,5 +1,6 @@
 package com.example.demo.shared.persistence;
 
+import static com.example.demo.jooq.tables.FixtureItemDetailArchiveTable.FIXTURE_ITEM_DETAIL_ARCHIVE;
 import static com.example.demo.jooq.tables.FixtureItemDetailTable.FIXTURE_ITEM_DETAIL;
 import static com.example.demo.jooq.tables.FixtureItemTable.FIXTURE_ITEM;
 import static com.example.demo.shared.persistence.FixtureAggregates.DETAILS;
@@ -107,6 +108,7 @@ class TableWriterConcurrencyTest {
       connection.setAutoCommit(true);
       final DSLContext autoCommit = DSL.using(connection, SQLDialect.POSTGRES);
       autoCommit.deleteFrom(FIXTURE_ITEM_DETAIL).execute();
+      autoCommit.deleteFrom(FIXTURE_ITEM_DETAIL_ARCHIVE).execute();
       autoCommit.deleteFrom(FIXTURE_ITEM).execute();
     }
   }
