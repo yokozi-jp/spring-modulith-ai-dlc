@@ -77,9 +77,6 @@ class EventPublicationResubmitterOutcomesTest {
   /** 設定値。 */
   @Autowired private EventPublicationResubmissionConfig.Properties properties;
 
-  /** 再投入の回数の上限。 */
-  @Autowired private EventPublicationResubmissionConfig.AbandonProperties abandon;
-
   /** 差し替えられる時計。 */
   @Autowired private MutableClock clock;
 
@@ -171,7 +168,6 @@ class EventPublicationResubmitterOutcomesTest {
             properties,
             policies,
             meterRegistry,
-            abandon,
             ResubmissionTestSupport.noStaleCheck());
 
     resubmitter.resubmitOnce();
@@ -305,7 +301,6 @@ class EventPublicationResubmitterOutcomesTest {
             properties,
             policies,
             otherRegistry,
-            abandon,
             ResubmissionTestSupport.noStaleCheck());
     first.resubmitOnce();
     complete(id);
@@ -370,7 +365,6 @@ class EventPublicationResubmitterOutcomesTest {
         jobProperties,
         policies,
         meterRegistry,
-        abandon,
         ResubmissionTestSupport.noStaleCheck());
   }
 
@@ -384,7 +378,6 @@ class EventPublicationResubmitterOutcomesTest {
         properties,
         policies,
         jobMeterRegistry,
-        abandon,
         registry);
   }
 

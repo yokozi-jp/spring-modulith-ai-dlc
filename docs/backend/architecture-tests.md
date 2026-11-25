@@ -50,11 +50,11 @@ jOOQの生成物の`com.example.demo.jooq`はOPENのモジュールであり、`
 規則名は`@ArchTest`のフィールド名であり、テスト結果にもこの名前で出る。
 
 - `dependenciesPointInward`：`domain.model`、`domain.service`、モジュールルートと`application`、`presentation`、`infrastructure.persistence`、`infrastructure.client`のオニオン構造で依存を内向きに限り、どの層にも属さないパッケージのクラスを拒否する。
-  ベースパッケージ直下と、どの層からも使える`shared`のパッケージ（後述の`sharedModuleIsUsedOnlyByPersistenceAdapters`）は、所属検査から除く。
+  ベースパッケージ直下と`shared`は、所属検査から除く。`shared.persistence`と`shared.eventresubmission`は、`infrastructure.persistence`と同じ層として検査される。
 - `infrastructureDependsOnlyOnDomainModel`：`infrastructure`は`application`、`domain.service`、モジュールルートの型に依存せず、機能モジュールの型のうち`domain.model`だけを使う。
-- `sharedModuleIsUsedOnlyByPersistenceAdapters`：`shared`の外で、どの層からも使える`shared`のパッケージ以外の`shared`の型に依存するクラスは、`infrastructure.persistence`に置く。
-  `shared`の中の依存は対象にしない。
-  どの層からも使えるパッケージの一覧は、`PackageByFeatureOnionArchitectureTest`の`ANY_LAYER_SHARED_PACKAGES`が持つ。この規則と`dependenciesPointInward`の所属検査の除外が、そこから組み立てる（[ADR-048](../adr/ADR-048-add-shared-module-for-jooq-common-code.md)、[ADR-062](../adr/ADR-062-map-business-exceptions-to-404-409-422.md)、[ADR-079](../adr/ADR-079-resubmit-failed-event-publications-periodically-with-shedlock.md)、[ADR-096](../adr/ADR-096-require-app-user-principal-for-audit-columns.md)、[ADR-105](../adr/ADR-105-bind-tenant-to-request-and-event-context.md)）。
+- `sharedModuleIsUsedOnlyByPersistenceAdapters`：`shared`の外で、`shared.persistence`と`shared.eventresubmission`の型に依存するクラスは、`infrastructure.persistence`に置く。
+  この規則が使う場所を限るのは、この2つである。使う場所を限る`shared`のパッケージの方針は[共有モジュール shared](shared-module.md)に従い、`shared.batch`の制限は[#667](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/667)で足す。
+  `shared`の中の依存は対象にしない（[ADR-048](../adr/ADR-048-add-shared-module-for-jooq-common-code.md)）。
 - `httpTypesAreNotUsedByInnerLayers`：`shared`と各モジュールの`domain`、`application`、`infrastructure.persistence`は、Spring Web、Springの HTTP、Servletの型に依存しない。HTTPの型を使うのは`presentation.web`、`infrastructure.client`、ベースパッケージ直下の設定に限る意図だが、規則が検査するのは上の4つのパッケージである。
 - `httpErrorsAreMappedOnlyInErrorPresentationWeb`：`error.presentation.web`の外のクラスは、`ProblemDetail`、`ErrorResponse`（入れ子の`Builder`と`Interceptor`を含む）、`ErrorResponseException`、`ResponseStatusException`、`@ExceptionHandler`、`@ControllerAdvice`、`@RestControllerAdvice`、`@ResponseStatus`に依存せず、`HttpStatus.CONFLICT`と`HttpStatus.UNPROCESSABLE_CONTENT`を読まない（[ADR-062](../adr/ADR-062-map-business-exceptions-to-404-409-422.md)）。
   注釈を付けることも依存に数え、成功の応答の`@ResponseStatus(HttpStatus.CREATED)`も拒否する。

@@ -170,6 +170,8 @@ pre-commit:
         - "README.md"
         - "tooling/adr-lint/**"
         - "tooling/removed-names/**"
+        - "tooling/readme-versions/**"
+        - "backend/build.gradle"
         - ".kiro/settings/mcp.json"
         - "tooling/iwe-mcp/**"
         - "tooling/iwe-tools/**"
@@ -213,6 +215,20 @@ pre-commit:
         echo "{staged_files}" >/dev/null
         task test-slot-test
       fail_text: "test-slot の自己検査に失敗しました。task test-slot-test で再実行してください。"
+
+    # 本番の Java、DB の SQL と YAML、検査にステージ済み変更があるとき、本番のコードの SQL を検査する（task lint-session-sql、task lint-db-clock）。
+    # Gradle を使わず、be-lint の glob には db の SQL と YAML が入らないため、be-lint とは別に pre-commit で流す。
+    - name: lint-backend-sql
+      glob:
+        - "backend/src/main/java/**"
+        - "backend/src/main/resources/db/**"
+        - "tooling/session-sql-lint/**"
+        - "tooling/db-clock-lint/**"
+      run: |
+        echo "{staged_files}" >/dev/null
+        task lint-session-sql
+        task lint-db-clock
+      fail_text: "本番のコードの SQL の検査に失敗しました。task lint-session-sql と task lint-db-clock で再実行してください。"
 
     # check.sh か自己検査にステージ済み変更があるとき、一時の git リポジトリで自己検査する（task test-weakening-test）。
     - name: test-weakening-test
@@ -342,21 +358,7 @@ pre-push:
         echo "{files}" >/dev/null
         cd backend && ./gradlew spotlessCheck pmdMain pmdTest spotbugsMain spotbugsTest
 
-    # backend に変更がある push のときだけテスト実行（カバレッジ検証含む）
-    # 開発用 .env / 開発 DB には触れず、task test で実行する。rollback の検証は compose-test の PostgreSQL、
-    # テストはテストの JVM ごとに起動するコンテナを使う（ADR-085）。
-    # Docker を使えない環境ではスキップ（最終担保は CI に任せる）。
-    - name: be-test
-      # lefthook の既定の照合では ** が 1 階層以上にしか一致しないため、backend 直下の build.gradle と
-      # settings.gradle を別のパターンで拾う。
-      glob:
-        - "backend/*.gradle"
-        - "backend/**/*.{java,gradle}"
-      files: *push-files
-      run: |
-        task docker-available || exit 0
-        echo "{files}" >/dev/null
-        task test
+    # バックエンドの全体のテスト（task test）は pre-push で実行しない。Backend CI が同じ検査を流す（ADR-128）。
 
     # GitHub Actions のワークフローか composite action に変更がある push のときだけ Lint（actionlint）
     # glob を効かせるため run 内で {files} を参照する。

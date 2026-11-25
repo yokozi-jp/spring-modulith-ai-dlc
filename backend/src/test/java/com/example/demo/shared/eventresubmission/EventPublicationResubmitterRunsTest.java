@@ -74,9 +74,6 @@ class EventPublicationResubmitterRunsTest {
   /** 設定値。 */
   @Autowired private EventPublicationResubmissionConfig.Properties properties;
 
-  /** 再投入の回数の上限。 */
-  @Autowired private EventPublicationResubmissionConfig.AbandonProperties abandon;
-
   /** 差し替えられる時計。 */
   @Autowired private MutableClock clock;
 
@@ -196,7 +193,6 @@ class EventPublicationResubmitterRunsTest {
             properties,
             policies,
             meterRegistry,
-            abandon,
             ResubmissionTestSupport.noStaleCheck());
     final Supplier<Double> exhaustedGauge =
         () ->
@@ -228,7 +224,6 @@ class EventPublicationResubmitterRunsTest {
         properties,
         policies,
         meterRegistry,
-        abandon,
         ResubmissionTestSupport.noStaleCheck());
   }
 

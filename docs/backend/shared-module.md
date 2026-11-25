@@ -41,10 +41,12 @@ tags: [architecture, backend, spring-modulith, shared-module]
   ヘッダーから `IdempotencyKey` の引数を作る resolver は、HTTP の型を使うため、ベースパッケージ直下の `IdempotencyKeyConfig` に置く。
 - 業務の概念を置かない。
   ルートのパッケージには `package-info.java` だけを置く。
-- `shared.persistence` を使ってよいのは、他のモジュールの `infrastructure.persistence` だけである。
-  `shared.eventresubmission` は `shared.persistence` と同じ層として扱う。`shared` に `infrastructure` のパッケージは置かない。
-  `shared.batch` を使ってよいのは、機能モジュールの `batch` だけである。
-  `shared.concurrency`、`shared.failure`、`shared.events`、`shared.idempotency`、`shared.security`、`shared.tenancy`、`shared.validation` は、どの層からも使える。
+- 使う場所を限る `shared` のパッケージは、次の 3 つだけである。
+  - `shared.persistence`：他のモジュールの `infrastructure.persistence` だけが使ってよい。
+  - `shared.eventresubmission`：`shared.persistence` と同じ層として扱う。`shared` に `infrastructure` のパッケージは置かない。
+  - `shared.batch`：機能モジュールの `batch` だけが使ってよい。
+- ほかの `shared` のパッケージ（`concurrency`、`failure`、`events`、`idempotency`、`security`、`tenancy`、`validation`）は、どの層からも使える。
+  使う場所を限る必要が出たときだけ、パッケージを ArchUnit の規則へ足す。
   ただし `domain.model` と `domain.service` が使える `shared` の型は許可リストに限る（[ArchUnit の規則](architecture-tests.md)）。
 
 使う場所の制限は、`PackageByFeatureOnionArchitectureTest` の `sharedModuleIsUsedOnlyByPersistenceAdapters` が検査する。

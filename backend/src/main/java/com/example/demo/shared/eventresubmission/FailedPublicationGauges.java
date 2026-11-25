@@ -13,6 +13,7 @@ import java.util.concurrent.atomic.AtomicLong;
 import lombok.extern.slf4j.Slf4j;
 import org.jooq.Condition;
 import org.jooq.DSLContext;
+import org.jooq.Field;
 import org.jooq.Records;
 import org.jooq.impl.DSL;
 import org.jspecify.annotations.Nullable;
@@ -34,8 +35,8 @@ final class FailedPublicationGauges {
   /** Spring Boot が構成した jOOQ。 */
   private final DSLContext dsl;
 
-  /** 再投入の回数の上限。 */
-  private final EventPublicationResubmissionConfig.AbandonProperties abandon;
+  /** リスナーごとの再投入の回数の上限。 */
+  private final ResubmissionPolicies policies;
 
   /** 自動の再投入を待つ FAILED の出版。 */
   private final StateGauges retrying;
@@ -49,9 +50,9 @@ final class FailedPublicationGauges {
   /* package */ FailedPublicationGauges(
       final DSLContext dsl,
       final MeterRegistry meterRegistry,
-      final EventPublicationResubmissionConfig.AbandonProperties abandon) {
+      final ResubmissionPolicies policies) {
     this.dsl = dsl;
-    this.abandon = abandon;
+    this.policies = policies;
     this.retrying = StateGauges.register(meterRegistry, "retrying");
     this.overLimit = StateGauges.register(meterRegistry, "over-limit");
     this.exhausted = StateGauges.register(meterRegistry, "exhausted");
@@ -91,9 +92,9 @@ final class FailedPublicationGauges {
 
   /** FAILED の出版を、1 つの文で回数の上限の内と外に分けて数える。 */
   private FailedCounts countFailed() {
-    // AbandonProperties.exceeded と同じ規則。Spring Modulith と同じく、空の completion_attempts は 0 と読む。
+    // ResubmissionPolicies.isDue と同じ規則。Spring Modulith と同じく、空の completion_attempts は 0 と読む。
     final Condition overLimitRow =
-        DSL.coalesce(EVENT_PUBLICATION.COMPLETION_ATTEMPTS, 0).gt(abandon.abandonAfterAttempts());
+        DSL.coalesce(EVENT_PUBLICATION.COMPLETION_ATTEMPTS, 0).gt(maxResubmissionsOfRow());
     return dsl.select(
             DSL.count().filterWhere(DSL.not(overLimitRow)),
             DSL.min(EVENT_PUBLICATION.PUBLICATION_DATE).filterWhere(DSL.not(overLimitRow)),
@@ -102,6 +103,15 @@ final class FailedPublicationGauges {
         .from(EVENT_PUBLICATION)
         .where(EVENT_PUBLICATION.STATUS.eq(EventPublication.Status.FAILED.name()))
         .fetchSingle(Records.mapping(FailedCounts::new));
+  }
+
+  /** 行のリスナーの、自動で再投入する回数の上限。既定と違うリスナーだけを CASE に並べる。 */
+  private Field<Integer> maxResubmissionsOfRow() {
+    final ResubmissionPolicies.MaxResubmissions max = policies.maxResubmissionsByListener();
+    final Field<Integer> otherwise = DSL.val(max.otherwise());
+    return max.byListener().isEmpty()
+        ? otherwise
+        : DSL.case_(EVENT_PUBLICATION.LISTENER_ID).mapValues(max.byListener()).else_(otherwise);
   }
 
   /**

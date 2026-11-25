@@ -68,8 +68,7 @@ class EventPublicationResubmitter {
       final ResubmissionPolicies policies,
       final Clock clock,
       final MeterRegistry meterRegistry,
-      final EventPublicationResubmissionConfig.Properties properties,
-      final EventPublicationResubmissionConfig.AbandonProperties abandon) {
+      final EventPublicationResubmissionConfig.Properties properties) {
     this.sweep = sweep;
     this.policies = policies;
     this.clock = clock;
@@ -82,7 +81,7 @@ class EventPublicationResubmitter {
         Counter.builder("event.publication.resubmissions")
             .description("再投入した（RESUBMITTED に進んだ）出版の数")
             .register(meterRegistry);
-    this.gauges = new FailedPublicationGauges(dsl, meterRegistry, abandon);
+    this.gauges = new FailedPublicationGauges(dsl, meterRegistry, policies);
   }
 
   private static Counter runs(final MeterRegistry meterRegistry, final String outcome) {
