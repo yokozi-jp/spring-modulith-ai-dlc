@@ -152,9 +152,9 @@ import org.springframework.transaction.support.TransactionOperations;
           : Optional.of(Kind.PUBLICATION_NOT_COMPLETED);
     }
 
-    /** {@code start} からの変化の説明。 */
+    /** 違反の説明の末尾に付ける、{@code start} からの変化の欄。 */
     /* package */ String describeSince(final Publications start) {
-      return "completed+"
+      return ", registry=completed+"
           + completedSince(start)
           + ", failed+"
           + failedSince(start)

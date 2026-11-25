@@ -27,8 +27,8 @@ import org.springframework.stereotype.Component;
  * も受け取らず、ルートの条件、版の条件、子の外部キーの条件は、宣言から {@code TableWriter} が作る。
  *
  * <p>{@link #update} は、ルートの行を {@code 一意の列 AND lock_no = 期待値}
- * で更新して版を進める。ルートの行ロックの下で、子を差分（削除、更新、追加）で書く。{@link #insert} は、ルートを書いてから子を複数行の INSERT で書く。宣言の {@link
- * AggregateTable#duplicateKey} の衝突は例外にせず、入れなかったことを返す。ルートの内部の主キーは {@code RETURNING}
+ * で更新して版を進める。ルートの行ロックの下で、子を差分（削除、更新、追加）で書く。{@link #insert} は、ルートを書いてから子を複数行の INSERT で書く。{@link
+ * AggregateTable#ofIdempotentOn} で宣言した重複を許す列の衝突は例外にせず、入れなかったことを返す。ルートの内部の主キーは {@code RETURNING}
  * で受けるため、Repository は読み直さない。
  *
  * <p>共通カラム、版の加算、件数の判定、{@code 55P03}（種類 {@code LOCK}）と {@code 23505}（種類 {@code UNIQUE}）の {@link
@@ -63,8 +63,8 @@ public class TableWriter {
   /**
    * 集約を INSERT する。ルートを書き、子を複数行の INSERT で書く。
    *
-   * <p>宣言に {@link AggregateTable#duplicateKey} があれば、{@code INSERT ... ON CONFLICT (その列) DO NOTHING}
-   * で書く。同じ値の行を書いて未コミットのトランザクションがあれば、そのトランザクションの終わりまで待ち、コミットされれば何も書かずに {@code false}
+   * <p>{@link AggregateTable#ofIdempotentOn} で重複を許す列を宣言した集約は、{@code INSERT ... ON CONFLICT (その列) DO
+   * NOTHING} で書く。同じ値の行を書いて未コミットのトランザクションがあれば、そのトランザクションの終わりまで待ち、コミットされれば何も書かずに {@code false}
    * を返す。入れなかったときは子を書かない。
    *
    * <p>子を宣言していない集約は、{@code childRows} を省く。
@@ -73,12 +73,12 @@ public class TableWriter {
    * @param root 新しい集約ルート。ルートの一意の列の値は、宣言の {@code keyOf} で集約ルートから取る
    * @param rootColumns ルートの業務の列の値。ルートの一意の列と内部の主キーは書けない
    * @param childRows 宣言した子すべての行（{@link ChildTable#rows}）。空の子は空の一覧で作る
-   * @return 入れたら {@code true}、宣言の {@code duplicateKey} の衝突で入れなかったら {@code false}。{@code
-   *     duplicateKey} のない集約は常に {@code true}
+   * @return 入れたら {@code true}、重複を許す列の衝突で入れなかったら {@code false}。{@link AggregateTable#of} で宣言した集約は常に
+   *     {@code true}
    * @throws IllegalArgumentException 宣言した子を渡していない場合、宣言していない子か同じ子を二度渡した場合、書けない列を渡した場合
    * @throws IllegalStateException トランザクションが開いていない、または読み取り専用の場合
-   * @throws ConflictException {@code duplicateKey} 以外の一意制約に違反した場合（種類は {@code UNIQUE}）、行ロックを {@code
-   *     lock_timeout} までに取れない場合（種類は {@code LOCK}）。原因は持たない
+   * @throws ConflictException 重複を許す列以外の一意制約に違反した場合（種類は {@code UNIQUE}）、行ロックを {@code lock_timeout}
+   *     までに取れない場合（種類は {@code LOCK}）。原因は持たない
    */
   public <R extends Record, K, A extends Versioned> boolean insert(
       final AggregateTable<R, K, A> aggregate,
@@ -88,8 +88,11 @@ public class TableWriter {
     requireTransaction();
     final List<ChildRows<?>> rows = inDeclaredOrder(aggregate, Arrays.asList(childRows));
     final Optional<Long> id = insertRoot(aggregate, aggregate.keyOf(root), rootColumns);
-    id.ifPresent(inserted -> rows.forEach(childRow -> children.insertAll(inserted, childRow)));
-    return id.isPresent();
+    if (id.isEmpty()) {
+      return false;
+    }
+    rows.forEach(childRow -> children.insertAll(id.get(), childRow));
+    return true;
   }
 
   /**
@@ -171,7 +174,7 @@ public class TableWriter {
   /**
    * ルートを INSERT し、RETURNING で受けた内部の主キーを返す。
    *
-   * @return 内部の主キー。宣言の {@code duplicateKey} の衝突で入れなかったら空
+   * @return 内部の主キー。重複を許す列の衝突で入れなかったら空
    */
   private <R extends Record, K> Optional<Long> insertRoot(
       final AggregateTable<R, K, ?> aggregate,

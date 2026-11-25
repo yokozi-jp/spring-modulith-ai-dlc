@@ -14,6 +14,7 @@ import com.example.demo.payment.domain.model.PaymentStatus;
 import com.example.demo.shared.persistence.AggregateTable;
 import com.example.demo.shared.persistence.TableWriter;
 import java.time.Instant;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.jooq.DSLContext;
@@ -27,18 +28,14 @@ import org.springframework.stereotype.Repository;
 @Repository
 class JooqPaymentRepository implements PaymentRepository {
 
-  /**
-   * 決済記録の集約。ルートは公開 ID で一つに決める。同じ注文の 2 回目の決済記録は、入れずに処理済みとする。
-   *
-   * <p>{@code duplicateKey} を続けると {@code of} の型引数が推論されないため、ラムダの引数に型を書く。
-   */
+  /** 決済記録の集約。ルートは公開 ID で一つに決める。同じ注文の 2 回目の決済記録は、入れずに処理済みとする。 */
   private static final AggregateTable<TPaymentRecord, UUID, Payment> PAYMENT =
-      AggregateTable.of(
-              T_PAYMENT,
-              T_PAYMENT.PUBLIC_ID,
-              (Payment payment) -> payment.id().value(),
-              T_PAYMENT.PAYMENT_ID)
-          .duplicateKey(T_PAYMENT.TENANT_PUBLIC_ID, T_PAYMENT.ORDER_PUBLIC_ID);
+      AggregateTable.ofIdempotentOn(
+          T_PAYMENT,
+          T_PAYMENT.PUBLIC_ID,
+          payment -> payment.id().value(),
+          T_PAYMENT.PAYMENT_ID,
+          List.of(T_PAYMENT.TENANT_PUBLIC_ID, T_PAYMENT.ORDER_PUBLIC_ID));
 
   /** SQL を組み立てて実行する jOOQ のコンテキスト。 */
   private final DSLContext dsl;

@@ -34,12 +34,6 @@ import org.springframework.core.env.Environment;
    */
   /* package */ static final Duration CONTENTION_LIMIT = CommitGate.HOLD_LIMIT.minusSeconds(2);
 
-  /** 違反の説明の、出版の状態の欄。 */
-  private static final String REGISTRY = ", registry=";
-
-  /** 違反の説明の、2 回目の競合の欄。 */
-  private static final String SECOND = " (second delivery ";
-
   /** 同時の 2 回で届ける配信の数。 */
   private static final int TWO = 2;
 
@@ -105,9 +99,9 @@ import org.springframework.core.env.Environment;
       this.description = description;
     }
 
-    @Override
-    public String toString() {
-      return description;
+    /** 違反の説明に添える、2 回目の競合の欄。 */
+    private String asSecondDelivery() {
+      return " (second delivery " + description + ")";
     }
   }
 
@@ -146,15 +140,13 @@ import org.springframework.core.env.Environment;
               state -> hold.arrivals() > 0 || state.settledSince(start) > 0);
       if (hold.arrivals() == 0) {
         return List.of(
-            new Violation(
-                listener,
+            violation(
                 Kind.FIRST_NOT_HELD,
                 "the first delivery did not stop before its commit: outsideTransaction="
                     + hold.outsideTransaction()
                     + ", failures="
-                    + hold.failures()
-                    + REGISTRY
-                    + first.describeSince(start)));
+                    + hold.failures(),
+                first));
       }
       final Set<ExternalCall> once = calls.distinct();
       registry.publish(event);
@@ -165,14 +157,17 @@ import org.springframework.core.env.Environment;
           .map(second -> commitBothAndCompare(once, second))
           .orElseGet(() ->
               List.of(
-                  new Violation(
-                      listener,
+                  violation(
                       Kind.SECOND_NOT_CONTENDED,
                       "the second delivery neither waited for a lock, reached the commit gate, nor"
                           + " failed within "
-                          + CONTENTION_LIMIT
-                          + REGISTRY
-                          + contended.describeSince(start))));
+                          + CONTENTION_LIMIT,
+                      contended)));
+    }
+
+    /** 1 回目の前からの出版の状態の変化を添えた違反を作る。 */
+    private Violation violation(final Kind kind, final String what, final Publications state) {
+      return new Violation(listener, kind, what + state.describeSince(start));
     }
 
     private Optional<Contention> contention(final Publications now) {
@@ -201,40 +196,29 @@ import org.springframework.core.env.Environment;
                       || (state.completedSince(start) > 0 && hold.arrivals() >= TWO));
       if (afterFirst.failedSince(start) > 0) {
         return List.of(
-            new Violation(
-                listener,
+            violation(
                 Kind.DELIVERY_FAILED,
                 "a delivery failed after the first was allowed to commit"
-                    + SECOND
-                    + second
-                    + "): failures="
-                    + hold.failures()
-                    + REGISTRY
-                    + afterFirst.describeSince(start)));
+                    + second.asSecondDelivery()
+                    + ": failures="
+                    + hold.failures(),
+                afterFirst));
       }
       if (afterFirst.completedSince(start) == 0) {
         return List.of(
-            new Violation(
-                listener,
+            violation(
                 Kind.PUBLICATION_NOT_COMPLETED,
                 "the first delivery did not complete after it was allowed to commit"
-                    + SECOND
-                    + second
-                    + ")"
-                    + REGISTRY
-                    + afterFirst.describeSince(start)));
+                    + second.asSecondDelivery(),
+                afterFirst));
       }
       if (hold.arrivals() < TWO) {
         return List.of(
-            new Violation(
-                listener,
+            violation(
                 Kind.SECOND_NOT_AT_COMMIT,
                 "the second delivery did not reach its commit after the first committed"
-                    + SECOND
-                    + second
-                    + ")"
-                    + REGISTRY
-                    + afterFirst.describeSince(start)));
+                    + second.asSecondDelivery(),
+                afterFirst));
       }
       final TableRows single = TableRows.read(environment);
       hold.releaseNext();
@@ -245,16 +229,13 @@ import org.springframework.core.env.Environment;
       return Stream.of(
               end.unsettledSince(start, TWO)
                   .map(kind ->
-                      new Violation(
-                          listener,
+                      violation(
                           kind,
                           "the second delivery did not complete after it was allowed to commit"
-                              + SECOND
-                              + second
-                              + "): failures="
-                              + hold.failures()
-                              + REGISTRY
-                              + end.describeSince(start))),
+                              + second.asSecondDelivery()
+                              + ": failures="
+                              + hold.failures(),
+                          end)),
               diff.map(rows ->
                   new Violation(
                       listener,
@@ -262,9 +243,8 @@ import org.springframework.core.env.Environment;
                       "event="
                           + event
                           + " changed rows after the first delivery had committed"
-                          + SECOND
-                          + second
-                          + "):"
+                          + second.asSecondDelivery()
+                          + ":"
                           + rows)),
               Violation.when(
                   !once.equals(twice),

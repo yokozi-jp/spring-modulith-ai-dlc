@@ -1,18 +1,23 @@
 package com.example.demo.persistence.conventions;
 
 import com.example.demo.persistence.conventions.CatalogSnapshot.ConstraintRow;
+import com.example.demo.persistence.conventions.CatalogSnapshot.IndexRow;
 import com.example.demo.shared.persistence.DeclaredAggregate;
 import com.example.demo.shared.persistence.DeclaredAggregate.DeclaredChild;
 import java.util.List;
 import java.util.Set;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 /**
- * 集約の宣言を、DBの外部キーと突き合わせる。
+ * 集約の宣言を、DBの外部キーと一意索引と突き合わせる。
  *
  * <p>子だけの更新が親の{@code lock_no}を進めるのは、{@code
  * TableWriter}が子を親の集約の中でだけ書くからである。子のテーブルを、親の子として宣言し忘れると、その子だけを更新する Repositoryは親の{@code
  * lock_no}を進めない（ADR-054）。同じモジュールの表どうしには外部キーを置く規約があるため、外部キーから親子の関係を読み、宣言と照らす。
+ *
+ * <p>重複を許す一意索引の列（{@code duplicateKey}）は、{@code ON CONFLICT (列)} の対象になる。列の組に合う一意索引がなければ、PostgreSQL は
+ * {@code 42P10} で INSERT を拒む。ルートを一つに決める一意の列を含む組は、公開 ID の採番の誤りによる衝突を、処理済みとして黙って捨てる（ADR-129）。
  */
 final class AggregateDeclarationConventions {
 
@@ -21,6 +26,12 @@ final class AggregateDeclarationConventions {
 
   /** 宣言した子の{@code parentKey}が、ルートへの外部キーの列に含まれない。 */
   /* package */ static final String WRONG_PARENT_KEY = "AG2";
+
+  /** 宣言した{@code duplicateKey}の列の組と一致する、述語と式のない一意索引がルートのテーブルにない。 */
+  /* package */ static final String UNBACKED_DUPLICATE_KEY = "AG3";
+
+  /** 宣言した{@code duplicateKey}が、ルートを一つに決める一意の列を含む。 */
+  /* package */ static final String DUPLICATE_KEY_WITH_ROOT_KEY = "AG4";
 
   /** 集約の宣言の許可リスト。対象は{@code 参照する表 -> 参照される表}。 */
   /* package */ static final List<AllowlistEntry> ALLOWLIST =
@@ -43,12 +54,14 @@ final class AggregateDeclarationConventions {
    *
    * @param aggregates 宣言した集約
    * @param constraints カタログの制約。外部キー以外と、業務の外のスキーマは読み飛ばす
+   * @param indexes カタログのインデックス
    * @param allowlist 許可リスト
    * @return 許可リストで抑止されなかった違反と、使われなかった許可リストの項目
    */
   /* package */ static List<ConventionViolation> check(
       final List<DeclaredAggregate> aggregates,
       final List<ConstraintRow> constraints,
+      final List<IndexRow> indexes,
       final List<AllowlistEntry> allowlist) {
     final List<ConstraintRow> foreignKeys =
         constraints.stream()
@@ -57,9 +70,12 @@ final class AggregateDeclarationConventions {
             .filter(row -> row.schema().equals(row.referencedSchema()))
             .toList();
     return AllowlistEntry.apply(
-        Stream.concat(
+        Stream.of(
                 undeclaredChildren(aggregates, foreignKeys),
-                wrongParentKeys(aggregates, foreignKeys))
+                wrongParentKeys(aggregates, foreignKeys),
+                unbackedDuplicateKeys(aggregates, indexes),
+                duplicateKeysWithRootKey(aggregates))
+            .flatMap(violations -> violations)
             .toList(),
         allowlist);
   }
@@ -71,7 +87,7 @@ final class AggregateDeclarationConventions {
             .flatMap(aggregate ->
                 aggregate.children().stream()
                     .map(child -> child.table() + " -> " + aggregate.root()))
-            .collect(java.util.stream.Collectors.toSet());
+            .collect(Collectors.toSet());
     return foreignKeys.stream()
         .map(row ->
             qualified(row.schema(), row.table())
@@ -98,6 +114,41 @@ final class AggregateDeclarationConventions {
                         WRONG_PARENT_KEY,
                         child.table() + "." + child.parentKey(),
                         aggregate.root() + " への外部キーの列を ChildTable の parentKey にする（" + DOC + "）。")));
+  }
+
+  private static Stream<ConventionViolation> unbackedDuplicateKeys(
+      final List<DeclaredAggregate> aggregates, final List<IndexRow> indexes) {
+    return aggregates.stream()
+        .filter(aggregate -> !aggregate.duplicateKey().isEmpty())
+        .filter(
+            aggregate -> indexes.stream().noneMatch(index -> backsDuplicateKey(aggregate, index)))
+        .map(aggregate ->
+            new ConventionViolation(
+                UNBACKED_DUPLICATE_KEY,
+                aggregate.root() + "(" + String.join(", ", aggregate.duplicateKey()) + ")",
+                "duplicateKey の列を、ルートのテーブルの述語と式のない一意索引の列とちょうど同じ組にする（" + DOC + "）。"));
+  }
+
+  /** {@code ON CONFLICT (列)} が推論に使う、列の集合がちょうど一致する、述語と式のない一意索引か。 */
+  private static boolean backsDuplicateKey(
+      final DeclaredAggregate aggregate, final IndexRow index) {
+    return index.unique()
+        && !index.hasPredicate()
+        && !index.hasExpressions()
+        && qualified(index.schema(), index.table()).equals(aggregate.root())
+        && index.keyColumns().size() == aggregate.duplicateKey().size()
+        && Set.copyOf(index.keyColumns()).equals(Set.copyOf(aggregate.duplicateKey()));
+  }
+
+  private static Stream<ConventionViolation> duplicateKeysWithRootKey(
+      final List<DeclaredAggregate> aggregates) {
+    return aggregates.stream()
+        .filter(aggregate -> aggregate.duplicateKey().contains(aggregate.key()))
+        .map(aggregate ->
+            new ConventionViolation(
+                DUPLICATE_KEY_WITH_ROOT_KEY,
+                aggregate.root() + "." + aggregate.key(),
+                "duplicateKey には、業務で同じ集約を表す列の一意索引を宣言し、ルートを一つに決める一意の列を含めない（" + DOC + "）。"));
   }
 
   private static boolean isForeignKeyColumn(

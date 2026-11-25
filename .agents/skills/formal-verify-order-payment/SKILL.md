@@ -111,7 +111,7 @@ git diff --name-only --diff-filter=A "$(sed -n 's/^同期コミット：`\([0-9a
 | `DSend`           | `PaymentGatewayClient.charge` の `POST /v1/charges`（`Idempotency-Key` は注文 ID）                                                                                                                 |
 | `GatewayDecide`   | 決済代行が冪等性キーの判定を決める（モデルの外の決済代行。ADR-072 の契約）                                                                                                                         |
 | `DReply`          | `PaymentGatewayClient.charge` の戻り値（`toOutcome`、`contractError`）か例外（タイムアウト、5xx、401、403、429）。例外なら、決済代行の判定によらず配信の見た結果を `TRANSIENT` にする             |
-| `DInsert`         | `Payment.record`、`JooqPaymentRepository.add` → `TableWriter.insert` の `INSERT ... ON CONFLICT (tenant_public_id, order_public_id) DO NOTHING`（宣言の `AggregateTable.duplicateKey`、`uk_2_t_payment`）とリスナーのトランザクションのコミット。開いたままのトランザクションの行とぶつかる INSERT はその終わりを待つため、INSERT とコミットを一つのステップにする。0 件なら `ChargeOrderCommandHandler.handle` が 1 回目の決済記録を読んで `AlreadyRecorded` を返し、リスナーは正常に終わる |
+| `DInsert`         | `Payment.record`、`JooqPaymentRepository.add` → `TableWriter.insert` の `INSERT ... ON CONFLICT (tenant_public_id, order_public_id) DO NOTHING`（`AggregateTable.ofIdempotentOn` の宣言、`uk_2_t_payment`）とリスナーのトランザクションのコミット。開いたままのトランザクションの行とぶつかる INSERT はその終わりを待つため、INSERT とコミットを一つのステップにする。0 件なら `ChargeOrderCommandHandler.handle` が 1 回目の決済記録を読んで `AlreadyRecorded` を返し、リスナーは正常に終わる |
 | `DMarkCompleted`  | `DefaultEventPublicationRegistry.markCompleted`（archive への写しと削除）                                                                                                                          |
 | `DMarkFailed`     | `DefaultEventPublicationRegistry.markFailed` → `markFailedOrAbandoned`。`PublicationsInProgress` のこの配信の登録は、ほかの配信が外さないため、必ず判断する。`AbandonPolicies` の既定が、渡された出版の `getCompletionAttempts()`（配信 `d` では `d - 1`、最初の配信では 1）を `abandon-after-attempts` と比べ、それ以上なら（`d = MaxDeliveries`）archive へ `ABANDONED` で移し、未満なら `status != 'FAILED'` の UPDATE を実行する |
 | `DCrash`          | 配信の途中のプロセスの停止。リスナーのトランザクションはロールバックする                                                                                                                           |
@@ -174,7 +174,7 @@ git diff --name-only --diff-filter=A "$(sed -n 's/^同期コミット：`\([0-9a
 
 同期コミット：`e4b52ee7cb70d32e6ca6062a7064d607b5f56074`（main。#551 の Pull Request の土台）
 
-#551 の Pull Request のコード（決済記録を `INSERT ... ON CONFLICT DO NOTHING` で入れ、0 件なら 1 回目の決済記録を返すようにした後）で、`ChargeOrderCommandHandler`、`PaymentRepository`、`JooqPaymentRepository`、`TableWriter.insert`、`AggregateTable.duplicateKey` を読み、対応表の `DReadPayment`、`DReply`、`DInsert` がモデルと一致することを確かめた。
+#551 の Pull Request のコード（決済記録を `INSERT ... ON CONFLICT DO NOTHING` で入れ、0 件なら 1 回目の決済記録を返すようにした後）で、`ChargeOrderCommandHandler`、`PaymentRepository`、`JooqPaymentRepository`、`TableWriter.insert`、`AggregateTable.ofIdempotentOn` を読み、対応表の `DReadPayment`、`DReply`、`DInsert` がモデルと一致することを確かめた。
 同時の 2 回目の INSERT は 1 回目のトランザクションの終わりを待ち、例外にならずに完了する。
 
 #562 の Pull Request のコード（回数の上限を `abandon-after-attempts` に任せた後）で、「変更がこの検証に関わるか」のファイルと対応表がモデルと一致することを確かめた。

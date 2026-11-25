@@ -20,9 +20,6 @@ import org.springframework.core.env.Environment;
  */
 /* package */ final class SequentialCheck {
 
-  /** 違反の説明の、出版の状態の欄。 */
-  private static final String REGISTRY = ", registry=";
-
   /** テナントを登録する jOOQ のコンテキスト。 */
   private final DSLContext dsl;
 
@@ -71,9 +68,7 @@ import org.springframework.core.env.Environment;
             .unsettledSince(start, 1)
             .map(kind ->
                 new Violation(
-                    listener,
-                    kind,
-                    "first delivery: event=" + event + REGISTRY + first.describeSince(start)));
+                    listener, kind, "first delivery: event=" + event + first.describeSince(start)));
     if (firstUnsettled.isPresent()) {
       return firstUnsettled.stream().toList();
     }
@@ -95,10 +90,7 @@ import org.springframework.core.env.Environment;
                     new Violation(
                         listener,
                         kind,
-                        "second delivery: event="
-                            + event
-                            + REGISTRY
-                            + second.describeSince(first))),
+                        "second delivery: event=" + event + second.describeSince(first))),
             secondDiff.map(diff ->
                 new Violation(
                     listener,

@@ -238,6 +238,7 @@ record CatalogSnapshot(
    * @param backsExclusionConstraint 排他制約のインデックスか
    * @param unique ユニークインデックスか
    * @param firstColumn 先頭のキーの列名。先頭が式なら{@code null}
+   * @param keyColumns キーの列名（{@code indkey}の順、INCLUDEの列を除く）。式の列は含まない
    */
   /* package */ record IndexRow(
       String schema,
@@ -251,7 +252,8 @@ record CatalogSnapshot(
       boolean hasPredicate,
       boolean backsExclusionConstraint,
       boolean unique,
-      @Nullable String firstColumn) {}
+      @Nullable String firstColumn,
+      List<String> keyColumns) {}
 
   /**
    * {@code pg_trigger}の1行。

@@ -1,7 +1,6 @@
 package com.example.demo.shared.persistence;
 
 import com.example.demo.shared.concurrency.Versioned;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.function.Function;
 import org.jooq.Record;
@@ -14,7 +13,7 @@ import org.jooq.TableField;
  * <p>集約ルートのテーブル、ルートを一つに決める一意の列（{@code public_id} など）と集約ルートからその値を取る関数、ルートの内部の主キー、子のテーブルを持つ。{@link
  * TableWriter} は、この宣言から版の条件と子の外部キーの条件を作るため、Repository は {@code Condition} を渡さない。
  *
- * <p>同じ集約の 2 回目の保存を処理済みとして正常に終える集約は、重複を許す一意索引の列を {@link #duplicateKey} で宣言する。{@link
+ * <p>同じ集約の 2 回目の保存を処理済みとして正常に終える集約は、重複を許す一意索引の列を {@link #ofIdempotentOn} で宣言する。{@link
  * TableWriter#insert} は、この列の衝突を例外にせず、入れなかったことを返す。
  *
  * <p>宣言は構造（重複を許す一意索引を含む）と、ルートを一つに決める値の取り方（{@code keyOf}）だけを持つ。業務の値から列への変換は、保存のたびの呼び出しのラムダが持つ。
@@ -51,7 +50,7 @@ public final class AggregateTable<R extends Record, K, A extends Versioned> {
       final Function<A, K> keyOf,
       final TableField<R, Long> id,
       final List<ChildTable<?>> children,
-      final List<TableField<R, ?>> duplicateKey) {
+      final List<? extends TableField<R, ?>> duplicateKey) {
     this.table = table;
     this.key = key;
     this.keyOf = keyOf;
@@ -82,22 +81,33 @@ public final class AggregateTable<R extends Record, K, A extends Versioned> {
   }
 
   /**
-   * 重複を許す一意索引の列を宣言した、新しい宣言を返す。この宣言は変えない。
+   * 同じ集約の 2 回目の保存を処理済みとする集約を宣言する。
    *
-   * <p>{@link TableWriter#insert} は {@code INSERT ... ON CONFLICT (列) DO NOTHING}
-   * で書き、この列の衝突では子を書かずに {@code false} を返す。ほかの一意制約の違反は、宣言のない集約と同じく {@code ConflictException} になる。
+   * <p>{@link TableWriter#insert} は {@code INSERT ... ON CONFLICT (duplicateKey の列) DO NOTHING}
+   * で書き、この列の衝突では子を書かずに {@code false} を返す。ほかの一意制約の違反は、{@link #of} の集約と同じく {@code ConflictException}
+   * になる。
    *
-   * @param firstColumn 一意索引の列
-   * @param moreColumns 一意索引が複数の列のときの残りの列。索引の列とちょうど同じ組にする（テナントの列を含む）
-   * @throws IllegalArgumentException 集約ルートのテーブルの列でない場合
+   * @param table 集約ルートのテーブル
+   * @param key ルートを一つに決める一意の列
+   * @param keyOf 集約ルートから {@code key} の値を取る
+   * @param id ルートの内部の主キー
+   * @param duplicateKey 重複を許す一意索引の列。述語と式のない一意索引の列とちょうど同じ組にし（テナントの列を含む）、{@code key} を含めない
+   * @param children 子のテーブル。なければ省く
+   * @throws IllegalArgumentException テーブルに共通カラムがない場合、{@code duplicateKey} が空の場合、集約ルートのテーブルの列でない場合
    */
-  @SafeVarargs
-  public final AggregateTable<R, K, A> duplicateKey(
-      final TableField<R, ?> firstColumn, final TableField<R, ?>... moreColumns) {
-    final List<TableField<R, ?>> columns = new ArrayList<>();
-    columns.add(firstColumn);
-    columns.addAll(List.of(moreColumns));
-    for (final TableField<R, ?> column : columns) {
+  public static <R extends Record, K, A extends Versioned> AggregateTable<R, K, A> ofIdempotentOn(
+      final Table<R> table,
+      final TableField<R, K> key,
+      final Function<A, K> keyOf,
+      final TableField<R, Long> id,
+      final List<? extends TableField<R, ?>> duplicateKey,
+      final ChildTable<?>... children) {
+    CommonColumns.requireAuditColumns(table);
+    if (duplicateKey.isEmpty()) {
+      throw new IllegalArgumentException(
+          "duplicate key must have one or more columns: table=" + table.getName());
+    }
+    for (final TableField<R, ?> column : duplicateKey) {
       if (!table.equals(column.getTable())) {
         throw new IllegalArgumentException(
             "duplicate key column must belong to the aggregate root table: table="
@@ -106,7 +116,7 @@ public final class AggregateTable<R extends Record, K, A extends Versioned> {
                 + column.getQualifiedName());
       }
     }
-    return new AggregateTable<>(table, key, keyOf, id, children, columns);
+    return new AggregateTable<>(table, key, keyOf, id, List.of(children), duplicateKey);
   }
 
   /* package */ Table<R> table() {

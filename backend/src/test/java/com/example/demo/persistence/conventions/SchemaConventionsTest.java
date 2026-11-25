@@ -198,10 +198,34 @@ class SchemaConventionsTest {
     void acceptsGistOnlyForExclusionConstraints() {
       final IndexRow exclusion =
           new IndexRow(
-              ITEM, TABLE, "ex_m_item", "gist", false, 2, 2, false, false, true, false, null);
+              ITEM,
+              TABLE,
+              "ex_m_item",
+              "gist",
+              false,
+              2,
+              2,
+              false,
+              false,
+              true,
+              false,
+              null,
+              List.of());
       final IndexRow plainGist =
           new IndexRow(
-              ITEM, TABLE, "idx_2_m_item", "gist", false, 1, 1, false, false, false, false, null);
+              ITEM,
+              TABLE,
+              "idx_2_m_item",
+              "gist",
+              false,
+              1,
+              1,
+              false,
+              false,
+              false,
+              false,
+              null,
+              List.of());
 
       assertThat(keys(SchemaTableConventions.indexes(List.of(exclusion, plainGist))))
           .containsExactly("K7 item.idx_2_m_item");
@@ -212,7 +236,19 @@ class SchemaConventionsTest {
     void rejectsExpressionIndexes() {
       final IndexRow row =
           new IndexRow(
-              ITEM, TABLE, "idx_1_m_item", BTREE, false, 1, 1, true, false, false, false, null);
+              ITEM,
+              TABLE,
+              "idx_1_m_item",
+              BTREE,
+              false,
+              1,
+              1,
+              true,
+              false,
+              false,
+              false,
+              null,
+              List.of());
 
       assertThat(keys(SchemaTableConventions.indexes(List.of(row))))
           .containsExactly("K8 item.idx_1_m_item");
@@ -223,7 +259,19 @@ class SchemaConventionsTest {
     void rejectsPartialAndIncludeIndexes() {
       final IndexRow partial =
           new IndexRow(
-              ITEM, TABLE, "idx_2_m_item", BTREE, false, 1, 1, false, true, false, false, null);
+              ITEM,
+              TABLE,
+              "idx_2_m_item",
+              BTREE,
+              false,
+              1,
+              1,
+              false,
+              true,
+              false,
+              false,
+              null,
+              List.of());
       final IndexRow include = index(ITEM, BTREE, false, 1, 2);
 
       assertThat(keys(SchemaTableConventions.indexes(List.of(partial, include))))
