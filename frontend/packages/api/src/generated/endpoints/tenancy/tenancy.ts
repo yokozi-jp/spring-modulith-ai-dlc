@@ -28,12 +28,14 @@ import type {
 import type {
   BadRequestProblemResponse,
   ChangeMemberRoleRequest,
+  ChangeTenantMemberRoleHeaders,
   ConflictProblemResponse,
   ForbiddenProblemResponse,
   InternalServerErrorProblemResponse,
   MembershipListResponse,
   MembershipResponse,
   NotFoundProblemResponse,
+  RemoveTenantMemberHeaders,
   RemoveTenantMemberParams,
   SelectTenantRequest,
   TenantMembersDetailsResponse,
@@ -623,13 +625,28 @@ export const getRemoveTenantMemberUrl = (userId: string,
  * @summary 所属している利用者を外す。
  */
 export const removeTenantMember = async (userId: string,
-    params: RemoveTenantMemberParams, options?: Parameters<typeof apiFetch>[1]): Promise<removeTenantMemberResponseSuccess> => {
+    params: RemoveTenantMemberParams,
+    headers: RemoveTenantMemberHeaders, options?: Parameters<typeof apiFetch>[1]): Promise<removeTenantMemberResponseSuccess> => {
 
-  return apiFetch<removeTenantMemberResponseSuccess>(getRemoveTenantMemberUrl(userId,params),
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return apiFetch<removeTenantMemberResponseSuccess>(getRemoveTenantMemberUrl(userId,params),
   {
     ...options,
-    method: 'DELETE'
-
+    method: 'DELETE',
+    headers: { ...headers, ...getHeaders(options?.headers) }
 
   }
 );}
@@ -655,9 +672,9 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
 
       const mutationFn: MutationFunction<Awaited<ReturnType<typeof removeTenantMember>>, RemoveTenantMemberMutationVariables> = (props) => {
-          const {userId,params} = props ?? {};
+          const {userId,params,headers} = props ?? {};
 
-          return  removeTenantMember(userId,params,requestOptions)
+          return  removeTenantMember(userId,params,headers,requestOptions)
         }
 
 
@@ -670,7 +687,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type RemoveTenantMemberMutationResult = NonNullable<Awaited<ReturnType<typeof removeTenantMember>>>
 
     export type RemoveTenantMemberMutationError = ErrorType<BadRequestProblemResponse | UnauthorizedProblemResponse | ForbiddenProblemResponse | NotFoundProblemResponse | ConflictProblemResponse | UnprocessableContentProblemResponse | InternalServerErrorProblemResponse>
-    export type RemoveTenantMemberMutationVariables = {userId: string;params: RemoveTenantMemberParams}
+    export type RemoveTenantMemberMutationVariables = {userId: string;params: RemoveTenantMemberParams;headers: RemoveTenantMemberHeaders}
 
     /**
  * @summary 所属している利用者を外す。
@@ -745,7 +762,8 @@ export const getChangeTenantMemberRoleUrl = (userId: string,) => {
  * @summary 所属している利用者の役割を変える。
  */
 export const changeTenantMemberRole = async (userId: string,
-    changeMemberRoleRequest: ChangeMemberRoleRequest, options?: Parameters<typeof apiFetch>[1]): Promise<changeTenantMemberRoleResponseSuccess> => {
+    changeMemberRoleRequest: ChangeMemberRoleRequest,
+    headers: ChangeTenantMemberRoleHeaders, options?: Parameters<typeof apiFetch>[1]): Promise<changeTenantMemberRoleResponseSuccess> => {
 
     const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
     if (!h) return {};
@@ -765,7 +783,7 @@ return apiFetch<changeTenantMemberRoleResponseSuccess>(getChangeTenantMemberRole
   {
     ...options,
     method: 'PUT',
-    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    headers: { 'Content-Type': 'application/json',...headers, ...getHeaders(options?.headers) },
     body: JSON.stringify(changeMemberRoleRequest)
   }
 );}
@@ -791,9 +809,9 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
 
       const mutationFn: MutationFunction<Awaited<ReturnType<typeof changeTenantMemberRole>>, ChangeTenantMemberRoleMutationVariables> = (props) => {
-          const {userId,data} = props ?? {};
+          const {userId,data,headers} = props ?? {};
 
-          return  changeTenantMemberRole(userId,data,requestOptions)
+          return  changeTenantMemberRole(userId,data,headers,requestOptions)
         }
 
 
@@ -806,7 +824,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type ChangeTenantMemberRoleMutationResult = NonNullable<Awaited<ReturnType<typeof changeTenantMemberRole>>>
     export type ChangeTenantMemberRoleMutationBody = ChangeMemberRoleRequest
     export type ChangeTenantMemberRoleMutationError = ErrorType<BadRequestProblemResponse | UnauthorizedProblemResponse | ForbiddenProblemResponse | NotFoundProblemResponse | ConflictProblemResponse | UnprocessableContentProblemResponse | InternalServerErrorProblemResponse>
-    export type ChangeTenantMemberRoleMutationVariables = {userId: string;data: ChangeMemberRoleRequest}
+    export type ChangeTenantMemberRoleMutationVariables = {userId: string;data: ChangeMemberRoleRequest;headers: ChangeTenantMemberRoleHeaders}
 
     /**
  * @summary 所属している利用者の役割を変える。

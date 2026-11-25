@@ -4,8 +4,10 @@
  */
 
 export * from './changeMemberRoleRequest.ts';
+export * from './changeTenantMemberRoleHeaders.ts';
 export * from './membershipListResponse.ts';
 export * from './membershipResponse.ts';
+export * from './removeTenantMemberHeaders.ts';
 export * from './removeTenantMemberParams.ts';
 export * from './selectTenantRequest.ts';
 export * from './tenantMemberResponse.ts';

@@ -37,6 +37,9 @@ React の state を使わない処理は Hook にせず、[feature の module](f
 
 - `export function use<用途>(...)` の関数宣言にし、ファイルに一つだけ export する。
 - mutation は `@frontend/api/endpoints/<tag>/<tag>` の生成の `use<Operation>()` で送る。
+- `Idempotency-Key` を求める mutation は、利用者が操作するたびに `idempotencyKeyHeaders()` を呼び、`mutate` の変数の `headers` に入れる（[ADR-126](../../adr/ADR-126-require-idempotency-key-on-all-non-safe-business-apis.md)）。
+  同じ値を送るのは、同じ変数で呼ばれる自動の再試行だけにする。
+  自動の再試行は [#540](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/540) の再試行の実装で入り、今の既定では mutation を再試行しない。
 - 画面遷移と通知は、`mutate` に渡す callback（`onSuccess`、`onError`）に置き、`useMutation` の options に置かない（[mutationの後のcache](../routing-and-state.md#mutationの後のcache)）。
 - 失敗の通知は、`@/lib/notice` の `failureNotice` か、feature の module の関数（`formFailure`）で作る。
   見出しは backend の `title` を使い、説明は操作ごとの catalog の文言にする（[更新の競合（409）の画面の扱い](../update-conflicts.md)）。
@@ -50,7 +53,7 @@ React の state を使わない処理は Hook にせず、[feature の module](f
 
 ## 依存してよいもの、してはいけないもの
 
-- **依存してよいもの**：`@frontend/api/endpoints/<tag>/<tag>` の生成 Hook、query options、query key、`@frontend/api/models` の型、`@tanstack/react-query`（`useSuspenseQuery`、`useQueryClient`）、`@tanstack/react-router` の `useNavigate`、`react` の `useState`、`react-i18next`、`@/lib/notice`、同じ feature の module と Hook。
+- **依存してよいもの**：`@frontend/api/endpoints/<tag>/<tag>` の生成 Hook、query options、query key、`@frontend/api/models` の型、`@frontend/api/idempotency-key` の `idempotencyKeyHeaders`、`@tanstack/react-query`（`useSuspenseQuery`、`useQueryClient`）、`@tanstack/react-router` の `useNavigate`、`react` の `useState`、`react-i18next`、`@/lib/notice`、同じ feature の module と Hook。
 - **依存してはいけないもの**：`@/routes/**` と `@/routeTree.gen`、他の feature、Base UI（`@base-ui/**`）、テスト用の部品、テレメトリの SDK、global の `fetch` と `XMLHttpRequest`、Effect（`useEffect`、`useLayoutEffect`、`useInsertionEffect`、`useEffectEvent`）。
 
 ## 最小の例と典型的な例
@@ -63,6 +66,7 @@ import {
   useChangeTenantMemberRole,
   useRemoveTenantMember,
 } from "@frontend/api/endpoints/tenancy/tenancy";
+import { idempotencyKeyHeaders } from "@frontend/api/idempotency-key";
 import { useTranslation } from "react-i18next";
 
 import { failureNotice } from "@/lib/notice";
@@ -100,13 +104,16 @@ export function useMemberActions(lockNo: number, setNotice: (notice: Notice | un
     handleChangeRole: (userId: string, role: string) => {
       setNotice(undefined);
       changeRole(
-        { userId, data: { role, lockNo } },
+        { userId, data: { role, lockNo }, headers: idempotencyKeyHeaders() },
         callbacks(t("tenancy.members.notice.roleChanged")),
       );
     },
     handleRemove: (userId: string) => {
       setNotice(undefined);
-      removeMember({ userId, params: { lockNo } }, callbacks(t("tenancy.members.notice.removed")));
+      removeMember(
+        { userId, params: { lockNo }, headers: idempotencyKeyHeaders() },
+        callbacks(t("tenancy.members.notice.removed")),
+      );
     },
   };
 }
@@ -198,6 +205,7 @@ Hook は、Hook を使う画面の component test で確かめ、Hook ごとの�
 - [ ] `useState` の戻り値を値と setter の組に分割代入する。［Oxlint で検査：react/hook-use-state］
 - [ ] Effect を使わない。［Oxlint で検査：react-rules/no-effect］
 - [ ] mutation を生成 Hook で送り、画面遷移と通知を `mutate` の callback に置く。［自分で点検］
+- [ ] 操作のたびに `idempotencyKeyHeaders()` で新しい `Idempotency-Key` を採る。［型検査で検査：生成した変数の型の必須の `headers`（値の採り方は自分で点検）］
 - [ ] 失敗の通知は `failureNotice` か feature の module の関数で作り、見出しを backend の `title` にする。［自分で点検］
 - [ ] 表示中の `lockNo` を送り、409 を自動で再送しない。［自分で点検］
 - [ ] 送信中の 2 回目を送らない。［自分で点検］

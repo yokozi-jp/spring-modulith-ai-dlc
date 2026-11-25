@@ -51,7 +51,7 @@ OpenAPIへのエラー応答の付け方は[OpenAPIのアノテーションとJa
   認証後にエンドポイントのないパスを指定すると、メソッドによらず404になる。
   Spring Securityが受け付ける7つのメソッド（DELETE、GET、HEAD、OPTIONS、PATCH、POST、PUT）以外は、405にも404にもならず400になる。
   OpenAPIには、405を今は書いていない。
-  `commonProblemResponses`が付けるのは、401、403、500と、入力を持つ操作の400である。
+  `OpenApiConfig`のcustomizerが付けるのは、401、403、500、入力を持つ操作の400、`Idempotency-Key`を求める操作の409である。
 - **409 Conflict**：楽観ロックの競合、悲観ロックの取得失敗、一意制約違反。
   `shared.concurrency`の`ConflictException`は、`ApiExceptionHandler`が競合の種類ごとのtypeの409にする。
 - **413 Content Too Large**：リクエストの本文が上限を超えた。ヘッダーの超過は、Tomcatが400を返す。
